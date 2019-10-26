@@ -204,7 +204,8 @@ TEST(Op, CumProd) {
 
 TEST(Op, CumSum) {
   auto I = Placeholder(PLAIDML_DATA_FLOAT32, {7, 7, 3, 64}, "I");
-  auto cumsum = op::cumsum(I, 2);
+  int axis = 2;
+  auto cumsum = op::cumsum(I, axis);
   IVLOG(1, "cumsum done");
   Program program("cumsum", {cumsum});
   IVLOG(1, program);
@@ -232,6 +233,92 @@ TEST(Op, Dot) {
   _X0
 ) {
   _X0[x0, x1, x2, x4, x5, x6 : 7, 7, 3, 7, 7, 64] = +(I[x0, x1, x2, x3] * K[x4, x5, x3, x6]);
+}
+)"));
+}
+
+TEST(Op, Elu) {
+  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {7, 7, 3, 64}, "I");
+  float alpha = 0.1;
+  auto elu = op::elu(I, alpha);
+  IVLOG(1, "elu done");
+  Program program("elu", {elu});
+  IVLOG(1, program);
+  EXPECT_THAT(program, Eq(R"(function (
+  I[I_0, I_1, I_2, I_3]
+) -> (
+  _X7
+) {
+  _X0 = 0;
+  _X1 = cmp_lt(I, _X0);
+  _X2 = 0.100000;
+  _X3 = exp(I);
+  _X4 = mul(_X2, _X3);
+  _X5 = 0.100000;
+  _X6 = sub(_X4, _X5);
+  _X7 = cond(_X1, _X6, I);
+}
+)"));
+}
+
+TEST(Op, ExpandDims) {
+  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {7, 7, 3, 64}, "I");
+  int axis = 2;
+  auto expand_dims = op::expand_dims(I, axis);
+  IVLOG(1, "expand_dims done");
+  Program program("expand_dims", {expand_dims});
+  IVLOG(1, program);
+  EXPECT_THAT(program, Eq(R"(function (
+  I[I_0, I_1, I_2, I_3]
+) -> (
+  _X0
+) {
+  _X0[n0, n1, a, n2, n3 : 7, 7, 1, 3, 64] = =(I[n0, n1, n2, n3]);
+}
+)"));
+}
+
+TEST(Op, Flip) {
+  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {7, 7, 3, 64}, "I");
+  int axis = 2;
+  auto flip = op::flip(I, axis);
+  IVLOG(1, "flip done");
+  Program program("flip", {flip});
+  IVLOG(1, program);
+  EXPECT_THAT(program, Eq(R"(function (
+  I[I_0, I_1, I_2, I_3]
+) -> (
+  _X0
+) {
+  _X0[x0, x1, 2 - x2, x3 : 7, 7, 3, 64] = =(I[x0, x1, x2, x3]);
+}
+)"));
+}
+
+TEST(Op, HardSigmoid) {
+  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {7, 7, 3, 64}, "I");
+  float slope = 2.0;
+  auto hard_sigmoid = op::hard_sigmoid(I, slope);
+  IVLOG(1, "hard_sigmoid done");
+  Program program("hard_sigmoid", {hard_sigmoid});
+  IVLOG(1, program);
+  EXPECT_THAT(program, Eq(R"(function (
+  I[I_0, I_1, I_2, I_3]
+) -> (
+  _X11
+) {
+  _X0 = -0.250000;
+  _X1 = cmp_lt(I, _X0);
+  _X2 = 0.000000;
+  _X3 = 0.250000;
+  _X4 = cmp_gt(I, _X3);
+  _X5 = 1.000000;
+  _X6 = 2.000000;
+  _X7 = mul(_X6, I);
+  _X8 = 0.500000;
+  _X9 = add(_X7, _X8);
+  _X10 = cond(_X4, _X5, _X9);
+  _X11 = cond(_X1, _X2, _X10);
 }
 )"));
 }
