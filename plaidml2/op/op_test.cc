@@ -295,34 +295,6 @@ TEST(Op, Flip) {
 )"));
 }
 
-TEST(Op, HardSigmoid) {
-  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {7, 7, 3, 64}, "I");
-  float slope = 2.0;
-  auto hard_sigmoid = op::hard_sigmoid(I, slope);
-  IVLOG(1, "hard_sigmoid done");
-  Program program("hard_sigmoid", {hard_sigmoid});
-  IVLOG(1, program);
-  EXPECT_THAT(program, Eq(R"(function (
-  I[I_0, I_1, I_2, I_3]
-) -> (
-  _X11
-) {
-  _X0 = -0.250000;
-  _X1 = cmp_lt(I, _X0);
-  _X2 = 0.000000;
-  _X3 = 0.250000;
-  _X4 = cmp_gt(I, _X3);
-  _X5 = 1.000000;
-  _X6 = 2.000000;
-  _X7 = mul(_X6, I);
-  _X8 = 0.500000;
-  _X9 = add(_X7, _X8);
-  _X10 = cond(_X4, _X5, _X9);
-  _X11 = cond(_X1, _X2, _X10);
-}
-)"));
-}
-
 TEST(Op, Max) {
   auto I = Placeholder(PLAIDML_DATA_FLOAT32, {1, 224, 224, 3}, "I");
   auto max = op::max(I);  // NOLINT(build/include_what_you_use)

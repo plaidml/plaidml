@@ -90,11 +90,6 @@ inline edsl::Tensor flip(const edsl::Tensor& I, int axis) {
   return details::op("flip", args).as_tensor();
 }
 
-inline edsl::Tensor hard_sigmoid(const edsl::Tensor& I, float slope) {
-  auto args = edsl::make_tuple(I, slope);
-  return details::op("hard_sigmoid", args).as_tensor();
-}
-
 inline edsl::Tensor max(const edsl::Tensor& I,  // NOLINT(build/include_what_you_use)
                         const edsl::Value& axes = edsl::None(), bool keepdims = false) {
   auto args = edsl::make_tuple(I, axes, keepdims);
