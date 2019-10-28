@@ -12,9 +12,7 @@
 #include "pmlc/dialect/eltwise/util.h"
 #include "pmlc/util/util.h"
 
-namespace pmlc {
-namespace dialect {
-namespace tile {
+namespace pmlc::dialect::tile {
 
 using eltwise::constFoldBinaryOp;
 using eltwise::constFoldUnaryOp;
@@ -113,8 +111,8 @@ struct AffineDomainFolder : public OpRewritePattern<AffineDomainOp> {
   PatternMatchResult matchAndRewrite(AffineDomainOp op, PatternRewriter& rewriter) const override {
     IVLOG(5, "AffineDomainFolder::matchAndRewrite>");
     auto terminator = op.body().front().getTerminator();
-    while (auto constraintOp = llvm::dyn_cast<ConstraintOp>(terminator)) {
-      terminator = constraintOp.body().front().getTerminator();
+    while (!llvm::isa<ContractionOp>(terminator)) {
+      terminator = terminator->getRegion(0).front().getTerminator();
     }
     auto size_map_op = llvm::dyn_cast<AffineSizeMapOp>(terminator->getOperand(0)->getDefiningOp());
     if (!size_map_op) {
@@ -428,6 +426,4 @@ Type ShapeOp::getResultType(ArrayRef<Value*> operands) {
 #define GET_OP_CLASSES
 #include "pmlc/dialect/tile/ops.cc.inc"
 
-}  // namespace tile
-}  // namespace dialect
-}  // namespace pmlc
+}  // namespace pmlc::dialect::tile

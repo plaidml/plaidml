@@ -13,9 +13,7 @@
 #include "pmlc/dialect/stripe/ops.h"
 #include "pmlc/dialect/tile/ops.h"
 
-namespace pmlc {
-namespace dialect {
-namespace tile {
+namespace pmlc::dialect::tile {
 
 namespace math = vertexai::tile::math;
 
@@ -48,7 +46,7 @@ struct Constraints {
 };
 
 struct Contraction {
-  explicit Contraction(ContractionOp op, llvm::ArrayRef<ConstraintOp> constraintOps);
+  Contraction(ContractionOp op, llvm::ArrayRef<ConstraintOp> constraintOps);
 
   std::tuple<IndexBounds, SimpleConstraints> ComputeBounds(llvm::ArrayRef<stripe::TensorType> shapes);
 
@@ -76,6 +74,4 @@ struct Contraction {
 
 math::Affine Integerize(const IndexPoly& poly, const IndexBounds& bounds);
 
-}  // namespace tile
-}  // namespace dialect
-}  // namespace pmlc
+}  // namespace pmlc::dialect::tile

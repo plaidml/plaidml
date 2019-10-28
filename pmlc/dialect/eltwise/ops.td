@@ -33,23 +33,14 @@ def ScalarConstantOp :
   let results = (outs Eltwise_AnyTensor:$result);
 
   let builders = [OpBuilder<
-    "Builder* builder, OperationState& result, ScalarType type, double value", [{
+    "Builder* builder, OperationState& result, Type type, double value", [{
       result.addAttribute("value", builder->getF32FloatAttr(value));
       result.addTypes(builder->getTensorType({}, type));
     }]
   >, OpBuilder<
-    "Builder* builder, OperationState& result, ScalarType type, int64_t value", [{
+    "Builder* builder, OperationState& result, Type type, int64_t value", [{
       result.addAttribute("value", builder->getI64IntegerAttr(value));
       result.addTypes(builder->getTensorType({}, type));
-    }]
-  >, OpBuilder<
-    "Builder* builder, OperationState& result, ScalarType type, Attribute value", [{
-      result.addAttribute("value", value);
-      result.addTypes(builder->getTensorType({}, type));
-    }]
-  >, OpBuilder<
-    "Builder* builder, OperationState& result, ScalarType type, ArrayRef<Value*> operands", [{
-      llvm_unreachable("unhandled transcoding");
     }]
   >];
 

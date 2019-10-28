@@ -15,6 +15,7 @@ def ContractionOpInterface : OpInterface<"ContractionOp"> {
     InterfaceMethod<"TODO", "unsigned", "getNumOperands">,
     InterfaceMethod<"TODO", "AggregationKind", "getAggregationKind">,
     InterfaceMethod<"TODO", "CombinationKind", "getCombinationKind">,
+    InterfaceMethod<"TODO", "Value*", "getInitializer">,
   ];
 }
 

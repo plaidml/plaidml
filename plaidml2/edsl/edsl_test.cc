@@ -11,8 +11,7 @@
 
 using ::testing::Eq;
 
-namespace plaidml {
-namespace edsl {
+namespace plaidml::edsl {
 
 bool operator==(const Program& lhs, const std::string& rhs) {  //
   return lhs.str() == rhs;
@@ -342,9 +341,6 @@ TEST(CppEdsl, RepeatElements) {
 }
 
 TEST(CppEdsl, UseDefault) {
-  if (vertexai::env::Get("PLAIDML_MLIR") == "1") {
-    FAIL() << "[MLIR] NYI: use_default";
-  }
   auto P = Placeholder(PLAIDML_DATA_FLOAT32, {1, 7, 10, 10});
   auto I = Placeholder(PLAIDML_DATA_FLOAT32, {1, 10, 10});
   TensorDim B, N1, N2;
@@ -714,5 +710,4 @@ TEST(CppEdsl, DupOut) {
 }
 
 }  // namespace
-}  // namespace edsl
-}  // namespace plaidml
+}  // namespace plaidml::edsl

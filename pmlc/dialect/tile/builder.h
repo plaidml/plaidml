@@ -15,9 +15,7 @@ class Value;
 class Operation;
 }  // namespace mlir
 
-namespace pmlc {
-namespace dialect {
-namespace tile {
+namespace pmlc::dialect::tile {
 
 using DataType = vertexai::tile::DataType;
 
@@ -96,6 +94,7 @@ class TileBuilder {
   mlir::Value* MakeConSumMulOp(llvm::ArrayRef<mlir::Value*> srcs, mlir::Value* sink, mlir::Value* sizes);
 
   void AddConstraint(mlir::Value* cion, mlir::Value* lhs, mlir::Value* rhs);
+  void SetUseDefault(mlir::Value* cion, mlir::Value* defaultValue);
 
   std::shared_ptr<TileProgram> MakeProgram(  //
       llvm::StringRef name,                  //
@@ -106,6 +105,4 @@ class TileBuilder {
   std::unique_ptr<Impl> impl;
 };
 
-}  // namespace tile
-}  // namespace dialect
-}  // namespace pmlc
+}  // namespace pmlc::dialect::tile
