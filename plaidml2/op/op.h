@@ -172,45 +172,36 @@ inline edsl::Tensor prod(const edsl::Tensor& I, const edsl::Value& axes = edsl::
   return details::op("prod", args).as_tensor();
 }
 
-class Relu {
+class relu {
  protected:
   edsl::Tensor I_;
-  edsl::Tensor alpha_ = edsl::None().as_tensor();
-  edsl::Tensor max_value_ = edsl::None().as_tensor();
+  edsl::Tensor alpha_;
+  edsl::Tensor max_value_;
   float threshold_ = 0.0;
 
  public:
-  explicit Relu(const edsl::Tensor& I) { I_ = I; }
-  void setAlpha(const edsl::Tensor& alpha) { alpha_ = alpha; }
-  void setMaxValue(const edsl::Tensor& max_value) { max_value_ = max_value; }
-  void setThreshold(float threshold) { threshold_ = threshold; }
-  edsl::Tensor create() {
+  explicit relu(const edsl::Tensor& I) { I_ = I; }
+
+  relu alpha(const edsl::Tensor& alpha) {
+    alpha_ = alpha;
+    return *this;
+  }
+
+  relu max_value(const edsl::Tensor& max_value) {
+    max_value_ = max_value;
+    return *this;
+  }
+
+  relu threshold(float threshold) {
+    threshold_ = threshold;
+    return *this;
+  }
+
+  edsl::Tensor operator()() {
     // actually make the relu from the op lib
     auto args = edsl::make_tuple(I_, alpha_, max_value_, threshold_);
     return details::op("relu", args).as_tensor();
   }
-};
-
-class relu : protected Relu {
- public:
-  explicit relu(const edsl::Tensor& I) : Relu(I) {}
-
-  relu& alpha(const edsl::Tensor& alpha_) {
-    setAlpha(alpha_);
-    return *this;
-  }
-
-  relu& max_value(const edsl::Tensor& max_value_) {
-    setMaxValue(max_value_);
-    return *this;
-  }
-
-  relu& threshold(float threshold_) {
-    setThreshold(threshold_);
-    return *this;
-  }
-
-  edsl::Tensor create() { return Relu::create(); }
 };
 
 inline edsl::Tensor repeat(const edsl::Tensor& I, int repeats, int axis) {
