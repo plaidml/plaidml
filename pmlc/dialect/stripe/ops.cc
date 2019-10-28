@@ -297,6 +297,7 @@ void AffinePolyOp::build(Builder* builder, OperationState& result, const AffineP
   result.addAttribute("coeffs", builder->getI64ArrayAttr(coeffs));
   result.addAttribute("offset", builder->getI64IntegerAttr(poly.constant));
   result.addTypes(builder->getType<AffineType>());
+  result.setOperandListToResizable();
 }
 
 static void printParallelForOp(OpAsmPrinter& p, ParallelForOp op) {  // NOLINT
