@@ -478,6 +478,20 @@ TEST(Op, Minimum) {
 )"));
 }
 
+TEST(Op, Pool) {
+  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20, 30, 40, 50}, "I");
+  Program program("pool", {op::pool(I, "sum", {1, 2, 3}, {1, 2, 3}, "none", {1, 2}, "nwc", true, true)});
+  IVLOG(1, program);
+  EXPECT_THAT(program, Eq(R"(function (
+  I[I_0, I_1, I_2, I_3, I_4]
+) -> (
+  _X0
+) {
+  _X0[x0, x1, x3, x5, x7 : 10, 22, 17, 14, 50] = +(I[x0, -1 + x1 + x2, -2 + 2*x3 + x4, 3*x5 + x6, x7]), x2 < 1, x4 < 2, x6 < 3;
+}
+)"));
+}
+
 TEST(Op, Prod) {
   auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "A");
   Program program("prod", {op::prod(A)});

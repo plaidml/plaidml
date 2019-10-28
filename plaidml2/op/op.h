@@ -173,6 +173,30 @@ inline edsl::Tensor minimum(const edsl::Tensor& X, const edsl::Tensor& Y) {
   return details::op("minimum", args).as_tensor();
 }
 
+inline edsl::Tensor pool(                    //
+    const edsl::Tensor I,                    //
+    const std::string& pool_mode,            //
+    const std::vector<int>& pool_size,       //
+    const std::vector<int>& strides,         //
+    const std::string& autopad_mode,         //
+    const std::vector<int>& manual_padding,  //
+    const std::string& input_layout,         //
+    bool include_padding_in_avg = false,     //
+    bool use_ceil_for_output_shape = false   //
+) {
+  auto args = edsl::make_tuple(          //
+      I,                                 //
+      pool_mode,                         //
+      edsl::make_tuple(pool_size),       //
+      edsl::make_tuple(strides),         //
+      autopad_mode,                      //
+      edsl::make_tuple(manual_padding),  //
+      input_layout,                      //
+      include_padding_in_avg,            //
+      use_ceil_for_output_shape);
+  return details::op("pool", args).as_tensor();
+}
+
 inline edsl::Tensor prod(const edsl::Tensor& I, const edsl::Value& axes = edsl::None(), bool keepdims = false) {
   auto args = edsl::make_tuple(I, axes, keepdims);
   return details::op("prod", args).as_tensor();
