@@ -11,7 +11,7 @@
 using mlir::NamedAttribute;
 using mlir::OpBuilder;
 using mlir::Value;
-using pmlc::dialect::stripe::AffineConstOp;
+using pmlc::dialect::stripe::AffinePolyOp;
 using pmlc::dialect::stripe::AffineType;
 using pmlc::dialect::stripe::ParallelForOp;
 using pmlc::dialect::stripe::RefineOp;

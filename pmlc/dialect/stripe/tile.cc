@@ -7,6 +7,7 @@ namespace dialect {
 namespace stripe {
 
 void Tile(ParallelForOp op, llvm::ArrayRef<int64_t> tile_sizes) {
+  /*
   // Make a builder to write to just before the terminator
   Block* obody = op.getBody();
   auto builder = op.getBodyBuilder();
@@ -52,6 +53,7 @@ void Tile(ParallelForOp op, llvm::ArrayRef<int64_t> tile_sizes) {
   // Move the rest of the code into the interior
   ibody->getOperations().splice(std::prev(ibody->end(), 1), obody->getOperations(), obody->begin(),
                                 std::prev(obody->end(), 2));
+  */
 }
 
 }  // namespace stripe

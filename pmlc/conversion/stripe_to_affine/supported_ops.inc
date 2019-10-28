@@ -10,7 +10,7 @@
 #define STRIPE_LAST_OP(OP) STRIPE_OP(OP)
 #endif
 
-STRIPE_OP(AffineConstOp)
+STRIPE_OP(AffinePolyOp)
 STRIPE_OP(ParallelForOp)
 STRIPE_LAST_OP(TerminateOp)
 
