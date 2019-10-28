@@ -474,7 +474,7 @@ TEST(Op, Relu) {
   auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "A");
   auto M = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "M");
   auto r = op::relu(I).alpha(A).max_value(M).threshold(0.05);
-  Program program("relu", {r()});
+  Program program("relu", {r});
   EXPECT_THAT(program, Eq(R"(function (
   I[I_0, I_1],
   A[A_0, A_1],
@@ -498,7 +498,7 @@ TEST(Op, ReluNoAlpha) {
   auto I = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "I");
   auto M = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "M");
   auto r = op::relu(I).max_value(M).threshold(0.05);
-  Program program("relu", {r()});
+  Program program("relu", {r});
   EXPECT_THAT(program, Eq(R"(function (
   I[I_0, I_1],
   M[M_0, M_1]
@@ -522,7 +522,7 @@ TEST(Op, ReluNoMaxValue) {
   auto I = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "I");
   auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "A");
   auto r = op::relu(I).alpha(A).threshold(0.05);
-  Program program("relu", {r()});
+  Program program("relu", {r});
   EXPECT_THAT(program, Eq(R"(function (
   I[I_0, I_1],
   A[A_0, A_1]
@@ -542,7 +542,7 @@ TEST(Op, ReluNoMaxValue) {
 TEST(Op, ReluOnlyThreshold) {
   auto I = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "I");
   auto r = op::relu(I).threshold(0.05);
-  Program program("relu", {r()});
+  Program program("relu", {r});
   EXPECT_THAT(program, Eq(R"(function (
   I[I_0, I_1]
 ) -> (
@@ -562,7 +562,7 @@ TEST(Op, ReluOnlyThreshold) {
 TEST(Op, ReluNoParams) {
   auto I = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "I");
   auto r = op::relu(I);
-  Program program("relu", {r()});
+  Program program("relu", {r});
   EXPECT_THAT(program, Eq(R"(function (
   I[I_0, I_1]
 ) -> (

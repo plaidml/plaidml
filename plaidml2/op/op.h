@@ -180,7 +180,7 @@ class relu {
   float threshold_ = 0.0;
 
  public:
-  explicit relu(const edsl::Tensor& I) { I_ = I; }
+  explicit relu(const edsl::Tensor& I) : I_(I) {}
 
   relu alpha(const edsl::Tensor& alpha) {
     alpha_ = alpha;
@@ -197,7 +197,7 @@ class relu {
     return *this;
   }
 
-  edsl::Tensor operator()() {
+  operator edsl::Tensor() const {
     // actually make the relu from the op lib
     auto args = edsl::make_tuple(I_, alpha_, max_value_, threshold_);
     return details::op("relu", args).as_tensor();
