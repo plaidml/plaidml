@@ -172,6 +172,38 @@ inline edsl::Tensor prod(const edsl::Tensor& I, const edsl::Value& axes = edsl::
   return details::op("prod", args).as_tensor();
 }
 
+class relu {
+ protected:
+  edsl::Tensor I_;
+  edsl::Tensor alpha_;
+  edsl::Tensor max_value_;
+  float threshold_ = 0.0;
+
+ public:
+  explicit relu(const edsl::Tensor& I) : I_(I) {}
+
+  relu alpha(const edsl::Tensor& alpha) {
+    alpha_ = alpha;
+    return *this;
+  }
+
+  relu max_value(const edsl::Tensor& max_value) {
+    max_value_ = max_value;
+    return *this;
+  }
+
+  relu threshold(float threshold) {
+    threshold_ = threshold;
+    return *this;
+  }
+
+  operator edsl::Tensor() const {
+    // actually make the relu from the op lib
+    auto args = edsl::make_tuple(I_, alpha_, max_value_, threshold_);
+    return details::op("relu", args).as_tensor();
+  }
+};
+
 inline edsl::Tensor repeat(const edsl::Tensor& I, int repeats, int axis) {
   auto args = edsl::make_tuple(I, repeats, axis);
   return details::op("repeat", args).as_tensor();
