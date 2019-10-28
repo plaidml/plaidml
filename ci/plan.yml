@@ -302,7 +302,7 @@ SUITES:
     runner: python
     workloads:
       backend:
-        args: [backend_test.py]
+        args: [backend_test.py, -v]
         precision: untested
         shards: 3
 
