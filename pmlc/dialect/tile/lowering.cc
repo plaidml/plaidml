@@ -3,6 +3,7 @@
 #include "pmlc/dialect/tile/lowering.h"
 
 #include <memory>
+#include <unordered_set>
 #include <vector>
 
 #include "llvm/Support/FormatVariadic.h"
@@ -49,9 +50,7 @@ using mlir::ReturnOp;
 using mlir::UnknownLoc;
 using mlir::Value;
 
-namespace pmlc {
-namespace dialect {
-namespace tile {
+namespace pmlc::dialect::tile {
 
 static stripe::TensorType convertIntoTensorType(Type type) {
   if (auto rankedType = type.dyn_cast<RankedTensorType>()) {
@@ -69,6 +68,59 @@ static stripe::TensorType convertIntoTensorType(Type type) {
     return stripe::TensorType::get(rankedType.getElementType(), newShape, stripe::OffsetsMap{}, false);
   }
   throw std::runtime_error("Invalid type");
+}
+
+static void addInitializer(         //
+    OpBuilder* builder,             //
+    ContractionOp contractionOp,    //
+    stripe::TensorType tensorType,  //
+    Value* output) {
+  auto loc = contractionOp.getLoc();
+  stripe::SymbolValueMap idxs;
+  llvm::SmallVector<int64_t, 6> ranges;
+  llvm::SmallVector<Attribute, 6> idxNames;
+  const auto& dims = tensorType.getShape();
+  for (const auto& dim : dims) {
+    ranges.emplace_back(dim.size);
+  }
+
+  auto forOp = builder->create<stripe::ParallelForOp>(loc, builder->getI64ArrayAttr(ranges));
+  auto attrs = llvm::SmallVector<NamedAttribute, 2>{
+      {builder->getIdentifier("kernel"), builder->getUnitAttr()},
+  };
+  auto body = builder->createBlock(&forOp.inner());
+  builder->setInsertionPointToStart(body);
+
+  llvm::SmallVector<Value*, 6> offsets;
+  for (unsigned i = 0; i < dims.size(); i++) {
+    auto arg = body->addArgument(stripe::AffineType::get(builder->getContext()));
+    auto idxName = llvm::formatv("i{0}", i);
+    idxNames.emplace_back(builder->getStringAttr(idxName.str()));
+    offsets.emplace_back(arg);
+  }
+
+  forOp.setAttr("idx_names", ArrayAttr::get(idxNames, builder->getContext()));
+
+  auto refType = stripe::TensorRefType::get(tensorType);
+  auto elementType = refType.getElementType();
+  auto scalarType = eltwise::getRankedTensorType(elementType);
+  auto sink = builder->create<stripe::RefineOp>(loc, refType, output, offsets);
+
+  if (auto init = contractionOp.getInitializer()) {
+    attrs.emplace_back(builder->getIdentifier("copy"), builder->getUnitAttr());
+    auto src = builder->create<stripe::RefineOp>(loc, refType, init, offsets);
+    auto loadOp = builder->create<stripe::LoadOp>(loc, scalarType, src.result());
+    builder->create<stripe::StoreOp>(loc, sink.result(), loadOp.into());
+  } else {
+    attrs.emplace_back(builder->getIdentifier("zero"), builder->getUnitAttr());
+    const int64_t zero = 0;
+    auto constOp = builder->create<eltwise::ScalarConstantOp>(loc, elementType, zero);
+    builder->create<stripe::StoreOp>(loc, sink.result(), constOp.result());
+  }
+
+  forOp.setAttr(stripe::Dialect::getStripeAttrsName(), builder->getDictionaryAttr(attrs));
+
+  builder->create<stripe::TerminateOp>(loc);
 }
 
 struct TypeConverter : public mlir::TypeConverter {
@@ -191,6 +243,12 @@ static Value* MakeCombination(            //
     case CombinationKind::add:
       return rewriter->create<eltwise::AddOp>(op.getLoc(), scalarType, operands).result();
     case CombinationKind::cond:
+      // TODO: NYI
+      // kernel.get()->stmts.push_back(std::make_shared<Constant>("$ZERO", 0.0));
+      // AddIntrinsic(kernel.get(), Intrinsic::EQ, input_based_type, {scalar_inputs[0], scalar_inputs[1]}, {"$IS_EQ"});
+      // AddIntrinsic(kernel.get(), Intrinsic::COND, output_type, {"$IS_EQ", scalar_inputs[2], "$ZERO"},
+      //              {ScalarName(op.output)});
+      // kernel->set_tag("comb_op_cond");
       break;
     case CombinationKind::eq:
       return rewriter->create<eltwise::CmpEqOp>(op.getLoc(), scalarType, operands).result();
@@ -240,8 +298,8 @@ struct AffineDomainOpConversion : public LoweringBase {
 
     // add induction vars
     llvm::SmallVector<int64_t, 8> ranges;
-    for (const auto& kvp : bounds) {
-      uint64_t range = kvp.second.max - kvp.second.min + 1;
+    for (const auto& [key, value] : bounds) {
+      uint64_t range = value.max - value.min + 1;
       ranges.emplace_back(range);
     }
 
@@ -269,10 +327,10 @@ struct AffineDomainOpConversion : public LoweringBase {
 
     stripe::SymbolValueMap idxs;
     llvm::SmallVector<Attribute, 8> idxNames;
-    for (const auto& kvp : bounds) {
+    for (const auto& [key, value] : bounds) {
       auto arg = body->addArgument(stripe::AffineType::get(rewriter.getContext()));
-      idxNames.emplace_back(rewriter.getStringAttr(kvp.first));
-      idxs.emplace(kvp.first, arg);
+      idxNames.emplace_back(rewriter.getStringAttr(key));
+      idxs.emplace(key, arg);
     }
     forOp.setAttr("idx_names", ArrayAttr::get(idxNames, rewriter.getContext()));
 
@@ -310,6 +368,7 @@ struct AffineDomainOpConversion : public LoweringBase {
     }
 
     // add constraints
+    llvm::SmallVector<Value*, 4> affineConstraints;
     for (const auto& constraint : constraints) {
       auto lhs = Integerize(constraint.poly, bounds);  // lhs <= rhs;
       lhs -= constraint.rhs;                           // lhs <= 0;
@@ -320,6 +379,15 @@ struct AffineDomainOpConversion : public LoweringBase {
       rewriter.create<stripe::TerminateOp>(op->getLoc());
       auto body = rewriter.createBlock(&constraintOp.ge_case());
       rewriter.setInsertionPointToStart(body);
+      affineConstraints.emplace_back(affine);
+    }
+
+    if (needsInitialize(output, resultTensorType, ranges, affineConstraints)) {
+      auto insertionPoint = rewriter.saveInsertionPoint();
+      rewriter.setInsertionPoint(forOp.getOperation());
+      addInitializer(&rewriter, contractionOp, resultTensorType, outputTensor);
+      rewriter.restoreInsertionPoint(insertionPoint);
+      // TODO: ref_it->mut().set_tag("initialized");
     }
 
     // LOADs
@@ -338,6 +406,7 @@ struct AffineDomainOpConversion : public LoweringBase {
     }
 
     // Combination Operation
+    // TODO: verify correct scalarType
     auto scalarType = resultTensorType.getElementType().cast<eltwise::ScalarType>();
     auto combo = MakeCombination(&rewriter, contractionOp, scalarType, inputs);
 
@@ -352,11 +421,63 @@ struct AffineDomainOpConversion : public LoweringBase {
     rewriter.create<stripe::TerminateOp>(op->getLoc());
     rewriter.replaceOp(op, {outputTensor});
 
-    // TODO: use_default
     // TODO: no_defract
-    // TODO: NeedsInitialize
 
     return matchSuccess();
+  }
+
+  bool needsInitialize(            //
+      Value* outRef,               //
+      stripe::TensorType outType,  //
+      ArrayRef<int64_t> ranges,    //
+      ArrayRef<Value*> constraints) const {
+    // Check if we have a simple output: 1 unique index per dimension, each full range
+    // If not, presume we need initialization for safety
+    // We assume here that the 0'th refinement is the output refinement
+    std::unordered_set<mlir::BlockArgument*> outIdxs;
+    auto refineOp = llvm::cast<stripe::RefineOp>(outRef->getDefiningOp());
+    const auto& outShape = outType.getShape();
+    for (unsigned i = 0; i < outShape.size(); i++) {
+      stripe::AffinePolynomial poly{refineOp.getOffset(i)};
+      if (poly == stripe::AffinePolynomial() && outShape[i].size == 1) {
+        continue;
+      }
+      if (poly.constant || poly.terms.size() != 1 || poly.terms.begin()->second != 1) {
+        // Not a single index with a multiplier of 1, bail
+        return true;
+      }
+      // TODO: should we check all terms?
+      auto idx = poly.terms.begin()->first;
+      if (outIdxs.count(idx)) {
+        // The index isn't unique, bail
+        return true;
+      }
+      outIdxs.insert(idx);
+      auto range = ranges[idx->getArgNumber()];
+      if (range != outShape[i].size) {
+        // The index range does not cover the entire size of the tensor dimension
+        return true;
+      }
+    }
+
+    // Now we check if we have any constraints that are 'output only'
+    // Output only indexes actually reduce the range we write to, whereas constraints
+    // that use both input + output make writes but only process some of the input
+    for (const auto& constraint : constraints) {
+      stripe::AffinePolynomial poly{constraint};
+      bool any_inputs = false;
+      for (const auto& [key, value] : poly.terms) {
+        if (!outIdxs.count(key)) {
+          any_inputs = true;
+        }
+      }
+      if (!any_inputs) {
+        // Found at least one output only constraint
+        return true;
+      }
+    }
+    // Looks good!
+    return false;
   }
 };
 
@@ -632,7 +753,7 @@ OwningModuleRef LowerIntoStripe(ModuleOp workspace) {
   IVLOG(1, "LowerIntoStripe");
   OwningModuleRef module(llvm::cast<ModuleOp>(workspace.getOperation()->clone()));
   mlir::PassManager pm(workspace.getContext(), true);
-  IVLOG(1, "before:\n" << mlir::debugString(*module->getOperation()));
+  IVLOG(3, "before:\n" << mlir::debugString(*module->getOperation()));
   pm.addPass(mlir::createCanonicalizerPass());
   pm.addPass(mlir::createCSEPass());
   pm.addPass(LoweringPass::Create());
@@ -643,7 +764,7 @@ OwningModuleRef LowerIntoStripe(ModuleOp workspace) {
     IVLOG(1, "LowerIntoStripe failed: " << mlir::debugString(*module->getOperation()));
     throw std::runtime_error("Lowering to stripe dialect failure");
   }
-  IVLOG(1, "after:\n" << mlir::debugString(*module->getOperation()));
+  IVLOG(3, "after:\n" << mlir::debugString(*module->getOperation()));
   return module;
 }
 
@@ -662,6 +783,4 @@ static mlir::PassRegistration<LoweringPass> legalize_pass(  //
 
 static mlir::TranslateFromMLIRRegistration IntoStripeTranslate("tile-to-stripe", IntoStripeTranslateFunction);
 
-}  // namespace tile
-}  // namespace dialect
-}  // namespace pmlc
+}  // namespace pmlc::dialect::tile

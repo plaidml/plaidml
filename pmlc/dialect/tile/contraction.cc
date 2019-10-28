@@ -20,20 +20,18 @@ using vertexai::tile::math::Integer;
 using vertexai::tile::math::RangeConstraint;
 using vertexai::tile::math::Rational;
 
-namespace pmlc {
-namespace dialect {
-namespace tile {
+namespace pmlc::dialect::tile {
 
 static bool IsImplied(const math::SimpleConstraint& constraint, const IndexBounds& bounds) {
   auto worst = constraint.poly.constant();
-  for (const auto& kvp : constraint.poly.getMap()) {
-    if (kvp.first.empty()) {
+  for (const auto& [key, value] : constraint.poly.getMap()) {
+    if (key.empty()) {
       continue;
     }
-    if (kvp.second < 0) {
-      worst += kvp.second * bounds.find(kvp.first)->second.min;
+    if (value < 0) {
+      worst += value * bounds.find(key)->second.min;
     } else {
-      worst += kvp.second * bounds.find(kvp.first)->second.max;
+      worst += value * bounds.find(key)->second.max;
     }
   }
   return (worst <= constraint.rhs);
@@ -159,8 +157,7 @@ std::set<std::string> Constraints::VariablesUsed() {
   // Returns all the variables appearing in the constraints
   std::set<std::string> ret;
   for (const auto& constraint : constraints) {
-    for (const auto& kvp : constraint.poly.getMap()) {
-      const auto& key = kvp.first;
+    for (const auto& [key, value] : constraint.poly.getMap()) {
       if (key.size()) {  // Do nothing for constant term
         ret.emplace(key);
       }
@@ -182,16 +179,16 @@ std::tuple<IndexBounds, SimpleConstraints> Constraints::ComputeBounds() {
     objectives.emplace_back(var, -1);
   }
   std::map<IndexPoly, bilp::ILPResult> result = solver.batch_solve(constraints, objectives);
-  for (const auto& kvp : result) {
+  for (const auto& [key, value] : result) {
     // ILPResult lists the objective for each requested optimization. Since we
     // used a monomial for each objective, GetNonzeroIndex returns the name of
     // the variable. Then we grab its coefficient to see if we were requesting
     // minimization or maximization
-    std::string var = kvp.first.GetNonzeroIndex();
-    if (kvp.first[var] == 1) {
-      out[var].min = static_cast<int64_t>(kvp.second.obj_val);
-    } else if (kvp.first[var] == -1) {
-      out[var].max = static_cast<int64_t>(-kvp.second.obj_val);
+    std::string var = key.GetNonzeroIndex();
+    if (key[var] == 1) {
+      out[var].min = static_cast<int64_t>(value.obj_val);
+    } else if (key[var] == -1) {
+      out[var].max = static_cast<int64_t>(-value.obj_val);
     } else {
       throw std::runtime_error("Internal error: unexpected ILP objective type");
     }
@@ -320,8 +317,8 @@ std::set<std::string> Contraction::getIndexVars() const {
   std::set<std::string> vars;
   for (const auto& access : accesses) {
     for (const auto& poly : access) {
-      for (const auto& kvp : poly.getMap()) {
-        vars.insert(kvp.first);
+      for (const auto& [key, value] : poly.getMap()) {
+        vars.insert(key);
       }
     }
   }
@@ -329,13 +326,13 @@ std::set<std::string> Contraction::getIndexVars() const {
   // Pre-add the 'constant' variable (which is always valid)
   vars.insert("");
   for (const auto& constraint : constraints) {
-    for (const auto& kvp : constraint.poly.getMap()) {
+    for (const auto& [key, value] : constraint.poly.getMap()) {
       // If there is a variable used in a constraint and that variable doesn't
       // appear in the list of variables from the tensors, then it's a variable
       // that appears only in the constraints, and we need to throw.
-      if (vars.find(kvp.first) == vars.end()) {
+      if (vars.find(key) == vars.end()) {
         std::ostringstream ss;
-        ss << "Contraction::getIndexAndOutputVars: Variable '" << kvp.first
+        ss << "Contraction::getIndexAndOutputVars: Variable '" << key
            << "' appears only in constraints of contraction:\n"
            << " Tensors:";
         for (const auto& access : accesses) {
@@ -379,15 +376,15 @@ static IndexPoly ConvertPoly(                       //
     const std::map<std::string, IndexPoly>& polys,  //
     bool transform_constant = false) {
   IndexPoly out;
-  for (const auto& kvp : in.getMap()) {
-    if (kvp.first == "" && !transform_constant) {
-      out += kvp.second;
+  for (const auto& [key, value] : in.getMap()) {
+    if (key == "" && !transform_constant) {
+      out += value;
     } else {
-      auto it = polys.find(kvp.first);
+      auto it = polys.find(key);
       if (it == polys.end()) {
         throw std::runtime_error("Invalid polynomial conversion");
       }
-      out += kvp.second * it->second;
+      out += value * it->second;
     }
   }
   return out;
@@ -471,12 +468,12 @@ void Contraction::Defractionalize(const Constraints& order) {
   bool has_fract = false;
   std::set<std::string> vars;
   for (const auto& constraint : order.constraints) {
-    for (const auto& kvp : constraint.poly.getMap()) {
-      if (denominator(kvp.second) != 1) {
+    for (const auto& [key, value] : constraint.poly.getMap()) {
+      if (denominator(value) != 1) {
         has_fract = true;
       }
-      if (kvp.first != "") {
-        vars.insert(kvp.first);
+      if (key != "") {
+        vars.insert(key);
       }
     }
     polys.push_back(constraint.poly);
@@ -623,7 +620,6 @@ std::tuple<IndexBounds, SimpleConstraints> Contraction::ComputeBounds(llvm::Arra
   IVLOG(3, "Merged Parallel Constraints:" << to_string(constraints.constraints));
   // Defract if needed (defract does early return if not required)
   Defractionalize(constraints);
-  // IVLOG(3, "Defracted:\n" << to_string(defracted));
   // Gather the constraints from index bounds
   constraints = GatherConstraints(shapes);
   // New parallel constraints might have been introduced by defract; re-merge them
@@ -649,6 +645,4 @@ math::Affine Integerize(const IndexPoly& poly, const IndexBounds& bounds) {
   return result;
 }
 
-}  // namespace tile
-}  // namespace dialect
-}  // namespace pmlc
+}  // namespace pmlc::dialect::tile
