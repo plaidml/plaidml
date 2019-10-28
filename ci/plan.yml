@@ -244,9 +244,46 @@ SUITES:
 
   base2:
     # TODO: Merge this suite back into base once the directory structure coalesces
+
     platforms:
+
+      keras-stripe-llvm-cpu:
+        pipelines: [plaidml, nightly]
+      keras-stripe-ocl-neo:
+        pipelines: [plaidml, nightly]
+      keras-plaid-mtl-uhd630:
+        pipelines: [plaidml, nightly]
+
+      keras-plaid-ocl-gfx804:
+        pipelines: [nightly]
+      keras-stripe-ocl-gfx804:
+        pipelines: [plaidml, nightly]
+
+      keras-plaid-ocl-gfx900:
+        pipelines: [nightly]
+      keras-stripe-ocl-gfx900:
+        pipelines: [plaidml, nightly]
+
+      keras-plaid-ocl-gp100gl:
+        pipelines: [nightly]
       keras-stripe-ocl-gp100gl:
         pipelines: [plaidml, nightly]
+
+      keras-plaid-ocl-gv100gl:
+        pipelines: [plaidml, nightly]
+      keras-stripe-ocl-gv100gl:
+        pipelines: [nightly]
+
+      keras-plaid-ocl-neo:
+        pipelines: [nightly]
+      keras-stripe-ocl-neo:
+        pipelines: [plaidml, nightly]
+
+      keras-plaid-mtl-uhd630:
+        pipelines: [nightly]
+      keras-stripe-mtl-uhd630:
+        pipelines: [plaidml, nightly]
+
     params:
       ci:
         batch_sizes: [0]
