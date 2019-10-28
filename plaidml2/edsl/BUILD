@@ -38,15 +38,17 @@ plaidml_cc_library(
         "derivs.cc",
         "derivs.h",
         "ffi.cc",
+        "helper.cc",
     ],
-    hdrs = SDK_HDRS,
+    hdrs = SDK_HDRS + [
+        "helper.h",
+    ],
     defines = ["PLAIDML_EDSL_DLL"],
     visibility = ["//visibility:public"],
     deps = [
         "//base/util",
         "//plaidml2/core",
         "//pmlc/dialect/tile",
-        "//tile/lang/ast",
     ],
     alwayslink = 1,
 )
@@ -75,6 +77,7 @@ plaidml_cc_test(
     deps = [
         ":api",
         ":edsl",
+        "//plaidml2:testenv",
         "//plaidml2/exec",
     ],
 )

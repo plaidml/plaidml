@@ -38,7 +38,7 @@ plaidml_expr* plaidml_op_make(  //
       throw std::runtime_error(str(boost::format("Operation not registered: %1%") % op_name));
     }
     auto ret = op(value);
-    return new plaidml_expr{ret.as_ptr()->expr, ret.as_ptr()->value};
+    return new plaidml_expr{ret.as_ptr()->value};
   });
 }
 

@@ -3,6 +3,7 @@
 #include <gmock/gmock.h>
 #include <google/protobuf/util/json_util.h>
 
+#include "plaidml2/edsl/helper.h"
 #include "tile/codegen/stencil.h"
 #include "tile/codegen/tile.h"
 #include "tile/codegen/vm.h"
@@ -80,10 +81,11 @@ std::vector<float> kConv1dExpected = {
 
 TEST(Codegen, ApplyTile) {
   int64_t dim = sqrt(kMatMulExpected.size());
-  auto runinfo = lib::LoadMatMul("matmul",                                        //
-                                 LogicalShape(PLAIDML_DATA_FLOAT32, {dim, dim}),  //
-                                 LogicalShape(PLAIDML_DATA_FLOAT32, {dim, dim}));
-  auto program = GenerateStripe(runinfo);
+  auto tileProgram = lib::LoadMatMul(                  //
+      "matmul",                                        //
+      LogicalShape(PLAIDML_DATA_FLOAT32, {dim, dim}),  //
+      LogicalShape(PLAIDML_DATA_FLOAT32, {dim, dim}));
+  auto program = plaidml::edsl::ConvertIntoStripe(tileProgram);
   auto main = program->entry->SubBlock(0);
   auto data = MakeMatMulTestData();
 
@@ -130,10 +132,11 @@ TEST(Stencil, MatchMatMul) {
   )");
 
   const std::int64_t DIM = 100;
-  auto runinfo = lib::LoadMatMul("matmul",                                        //
-                                 LogicalShape(PLAIDML_DATA_FLOAT32, {DIM, DIM}),  //
-                                 LogicalShape(PLAIDML_DATA_FLOAT32, {DIM, DIM}));
-  auto program = GenerateStripe(runinfo);
+  auto tileProgram = lib::LoadMatMul(                  //
+      "matmul",                                        //
+      LogicalShape(PLAIDML_DATA_FLOAT32, {DIM, DIM}),  //
+      LogicalShape(PLAIDML_DATA_FLOAT32, {DIM, DIM}));
+  auto program = plaidml::edsl::ConvertIntoStripe(tileProgram);
   auto main = program->entry->SubBlock(0);
   auto kernel = main->SubBlock(0);
 
@@ -167,10 +170,11 @@ TEST(Stencil, MatchMatMulForXSMMStrict) {
   )");
 
   const std::int64_t DIM = 1024;
-  auto runinfo = lib::LoadMatMul("matmul",                                        //
-                                 LogicalShape(PLAIDML_DATA_FLOAT32, {DIM, DIM}),  //
-                                 LogicalShape(PLAIDML_DATA_FLOAT32, {DIM, DIM}));
-  auto program = GenerateStripe(runinfo);
+  auto tileProgram = lib::LoadMatMul(                  //
+      "matmul",                                        //
+      LogicalShape(PLAIDML_DATA_FLOAT32, {DIM, DIM}),  //
+      LogicalShape(PLAIDML_DATA_FLOAT32, {DIM, DIM}));
+  auto program = plaidml::edsl::ConvertIntoStripe(tileProgram);
   auto main = program->entry->SubBlock(0);
   auto kernel = main->SubBlock(0);
 
@@ -205,10 +209,11 @@ TEST(Stencil, MatchMatMulForXSMMNonStrict) {
   )");
 
   const std::int64_t DIM = 100;
-  auto runinfo = lib::LoadMatMul("matmul",                                        //
-                                 LogicalShape(PLAIDML_DATA_FLOAT32, {DIM, DIM}),  //
-                                 LogicalShape(PLAIDML_DATA_FLOAT32, {DIM, DIM}));
-  auto program = GenerateStripe(runinfo);
+  auto tileProgram = lib::LoadMatMul(                  //
+      "matmul",                                        //
+      LogicalShape(PLAIDML_DATA_FLOAT32, {DIM, DIM}),  //
+      LogicalShape(PLAIDML_DATA_FLOAT32, {DIM, DIM}));
+  auto program = plaidml::edsl::ConvertIntoStripe(tileProgram);
   auto main = program->entry->SubBlock(0);
   auto kernel = main->SubBlock(0);
 
@@ -230,11 +235,12 @@ TEST(Stencil, MatchConv1D) {
     }
   )");
 
-  auto runinfo = lib::LoadConv1d("conv",                                            //
-                                 LogicalShape(PLAIDML_DATA_FLOAT32, {1, 100, 64}),  //
-                                 LogicalShape(PLAIDML_DATA_FLOAT32, {3, 64, 64}),   //
-                                 {1, 100, 64});
-  auto program = GenerateStripe(runinfo);
+  auto tileProgram = lib::LoadConv1d(                    //
+      "conv",                                            //
+      LogicalShape(PLAIDML_DATA_FLOAT32, {1, 100, 64}),  //
+      LogicalShape(PLAIDML_DATA_FLOAT32, {3, 64, 64}),   //
+      {1, 100, 64});
+  auto program = plaidml::edsl::ConvertIntoStripe(tileProgram);
   auto main = program->entry->SubBlock(0);
   auto kernel = main->SubBlock(0);
 
@@ -286,11 +292,12 @@ TEST(Stencil, MatchConv2D) {
     specs.push_back(stencil);
   }
 
-  auto runinfo = lib::LoadConv2d("conv",                                                 //
-                                 LogicalShape(PLAIDML_DATA_FLOAT32, {1, 100, 100, 56}),  //
-                                 LogicalShape(PLAIDML_DATA_FLOAT32, {3, 3, 56, 56}),     //
-                                 {1, 100, 100, 56});                                     //
-  auto program = GenerateStripe(runinfo);
+  auto tileProgram = lib::LoadConv2d(                         //
+      "conv",                                                 //
+      LogicalShape(PLAIDML_DATA_FLOAT32, {1, 100, 100, 56}),  //
+      LogicalShape(PLAIDML_DATA_FLOAT32, {3, 3, 56, 56}),     //
+      {1, 100, 100, 56});                                     //
+  auto program = plaidml::edsl::ConvertIntoStripe(tileProgram);
   auto main = program->entry->SubBlock(0);
   auto kernel = main->SubBlock(0);
 
@@ -329,10 +336,11 @@ TEST(Stencil, Pass) {
   )");
 
   const std::int64_t DIM = 5;
-  auto runinfo = lib::LoadMatMul("matmul",                                        //
-                                 LogicalShape(PLAIDML_DATA_FLOAT32, {DIM, DIM}),  //
-                                 LogicalShape(PLAIDML_DATA_FLOAT32, {DIM, DIM}));
-  auto program = GenerateStripe(runinfo);
+  auto tileProgram = lib::LoadMatMul(                  //
+      "matmul",                                        //
+      LogicalShape(PLAIDML_DATA_FLOAT32, {DIM, DIM}),  //
+      LogicalShape(PLAIDML_DATA_FLOAT32, {DIM, DIM}));
+  auto program = plaidml::edsl::ConvertIntoStripe(tileProgram);
   CompilerState state(program);
   StencilPass(options).Apply(&state);
   IVLOG(2, "\n" << *program->entry);
@@ -344,19 +352,6 @@ TEST(Stencil, Pass) {
   IVLOG(2, "B: " << data["B"]);
   IVLOG(2, "C: " << data["C"]);
   EXPECT_THAT(data["C"], ContainerEq(kMatMulExpected));
-}
-
-TEST(Codegen, TilePassBroadcast) {
-  lang::RunInfo runinfo;
-  runinfo.program_name = "broadcast";
-  runinfo.code = "function (A, B) -> (C) { C = add(A, B); }";
-  runinfo.input_shapes.emplace("A", tile::SimpleShape(DataType::FLOAT32, {1, 112, 112, 32}));
-  runinfo.input_shapes.emplace("B", tile::SimpleShape(DataType::FLOAT32, {32}));
-  runinfo.output_shapes.emplace("C", tile::SimpleShape(DataType::FLOAT32, {1, 112, 112, 32}));
-  auto program = GenerateStripe(runinfo);
-  auto main = program->entry->SubBlock(0);
-
-  IVLOG(2, "\n" << *program->entry);
 }
 
 }  // namespace test

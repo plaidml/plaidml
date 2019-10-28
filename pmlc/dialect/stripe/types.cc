@@ -2,9 +2,7 @@
 
 #include "pmlc/dialect/stripe/types.h"
 
-namespace pmlc {
-namespace dialect {
-namespace stripe {
+namespace pmlc::dialect::stripe {
 
 struct TensorTypeStorage : public mlir::TypeStorage {
   TensorTypeStorage(Type elementType, llvm::ArrayRef<TensorDim> shape, OffsetsMap offsets, bool is_const)
@@ -54,6 +52,20 @@ const OffsetsMap& TensorType::getOffsets() const { return getImpl()->offsets; }
 
 bool TensorType::is_const() const { return getImpl()->is_const; }
 
+uint64_t TensorType::getByteSize() const {
+  auto scalarType = getElementType().dyn_cast<eltwise::ScalarType>();
+  uint64_t total = 0;
+  for (const auto& dim : getShape()) {
+    if (!dim.size) {
+      return 0;
+    }
+    if (dim.stride > 0) {
+      total += (dim.size - 1) * dim.stride;
+    }
+  }
+  return (total + 1) * byte_width(scalarType.type());
+}
+
 struct TensorRefTypeStorage : public mlir::TypeStorage {
   TensorRefTypeStorage(Type elementType, int64_t rank, bool is_const)
       : elementType(elementType), rank(rank), is_const(is_const) {}
@@ -88,6 +100,4 @@ int64_t TensorRefType::getRank() const { return getImpl()->rank; }
 
 bool TensorRefType::is_const() const { return getImpl()->is_const; }
 
-}  // namespace stripe
-}  // namespace dialect
-}  // namespace pmlc
+}  // namespace pmlc::dialect::stripe

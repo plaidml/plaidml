@@ -6,10 +6,10 @@
 #include <string>
 
 #include "plaidml2/core/ffi.h"
+#include "pmlc/dialect/stripe/types.h"
 #include "pmlc/dialect/tile/builder.h"
 #include "tile/base/platform.h"
 #include "tile/base/shape.h"
-#include "tile/lang/ast/ast.h"
 
 extern "C" {
 
@@ -18,16 +18,14 @@ struct plaidml_string {
 };
 
 struct plaidml_shape {
-  vertexai::tile::TensorShape shape;
+  pmlc::dialect::stripe::TensorType type;
 };
 
 struct plaidml_expr {
-  vertexai::tile::lang::ast::ExprPtr expr;
   mlir::Value* value = nullptr;
 };
 
 struct plaidml_program {
-  vertexai::tile::lang::ast::ProgramEvaluation eval;
   std::shared_ptr<pmlc::dialect::tile::TileProgram> program;
 };
 
@@ -41,8 +39,16 @@ struct plaidml_view {
 
 }  // extern "C"
 
-namespace plaidml {
-namespace core {
+namespace plaidml::core {
+
+using pmlc::dialect::tile::TileBuilder;
+
+struct GlobalContext {
+  static TileBuilder* get() {
+    static thread_local TileBuilder builder;
+    return &builder;
+  }
+};
 
 struct PlatformHolder {
   PlatformHolder();
@@ -84,5 +90,4 @@ void ffi_wrap_void(plaidml_error* err, F fn) {
   }
 }
 
-}  // namespace core
-}  // namespace plaidml
+}  // namespace plaidml::core

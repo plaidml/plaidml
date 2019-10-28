@@ -58,8 +58,6 @@ plaidml_cc_library(
         "//base/util",
         "//pmlc/dialect/tile",
         "//tile/hal/opencl",
-        "//tile/lang",
-        "//tile/lang/ast",
         "//tile/platform/local_machine",
         "//tile/targets",
         "@boost//:filesystem",

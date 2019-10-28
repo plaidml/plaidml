@@ -7,6 +7,8 @@
 
 #include <boost/filesystem.hpp>
 
+#include "mlir/Support/DebugStringHelper.h"
+
 #include "base/util/env.h"
 #include "plaidml2/core/internal.h"
 #include "plaidml2/core/settings.h"
@@ -15,7 +17,9 @@
 using plaidml::core::ffi_wrap;
 using plaidml::core::ffi_wrap_void;
 using plaidml::core::GetPlatform;
+using plaidml::core::GlobalContext;
 using plaidml::core::Settings;
+using pmlc::dialect::eltwise::ScalarType;
 using vertexai::context::Context;
 using vertexai::tile::DataType;
 using vertexai::tile::TensorDimension;
@@ -24,8 +28,7 @@ using LocalPlatform = vertexai::tile::local_machine::Platform;
 
 extern const char* PLAIDML_VERSION;
 
-namespace plaidml {
-namespace core {
+namespace plaidml::core {
 
 PlatformHolder::PlatformHolder() : platform(new LocalPlatform) {}
 
@@ -34,8 +37,7 @@ PlatformHolder& GetPlatform() {
   return holder;
 }
 
-}  // namespace core
-}  // namespace plaidml
+}  // namespace plaidml::core
 
 extern "C" {
 
@@ -149,21 +151,16 @@ plaidml_shape* plaidml_shape_alloc(  //
     const int64_t* sizes,            //
     const int64_t* strides) {
   return ffi_wrap<plaidml_shape*>(err, nullptr, [&] {
-    std::vector<TensorDimension> dims(ndims);
-    for (size_t i = 0; i < ndims; i++) {
-      dims[i] = TensorDimension{strides[i], static_cast<uint64_t>(sizes[i])};
-    }
-    return new plaidml_shape{TensorShape{static_cast<DataType>(dtype), dims}};
+    auto type = GlobalContext::get()->MakeTensorType(static_cast<DataType>(dtype), {sizes, ndims}, {strides, ndims});
+    return new plaidml_shape{type};
   });
 }
 
 plaidml_string* plaidml_shape_repr(  //
     plaidml_error* err,              //
     plaidml_shape* shape) {
-  return ffi_wrap<plaidml_string*>(err, nullptr, [&] {
-    std::stringstream ss;
-    ss << shape->shape;
-    return new plaidml_string{ss.str()};
+  return ffi_wrap<plaidml_string*>(err, nullptr, [&] {  //
+    return new plaidml_string{mlir::debugString(shape->type)};
   });
 }
 
@@ -171,15 +168,17 @@ size_t plaidml_shape_get_ndims(  //
     plaidml_error* err,          //
     plaidml_shape* shape) {
   return ffi_wrap<size_t>(err, 0, [&] {  //
-    return shape->shape.dims.size();
+    return shape->type.getRank();
   });
 }
 
 plaidml_datatype plaidml_shape_get_dtype(  //
     plaidml_error* err,                    //
     plaidml_shape* shape) {
-  return ffi_wrap<plaidml_datatype>(err, PLAIDML_DATA_INVALID, [&] {  //
-    return static_cast<plaidml_datatype>(shape->shape.type);
+  return ffi_wrap<plaidml_datatype>(err, PLAIDML_DATA_INVALID, [&] {
+    auto elementType = shape->type.getElementType();
+    auto scalarType = elementType.dyn_cast<ScalarType>();
+    return static_cast<plaidml_datatype>(scalarType.type());
   });
 }
 
@@ -187,8 +186,12 @@ int64_t plaidml_shape_get_dim_size(  //
     plaidml_error* err,              //
     plaidml_shape* shape,            //
     size_t dim) {
-  return ffi_wrap<int64_t>(err, 0, [&] {  //
-    return shape->shape.dims.at(dim).size;
+  return ffi_wrap<int64_t>(err, 0, [&] {
+    const auto& dims = shape->type.getShape();
+    if (dims.size() < dim) {
+      throw std::range_error("dim index out of range");
+    }
+    return dims[dim].size;
   });
 }
 
@@ -196,8 +199,12 @@ int64_t plaidml_shape_get_dim_stride(  //
     plaidml_error* err,                //
     plaidml_shape* shape,              //
     size_t dim) {
-  return ffi_wrap<int64_t>(err, 0, [&] {  //
-    return shape->shape.dims.at(dim).stride;
+  return ffi_wrap<int64_t>(err, 0, [&] {
+    const auto& dims = shape->type.getShape();
+    if (dims.size() < dim) {
+      throw std::range_error("dim index out of range");
+    }
+    return dims[dim].stride;
   });
 }
 
@@ -205,7 +212,7 @@ uint64_t plaidml_shape_get_nbytes(  //
     plaidml_error* err,             //
     plaidml_shape* shape) {
   return ffi_wrap<int64_t>(err, 0, [&] {  //
-    return shape->shape.byte_size();
+    return shape->type.getByteSize();
   });
 }
 

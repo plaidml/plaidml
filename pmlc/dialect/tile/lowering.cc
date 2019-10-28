@@ -79,7 +79,7 @@ static void addInitializer(         //
   stripe::SymbolValueMap idxs;
   llvm::SmallVector<int64_t, 6> ranges;
   llvm::SmallVector<Attribute, 6> idxNames;
-  const auto& dims = tensorType.getShape();
+  auto dims = tensorType.getShape();
   for (const auto& dim : dims) {
     ranges.emplace_back(dim.size);
   }
@@ -249,7 +249,7 @@ static Value* MakeCombination(            //
       // AddIntrinsic(kernel.get(), Intrinsic::COND, output_type, {"$IS_EQ", scalar_inputs[2], "$ZERO"},
       //              {ScalarName(op.output)});
       // kernel->set_tag("comb_op_cond");
-      break;
+      throw std::runtime_error("NYI: CombinationKind::cond");
     case CombinationKind::eq:
       return rewriter->create<eltwise::CmpEqOp>(op.getLoc(), scalarType, operands).result();
     case CombinationKind::mul:
@@ -436,7 +436,7 @@ struct AffineDomainOpConversion : public LoweringBase {
     // We assume here that the 0'th refinement is the output refinement
     std::unordered_set<mlir::BlockArgument*> outIdxs;
     auto refineOp = llvm::cast<stripe::RefineOp>(outRef->getDefiningOp());
-    const auto& outShape = outType.getShape();
+    auto outShape = outType.getShape();
     for (unsigned i = 0; i < outShape.size(); i++) {
       stripe::AffinePolynomial poly{refineOp.getOffset(i)};
       if (poly == stripe::AffinePolynomial() && outShape[i].size == 1) {
@@ -520,7 +520,7 @@ struct EltwiseOpConversion : public LoweringBase {
 
     stripe::SymbolValueMap idxs;
     llvm::SmallVector<Attribute, 8> idxNames;
-    const auto& dims = resultTensorType.getShape();
+    auto dims = resultTensorType.getShape();
     for (unsigned i = 0; i < dims.size(); i++) {
       auto arg = body->addArgument(stripe::AffineType::get(rewriter.getContext()));
       auto idxName = llvm::formatv("i{0}", i);

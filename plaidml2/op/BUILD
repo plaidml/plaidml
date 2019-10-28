@@ -79,6 +79,7 @@ plaidml_cc_test(
     deps = [
         ":api",
         ":op",
+        "//plaidml2:testenv",
     ],
 )
 

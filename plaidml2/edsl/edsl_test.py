@@ -113,36 +113,66 @@ class TestEdsl(unittest.TestCase):
         D3 = softmax(dot(D2, K3) + B3)
         program = Program('mnist_mlp', [D3])
         self.assertMultiLineEqual(
-            str(program), '''function (
-  _X0[_X0_0, _X0_1],
-  _X1[_X1_0, _X1_1],
-  _X3[_X3_0],
-  _X9[_X9_0, _X9_1],
-  _X11[_X11_0],
-  _X17[_X17_0, _X17_1],
-  _X19[_X19_0]
-) -> (
-  _X25
-) {
-  _X2[x0, x2 : 1, 512] = +(_X0[x0, x1] * _X1[x1, x2]);
-  _X4 = add(_X2, _X3);
-  _X5 = 0.000000;
-  _X6 = cmp_lt(_X4, _X5);
-  _X7 = 0.000000;
-  _X8 = cond(_X6, _X7, _X4);
-  _X10[x0, x2 : 1, 512] = +(_X8[x0, x1] * _X9[x1, x2]);
-  _X12 = add(_X10, _X11);
-  _X13 = 0.000000;
-  _X14 = cmp_lt(_X12, _X13);
-  _X15 = 0.000000;
-  _X16 = cond(_X14, _X15, _X12);
-  _X18[x0, x2 : 1, 10] = +(_X16[x0, x1] * _X17[x1, x2]);
-  _X20 = add(_X18, _X19);
-  _X21[x0, 0 : 1, 1] = >(_X20[x0, x1]);
-  _X22 = sub(_X20, _X21);
-  _X23 = exp(_X22);
-  _X24[x0, 0 : 1, 1] = +(_X23[x0, x1]);
-  _X25 = div(_X23, _X24);
+            str(program), '''
+
+!fp32 = type tensor<!eltwise.fp32>
+module {
+  func @mnist_mlp(%arg0: tensor<10x!eltwise.fp32>, %arg1: tensor<512x!eltwise.fp32>, %arg2: tensor<512x!eltwise.fp32>, %arg3: tensor<1x784x!eltwise.fp32>, %arg4: tensor<784x512x!eltwise.fp32>, %arg5: tensor<512x512x!eltwise.fp32>, %arg6: tensor<512x10x!eltwise.fp32>) -> tensor<1x10x!eltwise.fp32> {
+    %c512 = "tile.const_dim"() {value = 512 : i64} : () -> index
+    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f32} : () -> !fp32
+    %c10 = "tile.const_dim"() {value = 10 : i64} : () -> index
+    %c0 = "tile.const_dim"() {value = 0 : i64} : () -> index
+    %c1 = "tile.const_dim"() {value = 1 : i64} : () -> index
+    %0 = "tile.domain"() ( {
+    ^bb0(%arg7: index, %arg8: index, %arg9: index):	// no predecessors
+      %15 = "tile.src_idx_map"(%arg3, %arg8, %arg7) : (tensor<1x784x!eltwise.fp32>, index, index) -> !tile.imap
+      %16 = "tile.src_idx_map"(%arg4, %arg7, %arg9) : (tensor<784x512x!eltwise.fp32>, index, index) -> !tile.imap
+      %17 = "tile.sink_idx_map"(%arg8, %arg9) : (index, index) -> !tile.imap
+      %18 = "tile.size_map"(%c1, %c512) : (index, index) -> !tile.smap
+      "tile.+(x*y)"(%18, %15, %16, %17) : (!tile.smap, !tile.imap, !tile.imap, !tile.imap) -> ()
+    }) : () -> tensor<1x512x!eltwise.fp32>
+    %1 = "eltwise.add"(%0, %arg2) {type = !eltwise.fp32} : (tensor<1x512x!eltwise.fp32>, tensor<512x!eltwise.fp32>) -> tensor<1x512x!eltwise.fp32>
+    %2 = "eltwise.cmp_lt"(%1, %cst) {type = !eltwise.fp32} : (tensor<1x512x!eltwise.fp32>, !fp32) -> tensor<1x512x!eltwise.bool>
+    %3 = "eltwise.select"(%2, %cst, %1) {type = !eltwise.fp32} : (tensor<1x512x!eltwise.bool>, !fp32, tensor<1x512x!eltwise.fp32>) -> tensor<1x512x!eltwise.fp32>
+    %4 = "tile.domain"() ( {
+    ^bb0(%arg7: index, %arg8: index, %arg9: index):	// no predecessors
+      %15 = "tile.src_idx_map"(%3, %arg8, %arg7) : (tensor<1x512x!eltwise.fp32>, index, index) -> !tile.imap
+      %16 = "tile.src_idx_map"(%arg5, %arg7, %arg9) : (tensor<512x512x!eltwise.fp32>, index, index) -> !tile.imap
+      %17 = "tile.sink_idx_map"(%arg8, %arg9) : (index, index) -> !tile.imap
+      %18 = "tile.size_map"(%c1, %c512) : (index, index) -> !tile.smap
+      "tile.+(x*y)"(%18, %15, %16, %17) : (!tile.smap, !tile.imap, !tile.imap, !tile.imap) -> ()
+    }) : () -> tensor<1x512x!eltwise.fp32>
+    %5 = "eltwise.add"(%4, %arg1) {type = !eltwise.fp32} : (tensor<1x512x!eltwise.fp32>, tensor<512x!eltwise.fp32>) -> tensor<1x512x!eltwise.fp32>
+    %6 = "eltwise.cmp_lt"(%5, %cst) {type = !eltwise.fp32} : (tensor<1x512x!eltwise.fp32>, !fp32) -> tensor<1x512x!eltwise.bool>
+    %7 = "eltwise.select"(%6, %cst, %5) {type = !eltwise.fp32} : (tensor<1x512x!eltwise.bool>, !fp32, tensor<1x512x!eltwise.fp32>) -> tensor<1x512x!eltwise.fp32>
+    %8 = "tile.domain"() ( {
+    ^bb0(%arg7: index, %arg8: index, %arg9: index):	// no predecessors
+      %15 = "tile.src_idx_map"(%7, %arg8, %arg7) : (tensor<1x512x!eltwise.fp32>, index, index) -> !tile.imap
+      %16 = "tile.src_idx_map"(%arg6, %arg7, %arg9) : (tensor<512x10x!eltwise.fp32>, index, index) -> !tile.imap
+      %17 = "tile.sink_idx_map"(%arg8, %arg9) : (index, index) -> !tile.imap
+      %18 = "tile.size_map"(%c1, %c10) : (index, index) -> !tile.smap
+      "tile.+(x*y)"(%18, %15, %16, %17) : (!tile.smap, !tile.imap, !tile.imap, !tile.imap) -> ()
+    }) : () -> tensor<1x10x!eltwise.fp32>
+    %9 = "eltwise.add"(%8, %arg0) {type = !eltwise.fp32} : (tensor<1x10x!eltwise.fp32>, tensor<10x!eltwise.fp32>) -> tensor<1x10x!eltwise.fp32>
+    %10 = "tile.domain"() ( {
+    ^bb0(%arg7: index, %arg8: index):	// no predecessors
+      %15 = "tile.src_idx_map"(%9, %arg8, %arg7) : (tensor<1x10x!eltwise.fp32>, index, index) -> !tile.imap
+      %16 = "tile.sink_idx_map"(%arg8, %c0) : (index, index) -> !tile.imap
+      %17 = "tile.size_map"(%c1, %c1) : (index, index) -> !tile.smap
+      "tile.>(x)"(%17, %15, %16) : (!tile.smap, !tile.imap, !tile.imap) -> ()
+    }) : () -> tensor<1x1x!eltwise.fp32>
+    %11 = "eltwise.sub"(%9, %10) {type = !eltwise.fp32} : (tensor<1x10x!eltwise.fp32>, tensor<1x1x!eltwise.fp32>) -> tensor<1x10x!eltwise.fp32>
+    %12 = "eltwise.exp"(%11) {type = !eltwise.fp32} : (tensor<1x10x!eltwise.fp32>) -> tensor<1x10x!eltwise.fp32>
+    %13 = "tile.domain"() ( {
+    ^bb0(%arg7: index, %arg8: index):	// no predecessors
+      %15 = "tile.src_idx_map"(%12, %arg8, %arg7) : (tensor<1x10x!eltwise.fp32>, index, index) -> !tile.imap
+      %16 = "tile.sink_idx_map"(%arg8, %c0) : (index, index) -> !tile.imap
+      %17 = "tile.size_map"(%c1, %c1) : (index, index) -> !tile.smap
+      "tile.+(x)"(%17, %15, %16) : (!tile.smap, !tile.imap, !tile.imap) -> ()
+    }) : () -> tensor<1x1x!eltwise.fp32>
+    %14 = "eltwise.div"(%12, %13) {type = !eltwise.fp32} : (tensor<1x10x!eltwise.fp32>, tensor<1x1x!eltwise.fp32>) -> tensor<1x10x!eltwise.fp32>
+    return %14 : tensor<1x10x!eltwise.fp32>
+  }
 }
 ''')
 
@@ -160,7 +190,7 @@ class TestEdsl(unittest.TestCase):
         P1 = max_pool_2d(C2)
         # model.add(Flatten())
         F = flatten(P1)
-        self.assertEqual(str(F.shape), 'fp32(1, 12100)')
+        self.assertEqual(str(F.shape), 'tensor<1x12100x!eltwise.fp32>')
         K3 = Tensor(LogicalShape(plaidml.DType.FLOAT32, [12100, 128]))
         B3 = Tensor(LogicalShape(plaidml.DType.FLOAT32, [128]))
         D1 = relu(dot(F, K3) + B3)
@@ -169,71 +199,49 @@ class TestEdsl(unittest.TestCase):
         B4 = Tensor(LogicalShape(plaidml.DType.FLOAT32, [100]))
         D2 = softmax(dot(D1, K4) + B4)
         program = Program('mnist_cnn', [D2])
-        self.assertMultiLineEqual(
-            str(program), '''function (
-  _X0[_X0_0, _X0_1, _X0_2, _X0_3],
-  _X1[_X1_0, _X1_1, _X1_2, _X1_3],
-  _X3[_X3_0],
-  _X9[_X9_0, _X9_1, _X9_2, _X9_3],
-  _X11[_X11_0],
-  _X21[_X21_0, _X21_1],
-  _X23[_X23_0],
-  _X29[_X29_0, _X29_1],
-  _X31[_X31_0]
-) -> (
-  _X37
-) {
-  _X2[x0, x1, x3, x6 : 1, 222, 222, 32] = +(_X0[x0, -1 + x1 + x2, -1 + x3 + x4, x5] * _X1[x2, x4, x5, x6]);
-  _X4 = add(_X2, _X3);
-  _X5 = 0.000000;
-  _X6 = cmp_lt(_X4, _X5);
-  _X7 = 0.000000;
-  _X8 = cond(_X6, _X7, _X4);
-  _X10[x0, x1, x3, x6 : 1, 220, 220, 64] = +(_X8[x0, -1 + x1 + x2, -1 + x3 + x4, x5] * _X9[x2, x4, x5, x6]);
-  _X12 = add(_X10, _X11);
-  _X13 = 0.000000;
-  _X14 = cmp_lt(_X12, _X13);
-  _X15 = 0.000000;
-  _X16 = cond(_X14, _X15, _X12);
-  _X17[x0, x1, x3, x5 : 1, 110, 110, 64] = >(_X16[x0, 2*x1 + x2, 2*x3 + x4, x5]), x2 < 2, x4 < 2;
-  _X18 = 1;
-  _X19 = 12100;
-  _X20 = reshape(_X17, _X18, _X19);
-  _X22[x0, x2 : 1, 128] = +(_X20[x0, x1] * _X21[x1, x2]);
-  _X24 = add(_X22, _X23);
-  _X25 = 0.000000;
-  _X26 = cmp_lt(_X24, _X25);
-  _X27 = 0.000000;
-  _X28 = cond(_X26, _X27, _X24);
-  _X30[x0, x2 : 1, 100] = +(_X28[x0, x1] * _X29[x1, x2]);
-  _X32 = add(_X30, _X31);
-  _X33[x0, 0 : 1, 1] = >(_X32[x0, x1]);
-  _X34 = sub(_X32, _X33);
-  _X35 = exp(_X34);
-  _X36[x0, 0 : 1, 1] = +(_X35[x0, x1]);
-  _X37 = div(_X35, _X36);
-}
-''')
 
     def test_arg_max(self):
         I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 10, 10]))
         O = arg_max(I)
-        self.assertEqual(str(O.shape), 'u32(1, 10)')
+        self.assertEqual(str(O.shape), 'tensor<1x10x!eltwise.u32>')
         program = Program('arg_max', [O])
         self.assertMultiLineEqual(
-            str(program), '''function (
-  _X0[_X0_0, _X0_1, _X0_2],
-  _X2[]
-) -> (
-  _X8
-) {
-  _X1[x0, x2 : 1, 10] = >(_X0[x0, x1, x2]);
-  _X3[x0 : 10] = =(_X2[]);
-  _X4 = 0;
-  _X5 = index(_X3, _X4);
-  _X6[x0, x2 : 1, 10] = >(_X0[x0, x1, x2] == _X1[x0, x2] ? _X5[x1]);
-  _X7 = 32;
-  _X8 = as_uint(_X6, _X7);
+            str(program), '''
+
+!i32 = type tensor<!eltwise.i32>
+!fp32 = type tensor<!eltwise.fp32>
+module {
+  func @arg_max(%arg0: tensor<1x10x10x!eltwise.fp32>, %arg1: !fp32) -> tensor<1x10x!eltwise.u32> {
+    %c1 = "tile.const_dim"() {value = 1 : i64} : () -> index
+    %c0 = "eltwise.sconst"() {value = 0 : i64} : () -> !i32
+    %c10 = "tile.const_dim"() {value = 10 : i64} : () -> index
+    %0 = "tile.domain"() ( {
+    ^bb0(%arg2: index, %arg3: index, %arg4: index):	// no predecessors
+      %5 = "tile.src_idx_map"(%arg0, %arg4, %arg3, %arg2) : (tensor<1x10x10x!eltwise.fp32>, index, index, index) -> !tile.imap
+      %6 = "tile.sink_idx_map"(%arg4, %arg2) : (index, index) -> !tile.imap
+      %7 = "tile.size_map"(%c1, %c10) : (index, index) -> !tile.smap
+      "tile.>(x)"(%7, %5, %6) : (!tile.smap, !tile.imap, !tile.imap) -> ()
+    }) : () -> tensor<1x10x!eltwise.fp32>
+    %1 = "tile.domain"() ( {
+    ^bb0(%arg2: index):	// no predecessors
+      %5 = "tile.src_idx_map"(%arg1) : (!fp32) -> !tile.imap
+      %6 = "tile.sink_idx_map"(%arg2) : (index) -> !tile.imap
+      %7 = "tile.size_map"(%c10) : (index) -> !tile.smap
+      "tile.=(x)"(%7, %5, %6) : (!tile.smap, !tile.imap, !tile.imap) -> ()
+    }) : () -> tensor<10x!eltwise.fp32>
+    %2 = "tile.index"(%1, %c0) : (tensor<10x!eltwise.fp32>, !i32) -> tensor<10x!eltwise.i32>
+    %3 = "tile.domain"() ( {
+    ^bb0(%arg2: index, %arg3: index, %arg4: index):	// no predecessors
+      %5 = "tile.src_idx_map"(%arg0, %arg4, %arg3, %arg2) : (tensor<1x10x10x!eltwise.fp32>, index, index, index) -> !tile.imap
+      %6 = "tile.src_idx_map"(%0, %arg4, %arg2) : (tensor<1x10x!eltwise.fp32>, index, index) -> !tile.imap
+      %7 = "tile.src_idx_map"(%2, %arg3) : (tensor<10x!eltwise.i32>, index) -> !tile.imap
+      %8 = "tile.sink_idx_map"(%arg4, %arg2) : (index, index) -> !tile.imap
+      %9 = "tile.size_map"(%c1, %c10) : (index, index) -> !tile.smap
+      "tile.>(x==y?z)"(%9, %5, %6, %7, %8) : (!tile.smap, !tile.imap, !tile.imap, !tile.imap, !tile.imap) -> ()
+    }) : () -> tensor<1x10x!eltwise.fp32>
+    %4 = "eltwise.as_uint"(%3) : (tensor<1x10x!eltwise.fp32>) -> tensor<1x10x!eltwise.u32>
+    return %4 : tensor<1x10x!eltwise.u32>
+  }
 }
 ''')
 
@@ -246,14 +254,22 @@ class TestEdsl(unittest.TestCase):
         O = -O_Neg
         program = Program('global_min', [O])
         self.assertMultiLineEqual(
-            str(program), '''function (
-  I[I_0, I_1, I_2]
-) -> (
-  _X2
-) {
-  _X0 = neg(I);
-  _X1[] = >(_X0[x0, x1, x2]);
-  _X2 = neg(_X1);
+            str(program), '''
+
+!fp32 = type tensor<!eltwise.fp32>
+module {
+  func @global_min(%arg0: tensor<10x10x10x!eltwise.fp32>) -> !fp32 {
+    %0 = "eltwise.neg"(%arg0) {type = !eltwise.fp32} : (tensor<10x10x10x!eltwise.fp32>) -> tensor<10x10x10x!eltwise.fp32>
+    %1 = "tile.domain"() ( {
+    ^bb0(%arg1: index, %arg2: index, %arg3: index):	// no predecessors
+      %3 = "tile.src_idx_map"(%0, %arg3, %arg2, %arg1) : (tensor<10x10x10x!eltwise.fp32>, index, index, index) -> !tile.imap
+      %4 = "tile.sink_idx_map"() : () -> !tile.imap
+      %5 = "tile.size_map"() : () -> !tile.smap
+      "tile.>(x)"(%5, %3, %4) : (!tile.smap, !tile.imap, !tile.imap) -> ()
+    }) : () -> !fp32
+    %2 = "eltwise.neg"(%1) {type = !eltwise.fp32} : (!fp32) -> !fp32
+    return %2 : !fp32
+  }
 }
 ''')
 
@@ -267,12 +283,23 @@ class TestEdsl(unittest.TestCase):
         O.add_constraint(i - k < N)
         program = Program('cum_sum', [O])
         self.assertMultiLineEqual(
-            str(program), '''function (
-  I[I_0]
-) -> (
-  _X0
-) {
-  _X0[x1 : 10] = +(I[x0]), -x0 + x1 < 10;
+            str(program), '''
+
+module {
+  func @cum_sum(%arg0: tensor<10x!eltwise.fp32>) -> tensor<10x!eltwise.fp32> {
+    %c10 = "tile.const_dim"() {value = 10 : i64} : () -> index
+    %0 = "tile.domain"() ( {
+    ^bb0(%arg1: index, %arg2: index):	// no predecessors
+      %1 = "tile.src_idx_map"(%arg0, %arg1) : (tensor<10x!eltwise.fp32>, index) -> !tile.imap
+      %2 = "tile.sink_idx_map"(%arg2) : (index) -> !tile.imap
+      %3 = "tile.size_map"(%c10) : (index) -> !tile.smap
+      %4 = "tile.affine_sub"(%arg2, %arg1) : (index, index) -> index
+      "tile.constraint"(%4, %c10) ( {
+        "tile.+(x)"(%3, %1, %2) : (!tile.smap, !tile.imap, !tile.imap) -> ()
+      }) : (index, index) -> ()
+    }) : () -> tensor<10x!eltwise.fp32>
+    return %0 : tensor<10x!eltwise.fp32>
+  }
 }
 ''')
 
@@ -289,17 +316,16 @@ class TestEdsl(unittest.TestCase):
         C1 = Tensor(LogicalShape(plaidml.DType.FLOAT32), name='C')
         program = Program('unique_names', [A + B + C0 + C1])
         self.assertMultiLineEqual(
-            str(program), '''function (
-  A[],
-  B[],
-  C[],
-  C0[]
-) -> (
-  _X2
-) {
-  _X0 = add(A, B);
-  _X1 = add(_X0, C);
-  _X2 = add(_X1, C0);
+            str(program), '''
+
+!fp32 = type tensor<!eltwise.fp32>
+module {
+  func @unique_names(%arg0: !fp32, %arg1: !fp32, %arg2: !fp32, %arg3: !fp32) -> !fp32 {
+    %0 = "eltwise.add"(%arg3, %arg2) {type = !eltwise.fp32} : (!fp32, !fp32) -> !fp32
+    %1 = "eltwise.add"(%0, %arg1) {type = !eltwise.fp32} : (!fp32, !fp32) -> !fp32
+    %2 = "eltwise.add"(%1, %arg0) {type = !eltwise.fp32} : (!fp32, !fp32) -> !fp32
+    return %2 : !fp32
+  }
 }
 ''')
 
@@ -313,36 +339,45 @@ class TestEdsl(unittest.TestCase):
         R = lars_momentum(X, Grad, Veloc, LR, 1. / 1024., 1. / 2048., 1. / 8.)
         program = Program('lars_momentum_4d', R)
         self.assertMultiLineEqual(
-            str(program), '''function (
-  _X1[_X1_0, _X1_1, _X1_2, _X1_3],
-  _X3[],
-  _X6[_X6_0, _X6_1, _X6_2, _X6_3],
-  _X11[_X11_0, _X11_1, _X11_2, _X11_3]
-) -> (
-  _X24,
-  _X23
-) {
-  _X0 = 0.125000;
-  _X2 = mul(_X0, _X1);
-  _X4 = 0.000977;
-  _X5 = mul(_X3, _X4);
-  _X7 = mul(_X6, _X6);
-  _X8[] = +(_X7[x0, x1, x2, x3]);
-  _X9 = sqrt(_X8);
-  _X10 = mul(_X5, _X9);
-  _X12 = mul(_X11, _X11);
-  _X13[] = +(_X12[x0, x1, x2, x3]);
-  _X14 = sqrt(_X13);
-  _X15 = 0.000488;
-  _X16 = mul(_X15, _X9);
-  _X17 = add(_X14, _X16);
-  _X18 = div(_X10, _X17);
-  _X19 = 0.000488;
-  _X20 = mul(_X19, _X6);
-  _X21 = add(_X11, _X20);
-  _X22 = mul(_X18, _X21);
-  _X23 = add(_X2, _X22);
-  _X24 = sub(_X6, _X23);
+            str(program), '''
+
+!fp32 = type tensor<!eltwise.fp32>
+module {
+  func @lars_momentum_4d(%arg0: tensor<4x7x3x9x!eltwise.fp32>, %arg1: tensor<4x7x3x9x!eltwise.fp32>, %arg2: !fp32, %arg3: tensor<4x7x3x9x!eltwise.fp32>) -> (tensor<4x7x3x9x!eltwise.fp32>, tensor<4x7x3x9x!eltwise.fp32>) {
+    %cst = "eltwise.sconst"() {value = 4.8828125E-4 : f32} : () -> !fp32
+    %cst_0 = "eltwise.sconst"() {value = 9.765625E-4 : f32} : () -> !fp32
+    %cst_1 = "eltwise.sconst"() {value = 1.250000e-01 : f32} : () -> !fp32
+    %0 = "eltwise.mul"(%arg0, %cst) {type = !eltwise.fp32} : (tensor<4x7x3x9x!eltwise.fp32>, !fp32) -> tensor<4x7x3x9x!eltwise.fp32>
+    %1 = "eltwise.add"(%arg1, %0) {type = !eltwise.fp32} : (tensor<4x7x3x9x!eltwise.fp32>, tensor<4x7x3x9x!eltwise.fp32>) -> tensor<4x7x3x9x!eltwise.fp32>
+    %2 = "eltwise.mul"(%arg0, %arg0) {type = !eltwise.fp32} : (tensor<4x7x3x9x!eltwise.fp32>, tensor<4x7x3x9x!eltwise.fp32>) -> tensor<4x7x3x9x!eltwise.fp32>
+    %3 = "tile.domain"() ( {
+    ^bb0(%arg4: index, %arg5: index, %arg6: index, %arg7: index):	// no predecessors
+      %17 = "tile.src_idx_map"(%2, %arg7, %arg6, %arg5, %arg4) : (tensor<4x7x3x9x!eltwise.fp32>, index, index, index, index) -> !tile.imap
+      %18 = "tile.sink_idx_map"() : () -> !tile.imap
+      %19 = "tile.size_map"() : () -> !tile.smap
+      "tile.+(x)"(%19, %17, %18) : (!tile.smap, !tile.imap, !tile.imap) -> ()
+    }) : () -> !fp32
+    %4 = "eltwise.sqrt"(%3) {type = !eltwise.fp32} : (!fp32) -> !fp32
+    %5 = "eltwise.mul"(%4, %cst) {type = !eltwise.fp32} : (!fp32, !fp32) -> !fp32
+    %6 = "eltwise.mul"(%arg1, %arg1) {type = !eltwise.fp32} : (tensor<4x7x3x9x!eltwise.fp32>, tensor<4x7x3x9x!eltwise.fp32>) -> tensor<4x7x3x9x!eltwise.fp32>
+    %7 = "tile.domain"() ( {
+    ^bb0(%arg4: index, %arg5: index, %arg6: index, %arg7: index):	// no predecessors
+      %17 = "tile.src_idx_map"(%6, %arg7, %arg6, %arg5, %arg4) : (tensor<4x7x3x9x!eltwise.fp32>, index, index, index, index) -> !tile.imap
+      %18 = "tile.sink_idx_map"() : () -> !tile.imap
+      %19 = "tile.size_map"() : () -> !tile.smap
+      "tile.+(x)"(%19, %17, %18) : (!tile.smap, !tile.imap, !tile.imap) -> ()
+    }) : () -> !fp32
+    %8 = "eltwise.sqrt"(%7) {type = !eltwise.fp32} : (!fp32) -> !fp32
+    %9 = "eltwise.add"(%8, %5) {type = !eltwise.fp32} : (!fp32, !fp32) -> !fp32
+    %10 = "eltwise.mul"(%arg2, %cst_0) {type = !eltwise.fp32} : (!fp32, !fp32) -> !fp32
+    %11 = "eltwise.mul"(%10, %4) {type = !eltwise.fp32} : (!fp32, !fp32) -> !fp32
+    %12 = "eltwise.div"(%11, %9) {type = !eltwise.fp32} : (!fp32, !fp32) -> !fp32
+    %13 = "eltwise.mul"(%12, %1) {type = !eltwise.fp32} : (!fp32, tensor<4x7x3x9x!eltwise.fp32>) -> tensor<4x7x3x9x!eltwise.fp32>
+    %14 = "eltwise.mul"(%arg3, %cst_1) {type = !eltwise.fp32} : (tensor<4x7x3x9x!eltwise.fp32>, !fp32) -> tensor<4x7x3x9x!eltwise.fp32>
+    %15 = "eltwise.add"(%14, %13) {type = !eltwise.fp32} : (tensor<4x7x3x9x!eltwise.fp32>, tensor<4x7x3x9x!eltwise.fp32>) -> tensor<4x7x3x9x!eltwise.fp32>
+    %16 = "eltwise.sub"(%arg0, %15) {type = !eltwise.fp32} : (tensor<4x7x3x9x!eltwise.fp32>, tensor<4x7x3x9x!eltwise.fp32>) -> tensor<4x7x3x9x!eltwise.fp32>
+    return %16, %15 : tensor<4x7x3x9x!eltwise.fp32>, tensor<4x7x3x9x!eltwise.fp32>
+  }
 }
 ''')
 
@@ -377,17 +412,27 @@ class TestEdsl(unittest.TestCase):
         O.use_default(P)
         program = Program('use_default', [O])
         self.assertMultiLineEqual(
-            str(program), '''function (
-  _X0[_X0_0, _X0_1, _X0_2, _X0_3],
-  _X1[_X1_0, _X1_1, _X1_2]
-) -> (
-  _X2
-) {
-  _X2[x0, 3, x1, x2 : 1, 7, 10, 10] = =(_X1[x0, x1, x2]) default _X0;
+            str(program), '''
+
+module {
+  func @use_default(%arg0: tensor<1x10x10x!eltwise.fp32>, %arg1: tensor<1x7x10x10x!eltwise.fp32>) -> tensor<1x7x10x10x!eltwise.fp32> {
+    %c3 = "tile.const_dim"() {value = 3 : i64} : () -> index
+    %c10 = "tile.const_dim"() {value = 10 : i64} : () -> index
+    %c7 = "tile.const_dim"() {value = 7 : i64} : () -> index
+    %c1 = "tile.const_dim"() {value = 1 : i64} : () -> index
+    %0 = "tile.domain"() ( {
+    ^bb0(%arg2: index, %arg3: index, %arg4: index):	// no predecessors
+      %1 = "tile.src_idx_map"(%arg0, %arg4, %arg3, %arg2) : (tensor<1x10x10x!eltwise.fp32>, index, index, index) -> !tile.imap
+      %2 = "tile.sink_idx_map"(%arg4, %c3, %arg3, %arg2) : (index, index, index, index) -> !tile.imap
+      %3 = "tile.size_map"(%c1, %c7, %c10, %c10) : (index, index, index, index) -> !tile.smap
+      "tile.=(x)"(%3, %1, %2, %arg1) : (!tile.smap, !tile.imap, !tile.imap, tensor<1x7x10x10x!eltwise.fp32>) -> ()
+    }) : () -> tensor<1x7x10x10x!eltwise.fp32>
+    return %0 : tensor<1x7x10x10x!eltwise.fp32>
+  }
 }
 ''')
 
-    def testDefract(self):
+    def test_defract(self):
         I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [3]), name='I')
         K = Tensor(LogicalShape(plaidml.DType.FLOAT32, [3]), name='K')
         i, j = TensorIndexes(2)
@@ -395,37 +440,62 @@ class TestEdsl(unittest.TestCase):
         O[i] += (I[(i - j + 1) // 2] * K[j])
         program = Program('defract_test', [O])
         self.assertMultiLineEqual(
-            str(program), '''function (
-  I[I_0],
-  K[K_0]
-) -> (
-  _X0
-) {
-  _X0[x0 : 5] = +(I[1/2 + 1/2*x0 - 1/2*x1] * K[x1]);
+            str(program), '''
+
+module {
+  func @defract_test(%arg0: tensor<3x!eltwise.fp32>, %arg1: tensor<3x!eltwise.fp32>) -> tensor<5x!eltwise.fp32> {
+    %c1 = "tile.const_dim"() {value = 1 : i64} : () -> index
+    %c2 = "tile.const_dim"() {value = 2 : i64} : () -> index
+    %c5 = "tile.const_dim"() {value = 5 : i64} : () -> index
+    %0 = "tile.domain"() ( {
+    ^bb0(%arg2: index, %arg3: index):	// no predecessors
+      %1 = "tile.affine_sub"(%arg3, %arg2) : (index, index) -> index
+      %2 = "tile.affine_add"(%1, %c1) : (index, index) -> index
+      %3 = "tile.affine_div"(%2, %c2) : (index, index) -> index
+      %4 = "tile.src_idx_map"(%arg0, %3) : (tensor<3x!eltwise.fp32>, index) -> !tile.imap
+      %5 = "tile.src_idx_map"(%arg1, %arg2) : (tensor<3x!eltwise.fp32>, index) -> !tile.imap
+      %6 = "tile.sink_idx_map"(%arg3) : (index) -> !tile.imap
+      %7 = "tile.size_map"(%c5) : (index) -> !tile.smap
+      "tile.+(x*y)"(%7, %4, %5, %6) : (!tile.smap, !tile.imap, !tile.imap, !tile.imap) -> ()
+    }) : () -> tensor<5x!eltwise.fp32>
+    return %0 : tensor<5x!eltwise.fp32>
+  }
 }
 ''')
         outputs = plaidml_exec.run(program, [(I, np.array([1, 2, 3])), (K, np.array([1, 2, 3]))])
         self.assertEqual(outputs[0].tolist(), [2, 5, 4, 9, 6])
 
-    def testDefractShort(self):
+    def test_defract_short(self):
         I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [3]), name='I')
         i, j = TensorIndexes(2)
         O = TensorOutput(6)
         O[i] += (I[(i - 1) // 2])
         program = Program('defract_short_test', [O])
         self.assertMultiLineEqual(
-            str(program), '''function (
-  I[I_0]
-) -> (
-  _X0
-) {
-  _X0[x0 : 6] = +(I[-1/2 + 1/2*x0]);
+            str(program), '''
+
+module {
+  func @defract_short_test(%arg0: tensor<3x!eltwise.fp32>) -> tensor<6x!eltwise.fp32> {
+    %c1 = "tile.const_dim"() {value = 1 : i64} : () -> index
+    %c2 = "tile.const_dim"() {value = 2 : i64} : () -> index
+    %c6 = "tile.const_dim"() {value = 6 : i64} : () -> index
+    %0 = "tile.domain"() ( {
+    ^bb0(%arg1: index):	// no predecessors
+      %1 = "tile.affine_sub"(%arg1, %c1) : (index, index) -> index
+      %2 = "tile.affine_div"(%1, %c2) : (index, index) -> index
+      %3 = "tile.src_idx_map"(%arg0, %2) : (tensor<3x!eltwise.fp32>, index) -> !tile.imap
+      %4 = "tile.sink_idx_map"(%arg1) : (index) -> !tile.imap
+      %5 = "tile.size_map"(%c6) : (index) -> !tile.smap
+      "tile.+(x)"(%5, %3, %4) : (!tile.smap, !tile.imap, !tile.imap) -> ()
+    }) : () -> tensor<6x!eltwise.fp32>
+    return %0 : tensor<6x!eltwise.fp32>
+  }
 }
 ''')
         outputs = plaidml_exec.run(program, [(I, np.array([1, 2, 3]))])
         self.assertEqual(outputs[0].tolist(), [0, 1, 0, 2, 0, 3])
 
-    def testDefractLong(self):
+    def test_defract_long(self):
         shape = [1, 3, 3, 1]
         I = Tensor(LogicalShape(plaidml.DType.FLOAT32, shape), name='I')
         K = Tensor(LogicalShape(plaidml.DType.FLOAT32, shape), name='K')
@@ -435,13 +505,31 @@ class TestEdsl(unittest.TestCase):
                                (x1 + k1 - 1) // 2, ci] * K[2 - k0, 2 - k1, co, ci])
         program = Program('defract_long', [O])
         self.assertMultiLineEqual(
-            str(program), '''function (
-  I[I_0, I_1, I_2, I_3],
-  K[K_0, K_1, K_2, K_3]
-) -> (
-  _X0
-) {
-  _X0[x0, x1, x3, x6 : 1, 5, 5, 1] = +(I[x0, -1/2 + 1/2*x1 + 1/2*x2, -1/2 + 1/2*x3 + 1/2*x4, x5] * K[2 - x2, 2 - x4, x6, x5]);
+            str(program), '''
+
+module {
+  func @defract_long(%arg0: tensor<1x3x3x1x!eltwise.fp32>, %arg1: tensor<1x3x3x1x!eltwise.fp32>) -> tensor<1x5x5x1x!eltwise.fp32> {
+    %c2 = "tile.const_dim"() {value = 2 : i64} : () -> index
+    %c5 = "tile.const_dim"() {value = 5 : i64} : () -> index
+    %c1 = "tile.const_dim"() {value = 1 : i64} : () -> index
+    %0 = "tile.domain"() ( {
+    ^bb0(%arg2: index, %arg3: index, %arg4: index, %arg5: index, %arg6: index, %arg7: index, %arg8: index):	// no predecessors
+      %1 = "tile.affine_add"(%arg4, %arg3) : (index, index) -> index
+      %2 = "tile.affine_sub"(%1, %c1) : (index, index) -> index
+      %3 = "tile.affine_div"(%2, %c2) : (index, index) -> index
+      %4 = "tile.affine_add"(%arg6, %arg5) : (index, index) -> index
+      %5 = "tile.affine_sub"(%4, %c1) : (index, index) -> index
+      %6 = "tile.affine_div"(%5, %c2) : (index, index) -> index
+      %7 = "tile.src_idx_map"(%arg0, %arg7, %6, %3, %arg2) : (tensor<1x3x3x1x!eltwise.fp32>, index, index, index, index) -> !tile.imap
+      %8 = "tile.affine_sub"(%c2, %arg3) : (index, index) -> index
+      %9 = "tile.affine_sub"(%c2, %arg5) : (index, index) -> index
+      %10 = "tile.src_idx_map"(%arg1, %9, %8, %arg8, %arg2) : (tensor<1x3x3x1x!eltwise.fp32>, index, index, index, index) -> !tile.imap
+      %11 = "tile.sink_idx_map"(%arg7, %arg6, %arg4, %arg8) : (index, index, index, index) -> !tile.imap
+      %12 = "tile.size_map"(%c1, %c5, %c5, %c1) : (index, index, index, index) -> !tile.smap
+      "tile.+(x*y)"(%12, %7, %10, %11) : (!tile.smap, !tile.imap, !tile.imap, !tile.imap) -> ()
+    }) : () -> tensor<1x5x5x1x!eltwise.fp32>
+    return %0 : tensor<1x5x5x1x!eltwise.fp32>
+  }
 }
 ''')
         outputs = plaidml_exec.run(program, [
@@ -466,7 +554,7 @@ class TestEdsl(unittest.TestCase):
                 [[0], [0], [0], [0], [0]],
             ]]))
 
-    def testFunkyLayerNames(self):
+    def test_funky_names(self):
         '''Exercises fix for plaidml bug #241
 
         Now that we emit keras layer names as 'pid' attribute values, in order
@@ -481,34 +569,49 @@ class TestEdsl(unittest.TestCase):
         O[i] += (I[(i - j + 1) // 2] * K[j])
         program = Program('this-is-not an identifier', [O])
         self.assertMultiLineEqual(
-            str(program), '''function (
-  I[I_0],
-  K[K_0]
-) -> (
-  _X0
-) {
-  _X0[x0 : 5] = +(I[1/2 + 1/2*x0 - 1/2*x1] * K[x1]);
+            str(program), '''
+
+module {
+  func @this-is-not an identifier(%arg0: tensor<3x!eltwise.fp32>, %arg1: tensor<3x!eltwise.fp32>) -> tensor<5x!eltwise.fp32> {
+    %c1 = "tile.const_dim"() {value = 1 : i64} : () -> index
+    %c2 = "tile.const_dim"() {value = 2 : i64} : () -> index
+    %c5 = "tile.const_dim"() {value = 5 : i64} : () -> index
+    %0 = "tile.domain"() ( {
+    ^bb0(%arg2: index, %arg3: index):	// no predecessors
+      %1 = "tile.affine_sub"(%arg3, %arg2) : (index, index) -> index
+      %2 = "tile.affine_add"(%1, %c1) : (index, index) -> index
+      %3 = "tile.affine_div"(%2, %c2) : (index, index) -> index
+      %4 = "tile.src_idx_map"(%arg0, %3) : (tensor<3x!eltwise.fp32>, index) -> !tile.imap
+      %5 = "tile.src_idx_map"(%arg1, %arg2) : (tensor<3x!eltwise.fp32>, index) -> !tile.imap
+      %6 = "tile.sink_idx_map"(%arg3) : (index) -> !tile.imap
+      %7 = "tile.size_map"(%c5) : (index) -> !tile.smap
+      "tile.+(x*y)"(%7, %4, %5, %6) : (!tile.smap, !tile.imap, !tile.imap, !tile.imap) -> ()
+    }) : () -> tensor<5x!eltwise.fp32>
+    return %0 : tensor<5x!eltwise.fp32>
+  }
 }
 ''')
         outputs = plaidml_exec.run(program, [(I, np.array([1, 2, 3])), (K, np.array([1, 2, 3]))])
         self.assertEqual(outputs[0].tolist(), [2, 5, 4, 9, 6])
 
-    def testTileIdentity(self):
+    def test_identity(self):
         I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [3]), name='I')
-        program = Program('tile_identity', [I])
-        self.assertMultiLineEqual(str(program), '''function (
-  I[I_0]
-) -> (
-  _X0
-) {
-  _X0 = ident(I);
+        program = Program('identity', [I])
+        self.assertMultiLineEqual(
+            str(program), '''
+
+module {
+  func @identity(%arg0: tensor<3x!eltwise.fp32>) -> tensor<3x!eltwise.fp32> {
+    %0 = "eltwise.ident"(%arg0) {type = !eltwise.fp32} : (tensor<3x!eltwise.fp32>) -> tensor<3x!eltwise.fp32>
+    return %0 : tensor<3x!eltwise.fp32>
+  }
 }
 ''')
         outputs = plaidml_exec.run(program, [(I, np.array([(1, 2, 3)]))])
         self.assertEqual(outputs[0].tolist(), [1, 2, 3])
 
     @unittest.skip('TODO: exception needs to be thrown')
-    def testAssignmentExceptions(self):
+    def test_assignment_exceptions(self):
         A = Tensor(LogicalShape(plaidml.DType.FLOAT32, [5, 1]), name='A')
         B = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 5]), name='B')
         L, M, N = TensorDims(3)
@@ -540,18 +643,18 @@ class TestEdsl(unittest.TestCase):
             program = Program('assignment_exception', [O])
         self.assertTrue("illegal assignment aggregation" in str(cm.exception))
 
-    def testTwoOutputs(self):
+    def test_two_outputs(self):
         I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [3]), name='I')
         program1 = Program('two_outputs', [I, I])
         self.assertMultiLineEqual(
-            str(program1), '''function (
-  I[I_0]
-) -> (
-  _X1,
-  _X0
-) {
-  _X0 = ident(I);
-  _X1 = ident(I);
+            str(program1), '''
+
+module {
+  func @two_outputs(%arg0: tensor<3x!eltwise.fp32>) -> (tensor<3x!eltwise.fp32>, tensor<3x!eltwise.fp32>) {
+    %0 = "eltwise.ident"(%arg0) {type = !eltwise.fp32} : (tensor<3x!eltwise.fp32>) -> tensor<3x!eltwise.fp32>
+    %1 = "eltwise.ident"(%arg0) {type = !eltwise.fp32} : (tensor<3x!eltwise.fp32>) -> tensor<3x!eltwise.fp32>
+    return %0, %1 : tensor<3x!eltwise.fp32>, tensor<3x!eltwise.fp32>
+  }
 }
 ''')
         outputs = plaidml_exec.run(program1, [(I, np.array([(1, 2, 3)]))])

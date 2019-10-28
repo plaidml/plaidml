@@ -14,9 +14,7 @@
 
 using namespace plaidml::edsl;  // NOLINT
 
-namespace plaidml {
-namespace op {
-namespace lib {
+namespace plaidml::op::lib {
 
 // Forward declare the operations here so they can call each other
 Value abs(const Value&);
@@ -2793,6 +2791,4 @@ void RegisterOps() {
   registry->Register("variance", variance);
 }
 
-}  // namespace lib
-}  // namespace op
-}  // namespace plaidml
+}  // namespace plaidml::op::lib

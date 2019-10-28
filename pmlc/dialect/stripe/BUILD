@@ -128,8 +128,8 @@ plaidml_cc_library(
 )
 
 plaidml_cc_test(
-    name = "stripe_test",
-    srcs = ["stripe_test.cc"],
+    name = "translate_test",
+    srcs = ["translate_test.cc"],
     copts = COPTS,
     tags = [
         "llvm",
@@ -138,9 +138,9 @@ plaidml_cc_test(
     deps = [
         ":passes",
         ":transcode",
+        "//plaidml2:testenv",
         "//testing:matchers",
         "//tile/codegen",
-        "//tile/lang",
         "//tile/lib",
     ],
 )
