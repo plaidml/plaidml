@@ -55,50 +55,14 @@ inline edsl::Tensor binary_crossentropy(const edsl::Tensor& I, const edsl::Tenso
   return details::op("binary_crossentropy", args).as_tensor();
 }
 
-inline edsl::Tensor concatenate(const std::vector<edsl::Tensor>& tensors, int axis) {
-  auto args = edsl::make_tuple(edsl::make_tuple(tensors), axis);
-  return details::op("concatenate", args).as_tensor();
-}
-
 inline edsl::Tensor clip(const edsl::Tensor& I, const edsl::Tensor& min, const edsl::Tensor& max) {
   auto args = edsl::make_tuple(I, min, max);
   return details::op("clip", args).as_tensor();
 }
 
-inline edsl::Tensor cumprod(const edsl::Tensor& I, int axis) {
-  auto args = edsl::make_tuple(I, axis);
-  return details::op("cumprod", args).as_tensor();
-}
-
-inline edsl::Tensor cumsum(const edsl::Tensor& I, int axis) {
-  auto args = edsl::make_tuple(I, axis);
-  return details::op("cumsum", args).as_tensor();
-}
-
-inline edsl::Tensor dot(const edsl::Tensor& I, const edsl::Tensor& K) {
-  auto args = edsl::make_tuple(I, K);
-  return details::op("dot", args).as_tensor();
-}
-
-inline edsl::Tensor elu(const edsl::Tensor& I, float alpha) {
-  auto args = edsl::make_tuple(I, alpha);
-  return details::op("elu", args).as_tensor();
-}
-
-inline edsl::Tensor expand_dims(const edsl::Tensor& I, int axis) {
-  auto args = edsl::make_tuple(I, axis);
-  return details::op("expand_dims", args).as_tensor();
-}
-
-inline edsl::Tensor flip(const edsl::Tensor& I, int axis) {
-  auto args = edsl::make_tuple(I, axis);
-  return details::op("flip", args).as_tensor();
-}
-
-inline edsl::Tensor max(const edsl::Tensor& I,  // NOLINT(build/include_what_you_use)
-                        const edsl::Value& axes = edsl::None(), bool keepdims = false) {
-  auto args = edsl::make_tuple(I, axes, keepdims);
-  return details::op("max", args).as_tensor();
+inline edsl::Tensor concatenate(const std::vector<edsl::Tensor>& tensors, int axis) {
+  auto args = edsl::make_tuple(edsl::make_tuple(tensors), axis);
+  return details::op("concatenate", args).as_tensor();
 }
 
 inline edsl::Tensor convolution(             //
@@ -141,9 +105,51 @@ inline edsl::Tensor convolution(             //
   return details::op("convolution", args).as_tensor();
 }
 
+inline edsl::Tensor cumprod(const edsl::Tensor& I, int axis) {
+  auto args = edsl::make_tuple(I, axis);
+  return details::op("cumprod", args).as_tensor();
+}
+
+inline edsl::Tensor cumsum(const edsl::Tensor& I, int axis) {
+  auto args = edsl::make_tuple(I, axis);
+  return details::op("cumsum", args).as_tensor();
+}
+
+inline edsl::Tensor dot(const edsl::Tensor& I, const edsl::Tensor& K) {
+  auto args = edsl::make_tuple(I, K);
+  return details::op("dot", args).as_tensor();
+}
+
+inline edsl::Tensor elu(const edsl::Tensor& I, float alpha) {
+  auto args = edsl::make_tuple(I, alpha);
+  return details::op("elu", args).as_tensor();
+}
+
+inline edsl::Tensor expand_dims(const edsl::Tensor& I, int axis) {
+  auto args = edsl::make_tuple(I, axis);
+  return details::op("expand_dims", args).as_tensor();
+}
+
+inline edsl::Tensor flip(const edsl::Tensor& I, int axis) {
+  auto args = edsl::make_tuple(I, axis);
+  return details::op("flip", args).as_tensor();
+}
+
 inline edsl::Tensor hard_sigmoid(const edsl::Tensor& I, float slope) {
   auto args = edsl::make_tuple(I, slope);
   return details::op("hard_sigmoid", args).as_tensor();
+}
+
+inline edsl::Tensor image_resize(const edsl::Tensor& I, const std::vector<int>& factors,
+                                 const std::string& interpolation, const std::string& layout) {
+  auto args = edsl::make_tuple(I, edsl::make_tuple(factors), interpolation, layout);
+  return details::op("image_resize", args).as_tensor();
+}
+
+inline edsl::Tensor max(const edsl::Tensor& I,  // NOLINT(build/include_what_you_use)
+                        const edsl::Value& axes = edsl::None(), bool keepdims = false) {
+  auto args = edsl::make_tuple(I, axes, keepdims);
+  return details::op("max", args).as_tensor();
 }
 
 inline edsl::Tensor maximum(const edsl::Tensor& X, const edsl::Tensor& Y) {
