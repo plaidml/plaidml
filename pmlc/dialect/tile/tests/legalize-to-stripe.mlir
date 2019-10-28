@@ -227,3 +227,30 @@ func @csum(%arg0: tensor<10x!eltwise.fp32>) -> tensor<10x!eltwise.fp32> {
 // CHECK-NEXT:   stripe.terminate
 // CHECK-NEXT: }
 // CHECK-NEXT: stripe.terminate
+
+// -----
+
+func @use_default(%arg0: tensor<1x10x10x!eltwise.fp32>, %arg1: tensor<1x7x10x10x!eltwise.fp32>) -> tensor<1x7x10x10x!eltwise.fp32> {
+  %c3 = "tile.const_dim"() {value = 3 : i64} : () -> index
+  %c10 = "tile.const_dim"() {value = 10 : i64} : () -> index
+  %c7 = "tile.const_dim"() {value = 7 : i64} : () -> index
+  %c1 = "tile.const_dim"() {value = 1 : i64} : () -> index
+  %4 = "tile.domain"() ( {
+  ^bb0(%arg2: index, %arg3: index, %arg4: index):	// no predecessors
+    %5 = "tile.src_idx_map"(%arg0, %arg4, %arg3, %arg2) : (tensor<1x10x10x!eltwise.fp32>, index, index, index) -> !tile.imap
+    %6 = "tile.sink_idx_map"(%arg4, %c3, %arg3, %arg2) : (index, index, index, index) -> !tile.imap
+    %7 = "tile.size_map"(%c1, %c7, %c10, %c10) : (index, index, index, index) -> !tile.smap
+    "tile.=(x)"(%7, %5, %6, %arg1) : (!tile.smap, !tile.imap, !tile.imap, tensor<1x7x10x10x!eltwise.fp32>) -> ()
+  }) : () -> tensor<1x7x10x10x!eltwise.fp32>
+  return %4 : tensor<1x7x10x10x!eltwise.fp32>
+}
+
+// CHECK-LABEL: func @use_default
+// CHECK: stripe.parallel_for ("i0":1, "i1":7, "i2":10, "i3":10)
+// CHECK: stripe.load
+// CHECK: stripe.store
+// CHECK: copy = unit
+// CHECK: stripe.parallel_for ("x0":10, "x1":10, "x2":1)
+// CHECK: stripe.load
+// CHECK: stripe.store
+// CHECK: contraction = unit

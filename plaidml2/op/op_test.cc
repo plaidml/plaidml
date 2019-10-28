@@ -469,6 +469,114 @@ TEST(Op, Prod) {
 )"));
 }
 
+TEST(Op, Relu) {
+  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "I");
+  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "A");
+  auto M = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "M");
+  auto r = op::relu(I).alpha(A).max_value(M).threshold(0.05);
+  Program program("relu", {r});
+  EXPECT_THAT(program, Eq(R"(function (
+  I[I_0, I_1],
+  A[A_0, A_1],
+  M[M_0, M_1]
+) -> (
+  _X7
+) {
+  _X0 = 0.050000;
+  _X1 = cmp_lt(I, _X0);
+  _X2 = 0.050000;
+  _X3 = sub(I, _X2);
+  _X4 = mul(A, _X3);
+  _X5 = cond(_X1, _X4, I);
+  _X6 = cmp_lt(_X5, M);
+  _X7 = cond(_X6, _X5, M);
+}
+)"));
+}
+
+TEST(Op, ReluNoAlpha) {
+  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "I");
+  auto M = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "M");
+  auto r = op::relu(I).max_value(M).threshold(0.05);
+  Program program("relu", {r});
+  EXPECT_THAT(program, Eq(R"(function (
+  I[I_0, I_1],
+  M[M_0, M_1]
+) -> (
+  _X8
+) {
+  _X0 = 0.050000;
+  _X1 = cmp_lt(I, _X0);
+  _X2 = 0.000000;
+  _X3 = 0.050000;
+  _X4 = sub(I, _X3);
+  _X5 = mul(_X2, _X4);
+  _X6 = cond(_X1, _X5, I);
+  _X7 = cmp_lt(_X6, M);
+  _X8 = cond(_X7, _X6, M);
+}
+)"));
+}
+
+TEST(Op, ReluNoMaxValue) {
+  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "I");
+  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "A");
+  auto r = op::relu(I).alpha(A).threshold(0.05);
+  Program program("relu", {r});
+  EXPECT_THAT(program, Eq(R"(function (
+  I[I_0, I_1],
+  A[A_0, A_1]
+) -> (
+  _X5
+) {
+  _X0 = 0.050000;
+  _X1 = cmp_lt(I, _X0);
+  _X2 = 0.050000;
+  _X3 = sub(I, _X2);
+  _X4 = mul(A, _X3);
+  _X5 = cond(_X1, _X4, I);
+}
+)"));
+}
+
+TEST(Op, ReluOnlyThreshold) {
+  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "I");
+  auto r = op::relu(I).threshold(0.05);
+  Program program("relu", {r});
+  EXPECT_THAT(program, Eq(R"(function (
+  I[I_0, I_1]
+) -> (
+  _X6
+) {
+  _X0 = 0.050000;
+  _X1 = cmp_lt(I, _X0);
+  _X2 = 0.000000;
+  _X3 = 0.050000;
+  _X4 = sub(I, _X3);
+  _X5 = mul(_X2, _X4);
+  _X6 = cond(_X1, _X5, I);
+}
+)"));
+}
+
+TEST(Op, ReluNoParams) {
+  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "I");
+  auto r = op::relu(I);
+  Program program("relu", {r});
+  EXPECT_THAT(program, Eq(R"(function (
+  I[I_0, I_1]
+) -> (
+  _X4
+) {
+  _X0 = 0.000000;
+  _X1 = cmp_lt(I, _X0);
+  _X2 = 0.000000;
+  _X3 = mul(_X2, I);
+  _X4 = cond(_X1, _X3, I);
+}
+)"));
+}
+
 TEST(Op, Repeat) {
   auto A = Placeholder(PLAIDML_DATA_FLOAT32, {32, 1, 4, 1}, "A");
   auto t = op::repeat(  //

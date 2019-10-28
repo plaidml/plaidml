@@ -34,9 +34,7 @@
 #include "pmlc/util/slice.h"
 #include "tile/base/shape.h"
 
-namespace pmlc {
-namespace dialect {
-namespace tile {
+namespace pmlc::dialect::tile {
 
 using eltwise::ScalarConstantOp;
 using eltwise::ScalarType;
@@ -420,12 +418,9 @@ mlir::Value* TileBuilder::MakeAffineSizeMapOp(llvm::ArrayRef<mlir::Value*> sizes
 }
 
 void TileBuilder::AddConstraint(mlir::Value* cion, mlir::Value* lhs, mlir::Value* rhs) {
-  IVLOG(2, "TileBuilder::AddConstraint>");
+  IVLOG(5, "TileBuilder::AddConstraint>");
   auto op = cion->getDefiningOp();
-  if (!op) {
-    throw std::runtime_error("add_constraint can only be specified on a contraction.");
-  }
-  auto domainOp = llvm::dyn_cast<AffineDomainOp>(op);
+  auto domainOp = llvm::dyn_cast_or_null<AffineDomainOp>(op);
   if (!domainOp) {
     throw std::runtime_error("add_constraint can only be specified on a contraction.");
   }
@@ -461,6 +456,22 @@ void TileBuilder::AddConstraint(mlir::Value* cion, mlir::Value* lhs, mlir::Value
   auto block = builder.createBlock(&constraintOp.body());
   auto& dst = block->getOperations();
   dst.splice(dst.end(), src->getOperations(), it, src->end());
+}
+
+void TileBuilder::SetUseDefault(mlir::Value* cion, mlir::Value* defaultValue) {
+  IVLOG(2, "TileBuilder::SetUseDefault>");
+  auto op = cion->getDefiningOp();
+  auto domainOp = llvm::dyn_cast_or_null<AffineDomainOp>(op);
+  if (!domainOp) {
+    throw std::runtime_error("use_default can only be specified on a contraction.");
+  }
+  auto terminator = domainOp.body().front().getTerminator();
+  while (!llvm::isa<ContractionOp>(terminator)) {
+    terminator = terminator->getRegion(0).front().getTerminator();
+  }
+  llvm::SmallVector<mlir::Value*, 6> operands{terminator->getOperands()};
+  operands.emplace_back(defaultValue);
+  terminator->setOperands(operands);
 }
 
 #define DEFINE_CONTRACTION_OPS(_agg_op_)                                                                    \
@@ -588,6 +599,4 @@ std::vector<mlir::Value*> TileBuilder::ComputeGradients(llvm::ArrayRef<mlir::Val
   return wrt;
 }
 
-}  // namespace tile
-}  // namespace dialect
-}  // namespace pmlc
+}  // namespace pmlc::dialect::tile

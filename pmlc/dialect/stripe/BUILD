@@ -49,9 +49,9 @@ mlir_tblgen(
 plaidml_cc_library(
     name = "stripe",
     srcs = [
-	"affine_poly.cc",
+        "affine_poly.cc",
         "analysis.cc",
-	"demo_vectorize.cc",
+        "demo_vectorize.cc",
         "dialect.cc",
         "ops.cc",
         "ops.cc.inc",
