@@ -805,6 +805,28 @@ TEST(Op, Transpose) {
 )"));
 }
 
+TEST(Op, Variance) {
+  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "A");
+  Program program("variance", {op::variance(A)});
+  IVLOG(1, program);
+  EXPECT_THAT(program, Eq(R"(function (
+  A[A_0, A_1]
+) -> (
+  _X8
+) {
+  _X0[x2, x3 : 1, 1] = +(A[x0, x1]);
+  _X1 = 200;
+  _X2 = div(_X0, _X1);
+  _X3 = sub(A, _X2);
+  _X4 = sub(A, _X2);
+  _X5 = mul(_X3, _X4);
+  _X6[] = +(_X5[x0, x1]);
+  _X7 = 200;
+  _X8 = div(_X6, _X7);
+}
+)"));
+}
+
 }  // namespace
 }  // namespace op
 }  // namespace plaidml
