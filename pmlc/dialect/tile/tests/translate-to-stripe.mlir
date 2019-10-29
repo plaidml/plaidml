@@ -13,9 +13,9 @@ func @eltwise_add(
 
 // CHECK: 0:   #program
 // CHECK-NEXT: block []:1 ( // eltwise_add
-// CHECK-NEXT:     #user none new@0x00000000 _X0[0, 0] fp32:I(10, 20):(20, 1):800 B
-// CHECK-NEXT:     #user none new@0x00000000 _X1[0, 0] fp32:I(10, 20):(20, 1):800 B
-// CHECK-NEXT:     #user none new@0x00000000 _X2[0, 0] fp32:I(10, 20):(20, 1):800 B
+// CHECK-NEXT:     none new@0x00000000 _X0[0, 0] fp32:I(10, 20):(20, 1):800 B
+// CHECK-NEXT:     none new@0x00000000 _X1[0, 0] fp32:I(10, 20):(20, 1):800 B
+// CHECK-NEXT:     none new@0x00000000 _X2[0, 0] fp32:I(10, 20):(20, 1):800 B
 // CHECK-NEXT: ) {
 // CHECK-NEXT:   0: #main
 // CHECK-NEXT:   block []:1 ( // main
@@ -55,9 +55,9 @@ func @dot(%arg0: tensor<1x784x!eltwise.fp32>, %arg1: tensor<784x512x!eltwise.fp3
 
 // CHECK: 0:   #program
 // CHECK-NEXT: block []:1 ( // dot
-// CHECK-NEXT:     #user none new@0x00000000 _X0[0, 0] fp32:I(1, 784):(784, 1):3.0625 KiB
-// CHECK-NEXT:     #user none new@0x00000000 _X1[0, 0] fp32:I(784, 512):(512, 1):1568 KiB
-// CHECK-NEXT:     #user none new@0x00000000 _X2[0, 0] fp32:I(1, 512):(512, 1):2 KiB
+// CHECK-NEXT:     none new@0x00000000 _X0[0, 0] fp32:I(1, 784):(784, 1):3.0625 KiB
+// CHECK-NEXT:     none new@0x00000000 _X1[0, 0] fp32:I(784, 512):(512, 1):1568 KiB
+// CHECK-NEXT:     none new@0x00000000 _X2[0, 0] fp32:I(1, 512):(512, 1):2 KiB
 // CHECK-NEXT: ) {
 // CHECK-NEXT:   0: #main
 // CHECK-NEXT:   block []:1 ( // main
@@ -110,10 +110,10 @@ func @double_dot(
 
 // CHECK: 0:   #program
 // CHECK-NEXT: block []:1 ( // double_dot
-// CHECK-DAG:      #user none new@0x00000000 _X0[0, 0] fp32:I(10, 20):(20, 1):800 B
-// CHECK-DAG:      #user none new@0x00000000 _X1[0, 0] fp32:I(20, 30):(30, 1):2.34375 KiB
-// CHECK-DAG:      #user none new@0x00000000 _X2[0, 0] fp32:I(30, 40):(40, 1):4.6875 KiB
-// CHECK-DAG:      #user none new@0x00000000 _X3[0, 0] fp32:I(10, 40):(40, 1):1.5625 KiB
+// CHECK-DAG:      none new@0x00000000 _X0[0, 0] fp32:I(10, 20):(20, 1):800 B
+// CHECK-DAG:      none new@0x00000000 _X1[0, 0] fp32:I(20, 30):(30, 1):2.34375 KiB
+// CHECK-DAG:      none new@0x00000000 _X2[0, 0] fp32:I(30, 40):(40, 1):4.6875 KiB
+// CHECK-DAG:      none new@0x00000000 _X3[0, 0] fp32:I(10, 40):(40, 1):1.5625 KiB
 // CHECK-NEXT: ) {
 // CHECK-NEXT:   0: #main
 // CHECK-NEXT:   block []:1 ( // main
@@ -163,8 +163,8 @@ func @relu(%arg0: !t_10x20xfp32) -> !t_10x20xfp32 {
 
 // CHECK: 0:   #program
 // CHECK-NEXT: block []:1 ( // relu
-// CHECK-NEXT:     #user none new@0x00000000 _X0[0, 0] fp32:I(10, 20):(20, 1):800 B
-// CHECK-NEXT:     #user none new@0x00000000 _X1[0, 0] fp32:I(10, 20):(20, 1):800 B
+// CHECK-NEXT:     none new@0x00000000 _X0[0, 0] fp32:I(10, 20):(20, 1):800 B
+// CHECK-NEXT:     none new@0x00000000 _X1[0, 0] fp32:I(10, 20):(20, 1):800 B
 // CHECK-NEXT: ) {
 // CHECK-NEXT:   0: #main
 // CHECK-NEXT:   block []:1 ( // main
@@ -208,8 +208,8 @@ func @reshape(%arg0: tensor<10x20x!eltwise.fp32>) -> tensor<5x5x20x!eltwise.fp32
 
 // CHECK:      0: #program
 // CHECK-NEXT: block []:1 ( // reshape
-// CHECK-NEXT:     #user none new@0x00000000 _X0[0, 0] fp32:I(10, 20):(20, 1):800 B
-// CHECK-NEXT:     #user none new@0x00000000 _X1[0, 0, 0] fp32:I(5, 5, 20):(100, 20, 1):1.95312 KiB
+// CHECK-NEXT:     none new@0x00000000 _X0[0, 0] fp32:I(10, 20):(20, 1):800 B
+// CHECK-NEXT:     none new@0x00000000 _X1[0, 0, 0] fp32:I(5, 5, 20):(100, 20, 1):1.95312 KiB
 // CHECK-NEXT: ) {
 // CHECK-NEXT:   0: #main
 // CHECK-NEXT:   block []:1 ( // main
