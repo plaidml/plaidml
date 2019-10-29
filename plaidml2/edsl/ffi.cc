@@ -597,7 +597,7 @@ plaidml_expr* plaidml_expr_contraction(  //
     }
     auto agg = getAggregationKind(agg_op);
     auto combo = getCombinationKind(combo_op);
-    auto value = GlobalContext::get()->MakeContractionOp(agg, combo, values, sink_idxs->value, sink_sizes->value);
+    auto value = GlobalContext::get()->MakeContractionOp(agg, combo, values, sink_idxs->value, sink_sizes->value, name);
     return new plaidml_expr{value};
   });
 }

@@ -82,7 +82,8 @@ class TileBuilder {
       util::CombinationKind combo,        //
       llvm::ArrayRef<mlir::Value*> srcs,  //
       mlir::Value* sink,                  //
-      mlir::Value* sizes);
+      mlir::Value* sizes,                 //
+      llvm::StringRef name);
 
   void AddConstraint(mlir::Value* cion, mlir::Value* lhs, mlir::Value* rhs);
   void SetUseDefault(mlir::Value* cion, mlir::Value* defaultValue);

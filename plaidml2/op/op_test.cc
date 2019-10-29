@@ -63,7 +63,7 @@ module {
       %5 = "tile.sink_idx_map"() : () -> !tile.imap
       %6 = "tile.size_map"() : () -> !tile.smap
       "tile.*(x)"(%6, %4, %5) : (!tile.smap, !tile.imap, !tile.imap) -> ()
-    }) : () -> !i32
+    }) {idx_names = ["x0", "x1", "x2", "x3"]} : () -> !i32
     %3 = "eltwise.as_uint"(%2) : (!i32) -> !u8
     return %3 : !u8
   }
@@ -93,7 +93,7 @@ module {
       %7 = "tile.sink_idx_map"() : () -> !tile.imap
       %8 = "tile.size_map"() : () -> !tile.smap
       "tile.+(x)"(%8, %6, %7) : (!tile.smap, !tile.imap, !tile.imap) -> ()
-    }) : () -> !i32
+    }) {idx_names = ["x0", "x1", "x2", "x3"]} : () -> !i32
     %3 = "eltwise.cmp_eq"(%2, %c0) {type = !eltwise.fp32} : (!i32, !i32) -> !bool
     %4 = "eltwise.select"(%3, %c0, %c1) {type = !eltwise.fp32} : (!bool, !i32, !i32) -> !i32
     %5 = "eltwise.as_uint"(%4) : (!i32) -> !u8
@@ -126,14 +126,14 @@ module {
       %6 = "tile.sink_idx_map"() : () -> !tile.imap
       %7 = "tile.size_map"() : () -> !tile.smap
       "tile.>(x)"(%7, %5, %6) : (!tile.smap, !tile.imap, !tile.imap) -> ()
-    }) : () -> !fp32
+    }) {idx_names = ["x0", "x1", "x2", "x3"]} : () -> !fp32
     %1 = "tile.domain"() ( {
     ^bb0(%arg1: index, %arg2: index, %arg3: index, %arg4: index):	// no predecessors
       %5 = "tile.src_idx_map"(%c1) : (!i32) -> !tile.imap
       %6 = "tile.sink_idx_map"(%arg4, %arg3, %arg2, %arg1) : (index, index, index, index) -> !tile.imap
       %7 = "tile.size_map"(%c1_0, %c224, %c224, %c3) : (index, index, index, index) -> !tile.smap
       "tile.=(x)"(%7, %5, %6) : (!tile.smap, !tile.imap, !tile.imap) -> ()
-    }) : () -> tensor<1x224x224x3x!eltwise.i32>
+    }) {idx_names = ["x0", "x1", "x2", "x3"]} : () -> tensor<1x224x224x3x!eltwise.i32>
     %2 = "tile.index"(%1, %c0) : (tensor<1x224x224x3x!eltwise.i32>, !i32) -> tensor<1x224x224x3x!eltwise.i32>
     %3 = "tile.domain"() ( {
     ^bb0(%arg1: index, %arg2: index, %arg3: index, %arg4: index):	// no predecessors
@@ -143,7 +143,7 @@ module {
       %8 = "tile.sink_idx_map"() : () -> !tile.imap
       %9 = "tile.size_map"() : () -> !tile.smap
       "tile.>(x==y?z)"(%9, %5, %6, %7, %8) : (!tile.smap, !tile.imap, !tile.imap, !tile.imap, !tile.imap) -> ()
-    }) : () -> !fp32
+    }) {idx_names = ["x0", "x1", "x2", "x3"]} : () -> !fp32
     %4 = "eltwise.as_uint"(%3) : (!fp32) -> !u32
     return %4 : !u32
   }
@@ -229,14 +229,14 @@ module {
       %5 = "tile.sink_idx_map"(%arg5, %arg4, %4, %arg2) : (index, index, index, index) -> !tile.imap
       %6 = "tile.size_map"(%c7, %c7, %c6, %c64) : (index, index, index, index) -> !tile.smap
       "tile.=(x)"(%6, %3, %5) : (!tile.smap, !tile.imap, !tile.imap) -> ()
-    }) : () -> tensor<7x7x6x64x!eltwise.fp32>
+    }) {idx_names = ["n3", "a", "n1", "n0"]} : () -> tensor<7x7x6x64x!eltwise.fp32>
     %1 = "tile.domain"() ( {
     ^bb0(%arg2: index, %arg3: index, %arg4: index, %arg5: index):	// no predecessors
       %3 = "tile.src_idx_map"(%arg1, %arg5, %arg4, %arg3, %arg2) : (tensor<7x7x3x64x!eltwise.fp32>, index, index, index, index) -> !tile.imap
       %4 = "tile.sink_idx_map"(%arg5, %arg4, %arg3, %arg2) : (index, index, index, index) -> !tile.imap
       %5 = "tile.size_map"(%c7, %c7, %c6, %c64) : (index, index, index, index) -> !tile.smap
       "tile.=(x)"(%5, %3, %4) : (!tile.smap, !tile.imap, !tile.imap) -> ()
-    }) : () -> tensor<7x7x6x64x!eltwise.fp32>
+    }) {idx_names = ["n3", "a", "n1", "n0"]} : () -> tensor<7x7x6x64x!eltwise.fp32>
     %2 = "eltwise.add"(%1, %0) {type = !eltwise.fp32} : (tensor<7x7x6x64x!eltwise.fp32>, tensor<7x7x6x64x!eltwise.fp32>) -> tensor<7x7x6x64x!eltwise.fp32>
     return %2 : tensor<7x7x6x64x!eltwise.fp32>
   }
@@ -289,7 +289,7 @@ module {
       %9 = "tile.sink_idx_map"(%arg7, %arg6, %arg4, %arg8) : (index, index, index, index) -> !tile.imap
       %10 = "tile.size_map"(%c1, %c112, %c112, %c64) : (index, index, index, index) -> !tile.smap
       "tile.+(x*y)"(%10, %7, %8, %9) : (!tile.smap, !tile.imap, !tile.imap, !tile.imap) -> ()
-    }) : () -> tensor<1x112x112x64x!eltwise.fp32>
+    }) {idx_names = ["ci", "k1", "x1", "k0", "x0", "n", "co"], name = "conv"} : () -> tensor<1x112x112x64x!eltwise.fp32>
     return %0 : tensor<1x112x112x64x!eltwise.fp32>
   }
 }
@@ -317,7 +317,7 @@ module {
       "tile.constraint"(%arg2, %c3) ( {
         "tile.*(x)"(%4, %2, %3) : (!tile.smap, !tile.imap, !tile.imap) -> ()
       }) : (index, index) -> ()
-    }) : () -> tensor<7x7x3x64x!eltwise.fp32>
+    }) {idx_names = ["x0", "x1", "x2", "x3", "x4"]} : () -> tensor<7x7x3x64x!eltwise.fp32>
     return %0 : tensor<7x7x3x64x!eltwise.fp32>
   }
 }
@@ -346,7 +346,7 @@ module {
       "tile.constraint"(%arg2, %c3) ( {
         "tile.+(x)"(%4, %2, %3) : (!tile.smap, !tile.imap, !tile.imap) -> ()
       }) : (index, index) -> ()
-    }) : () -> tensor<7x7x3x64x!eltwise.fp32>
+    }) {idx_names = ["x0", "x1", "x2", "x3", "x4"]} : () -> tensor<7x7x3x64x!eltwise.fp32>
     return %0 : tensor<7x7x3x64x!eltwise.fp32>
   }
 }
@@ -373,7 +373,7 @@ module {
       %3 = "tile.sink_idx_map"(%arg5, %arg4, %arg3, %arg8, %arg7, %arg6) : (index, index, index, index, index, index) -> !tile.imap
       %4 = "tile.size_map"(%c7, %c7, %c3, %c7, %c7, %c64) : (index, index, index, index, index, index) -> !tile.smap
       "tile.+(x*y)"(%4, %1, %2, %3) : (!tile.smap, !tile.imap, !tile.imap, !tile.imap) -> ()
-    }) : () -> tensor<7x7x3x7x7x64x!eltwise.fp32>
+    }) {idx_names = ["x0", "x1", "x2", "x3", "x4", "x5", "x6"]} : () -> tensor<7x7x3x7x7x64x!eltwise.fp32>
     return %0 : tensor<7x7x3x7x7x64x!eltwise.fp32>
   }
 }
@@ -425,7 +425,7 @@ module {
       %2 = "tile.sink_idx_map"(%arg4, %arg3, %arg5, %arg2, %arg1) : (index, index, index, index, index) -> !tile.imap
       %3 = "tile.size_map"(%c7, %c7, %c1, %c3, %c64) : (index, index, index, index, index) -> !tile.smap
       "tile.=(x)"(%3, %1, %2) : (!tile.smap, !tile.imap, !tile.imap) -> ()
-    }) : () -> tensor<7x7x1x3x64x!eltwise.fp32>
+    }) {idx_names = ["n3", "n2", "n1", "n0", "a"]} : () -> tensor<7x7x1x3x64x!eltwise.fp32>
     return %0 : tensor<7x7x1x3x64x!eltwise.fp32>
   }
 }
@@ -453,7 +453,7 @@ module {
       %3 = "tile.sink_idx_map"(%arg4, %arg3, %2, %arg1) : (index, index, index, index) -> !tile.imap
       %4 = "tile.size_map"(%c7, %c7, %c3, %c64) : (index, index, index, index) -> !tile.smap
       "tile.=(x)"(%4, %1, %3) : (!tile.smap, !tile.imap, !tile.imap) -> ()
-    }) : () -> tensor<7x7x3x64x!eltwise.fp32>
+    }) {idx_names = ["x0", "x1", "x2", "x3"]} : () -> tensor<7x7x3x64x!eltwise.fp32>
     return %0 : tensor<7x7x3x64x!eltwise.fp32>
   }
 }
@@ -525,7 +525,7 @@ module {
       %2 = "tile.sink_idx_map"() : () -> !tile.imap
       %3 = "tile.size_map"() : () -> !tile.smap
       "tile.>(x)"(%3, %1, %2) : (!tile.smap, !tile.imap, !tile.imap) -> ()
-    }) : () -> !fp32
+    }) {idx_names = ["x0", "x1", "x2", "x3"]} : () -> !fp32
     return %0 : !fp32
   }
 }
@@ -566,7 +566,7 @@ module {
       %3 = "tile.sink_idx_map"() : () -> !tile.imap
       %4 = "tile.size_map"() : () -> !tile.smap
       "tile.+(x)"(%4, %2, %3) : (!tile.smap, !tile.imap, !tile.imap) -> ()
-    }) : () -> !fp32
+    }) {idx_names = ["x0", "x1"]} : () -> !fp32
     %1 = "eltwise.div"(%0, %c200) {type = !eltwise.fp32} : (!fp32, !u32) -> !fp32
     return %1 : !fp32
   }
@@ -589,7 +589,7 @@ module {
       %2 = "tile.sink_idx_map"() : () -> !tile.imap
       %3 = "tile.size_map"() : () -> !tile.smap
       "tile.<(x)"(%3, %1, %2) : (!tile.smap, !tile.imap, !tile.imap) -> ()
-    }) : () -> !fp32
+    }) {idx_names = ["x0", "x1"]} : () -> !fp32
     return %0 : !fp32
   }
 }
@@ -648,7 +648,7 @@ module {
           }) : (index, index) -> ()
         }) : (index, index) -> ()
       }) : (index, index) -> ()
-    }) : () -> tensor<10x22x17x14x50x!eltwise.fp32>
+    }) {idx_names = ["x0", "x1", "x2", "x3", "x4", "x5", "x6", "x7"]} : () -> tensor<10x22x17x14x50x!eltwise.fp32>
     return %0 : tensor<10x22x17x14x50x!eltwise.fp32>
   }
 }
@@ -670,7 +670,7 @@ module {
       %2 = "tile.sink_idx_map"() : () -> !tile.imap
       %3 = "tile.size_map"() : () -> !tile.smap
       "tile.*(x)"(%3, %1, %2) : (!tile.smap, !tile.imap, !tile.imap) -> ()
-    }) : () -> !fp32
+    }) {idx_names = ["x0", "x1"]} : () -> !fp32
     return %0 : !fp32
   }
 }
@@ -807,7 +807,7 @@ module {
       "tile.constraint"(%arg5, %c3) ( {
         "tile.=(x)"(%5, %1, %4) : (!tile.smap, !tile.imap, !tile.imap) -> ()
       }) : (index, index) -> ()
-    }) : () -> tensor<32x1x12x1x!eltwise.fp32>
+    }) {idx_names = ["x0", "x1", "x2", "x3", "x4"]} : () -> tensor<32x1x12x1x!eltwise.fp32>
     return %0 : tensor<32x1x12x1x!eltwise.fp32>
   }
 }
@@ -874,7 +874,7 @@ module {
       %2 = "tile.sink_idx_map"() : () -> !tile.imap
       %3 = "tile.size_map"() : () -> !tile.smap
       "tile.=(x)"(%3, %1, %2) : (!tile.smap, !tile.imap, !tile.imap) -> ()
-    }) : () -> !fp32
+    }) {idx_names = []} : () -> !fp32
     return %0 : !fp32
   }
 }
@@ -929,7 +929,7 @@ module {
       %4 = "tile.sink_idx_map"(%arg4, %arg3, %3, %2) : (index, index, index, index) -> !tile.imap
       %5 = "tile.size_map"(%c64, %c4, %c36, %c38) : (index, index, index, index) -> !tile.smap
       "tile.=(x)"(%5, %1, %4) : (!tile.smap, !tile.imap, !tile.imap) -> ()
-    }) : () -> tensor<64x4x36x38x!eltwise.fp32>
+    }) {idx_names = ["x1", "x0", "c", "n"]} : () -> tensor<64x4x36x38x!eltwise.fp32>
     return %0 : tensor<64x4x36x38x!eltwise.fp32>
   }
 }
@@ -966,7 +966,7 @@ module {
       %2 = "tile.sink_idx_map"() : () -> !tile.imap
       %3 = "tile.size_map"() : () -> !tile.smap
       "tile.+(x)"(%3, %1, %2) : (!tile.smap, !tile.imap, !tile.imap) -> ()
-    }) : () -> !fp32
+    }) {idx_names = ["x0", "x1"]} : () -> !fp32
     return %0 : !fp32
   }
 }
@@ -1027,7 +1027,7 @@ module {
       %2 = "tile.sink_idx_map"(%arg1, %arg2) : (index, index) -> !tile.imap
       %3 = "tile.size_map"(%c20, %c10) : (index, index) -> !tile.smap
       "tile.=(x)"(%3, %1, %2) : (!tile.smap, !tile.imap, !tile.imap) -> ()
-    }) : () -> tensor<20x10x!eltwise.fp32>
+    }) {idx_names = ["x0", "x1"]} : () -> tensor<20x10x!eltwise.fp32>
     return %0 : tensor<20x10x!eltwise.fp32>
   }
 }
@@ -1052,7 +1052,7 @@ module {
       %7 = "tile.sink_idx_map"(%arg4, %arg3) : (index, index) -> !tile.imap
       %8 = "tile.size_map"(%c1, %c1) : (index, index) -> !tile.smap
       "tile.+(x)"(%8, %6, %7) : (!tile.smap, !tile.imap, !tile.imap) -> ()
-    }) : () -> tensor<1x1x!eltwise.fp32>
+    }) {idx_names = ["x0", "x1", "x2", "x3"]} : () -> tensor<1x1x!eltwise.fp32>
     %1 = "eltwise.div"(%0, %c200) {type = !eltwise.fp32} : (tensor<1x1x!eltwise.fp32>, !u32) -> tensor<1x1x!eltwise.fp32>
     %2 = "eltwise.sub"(%arg0, %1) {type = !eltwise.fp32} : (tensor<10x20x!eltwise.fp32>, tensor<1x1x!eltwise.fp32>) -> tensor<10x20x!eltwise.fp32>
     %3 = "eltwise.mul"(%2, %2) {type = !eltwise.fp32} : (tensor<10x20x!eltwise.fp32>, tensor<10x20x!eltwise.fp32>) -> tensor<10x20x!eltwise.fp32>
@@ -1062,7 +1062,7 @@ module {
       %7 = "tile.sink_idx_map"() : () -> !tile.imap
       %8 = "tile.size_map"() : () -> !tile.smap
       "tile.+(x)"(%8, %6, %7) : (!tile.smap, !tile.imap, !tile.imap) -> ()
-    }) : () -> !fp32
+    }) {idx_names = ["x0", "x1"]} : () -> !fp32
     %5 = "eltwise.div"(%4, %c200) {type = !eltwise.fp32} : (!fp32, !u32) -> !fp32
     return %5 : !fp32
   }

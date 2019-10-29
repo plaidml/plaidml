@@ -476,9 +476,11 @@ Value* TileBuilder::MakeContractionOp(  //
     util::CombinationKind combo,        //
     ArrayRef<Value*> srcs,              //
     Value* sink,                        //
-    Value* sizes) {
+    Value* sizes,                       //
+    StringRef name) {
   IVLOG(5, "TileBuilder::MakeContractionOp> " << util::stringifyAggregationKind(agg).str() << ":"
-                                              << util::stringifyCombinationKind(combo).str());
+                                              << util::stringifyCombinationKind(combo).str()
+                                              << ", name: " << name.str());
   IVLOG(5, mlir::debugString(impl->module));
   auto it = Impl::contractions.find(std::make_pair(agg, combo));
   if (it == Impl::contractions.end()) {
@@ -503,10 +505,10 @@ Value* TileBuilder::MakeContractionOp(  //
   SmallVector<Value*, 4> size_map_sizes(size_map_op.sizes());
   auto shape = eltwise::ComputeShape(size_map_sizes);
   auto tensorType = impl->builder.getTensorType(shape, elementType);
-  auto domain = impl->builder.create<AffineDomainOp>(impl->builder.getUnknownLoc(), tensorType);
-  auto& info = impl->domains[domain];
+  auto domainOp = impl->builder.create<AffineDomainOp>(impl->builder.getUnknownLoc(), tensorType);
+  auto& info = impl->domains[domainOp];
   auto body = new Block();
-  domain.body().push_back(body);
+  domainOp.body().push_back(body);
   llvm::SetVector<Value*> values;
   values.insert(srcs.begin(), srcs.end());
   values.insert(sink);
@@ -515,15 +517,26 @@ Value* TileBuilder::MakeContractionOp(  //
     return value->getType().isa<IndexType>();
   });
   // Find and replace each AffineIndexOp with a BlockArgument of the domain op
+  SmallVector<Attribute, 8> idxNames;
   std::queue<Value*> worklist;
   for (auto value : slice) {
     auto op = value->getDefiningOp();
-    if (auto idx_op = llvm::dyn_cast_or_null<AffineIndexOp>(op)) {
-      auto arg = body->addArgument(idx_op.getType());
+    if (auto indexOp = llvm::dyn_cast_or_null<AffineIndexOp>(op)) {
+      auto arg = body->addArgument(indexOp.getType());
       info.mapping.map(value, arg);
       worklist.push(value);
+      if (auto attr = indexOp.getAttrOfType<StringAttr>("name")) {
+        idxNames.emplace_back(attr);
+      } else {
+        auto name = llvm::formatv("x{0}", arg->getArgNumber());
+        idxNames.emplace_back(impl->builder.getStringAttr(name.str()));
+      }
     }
   }
+  if (!name.empty()) {
+    domainOp.setAttr("name", impl->builder.getStringAttr(name));
+  }
+  domainOp.setAttr("idx_names", mlir::ArrayAttr::get(idxNames, &impl->context));
   // Move across only the values/ops that depend on AffineIndexOps
   // First determine the transitive users of AffineIndexOps
   std::set<Value*> belong;
@@ -557,8 +570,8 @@ Value* TileBuilder::MakeContractionOp(  //
     new_srcs.emplace_back(info.mapping.lookup(src));
   }
   contractionBuilder->create(&domainBuilder, impl->builder.getUnknownLoc(), new_sizes, new_srcs, new_sink);
-  IVLOG(5, mlir::debugString(domain));
-  return domain.result();
+  IVLOG(5, mlir::debugString(domainOp));
+  return domainOp.result();
 }
 
 std::shared_ptr<TileProgram> TileBuilder::MakeProgram(  //

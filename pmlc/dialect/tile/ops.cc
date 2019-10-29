@@ -132,7 +132,8 @@ struct AffineDomainFolder : public OpRewritePattern<AffineDomainOp> {
     while (!llvm::isa<ContractionOp>(terminator)) {
       terminator = terminator->getRegion(0).front().getTerminator();
     }
-    auto sizeMapOp = llvm::dyn_cast<AffineSizeMapOp>(terminator->getOperand(0)->getDefiningOp());
+    auto contractionOp = llvm::cast<ContractionOp>(terminator);
+    auto sizeMapOp = llvm::dyn_cast<AffineSizeMapOp>(contractionOp.getSizeMap()->getDefiningOp());
     if (!sizeMapOp) {
       return matchFailure();
     }
@@ -146,6 +147,12 @@ struct AffineDomainFolder : public OpRewritePattern<AffineDomainOp> {
       return matchFailure();
     }
     auto newOp = rewriter.create<AffineDomainOp>(op.getLoc(), targetType);
+    if (auto attr = op.getAttrOfType<StringAttr>("name")) {
+      newOp.setAttr("name", attr);
+    }
+    if (auto attr = op.getAttrOfType<ArrayAttr>("idx_names")) {
+      newOp.setAttr("idx_names", attr);
+    }
     newOp.body().takeBody(op.body());
     rewriter.replaceOp(op, {newOp.result()});
     util::UpdateFuncOpType(newOp.getOperation());
