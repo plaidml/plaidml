@@ -2721,6 +2721,10 @@ Value variance(const Value& value) {
   auto axes = args[1];
   auto keepdims = args[2].as_bool();
 
+  IVLOG(2, "I: " << I.shape().str());
+  IVLOG(2, "axes: " << axes);
+  IVLOG(2, "keep_dims: " << keepdims);
+
   // Handle trivial cases
   if (I.shape().ndims() == 0) {
     // TODO: Adjust for dtype?
