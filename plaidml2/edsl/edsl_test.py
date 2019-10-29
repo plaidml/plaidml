@@ -381,6 +381,7 @@ module {
 }
 ''')
 
+    @unittest.skip('TODO: no_defract')
     def test_repeat_elts(self):
         I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [10, 10, 10]))
         N0, N1, N2 = TensorDims(3)

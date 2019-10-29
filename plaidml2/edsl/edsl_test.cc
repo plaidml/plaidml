@@ -300,7 +300,8 @@ module {
   exec::Executable::compile(program, inputs)->run();
 }
 
-TEST(CppEdsl, RepeatElements) {
+// TODO: no_defract
+TEST(CppEdsl, DISABLED_RepeatElements) {
   auto I = Placeholder(PLAIDML_DATA_FLOAT32, {10, 10, 10});
   TensorDim N0, N1, N2;
   TensorIndex n0, n1, n2, k;
@@ -447,7 +448,8 @@ Tensor Winograd(const Tensor& I, const Tensor& K, const Tensor& A, const Tensor&
   return O;
 }
 
-TEST(CppEdsl, Winograd) {
+// TODO: no_defract
+TEST(CppEdsl, DISABLED_Winograd) {
   const std::int64_t N = 1, X = 224, Y = 224, CI = 3, S = 3, CO = 32, BI = 32, BO = BI - CI + 1;
   auto I = Placeholder(PLAIDML_DATA_FLOAT32, {N, X, Y, CI});
   auto K = Placeholder(PLAIDML_DATA_FLOAT32, {S, S, CI, CO});
