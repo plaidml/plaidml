@@ -34,11 +34,10 @@ local exports = [
   'plaidml_logical_shape_free',
   'plaidml_logical_shape_into_tensor_shape',
   'plaidml_logical_shape_repr',
-  'plaidml_logical_shape_get_layout',
   'plaidml_logical_shape_get_ndims',
   'plaidml_logical_shape_get_dtype',
   'plaidml_logical_shape_get_dim_int',
-  'plaidml_logical_shape_get_dim_expr',
+  //   'plaidml_logical_shape_get_dim_expr',
   'plaidml_poly_expr_free',
   'plaidml_poly_expr_repr',
   'plaidml_poly_expr_dim',
@@ -84,7 +83,6 @@ local exports = [
   'plaidml_program_free',
   'plaidml_program_evaluate',
   'plaidml_program_repr',
-  'plaidml_program_runinfo',
 
   // op/ffi.h
   'plaidml_op_init',
