@@ -22,8 +22,6 @@ using plaidml::core::Settings;
 using pmlc::dialect::eltwise::ScalarType;
 using vertexai::context::Context;
 using vertexai::tile::DataType;
-using vertexai::tile::TensorDimension;
-using vertexai::tile::TensorShape;
 using LocalPlatform = vertexai::tile::local_machine::Platform;
 
 extern const char* PLAIDML_VERSION;

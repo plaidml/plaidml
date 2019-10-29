@@ -9,7 +9,6 @@
 #include "pmlc/dialect/stripe/types.h"
 #include "pmlc/dialect/tile/builder.h"
 #include "tile/base/platform.h"
-#include "tile/base/shape.h"
 
 extern "C" {
 
