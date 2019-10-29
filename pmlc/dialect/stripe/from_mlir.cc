@@ -177,7 +177,7 @@ StripeBuilder::StripeBuilder(mlir::FuncOp func) : blocks_(std::make_shared<std::
     TensorShape shape = intoShape(tensorInfo.base_type);
     std::vector<stripe::Affine> access(tensorInfo.access.size());
     stripe::Refinement ref{stripe::RefDir::None, "", name.str(), access, shape};
-    auto attrs = func.getArgAttrOfType<DictionaryAttr>(i, Dialect::getDialectAttrName(Dialect::getStripeAttrsName()));
+    auto attrs = func.getArgAttrOfType<DictionaryAttr>(i, Dialect::getDialectAttrName("attrs"));
     if (attrs) {
       add_attributes(&ref, attrs.getValue());
     }
