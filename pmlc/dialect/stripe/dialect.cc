@@ -127,7 +127,7 @@ mlir::Type Dialect::parseTensorRef(llvm::StringRef tyData, mlir::Location loc) c
 }
 
 std::string Dialect::getDialectAttrName(llvm::StringRef name) {
-  return llvm::formatv("{0}.{1}", stripe::Dialect::getDialectNamespace(), name).str();
+  return llvm::formatv("{0}.{1}", getDialectNamespace(), name).str();
 }
 
 mlir::Type Dialect::parseType(llvm::StringRef tyData, mlir::Location loc) const {

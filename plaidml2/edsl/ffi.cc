@@ -213,7 +213,7 @@ void plaidml_expr_free(  //
 plaidml_logical_shape* plaidml_expr_get_shape(  //
     plaidml_error* err,                         //
     plaidml_expr* expr) {
-  return ffi_wrap<plaidml_logical_shape*>(err, nullptr, [&] {  //
+  return ffi_wrap<plaidml_logical_shape*>(err, nullptr, [&] {
     IVLOG(3, "plaidml_expr_get_shape");
     if (!expr) {
       throw std::runtime_error(
@@ -227,15 +227,9 @@ void plaidml_expr_bind_shape(  //
     plaidml_error* err,        //
     plaidml_expr* expr,        //
     plaidml_logical_shape* shape) {
-  // TODO(MLIR)
-  return ffi_wrap_void(err, [&] {  //
+  return ffi_wrap_void(err, [&] {
     IVLOG(3, "plaidml_expr_bind_shape");
-    throw std::runtime_error("NYI: plaidml_expr_bind_shape");
-    // auto param_expr = std::dynamic_pointer_cast<ParamExpr>(expr->expr);
-    // if (!param_expr) {
-    //   throw std::runtime_error("Shape binding is only supported on ParamExprs");
-    // }
-    // param_expr->shape = shape->shape;
+    GlobalContext::get()->BindShape(expr->value, shape->type);
   });
 }
 
@@ -258,8 +252,7 @@ void plaidml_expr_bind_dims(  //
 plaidml_string* plaidml_expr_repr(  //
     plaidml_error* err,             //
     plaidml_expr* expr) {
-  // TODO(MLIR)
-  return ffi_wrap<plaidml_string*>(err, nullptr, [&] {  //
+  return ffi_wrap<plaidml_string*>(err, nullptr, [&] {
     IVLOG(3, "plaidml_expr_repr");
     return new plaidml_string{mlir::debugString(*expr->value)};
   });
@@ -282,7 +275,8 @@ plaidml_expr* plaidml_expr_placeholder(  //
     const char* name) {
   return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
     IVLOG(3, "plaidml_expr_placeholder");
-    return new plaidml_expr{GlobalContext::get()->MakePlaceholderOp(shape->type)};
+    return new plaidml_expr{
+        GlobalContext::get()->MakePlaceholderOp(shape->type, buffer ? buffer->buffer : nullptr, name)};
   });
 }
 
@@ -855,6 +849,8 @@ void plaidml_program_free(  //
 plaidml_program* plaidml_program_evaluate(  //
     plaidml_error* err,                     //
     const char* name,                       //
+    size_t ninputs,                         //
+    plaidml_expr** raw_inputs,              //
     size_t noutputs,                        //
     plaidml_expr** raw_outputs,             //
     plaidml_expr** new_outputs,             //
@@ -863,14 +859,25 @@ plaidml_program* plaidml_program_evaluate(  //
     plaidml_expr** dst_updates) {
   return ffi_wrap<plaidml_program*>(err, nullptr, [&] {
     IVLOG(3, "plaidml_program_evaluate");
-    std::vector<mlir::Value*> values(noutputs);
+    std::vector<mlir::Value*> inputs(ninputs);
+    for (size_t i = 0; i < ninputs; i++) {
+      if (!raw_inputs[i]) {
+        throw std::runtime_error("Undefined input in plaidml_program_evaluate");
+      }
+      inputs[i] = raw_inputs[i]->value;
+      if (!inputs[i]) {
+        IVLOG(5, "Found a missing input value: (index " << i << ")");
+      }
+    }
+
+    std::vector<mlir::Value*> outputs(noutputs);
     for (size_t i = 0; i < noutputs; i++) {
       if (!raw_outputs[i]) {
         throw std::runtime_error("Undefined output in plaidml_program_evaluate");
       }
-      values[i] = raw_outputs[i]->value;
-      if (!values[i]) {
-        IVLOG(5, "Found a missing value! (index " << i << ")");
+      outputs[i] = raw_outputs[i]->value;
+      if (!outputs[i]) {
+        IVLOG(5, "Found a missing output value: (index " << i << ")");
       }
     }
 
@@ -886,7 +893,7 @@ plaidml_program* plaidml_program_evaluate(  //
     // }
 
     std::vector<mlir::Value*> new_values(noutputs);
-    auto program = GlobalContext::get()->MakeProgram(name, values, new_values);
+    auto program = GlobalContext::get()->MakeProgram(name, inputs, outputs, new_values);
     for (size_t i = 0; i < noutputs; i++) {
       new_outputs[i] = new plaidml_expr{new_values[i]};
     }

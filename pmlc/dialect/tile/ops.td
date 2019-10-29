@@ -61,7 +61,7 @@ def DimOp : TileOp<"dim">, HasFolder {
   >];
 }
 
-def AffineConstantOp : TileOp<"const_dim">, HasFolder {
+def AffineConstantOp : TileOp<"affine_const">, HasFolder {
   let summary = "affine constant";
   let arguments = (ins I64Attr:$value);
   let results = (outs Index:$result);
@@ -89,7 +89,9 @@ def AffineIndexOp : TileOp<"idx"> {
   >];
 }
 
-class AffineOp<string mnemonic> : TileOp<mnemonic, [NoSideEffect]>, HasFolder {
+class AffineOp<string mnemonic, list<OpTrait> traits = []> :
+    TileOp<mnemonic, !listconcat(traits, [NoSideEffect])>,
+    HasFolder {
   let results = (outs Index:$result);
 
   let builders = [OpBuilder<
@@ -100,15 +102,15 @@ class AffineOp<string mnemonic> : TileOp<mnemonic, [NoSideEffect]>, HasFolder {
   >];
 }
 
-class AffineUnaryOp<string mnemonic> : AffineOp<mnemonic> {
+class AffineUnaryOp<string mnemonic, list<OpTrait> traits = []> : AffineOp<mnemonic, traits> {
   let arguments = (ins Index:$in);
 }
 
-class AffineBinaryOp<string mnemonic> : AffineOp<mnemonic> {
+class AffineBinaryOp<string mnemonic, list<OpTrait> traits = []> : AffineOp<mnemonic, traits> {
   let arguments = (ins Index:$lhs, Index:$rhs);
 }
 
-def AffineAddOp : AffineBinaryOp<"affine_add"> {
+def AffineAddOp : AffineBinaryOp<"affine_add", [Commutative]> {
   let summary = "Affine addition operation";
 }
 
@@ -116,7 +118,7 @@ def AffineDivOp : AffineBinaryOp<"affine_div"> {
   let summary = "Affine division operation";
 }
 
-def AffineMulOp : AffineBinaryOp<"affine_mul"> {
+def AffineMulOp : AffineBinaryOp<"affine_mul", [Commutative]> {
   let summary = "Affine multiplication operation";
 }
 
@@ -129,11 +131,11 @@ def AffineSubOp : AffineBinaryOp<"affine_sub"> {
   let summary = "Affine subtraction operation";
 }
 
-def AffineMaxOp : AffineBinaryOp<"affine_max"> {
+def AffineMaxOp : AffineBinaryOp<"affine_max", [Commutative]> {
   let summary = "Affine max operation";
 }
 
-def AffineMinOp : AffineBinaryOp<"affine_min"> {
+def AffineMinOp : AffineBinaryOp<"affine_min", [Commutative]> {
   let summary = "Affine min operation";
 }
 

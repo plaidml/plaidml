@@ -42,6 +42,7 @@ class TileBuilder {
   mlir::RankedTensorType MakeRankedTensorType(DataType dtype, llvm::ArrayRef<int64_t> dims);
   void BindTensorDims(mlir::Value* from, llvm::ArrayRef<mlir::Value**> into);
   mlir::RankedTensorType ComputeShape(mlir::Value* tensor);
+  void BindShape(mlir::Value* tensor, mlir::RankedTensorType type);
 
   stripe::TensorType MakeTensorType(DataType dtype, llvm::ArrayRef<int64_t> sizes, llvm::ArrayRef<int64_t> strides);
   stripe::TensorType IntoTensorType(mlir::RankedTensorType type);
@@ -62,7 +63,7 @@ class TileBuilder {
   mlir::Value* MakeScalarConstantOp(double value);
   mlir::Value* MakePrimitiveOp(llvm::StringRef fn, llvm::ArrayRef<mlir::Value*> args);
   mlir::Value* MakeDimOp(mlir::Value* tensor, unsigned dim);
-  mlir::Value* MakePlaceholderOp(mlir::RankedTensorType type);
+  mlir::Value* MakePlaceholderOp(mlir::RankedTensorType type, vertexai::tile::BufferPtr buffer, llvm::StringRef name);
   mlir::Value* MakeAffineConstantOp(int64_t value);
   mlir::Value* MakeAffineIndexOp(llvm::StringRef name = "");
   mlir::Value* MakeAffineAddOp(llvm::ArrayRef<mlir::Value*> args);
@@ -88,6 +89,7 @@ class TileBuilder {
 
   std::shared_ptr<TileProgram> MakeProgram(  //
       llvm::StringRef name,                  //
+      llvm::ArrayRef<mlir::Value*> inputs,   //
       llvm::ArrayRef<mlir::Value*> outputs,  //
       llvm::MutableArrayRef<mlir::Value*> new_outputs);
 

@@ -61,7 +61,7 @@ void plaidml_exec_init(  //
     plaidml_error* err) {
   static std::once_flag is_initialized;
   ffi_wrap_void(err, [&] {
-    std::call_once(is_initialized, []() {  //
+    std::call_once(is_initialized, []() {
       IVLOG(1, "plaidml_exec_init");
       GetPlatform();
     });
@@ -125,10 +125,12 @@ plaidml_executable* plaidml_compile(  //
     if (!stripeFuncOp) {
       throw std::runtime_error("Missing stripe FuncOp");
     }
-    for (auto kvp : program->program->ioMap) {
-      auto stagingValue = kvp.first;
+    for (const auto& [stagingValue, buffer] : program->program->ioMap) {
       auto programValue = program->program->mapper.lookupOrNull(stagingValue);
-      auto arg = llvm::dyn_cast_or_null<mlir::BlockArgument>(programValue);
+      if (!programValue) {
+        throw std::runtime_error("Invalid IoMap entry");
+      }
+      auto arg = llvm::dyn_cast<mlir::BlockArgument>(programValue);
       if (!arg) {
         throw std::runtime_error("Input expected BlockArgument");
       }
@@ -140,7 +142,7 @@ plaidml_executable* plaidml_compile(  //
       }
       auto inputName = attr.getValue().str();
       IVLOG(1, "  name: " << inputName);
-      exec->input_bufs[inputName] = kvp.second;
+      exec->input_bufs[inputName] = buffer;
     }
 
     // bind output buffers
@@ -181,11 +183,11 @@ void plaidml_target_list(  //
   ffi_wrap_void(err, [&] {
     auto configs = GetConfigs().configs();
     size_t i = 0;
-    for (const auto& kvp : configs) {
+    for (const auto& [key, value] : configs) {
       if (i >= ntargets) {
         break;
       }
-      targets[i++] = new plaidml_string{kvp.first};
+      targets[i++] = new plaidml_string{key};
     }
   });
 }

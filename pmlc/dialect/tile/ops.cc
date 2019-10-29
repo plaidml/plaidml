@@ -27,11 +27,13 @@ using mlir::PatternRewriter;
 using mlir::Value;
 
 OpFoldResult AffineConstantOp::fold(ArrayRef<Attribute> operands) {
+  IVLOG(5, "AffineConstantOp::fold");
   assert(operands.empty() && "constant has no operands");
   return getValue();
 }
 
 OpFoldResult AffineAddOp::fold(ArrayRef<Attribute> operands) {
+  IVLOG(5, "AffineAddOp::fold");
   /// add(x, 0) -> x
   if (matchPattern(rhs(), m_Zero())) {
     return lhs();
@@ -40,6 +42,7 @@ OpFoldResult AffineAddOp::fold(ArrayRef<Attribute> operands) {
 }
 
 OpFoldResult AffineDivOp::fold(ArrayRef<Attribute> operands) {
+  IVLOG(5, "AffineDivOp::fold");
   // Don't fold if it requires division by zero.
   if (matchPattern(rhs(), m_Zero())) {
     return {};
@@ -50,48 +53,63 @@ OpFoldResult AffineDivOp::fold(ArrayRef<Attribute> operands) {
   }
   // div(0, x) -> 0
   if (matchPattern(lhs(), m_Zero())) {
-    return Builder(getContext()).getZeroAttr(getType());
+    Builder builder(getContext());
+    return builder.getZeroAttr(builder.getIntegerType(64));
   }
   return constFoldBinaryOp(operands, [](double a, double b) { return a / b; });
 }
 
 OpFoldResult AffineMulOp::fold(ArrayRef<Attribute> operands) {
+  IVLOG(5, "AffineMulOp::fold");
   // mul(x, 0) -> 0
   if (matchPattern(rhs(), m_Zero())) {
+    IVLOG(5, "mul(x, 0) -> 0");
     return rhs();
   }
   // mul(x, 1) -> x
   if (matchPattern(rhs(), m_One())) {
+    IVLOG(5, "mul(x, 1) -> x");
     return lhs();
   }
-  return constFoldBinaryOp(operands, [](double a, double b) { return a * b; });
+  return constFoldBinaryOp(operands, [](double a, double b) {
+    IVLOG(5, a << " * " << b << " = " << a * b);
+    return a * b;
+  });
 }
 
 OpFoldResult AffineNegOp::fold(ArrayRef<Attribute> operands) {
+  IVLOG(5, "AffineNegOp::fold");
   return constFoldUnaryOp(operands, [](double x) { return -x; });
 }
 
 OpFoldResult AffineMaxOp::fold(ArrayRef<Attribute> operands) {
+  IVLOG(5, "AffineMaxOp::fold");
   return constFoldBinaryOp(operands, [](double a, double b) { return fmax(a, b); });
 }
 
 OpFoldResult AffineMinOp::fold(ArrayRef<Attribute> operands) {
+  IVLOG(5, "AffineMinOp::fold");
   return constFoldBinaryOp(operands, [](double a, double b) { return fmin(a, b); });
 }
 
 OpFoldResult AffineSubOp::fold(ArrayRef<Attribute> operands) {
+  IVLOG(5, "AffineSubOp::fold");
   // sub(x, x) -> 0
   if (lhs() == rhs()) {
-    return Builder(getContext()).getZeroAttr(getType());
+    IVLOG(5, "sub(x, x) -> 0");
+    Builder builder(getContext());
+    return builder.getZeroAttr(builder.getIntegerType(64));
   }
   /// sub(x, 0) -> x
   if (matchPattern(rhs(), m_Zero())) {
+    IVLOG(5, "sub(x, 0) -> x");
     return lhs();
   }
   return constFoldBinaryOp(operands, [](double a, double b) { return a - b; });
 }
 
 OpFoldResult DimOp::fold(ArrayRef<Attribute> operands) {
+  IVLOG(5, "DimOp::fold");
   auto type = tensor()->getType().dyn_cast<mlir::TensorType>();
   if (!type) {
     return {};

@@ -118,11 +118,11 @@ class TestEdsl(unittest.TestCase):
 !fp32 = type tensor<!eltwise.fp32>
 module {
   func @mnist_mlp(%arg0: tensor<10x!eltwise.fp32>, %arg1: tensor<512x!eltwise.fp32>, %arg2: tensor<512x!eltwise.fp32>, %arg3: tensor<1x784x!eltwise.fp32>, %arg4: tensor<784x512x!eltwise.fp32>, %arg5: tensor<512x512x!eltwise.fp32>, %arg6: tensor<512x10x!eltwise.fp32>) -> tensor<1x10x!eltwise.fp32> {
-    %c512 = "tile.const_dim"() {value = 512 : i64} : () -> index
+    %c512 = "tile.affine_const"() {value = 512 : i64} : () -> index
     %cst = "eltwise.sconst"() {value = 0.000000e+00 : f32} : () -> !fp32
-    %c10 = "tile.const_dim"() {value = 10 : i64} : () -> index
-    %c0 = "tile.const_dim"() {value = 0 : i64} : () -> index
-    %c1 = "tile.const_dim"() {value = 1 : i64} : () -> index
+    %c10 = "tile.affine_const"() {value = 10 : i64} : () -> index
+    %c0 = "tile.affine_const"() {value = 0 : i64} : () -> index
+    %c1 = "tile.affine_const"() {value = 1 : i64} : () -> index
     %0 = "tile.domain"() ( {
     ^bb0(%arg7: index, %arg8: index, %arg9: index):	// no predecessors
       %15 = "tile.src_idx_map"(%arg3, %arg8, %arg7) : (tensor<1x784x!eltwise.fp32>, index, index) -> !tile.imap
@@ -212,9 +212,9 @@ module {
 !fp32 = type tensor<!eltwise.fp32>
 module {
   func @arg_max(%arg0: tensor<1x10x10x!eltwise.fp32>, %arg1: !fp32) -> tensor<1x10x!eltwise.u32> {
-    %c1 = "tile.const_dim"() {value = 1 : i64} : () -> index
+    %c1 = "tile.affine_const"() {value = 1 : i64} : () -> index
     %c0 = "eltwise.sconst"() {value = 0 : i64} : () -> !i32
-    %c10 = "tile.const_dim"() {value = 10 : i64} : () -> index
+    %c10 = "tile.affine_const"() {value = 10 : i64} : () -> index
     %0 = "tile.domain"() ( {
     ^bb0(%arg2: index, %arg3: index, %arg4: index):	// no predecessors
       %5 = "tile.src_idx_map"(%arg0, %arg4, %arg3, %arg2) : (tensor<1x10x10x!eltwise.fp32>, index, index, index) -> !tile.imap
@@ -258,7 +258,7 @@ module {
 
 !fp32 = type tensor<!eltwise.fp32>
 module {
-  func @global_min(%arg0: tensor<10x10x10x!eltwise.fp32>) -> !fp32 {
+  func @global_min(%arg0: tensor<10x10x10x!eltwise.fp32> {tile.name = "I"}) -> !fp32 {
     %0 = "eltwise.neg"(%arg0) {type = !eltwise.fp32} : (tensor<10x10x10x!eltwise.fp32>) -> tensor<10x10x10x!eltwise.fp32>
     %1 = "tile.domain"() ( {
     ^bb0(%arg1: index, %arg2: index, %arg3: index):	// no predecessors
@@ -286,8 +286,8 @@ module {
             str(program), '''
 
 module {
-  func @cum_sum(%arg0: tensor<10x!eltwise.fp32>) -> tensor<10x!eltwise.fp32> {
-    %c10 = "tile.const_dim"() {value = 10 : i64} : () -> index
+  func @cum_sum(%arg0: tensor<10x!eltwise.fp32> {tile.name = "I"}) -> tensor<10x!eltwise.fp32> {
+    %c10 = "tile.affine_const"() {value = 10 : i64} : () -> index
     %0 = "tile.domain"() ( {
     ^bb0(%arg1: index, %arg2: index):	// no predecessors
       %1 = "tile.src_idx_map"(%arg0, %arg1) : (tensor<10x!eltwise.fp32>, index) -> !tile.imap
@@ -320,7 +320,7 @@ module {
 
 !fp32 = type tensor<!eltwise.fp32>
 module {
-  func @unique_names(%arg0: !fp32, %arg1: !fp32, %arg2: !fp32, %arg3: !fp32) -> !fp32 {
+  func @unique_names(%arg0: !fp32 {tile.name = "C"}, %arg1: !fp32 {tile.name = "C"}, %arg2: !fp32 {tile.name = "B"}, %arg3: !fp32 {tile.name = "A"}) -> !fp32 {
     %0 = "eltwise.add"(%arg3, %arg2) {type = !eltwise.fp32} : (!fp32, !fp32) -> !fp32
     %1 = "eltwise.add"(%0, %arg1) {type = !eltwise.fp32} : (!fp32, !fp32) -> !fp32
     %2 = "eltwise.add"(%1, %arg0) {type = !eltwise.fp32} : (!fp32, !fp32) -> !fp32
@@ -416,10 +416,10 @@ module {
 
 module {
   func @use_default(%arg0: tensor<1x10x10x!eltwise.fp32>, %arg1: tensor<1x7x10x10x!eltwise.fp32>) -> tensor<1x7x10x10x!eltwise.fp32> {
-    %c3 = "tile.const_dim"() {value = 3 : i64} : () -> index
-    %c10 = "tile.const_dim"() {value = 10 : i64} : () -> index
-    %c7 = "tile.const_dim"() {value = 7 : i64} : () -> index
-    %c1 = "tile.const_dim"() {value = 1 : i64} : () -> index
+    %c3 = "tile.affine_const"() {value = 3 : i64} : () -> index
+    %c10 = "tile.affine_const"() {value = 10 : i64} : () -> index
+    %c7 = "tile.affine_const"() {value = 7 : i64} : () -> index
+    %c1 = "tile.affine_const"() {value = 1 : i64} : () -> index
     %0 = "tile.domain"() ( {
     ^bb0(%arg2: index, %arg3: index, %arg4: index):	// no predecessors
       %1 = "tile.src_idx_map"(%arg0, %arg4, %arg3, %arg2) : (tensor<1x10x10x!eltwise.fp32>, index, index, index) -> !tile.imap
@@ -443,10 +443,10 @@ module {
             str(program), '''
 
 module {
-  func @defract_test(%arg0: tensor<3x!eltwise.fp32>, %arg1: tensor<3x!eltwise.fp32>) -> tensor<5x!eltwise.fp32> {
-    %c1 = "tile.const_dim"() {value = 1 : i64} : () -> index
-    %c2 = "tile.const_dim"() {value = 2 : i64} : () -> index
-    %c5 = "tile.const_dim"() {value = 5 : i64} : () -> index
+  func @defract_test(%arg0: tensor<3x!eltwise.fp32> {tile.name = "I"}, %arg1: tensor<3x!eltwise.fp32> {tile.name = "K"}) -> tensor<5x!eltwise.fp32> {
+    %c1 = "tile.affine_const"() {value = 1 : i64} : () -> index
+    %c2 = "tile.affine_const"() {value = 2 : i64} : () -> index
+    %c5 = "tile.affine_const"() {value = 5 : i64} : () -> index
     %0 = "tile.domain"() ( {
     ^bb0(%arg2: index, %arg3: index):	// no predecessors
       %1 = "tile.affine_sub"(%arg3, %arg2) : (index, index) -> index
@@ -475,10 +475,10 @@ module {
             str(program), '''
 
 module {
-  func @defract_short_test(%arg0: tensor<3x!eltwise.fp32>) -> tensor<6x!eltwise.fp32> {
-    %c1 = "tile.const_dim"() {value = 1 : i64} : () -> index
-    %c2 = "tile.const_dim"() {value = 2 : i64} : () -> index
-    %c6 = "tile.const_dim"() {value = 6 : i64} : () -> index
+  func @defract_short_test(%arg0: tensor<3x!eltwise.fp32> {tile.name = "I"}) -> tensor<6x!eltwise.fp32> {
+    %c1 = "tile.affine_const"() {value = 1 : i64} : () -> index
+    %c2 = "tile.affine_const"() {value = 2 : i64} : () -> index
+    %c6 = "tile.affine_const"() {value = 6 : i64} : () -> index
     %0 = "tile.domain"() ( {
     ^bb0(%arg1: index):	// no predecessors
       %1 = "tile.affine_sub"(%arg1, %c1) : (index, index) -> index
@@ -508,10 +508,10 @@ module {
             str(program), '''
 
 module {
-  func @defract_long(%arg0: tensor<1x3x3x1x!eltwise.fp32>, %arg1: tensor<1x3x3x1x!eltwise.fp32>) -> tensor<1x5x5x1x!eltwise.fp32> {
-    %c2 = "tile.const_dim"() {value = 2 : i64} : () -> index
-    %c5 = "tile.const_dim"() {value = 5 : i64} : () -> index
-    %c1 = "tile.const_dim"() {value = 1 : i64} : () -> index
+  func @defract_long(%arg0: tensor<1x3x3x1x!eltwise.fp32> {tile.name = "I"}, %arg1: tensor<1x3x3x1x!eltwise.fp32> {tile.name = "K"}) -> tensor<1x5x5x1x!eltwise.fp32> {
+    %c2 = "tile.affine_const"() {value = 2 : i64} : () -> index
+    %c5 = "tile.affine_const"() {value = 5 : i64} : () -> index
+    %c1 = "tile.affine_const"() {value = 1 : i64} : () -> index
     %0 = "tile.domain"() ( {
     ^bb0(%arg2: index, %arg3: index, %arg4: index, %arg5: index, %arg6: index, %arg7: index, %arg8: index):	// no predecessors
       %1 = "tile.affine_add"(%arg4, %arg3) : (index, index) -> index
@@ -572,10 +572,10 @@ module {
             str(program), '''
 
 module {
-  func @this-is-not an identifier(%arg0: tensor<3x!eltwise.fp32>, %arg1: tensor<3x!eltwise.fp32>) -> tensor<5x!eltwise.fp32> {
-    %c1 = "tile.const_dim"() {value = 1 : i64} : () -> index
-    %c2 = "tile.const_dim"() {value = 2 : i64} : () -> index
-    %c5 = "tile.const_dim"() {value = 5 : i64} : () -> index
+  func @this-is-not an identifier(%arg0: tensor<3x!eltwise.fp32> {tile.name = "I"}, %arg1: tensor<3x!eltwise.fp32> {tile.name = "K"}) -> tensor<5x!eltwise.fp32> {
+    %c1 = "tile.affine_const"() {value = 1 : i64} : () -> index
+    %c2 = "tile.affine_const"() {value = 2 : i64} : () -> index
+    %c5 = "tile.affine_const"() {value = 5 : i64} : () -> index
     %0 = "tile.domain"() ( {
     ^bb0(%arg2: index, %arg3: index):	// no predecessors
       %1 = "tile.affine_sub"(%arg3, %arg2) : (index, index) -> index
@@ -601,7 +601,7 @@ module {
             str(program), '''
 
 module {
-  func @identity(%arg0: tensor<3x!eltwise.fp32>) -> tensor<3x!eltwise.fp32> {
+  func @identity(%arg0: tensor<3x!eltwise.fp32> {tile.name = "I"}) -> tensor<3x!eltwise.fp32> {
     %0 = "eltwise.ident"(%arg0) {type = !eltwise.fp32} : (tensor<3x!eltwise.fp32>) -> tensor<3x!eltwise.fp32>
     return %0 : tensor<3x!eltwise.fp32>
   }
@@ -650,7 +650,7 @@ module {
             str(program1), '''
 
 module {
-  func @two_outputs(%arg0: tensor<3x!eltwise.fp32>) -> (tensor<3x!eltwise.fp32>, tensor<3x!eltwise.fp32>) {
+  func @two_outputs(%arg0: tensor<3x!eltwise.fp32> {tile.name = "I"}) -> (tensor<3x!eltwise.fp32>, tensor<3x!eltwise.fp32>) {
     %0 = "eltwise.ident"(%arg0) {type = !eltwise.fp32} : (tensor<3x!eltwise.fp32>) -> tensor<3x!eltwise.fp32>
     %1 = "eltwise.ident"(%arg0) {type = !eltwise.fp32} : (tensor<3x!eltwise.fp32>) -> tensor<3x!eltwise.fp32>
     return %0, %1 : tensor<3x!eltwise.fp32>, tensor<3x!eltwise.fp32>

@@ -121,9 +121,10 @@ class _Function(object):
             dtype = node.tensor.shape.dtype
             shape = edsl.LogicalShape(dtype, data.shape)
             node.tensor.bind(shape)
+        inputs = [x.tensor for x in self._inputs]
         outputs = [x.tensor for x in self._outputs]
         updates = [(x[0].tensor, x[1].tensor) for x in self._updates]
-        program = edsl.Program(self._name, outputs, updates)
+        program = edsl.Program(self._name, outputs, inputs=inputs, updates=updates)
         return plaidml_exec.Executable(program, [x.tensor for x in self._inputs])
 
 

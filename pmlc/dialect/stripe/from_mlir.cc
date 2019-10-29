@@ -163,7 +163,9 @@ StripeBuilder::StripeBuilder(mlir::FuncOp func) : blocks_(std::make_shared<std::
   cur_ = std::make_shared<stripe::Block>();
   cur_->name = func.getName();
   auto attrs = func.getAttrOfType<DictionaryAttr>(Dialect::getStripeAttrsName());
-  add_attributes(cur_.get(), attrs.getValue());
+  if (attrs) {
+    add_attributes(cur_.get(), attrs.getValue());
+  }
   auto mblock = &func.front();
   BlockInfo blockInfo(cur_.get());
   for (size_t i = 0; i < func.getNumArguments(); i++) {
@@ -190,25 +192,22 @@ StripeBuilder::StripeBuilder(mlir::FuncOp func) : blocks_(std::make_shared<std::
 }
 
 void StripeBuilder::add_attributes(stripe::Taggable* out, ArrayRef<NamedAttribute> attrs) {
-  for (auto kvp : attrs) {
-    llvm::StringRef name = kvp.first.strref();
+  for (const auto& [key, value] : attrs) {
+    auto name = key.strref();
     if (name.count('.')) {
       name = name.split('.').second;
     }
-    if (name == "__name") {
-      continue;
-    }
-    if (kvp.second.dyn_cast<UnitAttr>()) {
+    if (value.dyn_cast<UnitAttr>()) {
       out->set_attr(name);
-    } else if (auto attr = kvp.second.dyn_cast<BoolAttr>()) {
+    } else if (auto attr = value.dyn_cast<BoolAttr>()) {
       out->set_attr(name, attr.getValue());
-    } else if (auto attr = kvp.second.dyn_cast<IntegerAttr>()) {
+    } else if (auto attr = value.dyn_cast<IntegerAttr>()) {
       out->set_attr(name, attr.getInt());
-    } else if (auto attr = kvp.second.dyn_cast<FloatAttr>()) {
+    } else if (auto attr = value.dyn_cast<FloatAttr>()) {
       out->set_attr(name, attr.getValueAsDouble());
-    } else if (auto attr = kvp.second.dyn_cast<IntegerAttr>()) {
+    } else if (auto attr = value.dyn_cast<IntegerAttr>()) {
       out->set_attr(name, attr.getInt());
-    } else if (auto attr = kvp.second.dyn_cast<StringAttr>()) {
+    } else if (auto attr = value.dyn_cast<StringAttr>()) {
       out->set_attr(name, attr.getValue().str());
     } else {
       IVLOG(1, "Attr: " << name.str());
@@ -285,9 +284,9 @@ struct RefinementBuilder {
       std::vector<stripe::Affine> access;
       for (size_t i = 0; i < ndims; i++) {
         stripe::Affine aff;
-        for (const auto& kvp : tensorInfo.access[i].terms) {
-          if (kvp.first->getOwner() == mblock) {
-            aff += stripe::Affine(stripeBuilder->get_idx(sblock, kvp.first), kvp.second);
+        for (const auto& [key, value] : tensorInfo.access[i].terms) {
+          if (key->getOwner() == mblock) {
+            aff += stripe::Affine(stripeBuilder->get_idx(sblock, key), value);
           }
         }
         access.push_back(aff);
@@ -407,9 +406,9 @@ stripe::Affine StripeBuilder::build_affine(stripe::Block* sblock, Value* base) {
   stripe::Affine ret;
   AffinePolynomial poly(base);
   ret += poly.constant;
-  for (auto& kvp : poly.terms) {
-    std::string name = get_idx(sblock, kvp.first);
-    ret += stripe::Affine(name, kvp.second);
+  for (auto& [key, value] : poly.terms) {
+    std::string name = get_idx(sblock, key);
+    ret += stripe::Affine(name, value);
   }
   return ret;
 }
@@ -420,9 +419,9 @@ stripe::Location StripeBuilder::build_location(const StripeLocation& loc, Block*
     auto sdev = stripe::Device{dev.name};
     for (const auto& unit : dev.units) {
       auto aff = stripe::Affine{unit.constant};
-      for (const auto& kvp : unit.terms) {
-        if (kvp.first->getOwner() == mblock) {
-          aff += stripe::Affine(get_idx(sblock, kvp.first), kvp.second);
+      for (const auto& [key, value] : unit.terms) {
+        if (key->getOwner() == mblock) {
+          aff += stripe::Affine(get_idx(sblock, key), value);
         }
       }
       sdev.units.emplace_back(std::move(aff));

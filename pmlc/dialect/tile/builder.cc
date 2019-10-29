@@ -64,11 +64,15 @@ struct TileBuilder::Impl {
   ModuleOp module;
   OpBuilder builder;
   std::map<AffineDomainOp, DomainInfo> domains;
+  IoMap ioMap;
   static std::map<ContractionKey, std::string> contractions;
+  NoneOp noneOp;
 
   Impl()
       : module(ModuleOp::create(UnknownLoc::get(&context))),  //
-        builder(module.getBody()) {}
+        builder(module.getBody()) {
+    builder.setInsertionPointToStart(module.getBody());
+  }
 
   Type inferElementType(ArrayRef<Type> types) {
     DataType ret = DataType::INVALID;
@@ -133,6 +137,7 @@ TileBuilder::~TileBuilder() = default;
 
 void TileBuilder::Destroy(Value* value) {
   IVLOG(5, "TileBuilder::Destroy> value");
+  // impl->ioMap.erase(value);
   // TODO: fix memory mgmt issues, once purely MLIR path is complete
   // if (value && value->use_empty()) {
   //   auto op = value->getDefiningOp();
@@ -166,6 +171,10 @@ stripe::TensorType TileBuilder::IntoTensorType(mlir::RankedTensorType type) {
     stride *= shape[i];
   }
   return stripe::TensorType::get(type.getElementType(), newShape, stripe::OffsetsMap{}, false);
+}
+
+void TileBuilder::BindShape(mlir::Value* tensor, mlir::RankedTensorType type) {  //
+  tensor->setType(type);
 }
 
 void TileBuilder::BindTensorDims(Value* from, ArrayRef<Value**> intos) {
@@ -219,7 +228,7 @@ RankedTensorType TileBuilder::ComputeShape(Value* tensor) {
     return type;
   }
   SmallVector<Value*, 1> outputs{tensor};
-  auto program = MakeProgram("compute_shape", outputs, outputs);
+  auto program = MakeProgram("compute_shape", {}, outputs, outputs);
   return outputs[0]->getType().dyn_cast<RankedTensorType>();
 }
 
@@ -245,8 +254,11 @@ Value* TileBuilder::Clone(Value* value) {
 
 Value* TileBuilder::MakeNoneOp() {
   IVLOG(5, "TileBuilder::MakeNoneOp>");
-  auto type = impl->builder.getNoneType();
-  return impl->builder.create<NoneOp>(impl->builder.getUnknownLoc(), type).result();
+  if (!impl->noneOp) {
+    auto type = impl->builder.getNoneType();
+    impl->noneOp = impl->builder.create<NoneOp>(impl->builder.getUnknownLoc(), type);
+  }
+  return impl->noneOp.result();
 }
 
 Value* TileBuilder::MakeStringOp(StringRef value) {
@@ -325,9 +337,17 @@ RankedTensorType TileBuilder::MakeRankedTensorType(DataType dtype, ArrayRef<int6
   return RankedTensorType::get(shape, elementType);
 }
 
-Value* TileBuilder::MakePlaceholderOp(RankedTensorType type) {
-  IVLOG(5, "TileBuilder::MakePlaceholderOp> " << mlir::debugString(type));
-  return impl->builder.create<PlaceholderOp>(impl->builder.getUnknownLoc(), type).result();
+Value* TileBuilder::MakePlaceholderOp(RankedTensorType type, vertexai::tile::BufferPtr buffer, StringRef name) {
+  IVLOG(5, "TileBuilder::MakePlaceholderOp> " << name.str() << ": " << mlir::debugString(type));
+  auto op = impl->builder.create<PlaceholderOp>(impl->builder.getUnknownLoc(), type);
+  if (!name.empty()) {
+    op.setAttr("name", impl->builder.getStringAttr(name));
+  }
+  if (buffer) {
+    impl->ioMap.emplace(op.result(), buffer);
+  }
+  IVLOG(1, "TileBuilder::MakePlaceholderOp> " << mlir::debugString(type) << ": " << op.result());
+  return op.result();
 }
 
 Value* TileBuilder::MakeAffineConstantOp(int64_t value) {
@@ -339,7 +359,7 @@ Value* TileBuilder::MakeAffineIndexOp(StringRef name) {
   IVLOG(5, "TileBuilder::MakeAffineIndexOp> " << name.str());
   auto op = impl->builder.create<AffineIndexOp>(impl->builder.getUnknownLoc());
   if (!name.empty()) {
-    // op.setAttr(SymbolTable::getSymbolAttrName(), impl->builder.getStringAttr(name));
+    op.setAttr("name", impl->builder.getStringAttr(name));
   }
   return op.result();
 }
@@ -543,6 +563,7 @@ Value* TileBuilder::MakeContractionOp(  //
 
 std::shared_ptr<TileProgram> TileBuilder::MakeProgram(  //
     StringRef name,                                     //
+    ArrayRef<Value*> inputs,                            //
     ArrayRef<Value*> outputs,                           //
     llvm::MutableArrayRef<Value*> new_outputs) {
   IVLOG(5, "TileBuilder::MakeProgram> " << name.str());
@@ -564,11 +585,20 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(  //
   auto slice = util::getBackwardSlice(values, true);
   // Compute the input types
   std::vector<Type> inputTypes;
+  // add positional inputs
+  for (auto value : inputs) {
+    auto op = value->getDefiningOp();
+    auto placeholderOp = llvm::dyn_cast_or_null<PlaceholderOp>(op);
+    if (!placeholderOp) {
+      throw std::runtime_error("Exepected PlaceholderOp for positional input");
+    }
+    inputTypes.push_back(placeholderOp.result()->getType());
+  }
+  // add remaining placeholders
   for (auto value : slice) {
     auto op = value->getDefiningOp();
-    if (auto var_op = llvm::dyn_cast_or_null<PlaceholderOp>(op)) {
-      auto value = var_op.getResult();
-      inputTypes.push_back(value->getType());
+    if (auto placeholderOp = llvm::dyn_cast_or_null<PlaceholderOp>(op)) {
+      inputTypes.push_back(placeholderOp.result()->getType());
     }
   }
   // Construct a module
@@ -581,16 +611,41 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(  //
   funcOp.addEntryBlock();
   OpBuilder builder(funcOp.getBody());
   unsigned argcnt = 0;
+  for (auto value : inputs) {
+    auto it = impl->ioMap.find(value);
+    if (it != impl->ioMap.end()) {
+      program->ioMap.emplace(it->first, it->second);
+    }
+    auto new_value = funcOp.getArgument(argcnt++);
+    auto op = value->getDefiningOp();
+    auto placeholderOp = llvm::cast<PlaceholderOp>(op);
+    if (auto attr = placeholderOp.getAttrOfType<StringAttr>("name")) {
+      auto attrName = Dialect::getDialectAttrName("name");
+      funcOp.setArgAttr(new_value->getArgNumber(), attrName, attr);
+    }
+    IVLOG(5, "BlockArgument mapping: " << value << " -> " << new_value);
+    program->mapper.map(value, new_value);
+  }
   for (auto value : slice) {
+    auto it = impl->ioMap.find(value);
+    if (it != impl->ioMap.end()) {
+      program->ioMap.emplace(it->first, it->second);
+    }
     auto op = value->getDefiningOp();
     // Only copy over top-level ops (those owned by the workspace module)
     if (op && op->getBlock() == impl->module.getBody()) {
-      if (auto var_op = llvm::dyn_cast<PlaceholderOp>(op)) {
+      if (auto placeholderOp = llvm::dyn_cast<PlaceholderOp>(op)) {
         // Replace placeholders with block arguments
         auto new_value = funcOp.getArgument(argcnt++);
+        if (auto attr = placeholderOp.getAttrOfType<StringAttr>("name")) {
+          auto attrName = Dialect::getDialectAttrName("name");
+          funcOp.setArgAttr(new_value->getArgNumber(), attrName, attr);
+        }
+        IVLOG(5, "BlockArgument mapping: " << value << " -> " << new_value);
         program->mapper.map(value, new_value);
       } else {
         auto new_value = builder.clone(*op, program->mapper)->getResult(0);
+        IVLOG(5, "mapping: " << value << " -> " << new_value);
         program->mapper.map(value, new_value);
       }
     }
@@ -618,7 +673,7 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(  //
   for (unsigned i = 0; i < returnOp.getNumOperands(); i++) {
     new_outputs[i] = returnOp.getOperand(i);
   }
-  IVLOG(2, mlir::debugString(module));
+  IVLOG(2, "TileBuilder::MakeProgram>" << mlir::debugString(module));
   return program;
 }
 

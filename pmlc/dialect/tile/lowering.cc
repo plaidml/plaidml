@@ -551,7 +551,10 @@ struct EltwiseOpConversion : public LoweringBase {
       }
 
       Type operandType = operand->getType();
-      auto tensorRefType = operandType.cast<stripe::TensorRefType>();
+      auto tensorRefType = operandType.dyn_cast<stripe::TensorRefType>();
+      if (!tensorRefType) {
+        throw std::runtime_error("EltwiseOpConversion expected TensorRefType for operand type");
+      }
       if (resultTensorType.getRank() < tensorRefType.getRank()) {
         throw std::runtime_error("Invalid eltwise op: result rank < operand rank");
       }
