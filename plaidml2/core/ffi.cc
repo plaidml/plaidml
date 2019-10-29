@@ -64,6 +64,7 @@ void plaidml_init(plaidml_error* err) {
       IVLOG(1, "plaidml_init");
       Settings::Instance()->load();
       auto ctx = GlobalContext::getContext();
+      GetPlatform();
       auto eventlog_str = vertexai::env::Get("PLAIDML_EVENTLOG_FILENAME");
       if (eventlog_str.size()) {
         IVLOG(1, "Logging events to " << eventlog_str);
@@ -72,7 +73,6 @@ void plaidml_init(plaidml_error* err) {
         auto eventlog = std::make_shared<vertexai::eventing::file::EventLog>(e_config);
         ctx->set_eventlog(std::move(eventlog));
         ctx->set_is_logging_events(true);
-        GetPlatform();
       }
     });
   });
