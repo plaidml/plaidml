@@ -55,8 +55,8 @@ local PARAMS = {
               pass: {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.StencilPass',
                 reqs: ['agg_op_add', 'comb_op_mul'],
-                outer_set: ['mac'],
-                inner_set: ['mac_inner', 'xsmm', "cpu_thread"],
+                outer_set: ['mac', "cpu_thread"],
+                inner_set: ['mac_inner', 'xsmm'],
                 is_strict_dims: true,
                 stencils: [
                   {
@@ -179,7 +179,9 @@ local PARAMS = {
                 // Apply to only dense operations
                 reqs: ['contraction'],
                 outer_set: ['contract_outer', 'kernel'],
-                inner_set: ['contract_inner'],
+                // Add #cpu_thread because often the new tile_contract block is 
+                // inserted as parent of #xsmm block.
+                inner_set: ['contract_inner', 'cpu_thread'],
                 // "acc_idxs": false,
                 // Only consider PO2 sizes for speed
                 only_po2: true,

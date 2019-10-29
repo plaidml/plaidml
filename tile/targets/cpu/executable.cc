@@ -14,7 +14,7 @@
 #include <llvm/Transforms/Utils/Cloning.h>
 
 #include <algorithm>
-#include <deque>
+#include <list>
 #include <memory>
 #include <utility>
 
@@ -24,6 +24,8 @@
 #include "base/util/lookup.h"
 #include "tile/stripe/stripe.h"
 #include "tile/targets/cpu/link_names.h"
+
+#include "tbb/parallel_do.h"
 
 #if defined(_WIN32)
 // As of 2019-08-01, libxsmm doesn't compile on Windows if UNICODE is defined, since it passes
@@ -128,13 +130,67 @@ void prng_step(uint32_t* in_state, uint32_t* out_state, float* buf, size_t count
   }
 }
 
-void RunTimeLogEntry(char* str, char* extra, float address) {
-  IVLOG(1, "RunTimeLogEntry: " << str << ":" << extra << ":" /* 0x" << std::hex */ << address);
+void RunTimeLogEntry(char* str, char* extra, uint64_t* address) {
+  IVLOG(1, "RunTimeLogEntry: " << str << ":" << extra << ": 0x" << std::hex << address);
 }
 
 typedef void (*libxsmm_function)(const void* a, const void* b, void* c);
-void XSMMRTCaller(libxsmm_function func, const void* aPtr, const void* bPtr, void* cPtr) { func(aPtr, bPtr, cPtr); }
+// Classes for that are executed by the TBB parallel_do function.
+// XSMM item and executor.
+struct XSMMParallelItem {
+  XSMMParallelItem(const libxsmm_function func, const void* aIn, const void* bIn, void* cIn)
+      : funcToCall(func), a(aIn), b(bIn), c(cIn) {}
+  const libxsmm_function funcToCall;
+  const void* a;
+  const void* b;
+  void* c;
+};
 
+struct XSMMParallelItemExecutor {
+  void operator()(XSMMParallelItem& itemIn) const {
+    auto item = itemIn;
+    item.funcToCall(item.a, item.b, item.c);
+  }
+};
+
+// TODO: Add more items and executors as needed.
+void XSMMRTCaller(const libxsmm_function func, const void* aPtr, const void* bPtr, void* cPtr,
+                  void* parallelCollectionSlotPtr, ParallelCallType callType) {
+#if PLAID_USE_TBB_PARALLELISM
+  if (nullptr == parallelCollectionSlotPtr) {
+#endif  // PLAID_USE_TBB_PARALLELISM
+    func(aPtr, bPtr, cPtr);
+#if PLAID_USE_TBB_PARALLELISM
+  } else {
+    auto listPtr = static_cast<std::list<XSMMParallelItem>*>(parallelCollectionSlotPtr);
+    listPtr->emplace_back(XSMMParallelItem(func, aPtr, bPtr, cPtr));
+  }
+#endif  // #if PLAID_USE_TBB_PARALLELISM
+}
+
+void CreateParallelCollection(void** parallelCollectionSlotPtr, int64_t callType) {
+#if PLAID_USE_TBB_PARALLELISM
+  std::list<XSMMParallelItem>* ret = new std::list<XSMMParallelItem>();
+  if (parallelCollectionSlotPtr == nullptr || *parallelCollectionSlotPtr != nullptr) {
+    throw std::runtime_error("Invalid parallel collection state when creating one.");
+  }
+  *parallelCollectionSlotPtr = ret;
+#endif  // PLAID_USE_TBB_PARALLELISM
+}
+
+void ParallelExecute(void** parallelCollectionSlotPtr, int64_t callType) {
+#if PLAID_USE_TBB_PARALLELISM
+  if (parallelCollectionSlotPtr == nullptr || *parallelCollectionSlotPtr == nullptr) {
+    throw std::runtime_error("Invalid parallel collection state when executing in parallel.");
+  }
+
+  std::list<XSMMParallelItem>* listPtr = static_cast<std::list<XSMMParallelItem>*>(*parallelCollectionSlotPtr);
+  parallel_do(listPtr->begin(), listPtr->end(), XSMMParallelItemExecutor());
+  listPtr->clear();
+  delete listPtr;
+  *parallelCollectionSlotPtr = 0;
+#endif  // PLAID_USE_TBB_PARALLELISM
+}
 }  // namespace rt
 
 template <typename T>
@@ -156,12 +212,16 @@ llvm::JITSymbol Runtime::findSymbol(const std::string& name) {
       {"_prng_step", symInfo(rt::prng_step)},
       {"_RunTimeLogEntry", symInfo(rt::RunTimeLogEntry)},  // For debugging
       {"_XSMMRTCaller", symInfo(rt::XSMMRTCaller)},
+      {"_CreateParallelCollection", symInfo(rt::CreateParallelCollection)},
+      {"_ParallelExecute", symInfo(rt::ParallelExecute)},
       {"libxsmm_dmmdispatch", symInfo(libxsmm_dmmdispatch)},
       {"libxsmm_smmdispatch", symInfo(libxsmm_smmdispatch)},
       {"libxsmm_wimmdispatch", symInfo(libxsmm_wimmdispatch)},
       {"prng_step", symInfo(rt::prng_step)},
       {"RunTimeLogEntry", symInfo(rt::RunTimeLogEntry)},  // For debugging
       {"XSMMRTCaller", symInfo(rt::XSMMRTCaller)},
+      {"CreateParallelCollection", symInfo(rt::CreateParallelCollection)},
+      {"ParallelExecute", symInfo(rt::ParallelExecute)},
   };
   auto loc_rt = symbols.find(name);
   if (loc_rt != symbols.end()) {

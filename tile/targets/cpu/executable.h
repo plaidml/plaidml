@@ -12,10 +12,19 @@
 #include "tile/stripe/stripe.h"
 #include "tile/targets/cpu/programmodule.h"
 
+// For now disable TBB parallelizm in odrer to investigate potential
+// concurency (corectness) problems in XSMM.
+#define PLAID_USE_TBB_PARALLELISM 0
+
 namespace vertexai {
 namespace tile {
 namespace targets {
 namespace cpu {
+
+enum ParallelCallType {
+  NONE = 0,
+  XSMM,
+};
 
 class Executable {
  public:

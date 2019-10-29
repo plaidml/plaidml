@@ -15,6 +15,7 @@
 
 #include "tile/stripe/stripe.h"
 #include "tile/targets/cpu/config.h"
+#include "tile/targets/cpu/executable.h"
 #include "tile/targets/cpu/programmodule.h"
 
 namespace vertexai {
@@ -57,7 +58,11 @@ class Compiler : private stripe::ConstStmtVisitor {
   void GenerateArena(const stripe::Block& block);
   llvm::Function* CompileXSMMBlock(const stripe::Block& block, const XSMMDispatch xsmmDispatch,
                                    const XSMMCallData& xsmmCallData);
-  llvm::Function* CompileBlock(const stripe::Block& block);
+
+  // The returned tuple contains the generated function and a stack location that
+  // contains the pointer to a std::list<<parallel item>>, used to store the
+  // parallel pasks for mulicore execution of blocks.
+  std::tuple<llvm::Function*, llvm::Value*> CompileBlock(const stripe::Block& block);
   void Visit(const stripe::Load&) override;
   void Visit(const stripe::Store&) override;
   void Visit(const stripe::LoadIndex&) override;
@@ -176,6 +181,7 @@ class Compiler : private stripe::ConstStmtVisitor {
   void EmitRunTimeLogEntry(const std::string& str, const std::string& extra, llvm::Value* value = nullptr);
   void PrintOutputAssembly();
   void AggInit(const Buffer& dest, llvm::Value* init_val);
+  llvm::Value* getPassedParameters(const stripe::Block& block, llvm::Function* function);
 
   // Gets the leading dimensions and the buffers for an XSMM call if available.
   // @returns true if the XSMM call is applicable, otherwise false.
@@ -190,6 +196,7 @@ class Compiler : private stripe::ConstStmtVisitor {
   std::map<std::string, Scalar> scalars_;
   std::map<std::string, Buffer> buffers_;
   std::map<std::string, Index> indexes_;
+  llvm::Value* stackLocation;
   uint64_t arenaSize_ = 0;
 };
 
