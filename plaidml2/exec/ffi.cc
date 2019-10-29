@@ -241,7 +241,7 @@ void plaidml_executable_run(  //
     plaidml_error* err,       //
     plaidml_executable* exec) {
   ffi_wrap_void(err, [&] {
-    Context* ctx = GlobalContext::getContext();
+    auto ctx = GlobalContext::getContext();
     exec->program->Run(*ctx, exec->input_bufs, exec->output_bufs).get();
   });
 }

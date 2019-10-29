@@ -49,8 +49,9 @@ struct GlobalContext {
     static thread_local pmlc::dialect::tile::TileBuilder builder;
     return &builder;
   }
+
   static vertexai::context::Context* getContext() {
-    static thread_local vertexai::context::Context context;
+    static vertexai::context::Context context;
     return &context;
   }
 };
