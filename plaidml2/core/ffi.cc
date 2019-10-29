@@ -2,6 +2,8 @@
 
 #include "plaidml2/core/ffi.h"
 
+#include <stdlib.h>
+
 #include <memory>
 #include <mutex>
 #include <utility>
@@ -12,7 +14,7 @@
 #include "base/config/config.h"
 #include "base/context/context.h"
 #include "base/context/eventlog.h"
-#include "base/eventing/file/factory.h"
+#include "base/eventing/file/eventlog.h"
 #include "base/util/any_factory_map.h"
 #include "base/util/env.h"
 #include "plaidml2/core/internal.h"
@@ -25,8 +27,6 @@ using plaidml::core::GetPlatform;
 using plaidml::core::GlobalContext;
 using plaidml::core::Settings;
 using vertexai::context::Context;
-using vertexai::eventing::file::EventLogFactory;
-using vertexai::eventing::file::proto::EventLog;
 using vertexai::tile::DataType;
 using vertexai::tile::TensorDimension;
 using vertexai::tile::TensorShape;
@@ -67,26 +67,27 @@ void plaidml_init(plaidml_error* err) {
       auto eventlog_str = vertexai::env::Get("PLAIDML_EVENTLOG_FILENAME");
       if (eventlog_str.size()) {
         IVLOG(1, "Logging events to " << eventlog_str);
-        EventLog e;
-        e.set_filename(eventlog_str);
-        auto eventlog = EventLogFactory().MakeTypedInstance(*ctx, e);
+        vertexai::eventing::file::proto::EventLog e_config;
+        e_config.set_filename(eventlog_str);
+        auto eventlog = std::make_shared<vertexai::eventing::file::EventLog>(e_config);
         ctx->set_eventlog(std::move(eventlog));
         ctx->set_is_logging_events(true);
-      } else {
-        ctx->set_is_logging_events(false);
-        ctx->set_eventlog(std::shared_ptr<vertexai::context::EventLog>());
+        GetPlatform();
       }
-      GetPlatform();
     });
   });
+}
+
+void plaidml_reset_eventlog(void) {
+  auto ctx = GlobalContext::getContext();
+  ctx->set_eventlog(nullptr);
 }
 
 void plaidml_shutdown(plaidml_error* err) {
   ffi_wrap_void(err, [&] {
     IVLOG(1, "plaidml_shutdown");
     GetPlatform().platform.reset(nullptr);
-    auto ctx = GlobalContext::getContext();
-    ctx->eventlog()->FlushAndClose();
+    std::atexit(plaidml_reset_eventlog);
   });
 }
 
