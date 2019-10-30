@@ -3,7 +3,6 @@
 #include "plaidml2/core/ffi.h"
 
 #include <cstdlib>
-
 #include <memory>
 #include <mutex>
 #include <utility>
@@ -11,11 +10,9 @@
 
 #include <boost/filesystem.hpp>
 
-#include "base/config/config.h"
 #include "base/context/context.h"
 #include "base/context/eventlog.h"
 #include "base/eventing/file/eventlog.h"
-#include "base/util/any_factory_map.h"
 #include "base/util/env.h"
 #include "plaidml2/core/internal.h"
 #include "plaidml2/core/settings.h"
@@ -34,14 +31,14 @@ using LocalPlatform = vertexai::tile::local_machine::Platform;
 
 extern const char* PLAIDML_VERSION;
 
-namespace std {
+namespace {
 
 void plaidml_reset_eventlog(void) {
   auto ctx = GlobalContext::getContext();
   ctx->set_eventlog(nullptr);
 }
 
-}  // namespace std
+}  // namespace
 
 namespace plaidml {
 namespace core {
@@ -83,7 +80,7 @@ void plaidml_init(plaidml_error* err) {
         ctx->set_eventlog(std::move(eventlog));
         ctx->set_is_logging_events(true);
       }
-      std::atexit(std::plaidml_reset_eventlog);
+      std::atexit(plaidml_reset_eventlog);
     });
   });
 }
