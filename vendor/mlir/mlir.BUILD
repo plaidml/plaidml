@@ -486,6 +486,7 @@ cc_library(
         ":gen-infer-type-op-interface-defs",
         "@llvm//:support",
     ],
+    alwayslink = 1,
 )
 
 cc_library(
@@ -699,5 +700,32 @@ cc_library(
         ":TranslateClParser",
         ":Translation",
         "@llvm//:support",
+    ],
+)
+
+cc_binary(
+    name = "mlir-opt",
+    srcs = glob([
+        "tools/mlir-opt/*.cpp",
+        "tools/mlir-opt/*.h",
+    ]),
+    copts = PLATFORM_COPTS,
+    includes = ["include"],
+    linkopts = select({
+        "@com_intel_plaidml//toolchain:windows_x86_64": [],
+        "@com_intel_plaidml//toolchain:macos_x86_64": [],
+        "//conditions:default": [
+            "-pthread",
+            "-ldl",
+            "-lm",
+        ],
+    }),
+    visibility = ["//visibility:public"],
+    deps = [
+        ":Analysis",
+        ":OptMain",
+        ":Parser",
+        ":TestTransforms",
+        ":Transforms",
     ],
 )
