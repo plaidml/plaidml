@@ -15,6 +15,7 @@ class Dialect : public mlir::Dialect {
   explicit Dialect(mlir::MLIRContext* ctx);
 
   static llvm::StringRef getDialectNamespace() { return "tile"; }
+  static std::string getDialectAttrName(llvm::StringRef name);
   static std::string getCanonicalOpName(llvm::StringRef name);
 
   mlir::Type parseType(llvm::StringRef spec, mlir::Location loc) const override;
