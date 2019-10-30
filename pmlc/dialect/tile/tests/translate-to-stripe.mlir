@@ -40,8 +40,8 @@ func @eltwise_add(
 // -----
 
 func @dot(%arg0: tensor<1x784x!eltwise.fp32>, %arg1: tensor<784x512x!eltwise.fp32>) -> tensor<1x512x!eltwise.fp32> {
-  %0 = "tile.const_dim"() {value = 512 : i64} : () -> index
-  %1 = "tile.const_dim"() {value = 1 : i64} : () -> index
+  %0 = "tile.affine_const"() {value = 512 : i64} : () -> index
+  %1 = "tile.affine_const"() {value = 1 : i64} : () -> index
   %2 = "tile.domain"() ( {
   ^bb0(%arg2: index, %arg3: index, %arg4: index):	// no predecessors
     %3 = "tile.src_idx_map"(%arg0, %arg3, %arg2) : (tensor<1x784x!eltwise.fp32>, index, index) -> !tile.imap
@@ -86,9 +86,9 @@ func @double_dot(
   %arg1: tensor<20x30x!eltwise.fp32>,
   %arg2: tensor<30x40x!eltwise.fp32>
 ) -> tensor<10x40x!eltwise.fp32> {
-  %0 = "tile.const_dim"() {value = 30 : i64} : () -> index
-  %1 = "tile.const_dim"() {value = 10 : i64} : () -> index
-  %2 = "tile.const_dim"() {value = 40 : i64} : () -> index
+  %0 = "tile.affine_const"() {value = 30 : i64} : () -> index
+  %1 = "tile.affine_const"() {value = 10 : i64} : () -> index
+  %2 = "tile.affine_const"() {value = 40 : i64} : () -> index
   %3 = "tile.domain"() ( {
   ^bb0(%arg3: index, %arg4: index, %arg5: index):	// no predecessors
     %5 = "tile.src_idx_map"(%arg0, %arg4, %arg3) : (tensor<10x20x!eltwise.fp32>, index, index) -> !tile.imap
