@@ -22,17 +22,6 @@ bool operator==(const Program& lhs, const std::string& rhs) {  //
 namespace op {
 namespace {
 
-class Environment : public ::testing::Environment {
-  void SetUp() override {  //
-    plaidml::op::init();
-  }
-};
-
-[[gnu::unused]] auto init = []() {  //
-  ::testing::AddGlobalTestEnvironment(new Environment);
-  return 0;
-}();
-
 TEST(Op, Abs) {
   auto I = Placeholder(PLAIDML_DATA_FLOAT32, {1, 224, 224, 3}, "I");
   auto abs = op::abs(I);
@@ -186,6 +175,61 @@ TEST(Op, Clip) {
 )"));
 }
 
+TEST(Op, Concatenate) {
+  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {7, 7, 3, 64}, "A");
+  auto B = Placeholder(PLAIDML_DATA_FLOAT32, {7, 7, 3, 64}, "B");
+  auto concatenate = op::concatenate({A, B}, 2);
+  IVLOG(1, "concvatenate done");
+  Program program("concatenate", {concatenate});
+  IVLOG(1, program);
+  EXPECT_THAT(program, Eq(R"(function (
+  A[A_0, A_1, A_2, A_3],
+  B[B_0, B_1, B_2, B_3]
+) -> (
+  _X2
+) {
+  _X0[n0, n1, a, n3 : 7, 7, 6, 64] = =(A[n0, n1, a, n3]);
+  _X1[n0, n1, 3 + a, n3 : 7, 7, 6, 64] = =(B[n0, n1, a, n3]);
+  _X2 = add(_X0, _X1);
+}
+)"));
+}
+
+TEST(Op, Convolution) {
+  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {1, 224, 224, 3}, "I");
+  auto K = Placeholder(PLAIDML_DATA_FLOAT32, {7, 7, 3, 64}, "K");
+  auto conv = op::convolution(  //
+      I,                        // I_or_O
+      K,                        // F_or_O
+      {2, 2},                   // strides
+      {1, 1},                   // dilations
+      {1, 1},                   // data_dilations
+      {},                       // filter_shape
+      1,                        // groups
+      "explicit",               // autopad_mode
+      {3, 3},                   // manual_padding
+      "nxc",                    // input_layout
+      "xck",                    // filter_layout
+      "none",                   // group_layout
+      false,                    // winograd_allowed
+      "",                       // name
+      "ungrouped",              // autogroup_mode
+      "none",                   // deriv_mode
+      {});                      // result_shape
+  IVLOG(1, "Conv done");
+  Program program("convolution", {conv});
+  IVLOG(1, program);
+  EXPECT_THAT(program, Eq(R"(function (
+  I[I_0, I_1, I_2, I_3],
+  K[K_0, K_1, K_2, K_3]
+) -> (
+  conv
+) {
+  conv[n, x0, x1, co : 1, 112, 112, 64] = +(I[n, -3 + k0 + 2*x0, -3 + k1 + 2*x1, ci] * K[k0, k1, ci, co]);
+}
+)"));
+}
+
 TEST(Op, CumProd) {
   auto I = Placeholder(PLAIDML_DATA_FLOAT32, {7, 7, 3, 64}, "I");
   auto cumprod = op::cumprod(I, 2);
@@ -295,77 +339,6 @@ TEST(Op, Flip) {
 )"));
 }
 
-TEST(Op, Max) {
-  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {1, 224, 224, 3}, "I");
-  auto max = op::max(I);  // NOLINT(build/include_what_you_use)
-  IVLOG(1, "max done");
-  Program program("max", {max});
-  IVLOG(1, program);
-  EXPECT_THAT(program, Eq(R"(function (
-  I[I_0, I_1, I_2, I_3]
-) -> (
-  _X0
-) {
-  _X0[] = >(I[x0, x1, x2, x3]);
-}
-)"));
-}
-
-TEST(Op, Concatenate) {
-  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {7, 7, 3, 64}, "A");
-  auto B = Placeholder(PLAIDML_DATA_FLOAT32, {7, 7, 3, 64}, "B");
-  auto concatenate = op::concatenate({A, B}, 2);
-  IVLOG(1, "concvatenate done");
-  Program program("concatenate", {concatenate});
-  IVLOG(1, program);
-  EXPECT_THAT(program, Eq(R"(function (
-  A[A_0, A_1, A_2, A_3],
-  B[B_0, B_1, B_2, B_3]
-) -> (
-  _X2
-) {
-  _X0[n0, n1, a, n3 : 7, 7, 6, 64] = =(A[n0, n1, a, n3]);
-  _X1[n0, n1, 3 + a, n3 : 7, 7, 6, 64] = =(B[n0, n1, a, n3]);
-  _X2 = add(_X0, _X1);
-}
-)"));
-}
-
-TEST(Op, Convolution) {
-  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {1, 224, 224, 3}, "I");
-  auto K = Placeholder(PLAIDML_DATA_FLOAT32, {7, 7, 3, 64}, "K");
-  auto conv = op::convolution(  //
-      I,                        // I_or_O
-      K,                        // F_or_O
-      {2, 2},                   // strides
-      {1, 1},                   // dilations
-      {1, 1},                   // data_dilations
-      {},                       // filter_shape
-      1,                        // groups
-      "explicit",               // autopad_mode
-      {3, 3},                   // manual_padding
-      "nxc",                    // input_layout
-      "xck",                    // filter_layout
-      "none",                   // group_layout
-      false,                    // winograd_allowed
-      "",                       // name
-      "ungrouped",              // autogroup_mode
-      "none",                   // deriv_mode
-      {});                      // result_shape
-  IVLOG(1, "Conv done");
-  Program program("convolution", {conv});
-  IVLOG(1, program);
-  EXPECT_THAT(program, Eq(R"(function (
-  I[I_0, I_1, I_2, I_3],
-  K[K_0, K_1, K_2, K_3]
-) -> (
-  conv
-) {
-  conv[n, x0, x1, co : 1, 112, 112, 64] = +(I[n, -3 + k0 + 2*x0, -3 + k1 + 2*x1, ci] * K[k0, k1, ci, co]);
-}
-)"));
-}
-
 TEST(Op, HardSigmoid) {
   auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "A");
   Program program("hard_sigmoid", {op::hard_sigmoid(A, 0.05)});
@@ -387,6 +360,45 @@ TEST(Op, HardSigmoid) {
   _X9 = add(_X7, _X8);
   _X10 = cond(_X4, _X5, _X9);
   _X11 = cond(_X1, _X2, _X10);
+}
+)"));
+}
+
+TEST(Op, ImageResize) {
+  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {1, 224, 224, 3}, "I");
+  auto image_resize = op::image_resize(I, std::vector<int>{5, 4}, "bilinear", "nxc");
+  IVLOG(1, "image_resize done");
+  Program program("image_resize", {image_resize});
+  IVLOG(1, program);
+  EXPECT_THAT(program, Eq(R"(function (
+  I[I_0, I_1, I_2, I_3]
+) -> (
+  _X7
+) {
+  _X0 = 0.200000;
+  _X1[y : 5] = =(_X0[]);
+  _X2[y : 9] = +(_X1[-4 + j + y]), j < 5;
+  _X3 = 0.250000;
+  _X4[x : 4] = =(_X3[]);
+  _X5[x : 7] = +(_X4[-3 + i + x]), i < 4;
+  _X6[y, x : 9, 7] = =(_X2[y] * _X5[x]);
+  _X7[x0, -4 + j + 5*x1, -3 + i + 4*x2, x3 : 1, 1120, 896, 3] = +(I[x0, x1, x2, x3] * _X6[j, i]);
+}
+)"));
+}
+
+TEST(Op, Max) {
+  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {1, 224, 224, 3}, "I");
+  auto max = op::max(I);  // NOLINT(build/include_what_you_use)
+  IVLOG(1, "max done");
+  Program program("max", {max});
+  IVLOG(1, program);
+  EXPECT_THAT(program, Eq(R"(function (
+  I[I_0, I_1, I_2, I_3]
+) -> (
+  _X0
+) {
+  _X0[] = >(I[x0, x1, x2, x3]);
 }
 )"));
 }
@@ -451,6 +463,20 @@ TEST(Op, Minimum) {
 ) {
   _X0 = cmp_lt(A, B);
   _X1 = cond(_X0, A, B);
+}
+)"));
+}
+
+TEST(Op, Pool) {
+  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20, 30, 40, 50}, "I");
+  Program program("pool", {op::pool(I, "sum", {1, 2, 3}, {1, 2, 3}, "none", {1, 2}, "nwc", true, true)});
+  IVLOG(1, program);
+  EXPECT_THAT(program, Eq(R"(function (
+  I[I_0, I_1, I_2, I_3, I_4]
+) -> (
+  _X0
+) {
+  _X0[x0, x1, x3, x5, x7 : 10, 22, 17, 14, 50] = +(I[x0, -1 + x1 + x2, -2 + 2*x3 + x4, 3*x5 + x6, x7]), x2 < 1, x4 < 2, x6 < 3;
 }
 )"));
 }

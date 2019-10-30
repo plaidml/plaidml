@@ -40,8 +40,8 @@ func @eltwise_add(
 // -----
 
 func @dot(%arg0: tensor<1x784x!eltwise.fp32>, %arg1: tensor<784x512x!eltwise.fp32>) -> tensor<1x512x!eltwise.fp32> {
-  %0 = "tile.const_dim"() {value = 512 : i64} : () -> index
-  %1 = "tile.const_dim"() {value = 1 : i64} : () -> index
+  %0 = "tile.affine_const"() {value = 512 : i64} : () -> index
+  %1 = "tile.affine_const"() {value = 1 : i64} : () -> index
   %2 = "tile.domain"() ( {
   ^bb0(%arg2: index, %arg3: index, %arg4: index):	// no predecessors
     %3 = "tile.src_idx_map"(%arg0, %arg3, %arg2) : (tensor<1x784x!eltwise.fp32>, index, index) -> !tile.imap
@@ -67,14 +67,14 @@ func @dot(%arg0: tensor<1x784x!eltwise.fp32>, %arg1: tensor<784x512x!eltwise.fp3
 // CHECK-NEXT:   ) {
 // CHECK-NEXT:     0: #agg_op_add #combo_op_mul #contraction #kernel
 // CHECK-NEXT:     block [x0:784, x1:1, x2:512]:401408 (
-// CHECK-DAG:          #contraction in [[X0]][x1, x0] fp32:I(1, 1):(784, 1):4 B, E(1, 784):3.0625 KiB
-// CHECK-DAG:          #contraction in [[X1]][x0, x2] fp32:I(1, 1):(512, 1):4 B, E(784, 512):1568 KiB
-// CHECK-DAG:          out [[X2]][x1, x2]:add fp32:I(1, 1):(512, 1):4 B, E(1, 512):2 KiB
+// CHECK-DAG:          #contraction in _X0 = [[X0]][x1, x0] fp32:I(1, 1):(784, 1):4 B, E(1, 784):3.0625 KiB
+// CHECK-DAG:          #contraction in _X1 = [[X1]][x0, x2] fp32:I(1, 1):(512, 1):4 B, E(784, 512):1568 KiB
+// CHECK-DAG:          out X = [[X2]][x1, x2]:add fp32:I(1, 1):(512, 1):4 B, E(1, 512):2 KiB
 // CHECK-NEXT:     ) {
-// CHECK-NEXT:       0: $[[X0]] = load([[X0]])
-// CHECK-NEXT:       1: $[[X1]] = load([[X1]])
-// CHECK-NEXT:       2: $s = mul($[[X0]], $[[X1]])
-// CHECK-NEXT:       3: [[X2]] = store($s)
+// CHECK-NEXT:       0: $_X0 = load(_X0)
+// CHECK-NEXT:       1: $_X1 = load(_X1)
+// CHECK-NEXT:       2: $s = mul($_X0, $_X1)
+// CHECK-NEXT:       3: X = store($s)
 // CHECK-NEXT:     }
 // CHECK-NEXT:   }
 // CHECK-NEXT: }
@@ -86,9 +86,9 @@ func @double_dot(
   %arg1: tensor<20x30x!eltwise.fp32>,
   %arg2: tensor<30x40x!eltwise.fp32>
 ) -> tensor<10x40x!eltwise.fp32> {
-  %0 = "tile.const_dim"() {value = 30 : i64} : () -> index
-  %1 = "tile.const_dim"() {value = 10 : i64} : () -> index
-  %2 = "tile.const_dim"() {value = 40 : i64} : () -> index
+  %0 = "tile.affine_const"() {value = 30 : i64} : () -> index
+  %1 = "tile.affine_const"() {value = 10 : i64} : () -> index
+  %2 = "tile.affine_const"() {value = 40 : i64} : () -> index
   %3 = "tile.domain"() ( {
   ^bb0(%arg3: index, %arg4: index, %arg5: index):	// no predecessors
     %5 = "tile.src_idx_map"(%arg0, %arg4, %arg3) : (tensor<10x20x!eltwise.fp32>, index, index) -> !tile.imap
@@ -125,14 +125,14 @@ func @double_dot(
 // CHECK-NEXT:   ) {
 // CHECK-NEXT:     0: #agg_op_add #combo_op_mul #contraction #kernel
 // CHECK-NEXT:     block [x0:20, x1:10, x2:30]:6000 (
-// CHECK-DAG:          #contraction in [[X0]][x1, x0] fp32:I(1, 1):(20, 1):4 B, E(10, 20):800 B
-// CHECK-DAG:          #contraction in [[X1]][x0, x2] fp32:I(1, 1):(30, 1):4 B, E(20, 30):2.34375 KiB
-// CHECK-DAG:          out [[TMP]][x1, x2]:add fp32:I(1, 1):(30, 1):4 B, E(10, 30):1.17188 KiB
+// CHECK-DAG:          #contraction in _X0 = [[X0]][x1, x0] fp32:I(1, 1):(20, 1):4 B, E(10, 20):800 B
+// CHECK-DAG:          #contraction in _X1 = [[X1]][x0, x2] fp32:I(1, 1):(30, 1):4 B, E(20, 30):2.34375 KiB
+// CHECK-DAG:          out X = [[TMP]][x1, x2]:add fp32:I(1, 1):(30, 1):4 B, E(10, 30):1.17188 KiB
 // CHECK-NEXT:     ) {
-// CHECK-NEXT:       0: $[[X0]] = load([[X0]])
-// CHECK-NEXT:       1: $[[X1]] = load([[X1]])
-// CHECK-NEXT:       2: $s = mul($[[X0]], $[[X1]])
-// CHECK-NEXT:       3: [[TMP]] = store($s)
+// CHECK-NEXT:       0: $_X0 = load(_X0)
+// CHECK-NEXT:       1: $_X1 = load(_X1)
+// CHECK-NEXT:       2: $s = mul($_X0, $_X1)
+// CHECK-NEXT:       3: X = store($s)
 // CHECK-NEXT:     }
 // CHECK-NEXT:     1: #agg_op_add #combo_op_mul #contraction #kernel
 // CHECK-NEXT:     block [x0:30, x1:10, x2:40]:12000 (

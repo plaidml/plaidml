@@ -58,7 +58,7 @@ def DimOp : TileOp<"dim">, HasFolder {
   >];
 }
 
-def AffineConstantOp : TileOp<"const_dim">, HasFolder {
+def AffineConstantOp : TileOp<"affine_const">, HasFolder {
   let summary = "affine constant";
   let arguments = (ins I64Attr:$value);
   let results = (outs Index:$result);
@@ -86,7 +86,9 @@ def AffineIndexOp : TileOp<"idx"> {
   >];
 }
 
-class AffineOp<string mnemonic> : TileOp<mnemonic, [NoSideEffect]>, HasFolder {
+class AffineOp<string mnemonic, list<OpTrait> traits = []> :
+    TileOp<mnemonic, !listconcat(traits, [NoSideEffect])>,
+    HasFolder {
   let results = (outs Index:$result);
 
   let builders = [OpBuilder<
@@ -97,15 +99,15 @@ class AffineOp<string mnemonic> : TileOp<mnemonic, [NoSideEffect]>, HasFolder {
   >];
 }
 
-class AffineUnaryOp<string mnemonic> : AffineOp<mnemonic> {
+class AffineUnaryOp<string mnemonic, list<OpTrait> traits = []> : AffineOp<mnemonic, traits> {
   let arguments = (ins Index:$in);
 }
 
-class AffineBinaryOp<string mnemonic> : AffineOp<mnemonic> {
+class AffineBinaryOp<string mnemonic, list<OpTrait> traits = []> : AffineOp<mnemonic, traits> {
   let arguments = (ins Index:$lhs, Index:$rhs);
 }
 
-def AffineAddOp : AffineBinaryOp<"affine_add"> {
+def AffineAddOp : AffineBinaryOp<"affine_add", [Commutative]> {
   let summary = "Affine addition operation";
 }
 
@@ -113,7 +115,7 @@ def AffineDivOp : AffineBinaryOp<"affine_div"> {
   let summary = "Affine division operation";
 }
 
-def AffineMulOp : AffineBinaryOp<"affine_mul"> {
+def AffineMulOp : AffineBinaryOp<"affine_mul", [Commutative]> {
   let summary = "Affine multiplication operation";
 }
 
@@ -126,11 +128,11 @@ def AffineSubOp : AffineBinaryOp<"affine_sub"> {
   let summary = "Affine subtraction operation";
 }
 
-def AffineMaxOp : AffineBinaryOp<"affine_max"> {
+def AffineMaxOp : AffineBinaryOp<"affine_max", [Commutative]> {
   let summary = "Affine max operation";
 }
 
-def AffineMinOp : AffineBinaryOp<"affine_min"> {
+def AffineMinOp : AffineBinaryOp<"affine_min", [Commutative]> {
   let summary = "Affine min operation";
 }
 
@@ -187,10 +189,7 @@ def ConstraintOp : TileOp<"constraint", [Terminator]> {
 }
 
 class ContractionOp<string mnemonic, list<OpTrait> traits = []> :
-    TileOp<mnemonic, !listconcat(traits, [
-      Terminator,
-      ContractionOpInterface
-    ])>;
+    TileOp<mnemonic, !listconcat(traits, [Terminator, ContractionOpInterface])>;
 
 class UnaryConOp<string mnemonic, string agg, string combo> : ContractionOp<mnemonic> {
   let arguments = (ins
@@ -200,16 +199,15 @@ class UnaryConOp<string mnemonic, string agg, string combo> : ContractionOp<mnem
     Variadic<RankedTensorOf<[AnyScalar]>>:$init
   );
 
-  let builders = [OpBuilder<
-    "Builder* builder, OperationState& result, Value* size, Value* src, Value* sink", [{
-      result.addOperands(size);
-      result.addOperands(src);
-      result.addOperands(sink);
-      result.setOperandListToResizable();
-    }]
-  >];
-
   let extraClassDeclaration = [{
+    static Operation* create(OpBuilder* builder, Location loc, Value* size, ArrayRef<Value*> srcs, Value* sink) {
+      OperationState state(loc, getOperationName());
+      state.addOperands(size);
+      state.addOperands(srcs);
+      state.addOperands(sink);
+      state.setOperandListToResizable();
+      return builder->createOperation(state);
+    }
     Value* getSizeMap() { return size(); }
     std::vector<Value*> getSourceIndexMaps() { return {src()}; }
     Value* getSinkIndexMap() { return sink(); }
@@ -234,17 +232,15 @@ class BinaryConOp<string mnemonic, string agg, string combo> : ContractionOp<mne
     Variadic<RankedTensorOf<[AnyScalar]>>:$init
   );
 
-  let builders = [OpBuilder<
-    "Builder* builder, OperationState& result, Value* size, Value* src1, Value* src2, Value* sink", [{
-      result.addOperands(size);
-      result.addOperands(src1);
-      result.addOperands(src2);
-      result.addOperands(sink);
-      result.setOperandListToResizable();
-    }]
-  >];
-
   let extraClassDeclaration = [{
+    static Operation* create(OpBuilder* builder, Location loc, Value* size, ArrayRef<Value*> srcs, Value* sink) {
+      OperationState state(loc, getOperationName());
+      state.addOperands(size);
+      state.addOperands(srcs);
+      state.addOperands(sink);
+      state.setOperandListToResizable();
+      return builder->createOperation(state);
+    }
     Value* getSizeMap() { return size(); }
     std::vector<Value*> getSourceIndexMaps() { return {src1(), src2()}; }
     Value* getSinkIndexMap() { return sink(); }
@@ -270,18 +266,15 @@ class TernaryConOp<string mnemonic, string agg, string combo> : ContractionOp<mn
     Variadic<RankedTensorOf<[AnyScalar]>>:$init
   );
 
-  let builders = [OpBuilder<
-    "Builder* builder, OperationState& result, Value* size, Value* src1, Value* src2, Value* src3, Value* sink", [{
-      result.addOperands(size);
-      result.addOperands(src1);
-      result.addOperands(src2);
-      result.addOperands(src3);
-      result.addOperands(sink);
-      result.setOperandListToResizable();
-    }]
-  >];
-
   let extraClassDeclaration = [{
+    static Operation* create(OpBuilder* builder, Location loc, Value* size, ArrayRef<Value*> srcs, Value* sink) {
+      OperationState state(loc, getOperationName());
+      state.addOperands(size);
+      state.addOperands(srcs);
+      state.addOperands(sink);
+      state.setOperandListToResizable();
+      return builder->createOperation(state);
+    }
     Value* getSizeMap() { return size(); }
     std::vector<Value*> getSourceIndexMaps() { return {src1(), src2(), src3()}; }
     Value* getSinkIndexMap() { return sink(); }

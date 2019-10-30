@@ -19,18 +19,6 @@ bool operator==(const Program& lhs, const std::string& rhs) {  //
 
 namespace {
 
-class Environment : public ::testing::Environment {
-  void SetUp() override {
-    plaidml::init();
-    plaidml::edsl::init();
-  }
-};
-
-[[gnu::unused]] auto init = []() {  //
-  ::testing::AddGlobalTestEnvironment(new Environment);
-  return 0;
-}();
-
 Tensor Dot(const Tensor& X, const Tensor& Y) {
   TensorDim I, J, K;
   TensorIndex i, j, k;

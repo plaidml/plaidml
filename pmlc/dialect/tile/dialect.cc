@@ -7,6 +7,7 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/OpImplementation.h"
 
+#include "base/util/logging.h"
 #include "pmlc/dialect/tile/ops.h"
 
 namespace pmlc {
@@ -38,6 +39,10 @@ Dialect::Dialect(mlir::MLIRContext* ctx) : mlir::Dialect(getDialectNamespace(), 
   addInterfaces<OpAsmInterface>();
 }
 
+std::string Dialect::getDialectAttrName(llvm::StringRef name) {
+  return llvm::formatv("{0}.{1}", getDialectNamespace(), name).str();
+}
+
 std::string Dialect::getCanonicalOpName(llvm::StringRef name) {
   return llvm::formatv("{0}.{1}", getDialectNamespace(), name).str();
 }
@@ -66,6 +71,7 @@ mlir::Operation* Dialect::materializeConstant(  //
     mlir::Attribute value,                      //
     mlir::Type type,                            //
     mlir::Location loc) {
+  IVLOG(5, "tile::Dialect::materializeConstant");
   auto int_attr = value.dyn_cast<IntegerAttr>();
   if (int_attr) {
     return builder.create<AffineConstantOp>(loc, type, int_attr);
