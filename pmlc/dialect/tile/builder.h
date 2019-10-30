@@ -8,6 +8,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
 
+#include "pmlc/util/enums.h"
 #include "tile/base/shape.h"
 
 namespace mlir {
@@ -63,35 +64,13 @@ class TileBuilder {
   mlir::Value* MakeAffineSinkIndexMapOp(llvm::ArrayRef<mlir::Value*> idxs);
   mlir::Value* MakeAffineSizeMapOp(llvm::ArrayRef<mlir::Value*> sizes);
 
-  mlir::Value* MakeConAssignOp(llvm::ArrayRef<mlir::Value*> srcs, mlir::Value* sink, mlir::Value* sizes);
-  mlir::Value* MakeConAssignAddOp(llvm::ArrayRef<mlir::Value*> srcs, mlir::Value* sink, mlir::Value* sizes);
-  mlir::Value* MakeConAssignCondOp(llvm::ArrayRef<mlir::Value*> srcs, mlir::Value* sink, mlir::Value* sizes);
-  mlir::Value* MakeConAssignEqOp(llvm::ArrayRef<mlir::Value*> srcs, mlir::Value* sink, mlir::Value* sizes);
-  mlir::Value* MakeConAssignMulOp(llvm::ArrayRef<mlir::Value*> srcs, mlir::Value* sink, mlir::Value* sizes);
-
-  mlir::Value* MakeConMaxOp(llvm::ArrayRef<mlir::Value*> srcs, mlir::Value* sink, mlir::Value* sizes);
-  mlir::Value* MakeConMaxAddOp(llvm::ArrayRef<mlir::Value*> srcs, mlir::Value* sink, mlir::Value* sizes);
-  mlir::Value* MakeConMaxCondOp(llvm::ArrayRef<mlir::Value*> srcs, mlir::Value* sink, mlir::Value* sizes);
-  mlir::Value* MakeConMaxEqOp(llvm::ArrayRef<mlir::Value*> srcs, mlir::Value* sink, mlir::Value* sizes);
-  mlir::Value* MakeConMaxMulOp(llvm::ArrayRef<mlir::Value*> srcs, mlir::Value* sink, mlir::Value* sizes);
-
-  mlir::Value* MakeConMinOp(llvm::ArrayRef<mlir::Value*> srcs, mlir::Value* sink, mlir::Value* sizes);
-  mlir::Value* MakeConMinAddOp(llvm::ArrayRef<mlir::Value*> srcs, mlir::Value* sink, mlir::Value* sizes);
-  mlir::Value* MakeConMinCondOp(llvm::ArrayRef<mlir::Value*> srcs, mlir::Value* sink, mlir::Value* sizes);
-  mlir::Value* MakeConMinEqOp(llvm::ArrayRef<mlir::Value*> srcs, mlir::Value* sink, mlir::Value* sizes);
-  mlir::Value* MakeConMinMulOp(llvm::ArrayRef<mlir::Value*> srcs, mlir::Value* sink, mlir::Value* sizes);
-
-  mlir::Value* MakeConProdOp(llvm::ArrayRef<mlir::Value*> srcs, mlir::Value* sink, mlir::Value* sizes);
-  mlir::Value* MakeConProdAddOp(llvm::ArrayRef<mlir::Value*> srcs, mlir::Value* sink, mlir::Value* sizes);
-  mlir::Value* MakeConProdCondOp(llvm::ArrayRef<mlir::Value*> srcs, mlir::Value* sink, mlir::Value* sizes);
-  mlir::Value* MakeConProdEqOp(llvm::ArrayRef<mlir::Value*> srcs, mlir::Value* sink, mlir::Value* sizes);
-  mlir::Value* MakeConProdMulOp(llvm::ArrayRef<mlir::Value*> srcs, mlir::Value* sink, mlir::Value* sizes);
-
-  mlir::Value* MakeConSumOp(llvm::ArrayRef<mlir::Value*> srcs, mlir::Value* sink, mlir::Value* sizes);
-  mlir::Value* MakeConSumAddOp(llvm::ArrayRef<mlir::Value*> srcs, mlir::Value* sink, mlir::Value* sizes);
-  mlir::Value* MakeConSumCondOp(llvm::ArrayRef<mlir::Value*> srcs, mlir::Value* sink, mlir::Value* sizes);
-  mlir::Value* MakeConSumEqOp(llvm::ArrayRef<mlir::Value*> srcs, mlir::Value* sink, mlir::Value* sizes);
-  mlir::Value* MakeConSumMulOp(llvm::ArrayRef<mlir::Value*> srcs, mlir::Value* sink, mlir::Value* sizes);
+  mlir::Value* MakeContractionOp(         //
+      util::AggregationKind agg,          //
+      util::CombinationKind combo,        //
+      llvm::ArrayRef<mlir::Value*> srcs,  //
+      mlir::Value* sink,                  //
+      mlir::Value* sizes,                 //
+      llvm::StringRef name);
 
   void AddConstraint(mlir::Value* cion, mlir::Value* lhs, mlir::Value* rhs);
   void SetUseDefault(mlir::Value* cion, mlir::Value* defaultValue);
