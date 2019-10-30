@@ -106,6 +106,7 @@ def ParallelForOp : StripeOpWithPP<"parallel_for"> {
 def ConstraintOp : StripeOpWithPP<"constraint"> {
   let arguments = (ins AffineType:$input);
   let regions = (region AnyRegion:$ge_case, AnyRegion:$lt_case);
+  let hasCanonicalizer = 1;
 }
 
 def SpecialOpInterface : OpInterface<"SpecialOp"> {

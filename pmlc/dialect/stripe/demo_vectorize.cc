@@ -9,7 +9,7 @@
 
 #include "pmlc/dialect/stripe/analysis.h"
 #include "pmlc/dialect/stripe/ops.h"
-#include "pmlc/dialect/stripe/tile.h"
+#include "pmlc/dialect/stripe/transforms.h"
 
 namespace pmlc {
 namespace dialect {
@@ -36,6 +36,11 @@ void VectorizePass::runOnFunction() {
     }
     // Do the tiling
     Tile(op, tile_sizes);
+  });
+  f.walk([](ParallelForOp op) {
+    if (SafeConstraintInterior(op)) {
+      LiftConstraint(op);
+    }
   });
 }
 

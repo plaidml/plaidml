@@ -10,6 +10,7 @@ namespace dialect {
 namespace stripe {
 
 void Tile(ParallelForOp op, llvm::ArrayRef<int64_t> tile_sizes);
+LogicalResult LiftConstraint(ParallelForOp op);
 
 }  // namespace stripe
 }  // namespace dialect

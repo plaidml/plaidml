@@ -8,6 +8,7 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Support/DebugStringHelper.h"
 
+#include "pmlc/dialect/stripe/analysis.h"
 #include "pmlc/dialect/stripe/dialect.h"
 
 namespace pmlc::dialect::stripe {
@@ -58,6 +59,37 @@ struct SimplifyNopRefines final : public mlir::OpRewritePattern<RefineOp> {
 
   void rewrite(RefineOp op, mlir::PatternRewriter& rewriter) const final {  // NOLINT(runtime/references)
     rewriter.replaceOp(op, op.in());
+  }
+};
+
+struct RemoveTrivialConstraints final : public mlir::OpRewritePattern<ConstraintOp> {
+  explicit RemoveTrivialConstraints(mlir::MLIRContext* context) : OpRewritePattern<ConstraintOp>(context) {}
+
+  mlir::PatternMatchResult matchAndRewrite(ConstraintOp op, mlir::PatternRewriter& rewriter) const override {
+    auto irange = AffineRange(AffinePolynomial(op.input()));
+    auto oblock = op.getOperation()->getBlock();
+    if (irange.min >= 0) {
+      // Always true
+      if (!op.ge_case().empty()) {
+        auto iblock = &op.ge_case().front();
+        oblock->getOperations().splice(Block::iterator(op), iblock->getOperations(), iblock->begin(),
+                                       std::prev(iblock->end(), 1));
+      }
+      rewriter.replaceOp(op, llvm::None);
+      return matchSuccess();
+    } else if (irange.max < 0) {
+      // Always false
+      if (!op.lt_case().empty()) {
+        auto iblock = &op.lt_case().front();
+        oblock->getOperations().splice(Block::iterator(op), iblock->getOperations(), iblock->begin(),
+                                       std::prev(iblock->end(), 1));
+      }
+      rewriter.replaceOp(op, llvm::None);
+      return matchSuccess();
+    } else {
+      // Not trivial, never mind
+      return matchFailure();
+    }
   }
 };
 
@@ -390,6 +422,10 @@ static ParseResult parseConstraintOp(OpAsmParser& parser, OperationState& result
   result.regions.emplace_back(new Region(nullptr));
   r = r || parser.parseOptionalRegion(*result.regions.back(), {}, {});
   return mlir::failure(r);
+}
+
+void ConstraintOp::getCanonicalizationPatterns(OwningRewritePatternList& results, MLIRContext* context) {
+  results.insert<RemoveTrivialConstraints>(context);
 }
 
 static void printExecuteOnOp(OpAsmPrinter& p, ExecuteOnOp& op) {  // NOLINT
