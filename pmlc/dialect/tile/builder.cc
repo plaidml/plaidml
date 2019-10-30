@@ -57,6 +57,8 @@ struct DomainInfo {
   BlockAndValueMapping mapping;
 };
 
+using ContractionKey = std::pair<AggregationKind, CombinationKind>;
+
 struct UniqueNamer {
   std::set<std::string> names;
 
@@ -70,8 +72,6 @@ struct UniqueNamer {
     return next;
   }
 };
-
-using ContractionKey = std::pair<util::AggregationKind, util::CombinationKind>;
 
 struct TileBuilder::Impl {
   MLIRContext context;
