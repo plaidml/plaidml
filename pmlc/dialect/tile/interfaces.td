@@ -9,6 +9,13 @@ include "mlir/IR/OpBase.td"
 
 def ContractionOpInterface : OpInterface<"ContractionOp"> {
   let methods = [
+    StaticInterfaceMethod<"TODO", "Operation*", "create", (ins
+      "OpBuilder*":$builder,
+      "Location":$loc,
+      "Value*":$size,
+      "ArrayRef<Value*>":$srcs,
+      "Value*":$sink
+    )>,
     InterfaceMethod<"TODO", "std::vector<Value*>", "getSourceIndexMaps">,
     InterfaceMethod<"TODO", "Value*", "getSinkIndexMap">,
     InterfaceMethod<"TODO", "Value*", "getSizeMap">,
