@@ -4,7 +4,7 @@
 // Test Affine->Stripe conversion
 // RUN: pmlc-opt %s -convert-stripe-to-affine -convert-affine-to-stripe -split-input-file | FileCheck %s --check-prefix=STRIPE
 
-// These tests verify Stripe/Affine round-trip dialect conversion.
+// Verify Stripe/Affine round-trip conversion of stripe.parallel_for operation.
 
 func @main_parallel_for()
 attributes {stripe_attrs = {program = unit}} {
@@ -14,35 +14,14 @@ attributes {stripe_attrs = {program = unit}} {
   stripe.terminate
 }
 // AFFINE-LABEL: func @main_parallel_for()
-// AFFINE-NEXT: attributes
-// AFFINE-NEXT: affine.terminator
+// AFFINE: affine.terminator
 // AFFINE-NOT: affine.terminator
 // AFFINE-NOT: ^bb
 
 // STRIPE-LABEL: func @main_parallel_for()
-// STRIPE-NEXT: attributes
 // STRIPE: stripe.parallel_for () {
 // STRIPE: stripe.terminate
-// STRIPE: }
+// STRIPE: } {name = "main", stripe_attrs = {main = unit}}
 // STRIPE: stripe.terminate
 // STRIPE-NOT: stripe.terminate
 // STRIPE-NOT: ^bb
-
-// -----
-
-// TODO: Revisit with affine.poly
-//func @affine_const()
-//attributes {stripe_attrs = {program = unit, total_macs = 27 : i64}} {
-//  stripe.parallel_for () {
-//    %c0 = stripe.affine_const 0
-//    stripe.terminate
-//  } {name = "main", stripe_attrs = {main = unit}} 
-//  stripe.terminate
-//}
-// AFFINE!-LABEL: func @affine_const()
-// AFFINE!-NEXT: attributes
-// AFFINE!-NEXT: constant 0 : index
-
-// STRIPE!-LABEL: func @affine_const()
-// STRIPE!-NEXT: attributes
-// STRIPE!-NEXT: stripe.affine_const 0
