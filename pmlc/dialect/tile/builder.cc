@@ -57,6 +57,20 @@ struct DomainInfo {
   BlockAndValueMapping mapping;
 };
 
+struct UniqueNamer {
+  std::set<std::string> names;
+
+  std::string get(StringRef name) {
+    auto next = name.str();
+    auto [it, isUnique] = names.insert(next);  // NOLINT(whitespace/braces)
+    for (unsigned i = 0; !isUnique; i++) {
+      next = llvm::formatv("{0}_{1}", name, i).str();
+      std::tie(it, isUnique) = names.insert(next);
+    }
+    return next;
+  }
+};
+
 using ContractionKey = std::pair<util::AggregationKind, util::CombinationKind>;
 
 struct TileBuilder::Impl {
@@ -623,6 +637,8 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(  //
   auto funcOp = mlir::FuncOp::create(loc, name, funcType, {});
   funcOp.addEntryBlock();
   OpBuilder builder(funcOp.getBody());
+  UniqueNamer namer;
+  auto attrName = Dialect::getDialectAttrName("name");
   unsigned argcnt = 0;
   for (auto value : inputs) {
     auto it = impl->ioMap.find(value);
@@ -633,8 +649,9 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(  //
     auto op = value->getDefiningOp();
     auto placeholderOp = llvm::cast<PlaceholderOp>(op);
     if (auto attr = placeholderOp.getAttrOfType<StringAttr>("name")) {
-      auto attrName = Dialect::getDialectAttrName("name");
-      funcOp.setArgAttr(new_value->getArgNumber(), attrName, attr);
+      auto uniqueName = namer.get(attr.getValue());
+      auto uniqueAttr = builder.getStringAttr(uniqueName);
+      funcOp.setArgAttr(new_value->getArgNumber(), attrName, uniqueAttr);
     }
     IVLOG(5, "BlockArgument mapping: " << value << " -> " << new_value);
     program->mapper.map(value, new_value);
@@ -651,8 +668,9 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(  //
         // Replace placeholders with block arguments
         auto new_value = funcOp.getArgument(argcnt++);
         if (auto attr = placeholderOp.getAttrOfType<StringAttr>("name")) {
-          auto attrName = Dialect::getDialectAttrName("name");
-          funcOp.setArgAttr(new_value->getArgNumber(), attrName, attr);
+          auto uniqueName = namer.get(attr.getValue());
+          auto uniqueAttr = builder.getStringAttr(uniqueName);
+          funcOp.setArgAttr(new_value->getArgNumber(), attrName, uniqueAttr);
         }
         IVLOG(5, "BlockArgument mapping: " << value << " -> " << new_value);
         program->mapper.map(value, new_value);

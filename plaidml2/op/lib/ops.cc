@@ -631,25 +631,27 @@ Value binary_crossentropy(const Value& value) {
     throw std::runtime_error(str(
         boost::format("The epsilon used in binary_crossentropy must be between 0 and 0.5, received %1%") % epsilon));
   }
-  std::vector<Value> clip_inputs{raw_P, Value{epsilon}, Value{1. - epsilon}};
-  auto P = clip(Value{clip_inputs}).as_tensor();
+  auto clip_inputs = make_tuple(raw_P, Value{epsilon}, Value{1. - epsilon});
+  auto P = clip(clip_inputs).as_tensor();
   auto O = -T * log(P) - (1 - T) * log(1 - P);
-  TensorDeriv deriv = [](const Tensor& Y, const Tensor& DY, const std::vector<Tensor>& X) {  //
-    auto T = X[0];
-    auto P = X[1];
-    Tensor One{1.0};
-    auto ndims = T.shape().ndims();
-    std::vector<TensorDim> dims(ndims);
-    T.bind_dims(dims);
-    auto dims_prod = Tensor{1};
-    for (const auto& dim : dims) {
-      dims_prod = dims_prod * dim;
-    }
-    return std::vector<Tensor>{(log(One - P) - log(P)) / dims_prod, (-T / P + (One - T) / (One - P)) / dims_prod};
-  };
+  return Value{O};
+  // TODO: OverrideGrads
+  // TensorDeriv deriv = [](const Tensor& Y, const Tensor& DY, const std::vector<Tensor>& X) {  //
+  //   auto T = X[0];
+  //   auto P = X[1];
+  //   Tensor One{1.0};
+  //   auto ndims = T.shape().ndims();
+  //   std::vector<TensorDim> dims(ndims);
+  //   T.bind_dims(dims);
+  //   auto dims_prod = Tensor{1};
+  //   for (const auto& dim : dims) {
+  //     dims_prod = dims_prod * dim;
+  //   }
+  //   return std::vector<Tensor>{(log(One - P) - log(P)) / dims_prod, (-T / P + (One - T) / (One - P)) / dims_prod};
+  // };
   // Safe to use P without copy since it is built internally to this function
-  auto Overridden = OverrideGrads(deriv, std::vector<Tensor>{T, P}, O);
-  return Value{Overridden};
+  // auto Overridden = OverrideGrads(deriv, std::vector<Tensor>{T, P}, O);
+  // return Value{Overridden};
 }
 
 Value clip(const Value& value) {
@@ -1572,10 +1574,8 @@ Value image_resize(const Value& value) {
   Tensor O;
   switch (interp) {
     case InterpolationMode::NEAREST: {
-      std::vector<Value> repeat_inputs{raw_I, Value{factors[0]}, Value{pre_axes}};
-      auto R = repeat(Value{repeat_inputs});
-      std::vector<Value> repeat_inputs2{R, Value{factors[1]}, Value{pre_axes + 1}};
-      O = repeat(Value{repeat_inputs2}).as_tensor();
+      auto R = repeat(make_tuple(raw_I, Value{factors[0]}, Value{pre_axes}));
+      O = repeat(make_tuple(R, Value{factors[1]}, Value{pre_axes + 1})).as_tensor();
     } break;
     case InterpolationMode::BILINEAR: {
       // This aligns the corners to 0 and <factor> * (<dim> - 1), and assumes zero-padding, which is a bit weird. But
@@ -2075,11 +2075,13 @@ Value sigmoid(const Value& value) {
   }
   auto I = ident(args[0].as_tensor());  // Copy for safe gradient override
   auto O = 1.0 / (1.0 + exp(-I));
-  TensorDeriv deriv = [](const Tensor& Y, const Tensor& DY, const std::vector<Tensor>& X) {  //
-    return std::vector<Tensor>{Y * (1.0 - Y) * DY};
-  };
-  auto Overridden = OverrideGrads(deriv, std::vector<Tensor>{I}, O);
-  return Value{Overridden};
+  return Value{O};
+  // TODO: OverrideGrads
+  // TensorDeriv deriv = [](const Tensor& Y, const Tensor& DY, const std::vector<Tensor>& X) {  //
+  //   return std::vector<Tensor>{Y * (1.0 - Y) * DY};
+  // };
+  // auto Overridden = OverrideGrads(deriv, std::vector<Tensor>{I}, O);
+  // return Value{Overridden};
 }
 
 Value slice(const Value& value) {
@@ -2239,7 +2241,7 @@ Value softmax(const Value& value) {
         pattern[i] = Value{i};
       }
     }
-    I = transpose(Value{std::vector<Value>{args[0], Value{pattern}}}).as_tensor();
+    I = transpose(make_tuple(args[0], Value{pattern})).as_tensor();
     axis = ndims - 1;  // we've moved the softmax axis to be the last axis
   }
 
@@ -2257,33 +2259,38 @@ Value softmax(const Value& value) {
   auto N = TensorOutput(R_dims);
   N(R_idxs) += E(I_idxs);
   auto O = E / N;
-  TensorDeriv deriv = [](const Tensor& Y, const Tensor& DY, const std::vector<Tensor>& X) {  //
-    auto I = X[0];
-    auto ndims = I.shape().ndims();
-    std::vector<TensorDim> I_dims(ndims);
-    std::vector<TensorIndex> I_idxs(ndims);
-    I.bind_dims(I_dims);
-    std::vector<TensorDim> R_dims = I_dims;
-    std::vector<TensorIndex> R_idxs = I_idxs;
-    R_dims.back() = TensorDim{1};    // Softmax along last axis
-    R_idxs.back() = TensorIndex{0};  // Softmax along last axis
-
-    auto YdY = Y * DY;
-    auto T = TensorOutput(R_dims);
-    T(R_idxs) += YdY(I_idxs);
-    auto TB = TensorOutput(I_dims);
-    TB(I_idxs) += T(R_idxs);
-    return std::vector<Tensor>{YdY - TB * Y};
-  };
-  auto Overridden = OverrideGrads(deriv, std::vector<Tensor>{I}, O);
-  // If we reordered, return to original order
-  Tensor ret;
   if (transposed) {
-    ret = transpose(Value{std::vector<Value>{Value{Overridden}, Value{pattern}}}).as_tensor();
-  } else {
-    ret = Overridden;
+    return Value{transpose(make_tuple(Value{O}, Value{pattern})).as_tensor()};
   }
-  return Value{ret};
+  return Value{O};
+  // TODO: OverrideGrads
+  // TensorDeriv deriv = [](const Tensor& Y, const Tensor& DY, const std::vector<Tensor>& X) {  //
+  //   auto I = X[0];
+  //   auto ndims = I.shape().ndims();
+  //   std::vector<TensorDim> I_dims(ndims);
+  //   std::vector<TensorIndex> I_idxs(ndims);
+  //   I.bind_dims(I_dims);
+  //   std::vector<TensorDim> R_dims = I_dims;
+  //   std::vector<TensorIndex> R_idxs = I_idxs;
+  //   R_dims.back() = TensorDim{1};    // Softmax along last axis
+  //   R_idxs.back() = TensorIndex{0};  // Softmax along last axis
+
+  //   auto YdY = Y * DY;
+  //   auto T = TensorOutput(R_dims);
+  //   T(R_idxs) += YdY(I_idxs);
+  //   auto TB = TensorOutput(I_dims);
+  //   TB(I_idxs) += T(R_idxs);
+  //   return std::vector<Tensor>{YdY - TB * Y};
+  // };
+  // auto Overridden = OverrideGrads(deriv, std::vector<Tensor>{I}, O);
+  // // If we reordered, return to original order
+  // Tensor ret;
+  // if (transposed) {
+  //   ret = transpose(make_tuple(Value{Overridden}, Value{pattern}).as_tensor();
+  // } else {
+  //   ret = Overridden;
+  // }
+  // return Value{ret};
 }
 
 Value spatial_padding(const Value& value) {
@@ -2580,8 +2587,7 @@ Value squeeze(const Value& value) {
   for (const auto dim : O_dims) {
     O_dims_values.push_back(Value{dim});
   }
-  std::vector<Value> reshape_args = {Value{I}, Value{O_dims_values}};
-  return reshape(Value{reshape_args});
+  return reshape(make_tuple(Value{I}, Value{O_dims_values}));
 }
 
 Value sum(const Value& value) {

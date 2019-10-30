@@ -151,40 +151,39 @@ module {
 )#"));
 }
 
-// TODO: grad_override
-TEST(Op, DISABLED_BinaryCrossentropy) {
+TEST(Op, BinaryCrossentropy) {
   auto I = Placeholder(PLAIDML_DATA_FLOAT32, {7, 7, 3, 64}, "I");
   auto O = Placeholder(PLAIDML_DATA_FLOAT32, {7, 7, 3, 64}, "O");
   float epsilon = 0;
   auto binary_crossentropy = op::binary_crossentropy(I, O, epsilon);
   Program program("binary_crossentropy", {binary_crossentropy});
   IVLOG(1, program);
-  EXPECT_THAT(program, Eq(R"(function (
-  I[I_0, I_1, I_2, I_3],
-  O[O_0, O_1, O_2, O_3]
-) -> (
-  _X17
-) {
-  _X0 = ident(I);
-  _X1 = 0.000000;
-  _X2 = cmp_gt(O, _X1);
-  _X3 = cond(_X2, O, _X1);
-  _X4 = 1.000000;
-  _X5 = cmp_lt(_X3, _X4);
-  _X6 = cond(_X5, _X3, _X4);
-  _X7 = neg(_X0);
-  _X8 = log(_X6);
-  _X9 = mul(_X7, _X8);
-  _X10 = 1;
-  _X11 = sub(_X10, _X0);
-  _X12 = 1;
-  _X13 = sub(_X12, _X6);
-  _X14 = log(_X13);
-  _X15 = mul(_X11, _X14);
-  _X16 = sub(_X9, _X15);
-  _X17 = ident(_X16);
+  EXPECT_THAT(program, Eq(R"#(
+
+!fp32 = type tensor<!eltwise.fp32>
+!i32 = type tensor<!eltwise.i32>
+module {
+  func @binary_crossentropy(%arg0: tensor<7x7x3x64x!eltwise.fp32> {tile.name = "O"}, %arg1: tensor<7x7x3x64x!eltwise.fp32> {tile.name = "I"}) -> tensor<7x7x3x64x!eltwise.fp32> {
+    %cst = "eltwise.sconst"() {value = 1.000000e+00 : f32} : () -> !fp32
+    %cst_0 = "eltwise.sconst"() {value = 0.000000e+00 : f32} : () -> !fp32
+    %c1 = "eltwise.sconst"() {value = 1 : i64} : () -> !i32
+    %0 = "eltwise.cmp_gt"(%arg0, %cst_0) {type = !eltwise.fp32} : (tensor<7x7x3x64x!eltwise.fp32>, !fp32) -> tensor<7x7x3x64x!eltwise.bool>
+    %1 = "eltwise.select"(%0, %arg0, %cst_0) {type = !eltwise.fp32} : (tensor<7x7x3x64x!eltwise.bool>, tensor<7x7x3x64x!eltwise.fp32>, !fp32) -> tensor<7x7x3x64x!eltwise.fp32>
+    %2 = "eltwise.cmp_lt"(%1, %cst) {type = !eltwise.fp32} : (tensor<7x7x3x64x!eltwise.fp32>, !fp32) -> tensor<7x7x3x64x!eltwise.bool>
+    %3 = "eltwise.select"(%2, %1, %cst) {type = !eltwise.fp32} : (tensor<7x7x3x64x!eltwise.bool>, tensor<7x7x3x64x!eltwise.fp32>, !fp32) -> tensor<7x7x3x64x!eltwise.fp32>
+    %4 = "eltwise.sub"(%c1, %3) {type = !eltwise.fp32} : (!i32, tensor<7x7x3x64x!eltwise.fp32>) -> tensor<7x7x3x64x!eltwise.fp32>
+    %5 = "eltwise.log"(%4) {type = !eltwise.fp32} : (tensor<7x7x3x64x!eltwise.fp32>) -> tensor<7x7x3x64x!eltwise.fp32>
+    %6 = "eltwise.ident"(%arg1) {type = !eltwise.fp32} : (tensor<7x7x3x64x!eltwise.fp32>) -> tensor<7x7x3x64x!eltwise.fp32>
+    %7 = "eltwise.sub"(%c1, %6) {type = !eltwise.fp32} : (!i32, tensor<7x7x3x64x!eltwise.fp32>) -> tensor<7x7x3x64x!eltwise.fp32>
+    %8 = "eltwise.mul"(%7, %5) {type = !eltwise.fp32} : (tensor<7x7x3x64x!eltwise.fp32>, tensor<7x7x3x64x!eltwise.fp32>) -> tensor<7x7x3x64x!eltwise.fp32>
+    %9 = "eltwise.log"(%3) {type = !eltwise.fp32} : (tensor<7x7x3x64x!eltwise.fp32>) -> tensor<7x7x3x64x!eltwise.fp32>
+    %10 = "eltwise.neg"(%6) {type = !eltwise.fp32} : (tensor<7x7x3x64x!eltwise.fp32>) -> tensor<7x7x3x64x!eltwise.fp32>
+    %11 = "eltwise.mul"(%10, %9) {type = !eltwise.fp32} : (tensor<7x7x3x64x!eltwise.fp32>, tensor<7x7x3x64x!eltwise.fp32>) -> tensor<7x7x3x64x!eltwise.fp32>
+    %12 = "eltwise.sub"(%11, %8) {type = !eltwise.fp32} : (tensor<7x7x3x64x!eltwise.fp32>, tensor<7x7x3x64x!eltwise.fp32>) -> tensor<7x7x3x64x!eltwise.fp32>
+    return %12 : tensor<7x7x3x64x!eltwise.fp32>
+  }
 }
-)"));
+)#"));
 }
 
 TEST(Op, Clip) {
@@ -833,26 +832,25 @@ module {
 )#"));
 }
 
-// TODO: grad_override
-TEST(Op, DISABLED_Sigmoid) {
+TEST(Op, Sigmoid) {
   auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10}, "A");
   Program program("sigmoid", {op::sigmoid(A)});
   IVLOG(1, program);
-  EXPECT_THAT(program, Eq(R"(function (
-  A[A_0]
-) -> (
-  _X7
-) {
-  _X0 = ident(A);
-  _X1 = 1.000000;
-  _X2 = 1.000000;
-  _X3 = neg(_X0);
-  _X4 = exp(_X3);
-  _X5 = add(_X2, _X4);
-  _X6 = div(_X1, _X5);
-  _X7 = ident(_X6);
+  EXPECT_THAT(program, Eq(R"#(
+
+!fp32 = type tensor<!eltwise.fp32>
+module {
+  func @sigmoid(%arg0: tensor<10x!eltwise.fp32> {tile.name = "A"}) -> tensor<10x!eltwise.fp32> {
+    %cst = "eltwise.sconst"() {value = 1.000000e+00 : f32} : () -> !fp32
+    %0 = "eltwise.ident"(%arg0) {type = !eltwise.fp32} : (tensor<10x!eltwise.fp32>) -> tensor<10x!eltwise.fp32>
+    %1 = "eltwise.neg"(%0) {type = !eltwise.fp32} : (tensor<10x!eltwise.fp32>) -> tensor<10x!eltwise.fp32>
+    %2 = "eltwise.exp"(%1) {type = !eltwise.fp32} : (tensor<10x!eltwise.fp32>) -> tensor<10x!eltwise.fp32>
+    %3 = "eltwise.add"(%2, %cst) {type = !eltwise.fp32} : (tensor<10x!eltwise.fp32>, !fp32) -> tensor<10x!eltwise.fp32>
+    %4 = "eltwise.div"(%cst, %3) {type = !eltwise.fp32} : (!fp32, tensor<10x!eltwise.fp32>) -> tensor<10x!eltwise.fp32>
+    return %4 : tensor<10x!eltwise.fp32>
+  }
 }
-)"));
+)#"));
 }
 
 TEST(Op, Slice) {
@@ -881,25 +879,39 @@ module {
 )#"));
 }
 
-// TODO: grad_override
-TEST(Op, DISABLED_Softmax) {
+TEST(Op, Softmax) {
   auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "A");
   Program program("softmax", {op::softmax(A, 1)});
   IVLOG(1, program);
-  EXPECT_THAT(program, Eq(R"(function (
-  A[A_0, A_1]
-) -> (
-  _X6
-) {
-  _X0 = ident(A);
-  _X1[x0, 0 : 10, 1] = >(_X0[x0, x1]);
-  _X2 = sub(_X0, _X1);
-  _X3 = exp(_X2);
-  _X4[x0, 0 : 10, 1] = +(_X3[x0, x1]);
-  _X5 = div(_X3, _X4);
-  _X6 = ident(_X5);
+  EXPECT_THAT(program, Eq(R"#(
+
+module {
+  func @softmax(%arg0: tensor<10x20x!eltwise.fp32> {tile.name = "A"}) -> tensor<10x20x!eltwise.fp32> {
+    %c0 = "tile.affine_const"() {value = 0 : i64} : () -> index
+    %c1 = "tile.affine_const"() {value = 1 : i64} : () -> index
+    %c10 = "tile.affine_const"() {value = 10 : i64} : () -> index
+    %0 = "eltwise.ident"(%arg0) {type = !eltwise.fp32} : (tensor<10x20x!eltwise.fp32>) -> tensor<10x20x!eltwise.fp32>
+    %1 = "tile.domain"() ( {
+    ^bb0(%arg1: index, %arg2: index):	// no predecessors
+      %6 = "tile.src_idx_map"(%0, %arg2, %arg1) : (tensor<10x20x!eltwise.fp32>, index, index) -> !tile.imap
+      %7 = "tile.sink_idx_map"(%arg2, %c0) : (index, index) -> !tile.imap
+      %8 = "tile.size_map"(%c10, %c1) : (index, index) -> !tile.smap
+      "tile.>(x)"(%8, %6, %7) : (!tile.smap, !tile.imap, !tile.imap) -> ()
+    }) {idx_names = ["x0", "x1"]} : () -> tensor<10x1x!eltwise.fp32>
+    %2 = "eltwise.sub"(%0, %1) {type = !eltwise.fp32} : (tensor<10x20x!eltwise.fp32>, tensor<10x1x!eltwise.fp32>) -> tensor<10x20x!eltwise.fp32>
+    %3 = "eltwise.exp"(%2) {type = !eltwise.fp32} : (tensor<10x20x!eltwise.fp32>) -> tensor<10x20x!eltwise.fp32>
+    %4 = "tile.domain"() ( {
+    ^bb0(%arg1: index, %arg2: index):	// no predecessors
+      %6 = "tile.src_idx_map"(%3, %arg2, %arg1) : (tensor<10x20x!eltwise.fp32>, index, index) -> !tile.imap
+      %7 = "tile.sink_idx_map"(%arg2, %c0) : (index, index) -> !tile.imap
+      %8 = "tile.size_map"(%c10, %c1) : (index, index) -> !tile.smap
+      "tile.+(x)"(%8, %6, %7) : (!tile.smap, !tile.imap, !tile.imap) -> ()
+    }) {idx_names = ["x0", "x1"]} : () -> tensor<10x1x!eltwise.fp32>
+    %5 = "eltwise.div"(%3, %4) {type = !eltwise.fp32} : (tensor<10x20x!eltwise.fp32>, tensor<10x1x!eltwise.fp32>) -> tensor<10x20x!eltwise.fp32>
+    return %5 : tensor<10x20x!eltwise.fp32>
+  }
 }
-)"));
+)#"));
 }
 
 TEST(Op, SpatialPadding) {
