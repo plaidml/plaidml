@@ -161,3 +161,15 @@ py_setup(
     universal = True,
     visibility = ["//visibility:public"],
 )
+
+plaidml_cc_library(
+    name = "testenv",
+    testonly = 1,
+    srcs = ["testenv.cc"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":plaidml",
+        "@gmock//:gtest",
+    ],
+    alwayslink = 1,
+)

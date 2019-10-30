@@ -208,6 +208,10 @@ bool ConstantValueMatcher::match(mlir::Operation* op) {
     if (!tensorType.getElementType().isa<ScalarType>() || tensorType.getRank() != 0) {
       return false;
     }
+  } else if (type.isa<mlir::IndexType>()) {
+    if (auto intAttr = attr.dyn_cast<IntegerAttr>()) {
+      return intAttr.getValue() == value;
+    }
   } else if (!type.isa<ScalarType>()) {
     return false;
   }
