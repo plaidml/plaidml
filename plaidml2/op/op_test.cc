@@ -22,17 +22,6 @@ bool operator==(const Program& lhs, const std::string& rhs) {  //
 namespace op {
 namespace {
 
-class Environment : public ::testing::Environment {
-  void SetUp() override {  //
-    plaidml::op::init();
-  }
-};
-
-[[gnu::unused]] auto init = []() {  //
-  ::testing::AddGlobalTestEnvironment(new Environment);
-  return 0;
-}();
-
 TEST(Op, Abs) {
   auto I = Placeholder(PLAIDML_DATA_FLOAT32, {1, 224, 224, 3}, "I");
   auto abs = op::abs(I);
