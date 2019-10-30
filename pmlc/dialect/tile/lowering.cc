@@ -26,6 +26,7 @@
 #include "pmlc/dialect/stripe/transcode.h"
 #include "pmlc/dialect/stripe/util.h"
 #include "pmlc/dialect/tile/contraction.h"
+#include "pmlc/dialect/tile/dialect.h"
 #include "pmlc/dialect/tile/ops.h"
 #include "pmlc/dialect/tile/program.h"
 #include "pmlc/util/util.h"
@@ -79,7 +80,7 @@ static void addInitializer(         //
   stripe::SymbolValueMap idxs;
   llvm::SmallVector<int64_t, 6> ranges;
   llvm::SmallVector<Attribute, 6> idxNames;
-  const auto& dims = tensorType.getShape();
+  auto dims = tensorType.getShape();
   for (const auto& dim : dims) {
     ranges.emplace_back(dim.size);
   }
@@ -194,7 +195,8 @@ struct AffineConstantOpConversion : public LoweringBase {
       ConversionPatternRewriter& rewriter) const override {
     IVLOG(2, "AffineConstantOpConversion::matchAndRewrite>");
     auto constOp = llvm::cast<AffineConstantOp>(op);
-    rewriter.replaceOpWithNewOp<stripe::AffinePolyOp>(op, stripe::AffinePolynomial(constOp.value().getSExtValue()));
+    auto poly = stripe::AffinePolynomial(constOp.value().getSExtValue());
+    rewriter.replaceOpWithNewOp<stripe::AffinePolyOp>(op, poly);
     return matchSuccess();
   }
 };
@@ -214,7 +216,7 @@ struct ReturnOpConversion : public LoweringBase {
   }
 };
 
-static Value* ConvertOutputTensor(Operation* op, Value* tensor) {
+static Value* findOutputArgument(Operation* op, Value* tensor) {
   auto funcOp = op->getParentOfType<FuncOp>();
   auto attr = funcOp.getAttrOfType<IntegerAttr>("inputs");
   if (!attr) {
@@ -230,6 +232,19 @@ static Value* ConvertOutputTensor(Operation* op, Value* tensor) {
     }
   }
   return nullptr;
+}
+
+static StringAttr getTensorName(Value* tensor) {
+  if (auto op = tensor->getDefiningOp()) {
+    if (op->getNumOperands()) {
+      return getTensorName(op->getOperand(0));
+    }
+    return {};
+  }
+  auto blockArg = llvm::cast<mlir::BlockArgument>(tensor);
+  auto funcOp = llvm::cast<FuncOp>(blockArg->getOwner()->getParentOp());
+  auto stripeName = stripe::Dialect::getDialectAttrName("name");
+  return funcOp.getArgAttrOfType<StringAttr>(blockArg->getArgNumber(), stripeName);
 }
 
 static Value* MakeCombination(            //
@@ -249,7 +264,7 @@ static Value* MakeCombination(            //
       // AddIntrinsic(kernel.get(), Intrinsic::COND, output_type, {"$IS_EQ", scalar_inputs[2], "$ZERO"},
       //              {ScalarName(op.output)});
       // kernel->set_tag("comb_op_cond");
-      break;
+      throw std::runtime_error("NYI: CombinationKind::cond");
     case CombinationKind::eq:
       return rewriter->create<eltwise::CmpEqOp>(op.getLoc(), scalarType, operands).result();
     case CombinationKind::mul:
@@ -303,7 +318,7 @@ struct AffineDomainOpConversion : public LoweringBase {
       ranges.emplace_back(range);
     }
 
-    auto outputTensor = ConvertOutputTensor(op, domainOp.result());
+    auto outputTensor = findOutputArgument(op, domainOp.result());
     if (!outputTensor) {
       auto allocOp = rewriter.create<stripe::AllocateOp>(op->getLoc(), resultTensorType);
       outputTensor = allocOp.result();
@@ -361,6 +376,9 @@ struct AffineDomainOpConversion : public LoweringBase {
             {rewriter.getIdentifier("contraction"), rewriter.getUnitAttr()},
         };
         refineOp.setAttr(stripe::Dialect::getStripeAttrsName(), rewriter.getDictionaryAttr(refAttrs));
+        if (auto name = getTensorName(tensors[i])) {
+          refineOp.setAttr("name", name);
+        }
         refs.emplace_back(refineOp.result());
       } else {
         output = refineOp.result();
@@ -436,7 +454,7 @@ struct AffineDomainOpConversion : public LoweringBase {
     // We assume here that the 0'th refinement is the output refinement
     std::unordered_set<mlir::BlockArgument*> outIdxs;
     auto refineOp = llvm::cast<stripe::RefineOp>(outRef->getDefiningOp());
-    const auto& outShape = outType.getShape();
+    auto outShape = outType.getShape();
     for (unsigned i = 0; i < outShape.size(); i++) {
       stripe::AffinePolynomial poly{refineOp.getOffset(i)};
       if (poly == stripe::AffinePolynomial() && outShape[i].size == 1) {
@@ -495,7 +513,7 @@ struct EltwiseOpConversion : public LoweringBase {
     auto resultTensorType = convertIntoTensorType(resultType);
     IVLOG(3, "resultTensorType: " << mlir::debugString(resultTensorType));
 
-    auto outputTensor = ConvertOutputTensor(op, op->getResult(0));
+    auto outputTensor = findOutputArgument(op, op->getResult(0));
     if (!outputTensor) {
       auto allocOp = rewriter.create<stripe::AllocateOp>(op->getLoc(), resultTensorType);
       outputTensor = allocOp.result();
@@ -520,7 +538,7 @@ struct EltwiseOpConversion : public LoweringBase {
 
     stripe::SymbolValueMap idxs;
     llvm::SmallVector<Attribute, 8> idxNames;
-    const auto& dims = resultTensorType.getShape();
+    auto dims = resultTensorType.getShape();
     for (unsigned i = 0; i < dims.size(); i++) {
       auto arg = body->addArgument(stripe::AffineType::get(rewriter.getContext()));
       auto idxName = llvm::formatv("i{0}", i);
@@ -551,7 +569,10 @@ struct EltwiseOpConversion : public LoweringBase {
       }
 
       Type operandType = operand->getType();
-      auto tensorRefType = operandType.cast<stripe::TensorRefType>();
+      auto tensorRefType = operandType.dyn_cast<stripe::TensorRefType>();
+      if (!tensorRefType) {
+        throw std::runtime_error("EltwiseOpConversion expected TensorRefType for operand type");
+      }
       if (resultTensorType.getRank() < tensorRefType.getRank()) {
         throw std::runtime_error("Invalid eltwise op: result rank < operand rank");
       }
@@ -638,12 +659,32 @@ struct FuncOpConversion : public LoweringBase {
     newFuncOp.setAttr("inputs", rewriter.getI32IntegerAttr(type.getNumInputs()));
     newFuncOp.setAttr("outputs", rewriter.getI32IntegerAttr(type.getNumResults()));
 
-    for (unsigned i = 0; i < tensorTypes.size(); i++) {
-      auto name = llvm::formatv("_X{0}", i);
-      auto attrName = stripe::Dialect::getDialectAttrName("name");
-      newFuncOp.setArgAttr(i, attrName, rewriter.getStringAttr(name.str()));
-      auto attrLayout = stripe::Dialect::getDialectAttrName("layout");
-      newFuncOp.setArgAttr(i, attrLayout, rewriter.getTypeAttr(tensorTypes[i]));
+    auto tileName = rewriter.getIdentifier(Dialect::getDialectAttrName("name"));
+    auto stripeName = stripe::Dialect::getDialectAttrName("name");
+    auto stripeLayout = stripe::Dialect::getDialectAttrName("layout");
+
+    for (unsigned i = 0; i < type.getNumInputs(); i++) {
+      auto name = rewriter.getStringAttr(llvm::formatv("_X{0}", i).str());
+      if (auto attr = funcOp.getArgAttrOfType<StringAttr>(i, tileName)) {
+        name = attr;
+        newFuncOp.removeArgAttr(i, tileName);
+      }
+      newFuncOp.setArgAttr(i, stripeName, name);
+      newFuncOp.setArgAttr(i, stripeLayout, rewriter.getTypeAttr(tensorTypes[i]));
+    }
+
+    auto returnOp = llvm::cast<ReturnOp>(newFuncOp.getBody().front().getTerminator());
+    for (unsigned i = 0; i < type.getNumResults(); i++) {
+      auto argIndex = type.getNumInputs() + i;
+      auto operand = returnOp.getOperand(i);
+      auto name = rewriter.getStringAttr(llvm::formatv("_X{0}", argIndex).str());
+      if (auto op = operand->getDefiningOp()) {
+        if (auto attr = op->getAttrOfType<StringAttr>("name")) {
+          name = attr;
+        }
+      }
+      newFuncOp.setArgAttr(argIndex, stripeName, name);
+      newFuncOp.setArgAttr(argIndex, stripeLayout, rewriter.getTypeAttr(tensorTypes[argIndex]));
     }
 
     // Tell the rewriter to convert the region signature.
@@ -688,7 +729,7 @@ struct SpecialOpConversion : public LoweringBase {
       auto result = op->getResult(i);
       auto resultType = result->getType();
       auto resultTensorType = convertIntoTensorType(resultType);
-      auto output = ConvertOutputTensor(op, result);
+      auto output = findOutputArgument(op, result);
       if (!output) {
         auto allocOp = rewriter.create<stripe::AllocateOp>(op->getLoc(), resultTensorType);
         output = allocOp.result();

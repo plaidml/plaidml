@@ -19,6 +19,7 @@ using eltwise::constFoldUnaryOp;
 using eltwise::m_One;
 using eltwise::m_Zero;
 using llvm::SmallVector;
+using mlir::ArrayAttr;
 using mlir::FloatAttr;
 using mlir::IntegerAttr;
 using mlir::OpRewritePattern;
@@ -132,25 +133,30 @@ struct AffineDomainFolder : public OpRewritePattern<AffineDomainOp> {
     while (!llvm::isa<ContractionOp>(terminator)) {
       terminator = terminator->getRegion(0).front().getTerminator();
     }
-    auto size_map_op = llvm::dyn_cast<AffineSizeMapOp>(terminator->getOperand(0)->getDefiningOp());
-    if (!size_map_op) {
+    auto contractionOp = llvm::cast<ContractionOp>(terminator);
+    auto sizeMapOp = llvm::dyn_cast<AffineSizeMapOp>(contractionOp.getSizeMap()->getDefiningOp());
+    if (!sizeMapOp) {
       return matchFailure();
     }
-    llvm::SmallVector<Value*, 4> sizes(size_map_op.sizes());
+    llvm::SmallVector<Value*, 4> sizes(sizeMapOp.sizes());
     auto shape = eltwise::ComputeShape(sizes);
-    auto existingType = op.getType().cast<RankedTensorType>();
-    auto tensorType = rewriter.getTensorType(shape, existingType.getElementType());
-    IVLOG(6, "  existingType: " << mlir::debugString(existingType));
-    IVLOG(6, "  tensorType: " << mlir::debugString(tensorType));
-    if (existingType == tensorType) {
+    auto sourceType = op.getType().cast<RankedTensorType>();
+    auto targetType = rewriter.getTensorType(shape, sourceType.getElementType());
+    IVLOG(6, "  sourceType: " << mlir::debugString(sourceType));
+    IVLOG(6, "  targetType: " << mlir::debugString(targetType));
+    if (sourceType == targetType) {
       return matchFailure();
     }
-    auto newOp = rewriter.create<AffineDomainOp>(op.getLoc(), tensorType);
+    auto newOp = rewriter.create<AffineDomainOp>(op.getLoc(), targetType);
+    if (auto attr = op.getAttrOfType<StringAttr>("name")) {
+      newOp.setAttr("name", attr);
+    }
+    if (auto attr = op.getAttrOfType<ArrayAttr>("idx_names")) {
+      newOp.setAttr("idx_names", attr);
+    }
     newOp.body().takeBody(op.body());
     rewriter.replaceOp(op, {newOp.result()});
-
     util::UpdateFuncOpType(newOp.getOperation());
-
     return matchSuccess();
   }
 };
