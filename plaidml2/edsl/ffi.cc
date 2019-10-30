@@ -25,7 +25,7 @@ using namespace vertexai::tile::lang::ast;  // NOLINT
 
 using plaidml::core::ffi_wrap;
 using plaidml::core::ffi_wrap_void;
-using pmlc::dialect::tile::TileBuilder;
+using plaidml::core::GlobalContext;
 using pmlc::util::AggregationKind;
 using pmlc::util::CombinationKind;
 
@@ -102,13 +102,6 @@ CombinationKind getCombinationKind(plaidml_combo_op combo_op) {
   }
   throw std::runtime_error("Unsupported combo_op");
 }
-
-struct GlobalContext {
-  static TileBuilder* get() {
-    static thread_local TileBuilder builder;
-    return &builder;
-  }
-};
 
 mlir::Value* MakeAffineOp(plaidml_int_op op, const std::vector<mlir::Value*> operands) {
   auto builder = GlobalContext::get();
