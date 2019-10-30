@@ -183,10 +183,18 @@ local PARAMS = {
                 input_cost: 0.0, 
                 output_cost: 0.0,
                 split_factor: -100.0,
-                cache_width: PARAMS[cfg].CACHE_WIDTH, // Lubo 
+                cache_width: PARAMS[cfg].CACHE_WIDTH,
                 // Only consider PO2 sizes for speed
                 only_po2: true,
               }
+            },
+
+            {
+              name: 'prune_idxs',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.PruneIndexesPass',
+                reqs: ['program'],
+              },
             },
 
             {
