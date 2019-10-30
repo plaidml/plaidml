@@ -2,7 +2,7 @@
 
 #include "plaidml2/core/ffi.h"
 
-#include <stdlib.h>
+#include <cstdlib>
 
 #include <memory>
 #include <mutex>
@@ -33,6 +33,15 @@ using vertexai::tile::TensorShape;
 using LocalPlatform = vertexai::tile::local_machine::Platform;
 
 extern const char* PLAIDML_VERSION;
+
+namespace std {
+
+void plaidml_reset_eventlog(void) {
+  auto ctx = GlobalContext::getContext();
+  ctx->set_eventlog(nullptr);
+}
+
+}  // namespace std
 
 namespace plaidml {
 namespace core {
@@ -74,20 +83,15 @@ void plaidml_init(plaidml_error* err) {
         ctx->set_eventlog(std::move(eventlog));
         ctx->set_is_logging_events(true);
       }
+      std::atexit(std::plaidml_reset_eventlog);
     });
   });
-}
-
-void plaidml_reset_eventlog(void) {
-  auto ctx = GlobalContext::getContext();
-  ctx->set_eventlog(nullptr);
 }
 
 void plaidml_shutdown(plaidml_error* err) {
   ffi_wrap_void(err, [&] {
     IVLOG(1, "plaidml_shutdown");
     GetPlatform().platform.reset(nullptr);
-    std::atexit(plaidml_reset_eventlog);
   });
 }
 
