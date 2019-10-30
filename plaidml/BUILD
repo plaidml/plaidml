@@ -327,19 +327,17 @@ plaidml_py_wheel(
         "//toolchain:windows_x86_64": {
             "{BIN_DATA_FILES}": """Library/bin =
   data/plaidml.dll
-  data/pmlc.exe""",
+""",
         },
         "//toolchain:macos_x86_64": {
             "{BIN_DATA_FILES}": """lib =
   data/libplaidml.dylib
-bin =
-  data/pmlc""",
+""",
         },
         "//conditions:default": {
             "{BIN_DATA_FILES}": """lib =
   data/libplaidml.so
-bin =
-  data/pmlc""",
+""",
         },
     }),
     data = PLAIDML_CPP_HEADERS + [
@@ -348,7 +346,6 @@ bin =
         "//plaidml/base:base_cpp.h",
         "@half//:include/half.hpp",
         "plaidml-config.cmake",
-        "//tile/pmlc",
     ] + select({
         "//toolchain:windows_x86_64": [":plaidml_pub.dll"],
         "//toolchain:macos_x86_64": [":libplaidml_macos_pub"],
