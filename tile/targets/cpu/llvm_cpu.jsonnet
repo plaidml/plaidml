@@ -176,19 +176,17 @@ local PARAMS = {
               name: 'tile_contract',
               pass: {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.AutotilePass',
-                // Apply to only dense operations
                 reqs: ['contraction'],
-                outer_set: ['contract_outer', 'kernel'],
                 inner_set: ['contract_inner'],
-                // "acc_idxs": false,
+                outer_set: ['contract_outer', 'kernel', 'cpu_thread'],
+                acc_idxs: false,
+                input_cost: 0.0, 
+                output_cost: 0.0,
+                split_factor: -100.0,
+                cache_width: PARAMS[cfg].CACHE_WIDTH, // Lubo 
                 // Only consider PO2 sizes for speed
                 only_po2: true,
-                // All inputs must fit in local memory
-                max_total_size: PARAMS[cfg].L1_CACHE_SIZE * 1024,
-                // Since all loads to/from global memory are across a wide bus, use that as the
-                // cache_width to optimize for contigous regions of DRAM for each inner block
-                cache_width: PARAMS[cfg].CACHE_WIDTH,
-              },
+              }
             },
 
             {
