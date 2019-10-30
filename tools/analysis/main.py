@@ -51,7 +51,10 @@ def main():
         cmd = ['jupyter', 'nbconvert', '--execute', '--output', args.export, timeout_arg, notebook]
         subprocess.check_call(cmd, env=env)
     else:
-        cmd = ['jupyter', 'notebook', '--ip', args.ip, notebook]
+        conda_env = os.getenv('CONDA_DEFAULT_ENV')
+        python = os.path.join(conda_env, 'bin', 'python')
+        jupyter = os.path.join(conda_env, 'bin', 'jupyter')
+        cmd = [python, jupyter, 'notebook', '--ip', args.ip, notebook]
         devnull = open(os.devnull, 'w')
         try:
             subprocess.call(cmd, env=env, stdin=devnull)
