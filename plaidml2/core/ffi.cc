@@ -2,11 +2,17 @@
 
 #include "plaidml2/core/ffi.h"
 
+#include <cstdlib>
+#include <memory>
 #include <mutex>
+#include <utility>
 #include <vector>
 
 #include <boost/filesystem.hpp>
 
+#include "base/context/context.h"
+#include "base/context/eventlog.h"
+#include "base/eventing/file/eventlog.h"
 #include "base/util/env.h"
 #include "plaidml2/core/internal.h"
 #include "plaidml2/core/settings.h"
@@ -15,6 +21,7 @@
 using plaidml::core::ffi_wrap;
 using plaidml::core::ffi_wrap_void;
 using plaidml::core::GetPlatform;
+using plaidml::core::GlobalContext;
 using plaidml::core::Settings;
 using vertexai::context::Context;
 using vertexai::tile::DataType;
@@ -23,6 +30,15 @@ using vertexai::tile::TensorShape;
 using LocalPlatform = vertexai::tile::local_machine::Platform;
 
 extern const char* PLAIDML_VERSION;
+
+namespace {
+
+void plaidml_reset_eventlog(void) {
+  auto ctx = GlobalContext::getContext();
+  ctx->set_eventlog(nullptr);
+}
+
+}  // namespace
 
 namespace plaidml {
 namespace core {
@@ -53,7 +69,18 @@ void plaidml_init(plaidml_error* err) {
       }
       IVLOG(1, "plaidml_init");
       Settings::Instance()->load();
+      auto ctx = GlobalContext::getContext();
       GetPlatform();
+      auto eventlog_str = vertexai::env::Get("PLAIDML_EVENTLOG_FILENAME");
+      if (eventlog_str.size()) {
+        IVLOG(1, "Logging events to " << eventlog_str);
+        vertexai::eventing::file::proto::EventLog e_config;
+        e_config.set_filename(eventlog_str);
+        auto eventlog = std::make_shared<vertexai::eventing::file::EventLog>(e_config);
+        ctx->set_eventlog(std::move(eventlog));
+        ctx->set_is_logging_events(true);
+      }
+      std::atexit(plaidml_reset_eventlog);
     });
   });
 }
@@ -222,8 +249,8 @@ plaidml_buffer* plaidml_buffer_alloc(  //
     const char* device_id,             //
     size_t size) {
   return ffi_wrap<plaidml_buffer*>(err, nullptr, [&] {
-    Context ctx;
-    auto buffer = GetPlatform()->MakeBuffer(ctx, device_id, size);
+    auto ctx = GlobalContext::getContext();
+    auto buffer = GetPlatform()->MakeBuffer(*ctx, device_id, size);
     return new plaidml_buffer{buffer};
   });
 }
@@ -232,8 +259,8 @@ plaidml_view* plaidml_buffer_mmap_current(  //
     plaidml_error* err,                     //
     plaidml_buffer* buffer) {
   return ffi_wrap<plaidml_view*>(err, nullptr, [&] {  //
-    Context ctx;
-    return new plaidml_view{buffer->buffer->MapCurrent(ctx).get()};
+    auto ctx = GlobalContext::getContext();
+    return new plaidml_view{buffer->buffer->MapCurrent(*ctx).get()};
   });
 }
 
@@ -241,8 +268,8 @@ plaidml_view* plaidml_buffer_mmap_discard(  //
     plaidml_error* err,                     //
     plaidml_buffer* buffer) {
   return ffi_wrap<plaidml_view*>(err, nullptr, [&] {  //
-    Context ctx;
-    return new plaidml_view{buffer->buffer->MapDiscard(ctx)};
+    auto ctx = GlobalContext::getContext();
+    return new plaidml_view{buffer->buffer->MapDiscard(*ctx)};
   });
 }
 
@@ -274,8 +301,8 @@ void plaidml_view_writeback(  //
     plaidml_error* err,       //
     plaidml_view* view) {
   ffi_wrap_void(err, [&] {
-    Context ctx;
-    view->view->WriteBack(ctx);
+    auto ctx = GlobalContext::getContext();
+    view->view->WriteBack(*ctx);
   });
 }
 

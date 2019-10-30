@@ -23,6 +23,7 @@
 using plaidml::core::ffi_wrap;
 using plaidml::core::ffi_wrap_void;
 using plaidml::core::GetPlatform;
+using plaidml::core::GlobalContext;
 using pmlc::dialect::stripe::Dialect;
 using pmlc::dialect::stripe::FromMLIR;
 using pmlc::dialect::tile::LowerIntoStripe;
@@ -240,8 +241,8 @@ void plaidml_executable_run(  //
     plaidml_error* err,       //
     plaidml_executable* exec) {
   ffi_wrap_void(err, [&] {
-    Context ctx;
-    exec->program->Run(ctx, exec->input_bufs, exec->output_bufs).get();
+    auto ctx = GlobalContext::getContext();
+    exec->program->Run(*ctx, exec->input_bufs, exec->output_bufs).get();
   });
 }
 
