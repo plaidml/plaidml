@@ -187,10 +187,7 @@ def ConstraintOp : TileOp<"constraint", [Terminator]> {
 }
 
 class ContractionOp<string mnemonic, list<OpTrait> traits = []> :
-    TileOp<mnemonic, !listconcat(traits, [
-      Terminator,
-      ContractionOpInterface
-    ])>;
+    TileOp<mnemonic, !listconcat(traits, [Terminator, ContractionOpInterface])>;
 
 class UnaryConOp<string mnemonic, string agg, string combo> : ContractionOp<mnemonic> {
   let arguments = (ins
@@ -200,16 +197,15 @@ class UnaryConOp<string mnemonic, string agg, string combo> : ContractionOp<mnem
     Variadic<RankedTensorOf<[AnyScalar]>>:$init
   );
 
-  let builders = [OpBuilder<
-    "Builder* builder, OperationState& result, Value* size, Value* src, Value* sink", [{
-      result.addOperands(size);
-      result.addOperands(src);
-      result.addOperands(sink);
-      result.setOperandListToResizable();
-    }]
-  >];
-
   let extraClassDeclaration = [{
+    static Operation* create(OpBuilder* builder, Location loc, Value* size, ArrayRef<Value*> srcs, Value* sink) {
+      OperationState state(loc, getOperationName());
+      state.addOperands(size);
+      state.addOperands(srcs);
+      state.addOperands(sink);
+      state.setOperandListToResizable();
+      return builder->createOperation(state);
+    }
     Value* getSizeMap() { return size(); }
     std::vector<Value*> getSourceIndexMaps() { return {src()}; }
     Value* getSinkIndexMap() { return sink(); }
@@ -234,17 +230,15 @@ class BinaryConOp<string mnemonic, string agg, string combo> : ContractionOp<mne
     Variadic<RankedTensorOf<[AnyScalar]>>:$init
   );
 
-  let builders = [OpBuilder<
-    "Builder* builder, OperationState& result, Value* size, Value* src1, Value* src2, Value* sink", [{
-      result.addOperands(size);
-      result.addOperands(src1);
-      result.addOperands(src2);
-      result.addOperands(sink);
-      result.setOperandListToResizable();
-    }]
-  >];
-
   let extraClassDeclaration = [{
+    static Operation* create(OpBuilder* builder, Location loc, Value* size, ArrayRef<Value*> srcs, Value* sink) {
+      OperationState state(loc, getOperationName());
+      state.addOperands(size);
+      state.addOperands(srcs);
+      state.addOperands(sink);
+      state.setOperandListToResizable();
+      return builder->createOperation(state);
+    }
     Value* getSizeMap() { return size(); }
     std::vector<Value*> getSourceIndexMaps() { return {src1(), src2()}; }
     Value* getSinkIndexMap() { return sink(); }
@@ -270,18 +264,15 @@ class TernaryConOp<string mnemonic, string agg, string combo> : ContractionOp<mn
     Variadic<RankedTensorOf<[AnyScalar]>>:$init
   );
 
-  let builders = [OpBuilder<
-    "Builder* builder, OperationState& result, Value* size, Value* src1, Value* src2, Value* src3, Value* sink", [{
-      result.addOperands(size);
-      result.addOperands(src1);
-      result.addOperands(src2);
-      result.addOperands(src3);
-      result.addOperands(sink);
-      result.setOperandListToResizable();
-    }]
-  >];
-
   let extraClassDeclaration = [{
+    static Operation* create(OpBuilder* builder, Location loc, Value* size, ArrayRef<Value*> srcs, Value* sink) {
+      OperationState state(loc, getOperationName());
+      state.addOperands(size);
+      state.addOperands(srcs);
+      state.addOperands(sink);
+      state.setOperandListToResizable();
+      return builder->createOperation(state);
+    }
     Value* getSizeMap() { return size(); }
     std::vector<Value*> getSourceIndexMaps() { return {src1(), src2(), src3()}; }
     Value* getSinkIndexMap() { return sink(); }

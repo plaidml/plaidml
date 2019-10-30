@@ -44,22 +44,29 @@ using mlir::MLIRContext;
 using mlir::ModuleOp;
 using mlir::OpBuilder;
 using mlir::UnknownLoc;
+using util::AggregationKind;
+using util::CombinationKind;
 
 struct DomainInfo {
   BlockAndValueMapping mapping;
 };
+
+using ContractionKey = std::pair<AggregationKind, CombinationKind>;
 
 struct TileBuilder::Impl {
   MLIRContext context;
   ModuleOp module;
   OpBuilder builder;
   std::map<AffineDomainOp, DomainInfo> domains;
+  static std::map<ContractionKey, std::string> contractions;
 
   Impl()
       : module(ModuleOp::create(UnknownLoc::get(&context))),  //
-        builder(module.getBody()) {}
+        builder(module.getBody()) {
+    builder.setInsertionPointToStart(module.getBody());
+  }
 
-  mlir::Type ComputeElementType(llvm::ArrayRef<mlir::Type> types) {
+  Type inferElementType(ArrayRef<Type> types) {
     DataType ret = DataType::INVALID;
     for (auto type : types) {
       auto tensorType = type.cast<ShapedType>();
@@ -81,128 +88,39 @@ struct TileBuilder::Impl {
     }
     return abstractOp;
   }
+};
 
-  using CreateOpFunc = std::function<void(OpBuilder, BlockAndValueMapping*)>;
-
-  Operation* MakeContraction(             //
-      llvm::ArrayRef<mlir::Value*> srcs,  //
-      mlir::Value* sink,                  //
-      mlir::Value* sizes,                 //
-      CreateOpFunc fn) {
-    IVLOG(5, "TileBuilder::Impl::MakeContraction>");
-    IVLOG(5, mlir::debugString(module));
-    // Compute the sink shape of the contraction
-    llvm::SmallVector<mlir::Type, 3> types;
-    for (auto src : srcs) {
-      IVLOG(6, "  src: " << mlir::debugString(*src));
-      auto map_op = llvm::cast<AffineSourceIndexMapOp>(src->getDefiningOp());
-      types.push_back(map_op.tensor()->getType());
-    }
-    IVLOG(6, "  sink: " << mlir::debugString(*sink));
-    IVLOG(6, "  sizes: " << mlir::debugString(*sizes));
-    auto elementType = ComputeElementType(types);
-    auto size_map_op = llvm::cast<AffineSizeMapOp>(sizes->getDefiningOp());
-    llvm::SmallVector<Value*, 4> size_map_sizes(size_map_op.sizes());
-    auto shape = eltwise::ComputeShape(size_map_sizes);
-    auto tensorType = builder.getTensorType(shape, elementType);
-    auto domain = builder.create<AffineDomainOp>(builder.getUnknownLoc(), tensorType);
-    auto& info = domains[domain];
-    auto body = new Block();
-    domain.body().push_back(body);
-    llvm::SetVector<mlir::Value*> values;
-    values.insert(srcs.begin(), srcs.end());
-    values.insert(sink);
-    values.insert(sizes);
-    auto slice = util::getBackwardSlice(values, false, [](Value* value) {  //
-      return value->getType().isa<IndexType>();
-    });
-    // Find and replace each AffineIndexOp with a BlockArgument of the domain op
-    std::queue<mlir::Value*> worklist;
-    for (auto value : slice) {
-      auto op = value->getDefiningOp();
-      if (auto idx_op = llvm::dyn_cast<AffineIndexOp>(op)) {
-        auto arg = body->addArgument(idx_op.getType());
-        info.mapping.map(value, arg);
-        worklist.push(value);
-      }
-    }
-    // Move across only the values/ops that depend on AffineIndexOps
-    // First determine the transitive users of AffineIndexOps
-    std::set<Value*> belong;
-    while (worklist.size()) {
-      auto value = worklist.front();
-      worklist.pop();
-      for (auto user : value->getUsers()) {
-        auto user_value = user->getResult(0);
-        if (!belong.count(user_value)) {
-          belong.insert(user_value);
-          worklist.push(user_value);
-        }
-      }
-    }
-    // Now move across ops but do so in topologically sorted order
-    OpBuilder domain_builder(body);
-    for (auto value : slice) {
-      auto op = value->getDefiningOp();
-      if (belong.count(value) ||                    //
-          llvm::isa<AffineSourceIndexMapOp>(op) ||  //
-          llvm::isa<AffineSinkIndexMapOp>(op) ||    //
-          llvm::isa<AffineSizeMapOp>(op)) {
-        auto new_value = domain_builder.clone(*op, info.mapping)->getResult(0);
-        info.mapping.map(value, new_value);
-      }
-    }
-    fn(domain_builder, &info.mapping);
-    IVLOG(5, mlir::debugString(domain));
-    return domain.getOperation();
-  }
-
-  template <typename ConOp>
-  mlir::Value* MakeUnaryContraction(llvm::ArrayRef<mlir::Value*> srcs, mlir::Value* sink, mlir::Value* sizes) {
-    if (srcs.size() != 1) {
-      throw std::runtime_error("Unary contraction op requires 1 operand");
-    }
-    auto domain = MakeContraction({srcs[0]}, sink, sizes, [&](OpBuilder domain_builder, BlockAndValueMapping* mapping) {
-      auto new_src = mapping->lookup(srcs[0]);
-      auto new_sink = mapping->lookup(sink);
-      auto new_sizes = mapping->lookup(sizes);
-      domain_builder.create<ConOp>(builder.getUnknownLoc(), new_sizes, new_src, new_sink);
-    });
-    return domain->getResult(0);
-  }
-
-  template <typename ConOp>
-  mlir::Value* MakeBinaryContraction(llvm::ArrayRef<mlir::Value*> srcs, mlir::Value* sink, mlir::Value* sizes) {
-    if (srcs.size() != 2) {
-      throw std::runtime_error("Binary contraction op requires 2 operands");
-    }
-    auto domain =
-        MakeContraction({srcs[0], srcs[1]}, sink, sizes, [&](OpBuilder domain_builder, BlockAndValueMapping* mapping) {
-          auto new_src1 = mapping->lookup(srcs[0]);
-          auto new_src2 = mapping->lookup(srcs[1]);
-          auto new_sink = mapping->lookup(sink);
-          auto new_sizes = mapping->lookup(sizes);
-          domain_builder.create<ConOp>(builder.getUnknownLoc(), new_sizes, new_src1, new_src2, new_sink);
-        });
-    return domain->getResult(0);
-  }
-
-  template <typename ConOp>
-  mlir::Value* MakeTernaryContraction(llvm::ArrayRef<mlir::Value*> srcs, mlir::Value* sink, mlir::Value* sizes) {
-    if (srcs.size() != 3) {
-      throw std::runtime_error("Ternary contraction op requires 3 operands");
-    }
-    auto domain = MakeContraction(
-        {srcs[0], srcs[1], srcs[2]}, sink, sizes, [&](OpBuilder domain_builder, BlockAndValueMapping* mapping) {
-          auto new_src1 = mapping->lookup(srcs[0]);
-          auto new_src2 = mapping->lookup(srcs[1]);
-          auto new_src3 = mapping->lookup(srcs[2]);
-          auto new_sink = mapping->lookup(sink);
-          auto new_sizes = mapping->lookup(sizes);
-          domain_builder.create<ConOp>(builder.getUnknownLoc(), new_sizes, new_src1, new_src2, new_src3, new_sink);
-        });
-    return domain->getResult(0);
-  }
+std::map<ContractionKey, std::string> TileBuilder::Impl::contractions{
+    // assign
+    {std::make_pair(AggregationKind::assign, CombinationKind::none), "=(x)"},
+    {std::make_pair(AggregationKind::assign, CombinationKind::add), "=(x+y)"},
+    {std::make_pair(AggregationKind::assign, CombinationKind::cond), "=(x==y?z)"},
+    {std::make_pair(AggregationKind::assign, CombinationKind::eq), "=(x==y)"},
+    {std::make_pair(AggregationKind::assign, CombinationKind::mul), "=(x*y)"},
+    // max
+    {std::make_pair(AggregationKind::max, CombinationKind::none), ">(x)"},
+    {std::make_pair(AggregationKind::max, CombinationKind::add), ">(x+y)"},
+    {std::make_pair(AggregationKind::max, CombinationKind::cond), ">(x==y?z)"},
+    {std::make_pair(AggregationKind::max, CombinationKind::eq), ">(x==y)"},
+    {std::make_pair(AggregationKind::max, CombinationKind::mul), ">(x*y)"},
+    // min
+    {std::make_pair(AggregationKind::min, CombinationKind::none), "<(x)"},
+    {std::make_pair(AggregationKind::min, CombinationKind::add), "<(x+y)"},
+    {std::make_pair(AggregationKind::min, CombinationKind::cond), "<(x==y?z)"},
+    {std::make_pair(AggregationKind::min, CombinationKind::eq), "<(x==y)"},
+    {std::make_pair(AggregationKind::min, CombinationKind::mul), "<(x*y)"},
+    // prod
+    {std::make_pair(AggregationKind::mul, CombinationKind::none), "*(x)"},
+    {std::make_pair(AggregationKind::mul, CombinationKind::add), "*(x+y)"},
+    {std::make_pair(AggregationKind::mul, CombinationKind::cond), "*(x==y?z)"},
+    {std::make_pair(AggregationKind::mul, CombinationKind::eq), "*(x==y)"},
+    {std::make_pair(AggregationKind::mul, CombinationKind::mul), "*(x*y)"},
+    // sum
+    {std::make_pair(AggregationKind::add, CombinationKind::none), "+(x)"},
+    {std::make_pair(AggregationKind::add, CombinationKind::add), "+(x+y)"},
+    {std::make_pair(AggregationKind::add, CombinationKind::cond), "+(x==y?z)"},
+    {std::make_pair(AggregationKind::add, CombinationKind::eq), "+(x==y)"},
+    {std::make_pair(AggregationKind::add, CombinationKind::mul), "+(x*y)"},
 };
 
 TileBuilder::TileBuilder() : impl(new Impl) {}
@@ -474,42 +392,108 @@ void TileBuilder::SetUseDefault(mlir::Value* cion, mlir::Value* defaultValue) {
   terminator->setOperands(operands);
 }
 
-#define DEFINE_CONTRACTION_OPS(_agg_op_)                                                                    \
-  mlir::Value* TileBuilder::MakeCon##_agg_op_##Op(llvm::ArrayRef<mlir::Value*> srcs, mlir::Value* sink,     \
-                                                  mlir::Value* sizes) {                                     \
-    IVLOG(5, "TileBuilder::MakeCon##_agg_op_##Op>");                                                        \
-    return impl->MakeUnaryContraction<Con##_agg_op_##Op>(srcs, sink, sizes);                                \
-  }                                                                                                         \
-                                                                                                            \
-  mlir::Value* TileBuilder::MakeCon##_agg_op_##AddOp(llvm::ArrayRef<mlir::Value*> srcs, mlir::Value* sink,  \
-                                                     mlir::Value* sizes) {                                  \
-    IVLOG(5, "TileBuilder::MakeCon##_agg_op_##AddOp>");                                                     \
-    return impl->MakeBinaryContraction<Con##_agg_op_##AddOp>(srcs, sink, sizes);                            \
-  }                                                                                                         \
-                                                                                                            \
-  mlir::Value* TileBuilder::MakeCon##_agg_op_##CondOp(llvm::ArrayRef<mlir::Value*> srcs, mlir::Value* sink, \
-                                                      mlir::Value* sizes) {                                 \
-    IVLOG(5, "TileBuilder::MakeCon##_agg_op_##CondOp>");                                                    \
-    return impl->MakeTernaryContraction<Con##_agg_op_##CondOp>(srcs, sink, sizes);                          \
-  }                                                                                                         \
-                                                                                                            \
-  mlir::Value* TileBuilder::MakeCon##_agg_op_##EqOp(llvm::ArrayRef<mlir::Value*> srcs, mlir::Value* sink,   \
-                                                    mlir::Value* sizes) {                                   \
-    IVLOG(5, "TileBuilder::MakeCon##_agg_op_##EqOp>");                                                      \
-    return impl->MakeBinaryContraction<Con##_agg_op_##EqOp>(srcs, sink, sizes);                             \
-  }                                                                                                         \
-                                                                                                            \
-  mlir::Value* TileBuilder::MakeCon##_agg_op_##MulOp(llvm::ArrayRef<mlir::Value*> srcs, mlir::Value* sink,  \
-                                                     mlir::Value* sizes) {                                  \
-    IVLOG(5, "TileBuilder::MakeCon##_agg_op_##MulOp>");                                                     \
-    return impl->MakeBinaryContraction<Con##_agg_op_##MulOp>(srcs, sink, sizes);                            \
+Value* TileBuilder::MakeContractionOp(  //
+    util::AggregationKind agg,          //
+    util::CombinationKind combo,        //
+    ArrayRef<Value*> srcs,              //
+    Value* sink,                        //
+    Value* sizes,                       //
+    StringRef name) {
+  IVLOG(5, "TileBuilder::MakeContractionOp> " << util::stringifyAggregationKind(agg).str() << ":"
+                                              << util::stringifyCombinationKind(combo).str()
+                                              << ", name: " << name.str());
+  IVLOG(5, mlir::debugString(impl->module));
+  auto it = Impl::contractions.find(std::make_pair(agg, combo));
+  if (it == Impl::contractions.end()) {
+    throw std::runtime_error("Unsupported contraction");
   }
-
-DEFINE_CONTRACTION_OPS(Assign);
-DEFINE_CONTRACTION_OPS(Max);
-DEFINE_CONTRACTION_OPS(Min);
-DEFINE_CONTRACTION_OPS(Prod);
-DEFINE_CONTRACTION_OPS(Sum);
+  auto abstractOp = impl->lookupOperation(it->second);
+  auto contractionBuilder = abstractOp->getInterface<tile::ContractionOp>();
+  if (!contractionBuilder) {
+    throw std::runtime_error("Unsupported contraction");
+  }
+  // Compute the sink shape of the contraction
+  llvm::SmallVector<Type, 3> types;
+  for (auto src : srcs) {
+    IVLOG(6, "  src: " << mlir::debugString(*src));
+    auto map_op = llvm::cast<AffineSourceIndexMapOp>(src->getDefiningOp());
+    types.push_back(map_op.tensor()->getType());
+  }
+  IVLOG(6, "  sink: " << mlir::debugString(*sink));
+  IVLOG(6, "  sizes: " << mlir::debugString(*sizes));
+  auto elementType = impl->inferElementType(types);
+  auto size_map_op = llvm::cast<AffineSizeMapOp>(sizes->getDefiningOp());
+  llvm::SmallVector<Value*, 4> size_map_sizes(size_map_op.sizes());
+  auto shape = eltwise::ComputeShape(size_map_sizes);
+  auto tensorType = impl->builder.getTensorType(shape, elementType);
+  auto domainOp = impl->builder.create<AffineDomainOp>(impl->builder.getUnknownLoc(), tensorType);
+  auto& info = impl->domains[domainOp];
+  auto body = new Block();
+  domainOp.body().push_back(body);
+  llvm::SetVector<Value*> values;
+  values.insert(srcs.begin(), srcs.end());
+  values.insert(sink);
+  values.insert(sizes);
+  auto slice = util::getBackwardSlice(values, false, [](Value* value) {  //
+    return value->getType().isa<IndexType>();
+  });
+  // Find and replace each AffineIndexOp with a BlockArgument of the domain op
+  llvm::SmallVector<Attribute, 8> idxNames;
+  std::queue<Value*> worklist;
+  for (auto value : slice) {
+    auto op = value->getDefiningOp();
+    if (auto indexOp = llvm::dyn_cast_or_null<AffineIndexOp>(op)) {
+      auto arg = body->addArgument(indexOp.getType());
+      info.mapping.map(value, arg);
+      worklist.push(value);
+      if (auto attr = indexOp.getAttrOfType<StringAttr>("name")) {
+        idxNames.emplace_back(attr);
+      } else {
+        auto name = llvm::formatv("x{0}", arg->getArgNumber());
+        idxNames.emplace_back(impl->builder.getStringAttr(name.str()));
+      }
+    }
+  }
+  if (!name.empty()) {
+    domainOp.setAttr("name", impl->builder.getStringAttr(name));
+  }
+  domainOp.setAttr("idx_names", mlir::ArrayAttr::get(idxNames, &impl->context));
+  // Move across only the values/ops that depend on AffineIndexOps
+  // First determine the transitive users of AffineIndexOps
+  std::set<Value*> belong;
+  while (worklist.size()) {
+    auto value = worklist.front();
+    worklist.pop();
+    for (auto user : value->getUsers()) {
+      auto user_value = user->getResult(0);
+      if (!belong.count(user_value)) {
+        belong.insert(user_value);
+        worklist.push(user_value);
+      }
+    }
+  }
+  // Now move across ops but do so in topologically sorted order
+  OpBuilder domainBuilder(body);
+  for (auto value : slice) {
+    auto op = value->getDefiningOp();
+    if (belong.count(value) ||                    //
+        llvm::isa<AffineSourceIndexMapOp>(op) ||  //
+        llvm::isa<AffineSinkIndexMapOp>(op) ||    //
+        llvm::isa<AffineSizeMapOp>(op)) {
+      auto new_value = domainBuilder.clone(*op, info.mapping)->getResult(0);
+      info.mapping.map(value, new_value);
+    }
+  }
+  auto new_sizes = info.mapping.lookup(sizes);
+  auto new_sink = info.mapping.lookup(sink);
+  llvm::SmallVector<Value*, 3> new_srcs;
+  for (auto src : srcs) {
+    new_srcs.emplace_back(info.mapping.lookup(src));
+  }
+  contractionBuilder->create(&domainBuilder, impl->builder.getUnknownLoc(), new_sizes, new_srcs, new_sink);
+  IVLOG(5, mlir::debugString(domainOp));
+  return domainOp.result();
+}
 
 std::shared_ptr<TileProgram> TileBuilder::MakeProgram(  //
     llvm::StringRef name,                               //
