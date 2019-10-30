@@ -16,6 +16,7 @@
 
 namespace bilp = vertexai::tile::bilp;
 
+using mlir::ArrayAttr;
 using vertexai::tile::math::Integer;
 using vertexai::tile::math::RangeConstraint;
 using vertexai::tile::math::Rational;

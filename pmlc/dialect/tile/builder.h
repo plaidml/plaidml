@@ -12,7 +12,6 @@
 
 #include "pmlc/dialect/stripe/types.h"
 #include "pmlc/dialect/tile/program.h"
-
 #include "pmlc/util/enums.h"
 #include "tile/base/shape.h"
 

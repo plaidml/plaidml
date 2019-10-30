@@ -19,6 +19,7 @@ using eltwise::constFoldUnaryOp;
 using eltwise::m_One;
 using eltwise::m_Zero;
 using llvm::SmallVector;
+using mlir::ArrayAttr;
 using mlir::FloatAttr;
 using mlir::IntegerAttr;
 using mlir::OpRewritePattern;

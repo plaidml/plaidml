@@ -56,6 +56,7 @@ plaidml_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "//base/util",
+        "//base/eventing/file",
         "//pmlc/dialect/tile",
         "//tile/hal/opencl",
         "//tile/platform/local_machine",

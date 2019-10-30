@@ -40,12 +40,15 @@ struct plaidml_view {
 
 namespace plaidml::core {
 
-using pmlc::dialect::tile::TileBuilder;
-
 struct GlobalContext {
-  static TileBuilder* get() {
-    static thread_local TileBuilder builder;
+  static pmlc::dialect::tile::TileBuilder* get() {
+    static thread_local pmlc::dialect::tile::TileBuilder builder;
     return &builder;
+  }
+
+  static vertexai::context::Context* getContext() {
+    static vertexai::context::Context context;
+    return &context;
   }
 };
 
