@@ -114,12 +114,12 @@ plaidml_cc_library(
     name = "passes",
     srcs = [
         "padding_pass.cc",
-        "populate_tensor_ref_shape_pass.cc",
+        "populate_tensor_ref_shape_analysis.cc",
     ],
     hdrs = [
         "nop_pass.h",
         "padding_pass.h",
-        "populate_tensor_ref_shape_pass.h",
+        "populate_tensor_ref_shape_analysis.h",
     ],
     copts = COPTS,
     tags = ["llvm"],
