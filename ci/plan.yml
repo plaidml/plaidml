@@ -59,6 +59,10 @@ PLATFORMS:
     variant: macos_x86_64
   keras-stripe-mtl-uhd630:
     variant: macos_x86_64
+  keras-stripe-mtl-uhd630-cat:
+    variant: macos_x86_64_cat
+  keras-plaid-mtl-uhd630-cat:
+    variant: macos_x86_64_cat
   keras-plaid-mtl-iris655:
     variant: macos_x86_64
   keras-plaid-ocl-neo:
@@ -106,6 +110,15 @@ VARIANTS:
       PLAIDML_DEVICE: llvm_cpu.0
       PLAIDML_TARGET: llvm_cpu
   macos_x86_64:
+    bazel_config: macos_x86_64_ci
+    arch: macosx_10_10_x86_64
+    system: Darwin
+    env:
+      PLAIDML_DEVICE_IDS: llvm_cpu.0
+      PLAIDML_EXPERIMENTAL: 1
+      PLAIDML_DEVICE: llvm_cpu.0
+      PLAIDML_TARGET: llvm_cpu
+  macos_x86_64_cat:
     bazel_config: macos_x86_64_ci
     arch: macosx_10_10_x86_64
     system: Darwin
@@ -176,6 +189,11 @@ SUITES:
       keras-stripe-ocl-neo:
         pipelines: [plaidml, nightly]
       keras-plaid-mtl-uhd630:
+        pipelines: [plaidml, nightly]
+      
+      keras-stripe-mtl-uhd630-cat:
+        pipelines: [plaidml, nightly]
+      keras-plaid-mtl-uhd630-cat:
         pipelines: [plaidml, nightly]
 
       keras-plaid-ocl-gfx804:
