@@ -849,8 +849,6 @@ void plaidml_program_free(  //
 plaidml_program* plaidml_program_evaluate(  //
     plaidml_error* err,                     //
     const char* name,                       //
-    size_t ninputs,                         //
-    plaidml_expr** raw_inputs,              //
     size_t noutputs,                        //
     plaidml_expr** raw_outputs,             //
     plaidml_expr** new_outputs,             //
@@ -859,17 +857,6 @@ plaidml_program* plaidml_program_evaluate(  //
     plaidml_expr** dst_updates) {
   return ffi_wrap<plaidml_program*>(err, nullptr, [&] {
     IVLOG(3, "plaidml_program_evaluate");
-    std::vector<mlir::Value*> inputs(ninputs);
-    for (size_t i = 0; i < ninputs; i++) {
-      if (!raw_inputs[i]) {
-        throw std::runtime_error("Undefined input in plaidml_program_evaluate");
-      }
-      inputs[i] = raw_inputs[i]->value;
-      if (!inputs[i]) {
-        IVLOG(5, "Found a missing input value: (index " << i << ")");
-      }
-    }
-
     std::vector<mlir::Value*> outputs(noutputs);
     for (size_t i = 0; i < noutputs; i++) {
       if (!raw_outputs[i]) {
@@ -893,7 +880,7 @@ plaidml_program* plaidml_program_evaluate(  //
     // }
 
     std::vector<mlir::Value*> new_values(noutputs);
-    auto program = GlobalContext::get()->MakeProgram(name, inputs, outputs, new_values);
+    auto program = GlobalContext::get()->MakeProgram(name, outputs, new_values);
     for (size_t i = 0; i < noutputs; i++) {
       new_outputs[i] = new plaidml_expr{new_values[i]};
     }

@@ -129,11 +129,12 @@ plaidml_executable* plaidml_compile(  //
     for (const auto& [stagingValue, buffer] : program->program->ioMap) {
       auto programValue = program->program->mapper.lookupOrNull(stagingValue);
       if (!programValue) {
-        throw std::runtime_error("Invalid IoMap entry");
+        // This must be an unused input, ignore it.
+        continue;
       }
       auto arg = llvm::dyn_cast<mlir::BlockArgument>(programValue);
       if (!arg) {
-        throw std::runtime_error("Input expected BlockArgument");
+        throw std::runtime_error("Expected input to be a block argument");
       }
       auto argNumber = arg->getArgNumber();
       auto attrName = Dialect::getDialectAttrName("name");

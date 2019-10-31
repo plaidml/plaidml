@@ -52,6 +52,7 @@ using mlir::UnknownLoc;
 using mlir::Value;
 using util::AggregationKind;
 using util::CombinationKind;
+using vertexai::tile::BufferPtr;
 
 struct DomainInfo {
   BlockAndValueMapping mapping;
@@ -242,7 +243,7 @@ RankedTensorType TileBuilder::ComputeShape(Value* tensor) {
     return type;
   }
   SmallVector<Value*, 1> outputs{tensor};
-  auto program = MakeProgram("compute_shape", {}, outputs, outputs);
+  auto program = MakeProgram("compute_shape", outputs, outputs);
   return outputs[0]->getType().dyn_cast<RankedTensorType>();
 }
 
@@ -351,7 +352,7 @@ RankedTensorType TileBuilder::MakeRankedTensorType(DataType dtype, ArrayRef<int6
   return RankedTensorType::get(shape, elementType);
 }
 
-Value* TileBuilder::MakePlaceholderOp(RankedTensorType type, vertexai::tile::BufferPtr buffer, StringRef name) {
+Value* TileBuilder::MakePlaceholderOp(RankedTensorType type, BufferPtr buffer, StringRef name) {
   IVLOG(5, "TileBuilder::MakePlaceholderOp> " << name.str() << ": " << mlir::debugString(type));
   auto op = impl->builder.create<PlaceholderOp>(impl->builder.getUnknownLoc(), type);
   if (!name.empty()) {
@@ -590,7 +591,6 @@ Value* TileBuilder::MakeContractionOp(  //
 
 std::shared_ptr<TileProgram> TileBuilder::MakeProgram(  //
     StringRef name,                                     //
-    ArrayRef<Value*> inputs,                            //
     ArrayRef<Value*> outputs,                           //
     llvm::MutableArrayRef<Value*> new_outputs) {
   IVLOG(5, "TileBuilder::MakeProgram> " << name.str());
@@ -612,16 +612,6 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(  //
   auto slice = util::getBackwardSlice(values, true);
   // Compute the input types
   std::vector<Type> inputTypes;
-  // add positional inputs
-  for (auto value : inputs) {
-    auto op = value->getDefiningOp();
-    auto placeholderOp = llvm::dyn_cast_or_null<PlaceholderOp>(op);
-    if (!placeholderOp) {
-      throw std::runtime_error("Exepected PlaceholderOp for positional input");
-    }
-    inputTypes.push_back(placeholderOp.result()->getType());
-  }
-  // add remaining placeholders
   for (auto value : slice) {
     auto op = value->getDefiningOp();
     if (auto placeholderOp = llvm::dyn_cast_or_null<PlaceholderOp>(op)) {
@@ -640,22 +630,6 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(  //
   UniqueNamer namer;
   auto attrName = Dialect::getDialectAttrName("name");
   unsigned argcnt = 0;
-  for (auto value : inputs) {
-    auto it = impl->ioMap.find(value);
-    if (it != impl->ioMap.end()) {
-      program->ioMap.emplace(it->first, it->second);
-    }
-    auto new_value = funcOp.getArgument(argcnt++);
-    auto op = value->getDefiningOp();
-    auto placeholderOp = llvm::cast<PlaceholderOp>(op);
-    if (auto attr = placeholderOp.getAttrOfType<StringAttr>("name")) {
-      auto uniqueName = namer.get(attr.getValue());
-      auto uniqueAttr = builder.getStringAttr(uniqueName);
-      funcOp.setArgAttr(new_value->getArgNumber(), attrName, uniqueAttr);
-    }
-    IVLOG(5, "BlockArgument mapping: " << value << " -> " << new_value);
-    program->mapper.map(value, new_value);
-  }
   for (auto value : slice) {
     auto it = impl->ioMap.find(value);
     if (it != impl->ioMap.end()) {

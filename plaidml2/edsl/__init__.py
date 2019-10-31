@@ -550,8 +550,7 @@ class Program(ForeignObject):
     __ffi_del__ = lib.plaidml_program_free
     __ffi_repr__ = lib.plaidml_program_repr
 
-    def __init__(self, name, outputs, inputs=[], updates=[]):
-        raw_inputs = [x.as_ptr() for x in inputs]
+    def __init__(self, name, outputs, updates=[]):
         raw_outputs = [x.as_ptr() for x in outputs]
         new_outputs = ffi.new('plaidml_expr*[]', len(outputs))
         dst_updates = [x[0].as_ptr() for x in updates]
@@ -559,8 +558,6 @@ class Program(ForeignObject):
         ffi_obj = ffi_call(
             lib.plaidml_program_evaluate,
             name.encode(),
-            len(raw_inputs),
-            raw_inputs,
             len(raw_outputs),
             raw_outputs,
             new_outputs,

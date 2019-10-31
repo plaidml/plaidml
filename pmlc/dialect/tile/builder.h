@@ -9,7 +9,6 @@
 #include "llvm/ADT/StringRef.h"
 
 #include "mlir/IR/StandardTypes.h"
-
 #include "pmlc/dialect/stripe/types.h"
 #include "pmlc/dialect/tile/program.h"
 #include "pmlc/util/enums.h"
@@ -89,7 +88,6 @@ class TileBuilder {
 
   std::shared_ptr<TileProgram> MakeProgram(  //
       llvm::StringRef name,                  //
-      llvm::ArrayRef<mlir::Value*> inputs,   //
       llvm::ArrayRef<mlir::Value*> outputs,  //
       llvm::MutableArrayRef<mlir::Value*> new_outputs);
 
