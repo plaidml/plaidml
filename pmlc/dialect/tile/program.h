@@ -13,10 +13,12 @@ namespace pmlc {
 namespace dialect {
 namespace tile {
 
+using IoMap = std::unordered_map<mlir::Value*, vertexai::tile::BufferPtr>;
+
 struct TileProgram {
   mlir::OwningModuleRef module;
   mlir::BlockAndValueMapping mapper;
-  std::unordered_map<mlir::Value*, vertexai::tile::BufferPtr> ioMap;
+  IoMap ioMap;
 
   explicit TileProgram(mlir::ModuleOp module) : module(module) {}
 };

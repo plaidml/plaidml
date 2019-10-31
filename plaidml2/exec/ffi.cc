@@ -131,12 +131,15 @@ plaidml_executable* plaidml_compile(  //
       if (!stripeFuncOp) {
         throw std::runtime_error("Missing stripe FuncOp");
       }
-      for (auto kvp : program->program->ioMap) {
-        auto stagingValue = kvp.first;
-        auto programValue = program->program->mapper.lookup(stagingValue);
+      for (const auto& [stagingValue, buffer] : program->program->ioMap) {
+        auto programValue = program->program->mapper.lookupOrNull(stagingValue);
+        if (!programValue) {
+          // This must be an unused input, ignore it.
+          continue;
+        }
         auto arg = llvm::dyn_cast<mlir::BlockArgument>(programValue);
         if (!arg) {
-          throw std::runtime_error("Input expected BlockArgument");
+          throw std::runtime_error("Expected input to be a block argument");
         }
         auto argNumber = arg->getArgNumber();
         auto attrName = Dialect::getDialectAttrName("name");
@@ -146,7 +149,7 @@ plaidml_executable* plaidml_compile(  //
         }
         auto inputName = attr.getValue().str();
         IVLOG(1, "  name: " << inputName);
-        exec->input_bufs[inputName] = kvp.second;
+        exec->input_bufs[inputName] = buffer;
       }
 
       // bind output buffers
