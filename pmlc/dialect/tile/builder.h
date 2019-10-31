@@ -8,6 +8,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
 
+#include "pmlc/dialect/tile/program.h"
 #include "pmlc/util/enums.h"
 #include "tile/base/shape.h"
 
@@ -24,8 +25,6 @@ struct Shape {
   DataType elementType;
   llvm::ArrayRef<int64_t> dims;
 };
-
-struct TileProgram;
 
 class TileBuilder {
   struct Impl;
@@ -50,7 +49,8 @@ class TileBuilder {
   mlir::Value* MakeScalarConstantOp(double value);
   mlir::Value* MakePrimitiveOp(llvm::StringRef fn, llvm::ArrayRef<mlir::Value*> args);
   mlir::Value* MakeDimOp(mlir::Value* tensor, unsigned dim);
-  mlir::Value* MakePlaceholderOp(DataType dtype, llvm::ArrayRef<int64_t> dims);
+  mlir::Value* MakePlaceholderOp(DataType dtype, llvm::ArrayRef<int64_t> dims, vertexai::tile::BufferPtr buffer,
+                                 llvm::StringRef name);
   mlir::Value* MakeAffineConstantOp(int64_t value);
   mlir::Value* MakeAffineIndexOp(llvm::StringRef name = "");
   mlir::Value* MakeAffineAddOp(llvm::ArrayRef<mlir::Value*> args);

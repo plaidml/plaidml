@@ -28,6 +28,7 @@ using plaidml::core::ffi_wrap_void;
 using plaidml::core::GlobalContext;
 using pmlc::util::AggregationKind;
 using pmlc::util::CombinationKind;
+using vertexai::tile::DataType;
 
 namespace {
 
@@ -359,11 +360,11 @@ plaidml_expr* plaidml_expr_placeholder(  //
       }
     }
     if (use_mlir()) {
-      auto value = GlobalContext::get()->MakePlaceholderOp(shape->shape.dtype, dims);
+      auto bufptr = buffer ? buffer->buffer : nullptr;
+      auto value = GlobalContext::get()->MakePlaceholderOp(shape->shape.dtype, dims, bufptr, name);
       return new plaidml_expr{expr, value};
-    } else {
-      return new plaidml_expr{expr};
     }
+    return new plaidml_expr{expr};
   });
 }
 
@@ -1177,16 +1178,15 @@ plaidml_program* plaidml_program_evaluate(  //
         new_outputs[i] = new plaidml_expr{ret->eval.outputs[i], new_values[i]};
       }
       return ret;
-    } else {
-      auto ret = new plaidml_program{Evaluate(name, mutations)};
-      if (noutputs != ret->eval.outputs.size()) {
-        throw std::runtime_error("Internal error: noutputs != ret->eval.outputs.size()");
-      }
-      for (size_t i = 0; i < noutputs; i++) {
-        new_outputs[i] = new plaidml_expr{ret->eval.outputs[i]};
-      }
-      return ret;
     }
+    auto ret = new plaidml_program{Evaluate(name, mutations)};
+    if (noutputs != ret->eval.outputs.size()) {
+      throw std::runtime_error("Internal error: noutputs != ret->eval.outputs.size()");
+    }
+    for (size_t i = 0; i < noutputs; i++) {
+      new_outputs[i] = new plaidml_expr{ret->eval.outputs[i]};
+    }
+    return ret;
   });
 }
 
