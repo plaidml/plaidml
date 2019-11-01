@@ -8,92 +8,12 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Support/DebugStringHelper.h"
 
-#include "pmlc/dialect/stripe/analysis.h"
 #include "pmlc/dialect/stripe/dialect.h"
+#include "pmlc/dialect/stripe/rewrites.h"
 
 namespace pmlc::dialect::stripe {
 
 #include "pmlc/dialect/stripe/ops_interfaces.cc.inc"
-
-namespace {
-
-struct SimplifyPoly final : public mlir::OpRewritePattern<AffinePolyOp> {
-  explicit SimplifyPoly(mlir::MLIRContext* context) : OpRewritePattern<AffinePolyOp>(context) {}
-
-  mlir::PatternMatchResult match(AffinePolyOp op) const final {
-    for (size_t i = 0; i < op.getNumOperands(); i++) {
-      if (op.getOperand(i)->getKind() != Value::Kind::BlockArgument) {
-        return matchSuccess();
-      }
-    }
-    if (op.offset() == 0 && op.coeffs().size() == 1 && op.getCoeff(0) == 1) {
-      return matchSuccess();
-    }
-    return matchFailure();
-  }
-
-  void rewrite(AffinePolyOp op, mlir::PatternRewriter& rewriter) const final {  // NOLINT(runtime/references)
-    AffinePolynomial a(op.result());
-    if (a.constant == 0 && a.terms.size() == 1 && a.terms.begin()->second == 1) {
-      rewriter.replaceOp(op, a.terms.begin()->first);
-    } else {
-      rewriter.replaceOpWithNewOp<AffinePolyOp>(op, a);
-    }
-  }
-};
-
-struct SimplifyNopRefines final : public mlir::OpRewritePattern<RefineOp> {
-  explicit SimplifyNopRefines(mlir::MLIRContext* context) : OpRewritePattern<RefineOp>(context) {}
-
-  mlir::PatternMatchResult match(RefineOp op) const final {
-    for (auto* offset : op.offsets()) {
-      if (AffinePolynomial(offset) != AffinePolynomial()) {
-        return matchFailure();
-      }
-    }
-    if (op.getAttr(Dialect::getStripeAttrsName())) {
-      return matchFailure();
-    }
-    return matchSuccess();
-  }
-
-  void rewrite(RefineOp op, mlir::PatternRewriter& rewriter) const final {  // NOLINT(runtime/references)
-    rewriter.replaceOp(op, op.in());
-  }
-};
-
-struct RemoveTrivialConstraints final : public mlir::OpRewritePattern<ConstraintOp> {
-  explicit RemoveTrivialConstraints(mlir::MLIRContext* context) : OpRewritePattern<ConstraintOp>(context) {}
-
-  mlir::PatternMatchResult matchAndRewrite(ConstraintOp op, mlir::PatternRewriter& rewriter) const override {
-    auto irange = AffineRange(AffinePolynomial(op.input()));
-    auto oblock = op.getOperation()->getBlock();
-    if (irange.min >= 0) {
-      // Always true
-      if (!op.ge_case().empty()) {
-        auto iblock = &op.ge_case().front();
-        oblock->getOperations().splice(Block::iterator(op), iblock->getOperations(), iblock->begin(),
-                                       std::prev(iblock->end(), 1));
-      }
-      rewriter.replaceOp(op, llvm::None);
-      return matchSuccess();
-    } else if (irange.max < 0) {
-      // Always false
-      if (!op.lt_case().empty()) {
-        auto iblock = &op.lt_case().front();
-        oblock->getOperations().splice(Block::iterator(op), iblock->getOperations(), iblock->begin(),
-                                       std::prev(iblock->end(), 1));
-      }
-      rewriter.replaceOp(op, llvm::None);
-      return matchSuccess();
-    } else {
-      // Not trivial, never mind
-      return matchFailure();
-    }
-  }
-};
-
-}  // namespace
 
 void AffinePolyOp::getCanonicalizationPatterns(OwningRewritePatternList& results, MLIRContext* context) {
   results.insert<SimplifyPoly>(context);
@@ -221,7 +141,7 @@ static ParseResult parseAllocateOp(OpAsmParser& parser, OperationState& result) 
 }
 
 void AllocateOp::build(Builder* builder, OperationState& result, TensorType type) {  // NOLINT
-  result.addAttribute("layout", builder->getTypeAttr(type));
+  result.addAttribute("layout", TypeAttr::get(type));
   result.addTypes(TensorRefType::get(type));
 }
 

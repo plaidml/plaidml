@@ -141,7 +141,7 @@ struct AffineDomainFolder : public OpRewritePattern<AffineDomainOp> {
     llvm::SmallVector<Value*, 4> sizes(sizeMapOp.sizes());
     auto shape = eltwise::ComputeShape(sizes);
     auto sourceType = op.getType().cast<RankedTensorType>();
-    auto targetType = rewriter.getTensorType(shape, sourceType.getElementType());
+    auto targetType = RankedTensorType::get(shape, sourceType.getElementType());
     IVLOG(6, "  sourceType: " << mlir::debugString(sourceType));
     IVLOG(6, "  targetType: " << mlir::debugString(targetType));
     if (sourceType == targetType) {

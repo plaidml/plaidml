@@ -445,7 +445,7 @@ Value* TileBuilder::MakeContractionOp(  //
   auto size_map_op = llvm::cast<AffineSizeMapOp>(sizes->getDefiningOp());
   llvm::SmallVector<Value*, 4> size_map_sizes(size_map_op.sizes());
   auto shape = eltwise::ComputeShape(size_map_sizes);
-  auto tensorType = impl->builder.getTensorType(shape, elementType);
+  auto tensorType = RankedTensorType::get(shape, elementType);
   auto domainOp = impl->builder.create<AffineDomainOp>(impl->builder.getUnknownLoc(), tensorType);
   auto& info = impl->domains[domainOp];
   auto body = new Block();
