@@ -77,7 +77,7 @@ void PrintSimple(Operation* op, OpAsmPrinter* p, size_t count, ArrayRef<StringRe
   if (count > 0) {
     *p << " ";
   }
-  // Pring the normal (fixed) operands
+  // Print the normal (fixed) operands
   p->printOperands(op->operand_begin(), op->operand_begin() + count);
   // If we can have varargs, print them wrapped in ()'s
   if (vararg) {
