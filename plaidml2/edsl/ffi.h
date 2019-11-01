@@ -276,6 +276,11 @@ PLAIDML_EDSL_API plaidml_expr* plaidml_expr_call(  //
     size_t nargs,                                  //
     plaidml_expr** args);
 
+PLAIDML_EDSL_API plaidml_expr* plaidml_expr_cast(  //
+    plaidml_error* err,                            //
+    plaidml_expr* tensor,                          //
+    plaidml_datatype dtype);
+
 PLAIDML_EDSL_API plaidml_expr* plaidml_expr_index_map(  //
     plaidml_error* err,                                 //
     plaidml_expr* ref,                                  //

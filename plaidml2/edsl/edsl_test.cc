@@ -407,7 +407,7 @@ module {
       %9 = "tile.size_map"(%c1, %c10) : (index, index) -> !tile.smap
       "tile.>(x==y?z)"(%9, %5, %6, %7, %8) : (!tile.smap, !tile.imap, !tile.imap, !tile.imap, !tile.imap) -> ()
     }) {idx_names = ["x0", "x1", "x2"]} : () -> tensor<1x10x!eltwise.fp32>
-    %4 = "eltwise.as_uint"(%3) : (tensor<1x10x!eltwise.fp32>) -> tensor<1x10x!eltwise.u32>
+    %4 = "eltwise.cast"(%3) : (tensor<1x10x!eltwise.fp32>) -> tensor<1x10x!eltwise.u32>
     return %4 : tensor<1x10x!eltwise.u32>
   }
 }

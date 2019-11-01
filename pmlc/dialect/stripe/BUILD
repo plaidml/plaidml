@@ -141,6 +141,5 @@ plaidml_cc_test(
         "//plaidml2:testenv",
         "//testing:matchers",
         "//tile/codegen",
-        "//tile/lib",
     ],
 )

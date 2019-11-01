@@ -19,15 +19,14 @@
 
 #include "base/util/logging.h"
 #include "plaidml2/edsl/helper.h"
+#include "plaidml2/op/op.h"
 #include "testing/matchers.h"
 #include "tile/codegen/compile_pass.h"
 #include "tile/codegen/localize.h"
-#include "tile/lib/lib.h"
 
 using namespace plaidml::edsl;          // NOLINT
 using namespace pmlc::dialect::stripe;  // NOLINT
 using namespace vertexai::tile;         // NOLINT
-using namespace vertexai::tile::lib;    // NOLINT
 
 using ::testing::LinesEq;
 
@@ -48,7 +47,6 @@ static void RunTest(const Program& program, bool addLocations) {
 
   IVLOG(1, "Making a stripe program + fixing locals");
   auto stripe = plaidml::edsl::ConvertIntoStripe(program);
-  codegen::LocalizeBlockPass(codegen::AliasMap(codegen::AliasMap(), stripe->entry.get()), stripe->entry.get(), {"tmp"});
 
   if (addLocations) {
     codegen::CompilerState cstate{stripe};
@@ -118,89 +116,78 @@ static void RunTest(const Program& program, bool addLocations) {
 }
 
 TEST_P(TranslateTest, Conv2dBnRelu) {
-  LogicalShape I(PLAIDML_DATA_FLOAT32, {16, 112, 112, 64});
-  LogicalShape K(PLAIDML_DATA_FLOAT32, {3, 3, 64, 128});
-  LogicalShape C(PLAIDML_DATA_FLOAT32, {128});
-  auto program = LoadConv2dBnRelu("foo", I, K, C, {16, 112, 112, 128});
-  RunTest(program, GetParam());
-}
-
-TEST_P(TranslateTest, Conv2d) {
-  LogicalShape I(PLAIDML_DATA_FLOAT32, {16, 112, 112, 64});
-  LogicalShape K(PLAIDML_DATA_FLOAT32, {3, 3, 64, 128});
-  auto program = LoadConv2d("foo", I, K, {16, 112, 112, 128});
+  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {16, 112, 112, 64}, "I");
+  auto K = Placeholder(PLAIDML_DATA_FLOAT32, {3, 3, 64, 128}, "K");
+  auto B = Placeholder(PLAIDML_DATA_FLOAT32, {128}, "B");
+  auto S = Placeholder(PLAIDML_DATA_FLOAT32, {128}, "S");
+  auto O = plaidml::op::convolution(  //
+      I,                              // I_or_O
+      K,                              // F_or_O
+      {2, 2},                         // strides
+      {1, 1},                         // dilations
+      {1, 1},                         // data_dilations
+      {},                             // filter_shape
+      1,                              // groups
+      "explicit",                     // autopad_mode
+      {3, 3},                         // manual_padding
+      "nxc",                          // input_layout
+      "xck",                          // filter_layout
+      "none",                         // group_layout
+      false,                          // winograd_allowed
+      "",                             // name
+      "ungrouped",                    // autogroup_mode
+      "none",                         // deriv_mode
+      {});                            // result_shape
+  auto R = plaidml::op::relu((O + B) * S);
+  Program program("Conv2dBnRelu", {R});
   RunTest(program, GetParam());
 }
 
 TEST_P(TranslateTest, MaxPool2d) {
-  LogicalShape A(PLAIDML_DATA_FLOAT32, {1, 64, 64, 3});
-  auto program = LoadMaxPool2d("maxpool", A, {2, 2});
+  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {1, 64, 64, 3}, "I");
+  auto O = plaidml::op::pool(I, "max", {2, 2}, {1, 1}, "none", {1, 2}, "nwc", true, true);
+  Program program("pool", {O});
   RunTest(program, GetParam());
 }
 
 TEST_P(TranslateTest, Softmax) {
-  LogicalShape A(PLAIDML_DATA_FLOAT32, {64, 64});
-  auto program = LoadSoftmax("softmax", A);
+  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {64, 64}, "A");
+  Program program("softmax", {plaidml::op::softmax(A, 1)});
   RunTest(program, GetParam());
 }
 
 TEST_P(TranslateTest, EltwiseAdd) {
-  LogicalShape A(PLAIDML_DATA_FLOAT32, {16, 16});
-  LogicalShape B(PLAIDML_DATA_FLOAT32, {16, 16});
-  auto program = LoadEltwiseAdd("eltwise_add", A, B);
+  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {16, 16}, "A");
+  auto B = Placeholder(PLAIDML_DATA_FLOAT32, {16, 16}, "B");
+  Program program("eltwise_add", {A + B});
   RunTest(program, GetParam());
 }
 
-TEST_P(TranslateTest, EltwiseMul) {
-  LogicalShape A(PLAIDML_DATA_FLOAT32, {16, 16});
-  LogicalShape B(PLAIDML_DATA_FLOAT32, {16, 16});
-  auto program = LoadEltwiseMul("eltwise_mul", A, B);
+TEST_P(TranslateTest, ArgMax) {
+  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {1, 224, 224, 3}, "I");
+  Program program("argmax", {plaidml::op::argmax(I)});
   RunTest(program, GetParam());
 }
 
-TEST_P(TranslateTest, EltwiseDiv) {
-  LogicalShape A(PLAIDML_DATA_FLOAT32, {16, 16});
-  LogicalShape B(PLAIDML_DATA_FLOAT32, {16, 16});
-  auto program = LoadEltwiseDiv("eltwise_div", A, B);
+TEST_P(TranslateTest, Cast) {
+  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {1, 224, 224, 3}, "I");
+  Program program("cast", {as_bool(I)});
   RunTest(program, GetParam());
 }
 
-TEST_P(TranslateTest, MatMul) {
-  LogicalShape A(PLAIDML_DATA_FLOAT32, {16, 16});
-  LogicalShape B(PLAIDML_DATA_FLOAT32, {16, 16});
-  auto program = LoadMatMul("matmul", A, B);
+TEST_P(TranslateTest, Scalar) {
+  LogicalShape shape(PLAIDML_DATA_FLOAT32, {16, 64, 64, 32});
+  auto S = Placeholder(PLAIDML_DATA_FLOAT32, {}, "S");
+  Program program("scalar", {S});
   RunTest(program, GetParam());
-}
-
-// These two tests fail with invalid tensor dimensions if the location parameter for RunTest is set to 0.
-
-// TEST_P(TranslateTest, LayerNorm4dAx2) {
-//   LogicalShape A(PLAIDML_DATA_FLOAT32, {1, 64, 64, 32});
-//   auto program = LoadLayerNorm4dAx2("layer_norm", A);
-//   RunTest(program, true);
-// }
-
-TEST_P(TranslateTest, BatchNormalization) {
-  LogicalShape A(PLAIDML_DATA_FLOAT32, {16, 64, 64, 32});
-  auto program = LoadBatchNormalization("batch_norm", A);
-  RunTest(program, true);
-}
-
-Tensor Dot(const Tensor& X, const Tensor& Y) {
-  plaidml::edsl::TensorDim I, J, K;
-  TensorIndex i, j, k;
-  X.bind_dims(I, K);
-  Y.bind_dims(K, J);
-  auto R = TensorOutput(I, J);
-  R(i, j) += X(i, k) * Y(k, j);
-  return R;
 }
 
 TEST_P(TranslateTest, DoubleDot) {
-  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20});
-  auto B = Placeholder(PLAIDML_DATA_FLOAT32, {20, 30});
-  auto C = Placeholder(PLAIDML_DATA_FLOAT32, {30, 40});
-  auto program = Program("double_dot", {Dot(Dot(A, B), C)});
+  using plaidml::op::dot;
+  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "A");
+  auto B = Placeholder(PLAIDML_DATA_FLOAT32, {20, 30}, "B");
+  auto C = Placeholder(PLAIDML_DATA_FLOAT32, {30, 40}, "C");
+  Program program("double_dot", {dot(dot(A, B), C)});
   RunTest(program, GetParam());
 }
 

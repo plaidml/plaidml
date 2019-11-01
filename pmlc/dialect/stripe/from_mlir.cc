@@ -32,7 +32,9 @@ struct BlockInfo {
 
 struct ScalarInfo {
   std::set<std::string> names;
-  size_t next = 0;
+  std::string getUniqueName(StringRef name) {  //
+    return util::getUniqueName(&names, name);
+  }
 };
 
 struct StripeDevice {
@@ -461,7 +463,7 @@ void StripeBuilder::visit(ParallelForOp op) {
     int64_t range = op.ranges().getValue()[i].cast<IntegerAttr>().getInt();
     std::string idx_name = "idx";
     if (idx_names && idx_names.size() > i) {
-      if (auto str_attr = idx_names.getValue()[i].template dyn_cast<StringAttr>()) {
+      if (auto str_attr = idx_names.getValue()[i].dyn_cast<StringAttr>()) {
         idx_name = str_attr.getValue().str();
       }
     }
@@ -469,7 +471,7 @@ void StripeBuilder::visit(ParallelForOp op) {
     idxs_.emplace(std::make_pair(cur_.get(), oblock.getArgument(i)), idx_name);
     cur_->idxs.emplace_back(idx_name, range);
     if (idx_attrs && idx_attrs.size() > i) {
-      if (auto attrs = idx_attrs.getValue()[i].template dyn_cast<DictionaryAttr>()) {
+      if (auto attrs = idx_attrs.getValue()[i].dyn_cast<DictionaryAttr>()) {
         add_attributes(&cur_->idxs.back(), attrs.getValue());
       }
     }
@@ -580,8 +582,9 @@ void StripeBuilder::visit(eltwise::CastOp castOp) {
   auto result = op->getResult(0);
   auto tensorType = eltwise::getRankedTensorType(result->getType());
   auto scalarType = tensorType.getElementType().cast<eltwise::ScalarType>();
-  auto bitwidth = bit_width(scalarType.type());
-  auto bitwidth_name = scalar_name(op);
+  auto dtype = scalarType.type();
+  auto bitwidth = bit_width(dtype);
+  auto bitwidth_name = scalar_name(nullptr);
   auto constant = std::make_shared<stripe::Constant>(bitwidth_name, static_cast<int64_t>(bitwidth));
   cur_->stmts.push_back(constant);
 
@@ -589,7 +592,17 @@ void StripeBuilder::visit(eltwise::CastOp castOp) {
   auto out_name = scalar_name(op);
   scalars_.emplace(result, out_name);
   auto intr = std::make_shared<stripe::Intrinsic>();
-  intr->name = util::getOpName(op->getName());
+  if (is_float(dtype)) {
+    intr->name = "as_float";
+  } else if (is_int(dtype)) {
+    intr->name = "as_int";
+  } else if (is_uint(dtype)) {
+    intr->name = "as_uint";
+  } else if (dtype == DataType::BOOLEAN) {
+    intr->name = "as_bool";
+  } else {
+    throw std::runtime_error("Unsupported cast");
+  }
   intr->outputs.push_back(out_name);
   for (auto operand : op->getOperands()) {
     intr->inputs.push_back(get_scalar(operand));
@@ -658,19 +671,13 @@ std::string StripeBuilder::scalar_name(Operation* op, std::string out_name) {
   } else {
     out_name = "$" + out_name;
   }
-  auto attr = op->getAttr("scalar_name");
-  if (attr) {
-    auto name_attr = attr.dyn_cast<StringAttr>();
-    if (name_attr) {
-      out_name = name_attr.getValue();
+  if (op) {
+    if (auto attr = op->getAttrOfType<StringAttr>("scalar_name")) {
+      out_name = attr.getValue();
     }
   }
   auto& si = scalar_names_[cur_.get()];
-  while (si.names.count(out_name)) {
-    out_name = out_name + "_" + std::to_string(si.next++);
-  }
-  si.names.insert(out_name);
-  return out_name;
+  return si.getUniqueName(out_name);
 }
 
 }  // End namespace

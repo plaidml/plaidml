@@ -30,9 +30,13 @@ struct OpAsmInterface : public mlir::OpAsmDialectInterface {
   /// Get a special name to use when printing the given operation. The desired
   /// name should be streamed into 'os'.
   void getOpResultName(Operation* op, llvm::raw_ostream& os) const final {  // NOLINT
-    if (auto str_attr = op->getAttrOfType<mlir::StringAttr>("scalar_name")) {
-      std::string s = str_attr.getValue().str();
-      os << "s_" << s.substr(1);
+    if (auto attr = op->getAttrOfType<mlir::StringAttr>("scalar_name")) {
+      auto str = attr.getValue();
+      if (str.startswith("$s_")) {
+        os << str.substr(1);
+      } else {
+        os << "s_" << str.substr(1);
+      }
     } else if (auto const_op = llvm::dyn_cast<ScalarConstantOp>(op)) {
       auto attr = const_op.value();
       if (auto int_attr = attr.dyn_cast<IntegerAttr>()) {

@@ -462,6 +462,16 @@ double plaidml_expr_float_get_value(  //
   });
 }
 
+plaidml_expr* plaidml_expr_cast(  //
+    plaidml_error* err,           //
+    plaidml_expr* tensor,         //
+    plaidml_datatype dtype) {
+  return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
+    IVLOG(3, "plaidml_expr_cast");
+    return new plaidml_expr{GlobalContext::get()->MakeCastOp(tensor->value, static_cast<DataType>(dtype))};
+  });
+}
+
 plaidml_expr* plaidml_expr_call(  //
     plaidml_error* err,           //
     const char* fn,               //

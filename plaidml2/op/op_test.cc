@@ -64,7 +64,7 @@ module {
       %6 = "tile.size_map"() : () -> !tile.smap
       "tile.*(x)"(%6, %4, %5) : (!tile.smap, !tile.imap, !tile.imap) -> ()
     }) {idx_names = ["x0", "x1", "x2", "x3"]} : () -> !i32
-    %3 = "eltwise.as_uint"(%2) : (!i32) -> !u8
+    %3 = "eltwise.cast"(%2) : (!i32) -> !u8
     return %3 : !u8
   }
 }
@@ -96,7 +96,7 @@ module {
     }) {idx_names = ["x0", "x1", "x2", "x3"]} : () -> !i32
     %3 = "eltwise.cmp_eq"(%2, %c0) {type = !eltwise.fp32} : (!i32, !i32) -> !bool
     %4 = "eltwise.select"(%3, %c0, %c1) {type = !eltwise.fp32} : (!bool, !i32, !i32) -> !i32
-    %5 = "eltwise.as_uint"(%4) : (!i32) -> !u8
+    %5 = "eltwise.cast"(%4) : (!i32) -> !u8
     return %5 : !u8
   }
 }
@@ -144,7 +144,7 @@ module {
       %9 = "tile.size_map"() : () -> !tile.smap
       "tile.>(x==y?z)"(%9, %5, %6, %7, %8) : (!tile.smap, !tile.imap, !tile.imap, !tile.imap, !tile.imap) -> ()
     }) {idx_names = ["x0", "x1", "x2", "x3"]} : () -> !fp32
-    %4 = "eltwise.as_uint"(%3) : (!fp32) -> !u32
+    %4 = "eltwise.cast"(%3) : (!fp32) -> !u32
     return %4 : !u32
   }
 }

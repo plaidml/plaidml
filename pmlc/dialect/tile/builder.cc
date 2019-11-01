@@ -32,6 +32,7 @@
 #include "pmlc/dialect/tile/ops.h"
 #include "pmlc/dialect/tile/program.h"
 #include "pmlc/util/slice.h"
+#include "pmlc/util/util.h"
 #include "tile/base/shape.h"
 
 namespace pmlc::dialect::tile {
@@ -59,20 +60,6 @@ struct DomainInfo {
 };
 
 using ContractionKey = std::pair<AggregationKind, CombinationKind>;
-
-struct UniqueNamer {
-  std::set<std::string> names;
-
-  std::string get(StringRef name) {
-    auto next = name.str();
-    auto [it, isUnique] = names.insert(next);  // NOLINT(whitespace/braces)
-    for (unsigned i = 0; !isUnique; i++) {
-      next = llvm::formatv("{0}_{1}", name, i).str();
-      std::tie(it, isUnique) = names.insert(next);
-    }
-    return next;
-  }
-};
 
 struct TileBuilder::Impl {
   MLIRContext context;
@@ -245,6 +232,15 @@ RankedTensorType TileBuilder::ComputeShape(Value* tensor) {
   SmallVector<Value*, 1> outputs{tensor};
   auto program = MakeProgram("compute_shape", outputs, outputs);
   return outputs[0]->getType().dyn_cast<RankedTensorType>();
+}
+
+Value* TileBuilder::MakeCastOp(Value* tensor, DataType dtype) {
+  IVLOG(5, "TileBuilder::MakeCastOp> " << to_string(dtype));
+  IVLOG(6, "  arg: " << mlir::debugString(*tensor));
+  auto elementType = impl->builder.getType<ScalarType>(dtype);
+  auto tensorType = eltwise::getRankedTensorType(tensor->getType());
+  auto resultType = RankedTensorType::get(tensorType.getShape(), elementType);
+  return impl->builder.create<eltwise::CastOp>(impl->builder.getUnknownLoc(), resultType, tensor).result();
 }
 
 Value* TileBuilder::MakePrimitiveOp(StringRef fn, ArrayRef<Value*> args) {
@@ -627,7 +623,7 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(  //
   auto funcOp = mlir::FuncOp::create(loc, name, funcType, {});
   funcOp.addEntryBlock();
   OpBuilder builder(funcOp.getBody());
-  UniqueNamer namer;
+  std::set<std::string> names;
   auto attrName = Dialect::getDialectAttrName("name");
   unsigned argcnt = 0;
   for (auto value : slice) {
@@ -642,7 +638,7 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(  //
         // Replace placeholders with block arguments
         auto new_value = funcOp.getArgument(argcnt++);
         if (auto attr = placeholderOp.getAttrOfType<StringAttr>("name")) {
-          auto uniqueName = namer.get(attr.getValue());
+          auto uniqueName = util::getUniqueName(&names, attr.getValue());
           auto uniqueAttr = builder.getStringAttr(uniqueName);
           funcOp.setArgAttr(new_value->getArgNumber(), attrName, uniqueAttr);
         }
