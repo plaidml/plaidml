@@ -21,12 +21,6 @@ class TileOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
 def PlaceholderOp : TileOp<"var"> {
   let summary = "placeholder operation";
   let results = (outs Eltwise_AnyTensor:$result);
-
-  let builders = [OpBuilder<
-    "Builder* builder, OperationState& result, RankedTensorType type", [{
-      result.addTypes(type);
-    }]
-  >];
 }
 
 def TupleOp : TileOp<"tuple"> {
@@ -398,6 +392,24 @@ def ConSumMulOp : BinaryConOp<"+(x*y)", "add", "mul"> {
   let summary = "+(x * y) contraction";
 }
 
+def IndexOp : TileOp<"index", [NoSideEffect, GenericBuilderInterface]>, HasCanonicalizer {
+  let summary = "tensor index lookup operation";
+  let arguments = (ins Eltwise_AnyTensor:$tensor, Eltwise_Integer:$dim);
+  let results = (outs Eltwise_IntegerTensor:$result);
+
+  let extraClassDeclaration = [{
+    static Type getResultType(ArrayRef<Value*> operands);
+
+    static Operation* create(OpBuilder* builder, Location loc, Type type, ArrayRef<Value*> operands) {
+      OperationState state(loc, getOperationName());
+      state.addOperands(operands);
+      state.addAttribute("type", TypeAttr::get(type));
+      state.addTypes(getResultType(operands));
+      return builder->createOperation(state);
+    }
+  }];
+}
+
 class SpecialOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
     Op<TileDialect, mnemonic, !listconcat(traits, [SpecialOpInterface, GenericBuilderInterface])> {
 
@@ -418,76 +430,28 @@ def GatherOp : SpecialOp<"gather">, HasCanonicalizer {
   let summary = "special gather operation";
   let arguments = (ins Eltwise_AnyTensor:$tensor, Eltwise_IntegerTensor:$dims);
   let results = (outs Eltwise_AnyTensor:$result);
-
-  let builders = [OpBuilder<
-    "Builder* builder, OperationState& result, ScalarType type, ArrayRef<Value*> operands", [{
-      result.addOperands(operands);
-      result.addTypes(getResultType(operands));
-    }]
-  >];
-}
-
-def IndexOp : SpecialOp<"index">, HasCanonicalizer {
-  let summary = "tensor index lookup operation";
-  let arguments = (ins Eltwise_AnyTensor:$tensor, Eltwise_Integer:$dim);
-  let results = (outs Eltwise_IntegerTensor:$result);
-
-  let builders = [OpBuilder<
-    "Builder* builder, OperationState& result, ScalarType type, ArrayRef<Value*> operands", [{
-      result.addOperands(operands);
-      result.addTypes(getResultType(operands));
-    }]
-  >];
 }
 
 def PrngOp : SpecialOp<"prng">, HasCanonicalizer {
   let summary = "pseudorandom number generator";
   let arguments = (ins Eltwise_AnyTensor:$state, Variadic<Eltwise_Integer>:$dims);
   let results = (outs Eltwise_AnyTensor:$result);
-
-  let builders = [OpBuilder<
-    "Builder* builder, OperationState& result, ScalarType type, ArrayRef<Value*> operands", [{
-      result.addOperands(operands);
-      result.addTypes(getResultType(operands));
-    }]
-  >];
 }
 
 def ReshapeOp : SpecialOp<"reshape">, HasCanonicalizer {
   let summary = "tensor reshape operation";
   let arguments = (ins Eltwise_AnyTensor:$tensor, Variadic<Eltwise_Integer>:$dims);
   let results = (outs Eltwise_AnyTensor:$result);
-
-  let builders = [OpBuilder<
-    "Builder* builder, OperationState& result, ScalarType type, ArrayRef<Value*> operands", [{
-      result.addOperands(operands);
-      result.addTypes(getResultType(operands));
-    }]
-  >];
 }
 
 def ScatterOp : SpecialOp<"scatter">, HasCanonicalizer {
   let summary = "special scatter operation";
   let arguments = (ins Eltwise_AnyTensor:$tensor, Eltwise_IntegerTensor:$dims, Eltwise_AnyTensor:$other);
   let results = (outs Eltwise_AnyTensor:$result);
-
-  let builders = [OpBuilder<
-    "Builder* builder, OperationState& result, ScalarType type, ArrayRef<Value*> operands", [{
-      result.addOperands(operands);
-      result.addTypes(getResultType(operands));
-    }]
-  >];
 }
 
 def ShapeOp : SpecialOp<"shape">, HasCanonicalizer {
   let summary = "tensor shape operation";
   let arguments = (ins Eltwise_AnyTensor:$tensor);
   let results = (outs Eltwise_IntegerTensor:$result);
-
-  let builders = [OpBuilder<
-    "Builder* builder, OperationState& result, ScalarType type, ArrayRef<Value*> operands", [{
-      result.addOperands(operands);
-      result.addTypes(getResultType(operands));
-    }]
-  >];
 }
