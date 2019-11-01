@@ -135,6 +135,15 @@ void RunTimeLogEntry(char* str, char* extra, float address) {
 typedef void (*libxsmm_function)(const void* a, const void* b, void* c);
 void XSMMRTCaller(libxsmm_function func, const void* aPtr, const void* bPtr, void* cPtr) { func(aPtr, bPtr, cPtr); }
 
+typedef void (*cpu_thread_block)(void** refs, ssize_t* inits, size_t range_begin, size_t range_end);
+void ParallelFor(void** refs, ssize_t* inits, size_t range_size, cpu_thread_block func) {
+  // simulate invocation of parallel_for with a single index
+  func(refs, inits, 0, range_size);
+  // for (size_t i = 0; i < range_size; ++i) {
+  //  func(refs, inits, i, 1+i);
+  //}
+}
+
 }  // namespace rt
 
 template <typename T>
@@ -156,12 +165,14 @@ llvm::JITSymbol Runtime::findSymbol(const std::string& name) {
       {"_prng_step", symInfo(rt::prng_step)},
       {"_RunTimeLogEntry", symInfo(rt::RunTimeLogEntry)},  // For debugging
       {"_XSMMRTCaller", symInfo(rt::XSMMRTCaller)},
+      {"_ParallelFor", symInfo(rt::ParallelFor)},
       {"libxsmm_dmmdispatch", symInfo(libxsmm_dmmdispatch)},
       {"libxsmm_smmdispatch", symInfo(libxsmm_smmdispatch)},
       {"libxsmm_wimmdispatch", symInfo(libxsmm_wimmdispatch)},
       {"prng_step", symInfo(rt::prng_step)},
       {"RunTimeLogEntry", symInfo(rt::RunTimeLogEntry)},  // For debugging
       {"XSMMRTCaller", symInfo(rt::XSMMRTCaller)},
+      {"ParallelFor", symInfo(rt::ParallelFor)},
   };
   auto loc_rt = symbols.find(name);
   if (loc_rt != symbols.end()) {

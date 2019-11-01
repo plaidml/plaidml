@@ -107,6 +107,7 @@ void Compiler::GenerateInvoker(const stripe::Block& program, llvm::Function* mai
   // containing the parameter buffer data pointers; the wrapper will extract
   // each data pointer, then pass each one as a parameter when it calls the
   // program's top-level block function.
+  assert(!program.has_tag("cpu_thread"));
   // LLVM doesn't have the notion of a void pointer, so we'll pretend all of
   // these buffers are arrays of int8, then bitcast later.
   llvm::Type* arrayptr = builder_.getInt8PtrTy()->getPointerTo();
@@ -205,8 +206,6 @@ void Compiler::GenerateArena(const stripe::Block& block) {
 
 llvm::Function* Compiler::CompileXSMMBlock(const stripe::Block& block, const XSMMDispatch xsmmDispatch,
                                            const XSMMCallData& xsmmCallData) {
-  IVLOG(1, "XSMM Call.");
-
   // Validate incoming params.
   if (xsmmCallData.in0 == nullptr || xsmmCallData.in1 == nullptr || xsmmCallData.out0 == nullptr ||
       xsmmCallData.lda_a_value == 0 || xsmmCallData.lda_b_value == 0 || xsmmCallData.lda_c_value == 0) {
@@ -317,21 +316,6 @@ llvm::Function* Compiler::CompileXSMMBlock(const stripe::Block& block, const XSM
                                      nptr,
                                      nptr};
   llvm::Value* func = builder_.CreateCall(dispatch, args1);
-
-  IVLOG(1, block);
-  for (const auto& kvp : buffers_) {
-    IVLOG(1, "key:" << kvp.first);
-    IVLOG(1, "value:" << kvp.second.base);
-    // kvp.second.base->dump();
-    std::string type_str;
-    llvm::raw_string_ostream rso(type_str);
-    kvp.second.base->getType()->print(rso);
-    IVLOG(1, "llvm_type:" << type_str);
-    // kvp.second.base->dump();
-  }
-  IVLOG(1, block.ref_ins()[1]->into());
-  IVLOG(1, block.ref_ins()[0]->into());
-  IVLOG(1, block.ref_outs()[0]->into());
 
   std::vector<llvm::Type*> param_types{
       func->getType(),                                     // ptr of function to call
@@ -470,6 +454,7 @@ const XSMMDispatch Compiler::GetXSMMDispatch(const stripe::Block& block) {
 
 llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
   if (block.has_tag("xsmm")) {
+    assert(!block.has_tag("cpu_thread"));
     const XSMMDispatch xsmmDispatch = GetXSMMDispatch(block);
     XSMMCallData xsmmCallData;
     auto data = GetXSMMCallData(&xsmmCallData, block);
@@ -498,22 +483,53 @@ llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
   auto bb = llvm::BasicBlock::Create(context_, "entry", function);
   builder_.SetInsertPoint(bb);
 
-  // associate parameter values with buffers and indexes
-  for (auto ai = function->arg_begin(); ai != function->arg_end(); ++ai) {
-    unsigned idx = ai->getArgNo();
-    if (idx < block.refs.size()) {
+  if (block.has_tag("cpu_thread")) {
+    // This block will be invoked via ParallelFor, and its parameter signature
+    // must match the cpu_thread_block type defined in executable.cc.
+    assert(4 == function->arg_size());
+    // First parameter is a pointer to an array of refinement pointers.
+    // The type will always be int8_t**, so we must cast the pointer type.
+    llvm::Value* refsArray = function->getArg(0);
+    for (unsigned i = 0; i < block.refs.size(); ++i) {
+      llvm::Value* refElement = builder_.CreateConstGEP1_32(refsArray, i);
+      llvm::Value* refPtr = builder_.CreateLoad(refElement);
       auto it = block.refs.begin();
-      std::advance(it, idx);
-      std::string param_name = it->into();
-      ai->setName(param_name);
-      assert(nullptr == buffers_[param_name].base);
-      buffers_[param_name].base = &(*ai);
-    } else {
-      idx -= block.refs.size();
-      std::string param_name = block.idxs[idx].name;
-      ai->setName(param_name);
-      assert(nullptr == indexes_[param_name].init);
-      indexes_[param_name].init = &(*ai);
+      std::advance(it, i);
+      llvm::Type* buftype = CType(it->interior_shape.type)->getPointerTo();
+      std::string refName = it->into();
+      buffers_[refName].base = builder_.CreateBitCast(refPtr, buftype);
+    }
+    // Second parameter points to an array of index init values.
+    llvm::Value* initsArray = function->getArg(1);
+    for (unsigned i = 0; i < block.idxs.size(); ++i) {
+      llvm::Value* idxElement = builder_.CreateConstGEP1_32(initsArray, i);
+      llvm::Value* idxInit = builder_.CreateLoad(idxElement);
+      std::string idxName = block.idxs[i].name;
+      indexes_[idxName].init = idxInit;
+    }
+    // Third parameter is the composite index range begin.
+    // Fourth parameter is the composite index range end.
+    // We will use these to replace the init & limit values for index 0.
+  } else {
+    // This block will be invoked through a direct function call.
+    // First, a parameter for each refinement, containing the base address.
+    // Then, a parameter for each index, containing the initial value.
+    for (auto ai = function->arg_begin(); ai != function->arg_end(); ++ai) {
+      unsigned idx = ai->getArgNo();
+      if (idx < block.refs.size()) {
+        auto it = block.refs.begin();
+        std::advance(it, idx);
+        std::string param_name = it->into();
+        ai->setName(param_name);
+        assert(nullptr == buffers_[param_name].base);
+        buffers_[param_name].base = &(*ai);
+      } else {
+        idx -= block.refs.size();
+        std::string param_name = block.idxs[idx].name;
+        ai->setName(param_name);
+        assert(nullptr == indexes_[param_name].init);
+        indexes_[param_name].init = &(*ai);
+      }
     }
   }
 
@@ -533,7 +549,15 @@ llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
     limits[i] = builder_.CreateAdd(init, range);
   }
 
-  // EmitRunTimeLogEntry(block.name, "enter");
+  if (block.has_tag("cpu_thread") && !block.idxs.empty()) {
+    // Replace the init & limit values for index zero with the range_begin
+    // and range_end parameters passed in by ParallelFor.
+    auto& idx = indexes_[block.idxs[0].name];
+    llvm::Value* base = idx.init;
+    idx.init = builder_.CreateAdd(base, function->getArg(2));
+    limits[0] = builder_.CreateAdd(base, function->getArg(3));
+  }
+
   ProfileBlockEnter(block);
 
   // generate the basic blocks for each nested loop's evaluation stages
@@ -797,11 +821,12 @@ void Compiler::Visit(const stripe::Block& block) {
   for (auto& fptr_iter : nested.external_funcptrs_) {
     external_funcptrs_.emplace(fptr_iter);
   }
+
   // Generate a list of args.
   // The argument list begins with a pointer to each refinement. We will either
   // pass along the address of a refinement from the current block, or allocate
   // a new buffer for the nested block's use.
-  std::vector<llvm::Value*> args;
+  std::vector<llvm::Value*> refs;
   std::vector<llvm::Value*> allocs;
   for (auto& ref : block.refs) {
     llvm::Value* buffer = nullptr;
@@ -827,16 +852,56 @@ void Compiler::Visit(const stripe::Block& block) {
       std::string name = ref.from.empty() ? ref.into() : ref.from;
       buffer = ElementPtr(buffers_[name]);
     }
-    args.push_back(buffer);
+    refs.push_back(buffer);
   }
   // Following the list of refinement args, we will provide a list of initial
   // values for each of the block's indexes, which are specified as an affine
   // in terms of the current block's indexes.
+  std::vector<llvm::Value*> idxs;
   for (auto& idx : block.idxs) {
-    args.push_back(Eval(idx.affine));
+    idxs.push_back(Eval(idx.affine));
   }
-  // Invoke the function. It does not return a value.
-  builder_.CreateCall(function, args, "");
+
+  // Assemble the argument list and invoke the function.
+  if (block.has_tag("cpu_thread") && !block.has_tag("xsmm")) {
+    // Combine the bufs into an array; pass it as the first parameter.
+    auto int8PtrType = builder_.getInt8Ty()->getPointerTo();
+    auto int8PtrArrayType = llvm::ArrayType::get(int8PtrType, refs.size());
+    llvm::Value* bufsArg = builder_.CreateAlloca(int8PtrArrayType);
+    bufsArg = builder_.CreateBitCast(bufsArg, int8PtrType->getPointerTo());
+    for (size_t i = 0; i < refs.size(); ++i) {
+      llvm::Value* castRef = builder_.CreateBitCast(refs[i], int8PtrType);
+      llvm::Value* elementPtr = builder_.CreateConstGEP1_32(bufsArg, i);
+      builder_.CreateStore(castRef, elementPtr);
+    }
+    // Combine the idx inits into an array; pass it as the second parameter.
+    auto indexArrayType = llvm::ArrayType::get(IndexType(), idxs.size());
+    llvm::Value* initsArg = builder_.CreateAlloca(indexArrayType);
+    initsArg = builder_.CreateBitCast(initsArg, IndexType()->getPointerTo());
+    for (size_t i = 0; i < idxs.size(); ++i) {
+      llvm::Value* elementPtr = builder_.CreateConstGEP1_32(initsArg, i);
+      builder_.CreateStore(idxs[i], elementPtr);
+    }
+    if (!block.idxs.empty()) {
+      // For the moment we're only going to split over the first index. Later it
+      // might be nice to use a composite index, for better granularity.
+      size_t range = block.idxs[0].range;
+      ParallelFor(bufsArg, initsArg, range, function);
+    } else {
+      // There is no point in using ParallelFor to invoke a block which has no
+      // indexes, since there is no way to divide the work among threads.
+      auto zero = IndexConst(0);
+      builder_.CreateCall(function, {bufsArg, initsArg, zero, zero});
+    }
+  } else {
+    // Argument list consists of the refinements, followed by the index inits.
+    std::vector<llvm::Value*> args;
+    args.insert(args.end(), refs.begin(), refs.end());
+    args.insert(args.end(), idxs.begin(), idxs.end());
+    // Invoke the function. It does not return a value.
+    builder_.CreateCall(function, args, "");
+  }
+
   // Free the temporary buffers we allocated as parameter values.
   for (auto ptr : allocs) {
     Free(ptr);
@@ -1541,6 +1606,19 @@ void Compiler::AggInit(const Buffer& dest, llvm::Value* init_val) {
   }
 }
 
+void Compiler::ParallelFor(llvm::Value* refs, llvm::Value* idxs, size_t range, llvm::Function* block) {
+  llvm::Type* ptrArrayType = builder_.getInt8Ty()->getPointerTo()->getPointerTo();
+  llvm::Type* idxArrayType = IndexType()->getPointerTo();
+  std::vector<llvm::Type*> blockArgTypes{ptrArrayType, idxArrayType, IndexType(), IndexType()};
+  llvm::Type* blockType = llvm::FunctionType::get(builder_.getVoidTy(), blockArgTypes, false);
+  llvm::Type* blockPtrType = blockType->getPointerTo();
+  std::vector<llvm::Type*> fnArgTypes{ptrArrayType, idxArrayType, IndexType(), blockPtrType};
+  auto fnType = llvm::FunctionType::get(builder_.getVoidTy(), fnArgTypes, false);
+  auto fn = module_->getOrInsertFunction("ParallelFor", fnType).getCallee();
+  std::vector<llvm::Value*> argvals{refs, idxs, IndexConst(range), block};
+  builder_.CreateCall(fn, argvals, "");
+}
+
 void Compiler::Scatter(const stripe::Special& scatter) {
   // Three inputs: "data", "indices", "shape"; one output.
   // For each value in "data", look up the corresponding location from
@@ -1910,13 +1988,28 @@ llvm::Value* Compiler::IndexConst(ssize_t val) {
 llvm::FunctionType* Compiler::BlockType(const stripe::Block& block) {
   // Generate a type for the function which will implement this block.
   std::vector<llvm::Type*> param_types;
-  // Each buffer base address will be provided as a parameter.
-  for (const auto& ref : block.refs) {
-    param_types.push_back(CType(ref.interior_shape.type)->getPointerTo());
-  }
-  // Following the buffers, a parameter will provide the initial value for
-  // each of the block's indexes.
-  for (size_t i = 0; i < block.idxs.size(); ++i) {
+  if (block.has_tag("xsmm") || !block.has_tag("cpu_thread")) {
+    // This block function will be invoked directly.
+    // Each buffer base address will be provided as a parameter.
+    for (const auto& ref : block.refs) {
+      param_types.push_back(CType(ref.interior_shape.type)->getPointerTo());
+    }
+    // Following the buffers, a parameter will provide the initial value for
+    // each of the block's indexes.
+    for (size_t i = 0; i < block.idxs.size(); ++i) {
+      param_types.push_back(IndexType());
+    }
+  } else {
+    // This block function will be executed via ParallelFor.
+    // First parameter is a pointer to an array of refinement base addresses.
+    // Since all block functions must have the same type signature, we will
+    // define this as int8_t** instead and bitcast whenever we use it.
+    auto int8PtrType = builder_.getInt8Ty()->getPointerTo();
+    param_types.push_back(int8PtrType->getPointerTo());
+    // Next, pointer to an array of index init values.
+    param_types.push_back(IndexType()->getPointerTo());
+    // Third and fourth, composite index range begin and end values.
+    param_types.push_back(IndexType());
     param_types.push_back(IndexType());
   }
   // Blocks never return a value.

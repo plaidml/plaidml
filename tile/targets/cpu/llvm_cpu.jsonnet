@@ -56,7 +56,7 @@ local PARAMS = {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.StencilPass',
                 reqs: ['agg_op_add', 'comb_op_mul'],
                 outer_set: ['mac'],
-                inner_set: ['mac_inner', 'xsmm', "cpu_thread"],
+                inner_set: ['mac_inner', 'xsmm'],
                 is_strict_dims: true,
                 stencils: [
                   {

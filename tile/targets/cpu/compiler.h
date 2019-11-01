@@ -176,6 +176,7 @@ class Compiler : private stripe::ConstStmtVisitor {
   void EmitRunTimeLogEntry(const std::string& str, const std::string& extra, llvm::Value* value = nullptr);
   void PrintOutputAssembly();
   void AggInit(const Buffer& dest, llvm::Value* init_val);
+  void ParallelFor(llvm::Value* refs, llvm::Value* idxs, size_t range, llvm::Function* func);
 
   // Gets the leading dimensions and the buffers for an XSMM call if available.
   // @returns true if the XSMM call is applicable, otherwise false.
