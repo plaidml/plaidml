@@ -203,25 +203,12 @@ bool ConstantValueMatcher::match(mlir::Operation* op) {
   if (!mlir::detail::constant_op_binder<mlir::Attribute>(&attr).match(op)) {
     return false;
   }
-  auto type = op->getResult(0)->getType();
-  if (auto tensorType = type.dyn_cast<RankedTensorType>()) {
-    if (!tensorType.getElementType().isa<ScalarType>() || tensorType.getRank() != 0) {
-      return false;
-    }
-  } else if (type.isa<mlir::IndexType>()) {
-    if (auto intAttr = attr.dyn_cast<IntegerAttr>()) {
-      return intAttr.getValue() == value;
-    }
-  } else if (!type.isa<ScalarType>()) {
-    return false;
-  }
   if (auto intAttr = attr.dyn_cast<IntegerAttr>()) {
     return intAttr.getValue() == value;
   }
   if (auto floatAttr = attr.dyn_cast<FloatAttr>()) {
     return floatAttr.getValueAsDouble() == value;
   }
-
   return false;
 }
 
