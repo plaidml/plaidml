@@ -1,7 +1,15 @@
 // Copyright 2019, Intel Corporation
 
+#ifndef __PML_STRIPE_OPS__
+#define __PML_STRIPE_OPS__
+
+#ifndef __PML_UTIL_ENUMS__
 include "pmlc/util/enums.td"
+#endif
+
+#ifndef __PML_ELTWISE_PREDICATES__
 include "pmlc/dialect/eltwise/predicates.td"
+#endif
 
 def StripeDialect : Dialect {
   let name = "stripe";
@@ -48,7 +56,7 @@ def RefineOp : StripeOpWithPP<"refine", [NoSideEffect]> {
   let hasCanonicalizer = 1;
 }
 
-def LoadOp : StripeOpWithPP<"load"> {
+def LoadOp : StripeOpWithPP<"load", [NoSideEffect]> {
   let summary = "Load from a tensor";
   let arguments = (ins TensorRefType:$from);
   let results = (outs Eltwise_AnyTensor:$into);
@@ -180,3 +188,5 @@ def ExecuteOnOp : StripeOpWithPP<"execute_on", [Terminator, HasParent<"ParallelF
   // 'from' represents the executor value being returned.
   let arguments = (ins TensorRefType:$from);
 }
+
+#endif // __PML_STRIPE_OPS__
