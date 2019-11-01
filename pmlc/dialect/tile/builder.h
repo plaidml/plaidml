@@ -9,6 +9,7 @@
 #include "llvm/ADT/StringRef.h"
 
 #include "mlir/IR/StandardTypes.h"
+
 #include "pmlc/dialect/stripe/types.h"
 #include "pmlc/dialect/tile/program.h"
 #include "pmlc/util/enums.h"
