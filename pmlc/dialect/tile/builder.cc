@@ -357,7 +357,6 @@ Value* TileBuilder::MakePlaceholderOp(RankedTensorType type, BufferPtr buffer, S
   if (buffer) {
     impl->ioMap.emplace(op.result(), buffer);
   }
-  IVLOG(1, "TileBuilder::MakePlaceholderOp> " << mlir::debugString(type) << ": " << op.result());
   return op.result();
 }
 
