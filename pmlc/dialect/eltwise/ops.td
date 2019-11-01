@@ -1,8 +1,18 @@
 // Copyright 2019, Intel Corporation
+#ifndef __PML_ELTWISE_OPS__
+#define __PML_ELTWISE_OPS__
 
+#ifndef __PML_UTIL_INTERFACES__
 include "pmlc/util/interfaces.td"
+#endif
+
+#ifndef __PML_ELTWISE_INTERFACES__
 include "pmlc/dialect/eltwise/interfaces.td"
+#endif
+
+#ifndef __PML_ELTWISE_PREDICATES__
 include "pmlc/dialect/eltwise/predicates.td"
+#endif
 
 def EltwiseDialect : Dialect {
   let name = "eltwise";
@@ -273,3 +283,4 @@ def SelectOp : EltwiseOp<"select">, HasCanonicalizer {
   }] # EltwiseBuilderImpl_create;
 }
 
+#endif // __PML_ELTWISE_OPS__
