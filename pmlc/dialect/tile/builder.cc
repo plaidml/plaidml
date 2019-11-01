@@ -52,6 +52,7 @@ using mlir::UnknownLoc;
 using mlir::Value;
 using util::AggregationKind;
 using util::CombinationKind;
+using vertexai::tile::BufferPtr;
 
 struct DomainInfo {
   BlockAndValueMapping mapping;
@@ -78,6 +79,7 @@ struct TileBuilder::Impl {
   ModuleOp module;
   OpBuilder builder;
   std::map<AffineDomainOp, DomainInfo> domains;
+  IoMap ioMap;
   static std::map<ContractionKey, std::string> contractions;
 
   Impl()
@@ -141,7 +143,7 @@ std::map<ContractionKey, std::string> TileBuilder::Impl::contractions{
     {std::make_pair(AggregationKind::add, CombinationKind::cond), "+(x==y?z)"},
     {std::make_pair(AggregationKind::add, CombinationKind::eq), "+(x==y)"},
     {std::make_pair(AggregationKind::add, CombinationKind::mul), "+(x*y)"},
-};  // namespace pmlc::dialect::tile
+};
 
 TileBuilder::TileBuilder() : impl(new Impl) {}
 
@@ -158,7 +160,7 @@ void TileBuilder::Destroy(Value* value) {
   // }
 }
 
-void TileBuilder::BindTensorDim(unsigned dim, mlir::Value* from, mlir::Value** into) {
+void TileBuilder::BindTensorDim(unsigned dim, Value* from, Value** into) {
   if (!from) {
     throw std::runtime_error("BindTensorDim: from == nullptr");
   }
@@ -196,7 +198,7 @@ void TileBuilder::BindTensorDim(unsigned dim, mlir::Value* from, mlir::Value** i
   *into = MakeDimOp(from, dim);
 }
 
-Shape TileBuilder::GetShape(mlir::Value* tensor) {
+Shape TileBuilder::GetShape(Value* tensor) {
   IVLOG(5, "TileBuilder::GetShape>");
   auto type = tensor->getType().dyn_cast<mlir::RankedTensorType>();
   if (!type) {
@@ -277,7 +279,7 @@ Value* TileBuilder::MakeDimOp(Value* tensor, unsigned dim) {
   return impl->builder.create<DimOp>(impl->builder.getUnknownLoc(), tensor, dim).result();
 }
 
-mlir::Value* TileBuilder::MakePlaceholderOp(DataType dtype, llvm::ArrayRef<int64_t> dims) {
+Value* TileBuilder::MakePlaceholderOp(DataType dtype, ArrayRef<int64_t> dims, BufferPtr buffer, StringRef name) {
   IVLOG(5, "TileBuilder::MakePlaceholderOp> " << to_string(dtype));
   auto elt_type = impl->builder.getType<ScalarType>(dtype);
   // Convert dims: PlaidML semantics use 0 for unknown size, MLIR uses -1.
@@ -288,10 +290,17 @@ mlir::Value* TileBuilder::MakePlaceholderOp(DataType dtype, llvm::ArrayRef<int64
     }
   }
   auto shape = RankedTensorType::get(mlir_dims, elt_type);
-  return impl->builder.create<PlaceholderOp>(impl->builder.getUnknownLoc(), shape).result();
+  auto op = impl->builder.create<PlaceholderOp>(impl->builder.getUnknownLoc(), shape);
+  if (!name.empty()) {
+    op.setAttr("name", impl->builder.getStringAttr(name));
+  }
+  if (buffer) {
+    impl->ioMap.emplace(op.result(), buffer);
+  }
+  return op.result();
 }
 
-mlir::Value* TileBuilder::MakeAffineConstantOp(int64_t value) {
+Value* TileBuilder::MakeAffineConstantOp(int64_t value) {
   IVLOG(5, "TileBuilder::MakeAffineConstantOp> " << value);
   return impl->builder.create<AffineConstantOp>(impl->builder.getUnknownLoc(), value).result();
 }
@@ -516,9 +525,9 @@ Value* TileBuilder::MakeContractionOp(  //
 }
 
 std::shared_ptr<TileProgram> TileBuilder::MakeProgram(  //
-    llvm::StringRef name,                               //
-    llvm::ArrayRef<mlir::Value*> outputs,               //
-    llvm::MutableArrayRef<mlir::Value*> new_outputs) {
+    StringRef name,                                     //
+    ArrayRef<Value*> outputs,                           //
+    llvm::MutableArrayRef<Value*> new_outputs) {
   IVLOG(5, "TileBuilder::MakeProgram> " << name.str());
   IVLOG(6, mlir::debugString(impl->module));
   // Compute the result types
@@ -557,6 +566,10 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(  //
   auto attrName = Dialect::getDialectAttrName("name");
   unsigned argcnt = 0;
   for (auto value : slice) {
+    auto it = impl->ioMap.find(value);
+    if (it != impl->ioMap.end()) {
+      program->ioMap.emplace(it->first, it->second);
+    }
     auto op = value->getDefiningOp();
     // Only copy over top-level ops (those owned by the workspace module)
     if (op && op->getBlock() == impl->module.getBody()) {
@@ -580,11 +593,9 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(  //
   // Add a final ReturnOp
   std::vector<Value*> rets;
   for (unsigned i = 0; i < values.size(); i++) {
-    auto new_value = program->mapper.lookup(values[i]);
-    new_outputs[i] = new_value;
-    rets.push_back(new_value);
+    rets.emplace_back(program->mapper.lookup(values[i]));
   }
-  builder.create<mlir::ReturnOp>(loc, rets);
+  auto returnOp = builder.create<mlir::ReturnOp>(loc, rets);
   // Attach the function to the module
   module.push_back(funcOp);
   IVLOG(5, mlir::debugString(module));
@@ -599,7 +610,10 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(  //
   if (failed(result)) {
     throw std::runtime_error("Optimization passes failure");
   }
-  IVLOG(2, mlir::debugString(module));
+  for (unsigned i = 0; i < returnOp.getNumOperands(); i++) {
+    new_outputs[i] = returnOp.getOperand(i);
+  }
+  IVLOG(2, "TileBuilder::MakeProgram>" << mlir::debugString(module));
   return program;
 }
 

@@ -333,19 +333,17 @@ llvm::Function* Compiler::CompileXSMMBlock(const stripe::Block& block, const XSM
   IVLOG(1, block.ref_ins()[0]->into());
   IVLOG(1, block.ref_outs()[0]->into());
 
-  llvm::Type* voidPtrType = llvm::Type::getVoidTy(context_)->getPointerTo();
   std::vector<llvm::Type*> param_types{
-      func->getType(),  // ptr of function to call
-      voidPtrType,      // a
-      voidPtrType,      // b
-      voidPtrType,      // c
+      func->getType(),                                     // ptr of function to call
+      buffers_[xsmmCallData.in1->into()].base->getType(),  // a
+      buffers_[xsmmCallData.in0->into()].base->getType(),  // b
+      buffers_[xsmmCallData.out0->into()].base->getType()  // c
   };
   llvm::FunctionType* rftype = llvm::FunctionType::get(builder_.getVoidTy(), param_types, false);
   llvm::FunctionType* xsmmCallHelperType = llvm::FunctionType::get(builder_.getVoidTy(), param_types, false);
   auto xmmCallFunc = module_->getOrInsertFunction("XSMMRTCaller", xsmmCallHelperType).getCallee();
-  std::vector<llvm::Value*> args2 = {func, builder_.CreateBitCast(buffers_[xsmmCallData.in1->into()].base, voidPtrType),
-                                     builder_.CreateBitCast(buffers_[xsmmCallData.in0->into()].base, voidPtrType),
-                                     builder_.CreateBitCast(buffers_[xsmmCallData.out0->into()].base, voidPtrType)};
+  std::vector<llvm::Value*> args2 = {func, buffers_[xsmmCallData.in1->into()].base,
+                                     buffers_[xsmmCallData.in0->into()].base, buffers_[xsmmCallData.out0->into()].base};
   builder_.CreateCall(rftype, xmmCallFunc, args2);
   builder_.CreateRetVoid();
   return function;

@@ -385,12 +385,12 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
         switch (cnst->type) {
           case stripe::ConstType::Integer:
             op = builder->create<eltwise::ScalarConstantOp>(
-                unknownLoc, eltwise::ScalarType::get(builder->getContext(), DataType::INT64), cnst->iconst);
+                unknownLoc, eltwise::ScalarType::get(builder->getContext(), DataType::INT32), cnst->iconst);
             op.setAttr("scalar_name", builder->getStringAttr(cnst->name));
             break;
           case stripe::ConstType::Float:
             op = builder->create<eltwise::ScalarConstantOp>(
-                unknownLoc, eltwise::ScalarType::get(builder->getContext(), DataType::FLOAT64), cnst->fconst);
+                unknownLoc, eltwise::ScalarType::get(builder->getContext(), DataType::FLOAT32), cnst->fconst);
             op.setAttr("scalar_name", builder->getStringAttr(cnst->name));
             break;
         }
