@@ -2,6 +2,8 @@
 
 #include "pmlc/dialect/stripe/transforms.h"
 
+#include <algorithm>
+
 #include "pmlc/dialect/stripe/analysis.h"
 
 namespace pmlc {
@@ -65,6 +67,32 @@ void ExtractConstraintCase(ParallelForOp pf, bool ge) {
     block->getOperations().splice(con_it, inner->getOperations(), inner->begin(), std::prev(inner->end(), 1));
   }
   con.erase();
+}
+
+void LimitLower(ParallelForOp op, size_t arg, int64_t val) {
+  val = std::min(std::max(val, int64_t(0)), op.getRange(arg));
+  auto body = &op.inner().front();
+  OpBuilder builder(op);
+  llvm::SmallVector<int64_t, 8> ranges;
+  for (size_t i = 0; i < op.ranges().size(); i++) {
+    ranges.push_back(i == arg ? op.getRange(i) - val : op.getRange(i));
+  }
+  op.getOperation()->setAttr("ranges", builder.getI64ArrayAttr(ranges));
+  builder.setInsertionPointToStart(body);
+  auto new_idx = builder.create<AffinePolyOp>(op.getLoc(), AffinePolynomial(val));
+  body->getArgument(arg)->replaceAllUsesWith(new_idx);
+  new_idx.setAttr("coeffs", builder.getI64ArrayAttr({1}));
+  new_idx.getOperation()->setOperands({body->getArgument(arg)});
+}
+
+void LimitUpper(ParallelForOp op, size_t arg, int64_t val) {
+  val = std::min(std::max(val, int64_t(0)), op.getRange(arg));
+  OpBuilder builder(op);
+  llvm::SmallVector<int64_t, 8> ranges;
+  for (size_t i = 0; i < op.ranges().size(); i++) {
+    ranges.push_back(i == arg ? val : op.getRange(i));
+  }
+  op.getOperation()->setAttr("ranges", builder.getI64ArrayAttr(ranges));
 }
 
 // 'Lifts' a constraint.  The idea here is more move 'most' of the

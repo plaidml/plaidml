@@ -11,6 +11,8 @@ namespace stripe {
 
 void Tile(ParallelForOp op, llvm::ArrayRef<int64_t> tile_sizes);
 void ExtractConstraintCase(ParallelForOp op, bool ge);
+void LimitLower(ParallelForOp op, size_t arg, int64_t val);
+void LimitUpper(ParallelForOp op, size_t arg, int64_t val);
 void LiftConstraint(ParallelForOp op);
 bool SplitFor(ParallelForOp op);
 

@@ -68,6 +68,10 @@ void JigsawPass::runOnOperation() {
   pats.insert<SimplifyPoly>(context, 10);
   pats.insert<RemoveTrivialConstraints>(context, 10);
   pats.insert<SplitParallelFor>(context, 10);
+  pats.insert<RemoveNoSideEffectParallelFors>(context, 10);
+  pats.insert<RemoveRangeZeroParallelFors>(context, 10);
+  pats.insert<RemoveRangeOneIndexes>(context, 10);
+  pats.insert<InlineNoIndexParallelFors>(context, 10);
   // pats.insert<LiftConstraints>(context, 1);
 
   Operation* op = getOperation();

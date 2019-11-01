@@ -45,6 +45,67 @@ void SimplifyNopRefines::rewrite(RefineOp op, mlir::PatternRewriter& rewriter) c
   rewriter.replaceOp(op, op.in());
 }
 
+void InlineNoIndexParallelFors::rewrite(ParallelForOp op, mlir::PatternRewriter& rewriter) const {
+  auto oblock = op.getOperation()->getBlock();
+  auto iblock = &op.inner().front();
+  oblock->getOperations().splice(Block::iterator(op), iblock->getOperations(), iblock->begin(),
+                                 std::prev(iblock->end(), 1));
+  rewriter.replaceOp(op, llvm::None);
+}
+
+mlir::PatternMatchResult RemoveRangeZeroParallelFors::match(ParallelForOp op) const {
+  for (size_t i = 0; i < op.ranges().size(); i++) {
+    if (op.getRange(i) == 0) {
+      return matchSuccess();
+    }
+  }
+  return matchFailure();
+}
+
+mlir::PatternMatchResult RemoveNoSideEffectParallelFors::match(ParallelForOp op) const {
+  auto body = &op.inner().front();
+  auto it_end = std::prev(body->end(), 1);
+  for (auto it = body->begin(); it != it_end; ++it) {
+    if (!it->hasNoSideEffect()) {
+      return matchFailure();
+    }
+  }
+  return matchSuccess();
+}
+
+mlir::PatternMatchResult RemoveRangeOneIndexes::match(ParallelForOp op) const {
+  for (size_t i = 0; i < op.ranges().size(); i++) {
+    if (op.getRange(i) == 1) {
+      return matchSuccess();
+    }
+  }
+  return matchFailure();
+}
+
+void RemoveRangeOneIndexes::rewrite(ParallelForOp op, mlir::PatternRewriter& rewriter) const {
+  llvm::SmallVector<int64_t, 8> ranges;
+  auto zero = rewriter.create<AffinePolyOp>(op.getLoc(), AffinePolynomial());
+  auto body = &op.inner().front();
+  for (size_t i = 0; i < op.ranges().size(); i++) {
+    if (op.getRange(i) == 1) {
+      body->getArgument(i)->replaceAllUsesWith(zero);
+    } else {
+      ranges.push_back(op.getRange(i));
+    }
+  }
+  auto rop = rewriter.create<ParallelForOp>(op.getLoc(), ranges);
+  auto rbody = &rop.inner().front();
+  size_t new_id = 0;
+  for (size_t i = 0; i < op.ranges().size(); i++) {
+    if (op.getRange(i) != 1) {
+      body->getArgument(i)->replaceAllUsesWith(rbody->getArgument(new_id++));
+    }
+  }
+  rbody->getOperations().splice(std::prev(rbody->end(), 1), body->getOperations(), body->begin(),
+                                std::prev(body->end(), 1));
+  rewriter.replaceOp(op, llvm::None);
+}
+
 mlir::PatternMatchResult RemoveTrivialConstraints::matchAndRewrite(ConstraintOp op,
                                                                    mlir::PatternRewriter& rewriter) const {
   auto irange = AffineRange(AffinePolynomial(op.input()));
@@ -73,110 +134,6 @@ mlir::PatternMatchResult RemoveTrivialConstraints::matchAndRewrite(ConstraintOp 
   }
 }
 
-// 'Lifts' a constraint.  The idea here is more move 'most' of the
-//  checks out of a parallel for, and to split the cases up to allow
-//  more constraint rewrites, eventually resulting in (hopefully) no
-//  constraints in the fast path.
-//
-// More exactly, translates:
-//
-// PF [inner] {
-//   Pre
-//   Con ([outer_poly] + [inner_poly] + const) >= 0 {
-//     GE Case
-//   } else {
-//     LT Case
-//   }
-// }
-//
-// into:
-//
-// Con ([outer_poly] + min(inner_poly) + const) >= 0 {
-//   PF [inner] {
-//     Pre
-//     GE Case
-//   }
-// } else {
-//   Cons ([outer_poly] + max(inner_poly) + const >= 0) {
-//     PF [inner] {
-//       Pre
-//       Con ([outer_poly] + [inner_poly] + const) >= 0 {
-//         GE Case
-//       } else {
-//         LT Case
-//       }
-//     }
-//   } else {
-//     PF [inner] {
-//       Pre
-//       LT Case
-//     }
-//   }
-// }
-//
-
-mlir::PatternMatchResult LiftConstraints::match(ParallelForOp op) const {
-  if (SafeConstraintInterior(op)) {
-    return matchSuccess();
-  } else {
-    return matchFailure();
-  }
-}
-
-void LiftConstraints::rewrite(ParallelForOp pf, mlir::PatternRewriter& rewriter) const {
-  // Extract the constraint op
-  auto pf_block = &pf.inner().front();
-  auto con = mlir::dyn_cast<ConstraintOp>(*std::prev(pf_block->end(), 2));
-  // Get the complete polynomial, and split it into innner + outer
-  auto opoly = AffinePolynomial(con.input());
-  AffinePolynomial ipoly;
-  for (mlir::BlockArgument* arg : pf_block->getArguments()) {
-    auto it = opoly.terms.find(arg);
-    if (it != opoly.terms.end()) {
-      ipoly.terms.emplace(*it);
-      opoly.terms.erase(it);
-    }
-  }
-  // Compute the range of the inner polynomial
-  auto irange = AffineRange(ipoly);
-  // Make a builder aimed right before the original parallel-for
-  OpBuilder builder(pf.getOperation());
-  Location loc = pf.getLoc();
-  // Build the rewritten version
-  auto oc = builder.create<ConstraintOp>(loc, builder.create<AffinePolyOp>(loc, opoly + AffinePolynomial(irange.min)));
-  // Make always true block
-  builder.createBlock(&oc.ge_case(), oc.ge_case().begin());
-  auto ge_pf = mlir::dyn_cast<ParallelForOp>(builder.clone(*pf.getOperation()));
-  builder.create<TerminateOp>(loc);
-  // Splice ge block out
-  auto ge_block = &ge_pf.inner().front();
-  auto ge_con_it = std::prev(ge_block->end(), 2);
-  auto ge_con = mlir::dyn_cast<ConstraintOp>(*ge_con_it);
-  auto ge_ge = &ge_con.ge_case().front();
-  ge_block->getOperations().splice(ge_con_it, ge_ge->getOperations(), ge_ge->begin(), std::prev(ge_ge->end(), 1));
-  ge_con.erase();
-  builder.createBlock(&oc.lt_case(), oc.lt_case().begin());
-  auto ic = builder.create<ConstraintOp>(loc, builder.create<AffinePolyOp>(loc, opoly + AffinePolynomial(irange.max)));
-  builder.createBlock(&ic.ge_case(), ic.ge_case().begin());
-  builder.clone(*pf.getOperation());
-  builder.create<TerminateOp>(loc);
-  if (!con.lt_case().empty()) {
-    builder.createBlock(&ic.lt_case(), ic.lt_case().begin());
-    auto lt_pf = mlir::dyn_cast<ParallelForOp>(builder.clone(*pf.getOperation()));
-    builder.create<TerminateOp>(loc);
-    // Splice lt block out
-    auto lt_block = &lt_pf.inner().front();
-    auto lt_con_it = std::prev(lt_block->end(), 2);
-    auto lt_con = mlir::dyn_cast<ConstraintOp>(*lt_con_it);
-    auto lt_lt = &lt_con.lt_case().front();
-    lt_block->getOperations().splice(lt_con_it, lt_lt->getOperations(), lt_lt->begin(), std::prev(lt_lt->end(), 1));
-    lt_con.erase();
-  }
-  builder.setInsertionPointToEnd(&oc.lt_case().front());
-  builder.create<TerminateOp>(loc);
-  rewriter.replaceOp(pf, llvm::None);
-}
-
 mlir::PatternMatchResult SplitParallelFor::matchAndRewrite(ParallelForOp pf, mlir::PatternRewriter& rewriter) const {
   if (!SafeConstraintInterior(pf)) {
     return matchFailure();
@@ -189,22 +146,38 @@ mlir::PatternMatchResult SplitParallelFor::matchAndRewrite(ParallelForOp pf, mli
     return matchFailure();  // Only works for simple polynomials
   }
   // Get the actual relevant numbers from the poly
-  // mlir::BlockArgument* ba = poly.terms.begin()->first;
-  // int64_t m = poly.terms.begin()->second;
-  // int64_t b = poly.constant;
-  // Constraint says: m * i + b >= 0
-  // We want to solve for an inequality in i:
-  // If m > 0, i >= ceil(-b / m)
-  // If m < 0, i <= floor(-b / m)A
+  mlir::BlockArgument* ba = poly.terms.begin()->first;
+  // Find which argument it is (or not in this PF)
+  int which_arg = -1;
+  for (size_t i = 0; i < pf_block->getNumArguments(); i++) {
+    if (pf_block->getArgument(i) == ba) {
+      which_arg = i;
+      break;
+    }
+  }
+  if (which_arg < 0) {
+    return matchFailure();
+  }
+  int64_t m = poly.terms.begin()->second;
+  int64_t b = poly.constant;
   // Copy loop twice, once with each interior
   auto ge_pf = mlir::cast<ParallelForOp>(rewriter.clone(*pf.getOperation()));
   ExtractConstraintCase(ge_pf, true);
   auto lt_pf = mlir::cast<ParallelForOp>(rewriter.clone(*pf.getOperation()));
   ExtractConstraintCase(lt_pf, false);
-  /*
+  // Constraint says: m * i + b >= 0
+  // We want to solve for an inequality in i:
+  // If m > 0, i >= ceil(-b / m)
+  // If m < 0, i <= floor(-b / m) or ! i >= floor(-b / m) + 1
   if (m > 0) {
     int64_t is = (-b + (m - 1)) / m;
-  */
+    LimitLower(ge_pf, which_arg, is);
+    LimitUpper(lt_pf, which_arg, is);
+  } else {
+    int64_t is = (-b / m) + 1;
+    LimitLower(lt_pf, which_arg, is);
+    LimitUpper(ge_pf, which_arg, is);
+  }
   // Remove original
   rewriter.replaceOp(pf, llvm::None);
   return matchSuccess();

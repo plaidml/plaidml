@@ -20,17 +20,44 @@ struct SimplifyNopRefines final : public mlir::OpRewritePattern<RefineOp> {
   void rewrite(RefineOp op, mlir::PatternRewriter& rewriter) const final;  // NOLINT
 };
 
+struct InlineNoIndexParallelFors final : public mlir::OpRewritePattern<ParallelForOp> {
+  explicit InlineNoIndexParallelFors(mlir::MLIRContext* context, mlir::PatternBenefit benefit = 1)
+      : OpRewritePattern<ParallelForOp>(context, benefit) {}
+  mlir::PatternMatchResult match(ParallelForOp op) const final {
+    return (op.ranges().size() ? matchFailure() : matchSuccess());
+  }
+  void rewrite(ParallelForOp op, mlir::PatternRewriter& rewriter) const final;  // NOLINT
+};
+
+struct RemoveRangeZeroParallelFors final : public mlir::OpRewritePattern<ParallelForOp> {
+  explicit RemoveRangeZeroParallelFors(mlir::MLIRContext* context, mlir::PatternBenefit benefit = 1)
+      : OpRewritePattern<ParallelForOp>(context, benefit) {}
+  mlir::PatternMatchResult match(ParallelForOp op) const final;
+  void rewrite(ParallelForOp op, mlir::PatternRewriter& rewriter) const final {  // NOLINT
+    rewriter.replaceOp(op, llvm::None);
+  }
+};
+
+struct RemoveNoSideEffectParallelFors final : public mlir::OpRewritePattern<ParallelForOp> {
+  explicit RemoveNoSideEffectParallelFors(mlir::MLIRContext* context, mlir::PatternBenefit benefit = 1)
+      : OpRewritePattern<ParallelForOp>(context, benefit) {}
+  mlir::PatternMatchResult match(ParallelForOp op) const final;
+  void rewrite(ParallelForOp op, mlir::PatternRewriter& rewriter) const final {  // NOLINT
+    rewriter.replaceOp(op, llvm::None);
+  }
+};
+
+struct RemoveRangeOneIndexes final : public mlir::OpRewritePattern<ParallelForOp> {
+  explicit RemoveRangeOneIndexes(mlir::MLIRContext* context, mlir::PatternBenefit benefit = 1)
+      : OpRewritePattern<ParallelForOp>(context, benefit) {}
+  mlir::PatternMatchResult match(ParallelForOp op) const final;
+  void rewrite(ParallelForOp op, mlir::PatternRewriter& rewriter) const final;  // NOLINT
+};
+
 struct RemoveTrivialConstraints final : public mlir::OpRewritePattern<ConstraintOp> {
   explicit RemoveTrivialConstraints(mlir::MLIRContext* context, mlir::PatternBenefit benefit = 1)
       : OpRewritePattern<ConstraintOp>(context, benefit) {}
   mlir::PatternMatchResult matchAndRewrite(ConstraintOp op, mlir::PatternRewriter& rewriter) const override;  // NOLINT
-};
-
-struct LiftConstraints final : public mlir::OpRewritePattern<ParallelForOp> {
-  explicit LiftConstraints(mlir::MLIRContext* context, mlir::PatternBenefit benefit = 1)
-      : OpRewritePattern<ParallelForOp>(context, benefit) {}
-  mlir::PatternMatchResult match(ParallelForOp op) const final;
-  void rewrite(ParallelForOp op, mlir::PatternRewriter& rewriter) const final;  // NOLINT
 };
 
 struct SplitParallelFor final : public mlir::OpRewritePattern<ParallelForOp> {
