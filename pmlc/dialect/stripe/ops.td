@@ -56,7 +56,7 @@ def RefineOp : StripeOpWithPP<"refine", [NoSideEffect]> {
   let hasCanonicalizer = 1;
 }
 
-def LoadOp : StripeOpWithPP<"load"> {
+def LoadOp : StripeOpWithPP<"load", [NoSideEffect]> {
   let summary = "Load from a tensor";
   let arguments = (ins TensorRefType:$from);
   let results = (outs Eltwise_AnyTensor:$into);
