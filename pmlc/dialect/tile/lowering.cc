@@ -9,6 +9,7 @@
 #include "llvm/Support/FormatVariadic.h"
 
 #include "mlir/Dialect/StandardOps/Ops.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/DebugStringHelper.h"
@@ -697,6 +698,82 @@ struct FuncOpConversion : public LoweringBase {
   }
 };
 
+struct IndexOpConversion : public LoweringBase {
+  explicit IndexOpConversion(LoweringContext* lowering)  //
+      : LoweringBase(IndexOp::getOperationName(), lowering) {}
+
+  PatternMatchResult tryMatchAndRewrite(  //
+      Operation* op,                      //
+      llvm::ArrayRef<Value*> operands,    //
+      ConversionPatternRewriter& rewriter) const override {
+    IVLOG(2, "IndexOpConversion::matchAndRewrite>");
+    auto indexOp = llvm::cast<IndexOp>(op);
+
+    auto resultType = indexOp.result()->getType();
+    auto resultTensorType = convertIntoTensorType(resultType);
+    IVLOG(3, "resultTensorType: " << mlir::debugString(resultTensorType));
+
+    auto outputTensor = findOutputArgument(op, indexOp.result());
+    if (!outputTensor) {
+      auto allocOp = rewriter.create<stripe::AllocateOp>(op->getLoc(), resultTensorType);
+      outputTensor = allocOp.result();
+    }
+
+    llvm::SmallVector<int64_t, 8> ranges;
+    for (const auto& dim : resultTensorType.getShape()) {
+      ranges.emplace_back(dim.size);
+    }
+
+    auto forOp = rewriter.create<stripe::ParallelForOp>(  //
+        op->getLoc(),                                     //
+        rewriter.getI64ArrayAttr(ranges));
+    auto attrs = llvm::SmallVector<NamedAttribute, 3>{
+        {rewriter.getIdentifier("eltwise"), rewriter.getUnitAttr()},
+        {rewriter.getIdentifier("eltwise_index"), rewriter.getUnitAttr()},
+        {rewriter.getIdentifier("kernel"), rewriter.getUnitAttr()},
+    };
+    forOp.setAttr(stripe::Dialect::getStripeAttrsName(), rewriter.getDictionaryAttr(attrs));
+    auto body = rewriter.createBlock(&forOp.inner());
+
+    stripe::SymbolValueMap idxs;
+    llvm::SmallVector<Attribute, 8> idxNames;
+    auto dims = resultTensorType.getShape();
+    for (unsigned i = 0; i < dims.size(); i++) {
+      auto arg = body->addArgument(stripe::AffineType::get(rewriter.getContext()));
+      auto idxName = llvm::formatv("i{0}", i);
+      idxNames.emplace_back(rewriter.getStringAttr(idxName.str()));
+      idxs.emplace(idxName, arg);
+    }
+    forOp.setAttr("idx_names", ArrayAttr::get(idxNames, rewriter.getContext()));
+
+    // output refinement
+    Value* output;
+    llvm::SmallVector<Value*, 4> offsets;
+    for (unsigned i = 0; i < resultTensorType.getRank(); i++) {
+      offsets.emplace_back(body->getArgument(i));
+    }
+    Type refType = stripe::TensorRefType::get(resultTensorType);
+    auto refineOp = rewriter.create<stripe::RefineOp>(op->getLoc(), refType, outputTensor, offsets);
+    output = refineOp.result();
+
+    // LOAD_INDEX
+    auto elementType = resultTensorType.getElementType();
+    auto intoType = eltwise::getRankedTensorType(elementType);
+    IntegerAttr dimAttr;
+    if (!m_Constant(&dimAttr).match(indexOp.dim()->getDefiningOp())) {
+      throw std::runtime_error("Not a constant");
+    }
+    auto loadIndexOp = rewriter.create<stripe::LoadIndexOp>(op->getLoc(), intoType, offsets[dimAttr.getInt()]);
+
+    // STORE
+    rewriter.create<stripe::StoreOp>(op->getLoc(), output, loadIndexOp.into());
+
+    rewriter.create<stripe::TerminateOp>(op->getLoc());
+    rewriter.replaceOp(op, {outputTensor});
+    return matchSuccess();
+  }
+};
+
 struct SpecialOpConversion : public LoweringBase {
   explicit SpecialOpConversion(LoweringContext* lowering, StringRef opName)  //
       : LoweringBase(opName, lowering) {}
@@ -767,6 +844,7 @@ struct LoweringPass : public mlir::ModulePass<LoweringPass> {
         AffineConstantOpConversion,  //
         AffineDomainOpConversion,    //
         FuncOpConversion,            //
+        IndexOpConversion,           //
         ReturnOpConversion>(&lowering);
     auto eltwiseOps = util::getAllOpsWithInterface<eltwise::EltwiseOp>(&getContext());
     for (auto op : eltwiseOps) {
