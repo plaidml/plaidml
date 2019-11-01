@@ -72,6 +72,17 @@ static stripe::TensorType convertIntoTensorType(Type type) {
   throw std::runtime_error("Invalid type");
 }
 
+static Operation* createZero(OpBuilder* builder, Location loc, Type elementType) {
+  auto scalarType = elementType.cast<ScalarType>();
+  auto dtype = scalarType.type();
+  if (is_float(dtype)) {
+    const double zero = 0.0;
+    return builder->create<eltwise::ScalarConstantOp>(loc, elementType, zero);
+  }
+  const int64_t zero = 0;
+  return builder->create<eltwise::ScalarConstantOp>(loc, elementType, zero);
+}
+
 static void addInitializer(         //
     OpBuilder* builder,             //
     ContractionOp contractionOp,    //
@@ -105,19 +116,18 @@ static void addInitializer(         //
 
   auto refType = stripe::TensorRefType::get(tensorType);
   auto elementType = refType.getElementType();
-  auto scalarType = eltwise::getRankedTensorType(elementType);
+  auto loadType = eltwise::getRankedTensorType(elementType);
   auto sink = builder->create<stripe::RefineOp>(loc, refType, output, offsets);
 
   if (auto init = contractionOp.getInitializer()) {
     attrs.emplace_back(builder->getIdentifier("copy"), builder->getUnitAttr());
     auto src = builder->create<stripe::RefineOp>(loc, refType, init, offsets);
-    auto loadOp = builder->create<stripe::LoadOp>(loc, scalarType, src.result());
+    auto loadOp = builder->create<stripe::LoadOp>(loc, loadType, src.result());
     builder->create<stripe::StoreOp>(loc, sink.result(), loadOp.into());
   } else {
     attrs.emplace_back(builder->getIdentifier("zero"), builder->getUnitAttr());
-    const int64_t zero = 0;
-    auto constOp = builder->create<eltwise::ScalarConstantOp>(loc, elementType, zero);
-    builder->create<stripe::StoreOp>(loc, sink.result(), constOp.result());
+    auto constOp = createZero(builder, loc, elementType);
+    builder->create<stripe::StoreOp>(loc, sink.result(), constOp->getResult(0));
   }
 
   forOp.setAttr(stripe::Dialect::getStripeAttrsName(), builder->getDictionaryAttr(attrs));
@@ -258,14 +268,13 @@ static Value* MakeCombination(            //
       return operands[0];
     case CombinationKind::add:
       return rewriter->create<eltwise::AddOp>(op.getLoc(), scalarType, operands).result();
-    case CombinationKind::cond:
-      // TODO: NYI
-      // kernel.get()->stmts.push_back(std::make_shared<Constant>("$ZERO", 0.0));
-      // AddIntrinsic(kernel.get(), Intrinsic::EQ, input_based_type, {scalar_inputs[0], scalar_inputs[1]}, {"$IS_EQ"});
-      // AddIntrinsic(kernel.get(), Intrinsic::COND, output_type, {"$IS_EQ", scalar_inputs[2], "$ZERO"},
-      //              {ScalarName(op.output)});
-      // kernel->set_tag("comb_op_cond");
-      throw std::runtime_error("NYI: CombinationKind::cond");
+    case CombinationKind::cond: {
+      const double zero = 0.0;
+      auto constOp = rewriter->create<eltwise::ScalarConstantOp>(op.getLoc(), scalarType, zero);
+      auto cmpEqOp = rewriter->create<eltwise::CmpEqOp>(op.getLoc(), scalarType, operands.drop_back());
+      llvm::SmallVector<Value*, 3> args{cmpEqOp.result(), operands.back(), constOp.result()};
+      return rewriter->create<eltwise::SelectOp>(op.getLoc(), scalarType, args);
+    }
     case CombinationKind::eq:
       return rewriter->create<eltwise::CmpEqOp>(op.getLoc(), scalarType, operands).result();
     case CombinationKind::mul:
@@ -371,17 +380,24 @@ struct AffineDomainOpConversion : public LoweringBase {
         auto srcTensorType = convertIntoTensorType(srcType);
         srcType = stripe::TensorRefType::get(srcTensorType);
       }
-      auto refineOp = rewriter.create<stripe::RefineOp>(op->getLoc(), srcType, tensors[i], offsets);
       if (i) {
-        auto refAttrs = llvm::SmallVector<NamedAttribute, 1>{
-            {rewriter.getIdentifier("contraction"), rewriter.getUnitAttr()},
-        };
-        refineOp.setAttr(stripe::Dialect::getStripeAttrsName(), rewriter.getDictionaryAttr(refAttrs));
-        if (auto name = getTensorName(tensors[i])) {
-          refineOp.setAttr("name", name);
+        auto op = tensors[i]->getDefiningOp();
+        if (op && llvm::isa<eltwise::ScalarConstantOp>(op)) {
+          // This operand needs to be broadcast, skip creating a refinement
+          refs.emplace_back(tensors[i]);
+        } else {
+          auto refineOp = rewriter.create<stripe::RefineOp>(op->getLoc(), srcType, tensors[i], offsets);
+          auto refAttrs = llvm::SmallVector<NamedAttribute, 1>{
+              {rewriter.getIdentifier("contraction"), rewriter.getUnitAttr()},
+          };
+          refineOp.setAttr(stripe::Dialect::getStripeAttrsName(), rewriter.getDictionaryAttr(refAttrs));
+          if (auto name = getTensorName(tensors[i])) {
+            refineOp.setAttr("name", name);
+          }
+          refs.emplace_back(refineOp.result());
         }
-        refs.emplace_back(refineOp.result());
       } else {
+        auto refineOp = rewriter.create<stripe::RefineOp>(op->getLoc(), srcType, tensors[i], offsets);
         output = refineOp.result();
       }
     }
@@ -420,8 +436,15 @@ struct AffineDomainOpConversion : public LoweringBase {
       auto tensorRefType = srcType.cast<stripe::TensorRefType>();
       auto elementType = tensorRefType.getElementType();
       auto intoType = eltwise::getRankedTensorType(elementType);
-      auto loadOp = rewriter.create<stripe::LoadOp>(op->getLoc(), intoType, refs[i]);
-      inputs.emplace_back(loadOp.into());
+      auto op = refs[i]->getDefiningOp();
+      if (op && llvm::isa<eltwise::ScalarConstantOp>(op)) {
+        // No need to load a scalar constant, just use it directly
+        // This happens when we want to broadcast a scalar constant value
+        inputs.emplace_back(refs[i]);
+      } else {
+        auto loadOp = rewriter.create<stripe::LoadOp>(op->getLoc(), intoType, refs[i]);
+        inputs.emplace_back(loadOp.into());
+      }
     }
 
     // Combination Operation
