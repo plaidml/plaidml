@@ -2655,7 +2655,7 @@ Value tile(const Value& value) {
   }
   auto O = TensorOutput(O_dims);
   O(O_idxs) = I(I_idxs);
-  O.no_defract();
+  O.no_reduce();
   return Value{O};
 }
 

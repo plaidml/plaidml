@@ -474,9 +474,9 @@ class Tensor {
 
   plaidml_expr* as_ptr() const { return impl_->ptr.get(); }
 
-  // Enable no_defract on a contraction
-  Tensor& no_defract() {
-    ffi::call_void(plaidml_expr_contraction_set_no_defract, as_ptr(), true);
+  // Enable no_reduce on a contraction
+  Tensor& no_reduce() {
+    ffi::call_void(plaidml_expr_contraction_set_no_reduce, as_ptr(), true);
     return *this;
   }
 
