@@ -315,7 +315,7 @@ TEST(CppEdsl, RepeatElements) {
   auto O = TensorOutput(N0, 3 * N1, N2);
   O(n0, 3 * n1 + k, n2) = I(n0, n1, n2);
   O.add_constraint(k < 3);
-  O.no_defract();
+  O.no_reduce();
   Program program("repeat_elts", {O});
   EXPECT_THAT(program, Eq(R"(function (
   _X0[_X0_0, _X0_1, _X0_2]
@@ -417,7 +417,7 @@ Tensor Winograd(const Tensor& I, const Tensor& K, const Tensor& A, const Tensor&
   M(n, i, j, x, y, co) += V(n, i, j, x, y, ci) * U(i, j, ci, co);
   O1(n, i, j, x, y, co) += A(k, i) * M(n, k, j, x, y, co);
   O(n, BO * x + i, BO * y + j, co) += O1(n, i, k, x, y, co) * A(k, j);
-  O.no_defract();
+  O.no_reduce();
   return O;
 }
 
