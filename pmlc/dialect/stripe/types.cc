@@ -48,23 +48,20 @@ Type TensorType::getElementType() const { return getImpl()->elementType; }
 
 int64_t TensorType::getRank() const { return getImpl()->shape.size(); }
 
-llvm::ArrayRef<TensorDim> TensorType::getShape() const { return getImpl()->shape; }
+ArrayRef<TensorDim> TensorType::getShape() const { return getImpl()->shape; }
 
 const OffsetsMap& TensorType::getOffsets() const { return getImpl()->offsets; }
 
 bool TensorType::is_const() const { return getImpl()->is_const; }
 
 struct TensorRefTypeStorage : public mlir::TypeStorage {
-  TensorRefTypeStorage(Type elementType, int64_t rank, bool is_const, const ArrayRef<TensorDim> inShape)
+  TensorRefTypeStorage(Type elementType, int64_t rank, bool is_const, ArrayRef<TensorDim> inShape)
       : elementType(elementType), rank(rank), is_const(is_const) {
     std::copy(inShape.begin(), inShape.end(), std::back_inserter(shape));
   }
 
-  using KeyTy = std::tuple<Type, int64_t, bool, const ArrayRef<TensorDim>>;
-  bool operator==(const KeyTy& key) const {
-    return elementType == std::get<0>(key) && rank == std::get<1>(key) && is_const == std::get<2>(key) &&
-           std::equal(shape.begin(), shape.end(), std::get<3>(key).begin());
-  }
+  using KeyTy = std::tuple<Type, int64_t, bool, ArrayRef<TensorDim>>;
+  bool operator==(const KeyTy& key) const { return key == KeyTy(elementType, rank, is_const, shape); }
   static llvm::hash_code hashKey(const KeyTy& key) { return hash_value(key); }
 
   static TensorRefTypeStorage* construct(mlir::TypeStorageAllocator& allocator, const KeyTy& key) {  // NOLINT
@@ -80,12 +77,12 @@ struct TensorRefTypeStorage : public mlir::TypeStorage {
 
 TensorRefType TensorRefType::get(Type elementType, int64_t rank, bool is_const) {
   return Base::get(elementType.getContext(), Types::TensorRef, elementType, rank, is_const,
-                   /*shape=*/llvm::SmallVector<TensorDim, 0>());
+                   /*shape=*/ArrayRef<TensorDim>());
 }
 
-TensorRefType TensorRefType::get(TensorType type) {
+TensorRefType TensorRefType::get(TensorType type, bool propagateShape) {
   return Base::get(type.getContext(), Types::TensorRef, type.getElementType(), type.getRank(), type.is_const(),
-                   type.getShape());
+                   propagateShape ? type.getShape() : ArrayRef<TensorDim>());
 }
 
 Type TensorRefType::getElementType() const { return getImpl()->elementType; }

@@ -65,7 +65,7 @@ struct TensorDim {
 };
 
 inline llvm::hash_code hash_value(const TensorDim& td) {  //
-  return llvm::hash_combine(td.size, td.stride);
+  return llvm::hash_combine(td.size, td.stride, td.cls);
 }
 
 using OffsetsMap = llvm::SmallDenseMap<mlir::Identifier, int64_t>;
@@ -133,7 +133,9 @@ class TensorRefType : public Type::TypeBase<TensorRefType, Type, TensorRefTypeSt
   static bool kindof(unsigned kind) { return kind == Types::TensorRef; }
 
   static TensorRefType get(Type elementType, int64_t rank, bool is_const);
-  static TensorRefType get(TensorType type);
+
+  /// Construct a TensorRefType from `type`. If `propagateShape` is true, propagate `type` shape to TensorRefType.
+  static TensorRefType get(TensorType type, bool propagateShape = false);
 
   /// Return the element type.
   Type getElementType() const;
