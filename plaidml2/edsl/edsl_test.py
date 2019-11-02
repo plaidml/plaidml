@@ -381,7 +381,6 @@ module {
 }
 ''')
 
-    @unittest.skip('TODO: no_defract')
     def test_repeat_elts(self):
         I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [10, 10, 10]))
         N0, N1, N2 = TensorDims(3)
@@ -390,15 +389,29 @@ module {
         O = TensorOutput(N0, 3 * N1, N2)
         O[n0, 3 * n1 + k, n2] = I[n0, n1, n2]
         O.add_constraint(k < 3)
-        O.no_defract()
+        O.no_reduce()
         program = Program('repeat_elts', [O])
         self.assertMultiLineEqual(
-            str(program), '''function (
-  _X0[_X0_0, _X0_1, _X0_2]
-) -> (
-  _X1
-) {
-  _X1[x0, 3*x1 + x3, x2 : 10, 30, 10] = =(_X0[x0, x1, x2]), x3 < 3 no_defract;
+            str(program), '''
+
+module {
+  func @repeat_elts(%arg0: tensor<10x10x10x!eltwise.fp32>) -> tensor<10x30x10x!eltwise.fp32> {
+    %c30 = "tile.affine_const"() {value = 30 : i64} : () -> index
+    %c10 = "tile.affine_const"() {value = 10 : i64} : () -> index
+    %c3 = "tile.affine_const"() {value = 3 : i64} : () -> index
+    %0 = "tile.domain"() ( {
+    ^bb0(%arg1: index, %arg2: index, %arg3: index, %arg4: index):	// no predecessors
+      %1 = "tile.src_idx_map"(%arg0, %arg3, %arg2, %arg1) : (tensor<10x10x10x!eltwise.fp32>, index, index, index) -> !tile.imap
+      %2 = "tile.affine_mul"(%arg2, %c3) : (index, index) -> index
+      %3 = "tile.affine_add"(%2, %arg4) : (index, index) -> index
+      %4 = "tile.sink_idx_map"(%arg3, %3, %arg1) : (index, index, index) -> !tile.imap
+      %5 = "tile.size_map"(%c10, %c30, %c10) : (index, index, index) -> !tile.smap
+      "tile.constraint"(%arg4, %c3) ( {
+        "tile.=(x)"(%5, %1, %4) : (!tile.smap, !tile.imap, !tile.imap) -> ()
+      }) : (index, index) -> ()
+    }) {idx_names = ["x0", "x1", "x2", "x3"], no_reduce = true} : () -> tensor<10x30x10x!eltwise.fp32>
+    return %0 : tensor<10x30x10x!eltwise.fp32>
+  }
 }
 ''')
 

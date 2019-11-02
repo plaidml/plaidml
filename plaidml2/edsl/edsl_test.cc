@@ -300,8 +300,7 @@ module {
   exec::Executable::compile(program, inputs)->run();
 }
 
-// TODO: no_defract
-TEST(CppEdsl, DISABLED_RepeatElements) {
+TEST(CppEdsl, RepeatElements) {
   auto I = Placeholder(PLAIDML_DATA_FLOAT32, {10, 10, 10});
   TensorDim N0, N1, N2;
   TensorIndex n0, n1, n2, k;
@@ -309,16 +308,30 @@ TEST(CppEdsl, DISABLED_RepeatElements) {
   auto O = TensorOutput(N0, 3 * N1, N2);
   O(n0, 3 * n1 + k, n2) = I(n0, n1, n2);
   O.add_constraint(k < 3);
-  O.no_defract();
+  O.no_reduce();
   Program program("repeat_elts", {O});
-  EXPECT_THAT(program, Eq(R"(function (
-  _X0[_X0_0, _X0_1, _X0_2]
-) -> (
-  _X1
-) {
-  _X1[x0, 3*x1 + x3, x2 : 10, 30, 10] = =(_X0[x0, x1, x2]), x3 < 3 no_defract;
+  EXPECT_THAT(program, Eq(R"#(
+
+module {
+  func @repeat_elts(%arg0: tensor<10x10x10x!eltwise.fp32>) -> tensor<10x30x10x!eltwise.fp32> {
+    %c30 = "tile.affine_const"() {value = 30 : i64} : () -> index
+    %c10 = "tile.affine_const"() {value = 10 : i64} : () -> index
+    %c3 = "tile.affine_const"() {value = 3 : i64} : () -> index
+    %0 = "tile.domain"() ( {
+    ^bb0(%arg1: index, %arg2: index, %arg3: index, %arg4: index):	// no predecessors
+      %1 = "tile.src_idx_map"(%arg0, %arg3, %arg2, %arg1) : (tensor<10x10x10x!eltwise.fp32>, index, index, index) -> !tile.imap
+      %2 = "tile.affine_mul"(%arg2, %c3) : (index, index) -> index
+      %3 = "tile.affine_add"(%2, %arg4) : (index, index) -> index
+      %4 = "tile.sink_idx_map"(%arg3, %3, %arg1) : (index, index, index) -> !tile.imap
+      %5 = "tile.size_map"(%c10, %c30, %c10) : (index, index, index) -> !tile.smap
+      "tile.constraint"(%arg4, %c3) ( {
+        "tile.=(x)"(%5, %1, %4) : (!tile.smap, !tile.imap, !tile.imap) -> ()
+      }) : (index, index) -> ()
+    }) {idx_names = ["x0", "x1", "x2", "x3"], no_reduce = true} : () -> tensor<10x30x10x!eltwise.fp32>
+    return %0 : tensor<10x30x10x!eltwise.fp32>
+  }
 }
-)"));
+)#"));
   exec::Executable::compile(program, {I})->run();
 }
 
@@ -444,12 +457,11 @@ Tensor Winograd(const Tensor& I, const Tensor& K, const Tensor& A, const Tensor&
   M(n, i, j, x, y, co) += V(n, i, j, x, y, ci) * U(i, j, ci, co);
   O1(n, i, j, x, y, co) += A(k, i) * M(n, k, j, x, y, co);
   O(n, BO * x + i, BO * y + j, co) += O1(n, i, k, x, y, co) * A(k, j);
-  O.no_defract();
+  O.no_reduce();
   return O;
 }
 
-// TODO: no_defract
-TEST(CppEdsl, DISABLED_Winograd) {
+TEST(CppEdsl, Winograd) {
   const std::int64_t N = 1, X = 224, Y = 224, CI = 3, S = 3, CO = 32, BI = 32, BO = BI - CI + 1;
   auto I = Placeholder(PLAIDML_DATA_FLOAT32, {N, X, Y, CI});
   auto K = Placeholder(PLAIDML_DATA_FLOAT32, {S, S, CI, CO});
@@ -458,24 +470,25 @@ TEST(CppEdsl, DISABLED_Winograd) {
   auto G = Placeholder(PLAIDML_DATA_FLOAT32, {BI, S});
   auto W = Winograd(I, K, A, B, G);
   Program program("winograd", {W});
-  EXPECT_THAT(program, Eq(R"(function (
-  _X0[_X0_0, _X0_1],
-  _X1[_X1_0, _X1_1],
-  _X2[_X2_0, _X2_1, _X2_2, _X2_3],
-  _X5[_X5_0, _X5_1],
-  _X6[_X6_0, _X6_1, _X6_2, _X6_3]
-) -> (
-  _X11
-) {
-  _X3[x2, x1, x5, x3, x4, x6 : 1, 32, 32, 8, 8, 3] = +(_X1[x0, x1] * _X2[x2, x0 + 30*x3, 30*x4 + x5, x6]);
-  _X4[x0, x1, x6, x3, x4, x5 : 1, 32, 32, 8, 8, 3] = +(_X3[x0, x1, x2, x3, x4, x5] * _X1[x2, x6]);
-  _X7[x0, x2, x3, x4 : 32, 3, 3, 32] = +(_X5[x0, x1] * _X6[x1, x2, x3, x4]);
-  _X8[x0, x4, x2, x3 : 32, 32, 3, 32] = +(_X7[x0, x1, x2, x3] * _X5[x4, x1]);
-  _X9[x0, x1, x2, x3, x4, x6 : 1, 32, 32, 8, 8, 32] = +(_X4[x0, x1, x2, x3, x4, x5] * _X8[x1, x2, x5, x6]);
-  _X10[x2, x1, x3, x4, x5, x6 : 1, 30, 32, 8, 8, 32] = +(_X0[x0, x1] * _X9[x2, x0, x3, x4, x5, x6]);
-  _X11[x0, x1 + 30*x3, 30*x4 + x6, x5 : 1, 222, 222, 32] = +(_X10[x0, x1, x2, x3, x4, x5] * _X0[x2, x6]) no_defract;
-}
-)"));
+  //   EXPECT_THAT(program, Eq(R"(function (
+  //   _X0[_X0_0, _X0_1],
+  //   _X1[_X1_0, _X1_1],
+  //   _X2[_X2_0, _X2_1, _X2_2, _X2_3],
+  //   _X5[_X5_0, _X5_1],
+  //   _X6[_X6_0, _X6_1, _X6_2, _X6_3]
+  // ) -> (
+  //   _X11
+  // ) {
+  //   _X3[x2, x1, x5, x3, x4, x6 : 1, 32, 32, 8, 8, 3] = +(_X1[x0, x1] * _X2[x2, x0 + 30*x3, 30*x4 + x5, x6]);
+  //   _X4[x0, x1, x6, x3, x4, x5 : 1, 32, 32, 8, 8, 3] = +(_X3[x0, x1, x2, x3, x4, x5] * _X1[x2, x6]);
+  //   _X7[x0, x2, x3, x4 : 32, 3, 3, 32] = +(_X5[x0, x1] * _X6[x1, x2, x3, x4]);
+  //   _X8[x0, x4, x2, x3 : 32, 32, 3, 32] = +(_X7[x0, x1, x2, x3] * _X5[x4, x1]);
+  //   _X9[x0, x1, x2, x3, x4, x6 : 1, 32, 32, 8, 8, 32] = +(_X4[x0, x1, x2, x3, x4, x5] * _X8[x1, x2, x5, x6]);
+  //   _X10[x2, x1, x3, x4, x5, x6 : 1, 30, 32, 8, 8, 32] = +(_X0[x0, x1] * _X9[x2, x0, x3, x4, x5, x6]);
+  //   _X11[x0, x1 + 30*x3, 30*x4 + x6, x5 : 1, 222, 222, 32] = +(_X10[x0, x1, x2, x3, x4, x5] * _X0[x2, x6])
+  //   no_reduce;
+  // }
+  // )"));
   // This currently crashes when combined with the padding pass
   // exec::Executable::compile(program, {I, K, A, B, G})->run();
 }

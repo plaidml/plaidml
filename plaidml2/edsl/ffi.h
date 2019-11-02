@@ -333,10 +333,10 @@ PLAIDML_EDSL_API void plaidml_expr_contraction_add_constraint(  //
     plaidml_poly_expr* lhs,                                     //
     plaidml_dim_expr* rhs);
 
-PLAIDML_EDSL_API void plaidml_expr_contraction_set_no_defract(  //
-    plaidml_error* err,                                         //
-    plaidml_expr* expr,                                         //
-    bool no_defract);
+PLAIDML_EDSL_API void plaidml_expr_contraction_set_no_reduce(  //
+    plaidml_error* err,                                        //
+    plaidml_expr* expr,                                        //
+    bool no_reduce);
 
 PLAIDML_EDSL_API void plaidml_expr_contraction_set_use_default(  //
     plaidml_error* err,                                          //

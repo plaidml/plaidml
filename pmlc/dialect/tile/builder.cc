@@ -481,6 +481,16 @@ void TileBuilder::SetUseDefault(Value* cion, Value* defaultValue) {
   terminator->setOperands(operands);
 }
 
+void TileBuilder::SetNoReduce(mlir::Value* cion, bool no_reduce) {
+  IVLOG(2, "TileBuilder::SetNoReduce> " << no_reduce);
+  auto op = cion->getDefiningOp();
+  auto domainOp = llvm::dyn_cast_or_null<AffineDomainOp>(op);
+  if (!domainOp) {
+    throw std::runtime_error("no_reduce can only be specified on a contraction.");
+  }
+  domainOp.setAttr("no_reduce", impl->builder.getBoolAttr(no_reduce));
+}
+
 Value* TileBuilder::MakeContractionOp(  //
     util::AggregationKind agg,          //
     util::CombinationKind combo,        //
@@ -515,7 +525,7 @@ Value* TileBuilder::MakeContractionOp(  //
   SmallVector<Value*, 4> size_map_sizes(size_map_op.sizes());
   auto shape = eltwise::ComputeShape(size_map_sizes);
   auto tensorType = impl->builder.getTensorType(shape, elementType);
-  auto domainOp = impl->builder.create<AffineDomainOp>(impl->builder.getUnknownLoc(), tensorType);
+  auto domainOp = impl->builder.create<AffineDomainOp>(impl->builder.getUnknownLoc(), tensorType, BoolAttr{});
   auto& info = impl->domains[domainOp];
   auto body = new Block();
   domainOp.body().push_back(body);

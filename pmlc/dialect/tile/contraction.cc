@@ -168,7 +168,7 @@ std::set<std::string> Constraints::VariablesUsed() {
 }
 
 // TODO(T133): Check size of integer programming problem to prevent slowdown
-std::tuple<IndexBounds, SimpleConstraints> Constraints::ComputeBounds() {
+BoundsAndConstraints Constraints::ComputeBounds() {
   auto vars = VariablesUsed();
 
   // Run the solver for each variable min + max
@@ -618,12 +618,12 @@ bool Contraction::NeedReduce() const {
   return false;
 }
 
-std::tuple<IndexBounds, SimpleConstraints> Contraction::ComputeBounds(llvm::ArrayRef<stripe::TensorType> shapes) {
+BoundsAndConstraints Contraction::ComputeBounds(llvm::ArrayRef<stripe::TensorType> shapes, bool no_reduce) {
   ConstrainIndexVarsToInts();
   auto constraints = GatherConstraints(shapes);
   IVLOG(3, "Constraints:" << to_string(constraints.constraints));
   // Reduce if needed
-  if (NeedReduce()) {
+  if (NeedReduce() && !no_reduce) {
     ReduceOutputPolynomials(constraints);
     constraints = GatherConstraints(shapes);
   }

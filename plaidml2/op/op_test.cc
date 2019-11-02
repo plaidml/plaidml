@@ -1005,22 +1005,36 @@ module {
 )#"));
 }
 
-// TODO: no_defract
-TEST(Op, DISABLED_Tile) {
+TEST(Op, Tile) {
   auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "A");
   auto X = op::tile(  //
       A,              // tensor to tile
       {5, 4});        // tiling factors
   Program program("tile", {X});
   IVLOG(1, program);
-  EXPECT_THAT(program, Eq(R"(function (
-  A[A_0, A_1]
-) -> (
-  _X0
-) {
-  _X0[x0 + 10*x2, x1 + 20*x3 : 50, 80] = =(A[x0, x1]) no_defract;
+  EXPECT_THAT(program, Eq(R"#(
+
+module {
+  func @tile(%arg0: tensor<10x20x!eltwise.fp32> {tile.name = "A"}) -> tensor<50x80x!eltwise.fp32> {
+    %c80 = "tile.affine_const"() {value = 80 : i64} : () -> index
+    %c20 = "tile.affine_const"() {value = 20 : i64} : () -> index
+    %c50 = "tile.affine_const"() {value = 50 : i64} : () -> index
+    %c10 = "tile.affine_const"() {value = 10 : i64} : () -> index
+    %0 = "tile.domain"() ( {
+    ^bb0(%arg1: index, %arg2: index, %arg3: index, %arg4: index):	// no predecessors
+      %1 = "tile.src_idx_map"(%arg0, %arg2, %arg1) : (tensor<10x20x!eltwise.fp32>, index, index) -> !tile.imap
+      %2 = "tile.affine_mul"(%arg3, %c20) : (index, index) -> index
+      %3 = "tile.affine_add"(%2, %arg1) : (index, index) -> index
+      %4 = "tile.affine_mul"(%arg4, %c10) : (index, index) -> index
+      %5 = "tile.affine_add"(%4, %arg2) : (index, index) -> index
+      %6 = "tile.sink_idx_map"(%5, %3) : (index, index) -> !tile.imap
+      %7 = "tile.size_map"(%c50, %c80) : (index, index) -> !tile.smap
+      "tile.=(x)"(%7, %1, %6) : (!tile.smap, !tile.imap, !tile.imap) -> ()
+    }) {idx_names = ["x0", "x1", "x2", "x3"], no_reduce = true} : () -> tensor<50x80x!eltwise.fp32>
+    return %0 : tensor<50x80x!eltwise.fp32>
+  }
 }
-)"));
+)#"));
 }
 
 TEST(Op, Transpose) {

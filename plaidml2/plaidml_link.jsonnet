@@ -77,7 +77,7 @@ local exports = [
   'plaidml_expr_size_map',
   'plaidml_expr_contraction',
   'plaidml_expr_contraction_add_constraint',
-  'plaidml_expr_contraction_set_no_defract',
+  'plaidml_expr_contraction_set_no_reduce',
   'plaidml_expr_contraction_set_use_default',
   'plaidml_expr_gradient',
   'plaidml_deriv_register',

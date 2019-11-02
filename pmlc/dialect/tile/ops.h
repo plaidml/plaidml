@@ -18,6 +18,7 @@ using llvm::Optional;
 using mlir::ArrayAttr;
 using mlir::ArrayRef;
 using mlir::Attribute;
+using mlir::BoolAttr;
 using mlir::Builder;
 using mlir::IndexType;
 using mlir::IntegerAttr;

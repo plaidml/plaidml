@@ -316,10 +316,10 @@ struct AffineDomainOpConversion : public LoweringBase {
       auto srcTensorType = convertIntoTensorType(srcType);
       shapes.push_back(srcTensorType);
     }
+
     Contraction contraction{contractionOp, constraintOps};
-    IndexBounds bounds;
-    SimpleConstraints constraints;
-    std::tie(bounds, constraints) = contraction.ComputeBounds(shapes);
+    bool no_reduce = domainOp.no_reduce() && *domainOp.no_reduce();
+    const auto& [bounds, constraints] = contraction.ComputeBounds(shapes, no_reduce);
 
     // add induction vars
     llvm::SmallVector<int64_t, 8> ranges;
@@ -462,8 +462,6 @@ struct AffineDomainOpConversion : public LoweringBase {
 
     rewriter.create<stripe::TerminateOp>(op->getLoc());
     rewriter.replaceOp(op, {outputTensor});
-
-    // TODO: no_defract
 
     return matchSuccess();
   }

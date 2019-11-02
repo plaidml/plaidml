@@ -456,11 +456,11 @@ class Tensor(ForeignObject):
     def __rxor__(self, lhs):
         return call('bit_xor', lhs, self)
 
-    # Enable no_defract on a contraction
-    def no_defract(self):
+    # Enable no_reduce on a contraction
+    def no_reduce(self):
         if not self._is_contraction:
-            raise TypeError('no_defract can only be specified on a contraction.')
-        ffi_call(lib.plaidml_expr_contraction_set_no_defract, self.as_ptr(), True)
+            raise TypeError('no_reduce can only be specified on a contraction.')
+        ffi_call(lib.plaidml_expr_contraction_set_no_reduce, self.as_ptr(), True)
         return self
 
     # Set use_default on a contraction
