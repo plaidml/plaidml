@@ -15,8 +15,8 @@
 #include "base/util/env.h"
 #include "base/util/logging.h"
 
-using namespace llvm;  // NOLINT
-using namespace mlir;  // NOLINT
+using namespace llvm;  // NOLINT(build/namespaces)
+using namespace mlir;  // NOLINT(build/namespaces)
 
 static cl::opt<std::string> inputFilename(  //
     cl::Positional,                         //

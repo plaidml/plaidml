@@ -29,7 +29,7 @@ struct OpAsmInterface : public mlir::OpAsmDialectInterface {
 
   /// Get a special name to use when printing the given operation. The desired
   /// name should be streamed into 'os'.
-  void getOpResultName(Operation* op, llvm::raw_ostream& os) const final {  // NOLINT
+  void getOpResultName(Operation* op, llvm::raw_ostream& os) const final {
     if (auto attr = op->getAttrOfType<mlir::StringAttr>("scalar_name")) {
       os << "s_" << attr.getValue().substr(1);
     } else if (auto const_op = llvm::dyn_cast<ScalarConstantOp>(op)) {
@@ -41,7 +41,7 @@ struct OpAsmInterface : public mlir::OpAsmDialectInterface {
     }
   }
 
-  void getTypeAliases(mlir::SmallVectorImpl<std::pair<Type, StringRef>>& aliases) const final {  // NOLINT
+  void getTypeAliases(mlir::SmallVectorImpl<std::pair<Type, StringRef>>& aliases) const final {
     auto ctx = getDialect()->getContext();
     for (const auto dataType : vertexai::tile::GetDataTypeSet()) {
       // Intern the string

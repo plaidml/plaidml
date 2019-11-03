@@ -188,8 +188,7 @@ struct LoweringBase : public ConversionPattern {
  protected:
   virtual PatternMatchResult tryMatchAndRewrite(  //
       Operation* op,                              //
-      llvm::ArrayRef<Value*> operands,
-      ConversionPatternRewriter& rewriter) const = 0;  // NOLINT
+      llvm::ArrayRef<Value*> operands, ConversionPatternRewriter& rewriter) const = 0;
 
  protected:
   LoweringContext* lowering;

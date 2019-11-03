@@ -66,7 +66,7 @@ struct UniqueNamer {
 
   std::string get(StringRef name) {
     auto next = name.str();
-    auto [it, isUnique] = names.insert(next);  // NOLINT(whitespace/braces)
+    auto [it, isUnique] = names.insert(next);
     for (unsigned i = 0; !isUnique; i++) {
       next = llvm::formatv("{0}_{1}", name, i).str();
       std::tie(it, isUnique) = names.insert(next);

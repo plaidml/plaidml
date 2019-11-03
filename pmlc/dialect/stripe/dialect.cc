@@ -22,7 +22,7 @@ struct OpAsmInterface : public mlir::OpAsmDialectInterface {
 
   /// Get a special name to use when printing the given operation. The desired
   /// name should be streamed into 'os'.
-  void getOpResultName(Operation* op, llvm::raw_ostream& os) const final {  // NOLINT
+  void getOpResultName(Operation* op, llvm::raw_ostream& os) const final {
     if (auto attr = op->getAttrOfType<StringAttr>("name")) {
       os << attr.getValue();
     } else if (auto attr = op->getAttrOfType<StringAttr>("scalar_name")) {
@@ -34,7 +34,7 @@ struct OpAsmInterface : public mlir::OpAsmDialectInterface {
     }
   }
 
-  void getBlockArgumentName(mlir::BlockArgument* arg, llvm::raw_ostream& os) const final {  // NOLINT
+  void getBlockArgumentName(mlir::BlockArgument* arg, llvm::raw_ostream& os) const final {
     Operation* op = arg->getOwner()->getParentOp();
     if (auto vec = op->getAttrOfType<ArrayAttr>("idx_names")) {
       if (vec.size() > arg->getArgNumber()) {
@@ -45,7 +45,7 @@ struct OpAsmInterface : public mlir::OpAsmDialectInterface {
     }
   }
 
-  void getTypeAliases(mlir::SmallVectorImpl<std::pair<Type, StringRef>>& aliases) const final {  // NOLINT
+  void getTypeAliases(mlir::SmallVectorImpl<std::pair<Type, StringRef>>& aliases) const final {
     auto ctx = getDialect()->getContext();
     auto affineType = AffineType::get(ctx);
     aliases.push_back(std::make_pair(affineType, StringRef("aff")));
@@ -82,7 +82,7 @@ std::string Dialect::getCanonicalOpName(llvm::StringRef name) {
 mlir::Type Dialect::parseTensor(llvm::StringRef tyData, mlir::Location loc) const {
   static llvm::Regex re{R"(([[:alnum:]_]+)\[([[:digit:]]+):([[:digit:]]+)\])"};
   bool is_const = tyData.consume_back("const");
-  auto [typeSpec, sizeSpec] = tyData.trim().rsplit('(');  // NOLINT(whitespace/braces)
+  auto [typeSpec, sizeSpec] = tyData.trim().rsplit('(');
   auto type = mlir::parseType(typeSpec.trim(), getContext());
   if (!type) {
     emitError(loc, "invalid type specification: '") << typeSpec << "'";
