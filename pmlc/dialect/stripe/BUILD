@@ -56,7 +56,7 @@ plaidml_cc_library(
         "ops.cc",
         "ops.cc.inc",
         "ops_interfaces.cc.inc",
-	"rewrites.cc",
+        "rewrites.cc",
         "transforms.cc",
         "types.cc",
         "util.cc",

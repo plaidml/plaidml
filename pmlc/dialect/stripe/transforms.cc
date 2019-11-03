@@ -60,7 +60,7 @@ void Tile(ParallelForOp op, llvm::ArrayRef<int64_t> tile_sizes) {
 void ExtractConstraintCase(ParallelForOp pf, bool ge) {
   auto block = &pf.inner().front();
   auto con_it = std::prev(block->end(), 2);
-  auto con = mlir::dyn_cast<ConstraintOp>(*con_it);
+  auto con = mlir::cast<ConstraintOp>(*con_it);
   auto region = ge ? &con.ge_case() : &con.lt_case();
   if (!region->empty()) {
     auto inner = &region->front();
@@ -140,7 +140,7 @@ void LimitUpper(ParallelForOp op, size_t arg, int64_t val) {
 void LiftConstraint(ParallelForOp pf) {
   // Extract the constraint op
   auto pf_block = &pf.inner().front();
-  auto con = mlir::dyn_cast<ConstraintOp>(*std::prev(pf_block->end(), 2));
+  auto con = mlir::cast<ConstraintOp>(*std::prev(pf_block->end(), 2));
   // Get the complete polynomial, and split it into innner + outer
   auto opoly = AffinePolynomial(con.input());
   AffinePolynomial ipoly;
@@ -160,7 +160,7 @@ void LiftConstraint(ParallelForOp pf) {
   auto oc = builder.create<ConstraintOp>(loc, builder.create<AffinePolyOp>(loc, opoly + AffinePolynomial(irange.min)));
   // Make always true block
   builder.createBlock(&oc.ge_case(), oc.ge_case().begin());
-  auto ge_pf = mlir::dyn_cast<ParallelForOp>(builder.clone(*pf.getOperation()));
+  auto ge_pf = mlir::cast<ParallelForOp>(builder.clone(*pf.getOperation()));
   builder.create<TerminateOp>(loc);
   // Splice ge block out
   ExtractConstraintCase(ge_pf, true);
@@ -171,33 +171,13 @@ void LiftConstraint(ParallelForOp pf) {
   builder.create<TerminateOp>(loc);
   if (!con.lt_case().empty()) {
     builder.createBlock(&ic.lt_case(), ic.lt_case().begin());
-    auto lt_pf = mlir::dyn_cast<ParallelForOp>(builder.clone(*pf.getOperation()));
+    auto lt_pf = mlir::cast<ParallelForOp>(builder.clone(*pf.getOperation()));
     builder.create<TerminateOp>(loc);
     ExtractConstraintCase(lt_pf, true);
   }
   builder.setInsertionPointToEnd(&oc.lt_case().front());
   builder.create<TerminateOp>(loc);
   pf.getOperation()->erase();
-}
-
-bool SplitFor(ParallelForOp pf) {
-  if (!SafeConstraintInterior(pf)) {
-    return false;
-  }
-  // Extract the constraint op + poly
-  auto pf_block = &pf.inner().front();
-  auto con = mlir::dyn_cast<ConstraintOp>(*std::prev(pf_block->end(), 2));
-  auto poly = AffinePolynomial(con.input());
-  if (poly.terms.size() != 1) {
-    return false;  // Only works for simple polynomials
-  }
-  mlir::BlockArgument* ba = poly.terms.begin()->first;
-  if (ba->getOwner() != pf_block) {
-    return false;  // Only works when poly is over PF argument
-  }
-  std::cerr << "FOUND CANDIDATE:\n";
-  pf.dump();
-  return true;
 }
 
 }  // namespace stripe

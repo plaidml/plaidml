@@ -106,9 +106,9 @@ FlatTensorAccess ComputeAccess(Value* tensor) {
 }
 
 bool SafeConstraintInterior(ParallelForOp op) {
-  // Get an iterator the the begining of the interior
+  // Get an iterator to the begining of the interior
   auto block = &op.inner().front();
-  // Get the penulitmate Op (ignoring the terminator), which should be a constraint
+  // Get the penultimate Op (ignoring the terminator), which should be a constraint
   auto it_con = std::prev(block->end(), 2);
   // Check that it's good
   if (it_con == block->end() || !mlir::dyn_cast<ConstraintOp>(*it_con)) {
