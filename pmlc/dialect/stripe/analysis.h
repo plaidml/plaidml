@@ -49,7 +49,13 @@ struct FlatTensorAccess {
   CMP_OVERLOADS(FlatTensorAccess)
 };
 
+// For a tensor-reference, compute some information about the base allocation as
+// well as its access polynomials
 FlatTensorAccess ComputeAccess(Value* tensor);
+
+// Check if the parallel-for contains a constraint as its final op, and also
+// that any ops before the constraint are no-side-effect
+bool SafeConstraintInterior(ParallelForOp op);
 
 }  // namespace stripe
 }  // namespace dialect

@@ -5,6 +5,7 @@
 #include <utility>
 
 #include "mlir/IR/Dialect.h"
+#include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/Parser.h"
 #include "llvm/Support/FormatVariadic.h"
@@ -34,7 +35,7 @@ struct OpAsmInterface : public mlir::OpAsmDialectInterface {
     }
   }
 
-  void getBlockArgumentName(mlir::BlockArgument* arg, llvm::raw_ostream& os) const final {
+  void getRegionArgumentName(mlir::BlockArgument* arg, llvm::raw_ostream& os) const final {
     Operation* op = arg->getOwner()->getParentOp();
     if (auto vec = op->getAttrOfType<ArrayAttr>("idx_names")) {
       if (vec.size() > arg->getArgNumber()) {
@@ -132,7 +133,9 @@ std::string Dialect::getDialectAttrName(llvm::StringRef name) {
   return llvm::formatv("{0}.{1}", stripe::Dialect::getDialectNamespace(), name).str();
 }
 
-mlir::Type Dialect::parseType(llvm::StringRef tyData, mlir::Location loc) const {
+mlir::Type Dialect::parseType(mlir::DialectAsmParser& parser) const {
+  StringRef tyData = parser.getFullSymbolSpec();
+  Location loc = parser.getEncodedSourceLoc(parser.getNameLoc());
   if (tyData == "affine") {
     return AffineType::get(getContext());
   }
@@ -177,7 +180,8 @@ static void print(TensorRefType type, llvm::raw_ostream& os) {
   }
 }
 
-void Dialect::printType(mlir::Type type, llvm::raw_ostream& os) const {
+void Dialect::printType(mlir::Type type, mlir::DialectAsmPrinter& printer) const {
+  auto& os = printer.getStream();
   if (auto affineType = type.dyn_cast<AffineType>()) {
     print(affineType, os);
   } else if (auto executorType = type.dyn_cast<ExecutorType>()) {

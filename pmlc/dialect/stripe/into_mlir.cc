@@ -471,7 +471,7 @@ static mlir::FuncOp ProgramIntoMLIR(MLIRContext* ctx, const stripe::Block& block
     auto attrName = Dialect::getDialectAttrName("name");
     func.setArgAttr(argIndex, attrName, builder.getStringAttr(ref.into()));
     auto attrLayout = Dialect::getDialectAttrName("layout");
-    func.setArgAttr(argIndex, attrLayout, builder.getTypeAttr(tensorTypes[argIndex]));
+    func.setArgAttr(argIndex, attrLayout, TypeAttr::get(tensorTypes[argIndex]));
   }
 
   auto attrs = TagsToDict(&builder, block);
