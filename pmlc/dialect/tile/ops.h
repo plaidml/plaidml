@@ -14,8 +14,10 @@ namespace pmlc::dialect::tile {
 
 using eltwise::ScalarType;
 using llvm::APInt;
+using llvm::Optional;
 using mlir::ArrayRef;
 using mlir::Attribute;
+using mlir::BoolAttr;
 using mlir::Builder;
 using mlir::IndexType;
 using mlir::IntegerAttr;

@@ -147,7 +147,11 @@ struct AffineDomainFolder : public OpRewritePattern<AffineDomainOp> {
     if (sourceType == targetType) {
       return matchFailure();
     }
-    auto newOp = rewriter.create<AffineDomainOp>(op.getLoc(), targetType);
+    BoolAttr no_reduce;
+    if (auto optional = op.no_reduce()) {
+      no_reduce = rewriter.getBoolAttr(*optional);
+    }
+    auto newOp = rewriter.create<AffineDomainOp>(op.getLoc(), targetType, no_reduce);
     if (auto attr = op.getAttrOfType<StringAttr>("name")) {
       newOp.setAttr("name", attr);
     }
