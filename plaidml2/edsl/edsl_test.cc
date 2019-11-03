@@ -356,7 +356,7 @@ Tensor ArgMax(const Tensor& I) {
   I.bind_dims(X0, X1, X2);
   auto Max = TensorOutput(X0, X2);
   Max(x0, x2) >= I(x0, x1, x2);
-  auto One = Placeholder(I.shape().dtype(), {});
+  Tensor One{1};
   auto T = TensorOutput(X1);
   T(x1) = One();
   Tensor IX = index(T, 0);
@@ -371,12 +371,12 @@ TEST(CppEdsl, ArgMax) {
   Program program("arg_max", {X});
   EXPECT_THAT(X.shape(), Eq(LogicalShape(PLAIDML_DATA_UINT32, {1, 10})));
   EXPECT_THAT(program, Eq(R"(function (
-  _X0[_X0_0, _X0_1, _X0_2],
-  _X2[]
+  _X0[_X0_0, _X0_1, _X0_2]
 ) -> (
   _X8
 ) {
   _X1[x0, x2 : 1, 10] = >(_X0[x0, x1, x2]);
+  _X2 = 1;
   _X3[x0 : 10] = =(_X2[]);
   _X4 = 0;
   _X5 = index(_X3, _X4);

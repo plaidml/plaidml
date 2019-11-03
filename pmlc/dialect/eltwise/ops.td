@@ -211,7 +211,11 @@ def AsBoolOp : EltwiseOp<"as_bool"> {
     static Type getResultType(ArrayRef<Value*> operands) {
       auto tensorType = getRankedTensorType(operands[0]->getType());
       auto elementType = ScalarType::get(tensorType.getContext(), DataType::BOOLEAN);
-      return RankedTensorType::get(tensorType.getShape(), elementType);
+      auto resultType = RankedTensorType::get(tensorType.getShape(), elementType);
+      if (resultType.getRank() == 0) {
+        return elementType;
+      }
+      return resultType;
     }
   }] # EltwiseBuilderImpl_create;
 }

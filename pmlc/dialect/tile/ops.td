@@ -139,7 +139,7 @@ def AffineDomainOp : TileOp<"domain">, HasCanonicalizer {
 
 def AffineSourceIndexMapOp : TileOp<"src_idx_map", [HasParent<"AffineDomainOp">]> {
   let summary = "affine source index map";
-  let arguments = (ins RankedTensorOf<[AnyScalar]>:$tensor, Variadic<Index>:$dims);
+  let arguments = (ins EltwiseAny:$tensor, Variadic<Index>:$dims);
   let results = (outs AffineIndexMap:$result);
 
   let builders = [OpBuilder<
