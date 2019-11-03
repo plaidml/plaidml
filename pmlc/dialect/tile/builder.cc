@@ -16,6 +16,7 @@
 #include "mlir/Dialect/StandardOps/Ops.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Function.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/IR/Module.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/Value.h"
@@ -216,6 +217,20 @@ Value* TileBuilder::MakePrimitiveOp(StringRef fn, ArrayRef<Value*> args) {
   for (auto arg : args) {
     IVLOG(6, "  arg: " << mlir::debugString(*arg));
   }
+  if (fn == "index") {
+    if (args.size() != 2) {
+      throw std::runtime_error("index op expects 2 operands");
+    }
+    auto tensor = args[0];
+    auto dim = args[1];
+    auto resultType = IndexOp::getResultType(args.take_front());
+    IntegerAttr dimAttr;
+    if (!m_Constant(&dimAttr).match(dim->getDefiningOp())) {
+      throw std::runtime_error("index op expect argument 2 to be a constant integer");
+    }
+    auto op = impl->builder.create<IndexOp>(impl->builder.getUnknownLoc(), resultType, tensor, dimAttr);
+    return op.result();
+  }
   auto abstractOp = impl->lookupOperation(fn);
   auto genericBuilder = abstractOp->getInterface<util::GenericBuilder>();
   if (!genericBuilder) {
@@ -264,13 +279,13 @@ std::vector<Value*> TileBuilder::GetTupleElements(Value* value) {
 
 Value* TileBuilder::MakeScalarConstantOp(int64_t value) {
   IVLOG(5, "TileBuilder::MakeScalarConstantOp> " << value);
-  auto type = impl->builder.getType<ScalarType>(DataType::INT32);
+  auto type = impl->builder.getType<ScalarType>(DataType::INTX);
   return impl->builder.create<ScalarConstantOp>(impl->builder.getUnknownLoc(), type, value).result();
 }
 
 Value* TileBuilder::MakeScalarConstantOp(double value) {
   IVLOG(5, "TileBuilder::MakeScalarConstantOp> " << value);
-  auto type = impl->builder.getType<ScalarType>(DataType::FLOAT32);
+  auto type = impl->builder.getType<ScalarType>(DataType::FLOATX);
   return impl->builder.create<ScalarConstantOp>(impl->builder.getUnknownLoc(), type, value).result();
 }
 

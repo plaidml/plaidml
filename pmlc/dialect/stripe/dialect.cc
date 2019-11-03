@@ -46,15 +46,15 @@ struct OpAsmInterface : public mlir::OpAsmDialectInterface {
   }
 
   void getTypeAliases(mlir::SmallVectorImpl<std::pair<Type, StringRef>>& aliases) const final {  // NOLINT
-    MLIRContext* ctx = getDialect()->getContext();
-    Type t = AffineType::get(ctx);
-    aliases.push_back(std::make_pair(t, StringRef("aff")));
-    for (const auto dt : vertexai::tile::GetDataTypeSet()) {
-      for (size_t r = 0; r < 9; r++) {
-        std::string base = to_string(dt) + "_" + std::to_string(r);
-        auto st = ScalarType::get(ctx, dt);
-        aliases.emplace_back(TensorRefType::get(st, r, false), mlir::Identifier::get(base, ctx));
-        aliases.emplace_back(TensorRefType::get(st, r, true), mlir::Identifier::get(base + "_c", ctx));
+    auto ctx = getDialect()->getContext();
+    auto affineType = AffineType::get(ctx);
+    aliases.push_back(std::make_pair(affineType, StringRef("aff")));
+    for (const auto dataType : vertexai::tile::GetDataTypeSet()) {
+      for (size_t rank = 0; rank < 9; rank++) {
+        auto base = llvm::formatv("{0}_{1}", to_string(dataType), rank).str();
+        auto scalarType = ScalarType::get(ctx, dataType);
+        aliases.emplace_back(TensorRefType::get(scalarType, rank, false), mlir::Identifier::get(base, ctx));
+        aliases.emplace_back(TensorRefType::get(scalarType, rank, true), mlir::Identifier::get(base + "_c", ctx));
       }
     }
   }
