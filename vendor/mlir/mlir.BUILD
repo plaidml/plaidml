@@ -234,6 +234,22 @@ mlir_tblgen(
     incs = ["include"],
 )
 
+mlir_tblgen(
+    name = "gen-loop-like-interface-decls",
+    src = "include/mlir/Transforms/LoopLikeInterface.td",
+    out = "include/mlir/Transforms/LoopLikeInterface.h.inc",
+    action = "-gen-op-interface-decls",
+    incs = ["include"],
+)
+
+mlir_tblgen(
+    name = "gen-loop-like-interface-defs",
+    src = "include/mlir/Transforms/LoopLikeInterface.td",
+    out = "include/mlir/Transforms/LoopLikeInterface.cpp.inc",
+    action = "-gen-op-interface-defs",
+    incs = ["include"],
+)
+
 cc_library(
     name = "StandardOps",
     srcs = glob([
@@ -461,6 +477,7 @@ cc_library(
         ":StandardOps",
         ":gen-affine-op-decls",
         ":gen-affine-op-defs",
+        ":gen-loop-like-interface-decls",
     ],
     alwayslink = 1,
 )
@@ -518,6 +535,7 @@ cc_library(
         ":StandardOps",
         ":gen-loop-op-decls",
         ":gen-loop-op-defs",
+        ":gen-loop-like-interface-decls",
         "@llvm//:support",
     ],
     alwayslink = 1,
@@ -575,6 +593,8 @@ cc_library(
         ":Pass",
         ":TransformUtils",
         ":VectorOps",
+        ":gen-loop-like-interface-decls",
+        ":gen-loop-like-interface-defs",
     ],
     alwayslink = 1,
 )

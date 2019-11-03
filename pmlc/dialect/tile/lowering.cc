@@ -692,7 +692,7 @@ struct FuncOpConversion : public LoweringBase {
         newFuncOp.removeArgAttr(i, tileName);
       }
       newFuncOp.setArgAttr(i, stripeName, name);
-      newFuncOp.setArgAttr(i, stripeLayout, rewriter.getTypeAttr(tensorTypes[i]));
+      newFuncOp.setArgAttr(i, stripeLayout, TypeAttr::get(tensorTypes[i]));
     }
 
     auto returnOp = llvm::cast<ReturnOp>(newFuncOp.getBody().front().getTerminator());
@@ -706,7 +706,7 @@ struct FuncOpConversion : public LoweringBase {
         }
       }
       newFuncOp.setArgAttr(argIndex, stripeName, name);
-      newFuncOp.setArgAttr(argIndex, stripeLayout, rewriter.getTypeAttr(tensorTypes[argIndex]));
+      newFuncOp.setArgAttr(argIndex, stripeLayout, TypeAttr::get(tensorTypes[argIndex]));
     }
 
     // Tell the rewriter to convert the region signature.

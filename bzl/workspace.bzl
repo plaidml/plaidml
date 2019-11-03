@@ -169,17 +169,17 @@ def plaidml_workspace():
 
     dev_http_archive(
         name = "llvm",
-        url = "https://github.com/llvm-mirror/llvm/archive/6d4c970c3440a7d3418b3222b663438bc343c0db.zip",
-        sha256 = "b74de0e5e0fe1f430ee974425acf7ab1ab49bc41ea1f02b57a668893c5abf92d",
-        strip_prefix = "llvm-6d4c970c3440a7d3418b3222b663438bc343c0db",
+        url = "https://github.com/llvm/llvm-project/archive/ecc999101aadc8dc7d4af9fd88be10fe42674aa0.zip",
+        sha256 = "9c682951cc31a6d973e5d7a2cb7500fdf98b7908e7698b03bbb17c3466dcb2b9",
+        strip_prefix = "llvm-project-ecc999101aadc8dc7d4af9fd88be10fe42674aa0/llvm",
         build_file = Label("//vendor/llvm:llvm.BUILD"),
     )
 
     dev_http_archive(
         name = "mlir",
-        url = "https://github.com/tensorflow/mlir/archive/85a65512321acb64b39cae93cdcb2a72d825208c.zip",
-        sha256 = "69bcd0a9e6bc1891874e9e9653a145e51f5465a6145ec3d6244f2d9293c16a91",
-        strip_prefix = "mlir-85a65512321acb64b39cae93cdcb2a72d825208c",
+        url = "https://github.com/tensorflow/mlir/archive/a4b11eba615c87b9253f61d9b66f02839490e12b.zip",
+        sha256 = "5699b4e119b0170e72d8bfba1e132fc42b72e83eb40f56dbbd66d642c326aad6",
+        strip_prefix = "mlir-a4b11eba615c87b9253f61d9b66f02839490e12b",
         build_file = Label("//vendor/mlir:mlir.BUILD"),
         patches = [Label("//vendor/mlir:mlir.patch")],
         patch_args = ["-p1"],
