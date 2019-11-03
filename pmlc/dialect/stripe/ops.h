@@ -13,6 +13,7 @@ namespace pmlc {
 namespace dialect {
 namespace stripe {
 
+using eltwise::DataType;
 using eltwise::ScalarType;
 using mlir::ArrayAttr;
 using mlir::ArrayRef;

@@ -88,12 +88,11 @@ PatternMatchResult AffineTerminatorOpConverter::matchAndRewrite(AffineTerminator
   return matchSuccess();
 }
 
-void populateAffineToStripeConversionPatterns(mlir::OwningRewritePatternList& patterns,  // NOLINT
-                                              mlir::MLIRContext* ctx) {
+void populateAffineToStripeConversionPatterns(mlir::OwningRewritePatternList& patterns, mlir::MLIRContext* ctx) {
 #define AFFINE_OP(OP) OP##Converter,
 #define AFFINE_LAST_OP(OP) OP##Converter
   patterns.insert<
-#include "supported_ops.inc"  // NOLINT
+#include "supported_ops.inc"  // NOLINT(build/include)
       >(ctx);
 }
 

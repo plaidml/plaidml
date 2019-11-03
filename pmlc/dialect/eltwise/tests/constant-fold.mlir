@@ -1,7 +1,7 @@
 // RUN: pmlc-opt %s -canonicalize | FileCheck %s
 
-!fp32 = type tensor<!eltwise.fp32>
-!i32 = type tensor<!eltwise.i32>
+!fp32 = type !eltwise.fp32
+!i32 = type !eltwise.i32
 
 // CHECK-LABEL: @basic
 func @basic(%arg0: !fp32) -> !fp32 {

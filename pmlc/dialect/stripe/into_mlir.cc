@@ -378,8 +378,7 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
         Value* from = safe_at(locals.refs, load->from);
         auto tensorRefType = from->getType().cast<TensorRefType>();
         auto elementType = tensorRefType.getElementType();
-        auto intoType = eltwise::getRankedTensorType(elementType);
-        auto op = builder->create<LoadOp>(unknownLoc, intoType, from);
+        auto op = builder->create<LoadOp>(unknownLoc, elementType, from);
         auto attrs = TagsToDict(builder, *load);
         if (attrs.size()) {
           op.setAttr(Dialect::getStripeAttrsName(), attrs);
@@ -390,9 +389,8 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
       case stripe::StmtKind::LoadIndex: {
         const auto& load_idx = stripe::LoadIndex::Downcast(stmt);
         Value* from = AffineIntoMLIR(builder, locals.idxs, load_idx->from);
-        Type idx_base = eltwise::ScalarType::get(builder->getContext(), DataType::INT32);
-        Type idx_type = eltwise::getRankedTensorType(idx_base);
-        auto op = builder->create<LoadIndexOp>(unknownLoc, idx_type, from);
+        auto indexType = IndexType::get(builder->getContext());
+        auto op = builder->create<LoadIndexOp>(unknownLoc, indexType, from);
         op.setAttr("scalar_name", builder->getStringAttr(load_idx->into));
         locals.scalars.emplace(load_idx->into, op);
       } break;
@@ -428,12 +426,12 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
         switch (cnst->type) {
           case stripe::ConstType::Integer:
             op = builder->create<eltwise::ScalarConstantOp>(
-                unknownLoc, eltwise::ScalarType::get(builder->getContext(), DataType::INT32), cnst->iconst);
+                unknownLoc, eltwise::ScalarType::get(builder->getContext(), DataType::INTX), cnst->iconst);
             op.setAttr("scalar_name", builder->getStringAttr(cnst->name));
             break;
           case stripe::ConstType::Float:
             op = builder->create<eltwise::ScalarConstantOp>(
-                unknownLoc, eltwise::ScalarType::get(builder->getContext(), DataType::FLOAT32), cnst->fconst);
+                unknownLoc, eltwise::ScalarType::get(builder->getContext(), DataType::FLOATX), cnst->fconst);
             op.setAttr("scalar_name", builder->getStringAttr(cnst->name));
             break;
         }

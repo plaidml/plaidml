@@ -23,7 +23,7 @@ struct TensorTypeStorage : public mlir::TypeStorage {
     return llvm::hash_combine(std::get<0>(key), std::get<1>(key), llvm::hash_combine(offset_vec), std::get<3>(key));
   }
 
-  static TensorTypeStorage* construct(mlir::TypeStorageAllocator& allocator, const KeyTy& key) {  // NOLINT
+  static TensorTypeStorage* construct(mlir::TypeStorageAllocator& allocator, const KeyTy& key) {
     return new (allocator.allocate<TensorTypeStorage>())
         TensorTypeStorage(std::get<0>(key), std::get<1>(key), std::get<2>(key), std::get<3>(key));
   }
@@ -76,7 +76,7 @@ struct TensorRefTypeStorage : public mlir::TypeStorage {
   }
   static llvm::hash_code hashKey(const KeyTy& key) { return hash_value(key); }
 
-  static TensorRefTypeStorage* construct(mlir::TypeStorageAllocator& allocator, const KeyTy& key) {  // NOLINT
+  static TensorRefTypeStorage* construct(mlir::TypeStorageAllocator& allocator, const KeyTy& key) {
     return new (allocator.allocate<TensorRefTypeStorage>())
         TensorRefTypeStorage(std::get<0>(key), std::get<1>(key), std::get<2>(key));
   }

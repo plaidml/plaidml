@@ -46,15 +46,21 @@ struct CastCanonicalizer : public OpRewritePattern<CastOp> {
     auto op = castOp.getOperation();
     auto tensor = castOp.tensor();
     auto tensorType = getRankedTensorType(tensor->getType());
-    auto resultTensorType = getRankedTensorType(castOp.result()->getType());
-    auto elementType = resultTensorType.getElementType();
+    auto existingType = getRankedTensorType(castOp.result()->getType());
+    auto elementType = existingType.getElementType();
     auto resultType = RankedTensorType::get(tensorType.getShape(), elementType);
-    if (resultType == castOp.result()->getType()) {
+    if (resultType == existingType) {
       return Pattern::matchFailure();
     }
-    auto newOp = rewriter.create<CastOp>(op->getLoc(), resultType, tensor);
-    rewriter.replaceOp(op, {newOp});
-    util::UpdateFuncOpType(newOp.getOperation());
+    if (resultType.getRank() == 0) {
+      auto newOp = rewriter.create<CastOp>(op->getLoc(), elementType, tensor);
+      rewriter.replaceOp(op, {newOp});
+      util::UpdateFuncOpType(newOp.getOperation());
+    } else {
+      auto newOp = rewriter.create<CastOp>(op->getLoc(), resultType, tensor);
+      rewriter.replaceOp(op, {newOp});
+      util::UpdateFuncOpType(newOp.getOperation());
+    }
     return Pattern::matchSuccess();
   }
 };
@@ -70,7 +76,7 @@ Type CastOp::getResultType(ArrayRef<Value*> operands) {  //
 Operation* CastOp::create(OpBuilder* builder, Location loc, Type type, ArrayRef<Value*> operands) {
   OperationState state(loc, getOperationName());
   state.addOperands(operands);
-  state.addTypes(getRankedTensorType(type));
+  state.addTypes(type);
   return builder->createOperation(state);
 }
 

@@ -38,23 +38,23 @@ struct OpAsmInterface : public mlir::OpAsmDialectInterface {
         os << "s_" << str.substr(1);
       }
     } else if (auto const_op = llvm::dyn_cast<ScalarConstantOp>(op)) {
-      auto attr = const_op.value();
-      if (auto int_attr = attr.dyn_cast<IntegerAttr>()) {
-        os << 'c' << int_attr.getValue();
+      if (auto attr = const_op.value().dyn_cast<IntegerAttr>()) {
+        os << 'c' << attr.getValue();
       } else {
         os << "cst";
       }
     }
   }
 
-  void getTypeAliases(mlir::SmallVectorImpl<std::pair<Type, StringRef>>& aliases) const final {  // NOLINT
-    for (const auto dt : vertexai::tile::GetDataTypeSet()) {
+  void getTypeAliases(mlir::SmallVectorImpl<std::pair<Type, StringRef>>& aliases) const final {
+    auto ctx = getDialect()->getContext();
+    for (const auto dataType : vertexai::tile::GetDataTypeSet()) {
       // Intern the string
-      auto id = mlir::Identifier::get(to_string(dt), getDialect()->getContext());
+      auto alias = mlir::Identifier::get(to_string(dataType), ctx);
       // Get the type
-      Type t = RankedTensorType::get({}, ScalarType::get(getDialect()->getContext(), dt));
+      auto type = ScalarType::get(ctx, dataType);
       // Add the alias
-      aliases.push_back(std::make_pair(t, id));
+      aliases.emplace_back(type, alias);
     }
   }
 };

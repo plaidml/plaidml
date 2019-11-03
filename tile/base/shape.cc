@@ -2,6 +2,8 @@
 
 #include "tile/base/shape.h"
 
+#include "base/util/logging.h"
+
 namespace vertexai {
 namespace tile {
 
@@ -53,6 +55,30 @@ void TensorShape::resize_dim(size_t pos, uint64_t size) {
     item.second->stride = stride;
     stride *= item.second->size;
   }
+}
+
+DataType CommonSupertype(DataType lhs, DataType rhs) {
+  IVLOG(6, "CommonSupertype> " << to_string(lhs) << " : " << to_string(rhs));
+  if (lhs == DataType::INVALID) {
+    return rhs;
+  }
+  if (rhs == DataType::INVALID) {
+    return lhs;
+  }
+  if (is_float(lhs) != is_float(rhs)) {
+    if (is_float(rhs)) {
+      return rhs;
+    } else {
+      return lhs;
+    }
+  }
+  // TODO: This is a bit primitive; for example, it will pick
+  // the first of "int32" or "float32".  We may want to make it
+  // a bit more sophisticated.
+  if (bit_width(rhs) > bit_width(lhs)) {
+    return rhs;
+  }
+  return lhs;
 }
 
 }  // namespace tile
