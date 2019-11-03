@@ -169,9 +169,9 @@ def plaidml_workspace():
 
     dev_http_archive(
         name = "llvm",
-        url = "https://github.com/llvm/llvm-project/archive/e0b3a8c991569f8c05a4edb551b8cc2942e37ea1.zip",
-        sha256 = "2d13962ecc3659bd2a3240b28a5066d53ba07d5fff334fe5f19956d404c4b75c",
-        strip_prefix = "llvm-project-e0b3a8c991569f8c05a4edb551b8cc2942e37ea1/llvm",
+        url = "https://github.com/llvm/llvm-project/archive/ecc999101aadc8dc7d4af9fd88be10fe42674aa0.zip",
+        sha256 = "9c682951cc31a6d973e5d7a2cb7500fdf98b7908e7698b03bbb17c3466dcb2b9",
+        strip_prefix = "llvm-project-ecc999101aadc8dc7d4af9fd88be10fe42674aa0/llvm",
         build_file = Label("//vendor/llvm:llvm.BUILD"),
     )
 
