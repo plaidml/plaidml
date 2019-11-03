@@ -21,9 +21,5 @@ func @simple_accum(
   // CHECK: ^bb0(%[[i1:.*]]: !aff)
   // CHECK: stripe.parallel_for ("i":32)
   // CHECK: ^bb0(%[[i2:.*]]: !aff)
-  // CHECK-DAG: %[[ce:.*]] = stripe.affine_poly (%[[i1]], %[[i2]]) [-32, -1], 99
-  // CHECK-DAG: stripe.constraint %[[ce]]
-  // CHECK-DAG: %[[io:.*]] = stripe.affine_poly (%[[i1]], %[[i2]]) [32, 1], 0
-  // CHECK-DAG: stripe.refine {{.*}}(%[[io]])
 }
 
