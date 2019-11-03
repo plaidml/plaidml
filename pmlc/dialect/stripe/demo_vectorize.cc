@@ -39,11 +39,6 @@ void VectorizePass::runOnFunction() {
     // Do the tiling
     Tile(op, tile_sizes);
   });
-  /*
-  f.walk([](ParallelForOp op) {
-    SplitFor(op);
-  });
-  */
 }
 
 static mlir::PassRegistration<VectorizePass> vectorize_pass("stripe-vectorize", "Vectorize a stripe program");
@@ -59,7 +54,6 @@ void JigsawPass::runOnFunction() {
   f.walk([](ParallelForOp op) {
     if (SafeConstraintInterior(op)) {
       LiftConstraint(op);
-      // return mlir::WalkResult::interrupt();
     }
     return mlir::WalkResult::advance();
   });
@@ -76,7 +70,6 @@ void JigsawPass::runOnFunction() {
   pats.insert<RemoveRangeZeroParallelFors>(context, 10);
   pats.insert<RemoveRangeOneIndexes>(context, 10);
   pats.insert<InlineNoIndexParallelFors>(context, 10);
-  // pats.insert<LiftConstraints>(context, 1);
 
   applyPatternsGreedily(f, pats);
 }

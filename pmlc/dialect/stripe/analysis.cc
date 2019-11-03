@@ -111,7 +111,7 @@ bool SafeConstraintInterior(ParallelForOp op) {
   // Get the penultimate Op (ignoring the terminator), which should be a constraint
   auto it_con = std::prev(block->end(), 2);
   // Check that it's good
-  if (it_con == block->end() || !mlir::dyn_cast<ConstraintOp>(*it_con)) {
+  if (it_con == block->end() || !mlir::isa<ConstraintOp>(*it_con)) {
     return false;
   }
   // Check that all prior ops are no-side-effect and fail if not

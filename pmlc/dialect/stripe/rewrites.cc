@@ -13,17 +13,17 @@ namespace pmlc::dialect::stripe {
 mlir::PatternMatchResult SimplifyPoly::matchAndRewrite(AffinePolyOp op, mlir::PatternRewriter& rewriter) const {
   bool has_non_canonical = false;
   for (size_t i = 0; i < op.getNumOperands(); i++) {
-    if (op.getOperand(i)->getKind() != Value::Kind::BlockArgument) {
+    if (!mlir::isa<mlir::BlockArgument>(op.getOperand(i))) {
       has_non_canonical = true;
     }
   }
-  AffinePolynomial a(op.result());
-  if (a.constant == 0 && a.terms.size() == 1 && a.terms.begin()->second == 1) {
-    rewriter.replaceOp(op, a.terms.begin()->first);
+  AffinePolynomial poly(op.result());
+  if (poly.constant == 0 && poly.terms.size() == 1 && poly.terms.begin()->second == 1) {
+    rewriter.replaceOp(op, poly.terms.begin()->first);
     return matchSuccess();
   }
   if (has_non_canonical) {
-    rewriter.replaceOpWithNewOp<AffinePolyOp>(op, a);
+    rewriter.replaceOpWithNewOp<AffinePolyOp>(op, poly);
     return matchSuccess();
   }
   return matchFailure();
