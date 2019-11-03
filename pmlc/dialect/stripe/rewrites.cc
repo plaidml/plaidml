@@ -50,7 +50,7 @@ void InlineNoIndexParallelFors::rewrite(ParallelForOp op, mlir::PatternRewriter&
   auto iblock = &op.inner().front();
   oblock->getOperations().splice(Block::iterator(op), iblock->getOperations(), iblock->begin(),
                                  std::prev(iblock->end(), 1));
-  rewriter.replaceOp(op, llvm::None);
+  rewriter.eraseOp(op);
 }
 
 mlir::PatternMatchResult RemoveRangeZeroParallelFors::match(ParallelForOp op) const {
@@ -103,7 +103,7 @@ void RemoveRangeOneIndexes::rewrite(ParallelForOp op, mlir::PatternRewriter& rew
   }
   rbody->getOperations().splice(std::prev(rbody->end(), 1), body->getOperations(), body->begin(),
                                 std::prev(body->end(), 1));
-  rewriter.replaceOp(op, llvm::None);
+  rewriter.eraseOp(op);
 }
 
 mlir::PatternMatchResult RemoveTrivialConstraints::matchAndRewrite(ConstraintOp op,
@@ -117,7 +117,7 @@ mlir::PatternMatchResult RemoveTrivialConstraints::matchAndRewrite(ConstraintOp 
       oblock->getOperations().splice(Block::iterator(op), iblock->getOperations(), iblock->begin(),
                                      std::prev(iblock->end(), 1));
     }
-    rewriter.replaceOp(op, llvm::None);
+    rewriter.eraseOp(op);
     return matchSuccess();
   } else if (irange.max < 0) {
     // Always false
@@ -126,7 +126,7 @@ mlir::PatternMatchResult RemoveTrivialConstraints::matchAndRewrite(ConstraintOp 
       oblock->getOperations().splice(Block::iterator(op), iblock->getOperations(), iblock->begin(),
                                      std::prev(iblock->end(), 1));
     }
-    rewriter.replaceOp(op, llvm::None);
+    rewriter.eraseOp(op);
     return matchSuccess();
   } else {
     // Not trivial, never mind
@@ -179,7 +179,7 @@ mlir::PatternMatchResult SplitParallelFor::matchAndRewrite(ParallelForOp pf, mli
     LimitUpper(ge_pf, which_arg, is);
   }
   // Remove original
-  rewriter.replaceOp(pf, llvm::None);
+  rewriter.eraseOp(pf);
   return matchSuccess();
 }
 

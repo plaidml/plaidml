@@ -5,6 +5,7 @@
 #include "llvm/Support/FormatVariadic.h"
 
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpImplementation.h"
 
 #include "base/util/logging.h"
@@ -47,7 +48,8 @@ std::string Dialect::getCanonicalOpName(llvm::StringRef name) {
   return llvm::formatv("{0}.{1}", getDialectNamespace(), name).str();
 }
 
-void Dialect::printType(mlir::Type type, llvm::raw_ostream& os) const {
+void Dialect::printType(mlir::Type type, mlir::DialectAsmPrinter& printer) const {
+  auto& os = printer.getStream();
   if (auto t = type.dyn_cast<AffineIndexMapType>()) {
     os << "imap";
   } else if (auto t = type.dyn_cast<AffineSizeMapType>()) {
@@ -55,7 +57,9 @@ void Dialect::printType(mlir::Type type, llvm::raw_ostream& os) const {
   }
 }
 
-mlir::Type Dialect::parseType(llvm::StringRef spec, mlir::Location loc) const {
+mlir::Type Dialect::parseType(mlir::DialectAsmParser& parser) const {
+  StringRef spec = parser.getFullSymbolSpec();
+  Location loc = parser.getEncodedSourceLoc(parser.getNameLoc());
   if (spec == "imap") {
     return AffineIndexMapType::get(getContext());
   }
