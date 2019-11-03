@@ -1,45 +1,23 @@
 diff --git a/include/mlir/IR/OpImplementation.h b/include/mlir/IR/OpImplementation.h
-index 304a2c80..ee52dbc6 100644
+index a07bb143..e15d21ab 100644
 --- a/include/mlir/IR/OpImplementation.h
 +++ b/include/mlir/IR/OpImplementation.h
-@@ -133,6 +133,10 @@ public:
-     }
-   }
- 
-+  /// Print a newline and the current identation level, plus 'extraIndent'
-+  /// additional levels, for use in multi-line op/block/region representations.
-+  virtual void printNewline(int extraIndent = 0) = 0;
-+
- private:
-   OpAsmPrinter(const OpAsmPrinter &) = delete;
-   void operator=(const OpAsmPrinter &) = delete;
-@@ -588,6 +592,9 @@ public:
+@@ -594,6 +594,10 @@ public:
    /// Get a special name to use when printing the given operation. The desired
    /// name should be streamed into 'os'.
    virtual void getOpResultName(Operation *op, raw_ostream &os) const {}
-+  /// Get a special name to use when printing the block arguments. The desired
-+  /// name should be streamed into 'os'.
-+  virtual void getBlockArgumentName(BlockArgument *arg, raw_ostream &os) const {}
++  /// Get a special name to use when printing the entry block arguments for any
++  /// region contained by an Op in this dialect.  The desired name should be
++  /// streamed into 'os'.  If the result is empty, the default name will be used.
++  virtual void getRegionArgumentName(BlockArgument *arg, raw_ostream &os) const {}
  };
  
  } // end namespace mlir
 diff --git a/lib/IR/AsmPrinter.cpp b/lib/IR/AsmPrinter.cpp
-index ce79db0e..c2b02d9a 100644
+index 0e6b7882..c2aa84fe 100644
 --- a/lib/IR/AsmPrinter.cpp
 +++ b/lib/IR/AsmPrinter.cpp
-@@ -1280,6 +1280,11 @@ public:
-     });
-   }
- 
-+  void printNewline(int extraIndent) override {
-+    os << '\n';
-+    os.indent(currentIndent + extraIndent * indentWidth);
-+  }
-+
-   // Number of spaces used for indenting nested operations.
-   const static unsigned indentWidth = 2;
- 
-@@ -1392,10 +1397,21 @@ void OperationPrinter::numberValueID(Value *value) {
+@@ -1566,10 +1566,22 @@ void OperationPrinter::numberValueID(Value *value) {
    llvm::raw_svector_ostream specialName(specialNameBuffer);
  
    // Check to see if this value requested a special name.
@@ -48,18 +26,19 @@ index ce79db0e..c2b02d9a 100644
 -    if (auto *interface = state->getOpAsmInterface(op->getDialect()))
 -      interface->getOpResultName(op, specialName);
 +  if (state) {
-+    // First check for OpResult values
 +    if (auto *op = value->getDefiningOp()) {
++      // If the value is the result of an Op, ask the Op's dialect for a name
 +      if (auto *interface = state->getOpAsmInterface(op->getDialect()))
 +        interface->getOpResultName(op, specialName);
-+    }
-+    // Next check for BlockArgument values
-+    // Here we presume that a block belongs to the dialect of the op which
-+    // holds it's region (if any)
-+    if (auto* arg = mlir::dyn_cast<mlir::BlockArgument>(value)) {
-+      if (auto* op = arg->getOwner()->getParentOp()) {
-+        if (auto *interface = state->getOpAsmInterface(op->getDialect()))
-+          interface->getBlockArgumentName(arg, specialName);
++    } else {
++      // Otherwise, if the value is an entry block argument, find it's parent
++      // and ask it's dialect for a friendly name
++      auto arg = cast<BlockArgument>(value);
++      if (arg->getOwner()->isEntryBlock()) {
++        if (auto* op = arg->getOwner()->getParentOp()) {
++          if (auto *interface = state->getOpAsmInterface(op->getDialect()))
++            interface->getRegionArgumentName(arg, specialName);
++        }
 +      }
 +    }
    }

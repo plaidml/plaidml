@@ -39,13 +39,6 @@ void VectorizePass::runOnFunction() {
     // Do the tiling
     Tile(op, tile_sizes);
   });
-  f.walk([](ParallelForOp op) {
-    if (SafeConstraintInterior(op)) {
-      LiftConstraint(op);
-      // return mlir::WalkResult::interrupt();
-    }
-    return mlir::WalkResult::advance();
-  });
   /*
   f.walk([](ParallelForOp op) {
     SplitFor(op);
@@ -55,11 +48,22 @@ void VectorizePass::runOnFunction() {
 
 static mlir::PassRegistration<VectorizePass> vectorize_pass("stripe-vectorize", "Vectorize a stripe program");
 
-struct JigsawPass : public mlir::OperationPass<JigsawPass> {
-  void runOnOperation() override;
+struct JigsawPass : public mlir::FunctionPass<JigsawPass> {
+  void runOnFunction() override;
 };
 
-void JigsawPass::runOnOperation() {
+void JigsawPass::runOnFunction() {
+  mlir::FuncOp f = getFunction();
+
+  // Lift all the constraints
+  f.walk([](ParallelForOp op) {
+    if (SafeConstraintInterior(op)) {
+      LiftConstraint(op);
+      // return mlir::WalkResult::interrupt();
+    }
+    return mlir::WalkResult::advance();
+  });
+
   // Setup for a rewriter
   OwningRewritePatternList pats;
 
@@ -74,8 +78,7 @@ void JigsawPass::runOnOperation() {
   pats.insert<InlineNoIndexParallelFors>(context, 10);
   // pats.insert<LiftConstraints>(context, 1);
 
-  Operation* op = getOperation();
-  applyPatternsGreedily(op, pats);
+  applyPatternsGreedily(f, pats);
 }
 
 static mlir::PassRegistration<JigsawPass> jigsaw_pass("stripe-jigsaw",
