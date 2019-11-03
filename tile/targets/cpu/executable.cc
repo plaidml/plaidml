@@ -35,6 +35,12 @@
 // libxsmm
 #include "libxsmm_source.h"  // NOLINT
 
+// Lubo
+#include "tbb/tbb.h"
+
+using namespace tbb;
+// Lubo end
+
 namespace vertexai {
 namespace tile {
 namespace targets {
@@ -108,6 +114,26 @@ void Executable::SetPerfAttrs(stripe::Block* block) {
   }
 }
 
+// Lubo
+
+void Foo(float f) { IVLOG(1, "Lubo---Foo called!"); }
+
+class ApplyFoo {
+  float* const my_a;
+
+ public:
+  void operator()(const blocked_range<size_t>& r) const {
+    float* a = my_a;
+    for (size_t i = r.begin(); i != r.end(); ++i) Foo(a[i]);
+  }
+  ApplyFoo(float a[]) : my_a(a) {}
+};
+// Lubo end
+
+// Lubo
+void ParallelApplyFoo(float a[], size_t n) { parallel_for(blocked_range<size_t>(0, n), ApplyFoo(a)); }
+// Lubo end
+
 namespace rt {
 // Implementations of support functions the tile backend will link against,
 // that we won't be able to resolve from system libraries.
@@ -133,7 +159,14 @@ void RunTimeLogEntry(char* str, char* extra, float address) {
 }
 
 typedef void (*libxsmm_function)(const void* a, const void* b, void* c);
-void XSMMRTCaller(libxsmm_function func, const void* aPtr, const void* bPtr, void* cPtr) { func(aPtr, bPtr, cPtr); }
+void XSMMRTCaller(libxsmm_function func, const void* aPtr, const void* bPtr, void* cPtr) {
+  float a[3];
+  a[0] = 1.0;
+  a[1] = 2.0;
+  a[2] = 3.0;
+  ParallelApplyFoo(a, 3);  // Lubo
+  func(aPtr, bPtr, cPtr);
+}
 
 }  // namespace rt
 
@@ -190,6 +223,7 @@ llvm::JITSymbol Runtime::findSymbol(const std::string& name) {
     symbols.emplace(name, info);
     return info;
   }
+
   throw std::runtime_error("failed to resolve external symbol reference: \"" + name + "\"");
 }
 
