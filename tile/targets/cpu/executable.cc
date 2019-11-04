@@ -22,6 +22,7 @@
 
 #include "base/util/env.h"
 #include "base/util/lookup.h"
+#include "tbb/tbb.h"
 #include "tile/stripe/stripe.h"
 #include "tile/targets/cpu/link_names.h"
 
@@ -137,11 +138,10 @@ void XSMMRTCaller(libxsmm_function func, const void* aPtr, const void* bPtr, voi
 
 typedef void (*cpu_thread_block)(void** refs, ssize_t* inits, size_t range_begin, size_t range_end);
 void ParallelFor(void** refs, ssize_t* inits, size_t range_size, cpu_thread_block func) {
-  // simulate invocation of parallel_for with a single index
-  func(refs, inits, 0, range_size);
-  // for (size_t i = 0; i < range_size; ++i) {
-  //  func(refs, inits, i, 1+i);
-  //}
+  tbb::parallel_for(tbb::blocked_range<size_t>(0, range_size), [=](const tbb::blocked_range<size_t>& r) {
+    IVLOG(1, "parallel_for " << r.begin() << ":" << r.end());
+    func(refs, inits, r.begin(), r.end());
+  });
 }
 
 }  // namespace rt
