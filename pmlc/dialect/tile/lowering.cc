@@ -55,21 +55,19 @@ using mlir::Value;
 namespace pmlc::dialect::tile {
 
 static stripe::TensorType convertIntoTensorType(Type type) {
-  if (auto rankedType = type.dyn_cast<RankedTensorType>()) {
-    auto shape = rankedType.getShape();
-    auto cls = Identifier::get(stripe::kAddressClassIdentifier, rankedType.getContext());
-    llvm::SmallVector<stripe::TensorDim, 4> newShape(shape.size(), stripe::TensorDim{0, 0, cls});
-    // TODO: instead of using natural strides, use the I/O map supplied by the user
-    int64_t stride = 1;
-    for (int i = shape.size() - 1; i >= 0; i--) {
-      newShape[i].stride = stride;
-      newShape[i].size = shape[i];
-      stride *= shape[i];
-    }
-    // TODO: deal with is_const
-    return stripe::TensorType::get(rankedType.getElementType(), newShape, stripe::OffsetsMap{}, false);
+  auto rankedTensorType = eltwise::getRankedTensorType(type);
+  auto shape = rankedTensorType.getShape();
+  auto cls = Identifier::get(stripe::kAddressClassIdentifier, type.getContext());
+  llvm::SmallVector<stripe::TensorDim, 4> newShape(shape.size(), stripe::TensorDim{0, 0, cls});
+  // TODO: instead of using natural strides, use the I/O map supplied by the user
+  int64_t stride = 1;
+  for (int i = shape.size() - 1; i >= 0; i--) {
+    newShape[i].stride = stride;
+    newShape[i].size = shape[i];
+    stride *= shape[i];
   }
-  throw std::runtime_error("Invalid type");
+  // TODO: deal with is_const
+  return stripe::TensorType::get(rankedTensorType.getElementType(), newShape, stripe::OffsetsMap{}, false);
 }
 
 static Operation* createZero(OpBuilder* builder, Location loc, Type elementType) {
@@ -800,7 +798,7 @@ struct SpecialOpConversion : public LoweringBase {
     auto opName = stripe::Dialect::getCanonicalOpName(util::getOpName(op->getName()));
     auto abstractOp = AbstractOperation::lookup(opName, op->getContext());
     if (!abstractOp) {
-      op->emitError("AbstractOperation::lookup failed for: " + opName);
+      op->emitError("AbstractOperation::lookup failed for: ") << opName;
       return matchFailure();
     }
     auto specialOp = abstractOp->getInterface<stripe::SpecialOp>();

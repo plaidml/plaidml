@@ -199,9 +199,8 @@ static void IntrinsicIntoMLIR(OpBuilder* builder, SymbolTable* locals, const str
       throw std::runtime_error("Unsupported cast: " + intrinsic.name);
     }
     auto scalarType = DataTypeIntoMLIR(builder->getContext(), it->second);
-    auto resultType = eltwise::getRankedTensorType(scalarType);
     auto tensor = safe_at(locals->scalars, intrinsic.inputs[0]);
-    auto op = builder->create<eltwise::CastOp>(builder->getUnknownLoc(), resultType, tensor);
+    auto op = builder->create<eltwise::CastOp>(builder->getUnknownLoc(), scalarType, tensor);
     locals->scalars.emplace(intrinsic.outputs[0], op.result());
     op.setAttr("scalar_name", builder->getStringAttr(intrinsic.outputs[0]));
     return;

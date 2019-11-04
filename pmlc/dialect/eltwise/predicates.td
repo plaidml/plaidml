@@ -49,6 +49,11 @@ def AnyScalarUnsigned : Type<And<[
     CPred<"is_uint($_self.cast<ScalarType>().type())">
   ]>, "scalar-unsigned">;
 
+def IndexLike : Type<Or<[
+    Index.predicate,
+    ScalarIndex.predicate,
+  ]>, "index-like">;
+
 // Whether a type is a RankedTensorType.
 def IsRankedTensorTypePred : CPred<"$_self.isa<RankedTensorType>()">;
 

@@ -35,15 +35,16 @@ func @eltwise_add(
 
 // -----
 
+!int = type !eltwise.int
 func @dot(%arg0: tensor<1x784x!eltwise.fp32>, %arg1: tensor<784x512x!eltwise.fp32>) -> tensor<1x512x!eltwise.fp32> {
-  %0 = "tile.affine_const"() {value = 512 : i64} : () -> index
-  %1 = "tile.affine_const"() {value = 1 : i64} : () -> index
+  %0 = "tile.affine_const"() {value = 512 : i64} : () -> !int
+  %1 = "tile.affine_const"() {value = 1 : i64} : () -> !int
   %2 = "tile.domain"() ( {
-  ^bb0(%arg2: index, %arg3: index, %arg4: index):
-    %3 = "tile.src_idx_map"(%arg0, %arg3, %arg2) : (tensor<1x784x!eltwise.fp32>, index, index) -> !tile.imap
-    %4 = "tile.src_idx_map"(%arg1, %arg2, %arg4) : (tensor<784x512x!eltwise.fp32>, index, index) -> !tile.imap
-    %5 = "tile.sink_idx_map"(%arg3, %arg4) : (index, index) -> !tile.imap
-    %6 = "tile.size_map"(%1, %0) : (index, index) -> !tile.smap
+  ^bb0(%arg2: !int, %arg3: !int, %arg4: !int):
+    %3 = "tile.src_idx_map"(%arg0, %arg3, %arg2) : (tensor<1x784x!eltwise.fp32>, !int, !int) -> !tile.imap
+    %4 = "tile.src_idx_map"(%arg1, %arg2, %arg4) : (tensor<784x512x!eltwise.fp32>, !int, !int) -> !tile.imap
+    %5 = "tile.sink_idx_map"(%arg3, %arg4) : (!int, !int) -> !tile.imap
+    %6 = "tile.size_map"(%1, %0) : (!int, !int) -> !tile.smap
     "tile.+(x*y)"(%6, %3, %4, %5) : (!tile.smap, !tile.imap, !tile.imap, !tile.imap) -> ()
   }) : () -> tensor<1x512x!eltwise.fp32>
   return %2 : tensor<1x512x!eltwise.fp32>
@@ -73,28 +74,29 @@ func @dot(%arg0: tensor<1x784x!eltwise.fp32>, %arg1: tensor<784x512x!eltwise.fp3
 
 // -----
 
+!int = type !eltwise.int
 func @double_dot(
   %arg0: tensor<10x20x!eltwise.fp32>,
   %arg1: tensor<20x30x!eltwise.fp32>,
   %arg2: tensor<30x40x!eltwise.fp32>
 ) -> tensor<10x40x!eltwise.fp32> {
-  %0 = "tile.affine_const"() {value = 30 : i64} : () -> index
-  %1 = "tile.affine_const"() {value = 10 : i64} : () -> index
-  %2 = "tile.affine_const"() {value = 40 : i64} : () -> index
+  %0 = "tile.affine_const"() {value = 30 : i64} : () -> !int
+  %1 = "tile.affine_const"() {value = 10 : i64} : () -> !int
+  %2 = "tile.affine_const"() {value = 40 : i64} : () -> !int
   %3 = "tile.domain"() ( {
-  ^bb0(%arg3: index, %arg4: index, %arg5: index):
-    %5 = "tile.src_idx_map"(%arg0, %arg4, %arg3) : (tensor<10x20x!eltwise.fp32>, index, index) -> !tile.imap
-    %6 = "tile.src_idx_map"(%arg1, %arg3, %arg5) : (tensor<20x30x!eltwise.fp32>, index, index) -> !tile.imap
-    %7 = "tile.sink_idx_map"(%arg4, %arg5) : (index, index) -> !tile.imap
-    %8 = "tile.size_map"(%1, %0) : (index, index) -> !tile.smap
+  ^bb0(%arg3: !int, %arg4: !int, %arg5: !int):
+    %5 = "tile.src_idx_map"(%arg0, %arg4, %arg3) : (tensor<10x20x!eltwise.fp32>, !int, !int) -> !tile.imap
+    %6 = "tile.src_idx_map"(%arg1, %arg3, %arg5) : (tensor<20x30x!eltwise.fp32>, !int, !int) -> !tile.imap
+    %7 = "tile.sink_idx_map"(%arg4, %arg5) : (!int, !int) -> !tile.imap
+    %8 = "tile.size_map"(%1, %0) : (!int, !int) -> !tile.smap
     "tile.+(x*y)"(%8, %5, %6, %7) : (!tile.smap, !tile.imap, !tile.imap, !tile.imap) -> ()
   }) : () -> tensor<10x30x!eltwise.fp32>
   %4 = "tile.domain"() ( {
-  ^bb0(%arg3: index, %arg4: index, %arg5: index):
-    %5 = "tile.src_idx_map"(%3, %arg4, %arg3) : (tensor<10x30x!eltwise.fp32>, index, index) -> !tile.imap
-    %6 = "tile.src_idx_map"(%arg2, %arg3, %arg5) : (tensor<30x40x!eltwise.fp32>, index, index) -> !tile.imap
-    %7 = "tile.sink_idx_map"(%arg4, %arg5) : (index, index) -> !tile.imap
-    %8 = "tile.size_map"(%1, %2) : (index, index) -> !tile.smap
+  ^bb0(%arg3: !int, %arg4: !int, %arg5: !int):
+    %5 = "tile.src_idx_map"(%3, %arg4, %arg3) : (tensor<10x30x!eltwise.fp32>, !int, !int) -> !tile.imap
+    %6 = "tile.src_idx_map"(%arg2, %arg3, %arg5) : (tensor<30x40x!eltwise.fp32>, !int, !int) -> !tile.imap
+    %7 = "tile.sink_idx_map"(%arg4, %arg5) : (!int, !int) -> !tile.imap
+    %8 = "tile.size_map"(%1, %2) : (!int, !int) -> !tile.smap
     "tile.+(x*y)"(%8, %5, %6, %7) : (!tile.smap, !tile.imap, !tile.imap, !tile.imap) -> ()
   }) : () -> tensor<10x40x!eltwise.fp32>
   return %4 : tensor<10x40x!eltwise.fp32>
@@ -182,10 +184,11 @@ func @relu(%arg0: !t_10x20xfp32) -> !t_10x20xfp32 {
 
 // -----
 
+!int = type !eltwise.int
 func @reshape(%arg0: tensor<10x20x!eltwise.fp32>) -> tensor<5x5x20x!eltwise.fp32> {
-  %c5 = "eltwise.sconst"() {value = 5 : i64} : () -> index
-  %c20 = "eltwise.sconst"() {value = 20 : i64} : () -> index
-  %1 = "tile.reshape"(%arg0, %c5, %c5, %c20) : (tensor<10x20x!eltwise.fp32>, index, index, index) -> tensor<5x5x20x!eltwise.fp32>
+  %c5 = "eltwise.sconst"() {value = 5 : i64} : () -> !int
+  %c20 = "eltwise.sconst"() {value = 20 : i64} : () -> !int
+  %1 = "tile.reshape"(%arg0, %c5, %c5, %c20) : (tensor<10x20x!eltwise.fp32>, !int, !int, !int) -> tensor<5x5x20x!eltwise.fp32>
   return %1 : tensor<5x5x20x!eltwise.fp32>
 }
 
@@ -202,17 +205,18 @@ func @reshape(%arg0: tensor<10x20x!eltwise.fp32>) -> tensor<5x5x20x!eltwise.fp32
 
 // -----
 
+!int = type !eltwise.int
 func @csum(%arg0: tensor<10x!eltwise.fp32>) -> tensor<10x!eltwise.fp32> {
-  %0 = "tile.affine_const"() {value = 10 : i64} : () -> index
+  %0 = "tile.affine_const"() {value = 10 : i64} : () -> !int
   %1 = "tile.domain"() ( {
-  ^bb0(%arg1: index, %arg2: index):	// no predecessors
-    %2 = "tile.src_idx_map"(%arg0, %arg1) : (tensor<10x!eltwise.fp32>, index) -> !tile.imap
-    %3 = "tile.sink_idx_map"(%arg2) : (index) -> !tile.imap
-    %4 = "tile.size_map"(%0) : (index) -> !tile.smap
-    %5 = "tile.affine_sub"(%arg2, %arg1) : (index, index) -> index
+  ^bb0(%arg1: !int, %arg2: !int):	// no predecessors
+    %2 = "tile.src_idx_map"(%arg0, %arg1) : (tensor<10x!eltwise.fp32>, !int) -> !tile.imap
+    %3 = "tile.sink_idx_map"(%arg2) : (!int) -> !tile.imap
+    %4 = "tile.size_map"(%0) : (!int) -> !tile.smap
+    %5 = "tile.affine_sub"(%arg2, %arg1) : (!int, !int) -> !int
     "tile.constraint"(%5, %0) ( {
       "tile.+(x)"(%4, %2, %3) : (!tile.smap, !tile.imap, !tile.imap) -> ()
-    }) : (index, index) -> ()
+    }) : (!int, !int) -> ()
   }) : () -> tensor<10x!eltwise.fp32>
   return %1 : tensor<10x!eltwise.fp32>
 }
@@ -230,16 +234,17 @@ func @csum(%arg0: tensor<10x!eltwise.fp32>) -> tensor<10x!eltwise.fp32> {
 
 // -----
 
+!int = type !eltwise.int
 func @use_default(%arg0: tensor<1x10x10x!eltwise.fp32>, %arg1: tensor<1x7x10x10x!eltwise.fp32>) -> tensor<1x7x10x10x!eltwise.fp32> {
-  %c3 = "tile.affine_const"() {value = 3 : i64} : () -> index
-  %c10 = "tile.affine_const"() {value = 10 : i64} : () -> index
-  %c7 = "tile.affine_const"() {value = 7 : i64} : () -> index
-  %c1 = "tile.affine_const"() {value = 1 : i64} : () -> index
+  %c3 = "tile.affine_const"() {value = 3 : i64} : () -> !int
+  %c10 = "tile.affine_const"() {value = 10 : i64} : () -> !int
+  %c7 = "tile.affine_const"() {value = 7 : i64} : () -> !int
+  %c1 = "tile.affine_const"() {value = 1 : i64} : () -> !int
   %4 = "tile.domain"() ( {
-  ^bb0(%arg2: index, %arg3: index, %arg4: index):	// no predecessors
-    %5 = "tile.src_idx_map"(%arg0, %arg4, %arg3, %arg2) : (tensor<1x10x10x!eltwise.fp32>, index, index, index) -> !tile.imap
-    %6 = "tile.sink_idx_map"(%arg4, %c3, %arg3, %arg2) : (index, index, index, index) -> !tile.imap
-    %7 = "tile.size_map"(%c1, %c7, %c10, %c10) : (index, index, index, index) -> !tile.smap
+  ^bb0(%arg2: !int, %arg3: !int, %arg4: !int):	// no predecessors
+    %5 = "tile.src_idx_map"(%arg0, %arg4, %arg3, %arg2) : (tensor<1x10x10x!eltwise.fp32>, !int, !int, !int) -> !tile.imap
+    %6 = "tile.sink_idx_map"(%arg4, %c3, %arg3, %arg2) : (!int, !int, !int, !int) -> !tile.imap
+    %7 = "tile.size_map"(%c1, %c7, %c10, %c10) : (!int, !int, !int, !int) -> !tile.smap
     "tile.=(x)"(%7, %5, %6, %arg1) : (!tile.smap, !tile.imap, !tile.imap, tensor<1x7x10x10x!eltwise.fp32>) -> ()
   }) : () -> tensor<1x7x10x10x!eltwise.fp32>
   return %4 : tensor<1x7x10x10x!eltwise.fp32>

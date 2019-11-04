@@ -93,12 +93,12 @@ bool MergeTypes(Type* into, Type from, DataType dtype) {
     }
   }
 
-  auto intoElementType = intoShapedType.getElementType().dyn_cast<ScalarType>();
-  auto fromElementType = fromShapedType.getElementType().dyn_cast<ScalarType>();
-  if (!intoElementType || !fromElementType) {
-    throw std::runtime_error("NYI: Only scalar element types are supported");
-  }
   if (dtype == DataType::INVALID) {
+    auto intoElementType = intoShapedType.getElementType().dyn_cast<ScalarType>();
+    auto fromElementType = fromShapedType.getElementType().dyn_cast<ScalarType>();
+    if (!intoElementType || !fromElementType) {
+      throw std::runtime_error("NYI: Only scalar element types are supported");
+    }
     dtype = CommonSupertype(intoElementType.type(), fromElementType.type());
   }
   auto elementType = ScalarType::get(into->getContext(), dtype);
@@ -146,11 +146,7 @@ Type ComputeResultType(ArrayRef<Value*> operands, DataType override) {
       throw std::runtime_error(ss.str());
     }
   }
-  auto rankedTensorType = getRankedTensorType(ret);
-  if (rankedTensorType.getRank() == 0) {
-    ret = rankedTensorType.getElementType();
-    IVLOG(6, "  Scalar type: " << debugString(ret));
-  }
+  // return canonicalizeType(ret);
   return ret;
 }
 
@@ -166,6 +162,14 @@ SmallVector<int64_t, 4> ComputeShape(ArrayRef<Value*> operands) {
     }
   }
   return shape;
+}
+
+Type canonicalizeType(Type type) {
+  auto rankedTensorType = getRankedTensorType(type);
+  if (rankedTensorType.getRank() == 0) {
+    return rankedTensorType.getElementType();
+  }
+  return rankedTensorType;
 }
 
 Attribute constFoldUnaryOp(ArrayRef<Attribute> operands, UnaryCalculate calculate) {

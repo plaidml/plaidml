@@ -19,6 +19,8 @@ mlir::Type ComputeResultType(llvm::ArrayRef<mlir::Value*> operands, DataType ove
 
 mlir::RankedTensorType getRankedTensorType(mlir::Type type);
 
+mlir::Type canonicalizeType(mlir::Type type);
+
 using UnaryCalculate = std::function<double(double)>;
 mlir::Attribute constFoldUnaryOp(llvm::ArrayRef<mlir::Attribute> operands, UnaryCalculate calculate);
 

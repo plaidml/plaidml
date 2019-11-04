@@ -52,15 +52,9 @@ struct CastCanonicalizer : public OpRewritePattern<CastOp> {
     if (resultType == existingType) {
       return Pattern::matchFailure();
     }
-    if (resultType.getRank() == 0) {
-      auto newOp = rewriter.create<CastOp>(op->getLoc(), elementType, tensor);
-      rewriter.replaceOp(op, {newOp});
-      util::UpdateFuncOpType(newOp.getOperation());
-    } else {
-      auto newOp = rewriter.create<CastOp>(op->getLoc(), resultType, tensor);
-      rewriter.replaceOp(op, {newOp});
-      util::UpdateFuncOpType(newOp.getOperation());
-    }
+    auto newOp = rewriter.create<CastOp>(op->getLoc(), resultType, tensor);
+    rewriter.replaceOp(op, {newOp});
+    util::UpdateFuncOpType(newOp.getOperation());
     return Pattern::matchSuccess();
   }
 };
