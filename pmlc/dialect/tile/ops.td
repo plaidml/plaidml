@@ -20,7 +20,7 @@ class TileOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
 
 def PlaceholderOp : TileOp<"var"> {
   let summary = "placeholder operation";
-  let results = (outs Eltwise_AnyTensor:$result);
+  let results = (outs RankedTensorOf<[AnyScalar]>:$result);
 }
 
 def TupleOp : TileOp<"tuple"> {
@@ -39,7 +39,7 @@ def StringOp : TileOp<"str"> {
 
 def DimOp : TileOp<"dim">, HasFolder {
   let summary = "dimension index operation";
-  let arguments = (ins Eltwise_AnyTensor:$tensor, APIntAttr:$dim);
+  let arguments = (ins RankedTensorOf<[AnyScalar]>:$tensor, APIntAttr:$dim);
   let results = (outs Index:$result);
 
   let builders = [OpBuilder<
@@ -133,13 +133,13 @@ def AffineMinOp : AffineBinaryOp<"affine_min", [Commutative]> {
 def AffineDomainOp : TileOp<"domain">, HasCanonicalizer {
   let summary = "affine domain";
   let arguments = (ins OptionalAttr<BoolAttr>:$no_reduce);
-  let results = (outs Eltwise_AnyTensor:$result);
+  let results = (outs RankedTensorOf<[AnyScalar]>:$result);
   let regions = (region SizedRegion<1>:$body);
 }
 
 def AffineSourceIndexMapOp : TileOp<"src_idx_map", [HasParent<"AffineDomainOp">]> {
   let summary = "affine source index map";
-  let arguments = (ins Eltwise_AnyTensor:$tensor, Variadic<Index>:$dims);
+  let arguments = (ins EltwiseAny:$tensor, Variadic<Index>:$dims);
   let results = (outs AffineIndexMap:$result);
 
   let builders = [OpBuilder<
@@ -390,21 +390,13 @@ def ConSumMulOp : BinaryConOp<"+(x*y)", "add", "mul"> {
   let summary = "+(x * y) contraction";
 }
 
-def IndexOp : TileOp<"index", [NoSideEffect, GenericBuilderInterface]>, HasCanonicalizer {
+def IndexOp : TileOp<"index", [NoSideEffect]>, HasCanonicalizer {
   let summary = "tensor index lookup operation";
-  let arguments = (ins Eltwise_AnyTensor:$tensor, Eltwise_Integer:$dim);
-  let results = (outs Eltwise_IntegerTensor:$result);
+  let arguments = (ins RankedTensorOf<[AnyScalar]>:$tensor, APIntAttr:$dim);
+  let results = (outs RankedTensorOf<[ScalarIndex]>:$result);
 
   let extraClassDeclaration = [{
     static Type getResultType(ArrayRef<Value*> operands);
-
-    static Operation* create(OpBuilder* builder, Location loc, Type type, ArrayRef<Value*> operands) {
-      OperationState state(loc, getOperationName());
-      state.addOperands(operands);
-      state.addAttribute("type", TypeAttr::get(type));
-      state.addTypes(getResultType(operands));
-      return builder->createOperation(state);
-    }
   }];
 }
 
@@ -426,30 +418,30 @@ class SpecialOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
 
 def GatherOp : SpecialOp<"gather">, HasCanonicalizer {
   let summary = "special gather operation";
-  let arguments = (ins Eltwise_AnyTensor:$tensor, Eltwise_IntegerTensor:$dims);
-  let results = (outs Eltwise_AnyTensor:$result);
+  let arguments = (ins RankedTensorOf<[AnyScalar]>:$tensor, VectorOf<[Index]>:$dims);
+  let results = (outs RankedTensorOf<[AnyScalar]>:$result);
 }
 
 def PrngOp : SpecialOp<"prng">, HasCanonicalizer {
   let summary = "pseudorandom number generator";
-  let arguments = (ins Eltwise_AnyTensor:$state, Variadic<Eltwise_Integer>:$dims);
-  let results = (outs Eltwise_AnyTensor:$result);
+  let arguments = (ins RankedTensorOf<[AnyScalar]>:$state, Variadic<Index>:$dims);
+  let results = (outs RankedTensorOf<[AnyScalar]>:$result);
 }
 
 def ReshapeOp : SpecialOp<"reshape">, HasCanonicalizer {
   let summary = "tensor reshape operation";
-  let arguments = (ins Eltwise_AnyTensor:$tensor, Variadic<Eltwise_Integer>:$dims);
-  let results = (outs Eltwise_AnyTensor:$result);
+  let arguments = (ins RankedTensorOf<[AnyScalar]>:$tensor, Variadic<Index>:$dims);
+  let results = (outs RankedTensorOf<[AnyScalar]>:$result);
 }
 
 def ScatterOp : SpecialOp<"scatter">, HasCanonicalizer {
   let summary = "special scatter operation";
-  let arguments = (ins Eltwise_AnyTensor:$tensor, Eltwise_IntegerTensor:$dims, Eltwise_AnyTensor:$other);
-  let results = (outs Eltwise_AnyTensor:$result);
+  let arguments = (ins RankedTensorOf<[AnyScalar]>:$tensor, VectorOf<[Index]>:$dims, RankedTensorOf<[AnyScalar]>:$other);
+  let results = (outs RankedTensorOf<[AnyScalar]>:$result);
 }
 
 def ShapeOp : SpecialOp<"shape">, HasCanonicalizer {
   let summary = "tensor shape operation";
-  let arguments = (ins Eltwise_AnyTensor:$tensor);
-  let results = (outs Eltwise_IntegerTensor:$result);
+  let arguments = (ins RankedTensorOf<[AnyScalar]>:$tensor);
+  let results = (outs VectorOf<[Index]>:$result);
 }

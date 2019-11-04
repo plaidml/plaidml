@@ -1,11 +1,11 @@
 // RUN: pmlc-opt -tile-legalize-to-stripe -canonicalize -cse -split-input-file %s | FileCheck %s --dump-input-on-failure
 
 func @eltwise_add(
-  %arg0: tensor<10x20x!eltwise.fp32>, 
+  %arg0: tensor<10x20x!eltwise.fp32>,
   %arg1: tensor<10x20x!eltwise.fp32>
 ) -> tensor<10x20x!eltwise.fp32> {
   %0 = "eltwise.add"(%arg1, %arg0) {type = !eltwise.fp32} : (
-    tensor<10x20x!eltwise.fp32>, 
+    tensor<10x20x!eltwise.fp32>,
     tensor<10x20x!eltwise.fp32>
   ) -> tensor<10x20x!eltwise.fp32>
   return %0 : tensor<10x20x!eltwise.fp32>
@@ -24,7 +24,7 @@ func @eltwise_add(
 // CHECK-DAG:        %[[IN2:.*]] = stripe.refine %arg1(%i0, %i1) : !fp32_2 {stripe_attrs = {eltwise_add}}
 // CHECK-DAG:        %[[LOAD1:.*]] = stripe.load %[[IN1]] : !fp32_2
 // CHECK-DAG:        %[[LOAD2:.*]] = stripe.load %[[IN2]] : !fp32_2
-// CHECK-DAG:        %[[ADD:.*]] = "eltwise.add"(%[[LOAD2]], %[[LOAD1]]) {type = !eltwise.fp32} : (!fp32, !fp32) -> !fp32
+// CHECK-DAG:        %[[ADD:.*]] = "eltwise.add"(%[[LOAD2]], %[[LOAD1]]) {type = !fp32} : (!fp32, !fp32) -> !fp32
 // CHECK-DAG:        stripe.store %[[OUT]], %[[ADD]] : !fp32_2
 // CHECK-NEXT:       stripe.terminate
 // CHECK-NEXT:     } {stripe_attrs = {eltwise, eltwise_add, kernel}}
@@ -62,7 +62,7 @@ func @dot(%arg0: tensor<1x784x!eltwise.fp32>, %arg1: tensor<784x512x!eltwise.fp3
 // CHECK-DAG:        %[[IN2:.*]] = stripe.refine %arg1(%x0, %x2) : !fp32_2 {name = "_X1", stripe_attrs = {contraction}}
 // CHECK-DAG:        %[[LOAD1:.*]] = stripe.load %[[IN1]] : !fp32_2
 // CHECK-DAG:        %[[LOAD2:.*]] = stripe.load %[[IN2]] : !fp32_2
-// CHECK-DAG:        %[[MUL:.*]] = "eltwise.mul"(%[[LOAD1]], %[[LOAD2]]) {type = !eltwise.fp32} : (!fp32, !fp32) -> !fp32
+// CHECK-DAG:        %[[MUL:.*]] = "eltwise.mul"(%[[LOAD1]], %[[LOAD2]]) {type = !fp32} : (!fp32, !fp32) -> !fp32
 // CHECK-DAG:        stripe.aggregate "add" %[[OUT]] %[[MUL]] : !fp32_2
 // CHECK-NEXT:       stripe.terminate
 // CHECK-NEXT:     } {stripe_attrs = {agg_op_add, combo_op_mul, contraction, kernel}}
@@ -115,7 +115,7 @@ func @double_dot(
 // CHECK-DAG:        %[[IN2:.*]] = stripe.refine %arg1(%x0, %x2) : !fp32_2 {name = "_X1", stripe_attrs = {contraction}}
 // CHECK-DAG:        %[[LOAD1:.*]] = stripe.load %[[IN1]] : !fp32_2
 // CHECK-DAG:        %[[LOAD2:.*]] = stripe.load %[[IN2]] : !fp32_2
-// CHECK-DAG:        %[[MUL:.*]] = "eltwise.mul"(%[[LOAD1]], %[[LOAD2]]) {type = !eltwise.fp32} : (!fp32, !fp32) -> !fp32
+// CHECK-DAG:        %[[MUL:.*]] = "eltwise.mul"(%[[LOAD1]], %[[LOAD2]]) {type = !fp32} : (!fp32, !fp32) -> !fp32
 // CHECK-DAG:        stripe.aggregate "add" %[[OUT]] %[[MUL]] : !fp32_2
 // CHECK-NEXT:       stripe.terminate
 // CHECK-NEXT:     } {stripe_attrs = {agg_op_add, combo_op_mul, contraction, kernel}}
@@ -126,7 +126,7 @@ func @double_dot(
 // CHECK-DAG:        %[[IN2:.*]] = stripe.refine %arg2(%x0, %x2) : !fp32_2 {name = "_X2", stripe_attrs = {contraction}}
 // CHECK-DAG:        %[[LOAD1:.*]] = stripe.load %[[IN1]] : !fp32_2
 // CHECK-DAG:        %[[LOAD2:.*]] = stripe.load %[[IN2]] : !fp32_2
-// CHECK-DAG:        %[[MUL:.*]] = "eltwise.mul"(%[[LOAD1]], %[[LOAD2]]) {type = !eltwise.fp32} : (!fp32, !fp32) -> !fp32
+// CHECK-DAG:        %[[MUL:.*]] = "eltwise.mul"(%[[LOAD1]], %[[LOAD2]]) {type = !fp32} : (!fp32, !fp32) -> !fp32
 // CHECK-DAG:        stripe.aggregate "add" %[[OUT]] %[[MUL]] : !fp32_2
 // CHECK-NEXT:       stripe.terminate
 // CHECK-NEXT:     } {stripe_attrs = {agg_op_add, combo_op_mul, contraction, kernel}}
@@ -137,7 +137,7 @@ func @double_dot(
 
 // -----
 
-!fp32 = type tensor<!eltwise.fp32>
+!fp32 = type !eltwise.fp32
 !t_10x20xfp32 = type tensor<10x20x!eltwise.fp32>
 !t_10x20xbool = type tensor<10x20x!eltwise.bool>
 
@@ -160,7 +160,7 @@ func @relu(%arg0: !t_10x20xfp32) -> !t_10x20xfp32 {
 // CHECK-DAG:        %[[OUT:.*]] = stripe.refine %0(%i0, %i1) : !bool_2
 // CHECK-DAG:        %[[IN:.*]] = stripe.refine %arg0(%i0, %i1) : !fp32_2 {stripe_attrs = {eltwise_cmp_lt}}
 // CHECK-DAG:        %[[LOAD:.*]] = stripe.load %[[IN]] : !fp32_2
-// CHECK-DAG:        %[[CMP:.*]] = "eltwise.cmp_lt"(%[[LOAD]], %[[CST]]) {type = !eltwise.bool} : (!fp32, !fp32) -> !bool
+// CHECK-DAG:        %[[CMP:.*]] = "eltwise.cmp_lt"(%[[LOAD]], %[[CST]]) {type = !bool} : (!fp32, !fp32) -> !bool
 // CHECK-DAG:        stripe.store %[[OUT]], %[[CMP]] : !bool_2
 // CHECK-NEXT:       stripe.terminate
 // CHECK-NEXT:     } {stripe_attrs = {eltwise, eltwise_cmp_lt, kernel}}
@@ -171,7 +171,7 @@ func @relu(%arg0: !t_10x20xfp32) -> !t_10x20xfp32 {
 // CHECK-DAG:        %[[IN2:.*]] = stripe.refine %arg0(%i0, %i1) : !fp32_2 {stripe_attrs = {eltwise_select}}
 // CHECK-DAG:        %[[LOAD1:.*]] = stripe.load %[[IN1]] : !bool_2
 // CHECK-DAG:        %[[LOAD2:.*]] = stripe.load %[[IN2]] : !fp32_2
-// CHECK-DAG:        %[[SELECT:.*]] = "eltwise.select"(%[[LOAD1]], %[[CST]], %[[LOAD2]]) {type = !eltwise.fp32} : (!bool, !fp32, !fp32) -> !fp32
+// CHECK-DAG:        %[[SELECT:.*]] = "eltwise.select"(%[[LOAD1]], %[[CST]], %[[LOAD2]]) {type = !fp32} : (!bool, !fp32, !fp32) -> !fp32
 // CHECK-DAG:        stripe.store %[[OUT]], %[[SELECT]] : !fp32_2
 // CHECK-NEXT:       stripe.terminate
 // CHECK-NEXT:     } {stripe_attrs = {eltwise, eltwise_select, kernel}}
@@ -254,3 +254,17 @@ func @use_default(%arg0: tensor<1x10x10x!eltwise.fp32>, %arg1: tensor<1x7x10x10x
 // CHECK: stripe.load
 // CHECK: stripe.store
 // CHECK: contraction
+
+// -----
+
+func @index_op(%arg0: tensor<1x10x10x!eltwise.fp32>) -> tensor<1x10x10x!eltwise.int> {
+  %1 = "tile.index"(%arg0) {dim = 0 : i64} : (tensor<1x10x10x!eltwise.fp32>) -> tensor<1x10x10x!eltwise.int>
+  return %1 : tensor<1x10x10x!eltwise.int>
+}
+
+// CHECK-LABEL: func @index_op
+// CHECK: stripe.parallel_for ("i0":1, "i1":10, "i2":10)
+// CHECK: stripe.refine %arg1(%i0, %i1, %i2) : !int_3
+// CHECK: "stripe.load_index"(%i0) : (!aff) -> !int
+// CHECK: stripe.store %0, %1 : !int_3
+// CHECK: eltwise_index

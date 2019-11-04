@@ -25,9 +25,9 @@
 #include "tile/lang/runinfo.h"
 #include "tile/lib/lib.h"
 
-using namespace vertexai::tile;         // NOLINT
-using namespace pmlc::dialect::stripe;  // NOLINT
-using namespace plaidml::edsl;          // NOLINT
+using namespace vertexai::tile;         // NOLINT(build/namespaces)
+using namespace pmlc::dialect::stripe;  // NOLINT(build/namespaces)
+using namespace plaidml::edsl;          // NOLINT(build/namespaces)
 
 using ::testing::LinesEq;
 
