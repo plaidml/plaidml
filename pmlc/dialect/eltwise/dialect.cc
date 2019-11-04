@@ -10,6 +10,7 @@
 #include "mlir/Dialect/StandardOps/Ops.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Dialect.h"
+#include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpImplementation.h"
 
 #include "pmlc/dialect/eltwise/ops.h"
@@ -77,11 +78,12 @@ std::string Dialect::getCanonicalOpName(llvm::StringRef name) {
   return llvm::formatv("{0}.{1}", getDialectNamespace(), name).str();
 }
 
-mlir::Type Dialect::parseType(llvm::StringRef spec, mlir::Location loc) const {  //
-  return ScalarType::get(getContext(), DataTypeFromString(spec));
+mlir::Type Dialect::parseType(mlir::DialectAsmParser& parser) const {  //
+  return ScalarType::get(getContext(), DataTypeFromString(parser.getFullSymbolSpec()));
 }
 
-void Dialect::printType(mlir::Type type, llvm::raw_ostream& os) const {
+void Dialect::printType(mlir::Type type, mlir::DialectAsmPrinter& printer) const {
+  auto& os = printer.getStream();
   if (auto t = type.dyn_cast<ScalarType>()) {
     os << to_string(t.type());
   } else {

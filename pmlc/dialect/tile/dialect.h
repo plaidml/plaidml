@@ -18,8 +18,8 @@ class Dialect : public mlir::Dialect {
   static std::string getDialectAttrName(llvm::StringRef name);
   static std::string getCanonicalOpName(llvm::StringRef name);
 
-  mlir::Type parseType(llvm::StringRef spec, mlir::Location loc) const override;
-  void printType(mlir::Type type, llvm::raw_ostream& os) const override;
+  mlir::Type parseType(mlir::DialectAsmParser& parser) const override;
+  void printType(mlir::Type type, mlir::DialectAsmPrinter& printer) const override;
 
   mlir::Operation* materializeConstant(  //
       mlir::OpBuilder& builder,          //
