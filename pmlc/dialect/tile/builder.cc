@@ -99,6 +99,15 @@ struct TileBuilder::Impl {
     }
     return abstractOp;
   }
+
+  std::vector<mlir::Value*> getBackwardSliceOfAffine(const llvm::SetVector<mlir::Value*>& values) {
+    return util::getBackwardSlice(values, false, [](Value* value) {
+      if (auto scalarType = value->getType().dyn_cast<ScalarType>()) {
+        return scalarType.type() == DataType::INTX;
+      }
+      return false;
+    });
+  }
 };
 
 std::map<ContractionKey, std::string> TileBuilder::Impl::contractions{
@@ -223,10 +232,7 @@ void TileBuilder::BindTensorDims(Value* from, ArrayRef<Value**> intos) {
 
 RankedTensorType TileBuilder::ComputeShape(Value* tensor) {
   IVLOG(5, "TileBuilder::ComputeShape>");
-  auto type = tensor->getType().dyn_cast<RankedTensorType>();
-  if (!type) {
-    throw std::runtime_error("Only tensor types are supported");
-  }
+  auto type = eltwise::getRankedTensorType(tensor->getType());
   if (type.hasStaticShape()) {
     return type;
   }
@@ -456,9 +462,7 @@ void TileBuilder::AddConstraint(Value* cion, Value* lhs, Value* rhs) {
   llvm::SetVector<Value*> values;
   values.insert(lhs);
   values.insert(rhs);
-  auto slice = util::getBackwardSlice(values, false, [](Value* value) {  //
-    return value->getType().isa<IndexType>();
-  });
+  auto slice = impl->getBackwardSliceOfAffine(values);
 
   // Previously, some values will have already been cloned into the AffineDomainOp
   // However, there might be other ops that this constraint introduced that needs
@@ -548,9 +552,7 @@ Value* TileBuilder::MakeContractionOp(  //
   values.insert(srcs.begin(), srcs.end());
   values.insert(sink);
   values.insert(sizes);
-  auto slice = util::getBackwardSlice(values, false, [](Value* value) {  //
-    return value->getType().isa<IndexType>();
-  });
+  auto slice = impl->getBackwardSliceOfAffine(values);
   // Find and replace each AffineIndexOp with a BlockArgument of the domain op
   SmallVector<Attribute, 8> idxNames;
   std::queue<Value*> worklist;
@@ -693,6 +695,7 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(  //
   pm.addPass(mlir::createCSEPass());
   auto result = pm.run(module);
   if (failed(result)) {
+    IVLOG(1, mlir::debugString(module));
     throw std::runtime_error("Optimization passes failure");
   }
   for (unsigned i = 0; i < returnOp.getNumOperands(); i++) {
