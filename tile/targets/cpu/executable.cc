@@ -138,10 +138,8 @@ void XSMMRTCaller(libxsmm_function func, const void* aPtr, const void* bPtr, voi
 
 typedef void (*cpu_thread_block)(void** refs, ssize_t* inits, size_t range_begin, size_t range_end);
 void ParallelFor(void** refs, ssize_t* inits, size_t range_size, cpu_thread_block func) {
-  tbb::parallel_for(tbb::blocked_range<size_t>(0, range_size), [=](const tbb::blocked_range<size_t>& r) {
-    IVLOG(1, "parallel_for " << r.begin() << ":" << r.end());
-    func(refs, inits, r.begin(), r.end());
-  });
+  tbb::parallel_for(tbb::blocked_range<size_t>(0, range_size),
+                    [=](const tbb::blocked_range<size_t>& r) { func(refs, inits, r.begin(), r.end()); });
 }
 
 }  // namespace rt

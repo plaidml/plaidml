@@ -550,12 +550,25 @@ llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
   }
 
   if (block.has_tag("cpu_thread") && !block.idxs.empty()) {
+    // Find the index which has the largest range. We'll split that range
+    // across threads. The code which calls this block will pass that range
+    // in to ParallelFor, which will invoke this function providing the begin
+    // and end of the sub-range we should iterate over. We will use those
+    // values in place of the default init and limit for that index.
+    size_t best_index = 0;
+    size_t best_range = 0;
+    for (size_t i = 0; i < block.idxs.size(); ++i) {
+      if (block.idxs[i].range > best_range) {
+        best_range = block.idxs[i].range;
+        best_index = i;
+      }
+    }
     // Replace the init & limit values for index zero with the range_begin
     // and range_end parameters passed in by ParallelFor.
-    auto& idx = indexes_[block.idxs[0].name];
+    auto& idx = indexes_[block.idxs[best_index].name];
     llvm::Value* base = idx.init;
     idx.init = builder_.CreateAdd(base, function->getArg(2));
-    limits[0] = builder_.CreateAdd(base, function->getArg(3));
+    limits[best_index] = builder_.CreateAdd(base, function->getArg(3));
   }
 
   ProfileBlockEnter(block);
@@ -883,10 +896,20 @@ void Compiler::Visit(const stripe::Block& block) {
       builder_.CreateStore(idxs[i], elementPtr);
     }
     if (!block.idxs.empty()) {
-      // For the moment we're only going to split over the first index. Later it
-      // might be nice to use a composite index, for better granularity.
-      size_t range = block.idxs[0].range;
-      ParallelFor(bufsArg, initsArg, range, function);
+      // Pick the index with the largest range. Pass that range value in as
+      // the quantity to split over. When compiling the block function, we will
+      // use the same criterion to determine which loop should be controlled
+      // by the range_begin and range_end parameters provided by ParallelFor.
+      size_t best_range = 0;
+      for (auto& idx : block.idxs) {
+        if (idx.range > best_range) {
+          best_range = idx.range;
+        }
+      }
+      // Someday it might be nice to create a composite index over the ranges
+      // of all indexes, then split workers across it, for even greater
+      // granularity of work items, but this will do for now.
+      ParallelFor(bufsArg, initsArg, best_range, function);
     } else {
       // There is no point in using ParallelFor to invoke a block which has no
       // indexes, since there is no way to divide the work among threads.
