@@ -2,8 +2,11 @@
 
 #pragma once
 
+#include <memory>
+
 namespace mlir {
 class FuncOp;
+class Pass;
 }  // namespace mlir
 
 namespace pmlc {
@@ -22,9 +25,18 @@ class PopulateTensorRefShape {
  public:
   explicit PopulateTensorRefShape(mlir::Operation* op);
 
-  void populateWithShapes(mlir::FuncOp func);
+  /// Recompute shape information for 'tensor_ref' types.
+  void recompute();
+
+ private:
+  mlir::Operation* operation;
 };
 
 }  // namespace stripe
 }  // namespace dialect
 }  // namespace pmlc
+
+namespace mlir {
+/// Creates a pass for testing analysis that populates 'tensor_ref' types with shape information.
+std::unique_ptr<mlir::Pass> createTestPopulateTensorRefShapePass();
+}  // namespace mlir
