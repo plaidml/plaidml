@@ -334,6 +334,9 @@ plaidml_expr_kind plaidml_expr_get_kind(  //
         return PLAIDML_EXPR_FLOAT;
       }
     }
+    if (auto dimOp = llvm::dyn_cast_or_null<pmlc::dialect::tile::DimOp>(op)) {
+      return PLAIDML_EXPR_DIM;
+    }
     auto type = expr->value->getType();
     if (type.isa<mlir::NoneType>()) {
       return PLAIDML_EXPR_NONE;
@@ -343,9 +346,6 @@ plaidml_expr_kind plaidml_expr_get_kind(  //
     }
     if (type.isa<mlir::TupleType>()) {
       return PLAIDML_EXPR_TUPLE;
-    }
-    if (type.isa<mlir::IndexType>()) {
-      return PLAIDML_EXPR_DIM;
     }
     if (type.isa<mlir::RankedTensorType>()) {
       return PLAIDML_EXPR_TENSOR;
