@@ -22,8 +22,8 @@ class Dialect : public mlir::Dialect {
   mlir::Type parseTensor(llvm::StringRef tyData, mlir::Location loc) const;
   mlir::Type parseTensorRef(llvm::StringRef tyData, mlir::Location loc) const;
 
-  mlir::Type parseType(llvm::StringRef tyData, mlir::Location loc) const override;
-  void printType(mlir::Type type, llvm::raw_ostream& os) const override;
+  mlir::Type parseType(mlir::DialectAsmParser& parser) const override;
+  void printType(mlir::Type type, mlir::DialectAsmPrinter& printer) const override;
 };
 
 }  // namespace stripe

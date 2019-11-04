@@ -23,8 +23,7 @@ namespace conversion {
 namespace affine_to_stripe {
 
 /// Collect a set of patterns to convert Affine dialect ops to Stripe dialect ops.
-void populateAffineToStripeConversionPatterns(mlir::OwningRewritePatternList& patterns,  // NOLINT
-                                              mlir::MLIRContext* ctx);
+void populateAffineToStripeConversionPatterns(mlir::OwningRewritePatternList& patterns, mlir::MLIRContext* ctx);
 
 }  // namespace affine_to_stripe
 }  // namespace conversion

@@ -28,6 +28,7 @@ using IndexAccess = std::vector<IndexPoly>;
 using IndexBounds = std::map<std::string, Bound>;
 using RangeConstraints = std::vector<math::RangeConstraint>;
 using SimpleConstraints = std::vector<math::SimpleConstraint>;
+using BoundsAndConstraints = std::tuple<IndexBounds, SimpleConstraints>;
 
 struct Constraints {
   RangeConstraints constraints;
@@ -40,7 +41,7 @@ struct Constraints {
   // Computes the bounds implied by the constraints, and also rewrites remaining
   // constraints to be minimal presuming the new set of bounds.
   // Throws on failure (ie Unbounded)
-  std::tuple<IndexBounds, SimpleConstraints> ComputeBounds();
+  BoundsAndConstraints ComputeBounds();
 
   std::set<std::string> VariablesUsed();
 };
@@ -48,12 +49,10 @@ struct Constraints {
 struct Contraction {
   Contraction(ContractionOp op, llvm::ArrayRef<ConstraintOp> constraintOps);
 
-  std::tuple<IndexBounds, SimpleConstraints> ComputeBounds(llvm::ArrayRef<stripe::TensorType> shapes);
+  BoundsAndConstraints ComputeBounds(llvm::ArrayRef<stripe::TensorType> shapes, bool no_reduce);
 
   std::vector<IndexAccess> accesses;
   std::vector<math::RangeConstraint> constraints;
-  // bool no_defract = false;
-  // std::string use_default;
 
  private:
   std::set<std::string> getIndexVars() const;

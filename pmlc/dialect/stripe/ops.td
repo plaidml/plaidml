@@ -1,7 +1,15 @@
 // Copyright 2019, Intel Corporation
 
+#ifndef __PML_STRIPE_OPS__
+#define __PML_STRIPE_OPS__
+
+#ifndef __PML_UTIL_ENUMS__
 include "pmlc/util/enums.td"
+#endif
+
+#ifndef __PML_ELTWISE_PREDICATES__
 include "pmlc/dialect/eltwise/predicates.td"
+#endif
 
 def StripeDialect : Dialect {
   let name = "stripe";
@@ -18,8 +26,8 @@ class StripeOp<string mnemonic, list<OpTrait> traits = []> :
 
 class StripeOpWithPP<string mnemonic, list<OpTrait> traits = []> 
     : StripeOp<mnemonic, traits> {
-  let printer = [{ print$cppClass(p, *this); }];
-  let parser = [{ return parse$cppClass(parser, result); }];
+  let printer = [{ print$cppClass(&p, *this); }];
+  let parser = [{ return parse$cppClass(&parser, result); }];
 }
 
 def TerminateOp : StripeOpWithPP<"terminate", [Terminator]> {
@@ -48,26 +56,26 @@ def RefineOp : StripeOpWithPP<"refine", [NoSideEffect]> {
   let hasCanonicalizer = 1;
 }
 
-def LoadOp : StripeOpWithPP<"load"> {
+def LoadOp : StripeOpWithPP<"load", [NoSideEffect]> {
   let summary = "Load from a tensor";
   let arguments = (ins TensorRefType:$from);
-  let results = (outs Eltwise_AnyTensor:$into);
+  let results = (outs AnyScalar:$into);
 }
 
 def LoadIndexOp : StripeOp<"load_index"> {
   let summary = "Convert an affine expression into a scalar value";
   let arguments = (ins AffineType:$from);
-  let results = (outs Eltwise_AnyTensor:$into);
+  let results = (outs AnyScalar:$into);
 }
 
 def StoreOp : StripeOpWithPP<"store"> {
   let summary = "Store into a tensor";
-  let arguments = (ins TensorRefType:$into, Eltwise_AnyTensor:$from);
+  let arguments = (ins TensorRefType:$into, AnyScalar:$from);
 }
 
 def AggregateOp : StripeOpWithPP<"aggregate"> {
   let summary = "A accumulating store with a commutative, associative accumulation";
-  let arguments = (ins TensorRefType:$into, Eltwise_AnyTensor:$from, AggregationKind:$agg);
+  let arguments = (ins TensorRefType:$into, AnyScalar:$from, AggregationKind:$agg);
   let results = (outs);
 }
 
@@ -106,6 +114,7 @@ def ParallelForOp : StripeOpWithPP<"parallel_for"> {
 def ConstraintOp : StripeOpWithPP<"constraint"> {
   let arguments = (ins AffineType:$input);
   let regions = (region AnyRegion:$ge_case, AnyRegion:$lt_case);
+  let hasCanonicalizer = 1;
 }
 
 def SpecialOpInterface : OpInterface<"SpecialOp"> {
@@ -179,3 +188,5 @@ def ExecuteOnOp : StripeOpWithPP<"execute_on", [Terminator, HasParent<"ParallelF
   // 'from' represents the executor value being returned.
   let arguments = (ins TensorRefType:$from);
 }
+
+#endif // __PML_STRIPE_OPS__

@@ -74,6 +74,7 @@ class TileBuilder {
 
   void AddConstraint(mlir::Value* cion, mlir::Value* lhs, mlir::Value* rhs);
   void SetUseDefault(mlir::Value* cion, mlir::Value* defaultValue);
+  void SetNoReduce(mlir::Value* cion, bool no_reduce);
 
   std::shared_ptr<TileProgram> MakeProgram(  //
       llvm::StringRef name,                  //

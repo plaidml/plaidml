@@ -4,12 +4,14 @@
 
 #include "base/util/logging.h"
 
+#include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 
 #include "pmlc/dialect/stripe/analysis.h"
 #include "pmlc/dialect/stripe/ops.h"
-#include "pmlc/dialect/stripe/tile.h"
+#include "pmlc/dialect/stripe/rewrites.h"
+#include "pmlc/dialect/stripe/transforms.h"
 
 namespace pmlc {
 namespace dialect {
@@ -40,6 +42,40 @@ void VectorizePass::runOnFunction() {
 }
 
 static mlir::PassRegistration<VectorizePass> vectorize_pass("stripe-vectorize", "Vectorize a stripe program");
+
+struct JigsawPass : public mlir::FunctionPass<JigsawPass> {
+  void runOnFunction() override;
+};
+
+void JigsawPass::runOnFunction() {
+  mlir::FuncOp f = getFunction();
+
+  // Lift all the constraints
+  f.walk([](ParallelForOp op) {
+    if (SafeConstraintInterior(op)) {
+      LiftConstraint(op);
+    }
+    return mlir::WalkResult::advance();
+  });
+
+  // Setup for a rewriter
+  OwningRewritePatternList pats;
+
+  // Add in the required patterns
+  auto* context = &getContext();
+  pats.insert<SimplifyPoly>(context, 10);
+  pats.insert<RemoveTrivialConstraints>(context, 10);
+  pats.insert<SplitParallelFor>(context, 10);
+  pats.insert<RemoveNoSideEffectParallelFors>(context, 10);
+  pats.insert<RemoveRangeZeroParallelFors>(context, 10);
+  pats.insert<RemoveRangeOneIndexes>(context, 10);
+  pats.insert<InlineNoIndexParallelFors>(context, 10);
+
+  applyPatternsGreedily(f, pats);
+}
+
+static mlir::PassRegistration<JigsawPass> jigsaw_pass("stripe-jigsaw",
+                                                      "Split parallel-fors into bits to remove constraints");
 
 }  // namespace stripe
 }  // namespace dialect

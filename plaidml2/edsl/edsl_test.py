@@ -354,7 +354,7 @@ class TestEdsl(unittest.TestCase):
         O = TensorOutput(N0, 3 * N1, N2)
         O[n0, 3 * n1 + k, n2] = I[n0, n1, n2]
         O.add_constraint(k < 3)
-        O.no_defract()
+        O.no_reduce()
         program = Program('repeat_elts', [O])
         self.assertMultiLineEqual(
             str(program), '''function (

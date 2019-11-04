@@ -16,6 +16,7 @@
 #include "mlir/Dialect/StandardOps/Ops.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Function.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/IR/Module.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/Value.h"
@@ -65,7 +66,7 @@ struct UniqueNamer {
 
   std::string get(StringRef name) {
     auto next = name.str();
-    auto [it, isUnique] = names.insert(next);  // NOLINT(whitespace/braces)
+    auto [it, isUnique] = names.insert(next);
     for (unsigned i = 0; !isUnique; i++) {
       next = llvm::formatv("{0}_{1}", name, i).str();
       std::tie(it, isUnique) = names.insert(next);
@@ -91,8 +92,8 @@ struct TileBuilder::Impl {
   Type inferElementType(ArrayRef<Type> types) {
     DataType ret = DataType::INVALID;
     for (auto type : types) {
-      auto tensorType = type.cast<ShapedType>();
-      auto dtype = tensorType.getElementType().cast<ScalarType>().type();
+      auto rankedTensorType = eltwise::getRankedTensorType(type);
+      auto dtype = rankedTensorType.getElementType().cast<ScalarType>().type();
       ret = CommonSupertype(ret, dtype);
     }
     return builder.getType<ScalarType>(ret);
@@ -216,6 +217,20 @@ Value* TileBuilder::MakePrimitiveOp(StringRef fn, ArrayRef<Value*> args) {
   for (auto arg : args) {
     IVLOG(6, "  arg: " << mlir::debugString(*arg));
   }
+  if (fn == "index") {
+    if (args.size() != 2) {
+      throw std::runtime_error("index op expects 2 operands");
+    }
+    auto tensor = args[0];
+    auto dim = args[1];
+    auto resultType = IndexOp::getResultType(args.take_front());
+    IntegerAttr dimAttr;
+    if (!m_Constant(&dimAttr).match(dim->getDefiningOp())) {
+      throw std::runtime_error("index op expect argument 2 to be a constant integer");
+    }
+    auto op = impl->builder.create<IndexOp>(impl->builder.getUnknownLoc(), resultType, tensor, dimAttr);
+    return op.result();
+  }
   auto abstractOp = impl->lookupOperation(fn);
   auto genericBuilder = abstractOp->getInterface<util::GenericBuilder>();
   if (!genericBuilder) {
@@ -264,13 +279,13 @@ std::vector<Value*> TileBuilder::GetTupleElements(Value* value) {
 
 Value* TileBuilder::MakeScalarConstantOp(int64_t value) {
   IVLOG(5, "TileBuilder::MakeScalarConstantOp> " << value);
-  auto type = impl->builder.getType<ScalarType>(DataType::INT32);
+  auto type = impl->builder.getType<ScalarType>(DataType::INTX);
   return impl->builder.create<ScalarConstantOp>(impl->builder.getUnknownLoc(), type, value).result();
 }
 
 Value* TileBuilder::MakeScalarConstantOp(double value) {
   IVLOG(5, "TileBuilder::MakeScalarConstantOp> " << value);
-  auto type = impl->builder.getType<ScalarType>(DataType::FLOAT32);
+  auto type = impl->builder.getType<ScalarType>(DataType::FLOATX);
   return impl->builder.create<ScalarConstantOp>(impl->builder.getUnknownLoc(), type, value).result();
 }
 
@@ -421,6 +436,16 @@ void TileBuilder::SetUseDefault(Value* cion, Value* defaultValue) {
   terminator->setOperands(operands);
 }
 
+void TileBuilder::SetNoReduce(mlir::Value* cion, bool no_reduce) {
+  IVLOG(2, "TileBuilder::SetNoReduce> " << no_reduce);
+  auto op = cion->getDefiningOp();
+  auto domainOp = llvm::dyn_cast_or_null<AffineDomainOp>(op);
+  if (!domainOp) {
+    throw std::runtime_error("no_reduce can only be specified on a contraction.");
+  }
+  domainOp.setAttr("no_reduce", impl->builder.getBoolAttr(no_reduce));
+}
+
 Value* TileBuilder::MakeContractionOp(  //
     util::AggregationKind agg,          //
     util::CombinationKind combo,        //
@@ -454,8 +479,8 @@ Value* TileBuilder::MakeContractionOp(  //
   auto size_map_op = llvm::cast<AffineSizeMapOp>(sizes->getDefiningOp());
   llvm::SmallVector<Value*, 4> size_map_sizes(size_map_op.sizes());
   auto shape = eltwise::ComputeShape(size_map_sizes);
-  auto tensorType = impl->builder.getTensorType(shape, elementType);
-  auto domainOp = impl->builder.create<AffineDomainOp>(impl->builder.getUnknownLoc(), tensorType);
+  auto tensorType = RankedTensorType::get(shape, elementType);
+  auto domainOp = impl->builder.create<AffineDomainOp>(impl->builder.getUnknownLoc(), tensorType, BoolAttr{});
   auto& info = impl->domains[domainOp];
   auto body = new Block();
   domainOp.body().push_back(body);
