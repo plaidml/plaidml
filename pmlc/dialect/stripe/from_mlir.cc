@@ -174,7 +174,11 @@ StripeBuilder::StripeBuilder(mlir::FuncOp func) : blocks_(std::make_shared<std::
     // add refinement for each arg
     auto arg = func.getArgument(i);
     auto attrName = Dialect::getDialectAttrName("name");
-    auto name = func.getArgAttrOfType<StringAttr>(i, attrName).getValue();
+    auto nameAttr = func.getArgAttrOfType<StringAttr>(i, attrName);
+    if (!nameAttr) {
+      throw std::runtime_error("Missing expected 'name' attribute on function argument");
+    }
+    auto name = nameAttr.getValue();
     // Compute all the info about the tensor
     auto tensorInfo = ComputeAccessAndLoc(arg).first;
     // Translate allocation shape
