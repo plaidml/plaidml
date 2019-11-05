@@ -6,15 +6,11 @@
 
 #include "mlir/IR/Dialect.h"
 
-namespace llvm {
-class Regex;
-}
-
 namespace pmlc {
 namespace dialect {
 namespace stripe {
 
-class TensorDim;
+struct TensorDim;
 
 class Dialect : public mlir::Dialect {
  public:
@@ -27,7 +23,7 @@ class Dialect : public mlir::Dialect {
 
   mlir::Type parseTensor(llvm::StringRef tyData, mlir::Location loc) const;
   mlir::Type parseTensorRef(llvm::StringRef tyData, mlir::Location loc) const;
-  mlir::LogicalResult parseTensorSize(llvm::StringRef sizeSpec, mlir::Location loc,    // NOLINT
+  mlir::LogicalResult parseTensorSize(llvm::StringRef sizeSpec, mlir::Location loc,
                                       llvm::SmallVectorImpl<TensorDim>& odims) const;  // NOLINT
 
   mlir::Type parseType(mlir::DialectAsmParser& parser) const override;
