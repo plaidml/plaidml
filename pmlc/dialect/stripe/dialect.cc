@@ -100,28 +100,12 @@ mlir::Type Dialect::parseTensor(llvm::StringRef tyData, mlir::Location loc) cons
 }
 
 mlir::Type Dialect::parseTensorRef(llvm::StringRef tyData, mlir::Location loc) const {
-  bool is_const = tyData.consume_back("const");
-  StringRef typeSpec, ndimSpec, sizeSpec, rhs;
-  std::tie(typeSpec, rhs) = tyData.rsplit(':');
-  std::tie(ndimSpec, sizeSpec) = rhs.trim().rsplit('(');
-  auto type = mlir::parseType(typeSpec.trim(), getContext());
-  if (!type) {
-    emitError(loc, "invalid type specification: '") << typeSpec << "'";
-    return Type();
+  auto type = parseTensor(tyData, loc);
+  if (auto tensorType = type.dyn_cast<TensorType>()) {
+    return TensorRefType::get(tensorType, /*propagateShape=*/true);
   }
 
-  // Parse shape information if available.
-  llvm::SmallVector<TensorDim, 8> odims;
-  if (failed(parseTensorSize(sizeSpec, loc, odims))) {
-    return Type();
-  }
-
-  size_t ndims;
-  if (ndimSpec.trim().consumeInteger(0, ndims)) {
-    emitError(loc, "invalid ndims'") << ndims << "'";
-    return Type();
-  }
-  return TensorRefType::get(type, ndims, is_const);
+  return type;
 }
 
 LogicalResult Dialect::parseTensorSize(llvm::StringRef sizeSpec, mlir::Location loc,

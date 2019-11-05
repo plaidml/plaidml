@@ -19,8 +19,7 @@ module {
 // CHECK-SAME: (%{{.*}}: !stripe<"tensor_ref !eltwise.fp32:2(addr[10:20], addr[20:1])">
 // CHECK: stripe.refine {{.*}} : !stripe<"tensor_ref !eltwise.fp32:2(addr[10:20], addr[20:1])">
 
-// PARSE: ![[ALIAS:.*]] = type !stripe<"tensor_ref !eltwise.fp32:1">
 // PARSE-LABEL: func @func_param
-// PARSE-SAME: (%{{.*}}: ![[ALIAS]] 
-// PARSE: stripe.refine {{.*}} : ![[ALIAS]]
+// PARSE-SAME !stripe<"tensor_ref !eltwise.fp32:2(addr[10:20], addr[20:1])">
+// PARSE: stripe.refine {{.*}} : !stripe<"tensor_ref !eltwise.fp32:2(addr[10:20], addr[20:1])">
 
