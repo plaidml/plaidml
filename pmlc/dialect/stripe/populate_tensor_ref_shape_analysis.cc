@@ -31,7 +31,8 @@ template <class Range>
 static void populateValuesWithShapes(Range valueRange) {
   for (Value* result : valueRange) {
     if (result->getType().isa<TensorRefType>()) {
-      result->setType(TensorRefType::get(pmlc::dialect::stripe::ComputeAccess(result).base_type));
+      result->setType(
+          TensorRefType::get(pmlc::dialect::stripe::ComputeAccess(result).base_type, /*propagateShape=*/true));
     }
   }
 }
