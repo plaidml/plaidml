@@ -571,8 +571,6 @@ llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
     limits[best_index] = builder_.CreateAdd(base, function->getArg(3));
   }
 
-  ProfileBlockEnter(block);
-
   // generate the basic blocks for each nested loop's evaluation stages
   // initialize each loop index and generate the termination check
   std::vector<Loop> loops(block.idxs.size());
@@ -617,8 +615,6 @@ llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
     llvm::Value* variable = indexes_[block.idxs[i].name].variable;
     LeaveLoop(&loops[i], variable);
   }
-
-  ProfileBlockLeave(block);
 
   builder_.CreateRetVoid();
   return function;
@@ -835,6 +831,7 @@ void Compiler::Visit(const stripe::Block& block) {
     external_funcptrs_.emplace(fptr_iter);
   }
 
+  ProfileBlockEnter(block);
   // Generate a list of args.
   // The argument list begins with a pointer to each refinement. We will either
   // pass along the address of a refinement from the current block, or allocate
@@ -929,6 +926,8 @@ void Compiler::Visit(const stripe::Block& block) {
   for (auto ptr : allocs) {
     Free(ptr);
   }
+
+  ProfileBlockLeave(block);
 }
 
 void Compiler::Intrinsic(const stripe::Intrinsic& intrinsic, External handler) {
