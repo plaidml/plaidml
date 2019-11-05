@@ -81,7 +81,7 @@ std::string Dialect::getCanonicalOpName(llvm::StringRef name) {
 }
 
 mlir::Type Dialect::parseTensor(llvm::StringRef tyData, mlir::Location loc) const {
-  static llvm::Regex re{R"(([[:alnum:]_]+)\[([[:digit:]]+):([[:digit:]]+)\])"};
+  static llvm::Regex re{R"(([[:alnum:]_]*)\[([[:digit:]]+):([[:digit:]]+)\])"};
   bool is_const = tyData.consume_back("const");
   auto [typeSpec, sizeSpec] = tyData.trim().rsplit('(');
   auto type = mlir::parseType(typeSpec.trim(), getContext());
@@ -103,7 +103,11 @@ mlir::Type Dialect::parseTensor(llvm::StringRef tyData, mlir::Location loc) cons
         emitError(loc, "invalid tensor dimension '") << dim << "'";
         return Type();
       }
-      auto odim = TensorDim{0, 0, mlir::Identifier::get(matches[1], getContext())};
+      std::string dname = matches[1];
+      if (dname.empty()) {
+        dname = kAddressClassIdentifier;
+      }
+      auto odim = TensorDim{0, 0, mlir::Identifier::get(dname, getContext())};
       matches[2].getAsInteger(10, odim.size);
       matches[3].getAsInteger(10, odim.stride);
       odims.emplace_back(std::move(odim));
@@ -165,7 +169,11 @@ static void print(TensorType type, llvm::raw_ostream& os) {
     if (i) {
       os << ", ";
     }
-    os << dim.cls << '[' << dim.size << ":" << dim.stride << ']';
+    StringRef name = dim.cls;
+    if (name == kAddressClassIdentifier) {
+      name = "";
+    }
+    os << name << '[' << dim.size << ":" << dim.stride << ']';
   }
   os << ")";
   if (type.is_const()) {

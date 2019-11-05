@@ -23,9 +23,7 @@ struct SimplifyNopRefines final : public mlir::OpRewritePattern<RefineOp> {
 struct InlineNoIndexParallelFors final : public mlir::OpRewritePattern<ParallelForOp> {
   explicit InlineNoIndexParallelFors(mlir::MLIRContext* context, mlir::PatternBenefit benefit = 1)
       : OpRewritePattern<ParallelForOp>(context, benefit) {}
-  mlir::PatternMatchResult match(ParallelForOp op) const final {
-    return (op.ranges().size() ? matchFailure() : matchSuccess());
-  }
+  mlir::PatternMatchResult match(ParallelForOp op) const final;
   void rewrite(ParallelForOp op, mlir::PatternRewriter& rewriter) const final;  // NOLINT
 };
 

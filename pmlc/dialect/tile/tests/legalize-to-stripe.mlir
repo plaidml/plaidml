@@ -12,9 +12,9 @@ func @eltwise_add(
 }
 
 // CHECK-LABEL: func @eltwise_add(
-// CHECK-SAME: %arg0: !fp32_2 {stripe.layout = !stripe<"tensor !eltwise.fp32(addr[10:20], addr[20:1])">, stripe.name = "_X0"}
-// CHECK-SAME: %arg1: !fp32_2 {stripe.layout = !stripe<"tensor !eltwise.fp32(addr[10:20], addr[20:1])">, stripe.name = "_X1"}
-// CHECK-SAME: %arg2: !fp32_2 {stripe.layout = !stripe<"tensor !eltwise.fp32(addr[10:20], addr[20:1])">, stripe.name = "_X2"}
+// CHECK-SAME: %arg0: !fp32_2 {stripe.layout = !stripe<"tensor !eltwise.fp32([10:20], [20:1])">, stripe.name = "_X0"}
+// CHECK-SAME: %arg1: !fp32_2 {stripe.layout = !stripe<"tensor !eltwise.fp32([10:20], [20:1])">, stripe.name = "_X1"}
+// CHECK-SAME: %arg2: !fp32_2 {stripe.layout = !stripe<"tensor !eltwise.fp32([10:20], [20:1])">, stripe.name = "_X2"}
 // CHECK-NEXT: attributes  {inputs = 2 : i32, outputs = 1 : i32, stripe_attrs = {program}} {
 // CHECK-NEXT:   stripe.parallel_for () {
 // CHECK-NEXT:     stripe.parallel_for ("i0":10, "i1":20) {
@@ -50,9 +50,9 @@ func @dot(%arg0: tensor<1x784x!eltwise.fp32>, %arg1: tensor<784x512x!eltwise.fp3
 }
 
 // CHECK-LABEL: func @dot
-// CHECK-SAME: %arg0: !fp32_2 {stripe.layout = !stripe<"tensor !eltwise.fp32(addr[1:784], addr[784:1])">, stripe.name = "_X0"}
-// CHECK-SAME: %arg1: !fp32_2 {stripe.layout = !stripe<"tensor !eltwise.fp32(addr[784:512], addr[512:1])">, stripe.name = "_X1"}
-// CHECK-SAME: %arg2: !fp32_2 {stripe.layout = !stripe<"tensor !eltwise.fp32(addr[1:512], addr[512:1])">, stripe.name = "_X2"}
+// CHECK-SAME: %arg0: !fp32_2 {stripe.layout = !stripe<"tensor !eltwise.fp32([1:784], [784:1])">, stripe.name = "_X0"}
+// CHECK-SAME: %arg1: !fp32_2 {stripe.layout = !stripe<"tensor !eltwise.fp32([784:512], [512:1])">, stripe.name = "_X1"}
+// CHECK-SAME: %arg2: !fp32_2 {stripe.layout = !stripe<"tensor !eltwise.fp32([1:512], [512:1])">, stripe.name = "_X2"}
 // CHECK-NEXT: attributes  {inputs = 2 : i32, outputs = 1 : i32, stripe_attrs = {program}} {
 // CHECK-NEXT:   stripe.parallel_for () {
 // CHECK-NEXT:     stripe.parallel_for ("x0":784, "x1":1, "x2":512) {
@@ -101,13 +101,13 @@ func @double_dot(
 }
 
 // CHECK-LABEL: func @double_dot
-// CHECK-SAME: %arg0: !fp32_2 {stripe.layout = !stripe<"tensor !eltwise.fp32(addr[10:20], addr[20:1])">, stripe.name = "_X0"}
-// CHECK-SAME: %arg1: !fp32_2 {stripe.layout = !stripe<"tensor !eltwise.fp32(addr[20:30], addr[30:1])">, stripe.name = "_X1"}
-// CHECK-SAME: %arg2: !fp32_2 {stripe.layout = !stripe<"tensor !eltwise.fp32(addr[30:40], addr[40:1])">, stripe.name = "_X2"}
-// CHECK-SAME: %arg3: !fp32_2 {stripe.layout = !stripe<"tensor !eltwise.fp32(addr[10:40], addr[40:1])">, stripe.name = "_X3"}
+// CHECK-SAME: %arg0: !fp32_2 {stripe.layout = !stripe<"tensor !eltwise.fp32([10:20], [20:1])">, stripe.name = "_X0"}
+// CHECK-SAME: %arg1: !fp32_2 {stripe.layout = !stripe<"tensor !eltwise.fp32([20:30], [30:1])">, stripe.name = "_X1"}
+// CHECK-SAME: %arg2: !fp32_2 {stripe.layout = !stripe<"tensor !eltwise.fp32([30:40], [40:1])">, stripe.name = "_X2"}
+// CHECK-SAME: %arg3: !fp32_2 {stripe.layout = !stripe<"tensor !eltwise.fp32([10:40], [40:1])">, stripe.name = "_X3"}
 // CHECK-NEXT: attributes  {inputs = 3 : i32, outputs = 1 : i32, stripe_attrs = {program}} {
 // CHECK-NEXT:   stripe.parallel_for () {
-// CHECK-NEXT:     %0 = stripe.alloc {layout = !stripe<"tensor !eltwise.fp32(addr[10:30], addr[30:1])">}
+// CHECK-NEXT:     %0 = stripe.alloc {layout = !stripe<"tensor !eltwise.fp32([10:30], [30:1])">}
 // CHECK-NEXT:     stripe.parallel_for ("x0":20, "x1":10, "x2":30) {
 // CHECK-NEXT:     ^bb0(%x0: !aff, %x1: !aff, %x2: !aff):
 // CHECK-DAG:        %[[OUT:.*]] = stripe.refine %0(%x1, %x2) : !fp32_2
@@ -149,12 +149,12 @@ func @relu(%arg0: !t_10x20xfp32) -> !t_10x20xfp32 {
 }
 
 // CHECK-LABEL: func @relu
-// CHECK-SAME: %arg0: !fp32_2 {stripe.layout = !stripe<"tensor !eltwise.fp32(addr[10:20], addr[20:1])">, stripe.name = "_X0"}
-// CHECK-SAME: %arg1: !fp32_2 {stripe.layout = !stripe<"tensor !eltwise.fp32(addr[10:20], addr[20:1])">, stripe.name = "_X1"})
+// CHECK-SAME: %arg0: !fp32_2 {stripe.layout = !stripe<"tensor !eltwise.fp32([10:20], [20:1])">, stripe.name = "_X0"}
+// CHECK-SAME: %arg1: !fp32_2 {stripe.layout = !stripe<"tensor !eltwise.fp32([10:20], [20:1])">, stripe.name = "_X1"})
 // CHECK-NEXT: attributes  {inputs = 1 : i32, outputs = 1 : i32, stripe_attrs = {program}} {
 // CHECK-NEXT:   %[[CST:.*]] = "eltwise.sconst"() {value = 0.000000e+00 : f32} : () -> !fp32
 // CHECK-NEXT:   stripe.parallel_for ()
-// CHECK-NEXT:     %0 = stripe.alloc {layout = !stripe<"tensor !eltwise.bool(addr[10:20], addr[20:1])">}
+// CHECK-NEXT:     %0 = stripe.alloc {layout = !stripe<"tensor !eltwise.bool([10:20], [20:1])">}
 // CHECK-NEXT:     stripe.parallel_for ("i0":10, "i1":20) {
 // CHECK-NEXT:     ^bb0(%i0: !aff, %i1: !aff):
 // CHECK-DAG:        %[[OUT:.*]] = stripe.refine %0(%i0, %i1) : !bool_2
@@ -190,8 +190,8 @@ func @reshape(%arg0: tensor<10x20x!eltwise.fp32>) -> tensor<5x5x20x!eltwise.fp32
 }
 
 // CHECK-LABEL: func @reshape
-// CHECK-SAME: %arg0: !fp32_2 {stripe.layout = !stripe<"tensor !eltwise.fp32(addr[10:20], addr[20:1])">, stripe.name = "_X0"}
-// CHECK-SAME: %arg1: !fp32_3 {stripe.layout = !stripe<"tensor !eltwise.fp32(addr[5:100], addr[5:20], addr[20:1])">, stripe.name = "_X1"}
+// CHECK-SAME: %arg0: !fp32_2 {stripe.layout = !stripe<"tensor !eltwise.fp32([10:20], [20:1])">, stripe.name = "_X0"}
+// CHECK-SAME: %arg1: !fp32_3 {stripe.layout = !stripe<"tensor !eltwise.fp32([5:100], [5:20], [20:1])">, stripe.name = "_X1"}
 // CHECK-NEXT: attributes  {inputs = 1 : i32, outputs = 1 : i32, stripe_attrs = {program}} {
 // CHECK-NEXT:   stripe.parallel_for () {
 // CHECK:          "stripe.reshape"(%arg1, %arg0) : (!fp32_3, !fp32_2) -> ()

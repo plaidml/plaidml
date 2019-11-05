@@ -26,6 +26,17 @@ void RefineOp::getCanonicalizationPatterns(OwningRewritePatternList& results, ML
   results.insert<SimplifyNopRefines>(context);
 }
 
+void ConstraintOp::getCanonicalizationPatterns(OwningRewritePatternList& results, MLIRContext* context) {
+  results.insert<RemoveTrivialConstraints>(context);
+}
+
+void ParallelForOp::getCanonicalizationPatterns(OwningRewritePatternList& results, MLIRContext* context) {
+  results.insert<InlineNoIndexParallelFors>(context);
+  results.insert<RemoveRangeZeroParallelFors>(context);
+  results.insert<RemoveNoSideEffectParallelFors>(context);
+  results.insert<RemoveRangeOneIndexes>(context);
+}
+
 void PrintSimple(               //
     Operation* op,              //
     OpAsmPrinter* printer,      //
@@ -368,10 +379,6 @@ static ParseResult parseConstraintOp(OpAsmParser* parser, OperationState& result
       parser->resolveOperand(op, aff_type, result.operands) ||  //
       parser->parseRegion(*geRegion, {}, {}) ||                 //
       parser->parseOptionalRegion(*ltRegion, {}, {}));
-}
-
-void ConstraintOp::getCanonicalizationPatterns(OwningRewritePatternList& results, MLIRContext* context) {
-  results.insert<RemoveTrivialConstraints>(context);
 }
 
 static void printExecuteOnOp(OpAsmPrinter* printer, ExecuteOnOp& op) {
