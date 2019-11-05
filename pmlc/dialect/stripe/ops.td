@@ -109,6 +109,7 @@ def ParallelForOp : StripeOpWithPP<"parallel_for"> {
       return OpBuilder(getBody(), std::prev(getBody()->end()));
     }
   }];
+  let hasCanonicalizer = 1;
 }
 
 def ConstraintOp : StripeOpWithPP<"constraint"> {

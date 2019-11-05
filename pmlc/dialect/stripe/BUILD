@@ -53,6 +53,7 @@ plaidml_cc_library(
         "analysis.cc",
         "demo_vectorize.cc",
         "dialect.cc",
+        "jigsaw_pass.cc",
         "ops.cc",
         "ops.cc.inc",
         "ops_interfaces.cc.inc",

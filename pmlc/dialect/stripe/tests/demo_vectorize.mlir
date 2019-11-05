@@ -1,8 +1,10 @@
 // RUN: pmlc-opt %s -stripe-vectorize | FileCheck %s
 
 !aff = type !stripe.affine
+!fp32 = type !eltwise.fp32
 !fp32_0 = type !stripe<"tensor_ref !eltwise.fp32:0">
 !fp32_1 = type !stripe<"tensor_ref !eltwise.fp32:1">
+!fp32_4 = type !stripe<"tensor_ref !eltwise.fp32:1">
 
 // CHECK-LABEL: @simple_accum
 func @simple_accum(

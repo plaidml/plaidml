@@ -86,14 +86,22 @@ void RemoveRangeOneIndexes::rewrite(ParallelForOp op, mlir::PatternRewriter& rew
   llvm::SmallVector<int64_t, 8> ranges;
   auto zero = rewriter.create<AffinePolyOp>(op.getLoc(), AffinePolynomial());
   auto body = &op.inner().front();
+  auto idx_names = op.getAttrOfType<ArrayAttr>("idx_names");
+  llvm::SmallVector<Attribute, 8> new_idx_names;
   for (size_t i = 0; i < op.ranges().size(); i++) {
     if (op.getRange(i) == 1) {
       body->getArgument(i)->replaceAllUsesWith(zero);
     } else {
       ranges.push_back(op.getRange(i));
+      if (idx_names && idx_names.getValue().size() > i) {
+        new_idx_names.push_back(idx_names.getValue()[i]);
+      }
     }
   }
   auto rop = rewriter.create<ParallelForOp>(op.getLoc(), ranges);
+  if (idx_names) {
+    rop.setAttr("idx_names", rewriter.getArrayAttr(new_idx_names));
+  }
   auto rbody = &rop.inner().front();
   size_t new_id = 0;
   for (size_t i = 0; i < op.ranges().size(); i++) {
