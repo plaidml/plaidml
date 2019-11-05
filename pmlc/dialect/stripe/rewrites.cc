@@ -45,6 +45,16 @@ void SimplifyNopRefines::rewrite(RefineOp op, mlir::PatternRewriter& rewriter) c
   rewriter.replaceOp(op, op.in());
 }
 
+mlir::PatternMatchResult InlineNoIndexParallelFors::match(ParallelForOp op) const {
+  if (op.ranges().size() > 0) {
+    return matchFailure();
+  }
+  if (op.getAttr(Dialect::getStripeAttrsName())) {
+    return matchFailure();
+  }
+  return matchSuccess();
+}
+
 void InlineNoIndexParallelFors::rewrite(ParallelForOp op, mlir::PatternRewriter& rewriter) const {
   auto oblock = op.getOperation()->getBlock();
   auto iblock = &op.inner().front();
@@ -74,6 +84,9 @@ mlir::PatternMatchResult RemoveNoSideEffectParallelFors::match(ParallelForOp op)
 }
 
 mlir::PatternMatchResult RemoveRangeOneIndexes::match(ParallelForOp op) const {
+  if (op.getAttr(Dialect::getStripeAttrsName())) {
+    return matchFailure();
+  }
   for (size_t i = 0; i < op.ranges().size(); i++) {
     if (op.getRange(i) == 1) {
       return matchSuccess();
@@ -108,6 +121,9 @@ void RemoveRangeOneIndexes::rewrite(ParallelForOp op, mlir::PatternRewriter& rew
     if (op.getRange(i) != 1) {
       body->getArgument(i)->replaceAllUsesWith(rbody->getArgument(new_id++));
     }
+  }
+  if (auto stripe_attr = op.getAttr(Dialect::getStripeAttrsName())) {
+    rop.setAttr(Dialect::getStripeAttrsName(), stripe_attr);
   }
   rbody->getOperations().splice(std::prev(rbody->end(), 1), body->getOperations(), body->begin(),
                                 std::prev(body->end(), 1));
