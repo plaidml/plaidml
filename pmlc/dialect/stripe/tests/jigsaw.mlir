@@ -1,8 +1,8 @@
-// RUN: pmlc-opt %s -stripe-vectorize | FileCheck %s
+// RUN: pmlc-opt %s -stripe-jigsaw -canonicalize | FileCheck %s
 
 !aff = type !stripe.affine
 !fp32 = type !eltwise.fp32
-!fp32_4 = type !stripe<"tensor_ref !eltwise.fp32:1">
+!fp32_4 = type !stripe<"tensor_ref !eltwise.fp32:4">
 
 // CHECK-LABEL: @convolution
 func @convolution(
@@ -39,4 +39,18 @@ func @convolution(
   } 
   stripe.terminate
 }
+// Should split the above into 9 parts as follows:
+// TL  T TR
+//  L  M  R
+// BL  B BR
+// Or, ignoring order: 4 corners, 2 rows, 2 columns, 1 middle
+// CHECK-DAG: stripe.parallel_for ("n":16, "ci":32, "co":32, "i":2, "j":2)
+// CHECK-DAG: stripe.parallel_for ("n":16, "ci":32, "co":32, "i":2, "j":2)
+// CHECK-DAG: stripe.parallel_for ("n":16, "ci":32, "co":32, "i":2, "j":2)
+// CHECK-DAG: stripe.parallel_for ("n":16, "ci":32, "co":32, "i":2, "j":2)
+// CHECK-DAG: stripe.parallel_for ("n":16, "x":98, "ci":32, "co":32, "i":3, "j":2)
+// CHECK-DAG: stripe.parallel_for ("n":16, "x":98, "ci":32, "co":32, "i":3, "j":2)
+// CHECK-DAG: stripe.parallel_for ("n":16, "y":98, "ci":32, "co":32, "i":2, "j":3)
+// CHECK-DAG: stripe.parallel_for ("n":16, "x":98, "y":98, "ci":32, "co":32, "i":3, "j":3)
+
 

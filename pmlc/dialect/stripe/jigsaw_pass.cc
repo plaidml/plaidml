@@ -23,8 +23,6 @@ struct JigsawPass : public mlir::FunctionPass<JigsawPass> {
 
 void JigsawPass::runOnFunction() {
   mlir::FuncOp f = getFunction();
-  std::cerr << "WOOT!\n";
-
   Block* b = &f.getBody().front();
   auto it_prev = b->end();
   auto it_end = std::prev(b->end(), 1);
@@ -36,11 +34,10 @@ void JigsawPass::runOnFunction() {
     bool found = false;
     it->walk([&](ConstraintOp op) {
       AffinePolynomial poly(op.input());
-      int64_t best_benifit = -1;
+      float best_benefit = -1.0;
       ParallelForOp best_pf;
-      int best_index;
-      int64_t best_split;
-      bool best_pos;
+      int best_index = 0;
+      int64_t best_split = 0;
       for (auto [arg, scale] : poly.terms) {
         // Get the range of the index at hand
         auto pf = mlir::cast<ParallelForOp>(arg->getOwner()->getParentOp());
@@ -51,31 +48,29 @@ void JigsawPass::runOnFunction() {
         // Get the range of the remainder
         AffineRange rem_range(rem_poly);
         int64_t split = scale > 0 ? (-rem_range.min + scale - 1) / scale : (-rem_range.min / scale) + 1;
-        std::cerr << "  scale: " << scale << ", min: " << rem_range.min << ", max: " << rem_range.max
-                  << ", range: " << idx_range << "\n";
-        std::cerr << "  split: " << split << "\n";
+        IVLOG(3,
+              "  scale: " << scale << ", min: " << rem_range.min << ", range: " << idx_range << ", split: " << split);
         if (split <= 0 || split >= idx_range) {
           continue;
         }
-        int64_t benifit = scale > 0 ? idx_range - split : split;
-        if (benifit > best_benifit) {
-          best_benifit = benifit;
+        float benefit = scale > 0 ? idx_range - split : split;
+        benefit /= idx_range;
+        IVLOG(3, "  benefit = " << benefit)
+        if (benefit > best_benefit) {
+          best_benefit = benefit;
           best_pf = pf;
           best_index = arg->getArgNumber();
           best_split = split;
-          best_pos = (scale > 0);
         }
       }
-      if (best_benifit > 0) {
-        std::cerr << "best_benifit: " << best_benifit << ", best_split: " << best_split << ", best_pos: " << best_pos
-                  << "\n";
+      if (best_benefit > 0) {
         found = true;
         // Make some changes starting at the parallel for
         auto builder = OpBuilder(best_pf);
         // Specifically, clone the pf
         auto copy_pf = mlir::cast<ParallelForOp>(builder.clone(*best_pf.getOperation()));
-        LimitLower(copy_pf, best_index, best_split);
-        LimitUpper(best_pf, best_index, best_split);
+        LimitUpper(copy_pf, best_index, best_split);
+        LimitLower(best_pf, best_index, best_split);
         return mlir::WalkResult::interrupt();
       }
       return mlir::WalkResult::advance();
