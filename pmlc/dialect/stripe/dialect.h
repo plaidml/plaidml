@@ -30,8 +30,8 @@ class Dialect : public mlir::Dialect {
   mlir::LogicalResult parseTensorSize(llvm::StringRef sizeSpec, mlir::Location loc,    // NOLINT
                                       llvm::SmallVectorImpl<TensorDim>& odims) const;  // NOLINT
 
-  mlir::Type parseType(llvm::StringRef tyData, mlir::Location loc) const override;
-  void printType(mlir::Type type, llvm::raw_ostream& os) const override;
+  mlir::Type parseType(mlir::DialectAsmParser& parser) const override;
+  void printType(mlir::Type type, mlir::DialectAsmPrinter& printer) const override;
 };
 
 }  // namespace stripe

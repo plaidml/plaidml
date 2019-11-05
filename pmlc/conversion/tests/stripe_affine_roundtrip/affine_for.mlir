@@ -7,10 +7,10 @@
 // Verify Stripe/Affine round-trip conversion of stripe.parallel_for operation.
 
 func @main_parallel_for()
-attributes {stripe_attrs = {program = unit}} {
+attributes {stripe_attrs = {program}} {
   stripe.parallel_for () {
     stripe.terminate
-  } {name = "main", stripe_attrs = {main = unit}}
+  } {name = "main", stripe_attrs = {main}}
   stripe.terminate
 }
 // AFFINE-LABEL: func @main_parallel_for()
@@ -21,7 +21,7 @@ attributes {stripe_attrs = {program = unit}} {
 // STRIPE-LABEL: func @main_parallel_for()
 // STRIPE: stripe.parallel_for () {
 // STRIPE: stripe.terminate
-// STRIPE: } {name = "main", stripe_attrs = {main = unit}}
+// STRIPE: } {name = "main", stripe_attrs = {main}}
 // STRIPE: stripe.terminate
 // STRIPE-NOT: stripe.terminate
 // STRIPE-NOT: ^bb

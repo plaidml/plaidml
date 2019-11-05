@@ -29,7 +29,7 @@ struct ScalarTypeStorage : public mlir::TypeStorage {
   static llvm::hash_code hashKey(const KeyTy& key) { return key; }
   static KeyTy getKey(DataType type) { return static_cast<int>(type); }
 
-  static ScalarTypeStorage* construct(mlir::TypeStorageAllocator& allocator, const KeyTy& key) {  // NOLINT
+  static ScalarTypeStorage* construct(mlir::TypeStorageAllocator& allocator, const KeyTy& key) {
     return new (allocator.allocate<ScalarTypeStorage>()) ScalarTypeStorage(static_cast<DataType>(key));
   }
 

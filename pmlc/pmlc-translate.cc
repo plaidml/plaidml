@@ -12,8 +12,8 @@
 #include "mlir/Support/ToolUtilities.h"
 #include "mlir/Support/TranslateClParser.h"
 
-using namespace mlir;  // NOLINT
-using namespace llvm;  // NOLINT
+using namespace mlir;  // NOLINT(build/namespaces)
+using namespace llvm;  // NOLINT(build/namespaces)
 
 static cl::opt<std::string> inputFilename(  //
     cl::Positional,                         //

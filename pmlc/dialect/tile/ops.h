@@ -12,10 +12,13 @@
 
 namespace pmlc::dialect::tile {
 
+using eltwise::DataType;
 using eltwise::ScalarType;
 using llvm::APInt;
+using llvm::Optional;
 using mlir::ArrayRef;
 using mlir::Attribute;
+using mlir::BoolAttr;
 using mlir::Builder;
 using mlir::IndexType;
 using mlir::IntegerAttr;
@@ -40,6 +43,7 @@ using mlir::TupleType;
 using mlir::Type;
 using mlir::TypeAttr;
 using mlir::Value;
+using mlir::VectorType;
 using util::AggregationKind;
 using util::CombinationKind;
 using util::GenericBuilder;

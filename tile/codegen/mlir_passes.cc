@@ -6,6 +6,7 @@
 #include <memory>
 
 #include "mlir/Pass/PassManager.h"
+#include "mlir/Support/DebugStringHelper.h"
 #include "mlir/Transforms/Passes.h"
 
 #include "pmlc/dialect/eltwise/util.h"
@@ -47,7 +48,8 @@ void ConvertIntoMLIR(CompilerState* state) {
   IVLOG(1, "Converting to Stripe MLIR");
   IVLOG(3, "Original\n" << *state->prog->entry);
   state->mlir->module = pmlc::dialect::stripe::IntoMLIR(&state->mlir->ctx, *state->prog);
-  IVLOG(3, "New\n" << *state->mlir->module);
+  auto module = *state->mlir->module;
+  IVLOG(3, "New\n" << mlir::debugString(module));
 }
 
 template <typename Pass, typename Config>

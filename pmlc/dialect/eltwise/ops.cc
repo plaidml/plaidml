@@ -89,7 +89,11 @@ Type AsFloatOp::getResultType(ArrayRef<Value*> operands) {
       elementType = ScalarType::get(tensor->getContext(), DataType::FLOAT64);
       break;
   }
-  return RankedTensorType::get(tensorType.getShape(), elementType);
+  auto resultType = RankedTensorType::get(tensorType.getShape(), elementType);
+  if (resultType.getRank() == 0) {
+    return elementType;
+  }
+  return resultType;
 }
 
 void AsIntOp::getCanonicalizationPatterns(OwningRewritePatternList& results, MLIRContext* context) {
@@ -123,7 +127,11 @@ Type AsIntOp::getResultType(ArrayRef<Value*> operands) {
       elementType = ScalarType::get(tensor->getContext(), DataType::INT64);
       break;
   }
-  return RankedTensorType::get(tensorType.getShape(), elementType);
+  auto resultType = RankedTensorType::get(tensorType.getShape(), elementType);
+  if (resultType.getRank() == 0) {
+    return elementType;
+  }
+  return resultType;
 }
 
 void AsUIntOp::getCanonicalizationPatterns(OwningRewritePatternList& results, MLIRContext* context) {
@@ -157,7 +165,11 @@ Type AsUIntOp::getResultType(ArrayRef<Value*> operands) {
       elementType = ScalarType::get(tensor->getContext(), DataType::UINT64);
       break;
   }
-  return RankedTensorType::get(tensorType.getShape(), elementType);
+  auto resultType = RankedTensorType::get(tensorType.getShape(), elementType);
+  if (resultType.getRank() == 0) {
+    return elementType;
+  }
+  return resultType;
 }
 
 //

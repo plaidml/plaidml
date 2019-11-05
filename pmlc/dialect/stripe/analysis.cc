@@ -106,6 +106,24 @@ FlatTensorAccess ComputeAccess(Value* tensor) {
   return ret;
 }
 
+bool SafeConstraintInterior(ParallelForOp op) {
+  // Get an iterator to the begining of the interior
+  auto block = &op.inner().front();
+  // Get the penultimate Op (ignoring the terminator), which should be a constraint
+  auto it_con = std::prev(block->end(), 2);
+  // Check that it's good
+  if (it_con == block->end() || !mlir::isa<ConstraintOp>(*it_con)) {
+    return false;
+  }
+  // Check that all prior ops are no-side-effect and fail if not
+  for (auto it = block->begin(); it != it_con; ++it) {
+    if (!it->hasNoSideEffect()) {
+      return false;
+    }
+  }
+  return true;
+}
+
 }  // namespace stripe
 }  // namespace dialect
 }  // namespace pmlc
