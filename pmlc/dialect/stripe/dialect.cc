@@ -105,7 +105,7 @@ mlir::Type Dialect::parseTensor(llvm::StringRef tyData, mlir::Location loc) cons
       }
       std::string dname = matches[1];
       if (dname.empty()) {
-        dname = "addr";
+        dname = kAddressClassIdentifier;
       }
       auto odim = TensorDim{0, 0, mlir::Identifier::get(dname, getContext())};
       matches[2].getAsInteger(10, odim.size);
@@ -170,7 +170,7 @@ static void print(TensorType type, llvm::raw_ostream& os) {
       os << ", ";
     }
     StringRef name = dim.cls;
-    if (name == "addr") {
+    if (name == kAddressClassIdentifier) {
       name = "";
     }
     os << name << '[' << dim.size << ":" << dim.stride << ']';
