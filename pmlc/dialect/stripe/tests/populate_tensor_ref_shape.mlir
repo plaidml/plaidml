@@ -16,10 +16,10 @@ module {
   }
 }
 // CHECK-LABEL: func @func_param
-// CHECK-SAME: (%{{.*}}: !stripe<"tensor_ref !eltwise.fp32:2(addr[10:20], addr[20:1])">
-// CHECK: stripe.refine {{.*}} : !stripe<"tensor_ref !eltwise.fp32:2(addr[10:20], addr[20:1])">
+// CHECK-SAME: (%{{.*}}: !stripe<"tensor_ref !eltwise.fp32:2([10:20], [20:1])">
+// CHECK: stripe.refine {{.*}} : !stripe<"tensor_ref !eltwise.fp32:2([10:20], [20:1])">
 
 // PARSE-LABEL: func @func_param
-// PARSE-SAME !stripe<"tensor_ref !eltwise.fp32:2(addr[10:20], addr[20:1])">
-// PARSE: stripe.refine {{.*}} : !stripe<"tensor_ref !eltwise.fp32:2(addr[10:20], addr[20:1])">
+// PARSE-SAME !stripe<"tensor_ref !eltwise.fp32:2([10:20], [20:1])">
+// PARSE: stripe.refine {{.*}} : !stripe<"tensor_ref !eltwise.fp32:2([10:20], [20:1])">
 
