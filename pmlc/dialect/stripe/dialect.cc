@@ -101,8 +101,8 @@ mlir::Type Dialect::parseTensor(llvm::StringRef tyData, mlir::Location loc) cons
 
 mlir::Type Dialect::parseTensorRef(llvm::StringRef tyData, mlir::Location loc) const {
   auto type = parseTensor(tyData, loc);
-  if (auto tensorType = type.dyn_cast<TensorType>()) {
-    return TensorRefType::get(tensorType, /*propagateShape=*/true);
+  if (type) {
+    return TensorRefType::get(type.cast<TensorType>(), /*propagateShape=*/true);
   }
 
   return type;
@@ -110,9 +110,12 @@ mlir::Type Dialect::parseTensorRef(llvm::StringRef tyData, mlir::Location loc) c
 
 LogicalResult Dialect::parseTensorSize(llvm::StringRef sizeSpec, mlir::Location loc,
                                        llvm::SmallVectorImpl<TensorDim>& odims) const {
-  static llvm::Regex re{R"(([[:alnum:]_]+)\[([[:digit:]]+):([[:digit:]]+)\])"};
-
+  static llvm::Regex re{R"(([[:alnum:]_]*)\[([[:digit:]]+):([[:digit:]]+)\])"};
   if (!sizeSpec.empty()) {
+    if (!sizeSpec.consume_back(")")) {
+      emitError(loc, "invalid tensor type, no ()'s on size spec");
+      return mlir::failure();
+    }
     llvm::SmallVector<StringRef, 8> dims;
     llvm::SmallVector<StringRef, 4> matches;
     sizeSpec.split(dims, ",");
@@ -121,15 +124,14 @@ LogicalResult Dialect::parseTensorSize(llvm::StringRef sizeSpec, mlir::Location 
         emitError(loc, "invalid tensor dimension '") << dim << "'";
         return mlir::failure();
       }
-      auto odim = TensorDim{0, 0, mlir::Identifier::get(matches[1], getContext())};
+      std::string dname = matches[1];
+      if (dname.empty()) {
+        dname = kAddressClassIdentifier;
+      }
+      auto odim = TensorDim{0, 0, mlir::Identifier::get(dname, getContext())};
       matches[2].getAsInteger(10, odim.size);
       matches[3].getAsInteger(10, odim.stride);
       odims.emplace_back(std::move(odim));
-    }
-
-    if (!sizeSpec.consume_back(")")) {
-      emitError(loc, "invalid tensor type, no ()'s on size spec");
-      return mlir::failure();
     }
   }
 
@@ -173,7 +175,11 @@ static void printShape(T type, llvm::raw_ostream& os) {
       if (i) {
         os << ", ";
       }
-      os << dim.cls << '[' << dim.size << ":" << dim.stride << ']';
+      StringRef name = dim.cls;
+      if (name == kAddressClassIdentifier) {
+        name = "";
+      }
+      os << name << '[' << dim.size << ":" << dim.stride << ']';
     }
     os << ")";
   }
