@@ -75,9 +75,8 @@ struct TensorRefTypeStorage : public mlir::TypeStorage {
   llvm::SmallVector<TensorDim, 4> shape;
 };
 
-TensorRefType TensorRefType::get(Type elementType, int64_t rank, bool is_const) {
-  return Base::get(elementType.getContext(), Types::TensorRef, elementType, rank, is_const,
-                   /*shape=*/ArrayRef<TensorDim>());
+TensorRefType TensorRefType::get(Type elementType, int64_t rank, bool is_const, ArrayRef<TensorDim> shape) {
+  return Base::get(elementType.getContext(), Types::TensorRef, elementType, rank, is_const, shape);
 }
 
 TensorRefType TensorRefType::get(TensorType type, bool propagateShape) {
