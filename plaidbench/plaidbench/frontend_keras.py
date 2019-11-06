@@ -88,7 +88,7 @@ class Model(core.Model):
             mean = None
             var = None
             for w in weights:
-                name = w.name.split('/')[-1]
+                name = w.name.split('/')[-1].split(':')[0]
                 if name == 'beta':
                     beta = K.get_value(w)
                 elif name == 'gamma':
