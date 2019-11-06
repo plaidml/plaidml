@@ -8,6 +8,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <boost/math/special_functions/prime.hpp>
 
 #include "base/util/logging.h"
 #include "base/util/stream_container.h"
@@ -208,6 +209,7 @@ std::ostream& operator<<(std::ostream& os, Cost cost) {
 struct ComputeDensityCostModel {
   const proto::AutotilePass& options;
   std::set<const Index*> acc_idxs;
+  std::map<size_t, size_t> small_factors;
 
   explicit ComputeDensityCostModel(const Block& block, const proto::AutotilePass& options)
       : options(options),  //
@@ -215,6 +217,28 @@ struct ComputeDensityCostModel {
 
   bool IndexFilter(const Block& block, const Index& idx) const {  //
     return options.acc_idxs() || !acc_idxs.count(&idx);
+  }
+
+  size_t CountSmallFactors(size_t num) const {
+    if (small_factors.find(num) != small_factors.end()) {
+      return small_factors.at(num);
+    }
+    size_t n = num;
+    size_t count = 0;
+    size_t i = 0;
+    while (true) {
+      size_t prime = boost::math::prime(i);
+      if (prime > options.small_factor_upbound()) {
+        break;
+      }
+      while (n > 1 && n % prime == 0) {
+        n /= prime;
+        ++count;
+      }
+      ++i;
+    }
+    const_cast<std::map<size_t, size_t>&>(small_factors).emplace(num, count);
+    return count;
   }
 
   Cost ComputeCost(const Block& block, const Tile& tile) const {
@@ -259,6 +283,17 @@ struct ComputeDensityCostModel {
         tot_out_count *= tile_dim.count;
       }
     }
+
+    size_t n_factors = 1;
+    if (options.small_factor_upbound() > 0) {
+      for (auto& iter : tile_by_name) {
+        const Index* idx = block.idx_by_name(iter.first);
+        if (!acc_idxs.count(idx)) {
+          n_factors += CountSmallFactors(iter.second);
+        }
+      }
+    }
+
     double inv_size_util = static_cast<double>(options.min_size()) / std::min(tot_size, options.min_size());
     double inv_out_size_util =
         static_cast<double>(options.min_out_size()) / std::min(tot_out_size, options.min_out_size());
@@ -269,7 +304,7 @@ struct ComputeDensityCostModel {
     auto input_cost = options.input_cost() * metrics.input_bandwidth;
     auto output_cost = options.output_cost() * metrics.output_bandwidth;
     auto io_cost = 1.0 + input_cost + output_cost;  // Add 1 to make sure ineff still gets counted if in/out cost == 0
-    double cost = (ineff * io_cost / total_compute) + options.split_factor() * log2(tile.counts_product());
+    double cost = ((ineff * io_cost / total_compute) + options.split_factor() * log2(tile.counts_product())) / n_factors;
     IVLOG(4, "        cost: " << cost);
     return cost;
   }
@@ -382,14 +417,6 @@ void AutotilePass::Apply(CompilerState* state) const {
   RunOnBlocks(state->entry(), reqs, [this](const AliasMap& map, Block* block) {
     if (block->has_any_tags(FromProto(options_.exclude()))) {
       return;
-    }
-    if (block->has_tag("cache")) {
-      for (const auto& ref : block->refs) {
-        if (IsWriteDir(ref.dir) && ref.location.devs[0].name == "REGISTER") {
-          // This is cached buffer to register, can't be threaded.
-          return;
-        }
-      }
     }
     ComputeDensityCostModel model(*block, options_);
     auto result = PickBestTile(*block, options_.only_po2(), options_.only_even(), options_.only_multiple_of_32(),

@@ -2,24 +2,24 @@ local PARAMS = {
   amd_opencl: {
     LOCAL_MEM_KIB: 32,
     NUM_THREADS: 256,
-    CACHE_WIDTH: 128,
+    CACHE_WIDTH: 64,
     NUM_UNITS: 64,
-    REGS_MEM_B: 128,
-    REG_MEM_LAT: 1,
-    LOCAL_MEM_LAT: 30,
-    GLOBAL_MEM_LAT: 100,
+    REGS_MEM_B: 512,
+    REG_MEM_LAT: 4,
+    LOCAL_MEM_LAT: 60,
+    GLOBAL_MEM_LAT: 600,
     ALIGN_SIZE_B: 128,
     MAX_REFS: 1024,
   },
   amd_metal: {
-    LOCAL_MEM_KIB: 64,
+    LOCAL_MEM_KIB: 32,
     NUM_THREADS: 256,
-    CACHE_WIDTH: 128,
-    NUM_UNITS: 16,
-    REGS_MEM_B: 128,
-    REG_MEM_LAT: 1,
-    LOCAL_MEM_LAT: 30,
-    GLOBAL_MEM_LAT: 100,
+    CACHE_WIDTH: 64,
+    NUM_UNITS: 64,
+    REGS_MEM_B: 512,
+    REG_MEM_LAT: 4,
+    LOCAL_MEM_LAT: 60,
+    GLOBAL_MEM_LAT: 600,
     ALIGN_SIZE_B: 128,
     MAX_REFS: 31,
   },
@@ -116,6 +116,7 @@ local PARAMS = {
                 max_sizes_product: PARAMS[cfg].NUM_THREADS * 64,
                 min_out_size: PARAMS[cfg].NUM_THREADS,
                 cache_width: PARAMS[cfg].CACHE_WIDTH,
+                small_factor_upbound: 5,
               }
             },
 
@@ -197,14 +198,6 @@ local PARAMS = {
               name: 'prune_idxs',
               pass: {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.PruneIndexesPass',
-                reqs: ['all'],
-              },
-            },
-
-            {
-              name: 'reduce_constraints',
-              pass: {
-                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.IlpConstraintReductionPass',
                 reqs: ['all'],
               },
             },
@@ -296,34 +289,48 @@ local PARAMS = {
             {
               name: 'thread_cache',
               pass: {
-                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.ThreadInnerPass',
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.AutotilePass',
                 reqs: ['cache'],
                 outer_set: ['cache_outer', 'gpu_thread'],
                 inner_set: ['cache_threads', 'inline'],
-                threads: PARAMS[cfg].NUM_THREADS,
+                acc_idxs: true,
+                only_even: true,
+                interleave: true,
+                min_count: PARAMS[cfg].NUM_THREADS,
+                max_count: PARAMS[cfg].NUM_THREADS,
+                cache_width: PARAMS[cfg].CACHE_WIDTH,
               }
             },
 
             {
               name: 'thread_contract',
-              pass : {
-                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.ThreadInnerPass',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.AutotilePass',
                 reqs: ['contract_inner'],
                 outer_set: ['contract_inner', 'gpu_thread'],
                 inner_set: ['contract_inner_threads', 'inline'],
-                threads: PARAMS[cfg].NUM_THREADS,
+                acc_idxs: false,
+                only_even: true,
+                interleave: true,
+                min_count: PARAMS[cfg].NUM_THREADS,
+                max_count: PARAMS[cfg].NUM_THREADS,
+                cache_width: PARAMS[cfg].CACHE_WIDTH,
               }
             },
 
             {
               name: 'thread_eltwise',
               pass: {
-                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.ThreadInnerPass',
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.AutotilePass',
                 reqs: ['eltwise_middle'],
-                exclude: ['cache'],
                 outer_set: ['eltwise_middle', 'gpu_thread'],
                 inner_set: ['eltwise_inner', 'inline'],
-                threads: PARAMS[cfg].NUM_THREADS,
+                acc_idxs: true,
+                only_even: true,
+                interleave: true,
+                min_count: PARAMS[cfg].NUM_THREADS,
+                max_count: PARAMS[cfg].NUM_THREADS,
+                cache_width: PARAMS[cfg].CACHE_WIDTH,
               }
             },
 
@@ -341,7 +348,6 @@ local PARAMS = {
                 local_memory_latency: PARAMS[cfg].LOCAL_MEM_LAT,
                 register_latency: PARAMS[cfg].REG_MEM_LAT,
                 comp_parent_tag: 'contract_middle',
-                index_order: 'cache',
                 align_size: PARAMS[cfg].ALIGN_SIZE_B,
               }
             },
@@ -360,9 +366,16 @@ local PARAMS = {
                 local_memory_latency: PARAMS[cfg].LOCAL_MEM_LAT,
                 register_latency: PARAMS[cfg].REG_MEM_LAT,
                 comp_parent_tag: 'contract_middle',
-                index_order: 'comp',
                 align_size: PARAMS[cfg].ALIGN_SIZE_B,
               }
+            },
+
+            {
+              name: 'reduce_constraints',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.IlpConstraintReductionPass',
+                reqs: ['all'],
+              },
             },
 
             {

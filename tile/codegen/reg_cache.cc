@@ -6,6 +6,7 @@
 #include "tile/math/bignum.h"
 #include "tile/stripe/stripe.h"
 #include "tile/codegen/alias.h"
+#include "tile/codegen/idx_order.h"
 
 namespace vertexai {
 namespace tile {
@@ -27,22 +28,39 @@ struct RegisterPassOptions {
   bool cache_index_order;
 };
 
-bool ParseGlobalIndex(const std::string& idx, size_t* depth, std::string* name) {
-  size_t pos = idx.find(':');
-  if (pos == std::string::npos) {
-    return false;
-  }
-  *depth = std::atoi(idx.substr(1, pos - 1).c_str());
-  *name = idx.substr(pos + 1);
-  return true;
-}
-
 // Get the outer and inner (outer's first sub-block) loop count
-static bool OuterInnerLoopCount(Block* outer, size_t* outer_loop, size_t* inner_loop) {
+void OuterInnerLoopCount(Block* outer, size_t* outer_loop, size_t* inner_loop) {
   *outer_loop = outer->idxs_product();
   Block* inner = outer->SubBlock(0).get();
   *inner_loop = inner->idxs_product();
-  return true;
+}
+
+void ClearAccesses(const Refinement& ref) {
+  for (auto& access : ref.mut().access) {
+    access = Affine();
+  }
+}
+
+std::map<std::string, size_t> RefinementIndex(Block* block, const Refinement& ref) {
+  std::map<std::string, size_t> result;
+  for (auto& access : ref.access) {
+    auto& acc_map = access.getMap();
+    for (auto& kvp : acc_map) {
+      if (kvp.first.size() > 0) {
+        Index* idx = block->idx_by_name(kvp.first);
+        result.emplace(kvp.first, idx->range);
+      }
+    }
+  }
+  return result;
+}
+
+size_t IndexProduct(const std::map<std::string, size_t>& idxs) {
+  size_t result = 1;
+  for (auto& idx : idxs) {
+    result *= idx.second;
+  }
+  return result;
 }
 
 void FixRefLoc(const Refinement& src, const Refinement& dst) {
@@ -54,7 +72,7 @@ void FixRefLoc(const Refinement& src, const Refinement& dst) {
 }
 
 // Propagate the location, offset, and stride information recursively
-static void PropagateRefLoc(Block* block, const Refinement& outer_ref) {
+void PropagateRefLoc(Block* block, const Refinement& outer_ref) {
   for (auto stmt : block->stmts) {
     auto inner = Block::Downcast(stmt);
     if (inner) {
@@ -68,473 +86,652 @@ static void PropagateRefLoc(Block* block, const Refinement& outer_ref) {
   }
 }
 
-static Index* IndexByDim(Block* block, const Refinement& ref, size_t dim) {
-  const auto& aff = ref.access[dim];
-  if (aff == Affine()) {
-    return nullptr;
+// Copy index from src to dst except for wo
+std::set<std::string> CopyIndexWithout(Block* dst, Block* src,
+                                       const std::map<std::string, size_t>& valid_idxs,
+                                       const std::set<std::string>& invalid_idxs) {
+  dst->idxs.clear();
+  std::set<std::string> removed;
+  for (auto& idx : src->idxs) {
+    if (idx.affine == Affine()) {
+      if (valid_idxs.find(idx.name) != valid_idxs.end()) {
+        dst->idxs.push_back(idx);
+      }
+    }
+    else {
+      bool has_invalid_idx = false;
+      auto& acc_map = idx.affine.getMap();
+      for (auto& kvp : acc_map) {
+        if (kvp.first.size() > 0) {
+          if  (invalid_idxs.find(kvp.first) != invalid_idxs.end()) {
+            has_invalid_idx = true;
+            break;
+          }
+        }
+      }
+      if (has_invalid_idx) {
+        removed.insert(idx.name);
+      }
+      else {
+        dst->idxs.push_back(idx);
+      }
+    }
   }
-  const auto& aff_map = aff.getMap();
-  if (aff_map.size() != 1) {
-    throw std::runtime_error("Try to find the index with complex affine.");
-  }
-  return block->idx_by_name(aff_map.begin()->first);
+  return removed;
 }
 
-static void AdjustRefAccessHelper(Block* outer, Refinement* outer_ref, Block* inner, //
-                                  const std::map<std::string, Rational>& multiple,   //
-                                  bool adjust_all) {
-
-  // Adjust the refinement in inner
-  // For the cached refinement, the access must be the corresponding index.
-  // Only if adjust_all == true, adjust other refinements.
-  // In this case, the access are the corresponding index with the coefficient
-  // same as the outer index range
-  for (auto& inner_ref : inner->refs) {
-    if (adjust_all || inner_ref.from == outer_ref->into()) {
-      for (auto& aff : inner_ref.mut().access) {
-        auto& aff_map = aff.mutateMap();
-        for (auto& it : aff_map) {
-          it.second = (inner_ref.from == outer_ref->into()) ?
-                      1 : ToInteger(it.second / multiple.at(it.first));
+void CopyConstraints(Block* dst, Block* src) {
+  dst->constraints.clear();
+  for (auto& cons : src->constraints) {
+    auto& acc_map = cons.getMap();
+    bool valid = true;
+    for (auto& kvp : acc_map) {
+      if (kvp.first.size() > 0) {
+        Index *idx = dst->idx_by_name(kvp.first);
+        if (!idx) {
+          valid = false;
+          break;
         }
       }
     }
-  }
-  // Adjust the refinement in outer block
-  // Clear the accesses in block index to zero
-  for (auto& aff : outer_ref->mut().access) {
-    auto& aff_map = aff.mutateMap();
-    for (auto& aff_it : aff_map) {
-      if (outer->idx_by_name(aff_it.first)) {
-        aff_map.clear();
-        break;
-      }
+    if (valid) {
+      dst->constraints.push_back(cons);
     }
   }
 }
 
-static void AdjustRefAccess(Block* outer, const std::string& ref_name,        //
-                            const std::map<std::string, Rational>& multiple,  //
-                            bool adjust_all) {
-  auto it = outer->ref_by_from(ref_name);
-  for (auto stmt : outer->stmts) {
-    auto inner = Block::Downcast(stmt);
-    if (inner) {
-      AdjustRefAccessHelper(outer, &it->mut(), inner.get(), multiple, adjust_all);
-    }
-  }
-}
-
-// Reorder block's index according to base
-static void ReorderIndex(Block* base, Block* block, const std::string& ref_name) {
-  // Maps base index to block index for the same refinement
-  auto base_ref_it = base->ref_by_from(ref_name);
-  auto block_ref_it = block->ref_by_from(ref_name);
-  size_t n_dims = base_ref_it->access.size();
-  std::map<std::string, std::string> base2block;
-  std::map<std::string, std::string> block2base;
-  for (size_t i = 0; i < n_dims; ++i) {
-    auto base_idx = IndexByDim(base, *base_ref_it, i);
-    auto block_idx = IndexByDim(block, *block_ref_it, i);
-    if (base_idx == nullptr && block_idx == nullptr) {
-      continue;
-    }
-    if (base_idx == nullptr || block_idx == nullptr) {
-      throw std::runtime_error("Base refinement and block refinement don't match.");
-    }
-    base2block.emplace(base_idx->name, block_idx->name);
-    block2base.emplace(block_idx->name, base_idx->name);
-  }
-  // Remove all index in block, which also exist in base
-  block->idxs.erase(std::remove_if(block->idxs.begin(), block->idxs.end(),  //
-                                   [&block2base](const Index& idx) -> bool {
-                                     return block2base.find(idx.name) != block2base.end();
-                                   }),  //
-                    block->idxs.end());
-  for (const auto& idx : base->idxs) {
+void CopyIndexConstraints(Block* dst, Block* dst_inner, Block * src,
+                          Block* src_inner, Block* src_parent,
+                          const std::map<std::string, size_t>& outer_idxs,
+                          const std::map<std::string, size_t>& inner_idxs) {
+  // Correct the affine index in cache block from computing block
+  std::set<std::string> to_prune_idxs;
+  for (auto& idx : src_parent->idxs) {
     if (idx.affine == Affine()) {
-      auto it = base2block.find(idx.name);
-      if (it != base2block.end()) {
-        block->idxs.push_back({it->second, idx.range, Affine()});
-      } else {
-        block->idxs.push_back({idx.name + "_0", idx.range, Affine()});
-      }
+      to_prune_idxs.insert(idx.name);
     }
   }
-}
-
-// Check if cache's ref idx and comp's ref idx are in the same order from the end
-static bool ConsistentIdxOrder(Block* cache, const Refinement& cache_ref,  //
-                               Block* comp, const Refinement& comp_ref) {
-  size_t n_dims = cache_ref.access.size();
-  if (comp_ref.access.size() != n_dims) {
-    return false;
+  std::map<std::string, size_t> dummy_map;
+  for (auto& idx : src->idxs) {
+    dummy_map.emplace(idx.name, idx.range);
   }
-  for (size_t i = 0; i < n_dims; ++i) {
-    if (cache_ref.access[i] == Affine() && comp_ref.access[i] == Affine()) {
+  std::set<std::string> invalid_idxs = CopyIndexWithout(dst, src, dummy_map, to_prune_idxs);
+  CopyIndexWithout(dst_inner, src_inner, inner_idxs, invalid_idxs);
+
+  for (auto& idx : dst->idxs) {
+    if (idx.affine == Affine()) {
       continue;
     }
-    if (cache_ref.access[i] == Affine() || comp_ref.access[i] == Affine()) {
-      return false;
-    }
-    const auto& cache_map = cache_ref.access[i].getMap();
-    const auto& comp_map = comp_ref.access[i].getMap();
-    if (cache_map.size() != 1 || comp_map.size() != 1) {
-      return false;
-    }
-    const auto& cache_idx = cache_map.begin()->first;
-    const auto& comp_idx = comp_map.begin()->first;
-    size_t cache_order = 0;
-    size_t cache_idx_range = 0;
-    for (auto it = cache->idxs.rbegin(); it != cache->idxs.rend(); ++it) {
-      if (it->range > 1) {
-        ++cache_order;
-      }
-      if (it->name == cache_idx) {
-        cache_idx_range = it->range;
-        break;
+    std::map<std::string, Affine> replacement;
+    const auto& acc_map = idx.affine.getMap();
+    for (const auto& kvp : acc_map) {
+      if (kvp.first.size() > 0) {
+        Index* to_prune_var = src_parent->idx_by_name(kvp.first);
+        if (to_prune_var->affine != Affine()) {
+          // The index should not in to_prune block
+          replacement.emplace(kvp.first, to_prune_var->affine);
+        }
       }
     }
-    size_t comp_order = 0;
-    size_t comp_idx_range = 0;
-    for (auto it = comp->idxs.rbegin(); it != comp->idxs.rend(); ++it) {
-      if (it->range > 1) {
-        ++comp_order;
+    idx.affine.substitute(replacement);
+  }
+
+  // Remove the invalid constraints
+  CopyConstraints(dst_inner, src_inner);
+}
+
+std::vector<Affine> AccessCoefficients(const std::vector<Affine>& ref_access) {
+  std::vector<Affine> updated_access;
+  for (auto& access : ref_access) {
+    auto& acc_map = access.getMap();
+    size_t num_idxs = 0;
+    Affine new_access;
+    for (auto& kvp : acc_map) { 
+      if (kvp.first.size() > 0) {
+        ++num_idxs;
+        new_access = new_access + Affine(kvp.first);
       }
-      if (it->name == comp_idx) {
-        comp_idx_range = it->range;
-        break;
+      else {
+        new_access = new_access + Affine(kvp.second);
       }
     }
-    if (cache_order != comp_order) {
-      // If both index ranges are 1, the index can be removed later. It does not matter.
-      if (cache_idx_range != 1 || comp_idx_range != 1) {
-        return false;
+    // If there is no index or are more than one index in the access
+    // so that we just keep this access
+    updated_access.push_back(num_idxs == 1 ? new_access : access);
+  }
+  return updated_access;
+}
+
+bool CheckEltwiseAccess(Block* block, size_t n_dim, const Refinement& except) {
+  for (size_t i = 0; i < n_dim; ++i) {
+    Affine this_access;
+    for (const auto& ref : block->refs) {
+      if (ref.into() == except.into()) {
+        continue;
+      }
+      if (i < n_dim - ref.access.size()) {
+        continue;
+      }
+      size_t this_dim = i + ref.access.size() - n_dim;
+      if (this_access == Affine()) {
+        this_access = ref.access[this_dim];
+      }
+      else {
+        if (ref.access[this_dim] != Affine() && this_access != ref.access[this_dim]) {
+          return false;
+        }
       }
     }
   }
   return true;
 }
 
-// Transform the cache block and computational block as well as their refinements.
-static void PartialCacheInRegister(const AliasMap& parent_map,          //
-                                   Block* parent, Block* comp_parent,   //
-                                   Block* cache, Block* comp,           //
-                                   Block* orig_cache,                   //
-                                   bool cache_index_order,              //
-                                   bool keep_local,                     //
-                                   const std::string& ref_name,         //
-                                   const std::map<std::string, Rational>& multiple) {
-
-  // Note that parent is cache block's parent, probably not be computational block's parent
-  auto parent_ref_it = parent->ref_by_into(ref_name);
+// Replace the cache block (global <-> local) with a new block (global <-> register).
+// The new block's index and access reference the computing block.
+bool ReferenceComputingBlock(const AliasMap& parent_map,          //
+                             Block* parent, Block* comp_parent,   //
+                             Block* cache, Block* comp,           //
+                             const std::string& ref_name,         //
+                             const RegisterPassOptions& opt) {
   auto cache_inner = cache->SubBlock(0);
-
-  // Conver the constraints in global index sytle
-  std::vector<Affine> constraints;
-  // Only global->register needs the original constraints
-  if (!keep_local) {
-    AliasMap old_cache_map(parent_map, orig_cache);
-    AliasMap old_inner_map(old_cache_map, orig_cache->SubBlock(0).get());
-    for (const auto& cons : cache_inner->constraints) {
-      auto global_cons = cons.sym_eval(old_inner_map.idx_sources());
-      constraints.push_back(global_cons);
-    }
-  }
-
-  if (keep_local) {
-    std::string local_ref_name = parent_ref_it->into() + "_local";
-    Refinement local_ref = parent_ref_it->WithInto(local_ref_name);
-    parent->refs.insert(local_ref);
-    auto ref_it = orig_cache->ref_by_from(parent_ref_it->into());
-    ref_it->mut().from = local_ref_name;
-  }
-  parent_ref_it->mut().location.devs[0].name = "REGISTER";
-
-  // Transform the cache block's index to be same as computational block's index
-  for (const auto& it : multiple) {
-    bool found = false;
-    for (auto& idx : cache->idxs) {
-      if (it.first == idx.name) {
-        found = true;
-        idx.range = ToInteger(idx.range / it.second);
-        break;
-      }
-    }
-    if (!found) {
-      // The index doesn't exist. It means the range is 1.
-      cache->idxs.push_back({it.first, static_cast<uint64_t>(ToInteger(1 / it.second)), Affine()});
-    }
-    found = false;
-    for (auto& idx : cache_inner->idxs) {
-      if (it.first == idx.name) {
-        found = true;
-        idx.range = ToInteger(it.second * idx.range);
-        break;
-      }
-    }
-    if (!found) {
-      // The index doesn't exist. It means the range is 1.
-      cache_inner->idxs.push_back({it.first, static_cast<uint64_t>(ToInteger(it.second)), Affine()});
-    }
-  }
-
-  // Reorder the idx in cache block or comp block
-  if (cache_index_order) {
-    // Adjust comp blocks' index order according to cache block
-    ReorderIndex(cache, comp, ref_name);
-      // In this case we need to mark as "reg_cache" in order to
-      // tell the code emitter
-      cache->set_tag("reg_cache");
-      cache_inner->set_tag("reg_cache");
-  } else {
-    // Adjust cache block's index order according to comp block
-    ReorderIndex(comp, cache, ref_name);
-    // Do not set reg_cache for the cache/cache_inner
-    // because the index of cache is same as the index of comp
-    // and it needs conditions.
-  }
-  comp->set_tag("ordered_idx");
-
-  AdjustRefAccess(cache, ref_name, multiple, true);
-  AdjustRefAccess(comp, ref_name, multiple, false);
-
-  // Stride changed. So need to fix all ref's interior size
-  for (auto& cache_ref : cache->refs) {
-    const auto& inner_ref = cache_inner->ref_by_from(cache_ref.into());
-    cache_ref.mut().interior_shape = cache_inner->exterior_shape(inner_ref->into());
-    // For the cached refinement, we should change both interior
-    // and exterior shapes. So we need to change the stripe as well.
-    // For other refinement, we just change the interior shape.
-    if (cache_ref.from == ref_name) {
-      size_t n_dims = cache_ref.interior_shape.dims.size();
-      std::vector<size_t> sizes(n_dims);
-      for (size_t i = 0; i < n_dims; ++i) {
-        sizes[i] = cache_ref.interior_shape.dims[i].size;
-      }
-      parent_ref_it->mut().interior_shape =                //
-          SimpleShape(parent_ref_it->interior_shape.type,  //
-                      sizes, parent_ref_it->interior_shape.layout);
-    }
-  }
   auto comp_inner = comp->SubBlock(0);
-  auto comp_ref_it = comp->ref_by_from(ref_name);
-  const auto& inner_ref = comp_inner->ref_by_from(comp_ref_it->into());
-  comp_ref_it->mut().interior_shape = comp_inner->exterior_shape(inner_ref->into());
-  if (comp_parent != parent) {
-    auto comp_parent_ref_it = comp_parent->ref_by_into(ref_name);
-    comp_parent_ref_it->mut().interior_shape = comp->exterior_shape(comp_ref_it->into());
+
+  const auto& comp_outer_local_ref = comp->ref_by_into(ref_name);
+  const auto& comp_inner_local_ref = comp_inner->ref_by_into(comp_outer_local_ref->into());
+  const auto& cache_outer_local_ref = cache->ref_by_from(ref_name);
+  const auto& cache_inner_local_ref = cache_inner->ref_by_from(cache_outer_local_ref->into());
+  size_t n_dim = comp_outer_local_ref->access.size();
+
+  // Build the target register refinement shape
+  // according to local refinement shape in computing block
+  std::vector<Affine> comp_reg_access = AccessCoefficients(comp_inner_local_ref->access);
+  Refinement tmp_reg_ref = *comp_inner_local_ref;
+  tmp_reg_ref.access = comp_reg_access;
+  std::vector<Extent> comp_reg_extents = tmp_reg_ref.Extents(comp_inner->idxs);
+  std::vector<size_t> comp_reg_sizes;
+  size_t load_size = byte_width(tmp_reg_ref.interior_shape.type);
+  for (const auto& reg_ext : comp_reg_extents) {
+    comp_reg_sizes.push_back(reg_ext.max);
+    load_size *= (reg_ext.max - reg_ext.min);
+  }
+  auto comp_reg_shape = SimpleShape(tmp_reg_ref.interior_shape.type,
+                                    comp_reg_sizes, tmp_reg_ref.interior_shape.layout);
+
+  if (load_size > opt.reg_size) {
+    return false;
   }
 
-  PropagateRefLoc(parent, *parent_ref_it);
+  if (cache->has_tag("eltwise") &&
+     !(CheckEltwiseAccess(cache, n_dim, *cache_outer_local_ref) &&
+       CheckEltwiseAccess(cache_inner.get(), n_dim, *cache_inner_local_ref))) {
+    return false;
+  }
 
-  // Adjust constraints
-  cache_inner->constraints.clear();
-  // Build alias maps from parent to cache_inner
-  AliasMap new_parent_map(*(parent_map.parent_alias_map()), parent);
-  AliasMap new_cache_map(new_parent_map, cache);
-  AliasMap new_inner_map(new_cache_map, cache_inner.get());
-  // Adjust constraints
-  if (keep_local) {
-    // Local -> Register, the original constraints don't work.
-    // So check the ref extents only
-    Refinement* cache_inner_ref = (comp_ref_it->dir == RefDir::In) ?
-                                  cache_inner->ref_ins()[0] : cache_inner->ref_outs(true)[0];
-    const auto& ai = new_inner_map.at(cache_inner_ref->into());
-    for (size_t i = 0; i < cache_inner_ref->interior_shape.dims.size(); ++i) {
-      new_inner_map.AddConstraintForIndex(cache_inner.get(), ai, i,
-        "", cache_inner_ref->interior_shape.dims[i].size <= 1);
-    }
+  std::map<std::string, size_t> inner_used_idxs = RefinementIndex(comp_inner.get(), *comp_inner_local_ref);
+  std::map<std::string, size_t> outer_used_idxs = RefinementIndex(comp, *comp_outer_local_ref);
+
+  size_t cache_oloop;
+  size_t cache_iloop;
+  OuterInnerLoopCount(cache, &cache_oloop, &cache_iloop);
+  size_t comp_oloop;
+  size_t comp_iloop;
+  OuterInnerLoopCount(comp, &comp_oloop, &comp_iloop);
+  size_t new_cache_iloop = IndexProduct(inner_used_idxs);
+  double benefit = opt.lmem_lat * comp_iloop * comp_oloop + (opt.lmem_lat + opt.gmem_lat) * cache_iloop * cache_oloop;
+  double cost = opt.reg_lat * comp_iloop * comp_oloop + (opt.reg_lat + opt.gmem_lat) * new_cache_iloop * comp_oloop;
+  if (benefit < cost) {
+    return false;
+  }
+
+  // Determine the new shapes and accesses
+  std::vector<Affine> new_inner_access = comp_inner_local_ref->access;
+  std::vector<Affine> new_outer_access = comp_outer_local_ref->access;
+  std::vector<size_t> new_cache_sizes(n_dim);
+  for (size_t i = 0; i < n_dim; ++i) {
+    new_cache_sizes[i] = comp_outer_local_ref->interior_shape.dims[i].size;
+  }
+
+  if (parent == comp_parent) {
+    cache->idxs = comp->idxs;
+    std::set<std::string> dummy;
+    CopyIndexWithout(cache_inner.get(), comp_inner.get(), inner_used_idxs, dummy);
+    CopyConstraints(cache_inner.get(), comp_inner.get());
   }
   else {
-    // Global -> Register, modify the original constraints
-    for (auto& cons : constraints) {
-      for (auto& kvp : cons.mutateMap()) {
-        if (kvp.first == "") {
-          continue;
-        }
-        std::string idx_name;
-        size_t depth;
-        if (!ParseGlobalIndex(kvp.first, &depth, &idx_name)) {
-          throw std::runtime_error("Incorrect global index " + kvp.first);
-        }
-        // Modify only the variables that are defined in the cache inner level
-        if (depth == new_inner_map.depth()) {
-          kvp.second = ToInteger(kvp.second / multiple.at(idx_name));
-        }
-      }
-      // Translate back to local index
-      auto local_cons = new_inner_map.translate(cons);
-      cache_inner->constraints.push_back(local_cons);
+    CopyIndexConstraints(cache, cache_inner.get(), comp, comp_inner.get(),
+        comp_parent, outer_used_idxs, inner_used_idxs);
+  }
+
+  // New register refinements in cache block
+  std::string rref_short_name = opt.dir == RefDir::In ? "dst" : "src";
+  RefDir rref_dir = opt.dir == RefDir::In ? RefDir::Out : RefDir::In;
+  Refinement cache_inner_reg_ref = comp_inner_local_ref->WithInto(rref_short_name);
+  Refinement cache_outer_reg_ref = comp_outer_local_ref->WithInto(rref_short_name);
+  cache_inner_reg_ref.interior_shape = comp_reg_shape;
+  cache_inner_reg_ref.location.devs[0].name = "REGISTER";
+  cache_inner_reg_ref.access = comp_reg_access;
+  cache_inner_reg_ref.from = rref_short_name;
+  cache_inner_reg_ref.dir = rref_dir;
+  cache_inner_reg_ref.agg_op = "";
+  for (auto& dim : cache_inner_reg_ref.interior_shape.dims) {
+    dim.size = 1;
+  }
+  cache_inner->refs.erase(cache_inner_local_ref);
+  cache_inner->refs.insert(cache_inner_reg_ref);
+  cache_outer_reg_ref.interior_shape = comp_reg_shape;
+  ClearAccesses(cache_outer_reg_ref);
+  cache_outer_reg_ref.location.devs[0].name = "REGISTER";
+  cache_outer_reg_ref.dir = rref_dir;
+  cache_outer_reg_ref.agg_op = "";
+  cache->refs.erase(cache_outer_local_ref);
+  cache->refs.insert(cache_outer_reg_ref);
+  cache->set_tag("reg_cache_partial");
+
+  // Correct the refinements except for the register refinement
+  // Note that there may be multiple refinements except for the register refinement,
+  // especially for the store cache merged with the following element-wise operations
+  // Assign the shapes and accesses
+  for (const auto& inner_ref : cache_inner->refs) {
+    if (IsRegisterRef(inner_ref)) {
+      continue;
     }
-  }
-}
-
-// Try to decide if we should load the ref in cache into registers
-static bool CacheRefInRegister(const AliasMap& parent_map,                       //
-                               Block* parent, Block* comp_parent, Block* cache,  //
-                               Block* comp, const RegisterPassOptions& opt) {
-  std::set<Refinement>::const_iterator cache_ref_it;
-  // Determine the refinement in cache block
-  if (opt.dir == RefDir::In) {
-    cache_ref_it = cache->ref_by_into("dst");
-  } else if (opt.dir == RefDir::Out) {
-    cache_ref_it = cache->ref_by_into("src");
-  } else {
-    throw std::runtime_error("Invalid direction for caching into registers.");
-  }
-
-  // The candidate must be the ref marked as LOCAL
-  if (cache_ref_it->location.devs[0].name != "LOCAL") {
-    return false;
-  }
-
-  const auto& cache_inner = cache->SubBlock(0);
-  const std::string ref_name = cache_ref_it->from;
-
-  // Make sure each access of the refinement is single index, not complex affine
-  const auto& comp_ref_it = comp->ref_by_from(ref_name);
-  for (const auto& aff : comp_ref_it->access) {
-    if (aff != Affine() && aff.getMap().size() > 1) {
-      return false;
-    }
-  }
-
-  // The ref dim in all computation block should be same
-  if (comp_ref_it->access.size() != cache_ref_it->access.size()) {
-    return false;
-  }
-
-  // Get the inner and outer loop counts for the cache block
-  size_t outer_loop;
-  size_t inner_loop;
-  if (!OuterInnerLoopCount(cache, &outer_loop, &inner_loop)) {
-    return false;
-  }
-
-  // multiple is the vector of cache block index / computational block index
-  std::map<std::string, Rational> multiple;
-  // mul_prod is the product of multiple
-  double mul_prod = 1.0;
-  const auto& cache_inner_ref_it = cache_inner->ref_by_from(cache_ref_it->into());
-  for (size_t i = 0; i < cache_ref_it->access.size(); ++i) {
-    const auto& cache_ref_aff = cache_ref_it->access[i];
-    const auto& comp_ref_aff = comp_ref_it->access[i];
-    if (cache_ref_aff == Affine()) {
-      if (comp_ref_aff == Affine()) {
-        continue;
-      } else {
-        return false;
+    const auto& outer_ref = cache->ref_by_into(inner_ref.from);
+    // Change the accesses
+    auto& inner_access = inner_ref.mut().access;
+    size_t inner_access_dim = inner_access.size();
+    for (size_t i = 0; i < inner_access_dim; ++i) {
+      if (inner_access[i] != Affine()) {
+        inner_access[i] = new_inner_access[n_dim - inner_access_dim + i];
       }
     }
-    if (cache_ref_aff.getMap().size() != 1 || comp_ref_aff.getMap().size() != 1) {
-      return false;
+    auto& outer_access = outer_ref->mut().access;
+    size_t outer_access_dim = outer_access.size();
+    for (size_t i = 0; i < outer_access_dim; ++i) {
+      if (outer_access[i] != Affine()) {
+        outer_access[i] = new_outer_access[n_dim - outer_access_dim + i];
+      }
     }
-
-    const auto& cache_inner_aff = cache_inner_ref_it->access[i];
-    Index* cache_idx = cache->idx_by_name(cache_ref_aff.getMap().begin()->first);
-    Index* comp_idx = comp->idx_by_name(comp_ref_aff.getMap().begin()->first);
-    Index* cache_inner_idx = cache_inner->idx_by_name(cache_inner_aff.getMap().begin()->first);
-    // The index must be real loop, not affine
-    if (cache_idx->affine != Affine() || comp_idx->affine != Affine() || cache_inner_idx->affine != Affine()) {
-      return false;
+    // Change the sizes, do not have to change the strides
+    auto& inner_dims = inner_ref.mut().interior_shape.dims;
+    size_t inner_dims_size = inner_dims.size();
+    for (size_t i = 0; i < inner_dims_size; ++i) {
+      inner_dims[i].size = 1;
     }
-
-    // For each dim, make sure the total range (inner*outer) of cache block is
-    // divisible by comp_idx's range
-    size_t cache_total_range = cache_idx->range * cache_inner_idx->range;
-    // The first condition is for cache_total_range == 1
-    if (comp_idx->range > cache_total_range || cache_total_range % comp_idx->range > 0) {
-      return false;
-    }
-
-    Rational times = cache_idx->range;
-    // If not divisible, it's hard to transform, then give up.
-    if (cache_idx->range % comp_idx->range > 0 && comp_idx->range % cache_idx->range > 0) {
-      return false;
-    }
-    times /= comp_idx->range;
-    mul_prod *= static_cast<double>(times);
-    multiple.emplace(cache_idx->name, times);
-  }
-
-  // Now we compute the load count of the refinement elements in the computational block
-  size_t comp_load_count = 0;
-  size_t iloop;
-  size_t oloop;
-  if (!OuterInnerLoopCount(comp, &oloop, &iloop)) {
-    return false;
-  }
-  // If the block is threaded, only count the inner loop
-  if (comp->has_tag("gpu_thread")) {
-    comp_load_count += iloop;
-  } else {
-    comp_load_count += (iloop * oloop);
-  }
-
-  // Don't use interior shape size here because the refinement may be transformed
-  double load_size = mul_prod * cache_inner->idxs_product() *  //
-                     byte_width(cache_ref_it->interior_shape.type);
-  if (load_size > static_cast<double>(opt.reg_size)) {
-    return false;
-  }
-
-  // the cost could be negative because mul_prod is probably less than 1.0
-  double cache_load_cost = (inner_loop * mul_prod) * (opt.gmem_lat + opt.reg_lat)  //
-                           - inner_loop * (opt.gmem_lat + opt.lmem_lat);
-  double comp_load_benefit = comp_load_count * (opt.lmem_lat - opt.reg_lat);
-
-  // If the index order is based on the cache block,
-  // and the index order in comp block can't be change,
-  // we need to check if the the index order between cache block
-  // and comp block are consistent. If not consistent, copy 
-  // data from local to register
-  Block* to_cache = cache;
-  bool cache_index_order = opt.cache_index_order;
-  bool keep_local = comp_load_benefit <= cache_load_cost;
-  if (opt.cache_index_order && comp->has_tag("ordered_idx")) {
-    if (!ConsistentIdxOrder(cache, *cache_ref_it, comp, *comp_ref_it)) {
-      keep_local = true;
+    auto& outer_dims = outer_ref->mut().interior_shape.dims;
+    size_t outer_dims_size = outer_dims.size();
+    for (size_t i = 0; i < outer_dims_size; ++i) {
+      outer_dims[i].size = outer_access[i] == Affine() ?
+          1 : new_cache_sizes[n_dim - outer_dims_size + i];
     }
   }
 
-  if (keep_local) {
-    // New cache block from local to register
-    auto new_cache = CloneBlock(*cache);
-    auto new_inner = new_cache->SubBlock(0);
-    auto global_outer_ref_it = new_cache->ref_by_from(ref_name + "_raw");
-    auto global_inner_ref_it = new_inner->ref_by_from(global_outer_ref_it->into());
-    new_cache->refs.erase(*global_outer_ref_it);
-    new_inner->refs.erase(*global_inner_ref_it);
-
-    // outer ref for new_cache
-    auto local_outer_ref_it = cache->ref_by_from(ref_name);
-    std::string local_into = (local_outer_ref_it->into() == "src") ? "dst" : "src";
-    Refinement local_outer_ref = local_outer_ref_it->WithInto(local_into);
-    local_outer_ref.dir = (local_outer_ref.dir == RefDir::In) ? RefDir::Out : RefDir ::In;
-    local_outer_ref.from = ref_name + "_local";
-    new_cache->refs.insert(local_outer_ref);
-
-    // inner ref for new_cache
-    auto local_inner_ref_it = cache_inner->ref_by_from(local_outer_ref_it->into());
-    Refinement local_inner_ref = local_inner_ref_it->WithInto(local_into);
-    local_inner_ref.dir = (local_inner_ref.dir == RefDir::In) ? RefDir::Out : RefDir ::In;
-    local_inner_ref.from = local_inner_ref.into();
-    new_inner->refs.insert(local_inner_ref);
-
-    InsertAfterBlock(parent, cache, new_cache);
-    to_cache = new_cache.get();
-    cache_index_order = false;
+  // New register refinements in computing block
+  Refinement comp_inner_reg_ref = *comp_inner_local_ref;
+  Refinement comp_outer_reg_ref = *comp_outer_local_ref;
+  comp_inner_reg_ref.interior_shape = comp_reg_shape;
+  for (auto& dim : comp_inner_reg_ref.interior_shape.dims) {
+    dim.size = 1;
   }
+  comp_inner_reg_ref.location.devs[0].name = "REGISTER";
+  comp_inner_reg_ref.access = comp_reg_access;
+  comp_inner->refs.erase(comp_inner_local_ref);
+  comp_inner->refs.insert(comp_inner_reg_ref);
+  comp_outer_reg_ref.interior_shape = comp_reg_shape;
+  ClearAccesses(comp_outer_reg_ref);
+  comp_outer_reg_ref.location.devs[0].name = "REGISTER";
+  comp->refs.erase(comp_outer_local_ref);
+  comp->refs.insert(comp_outer_reg_ref);
 
-  // Now it's better to load the refinement into registers
-  PartialCacheInRegister(parent_map, parent, comp_parent, to_cache, comp, cache, 
-                         cache_index_order, keep_local, ref_name, multiple);
+  // Add the register refinement at parent level
+  const auto& parent_local_ref = parent->ref_by_into(ref_name);
+  Refinement parent_reg_ref = *parent_local_ref;
+  parent_reg_ref.location.devs[0].name = "REGISTER";
+  parent_reg_ref.interior_shape = comp_reg_shape;
+  parent->refs.erase(parent_local_ref);
+  parent->refs.insert(parent_reg_ref);
+  PropagateRefLoc(parent, parent_reg_ref);
+
   return true;
 }
 
-static void CacheWholeRefInRegister(Block* parent, Block* cache, Block* comp,  //
-                                    const RegisterPassOptions& opt) {
+// Replace the local refinements in place with register refinements
+// in cache block and computing block
+bool ReplaceLocalRefinement(const AliasMap& parent_map,          //
+                            Block* parent, Block* comp_parent,   //
+                            Block* cache, Block* comp,           //
+                            const std::string& ref_name,         //
+                            const RegisterPassOptions& opt) {
+  // Here the target refinement has same_access tag, which means
+  // the index in cache block and access of the refinement are
+  // consisitent with that in computing block
+
+  auto cache_inner = cache->SubBlock(0);
+  auto comp_inner = comp->SubBlock(0);
+
+  const auto& comp_outer_local_ref = comp->ref_by_into(ref_name);
+  const auto& comp_inner_local_ref = comp_inner->ref_by_into(comp_outer_local_ref->into());
+  const auto& cache_outer_local_ref = cache->ref_by_from(ref_name);
+  const auto& cache_inner_local_ref = cache_inner->ref_by_from(cache_outer_local_ref->into());
+  size_t n_dim = cache_outer_local_ref->access.size();
+
+  std::map<std::string, size_t> inner_used_idxs = RefinementIndex(comp_inner.get(), *comp_inner_local_ref);
+  std::map<std::string, size_t> outer_used_idxs = RefinementIndex(comp, *comp_outer_local_ref);
+
+  // Build the target register refinement shape
+  // according to local refinement shape in computing block
+  std::vector<Affine> comp_reg_access = AccessCoefficients(comp_inner_local_ref->access);
+  Refinement tmp_reg_ref = *comp_inner_local_ref;
+  tmp_reg_ref.access = comp_reg_access;
+  std::vector<Extent> comp_reg_extents = tmp_reg_ref.Extents(comp_inner->idxs);
+  std::vector<size_t> comp_reg_sizes;
+  size_t load_size = byte_width(tmp_reg_ref.interior_shape.type);
+  for (const auto& reg_ext : comp_reg_extents) {
+    comp_reg_sizes.push_back(reg_ext.max);
+    load_size *= (reg_ext.max - reg_ext.min);
+  }
+  auto comp_reg_shape = SimpleShape(tmp_reg_ref.interior_shape.type,
+                                    comp_reg_sizes, tmp_reg_ref.interior_shape.layout);
+
+  if (load_size > opt.reg_size) {
+    return false;
+  }
+
+  size_t cache_oloop;
+  size_t cache_iloop;
+  OuterInnerLoopCount(cache, &cache_oloop, &cache_iloop);
+  size_t comp_oloop;
+  size_t comp_iloop;
+  OuterInnerLoopCount(comp, &comp_oloop, &comp_iloop);
+  size_t new_cache_iloop = IndexProduct(inner_used_idxs);
+  double benefit = opt.lmem_lat * comp_iloop * comp_oloop + (opt.lmem_lat + opt.gmem_lat) * cache_iloop * cache_oloop;
+  double cost = opt.reg_lat * comp_iloop * comp_oloop + (opt.reg_lat + opt.gmem_lat) * new_cache_iloop * comp_oloop;
+  if (benefit < cost) {
+    return false;
+  }
+
+  if (cache->has_tag("eltwise") &&
+     !(CheckEltwiseAccess(cache, n_dim, *cache_outer_local_ref) &&
+       CheckEltwiseAccess(cache_inner.get(), n_dim, *cache_inner_local_ref))) {
+    return false;
+  }
+
+  // Before index conversion, compute the index multiple before and after conversion
+  std::map<std::string, Rational> multiple;
+  for (auto& old_idx : cache->idxs) {
+    Index* new_idx = comp->idx_by_name(old_idx.name);
+    Rational new_idx_range = new_idx ? new_idx->range : 1;
+    multiple.emplace(old_idx.name, new_idx_range / old_idx.range);
+  }
+
+  if (parent == comp_parent) {
+    cache->idxs = comp->idxs;
+    std::set<std::string> dummy;
+    CopyIndexWithout(cache_inner.get(), comp_inner.get(), inner_used_idxs, dummy);
+    CopyConstraints(cache_inner.get(), comp_inner.get());
+  }
+  else {
+    CopyIndexConstraints(cache, cache_inner.get(), comp, comp_inner.get(),
+        comp_parent, outer_used_idxs, inner_used_idxs);
+  }
+
+  // New register refinements in cache block
+  std::string rref_short_name = opt.dir == RefDir::In ? "dst" : "src";
+  RefDir rref_dir = opt.dir == RefDir::In ? RefDir::Out : RefDir::In;
+  Refinement cache_inner_reg_ref = comp_inner_local_ref->WithInto(rref_short_name);
+  Refinement cache_outer_reg_ref = comp_outer_local_ref->WithInto(rref_short_name);
+  cache_inner_reg_ref.interior_shape = comp_reg_shape;
+  cache_inner_reg_ref.access = comp_reg_access;
+  cache_inner_reg_ref.location.devs[0].name = "REGISTER";
+  cache_inner_reg_ref.from = rref_short_name;
+  cache_inner_reg_ref.dir = rref_dir;
+  for (auto& dim : cache_inner_reg_ref.interior_shape.dims) {
+    dim.size = 1;
+  }   
+  cache_inner->refs.erase(cache_inner_local_ref);
+  cache_inner->refs.insert(cache_inner_reg_ref);
+  cache_outer_reg_ref.interior_shape = comp_reg_shape;
+  ClearAccesses(cache_outer_reg_ref); 
+  cache_outer_reg_ref.location.devs[0].name = "REGISTER";
+  cache_outer_reg_ref.dir = rref_dir;
+  cache->refs.erase(cache_outer_local_ref);
+  cache->refs.insert(cache_outer_reg_ref);
+  cache->set_tag("reg_cache_partial");
+
+  // Correct refinements' accesses and shapes except for the register refinement
+  for (const auto& inner_ref : cache_inner->refs) {
+    if (IsRegisterRef(inner_ref)) {
+      continue;
+    }
+    const auto& outer_ref = cache->ref_by_into(inner_ref.from);
+    for (auto& access : inner_ref.mut().access) {
+      auto& acc_map = access.mutateMap();
+      for (auto& kvp : acc_map) {
+        if (kvp.first.size() > 0) {
+          kvp.second = ToInteger(kvp.second * multiple.at(kvp.first));
+        }
+      }
+    }
+    std::vector<Extent> extents = inner_ref.Extents(cache_inner->idxs);
+    for (size_t i = 0; i < extents.size(); ++i) {
+      outer_ref->mut().interior_shape.dims[i].size = extents[i].max;
+    }
+  }
+
+  // New register refinements in computing block
+  Refinement comp_inner_reg_ref = *comp_inner_local_ref;
+  Refinement comp_outer_reg_ref = *comp_outer_local_ref;
+  comp_inner_reg_ref.interior_shape = comp_reg_shape;
+  for (auto& dim : comp_inner_reg_ref.interior_shape.dims) {
+    dim.size = 1;
+  }
+  comp_inner_reg_ref.location.devs[0].name = "REGISTER";
+  comp_inner_reg_ref.access = comp_reg_access;
+  comp_inner->refs.erase(comp_inner_local_ref);
+  comp_inner->refs.insert(comp_inner_reg_ref);
+  comp_outer_reg_ref.interior_shape = comp_reg_shape;
+  ClearAccesses(comp_outer_reg_ref);
+  comp_outer_reg_ref.location.devs[0].name = "REGISTER";
+  comp->refs.erase(comp_outer_local_ref);
+  comp->refs.insert(comp_outer_reg_ref);
+
+  // Add the register refinement at parent level
+  const auto& parent_local_ref = parent->ref_by_into(ref_name);
+  Refinement parent_reg_ref = *parent_local_ref;
+  parent_reg_ref.location.devs[0].name = "REGISTER";
+  parent_reg_ref.interior_shape = comp_reg_shape;
+  parent->refs.erase(parent_local_ref);
+  parent->refs.insert(parent_reg_ref);
+  PropagateRefLoc(parent, parent_reg_ref);
+
+  return true;
+}
+
+// Append a new block of register<->global after the original block of local<->global
+bool AppendRegCacheBlock(const AliasMap& parent_map,          //
+                         Block* parent, Block* comp_parent,   //
+                         Block* orig_cache, Block* comp,      //
+                         const std::string& ref_name,         //
+                         const RegisterPassOptions& opt) {
+  auto comp_inner = comp->SubBlock(0);
+
+  const auto& comp_outer_local_ref = comp->ref_by_into(ref_name);
+  const auto& comp_inner_local_ref = comp_inner->ref_by_into(comp_outer_local_ref->into());
+  size_t n_dim = comp_outer_local_ref->access.size();
+
+  // Build the target register refinement shape
+  // according to local refinement shape in computing block
+  std::vector<Affine> comp_reg_access = AccessCoefficients(comp_inner_local_ref->access);
+  Refinement tmp_reg_ref = *comp_inner_local_ref;
+  tmp_reg_ref.access = comp_reg_access;
+  std::vector<Extent> comp_reg_extents = tmp_reg_ref.Extents(comp_inner->idxs);
+  std::vector<size_t> comp_reg_sizes;
+  size_t load_size = byte_width(tmp_reg_ref.interior_shape.type);
+  for (const auto& reg_ext : comp_reg_extents) {
+    comp_reg_sizes.push_back(reg_ext.max);
+    load_size *= (reg_ext.max - reg_ext.min);
+  }
+  auto comp_reg_shape = SimpleShape(tmp_reg_ref.interior_shape.type,
+                                    comp_reg_sizes, tmp_reg_ref.interior_shape.layout);
+
+  if (load_size > opt.reg_size) {
+    return false;
+  }
+
+  // Build a new cache block
+  auto cache = std::make_shared<Block>();
+  auto cache_inner = std::make_shared<Block>();
+  cache->set_tags({"cache", "cache_outer", "gpu_thread", "reg_cache_partial"});
+  cache->set_tag(opt.dir == RefDir::In ? "cache_load" : "cache_store");
+  cache_inner->set_tags({"cache_threads", "inline"});
+
+  std::map<std::string, size_t> inner_used_idxs = RefinementIndex(comp_inner.get(), *comp_inner_local_ref);
+  std::map<std::string, size_t> outer_used_idxs = RefinementIndex(comp, *comp_outer_local_ref);
+
+  // Determine the new shapes and accesses
+  std::vector<Affine> new_inner_access = comp_inner_local_ref->access;
+  std::vector<Affine> new_outer_access = comp_outer_local_ref->access;
+  std::vector<size_t> new_cache_sizes(n_dim);
+  for (size_t i = 0; i < n_dim; ++i) {
+    new_cache_sizes[i] = comp_outer_local_ref->interior_shape.dims[i].size;
+  }
+
+  if (parent == comp_parent) {
+    cache->idxs = comp->idxs;
+    std::set<std::string> dummy;
+    CopyIndexWithout(cache_inner.get(), comp_inner.get(), inner_used_idxs, dummy);
+    CopyConstraints(cache_inner.get(), comp_inner.get());
+  }
+  else {
+    CopyIndexConstraints(cache.get(), cache_inner.get(), comp, comp_inner.get(),
+        comp_parent, outer_used_idxs, inner_used_idxs);
+  }
+
+  // Register refinements in new cache blocks
+  std::string rref_short_name = opt.dir == RefDir::In ? "dst" : "src";
+  RefDir rref_dir = opt.dir == RefDir::In ? RefDir::Out : RefDir::In;
+  Refinement cache_inner_reg_ref = comp_inner_local_ref->WithInto(rref_short_name);
+  Refinement cache_outer_reg_ref = comp_outer_local_ref->WithInto(rref_short_name);
+  cache_inner_reg_ref.interior_shape = comp_reg_shape;
+  cache_inner_reg_ref.location.devs[0].name = "REGISTER";
+  cache_inner_reg_ref.access = comp_reg_access;
+  cache_inner_reg_ref.from = rref_short_name;
+  cache_inner_reg_ref.dir = rref_dir;
+  cache_inner_reg_ref.agg_op = "";
+  for (auto& dim : cache_inner_reg_ref.interior_shape.dims) {
+    dim.size = 1;
+  }
+  cache_inner->refs.insert(cache_inner_reg_ref);
+  cache_outer_reg_ref.interior_shape = comp_reg_shape;
+  ClearAccesses(cache_outer_reg_ref);
+  cache_outer_reg_ref.location.devs[0].name = "REGISTER";
+  cache_outer_reg_ref.dir = rref_dir;
+  cache_outer_reg_ref.agg_op = "";
+  cache->refs.insert(cache_outer_reg_ref);
+
+  // Change the local refinement in the original cache block
+  std::string local_ref_name = ref_name + "_local";
+  auto orig_cache_outer_local_ref = orig_cache->ref_by_from(ref_name);
+  orig_cache_outer_local_ref->mut().from = local_ref_name;
+
+  // Local refinements in new cache blocks
+  std::string local_ref_dir = opt.dir == RefDir::In ? "src" : "dst";
+  Refinement cache_inner_local_ref = comp_inner_local_ref->WithInto(local_ref_dir);
+  Refinement cache_outer_local_ref = comp_outer_local_ref->WithInto(local_ref_dir);
+  cache_inner_local_ref.from = cache_outer_local_ref.into();
+  cache_outer_local_ref.from = local_ref_name;
+  cache_inner->refs.insert(cache_inner_local_ref);
+  cache->refs.insert(cache_outer_local_ref);
+
+  // Insert the load and store statements
+  auto load = std::make_shared<Load>("src", "$X");
+  cache_inner->stmts.push_back(load);
+  auto store = std::make_shared<Store>("$X", "dst");
+  cache_inner->stmts.push_back(store);
+
+  // Insert the new cache block
+  cache->stmts.push_back(cache_inner);
+  InsertAfterBlock(parent, orig_cache, cache);
+
+  // New register refinements in computing block
+  Refinement comp_inner_reg_ref = *comp_inner_local_ref;
+  Refinement comp_outer_reg_ref = *comp_outer_local_ref;
+  comp_inner_reg_ref.interior_shape = comp_reg_shape;
+  for (auto& dim : comp_inner_reg_ref.interior_shape.dims) {
+    dim.size = 1;
+  }
+  comp_inner_reg_ref.location.devs[0].name = "REGISTER";
+  comp_inner_reg_ref.access = comp_reg_access;
+  comp_inner->refs.erase(comp_inner_local_ref);
+  comp_inner->refs.insert(comp_inner_reg_ref);
+  comp_outer_reg_ref.interior_shape = comp_reg_shape;
+  ClearAccesses(comp_outer_reg_ref);
+  comp_outer_reg_ref.location.devs[0].name = "REGISTER";
+  comp->refs.erase(comp_outer_local_ref);
+  comp->refs.insert(comp_outer_reg_ref);
+
+  // Add the register refinement at parent level
+  const auto& parent_local_ref = parent->ref_by_into(ref_name);
+  Refinement parent_reg_ref = *parent_local_ref;
+  Refinement new_parent_local_ref = parent_local_ref->WithInto(local_ref_name);
+  parent->refs.erase(parent_local_ref);
+  parent->refs.insert(new_parent_local_ref);
+  parent_reg_ref.location.devs[0].name = "REGISTER";
+  parent_reg_ref.interior_shape = comp_reg_shape;
+  parent->refs.insert(parent_reg_ref);
+  PropagateRefLoc(parent, parent_reg_ref);
+
+  return true;
+}
+
+// Replace the block, loading from global memory and store into registers
+bool CacheRefInRegister(const AliasMap& parent_map,          //
+                        Block* parent, Block* comp_parent,   //
+                        Block* cache, Block* comp,           //
+                        const RegisterPassOptions& opt) {
+
+  std::set<Refinement>::const_iterator cache_ref_it;
+  // Determine the refinement in cache block
+  if (opt.dir == RefDir::In) {
+    cache_ref_it = cache->ref_by_into("dst");
+  } else if (opt.dir == RefDir::Out) {
+    cache_ref_it = cache->ref_by_into("src");
+  } else {
+    throw std::runtime_error("Invalid direction for caching into registers.");
+  }
+  std::string ref_name = cache_ref_it->from;
+
+  auto cache_inner = cache->SubBlock(0);
+  const auto& cache_outer_local_ref = cache->ref_by_from(ref_name);
+  const auto& cache_inner_local_ref = cache_inner->ref_by_from(cache_outer_local_ref->into());
+  const auto cache_outer_global_ref = opt.dir == RefDir::In ? cache->ref_ins()[0] : cache->ref_outs(true)[0];
+  const auto cache_inner_global_ref = cache_inner->ref_by_from(cache_outer_global_ref->into());
+
+  bool optimized = false;
+
+  if (cache_outer_local_ref->access == cache_outer_global_ref->access &&
+      cache_inner_local_ref->access == cache_inner_global_ref->access) {
+    // If global access and local access are same in the cache block,
+    // replace the cache block referencing the computing block.
+    // The global access and register access in the new cache block are
+    // same as the original local access in the computing block.
+    optimized = ReferenceComputingBlock(parent_map, parent, comp_parent, cache, comp, ref_name, opt);
+  }
+
+  if (!optimized && cache_outer_local_ref->has_tag("same_access")) {
+    // If the cache block's local access is same as that in the computing block,
+    // replace local refinement with register refinement and keep global access
+    optimized = ReplaceLocalRefinement(parent_map, parent, comp_parent, cache, comp, ref_name, opt);
+  }
+/*
+  if (!optimized) {
+    optimized = AppendRegCacheBlock(parent_map, parent, comp_parent, cache, comp, ref_name, opt);
+  }
+*/
+  return optimized;
+}
+
+void CacheWholeRefInRegister(Block* parent, Block* cache, Block* comp,  //
+                             const RegisterPassOptions& opt) {
   std::set<Refinement>::const_iterator cache_ref_it;
   // Determine the refinement in cache block
   if (opt.dir == RefDir::In) {
@@ -553,13 +750,10 @@ static void CacheWholeRefInRegister(Block* parent, Block* cache, Block* comp,  /
   // Get the inner and outer loop counts for the cache block
   size_t outer_loop;
   size_t inner_loop;
-  if (!OuterInnerLoopCount(cache, &outer_loop, &inner_loop)) {
-    return;
-  }
+  OuterInnerLoopCount(cache, &outer_loop, &inner_loop);
 
   auto cache_inner = cache->SubBlock(0);
-  size_t type_size = byte_width(cache_ref_it->interior_shape.type);
-  size_t load_size = cache_inner->idxs_product() * type_size;
+  size_t load_size = cache->exterior_shape(cache_ref_it->into()).byte_size();
   if (load_size > opt.reg_size) {
     return;
   }
@@ -568,9 +762,7 @@ static void CacheWholeRefInRegister(Block* parent, Block* cache, Block* comp,  /
   size_t comp_load_count = 0;
   size_t iloop;
   size_t oloop;
-  if (!OuterInnerLoopCount(comp, &oloop, &iloop)) {
-    return;
-  }
+  OuterInnerLoopCount(comp, &oloop, &iloop);
 
   // If the block is threaded, only count the inner loop
   if (comp->has_tag("gpu_thread")) {
@@ -579,26 +771,38 @@ static void CacheWholeRefInRegister(Block* parent, Block* cache, Block* comp,  /
     comp_load_count += (iloop * oloop);
   }
 
-  double times = 1.0 * opt.align_size / type_size;
-  double glmem_lat = (opt.gmem_lat + (times - 1) * opt.lmem_lat) / times;
-  double cost = inner_loop * outer_loop * (glmem_lat + opt.reg_lat) -  //
-                inner_loop * (glmem_lat + opt.lmem_lat);
+  double cost = inner_loop * outer_loop * (opt.lmem_lat + opt.reg_lat);
   double benefit = comp_load_count * (opt.lmem_lat - opt.reg_lat);
 
   if (benefit > cost) {
-    // Load the whole buffer into register
-    cache->remove_tag("gpu_thread");
-    cache->set_tag("reg_cache");
-    cache_inner->set_tag("reg_cache");
+    // Add a block loading from local and caching into registers
+    auto reg_cache = CloneBlock(*cache);
+    reg_cache->remove_tag("gpu_thread");
+    reg_cache->set_tag("reg_cache_whole");
+    auto reg_cache_inner = reg_cache->SubBlock(0);
+    reg_cache_inner->set_tag("reg_cache_whole");
+    InsertAfterBlock(parent, cache, reg_cache);
+    // Create a local refinement
     auto parent_ref_it = parent->ref_by_into(cache_ref_it->from);
+    std::string local_ref = cache_ref_it->from + "_local";
+    Refinement parent_local_ref = parent_ref_it->WithInto(local_ref);
+    parent->refs.insert(parent_local_ref);
+    // Rename the local refinement in the original cache block
+    cache_ref_it->mut().from = local_ref;
+    // Replace the source refinement from raw to local
+    auto src_ref_it = reg_cache->ref_by_into("src");
+    reg_cache->refs.erase(src_ref_it);
+    Refinement new_src_ref = cache_ref_it->WithInto("src");
+    reg_cache->refs.insert(new_src_ref);
+    // Change the register refinement in the parent block
     parent_ref_it->mut().location.devs[0].name = "REGISTER";
     PropagateRefLoc(parent, *parent_ref_it);
   }
 }
 
-static void BlocksForRegisterCache(const AliasMap& parent_map,
-                                   Block* parent, Block* cache,
-                                   const RegisterPassOptions& opt) {
+void BlocksForRegisterCache(const AliasMap& parent_map,
+                            Block* parent, Block* cache,
+                            const RegisterPassOptions& opt) {
   std::string ref_name;
   if (opt.dir == RefDir::In) {
     ref_name = cache->ref_by_into("dst")->from;
@@ -610,14 +814,18 @@ static void BlocksForRegisterCache(const AliasMap& parent_map,
 
   Block* comp = nullptr;
   Block* comp_parent;
+
+  // Find the parent of the computing block with comp_parent_tag
   if (parent->has_tag(opt.comp_parent_tag)) {
     comp_parent = parent;
   } else if (parent->SubBlock(0)->has_tag(opt.comp_parent_tag)) {
     comp_parent = parent->SubBlock(0).get();
   } else {
+    IVLOG(1, "Cannot find the computing block.");
     return;
   }
 
+  // Find the computing block inside comp_parent
   for (auto stmt : comp_parent->stmts) {
     auto inner = Block::Downcast(stmt);
     if (inner && !inner->has_tag("cache")) {
@@ -642,12 +850,9 @@ static void BlocksForRegisterCache(const AliasMap& parent_map,
     }
   }
 
+  // Now we can start the caching if computing block and its parent exist
   if (comp) {
-    bool ret = CacheRefInRegister(parent_map, parent, comp_parent, cache, comp, opt);
-    // It is not safe to let cache store be in registers
-    if (!ret && opt.dir == RefDir::In) {
-      CacheWholeRefInRegister(parent, cache, comp, opt);
-    }
+    CacheRefInRegister(parent_map, parent, comp_parent, cache, comp, opt);
   }
 }
 
@@ -656,7 +861,9 @@ static void RegisterCacheRecurse(const AliasMap& parent_map,   //
                                  const Tags& reqs,             //
                                  const RegisterPassOptions& opt) {
   if (block->has_tags(reqs)) {
-    BlocksForRegisterCache(parent_map, parent, block, opt);
+    if (!block->has_tag("reg_cache_partial") && !block->has_tag("reg_cache_whole")) {
+      BlocksForRegisterCache(parent_map, parent, block, opt);
+    }
   } else {
     for (auto& stmt : block->stmts) {
       auto inner = stripe::Block::Downcast(stmt);
@@ -679,7 +886,6 @@ void RegisterCachePass::Apply(CompilerState* state) const {
   opt.reg_lat = options_.register_latency();
   opt.dir = stripe::FromProto(static_cast<stripe::proto::Refinement::Dir>(options_.dir()));
   opt.comp_parent_tag = options_.comp_parent_tag();
-  opt.cache_index_order = options_.index_order() == "cache";
   opt.align_size = options_.align_size();
 
   AliasMap base;
