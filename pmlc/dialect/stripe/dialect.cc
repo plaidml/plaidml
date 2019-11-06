@@ -8,6 +8,7 @@
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/Parser.h"
+#include "mlir/Support/LogicalResult.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/Regex.h"
 
@@ -81,7 +82,6 @@ std::string Dialect::getCanonicalOpName(llvm::StringRef name) {
 }
 
 mlir::Type Dialect::parseTensor(llvm::StringRef tyData, mlir::Location loc) const {
-  static llvm::Regex re{R"(([[:alnum:]_]*)\[([[:digit:]]+):([[:digit:]]+)\])"};
   bool is_const = tyData.consume_back("const");
   auto [typeSpec, sizeSpec] = tyData.trim().rsplit('(');
   auto type = mlir::parseType(typeSpec.trim(), getContext());
@@ -93,33 +93,22 @@ mlir::Type Dialect::parseTensor(llvm::StringRef tyData, mlir::Location loc) cons
     emitError(loc, "invalid tensor type, no ()'s on size spec");
     return Type();
   }
-  auto odims = llvm::SmallVector<TensorDim, 8>();
+
+  // Parse shape information, if available.
+  llvm::SmallVector<TensorDim, 8> odims;
   if (!sizeSpec.empty()) {
-    auto dims = llvm::SmallVector<StringRef, 8>();
-    sizeSpec.split(dims, ",");
-    auto matches = llvm::SmallVector<StringRef, 4>();
-    for (auto dim : dims) {
-      if (!re.match(dim, &matches)) {
-        emitError(loc, "invalid tensor dimension '") << dim << "'";
-        return Type();
-      }
-      std::string dname = matches[1];
-      if (dname.empty()) {
-        dname = kAddressClassIdentifier;
-      }
-      auto odim = TensorDim{0, 0, mlir::Identifier::get(dname, getContext())};
-      matches[2].getAsInteger(10, odim.size);
-      matches[3].getAsInteger(10, odim.stride);
-      odims.emplace_back(std::move(odim));
+    if (failed(parseTensorSize(sizeSpec, loc, odims))) {
+      return Type();
     }
   }
+
   return TensorType::get(type, odims, OffsetsMap(), is_const);
 }
 
 mlir::Type Dialect::parseTensorRef(llvm::StringRef tyData, mlir::Location loc) const {
   bool is_const = tyData.consume_back("const");
-  StringRef typeSpec, ndimSpec;
-  std::tie(typeSpec, ndimSpec) = tyData.rsplit(':');
+  auto [lhs, sizeSpec] = tyData.trim().rsplit('(');
+  auto [typeSpec, ndimSpec] = lhs.rsplit(':');
   auto type = mlir::parseType(typeSpec.trim(), getContext());
   if (!type) {
     emitError(loc, "invalid type specification: '") << typeSpec << "'";
@@ -130,7 +119,49 @@ mlir::Type Dialect::parseTensorRef(llvm::StringRef tyData, mlir::Location loc) c
     emitError(loc, "invalid ndims'") << ndims << "'";
     return Type();
   }
-  return TensorRefType::get(type, ndims, is_const);
+
+  // Parse shape information, if available.
+  llvm::SmallVector<TensorDim, 8> odims;
+  if (!sizeSpec.empty()) {
+    if (!sizeSpec.consume_back(")")) {
+      emitError(loc, "invalid tensor ref type, no ()'s on size spec");
+      return Type();
+    }
+    if (failed(parseTensorSize(sizeSpec, loc, odims))) {
+      return Type();
+    }
+    if (ndims != odims.size()) {
+      emitError(loc, "invalid tensor type")
+          << "num dimensions (" << ndims << ") doesn't match shape dimentions (" << odims.size() << ")";
+      return Type();
+    }
+  }
+
+  return TensorRefType::get(type, ndims, is_const, odims);
+}
+
+LogicalResult Dialect::parseTensorSize(llvm::StringRef sizeSpec, mlir::Location loc,
+                                       llvm::SmallVectorImpl<TensorDim>& odims) const {
+  static llvm::Regex re{R"(([[:alnum:]_]*)\[([[:digit:]]+):([[:digit:]]+)\])"};
+  llvm::SmallVector<StringRef, 8> dims;
+  llvm::SmallVector<StringRef, 4> matches;
+  sizeSpec.split(dims, ",");
+  for (auto dim : dims) {
+    if (!re.match(dim, &matches)) {
+      emitError(loc, "invalid tensor dimension '") << dim << "'";
+      return mlir::failure();
+    }
+    std::string dname = matches[1];
+    if (dname.empty()) {
+      dname = kAddressClassIdentifier;
+    }
+    auto odim = TensorDim{0, 0, mlir::Identifier::get(dname, getContext())};
+    matches[2].getAsInteger(10, odim.size);
+    matches[3].getAsInteger(10, odim.stride);
+    odims.emplace_back(std::move(odim));
+  }
+
+  return mlir::success();
 }
 
 std::string Dialect::getDialectAttrName(llvm::StringRef name) {
@@ -160,22 +191,30 @@ static void print(AffineType type, llvm::raw_ostream& os) { os << "affine"; }
 
 static void print(ExecutorType type, llvm::raw_ostream& os) { os << "executor"; }
 
+template <class T>
+static void printShape(T type, llvm::raw_ostream& os) {
+  auto shape = type.getShape();
+  if (shape.size()) {
+    os << "(";
+    for (int64_t i = 0; i < type.getRank(); i++) {
+      const auto& dim = shape[i];
+      if (i) {
+        os << ", ";
+      }
+      StringRef name = dim.cls;
+      if (name == kAddressClassIdentifier) {
+        name = "";
+      }
+      os << name << '[' << dim.size << ":" << dim.stride << ']';
+    }
+    os << ")";
+  }
+}
+
 static void print(TensorType type, llvm::raw_ostream& os) {
   os << "tensor ";
-  os << type.getElementType() << "(";
-  auto shape = type.getShape();
-  for (int64_t i = 0; i < type.getRank(); i++) {
-    const auto& dim = shape[i];
-    if (i) {
-      os << ", ";
-    }
-    StringRef name = dim.cls;
-    if (name == kAddressClassIdentifier) {
-      name = "";
-    }
-    os << name << '[' << dim.size << ":" << dim.stride << ']';
-  }
-  os << ")";
+  os << type.getElementType();
+  printShape(type, os);
   if (type.is_const()) {
     os << " const";
   }
@@ -183,6 +222,7 @@ static void print(TensorType type, llvm::raw_ostream& os) {
 
 static void print(TensorRefType type, llvm::raw_ostream& os) {
   os << "tensor_ref " << type.getElementType() << ":" << std::to_string(type.getRank());
+  printShape(type, os);
   if (type.is_const()) {
     os << " const";
   }
