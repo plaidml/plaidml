@@ -141,13 +141,17 @@ struct AffineDomainFolder : public OpRewritePattern<AffineDomainOp> {
     llvm::SmallVector<Value*, 4> sizes(sizeMapOp.sizes());
     auto shape = eltwise::ComputeShape(sizes);
     auto sourceType = op.getType().cast<RankedTensorType>();
-    auto targetType = rewriter.getTensorType(shape, sourceType.getElementType());
+    auto targetType = RankedTensorType::get(shape, sourceType.getElementType());
     IVLOG(6, "  sourceType: " << mlir::debugString(sourceType));
     IVLOG(6, "  targetType: " << mlir::debugString(targetType));
     if (sourceType == targetType) {
       return matchFailure();
     }
-    auto newOp = rewriter.create<AffineDomainOp>(op.getLoc(), targetType);
+    BoolAttr no_reduce;
+    if (auto optional = op.no_reduce()) {
+      no_reduce = rewriter.getBoolAttr(*optional);
+    }
+    auto newOp = rewriter.create<AffineDomainOp>(op.getLoc(), targetType, no_reduce);
     if (auto attr = op.getAttrOfType<StringAttr>("name")) {
       newOp.setAttr("name", attr);
     }
@@ -209,8 +213,8 @@ Type GatherOp::getResultType(ArrayRef<Value*> operands) {
   auto index = operands[1];
   auto indexType = eltwise::getRankedTensorType(index->getType());
   auto indexElementType = indexType.getElementType().dyn_cast<ScalarType>();
-  if (!indexElementType || indexElementType.type() != eltwise::DataType::INT32) {
-    throw std::runtime_error("'gather' requires the data type for the second argument to be INT32.");
+  if (!indexElementType || indexElementType.type() != eltwise::DataType::INTX) {
+    throw std::runtime_error("'gather' requires the data type for the second argument to be INTX.");
   }
   SmallVector<int64_t, 4> shape;
   auto tensorShape = tensorType.getShape();
@@ -241,7 +245,8 @@ struct IndexCanonicalizer : public OpRewritePattern<IndexOp> {
     if (resultType == indexOp.result()->getType()) {
       return Pattern::matchFailure();
     }
-    auto newOp = rewriter.create<IndexOp>(op->getLoc(), resultType, indexOp.tensor(), indexOp.dim());
+    auto dim = indexOp.getAttrOfType<IntegerAttr>("dim");
+    auto newOp = rewriter.create<IndexOp>(op->getLoc(), resultType, indexOp.tensor(), dim);
     rewriter.replaceOp(op, {newOp});
     util::UpdateFuncOpType(newOp.getOperation());
     return Pattern::matchSuccess();
@@ -257,13 +262,12 @@ Type IndexOp::getResultType(ArrayRef<Value*> operands) {
   for (auto operand : operands) {
     IVLOG(6, "  operand: " << mlir::debugString(*operand));
   }
-  if (operands.size() != 2) {
-    throw std::runtime_error("IndexOp requires 2 operands");
+  if (operands.size() != 1) {
+    throw std::runtime_error("IndexOp requires 1 operand");
   }
   auto tensor = operands.front();
   auto tensorType = eltwise::getRankedTensorType(tensor->getType());
-  // auto elementType = IndexType::get(tensor->getContext());
-  auto elementType = ScalarType::get(tensor->getContext(), eltwise::DataType::INT32);  // TODO: index type?
+  auto elementType = ScalarType::get(tensor->getContext(), eltwise::DataType::INTX);
   IVLOG(6, "  elementType: " << mlir::debugString(elementType));
   auto resultType = RankedTensorType::get(tensorType.getShape(), elementType);
   IVLOG(6, "  resultType: " << mlir::debugString(resultType));
@@ -392,9 +396,8 @@ Type ScatterOp::getResultType(ArrayRef<Value*> operands) {
   auto index = operands[1];
   auto indexType = eltwise::getRankedTensorType(index->getType());
   auto indexElementType = indexType.getElementType().dyn_cast<ScalarType>();
-  if (!indexElementType || indexElementType.type() != eltwise::DataType::INT32) {
-    // TODO: Handle other integer types?  Floor floats?
-    throw std::runtime_error("'scatter' requires the data type for the second argument to be INT32.");
+  if (!indexElementType || indexElementType.type() != eltwise::DataType::INTX) {
+    throw std::runtime_error("'scatter' requires the data type for the second argument to be INTX.");
   }
   auto other = operands[2];
   auto otherType = eltwise::getRankedTensorType(other->getType());

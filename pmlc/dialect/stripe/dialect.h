@@ -10,6 +10,8 @@ namespace pmlc {
 namespace dialect {
 namespace stripe {
 
+struct TensorDim;
+
 class Dialect : public mlir::Dialect {
  public:
   explicit Dialect(mlir::MLIRContext* ctx);
@@ -21,9 +23,11 @@ class Dialect : public mlir::Dialect {
 
   mlir::Type parseTensor(llvm::StringRef tyData, mlir::Location loc) const;
   mlir::Type parseTensorRef(llvm::StringRef tyData, mlir::Location loc) const;
+  mlir::LogicalResult parseTensorSize(llvm::StringRef sizeSpec, mlir::Location loc,
+                                      llvm::SmallVectorImpl<TensorDim>& odims) const;
 
-  mlir::Type parseType(llvm::StringRef tyData, mlir::Location loc) const override;
-  void printType(mlir::Type type, llvm::raw_ostream& os) const override;
+  mlir::Type parseType(mlir::DialectAsmParser& parser) const override;
+  void printType(mlir::Type type, mlir::DialectAsmPrinter& printer) const override;
 };
 
 }  // namespace stripe

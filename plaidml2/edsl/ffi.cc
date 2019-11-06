@@ -831,21 +831,24 @@ void plaidml_expr_contraction_add_constraint(  //
   });
 }
 
-void plaidml_expr_contraction_set_no_defract(  //
-    plaidml_error* err,                        //
-    plaidml_expr* expr,                        //
-    bool no_defract) {
-  // TODO(MLIR)
+void plaidml_expr_contraction_set_no_reduce(  //
+    plaidml_error* err,                       //
+    plaidml_expr* expr,                       //
+    bool no_reduce) {
   ffi_wrap_void(err, [&] {
-    IVLOG(3, "plaidml_expr_contraction_set_no_defract");
+    IVLOG(3, "plaidml_expr_contraction_set_no_reduce");
     if (!expr) {
-      throw std::runtime_error("no_defract can only be specified on a contraction.");
+      throw std::runtime_error("no_reduce can only be specified on a contraction.");
     }
-    auto cion = std::dynamic_pointer_cast<ContractionExpr>(expr->expr);
-    if (!cion) {
-      throw std::runtime_error("no_defract can only be specified on a contraction.");
+    if (use_mlir()) {
+      GlobalContext::get()->SetNoReduce(expr->value, no_reduce);
+    } else {
+      auto cion = std::dynamic_pointer_cast<ContractionExpr>(expr->expr);
+      if (!cion) {
+        throw std::runtime_error("no_reduce can only be specified on a contraction.");
+      }
+      cion->no_defract = no_reduce;
     }
-    cion->no_defract = no_defract;
   });
 }
 

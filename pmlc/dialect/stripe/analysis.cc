@@ -96,6 +96,7 @@ FlatTensorAccess ComputeAccess(Value* tensor) {
     }
     auto attrName = stripe::Dialect::getDialectAttrName("layout");
     auto attr = funcOp.getArgAttrOfType<mlir::TypeAttr>(arg->getArgNumber(), attrName);
+    assert(attr && "Expected 'layout' attribute in TensorRefType function argument");
     ret.base = tensor;
     ret.base_type = attr.getValue().cast<TensorType>();
     ret.access.resize(ret.base_type.getRank());
@@ -103,6 +104,24 @@ FlatTensorAccess ComputeAccess(Value* tensor) {
     throw std::runtime_error("Invalid tensor value");
   }
   return ret;
+}
+
+bool SafeConstraintInterior(ParallelForOp op) {
+  // Get an iterator to the begining of the interior
+  auto block = &op.inner().front();
+  // Get the penultimate Op (ignoring the terminator), which should be a constraint
+  auto it_con = std::prev(block->end(), 2);
+  // Check that it's good
+  if (it_con == block->end() || !mlir::isa<ConstraintOp>(*it_con)) {
+    return false;
+  }
+  // Check that all prior ops are no-side-effect and fail if not
+  for (auto it = block->begin(); it != it_con; ++it) {
+    if (!it->hasNoSideEffect()) {
+      return false;
+    }
+  }
+  return true;
 }
 
 }  // namespace stripe

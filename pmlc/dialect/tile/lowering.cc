@@ -116,13 +116,12 @@ static void addInitializer(         //
 
   auto refType = stripe::TensorRefType::get(tensorType);
   auto elementType = refType.getElementType();
-  auto loadType = eltwise::getRankedTensorType(elementType);
   auto sink = builder->create<stripe::RefineOp>(loc, refType, output, offsets);
 
   if (auto init = contractionOp.getInitializer()) {
     attrs.emplace_back(builder->getIdentifier("copy"), builder->getUnitAttr());
     auto src = builder->create<stripe::RefineOp>(loc, refType, init, offsets);
-    auto loadOp = builder->create<stripe::LoadOp>(loc, loadType, src.result());
+    auto loadOp = builder->create<stripe::LoadOp>(loc, elementType, src.result());
     builder->create<stripe::StoreOp>(loc, sink.result(), loadOp.into());
   } else {
     attrs.emplace_back(builder->getIdentifier("zero"), builder->getUnitAttr());
@@ -189,8 +188,7 @@ struct LoweringBase : public ConversionPattern {
  protected:
   virtual PatternMatchResult tryMatchAndRewrite(  //
       Operation* op,                              //
-      llvm::ArrayRef<Value*> operands,
-      ConversionPatternRewriter& rewriter) const = 0;  // NOLINT
+      llvm::ArrayRef<Value*> operands, ConversionPatternRewriter& rewriter) const = 0;
 
  protected:
   LoweringContext* lowering;
@@ -316,10 +314,10 @@ struct AffineDomainOpConversion : public LoweringBase {
       auto srcTensorType = convertIntoTensorType(srcType);
       shapes.push_back(srcTensorType);
     }
+
     Contraction contraction{contractionOp, constraintOps};
-    IndexBounds bounds;
-    SimpleConstraints constraints;
-    std::tie(bounds, constraints) = contraction.ComputeBounds(shapes);
+    bool no_reduce = domainOp.no_reduce() && *domainOp.no_reduce();
+    const auto& [bounds, constraints] = contraction.ComputeBounds(shapes, no_reduce);
 
     // add induction vars
     llvm::SmallVector<int64_t, 8> ranges;
@@ -435,14 +433,13 @@ struct AffineDomainOpConversion : public LoweringBase {
       }
       auto tensorRefType = srcType.cast<stripe::TensorRefType>();
       auto elementType = tensorRefType.getElementType();
-      auto intoType = eltwise::getRankedTensorType(elementType);
       auto op = refs[i]->getDefiningOp();
       if (op && llvm::isa<eltwise::ScalarConstantOp>(op)) {
         // No need to load a scalar constant, just use it directly
         // This happens when we want to broadcast a scalar constant value
         inputs.emplace_back(refs[i]);
       } else {
-        auto loadOp = rewriter.create<stripe::LoadOp>(op->getLoc(), intoType, refs[i]);
+        auto loadOp = rewriter.create<stripe::LoadOp>(op->getLoc(), elementType, refs[i]);
         inputs.emplace_back(loadOp.into());
       }
     }
@@ -462,8 +459,6 @@ struct AffineDomainOpConversion : public LoweringBase {
 
     rewriter.create<stripe::TerminateOp>(op->getLoc());
     rewriter.replaceOp(op, {outputTensor});
-
-    // TODO: no_defract
 
     return matchSuccess();
   }
@@ -614,9 +609,8 @@ struct EltwiseOpConversion : public LoweringBase {
       };
       refineOp.setAttr(stripe::Dialect::getStripeAttrsName(), rewriter.getDictionaryAttr(refAttrs));
       auto elementType = tensorRefType.getElementType();
-      auto intoType = eltwise::getRankedTensorType(elementType);
       // LOAD
-      auto loadOp = rewriter.create<stripe::LoadOp>(op->getLoc(), intoType, refineOp.result());
+      auto loadOp = rewriter.create<stripe::LoadOp>(op->getLoc(), elementType, refineOp.result());
       inputs.emplace_back(loadOp.into());
     }
 
@@ -694,7 +688,7 @@ struct FuncOpConversion : public LoweringBase {
         newFuncOp.removeArgAttr(i, tileName);
       }
       newFuncOp.setArgAttr(i, stripeName, name);
-      newFuncOp.setArgAttr(i, stripeLayout, rewriter.getTypeAttr(tensorTypes[i]));
+      newFuncOp.setArgAttr(i, stripeLayout, TypeAttr::get(tensorTypes[i]));
     }
 
     auto returnOp = llvm::cast<ReturnOp>(newFuncOp.getBody().front().getTerminator());
@@ -708,7 +702,7 @@ struct FuncOpConversion : public LoweringBase {
         }
       }
       newFuncOp.setArgAttr(argIndex, stripeName, name);
-      newFuncOp.setArgAttr(argIndex, stripeLayout, rewriter.getTypeAttr(tensorTypes[argIndex]));
+      newFuncOp.setArgAttr(argIndex, stripeLayout, TypeAttr::get(tensorTypes[argIndex]));
     }
 
     // Tell the rewriter to convert the region signature.
@@ -781,12 +775,8 @@ struct IndexOpConversion : public LoweringBase {
 
     // LOAD_INDEX
     auto elementType = resultTensorType.getElementType();
-    auto intoType = eltwise::getRankedTensorType(elementType);
-    IntegerAttr dimAttr;
-    if (!m_Constant(&dimAttr).match(indexOp.dim()->getDefiningOp())) {
-      throw std::runtime_error("Not a constant");
-    }
-    auto loadIndexOp = rewriter.create<stripe::LoadIndexOp>(op->getLoc(), intoType, offsets[dimAttr.getInt()]);
+    auto dim = indexOp.dim().getZExtValue();
+    auto loadIndexOp = rewriter.create<stripe::LoadIndexOp>(op->getLoc(), elementType, offsets[dim]);
 
     // STORE
     rewriter.create<stripe::StoreOp>(op->getLoc(), output, loadIndexOp.into());

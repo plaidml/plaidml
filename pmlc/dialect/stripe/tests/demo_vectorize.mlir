@@ -1,8 +1,11 @@
 // RUN: pmlc-opt %s -stripe-vectorize | FileCheck %s
+// RUN: pmlc-opt %s -stripe-vectorize -stripe-jigsaw -canonicalize | FileCheck --check-prefix JIGSAW %s
 
 !aff = type !stripe.affine
+!fp32 = type !eltwise.fp32
 !fp32_0 = type !stripe<"tensor_ref !eltwise.fp32:0">
 !fp32_1 = type !stripe<"tensor_ref !eltwise.fp32:1">
+!fp32_4 = type !stripe<"tensor_ref !eltwise.fp32:1">
 
 // CHECK-LABEL: @simple_accum
 func @simple_accum(
@@ -21,9 +24,17 @@ func @simple_accum(
   // CHECK: ^bb0(%[[i1:.*]]: !aff)
   // CHECK: stripe.parallel_for ("i":32)
   // CHECK: ^bb0(%[[i2:.*]]: !aff)
-  // CHECK-DAG: %[[ce:.*]] = stripe.affine_poly (%[[i1]], %[[i2]]) [-32, -1], 99
-  // CHECK-DAG: stripe.constraint %[[ce]]
-  // CHECK-DAG: %[[io:.*]] = stripe.affine_poly (%[[i1]], %[[i2]]) [32, 1], 0
-  // CHECK-DAG: stripe.refine {{.*}}(%[[io]])
+
+  // JIGSAW: parallel_for ("i":3)
+  // JIGSAW: ^bb0(%[[i1:.*]]: !aff)
+  // JIGSAW-NOT: constraint
+  // JIGSAW: parallel_for ("i":32)
+  // JIGSAW: ^bb0(%[[i2:.*]]: !aff)
+  // JIGSAW-NOT: constraint
+  // JIGSAW: terminate
+  // JIGSAW: terminate
+  // JIGSAW: parallel_for ("i":4)
+  // JIGSAW-NOT: constraint
+  // JIGSAW: terminate
 }
 

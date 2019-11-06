@@ -1,10 +1,11 @@
 // RUN: pmlc-opt %s -canonicalize | FileCheck %s
 
 !aff = type !stripe.affine
+!fp32 = type !eltwise<"fp32">
 !fp32_2 = type !stripe<"tensor_ref !eltwise.fp32:2">
 
 // CHECK-LABEL: @simplify_affines
-func @simplify_affines(%arg0: !fp32_2) -> !fp32_2 {
+func @simplify_affines(%arg0: !fp32_2) {
 
   // This test requires the use of all of the affine canonicalization
   // patterns in order to produce code that elides the final stripe.refine
@@ -26,7 +27,7 @@ func @simplify_affines(%arg0: !fp32_2) -> !fp32_2 {
 }
 
 // CHECK-LABEL: @simplify_raw_ref
-func @simplify_raw_ref(%arg0: !fp32_2) -> !fp32_2 {
+func @simplify_raw_ref(%arg0: !fp32_2) {
 
   // This test makes sure the simple affines that return raw block ops are removed
 
@@ -44,7 +45,7 @@ func @simplify_raw_ref(%arg0: !fp32_2) -> !fp32_2 {
 }
 
 // CHECK-LABEL: @no_simplify_useful_refines
-func @no_simplify_useful_refines(%arg0: !fp32_2) -> !fp32_2 {
+func @no_simplify_useful_refines(%arg0: !fp32_2)  {
 
   // This test validates that useful stripe.refine ops are not removed.
 
@@ -59,7 +60,7 @@ func @no_simplify_useful_refines(%arg0: !fp32_2) -> !fp32_2 {
 }
 
 // CHECK-LABEL: @no_simplify_stripe_attr_refines
-func @no_simplify_stripe_attr_refines(%arg0: !fp32_2) -> !fp32_2 {
+func @no_simplify_stripe_attr_refines(%arg0: !fp32_2) {
 
   // This test validates that stripe.refine ops with attributes are not removed.
 
@@ -69,6 +70,65 @@ func @no_simplify_stripe_attr_refines(%arg0: !fp32_2) -> !fp32_2 {
   %T = stripe.refine %arg0 (%c0, %c0) : !fp32_2 { stripe_attrs = {} }
   %0 = stripe.load %T : !fp32_2
   stripe.store %T, %0 : !fp32_2
+  stripe.terminate
+}
+
+// CHECK-LABEL: @simplify_nop_pf
+func @simplify_nop_pf(%arg0: !fp32_2) {
+  // Validate zero range PF's (and their interior) are removed
+  // CHECK-NOT: stripe.parallel_for
+  // CHECK-NOT: stripe.store
+
+  stripe.parallel_for ("i":0) {
+  ^bb0(%i: !aff):
+    %0 = "!eltwise.constant" () { value = 32.0} : () -> !fp32
+    stripe.store %arg0, %0 : !fp32_2
+    stripe.terminate
+  }
+  stripe.terminate
+}
+
+// CHECK-LABEL: @simplify_no_side_effect_pf
+func @simplify_no_side_effect_pf(%arg0: !fp32_2) {
+  // Validate zero range PF's (and their interior) are removed
+  // CHECK-NOT: stripe.parallel_for
+  // CHECK-NOT: stripe.load
+
+  stripe.parallel_for ("i":0) {
+  ^bb0(%i: !aff):
+    %0 = stripe.load %arg0 : !fp32_2
+    stripe.terminate
+  }
+  stripe.terminate
+}
+
+// CHECK-LABEL: @simplify_one_trip_pf
+func @simplify_one_trip_pf(%arg0: !fp32_2) {
+  // Validate one trip PF's are removed and inlined
+  // CHECK-NOT: stripe.parallel_for
+  // CHECK: stripe.store
+
+  stripe.parallel_for ("i":1) {
+  ^bb0(%i: !aff):
+    %0 = "!eltwise.constant" () { value = 32.0} : () -> !fp32
+    stripe.store %arg0, %0 : !fp32_2
+    stripe.terminate
+  }
+  stripe.terminate
+}
+
+// CHECK-LABEL: @dont_simplify_one_trip_pf_if_stripe_attrs
+func @dont_simplify_one_trip_pf_if_stripe_attrs(%arg0: !fp32_2) {
+  // Validate one trip PF's are removed and inlined
+  // CHECK: stripe.parallel_for
+  // CHECK: stripe.store
+
+  stripe.parallel_for ("i":1) {
+  ^bb0(%i: !aff):
+    %0 = "!eltwise.constant" () { value = 32.0} : () -> !fp32
+    stripe.store %arg0, %0 : !fp32_2
+    stripe.terminate
+  } { stripe_attrs = {} }
   stripe.terminate
 }
 
