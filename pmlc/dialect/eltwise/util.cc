@@ -114,9 +114,8 @@ RankedTensorType getRankedTensorType(Type type) {
     return rankedType;
   }
   SmallVector<int64_t, 0> shape;
-  if (type.isa<mlir::IndexType>()) {
-    // TODO: add index to DataType?
-    return RankedTensorType::get(shape, ScalarType::get(type.getContext(), DataType::UINT32));
+  if (type.isa<IndexType>()) {
+    return RankedTensorType::get(shape, ScalarType::get(type.getContext(), DataType::INTX));
   }
   if (type.isa<ScalarType>()) {
     return RankedTensorType::get(shape, type);

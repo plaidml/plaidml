@@ -31,14 +31,18 @@ struct RemoveRangeZeroParallelFors final : public mlir::OpRewritePattern<Paralle
   explicit RemoveRangeZeroParallelFors(mlir::MLIRContext* context, mlir::PatternBenefit benefit = 1)
       : OpRewritePattern<ParallelForOp>(context, benefit) {}
   mlir::PatternMatchResult match(ParallelForOp op) const final;
-  void rewrite(ParallelForOp op, mlir::PatternRewriter& rewriter) const final { rewriter.replaceOp(op, llvm::None); }
+  void rewrite(ParallelForOp op, mlir::PatternRewriter& rewriter) const final {  //
+    rewriter.replaceOp(op, llvm::None);
+  }
 };
 
 struct RemoveNoSideEffectParallelFors final : public mlir::OpRewritePattern<ParallelForOp> {
   explicit RemoveNoSideEffectParallelFors(mlir::MLIRContext* context, mlir::PatternBenefit benefit = 1)
       : OpRewritePattern<ParallelForOp>(context, benefit) {}
   mlir::PatternMatchResult match(ParallelForOp op) const final;
-  void rewrite(ParallelForOp op, mlir::PatternRewriter& rewriter) const final { rewriter.replaceOp(op, llvm::None); }
+  void rewrite(ParallelForOp op, mlir::PatternRewriter& rewriter) const final {  //
+    rewriter.replaceOp(op, llvm::None);
+  }
 };
 
 struct RemoveRangeOneIndexes final : public mlir::OpRewritePattern<ParallelForOp> {

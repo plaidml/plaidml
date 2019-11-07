@@ -1,11 +1,11 @@
 // RUN: pmlc-opt -tile-legalize-to-stripe -canonicalize -cse -split-input-file %s | FileCheck %s --dump-input-on-failure
 
 func @eltwise_add(
-  %arg0: tensor<10x20x!eltwise.fp32>, 
+  %arg0: tensor<10x20x!eltwise.fp32>,
   %arg1: tensor<10x20x!eltwise.fp32>
 ) -> tensor<10x20x!eltwise.fp32> {
   %0 = "eltwise.add"(%arg1, %arg0) {type = !eltwise.fp32} : (
-    tensor<10x20x!eltwise.fp32>, 
+    tensor<10x20x!eltwise.fp32>,
     tensor<10x20x!eltwise.fp32>
   ) -> tensor<10x20x!eltwise.fp32>
   return %0 : tensor<10x20x!eltwise.fp32>
@@ -254,3 +254,17 @@ func @use_default(%arg0: tensor<1x10x10x!eltwise.fp32>, %arg1: tensor<1x7x10x10x
 // CHECK: stripe.load
 // CHECK: stripe.store
 // CHECK: contraction
+
+// -----
+
+func @index_op(%arg0: tensor<1x10x10x!eltwise.fp32>) -> tensor<1x10x10x!eltwise.int> {
+  %1 = "tile.index"(%arg0) {dim = 0 : i64} : (tensor<1x10x10x!eltwise.fp32>) -> tensor<1x10x10x!eltwise.int>
+  return %1 : tensor<1x10x10x!eltwise.int>
+}
+
+// CHECK-LABEL: func @index_op
+// CHECK: stripe.parallel_for ("i0":1, "i1":10, "i2":10)
+// CHECK: stripe.refine %arg1(%i0, %i1, %i2) : !int_3
+// CHECK: "stripe.load_index"(%i0) : (!aff) -> !int
+// CHECK: stripe.store %0, %1 : !int_3
+// CHECK: eltwise_index

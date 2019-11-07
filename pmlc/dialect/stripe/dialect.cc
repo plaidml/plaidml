@@ -24,7 +24,7 @@ struct OpAsmInterface : public mlir::OpAsmDialectInterface {
 
   /// Get a special name to use when printing the given operation. The desired
   /// name should be streamed into 'os'.
-  void getOpResultName(Operation* op, llvm::raw_ostream& os) const final {  // NOLINT
+  void getOpResultName(Operation* op, llvm::raw_ostream& os) const final {
     if (auto attr = op->getAttrOfType<StringAttr>("name")) {
       os << attr.getValue();
     } else if (auto attr = op->getAttrOfType<StringAttr>("scalar_name")) {
@@ -36,7 +36,7 @@ struct OpAsmInterface : public mlir::OpAsmDialectInterface {
     }
   }
 
-  void getRegionArgumentName(mlir::BlockArgument* arg, llvm::raw_ostream& os) const final {  // NOLINT
+  void getRegionArgumentName(mlir::BlockArgument* arg, llvm::raw_ostream& os) const final {
     Operation* op = arg->getOwner()->getParentOp();
     if (auto vec = op->getAttrOfType<ArrayAttr>("idx_names")) {
       if (vec.size() > arg->getArgNumber()) {
@@ -47,16 +47,16 @@ struct OpAsmInterface : public mlir::OpAsmDialectInterface {
     }
   }
 
-  void getTypeAliases(mlir::SmallVectorImpl<std::pair<Type, StringRef>>& aliases) const final {  // NOLINT
-    MLIRContext* ctx = getDialect()->getContext();
-    Type t = AffineType::get(ctx);
-    aliases.push_back(std::make_pair(t, StringRef("aff")));
-    for (const auto dt : vertexai::tile::GetDataTypeSet()) {
-      for (size_t r = 0; r < 9; r++) {
-        std::string base = to_string(dt) + "_" + std::to_string(r);
-        auto st = ScalarType::get(ctx, dt);
-        aliases.emplace_back(TensorRefType::get(st, r, false), mlir::Identifier::get(base, ctx));
-        aliases.emplace_back(TensorRefType::get(st, r, true), mlir::Identifier::get(base + "_c", ctx));
+  void getTypeAliases(mlir::SmallVectorImpl<std::pair<Type, StringRef>>& aliases) const final {
+    auto ctx = getDialect()->getContext();
+    auto affineType = AffineType::get(ctx);
+    aliases.push_back(std::make_pair(affineType, StringRef("aff")));
+    for (const auto dataType : vertexai::tile::GetDataTypeSet()) {
+      for (size_t rank = 0; rank < 9; rank++) {
+        auto base = llvm::formatv("{0}_{1}", to_string(dataType), rank).str();
+        auto scalarType = ScalarType::get(ctx, dataType);
+        aliases.emplace_back(TensorRefType::get(scalarType, rank, false), mlir::Identifier::get(base, ctx));
+        aliases.emplace_back(TensorRefType::get(scalarType, rank, true), mlir::Identifier::get(base + "_c", ctx));
       }
     }
   }
@@ -83,7 +83,7 @@ std::string Dialect::getCanonicalOpName(llvm::StringRef name) {
 
 mlir::Type Dialect::parseTensor(llvm::StringRef tyData, mlir::Location loc) const {
   bool is_const = tyData.consume_back("const");
-  auto [typeSpec, sizeSpec] = tyData.trim().rsplit('(');  // NOLINT(whitespace/braces)
+  auto [typeSpec, sizeSpec] = tyData.trim().rsplit('(');
   auto type = mlir::parseType(typeSpec.trim(), getContext());
   if (!type) {
     emitError(loc, "invalid type specification: '") << typeSpec << "'";

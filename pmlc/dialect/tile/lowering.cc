@@ -778,8 +778,9 @@ struct IndexOpConversion : public LoweringBase {
 
     // LOAD_INDEX
     auto elementType = resultTensorType.getElementType();
+    auto loadType = eltwise::getRankedTensorType(elementType);
     auto dim = indexOp.dim().getZExtValue();
-    auto loadIndexOp = rewriter.create<stripe::LoadIndexOp>(op->getLoc(), elementType, offsets[dim]);
+    auto loadIndexOp = rewriter.create<stripe::LoadIndexOp>(op->getLoc(), loadType, offsets[dim]);
 
     // STORE
     rewriter.create<stripe::StoreOp>(op->getLoc(), output, loadIndexOp.into());
