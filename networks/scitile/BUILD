@@ -12,3 +12,17 @@ py_binary(
     ],
 )
 
+py_test(
+    name = "uw_tests",
+    srcs = [
+        "uw_tests.py",
+        "uw_toroidal_shell.py"
+    ],
+    tags = [
+        "keras",
+        "manual",
+    ],
+  deps = [
+        "//plaidml2/bridge/keras",
+    ],
+)

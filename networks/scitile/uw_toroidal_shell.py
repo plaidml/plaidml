@@ -3,10 +3,6 @@ import numpy as np
 import keras.backend as K
 import plaidml2.edsl as edsl
 
-N = 128  # number of grid points along each coord direction
-MINVAL, MAXVAL = -1.25, 1.25  # coordinate bounding values
-EPS = 1.0e-8  # Threshold for trivial gradient
-
 
 def function_g(x, y, z):
     X = x.tensor
@@ -93,12 +89,12 @@ def root(f):
     return K._KerasNode('root', tensor=O)
 
 
-def divide(num, denom):
+def divide(num, denom, eps):
     NUM = num.tensor
     DEN = denom.tensor
     idxs = edsl.TensorIndexes(3)
     empty_idxs = edsl.TensorIndexes(0)
-    O = edsl.select(DEN < EPS, 0, NUM / DEN)
+    O = edsl.select(DEN < eps, 0, NUM / DEN)
     return K._KerasNode('divide', tensor=O)
 
 
@@ -122,13 +118,17 @@ def sumall(rho):
     return K._KerasNode('sumall', tensor=O)
 
 
-def main():
-    coordvals = np.linspace(MINVAL, MAXVAL, N, dtype=np.float32)
-    delta = (MAXVAL - MINVAL) / (N - 1)  # grid spacing
+def toroidal_shell_integral(
+        n,  #number of grid points along each coord direction
+        minval,
+        maxval,  #minval , maxval : coordinate bounding values
+        eps):  # eps : Threshold for trivial gradient
+    coordvals = np.linspace(minval, maxval, n, dtype=np.float32)
+    delta = (maxval - minval) / (n - 1)  # grid spacing
 
-    X = K.variable(coordvals.reshape(N, 1, 1))
-    Y = K.variable(coordvals.reshape(1, N, 1))
-    Z = K.variable(coordvals.reshape(1, 1, N))
+    X = K.variable(coordvals.reshape(n, 1, 1))
+    Y = K.variable(coordvals.reshape(1, n, 1))
+    Z = K.variable(coordvals.reshape(1, 1, n))
 
     F = function_f(X, Y,
                    Z)  # f-rep of torodial shell f(x,y,z) = (sqrt(x^2+y^2)-1)^2 + z^2 + (0.1)^2
@@ -147,11 +147,19 @@ def main():
     DCHIDZ = partial_chi(F, 'z', delta)
 
     NUMER = dot(DFDX, DFDY, DFDZ, DCHIDX, DCHIDY, DCHIDZ)
-    H = divide(NUMER, DENOM)
+    H = divide(NUMER, DENOM, eps)
     RHO = rho(G, H)
     ANS = sumall(RHO)
     result = ANS.eval()
     result = result * (delta**3)
+    return result
+
+
+def main():
+    n = 128
+    minval, maxval = -1.25, 1.25
+    eps = 1.0e-8
+    result = toroidal_shell_integral(n, minval, maxval, eps)
     print("computed result: ")
     print(result)
 
