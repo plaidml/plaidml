@@ -20,7 +20,6 @@ py_test(
     ],
     tags = [
         "keras",
-        "manual",
     ],
   deps = [
         "//plaidml2/bridge/keras",
