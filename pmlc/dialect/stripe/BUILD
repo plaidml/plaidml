@@ -53,6 +53,7 @@ plaidml_cc_library(
         "analysis.cc",
         "demo_vectorize.cc",
         "dialect.cc",
+        "jigsaw_pass.cc",
         "ops.cc",
         "ops.cc.inc",
         "ops_interfaces.cc.inc",
@@ -116,10 +117,12 @@ plaidml_cc_library(
     name = "passes",
     srcs = [
         "padding_pass.cc",
+        "populate_tensor_ref_shape_analysis.cc",
     ],
     hdrs = [
         "nop_pass.h",
         "padding_pass.h",
+        "populate_tensor_ref_shape_analysis.h",
     ],
     copts = COPTS,
     tags = ["llvm"],
@@ -127,6 +130,7 @@ plaidml_cc_library(
         ":stripe",
         "//tile/codegen:proto_cc",
     ],
+    alwayslink = 1,
 )
 
 plaidml_cc_test(

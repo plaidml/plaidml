@@ -8,12 +8,11 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Support/DebugStringHelper.h"
 
+#include "pmlc/dialect/eltwise/util.h"
 #include "pmlc/dialect/stripe/dialect.h"
 #include "pmlc/dialect/stripe/rewrites.h"
 
 namespace pmlc::dialect::stripe {
-
-#include "pmlc/dialect/stripe/ops_interfaces.cc.inc"
 
 using mlir::failure;
 using mlir::success;
@@ -24,6 +23,17 @@ void AffinePolyOp::getCanonicalizationPatterns(OwningRewritePatternList& results
 
 void RefineOp::getCanonicalizationPatterns(OwningRewritePatternList& results, MLIRContext* context) {
   results.insert<SimplifyNopRefines>(context);
+}
+
+void ConstraintOp::getCanonicalizationPatterns(OwningRewritePatternList& results, MLIRContext* context) {
+  results.insert<RemoveTrivialConstraints>(context);
+}
+
+void ParallelForOp::getCanonicalizationPatterns(OwningRewritePatternList& results, MLIRContext* context) {
+  results.insert<InlineNoIndexParallelFors>(context);
+  results.insert<RemoveRangeZeroParallelFors>(context);
+  results.insert<RemoveNoSideEffectParallelFors>(context);
+  results.insert<RemoveRangeOneIndexes>(context);
 }
 
 void PrintSimple(               //
@@ -198,7 +208,7 @@ static ParseResult parseLoadOp(OpAsmParser* parser, OperationState& result) {
   return failure(  //
       ParseSimple(parser, &result, &operands, 1, {}, &refType, false) ||
       parser->resolveOperand(operands[0], refType, result.operands) ||
-      parser->addTypeToList(refType.getElementType(), result.types));
+      parser->addTypeToList(eltwise::getRankedTensorType(refType.getElementType()), result.types));
 }
 
 static void printStoreOp(OpAsmPrinter* printer, StoreOp op) {
@@ -211,7 +221,7 @@ static ParseResult parseStoreOp(OpAsmParser* parser, OperationState& result) {
   return failure(  //
       ParseSimple(parser, &result, &operands, 2, {}, &refType, false) ||
       parser->resolveOperand(operands[0], refType, result.operands) ||
-      parser->resolveOperand(operands[1], refType.getElementType(), result.operands));
+      parser->resolveOperand(operands[1], eltwise::getRankedTensorType(refType.getElementType()), result.operands));
 }
 
 static void printAggregateOp(OpAsmPrinter* printer, AggregateOp op) {
@@ -248,7 +258,7 @@ static ParseResult parseAggregateOp(OpAsmParser* parser, OperationState& result)
       parser->parseOperand(from) ||       //
       parser->parseColonType(refType) ||  //
       parser->resolveOperand(into, refType, result.operands) ||
-      parser->resolveOperand(from, refType.getElementType(), result.operands));
+      parser->resolveOperand(from, eltwise::getRankedTensorType(refType.getElementType()), result.operands));
 }
 
 static void printAffinePolyOp(OpAsmPrinter* printer, AffinePolyOp op) {
@@ -370,10 +380,6 @@ static ParseResult parseConstraintOp(OpAsmParser* parser, OperationState& result
       parser->parseOptionalRegion(*ltRegion, {}, {}));
 }
 
-void ConstraintOp::getCanonicalizationPatterns(OwningRewritePatternList& results, MLIRContext* context) {
-  results.insert<RemoveTrivialConstraints>(context);
-}
-
 static void printExecuteOnOp(OpAsmPrinter* printer, ExecuteOnOp& op) {
   PrintSimple(op.getOperation(), printer, 1, {}, op.from()->getType(), false);
 }
@@ -385,6 +391,8 @@ static ParseResult parseExecuteOnOp(OpAsmParser* parser, OperationState& result)
       ParseSimple(parser, &result, &operands, 1, {}, &refType, false) ||
       parser->resolveOperand(operands[0], refType, result.operands));
 }
+
+#include "pmlc/dialect/stripe/ops_interfaces.cc.inc"
 
 #define GET_OP_CLASSES
 #include "pmlc/dialect/stripe/ops.cc.inc"

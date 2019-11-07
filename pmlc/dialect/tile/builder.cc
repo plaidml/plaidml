@@ -92,8 +92,8 @@ struct TileBuilder::Impl {
   Type inferElementType(ArrayRef<Type> types) {
     DataType ret = DataType::INVALID;
     for (auto type : types) {
-      auto rankedTensorType = eltwise::getRankedTensorType(type);
-      auto dtype = rankedTensorType.getElementType().cast<ScalarType>().type();
+      auto tensorType = type.cast<ShapedType>();
+      auto dtype = tensorType.getElementType().cast<ScalarType>().type();
       ret = CommonSupertype(ret, dtype);
     }
     return builder.getType<ScalarType>(ret);
