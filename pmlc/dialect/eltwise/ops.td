@@ -44,7 +44,7 @@ def ScalarConstantOp :
 
   let builders = [OpBuilder<
     "Builder* builder, OperationState& result, Type type, double value", [{
-      result.addAttribute("value", builder->getF32FloatAttr(value));
+      result.addAttribute("value", builder->getF64FloatAttr(value));
       result.addTypes(RankedTensorType::get({}, type));
     }]
   >, OpBuilder<
