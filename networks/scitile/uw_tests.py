@@ -17,7 +17,6 @@ class UWTest(unittest.TestCase):
         eps = 1.0e-8
         result = toroidal_shell_integral(n, minval, maxval, eps)
         npt.assert_allclose(result, 3.9926786915581705, rtol=DEFAULT_TOL, atol=DEFAULT_ATOL)
-        #self.assertEqual(result, 3.9926786915581705)
 
 
 if __name__ == '__main__':
