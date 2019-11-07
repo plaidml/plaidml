@@ -1,4 +1,4 @@
-import time
+import timeit
 from collections import OrderedDict
 
 import numpy as np
@@ -56,23 +56,6 @@ def sum(R):
     return O
 
 
-class StopWatch:
-
-    def __init__(self):
-        self.__start = None
-        self.__total = 0.0
-
-    def start(self):
-        self.__start = time.perf_counter()
-
-    def stop(self):
-        stop = time.perf_counter()
-        self.__total += stop - self.__start
-
-    def elapsed(self):
-        return self.__total
-
-
 # n: number of grid points along each coord direction
 # minval, maxval: coordinate bounding values
 # eps: Threshold for trivial gradient
@@ -120,13 +103,9 @@ def toroidal_shell_integral(n, minval, maxval, eps, benchmark=False):
 
         # subsequent runs should not include compile time
         print('running...')
-        ITERATIONS = 40
-        stop_watch = StopWatch()
-        for i in range(ITERATIONS):
-            stop_watch.start()
-            run()
-            stop_watch.stop()
-        print('runtime:', stop_watch.elapsed() / ITERATIONS)
+        ITERATIONS = 100
+        elapsed = timeit.timeit(run, number=ITERATIONS)
+        print('runtime:', elapsed / ITERATIONS)
     else:
         result = run()
 
