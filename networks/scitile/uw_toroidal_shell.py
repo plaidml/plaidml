@@ -96,12 +96,8 @@ def root(f):
 def divide(num, denom):
     NUM = num.tensor
     DEN = denom.tensor
-    dims = edsl.TensorDims(DEN.shape.ndims)
-    NUM.bind_dims(*dims)
     idxs = edsl.TensorIndexes(3)
     empty_idxs = edsl.TensorIndexes(0)
-    eps_tensor = K.variable(EPS)
-    O = edsl.TensorOutput(dims)
     O = edsl.select(DEN < EPS, 0, NUM / DEN)
     return K._KerasNode('divide', tensor=O)
 
@@ -130,7 +126,6 @@ def main():
     coordvals = np.linspace(MINVAL, MAXVAL, N, dtype=np.float32)
     delta = (MAXVAL - MINVAL) / (N - 1)  # grid spacing
 
-    # X = edsl.Placeholder(shape, dtype)
     X = K.variable(coordvals.reshape(N, 1, 1))
     Y = K.variable(coordvals.reshape(1, N, 1))
     Z = K.variable(coordvals.reshape(1, 1, N))
