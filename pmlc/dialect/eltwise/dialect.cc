@@ -32,14 +32,9 @@ struct OpAsmInterface : public mlir::OpAsmDialectInterface {
 
   /// Get a special name to use when printing the given operation. The desired
   /// name should be streamed into 'os'.
-  void getOpResultName(Operation* op, llvm::raw_ostream& os) const final {  // NOLINT
+  void getOpResultName(Operation* op, llvm::raw_ostream& os) const final {
     if (auto attr = op->getAttrOfType<mlir::StringAttr>("scalar_name")) {
-      auto str = attr.getValue();
-      if (str.startswith("$s_")) {
-        os << str.substr(1);
-      } else {
-        os << "s_" << str.substr(1);
-      }
+      os << "s_" << attr.getValue().substr(1);
     } else if (auto const_op = llvm::dyn_cast<ScalarConstantOp>(op)) {
       if (auto attr = const_op.value().dyn_cast<IntegerAttr>()) {
         os << 'c' << attr.getValue();
@@ -55,7 +50,7 @@ struct OpAsmInterface : public mlir::OpAsmDialectInterface {
       // Intern the string
       auto alias = mlir::Identifier::get(to_string(dataType), ctx);
       // Get the type
-      auto type = ScalarType::get(ctx, dataType);
+      auto type = getRankedTensorType(ScalarType::get(ctx, dataType));
       // Add the alias
       aliases.emplace_back(type, alias);
     }
