@@ -525,7 +525,7 @@ class TestBackendOps(unittest.TestCase):
         return [x + y + z]
 
     @opTest([
-        [m(3, 3), 1.0],
+        [m(3, 3), 65555],
         [m(3, 3), -3.4],
     ])
     def testAddConstant(self, b, x, c):
