@@ -1,5 +1,10 @@
+import os
 from collections import OrderedDict
+
 import numpy as np
+
+os.environ['KERAS_BACKEND'] = 'plaidml2.bridge.keras'
+
 import keras.backend as K
 import plaidml2.edsl as edsl
 
