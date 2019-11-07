@@ -395,8 +395,8 @@ def ConSumMulOp : BinaryConOp<"+(x*y)", "add", "mul"> {
 
 def IndexOp : TileOp<"index", [NoSideEffect]>, HasCanonicalizer {
   let summary = "tensor index lookup operation";
-  let arguments = (ins Eltwise_AnyTensor:$tensor, APIntAttr:$dim);
-  let results = (outs Eltwise_IntegerTensor:$result);
+  let arguments = (ins EltwiseAny:$tensor, APIntAttr:$dim);
+  let results = (outs EltwiseIndex:$result);
 
   let extraClassDeclaration = [{
     static Type getResultType(ArrayRef<Value*> operands);

@@ -85,4 +85,9 @@ def EltwiseUnsigned : TypeConstraint<Or<[
     RankedTensorOf<[AnyScalarUnsigned]>.predicate
   ]>, "eltwise-unsigned">;
 
+def EltwiseIndex : TypeConstraint<Or<[
+    ScalarIndex.predicate,
+    RankedTensorOf<[ScalarIndex]>.predicate
+  ]>, "eltwise-integer">;
+
 #endif // __PML_ELTWISE_PREDICATES__
