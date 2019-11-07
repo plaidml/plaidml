@@ -1,0 +1,15 @@
+requires cuda
+-------------- -------
+enum34         1.1.6  
+funcsigs       1.0.2  
+llvmlite       0.30.0 
+numba          0.46.0 
+numpy          1.16.5 
+pip            19.3.1 
+pkg-resources  0.0.0  
+setuptools     41.6.0 
+singledispatch 3.4.0.3
+six            1.13.0 
+wheel          0.33.6 
+
+
