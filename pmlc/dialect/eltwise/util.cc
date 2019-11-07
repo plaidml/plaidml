@@ -114,7 +114,11 @@ RankedTensorType getRankedTensorType(Type type) {
     return rankedType;
   }
   SmallVector<int64_t, 0> shape;
-  if (type.isa<IndexType>() || type.isa<ScalarType>()) {
+  if (type.isa<mlir::IndexType>()) {
+    // TODO: add index to DataType?
+    return RankedTensorType::get(shape, ScalarType::get(type.getContext(), DataType::UINT32));
+  }
+  if (type.isa<ScalarType>()) {
     return RankedTensorType::get(shape, type);
   }
   throw std::runtime_error(llvm::formatv("Unsupported elementType for tensor: {0}", debugString(type)).str());
@@ -145,11 +149,6 @@ Type ComputeResultType(ArrayRef<Value*> operands, DataType override) {
       ss << ")";
       throw std::runtime_error(ss.str());
     }
-  }
-  auto rankedTensorType = getRankedTensorType(ret);
-  if (rankedTensorType.getRank() == 0) {
-    ret = rankedTensorType.getElementType();
-    IVLOG(6, "  Scalar type: " << debugString(ret));
   }
   return ret;
 }

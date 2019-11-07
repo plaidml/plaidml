@@ -48,7 +48,7 @@ struct OpAsmInterface : public mlir::OpAsmDialectInterface {
       // Intern the string
       auto alias = mlir::Identifier::get(to_string(dataType), ctx);
       // Get the type
-      auto type = ScalarType::get(ctx, dataType);
+      auto type = getRankedTensorType(ScalarType::get(ctx, dataType));
       // Add the alias
       aliases.emplace_back(type, alias);
     }

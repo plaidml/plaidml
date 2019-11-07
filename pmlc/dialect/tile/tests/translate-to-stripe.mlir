@@ -150,7 +150,7 @@ func @double_dot(
 
 // -----
 
-!fp32 = type !eltwise.fp32
+!fp32 = type tensor<!eltwise.fp32>
 !t_10x20xfp32 = type tensor<10x20x!eltwise.fp32>
 !t_10x20xbool = type tensor<10x20x!eltwise.bool>
 

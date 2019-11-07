@@ -41,7 +41,7 @@ mlir::PatternMatchResult SimplifyNopRefines::match(RefineOp op) const {
   return matchSuccess();
 }
 
-void SimplifyNopRefines::rewrite(RefineOp op, mlir::PatternRewriter& rewriter) const {  // NOLINT(runtime/references)
+void SimplifyNopRefines::rewrite(RefineOp op, mlir::PatternRewriter& rewriter) const {
   rewriter.replaceOp(op, op.in());
 }
 

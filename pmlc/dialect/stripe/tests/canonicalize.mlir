@@ -1,7 +1,7 @@
 // RUN: pmlc-opt %s -canonicalize | FileCheck %s
 
 !aff = type !stripe.affine
-!fp32 = type !eltwise<"fp32">
+!fp32 = type tensor<!eltwise.fp32>
 !fp32_2 = type !stripe<"tensor_ref !eltwise.fp32:2">
 
 // CHECK-LABEL: @simplify_affines
