@@ -8,7 +8,9 @@ py_binary(
     name = "uw_toroidal_shell",
     srcs = ["uw_toroidal_shell.py"],
     deps = [
-        "//plaidml2/bridge/keras",
+        "//plaidml2:py",
+        "//plaidml2/edsl:py",
+        "//plaidml2/exec:py",
     ],
 )
 
@@ -16,12 +18,11 @@ py_test(
     name = "uw_tests",
     srcs = [
         "uw_tests.py",
-        "uw_toroidal_shell.py"
+        "uw_toroidal_shell.py",
     ],
-    tags = [
-        "keras",
-    ],
-  deps = [
-        "//plaidml2/bridge/keras",
+    deps = [
+        "//plaidml2:py",
+        "//plaidml2/edsl:py",
+        "//plaidml2/exec:py",
     ],
 )

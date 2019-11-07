@@ -11,11 +11,7 @@ DEFAULT_ATOL = 1e-8
 class UWTest(unittest.TestCase):
 
     def test_torodial_shell_integral(self):
-
-        n = 128
-        minval, maxval = -1.25, 1.25
-        eps = 1.0e-8
-        result = toroidal_shell_integral(n, minval, maxval, eps)
+        result = toroidal_shell_integral(128, -1.25, 1.25, 1.0e-8)
         npt.assert_allclose(result, 3.9926786915581705, rtol=DEFAULT_TOL, atol=DEFAULT_ATOL)
 
 
