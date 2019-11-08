@@ -539,7 +539,15 @@ Value* TileBuilder::MakeContractionOp(  //
   }
   IVLOG(6, "  sink: " << mlir::debugString(*sink));
   IVLOG(6, "  sizes: " << mlir::debugString(*sizes));
-  auto elementType = impl->inferElementType(types);
+  Type elementType;
+  if (combo == CombinationKind::eq) {
+    elementType = ScalarType::get(&impl->context, DataType::BOOLEAN);
+  } else if (combo == CombinationKind::cond) {
+    auto rankedTensorType = eltwise::getRankedTensorType(types[2]);
+    elementType = rankedTensorType.getElementType();
+  } else {
+    elementType = impl->inferElementType(types);
+  }
   auto size_map_op = llvm::cast<AffineSizeMapOp>(sizes->getDefiningOp());
   SmallVector<Value*, 4> size_map_sizes(size_map_op.sizes());
   auto shape = eltwise::ComputeShape(size_map_sizes);

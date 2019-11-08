@@ -49,7 +49,7 @@ def DimOp : TileOp<"dim">, HasFolder {
     "Builder* builder, OperationState& result, Value* tensor, int64_t value", [{
       auto type = ScalarType::get(builder->getContext(), DataType::INTX);
       result.addOperands(tensor);
-      result.addAttribute("dim", builder->getIntegerAttr(type, value));
+      result.addAttribute("dim", builder->getI64IntegerAttr(value));
       result.addTypes(type);
     }]
   >];
@@ -433,7 +433,7 @@ def PrngOp : SpecialOp<"prng">, HasCanonicalizer {
 
 def ReshapeOp : SpecialOp<"reshape">, HasCanonicalizer {
   let summary = "tensor reshape operation";
-  let arguments = (ins RankedTensorOf<[AnyScalar]>:$tensor, Variadic<ScalarIndex>:$dims);
+  let arguments = (ins RankedTensorOf<[AnyScalar]>:$tensor, Variadic<EltwiseIndex>:$dims);
   let results = (outs RankedTensorOf<[AnyScalar]>:$result);
 }
 

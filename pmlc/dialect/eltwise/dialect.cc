@@ -94,12 +94,6 @@ mlir::Operation* Dialect::materializeConstant(  //
     mlir::Type type,                            //
     mlir::Location loc) {
   IVLOG(5, "eltwise::Dialect::materializeConstant> " << mlir::debugString(type));
-  if (auto rankedTensorType = type.dyn_cast<RankedTensorType>()) {
-    if (rankedTensorType.getRank() == 0) {
-      return builder.create<ScalarConstantOp>(loc, rankedTensorType.getElementType(), value);
-    }
-    return nullptr;
-  }
   return builder.create<ScalarConstantOp>(loc, type, value);
 }
 

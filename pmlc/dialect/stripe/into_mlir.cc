@@ -377,7 +377,8 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
         Value* from = safe_at(locals.refs, load->from);
         auto tensorRefType = from->getType().cast<TensorRefType>();
         auto elementType = tensorRefType.getElementType();
-        auto op = builder->create<LoadOp>(unknownLoc, elementType, from);
+        auto intoType = eltwise::getRankedTensorType(elementType);
+        auto op = builder->create<LoadOp>(unknownLoc, intoType, from);
         auto attrs = TagsToDict(builder, *load);
         if (attrs.size()) {
           op.setAttr(Dialect::getStripeAttrsName(), attrs);

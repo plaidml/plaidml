@@ -40,7 +40,7 @@ def ScalarConstantOp :
     HasFolder {
   let summary = "constant";
   let arguments = (ins AnyAttr:$value);
-  let results = (outs AnyScalar:$result);
+  let results = (outs EltwiseAny:$result);
 
   let builders = [OpBuilder<
     "Builder* builder, OperationState& result, Type type, double value", [{
@@ -212,7 +212,7 @@ def SelectOp : EltwiseOp<"select">, HasCanonicalizer {
 
   let extraClassDeclaration = [{
     static Type getResultType(ArrayRef<Value*> operands) {
-      return ComputeResultType(operands);
+      return ComputeResultType(operands.drop_front());
     }
   }] # EltwiseBuilderImpl_create;
 }

@@ -115,65 +115,62 @@ class TestEdsl(unittest.TestCase):
         self.assertMultiLineEqual(
             str(program), '''
 
-!int = type !eltwise.int
-!float = type !eltwise.float
-!fp32 = type !eltwise.fp32
-!bool = type !eltwise.bool
+!float = type tensor<!eltwise.float>
 module {
   func @mnist_mlp(%arg0: tensor<10x!eltwise.fp32>, %arg1: tensor<512x!eltwise.fp32>, %arg2: tensor<512x!eltwise.fp32>, %arg3: tensor<1x784x!eltwise.fp32>, %arg4: tensor<784x512x!eltwise.fp32>, %arg5: tensor<512x512x!eltwise.fp32>, %arg6: tensor<512x10x!eltwise.fp32>) -> tensor<1x10x!eltwise.fp32> {
-    %c512 = "tile.affine_const"() {value = 512 : i64} : () -> !int
+    %c512 = "tile.affine_const"() {value = 512 : i64} : () -> !eltwise.int
     %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !float
-    %c10 = "tile.affine_const"() {value = 10 : i64} : () -> !int
-    %c0 = "tile.affine_const"() {value = 0 : i64} : () -> !int
-    %c1 = "tile.affine_const"() {value = 1 : i64} : () -> !int
+    %c10 = "tile.affine_const"() {value = 10 : i64} : () -> !eltwise.int
+    %c0 = "tile.affine_const"() {value = 0 : i64} : () -> !eltwise.int
+    %c1 = "tile.affine_const"() {value = 1 : i64} : () -> !eltwise.int
     %0 = "tile.domain"() ( {
-    ^bb0(%arg7: !int, %arg8: !int, %arg9: !int):	// no predecessors
-      %15 = "tile.src_idx_map"(%arg3, %arg8, %arg7) : (tensor<1x784x!eltwise.fp32>, !int, !int) -> !tile.imap
-      %16 = "tile.src_idx_map"(%arg4, %arg7, %arg9) : (tensor<784x512x!eltwise.fp32>, !int, !int) -> !tile.imap
-      %17 = "tile.sink_idx_map"(%arg8, %arg9) : (!int, !int) -> !tile.imap
-      %18 = "tile.size_map"(%c1, %c512) : (!int, !int) -> !tile.smap
+    ^bb0(%arg7: !eltwise.int, %arg8: !eltwise.int, %arg9: !eltwise.int):	// no predecessors
+      %15 = "tile.src_idx_map"(%arg3, %arg8, %arg7) : (tensor<1x784x!eltwise.fp32>, !eltwise.int, !eltwise.int) -> !tile.imap
+      %16 = "tile.src_idx_map"(%arg4, %arg7, %arg9) : (tensor<784x512x!eltwise.fp32>, !eltwise.int, !eltwise.int) -> !tile.imap
+      %17 = "tile.sink_idx_map"(%arg8, %arg9) : (!eltwise.int, !eltwise.int) -> !tile.imap
+      %18 = "tile.size_map"(%c1, %c512) : (!eltwise.int, !eltwise.int) -> !tile.smap
       "tile.+(x*y)"(%18, %15, %16, %17) : (!tile.smap, !tile.imap, !tile.imap, !tile.imap) -> ()
     }) {idx_names = ["x0", "x1", "x2"]} : () -> tensor<1x512x!eltwise.fp32>
-    %1 = "eltwise.add"(%0, %arg2) {type = !fp32} : (tensor<1x512x!eltwise.fp32>, tensor<512x!eltwise.fp32>) -> tensor<1x512x!eltwise.fp32>
-    %2 = "eltwise.cmp_lt"(%1, %cst) {type = !fp32} : (tensor<1x512x!eltwise.fp32>, !float) -> tensor<1x512x!eltwise.bool>
-    %3 = "eltwise.select"(%2, %cst, %1) {type = !fp32} : (tensor<1x512x!eltwise.bool>, !float, tensor<1x512x!eltwise.fp32>) -> tensor<1x512x!eltwise.fp32>
+    %1 = "eltwise.add"(%0, %arg2) {type = !eltwise.fp32} : (tensor<1x512x!eltwise.fp32>, tensor<512x!eltwise.fp32>) -> tensor<1x512x!eltwise.fp32>
+    %2 = "eltwise.cmp_lt"(%1, %cst) {type = !eltwise.fp32} : (tensor<1x512x!eltwise.fp32>, !float) -> tensor<1x512x!eltwise.bool>
+    %3 = "eltwise.select"(%2, %cst, %1) {type = !eltwise.fp32} : (tensor<1x512x!eltwise.bool>, !float, tensor<1x512x!eltwise.fp32>) -> tensor<1x512x!eltwise.fp32>
     %4 = "tile.domain"() ( {
-    ^bb0(%arg7: !int, %arg8: !int, %arg9: !int):	// no predecessors
-      %15 = "tile.src_idx_map"(%3, %arg8, %arg7) : (tensor<1x512x!eltwise.fp32>, !int, !int) -> !tile.imap
-      %16 = "tile.src_idx_map"(%arg5, %arg7, %arg9) : (tensor<512x512x!eltwise.fp32>, !int, !int) -> !tile.imap
-      %17 = "tile.sink_idx_map"(%arg8, %arg9) : (!int, !int) -> !tile.imap
-      %18 = "tile.size_map"(%c1, %c512) : (!int, !int) -> !tile.smap
+    ^bb0(%arg7: !eltwise.int, %arg8: !eltwise.int, %arg9: !eltwise.int):	// no predecessors
+      %15 = "tile.src_idx_map"(%3, %arg8, %arg7) : (tensor<1x512x!eltwise.fp32>, !eltwise.int, !eltwise.int) -> !tile.imap
+      %16 = "tile.src_idx_map"(%arg5, %arg7, %arg9) : (tensor<512x512x!eltwise.fp32>, !eltwise.int, !eltwise.int) -> !tile.imap
+      %17 = "tile.sink_idx_map"(%arg8, %arg9) : (!eltwise.int, !eltwise.int) -> !tile.imap
+      %18 = "tile.size_map"(%c1, %c512) : (!eltwise.int, !eltwise.int) -> !tile.smap
       "tile.+(x*y)"(%18, %15, %16, %17) : (!tile.smap, !tile.imap, !tile.imap, !tile.imap) -> ()
     }) {idx_names = ["x0", "x1", "x2"]} : () -> tensor<1x512x!eltwise.fp32>
-    %5 = "eltwise.add"(%4, %arg1) {type = !fp32} : (tensor<1x512x!eltwise.fp32>, tensor<512x!eltwise.fp32>) -> tensor<1x512x!eltwise.fp32>
-    %6 = "eltwise.cmp_lt"(%5, %cst) {type = !fp32} : (tensor<1x512x!eltwise.fp32>, !float) -> tensor<1x512x!eltwise.bool>
-    %7 = "eltwise.select"(%6, %cst, %5) {type = !fp32} : (tensor<1x512x!eltwise.bool>, !float, tensor<1x512x!eltwise.fp32>) -> tensor<1x512x!eltwise.fp32>
+    %5 = "eltwise.add"(%4, %arg1) {type = !eltwise.fp32} : (tensor<1x512x!eltwise.fp32>, tensor<512x!eltwise.fp32>) -> tensor<1x512x!eltwise.fp32>
+    %6 = "eltwise.cmp_lt"(%5, %cst) {type = !eltwise.fp32} : (tensor<1x512x!eltwise.fp32>, !float) -> tensor<1x512x!eltwise.bool>
+    %7 = "eltwise.select"(%6, %cst, %5) {type = !eltwise.fp32} : (tensor<1x512x!eltwise.bool>, !float, tensor<1x512x!eltwise.fp32>) -> tensor<1x512x!eltwise.fp32>
     %8 = "tile.domain"() ( {
-    ^bb0(%arg7: !int, %arg8: !int, %arg9: !int):	// no predecessors
-      %15 = "tile.src_idx_map"(%7, %arg8, %arg7) : (tensor<1x512x!eltwise.fp32>, !int, !int) -> !tile.imap
-      %16 = "tile.src_idx_map"(%arg6, %arg7, %arg9) : (tensor<512x10x!eltwise.fp32>, !int, !int) -> !tile.imap
-      %17 = "tile.sink_idx_map"(%arg8, %arg9) : (!int, !int) -> !tile.imap
-      %18 = "tile.size_map"(%c1, %c10) : (!int, !int) -> !tile.smap
+    ^bb0(%arg7: !eltwise.int, %arg8: !eltwise.int, %arg9: !eltwise.int):	// no predecessors
+      %15 = "tile.src_idx_map"(%7, %arg8, %arg7) : (tensor<1x512x!eltwise.fp32>, !eltwise.int, !eltwise.int) -> !tile.imap
+      %16 = "tile.src_idx_map"(%arg6, %arg7, %arg9) : (tensor<512x10x!eltwise.fp32>, !eltwise.int, !eltwise.int) -> !tile.imap
+      %17 = "tile.sink_idx_map"(%arg8, %arg9) : (!eltwise.int, !eltwise.int) -> !tile.imap
+      %18 = "tile.size_map"(%c1, %c10) : (!eltwise.int, !eltwise.int) -> !tile.smap
       "tile.+(x*y)"(%18, %15, %16, %17) : (!tile.smap, !tile.imap, !tile.imap, !tile.imap) -> ()
     }) {idx_names = ["x0", "x1", "x2"]} : () -> tensor<1x10x!eltwise.fp32>
-    %9 = "eltwise.add"(%8, %arg0) {type = !fp32} : (tensor<1x10x!eltwise.fp32>, tensor<10x!eltwise.fp32>) -> tensor<1x10x!eltwise.fp32>
+    %9 = "eltwise.add"(%8, %arg0) {type = !eltwise.fp32} : (tensor<1x10x!eltwise.fp32>, tensor<10x!eltwise.fp32>) -> tensor<1x10x!eltwise.fp32>
     %10 = "tile.domain"() ( {
-    ^bb0(%arg7: !int, %arg8: !int):	// no predecessors
-      %15 = "tile.src_idx_map"(%9, %arg8, %arg7) : (tensor<1x10x!eltwise.fp32>, !int, !int) -> !tile.imap
-      %16 = "tile.sink_idx_map"(%arg8, %c0) : (!int, !int) -> !tile.imap
-      %17 = "tile.size_map"(%c1, %c1) : (!int, !int) -> !tile.smap
+    ^bb0(%arg7: !eltwise.int, %arg8: !eltwise.int):	// no predecessors
+      %15 = "tile.src_idx_map"(%9, %arg8, %arg7) : (tensor<1x10x!eltwise.fp32>, !eltwise.int, !eltwise.int) -> !tile.imap
+      %16 = "tile.sink_idx_map"(%arg8, %c0) : (!eltwise.int, !eltwise.int) -> !tile.imap
+      %17 = "tile.size_map"(%c1, %c1) : (!eltwise.int, !eltwise.int) -> !tile.smap
       "tile.>(x)"(%17, %15, %16) : (!tile.smap, !tile.imap, !tile.imap) -> ()
     }) {idx_names = ["x0", "x1"]} : () -> tensor<1x1x!eltwise.fp32>
-    %11 = "eltwise.sub"(%9, %10) {type = !fp32} : (tensor<1x10x!eltwise.fp32>, tensor<1x1x!eltwise.fp32>) -> tensor<1x10x!eltwise.fp32>
-    %12 = "eltwise.exp"(%11) {type = !fp32} : (tensor<1x10x!eltwise.fp32>) -> tensor<1x10x!eltwise.fp32>
+    %11 = "eltwise.sub"(%9, %10) {type = !eltwise.fp32} : (tensor<1x10x!eltwise.fp32>, tensor<1x1x!eltwise.fp32>) -> tensor<1x10x!eltwise.fp32>
+    %12 = "eltwise.exp"(%11) {type = !eltwise.fp32} : (tensor<1x10x!eltwise.fp32>) -> tensor<1x10x!eltwise.fp32>
     %13 = "tile.domain"() ( {
-    ^bb0(%arg7: !int, %arg8: !int):	// no predecessors
-      %15 = "tile.src_idx_map"(%12, %arg8, %arg7) : (tensor<1x10x!eltwise.fp32>, !int, !int) -> !tile.imap
-      %16 = "tile.sink_idx_map"(%arg8, %c0) : (!int, !int) -> !tile.imap
-      %17 = "tile.size_map"(%c1, %c1) : (!int, !int) -> !tile.smap
+    ^bb0(%arg7: !eltwise.int, %arg8: !eltwise.int):	// no predecessors
+      %15 = "tile.src_idx_map"(%12, %arg8, %arg7) : (tensor<1x10x!eltwise.fp32>, !eltwise.int, !eltwise.int) -> !tile.imap
+      %16 = "tile.sink_idx_map"(%arg8, %c0) : (!eltwise.int, !eltwise.int) -> !tile.imap
+      %17 = "tile.size_map"(%c1, %c1) : (!eltwise.int, !eltwise.int) -> !tile.smap
       "tile.+(x)"(%17, %15, %16) : (!tile.smap, !tile.imap, !tile.imap) -> ()
     }) {idx_names = ["x0", "x1"]} : () -> tensor<1x1x!eltwise.fp32>
-    %14 = "eltwise.div"(%12, %13) {type = !fp32} : (tensor<1x10x!eltwise.fp32>, tensor<1x1x!eltwise.fp32>) -> tensor<1x10x!eltwise.fp32>
+    %14 = "eltwise.div"(%12, %13) {type = !eltwise.fp32} : (tensor<1x10x!eltwise.fp32>, tensor<1x1x!eltwise.fp32>) -> tensor<1x10x!eltwise.fp32>
     return %14 : tensor<1x10x!eltwise.fp32>
   }
 }
@@ -211,38 +208,36 @@ module {
         self.assertMultiLineEqual(
             str(program), '''
 
-!int = type !eltwise.int
-!fp32 = type !eltwise.fp32
-!u32 = type !eltwise.u32
+!fp32 = type tensor<!eltwise.fp32>
 module {
-  func @arg_max(%arg0: tensor<1x10x10x!eltwise.fp32>, %arg1: tensor<!eltwise.fp32>) -> tensor<1x10x!eltwise.u32> {
-    %c1 = "tile.affine_const"() {value = 1 : i64} : () -> !int
-    %c10 = "tile.affine_const"() {value = 10 : i64} : () -> !int
+  func @arg_max(%arg0: tensor<1x10x10x!eltwise.fp32>, %arg1: !fp32) -> tensor<1x10x!eltwise.u32> {
+    %c1 = "tile.affine_const"() {value = 1 : i64} : () -> !eltwise.int
+    %c10 = "tile.affine_const"() {value = 10 : i64} : () -> !eltwise.int
     %0 = "tile.domain"() ( {
-    ^bb0(%arg2: !int, %arg3: !int, %arg4: !int):	// no predecessors
-      %5 = "tile.src_idx_map"(%arg0, %arg4, %arg3, %arg2) : (tensor<1x10x10x!eltwise.fp32>, !int, !int, !int) -> !tile.imap
-      %6 = "tile.sink_idx_map"(%arg4, %arg2) : (!int, !int) -> !tile.imap
-      %7 = "tile.size_map"(%c1, %c10) : (!int, !int) -> !tile.smap
+    ^bb0(%arg2: !eltwise.int, %arg3: !eltwise.int, %arg4: !eltwise.int):	// no predecessors
+      %5 = "tile.src_idx_map"(%arg0, %arg4, %arg3, %arg2) : (tensor<1x10x10x!eltwise.fp32>, !eltwise.int, !eltwise.int, !eltwise.int) -> !tile.imap
+      %6 = "tile.sink_idx_map"(%arg4, %arg2) : (!eltwise.int, !eltwise.int) -> !tile.imap
+      %7 = "tile.size_map"(%c1, %c10) : (!eltwise.int, !eltwise.int) -> !tile.smap
       "tile.>(x)"(%7, %5, %6) : (!tile.smap, !tile.imap, !tile.imap) -> ()
     }) {idx_names = ["x0", "x1", "x2"]} : () -> tensor<1x10x!eltwise.fp32>
     %1 = "tile.domain"() ( {
-    ^bb0(%arg2: !int):	// no predecessors
-      %5 = "tile.src_idx_map"(%arg1) : (tensor<!eltwise.fp32>) -> !tile.imap
-      %6 = "tile.sink_idx_map"(%arg2) : (!int) -> !tile.imap
-      %7 = "tile.size_map"(%c10) : (!int) -> !tile.smap
+    ^bb0(%arg2: !eltwise.int):	// no predecessors
+      %5 = "tile.src_idx_map"(%arg1) : (!fp32) -> !tile.imap
+      %6 = "tile.sink_idx_map"(%arg2) : (!eltwise.int) -> !tile.imap
+      %7 = "tile.size_map"(%c10) : (!eltwise.int) -> !tile.smap
       "tile.=(x)"(%7, %5, %6) : (!tile.smap, !tile.imap, !tile.imap) -> ()
     }) {idx_names = ["x0"]} : () -> tensor<10x!eltwise.fp32>
     %2 = "tile.index"(%1) {dim = 0 : i64} : (tensor<10x!eltwise.fp32>) -> tensor<10x!eltwise.int>
     %3 = "tile.domain"() ( {
-    ^bb0(%arg2: !int, %arg3: !int, %arg4: !int):	// no predecessors
-      %5 = "tile.src_idx_map"(%arg0, %arg4, %arg3, %arg2) : (tensor<1x10x10x!eltwise.fp32>, !int, !int, !int) -> !tile.imap
-      %6 = "tile.src_idx_map"(%0, %arg4, %arg2) : (tensor<1x10x!eltwise.fp32>, !int, !int) -> !tile.imap
-      %7 = "tile.src_idx_map"(%2, %arg3) : (tensor<10x!eltwise.int>, !int) -> !tile.imap
-      %8 = "tile.sink_idx_map"(%arg4, %arg2) : (!int, !int) -> !tile.imap
-      %9 = "tile.size_map"(%c1, %c10) : (!int, !int) -> !tile.smap
+    ^bb0(%arg2: !eltwise.int, %arg3: !eltwise.int, %arg4: !eltwise.int):	// no predecessors
+      %5 = "tile.src_idx_map"(%arg0, %arg4, %arg3, %arg2) : (tensor<1x10x10x!eltwise.fp32>, !eltwise.int, !eltwise.int, !eltwise.int) -> !tile.imap
+      %6 = "tile.src_idx_map"(%0, %arg4, %arg2) : (tensor<1x10x!eltwise.fp32>, !eltwise.int, !eltwise.int) -> !tile.imap
+      %7 = "tile.src_idx_map"(%2, %arg3) : (tensor<10x!eltwise.int>, !eltwise.int) -> !tile.imap
+      %8 = "tile.sink_idx_map"(%arg4, %arg2) : (!eltwise.int, !eltwise.int) -> !tile.imap
+      %9 = "tile.size_map"(%c1, %c10) : (!eltwise.int, !eltwise.int) -> !tile.smap
       "tile.>(x==y?z)"(%9, %5, %6, %7, %8) : (!tile.smap, !tile.imap, !tile.imap, !tile.imap, !tile.imap) -> ()
-    }) {idx_names = ["x0", "x1", "x2"]} : () -> tensor<1x10x!eltwise.fp32>
-    %4 = "eltwise.cast"(%3) : (tensor<1x10x!eltwise.fp32>) -> tensor<1x10x!eltwise.u32>
+    }) {idx_names = ["x0", "x1", "x2"]} : () -> tensor<1x10x!eltwise.int>
+    %4 = "eltwise.cast"(%3) : (tensor<1x10x!eltwise.int>) -> tensor<1x10x!eltwise.u32>
     return %4 : tensor<1x10x!eltwise.u32>
   }
 }
@@ -259,19 +254,18 @@ module {
         self.assertMultiLineEqual(
             str(program), '''
 
-!fp32 = type !eltwise.fp32
-!int = type !eltwise.int
+!fp32 = type tensor<!eltwise.fp32>
 module {
   func @global_min(%arg0: tensor<10x10x10x!eltwise.fp32> {tile.name = "I"}) -> !fp32 {
-    %0 = "eltwise.neg"(%arg0) {type = !fp32} : (tensor<10x10x10x!eltwise.fp32>) -> tensor<10x10x10x!eltwise.fp32>
+    %0 = "eltwise.neg"(%arg0) {type = !eltwise.fp32} : (tensor<10x10x10x!eltwise.fp32>) -> tensor<10x10x10x!eltwise.fp32>
     %1 = "tile.domain"() ( {
-    ^bb0(%arg1: !int, %arg2: !int, %arg3: !int):	// no predecessors
-      %3 = "tile.src_idx_map"(%0, %arg3, %arg2, %arg1) : (tensor<10x10x10x!eltwise.fp32>, !int, !int, !int) -> !tile.imap
+    ^bb0(%arg1: !eltwise.int, %arg2: !eltwise.int, %arg3: !eltwise.int):	// no predecessors
+      %3 = "tile.src_idx_map"(%0, %arg3, %arg2, %arg1) : (tensor<10x10x10x!eltwise.fp32>, !eltwise.int, !eltwise.int, !eltwise.int) -> !tile.imap
       %4 = "tile.sink_idx_map"() : () -> !tile.imap
       %5 = "tile.size_map"() : () -> !tile.smap
       "tile.>(x)"(%5, %3, %4) : (!tile.smap, !tile.imap, !tile.imap) -> ()
-    }) {idx_names = ["x0", "x1", "x2"]} : () -> tensor<!eltwise.fp32>
-    %2 = "eltwise.neg"(%1) {type = !fp32} : (tensor<!eltwise.fp32>) -> !fp32
+    }) {idx_names = ["x0", "x1", "x2"]} : () -> !fp32
+    %2 = "eltwise.neg"(%1) {type = !eltwise.fp32} : (!fp32) -> !fp32
     return %2 : !fp32
   }
 }
@@ -289,20 +283,18 @@ module {
         self.assertMultiLineEqual(
             str(program), '''
 
-!int = type !eltwise.int
-!fp32 = type !eltwise.fp32
 module {
   func @cum_sum(%arg0: tensor<10x!eltwise.fp32> {tile.name = "I"}) -> tensor<10x!eltwise.fp32> {
-    %c10 = "tile.affine_const"() {value = 10 : i64} : () -> !int
+    %c10 = "tile.affine_const"() {value = 10 : i64} : () -> !eltwise.int
     %0 = "tile.domain"() ( {
-    ^bb0(%arg1: !int, %arg2: !int):	// no predecessors
-      %1 = "tile.src_idx_map"(%arg0, %arg1) : (tensor<10x!eltwise.fp32>, !int) -> !tile.imap
-      %2 = "tile.sink_idx_map"(%arg2) : (!int) -> !tile.imap
-      %3 = "tile.size_map"(%c10) : (!int) -> !tile.smap
-      %4 = "tile.affine_sub"(%arg2, %arg1) : (!int, !int) -> !int
+    ^bb0(%arg1: !eltwise.int, %arg2: !eltwise.int):	// no predecessors
+      %1 = "tile.src_idx_map"(%arg0, %arg1) : (tensor<10x!eltwise.fp32>, !eltwise.int) -> !tile.imap
+      %2 = "tile.sink_idx_map"(%arg2) : (!eltwise.int) -> !tile.imap
+      %3 = "tile.size_map"(%c10) : (!eltwise.int) -> !tile.smap
+      %4 = "tile.affine_sub"(%arg2, %arg1) : (!eltwise.int, !eltwise.int) -> !eltwise.int
       "tile.constraint"(%4, %c10) ( {
         "tile.+(x)"(%3, %1, %2) : (!tile.smap, !tile.imap, !tile.imap) -> ()
-      }) : (!int, !int) -> ()
+      }) : (!eltwise.int, !eltwise.int) -> ()
     }) {idx_names = ["x0", "x1"]} : () -> tensor<10x!eltwise.fp32>
     return %0 : tensor<10x!eltwise.fp32>
   }
@@ -324,12 +316,12 @@ module {
         self.assertMultiLineEqual(
             str(program), '''
 
-!fp32 = type !eltwise.fp32
+!fp32 = type tensor<!eltwise.fp32>
 module {
-  func @unique_names(%arg0: tensor<!eltwise.fp32> {tile.name = "C"}, %arg1: tensor<!eltwise.fp32> {tile.name = "C_0"}, %arg2: tensor<!eltwise.fp32> {tile.name = "B"}, %arg3: tensor<!eltwise.fp32> {tile.name = "A"}) -> !fp32 {
-    %0 = "eltwise.add"(%arg3, %arg2) {type = !fp32} : (tensor<!eltwise.fp32>, tensor<!eltwise.fp32>) -> !fp32
-    %1 = "eltwise.add"(%0, %arg1) {type = !fp32} : (!fp32, tensor<!eltwise.fp32>) -> !fp32
-    %2 = "eltwise.add"(%1, %arg0) {type = !fp32} : (!fp32, tensor<!eltwise.fp32>) -> !fp32
+  func @unique_names(%arg0: !fp32 {tile.name = "C"}, %arg1: !fp32 {tile.name = "C_0"}, %arg2: !fp32 {tile.name = "B"}, %arg3: !fp32 {tile.name = "A"}) -> !fp32 {
+    %0 = "eltwise.add"(%arg3, %arg2) {type = !eltwise.fp32} : (!fp32, !fp32) -> !fp32
+    %1 = "eltwise.add"(%0, %arg1) {type = !eltwise.fp32} : (!fp32, !fp32) -> !fp32
+    %2 = "eltwise.add"(%1, %arg0) {type = !eltwise.fp32} : (!fp32, !fp32) -> !fp32
     return %2 : !fp32
   }
 }
@@ -347,43 +339,42 @@ module {
         self.assertMultiLineEqual(
             str(program), '''
 
-!float = type !eltwise.float
-!fp32 = type !eltwise.fp32
-!int = type !eltwise.int
+!float = type tensor<!eltwise.float>
+!fp32 = type tensor<!eltwise.fp32>
 module {
-  func @lars_momentum_4d(%arg0: tensor<4x7x3x9x!eltwise.fp32>, %arg1: tensor<4x7x3x9x!eltwise.fp32>, %arg2: tensor<!eltwise.fp32>, %arg3: tensor<4x7x3x9x!eltwise.fp32>) -> (tensor<4x7x3x9x!eltwise.fp32>, tensor<4x7x3x9x!eltwise.fp32>) {
+  func @lars_momentum_4d(%arg0: tensor<4x7x3x9x!eltwise.fp32>, %arg1: tensor<4x7x3x9x!eltwise.fp32>, %arg2: !fp32, %arg3: tensor<4x7x3x9x!eltwise.fp32>) -> (tensor<4x7x3x9x!eltwise.fp32>, tensor<4x7x3x9x!eltwise.fp32>) {
     %cst = "eltwise.sconst"() {value = 4.8828125E-4 : f64} : () -> !float
     %cst_0 = "eltwise.sconst"() {value = 9.765625E-4 : f64} : () -> !float
     %cst_1 = "eltwise.sconst"() {value = 1.250000e-01 : f64} : () -> !float
-    %0 = "eltwise.mul"(%arg0, %cst) {type = !fp32} : (tensor<4x7x3x9x!eltwise.fp32>, !float) -> tensor<4x7x3x9x!eltwise.fp32>
-    %1 = "eltwise.add"(%arg1, %0) {type = !fp32} : (tensor<4x7x3x9x!eltwise.fp32>, tensor<4x7x3x9x!eltwise.fp32>) -> tensor<4x7x3x9x!eltwise.fp32>
-    %2 = "eltwise.mul"(%arg0, %arg0) {type = !fp32} : (tensor<4x7x3x9x!eltwise.fp32>, tensor<4x7x3x9x!eltwise.fp32>) -> tensor<4x7x3x9x!eltwise.fp32>
+    %0 = "eltwise.mul"(%arg0, %cst) {type = !eltwise.fp32} : (tensor<4x7x3x9x!eltwise.fp32>, !float) -> tensor<4x7x3x9x!eltwise.fp32>
+    %1 = "eltwise.add"(%arg1, %0) {type = !eltwise.fp32} : (tensor<4x7x3x9x!eltwise.fp32>, tensor<4x7x3x9x!eltwise.fp32>) -> tensor<4x7x3x9x!eltwise.fp32>
+    %2 = "eltwise.mul"(%arg0, %arg0) {type = !eltwise.fp32} : (tensor<4x7x3x9x!eltwise.fp32>, tensor<4x7x3x9x!eltwise.fp32>) -> tensor<4x7x3x9x!eltwise.fp32>
     %3 = "tile.domain"() ( {
-    ^bb0(%arg4: !int, %arg5: !int, %arg6: !int, %arg7: !int):	// no predecessors
-      %17 = "tile.src_idx_map"(%2, %arg7, %arg6, %arg5, %arg4) : (tensor<4x7x3x9x!eltwise.fp32>, !int, !int, !int, !int) -> !tile.imap
+    ^bb0(%arg4: !eltwise.int, %arg5: !eltwise.int, %arg6: !eltwise.int, %arg7: !eltwise.int):	// no predecessors
+      %17 = "tile.src_idx_map"(%2, %arg7, %arg6, %arg5, %arg4) : (tensor<4x7x3x9x!eltwise.fp32>, !eltwise.int, !eltwise.int, !eltwise.int, !eltwise.int) -> !tile.imap
       %18 = "tile.sink_idx_map"() : () -> !tile.imap
       %19 = "tile.size_map"() : () -> !tile.smap
       "tile.+(x)"(%19, %17, %18) : (!tile.smap, !tile.imap, !tile.imap) -> ()
-    }) {idx_names = ["x0", "x1", "x2", "x3"]} : () -> tensor<!eltwise.fp32>
-    %4 = "eltwise.sqrt"(%3) {type = !fp32} : (tensor<!eltwise.fp32>) -> !fp32
-    %5 = "eltwise.mul"(%4, %cst) {type = !fp32} : (!fp32, !float) -> !fp32
-    %6 = "eltwise.mul"(%arg1, %arg1) {type = !fp32} : (tensor<4x7x3x9x!eltwise.fp32>, tensor<4x7x3x9x!eltwise.fp32>) -> tensor<4x7x3x9x!eltwise.fp32>
+    }) {idx_names = ["x0", "x1", "x2", "x3"]} : () -> !fp32
+    %4 = "eltwise.sqrt"(%3) {type = !eltwise.fp32} : (!fp32) -> !fp32
+    %5 = "eltwise.mul"(%4, %cst) {type = !eltwise.fp32} : (!fp32, !float) -> !fp32
+    %6 = "eltwise.mul"(%arg1, %arg1) {type = !eltwise.fp32} : (tensor<4x7x3x9x!eltwise.fp32>, tensor<4x7x3x9x!eltwise.fp32>) -> tensor<4x7x3x9x!eltwise.fp32>
     %7 = "tile.domain"() ( {
-    ^bb0(%arg4: !int, %arg5: !int, %arg6: !int, %arg7: !int):	// no predecessors
-      %17 = "tile.src_idx_map"(%6, %arg7, %arg6, %arg5, %arg4) : (tensor<4x7x3x9x!eltwise.fp32>, !int, !int, !int, !int) -> !tile.imap
+    ^bb0(%arg4: !eltwise.int, %arg5: !eltwise.int, %arg6: !eltwise.int, %arg7: !eltwise.int):	// no predecessors
+      %17 = "tile.src_idx_map"(%6, %arg7, %arg6, %arg5, %arg4) : (tensor<4x7x3x9x!eltwise.fp32>, !eltwise.int, !eltwise.int, !eltwise.int, !eltwise.int) -> !tile.imap
       %18 = "tile.sink_idx_map"() : () -> !tile.imap
       %19 = "tile.size_map"() : () -> !tile.smap
       "tile.+(x)"(%19, %17, %18) : (!tile.smap, !tile.imap, !tile.imap) -> ()
-    }) {idx_names = ["x0", "x1", "x2", "x3"]} : () -> tensor<!eltwise.fp32>
-    %8 = "eltwise.sqrt"(%7) {type = !fp32} : (tensor<!eltwise.fp32>) -> !fp32
-    %9 = "eltwise.add"(%8, %5) {type = !fp32} : (!fp32, !fp32) -> !fp32
-    %10 = "eltwise.mul"(%arg2, %cst_0) {type = !fp32} : (tensor<!eltwise.fp32>, !float) -> !fp32
-    %11 = "eltwise.mul"(%10, %4) {type = !fp32} : (!fp32, !fp32) -> !fp32
-    %12 = "eltwise.div"(%11, %9) {type = !fp32} : (!fp32, !fp32) -> !fp32
-    %13 = "eltwise.mul"(%12, %1) {type = !fp32} : (!fp32, tensor<4x7x3x9x!eltwise.fp32>) -> tensor<4x7x3x9x!eltwise.fp32>
-    %14 = "eltwise.mul"(%arg3, %cst_1) {type = !fp32} : (tensor<4x7x3x9x!eltwise.fp32>, !float) -> tensor<4x7x3x9x!eltwise.fp32>
-    %15 = "eltwise.add"(%14, %13) {type = !fp32} : (tensor<4x7x3x9x!eltwise.fp32>, tensor<4x7x3x9x!eltwise.fp32>) -> tensor<4x7x3x9x!eltwise.fp32>
-    %16 = "eltwise.sub"(%arg0, %15) {type = !fp32} : (tensor<4x7x3x9x!eltwise.fp32>, tensor<4x7x3x9x!eltwise.fp32>) -> tensor<4x7x3x9x!eltwise.fp32>
+    }) {idx_names = ["x0", "x1", "x2", "x3"]} : () -> !fp32
+    %8 = "eltwise.sqrt"(%7) {type = !eltwise.fp32} : (!fp32) -> !fp32
+    %9 = "eltwise.add"(%8, %5) {type = !eltwise.fp32} : (!fp32, !fp32) -> !fp32
+    %10 = "eltwise.mul"(%arg2, %cst_0) {type = !eltwise.fp32} : (!fp32, !float) -> !fp32
+    %11 = "eltwise.mul"(%10, %4) {type = !eltwise.fp32} : (!fp32, !fp32) -> !fp32
+    %12 = "eltwise.div"(%11, %9) {type = !eltwise.fp32} : (!fp32, !fp32) -> !fp32
+    %13 = "eltwise.mul"(%12, %1) {type = !eltwise.fp32} : (!fp32, tensor<4x7x3x9x!eltwise.fp32>) -> tensor<4x7x3x9x!eltwise.fp32>
+    %14 = "eltwise.mul"(%arg3, %cst_1) {type = !eltwise.fp32} : (tensor<4x7x3x9x!eltwise.fp32>, !float) -> tensor<4x7x3x9x!eltwise.fp32>
+    %15 = "eltwise.add"(%14, %13) {type = !eltwise.fp32} : (tensor<4x7x3x9x!eltwise.fp32>, tensor<4x7x3x9x!eltwise.fp32>) -> tensor<4x7x3x9x!eltwise.fp32>
+    %16 = "eltwise.sub"(%arg0, %15) {type = !eltwise.fp32} : (tensor<4x7x3x9x!eltwise.fp32>, tensor<4x7x3x9x!eltwise.fp32>) -> tensor<4x7x3x9x!eltwise.fp32>
     return %16, %15 : tensor<4x7x3x9x!eltwise.fp32>, tensor<4x7x3x9x!eltwise.fp32>
   }
 }
@@ -402,23 +393,21 @@ module {
         self.assertMultiLineEqual(
             str(program), '''
 
-!int = type !eltwise.int
-!fp32 = type !eltwise.fp32
 module {
   func @repeat_elts(%arg0: tensor<10x10x10x!eltwise.fp32>) -> tensor<10x30x10x!eltwise.fp32> {
-    %c30 = "tile.affine_const"() {value = 30 : i64} : () -> !int
-    %c10 = "tile.affine_const"() {value = 10 : i64} : () -> !int
-    %c3 = "tile.affine_const"() {value = 3 : i64} : () -> !int
+    %c30 = "tile.affine_const"() {value = 30 : i64} : () -> !eltwise.int
+    %c10 = "tile.affine_const"() {value = 10 : i64} : () -> !eltwise.int
+    %c3 = "tile.affine_const"() {value = 3 : i64} : () -> !eltwise.int
     %0 = "tile.domain"() ( {
-    ^bb0(%arg1: !int, %arg2: !int, %arg3: !int, %arg4: !int):	// no predecessors
-      %1 = "tile.src_idx_map"(%arg0, %arg3, %arg2, %arg1) : (tensor<10x10x10x!eltwise.fp32>, !int, !int, !int) -> !tile.imap
-      %2 = "tile.affine_mul"(%arg2, %c3) : (!int, !int) -> !int
-      %3 = "tile.affine_add"(%2, %arg4) : (!int, !int) -> !int
-      %4 = "tile.sink_idx_map"(%arg3, %3, %arg1) : (!int, !int, !int) -> !tile.imap
-      %5 = "tile.size_map"(%c10, %c30, %c10) : (!int, !int, !int) -> !tile.smap
+    ^bb0(%arg1: !eltwise.int, %arg2: !eltwise.int, %arg3: !eltwise.int, %arg4: !eltwise.int):	// no predecessors
+      %1 = "tile.src_idx_map"(%arg0, %arg3, %arg2, %arg1) : (tensor<10x10x10x!eltwise.fp32>, !eltwise.int, !eltwise.int, !eltwise.int) -> !tile.imap
+      %2 = "tile.affine_mul"(%arg2, %c3) : (!eltwise.int, !eltwise.int) -> !eltwise.int
+      %3 = "tile.affine_add"(%2, %arg4) : (!eltwise.int, !eltwise.int) -> !eltwise.int
+      %4 = "tile.sink_idx_map"(%arg3, %3, %arg1) : (!eltwise.int, !eltwise.int, !eltwise.int) -> !tile.imap
+      %5 = "tile.size_map"(%c10, %c30, %c10) : (!eltwise.int, !eltwise.int, !eltwise.int) -> !tile.smap
       "tile.constraint"(%arg4, %c3) ( {
         "tile.=(x)"(%5, %1, %4) : (!tile.smap, !tile.imap, !tile.imap) -> ()
-      }) : (!int, !int) -> ()
+      }) : (!eltwise.int, !eltwise.int) -> ()
     }) {idx_names = ["x0", "x1", "x2", "x3"], no_reduce = true} : () -> tensor<10x30x10x!eltwise.fp32>
     return %0 : tensor<10x30x10x!eltwise.fp32>
   }
@@ -438,19 +427,17 @@ module {
         self.assertMultiLineEqual(
             str(program), '''
 
-!int = type !eltwise.int
-!fp32 = type !eltwise.fp32
 module {
   func @use_default(%arg0: tensor<1x10x10x!eltwise.fp32>, %arg1: tensor<1x7x10x10x!eltwise.fp32>) -> tensor<1x7x10x10x!eltwise.fp32> {
-    %c3 = "tile.affine_const"() {value = 3 : i64} : () -> !int
-    %c10 = "tile.affine_const"() {value = 10 : i64} : () -> !int
-    %c7 = "tile.affine_const"() {value = 7 : i64} : () -> !int
-    %c1 = "tile.affine_const"() {value = 1 : i64} : () -> !int
+    %c3 = "tile.affine_const"() {value = 3 : i64} : () -> !eltwise.int
+    %c10 = "tile.affine_const"() {value = 10 : i64} : () -> !eltwise.int
+    %c7 = "tile.affine_const"() {value = 7 : i64} : () -> !eltwise.int
+    %c1 = "tile.affine_const"() {value = 1 : i64} : () -> !eltwise.int
     %0 = "tile.domain"() ( {
-    ^bb0(%arg2: !int, %arg3: !int, %arg4: !int):	// no predecessors
-      %1 = "tile.src_idx_map"(%arg0, %arg4, %arg3, %arg2) : (tensor<1x10x10x!eltwise.fp32>, !int, !int, !int) -> !tile.imap
-      %2 = "tile.sink_idx_map"(%arg4, %c3, %arg3, %arg2) : (!int, !int, !int, !int) -> !tile.imap
-      %3 = "tile.size_map"(%c1, %c7, %c10, %c10) : (!int, !int, !int, !int) -> !tile.smap
+    ^bb0(%arg2: !eltwise.int, %arg3: !eltwise.int, %arg4: !eltwise.int):	// no predecessors
+      %1 = "tile.src_idx_map"(%arg0, %arg4, %arg3, %arg2) : (tensor<1x10x10x!eltwise.fp32>, !eltwise.int, !eltwise.int, !eltwise.int) -> !tile.imap
+      %2 = "tile.sink_idx_map"(%arg4, %c3, %arg3, %arg2) : (!eltwise.int, !eltwise.int, !eltwise.int, !eltwise.int) -> !tile.imap
+      %3 = "tile.size_map"(%c1, %c7, %c10, %c10) : (!eltwise.int, !eltwise.int, !eltwise.int, !eltwise.int) -> !tile.smap
       "tile.=(x)"(%3, %1, %2, %arg1) : (!tile.smap, !tile.imap, !tile.imap, tensor<1x7x10x10x!eltwise.fp32>) -> ()
     }) {idx_names = ["x0", "x1", "x2"]} : () -> tensor<1x7x10x10x!eltwise.fp32>
     return %0 : tensor<1x7x10x10x!eltwise.fp32>
@@ -468,22 +455,20 @@ module {
         self.assertMultiLineEqual(
             str(program), '''
 
-!int = type !eltwise.int
-!fp32 = type !eltwise.fp32
 module {
   func @defract_test(%arg0: tensor<3x!eltwise.fp32> {tile.name = "I"}, %arg1: tensor<3x!eltwise.fp32> {tile.name = "K"}) -> tensor<5x!eltwise.fp32> {
-    %c1 = "tile.affine_const"() {value = 1 : i64} : () -> !int
-    %c2 = "tile.affine_const"() {value = 2 : i64} : () -> !int
-    %c5 = "tile.affine_const"() {value = 5 : i64} : () -> !int
+    %c1 = "tile.affine_const"() {value = 1 : i64} : () -> !eltwise.int
+    %c2 = "tile.affine_const"() {value = 2 : i64} : () -> !eltwise.int
+    %c5 = "tile.affine_const"() {value = 5 : i64} : () -> !eltwise.int
     %0 = "tile.domain"() ( {
-    ^bb0(%arg2: !int, %arg3: !int):	// no predecessors
-      %1 = "tile.affine_sub"(%arg3, %arg2) : (!int, !int) -> !int
-      %2 = "tile.affine_add"(%1, %c1) : (!int, !int) -> !int
-      %3 = "tile.affine_div"(%2, %c2) : (!int, !int) -> !int
-      %4 = "tile.src_idx_map"(%arg0, %3) : (tensor<3x!eltwise.fp32>, !int) -> !tile.imap
-      %5 = "tile.src_idx_map"(%arg1, %arg2) : (tensor<3x!eltwise.fp32>, !int) -> !tile.imap
-      %6 = "tile.sink_idx_map"(%arg3) : (!int) -> !tile.imap
-      %7 = "tile.size_map"(%c5) : (!int) -> !tile.smap
+    ^bb0(%arg2: !eltwise.int, %arg3: !eltwise.int):	// no predecessors
+      %1 = "tile.affine_sub"(%arg3, %arg2) : (!eltwise.int, !eltwise.int) -> !eltwise.int
+      %2 = "tile.affine_add"(%1, %c1) : (!eltwise.int, !eltwise.int) -> !eltwise.int
+      %3 = "tile.affine_div"(%2, %c2) : (!eltwise.int, !eltwise.int) -> !eltwise.int
+      %4 = "tile.src_idx_map"(%arg0, %3) : (tensor<3x!eltwise.fp32>, !eltwise.int) -> !tile.imap
+      %5 = "tile.src_idx_map"(%arg1, %arg2) : (tensor<3x!eltwise.fp32>, !eltwise.int) -> !tile.imap
+      %6 = "tile.sink_idx_map"(%arg3) : (!eltwise.int) -> !tile.imap
+      %7 = "tile.size_map"(%c5) : (!eltwise.int) -> !tile.smap
       "tile.+(x*y)"(%7, %4, %5, %6) : (!tile.smap, !tile.imap, !tile.imap, !tile.imap) -> ()
     }) {idx_names = ["x0", "x1"]} : () -> tensor<5x!eltwise.fp32>
     return %0 : tensor<5x!eltwise.fp32>
@@ -502,20 +487,18 @@ module {
         self.assertMultiLineEqual(
             str(program), '''
 
-!int = type !eltwise.int
-!fp32 = type !eltwise.fp32
 module {
   func @defract_short_test(%arg0: tensor<3x!eltwise.fp32> {tile.name = "I"}) -> tensor<6x!eltwise.fp32> {
-    %c1 = "tile.affine_const"() {value = 1 : i64} : () -> !int
-    %c2 = "tile.affine_const"() {value = 2 : i64} : () -> !int
-    %c6 = "tile.affine_const"() {value = 6 : i64} : () -> !int
+    %c1 = "tile.affine_const"() {value = 1 : i64} : () -> !eltwise.int
+    %c2 = "tile.affine_const"() {value = 2 : i64} : () -> !eltwise.int
+    %c6 = "tile.affine_const"() {value = 6 : i64} : () -> !eltwise.int
     %0 = "tile.domain"() ( {
-    ^bb0(%arg1: !int):	// no predecessors
-      %1 = "tile.affine_sub"(%arg1, %c1) : (!int, !int) -> !int
-      %2 = "tile.affine_div"(%1, %c2) : (!int, !int) -> !int
-      %3 = "tile.src_idx_map"(%arg0, %2) : (tensor<3x!eltwise.fp32>, !int) -> !tile.imap
-      %4 = "tile.sink_idx_map"(%arg1) : (!int) -> !tile.imap
-      %5 = "tile.size_map"(%c6) : (!int) -> !tile.smap
+    ^bb0(%arg1: !eltwise.int):	// no predecessors
+      %1 = "tile.affine_sub"(%arg1, %c1) : (!eltwise.int, !eltwise.int) -> !eltwise.int
+      %2 = "tile.affine_div"(%1, %c2) : (!eltwise.int, !eltwise.int) -> !eltwise.int
+      %3 = "tile.src_idx_map"(%arg0, %2) : (tensor<3x!eltwise.fp32>, !eltwise.int) -> !tile.imap
+      %4 = "tile.sink_idx_map"(%arg1) : (!eltwise.int) -> !tile.imap
+      %5 = "tile.size_map"(%c6) : (!eltwise.int) -> !tile.smap
       "tile.+(x)"(%5, %3, %4) : (!tile.smap, !tile.imap, !tile.imap) -> ()
     }) {idx_names = ["x0"]} : () -> tensor<6x!eltwise.fp32>
     return %0 : tensor<6x!eltwise.fp32>
@@ -537,27 +520,25 @@ module {
         self.assertMultiLineEqual(
             str(program), '''
 
-!int = type !eltwise.int
-!fp32 = type !eltwise.fp32
 module {
   func @defract_long(%arg0: tensor<1x3x3x1x!eltwise.fp32> {tile.name = "I"}, %arg1: tensor<1x3x3x1x!eltwise.fp32> {tile.name = "K"}) -> tensor<1x5x5x1x!eltwise.fp32> {
-    %c2 = "tile.affine_const"() {value = 2 : i64} : () -> !int
-    %c5 = "tile.affine_const"() {value = 5 : i64} : () -> !int
-    %c1 = "tile.affine_const"() {value = 1 : i64} : () -> !int
+    %c2 = "tile.affine_const"() {value = 2 : i64} : () -> !eltwise.int
+    %c5 = "tile.affine_const"() {value = 5 : i64} : () -> !eltwise.int
+    %c1 = "tile.affine_const"() {value = 1 : i64} : () -> !eltwise.int
     %0 = "tile.domain"() ( {
-    ^bb0(%arg2: !int, %arg3: !int, %arg4: !int, %arg5: !int, %arg6: !int, %arg7: !int, %arg8: !int):	// no predecessors
-      %1 = "tile.affine_add"(%arg4, %arg3) : (!int, !int) -> !int
-      %2 = "tile.affine_sub"(%1, %c1) : (!int, !int) -> !int
-      %3 = "tile.affine_div"(%2, %c2) : (!int, !int) -> !int
-      %4 = "tile.affine_add"(%arg6, %arg5) : (!int, !int) -> !int
-      %5 = "tile.affine_sub"(%4, %c1) : (!int, !int) -> !int
-      %6 = "tile.affine_div"(%5, %c2) : (!int, !int) -> !int
-      %7 = "tile.src_idx_map"(%arg0, %arg7, %6, %3, %arg2) : (tensor<1x3x3x1x!eltwise.fp32>, !int, !int, !int, !int) -> !tile.imap
-      %8 = "tile.affine_sub"(%c2, %arg3) : (!int, !int) -> !int
-      %9 = "tile.affine_sub"(%c2, %arg5) : (!int, !int) -> !int
-      %10 = "tile.src_idx_map"(%arg1, %9, %8, %arg8, %arg2) : (tensor<1x3x3x1x!eltwise.fp32>, !int, !int, !int, !int) -> !tile.imap
-      %11 = "tile.sink_idx_map"(%arg7, %arg6, %arg4, %arg8) : (!int, !int, !int, !int) -> !tile.imap
-      %12 = "tile.size_map"(%c1, %c5, %c5, %c1) : (!int, !int, !int, !int) -> !tile.smap
+    ^bb0(%arg2: !eltwise.int, %arg3: !eltwise.int, %arg4: !eltwise.int, %arg5: !eltwise.int, %arg6: !eltwise.int, %arg7: !eltwise.int, %arg8: !eltwise.int):	// no predecessors
+      %1 = "tile.affine_add"(%arg4, %arg3) : (!eltwise.int, !eltwise.int) -> !eltwise.int
+      %2 = "tile.affine_sub"(%1, %c1) : (!eltwise.int, !eltwise.int) -> !eltwise.int
+      %3 = "tile.affine_div"(%2, %c2) : (!eltwise.int, !eltwise.int) -> !eltwise.int
+      %4 = "tile.affine_add"(%arg6, %arg5) : (!eltwise.int, !eltwise.int) -> !eltwise.int
+      %5 = "tile.affine_sub"(%4, %c1) : (!eltwise.int, !eltwise.int) -> !eltwise.int
+      %6 = "tile.affine_div"(%5, %c2) : (!eltwise.int, !eltwise.int) -> !eltwise.int
+      %7 = "tile.src_idx_map"(%arg0, %arg7, %6, %3, %arg2) : (tensor<1x3x3x1x!eltwise.fp32>, !eltwise.int, !eltwise.int, !eltwise.int, !eltwise.int) -> !tile.imap
+      %8 = "tile.affine_sub"(%c2, %arg3) : (!eltwise.int, !eltwise.int) -> !eltwise.int
+      %9 = "tile.affine_sub"(%c2, %arg5) : (!eltwise.int, !eltwise.int) -> !eltwise.int
+      %10 = "tile.src_idx_map"(%arg1, %9, %8, %arg8, %arg2) : (tensor<1x3x3x1x!eltwise.fp32>, !eltwise.int, !eltwise.int, !eltwise.int, !eltwise.int) -> !tile.imap
+      %11 = "tile.sink_idx_map"(%arg7, %arg6, %arg4, %arg8) : (!eltwise.int, !eltwise.int, !eltwise.int, !eltwise.int) -> !tile.imap
+      %12 = "tile.size_map"(%c1, %c5, %c5, %c1) : (!eltwise.int, !eltwise.int, !eltwise.int, !eltwise.int) -> !tile.smap
       "tile.+(x*y)"(%12, %7, %10, %11) : (!tile.smap, !tile.imap, !tile.imap, !tile.imap) -> ()
     }) {idx_names = ["x0", "x1", "x2", "x3", "x4", "x5", "x6"]} : () -> tensor<1x5x5x1x!eltwise.fp32>
     return %0 : tensor<1x5x5x1x!eltwise.fp32>
@@ -603,22 +584,20 @@ module {
         self.assertMultiLineEqual(
             str(program), '''
 
-!int = type !eltwise.int
-!fp32 = type !eltwise.fp32
 module {
   func @"this-is-not an identifier"(%arg0: tensor<3x!eltwise.fp32> {tile.name = "I"}, %arg1: tensor<3x!eltwise.fp32> {tile.name = "K"}) -> tensor<5x!eltwise.fp32> {
-    %c1 = "tile.affine_const"() {value = 1 : i64} : () -> !int
-    %c2 = "tile.affine_const"() {value = 2 : i64} : () -> !int
-    %c5 = "tile.affine_const"() {value = 5 : i64} : () -> !int
+    %c1 = "tile.affine_const"() {value = 1 : i64} : () -> !eltwise.int
+    %c2 = "tile.affine_const"() {value = 2 : i64} : () -> !eltwise.int
+    %c5 = "tile.affine_const"() {value = 5 : i64} : () -> !eltwise.int
     %0 = "tile.domain"() ( {
-    ^bb0(%arg2: !int, %arg3: !int):	// no predecessors
-      %1 = "tile.affine_sub"(%arg3, %arg2) : (!int, !int) -> !int
-      %2 = "tile.affine_add"(%1, %c1) : (!int, !int) -> !int
-      %3 = "tile.affine_div"(%2, %c2) : (!int, !int) -> !int
-      %4 = "tile.src_idx_map"(%arg0, %3) : (tensor<3x!eltwise.fp32>, !int) -> !tile.imap
-      %5 = "tile.src_idx_map"(%arg1, %arg2) : (tensor<3x!eltwise.fp32>, !int) -> !tile.imap
-      %6 = "tile.sink_idx_map"(%arg3) : (!int) -> !tile.imap
-      %7 = "tile.size_map"(%c5) : (!int) -> !tile.smap
+    ^bb0(%arg2: !eltwise.int, %arg3: !eltwise.int):	// no predecessors
+      %1 = "tile.affine_sub"(%arg3, %arg2) : (!eltwise.int, !eltwise.int) -> !eltwise.int
+      %2 = "tile.affine_add"(%1, %c1) : (!eltwise.int, !eltwise.int) -> !eltwise.int
+      %3 = "tile.affine_div"(%2, %c2) : (!eltwise.int, !eltwise.int) -> !eltwise.int
+      %4 = "tile.src_idx_map"(%arg0, %3) : (tensor<3x!eltwise.fp32>, !eltwise.int) -> !tile.imap
+      %5 = "tile.src_idx_map"(%arg1, %arg2) : (tensor<3x!eltwise.fp32>, !eltwise.int) -> !tile.imap
+      %6 = "tile.sink_idx_map"(%arg3) : (!eltwise.int) -> !tile.imap
+      %7 = "tile.size_map"(%c5) : (!eltwise.int) -> !tile.smap
       "tile.+(x*y)"(%7, %4, %5, %6) : (!tile.smap, !tile.imap, !tile.imap, !tile.imap) -> ()
     }) {idx_names = ["x0", "x1"]} : () -> tensor<5x!eltwise.fp32>
     return %0 : tensor<5x!eltwise.fp32>
@@ -634,10 +613,9 @@ module {
         self.assertMultiLineEqual(
             str(program), '''
 
-!fp32 = type !eltwise.fp32
 module {
   func @identity(%arg0: tensor<3x!eltwise.fp32> {tile.name = "I"}) -> tensor<3x!eltwise.fp32> {
-    %0 = "eltwise.ident"(%arg0) {type = !fp32} : (tensor<3x!eltwise.fp32>) -> tensor<3x!eltwise.fp32>
+    %0 = "eltwise.ident"(%arg0) {type = !eltwise.fp32} : (tensor<3x!eltwise.fp32>) -> tensor<3x!eltwise.fp32>
     return %0 : tensor<3x!eltwise.fp32>
   }
 }
@@ -684,11 +662,10 @@ module {
         self.assertMultiLineEqual(
             str(program1), '''
 
-!fp32 = type !eltwise.fp32
 module {
   func @two_outputs(%arg0: tensor<3x!eltwise.fp32> {tile.name = "I"}) -> (tensor<3x!eltwise.fp32>, tensor<3x!eltwise.fp32>) {
-    %0 = "eltwise.ident"(%arg0) {type = !fp32} : (tensor<3x!eltwise.fp32>) -> tensor<3x!eltwise.fp32>
-    %1 = "eltwise.ident"(%arg0) {type = !fp32} : (tensor<3x!eltwise.fp32>) -> tensor<3x!eltwise.fp32>
+    %0 = "eltwise.ident"(%arg0) {type = !eltwise.fp32} : (tensor<3x!eltwise.fp32>) -> tensor<3x!eltwise.fp32>
+    %1 = "eltwise.ident"(%arg0) {type = !eltwise.fp32} : (tensor<3x!eltwise.fp32>) -> tensor<3x!eltwise.fp32>
     return %0, %1 : tensor<3x!eltwise.fp32>, tensor<3x!eltwise.fp32>
   }
 }

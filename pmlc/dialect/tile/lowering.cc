@@ -70,15 +70,17 @@ static stripe::TensorType convertIntoTensorType(Type type) {
   return stripe::TensorType::get(rankedTensorType.getElementType(), newShape, stripe::OffsetsMap{}, false);
 }
 
-static Operation* createZero(OpBuilder* builder, Location loc, Type elementType) {
+static eltwise::ScalarConstantOp createZero(OpBuilder* builder, Location loc, Type elementType) {
   auto scalarType = elementType.cast<ScalarType>();
   auto dtype = scalarType.type();
   if (is_float(dtype)) {
     const double zero = 0.0;
-    return builder->create<eltwise::ScalarConstantOp>(loc, elementType, zero);
+    auto constType = ScalarType::get(builder->getContext(), DataType::FLOATX);
+    return builder->create<eltwise::ScalarConstantOp>(loc, constType, zero);
   }
   const int64_t zero = 0;
-  return builder->create<eltwise::ScalarConstantOp>(loc, elementType, zero);
+  auto constType = ScalarType::get(builder->getContext(), DataType::INTX);
+  return builder->create<eltwise::ScalarConstantOp>(loc, constType, zero);
 }
 
 static void addInitializer(         //
@@ -119,12 +121,13 @@ static void addInitializer(         //
   if (auto init = contractionOp.getInitializer()) {
     attrs.emplace_back(builder->getIdentifier("copy"), builder->getUnitAttr());
     auto src = builder->create<stripe::RefineOp>(loc, refType, init, offsets);
-    auto loadOp = builder->create<stripe::LoadOp>(loc, elementType, src.result());
+    auto intoType = eltwise::getRankedTensorType(elementType);
+    auto loadOp = builder->create<stripe::LoadOp>(loc, intoType, src.result());
     builder->create<stripe::StoreOp>(loc, sink.result(), loadOp.into());
   } else {
     attrs.emplace_back(builder->getIdentifier("zero"), builder->getUnitAttr());
     auto constOp = createZero(builder, loc, elementType);
-    builder->create<stripe::StoreOp>(loc, sink.result(), constOp->getResult(0));
+    builder->create<stripe::StoreOp>(loc, sink.result(), constOp.result());
   }
 
   forOp.setAttr(stripe::Dialect::getStripeAttrsName(), builder->getDictionaryAttr(attrs));
@@ -265,8 +268,7 @@ static Value* MakeCombination(            //
     case CombinationKind::add:
       return rewriter->create<eltwise::AddOp>(op.getLoc(), scalarType, operands).result();
     case CombinationKind::cond: {
-      const double zero = 0.0;
-      auto constOp = rewriter->create<eltwise::ScalarConstantOp>(op.getLoc(), scalarType, zero);
+      auto constOp = createZero(rewriter, op.getLoc(), scalarType);
       auto cmpEqOp = rewriter->create<eltwise::CmpEqOp>(op.getLoc(), scalarType, operands.drop_back());
       llvm::SmallVector<Value*, 3> args{cmpEqOp.result(), operands.back(), constOp.result()};
       return rewriter->create<eltwise::SelectOp>(op.getLoc(), scalarType, args);
@@ -424,20 +426,17 @@ struct AffineDomainOpConversion : public LoweringBase {
     // LOADs
     llvm::SmallVector<Value*, 4> inputs;
     for (unsigned i = 0; i < refs.size(); i++) {
-      auto srcType = tensors[i]->getType();
-      if (!srcType.isa<stripe::TensorRefType>()) {
-        auto srcTensorType = convertIntoTensorType(srcType);
-        srcType = stripe::TensorRefType::get(srcTensorType);
-      }
-      auto tensorRefType = srcType.cast<stripe::TensorRefType>();
-      auto elementType = tensorRefType.getElementType();
       auto op = refs[i]->getDefiningOp();
       if (op && llvm::isa<eltwise::ScalarConstantOp>(op)) {
         // No need to load a scalar constant, just use it directly
         // This happens when we want to broadcast a scalar constant value
         inputs.emplace_back(refs[i]);
       } else {
-        auto loadOp = rewriter.create<stripe::LoadOp>(op->getLoc(), elementType, refs[i]);
+        auto srcType = refs[i]->getType();
+        auto tensorRefType = srcType.cast<stripe::TensorRefType>();
+        auto elementType = tensorRefType.getElementType();
+        auto intoType = eltwise::getRankedTensorType(elementType);
+        auto loadOp = rewriter.create<stripe::LoadOp>(op->getLoc(), intoType, refs[i]);
         inputs.emplace_back(loadOp.into());
       }
     }
@@ -607,8 +606,9 @@ struct EltwiseOpConversion : public LoweringBase {
       };
       refineOp.setAttr(stripe::Dialect::getStripeAttrsName(), rewriter.getDictionaryAttr(refAttrs));
       auto elementType = tensorRefType.getElementType();
+      auto intoType = eltwise::getRankedTensorType(elementType);
       // LOAD
-      auto loadOp = rewriter.create<stripe::LoadOp>(op->getLoc(), elementType, refineOp.result());
+      auto loadOp = rewriter.create<stripe::LoadOp>(op->getLoc(), intoType, refineOp.result());
       inputs.emplace_back(loadOp.into());
     }
 
