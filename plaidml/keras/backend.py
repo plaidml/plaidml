@@ -56,15 +56,15 @@ def _log_call(func):
 
     def wrapper(*args, **kwargs):
         # Construct a string logging the call if logging is turned on
-        if logger.isEnabledFor(logging.DEBUG):
-            sig = inspect.signature(func)
-            arg_str_list = list()
-            for i, arg in enumerate(args):
-                arg_str_list.append('{}: {}'.format(list(sig.parameters)[i][0], arg))
-            logger.debug(kwargs)  # TODO
-            for k, v in kwargs.items():
-                arg_str_list.append('{}: {}'.format(k, v))
-            logger.debug('{}({})'.format(func.__name__, ', '.join(arg_str_list)))
+        #if logger.isEnabledFor(logging.DEBUG):
+        #    sig = inspect.signature(func)
+        #    arg_str_list = list()
+        #    for i, arg in enumerate(args):
+        #        arg_str_list.append('{}: {}'.format(list(sig.parameters)[i][0], arg))
+        #    logger.debug(kwargs)  # TODO
+        #    for k, v in kwargs.items():
+        #        arg_str_list.append('{}: {}'.format(k, v))
+        #    logger.debug('{}({})'.format(func.__name__, ', '.join(arg_str_list)))
         # Call the requested function regardless
         return func(*args, **kwargs)
 
