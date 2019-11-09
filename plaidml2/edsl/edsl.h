@@ -204,7 +204,6 @@ class IndexedTensor {
     std::shared_ptr<plaidml_expr> sizes;
     std::shared_ptr<ComboParts> rhs;
     const Tensor* src = nullptr;
-    std::string layout;
     void MakeContraction(plaidml_agg_op agg_op, const IndexedTensor& rhs);
   };
 
@@ -280,15 +279,9 @@ class LogicalShape {
   friend class Tensor;
 
  public:
-  LogicalShape(plaidml_datatype dtype,            //
-               const std::vector<int64_t>& dims,  //
-               const std::string& layout = "")
-      : ptr_(details::make_plaidml_logical_shape(ffi::call<plaidml_logical_shape*>(  //
-            plaidml_logical_shape_alloc,                                             //
-            dtype,                                                                   //
-            dims.size(),                                                             //
-            dims.data(),                                                             //
-            layout.c_str()))) {}
+  LogicalShape(plaidml_datatype dtype, const std::vector<int64_t>& dims)
+      : ptr_(details::make_plaidml_logical_shape(
+            ffi::call<plaidml_logical_shape*>(plaidml_logical_shape_alloc, dtype, dims.size(), dims.data()))) {}
 
   plaidml_logical_shape* as_ptr() const { return ptr_.get(); }
 
@@ -298,10 +291,6 @@ class LogicalShape {
 
   plaidml_datatype dtype() const {  //
     return ffi::call<plaidml_datatype>(plaidml_logical_shape_get_dtype, ptr_.get());
-  }
-
-  std::string layout() const {  //
-    return ffi::str(ffi::call<plaidml_string*>(plaidml_logical_shape_get_layout, ptr_.get()));
   }
 
   size_t ndims() const {  //
@@ -345,7 +334,6 @@ class Tensor {
     bool has_dims = false;
     std::vector<TensorDim> dims;
     std::string name;
-    std::string layout;
   };
 
  public:
@@ -377,40 +365,33 @@ class Tensor {
     impl_->ptr = details::make_plaidml_expr(ffi::call<plaidml_expr*>(plaidml_expr_dim, dim.as_ptr()));
   }
 
-  explicit Tensor(const std::vector<int64_t>& dims, const std::string& layout = "") : impl_(new Impl) {
+  explicit Tensor(const std::vector<int64_t>& dims) : impl_(new Impl) {
     for (auto dim : dims) {
       impl_->dims.emplace_back(dim);
     }
     impl_->has_dims = true;
-    impl_->layout = layout;
   }
 
-  explicit Tensor(const std::vector<TensorDim>& dims, const std::string& layout = "") : impl_(new Impl) {
+  explicit Tensor(const std::vector<TensorDim>& dims) : impl_(new Impl) {
     impl_->dims = dims;
     impl_->has_dims = true;
-    impl_->layout = layout;
   }
 
-  explicit Tensor(const std::initializer_list<TensorDim>& dims, const std::string& layout = "") : impl_(new Impl) {
+  explicit Tensor(const std::initializer_list<TensorDim>& dims) : impl_(new Impl) {
     impl_->dims = dims;
     impl_->has_dims = true;
-    impl_->layout = layout;
   }
 
-  Tensor(const std::string& name, const std::vector<TensorDim>& dims, const std::string& layout = "")
-      : impl_(new Impl) {
+  Tensor(const std::string& name, const std::vector<TensorDim>& dims) : impl_(new Impl) {
     impl_->name = name;
     impl_->dims = dims;
     impl_->has_dims = true;
-    impl_->layout = layout;
   }
 
-  Tensor(const std::string& name, const std::initializer_list<TensorDim>& dims, const std::string& layout = "")
-      : impl_(new Impl) {
+  Tensor(const std::string& name, const std::initializer_list<TensorDim>& dims) : impl_(new Impl) {
     impl_->name = name;
     impl_->dims = dims;
     impl_->has_dims = true;
-    impl_->layout = layout;
   }
 
   // Copyable
@@ -430,7 +411,6 @@ class Tensor {
     }
     std::unique_ptr<IndexedTensor::Impl> impl(new IndexedTensor::Impl());
     impl->src = this;
-    impl->layout = impl_->layout;
     if (impl_->has_dims) {
       std::vector<plaidml_dim_expr*> sizes;
       for (const auto& dim : impl_->dims) {
@@ -543,12 +523,12 @@ Tensor TensorOutput(Ts... dims) {
   return Tensor{vec};
 }
 
-inline Tensor TensorOutput(const std::vector<TensorDim>& dims, const std::string& layout = "") {  //
-  return Tensor(dims, layout);
+inline Tensor TensorOutput(const std::vector<TensorDim>& dims) {  //
+  return Tensor(dims);
 }
 
-inline Tensor TensorOutput(const std::vector<int64_t>& dims, const std::string& layout = "") {  //
-  return Tensor(dims, layout);
+inline Tensor TensorOutput(const std::vector<int64_t>& dims) {  //
+  return Tensor(dims);
 }
 
 inline Tensor Placeholder(      //
@@ -866,8 +846,7 @@ inline void IndexedTensor::Impl::MakeContraction(plaidml_agg_op agg_op, const In
           sizes.get(),                           //
           src_idxs.size(),                       //
           src_idxs.data(),                       //
-          src->impl_->name.c_str(),              //
-          layout.c_str()));
+          src->impl_->name.c_str()));
 }
 
 // Represents a combo_op of COND in a contraction

@@ -24,13 +24,12 @@ class LogicalShape(ForeignObject):
     __ffi_del__ = lib.plaidml_logical_shape_free
     __ffi_repr__ = lib.plaidml_logical_shape_repr
 
-    def __init__(self, dtype=None, dims=[], ptr=None, layout=''):
+    def __init__(self, dtype=None, dims=[], ptr=None):
         if ptr:
             ffi_obj = ptr
         elif dtype is not None:
             raw_dims = ffi.new('int64_t[]', [0 if x is None else x for x in dims])
-            ffi_obj = ffi_call(lib.plaidml_logical_shape_alloc, dtype, len(dims), raw_dims,
-                               layout.encode())
+            ffi_obj = ffi_call(lib.plaidml_logical_shape_alloc, dtype, len(dims), raw_dims)
         else:
             raise ValueError('One of dtype= or ptr= must be specified.')
         super(LogicalShape, self).__init__(ffi_obj)
@@ -201,7 +200,7 @@ class _Contraction(ForeignObject):
     __ffi_del__ = lib.plaidml_expr_free
     __ffi_repr__ = lib.plaidml_expr_repr
 
-    def __init__(self, agg_op, combo_op, src_idxs, sink_idxs, sink_sizes, name, layout=''):
+    def __init__(self, agg_op, combo_op, src_idxs, sink_idxs, sink_sizes, name):
         src_idxs = [x.as_ptr() for x in src_idxs]
         expr = ffi_call(
             lib.plaidml_expr_contraction,
@@ -212,7 +211,6 @@ class _Contraction(ForeignObject):
             len(src_idxs),
             src_idxs,
             name.encode(),
-            layout.encode(),  # TODO: carry this thru from TensorOutput()
         )
         super(_Contraction, self).__init__(expr)
 

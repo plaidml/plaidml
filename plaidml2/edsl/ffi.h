@@ -51,8 +51,7 @@ PLAIDML_EDSL_API plaidml_logical_shape* plaidml_logical_shape_alloc(  //
     plaidml_error* err,                                               //
     plaidml_datatype dtype,                                           //
     size_t ndims,                                                     //
-    const int64_t* dims,                                              //
-    const char* layout);
+    const int64_t* dims);
 
 PLAIDML_EDSL_API void plaidml_logical_shape_free(  //
     plaidml_error* err,                            //
@@ -66,10 +65,6 @@ PLAIDML_EDSL_API plaidml_string* plaidml_logical_shape_repr(  //
     plaidml_error* err,                                       //
     plaidml_logical_shape* shape);
 
-PLAIDML_EDSL_API plaidml_string* plaidml_logical_shape_get_layout(  //
-    plaidml_error* err,                                             //
-    plaidml_logical_shape* shape);
-
 PLAIDML_EDSL_API size_t plaidml_logical_shape_get_ndims(  //
     plaidml_error* err,                                   //
     plaidml_logical_shape* shape);
@@ -81,11 +76,6 @@ PLAIDML_EDSL_API plaidml_datatype plaidml_logical_shape_get_dtype(  //
 PLAIDML_EDSL_API int64_t plaidml_logical_shape_get_dim_int(  //
     plaidml_error* err,                                      //
     plaidml_logical_shape* shape,                            //
-    size_t dim);
-
-PLAIDML_EDSL_API plaidml_dim_expr* plaidml_logical_shape_get_dim_expr(  //
-    plaidml_error* err,                                                 //
-    plaidml_logical_shape* shape,                                       //
     size_t dim);
 
 //
@@ -330,8 +320,7 @@ PLAIDML_EDSL_API plaidml_expr* plaidml_expr_contraction(  //
     plaidml_expr* sink_sizes,                             //
     size_t nsrcs,                                         //
     plaidml_expr** src_idxs,                              //
-    const char* name,                                     //
-    const char* layout);
+    const char* name);
 
 PLAIDML_EDSL_API void plaidml_expr_contraction_add_constraint(  //
     plaidml_error* err,                                         //

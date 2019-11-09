@@ -193,13 +193,11 @@ plaidml_logical_shape* plaidml_logical_shape_alloc(  //
     plaidml_error* err,                              //
     plaidml_datatype dtype,                          //
     size_t ndims,                                    //
-    const int64_t* dims,                             //
-    const char* layout) {
+    const int64_t* dims) {
   return ffi_wrap<plaidml_logical_shape*>(err, nullptr, [&] {
 #ifdef PLAIDML_AST
     auto ret = new plaidml_logical_shape;
     ret->shape.dtype = static_cast<DataType>(dtype);
-    ret->shape.layout = layout;
     for (size_t i = 0; i < ndims; i++) {
       auto int_expr = std::make_shared<DimIntExpr>(dims[i]);
       ret->shape.dims.emplace_back(LogicalDim{int_expr});
@@ -229,20 +227,6 @@ plaidml_string* plaidml_logical_shape_repr(  //
 #endif
 #ifdef PLAIDML_MLIR
     return new plaidml_string{mlir::debugString(shape->type)};
-#endif
-  });
-}
-
-plaidml_string* plaidml_logical_shape_get_layout(  //
-    plaidml_error* err,                            //
-    plaidml_logical_shape* shape) {
-  return ffi_wrap<plaidml_string*>(err, nullptr, [&] {  //
-#ifdef PLAIDML_AST
-    return new plaidml_string{shape->shape.layout};
-#endif
-#ifdef PLAIDML_MLIR
-    throw std::runtime_error("NYI: plaidml_logical_shape_get_layout");
-    return nullptr;
 #endif
   });
 }
@@ -970,8 +954,7 @@ plaidml_expr* plaidml_expr_contraction(  //
     plaidml_expr* sink_sizes,            //
     size_t nsrcs,                        //
     plaidml_expr** src_idxs,             //
-    const char* name,                    //
-    const char* layout) {
+    const char* name) {
   return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
     IVLOG(3, "plaidml_expr_contraction");
 #ifdef PLAIDML_AST
@@ -994,7 +977,7 @@ plaidml_expr* plaidml_expr_contraction(  //
       }
       expr->srcs.emplace_back(idxs);
     }
-    expr->ComputeShape(layout);
+    expr->ComputeShape("");
     return new plaidml_expr{expr};
 #endif
 #ifdef PLAIDML_MLIR
