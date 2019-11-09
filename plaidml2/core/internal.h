@@ -7,9 +7,9 @@
 
 #include "plaidml2/core/ffi.h"
 #include "tile/base/platform.h"
-#include "tile/base/shape.h"
 
 #ifdef PLAIDML_AST
+#include "tile/base/shape.h"
 #include "tile/lang/ast/ast.h"
 #endif
 #ifdef PLAIDML_MLIR

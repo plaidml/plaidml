@@ -78,11 +78,6 @@ PLAIDML_EDSL_API int64_t plaidml_logical_shape_get_dim_int(  //
     plaidml_logical_shape* shape,                            //
     size_t dim);
 
-// PLAIDML_EDSL_API plaidml_dim_expr* plaidml_logical_shape_get_dim_expr(  //
-//     plaidml_error* err,                                                 //
-//     plaidml_logical_shape* shape,                                       //
-//     size_t dim);
-
 //
 // plaidml_poly_expr
 //

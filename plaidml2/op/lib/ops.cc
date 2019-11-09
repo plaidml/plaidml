@@ -634,24 +634,21 @@ Value binary_crossentropy(const Value& value) {
   auto clip_inputs = make_tuple(raw_P, Value{epsilon}, Value{1. - epsilon});
   auto P = clip(clip_inputs).as_tensor();
   auto O = -T * log(P) - (1 - T) * log(1 - P);
-  return Value{O};
-  // TODO: OverrideGrads
-  // TensorDeriv deriv = [](const Tensor& Y, const Tensor& DY, const std::vector<Tensor>& X) {  //
-  //   auto T = X[0];
-  //   auto P = X[1];
-  //   Tensor One{1.0};
-  //   auto ndims = T.shape().ndims();
-  //   std::vector<TensorDim> dims(ndims);
-  //   T.bind_dims(dims);
-  //   auto dims_prod = Tensor{1};
-  //   for (const auto& dim : dims) {
-  //     dims_prod = dims_prod * dim;
-  //   }
-  //   return std::vector<Tensor>{(log(One - P) - log(P)) / dims_prod, (-T / P + (One - T) / (One - P)) / dims_prod};
-  // };
+  TensorDeriv deriv = [](const Tensor& Y, const Tensor& DY, const std::vector<Tensor>& X) {  //
+    auto T = X[0];
+    auto P = X[1];
+    Tensor One{1.0};
+    auto ndims = T.shape().ndims();
+    std::vector<TensorDim> dims(ndims);
+    T.bind_dims(dims);
+    auto dims_prod = Tensor{1};
+    for (const auto& dim : dims) {
+      dims_prod = dims_prod * dim;
+    }
+    return std::vector<Tensor>{(log(One - P) - log(P)) / dims_prod, (-T / P + (One - T) / (One - P)) / dims_prod};
+  };
   // Safe to use P without copy since it is built internally to this function
-  // auto Overridden = OverrideGrads(deriv, std::vector<Tensor>{T, P}, O);
-  // return Value{Overridden};
+  return Value{OverrideGrads(deriv, std::vector<Tensor>{T, P}, O)};
 }
 
 Value clip(const Value& value) {
@@ -2063,8 +2060,7 @@ Value scale_gradient(const Value& value) {
   TensorDeriv deriv = [](const Tensor& Y, const Tensor& DY, const std::vector<Tensor>& X) {
     return std::vector<Tensor>{X[1] * DY, Tensor{0.0}};
   };
-  auto Overridden = OverrideGrads(deriv, std::vector<Tensor>{I, scale}, O);
-  return Value{Overridden};
+  return Value{OverrideGrads(deriv, std::vector<Tensor>{I, scale}, O)};
 }
 
 Value sigmoid(const Value& value) {
@@ -2075,13 +2071,10 @@ Value sigmoid(const Value& value) {
   }
   auto I = ident(args[0].as_tensor());  // Copy for safe gradient override
   auto O = 1.0 / (1.0 + exp(-I));
-  return Value{O};
-  // TODO: OverrideGrads
-  // TensorDeriv deriv = [](const Tensor& Y, const Tensor& DY, const std::vector<Tensor>& X) {  //
-  //   return std::vector<Tensor>{Y * (1.0 - Y) * DY};
-  // };
-  // auto Overridden = OverrideGrads(deriv, std::vector<Tensor>{I}, O);
-  // return Value{Overridden};
+  TensorDeriv deriv = [](const Tensor& Y, const Tensor& DY, const std::vector<Tensor>& X) {  //
+    return std::vector<Tensor>{Y * (1.0 - Y) * DY};
+  };
+  return Value{OverrideGrads(deriv, std::vector<Tensor>{I}, O)};
 }
 
 Value slice(const Value& value) {
@@ -2259,38 +2252,30 @@ Value softmax(const Value& value) {
   auto N = TensorOutput(R_dims);
   N(R_idxs) += E(I_idxs);
   auto O = E / N;
-  if (transposed) {
-    return Value{transpose(make_tuple(Value{O}, Value{pattern})).as_tensor()};
-  }
-  return Value{O};
-  // TODO: OverrideGrads
-  // TensorDeriv deriv = [](const Tensor& Y, const Tensor& DY, const std::vector<Tensor>& X) {  //
-  //   auto I = X[0];
-  //   auto ndims = I.shape().ndims();
-  //   std::vector<TensorDim> I_dims(ndims);
-  //   std::vector<TensorIndex> I_idxs(ndims);
-  //   I.bind_dims(I_dims);
-  //   std::vector<TensorDim> R_dims = I_dims;
-  //   std::vector<TensorIndex> R_idxs = I_idxs;
-  //   R_dims.back() = TensorDim{1};    // Softmax along last axis
-  //   R_idxs.back() = TensorIndex{0};  // Softmax along last axis
+  TensorDeriv deriv = [](const Tensor& Y, const Tensor& DY, const std::vector<Tensor>& X) {  //
+    auto I = X[0];
+    auto ndims = I.shape().ndims();
+    std::vector<TensorDim> I_dims(ndims);
+    std::vector<TensorIndex> I_idxs(ndims);
+    I.bind_dims(I_dims);
+    std::vector<TensorDim> R_dims = I_dims;
+    std::vector<TensorIndex> R_idxs = I_idxs;
+    R_dims.back() = TensorDim{1};    // Softmax along last axis
+    R_idxs.back() = TensorIndex{0};  // Softmax along last axis
 
-  //   auto YdY = Y * DY;
-  //   auto T = TensorOutput(R_dims);
-  //   T(R_idxs) += YdY(I_idxs);
-  //   auto TB = TensorOutput(I_dims);
-  //   TB(I_idxs) += T(R_idxs);
-  //   return std::vector<Tensor>{YdY - TB * Y};
-  // };
-  // auto Overridden = OverrideGrads(deriv, std::vector<Tensor>{I}, O);
-  // // If we reordered, return to original order
-  // Tensor ret;
-  // if (transposed) {
-  //   ret = transpose(make_tuple(Value{Overridden}, Value{pattern}).as_tensor();
-  // } else {
-  //   ret = Overridden;
-  // }
-  // return Value{ret};
+    auto YdY = Y * DY;
+    auto T = TensorOutput(R_dims);
+    T(R_idxs) += YdY(I_idxs);
+    auto TB = TensorOutput(I_dims);
+    TB(I_idxs) += T(R_idxs);
+    return std::vector<Tensor>{YdY - TB * Y};
+  };
+  auto Overriden = OverrideGrads(deriv, std::vector<Tensor>{I}, O);
+  // If we reordered, return to original order
+  if (transposed) {
+    return transpose(make_tuple(Value{Overriden}, Value{pattern}));
+  }
+  return Value{Overriden};
 }
 
 Value spatial_padding(const Value& value) {

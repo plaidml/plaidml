@@ -96,13 +96,24 @@ plaidml_cc_library(
 )
 
 plaidml_cc_test(
-    name = "cc_test",
+    name = "cc_test_ast",
     srcs = ["edsl_test.cc"],
     deps = [
         ":api",
         ":edsl_ast",
         "//plaidml2:testenv_ast",
         "//plaidml2/exec:exec_ast",
+    ],
+)
+
+plaidml_cc_test(
+    name = "cc_test_mlir",
+    srcs = ["edsl_test.cc"],
+    deps = [
+        ":api",
+        ":edsl_mlir",
+        "//plaidml2:testenv_mlir",
+        "//plaidml2/exec:exec_mlir",
     ],
 )
 

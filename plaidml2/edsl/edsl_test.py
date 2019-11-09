@@ -2,12 +2,17 @@
 
 import argparse
 import functools
+import os
 import sys
 import unittest
 
 import plaidml2 as plaidml
-from plaidml2.edsl import *
 import plaidml2.exec as plaidml_exec
+from plaidml2.edsl import *
+
+
+def USE_MLIR():
+    return os.getenv('PLAIDML_MLIR') == '1'
 
 
 def dot(X, Y):
@@ -112,8 +117,9 @@ class TestEdsl(unittest.TestCase):
         B3 = Tensor(LogicalShape(plaidml.DType.FLOAT32, [10]))
         D3 = softmax(dot(D2, K3) + B3)
         program = Program('mnist_mlp', [D3])
-        self.assertMultiLineEqual(
-            str(program), '''
+        if USE_MLIR():
+            self.assertMultiLineEqual(
+                str(program), '''
 
 !float = type tensor<!eltwise.float>
 module {
@@ -175,6 +181,40 @@ module {
   }
 }
 ''')
+        else:
+            self.assertMultiLineEqual(
+                str(program), '''function (
+  _X0[_X0_0, _X0_1],
+  _X1[_X1_0, _X1_1],
+  _X3[_X3_0],
+  _X9[_X9_0, _X9_1],
+  _X11[_X11_0],
+  _X17[_X17_0, _X17_1],
+  _X19[_X19_0]
+) -> (
+  _X25
+) {
+  _X2[x0, x2 : 1, 512] = +(_X0[x0, x1] * _X1[x1, x2]);
+  _X4 = add(_X2, _X3);
+  _X5 = 0.000000;
+  _X6 = cmp_lt(_X4, _X5);
+  _X7 = 0.000000;
+  _X8 = cond(_X6, _X7, _X4);
+  _X10[x0, x2 : 1, 512] = +(_X8[x0, x1] * _X9[x1, x2]);
+  _X12 = add(_X10, _X11);
+  _X13 = 0.000000;
+  _X14 = cmp_lt(_X12, _X13);
+  _X15 = 0.000000;
+  _X16 = cond(_X14, _X15, _X12);
+  _X18[x0, x2 : 1, 10] = +(_X16[x0, x1] * _X17[x1, x2]);
+  _X20 = add(_X18, _X19);
+  _X21[x0, 0 : 1, 1] = >(_X20[x0, x1]);
+  _X22 = sub(_X20, _X21);
+  _X23 = exp(_X22);
+  _X24[x0, 0 : 1, 1] = +(_X23[x0, x1]);
+  _X25 = div(_X23, _X24);
+}
+''')
 
     def test_mnist_cnn(self):
         # model.add(Conv2D(32, kernel_size=(3, 3), activation='relu', input_shape=input_shape))
@@ -190,7 +230,10 @@ module {
         P1 = max_pool_2d(C2)
         # model.add(Flatten())
         F = flatten(P1)
-        self.assertEqual(str(F.shape), 'tensor<1x12100x!eltwise.fp32>')
+        if USE_MLIR():
+            self.assertEqual(str(F.shape), 'tensor<1x12100x!eltwise.fp32>')
+        else:
+            self.assertEqual(str(F.shape), 'fp32(1, 12100)')
         K3 = Tensor(LogicalShape(plaidml.DType.FLOAT32, [12100, 128]))
         B3 = Tensor(LogicalShape(plaidml.DType.FLOAT32, [128]))
         D1 = relu(dot(F, K3) + B3)
@@ -199,14 +242,61 @@ module {
         B4 = Tensor(LogicalShape(plaidml.DType.FLOAT32, [100]))
         D2 = softmax(dot(D1, K4) + B4)
         program = Program('mnist_cnn', [D2])
+        if not USE_MLIR():
+            self.assertMultiLineEqual(
+                str(program), '''function (
+  _X0[_X0_0, _X0_1, _X0_2, _X0_3],
+  _X1[_X1_0, _X1_1, _X1_2, _X1_3],
+  _X3[_X3_0],
+  _X9[_X9_0, _X9_1, _X9_2, _X9_3],
+  _X11[_X11_0],
+  _X21[_X21_0, _X21_1],
+  _X23[_X23_0],
+  _X29[_X29_0, _X29_1],
+  _X31[_X31_0]
+) -> (
+  _X37
+) {
+  _X2[x0, x1, x3, x6 : 1, 222, 222, 32] = +(_X0[x0, -1 + x1 + x2, -1 + x3 + x4, x5] * _X1[x2, x4, x5, x6]);
+  _X4 = add(_X2, _X3);
+  _X5 = 0.000000;
+  _X6 = cmp_lt(_X4, _X5);
+  _X7 = 0.000000;
+  _X8 = cond(_X6, _X7, _X4);
+  _X10[x0, x1, x3, x6 : 1, 220, 220, 64] = +(_X8[x0, -1 + x1 + x2, -1 + x3 + x4, x5] * _X9[x2, x4, x5, x6]);
+  _X12 = add(_X10, _X11);
+  _X13 = 0.000000;
+  _X14 = cmp_lt(_X12, _X13);
+  _X15 = 0.000000;
+  _X16 = cond(_X14, _X15, _X12);
+  _X17[x0, x1, x3, x5 : 1, 110, 110, 64] = >(_X16[x0, 2*x1 + x2, 2*x3 + x4, x5]), x2 < 2, x4 < 2;
+  _X18 = 1;
+  _X19 = 12100;
+  _X20 = reshape(_X17, _X18, _X19);
+  _X22[x0, x2 : 1, 128] = +(_X20[x0, x1] * _X21[x1, x2]);
+  _X24 = add(_X22, _X23);
+  _X25 = 0.000000;
+  _X26 = cmp_lt(_X24, _X25);
+  _X27 = 0.000000;
+  _X28 = cond(_X26, _X27, _X24);
+  _X30[x0, x2 : 1, 100] = +(_X28[x0, x1] * _X29[x1, x2]);
+  _X32 = add(_X30, _X31);
+  _X33[x0, 0 : 1, 1] = >(_X32[x0, x1]);
+  _X34 = sub(_X32, _X33);
+  _X35 = exp(_X34);
+  _X36[x0, 0 : 1, 1] = +(_X35[x0, x1]);
+  _X37 = div(_X35, _X36);
+}
+''')
 
     def test_arg_max(self):
         I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 10, 10]))
         O = arg_max(I)
-        self.assertEqual(str(O.shape), 'tensor<1x10x!eltwise.u32>')
         program = Program('arg_max', [O])
-        self.assertMultiLineEqual(
-            str(program), '''
+        if USE_MLIR():
+            self.assertEqual(str(O.shape), 'tensor<1x10x!eltwise.u32>')
+            self.assertMultiLineEqual(
+                str(program), '''
 
 !fp32 = type tensor<!eltwise.fp32>
 module {
@@ -242,6 +332,24 @@ module {
   }
 }
 ''')
+        else:
+            self.assertEqual(str(O.shape), 'u32(1, 10)')
+            self.assertMultiLineEqual(
+                str(program), '''function (
+  _X0[_X0_0, _X0_1, _X0_2],
+  _X2[]
+) -> (
+  _X8
+) {
+  _X1[x0, x2 : 1, 10] = >(_X0[x0, x1, x2]);
+  _X3[x0 : 10] = =(_X2[]);
+  _X4 = 0;
+  _X5 = index(_X3, _X4);
+  _X6[x0, x2 : 1, 10] = >(_X0[x0, x1, x2] == _X1[x0, x2] ? _X5[x1]);
+  _X7 = 32;
+  _X8 = as_uint(_X6, _X7);
+}
+''')
 
     def test_global_min(self):
         I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [10, 10, 10]), name='I')
@@ -251,8 +359,9 @@ module {
         O_Neg[()] >= Neg[i, j, k]
         O = -O_Neg
         program = Program('global_min', [O])
-        self.assertMultiLineEqual(
-            str(program), '''
+        if USE_MLIR():
+            self.assertMultiLineEqual(
+                str(program), '''
 
 !fp32 = type tensor<!eltwise.fp32>
 module {
@@ -270,6 +379,18 @@ module {
   }
 }
 ''')
+        else:
+            self.assertMultiLineEqual(
+                str(program), '''function (
+  I[I_0, I_1, I_2]
+) -> (
+  _X2
+) {
+  _X0 = neg(I);
+  _X1[] = >(_X0[x0, x1, x2]);
+  _X2 = neg(_X1);
+}
+''')
 
     def test_cum_sum(self):
         I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [10]), name='I')
@@ -280,8 +401,9 @@ module {
         O[i] += I[k]
         O.add_constraint(i - k < N)
         program = Program('cum_sum', [O])
-        self.assertMultiLineEqual(
-            str(program), '''
+        if USE_MLIR():
+            self.assertMultiLineEqual(
+                str(program), '''
 
 module {
   func @cum_sum(%arg0: tensor<10x!eltwise.fp32> {tile.name = "I"}) -> tensor<10x!eltwise.fp32> {
@@ -300,6 +422,16 @@ module {
   }
 }
 ''')
+        else:
+            self.assertMultiLineEqual(
+                str(program), '''function (
+  I[I_0]
+) -> (
+  _X0
+) {
+  _X0[x1 : 10] = +(I[x0]), -x0 + x1 < 10;
+}
+''')
 
     def test_invalid_shape_error(self):
         O = TensorOutput(TensorDims(3))
@@ -313,8 +445,9 @@ module {
         C0 = Tensor(LogicalShape(plaidml.DType.FLOAT32), name='C')
         C1 = Tensor(LogicalShape(plaidml.DType.FLOAT32), name='C')
         program = Program('unique_names', [A + B + C0 + C1])
-        self.assertMultiLineEqual(
-            str(program), '''
+        if USE_MLIR():
+            self.assertMultiLineEqual(
+                str(program), '''
 
 !fp32 = type tensor<!eltwise.fp32>
 module {
@@ -324,6 +457,21 @@ module {
     %2 = "eltwise.add"(%1, %arg0) {type = !eltwise.fp32} : (!fp32, !fp32) -> !fp32
     return %2 : !fp32
   }
+}
+''')
+        else:
+            self.assertMultiLineEqual(
+                str(program), '''function (
+  A[],
+  B[],
+  C[],
+  C0[]
+) -> (
+  _X2
+) {
+  _X0 = add(A, B);
+  _X1 = add(_X0, C);
+  _X2 = add(_X1, C0);
 }
 ''')
 
@@ -336,8 +484,9 @@ module {
         LR = Tensor(LR_Shape)
         R = lars_momentum(X, Grad, Veloc, LR, 1. / 1024., 1. / 2048., 1. / 8.)
         program = Program('lars_momentum_4d', R)
-        self.assertMultiLineEqual(
-            str(program), '''
+        if USE_MLIR():
+            self.assertMultiLineEqual(
+                str(program), '''
 
 !float = type tensor<!eltwise.float>
 !fp32 = type tensor<!eltwise.fp32>
@@ -379,6 +528,40 @@ module {
   }
 }
 ''')
+        else:
+            self.assertMultiLineEqual(
+                str(program), '''function (
+  _X1[_X1_0, _X1_1, _X1_2, _X1_3],
+  _X3[],
+  _X6[_X6_0, _X6_1, _X6_2, _X6_3],
+  _X11[_X11_0, _X11_1, _X11_2, _X11_3]
+) -> (
+  _X24,
+  _X23
+) {
+  _X0 = 0.125000;
+  _X2 = mul(_X0, _X1);
+  _X4 = 0.000977;
+  _X5 = mul(_X3, _X4);
+  _X7 = mul(_X6, _X6);
+  _X8[] = +(_X7[x0, x1, x2, x3]);
+  _X9 = sqrt(_X8);
+  _X10 = mul(_X5, _X9);
+  _X12 = mul(_X11, _X11);
+  _X13[] = +(_X12[x0, x1, x2, x3]);
+  _X14 = sqrt(_X13);
+  _X15 = 0.000488;
+  _X16 = mul(_X15, _X9);
+  _X17 = add(_X14, _X16);
+  _X18 = div(_X10, _X17);
+  _X19 = 0.000488;
+  _X20 = mul(_X19, _X6);
+  _X21 = add(_X11, _X20);
+  _X22 = mul(_X18, _X21);
+  _X23 = add(_X2, _X22);
+  _X24 = sub(_X6, _X23);
+}
+''')
 
     def test_repeat_elts(self):
         I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [10, 10, 10]))
@@ -390,8 +573,9 @@ module {
         O.add_constraint(k < 3)
         O.no_reduce()
         program = Program('repeat_elts', [O])
-        self.assertMultiLineEqual(
-            str(program), '''
+        if USE_MLIR():
+            self.assertMultiLineEqual(
+                str(program), '''
 
 module {
   func @repeat_elts(%arg0: tensor<10x10x10x!eltwise.fp32>) -> tensor<10x30x10x!eltwise.fp32> {
@@ -413,6 +597,16 @@ module {
   }
 }
 ''')
+        else:
+            self.assertMultiLineEqual(
+                str(program), '''function (
+  _X0[_X0_0, _X0_1, _X0_2]
+) -> (
+  _X1
+) {
+  _X1[x0, 3*x1 + x3, x2 : 10, 30, 10] = =(_X0[x0, x1, x2]), x3 < 3 no_defract;
+}
+''')
 
     def test_use_default(self):
         P = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 7, 10, 10]))
@@ -424,8 +618,9 @@ module {
         O[b, 3, i1, i2] = I[b, i1, i2]
         O.use_default(P)
         program = Program('use_default', [O])
-        self.assertMultiLineEqual(
-            str(program), '''
+        if USE_MLIR():
+            self.assertMultiLineEqual(
+                str(program), '''
 
 module {
   func @use_default(%arg0: tensor<1x10x10x!eltwise.fp32>, %arg1: tensor<1x7x10x10x!eltwise.fp32>) -> tensor<1x7x10x10x!eltwise.fp32> {
@@ -444,6 +639,17 @@ module {
   }
 }
 ''')
+        else:
+            self.assertMultiLineEqual(
+                str(program), '''function (
+  _X0[_X0_0, _X0_1, _X0_2, _X0_3],
+  _X1[_X1_0, _X1_1, _X1_2]
+) -> (
+  _X2
+) {
+  _X2[x0, 3, x1, x2 : 1, 7, 10, 10] = =(_X1[x0, x1, x2]) default _X0;
+}
+''')
 
     def test_defract(self):
         I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [3]), name='I')
@@ -452,8 +658,9 @@ module {
         O = TensorOutput(5)
         O[i] += (I[(i - j + 1) // 2] * K[j])
         program = Program('defract_test', [O])
-        self.assertMultiLineEqual(
-            str(program), '''
+        if USE_MLIR():
+            self.assertMultiLineEqual(
+                str(program), '''
 
 module {
   func @defract_test(%arg0: tensor<3x!eltwise.fp32> {tile.name = "I"}, %arg1: tensor<3x!eltwise.fp32> {tile.name = "K"}) -> tensor<5x!eltwise.fp32> {
@@ -475,6 +682,17 @@ module {
   }
 }
 ''')
+        else:
+            self.assertMultiLineEqual(
+                str(program), '''function (
+  I[I_0],
+  K[K_0]
+) -> (
+  _X0
+) {
+  _X0[x0 : 5] = +(I[1/2 + 1/2*x0 - 1/2*x1] * K[x1]);
+}
+''')
         outputs = plaidml_exec.run(program, [(I, np.array([1, 2, 3])), (K, np.array([1, 2, 3]))])
         self.assertEqual(outputs[0].tolist(), [2, 5, 4, 9, 6])
 
@@ -484,8 +702,9 @@ module {
         O = TensorOutput(6)
         O[i] += (I[(i - 1) // 2])
         program = Program('defract_short_test', [O])
-        self.assertMultiLineEqual(
-            str(program), '''
+        if USE_MLIR():
+            self.assertMultiLineEqual(
+                str(program), '''
 
 module {
   func @defract_short_test(%arg0: tensor<3x!eltwise.fp32> {tile.name = "I"}) -> tensor<6x!eltwise.fp32> {
@@ -505,6 +724,16 @@ module {
   }
 }
 ''')
+        else:
+            self.assertMultiLineEqual(
+                str(program), '''function (
+  I[I_0]
+) -> (
+  _X0
+) {
+  _X0[x0 : 6] = +(I[-1/2 + 1/2*x0]);
+}
+''')
         outputs = plaidml_exec.run(program, [(I, np.array([1, 2, 3]))])
         self.assertEqual(outputs[0].tolist(), [0, 1, 0, 2, 0, 3])
 
@@ -517,8 +746,9 @@ module {
         O[n, x0, x1, co] += (I[n, (x0 + k0 - 1) // 2,
                                (x1 + k1 - 1) // 2, ci] * K[2 - k0, 2 - k1, co, ci])
         program = Program('defract_long', [O])
-        self.assertMultiLineEqual(
-            str(program), '''
+        if USE_MLIR():
+            self.assertMultiLineEqual(
+                str(program), '''
 
 module {
   func @defract_long(%arg0: tensor<1x3x3x1x!eltwise.fp32> {tile.name = "I"}, %arg1: tensor<1x3x3x1x!eltwise.fp32> {tile.name = "K"}) -> tensor<1x5x5x1x!eltwise.fp32> {
@@ -543,6 +773,17 @@ module {
     }) {idx_names = ["x0", "x1", "x2", "x3", "x4", "x5", "x6"]} : () -> tensor<1x5x5x1x!eltwise.fp32>
     return %0 : tensor<1x5x5x1x!eltwise.fp32>
   }
+}
+''')
+        else:
+            self.assertMultiLineEqual(
+                str(program), '''function (
+  I[I_0, I_1, I_2, I_3],
+  K[K_0, K_1, K_2, K_3]
+) -> (
+  _X0
+) {
+  _X0[x0, x1, x3, x6 : 1, 5, 5, 1] = +(I[x0, -1/2 + 1/2*x1 + 1/2*x2, -1/2 + 1/2*x3 + 1/2*x4, x5] * K[2 - x2, 2 - x4, x6, x5]);
 }
 ''')
         outputs = plaidml_exec.run(program, [
@@ -581,8 +822,9 @@ module {
         O = TensorOutput(5)
         O[i] += (I[(i - j + 1) // 2] * K[j])
         program = Program('this-is-not an identifier', [O])
-        self.assertMultiLineEqual(
-            str(program), '''
+        if USE_MLIR():
+            self.assertMultiLineEqual(
+                str(program), '''
 
 module {
   func @"this-is-not an identifier"(%arg0: tensor<3x!eltwise.fp32> {tile.name = "I"}, %arg1: tensor<3x!eltwise.fp32> {tile.name = "K"}) -> tensor<5x!eltwise.fp32> {
@@ -604,20 +846,42 @@ module {
   }
 }
 ''')
+        else:
+            self.assertMultiLineEqual(
+                str(program), '''function (
+  I[I_0],
+  K[K_0]
+) -> (
+  _X0
+) {
+  _X0[x0 : 5] = +(I[1/2 + 1/2*x0 - 1/2*x1] * K[x1]);
+}
+''')
         outputs = plaidml_exec.run(program, [(I, np.array([1, 2, 3])), (K, np.array([1, 2, 3]))])
         self.assertEqual(outputs[0].tolist(), [2, 5, 4, 9, 6])
 
     def test_identity(self):
         I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [3]), name='I')
         program = Program('identity', [I])
-        self.assertMultiLineEqual(
-            str(program), '''
+        if USE_MLIR():
+            self.assertMultiLineEqual(
+                str(program), '''
 
 module {
   func @identity(%arg0: tensor<3x!eltwise.fp32> {tile.name = "I"}) -> tensor<3x!eltwise.fp32> {
     %0 = "eltwise.ident"(%arg0) {type = !eltwise.fp32} : (tensor<3x!eltwise.fp32>) -> tensor<3x!eltwise.fp32>
     return %0 : tensor<3x!eltwise.fp32>
   }
+}
+''')
+        else:
+            self.assertMultiLineEqual(
+                str(program), '''function (
+  I[I_0]
+) -> (
+  _X0
+) {
+  _X0 = ident(I);
 }
 ''')
         outputs = plaidml_exec.run(program, [(I, np.array([(1, 2, 3)]))])
@@ -634,8 +898,9 @@ module {
         O = TensorOutput(L, N)
         O[i, j] = A[i, k] * B[k, j]
         program = Program('assignment_non_exception', [O])
-        self.assertMultiLineEqual(
-            str(program), '''function (
+        if USE_MLIR():
+            self.assertMultiLineEqual(
+                str(program), '''function (
   A[A_0, A_1],
   B[B_0, B_1]
 ) -> (
@@ -659,8 +924,9 @@ module {
     def test_two_outputs(self):
         I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [3]), name='I')
         program1 = Program('two_outputs', [I, I])
-        self.assertMultiLineEqual(
-            str(program1), '''
+        if USE_MLIR():
+            self.assertMultiLineEqual(
+                str(program1), '''
 
 module {
   func @two_outputs(%arg0: tensor<3x!eltwise.fp32> {tile.name = "I"}) -> (tensor<3x!eltwise.fp32>, tensor<3x!eltwise.fp32>) {
@@ -668,6 +934,18 @@ module {
     %1 = "eltwise.ident"(%arg0) {type = !eltwise.fp32} : (tensor<3x!eltwise.fp32>) -> tensor<3x!eltwise.fp32>
     return %0, %1 : tensor<3x!eltwise.fp32>, tensor<3x!eltwise.fp32>
   }
+}
+''')
+        else:
+            self.assertMultiLineEqual(
+                str(program1), '''function (
+  I[I_0]
+) -> (
+  _X1,
+  _X0
+) {
+  _X0 = ident(I);
+  _X1 = ident(I);
 }
 ''')
         outputs = plaidml_exec.run(program1, [(I, np.array([(1, 2, 3)]))])

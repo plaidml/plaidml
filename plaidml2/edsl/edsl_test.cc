@@ -87,6 +87,41 @@ TEST(CppEdsl, MnistMlp) {
   auto bias3 = Placeholder(PLAIDML_DATA_FLOAT32, {10});
   auto dense3 = Softmax(Dot(dense2, kernel3) + bias3);
   Program program("mnist_mlp", {dense3});
+#ifdef PLAIDML_AST
+  EXPECT_THAT(program, Eq(R"(function (
+  _X0[_X0_0, _X0_1],
+  _X1[_X1_0, _X1_1],
+  _X3[_X3_0],
+  _X9[_X9_0, _X9_1],
+  _X11[_X11_0],
+  _X17[_X17_0, _X17_1],
+  _X19[_X19_0]
+) -> (
+  _X25
+) {
+  _X2[x0, x2 : 1, 512] = +(_X0[x0, x1] * _X1[x1, x2]);
+  _X4 = add(_X2, _X3);
+  _X5 = 0.000000;
+  _X6 = cmp_lt(_X4, _X5);
+  _X7 = 0.000000;
+  _X8 = cond(_X6, _X7, _X4);
+  _X10[x0, x2 : 1, 512] = +(_X8[x0, x1] * _X9[x1, x2]);
+  _X12 = add(_X10, _X11);
+  _X13 = 0.000000;
+  _X14 = cmp_lt(_X12, _X13);
+  _X15 = 0.000000;
+  _X16 = cond(_X14, _X15, _X12);
+  _X18[x0, x2 : 1, 10] = +(_X16[x0, x1] * _X17[x1, x2]);
+  _X20 = add(_X18, _X19);
+  _X21[x0, 0 : 1, 1] = >(_X20[x0, x1]);
+  _X22 = sub(_X20, _X21);
+  _X23 = exp(_X22);
+  _X24[x0, 0 : 1, 1] = +(_X23[x0, x1]);
+  _X25 = div(_X23, _X24);
+}
+)"));
+#endif
+#ifdef PLAIDML_MLIR
   EXPECT_THAT(program, Eq(R"#(
 
 !float = type tensor<!eltwise.float>
@@ -149,6 +184,7 @@ module {
   }
 }
 )#"));
+#endif
   std::vector<Tensor> inputs{input, kernel1, bias1, kernel2, bias2, kernel3, bias3};
   exec::Executable::compile(program, inputs)->run();
 }
@@ -219,6 +255,52 @@ TEST(CppEdsl, MnistCnn) {
   auto bias4 = Placeholder(PLAIDML_DATA_FLOAT32, {kNumClasses});
   auto dense2 = Softmax(Dot(dense1, kernel4) + bias4);
   Program program("mnist_cnn", {dense2});
+#ifdef PLAIDML_AST
+  EXPECT_THAT(program, Eq(R"(function (
+  _X0[_X0_0, _X0_1, _X0_2, _X0_3],
+  _X1[_X1_0, _X1_1, _X1_2, _X1_3],
+  _X3[_X3_0],
+  _X9[_X9_0, _X9_1, _X9_2, _X9_3],
+  _X11[_X11_0],
+  _X21[_X21_0, _X21_1],
+  _X23[_X23_0],
+  _X29[_X29_0, _X29_1],
+  _X31[_X31_0]
+) -> (
+  _X37
+) {
+  _X2[x0, x1, x3, x6 : 1, 222, 222, 32] = +(_X0[x0, -1 + x1 + x2, -1 + x3 + x4, x5] * _X1[x2, x4, x5, x6]);
+  _X4 = add(_X2, _X3);
+  _X5 = 0.000000;
+  _X6 = cmp_lt(_X4, _X5);
+  _X7 = 0.000000;
+  _X8 = cond(_X6, _X7, _X4);
+  _X10[x0, x1, x3, x6 : 1, 220, 220, 64] = +(_X8[x0, -1 + x1 + x2, -1 + x3 + x4, x5] * _X9[x2, x4, x5, x6]);
+  _X12 = add(_X10, _X11);
+  _X13 = 0.000000;
+  _X14 = cmp_lt(_X12, _X13);
+  _X15 = 0.000000;
+  _X16 = cond(_X14, _X15, _X12);
+  _X17[x0, x1, x3, x5 : 1, 110, 110, 64] = >(_X16[x0, 2*x1 + x2, 2*x3 + x4, x5]), x2 < 2, x4 < 2;
+  _X18 = 1;
+  _X19 = 12100;
+  _X20 = reshape(_X17, _X18, _X19);
+  _X22[x0, x2 : 1, 128] = +(_X20[x0, x1] * _X21[x1, x2]);
+  _X24 = add(_X22, _X23);
+  _X25 = 0.000000;
+  _X26 = cmp_lt(_X24, _X25);
+  _X27 = 0.000000;
+  _X28 = cond(_X26, _X27, _X24);
+  _X30[x0, x2 : 1, 100] = +(_X28[x0, x1] * _X29[x1, x2]);
+  _X32 = add(_X30, _X31);
+  _X33[x0, 0 : 1, 1] = >(_X32[x0, x1]);
+  _X34 = sub(_X32, _X33);
+  _X35 = exp(_X34);
+  _X36[x0, 0 : 1, 1] = +(_X35[x0, x1]);
+  _X37 = div(_X35, _X36);
+}
+)"));
+#endif
   // This currently crashes when combined with the padding pass
   std::vector<Tensor> inputs{input, kernel1, bias1, kernel2, bias2, kernel3, bias3, kernel4, bias4};
   exec::Executable::compile(program, inputs)->run();
@@ -256,6 +338,41 @@ TEST(CppEdsl, LarsMomentum4d) {
   auto LR = Placeholder(LR_shape);
   auto R = LarsMomentum(X, Grad, Veloc, LR, 1. / 1024., 1. / 2048., 1. / 8.);
   Program program("lars_momentum4d", {std::get<0>(R), std::get<1>(R)});
+#ifdef PLAIDML_AST
+  EXPECT_THAT(program, Eq(R"(function (
+  _X1[_X1_0, _X1_1, _X1_2, _X1_3],
+  _X3[],
+  _X6[_X6_0, _X6_1, _X6_2, _X6_3],
+  _X11[_X11_0, _X11_1, _X11_2, _X11_3]
+) -> (
+  _X24,
+  _X23
+) {
+  _X0 = 0.125000;
+  _X2 = mul(_X0, _X1);
+  _X4 = 0.000977;
+  _X5 = mul(_X3, _X4);
+  _X7 = mul(_X6, _X6);
+  _X8[] = +(_X7[x0, x1, x2, x3]);
+  _X9 = sqrt(_X8);
+  _X10 = mul(_X5, _X9);
+  _X12 = mul(_X11, _X11);
+  _X13[] = +(_X12[x0, x1, x2, x3]);
+  _X14 = sqrt(_X13);
+  _X15 = 0.000488;
+  _X16 = mul(_X15, _X9);
+  _X17 = add(_X14, _X16);
+  _X18 = div(_X10, _X17);
+  _X19 = 0.000488;
+  _X20 = mul(_X19, _X6);
+  _X21 = add(_X11, _X20);
+  _X22 = mul(_X18, _X21);
+  _X23 = add(_X2, _X22);
+  _X24 = sub(_X6, _X23);
+}
+)"));
+#endif
+#ifdef PLAIDML_MLIR
   EXPECT_THAT(program, Eq(R"#(
 
 !float = type tensor<!eltwise.float>
@@ -298,6 +415,7 @@ module {
   }
 }
 )#"));
+#endif
   std::vector<Tensor> inputs{X, Grad, Veloc, LR};
   exec::Executable::compile(program, inputs)->run();
 }
@@ -312,6 +430,17 @@ TEST(CppEdsl, RepeatElements) {
   O.add_constraint(k < 3);
   O.no_reduce();
   Program program("repeat_elts", {O});
+#ifdef PLAIDML_AST
+  EXPECT_THAT(program, Eq(R"(function (
+  _X0[_X0_0, _X0_1, _X0_2]
+) -> (
+  _X1
+) {
+  _X1[x0, 3*x1 + x3, x2 : 10, 30, 10] = =(_X0[x0, x1, x2]), x3 < 3 no_defract;
+}
+)"));
+#endif
+#ifdef PLAIDML_MLIR
   EXPECT_THAT(program, Eq(R"#(
 
 module {
@@ -334,6 +463,7 @@ module {
   }
 }
 )#"));
+#endif
   exec::Executable::compile(program, {I})->run();
 }
 
@@ -347,6 +477,18 @@ TEST(CppEdsl, UseDefault) {
   O(b, 3, i1, i2) = I(b, i1, i2);
   O.use_default(P);
   Program program("use_default", {O});
+#ifdef PLAIDML_AST
+  EXPECT_THAT(program, Eq(R"(function (
+  _X0[_X0_0, _X0_1, _X0_2, _X0_3],
+  _X1[_X1_0, _X1_1, _X1_2]
+) -> (
+  _X2
+) {
+  _X2[x0, 3, x1, x2 : 1, 7, 10, 10] = =(_X1[x0, x1, x2]) default _X0;
+}
+)"));
+#endif
+#ifdef PLAIDML_MLIR
   EXPECT_THAT(program, Eq(R"#(
 
 module {
@@ -366,6 +508,7 @@ module {
   }
 }
 )#"));
+#endif
   exec::Executable::compile(program, {P, I})->run();
 }
 
@@ -389,6 +532,24 @@ TEST(CppEdsl, ArgMax) {
   auto X = ArgMax(I);
   Program program("arg_max", {X});
   EXPECT_THAT(X.shape(), Eq(LogicalShape(PLAIDML_DATA_UINT32, {1, 10})));
+#ifdef PLAIDML_AST
+  EXPECT_THAT(program, Eq(R"(function (
+  _X0[_X0_0, _X0_1, _X0_2]
+) -> (
+  _X8
+) {
+  _X1[x0, x2 : 1, 10] = >(_X0[x0, x1, x2]);
+  _X2 = 1;
+  _X3[x0 : 10] = =(_X2[]);
+  _X4 = 0;
+  _X5 = index(_X3, _X4);
+  _X6[x0, x2 : 1, 10] = >(_X0[x0, x1, x2] == _X1[x0, x2] ? _X5[x1]);
+  _X7 = 32;
+  _X8 = as_uint(_X6, _X7);
+}
+)"));
+#endif
+#ifdef PLAIDML_MLIR
   EXPECT_THAT(program, Eq(R"#(
 
 !int = type tensor<!eltwise.int>
@@ -426,6 +587,7 @@ module {
   }
 }
 )#"));
+#endif
   // TODO: cpu backend is missing cast ops (as_uint)
   // exec::Executable::compile(program, {I})->run();
 }
@@ -471,25 +633,26 @@ TEST(CppEdsl, Winograd) {
   auto G = Placeholder(PLAIDML_DATA_FLOAT32, {BI, S});
   auto W = Winograd(I, K, A, B, G);
   Program program("winograd", {W});
-  //   EXPECT_THAT(program, Eq(R"(function (
-  //   _X0[_X0_0, _X0_1],
-  //   _X1[_X1_0, _X1_1],
-  //   _X2[_X2_0, _X2_1, _X2_2, _X2_3],
-  //   _X5[_X5_0, _X5_1],
-  //   _X6[_X6_0, _X6_1, _X6_2, _X6_3]
-  // ) -> (
-  //   _X11
-  // ) {
-  //   _X3[x2, x1, x5, x3, x4, x6 : 1, 32, 32, 8, 8, 3] = +(_X1[x0, x1] * _X2[x2, x0 + 30*x3, 30*x4 + x5, x6]);
-  //   _X4[x0, x1, x6, x3, x4, x5 : 1, 32, 32, 8, 8, 3] = +(_X3[x0, x1, x2, x3, x4, x5] * _X1[x2, x6]);
-  //   _X7[x0, x2, x3, x4 : 32, 3, 3, 32] = +(_X5[x0, x1] * _X6[x1, x2, x3, x4]);
-  //   _X8[x0, x4, x2, x3 : 32, 32, 3, 32] = +(_X7[x0, x1, x2, x3] * _X5[x4, x1]);
-  //   _X9[x0, x1, x2, x3, x4, x6 : 1, 32, 32, 8, 8, 32] = +(_X4[x0, x1, x2, x3, x4, x5] * _X8[x1, x2, x5, x6]);
-  //   _X10[x2, x1, x3, x4, x5, x6 : 1, 30, 32, 8, 8, 32] = +(_X0[x0, x1] * _X9[x2, x0, x3, x4, x5, x6]);
-  //   _X11[x0, x1 + 30*x3, 30*x4 + x6, x5 : 1, 222, 222, 32] = +(_X10[x0, x1, x2, x3, x4, x5] * _X0[x2, x6])
-  //   no_reduce;
-  // }
-  // )"));
+#ifdef PLAIDML_AST
+  EXPECT_THAT(program, Eq(R"(function (
+  _X0[_X0_0, _X0_1],
+  _X1[_X1_0, _X1_1],
+  _X2[_X2_0, _X2_1, _X2_2, _X2_3],
+  _X5[_X5_0, _X5_1],
+  _X6[_X6_0, _X6_1, _X6_2, _X6_3]
+) -> (
+  _X11
+) {
+  _X3[x2, x1, x5, x3, x4, x6 : 1, 32, 32, 8, 8, 3] = +(_X1[x0, x1] * _X2[x2, x0 + 30*x3, 30*x4 + x5, x6]);
+  _X4[x0, x1, x6, x3, x4, x5 : 1, 32, 32, 8, 8, 3] = +(_X3[x0, x1, x2, x3, x4, x5] * _X1[x2, x6]);
+  _X7[x0, x2, x3, x4 : 32, 3, 3, 32] = +(_X5[x0, x1] * _X6[x1, x2, x3, x4]);
+  _X8[x0, x4, x2, x3 : 32, 32, 3, 32] = +(_X7[x0, x1, x2, x3] * _X5[x4, x1]);
+  _X9[x0, x1, x2, x3, x4, x6 : 1, 32, 32, 8, 8, 32] = +(_X4[x0, x1, x2, x3, x4, x5] * _X8[x1, x2, x5, x6]);
+  _X10[x2, x1, x3, x4, x5, x6 : 1, 30, 32, 8, 8, 32] = +(_X0[x0, x1] * _X9[x2, x0, x3, x4, x5, x6]);
+  _X11[x0, x1 + 30*x3, 30*x4 + x6, x5 : 1, 222, 222, 32] = +(_X10[x0, x1, x2, x3, x4, x5] * _X0[x2, x6]) no_defract;
+}
+)"));
+#endif
   // This currently crashes when combined with the padding pass
   // exec::Executable::compile(program, {I, K, A, B, G})->run();
 }
@@ -501,6 +664,22 @@ TEST(CppEdsl, UniqueNames) {
   auto C0 = Placeholder(shape, "C");
   auto C1 = Placeholder(shape, "C");
   Program program("unique_names", {A + B + C0 + C1});
+#ifdef PLAIDML_AST
+  EXPECT_THAT(program, Eq(R"(function (
+  A[],
+  B[],
+  C[],
+  C0[]
+) -> (
+  _X2
+) {
+  _X0 = add(A, B);
+  _X1 = add(_X0, C);
+  _X2 = add(_X1, C0);
+}
+)"));
+#endif
+#ifdef PLAIDML_MLIR
   EXPECT_THAT(program, Eq(R"#(
 
 !fp32 = type tensor<!eltwise.fp32>
@@ -513,6 +692,7 @@ module {
   }
 }
 )#"));
+#endif
   exec::Executable::compile(program, {A, B, C0, C1})->run();
 }
 
@@ -524,6 +704,19 @@ TEST(CppEdsl, GlobalMin) {
   O_Neg() >= Neg(i, j, k);
   auto O = -O_Neg;
   Program program("global_min", {O});
+#ifdef PLAIDML_AST
+  EXPECT_THAT(program, Eq(R"(function (
+  I[I_0, I_1, I_2]
+) -> (
+  _X2
+) {
+  _X0 = neg(I);
+  _X1[] = >(_X0[x0, x1, x2]);
+  _X2 = neg(_X1);
+}
+)"));
+#endif
+#ifdef PLAIDML_MLIR
   EXPECT_THAT(program, Eq(R"#(
 
 !fp32 = type tensor<!eltwise.fp32>
@@ -542,6 +735,7 @@ module {
   }
 }
 )#"));
+#endif
   exec::Executable::compile(program, {I})->run();
 }
 
@@ -554,6 +748,17 @@ TEST(CppEdsl, CumSum) {
   O(i) += I(k);
   O.add_constraint(i - k < N);
   Program program("cumsum", {O});
+#ifdef PLAIDML_AST
+  EXPECT_THAT(program, Eq(R"(function (
+  I[I_0]
+) -> (
+  _X0
+) {
+  _X0[x1 : 10] = +(I[x0]), -x0 + x1 < 10;
+}
+)"));
+#endif
+#ifdef PLAIDML_MLIR
   EXPECT_THAT(program, Eq(R"#(
 
 module {
@@ -573,6 +778,7 @@ module {
   }
 }
 )#"));
+#endif
   exec::Executable::compile(program, {I})->run();
 }
 
@@ -618,6 +824,18 @@ TEST(CppEdsl, ComplexConv2d) {
   auto K = Placeholder(PLAIDML_DATA_FLOAT32, {3, 3, 3, 3, 32});
   auto O = ComplexConv2d(I, K, {2, 2}, {3, 3});
   Program program("complex_conv_2d", {O});
+#ifdef PLAIDML_AST
+  EXPECT_THAT(program, Eq(R"(function (
+  _X0[_X0_0, _X0_1, _X0_2, _X0_3, _X0_4],
+  _X1[_X1_0, _X1_1, _X1_2, _X1_3, _X1_4]
+) -> (
+  _X2
+) {
+  _X2[x0, x1, x3, x5, x7 : 1, 112, 112, 3, 32] = +(_X0[x0, -2 + 2*x1 + 3*x2, -2 + 2*x3 + 3*x4, x5, x6] * _X1[x2, x4, x5, x6, x7]);
+}
+)"));
+#endif
+#ifdef PLAIDML_MLIR
   EXPECT_THAT(program, Eq(R"#(
 
 module {
@@ -647,12 +865,25 @@ module {
   }
 }
 )#"));
+#endif
   exec::Executable::compile(program, {I, K})->run();
 }
 
 TEST(CppEdsl, Reciprocal) {
   auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10}, "A");
   Program program("reciprocal", {1 / A});
+#ifdef PLAIDML_AST
+  EXPECT_THAT(program, Eq(R"(function (
+  A[A_0]
+) -> (
+  _X1
+) {
+  _X0 = 1;
+  _X1 = div(_X0, A);
+}
+)"));
+#endif
+#ifdef PLAIDML_MLIR
   EXPECT_THAT(program, Eq(R"#(
 
 !int = type tensor<!eltwise.int>
@@ -664,10 +895,12 @@ module {
   }
 }
 )#"));
+#endif
   exec::Executable::compile(program, {A})->run();
 }
 
-TEST(CppEdsl, DISABLED_GradientDot) {
+#ifdef PLAIDML_AST
+TEST(CppEdsl, GradientDot) {
   auto A = Placeholder(PLAIDML_DATA_FLOAT32, {100, 100}, "A");
   auto B = Placeholder(PLAIDML_DATA_FLOAT32, {100, 100}, "B");
   auto O = Dot(A, B);
@@ -688,7 +921,9 @@ TEST(CppEdsl, DISABLED_GradientDot) {
 )"));
   exec::Executable::compile(program, {A, B})->run();
 }
+#endif
 
+#ifdef PLAIDML_AST
 Tensor Max2Da0(const Tensor& A) {
   TensorDim M, N;
   A.bind_dims(M, N);
@@ -699,7 +934,7 @@ Tensor Max2Da0(const Tensor& A) {
   return O;
 }
 
-TEST(CppEdsl, DISABLED_GradientMultiDot) {
+TEST(CppEdsl, GradientMultiDot) {
   auto A = Placeholder(PLAIDML_DATA_FLOAT32, {100, 100}, "A");
   auto B = Placeholder(PLAIDML_DATA_FLOAT32, {100, 100}, "B");
   auto C = Dot(A, B);
@@ -729,8 +964,10 @@ TEST(CppEdsl, DISABLED_GradientMultiDot) {
 )"));
   exec::Executable::compile(program, {A, B})->run();
 }
+#endif
 
-TEST(CppEdsl, DISABLED_GradientDotSqrt) {
+#ifdef PLAIDML_AST
+TEST(CppEdsl, GradientDotSqrt) {
   auto A = Placeholder(PLAIDML_DATA_FLOAT32, {100, 100}, "A");
   auto B = Placeholder(PLAIDML_DATA_FLOAT32, {100, 100}, "B");
   auto C = Dot(A, B);
@@ -757,6 +994,7 @@ TEST(CppEdsl, DISABLED_GradientDotSqrt) {
 )"));
   exec::Executable::compile(program, {A, B})->run();
 }
+#endif
 
 TEST(CppEdsl, DefractLong) {
   std::vector<int64_t> input_shape{1, 3, 3, 1};
