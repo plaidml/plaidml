@@ -44,7 +44,7 @@ jsonnet_to_json(
 )
 
 plaidml_cc_shlib(
-    name = "shlib",
+    name = "shlib_ast",
     linkopts = select({
         "@com_intel_plaidml//toolchain:windows_x86_64": [],
         "@com_intel_plaidml//toolchain:macos_x86_64": [
@@ -75,9 +75,41 @@ plaidml_cc_shlib(
     }),
 )
 
+plaidml_cc_shlib(
+    name = "shlib_mlir",
+    linkopts = select({
+        "@com_intel_plaidml//toolchain:windows_x86_64": [],
+        "@com_intel_plaidml//toolchain:macos_x86_64": [
+            "-Wl,-exported_symbols_list",
+            "$(location :plaidml.ld)",
+        ],
+        "//conditions:default": [
+            # Prefer internal library definitions.
+            "-Wl,-Bsymbolic-functions",
+            # Use an explicit linker script.
+            "-Wl,--version-script",
+            "$(location :plaidml.lds)",
+        ],
+    }),
+    shlib_name = "plaidml2_mlir",
+    visibility = ["//visibility:public"],
+    win_def_file = ":plaidml.def",
+    deps = [
+        ":plaidml_mlir",
+    ] + select({
+        "@com_intel_plaidml//toolchain:windows_x86_64": [],
+        "@com_intel_plaidml//toolchain:macos_x86_64": [
+            ":plaidml.ld",
+        ],
+        "//conditions:default": [
+            ":plaidml.lds",
+        ],
+    }),
+)
+
 plaidml_cc_library(
-    name = "api",
-    srcs = [":shlib"],
+    name = "api_ast",
+    srcs = [":shlib_ast"],
     linkstatic = 1,
     visibility = ["//visibility:public"],
     deps = [
@@ -94,7 +126,10 @@ plaidml_py_library(
         "__init__.py",
         "ffi.py",
     ],
-    data = [":shlib"],
+    data = [
+        ":shlib_ast",
+        ":shlib_mlir",
+    ],
     visibility = ["//visibility:public"],
     deps = [
         ":_ffi",
@@ -130,7 +165,7 @@ py_binary(
     srcs = ["setup.py"],
     data = [
         "plaidml2-config.cmake",
-        ":api",
+        ":api_ast",
         "//:LICENSE",
         "//plaidml2/core:sdk",
         "//plaidml2/edsl:sdk",
