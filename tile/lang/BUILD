@@ -175,7 +175,7 @@ plaidml_cc_test(
     srcs = ["gen_stripe_test.cc"],
     deps = [
         ":lang",
-        "//plaidml2/edsl",
+        "//plaidml2/edsl:edsl_ast",
         "//testing:matchers",
     ],
 )
