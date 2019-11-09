@@ -93,12 +93,12 @@ bool MergeTypes(Type* into, Type from, DataType dtype) {
     }
   }
 
-  auto intoElementType = intoShapedType.getElementType().dyn_cast<ScalarType>();
-  auto fromElementType = fromShapedType.getElementType().dyn_cast<ScalarType>();
-  if (!intoElementType || !fromElementType) {
-    throw std::runtime_error("NYI: Only scalar element types are supported");
-  }
   if (dtype == DataType::INVALID) {
+    auto intoElementType = intoShapedType.getElementType().dyn_cast<ScalarType>();
+    auto fromElementType = fromShapedType.getElementType().dyn_cast<ScalarType>();
+    if (!intoElementType || !fromElementType) {
+      throw std::runtime_error("NYI: Only scalar element types are supported");
+    }
     dtype = CommonSupertype(intoElementType.type(), fromElementType.type());
   }
   auto elementType = ScalarType::get(into->getContext(), dtype);

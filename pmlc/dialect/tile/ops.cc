@@ -444,7 +444,7 @@ Type ShapeOp::getResultType(ArrayRef<Value*> operands) {
   }
   auto tensor = operands[0];
   auto tensorType = eltwise::getRankedTensorType(tensor->getType());
-  auto elementType = tensorType.getElementType();
+  auto elementType = ScalarType::get(tensor->getContext(), eltwise::DataType::INT32);  // TODO: index type?
   return RankedTensorType::get({tensorType.getRank()}, elementType);
 }
 

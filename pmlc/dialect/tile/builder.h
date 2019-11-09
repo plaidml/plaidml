@@ -8,6 +8,9 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
 
+#include "mlir/IR/StandardTypes.h"
+
+#include "pmlc/dialect/stripe/types.h"
 #include "pmlc/dialect/tile/program.h"
 #include "pmlc/util/enums.h"
 #include "tile/base/shape.h"
@@ -35,9 +38,19 @@ class TileBuilder {
 
   void Destroy(mlir::Value* value);
 
-  void BindTensorDim(unsigned dim, mlir::Value* from, mlir::Value** into);
-  Shape GetShape(mlir::Value* tensor);
+  mlir::RankedTensorType MakeRankedTensorType(DataType dtype, llvm::ArrayRef<int64_t> dims);
+  void BindTensorDims(mlir::Value* from, llvm::ArrayRef<mlir::Value**> into);
+  mlir::RankedTensorType ComputeShape(mlir::Value* tensor);
+  void BindShape(mlir::Value* tensor, mlir::RankedTensorType type);
+
+  stripe::TensorType MakeTensorType(DataType dtype, llvm::ArrayRef<int64_t> sizes, llvm::ArrayRef<int64_t> strides);
+  stripe::TensorType IntoTensorType(mlir::RankedTensorType type);
+
+  llvm::StringRef GetStringValue(mlir::Value* value);
+  int64_t GetIntegerValue(mlir::Value* value);
+  double GetFloatValue(mlir::Value* value);
   std::vector<mlir::Value*> GetTupleElements(mlir::Value* value);
+
   std::vector<mlir::Value*> ComputeGradients(llvm::ArrayRef<mlir::Value*> wrt, mlir::Value* loss);
   mlir::Value* Clone(mlir::Value* value);
 
@@ -49,8 +62,7 @@ class TileBuilder {
   mlir::Value* MakeScalarConstantOp(double value);
   mlir::Value* MakePrimitiveOp(llvm::StringRef fn, llvm::ArrayRef<mlir::Value*> args);
   mlir::Value* MakeDimOp(mlir::Value* tensor, unsigned dim);
-  mlir::Value* MakePlaceholderOp(DataType dtype, llvm::ArrayRef<int64_t> dims, vertexai::tile::BufferPtr buffer,
-                                 llvm::StringRef name);
+  mlir::Value* MakePlaceholderOp(mlir::RankedTensorType type, vertexai::tile::BufferPtr buffer, llvm::StringRef name);
   mlir::Value* MakeAffineConstantOp(int64_t value);
   mlir::Value* MakeAffineIndexOp(llvm::StringRef name = "");
   mlir::Value* MakeAffineAddOp(llvm::ArrayRef<mlir::Value*> args);

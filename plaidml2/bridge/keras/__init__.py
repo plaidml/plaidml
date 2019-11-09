@@ -123,7 +123,7 @@ class _Function(object):
             node.tensor.bind(shape)
         outputs = [x.tensor for x in self._outputs]
         updates = [(x[0].tensor, x[1].tensor) for x in self._updates]
-        program = edsl.Program(self._name, outputs, updates)
+        program = edsl.Program(self._name, outputs, updates=updates)
         return plaidml_exec.Executable(program, [x.tensor for x in self._inputs])
 
 

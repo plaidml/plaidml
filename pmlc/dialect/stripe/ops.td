@@ -59,23 +59,23 @@ def RefineOp : StripeOpWithPP<"refine", [NoSideEffect]> {
 def LoadOp : StripeOpWithPP<"load", [NoSideEffect]> {
   let summary = "Load from a tensor";
   let arguments = (ins TensorRefType:$from);
-  let results = (outs Eltwise_AnyTensor:$into);
+  let results = (outs EltwiseAny:$into);
 }
 
 def LoadIndexOp : StripeOp<"load_index"> {
   let summary = "Convert an affine expression into a scalar value";
   let arguments = (ins AffineType:$from);
-  let results = (outs Eltwise_AnyTensor:$into);
+  let results = (outs EltwiseAny:$into);
 }
 
 def StoreOp : StripeOpWithPP<"store"> {
   let summary = "Store into a tensor";
-  let arguments = (ins TensorRefType:$into, Eltwise_AnyTensor:$from);
+  let arguments = (ins TensorRefType:$into, EltwiseAny:$from);
 }
 
 def AggregateOp : StripeOpWithPP<"aggregate"> {
   let summary = "A accumulating store with a commutative, associative accumulation";
-  let arguments = (ins TensorRefType:$into, Eltwise_AnyTensor:$from, AggregationKind:$agg);
+  let arguments = (ins TensorRefType:$into, EltwiseAny:$from, AggregationKind:$agg);
   let results = (outs);
 }
 

@@ -14,21 +14,45 @@ class HasFolder {
 }
 
 // Whether a type is a ScalarType.
-def IsScalarPred : CPred<"$_self.isa<ScalarType>()">;
+def IsScalarPred : And<[
+    CPred<"$_self.isa<ScalarType>()">,
+    CPred<"$_self.cast<ScalarType>().type() != DataType::INVALID">
+  ]>;
 
-def AnyScalar : Type<IsScalarPred, "scalar">;
+def AnyScalar : Type<Or<[
+    Index.predicate,
+    IsScalarPred,
+  ]>, "scalar">;
 
-def ScalarBool :
-    Type<And<[IsScalarPred, CPred<"$_self.cast<ScalarType>().type() == DataType::BOOLEAN">]>, "bool">;
+def ScalarBool : Type<And<[
+    IsScalarPred,
+    CPred<"$_self.cast<ScalarType>().type() == DataType::BOOLEAN">
+  ]>, "scalar-bool">;
 
-def AnyScalarFloat :
-    Type<And<[IsScalarPred, CPred<"is_float($_self.cast<ScalarType>().type())">]>, "floating-point">;
+def ScalarIndex : Type<And<[
+    IsScalarPred,
+    CPred<"$_self.cast<ScalarType>().type() == DataType::INTX">
+  ]>, "scalar-index">;
 
-def AnyScalarInteger :
-    Type<And<[IsScalarPred, CPred<"is_int($_self.cast<ScalarType>().type())">]>, "integer">;
+def AnyScalarFloat : Type<And<[
+    IsScalarPred,
+    CPred<"is_float($_self.cast<ScalarType>().type())">
+  ]>, "scalar-float">;
 
-def AnyScalarUnsigned :
-    Type<And<[IsScalarPred, CPred<"is_uint($_self.cast<ScalarType>().type())">]>, "unsigned">;
+def AnyScalarInteger : Type<And<[
+    IsScalarPred,
+    CPred<"is_int($_self.cast<ScalarType>().type())">
+  ]>, "scalar-integer">;
+
+def AnyScalarUnsigned : Type<And<[
+    IsScalarPred,
+    CPred<"is_uint($_self.cast<ScalarType>().type())">
+  ]>, "scalar-unsigned">;
+
+def IndexLike : Type<Or<[
+    Index.predicate,
+    ScalarIndex.predicate,
+  ]>, "index-like">;
 
 // Whether a type is a RankedTensorType.
 def IsRankedTensorTypePred : CPred<"$_self.isa<RankedTensorType>()">;
@@ -36,29 +60,34 @@ def IsRankedTensorTypePred : CPred<"$_self.isa<RankedTensorType>()">;
 class RankedTensorOf<list<Type> allowedTypes> :
     ShapedContainerType<allowedTypes, IsRankedTensorTypePred, "ranked-tensor">;
 
-def Eltwise_AnyTensor :
-    TypeConstraint<Or<[
-        Index.predicate,
-        RankedTensorOf<[AnyScalar]>.predicate
-    ]>,
-    "eltwise-any">;
+def EltwiseAny : TypeConstraint<Or<[
+    AnyScalar.predicate,
+    RankedTensorOf<[AnyScalar]>.predicate
+  ]>, "eltwise-any">;
 
-def Eltwise_BoolTensor : RankedTensorOf<[ScalarBool]>;
-def Eltwise_FloatTensor : RankedTensorOf<[AnyScalarFloat]>;
-def Eltwise_IntegerTensor : RankedTensorOf<[AnyScalarInteger]>;
-def Eltwise_UnsignedTensor : RankedTensorOf<[AnyScalarUnsigned]>;
+def EltwiseBool : TypeConstraint<Or<[
+    ScalarBool.predicate,
+    RankedTensorOf<[ScalarBool]>.predicate,
+  ]>, "eltwise-bool">;
 
-def IsScalarTensor :
-    Type<And<[IsRankedTensorTypePred, CPred<"$_self.cast<ShapedType>().getRank() == 0">]>, "scalar-tensor">;
+def EltwiseFloat : TypeConstraint<Or<[
+    AnyScalarFloat.predicate,
+    RankedTensorOf<[AnyScalarFloat]>.predicate
+  ]>, "eltwise-float">;
 
-def Eltwise_Integer :
-    Type<Or<[
-        Index.predicate,
-        And<[
-          RankedTensorOf<[AnyScalarInteger]>.predicate,
-          IsScalarTensor.predicate
-        ]>
-    ]>,
-    "eltwise-integer">;
+def EltwiseInteger : TypeConstraint<Or<[
+    AnyScalarInteger.predicate,
+    RankedTensorOf<[AnyScalarInteger]>.predicate
+  ]>, "eltwise-integer">;
+
+def EltwiseUnsigned : TypeConstraint<Or<[
+    AnyScalarUnsigned.predicate,
+    RankedTensorOf<[AnyScalarUnsigned]>.predicate
+  ]>, "eltwise-unsigned">;
+
+def EltwiseIndex : Type<Or<[
+    ScalarIndex.predicate,
+    RankedTensorOf<[ScalarIndex]>.predicate
+  ]>, "eltwise-index">;
 
 #endif // __PML_ELTWISE_PREDICATES__

@@ -18,6 +18,15 @@
 #include "plaidml2/core/settings.h"
 #include "tile/platform/local_machine/platform.h"
 
+#ifdef PLAIDML_AST
+using vertexai::tile::TensorDimension;
+using vertexai::tile::TensorShape;
+#endif
+#ifdef PLAIDML_MLIR
+#include "mlir/Support/DebugStringHelper.h"
+using pmlc::dialect::eltwise::ScalarType;
+#endif
+
 using plaidml::core::ffi_wrap;
 using plaidml::core::ffi_wrap_void;
 using plaidml::core::GetPlatform;
@@ -25,23 +34,11 @@ using plaidml::core::GlobalContext;
 using plaidml::core::Settings;
 using vertexai::context::Context;
 using vertexai::tile::DataType;
-using vertexai::tile::TensorDimension;
-using vertexai::tile::TensorShape;
 using LocalPlatform = vertexai::tile::local_machine::Platform;
 
 extern const char* PLAIDML_VERSION;
 
-namespace {
-
-void plaidml_reset_eventlog(void) {
-  auto ctx = GlobalContext::getContext();
-  ctx->set_eventlog(nullptr);
-}
-
-}  // namespace
-
-namespace plaidml {
-namespace core {
+namespace plaidml::core {
 
 PlatformHolder::PlatformHolder() : platform(new LocalPlatform) {}
 
@@ -50,8 +47,7 @@ PlatformHolder& GetPlatform() {
   return holder;
 }
 
-}  // namespace core
-}  // namespace plaidml
+}  // namespace plaidml::core
 
 extern "C" {
 
@@ -79,8 +75,8 @@ void plaidml_init(plaidml_error* err) {
         auto eventlog = std::make_shared<vertexai::eventing::file::EventLog>(e_config);
         ctx->set_eventlog(std::move(eventlog));
         ctx->set_is_logging_events(true);
+        std::atexit([]() { GlobalContext::getContext()->set_eventlog(nullptr); });
       }
-      std::atexit(plaidml_reset_eventlog);
     });
   });
 }
@@ -176,11 +172,17 @@ plaidml_shape* plaidml_shape_alloc(  //
     const int64_t* sizes,            //
     const int64_t* strides) {
   return ffi_wrap<plaidml_shape*>(err, nullptr, [&] {
+#ifdef PLAIDML_AST
     std::vector<TensorDimension> dims(ndims);
     for (size_t i = 0; i < ndims; i++) {
       dims[i] = TensorDimension{strides[i], static_cast<uint64_t>(sizes[i])};
     }
     return new plaidml_shape{TensorShape{static_cast<DataType>(dtype), dims}};
+#endif
+#ifdef PLAIDML_MLIR
+    auto type = GlobalContext::get()->MakeTensorType(static_cast<DataType>(dtype), {sizes, ndims}, {strides, ndims});
+    return new plaidml_shape{type};
+#endif
   });
 }
 
@@ -188,25 +190,42 @@ plaidml_string* plaidml_shape_repr(  //
     plaidml_error* err,              //
     plaidml_shape* shape) {
   return ffi_wrap<plaidml_string*>(err, nullptr, [&] {
+#ifdef PLAIDML_AST
     std::stringstream ss;
     ss << shape->shape;
     return new plaidml_string{ss.str()};
+#endif
+#ifdef PLAIDML_MLIR
+    return new plaidml_string{mlir::debugString(shape->type)};
+#endif
   });
 }
 
 size_t plaidml_shape_get_ndims(  //
     plaidml_error* err,          //
     plaidml_shape* shape) {
-  return ffi_wrap<size_t>(err, 0, [&] {  //
+  return ffi_wrap<size_t>(err, 0, [&] {
+#ifdef PLAIDML_AST
     return shape->shape.dims.size();
+#endif
+#ifdef PLAIDML_MLIR
+    return shape->type.getRank();
+#endif
   });
 }
 
 plaidml_datatype plaidml_shape_get_dtype(  //
     plaidml_error* err,                    //
     plaidml_shape* shape) {
-  return ffi_wrap<plaidml_datatype>(err, PLAIDML_DATA_INVALID, [&] {  //
+  return ffi_wrap<plaidml_datatype>(err, PLAIDML_DATA_INVALID, [&] {
+#ifdef PLAIDML_AST
     return static_cast<plaidml_datatype>(shape->shape.type);
+#endif
+#ifdef PLAIDML_MLIR
+    auto elementType = shape->type.getElementType();
+    auto scalarType = elementType.dyn_cast<ScalarType>();
+    return static_cast<plaidml_datatype>(scalarType.type());
+#endif
   });
 }
 
@@ -214,8 +233,17 @@ int64_t plaidml_shape_get_dim_size(  //
     plaidml_error* err,              //
     plaidml_shape* shape,            //
     size_t dim) {
-  return ffi_wrap<int64_t>(err, 0, [&] {  //
+  return ffi_wrap<int64_t>(err, 0, [&] {
+#ifdef PLAIDML_AST
     return shape->shape.dims.at(dim).size;
+#endif
+#ifdef PLAIDML_MLIR
+    const auto& dims = shape->type.getShape();
+    if (dims.size() < dim) {
+      throw std::range_error("dim index out of range");
+    }
+    return dims[dim].size;
+#endif
   });
 }
 
@@ -223,16 +251,30 @@ int64_t plaidml_shape_get_dim_stride(  //
     plaidml_error* err,                //
     plaidml_shape* shape,              //
     size_t dim) {
-  return ffi_wrap<int64_t>(err, 0, [&] {  //
+  return ffi_wrap<int64_t>(err, 0, [&] {
+#ifdef PLAIDML_AST
     return shape->shape.dims.at(dim).stride;
+#endif
+#ifdef PLAIDML_MLIR
+    const auto& dims = shape->type.getShape();
+    if (dims.size() < dim) {
+      throw std::range_error("dim index out of range");
+    }
+    return dims[dim].stride;
+#endif
   });
 }
 
 uint64_t plaidml_shape_get_nbytes(  //
     plaidml_error* err,             //
     plaidml_shape* shape) {
-  return ffi_wrap<int64_t>(err, 0, [&] {  //
+  return ffi_wrap<int64_t>(err, 0, [&] {
+#ifdef PLAIDML_AST
     return shape->shape.byte_size();
+#endif
+#ifdef PLAIDML_MLIR
+    return shape->type.getByteSize();
+#endif
   });
 }
 

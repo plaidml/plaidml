@@ -6,9 +6,7 @@
 
 #include "plaidml2/edsl/autodiff.h"
 
-namespace plaidml {
-namespace edsl {
-namespace deriv {
+namespace plaidml::edsl {
 
 #define DERIV_ARGS const Tensor &Y, const Tensor &DY, const std::vector<Tensor>&X
 
@@ -166,6 +164,4 @@ void RegisterDerivs() {
   });
 }
 
-}  // namespace deriv
-}  // namespace edsl
-}  // namespace plaidml
+}  // namespace plaidml::edsl

@@ -7,12 +7,13 @@
 
 #include "plaidml2/core/ffi.h"
 #include "tile/base/platform.h"
-#include "tile/base/shape.h"
 
 #ifdef PLAIDML_AST
+#include "tile/base/shape.h"
 #include "tile/lang/ast/ast.h"
 #endif
 #ifdef PLAIDML_MLIR
+#include "pmlc/dialect/stripe/types.h"
 #include "pmlc/dialect/tile/builder.h"
 #endif
 
@@ -23,7 +24,12 @@ struct plaidml_string {
 };
 
 struct plaidml_shape {
+#ifdef PLAIDML_AST
   vertexai::tile::TensorShape shape;
+#endif
+#ifdef PLAIDML_MLIR
+  pmlc::dialect::stripe::TensorType type;
+#endif
 };
 
 struct plaidml_expr {
@@ -54,8 +60,7 @@ struct plaidml_view {
 
 }  // extern "C"
 
-namespace plaidml {
-namespace core {
+namespace plaidml::core {
 
 struct GlobalContext {
 #ifdef PLAIDML_MLIR
@@ -111,5 +116,4 @@ void ffi_wrap_void(plaidml_error* err, F fn) {
   }
 }
 
-}  // namespace core
-}  // namespace plaidml
+}  // namespace plaidml::core

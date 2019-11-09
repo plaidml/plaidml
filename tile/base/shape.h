@@ -221,22 +221,7 @@ inline DataType DataTypeFromString(const std::string& str) {
 inline size_t byte_width(const DataType& dt) { return (bit_width(dt) + 7) / 8; }
 
 // Compute result type by 'upcasting' to the highest type in the hierarchy
-inline DataType CommonSupertype(DataType left, DataType right) {
-  if (is_float(right) != is_float(left)) {
-    if (is_float(right)) {
-      return right;
-    } else {
-      return left;
-    }
-  }
-  // TODO: This is a bit primitive; for example, it will pick
-  // the first of "int32" or "float32".  We may want to make it
-  // a bit more sophisticated.
-  if (bit_width(right) > bit_width(left)) {
-    return right;
-  }
-  return left;
-}
+DataType CommonSupertype(DataType left, DataType right);
 
 struct TensorDimension {
   TensorDimension() = default;
