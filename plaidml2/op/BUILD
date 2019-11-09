@@ -32,20 +32,46 @@ filegroup(
 )
 
 plaidml_cc_library(
-    name = "op",
+    name = "op_ast",
     srcs = [
         "ffi.cc",
     ],
     hdrs = [
         "ffi.h",
     ],
-    defines = ["PLAIDML_OP_DLL"],
+    defines = [
+        "PLAIDML_OP_DLL",
+        "PLAIDML_AST",
+    ],
     visibility = ["//visibility:public"],
     deps = [
         "//base/util",
-        "//plaidml2/core",
-        "//plaidml2/edsl",
-        "//plaidml2/op/lib",
+        "//plaidml2/core:core_ast",
+        "//plaidml2/edsl:edsl_ast",
+        "//plaidml2/op/lib:lib_ast",
+        "@boost",
+    ],
+    alwayslink = 1,
+)
+
+plaidml_cc_library(
+    name = "op_mlir",
+    srcs = [
+        "ffi.cc",
+    ],
+    hdrs = [
+        "ffi.h",
+    ],
+    defines = [
+        "PLAIDML_OP_DLL",
+        "PLAIDML_MLIR",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//base/util",
+        "//plaidml2/core:core_mlir",
+        "//plaidml2/edsl:edsl_mlir",
+        "//plaidml2/op/lib:lib_mlir",
         "@boost",
     ],
     alwayslink = 1,
@@ -78,8 +104,8 @@ plaidml_cc_test(
     srcs = ["op_test.cc"],
     deps = [
         ":api",
-        ":op",
-        "//plaidml2:testenv",
+        ":op_ast",
+        "//plaidml2:testenv_ast",
     ],
 )
 
