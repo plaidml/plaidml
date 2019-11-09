@@ -5,7 +5,7 @@ plaidml_cc_test(
     srcs = glob(["*.cc"]),
     deps = [
         "//base/proto",
-        "//plaidml2:testenv",
+        "//plaidml2:testenv_mlir",
         "//testing:matchers",
         "//tile/codegen",
         "//tile/lang",

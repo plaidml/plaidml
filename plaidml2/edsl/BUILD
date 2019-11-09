@@ -33,7 +33,28 @@ filegroup(
 )
 
 plaidml_cc_library(
-    name = "edsl",
+    name = "edsl_ast",
+    srcs = [
+        "derivs.cc",
+        "derivs.h",
+        "ffi.cc",
+    ],
+    hdrs = SDK_HDRS,
+    defines = [
+        "PLAIDML_EDSL_DLL",
+        "PLAIDML_AST",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//base/util",
+        "//plaidml2/core:core_ast",
+        "//tile/lang/ast",
+    ],
+    alwayslink = 1,
+)
+
+plaidml_cc_library(
+    name = "edsl_mlir",
     srcs = [
         "derivs.cc",
         "derivs.h",
@@ -43,11 +64,14 @@ plaidml_cc_library(
     hdrs = SDK_HDRS + [
         "helper.h",
     ],
-    defines = ["PLAIDML_EDSL_DLL"],
+    defines = [
+        "PLAIDML_EDSL_DLL",
+        "PLAIDML_MLIR",
+    ],
     visibility = ["//visibility:public"],
     deps = [
         "//base/util",
-        "//plaidml2/core",
+        "//plaidml2/core:core_mlir",
         "//pmlc/dialect/tile",
     ],
     alwayslink = 1,
@@ -76,9 +100,9 @@ plaidml_cc_test(
     srcs = ["edsl_test.cc"],
     deps = [
         ":api",
-        ":edsl",
-        "//plaidml2:testenv",
-        "//plaidml2/exec",
+        ":edsl_ast",
+        "//plaidml2:testenv_ast",
+        "//plaidml2/exec:exec_ast",
     ],
 )
 

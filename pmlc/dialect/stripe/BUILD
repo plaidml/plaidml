@@ -70,7 +70,7 @@ plaidml_cc_library(
         "ops.h",
         "ops.h.inc",
         "ops_interfaces.h.inc",
-	"rewrites.h",
+        "rewrites.h",
         "transforms.h",
         "types.h",
         "util.h",
@@ -144,7 +144,7 @@ plaidml_cc_test(
     deps = [
         ":passes",
         ":transcode",
-        "//plaidml2:testenv",
+        "//plaidml2:testenv_mlir",
         "//testing:matchers",
         "//tile/codegen",
     ],

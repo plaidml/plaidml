@@ -7,23 +7,27 @@
 #include <memory>
 #include <string>
 
-#include "mlir/Support/DebugStringHelper.h"
 #include "llvm/Support/FormatVariadic.h"
 
 #include "plaidml2/core/internal.h"
+#include "tile/targets/targets.h"
+
+#ifdef PLAIDML_AST
+#include "tile/lang/gen_stripe.h"
+#endif
+#ifdef PLAIDML_MLIR
+#include "mlir/Support/DebugStringHelper.h"
+
 #include "pmlc/dialect/stripe/dialect.h"
 #include "pmlc/dialect/stripe/transcode.h"
 #include "pmlc/dialect/tile/lowering.h"
 #include "pmlc/dialect/tile/program.h"
-#include "tile/targets/targets.h"
+#endif
 
 using plaidml::core::ffi_wrap;
 using plaidml::core::ffi_wrap_void;
 using plaidml::core::GetPlatform;
 using plaidml::core::GlobalContext;
-using pmlc::dialect::stripe::Dialect;
-using pmlc::dialect::stripe::FromMLIR;
-using pmlc::dialect::tile::LowerIntoStripe;
 using vertexai::context::Context;
 using vertexai::tile::Allocator;
 using vertexai::tile::Buffer;
@@ -31,6 +35,15 @@ using vertexai::tile::ConstBufferManager;
 using vertexai::tile::Program;
 using vertexai::tile::View;
 using vertexai::tile::targets::GetConfigs;
+
+#ifdef PLAIDML_AST
+using vertexai::tile::lang::ast::ParamExpr;
+#endif
+#ifdef PLAIDML_MLIR
+using pmlc::dialect::stripe::Dialect;
+using pmlc::dialect::stripe::FromMLIR;
+using pmlc::dialect::tile::LowerIntoStripe;
+#endif
 
 namespace {
 
@@ -103,9 +116,48 @@ plaidml_executable* plaidml_compile(  //
     if (!configs.count(target)) {
       throw std::runtime_error(llvm::formatv("Unknown target specified: {0}", target).str());
     }
+#ifdef PLAIDML_AST
     ConstBufferManager const_bufs;
     const_bufs.allocator = std::make_shared<PlatformAllocator>(device);
     std::unique_ptr<plaidml_executable> exec{new plaidml_executable};
+    auto stripe = vertexai::tile::lang::GenerateStripe(program->eval.runinfo);
+    Context ctx;
+    exec->program = GetPlatform()->MakeProgram(ctx, device, target, stripe, &const_bufs);
+    for (size_t i = 0; i < ninputs; i++) {
+      auto param_expr = std::dynamic_pointer_cast<ParamExpr>(inputs[i]->expr->expr);
+      if (!param_expr) {
+        throw std::runtime_error("Buffers can only be bound to ParamExprs");
+      }
+      param_expr->buffer = inputs[i]->buffer->buffer;
+    }
+    for (const auto& input : program->eval.inputs) {
+      auto it = program->eval.names_by_expr.find(input);
+      if (it == program->eval.names_by_expr.end()) {
+        throw std::runtime_error("Invalid program, input with unknown name");
+      }
+      exec->input_bufs[it->second] = input->buffer;
+    }
+    for (size_t i = 0; i < noutputs; i++) {
+      if (!outputs[i] || !outputs[i]->expr || !outputs[i]->buffer) {
+        throw std::runtime_error("Undefined output bindings");
+      }
+      auto expr = outputs[i]->expr->expr;
+      auto it = program->eval.names_by_expr.find(expr.get());
+      if (it == program->eval.names_by_expr.end()) {
+        throw std::runtime_error("Invalid program, output with unknown name");
+      }
+      exec->output_bufs[it->second] = outputs[i]->buffer->buffer;
+    }
+    for (const auto& kvp : program->eval.updates) {
+      exec->output_bufs[kvp.first] = kvp.second->buffer;
+    }
+    return exec.release();
+#endif
+#ifdef PLAIDML_MLIR
+    ConstBufferManager const_bufs;
+    const_bufs.allocator = std::make_shared<PlatformAllocator>(device);
+    std::unique_ptr<plaidml_executable> exec{new plaidml_executable};
+
     // 1. lower tile dialect -> stripe dialect
     auto module = LowerIntoStripe(*program->program->module);
     // 2. convert MLIR -> stripe
@@ -168,6 +220,7 @@ plaidml_executable* plaidml_compile(  //
 
     // TODO(MLIR): updates
     return exec.release();
+#endif
   });
 }
 

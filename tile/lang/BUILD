@@ -176,7 +176,7 @@ plaidml_cc_test(
     tags = ["manual"],
     deps = [
         ":lang",
-        "//plaidml2/edsl",
+        "//plaidml2/edsl:edsl_ast",
         "//testing:matchers",
     ],
 )
