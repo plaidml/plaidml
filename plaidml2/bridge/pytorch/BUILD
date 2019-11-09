@@ -20,7 +20,7 @@ plaidml_cc_library(
     tags = ["pytorch"],
     visibility = ["//visibility:public"],
     deps = [
-        "//plaidml2:api",
+        "//plaidml2:api_ast",
         "@com_intel_plaidml_conda_unix//:pytorch",
     ],
     alwayslink = 1,

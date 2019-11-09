@@ -23,16 +23,37 @@ filegroup(
 )
 
 plaidml_cc_library(
-    name = "exec",
+    name = "exec_ast",
     srcs = [
         "ffi.cc",
     ],
     hdrs = SDK_HDRS,
-    defines = ["PLAIDML_EXEC_DLL"],
+    defines = [
+        "PLAIDML_EXEC_DLL",
+        "PLAIDML_AST",
+    ],
     visibility = ["//visibility:public"],
     deps = [
         "//base/util",
-        "//plaidml2/core",
+        "//plaidml2/core:core_ast",
+    ],
+    alwayslink = 1,
+)
+
+plaidml_cc_library(
+    name = "exec_mlir",
+    srcs = [
+        "ffi.cc",
+    ],
+    hdrs = SDK_HDRS,
+    defines = [
+        "PLAIDML_EXEC_DLL",
+        "PLAIDML_MLIR",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//base/util",
+        "//plaidml2/core:core_mlir",
         "//pmlc/dialect/stripe:transcode",
     ],
     alwayslink = 1,
