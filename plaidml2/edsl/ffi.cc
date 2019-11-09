@@ -780,6 +780,50 @@ double plaidml_expr_float_get_value(  //
   });
 }
 
+plaidml_expr* plaidml_expr_cast(  //
+    plaidml_error* err,           //
+    plaidml_expr* tensor,         //
+    plaidml_datatype dtype) {
+  return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
+    IVLOG(3, "plaidml_expr_cast");
+#ifdef PLAIDML_AST
+    static ExprPtr bits8 = std::make_shared<IntConst>(8);
+    static ExprPtr bits16 = std::make_shared<IntConst>(16);
+    static ExprPtr bits32 = std::make_shared<IntConst>(32);
+    static ExprPtr bits64 = std::make_shared<IntConst>(64);
+    switch (static_cast<DataType>(dtype)) {
+      case DataType::INT8:
+        return new plaidml_expr{MakeCall("as_int", {tensor->expr, bits8})};
+      case DataType::INT16:
+        return new plaidml_expr{MakeCall("as_int", {tensor->expr, bits16})};
+      case DataType::INT32:
+        return new plaidml_expr{MakeCall("as_int", {tensor->expr, bits32})};
+      case DataType::INT64:
+        return new plaidml_expr{MakeCall("as_int", {tensor->expr, bits64})};
+      case DataType::UINT8:
+        return new plaidml_expr{MakeCall("as_uint", {tensor->expr, bits8})};
+      case DataType::UINT16:
+        return new plaidml_expr{MakeCall("as_uint", {tensor->expr, bits16})};
+      case DataType::UINT32:
+        return new plaidml_expr{MakeCall("as_uint", {tensor->expr, bits32})};
+      case DataType::UINT64:
+        return new plaidml_expr{MakeCall("as_uint", {tensor->expr, bits64})};
+      case DataType::FLOAT16:
+        return new plaidml_expr{MakeCall("as_float", {tensor->expr, bits16})};
+      case DataType::FLOAT32:
+        return new plaidml_expr{MakeCall("as_float", {tensor->expr, bits32})};
+      case DataType::FLOAT64:
+        return new plaidml_expr{MakeCall("as_float", {tensor->expr, bits64})};
+      default:
+        throw std::runtime_error("Unsupported dtype for cast");
+    }
+#endif
+#ifdef PLAIDML_MLIR
+    return new plaidml_expr{GlobalContext::get()->MakeCastOp(tensor->value, static_cast<DataType>(dtype))};
+#endif
+  });
+}
+
 plaidml_expr* plaidml_expr_call(  //
     plaidml_error* err,           //
     const char* fn,               //

@@ -241,6 +241,15 @@ RankedTensorType TileBuilder::ComputeShape(Value* tensor) {
   return outputs[0]->getType().dyn_cast<RankedTensorType>();
 }
 
+Value* TileBuilder::MakeCastOp(Value* tensor, DataType dtype) {
+  IVLOG(5, "TileBuilder::MakeCastOp> " << to_string(dtype));
+  IVLOG(6, "  arg: " << mlir::debugString(*tensor));
+  auto elementType = impl->builder.getType<ScalarType>(dtype);
+  auto tensorType = eltwise::getRankedTensorType(tensor->getType());
+  auto resultType = RankedTensorType::get(tensorType.getShape(), elementType);
+  return impl->builder.create<eltwise::CastOp>(impl->builder.getUnknownLoc(), resultType, tensor).result();
+}
+
 Value* TileBuilder::MakePrimitiveOp(StringRef fn, ArrayRef<Value*> args) {
   IVLOG(5, "TileBuilder::MakePrimitiveOp> " << fn.str());
   for (auto arg : args) {

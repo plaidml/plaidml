@@ -612,15 +612,57 @@ Tensor Call(const std::string& fn, Ts... args) {
   return Call(fn, vec);
 }
 
+inline Tensor cast(const Tensor& x, plaidml_datatype dtype) {
+  auto ptr = ffi::call<plaidml_expr*>(plaidml_expr_cast, x.as_ptr(), dtype);
+  return Tensor{ptr};
+}
+
 inline Tensor abs(const Tensor& x) { return Call("abs", x); }
 
-inline Tensor as_float(const Tensor& x, size_t bit_size) { return Call("as_float", x, static_cast<int64_t>(bit_size)); }
+inline Tensor as_float(const Tensor& x, size_t bit_size) {
+  switch (bit_size) {
+    case 16:
+      return cast(x, PLAIDML_DATA_FLOAT16);
+    case 32:
+      return cast(x, PLAIDML_DATA_FLOAT32);
+    case 64:
+      return cast(x, PLAIDML_DATA_FLOAT64);
+    default:
+      throw std::runtime_error("Invalid bit size for as_float");
+  }
+}
 
-inline Tensor as_int(const Tensor& x, size_t bit_size) { return Call("as_int", x, static_cast<int64_t>(bit_size)); }
+inline Tensor as_int(const Tensor& x, size_t bit_size) {
+  switch (bit_size) {
+    case 8:
+      return cast(x, PLAIDML_DATA_INT8);
+    case 16:
+      return cast(x, PLAIDML_DATA_INT16);
+    case 32:
+      return cast(x, PLAIDML_DATA_INT32);
+    case 64:
+      return cast(x, PLAIDML_DATA_INT64);
+    default:
+      throw std::runtime_error("Invalid bit size for as_int");
+  }
+}
 
-inline Tensor as_uint(const Tensor& x, size_t bit_size) { return Call("as_uint", x, static_cast<int64_t>(bit_size)); }
+inline Tensor as_uint(const Tensor& x, size_t bit_size) {
+  switch (bit_size) {
+    case 8:
+      return cast(x, PLAIDML_DATA_UINT8);
+    case 16:
+      return cast(x, PLAIDML_DATA_UINT16);
+    case 32:
+      return cast(x, PLAIDML_DATA_UINT32);
+    case 64:
+      return cast(x, PLAIDML_DATA_UINT64);
+    default:
+      throw std::runtime_error("Invalid bit size for as_uint");
+  }
+}
 
-inline Tensor as_bool(const Tensor& x) { return Call("as_bool", x); }
+inline Tensor as_bool(const Tensor& x) { return cast(x, PLAIDML_DATA_BOOLEAN); }
 
 inline Tensor cos(const Tensor& x) { return Call("cos", x); }
 
@@ -845,7 +887,7 @@ inline IndexedTensor IndexedTensor::operator==(const IndexedTensor& rhs) const {
   return IndexedTensor(PLAIDML_COMBO_OP_EQ, {this, &rhs});
 }
 
-inline Tensor Call(const std::string& fn, const std::vector<Tensor>& args) {  //
+inline Tensor Call(const std::string& fn, const std::vector<Tensor>& args) {
   std::vector<plaidml_expr*> ptrs(args.size());
   for (size_t i = 0; i < args.size(); i++) {
     ptrs[i] = args[i].as_ptr();

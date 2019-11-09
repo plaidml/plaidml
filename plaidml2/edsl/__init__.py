@@ -571,49 +571,75 @@ class Program(ForeignObject):
         super(Program, self).__init__(ffi_obj)
 
 
+def wrap_tensor(x):
+    if isinstance(x, six.integer_types):
+        return Tensor(expr=ffi_call(lib.plaidml_expr_int, x))
+    if np.issubdtype(type(x), np.integer):
+        return Tensor(expr=ffi_call(lib.plaidml_expr_int, x.item()))
+    if isinstance(x, float):
+        return Tensor(expr=ffi_call(lib.plaidml_expr_float, x))
+    if isinstance(x, TensorDim):
+        return Tensor(expr=ffi_call(lib.plaidml_expr_dim, x.as_ptr()))
+    if isinstance(x, Tensor):
+        return x
+    raise TypeError('Unexpected type for call argument: {}. fn: {}, args: {}, bad arg: {}'.format(
+        type(x), fn, args, x))
+
+
 def call(fn, *args):
-
-    def wrap(x):
-        if isinstance(x, six.integer_types):
-            return Tensor(expr=ffi_call(lib.plaidml_expr_int, x))
-        if np.issubdtype(type(x), np.integer):
-            return Tensor(expr=ffi_call(lib.plaidml_expr_int, x.item()))
-        if isinstance(x, float):
-            return Tensor(expr=ffi_call(lib.plaidml_expr_float, x))
-        if isinstance(x, TensorDim):
-            return Tensor(expr=ffi_call(lib.plaidml_expr_dim, x.as_ptr()))
-        if isinstance(x, Tensor):
-            return x
-        raise TypeError(
-            'Unexpected type for call argument: {}. fn: {}, args: {}, bad arg: {}'.format(
-                type(x), fn, args, x))
-
-    args = [wrap(x) for x in args]
+    args = [wrap_tensor(x) for x in args]
     raw_args = [x.as_ptr() for x in args]
     return Tensor(expr=ffi_call(lib.plaidml_expr_call, fn.encode(), len(args), raw_args))
 
 
+def cast(x, dtype):
+    return Tensor(expr=ffi_call(lib.plaidml_expr_cast, wrap_tensor(x).as_ptr(), dtype))
+
+
+def as_bool(x):
+    return cast(x, DType.BOOLEAN)
+
+
 def as_float(x, bit_size):
-    return call('as_float', x, bit_size)
+    map = {
+        16: DType.FLOAT16,
+        32: DType.FLOAT32,
+        64: DType.FLOAT64,
+    }
+    dtype = map.get(bit_size)
+    if not dtype:
+        raise 'Unsupport bit_size for as_float'
+    return cast(x, dtype)
 
 
 def as_int(x, bit_size):
-    return call('as_int', x, bit_size)
+    map = {
+        8: DType.INT8,
+        16: DType.INT16,
+        32: DType.INT32,
+        64: DType.INT64,
+    }
+    dtype = map.get(bit_size)
+    if not dtype:
+        raise 'Unsupport bit_size for as_int'
+    return cast(x, dtype)
 
 
 def as_uint(x, bit_size):
-    return call('as_uint', x, bit_size)
-
-
-def cast(x, dtype):
-    return call('as_{}'.format(dtype.info.base), x, dtype.info.bitwidth)
+    map = {
+        8: DType.UINT8,
+        16: DType.UINT16,
+        32: DType.UINT32,
+        64: DType.UINT64,
+    }
+    dtype = map.get(bit_size)
+    if not dtype:
+        raise 'Unsupport bit_size for as_uint'
+    return cast(x, dtype)
 
 
 def ceil(x):
     return call('ceil', x)
-
-
-# def element(x) : return call('element', {x}) # TODO: tuple
 
 
 def cond(lhs, rhs, true_case):
@@ -695,10 +721,6 @@ def select(cond, true_case, false_case):
 
 def shape(x):
     return call('shape', x)
-
-
-def sigmoid(x):
-    return call('sigmoid', x)
 
 
 def sin(x):

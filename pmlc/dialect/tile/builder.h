@@ -61,6 +61,7 @@ class TileBuilder {
   mlir::Value* MakeScalarConstantOp(int64_t value);
   mlir::Value* MakeScalarConstantOp(double value);
   mlir::Value* MakePrimitiveOp(llvm::StringRef fn, llvm::ArrayRef<mlir::Value*> args);
+  mlir::Value* MakeCastOp(mlir::Value* tensor, DataType dtype);
   mlir::Value* MakeDimOp(mlir::Value* tensor, unsigned dim);
   mlir::Value* MakePlaceholderOp(mlir::RankedTensorType type, vertexai::tile::BufferPtr buffer, llvm::StringRef name);
   mlir::Value* MakeAffineConstantOp(int64_t value);
