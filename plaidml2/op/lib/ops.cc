@@ -2270,7 +2270,7 @@ Value softmax(const Value& value) {
     TB(I_idxs) += T(R_idxs);
     return std::vector<Tensor>{YdY - TB * Y};
   };
-  auto Overriden = OverrideGrads(deriv, std::vector<Tensor>{I}, O);
+  auto Overridden = OverrideGrads(deriv, std::vector<Tensor>{I}, O);
   // If we reordered, return to original order
   if (transposed) {
     return transpose(make_tuple(Value{Overriden}, Value{pattern}));
