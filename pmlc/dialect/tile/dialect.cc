@@ -5,8 +5,10 @@
 #include "llvm/Support/FormatVariadic.h"
 
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpImplementation.h"
 
+#include "base/util/logging.h"
 #include "pmlc/dialect/tile/ops.h"
 
 namespace pmlc {
@@ -38,11 +40,16 @@ Dialect::Dialect(mlir::MLIRContext* ctx) : mlir::Dialect(getDialectNamespace(), 
   addInterfaces<OpAsmInterface>();
 }
 
+std::string Dialect::getDialectAttrName(llvm::StringRef name) {
+  return llvm::formatv("{0}.{1}", getDialectNamespace(), name).str();
+}
+
 std::string Dialect::getCanonicalOpName(llvm::StringRef name) {
   return llvm::formatv("{0}.{1}", getDialectNamespace(), name).str();
 }
 
-void Dialect::printType(mlir::Type type, llvm::raw_ostream& os) const {
+void Dialect::printType(mlir::Type type, mlir::DialectAsmPrinter& printer) const {
+  auto& os = printer.getStream();
   if (auto t = type.dyn_cast<AffineIndexMapType>()) {
     os << "imap";
   } else if (auto t = type.dyn_cast<AffineSizeMapType>()) {
@@ -50,7 +57,9 @@ void Dialect::printType(mlir::Type type, llvm::raw_ostream& os) const {
   }
 }
 
-mlir::Type Dialect::parseType(llvm::StringRef spec, mlir::Location loc) const {
+mlir::Type Dialect::parseType(mlir::DialectAsmParser& parser) const {
+  StringRef spec = parser.getFullSymbolSpec();
+  Location loc = parser.getEncodedSourceLoc(parser.getNameLoc());
   if (spec == "imap") {
     return AffineIndexMapType::get(getContext());
   }
@@ -66,9 +75,9 @@ mlir::Operation* Dialect::materializeConstant(  //
     mlir::Attribute value,                      //
     mlir::Type type,                            //
     mlir::Location loc) {
-  auto int_attr = value.dyn_cast<IntegerAttr>();
-  if (int_attr) {
-    return builder.create<AffineConstantOp>(loc, type, int_attr);
+  IVLOG(5, "tile::Dialect::materializeConstant");
+  if (auto attr = value.dyn_cast<IntegerAttr>()) {
+    return builder.create<AffineConstantOp>(loc, type, attr);
   }
   return nullptr;
 }

@@ -15,12 +15,16 @@ logger = logging.getLogger(__name__)
 _TLS = threading.local()
 _TLS.err = ffi.new('plaidml_error*')
 
+_LIBNAME = 'plaidml2'
+if os.getenv('PLAIDML_MLIR') == '1':
+    _LIBNAME = 'plaidml2_mlir'
+
 if platform.system() == 'Windows':
-    lib_name = 'plaidml2.dll'
+    lib_name = '{}.dll'.format(_LIBNAME)
 elif platform.system() == 'Darwin':
-    lib_name = 'libplaidml2.dylib'
+    lib_name = 'lib{}.dylib'.format(_LIBNAME)
 else:
-    lib_name = 'libplaidml2.so'
+    lib_name = 'lib{}.so'.format(_LIBNAME)
 
 lib_path = os.getenv('PLAIDML_LIB_PATH')
 if not lib_path:

@@ -4,12 +4,14 @@
 
 #include "base/util/logging.h"
 
+#include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 
 #include "pmlc/dialect/stripe/analysis.h"
 #include "pmlc/dialect/stripe/ops.h"
-#include "pmlc/dialect/stripe/tile.h"
+#include "pmlc/dialect/stripe/rewrites.h"
+#include "pmlc/dialect/stripe/transforms.h"
 
 namespace pmlc {
 namespace dialect {

@@ -38,126 +38,40 @@ mlir::OpFoldResult ScalarConstantOp::fold(ArrayRef<Attribute> operands) {
 // ---- CastOp ----
 //
 
-template <typename OpType>
-struct CastCanonicalizer : public OpRewritePattern<OpType> {
-  using OpRewritePattern<OpType>::OpRewritePattern;
+struct CastCanonicalizer : public OpRewritePattern<CastOp> {
+  using OpRewritePattern<CastOp>::OpRewritePattern;
 
-  PatternMatchResult matchAndRewrite(OpType castOp, PatternRewriter& rewriter) const override {
+  PatternMatchResult matchAndRewrite(CastOp castOp, PatternRewriter& rewriter) const override {
     IVLOG(5, "CastCanonicalizer::matchAndRewrite> " << mlir::debugString(castOp));
     auto op = castOp.getOperation();
     auto tensor = castOp.tensor();
     auto tensorType = getRankedTensorType(tensor->getType());
-    auto resultTensorType = getRankedTensorType(castOp.result()->getType());
-    auto elementType = resultTensorType.getElementType();
+    auto existingType = getRankedTensorType(castOp.result()->getType());
+    auto elementType = existingType.getElementType();
     auto resultType = RankedTensorType::get(tensorType.getShape(), elementType);
-    if (resultType == castOp.result()->getType()) {
+    if (resultType == existingType) {
       return Pattern::matchFailure();
     }
-    auto newOp = rewriter.create<OpType>(op->getLoc(), resultType, tensor);
+    auto newOp = rewriter.create<CastOp>(op->getLoc(), resultType, tensor);
     rewriter.replaceOp(op, {newOp});
     util::UpdateFuncOpType(newOp.getOperation());
     return Pattern::matchSuccess();
   }
 };
 
-void AsFloatOp::getCanonicalizationPatterns(OwningRewritePatternList& results, MLIRContext* context) {
-  results.insert<CastCanonicalizer<AsFloatOp>>(context);
+void CastOp::getCanonicalizationPatterns(OwningRewritePatternList& results, MLIRContext* context) {
+  results.insert<CastCanonicalizer>(context);
 }
 
-Type AsFloatOp::getResultType(ArrayRef<Value*> operands) {
-  IVLOG(5, "AsFloatOp::getResultType>")
-  if (operands.size() != 2) {
-    throw std::runtime_error("AsFloatOp requires 2 operands");
-  }
-  auto tensor = operands[0];
-  auto bitwidthOp = operands[1]->getDefiningOp();
-  IntegerAttr bitwidth;
-  if (!m_Constant(&bitwidth).match(bitwidthOp)) {
-    throw std::runtime_error("AsFloatOp requires 2nd operand to be a constant integer");
-  }
-  auto tensorType = getRankedTensorType(tensor->getType());
-  ScalarType elementType;
-  switch (bitwidth.getInt()) {
-    // TODO: How should this handle bfloat16?
-    case 16:
-      elementType = ScalarType::get(tensor->getContext(), DataType::FLOAT16);
-      break;
-    case 32:
-      elementType = ScalarType::get(tensor->getContext(), DataType::FLOAT32);
-      break;
-    case 64:
-      elementType = ScalarType::get(tensor->getContext(), DataType::FLOAT64);
-      break;
-  }
-  return RankedTensorType::get(tensorType.getShape(), elementType);
+Type CastOp::getResultType(ArrayRef<Value*> operands) {  //
+  llvm_unreachable("CastOp::getResultType not implemented");
 }
 
-void AsIntOp::getCanonicalizationPatterns(OwningRewritePatternList& results, MLIRContext* context) {
-  results.insert<CastCanonicalizer<AsIntOp>>(context);
-}
-
-Type AsIntOp::getResultType(ArrayRef<Value*> operands) {
-  IVLOG(5, "AsIntOp::getResultType>")
-  if (operands.size() != 2) {
-    throw std::runtime_error("AsIntOp requires 2 operands");
-  }
-  auto tensor = operands[0];
-  auto bitwidthOp = operands[1]->getDefiningOp();
-  IntegerAttr bitwidth;
-  if (!m_Constant(&bitwidth).match(bitwidthOp)) {
-    throw std::runtime_error("AsIntOp requires 2nd operand to be a constant integer");
-  }
-  auto tensorType = getRankedTensorType(tensor->getType());
-  ScalarType elementType;
-  switch (bitwidth.getInt()) {
-    case 8:
-      elementType = ScalarType::get(tensor->getContext(), DataType::INT8);
-      break;
-    case 16:
-      elementType = ScalarType::get(tensor->getContext(), DataType::INT16);
-      break;
-    case 32:
-      elementType = ScalarType::get(tensor->getContext(), DataType::INT32);
-      break;
-    case 64:
-      elementType = ScalarType::get(tensor->getContext(), DataType::INT64);
-      break;
-  }
-  return RankedTensorType::get(tensorType.getShape(), elementType);
-}
-
-void AsUIntOp::getCanonicalizationPatterns(OwningRewritePatternList& results, MLIRContext* context) {
-  results.insert<CastCanonicalizer<AsUIntOp>>(context);
-}
-
-Type AsUIntOp::getResultType(ArrayRef<Value*> operands) {
-  IVLOG(5, "AsUIntOp::getResultType>")
-  if (operands.size() != 2) {
-    throw std::runtime_error("AsUIntOp requires 2 operands");
-  }
-  auto tensor = operands[0];
-  auto bitwidthOp = operands[1]->getDefiningOp();
-  IntegerAttr bitwidth;
-  if (!m_Constant(&bitwidth).match(bitwidthOp)) {
-    throw std::runtime_error("AsUIntOp requires 2nd operand to be a constant integer");
-  }
-  auto tensorType = getRankedTensorType(tensor->getType());
-  ScalarType elementType;
-  switch (bitwidth.getInt()) {
-    case 8:
-      elementType = ScalarType::get(tensor->getContext(), DataType::UINT8);
-      break;
-    case 16:
-      elementType = ScalarType::get(tensor->getContext(), DataType::UINT16);
-      break;
-    case 32:
-      elementType = ScalarType::get(tensor->getContext(), DataType::UINT32);
-      break;
-    case 64:
-      elementType = ScalarType::get(tensor->getContext(), DataType::UINT64);
-      break;
-  }
-  return RankedTensorType::get(tensorType.getShape(), elementType);
+Operation* CastOp::create(OpBuilder* builder, Location loc, Type type, ArrayRef<Value*> operands) {
+  OperationState state(loc, getOperationName());
+  state.addOperands(operands);
+  state.addTypes(type);
+  return builder->createOperation(state);
 }
 
 //

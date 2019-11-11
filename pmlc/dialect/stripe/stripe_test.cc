@@ -25,9 +25,9 @@
 #include "tile/lang/runinfo.h"
 #include "tile/lib/lib.h"
 
-using namespace vertexai::tile;         // NOLINT
-using namespace pmlc::dialect::stripe;  // NOLINT
-using namespace plaidml::edsl;          // NOLINT
+using namespace vertexai::tile;         // NOLINT(build/namespaces)
+using namespace pmlc::dialect::stripe;  // NOLINT(build/namespaces)
+using namespace plaidml::edsl;          // NOLINT(build/namespaces)
 
 using ::testing::LinesEq;
 
@@ -219,7 +219,7 @@ TEST_P(TranscodeTest, BatchNormalization) {
 }
 
 static lang::RunInfo Evaluate(const std::string& name, const std::vector<Tensor>& vars) {
-  Program program(name, vars, {});
+  Program program(name, vars);
   return *static_cast<const lang::RunInfo*>(program.runinfo());
 }
 

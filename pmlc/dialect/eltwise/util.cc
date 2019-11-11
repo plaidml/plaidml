@@ -7,6 +7,8 @@
 #include <utility>
 #include <vector>
 
+#include "llvm/Support/FormatVariadic.h"
+
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Function.h"
 #include "mlir/IR/Matchers.h"
@@ -22,21 +24,21 @@ namespace eltwise {
 using llvm::ArrayRef;
 using llvm::SmallVector;
 using mlir::Attribute;
+using mlir::debugString;
 using mlir::FloatAttr;
 using mlir::FuncOp;
-using mlir::FunctionType;
+using mlir::IndexType;
 using mlir::IntegerAttr;
 using mlir::m_Constant;
 using mlir::Operation;
 using mlir::RankedTensorType;
-using mlir::ShapedType;
 using mlir::Type;
 using mlir::Value;
 
 namespace {
 
 bool MergeTypes(Type* into, Type from, DataType dtype) {
-  IVLOG(6, "MergeTypes> " << mlir::debugString(*into) << ", " << mlir::debugString(from));
+  IVLOG(6, "MergeTypes> " << debugString(*into) << ", " << debugString(from));
   auto intoShapedType = getRankedTensorType(*into);
   auto fromShapedType = getRankedTensorType(from);
 
@@ -91,37 +93,34 @@ bool MergeTypes(Type* into, Type from, DataType dtype) {
     }
   }
 
-  auto intoElementType = intoShapedType.getElementType().dyn_cast<ScalarType>();
-  auto fromElementType = fromShapedType.getElementType().dyn_cast<ScalarType>();
-  if (!intoElementType || !fromElementType) {
-    throw std::runtime_error("NYI: Only scalar element types are supported");
-  }
   if (dtype == DataType::INVALID) {
+    auto intoElementType = intoShapedType.getElementType().dyn_cast<ScalarType>();
+    auto fromElementType = fromShapedType.getElementType().dyn_cast<ScalarType>();
+    if (!intoElementType || !fromElementType) {
+      throw std::runtime_error("NYI: Only scalar element types are supported");
+    }
     dtype = CommonSupertype(intoElementType.type(), fromElementType.type());
   }
   auto elementType = ScalarType::get(into->getContext(), dtype);
   *into = RankedTensorType::get(resultShape, elementType);
-  IVLOG(6, "  Resulting type: " << mlir::debugString(*into));
+  IVLOG(6, "  Resulting type: " << debugString(*into));
   return true;
 }
 
 }  // namespace
 
-mlir::RankedTensorType getRankedTensorType(mlir::Type type) {
-  if (auto rankedType = type.dyn_cast<mlir::RankedTensorType>()) {
+RankedTensorType getRankedTensorType(Type type) {
+  if (auto rankedType = type.dyn_cast<RankedTensorType>()) {
     return rankedType;
   }
   SmallVector<int64_t, 0> shape;
-  if (type.isa<mlir::IndexType>()) {
-    // TODO: add index to DataType?
-    return RankedTensorType::get(shape, ScalarType::get(type.getContext(), DataType::UINT32));
+  if (type.isa<IndexType>()) {
+    return RankedTensorType::get(shape, ScalarType::get(type.getContext(), DataType::INTX));
   }
   if (type.isa<ScalarType>()) {
     return RankedTensorType::get(shape, type);
   }
-  std::stringstream ss;
-  ss << "Unsupported elementType for tensor: " << mlir::debugString(type);
-  throw std::runtime_error(ss.str());
+  throw std::runtime_error(llvm::formatv("Unsupported elementType for tensor: {0}", debugString(type)).str());
 }
 
 Type ComputeResultType(ArrayRef<Value*> operands, DataType override) {
@@ -129,7 +128,7 @@ Type ComputeResultType(ArrayRef<Value*> operands, DataType override) {
     std::vector<std::string> types;
     for (auto operand : operands) {
       auto type = operand->getType();
-      types.push_back(mlir::debugString(type));
+      types.push_back(debugString(type));
     }
     IVLOG(6, "ComputeResultType> " << types);
   }
@@ -144,7 +143,7 @@ Type ComputeResultType(ArrayRef<Value*> operands, DataType override) {
           ss << ", ";
         }
         auto type = operands[i]->getType();
-        ss << mlir::debugString(type);
+        ss << debugString(type);
       }
       ss << ")";
       throw std::runtime_error(ss.str());
@@ -157,7 +156,7 @@ SmallVector<int64_t, 4> ComputeShape(ArrayRef<Value*> operands) {
   SmallVector<int64_t, 4> shape;
   for (auto operand : operands) {
     auto op = operand->getDefiningOp();
-    mlir::IntegerAttr attr;
+    IntegerAttr attr;
     if (m_Constant(&attr).match(op)) {
       shape.push_back(attr.getInt());
     } else {
@@ -198,17 +197,9 @@ Attribute constFoldBinaryOp(ArrayRef<Attribute> operands, BinaryCalculate calcul
   return {};
 }
 
-bool ConstantValueMatcher::match(mlir::Operation* op) {
-  mlir::Attribute attr;
-  if (!mlir::detail::constant_op_binder<mlir::Attribute>(&attr).match(op)) {
-    return false;
-  }
-  auto type = op->getResult(0)->getType();
-  if (auto tensorType = type.dyn_cast<RankedTensorType>()) {
-    if (!tensorType.getElementType().isa<ScalarType>() || tensorType.getRank() != 0) {
-      return false;
-    }
-  } else if (!type.isa<ScalarType>()) {
+bool ConstantValueMatcher::match(Operation* op) {
+  Attribute attr;
+  if (!mlir::detail::constant_op_binder<Attribute>(&attr).match(op)) {
     return false;
   }
   if (auto intAttr = attr.dyn_cast<IntegerAttr>()) {
@@ -217,7 +208,6 @@ bool ConstantValueMatcher::match(mlir::Operation* op) {
   if (auto floatAttr = attr.dyn_cast<FloatAttr>()) {
     return floatAttr.getValueAsDouble() == value;
   }
-
   return false;
 }
 

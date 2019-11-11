@@ -2,30 +2,43 @@
 
 #include "plaidml2/core/ffi.h"
 
+#include <cstdlib>
+#include <memory>
 #include <mutex>
+#include <utility>
 #include <vector>
 
 #include <boost/filesystem.hpp>
 
+#include "base/context/context.h"
+#include "base/context/eventlog.h"
+#include "base/eventing/file/eventlog.h"
 #include "base/util/env.h"
 #include "plaidml2/core/internal.h"
 #include "plaidml2/core/settings.h"
 #include "tile/platform/local_machine/platform.h"
 
+#ifdef PLAIDML_AST
+using vertexai::tile::TensorDimension;
+using vertexai::tile::TensorShape;
+#endif
+#ifdef PLAIDML_MLIR
+#include "mlir/Support/DebugStringHelper.h"
+using pmlc::dialect::eltwise::ScalarType;
+#endif
+
 using plaidml::core::ffi_wrap;
 using plaidml::core::ffi_wrap_void;
 using plaidml::core::GetPlatform;
+using plaidml::core::GlobalContext;
 using plaidml::core::Settings;
 using vertexai::context::Context;
 using vertexai::tile::DataType;
-using vertexai::tile::TensorDimension;
-using vertexai::tile::TensorShape;
 using LocalPlatform = vertexai::tile::local_machine::Platform;
 
 extern const char* PLAIDML_VERSION;
 
-namespace plaidml {
-namespace core {
+namespace plaidml::core {
 
 PlatformHolder::PlatformHolder() : platform(new LocalPlatform) {}
 
@@ -34,8 +47,7 @@ PlatformHolder& GetPlatform() {
   return holder;
 }
 
-}  // namespace core
-}  // namespace plaidml
+}  // namespace plaidml::core
 
 extern "C" {
 
@@ -53,7 +65,18 @@ void plaidml_init(plaidml_error* err) {
       }
       IVLOG(1, "plaidml_init");
       Settings::Instance()->load();
+      auto ctx = GlobalContext::getContext();
       GetPlatform();
+      auto eventlog_str = vertexai::env::Get("PLAIDML_EVENTLOG_FILENAME");
+      if (eventlog_str.size()) {
+        IVLOG(1, "Logging events to " << eventlog_str);
+        vertexai::eventing::file::proto::EventLog e_config;
+        e_config.set_filename(eventlog_str);
+        auto eventlog = std::make_shared<vertexai::eventing::file::EventLog>(e_config);
+        ctx->set_eventlog(std::move(eventlog));
+        ctx->set_is_logging_events(true);
+        std::atexit([]() { GlobalContext::getContext()->set_eventlog(nullptr); });
+      }
     });
   });
 }
@@ -149,11 +172,17 @@ plaidml_shape* plaidml_shape_alloc(  //
     const int64_t* sizes,            //
     const int64_t* strides) {
   return ffi_wrap<plaidml_shape*>(err, nullptr, [&] {
+#ifdef PLAIDML_AST
     std::vector<TensorDimension> dims(ndims);
     for (size_t i = 0; i < ndims; i++) {
       dims[i] = TensorDimension{strides[i], static_cast<uint64_t>(sizes[i])};
     }
     return new plaidml_shape{TensorShape{static_cast<DataType>(dtype), dims}};
+#endif
+#ifdef PLAIDML_MLIR
+    auto type = GlobalContext::get()->MakeTensorType(static_cast<DataType>(dtype), {sizes, ndims}, {strides, ndims});
+    return new plaidml_shape{type};
+#endif
   });
 }
 
@@ -161,25 +190,42 @@ plaidml_string* plaidml_shape_repr(  //
     plaidml_error* err,              //
     plaidml_shape* shape) {
   return ffi_wrap<plaidml_string*>(err, nullptr, [&] {
+#ifdef PLAIDML_AST
     std::stringstream ss;
     ss << shape->shape;
     return new plaidml_string{ss.str()};
+#endif
+#ifdef PLAIDML_MLIR
+    return new plaidml_string{mlir::debugString(shape->type)};
+#endif
   });
 }
 
 size_t plaidml_shape_get_ndims(  //
     plaidml_error* err,          //
     plaidml_shape* shape) {
-  return ffi_wrap<size_t>(err, 0, [&] {  //
+  return ffi_wrap<size_t>(err, 0, [&] {
+#ifdef PLAIDML_AST
     return shape->shape.dims.size();
+#endif
+#ifdef PLAIDML_MLIR
+    return shape->type.getRank();
+#endif
   });
 }
 
 plaidml_datatype plaidml_shape_get_dtype(  //
     plaidml_error* err,                    //
     plaidml_shape* shape) {
-  return ffi_wrap<plaidml_datatype>(err, PLAIDML_DATA_INVALID, [&] {  //
+  return ffi_wrap<plaidml_datatype>(err, PLAIDML_DATA_INVALID, [&] {
+#ifdef PLAIDML_AST
     return static_cast<plaidml_datatype>(shape->shape.type);
+#endif
+#ifdef PLAIDML_MLIR
+    auto elementType = shape->type.getElementType();
+    auto scalarType = elementType.dyn_cast<ScalarType>();
+    return static_cast<plaidml_datatype>(scalarType.type());
+#endif
   });
 }
 
@@ -187,8 +233,17 @@ int64_t plaidml_shape_get_dim_size(  //
     plaidml_error* err,              //
     plaidml_shape* shape,            //
     size_t dim) {
-  return ffi_wrap<int64_t>(err, 0, [&] {  //
+  return ffi_wrap<int64_t>(err, 0, [&] {
+#ifdef PLAIDML_AST
     return shape->shape.dims.at(dim).size;
+#endif
+#ifdef PLAIDML_MLIR
+    const auto& dims = shape->type.getShape();
+    if (dims.size() < dim) {
+      throw std::range_error("dim index out of range");
+    }
+    return dims[dim].size;
+#endif
   });
 }
 
@@ -196,16 +251,30 @@ int64_t plaidml_shape_get_dim_stride(  //
     plaidml_error* err,                //
     plaidml_shape* shape,              //
     size_t dim) {
-  return ffi_wrap<int64_t>(err, 0, [&] {  //
+  return ffi_wrap<int64_t>(err, 0, [&] {
+#ifdef PLAIDML_AST
     return shape->shape.dims.at(dim).stride;
+#endif
+#ifdef PLAIDML_MLIR
+    const auto& dims = shape->type.getShape();
+    if (dims.size() < dim) {
+      throw std::range_error("dim index out of range");
+    }
+    return dims[dim].stride;
+#endif
   });
 }
 
 uint64_t plaidml_shape_get_nbytes(  //
     plaidml_error* err,             //
     plaidml_shape* shape) {
-  return ffi_wrap<int64_t>(err, 0, [&] {  //
+  return ffi_wrap<int64_t>(err, 0, [&] {
+#ifdef PLAIDML_AST
     return shape->shape.byte_size();
+#endif
+#ifdef PLAIDML_MLIR
+    return shape->type.getByteSize();
+#endif
   });
 }
 
@@ -222,8 +291,8 @@ plaidml_buffer* plaidml_buffer_alloc(  //
     const char* device_id,             //
     size_t size) {
   return ffi_wrap<plaidml_buffer*>(err, nullptr, [&] {
-    Context ctx;
-    auto buffer = GetPlatform()->MakeBuffer(ctx, device_id, size);
+    auto ctx = GlobalContext::getContext();
+    auto buffer = GetPlatform()->MakeBuffer(*ctx, device_id, size);
     return new plaidml_buffer{buffer};
   });
 }
@@ -232,8 +301,8 @@ plaidml_view* plaidml_buffer_mmap_current(  //
     plaidml_error* err,                     //
     plaidml_buffer* buffer) {
   return ffi_wrap<plaidml_view*>(err, nullptr, [&] {  //
-    Context ctx;
-    return new plaidml_view{buffer->buffer->MapCurrent(ctx).get()};
+    auto ctx = GlobalContext::getContext();
+    return new plaidml_view{buffer->buffer->MapCurrent(*ctx).get()};
   });
 }
 
@@ -241,8 +310,8 @@ plaidml_view* plaidml_buffer_mmap_discard(  //
     plaidml_error* err,                     //
     plaidml_buffer* buffer) {
   return ffi_wrap<plaidml_view*>(err, nullptr, [&] {  //
-    Context ctx;
-    return new plaidml_view{buffer->buffer->MapDiscard(ctx)};
+    auto ctx = GlobalContext::getContext();
+    return new plaidml_view{buffer->buffer->MapDiscard(*ctx)};
   });
 }
 
@@ -274,8 +343,8 @@ void plaidml_view_writeback(  //
     plaidml_error* err,       //
     plaidml_view* view) {
   ffi_wrap_void(err, [&] {
-    Context ctx;
-    view->view->WriteBack(ctx);
+    auto ctx = GlobalContext::getContext();
+    view->view->WriteBack(*ctx);
   });
 }
 

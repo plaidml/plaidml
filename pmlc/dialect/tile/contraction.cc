@@ -16,6 +16,7 @@
 
 namespace bilp = vertexai::tile::bilp;
 
+using mlir::ArrayAttr;
 using vertexai::tile::math::Integer;
 using vertexai::tile::math::RangeConstraint;
 using vertexai::tile::math::Rational;
@@ -167,7 +168,7 @@ std::set<std::string> Constraints::VariablesUsed() {
 }
 
 // TODO(T133): Check size of integer programming problem to prevent slowdown
-std::tuple<IndexBounds, SimpleConstraints> Constraints::ComputeBounds() {
+BoundsAndConstraints Constraints::ComputeBounds() {
   auto vars = VariablesUsed();
 
   // Run the solver for each variable min + max
@@ -213,6 +214,16 @@ std::tuple<IndexBounds, SimpleConstraints> Constraints::ComputeBounds() {
 static IndexPoly MakePoly(mlir::Value* value) {
   IVLOG(3, "MakePoly: " << mlir::debugString(*value));
   if (auto blockArg = llvm::dyn_cast<mlir::BlockArgument>(value)) {
+    auto domainOp = llvm::cast<AffineDomainOp>(blockArg->getOwner()->getParentOp());
+    if (auto attr = domainOp.getAttrOfType<ArrayAttr>("idx_names")) {
+      auto idxNames = attr.getValue();
+      if (blockArg->getArgNumber() < idxNames.size()) {
+        auto idxName = idxNames[blockArg->getArgNumber()];
+        if (auto strAttr = idxName.dyn_cast_or_null<StringAttr>()) {
+          return IndexPoly{strAttr.getValue().str()};
+        }
+      }
+    }
     auto name = llvm::formatv("x{0}", blockArg->getArgNumber());
     return IndexPoly{name.str()};
   }
@@ -607,12 +618,12 @@ bool Contraction::NeedReduce() const {
   return false;
 }
 
-std::tuple<IndexBounds, SimpleConstraints> Contraction::ComputeBounds(llvm::ArrayRef<stripe::TensorType> shapes) {
+BoundsAndConstraints Contraction::ComputeBounds(llvm::ArrayRef<stripe::TensorType> shapes, bool no_reduce) {
   ConstrainIndexVarsToInts();
   auto constraints = GatherConstraints(shapes);
   IVLOG(3, "Constraints:" << to_string(constraints.constraints));
   // Reduce if needed
-  if (NeedReduce()) {
+  if (NeedReduce() && !no_reduce) {
     ReduceOutputPolynomials(constraints);
     constraints = GatherConstraints(shapes);
   }

@@ -71,6 +71,7 @@ py_test(
         "tf_test.py",
     ],
     tags = [
+        "dbg",
         "keras",
         "windows_fail",
     ],

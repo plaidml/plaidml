@@ -24,13 +24,12 @@ class LogicalShape(ForeignObject):
     __ffi_del__ = lib.plaidml_logical_shape_free
     __ffi_repr__ = lib.plaidml_logical_shape_repr
 
-    def __init__(self, dtype=None, dims=[], ptr=None, layout=''):
+    def __init__(self, dtype=None, dims=[], ptr=None):
         if ptr:
             ffi_obj = ptr
         elif dtype is not None:
             raw_dims = ffi.new('int64_t[]', [0 if x is None else x for x in dims])
-            ffi_obj = ffi_call(lib.plaidml_logical_shape_alloc, dtype, len(dims), raw_dims,
-                               layout.encode())
+            ffi_obj = ffi_call(lib.plaidml_logical_shape_alloc, dtype, len(dims), raw_dims)
         else:
             raise ValueError('One of dtype= or ptr= must be specified.')
         super(LogicalShape, self).__init__(ffi_obj)
@@ -201,7 +200,7 @@ class _Contraction(ForeignObject):
     __ffi_del__ = lib.plaidml_expr_free
     __ffi_repr__ = lib.plaidml_expr_repr
 
-    def __init__(self, agg_op, combo_op, src_idxs, sink_idxs, sink_sizes, name, layout=''):
+    def __init__(self, agg_op, combo_op, src_idxs, sink_idxs, sink_sizes, name):
         src_idxs = [x.as_ptr() for x in src_idxs]
         expr = ffi_call(
             lib.plaidml_expr_contraction,
@@ -212,7 +211,6 @@ class _Contraction(ForeignObject):
             len(src_idxs),
             src_idxs,
             name.encode(),
-            layout.encode(),  # TODO: carry this thru from TensorOutput()
         )
         super(_Contraction, self).__init__(expr)
 
@@ -458,11 +456,11 @@ class Tensor(ForeignObject):
     def __rxor__(self, lhs):
         return call('bit_xor', lhs, self)
 
-    # Enable no_defract on a contraction
-    def no_defract(self):
+    # Enable no_reduce on a contraction
+    def no_reduce(self):
         if not self._is_contraction:
-            raise TypeError('no_defract can only be specified on a contraction.')
-        ffi_call(lib.plaidml_expr_contraction_set_no_defract, self.as_ptr(), True)
+            raise TypeError('no_reduce can only be specified on a contraction.')
+        ffi_call(lib.plaidml_expr_contraction_set_no_reduce, self.as_ptr(), True)
         return self
 
     # Set use_default on a contraction
@@ -571,49 +569,75 @@ class Program(ForeignObject):
         super(Program, self).__init__(ffi_obj)
 
 
+def wrap_tensor(x):
+    if isinstance(x, six.integer_types):
+        return Tensor(expr=ffi_call(lib.plaidml_expr_int, x))
+    if np.issubdtype(type(x), np.integer):
+        return Tensor(expr=ffi_call(lib.plaidml_expr_int, x.item()))
+    if isinstance(x, float):
+        return Tensor(expr=ffi_call(lib.plaidml_expr_float, x))
+    if isinstance(x, TensorDim):
+        return Tensor(expr=ffi_call(lib.plaidml_expr_dim, x.as_ptr()))
+    if isinstance(x, Tensor):
+        return x
+    raise TypeError('Unexpected type for call argument: {}. fn: {}, args: {}, bad arg: {}'.format(
+        type(x), fn, args, x))
+
+
 def call(fn, *args):
-
-    def wrap(x):
-        if isinstance(x, six.integer_types):
-            return Tensor(expr=ffi_call(lib.plaidml_expr_int, x))
-        if np.issubdtype(type(x), np.integer):
-            return Tensor(expr=ffi_call(lib.plaidml_expr_int, x.item()))
-        if isinstance(x, float):
-            return Tensor(expr=ffi_call(lib.plaidml_expr_float, x))
-        if isinstance(x, TensorDim):
-            return Tensor(expr=ffi_call(lib.plaidml_expr_dim, x.as_ptr()))
-        if isinstance(x, Tensor):
-            return x
-        raise TypeError(
-            'Unexpected type for call argument: {}. fn: {}, args: {}, bad arg: {}'.format(
-                type(x), fn, args, x))
-
-    args = [wrap(x) for x in args]
+    args = [wrap_tensor(x) for x in args]
     raw_args = [x.as_ptr() for x in args]
     return Tensor(expr=ffi_call(lib.plaidml_expr_call, fn.encode(), len(args), raw_args))
 
 
+def cast(x, dtype):
+    return Tensor(expr=ffi_call(lib.plaidml_expr_cast, wrap_tensor(x).as_ptr(), dtype))
+
+
+def as_bool(x):
+    return cast(x, DType.BOOLEAN)
+
+
 def as_float(x, bit_size):
-    return call('as_float', x, bit_size)
+    map = {
+        16: DType.FLOAT16,
+        32: DType.FLOAT32,
+        64: DType.FLOAT64,
+    }
+    dtype = map.get(bit_size)
+    if not dtype:
+        raise 'Unsupport bit_size for as_float'
+    return cast(x, dtype)
 
 
 def as_int(x, bit_size):
-    return call('as_int', x, bit_size)
+    map = {
+        8: DType.INT8,
+        16: DType.INT16,
+        32: DType.INT32,
+        64: DType.INT64,
+    }
+    dtype = map.get(bit_size)
+    if not dtype:
+        raise 'Unsupport bit_size for as_int'
+    return cast(x, dtype)
 
 
 def as_uint(x, bit_size):
-    return call('as_uint', x, bit_size)
-
-
-def cast(x, dtype):
-    return call('as_{}'.format(dtype.info.base), x, dtype.info.bitwidth)
+    map = {
+        8: DType.UINT8,
+        16: DType.UINT16,
+        32: DType.UINT32,
+        64: DType.UINT64,
+    }
+    dtype = map.get(bit_size)
+    if not dtype:
+        raise 'Unsupport bit_size for as_uint'
+    return cast(x, dtype)
 
 
 def ceil(x):
     return call('ceil', x)
-
-
-# def element(x) : return call('element', {x}) # TODO: tuple
 
 
 def cond(lhs, rhs, true_case):
@@ -695,10 +719,6 @@ def select(cond, true_case, false_case):
 
 def shape(x):
     return call('shape', x)
-
-
-def sigmoid(x):
-    return call('sigmoid', x)
 
 
 def sin(x):

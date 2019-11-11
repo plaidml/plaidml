@@ -20,13 +20,7 @@ class TileOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
 
 def PlaceholderOp : TileOp<"var"> {
   let summary = "placeholder operation";
-  let results = (outs Eltwise_AnyTensor:$result);
-
-  let builders = [OpBuilder<
-    "Builder* builder, OperationState& result, RankedTensorType type", [{
-      result.addTypes(type);
-    }]
-  >];
+  let results = (outs RankedTensorOf<[AnyScalar]>:$result);
 }
 
 def TupleOp : TileOp<"tuple"> {
@@ -41,32 +35,35 @@ def NoneOp : TileOp<"none"> {
 def StringOp : TileOp<"str"> {
   let arguments = (ins StrAttr:$value);
   let results = (outs StrType:$result);
+  let extraClassDeclaration = [{
+    StringAttr getValue() { return getAttrOfType<StringAttr>("value"); }
+  }];
 }
 
 def DimOp : TileOp<"dim">, HasFolder {
   let summary = "dimension index operation";
-  let arguments = (ins Eltwise_AnyTensor:$tensor, APIntAttr:$dim);
-  let results = (outs Index:$result);
+  let arguments = (ins RankedTensorOf<[AnyScalar]>:$tensor, APIntAttr:$dim);
+  let results = (outs ScalarIndex:$result);
 
   let builders = [OpBuilder<
     "Builder* builder, OperationState& result, Value* tensor, int64_t value", [{
-      auto type = builder->getIndexType();
+      auto type = ScalarType::get(builder->getContext(), DataType::INTX);
       result.addOperands(tensor);
-      result.addAttribute("dim", builder->getIntegerAttr(type, value));
+      result.addAttribute("dim", builder->getI64IntegerAttr(value));
       result.addTypes(type);
     }]
   >];
 }
 
-def AffineConstantOp : TileOp<"const_dim">, HasFolder {
+def AffineConstantOp : TileOp<"affine_const">, HasFolder {
   let summary = "affine constant";
   let arguments = (ins I64Attr:$value);
-  let results = (outs Index:$result);
+  let results = (outs ScalarIndex:$result);
 
   let builders = [OpBuilder<
     "Builder* builder, OperationState& result, int64_t value", [{
       result.addAttribute("value", builder->getI64IntegerAttr(value));
-      result.addTypes(builder->getIndexType());
+      result.addTypes(ScalarType::get(builder->getContext(), DataType::INTX));
     }]
   >];
 
@@ -77,35 +74,37 @@ def AffineConstantOp : TileOp<"const_dim">, HasFolder {
 
 def AffineIndexOp : TileOp<"idx"> {
   let summary = "affine index";
-  let results = (outs Index:$result);
+  let results = (outs ScalarIndex:$result);
 
   let builders = [OpBuilder<
     "Builder* builder, OperationState& result", [{
-      result.addTypes(builder->getIndexType());
+      result.addTypes(ScalarType::get(builder->getContext(), DataType::INTX));
     }]
   >];
 }
 
-class AffineOp<string mnemonic> : TileOp<mnemonic, [NoSideEffect]>, HasFolder {
-  let results = (outs Index:$result);
+class AffineOp<string mnemonic, list<OpTrait> traits = []> :
+    TileOp<mnemonic, !listconcat(traits, [NoSideEffect])>,
+    HasFolder {
+  let results = (outs ScalarIndex:$result);
 
   let builders = [OpBuilder<
     "Builder* builder, OperationState& result, ArrayRef<Value*> operands", [{
       result.addOperands(operands);
-      result.addTypes(builder->getIndexType());
+      result.addTypes(ScalarType::get(builder->getContext(), DataType::INTX));
     }]
   >];
 }
 
-class AffineUnaryOp<string mnemonic> : AffineOp<mnemonic> {
-  let arguments = (ins Index:$in);
+class AffineUnaryOp<string mnemonic, list<OpTrait> traits = []> : AffineOp<mnemonic, traits> {
+  let arguments = (ins ScalarIndex:$in);
 }
 
-class AffineBinaryOp<string mnemonic> : AffineOp<mnemonic> {
-  let arguments = (ins Index:$lhs, Index:$rhs);
+class AffineBinaryOp<string mnemonic, list<OpTrait> traits = []> : AffineOp<mnemonic, traits> {
+  let arguments = (ins ScalarIndex:$lhs, ScalarIndex:$rhs);
 }
 
-def AffineAddOp : AffineBinaryOp<"affine_add"> {
+def AffineAddOp : AffineBinaryOp<"affine_add", [Commutative]> {
   let summary = "Affine addition operation";
 }
 
@@ -113,36 +112,37 @@ def AffineDivOp : AffineBinaryOp<"affine_div"> {
   let summary = "Affine division operation";
 }
 
-def AffineMulOp : AffineBinaryOp<"affine_mul"> {
+def AffineMulOp : AffineBinaryOp<"affine_mul", [Commutative]> {
   let summary = "Affine multiplication operation";
 }
 
 def AffineNegOp : AffineUnaryOp<"affine_neg"> {
   let summary = "Affine negative operation";
-  let arguments = (ins Index:$input);
+  let arguments = (ins ScalarIndex:$input);
 }
 
 def AffineSubOp : AffineBinaryOp<"affine_sub"> {
   let summary = "Affine subtraction operation";
 }
 
-def AffineMaxOp : AffineBinaryOp<"affine_max"> {
+def AffineMaxOp : AffineBinaryOp<"affine_max", [Commutative]> {
   let summary = "Affine max operation";
 }
 
-def AffineMinOp : AffineBinaryOp<"affine_min"> {
+def AffineMinOp : AffineBinaryOp<"affine_min", [Commutative]> {
   let summary = "Affine min operation";
 }
 
 def AffineDomainOp : TileOp<"domain">, HasCanonicalizer {
   let summary = "affine domain";
-  let results = (outs Eltwise_AnyTensor:$result);
+  let arguments = (ins OptionalAttr<BoolAttr>:$no_reduce);
+  let results = (outs RankedTensorOf<[AnyScalar]>:$result);
   let regions = (region SizedRegion<1>:$body);
 }
 
 def AffineSourceIndexMapOp : TileOp<"src_idx_map", [HasParent<"AffineDomainOp">]> {
   let summary = "affine source index map";
-  let arguments = (ins Eltwise_AnyTensor:$tensor, Variadic<Index>:$dims);
+  let arguments = (ins EltwiseAny:$tensor, Variadic<ScalarIndex>:$dims);
   let results = (outs AffineIndexMap:$result);
 
   let builders = [OpBuilder<
@@ -156,7 +156,7 @@ def AffineSourceIndexMapOp : TileOp<"src_idx_map", [HasParent<"AffineDomainOp">]
 
 def AffineSinkIndexMapOp : TileOp<"sink_idx_map", [HasParent<"AffineDomainOp">]> {
   let summary = "affine sink index map";
-  let arguments = (ins Variadic<Index>:$dims);
+  let arguments = (ins Variadic<ScalarIndex>:$dims);
   let results = (outs AffineIndexMap:$result);
 
   let builders = [OpBuilder<
@@ -169,7 +169,7 @@ def AffineSinkIndexMapOp : TileOp<"sink_idx_map", [HasParent<"AffineDomainOp">]>
 
 def AffineSizeMapOp : TileOp<"size_map", [HasParent<"AffineDomainOp">]> {
   let summary = "affine size map";
-  let arguments = (ins Variadic<Index>:$sizes);
+  let arguments = (ins Variadic<ScalarIndex>:$sizes);
   let results = (outs AffineSizeMap:$result);
 
   let builders = [OpBuilder<
@@ -182,15 +182,12 @@ def AffineSizeMapOp : TileOp<"size_map", [HasParent<"AffineDomainOp">]> {
 
 def ConstraintOp : TileOp<"constraint", [Terminator]> {
   let summary = "constraint operation";
-  let arguments = (ins Index:$lhs, Index:$rhs);
+  let arguments = (ins ScalarIndex:$lhs, ScalarIndex:$rhs);
   let regions = (region SizedRegion<1>:$body);
 }
 
 class ContractionOp<string mnemonic, list<OpTrait> traits = []> :
-    TileOp<mnemonic, !listconcat(traits, [
-      Terminator,
-      ContractionOpInterface
-    ])>;
+    TileOp<mnemonic, !listconcat(traits, [Terminator, ContractionOpInterface])>;
 
 class UnaryConOp<string mnemonic, string agg, string combo> : ContractionOp<mnemonic> {
   let arguments = (ins
@@ -200,16 +197,15 @@ class UnaryConOp<string mnemonic, string agg, string combo> : ContractionOp<mnem
     Variadic<RankedTensorOf<[AnyScalar]>>:$init
   );
 
-  let builders = [OpBuilder<
-    "Builder* builder, OperationState& result, Value* size, Value* src, Value* sink", [{
-      result.addOperands(size);
-      result.addOperands(src);
-      result.addOperands(sink);
-      result.setOperandListToResizable();
-    }]
-  >];
-
   let extraClassDeclaration = [{
+    static Operation* create(OpBuilder* builder, Location loc, Value* size, ArrayRef<Value*> srcs, Value* sink) {
+      OperationState state(loc, getOperationName());
+      state.addOperands(size);
+      state.addOperands(srcs);
+      state.addOperands(sink);
+      state.setOperandListToResizable();
+      return builder->createOperation(state);
+    }
     Value* getSizeMap() { return size(); }
     std::vector<Value*> getSourceIndexMaps() { return {src()}; }
     Value* getSinkIndexMap() { return sink(); }
@@ -234,17 +230,15 @@ class BinaryConOp<string mnemonic, string agg, string combo> : ContractionOp<mne
     Variadic<RankedTensorOf<[AnyScalar]>>:$init
   );
 
-  let builders = [OpBuilder<
-    "Builder* builder, OperationState& result, Value* size, Value* src1, Value* src2, Value* sink", [{
-      result.addOperands(size);
-      result.addOperands(src1);
-      result.addOperands(src2);
-      result.addOperands(sink);
-      result.setOperandListToResizable();
-    }]
-  >];
-
   let extraClassDeclaration = [{
+    static Operation* create(OpBuilder* builder, Location loc, Value* size, ArrayRef<Value*> srcs, Value* sink) {
+      OperationState state(loc, getOperationName());
+      state.addOperands(size);
+      state.addOperands(srcs);
+      state.addOperands(sink);
+      state.setOperandListToResizable();
+      return builder->createOperation(state);
+    }
     Value* getSizeMap() { return size(); }
     std::vector<Value*> getSourceIndexMaps() { return {src1(), src2()}; }
     Value* getSinkIndexMap() { return sink(); }
@@ -270,18 +264,15 @@ class TernaryConOp<string mnemonic, string agg, string combo> : ContractionOp<mn
     Variadic<RankedTensorOf<[AnyScalar]>>:$init
   );
 
-  let builders = [OpBuilder<
-    "Builder* builder, OperationState& result, Value* size, Value* src1, Value* src2, Value* src3, Value* sink", [{
-      result.addOperands(size);
-      result.addOperands(src1);
-      result.addOperands(src2);
-      result.addOperands(src3);
-      result.addOperands(sink);
-      result.setOperandListToResizable();
-    }]
-  >];
-
   let extraClassDeclaration = [{
+    static Operation* create(OpBuilder* builder, Location loc, Value* size, ArrayRef<Value*> srcs, Value* sink) {
+      OperationState state(loc, getOperationName());
+      state.addOperands(size);
+      state.addOperands(srcs);
+      state.addOperands(sink);
+      state.setOperandListToResizable();
+      return builder->createOperation(state);
+    }
     Value* getSizeMap() { return size(); }
     std::vector<Value*> getSourceIndexMaps() { return {src1(), src2(), src3()}; }
     Value* getSinkIndexMap() { return sink(); }
@@ -402,6 +393,16 @@ def ConSumMulOp : BinaryConOp<"+(x*y)", "add", "mul"> {
   let summary = "+(x * y) contraction";
 }
 
+def IndexOp : TileOp<"index", [NoSideEffect]>, HasCanonicalizer {
+  let summary = "tensor index lookup operation";
+  let arguments = (ins EltwiseAny:$tensor, APIntAttr:$dim);
+  let results = (outs EltwiseIndex:$result);
+
+  let extraClassDeclaration = [{
+    static Type getResultType(ArrayRef<Value*> operands);
+  }];
+}
+
 class SpecialOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
     Op<TileDialect, mnemonic, !listconcat(traits, [SpecialOpInterface, GenericBuilderInterface])> {
 
@@ -420,78 +421,30 @@ class SpecialOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
 
 def GatherOp : SpecialOp<"gather">, HasCanonicalizer {
   let summary = "special gather operation";
-  let arguments = (ins Eltwise_AnyTensor:$tensor, Eltwise_IntegerTensor:$dims);
-  let results = (outs Eltwise_AnyTensor:$result);
-
-  let builders = [OpBuilder<
-    "Builder* builder, OperationState& result, ScalarType type, ArrayRef<Value*> operands", [{
-      result.addOperands(operands);
-      result.addTypes(getResultType(operands));
-    }]
-  >];
-}
-
-def IndexOp : SpecialOp<"index">, HasCanonicalizer {
-  let summary = "tensor index lookup operation";
-  let arguments = (ins Eltwise_AnyTensor:$tensor, Eltwise_Integer:$dim);
-  let results = (outs Eltwise_IntegerTensor:$result);
-
-  let builders = [OpBuilder<
-    "Builder* builder, OperationState& result, ScalarType type, ArrayRef<Value*> operands", [{
-      result.addOperands(operands);
-      result.addTypes(getResultType(operands));
-    }]
-  >];
+  let arguments = (ins RankedTensorOf<[AnyScalar]>:$tensor, VectorOf<[ScalarIndex]>:$dims);
+  let results = (outs RankedTensorOf<[AnyScalar]>:$result);
 }
 
 def PrngOp : SpecialOp<"prng">, HasCanonicalizer {
   let summary = "pseudorandom number generator";
-  let arguments = (ins Eltwise_AnyTensor:$state, Variadic<Eltwise_Integer>:$dims);
-  let results = (outs Eltwise_AnyTensor:$result);
-
-  let builders = [OpBuilder<
-    "Builder* builder, OperationState& result, ScalarType type, ArrayRef<Value*> operands", [{
-      result.addOperands(operands);
-      result.addTypes(getResultType(operands));
-    }]
-  >];
+  let arguments = (ins RankedTensorOf<[AnyScalar]>:$state, Variadic<ScalarIndex>:$dims);
+  let results = (outs RankedTensorOf<[AnyScalar]>:$result);
 }
 
 def ReshapeOp : SpecialOp<"reshape">, HasCanonicalizer {
   let summary = "tensor reshape operation";
-  let arguments = (ins Eltwise_AnyTensor:$tensor, Variadic<Eltwise_Integer>:$dims);
-  let results = (outs Eltwise_AnyTensor:$result);
-
-  let builders = [OpBuilder<
-    "Builder* builder, OperationState& result, ScalarType type, ArrayRef<Value*> operands", [{
-      result.addOperands(operands);
-      result.addTypes(getResultType(operands));
-    }]
-  >];
+  let arguments = (ins RankedTensorOf<[AnyScalar]>:$tensor, Variadic<EltwiseIndex>:$dims);
+  let results = (outs RankedTensorOf<[AnyScalar]>:$result);
 }
 
 def ScatterOp : SpecialOp<"scatter">, HasCanonicalizer {
   let summary = "special scatter operation";
-  let arguments = (ins Eltwise_AnyTensor:$tensor, Eltwise_IntegerTensor:$dims, Eltwise_AnyTensor:$other);
-  let results = (outs Eltwise_AnyTensor:$result);
-
-  let builders = [OpBuilder<
-    "Builder* builder, OperationState& result, ScalarType type, ArrayRef<Value*> operands", [{
-      result.addOperands(operands);
-      result.addTypes(getResultType(operands));
-    }]
-  >];
+  let arguments = (ins RankedTensorOf<[AnyScalar]>:$tensor, VectorOf<[ScalarIndex]>:$dims, RankedTensorOf<[AnyScalar]>:$other);
+  let results = (outs RankedTensorOf<[AnyScalar]>:$result);
 }
 
 def ShapeOp : SpecialOp<"shape">, HasCanonicalizer {
   let summary = "tensor shape operation";
-  let arguments = (ins Eltwise_AnyTensor:$tensor);
-  let results = (outs Eltwise_IntegerTensor:$result);
-
-  let builders = [OpBuilder<
-    "Builder* builder, OperationState& result, ScalarType type, ArrayRef<Value*> operands", [{
-      result.addOperands(operands);
-      result.addTypes(getResultType(operands));
-    }]
-  >];
+  let arguments = (ins RankedTensorOf<[AnyScalar]>:$tensor);
+  let results = (outs VectorOf<[ScalarIndex]>:$result);
 }

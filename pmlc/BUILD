@@ -13,6 +13,7 @@ plaidml_cc_binary(
         "//pmlc/conversion/stripe_to_affine",
         "//pmlc/dialect/eltwise",
         "//pmlc/dialect/stripe",
+        "//pmlc/dialect/stripe:passes",
         "//pmlc/dialect/tile",
         "@mlir//:EDSC",
         "@mlir//:OptMain",

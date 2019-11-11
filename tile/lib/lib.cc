@@ -18,7 +18,7 @@ using namespace plaidml::edsl;  // NOLINT
 namespace {
 
 lang::RunInfo Evaluate(const std::string& name, const std::vector<Tensor>& vars) {
-  Program program(name, vars, {});
+  Program program(name, vars);
   return *static_cast<const tile::lang::RunInfo*>(program.runinfo());
 }
 
@@ -493,8 +493,8 @@ lang::RunInfo LoadSoftmax(const std::string& name,      //
   return Evaluate(name, {E / N});
 }
 
-Tensor BatchNormalization(const Tensor& I, const Tensor& M, const Tensor& V, 
-                          const Tensor& G, const Tensor& B, const Tensor& E) {
+Tensor BatchNormalization(const Tensor& I, const Tensor& M, const Tensor& V, const Tensor& G, const Tensor& B,
+                          const Tensor& E) {
   return ((I - M) * G / sqrt(V + E)) + B;
 }
 

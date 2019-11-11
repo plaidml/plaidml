@@ -204,7 +204,6 @@ class IndexedTensor {
     std::shared_ptr<plaidml_expr> sizes;
     std::shared_ptr<ComboParts> rhs;
     const Tensor* src = nullptr;
-    std::string layout;
     void MakeContraction(plaidml_agg_op agg_op, const IndexedTensor& rhs);
   };
 
@@ -280,15 +279,9 @@ class LogicalShape {
   friend class Tensor;
 
  public:
-  LogicalShape(plaidml_datatype dtype,            //
-               const std::vector<int64_t>& dims,  //
-               const std::string& layout = "")
-      : ptr_(details::make_plaidml_logical_shape(ffi::call<plaidml_logical_shape*>(  //
-            plaidml_logical_shape_alloc,                                             //
-            dtype,                                                                   //
-            dims.size(),                                                             //
-            dims.data(),                                                             //
-            layout.c_str()))) {}
+  LogicalShape(plaidml_datatype dtype, const std::vector<int64_t>& dims)
+      : ptr_(details::make_plaidml_logical_shape(
+            ffi::call<plaidml_logical_shape*>(plaidml_logical_shape_alloc, dtype, dims.size(), dims.data()))) {}
 
   plaidml_logical_shape* as_ptr() const { return ptr_.get(); }
 
@@ -298,10 +291,6 @@ class LogicalShape {
 
   plaidml_datatype dtype() const {  //
     return ffi::call<plaidml_datatype>(plaidml_logical_shape_get_dtype, ptr_.get());
-  }
-
-  std::string layout() const {  //
-    return ffi::str(ffi::call<plaidml_string*>(plaidml_logical_shape_get_layout, ptr_.get()));
   }
 
   size_t ndims() const {  //
@@ -345,7 +334,6 @@ class Tensor {
     bool has_dims = false;
     std::vector<TensorDim> dims;
     std::string name;
-    std::string layout;
   };
 
  public:
@@ -377,40 +365,33 @@ class Tensor {
     impl_->ptr = details::make_plaidml_expr(ffi::call<plaidml_expr*>(plaidml_expr_dim, dim.as_ptr()));
   }
 
-  explicit Tensor(const std::vector<int64_t>& dims, const std::string& layout = "") : impl_(new Impl) {
+  explicit Tensor(const std::vector<int64_t>& dims) : impl_(new Impl) {
     for (auto dim : dims) {
       impl_->dims.emplace_back(dim);
     }
     impl_->has_dims = true;
-    impl_->layout = layout;
   }
 
-  explicit Tensor(const std::vector<TensorDim>& dims, const std::string& layout = "") : impl_(new Impl) {
+  explicit Tensor(const std::vector<TensorDim>& dims) : impl_(new Impl) {
     impl_->dims = dims;
     impl_->has_dims = true;
-    impl_->layout = layout;
   }
 
-  explicit Tensor(const std::initializer_list<TensorDim>& dims, const std::string& layout = "") : impl_(new Impl) {
+  explicit Tensor(const std::initializer_list<TensorDim>& dims) : impl_(new Impl) {
     impl_->dims = dims;
     impl_->has_dims = true;
-    impl_->layout = layout;
   }
 
-  Tensor(const std::string& name, const std::vector<TensorDim>& dims, const std::string& layout = "")
-      : impl_(new Impl) {
+  Tensor(const std::string& name, const std::vector<TensorDim>& dims) : impl_(new Impl) {
     impl_->name = name;
     impl_->dims = dims;
     impl_->has_dims = true;
-    impl_->layout = layout;
   }
 
-  Tensor(const std::string& name, const std::initializer_list<TensorDim>& dims, const std::string& layout = "")
-      : impl_(new Impl) {
+  Tensor(const std::string& name, const std::initializer_list<TensorDim>& dims) : impl_(new Impl) {
     impl_->name = name;
     impl_->dims = dims;
     impl_->has_dims = true;
-    impl_->layout = layout;
   }
 
   // Copyable
@@ -430,7 +411,6 @@ class Tensor {
     }
     std::unique_ptr<IndexedTensor::Impl> impl(new IndexedTensor::Impl());
     impl->src = this;
-    impl->layout = impl_->layout;
     if (impl_->has_dims) {
       std::vector<plaidml_dim_expr*> sizes;
       for (const auto& dim : impl_->dims) {
@@ -474,9 +454,9 @@ class Tensor {
 
   plaidml_expr* as_ptr() const { return impl_->ptr.get(); }
 
-  // Enable no_defract on a contraction
-  Tensor& no_defract() {
-    ffi::call_void(plaidml_expr_contraction_set_no_defract, as_ptr(), true);
+  // Enable no_reduce on a contraction
+  Tensor& no_reduce() {
+    ffi::call_void(plaidml_expr_contraction_set_no_reduce, as_ptr(), true);
     return *this;
   }
 
@@ -543,12 +523,12 @@ Tensor TensorOutput(Ts... dims) {
   return Tensor{vec};
 }
 
-inline Tensor TensorOutput(const std::vector<TensorDim>& dims, const std::string& layout = "") {  //
-  return Tensor(dims, layout);
+inline Tensor TensorOutput(const std::vector<TensorDim>& dims) {  //
+  return Tensor(dims);
 }
 
-inline Tensor TensorOutput(const std::vector<int64_t>& dims, const std::string& layout = "") {  //
-  return Tensor(dims, layout);
+inline Tensor TensorOutput(const std::vector<int64_t>& dims) {  //
+  return Tensor(dims);
 }
 
 inline Tensor Placeholder(      //
@@ -612,15 +592,57 @@ Tensor Call(const std::string& fn, Ts... args) {
   return Call(fn, vec);
 }
 
+inline Tensor cast(const Tensor& x, plaidml_datatype dtype) {
+  auto ptr = ffi::call<plaidml_expr*>(plaidml_expr_cast, x.as_ptr(), dtype);
+  return Tensor{ptr};
+}
+
 inline Tensor abs(const Tensor& x) { return Call("abs", x); }
 
-inline Tensor as_float(const Tensor& x, size_t bit_size) { return Call("as_float", x, static_cast<int64_t>(bit_size)); }
+inline Tensor as_float(const Tensor& x, size_t bit_size) {
+  switch (bit_size) {
+    case 16:
+      return cast(x, PLAIDML_DATA_FLOAT16);
+    case 32:
+      return cast(x, PLAIDML_DATA_FLOAT32);
+    case 64:
+      return cast(x, PLAIDML_DATA_FLOAT64);
+    default:
+      throw std::runtime_error("Invalid bit size for as_float");
+  }
+}
 
-inline Tensor as_int(const Tensor& x, size_t bit_size) { return Call("as_int", x, static_cast<int64_t>(bit_size)); }
+inline Tensor as_int(const Tensor& x, size_t bit_size) {
+  switch (bit_size) {
+    case 8:
+      return cast(x, PLAIDML_DATA_INT8);
+    case 16:
+      return cast(x, PLAIDML_DATA_INT16);
+    case 32:
+      return cast(x, PLAIDML_DATA_INT32);
+    case 64:
+      return cast(x, PLAIDML_DATA_INT64);
+    default:
+      throw std::runtime_error("Invalid bit size for as_int");
+  }
+}
 
-inline Tensor as_uint(const Tensor& x, size_t bit_size) { return Call("as_uint", x, static_cast<int64_t>(bit_size)); }
+inline Tensor as_uint(const Tensor& x, size_t bit_size) {
+  switch (bit_size) {
+    case 8:
+      return cast(x, PLAIDML_DATA_UINT8);
+    case 16:
+      return cast(x, PLAIDML_DATA_UINT16);
+    case 32:
+      return cast(x, PLAIDML_DATA_UINT32);
+    case 64:
+      return cast(x, PLAIDML_DATA_UINT64);
+    default:
+      throw std::runtime_error("Invalid bit size for as_uint");
+  }
+}
 
-inline Tensor as_bool(const Tensor& x) { return Call("as_bool", x); }
+inline Tensor as_bool(const Tensor& x) { return cast(x, PLAIDML_DATA_BOOLEAN); }
 
 inline Tensor cos(const Tensor& x) { return Call("cos", x); }
 
@@ -824,8 +846,7 @@ inline void IndexedTensor::Impl::MakeContraction(plaidml_agg_op agg_op, const In
           sizes.get(),                           //
           src_idxs.size(),                       //
           src_idxs.data(),                       //
-          src->impl_->name.c_str(),              //
-          layout.c_str()));
+          src->impl_->name.c_str()));
 }
 
 // Represents a combo_op of COND in a contraction
@@ -845,7 +866,7 @@ inline IndexedTensor IndexedTensor::operator==(const IndexedTensor& rhs) const {
   return IndexedTensor(PLAIDML_COMBO_OP_EQ, {this, &rhs});
 }
 
-inline Tensor Call(const std::string& fn, const std::vector<Tensor>& args) {  //
+inline Tensor Call(const std::string& fn, const std::vector<Tensor>& args) {
   std::vector<plaidml_expr*> ptrs(args.size());
   for (size_t i = 0; i < args.size(); i++) {
     ptrs[i] = args[i].as_ptr();

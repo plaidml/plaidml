@@ -14,9 +14,7 @@
 
 using namespace plaidml::edsl;  // NOLINT
 
-namespace plaidml {
-namespace op {
-namespace lib {
+namespace plaidml::op::lib {
 
 // Forward declare the operations here so they can call each other
 Value abs(const Value&);
@@ -633,8 +631,8 @@ Value binary_crossentropy(const Value& value) {
     throw std::runtime_error(str(
         boost::format("The epsilon used in binary_crossentropy must be between 0 and 0.5, received %1%") % epsilon));
   }
-  std::vector<Value> clip_inputs{raw_P, Value{epsilon}, Value{1. - epsilon}};
-  auto P = clip(Value{clip_inputs}).as_tensor();
+  auto clip_inputs = make_tuple(raw_P, Value{epsilon}, Value{1. - epsilon});
+  auto P = clip(clip_inputs).as_tensor();
   auto O = -T * log(P) - (1 - T) * log(1 - P);
   TensorDeriv deriv = [](const Tensor& Y, const Tensor& DY, const std::vector<Tensor>& X) {  //
     auto T = X[0];
@@ -650,8 +648,7 @@ Value binary_crossentropy(const Value& value) {
     return std::vector<Tensor>{(log(One - P) - log(P)) / dims_prod, (-T / P + (One - T) / (One - P)) / dims_prod};
   };
   // Safe to use P without copy since it is built internally to this function
-  auto Overridden = OverrideGrads(deriv, std::vector<Tensor>{T, P}, O);
-  return Value{Overridden};
+  return Value{OverrideGrads(deriv, std::vector<Tensor>{T, P}, O)};
 }
 
 Value clip(const Value& value) {
@@ -1574,10 +1571,8 @@ Value image_resize(const Value& value) {
   Tensor O;
   switch (interp) {
     case InterpolationMode::NEAREST: {
-      std::vector<Value> repeat_inputs{raw_I, Value{factors[0]}, Value{pre_axes}};
-      auto R = repeat(Value{repeat_inputs});
-      std::vector<Value> repeat_inputs2{R, Value{factors[1]}, Value{pre_axes + 1}};
-      O = repeat(Value{repeat_inputs2}).as_tensor();
+      auto R = repeat(make_tuple(raw_I, Value{factors[0]}, Value{pre_axes}));
+      O = repeat(make_tuple(R, Value{factors[1]}, Value{pre_axes + 1})).as_tensor();
     } break;
     case InterpolationMode::BILINEAR: {
       // This aligns the corners to 0 and <factor> * (<dim> - 1), and assumes zero-padding, which is a bit weird. But
@@ -2065,8 +2060,7 @@ Value scale_gradient(const Value& value) {
   TensorDeriv deriv = [](const Tensor& Y, const Tensor& DY, const std::vector<Tensor>& X) {
     return std::vector<Tensor>{X[1] * DY, Tensor{0.0}};
   };
-  auto Overridden = OverrideGrads(deriv, std::vector<Tensor>{I, scale}, O);
-  return Value{Overridden};
+  return Value{OverrideGrads(deriv, std::vector<Tensor>{I, scale}, O)};
 }
 
 Value sigmoid(const Value& value) {
@@ -2080,8 +2074,7 @@ Value sigmoid(const Value& value) {
   TensorDeriv deriv = [](const Tensor& Y, const Tensor& DY, const std::vector<Tensor>& X) {  //
     return std::vector<Tensor>{Y * (1.0 - Y) * DY};
   };
-  auto Overridden = OverrideGrads(deriv, std::vector<Tensor>{I}, O);
-  return Value{Overridden};
+  return Value{OverrideGrads(deriv, std::vector<Tensor>{I}, O)};
 }
 
 Value slice(const Value& value) {
@@ -2241,7 +2234,7 @@ Value softmax(const Value& value) {
         pattern[i] = Value{i};
       }
     }
-    I = transpose(Value{std::vector<Value>{args[0], Value{pattern}}}).as_tensor();
+    I = transpose(make_tuple(args[0], Value{pattern})).as_tensor();
     axis = ndims - 1;  // we've moved the softmax axis to be the last axis
   }
 
@@ -2279,13 +2272,10 @@ Value softmax(const Value& value) {
   };
   auto Overridden = OverrideGrads(deriv, std::vector<Tensor>{I}, O);
   // If we reordered, return to original order
-  Tensor ret;
   if (transposed) {
-    ret = transpose(Value{std::vector<Value>{Value{Overridden}, Value{pattern}}}).as_tensor();
-  } else {
-    ret = Overridden;
+    return transpose(make_tuple(Value{Overridden}, Value{pattern}));
   }
-  return Value{ret};
+  return Value{Overridden};
 }
 
 Value spatial_padding(const Value& value) {
@@ -2582,8 +2572,7 @@ Value squeeze(const Value& value) {
   for (const auto dim : O_dims) {
     O_dims_values.push_back(Value{dim});
   }
-  std::vector<Value> reshape_args = {Value{I}, Value{O_dims_values}};
-  return reshape(Value{reshape_args});
+  return reshape(make_tuple(Value{I}, Value{O_dims_values}));
 }
 
 Value sum(const Value& value) {
@@ -2655,7 +2644,7 @@ Value tile(const Value& value) {
   }
   auto O = TensorOutput(O_dims);
   O(O_idxs) = I(I_idxs);
-  O.no_defract();
+  O.no_reduce();
   return Value{O};
 }
 
@@ -2722,6 +2711,10 @@ Value variance(const Value& value) {
   auto I = args[0].as_tensor();
   auto axes = args[1];
   auto keepdims = args[2].as_bool();
+
+  IVLOG(2, "I: " << I.shape().str());
+  IVLOG(2, "axes: " << axes);
+  IVLOG(2, "keep_dims: " << keepdims);
 
   // Handle trivial cases
   if (I.shape().ndims() == 0) {
@@ -2793,6 +2786,4 @@ void RegisterOps() {
   registry->Register("variance", variance);
 }
 
-}  // namespace lib
-}  // namespace op
-}  // namespace plaidml
+}  // namespace plaidml::op::lib

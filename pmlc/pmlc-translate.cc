@@ -12,8 +12,11 @@
 #include "mlir/Support/ToolUtilities.h"
 #include "mlir/Support/TranslateClParser.h"
 
-using namespace mlir;  // NOLINT
-using namespace llvm;  // NOLINT
+#include "base/util/env.h"
+#include "base/util/logging.h"
+
+using namespace mlir;  // NOLINT(build/namespaces)
+using namespace llvm;  // NOLINT(build/namespaces)
 
 static cl::opt<std::string> inputFilename(  //
     cl::Positional,                         //
@@ -35,6 +38,15 @@ static cl::opt<bool> splitInputFile(                  //
     cl::init(false));
 
 int main(int argc, char** argv) {
+  START_EASYLOGGINGPP(argc, argv);
+  auto level_str = vertexai::env::Get("PLAIDML_VERBOSE");
+  if (level_str.size()) {
+    auto level = std::atoi(level_str.c_str());
+    if (level) {
+      el::Loggers::setVerboseLevel(level);
+    }
+  }
+
   // Add flags for all the registered translations.
   cl::opt<const TranslateFunction*, false, TranslationParser> requested_translation(  //
       "", cl::desc("Translation to perform"));

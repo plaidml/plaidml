@@ -11,9 +11,7 @@
 #include "pmlc/dialect/stripe/mlir.h"
 #include "tile/base/shape.h"
 
-namespace pmlc {
-namespace dialect {
-namespace stripe {
+namespace pmlc::dialect::stripe {
 
 constexpr char kAddressClassIdentifier[] = "addr";
 
@@ -65,7 +63,7 @@ struct TensorDim {
 };
 
 inline llvm::hash_code hash_value(const TensorDim& td) {  //
-  return llvm::hash_combine(td.size, td.stride);
+  return llvm::hash_combine(td.size, td.stride, td.cls);
 }
 
 using OffsetsMap = llvm::SmallDenseMap<mlir::Identifier, int64_t>;
@@ -122,6 +120,8 @@ class TensorType : public Type::TypeBase<TensorType, Type, TensorTypeStorage> {
 
   /// Check if things are const
   bool is_const() const;
+
+  uint64_t getByteSize() const;
 };
 
 struct TensorRefTypeStorage;
@@ -132,8 +132,10 @@ class TensorRefType : public Type::TypeBase<TensorRefType, Type, TensorRefTypeSt
 
   static bool kindof(unsigned kind) { return kind == Types::TensorRef; }
 
-  static TensorRefType get(Type elementType, int64_t rank, bool is_const);
-  static TensorRefType get(TensorType type);
+  static TensorRefType get(Type elementType, int64_t rank, bool is_const, ArrayRef<TensorDim> shape = {});
+
+  /// Construct a TensorRefType from `type`. If `propagateShape` is true, propagate `type` shape to TensorRefType.
+  static TensorRefType get(TensorType type, bool propagateShape = false);
 
   /// Return the element type.
   Type getElementType() const;
@@ -143,8 +145,9 @@ class TensorRefType : public Type::TypeBase<TensorRefType, Type, TensorRefTypeSt
 
   /// Check if things are const
   bool is_const() const;
+
+  /// Return the pre-computed TensorType shape for this TensorRefType.
+  const ArrayRef<TensorDim> getShape() const;
 };
 
-}  // namespace stripe
-}  // namespace dialect
-}  // namespace pmlc
+}  // namespace pmlc::dialect::stripe
