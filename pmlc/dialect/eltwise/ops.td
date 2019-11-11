@@ -40,7 +40,7 @@ def ScalarConstantOp :
     HasFolder {
   let summary = "constant";
   let arguments = (ins AnyAttr:$value);
-  let results = (outs Eltwise_AnyTensor:$result);
+  let results = (outs EltwiseAny:$result);
 
   let builders = [OpBuilder<
     "Builder* builder, OperationState& result, Type type, double value", [{
@@ -56,24 +56,22 @@ def ScalarConstantOp :
 
   let extraClassDeclaration = [{
     Attribute getValue() { return getAttr("value"); }
+    IntegerAttr getIntAttr() { return getAttrOfType<IntegerAttr>("value"); }
+    FloatAttr getFloatAttr() { return getAttrOfType<FloatAttr>("value"); }
   }];
 }
 
 class UnaryOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
     EltwiseOp<mnemonic, traits>,
     HasCanonicalizer {
-  let arguments = (ins Eltwise_AnyTensor:$in, TypeAttr:$type);
-  let results = (outs Eltwise_AnyTensor:$result);
+  let arguments = (ins EltwiseAny:$in, TypeAttr:$type);
+  let results = (outs EltwiseAny:$result);
 
   let builders = [OpBuilder<
     "Builder* builder, OperationState& result, ScalarType type, ArrayRef<Value*> operands", [{
       result.addOperands(operands);
       result.addAttribute("type", TypeAttr::get(type));
       result.addTypes(getResultType(operands));
-    }]
-  >, OpBuilder<
-    "Builder* builder, OperationState& result, ScalarType type, Value* operand", [{
-      build(builder, result, type, llvm::SmallVector<Value*, 1>({operand}));
     }]
   >];
 
@@ -87,18 +85,14 @@ class UnaryOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
 class BinaryOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
     EltwiseOp<mnemonic, traits>,
     HasCanonicalizer { 
-  let arguments = (ins Eltwise_AnyTensor:$lhs, Eltwise_AnyTensor:$rhs, TypeAttr:$type);
-  let results = (outs Eltwise_AnyTensor:$result);
+  let arguments = (ins EltwiseAny:$lhs, EltwiseAny:$rhs, TypeAttr:$type);
+  let results = (outs EltwiseAny:$result);
 
   let builders = [OpBuilder<
     "Builder* builder, OperationState& result, ScalarType type, ArrayRef<Value*> operands", [{
       result.addOperands(operands);
       result.addAttribute("type", TypeAttr::get(type));
       result.addTypes(getResultType(operands));
-    }]
-  >, OpBuilder<
-    "Builder* builder, OperationState& result, ScalarType type, Value* lhs, Value* rhs", [{
-      build(builder, result, type, {lhs, rhs});
     }]
   >];
 
@@ -109,21 +103,28 @@ class BinaryOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
   }] # EltwiseBuilderImpl_create;
 }
 
+def CastOp : EltwiseOp<"cast">, HasCanonicalizer {
+  let summary = "cast operation";
+  let arguments = (ins EltwiseAny:$tensor);
+  let results = (outs EltwiseAny:$result);
+
+  let extraClassDeclaration = [{
+    static Type getResultType(ArrayRef<Value*> operands);
+    static Operation* create(OpBuilder* builder, Location loc, Type type, ArrayRef<Value*> operands);
+  }];
+}
+
 class CompareOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
     EltwiseOp<mnemonic, traits>,
     HasCanonicalizer {
-  let arguments = (ins Eltwise_AnyTensor:$lhs, Eltwise_AnyTensor:$rhs, TypeAttr:$type);
-  let results = (outs Eltwise_BoolTensor:$result);
+  let arguments = (ins EltwiseAny:$lhs, EltwiseAny:$rhs, TypeAttr:$type);
+  let results = (outs EltwiseBool:$result);
 
   let builders = [OpBuilder<
     "Builder* builder, OperationState& result, ScalarType type, ArrayRef<Value*> operands", [{
       result.addOperands(operands);
       result.addAttribute("type", TypeAttr::get(type));
       result.addTypes(getResultType(operands));
-    }]
-  >, OpBuilder<
-    "Builder* builder, OperationState& result, ScalarType type, Value* lhs, Value* rhs", [{
-      build(builder, result, type, {lhs, rhs});
     }]
   >];
 
@@ -136,85 +137,18 @@ class CompareOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
 
 class UnaryIntOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
     UnaryOp<mnemonic, traits>,
-    Arguments<(ins Eltwise_IntegerTensor:$in, TypeAttr:$type)>,
-    Results<(outs Eltwise_IntegerTensor:$result)>;
+    Arguments<(ins EltwiseInteger:$in, TypeAttr:$type)>,
+    Results<(outs EltwiseInteger:$result)>;
 
 class UnaryFloatOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
     UnaryOp<mnemonic, traits>,
-    Arguments<(ins Eltwise_FloatTensor:$in, TypeAttr:$type)>,
-    Results<(outs Eltwise_FloatTensor:$result)>;
+    Arguments<(ins EltwiseFloat:$in, TypeAttr:$type)>,
+    Results<(outs EltwiseFloat:$result)>;
 
 class BinaryIntOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
     BinaryOp<mnemonic, traits>,
-    Arguments<(ins Eltwise_IntegerTensor:$lhs, Eltwise_IntegerTensor:$rhs, TypeAttr:$type)>,
-    Results<(outs Eltwise_IntegerTensor:$result)>;
-
-
-class CastOp<string mnemonic> :
-    EltwiseOp<mnemonic, [CastOpInterface, NoSideEffect]>,
-    HasCanonicalizer {
-  let arguments = (ins Eltwise_AnyTensor:$tensor);
-
-  let builders = [OpBuilder<
-    "Builder* builder, OperationState& result, ScalarType type, ArrayRef<Value*> operands"
-  >, OpBuilder<
-    "Builder* builder, OperationState& result, Value* tensor, IntegerAttr bitwidth"
-  >];
-
-  let extraClassDeclaration = [{
-    static Type getResultType(ArrayRef<Value*> operands);
-
-    static Operation* create(OpBuilder* builder, Location loc, Type type, ArrayRef<Value*> operands) {
-      OperationState state(loc, getOperationName());
-      if (operands.size() != 2) {
-        throw std::runtime_error("CastOp requires 2 operands");
-      }
-      auto tensor = operands[0];
-      state.addOperands(tensor);
-      state.addTypes(getResultType(operands));
-      return builder->createOperation(state);
-    }
-  }];
-}
-
-def AsFloatOp : CastOp<"as_float"> {
-  let summary = "cast into float operation";
-  let results = (outs Eltwise_FloatTensor:$result);
-}
-
-def AsIntOp : CastOp<"as_int"> {
-  let summary = "cast into integer operation";
-  let results = (outs Eltwise_IntegerTensor:$result);
-}
-
-def AsUIntOp : CastOp<"as_uint"> {
-  let summary = "cast into unsigned operation";
-  let results = (outs Eltwise_UnsignedTensor:$result);
-}
-
-def AsBoolOp : EltwiseOp<"as_bool"> {
-  let summary = "cast into boolean operation";
-  let arguments = (ins Eltwise_AnyTensor:$in);
-  let results = (outs Eltwise_BoolTensor:$result);
-  let builders = [OpBuilder<
-    "Builder* builder, OperationState& result, ScalarType type, ArrayRef<Value*> operands", [{
-      result.addOperands(operands);
-      result.addTypes(getResultType(operands));
-    }]
-  >, OpBuilder<
-    "Builder* builder, OperationState& result, ScalarType type, Value* val", [{
-      build(builder, result, type, std::vector<Value*>({val}));
-    }]
-  >];
-
-  let extraClassDeclaration = [{
-    static Type getResultType(ArrayRef<Value*> operands) {
-      auto tensorType = getRankedTensorType(operands[0]->getType());
-      auto elementType = ScalarType::get(tensorType.getContext(), DataType::BOOLEAN);
-      return RankedTensorType::get(tensorType.getShape(), elementType);
-    }
-  }] # EltwiseBuilderImpl_create;
-}
+    Arguments<(ins EltwiseInteger:$lhs, EltwiseInteger:$rhs, TypeAttr:$type)>,
+    Results<(outs EltwiseInteger:$result)>;
 
 def AbsOp : UnaryOp<"abs">;
 def ACosOp : UnaryFloatOp<"acos">;
@@ -262,11 +196,11 @@ def XorOp : BinaryIntOp<"xor", [Commutative, NoSideEffect]>;
 def SelectOp : EltwiseOp<"select">, HasCanonicalizer {
   let summary = "conditional selection";
   let arguments = (ins
-    Eltwise_BoolTensor:$cond,
-    Eltwise_AnyTensor:$tcase,
-    Eltwise_AnyTensor:$fcase,
+    EltwiseBool:$cond,
+    EltwiseAny:$tcase,
+    EltwiseAny:$fcase,
     TypeAttr:$type);
-  let results = (outs Eltwise_AnyTensor:$result);
+  let results = (outs EltwiseAny:$result);
 
   let builders = [OpBuilder<
     "Builder* builder, OperationState& result, ScalarType type, ArrayRef<Value*> operands", [{

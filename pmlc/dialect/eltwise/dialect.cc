@@ -12,7 +12,9 @@
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpImplementation.h"
+#include "mlir/Support/DebugStringHelper.h"
 
+#include "base/util/logging.h"
 #include "pmlc/dialect/eltwise/ops.h"
 
 #define DEBUG_TYPE "eltwise"
@@ -91,6 +93,7 @@ mlir::Operation* Dialect::materializeConstant(  //
     mlir::Attribute value,                      //
     mlir::Type type,                            //
     mlir::Location loc) {
+  IVLOG(5, "eltwise::Dialect::materializeConstant> " << mlir::debugString(type));
   return builder.create<ScalarConstantOp>(loc, type, value);
 }
 

@@ -5,12 +5,10 @@
 #include <algorithm>
 #include <map>
 #include <memory>
-#include <mutex>
 #include <string>
 
 #include "llvm/Support/FormatVariadic.h"
 
-#include "base/util/env.h"
 #include "plaidml2/core/internal.h"
 #include "tile/targets/targets.h"
 
@@ -77,7 +75,7 @@ void plaidml_exec_init(  //
     plaidml_error* err) {
   static std::once_flag is_initialized;
   ffi_wrap_void(err, [&] {
-    std::call_once(is_initialized, []() {  //
+    std::call_once(is_initialized, []() {
       IVLOG(1, "plaidml_exec_init");
       GetPlatform();
     });
@@ -240,11 +238,11 @@ void plaidml_target_list(  //
   ffi_wrap_void(err, [&] {
     auto configs = GetConfigs().configs();
     size_t i = 0;
-    for (const auto& kvp : configs) {
+    for (const auto& [key, value] : configs) {
       if (i >= ntargets) {
         break;
       }
-      targets[i++] = new plaidml_string{kvp.first};
+      targets[i++] = new plaidml_string{key};
     }
   });
 }

@@ -4,14 +4,11 @@
 
 #include <algorithm>
 #include <memory>
-#include <mutex>
-#include <sstream>
 #include <string>
 #include <vector>
 
-#include <boost/format.hpp>
+#include "llvm/Support/FormatVariadic.h"
 
-#include "base/util/env.h"
 #include "base/util/logging.h"
 #include "plaidml2/core/internal.h"
 #include "plaidml2/edsl/derivs.h"
@@ -22,6 +19,12 @@
 #endif
 
 #ifdef PLAIDML_MLIR
+#include "mlir/IR/StandardTypes.h"
+#include "mlir/IR/Value.h"
+#include "mlir/Support/DebugStringHelper.h"
+
+#include "pmlc/dialect/eltwise/types.h"
+#include "pmlc/dialect/tile/ops.h"
 #include "pmlc/util/enums.h"
 #endif
 
@@ -37,6 +40,8 @@ using namespace vertexai::tile::lang::ast;  // NOLINT
 #endif
 
 #ifdef PLAIDML_MLIR
+using pmlc::dialect::eltwise::ScalarType;
+using pmlc::dialect::tile::TileBuilder;
 using pmlc::util::AggregationKind;
 using pmlc::util::CombinationKind;
 #endif
@@ -149,8 +154,7 @@ struct plaidml_logical_shape {
   LogicalShape shape;
 #endif
 #ifdef PLAIDML_MLIR
-  DataType dtype;
-  std::vector<mlir::Value*> dims;
+  mlir::RankedTensorType type;
 #endif
 };
 
@@ -178,7 +182,9 @@ void plaidml_edsl_init(  //
   ffi_wrap_void(err, [&] {
     std::call_once(is_initialized, []() {
       IVLOG(1, "plaidml_edsl_init");
-      plaidml::edsl::deriv::RegisterDerivs();
+#ifdef PLAIDML_AST
+      plaidml::edsl::RegisterDerivs();
+#endif
     });
   });
 }
@@ -187,13 +193,11 @@ plaidml_logical_shape* plaidml_logical_shape_alloc(  //
     plaidml_error* err,                              //
     plaidml_datatype dtype,                          //
     size_t ndims,                                    //
-    const int64_t* dims,                             //
-    const char* layout) {
+    const int64_t* dims) {
   return ffi_wrap<plaidml_logical_shape*>(err, nullptr, [&] {
 #ifdef PLAIDML_AST
     auto ret = new plaidml_logical_shape;
     ret->shape.dtype = static_cast<DataType>(dtype);
-    ret->shape.layout = layout;
     for (size_t i = 0; i < ndims; i++) {
       auto int_expr = std::make_shared<DimIntExpr>(dims[i]);
       ret->shape.dims.emplace_back(LogicalDim{int_expr});
@@ -201,8 +205,13 @@ plaidml_logical_shape* plaidml_logical_shape_alloc(  //
     return ret;
 #endif
 #ifdef PLAIDML_MLIR
-    throw std::runtime_error("NYI: plaidml_logical_shape_alloc");
-    return nullptr;
+    llvm::SmallVector<int64_t, 6> dimsVec;
+    for (size_t i = 0; i < ndims; i++) {
+      dimsVec.emplace_back(dims[i]);
+    }
+    auto ret = new plaidml_logical_shape;
+    ret->type = GlobalContext::get()->MakeRankedTensorType(static_cast<DataType>(dtype), dimsVec);
+    return ret;
 #endif
   });
 }
@@ -217,22 +226,7 @@ plaidml_string* plaidml_logical_shape_repr(  //
     return new plaidml_string{ss.str()};
 #endif
 #ifdef PLAIDML_MLIR
-    throw std::runtime_error("NYI: plaidml_logical_shape_repr");
-    return nullptr;
-#endif
-  });
-}
-
-plaidml_string* plaidml_logical_shape_get_layout(  //
-    plaidml_error* err,                            //
-    plaidml_logical_shape* shape) {
-  return ffi_wrap<plaidml_string*>(err, nullptr, [&] {  //
-#ifdef PLAIDML_AST
-    return new plaidml_string{shape->shape.layout};
-#endif
-#ifdef PLAIDML_MLIR
-    throw std::runtime_error("NYI: plaidml_logical_shape_get_layout");
-    return nullptr;
+    return new plaidml_string{mlir::debugString(shape->type)};
 #endif
   });
 }
@@ -240,13 +234,12 @@ plaidml_string* plaidml_logical_shape_get_layout(  //
 size_t plaidml_logical_shape_get_ndims(  //
     plaidml_error* err,                  //
     plaidml_logical_shape* shape) {
-  return ffi_wrap<size_t>(err, 0, [&] {  //
+  return ffi_wrap<size_t>(err, 0, [&] {
 #ifdef PLAIDML_AST
     return shape->shape.dims.size();
 #endif
 #ifdef PLAIDML_MLIR
-    throw std::runtime_error("NYI: plaidml_logical_shape_get_ndims");
-    return 0;
+    return shape->type.getRank();
 #endif
   });
 }
@@ -254,13 +247,17 @@ size_t plaidml_logical_shape_get_ndims(  //
 plaidml_datatype plaidml_logical_shape_get_dtype(  //
     plaidml_error* err,                            //
     plaidml_logical_shape* shape) {
-  return ffi_wrap<plaidml_datatype>(err, PLAIDML_DATA_INVALID, [&] {  //
+  return ffi_wrap<plaidml_datatype>(err, PLAIDML_DATA_INVALID, [&] {
 #ifdef PLAIDML_AST
     return static_cast<plaidml_datatype>(shape->shape.dtype);
 #endif
 #ifdef PLAIDML_MLIR
-    throw std::runtime_error("NYI: plaidml_logical_shape_get_dtype");
-    return PLAIDML_DATA_INVALID;
+    auto elementType = shape->type.getElementType();
+    auto scalarType = elementType.dyn_cast<ScalarType>();
+    if (!scalarType) {
+      throw std::runtime_error("Expected scalar type");
+    }
+    return static_cast<plaidml_datatype>(scalarType.type());
 #endif
   });
 }
@@ -279,8 +276,15 @@ int64_t plaidml_logical_shape_get_dim_int(  //
     return static_cast<int64_t>(0);
 #endif
 #ifdef PLAIDML_MLIR
-    throw std::runtime_error("NYI: plaidml_logical_shape_get_dim_int");
-    return 0;
+    const auto& dims = shape->type.getShape();
+    if (dims.size() < dim) {
+      throw std::range_error("Index out of range");
+    }
+    auto ret = dims[dim];
+    if (ret < 0) {
+      return static_cast<int64_t>(0);
+    }
+    return ret;
 #endif
   });
 }
@@ -311,13 +315,12 @@ void plaidml_logical_shape_free(  //
 plaidml_shape* plaidml_logical_shape_into_tensor_shape(  //
     plaidml_error* err,                                  //
     plaidml_logical_shape* shape) {
-  return ffi_wrap<plaidml_shape*>(err, 0, [&] {  //
+  return ffi_wrap<plaidml_shape*>(err, 0, [&] {
 #ifdef PLAIDML_AST
     return new plaidml_shape{IntoTensorShape(shape->shape)};
 #endif
 #ifdef PLAIDML_MLIR
-    throw std::runtime_error("NYI: plaidml_logical_shape_into_tensor_shape");
-    return nullptr;
+    return new plaidml_shape{GlobalContext::get()->IntoTensorType(shape->type)};
 #endif
   });
 }
@@ -330,6 +333,7 @@ void plaidml_expr_free(  //
     IVLOG(3, "plaidml_expr_free> " << expr->expr->str());
 #endif
 #ifdef PLAIDML_MLIR
+    IVLOG(3, "plaidml_expr_free> " << mlir::debugString(*expr->value));
     GlobalContext::get()->Destroy(expr->value);
 #endif
     delete expr;
@@ -339,19 +343,17 @@ void plaidml_expr_free(  //
 plaidml_logical_shape* plaidml_expr_get_shape(  //
     plaidml_error* err,                         //
     plaidml_expr* expr) {
-  // TODO(MLIR)
-  return ffi_wrap<plaidml_logical_shape*>(err, nullptr, [&] {  //
+  return ffi_wrap<plaidml_logical_shape*>(err, nullptr, [&] {
     IVLOG(3, "plaidml_expr_get_shape");
-#ifdef PLAIDML_AST
     if (!expr) {
       throw std::runtime_error(
           "Cannot compute shape of null expr. Perhaps you requested the shape of an unassigned tensor?");
     }
+#ifdef PLAIDML_AST
     return new plaidml_logical_shape{expr->expr->shape};
 #endif
 #ifdef PLAIDML_MLIR
-    throw std::runtime_error("NYI: plaidml_expr_get_shape");
-    return nullptr;
+    return new plaidml_logical_shape{GlobalContext::get()->ComputeShape(expr->value)};
 #endif
   });
 }
@@ -360,8 +362,7 @@ void plaidml_expr_bind_shape(  //
     plaidml_error* err,        //
     plaidml_expr* expr,        //
     plaidml_logical_shape* shape) {
-  // TODO(MLIR)
-  return ffi_wrap_void(err, [&] {  //
+  return ffi_wrap_void(err, [&] {
     IVLOG(3, "plaidml_expr_bind_shape");
 #ifdef PLAIDML_AST
     auto param_expr = std::dynamic_pointer_cast<ParamExpr>(expr->expr);
@@ -371,8 +372,7 @@ void plaidml_expr_bind_shape(  //
     param_expr->shape = shape->shape;
 #endif
 #ifdef PLAIDML_MLIR
-    throw std::runtime_error("NYI: plaidml_expr_bind_shape");
-    return nullptr;
+    GlobalContext::get()->BindShape(expr->value, shape->type);
 #endif
   });
 }
@@ -395,9 +395,13 @@ void plaidml_expr_bind_dims(  //
     }
 #endif
 #ifdef PLAIDML_MLIR
+    IVLOG(3, "plaidml_expr_bind_dims> " << mlir::debugString(*expr->value));
+    llvm::SmallVector<mlir::Value**, 6> into;
     for (size_t i = 0; i < ndims; i++) {
-      GlobalContext::get()->BindTensorDim(i, expr->value, &dims[i]->value);
+      IVLOG(3, "bind_dims> i: " << i << ", from: " << expr->value << ", into: " << dims[i]->value);
+      into.emplace_back(&dims[i]->value);
     }
+    GlobalContext::get()->BindTensorDims(expr->value, into);
 #endif
   });
 }
@@ -405,15 +409,13 @@ void plaidml_expr_bind_dims(  //
 plaidml_string* plaidml_expr_repr(  //
     plaidml_error* err,             //
     plaidml_expr* expr) {
-  // TODO(MLIR)
-  return ffi_wrap<plaidml_string*>(err, nullptr, [&] {  //
+  return ffi_wrap<plaidml_string*>(err, nullptr, [&] {
     IVLOG(3, "plaidml_expr_repr");
 #ifdef PLAIDML_AST
     return new plaidml_string{expr->expr->str()};
 #endif
 #ifdef PLAIDML_MLIR
-    throw std::runtime_error("NYI: plaidml_expr_repr");
-    return nullptr;
+    return new plaidml_string{mlir::debugString(*expr->value)};
 #endif
   });
 }
@@ -427,6 +429,7 @@ plaidml_expr* plaidml_expr_dim(  //
     return new plaidml_expr{std::make_shared<DimExprExpr>(expr->expr)};
 #endif
 #ifdef PLAIDML_MLIR
+    // TODO: clone?
     return new plaidml_expr{expr->value};
 #endif
   });
@@ -457,10 +460,8 @@ plaidml_expr* plaidml_expr_placeholder(  //
     return new plaidml_expr{expr};
 #endif
 #ifdef PLAIDML_MLIR
-    std::vector<int64_t> dims(shape->dims.size());
-    // TODO(MLIR)
-    auto bufptr = buffer ? buffer->buffer : nullptr;
-    return new plaidml_expr{GlobalContext::get()->MakePlaceholderOp(shape->dtype, dims, bufptr, name)};
+    return new plaidml_expr{
+        GlobalContext::get()->MakePlaceholderOp(shape->type, buffer ? buffer->buffer : nullptr, name)};
 #endif
   });
 }
@@ -494,6 +495,7 @@ plaidml_expr* plaidml_expr_clone(  //
     return new plaidml_expr{expr->expr};
 #endif
 #ifdef PLAIDML_MLIR
+    IVLOG(3, "plaidml_expr_clone> " << mlir::debugString(*expr->value));
     // TODO(MLIR): deal with clone of expr->value
     return new plaidml_expr{expr->value};
 #endif
@@ -513,6 +515,7 @@ plaidml_dim_expr* plaidml_expr_get_dim(  //
     return new plaidml_dim_expr{dim_expr->expr};
 #endif
 #ifdef PLAIDML_MLIR
+    IVLOG(3, "plaidml_expr_get_dim> " << mlir::debugString(*expr->value));
     // TODO(MLIR): deal with clone of expr->value
     return new plaidml_dim_expr{expr->value};
 #endif
@@ -546,9 +549,33 @@ plaidml_expr_kind plaidml_expr_get_kind(  //
     return PLAIDML_EXPR_TENSOR;
 #endif
 #ifdef PLAIDML_MLIR
-    // TODO(MLIR)
-    throw std::runtime_error("NYI: plaidml_expr_get_kind");
-    return PLAIDML_EXPR_TENSOR;
+    auto op = expr->value->getDefiningOp();
+    if (auto constOp = llvm::dyn_cast_or_null<pmlc::dialect::eltwise::ScalarConstantOp>(op)) {
+      auto attr = constOp.getValue();
+      if (attr.isa<mlir::IntegerAttr>()) {
+        return PLAIDML_EXPR_INT;
+      }
+      if (attr.isa<mlir::FloatAttr>()) {
+        return PLAIDML_EXPR_FLOAT;
+      }
+    }
+    if (auto dimOp = llvm::dyn_cast_or_null<pmlc::dialect::tile::DimOp>(op)) {
+      return PLAIDML_EXPR_DIM;
+    }
+    auto type = expr->value->getType();
+    if (type.isa<mlir::NoneType>()) {
+      return PLAIDML_EXPR_NONE;
+    }
+    if (type.isa<pmlc::dialect::tile::StringType>()) {
+      return PLAIDML_EXPR_STR;
+    }
+    if (type.isa<mlir::TupleType>()) {
+      return PLAIDML_EXPR_TUPLE;
+    }
+    if (type.isa<mlir::RankedTensorType>()) {
+      return PLAIDML_EXPR_TENSOR;
+    }
+    throw std::runtime_error("Unknown expression kind");
 #endif
   });
 }
@@ -556,7 +583,7 @@ plaidml_expr_kind plaidml_expr_get_kind(  //
 plaidml_expr* plaidml_expr_none(  //
     plaidml_error* err            //
 ) {
-  return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {  //
+  return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
     IVLOG(3, "plaidml_expr_none");
 #ifdef PLAIDML_AST
     return new plaidml_expr{std::make_shared<NoneExpr>()};
@@ -603,9 +630,8 @@ size_t plaidml_expr_tuple_get_count(  //
     return tuple_expr->exprs.size();
 #endif
 #ifdef PLAIDML_MLIR
-    // TODO(MLIR)
-    throw std::runtime_error("NYI: plaidml_expr_tuple_get_count");
-    return 0;
+    auto elts = GlobalContext::get()->GetTupleElements(expr->value);
+    return elts.size();
 #endif
   });
 }
@@ -665,9 +691,8 @@ plaidml_string* plaidml_expr_str_get_value(  //
     return new plaidml_string{str_expr->value};
 #endif
 #ifdef PLAIDML_MLIR
-    // TODO(MLIR)
-    throw std::runtime_error("NYI: plaidml_expr_str_get_value");
-    return nullptr;
+    auto str = GlobalContext::get()->GetStringValue(expr->value);
+    return new plaidml_string{str.str()};
 #endif
   });
 }
@@ -702,9 +727,7 @@ int64_t plaidml_expr_int_get_value(  //
     return int_expr->value;
 #endif
 #ifdef PLAIDML_MLIR
-    // TODO(MLIR)
-    throw std::runtime_error("NYI: plaidml_expr_int_get_value");
-    return 0;
+    return GlobalContext::get()->GetIntegerValue(expr->value);
 #endif
   });
 }
@@ -718,8 +741,7 @@ plaidml_expr* plaidml_expr_float(  //
     return new plaidml_expr{std::make_shared<FloatConst>(value)};
 #endif
 #ifdef PLAIDML_MLIR
-    auto const_val = GlobalContext::get()->MakeScalarConstantOp(value);
-    return new plaidml_expr{const_val};
+    return new plaidml_expr{GlobalContext::get()->MakeScalarConstantOp(value)};
 #endif
   });
 }
@@ -727,7 +749,6 @@ plaidml_expr* plaidml_expr_float(  //
 double plaidml_expr_float_get_value(  //
     plaidml_error* err,               //
     plaidml_expr* expr) {
-  // TODO(MLIR)
   return ffi_wrap<double>(err, 0, [&] {
     IVLOG(3, "plaidml_expr_float_get_value");
 #ifdef PLAIDML_AST
@@ -738,8 +759,51 @@ double plaidml_expr_float_get_value(  //
     return float_expr->value;
 #endif
 #ifdef PLAIDML_MLIR
-    throw std::runtime_error("NYI: plaidml_expr_float_get_value");
-    return 0;
+    return GlobalContext::get()->GetFloatValue(expr->value);
+#endif
+  });
+}
+
+plaidml_expr* plaidml_expr_cast(  //
+    plaidml_error* err,           //
+    plaidml_expr* tensor,         //
+    plaidml_datatype dtype) {
+  return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
+    IVLOG(3, "plaidml_expr_cast");
+#ifdef PLAIDML_AST
+    static ExprPtr bits8 = std::make_shared<IntConst>(8);
+    static ExprPtr bits16 = std::make_shared<IntConst>(16);
+    static ExprPtr bits32 = std::make_shared<IntConst>(32);
+    static ExprPtr bits64 = std::make_shared<IntConst>(64);
+    switch (static_cast<DataType>(dtype)) {
+      case DataType::INT8:
+        return new plaidml_expr{MakeCall("as_int", {tensor->expr, bits8})};
+      case DataType::INT16:
+        return new plaidml_expr{MakeCall("as_int", {tensor->expr, bits16})};
+      case DataType::INT32:
+        return new plaidml_expr{MakeCall("as_int", {tensor->expr, bits32})};
+      case DataType::INT64:
+        return new plaidml_expr{MakeCall("as_int", {tensor->expr, bits64})};
+      case DataType::UINT8:
+        return new plaidml_expr{MakeCall("as_uint", {tensor->expr, bits8})};
+      case DataType::UINT16:
+        return new plaidml_expr{MakeCall("as_uint", {tensor->expr, bits16})};
+      case DataType::UINT32:
+        return new plaidml_expr{MakeCall("as_uint", {tensor->expr, bits32})};
+      case DataType::UINT64:
+        return new plaidml_expr{MakeCall("as_uint", {tensor->expr, bits64})};
+      case DataType::FLOAT16:
+        return new plaidml_expr{MakeCall("as_float", {tensor->expr, bits16})};
+      case DataType::FLOAT32:
+        return new plaidml_expr{MakeCall("as_float", {tensor->expr, bits32})};
+      case DataType::FLOAT64:
+        return new plaidml_expr{MakeCall("as_float", {tensor->expr, bits64})};
+      default:
+        throw std::runtime_error("Unsupported dtype for cast");
+    }
+#endif
+#ifdef PLAIDML_MLIR
+    return new plaidml_expr{GlobalContext::get()->MakeCastOp(tensor->value, static_cast<DataType>(dtype))};
 #endif
   });
 }
@@ -763,11 +827,7 @@ plaidml_expr* plaidml_expr_call(  //
 #endif
 #ifdef PLAIDML_MLIR
     std::vector<mlir::Value*> values(nargs);
-    // FIXME: has_exprs and has_values is a HACK to allow gradient callbacks
     for (size_t i = 0; i < nargs; i++) {
-      if (!args[i]) {
-        throw std::runtime_error(str(boost::format("Undefined tensor in call to %1%()") % fn));
-      }
       values[i] = args[i]->value;
     }
     return new plaidml_expr{GlobalContext::get()->MakePrimitiveOp(fn, values)};
@@ -890,12 +950,11 @@ plaidml_expr* plaidml_expr_contraction(  //
     plaidml_error* err,                  //
     plaidml_agg_op agg_op,               //
     plaidml_combo_op combo_op,           //
-    plaidml_expr* raw_sink_idxs,         //
-    plaidml_expr* raw_sink_sizes,        //
+    plaidml_expr* sink_idxs,             //
+    plaidml_expr* sink_sizes,            //
     size_t nsrcs,                        //
-    plaidml_expr** raw_src_idxs,         //
-    const char* name,                    //
-    const char* layout) {
+    plaidml_expr** src_idxs,             //
+    const char* name) {
   return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
     IVLOG(3, "plaidml_expr_contraction");
 #ifdef PLAIDML_AST
@@ -903,35 +962,35 @@ plaidml_expr* plaidml_expr_contraction(  //
     expr->name = name;
     expr->agg_op = into_agg_op(agg_op);
     expr->combo_op = into_combo_op(combo_op);
-    expr->sink_idxs = std::dynamic_pointer_cast<IndexMapExpr>(raw_sink_idxs->expr);
+    expr->sink_idxs = std::dynamic_pointer_cast<IndexMapExpr>(sink_idxs->expr);
     if (!expr->sink_idxs) {
       throw std::runtime_error("oops: sink_idxs");
     }
-    expr->sink_dims = std::dynamic_pointer_cast<SizeMapExpr>(raw_sink_sizes->expr);
+    expr->sink_dims = std::dynamic_pointer_cast<SizeMapExpr>(sink_sizes->expr);
     if (!expr->sink_dims) {
       throw std::runtime_error("oops: sink_dims");
     }
     for (size_t i = 0; i < nsrcs; i++) {
-      auto idxs = std::dynamic_pointer_cast<IndexMapExpr>(raw_src_idxs[i]->expr);
+      auto idxs = std::dynamic_pointer_cast<IndexMapExpr>(src_idxs[i]->expr);
       if (!idxs) {
         throw std::runtime_error("oops: src_idxs");
       }
       expr->srcs.emplace_back(idxs);
     }
-    expr->ComputeShape(layout);
+    expr->ComputeShape("");
     return new plaidml_expr{expr};
 #endif
 #ifdef PLAIDML_MLIR
     std::vector<mlir::Value*> src_values;
     for (size_t i = 0; i < nsrcs; i++) {
-      src_values.emplace_back(raw_src_idxs[i]->value);
+      src_values.emplace_back(src_idxs[i]->value);
     }
     auto value = GlobalContext::get()->MakeContractionOp(  //
         getAggregationKind(agg_op),                        //
         getCombinationKind(combo_op),                      //
         src_values,                                        //
-        raw_sink_idxs->value,                              //
-        raw_sink_sizes->value,                             //
+        sink_idxs->value,                                  //
+        sink_sizes->value,                                 //
         name);
     return new plaidml_expr{value};
 #endif
@@ -1016,7 +1075,6 @@ void plaidml_expr_gradient(  //
   // `wrt` and produces the output `loss`, produce the derivatives for each
   // tensor in `wrt` and store these `nwrt` derivatives in `derivs` in the
   // corresponding order as they were received in `wrt`.
-  // TODO(MLIR)
   ffi_wrap_void(err, [&] {
     IVLOG(3, "plaidml_expr_gradient");
 #ifdef PLAIDML_AST
@@ -1087,6 +1145,7 @@ void plaidml_poly_expr_free(plaidml_error* err, plaidml_poly_expr* expr) {
     IVLOG(3, "plaidml_poly_expr_free> " << expr->expr->str());
 #endif
 #ifdef PLAIDML_MLIR
+    IVLOG(3, "plaidml_poly_expr_free> " << mlir::debugString(*expr->value));
     GlobalContext::get()->Destroy(expr->value);
 #endif
     delete expr;
@@ -1102,9 +1161,7 @@ plaidml_string* plaidml_poly_expr_repr(  //
     return new plaidml_string{expr->expr->str()};
 #endif
 #ifdef PLAIDML_MLIR
-    // TODO(MLIR)
-    throw std::runtime_error("NYI: plaidml_poly_expr_repr");
-    return nullptr;
+    return new plaidml_string{mlir::debugString(*expr->value)};
 #endif
   });
 }
@@ -1183,6 +1240,7 @@ void plaidml_dim_expr_free(  //
     IVLOG(3, "plaidml_dim_expr_free> " << expr->expr->str());
 #endif
 #ifdef PLAIDML_MLIR
+    IVLOG(3, "plaidml_dim_expr_free> " << mlir::debugString(*expr->value));
     GlobalContext::get()->Destroy(expr->value);
 #endif
     delete expr;
@@ -1192,15 +1250,13 @@ void plaidml_dim_expr_free(  //
 plaidml_string* plaidml_dim_expr_repr(  //
     plaidml_error* err,                 //
     plaidml_dim_expr* expr) {
-  return ffi_wrap<plaidml_string*>(err, nullptr, [&] {  //
+  return ffi_wrap<plaidml_string*>(err, nullptr, [&] {
     IVLOG(3, "plaidml_dim_expr_repr");
 #ifdef PLAIDML_AST
     return new plaidml_string{expr->expr->str()};
 #endif
 #ifdef PLAIDML_MLIR
-    // TODO(MLIR)
-    throw std::runtime_error("NYI: plaidml_dim_expr_repr");
-    return nullptr;
+    return new plaidml_string{mlir::debugString(*expr->value)};
 #endif
   });
 }
@@ -1208,7 +1264,7 @@ plaidml_string* plaidml_dim_expr_repr(  //
 plaidml_dim_expr* plaidml_dim_expr_none(  //
     plaidml_error* err                    //
 ) {
-  return ffi_wrap<plaidml_dim_expr*>(err, nullptr, [&] {  //
+  return ffi_wrap<plaidml_dim_expr*>(err, nullptr, [&] {
     IVLOG(3, "plaidml_dim_expr_none");
 #ifdef PLAIDML_AST
     return new plaidml_dim_expr{std::make_shared<DimNoneExpr>()};
@@ -1249,9 +1305,7 @@ int64_t plaidml_dim_expr_get_int(  //
     return int_expr->value;
 #endif
 #ifdef PLAIDML_MLIR
-    // TODO(MLIR)
-    throw std::runtime_error("NYI: plaidml_dim_expr_get_int");
-    return 0;
+    return GlobalContext::get()->GetIntegerValue(expr->value);
 #endif
   });
 }
@@ -1356,9 +1410,8 @@ plaidml_string* plaidml_program_repr(  //
     return new plaidml_string{to_string(program->eval.runinfo.program)};
 #endif
 #ifdef PLAIDML_MLIR
-    // TODO(MLIR)
-    throw std::runtime_error("NYI: plaidml_program_repr");
-    return nullptr;
+    auto module = *program->program->module;
+    return new plaidml_string{mlir::debugString(module)};
 #endif
   });
 }
