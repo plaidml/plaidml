@@ -1402,7 +1402,7 @@ void Compiler::Shape(const stripe::Special& shape) {
   for (size_t i = 0; i < data_ndims; ++i) {
     uint64_t dim_size = data.refinement->interior_shape.dims[i].size;
     llvm::Value* val = builder_.getIntN(elem_bits, dim_size);
-    llvm::Value* dest = builder_.CreateGEP(out.base, {IndexConst(i)});
+    llvm::Value* dest = builder_.CreateGEP(out.base, IndexConst(i));
     builder_.CreateStore(val, dest);
   }
 }
@@ -1553,12 +1553,10 @@ void Compiler::Scatter(const stripe::Special& scatter) {
   auto& data_shape = data.refinement->interior_shape;
   Buffer indices = buffers_[scatter.inputs[1]];
   auto& indices_shape = indices.refinement->interior_shape;
-  Buffer shape = buffers_[scatter.inputs[2]];
-  auto& shape_shape = shape.refinement->interior_shape;
   assert(1 == scatter.outputs.size());
   Buffer output = buffers_[scatter.outputs[0]];
   auto& output_shape = output.refinement->interior_shape;
-  assert(output_shape == shape_shape);
+  assert(output_shape == buffers_[scatter.inputs[2]].refinement->interior_shape);
 
   // Build a loop nest over each dimension of the data.
   size_t data_ndims = data_shape.dims.size();
@@ -1795,6 +1793,9 @@ llvm::Type* Compiler::CType(DataType type) {
     case DataType::INT32:
     case DataType::UINT32:
       return builder_.getInt32Ty();
+    case DataType::INTX:
+    case DataType::UINTX:
+      return builder_.getInt64Ty();
     case DataType::INT64:
     case DataType::UINT64:
       return builder_.getInt64Ty();
@@ -1804,9 +1805,9 @@ llvm::Type* Compiler::CType(DataType type) {
       return builder_.getFloatTy();
     case DataType::FLOAT64:
       return builder_.getDoubleTy();
-    case DataType::INT128:
-    case DataType::PRNG:
-    case DataType::INVALID:
+    case DataType::FLOATX:
+      return builder_.getDoubleTy();
+    default:
       throw Error("Invalid type: " + to_string(type));
   }
   return builder_.getVoidTy();
@@ -1982,7 +1983,7 @@ void Compiler::EmitRunTimeLogEntry(const std::string& str, const std::string& ex
   } else {
     log_args.push_back(llvm::ConstantFP::get(builder_.getFloatTy(), 0.0));
   }
-  auto buffer = builder_.CreateCall(RunTimeLogEntry(), log_args, "");
+  builder_.CreateCall(RunTimeLogEntry(), log_args, "");
 }
 
 void Compiler::Free(llvm::Value* buffer) {
