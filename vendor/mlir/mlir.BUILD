@@ -39,7 +39,7 @@ cc_binary(
     srcs = glob([
         "tools/mlir-tblgen/*.cpp",
         "tools/mlir-tblgen/*.h",
-    ]),
+    ]) + ["@com_intel_plaidml//pmlc/dialect/op_lib:gen_op_lib_wrappers"],
     copts = PLATFORM_COPTS,
     includes = ["include"],
     linkopts = select({
