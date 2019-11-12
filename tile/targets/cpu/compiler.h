@@ -57,6 +57,7 @@ class Compiler : private stripe::ConstStmtVisitor {
   void GenerateArena(const stripe::Block& block);
   llvm::Function* CompileXSMMBlock(const stripe::Block& block, const XSMMDispatch xsmmDispatch,
                                    const XSMMCallData& xsmmCallData);
+  llvm::Function* CompileThreadedBlock(const stripe::Block& block);
   llvm::Function* CompileBlock(const stripe::Block& block);
   void Visit(const stripe::Load&) override;
   void Visit(const stripe::Store&) override;

@@ -7,6 +7,7 @@
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IR/Module.h>
+#include <llvm/IR/Verifier.h>
 #include <llvm/Support/DynamicLibrary.h>
 #include <llvm/Support/ToolOutputFile.h>
 #include <llvm/Transforms/IPO/PassManagerBuilder.h>
@@ -72,6 +73,9 @@ ProgramModule Compiler::CompileProgram(const stripe::Block& program) {
   if (config_.print_llvm_ir_simple) {
     llvm::errs() << "LLVM IR, unoptimized: ================\n";
     module_->print(llvm::errs(), nullptr);
+  }
+  if (llvm::verifyModule(*module_, &llvm::errs())) {
+    throw std::runtime_error("Byte");
   }
   modopt.run(*module_);
   if (config_.print_llvm_ir_optimized) {
@@ -452,6 +456,102 @@ const XSMMDispatch Compiler::GetXSMMDispatch(const stripe::Block& block) {
   return xsmmDispatch;
 }
 
+llvm::Function* Compiler::CompileThreadedBlock(const stripe::Block& block) {
+  // Generate a function implementing the body of this block.
+  // Buffers (refinements) will be passed in as function parameters, as will
+  // the initial value for each index.
+
+  for (const auto& ref : block.refs) {
+    buffers_[ref.into()] = Buffer{&ref};
+  }
+  for (const auto& idx : block.idxs) {
+    indexes_[idx.name] = Index{&idx};
+  }
+
+  // create the LLVM function which will implement the Stripe block
+  auto linkage = llvm::Function::ExternalLinkage;
+  auto name = block.name;
+  auto func_type = BlockType(block);
+  auto function = llvm::Function::Create(func_type, linkage, name, module_);
+  // create a basic block; configure the builder to start there
+  auto bb = llvm::BasicBlock::Create(context_, "entry", function);
+  builder_.SetInsertPoint(bb);
+
+  // This block will be invoked via ParallelFor, and its parameter signature
+  // must match the cpu_thread_block type defined in executable.cc.
+  assert(4 == function->arg_size());
+  // First parameter is a pointer to an array of refinement pointers.
+  // The type will always be int8_t**, so we must cast the pointer type.
+  llvm::Value* refsArray = function->getArg(0);
+  for (unsigned i = 0; i < block.refs.size(); ++i) {
+    llvm::Value* refElement = builder_.CreateConstGEP1_32(refsArray, i);
+    llvm::Value* refPtr = builder_.CreateLoad(refElement);
+    auto it = block.refs.begin();
+    std::advance(it, i);
+    llvm::Type* buftype = CType(it->interior_shape.type)->getPointerTo();
+    std::string refName = it->into();
+    buffers_[refName].base = builder_.CreateBitCast(refPtr, buftype);
+  }
+  // Second parameter points to an array of index init values.
+  llvm::Value* initsArray = function->getArg(1);
+  for (unsigned i = 0; i < block.idxs.size(); ++i) {
+    llvm::Value* idxElement = builder_.CreateConstGEP1_32(initsArray, i);
+    llvm::Value* idxInit = builder_.CreateLoad(idxElement);
+    std::string idxName = block.idxs[i].name;
+    indexes_[idxName].init = idxInit;
+    llvm::Value* idx_ptr = builder_.CreateAlloca(IndexType());
+    indexes_[idxName].variable = idx_ptr;
+  }
+  // Third parameter is the composite index range begin.
+  // Fourth parameter is the composite index range end.
+  // We will use these to replace the init & limit values for index 0.
+
+  // Construct the joint index loop
+  Loop joint_loop;
+  llvm::Value* joint_idx = builder_.CreateAlloca(IndexType());
+  CreateLoop(&joint_loop, "joint_idx");
+  EnterLoop(&joint_loop, joint_idx, function->getArg(2), function->getArg(3));
+
+  // Extract into specific index values
+  llvm::Value* cur = builder_.CreateLoad(joint_idx);
+  for (auto& idx : block.idxs) {
+    auto low_part = builder_.CreateURem(cur, IndexConst(idx.range));
+    auto with_init = builder_.CreateAdd(low_part, indexes_[idx.name].init);
+    cur = builder_.CreateUDiv(cur, IndexConst(idx.range));
+    builder_.CreateStore(with_init, indexes_[idx.name].variable);
+  }
+
+  // check the constraints against the current index values and decide whether
+  // to execute the block body for this iteration
+  llvm::Value* go = builder_.getTrue();
+  for (auto& constraint : block.constraints) {
+    llvm::Value* gateval = Eval(constraint);
+    llvm::Value* check = builder_.CreateICmpSGE(gateval, IndexConst(0));
+    go = builder_.CreateAnd(check, go);
+  }
+  auto block_body = llvm::BasicBlock::Create(context_, "block", function);
+  auto block_done = llvm::BasicBlock::Create(context_, "next", function);
+  builder_.CreateCondBr(go, block_body, block_done);
+  builder_.SetInsertPoint(block_body);
+
+  // process each statement in the block body, generating code to modify the
+  // parameter buffer contents
+  std::shared_ptr<stripe::Block> pBlock = std::make_shared<stripe::Block>(block);
+  for (const auto& stmt : block.stmts) {
+    stmt->Accept(this);
+  }
+
+  // rejoin instruction flow after the constraint check
+  builder_.CreateBr(block_done);
+  builder_.SetInsertPoint(block_done);
+
+  // increment each index, from innermost to outermost, then jump back to test
+  LeaveLoop(&joint_loop, joint_idx);
+
+  builder_.CreateRetVoid();
+  return function;
+}
+
 llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
   if (block.has_tag("xsmm")) {
     assert(!block.has_tag("cpu_thread"));
@@ -461,6 +561,9 @@ llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
     if (xsmmDispatch != XSMMDispatch::NONE && data) {
       return CompileXSMMBlock(block, xsmmDispatch, xsmmCallData);
     }
+  }
+  if (block.has_tag("cpu_thread")) {
+    return CompileThreadedBlock(block);
   }
 
   // Generate a function implementing the body of this block.
@@ -483,53 +586,24 @@ llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
   auto bb = llvm::BasicBlock::Create(context_, "entry", function);
   builder_.SetInsertPoint(bb);
 
-  if (block.has_tag("cpu_thread")) {
-    // This block will be invoked via ParallelFor, and its parameter signature
-    // must match the cpu_thread_block type defined in executable.cc.
-    assert(4 == function->arg_size());
-    // First parameter is a pointer to an array of refinement pointers.
-    // The type will always be int8_t**, so we must cast the pointer type.
-    llvm::Value* refsArray = function->getArg(0);
-    for (unsigned i = 0; i < block.refs.size(); ++i) {
-      llvm::Value* refElement = builder_.CreateConstGEP1_32(refsArray, i);
-      llvm::Value* refPtr = builder_.CreateLoad(refElement);
+  // This block will be invoked through a direct function call.
+  // First, a parameter for each refinement, containing the base address.
+  // Then, a parameter for each index, containing the initial value.
+  for (auto ai = function->arg_begin(); ai != function->arg_end(); ++ai) {
+    unsigned idx = ai->getArgNo();
+    if (idx < block.refs.size()) {
       auto it = block.refs.begin();
-      std::advance(it, i);
-      llvm::Type* buftype = CType(it->interior_shape.type)->getPointerTo();
-      std::string refName = it->into();
-      buffers_[refName].base = builder_.CreateBitCast(refPtr, buftype);
-    }
-    // Second parameter points to an array of index init values.
-    llvm::Value* initsArray = function->getArg(1);
-    for (unsigned i = 0; i < block.idxs.size(); ++i) {
-      llvm::Value* idxElement = builder_.CreateConstGEP1_32(initsArray, i);
-      llvm::Value* idxInit = builder_.CreateLoad(idxElement);
-      std::string idxName = block.idxs[i].name;
-      indexes_[idxName].init = idxInit;
-    }
-    // Third parameter is the composite index range begin.
-    // Fourth parameter is the composite index range end.
-    // We will use these to replace the init & limit values for index 0.
-  } else {
-    // This block will be invoked through a direct function call.
-    // First, a parameter for each refinement, containing the base address.
-    // Then, a parameter for each index, containing the initial value.
-    for (auto ai = function->arg_begin(); ai != function->arg_end(); ++ai) {
-      unsigned idx = ai->getArgNo();
-      if (idx < block.refs.size()) {
-        auto it = block.refs.begin();
-        std::advance(it, idx);
-        std::string param_name = it->into();
-        ai->setName(param_name);
-        assert(nullptr == buffers_[param_name].base);
-        buffers_[param_name].base = &(*ai);
-      } else {
-        idx -= block.refs.size();
-        std::string param_name = block.idxs[idx].name;
-        ai->setName(param_name);
-        assert(nullptr == indexes_[param_name].init);
-        indexes_[param_name].init = &(*ai);
-      }
+      std::advance(it, idx);
+      std::string param_name = it->into();
+      ai->setName(param_name);
+      assert(nullptr == buffers_[param_name].base);
+      buffers_[param_name].base = &(*ai);
+    } else {
+      idx -= block.refs.size();
+      std::string param_name = block.idxs[idx].name;
+      ai->setName(param_name);
+      assert(nullptr == indexes_[param_name].init);
+      indexes_[param_name].init = &(*ai);
     }
   }
 
@@ -547,28 +621,6 @@ llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
     llvm::Value* init = indexes_[block.idxs[i].name].init;
     llvm::Value* range = IndexConst(block.idxs[i].range);
     limits[i] = builder_.CreateAdd(init, range);
-  }
-
-  if (block.has_tag("cpu_thread") && !block.idxs.empty()) {
-    // Find the index which has the largest range. We'll split that range
-    // across threads. The code which calls this block will pass that range
-    // in to ParallelFor, which will invoke this function providing the begin
-    // and end of the sub-range we should iterate over. We will use those
-    // values in place of the default init and limit for that index.
-    size_t best_index = 0;
-    size_t best_range = 0;
-    for (size_t i = 0; i < block.idxs.size(); ++i) {
-      if (block.idxs[i].range > best_range) {
-        best_range = block.idxs[i].range;
-        best_index = i;
-      }
-    }
-    // Replace the init & limit values for index zero with the range_begin
-    // and range_end parameters passed in by ParallelFor.
-    auto& idx = indexes_[block.idxs[best_index].name];
-    llvm::Value* base = idx.init;
-    idx.init = builder_.CreateAdd(base, function->getArg(2));
-    limits[best_index] = builder_.CreateAdd(base, function->getArg(3));
   }
 
   // generate the basic blocks for each nested loop's evaluation stages
@@ -893,20 +945,11 @@ void Compiler::Visit(const stripe::Block& block) {
       builder_.CreateStore(idxs[i], elementPtr);
     }
     if (!block.idxs.empty()) {
-      // Pick the index with the largest range. Pass that range value in as
-      // the quantity to split over. When compiling the block function, we will
-      // use the same criterion to determine which loop should be controlled
-      // by the range_begin and range_end parameters provided by ParallelFor.
-      size_t best_range = 0;
+      size_t total_range = 1;
       for (auto& idx : block.idxs) {
-        if (idx.range > best_range) {
-          best_range = idx.range;
-        }
+        total_range *= idx.range;
       }
-      // Someday it might be nice to create a composite index over the ranges
-      // of all indexes, then split workers across it, for even greater
-      // granularity of work items, but this will do for now.
-      ParallelFor(bufsArg, initsArg, best_range, function);
+      ParallelFor(bufsArg, initsArg, total_range, function);
     } else {
       // There is no point in using ParallelFor to invoke a block which has no
       // indexes, since there is no way to divide the work among threads.
@@ -2124,7 +2167,10 @@ llvm::Value* Compiler::ReadCycleCounter(void) {
   auto functype = llvm::FunctionType::get(builder_.getInt64Ty(), {}, false);
   const char* funcname = "llvm.readcyclecounter";
   auto func = module_->getOrInsertFunction(funcname, functype).getCallee();
-  return builder_.CreateCall(func, {}, "");
+  auto divisor = IndexConst(1000);
+  auto rcc = builder_.CreateCall(func, {}, "");
+  auto div = builder_.CreateUDiv(rcc, divisor);
+  return div;
 }
 
 void Compiler::ProfileBlockEnter(const stripe::Block& block) {
