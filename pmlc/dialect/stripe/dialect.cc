@@ -89,14 +89,15 @@ mlir::Type Dialect::parseTensor(llvm::StringRef tyData, mlir::Location loc) cons
     emitError(loc, "invalid type specification: '") << typeSpec << "'";
     return Type();
   }
-  if (!sizeSpec.consume_back(")")) {
-    emitError(loc, "invalid tensor type, no ()'s on size spec");
-    return Type();
-  }
 
   // Parse shape information, if available.
   llvm::SmallVector<TensorDim, 8> odims;
   if (!sizeSpec.empty()) {
+    if (!sizeSpec.consume_back(")")) {
+      emitError(loc, "invalid tensor type, no ()'s on size spec");
+      return Type();
+    }
+
     if (failed(parseTensorSize(sizeSpec, loc, odims))) {
       return Type();
     }
@@ -132,7 +133,7 @@ mlir::Type Dialect::parseTensorRef(llvm::StringRef tyData, mlir::Location loc) c
     }
     if (ndims != odims.size()) {
       emitError(loc, "invalid tensor type")
-          << "num dimensions (" << ndims << ") doesn't match shape dimentions (" << odims.size() << ")";
+          << "num dimensions (" << ndims << ") doesn't match shape dimensions (" << odims.size() << ")";
       return Type();
     }
   }
@@ -165,7 +166,7 @@ LogicalResult Dialect::parseTensorSize(llvm::StringRef sizeSpec, mlir::Location 
 }
 
 std::string Dialect::getDialectAttrName(llvm::StringRef name) {
-  return llvm::formatv("{0}.{1}", stripe::Dialect::getDialectNamespace(), name).str();
+  return llvm::formatv("{0}.{1}", getDialectNamespace(), name).str();
 }
 
 mlir::Type Dialect::parseType(mlir::DialectAsmParser& parser) const {

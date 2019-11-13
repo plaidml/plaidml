@@ -22,7 +22,7 @@ func @simplify_affines(%arg0: !fp32_2) {
 
   %T = stripe.refine %arg0 (%t1, %z) : !fp32_2
   %0 = stripe.load %T : !fp32_2
-  stripe.store %T, %0 : !fp32_2
+  "stripe.store"(%T, %0) : (!fp32_2, !fp32) -> ()
   stripe.terminate
 }
 
@@ -38,7 +38,7 @@ func @simplify_raw_ref(%arg0: !fp32_2) {
     %p = stripe.affine_poly (%i) [1], 0
     %T = stripe.refine %arg0 (%p, %p) : !fp32_2
     %0 = stripe.load %T : !fp32_2
-    stripe.store %T, %0 : !fp32_2
+    "stripe.store"(%T, %0) : (!fp32_2, !fp32) -> ()
     stripe.terminate
   }
   stripe.terminate
@@ -55,7 +55,7 @@ func @no_simplify_useful_refines(%arg0: !fp32_2)  {
   %c1 = stripe.affine_poly () [], 1
   %T = stripe.refine %arg0 (%c0, %c1) : !fp32_2
   %0 = stripe.load %T : !fp32_2
-  stripe.store %T, %0 : !fp32_2
+  "stripe.store"(%T, %0) : (!fp32_2, !fp32) -> ()
   stripe.terminate
 }
 
@@ -69,7 +69,7 @@ func @no_simplify_stripe_attr_refines(%arg0: !fp32_2) {
   %c0 = stripe.affine_poly () [], 0
   %T = stripe.refine %arg0 (%c0, %c0) : !fp32_2 { stripe_attrs = {} }
   %0 = stripe.load %T : !fp32_2
-  stripe.store %T, %0 : !fp32_2
+  "stripe.store"(%T, %0) : (!fp32_2, !fp32) -> ()
   stripe.terminate
 }
 
@@ -77,12 +77,12 @@ func @no_simplify_stripe_attr_refines(%arg0: !fp32_2) {
 func @simplify_nop_pf(%arg0: !fp32_2) {
   // Validate zero range PF's (and their interior) are removed
   // CHECK-NOT: stripe.parallel_for
-  // CHECK-NOT: stripe.store
+  // CHECK-NOT: "stripe.store"
 
   stripe.parallel_for ("i":0) {
   ^bb0(%i: !aff):
     %0 = "!eltwise.constant" () { value = 32.0} : () -> !fp32
-    stripe.store %arg0, %0 : !fp32_2
+    "stripe.store"(%arg0, %0) : (!fp32_2, !fp32) -> ()
     stripe.terminate
   }
   stripe.terminate
@@ -106,12 +106,12 @@ func @simplify_no_side_effect_pf(%arg0: !fp32_2) {
 func @simplify_one_trip_pf(%arg0: !fp32_2) {
   // Validate one trip PF's are removed and inlined
   // CHECK-NOT: stripe.parallel_for
-  // CHECK: stripe.store
+  // CHECK: "stripe.store"
 
   stripe.parallel_for ("i":1) {
   ^bb0(%i: !aff):
     %0 = "!eltwise.constant" () { value = 32.0} : () -> !fp32
-    stripe.store %arg0, %0 : !fp32_2
+    "stripe.store"(%arg0, %0) : (!fp32_2, !fp32) -> ()
     stripe.terminate
   }
   stripe.terminate
@@ -121,12 +121,12 @@ func @simplify_one_trip_pf(%arg0: !fp32_2) {
 func @dont_simplify_one_trip_pf_if_stripe_attrs(%arg0: !fp32_2) {
   // Validate one trip PF's are removed and inlined
   // CHECK: stripe.parallel_for
-  // CHECK: stripe.store
+  // CHECK: "stripe.store"
 
   stripe.parallel_for ("i":1) {
   ^bb0(%i: !aff):
     %0 = "!eltwise.constant" () { value = 32.0} : () -> !fp32
-    stripe.store %arg0, %0 : !fp32_2
+    "stripe.store"(%arg0, %0) : (!fp32_2, !fp32) -> ()
     stripe.terminate
   } { stripe_attrs = {} }
   stripe.terminate
