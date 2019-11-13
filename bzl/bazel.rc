@@ -71,8 +71,8 @@ test:macos_x86_64_ci --test_tag_filters=-large,-linux,-msvc,-not_ci
 build:macos_x86_64_ci_dbg -c dbg
 build:macos_x86_64_ci_dbg --cpu=darwin_x86_64
 build:macos_x86_64_ci_dbg --apple_platform_type=macos
-build:macos_x86_64_ci_dbg --build_tag_filters=-large,-linux,-msvc,-not_ci
-test:macos_x86_64_ci_dbg --test_tag_filters=-large,-linux,-msvc,-not_ci
+build:macos_x86_64_ci_dbg --build_tag_filters=-dbg,-large,-linux,-msvc,-not_ci
+test:macos_x86_64_ci_dbg --test_tag_filters=-dbg,-large,-linux,-msvc,-not_ci
 
 build:windows_x86_64 --build_tag_filters=-darwin,-docs,-linux,-metal,-pytorch
 build:windows_x86_64 --action_env=CONDA_EXE
