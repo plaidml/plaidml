@@ -12,6 +12,7 @@ PLATFORM_COPTS = select({
     "@com_intel_plaidml//toolchain:windows_x86_64": [
         "/w",
         "/DWIN32_LEAN_AND_MEAN",
+        "/std:c++17",  # This MUST match all other compilation units
     ],
     "//conditions:default": [
         "-std=c++14",
@@ -533,9 +534,9 @@ cc_library(
     includes = ["include"],
     deps = [
         ":StandardOps",
+        ":gen-loop-like-interface-decls",
         ":gen-loop-op-decls",
         ":gen-loop-op-defs",
-        ":gen-loop-like-interface-decls",
         "@llvm//:support",
     ],
     alwayslink = 1,

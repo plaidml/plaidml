@@ -25,7 +25,7 @@ func @eltwise_add(
 // CHECK-DAG:        %[[LOAD1:.*]] = stripe.load %[[IN1]] : !fp32_2
 // CHECK-DAG:        %[[LOAD2:.*]] = stripe.load %[[IN2]] : !fp32_2
 // CHECK-DAG:        %[[ADD:.*]] = "eltwise.add"(%[[LOAD2]], %[[LOAD1]]) {type = !eltwise.fp32} : (!fp32, !fp32) -> !fp32
-// CHECK-DAG:        stripe.store %[[OUT]], %[[ADD]] : !fp32_2
+// CHECK-DAG:        "stripe.store"(%[[OUT]], %[[ADD]]) : (!fp32_2, !fp32) -> ()
 // CHECK-NEXT:       stripe.terminate
 // CHECK-NEXT:     } {stripe_attrs = {eltwise, eltwise_add, kernel}}
 // CHECK-NEXT:     stripe.terminate
@@ -163,7 +163,7 @@ func @relu(%arg0: !t_10x20xfp32) -> !t_10x20xfp32 {
 // CHECK-DAG:        %[[IN:.*]] = stripe.refine %arg0(%i0, %i1) : !fp32_2 {stripe_attrs = {eltwise_cmp_lt}}
 // CHECK-DAG:        %[[LOAD:.*]] = stripe.load %[[IN]] : !fp32_2
 // CHECK-DAG:        %[[CMP:.*]] = "eltwise.cmp_lt"(%[[LOAD]], %[[CST]]) {type = !eltwise.bool} : (!fp32, !fp32) -> !bool
-// CHECK-DAG:        stripe.store %[[OUT]], %[[CMP]] : !bool_2
+// CHECK-DAG:        "stripe.store"(%[[OUT]], %[[CMP]]) : (!bool_2, !bool) -> ()
 // CHECK-NEXT:       stripe.terminate
 // CHECK-NEXT:     } {stripe_attrs = {eltwise, eltwise_cmp_lt, kernel}}
 // CHECK-NEXT:     stripe.parallel_for ("i0":10, "i1":20) {
@@ -174,7 +174,7 @@ func @relu(%arg0: !t_10x20xfp32) -> !t_10x20xfp32 {
 // CHECK-DAG:        %[[LOAD1:.*]] = stripe.load %[[IN1]] : !bool_2
 // CHECK-DAG:        %[[LOAD2:.*]] = stripe.load %[[IN2]] : !fp32_2
 // CHECK-DAG:        %[[SELECT:.*]] = "eltwise.select"(%[[LOAD1]], %[[CST]], %[[LOAD2]]) {type = !eltwise.fp32} : (!bool, !fp32, !fp32) -> !fp32
-// CHECK-DAG:        stripe.store %[[OUT]], %[[SELECT]] : !fp32_2
+// CHECK-DAG:        "stripe.store"(%[[OUT]], %[[SELECT]]) : (!fp32_2, !fp32) -> ()
 // CHECK-NEXT:       stripe.terminate
 // CHECK-NEXT:     } {stripe_attrs = {eltwise, eltwise_select, kernel}}
 // CHECK-NEXT:     stripe.terminate
@@ -271,7 +271,7 @@ func @index_op(%arg0: tensor<1x10x10x!eltwise.fp32>) -> tensor<1x10x10x!eltwise.
 // CHECK: stripe.parallel_for ("i0":1, "i1":10, "i2":10)
 // CHECK: stripe.refine %arg1(%i0, %i1, %i2) : !int_3
 // CHECK: "stripe.load_index"(%i0) : (!aff) -> !int
-// CHECK: stripe.store %0, %1 : !int_3
+// CHECK: "stripe.store"(%0, %1) : (!int_3, !int) -> ()
 // CHECK: eltwise_index
 
 // -----
