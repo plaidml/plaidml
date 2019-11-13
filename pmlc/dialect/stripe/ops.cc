@@ -136,7 +136,7 @@ ParseResult ParseSimple(                                   //
     }
   }
   // Parse any additional attributes
-  return parser->parseOptionalAttributeDict(res->attributes);
+  return parser->parseOptionalAttrDict(res->attributes);
 }
 
 void printTerminateOp(OpAsmPrinter* printer, TerminateOp op) {  //
@@ -341,7 +341,7 @@ ParseResult parseParallelForOp(OpAsmParser* parser, OperationState& result) {
   result.regions.emplace_back(new Region(nullptr));
   return failure(                                                    //
       parser->parseRegion(*result.regions.back(), {}, {}, false) ||  //
-      parser->parseOptionalAttributeDict(result.attributes));
+      parser->parseOptionalAttrDict(result.attributes));
 }
 
 void ParallelForOp::build(Builder* builder, OperationState& result, ArrayRef<int64_t> ranges) {
