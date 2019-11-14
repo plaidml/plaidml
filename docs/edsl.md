@@ -47,22 +47,7 @@ it's related to summation notation. Below we show how this C++ Tile code is
 related to the mathematical formula for the operation by using colors to
 highlight corresponding pieces:
 
-```math
-\Large
-\textcolor{red}{O[n]}
-\textcolor{yellow}{=}
-\textcolor{green}{\sum_{m}}
-\textcolor{cyan}{I[m, n]}
-```
-
-```math
-\Large
-\texttt{
-  \textcolor{red}{O(n)}
-  \textcolor{green}{+=}
-  \textcolor{cyan}{I(m, n)};
-}
-```
+![](images/edsl-summation-contraction.png)
 
 In green, notice that the summation symbol is represented as `+=` in C++ Tile
 code. Some portions of the notation do not perfectly correspond. Here's why:
@@ -108,22 +93,7 @@ Tensor max_over_axis(const Tensor& I) {
 
 Again, this corresponds closely to mathematical notation:
 
-```math
-\Large
-\textcolor{red}{O[n]}
-\textcolor{yellow}{=}
-\textcolor{green}{\max_m}
-\textcolor{cyan}{I[m, n]}
-```
-
-```math
-\Large
-\texttt{
-  \textcolor{red}{O(n)}
-  \textcolor{green}{>=}
-  \textcolor{cyan}{I(m, n)};
-}
-```
+![](images/edsl-max-contraction.png)
 
 ### Matrix Multiply
 
@@ -131,10 +101,7 @@ Next we'll consider matrix multiplication. Let's look at the mathematical
 expression for the matrix multiplication `C = AB` written out in element-level
 detail:
 
-```math
-\Large
-C[i, j] = \sum_{k} (A[i, k] \cdot B[k, j])
-```
+![](images/math-mat-mul.png)
 
 We can convert this to C++ Tile code using the same correspondence as the
 previous example: The summation sign becomes plus-assignment, the summation
@@ -323,24 +290,7 @@ We determined the Tile code for this example by starting from imperative code,
 but this Tile code is still very similar to mathematical notation, and we could
 have started there instead:
 
-```math
-\Large
-\textcolor{red}{O[n]}
-\textcolor{yellow}{=}
-\textcolor{green}{\max}\textcolor{magenta}{_{0 \leq j < 2}}
-\textcolor{cyan}{I[2i + j]}
-```
-
-```math
-\Large
-\texttt{
-  if (\textcolor{magenta}{j < 2}) \{{
-    \textcolor{red}{O(n)}
-    \textcolor{green}{>=}
-    \textcolor{cyan}{I(2 * i + j)};
-  \}}
-}
-```
+[](images/edsl-max-pool-1d.png)
 
 This Tile code handles odd values of `N` by rounding down the output tensor
 size. You may instead want to round up the output tensor size and use a smaller
@@ -428,10 +378,7 @@ Suppose we want to take the cumulative sum of a 1D tensor. That is, we want
 `O[i]` to be the sum of all input entries `I[k]` where `k <= i`. In summation
 notation, this is:
 
-```math
-\Large
-O[i] = \sum_{k \leq i} I[k]
-```
+![](images/math-cum-sum-raw.png)
 
 However, we can't use `k <= i` as a constraint in Tile; all the index variables
 must be gathered into a single index expression on one side of the inequality.
@@ -455,24 +402,7 @@ Tensor csum(const Tensor& I) {
 Alternatively, we could write `k = i - j` for `j` non-negative as an alternative
 way of forcing `k` to be no larger than `i`. Then in summation notation we have:
 
-```math
-\Large
-\textcolor{red}{O[i]}
-\textcolor{yellow}{=}
-\textcolor{green}{\sum}\textcolor{magenta}{_{0 \leq j}}
-\textcolor{cyan}{I[i - j]}
-```
-
-```math
-\Large
-\texttt{
-  if (\textcolor{magenta}{j < N}) \{{
-    \textcolor{red}{O(n)}
-    \textcolor{green}{+=}
-    \textcolor{cyan}{I(i - j)};
-  \}}
-}
-```
+![](images/edsl-cumsum.png)
 
 ### Convolution
 
@@ -485,10 +415,7 @@ K.conv1d(x, kernel, padding='valid')
 
 Let's start with the mathematical formula for this operation:
 
-```math
-\Large
-O[n, x, c_o] = \sum_k \sum_{c_i}(I[n, x + k, c_i] \cdot K[k, c_i, c_o])
-```
+![](images/math-conv-1D-raw.png)
 
 This is rather complicated, so let's walk through why this is the same
 convolution formula we're used to in machine learning.
@@ -517,26 +444,7 @@ This formula directly translates to Tile, although note that `padding='valid'`
 means that the spatial dimension of the output will be reduced by one less than
 the kernel size relative to the spatial dimension of the input:
 
-```math
-\Large
-\textcolor{red}{O[n, x, c_o]}
-\textcolor{yellow}{=}
-\textcolor{green}{\sum_k \sum_{c_i}}
-\textcolor{cyan}{I[n, x + k, c_i]}
-\textcolor{orange}{\cdot}
-\textcolor{lightblue}{K[k, c_i, c_o]}
-```
-
-```math
-\Large
-\texttt{
-  \textcolor{red}{O(n, x, co)}
-  \textcolor{green}{+=}
-  \textcolor{cyan}{I(n, x + k, ci)}
-  \textcolor{orange}{*}
-  \textcolor{lightblue}{K(k, ci, co)};
-}
-```
+![](images/edsl-convolution.png)
 
 ```c++
 Tensor conv_1d(const Tensor& I, const Tensor& K) {
@@ -567,12 +475,7 @@ an additional spatial dimension for each tensor, and the kernel offset index
 variables are multiplied by dilation scaling factors when used to determine
 indices for `I`:
 
-```math
-\Large
-O[n, x, y, c_o] = \sum_{k_x} \sum_{k_y} \sum_{c_i}
-I[n, x + 2k_x, y + 3k_y, c_i] *
-K[k_x, k_y, c_i, c_o]
-```
+![](images/math-dil-conv-2D.png)
 
 The effective size for a dilated kernel with kernel size `K` and dilation rate
 `d` is `d * (K - 1) + 1`, and so to achieve `'valid'` padding for this
@@ -597,17 +500,7 @@ Tensor conv_2d(const Tensor& I, const Tensor& K) {
 
 This final example demonstrates a strided dilated padded grouped convolution.
 
-```math
-\Large
-\begin{aligned}
-O&[n, x_0, x_1, g, c_{o, g}] \\
-&= \sum_{k_0, k_1, c_{i, g}}
-(
-  I[n, s_0 x_0 + d_0 k_0 - P_0, s_1 x_1 + d_1 k_1 - P_1, c_{i, g}] *
-  K[k_0, k_1, g, c_{i, g}, c_{o, g}]
-)
-\end{aligned}
-```
+![](images/math-complex-convolution.png)
 
 where _`s`_ gives the stride coefficients, _`d`_ gives the dilation
 coefficients, and _`P`_ gives the padding offsets.
