@@ -159,6 +159,8 @@ plaidml_cc_test(
         ":api",
         "//testing:matchers",
         "//testing:plaidml_config",
+        "@tbb",
+        "@xsmm",
     ],
 )
 
