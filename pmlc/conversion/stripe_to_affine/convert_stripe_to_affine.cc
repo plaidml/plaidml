@@ -231,12 +231,7 @@ PatternMatchResult LoadOpConverter::matchAndRewrite(LoadOp loadOp, ArrayRef<Valu
   Value* base;
   RefineOp refine = cast<RefineOp>(loadOp.from()->getDefiningOp());
   convertStripeAccessToAffine(accessAnalysis.getAccessInfo(refine), rewriter, base, indices, map);
-
-  // TODO: This is a temporary hack to make progress whereas function signature conversion is reworked in MLIR.
-  // Retrieve base from refineOp, skipping temporary cast introduced by function signature conversion.
-  base = refine.in()->getDefiningOp()->getOperand(0);
   rewriter.replaceOpWithNewOp<AffineLoadOp>(loadOp, base, map, indices);
-
   return matchSuccess();
 }
 
