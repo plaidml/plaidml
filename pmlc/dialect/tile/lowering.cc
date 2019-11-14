@@ -379,17 +379,19 @@ struct AffineDomainOpConversion : public LoweringBase {
         srcType = stripe::TensorRefType::get(srcTensorType);
       }
       if (i) {
-        auto op = tensors[i]->getDefiningOp();
-        if (op && llvm::isa<eltwise::ScalarConstantOp>(op)) {
+        auto tensorValue = tensors[i];
+        auto tensorLoc = tensorValue->getLoc();
+        auto tensorOp = tensorValue->getDefiningOp();
+        if (tensorOp && llvm::isa<eltwise::ScalarConstantOp>(tensorOp)) {
           // This operand needs to be broadcast, skip creating a refinement
-          refs.emplace_back(tensors[i]);
+          refs.emplace_back(tensorValue);
         } else {
-          auto refineOp = rewriter.create<stripe::RefineOp>(op->getLoc(), srcType, tensors[i], offsets);
+          auto refineOp = rewriter.create<stripe::RefineOp>(tensorLoc, srcType, tensorValue, offsets);
           auto refAttrs = llvm::SmallVector<NamedAttribute, 1>{
               {rewriter.getIdentifier("contraction"), rewriter.getUnitAttr()},
           };
           refineOp.setAttr(stripe::Dialect::getStripeAttrsName(), rewriter.getDictionaryAttr(refAttrs));
-          if (auto name = getTensorName(tensors[i])) {
+          if (auto name = getTensorName(tensorValue)) {
             refineOp.setAttr("name", name);
           }
           refs.emplace_back(refineOp.result());
