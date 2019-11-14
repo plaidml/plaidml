@@ -41,7 +41,6 @@ inline std::string c_dtype(const DataType& dt) {
     case DataType::INT16:
       return "short";
     case DataType::INT32:
-    case DataType::INTX:
       return "int";
     case DataType::INT64:
       return "ptrdiff_t";
@@ -50,14 +49,12 @@ inline std::string c_dtype(const DataType& dt) {
     case DataType::UINT16:
       return "ushort";
     case DataType::UINT32:
-    case DataType::UINTX:
       return "uint";
     case DataType::UINT64:
       return "size_t";
     case DataType::FLOAT16:
       return "half";
     case DataType::FLOAT32:
-    case DataType::FLOATX:
       return "float";
     default:
       throw std::runtime_error{"Unusable hardware type: " + to_string(dt)};

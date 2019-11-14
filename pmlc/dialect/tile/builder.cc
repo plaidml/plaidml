@@ -103,7 +103,7 @@ struct TileBuilder::Impl {
   std::vector<mlir::Value*> getBackwardSliceOfAffine(const llvm::SetVector<mlir::Value*>& values) {
     return util::getBackwardSlice(values, false, [](Value* value) {
       if (auto scalarType = value->getType().dyn_cast<ScalarType>()) {
-        return scalarType.type() == DataType::INTX;
+        return scalarType.type() == DataType::INT32;
       }
       return false;
     });
@@ -327,7 +327,7 @@ std::vector<Value*> TileBuilder::GetTupleElements(Value* value) {
 
 Value* TileBuilder::MakeScalarConstantOp(int64_t value) {
   IVLOG(5, "TileBuilder::MakeScalarConstantOp> " << value);
-  auto type = impl->builder.getType<ScalarType>(DataType::INTX);
+  auto type = impl->builder.getType<ScalarType>(DataType::INT32);
   return impl->builder.create<ScalarConstantOp>(impl->builder.getUnknownLoc(), type, value).result();
 }
 
@@ -340,7 +340,7 @@ int64_t TileBuilder::GetIntegerValue(mlir::Value* value) {
 
 Value* TileBuilder::MakeScalarConstantOp(double value) {
   IVLOG(5, "TileBuilder::MakeScalarConstantOp> " << value);
-  auto type = impl->builder.getType<ScalarType>(DataType::FLOATX);
+  auto type = impl->builder.getType<ScalarType>(DataType::FLOAT32);
   return impl->builder.create<ScalarConstantOp>(impl->builder.getUnknownLoc(), type, value).result();
 }
 

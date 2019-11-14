@@ -32,16 +32,13 @@ enum class DataType : int {
   INT32 = 0x12,
   INT64 = 0x13,
   INT128 = 0x14,
-  INTX = 0x1F,
   UINT8 = 0x20,
   UINT16 = 0x21,
   UINT32 = 0x22,
   UINT64 = 0x23,
-  UINTX = 0x2F,
   FLOAT16 = 0x31,
   FLOAT32 = 0x32,
   FLOAT64 = 0x33,
-  FLOATX = 0x3F,
   BFLOAT16 = 0x38,
   PRNG = 0x40,
 };
@@ -54,16 +51,13 @@ inline const std::set<DataType>& GetDataTypeSet() {
       DataType::INT32,     //
       DataType::INT64,     //
       DataType::INT128,    //
-      DataType::INTX,      //
       DataType::UINT8,     //
       DataType::UINT16,    //
       DataType::UINT32,    //
       DataType::UINT64,    //
-      DataType::UINTX,     //
       DataType::FLOAT16,   //
       DataType::FLOAT32,   //
       DataType::FLOAT64,   //
-      DataType::FLOATX,    //
       DataType::BFLOAT16,  //
   };
   return all_types;
@@ -76,7 +70,6 @@ inline bool is_int(const DataType& dt) {
     case DataType::INT32:
     case DataType::INT64:
     case DataType::INT128:
-    case DataType::INTX:
       return true;
     default:
       return false;
@@ -89,7 +82,6 @@ inline bool is_uint(const DataType& dt) {
     case DataType::UINT16:
     case DataType::UINT32:
     case DataType::UINT64:
-    case DataType::UINTX:
       return true;
     default:
       return false;
@@ -101,7 +93,6 @@ inline bool is_float(const DataType& dt) {
     case DataType::FLOAT16:
     case DataType::FLOAT32:
     case DataType::FLOAT64:
-    case DataType::FLOATX:
     case DataType::BFLOAT16:
       return true;
     default:
@@ -160,8 +151,6 @@ inline std::string to_string(const DataType& dt) {
       return "i64";
     case DataType::INT128:
       return "i128";
-    case DataType::INTX:
-      return "int";
     case DataType::UINT8:
       return "u8";
     case DataType::UINT16:
@@ -170,16 +159,12 @@ inline std::string to_string(const DataType& dt) {
       return "u32";
     case DataType::UINT64:
       return "u64";
-    case DataType::UINTX:
-      return "uint";
     case DataType::FLOAT16:
       return "fp16";
     case DataType::FLOAT32:
       return "fp32";
     case DataType::FLOAT64:
       return "fp64";
-    case DataType::FLOATX:
-      return "float";
     case DataType::BFLOAT16:
       return "bf16";
     case DataType::PRNG:
@@ -198,16 +183,13 @@ inline DataType DataTypeFromString(const std::string& str) {
       {"i32", DataType::INT32},      //
       {"i64", DataType::INT64},      //
       {"i128", DataType::INT128},    //
-      {"int", DataType::INTX},       //
       {"u8", DataType::UINT8},       //
       {"u16", DataType::UINT16},     //
       {"u32", DataType::UINT32},     //
       {"u64", DataType::UINT64},     //
-      {"uint", DataType::UINTX},     //
       {"fp16", DataType::FLOAT16},   //
       {"fp32", DataType::FLOAT32},   //
       {"fp64", DataType::FLOAT64},   //
-      {"float", DataType::FLOATX},   //
       {"bf16", DataType::BFLOAT16},  //
       {"prng", DataType::PRNG},      //
   };
@@ -371,8 +353,6 @@ inline DataType FromProto(const proto::TensorShape_DataType& dt) {
       return DataType::INT64;
     case proto::TensorShape_DataType_INT128:
       return DataType::INT128;
-    case proto::TensorShape_DataType_INTX:
-      return DataType::INTX;
     case proto::TensorShape_DataType_UINT8:
       return DataType::UINT8;
     case proto::TensorShape_DataType_UINT16:
@@ -381,16 +361,12 @@ inline DataType FromProto(const proto::TensorShape_DataType& dt) {
       return DataType::UINT32;
     case proto::TensorShape_DataType_UINT64:
       return DataType::UINT64;
-    case proto::TensorShape_DataType_UINTX:
-      return DataType::UINTX;
     case proto::TensorShape_DataType_FLOAT16:
       return DataType::FLOAT16;
     case proto::TensorShape_DataType_FLOAT32:
       return DataType::FLOAT32;
     case proto::TensorShape_DataType_FLOAT64:
       return DataType::FLOAT64;
-    case proto::TensorShape_DataType_FLOATX:
-      return DataType::FLOATX;
     case proto::TensorShape_DataType_BFLOAT16:
       return DataType::BFLOAT16;
     case proto::TensorShape_DataType_PRNG:
@@ -414,8 +390,6 @@ inline proto::TensorShape_DataType IntoProto(const DataType& dt) {
       return proto::TensorShape_DataType_INT64;
     case DataType::INT128:
       return proto::TensorShape_DataType_INT128;
-    case DataType::INTX:
-      return proto::TensorShape_DataType_INTX;
     case DataType::UINT8:
       return proto::TensorShape_DataType_UINT8;
     case DataType::UINT16:
@@ -424,16 +398,12 @@ inline proto::TensorShape_DataType IntoProto(const DataType& dt) {
       return proto::TensorShape_DataType_UINT32;
     case DataType::UINT64:
       return proto::TensorShape_DataType_UINT64;
-    case DataType::UINTX:
-      return proto::TensorShape_DataType_UINTX;
     case DataType::FLOAT16:
       return proto::TensorShape_DataType_FLOAT16;
     case DataType::FLOAT32:
       return proto::TensorShape_DataType_FLOAT32;
     case DataType::FLOAT64:
       return proto::TensorShape_DataType_FLOAT64;
-    case DataType::FLOATX:
-      return proto::TensorShape_DataType_FLOATX;
     case DataType::BFLOAT16:
       return proto::TensorShape_DataType_BFLOAT16;
     case DataType::PRNG:

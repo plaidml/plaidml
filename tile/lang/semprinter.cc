@@ -26,7 +26,6 @@ inline std::string c_dtype(const DataType& dt) {
       base = "int";
       break;
     case DataType::INT64:
-    case DataType::INTX:
       base = "long";
       break;
     case DataType::UINT8:
@@ -39,7 +38,6 @@ inline std::string c_dtype(const DataType& dt) {
       base = "uint";
       break;
     case DataType::UINT64:
-    case DataType::UINTX:
       base = "ulong";
       break;
     case DataType::FLOAT16:
