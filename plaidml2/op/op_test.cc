@@ -88,10 +88,10 @@ module {
     %c1 = "eltwise.sconst"() {value = 1 : i64} : () -> !int
     %c0 = "eltwise.sconst"() {value = 0 : i64} : () -> !int
     %0 = "eltwise.cmp_eq"(%arg0, %c0) {type = !eltwise.fp32} : (tensor<1x224x224x3x!eltwise.fp32>, !int) -> tensor<1x224x224x3x!eltwise.bool>
-    %1 = "eltwise.select"(%0, %c0, %c1) {type = !eltwise.fp32} : (tensor<1x224x224x3x!eltwise.bool>, !int, !int) -> !int
+    %1 = "eltwise.select"(%0, %c0, %c1) {type = !eltwise.fp32} : (tensor<1x224x224x3x!eltwise.bool>, !int, !int) -> tensor<1x224x224x3x!eltwise.int>
     %2 = "tile.domain"() ( {
     ^bb0(%arg1: !eltwise.int, %arg2: !eltwise.int, %arg3: !eltwise.int, %arg4: !eltwise.int):	// no predecessors
-      %4 = "tile.src_idx_map"(%1, %arg4, %arg3, %arg2, %arg1) : (!int, !eltwise.int, !eltwise.int, !eltwise.int, !eltwise.int) -> !tile.imap
+      %4 = "tile.src_idx_map"(%1, %arg4, %arg3, %arg2, %arg1) : (tensor<1x224x224x3x!eltwise.int>, !eltwise.int, !eltwise.int, !eltwise.int, !eltwise.int) -> !tile.imap
       %5 = "tile.sink_idx_map"() : () -> !tile.imap
       %6 = "tile.size_map"() : () -> !tile.smap
       "tile.*(x)"(%6, %4, %5) : (!tile.smap, !tile.imap, !tile.imap) -> ()
@@ -141,10 +141,10 @@ module {
     %c1 = "eltwise.sconst"() {value = 1 : i64} : () -> !int
     %c0 = "eltwise.sconst"() {value = 0 : i64} : () -> !int
     %0 = "eltwise.cmp_eq"(%arg0, %c0) {type = !eltwise.fp32} : (tensor<1x224x224x3x!eltwise.fp32>, !int) -> tensor<1x224x224x3x!eltwise.bool>
-    %1 = "eltwise.select"(%0, %c0, %c1) {type = !eltwise.fp32} : (tensor<1x224x224x3x!eltwise.bool>, !int, !int) -> !int
+    %1 = "eltwise.select"(%0, %c0, %c1) {type = !eltwise.fp32} : (tensor<1x224x224x3x!eltwise.bool>, !int, !int) -> tensor<1x224x224x3x!eltwise.int>
     %2 = "tile.domain"() ( {
     ^bb0(%arg1: !eltwise.int, %arg2: !eltwise.int, %arg3: !eltwise.int, %arg4: !eltwise.int):	// no predecessors
-      %6 = "tile.src_idx_map"(%1, %arg4, %arg3, %arg2, %arg1) : (!int, !eltwise.int, !eltwise.int, !eltwise.int, !eltwise.int) -> !tile.imap
+      %6 = "tile.src_idx_map"(%1, %arg4, %arg3, %arg2, %arg1) : (tensor<1x224x224x3x!eltwise.int>, !eltwise.int, !eltwise.int, !eltwise.int, !eltwise.int) -> !tile.imap
       %7 = "tile.sink_idx_map"() : () -> !tile.imap
       %8 = "tile.size_map"() : () -> !tile.smap
       "tile.+(x)"(%8, %6, %7) : (!tile.smap, !tile.imap, !tile.imap) -> ()
