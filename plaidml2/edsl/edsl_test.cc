@@ -1017,5 +1017,41 @@ TEST(CppEdsl, DupOut) {
   exec::Executable::compile(program, {A, B, C})->run();
 }
 
+TEST(CppEdsl, Select) {
+  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20});
+  auto O = select(I == 0, Tensor{0}, Tensor{1});
+  Program program("select", {O});
+#ifdef PLAIDML_AST
+  EXPECT_THAT(program, Eq(R"(function (
+  _X0[_X0_0, _X0_1]
+) -> (
+  _X5
+) {
+  _X1 = 0;
+  _X2 = cmp_eq(_X0, _X1);
+  _X3 = 0;
+  _X4 = 1;
+  _X5 = cond(_X2, _X3, _X4);
+}
+)"));
+#endif
+#ifdef PLAIDML_MLIR
+  EXPECT_THAT(program, Eq(R"#(
+
+!int = type tensor<!eltwise.int>
+module {
+  func @select(%arg0: tensor<10x20x!eltwise.fp32>) -> tensor<10x20x!eltwise.int> {
+    %c1 = "eltwise.sconst"() {value = 1 : i64} : () -> !int
+    %c0 = "eltwise.sconst"() {value = 0 : i64} : () -> !int
+    %0 = "eltwise.cmp_eq"(%arg0, %c0) {type = !eltwise.fp32} : (tensor<10x20x!eltwise.fp32>, !int) -> tensor<10x20x!eltwise.bool>
+    %1 = "eltwise.select"(%0, %c0, %c1) {type = !eltwise.fp32} : (tensor<10x20x!eltwise.bool>, !int, !int) -> tensor<10x20x!eltwise.int>
+    return %1 : tensor<10x20x!eltwise.int>
+  }
+}
+)#"));
+#endif
+  exec::Executable::compile(program, {I})->run();
+}
+
 }  // namespace
 }  // namespace plaidml::edsl

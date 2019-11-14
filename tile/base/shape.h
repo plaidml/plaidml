@@ -371,6 +371,8 @@ inline DataType FromProto(const proto::TensorShape_DataType& dt) {
       return DataType::INT64;
     case proto::TensorShape_DataType_INT128:
       return DataType::INT128;
+    case proto::TensorShape_DataType_INTX:
+      return DataType::INTX;
     case proto::TensorShape_DataType_UINT8:
       return DataType::UINT8;
     case proto::TensorShape_DataType_UINT16:
@@ -379,12 +381,16 @@ inline DataType FromProto(const proto::TensorShape_DataType& dt) {
       return DataType::UINT32;
     case proto::TensorShape_DataType_UINT64:
       return DataType::UINT64;
+    case proto::TensorShape_DataType_UINTX:
+      return DataType::UINTX;
     case proto::TensorShape_DataType_FLOAT16:
       return DataType::FLOAT16;
     case proto::TensorShape_DataType_FLOAT32:
       return DataType::FLOAT32;
     case proto::TensorShape_DataType_FLOAT64:
       return DataType::FLOAT64;
+    case proto::TensorShape_DataType_FLOATX:
+      return DataType::FLOATX;
     case proto::TensorShape_DataType_BFLOAT16:
       return DataType::BFLOAT16;
     case proto::TensorShape_DataType_PRNG:
@@ -408,6 +414,8 @@ inline proto::TensorShape_DataType IntoProto(const DataType& dt) {
       return proto::TensorShape_DataType_INT64;
     case DataType::INT128:
       return proto::TensorShape_DataType_INT128;
+    case DataType::INTX:
+      return proto::TensorShape_DataType_INTX;
     case DataType::UINT8:
       return proto::TensorShape_DataType_UINT8;
     case DataType::UINT16:
@@ -416,12 +424,16 @@ inline proto::TensorShape_DataType IntoProto(const DataType& dt) {
       return proto::TensorShape_DataType_UINT32;
     case DataType::UINT64:
       return proto::TensorShape_DataType_UINT64;
+    case DataType::UINTX:
+      return proto::TensorShape_DataType_UINTX;
     case DataType::FLOAT16:
       return proto::TensorShape_DataType_FLOAT16;
     case DataType::FLOAT32:
       return proto::TensorShape_DataType_FLOAT32;
     case DataType::FLOAT64:
       return proto::TensorShape_DataType_FLOAT64;
+    case DataType::FLOATX:
+      return proto::TensorShape_DataType_FLOATX;
     case DataType::BFLOAT16:
       return proto::TensorShape_DataType_BFLOAT16;
     case DataType::PRNG:

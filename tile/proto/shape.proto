@@ -13,13 +13,16 @@ message TensorShape {
     INT32 = 18;
     INT64 = 19;
     INT128 = 20;
+    INTX = 21;
     UINT8 = 32;
     UINT16 = 33;
     UINT32 = 34;
     UINT64 = 35;
+    UINTX = 36;
     FLOAT16 = 49;
     FLOAT32 = 50;
     FLOAT64 = 51;
+    FLOATX = 52;
     BFLOAT16 = 56;
     PRNG = 64;
   }

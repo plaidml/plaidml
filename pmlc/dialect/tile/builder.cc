@@ -623,6 +623,9 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(  //
     StringRef name,                                     //
     ArrayRef<Value*> outputs,                           //
     llvm::MutableArrayRef<Value*> new_outputs) {
+  if (name.empty()) {
+    name = "noname";
+  }
   IVLOG(5, "TileBuilder::MakeProgram> " << name.str());
   IVLOG(6, mlir::debugString(impl->module));
   // Compute the result types
@@ -681,6 +684,8 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(  //
       } else {
         auto new_value = builder.clone(*op, program->mapper)->getResult(0);
         IVLOG(5, "mapping: " << value << " -> " << new_value);
+        IVLOG(6, "value: " << mlir::debugString(*value));
+        IVLOG(6, "new_value: " << mlir::debugString(*new_value));
         program->mapper.map(value, new_value);
       }
     }

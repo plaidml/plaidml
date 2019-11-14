@@ -2,6 +2,8 @@
 
 #include "tile/lang/exprtype.h"
 
+#include <algorithm>
+
 namespace vertexai {
 namespace tile {
 namespace lang {
@@ -32,14 +34,17 @@ unsigned Rank(sem::Type ty) {
     case DataType::UINT32:
       return 8;
     case DataType::INT64:
+    case DataType::INTX:
       return 9;
     case DataType::UINT64:
+    case DataType::UINTX:
       return 10;
     case DataType::FLOAT16:
       return 11;
     case DataType::FLOAT32:
       return 12;
     case DataType::FLOAT64:
+    case DataType::FLOATX:
       return 13;
     default:
       throw std::logic_error{"Invalid type found in typecheck"};
@@ -294,6 +299,9 @@ void ExprType::AdjustLogicOpResult() {
       case DataType::INT64:
       case DataType::UINT64:
       case DataType::FLOAT64:
+      case DataType::INTX:
+      case DataType::UINTX:
+      case DataType::FLOATX:
         ty_.dtype = DataType::INT64;
         break;
       default:
