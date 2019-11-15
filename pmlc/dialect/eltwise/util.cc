@@ -115,7 +115,7 @@ RankedTensorType getRankedTensorType(Type type) {
   }
   SmallVector<int64_t, 0> shape;
   if (type.isa<IndexType>()) {
-    return RankedTensorType::get(shape, ScalarType::get(type.getContext(), DataType::INTX));
+    return RankedTensorType::get(shape, ScalarType::get(type.getContext(), DataType::INT32));
   }
   if (type.isa<ScalarType>()) {
     return RankedTensorType::get(shape, type);

@@ -211,9 +211,7 @@ def SelectOp : EltwiseOp<"select">, HasCanonicalizer {
   >];
 
   let extraClassDeclaration = [{
-    static Type getResultType(ArrayRef<Value*> operands) {
-      return ComputeResultType(operands.drop_front());
-    }
+    static Type getResultType(ArrayRef<Value*> operands);
   }] # EltwiseBuilderImpl_create;
 }
 

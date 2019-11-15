@@ -2,6 +2,8 @@
 
 #include "tile/lang/exprtype.h"
 
+#include <algorithm>
+
 namespace vertexai {
 namespace tile {
 namespace lang {

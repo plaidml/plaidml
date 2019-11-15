@@ -93,7 +93,7 @@ plaidml_cc_library(
 )
 
 plaidml_cc_test(
-    name = "cc_test_ast",
+    name = "cc_ast_test",
     srcs = ["edsl_test.cc"],
     deps = [
         ":api",
@@ -104,7 +104,7 @@ plaidml_cc_test(
 )
 
 plaidml_cc_test(
-    name = "cc_test_mlir",
+    name = "cc_mlir_test",
     srcs = ["edsl_test.cc"],
     deps = [
         ":api",

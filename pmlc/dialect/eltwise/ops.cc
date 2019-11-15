@@ -168,6 +168,12 @@ OpFoldResult MulOp::fold(ArrayRef<Attribute> operands) {
   return constFoldBinaryOp(operands, [](double a, double b) { return a * b; });
 }
 
+Type SelectOp::getResultType(ArrayRef<Value*> operands) {
+  auto inferShapeType = getRankedTensorType(ComputeResultType(operands));
+  auto inferElementType = getRankedTensorType(ComputeResultType(operands.drop_front()));
+  return RankedTensorType::get(inferShapeType.getShape(), inferElementType.getElementType());
+}
+
 #include "pmlc/dialect/eltwise/interfaces.cc.inc"
 
 #define GET_OP_CLASSES
