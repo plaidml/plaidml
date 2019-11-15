@@ -224,7 +224,7 @@ SUITES:
     runner: python
     workloads:
       backend:
-        args: [backend_test.py, -v]
+        args: [backend_test.py]
         conda_env: conda/keras_backend_test.yml
         precision: untested
         platform_overrides:
