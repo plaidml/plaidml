@@ -1,0 +1,639 @@
+<h1 id="c-tile-edsl">C++ Tile EDSL</h1>
+<p>The C++ Tile EDSL (Embedded Domain Specific Language) provides developers with a
+  way of describing a neural network so that the Stripe-based PlaidML compiler can
+  construct an efficient implementation.</p>
+<p>This tutorial is intended to help machine learning practitioners (or anyone with
+  a background in software engineering and mathematics) get started using the C++
+  Tile EDSL.</p>
+<h2 id="scope-and-warning">Scope and Warning</h2>
+<p>This tutorial provides an introduction to the C++ Tile EDSL. It is intended to
+  help machine learning practitioners get started writing Tile code as quickly as
+  possible, and as such covers core features, not every language detail. This is a
+  tutorial, not a spec, and as such will consist of a series of examples, with a
+  summary reference section at the end.</p>
+<p>This tutorial covers how to use the C++ Tile EDSL, not how Tile code is
+  constructed and manipulated by PlaidML. It does not cover the workings of
+  PlaidML utilities such as the pmlc compiler.</p>
+<p>Tile and PlaidML are still being developed and the APIs discussed here are subject
+  to change.</p>
+<h2 id="how-to-write-tile-code">How to Write Tile Code</h2>
+<h3 id="sum-over-axis">Sum Over Axis</h3>
+<p>We&#39;re ready to look at some C++ Tile code! Here&#39;s an operation that takes the
+  sum over axis <code>0</code> of a 2D tensor (in Keras this would be <code>K.sum(I, axis=0)</code>):</p>
+<pre><code class="lang-c++">Tensor sum_over_axis(const Tensor&amp; I) {
+  TensorDim M, N<span class="hljs-comment">;</span>
+  TensorIndex m, n<span class="hljs-comment">;</span>
+  I.<span class="hljs-keyword">bind_dims(M, </span>N)<span class="hljs-comment">;</span>
+  auto O = TensorOutput(N)<span class="hljs-comment">;</span>
+  O(n) += I(m, n)<span class="hljs-comment">; // contraction</span>
+  return O<span class="hljs-comment">;</span>
+}
+</code></pre>
+<p>An operation such as this which merges together values across one or more
+  indices is called a <em>contraction</em>. The syntax may look a bit odd at first, but
+  it&#39;s related to summation notation. Below we show how this C++ Tile code is
+  related to the mathematical formula for the operation by using colors to
+  highlight corresponding pieces:</p>
+<!--
+\Large
+\textcolor{red}{O[n]}
+\textcolor{yellow}{=}
+\textcolor{green}{\sum_{m}}
+\textcolor{cyan}{I[m, n]}
+!-->
+
+<!--
+\Large
+\texttt{
+  \textcolor{red}{O(n)}
+  \textcolor{green}{+=}
+  \textcolor{cyan}{I(m, n)};
+}
+-->
+<p><img src="images/edsl-summation-contraction.png"></p>
+<p>In green, notice that the summation symbol is represented as <code>+=</code> in C++ Tile
+  code. Some portions of the notation do not perfectly correspond. Here&#39;s why:</p>
+<ul>
+  <li>Summation notation includes a <code>m</code> subscript to indicate that <code>m</code> is the
+    variable being summed over. Tile code implicitly sums over all valid indices
+    (valid means not out of range for any tensor, and not failing any additional
+    user-specified constraints as discussed in later examples).</li>
+  <li>
+    <p>Tile must be explicitly given the shape of any new tensor created, done in
+      this code by <code>TensorOutput(N)</code>. In this case we want <code>N</code> to match the size of
+      the last dimension of <code>I</code>, which is specified by using <code>I.bind_dims(M, N)</code>.
+      It is possible, however, to make this dimension of <code>O</code> larger or smaller,
+      which would zero-pad or truncate <code>O</code> respectively.</p>
+    <p>For example,</p>
+    <pre><code class="lang-c++"><span class="hljs-attribute">auto O</span> = TensorOutput(N + 1);
+</code></pre>
+    <p>would result in a <code>0</code> as the last element of <code>O</code> if we&#39;re still assuming <code>N</code>
+      is the size of the last dimension of <code>I</code>.</p>
+  </li>
+  <li>
+    <p>As is the case for all C++ statements, they must end with a semicolon.</p>
+  </li>
+</ul>
+<h3 id="max-over-axis">Max Over Axis</h3>
+<p>Taking the maximum over axis <code>0</code> looks very similar to taking the sum over axis
+  <code>0</code>. Just like a sum is represented in Tile with <code>+=</code>, a max is represented by
+  <code>&gt;=</code>. Thus, the Tile code for max over axis <code>0</code> is just a single character
+  change from sum over axis <code>0</code>. Let&#39;s look at it as a Tile function:</p>
+<pre><code class="lang-c++">Tensor max_over_axis(const Tensor&amp; I) {
+  TensorDim M, N<span class="hljs-comment">;</span>
+  TensorIndex m, n<span class="hljs-comment">;</span>
+  I.<span class="hljs-keyword">bind_dims(M, </span>N)<span class="hljs-comment">;</span>
+  auto O = TensorOutput(N)<span class="hljs-comment">;</span>
+  O(n) &gt;= I(m, n)<span class="hljs-comment">;</span>
+  return O<span class="hljs-comment">;</span>
+}
+</code></pre>
+<p>Again, this corresponds closely to mathematical notation:</p>
+<!--
+\Large
+\textcolor{red}{O[n]}
+\textcolor{yellow}{=}
+\textcolor{green}{\max_m}
+\textcolor{cyan}{I[m, n]}
+-->
+
+<!--
+\Large
+\texttt{
+  \textcolor{red}{O(n)}
+  \textcolor{green}{&gt;=}
+  \textcolor{cyan}{I(m, n)};
+}
+-->
+<p><img src="images/edsl-max-contraction.png"></p>
+<h3 id="matrix-multiply">Matrix Multiply</h3>
+<p>Next we&#39;ll consider matrix multiplication. Let&#39;s look at the mathematical
+  expression for the matrix multiplication <code>C = AB</code> written out in element-level
+  detail:</p>
+
+<!--
+\Large
+C[i, j] = \sum_{k} (A[i, k] \cdot B[k, j])
+-->
+
+<p><img src="images/math-mat-mul.png"></p>
+
+<p>We can convert this to C++ Tile code using the same correspondence as the
+  previous example: The summation sign becomes plus-assignment, the summation
+  index is omitted, dimensions are given for the output tensor, and the statement
+  ends in a semicolon. Here&#39;s the result:</p>
+<pre><code class="lang-c++">C(<span class="hljs-name">i</span>, j) += A(<span class="hljs-name">i</span>, k) * B(<span class="hljs-name">k</span>, j)<span class="hljs-comment">;</span>
+</code></pre>
+<p>To have correct dimensions, we need <code>I</code> to be the first dimension of <code>A</code> and <code>J</code>
+  the last dimension of <code>B</code>. Here&#39;s how this looks as part of a full Tile
+  function:</p>
+<pre><code class="lang-c++">Tensor matmul(const Tensor&amp; A, const Tensor&amp; <span class="hljs-keyword">B) </span>{
+  TensorDim I, <span class="hljs-keyword">J, </span>K<span class="hljs-comment">;</span>
+  TensorIndex i, <span class="hljs-keyword">j, </span>k<span class="hljs-comment">;</span>
+  A.<span class="hljs-keyword">bind_dims(I, </span>K)<span class="hljs-comment">;</span>
+  <span class="hljs-keyword">B.bind_dims(K, </span><span class="hljs-keyword">J);
+</span>  auto C = TensorOutput(I, <span class="hljs-keyword">J);
+</span>  C(i, <span class="hljs-keyword">j) </span>+= A(i, k) * <span class="hljs-keyword">B(k, </span><span class="hljs-keyword">j);
+</span>  return C<span class="hljs-comment">;</span>
+}
+</code></pre>
+<p>Notice that we use <code>bind_dims</code> on inputs and we use <code>TensorOutput</code> on
+  outputs. Input dimensions can be repeated, which results in an error if the Tile
+  function is passed inputs whose corresponding dimensions don&#39;t all have the
+  specified size (for example <code>A.bind_dims(K, K)</code> would be constrained to a
+  square).</p>
+<h3 id="global-min">Global Min</h3>
+<p>There is a min contraction <code>&lt;=</code> analogous to the max contraction <code>&gt;=</code>. For the
+  purposes of this example, however, let&#39;s use the formula <code>min(X) = -max(-X)</code>, to
+  compute the min. We do this by combining a max computation with <em>elementwise</em>
+  operations that perform the same operation (in this case negation) on every
+  element of a tensor. Elementwise operations generally cannot be performed on the
+  same line as contractions, so we write the global min function (for a 3D tensor)
+  as follows:</p>
+<pre><code class="lang-c++">Tensor global_min(const Tensor&amp; I) {
+  TensorIndex i, <span class="hljs-keyword">j, </span>k<span class="hljs-comment">;</span>
+  auto Neg = -I<span class="hljs-comment">;</span>
+  auto O_Neg = TensorOutput()<span class="hljs-comment">;</span>
+  O_Neg() &gt;= Neg(i, <span class="hljs-keyword">j, </span>k)<span class="hljs-comment">;</span>
+  auto O = -O_Neg<span class="hljs-comment">;</span>
+  return O<span class="hljs-comment">;</span>
+}
+</code></pre>
+<p>There are several novel pieces in this example. First, note that the elementwise
+  operations do not include dimensions. Dimensions are inferred from the inputs in
+  elementwise operations, and so are never specified in elementwise ops. <code>Neg</code> has
+  the same shape as <code>I</code>, and <code>O</code> has the same shape as <code>O_Neg</code>. When an
+  elementwise binary operation is performed, the output shape is determined using
+  <a href="https://docs.scipy.org/doc/numpy/user/basics.broadcasting.html">broadcasting semantics</a>.</p>
+<p>Which brings us to the next novelty: we have our first example of a 0D tensor,
+  <code>O_Neg</code>. Tensors in Tile are allowed to have zero dimensions. In such a case the
+  tensor represents a scalar, i.e., a single value. In places where dimensions are
+  specified, you can indicate a 0-dimensional tensor by using <code>()</code> for the
+  dimensions, as in this example.</p>
+<p>Notice that we are taking the max over all axes in a single operation.
+  Contractions implicitly aggregate over <em>all</em> indices that write to the same
+  output location (in this case we aggregate over all values of <code>i</code>, <code>j</code>, and
+  <code>k</code>).</p>
+<h3 id="average">Average</h3>
+<p>To compute the mean of a tensor, we need to sum the elements and divide by the
+  total number of elements summed. We can do this by taking advantage of the fact
+  that we can divide by a constant (including an input <code>TensorDim</code>) as an
+  elementwise operation. Thus, to take the mean over axis <code>0</code> of a 2D tensor, we
+  write:</p>
+<pre><code class="lang-c++">Tensor avg(<span class="hljs-keyword">const</span> Tensor&amp; I) {
+  TensorDim X, Y;
+  TensorIndex x, y;
+  I.bind_dims(X, Y);
+  auto <span class="hljs-keyword">Sum</span> = TensorOutput();
+  <span class="hljs-built_in">Sum</span>(y) += <span class="hljs-built_in">I</span>(x, y);
+  <span class="hljs-keyword">return</span> <span class="hljs-keyword">Sum</span> / X;
+}
+</code></pre>
+<p>We can perform multiple elementwise operations on the same line, including
+  operations on constants and input dimensions. So, while it would be possible to
+  take a global mean of a 2D tensor in stages as so:</p>
+<pre><code>Tensor avg(<span class="hljs-keyword">const</span> Tensor&amp; I) {
+  TensorDim X, Y;
+  TensorIndex x, y;
+  I.bind_dims(X, Y);
+  auto <span class="hljs-keyword">Sum</span> = TensorOutput();
+  <span class="hljs-built_in">Sum</span>() += <span class="hljs-built_in">I</span>(x, y);
+  PartialMean = <span class="hljs-keyword">Sum</span> / X;
+  <span class="hljs-keyword">return</span> PartialMean / Y;
+}
+</code></pre>
+<p>it is more straightforward to merge the elementwise operations:</p>
+<pre><code>Tensor avg(<span class="hljs-keyword">const</span> Tensor&amp; I) {
+  TensorDim X, Y;
+  TensorIndex x, y;
+  I.bind_dims(X, Y);
+  auto <span class="hljs-keyword">Sum</span> = TensorOutput();
+  <span class="hljs-built_in">Sum</span>() += <span class="hljs-built_in">I</span>(x, y);
+  <span class="hljs-keyword">return</span> <span class="hljs-keyword">Sum</span> / (X * Y);
+}
+</code></pre>
+<h3 id="max-pool-1d">Max Pool 1D</h3>
+<p>Next let&#39;s implement a size 2 stride 2 maxpool in Tile. This is the operation
+  that splits a tensor into groups of 2 and takes the larger element from each
+  group, yielding a tensor of half the original size. This is straightforward to
+  implement in straight C++:</p>
+<pre><code class="lang-c++"><span class="hljs-type">float</span> I[N], O[N / <span class="hljs-number">2</span>];
+for (int i = <span class="hljs-number">0</span>; i &lt; N/<span class="hljs-number">2</span>; ++i) {
+  <span class="hljs-type">float</span> curr_max = FLT_MIN;
+  for (int j = <span class="hljs-number">0</span>; j &lt; <span class="hljs-number">2</span>; ++j) {
+    if (I[<span class="hljs-number">2</span> * i + j] &gt; curr_max) {
+      curr_max = I[<span class="hljs-number">2</span> * i + j];
+    }
+  }
+  O[i] = curr_max;
+}
+</code></pre>
+<p><code>for</code> loops over tensor indices get translated into contractions when written in
+  Tile. The most direct (and, sadly, wrong) implementation in Tile is:</p>
+<pre><code class="lang-c++"><span class="hljs-function">Tensor <span class="hljs-title">wrong_max_pool_1d</span><span class="hljs-params">(<span class="hljs-keyword">const</span> Tensor&amp; I)</span> </span>{
+  TensorDim N;
+  TensorIndex i, j;
+  I.bind_dims(N);
+  <span class="hljs-keyword">auto</span> O = TensorOutput(N / <span class="hljs-number">2</span>);
+  O(i) &gt;= I(<span class="hljs-number">2</span> * i + j);
+  <span class="hljs-keyword">return</span> O;
+}
+</code></pre>
+<p>If you were to run this code, every entry of <code>O</code> would equal the global max of
+  <code>I</code>. We correctly determined that this was a maximization operation, and the
+  indices for <code>O</code> and <code>I</code> match those used in the straight C++ code, so what went wrong?</p>
+<p>The problem with this Tile code is that there are too many &quot;valid&quot; indices. For
+  example, the case <code>i = 1</code>, <code>j = 3</code> means that <code>O[1]</code> checks <code>I[5]</code> as one
+  of the
+  potential maximum values, even though <code>O[1]</code> is intended to be <code>max(I[2], I[3])</code>.
+  When we wrote the code with for loops, the inner loop restricted <code>j</code> to <code>0</code> or
+  <code>1</code>; in the Tile code, the compiler figured out the allowed values of <code>j</code> by
+  looking at the shapes of the tensors, and the only restriction that imposes on
+  <code>j</code> is that <code>j</code> must be an integer satisfying <code>0 &lt;= 2 * i + j &lt; N</code>.</p>
+<p>When can use <code>if</code> statements in Tile to handle such situations:</p>
+<pre><code class="lang-c++"><span class="hljs-function">Tensor <span class="hljs-title">max_pool_1d</span><span class="hljs-params">(<span class="hljs-keyword">const</span> Tensor&amp; I)</span> </span>{
+  TensorDim N;
+  TensorIndex i, j;
+  I.bind_dims(N);
+  <span class="hljs-keyword">auto</span> O = TensorOutput(N / <span class="hljs-number">2</span>);
+  O(i) &gt;= I(<span class="hljs-number">2</span> * i + j);
+  O.add_constraints({j&lt;<span class="hljs-number">2</span>});
+  <span class="hljs-keyword">return</span> O;
+}
+</code></pre>
+<p>Something important to note here is that while we wrote <code>j &lt; 2</code>, this constraint
+  actually means <code>0&lt;= j &lt; 2</code>. Constraints are always bounded below by <code>0</code>.
+  (Without a constraint, however, index variables may still be negative: the
+  original code included e.g. <code>i = 1</code>, <code>j = -1</code> as valid index pair.)</p>
+<p>We determined the Tile code for this example by starting from imperative code,
+  but this Tile code is still very similar to mathematical notation, and we could
+  have started there instead:</p>
+
+<!--
+\Large
+\textcolor{red}{O[n]}
+\textcolor{yellow}{=}
+\textcolor{green}{\max}\textcolor{magenta}{_{0 \leq j &lt; 2}}
+\textcolor{cyan}{I[2i + j]}</p>
+-->
+
+<!--
+\Large
+\texttt{
+  if (\textcolor{magenta}{j &lt; 2}) {{
+    \textcolor{red}{O(n)}
+    \textcolor{green}{&gt;=}
+    \textcolor{cyan}{I(2 * i + j)};
+  }}
+}
+-->
+<p><img src="images/edsl-max-pool-1d.png"></p>
+<p>This Tile code handles odd values of <code>N</code> by rounding down the output tensor
+  size. You may instead want to round up the output tensor size and use a smaller
+  pool at the edge. This can be accomplished by simply adjusting the size of <code>O</code>:</p>
+<pre><code class="lang-c++"><span class="hljs-function">Tensor <span class="hljs-title">max_pool_1d</span><span class="hljs-params">(<span class="hljs-keyword">const</span> Tensor&amp; I)</span> </span>{
+  TensorDim N;
+  TensorIndex i, j;
+  I.bind_dims(N);
+  <span class="hljs-keyword">auto</span> O = TensorOutput((N + <span class="hljs-number">1</span>) / <span class="hljs-number">2</span>);
+  <span class="hljs-keyword">if</span> (j &lt; <span class="hljs-number">2</span>) {
+    O(i) &gt;= I(<span class="hljs-number">2</span> * i + j);
+  }
+  <span class="hljs-keyword">return</span> O;
+}
+</code></pre>
+<p>No special handling is needed for the case <code>i = (N - 1) / 2</code>, <code>j = 1</code>; this is
+  out of range for <code>I</code> and so is ignored by Tile, which is exactly the intended
+  behavior.</p>
+<h3 id="valid-indices">Valid Indices</h3>
+<p>When discussing contractions, we&#39;ve mentioned that they accumulate over &quot;all
+  valid indices&quot;. Hopefully the significance of this has been clear for the
+  specific examples we&#39;ve looked at, but to write complex or novel code it helps
+  to have a precise understanding of what is meant by &quot;valid indices&quot;.</p>
+<p>First, index validity is determined for a full set of index variables: <code>j = 1</code>
+  is not valid or invalid as a standalone index value, but may be part of a valid
+  or invalid set of index variables. For example, in the code:</p>
+<pre><code class="lang-c++"><span class="hljs-keyword">I</span>.bind_dims(<span class="hljs-keyword">N</span>);
+auto <span class="hljs-keyword">O</span> = TensorOutput((<span class="hljs-keyword">N</span> + <span class="hljs-number">1</span>) / <span class="hljs-number">2</span>);
+<span class="hljs-keyword">O</span>(i) &gt;= <span class="hljs-keyword">I</span>(<span class="hljs-number">2</span> * i + j);
+<span class="hljs-keyword">O</span>.add_constraints({j&lt;2});
+}
+</code></pre>
+<p>with <code>N = 5</code>, the indices <code>i = 1, j = 1</code> are valid indices.
+  However, <code>i = 2, j = 1</code> are not valid indices for this operation, nor are <code>i = -1000, j = 1</code>.
+</p>
+<p>A set of indices are <em>valid</em> if and only if:</p>
+<ol>
+  <li>All the index variables are integers.</li>
+  <li>All the index expressions for every tensor are in range. Specifically, if the
+    index variable values are plugged into every index expression, all the
+    resulting indices are non-negative integers less than the appropriate
+    dimension.</li>
+  <li>All the constraints are satisfied.
+    Constraints always take the form <code>[index expression] &lt; [constant expression]</code>
+    (where <code>[index expression]</code> is a linear polynomial in the index
+    variables and <code>[constant expression]</code> is a linear polynomial in the input
+    dimensions), and they always implicitly include <code>0 &lt;= [index expression]</code>.
+    Therefore we could also state this requirement as &quot;every constraint&#39;s index
+    expression is non-negative and less than its specified upper bound&quot;.</li>
+</ol>
+<h3 id="skipping">Skipping</h3>
+<p>The rule that all index variables must be integers allows us to &quot;skip&quot; certain
+  otherwise valid entries. For example, consider the Tile function:</p>
+<pre><code class="lang-c++">Tensor skip(const Tensor&amp; I) {
+  TensorDim M, N<span class="hljs-comment">;</span>
+  TensorIndex i, <span class="hljs-keyword">j;
+</span>  I.<span class="hljs-keyword">bind_dims(M, </span>N)<span class="hljs-comment">;</span>
+  auto O = TensorOutput(N)<span class="hljs-comment">;</span>
+  O(<span class="hljs-number">2</span> * i) += I(<span class="hljs-number">2</span> * i, <span class="hljs-keyword">j);
+</span>  return O<span class="hljs-comment">;</span>
+}
+</code></pre>
+<p>This operation only writes to even entries of <code>O</code>; while <code>i = 1/2, j = 1</code> does
+  yield valid index expressions (<code>O[1]</code> and <code>I[1, 1]</code>), using a fractional index
+  variable <code>i</code> makes these indices invalid. Note that some elements of <code>O</code> are
+  never written to. Any unwritten elements in the output of a contraction are
+  initialized to <code>0</code>.</p>
+<h3 id="cumulative-sum">Cumulative Sum</h3>
+<p>Suppose we want to take the cumulative sum of a 1D tensor. That is, we want
+  <code>O[i]</code> to be the sum of all input entries <code>I[k]</code> where <code>k &lt;= i</code>. In summation
+  notation, this is:</p>
+
+<!--
+\Large
+O[i] = \sum_{k \leq i} I[k]
+-->
+
+<p><img src="images/math-cum-sum-raw.png"></p>
+
+<p>However, we can&#39;t use <code>k &lt;= i</code> as a constraint in Tile; all the index variables
+  must be gathered into a single index expression on one side of the inequality.
+  Thus, we rewrite this as <code>0 &lt;= i - k</code>. Since the <code>0</code> bound is implicitly included
+  in all constraints, we just need to choose an upper bound large enough to never
+  be hit. From the dimensions of the tensors, we already know <code>i &lt; N</code> and <code>0 &lt;= k</code>,
+  and so <code>N</code> is an appropriate upper bound. The resulting Tile code is:</p>
+<pre><code class="lang-c++">Tensor csum(const Tensor&amp; I) {
+  TensorDim N<span class="hljs-comment">;</span>
+  TensorIndex i, k<span class="hljs-comment">;</span>
+  I.<span class="hljs-keyword">bind_dims(N);
+</span>  auto O = TensorOutput(N)<span class="hljs-comment">;</span>
+  O(i) += I(k)<span class="hljs-comment">;</span>
+  O.<span class="hljs-keyword">add_constraints({i </span>- k &lt; N})<span class="hljs-comment">;</span>
+  return O<span class="hljs-comment">;</span>
+}
+</code></pre>
+<p>Alternatively, we could write <code>k = i - j</code> for <code>j</code> non-negative as an alternative
+  way of forcing <code>k</code> to be no larger than <code>i</code>. Then in summation notation we have:</p>
+<p>![``
+  \Large
+  \textcolor{red}{O[i]}
+  \textcolor{yellow}{=}
+  \textcolor{green}{\sum}\textcolor{magenta}{_{0 \leq j}}
+  \textcolor{cyan}{I[i - j]}</p>
+<p>\Large
+  \texttt{
+  if (\textcolor{magenta}{j &lt; N}) {{
+    \textcolor{red}{O(n)}
+    \textcolor{green}{+=}
+    \textcolor{cyan}{I(i - j)};
+  }}
+  }
+  ``](images/edsl-cumsum.png)</p>
+<h3 id="convolution">Convolution</h3>
+<p>Let&#39;s implement a 1D convolution with output size equal to input size. This is
+  implementing the Keras backend operation:</p>
+<pre><code class="lang-python">K.co<span class="hljs-symbol">nv1</span>d<span class="hljs-comment">(x, kernel, padding='valid')</span>
+</code></pre>
+<p>Let&#39;s start with the mathematical formula for this operation:</p>
+
+<!--
+\Large
+O[n, x, c_o] = \sum_k \sum_{c_i}(I[n, x + k, c_i] \cdot K[k, c_i, c_o])
+-->
+
+<p><img src="images/math-conv-1D-raw.png"></p>
+<p>This is rather complicated, so let&#39;s walk through why this is the same
+  convolution formula we&#39;re used to in machine learning.</p>
+<p>A convolution produces output for a specific batch element at a specific
+  location in a specific channel by taking a weighted sum of the input for that
+  same batch element at that same location <em>and a surrounding region</em> over all
+  input channels. The weights are given by <code>K</code>, which depends on the output
+  channel, the input channel, and the displacement within the input region
+  relative to the reference location.</p>
+<p>This generally matches the given formula: The output <code>O</code> is given as a sum of
+  elements from the input <code>I</code>, weighted by <code>K</code>. Looking at the meaning of the
+  index variables, we see that it matches exactly:</p>
+<ul>
+  <li><code>n</code> represents which element of the batch we&#39;re on.</li>
+  <li><code>ci</code> represents which input channel we&#39;re on.</li>
+  <li><code>co</code> represents which output channel we&#39;re on.</li>
+  <li><code>x</code> represents our spatial location, giving the location being written to in
+    <code>O</code> and the smallest element read from in <code>I</code>.</li>
+  <li>Finally, <code>k</code> represents the kernel offset, that is, how far (in the spatial
+    dimension) the input element we&#39;re reading is from the lower bound of the
+    kernel.</li>
+</ul>
+<p>This formula directly translates to Tile, although note that <code>padding=&#39;valid&#39;</code>
+  means that the spatial dimension of the output will be reduced by one less than
+  the kernel size relative to the spatial dimension of the input:</p>
+
+<!--
+\Large
+\textcolor{red}{O[n, x, c_o]}
+\textcolor{yellow}{=}
+\textcolor{green}{\sum<em>k \sum</em>{c_i}}
+\textcolor{cyan}{I[n, x + k, c_i]}
+\textcolor{orange}{\cdot}
+\textcolor{lightblue}{K[k, c_i, c_o]}
+-->
+
+<!--
+\Large
+\texttt{
+  \textcolor{red}{O(n, x, co)}
+  \textcolor{green}{+=}
+  \textcolor{cyan}{I(n, x + k, ci)}
+  \textcolor{orange}{*}
+  \textcolor{lightblue}{K(k, ci, co)};
+}
+-->
+<p><img src="images/edsl-convolution.png"></p>
+<pre><code class="lang-c++">Tensor conv_1d(<span class="hljs-keyword">const</span> Tensor&amp; I, <span class="hljs-keyword">const</span> Tensor&amp; K) {
+  TensorDim <span class="hljs-keyword">N</span>, X, KX, <span class="hljs-keyword">CI</span>, CO;
+  TensorIndex <span class="hljs-keyword">n</span>, x, k, <span class="hljs-keyword">ci</span>, co;
+  I.bind_dims(<span class="hljs-keyword">N</span>, X, <span class="hljs-keyword">CI</span>);
+  K.bind_dims(KX, <span class="hljs-keyword">CI</span>, CO);
+  auto O = TensorOutput(<span class="hljs-keyword">N</span>, X - KX + 1, CO);
+  O(<span class="hljs-keyword">n</span>, x, co) += <span class="hljs-built_in">I</span>(<span class="hljs-keyword">n</span>, x + k, <span class="hljs-keyword">ci</span>) * K(k, <span class="hljs-keyword">ci</span>, co);
+  <span class="hljs-keyword">return</span> O;
+}
+</code></pre>
+<h3 id="dilated-2d-convolution">Dilated 2D Convolution</h3>
+<p>We can tweak this general formula for a convolution to add various features,
+  such as different strides, changing the padding, performing the convolution
+  depthwise, etc. For this example, we will implement a dilated 2D convolution
+  with dilation rate (2, 3). Specfically, we&#39;ll implement the Keras backend
+  function:</p>
+<pre><code class="lang-python">K.co<span class="hljs-symbol">nv2</span>d<span class="hljs-comment">(x, kernel, padding='valid', dilation_rate=(2, 3)</span>)
+</code></pre>
+<p>The formula for this is very similar to the previous convolution; we just have
+  an additional spatial dimension for each tensor, and the kernel offset index
+  variables are multiplied by dilation scaling factors when used to determine
+  indices for <code>I</code>:</p>
+
+<!--
+\Large
+O[n, x, c_o] = \sum_k \sum_{c_i}(I[n, x + k, c_i] \cdot K[k, c_i, c_o])
+-->
+
+<p><img src="images/math-dil-conv-2D.png"></p>
+
+<p>The effective size for a dilated kernel with kernel size <code>K</code> and dilation rate
+  <code>d</code> is <code>d * (K - 1) + 1</code>, and so to achieve <code>&#39;valid&#39;</code> padding for this
+  convolution, the x dimension must be reduced by <code>2 * (KX - 1)</code> and the y
+  dimension must be reduced by <code>3 * (KY - 1)</code>, where <code>KX</code> and <code>KY</code> are the x and y
+  dimensions of the kernel respectively. The rest of the Tile code corresponds
+  directly to the formula, and so we get:</p>
+<pre><code class="lang-c++">Tensor conv_2d(<span class="hljs-keyword">const</span> Tensor&amp; I, <span class="hljs-keyword">const</span> Tensor&amp; K) {
+  TensorDim <span class="hljs-keyword">N</span>, X, Y, KX, KY, <span class="hljs-keyword">CI</span>, CO;
+  TensorIndex <span class="hljs-keyword">n</span>, x, y, kx, ky, <span class="hljs-keyword">ci</span>, co;
+  I.bind_dims(<span class="hljs-keyword">N</span>, X, Y, <span class="hljs-keyword">CI</span>);
+  K.bind_dims(KX, KY, <span class="hljs-keyword">CI</span>, CO);
+  auto O = TensorOutput(<span class="hljs-keyword">N</span>, X - 2 * (KX - 1), Y - 3 * (KY - 1), CO);
+  O(<span class="hljs-keyword">n</span>, x, y, co) += <span class="hljs-built_in">I</span>(<span class="hljs-keyword">n</span>, x + 2 * kx, y + 3 * ky, <span class="hljs-keyword">ci</span>) * K(kx, ky, <span class="hljs-keyword">ci</span>, co);
+  <span class="hljs-keyword">return</span> O;
+}
+</code></pre>
+<h3 id="complex-convolution">Complex Convolution</h3>
+<p>This final example demonstrates a strided dilated padded grouped convolution.</p>
+
+<!--
+\Large
+\begin{aligned}
+O&[n, x_0, x_1, g, c_{o, g}] \\
+&= \sum_{k_0, k_1, c_{i, g}}
+(
+  I[n, s_0 x_0 + d_0 k_0 - P_0, s_1 x_1 + d_1 k_1 - P_1, c_{i, g}] *
+  K[k_0, k_1, g, c_{i, g}, c_{o, g}]
+)
+\end{aligned}
+-->
+
+<p><img src="images/math-complex-convolution.png"></p>
+
+<p>where <em><code>s</code></em> gives the stride coefficients, <em><code>d</code></em> gives the dilation
+  coefficients, and <em><code>P</code></em> gives the padding offsets.</p>
+<pre><code class="lang-c++"><span class="hljs-function">Tensor <span class="hljs-title">complex_conv_2d</span><span class="hljs-params">(
+    <span class="hljs-keyword">const</span> Tensor&amp; I,
+    <span class="hljs-keyword">const</span> Tensor&amp; K,
+    <span class="hljs-keyword">const</span> <span class="hljs-built_in">std</span>::<span class="hljs-built_in">vector</span>&lt;<span class="hljs-keyword">size_t</span>&gt;&amp; s,  <span class="hljs-comment">// stride coeffs</span>
+    <span class="hljs-keyword">const</span> <span class="hljs-built_in">std</span>::<span class="hljs-built_in">vector</span>&lt;<span class="hljs-keyword">size_t</span>&gt;&amp; d   <span class="hljs-comment">// dilation coeffs</span>
+)</span> </span>{
+  <span class="hljs-comment">// "same-lower" autopadding will be applied</span>
+  TensorDim N, G, GCI, GCO;
+  <span class="hljs-built_in">std</span>::<span class="hljs-built_in">vector</span>&lt;TensorDim&gt; X(<span class="hljs-number">2</span>);
+  <span class="hljs-built_in">std</span>::<span class="hljs-built_in">vector</span>&lt;TensorDim&gt; K(<span class="hljs-number">2</span>);
+  TensorIndex n, g, gci, gco;
+  <span class="hljs-built_in">std</span>::<span class="hljs-built_in">vector</span>&lt;TensorIndex&gt; x(<span class="hljs-number">2</span>);
+  <span class="hljs-built_in">std</span>::<span class="hljs-built_in">vector</span>&lt;TensorIndex&gt; k(<span class="hljs-number">2</span>);
+  I.bind_dims(N, X[<span class="hljs-number">0</span>], X[<span class="hljs-number">1</span>], G, GCI);
+  K.bind_dims(K[<span class="hljs-number">0</span>], K[<span class="hljs-number">1</span>], G, GCI, GCO);
+  <span class="hljs-comment">// Compute output spatial dimensions</span>
+  <span class="hljs-built_in">std</span>::<span class="hljs-built_in">vector</span>&lt;TensorDim&gt; Y(<span class="hljs-number">2</span>);
+  <span class="hljs-keyword">for</span> (<span class="hljs-keyword">size_t</span> i = <span class="hljs-number">0</span>; i &lt; Y.size(); ++i) {
+    Y[i] = (X[i] + s[i] - <span class="hljs-number">1</span>) / s[i];
+  }
+  <span class="hljs-comment">// Compute the effective kernel size after dilation</span>
+  <span class="hljs-built_in">std</span>::<span class="hljs-built_in">vector</span>&lt;TensorDim&gt; EK(<span class="hljs-number">2</span>);
+  <span class="hljs-keyword">for</span> (<span class="hljs-keyword">size_t</span> i = <span class="hljs-number">0</span>; i &lt; EK.size(); ++i) {
+    EK[i] = d[i] * (K[i] - <span class="hljs-number">1</span>) + <span class="hljs-number">1</span>;
+  }
+  <span class="hljs-comment">// Compute the padding offset</span>
+  <span class="hljs-built_in">std</span>::<span class="hljs-built_in">vector</span>&lt;TensorDim&gt; P(<span class="hljs-number">2</span>);
+  <span class="hljs-keyword">for</span> (<span class="hljs-keyword">size_t</span> i = <span class="hljs-number">0</span>; i &lt; P.size(); ++i) {
+    P[i] = ((Y[i] - <span class="hljs-number">1</span>) * s[i] + EK[i] - X[i]) / <span class="hljs-number">2</span>;
+  }
+  <span class="hljs-comment">// Specify the output size</span>
+  <span class="hljs-keyword">auto</span> O = TensorOutput(N, Y0, Y1, G, GCO);
+  <span class="hljs-comment">// Compute the convolution</span>
+  O(n, x[<span class="hljs-number">0</span>], x[<span class="hljs-number">1</span>], g, gco) +=
+      I(n, s[<span class="hljs-number">0</span>]*x[<span class="hljs-number">0</span>] + d[<span class="hljs-number">0</span>]*k[<span class="hljs-number">0</span>] - P[<span class="hljs-number">0</span>], s[<span class="hljs-number">1</span>]*x[<span class="hljs-number">1</span>] + d[<span class="hljs-number">1</span>]*k[<span class="hljs-number">1</span>] - P[<span class="hljs-number">1</span>], g, gci) *
+      K(k0, k1, g, gci, gco);
+  <span class="hljs-keyword">return</span> O;
+}
+</code></pre>
+<h2 id="reference">Reference</h2>
+<h3 id="contractions">Contractions</h3>
+<p>There are five <em>aggregation</em> operations:</p>
+<ul>
+  <li><code>operator +=</code> or <code>sum</code>: When multiple values are computed for the same
+    output location, they are added together.</li>
+  <li><code>operator *=</code> or <code>product</code>: when multiple values are computed for the same
+    output location, they are multiplied together.</li>
+  <li><code>operator &gt;=</code> or <code>max</code>: when multiple values are computed for the same
+    output location, the largest one is used.</li>
+  <li><code>operator &lt;=</code> or <code>min</code>: when multiple values are computed for the same
+    output location, the smallest one is used.</li>
+  <li><code>operator =</code> or <code>assign</code>: when multiple values are computed for the same
+    output location, an error is raised. Note that the compiler errs on the side
+    of caution and may raise an error even when no output location is assigned to
+    multiple times. If the programmer manually confirms that there is at most one
+    value computed for each output location, then any of the other aggregation
+    operations will have equivalent behavior and can be used to bypass this error
+    checking.</li>
+</ul>
+<p>There are limited operations available inside a contraction. Principally,
+  contractions allow the use of complex index expressions to determine which
+  elements are read from a tensor. If there is only one tensor used in the
+  contraction, such index manipulations are the only legal options. If there are
+  two tensors used inside the contraction, you also choose a <em>combination</em>
+  operation to determine how their values are combined. The only combination
+  operations that are currently well-supported are multiplication (<code>*</code>) and
+  addition (<code>+</code>).</p>
+<p>Contractions aggregate over all sets of <em>valid indices</em>. A set of indices is
+  valid for a contraction if and only if:</p>
+<ul>
+  <li>All index variables are integers</li>
+  <li>All index expressions used in tensors are within bounds</li>
+  <li>All user-specified constraints are satisfied</li>
+</ul>
+<h3 id="elementwise-operations">Elementwise Operations</h3>
+<p>Elementwise operations never specify indices or dimensions. The shape of the
+  output tensor is inferred from the shape of the input tensor(s). In most binary
+  operations, if the input tensors have different shapes, the output shape is
+  determined by broadcasting together the input shapes. If this is impossible or
+  ambiguous, it is an error.</p>
+<p>Common operations (not comprehensive; example tensor variable names provided to
+  illustrate syntax):</p>
+<ul>
+  <li>Addition: <code>O = A + B;</code></li>
+  <li>Subtraction: <code>O = A - B;</code></li>
+  <li>Multiplication: <code>O = A * B;</code></li>
+  <li>Division: <code>O = A / B;</code></li>
+  <li>Equality: <code>O = A == B;</code></li>
+  <li>Inequality: <code>O = A != B;</code></li>
+  <li>Less: <code>O = A &lt; B;</code></li>
+  <li>Square Root: <code>O = sqrt(A);</code></li>
+  <li>Exponential: <code>O = exp(A);</code></li>
+  <li>Power: <code>O = pow(A, B);</code></li>
+  <li>Sine: <code>O = sin(A);</code></li>
+  <li>Hyperbolic Tangent: <code>O = tanh(A);</code></li>
+  <li>Natural Log: <code>O = log(A);</code></li>
+  <li>Sigmoid: <code>O = sigmoid(A);</code></li>
+  <li>Conditional: <code>O = select(C, T, F);</code> (<code>C</code> may be a single value or a higher
+    dimensional tensor to be evaluated elementwise. <code>T</code> and <code>F</code> must have the same
+    shape, and unless <code>C</code> is known to be a constant at compile time, both will be
+    evaluated.)</li>
+</ul>
+<h3 id="types">Types</h3>
+<ul>
+  <li><code>Tensor</code>: Multidimensional arrays of a fixed shape. The scope of a tensor is
+    the entire function. By convention, tensors begin with a capital letter.</li>
+  <li><code>TensorDim</code>: Positive integers initially passed to a function as sizes of
+    input tensors. The scope of a dimension is the entire function. By convention,
+    dimensions begin with a capital letter.</li>
+  <li><code>TensorIndex</code>: Symbolic integers used in contractions to directly index a
+    tensor or as part of a formula to compute a tensor index. The scope of an
+    index is a single operation. By convention, indices begin with a lower case
+    letter.</li>
+</ul>
