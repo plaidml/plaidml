@@ -31,6 +31,8 @@ namespace tile {
 namespace targets {
 namespace cpu {
 
+#define VECTOR_MEM_ALIGNMENT 16
+
 class Error : public std::runtime_error {
  public:
   using std::runtime_error::runtime_error;
@@ -2109,12 +2111,12 @@ llvm::Value* Compiler::XSMMDispatchFunction(llvm::Type* alphaPtrType, llvm::Type
 }
 
 llvm::Value* Compiler::Malloc(size_t size) {
-  std::vector<llvm::Type*> argtypes{IndexType()};
+  std::vector<llvm::Type*> argtypes{IndexType(), IndexType()};
   llvm::Type* rettype = builder_.getInt8PtrTy();
   auto functype = llvm::FunctionType::get(rettype, argtypes, false);
-  const char* funcname = "malloc";
+  const char* funcname = "aligned_alloc";
   auto func = module_->getOrInsertFunction(funcname, functype).getCallee();
-  auto buffer = builder_.CreateCall(func, {IndexConst(size)}, "");
+  auto buffer = builder_.CreateCall(func, {IndexConst(VECTOR_MEM_ALIGNMENT), IndexConst(size)}, "");
   return buffer;
 }
 
