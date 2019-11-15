@@ -83,7 +83,6 @@ local exports = [
   'plaidml_program_free',
   'plaidml_program_evaluate',
   'plaidml_program_repr',
-  'plaidml_program_runinfo',
 
   // op/ffi.h
   'plaidml_op_init',

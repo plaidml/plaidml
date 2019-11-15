@@ -59,8 +59,11 @@ plaidml_cc_library(
         "derivs.cc",
         "derivs.h",
         "ffi.cc",
+        "helper.cc",
     ],
-    hdrs = SDK_HDRS,
+    hdrs = SDK_HDRS + [
+        "helper.h",
+    ],
     defines = [
         "PLAIDML_EDSL_DLL",
         "PLAIDML_MLIR",

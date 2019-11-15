@@ -446,5 +446,5 @@ def ScatterOp : SpecialOp<"scatter">, HasCanonicalizer {
 def ShapeOp : SpecialOp<"shape">, HasCanonicalizer {
   let summary = "tensor shape operation";
   let arguments = (ins RankedTensorOf<[AnyScalar]>:$tensor);
-  let results = (outs VectorOf<[ScalarIndex]>:$result);
+  let results = (outs RankedTensorOf<[ScalarIndex]>:$result);
 }

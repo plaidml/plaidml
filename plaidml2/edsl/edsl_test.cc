@@ -47,7 +47,7 @@ TEST(CppEdsl, Dot) {
   auto A = Placeholder(PLAIDML_DATA_FLOAT32, {1, 784});
   auto B = Placeholder(PLAIDML_DATA_FLOAT32, {784, 512});
   Program program("dot", {Dot(A, B)});
-  exec::Executable::compile(program, {A, B})->run();
+  exec::Binder(program).set_inputs({A, B}).build()->run();
 }
 
 TEST(CppEdsl, DoubleDot) {
@@ -55,7 +55,7 @@ TEST(CppEdsl, DoubleDot) {
   auto B = Placeholder(PLAIDML_DATA_FLOAT32, {20, 30});
   auto C = Placeholder(PLAIDML_DATA_FLOAT32, {30, 40});
   Program program("double_dot", {Dot(Dot(A, B), C)});
-  exec::Executable::compile(program, {A, B, C})->run();
+  exec::Binder(program).set_inputs({A, B, C}).build()->run();
 }
 
 TEST(CppEdsl, EltwiseAdd) {
@@ -63,13 +63,13 @@ TEST(CppEdsl, EltwiseAdd) {
   auto B = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20});
   auto C = A + B;
   Program program("eltwise_add", {C});
-  exec::Executable::compile(program, {A, B})->run();
+  exec::Binder(program).set_inputs({A, B}).build()->run();
 }
 
 TEST(CppEdsl, Relu) {
   auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20});
   Program program("relu", {Relu(A)});
-  exec::Executable::compile(program, {A})->run();
+  exec::Binder(program).set_inputs({A}).build()->run();
 }
 
 TEST(CppEdsl, MnistMlp) {
@@ -185,8 +185,7 @@ module {
 }
 )#"));
 #endif
-  std::vector<Tensor> inputs{input, kernel1, bias1, kernel2, bias2, kernel3, bias3};
-  exec::Executable::compile(program, inputs)->run();
+  exec::Binder(program).set_inputs({input, kernel1, bias1, kernel2, bias2, kernel3, bias3}).build()->run();
 }
 
 Tensor Convolution2(const Tensor& I, const Tensor& K) {
@@ -203,8 +202,9 @@ TEST(CppEdsl, Convolution) {
   auto I = Placeholder(PLAIDML_DATA_FLOAT32, {1, 224, 224, 1});
   auto K = Placeholder(PLAIDML_DATA_FLOAT32, {3, 3, 1, 32});
   Program program("convolution", {Convolution2(I, K)});
-  // This currently crashes when combined with the padding pass
-  // exec::Executable::compile(program, {I, K})->run();
+#ifdef PLAIDML_MLIR
+  exec::Binder(program).set_inputs({I, K}).build()->run();
+#endif
 }
 
 Tensor MaxPooling2(const Tensor& I) {
@@ -301,9 +301,10 @@ TEST(CppEdsl, MnistCnn) {
 }
 )"));
 #endif
-  // This currently crashes when combined with the padding pass
-  std::vector<Tensor> inputs{input, kernel1, bias1, kernel2, bias2, kernel3, bias3, kernel4, bias4};
-  exec::Executable::compile(program, inputs)->run();
+  exec::Binder(program)
+      .set_inputs({input, kernel1, bias1, kernel2, bias2, kernel3, bias3, kernel4, bias4})
+      .build()
+      ->run();
 }
 
 Tensor Normalize(const Tensor& X) {
@@ -415,8 +416,7 @@ module {
 }
 )#"));
 #endif
-  std::vector<Tensor> inputs{X, Grad, Veloc, LR};
-  exec::Executable::compile(program, inputs)->run();
+  exec::Binder(program).set_inputs({X, Grad, Veloc, LR}).build()->run();
 }
 
 TEST(CppEdsl, RepeatElements) {
@@ -463,7 +463,7 @@ module {
 }
 )#"));
 #endif
-  exec::Executable::compile(program, {I})->run();
+  exec::Binder(program).set_inputs({I}).build()->run();
 }
 
 TEST(CppEdsl, UseDefault) {
@@ -508,7 +508,7 @@ module {
 }
 )#"));
 #endif
-  exec::Executable::compile(program, {P, I})->run();
+  exec::Binder(program).set_inputs({P, I}).build()->run();
 }
 
 Tensor ArgMax(const Tensor& I) {
@@ -588,7 +588,7 @@ module {
 )#"));
 #endif
   // TODO: cpu backend is missing cast ops (as_uint)
-  // exec::Executable::compile(program, {I})->run();
+  exec::Binder(program).set_inputs({I}).build()->run();
 }
 
 Tensor Winograd(const Tensor& I, const Tensor& K, const Tensor& A, const Tensor& B, const Tensor& G) {
@@ -652,8 +652,7 @@ TEST(CppEdsl, Winograd) {
 }
 )"));
 #endif
-  // This currently crashes when combined with the padding pass
-  // exec::Executable::compile(program, {I, K, A, B, G})->run();
+  exec::Binder(program).set_inputs({I, K, A, B, G}).build()->run();
 }
 
 TEST(CppEdsl, UniqueNames) {
@@ -692,7 +691,7 @@ module {
 }
 )#"));
 #endif
-  exec::Executable::compile(program, {A, B, C0, C1})->run();
+  exec::Binder(program).set_inputs({A, B, C0, C1}).build()->run();
 }
 
 TEST(CppEdsl, GlobalMin) {
@@ -735,7 +734,7 @@ module {
 }
 )#"));
 #endif
-  exec::Executable::compile(program, {I})->run();
+  exec::Binder(program).set_inputs({I}).build()->run();
 }
 
 TEST(CppEdsl, CumSum) {
@@ -778,7 +777,7 @@ module {
 }
 )#"));
 #endif
-  exec::Executable::compile(program, {I})->run();
+  exec::Binder(program).set_inputs({I}).build()->run();
 }
 
 Tensor ComplexConv2d(const Tensor& I,               //
@@ -865,7 +864,7 @@ module {
 }
 )#"));
 #endif
-  exec::Executable::compile(program, {I, K})->run();
+  exec::Binder(program).set_inputs({I, K}).build()->run();
 }
 
 TEST(CppEdsl, Reciprocal) {
@@ -895,7 +894,7 @@ module {
 }
 )#"));
 #endif
-  exec::Executable::compile(program, {A})->run();
+  exec::Binder(program).set_inputs({A}).build()->run();
 }
 
 #ifdef PLAIDML_AST
@@ -918,7 +917,7 @@ TEST(CppEdsl, GradientDot) {
   _X3[x0, x2 : 100, 100] = +(_X1[x0, x1] * B[x2, x1]);
 }
 )"));
-  exec::Executable::compile(program, {A, B})->run();
+  exec::Binder(program).set_inputs({A, B}).build()->run();
 }
 #endif
 
@@ -961,7 +960,7 @@ TEST(CppEdsl, GradientMultiDot) {
   _X9 = add(_X7, _X8);
 }
 )"));
-  exec::Executable::compile(program, {A, B})->run();
+  exec::Binder(program).set_inputs({A, B}).build()->run();
 }
 #endif
 
@@ -991,7 +990,7 @@ TEST(CppEdsl, GradientDotSqrt) {
   _X8[x0, x2 : 100, 100] = +(_X6[x0, x1] * B[x2, x1]);
 }
 )"));
-  exec::Executable::compile(program, {A, B})->run();
+  exec::Binder(program).set_inputs({A, B}).build()->run();
 }
 #endif
 
@@ -1004,7 +1003,7 @@ TEST(CppEdsl, DefractLong) {
   TensorIndex n, x0, x1, k0, k1, co, ci;
   O(n, x0, x1, co) += I(n, (x0 + k0 - 1) / 2, (x1 + k1 - 1) / 2, ci) * K(2 - k0, 2 - k1, co, ci);
   Program program("defract_long", {O});
-  exec::Executable::compile(program, {I, K})->run();
+  exec::Binder(program).set_inputs({I, K}).build()->run();
 }
 
 TEST(CppEdsl, DupOut) {
@@ -1013,7 +1012,7 @@ TEST(CppEdsl, DupOut) {
   auto C = Placeholder(PLAIDML_DATA_FLOAT32, {30, 40});
   auto R = Dot(Dot(A, B), C);
   Program program("dup_out", {R, R, R});
-  exec::Executable::compile(program, {A, B, C})->run();
+  exec::Binder(program).set_inputs({A, B, C}).build()->run();
 }
 
 TEST(CppEdsl, Select) {
@@ -1049,7 +1048,41 @@ module {
 }
 )#"));
 #endif
-  exec::Executable::compile(program, {I})->run();
+  exec::Binder(program).set_inputs({I}).build()->run();
+}
+
+TEST(CppEdsl, Shape) {
+  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20});
+  auto O = shape(I);
+  Program program("shape", {O});
+#ifdef PLAIDML_AST
+  EXPECT_THAT(program, Eq(R"(function (
+  _X0[_X0_0, _X0_1]
+) -> (
+  _X1
+) {
+  _X1 = shape(_X0);
+}
+)"));
+#endif
+#ifdef PLAIDML_MLIR
+  EXPECT_THAT(program, Eq(R"#(
+
+module {
+  func @shape(%arg0: tensor<10x20x!eltwise.fp32>) -> tensor<2x!eltwise.i32> {
+    %0 = "tile.shape"(%arg0) {type = !eltwise.fp32} : (tensor<10x20x!eltwise.fp32>) -> tensor<2x!eltwise.i32>
+    return %0 : tensor<2x!eltwise.i32>
+  }
+}
+)#"));
+#endif
+  exec::Binder binder(program);
+  binder.set_input(I).build()->run();
+  auto view = binder.output(program.mapped_output(O)).mmap_current();
+  auto data = reinterpret_cast<const int32_t*>(view.data());
+  ASSERT_THAT(view.size(), sizeof(int32_t) * 2);
+  EXPECT_THAT(data[0], 10);
+  EXPECT_THAT(data[1], 20);
 }
 
 }  // namespace
