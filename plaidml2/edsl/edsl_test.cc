@@ -202,7 +202,9 @@ TEST(CppEdsl, Convolution) {
   auto I = Placeholder(PLAIDML_DATA_FLOAT32, {1, 224, 224, 1});
   auto K = Placeholder(PLAIDML_DATA_FLOAT32, {3, 3, 1, 32});
   Program program("convolution", {Convolution2(I, K)});
+#ifdef PLAIDML_MLIR
   exec::Binder(program).set_inputs({I, K}).build()->run();
+#endif
 }
 
 Tensor MaxPooling2(const Tensor& I) {
