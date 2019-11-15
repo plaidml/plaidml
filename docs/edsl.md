@@ -436,10 +436,12 @@ Suppose we want to take the cumulative sum of a 1D tensor. That is, we want
 `O[i]` to be the sum of all input entries `I[k]` where `k <= i`. In summation
 notation, this is:
 
-![``
+<!--
 \Large
 O[i] = \sum_{k \leq i} I[k]
-``](images/math-cum-sum-raw.png)
+-->
+
+![](images/math-cum-sum-raw.png)
 
 However, we can't use `k <= i` as a constraint in Tile; all the index variables
 must be gathered into a single index expression on one side of the inequality.
@@ -495,10 +497,12 @@ K.conv1d(x, kernel, padding='valid')
 
 Let's start with the mathematical formula for this operation:
 
-![``
+<!--
 \Large
 O[n, x, c_o] = \sum_k \sum_{c_i}(I[n, x + k, c_i] \cdot K[k, c_i, c_o])
-``](images/math-conv-1D-raw.png)
+-->
+
+![](images/math-conv-1D-raw.png)
 
 This is rather complicated, so let's walk through why this is the same
 convolution formula we're used to in machine learning.
