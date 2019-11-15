@@ -5,9 +5,8 @@
 
 #include <boost/format.hpp>
 
+#include "base/util/logging.h"
 #include "base/util/stream_container.h"
-#include "plaidml2/edsl/autodiff.h"
-#include "tile/util/tile_file.h"
 
 namespace vertexai::tile::lib {
 
@@ -287,10 +286,6 @@ Program LoadConv1d(              //
   auto I = Placeholder(input, "I");
   auto K = Placeholder(kernel, "K");
   return Program(name, {Convolution(I, K, output)});
-  // auto runinfo = Evaluate(name, {Convolution(I, K, output)});
-  // runinfo.const_inputs = {"K"};
-  // runinfo.input_buffers = {{"K", MakeBuffer(kernel)}};
-  // return runinfo;
 }
 
 Program LoadMaxPool2d(          //
@@ -311,10 +306,6 @@ Program LoadConv2d(              //
   auto I = Placeholder(input, "I");
   auto K = Placeholder(kernel, "K");
   return Program(name, {Convolution(I, K, output)});
-  // auto runinfo = Evaluate(name, {Convolution(I, K, output)});
-  // runinfo.const_inputs = {"K"};
-  // runinfo.input_buffers = {{"K", MakeBuffer(kernel)}};
-  // return runinfo;
 }
 
 Program LoadConv2dRelu(          //
@@ -325,10 +316,6 @@ Program LoadConv2dRelu(          //
   auto I = Placeholder(input, "I");
   auto K = Placeholder(kernel, "K");
   return Program(name, {Relu(Convolution(I, K, output))});
-  // auto runinfo = Evaluate(name, {Relu(Convolution(I, K, output))});
-  // runinfo.const_inputs = {"K"};
-  // runinfo.input_buffers = {{"K", MakeBuffer(kernel)}};
-  // return runinfo;
 }
 
 Program LoadConv2dBnRelu(          //
@@ -344,14 +331,6 @@ Program LoadConv2dBnRelu(          //
   auto O = Convolution(I, K, output);
   auto R = Relu((O + B) * S);
   return Program(name, {R});
-  // auto runinfo = Evaluate(name, {R});
-  // runinfo.const_inputs = {"K"};
-  // runinfo.input_buffers = {
-  //     {"K", MakeBuffer(kernel)},
-  //     {"B", MakeBuffer(channels)},
-  //     {"S", MakeBuffer(channels)},
-  // };
-  // return runinfo;
 }
 
 Program LoadConv2d3Deep            //
@@ -369,14 +348,6 @@ Program LoadConv2d3Deep            //
   auto O2 = Convolution(O1, K2, {dims[0], dims[1], dims[2], kernel2.int_dims()[3]});
   auto O3 = Convolution(O2, K3, {dims[0], dims[1], dims[2], kernel3.int_dims()[3]});
   return Program(name, {O3});
-  // auto runinfo = Evaluate(name, {O3});
-  // runinfo.const_inputs = {"K1", "K2", "K3"};
-  // runinfo.input_buffers = {
-  //     {"K1", MakeBuffer(kernel1)},
-  //     {"K2", MakeBuffer(kernel2)},
-  //     {"K3", MakeBuffer(kernel3)},
-  // };
-  // return runinfo;
 }
 
 Program LoadDilatedConv2d(      //
@@ -436,12 +407,6 @@ Program LoadPow(              //
   auto X = Placeholder(i1, "X");
   auto Y = Placeholder(i2, "Y");
   return Program(name, {pow(X, Y)});
-  // auto runinfo = Evaluate(name, {pow(X, Y)});
-  // runinfo.input_buffers = {
-  //     {"X", MakeBuffer(i1)},
-  //     {"Y", MakeBuffer(i2)},
-  // };
-  // return runinfo;
 }
 
 Tensor Norm4dAx2(const Tensor& I, const Tensor& G, const Tensor& B, const Tensor& Epsilon) {
