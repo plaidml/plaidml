@@ -2111,12 +2111,29 @@ llvm::Value* Compiler::XSMMDispatchFunction(llvm::Type* alphaPtrType, llvm::Type
 }
 
 llvm::Value* Compiler::Malloc(size_t size) {
-  std::vector<llvm::Type*> argtypes{IndexType(), IndexType()};
+  std::vector<llvm::Type*> argtypes{IndexType()
+  // MacOS RT doesn't have the align_alloc function and the allocations
+  // on it are 16 bytes aligned.
+#ifndef __APPLE__
+                                        ,
+                                    IndexType()
+#endif  // __APPLE__
+  };
   llvm::Type* rettype = builder_.getInt8PtrTy();
   auto functype = llvm::FunctionType::get(rettype, argtypes, false);
+#ifdef __APPLE__
+  const char* funcname = "malloc";
+#else   // __APPLE__
   const char* funcname = "aligned_alloc";
+#endif  // __APPLE__
   auto func = module_->getOrInsertFunction(funcname, functype).getCallee();
-  auto buffer = builder_.CreateCall(func, {IndexConst(VECTOR_MEM_ALIGNMENT), IndexConst(size)}, "");
+  auto buffer = builder_.CreateCall(func,
+                                    {
+#ifndef __APPLE__
+                                        IndexConst(VECTOR_MEM_ALIGNMENT),
+#endif  // __APPLE__
+                                        IndexConst(size)},
+                                    "");
   return buffer;
 }
 
