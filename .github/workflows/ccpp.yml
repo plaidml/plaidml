@@ -14,4 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v1
       - name: hello world
-        run: echo "hello world!"
+        shell: python
+        run: |
+          import os
+          print(os.environ['PATH'])
