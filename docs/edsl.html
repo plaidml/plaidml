@@ -1,3 +1,9 @@
+<head>
+<script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+<script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</head>
+
+<body>
 <h1 id="c-tile-edsl">C++ Tile EDSL</h1>
 <p>The C++ Tile EDSL (Embedded Domain Specific Language) provides developers with a
   way of describing a neural network so that the Stripe-based PlaidML compiler can
@@ -34,23 +40,24 @@
   it&#39;s related to summation notation. Below we show how this C++ Tile code is
   related to the mathematical formula for the operation by using colors to
   highlight corresponding pieces:</p>
-<!--
+
+<p>
+\[
 \Large
 \textcolor{red}{O[n]}
 \textcolor{yellow}{=}
 \textcolor{green}{\sum_{m}}
 \textcolor{cyan}{I[m, n]}
-!-->
+\]</p>
 
-<!--
+<p>
+\[
 \Large
-\texttt{
   \textcolor{red}{O(n)}
   \textcolor{green}{+=}
   \textcolor{cyan}{I(m, n)};
-}
--->
-<p><img src="images/edsl-summation-contraction.png"></p>
+\]
+</p>
 <p>In green, notice that the summation symbol is represented as <code>+=</code> in C++ Tile
   code. Some portions of the notation do not perfectly correspond. Here&#39;s why:</p>
 <ul>
@@ -89,34 +96,38 @@
 }
 </code></pre>
 <p>Again, this corresponds closely to mathematical notation:</p>
-<!--
+
+<p>
+\[
 \Large
 \textcolor{red}{O[n]}
 \textcolor{yellow}{=}
 \textcolor{green}{\max_m}
 \textcolor{cyan}{I[m, n]}
--->
+\]
+</p>
 
-<!--
+<p>
+\[
 \Large
-\texttt{
   \textcolor{red}{O(n)}
   \textcolor{green}{&gt;=}
   \textcolor{cyan}{I(m, n)};
-}
--->
-<p><img src="images/edsl-max-contraction.png"></p>
+\]
+</p>
+
 <h3 id="matrix-multiply">Matrix Multiply</h3>
 <p>Next we&#39;ll consider matrix multiplication. Let&#39;s look at the mathematical
   expression for the matrix multiplication <code>C = AB</code> written out in element-level
   detail:</p>
 
-<!--
+<p>
+\[
 \Large
 C[i, j] = \sum_{k} (A[i, k] \cdot B[k, j])
--->
+\]
+</p>
 
-<p><img src="images/math-mat-mul.png"></p>
 
 <p>We can convert this to C++ Tile code using the same correspondence as the
   previous example: The summation sign becomes plus-assignment, the summation
@@ -269,15 +280,18 @@ for (int i = <span class="hljs-number">0</span>; i &lt; N/<span class="hljs-numb
   but this Tile code is still very similar to mathematical notation, and we could
   have started there instead:</p>
 
-<!--
+<p>
+\[
 \Large
 \textcolor{red}{O[n]}
 \textcolor{yellow}{=}
 \textcolor{green}{\max}\textcolor{magenta}{_{0 \leq j &lt; 2}}
 \textcolor{cyan}{I[2i + j]}</p>
--->
+\]
+</p>
 
-<!--
+<p>
+\[
 \Large
 \texttt{
   if (\textcolor{magenta}{j &lt; 2}) {{
@@ -286,8 +300,9 @@ for (int i = <span class="hljs-number">0</span>; i &lt; N/<span class="hljs-numb
     \textcolor{cyan}{I(2 * i + j)};
   }}
 }
--->
-<p><img src="images/edsl-max-pool-1d.png"></p>
+\]
+</p>
+
 <p>This Tile code handles odd values of <code>N</code> by rounding down the output tensor
   size. You may instead want to round up the output tensor size and use a smaller
   pool at the edge. This can be accomplished by simply adjusting the size of <code>O</code>:</p>
@@ -359,12 +374,12 @@ auto <span class="hljs-keyword">O</span> = TensorOutput((<span class="hljs-keywo
   <code>O[i]</code> to be the sum of all input entries <code>I[k]</code> where <code>k &lt;= i</code>. In summation
   notation, this is:</p>
 
-<!--
+<p>
+\[
 \Large
 O[i] = \sum_{k \leq i} I[k]
--->
-
-<p><img src="images/math-cum-sum-raw.png"></p>
+\]
+</p>
 
 <p>However, we can&#39;t use <code>k &lt;= i</code> as a constraint in Tile; all the index variables
   must be gathered into a single index expression on one side of the inequality.
@@ -384,21 +399,26 @@ O[i] = \sum_{k \leq i} I[k]
 </code></pre>
 <p>Alternatively, we could write <code>k = i - j</code> for <code>j</code> non-negative as an alternative
   way of forcing <code>k</code> to be no larger than <code>i</code>. Then in summation notation we have:</p>
-<p>![``
+
+
+<p>
+\[
   \Large
   \textcolor{red}{O[i]}
   \textcolor{yellow}{=}
   \textcolor{green}{\sum}\textcolor{magenta}{_{0 \leq j}}
-  \textcolor{cyan}{I[i - j]}</p>
-<p>\Large
-  \texttt{
+  \textcolor{cyan}{I[i - j]}
+\]
+</p>
+<p>
+\[
+  \Large
   if (\textcolor{magenta}{j &lt; N}) {{
     \textcolor{red}{O(n)}
     \textcolor{green}{+=}
     \textcolor{cyan}{I(i - j)};
   }}
-  }
-  ``](images/edsl-cumsum.png)</p>
+\]</p>
 <h3 id="convolution">Convolution</h3>
 <p>Let&#39;s implement a 1D convolution with output size equal to input size. This is
   implementing the Keras backend operation:</p>
@@ -406,12 +426,13 @@ O[i] = \sum_{k \leq i} I[k]
 </code></pre>
 <p>Let&#39;s start with the mathematical formula for this operation:</p>
 
-<!--
+<p>
+\[
 \Large
 O[n, x, c_o] = \sum_k \sum_{c_i}(I[n, x + k, c_i] \cdot K[k, c_i, c_o])
--->
+\]
+</p>
 
-<p><img src="images/math-conv-1D-raw.png"></p>
 <p>This is rather complicated, so let&#39;s walk through why this is the same
   convolution formula we&#39;re used to in machine learning.</p>
 <p>A convolution produces output for a specific batch element at a specific
@@ -437,7 +458,8 @@ O[n, x, c_o] = \sum_k \sum_{c_i}(I[n, x + k, c_i] \cdot K[k, c_i, c_o])
   means that the spatial dimension of the output will be reduced by one less than
   the kernel size relative to the spatial dimension of the input:</p>
 
-<!--
+<p>
+\[
 \Large
 \textcolor{red}{O[n, x, c_o]}
 \textcolor{yellow}{=}
@@ -445,19 +467,20 @@ O[n, x, c_o] = \sum_k \sum_{c_i}(I[n, x + k, c_i] \cdot K[k, c_i, c_o])
 \textcolor{cyan}{I[n, x + k, c_i]}
 \textcolor{orange}{\cdot}
 \textcolor{lightblue}{K[k, c_i, c_o]}
--->
+\]
+</p>
 
-<!--
+<p>
+\[
 \Large
-\texttt{
   \textcolor{red}{O(n, x, co)}
   \textcolor{green}{+=}
   \textcolor{cyan}{I(n, x + k, ci)}
   \textcolor{orange}{*}
   \textcolor{lightblue}{K(k, ci, co)};
-}
--->
-<p><img src="images/edsl-convolution.png"></p>
+\]
+</p>
+
 <pre><code class="lang-c++">Tensor conv_1d(<span class="hljs-keyword">const</span> Tensor&amp; I, <span class="hljs-keyword">const</span> Tensor&amp; K) {
   TensorDim <span class="hljs-keyword">N</span>, X, KX, <span class="hljs-keyword">CI</span>, CO;
   TensorIndex <span class="hljs-keyword">n</span>, x, k, <span class="hljs-keyword">ci</span>, co;
@@ -481,12 +504,12 @@ O[n, x, c_o] = \sum_k \sum_{c_i}(I[n, x + k, c_i] \cdot K[k, c_i, c_o])
   variables are multiplied by dilation scaling factors when used to determine
   indices for <code>I</code>:</p>
 
-<!--
+<p>
+\[
 \Large
 O[n, x, c_o] = \sum_k \sum_{c_i}(I[n, x + k, c_i] \cdot K[k, c_i, c_o])
--->
-
-<p><img src="images/math-dil-conv-2D.png"></p>
+\]
+</p>
 
 <p>The effective size for a dilated kernel with kernel size <code>K</code> and dilation rate
   <code>d</code> is <code>d * (K - 1) + 1</code>, and so to achieve <code>&#39;valid&#39;</code> padding for this
@@ -507,7 +530,8 @@ O[n, x, c_o] = \sum_k \sum_{c_i}(I[n, x + k, c_i] \cdot K[k, c_i, c_o])
 <h3 id="complex-convolution">Complex Convolution</h3>
 <p>This final example demonstrates a strided dilated padded grouped convolution.</p>
 
-<!--
+<p>
+\[
 \Large
 \begin{aligned}
 O&[n, x_0, x_1, g, c_{o, g}] \\
@@ -517,9 +541,8 @@ O&[n, x_0, x_1, g, c_{o, g}] \\
   K[k_0, k_1, g, c_{i, g}, c_{o, g}]
 )
 \end{aligned}
--->
-
-<p><img src="images/math-complex-convolution.png"></p>
+\]
+</p>
 
 <p>where <em><code>s</code></em> gives the stride coefficients, <em><code>d</code></em> gives the dilation
   coefficients, and <em><code>P</code></em> gives the padding offsets.</p>
@@ -637,3 +660,4 @@ O&[n, x_0, x_1, g, c_{o, g}] \\
     index is a single operation. By convention, indices begin with a lower case
     letter.</li>
 </ul>
+</body>
