@@ -4,10 +4,14 @@ on: [push]
 
 jobs:
   build:
-
-    runs-on: ubuntu-18.04
-    
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: 
+          - macos-latest
+          - ubuntu-latest
+          - windows-latest
     steps:
-    - uses: actions/checkout@v1
-    - name: hello world
-      run: echo "hello world!"
+      - uses: actions/checkout@v1
+      - name: hello world
+        run: echo "hello world!"
