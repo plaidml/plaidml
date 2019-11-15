@@ -79,13 +79,16 @@ class Program {
       const std::string& name,             //
       const std::vector<Tensor>& outputs,  //
       const std::vector<std::tuple<Tensor, Tensor>>& updates = {});
+
   plaidml_program* as_ptr() const { return ptr_.get(); }
   std::string str() const { return ffi::str(ffi::call<plaidml_string*>(plaidml_program_repr, ptr_.get())); }
-  const std::vector<Tensor>& outputs() const { return outputs_; }
+  const std::vector<Tensor>& outputs() const { return new_outputs_; }
+  Tensor mapped_output(const Tensor& tensor) const;
 
  private:
   std::shared_ptr<plaidml_program> ptr_;
-  std::vector<Tensor> outputs_;
+  std::vector<Tensor> old_outputs_;
+  std::vector<Tensor> new_outputs_;
 };
 
 class TensorDim {
@@ -304,17 +307,6 @@ class LogicalShape {
     return ret;
   }
 
-  // std::vector<TensorDim> dims() const {
-  //   std::vector<TensorDim> ret(ndims());
-  //   for (size_t i = 0; i < ret.size(); i++) {
-  //     auto impl = std::make_shared<TensorDim::Impl>();
-  //     impl->ptr = details::make_plaidml_dim_expr(
-  //         ffi::call<plaidml_dim_expr*>(plaidml_logical_shape_get_dim_expr, ptr_.get(), i));
-  //     ret[i] = TensorDim(impl);
-  //   }
-  //   return ret;
-  // }
-
   bool operator==(const LogicalShape& rhs) const { return str() == rhs.str(); }
 
  private:
@@ -502,6 +494,14 @@ class Tensor {
 
  private:
   std::unique_ptr<Impl> impl_;
+};
+
+struct TensorRef {
+  Tensor tensor;
+
+  bool operator<(const TensorRef& rhs) const {  //
+    return tensor.as_ptr() < rhs.tensor.as_ptr();
+  }
 };
 
 template <typename... Ts>
@@ -711,7 +711,7 @@ inline Program::Program(                 //
     const std::string& name,             //
     const std::vector<Tensor>& outputs,  //
     const std::vector<std::tuple<Tensor, Tensor>>& updates)
-    : outputs_(outputs.size()) {
+    : old_outputs_(outputs), new_outputs_(outputs.size()) {
   std::vector<plaidml_expr*> raw_outputs(outputs.size());
   std::vector<plaidml_expr*> new_outputs(outputs.size());
   for (size_t i = 0; i < raw_outputs.size(); i++) {
@@ -739,8 +739,17 @@ inline Program::Program(                 //
       src_updates.data(),                                            //
       dst_updates.data()));
   for (size_t i = 0; i < new_outputs.size(); i++) {
-    outputs_[i] = Tensor(new_outputs[i]);
+    new_outputs_[i] = Tensor(new_outputs[i]);
   }
+}
+
+inline Tensor Program::mapped_output(const Tensor& tensor) const {
+  for (size_t i = 0; i < old_outputs_.size(); i++) {
+    if (old_outputs_.at(i).as_ptr() == tensor.as_ptr()) {
+      return new_outputs_[i];
+    }
+  }
+  throw std::out_of_range("Tensor not found in program outputs");
 }
 
 inline TensorDim TensorDim::operator-() const { return TensorDim(PLAIDML_INT_OP_NEG, {*this}); }
