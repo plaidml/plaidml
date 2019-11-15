@@ -34,6 +34,10 @@ CpuProgram::CpuProgram(            //
   state.const_bufs = const_bufs;
   codegen::Optimize(&state, stage.passes(), options);
   targets::cpu::Config config;
+  if (!env::Get("PLAIDML_CPU_PROFILE").empty()) {
+    config.profile_block_execution = true;
+    source_ = stripe->entry;
+  }
   executable_->compile(*stripe->entry, config);
 }
 
@@ -56,6 +60,10 @@ CpuProgram::CpuProgram(                              //
   state.const_bufs = const_bufs;
   codegen::Optimize(&state, stage.passes(), options);
   targets::cpu::Config config;
+  if (!env::Get("PLAIDML_CPU_PROFILE").empty()) {
+    config.profile_block_execution = true;
+    source_ = CloneBlock(*stripe->entry);
+  }
   executable_->compile(*stripe->entry, config);
 }
 
@@ -82,6 +90,19 @@ boost::future<void> CpuProgram::Run(  //
     }
   }
   executable_->run(buffers);
+  std::string profile_var = env::Get("PLAIDML_CPU_PROFILE");
+  if (!profile_var.empty()) {
+    // copy profile measurements into the saved stripe block
+    executable_->set_perf_attrs(source_.get());
+    // generate a unique file name for this run
+    static unsigned run_counter;
+    std::string suffix = "00000" + std::to_string(run_counter++);
+    suffix = suffix.substr(suffix.size() - 6);
+    auto path = boost::filesystem::path(profile_var + "." + suffix);
+    // dump annotated stripe block contents to disk
+    std::ofstream fout(path.string());
+    fout << *source_ << std::endl;
+  }
   return boost::make_ready_future();
 }
 
