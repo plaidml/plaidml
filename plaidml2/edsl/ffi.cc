@@ -333,6 +333,7 @@ void plaidml_expr_free(  //
     IVLOG(3, "plaidml_expr_free> " << expr->expr->str());
 #endif
 #ifdef PLAIDML_MLIR
+    IVLOG(3, "plaidml_expr_free> " << expr->value);
     IVLOG(3, "plaidml_expr_free> " << mlir::debugString(*expr->value));
     GlobalContext::get()->Destroy(expr->value);
 #endif
@@ -1394,7 +1395,7 @@ plaidml_program* plaidml_program_evaluate(  //
     std::vector<mlir::Value*> new_values(noutputs);
     auto ret = new plaidml_program{GlobalContext::get()->MakeProgram(name, values, new_values)};
     for (size_t i = 0; i < noutputs; i++) {
-      new_outputs[i] = new plaidml_expr{new_values[i]};
+      new_outputs[i] = new plaidml_expr{new_values[i], ret->program};
     }
     return ret;
 #endif

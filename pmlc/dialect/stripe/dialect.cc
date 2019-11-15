@@ -36,7 +36,7 @@ struct OpAsmInterface : public mlir::OpAsmDialectInterface {
     }
   }
 
-  void getRegionArgumentName(mlir::BlockArgument* arg, llvm::raw_ostream& os) const final {
+  void getRegionArgumentName(mlir::BlockArgument* arg, llvm::raw_ostream& os) const {
     Operation* op = arg->getOwner()->getParentOp();
     if (auto vec = op->getAttrOfType<ArrayAttr>("idx_names")) {
       if (vec.size() > arg->getArgNumber()) {
