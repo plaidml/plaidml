@@ -340,7 +340,7 @@ have started there instead:
 <!--
 \Large
 \texttt{
-  if (\textcolor{magenta}{j < 2}) \{{
+  add_constraints (\textcolor{magenta}{j < 2}) \{{
     \textcolor{red}{O(n)}
     \textcolor{green}{>=}
     \textcolor{cyan}{I(2 * i + j)};
@@ -476,7 +476,7 @@ way of forcing `k` to be no larger than `i`. Then in summation notation we have:
 <!--
 \Large
 \texttt{
-  if (\textcolor{magenta}{j < N}) \{{
+  add_constraints (\textcolor{magenta}{j < N}) \{{
     \textcolor{red}{O(n)}
     \textcolor{green}{+=}
     \textcolor{cyan}{I(i - j)};

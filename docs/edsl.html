@@ -54,7 +54,7 @@
 \[
 \Large
   \textcolor{red}{O(n)}
-  \textcolor{green}{+=}
+  \textcolor{green}{\,{+}{=}}
   \textcolor{cyan}{I(m, n)};
 \]
 </p>
@@ -111,7 +111,7 @@
 \[
 \Large
   \textcolor{red}{O(n)}
-  \textcolor{green}{&gt;=}
+  \textcolor{green}{\gte}
   \textcolor{cyan}{I(m, n)};
 \]
 </p>
@@ -285,19 +285,20 @@ for (int i = <span class="hljs-number">0</span>; i &lt; N/<span class="hljs-numb
 \Large
 \textcolor{red}{O[n]}
 \textcolor{yellow}{=}
-\textcolor{green}{\max}\textcolor{magenta}{_{0 \leq j &lt; 2}}
-\textcolor{cyan}{I[2i + j]}</p>
+\textcolor{green}{\max}
+\textcolor{magenta}{_{0 \leq j \lt 2}}
+\textcolor{cyan}{I[2i + j]}
 \]
 </p>
 
 <p>
 \[
 \Large
-  if (\textcolor{magenta}{j &lt; 2}) {{
+  \mathrm{add\_constraints} (\textcolor{magenta}{j \lt 2}) {\mathrm{\{}
     \textcolor{red}{O(n)}
-    \textcolor{green}{&gt;=}
+    \textcolor{green}{\geq}
     \textcolor{cyan}{I(2 * i + j)};
-  }}
+  \mathrm{\}}}
 \]
 </p>
 
@@ -309,7 +310,7 @@ for (int i = <span class="hljs-number">0</span>; i &lt; N/<span class="hljs-numb
   TensorIndex i, j;
   I.bind_dims(N);
   <span class="hljs-keyword">auto</span> O = TensorOutput((N + <span class="hljs-number">1</span>) / <span class="hljs-number">2</span>);
-  <span class="hljs-keyword">if</span> (j &lt; <span class="hljs-number">2</span>) {
+  <span class="hljs-keyword">add_constraints</span> (j &lt; <span class="hljs-number">2</span>) {
     O(i) &gt;= I(<span class="hljs-number">2</span> * i + j);
   }
   <span class="hljs-keyword">return</span> O;
@@ -411,11 +412,11 @@ O[i] = \sum_{k \leq i} I[k]
 <p>
 \[
   \Large
-  if (\textcolor{magenta}{j &lt; N}) {{
+  \mathrm{add\_constraints} (\textcolor{magenta}{j \lt N}) { \mathrm{\{}
     \textcolor{red}{O(n)}
-    \textcolor{green}{+=}
+    \textcolor{green}{\,{+}{=}}
     \textcolor{cyan}{I(i - j)};
-  }}
+  \mathrm{\}}}
 \]</p>
 <h3 id="convolution">Convolution</h3>
 <p>Let&#39;s implement a 1D convolution with output size equal to input size. This is
@@ -461,7 +462,7 @@ O[n, x, c_o] = \sum_k \sum_{c_i}(I[n, x + k, c_i] \cdot K[k, c_i, c_o])
 \Large
 \textcolor{red}{O[n, x, c_o]}
 \textcolor{yellow}{=}
-\textcolor{green}{\sum<em>k \sum</em>{c_i}}
+\textcolor{green}{\sum k \sum{c_i}}
 \textcolor{cyan}{I[n, x + k, c_i]}
 \textcolor{orange}{\cdot}
 \textcolor{lightblue}{K[k, c_i, c_o]}
@@ -472,7 +473,7 @@ O[n, x, c_o] = \sum_k \sum_{c_i}(I[n, x + k, c_i] \cdot K[k, c_i, c_o])
 \[
 \Large
   \textcolor{red}{O(n, x, co)}
-  \textcolor{green}{+=}
+  \textcolor{green}{\,{+}{=}}
   \textcolor{cyan}{I(n, x + k, ci)}
   \textcolor{orange}{*}
   \textcolor{lightblue}{K(k, ci, co)};
