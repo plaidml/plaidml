@@ -1793,9 +1793,6 @@ llvm::Type* Compiler::CType(DataType type) {
     case DataType::INT32:
     case DataType::UINT32:
       return builder_.getInt32Ty();
-    case DataType::INTX:
-    case DataType::UINTX:
-      return builder_.getInt64Ty();
     case DataType::INT64:
     case DataType::UINT64:
       return builder_.getInt64Ty();
@@ -1804,8 +1801,6 @@ llvm::Type* Compiler::CType(DataType type) {
     case DataType::FLOAT32:
       return builder_.getFloatTy();
     case DataType::FLOAT64:
-      return builder_.getDoubleTy();
-    case DataType::FLOATX:
       return builder_.getDoubleTy();
     default:
       throw Error("Invalid type: " + to_string(type));

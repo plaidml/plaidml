@@ -389,7 +389,7 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
       case stripe::StmtKind::LoadIndex: {
         const auto& load_idx = stripe::LoadIndex::Downcast(stmt);
         Value* from = AffineIntoMLIR(builder, locals.idxs, load_idx->from);
-        Type idx_base = ScalarType::get(builder->getContext(), DataType::INTX);
+        Type idx_base = ScalarType::get(builder->getContext(), DataType::INT32);
         Type idx_type = eltwise::getRankedTensorType(idx_base);
         auto op = builder->create<LoadIndexOp>(unknownLoc, idx_type, from);
         op.setAttr("scalar_name", builder->getStringAttr(load_idx->into));
@@ -427,12 +427,12 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
         switch (cnst->type) {
           case stripe::ConstType::Integer:
             op = builder->create<eltwise::ScalarConstantOp>(
-                unknownLoc, ScalarType::get(builder->getContext(), DataType::INTX), cnst->iconst);
+                unknownLoc, ScalarType::get(builder->getContext(), DataType::INT32), cnst->iconst);
             op.setAttr("scalar_name", builder->getStringAttr(cnst->name));
             break;
           case stripe::ConstType::Float:
             op = builder->create<eltwise::ScalarConstantOp>(
-                unknownLoc, ScalarType::get(builder->getContext(), DataType::FLOATX), cnst->fconst);
+                unknownLoc, ScalarType::get(builder->getContext(), DataType::FLOAT32), cnst->fconst);
             op.setAttr("scalar_name", builder->getStringAttr(cnst->name));
             break;
         }
