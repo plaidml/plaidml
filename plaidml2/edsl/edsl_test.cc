@@ -839,25 +839,25 @@ TEST(CppEdsl, ComplexConv2d) {
 
 module {
   func @complex_conv_2d(%arg0: tensor<1x224x224x3x3x!eltwise.fp32>, %arg1: tensor<3x3x3x3x32x!eltwise.fp32>) -> tensor<1x112x112x3x32x!eltwise.fp32> {
-    %c2 = "tile.affine_const"() {value = 2 : i64} : () -> !eltwise.int
-    %c112 = "tile.affine_const"() {value = 112 : i64} : () -> !eltwise.int
-    %c32 = "tile.affine_const"() {value = 32 : i64} : () -> !eltwise.int
-    %c3 = "tile.affine_const"() {value = 3 : i64} : () -> !eltwise.int
-    %c1 = "tile.affine_const"() {value = 1 : i64} : () -> !eltwise.int
+    %c2 = "tile.affine_const"() {value = 2 : i64} : () -> !eltwise.i32
+    %c112 = "tile.affine_const"() {value = 112 : i64} : () -> !eltwise.i32
+    %c32 = "tile.affine_const"() {value = 32 : i64} : () -> !eltwise.i32
+    %c3 = "tile.affine_const"() {value = 3 : i64} : () -> !eltwise.i32
+    %c1 = "tile.affine_const"() {value = 1 : i64} : () -> !eltwise.i32
     %0 = "tile.domain"() ( {
-    ^bb0(%arg2: !eltwise.int, %arg3: !eltwise.int, %arg4: !eltwise.int, %arg5: !eltwise.int, %arg6: !eltwise.int, %arg7: !eltwise.int, %arg8: !eltwise.int, %arg9: !eltwise.int):	// no predecessors
-      %1 = "tile.affine_mul"(%arg4, %c3) : (!eltwise.int, !eltwise.int) -> !eltwise.int
-      %2 = "tile.affine_mul"(%arg5, %c2) : (!eltwise.int, !eltwise.int) -> !eltwise.int
-      %3 = "tile.affine_add"(%2, %1) : (!eltwise.int, !eltwise.int) -> !eltwise.int
-      %4 = "tile.affine_sub"(%3, %c2) : (!eltwise.int, !eltwise.int) -> !eltwise.int
-      %5 = "tile.affine_mul"(%arg6, %c3) : (!eltwise.int, !eltwise.int) -> !eltwise.int
-      %6 = "tile.affine_mul"(%arg7, %c2) : (!eltwise.int, !eltwise.int) -> !eltwise.int
-      %7 = "tile.affine_add"(%6, %5) : (!eltwise.int, !eltwise.int) -> !eltwise.int
-      %8 = "tile.affine_sub"(%7, %c2) : (!eltwise.int, !eltwise.int) -> !eltwise.int
-      %9 = "tile.src_idx_map"(%arg0, %arg8, %8, %4, %arg3, %arg2) : (tensor<1x224x224x3x3x!eltwise.fp32>, !eltwise.int, !eltwise.int, !eltwise.int, !eltwise.int, !eltwise.int) -> !tile.imap
-      %10 = "tile.src_idx_map"(%arg1, %arg6, %arg4, %arg3, %arg2, %arg9) : (tensor<3x3x3x3x32x!eltwise.fp32>, !eltwise.int, !eltwise.int, !eltwise.int, !eltwise.int, !eltwise.int) -> !tile.imap
-      %11 = "tile.sink_idx_map"(%arg8, %arg7, %arg5, %arg3, %arg9) : (!eltwise.int, !eltwise.int, !eltwise.int, !eltwise.int, !eltwise.int) -> !tile.imap
-      %12 = "tile.size_map"(%c1, %c112, %c112, %c3, %c32) : (!eltwise.int, !eltwise.int, !eltwise.int, !eltwise.int, !eltwise.int) -> !tile.smap
+    ^bb0(%arg2: !eltwise.i32, %arg3: !eltwise.i32, %arg4: !eltwise.i32, %arg5: !eltwise.i32, %arg6: !eltwise.i32, %arg7: !eltwise.i32, %arg8: !eltwise.i32, %arg9: !eltwise.i32):	// no predecessors
+      %1 = "tile.affine_mul"(%arg4, %c3) : (!eltwise.i32, !eltwise.i32) -> !eltwise.i32
+      %2 = "tile.affine_mul"(%arg5, %c2) : (!eltwise.i32, !eltwise.i32) -> !eltwise.i32
+      %3 = "tile.affine_add"(%2, %1) : (!eltwise.i32, !eltwise.i32) -> !eltwise.i32
+      %4 = "tile.affine_sub"(%3, %c2) : (!eltwise.i32, !eltwise.i32) -> !eltwise.i32
+      %5 = "tile.affine_mul"(%arg6, %c3) : (!eltwise.i32, !eltwise.i32) -> !eltwise.i32
+      %6 = "tile.affine_mul"(%arg7, %c2) : (!eltwise.i32, !eltwise.i32) -> !eltwise.i32
+      %7 = "tile.affine_add"(%6, %5) : (!eltwise.i32, !eltwise.i32) -> !eltwise.i32
+      %8 = "tile.affine_sub"(%7, %c2) : (!eltwise.i32, !eltwise.i32) -> !eltwise.i32
+      %9 = "tile.src_idx_map"(%arg0, %arg8, %8, %4, %arg3, %arg2) : (tensor<1x224x224x3x3x!eltwise.fp32>, !eltwise.i32, !eltwise.i32, !eltwise.i32, !eltwise.i32, !eltwise.i32) -> !tile.imap
+      %10 = "tile.src_idx_map"(%arg1, %arg6, %arg4, %arg3, %arg2, %arg9) : (tensor<3x3x3x3x32x!eltwise.fp32>, !eltwise.i32, !eltwise.i32, !eltwise.i32, !eltwise.i32, !eltwise.i32) -> !tile.imap
+      %11 = "tile.sink_idx_map"(%arg8, %arg7, %arg5, %arg3, %arg9) : (!eltwise.i32, !eltwise.i32, !eltwise.i32, !eltwise.i32, !eltwise.i32) -> !tile.imap
+      %12 = "tile.size_map"(%c1, %c112, %c112, %c3, %c32) : (!eltwise.i32, !eltwise.i32, !eltwise.i32, !eltwise.i32, !eltwise.i32) -> !tile.smap
       "tile.+(x*y)"(%12, %9, %10, %11) : (!tile.smap, !tile.imap, !tile.imap, !tile.imap) -> ()
     }) {idx_names = ["x0", "x1", "x2", "x3", "x4", "x5", "x6", "x7"]} : () -> tensor<1x112x112x3x32x!eltwise.fp32>
     return %0 : tensor<1x112x112x3x32x!eltwise.fp32>

@@ -149,7 +149,6 @@ Type ComputeResultType(ArrayRef<Value*> operands, DataType override) {
       throw std::runtime_error(ss.str());
     }
   }
-  // return canonicalizeType(ret);
   return ret;
 }
 
@@ -165,14 +164,6 @@ SmallVector<int64_t, 4> ComputeShape(ArrayRef<Value*> operands) {
     }
   }
   return shape;
-}
-
-Type canonicalizeType(Type type) {
-  auto rankedTensorType = getRankedTensorType(type);
-  if (rankedTensorType.getRank() == 0) {
-    return rankedTensorType.getElementType();
-  }
-  return rankedTensorType;
 }
 
 Attribute constFoldUnaryOp(ArrayRef<Attribute> operands, UnaryCalculate calculate) {
