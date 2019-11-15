@@ -86,17 +86,18 @@ void Executable::Run(const std::map<std::string, void*>& buffers) {
 void Executable::SetPerfAttrs(stripe::Block* block) {
   // Look up the performance counters for this block.
   // Apply their values as tags.
-  std::string count_name = profile_count_name_ + block->name;
+  std::string block_id = block->name + "@" + std::to_string((uintptr_t)block);
+  std::string count_name = profile_count_name_ + block_id;
   uint64_t count_addr = engine_->getGlobalValueAddress(count_name);
   if (count_addr) {
     block->set_attr("execution_count", *reinterpret_cast<int64_t*>(count_addr));
   }
-  std::string ticks_name = profile_ticks_name_ + block->name;
+  std::string ticks_name = profile_ticks_name_ + block_id;
   uint64_t ticks_addr = engine_->getGlobalValueAddress(ticks_name);
   if (ticks_addr) {
     block->set_attr("execution_ticks", *reinterpret_cast<int64_t*>(ticks_addr));
   }
-  std::string loop_body_name = profile_loop_body_name_ + block->name;
+  std::string loop_body_name = profile_loop_body_name_ + block_id;
   uint64_t loop_ticks_addr = engine_->getGlobalValueAddress(loop_body_name);
   if (loop_ticks_addr) {
     block->set_attr("loop_body_ticks", *reinterpret_cast<int64_t*>(loop_ticks_addr));

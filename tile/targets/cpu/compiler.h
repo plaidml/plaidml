@@ -172,6 +172,7 @@ class Compiler : private stripe::ConstStmtVisitor {
   void ProfileBlockLeave(const stripe::Block& block);
   void ProfileLoopEnter(const stripe::Block& block);
   void ProfileLoopLeave(const stripe::Block& block);
+  std::string ProfileBlockID(const stripe::Block& block);
   const XSMMDispatch GetXSMMDispatch(const stripe::Block& block);
   llvm::Value* RunTimeLogEntry(void);
   void EmitRunTimeLogEntry(const std::string& str, const std::string& extra, llvm::Value* value = nullptr);
