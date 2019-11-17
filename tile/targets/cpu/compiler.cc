@@ -2123,19 +2123,27 @@ llvm::Value* Compiler::Malloc(size_t size) {
   auto functype = llvm::FunctionType::get(rettype, argtypes, false);
 #ifdef __APPLE__
   const char* funcname = "malloc";
-#else   // __APPLE__
+#elif defined(_WIN32)  // !__APPLE__
+  const char* funcname = "__aligned_malloc";
+#else                  // !__APPLE__ && !_WIN32
   const char* funcname = "aligned_alloc";
-#endif  // __APPLE__
+#endif                 // __APPLE__
   auto func = module_->getOrInsertFunction(funcname, functype).getCallee();
   auto buffer = builder_.CreateCall(func,
                                     {
+#ifdef _WIN32
+                                        IndexConst(size)},
+                                        IndexConst(VECTOR_MEM_ALIGNMENT)
+},
+#else  // !_WIN32
 #ifndef __APPLE__
                                         IndexConst(VECTOR_MEM_ALIGNMENT),
 #endif  // __APPLE__
                                         IndexConst(size)},
+#endif  // _WIN32
                                     "");
-  return buffer;
-}
+return buffer;
+}  // namespace cpu
 
 llvm::Value* Compiler::RunTimeLogEntry(void) {
   std::vector<llvm::Type*> argtypes{
@@ -2167,7 +2175,11 @@ void Compiler::Free(llvm::Value* buffer) {
   std::vector<llvm::Type*> argtypes{ptrtype};
   llvm::Type* rettype = llvm::Type::getVoidTy(context_);
   auto functype = llvm::FunctionType::get(rettype, argtypes, false);
+#ifdef _WIN32
+  const char* funcname = "_aligned_free";
+#else   // !_WIN32
   const char* funcname = "free";
+#endif  // _WIN32
   auto func = module_->getOrInsertFunction(funcname, functype).getCallee();
   builder_.CreateCall(func, {buffer}, "");
 }
@@ -2276,7 +2288,7 @@ void Compiler::PrintOutputAssembly() {
   llvm::errs() << outputStr << "\n";
 }
 
-}  // namespace cpu
 }  // namespace targets
 }  // namespace tile
+}  // namespace vertexai
 }  // namespace vertexai
