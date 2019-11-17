@@ -943,7 +943,7 @@ void Compiler::Visit(const stripe::Block& block) {
     llvm::Value* initsArg = builder_.CreateAlloca(indexArrayType);
     initsArg = builder_.CreateBitCast(initsArg, IndexType()->getPointerTo());
     for (size_t i = 0; i < idxs.size(); ++i) {
-      llvm::Value* elementPtr = builder_.CreateConstGEP1_32(initsArg, i);
+      llvm::Value* elementPtr = builder_.CreateConstGEP1_32(initsArg, 0);  // Lubo i);
       builder_.CreateStore(idxs[i], elementPtr);
     }
     if (!block.idxs.empty()) {
@@ -2132,9 +2132,7 @@ llvm::Value* Compiler::Malloc(size_t size) {
   auto buffer = builder_.CreateCall(func,
                                     {
 #ifdef _WIN32
-                                        IndexConst(size)},
-                                        IndexConst(VECTOR_MEM_ALIGNMENT)
-},
+                                        IndexConst(size), IndexConst(VECTOR_MEM_ALIGNMENT)},
 #else  // !_WIN32
 #ifndef __APPLE__
                                         IndexConst(VECTOR_MEM_ALIGNMENT),
@@ -2142,7 +2140,7 @@ llvm::Value* Compiler::Malloc(size_t size) {
                                         IndexConst(size)},
 #endif  // _WIN32
                                     "");
-return buffer;
+  return buffer;
 }  // namespace cpu
 
 llvm::Value* Compiler::RunTimeLogEntry(void) {
@@ -2209,7 +2207,8 @@ void Compiler::ProfileBlockEnter(const stripe::Block& block) {
     return;
   }
   // allocate counter variable
-  std::string profile_count_name = profile_count_name_ + block.name;
+  std::string block_id = ProfileBlockID(block);
+  std::string profile_count_name = profile_count_name_ + block_id;
   module_->getOrInsertGlobal(profile_count_name, IndexType());
   auto profile_count_gval = module_->getNamedGlobal(profile_count_name);
   profile_count_gval->setInitializer(llvm::Constant::getNullValue(IndexType()));
@@ -2217,7 +2216,7 @@ void Compiler::ProfileBlockEnter(const stripe::Block& block) {
   builder_.CreateAtomicRMW(llvm::AtomicRMWInst::BinOp::Add, profile_count_gval, IndexConst(1),
                            llvm::AtomicOrdering::Monotonic);
   // allocate timing variable
-  std::string profile_ticks_name = profile_ticks_name_ + block.name;
+  std::string profile_ticks_name = profile_ticks_name_ + block_id;
   module_->getOrInsertGlobal(profile_ticks_name, IndexType());
   auto profile_ticks_gval = module_->getNamedGlobal(profile_ticks_name);
   profile_ticks_gval->setInitializer(llvm::Constant::getNullValue(IndexType()));
@@ -2235,7 +2234,8 @@ void Compiler::ProfileBlockLeave(const stripe::Block& block) {
   // Add the current rdtsc back into the elapsed time counter, which both
   // corrects for the bias we introduced on function entry and accumulates
   // the elapsed time into the running total.
-  std::string profile_ticks_name = profile_ticks_name_ + block.name;
+  std::string block_id = ProfileBlockID(block);
+  std::string profile_ticks_name = profile_ticks_name_ + block_id;
   auto profile_ticks_gval = module_->getNamedGlobal(profile_ticks_name);
   builder_.CreateAtomicRMW(llvm::AtomicRMWInst::BinOp::Add, profile_ticks_gval, ReadCycleCounter(),
                            llvm::AtomicOrdering::Monotonic);
@@ -2247,7 +2247,8 @@ void Compiler::ProfileLoopEnter(const stripe::Block& block) {
   }
   // Count the time spent in the loop body, excluding increment/condition
   // overhead
-  std::string profile_name = profile_loop_body_name_ + block.name;
+  std::string block_id = ProfileBlockID(block);
+  std::string profile_name = profile_loop_body_name_ + block_id;
   module_->getOrInsertGlobal(profile_name, IndexType());
   auto profile_gval = module_->getNamedGlobal(profile_name);
   profile_gval->setInitializer(llvm::Constant::getNullValue(IndexType()));
@@ -2259,10 +2260,15 @@ void Compiler::ProfileLoopLeave(const stripe::Block& block) {
   if (!config_.profile_loop_body) {
     return;
   }
-  std::string profile_name = profile_loop_body_name_ + block.name;
+  std::string block_id = ProfileBlockID(block);
+  std::string profile_name = profile_loop_body_name_ + block_id;
   auto profile_gval = module_->getNamedGlobal(profile_name);
   builder_.CreateAtomicRMW(llvm::AtomicRMWInst::BinOp::Add, profile_gval, ReadCycleCounter(),
                            llvm::AtomicOrdering::Monotonic);
+}
+
+std::string Compiler::ProfileBlockID(const stripe::Block& block) {
+  return block.name + "@" + std::to_string((uintptr_t)&block);
 }
 
 void Compiler::PrintOutputAssembly() {
@@ -2288,7 +2294,7 @@ void Compiler::PrintOutputAssembly() {
   llvm::errs() << outputStr << "\n";
 }
 
+}  // namespace cpu
 }  // namespace targets
 }  // namespace tile
-}  // namespace vertexai
 }  // namespace vertexai
