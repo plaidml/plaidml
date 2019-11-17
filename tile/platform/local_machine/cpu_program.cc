@@ -64,7 +64,7 @@ CpuProgram::CpuProgram(                              //
     config.profile_block_execution = true;
     source_ = CloneBlock(*stripe->entry);
   }
-  executable_->compile(*stripe->entry, config);
+  executable_->compile(*(source_ ? source_ : stripe->entry), config);
 }
 
 CpuProgram::~CpuProgram() {}

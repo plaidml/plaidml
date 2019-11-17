@@ -2209,7 +2209,8 @@ void Compiler::ProfileBlockEnter(const stripe::Block& block) {
     return;
   }
   // allocate counter variable
-  std::string profile_count_name = profile_count_name_ + block.name;
+  std::string block_id = ProfileBlockID(block);
+  std::string profile_count_name = profile_count_name_ + block_id;
   module_->getOrInsertGlobal(profile_count_name, IndexType());
   auto profile_count_gval = module_->getNamedGlobal(profile_count_name);
   profile_count_gval->setInitializer(llvm::Constant::getNullValue(IndexType()));
@@ -2217,7 +2218,7 @@ void Compiler::ProfileBlockEnter(const stripe::Block& block) {
   builder_.CreateAtomicRMW(llvm::AtomicRMWInst::BinOp::Add, profile_count_gval, IndexConst(1),
                            llvm::AtomicOrdering::Monotonic);
   // allocate timing variable
-  std::string profile_ticks_name = profile_ticks_name_ + block.name;
+  std::string profile_ticks_name = profile_ticks_name_ + block_id;
   module_->getOrInsertGlobal(profile_ticks_name, IndexType());
   auto profile_ticks_gval = module_->getNamedGlobal(profile_ticks_name);
   profile_ticks_gval->setInitializer(llvm::Constant::getNullValue(IndexType()));
@@ -2235,7 +2236,8 @@ void Compiler::ProfileBlockLeave(const stripe::Block& block) {
   // Add the current rdtsc back into the elapsed time counter, which both
   // corrects for the bias we introduced on function entry and accumulates
   // the elapsed time into the running total.
-  std::string profile_ticks_name = profile_ticks_name_ + block.name;
+  std::string block_id = ProfileBlockID(block);
+  std::string profile_ticks_name = profile_ticks_name_ + block_id;
   auto profile_ticks_gval = module_->getNamedGlobal(profile_ticks_name);
   builder_.CreateAtomicRMW(llvm::AtomicRMWInst::BinOp::Add, profile_ticks_gval, ReadCycleCounter(),
                            llvm::AtomicOrdering::Monotonic);
@@ -2247,7 +2249,8 @@ void Compiler::ProfileLoopEnter(const stripe::Block& block) {
   }
   // Count the time spent in the loop body, excluding increment/condition
   // overhead
-  std::string profile_name = profile_loop_body_name_ + block.name;
+  std::string block_id = ProfileBlockID(block);
+  std::string profile_name = profile_loop_body_name_ + block_id;
   module_->getOrInsertGlobal(profile_name, IndexType());
   auto profile_gval = module_->getNamedGlobal(profile_name);
   profile_gval->setInitializer(llvm::Constant::getNullValue(IndexType()));
@@ -2259,10 +2262,15 @@ void Compiler::ProfileLoopLeave(const stripe::Block& block) {
   if (!config_.profile_loop_body) {
     return;
   }
-  std::string profile_name = profile_loop_body_name_ + block.name;
+  std::string block_id = ProfileBlockID(block);
+  std::string profile_name = profile_loop_body_name_ + block_id;
   auto profile_gval = module_->getNamedGlobal(profile_name);
   builder_.CreateAtomicRMW(llvm::AtomicRMWInst::BinOp::Add, profile_gval, ReadCycleCounter(),
                            llvm::AtomicOrdering::Monotonic);
+}
+
+std::string Compiler::ProfileBlockID(const stripe::Block& block) {
+  return block.name + "@" + std::to_string((uintptr_t)&block);
 }
 
 void Compiler::PrintOutputAssembly() {
