@@ -943,7 +943,7 @@ void Compiler::Visit(const stripe::Block& block) {
     llvm::Value* initsArg = builder_.CreateAlloca(indexArrayType);
     initsArg = builder_.CreateBitCast(initsArg, IndexType()->getPointerTo());
     for (size_t i = 0; i < idxs.size(); ++i) {
-      llvm::Value* elementPtr = builder_.CreateConstGEP1_32(initsArg, 0);  // Lubo i);
+      llvm::Value* elementPtr = builder_.CreateConstGEP1_32(initsArg, i);
       builder_.CreateStore(idxs[i], elementPtr);
     }
     if (!block.idxs.empty()) {
