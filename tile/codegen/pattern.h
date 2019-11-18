@@ -5,11 +5,11 @@
 #include <list>
 #include <map>
 #include <memory>
+#include <optional>
 #include <sstream>
 #include <string>
 #include <vector>
 
-#include <boost/optional.hpp>
 #include <boost/variant.hpp>
 
 #include "tile/codegen/codegen.pb.h"
@@ -63,7 +63,7 @@ struct MatchResult {
 };
 
 // Attempts to find the first permutation of 'value' that matches the supplied 'pattern'.
-boost::optional<MatchResult> MatchFirst(const Term& pattern, const Term& value);
+std::optional<MatchResult> MatchFirst(const Term& pattern, const Term& value);
 
 // Attempts to find all permutations of 'value' that matches the supplied 'pattern'.
 std::list<MatchResult> MatchAll(const Term& pattern, const Term& value);

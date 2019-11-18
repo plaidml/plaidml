@@ -1,8 +1,10 @@
 // Copyright 2019, Intel Corp.
 
+#include <algorithm>
 #include <memory>
 #include <regex>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <boost/format.hpp>
@@ -372,12 +374,12 @@ class MatchVisitor : public boost::static_visitor<bool> {
   std::list<MatchResult> choices_;
 };
 
-boost::optional<MatchResult> MatchFirst(const Term& pattern, const Term& value) {
+std::optional<MatchResult> MatchFirst(const Term& pattern, const Term& value) {
   MatchVisitor visitor;
   if (boost::apply_visitor(visitor, pattern, value)) {
     return visitor.matches().front();
   }
-  return boost::none;
+  return std::nullopt;
 }
 
 std::list<MatchResult> MatchAll(const Term& pattern, const Term& value) {
