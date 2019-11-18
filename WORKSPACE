@@ -35,9 +35,9 @@ register_toolchains(
 
 http_archive(
     name = "bazel_latex",
-    sha256 = "fd37ad77406af1e287753c08e018de59ee72470a5f647523f43bbe43ebf30a19",
-    strip_prefix = "bazel-latex-0.18",
-    url = "https://github.com/ProdriveTechnologies/bazel-latex/archive/v0.18.tar.gz",
+    sha256 = "2d8d5f590cfc8aa8e6d155c37c2d3540f3ab4d23ac96a576cdda8a1cf1b1e3ed",
+    strip_prefix = "bazel-latex-0.19",
+    url = "https://github.com/ProdriveTechnologies/bazel-latex/archive/v0.19.tar.gz",
 )
 
 load("@bazel_latex//:repositories.bzl", "latex_repositories")
