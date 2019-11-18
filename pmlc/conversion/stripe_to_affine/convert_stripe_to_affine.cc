@@ -26,6 +26,7 @@ using llvm::SmallVectorImpl;
 using mlir::AffineExpr;
 using mlir::AffineLoadOp;
 using mlir::AffineMap;
+using mlir::AffineStoreOp;
 using mlir::ArrayAttr;
 using mlir::ArrayRef;
 using mlir::ConstantIndexOp;
@@ -51,6 +52,7 @@ using pmlc::dialect::stripe::LoadOp;
 using pmlc::dialect::stripe::ParallelForOp;
 using pmlc::dialect::stripe::PopulateTensorRefShape;
 using pmlc::dialect::stripe::RefineOp;
+using pmlc::dialect::stripe::StoreOp;
 using pmlc::dialect::stripe::TensorDim;
 using pmlc::dialect::stripe::TensorRefType;
 using pmlc::dialect::stripe::TerminateOp;
@@ -239,6 +241,18 @@ PatternMatchResult RefineOpConverter::matchAndRewrite(RefineOp refineOp, ArrayRe
                                                       ConversionPatternRewriter& rewriter) const {
   // This op is indirectly converted from the memory access operation by using AccessInfoAnalysis.
   rewriter.eraseOp(refineOp);
+  return matchSuccess();
+}
+
+PatternMatchResult StoreOpConverter::matchAndRewrite(StoreOp storeOp, ArrayRef<Value*> operands,
+                                                     ConversionPatternRewriter& rewriter) const {
+  // Create map and indices to be used as map arguments.
+  AffineMap map;
+  SmallVector<Value*, 8> indices;
+  Value* base;
+  RefineOp refine = cast<RefineOp>(storeOp.into()->getDefiningOp());
+  convertStripeAccessToAffine(accessAnalysis.getAccessInfo(refine), rewriter, base, indices, map);
+  rewriter.replaceOpWithNewOp<AffineStoreOp>(storeOp, operands[1], base, map, indices);
   return matchSuccess();
 }
 
