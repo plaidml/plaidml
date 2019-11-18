@@ -9,7 +9,7 @@ latex_document(
         "@bazel_latex//packages:hyperref",
         "@bazel_latex//packages:listings",
         "toroidal_shell_moment.jpg",
-        "uw_toroidal_shell.tex",
+        "uw_toroidal_shell_doc.tex",
     ],
-    main = "uw_toroidal_shell.tex",
+    main = "uw_toroidal_shell_doc.tex",
 )
