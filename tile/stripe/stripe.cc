@@ -195,7 +195,7 @@ void PrintBytes(std::ostream& os, size_t bytes) {
   }
 }
 
-void PrintShapeDims(std::ostream& os, const std::vector<size_t>& dims, boost::optional<BankDimension> bank_dim) {
+void PrintShapeDims(std::ostream& os, const std::vector<size_t>& dims, std::optional<BankDimension> bank_dim) {
   os << "(";
   for (size_t i = 0; i < dims.size(); i++) {
     if (i > 0) {
@@ -213,7 +213,7 @@ void PrintShapeDims(std::ostream& os, const std::vector<size_t>& dims, boost::op
 struct DefaultCodec : Codec {
   explicit DefaultCodec(const TensorShape* shape) : Codec(shape) {}
   int64_t byte_size() const final { return shape_->sizes_product_bytes(); }
-  boost::optional<size_t> sparse_dim() const final { return boost::none; }
+  std::optional<size_t> sparse_dim() const final { return std::nullopt; }
 };
 
 class CodecRegistry {
@@ -849,21 +849,21 @@ bool operator==(const Location& loc, const std::string& pattern) {
     throw std::runtime_error{"Invalid location pattern: " + pattern};
   }
 
-  std::vector<std::pair<std::string, boost::optional<std::vector<boost::optional<std::int64_t>>>>> devs;
+  std::vector<std::pair<std::string, std::optional<std::vector<std::optional<std::int64_t>>>>> devs;
 
   auto devs_begin = std::sregex_iterator{pattern.begin(), pattern.end(), devs_re};
   auto re_end = std::sregex_iterator{};
 
   for (auto dit = devs_begin; dit != re_end; ++dit) {
     std::smatch dev_match = *dit;
-    auto dev_units_it = devs.emplace(devs.end(), dev_match[1], boost::none);
+    auto dev_units_it = devs.emplace(devs.end(), dev_match[1], std::nullopt);
     if (dev_match[2].first != dev_match[2].second) {
       dev_units_it->second.emplace();
       auto units_begin = std::sregex_iterator{dev_match[3].first, dev_match[3].second, units_re};
       for (auto uit = units_begin; uit != re_end; ++uit) {
         std::smatch unit_match = *uit;
         if (unit_match[1] == "*") {
-          dev_units_it->second->emplace_back(boost::none);
+          dev_units_it->second->emplace_back(std::nullopt);
         } else {
           dev_units_it->second->emplace_back(std::stoi(unit_match[1]));
         }

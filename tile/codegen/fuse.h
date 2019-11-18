@@ -4,9 +4,8 @@
 
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
-
-#include <boost/optional.hpp>
 
 #include "tile/codegen/alias.h"
 #include "tile/codegen/codegen.pb.h"
@@ -27,8 +26,8 @@ struct FusionPlan {
 };
 
 // Given a shared buffer between two blocks, compute a possible fusion
-boost::optional<FusionPlan> ComputeFusionPlan(const AliasMap& scope, const stripe::Block& a, const stripe::Block& b,
-                                              const std::string& buf_name);
+std::optional<FusionPlan> ComputeFusionPlan(const AliasMap& scope, const stripe::Block& a, const stripe::Block& b,
+                                            const std::string& buf_name);
 
 // A transform that flattens trivial indexes.  TODO: move to a utility header
 void FlattenTrivial(stripe::Block* block);
@@ -37,8 +36,7 @@ void FlattenTrivial(stripe::Block* block);
 std::shared_ptr<stripe::Block> FusionRefactor(const stripe::Block& block,                         //
                                               const std::map<std::string, std::string>& mapping,  //
                                               const TileShape& tile,                              //
-                                              bool interleave = false,
-                                              bool elide_trivial = true);
+                                              bool interleave = false, bool elide_trivial = true);
 
 // Attempt to fuse b into a.  Return true on success, in which case blocks have been
 // destructively modified.  Otherwise returns false and leave blocks unaltered.
@@ -60,8 +58,8 @@ class TagFusionStrategy : public FusionStrategy {
   explicit TagFusionStrategy(const proto::FusionPass& options) : options_(options) {}
   bool AttemptFuse(const stripe::Block& parent, const stripe::Block& a, const stripe::Block& b) {
     bool tag_match = parent.has_tags(stripe::FromProto(options_.parent_reqs())) &&  //
-                     a.has_tags(stripe::FromProto(options_.a_reqs())) &&      //
-                     b.has_tags(stripe::FromProto(options_.b_reqs())) &&      //
+                     a.has_tags(stripe::FromProto(options_.a_reqs())) &&            //
+                     b.has_tags(stripe::FromProto(options_.b_reqs())) &&            //
                      !a.has_any_tags(stripe::FromProto(options_.exclude())) &&      //
                      !b.has_any_tags(stripe::FromProto(options_.exclude()));
     if (!tag_match) {
@@ -76,10 +74,10 @@ class TagFusionStrategy : public FusionStrategy {
   void OnFused(const AliasMap& outer, stripe::Block* block, const stripe::Block& a, const stripe::Block& b) {
     block->add_tags(stripe::FromProto(options_.fused_set()));
     for (auto stmt : block->stmts) {
-       auto sub = stripe::Block::Downcast(stmt);
-       if (sub) {
-         sub->remove_tags(stripe::FromProto(options_.inner_remove_set()));
-       }
+      auto sub = stripe::Block::Downcast(stmt);
+      if (sub) {
+        sub->remove_tags(stripe::FromProto(options_.inner_remove_set()));
+      }
     }
   }
   bool NoInner() { return options_.no_inner(); }
@@ -90,8 +88,8 @@ class TagFusionStrategy : public FusionStrategy {
   const proto::FusionPass options_;
 };
 
-void FusionInner(const AliasMap& scope, stripe::Block* block, TagFusionStrategy* strategy, 
-                 bool no_inner = false, bool no_constraints = false);
+void FusionInner(const AliasMap& scope, stripe::Block* block, TagFusionStrategy* strategy, bool no_inner = false,
+                 bool no_constraints = false);
 
 class AlwaysFuseRecursive : public TagFusionStrategy {
  public:
