@@ -15,7 +15,7 @@ py_binary(
 )
 
 py_test(
-    name = "uw_tests",
+    name = "test",
     srcs = [
         "uw_tests.py",
         "uw_toroidal_shell.py",
@@ -26,3 +26,4 @@ py_test(
         "//plaidml2/exec:py",
     ],
 )
+

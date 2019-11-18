@@ -32,3 +32,14 @@ py_repositories()
 register_toolchains(
     "//:py_toolchain",
 )
+
+http_archive(
+    name = "bazel_latex",
+    sha256 = "fd37ad77406af1e287753c08e018de59ee72470a5f647523f43bbe43ebf30a19",
+    strip_prefix = "bazel-latex-0.18",
+    url = "https://github.com/ProdriveTechnologies/bazel-latex/archive/v0.18.tar.gz",
+)
+
+load("@bazel_latex//:repositories.bzl", "latex_repositories")
+
+latex_repositories()
