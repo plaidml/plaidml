@@ -22,7 +22,8 @@ namespace dialect {
 namespace stripe {
 
 PopulateTensorRefShape::PopulateTensorRefShape(mlir::Operation* op) : operation(op) {
-  assert(llvm::isa<FuncOp>(op) && "Only FuncOp is supported in PopulateTensorRefShape");
+  assert(isa<FuncOp>(op) && "Only FuncOp is supported in PopulateTensorRefShape");
+  recompute();
 }
 
 // Retrieve the layout information for each Value in `valueList` with a 'tensor_ref' type and replace the type with a
@@ -38,7 +39,7 @@ static void populateValuesWithShapes(Range valueRange) {
 }
 
 void PopulateTensorRefShape::recompute() {
-  FuncOp func = llvm::cast<FuncOp>(operation);
+  FuncOp func = cast<FuncOp>(operation);
 
   // Visit types in block arguments.
   for (auto& block : func.getBody().getBlocks()) {

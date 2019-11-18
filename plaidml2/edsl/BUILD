@@ -59,8 +59,11 @@ plaidml_cc_library(
         "derivs.cc",
         "derivs.h",
         "ffi.cc",
+        "helper.cc",
     ],
-    hdrs = SDK_HDRS,
+    hdrs = SDK_HDRS + [
+        "helper.h",
+    ],
     defines = [
         "PLAIDML_EDSL_DLL",
         "PLAIDML_MLIR",
@@ -93,13 +96,24 @@ plaidml_cc_library(
 )
 
 plaidml_cc_test(
-    name = "cc_test",
+    name = "cc_ast_test",
     srcs = ["edsl_test.cc"],
     deps = [
         ":api",
         ":edsl_ast",
         "//plaidml2:testenv_ast",
         "//plaidml2/exec:exec_ast",
+    ],
+)
+
+plaidml_cc_test(
+    name = "cc_mlir_test",
+    srcs = ["edsl_test.cc"],
+    deps = [
+        ":api",
+        ":edsl_mlir",
+        "//plaidml2:testenv_mlir",
+        "//plaidml2/exec:exec_mlir",
     ],
 )
 

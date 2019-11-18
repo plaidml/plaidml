@@ -1,19 +1,16 @@
 #pragma once
 
 #include <map>
+#include <optional>
 #include <string>
 
-#include <boost/optional.hpp>
+#include "plaidml2/edsl/edsl.h"
 
-#include "tile/lang/runinfo.h"
+namespace vertexai::tile::lib {
 
-namespace vertexai {
-namespace tile {
-namespace lib {
+using plaidml::edsl::Program;
 
-void RegisterTest(const std::string& name, std::function<lang::RunInfo()> factory);
-boost::optional<lang::RunInfo> CreateTest(const std::string& name);
+void RegisterTest(const std::string& name, std::function<Program()> factory);
+std::optional<Program> CreateTest(const std::string& name);
 
-}  // namespace lib
-}  // namespace tile
-}  // namespace vertexai
+}  // namespace vertexai::tile::lib

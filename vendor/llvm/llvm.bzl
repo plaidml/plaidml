@@ -407,7 +407,7 @@ llvm_copts = select({
 
 llvm_cxxopts = llvm_copts + select({
     "@com_intel_plaidml//toolchain:windows_x86_64": [
-        "/std:c++14",
+        "/std:c++17",  # This MUST match all other compilation units
     ],
     "//conditions:default": [
         "-std=c++14",

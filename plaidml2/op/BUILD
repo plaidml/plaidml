@@ -100,12 +100,22 @@ plaidml_py_library(
 )
 
 plaidml_cc_test(
-    name = "cc_test",
+    name = "cc_ast_test",
     srcs = ["op_test.cc"],
     deps = [
         ":api",
         ":op_ast",
         "//plaidml2:testenv_ast",
+    ],
+)
+
+plaidml_cc_test(
+    name = "cc_mlir_test",
+    srcs = ["op_test.cc"],
+    deps = [
+        ":api",
+        ":op_mlir",
+        "//plaidml2:testenv_mlir",
     ],
 )
 
