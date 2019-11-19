@@ -10,9 +10,9 @@ def plaidml_workspace():
 
     dev_http_archive(
         name = "bazel_latex",
-        sha256 = "ca575f3f1722594fce26f28e1b245c9c3268d83b73086efa5cccf2eec8983ca7",
-        strip_prefix = "bazel-latex-5f792741db24f7c2dcdedf981c03a8f3d031cde6",
-        url = "https://github.com/plaidml/bazel-latex/archive/5f792741db24f7c2dcdedf981c03a8f3d031cde6.zip",
+        sha256 = "5119802a5fbe2f27914af455c59b4ecdaaf57c0bc6c63da38098a30d94f48c9a",
+        strip_prefix = "bazel-latex-b6375d9df2952548c3371c0c865710655e8b1cc1",
+        url = "https://github.com/plaidml/bazel-latex/archive/b6375d9df2952548c3371c0c865710655e8b1cc1.zip",
     )
 
     http_archive(
