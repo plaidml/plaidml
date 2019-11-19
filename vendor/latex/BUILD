@@ -9,7 +9,7 @@ latex_package(
     srcs = [
         ":fancyvrb",
         ":fvextra",
-        "ifplatform",
+        ":ifplatform",
         "@bazel_latex//packages:etoolbox",
         "@bazel_latex//packages:float",
         "@bazel_latex//packages:framed",
