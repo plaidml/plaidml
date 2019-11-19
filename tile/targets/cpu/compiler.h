@@ -31,6 +31,13 @@ enum class XSMMDispatch : int {
   BMMM = 5,  // TODO: Need Stripe support for bfloat16.
 };
 
+// What block we are compiling.
+enum CompileFor {
+  NORMAL_BLOCK,
+  THREADED_BLOCK,
+  XSMM_BLOCK,
+};
+
 class Compiler : private stripe::ConstStmtVisitor {
  public:
   Compiler(llvm::LLVMContext* context, const Config& config);
@@ -179,6 +186,7 @@ class Compiler : private stripe::ConstStmtVisitor {
   void PrintOutputAssembly();
   void AggInit(const Buffer& dest, llvm::Value* init_val);
   void ParallelFor(llvm::Value* refs, llvm::Value* idxs, size_t range, llvm::Function* func);
+  CompileFor getCompileFor(const stripe::Block& block);
 
   // Gets the leading dimensions and the buffers for an XSMM call if available.
   // @returns true if the XSMM call is applicable, otherwise false.

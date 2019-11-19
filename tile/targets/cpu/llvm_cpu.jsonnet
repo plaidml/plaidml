@@ -184,20 +184,6 @@ local PARAMS = {
               },
             },
 
-            /*
-            // Assign offsets to allocation arena throughout the program.
-            {
-              name: 'place_program',
-              pass: {
-                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.MemoryPlacementPass',
-                reqs: ['program'],
-                skip_tags: ['user'],
-                locs: [{ devs: [{ name: 'DRAM' }] }],
-                alignment: 16,
-              },
-            },
-            */
-
             // Remove unused refinements after fusing, scalarization, and program placement
             {
               name: 'prune_refs',

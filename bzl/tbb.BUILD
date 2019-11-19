@@ -55,7 +55,7 @@ cc_library(
                "src/rml/include/*.h",
            ]) + ["src/rml/client/rml_tbb.cpp"] +
            select({
-               "@bazel_tools//src/conditions:windows": [
+               "@com_intel_plaidml//toolchain:windows_x86_64": [
                    ":gen_cpu_ctl_env",
                ],
                "//conditions:default": [],
@@ -69,7 +69,7 @@ cc_library(
         "__TBB_SOURCE_DIRECTLY_INCLUDED=1",
         "__TBB_x86_64=1",
     ] + select({
-        "@bazel_tools//src/conditions:windows": [
+        "@com_intel_plaidml//toolchain:windows_x86_64": [
             "USE_WINTHREAD",
             "__TBB_CPU_CTL_ENV_PRESENT=1",
         ],
@@ -119,7 +119,7 @@ genrule(
 cc_library(
     name = "tbb",
     srcs = select({
-        "@bazel_tools//src/conditions:windows": glob([
+        "@com_intel_plaidml//toolchain:windows_x86_64": glob([
             "src/tbb/*.cpp",
             "include/tbb/*.h",
             "src/tbb/*.h",
@@ -133,7 +133,7 @@ cc_library(
         ],
     }),
     hdrs = select({
-        "@bazel_tools//src/conditions:windows": [
+        "@com_intel_plaidml//toolchain:windows_x86_64": [
             ":gen_version_file",
         ],
         "//conditions:default": glob([
@@ -142,7 +142,7 @@ cc_library(
         ]),
     }),
     defines = select({
-        "@bazel_tools//src/conditions:windows": [
+        "@com_intel_plaidml//toolchain:windows_x86_64": [
             "TBB_USE_THREADING_TOOLS",
             "__TBB_DYNAMIC_LOAD_ENABLED=0",
             "__TBB_SOURCE_DIRECTLY_INCLUDED=1",
@@ -153,7 +153,7 @@ cc_library(
         "//conditions:default": [],
     }),
     includes = select({
-        "@bazel_tools//src/conditions:windows": [
+        "@com_intel_plaidml//toolchain:windows_x86_64": [
             "build/vs2013",
             "include",
             "src",

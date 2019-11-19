@@ -80,7 +80,14 @@ void Executable::Run(const std::map<std::string, void*>& buffers) {
   }
   void* argvec = args.data();
   uint64_t entrypoint = engine_->getFunctionAddress(invoker_name_);
+  // To get the raw execution time for generated code.
+  // struct timeval tp;
+  // gettimeofday(&tp, NULL);
+  // long long int ms = tp.tv_sec * 1000000 + tp.tv_usec; //get current timestamp in microseconds
   ((void (*)(void*))entrypoint)(argvec);
+  // gettimeofday(&tp, NULL);
+  // long long int msDone = tp.tv_sec * 1000000 + tp.tv_usec; //get current timestamp in microseconds
+  // IVLOG(1, "Raw execution time: " << msDone - ms);
 }
 
 void Executable::SetPerfAttrs(stripe::Block* block) {

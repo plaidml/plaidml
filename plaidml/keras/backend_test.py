@@ -1803,43 +1803,7 @@ class TestBackendOps(unittest.TestCase):
         return [o]
 
 
-### The tests below represent the resnet layers.
-    #   if (argc > i) iters      = atoi(argv[i++]);                         ${ITERS}
-    #   if (argc > i) ifw        = atoi(argv[i++]);                         56
-    #   if (argc > i) ifh        = atoi(argv[i++]);                          56
-    #   if (argc > i) nImg       = atoi(argv[i++]);                       ${MB}
-    #   if (argc > i) nIfm       = atoi(argv[i++]);                        64
-    #   if (argc > i) nOfm       = atoi(argv[i++]);                       256
-    #   if (argc > i) kw         = atoi(argv[i++]);                          1
-    #   if (argc > i) kh         = atoi(argv[i++]);                           1
-    #   if (argc > i) padw       = atoi(argv[i++]);                        0
-    #   if (argc > i) padh       = atoi(argv[i++]);                         0
-    #   if (argc > i) stride     = atoi(argv[i++]);                           1
-    #   if (argc > i) type       = *(argv[i++]);                              ${TYPE}
-    #   if (argc > i) format     = *(argv[i++]);                            ${FORMAT}
-    #   if (argc > i) padding_mode = atoi(argv[i++]);             ${PAD}
-    
-
-    # ${NUMACTL} ./layer_example_${BIN} ${ITERS}  56  56  ${MB}  64   256 1 1 0 0 1 ${TYPE} ${FORMAT} ${PAD}
-    # ${NUMACTL} ./layer_example_${BIN} ${ITERS}  56  56  ${MB}  64    64 1 1 0 0 1 ${TYPE} ${FORMAT} ${PAD}
-    # ${NUMACTL} ./layer_example_${BIN} ${ITERS}  56  56  ${MB}  64    64 3 3 1 1 1 ${TYPE} ${FORMAT} ${PAD}
-    # ${NUMACTL} ./layer_example_${BIN} ${ITERS}  56  56  ${MB}  256   64 1 1 0 0 1 ${TYPE} ${FORMAT} ${PAD}
-    # ${NUMACTL} ./layer_example_${BIN} ${ITERS}  56  56  ${MB}  256  512 1 1 0 0 2 ${TYPE} ${FORMAT} ${PAD}
-    # ${NUMACTL} ./layer_example_${BIN} ${ITERS}  56  56  ${MB}  256  128 1 1 0 0 2 ${TYPE} ${FORMAT} ${PAD} -
-    # ${NUMACTL} ./layer_example_${BIN} ${ITERS}  28  28  ${MB}  128  128 3 3 1 1 1 ${TYPE} ${FORMAT} ${PAD}-
-    # ${NUMACTL} ./layer_example_${BIN} ${ITERS}  28  28  ${MB}  128  512 1 1 0 0 1 ${TYPE} ${FORMAT} ${PAD}-
-    # ${NUMACTL} ./layer_example_${BIN} ${ITERS}  28  28  ${MB}  512  128 1 1 0 0 1 ${TYPE} ${FORMAT} ${PAD}-
-    # ${NUMACTL} ./layer_example_${BIN} ${ITERS}  28  28  ${MB}  512 1024 1 1 0 0 2 ${TYPE} ${FORMAT} ${PAD}-
-    # ${NUMACTL} ./layer_example_${BIN} ${ITERS}  28  28  ${MB}  512  256 1 1 0 0 2 ${TYPE} ${FORMAT} ${PAD}-
-    # ${NUMACTL} ./layer_example_${BIN} ${ITERS}  14  14  ${MB}  256  256 3 3 1 1 1 ${TYPE} ${FORMAT} ${PAD}-
-    # ${NUMACTL} ./layer_example_${BIN} ${ITERS}  14  14  ${MB}  256 1024 1 1 0 0 1 ${TYPE} ${FORMAT} ${PAD}-
-    # ${NUMACTL} ./layer_example_${BIN} ${ITERS}  14  14  ${MB} 1024  256 1 1 0 0 1 ${TYPE} ${FORMAT} ${PAD}-
-    # ${NUMACTL} ./layer_example_${BIN} ${ITERS}  14  14  ${MB} 1024 2048 1 1 0 0 2 ${TYPE} ${FORMAT} ${PAD}- 
-    # ${NUMACTL} ./layer_example_${BIN} ${ITERS}  14  14  ${MB} 1024  512 1 1 0 0 2 ${TYPE} ${FORMAT} ${PAD}-
-    # ${NUMACTL} ./layer_example_${BIN} ${ITERS}   7   7  ${MB}  512  512 3 3 1 1 1 ${TYPE} ${FORMAT} ${PAD}-
-    # ${NUMACTL} ./layer_example_${BIN} ${ITERS}   7   7  ${MB}  512 2048 1 1 0 0 1 ${TYPE} ${FORMAT} ${PAD}-
-    # ${NUMACTL} ./layer_example_${BIN} ${ITERS}   7   7  ${MB} 2048  512 1 1 0 0 1 ${TYPE} ${FORMAT} ${PAD}-
-
+    ### The tests below represent the resnet layers.
     @opTest([[m(1, 56, 56, 64), m(1, 1, 64, 256)]],
             do_grads=False,
             num_iterations=10,
@@ -2011,7 +1975,6 @@ class TestBackendOps(unittest.TestCase):
         c = b.conv2d(x, k, padding='same')
         o = b.relu(c)
         return [o]
-
 
     @opTest([[m(1, 64, 64, 128), m(3, 3, 128, 128)]],
             do_grads=False,

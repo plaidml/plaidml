@@ -555,7 +555,8 @@ llvm::Function* Compiler::CompileThreadedBlock(const stripe::Block& block) {
 }
 
 llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
-  if (block.has_tag("xsmm")) {
+  CompileFor compileFor = getCompileFor(block);
+  if (compileFor == XSMM_BLOCK) {
     assert(!block.has_tag("cpu_thread"));
     const XSMMDispatch xsmmDispatch = GetXSMMDispatch(block);
     XSMMCallData xsmmCallData;
@@ -563,8 +564,7 @@ llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
     if (xsmmDispatch != XSMMDispatch::NONE && data) {
       return CompileXSMMBlock(block, xsmmDispatch, xsmmCallData);
     }
-  }
-  if (block.has_tag("cpu_thread")) {
+  } else if (compileFor == THREADED_BLOCK) {
     return CompileThreadedBlock(block);
   }
 
@@ -927,7 +927,8 @@ void Compiler::Visit(const stripe::Block& block) {
   }
 
   // Assemble the argument list and invoke the function.
-  if (block.has_tag("cpu_thread") && !block.has_tag("xsmm")) {
+  if (getCompileFor(block) == THREADED_BLOCK) {
+    assert(!block.has_tag("xsmm"));
     // Combine the bufs into an array; pass it as the first parameter.
     auto int8PtrType = builder_.getInt8Ty()->getPointerTo();
     auto int8PtrArrayType = llvm::ArrayType::get(int8PtrType, refs.size());
@@ -2055,7 +2056,7 @@ llvm::Value* Compiler::IndexConst(ssize_t val) {
 llvm::FunctionType* Compiler::BlockType(const stripe::Block& block) {
   // Generate a type for the function which will implement this block.
   std::vector<llvm::Type*> param_types;
-  if (block.has_tag("xsmm") || !block.has_tag("cpu_thread")) {
+  if (getCompileFor(block) != THREADED_BLOCK) {
     // This block function will be invoked directly.
     // Each buffer base address will be provided as a parameter.
     for (const auto& ref : block.refs) {
@@ -2292,6 +2293,18 @@ void Compiler::PrintOutputAssembly() {
     pm.run(*module_);
   }
   llvm::errs() << outputStr << "\n";
+}
+
+CompileFor Compiler::getCompileFor(const stripe::Block& block) {
+  if (block.has_tag("xsmm")) {
+    // xsmm and cpu_threads tags are incompatible.
+    assert(!block.has_tag("cpu_thread"));
+    return XSMM_BLOCK;
+  } else if (block.has_tag("cpu_thread") && block.idxs_product() > 1) {
+    return THREADED_BLOCK;
+  }
+
+  return NORMAL_BLOCK;
 }
 
 }  // namespace cpu
