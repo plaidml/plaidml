@@ -35,12 +35,26 @@ cc_library(
     ],
 )
 
+cc_library(
+    name = "TableGenTools",
+    srcs = glob([
+        "tools/mlir-tblgen/mlir-tblgen.cpp",
+    ]),
+    copts = PLATFORM_COPTS,
+    includes = ["include"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":Support",
+        ":TableGen",
+    ],
+)
+
 cc_binary(
     name = "mlir-tblgen",
     srcs = glob([
         "tools/mlir-tblgen/*.cpp",
         "tools/mlir-tblgen/*.h",
-    ]) + ["@com_intel_plaidml//pmlc/dialect/op_lib:gen_op_lib_wrappers"],
+    ]),
     copts = PLATFORM_COPTS,
     includes = ["include"],
     linkopts = select({

@@ -1,14 +1,6 @@
 TBLGEN_ACTIONS = [
-    "-gen-enum-defs",
-    "-gen-enum-decls",
-    "-gen-llvmir-conversions",
-    "-gen-op-decls",
-    "-gen-op-defs",
-    "-gen-op-doc",
-    "-gen-op-interface-decls",
-    "-gen-op-interface-defs",
-    "-gen-reference-implementations",
-    "-gen-rewriters",
+    "-gen-op-lib-cpp-wrappers",
+    "-gen-op-lib-py-wrappers",
 ]
 
 COPTS = select({
@@ -31,11 +23,11 @@ def _tblgen_impl(ctx):
         outputs = [ctx.outputs.out],
         arguments = [args],
         executable = ctx.executable._tool,
-        mnemonic = "MLIRTableGen",
+        mnemonic = "OpLibTableGen",
     )
     return [DefaultInfo(files = depset([ctx.outputs.out]))]
 
-mlir_tblgen_rule = rule(
+op_lib_tblgen_rule = rule(
     attrs = {
         "src": attr.label(
             allow_single_file = [".td"],
@@ -56,7 +48,7 @@ mlir_tblgen_rule = rule(
         ),
         "flags": attr.string_list(),
         "_tool": attr.label(
-            default = Label("@mlir//:mlir-tblgen"),
+            default = Label("//pmlc/dialect/op_lib:op-lib-tblgen"),
             allow_single_file = True,
             executable = True,
             cfg = "host",
@@ -66,8 +58,8 @@ mlir_tblgen_rule = rule(
     implementation = _tblgen_impl,
 )
 
-def mlir_tblgen(name, src, out, incs, action, also = [], flags = []):
-    mlir_tblgen_rule(
+def op_lib_tblgen(name, src, out, incs, action, also = [], flags = []):
+    op_lib_tblgen_rule(
         name = "%s_rule" % name,
         src = src,
         also = also,
