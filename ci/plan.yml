@@ -21,6 +21,7 @@ CONST:
     vega:       12697.10
     gfx900:     11300.84
     gfx803:      3573.79
+    gfx906:     13379.70
     vega56:      4342.63
     # mali
     t628:          34.05
@@ -87,10 +88,6 @@ PLATFORMS:
     variant: linux_x86_64
   keras-stripe-ocl-neo:
     variant: linux_x86_64
-  keras-plaid-ocl-gfx803:
-     variant: linux_x86_64
-  keras-stripe-ocl-gfx803:
-     variant: linux_x86_64
   keras-plaid-ocl-gfx804:
      variant: windows_x86_64
   keras-stripe-ocl-gfx804:
@@ -231,8 +228,6 @@ SUITES:
         conda_env: conda/keras_backend_test.yml
         precision: untested
         platform_overrides:
-          keras-stripe-ocl-gfx803:
-            soft_fail: true
           keras-plaid-mtl-uhd630:
             soft_fail: true
         shards: 3
@@ -289,11 +284,6 @@ SUITES:
       keras-tf-dnnl-cpu:
         pipelines: [ci]
         append_args: [--tensorflow]
-
-      keras-plaid-ocl-gfx803:
-        pipelines: [nightly]
-      keras-stripe-ocl-gfx803:
-        pipelines: [plaidml, nightly]
 
       keras-plaid-ocl-gfx804: # (windows, amd)
         pipelines: [plaidml, nightly]
@@ -354,7 +344,6 @@ SUITES:
         precision: high
         skip_platforms: 
           - keras-stripe-llvm-cpu
-          - keras-stripe-ocl-gfx803
           - keras-stripe-ocl-gfx804
           - keras-stripe-ocl-gfx900
           - keras-stripe-ocl-gp100gl
@@ -368,14 +357,14 @@ SUITES:
         platform_overrides:
           keras-tf-dnnl-cpu:
             conda_env: conda/tensorflow-dnnl.yml
-          keras-plaid-ocl-gfx803:
-            prepend_args: [--examples, 128]
           keras-plaid-ocl-gfx804:
             prepend_args: [--examples, 64]
           keras-stripe-ocl-gfx804:
             prepend_args: [--examples, 64]
           keras-stripe-ocl-neo:
             prepend_args: [--examples, 512]
+          keras-plaid-ocl-neo:
+            soft_fail: true            
           keras-plaid-mtl-uhd630:
             prepend_args: [--examples, 256]
           keras-stripe-mtl-uhd630:
@@ -413,8 +402,6 @@ SUITES:
         platform_overrides:          
           keras-stripe-llvm-cpu:
             prepend_args: [--examples, 64]
-          keras-stripe-ocl-gfx803:
-            prepend_args: [--examples, 256]
           keras-plaid-ocl-gfx804:
             prepend_args: [--examples, 64]
           keras-stripe-ocl-gfx804:
@@ -430,14 +417,11 @@ SUITES:
         skip_platforms: 
           - keras-plaid-mtl-uhd630 
           - keras-stripe-mtl-uhd630
-          - keras-plaid-ocl-gfx803
           - keras-stripe-llvm-cpu
 
       xception:
         precision: high
         platform_overrides:
-          keras-stripe-ocl-gfx803:
-            prepend_args: [--examples, 64]
           keras-plaid-ocl-gfx804:
             prepend_args: [--examples, 64]
           keras-stripe-ocl-gfx804:
@@ -446,6 +430,7 @@ SUITES:
             prepend_args: [--examples, 512]
           keras-plaid-ocl-neo:
             prepend_args: [--examples, 256]
+            soft_fail: true
           keras-stripe-ocl-neo:
             prepend_args: [--examples, 256]
             perf_threshold: 0.7
@@ -529,130 +514,3 @@ SUITES:
         precision: low
         args: [plaidbench.py, mobilenet, --train, --print-stacktraces, --batch-size, '{batch_size}']
 
-
-  comprehensive:
-    platforms:
-      keras-stripe-llvm-cpu:
-        pipelines: [nightly]
-      keras-tf-cuda-gp100gl:
-        pipelines: [nightly]
-        append_args: [--tensorflow]
-      keras-plaid-ocl-gp100gl:
-        pipelines: [nightly]
-      keras-stripe-ocl-gp100gl:
-        pipelines: [nightly]
-    params:
-      nightly:
-        batch_sizes: [0]
-    wheels:
-      # NOTE: this list must be in least to most dependent order.
-      - plaidml-{version}-py2.py3-none-{arch}.whl
-      - plaidml_keras-{version}-py2.py3-none-any.whl
-    timeout: 5
-    conda_env: conda/ml_gpu.yml
-    cwd: networks/keras
-    runner: python
-    args: [harness.py, '{workload}', --results, '{results}']
-    workloads:
-      addition_rnn:
-        precision: low
-      antirectifier:
-        correct: no
-        precision: low
-      babi_memnn:
-        precision: low
-      babi_rnn:
-        skip: yes
-        precision: low
-        timeout: 10
-        expected: "Unable to compile Tile program"
-      cifar10_cnn:
-        precision: low
-      # conv_filter_visualization:
-      #   skip: yes # Takes longer than 20m
-      conv_lstm:
-        skip: yes
-        expected: "rnn is not implemented for variable sized inputs"
-        precision: untested
-      deep_dream:
-        skip: yes
-        expected: "PROD AggregationOp does not support derivatives yet"
-        precision: high
-      image_ocr:
-        skip: yes
-        expected: "The Keras backend function 'ctc_batch_cost' is not yet implemented"
-        precision: low
-        timeout: 10
-      imdb_bidirectional_lstm:
-        precision: low
-      imdb_cnn:
-        correct: no
-        precision: low
-      imdb_cnn_lstm:
-        precision: low
-      imdb_fasttext:
-        precision: low
-      imdb_lstm:
-        skip: yes
-        expected: "rnn is not implemented for variable sized inputs"
-        precision: low
-      lstm_benchmark:
-        precision: low
-      lstm_text_generation:
-        precision: low
-      mnist_acgan:
-        precision: untested # correctness tests are in vai_mnist_acgan
-      mnist_cnn:
-        correct: no
-        precision: low
-      mnist_hierarchical_rnn:
-        precision: low
-        correct: no
-      mnist_irnn:
-        correct: no
-        precision: low
-        timeout: 10
-      mnist_mlp:
-        correct: no
-        precision: low
-      mnist_net2net:
-        skip: yes
-        expected: "AssertionError: weight and bias from same layer should have compatible shapes"
-      mnist_siamese_graph:
-        corrent: no
-        precision: low
-      mnist_sklearn_wrapper:
-        skip: yes
-        expected: "ModuleNotFoundError: No module named 'sklearn.grid_search'"
-      mnist_swwae:
-        skip: yes
-        expected: "Invalid derivative: unknown function simple_reduce"
-      mnist_transfer_cnn:
-        correct: no
-        precision: low
-      neural_doodle:
-        skip: yes
-        expected: "name 'xrange' is not defined"
-      neural_style_transfer:
-        precision: untested
-      pretrained_word_embeddings:
-        skip: yes
-        expected: "No such file or directory: '/var/lib/buildkite-agent/.keras/datasets/glove.6B/glove.6B.100d.txt'"
-      reuters_mlp:
-        skip: yes
-        correct: no
-        precision: low
-      reuters_mlp_relu_vs_selu:
-        skip: yes
-        precision: low
-      stateful_lstm:
-        expected: "Out of memory"
-        precision: low
-      vai_mnist_acgan:
-        skip: yes
-        precision: untested # tests are in-file, not the harness tests
-        expected: "'utf-8' codec can't decode bytes in position 14-16: invalid continuation byte"
-      variational_autoencoder:
-        skip: yes # Disabled due to: T891
-      variational_autoencoder_deconv:
-        skip: yes # Disabled due to: T860

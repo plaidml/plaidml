@@ -76,9 +76,8 @@ mlir::Operation* Dialect::materializeConstant(  //
     mlir::Type type,                            //
     mlir::Location loc) {
   IVLOG(5, "tile::Dialect::materializeConstant");
-  auto int_attr = value.dyn_cast<IntegerAttr>();
-  if (int_attr) {
-    return builder.create<AffineConstantOp>(loc, type, int_attr);
+  if (auto attr = value.dyn_cast<IntegerAttr>()) {
+    return builder.create<AffineConstantOp>(loc, type, attr);
   }
   return nullptr;
 }

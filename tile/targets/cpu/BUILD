@@ -4,7 +4,6 @@ package(default_visibility = ["//visibility:public"])
 
 load("@io_bazel_rules_jsonnet//jsonnet:jsonnet.bzl", "jsonnet_to_json")
 load("//bzl:plaidml.bzl", "plaidml_cc_library")
-load("@com_intel_plaidml//vendor/llvm:llvm.bzl", "llvm_copts")
 
 jsonnet_to_json(
     name = "llvm_cpu_jsonnet",
@@ -24,7 +23,6 @@ plaidml_cc_library(
         "*.cc",
         "*.h",
     ]),
-    copts = llvm_copts,
     tags = ["llvm"],
     deps = [
         "//tile/stripe",
@@ -34,7 +32,7 @@ plaidml_cc_library(
         "@llvm//:mcjit",
         "@llvm//:x86_asm_parser",
         "@llvm//:x86_code_gen",
-        "@xsmm",
         "@tbb",
+        "@xsmm",
     ],
 )

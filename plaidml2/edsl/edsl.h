@@ -79,14 +79,16 @@ class Program {
       const std::string& name,             //
       const std::vector<Tensor>& outputs,  //
       const std::vector<std::tuple<Tensor, Tensor>>& updates = {});
+
   plaidml_program* as_ptr() const { return ptr_.get(); }
   std::string str() const { return ffi::str(ffi::call<plaidml_string*>(plaidml_program_repr, ptr_.get())); }
-  const void* runinfo() const { return ffi::call<const void*>(plaidml_program_runinfo, ptr_.get()); }
-  const std::vector<Tensor>& outputs() const { return outputs_; }
+  const std::vector<Tensor>& outputs() const { return new_outputs_; }
+  Tensor mapped_output(const Tensor& tensor) const;
 
  private:
   std::shared_ptr<plaidml_program> ptr_;
-  std::vector<Tensor> outputs_;
+  std::vector<Tensor> old_outputs_;
+  std::vector<Tensor> new_outputs_;
 };
 
 class TensorDim {
@@ -204,7 +206,6 @@ class IndexedTensor {
     std::shared_ptr<plaidml_expr> sizes;
     std::shared_ptr<ComboParts> rhs;
     const Tensor* src = nullptr;
-    std::string layout;
     void MakeContraction(plaidml_agg_op agg_op, const IndexedTensor& rhs);
   };
 
@@ -280,15 +281,9 @@ class LogicalShape {
   friend class Tensor;
 
  public:
-  LogicalShape(plaidml_datatype dtype,            //
-               const std::vector<int64_t>& dims,  //
-               const std::string& layout = "")
-      : ptr_(details::make_plaidml_logical_shape(ffi::call<plaidml_logical_shape*>(  //
-            plaidml_logical_shape_alloc,                                             //
-            dtype,                                                                   //
-            dims.size(),                                                             //
-            dims.data(),                                                             //
-            layout.c_str()))) {}
+  LogicalShape(plaidml_datatype dtype, const std::vector<int64_t>& dims)
+      : ptr_(details::make_plaidml_logical_shape(
+            ffi::call<plaidml_logical_shape*>(plaidml_logical_shape_alloc, dtype, dims.size(), dims.data()))) {}
 
   plaidml_logical_shape* as_ptr() const { return ptr_.get(); }
 
@@ -298,10 +293,6 @@ class LogicalShape {
 
   plaidml_datatype dtype() const {  //
     return ffi::call<plaidml_datatype>(plaidml_logical_shape_get_dtype, ptr_.get());
-  }
-
-  std::string layout() const {  //
-    return ffi::str(ffi::call<plaidml_string*>(plaidml_logical_shape_get_layout, ptr_.get()));
   }
 
   size_t ndims() const {  //
@@ -315,17 +306,6 @@ class LogicalShape {
     }
     return ret;
   }
-
-  // std::vector<TensorDim> dims() const {
-  //   std::vector<TensorDim> ret(ndims());
-  //   for (size_t i = 0; i < ret.size(); i++) {
-  //     auto impl = std::make_shared<TensorDim::Impl>();
-  //     impl->ptr = details::make_plaidml_dim_expr(
-  //         ffi::call<plaidml_dim_expr*>(plaidml_logical_shape_get_dim_expr, ptr_.get(), i));
-  //     ret[i] = TensorDim(impl);
-  //   }
-  //   return ret;
-  // }
 
   bool operator==(const LogicalShape& rhs) const { return str() == rhs.str(); }
 
@@ -345,7 +325,6 @@ class Tensor {
     bool has_dims = false;
     std::vector<TensorDim> dims;
     std::string name;
-    std::string layout;
   };
 
  public:
@@ -377,40 +356,33 @@ class Tensor {
     impl_->ptr = details::make_plaidml_expr(ffi::call<plaidml_expr*>(plaidml_expr_dim, dim.as_ptr()));
   }
 
-  explicit Tensor(const std::vector<int64_t>& dims, const std::string& layout = "") : impl_(new Impl) {
+  explicit Tensor(const std::vector<int64_t>& dims) : impl_(new Impl) {
     for (auto dim : dims) {
       impl_->dims.emplace_back(dim);
     }
     impl_->has_dims = true;
-    impl_->layout = layout;
   }
 
-  explicit Tensor(const std::vector<TensorDim>& dims, const std::string& layout = "") : impl_(new Impl) {
+  explicit Tensor(const std::vector<TensorDim>& dims) : impl_(new Impl) {
     impl_->dims = dims;
     impl_->has_dims = true;
-    impl_->layout = layout;
   }
 
-  explicit Tensor(const std::initializer_list<TensorDim>& dims, const std::string& layout = "") : impl_(new Impl) {
+  explicit Tensor(const std::initializer_list<TensorDim>& dims) : impl_(new Impl) {
     impl_->dims = dims;
     impl_->has_dims = true;
-    impl_->layout = layout;
   }
 
-  Tensor(const std::string& name, const std::vector<TensorDim>& dims, const std::string& layout = "")
-      : impl_(new Impl) {
+  Tensor(const std::string& name, const std::vector<TensorDim>& dims) : impl_(new Impl) {
     impl_->name = name;
     impl_->dims = dims;
     impl_->has_dims = true;
-    impl_->layout = layout;
   }
 
-  Tensor(const std::string& name, const std::initializer_list<TensorDim>& dims, const std::string& layout = "")
-      : impl_(new Impl) {
+  Tensor(const std::string& name, const std::initializer_list<TensorDim>& dims) : impl_(new Impl) {
     impl_->name = name;
     impl_->dims = dims;
     impl_->has_dims = true;
-    impl_->layout = layout;
   }
 
   // Copyable
@@ -430,7 +402,6 @@ class Tensor {
     }
     std::unique_ptr<IndexedTensor::Impl> impl(new IndexedTensor::Impl());
     impl->src = this;
-    impl->layout = impl_->layout;
     if (impl_->has_dims) {
       std::vector<plaidml_dim_expr*> sizes;
       for (const auto& dim : impl_->dims) {
@@ -525,6 +496,14 @@ class Tensor {
   std::unique_ptr<Impl> impl_;
 };
 
+struct TensorRef {
+  Tensor tensor;
+
+  bool operator<(const TensorRef& rhs) const {  //
+    return tensor.as_ptr() < rhs.tensor.as_ptr();
+  }
+};
+
 template <typename... Ts>
 Tensor NamedTensorOutput(const std::string& name, Ts&&... dims) {
   std::vector<TensorDim> vec;
@@ -543,12 +522,12 @@ Tensor TensorOutput(Ts... dims) {
   return Tensor{vec};
 }
 
-inline Tensor TensorOutput(const std::vector<TensorDim>& dims, const std::string& layout = "") {  //
-  return Tensor(dims, layout);
+inline Tensor TensorOutput(const std::vector<TensorDim>& dims) {  //
+  return Tensor(dims);
 }
 
-inline Tensor TensorOutput(const std::vector<int64_t>& dims, const std::string& layout = "") {  //
-  return Tensor(dims, layout);
+inline Tensor TensorOutput(const std::vector<int64_t>& dims) {  //
+  return Tensor(dims);
 }
 
 inline Tensor Placeholder(      //
@@ -612,15 +591,57 @@ Tensor Call(const std::string& fn, Ts... args) {
   return Call(fn, vec);
 }
 
+inline Tensor cast(const Tensor& x, plaidml_datatype dtype) {
+  auto ptr = ffi::call<plaidml_expr*>(plaidml_expr_cast, x.as_ptr(), dtype);
+  return Tensor{ptr};
+}
+
 inline Tensor abs(const Tensor& x) { return Call("abs", x); }
 
-inline Tensor as_float(const Tensor& x, size_t bit_size) { return Call("as_float", x, static_cast<int64_t>(bit_size)); }
+inline Tensor as_float(const Tensor& x, size_t bit_size) {
+  switch (bit_size) {
+    case 16:
+      return cast(x, PLAIDML_DATA_FLOAT16);
+    case 32:
+      return cast(x, PLAIDML_DATA_FLOAT32);
+    case 64:
+      return cast(x, PLAIDML_DATA_FLOAT64);
+    default:
+      throw std::runtime_error("Invalid bit size for as_float");
+  }
+}
 
-inline Tensor as_int(const Tensor& x, size_t bit_size) { return Call("as_int", x, static_cast<int64_t>(bit_size)); }
+inline Tensor as_int(const Tensor& x, size_t bit_size) {
+  switch (bit_size) {
+    case 8:
+      return cast(x, PLAIDML_DATA_INT8);
+    case 16:
+      return cast(x, PLAIDML_DATA_INT16);
+    case 32:
+      return cast(x, PLAIDML_DATA_INT32);
+    case 64:
+      return cast(x, PLAIDML_DATA_INT64);
+    default:
+      throw std::runtime_error("Invalid bit size for as_int");
+  }
+}
 
-inline Tensor as_uint(const Tensor& x, size_t bit_size) { return Call("as_uint", x, static_cast<int64_t>(bit_size)); }
+inline Tensor as_uint(const Tensor& x, size_t bit_size) {
+  switch (bit_size) {
+    case 8:
+      return cast(x, PLAIDML_DATA_UINT8);
+    case 16:
+      return cast(x, PLAIDML_DATA_UINT16);
+    case 32:
+      return cast(x, PLAIDML_DATA_UINT32);
+    case 64:
+      return cast(x, PLAIDML_DATA_UINT64);
+    default:
+      throw std::runtime_error("Invalid bit size for as_uint");
+  }
+}
 
-inline Tensor as_bool(const Tensor& x) { return Call("as_bool", x); }
+inline Tensor as_bool(const Tensor& x) { return cast(x, PLAIDML_DATA_BOOLEAN); }
 
 inline Tensor cos(const Tensor& x) { return Call("cos", x); }
 
@@ -690,7 +711,7 @@ inline Program::Program(                 //
     const std::string& name,             //
     const std::vector<Tensor>& outputs,  //
     const std::vector<std::tuple<Tensor, Tensor>>& updates)
-    : outputs_(outputs.size()) {
+    : old_outputs_(outputs), new_outputs_(outputs.size()) {
   std::vector<plaidml_expr*> raw_outputs(outputs.size());
   std::vector<plaidml_expr*> new_outputs(outputs.size());
   for (size_t i = 0; i < raw_outputs.size(); i++) {
@@ -718,8 +739,17 @@ inline Program::Program(                 //
       src_updates.data(),                                            //
       dst_updates.data()));
   for (size_t i = 0; i < new_outputs.size(); i++) {
-    outputs_[i] = Tensor(new_outputs[i]);
+    new_outputs_[i] = Tensor(new_outputs[i]);
   }
+}
+
+inline Tensor Program::mapped_output(const Tensor& tensor) const {
+  for (size_t i = 0; i < old_outputs_.size(); i++) {
+    if (old_outputs_.at(i).as_ptr() == tensor.as_ptr()) {
+      return new_outputs_[i];
+    }
+  }
+  throw std::out_of_range("Tensor not found in program outputs");
 }
 
 inline TensorDim TensorDim::operator-() const { return TensorDim(PLAIDML_INT_OP_NEG, {*this}); }
@@ -824,8 +854,7 @@ inline void IndexedTensor::Impl::MakeContraction(plaidml_agg_op agg_op, const In
           sizes.get(),                           //
           src_idxs.size(),                       //
           src_idxs.data(),                       //
-          src->impl_->name.c_str(),              //
-          layout.c_str()));
+          src->impl_->name.c_str()));
 }
 
 // Represents a combo_op of COND in a contraction
@@ -845,7 +874,7 @@ inline IndexedTensor IndexedTensor::operator==(const IndexedTensor& rhs) const {
   return IndexedTensor(PLAIDML_COMBO_OP_EQ, {this, &rhs});
 }
 
-inline Tensor Call(const std::string& fn, const std::vector<Tensor>& args) {  //
+inline Tensor Call(const std::string& fn, const std::vector<Tensor>& args) {
   std::vector<plaidml_expr*> ptrs(args.size());
   for (size_t i = 0; i < args.size(); i++) {
     ptrs[i] = args[i].as_ptr();

@@ -1,5 +1,8 @@
 #include "tile/lang/simplifier.h"
 
+#include <memory>
+#include <string>
+
 #include "tile/lang/scope.h"
 #include "tile/lang/sembuilder.h"
 #include "tile/lang/semprinter.h"
@@ -16,7 +19,7 @@ namespace sem {
 struct Symbol {
   // This member is set if the symbol can be resolved to an IntConst value.
   // If such a value exists, substitute in an IntConst over a LoadExpr.
-  boost::optional<int64_t> const_value;
+  std::optional<int64_t> const_value;
 
   // This member is set if the symbol can be resolved to another symbol.
   // That is, if the code looks like:
@@ -24,7 +27,7 @@ struct Symbol {
   // Then symbol 'x' is an alias to 'y'.
   // If such an alias exists, substitute every use for 'x' with a LoadExpr of 'y'.
   // It's also safe to elide this declaration since every use of 'x' will be replaced with 'y'.
-  boost::optional<std::string> alias;
+  std::optional<std::string> alias;
 };
 
 class Simplifier : public Visitor {

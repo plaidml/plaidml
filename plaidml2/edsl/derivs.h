@@ -2,12 +2,8 @@
 
 #pragma once
 
-namespace plaidml {
-namespace edsl {
-namespace deriv {
+namespace plaidml::edsl {
 
 void RegisterDerivs();
 
-}
-}  // namespace edsl
-}  // namespace plaidml
+}  // namespace plaidml::edsl

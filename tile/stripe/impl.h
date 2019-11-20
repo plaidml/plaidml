@@ -4,8 +4,7 @@
 
 #include <map>
 #include <string>
-
-#include <boost/variant.hpp>
+#include <variant>
 
 #include "tile/stripe/stripe.h"
 
@@ -20,15 +19,15 @@ inline std::ostream& operator<<(std::ostream& os, const Void& value) {
   return os;
 }
 
-using AttrValue = boost::variant<  //
-    Void,                          //
-    bool,                          //
-    int64_t,                       //
-    double,                        //
-    std::string,                   //
+using AttrValue = std::variant<  //
+    Void,                        //
+    bool,                        //
+    int64_t,                     //
+    double,                      //
+    std::string,                 //
     google::protobuf::Any>;
 
-class AttrValueToStringVisitor : public boost::static_visitor<std::string> {
+class AttrValueToStringVisitor {
  public:
   std::string operator()(const Void& v) const { return "{}"; }
   std::string operator()(const bool& v) const { return std::to_string(v); }
@@ -38,7 +37,7 @@ class AttrValueToStringVisitor : public boost::static_visitor<std::string> {
   std::string operator()(const google::protobuf::Any& v) const { return "<protobuf::Any object>"; }
 };
 
-inline std::string to_string(AttrValue val) { return boost::apply_visitor(AttrValueToStringVisitor(), val); }
+inline std::string to_string(AttrValue val) { return std::visit(AttrValueToStringVisitor(), val); }
 
 inline std::ostream& operator<<(std::ostream& os, const AttrValue& value) {
   os << to_string(value);

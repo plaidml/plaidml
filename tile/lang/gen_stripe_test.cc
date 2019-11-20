@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "plaidml2/edsl/edsl.h"
+#include "plaidml2/edsl/helper.h"
 #include "testing/matchers.h"
 #include "tile/lang/gen_stripe.h"
 
@@ -19,9 +20,9 @@ using namespace plaidml::edsl;  // NOLINT
 
 namespace {
 
-lang::RunInfo Evaluate(const std::string& name, const std::vector<Tensor>& vars) {
+std::shared_ptr<stripe::Program> Evaluate(const std::string& name, const std::vector<Tensor>& vars) {
   plaidml::edsl::Program program(name, vars);
-  return *static_cast<const tile::lang::RunInfo*>(program.runinfo());
+  return plaidml::edsl::ConvertIntoStripe(program);
 }
 
 Tensor ContractPlusElementwise(const Tensor& A, const Tensor& B) {
@@ -39,8 +40,7 @@ TEST(GenStripeTest, ContractPlusElementwise) {
   LogicalShape shape(PLAIDML_DATA_FLOAT32, {10, 10});
   auto A = Placeholder(shape);
   auto B = Placeholder(shape);
-  auto runinfo = Evaluate("ContractPlusElementwise", {ContractPlusElementwise(A, B)});
-  auto program = GenerateStripe(runinfo);
+  auto program = Evaluate("ContractPlusElementwise", {ContractPlusElementwise(A, B)});
   LOG(INFO) << "Block: " << *program->entry;
   EXPECT_THAT(IntoProto(*program->entry), EqualsProtoText(R"***(
     name: "ContractPlusElementwise"

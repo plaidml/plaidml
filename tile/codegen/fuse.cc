@@ -89,8 +89,8 @@ static Affine TranslateAffine(const Affine& src, const AliasMap& map, std::map<s
   return dest.sym_eval(remapped);
 }
 
-boost::optional<FusionPlan> ComputeFusionPlan(const AliasMap& scope, const Block& a, const Block& b,
-                                              const std::string& buf_name) {
+std::optional<FusionPlan> ComputeFusionPlan(const AliasMap& scope, const Block& a, const Block& b,
+                                            const std::string& buf_name) {
   IVLOG(3, "ComputeFusionPlan for " << buf_name << " between " << a.name << " and " << b.name);
   FusionPlan plan;
   plan.tile_a = TileShape(a.idxs.size(), 1);
@@ -101,12 +101,12 @@ boost::optional<FusionPlan> ComputeFusionPlan(const AliasMap& scope, const Block
   auto it_a = a.ref_by_from(buf_name, false);
   if (it_a == a.refs.end()) {
     IVLOG(3, "ComputeFusionPlan: buffer name unknown in block a");
-    return boost::none;
+    return std::nullopt;
   }
   auto it_b = b.ref_by_from(buf_name, false);
   if (it_b == b.refs.end()) {
     IVLOG(3, "ComputeFusionPlan: buffer name unknown in block b");
-    return boost::none;
+    return std::nullopt;
   }
   assert(it_a->access.size() == it_b->access.size());
   for (size_t i = 0; i < it_a->access.size(); i++) {
@@ -120,23 +120,23 @@ boost::optional<FusionPlan> ComputeFusionPlan(const AliasMap& scope, const Block
     }
     if (poly_a.getMap().size() != 1 || poly_a.getMap().begin()->first.empty()) {
       IVLOG(3, "ComputeFusionPlan: complex access in a: " << poly_a.toString());
-      return boost::none;
+      return std::nullopt;
     }
     if (poly_b.getMap().size() != 1 || poly_b.getMap().begin()->first.empty()) {
       IVLOG(3, "ComputeFusionPlan: complex access in b: " << poly_b.toString());
-      return boost::none;
+      return std::nullopt;
     }
     std::string idx_a = poly_a.getMap().begin()->first;
     std::string idx_b = poly_b.getMap().begin()->first;
     if (plan.remap_a.find(idx_a) != plan.remap_a.end()) {
       IVLOG(3, "ComputeFusionPlan: duplicate index");
-      return boost::none;
+      return std::nullopt;
     }
     int64_t mul_a = poly_a[idx_a];
     int64_t mul_b = poly_b[idx_b];
     if (mul_a % mul_b != 0) {
       IVLOG(3, "ComputeFusionPlan: uneven index division");
-      return boost::none;
+      return std::nullopt;
     }
     for (size_t i = 0; i < b.idxs.size(); i++) {
       if (b.idxs[i].name == idx_b) {
@@ -151,7 +151,7 @@ boost::optional<FusionPlan> ComputeFusionPlan(const AliasMap& scope, const Block
             plan.b_interleave = true;
           } else {
             IVLOG(3, "ComputeFusionPlan: b_range is less than a_range");
-            return boost::none;
+            return std::nullopt;
           }
         }
       }
@@ -174,7 +174,7 @@ boost::optional<FusionPlan> ComputeFusionPlan(const AliasMap& scope, const Block
     IVLOG(3, "ComputeFusionPlan: incompatible constraints");
     IVLOG(4, "    a: " << StreamContainer(a.constraints));
     IVLOG(4, "    b: " << StreamContainer(b.constraints));
-    return boost::none;
+    return std::nullopt;
   }
   // Compute induced remappings
   for (const auto& idx_b : b.idxs) {
