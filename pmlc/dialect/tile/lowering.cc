@@ -75,11 +75,11 @@ static eltwise::ScalarConstantOp createZero(OpBuilder* builder, Location loc, Ty
   auto dtype = scalarType.type();
   if (is_float(dtype)) {
     const double zero = 0.0;
-    auto constType = ScalarType::get(builder->getContext(), DataType::FLOATX);
+    auto constType = ScalarType::get(builder->getContext(), DataType::FLOAT32);
     return builder->create<eltwise::ScalarConstantOp>(loc, constType, zero);
   }
   const int64_t zero = 0;
-  auto constType = ScalarType::get(builder->getContext(), DataType::INTX);
+  auto constType = ScalarType::get(builder->getContext(), DataType::INT32);
   return builder->create<eltwise::ScalarConstantOp>(loc, constType, zero);
 }
 

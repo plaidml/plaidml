@@ -2,8 +2,10 @@
 
 #include "tile/codegen/partition.h"
 
-#include <boost/optional.hpp>
-#include <boost/optional/optional_io.hpp>
+#include <map>
+#include <optional>
+#include <set>
+#include <string>
 
 #include "base/util/logging.h"
 #include "base/util/throw.h"
@@ -323,7 +325,7 @@ void CollectBankInfo(std::map<std::string, BankInfo>* bank_infos,  //
     return;  // No valid indexes?  Skip this block
   }
   // Determine the bank_dim for the split memory
-  boost::optional<size_t> dim_pos;
+  std::optional<size_t> dim_pos;
   for (size_t i = 0; i < big_ref->access.size(); i++) {
     // Determine the dimension that is associated with the index we want to split on
     if (big_ref->access[i].get(idx_name)) {
@@ -334,7 +336,13 @@ void CollectBankInfo(std::map<std::string, BankInfo>* bank_infos,  //
       dim_pos = i;
     }
   }
-  IVLOG(2, "    dim_pos: " << dim_pos << ", base_ref: " << *big_alias.base_ref);
+  if (VLOG_IS_ON(2)) {
+    if (dim_pos) {
+      IVLOG(2, "    dim_pos: " << *dim_pos << ", base_ref: " << *big_alias.base_ref);
+    } else {
+      IVLOG(2, "    dim_pos: None, base_ref: " << *big_alias.base_ref);
+    }
+  }
   if (!dim_pos) {
     IVLOG(1, "Could not find dimension to bank on for block: " << block->name << ", ref: " << *big_alias.base_ref);
     return;

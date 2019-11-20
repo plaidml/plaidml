@@ -103,7 +103,7 @@ struct TileBuilder::Impl {
   std::vector<mlir::Value*> getBackwardSliceOfAffine(const llvm::SetVector<mlir::Value*>& values) {
     return util::getBackwardSlice(values, false, [](Value* value) {
       if (auto scalarType = value->getType().dyn_cast<ScalarType>()) {
-        return scalarType.type() == DataType::INTX;
+        return scalarType.type() == DataType::INT32;
       }
       return false;
     });
@@ -327,7 +327,7 @@ std::vector<Value*> TileBuilder::GetTupleElements(Value* value) {
 
 Value* TileBuilder::MakeScalarConstantOp(int64_t value) {
   IVLOG(5, "TileBuilder::MakeScalarConstantOp> " << value);
-  auto type = impl->builder.getType<ScalarType>(DataType::INTX);
+  auto type = impl->builder.getType<ScalarType>(DataType::INT32);
   return impl->builder.create<ScalarConstantOp>(impl->builder.getUnknownLoc(), type, value).result();
 }
 
@@ -340,7 +340,7 @@ int64_t TileBuilder::GetIntegerValue(mlir::Value* value) {
 
 Value* TileBuilder::MakeScalarConstantOp(double value) {
   IVLOG(5, "TileBuilder::MakeScalarConstantOp> " << value);
-  auto type = impl->builder.getType<ScalarType>(DataType::FLOATX);
+  auto type = impl->builder.getType<ScalarType>(DataType::FLOAT32);
   return impl->builder.create<ScalarConstantOp>(impl->builder.getUnknownLoc(), type, value).result();
 }
 
@@ -623,6 +623,9 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(  //
     StringRef name,                                     //
     ArrayRef<Value*> outputs,                           //
     llvm::MutableArrayRef<Value*> new_outputs) {
+  if (name.empty()) {
+    name = "noname";
+  }
   IVLOG(5, "TileBuilder::MakeProgram> " << name.str());
   IVLOG(6, mlir::debugString(impl->module));
   // Compute the result types
@@ -681,6 +684,8 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(  //
       } else {
         auto new_value = builder.clone(*op, program->mapper)->getResult(0);
         IVLOG(5, "mapping: " << value << " -> " << new_value);
+        IVLOG(6, "value: " << mlir::debugString(*value));
+        IVLOG(6, "new_value: " << mlir::debugString(*new_value));
         program->mapper.map(value, new_value);
       }
     }

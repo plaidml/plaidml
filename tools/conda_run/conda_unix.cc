@@ -39,6 +39,9 @@ int main(int argc, char* argv[]) {
 
     // Adjust environment variables to activate conda environment
     vertexai::env::Set("CONDA_DEFAULT_ENV", conda_env);
+    auto path = vertexai::env::Get("PATH");
+    auto new_path = python.parent_path().string() + ":" + path;
+    vertexai::env::Set("PATH", new_path);
 
     // This is to support ASAN on macOS.
     // By default, DYLD_INSERT_LIBRARIES is dropped, probably by SIP (I'm not exactly sure).

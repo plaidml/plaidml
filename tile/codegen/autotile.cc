@@ -3,6 +3,11 @@
 #include "tile/codegen/autotile.h"
 
 #include <algorithm>
+#include <map>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
 
 #include "base/util/logging.h"
 #include "base/util/stream_container.h"
@@ -147,8 +152,8 @@ TileMetrics ComputeSizes(const std::map<std::string, size_t>& tile_by_name,  //
       continue;
     }
     auto tiled = ref.ApplyTile(tile_by_name);
-    int64_t bytes = options.odd_size() ?
-      Codec::Resolve(MakeOddTile(tiled))->byte_size() : Codec::Resolve(tiled)->byte_size();
+    int64_t bytes =
+        options.odd_size() ? Codec::Resolve(MakeOddTile(tiled))->byte_size() : Codec::Resolve(tiled)->byte_size();
     double bandwidth = tiled.memory_io(options.cache_width());
     ret.total_bytes += bytes;
     ret.total_bandwidth += bandwidth;
@@ -298,7 +303,7 @@ struct TileResult {
 
 struct TileSearchState {
   std::set<Tile> found_tiles;
-  boost::optional<TileResult> best_so_far;
+  std::optional<TileResult> best_so_far;
   std::set<std::pair<double, Tile>> todo;
 
   void AddTile(const Tile& tile, Cost cost) {
@@ -314,8 +319,8 @@ struct TileSearchState {
 };
 
 template <typename CostModel>
-boost::optional<TileResult> PickBestTile(const Block& block, bool only_po2, bool only_even, bool only_multiple_of_32,
-                                         bool is_fast, const CostModel& model) {
+std::optional<TileResult> PickBestTile(const Block& block, bool only_po2, bool only_even, bool only_multiple_of_32,
+                                       bool is_fast, const CostModel& model) {
   IVLOG(3, "Autotile> PickBestTile> block: " << block.name);
   TileSearchState state;
   Tile tile(block, only_multiple_of_32 ? 32 : 1);
@@ -392,7 +397,7 @@ void AutotilePass::Apply(CompilerState* state) const {
     if (result) {
       IVLOG(2, "Autotile> block: " << block->name << ", tile: " << result->tile << ", cost: " << result->cost);
       const TileShape& tiling_shape = options_.flip() ? result->tile.counts() : result->tile.sizes();
-      if (ApplyTile(block, tiling_shape, false, false, options_.flip() || options_.interleave(), 
+      if (ApplyTile(block, tiling_shape, false, false, options_.flip() || options_.interleave(),
                     options_.location_idx_tag())) {
         auto inner = block->SubBlock(0);
         if (options_.copy_tags()) {

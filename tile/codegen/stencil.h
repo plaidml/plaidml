@@ -2,10 +2,9 @@
 
 #pragma once
 
+#include <optional>
 #include <string>
 #include <vector>
-
-#include <boost/optional.hpp>
 
 #include "tile/codegen/codegen.pb.h"
 #include "tile/codegen/compile_pass.h"
@@ -33,8 +32,8 @@ std::ostream& operator<<(std::ostream& os, const StencilMatch& match);
 bool operator==(const StencilMatch& lhs, const StencilMatch& rhs);
 bool operator<(const StencilMatch& lhs, const StencilMatch& rhs);
 
-boost::optional<StencilMatch> FindBestStencil(const std::vector<proto::Stencil>& specs, const bool is_strict_dims,
-                                              stripe::Block* block);
+std::optional<StencilMatch> FindBestStencil(const std::vector<proto::Stencil>& specs, const bool is_strict_dims,
+                                            stripe::Block* block);
 
 class StencilPass final : public CompilePass {
  public:

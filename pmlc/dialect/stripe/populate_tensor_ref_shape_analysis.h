@@ -23,6 +23,7 @@ namespace stripe {
 // more cases than the Stripe->Affine dialect conversion.
 class PopulateTensorRefShape {
  public:
+  /// Constructor for analysis manager. Only FuncOp is supported.
   explicit PopulateTensorRefShape(mlir::Operation* op);
 
   /// Recompute shape information for 'tensor_ref' types.
