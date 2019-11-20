@@ -384,8 +384,6 @@ void run_resnet50(int64_t batch_size = 1, size_t iterations = 100, size_t report
   all_inputs.push_back(I);
   auto bound_program = exec::Binder(program).set_inputs(all_inputs).build();
   IVLOG(1, "Inputs bound");
-  bound_program->run();
-  IVLOG(1, "Initial run complete");
   for (size_t i = 0; i < iterations; ++i) {
     bound_program->run();
     if (i % report_period == report_period - 1) {
@@ -400,13 +398,6 @@ int main(int argc, char* argv[]) {
   using plaidml::networks::run_resnet50;
 
   try {
-    auto level_str = vertexai::env::Get("PLAIDML_VERBOSE");
-    if (level_str.size()) {
-      auto level = std::atoi(level_str.c_str());
-      if (level) {
-        el::Loggers::setVerboseLevel(level);
-      }
-    }
     plaidml::op::init();
     run_resnet50();
     return 0;

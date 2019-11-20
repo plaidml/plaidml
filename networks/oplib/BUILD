@@ -9,9 +9,11 @@ plaidml_cc_binary(
     srcs = ["resnet50.cc"],
     deps = [
         "//base/util",
-        "//plaidml2:api_ast",
         "//plaidml2/edsl:api",
+        "//plaidml2/edsl:edsl_ast",
         "//plaidml2/exec:api",
-        "//plaidml2/op/lib:lib_ast",
+        "//plaidml2/exec:exec_ast",
+        "//plaidml2/op:api",
+        "//plaidml2/op:op_ast",
     ],
 )
