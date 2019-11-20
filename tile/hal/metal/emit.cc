@@ -56,7 +56,6 @@ inline std::string c_dtype(const DataType& dt) {
       return "half";
     case DataType::FLOAT32:
       return "float";
-    case DataType::FLOAT64:
     default:
       throw std::runtime_error{"Unusable hardware type: " + to_string(dt)};
   }
@@ -403,7 +402,8 @@ class Emitter : public sem::Visitor {
   }
 
  private:
-  void Select(const sem::Type& result_type, const sem::ExprPtr& cond, const sem::ExprPtr& tcase, const sem::ExprPtr& fcase) {
+  void Select(const sem::Type& result_type, const sem::ExprPtr& cond, const sem::ExprPtr& tcase,
+              const sem::ExprPtr& fcase) {
     auto tcase_type = TypeOf(tcase);
     auto fcase_type = TypeOf(fcase);
     auto cond_type = TypeOf(cond);

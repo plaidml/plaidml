@@ -8,6 +8,13 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file"
 def plaidml_workspace():
     configure_toolchain()
 
+    dev_http_archive(
+        name = "bazel_latex",
+        sha256 = "5119802a5fbe2f27914af455c59b4ecdaaf57c0bc6c63da38098a30d94f48c9a",
+        strip_prefix = "bazel-latex-b6375d9df2952548c3371c0c865710655e8b1cc1",
+        url = "https://github.com/plaidml/bazel-latex/archive/b6375d9df2952548c3371c0c865710655e8b1cc1.zip",
+    )
+
     http_archive(
         name = "boost",
         url = "https://github.com/plaidml/depot/raw/master/boost_1_66_0.tar.gz",

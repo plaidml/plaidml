@@ -2,6 +2,8 @@
 
 #include "tile/codegen/emitc.h"
 
+#include <vector>
+
 namespace vertexai {
 namespace tile {
 namespace codegen {

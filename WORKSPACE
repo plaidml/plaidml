@@ -32,3 +32,7 @@ py_repositories()
 register_toolchains(
     "//:py_toolchain",
 )
+
+load("@bazel_latex//:repositories.bzl", "latex_repositories")
+
+latex_repositories()

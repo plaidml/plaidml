@@ -38,6 +38,7 @@ struct plaidml_expr {
 #endif
 #ifdef PLAIDML_MLIR
   mlir::Value* value = nullptr;
+  std::shared_ptr<pmlc::dialect::tile::TileProgram> program;
 #endif
 };
 
