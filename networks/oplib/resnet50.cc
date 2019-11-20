@@ -379,10 +379,7 @@ void run_resnet50(int64_t batch_size = 1, size_t iterations = 100, size_t report
   IVLOG(1, "About to build resnet50 program");
   auto program = resnet50_program(batch_size, I, W, B);
   IVLOG(1, "Program built");
-  auto all_inputs = W;
-  all_inputs.insert(all_inputs.end(), B.begin(), B.end());
-  all_inputs.push_back(I);
-  auto bound_program = exec::Binder(program).set_inputs(all_inputs).build();
+  auto bound_program = exec::Binder(program).set_input(I).set_inputs(W).set_inputs(B).build();
   IVLOG(1, "Inputs bound");
   for (size_t i = 0; i < iterations; ++i) {
     bound_program->run();
