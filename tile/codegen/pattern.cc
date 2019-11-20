@@ -1,8 +1,10 @@
 // Copyright 2019, Intel Corp.
 
+#include <algorithm>
 #include <memory>
 #include <regex>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <boost/format.hpp>
@@ -170,7 +172,7 @@ Term Parse(const std::string& code) {
   return parser.parse_term();
 }
 
-class TermPrinter : public boost::static_visitor<void> {
+class TermPrinter {
  public:
   explicit TermPrinter(std::ostream& os) : os_(os) {}
 
@@ -204,7 +206,7 @@ class TermPrinter : public boost::static_visitor<void> {
       if (i) {
         os_ << ", ";
       }
-      boost::apply_visitor(*this, terms[i]);
+      std::visit(*this, terms[i]);
     }
   }
 
@@ -214,7 +216,7 @@ class TermPrinter : public boost::static_visitor<void> {
 
 std::ostream& operator<<(std::ostream& os, const Term& term) {
   TermPrinter printer(os);
-  boost::apply_visitor(printer, term);
+  std::visit(printer, term);
   return os;
 }
 
@@ -290,7 +292,7 @@ struct TermCompare {
 
 // lhs is always the pattern.
 // rhs is always the value to match against.
-class MatchVisitor : public boost::static_visitor<bool> {
+class MatchVisitor {
  public:
   MatchVisitor() : choices_{MatchResult{}} {}
   explicit MatchVisitor(const MatchVisitor& rhs) : choices_{rhs.choices_} {}
@@ -361,7 +363,7 @@ class MatchVisitor : public boost::static_visitor<bool> {
       return false;
     }
     for (size_t i = 0; i < lhs.size(); i++) {
-      if (!boost::apply_visitor(*visitor, lhs[i], rhs[i])) {
+      if (!std::visit(*visitor, lhs[i], rhs[i])) {
         return false;
       }
     }
@@ -372,17 +374,17 @@ class MatchVisitor : public boost::static_visitor<bool> {
   std::list<MatchResult> choices_;
 };
 
-boost::optional<MatchResult> MatchFirst(const Term& pattern, const Term& value) {
+std::optional<MatchResult> MatchFirst(const Term& pattern, const Term& value) {
   MatchVisitor visitor;
-  if (boost::apply_visitor(visitor, pattern, value)) {
+  if (std::visit(visitor, pattern, value)) {
     return visitor.matches().front();
   }
-  return boost::none;
+  return std::nullopt;
 }
 
 std::list<MatchResult> MatchAll(const Term& pattern, const Term& value) {
   MatchVisitor visitor;
-  if (boost::apply_visitor(visitor, pattern, value)) {
+  if (std::visit(visitor, pattern, value)) {
     return visitor.matches();
   }
   return std::list<MatchResult>{};
@@ -413,7 +415,7 @@ void PatternPass::Apply(CompilerState* state) const {
     if (match) {
       IVLOG(2, "PatternPass> block: " << block->name);
       for (const auto& kvp : options_.set_vars()) {
-        auto value = boost::get<pattern::Number>(safe_at(match->vars, kvp.second));
+        auto value = std::get<pattern::Number>(safe_at(match->vars, kvp.second));
         IVLOG(2, "  " << kvp.first << " = " << value);
         block->set_attr(kvp.first, value);
       }
