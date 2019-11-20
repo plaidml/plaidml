@@ -35,6 +35,20 @@ cc_library(
     ],
 )
 
+cc_library(
+    name = "TableGenTools",
+    srcs = glob([
+        "tools/mlir-tblgen/mlir-tblgen.cpp",
+    ]),
+    copts = PLATFORM_COPTS,
+    includes = ["include"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":Support",
+        ":TableGen",
+    ],
+)
+
 cc_binary(
     name = "mlir-tblgen",
     srcs = glob([
