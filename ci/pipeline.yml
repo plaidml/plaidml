@@ -8,6 +8,7 @@ steps:
 {{#variants}}
   - label: ':hammer_and_wrench: {{emoji}}'
     command: '{{python}} ci/buildkite.py build {{name}}'
+    key: '{{name}}'
     agents:
       PLATFORM: '{{name}}'
 {{/variants}}
@@ -21,6 +22,7 @@ steps:
     command: |
       {{python}} -m pip install pyyaml --user
       {{python}} ci/buildkite.py test {{platform}} {{suite}} {{workload}} {{batch_size}} {{#shard}}--shard-count {{count}} --shard {{id}}{{/shard}}
+    depends_on: {{variant}}
 
   {{#soft_fail}}
     soft_fail: true
