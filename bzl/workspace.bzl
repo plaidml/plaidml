@@ -184,9 +184,9 @@ def plaidml_workspace():
 
     dev_http_archive(
         name = "mlir",
-        url = "https://github.com/tensorflow/mlir/archive/a4b11eba615c87b9253f61d9b66f02839490e12b.zip",
-        sha256 = "5699b4e119b0170e72d8bfba1e132fc42b72e83eb40f56dbbd66d642c326aad6",
-        strip_prefix = "mlir-a4b11eba615c87b9253f61d9b66f02839490e12b",
+        url = "https://github.com/tensorflow/mlir/archive/fb8b50f70047220b671e0a03fab0ece2fd8b5a81.zip",
+        sha256 = "cae5f8e4d3c028036047c00008bc4241aefc2e5405361ba67ade462f02cc8e48",
+        strip_prefix = "mlir-fb8b50f70047220b671e0a03fab0ece2fd8b5a81",
         build_file = Label("//vendor/mlir:mlir.BUILD"),
         patches = [Label("//vendor/mlir:mlir.patch")],
         patch_args = ["-p1"],
