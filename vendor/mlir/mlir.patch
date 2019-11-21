@@ -1,46 +1,45 @@
 diff --git a/include/mlir/IR/OpImplementation.h b/include/mlir/IR/OpImplementation.h
-index a07bb143..e15d21ab 100644
+index 666a90ec..8aeee0cd 100644
 --- a/include/mlir/IR/OpImplementation.h
 +++ b/include/mlir/IR/OpImplementation.h
-@@ -594,6 +594,10 @@ public:
-   /// Get a special name to use when printing the given operation. The desired
-   /// name should be streamed into 'os'.
-   virtual void getOpResultName(Operation *op, raw_ostream &os) const {}
+@@ -629,6 +629,10 @@ public:
+   /// OpAsmInterface.td#getAsmResultNames for usage details and documentation.
+   virtual void getAsmResultNames(Operation *op,
+                                  OpAsmSetValueNameFn setNameFn) const {}
 +  /// Get a special name to use when printing the entry block arguments for any
 +  /// region contained by an Op in this dialect.  The desired name should be
 +  /// streamed into 'os'.  If the result is empty, the default name will be used.
 +  virtual void getRegionArgumentName(BlockArgument *arg, raw_ostream &os) const {}
  };
  
- } // end namespace mlir
+ //===--------------------------------------------------------------------===//
 diff --git a/lib/IR/AsmPrinter.cpp b/lib/IR/AsmPrinter.cpp
-index 0e6b7882..c2aa84fe 100644
+index 655a7761..6d3a463d 100644
 --- a/lib/IR/AsmPrinter.cpp
 +++ b/lib/IR/AsmPrinter.cpp
-@@ -1566,10 +1566,22 @@ void OperationPrinter::numberValueID(Value *value) {
-   llvm::raw_svector_ostream specialName(specialNameBuffer);
+@@ -1604,12 +1604,21 @@ void OperationPrinter::numberValuesInBlock(Block &block) {
  
-   // Check to see if this value requested a special name.
--  auto *op = value->getDefiningOp();
--  if (state && op) {
--    if (auto *interface = state->getOpAsmInterface(op->getDialect()))
--      interface->getOpResultName(op, specialName);
-+  if (state) {
-+    if (auto *op = value->getDefiningOp()) {
-+      // If the value is the result of an Op, ask the Op's dialect for a name
-+      if (auto *interface = state->getOpAsmInterface(op->getDialect()))
-+        interface->getOpResultName(op, specialName);
-+    } else {
-+      // Otherwise, if the value is an entry block argument, find it's parent
-+      // and ask it's dialect for a friendly name
-+      auto arg = cast<BlockArgument>(value);
-+      if (arg->getOwner()->isEntryBlock()) {
-+        if (auto* op = arg->getOwner()->getParentOp()) {
-+          if (auto *interface = state->getOpAsmInterface(op->getDialect()))
-+            interface->getRegionArgumentName(arg, specialName);
-+        }
-+      }
+   // Number the block arguments. We give entry block arguments a special name
+   // 'arg'.
+-  SmallString<32> specialNameBuffer(isEntryBlock ? "arg" : "");
+-  llvm::raw_svector_ostream specialName(specialNameBuffer);
++  OpAsmDialectInterface* interface = nullptr;
++  if (isEntryBlock && state) {
++    if (auto* op = block.getParentOp()) {
++      state->getOpAsmInterface(op->getDialect());
 +    }
++  }
+   for (auto *arg : block.getArguments()) {
++    SmallString<32> specialNameBuffer;
++    llvm::raw_svector_ostream specialName(specialNameBuffer);
+     if (isEntryBlock) {
+-      specialNameBuffer.resize(strlen("arg"));
+-      specialName << nextArgumentID++;
++      if (interface) {
++        interface->getRegionArgumentName(arg, specialName);
++      } else {
++        specialName << "arg" << nextArgumentID++;
++      }
+     }
+     setValueName(arg, specialName.str());
    }
- 
-   if (specialNameBuffer.empty()) {
