@@ -14,7 +14,7 @@ index 666a90ec..8aeee0cd 100644
  
  //===--------------------------------------------------------------------===//
 diff --git a/lib/IR/AsmPrinter.cpp b/lib/IR/AsmPrinter.cpp
-index 655a7761..6d3a463d 100644
+index 655a7761..be682e19 100644
 --- a/lib/IR/AsmPrinter.cpp
 +++ b/lib/IR/AsmPrinter.cpp
 @@ -1604,12 +1604,21 @@ void OperationPrinter::numberValuesInBlock(Block &block) {
@@ -23,10 +23,10 @@ index 655a7761..6d3a463d 100644
    // 'arg'.
 -  SmallString<32> specialNameBuffer(isEntryBlock ? "arg" : "");
 -  llvm::raw_svector_ostream specialName(specialNameBuffer);
-+  OpAsmDialectInterface* interface = nullptr;
++  const OpAsmDialectInterface* interface = nullptr;
 +  if (isEntryBlock && state) {
 +    if (auto* op = block.getParentOp()) {
-+      state->getOpAsmInterface(op->getDialect());
++      interface = state->getOpAsmInterface(op->getDialect());
 +    }
 +  }
    for (auto *arg : block.getArguments()) {

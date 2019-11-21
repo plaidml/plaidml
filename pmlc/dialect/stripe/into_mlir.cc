@@ -201,7 +201,7 @@ static void IntrinsicIntoMLIR(OpBuilder* builder, SymbolTable* locals, const str
     }
     auto scalarType = DataTypeIntoMLIR(builder->getContext(), it->second);
     auto tensor = safe_at(locals->scalars, intrinsic.inputs[0]);
-    auto op = builder->create<eltwise::CastOp>(builder->getUnknownLoc(), scalarType, tensor);
+    auto op = builder->create<eltwise::CastOp>(builder->getUnknownLoc(), RankedTensorType::get({}, scalarType), tensor);
     locals->scalars.emplace(intrinsic.outputs[0], op.result());
     op.setAttr("scalar_name", builder->getStringAttr(intrinsic.outputs[0]));
     return;
