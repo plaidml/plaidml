@@ -14,10 +14,10 @@ index 666a90ec..8aeee0cd 100644
  
  //===--------------------------------------------------------------------===//
 diff --git a/lib/IR/AsmPrinter.cpp b/lib/IR/AsmPrinter.cpp
-index 655a7761..be682e19 100644
+index 655a7761..5a664701 100644
 --- a/lib/IR/AsmPrinter.cpp
 +++ b/lib/IR/AsmPrinter.cpp
-@@ -1604,12 +1604,21 @@ void OperationPrinter::numberValuesInBlock(Block &block) {
+@@ -1604,12 +1604,22 @@ void OperationPrinter::numberValuesInBlock(Block &block) {
  
    // Number the block arguments. We give entry block arguments a special name
    // 'arg'.
@@ -37,7 +37,8 @@ index 655a7761..be682e19 100644
 -      specialName << nextArgumentID++;
 +      if (interface) {
 +        interface->getRegionArgumentName(arg, specialName);
-+      } else {
++      }
++      if (specialName.str() == "") {
 +        specialName << "arg" << nextArgumentID++;
 +      }
      }
