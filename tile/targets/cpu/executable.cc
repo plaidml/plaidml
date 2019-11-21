@@ -22,6 +22,7 @@
 
 #include "base/util/env.h"
 #include "base/util/lookup.h"
+#include "tbb/tbb.h"
 #include "tile/stripe/stripe.h"
 #include "tile/targets/cpu/link_names.h"
 
@@ -79,23 +80,31 @@ void Executable::Run(const std::map<std::string, void*>& buffers) {
   }
   void* argvec = args.data();
   uint64_t entrypoint = engine_->getFunctionAddress(invoker_name_);
+  // To get the raw execution time for generated code.
+  // struct timeval tp;
+  // gettimeofday(&tp, NULL);
+  // long long int ms = tp.tv_sec * 1000000 + tp.tv_usec; //get current timestamp in microseconds
   ((void (*)(void*))entrypoint)(argvec);
+  // gettimeofday(&tp, NULL);
+  // long long int msDone = tp.tv_sec * 1000000 + tp.tv_usec; //get current timestamp in microseconds
+  // IVLOG(1, "Raw execution time: " << msDone - ms);
 }
 
 void Executable::SetPerfAttrs(stripe::Block* block) {
   // Look up the performance counters for this block.
   // Apply their values as tags.
-  std::string count_name = profile_count_name_ + block->name;
+  std::string block_id = block->name + "@" + std::to_string((uintptr_t)block);
+  std::string count_name = profile_count_name_ + block_id;
   uint64_t count_addr = engine_->getGlobalValueAddress(count_name);
   if (count_addr) {
     block->set_attr("execution_count", *reinterpret_cast<int64_t*>(count_addr));
   }
-  std::string ticks_name = profile_ticks_name_ + block->name;
+  std::string ticks_name = profile_ticks_name_ + block_id;
   uint64_t ticks_addr = engine_->getGlobalValueAddress(ticks_name);
   if (ticks_addr) {
     block->set_attr("execution_ticks", *reinterpret_cast<int64_t*>(ticks_addr));
   }
-  std::string loop_body_name = profile_loop_body_name_ + block->name;
+  std::string loop_body_name = profile_loop_body_name_ + block_id;
   uint64_t loop_ticks_addr = engine_->getGlobalValueAddress(loop_body_name);
   if (loop_ticks_addr) {
     block->set_attr("loop_body_ticks", *reinterpret_cast<int64_t*>(loop_ticks_addr));
@@ -135,6 +144,12 @@ void RunTimeLogEntry(char* str, char* extra, float address) {
 typedef void (*libxsmm_function)(const void* a, const void* b, void* c);
 void XSMMRTCaller(libxsmm_function func, const void* aPtr, const void* bPtr, void* cPtr) { func(aPtr, bPtr, cPtr); }
 
+typedef void (*cpu_thread_block)(void** refs, ssize_t* inits, size_t range_begin, size_t range_end);
+void ParallelFor(void** refs, ssize_t* inits, size_t range_size, cpu_thread_block func) {
+  tbb::parallel_for(tbb::blocked_range<size_t>(0, range_size),
+                    [=](const tbb::blocked_range<size_t>& r) { func(refs, inits, r.begin(), r.end()); });
+}
+
 }  // namespace rt
 
 template <typename T>
@@ -156,12 +171,14 @@ llvm::JITSymbol Runtime::findSymbol(const std::string& name) {
       {"_prng_step", symInfo(rt::prng_step)},
       {"_RunTimeLogEntry", symInfo(rt::RunTimeLogEntry)},  // For debugging
       {"_XSMMRTCaller", symInfo(rt::XSMMRTCaller)},
+      {"_ParallelFor", symInfo(rt::ParallelFor)},
       {"libxsmm_dmmdispatch", symInfo(libxsmm_dmmdispatch)},
       {"libxsmm_smmdispatch", symInfo(libxsmm_smmdispatch)},
       {"libxsmm_wimmdispatch", symInfo(libxsmm_wimmdispatch)},
       {"prng_step", symInfo(rt::prng_step)},
       {"RunTimeLogEntry", symInfo(rt::RunTimeLogEntry)},  // For debugging
       {"XSMMRTCaller", symInfo(rt::XSMMRTCaller)},
+      {"ParallelFor", symInfo(rt::ParallelFor)},
   };
   auto loc_rt = symbols.find(name);
   if (loc_rt != symbols.end()) {

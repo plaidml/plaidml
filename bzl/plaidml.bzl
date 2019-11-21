@@ -47,10 +47,7 @@ def plaidml_cc_test(copts = [], deps = (), linkopts = [], **kwargs):
     native.cc_test(
         copts = PLAIDML_COPTS + copts,
         deps = deps + [str(Label("//testing:gtest_main"))],
-        linkstatic = select({
-            "@com_intel_plaidml//toolchain:linux_x86_64": 1,
-            "//conditions:default": None,
-        }),
+        linkstatic = 1,
         linkopts = PLAIDML_LINKOPTS + linkopts,
         **kwargs
     )

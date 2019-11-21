@@ -112,6 +112,9 @@ std::optional<FusionPlan> ComputeFusionPlan(const AliasMap& scope, const Block& 
   for (size_t i = 0; i < it_a->access.size(); i++) {
     const Affine& poly_a = it_a->access[i];
     const Affine& poly_b = it_b->access[i];
+    if (a.exterior_shape(it_a->into()).dims[i].size == 1) {
+      continue;
+    }
     if (poly_a == 0 && poly_b == 0) {
       continue;
     }
