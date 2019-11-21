@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "llvm/ADT/SetVector.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/FormatVariadic.h"
 
 #include "mlir/Analysis/Verifier.h"
@@ -560,10 +561,16 @@ Value* TileBuilder::MakeContractionOp(  //
   }
   // Compute the sink shape of the contraction
   SmallVector<Type, 3> types;
+  SmallVector<Value*, 3> domainSrcs;
+  std::unordered_map<Value*, mlir::BlockArgument*> srcRewriteMap;
+  auto body = new Block();
   for (auto src : srcs) {
     IVLOG(6, "  src: " << mlir::debugString(*src));
     auto map_op = llvm::cast<AffineSourceIndexMapOp>(src->getDefiningOp());
-    types.push_back(map_op.tensor()->getType());
+    auto ty = map_op.tensor()->getType();
+    types.push_back(ty);
+    domainSrcs.emplace_back(map_op.tensor());
+    srcRewriteMap[map_op.tensor()] = body->addArgument(ty);
   }
   IVLOG(6, "  sink: " << mlir::debugString(*sink));
   IVLOG(6, "  sizes: " << mlir::debugString(*sizes));
@@ -580,9 +587,9 @@ Value* TileBuilder::MakeContractionOp(  //
   SmallVector<Value*, 4> size_map_sizes(size_map_op.sizes());
   auto shape = eltwise::ComputeShape(size_map_sizes);
   auto tensorType = RankedTensorType::get(shape, elementType);
-  auto domainOp = impl->builder.create<AffineDomainOp>(impl->builder.getUnknownLoc(), tensorType, BoolAttr{});
+  auto domainOp =
+      impl->builder.create<AffineDomainOp>(impl->builder.getUnknownLoc(), tensorType, domainSrcs, BoolAttr{});
   auto& info = impl->domains[domainOp];
-  auto body = new Block();
   domainOp.body().push_back(body);
   llvm::SetVector<Value*> values;
   values.insert(srcs.begin(), srcs.end());
@@ -601,7 +608,7 @@ Value* TileBuilder::MakeContractionOp(  //
       if (auto attr = indexOp.getAttrOfType<StringAttr>("name")) {
         idxNames.emplace_back(attr);
       } else {
-        auto name = llvm::formatv("x{0}", arg->getArgNumber());
+        auto name = llvm::formatv("x{0}", arg->getArgNumber() - domainSrcs.size());
         idxNames.emplace_back(impl->builder.getStringAttr(name.str()));
       }
     }
@@ -624,7 +631,8 @@ Value* TileBuilder::MakeContractionOp(  //
       }
     }
   }
-  // Now move across ops but do so in topologically sorted order
+  // Now move across ops but do so in topologically sorted order.
+  // Rewrite source index maps to point to block arguments as we go.
   OpBuilder domainBuilder(body);
   for (auto value : slice) {
     auto op = value->getDefiningOp();
@@ -632,7 +640,14 @@ Value* TileBuilder::MakeContractionOp(  //
         llvm::isa<AffineSourceIndexMapOp>(op) ||  //
         llvm::isa<AffineSinkIndexMapOp>(op) ||    //
         llvm::isa<AffineSizeMapOp>(op)) {
-      auto new_value = domainBuilder.clone(*op, info.mapping)->getResult(0);
+      auto newOp = domainBuilder.clone(*op, info.mapping);
+      if (auto asSrcMap = mlir::dyn_cast<AffineSourceIndexMapOp>(newOp)) {
+        Value* tensor = asSrcMap.getOperand(0);
+        if (srcRewriteMap.count(tensor)) {
+          asSrcMap.setOperand(0, srcRewriteMap.at(tensor));
+        }
+      }
+      auto new_value = newOp->getResult(0);
       info.mapping.map(value, new_value);
     }
   }
@@ -761,6 +776,9 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(StringRef name, const Prog
   mlir::PassManager pm(&impl->context);
   pm.addPass(mlir::createCanonicalizerPass());
   pm.addPass(mlir::createCSEPass());
+  if (VLOG_IS_ON(3)) {
+    pm.enableIRPrinting([](mlir::Pass*) { return true; }, [](mlir::Pass*) { return true; }, true, llvm::dbgs());
+  }
   auto result = pm.run(module);
   if (failed(result)) {
     IVLOG(1, mlir::debugString(module));

@@ -151,7 +151,11 @@ struct AffineDomainFolder : public OpRewritePattern<AffineDomainOp> {
     if (auto optional = op.no_reduce()) {
       no_reduce = rewriter.getBoolAttr(*optional);
     }
-    auto newOp = rewriter.create<AffineDomainOp>(op.getLoc(), targetType, no_reduce);
+    mlir::SmallVector<mlir::Value*, 3> tensors;
+    for (mlir::Value* tensor : op.tensors()) {
+      tensors.emplace_back(tensor);
+    }
+    auto newOp = rewriter.create<AffineDomainOp>(op.getLoc(), targetType, tensors, no_reduce);
     if (auto attr = op.getAttrOfType<StringAttr>("name")) {
       newOp.setAttr("name", attr);
     }
@@ -159,6 +163,10 @@ struct AffineDomainFolder : public OpRewritePattern<AffineDomainOp> {
       newOp.setAttr("idx_names", attr);
     }
     newOp.body().takeBody(op.body());
+    auto& block = newOp.body().front();
+    for (std::size_t idx = 0; idx < tensors.size(); ++idx) {
+      block.getArgument(idx)->setType(tensors[idx]->getType());
+    }
     rewriter.replaceOp(op, {newOp.result()});
     util::UpdateFuncOpType(newOp.getOperation());
     return matchSuccess();

@@ -135,7 +135,7 @@ def AffineMinOp : AffineBinaryOp<"affine_min", [Commutative]> {
 
 def AffineDomainOp : TileOp<"domain">, HasCanonicalizer {
   let summary = "affine domain";
-  let arguments = (ins OptionalAttr<BoolAttr>:$no_reduce);
+  let arguments = (ins Variadic<RankedTensorOf<[AnyScalar]>>:$tensors, OptionalAttr<BoolAttr>:$no_reduce);
   let results = (outs RankedTensorOf<[AnyScalar]>:$result);
   let regions = (region SizedRegion<1>:$body);
 }

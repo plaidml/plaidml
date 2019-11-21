@@ -6,6 +6,7 @@
 #include <unordered_set>
 #include <vector>
 
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/FormatVariadic.h"
 
 #include "mlir/Dialect/StandardOps/Ops.h"
@@ -253,6 +254,9 @@ static StringAttr getTensorName(LoweringContext* context, Value* tensor) {
     return {};
   }
   auto blockArg = llvm::cast<mlir::BlockArgument>(tensor);
+  if (auto domainOp = mlir::dyn_cast_or_null<tile::AffineDomainOp>(blockArg->getOwner()->getParentOp())) {
+    return getTensorName(context, domainOp.getOperand(blockArg->getArgNumber()));
+  }
   return context->names[blockArg->getArgNumber()];
 }
 
@@ -359,7 +363,14 @@ struct AffineDomainOpConversion : public LoweringBase {
     llvm::SmallVector<Value*, 4> tensors{outputTensor};
     for (auto src : contractionOp.getSourceIndexMaps()) {
       auto srcOp = llvm::cast<AffineSourceIndexMapOp>(src->getDefiningOp());
-      tensors.emplace_back(srcOp.tensor());
+      mlir::Value* tensor = srcOp.tensor();
+      if (auto arg = mlir::dyn_cast<mlir::BlockArgument>(tensor)) {
+        auto domain = mlir::dyn_cast_or_null<tile::AffineDomainOp>(arg->getOwner()->getParentOp());
+        if (domain) {
+          tensor = domain.getOperand(arg->getArgNumber());
+        }
+      }
+      tensors.emplace_back(tensor);
     }
 
     // add refinements
@@ -934,22 +945,27 @@ struct LoweringPass : public mlir::ModulePass<LoweringPass> {
   static std::unique_ptr<mlir::Pass> Create() { return std::make_unique<LoweringPass>(); }
 };
 
+void AddStripeLoweringPasses(mlir::PassManager* pm) {
+  pm->addPass(mlir::createCanonicalizerPass());
+  pm->addPass(mlir::createCSEPass());
+  pm->addPass(LoweringPass::Create());
+  pm->addPass(mlir::createCanonicalizerPass());
+  pm->addPass(mlir::createCSEPass());
+}
+
 OwningModuleRef LowerIntoStripe(ModuleOp workspace) {
   IVLOG(1, "LowerIntoStripe");
   OwningModuleRef module(llvm::cast<ModuleOp>(workspace.getOperation()->clone()));
   mlir::PassManager pm(workspace.getContext(), true);
-  IVLOG(3, "before:\n" << mlir::debugString(*module->getOperation()));
-  pm.addPass(mlir::createCanonicalizerPass());
-  pm.addPass(mlir::createCSEPass());
-  pm.addPass(LoweringPass::Create());
-  pm.addPass(mlir::createCanonicalizerPass());
-  pm.addPass(mlir::createCSEPass());
+  AddStripeLoweringPasses(&pm);
+  if (VLOG_IS_ON(3)) {
+    pm.enableIRPrinting([](mlir::Pass*) { return true; }, [](mlir::Pass*) { return true; }, true, llvm::dbgs());
+  }
   auto result = pm.run(*module);
   if (failed(result)) {
     IVLOG(1, "LowerIntoStripe failed: " << mlir::debugString(*module->getOperation()));
     throw std::runtime_error("Lowering to stripe dialect failure");
   }
-  IVLOG(3, "after:\n" << mlir::debugString(*module->getOperation()));
   return module;
 }
 
