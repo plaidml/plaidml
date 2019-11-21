@@ -7,6 +7,7 @@
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IR/Module.h>
+#include <llvm/IR/Verifier.h>
 #include <llvm/Support/DynamicLibrary.h>
 #include <llvm/Support/ToolOutputFile.h>
 #include <llvm/Transforms/IPO/PassManagerBuilder.h>
@@ -29,6 +30,8 @@ namespace vertexai {
 namespace tile {
 namespace targets {
 namespace cpu {
+
+#define VECTOR_MEM_ALIGNMENT 16
 
 class Error : public std::runtime_error {
  public:
@@ -73,6 +76,9 @@ ProgramModule Compiler::CompileProgram(const stripe::Block& program) {
     llvm::errs() << "LLVM IR, unoptimized: ================\n";
     module_->print(llvm::errs(), nullptr);
   }
+  if (llvm::verifyModule(*module_, &llvm::errs())) {
+    throw std::runtime_error("Byte");
+  }
   modopt.run(*module_);
   if (config_.print_llvm_ir_optimized) {
     llvm::errs() << "LLVM IR, after optimization: ================\n";
@@ -107,6 +113,7 @@ void Compiler::GenerateInvoker(const stripe::Block& program, llvm::Function* mai
   // containing the parameter buffer data pointers; the wrapper will extract
   // each data pointer, then pass each one as a parameter when it calls the
   // program's top-level block function.
+  assert(!program.has_tag("cpu_thread"));
   // LLVM doesn't have the notion of a void pointer, so we'll pretend all of
   // these buffers are arrays of int8, then bitcast later.
   llvm::Type* arrayptr = builder_.getInt8PtrTy()->getPointerTo();
@@ -205,8 +212,6 @@ void Compiler::GenerateArena(const stripe::Block& block) {
 
 llvm::Function* Compiler::CompileXSMMBlock(const stripe::Block& block, const XSMMDispatch xsmmDispatch,
                                            const XSMMCallData& xsmmCallData) {
-  IVLOG(1, "XSMM Call.");
-
   // Validate incoming params.
   if (xsmmCallData.in0 == nullptr || xsmmCallData.in1 == nullptr || xsmmCallData.out0 == nullptr ||
       xsmmCallData.lda_a_value == 0 || xsmmCallData.lda_b_value == 0 || xsmmCallData.lda_c_value == 0) {
@@ -317,21 +322,6 @@ llvm::Function* Compiler::CompileXSMMBlock(const stripe::Block& block, const XSM
                                      nptr,
                                      nptr};
   llvm::Value* func = builder_.CreateCall(dispatch, args1);
-
-  IVLOG(1, block);
-  for (const auto& kvp : buffers_) {
-    IVLOG(1, "key:" << kvp.first);
-    IVLOG(1, "value:" << kvp.second.base);
-    // kvp.second.base->dump();
-    std::string type_str;
-    llvm::raw_string_ostream rso(type_str);
-    kvp.second.base->getType()->print(rso);
-    IVLOG(1, "llvm_type:" << type_str);
-    // kvp.second.base->dump();
-  }
-  IVLOG(1, block.ref_ins()[1]->into());
-  IVLOG(1, block.ref_ins()[0]->into());
-  IVLOG(1, block.ref_outs()[0]->into());
 
   std::vector<llvm::Type*> param_types{
       func->getType(),                                     // ptr of function to call
@@ -468,14 +458,114 @@ const XSMMDispatch Compiler::GetXSMMDispatch(const stripe::Block& block) {
   return xsmmDispatch;
 }
 
+llvm::Function* Compiler::CompileThreadedBlock(const stripe::Block& block) {
+  // Generate a function implementing the body of this block.
+  // Buffers (refinements) will be passed in as function parameters, as will
+  // the initial value for each index.
+
+  for (const auto& ref : block.refs) {
+    buffers_[ref.into()] = Buffer{&ref};
+  }
+  for (const auto& idx : block.idxs) {
+    indexes_[idx.name] = Index{&idx};
+  }
+
+  // create the LLVM function which will implement the Stripe block
+  auto linkage = llvm::Function::ExternalLinkage;
+  auto name = block.name;
+  auto func_type = BlockType(block);
+  auto function = llvm::Function::Create(func_type, linkage, name, module_);
+  // create a basic block; configure the builder to start there
+  auto bb = llvm::BasicBlock::Create(context_, "entry", function);
+  builder_.SetInsertPoint(bb);
+
+  // This block will be invoked via ParallelFor, and its parameter signature
+  // must match the cpu_thread_block type defined in executable.cc.
+  assert(4 == function->arg_size());
+  // First parameter is a pointer to an array of refinement pointers.
+  // The type will always be int8_t**, so we must cast the pointer type.
+  llvm::Value* refsArray = function->getArg(0);
+  for (unsigned i = 0; i < block.refs.size(); ++i) {
+    llvm::Value* refElement = builder_.CreateConstGEP1_32(refsArray, i);
+    llvm::Value* refPtr = builder_.CreateLoad(refElement);
+    auto it = block.refs.begin();
+    std::advance(it, i);
+    llvm::Type* buftype = CType(it->interior_shape.type)->getPointerTo();
+    std::string refName = it->into();
+    buffers_[refName].base = builder_.CreateBitCast(refPtr, buftype);
+  }
+  // Second parameter points to an array of index init values.
+  llvm::Value* initsArray = function->getArg(1);
+  for (unsigned i = 0; i < block.idxs.size(); ++i) {
+    llvm::Value* idxElement = builder_.CreateConstGEP1_32(initsArray, i);
+    llvm::Value* idxInit = builder_.CreateLoad(idxElement);
+    std::string idxName = block.idxs[i].name;
+    indexes_[idxName].init = idxInit;
+    llvm::Value* idx_ptr = builder_.CreateAlloca(IndexType());
+    indexes_[idxName].variable = idx_ptr;
+  }
+  // Third parameter is the composite index range begin.
+  // Fourth parameter is the composite index range end.
+  // We will use these to replace the init & limit values for index 0.
+
+  // Construct the joint index loop
+  Loop joint_loop;
+  llvm::Value* joint_idx = builder_.CreateAlloca(IndexType());
+  CreateLoop(&joint_loop, "joint_idx");
+  EnterLoop(&joint_loop, joint_idx, function->getArg(2), function->getArg(3));
+
+  // Extract into specific index values
+  llvm::Value* cur = builder_.CreateLoad(joint_idx);
+  for (auto& idx : block.idxs) {
+    auto low_part = builder_.CreateURem(cur, IndexConst(idx.range));
+    auto with_init = builder_.CreateAdd(low_part, indexes_[idx.name].init);
+    cur = builder_.CreateUDiv(cur, IndexConst(idx.range));
+    builder_.CreateStore(with_init, indexes_[idx.name].variable);
+  }
+
+  // check the constraints against the current index values and decide whether
+  // to execute the block body for this iteration
+  llvm::Value* go = builder_.getTrue();
+  for (auto& constraint : block.constraints) {
+    llvm::Value* gateval = Eval(constraint);
+    llvm::Value* check = builder_.CreateICmpSGE(gateval, IndexConst(0));
+    go = builder_.CreateAnd(check, go);
+  }
+  auto block_body = llvm::BasicBlock::Create(context_, "block", function);
+  auto block_done = llvm::BasicBlock::Create(context_, "next", function);
+  builder_.CreateCondBr(go, block_body, block_done);
+  builder_.SetInsertPoint(block_body);
+
+  // process each statement in the block body, generating code to modify the
+  // parameter buffer contents
+  std::shared_ptr<stripe::Block> pBlock = std::make_shared<stripe::Block>(block);
+  for (const auto& stmt : block.stmts) {
+    stmt->Accept(this);
+  }
+
+  // rejoin instruction flow after the constraint check
+  builder_.CreateBr(block_done);
+  builder_.SetInsertPoint(block_done);
+
+  // increment each index, from innermost to outermost, then jump back to test
+  LeaveLoop(&joint_loop, joint_idx);
+
+  builder_.CreateRetVoid();
+  return function;
+}
+
 llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
-  if (block.has_tag("xsmm")) {
+  CompileFor compileFor = getCompileFor(block);
+  if (compileFor == XSMM_BLOCK) {
+    assert(!block.has_tag("cpu_thread"));
     const XSMMDispatch xsmmDispatch = GetXSMMDispatch(block);
     XSMMCallData xsmmCallData;
     auto data = GetXSMMCallData(&xsmmCallData, block);
     if (xsmmDispatch != XSMMDispatch::NONE && data) {
       return CompileXSMMBlock(block, xsmmDispatch, xsmmCallData);
     }
+  } else if (compileFor == THREADED_BLOCK) {
+    return CompileThreadedBlock(block);
   }
 
   // Generate a function implementing the body of this block.
@@ -498,7 +588,9 @@ llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
   auto bb = llvm::BasicBlock::Create(context_, "entry", function);
   builder_.SetInsertPoint(bb);
 
-  // associate parameter values with buffers and indexes
+  // This block will be invoked through a direct function call.
+  // First, a parameter for each refinement, containing the base address.
+  // Then, a parameter for each index, containing the initial value.
   for (auto ai = function->arg_begin(); ai != function->arg_end(); ++ai) {
     unsigned idx = ai->getArgNo();
     if (idx < block.refs.size()) {
@@ -532,9 +624,6 @@ llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
     llvm::Value* range = IndexConst(block.idxs[i].range);
     limits[i] = builder_.CreateAdd(init, range);
   }
-
-  // EmitRunTimeLogEntry(block.name, "enter");
-  ProfileBlockEnter(block);
 
   // generate the basic blocks for each nested loop's evaluation stages
   // initialize each loop index and generate the termination check
@@ -580,8 +669,6 @@ llvm::Function* Compiler::CompileBlock(const stripe::Block& block) {
     llvm::Value* variable = indexes_[block.idxs[i].name].variable;
     LeaveLoop(&loops[i], variable);
   }
-
-  ProfileBlockLeave(block);
 
   builder_.CreateRetVoid();
   return function;
@@ -797,11 +884,13 @@ void Compiler::Visit(const stripe::Block& block) {
   for (auto& fptr_iter : nested.external_funcptrs_) {
     external_funcptrs_.emplace(fptr_iter);
   }
+
+  ProfileBlockEnter(block);
   // Generate a list of args.
   // The argument list begins with a pointer to each refinement. We will either
   // pass along the address of a refinement from the current block, or allocate
   // a new buffer for the nested block's use.
-  std::vector<llvm::Value*> args;
+  std::vector<llvm::Value*> refs;
   std::vector<llvm::Value*> allocs;
   for (auto& ref : block.refs) {
     llvm::Value* buffer = nullptr;
@@ -827,20 +916,64 @@ void Compiler::Visit(const stripe::Block& block) {
       std::string name = ref.from.empty() ? ref.into() : ref.from;
       buffer = ElementPtr(buffers_[name]);
     }
-    args.push_back(buffer);
+    refs.push_back(buffer);
   }
   // Following the list of refinement args, we will provide a list of initial
   // values for each of the block's indexes, which are specified as an affine
   // in terms of the current block's indexes.
+  std::vector<llvm::Value*> idxs;
   for (auto& idx : block.idxs) {
-    args.push_back(Eval(idx.affine));
+    idxs.push_back(Eval(idx.affine));
   }
-  // Invoke the function. It does not return a value.
-  builder_.CreateCall(function, args, "");
+
+  // Assemble the argument list and invoke the function.
+  if (getCompileFor(block) == THREADED_BLOCK) {
+    assert(!block.has_tag("xsmm"));
+    // Combine the bufs into an array; pass it as the first parameter.
+    auto int8PtrType = builder_.getInt8Ty()->getPointerTo();
+    auto int8PtrArrayType = llvm::ArrayType::get(int8PtrType, refs.size());
+    llvm::Value* bufsArg = builder_.CreateAlloca(int8PtrArrayType);
+    bufsArg = builder_.CreateBitCast(bufsArg, int8PtrType->getPointerTo());
+    for (size_t i = 0; i < refs.size(); ++i) {
+      llvm::Value* castRef = builder_.CreateBitCast(refs[i], int8PtrType);
+      llvm::Value* elementPtr = builder_.CreateConstGEP1_32(bufsArg, i);
+      builder_.CreateStore(castRef, elementPtr);
+    }
+    // Combine the idx inits into an array; pass it as the second parameter.
+    auto indexArrayType = llvm::ArrayType::get(IndexType(), idxs.size());
+    llvm::Value* initsArg = builder_.CreateAlloca(indexArrayType);
+    initsArg = builder_.CreateBitCast(initsArg, IndexType()->getPointerTo());
+    for (size_t i = 0; i < idxs.size(); ++i) {
+      llvm::Value* elementPtr = builder_.CreateConstGEP1_32(initsArg, i);
+      builder_.CreateStore(idxs[i], elementPtr);
+    }
+    if (!block.idxs.empty()) {
+      size_t total_range = 1;
+      for (auto& idx : block.idxs) {
+        total_range *= idx.range;
+      }
+      ParallelFor(bufsArg, initsArg, total_range, function);
+    } else {
+      // There is no point in using ParallelFor to invoke a block which has no
+      // indexes, since there is no way to divide the work among threads.
+      auto zero = IndexConst(0);
+      builder_.CreateCall(function, {bufsArg, initsArg, zero, zero});
+    }
+  } else {
+    // Argument list consists of the refinements, followed by the index inits.
+    std::vector<llvm::Value*> args;
+    args.insert(args.end(), refs.begin(), refs.end());
+    args.insert(args.end(), idxs.begin(), idxs.end());
+    // Invoke the function. It does not return a value.
+    builder_.CreateCall(function, args, "");
+  }
+
   // Free the temporary buffers we allocated as parameter values.
   for (auto ptr : allocs) {
     Free(ptr);
   }
+
+  ProfileBlockLeave(block);
 }
 
 void Compiler::Intrinsic(const stripe::Intrinsic& intrinsic, External handler) {
@@ -1541,6 +1674,19 @@ void Compiler::AggInit(const Buffer& dest, llvm::Value* init_val) {
   }
 }
 
+void Compiler::ParallelFor(llvm::Value* refs, llvm::Value* idxs, size_t range, llvm::Function* block) {
+  llvm::Type* ptrArrayType = builder_.getInt8Ty()->getPointerTo()->getPointerTo();
+  llvm::Type* idxArrayType = IndexType()->getPointerTo();
+  std::vector<llvm::Type*> blockArgTypes{ptrArrayType, idxArrayType, IndexType(), IndexType()};
+  llvm::Type* blockType = llvm::FunctionType::get(builder_.getVoidTy(), blockArgTypes, false);
+  llvm::Type* blockPtrType = blockType->getPointerTo();
+  std::vector<llvm::Type*> fnArgTypes{ptrArrayType, idxArrayType, IndexType(), blockPtrType};
+  auto fnType = llvm::FunctionType::get(builder_.getVoidTy(), fnArgTypes, false);
+  auto fn = module_->getOrInsertFunction("ParallelFor", fnType).getCallee();
+  std::vector<llvm::Value*> argvals{refs, idxs, IndexConst(range), block};
+  builder_.CreateCall(fn, argvals, "");
+}
+
 void Compiler::Scatter(const stripe::Special& scatter) {
   // Three inputs: "data", "indices", "shape"; one output.
   // For each value in "data", look up the corresponding location from
@@ -1906,13 +2052,28 @@ llvm::Value* Compiler::IndexConst(ssize_t val) {
 llvm::FunctionType* Compiler::BlockType(const stripe::Block& block) {
   // Generate a type for the function which will implement this block.
   std::vector<llvm::Type*> param_types;
-  // Each buffer base address will be provided as a parameter.
-  for (const auto& ref : block.refs) {
-    param_types.push_back(CType(ref.interior_shape.type)->getPointerTo());
-  }
-  // Following the buffers, a parameter will provide the initial value for
-  // each of the block's indexes.
-  for (size_t i = 0; i < block.idxs.size(); ++i) {
+  if (getCompileFor(block) != THREADED_BLOCK) {
+    // This block function will be invoked directly.
+    // Each buffer base address will be provided as a parameter.
+    for (const auto& ref : block.refs) {
+      param_types.push_back(CType(ref.interior_shape.type)->getPointerTo());
+    }
+    // Following the buffers, a parameter will provide the initial value for
+    // each of the block's indexes.
+    for (size_t i = 0; i < block.idxs.size(); ++i) {
+      param_types.push_back(IndexType());
+    }
+  } else {
+    // This block function will be executed via ParallelFor.
+    // First parameter is a pointer to an array of refinement base addresses.
+    // Since all block functions must have the same type signature, we will
+    // define this as int8_t** instead and bitcast whenever we use it.
+    auto int8PtrType = builder_.getInt8Ty()->getPointerTo();
+    param_types.push_back(int8PtrType->getPointerTo());
+    // Next, pointer to an array of index init values.
+    param_types.push_back(IndexType()->getPointerTo());
+    // Third and fourth, composite index range begin and end values.
+    param_types.push_back(IndexType());
     param_types.push_back(IndexType());
   }
   // Blocks never return a value.
@@ -1947,14 +2108,37 @@ llvm::Value* Compiler::XSMMDispatchFunction(llvm::Type* alphaPtrType, llvm::Type
 }
 
 llvm::Value* Compiler::Malloc(size_t size) {
-  std::vector<llvm::Type*> argtypes{IndexType()};
+  std::vector<llvm::Type*> argtypes{IndexType()
+  // MacOS RT doesn't have the align_alloc function and the allocations
+  // on it are 16 bytes aligned.
+#ifndef __APPLE__
+                                        ,
+                                    IndexType()
+#endif  // __APPLE__
+  };
   llvm::Type* rettype = builder_.getInt8PtrTy();
   auto functype = llvm::FunctionType::get(rettype, argtypes, false);
+#ifdef __APPLE__
   const char* funcname = "malloc";
+#elif defined(_WIN32)  // !__APPLE__
+  const char* funcname = "__aligned_malloc";
+#else                  // !__APPLE__ && !_WIN32
+  const char* funcname = "aligned_alloc";
+#endif                 // __APPLE__
   auto func = module_->getOrInsertFunction(funcname, functype).getCallee();
-  auto buffer = builder_.CreateCall(func, {IndexConst(size)}, "");
+  auto buffer = builder_.CreateCall(func,
+                                    {
+#ifdef _WIN32
+                                        IndexConst(size), IndexConst(VECTOR_MEM_ALIGNMENT)},
+#else  // !_WIN32
+#ifndef __APPLE__
+                                        IndexConst(VECTOR_MEM_ALIGNMENT),
+#endif  // __APPLE__
+                                        IndexConst(size)},
+#endif  // _WIN32
+                                    "");
   return buffer;
-}
+}  // namespace cpu
 
 llvm::Value* Compiler::RunTimeLogEntry(void) {
   std::vector<llvm::Type*> argtypes{
@@ -1986,7 +2170,11 @@ void Compiler::Free(llvm::Value* buffer) {
   std::vector<llvm::Type*> argtypes{ptrtype};
   llvm::Type* rettype = llvm::Type::getVoidTy(context_);
   auto functype = llvm::FunctionType::get(rettype, argtypes, false);
+#ifdef _WIN32
+  const char* funcname = "_aligned_free";
+#else   // !_WIN32
   const char* funcname = "free";
+#endif  // _WIN32
   auto func = module_->getOrInsertFunction(funcname, functype).getCallee();
   builder_.CreateCall(func, {buffer}, "");
 }
@@ -2005,7 +2193,10 @@ llvm::Value* Compiler::ReadCycleCounter(void) {
   auto functype = llvm::FunctionType::get(builder_.getInt64Ty(), {}, false);
   const char* funcname = "llvm.readcyclecounter";
   auto func = module_->getOrInsertFunction(funcname, functype).getCallee();
-  return builder_.CreateCall(func, {}, "");
+  auto divisor = IndexConst(1000);
+  auto rcc = builder_.CreateCall(func, {}, "");
+  auto div = builder_.CreateUDiv(rcc, divisor);
+  return div;
 }
 
 void Compiler::ProfileBlockEnter(const stripe::Block& block) {
@@ -2013,25 +2204,24 @@ void Compiler::ProfileBlockEnter(const stripe::Block& block) {
     return;
   }
   // allocate counter variable
-  std::string profile_count_name = profile_count_name_ + block.name;
+  std::string block_id = ProfileBlockID(block);
+  std::string profile_count_name = profile_count_name_ + block_id;
   module_->getOrInsertGlobal(profile_count_name, IndexType());
   auto profile_count_gval = module_->getNamedGlobal(profile_count_name);
   profile_count_gval->setInitializer(llvm::Constant::getNullValue(IndexType()));
   // increment the execution count for this pass through the block
-  llvm::Value* profile_count = builder_.CreateLoad(profile_count_gval);
-  profile_count = builder_.CreateAdd(profile_count, IndexConst(1));
-  builder_.CreateStore(profile_count, profile_count_gval);
+  builder_.CreateAtomicRMW(llvm::AtomicRMWInst::BinOp::Add, profile_count_gval, IndexConst(1),
+                           llvm::AtomicOrdering::Monotonic);
   // allocate timing variable
-  std::string profile_ticks_name = profile_ticks_name_ + block.name;
+  std::string profile_ticks_name = profile_ticks_name_ + block_id;
   module_->getOrInsertGlobal(profile_ticks_name, IndexType());
   auto profile_ticks_gval = module_->getNamedGlobal(profile_ticks_name);
   profile_ticks_gval->setInitializer(llvm::Constant::getNullValue(IndexType()));
   // Subtract the current rdtsc value from the saved tick count. This will
   // give us a temporarily invalid base value, which we will correct by adding
   // the ending rdtsc value back in when the block finishes.
-  llvm::Value* profile_ticks = builder_.CreateLoad(profile_ticks_gval);
-  profile_ticks = builder_.CreateSub(profile_ticks, ReadCycleCounter());
-  builder_.CreateStore(profile_ticks, profile_ticks_gval);
+  builder_.CreateAtomicRMW(llvm::AtomicRMWInst::BinOp::Sub, profile_ticks_gval, ReadCycleCounter(),
+                           llvm::AtomicOrdering::Monotonic);
 }
 
 void Compiler::ProfileBlockLeave(const stripe::Block& block) {
@@ -2041,12 +2231,11 @@ void Compiler::ProfileBlockLeave(const stripe::Block& block) {
   // Add the current rdtsc back into the elapsed time counter, which both
   // corrects for the bias we introduced on function entry and accumulates
   // the elapsed time into the running total.
-  std::string profile_ticks_name = profile_ticks_name_ + block.name;
+  std::string block_id = ProfileBlockID(block);
+  std::string profile_ticks_name = profile_ticks_name_ + block_id;
   auto profile_ticks_gval = module_->getNamedGlobal(profile_ticks_name);
-  // add the current value of the cpu tick counter to the tick count
-  llvm::Value* profile_ticks = builder_.CreateLoad(profile_ticks_gval);
-  profile_ticks = builder_.CreateAdd(profile_ticks, ReadCycleCounter());
-  builder_.CreateStore(profile_ticks, profile_ticks_gval);
+  builder_.CreateAtomicRMW(llvm::AtomicRMWInst::BinOp::Add, profile_ticks_gval, ReadCycleCounter(),
+                           llvm::AtomicOrdering::Monotonic);
 }
 
 void Compiler::ProfileLoopEnter(const stripe::Block& block) {
@@ -2055,24 +2244,28 @@ void Compiler::ProfileLoopEnter(const stripe::Block& block) {
   }
   // Count the time spent in the loop body, excluding increment/condition
   // overhead
-  std::string profile_name = profile_loop_body_name_ + block.name;
+  std::string block_id = ProfileBlockID(block);
+  std::string profile_name = profile_loop_body_name_ + block_id;
   module_->getOrInsertGlobal(profile_name, IndexType());
   auto profile_gval = module_->getNamedGlobal(profile_name);
   profile_gval->setInitializer(llvm::Constant::getNullValue(IndexType()));
-  llvm::Value* profile_ticks = builder_.CreateLoad(profile_gval);
-  profile_ticks = builder_.CreateSub(profile_ticks, ReadCycleCounter());
-  builder_.CreateStore(profile_ticks, profile_gval);
+  builder_.CreateAtomicRMW(llvm::AtomicRMWInst::BinOp::Sub, profile_gval, ReadCycleCounter(),
+                           llvm::AtomicOrdering::Monotonic);
 }
 
 void Compiler::ProfileLoopLeave(const stripe::Block& block) {
   if (!config_.profile_loop_body) {
     return;
   }
-  std::string profile_name = profile_loop_body_name_ + block.name;
+  std::string block_id = ProfileBlockID(block);
+  std::string profile_name = profile_loop_body_name_ + block_id;
   auto profile_gval = module_->getNamedGlobal(profile_name);
-  llvm::Value* profile_ticks = builder_.CreateLoad(profile_gval);
-  profile_ticks = builder_.CreateAdd(profile_ticks, ReadCycleCounter());
-  builder_.CreateStore(profile_ticks, profile_gval);
+  builder_.CreateAtomicRMW(llvm::AtomicRMWInst::BinOp::Add, profile_gval, ReadCycleCounter(),
+                           llvm::AtomicOrdering::Monotonic);
+}
+
+std::string Compiler::ProfileBlockID(const stripe::Block& block) {
+  return block.name + "@" + std::to_string((uintptr_t)&block);
 }
 
 void Compiler::PrintOutputAssembly() {
@@ -2096,6 +2289,18 @@ void Compiler::PrintOutputAssembly() {
     pm.run(*module_);
   }
   llvm::errs() << outputStr << "\n";
+}
+
+CompileFor Compiler::getCompileFor(const stripe::Block& block) {
+  if (block.has_tag("xsmm")) {
+    // xsmm and cpu_threads tags are incompatible.
+    assert(!block.has_tag("cpu_thread"));
+    return XSMM_BLOCK;
+  } else if (block.has_tag("cpu_thread") && block.idxs_product() > 1) {
+    return THREADED_BLOCK;
+  }
+
+  return NORMAL_BLOCK;
 }
 
 }  // namespace cpu
