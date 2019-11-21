@@ -2,6 +2,7 @@
 
 #include <gmock/gmock.h>
 
+#include "plaidml2/edsl/helper.h"
 #include "tile/codegen/cache.h"
 #include "tile/codegen/tile.h"
 #include "tile/codegen/vm.h"
@@ -58,10 +59,11 @@ TEST(Codegen, Cache) {
   };
 
   int64_t dim = sqrt(expected.size());
-  auto runinfo = lib::LoadMatMul("matmul",                                        //
-                                 LogicalShape(PLAIDML_DATA_FLOAT32, {dim, dim}),  //
-                                 LogicalShape(PLAIDML_DATA_FLOAT32, {dim, dim}));
-  auto program = GenerateStripe(runinfo);
+  auto tileProgram = lib::LoadMatMul(                  //
+      "matmul",                                        //
+      LogicalShape(PLAIDML_DATA_FLOAT32, {dim, dim}),  //
+      LogicalShape(PLAIDML_DATA_FLOAT32, {dim, dim}));
+  auto program = plaidml::edsl::ConvertIntoStripe(tileProgram);
   auto main = program->entry->SubBlock(0);
   auto kernel = main->SubBlock(0);
   IVLOG(2, "Original>\n" << *program->entry);
@@ -87,10 +89,12 @@ TEST(Codegen, Cache) {
 }
 
 TEST(Codegen, CacheConv2d) {
-  auto runinfo = lib::LoadConv2d("conv2d",                                              //
-                                 LogicalShape(PLAIDML_DATA_FLOAT32, {100, 14, 14, 3}),  //
-                                 LogicalShape(PLAIDML_DATA_FLOAT32, {3, 3, 3, 3}), {100, 12, 12, 3});
-  auto program = GenerateStripe(runinfo);
+  auto tileProgram = lib::LoadConv2d(                        //
+      "conv2d",                                              //
+      LogicalShape(PLAIDML_DATA_FLOAT32, {100, 14, 14, 3}),  //
+      LogicalShape(PLAIDML_DATA_FLOAT32, {3, 3, 3, 3}),      //
+      {100, 12, 12, 3});
+  auto program = plaidml::edsl::ConvertIntoStripe(tileProgram);
   auto main = program->entry->SubBlock(0);
   auto kernel = main->SubBlock(0);
 

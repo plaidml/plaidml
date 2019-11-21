@@ -2,11 +2,10 @@
 
 #pragma once
 
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
-
-#include <boost/optional.hpp>
 
 namespace vertexai {
 namespace tile {
@@ -21,7 +20,7 @@ class Scope {
   explicit Scope(const Scope<V>* parent) : parent_{parent} {}
 
   // Lookup the key in this scope or a parent scope.
-  boost::optional<V> Lookup(const std::string& key) const {
+  std::optional<V> Lookup(const std::string& key) const {
     auto it = items_.find(key);
     if (it != items_.end()) {
       return it->second;
@@ -29,7 +28,7 @@ class Scope {
     if (parent_) {
       return parent_->Lookup(key);
     }
-    return boost::none;
+    return std::nullopt;
   }
 
   bool Defines(const std::string& key) const {

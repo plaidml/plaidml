@@ -4,14 +4,13 @@
 #include <limits>
 #include <map>
 #include <memory>
+#include <optional>
 #include <set>
 #include <sstream>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
-
-#include <boost/optional.hpp>
 
 #include "base/util/transfer_object.h"
 #include "tile/lang/flat.h"
@@ -98,7 +97,7 @@ struct KernelInfo {
   std::vector<KernelInfo> candidates;
   proto::KernelInfo info;
   KernelType ktype = KernelType::kFunction;
-  boost::optional<FlatContraction> flat;
+  std::optional<FlatContraction> flat;
   // The map from each output to the set of inputs it's allowed to alias.
   // TODO: Consider unifying this map with outputs.
   std::map<std::string, std::set<std::string>> safe_self_aliases;

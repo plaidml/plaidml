@@ -8,6 +8,13 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file"
 def plaidml_workspace():
     configure_toolchain()
 
+    dev_http_archive(
+        name = "bazel_latex",
+        sha256 = "5119802a5fbe2f27914af455c59b4ecdaaf57c0bc6c63da38098a30d94f48c9a",
+        strip_prefix = "bazel-latex-b6375d9df2952548c3371c0c865710655e8b1cc1",
+        url = "https://github.com/plaidml/bazel-latex/archive/b6375d9df2952548c3371c0c865710655e8b1cc1.zip",
+    )
+
     http_archive(
         name = "boost",
         url = "https://github.com/plaidml/depot/raw/master/boost_1_66_0.tar.gz",
@@ -177,9 +184,9 @@ def plaidml_workspace():
 
     dev_http_archive(
         name = "mlir",
-        url = "https://github.com/tensorflow/mlir/archive/a4b11eba615c87b9253f61d9b66f02839490e12b.zip",
-        sha256 = "5699b4e119b0170e72d8bfba1e132fc42b72e83eb40f56dbbd66d642c326aad6",
-        strip_prefix = "mlir-a4b11eba615c87b9253f61d9b66f02839490e12b",
+        url = "https://github.com/tensorflow/mlir/archive/fb8b50f70047220b671e0a03fab0ece2fd8b5a81.zip",
+        sha256 = "cae5f8e4d3c028036047c00008bc4241aefc2e5405361ba67ade462f02cc8e48",
+        strip_prefix = "mlir-fb8b50f70047220b671e0a03fab0ece2fd8b5a81",
         build_file = Label("//vendor/mlir:mlir.BUILD"),
         patches = [Label("//vendor/mlir:mlir.patch")],
         patch_args = ["-p1"],

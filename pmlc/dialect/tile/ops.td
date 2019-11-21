@@ -47,7 +47,7 @@ def DimOp : TileOp<"dim">, HasFolder {
 
   let builders = [OpBuilder<
     "Builder* builder, OperationState& result, Value* tensor, int64_t value", [{
-      auto type = ScalarType::get(builder->getContext(), DataType::INTX);
+      auto type = ScalarType::get(builder->getContext(), DataType::INT32);
       result.addOperands(tensor);
       result.addAttribute("dim", builder->getI64IntegerAttr(value));
       result.addTypes(type);
@@ -63,7 +63,7 @@ def AffineConstantOp : TileOp<"affine_const">, HasFolder {
   let builders = [OpBuilder<
     "Builder* builder, OperationState& result, int64_t value", [{
       result.addAttribute("value", builder->getI64IntegerAttr(value));
-      result.addTypes(ScalarType::get(builder->getContext(), DataType::INTX));
+      result.addTypes(ScalarType::get(builder->getContext(), DataType::INT32));
     }]
   >];
 
@@ -78,7 +78,7 @@ def AffineIndexOp : TileOp<"idx"> {
 
   let builders = [OpBuilder<
     "Builder* builder, OperationState& result", [{
-      result.addTypes(ScalarType::get(builder->getContext(), DataType::INTX));
+      result.addTypes(ScalarType::get(builder->getContext(), DataType::INT32));
     }]
   >];
 }
@@ -91,7 +91,7 @@ class AffineOp<string mnemonic, list<OpTrait> traits = []> :
   let builders = [OpBuilder<
     "Builder* builder, OperationState& result, ArrayRef<Value*> operands", [{
       result.addOperands(operands);
-      result.addTypes(ScalarType::get(builder->getContext(), DataType::INTX));
+      result.addTypes(ScalarType::get(builder->getContext(), DataType::INT32));
     }]
   >];
 }
@@ -446,5 +446,5 @@ def ScatterOp : SpecialOp<"scatter">, HasCanonicalizer {
 def ShapeOp : SpecialOp<"shape">, HasCanonicalizer {
   let summary = "tensor shape operation";
   let arguments = (ins RankedTensorOf<[AnyScalar]>:$tensor);
-  let results = (outs VectorOf<[ScalarIndex]>:$result);
+  let results = (outs RankedTensorOf<[ScalarIndex]>:$result);
 }

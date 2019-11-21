@@ -22,9 +22,10 @@ namespace stripe {
 struct OpAsmInterface : public mlir::OpAsmDialectInterface {
   using mlir::OpAsmDialectInterface::OpAsmDialectInterface;
 
-  /// Get a special name to use when printing the given operation. The desired
-  /// name should be streamed into 'os'.
-  void getOpResultName(Operation* op, llvm::raw_ostream& os) const final {
+  /// Get a special name to use when printing the given operation.
+  void getAsmResultNames(Operation* op, mlir::OpAsmSetValueNameFn setNameFn) const final {
+    llvm::SmallString<32> osbuf;
+    llvm::raw_svector_ostream os(osbuf);
     if (auto attr = op->getAttrOfType<StringAttr>("name")) {
       os << attr.getValue();
     } else if (auto attr = op->getAttrOfType<StringAttr>("scalar_name")) {
@@ -34,6 +35,7 @@ struct OpAsmInterface : public mlir::OpAsmDialectInterface {
         os << 'c' << poly_op.offset().getSExtValue();
       }
     }
+    setNameFn(op->getResult(0), os.str());
   }
 
   void getRegionArgumentName(mlir::BlockArgument* arg, llvm::raw_ostream& os) const {

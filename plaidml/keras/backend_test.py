@@ -1802,6 +1802,180 @@ class TestBackendOps(unittest.TestCase):
         o = b.relu(c)
         return [o]
 
+
+    ### The tests below represent the resnet layers.
+    @opTest([[m(1, 56, 56, 64), m(1, 1, 64, 256)]],
+            do_grads=False,
+            num_iterations=10,
+            measure_eval_time=True)
+    def resnetLayer10(self, b, x, k):
+        c = b.conv2d(x, k, padding='same')
+        o = b.relu(c)
+        return [o]
+
+    @opTest([[m(1, 56, 56, 64), m(1, 1, 64, 64)]],
+            do_grads=False,
+            num_iterations=10,
+            measure_eval_time=True)
+    def resnetLayer11(self, b, x, k):
+        c = b.conv2d(x, k, padding='same')
+        o = b.relu(c)
+        return [o]
+
+    @opTest([[m(1, 56, 56, 64), m(3, 3, 64, 64)]],
+            do_grads=False,
+            num_iterations=10,
+            measure_eval_time=True)
+    def resnetLayer12(self, b, x, k):
+        c = b.conv2d(x, k, padding='same')
+        o = b.relu(c)
+        return [o]
+
+    @opTest([[m(1, 56, 56, 256), m(1, 1, 256, 64)]],
+            do_grads=False,
+            num_iterations=10,
+            measure_eval_time=True)
+    def resnetLayer13(self, b, x, k):
+        c = b.conv2d(x, k, padding='same')
+        o = b.relu(c)
+        return [o]
+
+    @opTest([[m(1, 56, 56, 256), m(1, 1, 256, 512)]],
+            do_grads=False,
+            num_iterations=10,
+            measure_eval_time=True)
+    def resnetLayer14(self, b, x, k):
+        c = b.conv2d(x, k, padding='same', strides=(1, 2))
+        o = b.relu(c)
+        return [o]
+
+    @opTest([[m(1, 56, 56, 256), m(1, 1, 256, 128)]],
+            do_grads=False,
+            num_iterations=10,
+            measure_eval_time=True)
+    def resnetLayer15(self, b, x, k):
+        c = b.conv2d(x, k, padding='same', strides=(1, 2))
+        o = b.relu(c)
+        return [o]
+
+    @opTest([[m(1, 28, 28, 128), m(3, 3, 128, 128)]],
+            do_grads=False,
+            num_iterations=10,
+            measure_eval_time=True)
+    def resnetLayer16(self, b, x, k):
+        c = b.conv2d(x, k, padding='same')
+        o = b.relu(c)
+        return [o]
+
+    @opTest([[m(1, 28, 28, 128), m(1, 1, 128, 512)]],
+            do_grads=False,
+            num_iterations=10,
+            measure_eval_time=True)
+    def resnetLayer17(self, b, x, k):
+        c = b.conv2d(x, k, padding='same')
+        o = b.relu(c)
+        return [o]
+
+    @opTest([[m(1, 28, 28, 512), m(1, 1, 512, 128)]],
+            do_grads=False,
+            num_iterations=10,
+            measure_eval_time=True)
+    def resnetLayer18(self, b, x, k):
+        c = b.conv2d(x, k, padding='same')
+        o = b.relu(c)
+        return [o]
+
+    @opTest([[m(1, 28, 28, 512), m(1, 1, 512, 1024)]],
+            do_grads=False,
+            num_iterations=10,
+            measure_eval_time=True)
+    def resnetLayer19(self, b, x, k):
+        c = b.conv2d(x, k, padding='same', strides=(1, 2))
+        o = b.relu(c)
+        return [o]
+
+    @opTest([[m(1, 28, 28, 512), m(1, 1, 512, 256)]],
+            do_grads=False,
+            num_iterations=10,
+            measure_eval_time=True)
+    def resnetLayer20(self, b, x, k):
+        c = b.conv2d(x, k, padding='same', strides=(1, 2))
+        o = b.relu(c)
+        return [o]
+
+    @opTest([[m(1, 14, 14, 256), m(3, 3, 256, 256)]],
+            do_grads=False,
+            num_iterations=10,
+            measure_eval_time=True)
+    def resnetLayer21(self, b, x, k):
+        c = b.conv2d(x, k, padding='same')
+        o = b.relu(c)
+        return [o]
+
+    @opTest([[m(1, 14, 14, 256), m(1, 1, 256, 1024)]],
+            do_grads=False,
+            num_iterations=10,
+            measure_eval_time=True)
+    def resnetLayer22(self, b, x, k):
+        c = b.conv2d(x, k, padding='same')
+        o = b.relu(c)
+        return [o]
+
+    @opTest([[m(1, 14, 14, 1024), m(1, 1, 1024, 256)]],
+            do_grads=False,
+            num_iterations=10,
+            measure_eval_time=True)
+    def resnetLayer23(self, b, x, k):
+        c = b.conv2d(x, k, padding='same')
+        o = b.relu(c)
+        return [o]
+
+
+    @opTest([[m(1, 14, 14, 1024), m(1, 1, 1024, 2048)]],
+            do_grads=False,
+            num_iterations=10,
+            measure_eval_time=True)
+    def resnetLayer24(self, b, x, k):
+        c = b.conv2d(x, k, padding='same', strides=(1, 2))
+        o = b.relu(c)
+        return [o]
+
+    @opTest([[m(1, 14, 14, 1024), m(1, 1, 1024, 512)]],
+            do_grads=False,
+            num_iterations=10,
+            measure_eval_time=True)
+    def resnetLayer25(self, b, x, k):
+        c = b.conv2d(x, k, padding='same', strides=(1, 2),)
+        o = b.relu(c)
+        return [o]
+
+    @opTest([[m(1, 7, 7, 512), m(3, 3, 512, 512)]],
+            do_grads=False,
+            num_iterations=10,
+            measure_eval_time=True)
+    def resnetLayer26(self, b, x, k):
+        c = b.conv2d(x, k, padding='same')
+        o = b.relu(c)
+        return [o]
+
+    @opTest([[m(1, 7, 7, 512), m(1, 1, 512, 2048)]],
+            do_grads=False,
+            num_iterations=10,
+            measure_eval_time=True)
+    def resnetLayer27(self, b, x, k):
+        c = b.conv2d(x, k, padding='same')
+        o = b.relu(c)
+        return [o]
+
+    @opTest([[m(1, 7, 7, 2048), m(1, 1, 2048, 512)]],
+            do_grads=False,
+            num_iterations=10,
+            measure_eval_time=True)
+    def resnetLayer28(self, b, x, k):
+        c = b.conv2d(x, k, padding='same')
+        o = b.relu(c)
+        return [o]
+
     @opTest([[m(1, 64, 64, 128), m(3, 3, 128, 128)]],
             do_grads=False,
             num_iterations=10,
