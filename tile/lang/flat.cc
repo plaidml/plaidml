@@ -12,6 +12,8 @@
 #include "base/util/logging.h"
 #include "tile/lang/bound.h"
 
+TRANSFER_ENUM(vertexai::tile::DataType);
+
 namespace vertexai {
 namespace tile {
 namespace lang {

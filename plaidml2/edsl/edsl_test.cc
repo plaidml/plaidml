@@ -1085,5 +1085,45 @@ module {
   EXPECT_THAT(data[1], 20);
 }
 
+TEST(CppEdsl, Prng) {
+  auto S = Placeholder(PLAIDML_DATA_UINT32, {3, 2048});
+  auto O = prng(S, {2, 3, 4, 5});
+  Program program("prng", {O});
+#ifdef PLAIDML_AST
+  EXPECT_THAT(program, Eq(R"(function (
+  _X0[_X0_0, _X0_1]
+) -> (
+  _X6,
+  _X7
+) {
+  _X1 = 2;
+  _X2 = 3;
+  _X3 = 4;
+  _X4 = 5;
+  _X5 = prng_step(_X0, _X1, _X2, _X3, _X4);
+  _X6 = prng_state(_X5);
+  _X7 = prng_value(_X5);
+}
+)"));
+#endif
+#ifdef PLAIDML_MLIR
+  EXPECT_THAT(program, Eq(R"#(
+
+!i32 = type tensor<!eltwise.i32>
+module {
+  func @prng(%arg0: tensor<3x2048x!eltwise.u32>) -> (tensor<2x3x4x5x!eltwise.fp32>, tensor<3x2048x!eltwise.u32>) {
+    %c5 = "eltwise.sconst"() {value = 5 : i64} : () -> !i32
+    %c4 = "eltwise.sconst"() {value = 4 : i64} : () -> !i32
+    %c3 = "eltwise.sconst"() {value = 3 : i64} : () -> !i32
+    %c2 = "eltwise.sconst"() {value = 2 : i64} : () -> !i32
+    %0:2 = "tile.prng"(%arg0, %c2, %c3, %c4, %c5) : (tensor<3x2048x!eltwise.u32>, !i32, !i32, !i32, !i32) -> (tensor<2x3x4x5x!eltwise.fp32>, tensor<3x2048x!eltwise.u32>)
+    return %0#0, %0#1 : tensor<2x3x4x5x!eltwise.fp32>, tensor<3x2048x!eltwise.u32>
+  }
+}
+)#"));
+#endif
+  exec::Binder(program).set_inputs({S}).build()->run();
+}
+
 }  // namespace
 }  // namespace plaidml::edsl

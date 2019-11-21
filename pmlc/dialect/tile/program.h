@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include <unordered_map>
+#include <vector>
 
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Module.h"
@@ -13,12 +13,16 @@ namespace pmlc {
 namespace dialect {
 namespace tile {
 
-using IoMap = std::unordered_map<mlir::Value*, vertexai::tile::BufferPtr>;
+struct ProgramArgument {
+  bool isInput;
+  mlir::Value* value;
+  vertexai::tile::BufferPtr buffer;
+};
 
 struct TileProgram {
   mlir::OwningModuleRef module;
-  mlir::BlockAndValueMapping mapper;
-  IoMap ioMap;
+  std::vector<mlir::Value*> outputs;
+  std::vector<ProgramArgument> arguments;
 
   explicit TileProgram(mlir::ModuleOp module) : module(module) {}
 };

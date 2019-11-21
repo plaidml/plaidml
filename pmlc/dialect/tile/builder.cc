@@ -6,6 +6,7 @@
 #include <queue>
 #include <set>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -34,7 +35,6 @@
 #include "pmlc/dialect/tile/program.h"
 #include "pmlc/util/slice.h"
 #include "pmlc/util/util.h"
-#include "tile/base/shape.h"
 
 namespace pmlc::dialect::tile {
 
@@ -61,15 +61,18 @@ struct DomainInfo {
 };
 
 using ContractionKey = std::pair<AggregationKind, CombinationKind>;
+using Bindings = std::unordered_map<mlir::Value*, vertexai::tile::BufferPtr>;
 
 struct TileBuilder::Impl {
   MLIRContext context;
   ModuleOp module;
   OpBuilder builder;
   std::map<AffineDomainOp, DomainInfo> domains;
-  IoMap ioMap;
-  static std::map<ContractionKey, std::string> contractions;
+  std::map<Value*, Value*> implicitUpdates;
+  Bindings implicitBindings;
   NoneOp noneOp;
+
+  static std::map<ContractionKey, std::string> contractions;
 
   Impl()
       : module(ModuleOp::create(UnknownLoc::get(&context))),  //
@@ -107,6 +110,35 @@ struct TileBuilder::Impl {
       }
       return false;
     });
+  }
+
+  Value* makeIndexOp(StringRef fn, ArrayRef<Value*> args) {
+    if (args.size() != 2) {
+      throw std::runtime_error("index op expects 2 operands");
+    }
+    auto tensor = args[0];
+    auto dim = args[1];
+    auto resultType = IndexOp::getResultType(args.take_front());
+    IntegerAttr dimAttr;
+    if (!m_Constant(&dimAttr).match(dim->getDefiningOp())) {
+      throw std::runtime_error("index op expect argument 2 to be a constant integer");
+    }
+    auto op = builder.create<IndexOp>(builder.getUnknownLoc(), resultType, tensor, dimAttr);
+    return op.result();
+  }
+
+  Value* makePrngOp(StringRef fn, ArrayRef<Value*> args) {
+    if (args.size() < 1) {
+      throw std::runtime_error("prng op expects at least one operand");
+    }
+    auto state = args.front();
+    auto dims = args.drop_front();
+    auto resultType = PrngOp::getResultType(args);
+    auto elementType = builder.getType<ScalarType>(DataType::UINT32);
+    auto stateType = RankedTensorType::get({3, 2048}, elementType);
+    auto op = builder.create<PrngOp>(builder.getUnknownLoc(), resultType, stateType, state, dims);
+    implicitUpdates.emplace(op.new_state(), op.state());
+    return op.result();
   }
 };
 
@@ -149,7 +181,7 @@ TileBuilder::~TileBuilder() = default;
 
 void TileBuilder::Destroy(Value* value) {
   IVLOG(5, "TileBuilder::Destroy> value");
-  // impl->ioMap.erase(value);
+  // impl->implicitBindings.erase(value);
   // TODO: fix memory mgmt issues, once purely MLIR path is complete
   // if (value && value->use_empty()) {
   //   auto op = value->getDefiningOp();
@@ -236,9 +268,10 @@ RankedTensorType TileBuilder::ComputeShape(Value* tensor) {
   if (type.hasStaticShape()) {
     return type;
   }
-  SmallVector<Value*, 1> outputs{tensor};
-  auto program = MakeProgram("compute_shape", outputs, outputs);
-  return outputs[0]->getType().dyn_cast<RankedTensorType>();
+  ProgramMutations mutations;
+  mutations.outputs.emplace_back(tensor);
+  auto program = MakeProgram("compute_shape", mutations);
+  return program->outputs[0]->getType().dyn_cast<RankedTensorType>();
 }
 
 Value* TileBuilder::MakeCastOp(Value* tensor, DataType dtype) {
@@ -251,23 +284,18 @@ Value* TileBuilder::MakeCastOp(Value* tensor, DataType dtype) {
 }
 
 Value* TileBuilder::MakePrimitiveOp(StringRef fn, ArrayRef<Value*> args) {
+  using PrimitiveBuilder = Value* (Impl::*)(StringRef fn, ArrayRef<Value*> args);
+  static std::map<StringRef, PrimitiveBuilder> primitives = {
+      {"index", &Impl::makeIndexOp},
+      {"prng", &Impl::makePrngOp},
+  };
   IVLOG(5, "TileBuilder::MakePrimitiveOp> " << fn.str());
   for (auto arg : args) {
     IVLOG(6, "  arg: " << mlir::debugString(*arg));
   }
-  if (fn == "index") {
-    if (args.size() != 2) {
-      throw std::runtime_error("index op expects 2 operands");
-    }
-    auto tensor = args[0];
-    auto dim = args[1];
-    auto resultType = IndexOp::getResultType(args.take_front());
-    IntegerAttr dimAttr;
-    if (!m_Constant(&dimAttr).match(dim->getDefiningOp())) {
-      throw std::runtime_error("index op expect argument 2 to be a constant integer");
-    }
-    auto op = impl->builder.create<IndexOp>(impl->builder.getUnknownLoc(), resultType, tensor, dimAttr);
-    return op.result();
+  auto it = primitives.find(fn);
+  if (it != primitives.end()) {
+    return (impl.get()->*it->second)(fn, args);
   }
   auto abstractOp = impl->lookupOperation(fn);
   auto genericBuilder = abstractOp->getInterface<util::GenericBuilder>();
@@ -376,7 +404,7 @@ Value* TileBuilder::MakePlaceholderOp(RankedTensorType type, BufferPtr buffer, S
     op.setAttr("name", impl->builder.getStringAttr(name));
   }
   if (buffer) {
-    impl->ioMap.emplace(op.result(), buffer);
+    impl->implicitBindings[op.result()] = buffer;
   }
   return op.result();
 }
@@ -619,30 +647,28 @@ Value* TileBuilder::MakeContractionOp(  //
   return domainOp.result();
 }
 
-std::shared_ptr<TileProgram> TileBuilder::MakeProgram(  //
-    StringRef name,                                     //
-    ArrayRef<Value*> outputs,                           //
-    llvm::MutableArrayRef<Value*> new_outputs) {
+std::shared_ptr<TileProgram> TileBuilder::MakeProgram(StringRef name, const ProgramMutations& mutations) {
   if (name.empty()) {
     name = "noname";
   }
   IVLOG(5, "TileBuilder::MakeProgram> " << name.str());
   IVLOG(6, mlir::debugString(impl->module));
-  // Compute the result types
-  std::vector<Type> resultTypes(outputs.size());
-  llvm::SetVector<Value*> values;
-  for (unsigned i = 0; i < outputs.size(); i++) {
-    if (!outputs[i]) {
+  // Wrap duplicate outputs and outputs that directly refer to inputs
+  llvm::SetVector<Value*> outputs;
+  for (auto output : mutations.outputs) {
+    if (!output) {
       throw std::runtime_error("Invalid output");
     }
-    resultTypes[i] = outputs[i]->getType();
-    if (values.count(outputs[i]) || llvm::isa<PlaceholderOp>(outputs[i]->getDefiningOp())) {
-      values.insert(MakePrimitiveOp("ident", {outputs[i]}));
+    if (outputs.count(output) || llvm::isa<PlaceholderOp>(output->getDefiningOp())) {
+      outputs.insert(MakePrimitiveOp("ident", {output}));
     } else {
-      values.insert(outputs[i]);
+      outputs.insert(output);
     }
   }
-  auto slice = util::getBackwardSlice(values, true);
+  for (const auto& update : mutations.updates) {
+    outputs.insert(update.source);
+  }
+  auto slice = util::getBackwardSlice(outputs, true);
   // Compute the input types
   std::vector<Type> inputTypes;
   for (auto value : slice) {
@@ -656,46 +682,75 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(  //
   auto module = ModuleOp::create(loc);
   auto program = std::make_shared<TileProgram>(module);
   // Construct a function to represent the entire program
-  auto funcType = mlir::FunctionType::get(inputTypes, resultTypes, &impl->context);
-  auto funcOp = mlir::FuncOp::create(loc, name, funcType, {});
+  auto initialFuncType = mlir::FunctionType::get(inputTypes, {}, &impl->context);
+  auto funcOp = mlir::FuncOp::create(loc, name, initialFuncType, {});
   funcOp.addEntryBlock();
   OpBuilder builder(funcOp.getBody());
   std::set<std::string> names;
   auto attrName = Dialect::getDialectAttrName("name");
   unsigned argcnt = 0;
+  std::map<Operation*, Operation*> opMap;
+  BlockAndValueMapping mapper;
   for (auto value : slice) {
-    auto it = impl->ioMap.find(value);
-    if (it != impl->ioMap.end()) {
-      program->ioMap.emplace(it->first, it->second);
-    }
     auto op = value->getDefiningOp();
     // Only copy over top-level ops (those owned by the workspace module)
     if (op && op->getBlock() == impl->module.getBody()) {
       if (auto placeholderOp = llvm::dyn_cast<PlaceholderOp>(op)) {
         // Replace placeholders with block arguments
-        auto new_value = funcOp.getArgument(argcnt++);
+        auto blockArg = funcOp.getArgument(argcnt++);
         if (auto attr = placeholderOp.getAttrOfType<StringAttr>("name")) {
           auto uniqueName = util::getUniqueName(&names, attr.getValue());
           auto uniqueAttr = builder.getStringAttr(uniqueName);
-          funcOp.setArgAttr(new_value->getArgNumber(), attrName, uniqueAttr);
+          funcOp.setArgAttr(blockArg->getArgNumber(), attrName, uniqueAttr);
         }
-        IVLOG(5, "BlockArgument mapping: " << value << " -> " << new_value);
-        program->mapper.map(value, new_value);
+        IVLOG(5, "BlockArgument mapping: " << value << " -> " << blockArg);
+        mapper.map(value, blockArg);
+        ProgramArgument programArg{true, value};
+        auto itBinding = impl->implicitBindings.find(value);
+        if (itBinding != impl->implicitBindings.end()) {
+          programArg.buffer = itBinding->second;
+        }
+        program->arguments.emplace_back(programArg);
       } else {
-        auto new_value = builder.clone(*op, program->mapper)->getResult(0);
-        IVLOG(5, "mapping: " << value << " -> " << new_value);
-        IVLOG(6, "value: " << mlir::debugString(*value));
-        IVLOG(6, "new_value: " << mlir::debugString(*new_value));
-        program->mapper.map(value, new_value);
+        Operation* newOp;
+        auto it = opMap.find(op);
+        if (it != opMap.end()) {
+          newOp = it->second;
+        } else {
+          newOp = builder.clone(*op, mapper);
+          opMap.emplace(op, newOp);
+        }
+        for (unsigned i = 0; i < op->getNumResults(); i++) {
+          auto oldResult = op->getResult(i);
+          auto newResult = newOp->getResult(i);
+          if (oldResult == value) {
+            IVLOG(5, "mapping: " << value << " -> " << newResult);
+            IVLOG(6, "value: " << mlir::debugString(*value));
+            IVLOG(6, "newResult: " << mlir::debugString(*newResult));
+            mapper.map(value, newResult);
+          } else {
+            auto itUpdate = impl->implicitUpdates.find(oldResult);
+            if (itUpdate != impl->implicitUpdates.end()) {
+              mapper.map(oldResult, newResult);
+              outputs.insert(oldResult);
+            }
+          }
+        }
       }
     }
   }
   // Add a final ReturnOp
-  std::vector<Value*> rets;
-  for (unsigned i = 0; i < values.size(); i++) {
-    rets.emplace_back(program->mapper.lookup(values[i]));
+  std::vector<Value*> returnOperands;
+  std::vector<Type> resultTypes;
+  for (auto output : outputs) {
+    auto value = mapper.lookup(output);
+    resultTypes.emplace_back(value->getType());
+    returnOperands.emplace_back(value);
   }
-  auto returnOp = builder.create<mlir::ReturnOp>(loc, rets);
+  auto returnOp = builder.create<mlir::ReturnOp>(loc, returnOperands);
+  // compute final function type
+  auto finalFuncType = mlir::FunctionType::get(inputTypes, resultTypes, &impl->context);
+  funcOp.setType(finalFuncType);
   // Attach the function to the module
   module.push_back(funcOp);
   IVLOG(5, mlir::debugString(module));
@@ -712,7 +767,18 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(  //
     throw std::runtime_error("Optimization passes failure");
   }
   for (unsigned i = 0; i < returnOp.getNumOperands(); i++) {
-    new_outputs[i] = returnOp.getOperand(i);
+    program->outputs.emplace_back(returnOp.getOperand(i));
+    auto value = returnOp.getOperand(i);
+    auto itUpdate = impl->implicitUpdates.find(outputs[i]);
+    if (itUpdate != impl->implicitUpdates.end()) {
+      value = itUpdate->second;
+    }
+    ProgramArgument programArg{false, value};
+    auto itBinding = impl->implicitBindings.find(outputs[i]);
+    if (itBinding != impl->implicitBindings.end()) {
+      programArg.buffer = itBinding->second;
+    }
+    program->arguments.emplace_back(programArg);
   }
   IVLOG(2, "TileBuilder::MakeProgram>" << mlir::debugString(module));
   return program;
