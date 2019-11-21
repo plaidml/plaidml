@@ -13,7 +13,6 @@ steps:
       PLATFORM: '{{name}}'
 {{/variants}}
 
-  - wait
 
 # test phase
 
