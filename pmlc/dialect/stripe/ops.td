@@ -68,7 +68,7 @@ def LoadIndexOp : StripeOp<"load_index"> {
   let results = (outs EltwiseAny:$into);
 }
 
-def StoreOp : StripeOp<"store"> {
+def StoreOp : StripeOpWithPP<"store"> {
   let summary = "Store into a tensor";
   let arguments = (ins TensorRefType:$into, EltwiseAny:$from);
 }

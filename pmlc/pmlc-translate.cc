@@ -4,8 +4,10 @@
 
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/ToolOutputFile.h"
 
+#include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/Support/FileUtilities.h"
 #include "mlir/Support/LogicalResult.h"
@@ -48,8 +50,8 @@ int main(int argc, char** argv) {
   }
 
   // Add flags for all the registered translations.
-  cl::opt<const TranslateFunction*, false, TranslationParser> requested_translation(  //
-      "", cl::desc("Translation to perform"));
+  llvm::cl::opt<const TranslateFunction*, false, TranslationParser> translationRequested(
+      "", llvm::cl::desc("Translation to perform"), llvm::cl::Required);
 
   cl::ParseCommandLineOptions(argc, argv, "pmlc MLIR translation driver\n");
 
@@ -66,9 +68,18 @@ int main(int argc, char** argv) {
     return 1;
   }
 
+  // Processes the memory buffer with a new MLIRContext.
   auto processBuffer = [&](std::unique_ptr<MemoryBuffer> ownedBuffer, raw_ostream& os) {
     MLIRContext context;
-    return (*requested_translation)(std::move(ownedBuffer), os, &context);
+    llvm::SourceMgr sourceMgr;
+    sourceMgr.AddNewSourceBuffer(std::move(ownedBuffer), llvm::SMLoc());
+
+    // In the diagnostic verification flow, we ignore whether the translation
+    // failed (in most cases, it is expected to fail). Instead, we check if the
+    // diagnostics were produced as expected.
+    mlir::SourceMgrDiagnosticVerifierHandler sourceMgrHandler(sourceMgr, &context);
+    (*translationRequested)(sourceMgr, os, &context);
+    return sourceMgrHandler.verify();
   };
 
   if (splitInputFile) {

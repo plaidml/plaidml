@@ -22,7 +22,6 @@ plaidml_cc_binary(
         "@mlir//:EDSC",
         "@mlir//:OptMain",
         "@mlir//:Parser",
-        "@mlir//:TestTransforms",
         "@mlir//:Transforms",
     ],
 )

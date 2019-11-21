@@ -301,10 +301,12 @@ TEST(CppEdsl, MnistCnn) {
 }
 )"));
 #endif
+#ifdef PLAIDML_MLIR
   exec::Binder(program)
       .set_inputs({input, kernel1, bias1, kernel2, bias2, kernel3, bias3, kernel4, bias4})
       .build()
       ->run();
+#endif  // PLAIDML_MLIR
 }
 
 Tensor Normalize(const Tensor& X) {

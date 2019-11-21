@@ -270,7 +270,7 @@ proto::Location IntoProto(const Location& loc) {
   return ret;
 }
 
-struct AttrValueVisitor : public boost::static_visitor<proto::Attribute> {
+struct AttrValueVisitor {
   proto::Attribute operator()(const Void& x) const {
     proto::Attribute ret;
     return ret;
@@ -338,7 +338,7 @@ proto::Refinement IntoProto(const Refinement& ref) {
   // }
   AttrValueVisitor visitor;
   for (const auto& attr : Accessor::impl(ref)->attrs) {
-    (*ret.mutable_attrs())[attr.first] = boost::apply_visitor(visitor, attr.second);
+    (*ret.mutable_attrs())[attr.first] = std::visit(visitor, attr.second);
   }
   return ret;
 }
@@ -416,7 +416,7 @@ proto::Statement IntoProto(const std::shared_ptr<Statement>& stmt, const std::ve
   }
   AttrValueVisitor visitor;
   for (const auto& attr : Accessor::impl(*stmt)->attrs) {
-    (*ret.mutable_attrs())[attr.first] = boost::apply_visitor(visitor, attr.second);
+    (*ret.mutable_attrs())[attr.first] = std::visit(visitor, attr.second);
   }
   switch (stmt->kind()) {
     case StmtKind::Load:
@@ -451,7 +451,7 @@ proto::Index IntoProto(const Index& idx) {
   *ret.mutable_affine() = IntoProto(idx.affine);
   AttrValueVisitor visitor;
   for (const auto& attr : Accessor::impl(idx)->attrs) {
-    (*ret.mutable_attrs())[attr.first] = boost::apply_visitor(visitor, attr.second);
+    (*ret.mutable_attrs())[attr.first] = std::visit(visitor, attr.second);
   }
   return ret;
 }
@@ -502,7 +502,7 @@ proto::Program IntoProto(const Program& program) {
   }
   AttrValueVisitor visitor;
   for (const auto& attr : Accessor::impl(*program.entry)->attrs) {
-    (*entry->mutable_attrs())[attr.first] = boost::apply_visitor(visitor, attr.second);
+    (*entry->mutable_attrs())[attr.first] = std::visit(visitor, attr.second);
   }
   return ret;
 }

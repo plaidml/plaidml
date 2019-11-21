@@ -2,7 +2,7 @@ import unittest
 import numpy.testing as npt
 import os
 
-from networks.scitile.uw_toroidal_shell import toroidal_shell_integral
+from networks.scitile.uw_toroidal_shell.uw_toroidal_shell import toroidal_shell_integral
 
 DEFAULT_TOL = 1e-3
 DEFAULT_ATOL = 1e-8
