@@ -19,6 +19,8 @@
 #define PASS_NAME "convert-stripe-to-affine"
 #define DEBUG_TYPE PASS_NAME
 
+using llvm::cast;
+using llvm::isa;
 using llvm::SmallVector;
 using llvm::SmallVectorImpl;
 using mlir::AffineExpr;
@@ -26,7 +28,6 @@ using mlir::AffineLoadOp;
 using mlir::AffineMap;
 using mlir::ArrayAttr;
 using mlir::ArrayRef;
-using mlir::cast;
 using mlir::ConstantIndexOp;
 using mlir::ConversionPatternRewriter;
 using mlir::DenseMap;
