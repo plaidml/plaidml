@@ -6,6 +6,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <unordered_map>
 
 #include "llvm/Support/FormatVariadic.h"
 
@@ -31,6 +32,7 @@ using plaidml::core::GlobalContext;
 using vertexai::context::Context;
 using vertexai::tile::Allocator;
 using vertexai::tile::Buffer;
+using vertexai::tile::BufferPtr;
 using vertexai::tile::ConstBufferManager;
 using vertexai::tile::Program;
 using vertexai::tile::View;
@@ -166,59 +168,35 @@ plaidml_executable* plaidml_compile(  //
     exec->program = GetPlatform()->MakeProgram(ctx, device, target, stripe, &const_bufs);
     IVLOG(1, "After make program");
 
-    // add user supplied input buffers to the ioMap
-    for (size_t i = 0; i < ninputs; i++) {
-      IVLOG(1, "Input[" << i << "]");
-      auto stagingValue = inputs[i]->expr->value;
-      program->program->ioMap.emplace(stagingValue, inputs[i]->buffer->buffer);
+    using Bindings = std::unordered_map<mlir::Value*, vertexai::tile::BufferPtr>;
+    Bindings bindings;
+    for (unsigned i = 0; i < ninputs; i++) {
+      bindings[inputs[i]->expr->value] = inputs[i]->buffer->buffer;
+    }
+    for (unsigned i = 0; i < noutputs; i++) {
+      bindings[outputs[i]->expr->value] = outputs[i]->buffer->buffer;
     }
 
-    // bind all input buffers
-    auto stripeFuncOp = llvm::dyn_cast<mlir::FuncOp>(module->getBody()->front());
-    if (!stripeFuncOp) {
-      throw std::runtime_error("Missing stripe FuncOp");
-    }
-    for (const auto& [stagingValue, buffer] : program->program->ioMap) {
-      auto programValue = program->program->mapper.lookupOrNull(stagingValue);
-      if (!programValue) {
-        // This must be an unused input, ignore it.
-        continue;
-      }
-      auto arg = llvm::dyn_cast<mlir::BlockArgument>(programValue);
-      if (!arg) {
-        throw std::runtime_error("Expected input to be a block argument");
-      }
-      auto argNumber = arg->getArgNumber();
-      auto attrName = Dialect::getDialectAttrName("name");
-      auto attr = stripeFuncOp.getArgAttrOfType<mlir::StringAttr>(argNumber, attrName);
+    auto attrName = Dialect::getDialectAttrName("name");
+    auto stripeFuncOp = llvm::cast<mlir::FuncOp>(module->getBody()->front());
+    for (unsigned i = 0; i < program->program->arguments.size(); i++) {
+      const auto& arg = program->program->arguments[i];
+      auto attr = stripeFuncOp.getArgAttrOfType<mlir::StringAttr>(i, attrName);
       if (!attr) {
         throw std::runtime_error("Missing expected argument attribute");
       }
-      auto inputName = attr.getValue().str();
-      IVLOG(1, "  name: " << inputName);
-      exec->input_bufs[inputName] = buffer;
-    }
-
-    // bind output buffers
-    auto tileFuncOp = llvm::dyn_cast<mlir::FuncOp>(program->program->module->getBody()->front());
-    if (!tileFuncOp) {
-      throw std::runtime_error("Missing tile FuncOp");
-    }
-    auto numInputs = tileFuncOp.getNumArguments();
-    for (size_t i = 0; i < noutputs; i++) {
-      IVLOG(1, "Output[" << i << "]: ");
-      auto argNumber = numInputs + i;
-      auto attrName = Dialect::getDialectAttrName("name");
-      auto attr = stripeFuncOp.getArgAttrOfType<mlir::StringAttr>(argNumber, attrName);
-      if (!attr) {
-        throw std::runtime_error("Missing expected argument attribute");
+      auto name = attr.getValue().str();
+      auto it = bindings.find(arg.value);
+      auto buffer = (it == bindings.end()) ? arg.buffer : it->second;
+      if (arg.isInput) {
+        IVLOG(1, " Input[" << i << "]: " << name << ": " << buffer);
+        exec->input_bufs[name] = buffer;
+      } else {
+        IVLOG(1, "Output[" << i << "]: " << name << ": " << buffer);
+        exec->output_bufs[name] = buffer;
       }
-      auto outputName = attr.getValue().str();
-      IVLOG(1, "  name: " << outputName);
-      exec->output_bufs[outputName] = outputs[i]->buffer->buffer;
     }
 
-    // TODO(MLIR): updates
     return exec.release();
 #endif
   });

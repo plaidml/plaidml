@@ -548,14 +548,14 @@ void StripeBuilder::visit(SpecialOp specialOp) {
   IVLOG(3, "StripeBuilder::visit(SpecialOp)");
   auto stmt = std::make_shared<stripe::Special>();
   auto op = specialOp.getOperation();
-  size_t operand = 0;
-  for (size_t i = 0; i < specialOp.getNumOutputs(); i++) {
-    auto out_name = add_refinements(op->getBlock(), op->getOperand(operand++), stripe::RefDir::Out, "", true);
-    stmt->outputs.emplace_back(out_name);
-  }
   for (size_t i = 0; i < specialOp.getNumInputs(); i++) {
-    auto in_name = add_refinements(op->getBlock(), op->getOperand(operand++), stripe::RefDir::In, "", true);
+    auto operandIdx = specialOp.getNumOutputs() + i;
+    auto in_name = add_refinements(op->getBlock(), op->getOperand(operandIdx), stripe::RefDir::In, "", true);
     stmt->inputs.emplace_back(in_name);
+  }
+  for (size_t i = 0; i < specialOp.getNumOutputs(); i++) {
+    auto out_name = add_refinements(op->getBlock(), op->getOperand(i), stripe::RefDir::Out, "", true);
+    stmt->outputs.emplace_back(out_name);
   }
   stmt->name = util::getOpName(op->getName());
   cur_->stmts.push_back(stmt);
