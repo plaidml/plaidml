@@ -2,11 +2,22 @@
 
 #include "tile/codegen/schedule.h"
 
+#include <algorithm>
 #include <forward_list>
+#include <list>
+#include <map>
+#include <memory>
+#include <optional>
+#include <set>
+#include <string>
+#include <tuple>
+#include <unordered_map>
+#include <unordered_set>
+#include <utility>
+#include <vector>
 
 #include <boost/graph/graph_traits.hpp>
 #include <boost/graph/undirected_graph.hpp>
-#include <boost/optional.hpp>
 
 #include "base/util/error.h"
 #include "base/util/lookup.h"
@@ -601,8 +612,8 @@ class Scheduler {
                                                                   const std::vector<IO>& ios);
 
   // Makes a placement plan, trying several strategies.
-  boost::optional<PlacementPlan> TryMakePlan(stripe::Block* current_block, std::size_t current_step,
-                                             const std::vector<IO>& ios);
+  std::optional<PlacementPlan> TryMakePlan(stripe::Block* current_block, std::size_t current_step,
+                                           const std::vector<IO>& ios);
 
   // Determines the memory units on which a tensor is allowed to exist.
   std::vector<stripe::Affine> GetValidUnits(stripe::Block* current_block, PlacementPlan* plan,
@@ -617,23 +628,23 @@ class Scheduler {
   // Statement's existing inputs and outputs, and does not collide
   // with any previously-scheduled CacheEntry unless that CacheEntry
   // has a writer (i.e. does not require swap-in).
-  boost::optional<PlacementPlan> TryMakePlanWithNoSwaps(stripe::Block* current_block, std::size_t current_step,
-                                                        const PlacementPlan& existing_entry_plan,
-                                                        const std::vector<std::pair<PlacementKey, Placement>>& todos);
+  std::optional<PlacementPlan> TryMakePlanWithNoSwaps(stripe::Block* current_block, std::size_t current_step,
+                                                      const PlacementPlan& existing_entry_plan,
+                                                      const std::vector<std::pair<PlacementKey, Placement>>& todos);
 
   // Attempts to make a placement plan that preserves the current
   // Statement's existing inputs and outputs, but allows collisions
   // with previously-scheduled CacheEntries (producing swap-ins).
-  boost::optional<PlacementPlan> TryMakePlanWithSwaps(stripe::Block* current_block,
-                                                      const PlacementPlan& existing_entry_plan,
-                                                      const std::vector<std::pair<PlacementKey, Placement>>& todos);
+  std::optional<PlacementPlan> TryMakePlanWithSwaps(stripe::Block* current_block,
+                                                    const PlacementPlan& existing_entry_plan,
+                                                    const std::vector<std::pair<PlacementKey, Placement>>& todos);
 
   // Makes an worst-possible-case placement plan, by scheduling
   // without regard to existing entries.  This is guaranteed to work
   // iff the shape of every refinement can simultaneously fit into
   // memory, but isn't guaranteed to be optimal at all.
-  boost::optional<PlacementPlan> TryMakeFallbackPlan(stripe::Block* current_block,
-                                                     const std::vector<std::pair<PlacementKey, Placement>>& placements);
+  std::optional<PlacementPlan> TryMakeFallbackPlan(stripe::Block* current_block,
+                                                   const std::vector<std::pair<PlacementKey, Placement>>& placements);
 
   // Schedules a swap-in operation:
   // * Adds a swap-in block just before the supplied iterator,
@@ -867,7 +878,7 @@ void Scheduler::Run() {
     }
 
     // Figure out where we're going to put any newly-created CacheEntries.
-    boost::optional<PlacementPlan> plan_option = TryMakePlan(current_block, current_step, ios);
+    std::optional<PlacementPlan> plan_option = TryMakePlan(current_block, current_step, ios);
     if (!plan_option) {
       LOG(WARNING) << "Failed to create placement plan fitting within " << (mem_bytes_ / 1024)
                    << " KiB memory boundary";
@@ -1337,8 +1348,8 @@ std::vector<std::pair<PlacementKey, Placement>> MakePartialPlacements(const std:
   return result;
 }
 
-boost::optional<PlacementPlan> Scheduler::TryMakePlan(stripe::Block* current_block, std::size_t current_step,
-                                                      const std::vector<IO>& ios) {
+std::optional<PlacementPlan> Scheduler::TryMakePlan(stripe::Block* current_block, std::size_t current_step,
+                                                    const std::vector<IO>& ios) {
   // Initialize useful planning inputs.
   PlacementPlan existing_entry_plan;
   std::vector<IO> todos;
@@ -1359,7 +1370,7 @@ boost::optional<PlacementPlan> Scheduler::TryMakePlan(stripe::Block* current_blo
   auto todo_fulls = MakeFullPlacements(todos);
   auto todo_partials = MakePartialPlacements(todos);
 
-  boost::optional<PlacementPlan> plan;
+  std::optional<PlacementPlan> plan;
 
   plan = TryMakePlanWithNoSwaps(current_block, current_step, existing_entry_plan, todo_fulls);
   if (plan) {
@@ -1400,7 +1411,7 @@ boost::optional<PlacementPlan> Scheduler::TryMakePlan(stripe::Block* current_blo
   }
 
   IVLOG(2, "  Failed to make plan");
-  return boost::none;
+  return std::nullopt;
 }
 
 std::vector<stripe::Affine> Scheduler::GetValidUnits(stripe::Block* current_block, PlacementPlan* plan,
@@ -1470,7 +1481,7 @@ bool Scheduler::TryPlaceInRanges(stripe::Block* current_block, PlacementPlan* pl
       // A new Placement.
       std::size_t size = pkey_placement.second.size;
       IVLOG(3, "        Finding placement for " << pkey_placement.first.ri->name << ", size=" << size);
-      boost::optional<std::pair<stripe::Affine, std::list<MemRange>::iterator>> best_so_far;
+      std::optional<std::pair<stripe::Affine, std::list<MemRange>::iterator>> best_so_far;
       std::size_t best_waste_so_far = mem_bytes_;
       for (const auto& unit : GetValidUnits(current_block, plan, it_inserted.first)) {
         IVLOG(3, "          Checking free space on unit " << unit);
@@ -1506,7 +1517,7 @@ bool Scheduler::TryPlaceInRanges(stripe::Block* current_block, PlacementPlan* pl
   return true;
 }
 
-boost::optional<PlacementPlan> Scheduler::TryMakePlanWithNoSwaps(
+std::optional<PlacementPlan> Scheduler::TryMakePlanWithNoSwaps(
     stripe::Block* current_block, std::size_t current_step, const PlacementPlan& existing_entry_plan,
     const std::vector<std::pair<PlacementKey, Placement>>& todos) {
   std::map<stripe::Affine, std::list<MemRange>> unit_ranges;
@@ -1567,10 +1578,10 @@ boost::optional<PlacementPlan> Scheduler::TryMakePlanWithNoSwaps(
     }
   } while (++limit_use_step < current_step);
 
-  return boost::none;
+  return std::nullopt;
 }
 
-boost::optional<PlacementPlan> Scheduler::TryMakePlanWithSwaps(
+std::optional<PlacementPlan> Scheduler::TryMakePlanWithSwaps(
     stripe::Block* current_block, const PlacementPlan& existing_entry_plan,
     const std::vector<std::pair<PlacementKey, Placement>>& todos) {
   std::map<stripe::Affine, std::list<MemRange>> unit_ranges;
@@ -1595,13 +1606,13 @@ boost::optional<PlacementPlan> Scheduler::TryMakePlanWithSwaps(
   }
 
   if (!TryPlaceInRanges(current_block, &plan, todos, std::move(unit_ranges))) {
-    return boost::none;
+    return std::nullopt;
   }
 
   return plan;
 }
 
-boost::optional<PlacementPlan> Scheduler::TryMakeFallbackPlan(
+std::optional<PlacementPlan> Scheduler::TryMakeFallbackPlan(
     stripe::Block* current_block, const std::vector<std::pair<PlacementKey, Placement>>& placements) {
   // TODO: Consider pipelining and small-group parallel processing.
   //       There's an interesting tradeoff here: increased parallelism
@@ -1641,7 +1652,7 @@ boost::optional<PlacementPlan> Scheduler::TryMakeFallbackPlan(
       if (placements.size() > units_.size()) {
         // This can't be scheduled with IO coloring -- there are more
         // placements than units.
-        return boost::none;
+        return std::nullopt;
       }
       std::set<stripe::Affine> used_output_units;
       auto unit_it = units_.begin();
@@ -1671,7 +1682,7 @@ boost::optional<PlacementPlan> Scheduler::TryMakeFallbackPlan(
             }
           }
           if (!found_unit) {
-            return boost::none;  // Unable to build a placement plan.
+            return std::nullopt;  // Unable to build a placement plan.
           }
         }
       }
@@ -1691,7 +1702,7 @@ boost::optional<PlacementPlan> Scheduler::TryMakeFallbackPlan(
           }
         }
         if (!found_unit) {
-          return boost::none;  // Unable to build a placement plan.
+          return std::nullopt;  // Unable to build a placement plan.
         }
       }
       break;
@@ -1712,7 +1723,7 @@ boost::optional<PlacementPlan> Scheduler::TryMakeFallbackPlan(
   // Verify the plan.
   for (const auto& unit_offset : offsets) {
     if (mem_bytes_ < unit_offset.second) {
-      return boost::none;
+      return std::nullopt;
     }
   }
 

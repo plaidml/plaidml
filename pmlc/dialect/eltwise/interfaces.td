@@ -9,6 +9,4 @@ include "mlir/IR/OpBase.td"
 
 def EltwiseOpInterface : OpInterface<"EltwiseOp">;
 
-def CastOpInterface : OpInterface<"CastOp">;
-
 #endif // __PML_ELTWISE_INTERFACES__

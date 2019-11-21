@@ -3,6 +3,7 @@
 #include <gtest/gtest.h>
 
 #include "base/proto/proto.h"
+#include "plaidml2/edsl/helper.h"
 #include "testing/matchers.h"
 #include "tile/codegen/driver.h"
 #include "tile/codegen/schedule.h"
@@ -732,8 +733,8 @@ TEST(Schedule, Basic) {
     options.dbg_dir = dbg_dir;
     IVLOG(1, "Writing passes to: " << dbg_dir);
   }
-  auto runinfo = lib::CreateTest("layer_test2");
-  auto program = GenerateStripe(*runinfo);
+  auto tileProgram = lib::CreateTest("layer_test2");
+  auto program = plaidml::edsl::ConvertIntoStripe(*tileProgram);
   CompilerState state(program);
   Optimize(&state, stage.passes(), options);
 }

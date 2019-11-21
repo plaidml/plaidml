@@ -5,33 +5,14 @@
 
 #include <boost/format.hpp>
 
+#include "base/util/logging.h"
 #include "base/util/stream_container.h"
-#include "plaidml2/edsl/autodiff.h"
-#include "tile/util/tile_file.h"
 
-namespace vertexai {
-namespace tile {
-namespace lib {
+namespace vertexai::tile::lib {
 
 using namespace plaidml::edsl;  // NOLINT
 
 namespace {
-
-lang::RunInfo Evaluate(const std::string& name, const std::vector<Tensor>& vars) {
-  Program program(name, vars);
-  return *static_cast<const tile::lang::RunInfo*>(program.runinfo());
-}
-
-std::shared_ptr<lang::BufferBase> MakeBuffer(const LogicalShape& shape) {
-  std::vector<size_t> sizes;
-  for (const auto& dim : shape.int_dims()) {
-    sizes.push_back(dim);
-  }
-  auto tensor_shape = tile::SimpleShape(static_cast<DataType>(shape.dtype()), sizes);
-  auto buffer = std::make_shared<util::SimpleBuffer>();
-  buffer->bytes.resize(tensor_shape.byte_size());
-  return buffer;
-}
 
 Tensor MatMul(const Tensor& A, const Tensor& B) {
   TensorDim M, N, K;
@@ -90,12 +71,13 @@ Tensor Tanh(const Tensor& X) { return Call("tanh", X); }
 
 }  // namespace
 
-Tensor Convolution(const Tensor& I,                      //
-                   const Tensor& K,                      //
-                   const std::vector<int64_t>& O_sizes,  //
-                   std::vector<size_t> strides,          //
-                   ConvolutionFormat I_format,           //
-                   ConvolutionFormat K_format) {
+Tensor Convolution(                       //
+    const Tensor& I,                      //
+    const Tensor& K,                      //
+    const std::vector<int64_t>& O_sizes,  //
+    std::vector<size_t> strides,          //
+    ConvolutionFormat I_format,           //
+    ConvolutionFormat K_format) {
   TensorDim N, CI, CO;
   auto I_shape = I.shape();
   auto K_shape = K.shape();
@@ -168,107 +150,121 @@ Tensor Convolution(const Tensor& I,                      //
   return O;
 }
 
-lang::RunInfo LoadMatMul(const std::string& name, const LogicalShape& i1, const LogicalShape& i2) {
+Program LoadMatMul(const std::string& name, const LogicalShape& i1, const LogicalShape& i2) {
   auto A = Placeholder(i1, "A");
   auto B = Placeholder(i2, "B");
-  return Evaluate(name, {MatMul(A, B)});
+  return Program(name, {MatMul(A, B)});
 }
 
-lang::RunInfo LoadMatMulIntermediate(const std::string& name, const LogicalShape& i1, const LogicalShape& i2,
-                                     const LogicalShape& i3) {
+Program LoadMatMulIntermediate(  //
+    const std::string& name,     //
+    const LogicalShape& i1,      //
+    const LogicalShape& i2,      //
+    const LogicalShape& i3) {
   auto A = Placeholder(i1, "A");
   auto B = Placeholder(i2, "B");
   auto C = Placeholder(i3, "C");
   Tensor D = MatMul(A, B);
   Tensor E = D + C;
-  return Evaluate(name, {D, E});
+  return Program(name, {D, E});
 }
 
-lang::RunInfo LoadEltwiseMulFlip(const std::string& name, const LogicalShape& i1, const LogicalShape& i2) {
+Program LoadEltwiseMulFlip(const std::string& name, const LogicalShape& i1, const LogicalShape& i2) {
   auto A = Placeholder(i1, "A");
   auto B = Placeholder(i2, "B");
-  return Evaluate(name, {~(A * B)});
+  return Program(name, {~(A * B)});
 }
 
-lang::RunInfo LoadMatMulAmongEltwise(const std::string& name, const LogicalShape& i1, const LogicalShape& i2,
-                                     const LogicalShape& i3) {
+Program LoadMatMulAmongEltwise(  //
+    const std::string& name,     //
+    const LogicalShape& i1,      //
+    const LogicalShape& i2,      //
+    const LogicalShape& i3) {
   auto A = Placeholder(i1, "A");
   auto B = Placeholder(i2, "B");
   auto C = Placeholder(i3, "C");
   Tensor NegA = -A;
   Tensor NegB = -B;
   Tensor P = MatMul(NegA, NegB);
-  return Evaluate(name, {P + C});
+  return Program(name, {P + C});
 }
 
-lang::RunInfo LoadEltwiseAdd(const std::string& name, const LogicalShape& i1, const LogicalShape& i2) {
+Program LoadEltwiseAdd(const std::string& name, const LogicalShape& i1, const LogicalShape& i2) {
   auto A = Placeholder(i1, "A");
   auto B = Placeholder(i2, "B");
-  return Evaluate(name, {A + B});
+  return Program(name, {A + B});
 }
 
-lang::RunInfo LoadEltwiseMultiAdd(const std::string& name, const LogicalShape& i1, const LogicalShape& i2,
-                                  const LogicalShape& i3, const LogicalShape& i4) {
+Program LoadEltwiseMultiAdd(  //
+    const std::string& name,  //
+    const LogicalShape& i1,   //
+    const LogicalShape& i2,   //
+    const LogicalShape& i3,   //
+    const LogicalShape& i4) {
   auto A = Placeholder(i1, "A");
   auto B = Placeholder(i2, "B");
   auto C = Placeholder(i3, "C");
   auto D = Placeholder(i4, "D");
-  return Evaluate(name, {A + B + C + D});
+  return Program(name, {A + B + C + D});
 }
 
-lang::RunInfo LoadEltwiseDiv(const std::string& name, const LogicalShape& i1, const LogicalShape& i2) {
+Program LoadEltwiseDiv(const std::string& name, const LogicalShape& i1, const LogicalShape& i2) {
   auto A = Placeholder(i1, "A");
   auto B = Placeholder(i2, "B");
-  return Evaluate(name, {A / B});
+  return Program(name, {A / B});
 }
 
-lang::RunInfo LoadConstScalarMul(const std::string& name, const double s, const LogicalShape& i1) {
+Program LoadConstScalarMul(const std::string& name, const double s, const LogicalShape& i1) {
   Tensor scalar(s);
   auto A = Placeholder(i1, "A");
-  return Evaluate(name, {scalar * A});
+  return Program(name, {scalar * A});
 }
 
-lang::RunInfo LoadEltwiseMul(const std::string& name, const LogicalShape& i1, const LogicalShape& i2) {
+Program LoadEltwiseMul(const std::string& name, const LogicalShape& i1, const LogicalShape& i2) {
   auto A = Placeholder(i1, "A");
   auto B = Placeholder(i2, "B");
-  return Evaluate(name, {A * B});
+  return Program(name, {A * B});
 }
 
-lang::RunInfo LoadEltwiseMultiMul(const std::string& name, const LogicalShape& i1, const LogicalShape& i2,
-                                  const LogicalShape& i3, const LogicalShape& i4) {
+Program LoadEltwiseMultiMul(  //
+    const std::string& name,  //
+    const LogicalShape& i1,   //
+    const LogicalShape& i2,   //
+    const LogicalShape& i3,   //
+    const LogicalShape& i4) {
   auto A = Placeholder(i1, "A");
   auto B = Placeholder(i2, "B");
   auto C = Placeholder(i3, "C");
   auto D = Placeholder(i4, "D");
-  return Evaluate(name, {A * B * C * D});
+  return Program(name, {A * B * C * D});
 }
 
-lang::RunInfo LoadSin(const std::string& name, const LogicalShape& i1) {
+Program LoadSin(const std::string& name, const LogicalShape& i1) {
   auto A = Placeholder(i1, "A");
-  return Evaluate(name, {Sin(A)});
+  return Program(name, {Sin(A)});
 }
 
-lang::RunInfo LoadTanh(const std::string& name, const LogicalShape& i1) {
+Program LoadTanh(const std::string& name, const LogicalShape& i1) {
   auto A = Placeholder(i1, "A");
-  return Evaluate(name, {Tanh(A)});
+  return Program(name, {Tanh(A)});
 }
 
-lang::RunInfo LoadMulThenNeg(const std::string& name, const LogicalShape& i1, const LogicalShape& i2) {
+Program LoadMulThenNeg(const std::string& name, const LogicalShape& i1, const LogicalShape& i2) {
   auto A = Placeholder(i1, "A");
   auto B = Placeholder(i2, "B");
   Tensor C = A * B;
-  return Evaluate(name, {-C});
+  return Program(name, {-C});
 }
 
-lang::RunInfo LoadNegThenMul(const std::string& name, const LogicalShape& i1, const LogicalShape& i2) {
+Program LoadNegThenMul(const std::string& name, const LogicalShape& i1, const LogicalShape& i2) {
   auto A = Placeholder(i1, "A");
   auto B = Placeholder(i2, "B");
   Tensor NegA = -A;
   Tensor NegB = -B;
-  return Evaluate(name, {NegA * NegB});
+  return Program(name, {NegA * NegB});
 }
 
-lang::RunInfo LoadConstCalc(const std::string& name) {
+Program LoadConstCalc(const std::string& name) {
   Tensor N(1);
   Tensor F(0.0);
   Tensor F2(3.7);
@@ -279,80 +275,70 @@ lang::RunInfo LoadConstCalc(const std::string& name) {
   DoubleN(i) = N();
   Tensor Partial = Simple + DoubleN;
   Tensor O = Partial + F2;
-  return Evaluate(name, {O});
+  return Program(name, {O});
 }
 
-lang::RunInfo LoadConv1d(const std::string& name,     //
-                         const LogicalShape& input,   //
-                         const LogicalShape& kernel,  //
-                         const std::vector<int64_t>& output) {
+Program LoadConv1d(              //
+    const std::string& name,     //
+    const LogicalShape& input,   //
+    const LogicalShape& kernel,  //
+    const std::vector<int64_t>& output) {
   auto I = Placeholder(input, "I");
   auto K = Placeholder(kernel, "K");
-  auto runinfo = Evaluate(name, {Convolution(I, K, output)});
-  runinfo.const_inputs = {"K"};
-  runinfo.input_buffers = {{"K", MakeBuffer(kernel)}};
-  return runinfo;
+  return Program(name, {Convolution(I, K, output)});
 }
 
-lang::RunInfo LoadMaxPool2d(const std::string& name,    //
-                            const LogicalShape& input,  //
-                            const std::vector<size_t>& pool_size) {
+Program LoadMaxPool2d(          //
+    const std::string& name,    //
+    const LogicalShape& input,  //
+    const std::vector<size_t>& pool_size) {
   // This is a max pool with strides == pool_size
   auto I = Placeholder(input, "I");
-  auto runinfo = Evaluate(name, {MaxPool2d(I, pool_size, {})});
+  auto runinfo = Program(name, {MaxPool2d(I, pool_size, {})});
   return runinfo;
 }
 
-lang::RunInfo LoadConv2d(const std::string& name,     //
-                         const LogicalShape& input,   //
-                         const LogicalShape& kernel,  //
-                         const std::vector<int64_t>& output) {
+Program LoadConv2d(              //
+    const std::string& name,     //
+    const LogicalShape& input,   //
+    const LogicalShape& kernel,  //
+    const std::vector<int64_t>& output) {
   auto I = Placeholder(input, "I");
   auto K = Placeholder(kernel, "K");
-  auto runinfo = Evaluate(name, {Convolution(I, K, output)});
-  runinfo.const_inputs = {"K"};
-  runinfo.input_buffers = {{"K", MakeBuffer(kernel)}};
-  return runinfo;
+  return Program(name, {Convolution(I, K, output)});
 }
 
-lang::RunInfo LoadConv2dRelu(const std::string& name,     //
-                             const LogicalShape& input,   //
-                             const LogicalShape& kernel,  //
-                             const std::vector<int64_t>& output) {
+Program LoadConv2dRelu(          //
+    const std::string& name,     //
+    const LogicalShape& input,   //
+    const LogicalShape& kernel,  //
+    const std::vector<int64_t>& output) {
   auto I = Placeholder(input, "I");
   auto K = Placeholder(kernel, "K");
-  auto runinfo = Evaluate(name, {Relu(Convolution(I, K, output))});
-  runinfo.const_inputs = {"K"};
-  runinfo.input_buffers = {{"K", MakeBuffer(kernel)}};
-  return runinfo;
+  return Program(name, {Relu(Convolution(I, K, output))});
 }
 
-lang::RunInfo LoadConv2dBnRelu(const std::string& name,       //
-                               const LogicalShape& input,     //
-                               const LogicalShape& kernel,    //
-                               const LogicalShape& channels,  //
-                               const std::vector<int64_t>& output) {
+Program LoadConv2dBnRelu(          //
+    const std::string& name,       //
+    const LogicalShape& input,     //
+    const LogicalShape& kernel,    //
+    const LogicalShape& channels,  //
+    const std::vector<int64_t>& output) {
   auto I = Placeholder(input, "I");
   auto K = Placeholder(kernel, "K");
   auto B = Placeholder(channels, "B");
   auto S = Placeholder(channels, "S");
   auto O = Convolution(I, K, output);
   auto R = Relu((O + B) * S);
-  auto runinfo = Evaluate(name, {R});
-  runinfo.const_inputs = {"K"};
-  runinfo.input_buffers = {
-      {"K", MakeBuffer(kernel)},
-      {"B", MakeBuffer(channels)},
-      {"S", MakeBuffer(channels)},
-  };
-  return runinfo;
+  return Program(name, {R});
 }
 
-lang::RunInfo LoadConv2d3Deep(const std::string& name,      //
-                              const LogicalShape& input,    //
-                              const LogicalShape& kernel1,  //
-                              const LogicalShape& kernel2,  //
-                              const LogicalShape& kernel3) {
+Program LoadConv2d3Deep            //
+    (const std::string& name,      //
+     const LogicalShape& input,    //
+     const LogicalShape& kernel1,  //
+     const LogicalShape& kernel2,  //
+     const LogicalShape& kernel3) {
   auto I = Placeholder(input, "I");
   auto K1 = Placeholder(kernel1, "K1");
   auto K2 = Placeholder(kernel2, "K2");
@@ -361,22 +347,16 @@ lang::RunInfo LoadConv2d3Deep(const std::string& name,      //
   auto O1 = Convolution(I, K1, {dims[0], dims[1], dims[2], kernel1.int_dims()[3]});
   auto O2 = Convolution(O1, K2, {dims[0], dims[1], dims[2], kernel2.int_dims()[3]});
   auto O3 = Convolution(O2, K3, {dims[0], dims[1], dims[2], kernel3.int_dims()[3]});
-  auto runinfo = Evaluate(name, {O3});
-  runinfo.const_inputs = {"K1", "K2", "K3"};
-  runinfo.input_buffers = {
-      {"K1", MakeBuffer(kernel1)},
-      {"K2", MakeBuffer(kernel2)},
-      {"K3", MakeBuffer(kernel3)},
-  };
-  return runinfo;
+  return Program(name, {O3});
 }
 
-lang::RunInfo LoadDilatedConv2d(const std::string& name,    //
-                                const LogicalShape& input,  //
-                                const LogicalShape& kernel) {
+Program LoadDilatedConv2d(      //
+    const std::string& name,    //
+    const LogicalShape& input,  //
+    const LogicalShape& kernel) {
   auto I = Placeholder(input, "I");
   auto K = Placeholder(kernel, "K");
-  return Evaluate(name, {DilatedConvolution2(I, K)});
+  return Program(name, {DilatedConvolution2(I, K)});
 }
 
 Tensor Normalize(const Tensor& X) {
@@ -387,13 +367,14 @@ Tensor Normalize(const Tensor& X) {
   return sqrt(X_MS);
 }
 
-std::tuple<Tensor, Tensor> LarsMomentum(const Tensor& X,           //
-                                        const Tensor& Grad,        //
-                                        const Tensor& Veloc,       //
-                                        const Tensor& LR,          //
-                                        double lars_coeff,         //
-                                        double lars_weight_decay,  //
-                                        double momentum) {
+std::tuple<Tensor, Tensor> LarsMomentum(  //
+    const Tensor& X,                      //
+    const Tensor& Grad,                   //
+    const Tensor& Veloc,                  //
+    const Tensor& LR,                     //
+    double lars_coeff,                    //
+    double lars_weight_decay,             //
+    double momentum) {
   auto XNorm = Normalize(X);
   auto GradNorm = Normalize(Grad);
   auto LocLR = LR * lars_coeff * XNorm / (GradNorm + lars_weight_decay * XNorm);
@@ -401,9 +382,10 @@ std::tuple<Tensor, Tensor> LarsMomentum(const Tensor& X,           //
   return std::make_tuple(X - NewVeloc, NewVeloc);
 }
 
-lang::RunInfo LoadLarsMomentum4d(const std::string& name,      //
-                                 const LogicalShape& x_shape,  //
-                                 const LogicalShape& lr_shape) {
+Program LoadLarsMomentum4d(       //
+    const std::string& name,      //
+    const LogicalShape& x_shape,  //
+    const LogicalShape& lr_shape) {
   // Note: X/Grad/Veloc/NewX/NewVeloc should all have the same shape for the
   // semantics of this operation to be correct, so we only pass in 1 shape for
   // all of them.
@@ -415,20 +397,16 @@ lang::RunInfo LoadLarsMomentum4d(const std::string& name,      //
   auto Veloc = Placeholder(x_shape);
   auto LR = Placeholder(lr_shape);
   auto R = LarsMomentum(X, Grad, Veloc, LR, lars_coeff, lars_weight_decay, momentum);
-  return Evaluate("lars_momentum4d", {std::get<0>(R), std::get<1>(R)});
+  return Program("lars_momentum4d", {std::get<0>(R), std::get<1>(R)});
 }
 
-lang::RunInfo LoadPow(const std::string& name,  //
-                      const LogicalShape& i1,   //
-                      const LogicalShape& i2) {
+Program LoadPow(              //
+    const std::string& name,  //
+    const LogicalShape& i1,   //
+    const LogicalShape& i2) {
   auto X = Placeholder(i1, "X");
   auto Y = Placeholder(i2, "Y");
-  auto runinfo = Evaluate(name, {pow(X, Y)});
-  runinfo.input_buffers = {
-      {"X", MakeBuffer(i1)},
-      {"Y", MakeBuffer(i2)},
-  };
-  return runinfo;
+  return Program(name, {pow(X, Y)});
 }
 
 Tensor Norm4dAx2(const Tensor& I, const Tensor& G, const Tensor& B, const Tensor& Epsilon) {
@@ -447,14 +425,15 @@ Tensor Norm4dAx2(const Tensor& I, const Tensor& G, const Tensor& B, const Tensor
   return (G / Stdev) * (I - Mu) + B;
 }
 
-lang::RunInfo LoadLayerNorm4dAx2(const std::string& name,  //
-                                 const LogicalShape& input) {
+Program LoadLayerNorm4dAx2(   //
+    const std::string& name,  //
+    const LogicalShape& input) {
   // Note: I/G/B/O should all have the same shape, so pass in one shape to share
   auto I = Placeholder(input);
   auto G = Placeholder(input);
   auto B = Placeholder(input);
   auto Epsilon = Placeholder(PLAIDML_DATA_FLOAT32, {});
-  return Evaluate(name, {Norm4dAx2(I, G, B, Epsilon)});
+  return Program(name, {Norm4dAx2(I, G, B, Epsilon)});
 }
 
 Tensor PolygonBoxTransform(const Tensor& I) {
@@ -472,15 +451,16 @@ Tensor PolygonBoxTransform(const Tensor& I) {
   return TE + TO;
 }
 
-lang::RunInfo LoadPolygonBoxTransform(const std::string& name,  //
-                                      const LogicalShape& input) {
+Program LoadPolygonBoxTransform(  //
+    const std::string& name,      //
+    const LogicalShape& input) {
   // Note: I and O have the same shape
   auto I = Placeholder(input);
-  return Evaluate(name, {PolygonBoxTransform(I)});
+  return Program(name, {PolygonBoxTransform(I)});
 }
 
-lang::RunInfo LoadSoftmax(const std::string& name,      //
-                          const LogicalShape& input) {  //
+Program LoadSoftmax(const std::string& name,      //
+                    const LogicalShape& input) {  //
   auto X1 = Placeholder(input);
   TensorDim I, J;
   X1.bind_dims(I, J);
@@ -490,16 +470,22 @@ lang::RunInfo LoadSoftmax(const std::string& name,      //
   auto E = exp(X1 - M);
   auto N = NamedTensorOutput("N", I, 1);
   N(i, 0) += E(i, j);
-  return Evaluate(name, {E / N});
+  return Program(name, {E / N});
 }
 
-Tensor BatchNormalization(const Tensor& I, const Tensor& M, const Tensor& V, const Tensor& G, const Tensor& B,
-                          const Tensor& E) {
+Tensor BatchNormalization(  //
+    const Tensor& I,        //
+    const Tensor& M,        //
+    const Tensor& V,        //
+    const Tensor& G,        //
+    const Tensor& B,        //
+    const Tensor& E) {
   return ((I - M) * G / sqrt(V + E)) + B;
 }
 
-lang::RunInfo LoadBatchNormalization(const std::string& name,      //
-                                     const LogicalShape& input) {  //
+Program LoadBatchNormalization(   //
+    const std::string& name,      //
+    const LogicalShape& input) {  //
   auto b1dims = input.int_dims();
   b1dims[0] = 1;
   auto b1 = LogicalShape(PLAIDML_DATA_FLOAT32, b1dims);
@@ -509,9 +495,7 @@ lang::RunInfo LoadBatchNormalization(const std::string& name,      //
   auto G = Placeholder(b1);
   auto B = Placeholder(b1);
   auto E = Placeholder(PLAIDML_DATA_FLOAT32, {});
-  return Evaluate(name, {BatchNormalization(I, M, V, G, B, E)});
+  return Program(name, {BatchNormalization(I, M, V, G, B, E)});
 }
 
-}  // namespace lib
-}  // namespace tile
-}  // namespace vertexai
+}  // namespace vertexai::tile::lib

@@ -55,32 +55,32 @@ using mlir::Value;
 namespace pmlc::dialect::tile {
 
 static stripe::TensorType convertIntoTensorType(Type type) {
-  if (auto rankedType = type.dyn_cast<RankedTensorType>()) {
-    auto shape = rankedType.getShape();
-    auto cls = Identifier::get(stripe::kAddressClassIdentifier, rankedType.getContext());
-    llvm::SmallVector<stripe::TensorDim, 4> newShape(shape.size(), stripe::TensorDim{0, 0, cls});
-    // TODO: instead of using natural strides, use the I/O map supplied by the user
-    int64_t stride = 1;
-    for (int i = shape.size() - 1; i >= 0; i--) {
-      newShape[i].stride = stride;
-      newShape[i].size = shape[i];
-      stride *= shape[i];
-    }
-    // TODO: deal with is_const
-    return stripe::TensorType::get(rankedType.getElementType(), newShape, stripe::OffsetsMap{}, false);
+  auto rankedTensorType = eltwise::getRankedTensorType(type);
+  auto shape = rankedTensorType.getShape();
+  auto cls = Identifier::get(stripe::kAddressClassIdentifier, type.getContext());
+  llvm::SmallVector<stripe::TensorDim, 4> newShape(shape.size(), stripe::TensorDim{0, 0, cls});
+  // TODO: instead of using natural strides, use the I/O map supplied by the user
+  int64_t stride = 1;
+  for (int i = shape.size() - 1; i >= 0; i--) {
+    newShape[i].stride = stride;
+    newShape[i].size = shape[i];
+    stride *= shape[i];
   }
-  throw std::runtime_error("Invalid type");
+  // TODO: deal with is_const
+  return stripe::TensorType::get(rankedTensorType.getElementType(), newShape, stripe::OffsetsMap{}, false);
 }
 
-static Operation* createZero(OpBuilder* builder, Location loc, Type elementType) {
+static eltwise::ScalarConstantOp createZero(OpBuilder* builder, Location loc, Type elementType) {
   auto scalarType = elementType.cast<ScalarType>();
   auto dtype = scalarType.type();
   if (is_float(dtype)) {
     const double zero = 0.0;
-    return builder->create<eltwise::ScalarConstantOp>(loc, elementType, zero);
+    auto constType = ScalarType::get(builder->getContext(), DataType::FLOAT32);
+    return builder->create<eltwise::ScalarConstantOp>(loc, constType, zero);
   }
   const int64_t zero = 0;
-  return builder->create<eltwise::ScalarConstantOp>(loc, elementType, zero);
+  auto constType = ScalarType::get(builder->getContext(), DataType::INT32);
+  return builder->create<eltwise::ScalarConstantOp>(loc, constType, zero);
 }
 
 static void addInitializer(         //
@@ -116,18 +116,18 @@ static void addInitializer(         //
 
   auto refType = stripe::TensorRefType::get(tensorType);
   auto elementType = refType.getElementType();
-  auto loadType = eltwise::getRankedTensorType(elementType);
   auto sink = builder->create<stripe::RefineOp>(loc, refType, output, offsets);
 
   if (auto init = contractionOp.getInitializer()) {
     attrs.emplace_back(builder->getIdentifier("copy"), builder->getUnitAttr());
     auto src = builder->create<stripe::RefineOp>(loc, refType, init, offsets);
-    auto loadOp = builder->create<stripe::LoadOp>(loc, loadType, src.result());
+    auto intoType = eltwise::getRankedTensorType(elementType);
+    auto loadOp = builder->create<stripe::LoadOp>(loc, intoType, src.result());
     builder->create<stripe::StoreOp>(loc, sink.result(), loadOp.into());
   } else {
     attrs.emplace_back(builder->getIdentifier("zero"), builder->getUnitAttr());
     auto constOp = createZero(builder, loc, elementType);
-    builder->create<stripe::StoreOp>(loc, sink.result(), constOp->getResult(0));
+    builder->create<stripe::StoreOp>(loc, sink.result(), constOp.result());
   }
 
   forOp.setAttr(stripe::Dialect::getStripeAttrsName(), builder->getDictionaryAttr(attrs));
@@ -268,8 +268,7 @@ static Value* MakeCombination(            //
     case CombinationKind::add:
       return rewriter->create<eltwise::AddOp>(op.getLoc(), scalarType, operands).result();
     case CombinationKind::cond: {
-      const double zero = 0.0;
-      auto constOp = rewriter->create<eltwise::ScalarConstantOp>(op.getLoc(), scalarType, zero);
+      auto constOp = createZero(rewriter, op.getLoc(), scalarType);
       auto cmpEqOp = rewriter->create<eltwise::CmpEqOp>(op.getLoc(), scalarType, operands.drop_back());
       llvm::SmallVector<Value*, 3> args{cmpEqOp.result(), operands.back(), constOp.result()};
       return rewriter->create<eltwise::SelectOp>(op.getLoc(), scalarType, args);
@@ -427,20 +426,16 @@ struct AffineDomainOpConversion : public LoweringBase {
     // LOADs
     llvm::SmallVector<Value*, 4> inputs;
     for (unsigned i = 0; i < refs.size(); i++) {
-      auto srcType = tensors[i]->getType();
-      if (!srcType.isa<stripe::TensorRefType>()) {
-        auto srcTensorType = convertIntoTensorType(srcType);
-        srcType = stripe::TensorRefType::get(srcTensorType);
-      }
-      auto tensorRefType = srcType.cast<stripe::TensorRefType>();
-      auto elementType = tensorRefType.getElementType();
-      auto intoType = eltwise::getRankedTensorType(elementType);
       auto op = refs[i]->getDefiningOp();
       if (op && llvm::isa<eltwise::ScalarConstantOp>(op)) {
         // No need to load a scalar constant, just use it directly
         // This happens when we want to broadcast a scalar constant value
         inputs.emplace_back(refs[i]);
       } else {
+        auto srcType = refs[i]->getType();
+        auto tensorRefType = srcType.cast<stripe::TensorRefType>();
+        auto elementType = tensorRefType.getElementType();
+        auto intoType = eltwise::getRankedTensorType(elementType);
         auto loadOp = rewriter.create<stripe::LoadOp>(op->getLoc(), intoType, refs[i]);
         inputs.emplace_back(loadOp.into());
       }
@@ -804,7 +799,7 @@ struct SpecialOpConversion : public LoweringBase {
     auto opName = stripe::Dialect::getCanonicalOpName(util::getOpName(op->getName()));
     auto abstractOp = AbstractOperation::lookup(opName, op->getContext());
     if (!abstractOp) {
-      op->emitError("AbstractOperation::lookup failed for: " + opName);
+      op->emitError("AbstractOperation::lookup failed for: ") << opName;
       return matchFailure();
     }
     auto specialOp = abstractOp->getInterface<stripe::SpecialOp>();

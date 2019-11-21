@@ -1,5 +1,7 @@
-
 #include "tile/lang/emitc.h"
+
+#include <map>
+#include <utility>
 
 #include "tile/lang/fpconv.h"
 

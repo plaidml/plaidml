@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include <map>
 #include <memory>
 #include <string>
 #include <vector>
@@ -13,7 +14,7 @@
 namespace plaidml {
 namespace exec {
 
-inline void init() {  //
+inline void init() {
   plaidml::init();
   ffi::call_void(plaidml_exec_init);
 }
@@ -39,6 +40,17 @@ struct Binding {
 
 class Executable {
  public:
+  Executable(const edsl::Program& program,        //
+             const std::vector<Binding>& inputs,  //
+             const std::vector<Binding>& outputs)
+      : Executable(                           //
+            program,                          //
+            Settings::get("PLAIDML_DEVICE"),  //
+            Settings::get("PLAIDML_TARGET"),  //
+            inputs,                           //
+            outputs)                          //
+  {}
+
   Executable(const edsl::Program& program,        //
              const std::string& device_id,        //
              const std::string& target_id,        //
@@ -74,29 +86,95 @@ class Executable {
     ffi::call_void(plaidml_executable_run, ptr_.get());
   }
 
-  static std::shared_ptr<Executable> compile(const edsl::Program& program, const std::vector<edsl::Tensor>& inputs) {
-    auto device = Settings::get("PLAIDML_DEVICE");
-    auto target = Settings::get("PLAIDML_TARGET");
+ private:
+  std::shared_ptr<plaidml_executable> ptr_;
+};
 
-    std::vector<Binding> input_bindings;
+class Binder {
+ public:
+  explicit Binder(const edsl::Program& program)
+      : program_(program),  //
+        device_(Settings::get("PLAIDML_DEVICE")),
+        target_(Settings::get("PLAIDML_TARGET")) {}
+
+  Binder& set_device(const std::string& value) {
+    device_ = value;
+    return *this;
+  }
+
+  Binder& set_target(const std::string& value) {
+    target_ = value;
+    return *this;
+  }
+
+  Buffer input(const edsl::Tensor& tensor) {  //
+    return inputs_.at(edsl::TensorRef{tensor});
+  }
+
+  Buffer output(const edsl::Tensor& tensor) {  //
+    return outputs_.at(edsl::TensorRef{tensor});
+  }
+
+  Binder& set_input(const edsl::Tensor& tensor, const Buffer& buffer) {
+    inputs_[edsl::TensorRef{tensor}] = buffer;
+    return *this;
+  }
+
+  Binder& set_inputs(const std::vector<edsl::Tensor>& inputs) {
     for (auto input : inputs) {
-      auto shape = input.shape();
-      TensorShape tensor_shape(shape.dtype(), shape.int_dims());
-      input_bindings.emplace_back(Binding{input, Buffer{device, tensor_shape}});
+      set_input(input);
     }
+    return *this;
+  }
 
+  Binder& set_output(const edsl::Tensor& tensor, const Buffer& buffer) {
+    outputs_[edsl::TensorRef{tensor}] = buffer;
+    return *this;
+  }
+
+  Binder& set_outputs(const std::vector<edsl::Tensor>& outputs) {
+    for (auto output : outputs) {
+      set_output(output);
+    }
+    return *this;
+  }
+
+  Binder& set_input(const edsl::Tensor& tensor) {
+    auto shape = tensor.shape();
+    TensorShape tensor_shape(shape.dtype(), shape.int_dims());
+    return set_input(tensor, Buffer{device_, tensor_shape});
+  }
+
+  Binder& set_output(const edsl::Tensor& tensor) {
+    auto shape = tensor.shape();
+    TensorShape tensor_shape(shape.dtype(), shape.int_dims());
+    return set_output(tensor, Buffer{device_, tensor_shape});
+  }
+
+  std::shared_ptr<Executable> build() {
+    std::vector<Binding> input_bindings;
+    for (const auto& kvp : inputs_) {
+      input_bindings.emplace_back(Binding{kvp.first.tensor, kvp.second});
+    }
     std::vector<Binding> output_bindings;
-    for (auto output : program.outputs()) {
-      auto shape = output.shape();
-      TensorShape tensor_shape(shape.dtype(), shape.int_dims());
-      output_bindings.emplace_back(Binding{output, Buffer{device, tensor_shape}});
+    for (auto output : program_.outputs()) {
+      edsl::TensorRef ref{output};
+      auto it = outputs_.find(ref);
+      if (it == outputs_.end()) {
+        set_output(output);
+        it = outputs_.find(ref);
+      }
+      output_bindings.emplace_back(Binding{output, it->second});
     }
-
-    return std::make_shared<Executable>(program, device, target, input_bindings, output_bindings);
+    return std::make_shared<Executable>(program_, input_bindings, output_bindings);
   }
 
  private:
-  std::shared_ptr<plaidml_executable> ptr_;
+  edsl::Program program_;
+  std::string device_;
+  std::string target_;
+  std::map<edsl::TensorRef, Buffer> inputs_;
+  std::map<edsl::TensorRef, Buffer> outputs_;
 };
 
 inline std::vector<std::string> list_devices() {

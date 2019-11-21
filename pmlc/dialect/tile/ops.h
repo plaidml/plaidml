@@ -12,6 +12,7 @@
 
 namespace pmlc::dialect::tile {
 
+using eltwise::DataType;
 using eltwise::ScalarType;
 using llvm::APInt;
 using llvm::Optional;
@@ -42,6 +43,7 @@ using mlir::TupleType;
 using mlir::Type;
 using mlir::TypeAttr;
 using mlir::Value;
+using mlir::VectorType;
 using util::AggregationKind;
 using util::CombinationKind;
 using util::GenericBuilder;

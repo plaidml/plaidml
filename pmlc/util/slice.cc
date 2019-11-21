@@ -69,9 +69,9 @@ class BackwardSliceImpl {
 
 }  // namespace
 
-std::vector<mlir::Value*> getBackwardSlice(  //
-    llvm::SetVector<mlir::Value*> values,    //
-    bool enter_regions,                      //
+std::vector<mlir::Value*> getBackwardSlice(       //
+    const llvm::SetVector<mlir::Value*>& values,  //
+    bool enter_regions,                           //
     TransitiveFilter filter) {
   BackwardSliceImpl impl(values, enter_regions, filter);
   return impl.slice;

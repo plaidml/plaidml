@@ -11,9 +11,7 @@
 #include "pmlc/dialect/stripe/mlir.h"
 #include "tile/base/shape.h"
 
-namespace pmlc {
-namespace dialect {
-namespace stripe {
+namespace pmlc::dialect::stripe {
 
 constexpr char kAddressClassIdentifier[] = "addr";
 
@@ -122,6 +120,8 @@ class TensorType : public Type::TypeBase<TensorType, Type, TensorTypeStorage> {
 
   /// Check if things are const
   bool is_const() const;
+
+  uint64_t getByteSize() const;
 };
 
 struct TensorRefTypeStorage;
@@ -150,6 +150,4 @@ class TensorRefType : public Type::TypeBase<TensorRefType, Type, TensorRefTypeSt
   const ArrayRef<TensorDim> getShape() const;
 };
 
-}  // namespace stripe
-}  // namespace dialect
-}  // namespace pmlc
+}  // namespace pmlc::dialect::stripe

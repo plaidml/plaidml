@@ -5,6 +5,7 @@
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/MemoryBuffer.h"
 
+#include "mlir/IR/Matchers.h"
 #include "mlir/Translation.h"
 
 #include "base/util/lookup.h"
@@ -159,9 +160,50 @@ static std::vector<Value*> LocationIntoTensorOffsets(OpBuilder* builder, const S
   return offsets;
 }
 
+using CastKey = std::pair<std::string, unsigned>;
+
+static std::map<CastKey, DataType> castMap = {
+    {std::make_pair("as_bool", 0), DataType::BOOLEAN},    //
+    {std::make_pair("as_int", 8), DataType::INT8},        //
+    {std::make_pair("as_int", 16), DataType::INT16},      //
+    {std::make_pair("as_int", 32), DataType::INT32},      //
+    {std::make_pair("as_int", 64), DataType::INT64},      //
+    {std::make_pair("as_uint", 8), DataType::UINT8},      //
+    {std::make_pair("as_uint", 16), DataType::UINT16},    //
+    {std::make_pair("as_uint", 32), DataType::UINT32},    //
+    {std::make_pair("as_uint", 64), DataType::UINT64},    //
+    {std::make_pair("as_float", 16), DataType::FLOAT16},  //
+    {std::make_pair("as_float", 32), DataType::FLOAT32},  //
+    {std::make_pair("as_float", 64), DataType::FLOAT64},  //
+};
+
 static void IntrinsicIntoMLIR(OpBuilder* builder, SymbolTable* locals, const stripe::Intrinsic& intrinsic) {
   if (intrinsic.any_tags()) {
     throw std::runtime_error("No tags allowed on intrinsics");
+  }
+  if (intrinsic.name == "as_float" ||  //
+      intrinsic.name == "as_int" ||    //
+      intrinsic.name == "as_uint" ||   //
+      intrinsic.name == "as_bool") {
+    auto bitwidth = 0;
+    if (intrinsic.name != "as_bool") {
+      auto bitwidthValue = safe_at(locals->scalars, intrinsic.inputs[1]);
+      IntegerAttr bitwidthAttr;
+      if (!m_Constant(&bitwidthAttr).match(bitwidthValue->getDefiningOp())) {
+        throw std::runtime_error("Not a constant");
+      }
+      bitwidth = bitwidthAttr.getInt();
+    }
+    auto it = castMap.find(std::make_pair(intrinsic.name, bitwidth));
+    if (it == castMap.end()) {
+      throw std::runtime_error("Unsupported cast: " + intrinsic.name);
+    }
+    auto scalarType = DataTypeIntoMLIR(builder->getContext(), it->second);
+    auto tensor = safe_at(locals->scalars, intrinsic.inputs[0]);
+    auto op = builder->create<eltwise::CastOp>(builder->getUnknownLoc(), scalarType, tensor);
+    locals->scalars.emplace(intrinsic.outputs[0], op.result());
+    op.setAttr("scalar_name", builder->getStringAttr(intrinsic.outputs[0]));
+    return;
   }
   auto opName = eltwise::Dialect::getCanonicalOpName(intrinsic.name);
   auto abstractOp = mlir::AbstractOperation::lookup(opName, builder->getContext());
@@ -347,7 +389,7 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
       case stripe::StmtKind::LoadIndex: {
         const auto& load_idx = stripe::LoadIndex::Downcast(stmt);
         Value* from = AffineIntoMLIR(builder, locals.idxs, load_idx->from);
-        Type idx_base = ScalarType::get(builder->getContext(), DataType::INTX);
+        Type idx_base = ScalarType::get(builder->getContext(), DataType::INT32);
         Type idx_type = eltwise::getRankedTensorType(idx_base);
         auto op = builder->create<LoadIndexOp>(unknownLoc, idx_type, from);
         op.setAttr("scalar_name", builder->getStringAttr(load_idx->into));
@@ -385,12 +427,12 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
         switch (cnst->type) {
           case stripe::ConstType::Integer:
             op = builder->create<eltwise::ScalarConstantOp>(
-                unknownLoc, ScalarType::get(builder->getContext(), DataType::INTX), cnst->iconst);
+                unknownLoc, ScalarType::get(builder->getContext(), DataType::INT32), cnst->iconst);
             op.setAttr("scalar_name", builder->getStringAttr(cnst->name));
             break;
           case stripe::ConstType::Float:
             op = builder->create<eltwise::ScalarConstantOp>(
-                unknownLoc, ScalarType::get(builder->getContext(), DataType::FLOATX), cnst->fconst);
+                unknownLoc, ScalarType::get(builder->getContext(), DataType::FLOAT32), cnst->fconst);
             op.setAttr("scalar_name", builder->getStringAttr(cnst->name));
             break;
         }
