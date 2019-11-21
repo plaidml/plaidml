@@ -1,10 +1,17 @@
 // Copyright 2019 Intel Corporation
 
+#include <algorithm>
+#include <utility>
+
 #include "pmlc/conversion/stripe_to_affine/convert_stripe_to_affine.h"
+#include "pmlc/dialect/eltwise/types.h"
+#include "pmlc/dialect/stripe/analysis.h"
 #include "pmlc/dialect/stripe/ops.h"
+#include "pmlc/dialect/stripe/populate_tensor_ref_shape_analysis.h"
 
 #include "mlir/Dialect/AffineOps/AffineOps.h"
 #include "mlir/Dialect/StandardOps/Ops.h"
+#include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -12,63 +19,155 @@
 #define PASS_NAME "convert-stripe-to-affine"
 #define DEBUG_TYPE PASS_NAME
 
+using llvm::cast;
+using llvm::isa;
+using llvm::SmallVector;
+using llvm::SmallVectorImpl;
+using mlir::AffineExpr;
+using mlir::AffineLoadOp;
+using mlir::AffineMap;
+using mlir::ArrayAttr;
+using mlir::ArrayRef;
+using mlir::ConstantIndexOp;
+using mlir::ConversionPatternRewriter;
+using mlir::DenseMap;
+using mlir::dyn_cast;
+using mlir::FuncOp;
+using mlir::MemRefType;
+using mlir::MLIRContext;
+using mlir::OpConversionPattern;
+using mlir::Operation;
+using mlir::OwningRewritePatternList;
+using mlir::PatternMatchResult;
+using mlir::Type;
+using mlir::TypeConverter;
+using mlir::Value;
+using pmlc::dialect::eltwise::ScalarType;
+using pmlc::dialect::stripe::AffinePolyOp;
+using pmlc::dialect::stripe::AffineType;
+using pmlc::dialect::stripe::ComputeAccess;
+using pmlc::dialect::stripe::FlatTensorAccess;
+using pmlc::dialect::stripe::LoadOp;
+using pmlc::dialect::stripe::ParallelForOp;
+using pmlc::dialect::stripe::PopulateTensorRefShape;
+using pmlc::dialect::stripe::RefineOp;
+using pmlc::dialect::stripe::TensorDim;
+using pmlc::dialect::stripe::TensorRefType;
+using pmlc::dialect::stripe::TerminateOp;
+using vertexai::tile::is_int;
+using vertexai::tile::is_uint;
+
 namespace {
 
-// Pass to convert Stripe dialect to Affine dialect.
-struct ConvertStripeToAffine : public mlir::FunctionPass<ConvertStripeToAffine> {
-  void runOnFunction() override;
+/// Analysis that computes the flat tensor access information for every refine operation.
+class AccessInfoAnalysis {
+ public:
+  explicit AccessInfoAnalysis(FuncOp f) : func(f) { recompute(); }
+
+  // Recompute polynomial information for all the refine ops in the target FuncOp. Pre-existing analysis information
+  // is cleared beforehand.
+  void recompute() {
+    accessInfoMap.clear();
+    func.walk([&](Operation* op) {
+      if (auto refine = dyn_cast<RefineOp>(op)) {
+        // TODO: compute access information only for those refineOps that feed a memory operation?
+        accessInfoMap[refine] = ComputeAccess(refine.getResult());
+      }
+    });
+  }
+
+  // Retrieve the polynomial information for a given Operation. Assert if there is no polynomial information available
+  // for that Operation.
+  const FlatTensorAccess& getAccessInfo(Operation* op) const {
+    auto it = accessInfoMap.find(op);
+    assert(it != accessInfoMap.end() && "AccessInfo not found.");
+    return it->second;
+  }
+
+ private:
+  FuncOp func;
+
+  // Map between an operation and its computed flat polynomial information.
+  DenseMap<Operation*, FlatTensorAccess> accessInfoMap;
 };
 
-void ConvertStripeToAffine::runOnFunction() {
-  mlir::OwningRewritePatternList patterns;
-  pmlc::conversion::stripe_to_affine::populateStripeToAffineConversionPatterns(patterns, &getContext());
+/// Stripe to Affine type converter.
+class StripeToAffineTypeConverter : public mlir::TypeConverter {
+ public:
+  StripeToAffineTypeConverter() : TypeConverter() {}
 
-  // Add Affine/Std dialect legal ops to conversion target.
-  mlir::ConversionTarget target(getContext());
-  target.addLegalOp<mlir::ModuleOp, mlir::ModuleTerminatorOp>();
-  target.addLegalDialect<mlir::AffineOpsDialect, mlir::StandardOpsDialect>();
-  target.addDynamicallyLegalOp<mlir::FuncOp>([&](mlir::FuncOp op) {
-    // TODO: FuncOp is legal only if types have been converted to Std types.
-    return true;  // typeConverter.isSignatureLegal(op.getType());
-  });
+  Type convertType(Type t) override;
 
-  if (failed(mlir::applyFullConversion(getFunction(), target, patterns))) {
-    signalPassFailure();
+ private:
+  /// Utility that converts a Stripe element type to Affine.
+  Type convertEltType(ScalarType t, MLIRContext* context);
+};
+
+Type StripeToAffineTypeConverter::convertType(Type type) {
+  if (auto tensorRef = type.dyn_cast<TensorRefType>()) {
+    // Transform Stripe shape to Affine shape format and convert TensorRefType to MemRefType.
+    auto stripeShape = tensorRef.getShape();
+    assert(stripeShape.size() > 0 && "Unexpected shape in TensorRefType");
+    SmallVector<int64_t, 8> affineShape;
+    std::transform(stripeShape.begin(), stripeShape.end(), std::back_inserter(affineShape),
+                   [](const TensorDim& dim) -> int64_t { return dim.size; });
+    return MemRefType::get(affineShape, convertType(tensorRef.getElementType()), {/* no map used */}, 0);
+  } else if (auto scalarType = type.dyn_cast<ScalarType>()) {
+    return convertEltType(scalarType, type.getContext());
   }
+  // No conversion neeeded. Return the input type.
+  return type;
 }
 
-}  // namespace
+/// Utility that converts a Stripe element type to Affine.
+Type StripeToAffineTypeConverter::convertEltType(ScalarType scalarType, MLIRContext* context) {
+  // Process the non-MLIR Tile type in Eltwise ScalarType.
+  auto tileType = scalarType.type();
+  if (is_int(tileType) || is_uint(tileType)) {
+    return mlir::IntegerType::get(bit_width(tileType), context);
+  } else if (is_float(tileType)) {
+    switch (bit_width(tileType)) {
+      case 32:
+        return mlir::FloatType::getF32(context);
+      case 64:
+        return mlir::FloatType::getF64(context);
+    }
+    llvm_unreachable("Unsupported size for float ScalarType");
+  }
+  llvm_unreachable("Unsupported ScalarType");
+}
 
-namespace pmlc {
-namespace conversion {
-namespace stripe_to_affine {
+// Base class for Stripe Op conversion.
+template <class OP>
+class StripeOpConverter : public OpConversionPattern<OP> {
+ public:
+  using OpConversionPattern<OP>::OpConversionPattern;
+  StripeOpConverter(MLIRContext* context, const AccessInfoAnalysis& accessAnalysis)
+      : OpConversionPattern<OP>(context, /*benefit=*/1), accessAnalysis(accessAnalysis) {}
 
-using mlir::ArrayAttr;
-using mlir::isa;
-using mlir::OpRewritePattern;
-using mlir::PatternMatchResult;
-using mlir::PatternRewriter;
-using mlir::SmallVector;
-using pmlc::dialect::stripe::AffinePolyOp;
-using pmlc::dialect::stripe::ParallelForOp;
-using pmlc::dialect::stripe::TerminateOp;
+ protected:
+  const AccessInfoAnalysis& accessAnalysis;
+};
 
-// Declaration of Stripe ops converters for supported ops.
-#define STRIPE_OP(OP)                                                                    \
-  struct OP##Converter : public OpRewritePattern<OP> {                                   \
-    using OpRewritePattern<OP>::OpRewritePattern;                                        \
-                                                                                         \
-    PatternMatchResult matchAndRewrite(OP Op, PatternRewriter& rewriter) const override; \
+// Declaration of Stripe Ops converters for supported Ops.
+#define STRIPE_OP(OP)                                                                       \
+  struct OP##Converter : public StripeOpConverter<OP> {                                     \
+    using StripeOpConverter<OP>::StripeOpConverter;                                         \
+                                                                                            \
+    PatternMatchResult matchAndRewrite(OP op, ArrayRef<Value*> operands,                    \
+                                       ConversionPatternRewriter& rewriter) const override; \
   };
 #include "supported_ops.inc"
 
-PatternMatchResult AffinePolyOpConverter::matchAndRewrite(AffinePolyOp constOp, PatternRewriter& rewriter) const {
-  // TODO: This is no longer correct
-  rewriter.replaceOpWithNewOp<mlir::ConstantIndexOp>(constOp, constOp.offset().getSExtValue());
+PatternMatchResult AffinePolyOpConverter::matchAndRewrite(AffinePolyOp constOp, ArrayRef<Value*> operands,
+                                                          ConversionPatternRewriter& rewriter) const {
+  // This op is indirectly converted from the memory access operation by using AccessInfoAnalysis.
+  rewriter.eraseOp(constOp);
   return matchSuccess();
 }
 
-PatternMatchResult ParallelForOpConverter::matchAndRewrite(ParallelForOp forOp, PatternRewriter& rewriter) const {
+PatternMatchResult ParallelForOpConverter::matchAndRewrite(ParallelForOp forOp, ArrayRef<Value*> operands,
+                                                           ConversionPatternRewriter& rewriter) const {
   auto forRanges = forOp.ranges().getValue();
   auto& forBodyRegion = forOp.inner();
   assert(forBodyRegion.getBlocks().size() == 1 && "Unexpected control flow in Stripe");
@@ -90,24 +189,107 @@ PatternMatchResult ParallelForOpConverter::matchAndRewrite(ParallelForOp forOp, 
   return matchSuccess();
 }
 
+/// Utility that converts a Stripe access to Affine given a `FlatTensorAccess` that contains the polynomial
+/// information. It returns:
+///    - 'base': affine.load/affine.store base memref Value.
+///    - 'indices': list of indices to be used as affine map arguments.
+///    - 'affineMap': affine map with mapping for for the list of indices.
+static void convertStripeAccessToAffine(const FlatTensorAccess& accessInfo, ConversionPatternRewriter& rewriter,
+                                        Value*& base, SmallVectorImpl<Value*>& indices, AffineMap& affineMap) {
+  SmallVector<AffineExpr, 4> resultExprs;
+  unsigned numTerms = 0;
+  // Process all the polynomials in the access. Each polynomial has a set of terms consisting of {index * constant
+  // coefficient}, and an independent constant term. We create an affine expression for each polynomial.
+  for (auto polynomial : accessInfo.access) {
+    // Create an affine expression with the independent constant term.
+    AffineExpr polyExpr = rewriter.getAffineConstantExpr(polynomial.constant);
+    unsigned dimPos = 0;
+    for (auto term : polynomial.terms) {
+      indices.emplace_back(rewriter.getRemappedValue(term.first));
+      // Add index * coefficient expression to the affine expression.
+      auto indexExpr = rewriter.getAffineDimExpr(dimPos);
+      auto multiplierExpr = rewriter.getAffineConstantExpr(term.second);
+      auto termExpr = indexExpr * multiplierExpr;
+      polyExpr = termExpr + polyExpr;
+      ++dimPos;
+    }
+    numTerms += dimPos;
+    resultExprs.emplace_back(std::move(polyExpr));
+  }
+
+  base = rewriter.getRemappedValue(accessInfo.base);
+  // Create an affine map with the resulting affine expressions. The affine map won't have symbols since all the
+  // coefficients in Stripe polynomials are constant for now.
+  affineMap = AffineMap::get(/*dimCount=*/numTerms, /*symbolCount=*/0, resultExprs);
+}
+
+PatternMatchResult LoadOpConverter::matchAndRewrite(LoadOp loadOp, ArrayRef<Value*> operands,
+                                                    ConversionPatternRewriter& rewriter) const {
+  // Create map and indices to be used as map arguments.
+  AffineMap map;
+  SmallVector<Value*, 8> indices;
+  Value* base;
+  RefineOp refine = cast<RefineOp>(loadOp.from()->getDefiningOp());
+  convertStripeAccessToAffine(accessAnalysis.getAccessInfo(refine), rewriter, base, indices, map);
+  rewriter.replaceOpWithNewOp<AffineLoadOp>(loadOp, base, map, indices);
+  return matchSuccess();
+}
+
+PatternMatchResult RefineOpConverter::matchAndRewrite(RefineOp refineOp, ArrayRef<Value*> operands,
+                                                      ConversionPatternRewriter& rewriter) const {
+  // This op is indirectly converted from the memory access operation by using AccessInfoAnalysis.
+  rewriter.eraseOp(refineOp);
+  return matchSuccess();
+}
+
 // Converts TerminateOp to AffineTerminatorOp. If a TerminateOp requires a special context-dependent treatment, that
 // must be implemented in the Op providing the context.
-PatternMatchResult TerminateOpConverter::matchAndRewrite(TerminateOp terminateOp, PatternRewriter& rewriter) const {
+PatternMatchResult TerminateOpConverter::matchAndRewrite(TerminateOp terminateOp, ArrayRef<Value*> operands,
+                                                         ConversionPatternRewriter& rewriter) const {
   rewriter.replaceOpWithNewOp<mlir::AffineTerminatorOp>(terminateOp);
   return matchSuccess();
 }
 
-void populateStripeToAffineConversionPatterns(mlir::OwningRewritePatternList& patterns, mlir::MLIRContext* ctx) {
+void populateStripeToAffineConversionPatterns(OwningRewritePatternList& patterns, MLIRContext* ctx,
+                                              TypeConverter& typeConverter, const AccessInfoAnalysis& accessAnalysis) {
 #define STRIPE_OP(OP) OP##Converter,
 #define STRIPE_LAST_OP(OP) OP##Converter
   patterns.insert<
 #include "supported_ops.inc"  // NOLINT(build/include)
-      >(ctx);
+      >(ctx, accessAnalysis);
+
+  mlir::populateFuncOpTypeConversionPattern(patterns, ctx, typeConverter);
 }
 
-}  // namespace stripe_to_affine
-}  // namespace conversion
-}  // namespace pmlc
+// Pass to convert Stripe dialect to Affine dialect.
+struct ConvertStripeToAffine : public mlir::FunctionPass<ConvertStripeToAffine> {
+  void runOnFunction() override;
+};
+
+void ConvertStripeToAffine::runOnFunction() {
+  // Add shape information to tensor ref types, which is needed for Stripe->Affine type conversion.
+  getAnalysis<PopulateTensorRefShape>();
+
+  AccessInfoAnalysis accessAnalysis(getFunction());
+
+  StripeToAffineTypeConverter typeConverter;
+  OwningRewritePatternList patterns;
+  populateStripeToAffineConversionPatterns(patterns, &getContext(), typeConverter, accessAnalysis);
+
+  // Add Affine/Std dialect legal ops to conversion target.
+  mlir::ConversionTarget target(getContext());
+  target.addLegalOp<mlir::ModuleOp, mlir::ModuleTerminatorOp>();
+  target.addLegalDialect<mlir::AffineOpsDialect, mlir::StandardOpsDialect>();
+  target.addDynamicallyLegalOp<mlir::FuncOp>([&](mlir::FuncOp op) {
+    // FuncOp is legal only if types have been converted to Std types.
+    return typeConverter.isSignatureLegal(op.getType());
+  });
+
+  if (failed(mlir::applyFullConversion(getFunction(), target, patterns))) {
+    signalPassFailure();
+  }
+}
+}  // namespace
 
 std::unique_ptr<mlir::FunctionPassBase> mlir::createConvertStripeToAffinePass() {
   return std::make_unique<ConvertStripeToAffine>();
