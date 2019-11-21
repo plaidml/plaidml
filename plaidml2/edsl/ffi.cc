@@ -41,6 +41,8 @@ using namespace vertexai::tile::lang::ast;  // NOLINT
 
 #ifdef PLAIDML_MLIR
 using pmlc::dialect::eltwise::ScalarType;
+using pmlc::dialect::tile::ProgramMutations;
+using pmlc::dialect::tile::ProgramUpdate;
 using pmlc::dialect::tile::TileBuilder;
 using pmlc::util::AggregationKind;
 using pmlc::util::CombinationKind;
@@ -1348,8 +1350,8 @@ plaidml_program* plaidml_program_evaluate(  //
     plaidml_error* err,                     //
     const char* name,                       //
     size_t noutputs,                        //
-    plaidml_expr** raw_outputs,             //
-    plaidml_expr** new_outputs,             //
+    plaidml_expr** raw_old_outputs,         //
+    plaidml_expr** raw_new_outputs,         //
     size_t nupdates,                        //
     plaidml_expr** src_updates,             //
     plaidml_expr** dst_updates) {
@@ -1359,10 +1361,10 @@ plaidml_program* plaidml_program_evaluate(  //
     ProgramMutations mutations;
     std::vector<ExprPtr> outputs(noutputs);
     for (size_t i = 0; i < noutputs; i++) {
-      if (!raw_outputs[i]) {
+      if (!raw_old_outputs[i]) {
         throw std::runtime_error("Undefined output in plaidml_program_evaluate");
       }
-      mutations.outputs.emplace_back(raw_outputs[i]->expr);
+      mutations.outputs.emplace_back(raw_old_outputs[i]->expr);
     }
     std::vector<ProgramUpdate> updates(nupdates);
     for (size_t i = 0; i < nupdates; i++) {
@@ -1379,23 +1381,31 @@ plaidml_program* plaidml_program_evaluate(  //
       throw std::runtime_error("Internal error: noutputs != ret->eval.outputs.size()");
     }
     for (size_t i = 0; i < noutputs; i++) {
-      new_outputs[i] = new plaidml_expr{ret->eval.outputs[i]};
+      raw_new_outputs[i] = new plaidml_expr{ret->eval.outputs[i]};
     }
     return ret;
 #endif
 #ifdef PLAIDML_MLIR
-    std::vector<mlir::Value*> values(noutputs);
+    ProgramMutations mutations;
     for (size_t i = 0; i < noutputs; i++) {
-      if (!raw_outputs[i]) {
+      if (!raw_old_outputs[i]) {
         throw std::runtime_error("Undefined output in plaidml_program_evaluate");
       }
-      values[i] = raw_outputs[i]->value;
+      mutations.outputs.emplace_back(raw_old_outputs[i]->value);
     }
-    // TODO(MLIR): updates
-    std::vector<mlir::Value*> new_values(noutputs);
-    auto ret = new plaidml_program{GlobalContext::get()->MakeProgram(name, values, new_values)};
+    for (size_t i = 0; i < nupdates; i++) {
+      if (!src_updates[i]) {
+        throw std::runtime_error("Undefined update src in plaidml_program_evaluate");
+      }
+      if (!dst_updates[i]) {
+        throw std::runtime_error("Undefined update dst in plaidml_program_evaluate");
+      }
+      mutations.updates.emplace(ProgramUpdate{src_updates[i]->value, dst_updates[i]->value});
+    }
+    auto ret = new plaidml_program{GlobalContext::get()->MakeProgram(name, mutations)};
+    assert(noutputs <= ret->program->outputs.size());
     for (size_t i = 0; i < noutputs; i++) {
-      new_outputs[i] = new plaidml_expr{new_values[i], ret->program};
+      raw_new_outputs[i] = new plaidml_expr{ret->program->outputs[i], ret->program};
     }
     return ret;
 #endif

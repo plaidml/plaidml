@@ -8,7 +8,6 @@
 #include <utility>
 #include <vector>
 
-#include "base/util/transfer_object.h"
 #include "tile/proto/shape.pb.h"
 
 namespace vertexai {
@@ -452,5 +451,3 @@ inline proto::TensorShape IntoProto(const TensorShape& shape) {
 
 }  // namespace tile
 }  // namespace vertexai
-
-TRANSFER_ENUM(vertexai::tile::DataType);

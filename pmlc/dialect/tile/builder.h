@@ -3,6 +3,7 @@
 #pragma once
 
 #include <memory>
+#include <set>
 #include <vector>
 
 #include "llvm/ADT/ArrayRef.h"
@@ -27,6 +28,20 @@ using DataType = vertexai::tile::DataType;
 struct Shape {
   DataType elementType;
   llvm::ArrayRef<int64_t> dims;
+};
+
+struct ProgramUpdate {
+  mlir::Value* source;
+  mlir::Value* target;
+
+  bool operator<(const ProgramUpdate& rhs) const {  //
+    return std::tie(source, target) < std::tie(rhs.source, rhs.target);
+  }
+};
+
+struct ProgramMutations {
+  std::vector<mlir::Value*> outputs;
+  std::set<ProgramUpdate> updates;
 };
 
 class TileBuilder {
@@ -89,10 +104,7 @@ class TileBuilder {
   void SetUseDefault(mlir::Value* cion, mlir::Value* defaultValue);
   void SetNoReduce(mlir::Value* cion, bool no_reduce);
 
-  std::shared_ptr<TileProgram> MakeProgram(  //
-      llvm::StringRef name,                  //
-      llvm::ArrayRef<mlir::Value*> outputs,  //
-      llvm::MutableArrayRef<mlir::Value*> new_outputs);
+  std::shared_ptr<TileProgram> MakeProgram(llvm::StringRef name, const ProgramMutations& mutations);
 
  private:
   std::unique_ptr<Impl> impl;
