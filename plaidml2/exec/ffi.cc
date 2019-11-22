@@ -190,9 +190,15 @@ plaidml_executable* plaidml_compile(  //
       auto buffer = (it == bindings.end()) ? arg.buffer : it->second;
       if (arg.isInput) {
         IVLOG(1, " Input[" << i << "]: " << name << ": " << buffer);
+        if (!buffer) {
+          throw std::runtime_error("Unbound input");
+        }
         exec->input_bufs[name] = buffer;
       } else {
         IVLOG(1, "Output[" << i << "]: " << name << ": " << buffer);
+        if (!buffer) {
+          throw std::runtime_error("Unbound output");
+        }
         exec->output_bufs[name] = buffer;
       }
     }

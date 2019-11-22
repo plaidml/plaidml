@@ -99,6 +99,7 @@ class _Function(object):
         inputs = [
             np.array(inp) if isinstance(inp, (six.integer_types, float)) else inp for inp in inputs
         ]
+        # NOTE: need fully resolved shape here
         input_shapes = tuple([x.shape for x in inputs])
         # logger.debug('_Function: {}({})'.format(self._name, input_shapes))
         exe = self._cache.get(input_shapes)
@@ -110,6 +111,7 @@ class _Function(object):
     def _compile(self, inputs):
         for node, data in zip(self._inputs, inputs):
             dtype = node.tensor.shape.dtype
+            # NOTE: need fully resolved shape here
             shape = edsl.LogicalShape(dtype, data.shape)
             node.tensor.bind(shape)
         outputs = [x.tensor for x in self._outputs]
@@ -143,7 +145,7 @@ class _KerasNode(object):
         return str(self.tensor)
 
     def __str__(self):
-        return '{}|{}'.format(self.name, self.tensor.shape)
+        return self.name
 
     def eval(self):
         return get_value(self)
@@ -407,6 +409,7 @@ def bias_add(x, bias, data_format=None):
             'only "channels_first" and "channels_last" recognized.')
     if ndim(x) > 2:
         if data_format == 'channels_first':
+            # FIXME: tensor.shape is expensive
             try:
                 bias_dims = bias.tensor.shape.dims
             except AttributeError:
@@ -837,6 +840,8 @@ def get_uid(prefix=''):
 
 @_log_call
 def get_value(x):
+    if x.tensor._buffer:
+        return x.tensor._buffer.as_ndarray()
     inputs = []
     fn = _Function(inputs, [x], [], name='get_value')
     outputs = fn(inputs)
@@ -1401,6 +1406,7 @@ def separable_conv(x,
     data_format = _normalize_data_format(data_format)
     if int_shape(pointwise_kernel
                 )[-2] != int_shape(depthwise_kernel)[-1] * int_shape(depthwise_kernel)[-2]:
+        # FIXME: tensor.shape is expensive
         raise ValueError(
             ('Shape mismatch in separable convolution. Depthwise kernel input ' +
              'channel count must match pointwise kernel channel count times channel ' +
@@ -1433,8 +1439,15 @@ def separable_conv2d(x,
                      padding='valid',
                      data_format=None,
                      dilation_rate=(1, 1)):
-    return separable_conv(x, depthwise_kernel, pointwise_kernel, strides, padding, data_format,
-                          dilation_rate)
+    return separable_conv(
+        x,
+        depthwise_kernel,
+        pointwise_kernel,
+        strides,
+        padding,
+        data_format,
+        dilation_rate,
+    )
 
 
 @_log_call
@@ -1511,6 +1524,7 @@ def softsign(x):
 def sparse_categorical_crossentropy(target, output, from_logits=False):
     dims = edsl.TensorDims(output.tensor.shape.ndims)
     output.tensor.bind_dims(*dims)
+    # FIXME: tensor.shape is expensive
     return categorical_crossentropy(
         reshape(one_hot(target, output.tensor.shape.int_dims[-1]), dims), output, from_logits)
 

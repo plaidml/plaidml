@@ -61,15 +61,15 @@ struct DomainInfo {
 };
 
 using ContractionKey = std::pair<AggregationKind, CombinationKind>;
-using Bindings = std::unordered_map<mlir::Value*, vertexai::tile::BufferPtr>;
 
 struct TileBuilder::Impl {
   MLIRContext context;
   ModuleOp module;
   OpBuilder builder;
   std::map<AffineDomainOp, DomainInfo> domains;
-  std::map<Value*, Value*> implicitUpdates;
-  Bindings implicitBindings;
+  std::unordered_map<Value*, RankedTensorType> shapeCache;
+  std::unordered_map<Value*, Value*> implicitUpdates;
+  std::unordered_map<mlir::Value*, vertexai::tile::BufferPtr> implicitBindings;
   NoneOp noneOp;
 
   static std::map<ContractionKey, std::string> contractions;
@@ -221,6 +221,10 @@ void TileBuilder::BindShape(mlir::Value* tensor, mlir::RankedTensorType type) { 
   tensor->setType(type);
 }
 
+void TileBuilder::BindBuffer(mlir::Value* tensor, vertexai::tile::BufferPtr buffer) {
+  impl->implicitBindings[tensor] = buffer;
+}
+
 void TileBuilder::BindTensorDims(Value* from, ArrayRef<Value**> intos) {
   if (!from) {
     throw std::runtime_error("BindTensorDim: from == nullptr");
@@ -268,10 +272,16 @@ RankedTensorType TileBuilder::ComputeShape(Value* tensor) {
   if (type.hasStaticShape()) {
     return type;
   }
+  auto it = impl->shapeCache.find(tensor);
+  if (it != impl->shapeCache.end()) {
+    return it->second;
+  }
   ProgramMutations mutations;
   mutations.outputs.emplace_back(tensor);
   auto program = MakeProgram("compute_shape", mutations);
-  return program->outputs[0]->getType().dyn_cast<RankedTensorType>();
+  auto shape = program->outputs[0]->getType().dyn_cast<RankedTensorType>();
+  impl->shapeCache.emplace(tensor, shape);
+  return shape;
 }
 
 Value* TileBuilder::MakeCastOp(Value* tensor, DataType dtype) {
@@ -651,7 +661,7 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(StringRef name, const Prog
   if (name.empty()) {
     name = "noname";
   }
-  IVLOG(5, "TileBuilder::MakeProgram> " << name.str());
+  IVLOG(1, "TileBuilder::MakeProgram> " << name.str());
   IVLOG(6, mlir::debugString(impl->module));
   // Wrap duplicate outputs and outputs that directly refer to inputs
   llvm::SetVector<Value*> outputs;
@@ -743,7 +753,10 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(StringRef name, const Prog
   std::vector<Value*> returnOperands;
   std::vector<Type> resultTypes;
   for (auto output : outputs) {
-    auto value = mapper.lookup(output);
+    auto value = mapper.lookupOrNull(output);
+    if (!value) {
+      throw std::runtime_error("Output not found in mapper");
+    }
     resultTypes.emplace_back(value->getType());
     returnOperands.emplace_back(value);
   }
@@ -774,7 +787,7 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(StringRef name, const Prog
       value = itUpdate->second;
     }
     ProgramArgument programArg{false, value};
-    auto itBinding = impl->implicitBindings.find(outputs[i]);
+    auto itBinding = impl->implicitBindings.find(value);
     if (itBinding != impl->implicitBindings.end()) {
       programArg.buffer = itBinding->second;
     }

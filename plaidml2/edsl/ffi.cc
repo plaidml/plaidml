@@ -483,8 +483,7 @@ void plaidml_expr_param_reset(  //
     }
 #endif
 #ifdef PLAIDML_MLIR
-    throw std::runtime_error("NYI: plaidml_expr_param_reset");
-    return nullptr;
+    GlobalContext::get()->BindBuffer(expr->value, buffer->buffer);
 #endif
   });
 }
@@ -891,7 +890,7 @@ plaidml_expr* plaidml_expr_grad_override(  //
 #endif
 #ifdef PLAIDML_MLIR
     // TODO(MLIR)
-    return new plaidml_expr{GlobalContext::get()->MakePrimitiveOp("ident", out->value)};
+    return new plaidml_expr{out->value};
 #endif
   });
 }

@@ -24,6 +24,13 @@ def plaidml_workspace():
     )
 
     http_archive(
+        name = "com_github_google_benchmark",
+        url = "https://github.com/google/benchmark/archive/v1.5.0.tar.gz",
+        sha256 = "3c6a165b6ecc948967a1ead710d4a181d7b0fbcaa183ef7ea84604994966221a",
+        strip_prefix = "benchmark-1.5.0",
+    )
+
+    http_archive(
         name = "easylogging",
         url = "https://github.com/muflihun/easyloggingpp/releases/download/v9.95.0/easyloggingpp_v9.95.0.tar.gz",
         sha256 = "4b1aebe19e383349c6e438aac357eccfabb0ce34430e872508ed8ee0d1629e0f",
