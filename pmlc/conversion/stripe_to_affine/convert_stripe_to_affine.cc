@@ -11,6 +11,8 @@
 
 #include "mlir/Dialect/AffineOps/AffineOps.h"
 #include "mlir/Dialect/StandardOps/Ops.h"
+#include "mlir/EDSC/Builders.h"
+#include "mlir/EDSC/Intrinsics.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
@@ -20,20 +22,24 @@
 #define DEBUG_TYPE PASS_NAME
 
 using llvm::cast;
+using llvm::dyn_cast;
 using llvm::isa;
+using llvm::SmallDenseMap;
 using llvm::SmallVector;
 using llvm::SmallVectorImpl;
 using mlir::AffineExpr;
+using mlir::AffineForOp;
 using mlir::AffineLoadOp;
 using mlir::AffineMap;
 using mlir::AffineStoreOp;
 using mlir::ArrayAttr;
 using mlir::ArrayRef;
+using mlir::Block;
 using mlir::ConstantIndexOp;
 using mlir::ConversionPatternRewriter;
 using mlir::DenseMap;
-using mlir::dyn_cast;
 using mlir::FuncOp;
+using mlir::IntegerAttr;
 using mlir::MemRefType;
 using mlir::MLIRContext;
 using mlir::OpConversionPattern;
@@ -43,6 +49,11 @@ using mlir::PatternMatchResult;
 using mlir::Type;
 using mlir::TypeConverter;
 using mlir::Value;
+using mlir::edsc::AffineLoopNestBuilder;
+using mlir::edsc::IndexHandle;
+using mlir::edsc::ScopedContext;
+using mlir::edsc::ValueHandle;
+using mlir::edsc::intrinsics::constant_index;
 using pmlc::dialect::eltwise::ScalarType;
 using pmlc::dialect::stripe::AffinePolyOp;
 using pmlc::dialect::stripe::AffineType;
@@ -139,16 +150,66 @@ Type StripeToAffineTypeConverter::convertEltType(ScalarType scalarType, MLIRCont
   llvm_unreachable("Unsupported ScalarType");
 }
 
+/// Context for Stripe to Affine conversion. It holds analysis and conversion state information.
+struct StripeToAffineContext {
+  explicit StripeToAffineContext(FuncOp func) : accessAnalysis(func) {}
+
+  // Stripe memory access information.
+  const AccessInfoAnalysis accessAnalysis;
+
+  // Mapping between Stripe induction variable and Affine induction variable BlockArguments. Note that this mapping is
+  // not part of ConversionPatternRewriter. ParallelForOp is replaced with an Affine loop nest as a whole, not piece by
+  // piece.
+  // TODO: Revisit this in the future if there is a way to convert BlockArguments using ConversionPatternRewriter.
+  SmallDenseMap<Value*, Value*, 8> remappedIvs;
+};
+
 // Base class for Stripe Op conversion.
 template <class OP>
 class StripeOpConverter : public OpConversionPattern<OP> {
  public:
   using OpConversionPattern<OP>::OpConversionPattern;
-  StripeOpConverter(MLIRContext* context, const AccessInfoAnalysis& accessAnalysis)
-      : OpConversionPattern<OP>(context, /*benefit=*/1), accessAnalysis(accessAnalysis) {}
+  StripeOpConverter(MLIRContext* context, StripeToAffineContext& convContext)
+      : OpConversionPattern<OP>(context, /*benefit=*/1), convContext(convContext) {}
 
  protected:
-  const AccessInfoAnalysis& accessAnalysis;
+  /// Utility that converts a Stripe access to Affine given a `FlatTensorAccess` that contains the polynomial
+  /// information. It returns:
+  ///    - 'base': affine.load/affine.store base memref Value.
+  ///    - 'indices': list of indices to be used as affine map arguments.
+  ///    - 'affineMap': affine map with mapping for for the list of indices.
+  void convertStripeAccessToAffine(RefineOp refine, ConversionPatternRewriter& rewriter, Value*& base,
+                                   SmallVectorImpl<Value*>& indices, AffineMap& affineMap) const {
+    SmallVector<AffineExpr, 4> resultExprs;
+    // Process all the polynomials in the access. Each polynomial has a set of terms consisting of {index * constant
+    // coefficient}, and an independent constant term. We create an affine expression for each polynomial.
+    FlatTensorAccess accessInfo = convContext.accessAnalysis.getAccessInfo(refine);
+    unsigned dimPos = 0;
+    for (auto polynomial : accessInfo.access) {
+      // Create an affine expression with the independent constant term.
+      AffineExpr polyExpr = rewriter.getAffineConstantExpr(polynomial.constant);
+      for (auto term : polynomial.terms) {
+        auto remappedIvIt = convContext.remappedIvs.find(term.first);
+        assert(remappedIvIt != convContext.remappedIvs.end() && "IV not found in Stripe->Affine mapping");
+        indices.emplace_back(remappedIvIt->second);
+        // Add index * coefficient expression to the affine expression.
+        auto indexExpr = rewriter.getAffineDimExpr(dimPos);
+        auto multiplierExpr = rewriter.getAffineConstantExpr(term.second);
+        auto termExpr = indexExpr * multiplierExpr;
+        polyExpr = termExpr + polyExpr;
+        ++dimPos;
+      }
+      resultExprs.emplace_back(std::move(polyExpr));
+    }
+
+    base = rewriter.getRemappedValue(accessInfo.base);
+    // Create an affine map with the resulting affine expressions. The affine map won't have symbols since all the
+    // coefficients in Stripe polynomials are constant for now.
+    affineMap = AffineMap::get(/*dimCount=*/dimPos, /*symbolCount=*/0, resultExprs);
+  }
+
+  // Contains analysis and temporary information needed for the Stripe to Affine conversion.
+  StripeToAffineContext& convContext;
 };
 
 // Declaration of Stripe Ops converters for supported Ops.
@@ -168,61 +229,58 @@ PatternMatchResult AffinePolyOpConverter::matchAndRewrite(AffinePolyOp constOp, 
   return matchSuccess();
 }
 
-PatternMatchResult ParallelForOpConverter::matchAndRewrite(ParallelForOp forOp, ArrayRef<Value*> operands,
+PatternMatchResult ParallelForOpConverter::matchAndRewrite(ParallelForOp stripeForOp, ArrayRef<Value*> operands,
                                                            ConversionPatternRewriter& rewriter) const {
-  auto forRanges = forOp.ranges().getValue();
-  auto& forBodyRegion = forOp.inner();
-  assert(forBodyRegion.getBlocks().size() == 1 && "Unexpected control flow in Stripe");
+  auto ranges = stripeForOp.ranges().getValue();
+  size_t numRanges = ranges.size();
+  auto& stripeForBody = stripeForOp.inner();
+  assert(stripeForBody.getBlocks().size() == 1 && "Unexpected control flow in Stripe");
 
-  if (!forRanges.size()) {
+  if (numRanges == 0) {
     // This is ParallelForOp with no ranges so no affine.loop needed ("main" case). Move ParallelForOp's operations
     // (single block) into parent single block. ParallelForOp terminator is not moved since parent region already have
     // one.
-    auto& parentBlockOps = forOp.getOperation()->getBlock()->getOperations();
-    auto& forBodyOps = forBodyRegion.front().getOperations();
+    auto& parentBlockOps = stripeForOp.getOperation()->getBlock()->getOperations();
+    auto& bodyOps = stripeForBody.front().getOperations();
     assert(isa<TerminateOp>(parentBlockOps.back()) && "Expected terminator");
-    parentBlockOps.splice(mlir::Block::iterator(forOp), forBodyOps, forBodyOps.begin(), std::prev(forBodyOps.end()));
+    parentBlockOps.splice(Block::iterator(stripeForOp), bodyOps, bodyOps.begin(), std::prev(bodyOps.end()));
   } else {
-    llvm_unreachable("ParallelForOp not supported yet");
+    // Create an Affine loop nest following the order of ranges.
+    ScopedContext scope(rewriter, stripeForOp.getLoc());
+    SmallVector<ValueHandle, 8> affineIvs;
+    SmallVector<ValueHandle*, 8> affineIvPtrs;
+    SmallVector<ValueHandle, 8> affineLbs;
+    SmallVector<ValueHandle, 8> affineUbs;
+    SmallVector<int64_t, 8> affineSteps;
+
+    for (size_t rangeIdx = 0; rangeIdx < numRanges; ++rangeIdx) {
+      affineIvs.emplace_back(IndexHandle());
+      affineIvPtrs.emplace_back(&affineIvs.back());
+      affineLbs.emplace_back(constant_index(0));
+      affineUbs.emplace_back(constant_index(ranges[rangeIdx].cast<IntegerAttr>().getInt()));
+      affineSteps.emplace_back(1);
+    }
+
+    // Build the empty Affine loop nest with an innermost loop body containing a terminator.
+    AffineLoopNestBuilder(affineIvPtrs, affineLbs, affineUbs, affineSteps)();
+
+    const auto stripeIvValues = stripeForBody.front().getArguments();
+    assert(stripeIvValues.size() == affineIvs.size() && "Stripe and Affine number of IVs doesn't match");
+    for (size_t ivIdx = 0; ivIdx < numRanges; ++ivIdx) {
+      convContext.remappedIvs.insert(std::pair<Value*, Value*>(stripeIvValues[ivIdx], affineIvs[ivIdx].getValue()));
+    }
+
+    // Move ParallelForOp's operations (single block) to Affine innermost loop. We skip the terminator since Affine loop
+    // has one already.
+    auto& innermostLoopOps = mlir::getForInductionVarOwner(affineIvs[numRanges - 1]).getBody()->getOperations();
+    auto& stripeBodyOps = stripeForBody.front().getOperations();
+    innermostLoopOps.splice(Block::iterator(innermostLoopOps.front()), stripeBodyOps, stripeBodyOps.begin(),
+                            std::prev(stripeBodyOps.end()));
   }
 
   // We are done. Remove ParallelForOp.
-  rewriter.replaceOp(forOp, {});
+  rewriter.replaceOp(stripeForOp, {});
   return matchSuccess();
-}
-
-/// Utility that converts a Stripe access to Affine given a `FlatTensorAccess` that contains the polynomial
-/// information. It returns:
-///    - 'base': affine.load/affine.store base memref Value.
-///    - 'indices': list of indices to be used as affine map arguments.
-///    - 'affineMap': affine map with mapping for for the list of indices.
-static void convertStripeAccessToAffine(const FlatTensorAccess& accessInfo, ConversionPatternRewriter& rewriter,
-                                        Value*& base, SmallVectorImpl<Value*>& indices, AffineMap& affineMap) {
-  SmallVector<AffineExpr, 4> resultExprs;
-  unsigned numTerms = 0;
-  // Process all the polynomials in the access. Each polynomial has a set of terms consisting of {index * constant
-  // coefficient}, and an independent constant term. We create an affine expression for each polynomial.
-  for (auto polynomial : accessInfo.access) {
-    // Create an affine expression with the independent constant term.
-    AffineExpr polyExpr = rewriter.getAffineConstantExpr(polynomial.constant);
-    unsigned dimPos = 0;
-    for (auto term : polynomial.terms) {
-      indices.emplace_back(rewriter.getRemappedValue(term.first));
-      // Add index * coefficient expression to the affine expression.
-      auto indexExpr = rewriter.getAffineDimExpr(dimPos);
-      auto multiplierExpr = rewriter.getAffineConstantExpr(term.second);
-      auto termExpr = indexExpr * multiplierExpr;
-      polyExpr = termExpr + polyExpr;
-      ++dimPos;
-    }
-    numTerms += dimPos;
-    resultExprs.emplace_back(std::move(polyExpr));
-  }
-
-  base = rewriter.getRemappedValue(accessInfo.base);
-  // Create an affine map with the resulting affine expressions. The affine map won't have symbols since all the
-  // coefficients in Stripe polynomials are constant for now.
-  affineMap = AffineMap::get(/*dimCount=*/numTerms, /*symbolCount=*/0, resultExprs);
 }
 
 PatternMatchResult LoadOpConverter::matchAndRewrite(LoadOp loadOp, ArrayRef<Value*> operands,
@@ -232,7 +290,7 @@ PatternMatchResult LoadOpConverter::matchAndRewrite(LoadOp loadOp, ArrayRef<Valu
   SmallVector<Value*, 8> indices;
   Value* base;
   RefineOp refine = cast<RefineOp>(loadOp.from()->getDefiningOp());
-  convertStripeAccessToAffine(accessAnalysis.getAccessInfo(refine), rewriter, base, indices, map);
+  convertStripeAccessToAffine(refine, rewriter, base, indices, map);
   rewriter.replaceOpWithNewOp<AffineLoadOp>(loadOp, base, map, indices);
   return matchSuccess();
 }
@@ -251,7 +309,7 @@ PatternMatchResult StoreOpConverter::matchAndRewrite(StoreOp storeOp, ArrayRef<V
   SmallVector<Value*, 8> indices;
   Value* base;
   RefineOp refine = cast<RefineOp>(storeOp.into()->getDefiningOp());
-  convertStripeAccessToAffine(accessAnalysis.getAccessInfo(refine), rewriter, base, indices, map);
+  convertStripeAccessToAffine(refine, rewriter, base, indices, map);
   rewriter.replaceOpWithNewOp<AffineStoreOp>(storeOp, operands[1], base, map, indices);
   return matchSuccess();
 }
@@ -265,12 +323,12 @@ PatternMatchResult TerminateOpConverter::matchAndRewrite(TerminateOp terminateOp
 }
 
 void populateStripeToAffineConversionPatterns(OwningRewritePatternList& patterns, MLIRContext* ctx,
-                                              TypeConverter& typeConverter, const AccessInfoAnalysis& accessAnalysis) {
+                                              TypeConverter& typeConverter, StripeToAffineContext& convContext) {
 #define STRIPE_OP(OP) OP##Converter,
 #define STRIPE_LAST_OP(OP) OP##Converter
   patterns.insert<
 #include "supported_ops.inc"  // NOLINT(build/include)
-      >(ctx, accessAnalysis);
+      >(ctx, convContext);
 
   mlir::populateFuncOpTypeConversionPattern(patterns, ctx, typeConverter);
 }
@@ -284,11 +342,11 @@ void ConvertStripeToAffine::runOnFunction() {
   // Add shape information to tensor ref types, which is needed for Stripe->Affine type conversion.
   getAnalysis<PopulateTensorRefShape>();
 
-  AccessInfoAnalysis accessAnalysis(getFunction());
+  StripeToAffineContext convContext(getFunction());
 
   StripeToAffineTypeConverter typeConverter;
   OwningRewritePatternList patterns;
-  populateStripeToAffineConversionPatterns(patterns, &getContext(), typeConverter, accessAnalysis);
+  populateStripeToAffineConversionPatterns(patterns, &getContext(), typeConverter, convContext);
 
   // Add Affine/Std dialect legal ops to conversion target.
   mlir::ConversionTarget target(getContext());
