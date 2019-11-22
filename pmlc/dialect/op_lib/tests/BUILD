@@ -2,4 +2,4 @@
 
 load("//pmlc:lit.bzl", "glob_lit_tests")
 
-glob_lit_tests(data = ["//pmlc/dialect/op_lib:op-lib-tblgen"])
+glob_lit_tests(data = ["//pmlc/dialect/op_lib:op-lib-tblgen", "@mlir//:OpBase"])
