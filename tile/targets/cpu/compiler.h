@@ -31,6 +31,13 @@ enum class XSMMDispatch : int {
   BMMM = 5,  // TODO: Need Stripe support for bfloat16.
 };
 
+// What block we are compiling.
+enum CompileFor {
+  NORMAL_BLOCK,
+  THREADED_BLOCK,
+  XSMM_BLOCK,
+};
+
 class Compiler : private stripe::ConstStmtVisitor {
  public:
   Compiler(llvm::LLVMContext* context, const Config& config);
@@ -57,6 +64,7 @@ class Compiler : private stripe::ConstStmtVisitor {
   void GenerateArena(const stripe::Block& block);
   llvm::Function* CompileXSMMBlock(const stripe::Block& block, const XSMMDispatch xsmmDispatch,
                                    const XSMMCallData& xsmmCallData);
+  llvm::Function* CompileThreadedBlock(const stripe::Block& block);
   llvm::Function* CompileBlock(const stripe::Block& block);
   void Visit(const stripe::Load&) override;
   void Visit(const stripe::Store&) override;
@@ -171,11 +179,14 @@ class Compiler : private stripe::ConstStmtVisitor {
   void ProfileBlockLeave(const stripe::Block& block);
   void ProfileLoopEnter(const stripe::Block& block);
   void ProfileLoopLeave(const stripe::Block& block);
+  std::string ProfileBlockID(const stripe::Block& block);
   const XSMMDispatch GetXSMMDispatch(const stripe::Block& block);
   llvm::Value* RunTimeLogEntry(void);
   void EmitRunTimeLogEntry(const std::string& str, const std::string& extra, llvm::Value* value = nullptr);
   void PrintOutputAssembly();
   void AggInit(const Buffer& dest, llvm::Value* init_val);
+  void ParallelFor(llvm::Value* refs, llvm::Value* idxs, size_t range, llvm::Function* func);
+  CompileFor getCompileFor(const stripe::Block& block);
 
   // Gets the leading dimensions and the buffers for an XSMM call if available.
   // @returns true if the XSMM call is applicable, otherwise false.

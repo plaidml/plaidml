@@ -4,6 +4,7 @@
 
 #include <vector>
 
+#include "plaidml2/edsl/helper.h"
 #include "tile/codegen/pattern.h"
 #include "tile/lang/gen_stripe.h"
 #include "tile/lib/lib.h"
@@ -23,9 +24,9 @@ using namespace stripe;         // NOLINT
 using namespace plaidml::edsl;  // NOLINT
 using plaidml::edsl::LogicalShape;
 
-lang::RunInfo Evaluate(const std::string& name, const std::vector<Tensor>& vars) {
+std::shared_ptr<stripe::Program> Evaluate(const std::string& name, const std::vector<Tensor>& vars) {
   plaidml::edsl::Program program(name, vars);
-  return *static_cast<const tile::lang::RunInfo*>(program.runinfo());
+  return plaidml::edsl::ConvertIntoStripe(program);
 }
 
 void RoundTrip(const std::string& code) { EXPECT_THAT(to_string(Parse(code)), Eq(code)); }
@@ -203,9 +204,7 @@ TEST(Pattern, Conv1x1s1) {
   auto I = Placeholder(PLAIDML_DATA_INT8, {1, 100, 100, 56}, "I");
   auto K = Placeholder(PLAIDML_DATA_INT8, {1, 1, 56, 56}, "K");
   std::vector<int64_t> O_dims = {1, 100, 100, 56};
-  auto runinfo = Evaluate("conv1x1s1", {lib::Convolution(I, K, O_dims)});
-  runinfo.const_inputs = {"K"};
-  auto program = GenerateStripe(runinfo);
+  auto program = Evaluate("conv1x1s1", {lib::Convolution(I, K, O_dims)});
   auto main = program->entry->SubBlock(0);
   auto kernel = main->SubBlock(0);
   IVLOG(2, *main);
@@ -244,24 +243,23 @@ block([
   EXPECT_THAT(to_string(term), Eq(to_string(expected)));
   auto pattern = GeneratePattern();
   IVLOG(1, pattern);
-  EXPECT_THAT(to_string(MatchAll(pattern, term)),  //
-              ContainerEq(std::vector<std::string>{
-                  "{(CI->ci), (CI_range->56), (CO->co), (CO_range->56), (K0->k0), (K0_range->1), (K1->k1), "
-                  "(K1_range->1), (N->n), (N_range->1), (P0->0), (P1->0), (S0->1), (S1->1), (X0->x0), (X0_range->100), "
-                  "(X1->x1), (X1_range->100)}",
-                  "{(CI->ci), (CI_range->56), (CO->co), (CO_range->56), (K0->k1), (K0_range->1), (K1->k0), "
-                  "(K1_range->1), (N->n), (N_range->1), (P0->0), (P1->0), (S0->1), (S1->1), (X0->x1), (X0_range->100), "
-                  "(X1->x0), (X1_range->100)}",
-              }));
+  EXPECT_THAT(                             //
+      to_string(MatchAll(pattern, term)),  //
+      ContainerEq(std::vector<std::string>{
+          "{(CI->ci), (CI_range->56), (CO->co), (CO_range->56), (K0->k0), (K0_range->1), (K1->k1), "
+          "(K1_range->1), (N->n), (N_range->1), (P0->0), (P1->0), (S0->1), (S1->1), (X0->x0), (X0_range->100), "
+          "(X1->x1), (X1_range->100)}",
+          "{(CI->ci), (CI_range->56), (CO->co), (CO_range->56), (K0->k1), (K0_range->1), (K1->k0), "
+          "(K1_range->1), (N->n), (N_range->1), (P0->0), (P1->0), (S0->1), (S1->1), (X0->x1), (X0_range->100), "
+          "(X1->x0), (X1_range->100)}",
+      }));
 }
 
 TEST(Pattern, Conv3x3s1) {
   auto I = Placeholder(PLAIDML_DATA_INT8, {1, 100, 100, 56}, "I");
   auto K = Placeholder(PLAIDML_DATA_INT8, {3, 3, 56, 56}, "K");
   std::vector<int64_t> O_dims = {1, 100, 100, 56};
-  auto runinfo = Evaluate("conv3x3s1", {lib::Convolution(I, K, O_dims)});
-  runinfo.const_inputs = {"K"};
-  auto program = GenerateStripe(runinfo);
+  auto program = Evaluate("conv3x3s1", {lib::Convolution(I, K, O_dims)});
   auto main = program->entry->SubBlock(0);
   auto kernel = main->SubBlock(0);
   IVLOG(2, *main);
@@ -315,9 +313,7 @@ TEST(Pattern, Conv7x7s2) {
   auto I = Placeholder(PLAIDML_DATA_INT8, {1, 224, 224, 3}, "I");
   auto K = Placeholder(PLAIDML_DATA_INT8, {7, 7, 3, 64}, "K");
   std::vector<int64_t> O_dims = {1, 112, 112, 64};
-  auto runinfo = Evaluate("conv7x7s2", {lib::Convolution(I, K, O_dims, {2, 2})});
-  runinfo.const_inputs = {"K"};
-  auto program = GenerateStripe(runinfo);
+  auto program = Evaluate("conv7x7s2", {lib::Convolution(I, K, O_dims, {2, 2})});
   auto main = program->entry->SubBlock(0);
   auto kernel = main->SubBlock(0);
   IVLOG(2, *main);

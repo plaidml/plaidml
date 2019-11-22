@@ -58,9 +58,9 @@ void swap(Orderer<V>& v1, Orderer<V>& v2) {
   std::swap(*v1, *v2);
 }
 
-boost::optional<StencilMatch> FindBestStencil(const std::vector<proto::Stencil>& specs, const bool is_strict_dims,
-                                              stripe::Block* block) {
-  boost::optional<StencilMatch> lowest_cost_match;
+std::optional<StencilMatch> FindBestStencil(const std::vector<proto::Stencil>& specs, const bool is_strict_dims,
+                                            stripe::Block* block) {
+  std::optional<StencilMatch> lowest_cost_match;
 
   std::vector<Orderer<Refinement*>> ref_ins;
   std::size_t ord = 0;

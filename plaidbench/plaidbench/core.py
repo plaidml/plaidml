@@ -290,6 +290,7 @@ def _inner_run(reports,
                 if og.level is logging.NOTSET:
                     plaidml.DEFAULT_LOG_HANDLER.setLevel(logging.WARNING)
                 og.setLevel(logging.DEBUG)
+                og.addFilter(timef)
 
         stop_watch.start()
         _, overrides = model.run()

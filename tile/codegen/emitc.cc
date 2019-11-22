@@ -2,6 +2,10 @@
 
 #include "tile/codegen/emitc.h"
 
+#include <vector>
+
+#include <boost/format.hpp>
+
 namespace vertexai {
 namespace tile {
 namespace codegen {

@@ -6,12 +6,11 @@
 #include <list>
 #include <map>
 #include <memory>
+#include <optional>
 #include <set>
 #include <string>
 #include <unordered_map>
 #include <vector>
-
-#include <boost/optional.hpp>
 
 #include "tile/base/shape.h"
 #include "tile/math/polynomial.h"
@@ -153,7 +152,7 @@ class Codec {
 
   virtual ~Codec() = default;
   virtual int64_t byte_size() const = 0;
-  virtual boost::optional<size_t> sparse_dim() const = 0;
+  virtual std::optional<size_t> sparse_dim() const = 0;
 
  protected:
   explicit Codec(const TensorShape* shape);
@@ -232,8 +231,8 @@ struct Refinement : Taggable {
              const std::string& agg_op = "",         //
              const Location& location = Location{},  //
              uint64_t offset = 0,                    //
-             const boost::optional<BankDimension>& bank_dim = boost::none,
-             const boost::optional<Affine>& cache_unit = boost::none)
+             const std::optional<BankDimension>& bank_dim = std::nullopt,
+             const std::optional<Affine>& cache_unit = std::nullopt)
       : dir(dir),
         from(from),
         access(access),
@@ -265,9 +264,9 @@ struct Refinement : Taggable {
   TensorShape interior_shape;
   std::string agg_op;
   Location location;
-  uint64_t offset = 0;                      // Offset within the location's arena.
-  boost::optional<BankDimension> bank_dim;  // Which dimension should we bank on
-  boost::optional<Affine> cache_unit;       // Which cache we should use when encaching this refinement
+  uint64_t offset = 0;                    // Offset within the location's arena.
+  std::optional<BankDimension> bank_dim;  // Which dimension should we bank on
+  std::optional<Affine> cache_unit;       // Which cache we should use when encaching this refinement
 
   Affine FlatAccess() const;
   TensorShape ApplyTile(const std::map<std::string, size_t>& tile_by_name) const;

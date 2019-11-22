@@ -136,22 +136,22 @@ ParseResult ParseSimple(                                   //
     }
   }
   // Parse any additional attributes
-  return parser->parseOptionalAttributeDict(res->attributes);
+  return parser->parseOptionalAttrDict(res->attributes);
 }
 
-static void printTerminateOp(OpAsmPrinter* printer, TerminateOp op) {  //
+void printTerminateOp(OpAsmPrinter* printer, TerminateOp op) {  //
   *printer << op.getOperationName();
 }
 
-static ParseResult parseTerminateOp(OpAsmParser* parser, OperationState& result) {  //
+ParseResult parseTerminateOp(OpAsmParser* parser, OperationState& result) {  //
   return mlir::success();
 }
 
-static void printAllocateOp(OpAsmPrinter* printer, AllocateOp op) {
+void printAllocateOp(OpAsmPrinter* printer, AllocateOp op) {
   PrintSimple(op.getOperation(), printer, 0, {}, Type(), false);
 }
 
-static ParseResult parseAllocateOp(OpAsmParser* parser, OperationState& result) {
+ParseResult parseAllocateOp(OpAsmParser* parser, OperationState& result) {
   llvm::SmallVector<OpAsmParser::OperandType, 0> operands;
   if (ParseSimple(parser, &result, &operands, 0, {}, static_cast<Type*>(nullptr), false)) {
     return failure();
@@ -178,11 +178,11 @@ void AllocateOp::build(Builder* builder, OperationState& result, TensorType type
   result.addTypes(TensorRefType::get(type));
 }
 
-static void printRefineOp(OpAsmPrinter* printer, RefineOp op) {
+void printRefineOp(OpAsmPrinter* printer, RefineOp op) {
   PrintSimple(op.getOperation(), printer, 1, {}, op.in()->getType(), true);
 }
 
-static ParseResult parseRefineOp(OpAsmParser* parser, OperationState& result) {
+ParseResult parseRefineOp(OpAsmParser* parser, OperationState& result) {
   TensorRefType refType;
   llvm::SmallVector<OpAsmParser::OperandType, 8> operands;
   if (ParseSimple(parser, &result, &operands, 1, {}, &refType, true) ||  //
@@ -198,11 +198,11 @@ static ParseResult parseRefineOp(OpAsmParser* parser, OperationState& result) {
   return parser->addTypeToList(refType, result.types);
 }
 
-static void printLoadOp(OpAsmPrinter* printer, LoadOp op) {
+void printLoadOp(OpAsmPrinter* printer, LoadOp op) {
   PrintSimple(op.getOperation(), printer, 1, {}, op.from()->getType(), false);
 }
 
-static ParseResult parseLoadOp(OpAsmParser* parser, OperationState& result) {
+ParseResult parseLoadOp(OpAsmParser* parser, OperationState& result) {
   TensorRefType refType;
   llvm::SmallVector<OpAsmParser::OperandType, 1> operands;
   return failure(  //
@@ -211,11 +211,11 @@ static ParseResult parseLoadOp(OpAsmParser* parser, OperationState& result) {
       parser->addTypeToList(eltwise::getRankedTensorType(refType.getElementType()), result.types));
 }
 
-static void printStoreOp(OpAsmPrinter* printer, StoreOp op) {
+void printStoreOp(OpAsmPrinter* printer, StoreOp op) {
   PrintSimple(op.getOperation(), printer, 2, {}, op.into()->getType(), false);
 }
 
-static ParseResult parseStoreOp(OpAsmParser* parser, OperationState& result) {
+ParseResult parseStoreOp(OpAsmParser* parser, OperationState& result) {
   TensorRefType refType;
   llvm::SmallVector<OpAsmParser::OperandType, 2> operands;
   return failure(  //
@@ -224,7 +224,7 @@ static ParseResult parseStoreOp(OpAsmParser* parser, OperationState& result) {
       parser->resolveOperand(operands[1], eltwise::getRankedTensorType(refType.getElementType()), result.operands));
 }
 
-static void printAggregateOp(OpAsmPrinter* printer, AggregateOp op) {
+void printAggregateOp(OpAsmPrinter* printer, AggregateOp op) {
   *printer << op.getOperation()->getName() << " \"";
   *printer << util::stringifyAggregationKind(op.agg());
   *printer << "\" ";
@@ -237,7 +237,7 @@ static void printAggregateOp(OpAsmPrinter* printer, AggregateOp op) {
   printer->printOptionalAttrDict(op.getOperation()->getAttrs(), skip);
 }
 
-static ParseResult parseAggregateOp(OpAsmParser* parser, OperationState& result) {
+ParseResult parseAggregateOp(OpAsmParser* parser, OperationState& result) {
   StringAttr agg_op_val;
   llvm::SmallVector<NamedAttribute, 1> ignore;
   auto ctx = parser->getBuilder().getContext();
@@ -261,11 +261,11 @@ static ParseResult parseAggregateOp(OpAsmParser* parser, OperationState& result)
       parser->resolveOperand(from, eltwise::getRankedTensorType(refType.getElementType()), result.operands));
 }
 
-static void printAffinePolyOp(OpAsmPrinter* printer, AffinePolyOp op) {
+void printAffinePolyOp(OpAsmPrinter* printer, AffinePolyOp op) {
   PrintSimple(op.getOperation(), printer, 0, {"coeffs", "offset"}, Type(), true);
 }
 
-static ParseResult parseAffinePolyOp(OpAsmParser* parser, OperationState& result) {
+ParseResult parseAffinePolyOp(OpAsmParser* parser, OperationState& result) {
   auto aff_type = AffineType::get(parser->getBuilder().getContext());
   llvm::SmallVector<OpAsmParser::OperandType, 0> operands;
   return failure(  //
@@ -286,7 +286,7 @@ void AffinePolyOp::build(Builder* builder, OperationState& result, const AffineP
   result.setOperandListToResizable();
 }
 
-static void printParallelForOp(OpAsmPrinter* printer, ParallelForOp op) {
+void printParallelForOp(OpAsmPrinter* printer, ParallelForOp op) {
   *printer << op.getOperation()->getName() << " (";
   llvm::SmallVector<StringRef, 8> skip;
   skip.push_back("ranges");
@@ -309,7 +309,7 @@ static void printParallelForOp(OpAsmPrinter* printer, ParallelForOp op) {
   printer->printOptionalAttrDict(op.getOperation()->getAttrs(), skip);
 }
 
-static ParseResult parseParallelForOp(OpAsmParser* parser, OperationState& result) {
+ParseResult parseParallelForOp(OpAsmParser* parser, OperationState& result) {
   if (parser->parseLParen()) {
     return failure();
   }
@@ -341,7 +341,7 @@ static ParseResult parseParallelForOp(OpAsmParser* parser, OperationState& resul
   result.regions.emplace_back(new Region(nullptr));
   return failure(                                                    //
       parser->parseRegion(*result.regions.back(), {}, {}, false) ||  //
-      parser->parseOptionalAttributeDict(result.attributes));
+      parser->parseOptionalAttrDict(result.attributes));
 }
 
 void ParallelForOp::build(Builder* builder, OperationState& result, ArrayRef<int64_t> ranges) {
@@ -357,7 +357,7 @@ void ParallelForOp::build(Builder* builder, OperationState& result, ArrayRef<int
   body->push_back(Operation::create(state));
 }
 
-static void printConstraintOp(OpAsmPrinter* printer, ConstraintOp op) {
+void printConstraintOp(OpAsmPrinter* printer, ConstraintOp op) {
   *printer << op.getOperation()->getName() << " ";
   printer->printOperand(op.input());
   printer->printRegion(op.ge_case());
@@ -366,7 +366,7 @@ static void printConstraintOp(OpAsmPrinter* printer, ConstraintOp op) {
   }
 }
 
-static ParseResult parseConstraintOp(OpAsmParser* parser, OperationState& result) {
+ParseResult parseConstraintOp(OpAsmParser* parser, OperationState& result) {
   auto aff_type = AffineType::get(parser->getBuilder().getContext());
   auto geRegion = new Region(nullptr);
   result.regions.emplace_back(geRegion);
@@ -380,11 +380,11 @@ static ParseResult parseConstraintOp(OpAsmParser* parser, OperationState& result
       parser->parseOptionalRegion(*ltRegion, {}, {}));
 }
 
-static void printExecuteOnOp(OpAsmPrinter* printer, ExecuteOnOp& op) {
+void printExecuteOnOp(OpAsmPrinter* printer, ExecuteOnOp& op) {
   PrintSimple(op.getOperation(), printer, 1, {}, op.from()->getType(), false);
 }
 
-static ParseResult parseExecuteOnOp(OpAsmParser* parser, OperationState& result) {
+ParseResult parseExecuteOnOp(OpAsmParser* parser, OperationState& result) {
   TensorRefType refType;
   llvm::SmallVector<OpAsmParser::OperandType, 1> operands;
   return failure(  //

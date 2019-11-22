@@ -5,12 +5,11 @@
 #include <list>
 #include <map>
 #include <memory>
+#include <optional>
 #include <sstream>
 #include <string>
+#include <variant>
 #include <vector>
-
-#include <boost/optional.hpp>
-#include <boost/variant.hpp>
 
 #include "tile/codegen/codegen.pb.h"
 #include "tile/codegen/compile_pass.h"
@@ -33,13 +32,13 @@ struct Struct;
 struct List;
 struct Set;
 
-using Term = boost::variant<  //
-    Atom,                     //
-    Number,                   //
-    Variable,                 //
-    std::shared_ptr<List>,    //
-    std::shared_ptr<Set>,     //
-    std::shared_ptr<Struct>   //
+using Term = std::variant<   //
+    Atom,                    //
+    Number,                  //
+    Variable,                //
+    std::shared_ptr<List>,   //
+    std::shared_ptr<Set>,    //
+    std::shared_ptr<Struct>  //
     >;
 
 struct Struct {
@@ -63,7 +62,7 @@ struct MatchResult {
 };
 
 // Attempts to find the first permutation of 'value' that matches the supplied 'pattern'.
-boost::optional<MatchResult> MatchFirst(const Term& pattern, const Term& value);
+std::optional<MatchResult> MatchFirst(const Term& pattern, const Term& value);
 
 // Attempts to find all permutations of 'value' that matches the supplied 'pattern'.
 std::list<MatchResult> MatchAll(const Term& pattern, const Term& value);

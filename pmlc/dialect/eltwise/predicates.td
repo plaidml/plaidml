@@ -31,8 +31,13 @@ def ScalarBool : Type<And<[
 
 def ScalarIndex : Type<And<[
     IsScalarPred,
-    CPred<"$_self.cast<ScalarType>().type() == DataType::INTX">
+    CPred<"$_self.cast<ScalarType>().type() == DataType::INT32">
   ]>, "scalar-index">;
+
+def ScalarUINT32 : Type<And<[
+    IsScalarPred,
+    CPred<"$_self.cast<ScalarType>().type() == DataType::UINT32">
+  ]>, "scalar-u32">;
 
 def AnyScalarFloat : Type<And<[
     IsScalarPred,

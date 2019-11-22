@@ -75,11 +75,11 @@ static eltwise::ScalarConstantOp createZero(OpBuilder* builder, Location loc, Ty
   auto dtype = scalarType.type();
   if (is_float(dtype)) {
     const double zero = 0.0;
-    auto constType = ScalarType::get(builder->getContext(), DataType::FLOATX);
+    auto constType = ScalarType::get(builder->getContext(), DataType::FLOAT32);
     return builder->create<eltwise::ScalarConstantOp>(loc, constType, zero);
   }
   const int64_t zero = 0;
-  auto constType = ScalarType::get(builder->getContext(), DataType::INTX);
+  auto constType = ScalarType::get(builder->getContext(), DataType::INT32);
   return builder->create<eltwise::ScalarConstantOp>(loc, constType, zero);
 }
 
@@ -165,6 +165,7 @@ struct LoweringContext {
 
   MLIRContext* context;
   TypeConverter typeConverter;
+  std::vector<StringAttr> names;
 };
 
 struct LoweringBase : public ConversionPattern {
@@ -244,17 +245,15 @@ static Value* findOutputArgument(Operation* op, Value* tensor) {
   return nullptr;
 }
 
-static StringAttr getTensorName(Value* tensor) {
+static StringAttr getTensorName(LoweringContext* context, Value* tensor) {
   if (auto op = tensor->getDefiningOp()) {
     if (op->getNumOperands()) {
-      return getTensorName(op->getOperand(0));
+      return getTensorName(context, op->getOperand(0));
     }
     return {};
   }
   auto blockArg = llvm::cast<mlir::BlockArgument>(tensor);
-  auto funcOp = llvm::cast<FuncOp>(blockArg->getOwner()->getParentOp());
-  auto stripeName = stripe::Dialect::getDialectAttrName("name");
-  return funcOp.getArgAttrOfType<StringAttr>(blockArg->getArgNumber(), stripeName);
+  return context->names[blockArg->getArgNumber()];
 }
 
 static Value* MakeCombination(            //
@@ -379,17 +378,19 @@ struct AffineDomainOpConversion : public LoweringBase {
         srcType = stripe::TensorRefType::get(srcTensorType);
       }
       if (i) {
-        auto op = tensors[i]->getDefiningOp();
-        if (op && llvm::isa<eltwise::ScalarConstantOp>(op)) {
+        auto tensorValue = tensors[i];
+        auto tensorLoc = tensorValue->getLoc();
+        auto tensorOp = tensorValue->getDefiningOp();
+        if (tensorOp && llvm::isa<eltwise::ScalarConstantOp>(tensorOp)) {
           // This operand needs to be broadcast, skip creating a refinement
-          refs.emplace_back(tensors[i]);
+          refs.emplace_back(tensorValue);
         } else {
-          auto refineOp = rewriter.create<stripe::RefineOp>(op->getLoc(), srcType, tensors[i], offsets);
+          auto refineOp = rewriter.create<stripe::RefineOp>(tensorLoc, srcType, tensorValue, offsets);
           auto refAttrs = llvm::SmallVector<NamedAttribute, 1>{
               {rewriter.getIdentifier("contraction"), rewriter.getUnitAttr()},
           };
           refineOp.setAttr(stripe::Dialect::getStripeAttrsName(), rewriter.getDictionaryAttr(refAttrs));
-          if (auto name = getTensorName(tensors[i])) {
+          if (auto name = getTensorName(lowering, tensorValue)) {
             refineOp.setAttr("name", name);
           }
           refs.emplace_back(refineOp.result());
@@ -679,6 +680,7 @@ struct FuncOpConversion : public LoweringBase {
     auto stripeName = stripe::Dialect::getDialectAttrName("name");
     auto stripeLayout = stripe::Dialect::getDialectAttrName("layout");
 
+    lowering->names.clear();
     for (unsigned i = 0; i < type.getNumInputs(); i++) {
       auto name = rewriter.getStringAttr(llvm::formatv("_X{0}", i).str());
       if (auto attr = funcOp.getArgAttrOfType<StringAttr>(i, tileName)) {
@@ -686,6 +688,7 @@ struct FuncOpConversion : public LoweringBase {
         newFuncOp.removeArgAttr(i, tileName);
       }
       newFuncOp.setArgAttr(i, stripeName, name);
+      lowering->names.push_back(name);
       newFuncOp.setArgAttr(i, stripeLayout, TypeAttr::get(tensorTypes[i]));
     }
 
@@ -700,6 +703,7 @@ struct FuncOpConversion : public LoweringBase {
         }
       }
       newFuncOp.setArgAttr(argIndex, stripeName, name);
+      lowering->names.push_back(name);
       newFuncOp.setArgAttr(argIndex, stripeLayout, TypeAttr::get(tensorTypes[argIndex]));
     }
 
@@ -816,10 +820,10 @@ struct SpecialOpConversion : public LoweringBase {
     std::vector<Value*> outputs;
     for (unsigned i = 0; i < specialOp->getNumOutputs(); i++) {
       auto result = op->getResult(i);
-      auto resultType = result->getType();
-      auto resultTensorType = convertIntoTensorType(resultType);
       auto output = findOutputArgument(op, result);
       if (!output) {
+        auto resultType = result->getType();
+        auto resultTensorType = convertIntoTensorType(resultType);
         auto allocOp = rewriter.create<stripe::AllocateOp>(op->getLoc(), resultTensorType);
         output = allocOp.result();
       }
@@ -828,6 +832,52 @@ struct SpecialOpConversion : public LoweringBase {
 
     specialOp->create(&rewriter, op->getLoc(), inputs, outputs);
     rewriter.replaceOp(op, outputs);
+    return matchSuccess();
+  }
+};
+
+struct PrngOpConversion : public LoweringBase {
+  explicit PrngOpConversion(LoweringContext* lowering, StringRef opName)  //
+      : LoweringBase(opName, lowering) {}
+
+  PatternMatchResult tryMatchAndRewrite(  //
+      Operation* op,                      //
+      ArrayRef<Value*> operands,          //
+      ConversionPatternRewriter& rewriter) const override {
+    IVLOG(2, "PrngOpConversion::matchAndRewrite>");
+    auto prngOp = llvm::cast<PrngOp>(op);
+
+    auto opName = stripe::Dialect::getCanonicalOpName("prng_step");
+    auto abstractOp = AbstractOperation::lookup(opName, op->getContext());
+    if (!abstractOp) {
+      op->emitError("AbstractOperation::lookup failed for: ") << opName;
+      return matchFailure();
+    }
+
+    auto specialOp = abstractOp->getInterface<stripe::SpecialOp>();
+    if (!specialOp) {
+      op->emitError("SpecialOp interface expected");
+      return matchFailure();
+    }
+
+    std::vector<Value*> inputs{prngOp.state()};
+    std::vector<Value*> outputs;
+    auto newState = findOutputArgument(op, prngOp.new_state());
+    outputs.emplace_back(newState);
+    auto result = prngOp.result();
+    auto output = findOutputArgument(op, result);
+    if (!output) {
+      auto resultType = result->getType();
+      auto resultTensorType = convertIntoTensorType(resultType);
+      auto allocOp = rewriter.create<stripe::AllocateOp>(op->getLoc(), resultTensorType);
+      output = allocOp.result();
+    }
+    outputs.emplace_back(output);
+
+    specialOp->create(&rewriter, op->getLoc(), inputs, outputs);
+    result->replaceAllUsesWith(output);
+    prngOp.new_state()->replaceAllUsesWith(newState);
+    rewriter.eraseOp(op);
     return matchSuccess();
   }
 };
@@ -864,14 +914,18 @@ struct LoweringPass : public mlir::ModulePass<LoweringPass> {
     }
     auto specialOps = util::getAllOpsWithInterface<tile::SpecialOp>(&getContext());
     for (auto op : specialOps) {
-      patterns.insert<SpecialOpConversion>(&lowering, op->name);
+      if (op->name == tile::Dialect::getCanonicalOpName("prng")) {
+        patterns.insert<PrngOpConversion>(&lowering, op->name);
+      } else {
+        patterns.insert<SpecialOpConversion>(&lowering, op->name);
+      }
     }
     if (failed(applyPartialConversion(getModule(), target, patterns, &lowering.typeConverter))) {
       emitError(UnknownLoc::get(&getContext()), "Error lowering tile -> stripe\n");
       signalPassFailure();
     }
 
-    getModule().walk([](FuncOp funcOp) {
+    getModule().walk([&](FuncOp funcOp) {
       // Wraps function body with a ParallelForOp to represent Stripe's 'main' block.
       stripe::createMainParallelFor(funcOp);
     });

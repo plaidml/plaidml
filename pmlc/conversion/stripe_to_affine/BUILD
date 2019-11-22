@@ -16,6 +16,7 @@ plaidml_cc_library(
     tags = ["llvm"],
     deps = [
         "//pmlc/dialect/stripe",
+        "//pmlc/dialect/stripe:passes",
     ],
     alwayslink=1,
 )

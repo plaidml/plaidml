@@ -7,8 +7,10 @@ PY_SRCS_VER = "PY2AND3"
 
 PLAIDML_COPTS = select({
     "@com_intel_plaidml//toolchain:windows_x86_64": [
-        "/std:c++17",
+        "/std:c++17",  # This MUST match all other compilation units
         "/Zc:__cplusplus",
+        "/Zc:inline",
+        "/Zc:strictStrings",
         "/DWIN32_LEAN_AND_MEAN",
     ],
     "//conditions:default": [
@@ -45,10 +47,7 @@ def plaidml_cc_test(copts = [], deps = (), linkopts = [], **kwargs):
     native.cc_test(
         copts = PLAIDML_COPTS + copts,
         deps = deps + [str(Label("//testing:gtest_main"))],
-        linkstatic = select({
-            "@com_intel_plaidml//toolchain:linux_x86_64": 1,
-            "//conditions:default": None,
-        }),
+        linkstatic = 1,
         linkopts = PLAIDML_LINKOPTS + linkopts,
         **kwargs
     )

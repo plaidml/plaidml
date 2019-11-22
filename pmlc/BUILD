@@ -1,6 +1,10 @@
 # Copyright 2019 Intel Corporation.
 
-load("//bzl:plaidml.bzl", "plaidml_cc_binary")
+load(
+    "//bzl:plaidml.bzl",
+    "plaidml_cc_binary",
+    "plaidml_cc_test",
+)
 load("//vendor/mlir:mlir.bzl", "COPTS")
 
 plaidml_cc_binary(
@@ -18,7 +22,6 @@ plaidml_cc_binary(
         "@mlir//:EDSC",
         "@mlir//:OptMain",
         "@mlir//:Parser",
-        "@mlir//:TestTransforms",
         "@mlir//:Transforms",
     ],
 )
@@ -43,4 +46,14 @@ filegroup(
     name = "litfiles",
     srcs = glob(["runlit*py"]),
     visibility = ["//visibility:public"],
+)
+
+plaidml_cc_test(
+    name = "test",
+    srcs = ["test.cc"],
+    copts = COPTS,
+    deps = [
+        "@mlir//:IR",
+        "@mlir//:Transforms",
+    ],
 )

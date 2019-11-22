@@ -50,6 +50,7 @@ class CpuProgram final : public tile::Program {
 
  private:
   std::unique_ptr<tile::targets::cpu::Native> executable_;
+  std::shared_ptr<stripe::Block> source_;
 };
 
 }  // namespace local_machine

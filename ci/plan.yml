@@ -88,10 +88,6 @@ PLATFORMS:
     variant: linux_x86_64
   keras-stripe-ocl-neo:
     variant: linux_x86_64
-  keras-plaid-ocl-gfx803:
-     variant: linux_x86_64
-  keras-stripe-ocl-gfx803:
-     variant: linux_x86_64
   keras-plaid-ocl-gfx804:
      variant: windows_x86_64
   keras-stripe-ocl-gfx804:
@@ -232,8 +228,6 @@ SUITES:
         conda_env: conda/keras_backend_test.yml
         precision: untested
         platform_overrides:
-          keras-stripe-ocl-gfx803:
-            soft_fail: true
           keras-plaid-mtl-uhd630:
             soft_fail: true
         shards: 3
@@ -328,11 +322,6 @@ SUITES:
         pipelines: [ci]
         append_args: [--tensorflow]
 
-      keras-plaid-ocl-gfx803:
-        pipelines: [nightly]
-      keras-stripe-ocl-gfx803:
-        pipelines: [plaidml, nightly]
-
       keras-plaid-ocl-gfx804: # (windows, amd)
         pipelines: [plaidml, nightly]
       keras-stripe-ocl-gfx804:
@@ -392,7 +381,6 @@ SUITES:
         precision: high
         skip_platforms: 
           - keras-stripe-llvm-cpu
-          - keras-stripe-ocl-gfx803
           - keras-stripe-ocl-gfx804
           - keras-stripe-ocl-gfx900
           - keras-stripe-ocl-gp100gl
@@ -406,14 +394,14 @@ SUITES:
         platform_overrides:
           keras-tf-dnnl-cpu:
             conda_env: conda/tensorflow-dnnl.yml
-          keras-plaid-ocl-gfx803:
-            prepend_args: [--examples, 128]
           keras-plaid-ocl-gfx804:
             prepend_args: [--examples, 64]
           keras-stripe-ocl-gfx804:
             prepend_args: [--examples, 64]
           keras-stripe-ocl-neo:
             prepend_args: [--examples, 512]
+          keras-plaid-ocl-neo:
+            soft_fail: true            
           keras-plaid-mtl-uhd630:
             prepend_args: [--examples, 256]
           keras-stripe-mtl-uhd630:
@@ -451,8 +439,6 @@ SUITES:
         platform_overrides:          
           keras-stripe-llvm-cpu:
             prepend_args: [--examples, 64]
-          keras-stripe-ocl-gfx803:
-            prepend_args: [--examples, 256]
           keras-plaid-ocl-gfx804:
             prepend_args: [--examples, 64]
           keras-stripe-ocl-gfx804:
@@ -468,14 +454,11 @@ SUITES:
         skip_platforms: 
           - keras-plaid-mtl-uhd630 
           - keras-stripe-mtl-uhd630
-          - keras-plaid-ocl-gfx803
           - keras-stripe-llvm-cpu
 
       xception:
         precision: high
         platform_overrides:
-          keras-stripe-ocl-gfx803:
-            prepend_args: [--examples, 64]
           keras-plaid-ocl-gfx804:
             prepend_args: [--examples, 64]
           keras-stripe-ocl-gfx804:
@@ -484,6 +467,7 @@ SUITES:
             prepend_args: [--examples, 512]
           keras-plaid-ocl-neo:
             prepend_args: [--examples, 256]
+            soft_fail: true
           keras-stripe-ocl-neo:
             prepend_args: [--examples, 256]
             perf_threshold: 0.7
