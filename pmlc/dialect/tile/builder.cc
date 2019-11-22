@@ -69,7 +69,7 @@ struct TileBuilder::Impl {
   std::map<AffineDomainOp, DomainInfo> domains;
   std::unordered_map<Value*, RankedTensorType> shapeCache;
   std::unordered_map<Value*, Value*> implicitUpdates;
-  std::unordered_map<mlir::Value*, vertexai::tile::BufferPtr> implicitBindings;
+  std::unordered_map<Value*, BufferPtr> implicitBindings;
   NoneOp noneOp;
 
   static std::map<ContractionKey, std::string> contractions;
@@ -103,7 +103,7 @@ struct TileBuilder::Impl {
     return abstractOp;
   }
 
-  std::vector<mlir::Value*> getBackwardSliceOfAffine(const llvm::SetVector<mlir::Value*>& values) {
+  std::vector<Value*> getBackwardSliceOfAffine(const llvm::SetVector<Value*>& values) {
     return util::getBackwardSlice(values, false, [](Value* value) {
       if (auto scalarType = value->getType().dyn_cast<ScalarType>()) {
         return scalarType.type() == DataType::INT32;
@@ -204,7 +204,7 @@ stripe::TensorType TileBuilder::MakeTensorType(  //
   return stripe::TensorType::get(elementType, dims, stripe::OffsetsMap{}, false);
 }
 
-stripe::TensorType TileBuilder::IntoTensorType(mlir::RankedTensorType type) {
+stripe::TensorType TileBuilder::IntoTensorType(RankedTensorType type) {
   auto shape = type.getShape();
   auto cls = mlir::Identifier::get(stripe::kAddressClassIdentifier, type.getContext());
   llvm::SmallVector<stripe::TensorDim, 4> newShape(shape.size(), stripe::TensorDim{0, 0, cls});
@@ -217,13 +217,11 @@ stripe::TensorType TileBuilder::IntoTensorType(mlir::RankedTensorType type) {
   return stripe::TensorType::get(type.getElementType(), newShape, stripe::OffsetsMap{}, false);
 }
 
-void TileBuilder::BindShape(mlir::Value* tensor, mlir::RankedTensorType type) {  //
+void TileBuilder::BindShape(Value* tensor, RankedTensorType type) {  //
   tensor->setType(type);
 }
 
-void TileBuilder::BindBuffer(mlir::Value* tensor, vertexai::tile::BufferPtr buffer) {
-  impl->implicitBindings[tensor] = buffer;
-}
+void TileBuilder::BindBuffer(Value* tensor, BufferPtr buffer) { impl->implicitBindings[tensor] = buffer; }
 
 void TileBuilder::BindTensorDims(Value* from, ArrayRef<Value**> intos) {
   if (!from) {
@@ -338,7 +336,7 @@ Value* TileBuilder::MakeStringOp(StringRef value) {
   return impl->builder.create<StringOp>(impl->builder.getUnknownLoc(), type, attr).result();
 }
 
-llvm::StringRef TileBuilder::GetStringValue(mlir::Value* value) {
+llvm::StringRef TileBuilder::GetStringValue(Value* value) {
   if (auto op = llvm::dyn_cast_or_null<StringOp>(value->getDefiningOp())) {
     return op.getValue().getValue();
   }
@@ -369,7 +367,7 @@ Value* TileBuilder::MakeScalarConstantOp(int64_t value) {
   return impl->builder.create<ScalarConstantOp>(impl->builder.getUnknownLoc(), type, value).result();
 }
 
-int64_t TileBuilder::GetIntegerValue(mlir::Value* value) {
+int64_t TileBuilder::GetIntegerValue(Value* value) {
   if (auto op = llvm::dyn_cast_or_null<ScalarConstantOp>(value->getDefiningOp())) {
     return op.getIntAttr().getInt();
   }
@@ -382,7 +380,7 @@ Value* TileBuilder::MakeScalarConstantOp(double value) {
   return impl->builder.create<ScalarConstantOp>(impl->builder.getUnknownLoc(), type, value).result();
 }
 
-double TileBuilder::GetFloatValue(mlir::Value* value) {
+double TileBuilder::GetFloatValue(Value* value) {
   if (auto op = llvm::dyn_cast_or_null<ScalarConstantOp>(value->getDefiningOp())) {
     return op.getFloatAttr().getValueAsDouble();
   }
@@ -538,7 +536,7 @@ void TileBuilder::SetUseDefault(Value* cion, Value* defaultValue) {
   terminator->setOperands(operands);
 }
 
-void TileBuilder::SetNoReduce(mlir::Value* cion, bool no_reduce) {
+void TileBuilder::SetNoReduce(Value* cion, bool no_reduce) {
   IVLOG(2, "TileBuilder::SetNoReduce> " << no_reduce);
   auto op = cion->getDefiningOp();
   auto domainOp = llvm::dyn_cast_or_null<AffineDomainOp>(op);
