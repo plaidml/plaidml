@@ -286,6 +286,7 @@ class Tensor(ForeignObject):
 
     def __init__(self, shape=None, dims=None, expr=None, value=None, name='', buffer=None):
         self._name = name
+        self._buffer = buffer
         if shape:
             if buffer is None:
                 raw_buffer = ffi.NULL
