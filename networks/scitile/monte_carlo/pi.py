@@ -2,8 +2,6 @@ import timeit
 from collections import OrderedDict
 
 import numpy as np
-from numpy.random import seed
-from numpy.random import rand
 import plaidml2 as plaidml
 import plaidml2.edsl as edsl
 import plaidml2.exec as plaidml_exec
@@ -20,20 +18,15 @@ def sum(R):
     return O
 
 
-def check_val(Z):
-    IN = edsl.TensorOutput()
-    IN = edsl.select(Z <= 1, 1, 0)
-    return IN
-
-
 #n: number of darts thrown in 2x2 square
-#   The function computes the number of points that fall inside a circle
-#   of radius 1 inscripbed with-in the 2X2 square region and uses this to
-#   compute pi
+#   The function computes the ratio of points that fall inside a circle
+#   of radius 1 (inscribed with-in the 2X2 square region) to the number of
+#   points that fall outside. This ratio is used this to compute the area
+#   of the inscribed circle ~ pi
 def monte_carlo_pi(n, benchmark=False):
-    seed(2)
-    values_x = rand(n)
-    values_y = rand(n)
+    np.random.seed(2)
+    values_x = np.random.rand(n)
+    values_y = np.random.rand(n)
 
     X_data = values_x.reshape(n)
     Y_data = values_y.reshape(n)
@@ -43,7 +36,7 @@ def monte_carlo_pi(n, benchmark=False):
 
     Z = sq(X) + sq(Y)
 
-    Z = check_val(Z)
+    Z = edsl.select(Z <= 1, 1, 0)
     O = sum(Z)
 
     program = edsl.Program('monte_carlo_pi', [O])
