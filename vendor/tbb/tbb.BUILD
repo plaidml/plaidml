@@ -2,7 +2,16 @@
 
 package(default_visibility = ["//visibility:public"])
 
+load("@bazel_skylib//rules:copy_file.bzl", "copy_file")
+
 exports_files(["LICENSE"])
+
+# NOTE: we must copy this file because bazel cannot handle directories with 'build' in them
+copy_file(
+    name = "version_string.ver",
+    src = "build/vs2013/version_string.ver",
+    out = "version_string.ver",
+)
 
 cc_library(
     name = "tbb",
@@ -20,10 +29,10 @@ cc_library(
     hdrs = glob([
         "include/serial/**",
         "include/tbb/**/**",
-        "build/vs2013/version_string.ver",
-    ]),
+    ]) + [
+        ":version_string.ver",
+    ],
     copts = [
-        "-Iexternal/tbb/build/vs2013",
         "-Iexternal/tbb/src",
     ],
     defines = [
