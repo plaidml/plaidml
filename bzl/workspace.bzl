@@ -178,7 +178,7 @@ def plaidml_workspace():
         url = "https://github.com/intel/tbb/archive/tbb_2019.zip",
         sha256 = "078c969b1bbd6b2afb01f65cf9d513bb80636363b206f1e2ae221b614d7ae197",
         strip_prefix = "tbb-tbb_2019",
-        build_file = Label("//bzl:tbb.BUILD"),
+        build_file = Label("//vendor/tbb:tbb.BUILD"),
     )
 
     dev_http_archive(
