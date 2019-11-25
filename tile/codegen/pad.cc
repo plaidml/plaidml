@@ -186,7 +186,7 @@ void ModifyBlockIdxs(Block* block, const std::map<std::string, size_t>& new_idxs
     reshape->set_tag("kernel");
     reshape->name = "kernel_" + std::to_string(parent->stmts.size()) + "(" + src_ref_name + ")";
     // Modify the ref in the original block
-    Refinement new_block_ref(RefDir::Out, src_ref_name, ref_name, block_ref_it->access, src_inner_shape,
+    Refinement new_block_ref(RefDir::Out, src_ref_name, block_ref_it->into(), block_ref_it->access, src_inner_shape,
                              block_ref_it->agg_op, block_ref_it->location, block_ref_it->offset, block_ref_it->bank_dim,
                              block_ref_it->cache_unit);
     block->refs.erase(*block_ref_it);

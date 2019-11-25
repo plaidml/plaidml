@@ -48,16 +48,17 @@ local PARAMS = {
               },
             },
 
-            // Stencil pass to tile the data for XSMM
-            {
-              name: 'stencil_mac',
-              pass: {
-                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.StencilPass',
-                reqs: ['agg_op_add', 'comb_op_mul'],
-                outer_set: ['mac'],
-                inner_set: ['mac_inner', 'xsmm'],
-                is_strict_dims: true,
-                stencils: [
+            // Automatic stencil pass in MLIR
+            {  
+               name: 'mlir_auto_stencil',
+               pass: {
+                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.MLIR_AutoStencilPass',
+                 reqs: ['agg_op_add', 'comb_op_mul'],
+                 processors: 56,
+                 startup_cost: 32,
+                 only_even: [true, true, true], // XSMM lib does not allow innermost constraints
+                 only_po2: [false, false, false],
+                 special_stencils: [
                   {
                     startup_cost: 32,
                     idxs: [
@@ -66,35 +67,10 @@ local PARAMS = {
                       { name: 'k', size: 3, outs: [0], ins: [1, -1] },
                     ],
                   },
-                  {
-                    startup_cost: 32,
-                    idxs: [
-                      { name: 'm', size: 32, outs: [1], ins: [0, 1] },
-                      { name: 'n', size: -1, outs: [-1], ins: [-1, 0] },
-                      { name: 'k', size: 32, outs: [0], ins: [1, -1] },
-                    ],
-                  },
-                  {
-                    startup_cost: 32,
-                    idxs: [
-                      { name: 'm', size: 16, outs: [1], ins: [0, 1] },
-                      { name: 'n', size: -1, outs: [-1], ins: [-1, 0] },
-                      { name: 'k', size: 16, outs: [0], ins: [1, -1] },
-                    ],
-                  },
-                  {
-                    startup_cost: 32,
-                    idxs: [
-                      { name: 'm', size: 48, outs: [1], ins: [0, 1] },
-                      { name: 'n', size: -1, outs: [-1], ins: [-1, 0] },
-                      { name: 'k', size: 48, outs: [0], ins: [1, -1] },
-                    ],
-                  },
                 ],
-                inputs_set: [{ tags: ['A'] }, { tags: ['B'] }],
-                outputs_set: [{ tags: ['C'] }],
-              },
+               },
             },
+
             {
               name: 'fuse_mac_eltwise',
               pass: {
