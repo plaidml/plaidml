@@ -151,7 +151,7 @@ class Binder {
     return set_output(tensor, Buffer{device_, tensor_shape});
   }
 
-  std::shared_ptr<Executable> build() {
+  std::shared_ptr<Executable> compile() {
     std::vector<Binding> input_bindings;
     for (const auto& kvp : inputs_) {
       input_bindings.emplace_back(Binding{kvp.first.tensor, kvp.second});

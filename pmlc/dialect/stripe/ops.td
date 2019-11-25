@@ -68,7 +68,7 @@ def LoadIndexOp : StripeOp<"load_index"> {
   let results = (outs EltwiseAny:$into);
 }
 
-def StoreOp : StripeOp<"store"> {
+def StoreOp : StripeOpWithPP<"store"> {
   let summary = "Store into a tensor";
   let arguments = (ins TensorRefType:$into, EltwiseAny:$from);
 }
@@ -178,7 +178,7 @@ def ScatterOp : SpecialOp<"scatter", 1, 3> {
 
 def PrngStepOp : SpecialOp<"prng_step", 2, 1> {
   let arguments = (ins
-    TensorRefType:$state_out, 
+    TensorRefType:$state_out,
     TensorRefType:$buffer_out,
     TensorRefType:$state_in
   );

@@ -129,6 +129,22 @@ mlir_tblgen(
 )
 
 mlir_tblgen(
+    name = "gen-standard-enum-decls",
+    src = "include/mlir/Dialect/StandardOps/Ops.td",
+    out = "include/mlir/Dialect/StandardOps/OpsEnums.h.inc",
+    action = "-gen-enum-decls",
+    incs = ["include"],
+)
+
+mlir_tblgen(
+    name = "gen-standard-enum-defs",
+    src = "include/mlir/Dialect/StandardOps/Ops.td",
+    out = "include/mlir/Dialect/StandardOps/OpsEnums.cpp.inc",
+    action = "-gen-enum-defs",
+    incs = ["include"],
+)
+
+mlir_tblgen(
     name = "gen-affine-op-decls",
     src = "include/mlir/Dialect/AffineOps/AffineOps.td",
     out = "include/mlir/Dialect/AffineOps/AffineOps.h.inc",
@@ -169,18 +185,18 @@ mlir_tblgen(
 )
 
 mlir_tblgen(
-    name = "gen-llvm-enum-decls",
-    src = "include/mlir/Dialect/LLVMIR/LLVMOps.td",
-    out = "include/mlir/Dialect/LLVMIR/LLVMOpsEnums.h.inc",
-    action = "-gen-enum-decls",
-    incs = ["include"],
-)
-
-mlir_tblgen(
     name = "gen-llvm-op-defs",
     src = "include/mlir/Dialect/LLVMIR/LLVMOps.td",
     out = "include/mlir/Dialect/LLVMIR/LLVMOps.cpp.inc",
     action = "-gen-op-defs",
+    incs = ["include"],
+)
+
+mlir_tblgen(
+    name = "gen-llvm-enum-decls",
+    src = "include/mlir/Dialect/LLVMIR/LLVMOps.td",
+    out = "include/mlir/Dialect/LLVMIR/LLVMOpsEnums.h.inc",
+    action = "-gen-enum-decls",
     incs = ["include"],
 )
 
@@ -272,6 +288,22 @@ mlir_tblgen(
     incs = ["include"],
 )
 
+mlir_tblgen(
+    name = "op-asm-interface-decls",
+    src = "include/mlir/IR/OpAsmInterface.td",
+    out = "include/mlir/IR/OpAsmInterface.h.inc",
+    action = "-gen-op-interface-decls",
+    incs = ["include"],
+)
+
+mlir_tblgen(
+    name = "op-asm-interface-defs",
+    src = "include/mlir/IR/OpAsmInterface.td",
+    out = "include/mlir/IR/OpAsmInterface.cpp.inc",
+    action = "-gen-op-interface-defs",
+    incs = ["include"],
+)
+
 cc_library(
     name = "StandardOps",
     srcs = glob([
@@ -288,6 +320,9 @@ cc_library(
         ":gen-call-interfaces-decls",
         ":gen-standard-op-decls",
         ":gen-standard-op-defs",
+        ":gen-standard-enum-decls",
+        ":gen-standard-enum-defs",
+        ":op-asm-interface-decls",
         "@llvm//:support",
     ],
     alwayslink = 1,
@@ -478,6 +513,8 @@ cc_library(
         ":Support",
         ":gen-call-interfaces-decls",
         ":gen-call-interfaces-defs",
+        ":op-asm-interface-decls",
+        ":op-asm-interface-defs",
         "@llvm//:support",
     ],
 )

@@ -4,6 +4,8 @@
 
 #include <vector>
 
+#include <boost/format.hpp>
+
 namespace vertexai {
 namespace tile {
 namespace codegen {

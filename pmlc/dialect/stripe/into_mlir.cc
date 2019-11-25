@@ -4,6 +4,7 @@
 
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/SourceMgr.h"
 
 #include "mlir/IR/Matchers.h"
 #include "mlir/Translation.h"
@@ -200,7 +201,7 @@ static void IntrinsicIntoMLIR(OpBuilder* builder, SymbolTable* locals, const str
     }
     auto scalarType = DataTypeIntoMLIR(builder->getContext(), it->second);
     auto tensor = safe_at(locals->scalars, intrinsic.inputs[0]);
-    auto op = builder->create<eltwise::CastOp>(builder->getUnknownLoc(), scalarType, tensor);
+    auto op = builder->create<eltwise::CastOp>(builder->getUnknownLoc(), RankedTensorType::get({}, scalarType), tensor);
     locals->scalars.emplace(intrinsic.outputs[0], op.result());
     op.setAttr("scalar_name", builder->getStringAttr(intrinsic.outputs[0]));
     return;
@@ -536,17 +537,20 @@ mlir::OwningModuleRef IntoMLIR(MLIRContext* ctx, const stripe::Program& prog) {
 }
 
 static mlir::OwningModuleRef IntoMlirTranslateFunction(  //
-    std::unique_ptr<llvm::MemoryBuffer> input,           //
+    llvm::SourceMgr& sourceMgr,                          //
     MLIRContext* context) {
   vertexai::tile::stripe::proto::Program proto;
-  if (!stripe::FromProtoText(input->getBuffer().str(), &proto)) {
+  if (!stripe::FromProtoText(sourceMgr.getMemoryBuffer(sourceMgr.getMainFileID())->getBuffer().str(), &proto)) {
     llvm::report_fatal_error("Could not parse stripe prototxt");
     return nullptr;
   }
   return IntoMLIR(context, *stripe::FromProto(proto));
 }
 
-static mlir::TranslateToMLIRRegistration IntoMlirTranslate("stripe-to-mlir", IntoMlirTranslateFunction);
+static mlir::TranslateToMLIRRegistration IntoMlirTranslate("stripe-to-mlir",
+                                                           [](llvm::SourceMgr& sourceMgr, MLIRContext* context) {
+                                                             return IntoMlirTranslateFunction(sourceMgr, context);
+                                                           });
 
 }  // namespace stripe
 }  // namespace dialect

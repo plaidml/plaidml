@@ -11,7 +11,10 @@
 #endif
 
 STRIPE_OP(AffinePolyOp)
+STRIPE_OP(LoadOp)
 STRIPE_OP(ParallelForOp)
+STRIPE_OP(RefineOp)
+STRIPE_OP(StoreOp)
 STRIPE_LAST_OP(TerminateOp)
 
 #undef STRIPE_OP

@@ -289,9 +289,10 @@ struct PrngCanonicalizer : public OpRewritePattern<PrngOp> {
     if (resultType == prngOp.result()->getType()) {
       return Pattern::matchFailure();
     }
+    auto stateType = prngOp.new_state()->getType();
     SmallVector<Value*, 4> dims(prngOp.dims());
-    auto newOp = rewriter.create<PrngOp>(op->getLoc(), resultType, prngOp.state(), dims);
-    rewriter.replaceOp(op, {newOp});
+    auto newOp = rewriter.create<PrngOp>(op->getLoc(), resultType, stateType, prngOp.state(), dims);
+    rewriter.replaceOp(op, {newOp.result(), newOp.new_state()});
     util::UpdateFuncOpType(newOp.getOperation());
     return Pattern::matchSuccess();
   }
@@ -303,14 +304,13 @@ void PrngOp::getCanonicalizationPatterns(OwningRewritePatternList& results, MLIR
 
 Type PrngOp::getResultType(ArrayRef<Value*> operands) {
   IVLOG(5, "PrngOp::getResultType>")
-  if (operands.size() < 2) {
-    throw std::runtime_error("PrngOp requires at least 2 operands");
+  if (operands.size() < 1) {
+    throw std::runtime_error("PrngOp requires at least one operand");
   }
-  auto tensor = operands.front();
+  auto state = operands.front();
   auto dims = operands.drop_front();
-  auto tensorType = eltwise::getRankedTensorType(tensor->getType());
-  auto elementType = tensorType.getElementType();
   auto shape = eltwise::ComputeShape(dims);
+  auto elementType = ScalarType::get(state->getContext(), DataType::FLOAT32);
   return RankedTensorType::get(shape, elementType);
 }
 

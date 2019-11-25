@@ -3,6 +3,7 @@
 #pragma once
 
 #include <memory>
+#include <set>
 #include <vector>
 
 #include "llvm/ADT/ArrayRef.h"
@@ -29,6 +30,20 @@ struct Shape {
   llvm::ArrayRef<int64_t> dims;
 };
 
+struct ProgramUpdate {
+  mlir::Value* source;
+  mlir::Value* target;
+
+  bool operator<(const ProgramUpdate& rhs) const {  //
+    return std::tie(source, target) < std::tie(rhs.source, rhs.target);
+  }
+};
+
+struct ProgramMutations {
+  std::vector<mlir::Value*> outputs;
+  std::set<ProgramUpdate> updates;
+};
+
 class TileBuilder {
   struct Impl;
 
@@ -42,6 +57,7 @@ class TileBuilder {
   void BindTensorDims(mlir::Value* from, llvm::ArrayRef<mlir::Value**> into);
   mlir::RankedTensorType ComputeShape(mlir::Value* tensor);
   void BindShape(mlir::Value* tensor, mlir::RankedTensorType type);
+  void BindBuffer(mlir::Value* tensor, vertexai::tile::BufferPtr buffer);
 
   stripe::TensorType MakeTensorType(DataType dtype, llvm::ArrayRef<int64_t> sizes, llvm::ArrayRef<int64_t> strides);
   stripe::TensorType IntoTensorType(mlir::RankedTensorType type);
@@ -89,10 +105,7 @@ class TileBuilder {
   void SetUseDefault(mlir::Value* cion, mlir::Value* defaultValue);
   void SetNoReduce(mlir::Value* cion, bool no_reduce);
 
-  std::shared_ptr<TileProgram> MakeProgram(  //
-      llvm::StringRef name,                  //
-      llvm::ArrayRef<mlir::Value*> outputs,  //
-      llvm::MutableArrayRef<mlir::Value*> new_outputs);
+  std::shared_ptr<TileProgram> MakeProgram(llvm::StringRef name, const ProgramMutations& mutations);
 
  private:
   std::unique_ptr<Impl> impl;

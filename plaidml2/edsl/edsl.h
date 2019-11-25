@@ -659,17 +659,13 @@ inline Tensor log(const Tensor& x) { return Call("log", x); }
 
 inline Tensor pow(const Tensor& x, const Tensor& y) { return Call("pow", x, y); }
 
-inline Tensor prng_state(const Tensor& x) { return Call("prng_state", x); }
-
-inline Tensor prng_step(const Tensor& x, const std::vector<size_t>& sizes) {
-  std::vector<Tensor> args = {x};
-  for (const auto& size : sizes) {
-    args.emplace_back(static_cast<int64_t>(size));
+inline Tensor prng(const Tensor& state, const std::vector<int64_t>& dims) {
+  std::vector<Tensor> args = {state};
+  for (const auto& dim : dims) {
+    args.emplace_back(dim);
   }
-  return Call("prng_step", args);
+  return Call("prng", args);
 }
-
-inline Tensor prng_value(const Tensor& x) { return Call("prng_value", x); }
 
 inline Tensor reshape(const Tensor& x, const std::vector<int64_t>& dims) {
   std::vector<Tensor> args = {x};

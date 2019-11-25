@@ -425,10 +425,10 @@ def GatherOp : SpecialOp<"gather">, HasCanonicalizer {
   let results = (outs RankedTensorOf<[AnyScalar]>:$result);
 }
 
-def PrngOp : SpecialOp<"prng">, HasCanonicalizer {
+def PrngOp : SpecialOp<"prng", []>, HasCanonicalizer {
   let summary = "pseudorandom number generator";
-  let arguments = (ins RankedTensorOf<[AnyScalar]>:$state, Variadic<ScalarIndex>:$dims);
-  let results = (outs RankedTensorOf<[AnyScalar]>:$result);
+  let arguments = (ins RankedTensorOf<[ScalarUINT32]>:$state, Variadic<EltwiseIndex>:$dims);
+  let results = (outs RankedTensorOf<[AnyScalarFloat]>:$result, RankedTensorOf<[ScalarUINT32]>:$new_state);
 }
 
 def ReshapeOp : SpecialOp<"reshape">, HasCanonicalizer {
