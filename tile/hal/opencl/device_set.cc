@@ -355,9 +355,9 @@ DeviceSet::DeviceSet(const context::Context& ctx, std::uint32_t pidx, cl_platfor
   ocl::GetDeviceIDs(pid, CL_DEVICE_TYPE_ALL, initial_devices.size(), initial_devices.data(), nullptr);
 
   std::vector<cl_device_id> devices;
-  for (const auto& did : initial_devices) {
+  for (auto did : initial_devices) {
     // Remove OpenCL devices that are older than PLAIDML_MIN_OPENCL_VERSION
-    auto device_version = CLInfoType<CL_DEVICE_VERSION>::Read(did);
+    auto device_version = CLInfo<CL_DEVICE_VERSION>(did);
     if (device_version.compare(PLAIDML_MIN_OPENCL_VERSION) < 0) {
       continue;
     }
@@ -366,6 +366,11 @@ DeviceSet::DeviceSet(const context::Context& ctx, std::uint32_t pidx, cl_platfor
       continue;
     }
     devices.emplace_back(did);
+  }
+
+  if (devices.empty()) {
+    // This platform has no usable devices
+    return;
   }
 
   cl_context_properties props[3] = {CL_CONTEXT_PLATFORM, reinterpret_cast<cl_context_properties>(pid), 0};
