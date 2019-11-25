@@ -12,6 +12,7 @@
 #include "pmlc/dialect/eltwise/ops.h"
 #include "pmlc/dialect/stripe/analysis.h"
 #include "pmlc/dialect/stripe/dialect.h"
+#include "pmlc/dialect/stripe/util.h"
 #include "pmlc/util/util.h"
 
 namespace pmlc {
@@ -73,6 +74,7 @@ class StripeBuilder {
 
  private:
   std::string scalar_name(Operation* op, std::string out_name = "");
+  std::string passthru_idx_name(BlockArgument* idx);
   void add_attributes(stripe::Taggable* out, ArrayRef<NamedAttribute> in);
   std::string add_refinements(  //
       Block* block,             //
@@ -310,8 +312,6 @@ struct RefinementBuilder {
         }
       }
       sblock->refs.emplace(dir, "", ref_name, access, shape, aggName);
-      // TODO: Only do this when we are 1-to-1
-      aggName = "";
     }
 
     // Connect up previously added block
@@ -399,11 +399,20 @@ std::string StripeBuilder::add_refinements(  //
   return builder.refName;
 }
 
+std::string StripeBuilder::passthru_idx_name(BlockArgument* idx) {
+  return idxName(idx).str() + "_0";
+}
+
 std::string StripeBuilder::get_idx(stripe::Block* block, mlir::BlockArgument* affine) {
   auto key = std::make_pair(block, affine);
   auto it = idxs_.find(key);
   if (it == idxs_.end()) {
-    throw std::runtime_error("Need to add passthurs");
+    // Need to add passthurs
+    std::string orig_name = idxName(affine).str();
+    std::string passthru_name = passthru_idx_name(affine);
+    block->idxs.push_back({passthru_name, 1, stripe::Affine(orig_name)});
+    idxs_.emplace(key, passthru_name);
+    return passthru_name;
   }
   return it->second;
 }

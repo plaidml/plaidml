@@ -63,6 +63,17 @@ message PadPass {
   optional uint32 prime_threshold = 2 [default = 32];
 }
 
+// Automatic stencil pass in MLIR
+message MLIR_AutoStencilPass {
+  repeated string reqs = 1;
+  // Number of processors
+  required uint32 processors = 2;
+  // Whether tiles of (M, N, K) is only even
+  repeated bool only_even = 3;
+  // Whether tiles of (M, N, K) is only power of two
+  repeated bool only_po2 = 4;
+}
+
 // A No-op pass to test MLIR transcoding
 message MLIR_NopPass {
 }

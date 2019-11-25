@@ -257,6 +257,8 @@ static void SpecialIntoMLIR(OpBuilder* builder, SymbolTable* locals, const strip
     SpecialConvertImpl<ScatterOp>(builder, locals, special);
   } else if (special.name == "shape") {
     SpecialConvertImpl<ShapeOp>(builder, locals, special);
+  }else if (special.name == "zero") {
+    SpecialConvertImpl<ZeroOp>(builder, locals, special);
   } else {
     throw std::runtime_error("Unknown special: " + special.name);
   }
