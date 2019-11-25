@@ -8,7 +8,7 @@ exports_files(["LICENSE"])
 
 # NOTE: we must copy this file because bazel cannot handle directories with 'build' in them
 copy_file(
-    name = "version_string.ver",
+    name = "version_string",
     src = "build/vs2013/version_string.ver",
     out = "version_string.ver",
 )
@@ -30,12 +30,28 @@ cc_library(
         "include/serial/**",
         "include/tbb/**/**",
     ]) + [
-        ":version_string.ver",
+        ":version_string",
     ],
     copts = [
         "-Iexternal/tbb/src",
-    ],
+    ] + select({
+        "@com_intel_plaidml//toolchain:windows_x86_64": [],
+        "@com_intel_plaidml//toolchain:macos_x86_64": [
+            "-mrtm",
+        ],
+        "@com_intel_plaidml//toolchain:linux_x86_64": [
+            "-mrtm",
+            # this prevents segfaults
+            # see: https://gcc.gnu.org/onlinedocs/gcc/Optimize-Options.html
+            "-flifetime-dse=1",
+        ],
+    }),
     defines = [
+        "TBB_SUPPRESS_DEPRECATED_MESSAGES=1",
+    ],
+    includes = ["include"],
+    linkstatic = 1,
+    local_defines = [
         "__TBB_DYNAMIC_LOAD_ENABLED=0",
         "__TBB_SOURCE_DIRECTLY_INCLUDED=1",
     ] + select({
@@ -47,10 +63,8 @@ cc_library(
         ],
         "//conditions:default": [
             "__TBB_BUILD=1",
-            "TBB_SUPPRESS_DEPRECATED_MESSAGES=1",
             "USE_PTHREAD",
         ],
     }),
-    includes = ["include"],
     alwayslink = 1,
 )
