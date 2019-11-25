@@ -135,8 +135,8 @@ description:
   }];
 
   let arguments = (
-      ins AnyTensor:$_x,
-      AnyTensor:$f,
+      ins AnyTensor:$x,
+      AnyTensor:$filter,
       I32ArrayAttr:$strides,
       I32ArrayAttr:$dilations,
       I32ArrayAttr:$data_dilations,

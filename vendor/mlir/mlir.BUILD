@@ -20,6 +20,13 @@ PLATFORM_COPTS = select({
     ],
 })
 
+filegroup(
+    name = "OpBase",
+    srcs = glob([
+        "include/mlir/IR/OpBase.td",
+    ]),
+)
+
 cc_library(
     name = "TableGen",
     srcs = glob([

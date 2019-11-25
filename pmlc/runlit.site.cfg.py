@@ -23,6 +23,7 @@ config.suffixes = ['.td', '.mlir', '.pbtxt']
 
 mlir_tf_tools_dirs = [
     'pmlc',
+    'pmlc/dialect/op_lib',
 ]
 config.mlir_tf_tools_dirs = [
     os.path.join(os.environ['TEST_SRCDIR'], os.environ['TEST_WORKSPACE'], s)
