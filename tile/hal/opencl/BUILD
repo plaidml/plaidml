@@ -88,7 +88,7 @@ plaidml_cc_test(
     name = "platform_test",
     srcs = ["platform_test.cc"],
     tags = [
-        "not_ci",
+        "manual",
         "opencl",
     ],
     deps = [

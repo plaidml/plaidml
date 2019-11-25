@@ -6,12 +6,11 @@ load("//tools/gencfg:build_defs.bzl", "gencfg")
 gencfg(
     name = "configs",
     srcs = [
+        "//tile/targets/cpu:llvm_cpu.json",
         "//tile/targets/gpu:amd.json",
         "//tile/targets/gpu:cm.json",
-        "//tile/targets/gpu:nvidia.json",
         "//tile/targets/gpu:intel_gen9.json",
-        "//tile/targets/cpu:llvm_cpu.json",
-        "//tile/targets/cpu:opencl_cpu.json",
+        "//tile/targets/gpu:nvidia.json",
     ],
     identifier = "vertexai::tile::targets::kConfigs",
 )
