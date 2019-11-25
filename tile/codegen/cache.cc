@@ -59,6 +59,19 @@ bool ContainBlock(Block* outer, Block* inner) {
   return false;
 }
 
+void NewIndexIntoBlock(Block* block, const std::string& idx_name, size_t range,
+                       std::map<std::string, size_t>* used_idxs) {
+  if (used_idxs->find(idx_name) == used_idxs->end()) {
+    block->idxs.push_back({idx_name, range});
+    used_idxs->emplace(idx_name, range);
+  }
+  else {
+    if (used_idxs->at(idx_name) != range) {
+      throw std::runtime_error("Try to add duplicated index with different ranges.");
+    }
+  }
+}
+
 // Find the insertion position for the cache block
 // The position is the sub-block of outer, which contains inner
 // In/Out ref is inserted before/after the position
@@ -219,6 +232,7 @@ void ApplyCache(const AliasMap& alias_map,    //
   std::vector<size_t> local_sizes;
   std::vector<Affine> local_access;
   std::vector<Affine> global_access(n_dim);
+  std::map<std::string, size_t> used_idxs;
 
   for (size_t k = 0; k < n_dim; ++k) {
     const auto& dim_vars = vars[k];
@@ -228,7 +242,7 @@ void ApplyCache(const AliasMap& alias_map,    //
         // Transform this dim
         for (size_t i = 0; i < dim_vars.size(); ++i) {
           const auto& var = dim_vars[i];
-          xfer_block.idxs.push_back({var.idx, var.range});
+          NewIndexIntoBlock(&xfer_block, var.idx, var.range, &used_idxs);
           local_access.push_back(Affine(var.idx));
           local_sizes.push_back(odd_size ? NextOdd(var.range) : var.range);
         }
@@ -240,7 +254,7 @@ void ApplyCache(const AliasMap& alias_map,    //
         int64_t low = 0;
         for (size_t i = 0; i < dim_vars.size(); ++i) {
           const auto& var = dim_vars[i];
-          xfer_block.idxs.push_back({var.idx, var.range});
+          NewIndexIntoBlock(&xfer_block, var.idx, var.range, &used_idxs);
           exp = exp + Affine(var.idx, var.coeff * var.sign);
           high += var.high;
           low += var.low;
@@ -320,7 +334,7 @@ void ApplyCache(const AliasMap& alias_map,    //
     src.access = global_access;
     dst.location = mem_loc;
     if (reorder_idx) {
-      ReorderIndex(cache_block.get(), src);
+      ReorderIndex(cache_block.get(), true, false);
     }
     StatementIt pos = InsertPosition(outer_block, ref_block);
     outer_block->stmts.insert(pos, cache_block);
@@ -338,7 +352,7 @@ void ApplyCache(const AliasMap& alias_map,    //
     dst.access = global_access;
     src.location = mem_loc;
     if (reorder_idx) {
-      ReorderIndex(cache_block.get(), dst);
+      ReorderIndex(cache_block.get(), true, false);
     }
     StatementIt pos = InsertPosition(outer_block, ref_block);
     ++pos;
@@ -381,6 +395,25 @@ void ApplyCache(const AliasMap& alias_map,    //
     }
   }
   ref_it->mut().access = ref_local_access;
+
+  if (local_access == ref_local_access) {
+    const auto& ref = cache_block->ref_by_into(dir == RefDir::In ? "dst" : "src");
+    // To determine if all index in cache block
+    // are same as that in the reference block
+    bool same_idxs = true;
+    for (auto& idx : cache_block->idxs) {
+      Index* ref_idx = ref_block->idx_by_name(idx.name);
+      if (!ref_idx || ref_idx->range != idx.range) {
+        same_idxs = false;
+        break;
+      }
+    }
+    if (same_idxs) {
+      // If index and access are both consistent,
+      // set same_access tag for the reg_cache pass
+      ref->mut().set_tag("same_access");
+    }
+  }
 
   // Update inner blocks strides + locations
   FixupMiddleBlockRefs(outer_block, ref_block, var_name, raw_name,
@@ -505,7 +538,7 @@ void ApplySimpleCache(const AliasMap& map,          //
     src.interior_shape = raw_xfer_shape;
     dst.location = mem_loc;
     if (reorder_idx) {
-      ReorderIndex(cache_load.get(), src);
+      ReorderIndex(cache_load.get(), true, false);
     }
     block->stmts.emplace_front(cache_load);
   }
@@ -520,7 +553,7 @@ void ApplySimpleCache(const AliasMap& map,          //
     dst.interior_shape = raw_xfer_shape;
     src.location = mem_loc;
     if (reorder_idx) {
-      ReorderIndex(cache_store.get(), dst);
+      ReorderIndex(cache_store.get(), true, false);
     }
     block->stmts.emplace_back(cache_store);
   }

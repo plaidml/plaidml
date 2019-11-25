@@ -3,10 +3,10 @@ local PARAMS = {
     LOCAL_MEM_KIB: 48,
     NUM_THREADS: 256,
     CACHE_WIDTH: 128,
-    NUM_UNITS: 15,
+    NUM_UNITS: 64,
     REGS_MEM_B: 1024,
     REG_MEM_LAT: 1,
-    LOCAL_MEM_LAT: 30,
+    LOCAL_MEM_LAT: 60,
     GLOBAL_MEM_LAT: 100,
     ALIGN_SIZE_B: 64
   },
@@ -104,6 +104,7 @@ local PARAMS = {
                 max_sizes_product: PARAMS[cfg].NUM_THREADS * 64,
                 min_out_size: PARAMS[cfg].NUM_THREADS,
                 cache_width: PARAMS[cfg].CACHE_WIDTH,
+                small_factor_upbound: 5,
               }
             },
 
@@ -183,14 +184,6 @@ local PARAMS = {
               name: 'prune_idxs',
               pass: {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.PruneIndexesPass',
-                reqs: ['all'],
-              },
-            },
-
-            {
-              name: 'reduce_constraints',
-              pass: {
-                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.IlpConstraintReductionPass',
                 reqs: ['all'],
               },
             },
@@ -326,7 +319,6 @@ local PARAMS = {
                 local_memory_latency: PARAMS[cfg].LOCAL_MEM_LAT,
                 register_latency: PARAMS[cfg].REG_MEM_LAT,
                 comp_parent_tag: 'contract_middle',
-                index_order: 'cache',
                 align_size: PARAMS[cfg].ALIGN_SIZE_B,
               }
             },
@@ -345,9 +337,16 @@ local PARAMS = {
                 local_memory_latency: PARAMS[cfg].LOCAL_MEM_LAT,
                 register_latency: PARAMS[cfg].REG_MEM_LAT,
                 comp_parent_tag: 'contract_middle',
-                index_order: 'comp',
                 align_size: PARAMS[cfg].ALIGN_SIZE_B,
               }
+            },
+
+            {
+              name: 'reduce_constraints',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.IlpConstraintReductionPass',
+                reqs: ['all'],
+              },
             },
 
             {

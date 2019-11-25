@@ -107,11 +107,6 @@ std::ostream& operator<<(std::ostream& os, const AliasInfo& ai) {
   return os;
 }
 
-std::ostream& operator<<(std::ostream& os, const Extent& extent) {
-  os << "(" << extent.min << ", " << extent.max << ")";
-  return os;
-}
-
 bool CheckOverlap(const std::vector<Extent>& ae, const std::vector<Extent>& be) {
   IVLOG(4, boost::format("  CheckOverlap: a: '%1%', b: '%2%'") % StreamContainer(ae) % StreamContainer(be));
   if (ae.size() != be.size()) {

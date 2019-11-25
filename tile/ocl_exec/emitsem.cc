@@ -626,8 +626,8 @@ void SemtreeEmitter::Visit(const stripe::Block& block) {
     return;
   }
   size_t this_block_threads = block.has_tag("gpu_thread") ? block.idxs_product() : 1;
-  if (thread_condition_ == nullptr && !block.has_tag("reg_cache") && max_threads(block) == 1 &&
-      outer_threads_ * this_block_threads < used_threads_) {
+  if (thread_condition_ == nullptr && block.has_tag("gpu_thread") && !block.has_tag("reg_cache_whole")
+      && max_threads(block) == 1 && outer_threads_ * this_block_threads < used_threads_) {
     thread_condition_ = &block;
   }
   // For subgroup_inline, we unroll the block directly because
