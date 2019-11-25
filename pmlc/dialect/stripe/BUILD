@@ -101,10 +101,12 @@ plaidml_cc_library(
 plaidml_cc_library(
     name = "passes",
     srcs = [
+        "autostencil_pass.cc",
         "padding_pass.cc",
         "populate_tensor_ref_shape_analysis.cc",
     ],
     hdrs = [
+        "autostencil_pass.h",
         "nop_pass.h",
         "padding_pass.h",
         "populate_tensor_ref_shape_analysis.h",
@@ -113,7 +115,9 @@ plaidml_cc_library(
     tags = ["llvm"],
     deps = [
         ":stripe",
+        ":transcode",
         "//tile/codegen:proto_cc",
+        "//tile/targets/cpu",
     ],
     alwayslink = 1,
 )

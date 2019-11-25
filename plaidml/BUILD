@@ -72,7 +72,9 @@ plaidml_cc_library(
     name = "api",
     srcs = PLAIDML_CPP_SOURCES + ["config-bazel.cc"],
     hdrs = PLAIDML_CPP_HEADERS,
-    data = [":configs"],
+    data = [
+      ":configs",
+    ],
     visibility = ["//visibility:public"],
     deps = PLAIDML_CPP_DEPS,
     alwayslink = 1,
@@ -244,7 +246,9 @@ PYTHON_SRCS = [
 plaidml_py_library(
     name = "py",
     srcs = PYTHON_SRCS,
-    data = [":configs"] + select({
+    data = [
+      ":configs",
+    ] + select({
         "//toolchain:windows_x86_64": [":plaidml.dll"],
         "//toolchain:macos_x86_64": [":libplaidml.dylib"],
         "//conditions:default": [":libplaidml.so"],

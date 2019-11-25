@@ -35,6 +35,7 @@ using mlir::ArrayAttr;
 using mlir::ArrayRef;
 using mlir::Attribute;
 using mlir::Block;
+using mlir::BlockArgument;
 using mlir::BoolAttr;
 using mlir::Builder;
 using mlir::DictionaryAttr;
