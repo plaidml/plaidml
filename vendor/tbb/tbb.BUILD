@@ -13,6 +13,12 @@ copy_file(
     out = "version_string.ver",
 )
 
+copy_file(
+    name = "gen_cpu_ctl_env",
+    src = "@com_intel_plaidml//vendor/tbb:gen_cpu_ctl_env.cc",
+    out = "gen_cpu_ctl_env.cc",
+)
+
 cc_library(
     name = "tbb",
     srcs = glob([
@@ -22,7 +28,7 @@ cc_library(
         "src/tbb/*.h",
     ]) + select({
         "@com_intel_plaidml//toolchain:windows_x86_64": [
-            "@com_intel_plaidml//vendor/tbb:gen_cpu_ctl_env.cc",
+            ":gen_cpu_ctl_env",
         ],
         "//conditions:default": [],
     }),
@@ -48,6 +54,7 @@ cc_library(
     }),
     defines = [
         "TBB_SUPPRESS_DEPRECATED_MESSAGES=1",
+        "__TBB_BUILD=1",
     ],
     includes = ["include"],
     linkstatic = 1,
@@ -62,7 +69,6 @@ cc_library(
             "USE_WINTHREAD",
         ],
         "//conditions:default": [
-            "__TBB_BUILD=1",
             "USE_PTHREAD",
         ],
     }),
