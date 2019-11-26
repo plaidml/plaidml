@@ -73,8 +73,8 @@ class Binder:
         if target is None:
             target = plaidml_settings.get('PLAIDML_TARGET')
         self.target = target
-        self.inputs = {}
-        self.outputs = {}
+        self.inputs = {arg.ref: arg.buffer for arg in program.inputs if arg.buffer}
+        self.outputs = {arg.ref: arg.buffer for arg in program.outputs if arg.buffer}
 
     def input(self, tensor):
         if isinstance(tensor, edsl.Tensor):
@@ -107,7 +107,7 @@ class Binder:
         buffer = map.get(arg.ref)
         if buffer:
             return buffer
-        buffer = plaidml.Buffer(self.device, arg.shape.into_TensorShape())
+        buffer = plaidml.Buffer(arg.shape.into_TensorShape(), device=self.device)
         map[arg.ref] = buffer
         return buffer
 

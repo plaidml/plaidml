@@ -7,7 +7,7 @@ import numpy as np
 import six
 
 from plaidml2 import DType
-from plaidml2.core import TensorShape
+from plaidml2.core import TensorShape, Buffer
 from plaidml2.ffi import ForeignObject, ffi, ffi_call, lib
 
 logger = logging.getLogger(__name__)
@@ -48,13 +48,6 @@ class LogicalShape(ForeignObject):
             ffi_call(lib.plaidml_logical_shape_get_dim_int, self.as_ptr(), i)
             for i in range(self.ndims)
         ]
-
-    # @property
-    # def dims(self):
-    #     return [
-    #         TensorDim(expr=ffi_call(lib.plaidml_logical_shape_get_dim_expr, self.as_ptr(), i))
-    #         for i in range(self.ndims)
-    #     ]
 
     def into_TensorShape(self):
         return TensorShape(
@@ -504,8 +497,7 @@ class TensorRef:
         self.tensor = tensor
 
     def __hash__(self):
-        ptr = ffi_call(lib.plaidml_expr_ptr, self.tensor.as_ptr())
-        return int(ffi.cast('int', ptr))
+        return hash(ffi_call(lib.plaidml_expr_ptr, self.tensor.as_ptr()))
 
     def __eq__(self, other):
         if isinstance(other, Tensor):
@@ -568,6 +560,11 @@ class ProgramArgument:
         self.is_input = arg.is_input
         self.ref = TensorRef(Tensor(expr=ffi_call(lib.plaidml_expr_clone, arg.tensor)))
         self.shape = LogicalShape(ptr=ffi_call(lib.plaidml_logical_shape_clone, arg.shape))
+        if arg.buffer:
+            tensor_shape = self.shape.into_TensorShape()
+            self.buffer = Buffer(tensor_shape, ptr=ffi_call(lib.plaidml_buffer_clone, arg.buffer))
+        else:
+            self.buffer = None
 
 
 class Program(ForeignObject):

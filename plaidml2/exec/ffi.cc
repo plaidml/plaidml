@@ -171,12 +171,14 @@ plaidml_executable* plaidml_compile(  //
     exec->program = GetPlatform()->MakeProgram(ctx, device, target, stripe, &const_bufs);
     IVLOG(1, "After make program");
 
-    std::unordered_map<mlir::Value*, BufferPtr> bindings;
+    std::unordered_map<mlir::Value*, BufferPtr> input_bindings;
     for (unsigned i = 0; i < ninputs; i++) {
-      bindings[inputs[i]->expr->value] = inputs[i]->buffer->buffer;
+      input_bindings[inputs[i]->expr->value] = inputs[i]->buffer->buffer;
     }
+
+    std::unordered_map<mlir::Value*, BufferPtr> output_bindings;
     for (unsigned i = 0; i < noutputs; i++) {
-      bindings[outputs[i]->expr->value] = outputs[i]->buffer->buffer;
+      output_bindings[outputs[i]->expr->value] = outputs[i]->buffer->buffer;
     }
 
     auto attrName = Dialect::getDialectAttrName("name");
@@ -188,16 +190,20 @@ plaidml_executable* plaidml_compile(  //
         throw std::runtime_error("Missing expected argument attribute");
       }
       auto name = attr.getValue().str();
-      auto it = bindings.find(arg.value);
-      auto buffer = (it == bindings.end()) ? arg.buffer : it->second;
       if (arg.isInput) {
-        IVLOG(1, " Input[" << i << "]: " << name << ": " << buffer);
+        auto it = input_bindings.find(arg.value);
+        auto is_implicit = (it == input_bindings.end());
+        auto buffer = is_implicit ? arg.buffer : it->second;
+        IVLOG(1, " Input[" << i << "]: " << name << ": " << buffer << ", implicit: " << is_implicit);
         if (!buffer) {
           throw std::runtime_error("Unbound input");
         }
         exec->input_bufs[name] = buffer;
       } else {
-        IVLOG(1, "Output[" << i << "]: " << name << ": " << buffer);
+        auto it = output_bindings.find(arg.value);
+        auto is_implicit = (it == output_bindings.end());
+        auto buffer = is_implicit ? arg.buffer : it->second;
+        IVLOG(1, "Output[" << i << "]: " << name << ": " << buffer << ", implicit: " << is_implicit);
         if (!buffer) {
           throw std::runtime_error("Unbound output");
         }

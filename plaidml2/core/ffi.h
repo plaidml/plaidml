@@ -183,6 +183,10 @@ PLAIDML_CORE_API void plaidml_buffer_free(  //
     plaidml_error* err,                     //
     plaidml_buffer* buffer);
 
+PLAIDML_CORE_API plaidml_buffer* plaidml_buffer_clone(  //
+    plaidml_error* err,                                 //
+    plaidml_buffer* buffer);
+
 PLAIDML_CORE_API plaidml_buffer* plaidml_buffer_alloc(  //
     plaidml_error* err,                                 //
     const char* device_id,                              //

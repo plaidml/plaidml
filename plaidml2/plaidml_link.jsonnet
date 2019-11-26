@@ -21,6 +21,7 @@ local exports = [
   'plaidml_shape_get_nbytes',
   'plaidml_buffer_free',
   'plaidml_buffer_alloc',
+  'plaidml_buffer_clone',
   'plaidml_buffer_mmap_current',
   'plaidml_buffer_mmap_discard',
   'plaidml_view_free',

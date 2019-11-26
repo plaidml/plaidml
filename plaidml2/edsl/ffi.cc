@@ -222,12 +222,11 @@ plaidml_logical_shape* plaidml_logical_shape_clone(  //
     plaidml_error* err,                              //
     plaidml_logical_shape* shape) {
   return ffi_wrap<plaidml_logical_shape*>(err, nullptr, [&] {
-#ifdef PLAIDML_AST
     IVLOG(3, "plaidml_logical_shape");
+#ifdef PLAIDML_AST
     return new plaidml_logical_shape{shape->shape};
 #endif
 #ifdef PLAIDML_MLIR
-    IVLOG(3, "plaidml_logical_shape");
     // TODO(MLIR): deal with clone
     return new plaidml_logical_shape{shape->type};
 #endif
@@ -1412,6 +1411,12 @@ plaidml_program* plaidml_program_evaluate(  //
       args[i].is_input = arg.is_input;
       args[i].tensor = new plaidml_expr{arg.expr};
       args[i].shape = new plaidml_logical_shape{arg.expr->shape};
+      auto param_expr = std::dynamic_pointer_cast<ParamExpr>(arg.expr);
+      if (param_expr && param_expr->buffer) {
+        args[i].buffer = new plaidml_buffer{param_expr->buffer};
+      } else {
+        args[i].buffer = nullptr;
+      }
     }
     *raw_args = new plaidml_program_args{nargs, args};
     return ret;
@@ -1441,6 +1446,11 @@ plaidml_program* plaidml_program_evaluate(  //
       args[i].is_input = ret->program->arguments[i].isInput;
       args[i].tensor = new plaidml_expr{ret->program->arguments[i].value};
       args[i].shape = new plaidml_logical_shape{ret->program->arguments[i].shape};
+      if (ret->program->arguments[i].buffer) {
+        args[i].buffer = new plaidml_buffer{ret->program->arguments[i].buffer};
+      } else {
+        args[i].buffer = nullptr;
+      }
     }
     *raw_args = new plaidml_program_args{nargs, args};
     return ret;
@@ -1471,6 +1481,7 @@ PLAIDML_EDSL_API void plaidml_program_args_free(  //
     for (unsigned i = 0; i < args->nargs; i++) {
       delete args->args[i].shape;
       delete args->args[i].tensor;
+      delete args->args[i].buffer;
     }
     delete[] args->args;
     delete args;

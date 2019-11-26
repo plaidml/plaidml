@@ -515,6 +515,7 @@ struct ProgramArgument {
   bool is_input;
   TensorRef tensor;
   LogicalShape shape;
+  std::shared_ptr<Buffer> buffer;
 };
 
 template <typename... Ts>
@@ -752,6 +753,11 @@ inline Program::Program(                 //
     Tensor tensor(ffi::call<plaidml_expr*>(plaidml_expr_clone, arg.tensor));
     LogicalShape shape(ffi::call<plaidml_logical_shape*>(plaidml_logical_shape_clone, arg.shape));
     ProgramArgument programArg{arg.is_input, tensor, shape};
+    if (arg.buffer) {
+      TensorShape tensor_shape(shape.dtype(), shape.int_dims());
+      auto bufptr = ffi::call<plaidml_buffer*>(plaidml_buffer_clone, arg.buffer);
+      programArg.buffer = std::make_shared<Buffer>(bufptr, tensor_shape);
+    }
     if (arg.is_input) {
       inputs_.push_back(programArg);
     } else {

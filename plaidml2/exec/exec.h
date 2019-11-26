@@ -98,7 +98,18 @@ class Binder {
   explicit Binder(const edsl::Program& program)
       : program_(program),  //
         device_(Settings::get("PLAIDML_DEVICE")),
-        target_(Settings::get("PLAIDML_TARGET")) {}
+        target_(Settings::get("PLAIDML_TARGET")) {
+    for (const auto& arg : program.inputs()) {
+      if (arg.buffer) {
+        inputs_[arg.tensor] = *arg.buffer;
+      }
+    }
+    for (const auto& arg : program.outputs()) {
+      if (arg.buffer) {
+        outputs_[arg.tensor] = *arg.buffer;
+      }
+    }
+  }
 
   Binder& set_device(const std::string& value) {
     device_ = value;

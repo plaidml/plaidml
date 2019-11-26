@@ -96,10 +96,11 @@ class _Executable(object):
     def __call__(self, inputs):
         for tensor, data in zip(self._inputs, inputs):
             buffer = self.binder.input(tensor)
-            data = np.array(data, dtype=buffer.shape.dtype.into_numpy())
-            buffer.copy_from_ndarray(data)
+            if buffer:
+                data = np.array(data, dtype=buffer.shape.dtype.into_numpy())
+                buffer.copy_from_ndarray(data)
         self.executable.run()
-        return [self.binder.output(x.ref).as_ndarray() for x in self.program.outputs()]
+        return [self.binder.output(x.ref).as_ndarray() for x in self.program.outputs]
 
 
 class _Function(object):
@@ -112,10 +113,9 @@ class _Function(object):
         self._cache = {}
 
     def __call__(self, inputs):
-        logger.debug('_Function: {}({})'.format(self._name, inputs))
         inputs = [np.array(x) if isinstance(x, (six.integer_types, float)) else x for x in inputs]
         input_shapes = tuple([x.shape for x in inputs])
-        # logger.debug('_Function: {}({})'.format(self._name, input_shapes))
+        logger.debug('_Function: {}({})'.format(self._name, input_shapes))
         exe = self._cache.get(input_shapes)
         if not exe:
             exe = self._compile(inputs)
@@ -125,7 +125,6 @@ class _Function(object):
     def _compile(self, inputs):
         for node, data in zip(self._inputs, inputs):
             dtype = node.tensor.shape.dtype
-            # NOTE: need fully resolved shape here
             shape = edsl.LogicalShape(dtype, data.shape)
             node.tensor.bind(shape)
         inputs = [x.tensor for x in self._inputs]
@@ -138,7 +137,7 @@ def _create_var(name, value):
     dtype = plaidml.DType.from_numpy(value.dtype)
     shape = edsl.LogicalShape(dtype, value.shape)
     tensor_shape = plaidml.TensorShape(dtype, value.shape)
-    buffer = plaidml.Buffer(_device, tensor_shape)
+    buffer = plaidml.Buffer(tensor_shape, device=_device)
     buffer.copy_from_ndarray(value)
     return edsl.Tensor(shape=shape, name=name, buffer=buffer)
 
@@ -1483,7 +1482,7 @@ def set_learning_phase(value):
 def set_value(x, value):
     dtype = plaidml.DType.from_numpy(value.dtype)
     tensor_shape = plaidml.TensorShape(dtype, value.shape)
-    buffer = plaidml.Buffer(_device, tensor_shape)
+    buffer = plaidml.Buffer(tensor_shape, device=_device)
     buffer.copy_from_ndarray(value)
     x.tensor.set_param_value(buffer)
 

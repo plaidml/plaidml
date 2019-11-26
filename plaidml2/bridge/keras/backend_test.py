@@ -223,8 +223,7 @@ def opTest(in_data,
             funcs = test_func(self, b, *(xv + ps + list(run_args)))
             tf_session.run(tensorflow.global_variables_initializer())
             for gf, f in zip(grad_funcs, funcs):
-                fr_fn = b.function(x, [f])
-                fr = fr_fn([t for t in data if hasattr(t, 'shape')])
+                fr = f.eval()
                 if do_grads:
                     df = b.gradients(b.mean(gf), x)
                     gfn = b.function(x, df, updates=[])

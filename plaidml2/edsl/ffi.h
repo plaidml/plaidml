@@ -128,11 +128,6 @@ PLAIDML_EDSL_API plaidml_dim_expr* plaidml_dim_expr_none(  //
     plaidml_error* err                                     //
 );
 
-// PLAIDML_EDSL_API plaidml_dim_expr* plaidml_dim_expr_ref(  //
-//     plaidml_error* err,                                   //
-//     plaidml_expr* ref,                                    //
-//     size_t dim);
-
 PLAIDML_EDSL_API plaidml_dim_expr* plaidml_dim_expr_int(  //
     plaidml_error* err,                                   //
     int64_t value);
@@ -354,6 +349,7 @@ typedef struct plaidml_program_arg {
   bool is_input;
   plaidml_expr* tensor;
   plaidml_logical_shape* shape;
+  plaidml_buffer* buffer;
 } plaidml_program_arg;
 
 typedef struct plaidml_program_args {
