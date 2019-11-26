@@ -85,6 +85,23 @@ def _log_call(func):
     return wrapper
 
 
+class _Executable(object):
+
+    def __init__(self, name, inputs, outputs, updates):
+        self._inputs = inputs
+        self.program = edsl.Program(name, outputs, updates=updates)
+        self.binder = plaidml_exec.Binder(self.program)
+        self.exectuable = self.binder.compile()
+
+    def __call__(self, inputs):
+        for tensor, data in zip(self._inputs, inputs):
+            buffer = self.binder.input(tensor)
+            data = np.array(data, dtype=buffer.shape.dtype.into_numpy())
+            buffer.copy_from_ndarray(data)
+        self.executable.run()
+        return [self.binder.output(x.ref).as_ndarray() for x in self.program.outputs()]
+
+
 class _Function(object):
 
     def __init__(self, inputs, outputs, updates, name):
@@ -96,28 +113,24 @@ class _Function(object):
 
     def __call__(self, inputs):
         logger.debug('_Function: {}({})'.format(self._name, inputs))
-        inputs = [
-            np.array(inp) if isinstance(inp, (six.integer_types, float)) else inp for inp in inputs
-        ]
-        # NOTE: need fully resolved shape here
+        inputs = [np.array(x) if isinstance(x, (six.integer_types, float)) else x for x in inputs]
         input_shapes = tuple([x.shape for x in inputs])
         # logger.debug('_Function: {}({})'.format(self._name, input_shapes))
         exe = self._cache.get(input_shapes)
         if not exe:
             exe = self._compile(inputs)
             self._cache[input_shapes] = exe
-        return [x.as_ndarray() for x in exe(inputs)]
+        return exe(inputs)
 
     def _compile(self, inputs):
         for node, data in zip(self._inputs, inputs):
             dtype = node.tensor.shape.dtype
-            # NOTE: need fully resolved shape here
             shape = edsl.LogicalShape(dtype, data.shape)
             node.tensor.bind(shape)
+        inputs = [x.tensor for x in self._inputs]
         outputs = [x.tensor for x in self._outputs]
         updates = [(x[0].tensor, x[1].tensor) for x in self._updates]
-        program = edsl.Program(self._name, outputs, updates=updates)
-        return plaidml_exec.Executable(program, [x.tensor for x in self._inputs])
+        return _Executable(self._name, inputs, outputs, updates)
 
 
 def _create_var(name, value):

@@ -387,7 +387,7 @@ struct resnet50 : public benchmark::Fixture {
     auto W = weight_placeholders();
     auto B = bias_placeholders();
     auto program = build(batch_size, I, W, B);
-    return exec::Binder(program).set_input(I).set_inputs(W).set_inputs(B).compile();
+    return exec::Binder(program).compile();
   }
 };
 

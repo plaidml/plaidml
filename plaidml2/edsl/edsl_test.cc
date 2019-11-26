@@ -47,7 +47,7 @@ TEST(CppEdsl, Dot) {
   auto A = Placeholder(PLAIDML_DATA_FLOAT32, {1, 784});
   auto B = Placeholder(PLAIDML_DATA_FLOAT32, {784, 512});
   Program program("dot", {Dot(A, B)});
-  exec::Binder(program).set_inputs({A, B}).compile()->run();
+  exec::Binder(program).compile()->run();
 }
 
 TEST(CppEdsl, DoubleDot) {
@@ -55,7 +55,7 @@ TEST(CppEdsl, DoubleDot) {
   auto B = Placeholder(PLAIDML_DATA_FLOAT32, {20, 30});
   auto C = Placeholder(PLAIDML_DATA_FLOAT32, {30, 40});
   Program program("double_dot", {Dot(Dot(A, B), C)});
-  exec::Binder(program).set_inputs({A, B, C}).compile()->run();
+  exec::Binder(program).compile()->run();
 }
 
 TEST(CppEdsl, EltwiseAdd) {
@@ -63,13 +63,13 @@ TEST(CppEdsl, EltwiseAdd) {
   auto B = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20});
   auto C = A + B;
   Program program("eltwise_add", {C});
-  exec::Binder(program).set_inputs({A, B}).compile()->run();
+  exec::Binder(program).compile()->run();
 }
 
 TEST(CppEdsl, Relu) {
   auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20});
   Program program("relu", {Relu(A)});
-  exec::Binder(program).set_inputs({A}).compile()->run();
+  exec::Binder(program).compile()->run();
 }
 
 TEST(CppEdsl, MnistMlp) {
@@ -185,7 +185,7 @@ module {
 }
 )#"));
 #endif
-  exec::Binder(program).set_inputs({input, kernel1, bias1, kernel2, bias2, kernel3, bias3}).compile()->run();
+  exec::Binder(program).compile()->run();
 }
 
 Tensor Convolution2(const Tensor& I, const Tensor& K) {
@@ -203,7 +203,7 @@ TEST(CppEdsl, Convolution) {
   auto K = Placeholder(PLAIDML_DATA_FLOAT32, {3, 3, 1, 32});
   Program program("convolution", {Convolution2(I, K)});
 #ifdef PLAIDML_MLIR
-  exec::Binder(program).set_inputs({I, K}).compile()->run();
+  exec::Binder(program).compile()->run();
 #endif
 }
 
@@ -302,10 +302,7 @@ TEST(CppEdsl, MnistCnn) {
 )"));
 #endif
 #ifdef PLAIDML_MLIR
-  exec::Binder(program)
-      .set_inputs({input, kernel1, bias1, kernel2, bias2, kernel3, bias3, kernel4, bias4})
-      .compile()
-      ->run();
+  exec::Binder(program).compile()->run();
 #endif  // PLAIDML_MLIR
 }
 
@@ -418,7 +415,7 @@ module {
 }
 )#"));
 #endif
-  exec::Binder(program).set_inputs({X, Grad, Veloc, LR}).compile()->run();
+  exec::Binder(program).compile()->run();
 }
 
 TEST(CppEdsl, RepeatElements) {
@@ -465,7 +462,7 @@ module {
 }
 )#"));
 #endif
-  exec::Binder(program).set_inputs({I}).compile()->run();
+  exec::Binder(program).compile()->run();
 }
 
 TEST(CppEdsl, UseDefault) {
@@ -510,7 +507,7 @@ module {
 }
 )#"));
 #endif
-  exec::Binder(program).set_inputs({P, I}).compile()->run();
+  exec::Binder(program).compile()->run();
 }
 
 Tensor ArgMax(const Tensor& I) {
@@ -590,7 +587,7 @@ module {
 )#"));
 #endif
   // TODO: cpu backend is missing cast ops (as_uint)
-  exec::Binder(program).set_inputs({I}).compile()->run();
+  exec::Binder(program).compile()->run();
 }
 
 Tensor Winograd(const Tensor& I, const Tensor& K, const Tensor& A, const Tensor& B, const Tensor& G) {
@@ -654,7 +651,7 @@ TEST(CppEdsl, Winograd) {
 }
 )"));
 #endif
-  exec::Binder(program).set_inputs({I, K, A, B, G}).compile()->run();
+  exec::Binder(program).compile()->run();
 }
 
 TEST(CppEdsl, UniqueNames) {
@@ -693,7 +690,7 @@ module {
 }
 )#"));
 #endif
-  exec::Binder(program).set_inputs({A, B, C0, C1}).compile()->run();
+  exec::Binder(program).compile()->run();
 }
 
 TEST(CppEdsl, GlobalMin) {
@@ -736,7 +733,7 @@ module {
 }
 )#"));
 #endif
-  exec::Binder(program).set_inputs({I}).compile()->run();
+  exec::Binder(program).compile()->run();
 }
 
 TEST(CppEdsl, CumSum) {
@@ -779,7 +776,7 @@ module {
 }
 )#"));
 #endif
-  exec::Binder(program).set_inputs({I}).compile()->run();
+  exec::Binder(program).compile()->run();
 }
 
 Tensor ComplexConv2d(const Tensor& I,               //
@@ -866,7 +863,7 @@ module {
 }
 )#"));
 #endif
-  exec::Binder(program).set_inputs({I, K}).compile()->run();
+  exec::Binder(program).compile()->run();
 }
 
 TEST(CppEdsl, Reciprocal) {
@@ -896,7 +893,7 @@ module {
 }
 )#"));
 #endif
-  exec::Binder(program).set_inputs({A}).compile()->run();
+  exec::Binder(program).compile()->run();
 }
 
 #ifdef PLAIDML_AST
@@ -919,7 +916,7 @@ TEST(CppEdsl, GradientDot) {
   _X3[x0, x2 : 100, 100] = +(_X1[x0, x1] * B[x2, x1]);
 }
 )"));
-  exec::Binder(program).set_inputs({A, B}).compile()->run();
+  exec::Binder(program).compile()->run();
 }
 #endif
 
@@ -962,7 +959,7 @@ TEST(CppEdsl, GradientMultiDot) {
   _X9 = add(_X7, _X8);
 }
 )"));
-  exec::Binder(program).set_inputs({A, B}).compile()->run();
+  exec::Binder(program).compile()->run();
 }
 #endif
 
@@ -992,7 +989,7 @@ TEST(CppEdsl, GradientDotSqrt) {
   _X8[x0, x2 : 100, 100] = +(_X6[x0, x1] * B[x2, x1]);
 }
 )"));
-  exec::Binder(program).set_inputs({A, B}).compile()->run();
+  exec::Binder(program).compile()->run();
 }
 #endif
 
@@ -1005,7 +1002,7 @@ TEST(CppEdsl, DefractLong) {
   TensorIndex n, x0, x1, k0, k1, co, ci;
   O(n, x0, x1, co) += I(n, (x0 + k0 - 1) / 2, (x1 + k1 - 1) / 2, ci) * K(2 - k0, 2 - k1, co, ci);
   Program program("defract_long", {O});
-  exec::Binder(program).set_inputs({I, K}).compile()->run();
+  exec::Binder(program).compile()->run();
 }
 
 TEST(CppEdsl, DupOut) {
@@ -1014,7 +1011,7 @@ TEST(CppEdsl, DupOut) {
   auto C = Placeholder(PLAIDML_DATA_FLOAT32, {30, 40});
   auto R = Dot(Dot(A, B), C);
   Program program("dup_out", {R, R, R});
-  exec::Binder(program).set_inputs({A, B, C}).compile()->run();
+  exec::Binder(program).compile()->run();
 }
 
 TEST(CppEdsl, Select) {
@@ -1050,7 +1047,7 @@ module {
 }
 )#"));
 #endif
-  exec::Binder(program).set_inputs({I}).compile()->run();
+  exec::Binder(program).compile()->run();
 }
 
 TEST(CppEdsl, Shape) {
@@ -1079,8 +1076,9 @@ module {
 )#"));
 #endif
   exec::Binder binder(program);
-  binder.set_input(I).compile()->run();
-  auto view = binder.output(program.mapped_output(O)).mmap_current();
+  binder.compile()->run();
+  IVLOG(1, "output: " << O.as_ptr());
+  auto view = binder.output(O).mmap_current();
   auto data = reinterpret_cast<const int32_t*>(view.data());
   ASSERT_THAT(view.size(), sizeof(int32_t) * 2);
   EXPECT_THAT(data[0], 10);
@@ -1124,7 +1122,7 @@ module {
 }
 )#"));
 #endif
-  exec::Binder(program).set_inputs({S}).compile()->run();
+  exec::Binder(program).compile()->run();
 }
 
 }  // namespace

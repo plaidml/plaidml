@@ -2,6 +2,7 @@
 
 #include "tile/lang/ast/ast.h"
 
+#include <algorithm>
 #include <unordered_set>
 
 #include <boost/format.hpp>
@@ -310,14 +311,16 @@ class ProgramEvaluator : public AstVisitor<void> {
       expr->Accept(&evaluator);
       expr->Accept(this);
     }
-    for (const auto& expr : mutations.outputs) {
+    // for (const auto& expr : mutations.outputs) {
+    for (size_t i = 0; i < mutations.outputs.size(); i++) {
       // At this point, it should be guaranteed that the output expressions have been visited.
+      const auto& expr = mutations.outputs[i];
       auto name = safe_at(&eval_.names_by_expr, expr.get());
       auto shape = safe_at(&bindings_by_expr_, expr.get()).shape;
       IVLOG(2, "Output> " << name << ": " << shape);
       eval_.runinfo.output_shapes.emplace(name, shape);
       eval_.runinfo.program.outputs.push_back(name);
-      eval_.outputs.push_back(expr);
+      eval_.args.emplace_back(ProgramArgument{false, name, mutations.originals[i]});
     }
     for (const auto& update : mutations.updates) {
       auto src_name = safe_at(&eval_.names_by_expr, update.src.get());
@@ -352,7 +355,8 @@ class ProgramEvaluator : public AstVisitor<void> {
       input.dims.emplace_back(dim_name);
     }
     auto shape = safe_at(&bindings_by_expr_, &expr).shape;
-    eval_.inputs.push_back(&expr);
+    auto ptr = std::const_pointer_cast<Expr>(expr.as_ptr());
+    eval_.args.emplace_back(ProgramArgument{true, name, ptr});
     eval_.runinfo.program.inputs.push_back(input);
     eval_.runinfo.input_shapes.emplace(name, shape);
     eval_.names_by_expr.emplace(&expr, name);
@@ -630,6 +634,7 @@ class ExprOptimizer : public AstPass {
 
 ProgramEvaluation Evaluate(const std::string& name, ProgramMutations mutations) {
   std::unordered_set<Expr*> dups;
+  mutations.originals = mutations.outputs;
   for (size_t i = 0; i < mutations.outputs.size(); i++) {
     auto output = mutations.outputs[i];
     auto ptr = output.get();

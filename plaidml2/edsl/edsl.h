@@ -19,9 +19,12 @@ namespace plaidml {
 namespace edsl {
 
 class IndexedTensor;
+class Program;
+struct ProgramArgument;
 class Tensor;
 class TensorDim;
 class TensorIndex;
+struct TensorRef;
 class Value;
 
 using TensorDeriv = std::vector<Tensor> (*)(  //
@@ -82,13 +85,15 @@ class Program {
 
   plaidml_program* as_ptr() const { return ptr_.get(); }
   std::string str() const { return ffi::str(ffi::call<plaidml_string*>(plaidml_program_repr, ptr_.get())); }
-  const std::vector<Tensor>& outputs() const { return new_outputs_; }
-  Tensor mapped_output(const Tensor& tensor) const;
+  const std::vector<ProgramArgument>& args() const { return args_; }
+  const std::vector<ProgramArgument>& inputs() const { return inputs_; }
+  const std::vector<ProgramArgument>& outputs() const { return outputs_; }
 
  private:
   std::shared_ptr<plaidml_program> ptr_;
-  std::vector<Tensor> old_outputs_;
-  std::vector<Tensor> new_outputs_;
+  std::vector<ProgramArgument> args_;
+  std::vector<ProgramArgument> inputs_;
+  std::vector<ProgramArgument> outputs_;
 };
 
 class TensorDim {
@@ -278,6 +283,7 @@ inline IndexedTensor min(IndexedTensor lhs, const IndexedTensor& rhs) { return s
 inline IndexedTensor assign(IndexedTensor lhs, const IndexedTensor& rhs) { return std::move(lhs = rhs); }
 
 class LogicalShape {
+  friend class Program;
   friend class Tensor;
 
  public:
@@ -310,7 +316,7 @@ class LogicalShape {
   bool operator==(const LogicalShape& rhs) const { return str() == rhs.str(); }
 
  private:
-  explicit LogicalShape(const std::shared_ptr<plaidml_logical_shape>& ptr) : ptr_(ptr) {}
+  explicit LogicalShape(plaidml_logical_shape* ptr) : ptr_(details::make_plaidml_logical_shape(ptr)) {}
 
  private:
   std::shared_ptr<plaidml_logical_shape> ptr_;
@@ -445,6 +451,8 @@ class Tensor {
 
   plaidml_expr* as_ptr() const { return impl_->ptr.get(); }
 
+  void* raw_ptr() const { return ffi::call<void*>(plaidml_expr_ptr, as_ptr()); }
+
   // Enable no_reduce on a contraction
   Tensor& no_reduce() {
     ffi::call_void(plaidml_expr_contraction_set_no_reduce, as_ptr(), true);
@@ -469,8 +477,7 @@ class Tensor {
 
   // Return the tensor's shape
   LogicalShape shape() const {
-    auto ptr = details::make_plaidml_logical_shape(ffi::call<plaidml_logical_shape*>(plaidml_expr_get_shape, as_ptr()));
-    return LogicalShape(ptr);
+    return LogicalShape(ffi::call<plaidml_logical_shape*>(plaidml_expr_get_shape, as_ptr()));
   }
 
   // Verify that the specified dims match the dims of this tensor.
@@ -498,10 +505,16 @@ class Tensor {
 
 struct TensorRef {
   Tensor tensor;
+  TensorRef(const Tensor& tensor) : tensor(tensor) {}  // NOLINT[runtime/explicit]
+  operator Tensor() const { return tensor; }
+  bool operator<(const TensorRef& rhs) const { return tensor.raw_ptr() < rhs.tensor.raw_ptr(); }
+  bool operator==(const TensorRef& rhs) const { return tensor.raw_ptr() == rhs.tensor.raw_ptr(); }
+};
 
-  bool operator<(const TensorRef& rhs) const {  //
-    return tensor.as_ptr() < rhs.tensor.as_ptr();
-  }
+struct ProgramArgument {
+  bool is_input;
+  TensorRef tensor;
+  LogicalShape shape;
 };
 
 template <typename... Ts>
@@ -706,8 +719,7 @@ inline Tensor zero() { return Tensor{0}; }
 inline Program::Program(                 //
     const std::string& name,             //
     const std::vector<Tensor>& outputs,  //
-    const std::vector<std::tuple<Tensor, Tensor>>& updates)
-    : old_outputs_(outputs), new_outputs_(outputs.size()) {
+    const std::vector<std::tuple<Tensor, Tensor>>& updates) {
   std::vector<plaidml_expr*> raw_outputs(outputs.size());
   std::vector<plaidml_expr*> new_outputs(outputs.size());
   for (size_t i = 0; i < raw_outputs.size(); i++) {
@@ -725,27 +737,29 @@ inline Program::Program(                 //
     dst_updates[i] = std::get<0>(updates[i]).as_ptr();
     src_updates[i] = std::get<1>(updates[i]).as_ptr();
   }
+  plaidml_program_args* args;
   ptr_ = details::make_plaidml_program(ffi::call<plaidml_program*>(  //
       plaidml_program_evaluate,                                      //
       name.c_str(),                                                  //
       raw_outputs.size(),                                            //
       raw_outputs.data(),                                            //
-      new_outputs.data(),                                            //
       updates.size(),                                                //
       src_updates.data(),                                            //
-      dst_updates.data()));
-  for (size_t i = 0; i < new_outputs.size(); i++) {
-    new_outputs_[i] = Tensor(new_outputs[i]);
-  }
-}
-
-inline Tensor Program::mapped_output(const Tensor& tensor) const {
-  for (size_t i = 0; i < old_outputs_.size(); i++) {
-    if (old_outputs_.at(i).as_ptr() == tensor.as_ptr()) {
-      return new_outputs_[i];
+      dst_updates.data(),                                            //
+      &args));
+  for (size_t i = 0; i < args->nargs; i++) {
+    const auto& arg = args->args[i];
+    Tensor tensor(ffi::call<plaidml_expr*>(plaidml_expr_clone, arg.tensor));
+    LogicalShape shape(ffi::call<plaidml_logical_shape*>(plaidml_logical_shape_clone, arg.shape));
+    ProgramArgument programArg{arg.is_input, tensor, shape};
+    if (arg.is_input) {
+      inputs_.push_back(programArg);
+    } else {
+      outputs_.push_back(programArg);
     }
+    args_.emplace_back(programArg);
   }
-  throw std::out_of_range("Tensor not found in program outputs");
+  ffi::call_void(plaidml_program_args_free, args);
 }
 
 inline TensorDim TensorDim::operator-() const { return TensorDim(PLAIDML_INT_OP_NEG, {*this}); }

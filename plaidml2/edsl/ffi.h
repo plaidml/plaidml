@@ -57,6 +57,10 @@ PLAIDML_EDSL_API void plaidml_logical_shape_free(  //
     plaidml_error* err,                            //
     plaidml_logical_shape* shape);
 
+PLAIDML_EDSL_API plaidml_logical_shape* plaidml_logical_shape_clone(  //
+    plaidml_error* err,                                               //
+    plaidml_logical_shape* shape);
+
 PLAIDML_EDSL_API plaidml_shape* plaidml_logical_shape_into_tensor_shape(  //
     plaidml_error* err,                                                   //
     plaidml_logical_shape* shape);                                        //
@@ -173,6 +177,10 @@ PLAIDML_EDSL_API void plaidml_deriv_register(  //
 //
 
 PLAIDML_EDSL_API void plaidml_expr_free(  //
+    plaidml_error* err,                   //
+    plaidml_expr* expr);
+
+PLAIDML_EDSL_API void* plaidml_expr_ptr(  //
     plaidml_error* err,                   //
     plaidml_expr* expr);
 
@@ -342,6 +350,17 @@ PLAIDML_EDSL_API void plaidml_expr_contraction_set_use_default(  //
 // plaidml_program
 //
 
+typedef struct plaidml_program_arg {
+  bool is_input;
+  plaidml_expr* tensor;
+  plaidml_logical_shape* shape;
+} plaidml_program_arg;
+
+typedef struct plaidml_program_args {
+  size_t nargs;
+  plaidml_program_arg* args;
+} plaidml_program_args;
+
 PLAIDML_EDSL_API void plaidml_program_free(  //
     plaidml_error* err,                      //
     plaidml_program* program);
@@ -351,30 +370,18 @@ PLAIDML_EDSL_API plaidml_program* plaidml_program_evaluate(  //
     const char* name,                                        //
     size_t noutputs,                                         //
     plaidml_expr** outputs,                                  //
-    plaidml_expr** new_outputs,                              //
     size_t nupdates,                                         //
     plaidml_expr** src_updates,                              //
-    plaidml_expr** dst_updates);
+    plaidml_expr** dst_updates,                              //
+    plaidml_program_args** args);
 
 PLAIDML_EDSL_API plaidml_string* plaidml_program_repr(  //
     plaidml_error* err,                                 //
     plaidml_program* program);
 
-// This is a temporary HACK to provide underlying access to the RunInfo
-PLAIDML_EDSL_API const void* plaidml_program_runinfo(  //
-    plaidml_error* err,                                //
-    plaidml_program* program);
-
-// TODO: We can't have this API (which provides support for offline compilation)
-//       until we get a new stripe-based scheduler.
-// PLAIDML_EDSL_API plaidml_executable* plaidml_program_compile(  //
-//     plaidml_error* err,                                        //
-//     plaidml_program* program,                                  //
-//     const char* target,                                        //
-//     size_t ninputs,                                            //
-//     plaidml_binding* inputs,                                   //
-//     size_t noutputs,                                           //
-//     plaidml_binding* outputs);
+PLAIDML_EDSL_API void plaidml_program_args_free(  //
+    plaidml_error* err,                           //
+    plaidml_program_args* args);
 
 #ifdef __cplusplus
 }  // extern "C"

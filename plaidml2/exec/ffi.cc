@@ -39,6 +39,7 @@ using vertexai::tile::View;
 using vertexai::tile::targets::GetConfigs;
 
 #ifdef PLAIDML_AST
+using vertexai::tile::lang::ast::ExprPtr;
 using vertexai::tile::lang::ast::ParamExpr;
 #endif
 #ifdef PLAIDML_MLIR
@@ -125,30 +126,32 @@ plaidml_executable* plaidml_compile(  //
     auto stripe = vertexai::tile::lang::GenerateStripe(program->eval.runinfo);
     Context ctx;
     exec->program = GetPlatform()->MakeProgram(ctx, device, target, stripe, &const_bufs);
+    std::unordered_map<ExprPtr, BufferPtr> input_bindings;
     for (size_t i = 0; i < ninputs; i++) {
       auto param_expr = std::dynamic_pointer_cast<ParamExpr>(inputs[i]->expr->expr);
       if (!param_expr) {
         throw std::runtime_error("Buffers can only be bound to ParamExprs");
       }
       param_expr->buffer = inputs[i]->buffer->buffer;
+      input_bindings[inputs[i]->expr->expr] = inputs[i]->buffer->buffer;
     }
-    for (const auto& input : program->eval.inputs) {
-      auto it = program->eval.names_by_expr.find(input);
-      if (it == program->eval.names_by_expr.end()) {
-        throw std::runtime_error("Invalid program, input with unknown name");
-      }
-      exec->input_bufs[it->second] = input->buffer;
-    }
+    std::unordered_map<ExprPtr, BufferPtr> output_bindings;
     for (size_t i = 0; i < noutputs; i++) {
-      if (!outputs[i] || !outputs[i]->expr || !outputs[i]->buffer) {
-        throw std::runtime_error("Undefined output bindings");
+      output_bindings[outputs[i]->expr->expr] = outputs[i]->buffer->buffer;
+    }
+    for (const auto& arg : program->eval.args) {
+      if (arg.is_input) {
+        auto it = input_bindings.find(arg.expr);
+        auto param_expr = std::dynamic_pointer_cast<ParamExpr>(arg.expr);
+        auto buffer = (it == input_bindings.end()) ? param_expr->buffer : it->second;
+        exec->input_bufs[arg.name] = buffer;
+      } else {
+        auto it = output_bindings.find(arg.expr);
+        if (it == output_bindings.end()) {
+          throw std::runtime_error("Invalid program, unbound output");
+        }
+        exec->output_bufs[arg.name] = it->second;
       }
-      auto expr = outputs[i]->expr->expr;
-      auto it = program->eval.names_by_expr.find(expr.get());
-      if (it == program->eval.names_by_expr.end()) {
-        throw std::runtime_error("Invalid program, output with unknown name");
-      }
-      exec->output_bufs[it->second] = outputs[i]->buffer->buffer;
     }
     for (const auto& kvp : program->eval.updates) {
       exec->output_bufs[kvp.first] = kvp.second->buffer;
@@ -168,8 +171,7 @@ plaidml_executable* plaidml_compile(  //
     exec->program = GetPlatform()->MakeProgram(ctx, device, target, stripe, &const_bufs);
     IVLOG(1, "After make program");
 
-    using Bindings = std::unordered_map<mlir::Value*, vertexai::tile::BufferPtr>;
-    Bindings bindings;
+    std::unordered_map<mlir::Value*, BufferPtr> bindings;
     for (unsigned i = 0; i < ninputs; i++) {
       bindings[inputs[i]->expr->value] = inputs[i]->buffer->buffer;
     }

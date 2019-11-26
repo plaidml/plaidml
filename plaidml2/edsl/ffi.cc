@@ -218,6 +218,22 @@ plaidml_logical_shape* plaidml_logical_shape_alloc(  //
   });
 }
 
+plaidml_logical_shape* plaidml_logical_shape_clone(  //
+    plaidml_error* err,                              //
+    plaidml_logical_shape* shape) {
+  return ffi_wrap<plaidml_logical_shape*>(err, nullptr, [&] {
+#ifdef PLAIDML_AST
+    IVLOG(3, "plaidml_logical_shape");
+    return new plaidml_logical_shape{shape->shape};
+#endif
+#ifdef PLAIDML_MLIR
+    IVLOG(3, "plaidml_logical_shape");
+    // TODO(MLIR): deal with clone
+    return new plaidml_logical_shape{shape->type};
+#endif
+  });
+}
+
 plaidml_string* plaidml_logical_shape_repr(  //
     plaidml_error* err,                      //
     plaidml_logical_shape* shape) {
@@ -340,6 +356,20 @@ void plaidml_expr_free(  //
     GlobalContext::get()->Destroy(expr->value);
 #endif
     delete expr;
+  });
+}
+
+void* plaidml_expr_ptr(  //
+    plaidml_error* err,  //
+    plaidml_expr* expr) {
+  return ffi_wrap<void*>(err, nullptr, [&] {
+    IVLOG(3, "plaidml_expr_ptr");
+#ifdef PLAIDML_AST
+    return expr->expr.get();
+#endif
+#ifdef PLAIDML_MLIR
+    return expr->value;
+#endif
   });
 }
 
@@ -1349,21 +1379,20 @@ plaidml_program* plaidml_program_evaluate(  //
     plaidml_error* err,                     //
     const char* name,                       //
     size_t noutputs,                        //
-    plaidml_expr** raw_old_outputs,         //
-    plaidml_expr** raw_new_outputs,         //
+    plaidml_expr** raw_outputs,             //
     size_t nupdates,                        //
     plaidml_expr** src_updates,             //
-    plaidml_expr** dst_updates) {
+    plaidml_expr** dst_updates,             //
+    plaidml_program_args** raw_args) {
   return ffi_wrap<plaidml_program*>(err, nullptr, [&] {
     IVLOG(3, "plaidml_program_evaluate");
 #ifdef PLAIDML_AST
     ProgramMutations mutations;
-    std::vector<ExprPtr> outputs(noutputs);
     for (size_t i = 0; i < noutputs; i++) {
-      if (!raw_old_outputs[i]) {
+      if (!raw_outputs[i]) {
         throw std::runtime_error("Undefined output in plaidml_program_evaluate");
       }
-      mutations.outputs.emplace_back(raw_old_outputs[i]->expr);
+      mutations.outputs.emplace_back(raw_outputs[i]->expr);
     }
     std::vector<ProgramUpdate> updates(nupdates);
     for (size_t i = 0; i < nupdates; i++) {
@@ -1376,21 +1405,24 @@ plaidml_program* plaidml_program_evaluate(  //
       mutations.updates.emplace_back(ProgramUpdate{src_updates[i]->expr, dst_updates[i]->expr});
     }
     auto ret = new plaidml_program{Evaluate(name, mutations)};
-    if (noutputs != ret->eval.outputs.size()) {
-      throw std::runtime_error("Internal error: noutputs != ret->eval.outputs.size()");
+    auto nargs = ret->eval.args.size();
+    auto args = new plaidml_program_arg[nargs];
+    for (unsigned i = 0; i < nargs; i++) {
+      const auto& arg = ret->eval.args[i];
+      args[i].is_input = arg.is_input;
+      args[i].tensor = new plaidml_expr{arg.expr};
+      args[i].shape = new plaidml_logical_shape{arg.expr->shape};
     }
-    for (size_t i = 0; i < noutputs; i++) {
-      raw_new_outputs[i] = new plaidml_expr{ret->eval.outputs[i]};
-    }
+    *raw_args = new plaidml_program_args{nargs, args};
     return ret;
 #endif
 #ifdef PLAIDML_MLIR
     ProgramMutations mutations;
     for (size_t i = 0; i < noutputs; i++) {
-      if (!raw_old_outputs[i]) {
+      if (!raw_outputs[i]) {
         throw std::runtime_error("Undefined output in plaidml_program_evaluate");
       }
-      mutations.outputs.emplace_back(raw_old_outputs[i]->value);
+      mutations.outputs.emplace_back(raw_outputs[i]->value);
     }
     for (size_t i = 0; i < nupdates; i++) {
       if (!src_updates[i]) {
@@ -1403,9 +1435,14 @@ plaidml_program* plaidml_program_evaluate(  //
     }
     auto ret = new plaidml_program{GlobalContext::get()->MakeProgram(name, mutations)};
     assert(noutputs <= ret->program->outputs.size());
-    for (size_t i = 0; i < noutputs; i++) {
-      raw_new_outputs[i] = new plaidml_expr{ret->program->outputs[i], ret->program};
+    auto nargs = ret->program->arguments.size();
+    auto args = new plaidml_program_arg[nargs];
+    for (unsigned i = 0; i < nargs; i++) {
+      args[i].is_input = ret->program->arguments[i].isInput;
+      args[i].tensor = new plaidml_expr{ret->program->arguments[i].value};
+      args[i].shape = new plaidml_logical_shape{ret->program->arguments[i].shape};
     }
+    *raw_args = new plaidml_program_args{nargs, args};
     return ret;
 #endif
   });
@@ -1426,19 +1463,17 @@ plaidml_string* plaidml_program_repr(  //
   });
 }
 
-const void* plaidml_program_runinfo(  //
-    plaidml_error* err,               //
-    plaidml_program* program) {
-  return ffi_wrap<const void*>(err, nullptr, [&] {
-    IVLOG(3, "plaidml_program_runinfo");
-#ifdef PLAIDML_AST
-    return &program->eval.runinfo;
-#endif
-#ifdef PLAIDML_MLIR
-    // TODO(MLIR)
-    throw std::runtime_error("NYI: plaidml_program_runinfo");
-    return nullptr;
-#endif
+PLAIDML_EDSL_API void plaidml_program_args_free(  //
+    plaidml_error* err,                           //
+    plaidml_program_args* args) {
+  ffi_wrap_void(err, [&] {
+    IVLOG(3, "plaidml_program_args_free");
+    for (unsigned i = 0; i < args->nargs; i++) {
+      delete args->args[i].shape;
+      delete args->args[i].tensor;
+    }
+    delete[] args->args;
+    delete args;
   });
 }
 
