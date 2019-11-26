@@ -311,7 +311,6 @@ class ProgramEvaluator : public AstVisitor<void> {
       expr->Accept(&evaluator);
       expr->Accept(this);
     }
-    // for (const auto& expr : mutations.outputs) {
     for (size_t i = 0; i < mutations.outputs.size(); i++) {
       // At this point, it should be guaranteed that the output expressions have been visited.
       const auto& expr = mutations.outputs[i];
