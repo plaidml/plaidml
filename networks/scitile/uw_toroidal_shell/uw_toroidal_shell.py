@@ -93,8 +93,6 @@ def toroidal_shell_integral(n, minval, maxval, eps, benchmark=False):
     binder = plaidml_exec.Binder(program)
     executable = binder.compile()
 
-    # executable = plaidml_exec.Executable(program, [X, Y, Z])
-
     def run():
         binder.input(X).copy_from_ndarray(X_data)
         binder.input(Y).copy_from_ndarray(Y_data)
