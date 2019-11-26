@@ -21,6 +21,7 @@ local exports = [
   'plaidml_shape_get_nbytes',
   'plaidml_buffer_free',
   'plaidml_buffer_alloc',
+  'plaidml_buffer_clone',
   'plaidml_buffer_mmap_current',
   'plaidml_buffer_mmap_discard',
   'plaidml_view_free',
@@ -31,6 +32,7 @@ local exports = [
   // edsl/ffi.h
   'plaidml_edsl_init',
   'plaidml_logical_shape_alloc',
+  'plaidml_logical_shape_clone',
   'plaidml_logical_shape_free',
   'plaidml_logical_shape_into_tensor_shape',
   'plaidml_logical_shape_repr',
@@ -50,6 +52,7 @@ local exports = [
   'plaidml_dim_expr_get_int',
   'plaidml_dim_expr_op',
   'plaidml_expr_free',
+  'plaidml_expr_ptr',
   'plaidml_expr_get_shape',
   'plaidml_expr_bind_shape',
   'plaidml_expr_bind_dims',
@@ -83,6 +86,7 @@ local exports = [
   'plaidml_program_free',
   'plaidml_program_evaluate',
   'plaidml_program_repr',
+  'plaidml_program_args_free',
 
   // op/ffi.h
   'plaidml_op_init',

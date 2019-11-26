@@ -1,44 +1,29 @@
 def _xsmm_repo_impl(repository_ctx):
-    name = repository_ctx.name
-    url = repository_ctx.attr.url
-    sha256 = repository_ctx.attr.sha256
-    stripPrefix = repository_ctx.attr.stripPrefix
+    make = repository_ctx.which("make")
+    if not make:
+        fail("xsmm_repo failed: 'make' could not be found. " +
+             "If you are on Windows, did you run 'conda activate .cenv\\'?")
 
-    args = [
-        repository_ctx.which("make"),
-        "-f",
-        "./Makefile",
-        "header-only",
-    ]
-
-    result = repository_ctx.download_and_extract(
-        url = url,
-        sha256 = sha256,
-        stripPrefix = stripPrefix,
+    repository_ctx.download_and_extract(
+        url = repository_ctx.attr.url,
+        sha256 = repository_ctx.attr.sha256,
+        stripPrefix = repository_ctx.attr.strip_prefix,
     )
 
     result = repository_ctx.execute(
-        args,
+        [make, "-f", "Makefile", "header-only"],
         quiet = False,
-        timeout = 1200,
     )
-
     if result.return_code:
-        fail("xmss_repo failed: %s (%s)" % (result.stdout, result.stderr))
+        fail("xsmm_repo failed: %s (%s)" % (result.stdout, result.stderr))
 
     repository_ctx.template("BUILD", repository_ctx.attr.build_file, {}, False)
 
 xsmm_repo = repository_rule(
     attrs = {
-        "url": attr.string(
-            mandatory = True,
-        ),
-        "sha256": attr.string(
-            mandatory = True,
-        ),
-        "stripPrefix": attr.string(
-            mandatory = True,
-        ),
+        "url": attr.string(mandatory = True),
+        "sha256": attr.string(),
+        "strip_prefix": attr.string(),
         "build_file": attr.label(
             mandatory = True,
             allow_single_file = True,

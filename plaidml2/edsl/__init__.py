@@ -7,7 +7,7 @@ import numpy as np
 import six
 
 from plaidml2 import DType
-from plaidml2.core import TensorShape
+from plaidml2.core import TensorShape, Buffer
 from plaidml2.ffi import ForeignObject, ffi, ffi_call, lib
 
 logger = logging.getLogger(__name__)
@@ -48,13 +48,6 @@ class LogicalShape(ForeignObject):
             ffi_call(lib.plaidml_logical_shape_get_dim_int, self.as_ptr(), i)
             for i in range(self.ndims)
         ]
-
-    # @property
-    # def dims(self):
-    #     return [
-    #         TensorDim(expr=ffi_call(lib.plaidml_logical_shape_get_dim_expr, self.as_ptr(), i))
-    #         for i in range(self.ndims)
-    #     ]
 
     def into_TensorShape(self):
         return TensorShape(
@@ -498,6 +491,20 @@ class Tensor(ForeignObject):
         ffi_call(lib.plaidml_expr_bind_shape, self.as_ptr(), shape.as_ptr())
 
 
+class TensorRef:
+
+    def __init__(self, tensor):
+        self.tensor = tensor
+
+    def __hash__(self):
+        return hash(ffi_call(lib.plaidml_expr_ptr, self.tensor.as_ptr()))
+
+    def __eq__(self, other):
+        if isinstance(other, Tensor):
+            return self.__hash__() == TensorRef(other).__hash__()
+        return self.__hash__() == other.__hash__()
+
+
 class Value(ForeignObject):
     __ffi_del__ = lib.plaidml_expr_free
     __ffi_repr__ = lib.plaidml_expr_repr
@@ -547,27 +554,49 @@ def TensorIndexes(count):
     return [TensorIndex() for i in range(count)]
 
 
+class ProgramArgument:
+
+    def __init__(self, arg):
+        self.is_input = arg.is_input
+        self.ref = TensorRef(Tensor(expr=ffi_call(lib.plaidml_expr_clone, arg.tensor)))
+        self.shape = LogicalShape(ptr=ffi_call(lib.plaidml_logical_shape_clone, arg.shape))
+        if arg.buffer:
+            tensor_shape = self.shape.into_TensorShape()
+            self.buffer = Buffer(tensor_shape, ptr=ffi_call(lib.plaidml_buffer_clone, arg.buffer))
+        else:
+            self.buffer = None
+
+
 class Program(ForeignObject):
     __ffi_del__ = lib.plaidml_program_free
     __ffi_repr__ = lib.plaidml_program_repr
 
     def __init__(self, name, outputs, updates=[]):
         raw_outputs = [x.as_ptr() for x in outputs]
-        new_outputs = ffi.new('plaidml_expr*[]', len(outputs))
         dst_updates = [x[0].as_ptr() for x in updates]
         src_updates = [x[1].as_ptr() for x in updates]
+        raw_args = ffi.new('plaidml_program_args**')
         ffi_obj = ffi_call(
             lib.plaidml_program_evaluate,
             name.encode(),
             len(raw_outputs),
             raw_outputs,
-            new_outputs,
             len(updates),
             src_updates,
             dst_updates,
+            raw_args,
         )
-        self.outputs = [Tensor(expr=x) for x in new_outputs]
+        self.args = [ProgramArgument(raw_args[0].args[i]) for i in range(raw_args[0].nargs)]
+        ffi_call(lib.plaidml_program_args_free, raw_args[0])
         super(Program, self).__init__(ffi_obj)
+
+    @property
+    def inputs(self):
+        return [x for x in self.args if x.is_input]
+
+    @property
+    def outputs(self):
+        return [x for x in self.args if not x.is_input]
 
 
 def wrap_tensor(x):

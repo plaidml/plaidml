@@ -505,10 +505,10 @@ void Compiler::run(Stack* stack) {
   CompleteArgumentSpec spec{false, inputs};
   auto it = cache_.find(spec);
   if (it == cache_.end()) {
-    std::tie(it, std::ignore) = cache_.emplace(spec, compile(&inputs));
+    std::tie(it, std::ignore) = cache_.emplace(spec, compile(inputs));
   }
 
-  auto outputs = it->second->run(&inputs);
+  auto outputs = it->second->run(inputs);
 
   drop(*stack, num_inputs);
   for (const auto& output : outputs) {
@@ -517,12 +517,12 @@ void Compiler::run(Stack* stack) {
   }
 }
 
-std::shared_ptr<Executable> Compiler::compile(at::ArrayRef<IValue>* inputs) {
+std::shared_ptr<Executable> Compiler::compile(at::ArrayRef<IValue> inputs) {
   IVLOG(1, "Compiler::compile>");
   std::vector<edsl::Tensor> input_tensors;
   std::unordered_map<const Value*, edsl::Value> value_map;
-  for (size_t i = 0; i < inputs->size(); i++) {
-    const auto& ival = inputs->at(i);
+  for (size_t i = 0; i < inputs.size(); i++) {
+    const auto& ival = inputs.at(i);
     if (!ival.isTensor()) {
       throw std::runtime_error("Unexpected non-tensor input");
     }
@@ -600,56 +600,63 @@ std::shared_ptr<Executable> Compiler::compile(at::ArrayRef<IValue>* inputs) {
 
 static size_t g_program_id = 1;
 
-Executable::Executable(const std::string& device_id,             //
-                       const std::string& target_id,             //
-                       const std::vector<edsl::Tensor>& inputs,  //
-                       const std::vector<edsl::Tensor>& outputs)
+// TODO: FIXME sometime
+
+Executable::Executable(                       //
+    const std::string& device_id,             //
+    const std::string& target_id,             //
+    const std::vector<edsl::Tensor>& inputs,  //
+    const std::vector<edsl::Tensor>& outputs)
     : device_id_(device_id),  //
       target_id_(target_id),
-      input_bindings_(inputs.size()),
+      // input_bindings_(inputs.size()),
       output_ivalues_(outputs.size()) {
-  for (size_t i = 0; i < inputs.size(); i++) {
-    auto shape = inputs[i].shape();
-    plaidml::TensorShape tensor_shape(shape.dtype(), shape.int_dims());
-    plaidml::Buffer buffer(device_id, tensor_shape);
-    input_bindings_[i] = plaidml::exec::Binding{inputs[i], buffer};
-  }
+  // for (size_t i = 0; i < inputs.size(); i++) {
+  //   auto shape = inputs[i].shape();
+  //   plaidml::TensorShape tensor_shape(shape.dtype(), shape.int_dims());
+  //   plaidml::Buffer buffer(device_id, tensor_shape);
+  //   input_bindings_[i] = plaidml::exec::Binding{inputs[i], buffer};
+  // }
   std::stringstream ss;
   ss << "pytorch_" << g_program_id++;
   name_ = ss.str();
-  program_ = std::make_unique<edsl::Program>(name_, outputs);
+  edsl::Program program(name_, outputs);
+  // program_ = std::make_unique<edsl::Program>(name_, outputs);
   IVLOG(1, "Executable::Executable>");
-  IVLOG(2, program_->str());
-  for (size_t i = 0; i < outputs.size(); i++) {
-    auto shape = outputs[i].shape();
-    plaidml::TensorShape tensor_shape(shape.dtype(), shape.int_dims());
-    output_bindings_.emplace_back(plaidml::exec::Binding{
-        program_->outputs().at(i),                // tensor
-        plaidml::Buffer{device_id, tensor_shape}  // buffer
-    });
-    std::vector<int64_t> sizes;
-    auto dims = shape.int_dims();
-    for (size_t j = 0; j < dims.size(); j++) {
-      sizes.push_back(dims[j]);
-    }
-    output_ivalues_[i] = at::empty(at::IntArrayRef(sizes));
-  }
-  exec_ =
-      std::make_shared<plaidml::exec::Executable>(*program_, device_id_, target_id_, input_bindings_, output_bindings_);
+  IVLOG(2, program.str());
+  binder_ = std::make_unique<plaidml::exec::Binder>(program);
+  // for (size_t i = 0; i < outputs.size(); i++) {
+  //   // auto shape = outputs[i].shape();
+  //   // plaidml::TensorShape tensor_shape(shape.dtype(), shape.int_dims());
+  //   // output_bindings_.emplace_back(plaidml::exec::Binding{
+  //   //     program_->outputs().at(i),                // tensor
+  //   //     plaidml::Buffer{device_id, tensor_shape}  // buffer
+  //   // });
+  //   std::vector<int64_t> sizes;
+  //   auto dims = shape.int_dims();
+  //   for (size_t j = 0; j < dims.size(); j++) {
+  //     sizes.push_back(dims[j]);
+  //   }
+  //   output_ivalues_[i] = at::empty(at::IntArrayRef(sizes));
+  // }
+  // exec_ =
+  //     std::make_shared<plaidml::exec::Executable>(*program_, device_id_, target_id_, input_bindings_,
+  //     output_bindings_);
+  exec_ = binder_->compile();
   IVLOG(1, "Executable::Executable> done");
 }
 
-std::vector<torch::jit::IValue> Executable::run(at::ArrayRef<torch::jit::IValue>* inputs) {
+at::ArrayRef<torch::jit::IValue> Executable::run(at::ArrayRef<torch::jit::IValue> inputs) {
   IVLOG(1, "Executable::run> " << name_);
-  for (size_t i = 0; i < input_bindings_.size(); i++) {
-    input_bindings_[i].buffer.copy_from((*inputs)[i].toTensor().data_ptr());
-  }
+  // for (size_t i = 0; i < input_bindings_.size(); i++) {
+  //   input_bindings_[i].buffer.copy_from(inputs[i].toTensor().data_ptr());
+  // }
   exec_->run();
-  for (size_t i = 0, j = 0; i < output_bindings_.size(); i++) {
-    if (output_ivalues_[i].isTensor()) {
-      output_bindings_[j++].buffer.copy_into(output_ivalues_[i].toTensor().data_ptr());
-    }
-  }
+  // for (size_t i = 0, j = 0; i < output_bindings_.size(); i++) {
+  //   if (output_ivalues_[i].isTensor()) {
+  //     output_bindings_[j++].buffer.copy_into(output_ivalues_[i].toTensor().data_ptr());
+  //   }
+  // }
   IVLOG(1, "Executable::run> done");
   return output_ivalues_;
 }

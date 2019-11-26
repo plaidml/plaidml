@@ -121,7 +121,7 @@ struct Expr : std::enable_shared_from_this<Expr> {
 };
 
 struct ParamExpr : Expr {
-  std::shared_ptr<tile::Buffer> buffer;
+  BufferPtr buffer;
   explicit ParamExpr(const std::string& name = "");
   void Accept(AstVisitor<void>* visitor) { visitor->Visit(*this); }
   std::string str() const;
@@ -356,10 +356,15 @@ struct DimRefExpr : DimExpr {
   std::string str() const;
 };
 
+struct ProgramArgument {
+  bool is_input;
+  std::string name;
+  ExprPtr expr;
+};
+
 struct ProgramEvaluation {
   RunInfo runinfo;
-  std::vector<const ParamExpr*> inputs;
-  std::vector<ExprPtr> outputs;
+  std::vector<ProgramArgument> args;
   std::unordered_map<const Expr*, std::string> names_by_expr;
   std::unordered_map<std::string, const ParamExpr*> updates;
 };
@@ -370,6 +375,7 @@ struct ProgramUpdate {
 };
 
 struct ProgramMutations {
+  std::vector<ExprPtr> originals;
   std::vector<ExprPtr> outputs;
   std::vector<ProgramUpdate> updates;
 };

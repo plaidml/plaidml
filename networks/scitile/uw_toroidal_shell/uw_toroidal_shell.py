@@ -90,11 +90,15 @@ def toroidal_shell_integral(n, minval, maxval, eps, benchmark=False):
     O = sum(-G * H)
 
     program = edsl.Program('toroidal_shell_integral', [O])
-    executable = plaidml_exec.Executable(program, [X, Y, Z])
+    binder = plaidml_exec.Binder(program)
+    executable = binder.compile()
 
     def run():
-        outputs = executable([X_data, Y_data, Z_data])
-        return outputs[0].as_ndarray()
+        binder.input(X).copy_from_ndarray(X_data)
+        binder.input(Y).copy_from_ndarray(Y_data)
+        binder.input(Z).copy_from_ndarray(Z_data)
+        executable.run()
+        return binder.output(O).as_ndarray()
 
     if benchmark:
         # the first run will compile and run

@@ -1,10 +1,15 @@
 # Copyright 2019 Intel Corporation.
 
+import logging
+
 import numpy as np
 
 import plaidml2 as plaidml
+import plaidml2.edsl as edsl
 import plaidml2.settings as plaidml_settings
 from plaidml2.ffi import ForeignObject, decode_str, ffi, ffi_call, lib
+
+logger = logging.getLogger(__name__)
 
 
 def __init():
@@ -31,27 +36,17 @@ def list_targets():
 class Executable(ForeignObject):
     __ffi_del__ = lib.plaidml_executable_free
 
-    def __init__(self, program, inputs, device=None, target=None):
+    def __init__(self, program, inputs=[], outputs=[], device=None, target=None):
         if device is None:
             device = plaidml_settings.get('PLAIDML_DEVICE')
         if target is None:
             target = plaidml_settings.get('PLAIDML_TARGET')
 
-        def make_buffer(tensor):
-            # convert LogicalShape into TensorShape
-            return plaidml.Buffer(device, tensor.shape.into_TensorShape())
-
-        self._input_bindings = [(x, make_buffer(x)) for x in inputs]
-        self._output_bindings = [(x, make_buffer(x)) for x in program.outputs]
-
-        self._inputs = [x[1] for x in self._input_bindings]
-        self._outputs = [x[1] for x in self._output_bindings]
-
         def wrap(x, y):
             return ffi.new('plaidml_binding*', [x.as_ptr(), y.as_ptr()])
 
-        inputs = [wrap(x, y) for x, y in self._input_bindings]
-        outputs = [wrap(x, y) for x, y in self._output_bindings]
+        inputs = [wrap(x, y) for x, y in inputs]
+        outputs = [wrap(x, y) for x, y in outputs]
         ffi_obj = ffi_call(
             lib.plaidml_compile,
             program.as_ptr(),
@@ -64,15 +59,65 @@ class Executable(ForeignObject):
         )
         super(Executable, self).__init__(ffi_obj)
 
-    def __call__(self, inputs):
-        for buffer, ndarray in zip(self._inputs, inputs):
-            # Cast the input data type to match the dtype expected by the placeholder buffer
-            ndarray = np.array(ndarray, dtype=buffer.shape.dtype.into_numpy())
-            buffer.copy_from_ndarray(ndarray)
+    def run(self):
         ffi_call(lib.plaidml_executable_run, self.as_ptr())
-        return self._outputs
+
+
+class Binder:
+
+    def __init__(self, program, device=None, target=None):
+        self.program = program
+        if device is None:
+            device = plaidml_settings.get('PLAIDML_DEVICE')
+        self.device = device
+        if target is None:
+            target = plaidml_settings.get('PLAIDML_TARGET')
+        self.target = target
+        self.inputs = {arg.ref: arg.buffer for arg in program.inputs if arg.buffer}
+        self.outputs = {arg.ref: arg.buffer for arg in program.outputs if arg.buffer}
+
+    def input(self, tensor):
+        if isinstance(tensor, edsl.Tensor):
+            tensor = edsl.TensorRef(tensor)
+        return self.inputs.get(tensor)
+
+    def output(self, tensor):
+        if isinstance(tensor, edsl.Tensor):
+            tensor = edsl.TensorRef(tensor)
+        return self.outputs.get(tensor)
+
+    def set_input(self, tensor, buffer):
+        if isinstance(tensor, edsl.Tensor):
+            tensor = edsl.TensorRef(tensor)
+        self.inputs[tensor] = buffer
+        return self
+
+    def set_output(self, tensor, buffer):
+        if isinstance(tensor, edsl.Tensor):
+            tensor = edsl.TensorRef(tensor)
+        self.outputs[tensor] = buffer
+        return self
+
+    def compile(self):
+        inputs = [(x.ref.tensor, self._get_buffer(self.inputs, x)) for x in self.program.inputs]
+        outputs = [(x.ref.tensor, self._get_buffer(self.outputs, x)) for x in self.program.outputs]
+        return Executable(self.program, inputs, outputs, device=self.device, target=self.target)
+
+    def _get_buffer(self, map, arg):
+        buffer = map.get(arg.ref)
+        if buffer:
+            return buffer
+        buffer = plaidml.Buffer(arg.shape.into_TensorShape(), device=self.device)
+        map[arg.ref] = buffer
+        return buffer
 
 
 def run(program, inputs, device=None, target=None):
-    exe = Executable(program, [x for x, y in inputs], device=device, target=target)
-    return [x.as_ndarray() for x in exe([y for x, y in inputs])]
+    binder = Binder(program, device=device, target=target)
+    executable = binder.compile()
+    for tensor, data in inputs:
+        buffer = binder.input(tensor)
+        data = np.array(data, dtype=buffer.shape.dtype.into_numpy())
+        buffer.copy_from_ndarray(data)
+    executable.run()
+    return [binder.output(x.ref).as_ndarray() for x in program.outputs]

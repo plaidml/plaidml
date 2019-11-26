@@ -713,7 +713,7 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(StringRef name, const Prog
         }
         IVLOG(5, "BlockArgument mapping: " << value << " -> " << blockArg);
         mapper.map(value, blockArg);
-        ProgramArgument programArg{true, value};
+        ProgramArgument programArg{true, value, value->getType().cast<RankedTensorType>()};
         auto itBinding = impl->implicitBindings.find(value);
         if (itBinding != impl->implicitBindings.end()) {
           programArg.buffer = itBinding->second;
@@ -778,18 +778,19 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(StringRef name, const Prog
     throw std::runtime_error("Optimization passes failure");
   }
   for (unsigned i = 0; i < returnOp.getNumOperands(); i++) {
-    program->outputs.emplace_back(returnOp.getOperand(i));
-    auto value = returnOp.getOperand(i);
+    auto userValue = outputs[i];
+    auto finalValue = returnOp.getOperand(i);
     auto itUpdate = impl->implicitUpdates.find(outputs[i]);
     if (itUpdate != impl->implicitUpdates.end()) {
-      value = itUpdate->second;
+      userValue = itUpdate->second;
     }
-    ProgramArgument programArg{false, value};
-    auto itBinding = impl->implicitBindings.find(value);
+    ProgramArgument programArg{false, userValue, finalValue->getType().cast<RankedTensorType>()};
+    auto itBinding = impl->implicitBindings.find(finalValue);
     if (itBinding != impl->implicitBindings.end()) {
       programArg.buffer = itBinding->second;
     }
     program->arguments.emplace_back(programArg);
+    program->outputs.emplace_back(finalValue);
   }
   IVLOG(2, "TileBuilder::MakeProgram>" << mlir::debugString(module));
   return program;
