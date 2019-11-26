@@ -169,7 +169,7 @@ def plaidml_workspace():
         name = "xsmm",
         url = "https://github.com/hfp/libxsmm/archive/1.12.1.zip",
         sha256 = "451ec9d30f0890bf3081aa3d0d264942a6dea8f9d29c17bececc8465a10a832b",
-        stripPrefix = "libxsmm-1.12.1",
+        strip_prefix = "libxsmm-1.12.1",
         build_file = Label("//bzl:xsmm.BUILD"),
     )
 
