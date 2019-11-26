@@ -40,6 +40,8 @@ tool_dirs = config.mlir_tf_tools_dirs + [config.mlir_tools_dir, config.llvm_tool
 tool_names = [
     'mlir-opt',
     'mlir-translate',
+    'mlir-tblgen',
+    'op-lib-tblgen',
     'pmlc-opt',
     'pmlc-translate',
 ]

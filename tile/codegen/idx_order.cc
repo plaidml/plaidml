@@ -12,53 +12,85 @@ namespace codegen {
 using namespace stripe;  // NOLINT
 using namespace math;    // NOLINT
 
-// Reorder the index in cache block. Let the low bits of thread ID
-// be the low stride of ref
-void ReorderIndex(Block* block, const Refinement& ref) {
-  std::map<std::string, size_t> idx_stride;
-  TensorShape shape = block->exterior_shape(ref.into());
-  for (size_t i = 0; i < ref.access.size(); ++i) {
-    auto& acc_map = ref.access[i].getMap();
-    if (acc_map.size() == 1 && acc_map.begin()->first != "") {
-      idx_stride.emplace(acc_map.begin()->first, shape.dims[i].stride);
-    }
-  }
-  std::sort(block->idxs.begin(), block->idxs.end(),
-    [idx_stride](const Index& idx0, const Index& idx1) {
-      auto it0 = idx_stride.find(idx0.name);
-      if (it0 != idx_stride.end()) {
-        auto it1 = idx_stride.find(idx1.name);
-        if (it1 != idx_stride.end()) {
-          return it0->second >  it1->second;
-        }
-      }
-      return false;
-    }
-  );
+struct RefInfo {
+  std::string name;  // Refinement name
+  Index* low_idx;    // The lowest index (stride 1)
+  size_t size;       // Refinement size
+};
+
+bool IsGlobalRef(const Refinement& ref) {
+  return ref.location.devs.size() == 0 || ref.location.devs[0].name == "GLOBAL";
 }
 
-void IdxOrder(const AliasMap& alias_map, Block* block, const proto::IdxOrderPass& options) {
-  // Find out the largest refinement and use it as the reference
-  size_t max_size = 0;
-  std::string max_ref;
-  for (const auto& ref : block->refs) {
-    size_t size = block->exterior_shape(ref.into()).sizes_product();
-    if (size > max_size) {
-      max_size = size;
-      max_ref = ref.into();
+bool IsRegisterRef(const Refinement& ref) {
+  return ref.location.devs.size() > 0 && ref.location.devs[0].name == "REGISTER";
+}
+
+Index* StrideOneIndex(Block* block, const Refinement& ref) {
+  const auto& dims = ref.interior_shape.dims;
+  int n_dim = dims.size();
+  for (int i = n_dim - 1; i >= 0; --i) {
+    if (dims[i].stride > 1) {
+      continue;
+    }
+    if ((i == 0) || (i > 0 && dims[i - 1].stride > 1)) {
+      auto& acc_map = ref.access[i].getMap();
+      for (auto& kvp : acc_map) {
+        if (kvp.first.size() > 0 && kvp.second == 1) {
+          return block->idx_by_name(kvp.first);
+        }
+      }
     }
   }
-  if (max_size > 0) {
-    auto ref_it = block->ref_by_into(max_ref);
-    ReorderIndex(block, *ref_it);
+  return nullptr;
+}
+
+void ReorderIndex(Block* block, bool global_only, bool apply_inner) {
+  // Find out the largest refinement and use it as the reference
+  std::vector<RefInfo> ref_info;
+  Block *target = apply_inner ? (block->SubBlock(0).get()) : block;
+  for (const auto& ref : block->refs) {
+    if (IsRegisterRef(ref) || (global_only && !IsGlobalRef(ref))) {
+      continue;
+    }
+    size_t size = block->exterior_shape(ref.into()).sizes_product();
+    RefInfo ri = {ref.into(), StrideOneIndex(target, ref), size};
+    if (ri.low_idx) {
+      ref_info.push_back(ri);
+    }
   }
+
+  // Sort ref_info by size
+  std::sort(ref_info.begin(), ref_info.end(),
+    [](const RefInfo& r0, const RefInfo& r1) { return r0.size > r1.size; });
+  std::vector<Index> new_idxs;
+  std::set<Index*> used_idx;
+
+  // Push the lowest index
+  for (auto& ri : ref_info) {
+    if (used_idx.find(ri.low_idx) == used_idx.end()) {
+      new_idxs.push_back(*ri.low_idx);
+      used_idx.insert(ri.low_idx);
+    }
+  }
+
+  // Push the remaining index
+  for (auto iter = target->idxs.rbegin(); iter != target->idxs.rend(); ++iter) {
+    if (used_idx.find(&(*iter)) == used_idx.end()) {
+      new_idxs.push_back(*iter);
+      used_idx.insert(&(*iter));
+    }
+  }
+
+  std::reverse(new_idxs.begin(), new_idxs.end());
+  target->idxs = new_idxs;
 }
 
 void IdxOrderPass::Apply(CompilerState* state) const {
   auto reqs = stripe::FromProto(options_.reqs());
   RunOnBlocks(state->entry(), reqs,
-              [this](const AliasMap& alias_map, stripe::Block* block) {  //
-                IdxOrder(alias_map, block, options_);
+              [](const AliasMap& alias_map, stripe::Block* block) {  //
+                ReorderIndex(block, true, false);
               },
               true);
 }

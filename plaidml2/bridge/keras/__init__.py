@@ -125,6 +125,7 @@ class _Function(object):
     def _compile(self, inputs):
         for node, data in zip(self._inputs, inputs):
             dtype = node.tensor.shape.dtype
+            # NOTE: need fully resolved shape here
             shape = edsl.LogicalShape(dtype, data.shape)
             node.tensor.bind(shape)
         inputs = [x.tensor for x in self._inputs]

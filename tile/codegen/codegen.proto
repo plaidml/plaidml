@@ -217,8 +217,6 @@ message RegisterCachePass {
   required stripe.proto.Refinement.Dir dir = 8;
   // The tag of the parent of the computational block
   required string comp_parent_tag = 9;
-  // The index order base block
-  required string index_order = 10;
   // The aligned size for the arch
   required uint32 align_size = 11;
 }
@@ -486,6 +484,8 @@ message AutotilePass {
   repeated string exclude = 36;
   // If the tiling is interleaved
   optional bool interleave = 37;
+  // Only the primes <= small_factor_upbound are counted as small factors
+  optional uint32 small_factor_upbound = 39 [default = 0];
 }
 
 // A pass that attempts to transpose intermediate buffers such that any

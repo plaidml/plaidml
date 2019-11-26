@@ -21,17 +21,12 @@ enum class AliasType {
   Exact,    // Buffers are indentical for every index state
 };
 
-struct Extent {
-  int64_t min;
-  int64_t max;
-};
-
 struct AliasInfo {
   stripe::Block* base_block = nullptr;
   stripe::Refinement* base_ref = nullptr;
   std::string base_name;
   std::vector<stripe::Affine> access;
-  std::vector<Extent> extents;
+  std::vector<stripe::Extent> extents;
   stripe::Location location;
   TensorShape shape;
 
@@ -100,7 +95,7 @@ class AliasMap {
 // determine the overlap of the exterior ranges of two AliasInfos,
 // across the entire range over which the underlying refinement will
 // be instantiated.
-bool CheckOverlap(const std::vector<Extent>& a_extents, const std::vector<Extent>& b_extents);
+bool CheckOverlap(const std::vector<stripe::Extent>& a_extents, const std::vector<stripe::Extent>& b_extents);
 
 template <typename F>
 void RunOnBlocksRecurse(const AliasMap& map, stripe::Block* block, const stripe::Tags& reqs, const F& func,
@@ -128,7 +123,6 @@ void RunOnBlocks(stripe::Block* root, const stripe::Tags& reqs, const F& func, b
 }
 
 std::ostream& operator<<(std::ostream& os, const AliasInfo& ai);
-std::ostream& operator<<(std::ostream& os, const Extent& extent);
 
 }  // namespace codegen
 }  // namespace tile

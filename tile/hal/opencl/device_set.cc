@@ -2,6 +2,7 @@
 
 #include "tile/hal/opencl/device_set.h"
 
+#include <set>
 #include <string>
 #include <utility>
 
@@ -350,16 +351,27 @@ DeviceSet::DeviceSet(const context::Context& ctx, std::uint32_t pidx, cl_platfor
 
   cl_uint device_count;
   ocl::GetDeviceIDs(pid, CL_DEVICE_TYPE_ALL, 0, nullptr, &device_count);
-  std::vector<cl_device_id> devices(device_count);
-  ocl::GetDeviceIDs(pid, CL_DEVICE_TYPE_ALL, devices.size(), devices.data(), nullptr);
+  std::vector<cl_device_id> initial_devices(device_count);
+  ocl::GetDeviceIDs(pid, CL_DEVICE_TYPE_ALL, initial_devices.size(), initial_devices.data(), nullptr);
 
-  // Remove OpenCL devices that are older than PLAIDML_MIN_OPENCL_VERSION
-  devices.erase(std::remove_if(devices.begin(), devices.end(),
-                               [](const cl_device_id& did) {
-                                 auto device_version = CLInfoType<CL_DEVICE_VERSION>::Read(did);
-                                 return (device_version.compare(PLAIDML_MIN_OPENCL_VERSION) < 0);
-                               }),
-                devices.end());
+  std::vector<cl_device_id> devices;
+  for (auto did : initial_devices) {
+    // Remove OpenCL devices that are older than PLAIDML_MIN_OPENCL_VERSION
+    auto device_version = CLInfo<CL_DEVICE_VERSION>(did);
+    if (device_version.compare(PLAIDML_MIN_OPENCL_VERSION) < 0) {
+      continue;
+    }
+    if (CLInfo<CL_DEVICE_TYPE>(did) == CL_DEVICE_TYPE_CPU) {
+      // skip Intel CPU due to conflict with TBB
+      continue;
+    }
+    devices.emplace_back(did);
+  }
+
+  if (devices.empty()) {
+    // This platform has no usable devices
+    return;
+  }
 
   cl_context_properties props[3] = {CL_CONTEXT_PLATFORM, reinterpret_cast<cl_context_properties>(pid), 0};
   Err err;
