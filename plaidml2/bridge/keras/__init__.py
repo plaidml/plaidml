@@ -91,7 +91,7 @@ class _Executable(object):
         self._inputs = inputs
         self.program = edsl.Program(name, outputs, updates=updates)
         self.binder = plaidml_exec.Binder(self.program)
-        self.exectuable = self.binder.compile()
+        self.executable = self.binder.compile()
 
     def __call__(self, inputs):
         for tensor, data in zip(self._inputs, inputs):
