@@ -190,7 +190,7 @@ def AffineConstraintsOp : TileOpWithPPV<"cons", [NoSideEffect]> {
   let results = (outs AffineConstraints:$result);
 }
 
-def AffineDynamicContractionOp : TileOpWithPPV<"dyn_cion", [NoSideEffect]>, HasCanonicalizer {
+def AffineSymbolicContractionOp : TileOpWithPPV<"sym_cion", [NoSideEffect]>, HasCanonicalizer {
   let arguments = (ins
     EltwiseAny:$init,
     AffineConstraints:$cons,

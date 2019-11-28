@@ -270,10 +270,10 @@ struct ContractionBuilder {
   }
 };
 
-struct DynamicContractionCanonicalizer : OpRewritePattern<AffineDynamicContractionOp> {
-  using OpRewritePattern<AffineDynamicContractionOp>::OpRewritePattern;
+struct SymbolicContractionCanonicalizer : OpRewritePattern<AffineSymbolicContractionOp> {
+  using OpRewritePattern<AffineSymbolicContractionOp>::OpRewritePattern;
 
-  PatternMatchResult matchAndRewrite(AffineDynamicContractionOp op, PatternRewriter& rewriter) const override {
+  PatternMatchResult matchAndRewrite(AffineSymbolicContractionOp op, PatternRewriter& rewriter) const override {
     auto sizeMapOp = llvm::cast<AffineMapOp>(op.size()->getDefiningOp());
     SmallVector<Value*, 4> sizeDims(sizeMapOp.dims());
     auto shape = eltwise::ComputeShape(sizeDims);
@@ -310,10 +310,10 @@ struct DynamicContractionCanonicalizer : OpRewritePattern<AffineDynamicContracti
   }
 };
 
-void AffineDynamicContractionOp::getCanonicalizationPatterns(  //
-    OwningRewritePatternList& results,                         //
+void AffineSymbolicContractionOp::getCanonicalizationPatterns(  //
+    OwningRewritePatternList& results,                          //
     MLIRContext* context) {
-  results.insert<DynamicContractionCanonicalizer>(context);
+  results.insert<SymbolicContractionCanonicalizer>(context);
 }
 
 void AffineContractionOp::build(  //
@@ -759,9 +759,9 @@ LogicalResult verifyAffineConstraintsOp(AffineConstraintsOp op) {  //
   return success();
 }
 
-// ---- AffineDynamicContractionOp ----
+// ---- AffineSymbolicContractionOp ----
 
-void printAffineDynamicContractionOp(OpAsmPrinter* printer, AffineDynamicContractionOp op) {  //
+void printAffineSymbolicContractionOp(OpAsmPrinter* printer, AffineSymbolicContractionOp op) {  //
   *printer << op.getOperation()->getName() << ' ';
   *printer << util::stringifyAggregationKind(op.agg());
   *printer << ", ";
@@ -782,7 +782,7 @@ void printAffineDynamicContractionOp(OpAsmPrinter* printer, AffineDynamicContrac
   printer->printType(op.result()->getType());
 }
 
-ParseResult parseAffineDynamicContractionOp(OpAsmParser* parser, OperationState& result) {
+ParseResult parseAffineSymbolicContractionOp(OpAsmParser* parser, OperationState& result) {
   StringRef strAgg;
   StringRef strCombo;
   OpAsmParser::OperandType init;
@@ -838,7 +838,7 @@ ParseResult parseAffineDynamicContractionOp(OpAsmParser* parser, OperationState&
   return success();
 }
 
-LogicalResult verifyAffineDynamicContractionOp(AffineDynamicContractionOp op) {  //
+LogicalResult verifyAffineSymbolicContractionOp(AffineSymbolicContractionOp op) {  //
   return success();
 }
 
@@ -856,17 +856,11 @@ void printAffineContractionOp(OpAsmPrinter* printer, AffineContractionOp op) {  
   *printer << ' ';
   printer->printOptionalAttrDict(op.getAttrs(), {"agg", "combo"});
   *printer << " : ";
-  *printer << '(';
   printer->printType(op.init()->getType());
   *printer << ", ";
   SmallVector<Value*, 4> tensors(op.tensors());
-  for (unsigned i = 0; i < tensors.size(); i++) {
-    if (i) {
-      *printer << ", ";
-    }
-    printer->printType(tensors[i]->getType());
-  }
-  *printer << ')';
+  mlir::interleaveComma(op.tensors(), printer->getStream(),
+                        [&](Value* operand) { printer->printType(operand->getType()); });
   *printer << " -> ";
   printer->printType(op.result()->getType());
 }
