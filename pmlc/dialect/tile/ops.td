@@ -281,7 +281,7 @@ def AffineSizeMapOp : TileOp<"size_map", [HasParent<"AffineDomainOp">]> {
 
 def ConstraintOp : TileOp<"constraint", [Terminator]> {
   let summary = "constraint operation";
-  let arguments = (ins ScalarIndex:$lhs, ScalarIndex:$rhs);
+  let arguments = (ins IndexLike:$lhs, IndexLike:$rhs);
   let regions = (region SizedRegion<1>:$body);
 }
 
