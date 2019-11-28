@@ -33,6 +33,13 @@ def StrType : Type<CPred<"$_self.isa<StringType>()">, "string">;
 class TileOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
     Op<TileDialect, mnemonic, traits> {}
 
+class TileOpWithPPV<string mnemonic, list<OpTrait> traits = []> :
+    TileOp<mnemonic, traits> {
+  let printer = [{ print$cppClass(&p, *this); }];
+  let parser = [{ return parse$cppClass(&parser, result); }];
+  let verifier = [{ return verify$cppClass(*this); }];
+}
+
 def PlaceholderOp : TileOp<"var"> {
   let summary = "placeholder operation";
   let results = (outs RankedTensorOf<[AnyScalar]>:$result);
@@ -55,7 +62,7 @@ def StringOp : TileOp<"str"> {
   }];
 }
 
-def DimOp : TileOp<"dim">, HasFolder {
+def DimOp : TileOpWithPPV<"dim", [NoSideEffect]>, HasFolder {
   let summary = "dimension index operation";
   let arguments = (ins RankedTensorOf<[AnyScalar]>:$tensor, APIntAttr:$dim);
   let results = (outs IndexLike:$result);
@@ -70,7 +77,7 @@ def DimOp : TileOp<"dim">, HasFolder {
   >];
 }
 
-def AffineConstantOp : TileOp<"affine_const">, HasFolder {
+def AffineConstantOp : TileOpWithPPV<"affine_const", [NoSideEffect]>, HasFolder {
   let summary = "affine constant";
   let arguments = (ins I64Attr:$value);
   let results = (outs IndexLike:$result);
@@ -87,7 +94,7 @@ def AffineConstantOp : TileOp<"affine_const">, HasFolder {
   }];
 }
 
-def AffineIndexOp : TileOp<"idx", []> {
+def AffineIndexOp : TileOpWithPPV<"idx"> {
   let summary = "affine index";
   let results = (outs IndexLike:$result);
 
@@ -117,6 +124,8 @@ class AffineUnaryOp<string mnemonic, list<OpTrait> traits = []> : AffineOp<mnemo
 
 class AffineBinaryOp<string mnemonic, list<OpTrait> traits = []> : AffineOp<mnemonic, traits> {
   let arguments = (ins IndexLike:$lhs, IndexLike:$rhs);
+  let printer = [{ printAffineBinaryOp(&p, *this); }];
+  let parser = [{ return parseAffineBinaryOp(&parser, result); }];
 }
 
 def AffineAddOp : AffineBinaryOp<"affine_add", [Commutative]> {
@@ -148,7 +157,7 @@ def AffineMinOp : AffineBinaryOp<"affine_min", [Commutative]> {
   let summary = "Affine min operation";
 }
 
-def AffineTensorMapOp : TileOp<"tmap"> {
+def AffineTensorMapOp : TileOpWithPPV<"tmap", [NoSideEffect]> {
   let summary = "affine tensor map operation";
   let arguments = (ins EltwiseAny:$tensor, Variadic<Index>:$dims);
   let results = (outs AffineTensorMap:$result);
@@ -162,7 +171,7 @@ def AffineTensorMapOp : TileOp<"tmap"> {
   >];
 }
 
-def AffineMapOp : TileOp<"map"> {
+def AffineMapOp : TileOpWithPPV<"map", [NoSideEffect]> {
   let summary = "affine map operation";
   let arguments = (ins Variadic<Index>:$dims);
   let results = (outs AffineMap:$result);
@@ -175,13 +184,13 @@ def AffineMapOp : TileOp<"map"> {
   >];
 }
 
-def AffineConstraintsOp : TileOp<"cons"> {
+def AffineConstraintsOp : TileOpWithPPV<"cons", [NoSideEffect]> {
   let summary = "affine constraint operation";
   let arguments = (ins Variadic<Index>:$pairs);
   let results = (outs AffineConstraints:$result);
 }
 
-def AffineDynamicContractionOp : TileOp<"dyn_cion">, HasCanonicalizer {
+def AffineDynamicContractionOp : TileOpWithPPV<"dyn_cion", [NoSideEffect]>, HasCanonicalizer {
   let arguments = (ins
     EltwiseAny:$init,
     AffineConstraints:$cons,
@@ -195,7 +204,7 @@ def AffineDynamicContractionOp : TileOp<"dyn_cion">, HasCanonicalizer {
   let results = (outs RankedTensorOf<[AnyScalar]>:$result);
 }
 
-def AffineContractionOp : TileOp<"cion"> {
+def AffineContractionOp : TileOpWithPPV<"cion"> {
   let arguments = (ins
     EltwiseAny:$init,
     Variadic<EltwiseAny>:$tensors,
