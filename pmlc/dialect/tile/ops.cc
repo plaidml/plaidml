@@ -2,6 +2,10 @@
 
 #include "pmlc/dialect/tile/ops.h"
 
+#include <vector>
+
+#include "llvm/ADT/SetVector.h"
+
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Matchers.h"
@@ -18,7 +22,9 @@ using eltwise::constFoldBinaryOp;
 using eltwise::constFoldUnaryOp;
 using eltwise::m_One;
 using eltwise::m_Zero;
+using llvm::SetVector;
 using llvm::SmallVector;
+using mlir::AffineExpr;
 using mlir::ArrayAttr;
 using mlir::FloatAttr;
 using mlir::IntegerAttr;
@@ -122,8 +128,6 @@ OpFoldResult DimOp::fold(ArrayRef<Attribute> operands) {
   return IntegerAttr::get(mlir::IntegerType::get(64, getContext()), size);
 }
 
-namespace {
-
 struct AffineDomainFolder : public OpRewritePattern<AffineDomainOp> {
   using OpRewritePattern<AffineDomainOp>::OpRewritePattern;
 
@@ -138,7 +142,7 @@ struct AffineDomainFolder : public OpRewritePattern<AffineDomainOp> {
     if (!sizeMapOp) {
       return matchFailure();
     }
-    llvm::SmallVector<Value*, 4> sizes(sizeMapOp.sizes());
+    SmallVector<Value*, 4> sizes(sizeMapOp.sizes());
     auto shape = eltwise::ComputeShape(sizes);
     auto sourceType = op.getType().cast<RankedTensorType>();
     auto targetType = RankedTensorType::get(shape, sourceType.getElementType());
@@ -165,12 +169,173 @@ struct AffineDomainFolder : public OpRewritePattern<AffineDomainOp> {
   }
 };
 
-}  // namespace
-
 void AffineDomainOp::getCanonicalizationPatterns(  //
     OwningRewritePatternList& results,             //
     MLIRContext* context) {
   results.insert<AffineDomainFolder>(context);
+}
+
+struct ContractionBuilder {
+  MLIRContext* context;
+  SetVector<Value*> idxs;
+  std::vector<Value*> tensors;
+  std::vector<AffineExpr> sink;
+  std::vector<std::vector<AffineExpr>> srcs;
+  std::vector<AffineExpr> cons;
+
+  ContractionBuilder(AffineMapOp sink, AffineConstraintsOp constraints)
+      : context(sink.getContext()), sink(addDims(sink.dims())) {
+    SmallVector<Value*, 8> pairs(constraints.pairs());
+    for (auto it = pairs.begin(); it != pairs.end(); it++) {
+      auto lhs = *it++;
+      auto rhs = *it;
+      cons.emplace_back(makeConstraint(lhs, rhs));
+    }
+  }
+
+  std::vector<AffineExpr> addDims(Operation::operand_range dims) {
+    std::vector<AffineExpr> exprs;
+    for (auto dim : dims) {
+      exprs.emplace_back(makeExpr(dim));
+    }
+    return exprs;
+  }
+
+  void addSourceMap(AffineTensorMapOp op) {
+    tensors.emplace_back(op.tensor());
+    srcs.emplace_back(addDims(op.dims()));
+  }
+
+  AffineMap makeMap(ArrayRef<AffineExpr> exprs) {
+    if (exprs.size()) {
+      return AffineMap::get(idxs.size(), 0, exprs);
+    }
+    return AffineMap::get(context);
+  }
+
+  std::vector<AffineMap> getSources() {
+    std::vector<AffineMap> ret;
+    for (auto src : srcs) {
+      ret.emplace_back(makeMap(src));
+    }
+    return ret;
+  }
+
+  AffineMap getSink() {  //
+    return makeMap(sink);
+  }
+
+  IntegerSet getConstraints() {
+    if (cons.empty()) {
+      return IntegerSet::getEmptySet(idxs.size(), 0, context);
+    }
+    SmallVector<bool, 4> flags(cons.size(), false);
+    return IntegerSet::get(idxs.size(), 0, cons, flags);
+  }
+
+  AffineExpr makeConstraint(Value* lhs, Value* rhs) {  //
+    return makeExpr(lhs) - makeExpr(rhs);
+  }
+
+  AffineExpr makeExpr(Value* value) {
+    IVLOG(3, "MakePoly: " << mlir::debugString(*value));
+    auto defOp = value->getDefiningOp();
+    if (auto op = llvm::dyn_cast<AffineIndexOp>(defOp)) {
+      idxs.insert(value);
+      auto pos = std::distance(idxs.begin(), llvm::find(idxs, value));
+      return mlir::getAffineDimExpr(pos, context);
+    }
+    if (auto op = llvm::dyn_cast<AffineConstantOp>(defOp)) {
+      return mlir::getAffineConstantExpr(op.value().getSExtValue(), context);
+    }
+    if (auto op = llvm::dyn_cast<AffineAddOp>(defOp)) {
+      return makeExpr(op.lhs()) + makeExpr(op.rhs());
+    }
+    if (auto op = llvm::dyn_cast<AffineMulOp>(defOp)) {
+      return makeExpr(op.lhs()) * makeExpr(op.rhs());
+    }
+    if (auto op = llvm::dyn_cast<AffineDivOp>(defOp)) {
+      return makeExpr(op.lhs()).floorDiv(makeExpr(op.rhs()));
+    }
+    if (auto op = llvm::dyn_cast<AffineNegOp>(defOp)) {
+      return -makeExpr(op.input());
+    }
+    if (auto op = llvm::dyn_cast<AffineSubOp>(defOp)) {
+      return makeExpr(op.lhs()) - makeExpr(op.rhs());
+    }
+    throw std::runtime_error("Invalid affine op");
+  }
+};
+
+struct DynamicContractionCanonicalizer : OpRewritePattern<AffineDynamicContractionOp> {
+  using OpRewritePattern<AffineDynamicContractionOp>::OpRewritePattern;
+
+  PatternMatchResult matchAndRewrite(AffineDynamicContractionOp op, PatternRewriter& rewriter) const override {
+    auto sizeMapOp = llvm::cast<AffineMapOp>(op.size()->getDefiningOp());
+    SmallVector<Value*, 4> sizeDims(sizeMapOp.dims());
+    auto shape = eltwise::ComputeShape(sizeDims);
+    auto sourceType = op.result()->getType().cast<RankedTensorType>();
+    auto resultType = RankedTensorType::get(shape, sourceType.getElementType());
+    if (!resultType.hasStaticShape()) {
+      return matchFailure();
+    }
+
+    auto sinkMapOp = llvm::cast<AffineMapOp>(op.sink()->getDefiningOp());
+    auto consOp = llvm::cast<AffineConstraintsOp>(op.cons()->getDefiningOp());
+    ContractionBuilder builder(sinkMapOp, consOp);
+    for (auto src : op.srcs()) {
+      auto mapOp = llvm::cast<AffineTensorMapOp>(src->getDefiningOp());
+      builder.addSourceMap(mapOp);
+    }
+
+    auto newOp = rewriter.create<AffineContractionOp>(  //
+        op.getLoc(),                                    //
+        resultType,                                     //
+        op.init(),                                      //
+        builder.tensors,                                //
+        op.agg(),                                       //
+        op.combo(),                                     //
+        builder.getSink(),                              //
+        builder.getSources(),                           //
+        builder.getConstraints(),                       //
+        op.no_reduce().hasValue());
+    rewriter.replaceOp(op, newOp.result());
+
+    util::UpdateFuncOpType(newOp.getOperation());
+
+    return matchSuccess();
+  }
+};
+
+void AffineDynamicContractionOp::getCanonicalizationPatterns(  //
+    OwningRewritePatternList& results,                         //
+    MLIRContext* context) {
+  results.insert<DynamicContractionCanonicalizer>(context);
+}
+
+void AffineContractionOp::build(  //
+    Builder* builder,             //
+    OperationState& result,       //
+    Type resultType,              //
+    Value* init,                  //
+    ArrayRef<Value*> tensors,     //
+    AggregationKind agg,          //
+    CombinationKind combo,        //
+    AffineMap sink,               //
+    ArrayRef<AffineMap> srcs,     //
+    IntegerSet cons,              //
+    bool no_reduce) {
+  result.addOperands(init);
+  result.addOperands(tensors);
+  result.addTypes(resultType);
+  result.addAttribute("agg", builder->getI64IntegerAttr(static_cast<int64_t>(agg)));
+  result.addAttribute("combo", builder->getI64IntegerAttr(static_cast<int64_t>(combo)));
+  result.addAttribute("sink", AffineMapAttr::get(sink));
+  result.addAttribute("srcs", builder->getAffineMapArrayAttr(srcs));
+  result.addAttribute("cons", IntegerSetAttr::get(cons));
+  if (no_reduce) {
+    result.addAttribute("no_reduce", builder->getUnitAttr());
+  }
 }
 
 //

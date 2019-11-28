@@ -58,6 +58,7 @@ plaidml_cc_library(
         "lowering.cc",
         "ops.cc",
         "ops.cc.inc",
+        "types.cc",
     ],
     hdrs = [
         "builder.h",

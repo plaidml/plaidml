@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include "mlir/IR/AffineMap.h"
+#include "mlir/IR/IntegerSet.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/StandardTypes.h"
 
@@ -16,12 +18,17 @@ using eltwise::DataType;
 using eltwise::ScalarType;
 using llvm::APInt;
 using llvm::Optional;
+using mlir::AffineMap;
+using mlir::AffineMapAttr;
+using mlir::ArrayAttr;
 using mlir::ArrayRef;
 using mlir::Attribute;
 using mlir::BoolAttr;
 using mlir::Builder;
 using mlir::IndexType;
 using mlir::IntegerAttr;
+using mlir::IntegerSet;
+using mlir::IntegerSetAttr;
 using mlir::Location;
 using mlir::LogicalResult;
 using mlir::MLIRContext;
@@ -42,6 +49,7 @@ using mlir::StringRef;
 using mlir::TupleType;
 using mlir::Type;
 using mlir::TypeAttr;
+using mlir::UnitAttr;
 using mlir::Value;
 using mlir::VectorType;
 using util::AggregationKind;
