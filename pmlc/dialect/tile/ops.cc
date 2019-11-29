@@ -335,7 +335,9 @@ void AffineContractionOp::build(  //
   result.addAttribute("combo", builder->getI64IntegerAttr(static_cast<int64_t>(combo)));
   result.addAttribute("sink", AffineMapAttr::get(sink));
   result.addAttribute("srcs", builder->getAffineMapArrayAttr(srcs));
-  result.addAttribute("cons", IntegerSetAttr::get(cons));
+  if (!cons.isEmptyIntegerSet()) {
+    result.addAttribute("cons", IntegerSetAttr::get(cons));
+  }
   if (no_reduce) {
     result.addAttribute("no_reduce", builder->getUnitAttr());
   }
@@ -844,7 +846,11 @@ LogicalResult verifyAffineSymbolicContractionOp(AffineSymbolicContractionOp op) 
 
 // ---- AffineContractionOp ----
 
-void printAffineContractionOp(OpAsmPrinter* printer, AffineContractionOp op) {  //
+void printAffineContractionOp(OpAsmPrinter* printer, AffineContractionOp op) {
+  std::vector<StringRef> elidedAttrs = {"agg", "combo"};
+  if (op.cons().hasValue() && op.cons().getValue().isEmptyIntegerSet()) {
+    elidedAttrs.emplace_back("cons");
+  }
   *printer << op.getOperation()->getName() << ' ';
   *printer << util::stringifyAggregationKind(op.agg());
   *printer << ", ";
@@ -854,7 +860,7 @@ void printAffineContractionOp(OpAsmPrinter* printer, AffineContractionOp op) {  
   *printer << ", ";
   printer->printOperands(op.tensors());
   *printer << ' ';
-  printer->printOptionalAttrDict(op.getAttrs(), {"agg", "combo"});
+  printer->printOptionalAttrDict(op.getAttrs(), elidedAttrs);
   *printer << " : ";
   printer->printType(op.init()->getType());
   *printer << ", ";

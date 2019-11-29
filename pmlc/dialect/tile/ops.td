@@ -204,7 +204,7 @@ def AffineSymbolicContractionOp : TileOpWithPPV<"sym_cion", [NoSideEffect]>, Has
   let results = (outs RankedTensorOf<[AnyScalar]>:$result);
 }
 
-def AffineContractionOp : TileOpWithPPV<"cion"> {
+def AffineContractionOp : TileOpWithPPV<"cion", [NoSideEffect]> {
   let arguments = (ins
     EltwiseAny:$init,
     Variadic<EltwiseAny>:$tensors,
@@ -212,7 +212,7 @@ def AffineContractionOp : TileOpWithPPV<"cion"> {
     CombinationKind:$combo,
     AffineMapAttr:$sink,
     AffineMapArrayAttr:$srcs,
-    IntegerSetAttr:$cons,
+    OptionalAttr<IntegerSetAttr>:$cons,
     OptionalAttr<UnitAttr>:$no_reduce
   );
   let results = (outs RankedTensorOf<[AnyScalar]>:$result);

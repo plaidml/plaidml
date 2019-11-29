@@ -2,6 +2,4 @@
 
 load("//pmlc:lit.bzl", "glob_lit_tests")
 
-glob_lit_tests(
-    tags_override = {"cion-to-stripe.mlir": ["manual"]},
-)
+glob_lit_tests()

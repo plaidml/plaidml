@@ -38,6 +38,7 @@ using mlir::Block;
 using mlir::ConversionPattern;
 using mlir::ConversionPatternRewriter;
 using mlir::ConversionTarget;
+using mlir::FloatAttr;
 using mlir::FuncOp;
 using mlir::FunctionType;
 using mlir::Identifier;
@@ -70,17 +71,15 @@ static stripe::TensorType convertIntoTensorType(Type type) {
   return stripe::TensorType::get(rankedTensorType.getElementType(), newShape, stripe::OffsetsMap{}, false);
 }
 
-static eltwise::ScalarConstantOp createZero(OpBuilder* builder, Location loc, Type elementType) {
+static eltwise::ScalarConstantOp createInit(OpBuilder* builder, Location loc, Type elementType, double value = 0.0) {
   auto scalarType = elementType.cast<ScalarType>();
   auto dtype = scalarType.type();
   if (is_float(dtype)) {
-    const double zero = 0.0;
     auto constType = ScalarType::get(builder->getContext(), DataType::FLOAT32);
-    return builder->create<eltwise::ScalarConstantOp>(loc, constType, zero);
+    return builder->create<eltwise::ScalarConstantOp>(loc, constType, value);
   }
-  const int64_t zero = 0;
   auto constType = ScalarType::get(builder->getContext(), DataType::INT32);
-  return builder->create<eltwise::ScalarConstantOp>(loc, constType, zero);
+  return builder->create<eltwise::ScalarConstantOp>(loc, constType, static_cast<int64_t>(value));
 }
 
 static void addInitializer(         //
@@ -126,7 +125,7 @@ static void addInitializer(         //
     builder->create<stripe::StoreOp>(loc, sink.result(), loadOp.into());
   } else {
     attrs.emplace_back(builder->getIdentifier("zero"), builder->getUnitAttr());
-    auto constOp = createZero(builder, loc, elementType);
+    auto constOp = createInit(builder, loc, elementType);
     builder->create<stripe::StoreOp>(loc, sink.result(), constOp.result());
   }
 
@@ -258,24 +257,25 @@ static StringAttr getTensorName(LoweringContext* context, Value* tensor) {
 
 static Value* MakeCombination(            //
     ConversionPatternRewriter* rewriter,  //
-    ContractionOp op,                     //
+    Location loc,                         //
+    CombinationKind combo,                //
     ScalarType scalarType,                //
     ArrayRef<Value*> operands) {
-  switch (op.getCombinationKind()) {
+  switch (combo) {
     case CombinationKind::none:
       return operands[0];
     case CombinationKind::add:
-      return rewriter->create<eltwise::AddOp>(op.getLoc(), scalarType, operands).result();
+      return rewriter->create<eltwise::AddOp>(loc, scalarType, operands).result();
     case CombinationKind::cond: {
-      auto constOp = createZero(rewriter, op.getLoc(), scalarType);
-      auto cmpEqOp = rewriter->create<eltwise::CmpEqOp>(op.getLoc(), scalarType, operands.drop_back());
+      auto constOp = createInit(rewriter, loc, scalarType);
+      auto cmpEqOp = rewriter->create<eltwise::CmpEqOp>(loc, scalarType, operands.drop_back());
       llvm::SmallVector<Value*, 3> args{cmpEqOp.result(), operands.back(), constOp.result()};
-      return rewriter->create<eltwise::SelectOp>(op.getLoc(), scalarType, args);
+      return rewriter->create<eltwise::SelectOp>(loc, scalarType, args);
     }
     case CombinationKind::eq:
-      return rewriter->create<eltwise::CmpEqOp>(op.getLoc(), scalarType, operands).result();
+      return rewriter->create<eltwise::CmpEqOp>(loc, scalarType, operands).result();
     case CombinationKind::mul:
-      return rewriter->create<eltwise::MulOp>(op.getLoc(), scalarType, operands).result();
+      return rewriter->create<eltwise::MulOp>(loc, scalarType, operands).result();
   }
   throw std::runtime_error("Invalid combination op");
 }
@@ -445,7 +445,8 @@ struct AffineDomainOpConversion : public LoweringBase {
     // Combination Operation
     // TODO: verify correct scalarType
     auto scalarType = resultTensorType.getElementType().cast<eltwise::ScalarType>();
-    auto combo = MakeCombination(&rewriter, contractionOp, scalarType, inputs);
+    auto loc = contractionOp.getLoc();
+    auto combo = MakeCombination(&rewriter, loc, comboKind, scalarType, inputs);
 
     // STORE/Aggregate
     if (aggKind == AggregationKind::assign) {
@@ -513,6 +514,287 @@ struct AffineDomainOpConversion : public LoweringBase {
     }
     // Looks good!
     return false;
+  }
+};
+
+struct ContractionOpConversion : public LoweringBase {
+  explicit ContractionOpConversion(LoweringContext* lowering)
+      : LoweringBase(AffineContractionOp::getOperationName(), lowering) {}
+
+  PatternMatchResult tryMatchAndRewrite(  //
+      Operation* op,                      //
+      llvm::ArrayRef<Value*> operands,    //
+      ConversionPatternRewriter& rewriter) const override {
+    IVLOG(2, "ContractionOpConversion::matchAndRewrite>");
+    auto cionOp = llvm::cast<AffineContractionOp>(op);
+    auto loc = op->getLoc();
+
+    auto resultType = cionOp.result()->getType();
+    auto resultTensorType = convertIntoTensorType(resultType);
+    IVLOG(3, "resultTensorType: " << mlir::debugString(resultTensorType));
+    llvm::SmallVector<stripe::TensorType, 4> shapes{resultTensorType};
+    for (auto src : cionOp.tensors()) {
+      shapes.emplace_back(convertIntoTensorType(src->getType()));
+    }
+
+    Contraction contraction{cionOp};
+    bool no_reduce = cionOp.no_reduce().hasValue();
+    const auto& [bounds, constraints] = contraction.ComputeBounds(shapes, no_reduce);
+
+    // add induction vars
+    llvm::SmallVector<int64_t, 8> ranges;
+    for (const auto& [key, value] : bounds) {
+      uint64_t range = value.max - value.min + 1;
+      ranges.emplace_back(range);
+    }
+
+    auto outputTensor = findOutputArgument(op, cionOp.result());
+    if (!outputTensor) {
+      auto allocOp = rewriter.create<stripe::AllocateOp>(loc, resultTensorType);
+      outputTensor = allocOp.result();
+    }
+
+    auto aggKind = cionOp.agg();
+    auto aggOpTag = llvm::formatv("agg_op_{0}", util::stringifyAggregationKind(aggKind));
+    auto comboKind = cionOp.combo();
+    auto comboOpTag = llvm::formatv("combo_op_{0}", util::stringifyCombinationKind(comboKind));
+    auto forOp = rewriter.create<stripe::ParallelForOp>(  //
+        loc,                                              //
+        rewriter.getI64ArrayAttr(ranges));
+    auto attrs = llvm::SmallVector<NamedAttribute, 4>{
+        {rewriter.getIdentifier("contraction"), rewriter.getUnitAttr()},
+        {rewriter.getIdentifier("kernel"), rewriter.getUnitAttr()},
+        {rewriter.getIdentifier(aggOpTag.str()), rewriter.getUnitAttr()},
+        {rewriter.getIdentifier(comboOpTag.str()), rewriter.getUnitAttr()},
+    };
+    forOp.setAttr(stripe::Dialect::getStripeAttrsName(), rewriter.getDictionaryAttr(attrs));
+    auto body = rewriter.createBlock(&forOp.inner());
+
+    stripe::SymbolValueMap idxs;
+    llvm::SmallVector<Attribute, 8> idxNames;
+    for (const auto& [key, value] : bounds) {
+      auto arg = body->addArgument(stripe::AffineType::get(rewriter.getContext()));
+      idxNames.emplace_back(rewriter.getStringAttr(key));
+      idxs.emplace(key, arg);
+    }
+    forOp.setAttr("idx_names", ArrayAttr::get(idxNames, rewriter.getContext()));
+
+    llvm::SmallVector<Value*, 4> tensors{outputTensor};
+    for (auto src : cionOp.tensors()) {
+      tensors.emplace_back(src);
+    }
+
+    // add refinements
+    Value* output = nullptr;
+    llvm::SmallVector<Value*, 4> refs;
+    for (unsigned i = 0; i < contraction.accesses.size(); i++) {
+      const auto& access = contraction.accesses[i];
+      llvm::SmallVector<Value*, 4> offsets;
+      for (const auto& poly : access) {
+        auto affine = Integerize(poly, bounds);
+        offsets.emplace_back(stripe::AffineIntoMLIR(&rewriter, idxs, affine));
+      }
+      auto srcType = tensors[i]->getType();
+      if (!srcType.isa<stripe::TensorRefType>()) {
+        auto srcTensorType = convertIntoTensorType(srcType);
+        srcType = stripe::TensorRefType::get(srcTensorType);
+      }
+      if (i) {
+        auto tensorValue = tensors[i];
+        auto tensorLoc = tensorValue->getLoc();
+        auto tensorOp = tensorValue->getDefiningOp();
+        if (tensorOp && llvm::isa<eltwise::ScalarConstantOp>(tensorOp)) {
+          // This operand needs to be broadcast, skip creating a refinement
+          refs.emplace_back(tensorValue);
+        } else {
+          auto refineOp = rewriter.create<stripe::RefineOp>(tensorLoc, srcType, tensorValue, offsets);
+          auto refAttrs = llvm::SmallVector<NamedAttribute, 1>{
+              {rewriter.getIdentifier("contraction"), rewriter.getUnitAttr()},
+          };
+          refineOp.setAttr(stripe::Dialect::getStripeAttrsName(), rewriter.getDictionaryAttr(refAttrs));
+          if (auto name = getTensorName(lowering, tensorValue)) {
+            refineOp.setAttr("name", name);
+          }
+          refs.emplace_back(refineOp.result());
+        }
+      } else {
+        auto refineOp = rewriter.create<stripe::RefineOp>(loc, srcType, tensors[i], offsets);
+        output = refineOp.result();
+      }
+    }
+
+    // add constraints
+    llvm::SmallVector<Value*, 4> affineConstraints;
+    for (const auto& constraint : constraints) {
+      auto lhs = Integerize(constraint.poly, bounds);  // lhs <= rhs;
+      lhs -= constraint.rhs;                           // lhs <= 0;
+      lhs = -lhs;                                      // lhs >= 0
+      IVLOG(3, "constraint: " << lhs << " >= 0");
+      auto affine = stripe::AffineIntoMLIR(&rewriter, idxs, lhs);
+      auto constraintOp = rewriter.create<stripe::ConstraintOp>(loc, affine);
+      rewriter.create<stripe::TerminateOp>(loc);
+      auto body = rewriter.createBlock(&constraintOp.ge_case());
+      rewriter.setInsertionPointToStart(body);
+      affineConstraints.emplace_back(affine);
+    }
+
+    if (needsInitialize(output, resultTensorType, ranges, affineConstraints)) {
+      auto insertionPoint = rewriter.saveInsertionPoint();
+      rewriter.setInsertionPoint(forOp.getOperation());
+      addInitializer(&rewriter, cionOp, resultTensorType, outputTensor);
+      rewriter.restoreInsertionPoint(insertionPoint);
+      // TODO: ref_it->mut().set_tag("initialized");
+    }
+
+    // LOADs
+    llvm::SmallVector<Value*, 4> inputs;
+    for (unsigned i = 0; i < refs.size(); i++) {
+      auto defOp = refs[i]->getDefiningOp();
+      if (defOp && llvm::isa<eltwise::ScalarConstantOp>(defOp)) {
+        // No need to load a scalar constant, just use it directly
+        // This happens when we want to broadcast a scalar constant value
+        inputs.emplace_back(refs[i]);
+      } else {
+        auto srcType = refs[i]->getType();
+        auto tensorRefType = srcType.cast<stripe::TensorRefType>();
+        auto elementType = tensorRefType.getElementType();
+        auto intoType = eltwise::getRankedTensorType(elementType);
+        auto loadOp = rewriter.create<stripe::LoadOp>(loc, intoType, refs[i]);
+        inputs.emplace_back(loadOp.into());
+      }
+    }
+
+    // Combination Operation
+    // TODO: verify correct scalarType
+    auto scalarType = resultTensorType.getElementType().cast<eltwise::ScalarType>();
+    auto combo = MakeCombination(&rewriter, cionOp.getLoc(), cionOp.combo(), scalarType, inputs);
+
+    // STORE/Aggregate
+    if (aggKind == AggregationKind::assign) {
+      rewriter.create<stripe::StoreOp>(loc, output, combo);
+    } else {
+      auto aggAttr = rewriter.getI64IntegerAttr(static_cast<int>(aggKind));
+      rewriter.create<stripe::AggregateOp>(loc, output, combo, aggAttr);
+    }
+
+    rewriter.create<stripe::TerminateOp>(loc);
+    rewriter.replaceOp(op, {outputTensor});
+
+    return matchSuccess();
+  }
+
+  bool needsInitialize(            //
+      Value* outRef,               //
+      stripe::TensorType outType,  //
+      ArrayRef<int64_t> ranges,    //
+      ArrayRef<Value*> constraints) const {
+    // Check if we have a simple output: 1 unique index per dimension, each full range
+    // If not, presume we need initialization for safety
+    // We assume here that the 0'th refinement is the output refinement
+    std::unordered_set<mlir::BlockArgument*> outIdxs;
+    auto refineOp = llvm::cast<stripe::RefineOp>(outRef->getDefiningOp());
+    auto outShape = outType.getShape();
+    for (unsigned i = 0; i < outShape.size(); i++) {
+      stripe::AffinePolynomial poly{refineOp.getOffset(i)};
+      if (poly == stripe::AffinePolynomial() && outShape[i].size == 1) {
+        continue;
+      }
+      if (poly.constant || poly.terms.size() != 1 || poly.terms.begin()->second != 1) {
+        // Not a single index with a multiplier of 1, bail
+        return true;
+      }
+      // TODO: should we check all terms?
+      auto idx = poly.terms.begin()->first;
+      if (outIdxs.count(idx)) {
+        // The index isn't unique, bail
+        return true;
+      }
+      outIdxs.insert(idx);
+      auto range = ranges[idx->getArgNumber()];
+      if (range != outShape[i].size) {
+        // The index range does not cover the entire size of the tensor dimension
+        return true;
+      }
+    }
+
+    // Now we check if we have any constraints that are 'output only'
+    // Output only indexes actually reduce the range we write to, whereas constraints
+    // that use both input + output make writes but only process some of the input
+    for (const auto& constraint : constraints) {
+      stripe::AffinePolynomial poly{constraint};
+      bool any_inputs = false;
+      for (const auto& [key, value] : poly.terms) {
+        if (!outIdxs.count(key)) {
+          any_inputs = true;
+        }
+      }
+      if (!any_inputs) {
+        // Found at least one output only constraint
+        return true;
+      }
+    }
+    // Looks good!
+    return false;
+  }
+
+  void addInitializer(                    //
+      OpBuilder* builder,                 //
+      AffineContractionOp contractionOp,  //
+      stripe::TensorType tensorType,      //
+      Value* output) const {
+    auto loc = contractionOp.getLoc();
+    stripe::SymbolValueMap idxs;
+    llvm::SmallVector<int64_t, 6> ranges;
+    llvm::SmallVector<Attribute, 6> idxNames;
+    auto dims = tensorType.getShape();
+    for (const auto& dim : dims) {
+      ranges.emplace_back(dim.size);
+    }
+
+    auto forOp = builder->create<stripe::ParallelForOp>(loc, builder->getI64ArrayAttr(ranges));
+    auto attrs = llvm::SmallVector<NamedAttribute, 2>{
+        {builder->getIdentifier("kernel"), builder->getUnitAttr()},
+    };
+    auto body = builder->createBlock(&forOp.inner());
+    builder->setInsertionPointToStart(body);
+
+    llvm::SmallVector<Value*, 6> offsets;
+    for (unsigned i = 0; i < dims.size(); i++) {
+      auto arg = body->addArgument(stripe::AffineType::get(builder->getContext()));
+      auto idxName = llvm::formatv("i{0}", i);
+      idxNames.emplace_back(builder->getStringAttr(idxName.str()));
+      offsets.emplace_back(arg);
+    }
+
+    forOp.setAttr("idx_names", ArrayAttr::get(idxNames, builder->getContext()));
+
+    auto refType = stripe::TensorRefType::get(tensorType);
+    auto elementType = refType.getElementType();
+    auto sink = builder->create<stripe::RefineOp>(loc, refType, output, offsets);
+    auto init = contractionOp.init();
+    auto defOp = init->getDefiningOp();
+
+    IntegerAttr intAttr;
+    FloatAttr floatAttr;
+    if (defOp && mlir::m_Constant(&intAttr).match(defOp)) {
+      attrs.emplace_back(builder->getIdentifier("zero"), builder->getUnitAttr());
+      auto constOp = createInit(builder, loc, elementType, intAttr.getValue().getZExtValue());
+      builder->create<stripe::StoreOp>(loc, sink.result(), constOp.result());
+    } else if (defOp && mlir::m_Constant(&floatAttr).match(defOp)) {
+      attrs.emplace_back(builder->getIdentifier("zero"), builder->getUnitAttr());
+      auto constOp = createInit(builder, loc, elementType, floatAttr.getValue().convertToDouble());
+      builder->create<stripe::StoreOp>(loc, sink.result(), constOp.result());
+    } else {
+      attrs.emplace_back(builder->getIdentifier("copy"), builder->getUnitAttr());
+      auto src = builder->create<stripe::RefineOp>(loc, refType, init, offsets);
+      auto intoType = eltwise::getRankedTensorType(elementType);
+      auto loadOp = builder->create<stripe::LoadOp>(loc, intoType, src.result());
+      builder->create<stripe::StoreOp>(loc, sink.result(), loadOp.into());
+    }
+
+    forOp.setAttr(stripe::Dialect::getStripeAttrsName(), builder->getDictionaryAttr(attrs));
+
+    builder->create<stripe::TerminateOp>(loc);
   }
 };
 
@@ -905,6 +1187,7 @@ struct LoweringPass : public mlir::ModulePass<LoweringPass> {
     patterns.insert<                 //
         AffineConstantOpConversion,  //
         AffineDomainOpConversion,    //
+        ContractionOpConversion,     //
         FuncOpConversion,            //
         IndexOpConversion,           //
         ReturnOpConversion>(&lowering);
@@ -937,7 +1220,7 @@ struct LoweringPass : public mlir::ModulePass<LoweringPass> {
 OwningModuleRef LowerIntoStripe(ModuleOp workspace) {
   IVLOG(1, "LowerIntoStripe");
   OwningModuleRef module(llvm::cast<ModuleOp>(workspace.getOperation()->clone()));
-  mlir::PassManager pm(workspace.getContext(), true);
+  mlir::PassManager pm(workspace.getContext());
   IVLOG(3, "before:\n" << mlir::debugString(*module->getOperation()));
   pm.addPass(mlir::createCanonicalizerPass());
   pm.addPass(mlir::createCSEPass());

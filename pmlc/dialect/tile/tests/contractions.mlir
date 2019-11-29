@@ -23,12 +23,11 @@ func @dot(%arg0: tensor<1x2x!eltwise.fp32>, %arg1: tensor<2x3x!eltwise.fp32>) ->
 // CHECK: #[[MAP0:map[0-9]+]] = (d0, d1, d2) -> (d0, d1)
 // CHECK: #[[MAP1:map[0-9]+]] = (d0, d1, d2) -> (d0, d2)
 // CHECK: #[[MAP2:map[0-9]+]] = (d0, d1, d2) -> (d2, d1)
-// CHECK: #[[SET0:set[0-9]+]] = (d0, d1, d2) : (1 == 0)
 
 // CHECK: func @dot(%arg0: tensor<1x2x!eltwise.fp32>, %arg1: tensor<2x3x!eltwise.fp32>) -> tensor<1x3x!eltwise.fp32> {
 // CHECK:   %[[CST:.*]] = "eltwise.sconst"() {value = 0.000000e+00 : f32} : () -> !fp32
 // CHECK:   %[[CION:.*]] = tile.cion add, mul, %[[CST]], %arg0, %arg1
-// CHECK-SAME: {cons = #[[SET0]], sink = #[[MAP0]], srcs = [#[[MAP1]], #[[MAP2]]]}
+// CHECK-SAME: {sink = #[[MAP0]], srcs = [#[[MAP1]], #[[MAP2]]]}
 // CHECK-SAME: !fp32, tensor<1x2x!eltwise.fp32>, tensor<2x3x!eltwise.fp32> -> tensor<1x3x!eltwise.fp32>
 // CHECK:   return %[[CION]] : tensor<1x3x!eltwise.fp32>
 // CHECK: }

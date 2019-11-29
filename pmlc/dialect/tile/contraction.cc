@@ -263,6 +263,50 @@ static IndexPoly MakePoly(mlir::Value* value) {
   throw std::runtime_error("Invalid affine op");
 }
 
+static IndexPoly MakePoly(mlir::AffineExpr expr) {
+  IVLOG(3, "MakePoly: " << mlir::debugString(expr));
+  if (auto dimExpr = expr.dyn_cast<mlir::AffineDimExpr>()) {
+    auto name = llvm::formatv("x{0}", dimExpr.getPosition());
+    return IndexPoly{name.str()};
+  }
+  if (auto constExpr = expr.dyn_cast<mlir::AffineConstantExpr>()) {
+    return IndexPoly{constExpr.getValue()};
+  }
+  if (auto binaryExpr = expr.dyn_cast<mlir::AffineBinaryOpExpr>()) {
+    switch (binaryExpr.getKind()) {
+      case mlir::AffineExprKind::Add:
+        return MakePoly(binaryExpr.getLHS()) + MakePoly(binaryExpr.getRHS());
+      case mlir::AffineExprKind::Mul: {
+        auto rhs = MakePoly(binaryExpr.getRHS());
+        return MakePoly(binaryExpr.getLHS()) * rhs.constant();
+      }
+      case mlir::AffineExprKind::FloorDiv: {
+        auto rhs = MakePoly(binaryExpr.getRHS());
+        return MakePoly(binaryExpr.getLHS()) / rhs.constant();
+      }
+      default:
+        throw std::runtime_error("Unsupported AffineBinaryOpExpr");
+    }
+  }
+  throw std::runtime_error("Invalid AffineExpr");
+}
+
+static IndexAccess ConvertAffineMap(mlir::AffineMap map) {
+  IndexAccess dims;
+  for (auto expr : map.getResults()) {
+    dims.emplace_back(MakePoly(expr));
+  }
+  return dims;
+}
+
+Contraction::Contraction(AffineContractionOp op) {
+  accesses.emplace_back(ConvertAffineMap(op.sink()));
+  for (auto src : op.srcs()) {
+    auto map = src.cast<AffineMapAttr>().getValue();
+    accesses.emplace_back(ConvertAffineMap(map));
+  }
+}
+
 Contraction::Contraction(ContractionOp op, llvm::ArrayRef<ConstraintOp> constraintOps) {
   {
     auto sink = op.getSinkIndexMap();
