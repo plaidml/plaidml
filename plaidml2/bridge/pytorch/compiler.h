@@ -20,15 +20,16 @@ class Executable {
              const std::vector<plaidml::edsl::Tensor>& inputs,  //
              const std::vector<plaidml::edsl::Tensor>& outputs);
 
-  std::vector<torch::jit::IValue> run(at::ArrayRef<torch::jit::IValue>* inputs);
+  at::ArrayRef<torch::jit::IValue> run(at::ArrayRef<torch::jit::IValue> inputs);
 
  private:
   std::string device_id_;
   std::string target_id_;
   std::unique_ptr<plaidml::edsl::Program> program_;
+  std::unique_ptr<plaidml::exec::Binder> binder_;
   std::shared_ptr<plaidml::exec::Executable> exec_;
-  std::vector<plaidml::exec::Binding> input_bindings_;
-  std::vector<plaidml::exec::Binding> output_bindings_;
+  // std::vector<plaidml::exec::Binding> input_bindings_;
+  // std::vector<plaidml::exec::Binding> output_bindings_;
   std::vector<torch::jit::IValue> output_ivalues_;
   std::string name_;
 };
@@ -45,7 +46,7 @@ class Compiler {
   static bool is_supported(torch::jit::Node* node);
 
  private:
-  std::shared_ptr<Executable> compile(at::ArrayRef<torch::jit::IValue>* inputs);
+  std::shared_ptr<Executable> compile(at::ArrayRef<torch::jit::IValue> inputs);
 
  private:
   std::string device_id_;

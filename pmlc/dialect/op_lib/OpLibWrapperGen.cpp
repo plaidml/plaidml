@@ -18,12 +18,14 @@
 #include "mlir/TableGen/GenInfo.h"
 #include "mlir/TableGen/OpInterfaces.h"
 #include "mlir/TableGen/Operator.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Signals.h"
 #include "llvm/TableGen/Error.h"
 #include "llvm/TableGen/Record.h"
 #include "llvm/TableGen/TableGenBackend.h"
 
+using llvm::MapVector;
 using llvm::raw_ostream;
 using llvm::Record;
 using llvm::RecordKeeper;
@@ -40,8 +42,8 @@ using namespace pmlc::dialect::op;  // NOLINT [build/namespaces]
 
 namespace tblgen {
 
-static inline std::map<StringRef, StringRef> getAttributes(const Operator& op) {
-  std::map<StringRef, StringRef> attributes_;
+static MapVector<StringRef, StringRef> getAttributes(const Operator& op) {
+  MapVector<StringRef, StringRef> attributes_;
   for (auto& namedAttr : op.getAttributes()) {
     const auto& name = namedAttr.name;
     auto mlir_type = namedAttr.attr.getReturnType();
@@ -54,8 +56,8 @@ static inline std::map<StringRef, StringRef> getAttributes(const Operator& op) {
   return attributes_;
 }
 
-static inline std::map<StringRef, StringRef> getOperands(const Operator& op) {
-  std::map<StringRef, StringRef> operands_;
+static MapVector<StringRef, StringRef> getOperands(const Operator& op) {
+  MapVector<StringRef, StringRef> operands_;
   for (int index = 0; index < op.getNumOperands(); index++) {
     auto& namedOperand = op.getOperand(index);
     const auto& name = namedOperand.name;
@@ -65,7 +67,7 @@ static inline std::map<StringRef, StringRef> getOperands(const Operator& op) {
   return operands_;
 }
 
-static inline StringRef getReturnType(const Operator& op) {
+static StringRef getReturnType(const Operator& op) {
   StringRef type;
   int n_results = op.getNumResults();
   if (n_results > 1) {
@@ -82,8 +84,8 @@ static inline StringRef getReturnType(const Operator& op) {
 struct OpInfo {
   StringRef name_;
   StringRef returnType_;
-  std::map<StringRef, StringRef> attributes_;
-  std::map<StringRef, StringRef> operands_;
+  MapVector<StringRef, StringRef> attributes_;
+  MapVector<StringRef, StringRef> operands_;
   explicit OpInfo(const Operator& op) {
     name_ = op.getCppClassName();
     returnType_ = getReturnType(op);
@@ -94,7 +96,7 @@ struct OpInfo {
 
 struct TypeInfo {
   StringRef name_;
-  std::map<StringRef, int> opts_;
+  MapVector<StringRef, int> opts_;
   StringRef returnType_;
   explicit TypeInfo(const EnumAttr& ea) {
     name_ = ea.getEnumClassName();
@@ -105,7 +107,6 @@ struct TypeInfo {
   }
 };
 
-// TODO(dgkutnic): Make DialectInfo into a protobuf object.
 struct DialectInfo {
   std::vector<OpInfo> all_ops_;
   std::vector<TypeInfo> all_types_;
@@ -180,6 +181,7 @@ inline void init() {  //
 
 )";
 
+// Order doesn't matter here, but lookup efficiency does, so keep as a std::map. 
 static inline const std::map<StringRef, StringRef> typeLookupTable = {
     {"APInt", "int"},
     {"ArrayAttr", "std::vector<int>"},

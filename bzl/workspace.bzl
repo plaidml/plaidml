@@ -24,6 +24,13 @@ def plaidml_workspace():
     )
 
     http_archive(
+        name = "com_github_google_benchmark",
+        url = "https://github.com/google/benchmark/archive/v1.5.0.tar.gz",
+        sha256 = "3c6a165b6ecc948967a1ead710d4a181d7b0fbcaa183ef7ea84604994966221a",
+        strip_prefix = "benchmark-1.5.0",
+    )
+
+    http_archive(
         name = "easylogging",
         url = "https://github.com/muflihun/easyloggingpp/releases/download/v9.95.0/easyloggingpp_v9.95.0.tar.gz",
         sha256 = "4b1aebe19e383349c6e438aac357eccfabb0ce34430e872508ed8ee0d1629e0f",
@@ -162,7 +169,7 @@ def plaidml_workspace():
         name = "xsmm",
         url = "https://github.com/hfp/libxsmm/archive/1.12.1.zip",
         sha256 = "451ec9d30f0890bf3081aa3d0d264942a6dea8f9d29c17bececc8465a10a832b",
-        stripPrefix = "libxsmm-1.12.1",
+        strip_prefix = "libxsmm-1.12.1",
         build_file = Label("//bzl:xsmm.BUILD"),
     )
 
@@ -171,7 +178,7 @@ def plaidml_workspace():
         url = "https://github.com/intel/tbb/archive/tbb_2019.zip",
         sha256 = "078c969b1bbd6b2afb01f65cf9d513bb80636363b206f1e2ae221b614d7ae197",
         strip_prefix = "tbb-tbb_2019",
-        build_file = Label("//bzl:tbb.BUILD"),
+        build_file = Label("//vendor/tbb:tbb.BUILD"),
     )
 
     dev_http_archive(

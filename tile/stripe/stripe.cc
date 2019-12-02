@@ -1092,6 +1092,38 @@ Affine Refinement::FlatAccess() const {
   return ret;
 }
 
+std::ostream& operator<<(std::ostream& os, const Extent& extent) {
+  os << "(" << extent.min << ", " << extent.max << ")";
+  return os;
+}
+
+std::vector<Extent> Refinement::Extents(const std::vector<Index>& idxs) const {
+  std::vector<Extent> extents;
+  std::map<std::string, size_t> ranges;
+  for (const auto& idx : idxs) {
+    ranges[idx.name] = idx.range;
+  }
+  for (size_t i = 0; i < access.size(); i++) {
+    const auto& aff = access[i];
+    int64_t neg = 0;
+    int64_t pos = 0;
+    for (const auto& kvp : aff.getMap()) {
+      if (kvp.first == "") {
+        pos += kvp.second;
+        neg += kvp.second;
+        continue;
+      }
+      if (kvp.second > 0) {
+        pos += kvp.second * (ranges.at(kvp.first) - 1);
+      } else {
+        neg += kvp.second * (ranges.at(kvp.first) - 1);
+      }
+    }
+    extents.push_back({neg, pos + 1});
+  }
+  return extents;
+}
+
 TensorShape Refinement::ApplyTile(const std::map<std::string, size_t>& tile_by_name) const {
   TensorShape shape = interior_shape;
   for (size_t i = 0; i < access.size(); i++) {
@@ -1157,6 +1189,17 @@ bool InsertAfterBlock(Block* parent, Block* sub, std::shared_ptr<Statement> stmt
     if (block && block.get() == sub) {
       ++it;
       parent->stmts.insert(it, stmt);
+      return true;
+    }
+  }
+  return false;
+}
+
+bool ReplaceBlock(Block* parent, Block* sub, std::shared_ptr<Statement> stmt) {
+  for (auto it = parent->stmts.begin(); it != parent->stmts.end(); ++it) {
+    auto block = Block::Downcast(*it);
+    if (block && block.get() == sub) {
+      *it = stmt;
       return true;
     }
   }

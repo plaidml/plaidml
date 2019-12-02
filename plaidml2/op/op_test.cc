@@ -280,8 +280,7 @@ module {
     %10 = "eltwise.neg"(%6) {type = !eltwise.fp32} : (tensor<7x7x3x64x!eltwise.fp32>) -> tensor<7x7x3x64x!eltwise.fp32>
     %11 = "eltwise.mul"(%10, %9) {type = !eltwise.fp32} : (tensor<7x7x3x64x!eltwise.fp32>, tensor<7x7x3x64x!eltwise.fp32>) -> tensor<7x7x3x64x!eltwise.fp32>
     %12 = "eltwise.sub"(%11, %8) {type = !eltwise.fp32} : (tensor<7x7x3x64x!eltwise.fp32>, tensor<7x7x3x64x!eltwise.fp32>) -> tensor<7x7x3x64x!eltwise.fp32>
-    %13 = "eltwise.ident"(%12) {type = !eltwise.fp32} : (tensor<7x7x3x64x!eltwise.fp32>) -> tensor<7x7x3x64x!eltwise.fp32>
-    return %13 : tensor<7x7x3x64x!eltwise.fp32>
+    return %12 : tensor<7x7x3x64x!eltwise.fp32>
   }
 }
 )#"));
@@ -1311,8 +1310,7 @@ module {
     %2 = "eltwise.exp"(%1) {type = !eltwise.fp32} : (tensor<10x!eltwise.fp32>) -> tensor<10x!eltwise.fp32>
     %3 = "eltwise.add"(%2, %cst) {type = !eltwise.fp32} : (tensor<10x!eltwise.fp32>, !fp32) -> tensor<10x!eltwise.fp32>
     %4 = "eltwise.div"(%cst, %3) {type = !eltwise.fp32} : (!fp32, tensor<10x!eltwise.fp32>) -> tensor<10x!eltwise.fp32>
-    %5 = "eltwise.ident"(%4) {type = !eltwise.fp32} : (tensor<10x!eltwise.fp32>) -> tensor<10x!eltwise.fp32>
-    return %5 : tensor<10x!eltwise.fp32>
+    return %4 : tensor<10x!eltwise.fp32>
   }
 }
 )#"));
@@ -1388,23 +1386,22 @@ module {
     %0 = "eltwise.ident"(%arg0) {type = !eltwise.fp32} : (tensor<10x20x!eltwise.fp32>) -> tensor<10x20x!eltwise.fp32>
     %1 = "tile.domain"() ( {
     ^bb0(%arg1: !eltwise.i32, %arg2: !eltwise.i32):	// no predecessors
-      %7 = "tile.src_idx_map"(%0, %arg2, %arg1) : (tensor<10x20x!eltwise.fp32>, !eltwise.i32, !eltwise.i32) -> !tile.imap
-      %8 = "tile.sink_idx_map"(%arg2, %c0) : (!eltwise.i32, !eltwise.i32) -> !tile.imap
-      %9 = "tile.size_map"(%c10, %c1) : (!eltwise.i32, !eltwise.i32) -> !tile.smap
-      "tile.>(x)"(%9, %7, %8) : (!tile.smap, !tile.imap, !tile.imap) -> ()
+      %6 = "tile.src_idx_map"(%0, %arg2, %arg1) : (tensor<10x20x!eltwise.fp32>, !eltwise.i32, !eltwise.i32) -> !tile.imap
+      %7 = "tile.sink_idx_map"(%arg2, %c0) : (!eltwise.i32, !eltwise.i32) -> !tile.imap
+      %8 = "tile.size_map"(%c10, %c1) : (!eltwise.i32, !eltwise.i32) -> !tile.smap
+      "tile.>(x)"(%8, %6, %7) : (!tile.smap, !tile.imap, !tile.imap) -> ()
     }) {idx_names = ["x0", "x1"]} : () -> tensor<10x1x!eltwise.fp32>
     %2 = "eltwise.sub"(%0, %1) {type = !eltwise.fp32} : (tensor<10x20x!eltwise.fp32>, tensor<10x1x!eltwise.fp32>) -> tensor<10x20x!eltwise.fp32>
     %3 = "eltwise.exp"(%2) {type = !eltwise.fp32} : (tensor<10x20x!eltwise.fp32>) -> tensor<10x20x!eltwise.fp32>
     %4 = "tile.domain"() ( {
     ^bb0(%arg1: !eltwise.i32, %arg2: !eltwise.i32):	// no predecessors
-      %7 = "tile.src_idx_map"(%3, %arg2, %arg1) : (tensor<10x20x!eltwise.fp32>, !eltwise.i32, !eltwise.i32) -> !tile.imap
-      %8 = "tile.sink_idx_map"(%arg2, %c0) : (!eltwise.i32, !eltwise.i32) -> !tile.imap
-      %9 = "tile.size_map"(%c10, %c1) : (!eltwise.i32, !eltwise.i32) -> !tile.smap
-      "tile.+(x)"(%9, %7, %8) : (!tile.smap, !tile.imap, !tile.imap) -> ()
+      %6 = "tile.src_idx_map"(%3, %arg2, %arg1) : (tensor<10x20x!eltwise.fp32>, !eltwise.i32, !eltwise.i32) -> !tile.imap
+      %7 = "tile.sink_idx_map"(%arg2, %c0) : (!eltwise.i32, !eltwise.i32) -> !tile.imap
+      %8 = "tile.size_map"(%c10, %c1) : (!eltwise.i32, !eltwise.i32) -> !tile.smap
+      "tile.+(x)"(%8, %6, %7) : (!tile.smap, !tile.imap, !tile.imap) -> ()
     }) {idx_names = ["x0", "x1"]} : () -> tensor<10x1x!eltwise.fp32>
     %5 = "eltwise.div"(%3, %4) {type = !eltwise.fp32} : (tensor<10x20x!eltwise.fp32>, tensor<10x1x!eltwise.fp32>) -> tensor<10x20x!eltwise.fp32>
-    %6 = "eltwise.ident"(%5) {type = !eltwise.fp32} : (tensor<10x20x!eltwise.fp32>) -> tensor<10x20x!eltwise.fp32>
-    return %6 : tensor<10x20x!eltwise.fp32>
+    return %5 : tensor<10x20x!eltwise.fp32>
   }
 }
 )#"));

@@ -84,10 +84,16 @@ ProgramModule Compiler::CompileProgram(const stripe::Block& program) {
     llvm::errs() << "LLVM IR, after optimization: ================\n";
     module_->print(llvm::errs(), nullptr);
   }
+#ifndef _MSC_VER
+  // This apparently trips an assertion on Windows with:
+  // Assertion failed: Target.isCompatibleDataLayout(getDataLayout()) &&
+  // "Can't create a MachineFunction using a Module with a " "Target-incompatible DataLayout attached\n",
+  // file external/llvm/lib/CodeGen/MachineFunction.cpp, line 201
   if (config_.print_assembly) {
     llvm::errs() << "Assembly code: ================\n";
     PrintOutputAssembly();
   }
+#endif
   // Wrap the finished module and the parameter names into a ProgramModule.
   for (auto& ref : program.refs) {
     if (ref.has_tag("user")) {

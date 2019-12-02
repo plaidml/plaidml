@@ -1,178 +1,155 @@
 {
-  "platform": {
-    "@type": "type.vertex.ai/vertexai.tile.local_machine.proto.Platform",
-    "hardware_configs": [
-      {
-        "description": "AMD OpenCL config",
-        "sel": {
-          "and": {
-            "sel": [
-              {
-                "or": {
-                  "sel": [
-                    {
-                      "name_regex": ".*AMD.*"
-                    },
-                    {
-                      "name_regex": ".*Advanced Micro Devices.*"
+    "platform": {
+        "@type": "type.vertex.ai/vertexai.tile.local_machine.proto.Platform",
+        "hardware_configs": [
+            {
+                "description": "AMD OpenCL config",
+                "sel": {
+                    "and": {
+                        "sel": [
+                            {
+                                "or": {
+                                    "sel": [
+                                        {
+                                            "name_regex": ".*AMD.*"
+                                        },
+                                        {
+                                            "name_regex": ".*Advanced Micro Devices.*"
+                                        }
+                                    ]
+                                }
+                            },
+                            {
+                                "name_regex": ".*OpenCL.*"
+                            },
+                            {
+                                "platform_regex": ".*"
+                            }
+                        ]
                     }
-                  ]
+                },
+                "settings": {
+                    "threads": 256,
+                    "vec_size": 1,
+                    "mem_width": 128,
+                    "max_mem": 32768,
+                    "max_regs": 16384,
+                    "goal_groups": 1,
+                    "goal_flops_per_byte": 50,
+                    "stripe_config": "amd_opencl"
                 }
-              },
-              {
-                "name_regex": ".*OpenCL.*"
-              },
-              {
-                "platform_regex": ".*"
-              }
-            ]
-          }
-        },
-        "settings": {
-          "threads": 256,
-          "vec_size": 1,
-          "mem_width": 128,
-          "max_mem": 32768,
-          "max_regs": 16384,
-          "goal_groups": 1,
-          "goal_flops_per_byte": 50,
-          "stripe_config": "amd_opencl"
-        }
-      },
-      {
-        "description": "AMD Metal config",
-        "sel": {
-          "and": {
-            "sel": [
-              {
-                "or": {
-                  "sel": [
-                    {
-                      "name_regex": ".*AMD.*"
-                    },
-                    {
-                      "name_regex": ".*Advanced Micro Devices.*"
+            },
+            {
+                "description": "AMD Metal config",
+                "sel": {
+                    "and": {
+                        "sel": [
+                            {
+                                "or": {
+                                    "sel": [
+                                        {
+                                            "name_regex": ".*AMD.*"
+                                        },
+                                        {
+                                            "name_regex": ".*Advanced Micro Devices.*"
+                                        }
+                                    ]
+                                }
+                            },
+                            {
+                                "name_regex": ".*Metal.*"
+                            },
+                            {
+                                "platform_regex": ".*"
+                            }
+                        ]
                     }
-                  ]
+                },
+                "settings": {
+                    "threads": 256,
+                    "vec_size": 1,
+                    "mem_width": 128,
+                    "max_mem": 32768,
+                    "max_regs": 16384,
+                    "goal_groups": 1,
+                    "goal_flops_per_byte": 50,
+                    "stripe_config": "amd_metal"
                 }
-              },
-              {
-                "name_regex": ".*Metal.*"
-              },
-              {
-                "platform_regex": ".*"
-              }
-            ]
-          }
-        },
-        "settings": {
-          "threads": 256,
-          "vec_size": 1,
-          "mem_width": 128,
-          "max_mem": 32768,
-          "max_regs": 16384,
-          "goal_groups": 1,
-          "goal_flops_per_byte": 50,
-          "stripe_config": "amd_metal"
-        }
-      },
-      {
-        "description": "Intel OpenCL CPU config",
-        "sel": {
-          "and": {
-            "sel": [
-              {
-                "vendor_regex": "Intel.*"
-              },
-              {
-                "name_regex": ".*CPU.*"
-              }
-            ]
-          }
-        },
-        "settings": {
-          "threads": 1,
-          "vec_size": 1,
-          "mem_width": 64,
-          "max_mem": 32768,
-          "max_regs": 32768,
-          "stripe_config": "opencl_cpu"
-        }
-      },
-      {
-        "description": "Metal config",
-        "sel": {
-          "name_regex": ".*Metal.*"
-        },
-        "settings": {
-          "threads": 128,
-          "vec_size": 4,
-          "mem_width": 256,
-          "max_mem": 16000,
-          "max_regs": 16000,
-          "goal_groups": 6,
-          "goal_flops_per_byte": 50,
-          "stripe_config": "intel_gen9_metal"
-        }
-      },
-      {
-        "description": "Intel *HD Graphics GPU config",
-        "sel": {
-          "name_regex": ".*HD Graphics.*"
-        },
-        "settings": {
-          "threads": 128,
-          "vec_size": 4,
-          "mem_width": 256,
-          "max_mem": 16000,
-          "max_regs": 16000,
-          "goal_groups": 6,
-          "goal_flops_per_byte": 50,
-          "stripe_config": "intel_gen9_opencl"
-        }
-      },
-      {
-        "description": "Intel Iris GPU config",
-        "sel": {
-          "name_regex": ".*Iris.*"
-        },
-        "settings": {
-          "threads": 128,
-          "vec_size": 4,
-          "mem_width": 256,
-          "max_mem": 16000,
-          "max_regs": 16000,
-          "goal_groups": 6,
-          "goal_flops_per_byte": 50,
-          "use_global": true
-        }
-      },
-      {
-        "description": "NVIDIA config",
-        "sel": {
-          "or": {
-            "sel": [
-              {
-                "name_regex": ".*NVIDIA.*"
-              },
-              {
-                "vendor_regex": ".*NVIDIA.*"
-              }
-            ]
-          }
-        },
-        "settings": {
-          "threads": 256,
-          "vec_size": 1,
-          "mem_width": 64,
-          "max_mem": 15360,
-          "max_regs": 32768,
-          "goal_groups": 7,
-          "goal_flops_per_byte": 46,
-          "disable_io_aliasing": true,
-          "stripe_config": "nvidia"
-        }
-      }
-    ]
-  }
+            },
+            {
+                "description": "Metal config",
+                "sel": {
+                    "name_regex": ".*Metal.*"
+                },
+                "settings": {
+                    "threads": 128,
+                    "vec_size": 4,
+                    "mem_width": 256,
+                    "max_mem": 16000,
+                    "max_regs": 16000,
+                    "goal_groups": 6,
+                    "goal_flops_per_byte": 50,
+                    "stripe_config": "intel_gen9_metal"
+                }
+            },
+            {
+                "description": "Intel *HD Graphics GPU config",
+                "sel": {
+                    "name_regex": ".*HD Graphics.*"
+                },
+                "settings": {
+                    "threads": 128,
+                    "vec_size": 4,
+                    "mem_width": 256,
+                    "max_mem": 16000,
+                    "max_regs": 16000,
+                    "goal_groups": 6,
+                    "goal_flops_per_byte": 50,
+                    "stripe_config": "intel_gen9_opencl"
+                }
+            },
+            {
+                "description": "Intel Iris GPU config",
+                "sel": {
+                    "name_regex": ".*Iris.*"
+                },
+                "settings": {
+                    "threads": 128,
+                    "vec_size": 4,
+                    "mem_width": 256,
+                    "max_mem": 16000,
+                    "max_regs": 16000,
+                    "goal_groups": 6,
+                    "goal_flops_per_byte": 50,
+                    "use_global": true
+                }
+            },
+            {
+                "description": "NVIDIA config",
+                "sel": {
+                    "or": {
+                        "sel": [
+                            {
+                                "name_regex": ".*NVIDIA.*"
+                            },
+                            {
+                                "vendor_regex": ".*NVIDIA.*"
+                            }
+                        ]
+                    }
+                },
+                "settings": {
+                    "threads": 256,
+                    "vec_size": 1,
+                    "mem_width": 64,
+                    "max_mem": 15360,
+                    "max_regs": 32768,
+                    "goal_groups": 7,
+                    "goal_flops_per_byte": 46,
+                    "disable_io_aliasing": true,
+                    "stripe_config": "nvidia"
+                }
+            }
+        ]
+    }
 }

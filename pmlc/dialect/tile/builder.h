@@ -57,6 +57,7 @@ class TileBuilder {
   void BindTensorDims(mlir::Value* from, llvm::ArrayRef<mlir::Value**> into);
   mlir::RankedTensorType ComputeShape(mlir::Value* tensor);
   void BindShape(mlir::Value* tensor, mlir::RankedTensorType type);
+  void BindBuffer(mlir::Value* tensor, vertexai::tile::BufferPtr buffer);
 
   stripe::TensorType MakeTensorType(DataType dtype, llvm::ArrayRef<int64_t> sizes, llvm::ArrayRef<int64_t> strides);
   stripe::TensorType IntoTensorType(mlir::RankedTensorType type);

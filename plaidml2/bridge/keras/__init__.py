@@ -85,6 +85,24 @@ def _log_call(func):
     return wrapper
 
 
+class _Executable(object):
+
+    def __init__(self, name, inputs, outputs, updates):
+        self._inputs = inputs
+        self.program = edsl.Program(name, outputs, updates=updates)
+        self.binder = plaidml_exec.Binder(self.program)
+        self.executable = self.binder.compile()
+
+    def __call__(self, inputs):
+        for tensor, data in zip(self._inputs, inputs):
+            buffer = self.binder.input(tensor)
+            if buffer:
+                data = np.array(data, dtype=buffer.shape.dtype.into_numpy())
+                buffer.copy_from_ndarray(data)
+        self.executable.run()
+        return [self.binder.output(x.ref).as_ndarray() for x in self.program.outputs]
+
+
 class _Function(object):
 
     def __init__(self, inputs, outputs, updates, name):
@@ -95,34 +113,31 @@ class _Function(object):
         self._cache = {}
 
     def __call__(self, inputs):
-        logger.debug('_Function: {}({})'.format(self._name, inputs))
-        inputs = [
-            np.array(inp) if isinstance(inp, (six.integer_types, float)) else inp for inp in inputs
-        ]
+        inputs = [np.array(x) if isinstance(x, (six.integer_types, float)) else x for x in inputs]
         input_shapes = tuple([x.shape for x in inputs])
-        # logger.debug('_Function: {}({})'.format(self._name, input_shapes))
+        logger.debug('_Function: {}({})'.format(self._name, input_shapes))
         exe = self._cache.get(input_shapes)
         if not exe:
             exe = self._compile(inputs)
             self._cache[input_shapes] = exe
-        return [x.as_ndarray() for x in exe(inputs)]
+        return exe(inputs)
 
     def _compile(self, inputs):
         for node, data in zip(self._inputs, inputs):
             dtype = node.tensor.shape.dtype
             shape = edsl.LogicalShape(dtype, data.shape)
             node.tensor.bind(shape)
+        inputs = [x.tensor for x in self._inputs]
         outputs = [x.tensor for x in self._outputs]
         updates = [(x[0].tensor, x[1].tensor) for x in self._updates]
-        program = edsl.Program(self._name, outputs, updates=updates)
-        return plaidml_exec.Executable(program, [x.tensor for x in self._inputs])
+        return _Executable(self._name, inputs, outputs, updates)
 
 
 def _create_var(name, value):
     dtype = plaidml.DType.from_numpy(value.dtype)
     shape = edsl.LogicalShape(dtype, value.shape)
     tensor_shape = plaidml.TensorShape(dtype, value.shape)
-    buffer = plaidml.Buffer(_device, tensor_shape)
+    buffer = plaidml.Buffer(tensor_shape, device=_device)
     buffer.copy_from_ndarray(value)
     return edsl.Tensor(shape=shape, name=name, buffer=buffer)
 
@@ -143,7 +158,7 @@ class _KerasNode(object):
         return str(self.tensor)
 
     def __str__(self):
-        return '{}|{}'.format(self.name, self.tensor.shape)
+        return self.name
 
     def eval(self):
         return get_value(self)
@@ -407,6 +422,7 @@ def bias_add(x, bias, data_format=None):
             'only "channels_first" and "channels_last" recognized.')
     if ndim(x) > 2:
         if data_format == 'channels_first':
+            # FIXME: tensor.shape is expensive
             try:
                 bias_dims = bias.tensor.shape.dims
             except AttributeError:
@@ -837,6 +853,8 @@ def get_uid(prefix=''):
 
 @_log_call
 def get_value(x):
+    if x.tensor._buffer:
+        return x.tensor._buffer.as_ndarray()
     inputs = []
     fn = _Function(inputs, [x], [], name='get_value')
     outputs = fn(inputs)
@@ -1401,6 +1419,7 @@ def separable_conv(x,
     data_format = _normalize_data_format(data_format)
     if int_shape(pointwise_kernel
                 )[-2] != int_shape(depthwise_kernel)[-1] * int_shape(depthwise_kernel)[-2]:
+        # FIXME: tensor.shape is expensive
         raise ValueError(
             ('Shape mismatch in separable convolution. Depthwise kernel input ' +
              'channel count must match pointwise kernel channel count times channel ' +
@@ -1433,8 +1452,15 @@ def separable_conv2d(x,
                      padding='valid',
                      data_format=None,
                      dilation_rate=(1, 1)):
-    return separable_conv(x, depthwise_kernel, pointwise_kernel, strides, padding, data_format,
-                          dilation_rate)
+    return separable_conv(
+        x,
+        depthwise_kernel,
+        pointwise_kernel,
+        strides,
+        padding,
+        data_format,
+        dilation_rate,
+    )
 
 
 @_log_call
@@ -1456,7 +1482,7 @@ def set_learning_phase(value):
 def set_value(x, value):
     dtype = plaidml.DType.from_numpy(value.dtype)
     tensor_shape = plaidml.TensorShape(dtype, value.shape)
-    buffer = plaidml.Buffer(_device, tensor_shape)
+    buffer = plaidml.Buffer(tensor_shape, device=_device)
     buffer.copy_from_ndarray(value)
     x.tensor.set_param_value(buffer)
 
@@ -1511,6 +1537,7 @@ def softsign(x):
 def sparse_categorical_crossentropy(target, output, from_logits=False):
     dims = edsl.TensorDims(output.tensor.shape.ndims)
     output.tensor.bind_dims(*dims)
+    # FIXME: tensor.shape is expensive
     return categorical_crossentropy(
         reshape(one_hot(target, output.tensor.shape.int_dims[-1]), dims), output, from_logits)
 

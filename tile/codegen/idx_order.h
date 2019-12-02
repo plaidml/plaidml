@@ -11,9 +11,14 @@ namespace vertexai {
 namespace tile {
 namespace codegen {
 
-void ReorderIndex(stripe::Block* block, const stripe::Refinement& ref);
+bool IsGlobalRef(const stripe::Refinement& ref);
 
-void IdxOrder(const AliasMap& alias_map, stripe::Block* block, const proto::IdxOrderPass& options);
+bool IsRegisterRef(const stripe::Refinement& ref);
+
+// Reorder the index in block
+// global_only: Take only global refinements into account
+// apply_inner: Assume block is tiled. Order the index in the inner block
+void ReorderIndex(stripe::Block* block, bool global_only, bool apply_inner);
 
 class IdxOrderPass final : public CompilePass {
  public:

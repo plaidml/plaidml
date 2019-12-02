@@ -20,6 +20,13 @@ PLATFORM_COPTS = select({
     ],
 })
 
+filegroup(
+    name = "OpBase",
+    srcs = glob([
+        "include/mlir/IR/OpBase.td",
+    ]),
+)
+
 cc_library(
     name = "TableGen",
     srcs = glob([
@@ -311,10 +318,10 @@ cc_library(
     includes = ["include"],
     deps = [
         ":gen-call-interfaces-decls",
-        ":gen-standard-op-decls",
-        ":gen-standard-op-defs",
         ":gen-standard-enum-decls",
         ":gen-standard-enum-defs",
+        ":gen-standard-op-decls",
+        ":gen-standard-op-defs",
         ":op-asm-interface-decls",
         "@llvm//:support",
     ],
@@ -346,6 +353,7 @@ cc_library(
     includes = ["include"],
     deps = [
         ":AffineOps",
+        ":Parser",
         ":StandardOps",
         ":TransformUtils",
         ":VectorOps",
