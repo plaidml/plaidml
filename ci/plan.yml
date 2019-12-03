@@ -148,7 +148,7 @@ SUITES:
       - plaidml_keras-{version}-py2.py3-none-any.whl
       - plaidbench-{version}-py2.py3-none-any.whl
     timeout: 5
-    conda_env: conda/tensorflow.yml
+    conda_env: ci/conda/tensorflow.yml
     compare: no
     eventlog: yes
     runner: plaidbench
@@ -218,14 +218,14 @@ SUITES:
       - plaidml-{version}-py2.py3-none-{arch}.whl
       - plaidml_keras-{version}-py2.py3-none-any.whl
     timeout: 30
-    conda_env: conda/tensorflow.yml
+    conda_env: ci/conda/tensorflow.yml
     compare: no
     cwd: plaidml/keras
     runner: python
     workloads:
       backend:
         args: [backend_test.py]
-        conda_env: conda/keras_backend_test.yml
+        conda_env: ci/conda/keras_backend_test.yml
         precision: untested
         platform_overrides:
           keras-plaid-mtl-uhd630:
@@ -263,7 +263,7 @@ SUITES:
       - plaidml2-{version}-py2.py3-none-{arch}.whl
       - plaidml2_keras-{version}-py2.py3-none-any.whl
     timeout: 30
-    conda_env: conda/keras_backend_test.yml
+    conda_env: ci/conda/keras_backend_test.yml
     compare: no
     cwd: plaidml2/bridge/keras
     runner: python
@@ -328,7 +328,7 @@ SUITES:
       - plaidml_keras-{version}-py2.py3-none-any.whl
       - plaidbench-{version}-py2.py3-none-any.whl
     timeout: 10
-    conda_env: conda/tensorflow.yml
+    conda_env: ci/conda/tensorflow.yml
     runner: plaidbench
     args: 
       - --results
@@ -356,7 +356,7 @@ SUITES:
         precision: high
         platform_overrides:
           keras-tf-dnnl-cpu:
-            conda_env: conda/tensorflow-dnnl.yml
+            conda_env: ci/conda/tensorflow-dnnl.yml
           keras-plaid-ocl-gfx804:
             prepend_args: [--examples, 64]
           keras-stripe-ocl-gfx804:
@@ -374,14 +374,14 @@ SUITES:
         precision: high
         platform_overrides:
           keras-tf-dnnl-cpu:
-            conda_env: conda/tensorflow-dnnl.yml
+            conda_env: ci/conda/tensorflow-dnnl.yml
       mobilenet_v2:
         precision: high
         platform_overrides:
           keras-plaid-mtl-uhd630:
             soft_fail: true
           keras-tf-dnnl-cpu:
-            conda_env: conda/tensorflow-dnnl.yml
+            conda_env: ci/conda/tensorflow-dnnl.yml
       resnet50:
         precision: high
         platform_overrides:
@@ -396,7 +396,7 @@ SUITES:
           keras-stripe-mtl-uhd630:
             prepend_args: [--examples, 256]
           keras-tf-dnnl-cpu:
-            conda_env: conda/tensorflow-dnnl.yml
+            conda_env: ci/conda/tensorflow-dnnl.yml
       vgg19:
         precision: high
         platform_overrides:          
@@ -413,7 +413,7 @@ SUITES:
           keras-stripe-mtl-uhd630:
             prepend_args: [--examples, 256]
           keras-tf-dnnl-cpu:
-            conda_env: conda/tensorflow-dnnl.yml
+            conda_env: ci/conda/tensorflow-dnnl.yml
         skip_platforms: 
           - keras-plaid-mtl-uhd630 
           - keras-stripe-mtl-uhd630
@@ -441,7 +441,7 @@ SUITES:
             prepend_args: [--examples, 64]
             soft_fail: true
           keras-tf-dnnl-cpu:
-            conda_env: conda/tensorflow-dnnl.yml
+            conda_env: ci/conda/tensorflow-dnnl.yml
         skip_platforms: [keras-plaid-ocl-gv100gl, keras-stripe-llvm-cpu]
 
   train:
@@ -489,7 +489,7 @@ SUITES:
       - plaidbench-{version}-py2.py3-none-any.whl
 
     timeout: 5
-    conda_env: conda/ml_gpu.yml
+    conda_env: ci/conda/ml_gpu.yml
     cwd: plaidbench
     runner: python
     examples: 256
