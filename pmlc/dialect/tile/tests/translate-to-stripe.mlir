@@ -41,14 +41,14 @@ func @eltwise_add(
 
 !i32 = type !eltwise.i32
 func @dot(%arg0: tensor<1x784x!eltwise.fp32>, %arg1: tensor<784x512x!eltwise.fp32>) -> tensor<1x512x!eltwise.fp32> {
-  %0 = "tile.affine_const"() {value = 512 : i64} : () -> !i32
-  %1 = "tile.affine_const"() {value = 1 : i64} : () -> !i32
+  %0 = tile.affine_const 512
+  %1 = tile.affine_const 1
   %2 = "tile.domain"() ( {
   ^bb0(%arg2: !i32, %arg3: !i32, %arg4: !i32):	// no predecessors
     %3 = "tile.src_idx_map"(%arg0, %arg3, %arg2) : (tensor<1x784x!eltwise.fp32>, !i32, !i32) -> !tile.imap
     %4 = "tile.src_idx_map"(%arg1, %arg2, %arg4) : (tensor<784x512x!eltwise.fp32>, !i32, !i32) -> !tile.imap
     %5 = "tile.sink_idx_map"(%arg3, %arg4) : (!i32, !i32) -> !tile.imap
-    %6 = "tile.size_map"(%1, %0) : (!i32, !i32) -> !tile.smap
+    %6 = "tile.size_map"(%1, %0) : (index, index) -> !tile.smap
     "tile.+(x*y)"(%6, %3, %4, %5) : (!tile.smap, !tile.imap, !tile.imap, !tile.imap) -> ()
   }) : () -> tensor<1x512x!eltwise.fp32>
   return %2 : tensor<1x512x!eltwise.fp32>
@@ -88,15 +88,15 @@ func @double_dot(
   %arg1: tensor<20x30x!eltwise.fp32>,
   %arg2: tensor<30x40x!eltwise.fp32>
 ) -> tensor<10x40x!eltwise.fp32> {
-  %0 = "tile.affine_const"() {value = 30 : i64} : () -> !i32
-  %1 = "tile.affine_const"() {value = 10 : i64} : () -> !i32
-  %2 = "tile.affine_const"() {value = 40 : i64} : () -> !i32
+  %0 = tile.affine_const 30
+  %1 = tile.affine_const 10
+  %2 = tile.affine_const 40
   %3 = "tile.domain"() ( {
   ^bb0(%arg3: !i32, %arg4: !i32, %arg5: !i32):	// no predecessors
     %5 = "tile.src_idx_map"(%arg0, %arg4, %arg3) : (tensor<10x20x!eltwise.fp32>, !i32, !i32) -> !tile.imap
     %6 = "tile.src_idx_map"(%arg1, %arg3, %arg5) : (tensor<20x30x!eltwise.fp32>, !i32, !i32) -> !tile.imap
     %7 = "tile.sink_idx_map"(%arg4, %arg5) : (!i32, !i32) -> !tile.imap
-    %8 = "tile.size_map"(%1, %0) : (!i32, !i32) -> !tile.smap
+    %8 = "tile.size_map"(%1, %0) : (index, index) -> !tile.smap
     "tile.+(x*y)"(%8, %5, %6, %7) : (!tile.smap, !tile.imap, !tile.imap, !tile.imap) -> ()
   }) : () -> tensor<10x30x!eltwise.fp32>
   %4 = "tile.domain"() ( {
@@ -104,7 +104,7 @@ func @double_dot(
     %5 = "tile.src_idx_map"(%3, %arg4, %arg3) : (tensor<10x30x!eltwise.fp32>, !i32, !i32) -> !tile.imap
     %6 = "tile.src_idx_map"(%arg2, %arg3, %arg5) : (tensor<30x40x!eltwise.fp32>, !i32, !i32) -> !tile.imap
     %7 = "tile.sink_idx_map"(%arg4, %arg5) : (!i32, !i32) -> !tile.imap
-    %8 = "tile.size_map"(%1, %2) : (!i32, !i32) -> !tile.smap
+    %8 = "tile.size_map"(%1, %2) : (index, index) -> !tile.smap
     "tile.+(x*y)"(%8, %5, %6, %7) : (!tile.smap, !tile.imap, !tile.imap, !tile.imap) -> ()
   }) : () -> tensor<10x40x!eltwise.fp32>
   return %4 : tensor<10x40x!eltwise.fp32>

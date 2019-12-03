@@ -1,22 +1,44 @@
 // Copyright 2019, Intel Corporation
 
+#ifndef AFFINE_OPS_BASE
+include "mlir/Dialect/AffineOps/AffineOpsBase.td"
+#endif
+
 include "pmlc/util/enums.td"
 include "pmlc/util/interfaces.td"
 include "pmlc/dialect/eltwise/interfaces.td"
 include "pmlc/dialect/eltwise/predicates.td"
 include "pmlc/dialect/tile/interfaces.td"
 
+// TODO: this should be defined upstream
+def IntegerSetAttr : Attr<
+    CPred<"$_self.isa<IntegerSetAttr>()">, "IntegerSet attribute"> {
+  let storageType = [{ IntegerSetAttr }];
+  let returnType = [{ IntegerSet }];
+  let constBuilderCall = "IntegerSetAttr::get($0)";
+}
+
 def TileDialect : Dialect {
   let name = "tile";
   let cppNamespace = "pmlc::dialect::tile";
 }
 
+def AffineMap : Type<CPred<"$_self.isa<AffineMapType>()">, "affine-map">;
+def AffineConstraints : Type<CPred<"$_self.isa<AffineConstraintsType>()">, "affine-constraints">;
 def AffineIndexMap : Type<CPred<"$_self.isa<AffineIndexMapType>()">, "affine-index-map">;
 def AffineSizeMap : Type<CPred<"$_self.isa<AffineSizeMapType>()">, "affine-size-map">;
+def AffineTensorMap : Type<CPred<"$_self.isa<AffineTensorMapType>()">, "affine-tensor-map">;
 def StrType : Type<CPred<"$_self.isa<StringType>()">, "string">;
 
 class TileOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
     Op<TileDialect, mnemonic, traits> {}
+
+class TileOpWithPPV<string mnemonic, list<OpTrait> traits = []> :
+    TileOp<mnemonic, traits> {
+  let printer = [{ print$cppClass(&p, *this); }];
+  let parser = [{ return parse$cppClass(&parser, result); }];
+  let verifier = [{ return verify$cppClass(*this); }];
+}
 
 def PlaceholderOp : TileOp<"var"> {
   let summary = "placeholder operation";
@@ -40,10 +62,10 @@ def StringOp : TileOp<"str"> {
   }];
 }
 
-def DimOp : TileOp<"dim">, HasFolder {
+def DimOp : TileOpWithPPV<"dim", [NoSideEffect]>, HasFolder {
   let summary = "dimension index operation";
   let arguments = (ins RankedTensorOf<[AnyScalar]>:$tensor, APIntAttr:$dim);
-  let results = (outs ScalarIndex:$result);
+  let results = (outs IndexLike:$result);
 
   let builders = [OpBuilder<
     "Builder* builder, OperationState& result, Value* tensor, int64_t value", [{
@@ -55,10 +77,10 @@ def DimOp : TileOp<"dim">, HasFolder {
   >];
 }
 
-def AffineConstantOp : TileOp<"affine_const">, HasFolder {
+def AffineConstantOp : TileOpWithPPV<"affine_const", [NoSideEffect]>, HasFolder {
   let summary = "affine constant";
   let arguments = (ins I64Attr:$value);
-  let results = (outs ScalarIndex:$result);
+  let results = (outs IndexLike:$result);
 
   let builders = [OpBuilder<
     "Builder* builder, OperationState& result, int64_t value", [{
@@ -72,9 +94,9 @@ def AffineConstantOp : TileOp<"affine_const">, HasFolder {
   }];
 }
 
-def AffineIndexOp : TileOp<"idx"> {
+def AffineIndexOp : TileOpWithPPV<"idx"> {
   let summary = "affine index";
-  let results = (outs ScalarIndex:$result);
+  let results = (outs IndexLike:$result);
 
   let builders = [OpBuilder<
     "Builder* builder, OperationState& result", [{
@@ -86,7 +108,7 @@ def AffineIndexOp : TileOp<"idx"> {
 class AffineOp<string mnemonic, list<OpTrait> traits = []> :
     TileOp<mnemonic, !listconcat(traits, [NoSideEffect])>,
     HasFolder {
-  let results = (outs ScalarIndex:$result);
+  let results = (outs IndexLike:$result);
 
   let builders = [OpBuilder<
     "Builder* builder, OperationState& result, ArrayRef<Value*> operands", [{
@@ -97,11 +119,13 @@ class AffineOp<string mnemonic, list<OpTrait> traits = []> :
 }
 
 class AffineUnaryOp<string mnemonic, list<OpTrait> traits = []> : AffineOp<mnemonic, traits> {
-  let arguments = (ins ScalarIndex:$in);
+  let arguments = (ins IndexLike:$in);
 }
 
 class AffineBinaryOp<string mnemonic, list<OpTrait> traits = []> : AffineOp<mnemonic, traits> {
-  let arguments = (ins ScalarIndex:$lhs, ScalarIndex:$rhs);
+  let arguments = (ins IndexLike:$lhs, IndexLike:$rhs);
+  let printer = [{ printAffineBinaryOp(&p, *this); }];
+  let parser = [{ return parseAffineBinaryOp(&parser, result); }];
 }
 
 def AffineAddOp : AffineBinaryOp<"affine_add", [Commutative]> {
@@ -118,7 +142,7 @@ def AffineMulOp : AffineBinaryOp<"affine_mul", [Commutative]> {
 
 def AffineNegOp : AffineUnaryOp<"affine_neg"> {
   let summary = "Affine negative operation";
-  let arguments = (ins ScalarIndex:$input);
+  let arguments = (ins IndexLike:$input);
 }
 
 def AffineSubOp : AffineBinaryOp<"affine_sub"> {
@@ -133,6 +157,81 @@ def AffineMinOp : AffineBinaryOp<"affine_min", [Commutative]> {
   let summary = "Affine min operation";
 }
 
+def AffineTensorMapOp : TileOpWithPPV<"tmap", [NoSideEffect]> {
+  let summary = "affine tensor map operation";
+  let arguments = (ins EltwiseAny:$tensor, Variadic<Index>:$dims);
+  let results = (outs AffineTensorMap:$result);
+
+  let builders = [OpBuilder<
+    "Builder* builder, OperationState& result, Value* tensor, ArrayRef<Value*> dims", [{
+      result.addOperands(tensor);
+      result.addOperands(dims);
+      result.addTypes(builder->getType<AffineIndexMapType>());
+    }]
+  >];
+}
+
+def AffineMapOp : TileOpWithPPV<"map", [NoSideEffect]> {
+  let summary = "affine map operation";
+  let arguments = (ins Variadic<Index>:$dims);
+  let results = (outs AffineMap:$result);
+
+  let builders = [OpBuilder<
+    "Builder* builder, OperationState& result, ArrayRef<Value*> dims", [{
+      result.addOperands(dims);
+      result.addTypes(builder->getType<AffineIndexMapType>());
+    }]
+  >];
+}
+
+def AffineConstraintsOp : TileOpWithPPV<"cons", [NoSideEffect]> {
+  let summary = "affine constraint operation";
+  let arguments = (ins Variadic<Index>:$pairs);
+  let results = (outs AffineConstraints:$result);
+}
+
+def AffineSymbolicContractionOp : TileOpWithPPV<"sym_cion", [NoSideEffect]>, HasCanonicalizer {
+  let arguments = (ins
+    EltwiseAny:$init,
+    AffineConstraints:$cons,
+    AffineMap:$size,
+    AffineMap:$sink,
+    Variadic<AffineTensorMap>:$srcs,
+    AggregationKind:$agg,
+    CombinationKind:$combo,
+    OptionalAttr<UnitAttr>:$no_reduce
+  );
+  let results = (outs RankedTensorOf<[AnyScalar]>:$result);
+}
+
+def AffineContractionOp : TileOpWithPPV<"cion", [NoSideEffect]> {
+  let arguments = (ins
+    EltwiseAny:$init,
+    Variadic<EltwiseAny>:$tensors,
+    AggregationKind:$agg,
+    CombinationKind:$combo,
+    AffineMapAttr:$sink,
+    AffineMapArrayAttr:$srcs,
+    OptionalAttr<IntegerSetAttr>:$cons,
+    OptionalAttr<UnitAttr>:$no_reduce
+  );
+  let results = (outs RankedTensorOf<[AnyScalar]>:$result);
+
+  let builders = [OpBuilder<
+    "Builder* builder, "
+    "OperationState& result, "
+    "Type resultType, "
+    "Value* init, "
+    "ArrayRef<Value*> tensors, "
+    "AggregationKind agg, "
+    "CombinationKind combo, "
+    "AffineMap sink, "
+    "ArrayRef<AffineMap> srcs, "
+    "IntegerSet cons, "
+    "bool no_reduce"
+  >];
+}
+
 def AffineDomainOp : TileOp<"domain">, HasCanonicalizer {
   let summary = "affine domain";
   let arguments = (ins OptionalAttr<BoolAttr>:$no_reduce);
@@ -142,7 +241,7 @@ def AffineDomainOp : TileOp<"domain">, HasCanonicalizer {
 
 def AffineSourceIndexMapOp : TileOp<"src_idx_map", [HasParent<"AffineDomainOp">]> {
   let summary = "affine source index map";
-  let arguments = (ins EltwiseAny:$tensor, Variadic<ScalarIndex>:$dims);
+  let arguments = (ins EltwiseAny:$tensor, Variadic<IndexLike>:$dims);
   let results = (outs AffineIndexMap:$result);
 
   let builders = [OpBuilder<
@@ -156,7 +255,7 @@ def AffineSourceIndexMapOp : TileOp<"src_idx_map", [HasParent<"AffineDomainOp">]
 
 def AffineSinkIndexMapOp : TileOp<"sink_idx_map", [HasParent<"AffineDomainOp">]> {
   let summary = "affine sink index map";
-  let arguments = (ins Variadic<ScalarIndex>:$dims);
+  let arguments = (ins Variadic<IndexLike>:$dims);
   let results = (outs AffineIndexMap:$result);
 
   let builders = [OpBuilder<
@@ -169,7 +268,7 @@ def AffineSinkIndexMapOp : TileOp<"sink_idx_map", [HasParent<"AffineDomainOp">]>
 
 def AffineSizeMapOp : TileOp<"size_map", [HasParent<"AffineDomainOp">]> {
   let summary = "affine size map";
-  let arguments = (ins Variadic<ScalarIndex>:$sizes);
+  let arguments = (ins Variadic<IndexLike>:$sizes);
   let results = (outs AffineSizeMap:$result);
 
   let builders = [OpBuilder<
@@ -182,7 +281,7 @@ def AffineSizeMapOp : TileOp<"size_map", [HasParent<"AffineDomainOp">]> {
 
 def ConstraintOp : TileOp<"constraint", [Terminator]> {
   let summary = "constraint operation";
-  let arguments = (ins ScalarIndex:$lhs, ScalarIndex:$rhs);
+  let arguments = (ins IndexLike:$lhs, IndexLike:$rhs);
   let regions = (region SizedRegion<1>:$body);
 }
 
