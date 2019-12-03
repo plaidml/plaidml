@@ -2,9 +2,14 @@
 
 #include "pmlc/dialect/tile/ops.h"
 
+#include <vector>
+
+#include "llvm/ADT/SetVector.h"
+
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Matchers.h"
+#include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Support/DebugStringHelper.h"
 
@@ -18,13 +23,17 @@ using eltwise::constFoldBinaryOp;
 using eltwise::constFoldUnaryOp;
 using eltwise::m_One;
 using eltwise::m_Zero;
+using llvm::SetVector;
 using llvm::SmallVector;
+using mlir::AffineExpr;
 using mlir::ArrayAttr;
+using mlir::failure;
 using mlir::FloatAttr;
 using mlir::IntegerAttr;
 using mlir::OpRewritePattern;
 using mlir::PatternMatchResult;
 using mlir::PatternRewriter;
+using mlir::success;
 using mlir::Value;
 
 OpFoldResult AffineConstantOp::fold(ArrayRef<Attribute> operands) {
@@ -122,8 +131,6 @@ OpFoldResult DimOp::fold(ArrayRef<Attribute> operands) {
   return IntegerAttr::get(mlir::IntegerType::get(64, getContext()), size);
 }
 
-namespace {
-
 struct AffineDomainFolder : public OpRewritePattern<AffineDomainOp> {
   using OpRewritePattern<AffineDomainOp>::OpRewritePattern;
 
@@ -138,7 +145,7 @@ struct AffineDomainFolder : public OpRewritePattern<AffineDomainOp> {
     if (!sizeMapOp) {
       return matchFailure();
     }
-    llvm::SmallVector<Value*, 4> sizes(sizeMapOp.sizes());
+    SmallVector<Value*, 4> sizes(sizeMapOp.sizes());
     auto shape = eltwise::ComputeShape(sizes);
     auto sourceType = op.getType().cast<RankedTensorType>();
     auto targetType = RankedTensorType::get(shape, sourceType.getElementType());
@@ -165,12 +172,175 @@ struct AffineDomainFolder : public OpRewritePattern<AffineDomainOp> {
   }
 };
 
-}  // namespace
-
 void AffineDomainOp::getCanonicalizationPatterns(  //
     OwningRewritePatternList& results,             //
     MLIRContext* context) {
   results.insert<AffineDomainFolder>(context);
+}
+
+struct ContractionBuilder {
+  MLIRContext* context;
+  SetVector<Value*> idxs;
+  std::vector<Value*> tensors;
+  std::vector<AffineExpr> sink;
+  std::vector<std::vector<AffineExpr>> srcs;
+  std::vector<AffineExpr> cons;
+
+  ContractionBuilder(AffineMapOp sink, AffineConstraintsOp constraints)
+      : context(sink.getContext()), sink(addDims(sink.dims())) {
+    SmallVector<Value*, 8> pairs(constraints.pairs());
+    for (auto it = pairs.begin(); it != pairs.end(); it++) {
+      auto lhs = *it++;
+      auto rhs = *it;
+      cons.emplace_back(makeConstraint(lhs, rhs));
+    }
+  }
+
+  std::vector<AffineExpr> addDims(Operation::operand_range dims) {
+    std::vector<AffineExpr> exprs;
+    for (auto dim : dims) {
+      exprs.emplace_back(makeExpr(dim));
+    }
+    return exprs;
+  }
+
+  void addSourceMap(AffineTensorMapOp op) {
+    tensors.emplace_back(op.tensor());
+    srcs.emplace_back(addDims(op.dims()));
+  }
+
+  AffineMap makeMap(ArrayRef<AffineExpr> exprs) {
+    if (exprs.size()) {
+      return AffineMap::get(idxs.size(), 0, exprs);
+    }
+    return AffineMap::get(context);
+  }
+
+  std::vector<AffineMap> getSources() {
+    std::vector<AffineMap> ret;
+    for (auto src : srcs) {
+      ret.emplace_back(makeMap(src));
+    }
+    return ret;
+  }
+
+  AffineMap getSink() {  //
+    return makeMap(sink);
+  }
+
+  IntegerSet getConstraints() {
+    if (cons.empty()) {
+      return IntegerSet::getEmptySet(idxs.size(), 0, context);
+    }
+    SmallVector<bool, 4> flags(cons.size(), false);
+    return IntegerSet::get(idxs.size(), 0, cons, flags);
+  }
+
+  AffineExpr makeConstraint(Value* lhs, Value* rhs) {  //
+    return makeExpr(lhs) - makeExpr(rhs);
+  }
+
+  AffineExpr makeExpr(Value* value) {
+    IVLOG(3, "MakePoly: " << mlir::debugString(*value));
+    auto defOp = value->getDefiningOp();
+    if (auto op = llvm::dyn_cast<AffineIndexOp>(defOp)) {
+      idxs.insert(value);
+      auto pos = std::distance(idxs.begin(), llvm::find(idxs, value));
+      return mlir::getAffineDimExpr(pos, context);
+    }
+    if (auto op = llvm::dyn_cast<AffineConstantOp>(defOp)) {
+      return mlir::getAffineConstantExpr(op.value().getSExtValue(), context);
+    }
+    if (auto op = llvm::dyn_cast<AffineAddOp>(defOp)) {
+      return makeExpr(op.lhs()) + makeExpr(op.rhs());
+    }
+    if (auto op = llvm::dyn_cast<AffineMulOp>(defOp)) {
+      return makeExpr(op.lhs()) * makeExpr(op.rhs());
+    }
+    if (auto op = llvm::dyn_cast<AffineDivOp>(defOp)) {
+      return makeExpr(op.lhs()).floorDiv(makeExpr(op.rhs()));
+    }
+    if (auto op = llvm::dyn_cast<AffineNegOp>(defOp)) {
+      return -makeExpr(op.input());
+    }
+    if (auto op = llvm::dyn_cast<AffineSubOp>(defOp)) {
+      return makeExpr(op.lhs()) - makeExpr(op.rhs());
+    }
+    throw std::runtime_error("Invalid affine op");
+  }
+};
+
+struct SymbolicContractionCanonicalizer : OpRewritePattern<AffineSymbolicContractionOp> {
+  using OpRewritePattern<AffineSymbolicContractionOp>::OpRewritePattern;
+
+  PatternMatchResult matchAndRewrite(AffineSymbolicContractionOp op, PatternRewriter& rewriter) const override {
+    auto sizeMapOp = llvm::cast<AffineMapOp>(op.size()->getDefiningOp());
+    SmallVector<Value*, 4> sizeDims(sizeMapOp.dims());
+    auto shape = eltwise::ComputeShape(sizeDims);
+    auto sourceType = op.result()->getType().cast<RankedTensorType>();
+    auto resultType = RankedTensorType::get(shape, sourceType.getElementType());
+    if (!resultType.hasStaticShape()) {
+      return matchFailure();
+    }
+
+    auto sinkMapOp = llvm::cast<AffineMapOp>(op.sink()->getDefiningOp());
+    auto consOp = llvm::cast<AffineConstraintsOp>(op.cons()->getDefiningOp());
+    ContractionBuilder builder(sinkMapOp, consOp);
+    for (auto src : op.srcs()) {
+      auto mapOp = llvm::cast<AffineTensorMapOp>(src->getDefiningOp());
+      builder.addSourceMap(mapOp);
+    }
+
+    auto newOp = rewriter.create<AffineContractionOp>(  //
+        op.getLoc(),                                    //
+        resultType,                                     //
+        op.init(),                                      //
+        builder.tensors,                                //
+        op.agg(),                                       //
+        op.combo(),                                     //
+        builder.getSink(),                              //
+        builder.getSources(),                           //
+        builder.getConstraints(),                       //
+        op.no_reduce().hasValue());
+    rewriter.replaceOp(op, newOp.result());
+
+    util::UpdateFuncOpType(newOp.getOperation());
+
+    return matchSuccess();
+  }
+};
+
+void AffineSymbolicContractionOp::getCanonicalizationPatterns(  //
+    OwningRewritePatternList& results,                          //
+    MLIRContext* context) {
+  results.insert<SymbolicContractionCanonicalizer>(context);
+}
+
+void AffineContractionOp::build(  //
+    Builder* builder,             //
+    OperationState& result,       //
+    Type resultType,              //
+    Value* init,                  //
+    ArrayRef<Value*> tensors,     //
+    AggregationKind agg,          //
+    CombinationKind combo,        //
+    AffineMap sink,               //
+    ArrayRef<AffineMap> srcs,     //
+    IntegerSet cons,              //
+    bool no_reduce) {
+  result.addOperands(init);
+  result.addOperands(tensors);
+  result.addTypes(resultType);
+  result.addAttribute("agg", builder->getI64IntegerAttr(static_cast<int64_t>(agg)));
+  result.addAttribute("combo", builder->getI64IntegerAttr(static_cast<int64_t>(combo)));
+  result.addAttribute("sink", AffineMapAttr::get(sink));
+  result.addAttribute("srcs", builder->getAffineMapArrayAttr(srcs));
+  if (!cons.isEmptyIntegerSet()) {
+    result.addAttribute("cons", IntegerSetAttr::get(cons));
+  }
+  if (no_reduce) {
+    result.addAttribute("no_reduce", builder->getUnitAttr());
+  }
 }
 
 //
@@ -446,6 +616,330 @@ Type ShapeOp::getResultType(ArrayRef<Value*> operands) {
   auto tensorType = eltwise::getRankedTensorType(tensor->getType());
   auto elementType = ScalarType::get(tensor->getContext(), eltwise::DataType::INT32);  // TODO: index type?
   return RankedTensorType::get({tensorType.getRank()}, elementType);
+}
+
+// ---- DimOp ----
+
+void printDimOp(OpAsmPrinter* printer, DimOp op) {  //
+  *printer << op.getOperation()->getName() << ' ';
+  printer->printOperand(op.tensor());
+  *printer << '[' << op.dim().getZExtValue() << ']';
+}
+
+ParseResult parseDimOp(OpAsmParser* parser, OperationState& result) {
+  auto indexType = parser->getBuilder().getIndexType();
+  OpAsmParser::OperandType tensor;
+  IntegerAttr dim;
+  Type type;
+  if (parser->parseOperand(tensor) ||                           //
+      parser->parseLSquare() ||                                 //
+      parser->parseAttribute(dim, "dim", result.attributes) ||  //
+      parser->parseRSquare() ||                                 //
+      parser->parseColonType(type) ||                           //
+      parser->resolveOperand(tensor, type, result.operands)) {
+    return failure();
+  }
+  result.addTypes(indexType);
+  return success();
+}
+
+LogicalResult verifyDimOp(DimOp op) {  //
+  return success();
+}
+
+// ---- AffineConstantOp ----
+
+void printAffineConstantOp(OpAsmPrinter* printer, AffineConstantOp op) {  //
+  *printer << op.getOperation()->getName() << ' ' << op.value().getZExtValue();
+}
+
+ParseResult parseAffineConstantOp(OpAsmParser* parser, OperationState& result) {
+  IntegerAttr value;
+  if (parser->parseAttribute(value, "value", result.attributes)) {
+    return failure();
+  }
+  auto indexType = parser->getBuilder().getIndexType();
+  result.addTypes(indexType);
+  return success();
+}
+
+LogicalResult verifyAffineConstantOp(AffineConstantOp op) {  //
+  return success();
+}
+
+// ---- AffineIndexOp ----
+
+void printAffineIndexOp(OpAsmPrinter* printer, AffineIndexOp op) {  //
+  *printer << op.getOperation()->getName();
+}
+
+ParseResult parseAffineIndexOp(OpAsmParser* parser, OperationState& result) {
+  auto indexType = parser->getBuilder().getIndexType();
+  result.addTypes(indexType);
+  return success();
+}
+
+LogicalResult verifyAffineIndexOp(AffineIndexOp op) {  //
+  return success();
+}
+
+// ---- AffineTensorMapOp ----
+
+void printAffineTensorMapOp(OpAsmPrinter* printer, AffineTensorMapOp op) {
+  *printer << op.getOperation()->getName() << ' ';
+  printer->printOperand(op.tensor());
+  *printer << '[';
+  printer->printOperands(op.dims());
+  *printer << ']';
+}
+
+ParseResult parseAffineTensorMapOp(OpAsmParser* parser, OperationState& result) {
+  auto indexType = parser->getBuilder().getIndexType();
+  OpAsmParser::OperandType tensor;
+  SmallVector<OpAsmParser::OperandType, 4> dims;
+  Type type;
+  if (parser->parseOperand(tensor) ||                                    //
+      parser->parseOperandList(dims, OpAsmParser::Delimiter::Square) ||  //
+      parser->parseColonType(type) ||                                    //
+      parser->resolveOperand(tensor, type, result.operands) ||           //
+      parser->resolveOperands(dims, indexType, result.operands)) {
+    return failure();
+  }
+  result.addTypes(AffineTensorMapType::get(result.getContext()));
+  return success();
+}
+
+LogicalResult verifyAffineTensorMapOp(AffineTensorMapOp op) {  //
+  return success();
+}
+
+// ---- AffineMapOp ----
+
+void printAffineMapOp(OpAsmPrinter* printer, AffineMapOp op) {
+  *printer << op.getOperation()->getName() << ' ';
+  printer->printOperands(op.dims());
+}
+
+ParseResult parseAffineMapOp(OpAsmParser* parser, OperationState& result) {
+  auto indexType = parser->getBuilder().getIndexType();
+  SmallVector<OpAsmParser::OperandType, 4> dims;
+  Type type;
+  if (parser->parseOperandList(dims) ||  //
+      parser->resolveOperands(dims, indexType, result.operands)) {
+    return failure();
+  }
+  result.addTypes(AffineMapType::get(result.getContext()));
+  return success();
+}
+
+LogicalResult verifyAffineMapOp(AffineMapOp op) {  //
+  return success();
+}
+
+// ---- AffineConstraintsOp ----
+
+void printAffineConstraintsOp(OpAsmPrinter* printer, AffineConstraintsOp op) {
+  *printer << op.getOperation()->getName() << ' ';
+  *printer << '(';
+  printer->printOperands(op.pairs());
+  *printer << ')';
+}
+
+ParseResult parseAffineConstraintsOp(OpAsmParser* parser, OperationState& result) {
+  auto indexType = parser->getBuilder().getIndexType();
+  SmallVector<OpAsmParser::OperandType, 4> dims;
+  Type type;
+  if (parser->parseOperandList(dims, OpAsmParser::Delimiter::Paren) ||  //
+      parser->resolveOperands(dims, indexType, result.operands)) {
+    return failure();
+  }
+  result.addTypes(AffineConstraintsType::get(result.getContext()));
+  return success();
+}
+
+LogicalResult verifyAffineConstraintsOp(AffineConstraintsOp op) {  //
+  return success();
+}
+
+// ---- AffineSymbolicContractionOp ----
+
+void printAffineSymbolicContractionOp(OpAsmPrinter* printer, AffineSymbolicContractionOp op) {  //
+  *printer << op.getOperation()->getName() << ' ';
+  *printer << util::stringifyAggregationKind(op.agg());
+  *printer << ", ";
+  *printer << util::stringifyCombinationKind(op.combo());
+  *printer << ", ";
+  printer->printOperand(op.init());
+  *printer << ", ";
+  printer->printOperand(op.cons());
+  *printer << ", ";
+  printer->printOperand(op.size());
+  *printer << ", ";
+  printer->printOperand(op.sink());
+  *printer << ", ";
+  printer->printOperands(op.srcs());
+  *printer << " : ";
+  printer->printType(op.init()->getType());
+  *printer << " -> ";
+  printer->printType(op.result()->getType());
+}
+
+ParseResult parseAffineSymbolicContractionOp(OpAsmParser* parser, OperationState& result) {
+  StringRef strAgg;
+  StringRef strCombo;
+  OpAsmParser::OperandType init;
+  Type initType;
+  OpAsmParser::OperandType cons;
+  auto consType = AffineConstraintsType::get(result.getContext());
+  OpAsmParser::OperandType size;
+  auto mapType = AffineMapType::get(result.getContext());
+  OpAsmParser::OperandType sink;
+  auto tmapType = AffineTensorMapType::get(result.getContext());
+  SmallVector<OpAsmParser::OperandType, 3> srcs;
+  Type resultType;
+  if (parser->parseKeyword(&strAgg) ||     //
+      parser->parseComma() ||              //
+      parser->parseKeyword(&strCombo) ||   //
+      parser->parseComma() ||              //
+      parser->parseOperand(init) ||        //
+      parser->parseComma() ||              //
+      parser->parseOperand(cons) ||        //
+      parser->parseComma() ||              //
+      parser->parseOperand(size) ||        //
+      parser->parseComma() ||              //
+      parser->parseOperand(sink) ||        //
+      parser->parseComma() ||              //
+      parser->parseOperandList(srcs) ||    //
+      parser->parseColonType(initType) ||  //
+      parser->parseArrow() ||              //
+      parser->parseType(resultType)) {
+    return failure();
+  }
+
+  if (parser->resolveOperand(init, initType, result.operands) ||
+      parser->resolveOperand(cons, consType, result.operands) ||
+      parser->resolveOperand(size, mapType, result.operands) ||
+      parser->resolveOperand(sink, mapType, result.operands) ||
+      parser->resolveOperands(srcs, tmapType, result.operands)) {
+    return failure();
+  }
+
+  auto agg = util::symbolizeAggregationKind(strAgg);
+  if (!agg) {
+    failure();
+  }
+  result.addAttribute("agg", parser->getBuilder().getI64IntegerAttr(static_cast<int64_t>(agg.getValue())));
+
+  auto combo = util::symbolizeCombinationKind(strCombo);
+  if (!combo) {
+    failure();
+  }
+  result.addAttribute("combo", parser->getBuilder().getI64IntegerAttr(static_cast<int64_t>(combo.getValue())));
+
+  result.addTypes(resultType);
+  return success();
+}
+
+LogicalResult verifyAffineSymbolicContractionOp(AffineSymbolicContractionOp op) {  //
+  return success();
+}
+
+// ---- AffineContractionOp ----
+
+void printAffineContractionOp(OpAsmPrinter* printer, AffineContractionOp op) {
+  std::vector<StringRef> elidedAttrs = {"agg", "combo"};
+  if (op.cons().hasValue() && op.cons().getValue().isEmptyIntegerSet()) {
+    elidedAttrs.emplace_back("cons");
+  }
+  *printer << op.getOperation()->getName() << ' ';
+  *printer << util::stringifyAggregationKind(op.agg());
+  *printer << ", ";
+  *printer << util::stringifyCombinationKind(op.combo());
+  *printer << ", ";
+  printer->printOperand(op.init());
+  *printer << ", ";
+  printer->printOperands(op.tensors());
+  *printer << ' ';
+  printer->printOptionalAttrDict(op.getAttrs(), elidedAttrs);
+  *printer << " : ";
+  printer->printType(op.init()->getType());
+  *printer << ", ";
+  SmallVector<Value*, 4> tensors(op.tensors());
+  mlir::interleaveComma(op.tensors(), printer->getStream(),
+                        [&](Value* operand) { printer->printType(operand->getType()); });
+  *printer << " -> ";
+  printer->printType(op.result()->getType());
+}
+
+ParseResult parseAffineContractionOp(OpAsmParser* parser, OperationState& result) {
+  StringRef strAgg;
+  StringRef strCombo;
+  OpAsmParser::OperandType init;
+  SmallVector<OpAsmParser::OperandType, 3> tensors;
+  SmallVector<Type, 4> types;
+  Type resultType;
+  if (parser->parseKeyword(&strAgg) ||                     //
+      parser->parseComma() ||                              //
+      parser->parseKeyword(&strCombo) ||                   //
+      parser->parseComma() ||                              //
+      parser->parseOperand(init) ||                        //
+      parser->parseComma() ||                              //
+      parser->parseOperandList(tensors) ||                 //
+      parser->parseOptionalAttrDict(result.attributes) ||  //
+      parser->parseColonTypeList(types) ||                 //
+      parser->parseArrow() ||                              //
+      parser->parseType(resultType)) {
+    return failure();
+  }
+
+  auto loc = parser->getCurrentLocation();
+  auto tensorTypes = llvm::makeArrayRef(types).drop_front();
+  if (parser->resolveOperand(init, types.front(), result.operands) ||
+      parser->resolveOperands(tensors, tensorTypes, loc, result.operands)) {
+    return failure();
+  }
+
+  auto agg = util::symbolizeAggregationKind(strAgg);
+  if (!agg) {
+    failure();
+  }
+  result.addAttribute("agg", parser->getBuilder().getI64IntegerAttr(static_cast<int64_t>(agg.getValue())));
+
+  auto combo = util::symbolizeCombinationKind(strCombo);
+  if (!combo) {
+    failure();
+  }
+  result.addAttribute("combo", parser->getBuilder().getI64IntegerAttr(static_cast<int64_t>(combo.getValue())));
+
+  result.addTypes(resultType);
+  return success();
+}
+
+LogicalResult verifyAffineContractionOp(AffineContractionOp op) {  //
+  return success();
+}
+
+// ---- AffineBinaryOp ----
+
+template <typename AffineBinaryOp>
+void printAffineBinaryOp(OpAsmPrinter* printer, AffineBinaryOp op) {
+  *printer << op.getOperation()->getName() << ' ';
+  printer->printOperands(op.getOperands());
+}
+
+ParseResult parseAffineBinaryOp(OpAsmParser* parser, OperationState& result) {
+  auto indexType = parser->getBuilder().getIndexType();
+  OpAsmParser::OperandType lhs;
+  OpAsmParser::OperandType rhs;
+  if (parser->parseOperand(lhs) ||                                //
+      parser->parseComma() ||                                     //
+      parser->parseOperand(rhs) ||                                //
+      parser->resolveOperand(lhs, indexType, result.operands) ||  //
+      parser->resolveOperand(rhs, indexType, result.operands)) {
+    return failure();
+  }
+  result.addTypes(IndexType::get(result.getContext()));
+  return success();
 }
 
 #include "pmlc/dialect/tile/interfaces.cc.inc"

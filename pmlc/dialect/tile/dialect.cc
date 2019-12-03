@@ -34,7 +34,13 @@ struct OpAsmInterface : public mlir::OpAsmDialectInterface {
 }  // namespace
 
 Dialect::Dialect(mlir::MLIRContext* ctx) : mlir::Dialect(getDialectNamespace(), ctx) {
-  addTypes<AffineIndexMapType, AffineSizeMapType, StringType>();
+  addTypes<                   //
+      AffineMapType,          //
+      AffineConstraintsType,  //
+      AffineIndexMapType,     //
+      AffineSizeMapType,      //
+      AffineTensorMapType,    //
+      StringType>();
   addOperations<
 #define GET_OP_LIST
 #include "pmlc/dialect/tile/ops.cc.inc"
@@ -52,24 +58,33 @@ std::string Dialect::getCanonicalOpName(llvm::StringRef name) {
 
 void Dialect::printType(mlir::Type type, mlir::DialectAsmPrinter& printer) const {
   auto& os = printer.getStream();
-  if (auto t = type.dyn_cast<AffineIndexMapType>()) {
+  if (type.isa<AffineIndexMapType>()) {
     os << "imap";
-  } else if (auto t = type.dyn_cast<AffineSizeMapType>()) {
+  } else if (type.isa<AffineTensorMapType>()) {
+    os << "tmap";
+  } else if (type.isa<AffineMapType>()) {
+    os << "map";
+  } else if (type.isa<AffineConstraintsType>()) {
+    os << "cons";
+  } else if (type.isa<AffineSizeMapType>()) {
     os << "smap";
   }
 }
 
 mlir::Type Dialect::parseType(mlir::DialectAsmParser& parser) const {
-  StringRef spec = parser.getFullSymbolSpec();
-  Location loc = parser.getEncodedSourceLoc(parser.getNameLoc());
-  if (spec == "imap") {
-    return AffineIndexMapType::get(getContext());
+  auto spec = parser.getFullSymbolSpec();
+  auto type = llvm::StringSwitch<mlir::Type>(spec)
+                  .Case("imap", AffineIndexMapType::get(getContext()))
+                  .Case("smap", AffineSizeMapType::get(getContext()))
+                  .Case("tmap", AffineTensorMapType::get(getContext()))
+                  .Case("map", AffineMapType::get(getContext()))
+                  .Case("cons", AffineConstraintsType::get(getContext()))
+                  .Default(Type());
+  if (!type) {
+    auto loc = parser.getEncodedSourceLoc(parser.getNameLoc());
+    emitError(loc, llvm::formatv("unknown tile type: '{0}'", spec));
   }
-  if (spec == "smap") {
-    return AffineSizeMapType::get(getContext());
-  }
-  emitError(loc, llvm::formatv("unknown tile type: '{0}'", spec));
-  return Type();
+  return type;
 }
 
 mlir::Operation* Dialect::materializeConstant(  //
@@ -82,18 +97,6 @@ mlir::Operation* Dialect::materializeConstant(  //
     return builder.create<AffineConstantOp>(loc, type, attr);
   }
   return nullptr;
-}
-
-AffineIndexMapType AffineIndexMapType::get(mlir::MLIRContext* context) {  //
-  return Base::get(context, Kinds::AffineIndexMap);
-}
-
-AffineSizeMapType AffineSizeMapType::get(mlir::MLIRContext* context) {  //
-  return Base::get(context, Kinds::AffineSizeMap);
-}
-
-StringType StringType::get(mlir::MLIRContext* context) {  //
-  return Base::get(context, Kinds::String);
 }
 
 static mlir::DialectRegistration<Dialect> EdslOps;
