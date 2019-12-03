@@ -25,8 +25,6 @@ def TileDialect : Dialect {
 
 def AffineMap : Type<CPred<"$_self.isa<AffineMapType>()">, "affine-map">;
 def AffineConstraints : Type<CPred<"$_self.isa<AffineConstraintsType>()">, "affine-constraints">;
-def AffineIndexMap : Type<CPred<"$_self.isa<AffineIndexMapType>()">, "affine-index-map">;
-def AffineSizeMap : Type<CPred<"$_self.isa<AffineSizeMapType>()">, "affine-size-map">;
 def AffineTensorMap : Type<CPred<"$_self.isa<AffineTensorMapType>()">, "affine-tensor-map">;
 def StrType : Type<CPred<"$_self.isa<StringType>()">, "string">;
 
@@ -69,10 +67,9 @@ def DimOp : TileOpWithPPV<"dim", [NoSideEffect]>, HasFolder {
 
   let builders = [OpBuilder<
     "Builder* builder, OperationState& result, Value* tensor, int64_t value", [{
-      auto type = ScalarType::get(builder->getContext(), DataType::INT32);
       result.addOperands(tensor);
       result.addAttribute("dim", builder->getI64IntegerAttr(value));
-      result.addTypes(type);
+      result.addTypes(builder->getIndexType());
     }]
   >];
 }
@@ -85,7 +82,7 @@ def AffineConstantOp : TileOpWithPPV<"affine_const", [NoSideEffect]>, HasFolder 
   let builders = [OpBuilder<
     "Builder* builder, OperationState& result, int64_t value", [{
       result.addAttribute("value", builder->getI64IntegerAttr(value));
-      result.addTypes(ScalarType::get(builder->getContext(), DataType::INT32));
+      result.addTypes(builder->getIndexType());
     }]
   >];
 
@@ -100,7 +97,7 @@ def AffineIndexOp : TileOpWithPPV<"idx"> {
 
   let builders = [OpBuilder<
     "Builder* builder, OperationState& result", [{
-      result.addTypes(ScalarType::get(builder->getContext(), DataType::INT32));
+      result.addTypes(builder->getIndexType());
     }]
   >];
 }
@@ -113,7 +110,7 @@ class AffineOp<string mnemonic, list<OpTrait> traits = []> :
   let builders = [OpBuilder<
     "Builder* builder, OperationState& result, ArrayRef<Value*> operands", [{
       result.addOperands(operands);
-      result.addTypes(ScalarType::get(builder->getContext(), DataType::INT32));
+      result.addTypes(builder->getIndexType());
     }]
   >];
 }
@@ -166,7 +163,7 @@ def AffineTensorMapOp : TileOpWithPPV<"tmap", [NoSideEffect]> {
     "Builder* builder, OperationState& result, Value* tensor, ArrayRef<Value*> dims", [{
       result.addOperands(tensor);
       result.addOperands(dims);
-      result.addTypes(builder->getType<AffineIndexMapType>());
+      result.addTypes(builder->getType<AffineTensorMapType>());
     }]
   >];
 }
@@ -179,7 +176,7 @@ def AffineMapOp : TileOpWithPPV<"map", [NoSideEffect]> {
   let builders = [OpBuilder<
     "Builder* builder, OperationState& result, ArrayRef<Value*> dims", [{
       result.addOperands(dims);
-      result.addTypes(builder->getType<AffineIndexMapType>());
+      result.addTypes(builder->getType<AffineMapType>());
     }]
   >];
 }
@@ -188,9 +185,16 @@ def AffineConstraintsOp : TileOpWithPPV<"cons", [NoSideEffect]> {
   let summary = "affine constraint operation";
   let arguments = (ins Variadic<Index>:$pairs);
   let results = (outs AffineConstraints:$result);
+
+  let builders = [OpBuilder<
+    "Builder* builder, OperationState& result", [{
+      result.setOperandListToResizable();
+      result.addTypes(builder->getType<AffineConstraintsType>());
+    }]
+  >];
 }
 
-def AffineSymbolicContractionOp : TileOpWithPPV<"sym_cion", [NoSideEffect]>, HasCanonicalizer {
+def SymbolicContractionOp : TileOpWithPPV<"sym_cion", [NoSideEffect]>, HasCanonicalizer {
   let arguments = (ins
     EltwiseAny:$init,
     AffineConstraints:$cons,
@@ -204,15 +208,16 @@ def AffineSymbolicContractionOp : TileOpWithPPV<"sym_cion", [NoSideEffect]>, Has
   let results = (outs RankedTensorOf<[AnyScalar]>:$result);
 }
 
-def AffineContractionOp : TileOpWithPPV<"cion", [NoSideEffect]> {
+def ContractionOp : TileOpWithPPV<"cion", [NoSideEffect]> {
   let arguments = (ins
     EltwiseAny:$init,
-    Variadic<EltwiseAny>:$tensors,
+    Variadic<AnyType>:$operands,
     AggregationKind:$agg,
     CombinationKind:$combo,
     AffineMapAttr:$sink,
     AffineMapArrayAttr:$srcs,
     OptionalAttr<IntegerSetAttr>:$cons,
+    OptionalAttr<AffineMapAttr>:$shape,
     OptionalAttr<UnitAttr>:$no_reduce
   );
   let results = (outs RankedTensorOf<[AnyScalar]>:$result);
@@ -230,266 +235,14 @@ def AffineContractionOp : TileOpWithPPV<"cion", [NoSideEffect]> {
     "IntegerSet cons, "
     "bool no_reduce"
   >];
-}
-
-def AffineDomainOp : TileOp<"domain">, HasCanonicalizer {
-  let summary = "affine domain";
-  let arguments = (ins OptionalAttr<BoolAttr>:$no_reduce);
-  let results = (outs RankedTensorOf<[AnyScalar]>:$result);
-  let regions = (region SizedRegion<1>:$body);
-}
-
-def AffineSourceIndexMapOp : TileOp<"src_idx_map", [HasParent<"AffineDomainOp">]> {
-  let summary = "affine source index map";
-  let arguments = (ins EltwiseAny:$tensor, Variadic<IndexLike>:$dims);
-  let results = (outs AffineIndexMap:$result);
-
-  let builders = [OpBuilder<
-    "Builder* builder, OperationState& result, Value* tensor, ArrayRef<Value*> dims", [{
-      result.addOperands(tensor);
-      result.addOperands(dims);
-      result.addTypes(builder->getType<AffineIndexMapType>());
-    }]
-  >];
-}
-
-def AffineSinkIndexMapOp : TileOp<"sink_idx_map", [HasParent<"AffineDomainOp">]> {
-  let summary = "affine sink index map";
-  let arguments = (ins Variadic<IndexLike>:$dims);
-  let results = (outs AffineIndexMap:$result);
-
-  let builders = [OpBuilder<
-    "Builder* builder, OperationState& result, ArrayRef<Value*> dims", [{
-      result.addOperands(dims);
-      result.addTypes(builder->getType<AffineIndexMapType>());
-    }]
-  >];
-}
-
-def AffineSizeMapOp : TileOp<"size_map", [HasParent<"AffineDomainOp">]> {
-  let summary = "affine size map";
-  let arguments = (ins Variadic<IndexLike>:$sizes);
-  let results = (outs AffineSizeMap:$result);
-
-  let builders = [OpBuilder<
-    "Builder* builder, OperationState& result, ArrayRef<Value*> sizes", [{
-      result.addOperands(sizes);
-      result.addTypes(builder->getType<AffineSizeMapType>());
-    }]
-  >];
-}
-
-def ConstraintOp : TileOp<"constraint", [Terminator]> {
-  let summary = "constraint operation";
-  let arguments = (ins IndexLike:$lhs, IndexLike:$rhs);
-  let regions = (region SizedRegion<1>:$body);
-}
-
-class ContractionOp<string mnemonic, list<OpTrait> traits = []> :
-    TileOp<mnemonic, !listconcat(traits, [Terminator, ContractionOpInterface])>;
-
-class UnaryConOp<string mnemonic, string agg, string combo> : ContractionOp<mnemonic> {
-  let arguments = (ins
-    AffineSizeMap:$size,
-    AffineIndexMap:$src,
-    AffineIndexMap:$sink,
-    Variadic<RankedTensorOf<[AnyScalar]>>:$init
-  );
 
   let extraClassDeclaration = [{
-    static Operation* create(OpBuilder* builder, Location loc, Value* size, ArrayRef<Value*> srcs, Value* sink) {
-      OperationState state(loc, getOperationName());
-      state.addOperands(size);
-      state.addOperands(srcs);
-      state.addOperands(sink);
-      state.setOperandListToResizable();
-      return builder->createOperation(state);
-    }
-    Value* getSizeMap() { return size(); }
-    std::vector<Value*> getSourceIndexMaps() { return {src()}; }
-    Value* getSinkIndexMap() { return sink(); }
-    unsigned getNumOperands() { return 1; }
-    AggregationKind getAggregationKind() { return AggregationKind::}] # agg # [{; }
-    CombinationKind getCombinationKind() { return CombinationKind::}] # combo # [{; }
-    Value* getInitializer() {
-      if (getOperation()->getNumOperands() < 4) {
-        return nullptr;
-      }
-      return getOperand(3);
-    }
+    static unsigned getNumTensors(CombinationKind combo);
+    unsigned getNumTensors();
+    unsigned getNumSymbols();
+    Value* getTensor(unsigned i);
+    Value* getSymbol(unsigned i);
   }];
-}
-
-class BinaryConOp<string mnemonic, string agg, string combo> : ContractionOp<mnemonic> {
-  let arguments = (ins
-    AffineSizeMap:$size,
-    AffineIndexMap:$src1,
-    AffineIndexMap:$src2,
-    AffineIndexMap:$sink,
-    Variadic<RankedTensorOf<[AnyScalar]>>:$init
-  );
-
-  let extraClassDeclaration = [{
-    static Operation* create(OpBuilder* builder, Location loc, Value* size, ArrayRef<Value*> srcs, Value* sink) {
-      OperationState state(loc, getOperationName());
-      state.addOperands(size);
-      state.addOperands(srcs);
-      state.addOperands(sink);
-      state.setOperandListToResizable();
-      return builder->createOperation(state);
-    }
-    Value* getSizeMap() { return size(); }
-    std::vector<Value*> getSourceIndexMaps() { return {src1(), src2()}; }
-    Value* getSinkIndexMap() { return sink(); }
-    unsigned getNumOperands() { return 2; }
-    AggregationKind getAggregationKind() { return AggregationKind::}] # agg # [{; }
-    CombinationKind getCombinationKind() { return CombinationKind::}] # combo # [{; }
-    Value* getInitializer() {
-      if (getOperation()->getNumOperands() < 5) {
-        return nullptr;
-      }
-      return getOperand(4);
-    }
-  }];
-}
-
-class TernaryConOp<string mnemonic, string agg, string combo> : ContractionOp<mnemonic> {
-  let arguments = (ins
-    AffineSizeMap:$size,
-    AffineIndexMap:$src1,
-    AffineIndexMap:$src2,
-    AffineIndexMap:$src3,
-    AffineIndexMap:$sink,
-    Variadic<RankedTensorOf<[AnyScalar]>>:$init
-  );
-
-  let extraClassDeclaration = [{
-    static Operation* create(OpBuilder* builder, Location loc, Value* size, ArrayRef<Value*> srcs, Value* sink) {
-      OperationState state(loc, getOperationName());
-      state.addOperands(size);
-      state.addOperands(srcs);
-      state.addOperands(sink);
-      state.setOperandListToResizable();
-      return builder->createOperation(state);
-    }
-    Value* getSizeMap() { return size(); }
-    std::vector<Value*> getSourceIndexMaps() { return {src1(), src2(), src3()}; }
-    Value* getSinkIndexMap() { return sink(); }
-    unsigned getNumOperands() { return 3; }
-    AggregationKind getAggregationKind() { return AggregationKind::}] # agg # [{; }
-    CombinationKind getCombinationKind() { return CombinationKind::}] # combo # [{; }
-    Value* getInitializer() {
-      if (getOperation()->getNumOperands() < 6) {
-        return nullptr;
-      }
-      return getOperand(5);
-    }
-  }];
-}
-
-// Assign
-def ConAssignOp : UnaryConOp<"=(x)", "assign", "none"> {
-  let summary = "=(x) contraction";
-}
-
-def ConAssignAddOp : BinaryConOp<"=(x+y)", "assign", "add"> {
-  let summary = "=(x + y) contraction";
-}
-
-def ConAssignCondOp : TernaryConOp<"=(x==y?z)", "assign", "cond"> {
-  let summary = "=(x == y ? z) contraction";
-}
-
-def ConAssignEqOp : BinaryConOp<"=(x==y)", "assign", "eq"> {
-  let summary = "=(x == y) contraction";
-}
-
-def ConAssignMulOp : BinaryConOp<"=(x*y)", "assign", "mul"> {
-  let summary = "=(x * y) contraction";
-}
-
-// Max
-def ConMaxOp : UnaryConOp<">(x)", "max", "none"> {
-  let summary = ">(x) contraction";
-}
-
-def ConMaxAddOp : BinaryConOp<">(x+y)", "max", "add"> {
-  let summary = ">(x + y) contraction";
-}
-
-def ConMaxCondOp : TernaryConOp<">(x==y?z)", "max", "cond"> {
-  let summary = ">(x == y ? z) contraction";
-}
-
-def ConMaxEqOp : BinaryConOp<">(x==y)", "max", "eq"> {
-  let summary = ">(x == y) contraction";
-}
-
-def ConMaxMulOp : BinaryConOp<">(x*y)", "max", "mul"> {
-  let summary = ">(x * y) contraction";
-}
-
-// Min
-def ConMinOp : UnaryConOp<"<(x)", "min", "none"> {
-  let summary = "<(x) contraction";
-}
-
-def ConMinAddOp : BinaryConOp<"<(x+y)", "min", "add"> {
-  let summary = "<(x + y) contraction";
-}
-
-def ConMinCondOp : TernaryConOp<"<(x==y?z)", "min", "cond"> {
-  let summary = "<(x == y ? z) contraction";
-}
-
-def ConMinEqOp : BinaryConOp<"<(x==y)", "min", "eq"> {
-  let summary = "<(x == y) contraction";
-}
-
-def ConMinMulOp : BinaryConOp<"<(x*y)", "min", "mul"> {
-  let summary = "<(x * y) contraction";
-}
-
-// Prod
-def ConProdOp : UnaryConOp<"*(x)", "mul", "none"> {
-  let summary = "*(x) contraction";
-}
-
-def ConProdAddOp : BinaryConOp<"*(x+y)", "mul", "add"> {
-  let summary = "*(x + y) contraction";
-}
-
-def ConProdCondOp : TernaryConOp<"*(x==y?z)", "mul", "cond"> {
-  let summary = "*(x == y ? z) contraction";
-}
-
-def ConProdEqOp : BinaryConOp<"*(x==y)", "mul", "eq"> {
-  let summary = "*(x == y) contraction";
-}
-
-def ConProdMulOp : BinaryConOp<"*(x*y)", "mul", "mul"> {
-  let summary = "*(x * y) contraction";
-}
-
-// Sum
-def ConSumOp : UnaryConOp<"+(x)", "add", "none"> {
-  let summary = "+(x) contraction";
-}
-
-def ConSumAddOp : BinaryConOp<"+(x+y)", "add", "add"> {
-  let summary = "+(x + y) contraction";
-}
-
-def ConSumCondOp : TernaryConOp<"+(x==y?z)", "add", "cond"> {
-  let summary = "+(x == y ? z) contraction";
-}
-
-def ConSumEqOp : BinaryConOp<"+(x==y)", "add", "eq"> {
-  let summary = "+(x == y) contraction";
-}
-
-def ConSumMulOp : BinaryConOp<"+(x*y)", "add", "mul"> {
-  let summary = "+(x * y) contraction";
 }
 
 def IndexOp : TileOp<"index", [NoSideEffect]>, HasCanonicalizer {

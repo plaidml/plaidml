@@ -8,16 +8,14 @@ func @dot(%arg0: tensor<1x2x!eltwise.fp32>, %arg1: tensor<2x3x!eltwise.fp32>) ->
   %1 = tile.idx
   %2 = tile.idx
   %3 = tile.dim %arg0[0] : tensor<1x2x!eltwise.fp32>
-  %4 = tile.dim %arg0[1] : tensor<1x2x!eltwise.fp32>
-  %5 = tile.dim %arg1[0] : tensor<2x3x!eltwise.fp32>
-  %6 = tile.dim %arg1[1] : tensor<2x3x!eltwise.fp32>
-  %7 = tile.tmap %arg0[%0, %2] : tensor<1x2x!eltwise.fp32>
-  %8 = tile.tmap %arg1[%2, %1] : tensor<2x3x!eltwise.fp32>
-  %9 = tile.map %3, %6
-  %10 = tile.map %0, %1
-  %11 = tile.cons ()
-  %12 = tile.sym_cion add, mul, %c0, %11, %9, %10, %7, %8 : !fp32 -> tensor<?x?x!eltwise.fp32>
-  return %12 : tensor<?x?x!eltwise.fp32>
+  %4 = tile.dim %arg1[1] : tensor<2x3x!eltwise.fp32>
+  %5 = tile.tmap %arg0[%0, %2] : tensor<1x2x!eltwise.fp32>
+  %6 = tile.tmap %arg1[%2, %1] : tensor<2x3x!eltwise.fp32>
+  %7 = tile.map %3, %4
+  %8 = tile.map %0, %1
+  %9 = tile.cons ()
+  %10 = tile.sym_cion add, mul, %c0, %9, %7, %8, %5, %6 : !fp32 -> tensor<?x?x!eltwise.fp32>
+  return %10 : tensor<?x?x!eltwise.fp32>
 }
 
 // CHECK: #[[MAP0:map[0-9]+]] = (d0, d1, d2) -> (d0, d1)
@@ -52,7 +50,7 @@ func @cumsum(%arg0: tensor<10x!eltwise.fp32>) -> tensor<?x!eltwise.fp32> {
 
 // CHECK: #[[MAP0:map[0-9]+]] = (d0, d1) -> (d0)
 // CHECK: #[[MAP1:map[0-9]+]] = (d0, d1) -> (d1)
-// CHECK: #[[SET0:set[0-9]+]] = (d0, d1) : (d0 - d1 - 10 >= 0)
+// CHECK: #[[SET0:set[0-9]+]] = (d0, d1) : (-(d0 - d1) + 9 >= 0)
 
 // CHECK: func @cumsum(%arg0: tensor<10x!eltwise.fp32>) -> tensor<10x!eltwise.fp32> {
 // CHECK:   %[[CST:.*]] = "eltwise.sconst"() {value = 0.000000e+00 : f32} : () -> !fp32
