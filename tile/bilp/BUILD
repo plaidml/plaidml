@@ -8,7 +8,6 @@ plaidml_cc_library(
         "tableau.cc",
         "tableau.h",
     ],
-    alwayslink = 1,
     visibility = ["//visibility:public"],
     deps = [
         "//base/util",

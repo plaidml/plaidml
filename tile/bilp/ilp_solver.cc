@@ -23,25 +23,41 @@ std::map<std::string, Rational> ILPSolver::reportSolution() const {
 std::map<Polynomial<Rational>, ILPResult> ILPSolver::batch_solve(const std::vector<RangeConstraint>& constraints,
                                                                  const std::vector<Polynomial<Rational>>& objectives) {
   // Solve a batch of ILP problems, all with the same constraints but different objectives
+  // A wrapper for the Tableau version
   Tableau t = makeStandardFormTableau(constraints);
-  if (!t.convertToCanonicalForm()) {
+  return batch_solve(&t, objectives);
+}
+
+std::map<Polynomial<Rational>, ILPResult> ILPSolver::batch_solve(const std::vector<SimpleConstraint>& constraints,
+                                                                 const std::vector<Polynomial<Rational>>& objectives) {
+  // Solve a batch of ILP problems, all with the same constraints but different objectives
+  // A wrapper for the Tableau version
+  Tableau t = makeStandardFormTableau(constraints);
+  return batch_solve(&t, objectives);
+}
+
+std::map<Polynomial<Rational>, ILPResult> ILPSolver::batch_solve(Tableau* tableau,
+                                                                 const std::vector<Polynomial<Rational>>& objectives) {
+  // Solve a batch of ILP problems, all with the same constraints but different objectives
+  // The objective in `tableau` is ignored (in favor of the `objectives` parameter)
+  if (!tableau->convertToCanonicalForm()) {
     throw std::runtime_error("Unable to run ILPSolver::batch_solve: Feasible region empty.");
   }
-  var_names_ = t.varNames();
-  t.convertToCanonicalForm();
+  var_names_ = tableau->varNames();
+  tableau->convertToCanonicalForm();
 
   std::map<Polynomial<Rational>, ILPResult> ret;
   for (const Polynomial<Rational>& obj : objectives) {
     clean();
-    var_names_ = t.varNames();
+    var_names_ = tableau->varNames();
 
     // Copy tableau for manipulation specific to the objective
-    Tableau specific_t = t;
+    Tableau specific_t = *tableau;
 
     // Set first row based on objective
     specific_t.mat()(0, 0) = 1;
-    for (size_t i = 0; i < t.varNames().size(); ++i) {
-      std::string var = t.varNames()[i];
+    for (size_t i = 0; i < tableau->varNames().size(); ++i) {
+      std::string var = tableau->varNames()[i];
       if (var.substr(var.size() - 4, 4) == "_pos") {
         specific_t.mat()(0, i + 1) = -obj[var.substr(1, var.size() - 5)];
       } else if (var.substr(var.size() - 4, 4) == "_neg") {
@@ -59,10 +75,26 @@ std::map<Polynomial<Rational>, ILPResult> ILPSolver::batch_solve(const std::vect
 }
 
 ILPResult ILPSolver::solve(const std::vector<RangeConstraint>& constraints, const Polynomial<Rational> objective) {
+  // A logging-enabled wrapper for make-Tableau-and-solve
   if (VLOG_IS_ON(3)) {
     std::ostringstream msg;
     msg << "Starting ILPSolver with constraints\n";
     for (const RangeConstraint& c : constraints) {
+      msg << "  " << c << "\n";
+    }
+    msg << "and objective " << objective;
+    IVLOG(3, msg.str());
+  }
+  Tableau t = makeStandardFormTableau(constraints, objective);
+  return solve(t);
+}
+
+ILPResult ILPSolver::solve(const std::vector<SimpleConstraint>& constraints, const Polynomial<Rational> objective) {
+  // A logging-enabled wrapper for make-Tableau-and-solve
+  if (VLOG_IS_ON(3)) {
+    std::ostringstream msg;
+    msg << "Starting ILPSolver with constraints\n";
+    for (const SimpleConstraint& c : constraints) {
       msg << "  " << c << "\n";
     }
     msg << "and objective " << objective;
@@ -166,8 +198,8 @@ Tableau ILPSolver::addGomoryCut(const Tableau& t, size_t row) {
   return ret;
 }
 
-Tableau makeStandardFormTableau(const std::vector<math::SimpleConstraint>& constraints,
-                                const math::Polynomial<math::Rational> objective) {
+Tableau ILPSolver::makeStandardFormTableau(const std::vector<math::SimpleConstraint>& constraints,
+                                           const math::Polynomial<math::Rational> objective) {
   // Create the standard form linear program for minimizing objective subject to constraints
 
   std::vector<Polynomial<Rational>> lp_constraints;  // The represented constraint is poly == 0

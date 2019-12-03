@@ -30,10 +30,17 @@ class ILPSolver {
   // every variable and every constraint value being an integer)
   ILPResult solve(const std::vector<math::RangeConstraint>& constraints,
                   const math::Polynomial<math::Rational> objective);
+  ILPResult solve(const std::vector<math::SimpleConstraint>& constraints,
+                  const math::Polynomial<math::Rational> objective);
   // Returns a solution for each objective, all subject to the same constraints
+  std::map<math::Polynomial<math::Rational>, ILPResult> batch_solve(
+      const std::vector<math::SimpleConstraint>& constraints,
+      const std::vector<math::Polynomial<math::Rational>>& objectives);
   std::map<math::Polynomial<math::Rational>, ILPResult> batch_solve(
       const std::vector<math::RangeConstraint>& constraints,
       const std::vector<math::Polynomial<math::Rational>>& objectives);
+  std::map<math::Polynomial<math::Rational>, ILPResult> batch_solve(
+      Tableau* tableau, const std::vector<math::Polynomial<math::Rational>>& objectives);
 
   void set_throw_infeasible(bool b) { throw_infeasible = b; }
 
