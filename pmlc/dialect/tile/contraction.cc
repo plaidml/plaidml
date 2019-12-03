@@ -234,11 +234,23 @@ static IndexPoly MakePoly(ContractionOp op, AffineExpr expr) {
       case AffineExprKind::Add:
         return MakePoly(op, binaryExpr.getLHS()) + MakePoly(op, binaryExpr.getRHS());
       case AffineExprKind::Mul: {
+        auto lhs = MakePoly(op, binaryExpr.getLHS());
         auto rhs = MakePoly(op, binaryExpr.getRHS());
-        return MakePoly(op, binaryExpr.getLHS()) * rhs.constant();
+        if (!rhs.isConstant()) {
+          // AffineExpr should gaurantee that constants are on the RHS
+          throw std::runtime_error(
+              llvm::formatv("Non-linear polynomial: {0} * {1}", lhs.toString(), rhs.toString()).str());
+        }
+        return lhs * rhs.constant();
       }
       case AffineExprKind::FloorDiv: {
+        auto lhs = MakePoly(op, binaryExpr.getLHS());
         auto rhs = MakePoly(op, binaryExpr.getRHS());
+        if (!rhs.isConstant()) {
+          throw std::runtime_error(
+              llvm::formatv("Divisor of polynomials must be a constant: {0} / {1}", lhs.toString(), rhs.toString())
+                  .str());
+        }
         return MakePoly(op, binaryExpr.getLHS()) / rhs.constant();
       }
       default:
