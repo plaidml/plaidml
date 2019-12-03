@@ -19,7 +19,7 @@ TEST(BilpTest, BasicTableauTest) {
   constraints.emplace_back(Polynomial<Rational>("x") + 4, 4);
   Polynomial<Rational> obj = Polynomial<Rational>("x", 3);
   ILPSolver solver;
-  Tableau t = solver.makeStandardFormTableau(constraints, obj);
+  Tableau t = ILPSolver::makeStandardFormTableau(constraints, obj);
 
   EXPECT_EQ(t.mat().size1(), 3);
   EXPECT_EQ(t.mat().size2(), 6);

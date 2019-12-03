@@ -8,6 +8,7 @@ plaidml_cc_library(
         "tableau.cc",
         "tableau.h",
     ],
+    alwayslink = 1,
     visibility = ["//visibility:public"],
     deps = [
         "//base/util",
@@ -21,7 +22,7 @@ plaidml_cc_test(
     srcs = [
         "test.cc",
     ],
-    tags = ["large"],
+    # tags = ["large"],
     timeout = "eternal",
     deps = [
         ":bilp",

@@ -63,8 +63,15 @@ class ILPSolver {
   // Transform constraints & objective to the tableau representing them
   // Can omit objective to set up just the constraints; this tableau can then be
   // copied to solve multiple problems with the same constraints
-  Tableau makeStandardFormTableau(
+  static Tableau makeStandardFormTableau(
       const std::vector<math::RangeConstraint>& constraints,
+      const math::Polynomial<math::Rational> objective = math::Polynomial<math::Rational>());
+  // Transform constraints & objective to the tableau representing them
+  // Can omit objective to set up just the constraints; this tableau can then be
+  // copied to solve multiple problems with the same constraints
+  // The simple constraints used here also assert that the constrained polynomial must evaluate to an integer
+  static Tableau makeStandardFormTableau(
+      const std::vector<math::SimpleConstraint>& constraints,
       const math::Polynomial<math::Rational> objective = math::Polynomial<math::Rational>());
   // Add an additional constraint that reduces the real feasible region but that
   // leaves the integral feasible region unchanged
