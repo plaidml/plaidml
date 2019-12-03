@@ -20,5 +20,6 @@ dependencies:
     - networkx
     - pandas
     - pcpp==1.20.1
+    - pystache
     - tensorflow==1.14.0
     - theano
