@@ -26,12 +26,11 @@ struct Bound {
 using IndexPoly = math::Polynomial<math::Rational>;
 using IndexAccess = std::vector<IndexPoly>;
 using IndexBounds = std::map<std::string, Bound>;
-using RangeConstraints = std::vector<math::RangeConstraint>;
 using SimpleConstraints = std::vector<math::SimpleConstraint>;
 using BoundsAndConstraints = std::tuple<IndexBounds, SimpleConstraints>;
 
 struct Constraints {
-  RangeConstraints constraints;
+  SimpleConstraints constraints;
 
   void AddTensor(const IndexAccess& access, stripe::TensorType tensorType);
 
@@ -52,7 +51,7 @@ struct Contraction {
   BoundsAndConstraints ComputeBounds(llvm::ArrayRef<stripe::TensorType> shapes, bool no_reduce);
 
   std::vector<IndexAccess> accesses;
-  std::vector<math::RangeConstraint> constraints;
+  SimpleConstraints constraints;
 
  private:
   std::set<std::string> getIndexVars() const;

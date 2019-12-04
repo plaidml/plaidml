@@ -62,6 +62,7 @@ static Rational UnifiedOffset(const Rational& c1, const Rational& c2, const Inte
 static RangeConstraint IntersectParallelConstraintPair(  //
     const RangeConstraint& constraint1,                  //
     const RangeConstraint& constraint2) {
+  // TODO: Redo this function in terms of `SimpleConstraint`s
   // Combines two parallel constraints into one. See merge-parallel.tex in
   // /tile/lang for more details.
   IVLOG(5, "Merging the parallel constraints " << constraint1 << ", " << constraint2);
@@ -100,6 +101,7 @@ static RangeConstraint IntersectParallelConstraintPair(  //
 }
 
 void Constraints::AddTensor(const IndexAccess& access, stripe::TensorType tensorType) {
+  // TODO: Redo for `constraints` being `SimpleConstraint`s
   auto shape = tensorType.getShape();
   if (access.size() != shape.size()) {
     throw std::runtime_error(llvm::formatv("Indexes != dimensions: {0} != {1}", access.size(), shape.size()).str());
@@ -110,6 +112,7 @@ void Constraints::AddTensor(const IndexAccess& access, stripe::TensorType tensor
 }
 
 void Constraints::MergeParallelConstraints() {
+  // TODO: Redo for `constraints` being `SimpleConstraint`s
   auto i = constraints.begin();
   while (i != constraints.end()) {
     // Remove trivially true constraints, fail for trivially false constraints
@@ -201,13 +204,8 @@ BoundsAndConstraints Constraints::ComputeBounds() {
   // Remove constraints which are implied
   SimpleConstraints remaining;
   for (const auto& constraint : constraints) {
-    auto lower = constraint.lowerBound();
-    if (!IsImplied(lower, out)) {
-      remaining.push_back(lower);
-    }
-    auto upper = constraint.upperBound();
-    if (!IsImplied(upper, out)) {
-      remaining.push_back(upper);
+    if (!IsImplied(constraint, out)) {
+      remaining.push_back(constraint);
     }
   }
 
@@ -296,6 +294,7 @@ Constraints Contraction::GatherConstraints(llvm::ArrayRef<stripe::TensorType> sh
   for (size_t i = 0; i < accesses.size(); i++) {
     ret.AddTensor(accesses[i], shapes[i]);
   }
+  // TODO: This loses meaning in the context of SimpleConstraints ... figure out what I want here
   std::stable_sort(ret.constraints.begin(), ret.constraints.end(), [](const auto& x, const auto& y) {  //
     return (x.range < y.range);
   });
@@ -306,7 +305,8 @@ void Contraction::ConstrainIndexVarsToInts() {
   const int32_t kBoundWidth = 1000000000;
   for (const auto& var : getIndexVars()) {
     if (!var.empty()) {  // Constant components not used
-      constraints.emplace_back(RangeConstraint(IndexPoly(var) + kBoundWidth / 2, kBoundWidth));
+      constraints.emplace_back(SimpleConstraint(IndexPoly(var), kBoundWidth / 2));
+      constraints.emplace_back(SimpleConstraint(-IndexPoly(var), kBoundWidth / 2));
     }
   }
 }
@@ -345,8 +345,7 @@ std::set<std::string> Contraction::getIndexVars() const {
         ss << "\nConstraints:";
         for (const auto& cons_error : constraints) {
           ss << " { Poly: " << cons_error.poly.toString();
-          ss << ", Range: " << std::to_string(cons_error.range);
-          ss << ", Var: " << cons_error.range << " }";
+          ss << ", RHS: " << std::to_string(cons_error.rhs) << " }";
         }
         throw std::runtime_error(ss.str());
       }
@@ -403,6 +402,7 @@ void Contraction::ReduceOutputPolynomials(const Constraints& order) {
   // Next, fill in from contraints until we have as many as variables or we run
   // out of options
   for (const auto& constraint : order.constraints) {
+    // TODO: Unclear if the doubling from using SimpleConstraints will make this a problem
     if (basis.dimensions() == indexVars.size()) {
       break;
     }
@@ -457,7 +457,7 @@ void Contraction::ReduceOutputPolynomials(const Constraints& order) {
   }
 
   for (auto& constraint : constraints) {
-    constraint = RangeConstraint(ConvertVariables(constraint.poly, vec_idx, inverses), constraint.range);
+    constraint = SimpleConstraint(ConvertVariables(constraint.poly, vec_idx, inverses), constraint.rhs);
   }
 }
 
@@ -465,6 +465,7 @@ void Contraction::Defractionalize(const Constraints& order) {
   IndexAccess polys;
   bool has_fract = false;
   std::set<std::string> vars;
+  // TODO: This probably needs some attention for the conversion to SimpleConstraints
   for (const auto& constraint : order.constraints) {
     for (const auto& [key, value] : constraint.poly.getMap()) {
       if (denominator(value) != 1) {
@@ -584,6 +585,7 @@ void Contraction::Defractionalize(const Constraints& order) {
     }
   }
 
+  // TODO: Switch to SimpleConstraint
   for (auto& constraint : constraints) {
     constraint = RangeConstraint(ConvertPoly(constraint.poly, replacements, transform_constant), constraint.range);
   }
@@ -605,6 +607,7 @@ bool Contraction::NeedReduce() const {
   return false;
 }
 
+// TODO: All the constraints in here _should_ be fine once the Ranged -> Simple port happens in all called functions
 BoundsAndConstraints Contraction::ComputeBounds(llvm::ArrayRef<stripe::TensorType> shapes, bool no_reduce) {
   ConstrainIndexVarsToInts();
   auto constraints = GatherConstraints(shapes);
