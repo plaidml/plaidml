@@ -4,7 +4,7 @@ latex_document(
     name = "docs",
     srcs = [
         "toroidal_shell_moment.jpg",
-        "uw_toroidal_shell_doc.tex",
+        "uw_torus_doc.tex",
         "//vendor/latex:minted",
         "@bazel_latex//packages:amsmath",
         "@bazel_latex//packages:graphicx",
@@ -12,6 +12,6 @@ latex_document(
         "@bazel_latex//packages:listings",
         "@bazel_latex//packages:xcolor",
     ],
-    main = "uw_toroidal_shell_doc.tex",
+    main = "uw_torus_doc.tex",
     tags = ["latex"],
 )
