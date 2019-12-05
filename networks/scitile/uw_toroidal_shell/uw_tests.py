@@ -26,7 +26,7 @@ class UWTest(unittest.TestCase):
         # G = 0  # Daubechies wavelet genus ( 1 <= G <= 7 ) #TODO: add genus
         eps = 1.0e-8
         exact_value = toroidal_shell_integral_moment_of_innertia_exact(R, r)
-        result = integral_surface_area(N, minval, maxval, eps, R, r, torus, integrand_inertia, 1)
+        result = integral_surface_area(N, minval, maxval, eps, torus, [R, r], integrand_inertia, 1)
         npt.assert_allclose(result, exact_value, rtol=DEFAULT_TOL, atol=DEFAULT_ATOL)
 
     def test_torus_surface_area(self):
@@ -38,7 +38,7 @@ class UWTest(unittest.TestCase):
         # G = 0  # Daubechies wavelet genus ( 1 <= G <= 7 ) #TODO: add genus
         eps = 1.0e-8
         exact_value = torus_surface_area_exact(R, r)
-        result = integral_surface_area(N, minval, maxval, eps, R, r, torus, integrand_empty, 1)
+        result = integral_surface_area(N, minval, maxval, eps, torus, [R, r], integrand_empty, 1)
         npt.assert_allclose(result, exact_value, rtol=DEFAULT_TOL, atol=DEFAULT_ATOL)
 
     def test_torus_volume(self):
@@ -50,7 +50,7 @@ class UWTest(unittest.TestCase):
         # G = 0  # Daubechies wavelet genus ( 1 <= G <= 7 ) #TODO: add genus
         eps = 1.0e-8
         exact_value = torus_volume_exact(R, r)
-        result = integral_volume(N, minval, maxval, eps, R, r, torus)
+        result = integral_volume(N, minval, maxval, eps, torus, [R, r])
         npt.assert_allclose(result, exact_value, rtol=DEFAULT_TOL, atol=DEFAULT_ATOL)
 
 

@@ -59,12 +59,6 @@ def grad(
     return partial(F, 'x', delta) + partial(F, 'y', delta) + partial(F, 'z', delta)
 
 
-# f-rep of torodial shell f(x, y, z) = (sqrt(x^2 + y^2) - 1)^2 + z^2 + (0.1)^2
-def frep_torus(X, Y, Z, R, r):
-    F = sq(edsl.sqrt(sq(X) + sq(Y)) - R) + sq(Z) - sq(r)
-    return F
-
-
 def toroidal_shell_integral_moment_of_innertia_exact(R, r):
     return 2 * (math.pi**2) * r * R * ((2 * (R**2)) + (3 * (r**2)))
 
@@ -75,6 +69,20 @@ def torus_volume_exact(R, r):
 
 def torus_surface_area_exact(R, r):
     return 4 * (math.pi**2) * r * R
+
+
+def torus(X, Y, Z, vars):
+    R = vars[0]  # major radius
+    r = vars[1]  # minor radius
+    return sq(edsl.sqrt(sq(X) + sq(Y)) - R) + sq(Z) - sq(r)
+
+
+def integrand_inertia(X, Y, Z):
+    return sq(X) + sq(Y)
+
+
+def integrand_empty(X, Y, Z):
+    return 1
 
 
 def run_program(X, Y, Z, X_data, Y_data, Z_data, O, benchmark=False):
@@ -104,35 +112,22 @@ def run_program(X, Y, Z, X_data, Y_data, Z_data, O, benchmark=False):
     return result
 
 
-def torus(X, Y, Z):
-    R = 10.0  # major radius
-    r = 2.0  # minor radius
-    return sq(edsl.sqrt(sq(X) + sq(Y)) - R) + sq(Z) - sq(r)
-
-
-def integrand_inertia(X, Y, Z):
-    return sq(X) + sq(Y)
-
-
-def integrand_empty(X, Y, Z):
-    return 1
-
-
 def integral_surface_area(
         n,  # number of grid points along each coord direction
         minval,  # coordinate bounding values
         maxval,  # coordinate bounding values
         eps,  # Threshold for trivial gradient
-        R,  # major radius
-        r,  # minor radius
+        # R,  # major radius
+        # r,  # minor radius
         frep,  # function 
+        frep_vars,  #functno rep variables
         integrand,  # integrand TODO: pull out integrand
         benchmark=False):  # benchmark: get timing information
 
     delta = (maxval - minval) / (n - 1)  # grid spacing
 
     X, Y, Z, X_data, Y_data, Z_data = meshgrid(n, minval, maxval)
-    F = frep(X, Y, Z)
+    F = frep(X, Y, Z, frep_vars)
     # F = frep_torus(X, Y, Z, R, r)
     G = integrand(X, Y, Z)
     DFDX = partial(F, 'x', delta)
@@ -159,15 +154,16 @@ def integral_volume(
         minval,  # coordinate bounding values
         maxval,  # coordinate bounding values
         eps,  # Threshold for trivial gradient
-        R,  # major radius
-        r,  # minor radius
-        frep,  # function
+        # R,  # major radius
+        # r,  # minor radius
+        frep,  # function rep
+        frep_vars,  # function rep variables
         benchmark=False):  # benchmark: get timing information
 
     delta = (maxval - minval) / (n - 1)  # grid spacing
 
     X, Y, Z, X_data, Y_data, Z_data = meshgrid(n, minval, maxval)
-    F = frep(X, Y, Z)
+    F = frep(X, Y, Z, frep_vars)
 
     PHI = (X + Y + Z) / 3.0
     # chi: occupancy function: 1 inside the region (f<0), 0 outside the region (f>0)
@@ -202,7 +198,7 @@ def main(
         print("Exact value: {}".format(exact_value))
         #compare the result
         #result = toroidal_shell_moment_of_inertia(N, minval, maxval, eps, R, r)
-        result = integral_volume(N, minval, maxval, eps, R, r, torus)
+        result = integral_volume(N, minval, maxval, eps, torus, [R, r])
         print("computed result using integral: {}".format(result))
         error = (abs(result - exact_value) / exact_value) * 100
         print("error: {} %".format(error))
