@@ -3,7 +3,6 @@ from collections import OrderedDict
 
 import numpy as np
 import math
-import matplotlib.pyplot as plt
 import plaidml2 as plaidml
 import plaidml2.edsl as edsl
 import plaidml2.exec as plaidml_exec
@@ -59,57 +58,8 @@ def grad(
     return partial(F, 'x', delta) + partial(F, 'y', delta) + partial(F, 'z', delta)
 
 
-def toroidal_shell_integral_moment_of_innertia_exact(R, r):
-    return 2 * (math.pi**2) * r * R * ((2 * (R**2)) + (3 * (r**2)))
-
-
-def torus_volume_exact(R, r):
-    return 2 * (math.pi**2) * (r**2) * R
-
-
-def torus_surface_area_exact(R, r):
-    return 4 * (math.pi**2) * r * R
-
-
-def torus(X, Y, Z, vars):
-    R = vars[0]  # major radius
-    r = vars[1]  # minor radius
-    return sq(edsl.sqrt(sq(X) + sq(Y)) - R) + sq(Z) - sq(r)
-
-
-def integrand_inertia(X, Y, Z):
-    return sq(X) + sq(Y)
-
-
 def integrand_empty(X, Y, Z):
     return 1
-
-
-def run_program(X, Y, Z, X_data, Y_data, Z_data, O, benchmark=False):
-    program = edsl.Program('torus_volume', [O])
-    binder = plaidml_exec.Binder(program)
-    executable = binder.compile()
-
-    def run():
-        binder.input(X).copy_from_ndarray(X_data)
-        binder.input(Y).copy_from_ndarray(Y_data)
-        binder.input(Z).copy_from_ndarray(Z_data)
-        executable.run()
-        return binder.output(O).as_ndarray()
-
-    if benchmark:
-        # the first run will compile and run
-        print('compiling...')
-        result = run()
-
-        # subsequent runs should not include compile time
-        print('running...')
-        ITERATIONS = 100
-        elapsed = timeit.timeit(run, number=ITERATIONS)
-        print('runtime:', elapsed / ITERATIONS)
-    else:
-        result = run()
-    return result
 
 
 def integral_surface_area(
@@ -117,8 +67,6 @@ def integral_surface_area(
         minval,  # coordinate bounding values
         maxval,  # coordinate bounding values
         eps,  # Threshold for trivial gradient
-        # R,  # major radius
-        # r,  # minor radius
         frep,  # function 
         frep_vars,  #functno rep variables
         integrand,  # integrand TODO: pull out integrand
@@ -154,8 +102,6 @@ def integral_volume(
         minval,  # coordinate bounding values
         maxval,  # coordinate bounding values
         eps,  # Threshold for trivial gradient
-        # R,  # major radius
-        # r,  # minor radius
         frep,  # function rep
         frep_vars,  # function rep variables
         benchmark=False):  # benchmark: get timing information
@@ -177,45 +123,28 @@ def integral_volume(
     return result * (delta**3)
 
 
-def main(
-):  #TODO:work in progress to generate graphs will clean up after documentation is completed
-    R = 10.0  # major radius
-    r = 2.0  # minor radius
-    #N = 128  # number of grid points
-    error_chart = np.array([])
-    error_chart_N_by_delta = np.array([])
-    for N in range(32, 512, 64):
-        print("evaluating for N: {}".format(N))
-        minval = -1.25 * R
-        maxval = 1.25 * R
-        delta = (maxval - minval) / (N - 1)  # grid spacing
-        eps = 1.0e-8
-        #compute exact value
-        #exact_value = toroidal_shell_integral_moment_of_innertia_exact(R, r)
-        exact_value = torus_volume_exact(R, r)
-        print(exact_value)
-        #run integral computation
-        print("Exact value: {}".format(exact_value))
-        #compare the result
-        #result = toroidal_shell_moment_of_inertia(N, minval, maxval, eps, R, r)
-        result = integral_volume(N, minval, maxval, eps, torus, [R, r])
-        print("computed result using integral: {}".format(result))
-        error = (abs(result - exact_value) / exact_value) * 100
-        print("error: {} %".format(error))
-        error_chart = np.append(error_chart, math.log(error))
-        error_chart_N_by_delta = np.append(error_chart_N_by_delta, math.log(R / delta))
+def run_program(X, Y, Z, X_data, Y_data, Z_data, O, benchmark=False):
+    program = edsl.Program('torus_volume', [O])
+    binder = plaidml_exec.Binder(program)
+    executable = binder.compile()
 
-    fig = plt.figure()
-    ax = plt.axes()
-    ax.set(
-        xlabel='log(R/delta)',
-        ylabel='log(error percentage)',
-        title=
-        'Result of convergence study genus 1 grid-based evaluationof moment of innertia of toroidal shell'
-    )
-    ax.scatter(error_chart_N_by_delta, error_chart)
-    plt.show()
+    def run():
+        binder.input(X).copy_from_ndarray(X_data)
+        binder.input(Y).copy_from_ndarray(Y_data)
+        binder.input(Z).copy_from_ndarray(Z_data)
+        executable.run()
+        return binder.output(O).as_ndarray()
 
+    if benchmark:
+        # the first run will compile and run
+        print('compiling...')
+        result = run()
 
-if __name__ == '__main__':
-    main()
+        # subsequent runs should not include compile time
+        print('running...')
+        ITERATIONS = 100
+        elapsed = timeit.timeit(run, number=ITERATIONS)
+        print('runtime:', elapsed / ITERATIONS)
+    else:
+        result = run()
+    return result

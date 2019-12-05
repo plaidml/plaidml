@@ -2,14 +2,14 @@ import unittest
 import numpy.testing as npt
 import os
 import math
-from networks.scitile.uw_toroidal_shell.uw_toroidal_shell import toroidal_shell_integral_moment_of_innertia_exact
-from networks.scitile.uw_toroidal_shell.uw_toroidal_shell import torus_surface_area_exact
-from networks.scitile.uw_toroidal_shell.uw_toroidal_shell import integral_surface_area
-from networks.scitile.uw_toroidal_shell.uw_toroidal_shell import torus_volume_exact
-from networks.scitile.uw_toroidal_shell.uw_toroidal_shell import integral_volume
-from networks.scitile.uw_toroidal_shell.uw_toroidal_shell import torus
-from networks.scitile.uw_toroidal_shell.uw_toroidal_shell import integrand_empty
-from networks.scitile.uw_toroidal_shell.uw_toroidal_shell import integrand_inertia
+from networks.scitile.storti_integrals.torus import toroidal_shell_integral_moment_of_innertia_exact
+from networks.scitile.storti_integrals.torus import torus_surface_area_exact
+from networks.scitile.storti_integrals.torus import integral_surface_area
+from networks.scitile.storti_integrals.torus import torus_volume_exact
+from networks.scitile.storti_integrals.torus import integral_volume
+from networks.scitile.storti_integrals.torus import torus
+from networks.scitile.storti_integrals.torus import integrand_empty
+from networks.scitile.storti_integrals.torus import integrand_inertia
 
 DEFAULT_TOL = 1e-2
 DEFAULT_ATOL = 1e-8

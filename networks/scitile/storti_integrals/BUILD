@@ -5,8 +5,8 @@ load("@rules_python//python:defs.bzl", "py_binary")
 package(default_visibility = ["//visibility:public"])
 
 py_binary(
-    name = "uw_toroidal_shell",
-    srcs = ["uw_toroidal_shell.py"],
+    name = "torus",
+    srcs = ["torus.py"],
     deps = [
         "//plaidml2:py",
         "//plaidml2/edsl:py",
@@ -15,10 +15,10 @@ py_binary(
 )
 
 py_test(
-    name = "uw_tests",
+    name = "torus_tests",
     srcs = [
-        "uw_tests.py",
-        "uw_toroidal_shell.py",
+        "torus_tests.py",
+        "torus.py",
     ],
     deps = [
         "//plaidml2:py",
