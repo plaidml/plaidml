@@ -37,7 +37,7 @@ def meshgrid(
 
 def partial(
         F,  # F: differentiable function tensor
-        wrt,  # wrt: variable with respect to which we need to differentiate ('x' | 'y' | 'z')
+        wrt,  # wrt: ('x' | 'y' | 'z')
         delta):  # delta: grid spacing
     F_neg = -F
     dims = edsl.TensorDims(3)
@@ -104,58 +104,37 @@ def run_program(X, Y, Z, X_data, Y_data, Z_data, O, benchmark=False):
     return result
 
 
-def toroidal_shell_moment_of_inertia(
+def torus(X, Y, Z):
+    R = 10.0  # major radius
+    r = 2.0  # minor radius
+    return sq(edsl.sqrt(sq(X) + sq(Y)) - R) + sq(Z) - sq(r)
+
+
+def integrand_inertia(X, Y, Z):
+    return sq(X) + sq(Y)
+
+
+def integrand_empty(X, Y, Z):
+    return 1
+
+
+def integral_surface_area(
         n,  # number of grid points along each coord direction
         minval,  # coordinate bounding values
         maxval,  # coordinate bounding values
         eps,  # Threshold for trivial gradient
         R,  # major radius
         r,  # minor radius
+        frep,  # function 
+        integrand,  # integrand TODO: pull out integrand
         benchmark=False):  # benchmark: get timing information
 
     delta = (maxval - minval) / (n - 1)  # grid spacing
 
     X, Y, Z, X_data, Y_data, Z_data = meshgrid(n, minval, maxval)
-    F = frep_torus(X, Y, Z, R, r)
-
-    # moment of inertia about z axis at each point g(x, y, z) = x^2 + y^2
-    G = sq(X) + sq(Y)
-
-    DFDX = partial(F, 'x', delta)
-    DFDY = partial(F, 'y', delta)
-    DFDZ = partial(F, 'z', delta)
-
-    # chi: occupancy function: 1 inside the region (f<0), 0 outside the region (f>0)
-    CHI = edsl.select(F > 0, 0, 1)
-    DCHIDX = partial(CHI, 'x', delta)
-    DCHIDY = partial(CHI, 'y', delta)
-    DCHIDZ = partial(CHI, 'z', delta)
-
-    NUMER = DFDX * DCHIDX + DFDY * DCHIDY + DFDZ * DCHIDZ
-    DENOM = edsl.sqrt(sq(DFDX) + sq(DFDY) + sq(DFDZ))
-    H = edsl.select(DENOM < eps, 0, NUMER / DENOM)
-    O = sum(-G * H)
-
-    result = run_program(X, Y, Z, X_data, Y_data, Z_data, O, benchmark)
-
-    return result * (delta**3)
-
-
-def torus_surface_area(
-        n,  # number of grid points along each coord direction
-        minval,  # coordinate bounding values
-        maxval,  # coordinate bounding values
-        eps,  # Threshold for trivial gradient
-        R,  # major radius
-        r,  # minor radius
-        G,  # integrand functino TODO: pull out integrand
-        benchmark=False):  # benchmark: get timing information
-
-    delta = (maxval - minval) / (n - 1)  # grid spacing
-
-    X, Y, Z, X_data, Y_data, Z_data = meshgrid(n, minval, maxval)
-    F = frep_torus(X, Y, Z, R, r)
-
+    F = frep(X, Y, Z)
+    # F = frep_torus(X, Y, Z, R, r)
+    G = integrand(X, Y, Z)
     DFDX = partial(F, 'x', delta)
     DFDY = partial(F, 'y', delta)
     DFDZ = partial(F, 'z', delta)
@@ -175,19 +154,20 @@ def torus_surface_area(
     return result * (delta**3)
 
 
-def torus_volume(
+def integral_volume(
         n,  # number of grid points along each coord direction
         minval,  # coordinate bounding values
         maxval,  # coordinate bounding values
         eps,  # Threshold for trivial gradient
         R,  # major radius
         r,  # minor radius
+        frep,  # function
         benchmark=False):  # benchmark: get timing information
-    # coordvals = np.linspace(minval, maxval, n, dtype=np.float32)
+
     delta = (maxval - minval) / (n - 1)  # grid spacing
 
     X, Y, Z, X_data, Y_data, Z_data = meshgrid(n, minval, maxval)
-    F = frep_torus(X, Y, Z, R, r)
+    F = frep(X, Y, Z)
 
     PHI = (X + Y + Z) / 3.0
     # chi: occupancy function: 1 inside the region (f<0), 0 outside the region (f>0)
@@ -203,8 +183,8 @@ def torus_volume(
 
 def main(
 ):  #TODO:work in progress to generate graphs will clean up after documentation is completed
-    R = 1.0  # major radius
-    r = 0.1  # minor radius
+    R = 10.0  # major radius
+    r = 2.0  # minor radius
     #N = 128  # number of grid points
     error_chart = np.array([])
     error_chart_N_by_delta = np.array([])
@@ -222,7 +202,7 @@ def main(
         print("Exact value: {}".format(exact_value))
         #compare the result
         #result = toroidal_shell_moment_of_inertia(N, minval, maxval, eps, R, r)
-        result = torus_volume(N, minval, maxval, eps, R, r)
+        result = integral_volume(N, minval, maxval, eps, R, r, torus)
         print("computed result using integral: {}".format(result))
         error = (abs(result - exact_value) / exact_value) * 100
         print("error: {} %".format(error))
