@@ -6,7 +6,8 @@ package(default_visibility = ["//visibility:public"])
 
 py_binary(
     name = "torus",
-    srcs = ["torus.py"],
+    srcs = ["torus.py",
+            "op.py",],
     deps = [
         "//plaidml2:py",
         "//plaidml2/edsl:py",
