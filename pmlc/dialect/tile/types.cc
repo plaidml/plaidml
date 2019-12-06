@@ -4,28 +4,20 @@
 
 namespace pmlc::dialect::tile {
 
-AffineTensorMapType AffineTensorMapType::get(mlir::MLIRContext* context) {  //
-  return Base::get(context, Kinds::AffineTensorMap);
-}
-
 AffineMapType AffineMapType::get(mlir::MLIRContext* context) {  //
-  return Base::get(context, Kinds::AffineMap);
+  return Base::get(context, TypeKinds::AffineMap);
 }
 
-AffineIndexMapType AffineIndexMapType::get(mlir::MLIRContext* context) {  //
-  return Base::get(context, Kinds::AffineIndexMap);
-}
-
-AffineSizeMapType AffineSizeMapType::get(mlir::MLIRContext* context) {  //
-  return Base::get(context, Kinds::AffineSizeMap);
+AffineTensorMapType AffineTensorMapType::get(mlir::MLIRContext* context) {  //
+  return Base::get(context, TypeKinds::AffineTensorMap);
 }
 
 AffineConstraintsType AffineConstraintsType::get(mlir::MLIRContext* context) {  //
-  return Base::get(context, Kinds::AffineConstraints);
+  return Base::get(context, TypeKinds::AffineConstraints);
 }
 
 StringType StringType::get(mlir::MLIRContext* context) {  //
-  return Base::get(context, Kinds::String);
+  return Base::get(context, TypeKinds::String);
 }
 
 }  // namespace pmlc::dialect::tile

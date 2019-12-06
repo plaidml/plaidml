@@ -33,6 +33,7 @@ using mlir::IntegerAttr;
 using mlir::OpRewritePattern;
 using mlir::PatternMatchResult;
 using mlir::PatternRewriter;
+using mlir::StringAttr;
 using mlir::success;
 using mlir::Value;
 
@@ -120,100 +121,100 @@ OpFoldResult AffineSubOp::fold(ArrayRef<Attribute> operands) {
 
 OpFoldResult DimOp::fold(ArrayRef<Attribute> operands) {
   IVLOG(5, "DimOp::fold");
-  auto type = tensor()->getType().dyn_cast<mlir::TensorType>();
-  if (!type) {
-    return {};
-  }
-  auto size = type.getDimSize(dim().getSExtValue());
-  if (mlir::ShapedType::isDynamic(size)) {
-    return {};
-  }
-  return IntegerAttr::get(mlir::IntegerType::get(64, getContext()), size);
+  return resolve();
 }
 
-struct AffineDomainFolder : public OpRewritePattern<AffineDomainOp> {
-  using OpRewritePattern<AffineDomainOp>::OpRewritePattern;
+template <typename T, typename R = void>
+class AffineVisitor {
+ public:
+  R visit(Value* value) {
+    static_assert(std::is_base_of<AffineVisitor, T>::value, "Must instantiate with a derived type of AffineVisitor");
+    auto defOp = value->getDefiningOp();
+    if (auto op = llvm::dyn_cast<AffineIndexOp>(defOp)) {
+      return static_cast<T*>(this)->visitIndexOp(op);
+    } else if (auto op = llvm::dyn_cast<AffineConstantOp>(defOp)) {
+      return static_cast<T*>(this)->visitConstantOp(op);
+    } else if (auto op = llvm::dyn_cast<AffineAddOp>(defOp)) {
+      visitOperands(op.lhs(), op.rhs());
+      return static_cast<T*>(this)->visitAddOp(op);
+    } else if (auto op = llvm::dyn_cast<AffineMulOp>(defOp)) {
+      visitOperands(op.lhs(), op.rhs());
+      return static_cast<T*>(this)->visitMulOp(op);
+    } else if (auto op = llvm::dyn_cast<AffineDivOp>(defOp)) {
+      visitOperands(op.lhs(), op.rhs());
+      return static_cast<T*>(this)->visitDivOp(op);
+    } else if (auto op = llvm::dyn_cast<AffineNegOp>(defOp)) {
+      visit(op.input());
+      return static_cast<T*>(this)->visitNegOp(op);
+    } else if (auto op = llvm::dyn_cast<AffineSubOp>(defOp)) {
+      visitOperands(op.lhs(), op.rhs());
+      return static_cast<T*>(this)->visitSubOp(op);
+    } else if (auto op = llvm::dyn_cast<DimOp>(defOp)) {
+      return static_cast<T*>(this)->visitDimOp(op);
+    }
+    llvm_unreachable("Unknown Affine op");
+  }
 
-  PatternMatchResult matchAndRewrite(AffineDomainOp op, PatternRewriter& rewriter) const override {
-    IVLOG(5, "AffineDomainFolder::matchAndRewrite>");
-    auto terminator = op.body().front().getTerminator();
-    while (!llvm::isa<ContractionOp>(terminator)) {
-      terminator = terminator->getRegion(0).front().getTerminator();
-    }
-    auto contractionOp = llvm::cast<ContractionOp>(terminator);
-    auto sizeMapOp = llvm::dyn_cast<AffineSizeMapOp>(contractionOp.getSizeMap()->getDefiningOp());
-    if (!sizeMapOp) {
-      return matchFailure();
-    }
-    SmallVector<Value*, 4> sizes(sizeMapOp.sizes());
-    auto shape = eltwise::ComputeShape(sizes);
-    auto sourceType = op.getType().cast<RankedTensorType>();
-    auto targetType = RankedTensorType::get(shape, sourceType.getElementType());
-    IVLOG(6, "  sourceType: " << mlir::debugString(sourceType));
-    IVLOG(6, "  targetType: " << mlir::debugString(targetType));
-    if (sourceType == targetType) {
-      return matchFailure();
-    }
-    BoolAttr no_reduce;
-    if (auto optional = op.no_reduce()) {
-      no_reduce = rewriter.getBoolAttr(*optional);
-    }
-    auto newOp = rewriter.create<AffineDomainOp>(op.getLoc(), targetType, no_reduce);
-    if (auto attr = op.getAttrOfType<StringAttr>("name")) {
-      newOp.setAttr("name", attr);
-    }
-    if (auto attr = op.getAttrOfType<ArrayAttr>("idx_names")) {
-      newOp.setAttr("idx_names", attr);
-    }
-    newOp.body().takeBody(op.body());
-    rewriter.replaceOp(op, {newOp.result()});
-    util::UpdateFuncOpType(newOp.getOperation());
-    return matchSuccess();
+  void visitIndexOp(AffineIndexOp op) {}
+  void visitConstantOp(AffineConstantOp op) {}
+  void visitAddOp(AffineAddOp op) {}
+  void visitMulOp(AffineMulOp op) {}
+  void visitDivOp(AffineDivOp op) {}
+  void visitSubOp(AffineSubOp op) {}
+  void visitNegOp(AffineNegOp op) {}
+  void visitDimOp(DimOp op) {}
+
+ private:
+  void visitOperands(Value* lhs, Value* rhs) {
+    visit(lhs);
+    visit(rhs);
   }
 };
 
-void AffineDomainOp::getCanonicalizationPatterns(  //
-    OwningRewritePatternList& results,             //
-    MLIRContext* context) {
-  results.insert<AffineDomainFolder>(context);
-}
-
-struct ContractionBuilder {
-  MLIRContext* context;
+struct AffineIndexCollector : public AffineVisitor<AffineIndexCollector> {
   SetVector<Value*> idxs;
-  std::vector<Value*> tensors;
-  std::vector<AffineExpr> sink;
-  std::vector<std::vector<AffineExpr>> srcs;
-  std::vector<AffineExpr> cons;
+  void visitIndexOp(AffineIndexOp op) { idxs.insert(op.result()); }
+};
 
-  ContractionBuilder(AffineMapOp sink, AffineConstraintsOp constraints)
-      : context(sink.getContext()), sink(addDims(sink.dims())) {
-    SmallVector<Value*, 8> pairs(constraints.pairs());
+struct ContractionBuilder : public AffineVisitor<ContractionBuilder, AffineExpr> {
+  friend class AffineVisitor<ContractionBuilder, AffineExpr>;
+
+ public:
+  explicit ContractionBuilder(SymbolicContractionOp op) : context(op.getContext()) {
+    auto sinkMapOp = llvm::cast<AffineMapOp>(op.sink()->getDefiningOp());
+    auto consOp = llvm::cast<AffineConstraintsOp>(op.cons()->getDefiningOp());
+
+    // first collect all the indexes
+    for (auto dim : sinkMapOp.dims()) {
+      collector.visit(dim);
+    }
+
+    for (auto src : op.srcs()) {
+      auto mapOp = llvm::cast<AffineTensorMapOp>(src->getDefiningOp());
+      for (auto dim : mapOp.dims()) {
+        collector.visit(dim);
+      }
+    }
+
+    for (auto pair : consOp.pairs()) {
+      collector.visit(pair);
+    }
+
+    // now construct the AffineExprs
+    sink = addDims(sinkMapOp.dims());
+
+    for (auto src : op.srcs()) {
+      auto mapOp = llvm::cast<AffineTensorMapOp>(src->getDefiningOp());
+      addSourceMap(mapOp);
+    }
+
+    SmallVector<Value*, 8> pairs(consOp.pairs());
     for (auto it = pairs.begin(); it != pairs.end(); it++) {
       auto lhs = *it++;
       auto rhs = *it;
+      cons.emplace_back(mlir::simplifyAffineExpr(makeExpr(lhs), collector.idxs.size(), 0));
       cons.emplace_back(makeConstraint(lhs, rhs));
     }
-  }
-
-  std::vector<AffineExpr> addDims(Operation::operand_range dims) {
-    std::vector<AffineExpr> exprs;
-    for (auto dim : dims) {
-      exprs.emplace_back(makeExpr(dim));
-    }
-    return exprs;
-  }
-
-  void addSourceMap(AffineTensorMapOp op) {
-    tensors.emplace_back(op.tensor());
-    srcs.emplace_back(addDims(op.dims()));
-  }
-
-  AffineMap makeMap(ArrayRef<AffineExpr> exprs) {
-    if (exprs.size()) {
-      return AffineMap::get(idxs.size(), 0, exprs);
-    }
-    return AffineMap::get(context);
   }
 
   std::vector<AffineMap> getSources() {
@@ -230,50 +231,105 @@ struct ContractionBuilder {
 
   IntegerSet getConstraints() {
     if (cons.empty()) {
-      return IntegerSet::getEmptySet(idxs.size(), 0, context);
+      return IntegerSet::getEmptySet(collector.idxs.size(), 0, context);
     }
     SmallVector<bool, 4> flags(cons.size(), false);
-    return IntegerSet::get(idxs.size(), 0, cons, flags);
+    return IntegerSet::get(collector.idxs.size(), 0, cons, flags);
   }
 
-  AffineExpr makeConstraint(Value* lhs, Value* rhs) {  //
-    return makeExpr(lhs) - makeExpr(rhs);
+  ArrayRef<Value*> getIndexes() {  //
+    return collector.idxs.getArrayRef();
   }
 
-  AffineExpr makeExpr(Value* value) {
-    IVLOG(3, "MakePoly: " << mlir::debugString(*value));
-    auto defOp = value->getDefiningOp();
-    if (auto op = llvm::dyn_cast<AffineIndexOp>(defOp)) {
-      idxs.insert(value);
-      auto pos = std::distance(idxs.begin(), llvm::find(idxs, value));
-      return mlir::getAffineDimExpr(pos, context);
+  ArrayRef<Value*> getTensors() {  //
+    return llvm::makeArrayRef(tensors);
+  }
+
+ private:
+  MLIRContext* context;
+  AffineIndexCollector collector;
+  std::vector<Value*> tensors;
+  std::vector<AffineExpr> sink;
+  std::vector<std::vector<AffineExpr>> srcs;
+  std::vector<AffineExpr> cons;
+
+  std::vector<AffineExpr> addDims(Operation::operand_range dims) {
+    std::vector<AffineExpr> exprs;
+    for (auto dim : dims) {
+      exprs.emplace_back(makeExpr(dim));
     }
-    if (auto op = llvm::dyn_cast<AffineConstantOp>(defOp)) {
-      return mlir::getAffineConstantExpr(op.value().getSExtValue(), context);
+    return exprs;
+  }
+
+  void addSourceMap(AffineTensorMapOp op) {
+    tensors.emplace_back(op.tensor());
+    srcs.emplace_back(addDims(op.dims()));
+  }
+
+  AffineMap makeMap(ArrayRef<AffineExpr> exprs) {
+    if (exprs.size()) {
+      return AffineMap::get(collector.idxs.size(), 0, exprs);
     }
-    if (auto op = llvm::dyn_cast<AffineAddOp>(defOp)) {
-      return makeExpr(op.lhs()) + makeExpr(op.rhs());
+    return AffineMap::get(context);
+  }
+
+  AffineExpr makeConstraint(Value* lhs, Value* rhs) {
+    // Constraints are in the form `lhs < rhs`
+    // IntegerSets are in the form `x >= 0`
+    // lhs < rhs
+    // -lhs > -rhs             multiply -1
+    // rhs - lhs > 0           add rhs
+    // rhs - lhs - 1 >= 0      subtract 1
+    auto expr = makeExpr(rhs) - makeExpr(lhs) - 1;
+    return mlir::simplifyAffineExpr(expr, collector.idxs.size(), 0);
+  }
+
+  AffineExpr makeExpr(Value* value) {  //
+    return visit(value);
+  }
+
+  AffineExpr visitIndexOp(AffineIndexOp op) {  //
+    auto value = op.result();
+    auto pos = std::distance(collector.idxs.begin(), llvm::find(collector.idxs, value));
+    return mlir::getAffineDimExpr(pos, context);
+  }
+
+  AffineExpr visitConstantOp(AffineConstantOp op) {  //
+    return mlir::getAffineConstantExpr(op.value().getSExtValue(), context);
+  }
+
+  AffineExpr visitAddOp(AffineAddOp op) {  //
+    return makeExpr(op.lhs()) + makeExpr(op.rhs());
+  }
+
+  AffineExpr visitMulOp(AffineMulOp op) {  //
+    return makeExpr(op.lhs()) * makeExpr(op.rhs());
+  }
+
+  AffineExpr visitSubOp(AffineSubOp op) {  //
+    return makeExpr(op.lhs()) - makeExpr(op.rhs());
+  }
+
+  AffineExpr visitDivOp(AffineDivOp op) {  //
+    return makeExpr(op.lhs()).floorDiv(makeExpr(op.rhs()));
+  }
+
+  AffineExpr visitNegOp(AffineNegOp op) {  //
+    return -makeExpr(op.input());
+  }
+
+  AffineExpr visitDimOp(DimOp op) {  //
+    if (auto attr = op.resolve()) {
+      return mlir::getAffineConstantExpr(attr.getInt(), context);
     }
-    if (auto op = llvm::dyn_cast<AffineMulOp>(defOp)) {
-      return makeExpr(op.lhs()) * makeExpr(op.rhs());
-    }
-    if (auto op = llvm::dyn_cast<AffineDivOp>(defOp)) {
-      return makeExpr(op.lhs()).floorDiv(makeExpr(op.rhs()));
-    }
-    if (auto op = llvm::dyn_cast<AffineNegOp>(defOp)) {
-      return -makeExpr(op.input());
-    }
-    if (auto op = llvm::dyn_cast<AffineSubOp>(defOp)) {
-      return makeExpr(op.lhs()) - makeExpr(op.rhs());
-    }
-    throw std::runtime_error("Invalid affine op");
+    llvm_unreachable("Invalid DimOp, must resolve to constant value");
   }
 };
 
-struct SymbolicContractionCanonicalizer : OpRewritePattern<AffineSymbolicContractionOp> {
-  using OpRewritePattern<AffineSymbolicContractionOp>::OpRewritePattern;
+struct SymbolicContractionCanonicalizer : OpRewritePattern<SymbolicContractionOp> {
+  using OpRewritePattern<SymbolicContractionOp>::OpRewritePattern;
 
-  PatternMatchResult matchAndRewrite(AffineSymbolicContractionOp op, PatternRewriter& rewriter) const override {
+  PatternMatchResult matchAndRewrite(SymbolicContractionOp op, PatternRewriter& rewriter) const override {
     auto sizeMapOp = llvm::cast<AffineMapOp>(op.size()->getDefiningOp());
     SmallVector<Value*, 4> sizeDims(sizeMapOp.dims());
     auto shape = eltwise::ComputeShape(sizeDims);
@@ -283,25 +339,36 @@ struct SymbolicContractionCanonicalizer : OpRewritePattern<AffineSymbolicContrac
       return matchFailure();
     }
 
-    auto sinkMapOp = llvm::cast<AffineMapOp>(op.sink()->getDefiningOp());
-    auto consOp = llvm::cast<AffineConstraintsOp>(op.cons()->getDefiningOp());
-    ContractionBuilder builder(sinkMapOp, consOp);
-    for (auto src : op.srcs()) {
-      auto mapOp = llvm::cast<AffineTensorMapOp>(src->getDefiningOp());
-      builder.addSourceMap(mapOp);
+    ContractionBuilder builder(op);
+    auto newOp = rewriter.create<ContractionOp>(  //
+        op.getLoc(),                              //
+        resultType,                               //
+        op.init(),                                //
+        builder.getTensors(),                     //
+        op.agg(),                                 //
+        op.combo(),                               //
+        builder.getSink(),                        //
+        builder.getSources(),                     //
+        builder.getConstraints(),                 //
+        op.no_reduce().hasValue(),                //
+        op.name().getValueOr(""));
+    bool hasNames = false;
+    auto idxs = builder.getIndexes();
+    SmallVector<Attribute, 8> idxNames;
+    for (unsigned i = 0; i < idxs.size(); i++) {
+      auto idx = idxs[i];
+      auto indexOp = llvm::cast<AffineIndexOp>(idx->getDefiningOp());
+      if (auto attr = indexOp.getAttrOfType<StringAttr>("name")) {
+        idxNames.emplace_back(attr);
+        hasNames = true;
+      } else {
+        auto name = llvm::formatv("x{0}", i);
+        idxNames.emplace_back(rewriter.getStringAttr(name.str()));
+      }
     }
-
-    auto newOp = rewriter.create<AffineContractionOp>(  //
-        op.getLoc(),                                    //
-        resultType,                                     //
-        op.init(),                                      //
-        builder.tensors,                                //
-        op.agg(),                                       //
-        op.combo(),                                     //
-        builder.getSink(),                              //
-        builder.getSources(),                           //
-        builder.getConstraints(),                       //
-        op.no_reduce().hasValue());
+    if (hasNames) {
+      newOp.setAttr("idxs", ArrayAttr::get(idxNames, rewriter.getContext()));
+    }
     rewriter.replaceOp(op, newOp.result());
 
     util::UpdateFuncOpType(newOp.getOperation());
@@ -310,24 +377,40 @@ struct SymbolicContractionCanonicalizer : OpRewritePattern<AffineSymbolicContrac
   }
 };
 
-void AffineSymbolicContractionOp::getCanonicalizationPatterns(  //
-    OwningRewritePatternList& results,                          //
+void SymbolicContractionOp::getCanonicalizationPatterns(  //
+    OwningRewritePatternList& results,                    //
     MLIRContext* context) {
   results.insert<SymbolicContractionCanonicalizer>(context);
 }
 
-void AffineContractionOp::build(  //
-    Builder* builder,             //
-    OperationState& result,       //
-    Type resultType,              //
-    Value* init,                  //
-    ArrayRef<Value*> tensors,     //
-    AggregationKind agg,          //
-    CombinationKind combo,        //
-    AffineMap sink,               //
-    ArrayRef<AffineMap> srcs,     //
-    IntegerSet cons,              //
-    bool no_reduce) {
+unsigned ContractionOp::getNumTensors(CombinationKind combo) {
+  switch (combo) {
+    case CombinationKind::none:
+      return 1;
+    case CombinationKind::add:
+    case CombinationKind::eq:
+    case CombinationKind::mul:
+      return 2;
+    case CombinationKind::cond:
+      return 3;
+    default:
+      throw std::runtime_error("Invalid combination op");
+  }
+}
+
+void ContractionOp::build(     //
+    Builder* builder,          //
+    OperationState& result,    //
+    Type resultType,           //
+    Value* init,               //
+    ArrayRef<Value*> tensors,  //
+    AggregationKind agg,       //
+    CombinationKind combo,     //
+    AffineMap sink,            //
+    ArrayRef<AffineMap> srcs,  //
+    IntegerSet cons,           //
+    bool no_reduce,            //
+    StringRef name) {
   result.addOperands(init);
   result.addOperands(tensors);
   result.addTypes(resultType);
@@ -340,6 +423,9 @@ void AffineContractionOp::build(  //
   }
   if (no_reduce) {
     result.addAttribute("no_reduce", builder->getUnitAttr());
+  }
+  if (name.size()) {
+    result.addAttribute("name", builder->getStringAttr(name));
   }
 }
 
@@ -620,6 +706,18 @@ Type ShapeOp::getResultType(ArrayRef<Value*> operands) {
 
 // ---- DimOp ----
 
+IntegerAttr DimOp::resolve() {  //
+  auto type = tensor()->getType().dyn_cast<mlir::TensorType>();
+  if (!type) {
+    return {};
+  }
+  auto size = type.getDimSize(dim().getSExtValue());
+  if (mlir::ShapedType::isDynamic(size)) {
+    return {};
+  }
+  return IntegerAttr::get(mlir::IntegerType::get(64, getContext()), size);
+}
+
 void printDimOp(OpAsmPrinter* printer, DimOp op) {  //
   *printer << op.getOperation()->getName() << ' ';
   printer->printOperand(op.tensor());
@@ -670,10 +768,14 @@ LogicalResult verifyAffineConstantOp(AffineConstantOp op) {  //
 // ---- AffineIndexOp ----
 
 void printAffineIndexOp(OpAsmPrinter* printer, AffineIndexOp op) {  //
-  *printer << op.getOperation()->getName();
+  *printer << op.getOperation()->getName() << ' ' << op.id().getSExtValue();
 }
 
 ParseResult parseAffineIndexOp(OpAsmParser* parser, OperationState& result) {
+  IntegerAttr id;
+  if (parser->parseAttribute(id, "id", result.attributes)) {
+    return failure();
+  }
   auto indexType = parser->getBuilder().getIndexType();
   result.addTypes(indexType);
   return success();
@@ -761,9 +863,9 @@ LogicalResult verifyAffineConstraintsOp(AffineConstraintsOp op) {  //
   return success();
 }
 
-// ---- AffineSymbolicContractionOp ----
+// ---- SymbolicContractionOp ----
 
-void printAffineSymbolicContractionOp(OpAsmPrinter* printer, AffineSymbolicContractionOp op) {  //
+void printSymbolicContractionOp(OpAsmPrinter* printer, SymbolicContractionOp op) {  //
   *printer << op.getOperation()->getName() << ' ';
   *printer << util::stringifyAggregationKind(op.agg());
   *printer << ", ";
@@ -784,7 +886,7 @@ void printAffineSymbolicContractionOp(OpAsmPrinter* printer, AffineSymbolicContr
   printer->printType(op.result()->getType());
 }
 
-ParseResult parseAffineSymbolicContractionOp(OpAsmParser* parser, OperationState& result) {
+ParseResult parseSymbolicContractionOp(OpAsmParser* parser, OperationState& result) {
   StringRef strAgg;
   StringRef strCombo;
   OpAsmParser::OperandType init;
@@ -840,82 +942,176 @@ ParseResult parseAffineSymbolicContractionOp(OpAsmParser* parser, OperationState
   return success();
 }
 
-LogicalResult verifyAffineSymbolicContractionOp(AffineSymbolicContractionOp op) {  //
+LogicalResult verifySymbolicContractionOp(SymbolicContractionOp op) {  //
   return success();
 }
 
-// ---- AffineContractionOp ----
+// ---- ContractionOp ----
 
-void printAffineContractionOp(OpAsmPrinter* printer, AffineContractionOp op) {
-  std::vector<StringRef> elidedAttrs = {"agg", "combo"};
-  if (op.cons().hasValue() && op.cons().getValue().isEmptyIntegerSet()) {
-    elidedAttrs.emplace_back("cons");
-  }
+unsigned ContractionOp::getNumTensors() {  //
+  return getNumTensors(combo());
+}
+
+unsigned ContractionOp::getNumSymbols() {  //
+  return getNumOperands() - 1 - getNumTensors();
+}
+
+Value* ContractionOp::getTensor(unsigned i) {  //
+  return *std::next(operands().begin(), i);
+}
+
+Value* ContractionOp::getSymbol(unsigned i) {  //
+  return *std::next(operands().begin(), getNumTensors() + i);
+}
+
+void printContractionOp(OpAsmPrinter* printer, ContractionOp op) {
+  SmallVector<StringRef, 3> elidedAttrs = {"agg", "combo", "name"};
+  // if (op.cons().hasValue() && op.cons().getValue().isEmptyIntegerSet()) {
+  //   elidedAttrs.emplace_back("cons");
+  // }
   *printer << op.getOperation()->getName() << ' ';
   *printer << util::stringifyAggregationKind(op.agg());
   *printer << ", ";
   *printer << util::stringifyCombinationKind(op.combo());
   *printer << ", ";
   printer->printOperand(op.init());
-  *printer << ", ";
-  printer->printOperands(op.tensors());
-  *printer << ' ';
+  auto numTensors = op.getNumTensors();
+  for (unsigned i = 0; i < numTensors; i++) {
+    *printer << ", ";
+    printer->printOperand(op.getTensor(i));
+  }
+  auto numSymbols = op.getNumSymbols();
+  if (numSymbols) {
+    *printer << " [";
+    for (unsigned i = 0; i < numSymbols; i++) {
+      if (i) {
+        *printer << ", ";
+      }
+      printer->printOperand(op.getSymbol(i));
+    }
+    *printer << ']';
+  }
   printer->printOptionalAttrDict(op.getAttrs(), elidedAttrs);
   *printer << " : ";
   printer->printType(op.init()->getType());
   *printer << ", ";
-  SmallVector<Value*, 4> tensors(op.tensors());
-  mlir::interleaveComma(op.tensors(), printer->getStream(),
-                        [&](Value* operand) { printer->printType(operand->getType()); });
+  for (unsigned i = 0; i < numTensors; i++) {
+    if (i) {
+      *printer << ", ";
+    }
+    printer->printType(op.getTensor(i)->getType());
+  }
   *printer << " -> ";
   printer->printType(op.result()->getType());
 }
 
-ParseResult parseAffineContractionOp(OpAsmParser* parser, OperationState& result) {
+ParseResult parseContractionOp(OpAsmParser* parser, OperationState& result) {
   StringRef strAgg;
   StringRef strCombo;
   OpAsmParser::OperandType init;
   SmallVector<OpAsmParser::OperandType, 3> tensors;
+  SmallVector<OpAsmParser::OperandType, 8> symbols;
   SmallVector<Type, 4> types;
   Type resultType;
-  if (parser->parseKeyword(&strAgg) ||                     //
-      parser->parseComma() ||                              //
-      parser->parseKeyword(&strCombo) ||                   //
-      parser->parseComma() ||                              //
-      parser->parseOperand(init) ||                        //
-      parser->parseComma() ||                              //
-      parser->parseOperandList(tensors) ||                 //
-      parser->parseOptionalAttrDict(result.attributes) ||  //
-      parser->parseColonTypeList(types) ||                 //
-      parser->parseArrow() ||                              //
-      parser->parseType(resultType)) {
-    return failure();
-  }
-
-  auto loc = parser->getCurrentLocation();
-  auto tensorTypes = llvm::makeArrayRef(types).drop_front();
-  if (parser->resolveOperand(init, types.front(), result.operands) ||
-      parser->resolveOperands(tensors, tensorTypes, loc, result.operands)) {
+  if (parser->parseKeyword(&strAgg) ||    //
+      parser->parseComma() ||             //
+      parser->parseKeyword(&strCombo) ||  //
+      parser->parseComma() ||             //
+      parser->parseOperand(init) ||       //
+      parser->parseComma()) {
     return failure();
   }
 
   auto agg = util::symbolizeAggregationKind(strAgg);
   if (!agg) {
-    failure();
+    return failure();
   }
   result.addAttribute("agg", parser->getBuilder().getI64IntegerAttr(static_cast<int64_t>(agg.getValue())));
 
   auto combo = util::symbolizeCombinationKind(strCombo);
   if (!combo) {
-    failure();
+    return failure();
   }
   result.addAttribute("combo", parser->getBuilder().getI64IntegerAttr(static_cast<int64_t>(combo.getValue())));
+
+  auto numTensors = ContractionOp::getNumTensors(combo.getValue());
+  if (parser->parseOperandList(tensors, numTensors) ||                              //
+      parser->parseOperandList(symbols, OpAsmParser::Delimiter::OptionalSquare) ||  //
+      parser->parseOptionalAttrDict(result.attributes) ||                           //
+      parser->parseColonTypeList(types) ||                                          //
+      parser->parseArrow() ||                                                       //
+      parser->parseType(resultType)) {
+    return failure();
+  }
+
+  auto loc = parser->getCurrentLocation();
+  auto indexType = parser->getBuilder().getIndexType();
+  auto tensorTypes = llvm::makeArrayRef(types).drop_front();
+  if (parser->resolveOperand(init, types.front(), result.operands) ||
+      parser->resolveOperands(tensors, tensorTypes, loc, result.operands) ||
+      parser->resolveOperands(symbols, indexType, result.operands)) {
+    return failure();
+  }
 
   result.addTypes(resultType);
   return success();
 }
 
-LogicalResult verifyAffineContractionOp(AffineContractionOp op) {  //
+bool isEltwiseAny(Type type) {
+  if (auto rankedTensorType = type.dyn_cast<RankedTensorType>()) {
+    auto elementType = rankedTensorType.getElementType();
+    if (elementType.isa<IndexType>()) {
+      return true;
+    }
+    if (auto scalarType = elementType.dyn_cast<ScalarType>()) {
+      if (scalarType.type() != DataType::INVALID) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+LogicalResult verifyContractionOp(ContractionOp op) {
+  auto numTensors = op.getNumTensors();
+  auto numSymbols = op.getNumSymbols();
+  SmallVector<Value*, 8> variadic(op.operands());
+  if (variadic.size() < numTensors) {
+    return op.emitOpError("combo '") << util::stringifyCombinationKind(op.combo()) << "' requires " << numTensors
+                                     << " tensor operands";
+  }
+  auto shape = op.shape();
+  auto resultType = op.result()->getType().cast<RankedTensorType>();
+  if (!resultType.hasStaticShape() && !shape.hasValue()) {
+    return op.emitOpError("attribute 'shape' is required when result type is dynamic");
+  }
+  unsigned expectedSymbols = op.sink().getNumSymbols();
+  if (shape.hasValue()) {
+    expectedSymbols += shape->getNumSymbols();
+  }
+  for (auto src : op.srcs()) {
+    auto map = src.cast<AffineMapAttr>();
+    expectedSymbols += map.getValue().getNumSymbols();
+  }
+  if (op.cons().hasValue()) {
+    expectedSymbols += op.cons().getValue().getNumSymbols();
+  }
+  if (expectedSymbols != numSymbols) {
+    return op.emitOpError("has incorrect number of symbols: expected ")
+           << expectedSymbols << " but found " << numSymbols;
+  }
+  for (unsigned i = 0; i < numTensors; i++) {
+    auto type = op.getTensor(i)->getType();
+    if (!isEltwiseAny(type)) {
+      return op.emitOpError("tensor #") << i << " must be eltwise-any, but got " << type;
+    }
+  }
+  for (unsigned i = 0; i < numSymbols; i++) {
+    auto type = op.getSymbol(i)->getType();
+    if (!type.isa<IndexType>()) {
+      return op.emitOpError("symbol #") << i << " must be index, but got " << type;
+    }
+  }
   return success();
 }
 

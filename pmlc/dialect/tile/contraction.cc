@@ -16,7 +16,10 @@
 
 namespace bilp = vertexai::tile::bilp;
 
+using mlir::AffineExpr;
+using mlir::AffineExprKind;
 using mlir::ArrayAttr;
+
 using vertexai::tile::math::Integer;
 using vertexai::tile::math::RangeConstraint;
 using vertexai::tile::math::Rational;
@@ -211,61 +214,15 @@ BoundsAndConstraints Constraints::ComputeBounds() {
   return std::tie(out, remaining);
 }
 
-static IndexPoly MakePoly(mlir::Value* value) {
-  IVLOG(3, "MakePoly: " << mlir::debugString(*value));
-  if (auto blockArg = llvm::dyn_cast<mlir::BlockArgument>(value)) {
-    auto domainOp = llvm::cast<AffineDomainOp>(blockArg->getOwner()->getParentOp());
-    if (auto attr = domainOp.getAttrOfType<ArrayAttr>("idx_names")) {
-      auto idxNames = attr.getValue();
-      if (blockArg->getArgNumber() < idxNames.size()) {
-        auto idxName = idxNames[blockArg->getArgNumber()];
-        if (auto strAttr = idxName.dyn_cast_or_null<StringAttr>()) {
-          return IndexPoly{strAttr.getValue().str()};
-        }
-      }
-    }
-    auto name = llvm::formatv("x{0}", blockArg->getArgNumber());
-    return IndexPoly{name.str()};
-  }
-  auto defOp = value->getDefiningOp();
-  if (auto op = llvm::dyn_cast<AffineConstantOp>(defOp)) {
-    return IndexPoly{op.value().getSExtValue()};
-  }
-  if (auto op = llvm::dyn_cast<AffineAddOp>(defOp)) {
-    return MakePoly(op.lhs()) + MakePoly(op.rhs());
-  }
-  if (auto op = llvm::dyn_cast<AffineDivOp>(defOp)) {
-    auto lhs = MakePoly(op.lhs());
-    auto rhs = MakePoly(op.rhs());
-    if (!rhs.isConstant()) {
-      throw std::runtime_error(
-          llvm::formatv("Divisor of polynomials must be a constant: {0} / {1}", lhs.toString(), rhs.toString()).str());
-    }
-    return lhs / rhs.constant();
-  }
-  if (auto op = llvm::dyn_cast<AffineMulOp>(defOp)) {
-    auto lhs = MakePoly(op.lhs());
-    auto rhs = MakePoly(op.rhs());
-    if (lhs.isConstant()) {
-      return rhs * lhs.constant();
-    }
-    if (rhs.isConstant()) {
-      return lhs * rhs.constant();
-    }
-    throw std::runtime_error(llvm::formatv("Non-linear polynomial: {0} * {1}", lhs.toString(), rhs.toString()).str());
-  }
-  if (auto op = llvm::dyn_cast<AffineNegOp>(defOp)) {
-    return -MakePoly(op.input());
-  }
-  if (auto op = llvm::dyn_cast<AffineSubOp>(defOp)) {
-    return MakePoly(op.lhs()) - MakePoly(op.rhs());
-  }
-  throw std::runtime_error("Invalid affine op");
-}
-
-static IndexPoly MakePoly(mlir::AffineExpr expr) {
+static IndexPoly MakePoly(ContractionOp op, AffineExpr expr) {
   IVLOG(3, "MakePoly: " << mlir::debugString(expr));
   if (auto dimExpr = expr.dyn_cast<mlir::AffineDimExpr>()) {
+    auto idxNames = op.getAttrOfType<ArrayAttr>("idxs");
+    if (idxNames) {
+      auto attr = idxNames.getValue()[dimExpr.getPosition()];
+      auto name = attr.cast<StringAttr>().getValue();
+      return IndexPoly{name.str()};
+    }
     auto name = llvm::formatv("x{0}", dimExpr.getPosition());
     return IndexPoly{name.str()};
   }
@@ -274,11 +231,11 @@ static IndexPoly MakePoly(mlir::AffineExpr expr) {
   }
   if (auto binaryExpr = expr.dyn_cast<mlir::AffineBinaryOpExpr>()) {
     switch (binaryExpr.getKind()) {
-      case mlir::AffineExprKind::Add:
-        return MakePoly(binaryExpr.getLHS()) + MakePoly(binaryExpr.getRHS());
-      case mlir::AffineExprKind::Mul: {
-        auto lhs = MakePoly(binaryExpr.getLHS());
-        auto rhs = MakePoly(binaryExpr.getRHS());
+      case AffineExprKind::Add:
+        return MakePoly(op, binaryExpr.getLHS()) + MakePoly(op, binaryExpr.getRHS());
+      case AffineExprKind::Mul: {
+        auto lhs = MakePoly(op, binaryExpr.getLHS());
+        auto rhs = MakePoly(op, binaryExpr.getRHS());
         if (!rhs.isConstant()) {
           // AffineExpr should gaurantee that constants are on the RHS
           throw std::runtime_error(
@@ -286,15 +243,15 @@ static IndexPoly MakePoly(mlir::AffineExpr expr) {
         }
         return lhs * rhs.constant();
       }
-      case mlir::AffineExprKind::FloorDiv: {
-        auto lhs = MakePoly(binaryExpr.getLHS());
-        auto rhs = MakePoly(binaryExpr.getRHS());
+      case AffineExprKind::FloorDiv: {
+        auto lhs = MakePoly(op, binaryExpr.getLHS());
+        auto rhs = MakePoly(op, binaryExpr.getRHS());
         if (!rhs.isConstant()) {
           throw std::runtime_error(
               llvm::formatv("Divisor of polynomials must be a constant: {0} / {1}", lhs.toString(), rhs.toString())
                   .str());
         }
-        return MakePoly(binaryExpr.getLHS()) / rhs.constant();
+        return MakePoly(op, binaryExpr.getLHS()) / rhs.constant();
       }
       default:
         throw std::runtime_error("Unsupported AffineBinaryOpExpr");
@@ -303,53 +260,27 @@ static IndexPoly MakePoly(mlir::AffineExpr expr) {
   throw std::runtime_error("Invalid AffineExpr");
 }
 
-static IndexAccess ConvertAffineMap(mlir::AffineMap map) {
+static IndexAccess ConvertAffineMap(ContractionOp op, mlir::AffineMap map) {
   IndexAccess dims;
   for (auto expr : map.getResults()) {
-    dims.emplace_back(MakePoly(expr));
+    dims.emplace_back(MakePoly(op, expr));
   }
   return dims;
 }
 
-Contraction::Contraction(AffineContractionOp op) {
-  accesses.emplace_back(ConvertAffineMap(op.sink()));
+Contraction::Contraction(ContractionOp op) {
+  accesses.emplace_back(ConvertAffineMap(op, op.sink()));
   for (auto src : op.srcs()) {
     auto map = src.cast<AffineMapAttr>().getValue();
-    accesses.emplace_back(ConvertAffineMap(map));
-  }
-}
-
-Contraction::Contraction(ContractionOp op, llvm::ArrayRef<ConstraintOp> constraintOps) {
-  {
-    auto sink = op.getSinkIndexMap();
-    auto sinkOp = llvm::cast<AffineSinkIndexMapOp>(sink->getDefiningOp());
-    IndexAccess dims;
-    for (auto dim : sinkOp.dims()) {
-      dims.emplace_back(MakePoly(dim));
-    }
-    accesses.emplace_back(dims);
+    accesses.emplace_back(ConvertAffineMap(op, map));
   }
 
-  for (auto src : op.getSourceIndexMaps()) {
-    auto srcOp = llvm::cast<AffineSourceIndexMapOp>(src->getDefiningOp());
-    IndexAccess dims;
-    for (auto dim : srcOp.dims()) {
-      dims.emplace_back(MakePoly(dim));
-    }
-    accesses.emplace_back(dims);
-  }
-
-  for (auto constraintOp : constraintOps) {
-    auto poly = MakePoly(constraintOp.lhs());
-    auto rhsOp = constraintOp.rhs()->getDefiningOp();
-    mlir::IntegerAttr attr;
-    if (!mlir::m_Constant(&attr).match(rhsOp)) {
-      throw std::runtime_error("Constraint range must resolve to a constant integer");
-    }
-    auto range = attr.getInt();
-    IVLOG(5, "constraint: " << poly << " < " << range);
-    constraints.emplace_back(poly, range);
-  }
+  // TODO: enable this once we can use SimpleConstraints directly
+  // if (op.cons().hasValue()) {
+  //   for (auto cons : op.cons().getValue().getConstraints()) {
+  //     constraints.emplace_back(MakePoly(op, cons), 0);
+  //   }
+  // }
 }
 
 Constraints Contraction::GatherConstraints(llvm::ArrayRef<stripe::TensorType> shapes) const {

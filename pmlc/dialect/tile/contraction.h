@@ -47,8 +47,7 @@ struct Constraints {
 };
 
 struct Contraction {
-  explicit Contraction(AffineContractionOp op);
-  Contraction(ContractionOp op, llvm::ArrayRef<ConstraintOp> constraintOps);
+  explicit Contraction(ContractionOp op);
 
   BoundsAndConstraints ComputeBounds(llvm::ArrayRef<stripe::TensorType> shapes, bool no_reduce);
 

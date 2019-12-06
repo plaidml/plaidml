@@ -3,6 +3,8 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include "llvm/ADT/StringRef.h"
+
 #include "base/util/env.h"
 #include "base/util/logging.h"
 #include "plaidml2/edsl/autodiff.h"
@@ -14,14 +16,14 @@ using ::testing::Eq;
 namespace plaidml::edsl {
 
 bool operator==(const Program& lhs, const std::string& rhs) {  //
-  return lhs.str() == rhs;
+  return llvm::StringRef(lhs.str()).trim() == llvm::StringRef(rhs).trim();
 }
 
 namespace {
 
 Tensor Dot(const Tensor& X, const Tensor& Y) {
   TensorDim I, J, K;
-  TensorIndex i, j, k;
+  TensorIndex i("i"), j("j"), k("k");
   X.bind_dims(I, K);
   Y.bind_dims(K, J);
   auto R = TensorOutput(I, J);
@@ -47,6 +49,23 @@ TEST(CppEdsl, Dot) {
   auto A = Placeholder(PLAIDML_DATA_FLOAT32, {1, 784});
   auto B = Placeholder(PLAIDML_DATA_FLOAT32, {784, 512});
   Program program("dot", {Dot(A, B)});
+#ifdef PLAIDML_MLIR
+  EXPECT_THAT(program, Eq(R"#(
+#map0 = (d0, d1, d2) -> (d0, d1)
+#map1 = (d0, d1, d2) -> (d0, d2)
+#map2 = (d0, d1, d2) -> (d2, d1)
+
+
+!fp32 = type tensor<!eltwise.fp32>
+module {
+  func @dot(%arg0: tensor<784x512x!eltwise.fp32>, %arg1: tensor<1x784x!eltwise.fp32>) -> tensor<1x512x!eltwise.fp32> {
+    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !fp32
+    %0 = tile.cion add, mul, %cst, %arg1, %arg0 {idxs = ["i", "j", "k"], sink = #map0, srcs = [#map1, #map2]} : !fp32, tensor<1x784x!eltwise.fp32>, tensor<784x512x!eltwise.fp32> -> tensor<1x512x!eltwise.fp32>
+    return %0 : tensor<1x512x!eltwise.fp32>
+  }
+}
+)#"));
+#endif
   exec::Binder(program).compile()->run();
 }
 
@@ -55,20 +74,60 @@ TEST(CppEdsl, DoubleDot) {
   auto B = Placeholder(PLAIDML_DATA_FLOAT32, {20, 30});
   auto C = Placeholder(PLAIDML_DATA_FLOAT32, {30, 40});
   Program program("double_dot", {Dot(Dot(A, B), C)});
-  exec::Binder(program).compile()->run();
+#ifdef PLAIDML_MLIR
+  EXPECT_THAT(program, Eq(R"#(
+#map0 = (d0, d1, d2) -> (d0, d1)
+#map1 = (d0, d1, d2) -> (d0, d2)
+#map2 = (d0, d1, d2) -> (d2, d1)
+
+
+!fp32 = type tensor<!eltwise.fp32>
+module {
+  func @double_dot(%arg0: tensor<30x40x!eltwise.fp32>, %arg1: tensor<20x30x!eltwise.fp32>, %arg2: tensor<10x20x!eltwise.fp32>) -> tensor<10x40x!eltwise.fp32> {
+    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !fp32
+    %0 = tile.cion add, mul, %cst, %arg2, %arg1 {idxs = ["i", "j", "k"], sink = #map0, srcs = [#map1, #map2]} : !fp32, tensor<10x20x!eltwise.fp32>, tensor<20x30x!eltwise.fp32> -> tensor<10x30x!eltwise.fp32>
+    %1 = tile.cion add, mul, %cst, %0, %arg0 {idxs = ["i", "j", "k"], sink = #map0, srcs = [#map1, #map2]} : !fp32, tensor<10x30x!eltwise.fp32>, tensor<30x40x!eltwise.fp32> -> tensor<10x40x!eltwise.fp32>
+    return %1 : tensor<10x40x!eltwise.fp32>
+  }
 }
+)#"));
+#endif
+  exec::Binder(program).compile()->run();
+}  // namespace plaidml::edsl
 
 TEST(CppEdsl, EltwiseAdd) {
   auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20});
   auto B = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20});
-  auto C = A + B;
-  Program program("eltwise_add", {C});
+  Program program("eltwise_add", {A + B});
+#ifdef PLAIDML_MLIR
+  EXPECT_THAT(program, Eq(R"#(
+module {
+  func @eltwise_add(%arg0: tensor<10x20x!eltwise.fp32>, %arg1: tensor<10x20x!eltwise.fp32>) -> tensor<10x20x!eltwise.fp32> {
+    %0 = "eltwise.add"(%arg1, %arg0) {type = !eltwise.fp32} : (tensor<10x20x!eltwise.fp32>, tensor<10x20x!eltwise.fp32>) -> tensor<10x20x!eltwise.fp32>
+    return %0 : tensor<10x20x!eltwise.fp32>
+  }
+}
+)#"));
+#endif
   exec::Binder(program).compile()->run();
 }
 
 TEST(CppEdsl, Relu) {
   auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20});
   Program program("relu", {Relu(A)});
+#ifdef PLAIDML_MLIR
+  EXPECT_THAT(program, Eq(R"#(
+!fp32 = type tensor<!eltwise.fp32>
+module {
+  func @relu(%arg0: tensor<10x20x!eltwise.fp32>) -> tensor<10x20x!eltwise.fp32> {
+    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !fp32
+    %0 = "eltwise.cmp_lt"(%arg0, %cst) {type = !eltwise.fp32} : (tensor<10x20x!eltwise.fp32>, !fp32) -> tensor<10x20x!eltwise.bool>
+    %1 = "eltwise.select"(%0, %cst, %arg0) {type = !eltwise.fp32} : (tensor<10x20x!eltwise.bool>, !fp32, tensor<10x20x!eltwise.fp32>) -> tensor<10x20x!eltwise.fp32>
+    return %1 : tensor<10x20x!eltwise.fp32>
+  }
+}
+)#"));
+#endif
   exec::Binder(program).compile()->run();
 }
 
@@ -99,19 +158,19 @@ TEST(CppEdsl, MnistMlp) {
 ) -> (
   _X25
 ) {
-  _X2[x0, x2 : 1, 512] = +(_X0[x0, x1] * _X1[x1, x2]);
+  _X2[i, j : 1, 512] = +(_X0[i, k] * _X1[k, j]);
   _X4 = add(_X2, _X3);
   _X5 = 0.000000;
   _X6 = cmp_lt(_X4, _X5);
   _X7 = 0.000000;
   _X8 = cond(_X6, _X7, _X4);
-  _X10[x0, x2 : 1, 512] = +(_X8[x0, x1] * _X9[x1, x2]);
+  _X10[i, j : 1, 512] = +(_X8[i, k] * _X9[k, j]);
   _X12 = add(_X10, _X11);
   _X13 = 0.000000;
   _X14 = cmp_lt(_X12, _X13);
   _X15 = 0.000000;
   _X16 = cond(_X14, _X15, _X12);
-  _X18[x0, x2 : 1, 10] = +(_X16[x0, x1] * _X17[x1, x2]);
+  _X18[i, j : 1, 10] = +(_X16[i, k] * _X17[k, j]);
   _X20 = add(_X18, _X19);
   _X21[x0, 0 : 1, 1] = >(_X20[x0, x1]);
   _X22 = sub(_X20, _X21);
@@ -123,62 +182,31 @@ TEST(CppEdsl, MnistMlp) {
 #endif
 #ifdef PLAIDML_MLIR
   EXPECT_THAT(program, Eq(R"#(
+#map0 = (d0, d1, d2) -> (d0, d1)
+#map1 = (d0, d1, d2) -> (d0, d2)
+#map2 = (d0, d1, d2) -> (d2, d1)
+#map3 = (d0, d1) -> (d0, 0)
+#map4 = (d0, d1) -> (d0, d1)
+
 
 !fp32 = type tensor<!eltwise.fp32>
 module {
-  func @mnist_mlp(%arg0: tensor<10x!eltwise.fp32>, %arg1: tensor<512x!eltwise.fp32>, %arg2: tensor<512x!eltwise.fp32>, %arg3: tensor<1x784x!eltwise.fp32>, %arg4: tensor<784x512x!eltwise.fp32>, %arg5: tensor<512x512x!eltwise.fp32>, %arg6: tensor<512x10x!eltwise.fp32>) -> tensor<1x10x!eltwise.fp32> {
-    %c512 = tile.affine_const 512
+  func @mnist_mlp(%arg0: tensor<10x!eltwise.fp32>, %arg1: tensor<512x10x!eltwise.fp32>, %arg2: tensor<512x!eltwise.fp32>, %arg3: tensor<512x512x!eltwise.fp32>, %arg4: tensor<512x!eltwise.fp32>, %arg5: tensor<784x512x!eltwise.fp32>, %arg6: tensor<1x784x!eltwise.fp32>) -> tensor<1x10x!eltwise.fp32> {
     %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !fp32
-    %c10 = tile.affine_const 10
-    %c0 = tile.affine_const 0
-    %c1 = tile.affine_const 1
-    %0 = "tile.domain"() ( {
-    ^bb0(%arg7: !eltwise.i32, %arg8: !eltwise.i32, %arg9: !eltwise.i32):	// no predecessors
-      %15 = "tile.src_idx_map"(%arg3, %arg8, %arg7) : (tensor<1x784x!eltwise.fp32>, !eltwise.i32, !eltwise.i32) -> !tile.imap
-      %16 = "tile.src_idx_map"(%arg4, %arg7, %arg9) : (tensor<784x512x!eltwise.fp32>, !eltwise.i32, !eltwise.i32) -> !tile.imap
-      %17 = "tile.sink_idx_map"(%arg8, %arg9) : (!eltwise.i32, !eltwise.i32) -> !tile.imap
-      %18 = "tile.size_map"(%c1, %c512) : (!eltwise.i32, !eltwise.i32) -> !tile.smap
-      "tile.+(x*y)"(%18, %15, %16, %17) : (!tile.smap, !tile.imap, !tile.imap, !tile.imap) -> ()
-    }) {idx_names = ["x0", "x1", "x2"]} : () -> tensor<1x512x!eltwise.fp32>
-    %1 = "eltwise.add"(%0, %arg2) {type = !eltwise.fp32} : (tensor<1x512x!eltwise.fp32>, tensor<512x!eltwise.fp32>) -> tensor<1x512x!eltwise.fp32>
+    %0 = tile.cion add, mul, %cst, %arg6, %arg5 {idxs = ["i", "j", "k"], sink = #map0, srcs = [#map1, #map2]} : !fp32, tensor<1x784x!eltwise.fp32>, tensor<784x512x!eltwise.fp32> -> tensor<1x512x!eltwise.fp32>
+    %1 = "eltwise.add"(%0, %arg4) {type = !eltwise.fp32} : (tensor<1x512x!eltwise.fp32>, tensor<512x!eltwise.fp32>) -> tensor<1x512x!eltwise.fp32>
     %2 = "eltwise.cmp_lt"(%1, %cst) {type = !eltwise.fp32} : (tensor<1x512x!eltwise.fp32>, !fp32) -> tensor<1x512x!eltwise.bool>
     %3 = "eltwise.select"(%2, %cst, %1) {type = !eltwise.fp32} : (tensor<1x512x!eltwise.bool>, !fp32, tensor<1x512x!eltwise.fp32>) -> tensor<1x512x!eltwise.fp32>
-    %4 = "tile.domain"() ( {
-    ^bb0(%arg7: !eltwise.i32, %arg8: !eltwise.i32, %arg9: !eltwise.i32):	// no predecessors
-      %15 = "tile.src_idx_map"(%3, %arg8, %arg7) : (tensor<1x512x!eltwise.fp32>, !eltwise.i32, !eltwise.i32) -> !tile.imap
-      %16 = "tile.src_idx_map"(%arg5, %arg7, %arg9) : (tensor<512x512x!eltwise.fp32>, !eltwise.i32, !eltwise.i32) -> !tile.imap
-      %17 = "tile.sink_idx_map"(%arg8, %arg9) : (!eltwise.i32, !eltwise.i32) -> !tile.imap
-      %18 = "tile.size_map"(%c1, %c512) : (!eltwise.i32, !eltwise.i32) -> !tile.smap
-      "tile.+(x*y)"(%18, %15, %16, %17) : (!tile.smap, !tile.imap, !tile.imap, !tile.imap) -> ()
-    }) {idx_names = ["x0", "x1", "x2"]} : () -> tensor<1x512x!eltwise.fp32>
-    %5 = "eltwise.add"(%4, %arg1) {type = !eltwise.fp32} : (tensor<1x512x!eltwise.fp32>, tensor<512x!eltwise.fp32>) -> tensor<1x512x!eltwise.fp32>
+    %4 = tile.cion add, mul, %cst, %3, %arg3 {idxs = ["i", "j", "k"], sink = #map0, srcs = [#map1, #map2]} : !fp32, tensor<1x512x!eltwise.fp32>, tensor<512x512x!eltwise.fp32> -> tensor<1x512x!eltwise.fp32>
+    %5 = "eltwise.add"(%4, %arg2) {type = !eltwise.fp32} : (tensor<1x512x!eltwise.fp32>, tensor<512x!eltwise.fp32>) -> tensor<1x512x!eltwise.fp32>
     %6 = "eltwise.cmp_lt"(%5, %cst) {type = !eltwise.fp32} : (tensor<1x512x!eltwise.fp32>, !fp32) -> tensor<1x512x!eltwise.bool>
     %7 = "eltwise.select"(%6, %cst, %5) {type = !eltwise.fp32} : (tensor<1x512x!eltwise.bool>, !fp32, tensor<1x512x!eltwise.fp32>) -> tensor<1x512x!eltwise.fp32>
-    %8 = "tile.domain"() ( {
-    ^bb0(%arg7: !eltwise.i32, %arg8: !eltwise.i32, %arg9: !eltwise.i32):	// no predecessors
-      %15 = "tile.src_idx_map"(%7, %arg8, %arg7) : (tensor<1x512x!eltwise.fp32>, !eltwise.i32, !eltwise.i32) -> !tile.imap
-      %16 = "tile.src_idx_map"(%arg6, %arg7, %arg9) : (tensor<512x10x!eltwise.fp32>, !eltwise.i32, !eltwise.i32) -> !tile.imap
-      %17 = "tile.sink_idx_map"(%arg8, %arg9) : (!eltwise.i32, !eltwise.i32) -> !tile.imap
-      %18 = "tile.size_map"(%c1, %c10) : (!eltwise.i32, !eltwise.i32) -> !tile.smap
-      "tile.+(x*y)"(%18, %15, %16, %17) : (!tile.smap, !tile.imap, !tile.imap, !tile.imap) -> ()
-    }) {idx_names = ["x0", "x1", "x2"]} : () -> tensor<1x10x!eltwise.fp32>
+    %8 = tile.cion add, mul, %cst, %7, %arg1 {idxs = ["i", "j", "k"], sink = #map0, srcs = [#map1, #map2]} : !fp32, tensor<1x512x!eltwise.fp32>, tensor<512x10x!eltwise.fp32> -> tensor<1x10x!eltwise.fp32>
     %9 = "eltwise.add"(%8, %arg0) {type = !eltwise.fp32} : (tensor<1x10x!eltwise.fp32>, tensor<10x!eltwise.fp32>) -> tensor<1x10x!eltwise.fp32>
-    %10 = "tile.domain"() ( {
-    ^bb0(%arg7: !eltwise.i32, %arg8: !eltwise.i32):	// no predecessors
-      %15 = "tile.src_idx_map"(%9, %arg8, %arg7) : (tensor<1x10x!eltwise.fp32>, !eltwise.i32, !eltwise.i32) -> !tile.imap
-      %16 = "tile.sink_idx_map"(%arg8, %c0) : (!eltwise.i32, !eltwise.i32) -> !tile.imap
-      %17 = "tile.size_map"(%c1, %c1) : (!eltwise.i32, !eltwise.i32) -> !tile.smap
-      "tile.>(x)"(%17, %15, %16) : (!tile.smap, !tile.imap, !tile.imap) -> ()
-    }) {idx_names = ["x0", "x1"]} : () -> tensor<1x1x!eltwise.fp32>
+    %10 = tile.cion max, none, %cst, %9 {sink = #map3, srcs = [#map4]} : !fp32, tensor<1x10x!eltwise.fp32> -> tensor<1x1x!eltwise.fp32>
     %11 = "eltwise.sub"(%9, %10) {type = !eltwise.fp32} : (tensor<1x10x!eltwise.fp32>, tensor<1x1x!eltwise.fp32>) -> tensor<1x10x!eltwise.fp32>
     %12 = "eltwise.exp"(%11) {type = !eltwise.fp32} : (tensor<1x10x!eltwise.fp32>) -> tensor<1x10x!eltwise.fp32>
-    %13 = "tile.domain"() ( {
-    ^bb0(%arg7: !eltwise.i32, %arg8: !eltwise.i32):	// no predecessors
-      %15 = "tile.src_idx_map"(%12, %arg8, %arg7) : (tensor<1x10x!eltwise.fp32>, !eltwise.i32, !eltwise.i32) -> !tile.imap
-      %16 = "tile.sink_idx_map"(%arg8, %c0) : (!eltwise.i32, !eltwise.i32) -> !tile.imap
-      %17 = "tile.size_map"(%c1, %c1) : (!eltwise.i32, !eltwise.i32) -> !tile.smap
-      "tile.+(x)"(%17, %15, %16) : (!tile.smap, !tile.imap, !tile.imap) -> ()
-    }) {idx_names = ["x0", "x1"]} : () -> tensor<1x1x!eltwise.fp32>
+    %13 = tile.cion add, none, %cst, %12 {sink = #map3, srcs = [#map4]} : !fp32, tensor<1x10x!eltwise.fp32> -> tensor<1x1x!eltwise.fp32>
     %14 = "eltwise.div"(%12, %13) {type = !eltwise.fp32} : (tensor<1x10x!eltwise.fp32>, tensor<1x1x!eltwise.fp32>) -> tensor<1x10x!eltwise.fp32>
     return %14 : tensor<1x10x!eltwise.fp32>
   }
@@ -285,13 +313,13 @@ TEST(CppEdsl, MnistCnn) {
   _X18 = 1;
   _X19 = 12100;
   _X20 = reshape(_X17, _X18, _X19);
-  _X22[x0, x2 : 1, 128] = +(_X20[x0, x1] * _X21[x1, x2]);
+  _X22[i, j : 1, 128] = +(_X20[i, k] * _X21[k, j]);
   _X24 = add(_X22, _X23);
   _X25 = 0.000000;
   _X26 = cmp_lt(_X24, _X25);
   _X27 = 0.000000;
   _X28 = cond(_X26, _X27, _X24);
-  _X30[x0, x2 : 1, 100] = +(_X28[x0, x1] * _X29[x1, x2]);
+  _X30[i, j : 1, 100] = +(_X28[i, k] * _X29[k, j]);
   _X32 = add(_X30, _X31);
   _X33[x0, 0 : 1, 1] = >(_X32[x0, x1]);
   _X34 = sub(_X32, _X33);
@@ -302,7 +330,52 @@ TEST(CppEdsl, MnistCnn) {
 )"));
 #endif
 #ifdef PLAIDML_MLIR
-  exec::Binder(program).compile()->run();
+  EXPECT_THAT(program, Eq(R"#(
+#map0 = (d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)
+#map1 = (d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4 - 1, d2 + d5 - 1, d6)
+#map2 = (d0, d1, d2, d3, d4, d5, d6) -> (d4, d5, d6, d3)
+#map3 = (d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)
+#map4 = (d0, d1, d2, d3, d4, d5) -> (d0, d1 * 2 + d4, d2 * 2 + d5, d3)
+#map5 = (d0, d1, d2) -> (d0, d1)
+#map6 = (d0, d1, d2) -> (d0, d2)
+#map7 = (d0, d1, d2) -> (d2, d1)
+#map8 = (d0, d1) -> (d0, 0)
+#map9 = (d0, d1) -> (d0, d1)
+
+#set0 = (d0, d1, d2, d3, d4, d5) : (d4 >= 0, -d4 + 1 >= 0, d5 >= 0, -d5 + 1 >= 0)
+
+!fp32 = type tensor<!eltwise.fp32>
+module {
+  func @mnist_cnn(%arg0: tensor<100x!eltwise.fp32>, %arg1: tensor<128x100x!eltwise.fp32>, %arg2: tensor<128x!eltwise.fp32>, %arg3: tensor<12100x128x!eltwise.fp32>, %arg4: tensor<64x!eltwise.fp32>, %arg5: tensor<3x3x32x64x!eltwise.fp32>, %arg6: tensor<32x!eltwise.fp32>, %arg7: tensor<3x3x1x32x!eltwise.fp32>, %arg8: tensor<1x224x224x1x!eltwise.fp32>) -> tensor<1x100x!eltwise.fp32> {
+    %c12100 = tile.affine_const 12100
+    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !fp32
+    %c1 = tile.affine_const 1
+    %0 = tile.cion add, mul, %cst, %arg8, %arg7 {sink = #map0, srcs = [#map1, #map2]} : !fp32, tensor<1x224x224x1x!eltwise.fp32>, tensor<3x3x1x32x!eltwise.fp32> -> tensor<1x222x222x32x!eltwise.fp32>
+    %1 = "eltwise.add"(%0, %arg6) {type = !eltwise.fp32} : (tensor<1x222x222x32x!eltwise.fp32>, tensor<32x!eltwise.fp32>) -> tensor<1x222x222x32x!eltwise.fp32>
+    %2 = "eltwise.cmp_lt"(%1, %cst) {type = !eltwise.fp32} : (tensor<1x222x222x32x!eltwise.fp32>, !fp32) -> tensor<1x222x222x32x!eltwise.bool>
+    %3 = "eltwise.select"(%2, %cst, %1) {type = !eltwise.fp32} : (tensor<1x222x222x32x!eltwise.bool>, !fp32, tensor<1x222x222x32x!eltwise.fp32>) -> tensor<1x222x222x32x!eltwise.fp32>
+    %4 = tile.cion add, mul, %cst, %3, %arg5 {sink = #map0, srcs = [#map1, #map2]} : !fp32, tensor<1x222x222x32x!eltwise.fp32>, tensor<3x3x32x64x!eltwise.fp32> -> tensor<1x220x220x64x!eltwise.fp32>
+    %5 = "eltwise.add"(%4, %arg4) {type = !eltwise.fp32} : (tensor<1x220x220x64x!eltwise.fp32>, tensor<64x!eltwise.fp32>) -> tensor<1x220x220x64x!eltwise.fp32>
+    %6 = "eltwise.cmp_lt"(%5, %cst) {type = !eltwise.fp32} : (tensor<1x220x220x64x!eltwise.fp32>, !fp32) -> tensor<1x220x220x64x!eltwise.bool>
+    %7 = "eltwise.select"(%6, %cst, %5) {type = !eltwise.fp32} : (tensor<1x220x220x64x!eltwise.bool>, !fp32, tensor<1x220x220x64x!eltwise.fp32>) -> tensor<1x220x220x64x!eltwise.fp32>
+    %8 = tile.cion max, none, %cst, %7 {cons = #set0, sink = #map3, srcs = [#map4]} : !fp32, tensor<1x220x220x64x!eltwise.fp32> -> tensor<1x110x110x64x!eltwise.fp32>
+    %9 = "tile.reshape"(%8, %c1, %c12100) : (tensor<1x110x110x64x!eltwise.fp32>, index, index) -> tensor<1x12100x!eltwise.fp32>
+    %10 = tile.cion add, mul, %cst, %9, %arg3 {idxs = ["i", "j", "k"], sink = #map5, srcs = [#map6, #map7]} : !fp32, tensor<1x12100x!eltwise.fp32>, tensor<12100x128x!eltwise.fp32> -> tensor<1x128x!eltwise.fp32>
+    %11 = "eltwise.add"(%10, %arg2) {type = !eltwise.fp32} : (tensor<1x128x!eltwise.fp32>, tensor<128x!eltwise.fp32>) -> tensor<1x128x!eltwise.fp32>
+    %12 = "eltwise.cmp_lt"(%11, %cst) {type = !eltwise.fp32} : (tensor<1x128x!eltwise.fp32>, !fp32) -> tensor<1x128x!eltwise.bool>
+    %13 = "eltwise.select"(%12, %cst, %11) {type = !eltwise.fp32} : (tensor<1x128x!eltwise.bool>, !fp32, tensor<1x128x!eltwise.fp32>) -> tensor<1x128x!eltwise.fp32>
+    %14 = tile.cion add, mul, %cst, %13, %arg1 {idxs = ["i", "j", "k"], sink = #map5, srcs = [#map6, #map7]} : !fp32, tensor<1x128x!eltwise.fp32>, tensor<128x100x!eltwise.fp32> -> tensor<1x100x!eltwise.fp32>
+    %15 = "eltwise.add"(%14, %arg0) {type = !eltwise.fp32} : (tensor<1x100x!eltwise.fp32>, tensor<100x!eltwise.fp32>) -> tensor<1x100x!eltwise.fp32>
+    %16 = tile.cion max, none, %cst, %15 {sink = #map8, srcs = [#map9]} : !fp32, tensor<1x100x!eltwise.fp32> -> tensor<1x1x!eltwise.fp32>
+    %17 = "eltwise.sub"(%15, %16) {type = !eltwise.fp32} : (tensor<1x100x!eltwise.fp32>, tensor<1x1x!eltwise.fp32>) -> tensor<1x100x!eltwise.fp32>
+    %18 = "eltwise.exp"(%17) {type = !eltwise.fp32} : (tensor<1x100x!eltwise.fp32>) -> tensor<1x100x!eltwise.fp32>
+    %19 = tile.cion add, none, %cst, %18 {sink = #map8, srcs = [#map9]} : !fp32, tensor<1x100x!eltwise.fp32> -> tensor<1x1x!eltwise.fp32>
+    %20 = "eltwise.div"(%18, %19) {type = !eltwise.fp32} : (tensor<1x100x!eltwise.fp32>, tensor<1x1x!eltwise.fp32>) -> tensor<1x100x!eltwise.fp32>
+    return %20 : tensor<1x100x!eltwise.fp32>
+  }
+}
+)#"));
+  // exec::Binder(program).compile()->run();
 #endif  // PLAIDML_MLIR
 }
 
@@ -374,40 +447,32 @@ TEST(CppEdsl, LarsMomentum4d) {
 #endif
 #ifdef PLAIDML_MLIR
   EXPECT_THAT(program, Eq(R"#(
+#map0 = () -> ()
+#map1 = (d0, d1, d2, d3) -> (d0, d1, d2, d3)
+
 
 !fp32 = type tensor<!eltwise.fp32>
 module {
   func @lars_momentum4d(%arg0: tensor<4x7x3x9x!eltwise.fp32>, %arg1: tensor<4x7x3x9x!eltwise.fp32>, %arg2: !fp32, %arg3: tensor<4x7x3x9x!eltwise.fp32>) -> (tensor<4x7x3x9x!eltwise.fp32>, tensor<4x7x3x9x!eltwise.fp32>) {
-    %cst = "eltwise.sconst"() {value = 4.8828125E-4 : f64} : () -> !fp32
-    %cst_0 = "eltwise.sconst"() {value = 9.765625E-4 : f64} : () -> !fp32
-    %cst_1 = "eltwise.sconst"() {value = 1.250000e-01 : f64} : () -> !fp32
-    %0 = "eltwise.mul"(%arg0, %cst) {type = !eltwise.fp32} : (tensor<4x7x3x9x!eltwise.fp32>, !fp32) -> tensor<4x7x3x9x!eltwise.fp32>
+    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !fp32
+    %cst_0 = "eltwise.sconst"() {value = 4.8828125E-4 : f64} : () -> !fp32
+    %cst_1 = "eltwise.sconst"() {value = 9.765625E-4 : f64} : () -> !fp32
+    %cst_2 = "eltwise.sconst"() {value = 1.250000e-01 : f64} : () -> !fp32
+    %0 = "eltwise.mul"(%arg0, %cst_0) {type = !eltwise.fp32} : (tensor<4x7x3x9x!eltwise.fp32>, !fp32) -> tensor<4x7x3x9x!eltwise.fp32>
     %1 = "eltwise.add"(%arg1, %0) {type = !eltwise.fp32} : (tensor<4x7x3x9x!eltwise.fp32>, tensor<4x7x3x9x!eltwise.fp32>) -> tensor<4x7x3x9x!eltwise.fp32>
     %2 = "eltwise.mul"(%arg0, %arg0) {type = !eltwise.fp32} : (tensor<4x7x3x9x!eltwise.fp32>, tensor<4x7x3x9x!eltwise.fp32>) -> tensor<4x7x3x9x!eltwise.fp32>
-    %3 = "tile.domain"() ( {
-    ^bb0(%arg4: !eltwise.i32, %arg5: !eltwise.i32, %arg6: !eltwise.i32, %arg7: !eltwise.i32):	// no predecessors
-      %17 = "tile.src_idx_map"(%2, %arg7, %arg6, %arg5, %arg4) : (tensor<4x7x3x9x!eltwise.fp32>, !eltwise.i32, !eltwise.i32, !eltwise.i32, !eltwise.i32) -> !tile.imap
-      %18 = "tile.sink_idx_map"() : () -> !tile.imap
-      %19 = "tile.size_map"() : () -> !tile.smap
-      "tile.+(x)"(%19, %17, %18) : (!tile.smap, !tile.imap, !tile.imap) -> ()
-    }) {idx_names = ["x0", "x1", "x2", "x3"]} : () -> !fp32
+    %3 = tile.cion add, none, %cst, %2 {sink = #map0, srcs = [#map1]} : !fp32, tensor<4x7x3x9x!eltwise.fp32> -> !fp32
     %4 = "eltwise.sqrt"(%3) {type = !eltwise.fp32} : (!fp32) -> !fp32
-    %5 = "eltwise.mul"(%4, %cst) {type = !eltwise.fp32} : (!fp32, !fp32) -> !fp32
+    %5 = "eltwise.mul"(%4, %cst_0) {type = !eltwise.fp32} : (!fp32, !fp32) -> !fp32
     %6 = "eltwise.mul"(%arg1, %arg1) {type = !eltwise.fp32} : (tensor<4x7x3x9x!eltwise.fp32>, tensor<4x7x3x9x!eltwise.fp32>) -> tensor<4x7x3x9x!eltwise.fp32>
-    %7 = "tile.domain"() ( {
-    ^bb0(%arg4: !eltwise.i32, %arg5: !eltwise.i32, %arg6: !eltwise.i32, %arg7: !eltwise.i32):	// no predecessors
-      %17 = "tile.src_idx_map"(%6, %arg7, %arg6, %arg5, %arg4) : (tensor<4x7x3x9x!eltwise.fp32>, !eltwise.i32, !eltwise.i32, !eltwise.i32, !eltwise.i32) -> !tile.imap
-      %18 = "tile.sink_idx_map"() : () -> !tile.imap
-      %19 = "tile.size_map"() : () -> !tile.smap
-      "tile.+(x)"(%19, %17, %18) : (!tile.smap, !tile.imap, !tile.imap) -> ()
-    }) {idx_names = ["x0", "x1", "x2", "x3"]} : () -> !fp32
+    %7 = tile.cion add, none, %cst, %6 {sink = #map0, srcs = [#map1]} : !fp32, tensor<4x7x3x9x!eltwise.fp32> -> !fp32
     %8 = "eltwise.sqrt"(%7) {type = !eltwise.fp32} : (!fp32) -> !fp32
     %9 = "eltwise.add"(%8, %5) {type = !eltwise.fp32} : (!fp32, !fp32) -> !fp32
-    %10 = "eltwise.mul"(%arg2, %cst_0) {type = !eltwise.fp32} : (!fp32, !fp32) -> !fp32
+    %10 = "eltwise.mul"(%arg2, %cst_1) {type = !eltwise.fp32} : (!fp32, !fp32) -> !fp32
     %11 = "eltwise.mul"(%10, %4) {type = !eltwise.fp32} : (!fp32, !fp32) -> !fp32
     %12 = "eltwise.div"(%11, %9) {type = !eltwise.fp32} : (!fp32, !fp32) -> !fp32
     %13 = "eltwise.mul"(%12, %1) {type = !eltwise.fp32} : (!fp32, tensor<4x7x3x9x!eltwise.fp32>) -> tensor<4x7x3x9x!eltwise.fp32>
-    %14 = "eltwise.mul"(%arg3, %cst_1) {type = !eltwise.fp32} : (tensor<4x7x3x9x!eltwise.fp32>, !fp32) -> tensor<4x7x3x9x!eltwise.fp32>
+    %14 = "eltwise.mul"(%arg3, %cst_2) {type = !eltwise.fp32} : (tensor<4x7x3x9x!eltwise.fp32>, !fp32) -> tensor<4x7x3x9x!eltwise.fp32>
     %15 = "eltwise.add"(%14, %13) {type = !eltwise.fp32} : (tensor<4x7x3x9x!eltwise.fp32>, tensor<4x7x3x9x!eltwise.fp32>) -> tensor<4x7x3x9x!eltwise.fp32>
     %16 = "eltwise.sub"(%arg0, %15) {type = !eltwise.fp32} : (tensor<4x7x3x9x!eltwise.fp32>, tensor<4x7x3x9x!eltwise.fp32>) -> tensor<4x7x3x9x!eltwise.fp32>
     return %16, %15 : tensor<4x7x3x9x!eltwise.fp32>, tensor<4x7x3x9x!eltwise.fp32>
@@ -440,23 +505,16 @@ TEST(CppEdsl, RepeatElements) {
 #endif
 #ifdef PLAIDML_MLIR
   EXPECT_THAT(program, Eq(R"#(
+#map0 = (d0, d1, d2, d3) -> (d0, d1 * 3 + d2, d3)
+#map1 = (d0, d1, d2, d3) -> (d0, d1, d3)
 
+#set0 = (d0, d1, d2, d3) : (d2 >= 0, -d2 + 2 >= 0)
+
+!fp32 = type tensor<!eltwise.fp32>
 module {
   func @repeat_elts(%arg0: tensor<10x10x10x!eltwise.fp32>) -> tensor<10x30x10x!eltwise.fp32> {
-    %c30 = tile.affine_const 30
-    %c10 = tile.affine_const 10
-    %c3 = tile.affine_const 3
-    %0 = "tile.domain"() ( {
-    ^bb0(%arg1: !eltwise.i32, %arg2: !eltwise.i32, %arg3: !eltwise.i32, %arg4: !eltwise.i32):	// no predecessors
-      %1 = "tile.src_idx_map"(%arg0, %arg3, %arg2, %arg1) : (tensor<10x10x10x!eltwise.fp32>, !eltwise.i32, !eltwise.i32, !eltwise.i32) -> !tile.imap
-      %2 = tile.affine_mul %arg2, %c3
-      %3 = tile.affine_add %2, %arg4
-      %4 = "tile.sink_idx_map"(%arg3, %3, %arg1) : (!eltwise.i32, !eltwise.i32, !eltwise.i32) -> !tile.imap
-      %5 = "tile.size_map"(%c10, %c30, %c10) : (!eltwise.i32, !eltwise.i32, !eltwise.i32) -> !tile.smap
-      "tile.constraint"(%arg4, %c3) ( {
-        "tile.=(x)"(%5, %1, %4) : (!tile.smap, !tile.imap, !tile.imap) -> ()
-      }) : (!eltwise.i32, !eltwise.i32) -> ()
-    }) {idx_names = ["x0", "x1", "x2", "x3"], no_reduce = true} : () -> tensor<10x30x10x!eltwise.fp32>
+    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !fp32
+    %0 = tile.cion assign, none, %cst, %arg0 {cons = #set0, no_reduce, sink = #map0, srcs = [#map1]} : !fp32, tensor<10x10x10x!eltwise.fp32> -> tensor<10x30x10x!eltwise.fp32>
     return %0 : tensor<10x30x10x!eltwise.fp32>
   }
 }
@@ -488,20 +546,13 @@ TEST(CppEdsl, UseDefault) {
 #endif
 #ifdef PLAIDML_MLIR
   EXPECT_THAT(program, Eq(R"#(
+#map0 = (d0, d1, d2) -> (d0, 3, d1, d2)
+#map1 = (d0, d1, d2) -> (d0, d1, d2)
+
 
 module {
   func @use_default(%arg0: tensor<1x10x10x!eltwise.fp32>, %arg1: tensor<1x7x10x10x!eltwise.fp32>) -> tensor<1x7x10x10x!eltwise.fp32> {
-    %c3 = tile.affine_const 3
-    %c10 = tile.affine_const 10
-    %c7 = tile.affine_const 7
-    %c1 = tile.affine_const 1
-    %0 = "tile.domain"() ( {
-    ^bb0(%arg2: !eltwise.i32, %arg3: !eltwise.i32, %arg4: !eltwise.i32):	// no predecessors
-      %1 = "tile.src_idx_map"(%arg0, %arg4, %arg3, %arg2) : (tensor<1x10x10x!eltwise.fp32>, !eltwise.i32, !eltwise.i32, !eltwise.i32) -> !tile.imap
-      %2 = "tile.sink_idx_map"(%arg4, %c3, %arg3, %arg2) : (!eltwise.i32, !eltwise.i32, !eltwise.i32, !eltwise.i32) -> !tile.imap
-      %3 = "tile.size_map"(%c1, %c7, %c10, %c10) : (!eltwise.i32, !eltwise.i32, !eltwise.i32, !eltwise.i32) -> !tile.smap
-      "tile.=(x)"(%3, %1, %2, %arg1) : (!tile.smap, !tile.imap, !tile.imap, tensor<1x7x10x10x!eltwise.fp32>) -> ()
-    }) {idx_names = ["x0", "x1", "x2"]} : () -> tensor<1x7x10x10x!eltwise.fp32>
+    %0 = tile.cion assign, none, %arg1, %arg0 {sink = #map0, srcs = [#map1]} : tensor<1x7x10x10x!eltwise.fp32>, tensor<1x10x10x!eltwise.fp32> -> tensor<1x7x10x10x!eltwise.fp32>
     return %0 : tensor<1x7x10x10x!eltwise.fp32>
   }
 }
@@ -549,37 +600,23 @@ TEST(CppEdsl, ArgMax) {
 #endif
 #ifdef PLAIDML_MLIR
   EXPECT_THAT(program, Eq(R"#(
+#map0 = (d0) -> (d0)
+#map1 = () -> ()
+#map2 = (d0, d1, d2) -> (d0, d1)
+#map3 = (d0, d1, d2) -> (d0, d2, d1)
+#map4 = (d0, d1, d2) -> (d2)
+
 
 !i32 = type tensor<!eltwise.i32>
+!fp32 = type tensor<!eltwise.fp32>
 module {
   func @arg_max(%arg0: tensor<1x10x10x!eltwise.fp32>) -> tensor<1x10x!eltwise.u32> {
-    %c1 = tile.affine_const 1
-    %c1_0 = "eltwise.sconst"() {value = 1 : i64} : () -> !i32
-    %c10 = tile.affine_const 10
-    %0 = "tile.domain"() ( {
-    ^bb0(%arg1: !eltwise.i32, %arg2: !eltwise.i32, %arg3: !eltwise.i32):	// no predecessors
-      %5 = "tile.src_idx_map"(%arg0, %arg3, %arg2, %arg1) : (tensor<1x10x10x!eltwise.fp32>, !eltwise.i32, !eltwise.i32, !eltwise.i32) -> !tile.imap
-      %6 = "tile.sink_idx_map"(%arg3, %arg1) : (!eltwise.i32, !eltwise.i32) -> !tile.imap
-      %7 = "tile.size_map"(%c1, %c10) : (!eltwise.i32, !eltwise.i32) -> !tile.smap
-      "tile.>(x)"(%7, %5, %6) : (!tile.smap, !tile.imap, !tile.imap) -> ()
-    }) {idx_names = ["x0", "x1", "x2"]} : () -> tensor<1x10x!eltwise.fp32>
-    %1 = "tile.domain"() ( {
-    ^bb0(%arg1: !eltwise.i32):	// no predecessors
-      %5 = "tile.src_idx_map"(%c1_0) : (!i32) -> !tile.imap
-      %6 = "tile.sink_idx_map"(%arg1) : (!eltwise.i32) -> !tile.imap
-      %7 = "tile.size_map"(%c10) : (!eltwise.i32) -> !tile.smap
-      "tile.=(x)"(%7, %5, %6) : (!tile.smap, !tile.imap, !tile.imap) -> ()
-    }) {idx_names = ["x0"]} : () -> tensor<10x!eltwise.i32>
-    %2 = "tile.index"(%1) {dim = 0 : i64} : (tensor<10x!eltwise.i32>) -> tensor<10x!eltwise.i32>
-    %3 = "tile.domain"() ( {
-    ^bb0(%arg1: !eltwise.i32, %arg2: !eltwise.i32, %arg3: !eltwise.i32):	// no predecessors
-      %5 = "tile.src_idx_map"(%arg0, %arg3, %arg2, %arg1) : (tensor<1x10x10x!eltwise.fp32>, !eltwise.i32, !eltwise.i32, !eltwise.i32) -> !tile.imap
-      %6 = "tile.src_idx_map"(%0, %arg3, %arg1) : (tensor<1x10x!eltwise.fp32>, !eltwise.i32, !eltwise.i32) -> !tile.imap
-      %7 = "tile.src_idx_map"(%2, %arg2) : (tensor<10x!eltwise.i32>, !eltwise.i32) -> !tile.imap
-      %8 = "tile.sink_idx_map"(%arg3, %arg1) : (!eltwise.i32, !eltwise.i32) -> !tile.imap
-      %9 = "tile.size_map"(%c1, %c10) : (!eltwise.i32, !eltwise.i32) -> !tile.smap
-      "tile.>(x==y?z)"(%9, %5, %6, %7, %8) : (!tile.smap, !tile.imap, !tile.imap, !tile.imap, !tile.imap) -> ()
-    }) {idx_names = ["x0", "x1", "x2"]} : () -> tensor<1x10x!eltwise.i32>
+    %c1 = "eltwise.sconst"() {value = 1 : i64} : () -> !i32
+    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !fp32
+    %0 = tile.cion assign, none, %cst, %c1 {sink = #map0, srcs = [#map1]} : !fp32, !i32 -> tensor<10x!eltwise.i32>
+    %1 = "tile.index"(%0) {dim = 0 : i64} : (tensor<10x!eltwise.i32>) -> tensor<10x!eltwise.i32>
+    %2 = tile.cion max, none, %cst, %arg0 {sink = #map2, srcs = [#map3]} : !fp32, tensor<1x10x10x!eltwise.fp32> -> tensor<1x10x!eltwise.fp32>
+    %3 = tile.cion max, cond, %cst, %arg0, %2, %1 {sink = #map2, srcs = [#map3, #map2, #map4]} : !fp32, tensor<1x10x10x!eltwise.fp32>, tensor<1x10x!eltwise.fp32>, tensor<10x!eltwise.i32> -> tensor<1x10x!eltwise.i32>
     %4 = "eltwise.cast"(%3) : (tensor<1x10x!eltwise.i32>) -> tensor<1x10x!eltwise.u32>
     return %4 : tensor<1x10x!eltwise.u32>
   }
@@ -678,7 +715,6 @@ TEST(CppEdsl, UniqueNames) {
 #endif
 #ifdef PLAIDML_MLIR
   EXPECT_THAT(program, Eq(R"#(
-
 !fp32 = type tensor<!eltwise.fp32>
 module {
   func @unique_names(%arg0: !fp32 {tile.name = "C"}, %arg1: !fp32 {tile.name = "C_0"}, %arg2: !fp32 {tile.name = "B"}, %arg3: !fp32 {tile.name = "A"}) -> !fp32 {
@@ -715,18 +751,16 @@ TEST(CppEdsl, GlobalMin) {
 #endif
 #ifdef PLAIDML_MLIR
   EXPECT_THAT(program, Eq(R"#(
+#map0 = () -> ()
+#map1 = (d0, d1, d2) -> (d0, d1, d2)
+
 
 !fp32 = type tensor<!eltwise.fp32>
 module {
   func @global_min(%arg0: tensor<10x10x10x!eltwise.fp32> {tile.name = "I"}) -> !fp32 {
+    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !fp32
     %0 = "eltwise.neg"(%arg0) {type = !eltwise.fp32} : (tensor<10x10x10x!eltwise.fp32>) -> tensor<10x10x10x!eltwise.fp32>
-    %1 = "tile.domain"() ( {
-    ^bb0(%arg1: !eltwise.i32, %arg2: !eltwise.i32, %arg3: !eltwise.i32):	// no predecessors
-      %3 = "tile.src_idx_map"(%0, %arg3, %arg2, %arg1) : (tensor<10x10x10x!eltwise.fp32>, !eltwise.i32, !eltwise.i32, !eltwise.i32) -> !tile.imap
-      %4 = "tile.sink_idx_map"() : () -> !tile.imap
-      %5 = "tile.size_map"() : () -> !tile.smap
-      "tile.>(x)"(%5, %3, %4) : (!tile.smap, !tile.imap, !tile.imap) -> ()
-    }) {idx_names = ["x0", "x1", "x2"]} : () -> !fp32
+    %1 = tile.cion max, none, %cst, %0 {sink = #map0, srcs = [#map1]} : !fp32, tensor<10x10x10x!eltwise.fp32> -> !fp32
     %2 = "eltwise.neg"(%1) {type = !eltwise.fp32} : (!fp32) -> !fp32
     return %2 : !fp32
   }
@@ -757,20 +791,16 @@ TEST(CppEdsl, CumSum) {
 #endif
 #ifdef PLAIDML_MLIR
   EXPECT_THAT(program, Eq(R"#(
+#map0 = (d0, d1) -> (d0)
+#map1 = (d0, d1) -> (d1)
 
+#set0 = (d0, d1) : (d0 - d1 >= 0, -d0 + d1 + 9 >= 0)
+
+!fp32 = type tensor<!eltwise.fp32>
 module {
   func @cumsum(%arg0: tensor<10x!eltwise.fp32> {tile.name = "I"}) -> tensor<10x!eltwise.fp32> {
-    %c10 = tile.affine_const 10
-    %0 = "tile.domain"() ( {
-    ^bb0(%arg1: !eltwise.i32, %arg2: !eltwise.i32):	// no predecessors
-      %1 = "tile.src_idx_map"(%arg0, %arg1) : (tensor<10x!eltwise.fp32>, !eltwise.i32) -> !tile.imap
-      %2 = "tile.sink_idx_map"(%arg2) : (!eltwise.i32) -> !tile.imap
-      %3 = "tile.size_map"(%c10) : (!eltwise.i32) -> !tile.smap
-      %4 = tile.affine_sub %arg2, %arg1
-      "tile.constraint"(%4, %c10) ( {
-        "tile.+(x)"(%3, %1, %2) : (!tile.smap, !tile.imap, !tile.imap) -> ()
-      }) : (!eltwise.i32, !eltwise.i32) -> ()
-    }) {idx_names = ["x0", "x1"]} : () -> tensor<10x!eltwise.fp32>
+    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !fp32
+    %0 = tile.cion add, none, %cst, %arg0 {cons = #set0, sink = #map0, srcs = [#map1]} : !fp32, tensor<10x!eltwise.fp32> -> tensor<10x!eltwise.fp32>
     return %0 : tensor<10x!eltwise.fp32>
   }
 }
@@ -779,10 +809,11 @@ module {
   exec::Binder(program).compile()->run();
 }
 
-Tensor ComplexConv2d(const Tensor& I,               //
-                     const Tensor& K,               //
-                     const std::vector<size_t>& s,  // stride coeffs
-                     const std::vector<size_t>& d   // dilation coeffs
+Tensor ComplexConv2d(              //
+    const Tensor& I,               //
+    const Tensor& K,               //
+    const std::vector<size_t>& s,  // stride coeffs
+    const std::vector<size_t>& d   // dilation coeffs
 ) {
   // "same-lower" autopadding will be applied
   TensorDim N, G, GCI, GCO;
@@ -834,30 +865,16 @@ TEST(CppEdsl, ComplexConv2d) {
 #endif
 #ifdef PLAIDML_MLIR
   EXPECT_THAT(program, Eq(R"#(
+#map0 = (d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4)
+#map1 = (d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1 * 2 + d5 * 3 - 2, d2 * 2 + d6 * 3 - 2, d3, d7)
+#map2 = (d0, d1, d2, d3, d4, d5, d6, d7) -> (d5, d6, d3, d7, d4)
 
+
+!fp32 = type tensor<!eltwise.fp32>
 module {
-  func @complex_conv_2d(%arg0: tensor<1x224x224x3x3x!eltwise.fp32>, %arg1: tensor<3x3x3x3x32x!eltwise.fp32>) -> tensor<1x112x112x3x32x!eltwise.fp32> {
-    %c2 = tile.affine_const 2
-    %c112 = tile.affine_const 112
-    %c32 = tile.affine_const 32
-    %c3 = tile.affine_const 3
-    %c1 = tile.affine_const 1
-    %0 = "tile.domain"() ( {
-    ^bb0(%arg2: !eltwise.i32, %arg3: !eltwise.i32, %arg4: !eltwise.i32, %arg5: !eltwise.i32, %arg6: !eltwise.i32, %arg7: !eltwise.i32, %arg8: !eltwise.i32, %arg9: !eltwise.i32):	// no predecessors
-      %1 = tile.affine_mul %arg4, %c3
-      %2 = tile.affine_mul %arg5, %c2
-      %3 = tile.affine_add %2, %1
-      %4 = tile.affine_sub %3, %c2
-      %5 = tile.affine_mul %arg6, %c3
-      %6 = tile.affine_mul %arg7, %c2
-      %7 = tile.affine_add %6, %5
-      %8 = tile.affine_sub %7, %c2
-      %9 = "tile.src_idx_map"(%arg0, %arg8, %8, %4, %arg3, %arg2) : (tensor<1x224x224x3x3x!eltwise.fp32>, !eltwise.i32, !eltwise.i32, !eltwise.i32, !eltwise.i32, !eltwise.i32) -> !tile.imap
-      %10 = "tile.src_idx_map"(%arg1, %arg6, %arg4, %arg3, %arg2, %arg9) : (tensor<3x3x3x3x32x!eltwise.fp32>, !eltwise.i32, !eltwise.i32, !eltwise.i32, !eltwise.i32, !eltwise.i32) -> !tile.imap
-      %11 = "tile.sink_idx_map"(%arg8, %arg7, %arg5, %arg3, %arg9) : (!eltwise.i32, !eltwise.i32, !eltwise.i32, !eltwise.i32, !eltwise.i32) -> !tile.imap
-      %12 = "tile.size_map"(%c1, %c112, %c112, %c3, %c32) : (!eltwise.i32, !eltwise.i32, !eltwise.i32, !eltwise.i32, !eltwise.i32) -> !tile.smap
-      "tile.+(x*y)"(%12, %9, %10, %11) : (!tile.smap, !tile.imap, !tile.imap, !tile.imap) -> ()
-    }) {idx_names = ["x0", "x1", "x2", "x3", "x4", "x5", "x6", "x7"]} : () -> tensor<1x112x112x3x32x!eltwise.fp32>
+  func @complex_conv_2d(%arg0: tensor<3x3x3x3x32x!eltwise.fp32>, %arg1: tensor<1x224x224x3x3x!eltwise.fp32>) -> tensor<1x112x112x3x32x!eltwise.fp32> {
+    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !fp32
+    %0 = tile.cion add, mul, %cst, %arg1, %arg0 {sink = #map0, srcs = [#map1, #map2]} : !fp32, tensor<1x224x224x3x3x!eltwise.fp32>, tensor<3x3x3x3x32x!eltwise.fp32> -> tensor<1x112x112x3x32x!eltwise.fp32>
     return %0 : tensor<1x112x112x3x32x!eltwise.fp32>
   }
 }
@@ -882,7 +899,6 @@ TEST(CppEdsl, Reciprocal) {
 #endif
 #ifdef PLAIDML_MLIR
   EXPECT_THAT(program, Eq(R"#(
-
 !i32 = type tensor<!eltwise.i32>
 module {
   func @reciprocal(%arg0: tensor<10x!eltwise.fp32> {tile.name = "A"}) -> tensor<10x!eltwise.fp32> {
@@ -912,8 +928,8 @@ TEST(CppEdsl, GradientDot) {
 ) {
   _X0 = 1.000000;
   _X1[x0, x1 : 100, 100] = +(_X0[]);
-  _X2[x1, x2 : 100, 100] = +(A[x0, x1] * _X1[x0, x2]);
-  _X3[x0, x2 : 100, 100] = +(_X1[x0, x1] * B[x2, x1]);
+  _X2[k, j : 100, 100] = +(A[i, k] * _X1[i, j]);
+  _X3[i, k : 100, 100] = +(_X1[i, j] * B[k, j]);
 }
 )"));
   exec::Binder(program).compile()->run();
@@ -946,16 +962,16 @@ TEST(CppEdsl, GradientMultiDot) {
   _X9,
   _X6
 ) {
-  _X0[x0, x2 : 100, 100] = +(A[x0, x1] * B[x1, x2]);
-  _X1[x0, x2 : 100, 100] = +(A[x0, x1] * _X0[x1, x2]);
+  _X0[i, j : 100, 100] = +(A[i, k] * B[k, j]);
+  _X1[i, j : 100, 100] = +(A[i, k] * _X0[k, j]);
   O[n : 100] = >(_X1[m, n]);
   _X2 = 1.000000;
   _X3[x0 : 100] = +(_X2[]);
   _X4[m, n : 100, 100] = +(_X1[m, n] == O[n] ? _X3[n]);
-  _X5[x1, x2 : 100, 100] = +(A[x0, x1] * _X4[x0, x2]);
-  _X6[x1, x2 : 100, 100] = +(A[x0, x1] * _X5[x0, x2]);
-  _X7[x0, x2 : 100, 100] = +(_X4[x0, x1] * _X0[x2, x1]);
-  _X8[x0, x2 : 100, 100] = +(_X5[x0, x1] * B[x2, x1]);
+  _X5[k, j : 100, 100] = +(A[i, k] * _X4[i, j]);
+  _X6[k, j : 100, 100] = +(A[i, k] * _X5[i, j]);
+  _X7[i, k : 100, 100] = +(_X4[i, j] * _X0[k, j]);
+  _X8[i, k : 100, 100] = +(_X5[i, j] * B[k, j]);
   _X9 = add(_X7, _X8);
 }
 )"));
@@ -981,12 +997,12 @@ TEST(CppEdsl, GradientDotSqrt) {
   _X0 = 1.000000;
   _X1[x0, x1 : 100, 100] = +(_X0[]);
   _X2 = 2;
-  _X3[x0, x2 : 100, 100] = +(A[x0, x1] * B[x1, x2]);
+  _X3[i, j : 100, 100] = +(A[i, k] * B[k, j]);
   _X4 = sqrt(_X3);
   _X5 = mul(_X2, _X4);
   _X6 = div(_X1, _X5);
-  _X7[x1, x2 : 100, 100] = +(A[x0, x1] * _X6[x0, x2]);
-  _X8[x0, x2 : 100, 100] = +(_X6[x0, x1] * B[x2, x1]);
+  _X7[k, j : 100, 100] = +(A[i, k] * _X6[i, j]);
+  _X8[i, k : 100, 100] = +(_X6[i, j] * B[k, j]);
 }
 )"));
   exec::Binder(program).compile()->run();
@@ -1034,7 +1050,6 @@ TEST(CppEdsl, Select) {
 #endif
 #ifdef PLAIDML_MLIR
   EXPECT_THAT(program, Eq(R"#(
-
 !i32 = type tensor<!eltwise.i32>
 module {
   func @select(%arg0: tensor<10x20x!eltwise.fp32>) -> tensor<10x20x!eltwise.i32> {
@@ -1066,7 +1081,6 @@ TEST(CppEdsl, Shape) {
 #endif
 #ifdef PLAIDML_MLIR
   EXPECT_THAT(program, Eq(R"#(
-
 module {
   func @shape(%arg0: tensor<10x20x!eltwise.fp32>) -> tensor<2x!eltwise.i32> {
     %0 = "tile.shape"(%arg0) {type = !eltwise.fp32} : (tensor<10x20x!eltwise.fp32>) -> tensor<2x!eltwise.i32>
@@ -1108,7 +1122,6 @@ TEST(CppEdsl, Prng) {
 #endif
 #ifdef PLAIDML_MLIR
   EXPECT_THAT(program, Eq(R"#(
-
 !i32 = type tensor<!eltwise.i32>
 module {
   func @prng(%arg0: tensor<3x2048x!eltwise.u32>) -> (tensor<2x3x4x5x!eltwise.fp32>, tensor<3x2048x!eltwise.u32>) {
