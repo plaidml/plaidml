@@ -69,7 +69,7 @@ def integral_surface_area(
         eps,  # Threshold for trivial gradient
         frep,  # function 
         frep_vars,  #functno rep variables
-        integrand,  # integrand TODO: pull out integrand
+        integrand,  # integrand 
         benchmark=False):  # benchmark: get timing information
 
     delta = (maxval - minval) / (n - 1)  # grid spacing

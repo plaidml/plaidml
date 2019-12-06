@@ -15,7 +15,7 @@ DEFAULT_TOL = 1e-2
 DEFAULT_ATOL = 1e-8
 
 
-class UWTest(unittest.TestCase):
+class TorusTest(unittest.TestCase):
 
     def test_toroidal_shell_moment_of_inertia(self):
         R = 10.0  # major radius
@@ -26,7 +26,7 @@ class UWTest(unittest.TestCase):
         # G = 0  # Daubechies wavelet genus ( 1 <= G <= 7 ) #TODO: add genus
         eps = 1.0e-8
         exact_value = toroidal_shell_integral_moment_of_innertia_exact(R, r)
-        result = integral_surface_area(N, minval, maxval, eps, torus, [R, r], integrand_inertia, 1)
+        result = integral_surface_area(N, minval, maxval, eps, torus, [R, r], integrand_inertia)
         npt.assert_allclose(result, exact_value, rtol=DEFAULT_TOL, atol=DEFAULT_ATOL)
 
     def test_torus_surface_area(self):
@@ -38,7 +38,7 @@ class UWTest(unittest.TestCase):
         # G = 0  # Daubechies wavelet genus ( 1 <= G <= 7 ) #TODO: add genus
         eps = 1.0e-8
         exact_value = torus_surface_area_exact(R, r)
-        result = integral_surface_area(N, minval, maxval, eps, torus, [R, r], integrand_empty, 1)
+        result = integral_surface_area(N, minval, maxval, eps, torus, [R, r], integrand_empty)
         npt.assert_allclose(result, exact_value, rtol=DEFAULT_TOL, atol=DEFAULT_ATOL)
 
     def test_torus_volume(self):

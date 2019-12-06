@@ -25,11 +25,12 @@ pip install /path/to/the/downloaded/wheel
 3. Grab the EDSL example code that you would like to run
 
 ```
-wget https://raw.githubusercontent.com/plaidml/plaidml/master/networks/scitile/uw_toroidal_shell/uw_toroidal_shell.py
+wget https://raw.githubusercontent.com/plaidml/plaidml/master/networks/scitile/storti_integrals/op.py
+wget https://raw.githubusercontent.com/plaidml/plaidml/master/networks/scitile/storti_integrals/torus.py
 ```
 
 4. run the example 
 
 ```
-python uw_toroidal_shell.py 
+python torus.py 
 ```
