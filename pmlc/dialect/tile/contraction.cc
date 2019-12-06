@@ -26,6 +26,8 @@ using vertexai::tile::math::Rational;
 
 namespace pmlc::dialect::tile {
 
+// TODO: What's with all these static functions?
+
 static bool IsImplied(const math::SimpleConstraint& constraint, const IndexBounds& bounds) {
   auto worst = constraint.poly.constant();
   for (const auto& [key, value] : constraint.poly.getMap()) {
@@ -59,13 +61,82 @@ static Rational UnifiedOffset(const Rational& c1, const Rational& c2, const Inte
   throw std::runtime_error("Merging constraints with empty intersection.");
 }
 
+// TODO: Need unit tests
+static RangeConstraint IntersectOpposedSimpleConstraints(  //
+    const SimpleConstraint& constraint1,                   //
+    const SimpleConstraint& constraint2) {
+  // Combines two SimpleConstraints which are parallel and bounding in opposite directions into
+  // a single equivalent RangeConstraint
+  Rational ratio = constraint1.poly.tryDivide(constraint2.poly, true);
+  if (ratio >= 0) {
+    throw std::invalid_argument(
+        "Parameters of IntersectOpposedSimpleConstraints must be parallel and in opposite directions");
+  }
+  // We know constraint1.poly <= constraint1.rhs and also constraint2.poly <= constraint2.rhs
+  // Could rewrite as 0 <= -constraint1.poly + constraint1.rhs and also 0 <= -constraint2.poly + constraint2.rhs
+  // Rewrite: constraint1.poly = p1 + c1 (where p1 has no constant part), constraint1.rhs = rhs1; similarly for 2
+  // So 0 <= -p1 - c1 + rhs1 and also 0 <= -p2 - c2 + rhs2
+  // and since a = ratio is negative, and p2 * a = p1, get
+  //   0 >= -a * p2 - a * c2 + a * rhs2
+  //   0 >= -p1 - a * c2 + a * rhs2
+  //   -c1 + rhs1 >= -p1 - a * c2 + a * rhs2 - c1 + rhs1
+  //   -c1 + rhs1 + a * c2 - a * rhs2 >= -p1 -c1 + rhs1
+  // So, merge into
+  //   0 <= -p1 - c1 + rhs1 <= -c1 + rhs1 + a * c2 - a * rhs2
+  // (noting that this is just for the bounds, not the integrality)
+  // And so use this to make a range constraint from constraint1 and then call to IntersectParallelConstraintPair
+  // Note that if the range is too generous the IntersectParallel call will fix it, so don't bother with a - 1
+  // This may have some duplication of work, but I think this is too tiny for that to matter for overall perf
+  auto merged_poly1 = -constraint1.poly + constraint1.rhs;
+  auto merged_const1 = -constraint1.poly.constant() + constraint1.rhs;
+  auto merged_const2 = -constraint2.poly.constant() + constraint2.rhs;
+  return IntersectParallelConstraintPair(RangeConstraint(merged_poly1, merged_const1 - ratio * merged_const2),
+                                         constraint2);
+}
+
+static RangeConstraint IntersectParallelConstraintPair(  //
+    const SimpleConstraint& constraint1,                 //
+    const RangeConstraint& constraint2) {
+  // Combines two parallel constraints into one
+  return IntersectParallelConstraintPair(constraint2, constraint1);
+}
+
+static RangeConstraint IntersectParallelConstraintPair(  //
+    const RangeConstraint& constraint1,                  //
+    const SimpleConstraint& constraint2) {
+  // Combines two parallel constraints into one
+  IVLOG(5, "Merging the parallel constraints " << constraint1 << ", " << constraint2);
+  if (constraint1.range <= 0) {
+    throw std::runtime_error("Given constraint with empty range in IntersectParallelConstraintPair: " +
+                             to_string(constraint1));
+  }
+  return IntersectParallelConstraintPairInner(constraint1, RangeConstraint(constraint2.rhs - constraint2.poly, -1));
+}
+
 static RangeConstraint IntersectParallelConstraintPair(  //
     const RangeConstraint& constraint1,                  //
     const RangeConstraint& constraint2) {
-  // TODO: Redo this function in terms of `SimpleConstraint`s
-  // Combines two parallel constraints into one. See merge-parallel.tex in
-  // /tile/lang for more details.
+  // Combines two parallel constraints into one
   IVLOG(5, "Merging the parallel constraints " << constraint1 << ", " << constraint2);
+  if (constraint1.range <= 0) {
+    throw std::runtime_error("Given constraint with empty range in IntersectParallelConstraintPair: " +
+                             to_string(constraint1));
+  }
+  if (constraint2.range <= 0) {
+    throw std::runtime_error("Given constraint with empty range in IntersectParallelConstraintPair: " +
+                             to_string(constraint2));
+  }
+  return IntersectParallelConstraintPairInner(constraint1, constraint2);
+}
+
+static RangeConstraint IntersectParallelConstraintPairInner(  //
+    const RangeConstraint& constraint1,                       //
+    const RangeConstraint& constraint2) {
+  // The primary algorithm for combining two parallel constraints into one. See
+  // merge-parallel.tex in /tile/lang for more details.
+  // Assumes the RangeConstraints have been validated to have positive ranges, _or_ that
+  // for constraint2 specifically it represents a one sided constraint by having an
+  // infinite range parameter represented as a range value of -1
   Rational ratio = constraint1.poly.tryDivide(constraint2.poly, true);
   if (ratio == 0) {
     throw std::invalid_argument("Parameters of IntersectParallelConstraintPair must be parallel");
@@ -81,10 +152,22 @@ static RangeConstraint IntersectParallelConstraintPair(  //
   //    n1*q + c1 = r1 - 1      n2*q + c2 = r2 - 1
   Rational q1_low = math::Min(-c1 / n1, (constraint1.range - 1 - c1) / n1);
   Rational q1_hi = math::Max(-c1 / n1, (constraint1.range - 1 - c1) / n1);
-  Rational q2_low = math::Min(-c2 / n2, (constraint2.range - 1 - c2) / n2);
-  Rational q2_hi = math::Max(-c2 / n2, (constraint2.range - 1 - c2) / n2);
-  Integer lower_bound = math::Max(math::Ceil(q1_low + d), math::Ceil(q2_low + d));
-  Integer upper_bound = math::Min(math::Floor(q1_hi + d), math::Floor(q2_hi + d));
+  Integer lower_bound;
+  Integer upper_bound;
+  if (constraint2.range > 0) {
+    Rational q2_low = math::Min(-c2 / n2, (constraint2.range - 1 - c2) / n2);
+    Rational q2_hi = math::Max(-c2 / n2, (constraint2.range - 1 - c2) / n2);
+    lower_bound = math::Max(math::Ceil(q1_low + d), math::Ceil(q2_low + d));
+    upper_bound = math::Min(math::Floor(q1_hi + d), math::Floor(q2_hi + d));
+  } else if (constraint2.range == -1) {
+    // Same calculations of lower/upper_bound as above, but with constraint2.range == infinity
+    Rational q2_low = -c2 / n2;
+    lower_bound = math::Max(math::Ceil(q1_low + d), math::Ceil(q2_low + d));
+    upper_bound = math::Floor(q1_hi + d);
+  } else {
+    throw std::runtime_error("Given constraint with empty range in IntersectParallelConstraintPair: " +
+                             to_string(constraint2));
+  }
   Rational merged_offset = -lower_bound + d;
   Integer range = upper_bound - lower_bound + 1;
   if (range <= 0) {
@@ -112,7 +195,6 @@ void Constraints::AddTensor(const IndexAccess& access, stripe::TensorType tensor
 }
 
 void Constraints::MergeParallelConstraints() {
-  // TODO: Redo for `constraints` being `SimpleConstraint`s
   auto i = constraints.begin();
   while (i != constraints.end()) {
     // Remove trivially true constraints, fail for trivially false constraints
@@ -282,6 +364,7 @@ Contraction::Contraction(ContractionOp op) {
 }
 
 Constraints Contraction::GatherConstraints(llvm::ArrayRef<stripe::TensorType> shapes) const {
+  // TODO: Switch to range constraints before running this algorithm
   // Make the output collection
   Constraints ret;
   // Add all the simple constraints
@@ -456,7 +539,7 @@ void Contraction::ReduceOutputPolynomials(const Constraints& order) {
     }
   }
 
-  for (auto& constraint : constraints) {
+  for (auto& constraint : constraints) {  // TODO: Probably need to update range_constraints not constraints nowadays
     constraint = SimpleConstraint(ConvertVariables(constraint.poly, vec_idx, inverses), constraint.rhs);
   }
 }
@@ -586,15 +669,16 @@ void Contraction::Defractionalize(const Constraints& order) {
   }
 
   // TODO: Switch to SimpleConstraint
-  for (auto& constraint : constraints) {
+  for (auto& constraint : constraints) {  // TODO: Probably need to use range_constraints not constraints nowadays
     constraint = RangeConstraint(ConvertPoly(constraint.poly, replacements, transform_constant), constraint.range);
   }
   if (transform_constant) {
     // Add constraint for the constant term if it's being transformed
-    constraints.emplace_back(RangeConstraint(ConvertPoly(IndexPoly(1), replacements, transform_constant) - 1, 1));
+    constraints.emplace_back(RangeConstraint(ConvertPoly(IndexPoly(1), replacements, transform_constant) - 1,
+                                             1));  // TODO: range_constraints
   }
   for (const auto& constraint : new_cons) {
-    constraints.push_back(constraint);
+    constraints.push_back(constraint);  // TODO: range_constraints
   }
 }
 
@@ -610,6 +694,7 @@ bool Contraction::NeedReduce() const {
 // TODO: All the constraints in here _should_ be fine once the Ranged -> Simple port happens in all called functions
 BoundsAndConstraints Contraction::ComputeBounds(llvm::ArrayRef<stripe::TensorType> shapes, bool no_reduce) {
   ConstrainIndexVarsToInts();
+  // TODO: Instead initialize range_constraints, then use gather to sort them
   auto constraints = GatherConstraints(shapes);
   IVLOG(3, "Constraints:" << to_string(constraints.constraints));
   // Reduce if needed

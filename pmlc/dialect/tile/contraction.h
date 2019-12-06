@@ -27,10 +27,11 @@ using IndexPoly = math::Polynomial<math::Rational>;
 using IndexAccess = std::vector<IndexPoly>;
 using IndexBounds = std::map<std::string, Bound>;
 using SimpleConstraints = std::vector<math::SimpleConstraint>;
-using BoundsAndConstraints = std::tuple<IndexBounds, SimpleConstraints>;
+using SimpleConstraints = std::vector<math::RangedConstraint>;
+using BoundsAndConstraints = std::tuple<IndexBounds, RangedConstraints>;
 
 struct Constraints {
-  SimpleConstraints constraints;
+  RangedConstraints constraints;
 
   void AddTensor(const IndexAccess& access, stripe::TensorType tensorType);
 
@@ -52,6 +53,8 @@ struct Contraction {
 
   std::vector<IndexAccess> accesses;
   SimpleConstraints constraints;
+  // During lowering, will transform all constraints to ranged constraints, which we track in ranged_constraints
+  Constraints ranged_constraints;
 
  private:
   std::set<std::string> getIndexVars() const;
