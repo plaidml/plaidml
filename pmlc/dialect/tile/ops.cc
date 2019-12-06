@@ -124,43 +124,97 @@ OpFoldResult DimOp::fold(ArrayRef<Attribute> operands) {
   return resolve();
 }
 
-struct ContractionBuilder {
-  MLIRContext* context;
-  SetVector<Value*> idxs;
-  std::vector<Value*> tensors;
-  std::vector<AffineExpr> sink;
-  std::vector<std::vector<AffineExpr>> srcs;
-  std::vector<AffineExpr> cons;
+template <typename T, typename R = void>
+class AffineVisitor {
+ public:
+  R visit(Value* value) {
+    static_assert(std::is_base_of<AffineVisitor, T>::value, "Must instantiate with a derived type of AffineVisitor");
+    auto defOp = value->getDefiningOp();
+    if (auto op = llvm::dyn_cast<AffineIndexOp>(defOp)) {
+      return static_cast<T*>(this)->visitIndexOp(op);
+    } else if (auto op = llvm::dyn_cast<AffineConstantOp>(defOp)) {
+      return static_cast<T*>(this)->visitConstantOp(op);
+    } else if (auto op = llvm::dyn_cast<AffineAddOp>(defOp)) {
+      visitOperands(op.lhs(), op.rhs());
+      return static_cast<T*>(this)->visitAddOp(op);
+    } else if (auto op = llvm::dyn_cast<AffineMulOp>(defOp)) {
+      visitOperands(op.lhs(), op.rhs());
+      return static_cast<T*>(this)->visitMulOp(op);
+    } else if (auto op = llvm::dyn_cast<AffineDivOp>(defOp)) {
+      visitOperands(op.lhs(), op.rhs());
+      return static_cast<T*>(this)->visitDivOp(op);
+    } else if (auto op = llvm::dyn_cast<AffineNegOp>(defOp)) {
+      visit(op.input());
+      return static_cast<T*>(this)->visitNegOp(op);
+    } else if (auto op = llvm::dyn_cast<AffineSubOp>(defOp)) {
+      visitOperands(op.lhs(), op.rhs());
+      return static_cast<T*>(this)->visitSubOp(op);
+    } else if (auto op = llvm::dyn_cast<DimOp>(defOp)) {
+      return static_cast<T*>(this)->visitDimOp(op);
+    }
+    llvm_unreachable("Unknown Affine op");
+  }
 
-  ContractionBuilder(AffineMapOp sink, AffineConstraintsOp constraints)
-      : context(sink.getContext()), sink(addDims(sink.dims())) {
-    SmallVector<Value*, 8> pairs(constraints.pairs());
+  void visitIndexOp(AffineIndexOp op) {}
+  void visitConstantOp(AffineConstantOp op) {}
+  void visitAddOp(AffineAddOp op) {}
+  void visitMulOp(AffineMulOp op) {}
+  void visitDivOp(AffineDivOp op) {}
+  void visitSubOp(AffineSubOp op) {}
+  void visitNegOp(AffineNegOp op) {}
+  void visitDimOp(DimOp op) {}
+
+ private:
+  void visitOperands(Value* lhs, Value* rhs) {
+    visit(lhs);
+    visit(rhs);
+  }
+};
+
+struct AffineIndexCollector : public AffineVisitor<AffineIndexCollector> {
+  SetVector<Value*> idxs;
+  void visitIndexOp(AffineIndexOp op) { idxs.insert(op.result()); }
+};
+
+struct ContractionBuilder : public AffineVisitor<ContractionBuilder, AffineExpr> {
+  friend class AffineVisitor<ContractionBuilder, AffineExpr>;
+
+ public:
+  explicit ContractionBuilder(SymbolicContractionOp op) : context(op.getContext()) {
+    auto sinkMapOp = llvm::cast<AffineMapOp>(op.sink()->getDefiningOp());
+    auto consOp = llvm::cast<AffineConstraintsOp>(op.cons()->getDefiningOp());
+
+    // first collect all the indexes
+    for (auto dim : sinkMapOp.dims()) {
+      collector.visit(dim);
+    }
+
+    for (auto src : op.srcs()) {
+      auto mapOp = llvm::cast<AffineTensorMapOp>(src->getDefiningOp());
+      for (auto dim : mapOp.dims()) {
+        collector.visit(dim);
+      }
+    }
+
+    for (auto pair : consOp.pairs()) {
+      collector.visit(pair);
+    }
+
+    // now construct the AffineExprs
+    sink = addDims(sinkMapOp.dims());
+
+    for (auto src : op.srcs()) {
+      auto mapOp = llvm::cast<AffineTensorMapOp>(src->getDefiningOp());
+      addSourceMap(mapOp);
+    }
+
+    SmallVector<Value*, 8> pairs(consOp.pairs());
     for (auto it = pairs.begin(); it != pairs.end(); it++) {
       auto lhs = *it++;
       auto rhs = *it;
-      cons.emplace_back(mlir::simplifyAffineExpr(makeExpr(lhs), idxs.size(), 0));
+      cons.emplace_back(mlir::simplifyAffineExpr(makeExpr(lhs), collector.idxs.size(), 0));
       cons.emplace_back(makeConstraint(lhs, rhs));
     }
-  }
-
-  std::vector<AffineExpr> addDims(Operation::operand_range dims) {
-    std::vector<AffineExpr> exprs;
-    for (auto dim : dims) {
-      exprs.emplace_back(makeExpr(dim));
-    }
-    return exprs;
-  }
-
-  void addSourceMap(AffineTensorMapOp op) {
-    tensors.emplace_back(op.tensor());
-    srcs.emplace_back(addDims(op.dims()));
-  }
-
-  AffineMap makeMap(ArrayRef<AffineExpr> exprs) {
-    if (exprs.size()) {
-      return AffineMap::get(idxs.size(), 0, exprs);
-    }
-    return AffineMap::get(context);
   }
 
   std::vector<AffineMap> getSources() {
@@ -177,10 +231,46 @@ struct ContractionBuilder {
 
   IntegerSet getConstraints() {
     if (cons.empty()) {
-      return IntegerSet::getEmptySet(idxs.size(), 0, context);
+      return IntegerSet::getEmptySet(collector.idxs.size(), 0, context);
     }
     SmallVector<bool, 4> flags(cons.size(), false);
-    return IntegerSet::get(idxs.size(), 0, cons, flags);
+    return IntegerSet::get(collector.idxs.size(), 0, cons, flags);
+  }
+
+  ArrayRef<Value*> getIndexes() {  //
+    return collector.idxs.getArrayRef();
+  }
+
+  ArrayRef<Value*> getTensors() {  //
+    return llvm::makeArrayRef(tensors);
+  }
+
+ private:
+  MLIRContext* context;
+  AffineIndexCollector collector;
+  std::vector<Value*> tensors;
+  std::vector<AffineExpr> sink;
+  std::vector<std::vector<AffineExpr>> srcs;
+  std::vector<AffineExpr> cons;
+
+  std::vector<AffineExpr> addDims(Operation::operand_range dims) {
+    std::vector<AffineExpr> exprs;
+    for (auto dim : dims) {
+      exprs.emplace_back(makeExpr(dim));
+    }
+    return exprs;
+  }
+
+  void addSourceMap(AffineTensorMapOp op) {
+    tensors.emplace_back(op.tensor());
+    srcs.emplace_back(addDims(op.dims()));
+  }
+
+  AffineMap makeMap(ArrayRef<AffineExpr> exprs) {
+    if (exprs.size()) {
+      return AffineMap::get(collector.idxs.size(), 0, exprs);
+    }
+    return AffineMap::get(context);
   }
 
   AffineExpr makeConstraint(Value* lhs, Value* rhs) {
@@ -191,43 +281,48 @@ struct ContractionBuilder {
     // rhs - lhs > 0           add rhs
     // rhs - lhs - 1 >= 0      subtract 1
     auto expr = makeExpr(rhs) - makeExpr(lhs) - 1;
-    return mlir::simplifyAffineExpr(expr, idxs.size(), 0);
+    return mlir::simplifyAffineExpr(expr, collector.idxs.size(), 0);
   }
 
-  AffineExpr makeExpr(Value* value) {
-    IVLOG(3, "makeExpr: " << mlir::debugString(*value));
-    auto defOp = value->getDefiningOp();
-    if (auto op = llvm::dyn_cast<AffineIndexOp>(defOp)) {
-      idxs.insert(value);
-      auto pos = std::distance(idxs.begin(), llvm::find(idxs, value));
-      return mlir::getAffineDimExpr(pos, context);
+  AffineExpr makeExpr(Value* value) {  //
+    return visit(value);
+  }
+
+  AffineExpr visitIndexOp(AffineIndexOp op) {  //
+    auto value = op.result();
+    auto pos = std::distance(collector.idxs.begin(), llvm::find(collector.idxs, value));
+    return mlir::getAffineDimExpr(pos, context);
+  }
+
+  AffineExpr visitConstantOp(AffineConstantOp op) {  //
+    return mlir::getAffineConstantExpr(op.value().getSExtValue(), context);
+  }
+
+  AffineExpr visitAddOp(AffineAddOp op) {  //
+    return makeExpr(op.lhs()) + makeExpr(op.rhs());
+  }
+
+  AffineExpr visitMulOp(AffineMulOp op) {  //
+    return makeExpr(op.lhs()) * makeExpr(op.rhs());
+  }
+
+  AffineExpr visitSubOp(AffineSubOp op) {  //
+    return makeExpr(op.lhs()) - makeExpr(op.rhs());
+  }
+
+  AffineExpr visitDivOp(AffineDivOp op) {  //
+    return makeExpr(op.lhs()).floorDiv(makeExpr(op.rhs()));
+  }
+
+  AffineExpr visitNegOp(AffineNegOp op) {  //
+    return -makeExpr(op.input());
+  }
+
+  AffineExpr visitDimOp(DimOp op) {  //
+    if (auto attr = op.resolve()) {
+      return mlir::getAffineConstantExpr(attr.getInt(), context);
     }
-    if (auto op = llvm::dyn_cast<AffineConstantOp>(defOp)) {
-      return mlir::getAffineConstantExpr(op.value().getSExtValue(), context);
-    }
-    if (auto op = llvm::dyn_cast<AffineAddOp>(defOp)) {
-      return makeExpr(op.lhs()) + makeExpr(op.rhs());
-    }
-    if (auto op = llvm::dyn_cast<AffineMulOp>(defOp)) {
-      return makeExpr(op.lhs()) * makeExpr(op.rhs());
-    }
-    if (auto op = llvm::dyn_cast<AffineDivOp>(defOp)) {
-      return makeExpr(op.lhs()).floorDiv(makeExpr(op.rhs()));
-    }
-    if (auto op = llvm::dyn_cast<AffineNegOp>(defOp)) {
-      return -makeExpr(op.input());
-    }
-    if (auto op = llvm::dyn_cast<AffineSubOp>(defOp)) {
-      return makeExpr(op.lhs()) - makeExpr(op.rhs());
-    }
-    if (auto op = llvm::dyn_cast<DimOp>(defOp)) {
-      if (auto attr = op.resolve()) {
-        return mlir::getAffineConstantExpr(attr.getInt(), context);
-      }
-    }
-    std::stringstream ss;
-    ss << "Invalid affine op: " << mlir::debugString(*value);
-    throw std::runtime_error(ss.str());
+    llvm_unreachable("Invalid DimOp, must resolve to constant value");
   }
 };
 
@@ -244,19 +339,12 @@ struct SymbolicContractionCanonicalizer : OpRewritePattern<SymbolicContractionOp
       return matchFailure();
     }
 
-    auto sinkMapOp = llvm::cast<AffineMapOp>(op.sink()->getDefiningOp());
-    auto consOp = llvm::cast<AffineConstraintsOp>(op.cons()->getDefiningOp());
-    ContractionBuilder builder(sinkMapOp, consOp);
-    for (auto src : op.srcs()) {
-      auto mapOp = llvm::cast<AffineTensorMapOp>(src->getDefiningOp());
-      builder.addSourceMap(mapOp);
-    }
-
+    ContractionBuilder builder(op);
     auto newOp = rewriter.create<ContractionOp>(  //
         op.getLoc(),                              //
         resultType,                               //
         op.init(),                                //
-        builder.tensors,                          //
+        builder.getTensors(),                     //
         op.agg(),                                 //
         op.combo(),                               //
         builder.getSink(),                        //
@@ -265,9 +353,10 @@ struct SymbolicContractionCanonicalizer : OpRewritePattern<SymbolicContractionOp
         op.no_reduce().hasValue(),                //
         op.name().getValueOr(""));
     bool hasNames = false;
+    auto idxs = builder.getIndexes();
     SmallVector<Attribute, 8> idxNames;
-    for (unsigned i = 0; i < builder.idxs.size(); i++) {
-      auto idx = builder.idxs[i];
+    for (unsigned i = 0; i < idxs.size(); i++) {
+      auto idx = idxs[i];
       auto indexOp = llvm::cast<AffineIndexOp>(idx->getDefiningOp());
       if (auto attr = indexOp.getAttrOfType<StringAttr>("name")) {
         idxNames.emplace_back(attr);
@@ -679,10 +768,14 @@ LogicalResult verifyAffineConstantOp(AffineConstantOp op) {  //
 // ---- AffineIndexOp ----
 
 void printAffineIndexOp(OpAsmPrinter* printer, AffineIndexOp op) {  //
-  *printer << op.getOperation()->getName();
+  *printer << op.getOperation()->getName() << ' ' << op.id().getSExtValue();
 }
 
 ParseResult parseAffineIndexOp(OpAsmParser* parser, OperationState& result) {
+  IntegerAttr id;
+  if (parser->parseAttribute(id, "id", result.attributes)) {
+    return failure();
+  }
   auto indexType = parser->getBuilder().getIndexType();
   result.addTypes(indexType);
   return success();

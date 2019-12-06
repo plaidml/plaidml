@@ -95,14 +95,15 @@ def AffineConstantOp : TileOpWithPPV<"affine_const", [NoSideEffect]>, HasFolder 
   }];
 }
 
-def AffineIndexOp : TileOpWithPPV<"idx"> {
+def AffineIndexOp : TileOpWithPPV<"idx", [NoSideEffect]> {
   let summary = "affine index";
-  let arguments = (ins OptionalAttr<StrAttr>:$name);
+  let arguments = (ins I64Attr:$id, OptionalAttr<StrAttr>:$name);
   let results = (outs IndexLike:$result);
 
   let builders = [OpBuilder<
-    "Builder* builder, OperationState& result, StringRef name", [{
+    "Builder* builder, OperationState& result, int64_t id, StringRef name", [{
       result.addTypes(builder->getIndexType());
+      result.addAttribute("id", builder->getI64IntegerAttr(id));
       if (name.size()) {
         result.addAttribute("name", builder->getStringAttr(name));
       }

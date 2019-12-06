@@ -4,9 +4,9 @@
 
 func @dot(%arg0: tensor<1x2x!eltwise.fp32>, %arg1: tensor<2x3x!eltwise.fp32>) -> tensor<?x?x!eltwise.fp32> {
   %c0 = "eltwise.sconst"() {value = 0.0 : f32} : () -> !fp32
-  %0 = tile.idx
-  %1 = tile.idx
-  %2 = tile.idx
+  %0 = tile.idx 0
+  %1 = tile.idx 1
+  %2 = tile.idx 2
   %3 = tile.dim %arg0[0] : tensor<1x2x!eltwise.fp32>
   %4 = tile.dim %arg1[1] : tensor<2x3x!eltwise.fp32>
   %5 = tile.tmap %arg0[%0, %2] : tensor<1x2x!eltwise.fp32>
@@ -36,8 +36,8 @@ func @dot(%arg0: tensor<1x2x!eltwise.fp32>, %arg1: tensor<2x3x!eltwise.fp32>) ->
 
 func @cumsum(%arg0: tensor<10x!eltwise.fp32>) -> tensor<?x!eltwise.fp32> {
   %c0 = "eltwise.sconst"() {value = 0.0 : f32} : () -> !fp32
-  %0 = tile.idx
-  %1 = tile.idx
+  %0 = tile.idx 0
+  %1 = tile.idx 1
   %2 = tile.dim %arg0[0] : tensor<10x!eltwise.fp32> 
   %3 = tile.tmap %arg0[%0] : tensor<10x!eltwise.fp32>
   %4 = tile.map %2

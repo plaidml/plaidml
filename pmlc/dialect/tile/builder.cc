@@ -70,6 +70,7 @@ struct TileBuilder::Impl {
   NoneOp noneOp;
   Value* defaultInit;
   Location loc;
+  unsigned idxCounter = 0;
 
   Impl()
       : module(ModuleOp::create(UnknownLoc::get(&context))),  //
@@ -398,7 +399,7 @@ Value* TileBuilder::MakeAffineConstantOp(int64_t value) {
 
 Value* TileBuilder::MakeAffineIndexOp(StringRef name) {
   IVLOG(5, "TileBuilder::MakeAffineIndexOp> " << name.str());
-  return impl->builder.create<AffineIndexOp>(impl->loc, name).result();
+  return impl->builder.create<AffineIndexOp>(impl->loc, impl->idxCounter++, name).result();
 }
 
 Value* TileBuilder::MakeAffineAddOp(ArrayRef<Value*> args) {
@@ -540,14 +541,6 @@ Value* TileBuilder::MakeContractionOp(  //
   return op.result();
 }
 
-struct PruneIndexesPass : public mlir::FunctionPass<PruneIndexesPass> {
-  void runOnFunction() final {
-    getFunction().walk([&](AffineIndexOp op) { op.erase(); });
-  }
-
-  static std::unique_ptr<mlir::Pass> create() { return std::make_unique<PruneIndexesPass>(); }
-};
-
 std::shared_ptr<TileProgram> TileBuilder::MakeProgram(StringRef name, const ProgramMutations& mutations) {
   if (name.empty()) {
     name = "noname";
@@ -665,7 +658,6 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(StringRef name, const Prog
   mlir::PassManager pm(&impl->context);
   pm.addPass(mlir::createCanonicalizerPass());
   pm.addPass(mlir::createCSEPass());
-  pm.addPass(PruneIndexesPass::create());
   auto result = pm.run(module);
   if (failed(result)) {
     IVLOG(1, mlir::debugString(module));
