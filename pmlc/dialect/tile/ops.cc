@@ -121,15 +121,7 @@ OpFoldResult AffineSubOp::fold(ArrayRef<Attribute> operands) {
 
 OpFoldResult DimOp::fold(ArrayRef<Attribute> operands) {
   IVLOG(5, "DimOp::fold");
-  auto type = tensor()->getType().dyn_cast<mlir::TensorType>();
-  if (!type) {
-    return {};
-  }
-  auto size = type.getDimSize(dim().getSExtValue());
-  if (mlir::ShapedType::isDynamic(size)) {
-    return {};
-  }
-  return IntegerAttr::get(mlir::IntegerType::get(64, getContext()), size);
+  return resolve();
 }
 
 struct ContractionBuilder {
@@ -146,6 +138,7 @@ struct ContractionBuilder {
     for (auto it = pairs.begin(); it != pairs.end(); it++) {
       auto lhs = *it++;
       auto rhs = *it;
+      cons.emplace_back(mlir::simplifyAffineExpr(makeExpr(lhs), idxs.size(), 0));
       cons.emplace_back(makeConstraint(lhs, rhs));
     }
   }
@@ -195,13 +188,14 @@ struct ContractionBuilder {
     // IntegerSets are in the form `x >= 0`
     // lhs < rhs
     // -lhs > -rhs             multiply -1
-    // rhs - lhs > 0           subtract lhs
+    // rhs - lhs > 0           add rhs
     // rhs - lhs - 1 >= 0      subtract 1
-    return makeExpr(rhs) - makeExpr(lhs) - 1;
+    auto expr = makeExpr(rhs) - makeExpr(lhs) - 1;
+    return mlir::simplifyAffineExpr(expr, idxs.size(), 0);
   }
 
   AffineExpr makeExpr(Value* value) {
-    IVLOG(3, "MakePoly: " << mlir::debugString(*value));
+    IVLOG(3, "makeExpr: " << mlir::debugString(*value));
     auto defOp = value->getDefiningOp();
     if (auto op = llvm::dyn_cast<AffineIndexOp>(defOp)) {
       idxs.insert(value);
@@ -225,6 +219,11 @@ struct ContractionBuilder {
     }
     if (auto op = llvm::dyn_cast<AffineSubOp>(defOp)) {
       return makeExpr(op.lhs()) - makeExpr(op.rhs());
+    }
+    if (auto op = llvm::dyn_cast<DimOp>(defOp)) {
+      if (auto attr = op.resolve()) {
+        return mlir::getAffineConstantExpr(attr.getInt(), context);
+      }
     }
     std::stringstream ss;
     ss << "Invalid affine op: " << mlir::debugString(*value);
@@ -263,7 +262,8 @@ struct SymbolicContractionCanonicalizer : OpRewritePattern<SymbolicContractionOp
         builder.getSink(),                        //
         builder.getSources(),                     //
         builder.getConstraints(),                 //
-        op.no_reduce().hasValue());
+        op.no_reduce().hasValue(),                //
+        op.name().getValueOr(""));
     bool hasNames = false;
     SmallVector<Attribute, 8> idxNames;
     for (unsigned i = 0; i < builder.idxs.size(); i++) {
@@ -304,6 +304,8 @@ unsigned ContractionOp::getNumTensors(CombinationKind combo) {
       return 2;
     case CombinationKind::cond:
       return 3;
+    default:
+      throw std::runtime_error("Invalid combination op");
   }
 }
 
@@ -318,7 +320,8 @@ void ContractionOp::build(     //
     AffineMap sink,            //
     ArrayRef<AffineMap> srcs,  //
     IntegerSet cons,           //
-    bool no_reduce) {
+    bool no_reduce,            //
+    StringRef name) {
   result.addOperands(init);
   result.addOperands(tensors);
   result.addTypes(resultType);
@@ -331,6 +334,9 @@ void ContractionOp::build(     //
   }
   if (no_reduce) {
     result.addAttribute("no_reduce", builder->getUnitAttr());
+  }
+  if (name.size()) {
+    result.addAttribute("name", builder->getStringAttr(name));
   }
 }
 
@@ -611,6 +617,18 @@ Type ShapeOp::getResultType(ArrayRef<Value*> operands) {
 
 // ---- DimOp ----
 
+IntegerAttr DimOp::resolve() {  //
+  auto type = tensor()->getType().dyn_cast<mlir::TensorType>();
+  if (!type) {
+    return {};
+  }
+  auto size = type.getDimSize(dim().getSExtValue());
+  if (mlir::ShapedType::isDynamic(size)) {
+    return {};
+  }
+  return IntegerAttr::get(mlir::IntegerType::get(64, getContext()), size);
+}
+
 void printDimOp(OpAsmPrinter* printer, DimOp op) {  //
   *printer << op.getOperation()->getName() << ' ';
   printer->printOperand(op.tensor());
@@ -854,7 +872,7 @@ Value* ContractionOp::getSymbol(unsigned i) {  //
 }
 
 void printContractionOp(OpAsmPrinter* printer, ContractionOp op) {
-  SmallVector<StringRef, 3> elidedAttrs = {"agg", "combo"};
+  SmallVector<StringRef, 3> elidedAttrs = {"agg", "combo", "name"};
   // if (op.cons().hasValue() && op.cons().getValue().isEmptyIntegerSet()) {
   //   elidedAttrs.emplace_back("cons");
   // }

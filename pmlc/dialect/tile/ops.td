@@ -72,6 +72,10 @@ def DimOp : TileOpWithPPV<"dim", [NoSideEffect]>, HasFolder {
       result.addTypes(builder->getIndexType());
     }]
   >];
+
+  let extraClassDeclaration = [{
+    IntegerAttr resolve();
+  }];
 }
 
 def AffineConstantOp : TileOpWithPPV<"affine_const", [NoSideEffect]>, HasFolder {
@@ -93,11 +97,15 @@ def AffineConstantOp : TileOpWithPPV<"affine_const", [NoSideEffect]>, HasFolder 
 
 def AffineIndexOp : TileOpWithPPV<"idx"> {
   let summary = "affine index";
+  let arguments = (ins OptionalAttr<StrAttr>:$name);
   let results = (outs IndexLike:$result);
 
   let builders = [OpBuilder<
-    "Builder* builder, OperationState& result", [{
+    "Builder* builder, OperationState& result, StringRef name", [{
       result.addTypes(builder->getIndexType());
+      if (name.size()) {
+        result.addAttribute("name", builder->getStringAttr(name));
+      }
     }]
   >];
 }
@@ -203,7 +211,8 @@ def SymbolicContractionOp : TileOpWithPPV<"sym_cion", [NoSideEffect]>, HasCanoni
     Variadic<AffineTensorMap>:$srcs,
     AggregationKind:$agg,
     CombinationKind:$combo,
-    OptionalAttr<UnitAttr>:$no_reduce
+    OptionalAttr<UnitAttr>:$no_reduce,
+    OptionalAttr<StrAttr>:$name
   );
   let results = (outs RankedTensorOf<[AnyScalar]>:$result);
 }
@@ -218,7 +227,8 @@ def ContractionOp : TileOpWithPPV<"cion", [NoSideEffect]> {
     AffineMapArrayAttr:$srcs,
     OptionalAttr<IntegerSetAttr>:$cons,
     OptionalAttr<AffineMapAttr>:$shape,
-    OptionalAttr<UnitAttr>:$no_reduce
+    OptionalAttr<UnitAttr>:$no_reduce,
+    OptionalAttr<StrAttr>:$name
   );
   let results = (outs RankedTensorOf<[AnyScalar]>:$result);
 
@@ -233,7 +243,8 @@ def ContractionOp : TileOpWithPPV<"cion", [NoSideEffect]> {
     "AffineMap sink, "
     "ArrayRef<AffineMap> srcs, "
     "IntegerSet cons, "
-    "bool no_reduce"
+    "bool no_reduce, "
+    "StringRef name"
   >];
 
   let extraClassDeclaration = [{

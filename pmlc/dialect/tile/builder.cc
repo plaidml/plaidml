@@ -398,11 +398,7 @@ Value* TileBuilder::MakeAffineConstantOp(int64_t value) {
 
 Value* TileBuilder::MakeAffineIndexOp(StringRef name) {
   IVLOG(5, "TileBuilder::MakeAffineIndexOp> " << name.str());
-  auto op = impl->builder.create<AffineIndexOp>(impl->loc);
-  if (!name.empty()) {
-    op.setAttr("name", impl->builder.getStringAttr(name));
-  }
-  return op.result();
+  return impl->builder.create<AffineIndexOp>(impl->loc, name).result();
 }
 
 Value* TileBuilder::MakeAffineAddOp(ArrayRef<Value*> args) {
@@ -525,6 +521,10 @@ Value* TileBuilder::MakeContractionOp(  //
   SmallVector<Value*, 4> sizeDims(sizeMapOp.dims());
   auto shape = eltwise::ComputeShape(sizeDims);
 
+  StringAttr nameAttr;
+  if (name.size()) {
+    nameAttr = impl->builder.getStringAttr(name);
+  }
   auto op = impl->builder.create<SymbolicContractionOp>(             //
       impl->loc,                                                     //
       RankedTensorType::get(shape, elementType),                     //
@@ -535,7 +535,8 @@ Value* TileBuilder::MakeContractionOp(  //
       srcs,                                                          //
       impl->builder.getI64IntegerAttr(static_cast<int64_t>(agg)),    //
       impl->builder.getI64IntegerAttr(static_cast<int64_t>(combo)),  //
-      UnitAttr{});
+      UnitAttr{},                                                    //
+      nameAttr);
   return op.result();
 }
 

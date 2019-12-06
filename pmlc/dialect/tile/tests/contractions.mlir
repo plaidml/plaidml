@@ -50,7 +50,7 @@ func @cumsum(%arg0: tensor<10x!eltwise.fp32>) -> tensor<?x!eltwise.fp32> {
 
 // CHECK: #[[MAP0:map[0-9]+]] = (d0, d1) -> (d0)
 // CHECK: #[[MAP1:map[0-9]+]] = (d0, d1) -> (d1)
-// CHECK: #[[SET0:set[0-9]+]] = (d0, d1) : (-(d0 - d1) + 9 >= 0)
+// CHECK: #[[SET0:set[0-9]+]] = (d0, d1) : (d0 - d1 >= 0, -d0 + d1 + 9 >= 0)
 
 // CHECK: func @cumsum(%arg0: tensor<10x!eltwise.fp32>) -> tensor<10x!eltwise.fp32> {
 // CHECK:   %[[CST:.*]] = "eltwise.sconst"() {value = 0.000000e+00 : f32} : () -> !fp32

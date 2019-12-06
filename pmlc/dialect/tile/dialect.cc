@@ -12,9 +12,7 @@
 #include "base/util/logging.h"
 #include "pmlc/dialect/tile/ops.h"
 
-namespace pmlc {
-namespace dialect {
-namespace tile {
+namespace pmlc::dialect::tile {
 
 namespace {
 
@@ -27,6 +25,18 @@ struct OpAsmInterface : public mlir::OpAsmDialectInterface {
     llvm::raw_svector_ostream os(osbuf);
     if (auto constOp = llvm::dyn_cast<AffineConstantOp>(op)) {
       os << 'c' << constOp.value().getSExtValue();
+    } else if (auto indexOp = llvm::dyn_cast<AffineIndexOp>(op)) {
+      if (indexOp.name().hasValue()) {
+        os << *indexOp.name();
+      }
+    } else if (auto cionOp = llvm::dyn_cast<SymbolicContractionOp>(op)) {
+      if (cionOp.name().hasValue()) {
+        os << *cionOp.name();
+      }
+    } else if (auto cionOp = llvm::dyn_cast<ContractionOp>(op)) {
+      if (cionOp.name().hasValue()) {
+        os << *cionOp.name();
+      }
     }
     setNameFn(op->getResult(0), os.str());
   }
@@ -94,6 +104,4 @@ Operation* Dialect::materializeConstant(  //
 
 static mlir::DialectRegistration<Dialect> EdslOps;
 
-}  // namespace tile
-}  // namespace dialect
-}  // namespace pmlc
+}  // namespace pmlc::dialect::tile

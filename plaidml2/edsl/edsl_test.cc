@@ -342,7 +342,7 @@ TEST(CppEdsl, MnistCnn) {
 #map8 = (d0, d1) -> (d0, 0)
 #map9 = (d0, d1) -> (d0, d1)
 
-#set0 = (d0, d1, d2, d3, d4, d5) : (-d4 + 1 >= 0, -d5 + 1 >= 0)
+#set0 = (d0, d1, d2, d3, d4, d5) : (d4 >= 0, -d4 + 1 >= 0, d5 >= 0, -d5 + 1 >= 0)
 
 !fp32 = type tensor<!eltwise.fp32>
 module {
@@ -508,7 +508,7 @@ TEST(CppEdsl, RepeatElements) {
 #map0 = (d0, d1, d2, d3) -> (d0, d1 * 3 + d2, d3)
 #map1 = (d0, d1, d2, d3) -> (d0, d1, d3)
 
-#set0 = (d0, d1, d2, d3) : (-d2 + 2 >= 0)
+#set0 = (d0, d1, d2, d3) : (d2 >= 0, -d2 + 2 >= 0)
 
 !fp32 = type tensor<!eltwise.fp32>
 module {
@@ -794,7 +794,7 @@ TEST(CppEdsl, CumSum) {
 #map0 = (d0, d1) -> (d0)
 #map1 = (d0, d1) -> (d1)
 
-#set0 = (d0, d1) : (-(d0 - d1) + 9 >= 0)
+#set0 = (d0, d1) : (d0 - d1 >= 0, -d0 + d1 + 9 >= 0)
 
 !fp32 = type tensor<!eltwise.fp32>
 module {

@@ -275,20 +275,11 @@ Contraction::Contraction(ContractionOp op) {
     accesses.emplace_back(ConvertAffineMap(op, map));
   }
 
-  if (op.cons().hasValue()) {
-    for (auto cons : op.cons().getValue().getConstraints()) {
-    }
-  }
-  // for (auto constraintOp : constraintOps) {
-  //   auto poly = MakePoly(constraintOp.lhs());
-  //   auto rhsOp = constraintOp.rhs()->getDefiningOp();
-  //   mlir::IntegerAttr attr;
-  //   if (!mlir::m_Constant(&attr).match(rhsOp)) {
-  //     throw std::runtime_error("Constraint range must resolve to a constant integer");
+  // TODO: enable this once we can use SimpleConstraints directly
+  // if (op.cons().hasValue()) {
+  //   for (auto cons : op.cons().getValue().getConstraints()) {
+  //     constraints.emplace_back(MakePoly(op, cons), 0);
   //   }
-  //   auto range = attr.getInt();
-  //   IVLOG(5, "constraint: " << poly << " < " << range);
-  //   constraints.emplace_back(poly, range);
   // }
 }
 

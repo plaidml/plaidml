@@ -388,8 +388,8 @@ TEST(Op, Convolution) {
 module {
   func @convolution(%arg0: tensor<7x7x3x64x!eltwise.fp32> {tile.name = "K"}, %arg1: tensor<1x224x224x3x!eltwise.fp32> {tile.name = "I"}) -> tensor<1x112x112x64x!eltwise.fp32> {
     %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !fp32
-    %0 = tile.cion add, mul, %cst, %arg1, %arg0 {idxs = ["n", "x0", "x1", "co", "k0", "k1", "ci"], sink = #map0, srcs = [#map1, #map2]} : !fp32, tensor<1x224x224x3x!eltwise.fp32>, tensor<7x7x3x64x!eltwise.fp32> -> tensor<1x112x112x64x!eltwise.fp32>
-    return %0 : tensor<1x112x112x64x!eltwise.fp32>
+    %conv = tile.cion add, mul, %cst, %arg1, %arg0 {idxs = ["n", "x0", "x1", "co", "k0", "k1", "ci"], sink = #map0, srcs = [#map1, #map2]} : !fp32, tensor<1x224x224x3x!eltwise.fp32>, tensor<7x7x3x64x!eltwise.fp32> -> tensor<1x112x112x64x!eltwise.fp32>
+    return %conv : tensor<1x112x112x64x!eltwise.fp32>
   }
 }
 )#"));
@@ -415,7 +415,7 @@ TEST(Op, CumProd) {
 #map0 = (d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)
 #map1 = (d0, d1, d2, d3, d4) -> (d0, d1, d2 - d4, d3)
 
-#set0 = (d0, d1, d2, d3, d4) : (-d4 + 2 >= 0)
+#set0 = (d0, d1, d2, d3, d4) : (d4 >= 0, -d4 + 2 >= 0)
 
 !fp32 = type tensor<!eltwise.fp32>
 module {
@@ -448,7 +448,7 @@ TEST(Op, CumSum) {
 #map0 = (d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)
 #map1 = (d0, d1, d2, d3, d4) -> (d0, d1, d2 - d4, d3)
 
-#set0 = (d0, d1, d2, d3, d4) : (-d4 + 2 >= 0)
+#set0 = (d0, d1, d2, d3, d4) : (d4 >= 0, -d4 + 2 >= 0)
 
 !fp32 = type tensor<!eltwise.fp32>
 module {
@@ -861,7 +861,7 @@ TEST(Op, Pool) {
 #map0 = (d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4)
 #map1 = (d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1 + d5 - 1, d2 * 2 + d6 - 2, d3 * 3 + d7, d4)
 
-#set0 = (d0, d1, d2, d3, d4, d5, d6, d7) : (-d5 >= 0, -d6 + 1 >= 0, -d7 + 2 >= 0)
+#set0 = (d0, d1, d2, d3, d4, d5, d6, d7) : (d5 >= 0, -d5 >= 0, d6 >= 0, -d6 + 1 >= 0, d7 >= 0, -d7 + 2 >= 0)
 
 !fp32 = type tensor<!eltwise.fp32>
 module {
@@ -1123,7 +1123,7 @@ TEST(Op, Repeat) {
 #map0 = (d0, d1, d2, d3, d4) -> (d0, d1, d2 * 3 + d3, d4)
 #map1 = (d0, d1, d2, d3, d4) -> (d0, d1, d2, d4)
 
-#set0 = (d0, d1, d2, d3, d4) : (-d3 + 2 >= 0)
+#set0 = (d0, d1, d2, d3, d4) : (d3 >= 0, -d3 + 2 >= 0)
 
 !fp32 = type tensor<!eltwise.fp32>
 module {
