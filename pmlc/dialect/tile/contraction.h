@@ -27,11 +27,11 @@ using IndexPoly = math::Polynomial<math::Rational>;
 using IndexAccess = std::vector<IndexPoly>;
 using IndexBounds = std::map<std::string, Bound>;
 using SimpleConstraints = std::vector<math::SimpleConstraint>;
-using SimpleConstraints = std::vector<math::RangedConstraint>;
-using BoundsAndConstraints = std::tuple<IndexBounds, RangedConstraints>;
+using RangeConstraints = std::vector<math::RangeConstraint>;
+using BoundsAndConstraints = std::tuple<IndexBounds, SimpleConstraints>;
 
 struct Constraints {
-  RangedConstraints constraints;
+  RangeConstraints constraints;
 
   void AddTensor(const IndexAccess& access, stripe::TensorType tensorType);
 
@@ -50,27 +50,27 @@ struct Contraction {
   explicit Contraction(ContractionOp op);
 
   BoundsAndConstraints ComputeBounds(llvm::ArrayRef<stripe::TensorType> shapes, bool no_reduce);
+  void DeduceRangeConstraints();
 
   std::vector<IndexAccess> accesses;
   SimpleConstraints constraints;
-  // During lowering, will transform all constraints to ranged constraints, which we track in ranged_constraints
-  Constraints ranged_constraints;
+  // During lowering, will transform all constraints to range constraints, which we track in range_constraints
+  Constraints range_constraints;
 
  private:
   std::set<std::string> getIndexVars() const;
 
   // Gathers boths explicit and implied constraints, and removes dups.
-  Constraints GatherConstraints(llvm::ArrayRef<stripe::TensorType> shapes) const;
+  void GatherConstraints(llvm::ArrayRef<stripe::TensorType> shapes);
 
-  // Adds constraints to the contraction forcing every variable used to be an
-  // integer
+  // Adds constraints to the contraction forcing every variable used to be an integer
   void ConstrainIndexVarsToInts();
 
   bool NeedReduce() const;
-  void ReduceOutputPolynomials(const Constraints& order);
+  void ReduceOutputPolynomials();
 
   // Remove any fractional polynomial multipliers (IE, any non-integers).
-  void Defractionalize(const Constraints& order);
+  void Defractionalize();
 };
 
 math::Affine Integerize(const IndexPoly& poly, const IndexBounds& bounds);
