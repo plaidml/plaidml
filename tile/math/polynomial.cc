@@ -392,16 +392,6 @@ RangeConstraint IntersectParallelConstraintPair(  //
   return IntersectParallelConstraintPairInner(constraint1, constraint2);
 }
 
-// TODO: Cull?
-// static RangeConstraint IntersectParallelConstraintPair(  //
-//     const SimpleConstraint& constraint1,                 //
-//     const RangeConstraint& constraint2) {
-//   // Combines two parallel constraints into one
-//   return IntersectParallelConstraintPair(constraint2, constraint1);
-// }
-
-// TODO: The Intersect...Constraint... functions should probably be moved to tile/math/polynomial.h
-
 // TODO: Need unit tests
 RangeConstraint IntersectOpposedSimpleConstraints(  //
     const SimpleConstraint& constraint1,            //

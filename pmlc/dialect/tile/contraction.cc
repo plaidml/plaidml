@@ -28,7 +28,6 @@ using vertexai::tile::math::SimpleConstraint;
 namespace pmlc::dialect::tile {
 
 void Constraints::AddTensor(const IndexAccess& access, stripe::TensorType tensorType) {
-  // TODO: Redo for `constraints` being `SimpleConstraint`s
   auto shape = tensorType.getShape();
   if (access.size() != shape.size()) {
     throw std::runtime_error(llvm::formatv("Indexes != dimensions: {0} != {1}", access.size(), shape.size()).str());
@@ -220,7 +219,8 @@ void Contraction::GatherConstraints(llvm::ArrayRef<stripe::TensorType> shapes) {
         llvm::formatv("Shape mismatch during constraint gathering: {0} vs {1}", shapes.size(), accesses.size()).str());
   }
   // Add constraints to keep each access in-bounds
-  // TODO: Do we actually need this each run of GatherConstraints? Seems like first time should be sufficient...
+  // TODO: We may be able to skip these AddTensor calls in the 2nd+ calls of GatherConstraints. But
+  // it won't hurt anything to leave it in, and it's simpler code to leave it in.
   for (size_t i = 0; i < accesses.size(); i++) {
     range_constraints.AddTensor(accesses[i], shapes[i]);
   }
@@ -336,7 +336,6 @@ void Contraction::ReduceOutputPolynomials() {
   // Next, fill in from contraints until we have as many as variables or we run
   // out of options
   for (const auto& constraint : range_constraints.constraints) {
-    // TODO: Unclear if the doubling from using SimpleConstraints will make this a problem
     if (basis.dimensions() == indexVars.size()) {
       break;
     }
@@ -399,7 +398,6 @@ void Contraction::Defractionalize() {
   IndexAccess polys;
   bool has_fract = false;
   std::set<std::string> vars;
-  // TODO: This probably needs some attention for the conversion to SimpleConstraints
   for (const auto& constraint : range_constraints.constraints) {
     for (const auto& [key, value] : constraint.poly.getMap()) {
       if (denominator(value) != 1) {
@@ -519,7 +517,6 @@ void Contraction::Defractionalize() {
     }
   }
 
-  // TODO: Switch to SimpleConstraint
   for (auto& constraint : range_constraints.constraints) {
     constraint = RangeConstraint(ConvertPoly(constraint.poly, replacements, transform_constant), constraint.range);
   }
@@ -593,10 +590,12 @@ void Contraction::DeduceRangeConstraints() {
     }
   }
   if (!unmerged.empty()) {
-    throw std::runtime_error("Unable to pair all constraints");
-    // TODO: Switch to better log:
-    // throw std::runtime_error("Unable to pair all constraints, started with " + to_string(constraints)
-    //   + ", unable to match " + to_string(unmerged));
+    // TODO: We could solve an ILP problem to make a range for outstanding unpaired constraints
+    // (unless the iteration space is unbounded, but that's an error)
+    // However, this should not occur in code originating from the EDSL, and so I'd rather throw
+    // an error here than get extra expressivity that we never use.
+    IVLOG(1, "Started with the constraints: " << constraints << ", unable to match " << unmerged);
+    throw std::runtime_error("Unable to pair all constraints in DeduceRangeConstraints");
   }
 }
 

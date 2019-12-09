@@ -104,7 +104,6 @@ inline std::string to_string(const RangeConstraint& c) {
   return "0 <= " + to_string(c.poly) + " < " + std::to_string(c.range);
 }
 
-// TODO: Verify namespace changes...
 // A range [min, max], ie min <= x <= max
 struct Bound {
   int64_t min;  // Smallest value inclusive
