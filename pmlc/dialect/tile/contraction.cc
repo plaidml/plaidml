@@ -368,12 +368,13 @@ Contraction::Contraction(ContractionOp op) {
     accesses.emplace_back(ConvertAffineMap(op, map));
   }
 
-  // TODO: enable this once we can use SimpleConstraints directly
-  // if (op.cons().hasValue()) {
-  //   for (auto cons : op.cons().getValue().getConstraints()) {
-  //     constraints.emplace_back(MakePoly(op, cons), 0);
-  //   }
-  // }
+  if (op.cons().hasValue()) {
+    for (auto cons : op.cons().getValue().getConstraints()) {
+      // MLIR AffineConstraints are [poly] >= 0, and simple constraints are [poly] <= [const]
+      // So we use 0 as the constant and negate the constraint
+      constraints.emplace_back(MakePoly(op, -cons), 0);
+    }
+  }
 }
 
 void Contraction::GatherConstraints(llvm::ArrayRef<stripe::TensorType> shapes) {
