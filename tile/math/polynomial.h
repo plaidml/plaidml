@@ -104,6 +104,27 @@ inline std::string to_string(const RangeConstraint& c) {
   return "0 <= " + to_string(c.poly) + " < " + std::to_string(c.range);
 }
 
+// TODO: Verify namespace changes...
+// A range [min, max], ie min <= x <= max
+struct Bound {
+  int64_t min;  // Smallest value inclusive
+  int64_t max;  // Largest value inclusive
+};
+
+using IndexBounds = std::map<std::string, Bound>;
+
+// True iff `constraint` holds for every choice of index values satisfying `bounds`
+bool IsImplied(const SimpleConstraint& constraint, const IndexBounds& bounds);
+
+// Construct a single constraint equivalent to the intersection of the two supplied parallel constraints
+RangeConstraint IntersectParallelConstraintPair(const RangeConstraint& constraint1, const RangeConstraint& constraint2);
+RangeConstraint IntersectParallelConstraintPair(const RangeConstraint& constraint1,
+                                                const SimpleConstraint& constraint2);
+
+// Same as IntersectParallelConstraintPair; with SimpleConstraints they must be parallel & in opposite directions
+RangeConstraint IntersectOpposedSimpleConstraints(const SimpleConstraint& constraint1,
+                                                  const SimpleConstraint& constraint2);
+
 inline MAKE_LOGGABLE(RangeConstraint, c, os) {
   os << to_string(c);
   return os;
@@ -116,6 +137,11 @@ inline MAKE_LOGGABLE(SimpleConstraint, c, os) {
 
 inline MAKE_LOGGABLE(Polynomial<Rational>, c, os) {
   os << to_string(c);
+  return os;
+}
+
+inline MAKE_LOGGABLE(Bound, b, os) {
+  os << "Bound[" << b.min << ", " << b.max << "]";
   return os;
 }
 

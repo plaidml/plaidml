@@ -25,10 +25,9 @@ struct Bound {
 
 using IndexPoly = math::Polynomial<math::Rational>;
 using IndexAccess = std::vector<IndexPoly>;
-using IndexBounds = std::map<std::string, Bound>;
 using SimpleConstraints = std::vector<math::SimpleConstraint>;
 using RangeConstraints = std::vector<math::RangeConstraint>;
-using BoundsAndConstraints = std::tuple<IndexBounds, SimpleConstraints>;
+using BoundsAndConstraints = std::tuple<math::IndexBounds, SimpleConstraints>;
 
 struct Constraints {
   RangeConstraints constraints;
@@ -73,6 +72,6 @@ struct Contraction {
   void Defractionalize();
 };
 
-math::Affine Integerize(const IndexPoly& poly, const IndexBounds& bounds);
+math::Affine Integerize(const IndexPoly& poly, const math::IndexBounds& bounds);
 
 }  // namespace pmlc::dialect::tile
