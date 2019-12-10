@@ -104,18 +104,42 @@ TEST_CASE("Inversion Test (Singular)", "[matrix][invert]") {
   REQUIRE(m.invert() == false);
 }
 
-TEST_CASE("Basic Polynomial<Rational> compilation", "[]") {
+TEST_CASE("Basic Polynomial<Rational> compilation", "[poly]") {
   Polynomial<Rational> i("i"), j("j"), k("k");
   Polynomial<Rational> x = 3 * i - j + 17;
   Polynomial<Rational> y = -x / 3 + k;
   REQUIRE(to_string(y) == "-17/3 - i + 1/3*j + k");
 }
 
-TEST_CASE("Basic Polynomial<Rational> evaluation", "[]") {
+TEST_CASE("Basic Polynomial<Rational> evaluation", "[poly]") {
   Polynomial<Rational> a0("a0"), a1("a1");
   Polynomial<Rational> r = a0 + 3 * a1 + 1;
   REQUIRE(to_string(r) == "1 + a0 + 3*a1");
   REQUIRE(r.eval({{"a0", 5}, {"a1", 9}}) == 33);
+}
+
+TEST_CASE("IntersectParallelConstraintPair", "[poly]") {
+  Polynomial<Rational> i("i"), j("j");
+  RangeConstraint c1{2 * i + j + 1, 8};
+  RangeConstraint c2{-4 * i - 2 * j - 2, 2};
+  auto intersection = IntersectParallelConstraintPair(c1, c2);
+  REQUIRE(to_string(intersection) == "0 <= -1 - 2*i - j < 1");
+}
+
+TEST_CASE("IntersectOpposedSimpleConstraints", "[poly]") {
+  Polynomial<Rational> i("i"), j("j");
+  SimpleConstraint c1{2 * i + j + 1, 4};
+  SimpleConstraint c2{-6 * i - 3 * j, 2};
+  auto intersection = IntersectOpposedSimpleConstraints(c1, c2);
+  REQUIRE(to_string(intersection) == "0 <= 2*i + j < 4");
+}
+
+TEST_CASE("IntersectOpposedSimpleConstraintsBasic", "[poly]") {
+  Polynomial<Rational> x("x");
+  SimpleConstraint c1{x + 1, 4};
+  SimpleConstraint c2{-3 * x, 2};
+  auto intersection = IntersectOpposedSimpleConstraints(c1, c2);
+  REQUIRE(to_string(intersection) == "0 <= x < 4");
 }
 
 TEST_CASE("HNFMatrix", "[hnf]") {

@@ -398,6 +398,7 @@ RangeConstraint IntersectOpposedSimpleConstraints(  //
     const SimpleConstraint& constraint2) {
   // Combines two SimpleConstraints which are parallel and bounding in opposite directions into
   // a single equivalent RangeConstraint
+  IVLOG(6, "Merging Opposed SimpleConstraints: " << constraint1 << " and " << constraint2);
   Rational ratio = constraint1.poly.tryDivide(constraint2.poly, true);
   if (ratio >= 0) {
     throw std::invalid_argument(
@@ -416,16 +417,22 @@ RangeConstraint IntersectOpposedSimpleConstraints(  //
   //   0 <= -p1 - c1 + rhs1 <= -c1 + rhs1 + a * c2 - a * rhs2
   // (noting that this is just for the bounds, not the integrality)
   // And so use this to make a range constraint from constraint1 and then call to IntersectParallelConstraintPair
-  // Note that if the range is too generous the IntersectParallel call will fix it, so don't bother with a - 1
-  // This may have some duplication of work, but I think this is too tiny for that to matter for overall perf
   auto merged_poly1 = -constraint1.poly + constraint1.rhs;
   auto merged_const1 = -constraint1.poly.constant() + constraint1.rhs;
   auto merged_const2 = -constraint2.poly.constant() + constraint2.rhs;
-  auto range = merged_const1 - ratio * merged_const2;
+  // Note that if the range is too generous the IntersectParallel call will fix it. So, instead of figuring out
+  // whether there is a fractional offset in the new form and determining the precise range, use Ceil and Floor
+  // to get an overapproximation of the range.
+  // This approach may duplicate a bit of work, but I think this is too tiny for that to matter for overall perf
+  auto range = math::Ceil(merged_const1) - math::Floor(ratio * merged_const2);  // TODO
   if (range > INT64_MAX) {
     throw std::out_of_range("Bound range in IntersectOpposedSimpleConstraints overflows int64.");
   }
   int64_t r = (int64_t)range;
+  // IVLOG(6, "Ratio: " << ratio << "; merged_poly1: " << merged_poly1 << "; merged_const1: " << merged_const1
+  //                    << "; merged_const2: " << merged_const2);
+  // IVLOG(6, "Range (& formula): " << range << " = ceil(" << merged_const1 << ") - floor(" << ratio << " * "
+  //                                << merged_const2 << ")");
   return IntersectParallelConstraintPair(RangeConstraint(merged_poly1, r), constraint2);
 }
 
