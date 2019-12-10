@@ -7,13 +7,12 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpImplementation.h"
+#include "mlir/Support/DebugStringHelper.h"
 
 #include "base/util/logging.h"
 #include "pmlc/dialect/tile/ops.h"
 
-namespace pmlc {
-namespace dialect {
-namespace tile {
+namespace pmlc::dialect::tile {
 
 namespace {
 
@@ -26,6 +25,18 @@ struct OpAsmInterface : public mlir::OpAsmDialectInterface {
     llvm::raw_svector_ostream os(osbuf);
     if (auto constOp = llvm::dyn_cast<AffineConstantOp>(op)) {
       os << 'c' << constOp.value().getSExtValue();
+    } else if (auto indexOp = llvm::dyn_cast<AffineIndexOp>(op)) {
+      if (indexOp.name().hasValue()) {
+        os << *indexOp.name();
+      }
+    } else if (auto cionOp = llvm::dyn_cast<SymbolicContractionOp>(op)) {
+      if (cionOp.name().hasValue()) {
+        os << *cionOp.name();
+      }
+    } else if (auto cionOp = llvm::dyn_cast<ContractionOp>(op)) {
+      if (cionOp.name().hasValue()) {
+        os << *cionOp.name();
+      }
     }
     setNameFn(op->getResult(0), os.str());
   }
@@ -37,8 +48,6 @@ Dialect::Dialect(mlir::MLIRContext* ctx) : mlir::Dialect(getDialectNamespace(), 
   addTypes<                   //
       AffineMapType,          //
       AffineConstraintsType,  //
-      AffineIndexMapType,     //
-      AffineSizeMapType,      //
       AffineTensorMapType,    //
       StringType>();
   addOperations<
@@ -48,34 +57,28 @@ Dialect::Dialect(mlir::MLIRContext* ctx) : mlir::Dialect(getDialectNamespace(), 
   addInterfaces<OpAsmInterface>();
 }
 
-std::string Dialect::getDialectAttrName(llvm::StringRef name) {
+std::string Dialect::getDialectAttrName(StringRef name) {
   return llvm::formatv("{0}.{1}", getDialectNamespace(), name).str();
 }
 
-std::string Dialect::getCanonicalOpName(llvm::StringRef name) {
+std::string Dialect::getCanonicalOpName(StringRef name) {
   return llvm::formatv("{0}.{1}", getDialectNamespace(), name).str();
 }
 
-void Dialect::printType(mlir::Type type, mlir::DialectAsmPrinter& printer) const {
+void Dialect::printType(Type type, mlir::DialectAsmPrinter& printer) const {
   auto& os = printer.getStream();
-  if (type.isa<AffineIndexMapType>()) {
-    os << "imap";
-  } else if (type.isa<AffineTensorMapType>()) {
+  if (type.isa<AffineTensorMapType>()) {
     os << "tmap";
   } else if (type.isa<AffineMapType>()) {
     os << "map";
   } else if (type.isa<AffineConstraintsType>()) {
     os << "cons";
-  } else if (type.isa<AffineSizeMapType>()) {
-    os << "smap";
   }
 }
 
-mlir::Type Dialect::parseType(mlir::DialectAsmParser& parser) const {
+Type Dialect::parseType(mlir::DialectAsmParser& parser) const {
   auto spec = parser.getFullSymbolSpec();
-  auto type = llvm::StringSwitch<mlir::Type>(spec)
-                  .Case("imap", AffineIndexMapType::get(getContext()))
-                  .Case("smap", AffineSizeMapType::get(getContext()))
+  auto type = llvm::StringSwitch<Type>(spec)
                   .Case("tmap", AffineTensorMapType::get(getContext()))
                   .Case("map", AffineMapType::get(getContext()))
                   .Case("cons", AffineConstraintsType::get(getContext()))
@@ -87,11 +90,11 @@ mlir::Type Dialect::parseType(mlir::DialectAsmParser& parser) const {
   return type;
 }
 
-mlir::Operation* Dialect::materializeConstant(  //
-    mlir::OpBuilder& builder,                   //
-    mlir::Attribute value,                      //
-    mlir::Type type,                            //
-    mlir::Location loc) {
+Operation* Dialect::materializeConstant(  //
+    mlir::OpBuilder& builder,             //
+    Attribute value,                      //
+    Type type,                            //
+    Location loc) {
   IVLOG(5, "tile::Dialect::materializeConstant");
   if (auto attr = value.dyn_cast<IntegerAttr>()) {
     return builder.create<AffineConstantOp>(loc, type, attr);
@@ -101,6 +104,4 @@ mlir::Operation* Dialect::materializeConstant(  //
 
 static mlir::DialectRegistration<Dialect> EdslOps;
 
-}  // namespace tile
-}  // namespace dialect
-}  // namespace pmlc
+}  // namespace pmlc::dialect::tile
