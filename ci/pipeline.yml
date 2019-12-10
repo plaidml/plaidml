@@ -36,6 +36,8 @@ steps:
   {{/retry}}
     agents:
       PLATFORM: '{{platform}}'
+    artifact_paths:
+      - "tmp/test/**/report.json"
 {{/tests}}
 
   - wait: ~

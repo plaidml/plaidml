@@ -177,12 +177,8 @@ def run(args, remainder):
         'ref.execution_duration': result.ref.execution_duration,
     }
 
-    report_path = output / 'report.json'
-    with report_path.open('w') as fp:
+    with (output / 'report.json').open('w') as fp:
         json.dump(report, fp)
-
-    if not args.local:
-        util.buildkite_upload('tmp/test/**/report.json')
 
     if retcode:
         sys.exit(retcode)
