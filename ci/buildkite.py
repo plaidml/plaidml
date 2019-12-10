@@ -120,14 +120,6 @@ def cmd_pipeline(args, remainder):
         util.printf(yml)
 
 
-def buildkite_upload(pattern, **kwargs):
-    util.check_call(['buildkite-agent', 'artifact', 'upload', pattern], **kwargs)
-
-
-def buildkite_download(pattern, destination, **kwargs):
-    util.check_call(['buildkite-agent', 'artifact', 'download', pattern, destination], **kwargs)
-
-
 def cmd_build(args, remainder):
     import yaml
     with open('ci/plan.yml') as file_:
@@ -162,8 +154,8 @@ def cmd_build(args, remainder):
     util.check_call(['bazelisk', 'test', '...'] + common_args, env=env)
 
     util.printf('--- :buildkite: Uploading artifacts...')
-    buildkite_upload(explain_log)
-    buildkite_upload(profile_json)
+    util.buildkite_upload(explain_log)
+    util.buildkite_upload(profile_json)
 
     shutil.rmtree('tmp', ignore_errors=True)
     tarball = os.path.join('bazel-bin', 'pkg.tar.gz')
@@ -173,7 +165,7 @@ def cmd_build(args, remainder):
             if item.name.endswith('.whl'):
                 wheels.append(item)
         tar.extractall('tmp', members=wheels)
-    buildkite_upload('*.whl', cwd='tmp')
+    util.buildkite_upload('*.whl', cwd='tmp')
 
     variant_dir = os.path.join('tmp', 'build', args.variant)
     os.makedirs(variant_dir)
@@ -182,7 +174,6 @@ def cmd_build(args, remainder):
 
 def cmd_test(args, remainder):
     import harness
-    buildkite_download('tmp/build/**/*', '.')
     harness.run(args, remainder)
 
 
@@ -192,7 +183,7 @@ def make_all_wheels(workdir):
     workdir.mkdir(parents=True, exist_ok=True)
 
     util.printf('downloading wheels...')
-    buildkite_download('*.whl', str(workdir), cwd=workdir)
+    util.buildkite_download('*.whl', str(workdir), cwd=workdir)
 
     tarball = 'all_wheels.tar.gz'
     util.printf('creating {}'.format(tarball))
@@ -202,19 +193,18 @@ def make_all_wheels(workdir):
             tar.add(whl, arcname=whl.name)
 
     util.printf('uploading {}'.format(tarball))
-    buildkite_upload(tarball)
+    util.buildkite_upload(tarball)
 
 
 def cmd_report(args, remainder):
     workdir = pathlib.Path('tmp').resolve()
-    buildkite_download('tmp/test/**/*', '.')
+    util.buildkite_download('tmp/test/**/*', '.')
     make_all_wheels(workdir)
-    archive_dir = os.path.join(args.root, args.pipeline, args.build_id)
     cmd = ['bazelisk', 'run', '//ci:report']
     cmd += ['--']
     cmd += ['--pipeline', args.pipeline]
     cmd += ['--annotate']
-    cmd += [archive_dir]
+    cmd += [str(workdir)]
     cmd += remainder
     util.check_call(cmd, stderr=subprocess.DEVNULL)
 

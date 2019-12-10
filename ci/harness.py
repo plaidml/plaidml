@@ -68,6 +68,7 @@ def run(args, remainder):
         outdir = root / 'nas'
         version = '0.0.0.dev0'
     else:
+        util.buildkite_download('tmp/build/{}/pkg.tar.gz'.format(variant_name), '.')
         pkg_path = root / 'build' / variant_name / 'pkg.tar.gz'
         outdir = root
         version = args.version
