@@ -197,7 +197,8 @@ def make_all_wheels(workdir):
     util.buildkite_upload(tarball)
 
 
-def download_windows_artifacts(pattern):
+def download_test_artifacts(pattern):
+    util.buildkite_download(pattern, '.')
     util.buildkite_download(pattern.replace('/', '\\'), '.')
     for path in glob.glob(pattern):
         src = pathlib.Path(path)
@@ -209,8 +210,7 @@ def download_windows_artifacts(pattern):
 def cmd_report(args, remainder):
     workdir = pathlib.Path('tmp').resolve()
     make_all_wheels(workdir)
-    util.buildkite_download('tmp/test/**/*', '.')
-    download_windows_artifacts()
+    download_test_artifacts('tmp/test/**/*')
     cmd = ['bazelisk', 'run', '//ci:report']
     cmd += ['--']
     cmd += ['--pipeline', args.pipeline]
