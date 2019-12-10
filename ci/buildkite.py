@@ -198,8 +198,8 @@ def make_all_wheels(workdir):
 
 def cmd_report(args, remainder):
     workdir = pathlib.Path('tmp').resolve()
-    util.buildkite_download('tmp/test/**/*', '.')
     make_all_wheels(workdir)
+    util.buildkite_download('tmp/test/**/*', '.')
     cmd = ['bazelisk', 'run', '//ci:report']
     cmd += ['--']
     cmd += ['--pipeline', args.pipeline]
