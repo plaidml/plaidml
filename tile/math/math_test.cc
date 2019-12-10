@@ -126,7 +126,7 @@ TEST_CASE("IntersectParallelConstraintPair", "[poly]") {
   REQUIRE(to_string(intersection) == "0 <= -1 - 2*i - j < 1");
 }
 
-TEST_CASE("IntersectOpposedSimpleConstraints", "[poly]") {
+TEST_CASE("IntersectOpposedSimpleConstraintsMultivar", "[poly]") {
   Polynomial<Rational> i("i"), j("j");
   SimpleConstraint c1{2 * i + j + 1, 4};
   SimpleConstraint c2{-6 * i - 3 * j, 2};
@@ -134,12 +134,20 @@ TEST_CASE("IntersectOpposedSimpleConstraints", "[poly]") {
   REQUIRE(to_string(intersection) == "0 <= 2*i + j < 4");
 }
 
-TEST_CASE("IntersectOpposedSimpleConstraintsBasic", "[poly]") {
+TEST_CASE("IntersectOpposedSimpleConstraints", "[poly]") {
   Polynomial<Rational> x("x");
   SimpleConstraint c1{x + 1, 4};
   SimpleConstraint c2{-3 * x, 2};
   auto intersection = IntersectOpposedSimpleConstraints(c1, c2);
   REQUIRE(to_string(intersection) == "0 <= x < 4");
+}
+
+TEST_CASE("IntersectOpposedSimpleBasic", "[poly]") {
+  Polynomial<Rational> x("x");
+  SimpleConstraint c1{x, 10};
+  SimpleConstraint c2{-x, 0};
+  auto intersection = IntersectOpposedSimpleConstraints(c1, c2);
+  REQUIRE(to_string(intersection) == "0 <= x < 11");
 }
 
 TEST_CASE("HNFMatrix", "[hnf]") {

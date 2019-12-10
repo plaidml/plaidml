@@ -392,7 +392,6 @@ RangeConstraint IntersectParallelConstraintPair(  //
   return IntersectParallelConstraintPairInner(constraint1, constraint2);
 }
 
-// TODO: Need unit tests
 RangeConstraint IntersectOpposedSimpleConstraints(  //
     const SimpleConstraint& constraint1,            //
     const SimpleConstraint& constraint2) {
@@ -415,7 +414,10 @@ RangeConstraint IntersectOpposedSimpleConstraints(  //
   //   -c1 + rhs1 + a * c2 - a * rhs2 >= -p1 -c1 + rhs1
   // So, merge into
   //   0 <= -p1 - c1 + rhs1 <= -c1 + rhs1 + a * c2 - a * rhs2
-  // (noting that this is just for the bounds, not the integrality)
+  // i.e.
+  //   0 <= -p1 - c1 + rhs1 < -c1 + rhs1 + a * c2 - a * rhs2 + 1
+  // (noting that this is just for the bounds, not the integrality, and noting that the right hand bound will be
+  // slightly too generous if the RHS is not an integer; see discussion below for why this is ok)
   // And so use this to make a range constraint from constraint1 and then call to IntersectParallelConstraintPair
   auto merged_poly1 = -constraint1.poly + constraint1.rhs;
   auto merged_const1 = -constraint1.poly.constant() + constraint1.rhs;
@@ -424,7 +426,7 @@ RangeConstraint IntersectOpposedSimpleConstraints(  //
   // whether there is a fractional offset in the new form and determining the precise range, use Ceil and Floor
   // to get an overapproximation of the range.
   // This approach may duplicate a bit of work, but I think this is too tiny for that to matter for overall perf
-  auto range = math::Ceil(merged_const1) - math::Floor(ratio * merged_const2);  // TODO
+  auto range = math::Ceil(merged_const1) - math::Floor(ratio * merged_const2) + 1;
   if (range > INT64_MAX) {
     throw std::out_of_range("Bound range in IntersectOpposedSimpleConstraints overflows int64.");
   }
