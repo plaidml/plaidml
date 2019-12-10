@@ -134,13 +134,17 @@ SUITES:
   smoke:
     platforms:
       keras-stripe-llvm-cpu:
-        pipelines: [plaidml]
-      keras-plaid-ocl-gp100gl:
-        pipelines: [plaidml]
+        pipelines: [plaidml, ci]
       keras-stripe-ocl-gp100gl:
-        pipelines: [plaidml]
+        pipelines: [plaidml, ci]
+      keras-stripe-ocl-gfx804:
+        pipelines: [ci]
+      keras-stripe-mtl-uhd630:
+        pipelines: [ci]
     params:
       plaidml:
+        batch_sizes: [0]
+      ci:
         batch_sizes: [0]
     wheels:
       # NOTE: this list must be in least to most dependent order.
@@ -279,10 +283,6 @@ SUITES:
         pipelines: [plaidml, nightly]
       keras-tf-cuda-gp100gl:
         pipelines: [nightly]
-        append_args: [--tensorflow]
-
-      keras-tf-dnnl-cpu:
-        pipelines: [ci]
         append_args: [--tensorflow]
 
       keras-plaid-ocl-gfx804: # (windows, amd)
