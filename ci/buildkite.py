@@ -203,7 +203,7 @@ def download_test_artifacts(pattern):
     for path in glob.glob(pattern):
         src = pathlib.Path(path)
         tgt = pathlib.Path(path.replace('\\', '/'))
-        tgt.parent.mkdir(parents=True)
+        tgt.parent.mkdir(parents=True, exist_ok=True)
         src.rename(tgt)
 
 
