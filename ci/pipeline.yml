@@ -38,7 +38,7 @@ steps:
       PLATFORM: '{{platform}}'
     artifact_paths:
       - "tmp/test/**/*"
-  {{/tests}}
+{{/tests}}
 
   - wait: ~
     continue_on_failure: true

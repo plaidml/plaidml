@@ -59,7 +59,7 @@ def run(args, remainder):
 
     root = pathlib.Path('tmp').resolve()
     input = root / 'input'
-    output_root = root / 'output'
+    output_root = root / 'test'
     output = test_info.path(output_root)
 
     shutil.rmtree(input, ignore_errors=True)
@@ -69,7 +69,7 @@ def run(args, remainder):
         version = '0.0.0.dev0'
     else:
         pkg_path = root / 'build' / variant_name / 'pkg.tar.gz'
-        outdir = archive_dir
+        outdir = root
         version = args.version
 
     util.printf('--- Extracting {} -> {}'.format(pkg_path, input))
@@ -177,10 +177,6 @@ def run(args, remainder):
 
     with (output / 'report.json').open('w') as fp:
         json.dump(report, fp)
-
-    src = output_root
-    dst = outdir / 'test'
-    copy_tree(str(src), str(dst))
 
     if retcode:
         sys.exit(retcode)
