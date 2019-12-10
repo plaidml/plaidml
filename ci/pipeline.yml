@@ -11,6 +11,8 @@ steps:
     key: '{{name}}'
     agents:
       PLATFORM: '{{name}}'
+    artifact_paths:
+      - "tmp/build/**/*"
 {{/variants}}
 
 
@@ -34,7 +36,9 @@ steps:
   {{/retry}}
     agents:
       PLATFORM: '{{platform}}'
-{{/tests}}
+    artifact_paths:
+      - "tmp/test/**/*"
+  {{/tests}}
 
   - wait: ~
     continue_on_failure: true

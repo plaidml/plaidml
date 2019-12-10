@@ -63,13 +63,12 @@ def run(args, remainder):
     output = test_info.path(output_root)
 
     shutil.rmtree(input, ignore_errors=True)
-    archive_dir = pathlib.Path(args.root) / args.pipeline / args.build_id
     if args.local:
         pkg_path = pathlib.Path('bazel-bin/pkg.tar.gz')
         outdir = root / 'nas'
         version = '0.0.0.dev0'
     else:
-        pkg_path = archive_dir / 'build' / variant_name / 'pkg.tar.gz'
+        pkg_path = root / 'build' / variant_name / 'pkg.tar.gz'
         outdir = archive_dir
         version = args.version
 

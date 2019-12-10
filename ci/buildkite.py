@@ -15,11 +15,6 @@ import util
 #
 # $ROOT/tmp/output/$SUITE/$WORKLOAD/$PLATFORM/{params}/[result.json, result.npy]
 
-if platform.system() == 'Windows':
-    ARTIFACTS_ROOT = "\\\\rackstation\\artifacts"
-else:
-    ARTIFACTS_ROOT = '/nas/artifacts'
-
 
 def load_template(name):
     this_dir = os.path.dirname(__file__)
@@ -101,20 +96,19 @@ def cmd_pipeline(args, remainder):
             shard = None
             shard_emoji = ''
         tests.append(
-            dict(
-                suite=test.suite_name,
-                workload=test.workload_name,
-                platform=test.platform_name,
-                batch_size=test.batch_size,
-                variant=test.variant,
-                timeout=test.timeout,
-                retry=test.retry,
-                soft_fail=test.soft_fail,
-                python=get_python(test.variant),
-                shard=shard,
-                shard_emoji=shard_emoji,
-                emoji=get_emoji(test.variant),
-                engine=get_engine(test.platform_name)))
+            dict(suite=test.suite_name,
+                 workload=test.workload_name,
+                 platform=test.platform_name,
+                 batch_size=test.batch_size,
+                 variant=test.variant,
+                 timeout=test.timeout,
+                 retry=test.retry,
+                 soft_fail=test.soft_fail,
+                 python=get_python(test.variant),
+                 shard=shard,
+                 shard_emoji=shard_emoji,
+                 emoji=get_emoji(test.variant),
+                 engine=get_engine(test.platform_name)))
 
     if args.count:
         util.printf('variants: {}'.format(len(variants)))
@@ -181,19 +175,14 @@ def cmd_build(args, remainder):
         tar.extractall('tmp', members=wheels)
     buildkite_upload('*.whl', cwd='tmp')
 
-    archive_dir = os.path.join(
-        args.root,
-        args.pipeline,
-        args.build_id,
-        'build',
-        args.variant,
-    )
-    os.makedirs(archive_dir, exist_ok=True)
-    shutil.copy(tarball, archive_dir)
+    variant_dir = os.path.join('tmp', 'build', args.variant)
+    os.makedirs(variant_dir)
+    shutil.copy(tarball, variant_dir)
 
 
 def cmd_test(args, remainder):
     import harness
+    buildkite_download('tmp/build/**/*', '.')
     harness.run(args, remainder)
 
 
@@ -218,6 +207,7 @@ def make_all_wheels(workdir):
 
 def cmd_report(args, remainder):
     workdir = pathlib.Path('tmp').resolve()
+    buildkite_download('tmp/test/**/*', '.')
     make_all_wheels(workdir)
     archive_dir = os.path.join(args.root, args.pipeline, args.build_id)
     cmd = ['bazelisk', 'run', '//ci:report']
@@ -267,7 +257,6 @@ def main():
     default_version = os.getenv('VAI_VERSION', '{}+{}.dev{}'.format(version, pipeline, build_id))
 
     main_parser = argparse.ArgumentParser()
-    main_parser.add_argument('--root', default=ARTIFACTS_ROOT)
     main_parser.add_argument('--pipeline', default=pipeline)
     main_parser.add_argument('--branch', default=branch)
     main_parser.add_argument('--build_id', default=build_id)
