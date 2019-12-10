@@ -144,6 +144,8 @@ SUITES:
     params:
       plaidml:
         batch_sizes: [0]
+      ci:
+        batch_sizes: [0]
     wheels:
       # NOTE: this list must be in least to most dependent order.
       - plaidml-{version}-py2.py3-none-{arch}.whl
