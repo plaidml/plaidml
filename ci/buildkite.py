@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import argparse
+import glob
 import os
 import pathlib
 import platform
@@ -196,11 +197,20 @@ def make_all_wheels(workdir):
     util.buildkite_upload(tarball)
 
 
+def download_windows_artifacts(pattern):
+    util.buildkite_download(pattern.replace('/', '\\'), '.')
+    for path in glob.glob(pattern):
+        src = pathlib.Path(path)
+        tgt = pathlib.Path(path.replace('\\', '/'))
+        tgt.parent.mkdir(parents=True)
+        src.rename(tgt)
+
+
 def cmd_report(args, remainder):
     workdir = pathlib.Path('tmp').resolve()
     make_all_wheels(workdir)
     util.buildkite_download('tmp/test/**/*', '.')
-    util.buildkite_download('tmp\\test\\**\\*', '.')
+    download_windows_artifacts()
     cmd = ['bazelisk', 'run', '//ci:report']
     cmd += ['--']
     cmd += ['--pipeline', args.pipeline]
