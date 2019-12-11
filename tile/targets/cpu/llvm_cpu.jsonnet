@@ -55,8 +55,8 @@ local PARAMS = {
                  '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.MLIR_AutoStencilPass',
                  reqs: ['agg_op_add', 'comb_op_mul'],
                  processors: 56,
-                 only_even: [false, false, true],
-                 only_po2: [true, true, false],
+                 only_even: [false, true, true],
+                 only_po2: [true, false, false],
                },
             },
 

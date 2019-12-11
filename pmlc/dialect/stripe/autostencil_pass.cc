@@ -70,7 +70,7 @@ private:
   // M, N, K's tiles
   unsigned tiles[kNumIndex];
   // The matrix_idx for the next search
-  unsigned nextMatrixIdx[kNumIndex] = {3, 2, 0};
+  unsigned nextMatrixIdx[kNumIndex] = {2, 3, 1};
   // Target tensors, the first two are load, the third is aggregate
   llvm::SmallVector<Value*, kNumTensors> tensors;
   // Stride one index for the tensors
@@ -98,16 +98,13 @@ AutoStencil::AutoStencil(const MLIR_AutoStencilPass& opts) :
 }
 
 double AutoStencil::Throughput(unsigned m, unsigned n, unsigned k) {
-  if (m == 16 && n == 16 && k == 3) {
+  if (m == 64 && n == 16 && k == 3) {
     return 64;
   }
   if (m == 32 && k == 32) {
     return 64;
   }
   if (m == 16 && k == 16) {
-    return 64;
-  }
-  if (m == 8 && k == 16) {
     return 64;
   }
   if (m == 48 && k == 48) {
@@ -190,15 +187,15 @@ void AutoStencil::SearchTiles(unsigned idx) {
   }
   unsigned range = idxRange(innerIdxs[idx]);
   if (options.only_po2()[idx]) {
-    unsigned i = 1;
-    while (i <= range) {
+    unsigned i = 1 << static_cast<unsigned>(std::floor(std::log2(range)));
+    while (i > 0) {
       tiles[idx] = i;
       SearchTiles(idx + 1);
-      i *= 2;
+      i /= 2;
     }
   }
   else {
-    for (unsigned i = 1; i <= range; ++i) {
+    for (unsigned i = range; i > 0; --i) {
       if (options.only_even()[idx] && (range % i != 0)) {
         continue;
       }
@@ -230,12 +227,12 @@ bool AutoStencil::IsStrideOne(BlockArgument* idx, unsigned tensor_idx) {
 bool AutoStencil::ValidateStrideOne(BlockArgument* idx, unsigned matrix_idx) {
   switch (matrix_idx) {
     case 0: {
-      // M is not restricted for stride one
-      return true;
+      // Test if M is stride one for B(1) and C(2)
+      return IsStrideOne(idx, tensorsOrder[1]) && IsStrideOne(idx, tensorsOrder[2]);
     }
     case 1: {
-      // Test if N is stride one for B(1) and C(2)
-      return IsStrideOne(idx, tensorsOrder[1]) && IsStrideOne(idx, tensorsOrder[2]);
+      // N is not restricted for stride one
+      return true;
     }
     case 2: {
       // Test if K is stride one for A(0)
@@ -265,15 +262,15 @@ void AutoStencil::SearchIndex(unsigned matrix_idx) {
 }
 
 void AutoStencil::SearchTensorsOrder() {
-  // A B C, Search N(1) first as N is most restricted index
+  // A B C, Search M(0) first as N is most restricted index
   tensorsOrder[0] = 0;
   tensorsOrder[1] = 1;
   tensorsOrder[2] = 2;
-  SearchIndex(1);
-  // B A C, Search N(1) first as N is most restricted index
+  SearchIndex(0);
+  // B A C, Search M(0) first as N is most restricted index
   tensorsOrder[0] = 1;
   tensorsOrder[1] = 0;
-  SearchIndex(1);
+  SearchIndex(0);
 }
 
 // Collect the index used by value's RefineOp
