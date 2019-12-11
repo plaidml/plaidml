@@ -198,8 +198,8 @@ Tableau ILPSolver::addGomoryCut(const Tableau& t, size_t row) {
   return ret;
 }
 
-Tableau ILPSolver::makeStandardFormTableau(const std::vector<math::SimpleConstraint>& constraints,
-                                           const math::Polynomial<math::Rational> objective) {
+Tableau makeStandardFormTableau(const std::vector<math::SimpleConstraint>& constraints,
+                                const math::Polynomial<math::Rational> objective) {
   // Create the standard form linear program for minimizing objective subject to constraints
 
   std::vector<Polynomial<Rational>> lp_constraints;  // The represented constraint is poly == 0
@@ -288,8 +288,7 @@ Tableau ILPSolver::makeStandardFormTableau(const std::vector<math::SimpleConstra
   return tableau;
 }
 
-Tableau ILPSolver::makeStandardFormTableau(const std::vector<RangeConstraint>& constraints,
-                                           const Polynomial<Rational> objective) {
+Tableau makeStandardFormTableau(const std::vector<RangeConstraint>& constraints, const Polynomial<Rational> objective) {
   // Create the standard form linear program for minimizing objective subject to the given constraints
   std::vector<math::SimpleConstraint> simple_constraints;
 
@@ -298,7 +297,7 @@ Tableau ILPSolver::makeStandardFormTableau(const std::vector<RangeConstraint>& c
     simple_constraints.emplace_back(c.upperBound());
   }
 
-  return ILPSolver::makeStandardFormTableau(simple_constraints, objective);
+  return makeStandardFormTableau(simple_constraints, objective);
 }
 
 void ILPSolver::clean() {

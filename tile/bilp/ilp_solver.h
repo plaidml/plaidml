@@ -66,20 +66,6 @@ class ILPSolver {
 
   // Returns the solver to a neutral state to prepare to solve another problem
   void clean();
-
-  // Transform constraints & objective to the tableau representing them
-  // Can omit objective to set up just the constraints; this tableau can then be
-  // copied to solve multiple problems with the same constraints
-  static Tableau makeStandardFormTableau(
-      const std::vector<math::RangeConstraint>& constraints,
-      const math::Polynomial<math::Rational> objective = math::Polynomial<math::Rational>());
-  // Transform constraints & objective to the tableau representing them
-  // Can omit objective to set up just the constraints; this tableau can then be
-  // copied to solve multiple problems with the same constraints
-  // The simple constraints used here also assert that the constrained polynomial must evaluate to an integer
-  static Tableau makeStandardFormTableau(
-      const std::vector<math::SimpleConstraint>& constraints,
-      const math::Polynomial<math::Rational> objective = math::Polynomial<math::Rational>());
   // Add an additional constraint that reduces the real feasible region but that
   // leaves the integral feasible region unchanged
   Tableau addGomoryCut(const Tableau& t, size_t row);
@@ -88,6 +74,19 @@ class ILPSolver {
   // solution, or find a noninteger feasible solution, add a cut, and iterate)
   void solve_step(Tableau& tableau, bool already_canonical = false);  // NOLINT(runtime/references)
 };
+
+// Transform constraints & objective to the tableau representing them
+// Can omit objective to set up just the constraints; this tableau can then be
+// copied to solve multiple problems with the same constraints
+Tableau makeStandardFormTableau(const std::vector<math::RangeConstraint>& constraints,
+                                const math::Polynomial<math::Rational> objective = math::Polynomial<math::Rational>());
+
+// Transform constraints & objective to the tableau representing them
+// Can omit objective to set up just the constraints; this tableau can then be
+// copied to solve multiple problems with the same constraints
+// The simple constraints used here also assert that the constrained polynomial must evaluate to an integer
+Tableau makeStandardFormTableau(const std::vector<math::SimpleConstraint>& constraints,
+                                const math::Polynomial<math::Rational> objective = math::Polynomial<math::Rational>());
 
 }  // namespace bilp
 }  // namespace tile

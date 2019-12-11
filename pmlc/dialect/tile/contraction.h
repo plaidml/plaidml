@@ -17,12 +17,6 @@ namespace pmlc::dialect::tile {
 
 namespace math = vertexai::tile::math;
 
-// A range [min, max], ie min <= x <= max
-struct Bound {
-  int64_t min;  // Smallest value inclusive
-  int64_t max;  // Largest value inclusive
-};
-
 using IndexPoly = math::Polynomial<math::Rational>;
 using IndexAccess = std::vector<IndexPoly>;
 using SimpleConstraints = std::vector<math::SimpleConstraint>;

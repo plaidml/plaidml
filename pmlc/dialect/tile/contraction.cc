@@ -543,7 +543,7 @@ void Contraction::DeduceRangeConstraints() {
   ConstrainIndexVarsToInts();
   // `unmerged` will track SimpleConstraints that we have yet to merge into a RangeConstraint.
   // Each entry is a collection of unpaired simple constraints, all parallel and pointing in the same direction
-  std::list<std::list<SimpleConstraint>> unmerged;
+  std::list<std::vector<SimpleConstraint>> unmerged;
   for (const auto& cons : constraints) {
     bool has_matched = false;
     // First try to merge with an existing RangeConstraint
@@ -572,10 +572,11 @@ void Contraction::DeduceRangeConstraints() {
       if (ratio < 0) {
         // Parallel in opposite direction:
         // Merge with everything in this set to create RangeConstraint that intersects all
+        // The first constraint in the set must be merged separately from the others as it is a
+        // merger of 2 simple constraints instead of 1 ranged and 1 simple in this case.
         auto r_cons = IntersectOpposedSimpleConstraints(cons, *cons_set->begin());
-        cons_set->erase(cons_set->begin());
-        for (auto& other_cons : *cons_set) {
-          r_cons = IntersectParallelConstraintPair(r_cons, other_cons);
+        for (auto other_cons = ++(cons_set->begin()); other_cons != cons_set->end(); ++other_cons) {
+          r_cons = IntersectParallelConstraintPair(r_cons, *other_cons);
         }
         range_constraints.constraints.push_back(r_cons);
         unmerged.erase(cons_set);
@@ -586,7 +587,7 @@ void Contraction::DeduceRangeConstraints() {
     }
     if (!has_matched) {
       // This is not parallel to anything, move to new set in unmerged
-      unmerged.emplace_back(std::list<SimpleConstraint>{cons});
+      unmerged.emplace_back(std::vector<SimpleConstraint>{cons});
     }
   }
   if (!unmerged.empty()) {
