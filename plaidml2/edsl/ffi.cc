@@ -1178,9 +1178,6 @@ plaidml_value_kind plaidml_value_get_kind(  //
     plaidml_value* value) {
   return ffi_wrap<plaidml_value_kind>(err, PLAIDML_VALUE_NONE, [&] {
     IVLOG(3, "plaidml_value_get_kind");
-    // if (value->variant.valueless_by_exception()) {
-    //   return PLAIDML_VALUE_NONE;
-    // }
     return std::visit(
         [](auto&& arg) {
           using T = std::decay_t<decltype(arg)>;
@@ -1344,9 +1341,6 @@ plaidml_string* plaidml_value_repr(  //
     plaidml_value* value) {
   return ffi_wrap<plaidml_string*>(err, nullptr, [&] {
     IVLOG(3, "plaidml_value_repr");
-    // if (value->variant.valueless_by_exception()) {
-    //   return new plaidml_string{"None"};
-    // }
     auto str = std::visit(
         [](auto&& arg) -> std::string {
           using T = std::decay_t<decltype(arg)>;
