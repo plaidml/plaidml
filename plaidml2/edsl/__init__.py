@@ -506,8 +506,8 @@ class TensorRef:
 
 
 class Value(ForeignObject):
-    __ffi_del__ = lib.plaidml_expr_free
-    __ffi_repr__ = lib.plaidml_expr_repr
+    __ffi_del__ = lib.plaidml_value_free
+    __ffi_repr__ = lib.plaidml_value_repr
 
     def __init__(self, value):
         # logger.debug('Value({})'.format(value))
@@ -517,29 +517,29 @@ class Value(ForeignObject):
             else:
                 value = value.tolist()
         if value is None:
-            ffi_obj = ffi_call(lib.plaidml_expr_none)
+            ffi_obj = ffi_call(lib.plaidml_value_none)
         elif isinstance(value, (six.integer_types, bool)):
-            ffi_obj = ffi_call(lib.plaidml_expr_int, value)
+            ffi_obj = ffi_call(lib.plaidml_value_int, value)
         elif isinstance(value, float):
-            ffi_obj = ffi_call(lib.plaidml_expr_float, value)
+            ffi_obj = ffi_call(lib.plaidml_value_float, value)
         elif isinstance(value, TensorDim):
-            ffi_obj = ffi_call(lib.plaidml_expr_dim, value.as_ptr())
+            ffi_obj = ffi_call(lib.plaidml_value_dim, value.as_ptr())
         elif isinstance(value, Tensor):
-            ffi_obj = ffi_call(lib.plaidml_expr_clone, value.as_ptr())
+            ffi_obj = ffi_call(lib.plaidml_value_expr, value.as_ptr())
         elif isinstance(value, (list, tuple)):
             self._elts = [Value(x) for x in value]
             raw_elts = [x.as_ptr() for x in self._elts]
-            ffi_obj = ffi_call(lib.plaidml_expr_tuple, len(raw_elts), raw_elts)
+            ffi_obj = ffi_call(lib.plaidml_value_tuple, len(raw_elts), raw_elts)
         elif isinstance(value, six.string_types):
-            ffi_obj = ffi_call(lib.plaidml_expr_str, value.encode('utf-8'))
-        elif isinstance(value, ffi.CData) and ffi.typeof(value) is ffi.typeof('plaidml_expr*'):
+            ffi_obj = ffi_call(lib.plaidml_value_str, value.encode('utf-8'))
+        elif isinstance(value, ffi.CData) and ffi.typeof(value) is ffi.typeof('plaidml_value*'):
             ffi_obj = value
         else:
             raise TypeError('Unsupported type {} for value={}'.format(type(value), value))
         super(Value, self).__init__(ffi_obj)
 
     def as_tensor(self):
-        return Tensor(expr=ffi_call(lib.plaidml_expr_clone, self.as_ptr()))
+        return Tensor(expr=ffi_call(lib.plaidml_value_expr_get, self.as_ptr()))
 
 
 def TensorOutput(*args):

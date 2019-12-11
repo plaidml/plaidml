@@ -687,4 +687,8 @@ std::vector<Value*> TileBuilder::ComputeGradients(ArrayRef<Value*> wrt, Value* l
   return wrt;
 }
 
+void TileBuilder::Dump() {  //
+  IVLOG(5, mlir::debugString(impl->module));
+}
+
 }  // namespace pmlc::dialect::tile

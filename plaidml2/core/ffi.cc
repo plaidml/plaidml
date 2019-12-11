@@ -357,4 +357,6 @@ void plaidml_view_writeback(  //
   });
 }
 
+VariantHolder::VariantHolder(const Variant& inner) : inner(inner) {}
+
 }  // extern "C"
