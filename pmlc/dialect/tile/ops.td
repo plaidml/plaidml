@@ -285,7 +285,7 @@ class SpecialOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
 
 def GatherOp : SpecialOp<"gather">, HasCanonicalizer {
   let summary = "special gather operation";
-  let arguments = (ins RankedTensorOf<[AnyScalar]>:$tensor, VectorOf<[ScalarIndex]>:$dims);
+  let arguments = (ins RankedTensorOf<[AnyScalar]>:$tensor, RankedTensorOf<[ScalarIndex]>:$dims);
   let results = (outs RankedTensorOf<[AnyScalar]>:$result);
 }
 

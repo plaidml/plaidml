@@ -571,6 +571,7 @@ struct EltwiseOpConversion : public LoweringBase {
 
     // input refinements
     auto inputs = llvm::SmallVector<Value*, 4>();
+    auto constType = ScalarType::get(rewriter.getContext(), DataType::INT32);
     for (auto operand : operands) {
       auto defOp = operand->getDefiningOp();
       if (defOp && llvm::isa<eltwise::ScalarConstantOp>(defOp)) {
@@ -579,9 +580,17 @@ struct EltwiseOpConversion : public LoweringBase {
       }
 
       Type operandType = operand->getType();
-      auto tensorRefType = operandType.dyn_cast<stripe::TensorRefType>();
-      if (!tensorRefType) {
-        throw std::runtime_error("EltwiseOpConversion expected TensorRefType for operand type");
+      stripe::TensorRefType tensorRefType;
+      llvm::Optional<int64_t> constValue;
+      if (auto affineType = operandType.dyn_cast<stripe::AffineType>()) {
+        tensorRefType = stripe::TensorRefType::get(constType, 0, true);
+        auto poly = stripe::AffinePolynomial(operand);
+        constValue = poly.constant;
+      } else {
+        tensorRefType = operandType.dyn_cast<stripe::TensorRefType>();
+        if (!tensorRefType) {
+          throw std::runtime_error("EltwiseOpConversion expected TensorRefType for operand type");
+        }
       }
       if (resultTensorType.getRank() < tensorRefType.getRank()) {
         throw std::runtime_error("Invalid eltwise op: result rank < operand rank");
@@ -594,16 +603,21 @@ struct EltwiseOpConversion : public LoweringBase {
         offsets[k] = body->getArgument(j);
       }
 
-      auto refineOp = rewriter.create<stripe::RefineOp>(op->getLoc(), operandType, operand, offsets);
-      auto refAttrs = llvm::SmallVector<NamedAttribute, 1>{
-          {rewriter.getIdentifier(eltwiseOpTag.str()), rewriter.getUnitAttr()},
-      };
-      refineOp.setAttr(stripe::Dialect::getStripeAttrsName(), rewriter.getDictionaryAttr(refAttrs));
-      auto elementType = tensorRefType.getElementType();
-      auto intoType = eltwise::getRankedTensorType(elementType);
-      // LOAD
-      auto loadOp = rewriter.create<stripe::LoadOp>(op->getLoc(), intoType, refineOp.result());
-      inputs.emplace_back(loadOp.into());
+      if (constValue) {
+        auto constOp = rewriter.create<eltwise::ScalarConstantOp>(op->getLoc(), constType, *constValue);
+        inputs.emplace_back(constOp);
+      } else {
+        auto refineOp = rewriter.create<stripe::RefineOp>(op->getLoc(), operandType, operand, offsets);
+        auto refAttrs = llvm::SmallVector<NamedAttribute, 1>{
+            {rewriter.getIdentifier(eltwiseOpTag.str()), rewriter.getUnitAttr()},
+        };
+        refineOp.setAttr(stripe::Dialect::getStripeAttrsName(), rewriter.getDictionaryAttr(refAttrs));
+        auto elementType = tensorRefType.getElementType();
+        auto intoType = eltwise::getRankedTensorType(elementType);
+        // LOAD
+        auto loadOp = rewriter.create<stripe::LoadOp>(op->getLoc(), intoType, refineOp.result());
+        inputs.emplace_back(loadOp.into());
+      }
     }
 
     // INTRINSIC
