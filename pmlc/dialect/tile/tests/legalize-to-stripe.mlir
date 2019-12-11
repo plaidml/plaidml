@@ -192,30 +192,29 @@ func @reshape(%arg0: tensor<10x20x!eltwise.fp32>) -> tensor<5x5x20x!eltwise.fp32
 
 // -----
 
-// TODO: fix when constraints can take SimpleConstraints directly
-// #map0 = (d0, d1) -> (d0)
-// #map1 = (d0, d1) -> (d1)
-// #set0 = (d0, d1) : (d0 - d1 >= 0, -d0 + d1 + 9 >= 0)
-// 
-// !fp32 = type !eltwise.fp32
-// !i32 = type !eltwise.i32
-// func @csum(%arg0: tensor<10x!eltwise.fp32>) -> tensor<10x!eltwise.fp32> {
-//   %cst = "eltwise.sconst"() {value = 0.0 : f64} : () -> !fp32
-//   %0 = tile.cion add, none, %cst, %arg0 {cons = #set0, sink = #map0, srcs = [#map1]} :
-//     !fp32, tensor<10x!eltwise.fp32> -> tensor<10x!eltwise.fp32>
-//   return %0 : tensor<10x!eltwise.fp32>
-// }
+#map0 = (d0, d1) -> (d0)
+#map1 = (d0, d1) -> (d1)
+#set0 = (d0, d1) : (d0 - d1 >= 0, -d0 + d1 + 9 >= 0)
 
-// xCHECK-LABEL: func @csum
-// xCHECK:      %[[REF1:.*]] = stripe.refine %arg1(%[[x1:.*]])
-// xCHECK-DAG:  %[[REF2:.*]] = stripe.refine %arg0(%[[x0:.*]])
-// xCHECK-DAG:  %[[AFF1:.*]] = stripe.affine_poly (%[[x0]], %[[x1]]) [-1, 1], 0
-// xCHECK-DAG:  stripe.constraint %[[AFF1]] {
-// xCHECK-NEXT:   %[[LOAD:.*]] = stripe.load %[[REF2]]
-// xCHECK-NEXT:   stripe.aggregate "add" %[[REF1]] %[[LOAD]]
-// xCHECK-NEXT:   stripe.terminate
-// xCHECK-NEXT: }
-// xCHECK-NEXT: stripe.terminate
+!fp32 = type !eltwise.fp32
+!i32 = type !eltwise.i32
+func @csum(%arg0: tensor<10x!eltwise.fp32>) -> tensor<10x!eltwise.fp32> {
+  %cst = "eltwise.sconst"() {value = 0.0 : f64} : () -> !fp32
+  %0 = tile.cion add, none, %cst, %arg0 {cons = #set0, sink = #map0, srcs = [#map1]} :
+    !fp32, tensor<10x!eltwise.fp32> -> tensor<10x!eltwise.fp32>
+  return %0 : tensor<10x!eltwise.fp32>
+}
+
+// CHECK-LABEL: func @csum
+// CHECK:      %[[REF1:.*]] = stripe.refine %arg1(%[[x0:.*]])
+// CHECK-DAG:  %[[REF2:.*]] = stripe.refine %arg0(%[[x1:.*]])
+// CHECK-DAG:  %[[AFF1:.*]] = stripe.affine_poly (%[[x0]], %[[x1]]) [1, -1], 0
+// CHECK-DAG:  stripe.constraint %[[AFF1]] {
+// CHECK-NEXT:   %[[LOAD:.*]] = stripe.load %[[REF2]]
+// CHECK-NEXT:   stripe.aggregate "add" %[[REF1]] %[[LOAD]]
+// CHECK-NEXT:   stripe.terminate
+// CHECK-NEXT: }
+// CHECK-NEXT: stripe.terminate
 
 // -----
 

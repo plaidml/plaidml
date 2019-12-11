@@ -21,7 +21,7 @@ plaidml_cc_test(
     srcs = [
         "test.cc",
     ],
-    tags = ["large"],
+    # tags = ["large"],
     timeout = "eternal",
     deps = [
         ":bilp",
