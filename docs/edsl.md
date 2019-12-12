@@ -47,7 +47,16 @@ it's related to summation notation. Below we show how this C++ Tile code is
 related to the mathematical formula for the operation by using colors to
 highlight corresponding pieces:
 
-![o\[n\]=\sum_{m}{I\[m,n\]}](https://render.githubusercontent.com/render/math?math=o%5Bn%5D%3D%5Csum_%7Bm%7D%7BI%5Bm%2Cn%5D%7D)
+<!-- ```math
+ \Large
+ \textcolor{red}{O[n]}
+ \textcolor{yellow}{=}
+ \textcolor{green}{\sum_{m}}
+ \textcolor{cyan}{I[m, n]}
+ ``` -->
+
+ ![\huge \color{red}O\[n\] \color{yellow}=\color{green}\sum_{m}{\color{blue}I\[m,n\]}](https://render.githubusercontent.com/render/math?math=%5Chuge%20%5Ccolor%7Bred%7DO%5Bn%5D%20%5Ccolor%7Byellow%7D%3D%5Ccolor%7Bgreen%7D%5Csum_%7Bm%7D%7B%5Ccolor%7Bblue%7DI%5Bm%2Cn%5D%7D)
+
 
 ![o\[n\]+=I\[m,n\]](https://render.githubusercontent.com/render/math?math=o%5Bn%5D%2B%3DI%5Bm%2Cn%5D)
 
@@ -431,10 +440,6 @@ K.conv1d(x, kernel, padding='valid')
 
 Let's start with the mathematical formula for this operation:
 
-```math
-\Large
-O[n, x, c_o] = \sum_k \sum_{c_i}(I[n, x + k, c_i] \cdot K[k, c_i, c_o])
-```
 ![O\[n, x, c_o\] = \sum_k \sum_{c_i}(I\[n, x + k, c_i\] \cdot K\[k, c_i, c_o\])](https://render.githubusercontent.com/render/math?math=O%5Bn%2C%20x%2C%20c_o%5D%20%3D%20%5Csum_k%20%5Csum_%7Bc_i%7D(I%5Bn%2C%20x%20%2B%20k%2C%20c_i%5D%20%5Ccdot%20K%5Bk%2C%20c_i%2C%20c_o%5D))
 
 This is rather complicated, so let's walk through why this is the same
