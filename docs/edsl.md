@@ -55,7 +55,7 @@ highlight corresponding pieces:
  \textcolor{cyan}{I[m, n]}
  ``` -->
 
- ![\Large \color{red}O\[n\] \color{yellow}=\color{green}\sum_{m}{\color{blue}I\[m,n\]}](https://render.githubusercontent.com/render/math?math=%5CLarge%20%5Ccolor%7Bred%7DO%5Bn%5D%20%5Ccolor%7Byellow%7D%3D%5Ccolor%7Bgreen%7D%5Csum_%7Bm%7D%7B%5Ccolor%7Bblue%7DI%5Bm%2Cn%5D%7D)
+ ![\Large \color{red}O\[n\] \color{black}=\color{green}\sum_{m}{\color{blue}I\[m,n\]}](https://render.githubusercontent.com/render/math?math=%5CLarge%20%5Ccolor%7Bred%7DO%5Bn%5D%20%5Ccolor%7Bblack%7D%3D%5Ccolor%7Bgreen%7D%5Csum_%7Bm%7D%7B%5Ccolor%7Bblue%7DI%5Bm%2Cn%5D%7D)
 
 <!-- ```math
  \Large
