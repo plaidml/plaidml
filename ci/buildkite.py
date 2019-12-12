@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import argparse
+import glob
 import os
 import pathlib
 import platform
@@ -14,11 +15,6 @@ import util
 # Artifacts are stored with buildkite using the following scheme:
 #
 # $ROOT/tmp/output/$SUITE/$WORKLOAD/$PLATFORM/{params}/[result.json, result.npy]
-
-if platform.system() == 'Windows':
-    ARTIFACTS_ROOT = "\\\\rackstation\\artifacts"
-else:
-    ARTIFACTS_ROOT = '/nas/artifacts'
 
 
 def load_template(name):
@@ -101,20 +97,19 @@ def cmd_pipeline(args, remainder):
             shard = None
             shard_emoji = ''
         tests.append(
-            dict(
-                suite=test.suite_name,
-                workload=test.workload_name,
-                platform=test.platform_name,
-                batch_size=test.batch_size,
-                variant=test.variant,
-                timeout=test.timeout,
-                retry=test.retry,
-                soft_fail=test.soft_fail,
-                python=get_python(test.variant),
-                shard=shard,
-                shard_emoji=shard_emoji,
-                emoji=get_emoji(test.variant),
-                engine=get_engine(test.platform_name)))
+            dict(suite=test.suite_name,
+                 workload=test.workload_name,
+                 platform=test.platform_name,
+                 batch_size=test.batch_size,
+                 variant=test.variant,
+                 timeout=test.timeout,
+                 retry=test.retry,
+                 soft_fail=test.soft_fail,
+                 python=get_python(test.variant),
+                 shard=shard,
+                 shard_emoji=shard_emoji,
+                 emoji=get_emoji(test.variant),
+                 engine=get_engine(test.platform_name)))
 
     if args.count:
         util.printf('variants: {}'.format(len(variants)))
@@ -124,14 +119,6 @@ def cmd_pipeline(args, remainder):
         ctx = dict(variants=variants, tests=tests)
         yml = pystache.render(load_template('pipeline.yml'), ctx)
         util.printf(yml)
-
-
-def buildkite_upload(pattern, **kwargs):
-    util.check_call(['buildkite-agent', 'artifact', 'upload', pattern], **kwargs)
-
-
-def buildkite_download(pattern, destination, **kwargs):
-    util.check_call(['buildkite-agent', 'artifact', 'download', pattern, destination], **kwargs)
 
 
 def cmd_build(args, remainder):
@@ -168,8 +155,8 @@ def cmd_build(args, remainder):
     util.check_call(['bazelisk', 'test', '...'] + common_args, env=env)
 
     util.printf('--- :buildkite: Uploading artifacts...')
-    buildkite_upload(explain_log)
-    buildkite_upload(profile_json)
+    util.buildkite_upload(explain_log)
+    util.buildkite_upload(profile_json)
 
     shutil.rmtree('tmp', ignore_errors=True)
     tarball = os.path.join('bazel-bin', 'pkg.tar.gz')
@@ -179,17 +166,11 @@ def cmd_build(args, remainder):
             if item.name.endswith('.whl'):
                 wheels.append(item)
         tar.extractall('tmp', members=wheels)
-    buildkite_upload('*.whl', cwd='tmp')
+    util.buildkite_upload('*.whl', cwd='tmp')
 
-    archive_dir = os.path.join(
-        args.root,
-        args.pipeline,
-        args.build_id,
-        'build',
-        args.variant,
-    )
-    os.makedirs(archive_dir, exist_ok=True)
-    shutil.copy(tarball, archive_dir)
+    variant_dir = os.path.join('tmp', 'build', args.variant)
+    os.makedirs(variant_dir)
+    shutil.copy(tarball, variant_dir)
 
 
 def cmd_test(args, remainder):
@@ -203,7 +184,7 @@ def make_all_wheels(workdir):
     workdir.mkdir(parents=True, exist_ok=True)
 
     util.printf('downloading wheels...')
-    buildkite_download('*.whl', str(workdir), cwd=workdir)
+    util.buildkite_download('*.whl', str(workdir), cwd=workdir)
 
     tarball = 'all_wheels.tar.gz'
     util.printf('creating {}'.format(tarball))
@@ -213,18 +194,28 @@ def make_all_wheels(workdir):
             tar.add(whl, arcname=whl.name)
 
     util.printf('uploading {}'.format(tarball))
-    buildkite_upload(tarball)
+    util.buildkite_upload(tarball)
+
+
+def download_test_artifacts(pattern):
+    util.buildkite_download(pattern, '.')
+    util.buildkite_download(pattern.replace('/', '\\'), '.')
+    for path in glob.glob(pattern):
+        src = pathlib.Path(path)
+        tgt = pathlib.Path(path.replace('\\', '/'))
+        tgt.parent.mkdir(parents=True, exist_ok=True)
+        src.rename(tgt)
 
 
 def cmd_report(args, remainder):
     workdir = pathlib.Path('tmp').resolve()
     make_all_wheels(workdir)
-    archive_dir = os.path.join(args.root, args.pipeline, args.build_id)
+    download_test_artifacts('tmp/test/**/*')
     cmd = ['bazelisk', 'run', '//ci:report']
     cmd += ['--']
     cmd += ['--pipeline', args.pipeline]
     cmd += ['--annotate']
-    cmd += [archive_dir]
+    cmd += [str(workdir)]
     cmd += remainder
     util.check_call(cmd, stderr=subprocess.DEVNULL)
 
@@ -267,7 +258,6 @@ def main():
     default_version = os.getenv('VAI_VERSION', '{}+{}.dev{}'.format(version, pipeline, build_id))
 
     main_parser = argparse.ArgumentParser()
-    main_parser.add_argument('--root', default=ARTIFACTS_ROOT)
     main_parser.add_argument('--pipeline', default=pipeline)
     main_parser.add_argument('--branch', default=branch)
     main_parser.add_argument('--build_id', default=build_id)

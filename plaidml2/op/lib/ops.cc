@@ -663,9 +663,6 @@ Value clip(const Value& value) {
   auto raw_min = args[1];
   auto raw_max = args[2];
 
-  // auto ndims = I.shape().ndims();
-  // std::vector<TensorDim> I_dims(ndims);
-  // I.bind_dims(I_dims);
   auto O = I;
   if (!raw_min.is_none()) {
     auto min = raw_min.as_tensor();

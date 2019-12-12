@@ -51,6 +51,7 @@ typedef struct plaidml_expr plaidml_expr;
 typedef struct plaidml_dim_expr plaidml_dim_expr;
 typedef struct plaidml_poly_expr plaidml_poly_expr;
 typedef struct plaidml_program plaidml_program;
+typedef struct plaidml_value plaidml_value;
 
 typedef struct {
   plaidml_expr* expr;

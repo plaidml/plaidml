@@ -17,18 +17,11 @@ namespace pmlc::dialect::tile {
 
 namespace math = vertexai::tile::math;
 
-// A range [min, max], ie min <= x <= max
-struct Bound {
-  int64_t min;  // Smallest value inclusive
-  int64_t max;  // Largest value inclusive
-};
-
 using IndexPoly = math::Polynomial<math::Rational>;
 using IndexAccess = std::vector<IndexPoly>;
-using IndexBounds = std::map<std::string, Bound>;
-using RangeConstraints = std::vector<math::RangeConstraint>;
 using SimpleConstraints = std::vector<math::SimpleConstraint>;
-using BoundsAndConstraints = std::tuple<IndexBounds, SimpleConstraints>;
+using RangeConstraints = std::vector<math::RangeConstraint>;
+using BoundsAndConstraints = std::tuple<math::IndexBounds, SimpleConstraints>;
 
 struct Constraints {
   RangeConstraints constraints;
@@ -50,27 +43,29 @@ struct Contraction {
   explicit Contraction(ContractionOp op);
 
   BoundsAndConstraints ComputeBounds(llvm::ArrayRef<stripe::TensorType> shapes, bool no_reduce);
+  void DeduceRangeConstraints();
 
   std::vector<IndexAccess> accesses;
-  std::vector<math::RangeConstraint> constraints;
+  SimpleConstraints constraints;
+  // During lowering, will transform all constraints to range constraints, which we track in range_constraints
+  Constraints range_constraints;
 
  private:
   std::set<std::string> getIndexVars() const;
 
   // Gathers boths explicit and implied constraints, and removes dups.
-  Constraints GatherConstraints(llvm::ArrayRef<stripe::TensorType> shapes) const;
+  void GatherConstraints(llvm::ArrayRef<stripe::TensorType> shapes);
 
-  // Adds constraints to the contraction forcing every variable used to be an
-  // integer
+  // Adds constraints to the contraction forcing every variable used to be an integer
   void ConstrainIndexVarsToInts();
 
   bool NeedReduce() const;
-  void ReduceOutputPolynomials(const Constraints& order);
+  void ReduceOutputPolynomials();
 
   // Remove any fractional polynomial multipliers (IE, any non-integers).
-  void Defractionalize(const Constraints& order);
+  void Defractionalize();
 };
 
-math::Affine Integerize(const IndexPoly& poly, const IndexBounds& bounds);
+math::Affine Integerize(const IndexPoly& poly, const math::IndexBounds& bounds);
 
 }  // namespace pmlc::dialect::tile

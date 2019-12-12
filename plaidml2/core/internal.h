@@ -4,6 +4,8 @@
 
 #include <memory>
 #include <string>
+#include <variant>
+#include <vector>
 
 #include "plaidml2/core/ffi.h"
 #include "tile/base/platform.h"
@@ -32,6 +34,15 @@ struct plaidml_shape {
 #endif
 };
 
+struct plaidml_dim_expr {
+#ifdef PLAIDML_AST
+  vertexai::tile::lang::ast::DimExprPtr expr;
+#endif
+#ifdef PLAIDML_MLIR
+  mlir::Value* value = nullptr;
+#endif
+};
+
 struct plaidml_expr {
 #ifdef PLAIDML_AST
   vertexai::tile::lang::ast::ExprPtr expr;
@@ -57,6 +68,29 @@ struct plaidml_buffer {
 
 struct plaidml_view {
   std::shared_ptr<vertexai::tile::View> view;
+};
+
+struct VariantHolder;
+using VariantPtr = std::shared_ptr<VariantHolder>;
+using Tuple = std::vector<VariantPtr>;
+
+using Variant = std::variant<  //
+    std::monostate,            // PLAIDML_VALUE_NONE
+    plaidml_dim_expr,          // PLAIDML_VALUE_DIM
+    plaidml_expr,              // PLAIDML_VALUE_EXPR
+    double,                    // PLAIDML_VALUE_FLOAT
+    int64_t,                   // PLAIDML_VALUE_INT
+    std::string,               // PLAIDML_VALUE_STR
+    Tuple                      // PLAIDML_VALUE_TUPLE
+    >;
+
+struct VariantHolder {
+  explicit VariantHolder(const Variant& inner);
+  Variant inner;
+};
+
+struct plaidml_value {
+  Variant variant;
 };
 
 }  // extern "C"
