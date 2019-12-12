@@ -47,22 +47,9 @@ it's related to summation notation. Below we show how this C++ Tile code is
 related to the mathematical formula for the operation by using colors to
 highlight corresponding pieces:
 
-```math
-\Large
-\textcolor{red}{O[n]}
-\textcolor{yellow}{=}
-\textcolor{green}{\sum_{m}}
-\textcolor{cyan}{I[m, n]}
-```
+![o\[n\]=\sum_{m}{I\[m,n\]}](https://render.githubusercontent.com/render/math?math=o%5Bn%5D%3D%5Csum_%7Bm%7D%7BI%5Bm%2Cn%5D%7D)
 
-```math
-\Large
-\texttt{
-  \textcolor{red}{O(n)}
-  \textcolor{green}{+=}
-  \textcolor{cyan}{I(m, n)};
-}
-```
+![o\[n\]+=I\[m,n\]](https://render.githubusercontent.com/render/math?math=o%5Bn%5D%2B%3DI%5Bm%2Cn%5D)
 
 In green, notice that the summation symbol is represented as `+=` in C++ Tile
 code. Some portions of the notation do not perfectly correspond. Here's why:
@@ -108,22 +95,10 @@ Tensor max_over_axis(const Tensor& I) {
 
 Again, this corresponds closely to mathematical notation:
 
-```math
-\Large
-\textcolor{red}{O[n]}
-\textcolor{yellow}{=}
-\textcolor{green}{\max_m}
-\textcolor{cyan}{I[m, n]}
-```
 
-```math
-\Large
-\texttt{
-  \textcolor{red}{O(n)}
-  \textcolor{green}{>=}
-  \textcolor{cyan}{I(m, n)};
-}
-```
+![o\[n\]= \max_{m}{I\[m,n\]}](https://render.githubusercontent.com/render/math?math=o%5Bn%5D%3D%20%5Cmax_%7Bm%7D%7BI%5Bm%2Cn%5D%7D)
+
+![o\[n\] > = I\[m,n\]](https://render.githubusercontent.com/render/math?math=o%5Bn%5D%20%3E%20%3D%20I%5Bm%2Cn%5D)
 
 ### Matrix Multiply
 
@@ -131,10 +106,8 @@ Next we'll consider matrix multiplication. Let's look at the mathematical
 expression for the matrix multiplication `C = AB` written out in element-level
 detail:
 
-```math
-\Large
-C[i, j] = \sum_{k} (A[i, k] \cdot B[k, j])
-```
+
+![C\[i, j\] = \sum_{k} (A\[i, k\] \cdot B\[k, j\])](https://render.githubusercontent.com/render/math?math=C%5Bi%2C%20j%5D%20%3D%20%5Csum_%7Bk%7D%20(A%5Bi%2C%20k%5D%20%5Ccdot%20B%5Bk%2C%20j%5D))
 
 We can convert this to C++ Tile code using the same correspondence as the
 previous example: The summation sign becomes plus-assignment, the summation
@@ -323,24 +296,13 @@ We determined the Tile code for this example by starting from imperative code,
 but this Tile code is still very similar to mathematical notation, and we could
 have started there instead:
 
-```math
-\Large
-\textcolor{red}{O[n]}
-\textcolor{yellow}{=}
-\textcolor{green}{\max}\textcolor{magenta}{_{0 \leq j < 2}}
-\textcolor{cyan}{I[2i + j]}
-```
 
-```math
-\Large
-\texttt{
-  if (\textcolor{magenta}{j < 2}) \{{
-    \textcolor{red}{O(n)}
-    \textcolor{green}{>=}
-    \textcolor{cyan}{I(2 * i + j)};
-  \}}
-}
-```
+![o\[n\] = \max_{0 \ge j < 2}{ I\[2i+j\]}](https://render.githubusercontent.com/render/math?math=O%5Bn%5D%20%3D%20%5Cmax_%7B0%20%5Cge%20j%20%3C%202%7D%7B%20I%5B2i%2Bj%5D%7D)
+
+
+![if (j < 2)  \{ O\[n\] > = I (2*i+j) \};](https://render.githubusercontent.com/render/math?math=if%20(j%20%3C%202)%20%20%5C%7B%20O%5Bn%5D%20%3E%20%3D%20I%20(2*i%2Bj)%20%5C%7D%3B)
+
+
 
 This Tile code handles odd values of `N` by rounding down the output tensor
 size. You may instead want to round up the output tensor size and use a smaller
@@ -428,10 +390,7 @@ Suppose we want to take the cumulative sum of a 1D tensor. That is, we want
 `O[i]` to be the sum of all input entries `I[k]` where `k <= i`. In summation
 notation, this is:
 
-```math
-\Large
-O[i] = \sum_{k \leq i} I[k]
-```
+![O\[i\] = \sum_{k \leq i} I\[k\]](https://render.githubusercontent.com/render/math?math=O%5Bi%5D%20%3D%20%5Csum_%7Bk%20%5Cleq%20i%7D%20I%5Bk%5D)
 
 However, we can't use `k <= i` as a constraint in Tile; all the index variables
 must be gathered into a single index expression on one side of the inequality.
@@ -455,24 +414,11 @@ Tensor csum(const Tensor& I) {
 Alternatively, we could write `k = i - j` for `j` non-negative as an alternative
 way of forcing `k` to be no larger than `i`. Then in summation notation we have:
 
-```math
-\Large
-\textcolor{red}{O[i]}
-\textcolor{yellow}{=}
-\textcolor{green}{\sum}\textcolor{magenta}{_{0 \leq j}}
-\textcolor{cyan}{I[i - j]}
-```
+![O\[i\] = \sum_{0 \leq j} I\[i-j\]](https://render.githubusercontent.com/render/math?math=O%5Bi%5D%20%3D%20%5Csum_%7B0%20%5Cleq%20j%7D%20I%5Bi-j%5D)
 
-```math
-\Large
-\texttt{
-  if (\textcolor{magenta}{j < N}) \{{
-    \textcolor{red}{O(n)}
-    \textcolor{green}{+=}
-    \textcolor{cyan}{I(i - j)};
-  \}}
-}
-```
+
+![if( j < N) \{ O\[n\] += I\[i-j\] ; \}](https://render.githubusercontent.com/render/math?math=if(%20j%20%3C%20N)%20%5C%7B%20O%5Bn%5D%20%2B%3D%20I%5Bi-j%5D%20%3B%20%5C%7D)
+
 
 ### Convolution
 
@@ -489,6 +435,7 @@ Let's start with the mathematical formula for this operation:
 \Large
 O[n, x, c_o] = \sum_k \sum_{c_i}(I[n, x + k, c_i] \cdot K[k, c_i, c_o])
 ```
+![O\[n, x, c_o\] = \sum_k \sum_{c_i}(I\[n, x + k, c_i\] \cdot K\[k, c_i, c_o\])](https://render.githubusercontent.com/render/math?math=O%5Bn%2C%20x%2C%20c_o%5D%20%3D%20%5Csum_k%20%5Csum_%7Bc_i%7D(I%5Bn%2C%20x%20%2B%20k%2C%20c_i%5D%20%5Ccdot%20K%5Bk%2C%20c_i%2C%20c_o%5D))
 
 This is rather complicated, so let's walk through why this is the same
 convolution formula we're used to in machine learning.
@@ -517,26 +464,11 @@ This formula directly translates to Tile, although note that `padding='valid'`
 means that the spatial dimension of the output will be reduced by one less than
 the kernel size relative to the spatial dimension of the input:
 
-```math
-\Large
-\textcolor{red}{O[n, x, c_o]}
-\textcolor{yellow}{=}
-\textcolor{green}{\sum_k \sum_{c_i}}
-\textcolor{cyan}{I[n, x + k, c_i]}
-\textcolor{orange}{\cdot}
-\textcolor{lightblue}{K[k, c_i, c_o]}
-```
 
-```math
-\Large
-\texttt{
-  \textcolor{red}{O(n, x, co)}
-  \textcolor{green}{+=}
-  \textcolor{cyan}{I(n, x + k, ci)}
-  \textcolor{orange}{*}
-  \textcolor{lightblue}{K(k, ci, co)};
-}
-```
+![O\[n, x, c_o\] = \sum_k \sum_{c_i}(I\[n, x + k, c_i\] \cdot K\[k, c_i, c_o\])](https://render.githubusercontent.com/render/math?math=O%5Bn%2C%20x%2C%20c_o%5D%20%3D%20%5Csum_k%20%5Csum_%7Bc_i%7D(I%5Bn%2C%20x%20%2B%20k%2C%20c_i%5D%20%5Ccdot%20K%5Bk%2C%20c_i%2C%20c_o%5D))
+
+
+![O\[n, x, c_o\] += (I\[n, x + k, ci\] * K\[k, ci, co\]);](https://render.githubusercontent.com/render/math?math=O%5Bn%2C%20x%2C%20c_o%5D%20%2B%3D%20(I%5Bn%2C%20x%20%2B%20k%2C%20ci%5D%20*%20K%5Bk%2C%20ci%2C%20co%5D)%3B)
 
 ```c++
 Tensor conv_1d(const Tensor& I, const Tensor& K) {
@@ -567,12 +499,8 @@ an additional spatial dimension for each tensor, and the kernel offset index
 variables are multiplied by dilation scaling factors when used to determine
 indices for `I`:
 
-```math
-\Large
-O[n, x, y, c_o] = \sum_{k_x} \sum_{k_y} \sum_{c_i}
-I[n, x + 2k_x, y + 3k_y, c_i] *
-K[k_x, k_y, c_i, c_o]
-```
+
+![O\[n, x, y, c_o\] = \sum_{k_x} \sum_{k_y} \sum_{c_i} I\[n, x + 2k_x, y + 3k_y, c_i\] * K\[k_x, k_y, c_i, c_o\]](https://render.githubusercontent.com/render/math?math=O%5Bn%2C%20x%2C%20y%2C%20c_o%5D%20%3D%20%5Csum_%7Bk_x%7D%20%5Csum_%7Bk_y%7D%20%5Csum_%7Bc_i%7D%20I%5Bn%2C%20x%20%2B%202k_x%2C%20y%20%2B%203k_y%2C%20c_i%5D%20*%20K%5Bk_x%2C%20k_y%2C%20c_i%2C%20c_o%5D)
 
 The effective size for a dilated kernel with kernel size `K` and dilation rate
 `d` is `d * (K - 1) + 1`, and so to achieve `'valid'` padding for this
@@ -597,17 +525,8 @@ Tensor conv_2d(const Tensor& I, const Tensor& K) {
 
 This final example demonstrates a strided dilated padded grouped convolution.
 
-```math
-\Large
-\begin{aligned}
-O&[n, x_0, x_1, g, c_{o, g}] \\
-&= \sum_{k_0, k_1, c_{i, g}}
-(
-  I[n, s_0 x_0 + d_0 k_0 - P_0, s_1 x_1 + d_1 k_1 - P_1, c_{i, g}] *
-  K[k_0, k_1, g, c_{i, g}, c_{o, g}]
-)
-\end{aligned}
-```
+![\begin{aligned} O&\[n, x_0, x_1, g, c_{o, g}\] \\ &= \sum_{k_0, k_1, c_{i, g}} (   I\[n, s_0 x_0 + d_0 k_0 - P_0, s_1 x_1 + d_1 k_1 - P_1, c_{i, g}\] *   K\[k_0, k_1, g, c_{i, g}, c_{o, g}\] ) \end{aligned}](https://render.githubusercontent.com/render/math?math=%5Cbegin%7Baligned%7D%20O%26%5Bn%2C%20x_0%2C%20x_1%2C%20g%2C%20c_%7Bo%2C%20g%7D%5D%20%5C%5C%20%26%3D%20%5Csum_%7Bk_0%2C%20k_1%2C%20c_%7Bi%2C%20g%7D%7D%20(%20%20%20I%5Bn%2C%20s_0%20x_0%20%2B%20d_0%20k_0%20-%20P_0%2C%20s_1%20x_1%20%2B%20d_1%20k_1%20-%20P_1%2C%20c_%7Bi%2C%20g%7D%5D%20*%20%20%20K%5Bk_0%2C%20k_1%2C%20g%2C%20c_%7Bi%2C%20g%7D%2C%20c_%7Bo%2C%20g%7D%5D%20)%20%5Cend%7Baligned%7D)
+
 
 where _`s`_ gives the stride coefficients, _`d`_ gives the dilation
 coefficients, and _`P`_ gives the padding offsets.
