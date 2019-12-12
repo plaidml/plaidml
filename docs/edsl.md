@@ -68,7 +68,6 @@ highlight corresponding pieces:
 
 ![\Large \color{red}O\[n\]\color{green}+=\color{blue}I\[m,n\]](https://render.githubusercontent.com/render/math?math=%5CLarge%20%5Ccolor%7Bred%7DO%5Bn%5D%5Ccolor%7Bgreen%7D%2B%3D%5Ccolor%7Bblue%7DI%5Bm%2Cn%5D)
 
-
 In green, notice that the summation symbol is represented as `+=` in C++ Tile
 code. Some portions of the notation do not perfectly correspond. Here's why:
 
@@ -112,6 +111,7 @@ Tensor max_over_axis(const Tensor& I) {
 ```
 
 Again, this corresponds closely to mathematical notation:
+
 <!-- 
 ```math
  \Large
@@ -129,11 +129,10 @@ Again, this corresponds closely to mathematical notation:
    \textcolor{cyan}{I(m, n)};
  }
  ``` -->
+
 ![\Large \color{red}O\[n\]\color{black}= \color{green}\max_{m}{\color{blue}I\[m,n\]}](https://render.githubusercontent.com/render/math?math=%5CLarge%20%5Ccolor%7Bred%7DO%5Bn%5D%5Ccolor%7Bblack%7D%3D%20%5Ccolor%7Bgreen%7D%5Cmax_%7Bm%7D%7B%5Ccolor%7Bblue%7DI%5Bm%2Cn%5D%7D)
 
-
 ![\Large \color{red}O\[n\] \color{green} > = \color{blue}I\[m,n\]](https://render.githubusercontent.com/render/math?math=%5CLarge%20%5Ccolor%7Bred%7DO%5Bn%5D%20%5Ccolor%7Bgreen%7D%20%3E%20%3D%20%5Ccolor%7Bblue%7DI%5Bm%2Cn%5D)
-
 
 ### Matrix Multiply
 
@@ -353,12 +352,10 @@ have started there instead:
    \}}
  }
  ``` -->
+
 ![\Large \color{red}O\[n\] \color{black}= \color{green}\max_{\color{magenta}0 \ge j < 2}{\color{blue} I\[2i+j\]}](https://render.githubusercontent.com/render/math?math=%5CLarge%20%5Ccolor%7Bred%7DO%5Bn%5D%20%5Ccolor%7Bblack%7D%3D%20%5Ccolor%7Bgreen%7D%5Cmax_%7B%5Ccolor%7Bmagenta%7D0%20%5Cge%20j%20%3C%202%7D%7B%5Ccolor%7Bblue%7D%20I%5B2i%2Bj%5D%7D)
 
 ![\Large \color{black}if (\color{magenta}j < 2\color{black})  \{\color{red} O\\[n\\] \color{green} > = \color{blue} I (2*i+j) \color{black};\}](https://render.githubusercontent.com/render/math?math=%5CLarge%20%5Ccolor%7Bblack%7Dif%20(%5Ccolor%7Bmagenta%7Dj%20%3C%202%5Ccolor%7Bblack%7D)%20%20%5C%7B%5Ccolor%7Bred%7D%20O%5C%5Bn%5C%5D%20%5Ccolor%7Bgreen%7D%20%3E%20%3D%20%5Ccolor%7Bblue%7D%20I%20(2*i%2Bj)%20%5Ccolor%7Bblack%7D%3B%5C%7D)
-
-
-
 
 This Tile code handles odd values of `N` by rounding down the output tensor
 size. You may instead want to round up the output tensor size and use a smaller
@@ -499,11 +496,6 @@ way of forcing `k` to be no larger than `i`. Then in summation notation we have:
 
 ![\Large \text{if ( } \color{magenta} j < N \color{black} \text{)}  \{ \color{red}O\[n\] \color{green} += \color{blue} I( I - j ) \color{black};\}](https://render.githubusercontent.com/render/math?math=%5CLarge%20%5Ctext%7Bif%20(%20%7D%20%5Ccolor%7Bmagenta%7D%20j%20%3C%20N%20%5Ccolor%7Bblack%7D%20%5Ctext%7B)%7D%20%20%5C%7B%20%5Ccolor%7Bred%7DO%5Bn%5D%20%5Ccolor%7Bgreen%7D%20%2B%3D%20%5Ccolor%7Bblue%7D%20I(%20I%20-%20j%20)%20%5Ccolor%7Bblack%7D%3B%5C%7D)
 
-
-
-
-
-
 ### Convolution
 
 Let's implement a 1D convolution with output size equal to input size. This is
@@ -558,7 +550,6 @@ the kernel size relative to the spatial dimension of the input:
  \textcolor{orange}{\cdot}
  \textcolor{lightblue}{K[k, c_i, c_o]}
  ```
-
  ```math
  \Large
  \texttt{
@@ -573,8 +564,6 @@ the kernel size relative to the spatial dimension of the input:
 ![\Large \color{red} O\[n, x, c_o\] \color{black} = \color{green} \sum_k \sum_{c_i} \color{blue} I\[n, x + k, c_i\] \color{orange} \cdot \color{lightblue}K\[k, c_i, c_o\]](https://render.githubusercontent.com/render/math?math=%5CLarge%20%5Ccolor%7Bred%7D%20O%5Bn%2C%20x%2C%20c_o%5D%20%5Ccolor%7Bblack%7D%20%3D%20%5Ccolor%7Bgreen%7D%20%5Csum_k%20%5Csum_%7Bc_i%7D%20%5Ccolor%7Bblue%7D%20I%5Bn%2C%20x%20%2B%20k%2C%20c_i%5D%20%5Ccolor%7Borange%7D%20%5Ccdot%20%5Ccolor%7Blightblue%7DK%5Bk%2C%20c_i%2C%20c_o%5D)
 
 ![\Large \color{red} O(n, x, co)  \color{green} += \color{blue}I(n, x + k, ci) \color{orange} * \color{lightblue}K(k, ci, co)](https://render.githubusercontent.com/render/math?math=%5CLarge%20%5Ccolor%7Bred%7D%20O(n%2C%20x%2C%20co)%20%20%5Ccolor%7Bgreen%7D%20%2B%3D%20%5Ccolor%7Bblue%7DI(n%2C%20x%20%2B%20k%2C%20ci)%20%5Ccolor%7Borange%7D%20*%20%5Ccolor%7Blightblue%7DK(k%2C%20ci%2C%20co))
-
-
 
 ```c++
 Tensor conv_1d(const Tensor& I, const Tensor& K) {
@@ -633,7 +622,6 @@ Tensor conv_2d(const Tensor& I, const Tensor& K) {
 }
 ```
 
-
 ### Complex Convolution
 
 This final example demonstrates a strided dilated padded grouped convolution.
@@ -651,7 +639,6 @@ This final example demonstrates a strided dilated padded grouped convolution.
  ``` -->
 
 ![\Large \begin{aligned} O&\[n, x_0, x_1, g, c_{o, g}\] \\ &= \sum_{k_0, k_1, c_{i, g}} (   I\[n, s_0 x_0 + d_0 k_0 - P_0, s_1 x_1 + d_1 k_1 - P_1, c_{i, g}\] *   K\[k_0, k_1, g, c_{i, g}, c_{o, g}\] ) \end{aligned}](https://render.githubusercontent.com/render/math?math=%5CLarge%20%5Cbegin%7Baligned%7D%20O%26%5Bn%2C%20x_0%2C%20x_1%2C%20g%2C%20c_%7Bo%2C%20g%7D%5D%20%5C%5C%20%26%3D%20%5Csum_%7Bk_0%2C%20k_1%2C%20c_%7Bi%2C%20g%7D%7D%20(%20%20%20I%5Bn%2C%20s_0%20x_0%20%2B%20d_0%20k_0%20-%20P_0%2C%20s_1%20x_1%20%2B%20d_1%20k_1%20-%20P_1%2C%20c_%7Bi%2C%20g%7D%5D%20*%20%20%20K%5Bk_0%2C%20k_1%2C%20g%2C%20c_%7Bi%2C%20g%7D%2C%20c_%7Bo%2C%20g%7D%5D%20)%20%5Cend%7Baligned%7D)
-
 
 where _`s`_ gives the stride coefficients, _`d`_ gives the dilation
 coefficients, and _`P`_ gives the padding offsets.
