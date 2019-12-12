@@ -4,7 +4,7 @@
 
 #include <mutex>
 
-#include <boost/format.hpp>
+#include "llvm/Support/FormatVariadic.h"
 
 #include "plaidml2/core/internal.h"
 #include "plaidml2/op/lib/ops.h"
@@ -27,23 +27,17 @@ void plaidml_op_init(  //
   });
 }
 
-plaidml_expr* plaidml_op_make(  //
-    plaidml_error* err,         //
-    const char* op_name,        //
-    plaidml_expr* expr) {
-  return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
-    Value value{expr};
+plaidml_value* plaidml_op_make(  //
+    plaidml_error* err,          //
+    const char* op_name,         //
+    plaidml_value* value) {
+  return ffi_wrap<plaidml_value*>(err, nullptr, [&] {
     auto op = lib::OperationRegistry::Instance()->Resolve(op_name);
     if (!op) {
-      throw std::runtime_error(str(boost::format("Operation not registered: %1%") % op_name));
+      throw std::runtime_error(llvm::formatv("Operation not registered: {0}", op_name).str());
     }
-    auto ret = op(value);
-#ifdef PLAIDML_AST
-    return new plaidml_expr{ret.as_ptr()->expr};
-#endif
-#ifdef PLAIDML_MLIR
-    return new plaidml_expr{ret.as_ptr()->value};
-#endif
+    auto ret = op(Value{value});
+    return new plaidml_value{ret.as_ptr()->variant};
   });
 }
 

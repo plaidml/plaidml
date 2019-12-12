@@ -165,7 +165,7 @@ static const char* const ffiFunction = R"(
 namespace details {
 
 inline edsl::Value op(const std::string& name, const edsl::Value& args) {
-  return edsl::Value(ffi::call<plaidml_expr*>(plaidml_op_make, name.c_str(), args.as_ptr()));
+  return edsl::Value(ffi::call<plaidml_value*>(plaidml_op_make, name.c_str(), args.as_ptr()));
 }
 
 } // namespace details
@@ -181,7 +181,7 @@ inline void init() {  //
 
 )";
 
-// Order doesn't matter here, but lookup efficiency does, so keep as a std::map. 
+// Order doesn't matter here, but lookup efficiency does, so keep as a std::map.
 static inline const std::map<StringRef, StringRef> typeLookupTable = {
     {"APInt", "int"},
     {"ArrayAttr", "std::vector<int>"},

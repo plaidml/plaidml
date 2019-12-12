@@ -107,6 +107,8 @@ class TileBuilder {
 
   std::shared_ptr<TileProgram> MakeProgram(llvm::StringRef name, const ProgramMutations& mutations);
 
+  void Dump();
+
  private:
   std::unique_ptr<Impl> impl;
 };

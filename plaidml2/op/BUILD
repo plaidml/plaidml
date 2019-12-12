@@ -49,7 +49,7 @@ plaidml_cc_library(
         "//plaidml2/core:core_ast",
         "//plaidml2/edsl:edsl_ast",
         "//plaidml2/op/lib:lib_ast",
-        "@boost",
+        "@llvm//:support",
     ],
     alwayslink = 1,
 )
@@ -72,7 +72,7 @@ plaidml_cc_library(
         "//plaidml2/core:core_mlir",
         "//plaidml2/edsl:edsl_mlir",
         "//plaidml2/op/lib:lib_mlir",
-        "@boost",
+        "@llvm//:support",
     ],
     alwayslink = 1,
 )
