@@ -9,6 +9,7 @@
 
 #include "llvm/ADT/StringSwitch.h"
 
+#include "mlir/Dialect/StandardOps/Ops.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Support/DebugStringHelper.h"
@@ -23,6 +24,7 @@ namespace pmlc {
 namespace dialect {
 namespace eltwise {
 
+using mlir::FloatAttr;
 using mlir::IntegerAttr;
 using mlir::OpRewritePattern;
 using mlir::Pattern;
@@ -32,6 +34,23 @@ using mlir::PatternRewriter;
 mlir::OpFoldResult ScalarConstantOp::fold(ArrayRef<Attribute> operands) {
   assert(operands.empty() && "constant has no operands");
   return getValue();
+}
+
+Value* ScalarConstantOp::buildStandard(ArrayRef<Value*> operands, ConversionPatternRewriter& rewriter) {
+  Type type = getType();
+  if (auto stype = type.dyn_cast<eltwise::ScalarType>()) {
+    type = stype.toStandard();
+  }
+  Attribute val = getValue();
+  if (auto ftype = type.dyn_cast<FloatType>()) {
+    auto fattr = val.cast<FloatAttr>();
+    val = FloatAttr::get(ftype, fattr.getValueAsDouble());
+  }
+  if (auto itype = type.dyn_cast<IntegerType>()) {
+    auto iattr = val.cast<IntegerAttr>();
+    val = IntegerAttr::get(itype, iattr.getInt());
+  }
+  return rewriter.create<mlir::ConstantOp>(getLoc(), type, val);
 }
 
 //

@@ -19,6 +19,7 @@ plaidml_cc_binary(
         "//pmlc/dialect/stripe",
         "//pmlc/dialect/stripe:passes",
         "//pmlc/dialect/tile",
+        "//pmlc/dialect/pxa",
         "@mlir//:EDSC",
         "@mlir//:OptMain",
         "@mlir//:Parser",

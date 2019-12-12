@@ -2,17 +2,12 @@
 
 package(default_visibility = ["//visibility:public"])
 
+load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_test")
 load("//vendor/mlir:mlir.bzl", "COPTS", "mlir_tblgen")
-load(
-    "//bzl:plaidml.bzl",
-    "plaidml_cc_library",
-    "plaidml_cc_test",
-)
 
 MLIR_TBLGEN_ALSO = [
-    "//pmlc/util:interfaces.td",
-    "interfaces.td",
-    "predicates.td",
+    "//pmlc/util:enums.td",
+    "//pmlc/dialect/eltwise:predicates.td",
 ]
 
 mlir_tblgen(
@@ -33,50 +28,34 @@ mlir_tblgen(
     incs = ["@mlir//:include"],
 )
 
-mlir_tblgen(
-    name = "gen-op-interface-decls",
-    src = "interfaces.td",
-    out = "interfaces.h.inc",
-    action = "-gen-op-interface-decls",
-    incs = ["@mlir//:include"],
-)
-
-mlir_tblgen(
-    name = "gen-op-interface-defs",
-    src = "interfaces.td",
-    out = "interfaces.cc.inc",
-    action = "-gen-op-interface-defs",
-    incs = ["@mlir//:include"],
-)
-
 plaidml_cc_library(
-    name = "eltwise",
+    name = "pxa",
     srcs = [
-        "dialect.cc",
-        "interfaces.cc.inc",
+        "from_tile.cc",
         "ops.cc",
         "ops.cc.inc",
-        "types.cc",
-        "util.cc",
     ],
     hdrs = [
         "dialect.h",
-        "interfaces.h.inc",
+        "from_tile.h",
         "ops.h",
         "ops.h.inc",
-        "types.h",
-        "util.h",
     ],
     copts = COPTS,
-    visibility = ["//visibility:public"],
+    tags = ["llvm"],
     deps = [
         ":gen-op-decls",
         ":gen-op-defs",
-        "//pmlc/util",
+        "//pmlc/dialect/eltwise",
+        "//pmlc/dialect/tile",
         "//tile/base",
+        "@boost",
         "@llvm//:support",
         "@mlir//:IR",
+        "@mlir//:Parser",
         "@mlir//:StandardOps",
+        "@mlir//:Transforms",
     ],
     alwayslink = 1,
 )
+

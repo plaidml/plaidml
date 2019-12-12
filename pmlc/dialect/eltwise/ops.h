@@ -7,6 +7,7 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/StandardTypes.h"
+#include "mlir/Transforms/DialectConversion.h"
 
 #include "pmlc/dialect/eltwise/types.h"
 #include "pmlc/dialect/eltwise/util.h"
@@ -22,6 +23,7 @@ using mlir::APInt;
 using mlir::ArrayRef;
 using mlir::Attribute;
 using mlir::Builder;
+using mlir::ConversionPatternRewriter;
 using mlir::FloatAttr;
 using mlir::FloatType;
 using mlir::IndexType;
