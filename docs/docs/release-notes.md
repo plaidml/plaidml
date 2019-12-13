@@ -1,3 +1,7 @@
+---
+nav_order: 7
+---
+
 # Release Notes
 
 ## PlaidML 0.6.2

@@ -1,4 +1,8 @@
-# Integrating PlaidML into your project's CI infrastructure
+---
+nav_order: 6
+---
+
+# CI Integration
 
 # Instantiating PlaidML Programmatically
 

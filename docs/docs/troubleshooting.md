@@ -1,3 +1,7 @@
+---
+nav_order: 4
+---
+
 # Troubleshooting
 
 Having trouble getting PlaidML to work? Well, you're in the right place!

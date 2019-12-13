@@ -1,3 +1,7 @@
+---
+nav_order: 2
+---
+
 # Building from source
 
 ## Install Anaconda

@@ -21,9 +21,6 @@ url: https://plaidml.github.io
 
 # Build settings
 markdown: kramdown
-#markdown: maruku
-kramdown:
-  math_engine: katex
 remote_theme: pmarsceill/just-the-docs
 plugins:
   - jekyll-feed
@@ -33,13 +30,6 @@ plugins:
 # to override the default setting.
 exclude:
   - README.md
-#   - Gemfile
-#   - Gemfile.lock
-#   - node_modules
-#   - vendor/bundle/
-#   - vendor/cache/
-#   - vendor/gems/
-#   - vendor/ruby/
 
 # just-the-docs settings
 logo: /assets/images/plaid-final.png

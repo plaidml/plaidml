@@ -8,14 +8,6 @@ permalink: /
 
 *A platform for making deep learning work everywhere.*
 
-[Documentation](https://vertexai-plaidml.readthedocs-hosted.com/) |
-[Installation Instructions](docs/install.md) |
-[Building PlaidML](docs/building.md) |
-[Contributing](docs/contributing.rst) |
-[Troubleshooting](docs/troubleshooting.md) |
-[Reporting Issues](#reporting-issues)
-
-
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/plaidml/plaidml/blob/master/LICENSE)
 [![Build status](https://badge.buildkite.com/5c9add6b89a14fd498e69a5035062368480e688c4c74cbfab3.svg?branch=master)](https://buildkite.com/plaidml/plaidml-plaidml)
 
@@ -101,6 +93,7 @@ art networks. Here's all the code you need to run VGG-19:
 
 ```python
 #!/usr/bin/env python
+
 import numpy as np
 import os
 import time

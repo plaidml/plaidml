@@ -1,9 +1,13 @@
+---
+nav_order: 1
+---
+
 # Installation Instructions
 
-PlaidML supports [Ubuntu\* Linux](#ubuntu-linux), [macOS\*](#macos) and
-[Microsoft Windows\*](#windows) operating systems.
+PlaidML supports [Ubuntu](#ubuntu), [macOS](#macos) and
+[Microsoft Windows](#windows) operating systems.
 
-## Ubuntu Linux
+## Ubuntu
 
 If necessary, install Python's ``pip`` tool. OpenCL 1.2 or greater is also
 required.
@@ -38,9 +42,9 @@ judicious use of a [Virtualenv].  To create one just for using PlaidML:
 python3 -m venv plaidml-venv
 source plaidml-venv/bin/activate
 ```
-### Keras\*
+### Keras
 
-There are two ways to get Keras\* working on your system:
+There are two ways to get Keras working on your system:
 
 1. Isolate it to your `venv` as follows:
 ```
@@ -62,12 +66,12 @@ pip install plaidml-keras plaidbench
 plaidbench keras mobilenet
 ```
 
-You can adapt any Keras\* code by using the PlaidML backend instead of the
-TensorFlow\*, CNTK\*, or Theano\* backend that you'd normally use; simply change
-the Keras\* backend to ``plaidml.keras.backend``. You can do this by modifying
+You can adapt any Keras code by using the PlaidML backend instead of the
+TensorFlow, CNTK, or Theano backend that you'd normally use; simply change
+the Keras backend to ``plaidml.keras.backend``. You can do this by modifying
 ``~/.keras/keras.json`` so that the backend line reads ``"backend":
 "plaidml.keras.backend"`` If this file does not exist, see the [Backend
-instructions for Keras]. If you don't need anything special in your Keras\*
+instructions for Keras]. If you don't need anything special in your Keras
 settings, you can set the ``~/.keras/keras.json`` as follows:
 
 ```json
@@ -98,9 +102,9 @@ judicious use of a [Virtualenv].  To create one just for using PlaidML:
 python3 -m venv plaidml-venv
 source plaidml-venv/bin/activate
 ```
-### Keras\*
+### Keras
 
-To install PlaidML with Keras\*, run the following:
+To install PlaidML with Keras, run the following:
 ```
 pip install -U plaidml-keras
 ```
@@ -116,9 +120,9 @@ pip install plaidml-keras plaidbench
 plaidbench keras mobilenet
 ```
 
-## Windows\*
+## Windows
 
-These instructions assume Windows\* 10 without Python installed; adapt
+These instructions assume Windows 10 without Python installed; adapt
 accordingly.
 
 1. First install [Chocolatey] by starting an Administrator PowerShell
@@ -133,7 +137,7 @@ You'll likely need to reboot your shell at this point.
 choco install -y python git vcredist2015
 ```
 1. Switch to an unprivileged PowerShell to install and set up PlaidML with
-Keras\*
+Keras
 ```
 pip install -U plaidml-keras
 plaidml-setup

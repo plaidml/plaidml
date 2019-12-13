@@ -1,3 +1,7 @@
+---
+nav_order: 3
+---
+
 # Contributing to PlaidML
 
 We welcome contributions to PlaidML from anyone. This document contains:
