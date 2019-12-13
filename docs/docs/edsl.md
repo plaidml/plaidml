@@ -224,7 +224,7 @@ We can perform multiple elementwise operations on the same line, including
 operations on constants and input dimensions. So, while it would be possible to
 take a global mean of a 2D tensor in stages as so:
 
-```
+```c++
 Tensor avg(const Tensor& I) {
   TensorDim X, Y;
   TensorIndex x, y;
@@ -238,7 +238,7 @@ Tensor avg(const Tensor& I) {
 
 it is more straightforward to merge the elementwise operations:
 
-```
+```c++
 Tensor avg(const Tensor& I) {
   TensorDim X, Y;
   TensorIndex x, y;
@@ -375,7 +375,6 @@ I.bind_dims(N);
 auto O = TensorOutput((N + 1) / 2);
 O(i) >= I(2 * i + j);
 O.add_constraint(j < 2);
-}
 ```
 
 with `N = 5`, the indices `i = 1, j = 1` are valid indices.
@@ -446,30 +445,6 @@ Tensor csum(const Tensor& I) {
   return O;
 }
 ```
-
-Alternatively, we could write `k = i - j` for `j` non-negative as an alternative
-way of forcing `k` to be no larger than `i`. Then in summation notation we have:
-
-\\[
-\color{red}O[i]
-\color{default}=
-\color{green}\sum_{\color{magenta}0 \leq j}
-\color{blue}I[i - j]
-\\]
-
-\\[
-\begin{aligned}
-&
-\color{red}\verb|O(n)|
-\color{green}\verb| += |
-\color{blue}\verb|I(i - j)|\color{default}\verb|;|
-\cr
-&
-\color{default}\verb|O.add_constraint(|
-\color{magenta}\verb|j < N|\color{default}\verb|);|
-\end{aligned}
-\\]
-
 
 ### Convolution
 

@@ -1,5 +1,5 @@
 <div align=center><a href="https://www.intel.ai/plaidml"><img
-src="docs/images/plaid-final.png" height="200"></a><br>
+src="docs/assets/images/plaid-final.png" height="200"></a><br>
 
 *A platform for making deep learning work everywhere.*
 
@@ -31,7 +31,7 @@ that would otherwise be bounded by the compute limitations of the device.
 
 As a component under [Keras], PlaidML can accelerate training workloads with
 customized or automatically-generated Tile code. It works especially well on
-GPUs, and it doesn't require use of CUDA/cuDNN on Nvidia* hardware, while
+GPUs, and it doesn't require use of CUDA/cuDNN on Nvidia hardware, while
 achieving comparable performance.
 
 PlaidML works on all major operating systems: Linux, macOS, and Windows.
@@ -95,6 +95,7 @@ art networks. Here's all the code you need to run VGG-19:
 
 ```python
 #!/usr/bin/env python
+
 import numpy as np
 import os
 import time
@@ -187,6 +188,6 @@ correctness as part of our continuous integration system.
 [License]: https://img.shields.io/badge/License-Apache%202.0-blue.svg
 [Build status]: https://badge.buildkite.com/5c9add6b89a14fd498e69a5035062368480e688c4c74cbfab3.svg?branch=master
 [Plaidbench]: https://github.com/plaidml/plaidml/tree/master/plaidbench
-[install-ubuntu]: https://plaidml.github.io/plaidml/docs/install.md#ubuntu
-[install-macos]: https://plaidml.github.io/plaidml/docs/install.md#macos
-[install-windows]: https://plaidml.github.io/plaidml/docs/install.md#windows
+[install-ubuntu]: https://plaidml.github.io/plaidml/docs/install#ubuntu
+[install-macos]: https://plaidml.github.io/plaidml/docs/install#macos
+[install-windows]: https://plaidml.github.io/plaidml/docs/install#windows
