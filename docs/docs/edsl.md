@@ -51,16 +51,16 @@ highlight corresponding pieces:
 $$
 \Large
 \color{red}{O[n]}
-\color{yellow}{=}
+=
 \color{green}{\sum_{m}}
-\color{cyan}{I[m, n]}
+\color{blue}{I[m, n]}
 $$
 
 $$
 \Large
-  \color{red}O(n)
-  \color{green}+=
-  \color{cyan}I(m, n);
+  \color{red}{O(n)}
+  \color{green}{+=}
+  \color{blue}{I(m, n)};
 $$
 
 In green, notice that the summation symbol is represented as `+=` in C++ Tile
@@ -110,16 +110,16 @@ Again, this corresponds closely to mathematical notation:
 $$
 \Large
 \color{red}{O[n]}
-\color{yellow}{=}
+=
 \color{green}{\max_m}
-\color{cyan}{I[m, n]}
+\color{blue}{I[m, n]}
 $$
 
 $$
 \Large
 \color{red}{O(n)}
 \color{green}{>=}
-\color{cyan}{I(m, n)};
+\color{blue}{I(m, n)};
 $$
 
 ### Matrix Multiply
@@ -320,27 +320,27 @@ We determined the Tile code for this example by starting from imperative code,
 but this Tile code is still very similar to mathematical notation, and we could
 have started there instead:
 
-
+<div>
 $$
 \Large
-\color{red} O[n]
-\color{yellow} = 
-\color{green} \max_{\color{magenta} 0 \leq j < 2}
-\color{cyan} I[2i + j] 
+\color{red} {O[n]}
+= 
+\color{green} \max_{\color{magenta}{ 0 \leq j < 2}}
+\color{blue} {I[2i + j]}
 $$
+</div>
 
-
+<div>
 $$
 \Large
-\texttt{
-  if (\color{magenta}{j < 2}) \{
+  \text{if} (\color{magenta}{j < 2}) \{
     \color{red}{O(n)}
     \color{green}{>=}
-    \color{cyan}{I(2 * i + j)};
+    \color{blue}{I(2 * i + j)};
   \}
-}
-$$
 
+$$
+</div>
 
 This Tile code handles odd values of `N` by rounding down the output tensor
 size. You may instead want to round up the output tensor size and use a smaller
@@ -457,19 +457,24 @@ way of forcing `k` to be no larger than `i`. Then in summation notation we have:
 
 $$
 \Large
-\color{red} O[i]
-\color{yellow} =
-\color{green} \sum_{\color{magenta} 0 \leq j} 
-\color{cyan} I[i - j]
+\color{red} {O[i]}  
+ =
+\color{green} \sum_{\color{magenta}{ 0 \leq j}} 
+\color{blue} {I[i - j]}
 $$
 
-
+<div>
 $$
 \Large
+  \text{if} (\color{magenta}{j < N}) \{
+    \color{red}{O(n)}
+    \color{green}{ += }
+    \color{blue}{I(i - j)};
+  \}
 
-  \text{if} ( \color{magenta}j < N \color{black} ) \color{red} O(n) \color{green}{+=} \color{cyan} I(i - j) \color{black};
-}
 $$
+</div>
+
 
 
 ### Convolution
@@ -518,16 +523,21 @@ the kernel size relative to the spatial dimension of the input:
 $$
 \Large
 \color{red}{O[n, x, c_o]}
-\color{yellow}{=}
+=
 \color{green}{\sum_k \sum_{c_i}}
-\color{cyan}{I[n, x + k, c_i]}
+\color{blue}{I[n, x + k, c_i]}
 \color{orange}{\cdot}
 \color{lightblue}{K[k, c_i, c_o]}
 $$
 
 $$
 \Large
-  \color{red}{ O(n, x, co)} \color{green} +=  \color{cyan} {I(n, x + k, ci)} \color{orange} * \color{lightblue} {K(k, ci, co)} \color{black};
+  \color{red}{ O(n, x, co)} 
+  \color{green} {+=}
+  \color{blue} {I(n, x + k, ci)} 
+  \color{orange} * 
+  \color{lightblue} {K(k, ci, co)} 
+  ;
 $$
 
 ```c++
@@ -592,12 +602,12 @@ This final example demonstrates a strided dilated padded grouped convolution.
 $$
 \Large
 \begin{aligned}
-O&[n, x_0, x_1, g, c_{o, g}] \\
-&= \sum_{k_0, k_1, c_{i, g}}
+    O & [n, x_0, x_1, g, c_{o, g}] \\
+     & = \sum_{k_0, k_1, c_{i, g}}
 (
   I[n, s_0 x_0 + d_0 k_0 - P_0, s_1 x_1 + d_1 k_1 - P_1, c_{i, g}] *
   K[k_0, k_1, g, c_{i, g}, c_{o, g}]
-)
+)\\
 \end{aligned}
 $$
 
