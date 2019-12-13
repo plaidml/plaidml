@@ -446,30 +446,6 @@ Tensor csum(const Tensor& I) {
 }
 ```
 
-Alternatively, we could write `k = i - j` for `j` non-negative as an alternative
-way of forcing `k` to be no larger than `i`. Then in summation notation we have:
-
-\\[
-\color{red}O[i]
-\color{default}=
-\color{green}\sum_{\color{magenta}0 \leq j}
-\color{blue}I[i - j]
-\\]
-
-\\[
-\begin{aligned}
-&
-\color{red}\verb|O(n)|
-\color{green}\verb| += |
-\color{blue}\verb|I(i - j)|\color{default}\verb|;|
-\cr
-&
-\color{default}\verb|O.add_constraint(|
-\color{magenta}\verb|j < N|\color{default}\verb|);|
-\end{aligned}
-\\]
-
-
 ### Convolution
 
 Let's implement a 1D convolution with output size equal to input size. This is
