@@ -1,9 +1,5 @@
 ---
-# Feel free to add content and custom Front Matter to this file.
-# To modify the layout, see https://jekyllrb.com/docs/themes/#overriding-theme-defaults
-
 layout: home
-permalink: /
 ---
 
 *A platform for making deep learning work everywhere.*
@@ -74,7 +70,7 @@ plaidbench --batch-size 16 keras --train mobilenet
 
 We support a variety of operating systems and installation methods.
 
-* [Ubuntu Linux](docs/install.md#ubuntu-linux)
+* [Ubuntu](docs/install.md#ubuntu)
 * [macOS](docs/install.md#macos)
 * [Windows](docs/install.md#windows)
 
@@ -82,9 +78,8 @@ We support a variety of operating systems and installation methods.
 
 ### Plaidbench
 
-[Plaidbench](https://github.com/plaidml/plaidbench) is a performance testing
-suite designed to help users compare the performance of different cards and
-different frameworks.
+[Plaidbench] is a performance testing suite designed to help users compare the
+performance of different cards and different frameworks.
 
 ### Hello VGG
 
@@ -178,3 +173,4 @@ correctness as part of our continuous integration system.
 [Onnx]: https://github.com/onnx
 [nGraph]: https://github.com/NervanaSystems/ngraph
 [slack workspace (#plaidml)]: https://join.slack.com/t/ngraph/shared_invite/enQtNjY1Njk4OTczMzEyLWIyZjZkMDNiNzJlYWQ3MGIyZTg2NjRkODAyYWZlZWY5MmRiODdlNzVkMjcxNjNmNWEyZjNkMDVhMTgwY2IzOWQ
+[Plaidbench]: https://github.com/plaidml/plaidml/tree/master/plaidbench
