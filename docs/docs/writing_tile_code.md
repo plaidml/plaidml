@@ -1,6 +1,6 @@
-{% include mathjax_support %}
-
 # Writing Tile Code
+
+{% include mathjax_support %}
 
 PlaidML uses a language called Tile to construct GPU kernels. When used to
 express machine learning operations, the Tile language is reasonably close to
@@ -83,7 +83,7 @@ detail:
 <!-- <div align=center><img src="images/math-mat-mul.png" height="60"
 alt="C[i, j] = sum_k(A[i, k] * B[k, j]"></div><br> -->
 
-<span> $$ C[i, j] = \sum_k(A[i, k] * B[k, j] $$</span>
+<span> $$ \Large C[i, j] = \sum_k(A[i, k] * B[k, j] $$</span>
 
 We can convert this to Tile code using the same correspondence as the previous
 example: The summation sign becomes plus, the summation index is omitted,
@@ -292,7 +292,7 @@ alt="O[i] = max_(0 <= j < 2)(I[2i + j])"></div><br>
 <div align=center><img src="images/code-pool-1D.png" height="30"
 alt="O[i: N / 2] = >(I[2 * i + j]), j < 2;"></div><br> -->
 
-<span>$$ O[i] = \max_{0 <= j < 2}{I[2i + j]} $$</span>
+<span>$$ O[i] = \max_{0 < = j < 2} I[2i + j] $$</span>
 
 <span>$$ O[i: N / 2] = > (I[2 * i + j]), j < 2;$$</span>
 

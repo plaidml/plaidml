@@ -1,4 +1,5 @@
 # C++ Tile EDSL
+{% include mathjax_support %}
 
 The C++ Tile EDSL (Embedded Domain Specific Language) provides developers with a
 way of describing a neural network so that the Stripe-based PlaidML compiler can
@@ -49,19 +50,17 @@ highlight corresponding pieces:
 
 $$
 \Large
-\textcolor{red}{O[n]}
-\textcolor{yellow}{=}
-\textcolor{green}{\sum_{m}}
-\textcolor{cyan}{I[m, n]}
+\color{red}{O[n]}
+\color{yellow}{=}
+\color{green}{\sum_{m}}
+\color{cyan}{I[m, n]}
 $$
 
 $$
 \Large
-\texttt{
-  \textcolor{red}{O(n)}
-  \textcolor{green}{+=}
-  \textcolor{cyan}{I(m, n)};
-}
+  \color{red}O(n)
+  \color{green}+=
+  \color{cyan}I(m, n);
 $$
 
 In green, notice that the summation symbol is represented as `+=` in C++ Tile
@@ -110,19 +109,17 @@ Again, this corresponds closely to mathematical notation:
 
 $$
 \Large
-\textcolor{red}{O[n]}
-\textcolor{yellow}{=}
-\textcolor{green}{\max_m}
-\textcolor{cyan}{I[m, n]}
+\color{red}{O[n]}
+\color{yellow}{=}
+\color{green}{\max_m}
+\color{cyan}{I[m, n]}
 $$
 
 $$
 \Large
-\texttt{
-  \textcolor{red}{O(n)}
-  \textcolor{green}{>=}
-  \textcolor{cyan}{I(m, n)};
-}
+\color{red}{O(n)}
+\color{green}{>=}
+\color{cyan}{I(m, n)};
 $$
 
 ### Matrix Multiply
@@ -323,28 +320,27 @@ We determined the Tile code for this example by starting from imperative code,
 but this Tile code is still very similar to mathematical notation, and we could
 have started there instead:
 
-{% raw %}
+
 $$
 \Large
-\textcolor{red}{O[n]}
-\textcolor{yellow}{=}
-\textcolor{green}{\max}\textcolor{magenta}{_{0 \leq j < 2}}
-\textcolor{cyan}{I[2i + j]}
+\color{red} O[n]
+\color{yellow} = 
+\color{green} \max_{\color{magenta} 0 \leq j < 2}
+\color{cyan} I[2i + j] 
 $$
-{% endraw %}
 
-{% raw %}
+
 $$
 \Large
 \texttt{
-  if (\textcolor{magenta}{j < 2}) \{{
-    \textcolor{red}{O(n)}
-    \textcolor{green}{>=}
-    \textcolor{cyan}{I(2 * i + j)};
-  \}}
+  if (\color{magenta}{j < 2}) \{
+    \color{red}{O(n)}
+    \color{green}{>=}
+    \color{cyan}{I(2 * i + j)};
+  \}
 }
 $$
-{% endraw %}
+
 
 This Tile code handles odd values of `N` by rounding down the output tensor
 size. You may instead want to round up the output tensor size and use a smaller
@@ -461,24 +457,20 @@ way of forcing `k` to be no larger than `i`. Then in summation notation we have:
 
 $$
 \Large
-\textcolor{red}{O[i]}
-\textcolor{yellow}{=}
-\textcolor{green}{\sum}\textcolor{magenta}{_{0 \leq j}}
-\textcolor{cyan}{I[i - j]}
+\color{red} O[i]
+\color{yellow} =
+\color{green} \sum_{\color{magenta} 0 \leq j} 
+\color{cyan} I[i - j]
 $$
 
-{% raw %}
+
 $$
 \Large
-\texttt{
-  if (\textcolor{magenta}{j < N}) \{{
-    \textcolor{red}{O(n)}
-    \textcolor{green}{+=}
-    \textcolor{cyan}{I(i - j)};
-  \}}
+
+  \text{if} ( \color{magenta}j < N \color{black} ) \color{red} O(n) \color{green}{+=} \color{cyan} I(i - j) \color{black};
 }
 $$
-{% endraw %}
+
 
 ### Convolution
 
@@ -525,23 +517,17 @@ the kernel size relative to the spatial dimension of the input:
 
 $$
 \Large
-\textcolor{red}{O[n, x, c_o]}
-\textcolor{yellow}{=}
-\textcolor{green}{\sum_k \sum_{c_i}}
-\textcolor{cyan}{I[n, x + k, c_i]}
-\textcolor{orange}{\cdot}
-\textcolor{lightblue}{K[k, c_i, c_o]}
+\color{red}{O[n, x, c_o]}
+\color{yellow}{=}
+\color{green}{\sum_k \sum_{c_i}}
+\color{cyan}{I[n, x + k, c_i]}
+\color{orange}{\cdot}
+\color{lightblue}{K[k, c_i, c_o]}
 $$
 
 $$
 \Large
-\texttt{
-  \textcolor{red}{O(n, x, co)}
-  \textcolor{green}{+=}
-  \textcolor{cyan}{I(n, x + k, ci)}
-  \textcolor{orange}{*}
-  \textcolor{lightblue}{K(k, ci, co)};
-}
+  \color{red}{ O(n, x, co)} \color{green} +=  \color{cyan} {I(n, x + k, ci)} \color{orange} * \color{lightblue} {K(k, ci, co)} \color{black};
 $$
 
 ```c++
