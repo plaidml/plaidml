@@ -51,7 +51,7 @@ highlight corresponding pieces:
 $$
 \Large
 \color{red}{O[n]}
-=
+\color{default}{=}
 \color{green}{\sum_{m}}
 \color{blue}{I[m, n]}
 $$
@@ -110,7 +110,7 @@ Again, this corresponds closely to mathematical notation:
 $$
 \Large
 \color{red}{O[n]}
-=
+\color{default}{=}
 \color{green}{\max_m}
 \color{blue}{I[m, n]}
 $$
@@ -320,11 +320,12 @@ We determined the Tile code for this example by starting from imperative code,
 but this Tile code is still very similar to mathematical notation, and we could
 have started there instead:
 
+<!-- remove div tags for equations to show up in preview  -->
 <div>
 $$
 \Large
 \color{red} {O[n]}
-= 
+\color{default}{=}
 \color{green} \max_{\color{magenta}{ 0 \leq j < 2}}
 \color{blue} {I[2i + j]}
 $$
@@ -333,14 +334,17 @@ $$
 <div>
 $$
 \Large
-  \text{if} (\color{magenta}{j < 2}) \{
-    \color{red}{O(n)}
-    \color{green}{>=}
-    \color{blue}{I(2 * i + j)};
-  \}
-
+  \text{if} 
+  \color{default}{(}
+  \color{magenta}{j < 2}
+  \color{default}{) \{}
+  \color{red}{O(n)}
+  \color{green}{ > =}
+  \color{blue}{I(2 * i + j)}
+  \color{default}{;\}}
 $$
 </div>
+
 
 This Tile code handles odd values of `N` by rounding down the output tensor
 size. You may instead want to round up the output tensor size and use a smaller
@@ -458,23 +462,25 @@ way of forcing `k` to be no larger than `i`. Then in summation notation we have:
 $$
 \Large
 \color{red} {O[i]}  
- =
+\color{default}{=}
 \color{green} \sum_{\color{magenta}{ 0 \leq j}} 
 \color{blue} {I[i - j]}
 $$
 
-<div>
+
+{% raw %}
 $$
 \Large
-  \text{if} (\color{magenta}{j < N}) \{
-    \color{red}{O(n)}
-    \color{green}{ += }
-    \color{blue}{I(i - j)};
-  \}
-
+  \text{if} 
+  \color{default}{(}
+  \color{magenta}{j < N}
+  \color{default}{) \{}
+  \color{red}{O(n)}
+  \color{green}{ +=}
+  \color{blue}{I(i - j)}
+  \color{default}{;\}}
 $$
-</div>
-
+{% endraw %}
 
 
 ### Convolution
@@ -522,12 +528,12 @@ the kernel size relative to the spatial dimension of the input:
 
 $$
 \Large
-\color{red}{O[n, x, c_o]}
-=
-\color{green}{\sum_k \sum_{c_i}}
-\color{blue}{I[n, x + k, c_i]}
-\color{orange}{\cdot}
-\color{lightblue}{K[k, c_i, c_o]}
+  \color{red}{O[n, x, c_o]}
+  \color{default}{=}
+  \color{green}{\sum_k \sum_{c_i}}
+  \color{blue}{I[n, x + k, c_i]}
+  \color{orange}{\cdot}
+  \color{lightblue}{K[k, c_i, c_o]}
 $$
 
 $$
@@ -598,7 +604,8 @@ Tensor conv_2d(const Tensor& I, const Tensor& K) {
 ### Complex Convolution
 
 This final example demonstrates a strided dilated padded grouped convolution.
-
+<!-- remove div tags for equation to show up in preview -->
+<div>
 $$
 \Large
 \begin{aligned}
@@ -610,6 +617,7 @@ $$
 )\\
 \end{aligned}
 $$
+</div>
 
 where _`s`_ gives the stride coefficients, _`d`_ gives the dilation
 coefficients, and _`P`_ gives the padding offsets.
