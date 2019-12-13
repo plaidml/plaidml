@@ -59,10 +59,9 @@ highlight corresponding pieces:
 \\]
 
 \\[
-\text
-\color{red}O(n)
-\color{green}+=
-\color{blue}I(m, n)\color{default};
+\color{red}\verb|O(n)|
+\color{green}\verb| += |
+\color{blue}\verb|I(m, n)|\color{default}\verb|;|
 \\]
 
 In green, notice that the summation symbol is represented as `+=` in C++ Tile
@@ -117,10 +116,9 @@ Again, this corresponds closely to mathematical notation:
 \\]
 
 \\[
-\text
-\color{red}O(n)
-\color{green}>=
-\color{blue}I(m, n)\color{default};
+\color{red}\verb|O(n)|
+\color{green}\verb| >= |
+\color{blue}\verb|I(m, n)|\color{default}\verb|;|
 \\]
 
 ### Matrix Multiply
@@ -297,7 +295,7 @@ When we wrote the code with for loops, the inner loop restricted `j` to `0` or
 looking at the shapes of the tensors, and the only restriction that imposes on
 `j` is that `j` must be an integer satisfying `0 <= 2 * i + j < N`.
 
-When can use `if` statements in Tile to handle such situations:
+When can use `add_constraint` in Tile to handle such situations:
 
 ```c++
 Tensor max_pool_1d(const Tensor& I) {
@@ -328,16 +326,16 @@ have started there instead:
 \\]
 
 \\[
-\text
-\color{red}O(n)
-\color{green}>=
-\color{blue}I(2 * i + j)\color{default}{;}
-\\]
-
-\\[
-\text
-\color{default}
-\verb|O.add_constraint|(\color{magenta}j < 2\color{default});
+\begin{aligned}
+&
+\color{red}\verb|O(n)|
+\color{green}\verb| >= |
+\color{blue}\verb|I(2 * i + j)|\color{default}\verb|;|
+\cr
+&
+\color{default}\verb|O.add_constraint(|
+\color{magenta}\verb|j < 2|\color{default}\verb|);|
+\end{aligned}
 \\]
 
 
@@ -351,9 +349,8 @@ Tensor max_pool_1d(const Tensor& I) {
   TensorIndex i, j;
   I.bind_dims(N);
   auto O = TensorOutput((N + 1) / 2);
-  if (j < 2) {
-    O(i) >= I(2 * i + j);
-  }
+  O(i) >= I(2 * i + j);
+  O.add_constraint(j < 2);
   return O;
 }
 ```
@@ -461,17 +458,17 @@ way of forcing `k` to be no larger than `i`. Then in summation notation we have:
 \\]
 
 \\[
-\text
-\color{red}O(n)
-\color{green}+=
-\color{blue}I(i - j)\color{default};
+\begin{aligned}
+&
+\color{red}\verb|O(n)|
+\color{green}\verb| += |
+\color{blue}\verb|I(i - j)|\color{default}\verb|;|
+\cr
+&
+\color{default}\verb|O.add_constraint(|
+\color{magenta}\verb|j < N|\color{default}\verb|);|
+\end{aligned}
 \\]
-
-\\[
-\text
-\verb|O.add_constraint|(\color{magenta}j < N\color{default});
-\\]
-
 
 
 ### Convolution
@@ -526,12 +523,11 @@ the kernel size relative to the spatial dimension of the input:
 \\]
 
 \\[
-\text
-\color{red}O(n, x, co)
-\color{green}+=
-\color{blue}I(n, x + k, ci)
-\color{orange}*
-\color{lightblue}K(k, ci, co)\color{default};
+\color{red}\verb|O(n, x, co)|
+\color{green}\verb| += |
+\color{blue}\verb|I(n, x + k, ci)|
+\color{orange}\verb| * |
+\color{lightblue}\verb|K(k, ci, co)|\color{default}\verb|;|
 \\]
 
 ```c++
@@ -593,12 +589,12 @@ Tensor conv_2d(const Tensor& I, const Tensor& K) {
 This final example demonstrates a strided dilated padded grouped convolution.
 \\[
 \begin{aligned}
-    O & [n, x_0, x_1, g, c_{o, g}] \\
-     & = \sum_{k_0, k_1, c_{i, g}}
+O&[n, x_0, x_1, g, c_{o, g}] \cr
+ &=\sum_{k_0, k_1, c_{i, g}}
 (
   I[n, s_0 x_0 + d_0 k_0 - P_0, s_1 x_1 + d_1 k_1 - P_1, c_{i, g}] *
   K[k_0, k_1, g, c_{i, g}, c_{o, g}]
-)\\
+)
 \end{aligned}
 \\]
 
