@@ -134,7 +134,7 @@ SUITES:
   smoke:
     platforms:
       keras-stripe-llvm-cpu:
-        pipelines: [plaidml, ci]
+        pipelines: [plaidml, ci, nightly]
       keras-stripe-ocl-gp100gl:
         pipelines: [plaidml, ci]
       keras-stripe-ocl-gfx804:
@@ -343,7 +343,6 @@ SUITES:
       imdb_lstm:
         precision: high
         skip_platforms: 
-          - keras-stripe-llvm-cpu
           - keras-stripe-ocl-gfx804
           - keras-stripe-ocl-gfx900
           - keras-stripe-ocl-gp100gl
@@ -369,7 +368,6 @@ SUITES:
             prepend_args: [--examples, 256]
           keras-stripe-mtl-uhd630:
             prepend_args: [--examples, 256]
-        skip_platforms: [keras-stripe-llvm-cpu]
       mobilenet:
         precision: high
         platform_overrides:
@@ -417,7 +415,6 @@ SUITES:
         skip_platforms: 
           - keras-plaid-mtl-uhd630 
           - keras-stripe-mtl-uhd630
-          - keras-stripe-llvm-cpu
 
       xception:
         precision: high
@@ -442,7 +439,7 @@ SUITES:
             soft_fail: true
           keras-tf-dnnl-cpu:
             conda_env: ci/conda/tensorflow-dnnl.yml
-        skip_platforms: [keras-plaid-ocl-gv100gl, keras-stripe-llvm-cpu]
+        skip_platforms: [keras-plaid-ocl-gv100gl]
 
   train:
     platforms:
