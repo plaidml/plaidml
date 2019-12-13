@@ -1,5 +1,5 @@
 <div align=center><a href="https://www.intel.ai/plaidml"><img
-src="docs/images/plaid-final.png" height="200"></a><br>
+src="docs/assets/images/plaid-final.png" height="200"></a><br>
 
 *A platform for making deep learning work everywhere.*
 
