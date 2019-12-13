@@ -70,9 +70,9 @@ plaidbench --batch-size 16 keras --train mobilenet
 
 We support a variety of operating systems and installation methods.
 
-* [Ubuntu](docs/install.md#ubuntu)
-* [macOS](docs/install.md#macos)
-* [Windows](docs/install.md#windows)
+* [Ubuntu](docs/install#ubuntu)
+* [macOS](docs/install#macos)
+* [Windows](docs/install#windows)
 
 ## Demos and Related Projects
 

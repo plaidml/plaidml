@@ -187,6 +187,6 @@ correctness as part of our continuous integration system.
 [License]: https://img.shields.io/badge/License-Apache%202.0-blue.svg
 [Build status]: https://badge.buildkite.com/5c9add6b89a14fd498e69a5035062368480e688c4c74cbfab3.svg?branch=master
 [Plaidbench]: https://github.com/plaidml/plaidml/tree/master/plaidbench
-[install-ubuntu]: https://plaidml.github.io/plaidml/docs/install.md#ubuntu
-[install-macos]: https://plaidml.github.io/plaidml/docs/install.md#macos
-[install-windows]: https://plaidml.github.io/plaidml/docs/install.md#windows
+[install-ubuntu]: https://plaidml.github.io/plaidml/docs/install#ubuntu
+[install-macos]: https://plaidml.github.io/plaidml/docs/install#macos
+[install-windows]: https://plaidml.github.io/plaidml/docs/install#windows
