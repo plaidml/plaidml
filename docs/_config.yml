@@ -21,6 +21,7 @@ url: https://plaidml.github.io
 
 # Build settings
 markdown: kramdown
+#markdown: maruku
 kramdown:
   math_engine: katex
 remote_theme: pmarsceill/just-the-docs

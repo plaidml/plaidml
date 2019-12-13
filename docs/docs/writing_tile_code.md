@@ -1,3 +1,5 @@
+{% include mathjax_support %}
+
 # Writing Tile Code
 
 PlaidML uses a language called Tile to construct GPU kernels. When used to
@@ -46,10 +48,13 @@ it's related to summation notation. Below we show how this Tile code is related
 to the mathematical formula for the operation by using colors to highlight
 corresponding pieces:
 
-<div align=center><img src="images/math-sum-0.png" height="70"
+<!-- <div align=center><img src="images/math-sum-0.png" height="70"
 alt="O[n] = sum_m I[m, n]"></div><br>
 <div align=center><img src="images/code-sum-0.png" height="40"
-alt="O[n: N] = +(I[m, n])"></div><br>
+alt="O[n: N] = +(I[m, n])"></div><br> -->
+<span> $$ O[n] = \sum_m I[m, n] $$</span>
+
+<span>$$ O[n: N] = +(I[m, n]) $$</span>
 
 In green, notice that the summation symbol is represented as ``+(...)`` in Tile
 code. In black, we have the portions of the notations that do not perfectly
@@ -75,8 +80,10 @@ Next we'll consider matrix multiplication. Let's look at the mathematical
 expression for the matrix multiplication ``C = AB`` written out in element-level
 detail:
 
-<div align=center><img src="images/math-mat-mul.png" height="60"
-alt="C[i, j] = sum_k(A[i, k] * B[k, j]"></div><br>
+<!-- <div align=center><img src="images/math-mat-mul.png" height="60"
+alt="C[i, j] = sum_k(A[i, k] * B[k, j]"></div><br> -->
+
+<span> $$ C[i, j] = \sum_k(A[i, k] * B[k, j] $$</span>
 
 We can convert this to Tile code using the same correspondence as the previous
 example: The summation sign becomes plus, the summation index is omitted,
@@ -121,10 +128,14 @@ function (I[M, N]) -> (O) {
 ```
 Again, this corresponds closely to mathematical notation:
 
-<div align=center><img src="images/math-max-0.png" height="60"
+<!-- <div align=center><img src="images/math-max-0.png" height="60"
 alt="O[n] = max_m(I[m, n])"></div><br>
 <div align=center><img src="images/code-max-0.png" height="40"
-alt="O[n: N] = >(I[m, n]);"></div>
+alt="O[n: N] = >(I[m, n]);"></div> -->
+
+<span>$$ O[n] = \max_m{I[m, n]} $$</span>
+
+<span>$$ O[n: N] = > (I[m, n]); $$</span>
 
 ### Global Min
 
@@ -276,10 +287,14 @@ We determined the Tile code for this example by starting from imperative code,
 but this Tile code is still very similar to mathematical notation, and we could
 have started there instead:
 
-<div align=center><img src="images/math-pool-1D.png" height="60"
+<!-- <div align=center><img src="images/math-pool-1D.png" height="60"
 alt="O[i] = max_(0 <= j < 2)(I[2i + j])"></div><br>
 <div align=center><img src="images/code-pool-1D.png" height="30"
-alt="O[i: N / 2] = >(I[2 * i + j]), j < 2;"></div><br>
+alt="O[i: N / 2] = >(I[2 * i + j]), j < 2;"></div><br> -->
+
+<span>$$ O[i] = \max_{0 <= j < 2}{I[2i + j]} $$</span>
+
+<span>$$ O[i: N / 2] = > (I[2 * i + j]), j < 2;$$</span>
 
 This Tile code handles odd values of ``N`` by rounding down the output tensor
 size. You may instead want to round up the output tensor size and use a smaller
