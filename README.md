@@ -31,7 +31,7 @@ that would otherwise be bounded by the compute limitations of the device.
 
 As a component under [Keras], PlaidML can accelerate training workloads with
 customized or automatically-generated Tile code. It works especially well on
-GPUs, and it doesn't require use of CUDA/cuDNN on Nvidia* hardware, while
+GPUs, and it doesn't require use of CUDA/cuDNN on Nvidia hardware, while
 achieving comparable performance.
 
 PlaidML works on all major operating systems: Linux, macOS, and Windows.
