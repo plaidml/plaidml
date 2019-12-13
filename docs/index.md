@@ -1,19 +1,11 @@
-<div align=center><a href="https://www.intel.ai/plaidml"><img
-src="docs/images/plaid-final.png" height="200"></a><br>
+---
+layout: home
+---
 
 *A platform for making deep learning work everywhere.*
 
-[Documentation] |
-[Installation Instructions] |
-[Building PlaidML] |
-[Contributing] |
-[Troubleshooting] |
-[Reporting Issues](#reporting-issues)
-
-</div>
-
-[![License]](https://github.com/plaidml/plaidml/blob/master/LICENSE)
-[![Build status]](https://buildkite.com/plaidml/plaidml-plaidml)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/plaidml/plaidml/blob/master/LICENSE)
+[![Build status](https://badge.buildkite.com/5c9add6b89a14fd498e69a5035062368480e688c4c74cbfab3.svg?branch=master)](https://buildkite.com/plaidml/plaidml-plaidml)
 
 PlaidML is an advanced and portable tensor compiler for enabling deep learning
 on laptops, embedded devices, or other devices where the available computing
@@ -37,8 +29,8 @@ achieving comparable performance.
 PlaidML works on all major operating systems: Linux, macOS, and Windows.
 
 If you are using a hardware target not supported by PlaidML by default, such as
-Clover, check out the instructions at [building PlaidML] to build a custom
-configuration to support your hardware.
+Clover, check out the instructions at [building PlaidML](docs/building.md) to
+build a custom configuration to support your hardware.
 
 ## Prerequisites
 - Python (v2 supported, v3 recommended)
@@ -46,7 +38,8 @@ configuration to support your hardware.
 
 ## Quick Start
 
-See the [troubleshooting] section for solutions to common issues.
+See the [troubleshooting documentation](docs/troubleshooting.md) for common
+issues.
 
 ```
 virtualenv plaidml
@@ -77,9 +70,9 @@ plaidbench --batch-size 16 keras --train mobilenet
 
 We support a variety of operating systems and installation methods.
 
-* [Ubuntu][install-ubuntu]
-* [macOS][install-macos]
-* [Windows][install-windows]
+* [Ubuntu](docs/install.md#ubuntu)
+* [macOS](docs/install.md#macos)
+* [Windows](docs/install.md#windows)
 
 ## Demos and Related Projects
 
@@ -95,6 +88,7 @@ art networks. Here's all the code you need to run VGG-19:
 
 ```python
 #!/usr/bin/env python
+
 import numpy as np
 import os
 import time
@@ -127,7 +121,7 @@ print("Ran in {} seconds".format(time.time() - start))
 
 ## Reporting Issues
 
-Either open a ticket on [GitHub] or join our [slack channel (#plaidml)][slack].
+Either open a ticket on [GitHub] or join our [slack workspace (#plaidml)].
 
 ## CI & Validation
 
@@ -176,17 +170,7 @@ correctness as part of our continuous integration system.
 [Keras]: https://keras.io/
 [GitHub]: https://github.com/plaidml/plaidml/issues
 [plaidml-dev]: https://groups.google.com/forum/#!forum/plaidml-dev
-[ONNX]: https://github.com/onnx
+[Onnx]: https://github.com/onnx
 [nGraph]: https://github.com/NervanaSystems/ngraph
-[slack]: https://join.slack.com/t/ngraph/shared_invite/enQtNjY1Njk4OTczMzEyLWIyZjZkMDNiNzJlYWQ3MGIyZTg2NjRkODAyYWZlZWY5MmRiODdlNzVkMjcxNjNmNWEyZjNkMDVhMTgwY2IzOWQ
-[Documentation]: https://plaidml.github.io/plaidml/
-[Installation Instructions]: https://plaidml.github.io/plaidml/docs/install
-[Building PlaidML]: https://plaidml.github.io/plaidml/docs/building
-[Contributing]: https://plaidml.github.io/plaidml/docs/contributing
-[Troubleshooting]: https://plaidml.github.io/plaidml/docs/troubleshooting
-[License]: https://img.shields.io/badge/License-Apache%202.0-blue.svg
-[Build status]: https://badge.buildkite.com/5c9add6b89a14fd498e69a5035062368480e688c4c74cbfab3.svg?branch=master
+[slack workspace (#plaidml)]: https://join.slack.com/t/ngraph/shared_invite/enQtNjY1Njk4OTczMzEyLWIyZjZkMDNiNzJlYWQ3MGIyZTg2NjRkODAyYWZlZWY5MmRiODdlNzVkMjcxNjNmNWEyZjNkMDVhMTgwY2IzOWQ
 [Plaidbench]: https://github.com/plaidml/plaidml/tree/master/plaidbench
-[install-ubuntu]: https://plaidml.github.io/plaidml/docs/install.md#ubuntu
-[install-macos]: https://plaidml.github.io/plaidml/docs/install.md#macos
-[install-windows]: https://plaidml.github.io/plaidml/docs/install.md#windows
