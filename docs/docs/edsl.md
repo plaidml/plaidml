@@ -467,8 +467,8 @@ $$
 \color{blue} {I[i - j]}
 $$
 
-
-{% raw %}
+<!-- remove div tage for equation to show up in preview -->
+<div>
 $$
 \Large
   \text{if} 
@@ -480,7 +480,7 @@ $$
   \color{blue}{I(i - j)}
   \color{default}{;\}}
 $$
-{% endraw %}
+</div>
 
 
 ### Convolution
