@@ -1,8 +1,0 @@
-{% extends "!layout.html" %}}
-{% block htmltitle %}
-    {% if pagename == 'index' %}
-            <title>Home{{ titlesuffix }}</title>
-    {% else %}
-            <title>{{ title|striptags|e }}{{ titlesuffix }}</title>
-    {% endif %}
-{% endblock %}
