@@ -25,7 +25,10 @@ Gradient::Gradient(mlir::Value* loss, TileBuilder* builder) : builder_(builder) 
                                        // TODO: This is an ad hoc list of what to filter out; make it principled
                                        return !mlir::isa<AffineConstraintsOp>(op) && !mlir::isa<AffineMapOp>(op) &&
                                               !mlir::isa<AffineIndexOp>(op) && !mlir::isa<DimOp>(op) &&
-                                              !mlir::isa<eltwise::ScalarConstantOp>(op);
+                                              !mlir::isa<AffineAddOp>(op) && !mlir::isa<AffineDivOp>(op) &&
+                                              !mlir::isa<AffineMulOp>(op) && !mlir::isa<AffineNegOp>(op) &&
+                                              !mlir::isa<AffineSubOp>(op) && !mlir::isa<AffineMaxOp>(op) &&
+                                              !mlir::isa<AffineMinOp>(op) && !mlir::isa<eltwise::ScalarConstantOp>(op);
                                      }});
   for (auto def = defs.rbegin(); def != defs.rend(); def++) {
     ComputeOperandDerivs(*def);
@@ -147,49 +150,91 @@ mlir::Value* Gradient::DeriveContraction(mlir::Value* dout, mlir::Value* out, si
   if (!op) {
     throw std::runtime_error("DeriveContraction called on non-contraction");
   }
+  if (op.combo() == util::CombinationKind::eq) {
+    // TODO: What type should this 0 be?
+    return builder_->MakeScalarConstantOp(0.);
+  }
 
   auto combo_kind = util::CombinationKind::none;  // This may be reset later if necessary
-  size_t i = 0;
   std::vector<Value*> new_srcs;
   Value* target_src = nullptr;
-  for (auto src : op.srcs()) {
-    if (i == idx) {
-      // This is the differentiated input; so swap in dout here to create the new op
-      std::vector<Value*> dout_idxs;
-      for (const auto& dim : llvm::cast<AffineMapOp>(op.sink()->getDefiningOp()).dims()) {
-        dout_idxs.push_back(dim);
+  switch (op.agg()) {
+    case util::AggregationKind::max:
+    case util::AggregationKind::min: {
+      size_t i = 0;
+      // TODO: Is there a better option to do "Get the unique src (or throw if not unique)"?
+      for (auto src : op.srcs()) {
+        if (i == idx) {
+          combo_kind = util::CombinationKind::cond;
+          auto src_op = mlir::dyn_cast_or_null<AffineTensorMapOp>(
+              src->getDefiningOp());  // TODO: Track that this is target_src_op
+          if (!src_op) {
+            throw std::runtime_error("src_op as cast is null");
+          }
+          new_srcs.push_back(src_op);
+          std::vector<Value*> dout_idxs;
+          for (const auto& dim : llvm::cast<AffineMapOp>(op.sink()->getDefiningOp()).dims()) {
+            dout_idxs.push_back(dim);
+          }
+          new_srcs.push_back(builder_->MakeAffineSourceIndexMapOp(op, dout_idxs));
+          new_srcs.push_back(builder_->MakeAffineSourceIndexMapOp(dout, dout_idxs));
+          // Also track that this is the differentiated source for later use
+          target_src = src;
+        } else {
+          throw std::runtime_error("Cannot differentiate max/min contractions with multiple input tensors");
+        }
+        i++;
       }
-      new_srcs.push_back(builder_->MakeAffineSourceIndexMapOp(dout, dout_idxs));
-      // Also track that this is the differentiated source for later use
-      target_src = src;
-    } else {
-      // This is the non-differentiated input; behavior depends on combo op
-      switch (op.combo()) {
-        case util::CombinationKind::none:
-          IVLOG(1, "About to fail on a NONE combo, with idx==" << idx << ", and i==" << i);
-          throw std::runtime_error(
-              "Unexpected multiple inputs found when differentiating contraction with NONE combination op");
-          break;
-        case util::CombinationKind::add:
-          // For +, we ignore the non-differentiated input
-          combo_kind = util::CombinationKind::none;
-          break;
-        case util::CombinationKind::cond:
-          throw std::runtime_error("Gradient of sum of conditionals not supported");
-          break;
-        case util::CombinationKind::eq:
-          throw std::runtime_error("Gradient of sum of equalities not supported");
-          break;
-        case util::CombinationKind::mul:
-          // For *, we multiply by the non-differentiated input
-          new_srcs.push_back(src);
-          combo_kind = util::CombinationKind::mul;
-          break;
-        default:
-          throw std::runtime_error("Failed to recognize combination op during differentiation");
+    } break;
+    case util::AggregationKind::add:
+    case util::AggregationKind::assign: {
+      size_t i = 0;
+      for (auto src : op.srcs()) {
+        if (i == idx) {
+          // This is the differentiated input; so swap in dout here to create the new op
+          std::vector<Value*> dout_idxs;
+          for (const auto& dim : llvm::cast<AffineMapOp>(op.sink()->getDefiningOp()).dims()) {
+            dout_idxs.push_back(dim);
+          }
+          new_srcs.push_back(builder_->MakeAffineSourceIndexMapOp(dout, dout_idxs));
+          // Also track that this is the differentiated source for later use
+          target_src = src;
+        } else {
+          // This is the non-differentiated input; behavior depends on combo op
+          switch (op.combo()) {
+            case util::CombinationKind::none:
+              IVLOG(1, "About to fail on a NONE combo, with idx==" << idx << ", and i==" << i);
+              throw std::runtime_error(
+                  "Unexpected multiple inputs found when differentiating contraction with NONE combination op");
+              break;
+            case util::CombinationKind::add:
+              // For +, we ignore the non-differentiated input
+              combo_kind = util::CombinationKind::none;
+              break;
+            case util::CombinationKind::cond:
+              throw std::runtime_error("Gradient of sum of conditionals not supported");
+              break;
+            case util::CombinationKind::eq:
+              throw std::logic_error("Gradient unexpectedly failed to detect combo op as equality");
+              break;
+            case util::CombinationKind::mul:
+              // For *, we multiply by the non-differentiated input
+              new_srcs.push_back(src);
+              combo_kind = util::CombinationKind::mul;
+              break;
+            default:
+              throw std::runtime_error("Failed to recognize combination op during differentiation");
+          }
+        }
+        i++;
       }
-    }
-    i++;
+    } break;
+    case util::AggregationKind::mul:
+      throw std::runtime_error("Cannot differentiate multiplication aggregations");
+      break;
+    default:
+      throw std::runtime_error("Did not recognize aggregation operation when differentiating " +
+                               mlir::debugString(*out));
   }
   if (!target_src) {
     throw std::runtime_error(
