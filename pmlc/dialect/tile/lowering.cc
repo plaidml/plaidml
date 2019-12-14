@@ -276,7 +276,7 @@ struct ContractionOpConversion : public LoweringBase {
     auto aggKind = cionOp.agg();
     auto aggOpTag = llvm::formatv("agg_op_{0}", util::stringifyAggregationKind(aggKind));
     auto comboKind = cionOp.combo();
-    auto comboOpTag = llvm::formatv("combo_op_{0}", util::stringifyCombinationKind(comboKind));
+    auto comboOpTag = llvm::formatv("comb_op_{0}", util::stringifyCombinationKind(comboKind));
     auto forOp = rewriter.create<stripe::ParallelForOp>(  //
         loc,                                              //
         rewriter.getI64ArrayAttr(ranges));
