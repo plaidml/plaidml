@@ -4,21 +4,21 @@ nav_order: 2
 
 # Building from source
 
-## Install Anaconda
+## Install Anaconda\*
 
-Install [Anaconda].  You'll want to use a Python 3 version.
+Install [Anaconda\*].  You'll want to use a Python 3 version.
 
 After installing Anaconda, you'll need to restart your shell, to pick up its
 environment variable modifications (i.e. the path to the conda tool and shell
 integrations).
 
-For Microsoft Windows, you'll also need the Visual C++ compiler (2017+) and the
-Windows SDK, following the [Bazel-on-Windows] instructions.
+For Microsoft Windows\*, you'll also need the Visual C++ compiler (2017+) and the
+Windows SDK, following the [Bazel-on-Windows\*] instructions.
 
-## Install bazelisk
+## Install Bazelisk\*
 
-The [Bazelisk] tool is a wrapper for `bazel` which provides the ability to
-enfore a particular version of Bazel. 
+The [Bazelisk\*] tool is a wrapper for `bazel` which provides the ability to
+enfore a particular version of Bazel\*. 
 
 Download the latest version for your platform and place the executable somewhere
 in your PATH (e.g. `/usr/local/bin`). You will also need to mark it as
@@ -35,7 +35,7 @@ https://github.com/bazelbuild/bazelisk/releases
 ## Configure the build
 
 Use the `configure` script to configure your build. Note: the `configure` script
-requires Python 3.
+requires Python 3\*.
 
 By default, running the `configure` script will:
 * Create and/or update your conda environment
@@ -125,26 +125,26 @@ After running `make` and `make install`, be sure to set the environment
 variables to the correct location where the libraries were built. Continuing the
 above example, this would be as follows for each respective OS:
 
-## Linux
+## Linux\*
 
-Most Linux distributions support `LD_LIBRARY_PATH`; consult the distribution's
+Most Linux\* distributions support `LD_LIBRARY_PATH`; consult the distribution's
 documentation for specifics.
 ```
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:~/ngraph_plaidml_dist/lib
 export NGRAPH_CPP_BUILD_PATH=~/ngraph_plaidml_dist
 ```
 
-## macOS
+## macOS\*
 
-MacOS usually requires use of `DYLD_LIBRARY_PATH`.
+MacOS\* usually requires use of `DYLD_LIBRARY_PATH`.
 ```
 export DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH:~/ngraph_plaidml_dist/lib
 export NGRAPH_CPP_BUILD_PATH=~/ngraph_plaidml_dist
 ```
 
-## Microsoft Windows
+## Microsoft Windows\*
 
-Windows requires that dynamic libraries are on your `PATH`.
+Windows\* requires that dynamic libraries are on your `PATH`.
 ```
 set PATH=%PATH%:~/ngraph_plaidml_dist
 ```
@@ -161,7 +161,7 @@ set PATH=%PATH%:~/ngraph_plaidml_dist
   non-experimental device #0. If you want to use an experimental device, set
   the environment variable `PLAIDML_EXPERIMENTAL=1`.
 
-# PlaidML with Keras
+# PlaidML with Keras\*
 
 The PlaidML-Keras Python Wheel contains the code needed for
 integration with Keras.
@@ -270,10 +270,10 @@ enviornment variable `PLAIDML_EXPERIMENTAL_CONFIG` to point to the custom `.json
 file. PlaidML will then read the custom configuration file and list it as a
 device when running `plaidml-setup`.
 
-[Anaconda]:https://www.anaconda.com/download
-[Bazel]:http://bazel.build
-[Bazelisk]:https://github.com/bazelbuild/bazelisk
-[Bazel-on-Windows]:https://docs.bazel.build/versions/master/windows.html
+[Anaconda\*]:https://www.anaconda.com/download
+[Bazel\*]:http://bazel.build
+[Bazelisk\*]:https://github.com/bazelbuild/bazelisk
+[Bazel-on-Windows\*]:https://docs.bazel.build/versions/master/windows.html
 [PlaidML backend]:https://www.ngraph.ai/documentation/backend-support/cpp-api#plaidml
 [nGraph build]:https://ngraph.nervanasys.com/docs/latest/buildlb.html
 [building the PlaidML Python Wheel]:(#build-the-plaidml-python-wheel)

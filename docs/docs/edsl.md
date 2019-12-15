@@ -2,9 +2,9 @@
 nav_order: 5
 ---
 
-# C++ Tile eDSL
+# C++\* Tile eDSL
 
-The C++ Tile eDSL (Embedded Domain Specific Language) provides developers with a
+The C++\* Tile eDSL (Embedded Domain Specific Language) provides developers with a
 way of describing a neural network so that the Stripe-based PlaidML compiler can
 construct an efficient implementation.
 

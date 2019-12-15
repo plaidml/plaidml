@@ -31,9 +31,9 @@ plaidml.exceptions.ResourceExhausted: Out of memory
 
 This error is caused by incorrect Tile syntax.
 
-### Bazel Issues
+### Bazel\* Issues
 
-For any Bazel-specific issues you're encountering, we recommend that you first
+For any Bazel\*-specific issues you're encountering, we recommend that you first
 visit [Bazel's installation
 documentation](https://docs.bazel.build/versions/master/install.html) which has
 a comprehensive overview of Bazel on various platforms. Any issues commonly
@@ -43,8 +43,8 @@ encountered by PlaidML users are documented below.
 Encountered error while reading extension file 'workspace.bzl': no such package '@toolchain//'
 ```
 
-On MacOS devices, `toolchain` errors often indicate that the user does not have
-Xcode properly installed. Even if you have Xcode Command Line Tools installed,
+On MacOS\* devices, `toolchain` errors often indicate that the user does not have
+Xcode\* properly installed. Even if you have Xcode Command Line Tools installed,
 you may not have a proper installation of Xcode itself.
 
 To check your installation of Xcode, first print the path of the active
@@ -72,12 +72,12 @@ Applying function, tensor with mismatching dimensionality
 ```
 
 This error may be caused by a known issue with the `BatchDot` operation, where 
-results are inconsistent across backends. The [Keras documentation for 
-BatchDot](https://keras.io/backend/#batch_dot) matches the Theano backend's 
+results are inconsistent across backends. The [Keras\* documentation for 
+BatchDot](https://keras.io/backend/#batch_dot) matches the Theano\* backend's 
 implemented behavior and the _default_ behavior within PlaidML. The TensorFlow 
 backend implements BatchDot in a different way, and this causes a mismatch in 
 the expected output shape (there is an [open issue against 
-TensorFlow](https://github.com/tensorflow/tensorflow/issues/30846) to get this 
+TensorFlow\*](https://github.com/tensorflow/tensorflow/issues/30846) to get this 
 fixed).
 
 If you have existing Keras code that was written for the TensorFlow backend, 

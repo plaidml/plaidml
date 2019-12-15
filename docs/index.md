@@ -13,7 +13,7 @@ hardware is not well supported or the available software stack contains
 unpalatable license restrictions.
 
 PlaidML sits underneath common machine learning frameworks, enabling users to
-access any hardware supported by PlaidML. PlaidML supports [Keras], [ONNX], and
+access any hardware supported by PlaidML. PlaidML supports [Keras\*], [ONNX\*], and
 [nGraph].
 
 As a component within the [nGraph Compiler stack], PlaidML further extends the
@@ -21,9 +21,9 @@ capabilities of specialized deep-learning hardware (especially GPUs,) and makes
 it both easier and faster to access or make use of subgraph-level optimizations
 that would otherwise be bounded by the compute limitations of the device.
 
-As a component under [Keras], PlaidML can accelerate training workloads with
+As a component under [Keras\*], PlaidML can accelerate training workloads with
 customized or automatically-generated Tile code. It works especially well on
-GPUs, and it doesn't require use of CUDA/cuDNN on Nvidia hardware, while
+GPUs, and it doesn't require use of CUDA/cuDNN on Nvidia\* hardware, while
 achieving comparable performance.
 
 PlaidML works on all major operating systems: Linux, macOS, and Windows.
@@ -33,7 +33,7 @@ Clover, check out the instructions at [building PlaidML](docs/building.md) to
 build a custom configuration to support your hardware.
 
 ## Prerequisites
-- Python (v2 supported, v3 recommended)
+- Python\* (v2 supported, v3 recommended)
 - OpenCL 1.2 or greater
 
 ## Quick Start
@@ -70,9 +70,9 @@ plaidbench --batch-size 16 keras --train mobilenet
 
 We support a variety of operating systems and installation methods.
 
-* [Ubuntu](docs/install#ubuntu)
-* [macOS](docs/install#macos)
-* [Windows](docs/install#windows)
+* [Ubuntu\*](docs/install#ubuntu)
+* [macOS\*](docs/install#macos)
+* [Windows\*](docs/install#windows)
 
 ## Demos and Related Projects
 
@@ -121,7 +121,7 @@ print("Ran in {} seconds".format(time.time() - start))
 
 ## Reporting Issues
 
-Either open a ticket on [GitHub] or join our [slack workspace (#plaidml)].
+Either open a ticket on [GitHub\*] or join our [Slack\* workspace (#plaidml)].
 
 ## CI & Validation
 
@@ -130,7 +130,7 @@ Either open a ticket on [GitHub] or join our [slack workspace (#plaidml)].
 A comprehensive set of tests for each release are run against the hardware
 targets listed below.
 
-* AMD
+* AMD\*
   * R9 Nano
   * RX 480
   * Vega 10
@@ -141,7 +141,7 @@ targets listed below.
   * HD Graphics 505
 
 
-* NVIDIA
+* NVIDIA\*
   * K80
   * GT 640M
   * GTX 1050
@@ -167,10 +167,10 @@ correctness as part of our continuous integration system.
   * examples/imdb_lstm.py (from keras)
 
 [nGraph Compiler stack]: https://ngraph.nervanasys.com/docs/latest/
-[Keras]: https://keras.io/
-[GitHub]: https://github.com/plaidml/plaidml/issues
+[Keras\*]: https://keras.io/
+[GitHub\*]: https://github.com/plaidml/plaidml/issues
 [plaidml-dev]: https://groups.google.com/forum/#!forum/plaidml-dev
-[Onnx]: https://github.com/onnx
+[Onnx\*]: https://github.com/onnx
 [nGraph]: https://github.com/NervanaSystems/ngraph
-[slack workspace (#plaidml)]: https://join.slack.com/t/ngraph/shared_invite/enQtNjY1Njk4OTczMzEyLWIyZjZkMDNiNzJlYWQ3MGIyZTg2NjRkODAyYWZlZWY5MmRiODdlNzVkMjcxNjNmNWEyZjNkMDVhMTgwY2IzOWQ
+[Slack\* workspace (#plaidml)]: https://join.slack.com/t/ngraph/shared_invite/enQtNjY1Njk4OTczMzEyLWIyZjZkMDNiNzJlYWQ3MGIyZTg2NjRkODAyYWZlZWY5MmRiODdlNzVkMjcxNjNmNWEyZjNkMDVhMTgwY2IzOWQ
 [Plaidbench]: https://github.com/plaidml/plaidml/tree/master/plaidbench
