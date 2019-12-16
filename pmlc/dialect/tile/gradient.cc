@@ -25,10 +25,11 @@ Gradient::Gradient(mlir::Value* loss, TileBuilder* builder) : builder_(builder) 
                                        // TODO: This is an ad hoc list of what to filter out; make it principled
                                        return !mlir::isa<AffineConstraintsOp>(op) && !mlir::isa<AffineMapOp>(op) &&
                                               !mlir::isa<AffineIndexOp>(op) && !mlir::isa<DimOp>(op) &&
-                                              !mlir::isa<AffineAddOp>(op) && !mlir::isa<AffineDivOp>(op) &&
-                                              !mlir::isa<AffineMulOp>(op) && !mlir::isa<AffineNegOp>(op) &&
-                                              !mlir::isa<AffineSubOp>(op) && !mlir::isa<AffineMaxOp>(op) &&
-                                              !mlir::isa<AffineMinOp>(op) && !mlir::isa<eltwise::ScalarConstantOp>(op);
+                                              !mlir::isa<AffineConstantOp>(op) && !mlir::isa<AffineAddOp>(op) &&
+                                              !mlir::isa<AffineDivOp>(op) && !mlir::isa<AffineMulOp>(op) &&
+                                              !mlir::isa<AffineNegOp>(op) && !mlir::isa<AffineSubOp>(op) &&
+                                              !mlir::isa<AffineMaxOp>(op) && !mlir::isa<AffineMinOp>(op) &&
+                                              !mlir::isa<eltwise::ScalarConstantOp>(op);
                                      }});
   for (auto def = defs.rbegin(); def != defs.rend(); def++) {
     ComputeOperandDerivs(*def);
