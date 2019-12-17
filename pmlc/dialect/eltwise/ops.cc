@@ -157,12 +157,16 @@ OpFoldResult AddOp::fold(ArrayRef<Attribute> operands) {
 }
 
 OpFoldResult DivOp::fold(ArrayRef<Attribute> operands) {
+  // don't fold division by zero
+  // modeling this choice on DivUIOp::Fold from the standard dialect
+  if (matchPattern(rhs(), m_Zero())) {
+    return {};
+  }
   // div(x, 1) -> x
   if (matchPattern(rhs(), m_One())) {
     return lhs();
   }
   // div(0, x) -> 0
-  // n.b. this folds 0/0 to 0. TODO: do we want to throw instead?
   if (matchPattern(lhs(), m_Zero())) {
     return lhs();
   }
