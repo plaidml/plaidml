@@ -22,15 +22,27 @@ source plaidml-venv/bin/activate
 pip install /path/to/the/downloaded/wheel
 ```
 
-3. Grab the EDSL example code that you would like to run
+4. Run plaidml2 setup
+
+```
+plaidml2-setup
+```
+
+4. Grab the EDSL example code that you would like to run
 
 ```
 wget https://raw.githubusercontent.com/plaidml/plaidml/master/networks/scitile/storti_integrals/op.py
 wget https://raw.githubusercontent.com/plaidml/plaidml/master/networks/scitile/storti_integrals/torus.py
 ```
 
-4. run the example 
+5. run the example 
 
 ```
 python torus.py 
+```
+
+6. depending on which example you choose you run you might need additinal dependencies like matplotlib
+
+```
+pip install matplotlib
 ```
