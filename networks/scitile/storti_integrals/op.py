@@ -187,7 +187,7 @@ def integral_surface_area_4D(
     O = sum_4D(-H * G)
 
     result = run_program_4D(X, Y, Z, W, X_data, Y_data, Z_data, W_data, O, benchmark)
-    return result * (delta**3)
+    return result * (delta**4)
 
 
 def integral_volume(
@@ -239,7 +239,7 @@ def integral_volume_4D(
 
     result = run_program_4D(X, Y, Z, W, X_data, Y_data, Z_data, W_data, O, benchmark)
 
-    return result * (delta**3)
+    return result * (delta**4)
 
 
 def run_program(X, Y, Z, X_data, Y_data, Z_data, O, benchmark=False):

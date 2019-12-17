@@ -8,6 +8,7 @@ py_binary(
     name = "torus",
     srcs = ["torus.py",
             "op.py",],
+    data = [":op"],
     deps = [
         "//plaidml2:py",
         "//plaidml2/edsl:py",
@@ -28,6 +29,7 @@ py_binary(
     name = "hypersphere",
     srcs = ["hypersphere.py",
             "op.py",],
+    data = [":op"],
     deps = [
         "//plaidml2:py",
         "//plaidml2/edsl:py",
@@ -36,11 +38,13 @@ py_binary(
 )
 
 py_test(
-    name = "torus_tests",
+    name = "storti_integral_tests",
     srcs = [
-        "torus_tests.py",
+        "storti_integral_tests.py",
         "torus.py",
+        "hypersphere.py",
     ],
+    data = [":op"],
     deps = [
         "//plaidml2:py",
         "//plaidml2/edsl:py",
