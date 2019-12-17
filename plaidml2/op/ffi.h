@@ -23,10 +23,10 @@ extern "C" {
 PLAIDML_OP_API void plaidml_op_init(  //
     plaidml_error* err);
 
-PLAIDML_OP_API plaidml_expr* plaidml_op_make(  //
-    plaidml_error* err,                        //
-    const char* op_name,                       //
-    plaidml_expr* expr);
+PLAIDML_OP_API plaidml_value* plaidml_op_make(  //
+    plaidml_error* err,                         //
+    const char* op_name,                        //
+    plaidml_value* value);
 
 #ifdef __cplusplus
 }  // extern "C"

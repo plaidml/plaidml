@@ -65,7 +65,7 @@ def IsRankedTensorTypePred : CPred<"$_self.isa<RankedTensorType>()">;
 class RankedTensorOf<list<Type> allowedTypes> :
     ShapedContainerType<allowedTypes, IsRankedTensorTypePred, "ranked-tensor">;
 
-def EltwiseAny : TypeConstraint<Or<[
+def EltwiseAny : Type<Or<[
     AnyScalar.predicate,
     RankedTensorOf<[AnyScalar]>.predicate
   ]>, "eltwise-any">;
@@ -91,8 +91,8 @@ def EltwiseUnsigned : TypeConstraint<Or<[
   ]>, "eltwise-unsigned">;
 
 def EltwiseIndex : Type<Or<[
-    ScalarIndex.predicate,
-    RankedTensorOf<[ScalarIndex]>.predicate
+    IndexLike.predicate,
+    RankedTensorOf<[IndexLike]>.predicate
   ]>, "eltwise-index">;
 
 #endif // __PML_ELTWISE_PREDICATES__

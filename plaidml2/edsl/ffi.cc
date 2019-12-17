@@ -160,15 +160,6 @@ struct plaidml_logical_shape {
 #endif
 };
 
-struct plaidml_dim_expr {
-#ifdef PLAIDML_AST
-  DimExprPtr expr;
-#endif
-#ifdef PLAIDML_MLIR
-  mlir::Value* value = nullptr;
-#endif
-};
-
 struct plaidml_poly_expr {
 #ifdef PLAIDML_AST
   PolyExprPtr expr;
@@ -553,181 +544,6 @@ plaidml_dim_expr* plaidml_expr_get_dim(  //
   });
 }
 
-plaidml_expr_kind plaidml_expr_get_kind(  //
-    plaidml_error* err,                   //
-    plaidml_expr* expr) {
-  return ffi_wrap<plaidml_expr_kind>(err, PLAIDML_EXPR_NONE, [&] {
-    IVLOG(3, "plaidml_expr_get_kind");
-#ifdef PLAIDML_AST
-    if (std::dynamic_pointer_cast<NoneExpr>(expr->expr)) {
-      return PLAIDML_EXPR_NONE;
-    }
-    if (std::dynamic_pointer_cast<StringExpr>(expr->expr)) {
-      return PLAIDML_EXPR_STR;
-    }
-    if (std::dynamic_pointer_cast<IntConst>(expr->expr)) {
-      return PLAIDML_EXPR_INT;
-    }
-    if (std::dynamic_pointer_cast<FloatConst>(expr->expr)) {
-      return PLAIDML_EXPR_FLOAT;
-    }
-    if (std::dynamic_pointer_cast<TupleExpr>(expr->expr)) {
-      return PLAIDML_EXPR_TUPLE;
-    }
-    if (std::dynamic_pointer_cast<DimExprExpr>(expr->expr)) {
-      return PLAIDML_EXPR_DIM;
-    }
-    return PLAIDML_EXPR_TENSOR;
-#endif
-#ifdef PLAIDML_MLIR
-    auto op = expr->value->getDefiningOp();
-    if (auto constOp = llvm::dyn_cast_or_null<pmlc::dialect::eltwise::ScalarConstantOp>(op)) {
-      auto attr = constOp.getValue();
-      if (attr.isa<mlir::IntegerAttr>()) {
-        return PLAIDML_EXPR_INT;
-      }
-      if (attr.isa<mlir::FloatAttr>()) {
-        return PLAIDML_EXPR_FLOAT;
-      }
-    }
-    if (auto dimOp = llvm::dyn_cast_or_null<pmlc::dialect::tile::DimOp>(op)) {
-      return PLAIDML_EXPR_DIM;
-    }
-    auto type = expr->value->getType();
-    if (type.isa<mlir::NoneType>()) {
-      return PLAIDML_EXPR_NONE;
-    }
-    if (type.isa<pmlc::dialect::tile::StringType>()) {
-      return PLAIDML_EXPR_STR;
-    }
-    if (type.isa<mlir::TupleType>()) {
-      return PLAIDML_EXPR_TUPLE;
-    }
-    if (type.isa<mlir::RankedTensorType>()) {
-      return PLAIDML_EXPR_TENSOR;
-    }
-    throw std::runtime_error("Unknown expression kind");
-#endif
-  });
-}
-
-plaidml_expr* plaidml_expr_none(  //
-    plaidml_error* err            //
-) {
-  return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
-    IVLOG(3, "plaidml_expr_none");
-#ifdef PLAIDML_AST
-    return new plaidml_expr{std::make_shared<NoneExpr>()};
-#endif
-#ifdef PLAIDML_MLIR
-    return new plaidml_expr{GlobalContext::get()->MakeNoneOp()};
-#endif
-  });
-}
-
-plaidml_expr* plaidml_expr_tuple(  //
-    plaidml_error* err,            //
-    size_t nargs,                  //
-    plaidml_expr** args) {
-  return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
-    IVLOG(3, "plaidml_expr_tuple");
-#ifdef PLAIDML_AST
-    std::vector<ExprPtr> exprs(nargs);
-    for (size_t i = 0; i < nargs; i++) {
-      exprs[i] = args[i]->expr;
-    }
-    return new plaidml_expr{std::make_shared<TupleExpr>(exprs)};
-#endif
-#ifdef PLAIDML_MLIR
-    std::vector<mlir::Value*> tuple(nargs);
-    for (size_t i = 0; i < nargs; i++) {
-      tuple[i] = args[i]->value;
-    }
-    return new plaidml_expr{GlobalContext::get()->MakeTupleOp(tuple)};
-#endif
-  });
-}
-
-size_t plaidml_expr_tuple_get_count(  //
-    plaidml_error* err,               //
-    plaidml_expr* expr) {
-  return ffi_wrap<size_t>(err, 0, [&] {
-    IVLOG(3, "plaidml_expr_tuple_get_count");
-#ifdef PLAIDML_AST
-    auto tuple_expr = std::dynamic_pointer_cast<TupleExpr>(expr->expr);
-    if (!tuple_expr) {
-      throw std::runtime_error("Expression is not a tuple");
-    }
-    return tuple_expr->exprs.size();
-#endif
-#ifdef PLAIDML_MLIR
-    auto elts = GlobalContext::get()->GetTupleElements(expr->value);
-    return elts.size();
-#endif
-  });
-}
-
-void plaidml_expr_tuple_get_exprs(  //
-    plaidml_error* err,             //
-    plaidml_expr* expr,             //
-    size_t nexprs,                  //
-    plaidml_expr** exprs) {
-  return ffi_wrap_void(err, [&] {
-#ifdef PLAIDML_AST
-    IVLOG(3, "plaidml_expr_tuple_get_exprs> nexprs: " << nexprs);
-    auto tuple_expr = std::dynamic_pointer_cast<TupleExpr>(expr->expr);
-    if (!tuple_expr) {
-      throw std::runtime_error("Expression is not a tuple");
-    }
-    for (size_t i = 0; i < std::min(nexprs, tuple_expr->exprs.size()); i++) {
-      exprs[i] = new plaidml_expr{tuple_expr->exprs[i]};
-    }
-#endif
-#ifdef PLAIDML_MLIR
-    auto elts = GlobalContext::get()->GetTupleElements(expr->value);
-    for (size_t i = 0; i < std::min(nexprs, elts.size()); i++) {
-      exprs[i] = new plaidml_expr{elts[i]};
-    }
-#endif
-  });
-}
-
-plaidml_expr* plaidml_expr_str(  //
-    plaidml_error* err,          //
-    const char* value) {
-  return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
-    IVLOG(3, "plaidml_expr_str> " << value);
-#ifdef PLAIDML_AST
-    return new plaidml_expr{std::make_shared<StringExpr>(value)};
-#endif
-#ifdef PLAIDML_MLIR
-    return new plaidml_expr{GlobalContext::get()->MakeStringOp(value)};
-#endif
-  });
-}
-
-plaidml_string* plaidml_expr_str_get_value(  //
-    plaidml_error* err,                      //
-    plaidml_expr* expr) {
-  return ffi_wrap<plaidml_string*>(err, nullptr, [&] {
-    IVLOG(3, "plaidml_expr_str_get_value");
-#ifdef PLAIDML_AST
-    if (!expr) {
-      throw std::runtime_error("plaidml_expr_str_get_value can only be used on an StringExpr");
-    }
-    auto str_expr = std::dynamic_pointer_cast<StringExpr>(expr->expr);
-    if (!str_expr) {
-      throw std::runtime_error("plaidml_expr_str_get_value can only be used on an StringExpr");
-    }
-    return new plaidml_string{str_expr->value};
-#endif
-#ifdef PLAIDML_MLIR
-    auto str = GlobalContext::get()->GetStringValue(expr->value);
-    return new plaidml_string{str.str()};
-#endif
-  });
-}
-
 plaidml_expr* plaidml_expr_int(  //
     plaidml_error* err,          //
     int64_t value) {
@@ -742,27 +558,6 @@ plaidml_expr* plaidml_expr_int(  //
   });
 }
 
-int64_t plaidml_expr_int_get_value(  //
-    plaidml_error* err,              //
-    plaidml_expr* expr) {
-  return ffi_wrap<int64_t>(err, 0, [&] {
-    IVLOG(3, "plaidml_expr_int_get_value");
-#ifdef PLAIDML_AST
-    if (!expr) {
-      throw std::runtime_error("plaidml_expr_int_get_value can only be used on an IntConst");
-    }
-    auto int_expr = std::dynamic_pointer_cast<IntConst>(expr->expr);
-    if (!int_expr) {
-      throw std::runtime_error("plaidml_expr_int_get_value can only be used on an IntConst");
-    }
-    return int_expr->value;
-#endif
-#ifdef PLAIDML_MLIR
-    return GlobalContext::get()->GetIntegerValue(expr->value);
-#endif
-  });
-}
-
 plaidml_expr* plaidml_expr_float(  //
     plaidml_error* err,            //
     double value) {
@@ -773,24 +568,6 @@ plaidml_expr* plaidml_expr_float(  //
 #endif
 #ifdef PLAIDML_MLIR
     return new plaidml_expr{GlobalContext::get()->MakeScalarConstantOp(value)};
-#endif
-  });
-}
-
-double plaidml_expr_float_get_value(  //
-    plaidml_error* err,               //
-    plaidml_expr* expr) {
-  return ffi_wrap<double>(err, 0, [&] {
-    IVLOG(3, "plaidml_expr_float_get_value");
-#ifdef PLAIDML_AST
-    auto float_expr = std::dynamic_pointer_cast<FloatConst>(expr->expr);
-    if (!float_expr) {
-      throw std::runtime_error("plaidml_expr_float_get_value can only be used on an FloatConst");
-    }
-    return float_expr->value;
-#endif
-#ifdef PLAIDML_MLIR
-    return GlobalContext::get()->GetFloatValue(expr->value);
 #endif
   });
 }
@@ -1362,6 +1139,239 @@ plaidml_dim_expr* plaidml_dim_expr_op(  //
     }
     return new plaidml_dim_expr{MakeAffineOp(op, values)};
 #endif
+  });
+}
+
+void plaidml_tuple_free(  //
+    plaidml_error* err,   //
+    plaidml_tuple* tuple) {
+  ffi_wrap_void(err, [&] {
+    IVLOG(3, "plaidml_tuple_free");
+    for (size_t i = 0; i < tuple->nelts; i++) {
+      delete tuple->elts[i];
+    }
+    delete[] tuple->elts;
+    delete tuple;
+  });
+}
+
+void plaidml_value_free(  //
+    plaidml_error* err,   //
+    plaidml_value* value) {
+  ffi_wrap_void(err, [&] {
+    IVLOG(3, "plaidml_value_free");
+    delete value;
+  });
+}
+
+plaidml_value* plaidml_value_clone(  //
+    plaidml_error* err,              //
+    plaidml_value* value) {
+  return ffi_wrap<plaidml_value*>(err, nullptr, [&] {
+    IVLOG(3, "plaidml_value_clone");
+    return new plaidml_value{*value};
+  });
+}
+
+plaidml_value_kind plaidml_value_get_kind(  //
+    plaidml_error* err,                     //
+    plaidml_value* value) {
+  return ffi_wrap<plaidml_value_kind>(err, PLAIDML_VALUE_NONE, [&] {
+    IVLOG(3, "plaidml_value_get_kind");
+    return std::visit(
+        [](auto&& arg) {
+          using T = std::decay_t<decltype(arg)>;
+          if constexpr (std::is_same_v<T, plaidml_dim_expr>) {
+            return PLAIDML_VALUE_DIM;
+          } else if constexpr (std::is_same_v<T, plaidml_expr>) {
+            return PLAIDML_VALUE_EXPR;
+          } else if constexpr (std::is_same_v<T, double>) {
+            return PLAIDML_VALUE_FLOAT;
+          } else if constexpr (std::is_same_v<T, int64_t>) {
+            return PLAIDML_VALUE_INT;
+          } else if constexpr (std::is_same_v<T, std::string>) {
+            return PLAIDML_VALUE_STR;
+          } else if constexpr (std::is_same_v<T, Tuple>) {
+            return PLAIDML_VALUE_TUPLE;
+          } else {
+            return PLAIDML_VALUE_NONE;
+          }
+        },
+        value->variant);
+  });
+}
+
+plaidml_value* plaidml_value_none(  //
+    plaidml_error* err              //
+) {
+  return ffi_wrap<plaidml_value*>(err, nullptr, [&] {
+    IVLOG(3, "plaidml_value_none");
+    return new plaidml_value{};
+  });
+}
+
+plaidml_value* plaidml_value_int(  //
+    plaidml_error* err,            //
+    int64_t value) {
+  return ffi_wrap<plaidml_value*>(err, nullptr, [&] {
+    IVLOG(3, "plaidml_value_int> " << value);
+    return new plaidml_value{value};
+  });
+}
+
+plaidml_value* plaidml_value_dim(  //
+    plaidml_error* err,            //
+    plaidml_dim_expr* expr) {
+  return ffi_wrap<plaidml_value*>(err, nullptr, [&] {
+    IVLOG(3, "plaidml_value_dim");
+    if (!expr) {
+      throw std::runtime_error("plaidml_value_dim requires non-null expr");
+    }
+    return new plaidml_value{*expr};
+  });
+}
+
+plaidml_value* plaidml_value_expr(  //
+    plaidml_error* err,             //
+    plaidml_expr* expr) {
+  return ffi_wrap<plaidml_value*>(err, nullptr, [&] {
+    IVLOG(3, "plaidml_value_expr> " << expr);
+    if (!expr) {
+      throw std::runtime_error("plaidml_value_expr requires non-null expr");
+    }
+    return new plaidml_value{*expr};
+  });
+}
+
+plaidml_value* plaidml_value_float(  //
+    plaidml_error* err,              //
+    double value) {
+  return ffi_wrap<plaidml_value*>(err, nullptr, [&] {
+    IVLOG(3, "plaidml_value_float");
+    return new plaidml_value{value};
+  });
+}
+
+plaidml_value* plaidml_value_str(  //
+    plaidml_error* err,            //
+    const char* value) {
+  return ffi_wrap<plaidml_value*>(err, nullptr, [&] {
+    IVLOG(3, "plaidml_value_str> " << value);
+    return new plaidml_value{value};
+  });
+}
+
+plaidml_value* plaidml_value_tuple(  //
+    plaidml_error* err,              //
+    size_t nelts,                    //
+    plaidml_value** elts) {
+  return ffi_wrap<plaidml_value*>(err, nullptr, [&] {
+    IVLOG(3, "plaidml_value_tuple");
+    Tuple tuple(nelts);
+    for (size_t i = 0; i < nelts; i++) {
+      tuple[i] = std::make_shared<VariantHolder>(elts[i]->variant);
+    }
+    return new plaidml_value{tuple};
+  });
+}
+
+plaidml_dim_expr* plaidml_value_dim_get(  //
+    plaidml_error* err,                   //
+    plaidml_value* value) {
+  return ffi_wrap<plaidml_dim_expr*>(err, nullptr, [&] {
+    IVLOG(3, "plaidml_value_dim_get");
+    return new plaidml_dim_expr{std::get<plaidml_dim_expr>(value->variant)};
+  });
+}
+
+plaidml_expr* plaidml_value_expr_get(  //
+    plaidml_error* err,                //
+    plaidml_value* value) {
+  return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
+    IVLOG(3, "plaidml_value_expr_get");
+    auto expr = std::get<plaidml_expr>(value->variant);
+    return new plaidml_expr{expr};
+  });
+}
+
+double plaidml_value_float_get(  //
+    plaidml_error* err,          //
+    plaidml_value* value) {
+  return ffi_wrap<double>(err, 0, [&] {
+    IVLOG(3, "plaidml_value_float_get");
+    return std::get<double>(value->variant);
+  });
+}
+
+int64_t plaidml_value_int_get(  //
+    plaidml_error* err,         //
+    plaidml_value* value) {
+  return ffi_wrap<int64_t>(err, 0, [&] {
+    IVLOG(3, "plaidml_value_int_get");
+    return std::get<int64_t>(value->variant);
+  });
+}
+
+plaidml_tuple* plaidml_value_tuple_get(  //
+    plaidml_error* err,                  //
+    plaidml_value* value) {
+  return ffi_wrap<plaidml_tuple*>(err, nullptr, [&] {
+    IVLOG(3, "plaidml_value_tuple_get");
+    auto tuple = std::get<Tuple>(value->variant);
+    auto nelts = tuple.size();
+    auto elts = new plaidml_value*[nelts];
+    for (size_t i = 0; i < nelts; i++) {
+      elts[i] = new plaidml_value{tuple[i]->inner};
+    }
+    return new plaidml_tuple{nelts, elts};
+  });
+}
+
+plaidml_string* plaidml_value_str_get(  //
+    plaidml_error* err,                 //
+    plaidml_value* value) {
+  return ffi_wrap<plaidml_string*>(err, nullptr, [&] {
+    IVLOG(3, "plaidml_value_str_get");
+    return new plaidml_string{std::get<std::string>(value->variant)};
+  });
+}
+
+plaidml_string* plaidml_value_repr(  //
+    plaidml_error* err,              //
+    plaidml_value* value) {
+  return ffi_wrap<plaidml_string*>(err, nullptr, [&] {
+    IVLOG(3, "plaidml_value_repr");
+    auto str = std::visit(
+        [](auto&& arg) -> std::string {
+          using T = std::decay_t<decltype(arg)>;
+          if constexpr (std::is_same_v<T, plaidml_dim_expr>) {
+#ifdef PLAIDML_AST
+            return arg.expr->str();
+#endif
+#ifdef PLAIDML_MLIR
+            return mlir::debugString(*arg.value);
+#endif
+          } else if constexpr (std::is_same_v<T, plaidml_expr>) {
+#ifdef PLAIDML_AST
+            return arg.expr->str();
+#endif
+#ifdef PLAIDML_MLIR
+            return mlir::debugString(*arg.value);
+#endif
+          } else if constexpr (std::is_same_v<T, double>) {
+            return std::to_string(arg);
+          } else if constexpr (std::is_same_v<T, int64_t>) {
+            return std::to_string(arg);
+          } else if constexpr (std::is_same_v<T, std::string>) {
+            return llvm::formatv("\"{0}\"", arg).str();
+          } else if constexpr (std::is_same_v<T, Tuple>) {
+            return "[]";
+          } else {
+            return "None";
+          }
+        },
+        value->variant);
+    return new plaidml_string{str};
   });
 }
 

@@ -79,22 +79,6 @@ std::vector<RangeConstraint> GatherConstraints(const Contraction& c, const std::
   return out;
 }
 
-bool IsImplied(const SimpleConstraint& c, const IndexBounds& b) {
-  const Polynomial<Rational>& p = c.poly;
-  Rational worst = p.constant();
-  for (const auto& kvp : p.getMap()) {
-    if (kvp.first == "") {
-      continue;
-    }
-    if (kvp.second < 0) {
-      worst += kvp.second * b.find(kvp.first)->second.min;
-    } else {
-      worst += kvp.second * b.find(kvp.first)->second.max;
-    }
-  }
-  return (worst <= c.rhs);
-}
-
 void MergeParallelConstraints(std::vector<RangeConstraint>* constraints) {
   auto i = constraints->begin();
   while (i != constraints->end()) {
