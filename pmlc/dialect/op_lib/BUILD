@@ -89,6 +89,15 @@ mlir_tblgen(
 )
 
 op_lib_tblgen(
+    name = "pml_gen_op_lib_cpp_enums",
+    src = "ops.td",
+    out = "op_lib_enums.h.inc",
+    action = "-gen-op-lib-cpp-enums",
+    also = MLIR_TBLGEN_ALSO,
+    incs = ["@mlir//:include"]
+)
+
+op_lib_tblgen(
     name = "pml_gen_op_lib_cpp_wrappers",
     src = "ops.td",
     out = "op_lib_wrappers.h.inc",
@@ -121,7 +130,7 @@ plaidml_cc_library(
 plaidml_cc_library(
     name = "plaidml_op_lib_wrappers",
     srcs = [
-        "op_lib_wrappers.cc"
+        "ops.cc"
     ],
     hdrs = [
         "op_lib_wrappers.h.inc",
@@ -133,6 +142,7 @@ plaidml_cc_library(
         "//plaidml2/edsl:edsl_mlir",
         "//plaidml2/op:op_mlir",
         "//pmlc/dialect/op_lib:gen_op_lib_wrappers",
+        ":pml_gen_op_lib_cpp_enums",
         ":pml_gen_op_lib_cpp_wrappers",
         ":pml_gen_op_lib_py_wrappers",
     ],

@@ -9,6 +9,7 @@
 //===----------------------------------------------------------------------===//
 
 #include <map>
+#include <regex>
 
 #include "base/util/logging.h"
 
@@ -152,6 +153,8 @@ static const char* const includeHeader = R"(
 #include "plaidml2/edsl/edsl.h"
 #include "plaidml2/op/ffi.h"
 
+#include "pmlc/dialect/op_lib/op_lib_enums.h.inc"
+
 )";
 
 static const char* const commentHeader = R"(
@@ -195,6 +198,7 @@ static inline const std::map<StringRef, StringRef> typeLookupTable = {
     {"PML_TensorLayoutAttr", "TensorLayout"},
     {"StringRef", "std::string"},
     {"tensor of any type values", "edsl::Tensor"},
+    {"uint32_t", "int64_t"},
 };
 
 static StringRef convertType(const StringRef type) {
@@ -265,7 +269,36 @@ class OpEmitter {
 
   inline void emitOperatorOverload(raw_ostream& os) {
     os.indent(4) << "operator " << convertType(opInfo_.returnType_) << "() const {\n";
-    os.indent(6) << "auto args = edsl::make_tuple();\n";
+    os.indent(6) << "auto args = edsl::make_tuple(";
+    bool visited = false;
+    for (const auto& operandPair : opInfo_.operands_) {
+      if (visited) os << ", ";
+      visited = true;
+      os << operandPair.first << "_";
+    }
+    for (const auto& attrPair : opInfo_.attributes_) {
+      if (visited) os << ", ";
+      visited = true;
+      // special cases: TODO(perhaps try to get rid of and/or simplify these)
+      bool is_enum = false;
+      bool is_vector = false;
+      std::regex enum_regex ("PML.*Attr");
+      if (std::regex_match(attrPair.second.str(), enum_regex)) { 
+          is_enum = true;
+      } else if (attrPair.second.str() == "ArrayAttr") {
+          is_vector = true;
+      }
+      if (is_enum) {
+          os << "static_cast<int64_t>(";
+      } else if (is_vector) {
+          os << "edsl::make_tuple(";
+      }
+      os << attrPair.first << "_";
+      if (is_enum || is_vector) {
+          os << ")";
+      }
+    }
+    os << ");\n";
     os.indent(6) << "return details::op(\"" << opInfo_.name_ << "\", args)";
     if (convertType(opInfo_.returnType_) == "edsl::Tensor") {
       os << ".as_tensor();";
@@ -293,7 +326,7 @@ class TypeEmitter {
  public:
   inline TypeEmitter(const TypeInfo& type, raw_ostream& os) : typeInfo_(TypeInfo(type)) {
     os << formatv(commentHeader, typeInfo_.name_, "enumerator");
-    os << "enum class " << typeInfo_.name_ << " : " << typeInfo_.returnType_ << " { \n";
+    os << "enum class " << typeInfo_.name_ << " : " << convertType(typeInfo_.returnType_) << " { \n";
     for (const auto& optPair : typeInfo_.opts_) {
       os.indent(2) << optPair.first << " = " << optPair.second << ",\n";
     }
@@ -311,7 +344,7 @@ class Emitter {
     os << "namespace plaidml {\n"
        << "namespace op {\n\n";
     emitInits(os);
-    emitTypes(info.all_types_, os);
+    // emitTypes(info.all_types_, os);
     emitOps(info.all_ops_, os);
     os << "\n\n} // namespace op\n"
        << "} // namespace plaidml\n";
@@ -323,12 +356,26 @@ class Emitter {
       OpEmitter(op, os);
     }
   }
+  /*
   static void emitTypes(const std::vector<TypeInfo>& types, raw_ostream& os) {
     for (auto type : types) {
       TypeEmitter(type, os);
     }
   }
+  */
 };
+
+static bool genEnums(const RecordKeeper& recordKeeper, raw_ostream& os) {
+  // First, grab all the data we'll ever need from the record and place it in a DialectInfo struct
+  auto OpLibDialect = DialectInfo(recordKeeper);
+  // Then, emit specifically for c++
+  os << "namespace plaidml {\n";
+  for (auto type : OpLibDialect.all_types_) {
+    TypeEmitter(type, os);
+  }
+  os << "} // namespace plaidml\n";
+  return false;
+}
 
 static bool genWrappers(const RecordKeeper& recordKeeper, raw_ostream& os) {
   // First, grab all the data we'll ever need from the record and place it in a DialectInfo struct
@@ -417,6 +464,11 @@ static bool genWrappers(const RecordKeeper& recordKeeper, raw_ostream& os) {
 }  // namespace python
 
 }  // namespace tblgen
+
+static mlir::GenRegistration genOpCPPEnums("gen-op-lib-cpp-enums", "Generate Op Lib C++ EDSL enums",
+                                       [](const RecordKeeper& records, raw_ostream& os) {
+                                         return tblgen::cpp::genEnums(records, os);
+                                       });
 
 static mlir::GenRegistration genOpCPPs("gen-op-lib-cpp-wrappers", "Generate Op Lib C++ EDSL wrappers",
                                        [](const RecordKeeper& records, raw_ostream& os) {
