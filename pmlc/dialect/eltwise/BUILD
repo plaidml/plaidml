@@ -2,75 +2,73 @@
 
 package(default_visibility = ["//visibility:public"])
 
-load("//vendor/mlir:mlir.bzl", "COPTS", "mlir_tblgen")
+load("//vendor/mlir:tblgen.bzl", "COPTS", "gentbl")
 load(
     "//bzl:plaidml.bzl",
     "plaidml_cc_library",
     "plaidml_cc_test",
 )
 
-MLIR_TBLGEN_ALSO = [
-    "//pmlc/util:interfaces.td",
-    "interfaces.td",
-    "predicates.td",
-]
-
-mlir_tblgen(
-    name = "gen-op-decls",
-    src = "ops.td",
-    out = "ops.h.inc",
-    action = "-gen-op-decls",
-    also = MLIR_TBLGEN_ALSO,
-    incs = ["@mlir//:include"],
+filegroup(
+    name = "td_files",
+    srcs = [
+        "interfaces.td",
+        "predicates.td",
+        "//pmlc/util:enums-td",
+        "//pmlc/util:interfaces-td",
+        "@mlir//:OpBaseTdFiles",
+    ],
 )
 
-mlir_tblgen(
-    name = "gen-op-defs",
-    src = "ops.td",
-    out = "ops.cc.inc",
-    action = "-gen-op-defs",
-    also = MLIR_TBLGEN_ALSO,
-    incs = ["@mlir//:include"],
+gentbl(
+    name = "gen-interfaces",
+    tbl_outs = [
+        (
+            "-gen-op-interface-decls",
+            "interfaces.h.inc",
+        ),
+        (
+            "-gen-op-interface-defs",
+            "interfaces.cc.inc",
+        ),
+    ],
+    td_file = "interfaces.td",
+    td_srcs = [":td_files"],
 )
 
-mlir_tblgen(
-    name = "gen-op-interface-decls",
-    src = "interfaces.td",
-    out = "interfaces.h.inc",
-    action = "-gen-op-interface-decls",
-    incs = ["@mlir//:include"],
-)
-
-mlir_tblgen(
-    name = "gen-op-interface-defs",
-    src = "interfaces.td",
-    out = "interfaces.cc.inc",
-    action = "-gen-op-interface-defs",
-    incs = ["@mlir//:include"],
+gentbl(
+    name = "gen-ops",
+    tbl_outs = [
+        (
+            "-gen-op-decls",
+            "ops.h.inc",
+        ),
+        (
+            "-gen-op-defs",
+            "ops.cc.inc",
+        ),
+    ],
+    td_file = "ops.td",
+    td_srcs = [":td_files"],
 )
 
 plaidml_cc_library(
     name = "eltwise",
     srcs = [
         "dialect.cc",
-        "interfaces.cc.inc",
         "ops.cc",
-        "ops.cc.inc",
         "util.cc",
     ],
     hdrs = [
         "dialect.h",
-        "interfaces.h.inc",
         "ops.h",
-        "ops.h.inc",
         "types.h",
         "util.h",
     ],
     copts = COPTS,
-    visibility = ["//visibility:public"],
     deps = [
-        ":gen-op-decls",
-        ":gen-op-defs",
+        ":gen-interfaces",
+        ":gen-ops",
         "//pmlc/util",
         "//tile/base",
         "@llvm//:support",

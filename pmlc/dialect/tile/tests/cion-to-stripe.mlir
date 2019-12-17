@@ -18,7 +18,7 @@ func @dot(%arg0: tensor<1x784x!eltwise.fp32>, %arg1: tensor<784x512x!eltwise.fp3
 // CHECK-SAME: %arg0: !fp32_2 {stripe.layout = !stripe<"tensor !eltwise.fp32([1:784], [784:1])">, stripe.name = "_X0"}
 // CHECK-SAME: %arg1: !fp32_2 {stripe.layout = !stripe<"tensor !eltwise.fp32([784:512], [512:1])">, stripe.name = "_X1"}
 // CHECK-SAME: %arg2: !fp32_2 {stripe.layout = !stripe<"tensor !eltwise.fp32([1:512], [512:1])">, stripe.name = "_X2"}
-// CHECK-NEXT: attributes  {inputs = 2 : i32, outputs = 1 : i32, stripe_attrs = {program}} {
+// CHECK-SAME: attributes {inputs = 2 : i32, outputs = 1 : i32, stripe_attrs = {program}} {
 // CHECK-NEXT:   stripe.parallel_for () {
 // CHECK-NEXT:     stripe.parallel_for ("x0":1, "x1":512, "x2":784) {
 // CHECK-NEXT:     ^bb0(%x0: !aff, %x1: !aff, %x2: !aff):
