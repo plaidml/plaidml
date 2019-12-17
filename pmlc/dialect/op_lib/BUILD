@@ -27,10 +27,55 @@ PLATFORM_COPTS = select({
     ],
 })
 
+plaidml_cc_library(
+    name = "OpModel",
+    srcs = [
+        "OpModel.cc",
+    ],
+    hdrs = [
+        "OpModel.h",
+    ],
+    deps = [
+        "@mlir//:TableGen",
+    ],
+)
+
+plaidml_cc_library(
+    name = "OpCPP",
+    srcs = glob([
+        "cpp/ImplGen.cc",
+        "cpp/WrapperGen.cc",
+    ]),
+    hdrs = glob([
+        "cpp/ImplGen.h",
+        "cpp/WrapperGen.h",
+        "cpp/utils.h",
+    ]),
+    deps = [
+        ":OpModel",
+        "@mlir//:TableGen",
+    ],
+)
+
+plaidml_cc_library(
+    name = "OpPY",
+    srcs = glob([
+        "python/WrapperGen.cc",
+    ]),
+    hdrs = glob([
+        "python/WrapperGen.h",
+        "python/utils.h",
+    ]),
+    deps = [
+        ":OpModel",
+        "@mlir//:TableGen",
+    ],
+)
+
 cc_binary(
     name = "op-lib-tblgen",
     srcs = [
-        "//pmlc/dialect/op_lib:OpLibWrapperGen.cpp"
+        "//pmlc/dialect/op_lib:OpLibGen.cc"
     ],
     copts = PLATFORM_COPTS,
     includes = ["@mlir//:include"],
@@ -45,6 +90,9 @@ cc_binary(
     }),
     visibility = ["//visibility:public"],
     deps = [
+        ":OpModel",
+        ":OpCPP",
+        ":OpPY",
         "//base/util",
         "@mlir//:TableGen",
         "@mlir//:TableGenTools",
@@ -89,10 +137,10 @@ mlir_tblgen(
 )
 
 op_lib_tblgen(
-    name = "pml_gen_op_lib_cpp_enums",
+    name = "pml_gen_op_lib_cpp_impl",
     src = "ops.td",
-    out = "op_lib_enums.h.inc",
-    action = "-gen-op-lib-cpp-enums",
+    out = "op_lib_impl.h.inc",
+    action = "-gen-op-lib-cpp-impl",
     also = MLIR_TBLGEN_ALSO,
     incs = ["@mlir//:include"]
 )
@@ -116,24 +164,27 @@ op_lib_tblgen(
 )
 
 plaidml_cc_library(
-    name = "gen_op_lib_wrappers",
+    name = "gen_op_lib_dialect",
     srcs = [
-        "OpLibWrapperGen.cpp",
+        "OpLibGen.cc",
     ],
     deps = [
         "//base/util",
-        "@mlir//:TableGen",
+        ":OpModel",
+        ":OpCPP",
+        ":OpPY",
     ],
     visibility = ["//visibility:public"],
 )
 
 plaidml_cc_library(
-    name = "plaidml_op_lib_wrappers",
+    name = "plaidml_op_lib_dialect",
     srcs = [
         "ops.cc"
     ],
     hdrs = [
         "op_lib_wrappers.h.inc",
+        "op_lib_impl.h.inc",
     ],
     copts = COPTS,
     visibility = ["//visibility:public"],
@@ -141,8 +192,8 @@ plaidml_cc_library(
         "//plaidml2/core:core_mlir",
         "//plaidml2/edsl:edsl_mlir",
         "//plaidml2/op:op_mlir",
-        "//pmlc/dialect/op_lib:gen_op_lib_wrappers",
-        ":pml_gen_op_lib_cpp_enums",
+        "//pmlc/dialect/op_lib:gen_op_lib_dialect",
+        ":pml_gen_op_lib_cpp_impl",
         ":pml_gen_op_lib_cpp_wrappers",
         ":pml_gen_op_lib_py_wrappers",
     ],
