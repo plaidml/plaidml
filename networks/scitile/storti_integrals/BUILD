@@ -15,6 +15,17 @@ py_binary(
     ],
 )
 
+py_binary(
+    name = "hypersphere",
+    srcs = ["hypersphere.py",
+            "op.py",],
+    deps = [
+        "//plaidml2:py",
+        "//plaidml2/edsl:py",
+        "//plaidml2/exec:py",
+    ],
+)
+
 py_test(
     name = "torus_tests",
     srcs = [
