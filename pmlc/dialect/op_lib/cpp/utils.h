@@ -1,0 +1,97 @@
+//===- utils.cc - MLIR op lib dialect tblgen utils for C++ ----------------===//
+//
+// Copyright 2019 Intel Corporation.
+//
+// =============================================================================
+//
+// utils
+//
+//===----------------------------------------------------------------------===//
+
+#pragma once
+
+#include <map>
+
+#include "mlir/Support/STLExtras.h"
+#include "llvm/ADT/StringExtras.h"
+
+using mlir::StringRef;
+
+namespace pmlc::dialect::op::tblgen::cpp {
+
+static inline const char* const fileCommentHeader = R"( // Copyright 2019 Intel Corporation.
+/*===- TableGen'erated file -------------------------------------*- C++ -*-===*\
+|*                                                                            *|
+|* Op Lib C++ EDSL Wrapper                                                    *|
+|*                                                                            *|
+|* Automatically generated file, do not edit!                                 *|
+|*                                                                            *|
+\*===----------------------------------------------------------------------===*/
+
+)";
+
+static inline const char* const includeHeader = R"(
+#pragma once
+
+#include <string>
+#include <vector>
+
+#include "plaidml2/edsl/edsl.h"
+#include "plaidml2/op/ffi.h"
+
+)";
+
+static inline const char* const commentHeader = R"(
+//===----------------------------------------------------------------------===//
+// {0} {1}
+//===----------------------------------------------------------------------===//
+
+)";
+
+static inline const char* const ffiFunction = R"(
+namespace details {
+
+inline edsl::Value op(const std::string& name, const edsl::Value& args) {
+  return edsl::Value(ffi::call<plaidml_expr*>(plaidml_op_make, name.c_str(), args.as_ptr()));
+}
+
+} // namespace details
+
+)";
+
+static inline const char* const initFunction = R"(
+inline void init() {  //
+  plaidml::init();
+  plaidml::edsl::init();
+  ffi::call_void(plaidml_op_init);
+}
+
+)";
+
+// Order doesn't matter here, but lookup efficiency does, so keep as a std::map.
+static inline const std::map<StringRef, StringRef> typeLookupTable = {
+    {"APInt", "int"},
+    {"ArrayAttr", "std::vector<int>"},
+    {"bool", "bool"},
+    {"MLIR_LIST", "edsl::Value&"},
+    {"MLIR_VOID", "void"},
+    {"PML_AutogroupModeAttr", "AutogroupMode"},
+    {"PML_AutopadModeAttr", "AutopadMode"},
+    {"PML_DerivModeAttr", "DerivMode"},
+    {"PML_GroupLayoutAttr", "GroupLayout"},
+    {"PML_TensorLayoutAttr", "TensorLayout"},
+    {"StringRef", "std::string"},
+    {"tensor of any type values", "edsl::Tensor"},
+    {"uint32_t", "int64_t"},
+};
+
+static inline StringRef convertType(const StringRef type) {
+  StringRef edslType = "unrecognized";
+  auto found = typeLookupTable.find(type);
+  if (found != typeLookupTable.end()) {
+    edslType = found->second;
+  }
+  return edslType;
+}
+
+}  // namespace pmlc::dialect::op::tblgen::cpp
