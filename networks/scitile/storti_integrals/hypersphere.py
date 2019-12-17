@@ -14,7 +14,6 @@ def hypersphere_area_exact(r):
 def hypersphere(X, Y, Z, W, vars):
     R = vars[0]  #radius
     p = vars[1]  #dim
-    #return edsl.sqrt(sq(X) + sq(Y) + sq(Z) + sq(W)) - 1
     return edsl.pow(edsl.pow(X, p) + edsl.pow(Y, p) + edsl.pow(Z, p) + edsl.pow(W, p), (1 / p)) - R
 
 
@@ -55,7 +54,7 @@ def main(
     p = 2
 
     min_N = 32
-    max_N = 65
+    max_N = 130
     interval = 32
 
     def check_integral(type, N, minval, maxval, eps, frep, vars):
