@@ -6,17 +6,16 @@ package(default_visibility = ["//visibility:public"])
 
 py_binary(
     name = "torus",
-    srcs = ["torus.py",
-            "op.py",],
-    data = [":op"],
+    srcs = ["torus.py",],
     deps = [
+        ":op",
         "//plaidml2:py",
         "//plaidml2/edsl:py",
         "//plaidml2/exec:py",
     ],
 )
 
-py_binary(
+py_library(
     name="op",
     srcs = ["op.py"],
     deps =[
@@ -25,12 +24,12 @@ py_binary(
         "//plaidml2/exec:py",
     ],
 )
+
 py_binary(
     name = "hypersphere",
-    srcs = ["hypersphere.py",
-            "op.py",],
-    data = [":op"],
+    srcs = ["hypersphere.py",],
     deps = [
+        ":op",
         "//plaidml2:py",
         "//plaidml2/edsl:py",
         "//plaidml2/exec:py",
@@ -44,8 +43,8 @@ py_test(
         "torus.py",
         "hypersphere.py",
     ],
-    data = [":op"],
     deps = [
+        ":op",
         "//plaidml2:py",
         "//plaidml2/edsl:py",
         "//plaidml2/exec:py",
