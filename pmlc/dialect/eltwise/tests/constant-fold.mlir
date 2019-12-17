@@ -204,3 +204,14 @@ func @fold_div_0_f32(%arg0: !fp32) -> !fp32 {
   // CHECK-NEXT: %cst = "eltwise.sconst"() {value = 0.000000e+00 : f32} : () -> !fp32
   // CHECK-NEXT: return %cst : !fp32
 }
+
+// Expected behavior of div by 0 is to not fold
+// CHECK-LABEL: @fold_div_f32_0
+func @fold_div_f32_0(%arg0: !fp32) -> !fp32 {
+  %cst = "eltwise.sconst"() {value = 0.0 : f32} : () -> !fp32
+  %0 = "eltwise.div"(%arg0, %cst) {type = !fp32} : (!fp32, !fp32) -> !fp32
+  return %0 : !fp32
+  // CHECK-NEXT: %cst = "eltwise.sconst"() {value = 0.000000e+00 : f32} : () -> !fp32
+  // CHECK-NEXT: %0 = "eltwise.div"(%arg0, %cst) {type = !fp32} : (!fp32, !fp32) -> !fp32
+  // CHECK-NEXT: return %0 : !fp32
+}
