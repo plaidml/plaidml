@@ -31,8 +31,8 @@ plaidml2-setup
 4. Grab the EDSL example code that you would like to run
 
 ```
-wget https://raw.githubusercontent.com/plaidml/plaidml/storti_integrals/networks/scitile/storti_integrals/op.py
-wget https://raw.githubusercontent.com/plaidml/plaidml/storti_integrals/networks/scitile/storti_integrals/torus.py
+wget https://raw.githubusercontent.com/plaidml/plaidml/1sanz_storti_integrals/networks/scitile/storti_integrals/op.py
+wget https://raw.githubusercontent.com/plaidml/plaidml/1sanz_storti_integrals/networks/scitile/storti_integrals/torus.py
 ```
 
 5. run the example 
