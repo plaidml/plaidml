@@ -166,7 +166,7 @@ def CmpLtOp : CompareOp<"cmp_lt">;
 def CmpNeOp : CompareOp<"cmp_ne", [Commutative, NoSideEffect]>;
 def CosHOp : UnaryFloatOp<"cosh">;
 def CosOp : UnaryFloatOp<"cos">;
-def DivOp : BinaryOp<"div">;
+def DivOp : BinaryOp<"div">, HasFolder;
 def ExpOp : UnaryFloatOp<"exp">;
 def FloorOp : UnaryOp<"floor">;
 // Prevent CSE from dropping 'ident' by avoiding the NoSideEffect trait
@@ -188,7 +188,7 @@ def SignOp : UnaryOp<"sign">;
 def SinHOp : UnaryFloatOp<"sinh">;
 def SinOp : UnaryFloatOp<"sin">;
 def SqrtOp : UnaryFloatOp<"sqrt">;
-def SubOp : BinaryOp<"sub">;
+def SubOp : BinaryOp<"sub">, HasFolder;
 def TanHOp : UnaryFloatOp<"tanh">;
 def TanOp : UnaryFloatOp<"tan">;
 def XorOp : BinaryIntOp<"xor", [Commutative, NoSideEffect]>;
