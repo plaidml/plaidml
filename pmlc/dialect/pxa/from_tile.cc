@@ -49,6 +49,8 @@ using mlir::ReturnOp;
 using mlir::Type;
 using mlir::Value;
 
+namespace {
+
 static stripe::TensorType ConvertIntoTensorType(Type type) {
   auto rankedTensorType = eltwise::getRankedTensorType(type);
   auto shape = rankedTensorType.getShape();
@@ -291,7 +293,7 @@ struct ContractionOpConversion : public LoweringBase<ContractionOp> {
     Value* outVal = MakeCombination(rewriter, op.getLoc(), op.combo(), types, vals);
     // Create the store
     auto outMap = op.sink();
-    rewriter.create<ReduceOp>(loc, op.agg(), outRef, outVal, outMap, idxs);
+    rewriter.create<ReduceOp>(loc, op.agg(), outVal, outRef, outMap, idxs);
     rewriter.replaceOp(op, outRef);
   }
 };
@@ -345,6 +347,8 @@ void LoweringPass::runOnModule() {
 
   // Do the final
 }
+
+}  // anonymous namespace
 
 static mlir::PassRegistration<LoweringPass> legalize_pass(  //
     "tile-legalize-to-pxa",                                 //

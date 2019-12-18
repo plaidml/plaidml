@@ -18,9 +18,11 @@ def PxaDialect : Dialect {
 class PxaOp<string mnemonic, list<OpTrait> traits = []> :
     Op<PxaDialect, mnemonic, traits>;
 
+def AnyScalar : AnyTypeOf<[AnyFloat, AnyInteger]> {}
+
 def ReduceOp : PxaOp<"reduce"> {
   let summary = "Reduce into memory";
-  let arguments = (ins AggregationKind:$agg, AnyMemRef:$out, AnyType:$val, AffineMapAttr:$map, Variadic<Index>:$idxs);
+  let arguments = (ins AggregationKind:$agg, AnyScalar:$val, AnyMemRef:$out, AffineMapAttr:$map, Variadic<Index>:$idxs);
   let results = (outs);
 }
 
@@ -35,17 +37,10 @@ def AffineParallelForOp : PxaOp<"parallel_for",
   let regions = (region SizedRegion<1>:$inner);
 }
 
-def AnyScalar : AnyTypeOf<[AnyFloat, AnyInteger]> {}
-
 def CastOp : PxaOp<"cast"> {
   let summary = "cast operation";
   let arguments = (ins AnyScalar:$input, BoolAttr:$in_signed, BoolAttr:$out_signed);
   let results = (outs AnyScalar:$result);
-}
-
-def TerminateOp : PxaOp<"terminate", [Terminator]> {
-  let summary = "hack";
-  let arguments = (ins);
 }
 
 #endif // __PML_PXA_OPS__

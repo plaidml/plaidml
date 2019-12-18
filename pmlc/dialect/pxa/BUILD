@@ -33,11 +33,13 @@ plaidml_cc_library(
     srcs = [
         "from_tile.cc",
         "ops.cc",
+        "to_affine.cc",
     ],
     hdrs = [
         "dialect.h",
         "from_tile.h",
         "ops.h",
+        "to_affine.h",
     ],
     copts = COPTS,
     tags = ["llvm"],
