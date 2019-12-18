@@ -17,7 +17,6 @@ plaidml_cc_library(
         "//tile/codegen",
         "//tile/lang",
         "//tile/lib",
-        "//tile/targets/cpu",
         "//tile/util",
         "@boost//:program_options",
     ],
