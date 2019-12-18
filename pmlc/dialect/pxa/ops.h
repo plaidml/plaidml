@@ -45,6 +45,7 @@ using mlir::StringRef;
 using mlir::Type;
 using mlir::TypeAttr;
 using mlir::Value;
+using mlir::ValueRange;
 using util::AggregationKind;
 
 namespace OpTrait = mlir::OpTrait;

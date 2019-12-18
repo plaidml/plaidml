@@ -182,6 +182,7 @@ py_binary(
         "@mlir//:LICENSE.TXT",
         "@tbb//:LICENSE",
         "@xsmm//:LICENSE.md",
+        ":setup",
     ],
     main = "setup.py",
     deps = [

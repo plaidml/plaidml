@@ -41,7 +41,7 @@ tool_names = [
     'mlir-opt',
     'mlir-translate',
     'mlir-tblgen',
-    'op-lib-tblgen',
+    'oplib-tblgen',
     'pmlc-opt',
     'pmlc-translate',
 ]

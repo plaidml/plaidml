@@ -22,15 +22,6 @@ def ReduceOp : PxaOp<"reduce"> {
   let summary = "Reduce into memory";
   let arguments = (ins AggregationKind:$agg, AnyMemRef:$out, AnyType:$val, AffineMapAttr:$map, Variadic<Index>:$idxs);
   let results = (outs);
-  let builders = [OpBuilder<
-    "Builder* builder, OperationState& result, AggregationKind agg, Value* out, Value* val, AffineMap map, ArrayRef<Value*> idxs", [{
-      result.addOperands(out);
-      result.addOperands(val);
-      result.addOperands(idxs);
-      result.addAttribute("agg", builder->getI64IntegerAttr(static_cast<int64_t>(agg)));
-      result.addAttribute("map", AffineMapAttr::get(map));
-    }]
-  >];
 }
 
 def ImplicitAffineTerminator

@@ -22,6 +22,7 @@
 #include "pmlc/dialect/eltwise/ops.h"
 #include "pmlc/dialect/eltwise/util.h"
 #include "pmlc/dialect/stripe/affine_poly.h"
+#include "pmlc/dialect/stripe/analysis.h"
 #include "pmlc/dialect/stripe/dialect.h"
 #include "pmlc/dialect/stripe/ops.h"
 #include "pmlc/dialect/stripe/transcode.h"
@@ -56,6 +57,7 @@ using mlir::Value;
 namespace pmlc::dialect::tile {
 
 static stripe::TensorType convertIntoTensorType(Type type) {
+  IVLOG(3, "convertIntoTensorType> " << mlir::debugString(type));
   auto rankedTensorType = eltwise::getRankedTensorType(type);
   auto shape = rankedTensorType.getShape();
   auto cls = Identifier::get(stripe::kAddressClassIdentifier, type.getContext());
@@ -236,7 +238,7 @@ struct ContractionOpConversion : public LoweringBase {
       Operation* op,                      //
       llvm::ArrayRef<Value*> operands,    //
       ConversionPatternRewriter& rewriter) const override {
-    IVLOG(2, "ContractionOpConversion::matchAndRewrite>");
+    IVLOG(2, "ContractionOpConversion::matchAndRewrite> " << mlir::debugString(*op));
     auto cionOp = llvm::cast<ContractionOp>(op);
     auto loc = op->getLoc();
 
@@ -245,7 +247,13 @@ struct ContractionOpConversion : public LoweringBase {
     IVLOG(3, "resultTensorType: " << mlir::debugString(resultTensorType));
     llvm::SmallVector<stripe::TensorType, 4> shapes{resultTensorType};
     for (auto src : cionOp.operands()) {
-      shapes.emplace_back(convertIntoTensorType(src->getType()));
+      auto srcType = src->getType();
+      if (srcType.isa<stripe::TensorRefType>()) {
+        auto access = stripe::ComputeAccess(src);
+        shapes.emplace_back(access.base_type);
+      } else {
+        shapes.emplace_back(convertIntoTensorType(srcType));
+      }
     }
 
     Contraction contraction{cionOp};
@@ -268,7 +276,7 @@ struct ContractionOpConversion : public LoweringBase {
     auto aggKind = cionOp.agg();
     auto aggOpTag = llvm::formatv("agg_op_{0}", util::stringifyAggregationKind(aggKind));
     auto comboKind = cionOp.combo();
-    auto comboOpTag = llvm::formatv("combo_op_{0}", util::stringifyCombinationKind(comboKind));
+    auto comboOpTag = llvm::formatv("comb_op_{0}", util::stringifyCombinationKind(comboKind));
     auto forOp = rewriter.create<stripe::ParallelForOp>(  //
         loc,                                              //
         rewriter.getI64ArrayAttr(ranges));

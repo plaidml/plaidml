@@ -1,4 +1,5 @@
 TBLGEN_ACTIONS = [
+    "-gen-op-lib-cpp-impl",
     "-gen-op-lib-cpp-wrappers",
     "-gen-op-lib-py-wrappers",
 ]

@@ -1,5 +1,5 @@
 load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_proto_library")
-load("//vendor/mlir:mlir.bzl", "COPTS")
+load("//vendor/mlir:tblgen.bzl", "COPTS")
 
 plaidml_proto_library(
     name = "proto",
@@ -20,10 +20,10 @@ plaidml_cc_library(
         ":proto_cc",
         "//base/config",
         "//base/util",
+        "//pmlc/dialect/stripe:passes",
+        "//pmlc/dialect/stripe:transcode",
         "//tile/bilp",
         "//tile/stripe",
-        "//pmlc/dialect/stripe:transcode",
-        "//pmlc/dialect/stripe:passes",
         "//tile/targets/cpu",
         "@boost//:filesystem",
     ],

@@ -5,7 +5,7 @@ load(
     "plaidml_cc_binary",
     "plaidml_cc_test",
 )
-load("//vendor/mlir:mlir.bzl", "COPTS")
+load("//vendor/mlir:tblgen.bzl", "COPTS")
 
 plaidml_cc_binary(
     name = "pmlc-opt",
@@ -21,7 +21,7 @@ plaidml_cc_binary(
         "//pmlc/dialect/tile",
         "//pmlc/dialect/pxa",
         "@mlir//:EDSC",
-        "@mlir//:OptMain",
+        "@mlir//:MlirOptLib",
         "@mlir//:Parser",
         "@mlir//:Transforms",
     ],
