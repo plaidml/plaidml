@@ -97,7 +97,8 @@ def main(
     y_line3, label3 = get_line_y(x3, y3)
     ax1.plot(x3, y_line3, label=label3)
     plt.legend(loc='lower left')
-    plt.savefig('figure_one.png')
+
+    plt.savefig(sys.argv[1])
 
 
 if __name__ == '__main__':
