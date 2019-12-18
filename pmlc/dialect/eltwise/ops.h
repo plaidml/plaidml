@@ -45,6 +45,7 @@ using mlir::TensorType;
 using mlir::Type;
 using mlir::TypeAttr;
 using mlir::Value;
+using mlir::ValueRange;
 using mlir::VectorType;
 using util::GenericBuilder;
 
