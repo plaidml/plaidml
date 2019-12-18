@@ -20,6 +20,10 @@
 
 namespace pmlc::dialect::pxa {
 
+using eltwise::ScalarConstantOp;
+using eltwise::ScalarType;
+using tile::AggregationKind;
+using tile::CombinationKind;
 using tile::Contraction;
 using tile::ContractionOp;
 using vertexai::tile::DataType;
@@ -29,12 +33,14 @@ using mlir::AllocOp;
 using mlir::ArrayRef;
 using mlir::ConversionPattern;
 using mlir::ConversionPatternRewriter;
+using mlir::FloatAttr;
 using mlir::FloatType;
 using mlir::FuncOp;
 using mlir::FunctionType;
+using mlir::IntegerAttr;
 using mlir::IntegerType;
 using mlir::MLIRContext;
-
+using mlir::OpBuilder;
 using mlir::OpConversionPattern;
 using mlir::Operation;
 using mlir::PatternMatchResult;
@@ -43,7 +49,7 @@ using mlir::ReturnOp;
 using mlir::Type;
 using mlir::Value;
 
-static stripe::TensorType convertIntoTensorType(Type type) {
+static stripe::TensorType ConvertIntoTensorType(Type type) {
   auto rankedTensorType = eltwise::getRankedTensorType(type);
   auto shape = rankedTensorType.getShape();
   auto cls = mlir::Identifier::get(stripe::kAddressClassIdentifier, type.getContext());
@@ -74,7 +80,7 @@ struct TypeConverter : public mlir::TypeConverter {
       IVLOG(4, "  FunctionType");
       return type;
     }
-    if (auto stype = type.dyn_cast<eltwise::ScalarType>()) {
+    if (auto stype = type.dyn_cast<ScalarType>()) {
       return stype.toStandard();
     }
     if (auto rtype = type.dyn_cast<RankedTensorType>()) {
@@ -123,13 +129,23 @@ struct FuncOpConversion : public LoweringBase<FuncOp> {
   }
 };
 
-struct ReturnOpConversion : public LoweringBase<ReturnOp> {
-  explicit ReturnOpConversion(MLIRContext* ctx) : LoweringBase(ctx) {}
+struct ScalarConstantOpConversion : public LoweringBase<ScalarConstantOp> {
+  explicit ScalarConstantOpConversion(MLIRContext* ctx) : LoweringBase(ctx) {}
 
-  void rewrite(ReturnOp op, ArrayRef<Value*> operands, ConversionPatternRewriter& rewriter) const override {
-    std::cerr << "WHY!\n";
-    rewriter.create<TerminateOp>(op.getLoc());
-    rewriter.eraseOp(op);
+  void rewrite(ScalarConstantOp op, ArrayRef<Value*> operands, ConversionPatternRewriter& rewriter) const override {
+    Type type = op.getType().dyn_cast<ScalarType>().toStandard();
+    Attribute val = op.getValue();
+    if (auto ftype = type.dyn_cast<FloatType>()) {
+      auto fattr = val.cast<FloatAttr>();
+      val = FloatAttr::get(ftype, fattr.getValueAsDouble());
+    } else if (auto itype = type.dyn_cast<IntegerType>()) {
+      auto iattr = val.cast<IntegerAttr>();
+      val = IntegerAttr::get(itype, iattr.getInt());
+    } else {
+      llvm_unreachable("Invalid scalar constant op");
+    }
+    auto newOp = rewriter.create<mlir::ConstantOp>(op.getLoc(), type, val);
+    rewriter.replaceOp(op, {newOp});
   }
 };
 
@@ -137,43 +153,100 @@ struct EltwiseOpConversion : public ConversionPattern {
   explicit EltwiseOpConversion(MLIRContext* ctx, StringRef opName) : ConversionPattern(opName, 1, ctx) {}
   PatternMatchResult match(Operation* op) const override { return this->matchSuccess(); }
   void rewrite(Operation* op, ArrayRef<Value*> operands, ConversionPatternRewriter& rewriter) const override {
+    /*
     auto eop = mlir::cast<eltwise::EltwiseOp>(op);
-    auto val = eop.buildStandard(operands, rewriter);
+    auto val = eop.buildStandard(rewriter, op-> operands, rewriter);
     rewriter.replaceOp(op, val);
+    */
   }
 };
 
-/*
+static ScalarType GetScalarType(Value* val) {
+  auto t = val->getType();
+  if (auto ttype = t.dyn_cast<mlir::TensorType>()) {
+    t = ttype.getElementType();
+  }
+  return t.cast<ScalarType>();
+}
+
+static Value* Cast(OpBuilder& builder, ScalarType in, ScalarType out, Value* stdVal) {
+  TypeConverter typeConverter(stdVal->getContext());
+  auto stypeOut = typeConverter.convertType(out);
+  if (stypeOut == stdVal->getType()) {
+    return stdVal;
+  }
+  bool in_signed = !is_uint(in.type());
+  bool out_signed = !is_uint(out.type());
+  return builder.create<CastOp>(stdVal->getLoc(), stypeOut, stdVal, builder.getBoolAttr(in_signed),
+                                builder.getBoolAttr(out_signed));
+}
+
+static ScalarType CommonSupertype(ScalarType a, ScalarType b) {
+  return ScalarType::get(a.getContext(), CommonSupertype(a.type(), b.type()));
+}
+
+static Value* CreateInit(OpBuilder& builder, Location loc, ScalarType stype, AggregationKind agg) {
+  Type type = stype.toStandard();
+  if (auto ftype = type.dyn_cast<FloatType>()) {
+    switch (agg) {
+      case AggregationKind::add:
+        return builder.create<mlir::ConstantOp>(loc, type, FloatAttr::get(ftype, 0.0));
+      case AggregationKind::mul:
+        return builder.create<mlir::ConstantOp>(loc, type, FloatAttr::get(ftype, 1.0));
+      default:
+        llvm_unreachable("Unsupported aggregation for CreateInit");
+    }
+  } else if (auto itype = type.dyn_cast<IntegerType>()) {
+    switch (agg) {
+      case AggregationKind::add:
+        return builder.create<mlir::ConstantOp>(loc, type, IntegerAttr::get(itype, 0));
+      case AggregationKind::mul:
+        return builder.create<mlir::ConstantOp>(loc, type, IntegerAttr::get(itype, 1));
+      default:
+        llvm_unreachable("Unsupported aggregation for CreateInit");
+    }
+  }
+  llvm_unreachable("Unknown type for CreateInit");
+}
+
 static Value* MakeCombination(            //
-    ConversionPatternRewriter* rewriter,  //
+    ConversionPatternRewriter& rewriter,  //
     Location loc,                         //
     CombinationKind combo,                //
-    ScalarType scalarType,                //
-    ArrayRef<Value*> operands) {
-  switch (combo) {
-    case CombinationKind::none:
-      return operands[0];
-    case CombinationKind::add:
-      return rewriter->create<eltwise::AddOp>(loc, scalarType, operands).result();
-    case CombinationKind::cond: {
-      auto constOp = createInit(rewriter, loc, scalarType);
-      auto cmpEqOp = rewriter->create<eltwise::CmpEqOp>(loc, scalarType, operands.drop_back());
-      llvm::SmallVector<Value*, 3> args{cmpEqOp.result(), operands.back(), constOp.result()};
-      return rewriter->create<eltwise::SelectOp>(loc, scalarType, args);
+    ArrayRef<ScalarType> types,           //
+    ArrayRef<Value*> vals)                //
+{
+  if (combo == CombinationKind::none) {
+    return vals[0];
+  } else if (combo == CombinationKind::cond) {
+    auto ctype = CommonSupertype(types[0], types[1]);
+    auto v0 = Cast(rewriter, types[0], ctype, vals[0]);
+    auto v1 = Cast(rewriter, types[1], ctype, vals[1]);
+    auto cmp = eltwise::CmpEqOp::buildStandard(rewriter, loc, ctype, {v0, v1});
+    auto zero = CreateInit(rewriter, loc, types[2], AggregationKind::add);
+    return eltwise::SelectOp::buildStandard(rewriter, loc, types[2], {cmp, vals[2], zero});
+  } else {
+    auto ctype = CommonSupertype(types[0], types[1]);
+    auto v0 = Cast(rewriter, types[0], ctype, vals[0]);
+    auto v1 = Cast(rewriter, types[1], ctype, vals[1]);
+    switch (combo) {
+      case CombinationKind::add:
+        return eltwise::AddOp::buildStandard(rewriter, loc, ctype, {v0, v1});
+      case CombinationKind::mul:
+        return eltwise::MulOp::buildStandard(rewriter, loc, ctype, {v0, v1});
+      case CombinationKind::eq:
+        return eltwise::CmpEqOp::buildStandard(rewriter, loc, ctype, {v0, v1});
+      default:
+        llvm_unreachable("Invalid combination");
     }
-    case CombinationKind::eq:
-      return rewriter->create<eltwise::CmpEqOp>(loc, scalarType, operands).result();
-    case CombinationKind::mul:
-      return rewriter->create<eltwise::MulOp>(loc, scalarType, operands).result();
   }
-  throw std::runtime_error("Invalid combination op");
 }
-*/
 
 struct ContractionOpConversion : public LoweringBase<ContractionOp> {
   explicit ContractionOpConversion(MLIRContext* ctx) : LoweringBase(ctx) {}
 
   void rewrite(ContractionOp op, ArrayRef<Value*> operands, ConversionPatternRewriter& rewriter) const override {
+    tile::ContractionOpOperandAdaptor new_op(operands);
     // Gather some basic info
     auto loc = op.getLoc();
     TypeConverter typeConverter(ctx);
@@ -181,10 +254,10 @@ struct ContractionOpConversion : public LoweringBase<ContractionOp> {
     // Make an allocation for the output
     auto outRef = rewriter.create<AllocOp>(loc, outType).getResult();
     // Get the shape (TODO: fix this to not use stripe)
-    auto resultTensorType = convertIntoTensorType(op.result()->getType());
+    auto resultTensorType = ConvertIntoTensorType(op.result()->getType());
     llvm::SmallVector<stripe::TensorType, 4> shapes{resultTensorType};
     for (auto src : op.operands()) {
-      shapes.emplace_back(convertIntoTensorType(src->getType()));
+      shapes.emplace_back(ConvertIntoTensorType(src->getType()));
     }
     // Do the actual maths
     Contraction contraction{op};
@@ -204,19 +277,21 @@ struct ContractionOpConversion : public LoweringBase<ContractionOp> {
     for (size_t i = 0; i < ranges.size(); i++) {
       idxs.push_back(body->addArgument(rewriter.getIndexType()));
     }
-    // Create the loads
+    // Create the loads + casts
     llvm::SmallVector<Value*, 4> vals;
-    for (size_t i = 1; i < operands.size(); i++) {
-      auto map = op.srcs().getValue()[i - 1].cast<AffineMapAttr>().getValue();
-      vals.push_back(rewriter.create<AffineLoadOp>(loc, operands[i], map, idxs));
+    llvm::SmallVector<ScalarType, 4> types;
+    for (size_t i = 0; i < op.srcs().getValue().size(); i++) {
+      auto map = op.srcs().getValue()[i].cast<AffineMapAttr>().getValue();
+      auto new_in = *std::next(new_op.operands().begin(), i);
+      vals.push_back(rewriter.create<AffineLoadOp>(loc, new_in, map, idxs));
+      auto old_in = *std::next(op.operands().begin(), i);
+      types.push_back(GetScalarType(old_in));
     }
     // TODO: Do the combination op
-    Value* outVal = operands[0];
+    Value* outVal = MakeCombination(rewriter, op.getLoc(), op.combo(), types, vals);
     // Create the store
     auto outMap = op.sink();
     rewriter.create<ReduceOp>(loc, op.agg(), outRef, outVal, outMap, idxs);
-
-    rewriter.create<AffineTerminatorOp>(loc);
     rewriter.replaceOp(op, outRef);
   }
 };
@@ -240,22 +315,35 @@ void LoweringPass::runOnModule() {
   // Setup rewrite patterns
   mlir::OwningRewritePatternList patterns;
   patterns.insert<FuncOpConversion>(&getContext());
-  patterns.insert<ReturnOpConversion>(&getContext());
   patterns.insert<ContractionOpConversion>(&getContext());
+  patterns.insert<ContractionOpConversion>(&getContext());
+  patterns.insert<ScalarConstantOpConversion>(&getContext());
   auto eltwiseOps = util::getAllOpsWithInterface<eltwise::EltwiseOp>(&getContext());
   for (auto op : eltwiseOps) {
     patterns.insert<EltwiseOpConversion>(&getContext(), op->name);
   }
 
   // Run the conversion
-  // if (failed(applyFullConversion(getModule(), target, patterns, nullptr))) {
   if (failed(applyPartialConversion(getModule(), target, patterns, nullptr))) {
     getModule().dump();
     emitError(mlir::UnknownLoc::get(&getContext()), "Error lowering tile -> pxa\n");
     signalPassFailure();
   }
 
-  getModule().dump();
+  // Do a final fixup to remove returns
+  getModule().walk([](FuncOp op) {
+    mlir::Block& block = op.getBody().front();
+    auto ret = mlir::cast<ReturnOp>(block.back());
+    size_t cur_arg = op.getType().getNumInputs() - ret.getNumOperands();
+    for (Value* v : ret.getOperands()) {
+      auto defOp = v->getDefiningOp();
+      v->replaceAllUsesWith(block.getArgument(cur_arg++));
+      defOp->erase();
+    }
+    ret.erase();
+  });
+
+  // Do the final
 }
 
 static mlir::PassRegistration<LoweringPass> legalize_pass(  //

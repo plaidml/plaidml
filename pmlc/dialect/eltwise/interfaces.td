@@ -10,10 +10,10 @@ include "mlir/IR/OpBase.td"
 def EltwiseOpInterface : OpInterface<"EltwiseOp"> {
   let description = "<TODO>";
   let methods = [
-    InterfaceMethod<
+    StaticInterfaceMethod<
       "Build a standard op from eltwise on in conversion", 
       "Value*", "buildStandard", 
-      (ins "ArrayRef<Value *>":$operands, "ConversionPatternRewriter&":$rewriter)
+      (ins "OpBuilder&":$builder, "Location":$loc, "ScalarType":$otype, "ArrayRef<Value *>":$operands)
     >,
   ];
 }

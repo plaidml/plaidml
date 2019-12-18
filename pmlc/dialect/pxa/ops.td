@@ -44,6 +44,14 @@ def AffineParallelForOp : PxaOp<"parallel_for",
   let regions = (region SizedRegion<1>:$inner);
 }
 
+def AnyScalar : AnyTypeOf<[AnyFloat, AnyInteger]> {}
+
+def CastOp : PxaOp<"cast"> {
+  let summary = "cast operation";
+  let arguments = (ins AnyScalar:$input, BoolAttr:$in_signed, BoolAttr:$out_signed);
+  let results = (outs AnyScalar:$result);
+}
+
 def TerminateOp : PxaOp<"terminate", [Terminator]> {
   let summary = "hack";
   let arguments = (ins);
