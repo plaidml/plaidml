@@ -60,7 +60,7 @@ def main(
     r = 2.0  # minor radius
 
     min_N = 32
-    max_N = 1024
+    max_N = 768
     interval = 32
 
     def check_integral(type, N, minval, maxval, eps, frep, vars):
