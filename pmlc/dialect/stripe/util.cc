@@ -4,8 +4,7 @@
 
 #include "mlir/IR/Builders.h"
 
-#include "pmlc/dialect/stripe/dialect.h"
-#include "pmlc/dialect/stripe/ops.h"
+#include "base/util/logging.h"
 
 using mlir::NamedAttribute;
 using mlir::OpBuilder;
@@ -33,6 +32,213 @@ void createMainParallelFor(mlir::FuncOp funcOp) {
 
   builder.setInsertionPointToEnd(src);
   builder.create<TerminateOp>(funcOp.getLoc());
+}
+
+bool hasAttr(Operation* op, const std::string& attr) {
+  std::set<std::string> op_attrs_set;
+  ArrayRef<NamedAttribute> op_attrs = op->getAttrOfType<DictionaryAttr>(Dialect::getStripeAttrsName()).getValue();
+  for (const auto& [key, value] : op_attrs) {
+    auto name = key.strref();
+    op_attrs_set.insert(name);
+  }
+  return op_attrs_set.find(attr) != op_attrs_set.end();
+}
+
+bool hasAttrs(Operation* op, const std::set<std::string>& attrs) {
+  std::set<std::string> op_attrs_set;
+  ArrayRef<NamedAttribute> op_attrs = op->getAttrOfType<DictionaryAttr>(Dialect::getStripeAttrsName()).getValue();
+  for (const auto& [key, value] : op_attrs) {
+    auto name = key.strref();
+    op_attrs_set.insert(name);
+  }
+  for (const auto& attr : attrs) {
+    if (op_attrs_set.find(attr) == op_attrs_set.end()) {
+      return false;
+    }
+  }
+  return true;
+}
+
+DictionaryAttr addAttrInDictionary(DictionaryAttr old_dict, OpBuilder builder, NamedAttribute elem) {
+  llvm::SmallVector<NamedAttribute, 8> new_array;
+  if (old_dict) {
+    ArrayRef<NamedAttribute> old_array = old_dict.getValue();
+    new_array.insert(new_array.begin(), old_array.begin(), old_array.end());
+  }
+  new_array.emplace_back(elem);
+  return builder.getDictionaryAttr(new_array);
+}
+
+ArrayAttr addAttrInArray(ArrayAttr old_array, OpBuilder builder, Attribute elem) {
+  llvm::SmallVector<Attribute, 8> new_array;
+  if (old_array) {
+    ArrayRef<Attribute> elements = old_array.getValue();
+    new_array.insert(new_array.begin(), elements.begin(), elements.end());
+  }
+  new_array.emplace_back(elem);
+  ArrayRef new_array_ref(new_array.begin(), new_array.end());
+  return builder.getArrayAttr(new_array_ref);
+}
+
+DictionaryAttr replaceAttrInDictionary(DictionaryAttr old_dict, OpBuilder builder, unsigned n, NamedAttribute elem) {
+  llvm::SmallVector<NamedAttribute, 8> new_array;
+  if (old_dict) {
+    ArrayRef<NamedAttribute> old_array = old_dict.getValue();
+    new_array.insert(new_array.begin(), old_array.begin(), old_array.end());
+  }
+  while (n >= new_array.size()) {
+    new_array.emplace_back(builder.getIdentifier(""), builder.getUnitAttr());
+  }
+  new_array[n] = elem;
+  return builder.getDictionaryAttr(new_array);
+}
+
+ArrayAttr replaceAttrInArray(ArrayAttr old_array, OpBuilder builder, unsigned n, Attribute elem) {
+  llvm::SmallVector<Attribute, 8> new_array;
+  if (old_array) {
+    ArrayRef<Attribute> elements = old_array.getValue();
+    new_array.insert(new_array.begin(), elements.begin(), elements.end());
+  }
+  while (n >= new_array.size()) {
+    new_array.emplace_back(builder.getUnitAttr());
+  }
+  new_array[n] = elem;
+  ArrayRef new_array_ref(new_array.begin(), new_array.end());
+  return builder.getArrayAttr(new_array_ref);
+}
+
+void setOpAttrUnit(Operation* op, OpBuilder builder, const std::string& attr_name) {
+  if (!op) {
+    throw std::runtime_error("setUnitAttr: op is null");
+  }
+  auto old_attrs_dict = op->getAttrOfType<DictionaryAttr>(Dialect::getStripeAttrsName());
+  NamedAttribute new_elem = {builder.getIdentifier(attr_name), builder.getUnitAttr()};
+  auto new_attrs_dict = addAttrInDictionary(old_attrs_dict, builder, new_elem);
+  op->setAttr(Dialect::getStripeAttrsName(), new_attrs_dict);
+}
+
+void setIdxAttrUnit(ParallelForOp op, StringRef target_idx, const std::string& attr_name) {
+  auto idx_names = op.getAttrOfType<ArrayAttr>(mlir::Identifier::get("idx_names", op.getContext()));
+  if (!idx_names) {
+    return;
+  }
+  auto old_idx_attrs = op.getAttrOfType<ArrayAttr>(mlir::Identifier::get("idx_attrs", op.getContext()));
+  ArrayAttr new_idx_attrs;
+  auto builder = op.getBodyBuilder();
+  for (unsigned i = 0; i < op.ranges().size(); i++) {
+    StringRef idx_name;
+    if (i < idx_names.size()) {
+      if (auto str_attr = idx_names.getValue()[i].dyn_cast<StringAttr>()) {
+        idx_name = str_attr.getValue();
+      }
+    }
+    if (idx_name == target_idx) {
+      DictionaryAttr old_dict;
+      if (old_idx_attrs && i < old_idx_attrs.size()) {
+        old_dict = old_idx_attrs.getValue()[i].dyn_cast<DictionaryAttr>();
+      }
+      NamedAttribute new_elem = {builder.getIdentifier(attr_name), builder.getUnitAttr()};
+      DictionaryAttr new_dict = addAttrInDictionary(old_dict, builder, new_elem);
+      new_idx_attrs = replaceAttrInArray(old_idx_attrs, builder, i, new_dict);
+      break;
+    }
+  }
+  op.setAttr(mlir::Identifier::get("idx_attrs", op.getContext()), new_idx_attrs);
+}
+
+int64_t idxRange(BlockArgument* idx) {
+  auto pf = mlir::cast<ParallelForOp>(idx->getOwner()->getParentOp());
+  return pf.getRange(idx->getArgNumber());
+}
+
+StringRef idxName(BlockArgument* idx) {
+  auto pf = mlir::cast<ParallelForOp>(idx->getOwner()->getParentOp());
+  auto names = pf.getAttrOfType<ArrayAttr>(mlir::Identifier::get("idx_names", pf.getContext()));
+  auto n = idx->getArgNumber();
+  auto idx_name = StringAttr::get("", pf.getContext());
+  if (names && n < names.size()) {
+    if (auto str_attr = names.getValue()[n].template dyn_cast<StringAttr>()) {
+      idx_name = str_attr;
+    }
+  }
+  return idx_name.getValue();
+}
+
+std::pair<StringRef, unsigned> getSingleIndex(ParallelForOp op, unsigned n) {
+  auto names = op.getAttrOfType<ArrayAttr>(mlir::Identifier::get("idx_names", op.getContext()));
+  auto ranges = op.ranges();
+  auto idx_name = StringAttr::get("", op.getContext());
+  if (names && n < names.size()) {
+    if (auto str_attr = names.getValue()[n].template dyn_cast<StringAttr>()) {
+      idx_name = str_attr;
+    }
+  }
+  unsigned range = ranges.getValue()[n].cast<IntegerAttr>().getInt();
+  return std::make_pair(idx_name.getValue(), range);
+}
+
+llvm::SmallVector<std::pair<StringRef, unsigned>, kIndexLimit> getAllIndex(ParallelForOp op) {
+  llvm::SmallVector<std::pair<StringRef, unsigned>, kIndexLimit> idxs;
+  auto names = op.getAttrOfType<ArrayAttr>(mlir::Identifier::get("idx_names", op.getContext()));
+  auto ranges = op.ranges();
+  for (unsigned i = 0; i < op.ranges().size(); i++) {
+    auto idx_name = StringAttr::get("", op.getContext());
+    if (names && i < names.size()) {
+      if (auto str_attr = names.getValue()[i].template dyn_cast<StringAttr>()) {
+        idx_name = str_attr;
+      }
+    }
+    unsigned range = ranges.getValue()[i].cast<IntegerAttr>().getInt();
+    idxs.push_back(std::make_pair(idx_name.getValue(), range));
+  }
+  return idxs;
+}
+
+TensorType baseType(Value* value) {
+  Value *cur_value = value;
+  do {
+    if (auto def = cur_value->getDefiningOp()) {
+      if (auto aop = mlir::dyn_cast<AllocateOp>(def)) {
+        return aop.layout();
+      }
+      auto rop = mlir::dyn_cast<RefineOp>(def);
+      cur_value = rop.in();
+    }
+    else if (auto arg = mlir::dyn_cast<mlir::BlockArgument>(cur_value)) {
+      auto parentOp = arg->getOwner()->getParentOp();
+      auto funcOp = mlir::dyn_cast<mlir::FuncOp>(parentOp);
+      if (!funcOp) {
+        throw std::runtime_error("Invalid tensor value: block argument not contained by FuncOp");
+      }
+      auto attrName = stripe::Dialect::getDialectAttrName("layout");
+      auto attr = funcOp.getArgAttrOfType<mlir::TypeAttr>(arg->getArgNumber(), attrName);
+      assert(attr && "Expected 'layout' attribute in TensorRefType function argument");
+      return attr.getValue().cast<TensorType>();
+    }
+    else {
+      throw std::runtime_error("Invalid tensor value");
+    }
+  } while (cur_value);
+  throw std::runtime_error("Base type not found for the operation.");
+}
+
+llvm::SmallVector<mlir::BlockArgument*, kIndexLimit> strideOneIdxs(Value* value) {
+  llvm::SmallVector<mlir::BlockArgument*, kIndexLimit> idxs;
+  auto ref_op = mlir::dyn_cast<RefineOp>(value->getDefiningOp());
+  TensorType base_type = baseType(value);
+  auto shape = base_type.getShape();
+  for (unsigned i = 0; i < shape.size(); i++) {
+    if (shape[i].stride != 1) {
+      continue;
+    }
+    auto access = AffinePolynomial(ref_op.getOffset(i));
+    for (auto [arg, scale] : access.terms) {
+      if (scale == 1) {
+        idxs.push_back(arg);
+      }
+    }
+  }
+  return idxs;
 }
 
 }  // namespace stripe
