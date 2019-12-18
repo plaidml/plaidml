@@ -1,6 +1,7 @@
 from op import *
 
 import matplotlib.pyplot as plt
+import sys
 
 
 def toroidal_shell_integral_moment_of_innertia_exact(R, r):
