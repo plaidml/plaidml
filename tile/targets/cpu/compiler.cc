@@ -1491,7 +1491,7 @@ void Compiler::Zero(const stripe::Special& zero) {
   assert(1 == zero.outputs.size());
   Buffer dst = buffers_[zero.outputs[0]];
   auto size = dst.refinement->interior_shape.byte_size();
-  builder_.CreateMemSet(dst.base, builder_.getInt8(0), size, 0);
+  builder_.CreateMemSet(dst.base, builder_.getInt8(0), size, llvm::MaybeAlign(0));
 }
 
 void Compiler::Copy(const stripe::Special& copy) {
@@ -2291,7 +2291,7 @@ void Compiler::PrintOutputAssembly() {
     llvm::legacy::PassManager pm;
     llvm::raw_string_ostream stream(outputStr);
     llvm::buffer_ostream pstream(stream);
-    ee->getTargetMachine()->addPassesToEmitFile(pm, pstream, nullptr, llvm::TargetMachine::CGFT_AssemblyFile);
+    ee->getTargetMachine()->addPassesToEmitFile(pm, pstream, nullptr, llvm::CGFT_AssemblyFile);
     pm.run(*module_);
   }
   llvm::errs() << outputStr << "\n";

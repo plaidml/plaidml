@@ -2,37 +2,14 @@
 
 package(default_visibility = ["//visibility:public"])
 
-load("//vendor/mlir:mlir.bzl", "COPTS", "mlir_tblgen")
-load("//pmlc/dialect/op_lib:op_lib.bzl", "COPTS", "op_lib_tblgen")
+load("//vendor/mlir:tblgen.bzl", "COPTS", "gentbl")
 load("//bzl:plaidml.bzl", "plaidml_cc_library")
 
-MLIR_TBLGEN_ALSO = [
-    "//pmlc/util:enums.td",
-    "//pmlc/dialect/eltwise:predicates.td",
-]
-
-PLATFORM_COPTS = select({
-    "@com_intel_plaidml//toolchain:macos_x86_64": [
-        "-std=c++14",
-        "-w",
-    ],
-    "@com_intel_plaidml//toolchain:windows_x86_64": [
-        "/w",
-        "/DWIN32_LEAN_AND_MEAN",
-        "/std:c++17",  # This MUST match all other compilation units
-    ],
-    "//conditions:default": [
-        "-std=c++14",
-        "-w",
-    ],
-})
-
 cc_binary(
-    name = "op-lib-tblgen",
+    name = "oplib-tblgen",
     srcs = [
-        "//pmlc/dialect/op_lib:OpLibWrapperGen.cpp"
+        "OpLibWrapperGen.cpp",
     ],
-    copts = PLATFORM_COPTS,
     includes = ["@mlir//:include"],
     linkopts = select({
         "@com_intel_plaidml//toolchain:windows_x86_64": [],
@@ -43,67 +20,28 @@ cc_binary(
             "-lm",
         ],
     }),
-    visibility = ["//visibility:public"],
     deps = [
         "//base/util",
-        "@mlir//:TableGen",
-        "@mlir//:TableGenTools",
+        "@mlir//:MlirTableGenMain",
         "@mlir//:Support",
+        "@mlir//:TableGen",
     ],
 )
 
-mlir_tblgen(
-    name = "pml_gen_op_interface_decls",
-    src = "ops.td",
-    out = "op_interfaces.h.inc",
-    action = "-gen-op-interface-decls",
-    also = MLIR_TBLGEN_ALSO,
-    incs = ["@mlir//:include"],
-)
-
-mlir_tblgen(
-    name = "pml_gen_op_interface_defs",
-    src = "ops.td",
-    out = "op_interfaces.cc.inc",
-    action = "-gen-op-interface-defs",
-    also = MLIR_TBLGEN_ALSO,
-    incs = ["@mlir//:include"],
-)
-
-mlir_tblgen(
-    name = "pml_gen_op_decls",
-    src = "ops.td",
-    out = "ops.h.inc",
-    action = "-gen-op-decls",
-    also = MLIR_TBLGEN_ALSO,
-    incs = ["@mlir//:include"],
-)
-
-mlir_tblgen(
-    name = "pml_gen_op_defs",
-    src = "ops.td",
-    out = "ops.cc.inc",
-    action = "-gen-op-defs",
-    also = MLIR_TBLGEN_ALSO,
-    incs = ["@mlir//:include"],
-)
-
-op_lib_tblgen(
-    name = "pml_gen_op_lib_cpp_wrappers",
-    src = "ops.td",
-    out = "op_lib_wrappers.h.inc",
-    action = "-gen-op-lib-cpp-wrappers",
-    also = MLIR_TBLGEN_ALSO,
-    incs = ["@mlir//:include"]
-)
-
-op_lib_tblgen(
-    name = "pml_gen_op_lib_py_wrappers",
-    src = "ops.td",
-    out = "op_lib_wrappers.py",
-    action = "-gen-op-lib-py-wrappers",
-    also = MLIR_TBLGEN_ALSO,
-    incs = ["@mlir//:include"]
+gentbl(
+    name = "gen-ops",
+    tbl_outs = [
+        (
+            "-gen-op-lib-cpp-wrappers",
+            "op_lib_wrappers.h.inc",
+        ),
+        (
+            "-gen-op-lib-py-wrappers",
+            "op_lib_wrappers.py",
+        ),
+    ],
+    tblgen = ":oplib-tblgen",
+    td_file = "ops.td",
 )
 
 plaidml_cc_library(
@@ -115,26 +53,19 @@ plaidml_cc_library(
         "//base/util",
         "@mlir//:TableGen",
     ],
-    visibility = ["//visibility:public"],
 )
 
 plaidml_cc_library(
-    name = "plaidml_op_lib_wrappers",
+    name = "wrappers_cc",
     srcs = [
-        "op_lib_wrappers.cc"
-    ],
-    hdrs = [
-        "op_lib_wrappers.h.inc",
+        "op_lib_wrappers.cc",
     ],
     copts = COPTS,
-    visibility = ["//visibility:public"],
     deps = [
+        ":gen-ops",
         "//plaidml2/core:core_mlir",
         "//plaidml2/edsl:edsl_mlir",
         "//plaidml2/op:op_mlir",
-        "//pmlc/dialect/op_lib:gen_op_lib_wrappers",
-        ":pml_gen_op_lib_cpp_wrappers",
-        ":pml_gen_op_lib_py_wrappers",
     ],
     alwayslink = 1,
 )
