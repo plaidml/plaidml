@@ -324,14 +324,15 @@ void Pad(Block* block, const AliasMap& map, const RefDefineMap& ref_def_map) {
     int64_t stride = 1;
     for (int i = exts.size() - 1; i >= 0; i--) {
       ref.mut().interior_shape.dims[i].stride = stride;
-      // When padding the new buffer should be biger and there should not be negative offsets.
+      // When padding the new buffer should be bigger and there should not be negative offsets.
       int64_t padSize = -exts[i].load.min;
       if (padSize < 0) {
         padSize = 0;
       }
       pad_size.push_back(padSize);
       uint64_t new_size = exts[i].load.max + 1 - exts[i].load.min;
-      new_size = std::max(new_size, ref.interior_shape.dims[i].size);
+      // N.B. Adding padSize to the interior_shape.size keeps the load block within bounds.
+      new_size = std::max(new_size, ref.interior_shape.dims[i].size + padSize);
       ref.mut().interior_shape.dims[i].size = new_size;
       stride *= new_size;
       // Bump all the interior pointers!
