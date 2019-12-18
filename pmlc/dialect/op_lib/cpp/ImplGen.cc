@@ -1,41 +1,24 @@
-//===- OpLibWrapperGen.cpp - MLIR op lib wrapper generator ----------------===//
+//===- ImplGen.cc - MLIR op lib dialect implementation generator for C++ --===//
 //
 // Copyright 2019 Intel Corporation.
 //
 // =============================================================================
 //
-// OpLibWrapperGen
+// ImplGen for C++ generates a file that C++ users can include in their own
+// code to fulfill the dependencies needed for the C++ op lib, i.e. custom
+// types.
 //
 //===----------------------------------------------------------------------===//
 
 #include <regex>
 
 #include "mlir/TableGen/Format.h"
-#include "mlir/TableGen/GenInfo.h"
-#include "mlir/TableGen/OpInterfaces.h"
-#include "llvm/Support/Signals.h"
-#include "llvm/TableGen/Error.h"
-#include "llvm/TableGen/Record.h"
-#include "llvm/TableGen/TableGenBackend.h"
 
 #include "pmlc/dialect/op_lib/cpp/ImplGen.h"
 
-using llvm::MapVector;
 using llvm::raw_ostream;
-using llvm::Record;
-using llvm::RecordKeeper;
-using mlir::GenRegistration;
-using mlir::StringRef;
-using mlir::tblgen::EnumAttr;
-using mlir::tblgen::Operator;
 
-namespace pmlc::dialect::op::tblgen {
-
-using namespace pmlc::dialect::op;  // NOLINT [build/namespaces]
-
-namespace cpp {
-
-namespace impl {
+namespace pmlc::dialect::op::tblgen::cpp::impl {
 
 TypeEmitter::TypeEmitter(const TypeInfo& type, raw_ostream& os) : typeInfo_(TypeInfo(type)) {
   os << formatv(commentHeader, typeInfo_.name_, "enumerator");
@@ -61,7 +44,4 @@ void Emitter::emitTypes(const std::vector<TypeInfo>& types, raw_ostream& os) {
   }
 }
 
-}  // namespace impl
-
-}  // namespace cpp
-}  // namespace pmlc::dialect::op::tblgen
+}  // namespace pmlc::dialect::op::tblgen::cpp::impl

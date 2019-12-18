@@ -4,7 +4,8 @@
 //
 // =============================================================================
 //
-// utils
+// Tablegen utilities for the C++ outputs of the op lib dialect. This
+// encompasses things such as headers, includes, and type mappings.
 //
 //===----------------------------------------------------------------------===//
 

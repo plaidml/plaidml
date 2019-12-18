@@ -1,10 +1,11 @@
-//===- OpLibWrapperGen.cpp - MLIR op lib wrapper generator ----------------===//
+//===- WrapperGen.h - MLIR op lib dialect wrapper generator for C++ -------===//
 //
 // Copyright 2019 Intel Corporation.
 //
 // =============================================================================
 //
-// OpLibWrapperGen
+// WrapperGen in C++ generates a file that wraps the C++ op lib with a fluent
+// interface.
 //
 //===----------------------------------------------------------------------===//
 
@@ -12,34 +13,12 @@
 
 #include <vector>
 
-#include "mlir/TableGen/Format.h"
-#include "mlir/TableGen/GenInfo.h"
-#include "mlir/TableGen/OpInterfaces.h"
-#include "llvm/Support/Signals.h"
-#include "llvm/TableGen/Error.h"
-#include "llvm/TableGen/Record.h"
-#include "llvm/TableGen/TableGenBackend.h"
-
 #include "pmlc/dialect/op_lib/OpModel.h"
 
-using llvm::MapVector;
 using llvm::raw_ostream;
-using llvm::Record;
 using llvm::RecordKeeper;
-using mlir::GenRegistration;
-using mlir::StringRef;
-using mlir::tblgen::EnumAttr;
-using mlir::tblgen::Operator;
 
-namespace pmlc {
-namespace dialect {
-namespace op {
-
-namespace tblgen {
-
-using namespace pmlc::dialect::op;  // NOLINT [build/namespaces]
-
-namespace cpp {
+namespace pmlc::dialect::op::tblgen::cpp {
 
 namespace wrapper {
 
@@ -88,10 +67,4 @@ static inline bool genWrappers(const RecordKeeper& recordKeeper, raw_ostream& os
   return false;
 }
 
-}  // namespace cpp
-
-}  // namespace tblgen
-
-}  // namespace op
-}  // namespace dialect
-}  // namespace pmlc
+}  // namespace pmlc::dialect::op::tblgen::cpp

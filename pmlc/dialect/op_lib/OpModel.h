@@ -26,11 +26,7 @@ using mlir::StringRef;
 using mlir::tblgen::EnumAttr;
 using mlir::tblgen::Operator;
 
-namespace pmlc {
-namespace dialect {
-namespace op {
-
-namespace tblgen {
+namespace pmlc::dialect::op::tblgen {
 
 struct OpInfo {
   StringRef name_;
@@ -53,8 +49,4 @@ struct DialectInfo {
   explicit DialectInfo(const RecordKeeper& recordKeeper);
 };
 
-}  // namespace tblgen
-
-}  // namespace op
-}  // namespace dialect
-}  // namespace pmlc
+}  // namespace pmlc::dialect::op::tblgen

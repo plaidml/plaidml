@@ -1,10 +1,12 @@
-//===- OpLibWrapperGen.cpp - MLIR op lib wrapper generator ----------------===//
+//===- ImplGen.h - MLIR op lib dialect implementation generator for C++ ---===//
 //
 // Copyright 2019 Intel Corporation.
 //
 // =============================================================================
 //
-// OpLibWrapperGen
+// ImplGen for C++ generates a file that C++ users can include in their own
+// code to fulfill the dependencies needed for the C++ op lib, i.e. custom
+// types.
 //
 //===----------------------------------------------------------------------===//
 

@@ -12,34 +12,12 @@
 
 #include <vector>
 
-#include "mlir/TableGen/Format.h"
-#include "mlir/TableGen/GenInfo.h"
-#include "mlir/TableGen/OpInterfaces.h"
-#include "llvm/Support/Signals.h"
-#include "llvm/TableGen/Error.h"
-#include "llvm/TableGen/Record.h"
-#include "llvm/TableGen/TableGenBackend.h"
-
 #include "pmlc/dialect/op_lib/OpModel.h"
 
-using llvm::MapVector;
 using llvm::raw_ostream;
-using llvm::Record;
 using llvm::RecordKeeper;
-using mlir::GenRegistration;
-using mlir::StringRef;
-using mlir::tblgen::EnumAttr;
-using mlir::tblgen::Operator;
 
-namespace pmlc {
-namespace dialect {
-namespace op {
-
-namespace tblgen {
-
-using namespace pmlc::dialect::op;  // NOLINT [build/namespaces]
-
-namespace python {
+namespace pmlc::dialect::op::tblgen::python {
 
 class Emitter {
  private:
@@ -60,10 +38,4 @@ static inline bool genWrappers(const RecordKeeper& recordKeeper, raw_ostream& os
   return false;
 }
 
-}  // namespace python
-
-}  // namespace tblgen
-
-}  // namespace op
-}  // namespace dialect
-}  // namespace pmlc
+}  // namespace pmlc::dialect::op::tblgen::python

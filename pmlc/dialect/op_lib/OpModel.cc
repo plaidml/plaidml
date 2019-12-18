@@ -19,11 +19,7 @@ using mlir::StringRef;
 using mlir::tblgen::EnumAttr;
 using mlir::tblgen::Operator;
 
-namespace pmlc {
-namespace dialect {
-namespace op {
-
-namespace tblgen {
+namespace pmlc::dialect::op::tblgen {
 
 // Operators, Operands, and Attributes
 
@@ -113,8 +109,4 @@ std::vector<TypeInfo> getTypeRecords(const RecordKeeper& recordKeeper) {
 DialectInfo::DialectInfo(const RecordKeeper& recordKeeper)
     : all_ops_(getOpRecords(recordKeeper)), all_types_(getTypeRecords(recordKeeper)) {}
 
-}  // namespace tblgen
-
-}  // namespace op
-}  // namespace dialect
-}  // namespace pmlc
+}  // namespace pmlc::dialect::op::tblgen
