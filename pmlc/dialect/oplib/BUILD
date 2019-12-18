@@ -23,16 +23,6 @@ plaidml_cc_binary(
     srcs = [
         "oplib_gen.cc",
     ],
-    # includes = ["@mlir//:include"],
-    # linkopts = select({
-    #     "@com_intel_plaidml//toolchain:windows_x86_64": [],
-    #     "@com_intel_plaidml//toolchain:macos_x86_64": [],
-    #     "//conditions:default": [
-    #         "-pthread",
-    #         "-ldl",
-    #         "-lm",
-    #     ],
-    # }),
     deps = [
         ":oplib",
         "//base/util",
@@ -49,15 +39,15 @@ gentbl(
     tbl_outs = [
         (
             "-gen-cpp-impl",
-            "op_lib_impl.h.inc",
+            "oplib_impl.h.inc",
         ),
         (
             "-gen-cpp-wrappers",
-            "op_lib_wrappers.h.inc",
+            "oplib_wrappers.h.inc",
         ),
         (
             "-gen-py-wrappers",
-            "op_lib_wrappers.py",
+            "oplib_wrappers.py",
         ),
     ],
     tblgen = ":oplib-tblgen",
