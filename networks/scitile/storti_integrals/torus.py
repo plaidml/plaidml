@@ -60,7 +60,7 @@ def main(
     r = 2.0  # minor radius
 
     min_N = 32
-    max_N = 130
+    max_N = 1024
     interval = 32
 
     def check_integral(type, N, minval, maxval, eps, frep, vars):
@@ -97,7 +97,7 @@ def main(
     y_line3, label3 = get_line_y(x3, y3)
     ax1.plot(x3, y_line3, label=label3)
     plt.legend(loc='lower left')
-    plt.show()
+    plt.savefig('figure_one.png')
 
 
 if __name__ == '__main__':
