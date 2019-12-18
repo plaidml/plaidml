@@ -184,6 +184,12 @@ def PrngStepOp : SpecialOp<"prng_step", 2, 1> {
   );
 }
 
+def ZeroOp : SpecialOp<"zero", 1, 0> {
+  let arguments = (ins
+    TensorRefType:$out
+  );
+}
+
 def ExecuteOnOp : StripeOpWithPP<"execute_on", [Terminator, HasParent<"ParallelForOp">]> {
   let summary = "Indicates where a ParallelForOp should execute";
   // 'from' represents the executor value being returned.
