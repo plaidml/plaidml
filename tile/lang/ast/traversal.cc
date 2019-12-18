@@ -104,6 +104,7 @@ class AstPassRunner : AstVisitor<void> {
     for (const auto& expr : ast) {
       expr->Accept(this);
     }
+    mutations_.originals = mutations.originals;
     for (const auto& output : mutations.outputs) {
       auto new_output = Translate(output);
       IVLOG(4, "AstPassRunner> output: " << output << " -> " << new_output);

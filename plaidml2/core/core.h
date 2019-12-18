@@ -135,10 +135,13 @@ class View {
 class Buffer {
  public:
   Buffer() = default;
-  Buffer(const std::string& device_id, const TensorShape& shape)
+  Buffer(const std::string& device, const TensorShape& shape)
       : ptr_(details::make_plaidml_buffer(
-            ffi::call<plaidml_buffer*>(plaidml_buffer_alloc, device_id.c_str(), shape.nbytes()))),
+            ffi::call<plaidml_buffer*>(plaidml_buffer_alloc, device.c_str(), shape.nbytes()))),
         shape_(shape) {}
+
+  explicit Buffer(plaidml_buffer* ptr, const TensorShape& shape)
+      : ptr_(details::make_plaidml_buffer(ptr)), shape_(shape) {}
 
   plaidml_buffer* as_ptr() const {  //
     return ptr_.get();

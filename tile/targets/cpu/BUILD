@@ -11,12 +11,6 @@ jsonnet_to_json(
     outs = ["llvm_cpu.json"],
 )
 
-jsonnet_to_json(
-    name = "opencl_cpu_jsonnet",
-    src = "opencl_cpu.jsonnet",
-    outs = ["opencl_cpu.json"],
-)
-
 plaidml_cc_library(
     name = "cpu",
     srcs = glob([

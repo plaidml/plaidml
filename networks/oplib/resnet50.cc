@@ -387,9 +387,13 @@ struct resnet50 : public benchmark::Fixture {
     auto W = weight_placeholders();
     auto B = bias_placeholders();
     auto program = build(batch_size, I, W, B);
-    return exec::Binder(program).set_input(I).set_inputs(W).set_inputs(B).compile();
+    return exec::Binder(program).compile();
   }
 };
+
+BENCHMARK_DEFINE_F(resnet50, build)(benchmark::State& state) {  // NOLINT[runtime/references]
+  compile()->run();
+}
 
 BENCHMARK_DEFINE_F(resnet50, compile)(benchmark::State& state) {  // NOLINT[runtime/references]
   for (auto _ : state) {
@@ -404,6 +408,8 @@ BENCHMARK_DEFINE_F(resnet50, run)(benchmark::State& state) {  // NOLINT[runtime/
   }
   state.SetItemsProcessed(state.iterations());
 }
+
+BENCHMARK_REGISTER_F(resnet50, build)->Unit(benchmark::kMillisecond)->Iterations(1);
 
 BENCHMARK_REGISTER_F(resnet50, compile)->Unit(benchmark::kMillisecond);
 

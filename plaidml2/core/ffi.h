@@ -51,6 +51,7 @@ typedef struct plaidml_expr plaidml_expr;
 typedef struct plaidml_dim_expr plaidml_dim_expr;
 typedef struct plaidml_poly_expr plaidml_poly_expr;
 typedef struct plaidml_program plaidml_program;
+typedef struct plaidml_value plaidml_value;
 
 typedef struct {
   plaidml_expr* expr;
@@ -181,6 +182,10 @@ PLAIDML_CORE_API uint64_t plaidml_shape_get_nbytes(  //
 
 PLAIDML_CORE_API void plaidml_buffer_free(  //
     plaidml_error* err,                     //
+    plaidml_buffer* buffer);
+
+PLAIDML_CORE_API plaidml_buffer* plaidml_buffer_clone(  //
+    plaidml_error* err,                                 //
     plaidml_buffer* buffer);
 
 PLAIDML_CORE_API plaidml_buffer* plaidml_buffer_alloc(  //

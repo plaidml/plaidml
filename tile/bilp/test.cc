@@ -19,7 +19,7 @@ TEST(BilpTest, BasicTableauTest) {
   constraints.emplace_back(Polynomial<Rational>("x") + 4, 4);
   Polynomial<Rational> obj = Polynomial<Rational>("x", 3);
   ILPSolver solver;
-  Tableau t = solver.makeStandardFormTableau(constraints, obj);
+  Tableau t = makeStandardFormTableau(constraints, obj);
 
   EXPECT_EQ(t.mat().size1(), 3);
   EXPECT_EQ(t.mat().size2(), 6);
@@ -90,8 +90,7 @@ TEST(BilpTest, SimpleOptimizeTest) {
   std::vector<RangeConstraint> constraints;
   constraints.emplace_back(Polynomial<Rational>("x") + 4, 4);
   Polynomial<Rational> obj = 3 * Polynomial<Rational>("x");
-  ILPSolver solver;
-  Tableau t = solver.makeStandardFormTableau(constraints, obj);
+  Tableau t = makeStandardFormTableau(constraints, obj);
   EXPECT_EQ(t.makeOptimal(), true);
 
   std::vector<Rational> soln = t.getSymbolicSolution();
@@ -108,8 +107,7 @@ TEST(BilpTest, OptimizeTest2D) {
   constraints.emplace_back(Polynomial<Rational>("x") + 1, 4);
   constraints.emplace_back(Polynomial<Rational>("y") + 2, 5);
   Polynomial<Rational> obj = -3 * Polynomial<Rational>("x") + 2 * Polynomial<Rational>("y");
-  ILPSolver solver;
-  Tableau t = solver.makeStandardFormTableau(constraints, obj);
+  Tableau t = makeStandardFormTableau(constraints, obj);
   EXPECT_EQ(t.makeOptimal(), true);
 
   std::vector<Rational> soln = t.getSymbolicSolution();
@@ -131,7 +129,7 @@ TEST(BilpTest, TrivialILPTest) {
   constraints.emplace_back(Polynomial<Rational>("y") + 2, 5);
   Polynomial<Rational> obj = -3 * Polynomial<Rational>("x") + 2 * Polynomial<Rational>("y");
   ILPSolver solver;
-  Tableau t = solver.makeStandardFormTableau(constraints, obj);
+  Tableau t = makeStandardFormTableau(constraints, obj);
   ILPResult res = solver.solve(t);
 
   EXPECT_EQ(res.soln["x"], 2);

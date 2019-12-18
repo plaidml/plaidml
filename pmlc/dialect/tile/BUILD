@@ -1,51 +1,48 @@
 # Copyright 2019 Intel Corporation.
 
-load("//vendor/mlir:mlir.bzl", "COPTS", "mlir_tblgen")
-load(
-    "//bzl:plaidml.bzl",
-    "plaidml_cc_library",
-    "plaidml_cc_test",
+package(default_visibility = ["//visibility:public"])
+
+load("//vendor/mlir:tblgen.bzl", "COPTS", "gentbl")
+load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_test")
+
+filegroup(
+    name = "td_files",
+    srcs = [
+        "interfaces.td",
+        "//pmlc/dialect/eltwise:td_files",
+    ],
 )
 
-MLIR_TBLGEN_ALSO = [
-    "interfaces.td",
-    "//pmlc/util:enums.td",
-    "//pmlc/util:interfaces.td",
-    "//pmlc/dialect/eltwise:predicates.td",
-]
-
-mlir_tblgen(
-    name = "gen-op-decls",
-    src = "ops.td",
-    out = "ops.h.inc",
-    action = "-gen-op-decls",
-    also = MLIR_TBLGEN_ALSO,
-    incs = ["@mlir//:include"],
+gentbl(
+    name = "gen-interfaces",
+    tbl_outs = [
+        (
+            "-gen-op-interface-decls",
+            "interfaces.h.inc",
+        ),
+        (
+            "-gen-op-interface-defs",
+            "interfaces.cc.inc",
+        ),
+    ],
+    td_file = "interfaces.td",
+    td_srcs = [":td_files"],
 )
 
-mlir_tblgen(
-    name = "gen-op-defs",
-    src = "ops.td",
-    out = "ops.cc.inc",
-    action = "-gen-op-defs",
-    also = MLIR_TBLGEN_ALSO,
-    incs = ["@mlir//:include"],
-)
-
-mlir_tblgen(
-    name = "gen-op-interface-decls",
-    src = "interfaces.td",
-    out = "interfaces.h.inc",
-    action = "-gen-op-interface-decls",
-    incs = ["@mlir//:include"],
-)
-
-mlir_tblgen(
-    name = "gen-op-interface-defs",
-    src = "interfaces.td",
-    out = "interfaces.cc.inc",
-    action = "-gen-op-interface-defs",
-    incs = ["@mlir//:include"],
+gentbl(
+    name = "gen-ops",
+    tbl_outs = [
+        (
+            "-gen-op-decls",
+            "ops.h.inc",
+        ),
+        (
+            "-gen-op-defs",
+            "ops.cc.inc",
+        ),
+    ],
+    td_file = "ops.td",
+    td_srcs = [":td_files"],
 )
 
 plaidml_cc_library(
@@ -54,29 +51,24 @@ plaidml_cc_library(
         "builder.cc",
         "contraction.cc",
         "dialect.cc",
-        "interfaces.cc.inc",
         "lowering.cc",
         "ops.cc",
-        "ops.cc.inc",
+        "types.cc",
     ],
     hdrs = [
         "builder.h",
         "contraction.h",
         "dialect.h",
-        "interfaces.h.inc",
         "lowering.h",
         "ops.h",
-        "ops.h.inc",
         "program.h",
         "types.h",
     ],
     copts = COPTS,
     visibility = ["//visibility:public"],
     deps = [
-        ":gen-op-decls",
-        ":gen-op-defs",
-        ":gen-op-interface-decls",
-        ":gen-op-interface-defs",
+        ":gen-interfaces",
+        ":gen-ops",
         "//base/util",
         "//pmlc/dialect/eltwise",
         "//pmlc/dialect/stripe",

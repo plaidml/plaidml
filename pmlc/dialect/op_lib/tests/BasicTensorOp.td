@@ -1,4 +1,4 @@
-// RUN: op-lib-tblgen -gen-op-lib-cpp-wrappers -I %S/../../../../../mlir/include %s | FileCheck --dump-input-on-failure %s
+// RUN: oplib-tblgen -gen-op-lib-cpp-wrappers -I mlir/include %s | FileCheck --dump-input-on-failure %s
 
 include "mlir/IR/OpBase.td"
 

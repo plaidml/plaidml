@@ -35,6 +35,14 @@ def check_output(cmd, **kwargs):
     return subprocess.check_output(cmd, **kwargs)
 
 
+def buildkite_upload(pattern, **kwargs):
+    check_call(['buildkite-agent', 'artifact', 'upload', pattern], **kwargs)
+
+
+def buildkite_download(pattern, destination, **kwargs):
+    check_call(['buildkite-agent', 'artifact', 'download', pattern, destination], **kwargs)
+
+
 class CondaEnv(object):
 
     def __init__(self, path):

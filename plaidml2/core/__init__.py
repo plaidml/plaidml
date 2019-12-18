@@ -198,10 +198,13 @@ class _View(ForeignObject):
 class Buffer(ForeignObject):
     __ffi_del__ = lib.plaidml_buffer_free
 
-    def __init__(self, device_id, shape):
+    def __init__(self, shape, device=None, ptr=None):
         self._shape = shape
         self._ndarray = None
-        ffi_obj = ffi_call(lib.plaidml_buffer_alloc, device_id.encode(), shape.nbytes)
+        if ptr:
+            ffi_obj = ptr
+        elif device:
+            ffi_obj = ffi_call(lib.plaidml_buffer_alloc, device.encode(), shape.nbytes)
         super(Buffer, self).__init__(ffi_obj)
 
     @property

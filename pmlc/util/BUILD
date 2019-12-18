@@ -1,59 +1,60 @@
 # Copyright 2019 Intel Corporation.
 
-load("//vendor/mlir:mlir.bzl", "COPTS", "mlir_tblgen")
+package(default_visibility = ["//visibility:public"])
+
+load("//vendor/mlir:tblgen.bzl", "COPTS", "gentbl")
 load("//bzl:plaidml.bzl", "plaidml_cc_library")
 
-exports_files([
-    "enums.td",
-    "interfaces.td",
-])
-
-mlir_tblgen(
-    name = "gen-op-enum-decls",
-    src = "enums.td",
-    out = "enums.h.inc",
-    action = "-gen-enum-decls",
-    incs = ["@mlir//:include"],
+filegroup(
+    name = "enums-td",
+    srcs = ["enums.td"],
 )
 
-mlir_tblgen(
-    name = "gen-op-enum-defs",
-    src = "enums.td",
-    out = "enums.cc.inc",
-    action = "-gen-enum-defs",
-    incs = ["@mlir//:include"],
+filegroup(
+    name = "interfaces-td",
+    srcs = ["interfaces.td"],
 )
 
-mlir_tblgen(
-    name = "gen-op-interface-decls",
-    src = "interfaces.td",
-    out = "interfaces.h.inc",
-    action = "-gen-op-interface-decls",
-    incs = ["@mlir//:include"],
+gentbl(
+    name = "interfaces-gen",
+    tbl_outs = [
+        (
+            "-gen-op-interface-decls",
+            "interfaces.h.inc",
+        ),
+        (
+            "-gen-op-interface-defs",
+            "interfaces.cc.inc",
+        ),
+    ],
+    td_file = "interfaces.td",
+    td_srcs = ["@mlir//:OpBaseTdFiles"],
 )
 
-mlir_tblgen(
-    name = "gen-op-interface-defs",
-    src = "interfaces.td",
-    out = "interfaces.cc.inc",
-    action = "-gen-op-interface-defs",
-    incs = ["@mlir//:include"],
+gentbl(
+    name = "enums-gen",
+    tbl_outs = [
+        (
+            "-gen-enum-decls",
+            "enums.h.inc",
+        ),
+        (
+            "-gen-enum-defs",
+            "enums.cc.inc",
+        ),
+    ],
+    td_file = "enums.td",
+    td_srcs = ["@mlir//:OpBaseTdFiles"],
 )
 
 plaidml_cc_library(
     name = "util",
-    srcs = glob([
-        "*.cc",
-    ]),
-    hdrs = glob([
-        "*.h",
-    ]),
-    visibility = ["//visibility:public"],
+    srcs = glob(["*.cc"]),
+    hdrs = glob(["*.h"]),
+    copts = COPTS,
     deps = [
-        ":gen-op-enum-decls",
-        ":gen-op-enum-defs",
-        ":gen-op-interface-decls",
-        ":gen-op-interface-defs",
+        ":enums-gen",
+        ":interfaces-gen",
         "//base/util",
         "//tile/base",
         "@llvm//:support",

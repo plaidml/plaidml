@@ -8,7 +8,7 @@ from setuptools import setup
 from tools.py_setup import bazel_stage
 
 CONSOLE_SCRIPTS = [
-    'plaidml-setup = plaidml.plaidml_setup:main',
+    'plaidml2-setup = plaidml2.plaidml_setup:main',
 ]
 
 REQUIRED_PACKAGES = [

@@ -286,6 +286,15 @@ void plaidml_buffer_free(  //
   });
 }
 
+plaidml_buffer* plaidml_buffer_clone(  //
+    plaidml_error* err,                //
+    plaidml_buffer* buffer) {
+  return ffi_wrap<plaidml_buffer*>(err, nullptr, [&] {
+    IVLOG(3, "plaidml_buffer_clone");
+    return new plaidml_buffer{buffer->buffer};
+  });
+}
+
 plaidml_buffer* plaidml_buffer_alloc(  //
     plaidml_error* err,                //
     const char* device_id,             //
@@ -347,5 +356,7 @@ void plaidml_view_writeback(  //
     view->view->WriteBack(*ctx);
   });
 }
+
+VariantHolder::VariantHolder(const Variant& inner) : inner(inner) {}
 
 }  // extern "C"

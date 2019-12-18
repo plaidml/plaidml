@@ -15,7 +15,7 @@ func @simple_1D_for(%arg0: !fp32_1 {stripe.layout = !stripe<"tensor !eltwise.fp3
     "stripe.store"(%r1, %l0) : (!fp32_1, !fp32) -> ()
     stripe.terminate
   }
-  stripe.terminate 
+  stripe.terminate
 }
 // AFFINE-LABEL: func @simple_1D_for(
 // AFFINE-SAME: %[[IN:.*]]: memref<2048xf32> {{.*}}, %[[OUT:.*]]: memref<2048xf32>

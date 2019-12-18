@@ -6,9 +6,7 @@
 
 #include "mlir/IR/Dialect.h"
 
-namespace pmlc {
-namespace dialect {
-namespace tile {
+namespace pmlc::dialect::tile {
 
 class Dialect : public mlir::Dialect {
  public:
@@ -28,6 +26,4 @@ class Dialect : public mlir::Dialect {
       mlir::Location loc) override;
 };
 
-}  // namespace tile
-}  // namespace dialect
-}  // namespace pmlc
+}  // namespace pmlc::dialect::tile

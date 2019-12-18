@@ -16,6 +16,7 @@ namespace tile {
 struct ProgramArgument {
   bool isInput;
   mlir::Value* value;
+  mlir::RankedTensorType shape;
   vertexai::tile::BufferPtr buffer;
 };
 

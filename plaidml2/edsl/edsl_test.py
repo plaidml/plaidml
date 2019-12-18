@@ -489,7 +489,6 @@ module {
                 str(program), '''
 
 !fp32 = type tensor<!eltwise.fp32>
-!fp32 = type tensor<!eltwise.fp32>
 module {
   func @lars_momentum_4d(%arg0: tensor<4x7x3x9x!eltwise.fp32>, %arg1: tensor<4x7x3x9x!eltwise.fp32>, %arg2: !fp32, %arg3: tensor<4x7x3x9x!eltwise.fp32>) -> (tensor<4x7x3x9x!eltwise.fp32>, tensor<4x7x3x9x!eltwise.fp32>) {
     %cst = "eltwise.sconst"() {value = 4.8828125E-4 : f64} : () -> !fp32
@@ -963,7 +962,4 @@ module {
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-v', '--verbose', type=int, default=0)
-    args, remainder = parser.parse_known_args()
-    unittest.main(argv=sys.argv[:1] + remainder, verbosity=args.verbose + 1)
+    unittest.main()
