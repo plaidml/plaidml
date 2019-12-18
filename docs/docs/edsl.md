@@ -319,7 +319,7 @@ but this Tile code is still very similar to mathematical notation, and we could
 have started there instead:
 
 \\[
-\color{red}O[n]
+\color{red}O[i]
 \color{default}=
 \color{green}\max_{\color{magenta}0 \leq j < 2}
 \color{blue}I[2i + j]
@@ -328,7 +328,7 @@ have started there instead:
 \\[
 \begin{aligned}
 &
-\color{red}\verb|O(n)|
+\color{red}\verb|O(i)|
 \color{green}\verb| >= |
 \color{blue}\verb|I(2 * i + j)|\color{default}\verb|;|
 \cr
