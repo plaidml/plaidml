@@ -5,10 +5,55 @@ package(default_visibility = ["//visibility:public"])
 load("//vendor/mlir:tblgen.bzl", "COPTS", "gentbl")
 load("//bzl:plaidml.bzl", "plaidml_cc_library")
 
+plaidml_cc_library(
+    name = "OpModel",
+    srcs = [
+        "OpModel.cc",
+    ],
+    hdrs = [
+        "OpModel.h",
+    ],
+    deps = [
+        "@mlir//:TableGen",
+    ],
+)
+
+plaidml_cc_library(
+    name = "OpCPP",
+    srcs = glob([
+        "cpp/ImplGen.cc",
+        "cpp/WrapperGen.cc",
+    ]),
+    hdrs = glob([
+        "cpp/ImplGen.h",
+        "cpp/WrapperGen.h",
+        "cpp/utils.h",
+    ]),
+    deps = [
+        ":OpModel",
+        "@mlir//:TableGen",
+    ],
+)
+
+plaidml_cc_library(
+    name = "OpPY",
+    srcs = glob([
+        "python/WrapperGen.cc",
+    ]),
+    hdrs = glob([
+        "python/WrapperGen.h",
+        "python/utils.h",
+    ]),
+    deps = [
+        ":OpModel",
+        "@mlir//:TableGen",
+    ],
+)
+
 cc_binary(
     name = "oplib-tblgen",
     srcs = [
-        "OpLibWrapperGen.cpp",
+        "//pmlc/dialect/op_lib:OpLibGen.cc"
     ],
     includes = ["@mlir//:include"],
     linkopts = select({
@@ -21,6 +66,9 @@ cc_binary(
         ],
     }),
     deps = [
+        ":OpModel",
+        ":OpCPP",
+        ":OpPY",
         "//base/util",
         "@mlir//:MlirTableGenMain",
         "@mlir//:Support",
@@ -31,6 +79,10 @@ cc_binary(
 gentbl(
     name = "gen-ops",
     tbl_outs = [
+        (
+            "-gen-op-lib-cpp-impl",
+            "op_lib_impl.h.inc",
+        ),
         (
             "-gen-op-lib-cpp-wrappers",
             "op_lib_wrappers.h.inc",
@@ -45,20 +97,26 @@ gentbl(
 )
 
 plaidml_cc_library(
-    name = "gen_op_lib_wrappers",
+    name = "gen_ops",
     srcs = [
-        "OpLibWrapperGen.cpp",
+        "OpLibGen.cc",
     ],
     deps = [
         "//base/util",
-        "@mlir//:TableGen",
+        ":OpModel",
+        ":OpCPP",
+        ":OpPY",
     ],
 )
 
 plaidml_cc_library(
-    name = "wrappers_cc",
+    name = "plaidml_ops_cc",
     srcs = [
-        "op_lib_wrappers.cc",
+        "ops.cc"
+    ],
+    hdrs = [
+        "op_lib_wrappers.h.inc",
+        "op_lib_impl.h.inc",
     ],
     copts = COPTS,
     deps = [

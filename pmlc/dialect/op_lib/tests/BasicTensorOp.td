@@ -15,13 +15,15 @@ def PML_BasicTensorOp : PML_Op<"basic_tensor_op", [NoSideEffect]> {
   let results = (outs AnyTensor:$test_output);
 }
 
+// CHECK-LABEL: BasicTensorOp wrapper
 // CHECK: class BasicTensorOp {
 // CHECK: protected:
 // CHECK:   edsl::Tensor test_input_;
 // CHECK: private:
 // CHECK:   explicit BasicTensorOp(edsl::Tensor test_input) : test_input_(test_input) {}
 // CHECK:   operator edsl::Tensor() const {
-// CHECK:     auto args = edsl::make_tuple();
+// CHECK:     auto args = edsl::make_tuple(test_input_);
 // CHECK:     return details::op("BasicTensorOp", args).as_tensor();
 // CHECK:   }
 // CHECK: };
+
