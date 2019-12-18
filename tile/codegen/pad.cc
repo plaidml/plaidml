@@ -158,14 +158,23 @@ void ModifyBlockIdxs(Block* block, const std::map<std::string, size_t>& new_idxs
     TensorShape src_outer_shape = SimpleShape(parent_ref_it->interior_shape.type, src_shape_dims);
     TensorShape src_inner_shape = src_outer_shape;
     TensorShape dst_inner_shape = parent_ref_it->interior_shape;
+    std::vector<Extent> extents = block_ref_it->Extents(block->idxs);
+    std::string src_ref_name = ref_name + "_copy";
     for (size_t i = 0; i < n_dim; ++i) {
       std::string idx_name = "i" + std::to_string(i);
       reshape->idxs.push_back({idx_name, parent_ref_it->interior_shape.dims[i].size});
+      if (extents[i].min > 0 || extents[i].max < static_cast<int64_t>(parent_ref_it->interior_shape.dims[i].size)) {
+        // If the aggregate block can't fully cover the new assign block, something is not initialized.
+        // We have to zero-initialize the refinement
+        auto zero = std::make_shared<Special>();
+        zero->name = "zero";
+        zero->outputs = {src_ref_name};
+        parent->stmts.push_front(zero);
+      }
       access.push_back(Affine(idx_name));
       src_inner_shape.dims[i].size = 1;
       dst_inner_shape.dims[i].size = 1;
     }
-    std::string src_ref_name = ref_name + "_copy";
     Refinement src_outer_ref(RefDir::None, "", src_ref_name, parent_ref_it->access, src_outer_shape,
                              parent_ref_it->agg_op, parent_ref_it->location, parent_ref_it->offset,
                              parent_ref_it->bank_dim, parent_ref_it->cache_unit);
@@ -343,6 +352,16 @@ void Pad(Block* block, const AliasMap& map, const RefDefineMap& ref_def_map) {
         }
         for (auto& refi : inner->refs) {
           if (refi.from == ref.into()) {
+            if (inner->has_tag("zero")) {
+              // This is the zero block for refi.from. Padding this block may cause partial-zero
+              // block and it is redundant as we will insert another zero block.
+              // So we should remove it directly.
+              inner->remove_tag("zero");
+              inner->stmts.clear();
+              inner->idxs.clear();
+              inner->refs.clear();
+              break;
+            }
             refi.mut().access[i] += padSize;
           }
         }
