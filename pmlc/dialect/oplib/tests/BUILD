@@ -3,6 +3,6 @@
 load("//pmlc:lit.bzl", "glob_lit_tests")
 
 glob_lit_tests(data = [
-    "//pmlc/dialect/op_lib:oplib-tblgen",
+    "//pmlc/dialect/oplib:oplib-tblgen",
     "@mlir//:OpBaseTdFiles",
 ])

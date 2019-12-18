@@ -18,7 +18,7 @@
 
 using mlir::StringRef;
 
-namespace pmlc::dialect::op::tblgen::python {
+namespace pmlc::dialect::oplib::python {
 
 static inline const char* const fileCommentHeader = R"(## Copyright 2019 Intel Corporation.
 ##===- TableGen'erated file ----------------------------------*- Python -*-===##
@@ -64,4 +64,4 @@ ffi.init_once(__init, 'plaidml_op_init')
 
 )";
 
-}  // namespace pmlc::dialect::op::tblgen::python
+}  // namespace pmlc::dialect::oplib::python

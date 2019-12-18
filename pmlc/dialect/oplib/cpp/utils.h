@@ -18,7 +18,7 @@
 
 using mlir::StringRef;
 
-namespace pmlc::dialect::op::tblgen::cpp {
+namespace pmlc::dialect::oplib::cpp {
 
 static inline const char* const fileCommentHeader = R"( // Copyright 2019 Intel Corporation.
 /*===- TableGen'erated file -------------------------------------*- C++ -*-===*\
@@ -95,4 +95,4 @@ static inline StringRef convertType(const StringRef type) {
   return edslType;
 }
 
-}  // namespace pmlc::dialect::op::tblgen::cpp
+}  // namespace pmlc::dialect::oplib::cpp

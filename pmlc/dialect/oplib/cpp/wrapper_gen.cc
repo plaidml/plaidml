@@ -9,20 +9,55 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "pmlc/dialect/oplib/cpp/wrapper_gen.h"
+
 #include <regex>
 #include <vector>
 
 #include "mlir/TableGen/Format.h"
 
-#include "pmlc/dialect/op_lib/cpp/WrapperGen.h"
-#include "pmlc/dialect/op_lib/cpp/utils.h"
+#include "pmlc/dialect/oplib/cpp/utils.h"
+#include "pmlc/dialect/oplib/model.h"
 
 using llvm::raw_ostream;
 using llvm::RecordKeeper;
 
-namespace pmlc::dialect::op::tblgen::cpp {
+namespace pmlc::dialect::oplib::cpp {
 
-namespace wrapper {
+// The OpEmitter class is responsible for emitting the fluent EDSL code for each TableGen Record. It begins by
+// querying the Record for relevant information about the Operator/Attributes/Results/Operatnds, then formats the
+// information in in an EDSL-readable format.
+class OpEmitter {
+ private:
+  OpInfo opInfo_;
+
+ public:
+  OpEmitter(const OpInfo& op, raw_ostream& os);
+  void emitConstructor(raw_ostream& os);
+  void emitDeclarations(raw_ostream& os);
+  void emitOperatorOverload(raw_ostream& os);
+  void emitSetters(raw_ostream& os);
+};
+
+class TypeEmitter {
+ private:
+  TypeInfo typeInfo_;
+
+ public:
+  TypeEmitter(const TypeInfo& type, raw_ostream& os);
+};
+
+class Emitter {
+ private:
+  DialectInfo info_;
+
+ public:
+  Emitter(DialectInfo info, raw_ostream& os);
+  static void emitHeaders(raw_ostream& os);
+  static void emitInits(raw_ostream& os);
+  static void emitOps(const std::vector<OpInfo>& ops, raw_ostream& os);
+  static void emitTypes(const std::vector<TypeInfo>& types, raw_ostream& os);
+};
 
 OpEmitter::OpEmitter(const OpInfo& op, raw_ostream& os) : opInfo_(OpInfo(op)) {
   os << formatv(commentHeader, opInfo_.name_, "wrapper");
@@ -143,8 +178,11 @@ Emitter::Emitter(DialectInfo info, raw_ostream& os) : info_(info) {
   os << "\n\n} // namespace op\n"
      << "} // namespace plaidml\n";
 }
+
 void Emitter::emitHeaders(raw_ostream& os) { os << fileCommentHeader << includeHeader; }
+
 void Emitter::emitInits(raw_ostream& os) { os << initFunction << ffiFunction; }
+
 void Emitter::emitOps(const std::vector<OpInfo>& ops, raw_ostream& os) {
   for (auto op : ops) {
     OpEmitter(op, os);
@@ -157,6 +195,12 @@ void Emitter::emitTypes(const std::vector<TypeInfo>& types, raw_ostream& os) {
   }
 }
 
-}  // namespace wrapper
+bool genWrappers(const RecordKeeper& recordKeeper, raw_ostream& os) {
+  // First, grab all the data we'll ever need from the record and place it in a DialectInfo struct
+  auto OpLibDialect = DialectInfo(recordKeeper);
+  // Then, emit specifically for c++
+  Emitter(OpLibDialect, os);
+  return false;
+}
 
-}  // namespace pmlc::dialect::op::tblgen::cpp
+}  // namespace pmlc::dialect::oplib::cpp
