@@ -26,17 +26,17 @@ namespace pmlc::dialect::oplib::cpp {
 
 class Emitter {
  private:
-  DialectInfo info_;
+  DialectInfo* info_;
   raw_ostream& os_;
 
  public:
-  Emitter(DialectInfo info, raw_ostream& os) : info_(info), os_(os) {}
+  Emitter(DialectInfo* info, raw_ostream& os) : info_(info), os_(os) {}
 
   void emit() {
     os_ << fileCommentHeader;
     os_ << "namespace plaidml {\n"
         << "namespace op {\n\n";
-    emitTypes(info_.all_types_);
+    emitTypes(info_->all_types_);
     os_ << "\n\n} // namespace op\n"
         << "} // namespace plaidml\n";
   }
@@ -61,7 +61,7 @@ bool genImpl(const RecordKeeper& recordKeeper, raw_ostream& os) {
   // First, grab all the data we'll ever need from the record and place it in a DialectInfo struct
   auto info = DialectInfo(recordKeeper);
   // Then, emit specifically for c++
-  Emitter(info, os).emit();
+  Emitter(&info, os).emit();
   return false;
 }
 
