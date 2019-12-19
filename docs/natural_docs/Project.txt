@@ -51,8 +51,12 @@ Source Folder: ../../plaidml2
 # control systems.  You can enter absolute paths and they will be converted
 # automatically.
 #
-# Source Folder: [path]
-#    Name: [name]
+ Source Folder: ../../plaidml2/core
+    Name: Core APIs
+ Source Folder: ../../plaidml2/edsl
+    Name: EDSL APIs
+ Source Folder: ../../plaidml2/exec
+    Name: Execution APIs
 #
 #    Specifies a folder which will be searched for source files.  If you have
 #    more than one, add the Name property to set how it will show up in the
