@@ -57,6 +57,8 @@ plaidml_cc_library(
     srcs = [
         "dialect.cc",
         "ops.cc",
+        "ops.cc.inc",
+        "types.cc",
         "util.cc",
     ],
     hdrs = [
