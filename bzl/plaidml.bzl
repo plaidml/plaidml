@@ -25,6 +25,7 @@ PLAIDML_LINKOPTS = select({
     "//conditions:default": [
         "-pthread",
         "-lm",
+        "-lstdc++fs",
     ],
 })
 
