@@ -9,15 +9,28 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "pmlc/dialect/oplib/python/wrapper_gen.h"
+
 #include <vector>
 
-#include "pmlc/dialect/op_lib/python/WrapperGen.h"
-#include "pmlc/dialect/op_lib/python/utils.h"
+#include "pmlc/dialect/oplib/model.h"
+#include "pmlc/dialect/oplib/python/utils.h"
 
 using llvm::raw_ostream;
 using llvm::RecordKeeper;
 
-namespace pmlc::dialect::op::tblgen::python {
+namespace pmlc::dialect::oplib::python {
+
+class Emitter {
+ private:
+  DialectInfo info_;
+
+ public:
+  Emitter(DialectInfo info, raw_ostream& os);
+  static void emitHeaders(raw_ostream& os);
+  static void emitInits(raw_ostream& os);
+  static void emitOps(const std::vector<OpInfo>& ops, raw_ostream& os);
+};
 
 Emitter::Emitter(DialectInfo info, raw_ostream& os) : info_(info) {
   emitHeaders(os);
@@ -33,4 +46,12 @@ void Emitter::emitOps(const std::vector<OpInfo>& ops, raw_ostream& os) {
   }
 }
 
-}  // namespace pmlc::dialect::op::tblgen::python
+bool genWrappers(const RecordKeeper& recordKeeper, raw_ostream& os) {
+  // First, grab all the data we'll ever need from the record and place it in a DialectInfo struct
+  auto OpLibDialect = DialectInfo(recordKeeper);
+  // Then, emit specifically for python
+  auto OpLibEmitter = Emitter(OpLibDialect, os);
+  return false;
+}
+
+}  // namespace pmlc::dialect::oplib::python

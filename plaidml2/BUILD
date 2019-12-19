@@ -166,6 +166,7 @@ py_binary(
     data = [
         "plaidml2-config.cmake",
         ":api_ast",
+        ":setup",
         "//:LICENSE",
         "//plaidml2/core:sdk",
         "//plaidml2/edsl:sdk",
@@ -182,7 +183,6 @@ py_binary(
         "@mlir//:LICENSE.TXT",
         "@tbb//:LICENSE",
         "@xsmm//:LICENSE.md",
-        ":setup",
     ],
     main = "setup.py",
     deps = [

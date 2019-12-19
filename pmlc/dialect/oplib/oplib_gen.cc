@@ -10,27 +10,29 @@
 
 #include "mlir/TableGen/GenInfo.h"
 
-#include "pmlc/dialect/op_lib/cpp/ImplGen.h"
-#include "pmlc/dialect/op_lib/cpp/WrapperGen.h"
-#include "pmlc/dialect/op_lib/python/WrapperGen.h"
+#include "pmlc/dialect/oplib/cpp/impl_gen.h"
+#include "pmlc/dialect/oplib/cpp/wrapper_gen.h"
+#include "pmlc/dialect/oplib/python/wrapper_gen.h"
 
+using llvm::raw_ostream;
+using llvm::RecordKeeper;
 using mlir::GenRegistration;
 
-namespace pmlc::dialect::op {
+namespace pmlc::dialect::oplib {
 
-static mlir::GenRegistration genOpCPPImpl("gen-op-lib-cpp-impl", "Generate Op Lib C++ EDSL impl",
+static mlir::GenRegistration genOpCPPImpl("gen-cpp-impl", "Generate Op Lib C++ EDSL impl",
                                           [](const RecordKeeper& records, raw_ostream& os) {
-                                            return tblgen::cpp::genImpl(records, os);
+                                            return cpp::genImpl(records, os);
                                           });
 
-static mlir::GenRegistration genOpCPPWrappers("gen-op-lib-cpp-wrappers", "Generate Op Lib C++ EDSL wrappers",
+static mlir::GenRegistration genOpCPPWrappers("gen-cpp-wrappers", "Generate Op Lib C++ EDSL wrappers",
                                               [](const RecordKeeper& records, raw_ostream& os) {
-                                                return tblgen::cpp::genWrappers(records, os);
+                                                return cpp::genWrappers(records, os);
                                               });
 
-static mlir::GenRegistration genOpPYWrappers("gen-op-lib-py-wrappers", "Generate Op Lib Python EDSL wrappers",
+static mlir::GenRegistration genOpPYWrappers("gen-py-wrappers", "Generate Op Lib Python EDSL wrappers",
                                              [](const RecordKeeper& records, raw_ostream& os) {
-                                               return tblgen::python::genWrappers(records, os);
+                                               return python::genWrappers(records, os);
                                              });
 
-}  // namespace pmlc::dialect::op
+}  // namespace pmlc::dialect::oplib
