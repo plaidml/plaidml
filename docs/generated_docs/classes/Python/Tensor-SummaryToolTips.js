@@ -1,1 +1,0 @@
-NDSummary.OnToolTipsLoaded("PythonClass:Tensor",{31:"<div class=\"NDToolTip TClass LPython\"><div class=\"NDClassPrototype\" id=\"NDClassPrototype31\"><div class=\"CPEntry TClass Current\"><div class=\"CPName\">Tensor</div></div></div><div class=\"TTSummary\">Represents a Tensor type.</div></div>"});

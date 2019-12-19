@@ -1,1 +1,0 @@
-NDSearch.OnPrefixDataLoaded("ten",["Class"],[["Tensor",,[[,,,,0,"File:edsl/__init__.py:Tensor","PythonClass:Tensor"]]],["TensorDim",,[[,,"C/C++",,0,"File:edsl/edsl.h:TensorDim","CClass:TensorDim"],[,,"Python",,0,"File:edsl/__init__.py:TensorDim","PythonClass:TensorDim"]]],["TensorIndex",,[[,,,,0,"File:edsl/__init__.py:TensorIndex","PythonClass:TensorIndex"]]]]);

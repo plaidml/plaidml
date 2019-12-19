@@ -1,1 +1,0 @@
-NDFramePage.OnPageTitleLoaded("PythonClass:Tensor","Tensor");NDSummary.OnSummaryLoaded("PythonClass:Tensor",[["Python","Python"]],[["Classes","Class"]],[[31,0,0,"Tensor"]]);

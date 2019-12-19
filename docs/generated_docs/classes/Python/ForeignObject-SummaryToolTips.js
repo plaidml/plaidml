@@ -1,1 +1,0 @@
-NDSummary.OnToolTipsLoaded("PythonClass:ForeignObject",{1:"<div class=\"NDToolTip TClass LPython\"><div class=\"NDClassPrototype\" id=\"NDClassPrototype1\"><div class=\"CPEntry TClass Current\"><div class=\"CPName\">ForeignObject</div></div></div><div class=\"TTSummary\">A class for objects native to C++ (thus, they are foreign in Python).</div></div>"});

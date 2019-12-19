@@ -1,1 +1,0 @@
-NDFramePage.OnPageTitleLoaded("PythonClass:TensorIndex","TensorIndex");NDSummary.OnSummaryLoaded("PythonClass:TensorIndex",[["Python","Python"]],[["Classes","Class"]],[[36,0,0,"TensorIndex"]]);

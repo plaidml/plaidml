@@ -1,1 +1,0 @@
-NDSummary.OnToolTipsLoaded("CClass:plaidml_shape",{24:"<div class=\"NDToolTip TStruct LC\"><div class=\"TTSummary\">A tensor shape primitive</div></div>"});

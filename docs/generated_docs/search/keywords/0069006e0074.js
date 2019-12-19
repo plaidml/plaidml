@@ -1,1 +1,0 @@
-NDSearch.OnPrefixDataLoaded("int",["Enumeration"],[["Integer",,[[,"PlaidML Integer Operations",,,0,"File:edsl/ffi.h:PlaidML_Integer_Operations"]]]]);

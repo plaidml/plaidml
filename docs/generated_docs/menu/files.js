@@ -1,1 +1,0 @@
-NDMenu.OnSectionLoaded("files.js",[[2,,"File0:",[[1,"NDFramePage.js"]]],[2,"PlaidML2 Reference Guide","File:",[[2,"core","File:core/",[[1,"internal.h"]]],[2,"edsl","File:edsl/",[[1,"__init__.py"],[1,"edsl.h"],[1,"edsl_test.cc"],[1,"ffi.h"]]],[1,"ffi.py"]]]]);

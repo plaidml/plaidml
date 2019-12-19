@@ -1,1 +1,0 @@
-NDFramePage.OnPageTitleLoaded("PythonClass:TensorDim","TensorDim");NDSummary.OnSummaryLoaded("PythonClass:TensorDim",[["Python","Python"]],[["Classes","Class"],["Functions","Function"],["Groups","Group"]],[[32,0,0,"TensorDim"],[28,0,2,"Functions","Functions"],[29,0,1,"__neg__","__neg__"],[33,0,1,"__add__","__add__"],[34,0,1,"__radd__","__radd__"],[35,0,1,"__sub__","__sub__"]]);
