@@ -1129,8 +1129,8 @@ module {
     %c4 = "eltwise.sconst"() {value = 4 : i64} : () -> !i32
     %c3 = "eltwise.sconst"() {value = 3 : i64} : () -> !i32
     %c2 = "eltwise.sconst"() {value = 2 : i64} : () -> !i32
-    %0:2 = "tile.prng"(%arg0, %c2, %c3, %c4, %c5) : (tensor<3x2048x!eltwise.u32>, !i32, !i32, !i32, !i32) -> (tensor<2x3x4x5x!eltwise.fp32>, tensor<3x2048x!eltwise.u32>)
-    return %0#0, %0#1 : tensor<2x3x4x5x!eltwise.fp32>, tensor<3x2048x!eltwise.u32>
+    %result, %new_state = "tile.prng"(%arg0, %c2, %c3, %c4, %c5) : (tensor<3x2048x!eltwise.u32>, !i32, !i32, !i32, !i32) -> (tensor<2x3x4x5x!eltwise.fp32>, tensor<3x2048x!eltwise.u32>)
+    return %result, %new_state : tensor<2x3x4x5x!eltwise.fp32>, tensor<3x2048x!eltwise.u32>
   }
 }
 )#"));

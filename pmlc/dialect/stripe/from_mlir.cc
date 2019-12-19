@@ -12,6 +12,7 @@
 #include "pmlc/dialect/eltwise/ops.h"
 #include "pmlc/dialect/stripe/analysis.h"
 #include "pmlc/dialect/stripe/dialect.h"
+#include "pmlc/dialect/stripe/util.h"
 #include "pmlc/util/util.h"
 
 namespace pmlc {
@@ -73,6 +74,7 @@ class StripeBuilder {
 
  private:
   std::string scalar_name(Operation* op, std::string out_name = "");
+  std::string passthru_idx_name(BlockArgument* idx);
   void add_attributes(stripe::Taggable* out, ArrayRef<NamedAttribute> in);
   std::string add_refinements(  //
       Block* block,             //
@@ -264,7 +266,8 @@ struct RefinementBuilder {
   }
 
   // Add a refinement into a stripe block
-  void addRefinement(Block* mblock, StringAttr nameAttr = StringAttr{}, DictionaryAttr attrs = DictionaryAttr{}) {
+  // Return whether the refinement is added
+  bool addRefinement(Block* mblock, StringAttr nameAttr = StringAttr{}, DictionaryAttr attrs = DictionaryAttr{}) {
     auto ndims = tensorInfo.access.size();
     auto it = stripeBuilder->blocks_->find(mblock);
     if (it == stripeBuilder->blocks_->end()) {
@@ -274,7 +277,7 @@ struct RefinementBuilder {
     auto sblock = blockInfo.stripe;
     if (!sblock) {
       // this must be a ConstraintOp
-      return;
+      return false;
     }
     // Begin by seeing if we've already made a ref for this block
     auto& ref_name = blockInfo.refs[tensorInfo];
@@ -310,8 +313,10 @@ struct RefinementBuilder {
         }
       }
       sblock->refs.emplace(dir, "", ref_name, access, shape, aggName);
-      // TODO: Only do this when we are 1-to-1
-      aggName = "";
+      if (sblock->has_tag("kernel")) {
+        // Do not propagate the agg_op outside the outermost block
+        aggName = "";
+      }
     }
 
     // Connect up previously added block
@@ -345,6 +350,7 @@ struct RefinementBuilder {
     if (attrs) {
       stripeBuilder->add_attributes(ref, attrs.getValue());
     }
+    return true;
   }
 };
 
@@ -356,6 +362,15 @@ std::string StripeBuilder::add_refinements(  //
     bool is_special) {
   RefinementBuilder builder(this, value, dir, agg_name, is_special);
   std::unordered_set<Block*> seen;
+
+  // The attributes are set only once
+  StringAttr nameAttr;
+  DictionaryAttr attrs;
+  if (auto op = value->getDefiningOp()) {
+    nameAttr = op->getAttrOfType<StringAttr>("name");
+    attrs = op->getAttrOfType<DictionaryAttr>(Dialect::getStripeAttrsName());
+  }
+
   while (true) {
     // move up the def-chain
     if (auto blockArg = mlir::dyn_cast<mlir::BlockArgument>(value)) {
@@ -377,15 +392,19 @@ std::string StripeBuilder::add_refinements(  //
       auto op = value->getDefiningOp();
       while (mblock != op->getBlock()) {
         if (!seen.count(mblock)) {
-          builder.addRefinement(mblock);
+          if (builder.addRefinement(mblock, nameAttr, attrs)) {
+            nameAttr = StringAttr{};
+            attrs = DictionaryAttr{};
+          }
           seen.insert(mblock);
         }
         mblock = mblock->getParentOp()->getBlock();
       }
-      auto nameAttr = op->getAttrOfType<StringAttr>("name");
-      auto attrs = op->getAttrOfType<DictionaryAttr>(Dialect::getStripeAttrsName());
       if (!seen.count(mblock)) {
-        builder.addRefinement(mblock, nameAttr, attrs);
+        if (builder.addRefinement(mblock, nameAttr, attrs)) {
+          nameAttr = StringAttr{};
+          attrs = DictionaryAttr{};
+        }
         seen.insert(mblock);
       }
       if (auto allocOp = mlir::dyn_cast<AllocateOp>(op)) {
@@ -399,11 +418,20 @@ std::string StripeBuilder::add_refinements(  //
   return builder.refName;
 }
 
+std::string StripeBuilder::passthru_idx_name(BlockArgument* idx) {
+  return idxName(idx).str() + "_0";
+}
+
 std::string StripeBuilder::get_idx(stripe::Block* block, mlir::BlockArgument* affine) {
   auto key = std::make_pair(block, affine);
   auto it = idxs_.find(key);
   if (it == idxs_.end()) {
-    throw std::runtime_error("Need to add passthurs");
+    // Need to add passthurs
+    std::string orig_name = idxName(affine).str();
+    std::string passthru_name = passthru_idx_name(affine);
+    block->idxs.push_back({passthru_name, 1, stripe::Affine(orig_name)});
+    idxs_.emplace(key, passthru_name);
+    return passthru_name;
   }
   return it->second;
 }

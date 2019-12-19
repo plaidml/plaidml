@@ -186,7 +186,7 @@ void ModifyBlockIdxs(Block* block, const std::map<std::string, size_t>& new_idxs
     reshape->set_tag("kernel");
     reshape->name = "kernel_" + std::to_string(parent->stmts.size()) + "(" + src_ref_name + ")";
     // Modify the ref in the original block
-    Refinement new_block_ref(RefDir::Out, src_ref_name, ref_name, block_ref_it->access, src_inner_shape,
+    Refinement new_block_ref(RefDir::Out, src_ref_name, block_ref_it->into(), block_ref_it->access, src_inner_shape,
                              block_ref_it->agg_op, block_ref_it->location, block_ref_it->offset, block_ref_it->bank_dim,
                              block_ref_it->cache_unit);
     block->refs.erase(*block_ref_it);
@@ -324,14 +324,15 @@ void Pad(Block* block, const AliasMap& map, const RefDefineMap& ref_def_map) {
     int64_t stride = 1;
     for (int i = exts.size() - 1; i >= 0; i--) {
       ref.mut().interior_shape.dims[i].stride = stride;
-      // When padding the new buffer should be biger and there should not be negative offsets.
+      // When padding the new buffer should be bigger and there should not be negative offsets.
       int64_t padSize = -exts[i].load.min;
       if (padSize < 0) {
         padSize = 0;
       }
       pad_size.push_back(padSize);
       uint64_t new_size = exts[i].load.max + 1 - exts[i].load.min;
-      new_size = std::max(new_size, ref.interior_shape.dims[i].size);
+      // N.B. Adding padSize to the interior_shape.size keeps the load block within bounds.
+      new_size = std::max(new_size, ref.interior_shape.dims[i].size + padSize);
       ref.mut().interior_shape.dims[i].size = new_size;
       stride *= new_size;
       // Bump all the interior pointers!

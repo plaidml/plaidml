@@ -5,6 +5,7 @@
 #include "mlir/IR/AffineMap.h"
 #include "mlir/IR/IntegerSet.h"
 #include "mlir/IR/OpDefinition.h"
+#include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/StandardTypes.h"
 
 #include "pmlc/dialect/eltwise/ops.h"
@@ -35,8 +36,10 @@ using mlir::MLIRContext;
 using mlir::NamedAttribute;
 using mlir::NoneType;
 using mlir::Op;
+using mlir::OpAsmOpInterface;
 using mlir::OpAsmParser;
 using mlir::OpAsmPrinter;
+using mlir::OpAsmSetValueNameFn;
 using mlir::OpBuilder;
 using mlir::Operation;
 using mlir::OperationState;
@@ -54,6 +57,7 @@ using mlir::Type;
 using mlir::TypeAttr;
 using mlir::UnitAttr;
 using mlir::Value;
+using mlir::ValueRange;
 using mlir::VectorType;
 using util::AggregationKind;
 using util::CombinationKind;

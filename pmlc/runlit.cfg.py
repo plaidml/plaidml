@@ -36,12 +36,12 @@ llvm_config.use_default_substitutions()
 # Tweak the PATH to include the tools dir.
 llvm_config.with_environment('PATH', config.llvm_tools_dir, append_path=True)
 
-tool_dirs = config.mlir_tf_tools_dirs + [config.mlir_tools_dir, config.llvm_tools_dir]
+tool_dirs = config.mlir_pmlc_tools_dirs + [config.mlir_tools_dir, config.llvm_tools_dir]
 tool_names = [
     'mlir-opt',
     'mlir-translate',
     'mlir-tblgen',
-    'op-lib-tblgen',
+    'oplib-tblgen',
     'pmlc-opt',
     'pmlc-translate',
 ]

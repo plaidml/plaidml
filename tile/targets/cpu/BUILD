@@ -4,6 +4,7 @@ package(default_visibility = ["//visibility:public"])
 
 load("@io_bazel_rules_jsonnet//jsonnet:jsonnet.bzl", "jsonnet_to_json")
 load("//bzl:plaidml.bzl", "plaidml_cc_library")
+load("//tools/heatmap:build_defs.bzl", "heatmap")
 
 jsonnet_to_json(
     name = "llvm_cpu_jsonnet",
@@ -13,10 +14,15 @@ jsonnet_to_json(
 
 plaidml_cc_library(
     name = "cpu",
-    srcs = glob([
-        "*.cc",
-        "*.h",
-    ]),
+    srcs = glob(
+        [
+            "*.cc",
+            "*.h",
+        ],
+        exclude = ["heatmap.tpl.cc"],
+    ) + [
+        ":heatmap",
+    ],
     tags = ["llvm"],
     deps = [
         "//tile/stripe",
@@ -29,4 +35,11 @@ plaidml_cc_library(
         "@tbb",
         "@xsmm",
     ],
+)
+
+heatmap(
+    name = "heatmap",
+    out = "heatmap.cc",
+    csv = "heatmap_skx_xeonplat_8180_1-7GHz_mblocked.csv.gz",
+    template = "heatmap.tpl.cc",
 )

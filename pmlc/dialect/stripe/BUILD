@@ -2,48 +2,38 @@
 
 package(default_visibility = ["//visibility:public"])
 
+load("//vendor/mlir:tblgen.bzl", "COPTS", "gentbl")
 load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_test")
-load("//vendor/mlir:mlir.bzl", "COPTS", "mlir_tblgen")
 
-MLIR_TBLGEN_ALSO = [
-    "//pmlc/util:enums.td",
-    "//pmlc/dialect/eltwise:predicates.td",
-]
-
-mlir_tblgen(
-    name = "gen-op-decls",
-    src = "ops.td",
-    out = "ops.h.inc",
-    action = "-gen-op-decls",
-    also = MLIR_TBLGEN_ALSO,
-    incs = ["@mlir//:include"],
+filegroup(
+    name = "td_files",
+    srcs = [
+        "//pmlc/dialect/eltwise:td_files",
+    ],
 )
 
-mlir_tblgen(
-    name = "gen-op-defs",
-    src = "ops.td",
-    out = "ops.cc.inc",
-    action = "-gen-op-defs",
-    also = MLIR_TBLGEN_ALSO,
-    incs = ["@mlir//:include"],
-)
-
-mlir_tblgen(
-    name = "gen-op-interface-decls",
-    src = "ops.td",
-    out = "ops_interfaces.h.inc",
-    action = "-gen-op-interface-decls",
-    also = MLIR_TBLGEN_ALSO,
-    incs = ["@mlir//:include"],
-)
-
-mlir_tblgen(
-    name = "gen-op-interface-defs",
-    src = "ops.td",
-    out = "ops_interfaces.cc.inc",
-    action = "-gen-op-interface-defs",
-    also = MLIR_TBLGEN_ALSO,
-    incs = ["@mlir//:include"],
+gentbl(
+    name = "gen-ops",
+    tbl_outs = [
+        (
+            "-gen-op-decls",
+            "ops.h.inc",
+        ),
+        (
+            "-gen-op-defs",
+            "ops.cc.inc",
+        ),
+        (
+            "-gen-op-interface-decls",
+            "ops_interfaces.h.inc",
+        ),
+        (
+            "-gen-op-interface-defs",
+            "ops_interfaces.cc.inc",
+        ),
+    ],
+    td_file = "ops.td",
+    td_srcs = [":td_files"],
 )
 
 plaidml_cc_library(
@@ -55,8 +45,6 @@ plaidml_cc_library(
         "dialect.cc",
         "jigsaw_pass.cc",
         "ops.cc",
-        "ops.cc.inc",
-        "ops_interfaces.cc.inc",
         "rewrites.cc",
         "transforms.cc",
         "types.cc",
@@ -68,8 +56,6 @@ plaidml_cc_library(
         "dialect.h",
         "mlir.h",
         "ops.h",
-        "ops.h.inc",
-        "ops_interfaces.h.inc",
         "rewrites.h",
         "transforms.h",
         "types.h",
@@ -78,8 +64,7 @@ plaidml_cc_library(
     copts = COPTS,
     tags = ["llvm"],
     deps = [
-        ":gen-op-decls",
-        ":gen-op-defs",
+        ":gen-ops",
         "//pmlc/dialect/eltwise",
         "//tile/base",
         "@boost",
@@ -116,10 +101,12 @@ plaidml_cc_library(
 plaidml_cc_library(
     name = "passes",
     srcs = [
+        "autostencil_pass.cc",
         "padding_pass.cc",
         "populate_tensor_ref_shape_analysis.cc",
     ],
     hdrs = [
+        "autostencil_pass.h",
         "nop_pass.h",
         "padding_pass.h",
         "populate_tensor_ref_shape_analysis.h",
@@ -128,7 +115,9 @@ plaidml_cc_library(
     tags = ["llvm"],
     deps = [
         ":stripe",
+        ":transcode",
         "//tile/codegen:proto_cc",
+        "//tile/targets/cpu",
     ],
     alwayslink = 1,
 )

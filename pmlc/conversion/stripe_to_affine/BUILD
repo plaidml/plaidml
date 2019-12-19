@@ -3,14 +3,14 @@
 package(default_visibility = ["//visibility:public"])
 
 load("//bzl:plaidml.bzl", "plaidml_cc_library")
-load("//vendor/mlir:mlir.bzl", "COPTS")
+load("//vendor/mlir:tblgen.bzl", "COPTS")
 
 plaidml_cc_library(
     name = "stripe_to_affine",
     srcs = [
         "convert_stripe_to_affine.cc",
         "convert_stripe_to_affine.h",
-        "supported_ops.inc"
+        "supported_ops.inc",
     ],
     copts = COPTS,
     tags = ["llvm"],
@@ -18,5 +18,5 @@ plaidml_cc_library(
         "//pmlc/dialect/stripe",
         "//pmlc/dialect/stripe:passes",
     ],
-    alwayslink=1,
+    alwayslink = 1,
 )
