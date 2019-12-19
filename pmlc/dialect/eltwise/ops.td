@@ -33,7 +33,8 @@ class EltwiseBuilderImpl {
 
 class EltwiseOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
     Op<EltwiseDialect, mnemonic, !listconcat(traits, [EltwiseOpInterface, GenericBuilderInterface])>,
-    EltwiseBuilderImpl;
+    EltwiseBuilderImpl {
+}
 
 def ScalarConstantOp :
     Op<EltwiseDialect, "sconst", [NoSideEffect]>,
@@ -76,6 +77,7 @@ class UnaryOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
   >];
 
   let extraClassDeclaration = [{
+    static Value* buildStandard(OpBuilder &builder, Location loc, ScalarType otype, ArrayRef<Value *> operands) { return nullptr; }
     static Type getResultType(ArrayRef<Value*> operands) {
       return ComputeResultType(operands);
     }
@@ -97,6 +99,7 @@ class BinaryOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
   >];
 
   let extraClassDeclaration = [{
+    static Value* buildStandard(OpBuilder &builder, Location loc, ScalarType otype, ArrayRef<Value *> operands);
     static Type getResultType(ArrayRef<Value*> operands) {
       return ComputeResultType(operands);
     }
@@ -109,6 +112,7 @@ def CastOp : EltwiseOp<"cast">, HasCanonicalizer {
   let results = (outs EltwiseAny:$result);
 
   let extraClassDeclaration = [{
+    static Value* buildStandard(OpBuilder &builder, Location loc, ScalarType otype, ArrayRef<Value *> operands) { return nullptr; }
     static Type getResultType(ArrayRef<Value*> operands);
     static Operation* create(OpBuilder* builder, Location loc, Type type, ArrayRef<Value*> operands);
   }];
@@ -129,6 +133,7 @@ class CompareOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
   >];
 
   let extraClassDeclaration = [{
+    static Value* buildStandard(OpBuilder &builder, Location loc, ScalarType otype, ArrayRef<Value *> operands) { return nullptr; }
     static Type getResultType(ArrayRef<Value*> operands) {
       return ComputeResultType(operands, DataType::BOOLEAN);
     }
@@ -211,6 +216,7 @@ def SelectOp : EltwiseOp<"select">, HasCanonicalizer {
   >];
 
   let extraClassDeclaration = [{
+    static Value* buildStandard(OpBuilder &builder, Location loc, ScalarType otype, ArrayRef<Value *> operands) { return nullptr; }
     static Type getResultType(ArrayRef<Value*> operands);
   }] # EltwiseBuilderImpl_create;
 }
