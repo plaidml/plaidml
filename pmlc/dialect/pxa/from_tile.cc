@@ -51,6 +51,14 @@ using mlir::Value;
 
 namespace {
 
+static ScalarType GetScalarType(Value* val) {
+  auto t = val->getType();
+  if (auto ttype = t.dyn_cast<mlir::TensorType>()) {
+    t = ttype.getElementType();
+  }
+  return t.cast<ScalarType>();
+}
+
 static stripe::TensorType ConvertIntoTensorType(Type type) {
   auto rankedTensorType = eltwise::getRankedTensorType(type);
   auto shape = rankedTensorType.getShape();
@@ -135,7 +143,7 @@ struct ScalarConstantOpConversion : public LoweringBase<ScalarConstantOp> {
   explicit ScalarConstantOpConversion(MLIRContext* ctx) : LoweringBase(ctx) {}
 
   void rewrite(ScalarConstantOp op, ArrayRef<Value*> operands, ConversionPatternRewriter& rewriter) const override {
-    Type type = op.getType().dyn_cast<ScalarType>().toStandard();
+    Type type = GetScalarType(op).toStandard();
     Attribute val = op.getValue();
     if (auto ftype = type.dyn_cast<FloatType>()) {
       auto fattr = val.cast<FloatAttr>();
@@ -152,24 +160,29 @@ struct ScalarConstantOpConversion : public LoweringBase<ScalarConstantOp> {
 };
 
 struct EltwiseOpConversion : public ConversionPattern {
-  explicit EltwiseOpConversion(MLIRContext* ctx, StringRef opName) : ConversionPattern(opName, 1, ctx) {}
+  explicit EltwiseOpConversion(MLIRContext* ctx, StringRef opName) : ConversionPattern(opName, 1, ctx), ctx(ctx) {}
+  MLIRContext* ctx;
   PatternMatchResult match(Operation* op) const override { return this->matchSuccess(); }
   void rewrite(Operation* op, ArrayRef<Value*> operands, ConversionPatternRewriter& rewriter) const override {
+    // Get loc
+    auto loc = op->getLoc();
+    // Get the output type
+    TypeConverter typeConverter(ctx);
+    auto outType = typeConverter.convertType(op->getResult(0)->getType()).cast<MemRefType>();
+    // Make an allocation for the output
+    auto outRef = rewriter.create<AllocOp>(loc, outType).getResult();
+    // Make a parallel for to fill the output
+    auto ranges = rewriter.getI64ArrayAttr(outType.getShape());
+    auto runtime_ranges = ArrayRef<Value*>();
+    rewriter.create<AffineParallelForOp>(loc, ranges, runtime_ranges);
+    // Replace output with the newly allocated buffer
+    rewriter.replaceOp(op, outRef);
     /*
     auto eop = mlir::cast<eltwise::EltwiseOp>(op);
     auto val = eop.buildStandard(rewriter, op-> operands, rewriter);
-    rewriter.replaceOp(op, val);
     */
   }
 };
-
-static ScalarType GetScalarType(Value* val) {
-  auto t = val->getType();
-  if (auto ttype = t.dyn_cast<mlir::TensorType>()) {
-    t = ttype.getElementType();
-  }
-  return t.cast<ScalarType>();
-}
 
 static Value* Cast(OpBuilder& builder, ScalarType in, ScalarType out, Value* stdVal) {
   TypeConverter typeConverter(stdVal->getContext());
