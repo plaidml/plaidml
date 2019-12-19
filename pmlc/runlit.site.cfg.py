@@ -21,13 +21,13 @@ config.mlir_obj_root = os.path.join(os.environ['TEST_SRCDIR'])
 config.mlir_tools_dir = os.path.join(os.environ['TEST_SRCDIR'], 'mlir')
 config.suffixes = ['.td', '.mlir', '.pbtxt']
 
-mlir_tf_tools_dirs = [
+mlir_pmlc_tools_dirs = [
     'pmlc',
-    'pmlc/dialect/op_lib',
+    'pmlc/dialect/oplib',
 ]
-config.mlir_tf_tools_dirs = [
+config.mlir_pmlc_tools_dirs = [
     os.path.join(os.environ['TEST_SRCDIR'], os.environ['TEST_WORKSPACE'], s)
-    for s in mlir_tf_tools_dirs
+    for s in mlir_pmlc_tools_dirs
 ]
 test_dir = os.environ['TEST_TARGET']
 test_dir = test_dir.strip('/').rsplit(':', 1)[0]
