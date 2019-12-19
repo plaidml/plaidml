@@ -321,12 +321,12 @@ class StripeGenerator {
         AddIntrinsic(kernel.get(), Intrinsic::EQ, input_based_type, {scalar_inputs[0], scalar_inputs[1]}, {"$IS_EQ"});
         AddIntrinsic(kernel.get(), Intrinsic::COND, output_type, {"$IS_EQ", scalar_inputs[2], "$ZERO"},
                      {ScalarName(op.output)});
-        kernel->set_tag("comb_op_cond");
+        kernel->set_tag("combo_op_cond");
       } else {
         auto combo_op = GetComboOp(cion.comb_op);
         if (!combo_op.empty()) {
           AddIntrinsic(kernel.get(), combo_op, input_based_type, scalar_inputs, {ScalarName(op.output)});
-          kernel->set_tag("comb_op_" + combo_op);
+          kernel->set_tag("combo_op_" + combo_op);
           if (agg_op == Intrinsic::SUM && combo_op == Intrinsic::MUL) {
             total_macs_ += kernel->idxs_product();
           }
@@ -335,7 +335,7 @@ class StripeGenerator {
     } else {
       AddIntrinsic(kernel.get(), "assign", input_based_type, scalar_inputs, {ScalarName(op.output)});
       // Mark including the agg_op
-      kernel->set_tag("agg_op_" + agg_op + "_no_comb_op");
+      kernel->set_tag("agg_op_" + agg_op + "_no_combo_op");
     }
 
     // STORE

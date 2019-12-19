@@ -82,7 +82,7 @@ static proto::Stage GenerateStage() {
         name: "stencil_mac",
         pass: {
           [type.vertex.ai/vertexai.tile.codegen.proto.StencilPass] {
-            reqs: ["agg_op_add", "comb_op_mul"],
+            reqs: ["agg_op_add", "combo_op_mul"],
             outer_set: ["dpu"],
             inner_set: ["dpu_inner"],
             stencils: [

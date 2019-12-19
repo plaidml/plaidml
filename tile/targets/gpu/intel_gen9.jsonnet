@@ -124,7 +124,7 @@ local PARAMS = {
               name: 'large_fc',
               pass: {
                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.FullyConnectedPass',
-                reqs: ['contraction', 'agg_op_add', 'comb_op_mul'],
+                reqs: ['contraction', 'agg_op_add', 'combo_op_mul'],
                 subgroup_sizes: PARAMS[cfg].SUBGROUP_SIZES,
                 threshold: 1024 * 2048,
                 zero_error: 0.00001,
@@ -188,7 +188,7 @@ local PARAMS = {
                 a_reqs: ['subgroup_outer'],
                 b_reqs: ['eltwise'],
                 no_constraints: true,
-                max_refs: PARAMS[cfg].MAX_REFS, 
+                max_refs: PARAMS[cfg].MAX_REFS,
               },
             },
 

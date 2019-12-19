@@ -204,7 +204,7 @@ void ModifyBlockIdxs(Block* block, const std::map<std::string, size_t>& new_idxs
 
 bool QualifiedBlock(Block* block) {
   return block && block->has_tag("agg_op_add") &&
-         (block->has_tag("comb_op_mul") || block->has_tag("agg_op_add_no_comb_op"));
+         (block->has_tag("combo_op_mul") || block->has_tag("agg_op_add_no_combo_op"));
 }
 
 // If the dimension's range is a large prime,

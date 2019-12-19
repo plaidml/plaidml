@@ -213,7 +213,7 @@ entry {
             loc {}
           }
           attrs { key: "agg_op_add" value {} }
-          attrs { key: "comb_op_mul" value {} }
+          attrs { key: "combo_op_mul" value {} }
           attrs { key: "contraction" value {} }
           attrs { key: "kernel" value {} }
         }
@@ -287,7 +287,7 @@ entry {
             loc {}
           }
           attrs { key: "agg_op_add" value {} }
-          attrs { key: "comb_op_mul" value {} }
+          attrs { key: "combo_op_mul" value {} }
           attrs { key: "contraction" value {} }
           attrs { key: "kernel" value {} }
         }
@@ -321,7 +321,7 @@ entry {
 # CHECK-NEXT:         comments = "_X2[x0, x2 : 10, 30] = +(_X0[x0, x1] * _X1[x1, x2])"
 # CHECK-SAME:         name = "kernel_0(_X0,_X1)"
 # CHECK-SAME:         agg_op_add = unit
-# CHECK-SAME:         comb_op_mul = unit
+# CHECK-SAME:         combo_op_mul = unit
 # CHECK-SAME:         contraction = unit
 # CHECK-SAME:         kernel = unit
 # CHECK-NEXT:     ^bb0(%x0: !aff, %x1: !aff, %x2: !aff):
@@ -338,7 +338,7 @@ entry {
 # CHECK-NEXT:         comments = "_X4[x0, x2 : 10, 40] = +(_X2[x0, x1] * _X3[x1, x2])"
 # CHECK-SAME:         name = "kernel_1(_X2,_X3)"
 # CHECK-SAME:         agg_op_add = unit
-# CHECK-SAME:         comb_op_mul = unit
+# CHECK-SAME:         combo_op_mul = unit
 # CHECK-SAME:         contraction = unit
 # CHECK-SAME:         kernel = unit
 # CHECK-NEXT:     ^bb0(%x0: !aff, %x1: !aff, %x2: !aff):

@@ -33,10 +33,10 @@ local PARAMS = {
 
             // No-op MLIR pass to test transcoding
             {
-               name: 'mlir_nop',
-               pass: {
-                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.MLIR_NopPass',
-               },
+              name: 'mlir_nop',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.MLIR_NopPass',
+              },
             },
 
             // Pad tensors to remove inner conditionals
@@ -52,15 +52,15 @@ local PARAMS = {
             // Note: the pass is disabled on Windows because of XSMM for Windows.
             // Please check AutoStencilPass::runOnFunction() in autostencil.cc
             {
-               name: 'mlir_auto_stencil',
-               pass: {
-                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.MLIR_AutoStencilPass',
-                 reqs: ['agg_op_add', 'comb_op_mul'],
-                 processors: 56,
-                 startup_cost: 32,
-                 only_even: [true, true, true], // XSMM lib does not allow innermost constraints
-                 only_po2: [false, false, false],
-                 special_stencils: [
+              name: 'mlir_auto_stencil',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.MLIR_AutoStencilPass',
+                reqs: ['agg_op_add', 'combo_op_mul'],
+                processors: 56,
+                startup_cost: 32,
+                only_even: [true, true, true],  // XSMM lib does not allow innermost constraints
+                only_po2: [false, false, false],
+                special_stencils: [
                   {
                     startup_cost: 32,
                     idxs: [
@@ -70,7 +70,7 @@ local PARAMS = {
                     ],
                   },
                 ],
-               },
+              },
             },
 
             {
@@ -90,7 +90,7 @@ local PARAMS = {
                 fused_set: ['eltwise'],
                 exclude: ['mac_inner'],
                 no_inner: true,
-              }
+              },
             },
             {
               name: 'eltwise fuse',
@@ -134,13 +134,13 @@ local PARAMS = {
                 outer_set: ['contract_outer', 'kernel', 'cpu_thread'],
                 //outer_set: ['contract_outer', 'kernel'],
                 acc_idxs: false,
-                input_cost: 0.0, 
+                input_cost: 0.0,
                 output_cost: 0.0,
                 split_factor: -100.0,
                 cache_width: PARAMS[cfg].CACHE_WIDTH,
                 // Only consider PO2 sizes for speed
                 only_po2: true,
-              }
+              },
             },
 
             {
@@ -172,7 +172,7 @@ local PARAMS = {
             },
 
             // Init aggregation outputs
-            // Keet this towards the end since other passes are generating intermediate blocks and the initialization 
+            // Keet this towards the end since other passes are generating intermediate blocks and the initialization
             // on aggregation transition could break in such cases.
             {
               name: 'init_aggregation_outputs',

@@ -325,7 +325,7 @@ TEST(Stencil, MatchConv2D) {
 TEST(Stencil, Pass) {
   auto options = ParseProtoJson<proto::StencilPass>(R"(
     {
-      "reqs": ["agg_op_add", "comb_op_mul"],
+      "reqs": ["agg_op_add", "combo_op_mul"],
       "startup_cost": 32,
       "idxs": [
         { "name": "k", "size":  2, "outs": [ -1 ], "ins": [ -1,  0 ] },

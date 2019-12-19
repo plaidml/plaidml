@@ -116,7 +116,7 @@ TEST(GenStripeTest, ContractPlusElementwise) {
         ]
         stmts [{
           attrs: { key: "agg_op_add" value {} }
-          attrs: { key: "comb_op_mul" value {} }
+          attrs: { key: "combo_op_mul" value {} }
           attrs: { key: "contraction" value {} }
           attrs: { key: "kernel" value {} }
           block {

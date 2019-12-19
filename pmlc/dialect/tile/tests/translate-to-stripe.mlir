@@ -62,7 +62,7 @@ func @dot(%arg0: tensor<1x784x!eltwise.fp32>, %arg1: tensor<784x512x!eltwise.fp3
 // CHECK-DAG:        in [[X1:.*]] = _X1[0, 0] fp32:I(784, 512):(512, 1):1568 KiB, E(784, 512):1568 KiB
 // CHECK-DAG:        out [[X2:.*]] = _X2[0, 0] fp32:I(1, 512):(512, 1):2 KiB, E(1, 512):2 KiB
 // CHECK-NEXT:   ) {
-// CHECK-NEXT:     0: #agg_op_add #comb_op_mul #contraction #kernel
+// CHECK-NEXT:     0: #agg_op_add #combo_op_mul #contraction #kernel
 // CHECK-NEXT:     block [x0:784, x1:1, x2:512]:401408 (
 // CHECK-DAG:          #contraction in _X0 = [[X0]][x1, x0] fp32:I(1, 1):(784, 1):4 B, E(1, 784):3.0625 KiB
 // CHECK-DAG:          #contraction in _X1 = [[X1]][x0, x2] fp32:I(1, 1):(512, 1):4 B, E(784, 512):1568 KiB
@@ -112,7 +112,7 @@ func @double_dot(
 // CHECK-DAG:        out [[X3:.*]] = _X3[0, 0] fp32:I(10, 40):(40, 1):1.5625 KiB, E(10, 40):1.5625 KiB
 // CHECK-DAG:        none new@0x00000000 [[TMP:.*]][0, 0] fp32:I(10, 30):(30, 1):1.17188 KiB
 // CHECK-NEXT:   ) {
-// CHECK-NEXT:     0: #agg_op_add #comb_op_mul #contraction #kernel
+// CHECK-NEXT:     0: #agg_op_add #combo_op_mul #contraction #kernel
 // CHECK-NEXT:     block [x0:20, x1:10, x2:30]:6000 (
 // CHECK-DAG:          #contraction in _X0 = [[X0]][x1, x0] fp32:I(1, 1):(20, 1):4 B, E(10, 20):800 B
 // CHECK-DAG:          #contraction in _X1 = [[X1]][x0, x2] fp32:I(1, 1):(30, 1):4 B, E(20, 30):2.34375 KiB
@@ -123,7 +123,7 @@ func @double_dot(
 // CHECK-NEXT:       2: $s = mul($_X0, $_X1)
 // CHECK-NEXT:       3: X = store($s)
 // CHECK-NEXT:     }
-// CHECK-NEXT:     1: #agg_op_add #comb_op_mul #contraction #kernel
+// CHECK-NEXT:     1: #agg_op_add #combo_op_mul #contraction #kernel
 // CHECK-NEXT:     block [x0:30, x1:10, x2:40]:12000 (
 // CHECK-DAG:          #contraction in [[X0_0:.*]] = [[TMP]][x1, x0] fp32:I(1, 1):(30, 1):4 B, E(10, 30):1.17188 KiB
 // CHECK-DAG:          #contraction in [[X1_0:.*]] = [[X2]][x0, x2] fp32:I(1, 1):(40, 1):4 B, E(30, 40):4.6875 KiB
