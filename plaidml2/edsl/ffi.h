@@ -20,6 +20,16 @@
 extern "C" {
 #endif  // __cplusplus
 
+/* 
+*  Enum: PlaidML Integer Operations
+*    PLAIDML_INT_OP_NEG - negation operation
+*    PLAIDML_INT_OP_ADD - addition operation
+*    PLAIDML_INT_OP_SUB - subtraction operation
+*    PLAIDML_INT_OP_MUL - multiplication operation
+*    PLAIDML_INT_OP_DIV - division operation
+*    PLAIDML_INT_OP_MAX - maximum operation
+*    PLAIDML_INT_OP_MIN - minimum operation
+*/
 typedef enum {
   PLAIDML_INT_OP_NEG,
   PLAIDML_INT_OP_ADD,

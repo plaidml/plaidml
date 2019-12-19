@@ -1,0 +1,1 @@
+NDMenu.OnSectionLoaded("classes.js",[[2,"C/C++","CClass:",[[1,"plaidml_dim_expr"],[1,"plaidml_shape"],[1,"TensorDim"]]],[2,"Python","PythonClass:",[[1,"ForeignObject"],[1,"Tensor"],[1,"TensorDim"],[1,"TensorIndex"]]]]);

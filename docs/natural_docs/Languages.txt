@@ -1,0 +1,95 @@
+﻿Format: 2.0.2
+
+# This is the Natural Docs languages file for this project.  If you change
+# anything here, it will apply to THIS PROJECT ONLY.  You can edit the version
+# in Natural Docs' Config folder to make the changes apply to all projects,
+# but it's recommended that you edit this version instead.
+
+
+# Ignored Extensions
+# ------------------------------------------------------------------------
+
+# If you'd like to prevent certain file extensions from being scanned by
+# Natural Docs, you can do it like this:
+#
+# Ignore Extensions: [extension] [extension] ...
+
+
+# Languages
+# ------------------------------------------------------------------------
+
+# These settings define the languages Natural Docs knows how to parse.  You
+# can define your own here or override the settings of the existing ones.
+# Note that all lists are space separated so that commas can be used as
+# values.
+#
+# Language: [name]
+# Alter Language: [name]
+#    Defines a new language or alters an existing one.  Its name can use any
+#    characters.  If any of the properties below have an add/replace form, you
+#    must use that when using Alter Language.
+#
+#    The language Shebang Script is special.  It's entry is only used for
+#    extensions, and files with those extensions have their shebang (#!) lines
+#    read to determine the real language of the file.  Extensionless files are
+#    always treated this way.
+#
+#    The language Text File is also special.  It's treated as one big comment
+#    so you can put Natural Docs content in them without special symbols.
+#
+# Extensions: [extension] [extension] ...
+# [Add/Replace] Extensions: [extension] [extension] ...
+#    Defines the file extensions of the language's source files.
+#
+# Shebang Strings: [string] [string] ...
+# [Add/Replace] Shebang Strings: [string] [string] ...
+#    Defines a list of strings that can appear in the shebang (#!) line to
+#    designate that it's part of the language.
+#
+# Simple Identifier: [name]
+#    The name of the language using only the letters A to Z.  No spaces,
+#    numbers, symbols, or Unicode allowed.  Defaults to the language name
+#    minus any unacceptable characters.  This is used to generate things like
+#    CSS class names.
+#
+# Aliases: [alias] [alias] ...
+# [Add/Replace] Aliases: [alias] [alias] ...
+#    Defines alternate names for the language that can be used to start a code
+#    block.
+#
+#
+# Properties for Basic Language Support Only
+# ------------------------------------------------------------------------
+# If you're adding your own language to Natural Docs you must define these.
+#
+# Line Comments: [symbol] [symbol] ...
+#    Defines a space-separated list of symbols that are used for line comments,
+#    if any.
+#
+# Block Comments: [opening sym] [closing sym] [opening sym] [closing sym] ...
+#    Defines a space-separated list of symbol pairs that are used for block
+#    comments, if any.
+#
+# Member Operator: [symbol]
+#    Defines the default member operator symbol.  The default is a dot.
+#
+# Line Extender: [symbol]
+#    Defines the symbol that allows a prototype to span multiple lines if
+#    normally a line break would end it.
+#
+# Enum Values: [global|under type|under parent]
+#    Defines how enum values are referenced.  The default is global.
+#    global       - Values are always global, referenced as 'value'.
+#    under type   - Values are under the enum type, referenced as
+#                   'class.enum.value'.
+#    under parent - Values are under the enum's parent, referenced as
+#                   'class.value'.
+#
+# Case Sensitive: [yes|no]
+#    Defines whether the language's identifiers are case sensitive.  The
+#    default is yes.
+#
+# [Comment Type] Prototype Enders: [symbol] [symbol] ...
+#    When defined, Natural Docs will attempt to get a prototype from the code
+#    immediately following the comment type.  It stops when it reaches one of
+#    these symbols.  Use \n for line breaks.

@@ -1,0 +1,1 @@
+NDContentPage.OnToolTipsLoaded({});

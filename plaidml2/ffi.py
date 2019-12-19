@@ -66,7 +66,10 @@ def ffi_call(func, *args):
         raise Error(_TLS.err)
     return ret
 
-
+'''
+    Class: ForeignObject
+    A class for objects native to C++ (thus, they are foreign in Python).
+'''
 class ForeignObject(object):
     __ffi_obj__ = None
     __ffi_del__ = None

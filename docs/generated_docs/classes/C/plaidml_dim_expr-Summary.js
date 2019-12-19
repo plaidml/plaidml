@@ -1,0 +1,1 @@
+NDFramePage.OnPageTitleLoaded("CClass:plaidml_dim_expr","plaidml_dim_expr");NDSummary.OnSummaryLoaded("CClass:plaidml_dim_expr",[["C/C++","C"]],[["Structs","Struct"]],[[30,0,0,"plaidml_dim_expr"]]);

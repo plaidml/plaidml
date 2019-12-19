@@ -1,0 +1,1 @@
+NDFramePage.OnPageTitleLoaded("CClass:plaidml_shape","plaidml_shape");NDSummary.OnSummaryLoaded("CClass:plaidml_shape",[["C/C++","C"]],[["Structs","Struct"]],[[24,0,0,"plaidml_shape"]]);

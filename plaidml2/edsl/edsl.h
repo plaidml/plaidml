@@ -85,23 +85,101 @@ class Program {
   std::vector<ProgramArgument> outputs_;
 };
 
+/*  
+*  Class: TensorDim
+*  Represents a single dimension of a Tensor.
+*/
 class TensorDim {
  public:
+  // -------------------------------------------------- 
+  // Group: Constructors
+  // -------------------------------------------------- 
+  /* 
+  *  Constructor: TensorDim()
+  *
+  *  Creates an empty TensorDim object.
+  *
+  *  Parameters:
+  *
+  *    None
+  *
+  *  Returns:
+  *
+  *    A new TensorDim.
+  */
   TensorDim() : ptr_(details::make_ptr(ffi::call<plaidml_dim_expr*>(plaidml_dim_expr_none))) {}
 
+  /* 
+  *  Constructor: TensorDim()
+  *
+  *  Initializes a TensorDim object with a pointer to an existing <plaidml_dim_expr> object.
+  *
+  *  Parameters:
+  *
+  *    ptr - a pointer to a tensor dimension primitive object
+  *
+  *  Returns:
+  *
+  *    A new TensorDim.
+  */
   explicit TensorDim(const std::shared_ptr<plaidml_dim_expr>& ptr) : ptr_(ptr) {}
 
+  /* 
+  *  Constructor: TensorDim()
+  *
+  *  Initializes a TensorDim object with a single integer value.
+  *
+  *  Parameters:
+  *
+  *    value - an integer representing the value to initialize the TensorDim with.
+  *
+  *  Returns:
+  *
+  *    A new TensorDim.
+  */
   explicit TensorDim(int64_t value)
       : ptr_(details::make_ptr(ffi::call<plaidml_dim_expr*>(plaidml_dim_expr_int, value))) {}
 
+  /* 
+  *  Constructor: TensorDim()
+  *
+  *  Initializes a TensorDim object with one of the <PlaidML Integer Operations> and its relevant arguments
+  *
+  *  Parameters:
+  *
+  *    op - the integer operation to perform
+  *    args - the input(s) to the integer operation specified
+  *
+  *  Returns:
+  *
+  *    A new TensorDim.
+  */
   TensorDim(plaidml_int_op op, const std::vector<TensorDim>& args) : ptr_(details::make_ptr(MakeOp(op, args))) {}
 
+  // -------------------------------------------------- 
+  // Group: Operators
+  // -------------------------------------------------- 
+  /*
+  *  Function: operator-()
+  *  Overloads the subtraction operator for a TensorDim object.
+  */
   TensorDim operator-() const;
 
+  // --------------------------------------------------
+  // Group: Properties
+  // --------------------------------------------------
+  /*
+  *  Property: str()
+  *  Returns a representation of the TensorDim as a string.
+  */
   std::string str() const {  //
     return ffi::str(ffi::call<plaidml_string*>(plaidml_dim_expr_repr, ptr_.get()));
   }
 
+  /*
+  *  Property: as_int()
+  *  Returns the value of the TensorDim as an integer.
+  */
   int64_t as_int() const {
     if (!ptr_) {
       throw std::runtime_error("as_int() only available on TensorDim with an integer value");
@@ -109,6 +187,10 @@ class TensorDim {
     return ffi::call<int64_t>(plaidml_dim_expr_get_int, ptr_.get());
   }
 
+  /*
+  *  Property: as_ptr()
+  *  Returns a pointer to the TensorDim.
+  */
   plaidml_dim_expr* as_ptr() const { return ptr_.get(); }
 
  private:
@@ -121,6 +203,13 @@ class TensorDim {
   }
 
  private:
+  // -------------------------------------------------- 
+  // Group: Variables
+  // --------------------------------------------------
+  /*
+  *  Variable: ptr_
+  *  A pointer to the tensor dimension primitive that makes up this TensorDim.
+  */
   std::shared_ptr<plaidml_dim_expr> ptr_;
 };
 

@@ -1,0 +1,1 @@
+NDSummary.OnToolTipsLoaded("File:core/internal.h",{24:"<div class=\"NDToolTip TStruct LC\"><div class=\"TTSummary\">A tensor shape primitive</div></div>",30:"<div class=\"NDToolTip TStruct LC\"><div class=\"TTSummary\">A tensor dimension primitive</div></div>"});

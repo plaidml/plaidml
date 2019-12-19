@@ -1,0 +1,1 @@
+NDFramePage.OnPageTitleLoaded("File:ffi.py","ffi.py");NDSummary.OnSummaryLoaded("File:ffi.py",[["Python","Python"]],[["Classes","Class"]],[[1,0,0,"ForeignObject","ForeignObject"]]);

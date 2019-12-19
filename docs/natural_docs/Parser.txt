@@ -1,0 +1,194 @@
+Format: 2.0
+
+# Natural Docs Parser Configuration File
+
+# This file is part of Natural Docs, which is Copyright © 2003-2018 Code Clear LLC.
+# Natural Docs is licensed under version 3 of the GNU Affero General Public License (AGPL)
+# Refer to License.txt for the complete details
+
+
+
+#
+# Code Blocks
+#______________________________________________________________________________
+
+
+Set: Start Block Keywords
+# The first word for lines like "(start code)".
+
+	start
+	begin
+	
+	
+Set: End Block Keywords
+# The first word for lines like "(end code)".
+
+	end
+	finish
+	done
+	
+	
+Table: Block Types
+# The second word for lines like "(start code)" which have no special attributes.
+# Can be either Generic, Code, or Prototype
+
+	text -> generic
+	plain text -> generic
+	diagram -> generic
+	table -> generic
+	code -> code
+	prototype -> prototype
+	
+	
+
+#
+# Inline Keywords
+#______________________________________________________________________________
+
+
+Set: See Image Keywords
+# The first word for lines like "(see image.jpg)".
+
+	see
+	
+
+Set: At Link Keywords
+# The middle word for lines like "<reference at http://www.somesite.com>".
+
+	at
+	
+	
+Set: URL Protocols
+# Strings that denote the beginning of an external URL, excluding mailto:.
+
+	http
+	https
+	ftp
+	sftp
+	news
+	file
+	
+	
+	
+
+#
+# Headings and Access Levels
+#______________________________________________________________________________
+
+
+Table: Special Headings
+# Can only be Parameters right now.
+
+	parameters -> parameters
+	parameter -> parameters
+	params -> parameters
+	param -> parameters
+	arguments -> parameters
+	argument -> parameters
+	args -> parameters
+	arg -> parameters
+
+
+Table: Access Level
+# Can be Public, Private, Protected, Internal, ProtectedInternal
+
+	public -> public
+	private -> private
+	protected -> protected
+	internal -> internal
+	protected internal -> protectedinternal
+	internal protected -> protectedinternal
+	protected-internal -> protectedinternal
+	internal-protected -> protectedinternal
+	protectedinternal -> protectedinternal
+	internalprotected -> protectedinternal
+	
+	
+
+
+#
+# Plurals and Possessives
+#______________________________________________________________________________
+
+
+Conversion List: Plural Conversions
+
+	# boys -> boy
+	s -> 
+	
+	# alumni -> alumnus
+	i -> us
+	
+	# errata -> erratum
+	a -> um
+	
+	# phenomena -> phenomenon
+	a -> on
+    
+	# foxes -> fox
+	es ->
+	
+	# amoebae -> amoeba
+	ae -> a
+    
+	# pennies -> penny
+	ies -> y
+	
+	# calves -> calf
+	ves -> f
+    
+	# knives -> knife
+	ves -> fe
+    
+	# parentheses -> parenthesis
+	ses -> sis
+
+	# women -> woman
+	en -> an
+    
+	# mice -> mouse
+	ice -> ouse
+    
+	# vetoes -> veto
+	# covered by foxes -> fox
+    
+	# matrices -> matrix
+	ces -> x
+    
+	# oxen -> ox
+	xen -> x
+    
+	# indices -> index
+	ices -> ex
+	
+	# feet -> foot
+	eet -> oot
+    
+	# geese -> goose
+	eese -> oose
+    
+	# teeth -> tooth
+	eeth -> ooth
+    
+	# children -> child
+	dren -> d
+
+
+Conversion List: Possessive Conversions
+
+	# Standard apostrophe
+	' ->
+	's ->
+	
+	# Unicode 2019: Right single quotation mark.  Equivalent to &rsquo; in HTML.
+	’ ->
+	’s ->
+	
+	
+Set: Acceptable Link Suffixes
+# Such as the "s" in <link>s.
+
+	s
+	es
+	's
+	’s

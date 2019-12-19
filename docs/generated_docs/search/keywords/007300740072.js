@@ -1,0 +1,1 @@
+NDSearch.OnPrefixDataLoaded("str",["Property"],[["str",,[["TensorDim",,,,0,"File:edsl/edsl.h:TensorDim.str","CClass:TensorDim:str"]]]]);

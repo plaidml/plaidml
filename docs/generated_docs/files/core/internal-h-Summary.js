@@ -1,0 +1,1 @@
+NDFramePage.OnPageTitleLoaded("File:core/internal.h","internal.h");NDSummary.OnSummaryLoaded("File:core/internal.h",[["C/C++","C"]],[["Structs","Struct"]],[[24,0,0,"plaidml_shape","plaidml_shape"],[30,0,0,"plaidml_dim_expr","plaidml_dim_expr"]]);

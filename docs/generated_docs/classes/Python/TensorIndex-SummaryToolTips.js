@@ -1,0 +1,1 @@
+NDSummary.OnToolTipsLoaded("PythonClass:TensorIndex",{36:"<div class=\"NDToolTip TClass LPython\"><div class=\"NDClassPrototype\" id=\"NDClassPrototype36\"><div class=\"CPEntry TClass Current\"><div class=\"CPName\">TensorIndex</div></div></div><div class=\"TTSummary\">Represents an index of a dimension within a Tensor.</div></div>"});

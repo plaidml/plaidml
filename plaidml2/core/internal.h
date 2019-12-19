@@ -25,6 +25,10 @@ struct plaidml_string {
   std::string str;
 };
 
+/*
+*  Struct: plaidml_shape
+*  A tensor shape primitive
+*/
 struct plaidml_shape {
 #ifdef PLAIDML_AST
   vertexai::tile::TensorShape shape;
@@ -34,6 +38,10 @@ struct plaidml_shape {
 #endif
 };
 
+/*
+*  Struct: plaidml_dim_expr
+* A tensor dimension primitive
+*/
 struct plaidml_dim_expr {
 #ifdef PLAIDML_AST
   vertexai::tile::lang::ast::DimExprPtr expr;

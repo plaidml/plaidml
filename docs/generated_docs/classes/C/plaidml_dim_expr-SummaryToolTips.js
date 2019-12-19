@@ -1,0 +1,1 @@
+NDSummary.OnToolTipsLoaded("CClass:plaidml_dim_expr",{30:"<div class=\"NDToolTip TStruct LC\"><div class=\"TTSummary\">A tensor dimension primitive</div></div>"});

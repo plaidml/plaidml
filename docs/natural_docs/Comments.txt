@@ -1,0 +1,75 @@
+﻿Format: 2.0.2
+
+# This is the Natural Docs comments file for this project.  If you change
+# anything here, it will apply to THIS PROJECT ONLY.  You can edit the version
+# in Natural Docs' Config folder to make the changes apply to all projects,
+# but it's recommended that you edit this version instead.
+
+
+# Ignored Keywords
+# ------------------------------------------------------------------------
+
+# If you'd like to prevent keywords from being recognized by Natural Docs,
+# you can do it like this:
+#
+# Ignore Keywords:
+#    [keyword]
+#    [keyword]
+#    ...
+
+
+# Comment Types
+# ------------------------------------------------------------------------
+
+# Each Natural Docs comment has a corresponding type which determine its
+# behavior.  You can define your own here or override the settings of the
+# existing ones.
+#
+# Comment Type: [name]
+# Alter Comment Type: [name]
+#    Creates a new comment type or changes an existing one.
+#
+# Display Name: [name]
+# Plural Display Name: [name]
+#    The singular and plural name of the comment type as it should appear in
+#    the output.
+#
+# Simple Identifier: [name]
+#    The name of the comment type using only the letters A to Z.  No spaces,
+#    numbers, symbols, or Unicode allowed.  Defaults to the comment type name
+#    minus any unacceptable characters.  This is used to generate things like
+#    CSS class names.
+#
+# Scope: [normal|start|end|always global]
+#    How the comment affects scope.  Defaults to normal.
+#    normal        - The comment stays within the current scope.
+#    start         - The comment starts a new scope for all the comments
+#                    beneath it, like class comments.
+#    end           - The comment resets the scope back to global for all the
+#                    comments beneath it, like section comments.
+#    always global - The comment is defined as a global symbol, but does not
+#                    change the scope for any other comments.
+#
+# Flags: [flag], [flag], ...
+#    A combination of settings that apply to the comment type.
+#    Code, File, or Documentation
+#        Whether it's used to describe a code element, a file, or is a
+#        standalone documentation comment.  Defaults to Code.
+#    Variable Type
+#        Whether it describes a code element that can be used as a variable's
+#        type.
+#    Class Hierarchy or Database Hierarchy
+#        Whether it describes a code element that should be included in the
+#        class or database hierarchy.  Requires Scope: Start.
+#    Enum
+#        Whether it describes an enum.
+#
+# Keywords:
+#    [keyword]
+#    [keyword], [plural keyword]
+#    ...
+#    A list of the comment type's keywords.  Each line after the heading is
+#    the keyword and optionally its plural form for list comments.  You can
+#    reuse existing keywords to change their definition.  When using
+#    "Alter Comment Type", these keywords are added to the existing ones
+#    rather than replacing them.

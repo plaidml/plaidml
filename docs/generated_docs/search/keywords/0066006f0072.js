@@ -1,0 +1,1 @@
+NDSearch.OnPrefixDataLoaded("for",["Class"],[["ForeignObject",,[[,,,,0,"File:ffi.py:ForeignObject","PythonClass:ForeignObject"]]]]);

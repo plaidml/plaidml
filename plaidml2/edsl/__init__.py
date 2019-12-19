@@ -61,14 +61,29 @@ def wrap_dim(x):
     if isinstance(x, six.integer_types):
         return TensorDim(expr=ffi_call(lib.plaidml_dim_expr_int, x))
     return x
+'''
+    Function: dim_op
 
+    Performs an integer operation on one or more dims.
 
+    Parameters
+
+        op - which of the <PlaidML Integer Operations> to perform
+        args - the arguments to the operation
+
+    Returns
+
+        The result of of the given op with the given args.
+'''
 def dim_op(op, *args):
     args = [wrap_dim(x) for x in args]
     raw_args = [x.as_ptr() for x in args]
     return ffi_call(lib.plaidml_dim_expr_op, op, len(args), raw_args)
 
-
+'''
+    Class: TensorDim
+    Represents a single dimension of a <Tensor>.
+'''
 class TensorDim(ForeignObject):
     __ffi_del__ = lib.plaidml_dim_expr_free
     __ffi_repr__ = lib.plaidml_dim_expr_repr
@@ -81,15 +96,71 @@ class TensorDim(ForeignObject):
     def _bind(self, expr):
         self.take_ptr(expr)
 
+    '''
+        Function: __neg__
+
+        Performs the <PLAIDML_INT_OP_NEG> <dim_op> on a TensorDim.
+
+        Parameters: 
+
+            None
+
+        Returns: 
+
+            The negated version of the TensorDim.
+
+    '''
     def __neg__(self):
         return TensorDim(dim_op(lib.PLAIDML_INT_OP_NEG, self))
 
+    '''
+        Function: __add__
+
+        Performs the <PLAIDML_INT_OP_ADD> <dim_op> on two TensorDims, with the parent TensorDim as the first operand.
+
+        Parameters:
+
+            other - the TensorDim to be added to this TensorDim.
+
+        Returns:
+
+            The sum of the TensorDims.
+
+    '''
     def __add__(self, other):
         return TensorDim(dim_op(lib.PLAIDML_INT_OP_ADD, self, other))
 
+    '''
+        Function: __radd__
+
+        Performs the <PLAIDML_INT_OP_ADD> <dim_op> on two TensorDim, with the parent TensorDim as the second operand.
+
+        Parameters:
+
+            other - the TensorDim to be added to this TensorDim.
+
+        Returns:
+
+            The sum of the TensorDims.
+
+    '''
     def __radd__(self, other):
         return TensorDim(dim_op(lib.PLAIDML_INT_OP_ADD, other, self))
 
+    '''
+        Function: __sub__
+
+        Performs the <PLAIDML_INT_OP_SUB> <dim_op> on a TensorDim, with the parent TensorDim as the first operand.
+
+        Parameters:
+
+            other - the TensorDim to be subtracted from this TensorDim.
+
+        Returns:
+
+            The difference of the TensorDims.
+
+    '''
     def __sub__(self, other):
         return TensorDim(dim_op(lib.PLAIDML_INT_OP_SUB, self, other))
 
@@ -122,7 +193,10 @@ def poly_op(op, *args):
     raw_args = [x.as_ptr() for x in args]
     return ffi_call(lib.plaidml_poly_expr_op, op, len(args), raw_args)
 
-
+'''
+    Class: TensorIndex
+    Represents an index of a dimension within a <Tensor>.
+'''
 class TensorIndex(ForeignObject):
     __ffi_del__ = lib.plaidml_poly_expr_free
     __ffi_repr__ = lib.plaidml_poly_expr_repr
@@ -269,7 +343,8 @@ class IndexedTensor(object):
             self._tensor._name,
         )
 
-
+# Class: Tensor
+# Represents a Tensor type.
 class Tensor(ForeignObject):
     __ffi_del__ = lib.plaidml_expr_free
     __ffi_repr__ = lib.plaidml_expr_repr

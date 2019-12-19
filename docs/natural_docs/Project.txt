@@ -1,0 +1,123 @@
+﻿Format: 2.0.2
+
+# This is the file you use to provide information about your project.  It can
+# also be used to specify input and output settings so you don't have to
+# include them on the command line.
+
+
+# Project Information
+# ------------------------------------------------------------------------
+
+Title: PlaidML
+Subtitle: An open source, extensible deep learning tensor compiler.
+
+Copyright: © 2019 Intel Corporation.
+
+Timestamp: mm/dd/yyyy
+#    m     - Single digit month, when possible.  January is "1".
+#    mm    - Always double digit month.  January is "01".
+#    mon   - Short month word.  January is "Jan".
+#    month - Long month word.  January is "January".
+#    d     - Single digit day, when possible.  1 is "1".
+#    dd    - Always double digit day.  1 is "01".
+#    day   - Day with text extension.  1 is "1st".
+#    yy    - Double digit year.  2017 is "17".
+#    yyyy  - Four digit year.  2017 is "2017".
+#    year  - Four digit year.  2017 is "2017".
+
+
+# This is where you specify general information about your project.
+#
+# Style: [style]
+#    The style to apply to the generated documentation.  It can be the name of
+#    a CSS file in the project configuration folder or a subfolder that
+#    contains Style.txt.  Do not include ".css" if using a CSS file.
+
+
+# Source Code
+# ------------------------------------------------------------------------
+
+Source Folder: ../../plaidml2
+   Name: PlaidML2 Reference Guide
+
+
+
+# This is where you specify what files and folders Natural Docs should be
+# scanning.  If you use any of these options on the command line, this entire
+# section is ignored except for names and numbers.
+#
+# All paths are relative to the project configuration folder, which lets this
+# file remain portable across computers and not cause problems in version
+# control systems.  You can enter absolute paths and they will be converted
+# automatically.
+#
+# Source Folder: [path]
+#    Name: [name]
+#
+#    Specifies a folder which will be searched for source files.  If you have
+#    more than one, add the Name property to set how it will show up in the
+#    menu.
+
+
+# Source Filtering
+# ------------------------------------------------------------------------
+
+# If there are any subfolders in the source code that you would like Natural
+# Docs to ignore, they can be specified here.  If you use any of these options
+# on the command line, this entire section is ignored.
+#
+# Ignore Source Folder: [path]
+#    Tells Natural Docs to skip this folder when scanning files.
+#
+# Ignore Source Folder Pattern: [pattern]
+#    Tells Natural Docs to skip all folder names which match this pattern when
+#    scanning files.  ? matches a single character, * matches zero or more
+#    characters.  It applies to the entire folder name, so "cli" will not
+#    match "client", although "cli*" will.
+#
+#    The data folders of common version control systems (.git, .svn, .cvs, .hg)
+#    are ignored automatically.  You do not have to specify them here.
+
+
+# Generated Documentation
+# ------------------------------------------------------------------------
+
+HTML Output Folder: ../generated_docs
+
+
+# This is where you specify what kind of documentation you want Natural Docs
+# to build and where it should be put.  If you use any of these options on the
+# command line, this entire section is ignored except for secondary settings.
+#
+# All paths are relative to the project configuration folder, which lets this
+# file remain portable across computers and not cause problems in version
+# control systems.  You can enter absolute paths and they will be converted
+# automatically.
+#
+# You can override any of the project information settings under each entry,
+# so if you have multiple output folders you can give them each different
+# styles or subtitles.
+#
+# HTML Output Folder: [path]
+#    [Project Information]
+#
+#    Generates HTML documentation in the specified folder.
+
+
+# Global Settings
+# ------------------------------------------------------------------------
+
+Tab Width: 4
+
+
+# Other settings that apply to your entire project.  Settings specified on the
+# command line override the settings here.
+#
+# Documented Only: [yes|no]
+#    Whether only documented code elements should appear in the output.
+#    Defaults to no.
+#
+# Auto Group: [yes|no]
+#    Whether groups should automatically apply to you code.  Defaults to yes.
+
+

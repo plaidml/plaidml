@@ -1,0 +1,1 @@
+NDSearch.OnPrefixDataLoaded("dim",["Function"],[["dim_op",,[[,,,,0,"File:edsl/__init__.py:dim_op"]]]]);
