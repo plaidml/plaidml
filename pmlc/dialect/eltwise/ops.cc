@@ -9,6 +9,7 @@
 
 #include "llvm/ADT/StringSwitch.h"
 
+#include "mlir/Dialect/StandardOps/Ops.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Support/DebugStringHelper.h"
@@ -23,6 +24,7 @@ namespace pmlc {
 namespace dialect {
 namespace eltwise {
 
+using mlir::FloatAttr;
 using mlir::IntegerAttr;
 using mlir::OpRewritePattern;
 using mlir::Pattern;
@@ -200,6 +202,55 @@ OpFoldResult SubOp::fold(ArrayRef<Attribute> operands) {
 }
 
 #include "pmlc/dialect/eltwise/interfaces.cc.inc"
+
+#define fi_to_std(orig, stdf, stdi)                                                                                 \
+  Value* orig::buildStandard(OpBuilder& builder, mlir::Location loc, ScalarType stype, ArrayRef<Value*> operands) { \
+    if (is_float(stype.type())) {                                                                                   \
+      return builder.create<mlir::stdf>(loc, operands[0], operands[1]);                                             \
+    } else {                                                                                                        \
+      return builder.create<mlir::stdi>(loc, operands[0], operands[1]);                                             \
+    }                                                                                                               \
+  }
+
+fi_to_std(AddOp, AddFOp, AddIOp) fi_to_std(SubOp, SubFOp, SubIOp) fi_to_std(MulOp, MulFOp, MulIOp)
+#define fus_to_std(orig, stdf, stdu, stds)                                                                          \
+  Value* orig::buildStandard(OpBuilder& builder, mlir::Location loc, ScalarType stype, ArrayRef<Value*> operands) { \
+    if (is_float(stype.type())) {                                                                                   \
+      return builder.create<mlir::stdf>(loc, operands[0], operands[1]);                                             \
+    } else if (is_uint(stype.type())) {                                                                             \
+      return builder.create<mlir::stdu>(loc, operands[0], operands[1]);                                             \
+    } else {                                                                                                        \
+      return builder.create<mlir::stds>(loc, operands[0], operands[1]);                                             \
+    }                                                                                                               \
+  }
+
+    fus_to_std(DivOp, DivFOp, DivIUOp, DivISOp) fus_to_std(ModOp, RemFOp, RemIUOp, RemISOp)
+
+        Value* MinOp::buildStandard(OpBuilder& builder, mlir::Location loc, ScalarType stype,
+                                    ArrayRef<Value*> operands) {
+  return nullptr;
+}
+Value* MaxOp::buildStandard(OpBuilder& builder, mlir::Location loc, ScalarType stype, ArrayRef<Value*> operands) {
+  return nullptr;
+}
+Value* AndOp::buildStandard(OpBuilder& builder, mlir::Location loc, ScalarType stype, ArrayRef<Value*> operands) {
+  return nullptr;
+}
+Value* OrOp::buildStandard(OpBuilder& builder, mlir::Location loc, ScalarType stype, ArrayRef<Value*> operands) {
+  return nullptr;
+}
+Value* XorOp::buildStandard(OpBuilder& builder, mlir::Location loc, ScalarType stype, ArrayRef<Value*> operands) {
+  return nullptr;
+}
+Value* ShlOp::buildStandard(OpBuilder& builder, mlir::Location loc, ScalarType stype, ArrayRef<Value*> operands) {
+  return nullptr;
+}
+Value* ShrOp::buildStandard(OpBuilder& builder, mlir::Location loc, ScalarType stype, ArrayRef<Value*> operands) {
+  return nullptr;
+}
+Value* PowOp::buildStandard(OpBuilder& builder, mlir::Location loc, ScalarType stype, ArrayRef<Value*> operands) {
+  return nullptr;
+}
 
 #define GET_OP_CLASSES
 #include "pmlc/dialect/eltwise/ops.cc.inc"
