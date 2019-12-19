@@ -34,38 +34,19 @@ using TensorDeriv = std::vector<Tensor> (*)(  //
 
 namespace details {
 
-template <typename T>
 struct Deleter {
-  std::function<void(plaidml_error*, T*)> fn;
-  void operator()(T* ptr) { ffi::call_void(fn, ptr); }
+  void operator()(plaidml_dim_expr* ptr) { ffi::call_void(plaidml_dim_expr_free, ptr); }
+  void operator()(plaidml_expr* ptr) { ffi::call_void(plaidml_expr_free, ptr); }
+  void operator()(plaidml_logical_shape* ptr) { ffi::call_void(plaidml_logical_shape_free, ptr); }
+  void operator()(plaidml_poly_expr* ptr) { ffi::call_void(plaidml_poly_expr_free, ptr); }
+  void operator()(plaidml_program* ptr) { ffi::call_void(plaidml_program_free, ptr); }
+  void operator()(plaidml_tuple* ptr) { ffi::call_void(plaidml_tuple_free, ptr); }
+  void operator()(plaidml_value* ptr) { ffi::call_void(plaidml_value_free, ptr); }
 };
 
-inline std::shared_ptr<plaidml_logical_shape> make_plaidml_logical_shape(plaidml_logical_shape* ptr) {
-  return std::shared_ptr<plaidml_logical_shape>(ptr, Deleter<plaidml_logical_shape>{plaidml_logical_shape_free});
-}
-
-inline std::shared_ptr<plaidml_expr> make_plaidml_expr(plaidml_expr* ptr) {
-  return std::shared_ptr<plaidml_expr>(ptr, Deleter<plaidml_expr>{plaidml_expr_free});
-}
-
-inline std::shared_ptr<plaidml_value> make_plaidml_value(plaidml_value* ptr) {
-  return std::shared_ptr<plaidml_value>(ptr, Deleter<plaidml_value>{plaidml_value_free});
-}
-
-inline std::shared_ptr<plaidml_poly_expr> make_plaidml_poly_expr(plaidml_poly_expr* ptr) {
-  return std::shared_ptr<plaidml_poly_expr>(ptr, Deleter<plaidml_poly_expr>{plaidml_poly_expr_free});
-}
-
-inline std::shared_ptr<plaidml_dim_expr> make_plaidml_dim_expr(plaidml_dim_expr* ptr) {
-  return std::shared_ptr<plaidml_dim_expr>(ptr, Deleter<plaidml_dim_expr>{plaidml_dim_expr_free});
-}
-
-inline std::shared_ptr<plaidml_program> make_plaidml_program(plaidml_program* ptr) {
-  return std::shared_ptr<plaidml_program>(ptr, Deleter<plaidml_program>{plaidml_program_free});
-}
-
-inline std::shared_ptr<plaidml_tuple> make_plaidml_tuple(plaidml_tuple* ptr) {
-  return std::shared_ptr<plaidml_tuple>(ptr, Deleter<plaidml_tuple>{plaidml_tuple_free});
+template <typename T>
+inline std::shared_ptr<T> make_ptr(T* ptr) {
+  return std::shared_ptr<T>(ptr, Deleter{});
 }
 
 template <typename T>
@@ -106,15 +87,14 @@ class Program {
 
 class TensorDim {
  public:
-  TensorDim() : ptr_(details::make_plaidml_dim_expr(ffi::call<plaidml_dim_expr*>(plaidml_dim_expr_none))) {}
+  TensorDim() : ptr_(details::make_ptr(ffi::call<plaidml_dim_expr*>(plaidml_dim_expr_none))) {}
 
   explicit TensorDim(const std::shared_ptr<plaidml_dim_expr>& ptr) : ptr_(ptr) {}
 
   explicit TensorDim(int64_t value)
-      : ptr_(details::make_plaidml_dim_expr(ffi::call<plaidml_dim_expr*>(plaidml_dim_expr_int, value))) {}
+      : ptr_(details::make_ptr(ffi::call<plaidml_dim_expr*>(plaidml_dim_expr_int, value))) {}
 
-  TensorDim(plaidml_int_op op, const std::vector<TensorDim>& args)
-      : ptr_(details::make_plaidml_dim_expr(MakeOp(op, args))) {}
+  TensorDim(plaidml_int_op op, const std::vector<TensorDim>& args) : ptr_(details::make_ptr(MakeOp(op, args))) {}
 
   TensorDim operator-() const;
 
@@ -148,19 +128,19 @@ struct Constraint;
 
 class TensorIndex {
  public:
-  TensorIndex() : ptr_(details::make_plaidml_poly_expr(ffi::call<plaidml_poly_expr*>(plaidml_poly_expr_index, ""))) {}
+  TensorIndex() : ptr_(details::make_ptr(ffi::call<plaidml_poly_expr*>(plaidml_poly_expr_index, ""))) {}
 
   explicit TensorIndex(int64_t value)
-      : ptr_(details::make_plaidml_poly_expr(ffi::call<plaidml_poly_expr*>(plaidml_poly_expr_literal, value))) {}
+      : ptr_(details::make_ptr(ffi::call<plaidml_poly_expr*>(plaidml_poly_expr_literal, value))) {}
 
   explicit TensorIndex(const std::string& name)
-      : ptr_(details::make_plaidml_poly_expr(ffi::call<plaidml_poly_expr*>(plaidml_poly_expr_index, name.c_str()))) {}
+      : ptr_(details::make_ptr(ffi::call<plaidml_poly_expr*>(plaidml_poly_expr_index, name.c_str()))) {}
 
   TensorIndex(plaidml_int_op op, const std::vector<TensorIndex>& args)
-      : ptr_(details::make_plaidml_poly_expr(MakePolyOp(op, args))) {}
+      : ptr_(details::make_ptr(MakePolyOp(op, args))) {}
 
   TensorIndex(plaidml_int_op op, const TensorIndex& idx, const TensorDim& dim, bool lhs_first)
-      : ptr_(details::make_plaidml_poly_expr(MakeDimPolyOp(op, idx, dim, lhs_first))) {}
+      : ptr_(details::make_ptr(MakeDimPolyOp(op, idx, dim, lhs_first))) {}
 
   TensorIndex operator-() const;
 
@@ -280,23 +260,13 @@ class IndexedTensor {
   explicit IndexedTensor(std::unique_ptr<Impl> impl) : impl_(std::move(impl)) {}
 };
 
-inline IndexedTensor sum(IndexedTensor lhs, const IndexedTensor& rhs) { return std::move(lhs += rhs); }
-
-inline IndexedTensor product(IndexedTensor lhs, const IndexedTensor& rhs) { return std::move(lhs *= rhs); }
-
-inline IndexedTensor max(IndexedTensor lhs, const IndexedTensor& rhs) { return std::move(lhs >= rhs); }
-
-inline IndexedTensor min(IndexedTensor lhs, const IndexedTensor& rhs) { return std::move(lhs <= rhs); }
-
-inline IndexedTensor assign(IndexedTensor lhs, const IndexedTensor& rhs) { return std::move(lhs = rhs); }
-
 class LogicalShape {
   friend class Program;
   friend class Tensor;
 
  public:
   LogicalShape(plaidml_datatype dtype, const std::vector<int64_t>& dims)
-      : ptr_(details::make_plaidml_logical_shape(
+      : ptr_(details::make_ptr(
             ffi::call<plaidml_logical_shape*>(plaidml_logical_shape_alloc, dtype, dims.size(), dims.data()))) {}
 
   plaidml_logical_shape* as_ptr() const { return ptr_.get(); }
@@ -324,7 +294,7 @@ class LogicalShape {
   bool operator==(const LogicalShape& rhs) const { return str() == rhs.str(); }
 
  private:
-  explicit LogicalShape(plaidml_logical_shape* ptr) : ptr_(details::make_plaidml_logical_shape(ptr)) {}
+  explicit LogicalShape(plaidml_logical_shape* ptr) : ptr_(details::make_ptr(ptr)) {}
 
  private:
   std::shared_ptr<plaidml_logical_shape> ptr_;
@@ -345,27 +315,27 @@ class Tensor {
   Tensor() : impl_(new Impl) {}
 
   explicit Tensor(plaidml_expr* ptr) : impl_(new Impl) {  //
-    impl_->ptr = details::make_plaidml_expr(ptr);
+    impl_->ptr = details::make_ptr(ptr);
   }
 
   explicit Tensor(int value) : impl_(new Impl) {  //
-    impl_->ptr = details::make_plaidml_expr(ffi::call<plaidml_expr*>(plaidml_expr_int, value));
+    impl_->ptr = details::make_ptr(ffi::call<plaidml_expr*>(plaidml_expr_int, value));
   }
 
   explicit Tensor(size_t value) : impl_(new Impl) {  //
-    impl_->ptr = details::make_plaidml_expr(ffi::call<plaidml_expr*>(plaidml_expr_int, value));
+    impl_->ptr = details::make_ptr(ffi::call<plaidml_expr*>(plaidml_expr_int, value));
   }
 
   explicit Tensor(int64_t value) : impl_(new Impl) {
-    impl_->ptr = details::make_plaidml_expr(ffi::call<plaidml_expr*>(plaidml_expr_int, value));
+    impl_->ptr = details::make_ptr(ffi::call<plaidml_expr*>(plaidml_expr_int, value));
   }
 
   explicit Tensor(double value) : impl_(new Impl) {
-    impl_->ptr = details::make_plaidml_expr(ffi::call<plaidml_expr*>(plaidml_expr_float, value));
+    impl_->ptr = details::make_ptr(ffi::call<plaidml_expr*>(plaidml_expr_float, value));
   }
 
   explicit Tensor(const TensorDim& dim) : impl_(new Impl) {
-    impl_->ptr = details::make_plaidml_expr(ffi::call<plaidml_expr*>(plaidml_expr_dim, dim.as_ptr()));
+    impl_->ptr = details::make_ptr(ffi::call<plaidml_expr*>(plaidml_expr_dim, dim.as_ptr()));
   }
 
   explicit Tensor(const std::vector<int64_t>& dims) : impl_(new Impl) {
@@ -419,17 +389,17 @@ class Tensor {
       for (const auto& dim : impl_->dims) {
         sizes.emplace_back(dim.as_ptr());
       }
-      impl->sizes = details::make_plaidml_expr(  //
-          ffi::call<plaidml_expr*>(              //
-              plaidml_expr_size_map,             //
-              sizes.size(),                      //
+      impl->sizes = details::make_ptr(  //
+          ffi::call<plaidml_expr*>(     //
+              plaidml_expr_size_map,    //
+              sizes.size(),             //
               sizes.data()));
     }
-    impl->idxs = details::make_plaidml_expr(  //
-        ffi::call<plaidml_expr*>(             //
-            plaidml_expr_index_map,           //
-            as_ptr(),                         //
-            idx_ptrs.size(),                  //
+    impl->idxs = details::make_ptr(  //
+        ffi::call<plaidml_expr*>(    //
+            plaidml_expr_index_map,  //
+            as_ptr(),                //
+            idx_ptrs.size(),         //
             idx_ptrs.data()));
     return IndexedTensor{std::move(impl)};
   }
@@ -747,14 +717,14 @@ inline Program::Program(                 //
     src_updates[i] = std::get<1>(updates[i]).as_ptr();
   }
   plaidml_program_args* args;
-  ptr_ = details::make_plaidml_program(ffi::call<plaidml_program*>(  //
-      plaidml_program_evaluate,                                      //
-      name.c_str(),                                                  //
-      raw_outputs.size(),                                            //
-      raw_outputs.data(),                                            //
-      updates.size(),                                                //
-      src_updates.data(),                                            //
-      dst_updates.data(),                                            //
+  ptr_ = details::make_ptr(ffi::call<plaidml_program*>(  //
+      plaidml_program_evaluate,                          //
+      name.c_str(),                                      //
+      raw_outputs.size(),                                //
+      raw_outputs.data(),                                //
+      updates.size(),                                    //
+      src_updates.data(),                                //
+      dst_updates.data(),                                //
       &args));
   for (size_t i = 0; i < args->nargs; i++) {
     const auto& arg = args->args[i];
@@ -869,15 +839,15 @@ inline void IndexedTensor::Impl::MakeContraction(plaidml_agg_op agg_op, const In
     combo_op = PLAIDML_COMBO_OP_NONE;
     src_idxs.emplace_back(rhs.impl_->idxs.get());
   }
-  src->impl_->ptr = details::make_plaidml_expr(  //
-      ffi::call<plaidml_expr*>(                  //
-          plaidml_expr_contraction,              //
-          agg_op,                                //
-          combo_op,                              //
-          idxs.get(),                            //
-          sizes.get(),                           //
-          src_idxs.size(),                       //
-          src_idxs.data(),                       //
+  src->impl_->ptr = details::make_ptr(  //
+      ffi::call<plaidml_expr*>(         //
+          plaidml_expr_contraction,     //
+          agg_op,                       //
+          combo_op,                     //
+          idxs.get(),                   //
+          sizes.get(),                  //
+          src_idxs.size(),              //
+          src_idxs.data(),              //
           src->impl_->name.c_str()));
 }
 
@@ -913,33 +883,29 @@ inline Tensor Call(const std::string& fn, const std::vector<Tensor>& args) {
 
 class Value {
  public:
-  Value() : ptr_(details::make_plaidml_value(ffi::call<plaidml_value*>(plaidml_value_none))) {}
+  Value() : ptr_(details::make_ptr(ffi::call<plaidml_value*>(plaidml_value_none))) {}
 
-  explicit Value(plaidml_value* ptr)
-      : ptr_(details::make_plaidml_value(ffi::call<plaidml_value*>(plaidml_value_clone, ptr))) {}
+  explicit Value(plaidml_value* ptr) : ptr_(details::make_ptr(ffi::call<plaidml_value*>(plaidml_value_clone, ptr))) {}
 
-  explicit Value(int value) : ptr_(details::make_plaidml_value(ffi::call<plaidml_value*>(plaidml_value_int, value))) {}
+  explicit Value(int value) : ptr_(details::make_ptr(ffi::call<plaidml_value*>(plaidml_value_int, value))) {}
 
-  explicit Value(size_t value)
-      : ptr_(details::make_plaidml_value(ffi::call<plaidml_value*>(plaidml_value_int, value))) {}
+  explicit Value(size_t value) : ptr_(details::make_ptr(ffi::call<plaidml_value*>(plaidml_value_int, value))) {}
 
-  explicit Value(int64_t value)
-      : ptr_(details::make_plaidml_value(ffi::call<plaidml_value*>(plaidml_value_int, value))) {}
+  explicit Value(int64_t value) : ptr_(details::make_ptr(ffi::call<plaidml_value*>(plaidml_value_int, value))) {}
 
-  explicit Value(double value)
-      : ptr_(details::make_plaidml_value(ffi::call<plaidml_value*>(plaidml_value_float, value))) {}
+  explicit Value(double value) : ptr_(details::make_ptr(ffi::call<plaidml_value*>(plaidml_value_float, value))) {}
 
   explicit Value(const std::string& value)
-      : ptr_(details::make_plaidml_value(ffi::call<plaidml_value*>(plaidml_value_str, value.c_str()))) {}
+      : ptr_(details::make_ptr(ffi::call<plaidml_value*>(plaidml_value_str, value.c_str()))) {}
 
   explicit Value(const TensorDim& dim)
-      : ptr_(details::make_plaidml_value(ffi::call<plaidml_value*>(plaidml_value_dim, dim.as_ptr()))) {}
+      : ptr_(details::make_ptr(ffi::call<plaidml_value*>(plaidml_value_dim, dim.as_ptr()))) {}
 
   explicit Value(const Tensor& tensor) {
     if (auto ptr = tensor.as_ptr()) {
-      ptr_ = details::make_plaidml_value(ffi::call<plaidml_value*>(plaidml_value_expr, ptr));
+      ptr_ = details::make_ptr(ffi::call<plaidml_value*>(plaidml_value_expr, ptr));
     } else {
-      ptr_ = details::make_plaidml_value(ffi::call<plaidml_value*>(plaidml_value_none));
+      ptr_ = details::make_ptr(ffi::call<plaidml_value*>(plaidml_value_none));
     }
   }
 
@@ -948,7 +914,7 @@ class Value {
     for (size_t i = 0; i < args.size(); i++) {
       args[i] = tuple[i].as_ptr();
     }
-    ptr_ = details::make_plaidml_value(ffi::call<plaidml_value*>(plaidml_value_tuple, args.size(), args.data()));
+    ptr_ = details::make_ptr(ffi::call<plaidml_value*>(plaidml_value_tuple, args.size(), args.data()));
   }
 
   std::string str() const {  //
@@ -1017,11 +983,11 @@ class Value {
   }
 
   TensorDim as_dim() const {  //
-    return TensorDim(details::make_plaidml_dim_expr(ffi::call<plaidml_dim_expr*>(plaidml_value_dim_get, as_ptr())));
+    return TensorDim(details::make_ptr(ffi::call<plaidml_dim_expr*>(plaidml_value_dim_get, as_ptr())));
   }
 
   std::vector<Value> as_tuple() const {
-    auto tuple = details::make_plaidml_tuple(ffi::call<plaidml_tuple*>(plaidml_value_tuple_get, as_ptr()));
+    auto tuple = details::make_ptr(ffi::call<plaidml_tuple*>(plaidml_value_tuple_get, as_ptr()));
     std::vector<Value> ret(tuple->nelts);
     for (size_t i = 0; i < ret.size(); i++) {
       ret[i] = Value{tuple->elts[i]};
@@ -1030,7 +996,7 @@ class Value {
   }
 
   std::vector<int64_t> as_int_tuple() const {
-    auto tuple = details::make_plaidml_tuple(ffi::call<plaidml_tuple*>(plaidml_value_tuple_get, as_ptr()));
+    auto tuple = details::make_ptr(ffi::call<plaidml_tuple*>(plaidml_value_tuple_get, as_ptr()));
     std::vector<int64_t> ret(tuple->nelts);
     for (size_t i = 0; i < ret.size(); i++) {
       ret[i] = Value{tuple->elts[i]}.as_int();

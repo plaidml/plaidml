@@ -18,9 +18,9 @@
 
 using mlir::StringRef;
 
-namespace pmlc::dialect::op::tblgen::cpp {
+namespace pmlc::dialect::oplib::cpp {
 
-static inline const char* const fileCommentHeader = R"( // Copyright 2019 Intel Corporation.
+static const char* const fileCommentHeader = R"( // Copyright 2019 Intel Corporation.
 /*===- TableGen'erated file -------------------------------------*- C++ -*-===*\
 |*                                                                            *|
 |* Op Lib C++ EDSL Wrapper                                                    *|
@@ -31,7 +31,7 @@ static inline const char* const fileCommentHeader = R"( // Copyright 2019 Intel 
 
 )";
 
-static inline const char* const includeHeader = R"(
+static const char* const includeHeader = R"(
 #pragma once
 
 #include <string>
@@ -42,14 +42,14 @@ static inline const char* const includeHeader = R"(
 
 )";
 
-static inline const char* const commentHeader = R"(
+static const char* const commentHeader = R"(
 //===----------------------------------------------------------------------===//
 // {0} {1}
 //===----------------------------------------------------------------------===//
 
 )";
 
-static inline const char* const ffiFunction = R"(
+static const char* const ffiFunction = R"(
 namespace details {
 
 inline edsl::Value op(const std::string& name, const edsl::Value& args) {
@@ -60,7 +60,7 @@ inline edsl::Value op(const std::string& name, const edsl::Value& args) {
 
 )";
 
-static inline const char* const initFunction = R"(
+static const char* const initFunction = R"(
 inline void init() {  //
   plaidml::init();
   plaidml::edsl::init();
@@ -70,7 +70,7 @@ inline void init() {  //
 )";
 
 // Order doesn't matter here, but lookup efficiency does, so keep as a std::map.
-static inline const std::map<StringRef, StringRef> typeLookupTable = {
+static const std::map<StringRef, StringRef> typeLookupTable = {
     {"APInt", "int"},
     {"ArrayAttr", "std::vector<int>"},
     {"bool", "bool"},
@@ -95,4 +95,4 @@ static inline StringRef convertType(const StringRef type) {
   return edslType;
 }
 
-}  // namespace pmlc::dialect::op::tblgen::cpp
+}  // namespace pmlc::dialect::oplib::cpp

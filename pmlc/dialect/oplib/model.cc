@@ -8,9 +8,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include <vector>
+#include "pmlc/dialect/oplib/model.h"
 
-#include "pmlc/dialect/op_lib/OpModel.h"
+#include <vector>
 
 using llvm::MapVector;
 using llvm::Record;
@@ -19,7 +19,7 @@ using mlir::StringRef;
 using mlir::tblgen::EnumAttr;
 using mlir::tblgen::Operator;
 
-namespace pmlc::dialect::op::tblgen {
+namespace pmlc::dialect::oplib {
 
 // Operators, Operands, and Attributes
 
@@ -109,4 +109,4 @@ std::vector<TypeInfo> getTypeRecords(const RecordKeeper& recordKeeper) {
 DialectInfo::DialectInfo(const RecordKeeper& recordKeeper)
     : all_ops_(getOpRecords(recordKeeper)), all_types_(getTypeRecords(recordKeeper)) {}
 
-}  // namespace pmlc::dialect::op::tblgen
+}  // namespace pmlc::dialect::oplib
