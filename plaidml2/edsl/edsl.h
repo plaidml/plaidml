@@ -15,7 +15,7 @@
 #include "plaidml2/core/core.h"
 #include "plaidml2/edsl/ffi.h"
 
-namespace plaidml {
+namespace plaidml2 {
 namespace edsl {
 
 class IndexedTensor;
@@ -32,6 +32,7 @@ using TensorDeriv = std::vector<Tensor> (*)(  //
     const Tensor& dY,                         //
     const std::vector<Tensor>& Xs);
 
+/// @cond IMPL
 namespace details {
 
 struct Deleter {
@@ -59,6 +60,8 @@ void into_vector(std::vector<T>* into, Head&& head, Tail&&... tail) {
 }
 
 }  // namespace details
+
+/// @endcond IMPL
 
 inline void init() {
   plaidml::init();
@@ -194,6 +197,7 @@ class IndexedTensor {
     std::vector<plaidml_expr*> args;
   };
 
+  /// @cond IMPL
   struct Impl {
     std::shared_ptr<plaidml_expr> idxs;
     std::shared_ptr<plaidml_expr> sizes;
@@ -201,6 +205,7 @@ class IndexedTensor {
     const Tensor* src = nullptr;
     void MakeContraction(plaidml_agg_op agg_op, const IndexedTensor& rhs);
   };
+  /// @endcond IMPL
 
  public:
   ~IndexedTensor() = default;
@@ -304,12 +309,14 @@ class Tensor {
   friend class IndexedTensor;
   friend class Value;
 
+  /// @cond IMPL
   struct Impl {
     std::shared_ptr<plaidml_expr> ptr;
     bool has_dims = false;
     std::vector<TensorDim> dims;
     std::string name;
   };
+  /// @endcond IMPL
 
  public:
   Tensor() : impl_(new Impl) {}
@@ -1063,4 +1070,4 @@ inline std::ostream& operator<<(std::ostream& os, const Value& x) {
 }
 
 }  // namespace edsl
-}  // namespace plaidml
+}  // namespace plaidml2

@@ -1,5 +1,7 @@
 // Copyright 2019 Intel Corporation.
 
+/// @cond FFI
+
 #include "plaidml2/edsl/ffi.h"
 
 #include <algorithm>
@@ -1499,3 +1501,5 @@ void plaidml_program_args_free(  //
 }
 
 }  // extern "C"
+
+/// @endcond FFI

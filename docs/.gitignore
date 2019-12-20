@@ -1,3 +1,6 @@
-_site
+_site/
 .sass-cache
 .jekyll-metadata
+api/
+latex/
+xml/

@@ -1,5 +1,7 @@
 // Copyright 2019 Intel Corporation.
 
+/// @cond FFI
+
 #include "plaidml2/core/ffi.h"
 
 #include <cstdlib>
@@ -381,3 +383,5 @@ void plaidml_view_writeback(  //
 VariantHolder::VariantHolder(const Variant& inner) : inner(inner) {}
 
 }  // extern "C"
+
+/// @endcond FFI

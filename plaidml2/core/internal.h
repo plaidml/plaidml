@@ -2,6 +2,8 @@
 
 #pragma once
 
+/// @cond FFI
+
 #include <memory>
 #include <string>
 #include <variant>
@@ -152,3 +154,5 @@ void ffi_wrap_void(plaidml_error* err, F fn) {
 }
 
 }  // namespace plaidml::core
+
+/// @endcond FFI

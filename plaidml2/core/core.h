@@ -11,8 +11,9 @@
 
 #include "plaidml2/core/ffi.h"
 
-namespace plaidml {
+namespace plaidml2 {
 
+/// @cond FFI
 namespace ffi {
 
 inline std::string str(plaidml_string* ptr) {
@@ -41,7 +42,9 @@ void call_void(F fn, Args... args) {
 }
 
 }  // namespace ffi
+/// @endcond FFI
 
+/// @cond IMPL
 namespace details {
 
 template <typename T>
@@ -63,6 +66,7 @@ inline std::shared_ptr<plaidml_view> make_plaidml_view(plaidml_view* ptr) {
 }
 
 }  // namespace details
+/// @endcond IMPL
 
 inline void init() {  //
   ffi::call_void(plaidml_init);
@@ -181,4 +185,4 @@ struct Settings {
   }
 };
 
-}  // namespace plaidml
+}  // namespace plaidml2

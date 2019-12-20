@@ -8,7 +8,7 @@
 #include "plaidml2/edsl/edsl.h"
 #include "plaidml2/op/ffi.h"
 
-namespace plaidml {
+namespace plaidml2 {
 namespace op {
 
 static const char* const NCX = "ncx";
@@ -22,6 +22,8 @@ inline void init() {  //
   ffi::call_void(plaidml_op_init);
 }
 
+/// @cond IMPL
+
 namespace details {
 
 inline edsl::Value op(const std::string& name, const edsl::Value& args) {
@@ -29,6 +31,8 @@ inline edsl::Value op(const std::string& name, const edsl::Value& args) {
 }
 
 }  // namespace details
+
+/// @endcond IMPL
 
 inline edsl::Tensor abs(const edsl::Tensor& I) {
   auto args = edsl::make_tuple(I);
@@ -298,4 +302,4 @@ inline edsl::Tensor variance(const edsl::Tensor& I, const edsl::Value& axes = ed
 }
 
 }  // namespace op
-}  // namespace plaidml
+}  // namespace plaidml2

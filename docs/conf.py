@@ -14,21 +14,18 @@
 # import sys
 # sys.path.insert(0, os.path.abspath('.'))
 
-
 # -- Project information -----------------------------------------------------
 
 project = 'plaidml'
 copyright = '2019, Intel Corporation'
 author = 'plaidml'
 
-
 # -- General configuration ---------------------------------------------------
 
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
-extensions = [
-]
+extensions = []
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -37,7 +34,6 @@ templates_path = ['_templates']
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
-
 
 # -- Options for HTML output -------------------------------------------------
 
@@ -59,25 +55,31 @@ extensions = [
 ]
 
 # Setup the breathe extension
-breathe_projects = {
-    "PlaidML": "./doxyoutput/xml"
-}
+breathe_projects = {"PlaidML": "./xml"}
 breathe_default_project = "PlaidML"
 
 # Setup the exhale extension
 exhale_args = {
     # These arguments are required
-    "containmentFolder":     "./api",
-    "rootFileName":          "plaidml2.rst",
-    "rootFileTitle":         "PlaidML2 API",
-    "afterTitleDescription": "PlaidML is an open source, extensible deep learning tensor compiler.",
-    "doxygenStripFromPath":  "..",
+    "containmentFolder":
+        "./api",
+    "rootFileName":
+        "plaidml2.rst",
+    "rootFileTitle":
+        "PlaidML2 API",
+    "afterTitleDescription":
+        "PlaidML is an open source, extensible deep learning tensor compiler.",
+    "doxygenStripFromPath":
+        "..",
     # Suggested optional arguments
-    "createTreeView":        True,
+    "createTreeView":
+        True,
     # TIP: if using the sphinx-bootstrap-theme, you need
     # "treeViewIsBootstrap": True,
-    "exhaleExecutesDoxygen": True,
-    "exhaleDoxygenStdin":    "INPUT = ../plaidml2"
+    # "exhaleExecutesDoxygen":
+    #     True,
+    # "exhaleDoxygenStdin":
+    #     "INPUT = ../plaidml2"
 }
 
 # Tell sphinx what the primary language being documented is.

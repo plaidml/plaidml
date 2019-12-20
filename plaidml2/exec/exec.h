@@ -11,7 +11,7 @@
 #include "plaidml2/edsl/edsl.h"
 #include "plaidml2/exec/ffi.h"
 
-namespace plaidml {
+namespace plaidml2 {
 namespace exec {
 
 inline void init() {
@@ -19,6 +19,7 @@ inline void init() {
   ffi::call_void(plaidml_exec_init);
 }
 
+/// @cond IMPL
 namespace details {
 
 struct Deleter {
@@ -32,6 +33,7 @@ inline std::shared_ptr<T> make_ptr(T* ptr) {
 }
 
 }  // namespace details
+/// @endcond IMPL
 
 struct Binding {
   edsl::Tensor tensor;
@@ -192,4 +194,4 @@ class Binder {
 
 }  // namespace exec
 
-}  // namespace plaidml
+}  // namespace plaidml2
