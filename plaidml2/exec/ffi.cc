@@ -85,22 +85,28 @@ void plaidml_exec_init(  //
   });
 }
 
-size_t plaidml_device_list_count(  //
+plaidml_strings* plaidml_devices_get(  //
     plaidml_error* err) {
-  return ffi_wrap<size_t>(err, 0, [&] {  //
-    return GetPlatform()->ListDevices().size();
+  return ffi_wrap<plaidml_strings*>(err, nullptr, [&] {
+    auto devices = GetPlatform()->ListDevices();
+    auto strs = new plaidml_string*[devices.size()];
+    for (size_t i = 0; i < devices.size(); i++) {
+      strs[i] = new plaidml_string{devices[i]};
+    }
+    return new plaidml_strings{devices.size(), strs};
   });
 }
 
-void plaidml_device_list(  //
-    plaidml_error* err,    //
-    size_t ndevices,       //
-    plaidml_string** device_ids) {
-  ffi_wrap_void(err, [&] {
-    auto devices = GetPlatform()->ListDevices();
-    for (size_t i = 0; i < std::min(ndevices, devices.size()); i++) {
-      device_ids[i] = new plaidml_string{devices[i]};
+plaidml_strings* plaidml_targets_get(  //
+    plaidml_error* err) {
+  return ffi_wrap<plaidml_strings*>(err, nullptr, [&] {
+    auto configs = GetConfigs().configs();
+    auto strs = new plaidml_string*[configs.size()];
+    size_t i = 0;
+    for (const auto& [key, value] : configs) {
+      strs[i++] = new plaidml_string{key};
     }
+    return new plaidml_strings{configs.size(), strs};
   });
 }
 
@@ -213,29 +219,6 @@ plaidml_executable* plaidml_compile(  //
 
     return exec.release();
 #endif
-  });
-}
-
-size_t plaidml_target_list_count(  //
-    plaidml_error* err) {
-  return ffi_wrap<size_t>(err, 0, [&] {  //
-    return GetConfigs().configs().size();
-  });
-}
-
-void plaidml_target_list(  //
-    plaidml_error* err,    //
-    size_t ntargets,       //
-    plaidml_string** targets) {
-  ffi_wrap_void(err, [&] {
-    auto configs = GetConfigs().configs();
-    size_t i = 0;
-    for (const auto& [key, value] : configs) {
-      if (i >= ntargets) {
-        break;
-      }
-      targets[i++] = new plaidml_string{key};
-    }
   });
 }
 

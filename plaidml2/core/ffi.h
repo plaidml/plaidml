@@ -10,18 +10,6 @@
 #include <stdint.h>
 #endif  // __cplusplus
 
-#if defined _WIN32 || defined __CYGWIN__
-#ifdef PLAIDML_CORE_DLL
-#define PLAIDML_CORE_API __declspec(dllexport)
-#else
-#define PLAIDML_CORE_API __declspec(dllimport)
-#endif
-#elif __GNUC__ >= 4
-#define PLAIDML_CORE_API __attribute__((visibility("default")))
-#else
-#define PLAIDML_CORE_API
-#endif
-
 #ifdef __cplusplus
 extern "C" {
 #endif  // __cplusplus
@@ -32,6 +20,11 @@ extern "C" {
 
 typedef struct plaidml_string plaidml_string;
 typedef struct plaidml_shape plaidml_shape;
+
+typedef struct plaidml_strings {
+  size_t nstrs;
+  plaidml_string** strs;
+} plaidml_strings;
 
 //
 // Execution
@@ -62,10 +55,10 @@ typedef struct {
 // String
 //
 
-PLAIDML_CORE_API const char* plaidml_string_ptr(  //
+const char* plaidml_string_ptr(  //
     plaidml_string* str);
 
-PLAIDML_CORE_API void plaidml_string_free(  //
+void plaidml_string_free(  //
     plaidml_string* str);
 
 //
@@ -77,41 +70,54 @@ typedef struct {
   plaidml_string* msg;
 } plaidml_error;
 
+void plaidml_strings_free(  //
+    plaidml_error* err,     //
+    plaidml_strings* strs);
+
 //
 // Library
 //
 
-PLAIDML_CORE_API void plaidml_init(  //
+typedef struct {
+  plaidml_string* key;
+  plaidml_string* value;
+} plaidml_kvp;
+
+typedef struct {
+  size_t nkvps;
+  plaidml_kvp* kvps;
+} plaidml_settings;
+
+void plaidml_init(  //
     plaidml_error* err);
 
-PLAIDML_CORE_API void plaidml_shutdown(  //
+void plaidml_shutdown(  //
     plaidml_error* err);
 
-PLAIDML_CORE_API const char* plaidml_version(  //
+const char* plaidml_version(  //
     plaidml_error* err);
 
-PLAIDML_CORE_API size_t plaidml_settings_list_count(  //
-    plaidml_error* err);
+void plaidml_settings_free(  //
+    plaidml_error* err,      //
+    plaidml_settings* settings);
 
-PLAIDML_CORE_API void plaidml_settings_list(  //
-    plaidml_error* err,                       //
-    size_t nitems,                            //
-    plaidml_string** keys,                    //
-    plaidml_string** values);
+plaidml_settings* plaidml_settings_list(  //
+    plaidml_error* err                    //
+);
 
-PLAIDML_CORE_API plaidml_string* plaidml_settings_get(  //
-    plaidml_error* err,                                 //
+plaidml_string* plaidml_settings_get(  //
+    plaidml_error* err,                //
     const char* key);
 
-PLAIDML_CORE_API void plaidml_settings_set(  //
-    plaidml_error* err,                      //
-    const char* key,                         //
+void plaidml_settings_set(  //
+    plaidml_error* err,     //
+    const char* key,        //
     const char* value);
 
-PLAIDML_CORE_API void plaidml_settings_load(  //
+void plaidml_settings_load(  //
     plaidml_error* err);
 
-PLAIDML_CORE_API void plaidml_settings_save(  //
+void plaidml_settings_save(  //
     plaidml_error* err);
 
 //
@@ -139,86 +145,86 @@ typedef enum {
   PLAIDML_DATA_PRNG = 0x40,
 } plaidml_datatype;
 
-PLAIDML_CORE_API void plaidml_shape_free(  //
+void plaidml_shape_free(  //
+    plaidml_error* err,   //
+    plaidml_shape* shape);
+
+plaidml_shape* plaidml_shape_alloc(  //
+    plaidml_error* err,              //
+    plaidml_datatype dtype,          //
+    size_t ndims,                    //
+    const int64_t* sizes,            //
+    const int64_t* strides);
+
+plaidml_string* plaidml_shape_repr(  //
+    plaidml_error* err,              //
+    plaidml_shape* shape);
+
+size_t plaidml_shape_get_ndims(  //
+    plaidml_error* err,          //
+    plaidml_shape* shape);
+
+plaidml_datatype plaidml_shape_get_dtype(  //
     plaidml_error* err,                    //
     plaidml_shape* shape);
 
-PLAIDML_CORE_API plaidml_shape* plaidml_shape_alloc(  //
-    plaidml_error* err,                               //
-    plaidml_datatype dtype,                           //
-    size_t ndims,                                     //
-    const int64_t* sizes,                             //
-    const int64_t* strides);
-
-PLAIDML_CORE_API plaidml_string* plaidml_shape_repr(  //
-    plaidml_error* err,                               //
-    plaidml_shape* shape);
-
-PLAIDML_CORE_API size_t plaidml_shape_get_ndims(  //
-    plaidml_error* err,                           //
-    plaidml_shape* shape);
-
-PLAIDML_CORE_API plaidml_datatype plaidml_shape_get_dtype(  //
-    plaidml_error* err,                                     //
-    plaidml_shape* shape);
-
-PLAIDML_CORE_API int64_t plaidml_shape_get_dim_size(  //
-    plaidml_error* err,                               //
-    plaidml_shape* shape,                             //
+int64_t plaidml_shape_get_dim_size(  //
+    plaidml_error* err,              //
+    plaidml_shape* shape,            //
     size_t dim);
 
-PLAIDML_CORE_API int64_t plaidml_shape_get_dim_stride(  //
-    plaidml_error* err,                                 //
-    plaidml_shape* shape,                               //
+int64_t plaidml_shape_get_dim_stride(  //
+    plaidml_error* err,                //
+    plaidml_shape* shape,              //
     size_t dim);
 
-PLAIDML_CORE_API uint64_t plaidml_shape_get_nbytes(  //
-    plaidml_error* err,                              //
+uint64_t plaidml_shape_get_nbytes(  //
+    plaidml_error* err,             //
     plaidml_shape* shape);
 
 //
 // Buffer
 //
 
-PLAIDML_CORE_API void plaidml_buffer_free(  //
+void plaidml_buffer_free(  //
+    plaidml_error* err,    //
+    plaidml_buffer* buffer);
+
+plaidml_buffer* plaidml_buffer_clone(  //
+    plaidml_error* err,                //
+    plaidml_buffer* buffer);
+
+plaidml_buffer* plaidml_buffer_alloc(  //
+    plaidml_error* err,                //
+    const char* device_id,             //
+    size_t size);
+
+plaidml_view* plaidml_buffer_mmap_current(  //
     plaidml_error* err,                     //
     plaidml_buffer* buffer);
 
-PLAIDML_CORE_API plaidml_buffer* plaidml_buffer_clone(  //
-    plaidml_error* err,                                 //
-    plaidml_buffer* buffer);
-
-PLAIDML_CORE_API plaidml_buffer* plaidml_buffer_alloc(  //
-    plaidml_error* err,                                 //
-    const char* device_id,                              //
-    size_t size);
-
-PLAIDML_CORE_API plaidml_view* plaidml_buffer_mmap_current(  //
-    plaidml_error* err,                                      //
-    plaidml_buffer* buffer);
-
-PLAIDML_CORE_API plaidml_view* plaidml_buffer_mmap_discard(  //
-    plaidml_error* err,                                      //
+plaidml_view* plaidml_buffer_mmap_discard(  //
+    plaidml_error* err,                     //
     plaidml_buffer* buffer);
 
 //
 // View
 //
 
-PLAIDML_CORE_API void plaidml_view_free(  //
-    plaidml_error* err,                   //
+void plaidml_view_free(  //
+    plaidml_error* err,  //
     plaidml_view* view);
 
-PLAIDML_CORE_API char* plaidml_view_data(  //
-    plaidml_error* err,                    //
+char* plaidml_view_data(  //
+    plaidml_error* err,   //
     plaidml_view* view);
 
-PLAIDML_CORE_API size_t plaidml_view_size(  //
-    plaidml_error* err,                     //
+size_t plaidml_view_size(  //
+    plaidml_error* err,    //
     plaidml_view* view);
 
-PLAIDML_CORE_API void plaidml_view_writeback(  //
-    plaidml_error* err,                        //
+void plaidml_view_writeback(  //
+    plaidml_error* err,       //
     plaidml_view* view);
 
 #ifdef __cplusplus

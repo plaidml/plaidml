@@ -974,8 +974,8 @@ plaidml_string* plaidml_poly_expr_repr(  //
   });
 }
 
-PLAIDML_EDSL_API plaidml_poly_expr* plaidml_poly_expr_dim(  //
-    plaidml_error* err,                                     //
+plaidml_poly_expr* plaidml_poly_expr_dim(  //
+    plaidml_error* err,                    //
     plaidml_dim_expr* expr) {
   return ffi_wrap<plaidml_poly_expr*>(err, nullptr, [&] {
     IVLOG(3, "plaidml_poly_expr_dim");
@@ -1483,8 +1483,8 @@ plaidml_string* plaidml_program_repr(  //
   });
 }
 
-PLAIDML_EDSL_API void plaidml_program_args_free(  //
-    plaidml_error* err,                           //
+void plaidml_program_args_free(  //
+    plaidml_error* err,          //
     plaidml_program_args* args) {
   ffi_wrap_void(err, [&] {
     IVLOG(3, "plaidml_program_args_free");

@@ -47,6 +47,7 @@ class ScalarType : public mlir::Type::TypeBase<ScalarType, mlir::Type, ScalarTyp
   }
 
   DataType type() { return getImpl()->type; }
+  Type toStandard();
 };
 
 }  // namespace eltwise
