@@ -2,10 +2,11 @@ local exports = [
   // core/ffi.h
   'plaidml_string_ptr',
   'plaidml_string_free',
+  'plaidml_strings_free',
   'plaidml_init',
   'plaidml_shutdown',
   'plaidml_version',
-  'plaidml_settings_list_count',
+  'plaidml_settings_free',
   'plaidml_settings_list',
   'plaidml_settings_get',
   'plaidml_settings_set',
@@ -103,10 +104,8 @@ local exports = [
 
   // exec/ffi.h
   'plaidml_exec_init',
-  'plaidml_device_list_count',
-  'plaidml_device_list',
-  'plaidml_target_list_count',
-  'plaidml_target_list',
+  'plaidml_devices_get',
+  'plaidml_targets_get',
   'plaidml_compile',
   'plaidml_executable_free',
   'plaidml_executable_run',

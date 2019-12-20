@@ -20,17 +20,19 @@ ffi.init_once(__init, 'plaidml_exec_init')
 
 
 def list_devices():
-    ndevices = ffi_call(lib.plaidml_device_list_count)
-    raw_devices = ffi.new('plaidml_string*[]', ndevices)
-    ffi_call(lib.plaidml_device_list, ndevices, raw_devices)
-    return [decode_str(x) for x in raw_devices]
+    strs = ffi_call(lib.plaidml_devices_get)
+    try:
+        return [decode_str(strs[0].strs[i]) for i in range(strs.nstrs)]
+    finally:
+        ffi_call(lib.plaidml_strings_free, strs)
 
 
 def list_targets():
-    ntargets = ffi_call(lib.plaidml_target_list_count)
-    raw_targets = ffi.new('plaidml_string*[]', ntargets)
-    ffi_call(lib.plaidml_target_list, ntargets, raw_targets)
-    return [decode_str(x) for x in raw_targets]
+    strs = ffi_call(lib.plaidml_targets_get)
+    try:
+        return [decode_str(strs[0].strs[i]) for i in range(strs.nstrs)]
+    finally:
+        ffi_call(lib.plaidml_strings_free, strs)
 
 
 class Executable(ForeignObject):

@@ -27,25 +27,15 @@ PLAIDML_EXEC_API void plaidml_exec_init(  //
 // Device
 //
 
-PLAIDML_EXEC_API size_t plaidml_device_list_count(  //
+PLAIDML_EXEC_API plaidml_strings* plaidml_devices_get(  //
     plaidml_error* err);
-
-PLAIDML_EXEC_API void plaidml_device_list(  //
-    plaidml_error* err,                     //
-    size_t ndevices,                        //
-    plaidml_string** device_ids);
 
 //
 // Target
 //
 
-PLAIDML_EXEC_API size_t plaidml_target_list_count(  //
+PLAIDML_EXEC_API plaidml_strings* plaidml_targets_get(  //
     plaidml_error* err);
-
-PLAIDML_EXEC_API void plaidml_target_list(  //
-    plaidml_error* err,                     //
-    size_t ntargets,                        //
-    plaidml_string** targets);
 
 //
 // Executable
