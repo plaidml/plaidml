@@ -33,6 +33,11 @@ extern "C" {
 typedef struct plaidml_string plaidml_string;
 typedef struct plaidml_shape plaidml_shape;
 
+typedef struct plaidml_strings {
+  size_t nstrs;
+  plaidml_string** strs;
+} plaidml_strings;
+
 //
 // Execution
 //
@@ -77,9 +82,23 @@ typedef struct {
   plaidml_string* msg;
 } plaidml_error;
 
+PLAIDML_CORE_API void plaidml_strings_free(  //
+    plaidml_error* err,                      //
+    plaidml_strings* strs);
+
 //
 // Library
 //
+
+typedef struct {
+  plaidml_string* key;
+  plaidml_string* value;
+} plaidml_kvp;
+
+typedef struct {
+  size_t nkvps;
+  plaidml_kvp* kvps;
+} plaidml_settings;
 
 PLAIDML_CORE_API void plaidml_init(  //
     plaidml_error* err);
@@ -90,14 +109,13 @@ PLAIDML_CORE_API void plaidml_shutdown(  //
 PLAIDML_CORE_API const char* plaidml_version(  //
     plaidml_error* err);
 
-PLAIDML_CORE_API size_t plaidml_settings_list_count(  //
-    plaidml_error* err);
-
-PLAIDML_CORE_API void plaidml_settings_list(  //
+PLAIDML_CORE_API void plaidml_settings_free(  //
     plaidml_error* err,                       //
-    size_t nitems,                            //
-    plaidml_string** keys,                    //
-    plaidml_string** values);
+    plaidml_settings* settings);
+
+PLAIDML_CORE_API plaidml_settings* plaidml_settings_list(  //
+    plaidml_error* err                                     //
+);
 
 PLAIDML_CORE_API plaidml_string* plaidml_settings_get(  //
     plaidml_error* err,                                 //

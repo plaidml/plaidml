@@ -4,11 +4,12 @@ from plaidml2.ffi import decode_str, ffi, ffi_call, lib
 
 
 def all():
-    nitems = ffi_call(lib.plaidml_settings_list_count)
-    raw_keys = ffi.new('plaidml_string*[]', nitems)
-    raw_values = ffi.new('plaidml_string*[]', nitems)
-    ffi_call(lib.plaidml_settings_list, nitems, raw_keys, raw_values)
-    return {decode_str(key): decode_str(value) for key, value in zip(raw_keys, raw_values)}
+    settings = ffi_call(lib.plaidml_settings_list)
+    try:
+        x = settings.kvps
+        return {decode_str(x[i].key): decode_str(x[i].value) for i in range(settings.nkvps)}
+    finally:
+        ffi_call(lib.plaidml_settings_free, settings)
 
 
 def get(key):
