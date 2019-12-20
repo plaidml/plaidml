@@ -122,3 +122,13 @@ plaidml_py_library(
     ],
     visibility = ["//visibility:public"],
 )
+
+py_test(
+    name = "py_test",
+    srcs = ["core_test.py"],
+    main = "core_test.py",
+    deps = [
+        ":py",
+        "//plaidml2:py",
+    ],
+)
