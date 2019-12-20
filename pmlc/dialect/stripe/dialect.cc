@@ -2,6 +2,7 @@
 
 #include "pmlc/dialect/stripe/dialect.h"
 
+#include <algorithm>
 #include <utility>
 
 #include "mlir/IR/Dialect.h"
@@ -38,13 +39,17 @@ struct OpAsmInterface : public mlir::OpAsmDialectInterface {
     setNameFn(op->getResult(0), os.str());
   }
 
-  void getRegionArgumentName(mlir::BlockArgument* arg, llvm::raw_ostream& os) const {
-    Operation* op = arg->getOwner()->getParentOp();
-    if (auto vec = op->getAttrOfType<ArrayAttr>("idx_names")) {
-      if (vec.size() > arg->getArgNumber()) {
-        if (auto str_attr = vec.getValue()[arg->getArgNumber()].dyn_cast<StringAttr>()) {
-          os << str_attr.getValue();
-        }
+  void getAsmBlockArgumentNames(mlir::Block* block, mlir::OpAsmSetValueNameFn setNameFn) const final {
+    auto op = block->getParentOp();
+    auto arrayAttr = op->getAttrOfType<ArrayAttr>("idx_names");
+    if (!arrayAttr) {
+      return;
+    }
+    auto args = block->getArguments();
+    auto e = std::min(arrayAttr.size(), args.size());
+    for (unsigned i = 0; i < e; ++i) {
+      if (auto strAttr = arrayAttr.getValue()[i].dyn_cast<StringAttr>()) {
+        setNameFn(args[i], strAttr.getValue());
       }
     }
   }
