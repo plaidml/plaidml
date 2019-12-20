@@ -5,6 +5,8 @@
 #include <algorithm>
 #include <iterator>
 #include <queue>
+#include <utility>
+#include <vector>
 
 namespace vertexai {
 namespace tile {
@@ -20,7 +22,7 @@ void RewriteLocation(stripe::Location* loc, const std::vector<Rewrite>& rewrites
   for (auto& rewrite : rewrites) {
     auto loc_it = loc->devs.begin();
     auto rew_it = rewrite.prefix.begin();
-    for (; loc_it != loc->devs.end() && *loc_it == *rew_it; ++loc_it, ++rew_it) {
+    for (; loc_it != loc->devs.end() && rew_it != rewrite.prefix.end() && *loc_it == *rew_it; ++loc_it, ++rew_it) {
     }
     if (rew_it == rewrite.prefix.end()) {
       std::vector<stripe::Device> target = rewrite.target;
