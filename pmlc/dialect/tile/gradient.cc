@@ -251,15 +251,29 @@ mlir::Value* Gradient::DeriveContraction(mlir::Value* dout, mlir::Value* out, si
     dsrc_idxs.push_back(dim);
   }
 
-  // TODO: Need to copy the constraints!
-  auto dop = builder_->MakeContractionOp(             //
+  std::string new_name;
+  // TODO: Currently names are broken
+  // auto src_name = op.name();
+  // if (src_name) {
+  //   new_name = llvm::formatv("d{0}", op.name()).str();
+  // } // else use the empty string (already initialized by default ctor)
+  auto dop_val = builder_->MakeContractionOp(         //
       util::AggregationKind::add,                     //
       combo_kind,                                     //
       new_srcs,                                       //
       builder_->MakeAffineSinkIndexMapOp(dsrc_idxs),  //
       builder_->MakeAffineSizeMapOp(sizes),           //
-      llvm::formatv("d{0}", op.name()).str());
-  return dop;
+      new_name);
+  // Copy the constraints from the forward pass contraction
+  auto src_cons = llvm::dyn_cast<AffineConstraintsOp>(op.cons()->getDefiningOp());
+  auto dop = llvm::dyn_cast<SymbolicContractionOp>(dop_val->getDefiningOp());
+  auto dst_cons = llvm::dyn_cast<AffineConstraintsOp>(dop.cons()->getDefiningOp());
+  mlir::SmallVector<mlir::Value*, 6> pairs{src_cons.pairs()};
+  for (const auto& pair : src_cons.pairs()) {
+    pairs.emplace_back(pair);
+  }
+  dst_cons.getOperation()->setOperands(pairs);
+  return dop_val;
 }
 
 mlir::Value* Gradient::DeriveSpecial(const mlir::Value* dout, SpecialOp* op, size_t idx) {
