@@ -2,8 +2,6 @@
 
 #pragma once
 
-/// @cond FFI
-
 #ifdef __cplusplus
 #include <cstddef>
 #include <cstdint>
@@ -232,5 +230,3 @@ void plaidml_view_writeback(  //
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus
-
-/// @endcond FFI

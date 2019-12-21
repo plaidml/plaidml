@@ -1,7 +1,5 @@
 // Copyright 2019 Intel Corporation.
 
-/// @cond FFI
-
 #include "plaidml2/op/ffi.h"
 
 #include <mutex>
@@ -44,5 +42,3 @@ plaidml_value* plaidml_op_make(  //
 }
 
 }  // extern "C"
-
-/// @endcond FFI

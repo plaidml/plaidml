@@ -19,7 +19,6 @@ inline void init() {
   ffi::call_void(plaidml_exec_init);
 }
 
-/// @cond IMPL
 namespace details {
 
 struct Deleter {
@@ -33,7 +32,6 @@ inline std::shared_ptr<T> make_ptr(T* ptr) {
 }
 
 }  // namespace details
-/// @endcond IMPL
 
 struct Binding {
   edsl::Tensor tensor;

@@ -47,51 +47,19 @@ extensions = [
     'breathe',
     'sphinx_rtd_theme',
     'sphinxcontrib.katex',
-    # 'exhale',
 ]
 
 # Setup the breathe extension
 breathe_projects = {
     "PlaidML": "./xml",
-    # "edsl": "./xml",
 }
 
 breathe_default_project = "PlaidML"
-
-# breathe_projects_source = {
-#     "edsl": ("../plaidml2/edsl", ["edsl.h"]),
-# }
 
 # breathe_doxygen_config_options = {
 #     'HIDE_FRIEND_COMPOUNDS': 'YES',
 #     'HIDE_UNDOC_CLASSES': 'YES',
 #     'HIDE_UNDOC_MEMBERS': 'YES',
-# }
-
-# Setup the exhale extension
-# exhale_args = {
-#     # These arguments are required
-#     "containmentFolder":
-#         "./exhale",
-#     "rootFileName":
-#         "plaidml2.rst",
-#     "rootFileTitle":
-#         "PlaidML2 API",
-#     "afterTitleDescription":
-#         "PlaidML is an open source, extensible deep learning tensor compiler.",
-#     "doxygenStripFromPath":
-#         "..",
-#     # Suggested optional arguments
-#     "createTreeView":
-#         True,
-#     # TIP: if using the sphinx-bootstrap-theme, you need
-#     # "treeViewIsBootstrap": True,
-#     "exhaleExecutesDoxygen":
-#         True,
-#     "exhaleUseDoxyfile":
-#         True,
-#     # "exhaleDoxygenStdin":
-#     #     "INPUT = ../plaidml2"
 # }
 
 # Tell sphinx what the primary language being documented is.

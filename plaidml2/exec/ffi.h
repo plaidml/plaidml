@@ -2,8 +2,6 @@
 
 #pragma once
 
-/// @cond FFI
-
 #include "plaidml2/core/ffi.h"
 
 #ifdef __cplusplus
@@ -52,5 +50,3 @@ void plaidml_executable_run(  //
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus
-
-/// @endcond FFI

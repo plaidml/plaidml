@@ -22,8 +22,6 @@ inline void init() {  //
   ffi::call_void(plaidml_op_init);
 }
 
-/// @cond IMPL
-
 namespace details {
 
 inline edsl::Value op(const std::string& name, const edsl::Value& args) {
@@ -31,8 +29,6 @@ inline edsl::Value op(const std::string& name, const edsl::Value& args) {
 }
 
 }  // namespace details
-
-/// @endcond IMPL
 
 inline edsl::Tensor abs(const edsl::Tensor& I) {
   auto args = edsl::make_tuple(I);
