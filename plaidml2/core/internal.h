@@ -95,7 +95,7 @@ struct plaidml_value {
 
 }  // extern "C"
 
-namespace plaidml::core {
+namespace plaidml2::core {
 
 struct GlobalContext {
 #ifdef PLAIDML_MLIR
@@ -151,4 +151,4 @@ void ffi_wrap_void(plaidml_error* err, F fn) {
   }
 }
 
-}  // namespace plaidml::core
+}  // namespace plaidml2::core

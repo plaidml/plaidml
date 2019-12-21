@@ -7,8 +7,7 @@
 
 #include "plaidml2/core/ffi.h"
 
-namespace plaidml {
-namespace core {
+namespace plaidml2::core {
 
 class Settings {
  public:
@@ -28,5 +27,4 @@ class Settings {
   std::map<std::string, std::string> settings_;
 };
 
-}  // namespace core
-}  // namespace plaidml
+}  // namespace plaidml2::core

@@ -6,7 +6,7 @@
 #include "pmlc/dialect/stripe/transcode.h"
 #include "pmlc/dialect/tile/lowering.h"
 
-namespace plaidml::edsl {
+namespace plaidml2::edsl {
 
 using StripeProgram = vertexai::tile::stripe::Program;
 using pmlc::dialect::stripe::FromMLIR;
@@ -18,4 +18,4 @@ std::shared_ptr<StripeProgram> ConvertIntoStripe(const Program& program) {
   return FromMLIR(*module);
 }
 
-}  // namespace plaidml::edsl
+}  // namespace plaidml2::edsl

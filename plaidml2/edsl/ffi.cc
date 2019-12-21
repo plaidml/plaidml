@@ -28,9 +28,9 @@
 #include "pmlc/util/enums.h"
 #endif
 
-using plaidml::core::ffi_wrap;
-using plaidml::core::ffi_wrap_void;
-using plaidml::core::GlobalContext;
+using plaidml2::core::ffi_wrap;
+using plaidml2::core::ffi_wrap_void;
+using plaidml2::core::GlobalContext;
 using vertexai::tile::DataType;
 
 #ifdef PLAIDML_AST
@@ -176,7 +176,7 @@ void plaidml_edsl_init(  //
     std::call_once(is_initialized, []() {
       IVLOG(1, "plaidml_edsl_init");
 #ifdef PLAIDML_AST
-      plaidml::edsl::RegisterDerivs();
+      plaidml2::edsl::RegisterDerivs();
 #endif
     });
   });

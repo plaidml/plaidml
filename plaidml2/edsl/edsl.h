@@ -64,7 +64,7 @@ void into_vector(std::vector<T>* into, Head&& head, Tail&&... tail) {
 /// TODO
 ///
 inline void init() {
-  plaidml::init();
+  plaidml2::init();
   ffi::call_void(plaidml_edsl_init);
 }
 
@@ -87,11 +87,6 @@ class Program {
       const std::vector<std::tuple<Tensor, Tensor>>& updates = {});
 
   ///
-  /// as_ptr
-  ///
-  plaidml_program* as_ptr() const { return ptr_.get(); }
-
-  ///
   /// Return the Program as a string.
   ///
   std::string str() const { return ffi::str(ffi::call<plaidml_string*>(plaidml_program_repr, ptr_.get())); }
@@ -110,6 +105,8 @@ class Program {
   /// outputs
   ///
   const std::vector<ProgramArgument>& outputs() const { return outputs_; }
+
+  plaidml_program* as_ptr() const { return ptr_.get(); }
 
  private:
   std::shared_ptr<plaidml_program> ptr_;
@@ -164,9 +161,6 @@ class TensorDim {
     return ffi::call<int64_t>(plaidml_dim_expr_get_int, ptr_.get());
   }
 
-  ///
-  /// TODO
-  ///
   plaidml_dim_expr* as_ptr() const { return ptr_.get(); }
 
  private:
@@ -235,9 +229,6 @@ class TensorIndex {
     return ffi::str(ffi::call<plaidml_string*>(plaidml_poly_expr_repr, as_ptr()));
   }
 
-  ///
-  /// TODO
-  ///
   plaidml_poly_expr* as_ptr() const { return ptr_.get(); }
 
  private:
@@ -394,11 +385,6 @@ class LogicalShape {
   ///
   /// TODO
   ///
-  plaidml_logical_shape* as_ptr() const { return ptr_.get(); }
-
-  ///
-  /// TODO
-  ///
   std::string str() const {  //
     return ffi::str(ffi::call<plaidml_string*>(plaidml_logical_shape_repr, ptr_.get()));
   }
@@ -432,6 +418,8 @@ class LogicalShape {
   /// TODO
   ///
   bool operator==(const LogicalShape& rhs) const { return str() == rhs.str(); }
+
+  plaidml_logical_shape* as_ptr() const { return ptr_.get(); }
 
  private:
   explicit LogicalShape(plaidml_logical_shape* ptr) : ptr_(details::make_ptr(ptr)) {}
@@ -613,10 +601,6 @@ class Tensor {
     return ffi::str(ffi::call<plaidml_string*>(plaidml_expr_repr, as_ptr()));
   }
 
-  plaidml_expr* as_ptr() const { return impl_->ptr.get(); }
-
-  void* raw_ptr() const { return ffi::call<void*>(plaidml_expr_ptr, as_ptr()); }
-
   ///
   /// Enable no_reduce on a contraction
   ///
@@ -678,6 +662,10 @@ class Tensor {
     details::into_vector(&vec, std::forward<Ts>(dims)...);
     bind_dims(vec);
   }
+
+  plaidml_expr* as_ptr() const { return impl_->ptr.get(); }
+
+  void* raw_ptr() const { return ffi::call<void*>(plaidml_expr_ptr, as_ptr()); }
 
  private:
   explicit Tensor(std::unique_ptr<Impl> impl) : impl_(std::move(impl)) {}

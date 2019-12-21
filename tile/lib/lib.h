@@ -7,9 +7,9 @@
 
 namespace vertexai::tile::lib {
 
-using plaidml::edsl::LogicalShape;
-using plaidml::edsl::Program;
-using plaidml::edsl::Tensor;
+using plaidml2::edsl::LogicalShape;
+using plaidml2::edsl::Program;
+using plaidml2::edsl::Tensor;
 
 enum class ConvolutionFormat {
   ChannelsFirst,

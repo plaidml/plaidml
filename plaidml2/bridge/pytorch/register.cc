@@ -32,8 +32,8 @@ static std::string g_target_id;  // NOLINT
 size_t g_verbosity = 0;
 
 PYBIND11_MODULE(plaidml_pytorch, module) {
-  plaidml::op::init();
-  plaidml::exec::init();
+  plaidml2::op::init();
+  plaidml2::exec::init();
 
   RegisterPass pass([](std::shared_ptr<Graph> graph) {
     if (g_fusion_enabled) {

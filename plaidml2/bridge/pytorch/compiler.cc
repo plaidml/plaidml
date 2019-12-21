@@ -8,8 +8,8 @@
 #include "plaidml2/op/op.h"
 
 using namespace torch::jit;  // NOLINT
-namespace edsl = plaidml::edsl;
-namespace op = plaidml::op;
+namespace edsl = plaidml2::edsl;
+namespace op = plaidml2::op;
 
 using OpFunction = std::function<edsl::Tensor(const std::vector<edsl::Value>& args)>;
 
@@ -624,7 +624,7 @@ Executable::Executable(                       //
   // program_ = std::make_unique<edsl::Program>(name_, outputs);
   IVLOG(1, "Executable::Executable>");
   IVLOG(2, program.str());
-  binder_ = std::make_unique<plaidml::exec::Binder>(program);
+  binder_ = std::make_unique<plaidml2::exec::Binder>(program);
   // for (size_t i = 0; i < outputs.size(); i++) {
   //   // auto shape = outputs[i].shape();
   //   // plaidml::TensorShape tensor_shape(shape.dtype(), shape.int_dims());

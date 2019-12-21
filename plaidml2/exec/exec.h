@@ -15,7 +15,7 @@ namespace plaidml2 {
 namespace exec {
 
 inline void init() {
-  plaidml::init();
+  plaidml2::init();
   ffi::call_void(plaidml_exec_init);
 }
 

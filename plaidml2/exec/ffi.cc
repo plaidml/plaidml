@@ -25,10 +25,10 @@
 #include "pmlc/dialect/tile/program.h"
 #endif
 
-using plaidml::core::ffi_wrap;
-using plaidml::core::ffi_wrap_void;
-using plaidml::core::GetPlatform;
-using plaidml::core::GlobalContext;
+using plaidml2::core::ffi_wrap;
+using plaidml2::core::ffi_wrap_void;
+using plaidml2::core::GetPlatform;
+using plaidml2::core::GlobalContext;
 using vertexai::context::Context;
 using vertexai::tile::Allocator;
 using vertexai::tile::Buffer;

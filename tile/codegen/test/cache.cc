@@ -20,7 +20,7 @@ namespace codegen {
 namespace test {
 
 using namespace stripe;  // NOLINT
-using plaidml::edsl::LogicalShape;
+using plaidml2::edsl::LogicalShape;
 
 TEST(Codegen, Cache) {
   std::map<std::string, std::vector<float>> data = {
@@ -63,7 +63,7 @@ TEST(Codegen, Cache) {
       "matmul",                                        //
       LogicalShape(PLAIDML_DATA_FLOAT32, {dim, dim}),  //
       LogicalShape(PLAIDML_DATA_FLOAT32, {dim, dim}));
-  auto program = plaidml::edsl::ConvertIntoStripe(tileProgram);
+  auto program = plaidml2::edsl::ConvertIntoStripe(tileProgram);
   auto main = program->entry->SubBlock(0);
   auto kernel = main->SubBlock(0);
   IVLOG(2, "Original>\n" << *program->entry);
@@ -94,7 +94,7 @@ TEST(Codegen, CacheConv2d) {
       LogicalShape(PLAIDML_DATA_FLOAT32, {100, 14, 14, 3}),  //
       LogicalShape(PLAIDML_DATA_FLOAT32, {3, 3, 3, 3}),      //
       {100, 12, 12, 3});
-  auto program = plaidml::edsl::ConvertIntoStripe(tileProgram);
+  auto program = plaidml2::edsl::ConvertIntoStripe(tileProgram);
   auto main = program->entry->SubBlock(0);
   auto kernel = main->SubBlock(0);
 

@@ -5,7 +5,11 @@
 #include "plaidml2/exec/exec.h"
 #include "plaidml2/op/op.h"
 
-namespace plaidml::networks::oplib {
+namespace edsl = plaidml2::edsl;
+namespace exec = plaidml2::exec;
+namespace op = plaidml2::op;
+
+namespace networks::oplib {
 
 namespace {
 
@@ -267,7 +271,7 @@ std::vector<edsl::Tensor> bias_placeholders() {
 
 struct resnet50 : public benchmark::Fixture {
   void SetUp(const benchmark::State& state) {  //
-    plaidml::op::init();
+    plaidml2::op::init();
   }
 
   edsl::Program build(                     //
@@ -416,4 +420,4 @@ BENCHMARK_REGISTER_F(resnet50, compile)->Unit(benchmark::kMillisecond);
 // TODO: get HAL timer results, UseManualTime() instead of UseRealTime()
 BENCHMARK_REGISTER_F(resnet50, run)->Unit(benchmark::kMillisecond)->UseRealTime();
 
-}  // namespace plaidml::networks::oplib
+}  // namespace networks::oplib

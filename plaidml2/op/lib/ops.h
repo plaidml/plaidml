@@ -7,7 +7,7 @@
 
 #include "plaidml2/edsl/edsl.h"
 
-namespace plaidml::op::lib {
+namespace plaidml2::op::lib {
 
 using Operation = std::function<edsl::Value(const edsl::Value& value)>;
 
@@ -36,4 +36,4 @@ class OperationRegistry {
 
 void RegisterOps();
 
-}  // namespace plaidml::op::lib
+}  // namespace plaidml2::op::lib

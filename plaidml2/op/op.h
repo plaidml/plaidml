@@ -17,8 +17,8 @@ static const char* const KCX = "kcx";
 static const char* const XCK = "xck";
 
 inline void init() {  //
-  plaidml::init();
-  plaidml::edsl::init();
+  plaidml2::init();
+  plaidml2::edsl::init();
   ffi::call_void(plaidml_op_init);
 }
 

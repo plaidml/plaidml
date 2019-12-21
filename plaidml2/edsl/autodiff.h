@@ -7,7 +7,7 @@
 
 #include "plaidml2/edsl/edsl.h"
 
-namespace plaidml {
+namespace plaidml2 {
 namespace edsl {
 
 // Given a forward pass tensor operation that takes inputs `wrt` and produces output `loss`,
@@ -37,4 +37,4 @@ inline void RegisterTensorDeriv(const std::string& name, TensorDeriv fn) {
 }
 
 }  // namespace edsl
-}  // namespace plaidml
+}  // namespace plaidml2

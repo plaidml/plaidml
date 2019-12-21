@@ -19,14 +19,14 @@ namespace codegen {
 namespace pattern {
 namespace test {
 
-using namespace lang;           // NOLINT
-using namespace stripe;         // NOLINT
-using namespace plaidml::edsl;  // NOLINT
-using plaidml::edsl::LogicalShape;
+using namespace lang;            // NOLINT
+using namespace stripe;          // NOLINT
+using namespace plaidml2::edsl;  // NOLINT
+using plaidml2::edsl::LogicalShape;
 
 std::shared_ptr<stripe::Program> Evaluate(const std::string& name, const std::vector<Tensor>& vars) {
-  plaidml::edsl::Program program(name, vars);
-  return plaidml::edsl::ConvertIntoStripe(program);
+  plaidml2::edsl::Program program(name, vars);
+  return plaidml2::edsl::ConvertIntoStripe(program);
 }
 
 void RoundTrip(const std::string& code) { EXPECT_THAT(to_string(Parse(code)), Eq(code)); }

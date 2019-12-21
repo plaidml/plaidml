@@ -8,7 +8,7 @@
 
 namespace vertexai::tile::lib {
 
-using plaidml::edsl::Program;
+using plaidml2::edsl::Program;
 
 void RegisterTest(const std::string& name, std::function<Program()> factory);
 std::optional<Program> CreateTest(const std::string& name);

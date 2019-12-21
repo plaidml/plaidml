@@ -10,7 +10,7 @@
 
 namespace vertexai::tile::lib {
 
-using namespace plaidml::edsl;  // NOLINT
+using namespace plaidml2::edsl;  // NOLINT
 
 namespace {
 

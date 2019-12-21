@@ -15,21 +15,21 @@
 
 class Executable {
  public:
-  Executable(const std::string& device_id,                      //
-             const std::string& target_id,                      //
-             const std::vector<plaidml::edsl::Tensor>& inputs,  //
-             const std::vector<plaidml::edsl::Tensor>& outputs);
+  Executable(const std::string& device_id,                       //
+             const std::string& target_id,                       //
+             const std::vector<plaidml2::edsl::Tensor>& inputs,  //
+             const std::vector<plaidml2::edsl::Tensor>& outputs);
 
   at::ArrayRef<torch::jit::IValue> run(at::ArrayRef<torch::jit::IValue> inputs);
 
  private:
   std::string device_id_;
   std::string target_id_;
-  std::unique_ptr<plaidml::edsl::Program> program_;
-  std::unique_ptr<plaidml::exec::Binder> binder_;
-  std::shared_ptr<plaidml::exec::Executable> exec_;
-  // std::vector<plaidml::exec::Binding> input_bindings_;
-  // std::vector<plaidml::exec::Binding> output_bindings_;
+  std::unique_ptr<plaidml2::edsl::Program> program_;
+  std::unique_ptr<plaidml2::exec::Binder> binder_;
+  std::shared_ptr<plaidml2::exec::Executable> exec_;
+  // std::vector<plaidml2::exec::Binding> input_bindings_;
+  // std::vector<plaidml2::exec::Binding> output_bindings_;
   std::vector<torch::jit::IValue> output_ivalues_;
   std::string name_;
 };
