@@ -4,3 +4,11 @@ gem install --user-install bundler jekyll
 bundle install
 bundle exec jekyll server --livereload
 ```
+
+
+```
+pip install breathe
+pip install livereload
+pip install sphinx-rtd-theme
+pip install sphinxcontrib-katex
+```

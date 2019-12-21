@@ -10,10 +10,13 @@ Welcome to plaidml's documentation!
    :maxdepth: 2
    :caption: Contents:
 
-   api/plaidml2
+   usage/install
+   usage/building
+   manual_api/index
 
-   PlaidML2 Core API <api/dir_plaidml2_core>
+Indices and tables
+==================
 
-   PlaidML2 EDSL API <api/dir_plaidml2_edsl>
-
-   PlaidML2 Execution API <api/dir_plaidml2_exec>
+* :ref:`genindex`
+* :ref:`modindex`
+* :ref:`search`
