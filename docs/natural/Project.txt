@@ -9,7 +9,7 @@
 # ------------------------------------------------------------------------
 
 Title: PlaidML
-Subtitle: An open source, extensible deep learning tensor compiler.
+Subtitle: A platform for making deep learning work everywhere.
 
 Copyright: © 2019 Intel Corporation.
 
@@ -37,8 +37,16 @@ Timestamp: mm/dd/yyyy
 # Source Code
 # ------------------------------------------------------------------------
 
-Source Folder: ../../plaidml2
-   Name: PlaidML2 Reference Guide
+Source Folder: ../../plaidml2/core
+   Name: Core API
+
+Source Folder 2: ../../plaidml2/edsl
+   Name: EDSL API
+
+Source Folder 3: ../../plaidml2/exec
+   Name: Execution API
+
+
 
 
 
@@ -51,12 +59,8 @@ Source Folder: ../../plaidml2
 # control systems.  You can enter absolute paths and they will be converted
 # automatically.
 #
- Source Folder: ../../plaidml2/core
-    Name: Core APIs
- Source Folder: ../../plaidml2/edsl
-    Name: EDSL APIs
- Source Folder: ../../plaidml2/exec
-    Name: Execution APIs
+# Source Folder: [path]
+#    Name: [name]
 #
 #    Specifies a folder which will be searched for source files.  If you have
 #    more than one, add the Name property to set how it will show up in the
@@ -86,7 +90,7 @@ Source Folder: ../../plaidml2
 # Generated Documentation
 # ------------------------------------------------------------------------
 
-HTML Output Folder: ../generated_docs
+HTML Output Folder: ../html
 
 
 # This is where you specify what kind of documentation you want Natural Docs
