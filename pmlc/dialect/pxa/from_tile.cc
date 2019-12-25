@@ -1,7 +1,5 @@
 // Copyright 2019, Intel Corporation
 
-#include "pmlc/dialect/pxa/from_tile.h"
-
 #include "mlir/Dialect/AffineOps/AffineOps.h"
 #include "mlir/Dialect/StandardOps/Ops.h"
 #include "mlir/Pass/Pass.h"
@@ -14,6 +12,7 @@
 #include "pmlc/dialect/eltwise/ops.h"
 #include "pmlc/dialect/pxa/dialect.h"
 #include "pmlc/dialect/pxa/ops.h"
+#include "pmlc/dialect/pxa/passes.h"
 #include "pmlc/dialect/tile/contraction.h"
 #include "pmlc/dialect/tile/ops.h"
 #include "pmlc/util/util.h"
@@ -349,19 +348,23 @@ void LoweringPass::runOnModule() {
   getModule().walk([](FuncOp op) {
     mlir::Block& block = op.getBody().front();
     auto ret = mlir::cast<ReturnOp>(block.back());
-    size_t cur_arg = op.getType().getNumInputs() - ret.getNumOperands();
-    for (Value* v : ret.getOperands()) {
-      auto defOp = v->getDefiningOp();
-      v->replaceAllUsesWith(block.getArgument(cur_arg++));
+    size_t blockArg = op.getType().getNumInputs() - ret.getNumOperands();
+    for (auto operand : ret.operands()) {
+      auto defOp = operand->getDefiningOp();
+      operand->replaceAllUsesWith(block.getArgument(blockArg++));
       defOp->erase();
     }
     ret.erase();
+    OpBuilder builder(&block);
+    builder.create<ReturnOp>(op.getLoc());
   });
-
-  // Do the final
 }
 
-}  // anonymous namespace
+}  // namespace
+
+std::unique_ptr<mlir::Pass> createLowerToPXAPass() {  //
+  return std::make_unique<LoweringPass>();
+}
 
 static mlir::PassRegistration<LoweringPass> legalize_pass(  //
     "tile-legalize-to-pxa",                                 //

@@ -7,9 +7,12 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <utility>
+#include <vector>
 
 #include "llvm/Support/FormatVariadic.h"
 
+#include "base/util/env.h"
 #include "plaidml2/core/internal.h"
 #include "tile/targets/targets.h"
 
@@ -17,8 +20,20 @@
 #include "tile/lang/gen_stripe.h"
 #endif
 #ifdef PLAIDML_MLIR
+#include "mlir/Conversion/LoopToStandard/ConvertLoopToStandard.h"
+#include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
+#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/Dialect/StandardOps/Ops.h"
+#include "mlir/ExecutionEngine/ExecutionEngine.h"
+#include "mlir/ExecutionEngine/OptUtils.h"
+#include "mlir/Pass/Pass.h"
+#include "mlir/Pass/PassManager.h"
 #include "mlir/Support/DebugStringHelper.h"
+#include "mlir/Target/LLVMIR.h"
+#include "mlir/Transforms/Passes.h"
+#include "llvm/Support/TargetSelect.h"
 
+#include "pmlc/dialect/pxa/passes.h"
 #include "pmlc/dialect/stripe/dialect.h"
 #include "pmlc/dialect/stripe/transcode.h"
 #include "pmlc/dialect/tile/lowering.h"
@@ -29,6 +44,7 @@ using plaidml::core::ffi_wrap;
 using plaidml::core::ffi_wrap_void;
 using plaidml::core::GetPlatform;
 using plaidml::core::GlobalContext;
+using pmlc::dialect::tile::ProgramArgument;
 using vertexai::context::Context;
 using vertexai::tile::Allocator;
 using vertexai::tile::Buffer;
@@ -43,9 +59,12 @@ using vertexai::tile::lang::ast::ExprPtr;
 using vertexai::tile::lang::ast::ParamExpr;
 #endif
 #ifdef PLAIDML_MLIR
-using pmlc::dialect::stripe::Dialect;
+using pmlc::dialect::pxa::createLowerToAffinePass;
+using pmlc::dialect::pxa::createLowerToPXAPass;
+using StripeDialect = pmlc::dialect::stripe::Dialect;
 using pmlc::dialect::stripe::FromMLIR;
 using pmlc::dialect::tile::LowerIntoStripe;
+using namespace mlir;  // NOLINT[build/namespaces]
 #endif
 
 namespace {
@@ -63,15 +82,280 @@ class PlatformAllocator : public Allocator {
   std::string device_id_;
 };
 
+template <typename T, int N>
+struct StridedMemRefType {
+  T* basePtr;
+  T* data;
+  int64_t offset;
+  int64_t sizes[N];
+  int64_t strides[N];
+};
+
+template <typename StreamType, typename T, int N>
+void printMemRefMetaData(StreamType& os, StridedMemRefType<T, N>* memref) {  // NOLINT[runtime/references]
+  static_assert(N > 0, "Expected N > 0");
+  os << "Memref ptr: " << reinterpret_cast<void*>(memref);
+  os << " base: " << reinterpret_cast<void*>(memref->data);
+  os << " rank: " << N;
+  os << " offset: " << memref->offset;
+  os << " sizes: [";
+  for (unsigned i = 0; i < N; ++i) {
+    if (i) {
+      os << ", ";
+    }
+    os << memref->sizes[i];
+  }
+  os << "] strides: [";
+  for (unsigned i = 0; i < N; ++i) {
+    if (i) {
+      os << ", ";
+    }
+    os << memref->strides[i];
+  }
+  os << "]";
+}
+
+template <typename T, int N>
+void printMemRef(StridedMemRefType<T, N>* memref) {
+  static_assert(N > 0, "Expected N > 0");
+  printMemRefMetaData(std::cout, memref);
+  // std::cout << " data = " << std::endl;
+  // MemRefDataPrinter<T, N>::print(std::cout, M.data, N, M.offset, M.sizes, M.strides);
+  std::cout << std::endl;
+}
+
+struct MemRefDescriptor {
+  MemRefDescriptor(void* data, MemRefType type) : memory(computeSize(type)) {
+    IVLOG(1, "descriptor size: " << memory.size());
+    int64_t offset;
+    SmallVector<int64_t, 4> strides;
+    auto maybeStrides = getStridesAndOffset(type, strides, offset);
+    if (failed(maybeStrides)) {
+      throw std::runtime_error("unexpected non-strided memref");
+    }
+    IVLOG(1, "type: " << debugString(type) << ", offset: " << offset);
+
+    auto ptr = memory.data();
+    std::memcpy(ptr, &data, sizeof(void*));
+    ptr += sizeof(void*);
+    std::memcpy(ptr, &data, sizeof(void*));
+    ptr += sizeof(void*);
+    std::memcpy(ptr, &offset, sizeof(int64_t));
+    ptr += sizeof(int64_t);
+    auto sizes = type.getShape();
+    for (unsigned i = 0; i < type.getRank(); i++) {
+      IVLOG(1, "  size: " << sizes[i] << ", stride: " << strides[i]);
+      std::memcpy(ptr, &sizes[i], sizeof(int64_t));
+      ptr += sizeof(int64_t);
+      std::memcpy(ptr, &strides[i], sizeof(int64_t));
+      ptr += sizeof(int64_t);
+    }
+  }
+
+  static unsigned computeSize(MemRefType type) {
+    return sizeof(void*) +                     // allocatedPtr
+           sizeof(void*) +                     // alignedPtr
+           sizeof(int64_t) +                   // offset
+           sizeof(int64_t) * type.getRank() +  // sizes
+           sizeof(int64_t) * type.getRank();   // strides
+  }
+
+  std::vector<char> memory;
+};
+
+struct Executable {
+  std::string entry;
+  std::unique_ptr<ExecutionEngine> engine;
+  std::vector<MemRefDescriptor> descriptors;
+  std::vector<void*> args;
+  std::vector<void*> ptrs;
+
+  Executable(StringRef entry, ModuleOp programModule, ArrayRef<ProgramArgument> programArgs);
+
+  void invoke() {
+    auto result = engine->invoke(entry, llvm::MutableArrayRef<void*>(args));
+    if (result) {
+      throw std::runtime_error("JIT invocation failed");
+    }
+  }
+};
+
+using MemRefTypes = std::vector<MemRefType>;
+
+class ArgumentCollectorPass : public FunctionPass<ArgumentCollectorPass> {
+ public:
+  explicit ArgumentCollectorPass(MemRefTypes* into) : into(into) {}
+
+  void runOnFunction() override {
+    auto funcOp = getFunction();
+    for (auto arg : funcOp.getArguments()) {
+      into->emplace_back(arg->getType().cast<MemRefType>());
+    }
+  }
+
+  static std::unique_ptr<Pass> create(MemRefTypes* into) { return std::make_unique<ArgumentCollectorPass>(into); }
+
+ private:
+  MemRefTypes* into;
+};
+
+class InjectTracingPass : public FunctionPass<InjectTracingPass> {
+ public:
+  void runOnFunction() override {
+    auto funcOp = getFunction();
+    auto moduleOp = funcOp.getParentOfType<ModuleOp>();
+
+    OpBuilder builder(funcOp.getBody());
+    for (auto arg : funcOp.getArguments()) {
+      auto memRefType = arg->getType().cast<MemRefType>();
+      SmallVector<int64_t, 2> shape(memRefType.getRank(), MemRefType::kDynamicSize);
+      auto genericType = MemRefType::get(shape, memRefType.getElementType());
+      auto printRef = getOrInsertPrint(moduleOp, genericType);
+      auto castOp = builder.create<MemRefCastOp>(builder.getUnknownLoc(), genericType, arg);
+      builder.create<CallOp>(builder.getUnknownLoc(), printRef, ArrayRef<Type>{}, castOp.getResult());
+    }
+  }
+
+  static FlatSymbolRefAttr getOrInsertPrint(ModuleOp module, MemRefType memRefType) {
+    auto* context = module.getContext();
+    // TODO: select symbol name based on memRefType
+    const char* symbol = "print_memref_2d_f32";
+    if (module.lookupSymbol<FuncOp>(symbol)) {
+      return SymbolRefAttr::get(symbol, context);
+    }
+    OpBuilder builder(context);
+    builder.setInsertionPointToStart(module.getBody());
+    auto funcType = FunctionType::get(memRefType, {}, context);
+    builder.create<FuncOp>(module.getLoc(), symbol, funcType, ArrayRef<NamedAttribute>{});
+    return SymbolRefAttr::get(symbol, context);
+  }
+
+  static std::unique_ptr<Pass> create() { return std::make_unique<InjectTracingPass>(); }
+};
+
+Executable::Executable(StringRef entry, ModuleOp programModule, ArrayRef<ProgramArgument> programArgs)
+    : entry(entry), args(programArgs.size()), ptrs(programArgs.size()) {
+  auto copy = cast<ModuleOp>(programModule.getOperation()->clone());
+  OwningModuleRef module(copy);
+  PassManager manager(module->getContext());
+  auto shouldPrintBeforePass = [](auto, auto) { return false; };
+  auto shouldPrintAfterPass = [](auto, auto) { return true; };
+  std::vector<MemRefType> memRefTypes;
+  manager.enableIRPrinting(shouldPrintBeforePass, shouldPrintAfterPass, true, true, llvm::errs());
+  manager.addNestedPass<FuncOp>(createCanonicalizerPass());
+  manager.addNestedPass<FuncOp>(createCSEPass());
+  manager.addPass(createLowerToPXAPass());
+  manager.addNestedPass<FuncOp>(createCanonicalizerPass());
+  manager.addNestedPass<FuncOp>(createCSEPass());
+  manager.addPass(createLowerToAffinePass());
+  manager.addNestedPass<FuncOp>(createCanonicalizerPass());
+  manager.addNestedPass<FuncOp>(createCSEPass());
+  manager.addPass(createLowerAffinePass());
+  manager.addNestedPass<FuncOp>(createCanonicalizerPass());
+  manager.addNestedPass<FuncOp>(createCSEPass());
+  // manager.addPass(createLowerToCFGPass());
+  // manager.addNestedPass<FuncOp>(createCanonicalizerPass());
+  // manager.addNestedPass<FuncOp>(createCSEPass());
+  manager.addPass(ArgumentCollectorPass::create(&memRefTypes));
+  if (VLOG_IS_ON(6)) {
+    manager.addPass(InjectTracingPass::create());
+  }
+  manager.addPass(createLowerToLLVMPass(true));
+  if (failed(manager.run(*module))) {
+    throw std::runtime_error("conversion to the LLVM IR dialect failed");
+  }
+
+  assert(memRefTypes.size() == programArgs.size() && "memRefTypes and programArgs size mismatch");
+
+  auto optPipeline = makeOptimizingTransformer(
+      /*optLevel=*/0, /*sizeLevel=*/0,
+      /*targetMachine=*/nullptr);
+
+  if (VLOG_IS_ON(6)) {
+    std::unique_ptr<llvm::LLVMContext> llvmContext(new llvm::LLVMContext);
+    auto llvmModule = translateModuleToLLVMIR(*module);
+    if (!llvmModule) {
+      throw std::runtime_error("could not convert to LLVM IR");
+    }
+    llvmModule->print(llvm::errs(), nullptr);
+  }
+
+  auto maybeEngine = ExecutionEngine::create(*module, optPipeline);
+  llvm::handleAllErrors(maybeEngine.takeError(), [](const llvm::ErrorInfoBase& b) {
+    b.log(llvm::errs());
+    throw std::runtime_error("Failed to create ExecutionEngine");
+  });
+
+  engine = std::move(*maybeEngine);
+  descriptors.reserve(args.size());
+
+  auto ctx = GlobalContext::getContext();
+  for (unsigned i = 0; i < args.size(); i++) {
+    auto view = programArgs[i].buffer->MapCurrent(*ctx).get();
+    descriptors.emplace_back(view->data(), memRefTypes[i]);
+    ptrs[i] = descriptors[i].memory.data();
+    args[i] = &ptrs[i];
+  }
+}
+
+std::unique_ptr<Executable> MakeExecutionEngine(  //
+    plaidml_program* program,                     //
+    const char* device,                           //
+    const char* target,                           //
+    size_t ninputs,                               //
+    plaidml_binding** inputs,                     //
+    size_t noutputs,                              //
+    plaidml_binding** outputs) {
+  std::unordered_map<Value*, BufferPtr> input_bindings;
+  for (unsigned i = 0; i < ninputs; i++) {
+    input_bindings[inputs[i]->expr->value] = inputs[i]->buffer->buffer;
+  }
+
+  std::unordered_map<Value*, BufferPtr> output_bindings;
+  for (unsigned i = 0; i < noutputs; i++) {
+    output_bindings[outputs[i]->expr->value] = outputs[i]->buffer->buffer;
+  }
+
+  std::vector<ProgramArgument> args(program->program->arguments.size());
+  for (unsigned i = 0; i < args.size(); i++) {
+    auto arg = program->program->arguments[i];
+    if (arg.isInput) {
+      auto it = input_bindings.find(arg.value);
+      if (it != input_bindings.end()) {
+        arg.buffer = it->second;
+      }
+      IVLOG(1, " Input[" << i << "]: " << arg.buffer);
+      if (!arg.buffer) {
+        throw std::runtime_error("Unbound input");
+      }
+    } else {
+      auto it = output_bindings.find(arg.value);
+      if (it != output_bindings.end()) {
+        arg.buffer = it->second;
+      }
+      IVLOG(1, "Output[" << i << "]: " << arg.buffer);
+      if (!arg.buffer) {
+        throw std::runtime_error("Unbound output");
+      }
+    }
+    args[i] = arg;
+  }
+
+  return std::make_unique<Executable>(program->program->entry, *program->program->module, args);
+}
+
 }  // namespace
 
 extern "C" {
+
+void print_memref_2d_f32(StridedMemRefType<float, 2>* M) { printMemRef(M); }
 
 struct plaidml_executable {
   using BufferMap = std::map<std::string, std::shared_ptr<Buffer>>;
   BufferMap input_bufs;
   BufferMap output_bufs;
   std::shared_ptr<Program> program;
+  std::unique_ptr<Executable> exec;
 };
 
 void plaidml_exec_init(  //
@@ -81,6 +365,9 @@ void plaidml_exec_init(  //
     std::call_once(is_initialized, []() {
       IVLOG(1, "plaidml_exec_init");
       GetPlatform();
+      llvm::InitializeNativeTarget();
+      llvm::InitializeNativeTargetAsmPrinter();
+      initializeLLVMPasses();
     });
   });
 }
@@ -165,6 +452,12 @@ plaidml_executable* plaidml_compile(  //
     return exec.release();
 #endif
 #ifdef PLAIDML_MLIR
+    if (vertexai::env::Get("PLAIDML_EE") == "1") {
+      auto exec = MakeExecutionEngine(program, device, target, ninputs, inputs, noutputs, outputs);
+      auto ret = new plaidml_executable;
+      ret->exec = std::move(exec);
+      return ret;
+    }
     ConstBufferManager const_bufs;
     const_bufs.allocator = std::make_shared<PlatformAllocator>(device);
     std::unique_ptr<plaidml_executable> exec{new plaidml_executable};
@@ -177,21 +470,21 @@ plaidml_executable* plaidml_compile(  //
     exec->program = GetPlatform()->MakeProgram(ctx, device, target, stripe, &const_bufs);
     IVLOG(1, "After make program");
 
-    std::unordered_map<mlir::Value*, BufferPtr> input_bindings;
+    std::unordered_map<Value*, BufferPtr> input_bindings;
     for (unsigned i = 0; i < ninputs; i++) {
       input_bindings[inputs[i]->expr->value] = inputs[i]->buffer->buffer;
     }
 
-    std::unordered_map<mlir::Value*, BufferPtr> output_bindings;
+    std::unordered_map<Value*, BufferPtr> output_bindings;
     for (unsigned i = 0; i < noutputs; i++) {
       output_bindings[outputs[i]->expr->value] = outputs[i]->buffer->buffer;
     }
 
-    auto attrName = Dialect::getDialectAttrName("name");
-    auto stripeFuncOp = llvm::cast<mlir::FuncOp>(module->getBody()->front());
+    auto attrName = StripeDialect::getDialectAttrName("name");
+    auto stripeFuncOp = cast<FuncOp>(module->getBody()->front());
     for (unsigned i = 0; i < program->program->arguments.size(); i++) {
       const auto& arg = program->program->arguments[i];
-      auto attr = stripeFuncOp.getArgAttrOfType<mlir::StringAttr>(i, attrName);
+      auto attr = stripeFuncOp.getArgAttrOfType<StringAttr>(i, attrName);
       if (!attr) {
         throw std::runtime_error("Missing expected argument attribute");
       }
@@ -234,8 +527,12 @@ void plaidml_executable_run(  //
     plaidml_error* err,       //
     plaidml_executable* exec) {
   ffi_wrap_void(err, [&] {
-    auto ctx = GlobalContext::getContext();
-    exec->program->Run(*ctx, exec->input_bufs, exec->output_bufs).get();
+    if (exec->exec) {
+      exec->exec->invoke();
+    } else {
+      auto ctx = GlobalContext::getContext();
+      exec->program->Run(*ctx, exec->input_bufs, exec->output_bufs).get();
+    }
   });
 }
 

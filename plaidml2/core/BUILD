@@ -53,7 +53,6 @@ plaidml_cc_library(
     ],
     hdrs = SDK_HDRS,
     defines = [
-        "PLAIDML_CORE_DLL",
         "PLAIDML_AST",
     ],
     visibility = ["//visibility:public"],
@@ -86,7 +85,6 @@ plaidml_cc_library(
     ],
     hdrs = SDK_HDRS,
     defines = [
-        "PLAIDML_CORE_DLL",
         "PLAIDML_MLIR",
     ],
     visibility = ["//visibility:public"],
