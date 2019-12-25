@@ -44,7 +44,6 @@ using plaidml::core::ffi_wrap;
 using plaidml::core::ffi_wrap_void;
 using plaidml::core::GetPlatform;
 using plaidml::core::GlobalContext;
-using pmlc::dialect::tile::ProgramArgument;
 using vertexai::context::Context;
 using vertexai::tile::Allocator;
 using vertexai::tile::Buffer;
@@ -61,6 +60,7 @@ using vertexai::tile::lang::ast::ParamExpr;
 #ifdef PLAIDML_MLIR
 using pmlc::dialect::pxa::createLowerToAffinePass;
 using pmlc::dialect::pxa::createLowerToPXAPass;
+using pmlc::dialect::tile::ProgramArgument;
 using StripeDialect = pmlc::dialect::stripe::Dialect;
 using pmlc::dialect::stripe::FromMLIR;
 using pmlc::dialect::tile::LowerIntoStripe;
@@ -81,6 +81,8 @@ class PlatformAllocator : public Allocator {
  private:
   std::string device_id_;
 };
+
+#ifdef PLAIDML_MLIR
 
 template <typename T, int N>
 struct StridedMemRefType {
@@ -344,18 +346,26 @@ std::unique_ptr<Executable> MakeExecutionEngine(  //
   return std::make_unique<Executable>(program->program->entry, *program->program->module, args);
 }
 
+#endif  // PLAIDML_MLIR
+
 }  // namespace
 
 extern "C" {
 
+#ifdef PLAIDML_MLIR
+
 void print_memref_2d_f32(StridedMemRefType<float, 2>* M) { printMemRef(M); }
+
+#endif  // PLAIDML_MLIR
 
 struct plaidml_executable {
   using BufferMap = std::map<std::string, std::shared_ptr<Buffer>>;
   BufferMap input_bufs;
   BufferMap output_bufs;
   std::shared_ptr<Program> program;
+#ifdef PLAIDML_MLIR
   std::unique_ptr<Executable> exec;
+#endif  // PLAIDML_MLIR
 };
 
 void plaidml_exec_init(  //
@@ -365,9 +375,11 @@ void plaidml_exec_init(  //
     std::call_once(is_initialized, []() {
       IVLOG(1, "plaidml_exec_init");
       GetPlatform();
+#ifdef PLAIDML_MLIR
       llvm::InitializeNativeTarget();
       llvm::InitializeNativeTargetAsmPrinter();
       initializeLLVMPasses();
+#endif  // PLAIDML_MLIR
     });
   });
 }
@@ -527,12 +539,16 @@ void plaidml_executable_run(  //
     plaidml_error* err,       //
     plaidml_executable* exec) {
   ffi_wrap_void(err, [&] {
+#ifdef PLAIDML_MLIR
     if (exec->exec) {
       exec->exec->invoke();
     } else {
+#endif  // PLAIDML_MLIR
       auto ctx = GlobalContext::getContext();
       exec->program->Run(*ctx, exec->input_bufs, exec->output_bufs).get();
+#ifdef PLAIDML_MLIR
     }
+#endif  // PLAIDML_MLIR
   });
 }
 
