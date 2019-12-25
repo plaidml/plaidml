@@ -126,34 +126,38 @@ void printMemRef(StridedMemRefType<T, N>* memref) {
   std::cout << std::endl;
 }
 
-struct MemRefDescriptor {
+class MemRefDescriptor {
+ private:
+  struct Base {
+    void* basePtr;
+    void* data;
+    int64_t offset;
+  };
+
+ public:
   MemRefDescriptor(void* data, MemRefType type) : memory(computeSize(type)) {
-    IVLOG(1, "descriptor size: " << memory.size());
     int64_t offset;
     SmallVector<int64_t, 4> strides;
     auto maybeStrides = getStridesAndOffset(type, strides, offset);
     if (failed(maybeStrides)) {
       throw std::runtime_error("unexpected non-strided memref");
     }
-    IVLOG(1, "type: " << debugString(type) << ", offset: " << offset);
-
-    auto ptr = memory.data();
-    std::memcpy(ptr, &data, sizeof(void*));
-    ptr += sizeof(void*);
-    std::memcpy(ptr, &data, sizeof(void*));
-    ptr += sizeof(void*);
-    std::memcpy(ptr, &offset, sizeof(int64_t));
-    ptr += sizeof(int64_t);
+    auto base = reinterpret_cast<Base*>(memory.data());
+    base->basePtr = data;
+    base->data = data;
+    base->offset = offset;
+    auto var = reinterpret_cast<int64_t*>(memory.data() + sizeof(Base));
+    auto rank = type.getRank();
     auto sizes = type.getShape();
-    for (unsigned i = 0; i < type.getRank(); i++) {
-      IVLOG(1, "  size: " << sizes[i] << ", stride: " << strides[i]);
-      std::memcpy(ptr, &sizes[i], sizeof(int64_t));
-      ptr += sizeof(int64_t);
-      std::memcpy(ptr, &strides[i], sizeof(int64_t));
-      ptr += sizeof(int64_t);
+    for (unsigned i = 0; i < rank; i++) {
+      var[i] = sizes[i];
+      var[i + rank] = strides[i];
     }
   }
 
+  void* ptr() { return memory.data(); }
+
+ private:
   static unsigned computeSize(MemRefType type) {
     return sizeof(void*) +                     // allocatedPtr
            sizeof(void*) +                     // alignedPtr
@@ -241,7 +245,7 @@ Executable::Executable(StringRef entry, ModuleOp programModule, ArrayRef<Program
   OwningModuleRef module(copy);
   PassManager manager(module->getContext());
   auto shouldPrintBeforePass = [](auto, auto) { return false; };
-  auto shouldPrintAfterPass = [](auto, auto) { return true; };
+  auto shouldPrintAfterPass = [](auto, auto) { return VLOG_IS_ON(3); };
   std::vector<MemRefType> memRefTypes;
   manager.enableIRPrinting(shouldPrintBeforePass, shouldPrintAfterPass, true, true, llvm::errs());
   manager.addNestedPass<FuncOp>(createCanonicalizerPass());
@@ -274,7 +278,6 @@ Executable::Executable(StringRef entry, ModuleOp programModule, ArrayRef<Program
       /*targetMachine=*/nullptr);
 
   if (VLOG_IS_ON(6)) {
-    std::unique_ptr<llvm::LLVMContext> llvmContext(new llvm::LLVMContext);
     auto llvmModule = translateModuleToLLVMIR(*module);
     if (!llvmModule) {
       throw std::runtime_error("could not convert to LLVM IR");
@@ -295,29 +298,25 @@ Executable::Executable(StringRef entry, ModuleOp programModule, ArrayRef<Program
   for (unsigned i = 0; i < args.size(); i++) {
     auto view = programArgs[i].buffer->MapCurrent(*ctx).get();
     descriptors.emplace_back(view->data(), memRefTypes[i]);
-    ptrs[i] = descriptors[i].memory.data();
+    ptrs[i] = descriptors[i].ptr();
     args[i] = &ptrs[i];
   }
 }
 
-std::unique_ptr<Executable> MakeExecutionEngine(  //
-    plaidml_program* program,                     //
-    const char* device,                           //
-    const char* target,                           //
-    size_t ninputs,                               //
-    plaidml_binding** inputs,                     //
-    size_t noutputs,                              //
+std::vector<ProgramArgument> BindProgramArguments(  //
+    plaidml_program* program,                       //
+    size_t ninputs,                                 //
+    plaidml_binding** inputs,                       //
+    size_t noutputs,                                //
     plaidml_binding** outputs) {
   std::unordered_map<Value*, BufferPtr> input_bindings;
   for (unsigned i = 0; i < ninputs; i++) {
     input_bindings[inputs[i]->expr->value] = inputs[i]->buffer->buffer;
   }
-
   std::unordered_map<Value*, BufferPtr> output_bindings;
   for (unsigned i = 0; i < noutputs; i++) {
     output_bindings[outputs[i]->expr->value] = outputs[i]->buffer->buffer;
   }
-
   std::vector<ProgramArgument> args(program->program->arguments.size());
   for (unsigned i = 0; i < args.size(); i++) {
     auto arg = program->program->arguments[i];
@@ -342,8 +341,7 @@ std::unique_ptr<Executable> MakeExecutionEngine(  //
     }
     args[i] = arg;
   }
-
-  return std::make_unique<Executable>(program->program->entry, *program->program->module, args);
+  return args;
 }
 
 #endif  // PLAIDML_MLIR
@@ -427,7 +425,7 @@ plaidml_executable* plaidml_compile(  //
 #ifdef PLAIDML_AST
     ConstBufferManager const_bufs;
     const_bufs.allocator = std::make_shared<PlatformAllocator>(device);
-    std::unique_ptr<plaidml_executable> exec{new plaidml_executable};
+    auto exec = std::make_unique<plaidml_executable>();
     auto stripe = vertexai::tile::lang::GenerateStripe(program->eval.runinfo);
     Context ctx;
     exec->program = GetPlatform()->MakeProgram(ctx, device, target, stripe, &const_bufs);
@@ -464,15 +462,15 @@ plaidml_executable* plaidml_compile(  //
     return exec.release();
 #endif
 #ifdef PLAIDML_MLIR
+    auto args = BindProgramArguments(program, ninputs, inputs, noutputs, outputs);
     if (vertexai::env::Get("PLAIDML_EE") == "1") {
-      auto exec = MakeExecutionEngine(program, device, target, ninputs, inputs, noutputs, outputs);
-      auto ret = new plaidml_executable;
-      ret->exec = std::move(exec);
-      return ret;
+      auto exec = std::make_unique<plaidml_executable>();
+      exec->exec = std::make_unique<Executable>(program->program->entry, *program->program->module, args);
+      return exec.release();
     }
     ConstBufferManager const_bufs;
     const_bufs.allocator = std::make_shared<PlatformAllocator>(device);
-    std::unique_ptr<plaidml_executable> exec{new plaidml_executable};
+    auto exec = std::make_unique<plaidml_executable>();
 
     // 1. lower tile dialect -> stripe dialect
     auto module = LowerIntoStripe(*program->program->module);
@@ -482,43 +480,19 @@ plaidml_executable* plaidml_compile(  //
     exec->program = GetPlatform()->MakeProgram(ctx, device, target, stripe, &const_bufs);
     IVLOG(1, "After make program");
 
-    std::unordered_map<Value*, BufferPtr> input_bindings;
-    for (unsigned i = 0; i < ninputs; i++) {
-      input_bindings[inputs[i]->expr->value] = inputs[i]->buffer->buffer;
-    }
-
-    std::unordered_map<Value*, BufferPtr> output_bindings;
-    for (unsigned i = 0; i < noutputs; i++) {
-      output_bindings[outputs[i]->expr->value] = outputs[i]->buffer->buffer;
-    }
-
     auto attrName = StripeDialect::getDialectAttrName("name");
     auto stripeFuncOp = cast<FuncOp>(module->getBody()->front());
-    for (unsigned i = 0; i < program->program->arguments.size(); i++) {
-      const auto& arg = program->program->arguments[i];
+    for (unsigned i = 0; i < args.size(); i++) {
+      const auto& arg = args[i];
       auto attr = stripeFuncOp.getArgAttrOfType<StringAttr>(i, attrName);
       if (!attr) {
         throw std::runtime_error("Missing expected argument attribute");
       }
       auto name = attr.getValue().str();
       if (arg.isInput) {
-        auto it = input_bindings.find(arg.value);
-        auto is_implicit = (it == input_bindings.end());
-        auto buffer = is_implicit ? arg.buffer : it->second;
-        IVLOG(1, " Input[" << i << "]: " << name << ": " << buffer << ", implicit: " << is_implicit);
-        if (!buffer) {
-          throw std::runtime_error("Unbound input");
-        }
-        exec->input_bufs[name] = buffer;
+        exec->input_bufs[name] = arg.buffer;
       } else {
-        auto it = output_bindings.find(arg.value);
-        auto is_implicit = (it == output_bindings.end());
-        auto buffer = is_implicit ? arg.buffer : it->second;
-        IVLOG(1, "Output[" << i << "]: " << name << ": " << buffer << ", implicit: " << is_implicit);
-        if (!buffer) {
-          throw std::runtime_error("Unbound output");
-        }
-        exec->output_bufs[name] = buffer;
+        exec->output_bufs[name] = arg.buffer;
       }
     }
 
