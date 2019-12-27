@@ -67,8 +67,12 @@ private:
   bool IsStrideOne(BlockArgument* idx, unsigned tensor_idx);
   // Test if idx in the tensors are stride one
   bool ValidateStrideOne(BlockArgument* idx, unsigned matrix_idx);
+  // Test if idx exists in tensorIdxs[tensor_idx]
+  bool IndexExists(BlockArgument* idx, unsigned tensor_idx);
+  // Test if idx exists in the right place
+  bool ValidateIndexExistance(BlockArgument* idx, unsigned matrix_idx);
 
-  // Number of processors
+  // Optimization options
   const MLIR_AutoStencilPass& options;
   // Stencil efficiency heatmap
   std::map<std::tuple<unsigned, unsigned, unsigned>, double> kHeatmap;
@@ -92,6 +96,8 @@ private:
   BlockArgumentSet accIdxs;
   // All used index
   BlockArgumentSet allIdxs;
+  // Index in tensors
+  BlockArgumentSet tensorIdxs[kNumTensors];
   // Each index has a set of conflict index that can't be choosed into inner block together
   llvm::DenseMap<BlockArgument*, BlockArgumentSet> conflict;
   // The best performance
@@ -210,10 +216,7 @@ double AutoStencil::Evaluate() {
     }
   }
 
-  // If the CPUs support hyperthreading, the outermost loop's product should be greater
-  // than the processor bumber. Otherwise, the CPUs are nut fully utilized.
-  size_t processors = options.hyperthreading() ? (options.processors() * 2) : options.processors();
-  unsigned outer_batches = (tot_outer_loop - 1) / processors + 1;
+  unsigned outer_batches = (tot_outer_loop - 1) / std::thread::hardware_concurrency() + 1;
   double perf = outer_batches * tot_middle_loop * (startup_cost + inner_time);
   IVLOG(3, "Performance = " << perf);
 
@@ -295,6 +298,38 @@ bool AutoStencil::ValidateStrideOne(BlockArgument* idx, unsigned matrix_idx) {
   return false;
 }
 
+bool AutoStencil::IndexExists(BlockArgument* idx, unsigned tensor_idx) {
+  return tensorIdxs[tensor_idx].find(idx) != tensorIdxs[tensor_idx].end();
+}
+
+// Confirm if idx exists in the right place
+bool AutoStencil::ValidateIndexExistance(BlockArgument* idx, unsigned matrix_idx) {
+  switch (matrix_idx) {
+    case 0: {
+      // Test if M exists in B and C, does not exist in A
+      return !IndexExists(idx, tensorsOrder[0]) &&
+             IndexExists(idx, tensorsOrder[1]) &&
+             IndexExists(idx, tensorsOrder[2]);
+    }
+    case 1: {
+      // Test if N exists in A and C, does not exist in B
+      return IndexExists(idx, tensorsOrder[0]) &&
+             !IndexExists(idx, tensorsOrder[1]) &&
+             IndexExists(idx, tensorsOrder[2]);
+    }
+    case 2: {
+      // Test if K exists in A and B, does not exist in C
+      return IndexExists(idx, tensorsOrder[0]) &&
+             IndexExists(idx, tensorsOrder[1]) &&
+             !IndexExists(idx, tensorsOrder[2]);
+    }
+    default: {
+      throw std::runtime_error("Wrong matrix_idx.");
+    }
+  }
+  return false;
+}
+
 // Search for matrix index (0 for M, 1 for N, 2 for K)
 void AutoStencil::SearchIndex(unsigned matrix_idx) {
   if (matrix_idx >= kNumIndex) {
@@ -304,7 +339,9 @@ void AutoStencil::SearchIndex(unsigned matrix_idx) {
   }
   auto& idxs = (matrix_idx == kNumIndex - 1) ? allIdxs : outIdxs;
   for (auto idx : idxs) {
-    if (!ConflictInnerIndex(idx) && ValidateStrideOne(idx, matrix_idx)) {
+    if (!ConflictInnerIndex(idx) &&
+        ValidateStrideOne(idx, matrix_idx) &&
+        ValidateIndexExistance(idx, matrix_idx)) {
       innerIdxs[matrix_idx] = idx;
       SearchIndex(nextMatrixIdx[matrix_idx]);
     }
@@ -312,12 +349,12 @@ void AutoStencil::SearchIndex(unsigned matrix_idx) {
 }
 
 void AutoStencil::SearchTensorsOrder() {
-  // A B C, Search M(0) first as N is most restricted index
+  // A B C, Search M(0) first as M is most restricted index
   tensorsOrder[0] = 0;
   tensorsOrder[1] = 1;
   tensorsOrder[2] = 2;
   SearchIndex(0);
-  // B A C, Search M(0) first as N is most restricted index
+  // B A C, Search M(0) first as M is most restricted index
   tensorsOrder[0] = 1;
   tensorsOrder[1] = 0;
   SearchIndex(0);
@@ -419,11 +456,12 @@ void AutoStencil::Stencil(ParallelForOp op) {
   }
 
   // The last tensor is the output.
-  outIdxs = RefUsedIdxs(tensors[kNumIndex - 1], true);
+  tensorIdxs[kNumIndex - 1] = RefUsedIdxs(tensors[kNumIndex - 1], true);
+  outIdxs = tensorIdxs[kNumIndex - 1];
   accIdxs.clear();
   for (unsigned i = 0; i < kNumIndex - 1; ++i) {
-    BlockArgumentSet used_idxs = RefUsedIdxs(tensors[i], true);
-    for (auto idx : used_idxs) {
+    tensorIdxs[i] = RefUsedIdxs(tensors[i], true);
+    for (auto idx : tensorIdxs[i]) {
       if (outIdxs.find(idx) == outIdxs.end()) {
         accIdxs.insert(idx);
       }
