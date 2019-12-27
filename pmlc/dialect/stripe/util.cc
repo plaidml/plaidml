@@ -265,6 +265,44 @@ DataType tensorElementType(Value* tensor) {
   return elt_type.type();
 }
 
+eltwise::ScalarConstantOp initialValue(OpBuilder* builder, DataType type,
+                                       const std::string& agg_name,
+                                       const std::string& var_name) {
+  if (agg_name == "assign") {
+    return eltwise::ScalarConstantOp();
+  }
+  eltwise::ScalarConstantOp op;
+  auto unknownLoc = builder->getUnknownLoc();
+
+  #define BUILD_CONST_OP(ivalue, fvalue)                                    \
+    if (IsIntegerDataType(type)) {                                          \
+      op = builder->create<eltwise::ScalarConstantOp>(                      \
+        unknownLoc, ScalarType::get(builder->getContext(), type), ivalue);  \
+    }                                                                       \
+    else if (IsFloatDataType(type)) {                                       \
+      op = builder->create<eltwise::ScalarConstantOp>(                      \
+        unknownLoc, ScalarType::get(builder->getContext(), type), fvalue);  \
+    }
+
+  if (agg_name == "add") {
+    BUILD_CONST_OP((int64_t)0, (double)0.0);
+  }
+  else if (agg_name == "mul") {
+    BUILD_CONST_OP((int64_t)1, (double)1.0);
+  }
+  else if (agg_name == "max") {
+    BUILD_CONST_OP(IntegerMin(type), FloatMin(type));
+  }
+  else if (agg_name == "min") {
+    BUILD_CONST_OP(IntegerMax(type), FloatMax(type));
+  }
+  else {
+    throw std::runtime_error("Unsupported aggregate op.");
+  }
+  op.setAttr("scalar_name", builder->getStringAttr(var_name == "" ? "cst" : var_name));
+  return op;
+}
+
 }  // namespace stripe
 }  // namespace dialect
 }  // namespace pmlc

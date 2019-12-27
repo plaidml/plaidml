@@ -101,11 +101,13 @@ plaidml_cc_library(
 plaidml_cc_library(
     name = "passes",
     srcs = [
+        "agginit_pass.cc",
         "autostencil_pass.cc",
         "padding_pass.cc",
         "populate_tensor_ref_shape_analysis.cc",
     ],
     hdrs = [
+        "agginit_pass.h",
         "autostencil_pass.h",
         "nop_pass.h",
         "padding_pass.h",

@@ -3,8 +3,12 @@
 #include "pmlc/dialect/stripe/transforms.h"
 
 #include <algorithm>
+#include <thread>
+
+#include "base/util/logging.h"
 
 #include "pmlc/dialect/stripe/analysis.h"
+#include "pmlc/dialect/stripe/util.h"
 
 namespace pmlc {
 namespace dialect {
@@ -178,6 +182,50 @@ void LiftConstraint(ParallelForOp pf) {
   builder.setInsertionPointToEnd(&oc.lt_case().front());
   builder.create<TerminateOp>(loc);
   pf.getOperation()->erase();
+}
+
+// Parallelize a ParallelForOip for eltwise only
+void ParallelizeEltwise(ParallelForOp op, unsigned min_inner_size, const std::string& thread_tag) {
+  unsigned n_processors = std::thread::hardware_concurrency();
+  int64_t inner_size = 1;
+  int64_t outer_size = 1;
+  for (unsigned i = 0; i < op.ranges().size(); ++i) {
+    outer_size *= op.getRange(i);
+  }
+  llvm::SmallVector<int64_t, 8> tiles(op.ranges().size());
+  // Get the minimal inner tile
+  for (int i = op.ranges().size() - 1; i >= 0; --i) {
+    int64_t range = op.getRange(i);
+    if (range * inner_size <= min_inner_size) {
+      // The top priority is to satisfy the minimal inner size
+      inner_size *= range;
+      outer_size /= range;
+      tiles[i] = range;
+    }
+    else {
+      int64_t tile = range;
+      for (int64_t k = range; k >= 1; --k) {
+        if (range % k == 0 && k * inner_size >= min_inner_size) {
+          // k is a feasible tile
+          tile = k;
+          if (outer_size / k >= n_processors) {
+            // If outer_size / k is already enough for processor utilization,
+            // we do not need smaller k.
+            break;
+          }
+        }
+      }
+      tiles[i] = tile;
+      inner_size *= tile;
+      outer_size /= tile;
+    }
+  }
+  // If outer_size is 1, we do not have to parallelize the loop
+  if (outer_size > 1) {
+    // Transform
+    Tile(op, tiles);
+    setOpAttrUnit(op, op.getBodyBuilder(), thread_tag);
+  }
 }
 
 }  // namespace stripe
