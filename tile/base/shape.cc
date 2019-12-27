@@ -81,5 +81,72 @@ DataType CommonSupertype(DataType lhs, DataType rhs) {
   return lhs;
 }
 
+bool IsIntegerDataType(DataType type) {
+  return type == DataType::INT128 ||
+         type == DataType::INT64 ||
+         type == DataType::INT32 ||
+         type == DataType::INT16 ||
+         type == DataType::INT8;
+}
+
+bool IsFloatDataType(DataType type) {
+  return type == DataType::FLOAT64 ||
+         type == DataType::FLOAT32 ||
+         type == DataType::FLOAT16 ||
+         type == DataType::BFLOAT16;
+}
+
+int64_t IntegerMax(DataType type) {
+  if (type == DataType::INT64) {
+    return (int64_t)std::numeric_limits<int64_t>::max();
+  }
+  if (type == DataType::INT32) {
+    return (int64_t)std::numeric_limits<int32_t>::max();
+  }
+  if (type == DataType::INT16) {
+    return (int64_t)std::numeric_limits<int16_t>::max();
+  }
+  if (type == DataType::INT8) {
+    return (int64_t)std::numeric_limits<int8_t>::max();
+  }
+  throw std::runtime_error("Unsupported integer type for max value");
+}
+
+int64_t IntegerMin(DataType type) {
+  if (type == DataType::INT64) {
+    return (int64_t)std::numeric_limits<int64_t>::lowest();
+  }
+  if (type == DataType::INT32) {
+    return (int64_t)std::numeric_limits<int32_t>::lowest();
+  }
+  if (type == DataType::INT16) {
+    return (int64_t)std::numeric_limits<int16_t>::lowest();
+  }
+  if (type == DataType::INT8) {
+    return (int64_t)std::numeric_limits<int8_t>::lowest();
+  }
+  throw std::runtime_error("Unsupported integer type for min value");
+}
+
+double FloatMax(DataType type) {
+  if (type == DataType::FLOAT64) {
+    return (double)std::numeric_limits<double>::max();
+  }
+  if (type == DataType::FLOAT32) {
+    return (double)std::numeric_limits<float>::max();
+  }
+  throw std::runtime_error("Unsupported float type for max value");
+}
+
+double FloatMin(DataType type) {
+  if (type == DataType::FLOAT64) {
+    return (double)std::numeric_limits<double>::lowest();
+  }
+  if (type == DataType::FLOAT32) {
+    return (double)std::numeric_limits<float>::lowest();
+  }
+  throw std::runtime_error("Unsupported float type for min value");
+}
+
 }  // namespace tile
 }  // namespace vertexai

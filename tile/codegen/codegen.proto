@@ -76,6 +76,13 @@ message MLIR_AutoStencilPass {
   repeated Stencil special_stencils = 5;
 }
 
+// Aggregate initialization pass in MLIR
+message MLIR_AggInitPass {
+  repeated string reqs = 1;
+  optional bool parallel = 2 [default = true];
+  optional uint32 cache_line = 3 [default = 64];
+}
+
 // A No-op pass to test MLIR transcoding
 message MLIR_NopPass {
 }

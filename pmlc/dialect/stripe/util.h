@@ -66,6 +66,11 @@ TensorType baseType(Value* value);
 // Get all index in tensor "value", whose strides are 1
 llvm::SmallVector<mlir::BlockArgument*, kIndexLimit> strideOneIdxs(mlir::Value* value);
 
+// Build the initial value for the aggregate type
+eltwise::ScalarConstantOp initialValue(OpBuilder* builder, DataType type,
+                                       const std::string& agg_name,
+                                       const std::string& var_name);
+
 }  // namespace stripe
 }  // namespace dialect
 }  // namespace pmlc
