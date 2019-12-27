@@ -417,7 +417,6 @@ SUITES:
         skip_platforms: 
           - keras-plaid-mtl-uhd630 
           - keras-stripe-mtl-uhd630
-          - keras-stripe-llvm-cpu
 
       xception:
         precision: high
