@@ -36,7 +36,11 @@ void createMainParallelFor(mlir::FuncOp funcOp) {
 
 bool hasAttr(Operation* op, const std::string& attr) {
   std::set<std::string> op_attrs_set;
-  ArrayRef<NamedAttribute> op_attrs = op->getAttrOfType<DictionaryAttr>(Dialect::getStripeAttrsName()).getValue();
+  DictionaryAttr dict_attr = op->getAttrOfType<DictionaryAttr>(Dialect::getStripeAttrsName());
+  if (!dict_attr) {
+    return false;
+  }
+  ArrayRef<NamedAttribute> op_attrs = dict_attr.getValue();
   for (const auto& [key, value] : op_attrs) {
     auto name = key.strref();
     op_attrs_set.insert(name);
@@ -46,7 +50,11 @@ bool hasAttr(Operation* op, const std::string& attr) {
 
 bool hasAttrs(Operation* op, const std::set<std::string>& attrs) {
   std::set<std::string> op_attrs_set;
-  ArrayRef<NamedAttribute> op_attrs = op->getAttrOfType<DictionaryAttr>(Dialect::getStripeAttrsName()).getValue();
+  DictionaryAttr dict_attr = op->getAttrOfType<DictionaryAttr>(Dialect::getStripeAttrsName());
+  if (!dict_attr) {
+    return false;
+  }
+  ArrayRef<NamedAttribute> op_attrs = dict_attr.getValue();
   for (const auto& [key, value] : op_attrs) {
     auto name = key.strref();
     op_attrs_set.insert(name);
@@ -239,6 +247,22 @@ llvm::SmallVector<mlir::BlockArgument*, kIndexLimit> strideOneIdxs(Value* value)
     }
   }
   return idxs;
+}
+
+StringRef tensorName(Value* tensor) {
+  if (auto op = tensor->getDefiningOp()) {
+    auto nameAttr = op->getAttrOfType<StringAttr>("name");
+    if (nameAttr) {
+      return nameAttr.getValue();
+    }
+  }
+  return StringRef();
+}
+
+DataType tensorElementType(Value* tensor) {
+  auto tensor_type = tensor->getType().cast<TensorRefType>();
+  auto elt_type = tensor_type.getElementType().cast<eltwise::ScalarType>();
+  return elt_type.type();
 }
 
 }  // namespace stripe
