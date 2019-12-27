@@ -449,13 +449,5 @@ inline proto::TensorShape IntoProto(const TensorShape& shape) {
   return ret;
 }
 
-/* Helpers for DataType */
-bool IsIntegerDataType(DataType type);
-bool IsFloatDataType(DataType type);
-int64_t IntegerMax(DataType type);
-int64_t IntegerMin(DataType type);
-double FloatMax(DataType type);
-double FloatMin(DataType type);
-
 }  // namespace tile
 }  // namespace vertexai

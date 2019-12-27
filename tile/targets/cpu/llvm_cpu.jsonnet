@@ -174,13 +174,11 @@ local PARAMS = {
             // Keet this towards the end since other passes are generating intermediate blocks and the initialization
             // on aggregation transition could break in such cases.
             {
-               name: 'mlir_agginit',
-               pass: {
-                 '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.MLIR_AggInitPass',
-                 reqs: ['contraction'],
-                 parallel: true,
-                 cache_line: 64,
-             },
+              name: 'init_aggregation_outputs',
+              pass: {
+                '@type': 'type.vertex.ai/vertexai.tile.codegen.proto.AggregationBlockOutputInitializationPass',
+                reqs: ['program'],
+              },
             },
           ],
         },
