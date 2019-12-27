@@ -29,7 +29,7 @@ to change.
 
 ## How to Write Tile Code
 
-### Sum Over Axis   
+### Sum Over Axis
 
 We're ready to look at some Python Tile code! Here's an operation that takes the
 sum over axis `0` of a 2D tensor (in Keras this would be `K.sum(I, axis=0)`):
@@ -202,7 +202,7 @@ Contractions implicitly aggregate over _all_ indices that write to the same
 output location (in this case we aggregate over all values of `i`, `j`, and
 `k`).
 
-### Average  
+### Average
 
 To compute the mean of a tensor, we need to sum the elements and divide by the
 total number of elements summed. We can do this by taking advantage of the fact
@@ -250,7 +250,7 @@ def avg(I):
   return Sum / (X * Y)
 ```
 
-### Max Pool 1D  
+### Max Pool 1D
 
 Next let's implement a size 2 stride 2 maxpool in Tile. This is the operation
 that splits a tensor into groups of 2 and takes the larger element from each
@@ -418,7 +418,7 @@ variable `i` makes these indices invalid. Note that some elements of `O` are
 never written to. Any unwritten elements in the output of a contraction are
 initialized to `0`.
 
-### Cumulative Sum  
+### Cumulative Sum
 
 Suppose we want to take the cumulative sum of a 1D tensor. That is, we want
 `O[i]` to be the sum of all input entries `I[k]` where `k <= i`. In summation
@@ -447,7 +447,7 @@ def csum(I) :
     return O
 ```
 
-### Convolution  
+### Convolution
 
 Let's implement a 1D convolution with output size equal to input size. This is
 implementing the Keras backend operation:
@@ -518,7 +518,7 @@ def conv_1d(I, K) :
     return O
 ```
 
-### Dilated 2D Convolution 
+### Dilated 2D Convolution
 
 We can tweak this general formula for a convolution to add various features,
 such as different strides, changing the padding, performing the convolution
@@ -562,7 +562,7 @@ def conv_2d(I, K) :
 ```
 
 
-### Complex Convolution  
+### Complex Convolution
 
 This final example demonstrates a strided dilated padded grouped convolution.
 \\[

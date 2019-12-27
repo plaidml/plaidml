@@ -30,6 +30,7 @@ to change.
 ## How to Write Tile Code
 
 ### Sum Over Axis 
+
 We're ready to look at some C++ Tile code! Here's an operation that takes the
 sum over axis `0` of a 2D tensor (in Keras this would be `K.sum(I, axis=0)`):
 
