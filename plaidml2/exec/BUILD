@@ -52,6 +52,7 @@ plaidml_cc_library(
     deps = [
         "//base/util",
         "//plaidml2/core:core_mlir",
+        "//pmlc/compiler",
         "//pmlc/dialect/pxa",
         "//pmlc/dialect/stripe:transcode",
         "@mlir//:AffineToStandardTransforms",
