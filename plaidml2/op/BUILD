@@ -40,7 +40,6 @@ plaidml_cc_library(
         "ffi.h",
     ],
     defines = [
-        "PLAIDML_OP_DLL",
         "PLAIDML_AST",
     ],
     visibility = ["//visibility:public"],
@@ -63,7 +62,6 @@ plaidml_cc_library(
         "ffi.h",
     ],
     defines = [
-        "PLAIDML_OP_DLL",
         "PLAIDML_MLIR",
     ],
     visibility = ["//visibility:public"],

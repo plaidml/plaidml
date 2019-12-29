@@ -5,13 +5,6 @@ package(default_visibility = ["//visibility:public"])
 load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_test")
 load("//vendor/mlir:tblgen.bzl", "COPTS", "gentbl")
 
-filegroup(
-  name = "td_files",
-  srcs = [
-    "//pmlc/dialect/eltwise:td_files",
-  ],
-)
-
 gentbl(
     name = "gen-ops",
     tbl_outs = [
@@ -25,7 +18,9 @@ gentbl(
         ),
     ],
     td_file = "ops.td",
-    td_srcs = [":td_files"],
+    td_srcs = [
+        "//pmlc/dialect/eltwise:td_files",
+    ],
 )
 
 plaidml_cc_library(
@@ -37,9 +32,8 @@ plaidml_cc_library(
     ],
     hdrs = [
         "dialect.h",
-        "from_tile.h",
         "ops.h",
-        "to_affine.h",
+        "passes.h",
     ],
     copts = COPTS,
     tags = ["llvm"],
@@ -57,4 +51,3 @@ plaidml_cc_library(
     ],
     alwayslink = 1,
 )
-
