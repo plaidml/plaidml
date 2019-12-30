@@ -734,7 +734,7 @@ TEST(Schedule, Basic) {
     IVLOG(1, "Writing passes to: " << dbg_dir);
   }
   auto tileProgram = lib::CreateTest("layer_test2");
-  auto program = plaidml2::edsl::ConvertIntoStripe(*tileProgram);
+  auto program = plaidml::edsl::ConvertIntoStripe(*tileProgram);
   CompilerState state(program);
   Optimize(&state, stage.passes(), options);
 }

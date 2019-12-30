@@ -24,7 +24,7 @@
 #include "tile/codegen/compile_pass.h"
 #include "tile/codegen/localize.h"
 
-using namespace plaidml2::edsl;         // NOLINT
+using namespace plaidml::edsl;          // NOLINT
 using namespace pmlc::dialect::stripe;  // NOLINT
 using namespace vertexai::tile;         // NOLINT
 
@@ -46,7 +46,7 @@ static void RunTest(const Program& program, bool addLocations) {
   mlir::MLIRContext context;
 
   IVLOG(1, "Making a stripe program + fixing locals");
-  auto stripe = plaidml2::edsl::ConvertIntoStripe(program);
+  auto stripe = plaidml::edsl::ConvertIntoStripe(program);
 
   if (addLocations) {
     codegen::CompilerState cstate{stripe};
@@ -120,39 +120,39 @@ TEST_P(TranslateTest, Conv2dBnRelu) {
   auto K = Placeholder(PLAIDML_DATA_FLOAT32, {3, 3, 64, 128}, "K");
   auto B = Placeholder(PLAIDML_DATA_FLOAT32, {128}, "B");
   auto S = Placeholder(PLAIDML_DATA_FLOAT32, {128}, "S");
-  auto O = plaidml2::op::convolution(  //
-      I,                               // I_or_O
-      K,                               // F_or_O
-      {2, 2},                          // strides
-      {1, 1},                          // dilations
-      {1, 1},                          // data_dilations
-      {},                              // filter_shape
-      1,                               // groups
-      "explicit",                      // autopad_mode
-      {3, 3},                          // manual_padding
-      "nxc",                           // input_layout
-      "xck",                           // filter_layout
-      "none",                          // group_layout
-      false,                           // winograd_allowed
-      "",                              // name
-      "ungrouped",                     // autogroup_mode
-      "none",                          // deriv_mode
-      {});                             // result_shape
-  auto R = plaidml2::op::relu((O + B) * S);
+  auto O = plaidml::op::convolution(  //
+      I,                              // I_or_O
+      K,                              // F_or_O
+      {2, 2},                         // strides
+      {1, 1},                         // dilations
+      {1, 1},                         // data_dilations
+      {},                             // filter_shape
+      1,                              // groups
+      "explicit",                     // autopad_mode
+      {3, 3},                         // manual_padding
+      "nxc",                          // input_layout
+      "xck",                          // filter_layout
+      "none",                         // group_layout
+      false,                          // winograd_allowed
+      "",                             // name
+      "ungrouped",                    // autogroup_mode
+      "none",                         // deriv_mode
+      {});                            // result_shape
+  auto R = plaidml::op::relu((O + B) * S);
   Program program("Conv2dBnRelu", {R});
   RunTest(program, GetParam());
 }
 
 TEST_P(TranslateTest, MaxPool2d) {
   auto I = Placeholder(PLAIDML_DATA_FLOAT32, {1, 64, 64, 3}, "I");
-  auto O = plaidml2::op::pool(I, "max", {2, 2}, {1, 1}, "none", {1, 2}, "nwc", true, true);
+  auto O = plaidml::op::pool(I, "max", {2, 2}, {1, 1}, "none", {1, 2}, "nwc", true, true);
   Program program("pool", {O});
   RunTest(program, GetParam());
 }
 
 TEST_P(TranslateTest, Softmax) {
   auto A = Placeholder(PLAIDML_DATA_FLOAT32, {64, 64}, "A");
-  Program program("softmax", {plaidml2::op::softmax(A, 1)});
+  Program program("softmax", {plaidml::op::softmax(A, 1)});
   RunTest(program, GetParam());
 }
 
@@ -165,7 +165,7 @@ TEST_P(TranslateTest, EltwiseAdd) {
 
 TEST_P(TranslateTest, ArgMax) {
   auto I = Placeholder(PLAIDML_DATA_FLOAT32, {1, 224, 224, 3}, "I");
-  Program program("argmax", {plaidml2::op::argmax(I)});
+  Program program("argmax", {plaidml::op::argmax(I)});
   RunTest(program, GetParam());
 }
 
@@ -183,7 +183,7 @@ TEST_P(TranslateTest, Scalar) {
 }
 
 TEST_P(TranslateTest, DoubleDot) {
-  using plaidml2::op::dot;
+  using plaidml::op::dot;
   auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "A");
   auto B = Placeholder(PLAIDML_DATA_FLOAT32, {20, 30}, "B");
   auto C = Placeholder(PLAIDML_DATA_FLOAT32, {30, 40}, "C");

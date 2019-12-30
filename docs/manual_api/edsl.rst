@@ -6,7 +6,7 @@ Embedded Domain Specific Language
 
 .. contents::
 
-.. doxygenfunction:: plaidml2::edsl::init
+.. doxygenfunction:: plaidml::edsl::init
 
 -------
 Objects

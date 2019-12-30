@@ -7,8 +7,8 @@
 #include "plaidml2/edsl/edsl.h"
 #include "tile/stripe/stripe.h"
 
-namespace plaidml2::edsl {
+namespace plaidml::edsl {
 
 std::shared_ptr<vertexai::tile::stripe::Program> ConvertIntoStripe(const Program& program);
 
-}  // namespace plaidml2::edsl
+}  // namespace plaidml::edsl

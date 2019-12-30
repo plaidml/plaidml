@@ -9,10 +9,10 @@
 #include "plaidml2/core/internal.h"
 #include "plaidml2/op/lib/ops.h"
 
-using plaidml2::core::ffi_wrap;
-using plaidml2::core::ffi_wrap_void;
-using namespace plaidml2::op;    // NOLINT
-using namespace plaidml2::edsl;  // NOLINT
+using plaidml::core::ffi_wrap;
+using plaidml::core::ffi_wrap_void;
+using namespace plaidml::op;    // NOLINT
+using namespace plaidml::edsl;  // NOLINT
 
 extern "C" {
 

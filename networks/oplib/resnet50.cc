@@ -5,9 +5,9 @@
 #include "plaidml2/exec/exec.h"
 #include "plaidml2/op/op.h"
 
-namespace edsl = plaidml2::edsl;
-namespace exec = plaidml2::exec;
-namespace op = plaidml2::op;
+namespace edsl = plaidml::edsl;
+namespace exec = plaidml::exec;
+namespace op = plaidml::op;
 
 namespace networks::oplib {
 
@@ -271,7 +271,7 @@ std::vector<edsl::Tensor> bias_placeholders() {
 
 struct resnet50 : public benchmark::Fixture {
   void SetUp(const benchmark::State& state) {  //
-    plaidml2::op::init();
+    plaidml::op::init();
   }
 
   edsl::Program build(                     //

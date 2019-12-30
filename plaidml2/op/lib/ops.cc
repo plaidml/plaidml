@@ -12,9 +12,9 @@
 #include "base/util/logging.h"
 #include "plaidml2/op/op.h"
 
-using namespace plaidml2::edsl;  // NOLINT
+using namespace plaidml::edsl;  // NOLINT
 
-namespace plaidml2::op::lib {
+namespace plaidml::op::lib {
 
 // Forward declare the operations here so they can call each other
 Value abs(const Value&);
@@ -2783,4 +2783,4 @@ void RegisterOps() {
   registry->Register("variance", variance);
 }
 
-}  // namespace plaidml2::op::lib
+}  // namespace plaidml::op::lib

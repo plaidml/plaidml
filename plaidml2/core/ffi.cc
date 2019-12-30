@@ -27,18 +27,18 @@ using vertexai::tile::TensorShape;
 using pmlc::dialect::eltwise::ScalarType;
 #endif
 
-using plaidml2::core::ffi_wrap;
-using plaidml2::core::ffi_wrap_void;
-using plaidml2::core::GetPlatform;
-using plaidml2::core::GlobalContext;
-using plaidml2::core::Settings;
+using plaidml::core::ffi_wrap;
+using plaidml::core::ffi_wrap_void;
+using plaidml::core::GetPlatform;
+using plaidml::core::GlobalContext;
+using plaidml::core::Settings;
 using vertexai::context::Context;
 using vertexai::tile::DataType;
 using LocalPlatform = vertexai::tile::local_machine::Platform;
 
 extern const char* PLAIDML_VERSION;
 
-namespace plaidml2::core {
+namespace plaidml::core {
 
 PlatformHolder::PlatformHolder() : platform(new LocalPlatform) {}
 
@@ -47,7 +47,7 @@ PlatformHolder& GetPlatform() {
   return holder;
 }
 
-}  // namespace plaidml2::core
+}  // namespace plaidml::core
 
 extern "C" {
 

@@ -11,7 +11,7 @@
 
 #include "plaidml2/core/ffi.h"
 
-namespace plaidml2 {
+namespace plaidml {
 
 namespace ffi {
 
@@ -181,4 +181,4 @@ struct Settings {
   }
 };
 
-}  // namespace plaidml2
+}  // namespace plaidml

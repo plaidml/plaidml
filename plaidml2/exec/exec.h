@@ -11,11 +11,11 @@
 #include "plaidml2/edsl/edsl.h"
 #include "plaidml2/exec/ffi.h"
 
-namespace plaidml2 {
+namespace plaidml {
 namespace exec {
 
 inline void init() {
-  plaidml2::init();
+  plaidml::init();
   ffi::call_void(plaidml_exec_init);
 }
 
@@ -192,4 +192,4 @@ class Binder {
 
 }  // namespace exec
 
-}  // namespace plaidml2
+}  // namespace plaidml

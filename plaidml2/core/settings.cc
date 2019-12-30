@@ -7,11 +7,11 @@
 #include "base/util/env.h"
 #include "plaidml2/core/internal.h"
 
-using plaidml2::core::ffi_wrap;
-using plaidml2::core::ffi_wrap_void;
+using plaidml::core::ffi_wrap;
+using plaidml::core::ffi_wrap_void;
 namespace fs = boost::filesystem;
 
-namespace plaidml2::core {
+namespace plaidml::core {
 
 namespace {
 
@@ -106,4 +106,4 @@ void Settings::save() {
   }
 }
 
-}  // namespace plaidml2::core
+}  // namespace plaidml::core

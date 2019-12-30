@@ -14,7 +14,7 @@
 using ::testing::ContainerEq;
 using ::testing::Eq;
 
-namespace plaidml2::edsl {
+namespace plaidml::edsl {
 
 bool operator==(const Program& lhs, const std::string& rhs) {  //
   return llvm::StringRef(lhs.str()).trim() == llvm::StringRef(rhs).trim();
@@ -1165,4 +1165,4 @@ module {
 }
 
 }  // namespace
-}  // namespace plaidml2::edsl
+}  // namespace plaidml::edsl

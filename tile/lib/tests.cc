@@ -12,7 +12,7 @@ std::pair<std::string, std::function<Program()>> MakeEntry(const std::string& na
 }
 
 std::map<std::string, std::function<Program()>>* InternalTests() {
-  plaidml2::edsl::init();
+  plaidml::edsl::init();
   static std::map<std::string, std::function<Program()>> tests = {
       MakeEntry("matmul",
                 [](const std::string& name) {

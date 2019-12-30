@@ -10,17 +10,17 @@
 
 using ::testing::Eq;
 
-using namespace plaidml2::edsl;  // NOLINT
+using namespace plaidml::edsl;  // NOLINT
 
-namespace plaidml2::edsl {
+namespace plaidml::edsl {
 
 bool operator==(const Program& lhs, const std::string& rhs) {  //
   return llvm::StringRef(lhs.str()).trim() == llvm::StringRef(rhs).trim();
 }
 
-}  // namespace plaidml2::edsl
+}  // namespace plaidml::edsl
 
-namespace plaidml2::op {
+namespace plaidml::op {
 namespace {
 
 TEST(Op, Abs) {
@@ -1533,4 +1533,4 @@ module {
 }
 
 }  // namespace
-}  // namespace plaidml2::op
+}  // namespace plaidml::op

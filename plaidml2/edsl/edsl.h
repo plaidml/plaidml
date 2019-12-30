@@ -15,7 +15,7 @@
 #include "plaidml2/core/core.h"
 #include "plaidml2/edsl/ffi.h"
 
-namespace plaidml2 {
+namespace plaidml {
 namespace edsl {
 
 class IndexedTensor;
@@ -64,7 +64,7 @@ void into_vector(std::vector<T>* into, Head&& head, Tail&&... tail) {
 /// TODO
 ///
 inline void init() {
-  plaidml2::init();
+  plaidml::init();
   ffi::call_void(plaidml_edsl_init);
 }
 
@@ -1384,4 +1384,4 @@ inline std::ostream& operator<<(std::ostream& os, const Value& x) {
 }
 
 }  // namespace edsl
-}  // namespace plaidml2
+}  // namespace plaidml

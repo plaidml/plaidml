@@ -22,7 +22,7 @@ namespace test {
 
 namespace {
 
-using plaidml2::edsl::LogicalShape;
+using plaidml::edsl::LogicalShape;
 
 template <typename T>
 T ParseProtoJson(const std::string& str) {
@@ -85,7 +85,7 @@ TEST(Codegen, ApplyTile) {
       "matmul",                                        //
       LogicalShape(PLAIDML_DATA_FLOAT32, {dim, dim}),  //
       LogicalShape(PLAIDML_DATA_FLOAT32, {dim, dim}));
-  auto program = plaidml2::edsl::ConvertIntoStripe(tileProgram);
+  auto program = plaidml::edsl::ConvertIntoStripe(tileProgram);
   auto main = program->entry->SubBlock(0);
   auto data = MakeMatMulTestData();
 
@@ -136,7 +136,7 @@ TEST(Stencil, MatchMatMul) {
       "matmul",                                        //
       LogicalShape(PLAIDML_DATA_FLOAT32, {DIM, DIM}),  //
       LogicalShape(PLAIDML_DATA_FLOAT32, {DIM, DIM}));
-  auto program = plaidml2::edsl::ConvertIntoStripe(tileProgram);
+  auto program = plaidml::edsl::ConvertIntoStripe(tileProgram);
   auto main = program->entry->SubBlock(0);
   auto kernel = main->SubBlock(0);
 
@@ -174,7 +174,7 @@ TEST(Stencil, MatchMatMulForXSMMStrict) {
       "matmul",                                        //
       LogicalShape(PLAIDML_DATA_FLOAT32, {DIM, DIM}),  //
       LogicalShape(PLAIDML_DATA_FLOAT32, {DIM, DIM}));
-  auto program = plaidml2::edsl::ConvertIntoStripe(tileProgram);
+  auto program = plaidml::edsl::ConvertIntoStripe(tileProgram);
   auto main = program->entry->SubBlock(0);
   auto kernel = main->SubBlock(0);
 
@@ -213,7 +213,7 @@ TEST(Stencil, MatchMatMulForXSMMNonStrict) {
       "matmul",                                        //
       LogicalShape(PLAIDML_DATA_FLOAT32, {DIM, DIM}),  //
       LogicalShape(PLAIDML_DATA_FLOAT32, {DIM, DIM}));
-  auto program = plaidml2::edsl::ConvertIntoStripe(tileProgram);
+  auto program = plaidml::edsl::ConvertIntoStripe(tileProgram);
   auto main = program->entry->SubBlock(0);
   auto kernel = main->SubBlock(0);
 
@@ -240,7 +240,7 @@ TEST(Stencil, MatchConv1D) {
       LogicalShape(PLAIDML_DATA_FLOAT32, {1, 100, 64}),  //
       LogicalShape(PLAIDML_DATA_FLOAT32, {3, 64, 64}),   //
       {1, 100, 64});
-  auto program = plaidml2::edsl::ConvertIntoStripe(tileProgram);
+  auto program = plaidml::edsl::ConvertIntoStripe(tileProgram);
   auto main = program->entry->SubBlock(0);
   auto kernel = main->SubBlock(0);
 
@@ -297,7 +297,7 @@ TEST(Stencil, MatchConv2D) {
       LogicalShape(PLAIDML_DATA_FLOAT32, {1, 100, 100, 56}),  //
       LogicalShape(PLAIDML_DATA_FLOAT32, {3, 3, 56, 56}),     //
       {1, 100, 100, 56});                                     //
-  auto program = plaidml2::edsl::ConvertIntoStripe(tileProgram);
+  auto program = plaidml::edsl::ConvertIntoStripe(tileProgram);
   auto main = program->entry->SubBlock(0);
   auto kernel = main->SubBlock(0);
 
@@ -340,7 +340,7 @@ TEST(Stencil, Pass) {
       "matmul",                                        //
       LogicalShape(PLAIDML_DATA_FLOAT32, {DIM, DIM}),  //
       LogicalShape(PLAIDML_DATA_FLOAT32, {DIM, DIM}));
-  auto program = plaidml2::edsl::ConvertIntoStripe(tileProgram);
+  auto program = plaidml::edsl::ConvertIntoStripe(tileProgram);
   CompilerState state(program);
   StencilPass(options).Apply(&state);
   IVLOG(2, "\n" << *program->entry);
