@@ -64,9 +64,6 @@ docs/_build/
 # Sphinx autoapi generated module summaries
 docs/plaidml/
 
-# PyBuilder
-target/
-
 # Jupyter Notebook
 .ipynb_checkpoints
 

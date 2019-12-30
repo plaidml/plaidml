@@ -55,10 +55,8 @@ plaidml_cc_library(
         "//pmlc/compiler",
         "//pmlc/dialect/pxa",
         "//pmlc/dialect/stripe:transcode",
-        "@mlir//:AffineToStandardTransforms",
-        "@mlir//:ExecutionEngine",
-        "@mlir//:ExecutionEngineUtils",
-        "@mlir//:LLVMTransforms",
+        "//pmlc/target/intel_gen",
+        "//pmlc/target/x86",
     ],
     alwayslink = 1,
 )

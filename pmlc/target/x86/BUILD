@@ -5,16 +5,14 @@ package(default_visibility = ["//visibility:public"])
 load("//bzl:plaidml.bzl", "plaidml_cc_library")
 
 plaidml_cc_library(
-    name = "compiler",
+    name = "x86",
     srcs = glob(["*.cc"]),
     hdrs = glob(["*.h"]),
     deps = [
-        "//base/util",
+        "//pmlc/compiler",
         "//pmlc/dialect/pxa",
-        "@llvm//:support",
-        "@mlir//:ExecutionEngine",
-        "@mlir//:ExecutionEngineUtils",
-        "@mlir//:IR",
+        "@mlir//:AffineToStandardTransforms",
         "@mlir//:LLVMTransforms",
     ],
+    alwayslink = 1,
 )

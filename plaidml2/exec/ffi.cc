@@ -21,6 +21,7 @@
 #endif
 #ifdef PLAIDML_MLIR
 #include "pmlc/compiler/compiler.h"
+#include "pmlc/compiler/registry.h"
 #include "pmlc/dialect/stripe/dialect.h"
 #include "pmlc/dialect/stripe/transcode.h"
 #include "pmlc/dialect/tile/lowering.h"
@@ -156,6 +157,15 @@ plaidml_strings* plaidml_devices_get(  //
 plaidml_strings* plaidml_targets_get(  //
     plaidml_error* err) {
   return ffi_wrap<plaidml_strings*>(err, nullptr, [&] {
+    if (vertexai::env::Get("PLAIDML_EE") == "1") {
+      const auto& targets = pmlc::compiler::listTargets();
+      auto strs = new plaidml_string*[targets.size()];
+      for (unsigned i = 0; i < targets.size(); i++) {
+        strs[i] = new plaidml_string{targets[i]};
+      }
+      return new plaidml_strings{targets.size(), strs};
+    }
+
     auto configs = GetConfigs().configs();
     auto strs = new plaidml_string*[configs.size()];
     size_t i = 0;
@@ -177,9 +187,11 @@ plaidml_executable* plaidml_compile(  //
     plaidml_binding** outputs) {
   return ffi_wrap<plaidml_executable*>(err, nullptr, [&] {
     IVLOG(1, "Compiling with device: " << device << ", target: " << target);
-    auto configs = GetConfigs().configs();
-    if (!configs.count(target)) {
-      throw std::runtime_error(llvm::formatv("Unknown target specified: {0}", target).str());
+    if (vertexai::env::Get("PLAIDML_EE") != "1") {
+      auto configs = GetConfigs().configs();
+      if (!configs.count(target)) {
+        throw std::runtime_error(llvm::formatv("Unknown target specified: {0}", target));
+      }
     }
 #ifdef PLAIDML_AST
     ConstBufferManager const_bufs;
@@ -230,7 +242,7 @@ plaidml_executable* plaidml_compile(  //
         auto view = args[i].buffer->MapCurrent(*ctx).get();
         bufptrs[i] = view->data();
       }
-      exec->exec = std::make_unique<Executable>(program->program->entry, *program->program->module, bufptrs);
+      exec->exec = std::make_unique<Executable>(program->program->entry, target, *program->program->module, bufptrs);
       return exec.release();
     }
     ConstBufferManager const_bufs;
