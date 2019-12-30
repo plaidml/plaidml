@@ -7,9 +7,12 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <utility>
+#include <vector>
 
 #include "llvm/Support/FormatVariadic.h"
 
+#include "base/util/env.h"
 #include "plaidml2/core/internal.h"
 #include "tile/targets/targets.h"
 
@@ -17,8 +20,7 @@
 #include "tile/lang/gen_stripe.h"
 #endif
 #ifdef PLAIDML_MLIR
-#include "mlir/Support/DebugStringHelper.h"
-
+#include "pmlc/compiler/compiler.h"
 #include "pmlc/dialect/stripe/dialect.h"
 #include "pmlc/dialect/stripe/transcode.h"
 #include "pmlc/dialect/tile/lowering.h"
@@ -43,9 +45,12 @@ using vertexai::tile::lang::ast::ExprPtr;
 using vertexai::tile::lang::ast::ParamExpr;
 #endif
 #ifdef PLAIDML_MLIR
-using pmlc::dialect::stripe::Dialect;
+using pmlc::compiler::Executable;
+using pmlc::dialect::tile::ProgramArgument;
+using StripeDialect = pmlc::dialect::stripe::Dialect;
 using pmlc::dialect::stripe::FromMLIR;
 using pmlc::dialect::tile::LowerIntoStripe;
+using namespace mlir;  // NOLINT[build/namespaces]
 #endif
 
 namespace {
@@ -55,13 +60,58 @@ class PlatformAllocator : public Allocator {
   explicit PlatformAllocator(const std::string& device_id) : device_id_(device_id) {}
 
   std::shared_ptr<Buffer> allocate(size_t size) {
-    Context ctx;
-    return GetPlatform()->MakeBuffer(ctx, device_id_, size);
+    auto ctx = GlobalContext::getContext();
+    return GetPlatform()->MakeBuffer(*ctx, device_id_, size);
   }
 
  private:
   std::string device_id_;
 };
+
+#ifdef PLAIDML_MLIR
+
+std::vector<ProgramArgument> BindProgramArguments(  //
+    plaidml_program* program,                       //
+    size_t ninputs,                                 //
+    plaidml_binding** inputs,                       //
+    size_t noutputs,                                //
+    plaidml_binding** outputs) {
+  std::unordered_map<Value*, BufferPtr> input_bindings;
+  for (unsigned i = 0; i < ninputs; i++) {
+    input_bindings[inputs[i]->expr->value] = inputs[i]->buffer->buffer;
+  }
+  std::unordered_map<Value*, BufferPtr> output_bindings;
+  for (unsigned i = 0; i < noutputs; i++) {
+    output_bindings[outputs[i]->expr->value] = outputs[i]->buffer->buffer;
+  }
+  std::vector<ProgramArgument> args(program->program->arguments.size());
+  for (unsigned i = 0; i < args.size(); i++) {
+    auto arg = program->program->arguments[i];
+    if (arg.isInput) {
+      auto it = input_bindings.find(arg.value);
+      if (it != input_bindings.end()) {
+        arg.buffer = it->second;
+      }
+      IVLOG(1, " Input[" << i << "]: " << arg.buffer);
+      if (!arg.buffer) {
+        throw std::runtime_error("Unbound input");
+      }
+    } else {
+      auto it = output_bindings.find(arg.value);
+      if (it != output_bindings.end()) {
+        arg.buffer = it->second;
+      }
+      IVLOG(1, "Output[" << i << "]: " << arg.buffer);
+      if (!arg.buffer) {
+        throw std::runtime_error("Unbound output");
+      }
+    }
+    args[i] = std::move(arg);
+  }
+  return args;
+}
+
+#endif  // PLAIDML_MLIR
 
 }  // namespace
 
@@ -72,6 +122,9 @@ struct plaidml_executable {
   BufferMap input_bufs;
   BufferMap output_bufs;
   std::shared_ptr<Program> program;
+#ifdef PLAIDML_MLIR
+  std::unique_ptr<Executable> exec;
+#endif  // PLAIDML_MLIR
 };
 
 void plaidml_exec_init(  //
@@ -81,6 +134,9 @@ void plaidml_exec_init(  //
     std::call_once(is_initialized, []() {
       IVLOG(1, "plaidml_exec_init");
       GetPlatform();
+#ifdef PLAIDML_MLIR
+      Executable::initialize();
+#endif  // PLAIDML_MLIR
     });
   });
 }
@@ -128,7 +184,7 @@ plaidml_executable* plaidml_compile(  //
 #ifdef PLAIDML_AST
     ConstBufferManager const_bufs;
     const_bufs.allocator = std::make_shared<PlatformAllocator>(device);
-    std::unique_ptr<plaidml_executable> exec{new plaidml_executable};
+    auto exec = std::make_unique<plaidml_executable>();
     auto stripe = vertexai::tile::lang::GenerateStripe(program->eval.runinfo);
     Context ctx;
     exec->program = GetPlatform()->MakeProgram(ctx, device, target, stripe, &const_bufs);
@@ -165,55 +221,42 @@ plaidml_executable* plaidml_compile(  //
     return exec.release();
 #endif
 #ifdef PLAIDML_MLIR
+    auto ctx = GlobalContext::getContext();
+    auto args = BindProgramArguments(program, ninputs, inputs, noutputs, outputs);
+    if (vertexai::env::Get("PLAIDML_EE") == "1") {
+      auto exec = std::make_unique<plaidml_executable>();
+      std::vector<void*> bufptrs(args.size());
+      for (unsigned i = 0; i < args.size(); i++) {
+        auto view = args[i].buffer->MapCurrent(*ctx).get();
+        bufptrs[i] = view->data();
+      }
+      exec->exec = std::make_unique<Executable>(program->program->entry, *program->program->module, bufptrs);
+      return exec.release();
+    }
     ConstBufferManager const_bufs;
     const_bufs.allocator = std::make_shared<PlatformAllocator>(device);
-    std::unique_ptr<plaidml_executable> exec{new plaidml_executable};
+    auto exec = std::make_unique<plaidml_executable>();
 
     // 1. lower tile dialect -> stripe dialect
     auto module = LowerIntoStripe(*program->program->module);
     // 2. convert MLIR -> stripe
     auto stripe = FromMLIR(*module);
-    Context ctx;
-    exec->program = GetPlatform()->MakeProgram(ctx, device, target, stripe, &const_bufs);
+    exec->program = GetPlatform()->MakeProgram(*ctx, device, target, stripe, &const_bufs);
     IVLOG(1, "After make program");
 
-    std::unordered_map<mlir::Value*, BufferPtr> input_bindings;
-    for (unsigned i = 0; i < ninputs; i++) {
-      input_bindings[inputs[i]->expr->value] = inputs[i]->buffer->buffer;
-    }
-
-    std::unordered_map<mlir::Value*, BufferPtr> output_bindings;
-    for (unsigned i = 0; i < noutputs; i++) {
-      output_bindings[outputs[i]->expr->value] = outputs[i]->buffer->buffer;
-    }
-
-    auto attrName = Dialect::getDialectAttrName("name");
-    auto stripeFuncOp = llvm::cast<mlir::FuncOp>(module->getBody()->front());
-    for (unsigned i = 0; i < program->program->arguments.size(); i++) {
-      const auto& arg = program->program->arguments[i];
-      auto attr = stripeFuncOp.getArgAttrOfType<mlir::StringAttr>(i, attrName);
+    auto attrName = StripeDialect::getDialectAttrName("name");
+    auto stripeFuncOp = cast<FuncOp>(module->getBody()->front());
+    for (unsigned i = 0; i < args.size(); i++) {
+      const auto& arg = args[i];
+      auto attr = stripeFuncOp.getArgAttrOfType<StringAttr>(i, attrName);
       if (!attr) {
         throw std::runtime_error("Missing expected argument attribute");
       }
       auto name = attr.getValue().str();
       if (arg.isInput) {
-        auto it = input_bindings.find(arg.value);
-        auto is_implicit = (it == input_bindings.end());
-        auto buffer = is_implicit ? arg.buffer : it->second;
-        IVLOG(1, " Input[" << i << "]: " << name << ": " << buffer << ", implicit: " << is_implicit);
-        if (!buffer) {
-          throw std::runtime_error("Unbound input");
-        }
-        exec->input_bufs[name] = buffer;
+        exec->input_bufs[name] = arg.buffer;
       } else {
-        auto it = output_bindings.find(arg.value);
-        auto is_implicit = (it == output_bindings.end());
-        auto buffer = is_implicit ? arg.buffer : it->second;
-        IVLOG(1, "Output[" << i << "]: " << name << ": " << buffer << ", implicit: " << is_implicit);
-        if (!buffer) {
-          throw std::runtime_error("Unbound output");
-        }
-        exec->output_bufs[name] = buffer;
+        exec->output_bufs[name] = arg.buffer;
       }
     }
 
@@ -234,8 +277,16 @@ void plaidml_executable_run(  //
     plaidml_error* err,       //
     plaidml_executable* exec) {
   ffi_wrap_void(err, [&] {
-    auto ctx = GlobalContext::getContext();
-    exec->program->Run(*ctx, exec->input_bufs, exec->output_bufs).get();
+#ifdef PLAIDML_MLIR
+    if (exec->exec) {
+      exec->exec->invoke();
+    } else {
+#endif  // PLAIDML_MLIR
+      auto ctx = GlobalContext::getContext();
+      exec->program->Run(*ctx, exec->input_bufs, exec->output_bufs).get();
+#ifdef PLAIDML_MLIR
+    }
+#endif  // PLAIDML_MLIR
   });
 }
 

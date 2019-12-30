@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include <string>
 #include <vector>
 
 #include "mlir/IR/BlockAndValueMapping.h"
@@ -21,6 +22,7 @@ struct ProgramArgument {
 };
 
 struct TileProgram {
+  std::string entry;
   mlir::OwningModuleRef module;
   std::vector<mlir::Value*> outputs;
   std::vector<ProgramArgument> arguments;

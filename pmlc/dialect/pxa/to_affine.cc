@@ -1,7 +1,5 @@
 // Copyright 2019, Intel Corporation
 
-#include "pmlc/dialect/pxa/to_affine.h"
-
 #include "mlir/Dialect/AffineOps/AffineOps.h"
 #include "mlir/Dialect/StandardOps/Ops.h"
 #include "mlir/EDSC/Builders.h"
@@ -14,6 +12,7 @@
 #include "base/util/logging.h"
 #include "pmlc/dialect/pxa/dialect.h"
 #include "pmlc/dialect/pxa/ops.h"
+#include "pmlc/dialect/pxa/passes.h"
 #include "pmlc/util/util.h"
 
 namespace pmlc::dialect::pxa {
@@ -118,6 +117,7 @@ struct ReduceOpConversion : public LoweringBase<ReduceOp> {
         llvm_unreachable("Unsupported aggregation for CreateInit");
     }
     rewriter.create<AffineStoreOp>(op.getLoc(), agg, op.out(), op.map(), op.idxs());
+    rewriter.create<AffineTerminatorOp>(op.getLoc());
     rewriter.eraseOp(op);
   }
 };
@@ -142,7 +142,11 @@ void LoweringPass::runOnModule() {
   }
 }
 
-}  // Anonymous namespace
+}  // namespace
+
+std::unique_ptr<mlir::Pass> createLowerToAffinePass() {  //
+  return std::make_unique<LoweringPass>();
+}
 
 static mlir::PassRegistration<LoweringPass> legalize_pass(  //
     "pxa-legalize-to-affine",                               //

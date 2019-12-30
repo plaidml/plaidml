@@ -338,8 +338,19 @@ llvm::Function* Compiler::CompileXSMMBlock(const stripe::Block& block, const XSM
   llvm::FunctionType* rftype = llvm::FunctionType::get(builder_.getVoidTy(), param_types, false);
   llvm::FunctionType* xsmmCallHelperType = llvm::FunctionType::get(builder_.getVoidTy(), param_types, false);
   auto xmmCallFunc = module_->getOrInsertFunction("XSMMRTCaller", xsmmCallHelperType).getCallee();
-  std::vector<llvm::Value*> args2 = {func, buffers_[xsmmCallData.in1->into()].base,
-                                     buffers_[xsmmCallData.in0->into()].base, buffers_[xsmmCallData.out0->into()].base};
+
+  #define CREATE_OFFSET_STMTS(name) llvm::Value* arg_##name;                                  \
+    if (xsmmCallData.offset_##name == 0) {                                                    \
+      arg_##name = buffers_[xsmmCallData.name->into()].base;                                  \
+    } else {                                                                                  \
+      llvm::Value* idx_list[1] = {llvm::ConstantInt::get(i32t, xsmmCallData.offset_##name)};  \
+      arg_##name = builder_.CreateGEP(buffers_[xsmmCallData.name->into()].base, idx_list);    \
+    }
+  CREATE_OFFSET_STMTS(in0);
+  CREATE_OFFSET_STMTS(in1);
+  CREATE_OFFSET_STMTS(out0);
+
+  std::vector<llvm::Value*> args2 = {func, arg_in1, arg_in0, arg_out0};
   builder_.CreateCall(rftype, xmmCallFunc, args2);
   builder_.CreateRetVoid();
   return function;
@@ -381,18 +392,24 @@ bool Compiler::GetXSMMCallData(XSMMCallData* xsmmCallData, const stripe::Block& 
 
   for (const auto& ref : block.refs) {
     if (ref.has_tag("A")) {
+      auto flat = ref.FlatAccess();
       if (useSpecialN) {
         xsmmCallData->lda_b_value = 0;
       } else {
-        xsmmCallData->lda_b_value = ref.FlatAccess()[n_name];
+        xsmmCallData->lda_b_value = flat[n_name];
       }
       xsmmCallData->in0 = &ref;
+      xsmmCallData->offset_in0 = flat.constant();
     } else if (ref.has_tag("B")) {
-      xsmmCallData->lda_a_value = ref.FlatAccess()[k_name];
+      auto flat = ref.FlatAccess();
+      xsmmCallData->lda_a_value = flat[k_name];
       xsmmCallData->in1 = &ref;
+      xsmmCallData->offset_in1 = flat.constant();
     } else if (ref.has_tag("C")) {
-      xsmmCallData->lda_c_value = ref.FlatAccess()[n_name];
+      auto flat = ref.FlatAccess();
+      xsmmCallData->lda_c_value = flat[n_name];
       xsmmCallData->out0 = &ref;
+      xsmmCallData->offset_out0 = flat.constant();
     }
   }
 

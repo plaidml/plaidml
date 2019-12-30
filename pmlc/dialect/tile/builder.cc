@@ -575,6 +575,7 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(StringRef name, const Prog
   auto loc = mlir::UnknownLoc::get(&impl->context);
   auto module = ModuleOp::create(loc);
   auto program = std::make_shared<TileProgram>(module);
+  program->entry = name;
   // Construct a function to represent the entire program
   auto initialFuncType = mlir::FunctionType::get(inputTypes, {}, &impl->context);
   auto funcOp = mlir::FuncOp::create(loc, name, initialFuncType, {});

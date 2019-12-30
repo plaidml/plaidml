@@ -11,6 +11,7 @@
 #include "plaidml2/edsl/edsl.h"
 #include "plaidml2/exec/exec.h"
 
+using ::testing::ContainerEq;
 using ::testing::Eq;
 
 namespace plaidml2::edsl {
@@ -46,9 +47,10 @@ Tensor Softmax(const Tensor& X) {
 }
 
 TEST(CppEdsl, Dot) {
-  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {1, 784});
-  auto B = Placeholder(PLAIDML_DATA_FLOAT32, {784, 512});
-  Program program("dot", {Dot(A, B)});
+  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {3, 3});
+  auto B = Placeholder(PLAIDML_DATA_FLOAT32, {3, 3});
+  auto C = Dot(A, B);
+  Program program("dot", {C});
 #ifdef PLAIDML_MLIR
   EXPECT_THAT(program, Eq(R"#(
 #map0 = (d0, d1, d2) -> (d0, d1)
@@ -58,15 +60,39 @@ TEST(CppEdsl, Dot) {
 
 !fp32 = type tensor<!eltwise.fp32>
 module {
-  func @dot(%arg0: tensor<784x512x!eltwise.fp32>, %arg1: tensor<1x784x!eltwise.fp32>) -> tensor<1x512x!eltwise.fp32> {
+  func @dot(%arg0: tensor<3x3x!eltwise.fp32>, %arg1: tensor<3x3x!eltwise.fp32>) -> tensor<3x3x!eltwise.fp32> {
     %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !fp32
-    %0 = tile.cion add, mul, %cst, %arg1, %arg0 {idxs = ["i", "j", "k"], sink = #map0, srcs = [#map1, #map2]} : !fp32, tensor<1x784x!eltwise.fp32>, tensor<784x512x!eltwise.fp32> -> tensor<1x512x!eltwise.fp32>
-    return %0 : tensor<1x512x!eltwise.fp32>
+    %0 = tile.cion add, mul, %cst, %arg1, %arg0 {idxs = ["i", "j", "k"], sink = #map0, srcs = [#map1, #map2]} : !fp32, tensor<3x3x!eltwise.fp32>, tensor<3x3x!eltwise.fp32> -> tensor<3x3x!eltwise.fp32>
+    return %0 : tensor<3x3x!eltwise.fp32>
   }
 }
 )#"));
 #endif
-  exec::Binder(program).compile()->run();
+
+  std::vector<float> input = {
+      1.0f, 2.0f, 3.0f,  //
+      4.0f, 5.0f, 6.0f,  //
+      7.0f, 8.0f, 9.0f,  //
+  };
+
+  std::vector<float> expected = {
+      30.0f,  36.0f,  42.0f,   //
+      66.0f,  81.0f,  96.0f,   //
+      102.0f, 126.0f, 150.0f,  //
+  };
+
+  auto binder = exec::Binder(program);
+  auto executable = binder.compile();
+  binder.input(A).copy_from(input.data());
+  binder.input(B).copy_from(input.data());
+  executable->run();
+  {
+    auto view = binder.output(C).mmap_current();
+    ASSERT_THAT(view.size(), expected.size() * sizeof(expected[0]));
+    auto data = reinterpret_cast<float*>(view.data());
+    std::vector<float> actual(data, data + expected.size());
+    EXPECT_THAT(actual, ContainerEq(expected));
+  }
 }
 
 TEST(CppEdsl, DoubleDot) {

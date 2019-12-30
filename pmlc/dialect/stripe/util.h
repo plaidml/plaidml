@@ -3,6 +3,7 @@
 #pragma once
 
 #include "mlir/IR/Function.h"
+#include "pmlc/dialect/eltwise/ops.h"
 #include "pmlc/dialect/stripe/dialect.h"
 #include "pmlc/dialect/stripe/mlir.h"
 #include "pmlc/dialect/stripe/ops.h"
@@ -46,6 +47,12 @@ int64_t idxRange(mlir::BlockArgument* idx);
 
 // Get the index name
 StringRef idxName(mlir::BlockArgument* idx);
+
+// Get the value name. value must be a tensor.
+StringRef tensorName(Value* tensor);
+
+// Get the element type of tensor
+DataType tensorElementType(Value* tensor);
 
 // Get a single index from ParallelForOp
 std::pair<StringRef, unsigned> getSingleIndex(ParallelForOp op, unsigned n);
