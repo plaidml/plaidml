@@ -5,7 +5,11 @@
 #include "plaidml2/exec/exec.h"
 #include "plaidml2/op/op.h"
 
-namespace plaidml::networks::oplib {
+namespace edsl = plaidml::edsl;
+namespace exec = plaidml::exec;
+namespace op = plaidml::op;
+
+namespace networks::oplib {
 
 namespace {
 
@@ -416,4 +420,4 @@ BENCHMARK_REGISTER_F(resnet50, compile)->Unit(benchmark::kMillisecond);
 // TODO: get HAL timer results, UseManualTime() instead of UseRealTime()
 BENCHMARK_REGISTER_F(resnet50, run)->Unit(benchmark::kMillisecond)->UseRealTime();
 
-}  // namespace plaidml::networks::oplib
+}  // namespace networks::oplib
