@@ -10,10 +10,10 @@ namespace {
 
 class Environment : public ::testing::Environment {
   void SetUp() override {
-    plaidml::init();
-    plaidml::edsl::init();
-    plaidml::op::init();
-    plaidml::exec::init();
+    plaidml2::init();
+    plaidml2::edsl::init();
+    plaidml2::op::init();
+    plaidml2::exec::init();
   }
 };
 
