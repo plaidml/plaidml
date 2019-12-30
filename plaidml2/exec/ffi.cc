@@ -157,6 +157,7 @@ plaidml_strings* plaidml_devices_get(  //
 plaidml_strings* plaidml_targets_get(  //
     plaidml_error* err) {
   return ffi_wrap<plaidml_strings*>(err, nullptr, [&] {
+#ifdef PLAIDML_MLIR
     if (vertexai::env::Get("PLAIDML_EE") == "1") {
       const auto& targets = pmlc::compiler::listTargets();
       auto strs = new plaidml_string*[targets.size()];
@@ -165,6 +166,7 @@ plaidml_strings* plaidml_targets_get(  //
       }
       return new plaidml_strings{targets.size(), strs};
     }
+#endif
 
     auto configs = GetConfigs().configs();
     auto strs = new plaidml_string*[configs.size()];
