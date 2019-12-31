@@ -99,9 +99,14 @@ void Gradient::ComputeOperandDerivs(mlir::Value* val) {
   } else if (mlir::isa<ScatterOp>(op)) {
     // TODO
     throw std::runtime_error("TODO: Derivs of Scatter not yet implemented");
-  } else if (mlir::isa<ReshapeOp>(op)) {
-    // TODO
-    throw std::runtime_error("TODO: Derivs of Reshape not yet implemented");
+  } else if (auto reshape_op = mlir::dyn_cast<ReshapeOp>(op)) {
+    auto tensor_input = reshape_op.tensor();
+    std::vector<mlir::Value*> args{grads_[val]};
+    for (size_t i = 0; i < tensor_input->getType().dyn_cast<RankedTensorType>().getRank(); ++i) {
+      args.push_back(builder_->MakeDimOp(tensor_input, i));
+    }
+    auto dop = builder_->MakePrimitiveOp("reshape", args);
+    AddToGradient(tensor_input, dop);
   } else if (mlir::isa<SpecialOp>(op)) {
     throw std::runtime_error("Unrecognized special operation, unable to differentiate");
   } else if (mlir::isa<DimOp>(op) || mlir::isa<eltwise::ScalarConstantOp>(op)) {
