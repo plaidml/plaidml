@@ -55,7 +55,8 @@ void Gradient::ComputeOperandDerivs(mlir::Value* val) {
   IVLOG(4, "Gradient::ComputeDerivative> " << mlir::debugString(*val));
   // TODO: Throw on ops with multiple results?
   auto op = val->getDefiningOp();
-  if (mlir::isa<AffineConstraintsOp>(op) || mlir::isa<AffineMapOp>(op) || mlir::isa<AffineIndexOp>(op)) {
+  if (mlir::isa<AffineConstraintsOp>(op) || mlir::isa<AffineMapOp>(op) || mlir::isa<AffineIndexOp>(op) ||
+      mlir::isa<PrngOp>(op) || mlir::isa<ShapeOp>(op)) {
     // TODO: Make the list of which ops these are more principled. Also, should these all be caught in the backwards
     // slice filter? If so, probably throw here.
     IVLOG(6, "Gradient::ComputeDerivative> Skipping computing derivatives for op "
@@ -88,9 +89,21 @@ void Gradient::ComputeOperandDerivs(mlir::Value* val) {
       AddToGradient(src, dop);
       idx++;
     }
+  } else if (auto gather_op = mlir::dyn_cast<GatherOp>(op)) {
+    auto tensor_input = gather_op.tensor();
+    auto dims_input = gather_op.dims();
+    auto dop = builder_->MakePrimitiveOp("scatter", {grads_[val], dims_input, tensor_input});
+    auto zero_op = builder_->MakeScalarConstantOp(0.);
+    AddToGradient(tensor_input, dop);
+    AddToGradient(dims_input, zero_op);
+  } else if (mlir::isa<ScatterOp>(op)) {
+    // TODO
+    throw std::runtime_error("TODO: Derivs of Scatter not yet implemented");
+  } else if (mlir::isa<ReshapeOp>(op)) {
+    // TODO
+    throw std::runtime_error("TODO: Derivs of Reshape not yet implemented");
   } else if (mlir::isa<SpecialOp>(op)) {
-    // TODO: Possibly can merge w/ EltwiseOp case?
-    throw std::runtime_error("TODO: Derivs of Specials not yet implemented");
+    throw std::runtime_error("Unrecognized special operation, unable to differentiate");
   } else if (mlir::isa<DimOp>(op) || mlir::isa<eltwise::ScalarConstantOp>(op)) {
     // TODO: If it turns out one of these matters, be sure to split it off from the ones that don't matter
     // TODO: Or otherwise skip? These shouldn't matter...
