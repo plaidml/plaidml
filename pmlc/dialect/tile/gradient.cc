@@ -2,7 +2,6 @@
 
 #include "pmlc/dialect/tile/gradient.h"
 
-// TODO: Clean includes
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/FormatVariadic.h"
 
@@ -78,6 +77,7 @@ void Gradient::ComputeOperandDerivs(mlir::Value* val) {
     // TODO: if grads_[operand] has rank > 0, call a simple_reduce
   } else if (auto cion_op = mlir::dyn_cast<SymbolicContractionOp>(op)) {
     {
+      // TODO: I discussed this with Jeremy and I think the below notes are wrong, but we need another discussion.
       // TODO: Do `init` deriv right: we should passthrough on plus, conditional against result on max/min, throw on
       // product
       // TODO: This is a temporary hack!
@@ -110,9 +110,6 @@ void Gradient::ComputeOperandDerivs(mlir::Value* val) {
   } else if (mlir::isa<SpecialOp>(op)) {
     throw std::runtime_error("Unrecognized special operation, unable to differentiate");
   } else if (mlir::isa<DimOp>(op) || mlir::isa<eltwise::ScalarConstantOp>(op)) {
-    // TODO: If it turns out one of these matters, be sure to split it off from the ones that don't matter
-    // TODO: Or otherwise skip? These shouldn't matter...
-    // TODO: See if int/float matters...
     auto dop = builder_->MakeScalarConstantOp(0.);
     for (const auto& operand : op->getOperands()) {
       AddToGradient(operand, dop);
@@ -147,18 +144,9 @@ mlir::Value* Gradient::DeriveEltwise(mlir::Value* dout, mlir::Value* out, size_t
   auto op = out->getDefiningOp();
   IVLOG(5, "Gradient::DeriveEltwise> dout=" << mlir::debugString(*dout) << ", op=" << mlir::debugString(*op)
                                             << ", idx=" << idx);
-  // TODO: Handle reshape specially. AST code for that follows
-  // if (op->fn == "reshape") {
-  //   std::vector<ExprPtr> args = {dout};
-  //   auto in = op->args[0];
-  //   auto dim_exprs = in->shape.dims_as_exprs();
-  //   for (size_t i = 0; i < in->shape.dims.size(); ++i) {
-  //     args.push_back(std::make_shared<DimExprExpr>(dim_exprs[i]));
-  //   }
-  //   return MakeCall("reshape", args);
-  // }
   auto deriv = DerivRegistry::Instance()->Resolve(op->getName().getStringRef());
   llvm::SmallVector<mlir::Value*, 3> operands{op->getOperands()};  // TODO: Size
+  // TODO: Need to add simple_reduce here, unless done in the "if isa EltwiseOp" block above
   return deriv.fn(out, dout, operands, deriv.user_fn, deriv.user_ctx)[idx];
 }
 
@@ -185,8 +173,7 @@ mlir::Value* Gradient::DeriveContraction(mlir::Value* dout, mlir::Value* out, si
       for (auto src : op.srcs()) {
         if (i == idx) {
           combo_kind = util::CombinationKind::cond;
-          auto src_op = mlir::dyn_cast_or_null<AffineTensorMapOp>(
-              src->getDefiningOp());  // TODO: Track that this is target_src_op
+          auto src_op = mlir::dyn_cast_or_null<AffineTensorMapOp>(src->getDefiningOp());
           if (!src_op) {
             throw std::runtime_error("src_op as cast is null");
           }
