@@ -2,17 +2,12 @@
 
 #pragma once
 
-// TODO: Need relevant includes
-// TODO: Several of these can move to the *.cc file
-
+#include <functional>
 #include <map>
 #include <string>
 #include <unordered_map>
 
-// #include "pmlc/dialect/eltwise/dialect.h"
-// #include "pmlc/dialect/eltwise/ops.h"
 #include "pmlc/dialect/tile/ops.h"
-// #include "pmlc/dialect/tile/program.h"
 
 namespace mlir {
 class Value;

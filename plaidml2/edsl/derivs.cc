@@ -165,6 +165,7 @@ void RegisterDerivs() {
   });
 #endif
 #ifdef PLAIDML_MLIR
+  // TODO: A number of operations for which I am uncertain if we want to add a derivative here have been marked "TODO"
   RegisterTensorDeriv("eltwise.abs", [](DERIV_ARGS) {  //
     return Tensors{select(X[0] < 0, -DY, DY)};
   });
@@ -172,7 +173,6 @@ void RegisterDerivs() {
     return Tensors{-DY / sqrt(1 - X[0] * X[0])};
   });
   RegisterTensorDeriv("eltwise.add", [](DERIV_ARGS) {  //
-    // TODO: Unclear if matched output is a problem
     return Tensors{DY, DY};
   });
   // TODO: And
