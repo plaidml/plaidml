@@ -50,7 +50,7 @@ using mlir::Value;
 
 namespace {
 
-static ScalarType GetScalarType(Value* val) {
+static ScalarType GetScalarType(Value val) {
   auto t = val->getType();
   if (auto ttype = t.dyn_cast<mlir::TensorType>()) {
     t = ttype.getElementType();
@@ -111,7 +111,7 @@ struct LoweringBase : public OpConversionPattern<OpType> {
 struct FuncOpConversion : public LoweringBase<FuncOp> {
   explicit FuncOpConversion(MLIRContext* ctx) : LoweringBase(ctx) {}
 
-  void rewrite(FuncOp op, ArrayRef<Value*> operands, ConversionPatternRewriter& rewriter) const override {
+  void rewrite(FuncOp op, ArrayRef<Value> operands, ConversionPatternRewriter& rewriter) const override {
     FunctionType type = op.getType();
     IVLOG(2, "FuncOpConversion::rewrite> " << mlir::debugString(type));
 
@@ -141,7 +141,7 @@ struct FuncOpConversion : public LoweringBase<FuncOp> {
 struct ScalarConstantOpConversion : public LoweringBase<ScalarConstantOp> {
   explicit ScalarConstantOpConversion(MLIRContext* ctx) : LoweringBase(ctx) {}
 
-  void rewrite(ScalarConstantOp op, ArrayRef<Value*> operands, ConversionPatternRewriter& rewriter) const override {
+  void rewrite(ScalarConstantOp op, ArrayRef<Value> operands, ConversionPatternRewriter& rewriter) const override {
     Type type = GetScalarType(op).toStandard();
     Attribute val = op.getValue();
     if (auto ftype = type.dyn_cast<FloatType>()) {
@@ -162,7 +162,7 @@ struct EltwiseOpConversion : public ConversionPattern {
   explicit EltwiseOpConversion(MLIRContext* ctx, StringRef opName) : ConversionPattern(opName, 1, ctx), ctx(ctx) {}
   MLIRContext* ctx;
   PatternMatchResult match(Operation* op) const override { return this->matchSuccess(); }
-  void rewrite(Operation* op, ArrayRef<Value*> operands, ConversionPatternRewriter& rewriter) const override {
+  void rewrite(Operation* op, ArrayRef<Value> operands, ConversionPatternRewriter& rewriter) const override {
     // Get loc
     auto loc = op->getLoc();
     // Get the output type
@@ -172,7 +172,7 @@ struct EltwiseOpConversion : public ConversionPattern {
     auto outRef = rewriter.create<AllocOp>(loc, outType).getResult();
     // Make a parallel for to fill the output
     auto ranges = rewriter.getI64ArrayAttr(outType.getShape());
-    auto runtime_ranges = ArrayRef<Value*>();
+    auto runtime_ranges = ArrayRef<Value>();
     rewriter.create<AffineParallelForOp>(loc, ranges, runtime_ranges);
     // Replace output with the newly allocated buffer
     rewriter.replaceOp(op, outRef);
@@ -183,7 +183,7 @@ struct EltwiseOpConversion : public ConversionPattern {
   }
 };
 
-static Value* Cast(OpBuilder& builder, ScalarType in, ScalarType out, Value* stdVal) {
+static Value Cast(OpBuilder& builder, ScalarType in, ScalarType out, Value stdVal) {
   TypeConverter typeConverter(stdVal->getContext());
   auto stypeOut = typeConverter.convertType(out);
   if (stypeOut == stdVal->getType()) {
@@ -199,7 +199,7 @@ static ScalarType CommonSupertype(ScalarType a, ScalarType b) {
   return ScalarType::get(a.getContext(), CommonSupertype(a.type(), b.type()));
 }
 
-static Value* CreateInit(OpBuilder& builder, Location loc, ScalarType stype, AggregationKind agg) {
+static Value CreateInit(OpBuilder& builder, Location loc, ScalarType stype, AggregationKind agg) {
   Type type = stype.toStandard();
   if (auto ftype = type.dyn_cast<FloatType>()) {
     switch (agg) {
@@ -223,12 +223,12 @@ static Value* CreateInit(OpBuilder& builder, Location loc, ScalarType stype, Agg
   llvm_unreachable("Unknown type for CreateInit");
 }
 
-static Value* MakeCombination(            //
+static Value MakeCombination(             //
     ConversionPatternRewriter& rewriter,  //
     Location loc,                         //
     CombinationKind combo,                //
     ArrayRef<ScalarType> types,           //
-    ArrayRef<Value*> vals)                //
+    ArrayRef<Value> vals)                 //
 {
   if (combo == CombinationKind::none) {
     return vals[0];
@@ -259,7 +259,7 @@ static Value* MakeCombination(            //
 struct ContractionOpConversion : public LoweringBase<ContractionOp> {
   explicit ContractionOpConversion(MLIRContext* ctx) : LoweringBase(ctx) {}
 
-  void rewrite(ContractionOp op, ArrayRef<Value*> operands, ConversionPatternRewriter& rewriter) const override {
+  void rewrite(ContractionOp op, ArrayRef<Value> operands, ConversionPatternRewriter& rewriter) const override {
     tile::ContractionOpOperandAdaptor new_op(operands);
     // Gather some basic info
     auto loc = op.getLoc();
@@ -284,15 +284,15 @@ struct ContractionOpConversion : public LoweringBase<ContractionOp> {
       ranges.emplace_back(range);
     }
     // Make the outer loops
-    auto runtime_ranges = ArrayRef<Value*>();
+    auto runtime_ranges = ArrayRef<Value>();
     auto forOp = rewriter.create<AffineParallelForOp>(loc, rewriter.getI64ArrayAttr(ranges), runtime_ranges);
     auto body = rewriter.createBlock(&forOp.inner());
-    llvm::SmallVector<Value*, 8> idxs;
+    llvm::SmallVector<Value, 8> idxs;
     for (size_t i = 0; i < ranges.size(); i++) {
       idxs.push_back(body->addArgument(rewriter.getIndexType()));
     }
     // Create the loads + casts
-    llvm::SmallVector<Value*, 4> vals;
+    llvm::SmallVector<Value, 4> vals;
     llvm::SmallVector<ScalarType, 4> types;
     for (size_t i = 0; i < op.srcs().getValue().size(); i++) {
       auto map = op.srcs().getValue()[i].cast<AffineMapAttr>().getValue();
@@ -302,7 +302,7 @@ struct ContractionOpConversion : public LoweringBase<ContractionOp> {
       types.push_back(GetScalarType(old_in));
     }
     // TODO: Do the combination op
-    Value* outVal = MakeCombination(rewriter, op.getLoc(), op.combo(), types, vals);
+    Value outVal = MakeCombination(rewriter, op.getLoc(), op.combo(), types, vals);
     // Create the store
     auto outMap = op.sink();
     rewriter.create<ReduceOp>(loc, op.agg(), outVal, outRef, outMap, idxs);

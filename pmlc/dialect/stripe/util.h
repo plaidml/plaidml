@@ -2,7 +2,12 @@
 
 #pragma once
 
+#include <set>
+#include <string>
+#include <utility>
+
 #include "mlir/IR/Function.h"
+
 #include "pmlc/dialect/eltwise/ops.h"
 #include "pmlc/dialect/stripe/dialect.h"
 #include "pmlc/dialect/stripe/mlir.h"
@@ -43,16 +48,16 @@ void setOpAttrUnit(mlir::Operation* op, mlir::OpBuilder builder, const std::stri
 void setIdxAttrUnit(ParallelForOp op, StringRef target_idx, const std::string& attr);
 
 // Get the index range
-int64_t idxRange(mlir::BlockArgument* idx);
+int64_t idxRange(mlir::BlockArgument idx);
 
 // Get the index name
-StringRef idxName(mlir::BlockArgument* idx);
+StringRef idxName(mlir::BlockArgument idx);
 
 // Get the value name. value must be a tensor.
-StringRef tensorName(Value* tensor);
+StringRef tensorName(Value tensor);
 
 // Get the element type of tensor
-DataType tensorElementType(Value* tensor);
+DataType tensorElementType(Value tensor);
 
 // Get a single index from ParallelForOp
 std::pair<StringRef, unsigned> getSingleIndex(ParallelForOp op, unsigned n);
@@ -61,14 +66,13 @@ std::pair<StringRef, unsigned> getSingleIndex(ParallelForOp op, unsigned n);
 llvm::SmallVector<std::pair<StringRef, unsigned>, kIndexLimit> getAllIndex(ParallelForOp op);
 
 // Get the base type for a tensor
-TensorType baseType(Value* value);
+TensorType baseType(Value value);
 
 // Get all index in tensor "value", whose strides are 1
-llvm::SmallVector<mlir::BlockArgument*, kIndexLimit> strideOneIdxs(mlir::Value* value);
+llvm::SmallVector<mlir::BlockArgument, kIndexLimit> strideOneIdxs(mlir::Value value);
 
 // Build the initial value for the aggregate type
-eltwise::ScalarConstantOp initialValue(OpBuilder* builder, DataType type,
-                                       const std::string& agg_name,
+eltwise::ScalarConstantOp initialValue(OpBuilder* builder, DataType type, const std::string& agg_name,
                                        const std::string& var_name);
 
 }  // namespace stripe

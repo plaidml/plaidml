@@ -18,9 +18,9 @@ namespace stripe = vertexai::tile::stripe;
 mlir::OwningModuleRef IntoMLIR(MLIRContext* ctx, const stripe::Program& prog);
 std::shared_ptr<stripe::Program> FromMLIR(mlir::ModuleOp module);
 
-using SymbolValueMap = std::map<std::string, mlir::Value*>;
+using SymbolValueMap = std::map<std::string, mlir::Value>;
 
-mlir::Value* AffineIntoMLIR(     //
+mlir::Value AffineIntoMLIR(      //
     mlir::OpBuilder* builder,    //
     const SymbolValueMap& idxs,  //
     const stripe::Affine& affine);

@@ -126,11 +126,11 @@ void setOpAttrUnit(Operation* op, OpBuilder builder, const std::string& attr_nam
 }
 
 void setIdxAttrUnit(ParallelForOp op, StringRef target_idx, const std::string& attr_name) {
-  auto idx_names = op.getAttrOfType<ArrayAttr>(mlir::Identifier::get("idx_names", op.getContext()));
+  auto idx_names = op.getAttrOfType<ArrayAttr>("idx_names");
   if (!idx_names) {
     return;
   }
-  auto old_idx_attrs = op.getAttrOfType<ArrayAttr>(mlir::Identifier::get("idx_attrs", op.getContext()));
+  auto old_idx_attrs = op.getAttrOfType<ArrayAttr>("idx_attrs");
   ArrayAttr new_idx_attrs;
   auto builder = op.getBodyBuilder();
   for (unsigned i = 0; i < op.ranges().size(); i++) {
@@ -151,33 +151,33 @@ void setIdxAttrUnit(ParallelForOp op, StringRef target_idx, const std::string& a
       break;
     }
   }
-  op.setAttr(mlir::Identifier::get("idx_attrs", op.getContext()), new_idx_attrs);
+  op.setAttr("idx_attrs", new_idx_attrs);
 }
 
-int64_t idxRange(BlockArgument* idx) {
-  auto pf = mlir::cast<ParallelForOp>(idx->getOwner()->getParentOp());
-  return pf.getRange(idx->getArgNumber());
+int64_t idxRange(BlockArgument idx) {
+  auto pf = mlir::cast<ParallelForOp>(idx.getOwner()->getParentOp());
+  return pf.getRange(idx.getArgNumber());
 }
 
-StringRef idxName(BlockArgument* idx) {
-  auto pf = mlir::cast<ParallelForOp>(idx->getOwner()->getParentOp());
-  auto names = pf.getAttrOfType<ArrayAttr>(mlir::Identifier::get("idx_names", pf.getContext()));
-  auto n = idx->getArgNumber();
-  auto idx_name = StringAttr::get("", pf.getContext());
-  if (names && n < names.size()) {
-    if (auto str_attr = names.getValue()[n].template dyn_cast<StringAttr>()) {
-      idx_name = str_attr;
+StringRef idxName(BlockArgument idx) {
+  auto op = mlir::cast<ParallelForOp>(idx.getOwner()->getParentOp());
+  auto idxNames = op.getAttrOfType<ArrayAttr>("idx_names");
+  auto argNumber = idx.getArgNumber();
+  if (idxNames && argNumber < idxNames.size()) {
+    auto argAttr = idxNames.getValue()[argNumber];
+    if (auto strAttr = argAttr.dyn_cast<StringAttr>()) {
+      return strAttr.getValue();
     }
   }
-  return idx_name.getValue();
+  return "";
 }
 
 std::pair<StringRef, unsigned> getSingleIndex(ParallelForOp op, unsigned n) {
-  auto names = op.getAttrOfType<ArrayAttr>(mlir::Identifier::get("idx_names", op.getContext()));
+  auto names = op.getAttrOfType<ArrayAttr>("idx_names");
   auto ranges = op.ranges();
   auto idx_name = StringAttr::get("", op.getContext());
   if (names && n < names.size()) {
-    if (auto str_attr = names.getValue()[n].template dyn_cast<StringAttr>()) {
+    if (auto str_attr = names.getValue()[n].dyn_cast<StringAttr>()) {
       idx_name = str_attr;
     }
   }
@@ -187,12 +187,12 @@ std::pair<StringRef, unsigned> getSingleIndex(ParallelForOp op, unsigned n) {
 
 llvm::SmallVector<std::pair<StringRef, unsigned>, kIndexLimit> getAllIndex(ParallelForOp op) {
   llvm::SmallVector<std::pair<StringRef, unsigned>, kIndexLimit> idxs;
-  auto names = op.getAttrOfType<ArrayAttr>(mlir::Identifier::get("idx_names", op.getContext()));
+  auto names = op.getAttrOfType<ArrayAttr>("idx_names");
   auto ranges = op.ranges();
   for (unsigned i = 0; i < op.ranges().size(); i++) {
     auto idx_name = StringAttr::get("", op.getContext());
     if (names && i < names.size()) {
-      if (auto str_attr = names.getValue()[i].template dyn_cast<StringAttr>()) {
+      if (auto str_attr = names.getValue()[i].dyn_cast<StringAttr>()) {
         idx_name = str_attr;
       }
     }
@@ -202,17 +202,16 @@ llvm::SmallVector<std::pair<StringRef, unsigned>, kIndexLimit> getAllIndex(Paral
   return idxs;
 }
 
-TensorType baseType(Value* value) {
-  Value *cur_value = value;
+TensorType baseType(Value value) {
+  auto cur_value = value;
   do {
-    if (auto def = cur_value->getDefiningOp()) {
+    if (auto def = cur_value.getDefiningOp()) {
       if (auto aop = mlir::dyn_cast<AllocateOp>(def)) {
         return aop.layout();
       }
       auto rop = mlir::dyn_cast<RefineOp>(def);
       cur_value = rop.in();
-    }
-    else if (auto arg = mlir::dyn_cast<mlir::BlockArgument>(cur_value)) {
+    } else if (auto arg = cur_value.dyn_cast<BlockArgument>()) {
       auto parentOp = arg->getOwner()->getParentOp();
       auto funcOp = mlir::dyn_cast<mlir::FuncOp>(parentOp);
       if (!funcOp) {
@@ -222,17 +221,16 @@ TensorType baseType(Value* value) {
       auto attr = funcOp.getArgAttrOfType<mlir::TypeAttr>(arg->getArgNumber(), attrName);
       assert(attr && "Expected 'layout' attribute in TensorRefType function argument");
       return attr.getValue().cast<TensorType>();
-    }
-    else {
+    } else {
       throw std::runtime_error("Invalid tensor value");
     }
   } while (cur_value);
   throw std::runtime_error("Base type not found for the operation.");
 }
 
-llvm::SmallVector<mlir::BlockArgument*, kIndexLimit> strideOneIdxs(Value* value) {
-  llvm::SmallVector<mlir::BlockArgument*, kIndexLimit> idxs;
-  auto ref_op = mlir::dyn_cast<RefineOp>(value->getDefiningOp());
+llvm::SmallVector<BlockArgument, kIndexLimit> strideOneIdxs(Value value) {
+  llvm::SmallVector<BlockArgument, kIndexLimit> idxs;
+  auto ref_op = mlir::dyn_cast<RefineOp>(value.getDefiningOp());
   TensorType base_type = baseType(value);
   auto shape = base_type.getShape();
   for (unsigned i = 0; i < shape.size(); i++) {
@@ -249,7 +247,7 @@ llvm::SmallVector<mlir::BlockArgument*, kIndexLimit> strideOneIdxs(Value* value)
   return idxs;
 }
 
-StringRef tensorName(Value* tensor) {
+StringRef tensorName(Value tensor) {
   if (auto op = tensor->getDefiningOp()) {
     auto nameAttr = op->getAttrOfType<StringAttr>("name");
     if (nameAttr) {
@@ -259,14 +257,13 @@ StringRef tensorName(Value* tensor) {
   return StringRef();
 }
 
-DataType tensorElementType(Value* tensor) {
+DataType tensorElementType(Value tensor) {
   auto tensor_type = tensor->getType().cast<TensorRefType>();
   auto elt_type = tensor_type.getElementType().cast<eltwise::ScalarType>();
   return elt_type.type();
 }
 
-eltwise::ScalarConstantOp initialValue(OpBuilder* builder, DataType type,
-                                       const std::string& agg_name,
+eltwise::ScalarConstantOp initialValue(OpBuilder* builder, DataType type, const std::string& agg_name,
                                        const std::string& var_name) {
   if (agg_name == "assign") {
     return eltwise::ScalarConstantOp();
@@ -274,29 +271,22 @@ eltwise::ScalarConstantOp initialValue(OpBuilder* builder, DataType type,
   eltwise::ScalarConstantOp op;
   auto unknownLoc = builder->getUnknownLoc();
 
-  #define BUILD_CONST_OP(ivalue, fvalue)                                    \
-    if (is_int(type)) {                                                     \
-      op = builder->create<eltwise::ScalarConstantOp>(                      \
-        unknownLoc, ScalarType::get(builder->getContext(), type), ivalue);  \
-    }                                                                       \
-    else if (is_float(type)) {                                              \
-      op = builder->create<eltwise::ScalarConstantOp>(                      \
-        unknownLoc, ScalarType::get(builder->getContext(), type), fvalue);  \
-    }
+#define BUILD_CONST_OP(ivalue, fvalue)                                                                                 \
+  if (is_int(type)) {                                                                                                  \
+    op = builder->create<eltwise::ScalarConstantOp>(unknownLoc, ScalarType::get(builder->getContext(), type), ivalue); \
+  } else if (is_float(type)) {                                                                                         \
+    op = builder->create<eltwise::ScalarConstantOp>(unknownLoc, ScalarType::get(builder->getContext(), type), fvalue); \
+  }
 
   if (agg_name == "add") {
     BUILD_CONST_OP((int64_t)0, (double)0.0);
-  }
-  else if (agg_name == "mul") {
+  } else if (agg_name == "mul") {
     BUILD_CONST_OP((int64_t)1, (double)1.0);
-  }
-  else if (agg_name == "max") {
+  } else if (agg_name == "max") {
     BUILD_CONST_OP(IntegerMin(type), FloatMin(type));
-  }
-  else if (agg_name == "min") {
+  } else if (agg_name == "min") {
     BUILD_CONST_OP(IntegerMax(type), FloatMax(type));
-  }
-  else {
+  } else {
     throw std::runtime_error("Unsupported aggregate op.");
   }
   op.setAttr("scalar_name", builder->getStringAttr(var_name == "" ? "cst" : var_name));

@@ -48,9 +48,9 @@ AffineRange::AffineRange(const AffinePolynomial& poly) : min(poly.constant), max
     // Update the stride
     stride = boost::math::gcd(stride, uint64_t(std::abs(kvp.second)));
     // Extract the parallel for this affine is an argument of
-    auto pf = mlir::cast<ParallelForOp>(kvp.first->getOwner()->getParentOp());
+    auto pf = mlir::cast<ParallelForOp>(kvp.first.getOwner()->getParentOp());
     // Extract the appropriate attribute from ranges
-    Attribute ra = pf.ranges().getValue()[kvp.first->getArgNumber()];
+    Attribute ra = pf.ranges().getValue()[kvp.first.getArgNumber()];
     // Turn the range into an integer
     int64_t range = ra.cast<IntegerAttr>().getInt();
     // Update min/max
@@ -64,7 +64,7 @@ AffineRange::AffineRange(const AffinePolynomial& poly) : min(poly.constant), max
 
 bool FlatTensorAccess::operator<(const FlatTensorAccess& rhs) const {
   if (base != rhs.base) {
-    return base < rhs.base;
+    return base.getAsOpaquePointer() < rhs.base.getAsOpaquePointer();
   }
   return access < rhs.access;
 }
@@ -73,9 +73,9 @@ bool FlatTensorAccess::operator==(const FlatTensorAccess& rhs) const {
   return base == rhs.base && access == rhs.access;
 }
 
-FlatTensorAccess ComputeAccess(Value* tensor) {
+FlatTensorAccess ComputeAccess(Value tensor) {
   FlatTensorAccess ret;
-  if (auto bop = tensor->getDefiningOp()) {
+  if (auto bop = tensor.getDefiningOp()) {
     if (auto op = mlir::dyn_cast<AllocateOp>(bop)) {
       ret.base = op.result();
       ret.base_type = op.layout();
@@ -88,14 +88,14 @@ FlatTensorAccess ComputeAccess(Value* tensor) {
     } else {
       throw std::runtime_error("Invalid tensor value in ComputeAccess");
     }
-  } else if (auto arg = mlir::dyn_cast<mlir::BlockArgument>(tensor)) {
-    auto parentOp = arg->getOwner()->getParentOp();
+  } else if (auto arg = tensor.dyn_cast<mlir::BlockArgument>()) {
+    auto parentOp = arg.getOwner()->getParentOp();
     auto funcOp = mlir::dyn_cast<mlir::FuncOp>(parentOp);
     if (!funcOp) {
       throw std::runtime_error("Invalid tensor value: block argument not contained by FuncOp");
     }
     auto attrName = stripe::Dialect::getDialectAttrName("layout");
-    auto attr = funcOp.getArgAttrOfType<mlir::TypeAttr>(arg->getArgNumber(), attrName);
+    auto attr = funcOp.getArgAttrOfType<mlir::TypeAttr>(arg.getArgNumber(), attrName);
     assert(attr && "Expected 'layout' attribute in TensorRefType function argument");
     ret.base = tensor;
     ret.base_type = attr.getValue().cast<TensorType>();

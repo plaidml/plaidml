@@ -11,11 +11,11 @@ plaidml_cc_library(
     deps = [
         "//base/util",
         "//pmlc/dialect/pxa",
-        "@llvm//:support",
-        "@mlir//:AffineToStandardTransforms",
-        "@mlir//:ExecutionEngine",
-        "@mlir//:ExecutionEngineUtils",
-        "@mlir//:IR",
-        "@mlir//:LLVMTransforms",
+        "@llvm-project//llvm:support",
+        "@llvm-project//mlir:AffineToStandardTransforms",
+        "@llvm-project//mlir:ExecutionEngine",
+        "@llvm-project//mlir:ExecutionEngineUtils",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LLVMTransforms",
     ],
 )

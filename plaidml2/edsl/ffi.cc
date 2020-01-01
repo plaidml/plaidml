@@ -125,7 +125,7 @@ CombinationKind getCombinationKind(plaidml_combo_op combo_op) {
   throw std::runtime_error("Unsupported combo_op");
 }
 
-mlir::Value* MakeAffineOp(plaidml_int_op op, const std::vector<mlir::Value*> operands) {
+mlir::Value MakeAffineOp(plaidml_int_op op, const std::vector<mlir::Value> operands) {
   auto builder = GlobalContext::get();
   switch (op) {
     case PLAIDML_INT_OP_ADD:
@@ -165,7 +165,7 @@ struct plaidml_poly_expr {
   PolyExprPtr expr;
 #endif
 #ifdef PLAIDML_MLIR
-  mlir::Value* value = nullptr;
+  mlir::Value value;
 #endif
 };
 
@@ -342,7 +342,7 @@ void plaidml_expr_free(  //
 #endif
 #ifdef PLAIDML_MLIR
     IVLOG(3, "plaidml_expr_free> " << expr->value);
-    IVLOG(3, "plaidml_expr_free> " << mlir::debugString(*expr->value));
+    IVLOG(3, "plaidml_expr_free> " << mlir::debugString(expr->value));
     GlobalContext::get()->Destroy(expr->value);
 #endif
     delete expr;
@@ -358,7 +358,7 @@ void* plaidml_expr_ptr(  //
     return expr->expr.get();
 #endif
 #ifdef PLAIDML_MLIR
-    return expr->value;
+    return expr->value.getAsOpaquePointer();
 #endif
   });
 }
@@ -418,8 +418,8 @@ void plaidml_expr_bind_dims(  //
     }
 #endif
 #ifdef PLAIDML_MLIR
-    IVLOG(3, "plaidml_expr_bind_dims> " << mlir::debugString(*expr->value));
-    llvm::SmallVector<mlir::Value**, 6> into;
+    IVLOG(3, "plaidml_expr_bind_dims> " << mlir::debugString(expr->value));
+    llvm::SmallVector<mlir::Value*, 6> into;
     for (size_t i = 0; i < ndims; i++) {
       IVLOG(3, "bind_dims> i: " << i << ", from: " << expr->value << ", into: " << dims[i]->value);
       into.emplace_back(&dims[i]->value);
@@ -438,7 +438,7 @@ plaidml_string* plaidml_expr_repr(  //
     return new plaidml_string{expr->expr->str()};
 #endif
 #ifdef PLAIDML_MLIR
-    return new plaidml_string{mlir::debugString(*expr->value)};
+    return new plaidml_string{mlir::debugString(expr->value)};
 #endif
   });
 }
@@ -517,7 +517,7 @@ plaidml_expr* plaidml_expr_clone(  //
     return new plaidml_expr{expr->expr};
 #endif
 #ifdef PLAIDML_MLIR
-    IVLOG(3, "plaidml_expr_clone> " << mlir::debugString(*expr->value));
+    IVLOG(3, "plaidml_expr_clone> " << mlir::debugString(expr->value));
     // TODO(MLIR): deal with clone of expr->value
     return new plaidml_expr{expr->value};
 #endif
@@ -537,7 +537,7 @@ plaidml_dim_expr* plaidml_expr_get_dim(  //
     return new plaidml_dim_expr{dim_expr->expr};
 #endif
 #ifdef PLAIDML_MLIR
-    IVLOG(3, "plaidml_expr_get_dim> " << mlir::debugString(*expr->value));
+    IVLOG(3, "plaidml_expr_get_dim> " << mlir::debugString(expr->value));
     // TODO(MLIR): deal with clone of expr->value
     return new plaidml_dim_expr{expr->value};
 #endif
@@ -634,7 +634,7 @@ plaidml_expr* plaidml_expr_call(  //
     return new plaidml_expr{MakeCall(fn, exprs)};
 #endif
 #ifdef PLAIDML_MLIR
-    std::vector<mlir::Value*> values(nargs);
+    std::vector<mlir::Value> values(nargs);
     for (size_t i = 0; i < nargs; i++) {
       values[i] = args[i]->value;
     }
@@ -719,7 +719,7 @@ plaidml_expr* plaidml_expr_index_map(  //
     return new plaidml_expr{std::make_shared<IndexMapExpr>(nullptr, idx_exprs)};
 #endif
 #ifdef PLAIDML_MLIR
-    std::vector<mlir::Value*> idx_values(ndims);
+    std::vector<mlir::Value> idx_values(ndims);
     for (size_t i = 0; i < ndims; i++) {
       idx_values[i] = raw_idxs[i]->value;
     }
@@ -745,7 +745,7 @@ plaidml_expr* plaidml_expr_size_map(  //
     return new plaidml_expr{std::make_shared<SizeMapExpr>(dim_exprs)};
 #endif
 #ifdef PLAIDML_MLIR
-    std::vector<mlir::Value*> dim_values;
+    std::vector<mlir::Value> dim_values;
     for (size_t i = 0; i < ndims; i++) {
       dim_values.emplace_back(raw_dims[i]->value);
     }
@@ -789,7 +789,7 @@ plaidml_expr* plaidml_expr_contraction(  //
     return new plaidml_expr{expr};
 #endif
 #ifdef PLAIDML_MLIR
-    std::vector<mlir::Value*> src_values;
+    std::vector<mlir::Value> src_values;
     for (size_t i = 0; i < nsrcs; i++) {
       src_values.emplace_back(src_idxs[i]->value);
     }
@@ -896,7 +896,7 @@ void plaidml_expr_gradient(  //
     }
 #endif
 #ifdef PLAIDML_MLIR
-    std::vector<mlir::Value*> wrt_values(nwrts);
+    std::vector<mlir::Value> wrt_values(nwrts);
     for (size_t i = 0; i < nwrts; i++) {
       wrt_values[i] = wrts[i]->value;
     }
@@ -953,7 +953,7 @@ void plaidml_poly_expr_free(plaidml_error* err, plaidml_poly_expr* expr) {
     IVLOG(3, "plaidml_poly_expr_free> " << expr->expr->str());
 #endif
 #ifdef PLAIDML_MLIR
-    IVLOG(3, "plaidml_poly_expr_free> " << mlir::debugString(*expr->value));
+    IVLOG(3, "plaidml_poly_expr_free> " << mlir::debugString(expr->value));
     GlobalContext::get()->Destroy(expr->value);
 #endif
     delete expr;
@@ -969,7 +969,7 @@ plaidml_string* plaidml_poly_expr_repr(  //
     return new plaidml_string{expr->expr->str()};
 #endif
 #ifdef PLAIDML_MLIR
-    return new plaidml_string{mlir::debugString(*expr->value)};
+    return new plaidml_string{mlir::debugString(expr->value)};
 #endif
   });
 }
@@ -1031,7 +1031,7 @@ plaidml_poly_expr* plaidml_poly_expr_op(  //
     return new plaidml_poly_expr{MakeOp(static_cast<IntOp>(op), vec_args)};
 #endif
 #ifdef PLAIDML_MLIR
-    std::vector<mlir::Value*> values(nargs);
+    std::vector<mlir::Value> values(nargs);
     for (size_t i = 0; i < nargs; i++) {
       values[i] = args[i]->value;
     }
@@ -1048,7 +1048,7 @@ void plaidml_dim_expr_free(  //
     IVLOG(3, "plaidml_dim_expr_free> " << expr->expr->str());
 #endif
 #ifdef PLAIDML_MLIR
-    IVLOG(3, "plaidml_dim_expr_free> " << mlir::debugString(*expr->value));
+    IVLOG(3, "plaidml_dim_expr_free> " << mlir::debugString(expr->value));
     GlobalContext::get()->Destroy(expr->value);
 #endif
     delete expr;
@@ -1064,7 +1064,7 @@ plaidml_string* plaidml_dim_expr_repr(  //
     return new plaidml_string{expr->expr->str()};
 #endif
 #ifdef PLAIDML_MLIR
-    return new plaidml_string{mlir::debugString(*expr->value)};
+    return new plaidml_string{mlir::debugString(expr->value)};
 #endif
   });
 }
@@ -1133,7 +1133,7 @@ plaidml_dim_expr* plaidml_dim_expr_op(  //
     return new plaidml_dim_expr{MakeOp(static_cast<IntOp>(op), vec_args)};
 #endif
 #ifdef PLAIDML_MLIR
-    std::vector<mlir::Value*> values(nargs);
+    std::vector<mlir::Value> values(nargs);
     for (size_t i = 0; i < nargs; i++) {
       values[i] = args[i]->value;
     }
@@ -1349,14 +1349,14 @@ plaidml_string* plaidml_value_repr(  //
             return arg.expr->str();
 #endif
 #ifdef PLAIDML_MLIR
-            return mlir::debugString(*arg.value);
+            return mlir::debugString(arg.value);
 #endif
           } else if constexpr (std::is_same_v<T, plaidml_expr>) {
 #ifdef PLAIDML_AST
             return arg.expr->str();
 #endif
 #ifdef PLAIDML_MLIR
-            return mlir::debugString(*arg.value);
+            return mlir::debugString(arg.value);
 #endif
           } else if constexpr (std::is_same_v<T, double>) {
             return std::to_string(arg);

@@ -123,7 +123,7 @@ RankedTensorType getRankedTensorType(Type type) {
   throw std::runtime_error(llvm::formatv("Unsupported elementType for tensor: {0}", debugString(type)).str());
 }
 
-Type ComputeResultType(ArrayRef<Value*> operands, DataType override) {
+Type ComputeResultType(ArrayRef<Value> operands, DataType override) {
   if (VLOG_IS_ON(6)) {
     std::vector<std::string> types;
     for (auto operand : operands) {
@@ -152,7 +152,7 @@ Type ComputeResultType(ArrayRef<Value*> operands, DataType override) {
   return ret;
 }
 
-SmallVector<int64_t, 4> ComputeShape(ArrayRef<Value*> operands) {
+SmallVector<int64_t, 4> ComputeShape(ArrayRef<Value> operands) {
   SmallVector<int64_t, 4> shape;
   for (auto operand : operands) {
     auto op = operand->getDefiningOp();

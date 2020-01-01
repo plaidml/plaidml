@@ -64,11 +64,11 @@ struct TileBuilder::Impl {
   MLIRContext context;
   ModuleOp module;
   OpBuilder builder;
-  std::unordered_map<Value*, Value*> implicitUpdates;
-  std::unordered_map<Value*, BufferPtr> implicitBindings;
-  std::unordered_map<Value*, RankedTensorType> shapeCache;
+  llvm::DenseMap<Value, Value> implicitUpdates;
+  llvm::DenseMap<Value, BufferPtr> implicitBindings;
+  llvm::DenseMap<Value, RankedTensorType> shapeCache;
   NoneOp noneOp;
-  Value* defaultInit;
+  Value defaultInit;
   Location loc;
   unsigned idxCounter = 0;
 
@@ -103,8 +103,8 @@ struct TileBuilder::Impl {
     return abstractOp;
   }
 
-  std::vector<Value*> getBackwardSliceOfAffine(const llvm::SetVector<Value*>& values) {
-    return util::getBackwardSlice(values, false, [](Value* value) {
+  std::vector<Value> getBackwardSliceOfAffine(const llvm::SetVector<Value>& values) {
+    return util::getBackwardSlice(values, false, [](Value value) {
       if (auto scalarType = value->getType().dyn_cast<ScalarType>()) {
         return scalarType.type() == DataType::INT32;
       }
@@ -112,7 +112,7 @@ struct TileBuilder::Impl {
     });
   }
 
-  Value* makeIndexOp(StringRef fn, ArrayRef<Value*> args) {
+  Value makeIndexOp(StringRef fn, ArrayRef<Value> args) {
     if (args.size() != 2) {
       throw std::runtime_error("index op expects 2 operands");
     }
@@ -127,7 +127,7 @@ struct TileBuilder::Impl {
     return op.result();
   }
 
-  Value* makePrngOp(StringRef fn, ArrayRef<Value*> args) {
+  Value makePrngOp(StringRef fn, ArrayRef<Value> args) {
     if (args.size() < 1) {
       throw std::runtime_error("prng op expects at least one operand");
     }
@@ -137,11 +137,11 @@ struct TileBuilder::Impl {
     auto elementType = builder.getType<ScalarType>(DataType::UINT32);
     auto stateType = RankedTensorType::get({3, 2048}, elementType);
     auto op = builder.create<PrngOp>(loc, resultType, stateType, state, dims);
-    implicitUpdates.emplace(op.new_state(), op.state());
+    implicitUpdates.insert(std::make_pair(op.new_state(), op.state()));
     return op.result();
   }
 
-  Value* makeScalarConstantOp(double value) {
+  Value makeScalarConstantOp(double value) {
     auto type = builder.getType<ScalarType>(DataType::FLOAT32);
     return builder.create<ScalarConstantOp>(loc, type, value).result();
   }
@@ -151,7 +151,7 @@ TileBuilder::TileBuilder() : impl(new Impl) {}
 
 TileBuilder::~TileBuilder() = default;
 
-void TileBuilder::Destroy(Value* value) {
+void TileBuilder::Destroy(Value value) {
   IVLOG(5, "TileBuilder::Destroy> value");
   // impl->implicitBindings.erase(value);
   // TODO: fix memory mgmt issues, once purely MLIR path is complete
@@ -189,28 +189,28 @@ stripe::TensorType TileBuilder::IntoTensorType(RankedTensorType type) {
   return stripe::TensorType::get(type.getElementType(), newShape, stripe::OffsetsMap{}, false);
 }
 
-void TileBuilder::BindShape(Value* tensor, RankedTensorType type) {
+void TileBuilder::BindShape(Value tensor, RankedTensorType type) {
   IVLOG(5, "TileBuilder::BindShape>");
   tensor->setType(type);
 }
 
-void TileBuilder::BindBuffer(Value* tensor, BufferPtr buffer) {
+void TileBuilder::BindBuffer(Value tensor, BufferPtr buffer) {
   IVLOG(5, "TileBuilder::BindBuffer>");
   impl->implicitBindings[tensor] = buffer;
 }
 
-void TileBuilder::BindTensorDims(Value* from, ArrayRef<Value**> intos) {
+void TileBuilder::BindTensorDims(Value from, ArrayRef<Value*> intos) {
   if (!from) {
     throw std::runtime_error("BindTensorDim: from == nullptr");
   }
-  IVLOG(5, "TileBuilder::BindTensorDim> from: " << mlir::debugString(*from));
+  IVLOG(5, "TileBuilder::BindTensorDim> from: " << mlir::debugString(from));
   for (unsigned i = 0; i < intos.size(); i++) {
     auto into = intos[i];
     if (!into) {
       throw std::runtime_error("BindTensorDim: into == nullptr");
     }
     if (*into) {
-      IVLOG(6, "into: " << mlir::debugString(**into));
+      IVLOG(6, "into: " << mlir::debugString(*into));
       auto fromType = from->getType().dyn_cast<RankedTensorType>();
       if (!fromType) {
         throw std::runtime_error("Unexpected type");
@@ -240,7 +240,7 @@ void TileBuilder::BindTensorDims(Value* from, ArrayRef<Value**> intos) {
   }
 }
 
-RankedTensorType TileBuilder::ComputeShape(Value* tensor) {
+RankedTensorType TileBuilder::ComputeShape(Value tensor) {
   IVLOG(5, "TileBuilder::ComputeShape>");
   auto type = eltwise::getRankedTensorType(tensor->getType());
   if (type.hasStaticShape()) {
@@ -254,28 +254,28 @@ RankedTensorType TileBuilder::ComputeShape(Value* tensor) {
   mutations.outputs.emplace_back(tensor);
   auto program = MakeProgram("compute_shape", mutations);
   auto shape = program->outputs[0]->getType().dyn_cast<RankedTensorType>();
-  impl->shapeCache.emplace(tensor, shape);
+  impl->shapeCache.insert(std::make_pair(tensor, shape));
   return shape;
 }
 
-Value* TileBuilder::MakeCastOp(Value* tensor, DataType dtype) {
+Value TileBuilder::MakeCastOp(Value tensor, DataType dtype) {
   IVLOG(5, "TileBuilder::MakeCastOp> " << to_string(dtype));
-  IVLOG(6, "  arg: " << mlir::debugString(*tensor));
+  IVLOG(6, "  arg: " << mlir::debugString(tensor));
   auto elementType = impl->builder.getType<ScalarType>(dtype);
   auto tensorType = eltwise::getRankedTensorType(tensor->getType());
   auto resultType = RankedTensorType::get(tensorType.getShape(), elementType);
   return impl->builder.create<eltwise::CastOp>(impl->loc, resultType, tensor).result();
 }
 
-Value* TileBuilder::MakePrimitiveOp(StringRef fn, ArrayRef<Value*> args) {
-  using PrimitiveBuilder = Value* (Impl::*)(StringRef fn, ArrayRef<Value*> args);
+Value TileBuilder::MakePrimitiveOp(StringRef fn, ArrayRef<Value> args) {
+  using PrimitiveBuilder = Value (Impl::*)(StringRef fn, ArrayRef<Value> args);
   static std::map<StringRef, PrimitiveBuilder> primitives = {
       {"index", &Impl::makeIndexOp},
       {"prng", &Impl::makePrngOp},
   };
   IVLOG(5, "TileBuilder::MakePrimitiveOp> " << fn.str());
   for (auto arg : args) {
-    IVLOG(6, "  arg: " << mlir::debugString(*arg));
+    IVLOG(6, "  arg: " << mlir::debugString(arg));
   }
   auto it = primitives.find(fn);
   if (it != primitives.end()) {
@@ -291,12 +291,12 @@ Value* TileBuilder::MakePrimitiveOp(StringRef fn, ArrayRef<Value*> args) {
   return op->getResult(0);
 }
 
-Value* TileBuilder::Clone(Value* value) {
-  IVLOG(5, "TileBuilder::Clone> " << mlir::debugString(*value));
+Value TileBuilder::Clone(Value value) {
+  IVLOG(5, "TileBuilder::Clone> " << mlir::debugString(value));
   return impl->builder.clone(*value->getDefiningOp())->getResult(0);
 }
 
-Value* TileBuilder::MakeNoneOp() {
+Value TileBuilder::MakeNoneOp() {
   IVLOG(5, "TileBuilder::MakeNoneOp>");
   if (!impl->noneOp) {
     auto type = impl->builder.getNoneType();
@@ -305,21 +305,21 @@ Value* TileBuilder::MakeNoneOp() {
   return impl->noneOp.result();
 }
 
-Value* TileBuilder::MakeStringOp(StringRef value) {
+Value TileBuilder::MakeStringOp(StringRef value) {
   IVLOG(5, "TileBuilder::MakeStringOp> " << value.str());
   auto type = StringType::get(&impl->context);
   auto attr = impl->builder.getStringAttr(value);
   return impl->builder.create<StringOp>(impl->loc, type, attr).result();
 }
 
-llvm::StringRef TileBuilder::GetStringValue(Value* value) {
+llvm::StringRef TileBuilder::GetStringValue(Value value) {
   if (auto op = llvm::dyn_cast_or_null<StringOp>(value->getDefiningOp())) {
     return op.getValue().getValue();
   }
   throw std::runtime_error("Expected StringOp");
 }
 
-Value* TileBuilder::MakeTupleOp(ArrayRef<Value*> elts) {
+Value TileBuilder::MakeTupleOp(ArrayRef<Value> elts) {
   IVLOG(5, "TileBuilder::MakeTupleOp> elts: " << elts.size());
   std::vector<Type> types;
   for (auto elt : elts) {
@@ -329,41 +329,41 @@ Value* TileBuilder::MakeTupleOp(ArrayRef<Value*> elts) {
   return impl->builder.create<TupleOp>(impl->loc, tupleType, elts).result();
 }
 
-std::vector<Value*> TileBuilder::GetTupleElements(Value* value) {
-  IVLOG(5, "TileBuilder::GetTupleElements> " << mlir::debugString(*value));
+std::vector<Value> TileBuilder::GetTupleElements(Value value) {
+  IVLOG(5, "TileBuilder::GetTupleElements> " << mlir::debugString(value));
   if (auto op = llvm::dyn_cast_or_null<TupleOp>(value->getDefiningOp())) {
-    return std::vector<Value*>(op.elts().begin(), op.elts().end());
+    return std::vector<Value>(op.elts().begin(), op.elts().end());
   }
   throw std::runtime_error("Expected TupleOp");
 }
 
-Value* TileBuilder::MakeScalarConstantOp(int64_t value) {
+Value TileBuilder::MakeScalarConstantOp(int64_t value) {
   IVLOG(5, "TileBuilder::MakeScalarConstantOp> " << value);
   auto type = impl->builder.getType<ScalarType>(DataType::INT32);
   return impl->builder.create<ScalarConstantOp>(impl->loc, type, value).result();
 }
 
-int64_t TileBuilder::GetIntegerValue(Value* value) {
+int64_t TileBuilder::GetIntegerValue(Value value) {
   if (auto op = llvm::dyn_cast_or_null<ScalarConstantOp>(value->getDefiningOp())) {
     return op.getIntAttr().getInt();
   }
   throw std::runtime_error("Expected ScalarConstantOp");
 }
 
-Value* TileBuilder::MakeScalarConstantOp(double value) {
+Value TileBuilder::MakeScalarConstantOp(double value) {
   IVLOG(5, "TileBuilder::MakeScalarConstantOp> " << value);
   return impl->makeScalarConstantOp(value);
 }
 
-double TileBuilder::GetFloatValue(Value* value) {
+double TileBuilder::GetFloatValue(Value value) {
   if (auto op = llvm::dyn_cast_or_null<ScalarConstantOp>(value->getDefiningOp())) {
     return op.getFloatAttr().getValueAsDouble();
   }
   throw std::runtime_error("Expected ScalarConstantOp");
 }
 
-Value* TileBuilder::MakeDimOp(Value* tensor, unsigned dim) {
-  IVLOG(5, "TileBuilder::MakeDimOp> tensor: " << mlir::debugString(*tensor) << ", dim: " << dim);
+Value TileBuilder::MakeDimOp(Value tensor, unsigned dim) {
+  IVLOG(5, "TileBuilder::MakeDimOp> tensor: " << mlir::debugString(tensor) << ", dim: " << dim);
   return impl->builder.create<DimOp>(impl->loc, tensor, dim).result();
 }
 
@@ -380,7 +380,7 @@ RankedTensorType TileBuilder::MakeRankedTensorType(DataType dtype, ArrayRef<int6
   return RankedTensorType::get(shape, elementType);
 }
 
-Value* TileBuilder::MakePlaceholderOp(RankedTensorType type, BufferPtr buffer, StringRef name) {
+Value TileBuilder::MakePlaceholderOp(RankedTensorType type, BufferPtr buffer, StringRef name) {
   IVLOG(5, "TileBuilder::MakePlaceholderOp> " << name.str() << ": " << mlir::debugString(type));
   auto op = impl->builder.create<PlaceholderOp>(impl->loc, type);
   if (!name.empty()) {
@@ -392,67 +392,67 @@ Value* TileBuilder::MakePlaceholderOp(RankedTensorType type, BufferPtr buffer, S
   return op.result();
 }
 
-Value* TileBuilder::MakeAffineConstantOp(int64_t value) {
+Value TileBuilder::MakeAffineConstantOp(int64_t value) {
   IVLOG(5, "TileBuilder::MakeAffineConstantOp> " << value);
   return impl->builder.create<AffineConstantOp>(impl->loc, value).result();
 }
 
-Value* TileBuilder::MakeAffineIndexOp(StringRef name) {
+Value TileBuilder::MakeAffineIndexOp(StringRef name) {
   IVLOG(5, "TileBuilder::MakeAffineIndexOp> " << name.str());
   return impl->builder.create<AffineIndexOp>(impl->loc, impl->idxCounter++, name).result();
 }
 
-Value* TileBuilder::MakeAffineAddOp(ArrayRef<Value*> args) {
+Value TileBuilder::MakeAffineAddOp(ArrayRef<Value> args) {
   IVLOG(5, "TileBuilder::MakeAffineAddOp>");
   return impl->builder.create<AffineAddOp>(impl->loc, args).result();
 }
 
-Value* TileBuilder::MakeAffineSubOp(ArrayRef<Value*> args) {
+Value TileBuilder::MakeAffineSubOp(ArrayRef<Value> args) {
   IVLOG(5, "TileBuilder::MakeAffineSubOp>");
   return impl->builder.create<AffineSubOp>(impl->loc, args).result();
 }
 
-Value* TileBuilder::MakeAffineMulOp(ArrayRef<Value*> args) {
+Value TileBuilder::MakeAffineMulOp(ArrayRef<Value> args) {
   IVLOG(5, "TileBuilder::MakeAffineMulOp>");
   return impl->builder.create<AffineMulOp>(impl->loc, args).result();
 }
 
-Value* TileBuilder::MakeAffineDivOp(ArrayRef<Value*> args) {
+Value TileBuilder::MakeAffineDivOp(ArrayRef<Value> args) {
   IVLOG(5, "TileBuilder::MakeAffineDivOp>");
   return impl->builder.create<AffineDivOp>(impl->loc, args).result();
 }
 
-Value* TileBuilder::MakeAffineNegOp(ArrayRef<Value*> args) {
+Value TileBuilder::MakeAffineNegOp(ArrayRef<Value> args) {
   IVLOG(5, "TileBuilder::MakeAffineNegOp>");
   return impl->builder.create<AffineNegOp>(impl->loc, args).result();
 }
 
-Value* TileBuilder::MakeAffineMaxOp(ArrayRef<Value*> args) {
+Value TileBuilder::MakeAffineMaxOp(ArrayRef<Value> args) {
   IVLOG(5, "TileBuilder::MakeAffineMaxOp>");
   return impl->builder.create<AffineMaxOp>(impl->loc, args).result();
 }
 
-Value* TileBuilder::MakeAffineMinOp(ArrayRef<Value*> args) {
+Value TileBuilder::MakeAffineMinOp(ArrayRef<Value> args) {
   IVLOG(5, "TileBuilder::MakeAffineMinOp>");
   return impl->builder.create<AffineMinOp>(impl->loc, args).result();
 }
 
-Value* TileBuilder::MakeAffineSourceIndexMapOp(Value* tensor, ArrayRef<Value*> idxs) {
+Value TileBuilder::MakeAffineSourceIndexMapOp(Value tensor, ArrayRef<Value> idxs) {
   IVLOG(5, "TileBuilder::MakeAffineSourceIndexMapOp>");
   return impl->builder.create<AffineTensorMapOp>(impl->loc, tensor, idxs).result();
 }
 
-Value* TileBuilder::MakeAffineSinkIndexMapOp(ArrayRef<Value*> idxs) {
+Value TileBuilder::MakeAffineSinkIndexMapOp(ArrayRef<Value> idxs) {
   IVLOG(5, "TileBuilder::MakeAffineSinkIndexMapOp>");
   return impl->builder.create<AffineMapOp>(impl->loc, idxs).result();
 }
 
-Value* TileBuilder::MakeAffineSizeMapOp(ArrayRef<Value*> sizes) {
+Value TileBuilder::MakeAffineSizeMapOp(ArrayRef<Value> sizes) {
   IVLOG(5, "TileBuilder::MakeAffineSizeMapOp>");
   return impl->builder.create<AffineMapOp>(impl->loc, sizes).result();
 }
 
-void TileBuilder::AddConstraint(Value* cion, Value* lhs, Value* rhs) {
+void TileBuilder::AddConstraint(Value cion, Value lhs, Value rhs) {
   IVLOG(5, "TileBuilder::AddConstraint>");
   auto op = cion->getDefiningOp();
   auto cionOp = llvm::dyn_cast_or_null<SymbolicContractionOp>(op);
@@ -461,13 +461,13 @@ void TileBuilder::AddConstraint(Value* cion, Value* lhs, Value* rhs) {
   }
 
   auto consOp = llvm::cast<AffineConstraintsOp>(cionOp.cons()->getDefiningOp());
-  SmallVector<Value*, 6> pairs{consOp.pairs()};
+  SmallVector<Value, 6> pairs{consOp.pairs()};
   pairs.emplace_back(lhs);
   pairs.emplace_back(rhs);
   consOp.getOperation()->setOperands(pairs);
 }
 
-void TileBuilder::SetUseDefault(Value* cion, Value* init) {
+void TileBuilder::SetUseDefault(Value cion, Value init) {
   IVLOG(2, "TileBuilder::SetUseDefault>");
   auto op = cion->getDefiningOp();
   auto cionOp = llvm::dyn_cast_or_null<SymbolicContractionOp>(op);
@@ -477,7 +477,7 @@ void TileBuilder::SetUseDefault(Value* cion, Value* init) {
   cionOp.setOperand(0, init);
 }
 
-void TileBuilder::SetNoReduce(Value* cion, bool no_reduce) {
+void TileBuilder::SetNoReduce(Value cion, bool no_reduce) {
   IVLOG(2, "TileBuilder::SetNoReduce> " << no_reduce);
   auto op = cion->getDefiningOp();
   auto cionOp = llvm::dyn_cast_or_null<SymbolicContractionOp>(op);
@@ -491,12 +491,12 @@ void TileBuilder::SetNoReduce(Value* cion, bool no_reduce) {
   }
 }
 
-Value* TileBuilder::MakeContractionOp(  //
-    util::AggregationKind agg,          //
-    util::CombinationKind combo,        //
-    ArrayRef<Value*> srcs,              //
-    Value* sink,                        //
-    Value* sizes,                       //
+Value TileBuilder::MakeContractionOp(  //
+    util::AggregationKind agg,         //
+    util::CombinationKind combo,       //
+    ArrayRef<Value> srcs,              //
+    Value sink,                        //
+    Value sizes,                       //
     StringRef name) {
   IVLOG(5, "TileBuilder::MakeContractionOp> " << util::stringifyAggregationKind(agg).str() << ":"
                                               << util::stringifyCombinationKind(combo).str()
@@ -519,7 +519,7 @@ Value* TileBuilder::MakeContractionOp(  //
     elementType = impl->inferElementType(types);
   }
   auto sizeMapOp = llvm::cast<AffineMapOp>(sizes->getDefiningOp());
-  SmallVector<Value*, 4> sizeDims(sizeMapOp.dims());
+  SmallVector<Value, 4> sizeDims(sizeMapOp.dims());
   auto shape = eltwise::ComputeShape(sizeDims);
 
   StringAttr nameAttr;
@@ -548,7 +548,7 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(StringRef name, const Prog
   IVLOG(1, "TileBuilder::MakeProgram> " << name.str());
   IVLOG(6, mlir::debugString(impl->module));
   // Wrap duplicate outputs and outputs that directly refer to inputs
-  llvm::SetVector<Value*> outputs;
+  llvm::SetVector<Value> outputs;
   for (auto output : mutations.outputs) {
     if (!output) {
       throw std::runtime_error("Invalid output");
@@ -620,8 +620,8 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(StringRef name, const Prog
           auto newResult = newOp->getResult(i);
           if (oldResult == value) {
             IVLOG(5, "mapping: " << value << " -> " << newResult);
-            IVLOG(6, "value: " << mlir::debugString(*value));
-            IVLOG(6, "newResult: " << mlir::debugString(*newResult));
+            IVLOG(6, "value: " << mlir::debugString(value));
+            IVLOG(6, "newResult: " << mlir::debugString(newResult));
             mapper.map(value, newResult);
           } else {
             auto itUpdate = impl->implicitUpdates.find(oldResult);
@@ -635,7 +635,7 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(StringRef name, const Prog
     }
   }
   // Add a final ReturnOp
-  std::vector<Value*> returnOperands;
+  std::vector<Value> returnOperands;
   std::vector<Type> resultTypes;
   for (auto output : outputs) {
     auto value = mapper.lookupOrNull(output);
@@ -683,7 +683,7 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(StringRef name, const Prog
   return program;
 }
 
-std::vector<Value*> TileBuilder::ComputeGradients(ArrayRef<Value*> wrt, Value* loss) {
+std::vector<Value> TileBuilder::ComputeGradients(ArrayRef<Value> wrt, Value loss) {
   // TODO
   return wrt;
 }

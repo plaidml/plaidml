@@ -39,7 +39,7 @@ struct plaidml_dim_expr {
   vertexai::tile::lang::ast::DimExprPtr expr;
 #endif
 #ifdef PLAIDML_MLIR
-  mlir::Value* value = nullptr;
+  mlir::Value value;
 #endif
 };
 
@@ -48,7 +48,7 @@ struct plaidml_expr {
   vertexai::tile::lang::ast::ExprPtr expr;
 #endif
 #ifdef PLAIDML_MLIR
-  mlir::Value* value = nullptr;
+  mlir::Value value;
   std::shared_ptr<pmlc::dialect::tile::TileProgram> program;
 #endif
 };
