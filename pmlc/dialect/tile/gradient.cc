@@ -102,7 +102,7 @@ void Gradient::ComputeOperandDerivs(mlir::Value* val) {
   } else if (auto reshape_op = mlir::dyn_cast<ReshapeOp>(op)) {
     auto tensor_input = reshape_op.tensor();
     std::vector<mlir::Value*> args{grads_[val]};
-    for (size_t i = 0; i < tensor_input->getType().dyn_cast<RankedTensorType>().getRank(); ++i) {
+    for (int i = 0; i < tensor_input->getType().dyn_cast<RankedTensorType>().getRank(); ++i) {
       args.push_back(builder_->MakeDimOp(tensor_input, i));
     }
     auto dop = builder_->MakePrimitiveOp("reshape", args);
@@ -248,7 +248,7 @@ mlir::Value* Gradient::DeriveContraction(mlir::Value* dout, mlir::Value* out, si
   }
   auto target_src_op = llvm::cast<AffineTensorMapOp>(target_src->getDefiningOp());
   std::vector<mlir::Value*> sizes;
-  for (size_t i = 0; i < target_src_op.tensor()->getType().dyn_cast<RankedTensorType>().getRank(); ++i) {
+  for (int i = 0; i < target_src_op.tensor()->getType().dyn_cast<RankedTensorType>().getRank(); ++i) {
     sizes.push_back(builder_->MakeDimOp(target_src_op.tensor(), i));
   }
   std::vector<mlir::Value*> dsrc_idxs;
