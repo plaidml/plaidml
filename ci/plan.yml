@@ -386,14 +386,22 @@ SUITES:
         platform_overrides:
           keras-stripe-llvm-cpu:
             prepend_args: [--examples, 128]
+          keras-stripe-ocl-gfx900:
+            prepend_args: [--examples, 128]
           keras-plaid-ocl-gfx804:
             prepend_args: [--examples, 128]
           keras-stripe-ocl-gfx804:
             prepend_args: [--examples, 128]
+          keras-stripe-ocl-gv100gl:
+            prepend_args: [--examples, 128]
+          keras-stripe-ocl-gp100gl:
+            prepend_args: [--examples, 128]
+          keras-stripe-ocl-neo:
+            prepend_args: [--examples, 64]
           keras-plaid-mtl-uhd630:
-            prepend_args: [--examples, 256]
+            prepend_args: [--examples, 64]
           keras-stripe-mtl-uhd630:
-            prepend_args: [--examples, 256]
+            prepend_args: [--examples, 64]
           keras-tf-dnnl-cpu:
             conda_env: ci/conda/tensorflow-dnnl.yml
       vgg19:
