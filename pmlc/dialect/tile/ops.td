@@ -303,7 +303,7 @@ def ReshapeOp : SpecialOp<"reshape">, HasCanonicalizer {
 
 def ScatterOp : SpecialOp<"scatter">, HasCanonicalizer {
   let summary = "special scatter operation";
-  let arguments = (ins RankedTensorOf<[AnyScalar]>:$tensor, VectorOf<[ScalarIndex]>:$dims, RankedTensorOf<[AnyScalar]>:$other);
+  let arguments = (ins RankedTensorOf<[AnyScalar]>:$tensor, RankedTensorOf<[ScalarIndex]>:$dims, RankedTensorOf<[AnyScalar]>:$other);
   let results = (outs RankedTensorOf<[AnyScalar]>:$result);
 }
 

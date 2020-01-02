@@ -3,6 +3,7 @@
 #include <gmock/gmock.h>
 
 #include "plaidml2/edsl/edsl.h"
+#include "plaidml2/exec/exec.h"
 #include "plaidml2/op/op.h"
 
 namespace {
@@ -12,6 +13,7 @@ class Environment : public ::testing::Environment {
     plaidml::init();
     plaidml::edsl::init();
     plaidml::op::init();
+    plaidml::exec::init();
   }
 };
 

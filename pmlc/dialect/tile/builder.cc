@@ -31,6 +31,7 @@
 #include "pmlc/dialect/eltwise/dialect.h"
 #include "pmlc/dialect/eltwise/ops.h"
 #include "pmlc/dialect/tile/dialect.h"
+#include "pmlc/dialect/tile/gradient.h"
 #include "pmlc/dialect/tile/ops.h"
 #include "pmlc/dialect/tile/program.h"
 #include "pmlc/util/slice.h"
@@ -575,6 +576,7 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(StringRef name, const Prog
   auto loc = mlir::UnknownLoc::get(&impl->context);
   auto module = ModuleOp::create(loc);
   auto program = std::make_shared<TileProgram>(module);
+  program->entry = name;
   // Construct a function to represent the entire program
   auto initialFuncType = mlir::FunctionType::get(inputTypes, {}, &impl->context);
   auto funcOp = mlir::FuncOp::create(loc, name, initialFuncType, {});
@@ -683,8 +685,27 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(StringRef name, const Prog
 }
 
 std::vector<Value*> TileBuilder::ComputeGradients(ArrayRef<Value*> wrt, Value* loss) {
-  // TODO
-  return wrt;
+  IVLOG(2, "TileBuilder::ComputeGradients>");
+  auto value = loss;
+  auto ndims = ComputeShape(loss).getShape().size();
+  if (ndims) {
+    std::vector<Value*> src_idxs;
+    for (size_t i = 0; i < ndims; ++i) {
+      src_idxs.push_back(MakeAffineIndexOp(""));
+    }
+    ArrayRef<Value*> srcs{MakeAffineSourceIndexMapOp(loss, src_idxs)};
+    auto sink = MakeAffineSinkIndexMapOp(ArrayRef<Value*>{});
+    auto sizes = MakeAffineSizeMapOp(ArrayRef<Value*>{});
+    auto cion =
+        MakeContractionOp(util::AggregationKind::add, util::CombinationKind::none, srcs, sink, sizes, "net_loss");
+    value = cion;
+  }
+  Gradient grad(value, this);
+  std::vector<Value*> ret(wrt.size());
+  for (size_t i = 0; i < wrt.size(); i++) {
+    ret[i] = grad.GetDerivative(wrt[i]);
+  }
+  return ret;
 }
 
 void TileBuilder::Dump() {  //

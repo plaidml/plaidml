@@ -148,6 +148,12 @@ class AffineVisitor {
     } else if (auto op = llvm::dyn_cast<AffineSubOp>(defOp)) {
       visitOperands(op.lhs(), op.rhs());
       return static_cast<T*>(this)->visitSubOp(op);
+    } else if (auto op = llvm::dyn_cast<AffineMaxOp>(defOp)) {
+      visitOperands(op.lhs(), op.rhs());
+      return static_cast<T*>(this)->visitMaxOp(op);
+    } else if (auto op = llvm::dyn_cast<AffineMinOp>(defOp)) {
+      visitOperands(op.lhs(), op.rhs());
+      return static_cast<T*>(this)->visitMinOp(op);
     } else if (auto op = llvm::dyn_cast<DimOp>(defOp)) {
       return static_cast<T*>(this)->visitDimOp(op);
     }
@@ -161,6 +167,8 @@ class AffineVisitor {
   void visitDivOp(AffineDivOp op) {}
   void visitSubOp(AffineSubOp op) {}
   void visitNegOp(AffineNegOp op) {}
+  void visitMaxOp(AffineMaxOp op) {}
+  void visitMinOp(AffineMinOp op) {}
   void visitDimOp(DimOp op) {}
 
  private:
@@ -173,6 +181,38 @@ class AffineVisitor {
 struct AffineIndexCollector : public AffineVisitor<AffineIndexCollector> {
   SetVector<Value*> idxs;
   void visitIndexOp(AffineIndexOp op) { idxs.insert(op.result()); }
+};
+
+struct IsFoldableVisitor : public AffineVisitor<IsFoldableVisitor> {
+  bool foldable = true;
+  void visitMaxOp(AffineMaxOp op) { foldable = false; }
+  void visitMinOp(AffineMinOp op) { foldable = false; }
+
+  bool is_foldable(SymbolicContractionOp op) {
+    foldable = true;
+    auto sinkMapOp = llvm::cast<AffineMapOp>(op.sink()->getDefiningOp());
+    for (auto dim : sinkMapOp.dims()) {
+      visit(dim);
+    }
+
+    auto sizeMapOp = llvm::cast<AffineMapOp>(op.size()->getDefiningOp());
+    for (auto dim : sizeMapOp.dims()) {
+      visit(dim);
+    }
+
+    for (auto src : op.srcs()) {
+      auto mapOp = llvm::cast<AffineTensorMapOp>(src->getDefiningOp());
+      for (auto dim : mapOp.dims()) {
+        visit(dim);
+      }
+    }
+
+    auto consOp = llvm::cast<AffineConstraintsOp>(op.cons()->getDefiningOp());
+    for (auto pair : consOp.pairs()) {
+      visit(pair);
+    }
+    return foldable;
+  }
 };
 
 struct ContractionBuilder : public AffineVisitor<ContractionBuilder, AffineExpr> {
@@ -317,6 +357,14 @@ struct ContractionBuilder : public AffineVisitor<ContractionBuilder, AffineExpr>
     return -makeExpr(op.input());
   }
 
+  AffineExpr visitMaxOp(AffineMaxOp op) {  //
+    llvm_unreachable("Max op not legal in ContractionBuilder affines, this should have been folded earlier");
+  }
+
+  AffineExpr visitMinOp(AffineMinOp op) {  //
+    llvm_unreachable("Min op not legal in ContractionBuilder affines, this should have been folded earlier");
+  }
+
   AffineExpr visitDimOp(DimOp op) {  //
     if (auto attr = op.resolve()) {
       return mlir::getAffineConstantExpr(attr.getInt(), context);
@@ -335,6 +383,10 @@ struct SymbolicContractionCanonicalizer : OpRewritePattern<SymbolicContractionOp
     auto sourceType = op.result()->getType().cast<RankedTensorType>();
     auto resultType = RankedTensorType::get(shape, sourceType.getElementType());
     if (!resultType.hasStaticShape()) {
+      return matchFailure();
+    }
+    IsFoldableVisitor foldable_checker;
+    if (!foldable_checker.is_foldable(op)) {
       return matchFailure();
     }
 

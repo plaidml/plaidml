@@ -16,6 +16,9 @@ void LimitUpper(ParallelForOp op, size_t arg, int64_t val);
 void LiftConstraint(ParallelForOp op);
 bool SplitFor(ParallelForOp op);
 
+// Parallelize a ParallelForOp for eltwise only
+void ParallelizeEltwise(ParallelForOp op, unsigned min_inner_size, const std::string& thread_tag);
+
 }  // namespace stripe
 }  // namespace dialect
 }  // namespace pmlc
