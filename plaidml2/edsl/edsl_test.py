@@ -131,6 +131,14 @@ def global_min(I):
   O = -O_Neg
   return O
 
+def avg(I):
+  X, Y = TensorDims(2)
+  x, y = TensorIndexes(2)
+  I.bind_dims(X, Y)
+  Sum = TensorOutput()
+  Sum[y] += I[x, y]
+  return Sum / X
+
 class TestEdsl(unittest.TestCase):
     maxDiff = None
 
@@ -230,39 +238,35 @@ module {
 }
 ''')
 
-    # def test_global_min(self):
-    #   I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 784]))
-    #   O = global_min(I)
-    #   program = Program('global_min', [O])
-    #   print("dum dum")
-    #   print(str(program))
-      # if USE_MLIR():
-      #   print(str(program))
-#           self.assertMultiLineEqual(  
-#                 str(program), '''
-# ''')       
-      # else:
-      #   print(str(program))
-#         self.assertMultiLineEqual(
-#                 str(program), '''
-# ''')
+    def test_avg(self):
+      I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 784]))
+      O = avg(I)
+      program = Program('avg', [O])
+      if USE_MLIR():
+        self.assertMultiLineEqual(  
+                str(program), '''#map0 = (d0, d1) -> (d0)
+#map1 = (d0, d1) -> (d1, d0)
 
-#     def test_matmul(self):
-#       A = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 784]))
-#       B = Tensor(LogicalShape(plaidml.DType.FLOAT32, [784, 784]))
-#       O = matmul(A,B)
-#       program = Program('matmul', [O])
-#      # print(str(program))
-#       if USE_MLIR():
-#           print(str(program))
-# #           self.assertMultiLineEqual(  
-# #                 str(program), '''
-# # ''')       
-#       else:
-#           print(str(program))
-# #         self.assertMultiLineEqual(
-# #                 str(program), '''
-# # ''')
+
+!fp32 = type tensor<!eltwise.fp32>
+module {
+  func @avg(%arg0: tensor<1x784x!eltwise.fp32>) -> !fp32 {
+    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !fp32
+    %0 = tile.cion add, none, %cst, %arg0 {sink = #map0, srcs = [#map1]} : !fp32, tensor<1x784x!eltwise.fp32> -> !fp32
+    return %0 : !fp32
+  }
+}
+''')       
+      else:
+        self.assertMultiLineEqual(
+                str(program), '''function (
+  _X0[_X0_0, _X0_1]
+) -> (
+  _X1
+) {
+  _X1[x1 : ] = +(_X0[x0, x1]);
+}
+''')
 
     def test_mnist_mlp(self):
         # model.add(Dense(512, activation='relu', input_shape=(784,)))
