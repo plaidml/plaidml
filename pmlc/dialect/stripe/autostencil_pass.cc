@@ -29,7 +29,7 @@ using vertexai::tile::codegen::proto::MLIR_AutoStencilPass;
 using vertexai::tile::targets::cpu::kHeatmapKeys;
 using vertexai::tile::targets::cpu::kHeatmapSize;
 using vertexai::tile::targets::cpu::kHeatmapValues;
-using BlockArgumentSet = llvm::SmallPtrSet<mlir::BlockArgument, kIndexLimit>;
+using BlockArgumentSet = llvm::SmallPtrSet<mlir::BlockArgument, 8>;
 
 // Number of tensors for the matrix multiplication
 const unsigned kNumTensors = 3;
@@ -387,13 +387,15 @@ void AutoStencil::Transform() {
     IVLOG(1, "No tile plan for stencil.");
     return;
   }
-  llvm::SmallVector<std::pair<StringRef, unsigned>, kIndexLimit> idxs = getAllIndex(curOp);
+
+  llvm::SmallVector<std::pair<StringRef, unsigned>, 8> idxs;
+  getAllIndex(curOp, &idxs);
   llvm::StringMap<unsigned> bestTileByName;
   for (unsigned i = 0; i < kNumIndex; ++i) {
     bestTileByName[idxName(bestIdxs[i])] = bestTiles[i];
   }
-  llvm::SmallVector<int64_t, kIndexLimit> inner_sizes;
-  for (auto& idx : idxs) {
+  llvm::SmallVector<int64_t, 8> inner_sizes;
+  for (const auto& idx : idxs) {
     auto it = bestTileByName.find(idx.first);
     inner_sizes.push_back(it == bestTileByName.end() ? 1 : it->second);
   }
@@ -468,7 +470,8 @@ void AutoStencil::Stencil(ParallelForOp op) {
 
   // Collect stride-one index
   for (unsigned i = 0; i < kNumTensors; ++i) {
-    auto idxs = strideOneIdxs(tensors[i]);
+    llvm::SmallVector<mlir::BlockArgument, 8> idxs;
+    strideOneIdxs(tensors[i], &idxs);
     strideOne[i].insert(idxs.begin(), idxs.end());
   }
 

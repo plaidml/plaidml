@@ -2,6 +2,8 @@
 
 #include "pmlc/dialect/stripe/util.h"
 
+#include <limits>
+
 #include "mlir/IR/Builders.h"
 
 #include "base/util/logging.h"
@@ -34,7 +36,7 @@ void createMainParallelFor(mlir::FuncOp funcOp) {
   builder.create<TerminateOp>(funcOp.getLoc());
 }
 
-bool hasAttr(Operation* op, const std::string& attr) {
+bool hasAttr(Operation* op, StringRef attr) {
   std::set<std::string> op_attrs_set;
   DictionaryAttr dict_attr = op->getAttrOfType<DictionaryAttr>(Dialect::getStripeAttrsName());
   if (!dict_attr) {
@@ -115,7 +117,7 @@ ArrayAttr replaceAttrInArray(ArrayAttr old_array, OpBuilder builder, unsigned n,
   return builder.getArrayAttr(new_array_ref);
 }
 
-void setOpAttrUnit(Operation* op, OpBuilder builder, const std::string& attr_name) {
+void setOpAttrUnit(Operation* op, OpBuilder builder, StringRef attr_name) {
   if (!op) {
     throw std::runtime_error("setUnitAttr: op is null");
   }
@@ -125,7 +127,7 @@ void setOpAttrUnit(Operation* op, OpBuilder builder, const std::string& attr_nam
   op->setAttr(Dialect::getStripeAttrsName(), new_attrs_dict);
 }
 
-void setIdxAttrUnit(ParallelForOp op, StringRef target_idx, const std::string& attr_name) {
+void setIdxAttrUnit(ParallelForOp op, StringRef target_idx, StringRef attr_name) {
   auto idx_names = op.getAttrOfType<ArrayAttr>("idx_names");
   if (!idx_names) {
     return;
@@ -185,8 +187,7 @@ std::pair<StringRef, unsigned> getSingleIndex(ParallelForOp op, unsigned n) {
   return std::make_pair(idx_name.getValue(), range);
 }
 
-llvm::SmallVector<std::pair<StringRef, unsigned>, kIndexLimit> getAllIndex(ParallelForOp op) {
-  llvm::SmallVector<std::pair<StringRef, unsigned>, kIndexLimit> idxs;
+void getAllIndex(ParallelForOp op, llvm::SmallVectorImpl<std::pair<StringRef, unsigned>>* idxs) {
   auto names = op.getAttrOfType<ArrayAttr>("idx_names");
   auto ranges = op.ranges();
   for (unsigned i = 0; i < op.ranges().size(); i++) {
@@ -197,9 +198,8 @@ llvm::SmallVector<std::pair<StringRef, unsigned>, kIndexLimit> getAllIndex(Paral
       }
     }
     unsigned range = ranges.getValue()[i].cast<IntegerAttr>().getInt();
-    idxs.push_back(std::make_pair(idx_name.getValue(), range));
+    idxs->push_back(std::make_pair(idx_name.getValue(), range));
   }
-  return idxs;
 }
 
 TensorType baseType(Value value) {
@@ -228,8 +228,7 @@ TensorType baseType(Value value) {
   throw std::runtime_error("Base type not found for the operation.");
 }
 
-llvm::SmallVector<BlockArgument, kIndexLimit> strideOneIdxs(Value value) {
-  llvm::SmallVector<BlockArgument, kIndexLimit> idxs;
+void strideOneIdxs(Value value, llvm::SmallVectorImpl<BlockArgument>* idxs) {
   auto ref_op = mlir::dyn_cast<RefineOp>(value.getDefiningOp());
   TensorType base_type = baseType(value);
   auto shape = base_type.getShape();
@@ -240,11 +239,10 @@ llvm::SmallVector<BlockArgument, kIndexLimit> strideOneIdxs(Value value) {
     auto access = AffinePolynomial(ref_op.getOffset(i));
     for (auto [arg, scale] : access.terms) {
       if (scale == 1) {
-        idxs.push_back(arg);
+        idxs->push_back(arg);
       }
     }
   }
-  return idxs;
 }
 
 StringRef tensorName(Value tensor) {
@@ -263,31 +261,98 @@ DataType tensorElementType(Value tensor) {
   return elt_type.type();
 }
 
-eltwise::ScalarConstantOp initialValue(OpBuilder* builder, DataType type, const std::string& agg_name,
-                                       const std::string& var_name) {
-  if (agg_name == "assign") {
-    return eltwise::ScalarConstantOp();
+int64_t IntegerMax(DataType type) {
+  switch (type) {
+    case DataType::INT8:
+      return std::numeric_limits<int8_t>::max();
+    case DataType::INT16:
+      return std::numeric_limits<int16_t>::max();
+    case DataType::INT32:
+      return std::numeric_limits<int32_t>::max();
+    case DataType::INT64:
+      return std::numeric_limits<int64_t>::max();
+    default:
+      return 0;
   }
-  eltwise::ScalarConstantOp op;
+  llvm_unreachable("Unreachable code");
+}
+
+int64_t IntegerMin(DataType type) {
+  switch (type) {
+    case DataType::INT8:
+      return std::numeric_limits<int8_t>::lowest();
+    case DataType::INT16:
+      return std::numeric_limits<int16_t>::lowest();
+    case DataType::INT32:
+      return std::numeric_limits<int32_t>::lowest();
+    case DataType::INT64:
+      return std::numeric_limits<int64_t>::lowest();
+    default:
+      return 0;
+  }
+  llvm_unreachable("Unreachable code");
+}
+
+double FloatMax(DataType type) {
+  switch (type) {
+    case DataType::FLOAT16:
+      throw std::runtime_error("Unsupported type for FloatMax");
+    case DataType::FLOAT32:
+      return std::numeric_limits<float>::max();
+    case DataType::FLOAT64:
+      return std::numeric_limits<double>::max();
+    default:
+      return 0;
+  }
+  llvm_unreachable("Unreachable code");
+}
+
+double FloatMin(DataType type) {
+  switch (type) {
+    case DataType::FLOAT16:
+      throw std::runtime_error("Unsupported type for FloatMin");
+    case DataType::FLOAT32:
+      return std::numeric_limits<float>::lowest();
+    case DataType::FLOAT64:
+      return std::numeric_limits<double>::lowest();
+    default:
+      return 0;
+  }
+  llvm_unreachable("Unreachable code");
+}
+
+eltwise::ScalarConstantOp createConstOp(OpBuilder* builder, DataType type, int64_t ivalue, double fvalue) {
   auto unknownLoc = builder->getUnknownLoc();
-
-#define BUILD_CONST_OP(ivalue, fvalue)                                                                                 \
-  if (is_int(type)) {                                                                                                  \
-    op = builder->create<eltwise::ScalarConstantOp>(unknownLoc, ScalarType::get(builder->getContext(), type), ivalue); \
-  } else if (is_float(type)) {                                                                                         \
-    op = builder->create<eltwise::ScalarConstantOp>(unknownLoc, ScalarType::get(builder->getContext(), type), fvalue); \
+  auto scalarType = ScalarType::get(builder->getContext(), type);
+  if (is_float(type)) {
+    return builder->create<eltwise::ScalarConstantOp>(unknownLoc, scalarType, fvalue);
   }
+  return builder->create<eltwise::ScalarConstantOp>(unknownLoc, scalarType, ivalue);
+}
 
-  if (agg_name == "add") {
-    BUILD_CONST_OP((int64_t)0, (double)0.0);
-  } else if (agg_name == "mul") {
-    BUILD_CONST_OP((int64_t)1, (double)1.0);
-  } else if (agg_name == "max") {
-    BUILD_CONST_OP(IntegerMin(type), FloatMin(type));
-  } else if (agg_name == "min") {
-    BUILD_CONST_OP(IntegerMax(type), FloatMax(type));
-  } else {
-    throw std::runtime_error("Unsupported aggregate op.");
+eltwise::ScalarConstantOp initialValue(  //
+    OpBuilder* builder,                  //
+    DataType type,                       //
+    AggregationKind agg,                 //
+    StringRef var_name) {
+  eltwise::ScalarConstantOp op;
+  switch (agg) {
+    case AggregationKind::assign:
+      return eltwise::ScalarConstantOp();
+    case AggregationKind::add:
+      op = createConstOp(builder, type, 0, 0.0);
+      break;
+    case AggregationKind::mul:
+      op = createConstOp(builder, type, 1, 1.0);
+      break;
+    case AggregationKind::max:
+      op = createConstOp(builder, type, IntegerMin(type), FloatMin(type));
+      break;
+    case AggregationKind::min:
+      op = createConstOp(builder, type, IntegerMax(type), FloatMax(type));
+      break;
+    default:
+      throw std::runtime_error("Unsupported aggregation op.");
   }
   op.setAttr("scalar_name", builder->getStringAttr(var_name == "" ? "cst" : var_name));
   return op;
