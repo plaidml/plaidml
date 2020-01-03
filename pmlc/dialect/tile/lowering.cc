@@ -230,6 +230,161 @@ static Value MakeCombination(             //
   throw std::runtime_error("Invalid combination op");
 }
 
+struct ContractionOpSimplifyLHSAndBound : public LoweringBase {
+  explicit ContractionOpSimplifyLHSAndBound(LoweringContext* lowering)
+      : LoweringBase(ContractionOp::getOperationName(), lowering) {}
+
+  PatternMatchResult tryMatchAndRewrite(  //
+      Operation* op,  //
+      llvm::ArrayRef<Value> operands, //
+      ConversionPatternRewriter& rewriter) const override {
+    IVLOG(1, "ContractionOpSimplifyLHSAndBound::matchAndRewrite> " << mlir::debugString(*op));
+    auto cionOp = llvm::cast<ContractionOp>(op);
+    auto loc = op->getLoc();
+
+    // TODO: Ultimately want to replace this chunk to avoid stripe::TensorType (by rewriting ComputeBounds to expect `shapes` in a different type/format)
+    auto resultType = cionOp.result()->getType();
+    auto resultTensorType = convertIntoTensorType(resultType);
+    IVLOG(3, "resultTensorType: " << mlir::debugString(resultTensorType));
+    llvm::SmallVector<stripe::TensorType, 4> shapes{resultTensorType};
+    for (auto src : cionOp.operands()) {
+      auto srcType = src->getType();
+      if (srcType.isa<stripe::TensorRefType>()) {
+        auto access = stripe::ComputeAccess(src);
+        shapes.emplace_back(access.base_type);
+      } else {
+        shapes.emplace_back(convertIntoTensorType(srcType));
+      }
+    }
+
+    Contraction contraction{cionOp};
+    bool no_reduce = cionOp.no_reduce().hasValue();
+    const auto& [bounds, constraints] = contraction.ComputeBounds(shapes, no_reduce);
+    IVLOG(1, "Returning from ComputeBounds with\nbounds: " << bounds << "\nconstraints: " << constraints <<"\naccesses: " << contraction.accesses);
+
+    // TODO: Just see if this even works
+    AffineMap map;
+    // NO auto mapOp = rewriter.create<tile::AffineMapOp>(loc);
+    IVLOG(1, "Making new contraction");
+    if (cionOp.cons().hasValue()) {
+      IVLOG(2, "The incoming cion DOES have constraints");
+    } else {
+      IVLOG(2, "There is NO constraints on the incoming cion");
+    }
+    if (cionOp.shape().hasValue()) {
+      IVLOG(2, "The incoming cion DOES have a shape");
+    } else {
+      IVLOG(2, "There is NO shape on the incoming cion");
+    }
+    if (cionOp.no_reduce().hasValue()) {
+      IVLOG(2, "The incoming cion DOES have no_reduce");
+    } else {
+      IVLOG(2, "There is NO no_reduce on the incoming cion");
+    }
+    if (cionOp.name().hasValue()) {
+      IVLOG(2, "The incoming cion DOES have a name");
+    } else {
+      IVLOG(2, "There is NO name on the incoming cion");
+    }
+
+
+    // auto idx_count = bounds.size();
+    std::map<std::string, size_t> idx_lookup;
+    size_t curr_idx = 0;
+    for (const auto& [key, unused] : bounds) {
+      // TODO: While I'm here, I could write the bounds (currently in the `unused` variable) into the bounds attr
+      idx_lookup[key] = curr_idx;
+      curr_idx++;
+    }
+    for (auto it = constraints.begin(); it != constraints.end(); it++) {
+      // TODO
+    }
+    // SmallVector<Value, 8> pairs(consOp.pairs());
+    // for (auto it = pairs.begin(); it != pairs.end(); it++) {
+    //   auto lhs = *it++;
+    //   auto rhs = *it;
+    //   cons.emplace_back(mlir::simplifyAffineExpr(makeExpr(lhs), collector.idxs.size(), 0));
+    //   cons.emplace_back(makeConstraint(lhs, rhs));
+    // }
+
+
+
+    auto new_cion = rewriter.create<tile::ContractionOp>(loc, resultType,
+        cionOp.init(),
+        cionOp.operands(),
+        cionOp.agg(),
+        cionOp.combo(),
+        cionOp.sink(),  // TODO: Sink
+        ArrayAttr::get(cionOp.srcs(), rewriter.getContext()),  // TODO: Srcs
+        // IntegerSetAttr::get(IntegerSet::getEmptySet(0 /*collector.idxs.size()*/, 0, rewriter.getContext())),// TODO: Cons
+        cionOp.cons().hasValue() ? IntegerSetAttr::get(cionOp.cons().getValue()) : nullptr,  // TODO: Cons
+        cionOp.shape().hasValue() ? AffineMapAttr::get(cionOp.shape().getValue()) : nullptr,
+        cionOp.no_reduce().hasValue() ? UnitAttr::get(rewriter.getContext()) : nullptr,
+        StringAttr::get(cionOp.name().getValueOr(""), rewriter.getContext())
+    );
+    // auto new_cion = rewriter.create<tile::ContractionOp>(loc, resultType, cionOp.init(),
+    //     operands,  //cionOp.operands(),
+    //     cionOp.agg(), cionOp.combo(),
+    //     mapOp.result(),  // AffineMapAttr::get(cionOp.sink()),
+    //     mapOp.result(), //cionOp.srcs(), // ArrayAttr::get(cionOp.srcs(), rewriter.getContext()),
+    //     IntegerSet::getEmptySet(0 /*collector.idxs.size()*/, 0, rewriter.getContext()), //nullptr, //IntegerSetAttr::get(cionOp.cons()),
+    //     // AffineMapAttr::get(map), //nullptr, //cionOp.shape(),   // This is the one not in the 12-long builder
+    //     cionOp.no_reduce().hasValue(), //rewriter.getUnitAttr(cionOp.no_reduce().hasValue()), //nullptr, //cionOp.no_reduce(),
+    //     cionOp.name().getValueOr("")); //rewriter.getStringAttr("")); //nullptr); //cionOp.name());
+    IVLOG(1, "Contraction made");
+    IVLOG(1, "Original Contraction: " << mlir::debugString(*cionOp));
+    IVLOG(1, "Rewritten Contraction: " << mlir::debugString(*new_cion));
+
+
+    // ContractionBuilder builder(op);   // This is a sym_cion builder
+    // auto newOp = rewriter.create<ContractionOp>(  //
+    //     op.getLoc(),                              //
+    //     resultType,                               //
+    //     op.init(),                                //
+    //     builder.getTensors(),                     //
+    //     op.agg(),                                 //
+    //     op.combo(),                               //
+    //     builder.getSink(),                        //
+    //     builder.getSources(),                     //
+    //     builder.getConstraints(),                 //
+    //     op.no_reduce().hasValue(),                //
+    //     op.name().getValueOr(""));
+
+    // let arguments = (ins
+    //   EltwiseAny:$init,
+    //   Variadic<AnyType>:$operands,
+    //   AggregationKind:$agg,
+    //   CombinationKind:$combo,
+    //   AffineMapAttr:$sink,
+    //   AffineMapArrayAttr:$srcs,
+    //   OptionalAttr<IntegerSetAttr>:$cons,
+    //   OptionalAttr<AffineMapAttr>:$shape,
+    //   OptionalAttr<UnitAttr>:$no_reduce,
+    //   OptionalAttr<StrAttr>:$name
+    // );
+    // let results = (outs RankedTensorOf<[AnyScalar]>:$result);
+    //
+    // let builders = [OpBuilder<
+    //   "Builder* builder, "
+    //   "OperationState& result, "
+    //   "Type resultType, "
+    //   "Value* init, "
+    //   "ArrayRef<Value*> tensors, "
+    //   "AggregationKind agg, "
+    //   "CombinationKind combo, "
+    //   "AffineMap sink, "
+    //   "ArrayRef<AffineMap> srcs, "
+    //   "IntegerSet cons, "
+    //   "bool no_reduce, "
+    //   "StringRef name"
+    // >];
+
+
+
+    throw std::runtime_error("Intentional abort for testing");
+  }
+};
+
 struct ContractionOpConversion : public LoweringBase {
   explicit ContractionOpConversion(LoweringContext* lowering)
       : LoweringBase(ContractionOp::getOperationName(), lowering) {}
@@ -259,6 +414,7 @@ struct ContractionOpConversion : public LoweringBase {
     Contraction contraction{cionOp};
     bool no_reduce = cionOp.no_reduce().hasValue();
     const auto& [bounds, constraints] = contraction.ComputeBounds(shapes, no_reduce);
+    IVLOG(3, "Returning from ComputeBounds with\nbounds: " << bounds << "\nconstraints: " << constraints);
 
     // add induction vars
     llvm::SmallVector<int64_t, 8> ranges;
@@ -308,6 +464,7 @@ struct ContractionOpConversion : public LoweringBase {
     llvm::SmallVector<Value, 4> refs;
     for (unsigned i = 0; i < contraction.accesses.size(); i++) {
       const auto& access = contraction.accesses[i];
+      IVLOG(3, "Manipulating access " << i << ": " << access);
       llvm::SmallVector<Value, 4> offsets;
       for (const auto& poly : access) {
         auto affine = Integerize(poly, bounds);
@@ -919,7 +1076,8 @@ struct LoweringPass : public mlir::ModulePass<LoweringPass> {
     OwningRewritePatternList patterns;
     patterns.insert<                 //
         AffineConstantOpConversion,  //
-        ContractionOpConversion,     //
+        ContractionOpSimplifyLHSAndBound,
+        // ContractionOpConversion,     //
         FuncOpConversion,            //
         IndexOpConversion,           //
         ReturnOpConversion>(&lowering);
