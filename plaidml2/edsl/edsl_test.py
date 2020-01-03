@@ -98,9 +98,171 @@ def arg_max(I):
     O[x0, x2] >= cond(I[x0, x1, x2], Max[x0, x2], IX[x1])
     return as_uint(O, 32)
 
+def sum_over_axis(I):
+    M, N = TensorDims(2)
+    m, n = TensorIndexes(2)
+    I.bind_dims(M, N)
+    O = TensorOutput(N)
+    O[n] += I[m, n]; # contraction
+    return O
+
+def max_over_axis(I):
+    M, N = TensorDims(2)
+    m, n = TensorIndexes(2)
+    I.bind_dims(M, N)
+    O = TensorOutput(N)
+    O[n] >= I[m, n]
+    return O
+
+def matmul(A, B):
+  I, J, K =  TensorDims(3)
+  i, j, k = TensorIndexes(3)
+  A.bind_dims(I, K)
+  B.bind_dims(K, J)
+  C = TensorOutput(I, J)
+  C[i, j] += A[i, k] * B[k, j]
+  return C
+
+def global_min(I):
+  i, j, k = TensorIndexes(3)
+  Neg = -I
+  O_Neg = TensorOutput()
+  O_Neg[()] >= Neg[i, j, k]
+  O = -O_Neg
+  return O
 
 class TestEdsl(unittest.TestCase):
     maxDiff = None
+
+    def test_sum_over_axis(self):
+      I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 784]))
+      O = sum_over_axis(I)
+      program = Program('sum_over_axis', [O])
+     # print(str(program))
+      if USE_MLIR():
+          #print(str(program))
+          self.assertMultiLineEqual(
+                str(program), '''#map0 = (d0, d1) -> (d0)
+#map1 = (d0, d1) -> (d1, d0)
+
+
+!fp32 = type tensor<!eltwise.fp32>
+module {
+  func @sum_over_axis(%arg0: tensor<1x784x!eltwise.fp32>) -> tensor<784x!eltwise.fp32> {
+    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !fp32
+    %0 = tile.cion add, none, %cst, %arg0 {sink = #map0, srcs = [#map1]} : !fp32, tensor<1x784x!eltwise.fp32> -> tensor<784x!eltwise.fp32>
+    return %0 : tensor<784x!eltwise.fp32>
+  }
+}
+''')       
+      else:
+        self.assertMultiLineEqual(
+                str(program), '''function (
+  _X0[_X0_0, _X0_1]
+) -> (
+  _X1
+) {
+  _X1[x1 : 784] = +(_X0[x0, x1]);
+}
+''')
+  
+    def test_max_over_axis(self):
+      I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 784]))
+      O = max_over_axis(I)
+      program = Program('max_over_axis', [O])
+     # print(str(program))
+      if USE_MLIR():
+          self.assertMultiLineEqual(
+                str(program), '''#map0 = (d0, d1) -> (d0)
+#map1 = (d0, d1) -> (d1, d0)
+
+
+!fp32 = type tensor<!eltwise.fp32>
+module {
+  func @max_over_axis(%arg0: tensor<1x784x!eltwise.fp32>) -> tensor<784x!eltwise.fp32> {
+    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !fp32
+    %0 = tile.cion max, none, %cst, %arg0 {sink = #map0, srcs = [#map1]} : !fp32, tensor<1x784x!eltwise.fp32> -> tensor<784x!eltwise.fp32>
+    return %0 : tensor<784x!eltwise.fp32>
+  }
+}
+''')       
+      else:
+        self.assertMultiLineEqual(
+                str(program), '''function (
+  _X0[_X0_0, _X0_1]
+) -> (
+  _X1
+) {
+  _X1[x1 : 784] = >(_X0[x0, x1]);
+}
+''')
+
+    def test_matmul(self):
+      A = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 784]))
+      B = Tensor(LogicalShape(plaidml.DType.FLOAT32, [784, 784]))
+      O = matmul(A,B)
+      program = Program('matmul', [O])
+      if USE_MLIR():
+          self.assertMultiLineEqual(
+                str(program), '''#map0 = (d0, d1, d2) -> (d0, d1)
+#map1 = (d0, d1, d2) -> (d0, d2)
+#map2 = (d0, d1, d2) -> (d2, d1)
+
+
+!fp32 = type tensor<!eltwise.fp32>
+module {
+  func @matmul(%arg0: tensor<784x784x!eltwise.fp32>, %arg1: tensor<1x784x!eltwise.fp32>) -> tensor<1x784x!eltwise.fp32> {
+    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !fp32
+    %0 = tile.cion add, mul, %cst, %arg1, %arg0 {sink = #map0, srcs = [#map1, #map2]} : !fp32, tensor<1x784x!eltwise.fp32>, tensor<784x784x!eltwise.fp32> -> tensor<1x784x!eltwise.fp32>
+    return %0 : tensor<1x784x!eltwise.fp32>
+  }
+}
+''')       
+      else:
+        self.assertMultiLineEqual(
+                str(program), '''function (
+  _X0[_X0_0, _X0_1],
+  _X1[_X1_0, _X1_1]
+) -> (
+  _X2
+) {
+  _X2[x0, x2 : 1, 784] = +(_X0[x0, x1] * _X1[x1, x2]);
+}
+''')
+
+    # def test_global_min(self):
+    #   I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 784]))
+    #   O = global_min(I)
+    #   program = Program('global_min', [O])
+    #   print("dum dum")
+    #   print(str(program))
+      # if USE_MLIR():
+      #   print(str(program))
+#           self.assertMultiLineEqual(  
+#                 str(program), '''
+# ''')       
+      # else:
+      #   print(str(program))
+#         self.assertMultiLineEqual(
+#                 str(program), '''
+# ''')
+
+#     def test_matmul(self):
+#       A = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 784]))
+#       B = Tensor(LogicalShape(plaidml.DType.FLOAT32, [784, 784]))
+#       O = matmul(A,B)
+#       program = Program('matmul', [O])
+#      # print(str(program))
+#       if USE_MLIR():
+#           print(str(program))
+# #           self.assertMultiLineEqual(  
+# #                 str(program), '''
+# # ''')       
+#       else:
+#           print(str(program))
+# #         self.assertMultiLineEqual(
+# #                 str(program), '''
+# # ''')
 
     def test_mnist_mlp(self):
         # model.add(Dense(512, activation='relu', input_shape=(784,)))
@@ -353,27 +515,20 @@ module {
 
     def test_global_min(self):
         I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [10, 10, 10]), name='I')
-        i, j, k = TensorIndexes(3)
-        O_Neg = TensorOutput()
-        Neg = -I
-        O_Neg[()] >= Neg[i, j, k]
-        O = -O_Neg
+        O = global_min(I)
         program = Program('global_min', [O])
         if USE_MLIR():
             self.assertMultiLineEqual(
-                str(program), '''
+                str(program), '''#map0 = () -> ()
+#map1 = (d0, d1, d2) -> (d0, d1, d2)
+
 
 !fp32 = type tensor<!eltwise.fp32>
 module {
   func @global_min(%arg0: tensor<10x10x10x!eltwise.fp32> {tile.name = "I"}) -> !fp32 {
+    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !fp32
     %0 = "eltwise.neg"(%arg0) {type = !eltwise.fp32} : (tensor<10x10x10x!eltwise.fp32>) -> tensor<10x10x10x!eltwise.fp32>
-    %1 = "tile.domain"() ( {
-    ^bb0(%arg1: !eltwise.i32, %arg2: !eltwise.i32, %arg3: !eltwise.i32):	// no predecessors
-      %3 = "tile.src_idx_map"(%0, %arg3, %arg2, %arg1) : (tensor<10x10x10x!eltwise.fp32>, !eltwise.i32, !eltwise.i32, !eltwise.i32) -> !tile.imap
-      %4 = "tile.sink_idx_map"() : () -> !tile.imap
-      %5 = "tile.size_map"() : () -> !tile.smap
-      "tile.>(x)"(%5, %3, %4) : (!tile.smap, !tile.imap, !tile.imap) -> ()
-    }) {idx_names = ["x0", "x1", "x2"]} : () -> !fp32
+    %1 = tile.cion max, none, %cst, %0 {sink = #map0, srcs = [#map1]} : !fp32, tensor<10x10x10x!eltwise.fp32> -> !fp32
     %2 = "eltwise.neg"(%1) {type = !eltwise.fp32} : (!fp32) -> !fp32
     return %2 : !fp32
   }

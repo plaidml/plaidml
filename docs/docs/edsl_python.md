@@ -36,13 +36,13 @@ sum over axis `0` of a 2D tensor (in Keras this would be `K.sum(I, axis=0)`):
 
 Python [ | C++ ]({{ site.baseurl }}{% link docs/edsl.md%}#sum-over-axis)
 ```python
-def sum_over_axis(I):
-    M, N = TensorDims(2)
-    m, n = TensorIndexes(2)
-    I.bind_dims(M, N)
-    O = TensorOutput(N)
-    O(n) += I(m, n); // contraction
-    return O
+    def sum_over_axis(I):
+      M, N = TensorDims(2)
+      m, n = TensorIndexes(2)
+      I.bind_dims(M, N)
+      O = TensorOutput(N)
+      O[n] += I[m, n]; # contraction
+      return O
 ```
 
 
@@ -102,7 +102,7 @@ def max_over_axis(I):
     m, n = TensorIndexes(2)
     I.bind_dims(M, N)
     O = TensorOutput(N)
-    O(n) >= I(m, n)
+    O[n] >= I[m, n]
     return O
 ```
 
@@ -137,7 +137,7 @@ index is omitted, dimensions are given for the output tensor, and the statement
 ends in a semicolon. Here's the result:
 
 ```python
-C(i, j) += A(i, k) * B(k, j)
+C[i, j] += A[i, k] * B[k, j]
 ```
 
 To have correct dimensions, we need `I` to be the first dimension of `A` and `J`
@@ -152,7 +152,7 @@ def matmul(A, B):
   A.bind_dims(I, K)
   B.bind_dims(K, J)
   C = TensorOutput(I, J)
-  C(i, j) += A(i, k) * B(k, j)
+  C[i, j] += A[i, k] * B[k, j]
   return C
 ```
 
@@ -181,7 +181,6 @@ def global_min(I):
   O_Neg() >= Neg(i, j, k)
   auto O = -O_Neg
   return O
-}
 ```
 
 There are several novel pieces in this example. First, note that the elementwise

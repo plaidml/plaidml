@@ -29,7 +29,7 @@ to change.
 
 ## How to Write Tile Code
 
-### Sum Over Axis 
+### Sum Over Axis
 
 We're ready to look at some C++ Tile code! Here's an operation that takes the
 sum over axis `0` of a 2D tensor (in Keras this would be `K.sum(I, axis=0)`):
@@ -88,7 +88,7 @@ code. Some portions of the notation do not perfectly correspond. Here's why:
 
 - As is the case for all C++ statements, they must end with a semicolon.
 
-### Max Over Axis 
+### Max Over Axis
 
 Taking the maximum over axis `0` looks very similar to taking the sum over axis
 `0`. Just like a sum is represented in Tile with `+=`, a max is represented by
@@ -122,7 +122,7 @@ Again, this corresponds closely to mathematical notation:
 \color{blue}\verb|I(m, n)|\color{default}\verb|;|
 \\]
 
-### Matrix Multiply 
+### Matrix Multiply
 
 Next we'll consider matrix multiplication. Let's look at the mathematical
 expression for the matrix multiplication `C = AB` written out in element-level
@@ -164,7 +164,7 @@ function is passed inputs whose corresponding dimensions don't all have the
 specified size (for example `A.bind_dims(K, K)` would be constrained to a
 square).
 
-### Global Min 
+### Global Min
 
 There is a min contraction `<=` analogous to the max contraction `>=`. For the
 purposes of this example, however, let's use the formula `min(X) = -max(-X)`, to
@@ -204,7 +204,7 @@ Contractions implicitly aggregate over _all_ indices that write to the same
 output location (in this case we aggregate over all values of `i`, `j`, and
 `k`).
 
-### Average 
+### Average
 
 To compute the mean of a tensor, we need to sum the elements and divide by the
 total number of elements summed. We can do this by taking advantage of the fact
@@ -255,7 +255,7 @@ Tensor avg(const Tensor& I) {
 }
 ```
 
-### Max Pool 1D 
+### Max Pool 1D
 
 Next let's implement a size 2 stride 2 maxpool in Tile. This is the operation
 that splits a tensor into groups of 2 and takes the larger element from each
@@ -369,7 +369,7 @@ No special handling is needed for the case `i = (N - 1) / 2`, `j = 1`; this is
 out of range for `I` and so is ignored by Tile, which is exactly the intended
 behavior.
 
-### Valid Indices 
+### Valid Indices
 
 When discussing contractions, we've mentioned that they accumulate over "all
 valid indices". Hopefully the significance of this has been clear for the
@@ -406,7 +406,7 @@ A set of indices are _valid_ if and only if:
    Therefore we could also state this requirement as "every constraint's index
    expression is non-negative and less than its specified upper bound".
 
-### Skipping 
+### Skipping
 
 The rule that all index variables must be integers allows us to "skip" certain
 otherwise valid entries. For example, consider the Tile function:
@@ -459,7 +459,7 @@ Tensor csum(const Tensor& I) {
 }
 ```
 
-### Convolution 
+### Convolution
 
 Let's implement a 1D convolution with output size equal to input size. This is
 implementing the Keras backend operation:
@@ -531,7 +531,7 @@ Tensor conv_1d(const Tensor& I, const Tensor& K) {
 }
 ```
 
-### Dilated 2D Convolution 
+### Dilated 2D Convolution
 
 We can tweak this general formula for a convolution to add various features,
 such as different strides, changing the padding, performing the convolution
@@ -574,7 +574,7 @@ Tensor conv_2d(const Tensor& I, const Tensor& K) {
 }
 ```
 
-### Complex Convolution 
+### Complex Convolution
 
 This final example demonstrates a strided dilated padded grouped convolution.
 \\[
