@@ -178,8 +178,8 @@ def global_min(I):
   i, j, k = TensorIndexes(3)
   Neg = -I
   O_Neg = TensorOutput()
-  O_Neg() >= Neg(i, j, k)
-  auto O = -O_Neg
+  O_Neg[()] >= Neg[i, j, k]
+  O = -O_Neg
   return O
 ```
 
@@ -216,7 +216,7 @@ def avg(I):
   x, y = TensorIndexes(2)
   I.bind_dims(X, Y)
   Sum = TensorOutput()
-  Sum(y) += I(x, y)
+  Sum[y] += I[x, y]
   return Sum / X
 ```
 
@@ -231,7 +231,7 @@ def avg(I):
   x, y = TensorIndexes(2)
   I.bind_dims(X, Y)
   Sum = TensorOutput()
-  Sum() += I(x, y)
+  Sum[()] += I[x, y]
   PartialMean = Sum / X
   return PartialMean / Y
 ```
@@ -241,11 +241,11 @@ it is more straightforward to merge the elementwise operations:
 Python [ | C++ ]({{ site.baseurl }}{% link docs/edsl.md%}#average)
 ```python
 def avg(I):
-  X, Y = TensorDim2(2)
+  X, Y = TensorDims(2)
   x, y = TensorIndexes(2)
   I.bind_dims(X, Y)
   Sum = TensorOutput()
-  Sum() += I(x, y)
+  Sum[()] += I[x, y]
   return Sum / (X * Y)
 ```
 
@@ -279,7 +279,7 @@ def wrong_max_pool_1d(I) :
     i, j = TensorIndexes(2)
     I.bind_dims(N)
     O = TensorOutput(N / 2)
-    O(i) >= I(2 * i + j)
+    O[i] >= I[2 * i + j]
     return O
 ```
 
@@ -304,7 +304,7 @@ def max_pool_1d(I):
     i, j = TensorIndexes(2)
     I.bind_dims(N)
     O = TensorOutput(N / 2)
-    O(i) >= I(2 * i + j)
+    O[i] >= I[2 * i + j]
     O.add_constraint(j < 2)
     return O
 ```
@@ -349,7 +349,7 @@ def max_pool_1d(I) :
     i, j = TensorIndexes(2)
     I.bind_dims(N)
     O = TensorOutput((N + 1) / 2)
-    O(i) >= I(2 * i + j)
+    O[i] >= I[2 * i + j]
     O.add_constraint(j < 2)
     return O
 ```
@@ -373,7 +373,7 @@ Python [ | C++ ]({{ site.baseurl }}{% link docs/edsl.md%}#valid-indices)
 ```python
 I.bind_dims(N)
 O = TensorOutput((N + 1) / 2)
-O(i) >= I(2 * i + j)
+O[i] >= I[2 * i + j]
 O.add_constraint(j < 2)
 ```
 
@@ -407,7 +407,7 @@ def skip(I) :
     i, j = TensorIndexes(2)
     I.bind_dims(M, N)
     O = TensorOutput(N)
-    O(2 * i) += I(2 * i, j)
+    O[2 * i] += I[2 * i, j]
     return O
 ```
 
@@ -441,7 +441,7 @@ def csum(I) :
     i, k = TensorIndexes(2)
     I.bind_dims(N)
     O = TensorOutput(N)
-    O(i) += I(k)
+    O[i] += I[k]
     O.add_constraint(i - k < N)
     return O
 ```
@@ -513,7 +513,7 @@ def conv_1d(I, K) :
     I.bind_dims(N, X, CI)
     K.bind_dims(KX, CI, CO)
     O = TensorOutput(N, X - KX + 1, CO)
-    O(n, x, co) += I(n, x + k, ci) * K(k, ci, co)
+    O[n, x, co] += I[n, x + k, ci] * K[k, ci, co]
     return O
 ```
 
@@ -555,7 +555,7 @@ def conv_2d(I, K) :
     I.bind_dims(N, X, Y, CI)
     K.bind_dims(KX, KY, CI, CO)
     O = TensorOutput(N, X - 2 * (KX - 1), Y - 3 * (KY - 1), CO)
-    O(n, x, y, co) += I(n, x + 2 * kx, y + 3 * ky, ci) * K(kx, ky, ci, co)
+    O[n, x, y, co] += I[n, x + 2 * kx, y + 3 * ky, ci] * K[kx, ky, ci, co]
     return O
 
 ```
@@ -616,9 +616,9 @@ def complex_conv_2d(
     O = TensorOutput(N, Y0, Y1, G, GCO)
 
     # Compute the convolution
-    O(n, x0, x1, g, gco) +=
-        I(n, s0*x1 + d0*k0 - P0, s1*x1 + d1*k1 - P1, g, gci) *
-        K(k0, k1, g, gci, gco)
+    O[n, x0, x1, g, gco] +=
+        I[n, s0*x1 + d0*k0 - P0, s1*x1 + d1*k1 - P1, g, gci] *
+        K[k0, k1, g, gci, gco]
   return O
 
 ```

@@ -139,6 +139,23 @@ def avg(I):
   Sum[y] += I[x, y]
   return Sum / X
 
+def avg_stages(I):
+  X, Y = TensorDims(2)
+  x, y = TensorIndexes(2)
+  I.bind_dims(X, Y)
+  Sum = TensorOutput()
+  Sum[()] += I[x, y]
+  PartialMean = Sum / X
+  return PartialMean / Y
+
+def avg_merge(I):
+  X, Y = TensorDims(2)
+  x, y = TensorIndexes(2)
+  I.bind_dims(X, Y)
+  Sum = TensorOutput()
+  Sum[()] += I[x, y]
+  return Sum / (X * Y)
+
 class TestEdsl(unittest.TestCase):
     maxDiff = None
 
@@ -265,6 +282,74 @@ module {
   _X1
 ) {
   _X1[x1 : ] = +(_X0[x0, x1]);
+}
+''')
+
+    def test_avg_stages(self):
+      I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 784]))
+      O = avg_stages(I)
+      program = Program('avg_stages', [O])
+      if USE_MLIR():
+        self.assertMultiLineEqual(  
+                str(program), '''#map0 = () -> ()
+#map1 = (d0, d1) -> (d0, d1)
+
+
+!fp32 = type tensor<!eltwise.fp32>
+module {
+  func @avg_stages(%arg0: tensor<1x784x!eltwise.fp32>) -> !fp32 {
+    %c784 = tile.affine_const 784
+    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !fp32
+    %0 = tile.cion add, none, %cst, %arg0 {sink = #map0, srcs = [#map1]} : !fp32, tensor<1x784x!eltwise.fp32> -> !fp32
+    %1 = "eltwise.div"(%0, %c784) {type = !eltwise.fp32} : (!fp32, index) -> !fp32
+    return %1 : !fp32
+  }
+}
+''')       
+      else:
+        self.assertMultiLineEqual(
+                str(program), '''function (
+  _X0[_X0_0, _X0_1]
+) -> (
+  _X3
+) {
+  _X1[] = +(_X0[x0, x1]);
+  _X2 = 784;
+  _X3 = div(_X1, _X2);
+}
+''')
+
+    def test_avg_merge(self):
+      I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 784]))
+      O = avg_merge(I)
+      program = Program('avg_merge', [O])
+      if USE_MLIR():
+        self.assertMultiLineEqual(  
+                str(program), '''#map0 = () -> ()
+#map1 = (d0, d1) -> (d0, d1)
+
+
+!fp32 = type tensor<!eltwise.fp32>
+module {
+  func @avg_merge(%arg0: tensor<1x784x!eltwise.fp32>) -> !fp32 {
+    %c784 = tile.affine_const 784
+    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !fp32
+    %0 = tile.cion add, none, %cst, %arg0 {sink = #map0, srcs = [#map1]} : !fp32, tensor<1x784x!eltwise.fp32> -> !fp32
+    %1 = "eltwise.div"(%0, %c784) {type = !eltwise.fp32} : (!fp32, index) -> !fp32
+    return %1 : !fp32
+  }
+}
+''')       
+      else:
+        self.assertMultiLineEqual(
+                str(program), '''function (
+  _X0[_X0_0, _X0_1]
+) -> (
+  _X3
+) {
+  _X1[] = +(_X0[x0, x1]);
+  _X2 = 784;
+  _X3 = div(_X1, _X2);
 }
 ''')
 
