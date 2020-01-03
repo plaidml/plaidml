@@ -21,7 +21,7 @@ def EltwiseDialect : Dialect {
 
 class EltwiseBuilderImpl {
   code EltwiseBuilderImpl_create = [{
-    static Operation* create(OpBuilder* builder, Location loc, Type type, ArrayRef<Value*> operands) {
+    static Operation* create(OpBuilder* builder, Location loc, Type type, ArrayRef<Value> operands) {
       OperationState state(loc, getOperationName());
       state.addOperands(operands);
       state.addAttribute("type", TypeAttr::get(type));
@@ -69,7 +69,7 @@ class UnaryOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
   let results = (outs EltwiseAny:$result);
 
   let builders = [OpBuilder<
-    "Builder* builder, OperationState& result, ScalarType type, ArrayRef<Value*> operands", [{
+    "Builder* builder, OperationState& result, ScalarType type, ArrayRef<Value> operands", [{
       result.addOperands(operands);
       result.addAttribute("type", TypeAttr::get(type));
       result.addTypes(getResultType(operands));
@@ -77,8 +77,8 @@ class UnaryOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
   >];
 
   let extraClassDeclaration = [{
-    static Value* buildStandard(OpBuilder &builder, Location loc, ScalarType otype, ArrayRef<Value *> operands) { return nullptr; }
-    static Type getResultType(ArrayRef<Value*> operands) {
+    static Value buildStandard(OpBuilder &builder, Location loc, ScalarType otype, ArrayRef<Value> operands) { return nullptr; }
+    static Type getResultType(ArrayRef<Value> operands) {
       return ComputeResultType(operands);
     }
   }] # EltwiseBuilderImpl_create;
@@ -91,7 +91,7 @@ class BinaryOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
   let results = (outs EltwiseAny:$result);
 
   let builders = [OpBuilder<
-    "Builder* builder, OperationState& result, ScalarType type, ArrayRef<Value*> operands", [{
+    "Builder* builder, OperationState& result, ScalarType type, ArrayRef<Value> operands", [{
       result.addOperands(operands);
       result.addAttribute("type", TypeAttr::get(type));
       result.addTypes(getResultType(operands));
@@ -99,8 +99,8 @@ class BinaryOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
   >];
 
   let extraClassDeclaration = [{
-    static Value* buildStandard(OpBuilder &builder, Location loc, ScalarType otype, ArrayRef<Value *> operands);
-    static Type getResultType(ArrayRef<Value*> operands) {
+    static Value buildStandard(OpBuilder &builder, Location loc, ScalarType otype, ArrayRef<Value> operands);
+    static Type getResultType(ArrayRef<Value> operands) {
       return ComputeResultType(operands);
     }
   }] # EltwiseBuilderImpl_create;
@@ -112,9 +112,9 @@ def CastOp : EltwiseOp<"cast">, HasCanonicalizer {
   let results = (outs EltwiseAny:$result);
 
   let extraClassDeclaration = [{
-    static Value* buildStandard(OpBuilder &builder, Location loc, ScalarType otype, ArrayRef<Value *> operands) { return nullptr; }
-    static Type getResultType(ArrayRef<Value*> operands);
-    static Operation* create(OpBuilder* builder, Location loc, Type type, ArrayRef<Value*> operands);
+    static Value buildStandard(OpBuilder &builder, Location loc, ScalarType otype, ArrayRef<Value> operands) { return nullptr; }
+    static Type getResultType(ArrayRef<Value> operands);
+    static Operation* create(OpBuilder* builder, Location loc, Type type, ArrayRef<Value> operands);
   }];
 }
 
@@ -125,7 +125,7 @@ class CompareOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
   let results = (outs EltwiseBool:$result);
 
   let builders = [OpBuilder<
-    "Builder* builder, OperationState& result, ScalarType type, ArrayRef<Value*> operands", [{
+    "Builder* builder, OperationState& result, ScalarType type, ArrayRef<Value> operands", [{
       result.addOperands(operands);
       result.addAttribute("type", TypeAttr::get(type));
       result.addTypes(getResultType(operands));
@@ -133,8 +133,8 @@ class CompareOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
   >];
 
   let extraClassDeclaration = [{
-    static Value* buildStandard(OpBuilder &builder, Location loc, ScalarType otype, ArrayRef<Value *> operands) { return nullptr; }
-    static Type getResultType(ArrayRef<Value*> operands) {
+    static Value buildStandard(OpBuilder &builder, Location loc, ScalarType otype, ArrayRef<Value> operands) { return nullptr; }
+    static Type getResultType(ArrayRef<Value> operands) {
       return ComputeResultType(operands, DataType::BOOLEAN);
     }
   }] # EltwiseBuilderImpl_create;
@@ -208,7 +208,7 @@ def SelectOp : EltwiseOp<"select">, HasCanonicalizer {
   let results = (outs EltwiseAny:$result);
 
   let builders = [OpBuilder<
-    "Builder* builder, OperationState& result, ScalarType type, ArrayRef<Value*> operands", [{
+    "Builder* builder, OperationState& result, ScalarType type, ArrayRef<Value> operands", [{
       result.addOperands(operands);
       result.addAttribute("type", TypeAttr::get(type));
       result.addTypes(getResultType(operands));
@@ -216,8 +216,8 @@ def SelectOp : EltwiseOp<"select">, HasCanonicalizer {
   >];
 
   let extraClassDeclaration = [{
-    static Value* buildStandard(OpBuilder &builder, Location loc, ScalarType otype, ArrayRef<Value *> operands) { return nullptr; }
-    static Type getResultType(ArrayRef<Value*> operands);
+    static Value buildStandard(OpBuilder &builder, Location loc, ScalarType otype, ArrayRef<Value> operands) { return nullptr; }
+    static Type getResultType(ArrayRef<Value> operands);
   }] # EltwiseBuilderImpl_create;
 }
 

@@ -161,7 +161,7 @@ struct StripeToAffineContext {
   // not part of ConversionPatternRewriter. ParallelForOp is replaced with an Affine loop nest as a whole, not piece by
   // piece.
   // TODO: Revisit this in the future if there is a way to convert BlockArguments using ConversionPatternRewriter.
-  SmallDenseMap<Value*, Value*, 8> remappedIvs;
+  SmallDenseMap<Value, Value, 8> remappedIvs;
 };
 
 // Base class for Stripe Op conversion.
@@ -178,8 +178,8 @@ class StripeOpConverter : public OpConversionPattern<OP> {
   ///    - 'base': affine.load/affine.store base memref Value.
   ///    - 'indices': list of indices to be used as affine map arguments.
   ///    - 'affineMap': affine map with mapping for for the list of indices.
-  void convertStripeAccessToAffine(RefineOp refine, ConversionPatternRewriter& rewriter, Value*& base,
-                                   SmallVectorImpl<Value*>& indices, AffineMap& affineMap) const {
+  void convertStripeAccessToAffine(RefineOp refine, ConversionPatternRewriter& rewriter, Value& base,
+                                   SmallVectorImpl<Value>& indices, AffineMap& affineMap) const {
     SmallVector<AffineExpr, 4> resultExprs;
     // Process all the polynomials in the access. Each polynomial has a set of terms consisting of {index * constant
     // coefficient}, and an independent constant term. We create an affine expression for each polynomial.
@@ -217,19 +217,19 @@ class StripeOpConverter : public OpConversionPattern<OP> {
   struct OP##Converter : public StripeOpConverter<OP> {                                     \
     using StripeOpConverter<OP>::StripeOpConverter;                                         \
                                                                                             \
-    PatternMatchResult matchAndRewrite(OP op, ArrayRef<Value*> operands,                    \
+    PatternMatchResult matchAndRewrite(OP op, ArrayRef<Value> operands,                     \
                                        ConversionPatternRewriter& rewriter) const override; \
   };
 #include "supported_ops.inc"
 
-PatternMatchResult AffinePolyOpConverter::matchAndRewrite(AffinePolyOp constOp, ArrayRef<Value*> operands,
+PatternMatchResult AffinePolyOpConverter::matchAndRewrite(AffinePolyOp constOp, ArrayRef<Value> operands,
                                                           ConversionPatternRewriter& rewriter) const {
   // This op is indirectly converted from the memory access operation by using AccessInfoAnalysis.
   rewriter.eraseOp(constOp);
   return matchSuccess();
 }
 
-PatternMatchResult ParallelForOpConverter::matchAndRewrite(ParallelForOp stripeForOp, ArrayRef<Value*> operands,
+PatternMatchResult ParallelForOpConverter::matchAndRewrite(ParallelForOp stripeForOp, ArrayRef<Value> operands,
                                                            ConversionPatternRewriter& rewriter) const {
   auto ranges = stripeForOp.ranges().getValue();
   size_t numRanges = ranges.size();
@@ -267,7 +267,7 @@ PatternMatchResult ParallelForOpConverter::matchAndRewrite(ParallelForOp stripeF
     const auto stripeIvValues = stripeForBody.front().getArguments();
     assert(stripeIvValues.size() == affineIvs.size() && "Stripe and Affine number of IVs doesn't match");
     for (size_t ivIdx = 0; ivIdx < numRanges; ++ivIdx) {
-      convContext.remappedIvs.insert(std::pair<Value*, Value*>(stripeIvValues[ivIdx], affineIvs[ivIdx].getValue()));
+      convContext.remappedIvs.insert(std::pair<Value, Value>(stripeIvValues[ivIdx], affineIvs[ivIdx].getValue()));
     }
 
     // Move ParallelForOp's operations (single block) to Affine innermost loop. We skip the terminator since Affine loop
@@ -283,31 +283,31 @@ PatternMatchResult ParallelForOpConverter::matchAndRewrite(ParallelForOp stripeF
   return matchSuccess();
 }
 
-PatternMatchResult LoadOpConverter::matchAndRewrite(LoadOp loadOp, ArrayRef<Value*> operands,
+PatternMatchResult LoadOpConverter::matchAndRewrite(LoadOp loadOp, ArrayRef<Value> operands,
                                                     ConversionPatternRewriter& rewriter) const {
   // Create map and indices to be used as map arguments.
   AffineMap map;
-  SmallVector<Value*, 8> indices;
-  Value* base;
+  SmallVector<Value, 8> indices;
+  Value base;
   RefineOp refine = cast<RefineOp>(loadOp.from()->getDefiningOp());
   convertStripeAccessToAffine(refine, rewriter, base, indices, map);
   rewriter.replaceOpWithNewOp<AffineLoadOp>(loadOp, base, map, indices);
   return matchSuccess();
 }
 
-PatternMatchResult RefineOpConverter::matchAndRewrite(RefineOp refineOp, ArrayRef<Value*> operands,
+PatternMatchResult RefineOpConverter::matchAndRewrite(RefineOp refineOp, ArrayRef<Value> operands,
                                                       ConversionPatternRewriter& rewriter) const {
   // This op is indirectly converted from the memory access operation by using AccessInfoAnalysis.
   rewriter.eraseOp(refineOp);
   return matchSuccess();
 }
 
-PatternMatchResult StoreOpConverter::matchAndRewrite(StoreOp storeOp, ArrayRef<Value*> operands,
+PatternMatchResult StoreOpConverter::matchAndRewrite(StoreOp storeOp, ArrayRef<Value> operands,
                                                      ConversionPatternRewriter& rewriter) const {
   // Create map and indices to be used as map arguments.
   AffineMap map;
-  SmallVector<Value*, 8> indices;
-  Value* base;
+  SmallVector<Value, 8> indices;
+  Value base;
   RefineOp refine = cast<RefineOp>(storeOp.into()->getDefiningOp());
   convertStripeAccessToAffine(refine, rewriter, base, indices, map);
   rewriter.replaceOpWithNewOp<AffineStoreOp>(storeOp, operands[1], base, map, indices);
@@ -316,7 +316,7 @@ PatternMatchResult StoreOpConverter::matchAndRewrite(StoreOp storeOp, ArrayRef<V
 
 // Converts TerminateOp to AffineTerminatorOp. If a TerminateOp requires a special context-dependent treatment, that
 // must be implemented in the Op providing the context.
-PatternMatchResult TerminateOpConverter::matchAndRewrite(TerminateOp terminateOp, ArrayRef<Value*> operands,
+PatternMatchResult TerminateOpConverter::matchAndRewrite(TerminateOp terminateOp, ArrayRef<Value> operands,
                                                          ConversionPatternRewriter& rewriter) const {
   rewriter.replaceOpWithNewOp<mlir::AffineTerminatorOp>(terminateOp);
   return matchSuccess();

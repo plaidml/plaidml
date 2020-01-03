@@ -2,6 +2,8 @@
 
 #include "pmlc/dialect/tile/gradient.h"
 
+#include <vector>
+
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/FormatVariadic.h"
 
@@ -14,34 +16,41 @@
 
 namespace pmlc::dialect::tile {
 
-Gradient::Gradient(mlir::Value* loss, TileBuilder* builder) : builder_(builder) {
-  IVLOG(3, "Gradient::Gradient> loss: " << mlir::debugString(*loss));
+Gradient::Gradient(mlir::Value loss, TileBuilder* builder) : builder_(builder) {
+  IVLOG(3, "Gradient::Gradient> loss: " << mlir::debugString(loss));
   grads_[loss] = builder_->MakeScalarConstantOp(1.0);
-  llvm::SetVector<mlir::Value*> loss_setvec;
+  llvm::SetVector<mlir::Value> loss_setvec;
   loss_setvec.insert(loss);
-  auto defs = util::getBackwardSlice(loss_setvec, false, std::function<bool(mlir::Value*)>{[](mlir::Value* val) {
-                                       auto op = val->getDefiningOp();
-                                       // TODO: This is an ad hoc list of what to filter out; make it principled
-                                       return !mlir::isa<AffineConstraintsOp>(op) && !mlir::isa<AffineMapOp>(op) &&
-                                              !mlir::isa<AffineIndexOp>(op) && !mlir::isa<DimOp>(op) &&
-                                              !mlir::isa<AffineConstantOp>(op) && !mlir::isa<AffineAddOp>(op) &&
-                                              !mlir::isa<AffineDivOp>(op) && !mlir::isa<AffineMulOp>(op) &&
-                                              !mlir::isa<AffineNegOp>(op) && !mlir::isa<AffineSubOp>(op) &&
-                                              !mlir::isa<AffineMaxOp>(op) && !mlir::isa<AffineMinOp>(op) &&
-                                              !mlir::isa<eltwise::ScalarConstantOp>(op);
-                                     }});
+  auto defs = util::getBackwardSlice(  //
+      loss_setvec, false, std::function<bool(mlir::Value)>{[](mlir::Value val) {
+        auto op = val->getDefiningOp();
+        // TODO: This is an ad hoc list of what to filter out; make it principled
+        return !mlir::isa<AffineConstraintsOp>(op) &&  //
+               !mlir::isa<AffineMapOp>(op) &&          //
+               !mlir::isa<AffineIndexOp>(op) &&        //
+               !mlir::isa<DimOp>(op) &&                //
+               !mlir::isa<AffineConstantOp>(op) &&     //
+               !mlir::isa<AffineAddOp>(op) &&          //
+               !mlir::isa<AffineDivOp>(op) &&          //
+               !mlir::isa<AffineMulOp>(op) &&          //
+               !mlir::isa<AffineNegOp>(op) &&          //
+               !mlir::isa<AffineSubOp>(op) &&          //
+               !mlir::isa<AffineMaxOp>(op) &&          //
+               !mlir::isa<AffineMinOp>(op) &&          //
+               !mlir::isa<eltwise::ScalarConstantOp>(op);
+      }});
   for (auto def = defs.rbegin(); def != defs.rend(); def++) {
     ComputeOperandDerivs(*def);
   }
   if (VLOG_IS_ON(5)) {
     IVLOG(5, "Gradient::Gradient> Computed the following gradients: ");
     for (auto [key, value] : grads_) {
-      IVLOG(5, "  key is " << mlir::debugString(*key) << "\n    for val " << mlir::debugString(*value));
+      IVLOG(5, "  key is " << mlir::debugString(key) << "\n    for val " << mlir::debugString(value));
     }
   }
 }
 
-void Gradient::AddToGradient(Value* source_op, Value* deriv) {
+void Gradient::AddToGradient(Value source_op, Value deriv) {
   // Adds the gradient `deriv` computed for one use of `source_op` to the overall gradient of `source_op`
   if (!grads_.count(source_op)) {
     grads_[source_op] = deriv;
@@ -50,12 +59,15 @@ void Gradient::AddToGradient(Value* source_op, Value* deriv) {
   }
 }
 
-void Gradient::ComputeOperandDerivs(mlir::Value* val) {
-  IVLOG(4, "Gradient::ComputeDerivative> " << mlir::debugString(*val));
+void Gradient::ComputeOperandDerivs(mlir::Value val) {
+  IVLOG(4, "Gradient::ComputeDerivative> " << mlir::debugString(val));
   // TODO: Throw on ops with multiple results?
   auto op = val->getDefiningOp();
-  if (mlir::isa<AffineConstraintsOp>(op) || mlir::isa<AffineMapOp>(op) || mlir::isa<AffineIndexOp>(op) ||
-      mlir::isa<PrngOp>(op) || mlir::isa<ShapeOp>(op)) {
+  if (mlir::isa<AffineConstraintsOp>(op) ||  //
+      mlir::isa<AffineMapOp>(op) ||          //
+      mlir::isa<AffineIndexOp>(op) ||        //
+      mlir::isa<PrngOp>(op) ||               //
+      mlir::isa<ShapeOp>(op)) {
     // TODO: Make the list of which ops these are more principled. Also, should these all be caught in the backwards
     // slice filter? If so, probably throw here.
     IVLOG(6, "Gradient::ComputeDerivative> Skipping computing derivatives for op "
@@ -64,7 +76,7 @@ void Gradient::ComputeOperandDerivs(mlir::Value* val) {
   }
   if (!grads_.count(val)) {
     IVLOG(1, "Gradient::ComputeOperandDerivs> Called on Value which has not itself been differentiated: "
-                 << mlir::debugString(*val));
+                 << mlir::debugString(val));
     throw std::runtime_error("Unexpected missing derivative in ComputeOperandDerivs");
   }
   if (mlir::isa<eltwise::EltwiseOp>(op)) {
@@ -101,7 +113,7 @@ void Gradient::ComputeOperandDerivs(mlir::Value* val) {
     throw std::runtime_error("TODO: Derivs of Scatter not yet implemented");
   } else if (auto reshape_op = mlir::dyn_cast<ReshapeOp>(op)) {
     auto tensor_input = reshape_op.tensor();
-    std::vector<mlir::Value*> args{grads_[val]};
+    std::vector<mlir::Value> args{grads_[val]};
     for (int i = 0; i < tensor_input->getType().dyn_cast<RankedTensorType>().getRank(); ++i) {
       args.push_back(builder_->MakeDimOp(tensor_input, i));
     }
@@ -126,32 +138,32 @@ void Gradient::ComputeOperandDerivs(mlir::Value* val) {
   }
 }
 
-mlir::Value* Gradient::GetDerivative(mlir::Value* val) {
-  IVLOG(5, "Gradient::GetDerivative> " << mlir::debugString(*val));
+mlir::Value Gradient::GetDerivative(mlir::Value val) {
+  IVLOG(5, "Gradient::GetDerivative> " << mlir::debugString(val));
   auto it = grads_.find(val);
   if (it != grads_.end()) {
-    IVLOG(6, "  Gradient::GetDerivative> Derivative retrieved: " << mlir::debugString(*it->second));
+    IVLOG(6, "  Gradient::GetDerivative> Derivative retrieved: " << mlir::debugString(it->second));
     return it->second;
   }
   // TODO:
   // In the long run, this should probably just return 0 or otherwise indicate a continuation
   // For now, I want to know if we hit this (as we shouldn't in most cases)
-  IVLOG(1, "Gradient::GetDerivative> The requested derivative of " << mlir::debugString(*val) << " was not computed!");
+  IVLOG(1, "Gradient::GetDerivative> The requested derivative of " << mlir::debugString(val) << " was not computed!");
   throw std::runtime_error("TODO: requested derivative not from getBackwardSlice");
 }
 
-mlir::Value* Gradient::DeriveEltwise(mlir::Value* dout, mlir::Value* out, size_t idx) {
+mlir::Value Gradient::DeriveEltwise(mlir::Value dout, mlir::Value out, size_t idx) {
   auto op = out->getDefiningOp();
-  IVLOG(5, "Gradient::DeriveEltwise> dout=" << mlir::debugString(*dout) << ", op=" << mlir::debugString(*op)
+  IVLOG(5, "Gradient::DeriveEltwise> dout=" << mlir::debugString(dout) << ", op=" << mlir::debugString(*op)
                                             << ", idx=" << idx);
   auto deriv = DerivRegistry::Instance()->Resolve(op->getName().getStringRef());
-  llvm::SmallVector<mlir::Value*, 3> operands{op->getOperands()};  // TODO: Size
+  llvm::SmallVector<mlir::Value, 3> operands{op->getOperands()};  // TODO: Size
   // TODO: Need to add simple_reduce here, unless done in the "if isa EltwiseOp" block above
   return deriv.fn(out, dout, operands, deriv.user_fn, deriv.user_ctx)[idx];
 }
 
-mlir::Value* Gradient::DeriveContraction(mlir::Value* dout, mlir::Value* out, size_t idx) {
-  IVLOG(5, "Gradient::DeriveContraction> dout=" << mlir::debugString(*dout) << ", out=" << mlir::debugString(*out)
+mlir::Value Gradient::DeriveContraction(mlir::Value dout, mlir::Value out, size_t idx) {
+  IVLOG(5, "Gradient::DeriveContraction> dout=" << mlir::debugString(dout) << ", out=" << mlir::debugString(out)
                                                 << ", idx=" << idx);
   auto op = llvm::dyn_cast_or_null<SymbolicContractionOp>(out->getDefiningOp());
   if (!op) {
@@ -163,8 +175,8 @@ mlir::Value* Gradient::DeriveContraction(mlir::Value* dout, mlir::Value* out, si
   }
 
   auto combo_kind = util::CombinationKind::none;  // This may be reset later if necessary
-  std::vector<Value*> new_srcs;
-  Value* target_src = nullptr;
+  std::vector<Value> new_srcs;
+  Value target_src = nullptr;
   switch (op.agg()) {
     case util::AggregationKind::max:
     case util::AggregationKind::min: {
@@ -178,7 +190,7 @@ mlir::Value* Gradient::DeriveContraction(mlir::Value* dout, mlir::Value* out, si
             throw std::runtime_error("src_op as cast is null");
           }
           new_srcs.push_back(src_op);
-          std::vector<Value*> dout_idxs;
+          std::vector<Value> dout_idxs;
           for (const auto& dim : llvm::cast<AffineMapOp>(op.sink()->getDefiningOp()).dims()) {
             dout_idxs.push_back(dim);
           }
@@ -198,7 +210,7 @@ mlir::Value* Gradient::DeriveContraction(mlir::Value* dout, mlir::Value* out, si
       for (auto src : op.srcs()) {
         if (i == idx) {
           // This is the differentiated input; so swap in dout here to create the new op
-          std::vector<Value*> dout_idxs;
+          std::vector<Value> dout_idxs;
           for (const auto& dim : llvm::cast<AffineMapOp>(op.sink()->getDefiningOp()).dims()) {
             dout_idxs.push_back(dim);
           }
@@ -240,18 +252,18 @@ mlir::Value* Gradient::DeriveContraction(mlir::Value* dout, mlir::Value* out, si
       break;
     default:
       throw std::runtime_error("Did not recognize aggregation operation when differentiating " +
-                               mlir::debugString(*out));
+                               mlir::debugString(out));
   }
   if (!target_src) {
     throw std::runtime_error(
         llvm::formatv("Trying to derive contraction at out of range index (requested source operand {0})", idx).str());
   }
   auto target_src_op = llvm::cast<AffineTensorMapOp>(target_src->getDefiningOp());
-  std::vector<mlir::Value*> sizes;
+  std::vector<mlir::Value> sizes;
   for (int i = 0; i < target_src_op.tensor()->getType().dyn_cast<RankedTensorType>().getRank(); ++i) {
     sizes.push_back(builder_->MakeDimOp(target_src_op.tensor(), i));
   }
-  std::vector<mlir::Value*> dsrc_idxs;
+  std::vector<mlir::Value> dsrc_idxs;
   for (const auto& dim : target_src_op.dims()) {
     dsrc_idxs.push_back(dim);
   }
@@ -273,7 +285,7 @@ mlir::Value* Gradient::DeriveContraction(mlir::Value* dout, mlir::Value* out, si
   auto src_cons = llvm::dyn_cast<AffineConstraintsOp>(op.cons()->getDefiningOp());
   auto dop = llvm::dyn_cast<SymbolicContractionOp>(dop_val->getDefiningOp());
   auto dst_cons = llvm::dyn_cast<AffineConstraintsOp>(dop.cons()->getDefiningOp());
-  mlir::SmallVector<mlir::Value*, 6> pairs{src_cons.pairs()};
+  mlir::SmallVector<mlir::Value, 6> pairs{src_cons.pairs()};
   for (const auto& pair : src_cons.pairs()) {
     pairs.emplace_back(pair);
   }
@@ -281,7 +293,7 @@ mlir::Value* Gradient::DeriveContraction(mlir::Value* dout, mlir::Value* out, si
   return dop_val;
 }
 
-mlir::Value* Gradient::DeriveSpecial(const mlir::Value* dout, SpecialOp* op, size_t idx) {
+mlir::Value Gradient::DeriveSpecial(const mlir::Value dout, SpecialOp* op, size_t idx) {
   throw std::runtime_error("Made it to DeriveSpecial!");
 }
 

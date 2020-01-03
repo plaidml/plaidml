@@ -3,7 +3,7 @@
 #pragma once
 
 #include "mlir/Pass/Pass.h"
-#include "mlir/Pass/PassRegistry.h"
+
 #include "tile/codegen/codegen.pb.h"
 
 namespace pmlc {

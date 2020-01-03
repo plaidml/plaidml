@@ -21,11 +21,11 @@ class TileBuilder;
 //  1. Y: The Value for the node
 //  2. dY: The Value for the already-computed gradient of the node's output
 //  3. Xs: The Values for the node's inputs
-using Deriv = std::function<llvm::SmallVector<mlir::Value*, 3>(  // TODO: Size?
-    mlir::Value* Y,                                              //
-    mlir::Value* dY,                                             //
-    const llvm::SmallVector<mlir::Value*, 3>& Xs,                // TODO: Size?
-    void* user_fn,                                               //
+using Deriv = std::function<llvm::SmallVector<mlir::Value, 3>(  // TODO: Size?
+    mlir::Value Y,                                              //
+    mlir::Value dY,                                             //
+    const llvm::SmallVector<mlir::Value, 3>& Xs,                // TODO: Size?
+    void* user_fn,                                              //
     void* user_ctx)>;
 
 // A DerivEntry bundles the Deriv with the FFI-processed user function & context needed to call it from Values
@@ -63,18 +63,18 @@ class DerivRegistry {
 
 class Gradient {
  public:
-  explicit Gradient(mlir::Value* loss, TileBuilder* builder);
-  void ComputeOperandDerivs(mlir::Value* val);
-  mlir::Value* GetDerivative(mlir::Value* val);
+  explicit Gradient(mlir::Value loss, TileBuilder* builder);
+  void ComputeOperandDerivs(mlir::Value val);
+  mlir::Value GetDerivative(mlir::Value val);
 
  private:
-  mlir::Value* DeriveEltwise(mlir::Value* dout, mlir::Value* out, size_t idx);
-  mlir::Value* DeriveContraction(mlir::Value* dout, mlir::Value* out, size_t idx);
-  mlir::Value* DeriveSpecial(const mlir::Value* dout, SpecialOp* op, size_t val);  // TODO
-  void AddToGradient(Value* source_op, Value* deriv);
+  mlir::Value DeriveEltwise(mlir::Value dout, mlir::Value out, size_t idx);
+  mlir::Value DeriveContraction(mlir::Value dout, mlir::Value out, size_t idx);
+  mlir::Value DeriveSpecial(const mlir::Value dout, SpecialOp* op, size_t val);  // TODO
+  void AddToGradient(Value source_op, Value deriv);
 
   TileBuilder* builder_;
-  std::map<mlir::Value*, mlir::Value*> grads_;
+  llvm::DenseMap<mlir::Value, mlir::Value> grads_;
 };
 
 }  // namespace pmlc::dialect::tile

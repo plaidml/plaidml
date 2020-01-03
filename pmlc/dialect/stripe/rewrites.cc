@@ -3,6 +3,7 @@
 #include "pmlc/dialect/stripe/rewrites.h"
 
 #include "mlir/IR/PatternMatch.h"
+
 #include "pmlc/dialect/stripe/analysis.h"
 #include "pmlc/dialect/stripe/dialect.h"
 #include "pmlc/dialect/stripe/ops.h"
@@ -13,7 +14,7 @@ namespace pmlc::dialect::stripe {
 mlir::PatternMatchResult SimplifyPoly::matchAndRewrite(AffinePolyOp op, mlir::PatternRewriter& rewriter) const {
   bool has_non_canonical = false;
   for (size_t i = 0; i < op.getNumOperands(); i++) {
-    if (!mlir::isa<mlir::BlockArgument>(op.getOperand(i))) {
+    if (!op.getOperand(i).isa<BlockArgument>()) {
       has_non_canonical = true;
     }
   }
@@ -30,7 +31,7 @@ mlir::PatternMatchResult SimplifyPoly::matchAndRewrite(AffinePolyOp op, mlir::Pa
 }
 
 mlir::PatternMatchResult SimplifyNopRefines::match(RefineOp op) const {
-  for (auto* offset : op.offsets()) {
+  for (auto offset : op.offsets()) {
     if (AffinePolynomial(offset) != AffinePolynomial()) {
       return matchFailure();
     }
@@ -170,7 +171,7 @@ mlir::PatternMatchResult SplitParallelFor::matchAndRewrite(ParallelForOp pf, mli
     return matchFailure();  // Only works for simple polynomials
   }
   // Get the actual relevant numbers from the poly
-  mlir::BlockArgument* ba = poly.terms.begin()->first;
+  auto ba = poly.terms.begin()->first;
   // Find which argument it is (or not in this PF)
   int which_arg = -1;
   for (size_t i = 0; i < pf_block->getNumArguments(); i++) {

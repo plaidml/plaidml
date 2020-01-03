@@ -12,6 +12,6 @@ plaidml_cc_library(
     ]),
     deps = [
         "//pmlc/dialect/oplib",
-        "@mlir//:TableGen",
+        "@llvm-project//mlir:TableGen",
     ],
 )

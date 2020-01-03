@@ -27,7 +27,7 @@ struct AffineRange {
   AffineRange& operator+=(const AffineRange& x);
   AffineRange& operator|=(const AffineRange& x);
   explicit AffineRange(const AffinePolynomial& x);
-  explicit AffineRange(Value* x) : AffineRange(AffinePolynomial(x)) {}
+  explicit AffineRange(Value x) : AffineRange(AffinePolynomial(x)) {}
 };
 
 // Operator overload for affine ops as well as union
@@ -39,7 +39,7 @@ inline AffineRange operator|(const AffineRange& a, const AffineRange& b) {
 }
 
 struct FlatTensorAccess {
-  Value* base;
+  Value base;
   TensorType base_type;
   std::vector<AffinePolynomial> access;
 
@@ -51,7 +51,7 @@ struct FlatTensorAccess {
 
 // For a tensor-reference, compute some information about the base allocation as
 // well as its access polynomials
-FlatTensorAccess ComputeAccess(Value* tensor);
+FlatTensorAccess ComputeAccess(Value tensor);
 
 // Check if the parallel-for contains a constraint as its final op, and also
 // that any ops before the constraint are no-side-effect

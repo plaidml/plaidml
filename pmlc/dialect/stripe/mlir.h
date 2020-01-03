@@ -61,6 +61,12 @@ using mlir::TypeAttr;
 using mlir::UnitAttr;
 using mlir::Value;
 
+struct BlockArgumentCompare {
+  bool operator()(BlockArgument lhs, BlockArgument rhs) const {  //
+    return lhs.getAsOpaquePointer() < rhs.getAsOpaquePointer();
+  }
+};
+
 }  // namespace stripe
 }  // namespace dialect
 }  // namespace pmlc

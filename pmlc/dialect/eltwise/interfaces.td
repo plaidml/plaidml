@@ -11,12 +11,15 @@ def EltwiseOpInterface : OpInterface<"EltwiseOp"> {
   let description = "<TODO>";
   let methods = [
     StaticInterfaceMethod<
-      "Build a standard op from eltwise on in conversion", 
-      "Value*", "buildStandard", 
-      (ins "OpBuilder&":$builder, "Location":$loc, "ScalarType":$otype, "ArrayRef<Value *>":$operands)
+      "Build a standard op from eltwise on in conversion",
+      "Value", "buildStandard", (ins
+        "OpBuilder&":$builder,
+        "Location":$loc,
+        "ScalarType":$otype,
+        "ArrayRef<Value>":$operands
+      )
     >,
   ];
 }
-
 
 #endif // __PML_ELTWISE_INTERFACES__

@@ -16,7 +16,7 @@ filegroup(
         "predicates.td",
         "//pmlc/util:enums-td",
         "//pmlc/util:interfaces-td",
-        "@mlir//:OpBaseTdFiles",
+        "@llvm-project//mlir:OpBaseTdFiles",
     ],
 )
 
@@ -73,9 +73,9 @@ plaidml_cc_library(
         ":gen-ops",
         "//pmlc/util",
         "//tile/base",
-        "@llvm//:support",
-        "@mlir//:IR",
-        "@mlir//:StandardOps",
+        "@llvm-project//llvm:support",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:StandardOps",
     ],
     alwayslink = 1,
 )
