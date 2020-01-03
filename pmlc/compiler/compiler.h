@@ -18,7 +18,7 @@ class MemRefDescriptor;
 
 class Executable {
  public:
-  Executable(mlir::StringRef entry, mlir::ModuleOp module, mlir::ArrayRef<void*> bufptrs);
+  Executable(mlir::StringRef entry, mlir::StringRef target, mlir::ModuleOp module, mlir::ArrayRef<void*> bufptrs);
   ~Executable();
 
   void invoke();

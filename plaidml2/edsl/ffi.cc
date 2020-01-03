@@ -24,6 +24,7 @@
 #include "mlir/Support/DebugStringHelper.h"
 
 #include "pmlc/dialect/eltwise/types.h"
+#include "pmlc/dialect/tile/gradient.h"
 #include "pmlc/dialect/tile/ops.h"
 #include "pmlc/util/enums.h"
 #endif
@@ -41,6 +42,7 @@ using namespace vertexai::tile::lang::ast;  // NOLINT
 
 #ifdef PLAIDML_MLIR
 using pmlc::dialect::eltwise::ScalarType;
+using pmlc::dialect::tile::DerivRegistry;
 using pmlc::dialect::tile::ProgramMutations;
 using pmlc::dialect::tile::ProgramUpdate;
 using pmlc::dialect::tile::TileBuilder;
@@ -175,9 +177,7 @@ void plaidml_edsl_init(  //
   ffi_wrap_void(err, [&] {
     std::call_once(is_initialized, []() {
       IVLOG(1, "plaidml_edsl_init");
-#ifdef PLAIDML_AST
       plaidml::edsl::RegisterDerivs();
-#endif
     });
   });
 }
@@ -941,8 +941,29 @@ void plaidml_deriv_register(  //
     DerivRegistry::Instance()->Register(name, thunk, reinterpret_cast<void*>(fn), user_ctx);
 #endif
 #ifdef PLAIDML_MLIR
-    throw std::runtime_error("NYI: plaidml_deriv_register");
-    return nullptr;
+    auto thunk = [](mlir::Value Y,                                //
+                    mlir::Value dY,                               //
+                    const llvm::SmallVector<mlir::Value, 3>& Xs,  //
+                    void* user_fn,                                //
+                    void* user_ctx) {
+      IVLOG(6, "plaidml_deriv_register> thunk");
+      plaidml_deriv fn = reinterpret_cast<plaidml_deriv>(user_fn);
+      std::vector<plaidml_expr*> X_exprs(Xs.size());
+      std::vector<plaidml_expr*> dX_exprs(Xs.size());
+      auto Y_expr = new plaidml_expr{Y};
+      auto dY_expr = new plaidml_expr{dY};
+      for (size_t i = 0; i < X_exprs.size(); i++) {
+        X_exprs[i] = new plaidml_expr{Xs[i]};
+      }
+      fn(user_ctx, Y_expr, dY_expr, X_exprs.size(), X_exprs.data(), dX_exprs.data());
+      llvm::SmallVector<mlir::Value, 3> ret(Xs.size());
+      for (size_t i = 0; i < ret.size(); i++) {
+        ret[i] = dX_exprs[i]->value;
+        delete dX_exprs[i];  // TODO: Do I want this delete?
+      }
+      return ret;
+    };
+    DerivRegistry::Instance()->Register(name, thunk, reinterpret_cast<void*>(fn), user_ctx);
 #endif
   });
 }
@@ -1432,6 +1453,7 @@ plaidml_program* plaidml_program_evaluate(  //
     return ret;
 #endif
 #ifdef PLAIDML_MLIR
+    IVLOG(5, "  plaidml_program_evaluate>> noutputs: " << noutputs << ", nupdates: " << nupdates);
     ProgramMutations mutations;
     for (size_t i = 0; i < noutputs; i++) {
       if (!raw_outputs[i]) {
