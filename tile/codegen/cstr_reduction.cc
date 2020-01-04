@@ -102,7 +102,7 @@ void LightCstrReduction(const AliasMap& alias_map, Block* block, const proto::Li
       //       range'(idx) = min(range(idx), RoundUp(lim_value-1, -coeff) + 1)
       if (coeff < 0) {
         uint64_t range = idx->range;
-        // N.B. 0 < max_value, or the block would've already been marked for removal.
+        // N.B. 0 < lim_value, or the block would've already been marked for removal.
         uint64_t new_range = std::min(range, RoundUp(static_cast<uint64_t>(lim_value - 1), -coeff) + 1);
         if (range != new_range) {
           IVLOG(4, "Reduce range of " << kvp.first << " from " << range << " to " << new_range);
