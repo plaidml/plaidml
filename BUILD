@@ -5,7 +5,7 @@
 package(default_visibility = ["//visibility:public"])
 
 load("@rules_pkg//:pkg.bzl", "pkg_tar")
-load("@rules_python//python:defs.bzl", "py_binary", "py_runtime_pair")
+load("@rules_python//python:defs.bzl", "py_runtime_pair")
 
 exports_files([
     "LICENSE",
@@ -46,22 +46,4 @@ toolchain(
     name = "py_toolchain",
     toolchain = ":py_runtime_pair",
     toolchain_type = "@rules_python//python:toolchain_type",
-)
-
-py_binary(
-    name = "watch",
-    srcs = [
-        "watch.py",
-    ],
-    data = [
-        "//docs",
-        "//plaidml2/edsl:docs",
-    ],
-    deps = [
-        "//plaidml2:py",
-        "//plaidml2/edsl:py",
-        "//plaidml2/exec:py",
-        "//plaidml2/op:py",
-        "//tools/py_setup",
-    ],
 )
