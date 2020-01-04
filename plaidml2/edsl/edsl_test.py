@@ -265,7 +265,9 @@ class TestEdsl(unittest.TestCase):
         program = Program('sum_over_axis', [O])
         if USE_MLIR():
             self.assertMultiLineEqual(
-                str(program), '''#map0 = (d0, d1) -> (d0)
+                str(program), ('''
+                
+#map0 = (d0, d1) -> (d0)
 #map1 = (d0, d1) -> (d1, d0)
 
 
@@ -277,7 +279,7 @@ module {
     return %0 : tensor<784x!eltwise.fp32>
   }
 }
-''')
+''').lstrip())
         else:
             self.assertMultiLineEqual(
                 str(program), '''function (
@@ -295,7 +297,9 @@ module {
         program = Program('max_over_axis', [O])
         if USE_MLIR():
             self.assertMultiLineEqual(
-                str(program), '''#map0 = (d0, d1) -> (d0)
+                str(program), ('''
+                
+#map0 = (d0, d1) -> (d0)
 #map1 = (d0, d1) -> (d1, d0)
 
 
@@ -307,7 +311,7 @@ module {
     return %0 : tensor<784x!eltwise.fp32>
   }
 }
-''')
+''').lstrip())
         else:
             self.assertMultiLineEqual(
                 str(program), '''function (
@@ -326,7 +330,9 @@ module {
         program = Program('matmul', [O])
         if USE_MLIR():
             self.assertMultiLineEqual(
-                str(program), '''#map0 = (d0, d1, d2) -> (d0, d1)
+                str(program), ('''
+                
+#map0 = (d0, d1, d2) -> (d0, d1)
 #map1 = (d0, d1, d2) -> (d0, d2)
 #map2 = (d0, d1, d2) -> (d2, d1)
 
@@ -339,7 +345,7 @@ module {
     return %0 : tensor<1x784x!eltwise.fp32>
   }
 }
-''')
+''').lstrip())
         else:
             self.assertMultiLineEqual(
                 str(program), '''function (
@@ -358,7 +364,9 @@ module {
         program = Program('avg', [O])
         if USE_MLIR():
             self.assertMultiLineEqual(
-                str(program), '''#map0 = (d0, d1) -> (d0)
+                str(program), ('''
+                
+#map0 = (d0, d1) -> (d0)
 #map1 = (d0, d1) -> (d1, d0)
 
 
@@ -370,7 +378,7 @@ module {
     return %0 : !fp32
   }
 }
-''')
+''').lstrip())
         else:
             self.assertMultiLineEqual(
                 str(program), '''function (
@@ -388,7 +396,9 @@ module {
         program = Program('avg_stages', [O])
         if USE_MLIR():
             self.assertMultiLineEqual(
-                str(program), '''#map0 = () -> ()
+                str(program), ('''
+
+#map0 = () -> ()
 #map1 = (d0, d1) -> (d0, d1)
 
 
@@ -402,7 +412,7 @@ module {
     return %1 : !fp32
   }
 }
-''')
+''').lstrip())
         else:
             self.assertMultiLineEqual(
                 str(program), '''function (
@@ -422,7 +432,9 @@ module {
         program = Program('avg_merge', [O])
         if USE_MLIR():
             self.assertMultiLineEqual(
-                str(program), '''#map0 = () -> ()
+                str(program), ('''
+                
+#map0 = () -> ()
 #map1 = (d0, d1) -> (d0, d1)
 
 
@@ -436,7 +448,7 @@ module {
     return %1 : !fp32
   }
 }
-''')
+''').lstrip())
         else:
             self.assertMultiLineEqual(
                 str(program), '''function (
@@ -456,7 +468,9 @@ module {
         program = Program('max_pool_1d', [O])
         if USE_MLIR():
             self.assertMultiLineEqual(
-                str(program), '''#map0 = (d0, d1) -> (d0)
+                str(program), ('''
+                
+#map0 = (d0, d1) -> (d0)
 #map1 = (d0, d1) -> (d0 * 2 + d1)
 
 #set0 = (d0, d1) : (d1 >= 0, -d1 + 1 >= 0)
@@ -469,7 +483,7 @@ module {
     return %0 : tensor<5x!eltwise.fp32>
   }
 }
-''')
+''').lstrip())
         else:
             self.assertMultiLineEqual(
                 str(program), '''function (
@@ -487,7 +501,9 @@ module {
         program = Program('skip', [O])
         if USE_MLIR():
             self.assertMultiLineEqual(
-                str(program), '''#map0 = (d0, d1) -> (d0 * 2)
+                str(program), ('''
+                
+#map0 = (d0, d1) -> (d0 * 2)
 #map1 = (d0, d1) -> (d0 * 2, d1)
 
 
@@ -499,7 +515,7 @@ module {
     return %0 : tensor<784x!eltwise.fp32>
   }
 }
-''')
+''').lstrip())
         else:
             self.assertMultiLineEqual(
                 str(program), '''function (
@@ -518,7 +534,9 @@ module {
         program = Program('conv_1d', [O])
         if USE_MLIR():
             self.assertMultiLineEqual(
-                str(program), '''#map0 = (d0, d1, d2, d3, d4) -> (d0, d1, d2)
+                str(program), ('''
+                
+#map0 = (d0, d1, d2, d3, d4) -> (d0, d1, d2)
 #map1 = (d0, d1, d2, d3, d4) -> (d0, d1 + d3, d4)
 #map2 = (d0, d1, d2, d3, d4) -> (d3, d4, d2)
 
@@ -531,7 +549,7 @@ module {
     return %0 : tensor<1x222x1x!eltwise.fp32>
   }
 }
-''')
+''').lstrip())
         else:
             self.assertMultiLineEqual(
                 str(program), '''function (
@@ -551,7 +569,9 @@ module {
         program = Program('conv_2d_dilated', [O])
         if USE_MLIR():
             self.assertMultiLineEqual(
-                str(program), '''#map0 = (d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)
+                str(program), ('''
+                
+#map0 = (d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)
 #map1 = (d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4 * 2, d2 + d5 * 3, d6)
 #map2 = (d0, d1, d2, d3, d4, d5, d6) -> (d4, d5, d6, d3)
 
@@ -564,7 +584,7 @@ module {
     return %0 : tensor<1x220x218x32x!eltwise.fp32>
   }
 }
-''')
+''').lstrip())
         else:
             self.assertMultiLineEqual(
                 str(program), '''function (
@@ -627,7 +647,9 @@ module {
         program = Program('mnist_mlp', [D3])
         if USE_MLIR():
             self.assertMultiLineEqual(
-                str(program), '''#map0 = (d0, d1, d2) -> (d0, d1)
+                str(program), ('''
+
+#map0 = (d0, d1, d2) -> (d0, d1)
 #map1 = (d0, d1, d2) -> (d0, d2)
 #map2 = (d0, d1, d2) -> (d2, d1)
 #map3 = (d0, d1) -> (d0, 0)
@@ -656,7 +678,7 @@ module {
     return %14 : tensor<1x10x!eltwise.fp32>
   }
 }
-''')
+''').lstrip())
         else:
             self.assertMultiLineEqual(
                 str(program), '''function (
@@ -772,7 +794,9 @@ module {
         if USE_MLIR():
             self.assertEqual(str(O.shape), 'tensor<1x10x!eltwise.u32>')
             self.assertMultiLineEqual(
-                str(program), '''#map0 = (d0) -> (d0)
+                str(program), ('''
+                
+#map0 = (d0) -> (d0)
 #map1 = () -> ()
 #map2 = (d0, d1, d2) -> (d0, d1)
 #map3 = (d0, d1, d2) -> (d0, d2, d1)
@@ -791,7 +815,7 @@ module {
     return %4 : tensor<1x10x!eltwise.u32>
   }
 }
-''')
+''').lstrip())
         else:
             self.assertEqual(str(O.shape), 'u32(1, 10)')
             self.assertMultiLineEqual(
@@ -817,7 +841,9 @@ module {
         program = Program('global_min', [O])
         if USE_MLIR():
             self.assertMultiLineEqual(
-                str(program), '''#map0 = () -> ()
+                str(program), ('''
+
+#map0 = () -> ()
 #map1 = (d0, d1, d2) -> (d0, d1, d2)
 
 
@@ -831,7 +857,7 @@ module {
     return %2 : !fp32
   }
 }
-''')
+''').lstrip())
         else:
             self.assertMultiLineEqual(
                 str(program), '''function (
@@ -851,7 +877,9 @@ module {
         program = Program('cum_sum', [O])
         if USE_MLIR():
             self.assertMultiLineEqual(
-                str(program), '''#map0 = (d0, d1) -> (d0)
+                str(program), ('''
+
+#map0 = (d0, d1) -> (d0)
 #map1 = (d0, d1) -> (d1)
 
 #set0 = (d0, d1) : (d0 - d1 >= 0, -d0 + d1 + 9 >= 0)
@@ -864,7 +892,7 @@ module {
     return %0 : tensor<10x!eltwise.fp32>
   }
 }
-''')
+''').lstrip())
         else:
             self.assertMultiLineEqual(
                 str(program), '''function (
@@ -929,7 +957,9 @@ module {
         program = Program('lars_momentum_4d', R)
         if USE_MLIR():
             self.assertMultiLineEqual(
-                str(program), '''#map0 = () -> ()
+                str(program), ('''
+
+#map0 = () -> ()
 #map1 = (d0, d1, d2, d3) -> (d0, d1, d2, d3)
 
 
@@ -960,7 +990,7 @@ module {
     return %16, %15 : tensor<4x7x3x9x!eltwise.fp32>, tensor<4x7x3x9x!eltwise.fp32>
   }
 }
-''')
+''').lstrip())
         else:
             self.assertMultiLineEqual(
                 str(program), '''function (
@@ -1008,7 +1038,9 @@ module {
         program = Program('repeat_elts', [O])
         if USE_MLIR():
             self.assertMultiLineEqual(
-                str(program), '''#map0 = (d0, d1, d2, d3) -> (d0, d1 * 3 + d2, d3)
+                str(program), ('''
+
+#map0 = (d0, d1, d2, d3) -> (d0, d1 * 3 + d2, d3)
 #map1 = (d0, d1, d2, d3) -> (d0, d1, d3)
 
 #set0 = (d0, d1, d2, d3) : (d2 >= 0, -d2 + 2 >= 0)
@@ -1021,7 +1053,7 @@ module {
     return %0 : tensor<10x30x10x!eltwise.fp32>
   }
 }
-''')
+''').lstrip())
         else:
             self.assertMultiLineEqual(
                 str(program), '''function (
@@ -1045,7 +1077,9 @@ module {
         program = Program('use_default', [O])
         if USE_MLIR():
             self.assertMultiLineEqual(
-                str(program), '''#map0 = (d0, d1, d2) -> (d0, 3, d1, d2)
+                str(program), ('''
+                
+#map0 = (d0, d1, d2) -> (d0, 3, d1, d2)
 #map1 = (d0, d1, d2) -> (d0, d1, d2)
 
 
@@ -1055,7 +1089,7 @@ module {
     return %0 : tensor<1x7x10x10x!eltwise.fp32>
   }
 }
-''')
+''').lstrip())
         else:
             self.assertMultiLineEqual(
                 str(program), '''function (
@@ -1077,7 +1111,9 @@ module {
         program = Program('defract_test', [O])
         if USE_MLIR():
             self.assertMultiLineEqual(
-                str(program), '''#map0 = (d0, d1) -> (d0)
+                str(program), ('''
+                
+#map0 = (d0, d1) -> (d0)
 #map1 = (d0, d1) -> ((d0 - d1 + 1) floordiv 2)
 #map2 = (d0, d1) -> (d1)
 
@@ -1090,7 +1126,7 @@ module {
     return %0 : tensor<5x!eltwise.fp32>
   }
 }
-''')
+''').lstrip())
         else:
             self.assertMultiLineEqual(
                 str(program), '''function (
@@ -1113,7 +1149,9 @@ module {
         program = Program('defract_short_test', [O])
         if USE_MLIR():
             self.assertMultiLineEqual(
-                str(program), '''#map0 = (d0) -> (d0)
+                str(program), ('''
+                
+#map0 = (d0) -> (d0)
 #map1 = (d0) -> ((d0 - 1) floordiv 2)
 
 
@@ -1125,7 +1163,7 @@ module {
     return %0 : tensor<6x!eltwise.fp32>
   }
 }
-''')
+''').lstrip())
         else:
             self.assertMultiLineEqual(
                 str(program), '''function (
@@ -1150,7 +1188,9 @@ module {
         program = Program('defract_long', [O])
         if USE_MLIR():
             self.assertMultiLineEqual(
-                str(program), '''#map0 = (d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)
+                str(program), ('''
+
+#map0 = (d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)
 #map1 = (d0, d1, d2, d3, d4, d5, d6) -> (d0, (d1 + d4 - 1) floordiv 2, (d2 + d5 - 1) floordiv 2, d6)
 #map2 = (d0, d1, d2, d3, d4, d5, d6) -> (-d4 + 2, -d5 + 2, d3, d6)
 
@@ -1163,7 +1203,7 @@ module {
     return %0 : tensor<1x5x5x1x!eltwise.fp32>
   }
 }
-''')
+''').lstrip())
         else:
             self.assertMultiLineEqual(
                 str(program), '''function (
@@ -1213,7 +1253,9 @@ module {
         program = Program('this-is-not an identifier', [O])
         if USE_MLIR():
             self.assertMultiLineEqual(
-                str(program), '''#map0 = (d0, d1) -> (d0)
+                str(program), ('''
+
+#map0 = (d0, d1) -> (d0)
 #map1 = (d0, d1) -> ((d0 - d1 + 1) floordiv 2)
 #map2 = (d0, d1) -> (d1)
 
@@ -1226,7 +1268,7 @@ module {
     return %0 : tensor<5x!eltwise.fp32>
   }
 }
-''')
+''').lstrip())
         else:
             self.assertMultiLineEqual(
                 str(program), '''function (
