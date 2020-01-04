@@ -14,9 +14,3 @@ Welcome to plaidml's documentation!
    usage/building
    manual_api/index
 
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`

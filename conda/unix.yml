@@ -4,6 +4,7 @@ channels:
 dependencies:
   - bison
   - cffi
+  - doxygen
   - flex
   - jupyter
   - pip
@@ -11,13 +12,16 @@ dependencies:
   - scikit-image
   - pip:
     - asq
+    - autodoc
     - bokeh
+    - breathe
     - click
     - defaultlist
     - graphviz
     - humanize
     - keras==2.2.4
     - keras-applications==1.0.8
+    - livereload
     - matplotlib
     - networkx
     - pandas
@@ -26,6 +30,10 @@ dependencies:
     - pystache
     - pyyaml
     - requests
+    - sphinxcontrib.katex
+    - sphinxcontrib-napoleon
+    - sphinx_rtd_theme
+    - sphinx-tabs
     - tensorflow==1.14.0
     - theano
     - https://download.pytorch.org/whl/nightly/cpu/torch_nightly-1.2.0.dev20190618-cp37-none-macosx_10_7_x86_64.whl; platform_system == 'Darwin'
