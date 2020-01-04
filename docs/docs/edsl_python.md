@@ -509,7 +509,7 @@ Python [ | C++ ]({{ site.baseurl }}{% link docs/edsl.md%}#convolution)
 ```python
 def conv_1d(I, K) :
     N, X, KX, CI, CO = TensorDims(5)
-    TensorIndex n, x, k, ci, co = TensorIndexes(5)
+    n, x, k, ci, co = TensorIndexes(5)
     I.bind_dims(N, X, CI)
     K.bind_dims(KX, CI, CO)
     O = TensorOutput(N, X - KX + 1, CO)
@@ -599,8 +599,8 @@ def complex_conv_2d(
 
     # Compute output spatial dimensions
     Y0, Y1 = TensorDims(2)
-    Y0 = (X0 + s0 - 1) / s0
-    Y1 = (X1 + s1 - 1) / s1
+    Y0 = (X0 + s0 - 1) // s0
+    Y1 = (X1 + s1 - 1) // s1
 
     #Compute the effective kernel size after dilation
     EK0, EK1 = TensorDims(2)
@@ -609,17 +609,15 @@ def complex_conv_2d(
 
    #Compute the padding offset
     P0,P1 = TensorDims(2)
-    P0 = ((Y0 - 1) * s0 + EK0 - X0) / 2
-    P1 = ((Y1 - 1) * s1 + EK1 - X1) / 2
+    P0 = ((Y0 - 1) * s0 + EK0 - X0) // 2
+    P1 = ((Y1 - 1) * s1 + EK1 - X1) // 2
 
     # Specify the output size
     O = TensorOutput(N, Y0, Y1, G, GCO)
 
     # Compute the convolution
-    O[n, x0, x1, g, gco] +=
-        I[n, s0*x1 + d0*k0 - P0, s1*x1 + d1*k1 - P1, g, gci] *
-        K[k0, k1, g, gci, gco]
-  return O
+    O[n, x0, x1, g, gco] += I[n, s0*x1 + d0*k0 - P0, s1*x1 + d1*k1 - P1, g, gci] * K[k0, k1, g, gci, gco]
+    return O
 
 ```
 
