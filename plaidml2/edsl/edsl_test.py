@@ -242,9 +242,7 @@ class TestEdsl(unittest.TestCase):
       I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 784]))
       O = sum_over_axis(I)
       program = Program('sum_over_axis', [O])
-     # print(str(program))
       if USE_MLIR():
-          #print(str(program))
           self.assertMultiLineEqual(
                 str(program), '''#map0 = (d0, d1) -> (d0)
 #map1 = (d0, d1) -> (d1, d0)
@@ -274,7 +272,6 @@ module {
       I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 784]))
       O = max_over_axis(I)
       program = Program('max_over_axis', [O])
-     # print(str(program))
       if USE_MLIR():
           self.assertMultiLineEqual(
                 str(program), '''#map0 = (d0, d1) -> (d0)
@@ -532,7 +529,6 @@ module {
       O = conv_2d_dialated(I,K)
       program = Program('conv_2d_dialated', [O])
       if USE_MLIR():
-        #print(str(program))
         self.assertMultiLineEqual(  
                 str(program), '''#map0 = (d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)
 #map1 = (d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4 * 2, d2 + d5 * 3, d6)
