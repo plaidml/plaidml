@@ -43,14 +43,14 @@ namespace stripe {
 // constant offset.  We can 'flatten' any affine expression into such a
 // polynomial.
 struct AffinePolynomial {
-  std::map<mlir::BlockArgument*, int64_t> terms;
+  std::map<BlockArgument, int64_t, BlockArgumentCompare> terms;
   int64_t constant;
   // Make an empty polynomial
   AffinePolynomial();
   // Make a constant polynomial
   explicit AffinePolynomial(int64_t x);
   // Make a polynomial from an affine expression
-  explicit AffinePolynomial(Value* x);
+  explicit AffinePolynomial(Value x);
   // Perform operations on a polynomial
   AffinePolynomial& operator*=(int64_t x);
   AffinePolynomial& operator+=(const AffinePolynomial& x);

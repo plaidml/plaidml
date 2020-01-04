@@ -1,19 +1,19 @@
 // Copyright 2019, Intel Corporation
 
-#include "pmlc/dialect/stripe/transcode.h"
 #include "pmlc/dialect/stripe/agginit_pass.h"
 
-#include <sstream>
+#include <set>
+#include <string>
+#include <utility>
 #include <vector>
 
-#include "base/util/logging.h"
-
 #include "mlir/IR/Matchers.h"
-#include "mlir/Translation.h"
 
+#include "base/util/logging.h"
 #include "pmlc/dialect/stripe/analysis.h"
 #include "pmlc/dialect/stripe/dialect.h"
 #include "pmlc/dialect/stripe/ops.h"
+#include "pmlc/dialect/stripe/transcode.h"
 #include "pmlc/dialect/stripe/transforms.h"
 #include "pmlc/dialect/stripe/util.h"
 
@@ -24,13 +24,14 @@ namespace stripe {
 using vertexai::tile::codegen::proto::MLIR_AggInitPass;
 
 class AggregateInitializer {
-public:
+ public:
   AggregateInitializer(const MLIR_AggInitPass& opts, mlir::FuncOp f);
   // Initialize the aggregate buffers in op
   void Initialize(ParallelForOp op);
-private:
+
+ private:
   // Find out where to insert the initialization of tensor
-  std::pair<Operation*, Value*> InitLocation(Value* tensor);
+  std::pair<Operation*, Value> InitLocation(Value tensor);
   // Insert the initialization for the tensor in the aggregate op
   void InsertInit(AggregateOp aop);
 
@@ -44,13 +45,12 @@ private:
   std::set<StringRef> zeroSet;
 };
 
-AggregateInitializer::AggregateInitializer(const MLIR_AggInitPass& opts, mlir::FuncOp f)
-  : options(opts) {
+AggregateInitializer::AggregateInitializer(const MLIR_AggInitPass& opts, mlir::FuncOp f) : options(opts) {
   // Collect the zero-initialized tensors
-  f.walk([this] (ZeroOp op) {
+  f.walk([this](ZeroOp op) {  //
     zeroSet.insert(tensorName(op.out()));
   });
-  f.walk([this] (ParallelForOp op) {
+  f.walk([this](ParallelForOp op) {
     if (hasAttr(op.getOperation(), "zero")) {
       auto body = op.getBody();
       for (auto& op_base : *body) {
@@ -63,8 +63,8 @@ AggregateInitializer::AggregateInitializer(const MLIR_AggInitPass& opts, mlir::F
 }
 
 // Find out where to insert the initialization of tensor
-std::pair<Operation*, Value*> AggregateInitializer::InitLocation(Value* tensor) {
-  Value* cur_tensor = tensor;
+std::pair<Operation*, Value> AggregateInitializer::InitLocation(Value tensor) {
+  Value cur_tensor = tensor;
   while (cur_tensor) {
     if (auto def_op = cur_tensor->getDefiningOp()) {
       if (auto allocate_op = mlir::dyn_cast<AllocateOp>(def_op)) {
@@ -81,8 +81,7 @@ std::pair<Operation*, Value*> AggregateInitializer::InitLocation(Value* tensor) 
         }
         cur_tensor = refine_op.in();
       }
-    }
-    else {
+    } else {
       throw std::runtime_error("Cannot find the tensor definition.");
     }
   }
@@ -91,16 +90,15 @@ std::pair<Operation*, Value*> AggregateInitializer::InitLocation(Value* tensor) 
 
 // Insert the initialization for the tensor in the aggregate op
 void AggregateInitializer::InsertInit(AggregateOp aop) {
-  Value* tensor = aop.into();
-  std::string agg_name = util::stringifyAggregationKind(aop.agg());
+  Value tensor = aop.into();
+  auto agg = aop.agg();
 
   // Insert the initialization right before init_loc
-  Operation* init_loc;
-  Value* init_tensor;
-  std::tie(init_loc, init_tensor) = InitLocation(tensor);
+  auto [init_loc, init_tensor] = InitLocation(tensor);
 
-  if (agg_name == "add" && init_loc->getParentOp() == curOp.getParentOp()
-      && zeroSet.count(tensorName(init_tensor))) {
+  if (agg == AggregationKind::add &&                     //
+      init_loc->getParentOp() == curOp.getParentOp() &&  //
+      zeroSet.count(tensorName(init_tensor))) {
     // If this is add aggregate op, and the intialization is at the
     // outermost level, and the target tensor has been (fullu) zero-initialized,
     // we do not have to initialize it again.
@@ -125,8 +123,7 @@ void AggregateInitializer::InsertInit(AggregateOp aop) {
     if (shape[i].cls == kAddressClassIdentifier) {
       low[i] = (ranges[i].min > 0) ? ranges[i].min : 0;
       high[i] = (shape[i].size - 1 < ranges[i].max) ? (shape[i].size - 1) : ranges[i].max;
-    }
-    else {
+    } else {
       low[i] = high[i] = 0;
     }
   }
@@ -160,34 +157,30 @@ void AggregateInitializer::InsertInit(AggregateOp aop) {
 
   // Determine the initial value
   DataType init_type = tensorElementType(init_tensor);
-  eltwise::ScalarConstantOp const_op = initialValue(builder,
-    init_type, agg_name, "CST");
+  eltwise::ScalarConstantOp const_op = initialValue(builder, init_type, agg, "CST");
 
   // Create statements
-  std::vector<Value*> offsets(ranges.size());
+  std::vector<Value> offsets(ranges.size());
   for (unsigned i = 0; i < n_dims; ++i) {
     if (shape[i].cls == kAddressClassIdentifier) {
       auto idx = loop_body->addArgument(AffineType::get(builder->getContext()));
-      llvm::SmallVector<Value*, 1> vars = {idx};
+      llvm::SmallVector<Value, 1> vars = {idx};
       llvm::SmallVector<int64_t, 1> coeffs = {1};
-      offsets[i] = builder->create<AffinePolyOp>(
-        unknownLoc,
-        builder->getType<AffineType>(),
-        vars,
-        builder->getI64ArrayAttr(coeffs),
-        builder->getI64IntegerAttr(low[i])
-      );
-    }
-    else {
-      llvm::SmallVector<Value*, 1> vars;
+      offsets[i] = builder->create<AffinePolyOp>(  //
+          unknownLoc,                              //
+          builder->getType<AffineType>(),          //
+          vars,                                    //
+          builder->getI64ArrayAttr(coeffs),        //
+          builder->getI64IntegerAttr(low[i]));
+    } else {
+      llvm::SmallVector<Value, 1> vars;
       llvm::SmallVector<int64_t, 1> coeffs;
-      offsets[i] = builder->create<AffinePolyOp>(
-        unknownLoc,
-        builder->getType<AffineType>(),
-        vars,
-        builder->getI64ArrayAttr(coeffs),
-        builder->getI64IntegerAttr(0)
-      );
+      offsets[i] = builder->create<AffinePolyOp>(  //
+          unknownLoc,                              //
+          builder->getType<AffineType>(),          //
+          vars,                                    //
+          builder->getI64ArrayAttr(coeffs),        //
+          builder->getI64IntegerAttr(0));
     }
   }
   auto ref_op = builder->create<RefineOp>(unknownLoc, init_tensor->getType(), init_tensor, offsets);
@@ -211,7 +204,7 @@ void AggregateInitializer::Initialize(ParallelForOp op) {
   curOp = op;
   OpBuilder op_builder = op.getBodyBuilder();
   builder = &op_builder;
-  obody->walk([&](AggregateOp aop) {
+  obody->walk([&](AggregateOp aop) {  //
     InsertInit(aop);
   });
 }
@@ -220,7 +213,7 @@ void AggInitPass::runOnFunction() {
   auto reqs = vertexai::tile::stripe::FromProto(options.reqs());
   mlir::FuncOp f = getFunction();
   AggregateInitializer ai(options, f);
-  f.walk([&reqs, &ai] (ParallelForOp op) {
+  f.walk([&reqs, &ai](ParallelForOp op) {
     if (hasAttrs(op.getOperation(), reqs)) {
       ai.Initialize(op);
     }

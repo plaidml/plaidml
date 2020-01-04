@@ -9,6 +9,7 @@
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Verifier.h>
 #include <llvm/Support/DynamicLibrary.h>
+#include <llvm/Support/TargetRegistry.h>
 #include <llvm/Support/ToolOutputFile.h>
 #include <llvm/Transforms/IPO/PassManagerBuilder.h>
 #include <llvm/Transforms/Utils/Cloning.h>
@@ -55,6 +56,14 @@ ProgramModule Compiler::CompileProgram(const stripe::Block& program) {
   ProgramModule ret;
   ret.module = std::make_unique<llvm::Module>("stripe", context_);
   module_ = ret.module.get();
+
+  auto targetTriple = llvm::sys::getProcessTriple();
+  std::string errorMessage;
+  auto target = llvm::TargetRegistry::lookupTarget(targetTriple, errorMessage);
+  std::unique_ptr<llvm::TargetMachine> machine(target->createTargetMachine(targetTriple, "generic", "", {}, {}));
+  module_->setDataLayout(machine->createDataLayout());
+  module_->setTargetTriple(targetTriple);
+
   GenerateArena(program);
   llvm::Function* main = CompileBlock(program);
   ret.externals = external_funcptrs_;
@@ -84,16 +93,10 @@ ProgramModule Compiler::CompileProgram(const stripe::Block& program) {
     llvm::errs() << "LLVM IR, after optimization: ================\n";
     module_->print(llvm::errs(), nullptr);
   }
-#ifndef _MSC_VER
-  // This apparently trips an assertion on Windows with:
-  // Assertion failed: Target.isCompatibleDataLayout(getDataLayout()) &&
-  // "Can't create a MachineFunction using a Module with a " "Target-incompatible DataLayout attached\n",
-  // file external/llvm/lib/CodeGen/MachineFunction.cpp, line 201
   if (config_.print_assembly) {
     llvm::errs() << "Assembly code: ================\n";
-    PrintOutputAssembly();
+    PrintOutputAssembly(machine.get());
   }
-#endif
   // Wrap the finished module and the parameter names into a ProgramModule.
   for (auto& ref : program.refs) {
     if (ref.has_tag("user")) {
@@ -339,13 +342,14 @@ llvm::Function* Compiler::CompileXSMMBlock(const stripe::Block& block, const XSM
   llvm::FunctionType* xsmmCallHelperType = llvm::FunctionType::get(builder_.getVoidTy(), param_types, false);
   auto xmmCallFunc = module_->getOrInsertFunction("XSMMRTCaller", xsmmCallHelperType).getCallee();
 
-  #define CREATE_OFFSET_STMTS(name) llvm::Value* arg_##name;                                  \
-    if (xsmmCallData.offset_##name == 0) {                                                    \
-      arg_##name = buffers_[xsmmCallData.name->into()].base;                                  \
-    } else {                                                                                  \
-      llvm::Value* idx_list[1] = {llvm::ConstantInt::get(i32t, xsmmCallData.offset_##name)};  \
-      arg_##name = builder_.CreateGEP(buffers_[xsmmCallData.name->into()].base, idx_list);    \
-    }
+#define CREATE_OFFSET_STMTS(name)                                                          \
+  llvm::Value* arg_##name;                                                                 \
+  if (xsmmCallData.offset_##name == 0) {                                                   \
+    arg_##name = buffers_[xsmmCallData.name->into()].base;                                 \
+  } else {                                                                                 \
+    llvm::Value* idx_list[1] = {llvm::ConstantInt::get(i32t, xsmmCallData.offset_##name)}; \
+    arg_##name = builder_.CreateGEP(buffers_[xsmmCallData.name->into()].base, idx_list);   \
+  }
   CREATE_OFFSET_STMTS(in0);
   CREATE_OFFSET_STMTS(in1);
   CREATE_OFFSET_STMTS(out0);
@@ -1522,7 +1526,7 @@ void Compiler::Reshape(const stripe::Special& reshape) {
   assert(1 == reshape.outputs.size());
   Buffer dst = buffers_[reshape.outputs[0]];
   auto size = IndexConst(dst.refinement->interior_shape.byte_size());
-  builder_.CreateMemCpy(dst.base, 0, src.base, 0, size);
+  builder_.CreateMemCpy(dst.base, llvm::MaybeAlign(0), src.base, llvm::MaybeAlign(0), size);
 }
 
 void Compiler::PrngStep(const stripe::Special& prng_step) {
@@ -2291,24 +2295,13 @@ std::string Compiler::ProfileBlockID(const stripe::Block& block) {
   return block.name + "@" + std::to_string((uintptr_t)&block);
 }
 
-void Compiler::PrintOutputAssembly() {
-  // duplicate the output module, so we can create an execution engine, which
-  // will give us a target machine, which we can use to disassemble
-  std::unique_ptr<llvm::Module> clone(llvm::CloneModule(*module_));
-  std::string builderErrorStr;
-  auto ee =
-      llvm::EngineBuilder(std::move(clone)).setErrorStr(&builderErrorStr).setEngineKind(llvm::EngineKind::JIT).create();
-  if (ee) {
-    ee->finalizeObject();
-  } else {
-    throw Error("Failed to create ExecutionEngine: " + builderErrorStr);
-  }
+void Compiler::PrintOutputAssembly(llvm::TargetMachine* machine) {
   std::string outputStr;
   {
-    llvm::legacy::PassManager pm;
     llvm::raw_string_ostream stream(outputStr);
     llvm::buffer_ostream pstream(stream);
-    ee->getTargetMachine()->addPassesToEmitFile(pm, pstream, nullptr, llvm::CGFT_AssemblyFile);
+    llvm::legacy::PassManager pm;
+    machine->addPassesToEmitFile(pm, pstream, nullptr, llvm::CGFT_AssemblyFile);
     pm.run(*module_);
   }
   llvm::errs() << outputStr << "\n";

@@ -8,8 +8,6 @@
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/TargetSelect.h"
 
-#include "mlir/Conversion/LoopToStandard/ConvertLoopToStandard.h"
-#include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
 #include "mlir/Dialect/StandardOps/Ops.h"
 #include "mlir/ExecutionEngine/ExecutionEngine.h"
 #include "mlir/ExecutionEngine/OptUtils.h"
@@ -19,9 +17,9 @@
 #include "mlir/Transforms/Passes.h"
 
 #include "base/util/logging.h"
+#include "pmlc/compiler/registry.h"
 #include "pmlc/dialect/pxa/passes.h"
 
-using llvm::formatv;
 using namespace mlir;  // NOLINT[build/namespaces]
 using pmlc::dialect::pxa::createLowerToAffinePass;
 using pmlc::dialect::pxa::createLowerToPXAPass;
@@ -178,34 +176,31 @@ void Executable::initialize() {
   initializeLLVMPasses();
 }
 
-Executable::Executable(StringRef entry, ModuleOp programModule, ArrayRef<void*> bufptrs)
+Executable::Executable(StringRef entry, StringRef target, ModuleOp programModule, ArrayRef<void*> bufptrs)
     : entry(entry), args(bufptrs.size()), ptrs(bufptrs.size()) {
   auto copy = cast<ModuleOp>(programModule.getOperation()->clone());
   OwningModuleRef module(copy);
   PassManager manager(module->getContext());
   auto shouldPrintBeforePass = [](auto, auto) { return false; };
   auto shouldPrintAfterPass = [](auto, auto) { return VLOG_IS_ON(3); };
-  std::vector<MemRefType> memRefTypes;
-  manager.enableIRPrinting(shouldPrintBeforePass, shouldPrintAfterPass, true, true, llvm::errs());
+
+  manager.enableIRPrinting(shouldPrintBeforePass, shouldPrintAfterPass, true, false, llvm::errs());
   manager.addNestedPass<FuncOp>(createCanonicalizerPass());
   manager.addNestedPass<FuncOp>(createCSEPass());
+
   manager.addPass(createLowerToPXAPass());
   manager.addNestedPass<FuncOp>(createCanonicalizerPass());
   manager.addNestedPass<FuncOp>(createCSEPass());
-  manager.addPass(createLowerToAffinePass());
-  manager.addNestedPass<FuncOp>(createCanonicalizerPass());
-  manager.addNestedPass<FuncOp>(createCSEPass());
-  manager.addPass(createLowerAffinePass());
-  manager.addNestedPass<FuncOp>(createCanonicalizerPass());
-  manager.addNestedPass<FuncOp>(createCSEPass());
-  // manager.addPass(createLowerToCFGPass());
-  // manager.addNestedPass<FuncOp>(createCanonicalizerPass());
-  // manager.addNestedPass<FuncOp>(createCSEPass());
+
+  std::vector<MemRefType> memRefTypes;
   manager.addPass(ArgumentCollectorPass::create(&memRefTypes));
   if (VLOG_IS_ON(6)) {
     manager.addPass(InjectTracingPass::create());
   }
-  manager.addPass(createLowerToLLVMPass(true));
+
+  auto pipelineBuilder = resolveTarget(target);
+  pipelineBuilder(&manager);
+
   if (failed(manager.run(*module))) {
     throw std::runtime_error("conversion to the LLVM IR dialect failed");
   }

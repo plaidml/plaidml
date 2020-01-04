@@ -54,7 +54,7 @@ plaidml_cc_library(
         "//base/util",
         "//plaidml2/core:core_ast",
         "//tile/lang/ast",
-        "@llvm//:support",
+        "@llvm-project//llvm:support",
     ],
     alwayslink = 1,
 )
@@ -78,7 +78,7 @@ plaidml_cc_library(
         "//base/util",
         "//plaidml2/core:core_mlir",
         "//pmlc/dialect/tile",
-        "@llvm//:support",
+        "@llvm-project//llvm:support",
     ],
     alwayslink = 1,
 )

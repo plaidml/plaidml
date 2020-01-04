@@ -73,7 +73,7 @@ plaidml_cc_library(
     srcs = PLAIDML_CPP_SOURCES + ["config-bazel.cc"],
     hdrs = PLAIDML_CPP_HEADERS,
     data = [
-      ":configs",
+        ":configs",
     ],
     visibility = ["//visibility:public"],
     deps = PLAIDML_CPP_DEPS,
@@ -247,7 +247,7 @@ plaidml_py_library(
     name = "py",
     srcs = PYTHON_SRCS,
     data = [
-      ":configs",
+        ":configs",
     ] + select({
         "//toolchain:windows_x86_64": [":plaidml.dll"],
         "//toolchain:macos_x86_64": [":libplaidml.dylib"],
@@ -292,7 +292,7 @@ genrule(
         "@gmock//:license",
         "@jsoncpp//:license",
         "@six_archive//:license",
-        "@llvm//:license",
+        "@llvm-project//llvm:license",
     ],
     outs = [
         "boost-LICENSE",

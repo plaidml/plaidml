@@ -3,6 +3,7 @@
 #pragma once
 
 #include "mlir/IR/PatternMatch.h"
+
 #include "pmlc/dialect/stripe/ops.h"
 
 namespace pmlc::dialect::stripe {

@@ -62,7 +62,7 @@ struct LoweringBase : public OpConversionPattern<OpType> {
 struct AffineParallelForOpConversion : public LoweringBase<AffineParallelForOp> {
   explicit AffineParallelForOpConversion(MLIRContext* ctx) : LoweringBase(ctx) {}
 
-  void rewrite(AffineParallelForOp op, ArrayRef<Value*> operands, ConversionPatternRewriter& rewriter) const override {
+  void rewrite(AffineParallelForOp op, ArrayRef<Value> operands, ConversionPatternRewriter& rewriter) const override {
     // Create an Affine loop nest following the order of ranges.
     ScopedContext scope(rewriter, op.getLoc());
     llvm::SmallVector<ValueHandle, 8> affineIvs;
@@ -103,9 +103,9 @@ struct AffineParallelForOpConversion : public LoweringBase<AffineParallelForOp> 
 struct ReduceOpConversion : public LoweringBase<ReduceOp> {
   explicit ReduceOpConversion(MLIRContext* ctx) : LoweringBase(ctx) {}
 
-  void rewrite(ReduceOp op, ArrayRef<Value*> operands, ConversionPatternRewriter& rewriter) const override {
+  void rewrite(ReduceOp op, ArrayRef<Value> operands, ConversionPatternRewriter& rewriter) const override {
     auto in = rewriter.create<AffineLoadOp>(op.getLoc(), op.out(), op.map(), op.idxs());
-    Value* agg = nullptr;
+    Value agg;
     switch (op.agg()) {
       case AggregationKind::add:
         agg = rewriter.create<mlir::AddFOp>(op.getLoc(), in, op.val());

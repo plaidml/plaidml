@@ -66,7 +66,7 @@ def DimOp : TileOpWithPPV<"dim", [NoSideEffect]>, HasFolder {
   let results = (outs IndexLike:$result);
 
   let builders = [OpBuilder<
-    "Builder* builder, OperationState& result, Value* tensor, int64_t value", [{
+    "Builder* builder, OperationState& result, Value tensor, int64_t value", [{
       result.addOperands(tensor);
       result.addAttribute("dim", builder->getI64IntegerAttr(value));
       result.addTypes(builder->getIndexType());
@@ -117,7 +117,7 @@ class AffineOp<string mnemonic, list<OpTrait> traits = []> :
   let results = (outs IndexLike:$result);
 
   let builders = [OpBuilder<
-    "Builder* builder, OperationState& result, ArrayRef<Value*> operands", [{
+    "Builder* builder, OperationState& result, ArrayRef<Value> operands", [{
       result.addOperands(operands);
       result.addTypes(builder->getIndexType());
     }]
@@ -169,7 +169,7 @@ def AffineTensorMapOp : TileOpWithPPV<"tmap", [NoSideEffect]> {
   let results = (outs AffineTensorMap:$result);
 
   let builders = [OpBuilder<
-    "Builder* builder, OperationState& result, Value* tensor, ArrayRef<Value*> dims", [{
+    "Builder* builder, OperationState& result, Value tensor, ArrayRef<Value> dims", [{
       result.addOperands(tensor);
       result.addOperands(dims);
       result.addTypes(builder->getType<AffineTensorMapType>());
@@ -183,7 +183,7 @@ def AffineMapOp : TileOpWithPPV<"map", [NoSideEffect]> {
   let results = (outs AffineMap:$result);
 
   let builders = [OpBuilder<
-    "Builder* builder, OperationState& result, ArrayRef<Value*> dims", [{
+    "Builder* builder, OperationState& result, ArrayRef<Value> dims", [{
       result.addOperands(dims);
       result.addTypes(builder->getType<AffineMapType>());
     }]
@@ -237,8 +237,8 @@ def ContractionOp : TileOpWithPPV<"cion", [NoSideEffect]> {
     "Builder* builder, "
     "OperationState& result, "
     "Type resultType, "
-    "Value* init, "
-    "ArrayRef<Value*> tensors, "
+    "Value init, "
+    "ArrayRef<Value> tensors, "
     "AggregationKind agg, "
     "CombinationKind combo, "
     "AffineMap sink, "
@@ -252,8 +252,8 @@ def ContractionOp : TileOpWithPPV<"cion", [NoSideEffect]> {
     static unsigned getNumTensors(CombinationKind combo);
     unsigned getNumTensors();
     unsigned getNumSymbols();
-    Value* getTensor(unsigned i);
-    Value* getSymbol(unsigned i);
+    Value getTensor(unsigned i);
+    Value getSymbol(unsigned i);
   }];
 }
 
@@ -263,7 +263,7 @@ def IndexOp : TileOp<"index", [NoSideEffect]>, HasCanonicalizer {
   let results = (outs EltwiseIndex:$result);
 
   let extraClassDeclaration = [{
-    static Type getResultType(ArrayRef<Value*> operands);
+    static Type getResultType(ArrayRef<Value> operands);
   }];
 }
 
@@ -271,9 +271,9 @@ class SpecialOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
     Op<TileDialect, mnemonic, !listconcat(traits, [SpecialOpInterface, GenericBuilderInterface])> {
 
   let extraClassDeclaration = [{
-    static Type getResultType(ArrayRef<Value*> operands);
+    static Type getResultType(ArrayRef<Value> operands);
 
-    static Operation* create(OpBuilder* builder, Location loc, Type type, ArrayRef<Value*> operands) {
+    static Operation* create(OpBuilder* builder, Location loc, Type type, ArrayRef<Value> operands) {
       OperationState state(loc, getOperationName());
       state.addOperands(operands);
       state.addAttribute("type", TypeAttr::get(type));
@@ -303,7 +303,7 @@ def ReshapeOp : SpecialOp<"reshape">, HasCanonicalizer {
 
 def ScatterOp : SpecialOp<"scatter">, HasCanonicalizer {
   let summary = "special scatter operation";
-  let arguments = (ins RankedTensorOf<[AnyScalar]>:$tensor, VectorOf<[ScalarIndex]>:$dims, RankedTensorOf<[AnyScalar]>:$other);
+  let arguments = (ins RankedTensorOf<[AnyScalar]>:$tensor, RankedTensorOf<[ScalarIndex]>:$dims, RankedTensorOf<[AnyScalar]>:$other);
   let results = (outs RankedTensorOf<[AnyScalar]>:$result);
 }
 

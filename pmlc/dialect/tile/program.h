@@ -16,7 +16,7 @@ namespace tile {
 
 struct ProgramArgument {
   bool isInput;
-  mlir::Value* value;
+  mlir::Value value;
   mlir::RankedTensorType shape;
   vertexai::tile::BufferPtr buffer;
 };
@@ -24,7 +24,7 @@ struct ProgramArgument {
 struct TileProgram {
   std::string entry;
   mlir::OwningModuleRef module;
-  std::vector<mlir::Value*> outputs;
+  std::vector<mlir::Value> outputs;
   std::vector<ProgramArgument> arguments;
 
   explicit TileProgram(mlir::ModuleOp module) : module(module) {}
