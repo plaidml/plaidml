@@ -300,10 +300,10 @@ When can use `add_constraint` in Tile to handle such situations:
 Python [ | C++ ]({{ site.baseurl }}{% link docs/edsl.md%}#max-pool-1d)
 ```python
 def max_pool_1d(I):
-    N = TensorDim
+    N = TensorDim()
     i, j = TensorIndexes(2)
     I.bind_dims(N)
-    O = TensorOutput(N / 2)
+    O = TensorOutput(N // 2)
     O[i] >= I[2 * i + j]
     O.add_constraint(j < 2)
     return O
@@ -345,10 +345,10 @@ pool at the edge. This can be accomplished by simply adjusting the size of `O`:
 
 ```python
 def max_pool_1d(I) :
-    N = TensorDim 
+    N = TensorDim() 
     i, j = TensorIndexes(2)
     I.bind_dims(N)
-    O = TensorOutput((N + 1) / 2)
+    O = TensorOutput((N + 1) // 2)
     O[i] >= I[2 * i + j]
     O.add_constraint(j < 2)
     return O
@@ -372,7 +372,7 @@ or invalid set of index variables. For example, in the code:
 Python [ | C++ ]({{ site.baseurl }}{% link docs/edsl.md%}#valid-indices)
 ```python
 I.bind_dims(N)
-O = TensorOutput((N + 1) / 2)
+O = TensorOutput((N + 1) // 2)
 O[i] >= I[2 * i + j]
 O.add_constraint(j < 2)
 ```

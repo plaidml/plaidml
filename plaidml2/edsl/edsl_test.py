@@ -50,6 +50,14 @@ def conv_2d(I, K):
     R[n, x0, x1, co] += I[n, x0 + k0 - (K0 // 2), x1 + k1 - (K1 // 2), ci] * K[k0, k1, ci, co]
     return R
 
+def max_pool_1d(I):
+    N = TensorDim()
+    i, j = TensorIndexes(2)
+    I.bind_dims(N)
+    O = TensorOutput(N // 2)
+    O[i] >= I[2 * i + j]
+    O.add_constraint(j < 2)
+    return O
 
 def max_pool_2d(I):
     N, X0, X1, C = TensorDims(4)
@@ -59,7 +67,6 @@ def max_pool_2d(I):
     R[n, x0, x1, c] >= I[n, 2 * x0 + i, 2 * x1 + j, c]
     R.add_constraints([i < 2, j < 2])
     return R
-
 
 def flatten(X):
     X_dims = TensorDims(X.shape.ndims)
@@ -115,46 +122,63 @@ def max_over_axis(I):
     return O
 
 def matmul(A, B):
-  I, J, K =  TensorDims(3)
-  i, j, k = TensorIndexes(3)
-  A.bind_dims(I, K)
-  B.bind_dims(K, J)
-  C = TensorOutput(I, J)
-  C[i, j] += A[i, k] * B[k, j]
-  return C
+    I, J, K =  TensorDims(3)
+    i, j, k = TensorIndexes(3)
+    A.bind_dims(I, K)
+    B.bind_dims(K, J)
+    C = TensorOutput(I, J)
+    C[i, j] += A[i, k] * B[k, j]
+    return C
 
 def global_min(I):
-  i, j, k = TensorIndexes(3)
-  Neg = -I
-  O_Neg = TensorOutput()
-  O_Neg[()] >= Neg[i, j, k]
-  O = -O_Neg
-  return O
+    i, j, k = TensorIndexes(3)
+    Neg = -I
+    O_Neg = TensorOutput()
+    O_Neg[()] >= Neg[i, j, k]
+    O = -O_Neg
+    return O
 
 def avg(I):
-  X, Y = TensorDims(2)
-  x, y = TensorIndexes(2)
-  I.bind_dims(X, Y)
-  Sum = TensorOutput()
-  Sum[y] += I[x, y]
-  return Sum / X
+    X, Y = TensorDims(2)
+    x, y = TensorIndexes(2)
+    I.bind_dims(X, Y)
+    Sum = TensorOutput()
+    Sum[y] += I[x, y]
+    return Sum / X
 
 def avg_stages(I):
-  X, Y = TensorDims(2)
-  x, y = TensorIndexes(2)
-  I.bind_dims(X, Y)
-  Sum = TensorOutput()
-  Sum[()] += I[x, y]
-  PartialMean = Sum / X
-  return PartialMean / Y
+    X, Y = TensorDims(2)
+    x, y = TensorIndexes(2)
+    I.bind_dims(X, Y)
+    Sum = TensorOutput()
+    Sum[()] += I[x, y]
+    PartialMean = Sum / X
+    return PartialMean / Y
 
 def avg_merge(I):
-  X, Y = TensorDims(2)
-  x, y = TensorIndexes(2)
-  I.bind_dims(X, Y)
-  Sum = TensorOutput()
-  Sum[()] += I[x, y]
-  return Sum / (X * Y)
+    X, Y = TensorDims(2)
+    x, y = TensorIndexes(2)
+    I.bind_dims(X, Y)
+    Sum = TensorOutput()
+    Sum[()] += I[x, y]
+    return Sum / (X * Y)
+
+def skip(I) :
+    M, N = TensorDims(2)
+    i, j = TensorIndexes(2)
+    I.bind_dims(M, N)
+    O = TensorOutput(N)
+    O[2 * i] += I[2 * i, j]
+    return O
+
+def csum(I) :
+    N = TensorDim()
+    i, k = TensorIndexes(2)
+    I.bind_dims(N)
+    O = TensorOutput(N)
+    O[i] += I[k]
+    O.add_constraint(i - k < N)
+    return O
 
 class TestEdsl(unittest.TestCase):
     maxDiff = None
@@ -350,6 +374,66 @@ module {
   _X1[] = +(_X0[x0, x1]);
   _X2 = 784;
   _X3 = div(_X1, _X2);
+}
+''')
+
+    def test_max_pool_1d(self):
+      I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [10]), name='I')
+      O = max_pool_1d(I)
+      program = Program('max_pool_1d', [O])
+      if USE_MLIR():
+        self.assertMultiLineEqual(  
+                str(program), '''#map0 = (d0, d1) -> (d0)
+#map1 = (d0, d1) -> (d0 * 2 + d1)
+
+#set0 = (d0, d1) : (d1 >= 0, -d1 + 1 >= 0)
+
+!fp32 = type tensor<!eltwise.fp32>
+module {
+  func @max_pool_1d(%arg0: tensor<10x!eltwise.fp32> {tile.name = "I"}) -> tensor<5x!eltwise.fp32> {
+    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !fp32
+    %0 = tile.cion max, none, %cst, %arg0 {cons = #set0, sink = #map0, srcs = [#map1]} : !fp32, tensor<10x!eltwise.fp32> -> tensor<5x!eltwise.fp32>
+    return %0 : tensor<5x!eltwise.fp32>
+  }
+}
+''')       
+      else:
+        self.assertMultiLineEqual(
+                str(program), '''function (
+  I[I_0]
+) -> (
+  _X0
+) {
+  _X0[x0 : 5] = >(I[2*x0 + x1]), x1 < 2;
+}
+''')
+    def test_skip(self):
+      I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 784]))
+      O = skip(I)
+      program = Program('skip', [O])
+      if USE_MLIR():
+        self.assertMultiLineEqual(  
+                str(program), '''#map0 = (d0, d1) -> (d0 * 2)
+#map1 = (d0, d1) -> (d0 * 2, d1)
+
+
+!fp32 = type tensor<!eltwise.fp32>
+module {
+  func @skip(%arg0: tensor<1x784x!eltwise.fp32>) -> tensor<784x!eltwise.fp32> {
+    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !fp32
+    %0 = tile.cion add, none, %cst, %arg0 {sink = #map0, srcs = [#map1]} : !fp32, tensor<1x784x!eltwise.fp32> -> tensor<784x!eltwise.fp32>
+    return %0 : tensor<784x!eltwise.fp32>
+  }
+}
+''')       
+      else:
+        self.assertMultiLineEqual(
+                str(program), '''function (
+  _X0[_X0_0, _X0_1]
+) -> (
+  _X1
+) {
+  _X1[2*x0 : 784] = +(_X0[2*x0, x1]);
 }
 ''')
 
@@ -638,30 +722,20 @@ module {
 
     def test_cum_sum(self):
         I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [10]), name='I')
-        N = TensorDim()
-        i, k = TensorIndexes(2)
-        I.bind_dims(N)
-        O = TensorOutput(N)
-        O[i] += I[k]
-        O.add_constraint(i - k < N)
+        O = csum(I)
         program = Program('cum_sum', [O])
         if USE_MLIR():
-            self.assertMultiLineEqual(
-                str(program), '''
+          self.assertMultiLineEqual(
+                str(program), '''#map0 = (d0, d1) -> (d0)
+#map1 = (d0, d1) -> (d1)
 
+#set0 = (d0, d1) : (d0 - d1 >= 0, -d0 + d1 + 9 >= 0)
+
+!fp32 = type tensor<!eltwise.fp32>
 module {
   func @cum_sum(%arg0: tensor<10x!eltwise.fp32> {tile.name = "I"}) -> tensor<10x!eltwise.fp32> {
-    %c10 = "tile.affine_const"() {value = 10 : i64} : () -> !eltwise.i32
-    %0 = "tile.domain"() ( {
-    ^bb0(%arg1: !eltwise.i32, %arg2: !eltwise.i32):	// no predecessors
-      %1 = "tile.src_idx_map"(%arg0, %arg1) : (tensor<10x!eltwise.fp32>, !eltwise.i32) -> !tile.imap
-      %2 = "tile.sink_idx_map"(%arg2) : (!eltwise.i32) -> !tile.imap
-      %3 = "tile.size_map"(%c10) : (!eltwise.i32) -> !tile.smap
-      %4 = "tile.affine_sub"(%arg2, %arg1) : (!eltwise.i32, !eltwise.i32) -> !eltwise.i32
-      "tile.constraint"(%4, %c10) ( {
-        "tile.+(x)"(%3, %1, %2) : (!tile.smap, !tile.imap, !tile.imap) -> ()
-      }) : (!eltwise.i32, !eltwise.i32) -> ()
-    }) {idx_names = ["x0", "x1"]} : () -> tensor<10x!eltwise.fp32>
+    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !fp32
+    %0 = tile.cion add, none, %cst, %arg0 {cons = #set0, sink = #map0, srcs = [#map1]} : !fp32, tensor<10x!eltwise.fp32> -> tensor<10x!eltwise.fp32>
     return %0 : tensor<10x!eltwise.fp32>
   }
 }
