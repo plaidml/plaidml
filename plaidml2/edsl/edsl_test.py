@@ -40,7 +40,8 @@ def softmax(X):
     N[i, 0] += E[i, j]
     return E / N
 
-def conv_1d(I, K) :
+
+def conv_1d(I, K):
     N, X, KX, CI, CO = TensorDims(5)
     n, x, k, ci, co = TensorIndexes(5)
     I.bind_dims(N, X, CI)
@@ -49,7 +50,8 @@ def conv_1d(I, K) :
     O[n, x, co] += I[n, x + k, ci] * K[k, ci, co]
     return O
 
-def conv_2d_dialated(I, K) :
+
+def conv_2d_dilated(I, K):
     N, X, Y, KX, KY, CI, CO = TensorDims(7)
     n, x, y, kx, ky, ci, co = TensorIndexes(7)
     I.bind_dims(N, X, Y, CI)
@@ -57,6 +59,7 @@ def conv_2d_dialated(I, K) :
     O = TensorOutput(N, X - 2 * (KX - 1), Y - 3 * (KY - 1), CO)
     O[n, x, y, co] += I[n, x + 2 * kx, y + 3 * ky, ci] * K[kx, ky, ci, co]
     return O
+
 
 def conv_2d(I, K):
     CI, CO, K0, K1, N, X0, X1 = TensorDims(7)
@@ -67,12 +70,15 @@ def conv_2d(I, K):
     R[n, x0, x1, co] += I[n, x0 + k0 - (K0 // 2), x1 + k1 - (K1 // 2), ci] * K[k0, k1, ci, co]
     return R
 
+
 def complex_conv_2d(
-    I,
-    K,
-    s0,s1,  # stride coeffs
-    d0,d1   # dilation coeffs
-) :
+        I,
+        K,
+        s0,
+        s1,  # stride coeffs
+        d0,
+        d1  # dilation coeffs
+):
     # "same-lower" autopadding will be applied
     N, G, GCI, GCO = TensorDims(4)
     X0, X1 = TensorDims(2)
@@ -93,8 +99,8 @@ def complex_conv_2d(
     EK0 = d0 * (K0 - 1) + 1
     EK1 = d1 * (K1 - 1) + 1
 
-   #Compute the padding offset
-    P0,P1 = TensorDims(2)
+    #Compute the padding offset
+    P0, P1 = TensorDims(2)
     P0 = ((Y0 - 1) * s0 + EK0 - X0) // 2
     P1 = ((Y1 - 1) * s1 + EK1 - X1) // 2
 
@@ -102,8 +108,10 @@ def complex_conv_2d(
     O = TensorOutput(N, Y0, Y1, G, GCO)
 
     # Compute the convolution
-    O[n, x0, x1, g, gco] += I[n, s0*x1 + d0*k0 - P0, s1*x1 + d1*k1 - P1, g, gci] * K[k0, k1, g, gci, gco]
+    O[n, x0, x1, g, gco] += I[n, s0 * x1 + d0 * k0 - P0, s1 * x1 + d1 * k1 -
+                              P1, g, gci] * K[k0, k1, g, gci, gco]
     return O
+
 
 def max_pool_1d(I):
     N = TensorDim()
@@ -114,6 +122,7 @@ def max_pool_1d(I):
     O.add_constraint(j < 2)
     return O
 
+
 def max_pool_2d(I):
     N, X0, X1, C = TensorDims(4)
     n, x0, x1, i, j, c = TensorIndexes(6)
@@ -122,6 +131,7 @@ def max_pool_2d(I):
     R[n, x0, x1, c] >= I[n, 2 * x0 + i, 2 * x1 + j, c]
     R.add_constraints([i < 2, j < 2])
     return R
+
 
 def flatten(X):
     X_dims = TensorDims(X.shape.ndims)
@@ -160,13 +170,16 @@ def arg_max(I):
     O[x0, x2] >= cond(I[x0, x1, x2], Max[x0, x2], IX[x1])
     return as_uint(O, 32)
 
+
 def sum_over_axis(I):
     M, N = TensorDims(2)
     m, n = TensorIndexes(2)
     I.bind_dims(M, N)
     O = TensorOutput(N)
-    O[n] += I[m, n]; # contraction
+    O[n] += I[m, n]
+    # contraction
     return O
+
 
 def max_over_axis(I):
     M, N = TensorDims(2)
@@ -176,14 +189,16 @@ def max_over_axis(I):
     O[n] >= I[m, n]
     return O
 
+
 def matmul(A, B):
-    I, J, K =  TensorDims(3)
+    I, J, K = TensorDims(3)
     i, j, k = TensorIndexes(3)
     A.bind_dims(I, K)
     B.bind_dims(K, J)
     C = TensorOutput(I, J)
     C[i, j] += A[i, k] * B[k, j]
     return C
+
 
 def global_min(I):
     i, j, k = TensorIndexes(3)
@@ -193,6 +208,7 @@ def global_min(I):
     O = -O_Neg
     return O
 
+
 def avg(I):
     X, Y = TensorDims(2)
     x, y = TensorIndexes(2)
@@ -200,6 +216,7 @@ def avg(I):
     Sum = TensorOutput()
     Sum[y] += I[x, y]
     return Sum / X
+
 
 def avg_stages(I):
     X, Y = TensorDims(2)
@@ -210,6 +227,7 @@ def avg_stages(I):
     PartialMean = Sum / X
     return PartialMean / Y
 
+
 def avg_merge(I):
     X, Y = TensorDims(2)
     x, y = TensorIndexes(2)
@@ -218,7 +236,8 @@ def avg_merge(I):
     Sum[()] += I[x, y]
     return Sum / (X * Y)
 
-def skip(I) :
+
+def skip(I):
     M, N = TensorDims(2)
     i, j = TensorIndexes(2)
     I.bind_dims(M, N)
@@ -226,7 +245,8 @@ def skip(I) :
     O[2 * i] += I[2 * i, j]
     return O
 
-def csum(I) :
+
+def csum(I):
     N = TensorDim()
     i, k = TensorIndexes(2)
     I.bind_dims(N)
@@ -235,15 +255,16 @@ def csum(I) :
     O.add_constraint(i - k < N)
     return O
 
+
 class TestEdsl(unittest.TestCase):
     maxDiff = None
 
     def test_sum_over_axis(self):
-      I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 784]))
-      O = sum_over_axis(I)
-      program = Program('sum_over_axis', [O])
-      if USE_MLIR():
-          self.assertMultiLineEqual(
+        I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 784]))
+        O = sum_over_axis(I)
+        program = Program('sum_over_axis', [O])
+        if USE_MLIR():
+            self.assertMultiLineEqual(
                 str(program), '''#map0 = (d0, d1) -> (d0)
 #map1 = (d0, d1) -> (d1, d0)
 
@@ -256,9 +277,9 @@ module {
     return %0 : tensor<784x!eltwise.fp32>
   }
 }
-''')       
-      else:
-        self.assertMultiLineEqual(
+''')
+        else:
+            self.assertMultiLineEqual(
                 str(program), '''function (
   _X0[_X0_0, _X0_1]
 ) -> (
@@ -267,13 +288,13 @@ module {
   _X1[x1 : 784] = +(_X0[x0, x1]);
 }
 ''')
-  
+
     def test_max_over_axis(self):
-      I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 784]))
-      O = max_over_axis(I)
-      program = Program('max_over_axis', [O])
-      if USE_MLIR():
-          self.assertMultiLineEqual(
+        I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 784]))
+        O = max_over_axis(I)
+        program = Program('max_over_axis', [O])
+        if USE_MLIR():
+            self.assertMultiLineEqual(
                 str(program), '''#map0 = (d0, d1) -> (d0)
 #map1 = (d0, d1) -> (d1, d0)
 
@@ -286,9 +307,9 @@ module {
     return %0 : tensor<784x!eltwise.fp32>
   }
 }
-''')       
-      else:
-        self.assertMultiLineEqual(
+''')
+        else:
+            self.assertMultiLineEqual(
                 str(program), '''function (
   _X0[_X0_0, _X0_1]
 ) -> (
@@ -299,12 +320,12 @@ module {
 ''')
 
     def test_matmul(self):
-      A = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 784]))
-      B = Tensor(LogicalShape(plaidml.DType.FLOAT32, [784, 784]))
-      O = matmul(A,B)
-      program = Program('matmul', [O])
-      if USE_MLIR():
-          self.assertMultiLineEqual(
+        A = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 784]))
+        B = Tensor(LogicalShape(plaidml.DType.FLOAT32, [784, 784]))
+        O = matmul(A, B)
+        program = Program('matmul', [O])
+        if USE_MLIR():
+            self.assertMultiLineEqual(
                 str(program), '''#map0 = (d0, d1, d2) -> (d0, d1)
 #map1 = (d0, d1, d2) -> (d0, d2)
 #map2 = (d0, d1, d2) -> (d2, d1)
@@ -318,9 +339,9 @@ module {
     return %0 : tensor<1x784x!eltwise.fp32>
   }
 }
-''')       
-      else:
-        self.assertMultiLineEqual(
+''')
+        else:
+            self.assertMultiLineEqual(
                 str(program), '''function (
   _X0[_X0_0, _X0_1],
   _X1[_X1_0, _X1_1]
@@ -332,11 +353,11 @@ module {
 ''')
 
     def test_avg(self):
-      I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 784]))
-      O = avg(I)
-      program = Program('avg', [O])
-      if USE_MLIR():
-        self.assertMultiLineEqual(  
+        I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 784]))
+        O = avg(I)
+        program = Program('avg', [O])
+        if USE_MLIR():
+            self.assertMultiLineEqual(
                 str(program), '''#map0 = (d0, d1) -> (d0)
 #map1 = (d0, d1) -> (d1, d0)
 
@@ -349,9 +370,9 @@ module {
     return %0 : !fp32
   }
 }
-''')       
-      else:
-        self.assertMultiLineEqual(
+''')
+        else:
+            self.assertMultiLineEqual(
                 str(program), '''function (
   _X0[_X0_0, _X0_1]
 ) -> (
@@ -362,11 +383,11 @@ module {
 ''')
 
     def test_avg_stages(self):
-      I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 784]))
-      O = avg_stages(I)
-      program = Program('avg_stages', [O])
-      if USE_MLIR():
-        self.assertMultiLineEqual(  
+        I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 784]))
+        O = avg_stages(I)
+        program = Program('avg_stages', [O])
+        if USE_MLIR():
+            self.assertMultiLineEqual(
                 str(program), '''#map0 = () -> ()
 #map1 = (d0, d1) -> (d0, d1)
 
@@ -381,9 +402,9 @@ module {
     return %1 : !fp32
   }
 }
-''')       
-      else:
-        self.assertMultiLineEqual(
+''')
+        else:
+            self.assertMultiLineEqual(
                 str(program), '''function (
   _X0[_X0_0, _X0_1]
 ) -> (
@@ -396,11 +417,11 @@ module {
 ''')
 
     def test_avg_merge(self):
-      I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 784]))
-      O = avg_merge(I)
-      program = Program('avg_merge', [O])
-      if USE_MLIR():
-        self.assertMultiLineEqual(  
+        I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 784]))
+        O = avg_merge(I)
+        program = Program('avg_merge', [O])
+        if USE_MLIR():
+            self.assertMultiLineEqual(
                 str(program), '''#map0 = () -> ()
 #map1 = (d0, d1) -> (d0, d1)
 
@@ -415,9 +436,9 @@ module {
     return %1 : !fp32
   }
 }
-''')       
-      else:
-        self.assertMultiLineEqual(
+''')
+        else:
+            self.assertMultiLineEqual(
                 str(program), '''function (
   _X0[_X0_0, _X0_1]
 ) -> (
@@ -430,11 +451,11 @@ module {
 ''')
 
     def test_max_pool_1d(self):
-      I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [10]), name='I')
-      O = max_pool_1d(I)
-      program = Program('max_pool_1d', [O])
-      if USE_MLIR():
-        self.assertMultiLineEqual(  
+        I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [10]), name='I')
+        O = max_pool_1d(I)
+        program = Program('max_pool_1d', [O])
+        if USE_MLIR():
+            self.assertMultiLineEqual(
                 str(program), '''#map0 = (d0, d1) -> (d0)
 #map1 = (d0, d1) -> (d0 * 2 + d1)
 
@@ -448,9 +469,9 @@ module {
     return %0 : tensor<5x!eltwise.fp32>
   }
 }
-''')       
-      else:
-        self.assertMultiLineEqual(
+''')
+        else:
+            self.assertMultiLineEqual(
                 str(program), '''function (
   I[I_0]
 ) -> (
@@ -461,11 +482,11 @@ module {
 ''')
 
     def test_skip(self):
-      I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 784]))
-      O = skip(I)
-      program = Program('skip', [O])
-      if USE_MLIR():
-        self.assertMultiLineEqual(  
+        I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 784]))
+        O = skip(I)
+        program = Program('skip', [O])
+        if USE_MLIR():
+            self.assertMultiLineEqual(
                 str(program), '''#map0 = (d0, d1) -> (d0 * 2)
 #map1 = (d0, d1) -> (d0 * 2, d1)
 
@@ -478,9 +499,9 @@ module {
     return %0 : tensor<784x!eltwise.fp32>
   }
 }
-''')       
-      else:
-        self.assertMultiLineEqual(
+''')
+        else:
+            self.assertMultiLineEqual(
                 str(program), '''function (
   _X0[_X0_0, _X0_1]
 ) -> (
@@ -491,12 +512,12 @@ module {
 ''')
 
     def test_conv_1d(self):
-      I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 224, 3]))
-      K = Tensor(LogicalShape(plaidml.DType.FLOAT32, [3, 3, 1]))
-      O = conv_1d(I,K)
-      program = Program('conv_1d', [O])
-      if USE_MLIR():
-        self.assertMultiLineEqual(  
+        I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 224, 3]))
+        K = Tensor(LogicalShape(plaidml.DType.FLOAT32, [3, 3, 1]))
+        O = conv_1d(I, K)
+        program = Program('conv_1d', [O])
+        if USE_MLIR():
+            self.assertMultiLineEqual(
                 str(program), '''#map0 = (d0, d1, d2, d3, d4) -> (d0, d1, d2)
 #map1 = (d0, d1, d2, d3, d4) -> (d0, d1 + d3, d4)
 #map2 = (d0, d1, d2, d3, d4) -> (d3, d4, d2)
@@ -510,9 +531,9 @@ module {
     return %0 : tensor<1x222x1x!eltwise.fp32>
   }
 }
-''')       
-      else:
-        self.assertMultiLineEqual(
+''')
+        else:
+            self.assertMultiLineEqual(
                 str(program), '''function (
   _X0[_X0_0, _X0_1, _X0_2],
   _X1[_X1_0, _X1_1, _X1_2]
@@ -523,13 +544,13 @@ module {
 }
 ''')
 
-    def test_conv_2d_dialated(self):
-      I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 224, 224, 1]))
-      K = Tensor(LogicalShape(plaidml.DType.FLOAT32, [3, 3, 1, 32]))
-      O = conv_2d_dialated(I,K)
-      program = Program('conv_2d_dialated', [O])
-      if USE_MLIR():
-        self.assertMultiLineEqual(  
+    def test_conv_2d_dilated(self):
+        I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 224, 224, 1]))
+        K = Tensor(LogicalShape(plaidml.DType.FLOAT32, [3, 3, 1, 32]))
+        O = conv_2d_dilated(I, K)
+        program = Program('conv_2d_dilated', [O])
+        if USE_MLIR():
+            self.assertMultiLineEqual(
                 str(program), '''#map0 = (d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)
 #map1 = (d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4 * 2, d2 + d5 * 3, d6)
 #map2 = (d0, d1, d2, d3, d4, d5, d6) -> (d4, d5, d6, d3)
@@ -537,15 +558,15 @@ module {
 
 !fp32 = type tensor<!eltwise.fp32>
 module {
-  func @conv_2d_dialated(%arg0: tensor<3x3x1x32x!eltwise.fp32>, %arg1: tensor<1x224x224x1x!eltwise.fp32>) -> tensor<1x220x218x32x!eltwise.fp32> {
+  func @conv_2d_dilated(%arg0: tensor<3x3x1x32x!eltwise.fp32>, %arg1: tensor<1x224x224x1x!eltwise.fp32>) -> tensor<1x220x218x32x!eltwise.fp32> {
     %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !fp32
     %0 = tile.cion add, mul, %cst, %arg1, %arg0 {sink = #map0, srcs = [#map1, #map2]} : !fp32, tensor<1x224x224x1x!eltwise.fp32>, tensor<3x3x1x32x!eltwise.fp32> -> tensor<1x220x218x32x!eltwise.fp32>
     return %0 : tensor<1x220x218x32x!eltwise.fp32>
   }
 }
-''')       
-      else:
-        self.assertMultiLineEqual(
+''')
+        else:
+            self.assertMultiLineEqual(
                 str(program), '''function (
   _X0[_X0_0, _X0_1, _X0_2, _X0_3],
   _X1[_X1_0, _X1_1, _X1_2, _X1_3]
@@ -557,13 +578,13 @@ module {
 ''')
 
     def test_complex_conv_2d(self):
-      I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 1, 1, 1, 1]))
-      K = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 1, 1, 1, 1]))
-      O = complex_conv_2d(I,K,1,2,1,2)
-      program = Program('complex_conv_2d', [O])
-      if USE_MLIR():
-        self.assertMultiLineEqual(  
-                str(program), '''#map0 = (d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4)
+        I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 1, 1, 1, 1]))
+        K = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 1, 1, 1, 1]))
+        O = complex_conv_2d(I, K, 1, 2, 1, 2)
+        program = Program('complex_conv_2d', [O])
+        if USE_MLIR():
+            self.assertMultiLineEqual(str(program), ('''
+                #map0 = (d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4)
 #map1 = (d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d2 + d5, d2 * 2 + d6 * 2, d3, d7)
 #map2 = (d0, d1, d2, d3, d4, d5, d6, d7) -> (d5, d6, d3, d7, d4)
 
@@ -576,9 +597,9 @@ module {
     return %0 : tensor<1x1x1x1x1x!eltwise.fp32>
   }
 }
-''')       
-      else:
-        self.assertMultiLineEqual(
+''').lstrip())
+        else:
+            self.assertMultiLineEqual(
                 str(program), '''function (
   _X0[_X0_0, _X0_1, _X0_2, _X0_3, _X0_4],
   _X1[_X1_0, _X1_1, _X1_2, _X1_3, _X1_4]
@@ -829,7 +850,7 @@ module {
         O = csum(I)
         program = Program('cum_sum', [O])
         if USE_MLIR():
-          self.assertMultiLineEqual(
+            self.assertMultiLineEqual(
                 str(program), '''#map0 = (d0, d1) -> (d0)
 #map1 = (d0, d1) -> (d1)
 
@@ -1023,7 +1044,7 @@ module {
         O.use_default(P)
         program = Program('use_default', [O])
         if USE_MLIR():
-          self.assertMultiLineEqual(
+            self.assertMultiLineEqual(
                 str(program), '''#map0 = (d0, d1, d2) -> (d0, 3, d1, d2)
 #map1 = (d0, d1, d2) -> (d0, d1, d2)
 
