@@ -517,8 +517,6 @@ struct LoweringPass : public mlir::ModulePass<LoweringPass> {
       OpBuilder builder(&block);
       builder.create<ReturnOp>(op.getLoc());
     });
-
-    getModule().dump();
   }
 };
 

@@ -181,10 +181,11 @@ Executable::Executable(StringRef entry, StringRef target, ModuleOp programModule
   auto copy = cast<ModuleOp>(programModule.getOperation()->clone());
   OwningModuleRef module(copy);
   PassManager manager(module->getContext());
+
   auto shouldPrintBeforePass = [](auto, auto) { return false; };
   auto shouldPrintAfterPass = [](auto, auto) { return VLOG_IS_ON(3); };
-
   manager.enableIRPrinting(shouldPrintBeforePass, shouldPrintAfterPass, true, false, llvm::errs());
+
   manager.addNestedPass<FuncOp>(createCanonicalizerPass());
   manager.addNestedPass<FuncOp>(createCSEPass());
 

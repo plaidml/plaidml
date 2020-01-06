@@ -192,7 +192,7 @@ def plaidml_workspace():
             "//vendor/llvm:llvm.BUILD": "llvm/BUILD.bazel",
             "//vendor/mlir:mlir.BUILD": "mlir/BUILD.bazel",
         },
-        patch_file = "//vendor/mlir:mlir.patch",
+        patches = ["//vendor/mlir:mlir.patch"],
         override = "PLAIDML_LLVM_REPO",
     )
 

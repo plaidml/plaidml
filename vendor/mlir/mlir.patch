@@ -12,3 +12,6 @@ index 5f4cc2e1060..916e8881210 100644
 +  // return isa<FuncOp>(parentOp) || isa<AffineForOp>(parentOp);
 +  return true;
  }
+
+ /// Returns true if the 'index' dimension of the `memref` defined by
+ 
