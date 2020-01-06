@@ -3,7 +3,8 @@
 from livereload import Server, shell
 
 doxygen = shell('doxygen', cwd='docs')
-sphinx = shell('make html', cwd='docs')
+
+sphinx = shell('sphinx-build -M html . _build', cwd='docs')
 
 
 def rebuild():

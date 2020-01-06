@@ -27,6 +27,12 @@ pkg_tar(
 )
 
 filegroup(
+    name = "docs",
+    srcs = ["edsl.h"],
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
     name = "sdk",
     srcs = SDK_HDRS,
     visibility = ["//visibility:public"],
