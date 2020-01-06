@@ -8,10 +8,8 @@
 #include <tuple>
 #include <vector>
 
-#include "tile/math/polynomial.h"
-
-#include "pmlc/dialect/stripe/ops.h"
 #include "pmlc/dialect/tile/ops.h"
+#include "tile/math/polynomial.h"
 
 namespace pmlc::dialect::tile {
 
@@ -22,11 +20,12 @@ using IndexAccess = std::vector<IndexPoly>;
 using SimpleConstraints = std::vector<math::SimpleConstraint>;
 using RangeConstraints = std::vector<math::RangeConstraint>;
 using BoundsAndConstraints = std::tuple<math::IndexBounds, SimpleConstraints>;
+using Shape = llvm::ArrayRef<int64_t>;
 
 struct Constraints {
   RangeConstraints constraints;
 
-  void AddTensor(const IndexAccess& access, stripe::TensorType tensorType);
+  void AddTensor(const IndexAccess& access, Shape shape);
 
   // Searches for any parallel constraints and merges them
   void MergeParallelConstraints();
@@ -42,7 +41,7 @@ struct Constraints {
 struct Contraction {
   explicit Contraction(ContractionOp op);
 
-  BoundsAndConstraints ComputeBounds(llvm::ArrayRef<stripe::TensorType> shapes, bool no_reduce);
+  BoundsAndConstraints ComputeBounds(llvm::ArrayRef<Shape> shapes, bool no_reduce);
   void DeduceRangeConstraints();
 
   std::vector<IndexAccess> accesses;
@@ -54,7 +53,7 @@ struct Contraction {
   std::set<std::string> getIndexVars() const;
 
   // Gathers boths explicit and implied constraints, and removes dups.
-  void GatherConstraints(llvm::ArrayRef<stripe::TensorType> shapes);
+  void GatherConstraints(llvm::ArrayRef<Shape> shapes);
 
   // Adds constraints to the contraction forcing every variable used to be an integer
   void ConstrainIndexVarsToInts();

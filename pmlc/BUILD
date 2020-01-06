@@ -15,15 +15,18 @@ plaidml_cc_binary(
     deps = [
         "//pmlc/conversion/affine_to_stripe",
         "//pmlc/conversion/stripe_to_affine",
+        "//pmlc/conversion/tile_to_pxa",
         "//pmlc/dialect/eltwise",
         "//pmlc/dialect/pxa",
         "//pmlc/dialect/stripe",
         "//pmlc/dialect/stripe:passes",
         "//pmlc/dialect/tile",
-        "@mlir//:EDSC",
-        "@mlir//:MlirOptLib",
-        "@mlir//:Parser",
-        "@mlir//:Transforms",
+        "@llvm-project//mlir:AffineDialectRegistration",
+        "@llvm-project//mlir:EDSC",
+        "@llvm-project//mlir:MlirOptLib",
+        "@llvm-project//mlir:Parser",
+        "@llvm-project//mlir:StandardDialectRegistration",
+        "@llvm-project//mlir:Transforms",
     ],
 )
 
@@ -35,11 +38,11 @@ plaidml_cc_binary(
     deps = [
         "//pmlc/dialect/stripe:transcode",
         "//pmlc/dialect/tile",
-        "@llvm//:support",
-        "@mlir//:IR",
-        "@mlir//:Support",
-        "@mlir//:TranslateClParser",
-        "@mlir//:Translation",
+        "@llvm-project//llvm:support",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:TranslateClParser",
+        "@llvm-project//mlir:Translation",
     ],
 )
 
@@ -54,7 +57,7 @@ plaidml_cc_test(
     srcs = ["test.cc"],
     copts = COPTS,
     deps = [
-        "@mlir//:IR",
-        "@mlir//:Transforms",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Transforms",
     ],
 )

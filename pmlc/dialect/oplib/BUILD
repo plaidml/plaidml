@@ -14,7 +14,7 @@ plaidml_cc_library(
         "model.h",
     ],
     deps = [
-        "@mlir//:TableGen",
+        "@llvm-project//mlir:TableGen",
     ],
 )
 
@@ -28,9 +28,9 @@ plaidml_cc_binary(
         "//base/util",
         "//pmlc/dialect/oplib/cpp",
         "//pmlc/dialect/oplib/python",
-        "@mlir//:MlirTableGenMain",
-        "@mlir//:Support",
-        "@mlir//:TableGen",
+        "@llvm-project//mlir:MlirTableGenMain",
+        "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:TableGen",
     ],
 )
 

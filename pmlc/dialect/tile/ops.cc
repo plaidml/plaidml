@@ -126,7 +126,7 @@ OpFoldResult DimOp::fold(ArrayRef<Attribute> operands) {
 template <typename T, typename R = void>
 class AffineVisitor {
  public:
-  R visit(Value* value) {
+  R visit(Value value) {
     static_assert(std::is_base_of<AffineVisitor, T>::value, "Must instantiate with a derived type of AffineVisitor");
     auto defOp = value->getDefiningOp();
     if (auto op = llvm::dyn_cast<AffineIndexOp>(defOp)) {
@@ -172,14 +172,14 @@ class AffineVisitor {
   void visitDimOp(DimOp op) {}
 
  private:
-  void visitOperands(Value* lhs, Value* rhs) {
+  void visitOperands(Value lhs, Value rhs) {
     visit(lhs);
     visit(rhs);
   }
 };
 
 struct AffineIndexCollector : public AffineVisitor<AffineIndexCollector> {
-  SetVector<Value*> idxs;
+  SetVector<Value> idxs;
   void visitIndexOp(AffineIndexOp op) { idxs.insert(op.result()); }
 };
 
@@ -247,7 +247,7 @@ struct ContractionBuilder : public AffineVisitor<ContractionBuilder, AffineExpr>
       addSourceMap(mapOp);
     }
 
-    SmallVector<Value*, 8> pairs(consOp.pairs());
+    SmallVector<Value, 8> pairs(consOp.pairs());
     for (auto it = pairs.begin(); it != pairs.end(); it++) {
       auto lhs = *it++;
       auto rhs = *it;
@@ -276,18 +276,18 @@ struct ContractionBuilder : public AffineVisitor<ContractionBuilder, AffineExpr>
     return IntegerSet::get(collector.idxs.size(), 0, cons, flags);
   }
 
-  ArrayRef<Value*> getIndexes() {  //
+  ArrayRef<Value> getIndexes() {  //
     return collector.idxs.getArrayRef();
   }
 
-  ArrayRef<Value*> getTensors() {  //
+  ArrayRef<Value> getTensors() {  //
     return llvm::makeArrayRef(tensors);
   }
 
  private:
   MLIRContext* context;
   AffineIndexCollector collector;
-  std::vector<Value*> tensors;
+  std::vector<Value> tensors;
   std::vector<AffineExpr> sink;
   std::vector<std::vector<AffineExpr>> srcs;
   std::vector<AffineExpr> cons;
@@ -312,7 +312,7 @@ struct ContractionBuilder : public AffineVisitor<ContractionBuilder, AffineExpr>
     return AffineMap::get(context);
   }
 
-  AffineExpr makeConstraint(Value* lhs, Value* rhs) {
+  AffineExpr makeConstraint(Value lhs, Value rhs) {
     // Constraints are in the form `lhs < rhs`
     // IntegerSets are in the form `x >= 0`
     // lhs < rhs
@@ -323,7 +323,7 @@ struct ContractionBuilder : public AffineVisitor<ContractionBuilder, AffineExpr>
     return mlir::simplifyAffineExpr(expr, collector.idxs.size(), 0);
   }
 
-  AffineExpr makeExpr(Value* value) {  //
+  AffineExpr makeExpr(Value value) {  //
     return visit(value);
   }
 
@@ -378,7 +378,7 @@ struct SymbolicContractionCanonicalizer : OpRewritePattern<SymbolicContractionOp
 
   PatternMatchResult matchAndRewrite(SymbolicContractionOp op, PatternRewriter& rewriter) const override {
     auto sizeMapOp = llvm::cast<AffineMapOp>(op.size()->getDefiningOp());
-    SmallVector<Value*, 4> sizeDims(sizeMapOp.dims());
+    SmallVector<Value, 4> sizeDims(sizeMapOp.dims());
     auto shape = eltwise::ComputeShape(sizeDims);
     auto sourceType = op.result()->getType().cast<RankedTensorType>();
     auto resultType = RankedTensorType::get(shape, sourceType.getElementType());
@@ -453,8 +453,8 @@ void ContractionOp::build(     //
     Builder* builder,          //
     OperationState& result,    //
     Type resultType,           //
-    Value* init,               //
-    ArrayRef<Value*> tensors,  //
+    Value init,                //
+    ArrayRef<Value> tensors,   //
     AggregationKind agg,       //
     CombinationKind combo,     //
     AffineMap sink,            //
@@ -490,7 +490,7 @@ struct GatherCanonicalizer : public OpRewritePattern<GatherOp> {
   PatternMatchResult matchAndRewrite(GatherOp gatherOp, PatternRewriter& rewriter) const override {
     IVLOG(5, "IndexCanonicalizer::matchAndRewrite> " << mlir::debugString(gatherOp));
     auto op = gatherOp.getOperation();
-    SmallVector<Value*, 2> operands(op->getOperands());
+    SmallVector<Value, 2> operands(op->getOperands());
     auto resultType = GatherOp::getResultType(operands);
     if (resultType == gatherOp.result()->getType()) {
       return Pattern::matchFailure();
@@ -506,7 +506,7 @@ void GatherOp::getCanonicalizationPatterns(OwningRewritePatternList& results, ML
   results.insert<GatherCanonicalizer>(context);
 }
 
-Type GatherOp::getResultType(ArrayRef<Value*> operands) {
+Type GatherOp::getResultType(ArrayRef<Value> operands) {
   IVLOG(5, "GatherOp::getResultType>")
   if (operands.size() != 2) {
     throw std::runtime_error("GatherOp requires 2 operands");
@@ -547,7 +547,7 @@ struct IndexCanonicalizer : public OpRewritePattern<IndexOp> {
   PatternMatchResult matchAndRewrite(IndexOp indexOp, PatternRewriter& rewriter) const override {
     IVLOG(5, "IndexCanonicalizer::matchAndRewrite> " << mlir::debugString(indexOp));
     auto op = indexOp.getOperation();
-    SmallVector<Value*, 2> operands(op->getOperands());
+    SmallVector<Value, 2> operands(op->getOperands());
     auto resultType = IndexOp::getResultType(operands);
     if (resultType == indexOp.result()->getType()) {
       return Pattern::matchFailure();
@@ -564,10 +564,10 @@ void IndexOp::getCanonicalizationPatterns(OwningRewritePatternList& results, MLI
   results.insert<IndexCanonicalizer>(context);
 }
 
-Type IndexOp::getResultType(ArrayRef<Value*> operands) {
+Type IndexOp::getResultType(ArrayRef<Value> operands) {
   IVLOG(5, "IndexOp::getResultType>")
   for (auto operand : operands) {
-    IVLOG(6, "  operand: " << mlir::debugString(*operand));
+    IVLOG(6, "  operand: " << mlir::debugString(operand));
   }
   if (operands.size() != 1) {
     throw std::runtime_error("IndexOp requires 1 operand");
@@ -591,13 +591,13 @@ struct PrngCanonicalizer : public OpRewritePattern<PrngOp> {
   PatternMatchResult matchAndRewrite(PrngOp prngOp, PatternRewriter& rewriter) const override {
     IVLOG(5, "PrngCanonicalizer::matchAndRewrite> " << mlir::debugString(prngOp));
     auto op = prngOp.getOperation();
-    SmallVector<Value*, 5> operands(op->getOperands());
+    SmallVector<Value, 5> operands(op->getOperands());
     auto resultType = PrngOp::getResultType(operands);
     if (resultType == prngOp.result()->getType()) {
       return Pattern::matchFailure();
     }
     auto stateType = prngOp.new_state()->getType();
-    SmallVector<Value*, 4> dims(prngOp.dims());
+    SmallVector<Value, 4> dims(prngOp.dims());
     auto newOp = rewriter.create<PrngOp>(op->getLoc(), resultType, stateType, prngOp.state(), dims);
     rewriter.replaceOp(op, {newOp.result(), newOp.new_state()});
     util::UpdateFuncOpType(newOp.getOperation());
@@ -609,7 +609,7 @@ void PrngOp::getCanonicalizationPatterns(OwningRewritePatternList& results, MLIR
   results.insert<PrngCanonicalizer>(context);
 }
 
-Type PrngOp::getResultType(ArrayRef<Value*> operands) {
+Type PrngOp::getResultType(ArrayRef<Value> operands) {
   IVLOG(5, "PrngOp::getResultType>")
   if (operands.size() < 1) {
     throw std::runtime_error("PrngOp requires at least one operand");
@@ -631,12 +631,12 @@ struct ReshapeCanonicalizer : public OpRewritePattern<ReshapeOp> {
   PatternMatchResult matchAndRewrite(ReshapeOp reshapeOp, PatternRewriter& rewriter) const override {
     IVLOG(5, "ReshapeCanonicalizer::matchAndRewrite> " << mlir::debugString(reshapeOp));
     auto op = reshapeOp.getOperation();
-    SmallVector<Value*, 5> operands(op->getOperands());
+    SmallVector<Value, 5> operands(op->getOperands());
     auto resultType = ReshapeOp::getResultType(operands);
     if (resultType == reshapeOp.result()->getType()) {
       return Pattern::matchFailure();
     }
-    SmallVector<Value*, 4> dims(reshapeOp.dims());
+    SmallVector<Value, 4> dims(reshapeOp.dims());
     auto newOp = rewriter.create<ReshapeOp>(op->getLoc(), resultType, reshapeOp.tensor(), dims);
     rewriter.replaceOp(op, {newOp});
     util::UpdateFuncOpType(newOp.getOperation());
@@ -648,7 +648,7 @@ void ReshapeOp::getCanonicalizationPatterns(OwningRewritePatternList& results, M
   results.insert<ReshapeCanonicalizer>(context);
 }
 
-Type ReshapeOp::getResultType(ArrayRef<Value*> operands) {
+Type ReshapeOp::getResultType(ArrayRef<Value> operands) {
   IVLOG(5, "ReshapeOp::getResultType>")
   if (operands.size() < 2) {
     throw std::runtime_error("ReshapeOp requires at least 2 operands");
@@ -671,7 +671,7 @@ struct ScatterCanonicalizer : public OpRewritePattern<ScatterOp> {
   PatternMatchResult matchAndRewrite(ScatterOp scatterOp, PatternRewriter& rewriter) const override {
     IVLOG(5, "IndexCanonicalizer::matchAndRewrite> " << mlir::debugString(scatterOp));
     auto op = scatterOp.getOperation();
-    SmallVector<Value*, 3> operands(op->getOperands());
+    SmallVector<Value, 3> operands(op->getOperands());
     auto resultType = ScatterOp::getResultType(operands);
     if (resultType == scatterOp.result()->getType()) {
       return Pattern::matchFailure();
@@ -688,7 +688,7 @@ void ScatterOp::getCanonicalizationPatterns(OwningRewritePatternList& results, M
   results.insert<ScatterCanonicalizer>(context);
 }
 
-Type ScatterOp::getResultType(ArrayRef<Value*> operands) {
+Type ScatterOp::getResultType(ArrayRef<Value> operands) {
   IVLOG(5, "ScatterOp::getResultType>")
   if (operands.size() != 3) {
     throw std::runtime_error("ScatterOp requires 3 operands");
@@ -728,7 +728,7 @@ struct ShapeCanonicalizer : public OpRewritePattern<ShapeOp> {
   PatternMatchResult matchAndRewrite(ShapeOp shapeOp, PatternRewriter& rewriter) const override {
     IVLOG(5, "ShapeCanonicalizer::matchAndRewrite> " << mlir::debugString(shapeOp));
     auto op = shapeOp.getOperation();
-    SmallVector<Value*, 1> operands(op->getOperands());
+    SmallVector<Value, 1> operands(op->getOperands());
     auto resultType = ShapeOp::getResultType(operands);
     if (resultType == shapeOp.result()->getType()) {
       return Pattern::matchFailure();
@@ -744,7 +744,7 @@ void ShapeOp::getCanonicalizationPatterns(OwningRewritePatternList& results, MLI
   results.insert<ShapeCanonicalizer>(context);
 }
 
-Type ShapeOp::getResultType(ArrayRef<Value*> operands) {
+Type ShapeOp::getResultType(ArrayRef<Value> operands) {
   IVLOG(5, "ShapeOp::getResultType>")
   if (operands.size() != 1) {
     throw std::runtime_error("ShapeOp requires 1 operand");
@@ -766,7 +766,8 @@ IntegerAttr DimOp::resolve() {  //
   if (mlir::ShapedType::isDynamic(size)) {
     return {};
   }
-  return IntegerAttr::get(mlir::IntegerType::get(64, getContext()), size);
+  auto indexType = mlir::IndexType::get(getContext());
+  return IntegerAttr::get(indexType, size);
 }
 
 void printDimOp(OpAsmPrinter* printer, DimOp op) {  //
@@ -780,11 +781,11 @@ ParseResult parseDimOp(OpAsmParser* parser, OperationState& result) {
   OpAsmParser::OperandType tensor;
   IntegerAttr dim;
   Type type;
-  if (parser->parseOperand(tensor) ||                           //
-      parser->parseLSquare() ||                                 //
-      parser->parseAttribute(dim, "dim", result.attributes) ||  //
-      parser->parseRSquare() ||                                 //
-      parser->parseColonType(type) ||                           //
+  if (parser->parseOperand(tensor) ||                                      //
+      parser->parseLSquare() ||                                            //
+      parser->parseAttribute(dim, indexType, "dim", result.attributes) ||  //
+      parser->parseRSquare() ||                                            //
+      parser->parseColonType(type) ||                                      //
       parser->resolveOperand(tensor, type, result.operands)) {
     return failure();
   }
@@ -803,11 +804,11 @@ void printAffineConstantOp(OpAsmPrinter* printer, AffineConstantOp op) {  //
 }
 
 ParseResult parseAffineConstantOp(OpAsmParser* parser, OperationState& result) {
+  auto indexType = parser->getBuilder().getIndexType();
   IntegerAttr value;
-  if (parser->parseAttribute(value, "value", result.attributes)) {
+  if (parser->parseAttribute(value, indexType, "value", result.attributes)) {
     return failure();
   }
-  auto indexType = parser->getBuilder().getIndexType();
   result.addTypes(indexType);
   return success();
 }
@@ -1007,11 +1008,11 @@ unsigned ContractionOp::getNumSymbols() {  //
   return getNumOperands() - 1 - getNumTensors();
 }
 
-Value* ContractionOp::getTensor(unsigned i) {  //
+Value ContractionOp::getTensor(unsigned i) {  //
   return *std::next(operands().begin(), i);
 }
 
-Value* ContractionOp::getSymbol(unsigned i) {  //
+Value ContractionOp::getSymbol(unsigned i) {  //
   return *std::next(operands().begin(), getNumTensors() + i);
 }
 
@@ -1126,7 +1127,7 @@ bool isEltwiseAny(Type type) {
 LogicalResult verifyContractionOp(ContractionOp op) {
   auto numTensors = op.getNumTensors();
   auto numSymbols = op.getNumSymbols();
-  SmallVector<Value*, 8> variadic(op.operands());
+  SmallVector<Value, 8> variadic(op.operands());
   if (variadic.size() < numTensors) {
     return op.emitOpError("combo '") << util::stringifyCombinationKind(op.combo()) << "' requires " << numTensors
                                      << " tensor operands";

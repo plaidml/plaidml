@@ -28,7 +28,7 @@ gentbl(
         ),
     ],
     td_file = "interfaces.td",
-    td_srcs = ["@mlir//:OpBaseTdFiles"],
+    td_srcs = ["@llvm-project//mlir:OpBaseTdFiles"],
 )
 
 gentbl(
@@ -44,7 +44,7 @@ gentbl(
         ),
     ],
     td_file = "enums.td",
-    td_srcs = ["@mlir//:OpBaseTdFiles"],
+    td_srcs = ["@llvm-project//mlir:OpBaseTdFiles"],
 )
 
 plaidml_cc_library(
@@ -57,7 +57,7 @@ plaidml_cc_library(
         ":interfaces-gen",
         "//base/util",
         "//tile/base",
-        "@llvm//:support",
-        "@mlir//:IR",
+        "@llvm-project//llvm:support",
+        "@llvm-project//mlir:IR",
     ],
 )

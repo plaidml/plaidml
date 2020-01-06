@@ -5,7 +5,7 @@ def _impl(ctx):
         inputs = ctx.files.srcs,
         outputs = [out],
         executable = ctx.file.sphinx,
-        arguments = [srcdir, out.path, "--plantuml", ctx.file._plantuml.path],
+        arguments = [srcdir, out.path],
         use_default_shell_env = True,
         mnemonic = "SphinxBuild",
     )
@@ -27,10 +27,6 @@ sphinx = rule(
             allow_single_file = True,
             executable = True,
             cfg = "host",
-        ),
-        "_plantuml": attr.label(
-            default = Label("@plantuml_jar//file"),
-            allow_single_file = True,
         ),
     },
     implementation = _impl,

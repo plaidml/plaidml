@@ -28,6 +28,15 @@ def AffineConstraints : Type<CPred<"$_self.isa<AffineConstraintsType>()">, "affi
 def AffineTensorMap : Type<CPred<"$_self.isa<AffineTensorMapType>()">, "affine-tensor-map">;
 def StrType : Type<CPred<"$_self.isa<StringType>()">, "string">;
 
+def IndexAttr : Attr<
+      And<[CPred<"$_self.isa<IntegerAttr>()">,
+           CPred<"$_self.cast<IntegerAttr>().getType().isIndex()">]>,
+      "index attribute"> {
+  let constBuilderCall = "$_builder.getIntegerAttr($_builder.getIndexType(), $0)";
+  let storageType = "IntegerAttr";
+  let returnType = [{ APInt }];
+}
+
 class TileOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
     Op<TileDialect, mnemonic, traits> {}
 
@@ -62,14 +71,15 @@ def StringOp : TileOp<"str"> {
 
 def DimOp : TileOpWithPPV<"dim", [NoSideEffect]>, HasFolder {
   let summary = "dimension index operation";
-  let arguments = (ins RankedTensorOf<[AnyScalar]>:$tensor, APIntAttr:$dim);
+  let arguments = (ins RankedTensorOf<[AnyScalar]>:$tensor, IndexAttr:$dim);
   let results = (outs IndexLike:$result);
 
   let builders = [OpBuilder<
-    "Builder* builder, OperationState& result, Value* tensor, int64_t value", [{
+    "Builder* builder, OperationState& result, Value tensor, int64_t value", [{
+      auto indexType = builder->getIndexType();
       result.addOperands(tensor);
-      result.addAttribute("dim", builder->getI64IntegerAttr(value));
-      result.addTypes(builder->getIndexType());
+      result.addAttribute("dim", builder->getIntegerAttr(indexType, value));
+      result.addTypes(indexType);
     }]
   >];
 
@@ -80,13 +90,14 @@ def DimOp : TileOpWithPPV<"dim", [NoSideEffect]>, HasFolder {
 
 def AffineConstantOp : TileOpWithPPV<"affine_const", [NoSideEffect]>, HasFolder {
   let summary = "affine constant";
-  let arguments = (ins I64Attr:$value);
+  let arguments = (ins IndexAttr:$value);
   let results = (outs IndexLike:$result);
 
   let builders = [OpBuilder<
     "Builder* builder, OperationState& result, int64_t value", [{
-      result.addAttribute("value", builder->getI64IntegerAttr(value));
-      result.addTypes(builder->getIndexType());
+      auto indexType = builder->getIndexType();
+      result.addAttribute("value", builder->getIntegerAttr(indexType, value));
+      result.addTypes(indexType);
     }]
   >];
 
@@ -117,7 +128,7 @@ class AffineOp<string mnemonic, list<OpTrait> traits = []> :
   let results = (outs IndexLike:$result);
 
   let builders = [OpBuilder<
-    "Builder* builder, OperationState& result, ArrayRef<Value*> operands", [{
+    "Builder* builder, OperationState& result, ArrayRef<Value> operands", [{
       result.addOperands(operands);
       result.addTypes(builder->getIndexType());
     }]
@@ -169,7 +180,7 @@ def AffineTensorMapOp : TileOpWithPPV<"tmap", [NoSideEffect]> {
   let results = (outs AffineTensorMap:$result);
 
   let builders = [OpBuilder<
-    "Builder* builder, OperationState& result, Value* tensor, ArrayRef<Value*> dims", [{
+    "Builder* builder, OperationState& result, Value tensor, ArrayRef<Value> dims", [{
       result.addOperands(tensor);
       result.addOperands(dims);
       result.addTypes(builder->getType<AffineTensorMapType>());
@@ -183,7 +194,7 @@ def AffineMapOp : TileOpWithPPV<"map", [NoSideEffect]> {
   let results = (outs AffineMap:$result);
 
   let builders = [OpBuilder<
-    "Builder* builder, OperationState& result, ArrayRef<Value*> dims", [{
+    "Builder* builder, OperationState& result, ArrayRef<Value> dims", [{
       result.addOperands(dims);
       result.addTypes(builder->getType<AffineMapType>());
     }]
@@ -237,8 +248,8 @@ def ContractionOp : TileOpWithPPV<"cion", [NoSideEffect]> {
     "Builder* builder, "
     "OperationState& result, "
     "Type resultType, "
-    "Value* init, "
-    "ArrayRef<Value*> tensors, "
+    "Value init, "
+    "ArrayRef<Value> tensors, "
     "AggregationKind agg, "
     "CombinationKind combo, "
     "AffineMap sink, "
@@ -252,8 +263,8 @@ def ContractionOp : TileOpWithPPV<"cion", [NoSideEffect]> {
     static unsigned getNumTensors(CombinationKind combo);
     unsigned getNumTensors();
     unsigned getNumSymbols();
-    Value* getTensor(unsigned i);
-    Value* getSymbol(unsigned i);
+    Value getTensor(unsigned i);
+    Value getSymbol(unsigned i);
   }];
 }
 
@@ -263,7 +274,7 @@ def IndexOp : TileOp<"index", [NoSideEffect]>, HasCanonicalizer {
   let results = (outs EltwiseIndex:$result);
 
   let extraClassDeclaration = [{
-    static Type getResultType(ArrayRef<Value*> operands);
+    static Type getResultType(ArrayRef<Value> operands);
   }];
 }
 
@@ -271,9 +282,9 @@ class SpecialOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
     Op<TileDialect, mnemonic, !listconcat(traits, [SpecialOpInterface, GenericBuilderInterface])> {
 
   let extraClassDeclaration = [{
-    static Type getResultType(ArrayRef<Value*> operands);
+    static Type getResultType(ArrayRef<Value> operands);
 
-    static Operation* create(OpBuilder* builder, Location loc, Type type, ArrayRef<Value*> operands) {
+    static Operation* create(OpBuilder* builder, Location loc, Type type, ArrayRef<Value> operands) {
       OperationState state(loc, getOperationName());
       state.addOperands(operands);
       state.addAttribute("type", TypeAttr::get(type));

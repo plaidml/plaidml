@@ -15,11 +15,11 @@ namespace dialect {
 namespace stripe {
 
 // Compute for a given tensor the range of each of it's dimensions
-std::vector<AffineRange> ComputeUnboundedRanges(Value* val) {
+std::vector<AffineRange> ComputeUnboundedRanges(Value val) {
   // Initialize ranges to 'no-use' case
   std::vector<AffineRange> r;
   // Go over all uses
-  for (const auto& use : val->getUses()) {
+  for (const auto& use : val.getUses()) {
     std::vector<AffineRange> inner;
     if (auto ref = mlir::dyn_cast<RefineOp>(use.getOwner())) {
       // If it's a refinement, recurse

@@ -5,6 +5,14 @@ package(default_visibility = ["//visibility:public"])
 load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_test")
 load("//vendor/mlir:tblgen.bzl", "COPTS", "gentbl")
 
+filegroup(
+    name = "td_files",
+    srcs = [
+        "//pmlc/dialect/eltwise:td_files",
+        "@llvm-project//mlir:OpBaseTdFiles",
+    ],
+)
+
 gentbl(
     name = "gen-ops",
     tbl_outs = [
@@ -18,15 +26,12 @@ gentbl(
         ),
     ],
     td_file = "ops.td",
-    td_srcs = [
-        "//pmlc/dialect/eltwise:td_files",
-    ],
+    td_srcs = [":td_files"],
 )
 
 plaidml_cc_library(
     name = "pxa",
     srcs = [
-        "from_tile.cc",
         "ops.cc",
         "to_affine.cc",
     ],
@@ -43,11 +48,13 @@ plaidml_cc_library(
         "//pmlc/dialect/tile",
         "//tile/base",
         "@boost",
-        "@llvm//:support",
-        "@mlir//:IR",
-        "@mlir//:Parser",
-        "@mlir//:StandardOps",
-        "@mlir//:Transforms",
+        "@llvm-project//llvm:support",
+        "@llvm-project//mlir:AffineDialectRegistration",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Parser",
+        "@llvm-project//mlir:StandardDialectRegistration",
+        "@llvm-project//mlir:StandardOps",
+        "@llvm-project//mlir:Transforms",
     ],
     alwayslink = 1,
 )

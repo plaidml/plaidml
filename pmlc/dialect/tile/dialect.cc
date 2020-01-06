@@ -97,7 +97,9 @@ Operation* Dialect::materializeConstant(  //
     Location loc) {
   IVLOG(5, "tile::Dialect::materializeConstant");
   if (auto attr = value.dyn_cast<IntegerAttr>()) {
-    return builder.create<AffineConstantOp>(loc, type, attr);
+    auto indexType = builder.getIndexType();
+    auto indexAttr = builder.getIntegerAttr(indexType, attr.getInt());
+    return builder.create<AffineConstantOp>(loc, indexType, indexAttr);
   }
   return nullptr;
 }

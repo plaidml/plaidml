@@ -77,11 +77,11 @@ std::vector<ProgramArgument> BindProgramArguments(  //
     plaidml_binding** inputs,                       //
     size_t noutputs,                                //
     plaidml_binding** outputs) {
-  std::unordered_map<Value*, BufferPtr> input_bindings;
+  llvm::DenseMap<Value, BufferPtr> input_bindings;
   for (unsigned i = 0; i < ninputs; i++) {
     input_bindings[inputs[i]->expr->value] = inputs[i]->buffer->buffer;
   }
-  std::unordered_map<Value*, BufferPtr> output_bindings;
+  llvm::DenseMap<Value, BufferPtr> output_bindings;
   for (unsigned i = 0; i < noutputs; i++) {
     output_bindings[outputs[i]->expr->value] = outputs[i]->buffer->buffer;
   }
