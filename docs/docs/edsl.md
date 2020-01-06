@@ -34,7 +34,6 @@ to change.
 We're ready to look at some C++ Tile code! Here's an operation that takes the
 sum over axis `0` of a 2D tensor (in Keras this would be `K.sum(I, axis=0)`):
 
-C++ [  | Python ]({{ site.baseurl }}{% link docs/edsl_python.md%}#sum-over-axis)
 ```c++
 Tensor sum_over_axis(const Tensor& I) {
   TensorDim M, N;
@@ -45,6 +44,7 @@ Tensor sum_over_axis(const Tensor& I) {
   return O;
 }
 ```
+
 An operation such as this which merges together values across one or more
 indices is called a _contraction_. The syntax may look a bit odd at first, but
 it's related to summation notation. Below we show how this C++ Tile code is
@@ -95,7 +95,6 @@ Taking the maximum over axis `0` looks very similar to taking the sum over axis
 `>=`. Thus, the Tile code for max over axis `0` is just a single character
 change from sum over axis `0`. Let's look at it as a Tile function:
 
-C++ [  | Python ]({{ site.baseurl }}{% link docs/edsl_python.md%}#max-over-axis)
 ```c++
 Tensor max_over_axis(const Tensor& I) {
   TensorDim M, N;
@@ -145,7 +144,6 @@ To have correct dimensions, we need `I` to be the first dimension of `A` and `J`
 the last dimension of `B`. Here's how this looks as part of a full Tile
 function:
 
-C++ [  | Python ]({{ site.baseurl }}{% link docs/edsl_python.md%}#matrix-multiply)
 ```c++
 Tensor matmul(const Tensor& A, const Tensor& B) {
   TensorDim I, J, K;
@@ -174,7 +172,6 @@ element of a tensor. Elementwise operations generally cannot be performed on the
 same line as contractions, so we write the global min function (for a 3D tensor)
 as follows:
 
-C++ [  | Python ]({{ site.baseurl }}{% link docs/edsl_python.md%}#global-min)
 ```c++
 Tensor global_min(const Tensor& I) {
   TensorIndex i, j, k;
@@ -212,7 +209,6 @@ that we can divide by a constant (including an input `TensorDim`) as an
 elementwise operation. Thus, to take the mean over axis `0` of a 2D tensor, we
 write:
 
-C++ [  | Python ]({{ site.baseurl }}{% link docs/edsl_python.md%}#average)
 ```c++
 Tensor avg(const Tensor& I) {
   TensorDim X, Y;
@@ -228,7 +224,6 @@ We can perform multiple elementwise operations on the same line, including
 operations on constants and input dimensions. So, while it would be possible to
 take a global mean of a 2D tensor in stages as so:
 
-C++ [  | Python ]({{ site.baseurl }}{% link docs/edsl_python.md%}#average)
 ```c++
 Tensor avg(const Tensor& I) {
   TensorDim X, Y;
@@ -243,7 +238,6 @@ Tensor avg(const Tensor& I) {
 
 it is more straightforward to merge the elementwise operations:
 
-C++ [  | Python ]({{ site.baseurl }}{% link docs/edsl_python.md%}#average)
 ```c++
 Tensor avg(const Tensor& I) {
   TensorDim X, Y;
@@ -262,7 +256,6 @@ that splits a tensor into groups of 2 and takes the larger element from each
 group, yielding a tensor of half the original size. This is straightforward to
 implement in straight C++:
 
-C++ [  | Python ]({{ site.baseurl }}{% link docs/edsl_python.md%}#max-pool-1d)
 ```c++
 float I[N], O[N / 2];
 for (int i = 0; i < N/2; ++i) {
@@ -279,7 +272,6 @@ for (int i = 0; i < N/2; ++i) {
 `for` loops over tensor indices get translated into contractions when written in
 Tile. The most direct (and, sadly, wrong) implementation in Tile is:
 
-C++ [  | Python ]({{ site.baseurl }}{% link docs/edsl_python.md%}#max-pool-1d)
 ```c++
 Tensor wrong_max_pool_1d(const Tensor& I) {
   TensorDim N;
@@ -305,7 +297,6 @@ looking at the shapes of the tensors, and the only restriction that imposes on
 
 When can use `add_constraint` in Tile to handle such situations:
 
-C++ [  | Python ]({{ site.baseurl }}{% link docs/edsl_python.md%}#max-pool-1d)
 ```c++
 Tensor max_pool_1d(const Tensor& I) {
   TensorDim N;
@@ -352,7 +343,6 @@ This Tile code handles odd values of `N` by rounding down the output tensor
 size. You may instead want to round up the output tensor size and use a smaller
 pool at the edge. This can be accomplished by simply adjusting the size of `O`:
 
-C++ [  | Python ]({{ site.baseurl }}{% link docs/edsl_python.md%}#max-pool-1d)
 ```c++
 Tensor max_pool_1d(const Tensor& I) {
   TensorDim N;
@@ -380,7 +370,6 @@ First, index validity is determined for a full set of index variables: `j = 1`
 is not valid or invalid as a standalone index value, but may be part of a valid
 or invalid set of index variables. For example, in the code:
 
-C++ [  | Python ]({{ site.baseurl }}{% link docs/edsl_python.md%}#valid-indices)
 ```c++
 I.bind_dims(N);
 auto O = TensorOutput((N + 1) / 2);
@@ -411,7 +400,6 @@ A set of indices are _valid_ if and only if:
 The rule that all index variables must be integers allows us to "skip" certain
 otherwise valid entries. For example, consider the Tile function:
 
-C++ [  | Python ]({{ site.baseurl }}{% link docs/edsl_python.md%}#skipping)
 ```c++
 Tensor skip(const Tensor& I) {
   TensorDim M, N;
@@ -446,7 +434,6 @@ in all constraints, we just need to choose an upper bound large enough to never
 be hit. From the dimensions of the tensors, we already know `i < N` and `0 <= k`,
 and so `N` is an appropriate upper bound. The resulting Tile code is:
 
-C++ [  | Python ]({{ site.baseurl }}{% link docs/edsl_python.md%}#cumulative-sum)
 ```c++
 Tensor csum(const Tensor& I) {
   TensorDim N;
@@ -518,7 +505,6 @@ the kernel size relative to the spatial dimension of the input:
 \color{lightblue}\verb|K(k, ci, co)|\color{default}\verb|;|
 \\]
 
-C++ [  | Python ]({{ site.baseurl }}{% link docs/edsl_python.md%}#convolution)
 ```c++
 Tensor conv_1d(const Tensor& I, const Tensor& K) {
   TensorDim N, X, KX, CI, CO;
@@ -561,7 +547,6 @@ dimension must be reduced by `3 * (KY - 1)`, where `KX` and `KY` are the x and y
 dimensions of the kernel respectively. The rest of the Tile code corresponds
 directly to the formula, and so we get:
 
-C++ [  | Python ]({{ site.baseurl }}{% link docs/edsl_python.md%}#dilated-2d-convolution)
 ```c++
 Tensor conv_2d(const Tensor& I, const Tensor& K) {
   TensorDim N, X, Y, KX, KY, CI, CO;
@@ -592,7 +577,6 @@ O&[n, x_0, x_1, g, c_{o, g}] \cr
 where _`s`_ gives the stride coefficients, _`d`_ gives the dilation
 coefficients, and _`P`_ gives the padding offsets.
 
-C++ [  | Python ]({{ site.baseurl }}{% link docs/edsl_python.md%}#complex-convolution)
 ```c++
 Tensor complex_conv_2d(
     const Tensor& I,
