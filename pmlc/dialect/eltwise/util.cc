@@ -34,6 +34,7 @@ using mlir::Operation;
 using mlir::RankedTensorType;
 using mlir::Type;
 using mlir::Value;
+using mlir::ValueRange;
 
 namespace {
 
@@ -123,7 +124,7 @@ RankedTensorType getRankedTensorType(Type type) {
   throw std::runtime_error(llvm::formatv("Unsupported elementType for tensor: {0}", debugString(type)).str());
 }
 
-Type ComputeResultType(ArrayRef<Value> operands, DataType override) {
+Type ComputeResultType(ValueRange operands, DataType override) {
   if (VLOG_IS_ON(6)) {
     std::vector<std::string> types;
     for (auto operand : operands) {
@@ -132,7 +133,7 @@ Type ComputeResultType(ArrayRef<Value> operands, DataType override) {
     }
     IVLOG(6, "ComputeResultType> " << types);
   }
-  Type ret = operands.front()->getType();
+  Type ret = (*operands.begin())->getType();
   for (auto operand : operands.drop_front()) {
     auto type = operand->getType();
     if (!MergeTypes(&ret, type, override)) {

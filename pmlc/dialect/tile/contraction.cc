@@ -3,6 +3,7 @@
 #include "pmlc/dialect/tile/contraction.h"
 
 #include <limits>
+#include <list>
 
 #include "llvm/Support/FormatVariadic.h"
 
@@ -27,13 +28,12 @@ using vertexai::tile::math::SimpleConstraint;
 
 namespace pmlc::dialect::tile {
 
-void Constraints::AddTensor(const IndexAccess& access, stripe::TensorType tensorType) {
-  auto shape = tensorType.getShape();
+void Constraints::AddTensor(const IndexAccess& access, Shape shape) {
   if (access.size() != shape.size()) {
     throw std::runtime_error(llvm::formatv("Indexes != dimensions: {0} != {1}", access.size(), shape.size()).str());
   }
   for (size_t i = 0; i < access.size(); i++) {
-    constraints.emplace_back(access[i], shape[i].size);
+    constraints.emplace_back(access[i], shape[i]);
   }
 }
 
@@ -212,7 +212,7 @@ Contraction::Contraction(ContractionOp op) {
   }
 }
 
-void Contraction::GatherConstraints(llvm::ArrayRef<stripe::TensorType> shapes) {
+void Contraction::GatherConstraints(llvm::ArrayRef<Shape> shapes) {
   // Sanity check the shapes
   if (shapes.size() != accesses.size()) {
     throw std::runtime_error(
@@ -600,7 +600,7 @@ void Contraction::DeduceRangeConstraints() {
   }
 }
 
-BoundsAndConstraints Contraction::ComputeBounds(llvm::ArrayRef<stripe::TensorType> shapes, bool no_reduce) {
+BoundsAndConstraints Contraction::ComputeBounds(llvm::ArrayRef<Shape> shapes, bool no_reduce) {
   // Because we construct `range_constraints` from `constraints` and then ignore the information in `constraints` in
   // favor of `range_constraints`, this section is a bit brittle. Check assumptions about whether `constraints` or
   // `range_constraints` are used when working with this code.

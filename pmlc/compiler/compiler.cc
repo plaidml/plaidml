@@ -18,11 +18,11 @@
 
 #include "base/util/logging.h"
 #include "pmlc/compiler/registry.h"
+#include "pmlc/conversion/tile_to_pxa/pass.h"
 #include "pmlc/dialect/pxa/passes.h"
 
 using namespace mlir;  // NOLINT[build/namespaces]
-using pmlc::dialect::pxa::createLowerToAffinePass;
-using pmlc::dialect::pxa::createLowerToPXAPass;
+using pmlc::conversion::tile_to_pxa::createLowerTileToPXAPass;
 
 namespace pmlc::compiler {
 
@@ -188,7 +188,7 @@ Executable::Executable(StringRef entry, StringRef target, ModuleOp programModule
   manager.addNestedPass<FuncOp>(createCanonicalizerPass());
   manager.addNestedPass<FuncOp>(createCSEPass());
 
-  manager.addPass(createLowerToPXAPass());
+  manager.addPass(createLowerTileToPXAPass());
   manager.addNestedPass<FuncOp>(createCanonicalizerPass());
   manager.addNestedPass<FuncOp>(createCSEPass());
 

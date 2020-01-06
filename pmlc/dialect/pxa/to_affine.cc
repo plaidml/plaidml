@@ -100,10 +100,10 @@ struct AffineParallelForOpConversion : public LoweringBase<AffineParallelForOp> 
   }
 };
 
-struct ReduceOpConversion : public LoweringBase<ReduceOp> {
-  explicit ReduceOpConversion(MLIRContext* ctx) : LoweringBase(ctx) {}
+struct AffineReduceOpConversion : public LoweringBase<AffineReduceOp> {
+  explicit AffineReduceOpConversion(MLIRContext* ctx) : LoweringBase(ctx) {}
 
-  void rewrite(ReduceOp op, ArrayRef<Value> operands, ConversionPatternRewriter& rewriter) const override {
+  void rewrite(AffineReduceOp op, ArrayRef<Value> operands, ConversionPatternRewriter& rewriter) const override {
     auto in = rewriter.create<AffineLoadOp>(op.getLoc(), op.out(), op.map(), op.idxs());
     Value agg;
     switch (op.agg()) {
@@ -132,7 +132,7 @@ void LoweringPass::runOnModule() {
   // Setup rewrite patterns
   mlir::OwningRewritePatternList patterns;
   patterns.insert<AffineParallelForOpConversion>(&getContext());
-  patterns.insert<ReduceOpConversion>(&getContext());
+  patterns.insert<AffineReduceOpConversion>(&getContext());
 
   // Run the conversion
   if (failed(applyPartialConversion(getModule(), target, patterns, nullptr))) {
@@ -144,7 +144,7 @@ void LoweringPass::runOnModule() {
 
 }  // namespace
 
-std::unique_ptr<mlir::Pass> createLowerToAffinePass() {  //
+std::unique_ptr<mlir::Pass> createLowerPXAToAffinePass() {  //
   return std::make_unique<LoweringPass>();
 }
 

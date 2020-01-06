@@ -26,6 +26,7 @@ namespace eltwise {
 
 using mlir::FloatAttr;
 using mlir::IntegerAttr;
+using mlir::Location;
 using mlir::OpRewritePattern;
 using mlir::Pattern;
 using mlir::PatternMatchResult;
@@ -65,11 +66,11 @@ void CastOp::getCanonicalizationPatterns(OwningRewritePatternList& results, MLIR
   results.insert<CastCanonicalizer>(context);
 }
 
-Type CastOp::getResultType(ArrayRef<Value> operands) {  //
+Type CastOp::getResultType(ValueRange operands) {  //
   llvm_unreachable("CastOp::getResultType not implemented");
 }
 
-Operation* CastOp::create(OpBuilder* builder, Location loc, Type type, ArrayRef<Value> operands) {
+Operation* CastOp::create(OpBuilder* builder, Location loc, Type type, ValueRange operands) {
   OperationState state(loc, getOperationName());
   state.addOperands(operands);
   state.addTypes(type);
@@ -187,7 +188,7 @@ OpFoldResult MulOp::fold(ArrayRef<Attribute> operands) {
   return constFoldBinaryOp(operands, [](double a, double b) { return a * b; });
 }
 
-Type SelectOp::getResultType(ArrayRef<Value> operands) {
+Type SelectOp::getResultType(ValueRange operands) {
   auto inferShapeType = getRankedTensorType(ComputeResultType(operands));
   auto inferElementType = getRankedTensorType(ComputeResultType(operands.drop_front()));
   return RankedTensorType::get(inferShapeType.getShape(), inferElementType.getElementType());
@@ -202,65 +203,6 @@ OpFoldResult SubOp::fold(ArrayRef<Attribute> operands) {
 }
 
 #include "pmlc/dialect/eltwise/interfaces.cc.inc"
-
-#define FI_TO_STD(orig, stdf, stdi)                                                                               \
-  Value orig::buildStandard(OpBuilder& builder, mlir::Location loc, ScalarType stype, ArrayRef<Value> operands) { \
-    if (is_float(stype.type())) {                                                                                 \
-      return builder.create<mlir::stdf>(loc, operands[0], operands[1]);                                           \
-    } else {                                                                                                      \
-      return builder.create<mlir::stdi>(loc, operands[0], operands[1]);                                           \
-    }                                                                                                             \
-  }
-
-FI_TO_STD(AddOp, AddFOp, AddIOp);
-FI_TO_STD(SubOp, SubFOp, SubIOp);
-FI_TO_STD(MulOp, MulFOp, MulIOp);
-
-#define FUS_TO_STD(orig, stdf, stdu, stds)                                                                        \
-  Value orig::buildStandard(OpBuilder& builder, mlir::Location loc, ScalarType stype, ArrayRef<Value> operands) { \
-    if (is_float(stype.type())) {                                                                                 \
-      return builder.create<mlir::stdf>(loc, operands[0], operands[1]);                                           \
-    } else if (is_uint(stype.type())) {                                                                           \
-      return builder.create<mlir::stdu>(loc, operands[0], operands[1]);                                           \
-    } else {                                                                                                      \
-      return builder.create<mlir::stds>(loc, operands[0], operands[1]);                                           \
-    }                                                                                                             \
-  }
-
-FUS_TO_STD(DivOp, DivFOp, SignedDivIOp, UnsignedDivIOp);
-FUS_TO_STD(ModOp, RemFOp, SignedRemIOp, UnsignedRemIOp);
-
-Value MinOp::buildStandard(OpBuilder& builder, mlir::Location loc, ScalarType stype, ArrayRef<Value> operands) {
-  return nullptr;
-}
-
-Value MaxOp::buildStandard(OpBuilder& builder, mlir::Location loc, ScalarType stype, ArrayRef<Value> operands) {
-  return nullptr;
-}
-
-Value AndOp::buildStandard(OpBuilder& builder, mlir::Location loc, ScalarType stype, ArrayRef<Value> operands) {
-  return nullptr;
-}
-
-Value OrOp::buildStandard(OpBuilder& builder, mlir::Location loc, ScalarType stype, ArrayRef<Value> operands) {
-  return nullptr;
-}
-
-Value XorOp::buildStandard(OpBuilder& builder, mlir::Location loc, ScalarType stype, ArrayRef<Value> operands) {
-  return nullptr;
-}
-
-Value ShlOp::buildStandard(OpBuilder& builder, mlir::Location loc, ScalarType stype, ArrayRef<Value> operands) {
-  return nullptr;
-}
-
-Value ShrOp::buildStandard(OpBuilder& builder, mlir::Location loc, ScalarType stype, ArrayRef<Value> operands) {
-  return nullptr;
-}
-
-Value PowOp::buildStandard(OpBuilder& builder, mlir::Location loc, ScalarType stype, ArrayRef<Value> operands) {
-  return nullptr;
-}
 
 #define GET_OP_CLASSES
 #include "pmlc/dialect/eltwise/ops.cc.inc"

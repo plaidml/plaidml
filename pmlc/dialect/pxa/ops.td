@@ -3,44 +3,61 @@
 #ifndef __PML_PXA_OPS__
 #define __PML_PXA_OPS__
 
+#ifndef AFFINE_OPS_BASE
 include "mlir/Dialect/AffineOps/AffineOpsBase.td"
+#endif
+
+#ifndef MLIR_LOOPLIKEINTERFACE
 include "mlir/Transforms/LoopLikeInterface.td"
+#endif
 
 #ifndef __PML_UTIL_ENUMS__
 include "pmlc/util/enums.td"
 #endif
 
-def PxaDialect : Dialect {
+def PXA_Dialect : Dialect {
   let name = "pxa";
   let cppNamespace = "pmlc::dialect::pxa";
 }
 
-class PxaOp<string mnemonic, list<OpTrait> traits = []> :
-    Op<PxaDialect, mnemonic, traits>;
+class PXA_Op<string mnemonic, list<OpTrait> traits = []> :
+    Op<PXA_Dialect, mnemonic, traits>;
 
-def AnyScalar : AnyTypeOf<[AnyFloat, AnyInteger]> {}
+class PXA_OpWithPP<string mnemonic, list<OpTrait> traits = []> :
+    PXA_Op<mnemonic, traits> {
+  let printer = [{ print$cppClass(&p, *this); }];
+  let parser = [{ return parse$cppClass(&parser, result); }];
+}
 
-def ReduceOp : PxaOp<"reduce"> {
+def AnyStdScalar : AnyTypeOf<[AnyFloat, AnyInteger]> {}
+
+def AffineReduceOp : PXA_Op<"reduce"> {
   let summary = "Reduce into memory";
-  let arguments = (ins AggregationKind:$agg, AnyScalar:$val, AnyMemRef:$out, AffineMapAttr:$map, Variadic<Index>:$idxs);
+  let arguments = (ins
+    AggregationKind:$agg,
+    AnyStdScalar:$val,
+    AnyMemRef:$out,
+    AffineMapAttr:$map,
+    Variadic<Index>:$idxs
+  );
   let results = (outs);
 }
 
 def ImplicitAffineTerminator
     : SingleBlockImplicitTerminator<"AffineTerminatorOp">;
 
-def AffineParallelForOp : PxaOp<"parallel_for",
+def AffineParallelForOp : PXA_Op<"parallel_for",
     [ImplicitAffineTerminator,
      DeclareOpInterfaceMethods<LoopLikeOpInterface>]> {
   let summary = "multi-index parallel for operation";
-  let arguments = (ins I64ArrayAttr:$ranges, Variadic<Index>:$runtime_ranges);
+  let arguments = (ins I64ArrayAttr:$ranges, Variadic<Index>:$dynamic_ranges);
   let regions = (region SizedRegion<1>:$inner);
 }
 
-def CastOp : PxaOp<"cast"> {
+def PXA_CastOp : PXA_Op<"cast"> {
   let summary = "cast operation";
-  let arguments = (ins AnyScalar:$input, BoolAttr:$in_signed, BoolAttr:$out_signed);
-  let results = (outs AnyScalar:$result);
+  let arguments = (ins AnyStdScalar:$input, BoolAttr:$in_signed, BoolAttr:$out_signed);
+  let results = (outs AnyStdScalar:$result);
 }
 
 #endif // __PML_PXA_OPS__

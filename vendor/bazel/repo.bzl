@@ -51,31 +51,14 @@ def _apply_patch(ctx, patch_file):
     cmd = _wrap_bash_cmd(ctx, patch_command)
     _execute_and_check_ret_code(ctx, cmd)
 
-def _apply_delete(ctx, paths):
-    for path in paths:
-        if path.startswith("/"):
-            fail("refusing to rm -rf path starting with '/': " + path)
-        if ".." in path:
-            fail("refusing to rm -rf path containing '..': " + path)
-    cmd = _wrap_bash_cmd(ctx, ["rm", "-rf"] + [ctx.path(path) for path in paths])
-    _execute_and_check_ret_code(ctx, cmd)
-
 def _http_archive_impl(ctx):
-    # Use "BUILD.bazel" to avoid conflict with third party projects that contain a
-    # file or directory called "BUILD"
-    buildfile_path = ctx.path("BUILD.bazel")
-    env_key = "BAZEL_" + ctx.name.upper() + "_PATH"
-    if env_key in ctx.os.environ:
-        repo_path = ctx.os.environ[env_key]
-        script_path = ctx.path(Label(":redirect.py"))
-        result = ctx.execute([
-            ctx.which("python"),
-            script_path,
-            repo_path,
-            ctx.path("."),
-        ], quiet = False)
-        if not result.return_code == 0:
-            fail("http_archive failure: %s\n" % result.stderr)
+    override = ctx.attr.override
+    if override != None and override in ctx.os.environ:
+        repo_path = ctx.os.environ[override]
+        print("using override: {}={}".format(override, repo_path))
+        ctx.symlink(repo_path, ctx.path("."))
+        for src, tgt in ctx.attr.link_files.items():
+            ctx.delete(ctx.path(tgt))
     else:
         ctx.download_and_extract(
             ctx.attr.url,
@@ -85,10 +68,14 @@ def _http_archive_impl(ctx):
             ctx.attr.strip_prefix,
         )
         if ctx.attr.delete:
-            _apply_delete(ctx, ctx.attr.delete)
+            for path in ctx.attr.delete:
+                ctx.delete(ctx.path(path))
         if ctx.attr.patch_file != None:
             _apply_patch(ctx, ctx.attr.patch_file)
     if ctx.attr.build_file != None:
+        # Use "BUILD.bazel" to avoid conflict with third party projects that contain a
+        # file or directory called "BUILD"
+        buildfile_path = ctx.path("BUILD.bazel")
         ctx.symlink(ctx.attr.build_file, buildfile_path)
     for src, tgt in ctx.attr.link_files.items():
         ctx.symlink(Label(src), ctx.path(tgt))
@@ -108,5 +95,6 @@ http_archive = repository_rule(
         "build_file": attr.label(),
         "patch_file": attr.label(),
         "link_files": attr.string_dict(),
+        "override": attr.string(),
     },
 )
