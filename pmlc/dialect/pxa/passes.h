@@ -10,7 +10,6 @@ class Pass;
 
 namespace pmlc::dialect::pxa {
 
-std::unique_ptr<mlir::Pass> createLowerToPXAPass();
-std::unique_ptr<mlir::Pass> createLowerToAffinePass();
+std::unique_ptr<mlir::Pass> createLowerPXAToAffinePass();
 
 }  // namespace pmlc::dialect::pxa

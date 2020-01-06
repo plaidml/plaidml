@@ -768,7 +768,7 @@ TEST(Op, Mean) {
 !fp32 = type tensor<!eltwise.fp32>
 module {
   func @mean(%arg0: tensor<10x20x!eltwise.fp32> {tile.name = "A"}) -> !fp32 {
-    %c200 = "eltwise.sconst"() {value = 200 : i64} : () -> !i32
+    %c200 = "eltwise.sconst"() {value = 200 : index} : () -> !i32
     %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !fp32
     %0 = tile.cion add, none, %cst, %arg0 {sink = #map0, srcs = [#map1]} : !fp32, tensor<10x20x!eltwise.fp32> -> !fp32
     %1 = "eltwise.div"(%0, %c200) {type = !eltwise.fp32} : (!fp32, !i32) -> !fp32
@@ -1517,7 +1517,7 @@ TEST(Op, Variance) {
 !fp32 = type tensor<!eltwise.fp32>
 module {
   func @variance(%arg0: tensor<10x20x!eltwise.fp32> {tile.name = "A"}) -> !fp32 {
-    %c200 = "eltwise.sconst"() {value = 200 : i64} : () -> !i32
+    %c200 = "eltwise.sconst"() {value = 200 : index} : () -> !i32
     %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !fp32
     %0 = tile.cion add, none, %cst, %arg0 {sink = #map0, srcs = [#map1]} : !fp32, tensor<10x20x!eltwise.fp32> -> tensor<1x1x!eltwise.fp32>
     %1 = "eltwise.div"(%0, %c200) {type = !eltwise.fp32} : (tensor<1x1x!eltwise.fp32>, !i32) -> tensor<1x1x!eltwise.fp32>

@@ -10,14 +10,14 @@
 #include "pmlc/dialect/pxa/passes.h"
 
 using namespace mlir;  // NOLINT[build/namespaces]
-using pmlc::dialect::pxa::createLowerToAffinePass;
+using pmlc::dialect::pxa::createLowerPXAToAffinePass;
 
 namespace pmlc::target::x86 {
 
 static compiler::TargetRegistration pipeline("llvm_cpu", [](OpPassManager* pm) {
   // TODO: do optimizations here
 
-  pm->addPass(createLowerToAffinePass());
+  pm->addPass(createLowerPXAToAffinePass());
   pm->addNestedPass<FuncOp>(createCanonicalizerPass());
   pm->addNestedPass<FuncOp>(createCSEPass());
 

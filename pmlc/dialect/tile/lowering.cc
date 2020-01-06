@@ -56,6 +56,11 @@ using mlir::Value;
 
 namespace pmlc::dialect::tile {
 
+static Shape getShape(Type type) {
+  auto rankedTensorType = eltwise::getRankedTensorType(type);
+  return rankedTensorType.getShape();
+}
+
 static stripe::TensorType convertIntoTensorType(Type type) {
   IVLOG(3, "convertIntoTensorType> " << mlir::debugString(type));
   auto rankedTensorType = eltwise::getRankedTensorType(type);
@@ -245,14 +250,20 @@ struct ContractionOpConversion : public LoweringBase {
     auto resultType = cionOp.result()->getType();
     auto resultTensorType = convertIntoTensorType(resultType);
     IVLOG(3, "resultTensorType: " << mlir::debugString(resultTensorType));
-    llvm::SmallVector<stripe::TensorType, 4> shapes{resultTensorType};
+    llvm::SmallVector<Shape, 4> shapes{getShape(resultType)};
+    llvm::SmallVector<std::vector<int64_t>, 4> tmpShapes;
     for (auto src : cionOp.operands()) {
       auto srcType = src->getType();
       if (srcType.isa<stripe::TensorRefType>()) {
         auto access = stripe::ComputeAccess(src);
-        shapes.emplace_back(access.base_type);
+        std::vector<int64_t> tmpShape;
+        for (auto dim : access.base_type.getShape()) {
+          tmpShape.push_back(dim.size);
+        }
+        tmpShapes.push_back(tmpShape);
+        shapes.emplace_back(tmpShapes.back());
       } else {
-        shapes.emplace_back(convertIntoTensorType(srcType));
+        shapes.emplace_back(getShape(srcType));
       }
     }
 

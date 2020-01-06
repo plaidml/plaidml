@@ -766,7 +766,8 @@ IntegerAttr DimOp::resolve() {  //
   if (mlir::ShapedType::isDynamic(size)) {
     return {};
   }
-  return IntegerAttr::get(mlir::IntegerType::get(64, getContext()), size);
+  auto indexType = mlir::IndexType::get(getContext());
+  return IntegerAttr::get(indexType, size);
 }
 
 void printDimOp(OpAsmPrinter* printer, DimOp op) {  //
@@ -780,11 +781,11 @@ ParseResult parseDimOp(OpAsmParser* parser, OperationState& result) {
   OpAsmParser::OperandType tensor;
   IntegerAttr dim;
   Type type;
-  if (parser->parseOperand(tensor) ||                           //
-      parser->parseLSquare() ||                                 //
-      parser->parseAttribute(dim, "dim", result.attributes) ||  //
-      parser->parseRSquare() ||                                 //
-      parser->parseColonType(type) ||                           //
+  if (parser->parseOperand(tensor) ||                                      //
+      parser->parseLSquare() ||                                            //
+      parser->parseAttribute(dim, indexType, "dim", result.attributes) ||  //
+      parser->parseRSquare() ||                                            //
+      parser->parseColonType(type) ||                                      //
       parser->resolveOperand(tensor, type, result.operands)) {
     return failure();
   }
@@ -803,11 +804,11 @@ void printAffineConstantOp(OpAsmPrinter* printer, AffineConstantOp op) {  //
 }
 
 ParseResult parseAffineConstantOp(OpAsmParser* parser, OperationState& result) {
+  auto indexType = parser->getBuilder().getIndexType();
   IntegerAttr value;
-  if (parser->parseAttribute(value, "value", result.attributes)) {
+  if (parser->parseAttribute(value, indexType, "value", result.attributes)) {
     return failure();
   }
-  auto indexType = parser->getBuilder().getIndexType();
   result.addTypes(indexType);
   return success();
 }
