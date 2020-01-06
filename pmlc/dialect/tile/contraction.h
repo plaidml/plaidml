@@ -8,10 +8,8 @@
 #include <tuple>
 #include <vector>
 
-#include "tile/math/polynomial.h"
-
-// #include "pmlc/dialect/stripe/ops.h"
 #include "pmlc/dialect/tile/ops.h"
+#include "tile/math/polynomial.h"
 
 namespace pmlc::dialect::tile {
 
