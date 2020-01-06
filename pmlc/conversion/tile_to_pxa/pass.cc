@@ -228,40 +228,47 @@ struct EltwiseUnsigned {
   bool match(Type type) const { return is_uint(getScalarType(type).type()); }
 };
 
+struct FirstOperand {
+  Value create(ConversionPatternRewriter& rewriter, Location loc, Type resultType, ArrayRef<Value> operands) {
+    return operands.front();
+  }
+};
+
 template <typename OpType>
 struct StdOp {
-  OpType create(ConversionPatternRewriter& rewriter, Location loc, Type resultType, ArrayRef<Value> operands) {
+  Value create(ConversionPatternRewriter& rewriter, Location loc, Type resultType, ArrayRef<Value> operands) {
     // TODO: add cast op for each operand wherever appropriate
     auto attrs = ArrayRef<NamedAttribute>{};
     auto resultTypes = llvm::makeArrayRef(resultType);
-    return rewriter.create<OpType>(loc, resultTypes, operands, attrs);
+    auto op = rewriter.create<OpType>(loc, resultTypes, operands, attrs);
+    return op.getOperation()->getResult(0);
   }
 };
 
 template <CmpFPredicate predicate>
 struct CmpFloatOp {
-  mlir::CmpFOp create(ConversionPatternRewriter& rewriter, Location loc, Type resultType, ArrayRef<Value> operands) {
+  Value create(ConversionPatternRewriter& rewriter, Location loc, Type resultType, ArrayRef<Value> operands) {
     // TODO: add cast op for each operand wherever appropriate
-    return rewriter.create<mlir::CmpFOp>(loc, predicate, operands[0], operands[1]);
+    return rewriter.create<mlir::CmpFOp>(loc, predicate, operands[0], operands[1]).getResult();
   }
 };
 
 template <CmpIPredicate predicate>
 struct CmpIntOp {
-  mlir::CmpIOp create(ConversionPatternRewriter& rewriter, Location loc, Type resultType, ArrayRef<Value> operands) {
+  Value create(ConversionPatternRewriter& rewriter, Location loc, Type resultType, ArrayRef<Value> operands) {
     // TODO: add cast op for each operand wherever appropriate
-    return rewriter.create<mlir::CmpIOp>(loc, predicate, operands[0], operands[1]);
+    return rewriter.create<mlir::CmpIOp>(loc, predicate, operands[0], operands[1]).getResult();
   }
 };
 
 template <typename CmpOpBuilder>
 struct CondOp {
-  mlir::SelectOp create(ConversionPatternRewriter& rewriter, Location loc, Type resultType, ArrayRef<Value> operands) {
+  Value create(ConversionPatternRewriter& rewriter, Location loc, Type resultType, ArrayRef<Value> operands) {
     // TODO: add cast op for each operand wherever appropriate
     CmpOpBuilder cmpOpBuilder;
-    auto cmpOp = cmpOpBuilder.create(rewriter, loc, resultType, operands.take_front(2));
+    auto cmp = cmpOpBuilder.create(rewriter, loc, resultType, operands.take_front(2));
     auto zero = createInit(rewriter, loc, resultType, AggregationKind::add);
-    return rewriter.create<mlir::SelectOp>(loc, cmpOp, operands[2], zero);
+    return rewriter.create<mlir::SelectOp>(loc, cmp, operands[2], zero).getResult();
   }
 
   Value createInit(OpBuilder& builder, Location loc, Type type, AggregationKind agg) const {
@@ -320,8 +327,6 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
       idxs.push_back(idx);
     }
 
-    // TODO: handle broadcasts
-
     // Create the loads
     SmallVector<Value, 4> scalars;
     for (size_t i = 0; i < operands.size(); i++) {
@@ -331,7 +336,16 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
       if (defOp && mlir::m_Constant(&attr).match(defOp)) {
         scalars.push_back(operand);
       } else {
-        scalars.push_back(rewriter.create<AffineLoadOp>(loc, operand, idxs));
+        // handle broadcasts
+        auto operandType = operand.getType().cast<MemRefType>();
+        assert(operandType.getRank() <= resultMemRefType.getRank() && "result rank < operand rank");
+        SmallVector<Value, 8> operandIdxs(operandType.getRank());
+        for (unsigned i = 0; i < operandType.getRank(); i++) {
+          unsigned j = resultMemRefType.getRank() - i - 1;
+          unsigned k = operandType.getRank() - i - 1;
+          operandIdxs[k] = body->getArgument(j);
+        }
+        scalars.push_back(rewriter.create<AffineLoadOp>(loc, operand, operandIdxs));
       }
     }
 
@@ -423,14 +437,17 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
 
     // Create the loads + casts
     SmallVector<Value, 4> scalars;
-    SmallVector<ScalarType, 4> types;
     auto srcs = op.srcs().getValue();
     for (size_t i = 0; i < srcs.size(); i++) {
-      auto memref = cionOperands[i];
-      auto map = srcs[i].cast<AffineMapAttr>().getValue();
-      scalars.push_back(rewriter.create<AffineLoadOp>(loc, memref, map, idxs));
-      auto scalarType = getScalarType(op.operands()[i]);
-      types.push_back(scalarType);
+      auto operand = cionOperands[i];
+      auto defOp = operand.getDefiningOp();
+      Attribute attr;
+      if (defOp && mlir::m_Constant(&attr).match(defOp)) {
+        scalars.push_back(operand);
+      } else {
+        auto map = srcs[i].cast<AffineMapAttr>().getValue();
+        scalars.push_back(rewriter.create<AffineLoadOp>(loc, operand, map, idxs));
+      }
     }
 
     // Do the combination op
@@ -466,6 +483,7 @@ struct LoweringPass : public mlir::ModulePass<LoweringPass> {
         AffineConstantOpConversion,  //
         FuncOpConversion,            //
         ScalarConstantOpConversion,  //
+        ContractionOpConversion<CombinationKind::none, FirstOperand>,
         ContractionOpConversion<CombinationKind::add, StdOp<mlir::AddFOp>, ResultIs<EltwiseFloat>>,
         ContractionOpConversion<CombinationKind::add, StdOp<mlir::AddIOp>, ResultIs<EltwiseInteger>>,
         ContractionOpConversion<CombinationKind::mul, StdOp<mlir::MulFOp>, ResultIs<EltwiseFloat>>,
@@ -474,6 +492,8 @@ struct LoweringPass : public mlir::ModulePass<LoweringPass> {
         ContractionOpConversion<CombinationKind::eq, CmpIntOp<CmpIPredicate::eq>, ResultIs<EltwiseInteger>>,
         ContractionOpConversion<CombinationKind::cond, CondOp<CmpFloatOp<CmpFPredicate::OEQ>>, ResultIs<EltwiseFloat>>,
         ContractionOpConversion<CombinationKind::cond, CondOp<CmpIntOp<CmpIPredicate::eq>>, ResultIs<EltwiseInteger>>,
+        EltwiseOpConversion<ew::ExpOp, StdOp<mlir::ExpOp>>,
+        EltwiseOpConversion<ew::NegOp, StdOp<mlir::NegFOp>, ResultIs<EltwiseFloat>>,
         EltwiseOpConversion<ew::AddOp, StdOp<mlir::AddFOp>, ResultIs<EltwiseFloat>>,
         EltwiseOpConversion<ew::AddOp, StdOp<mlir::AddIOp>, ResultIs<EltwiseInteger>>,
         EltwiseOpConversion<ew::SubOp, StdOp<mlir::SubFOp>, ResultIs<EltwiseFloat>>,
