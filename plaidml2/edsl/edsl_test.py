@@ -75,12 +75,12 @@ def conv_2d(I, K):
 
 
 def complex_conv_2d(
-    I,
-    K,
-    s0,
-    s1,  # stride coeffs
-    d0,
-    d1  # dilation coeffs
+        I,
+        K,
+        s0,
+        s1,  # stride coeffs
+        d0,
+        d1  # dilation coeffs
 ):
     # "same-lower" autopadding will be applied
     N, G, GCI, GCO = TensorDims(4)
@@ -111,8 +111,8 @@ def complex_conv_2d(
     O = TensorOutput(N, Y0, Y1, G, GCO)
 
     # Compute the convolution
-    O[n, x0, x1, g,
-      gco] += I[n, s0 * x1 + d0 * k0 - P0, s1 * x1 + d1 * k1 - P1, g, gci] * K[k0, k1, g, gci, gco]
+    O[n, x0, x1, g, gco] += I[n, s0 * x1 + d0 * k0 - P0, s1 * x1 + d1 * k1 -
+                              P1, g, gci] * K[k0, k1, g, gci, gco]
     return O
 
 
