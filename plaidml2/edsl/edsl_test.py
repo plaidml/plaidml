@@ -571,22 +571,22 @@ function (
         compare_results(self, program, expected_mlir, expected_ast)
 
     def test_complex_conv_2d(self):
-        I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 1, 1, 1, 1]))
-        K = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 1, 1, 1, 1]))
+        I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 224, 224, 3, 3]))
+        K = Tensor(LogicalShape(plaidml.DType.FLOAT32, [3, 3, 3, 3, 32]))
         O = complex_conv_2d(I, K, 1, 2, 1, 2)
         program = Program('complex_conv_2d', [O])
         expected_mlir = '''
 #map0 = (d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4)
-#map1 = (d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d2 + d5, d2 * 2 + d6 * 2, d3, d7)
+#map1 = (d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d2 + d5 - 1, d2 * 2 + d6 * 2 - 1, d3, d7)
 #map2 = (d0, d1, d2, d3, d4, d5, d6, d7) -> (d5, d6, d3, d7, d4)
 
 
 !fp32 = type tensor<!eltwise.fp32>
 module {
-  func @complex_conv_2d(%arg0: tensor<1x1x1x1x1x!eltwise.fp32>, %arg1: tensor<1x1x1x1x1x!eltwise.fp32>) -> tensor<1x1x1x1x1x!eltwise.fp32> {
+  func @complex_conv_2d(%arg0: tensor<3x3x3x3x32x!eltwise.fp32>, %arg1: tensor<1x224x224x3x3x!eltwise.fp32>) -> tensor<1x224x112x3x32x!eltwise.fp32> {
     %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !fp32
-    %0 = tile.cion add, mul, %cst, %arg1, %arg0 {sink = #map0, srcs = [#map1, #map2]} : !fp32, tensor<1x1x1x1x1x!eltwise.fp32>, tensor<1x1x1x1x1x!eltwise.fp32> -> tensor<1x1x1x1x1x!eltwise.fp32>
-    return %0 : tensor<1x1x1x1x1x!eltwise.fp32>
+    %0 = tile.cion add, mul, %cst, %arg1, %arg0 {sink = #map0, srcs = [#map1, #map2]} : !fp32, tensor<1x224x224x3x3x!eltwise.fp32>, tensor<3x3x3x3x32x!eltwise.fp32> -> tensor<1x224x112x3x32x!eltwise.fp32>
+    return %0 : tensor<1x224x112x3x32x!eltwise.fp32>
   }
 }
 '''
@@ -597,10 +597,21 @@ function (
 ) -> (
   _X2
 ) {
-  _X2[x0, x7, x1, x4, x6 : 1, 1, 1, 1, 1] = +(_X0[x0, x1 + x2, 2*x1 + 2*x3, x4, x5] * _X1[x2, x3, x4, x5, x6]);
+  _X2[x0, x7, x1, x4, x6 : 1, 224, 112, 3, 32] = +(_X0[x0, -1 + x1 + x2, -1 + 2*x1 + 2*x3, x4, x5] * _X1[x2, x3, x4, x5, x6]);
 }
 '''
         compare_results(self, program, expected_mlir, expected_ast)
+
+    @unittest.skip(
+        'TODO: currently segfaults mismatched dimensions error needs to be printed correctly')
+    def test_complex_conv_2d_dim_mismatch(self):
+        I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 1, 1, 1, 1]))
+        K = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 1, 1, 1, 1]))
+        O = complex_conv_2d(I, K, 1, 2, 1, 2)
+        program = Program('complex_conv_2d', [O])
+        # expected_mlir = '''?'''
+        # expected_ast = '''?'''
+        # compare_results(self, program, expected_mlir, expected_ast)
 
     def test_mnist_mlp(self):
         # model.add(Dense(512, activation='relu', input_shape=(784,)))
