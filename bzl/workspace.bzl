@@ -189,10 +189,10 @@ def plaidml_workspace():
         sha256 = LLVM_SHA256,
         strip_prefix = "llvm-project-" + LLVM_COMMIT,
         link_files = {
-            "//vendor/llvm:llvm.BUILD": "llvm/BUILD.bazel",
-            "//vendor/mlir:mlir.BUILD": "mlir/BUILD.bazel",
+            clean_dep("//vendor/llvm:llvm.BUILD"): "llvm/BUILD.bazel",
+            clean_dep("//vendor/mlir:mlir.BUILD"): "mlir/BUILD.bazel",
         },
-        patches = ["//vendor/mlir:mlir.patch"],
+        patches = [clean_dep("//vendor/mlir:mlir.patch")],
         override = "PLAIDML_LLVM_REPO",
     )
 
