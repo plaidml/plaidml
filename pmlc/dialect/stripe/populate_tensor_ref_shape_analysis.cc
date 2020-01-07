@@ -2,10 +2,10 @@
 
 #include <algorithm>
 
+#include "mlir/Pass/Pass.h"
+
 #include "pmlc/dialect/stripe/analysis.h"
 #include "pmlc/dialect/stripe/populate_tensor_ref_shape_analysis.h"
-
-#include "mlir/Pass/Pass.h"
 
 #define PASS_NAME "test-populate-tensor-ref-shape"
 #define DEBUG_TYPE PASS_NAME
@@ -30,8 +30,8 @@ PopulateTensorRefShape::PopulateTensorRefShape(mlir::Operation* op) : operation(
 // 'tensor_ref' that contains the shape information.
 template <class Range>
 static void populateValuesWithShapes(Range valueRange) {
-  for (Value* result : valueRange) {
-    if (result->getType().isa<TensorRefType>()) {
+  for (auto result : valueRange) {
+    if (result->getType().template isa<TensorRefType>()) {
       result->setType(
           TensorRefType::get(pmlc::dialect::stripe::ComputeAccess(result).base_type, /*propagateShape=*/true));
     }
@@ -51,7 +51,7 @@ void PopulateTensorRefShape::recompute() {
   auto funcArgs = func.getArguments();
   SmallVector<Type, 8> newInputs;
   std::transform(funcArgs.begin(), funcArgs.end(), std::back_inserter(newInputs),
-                 [](const BlockArgument* arg) { return arg->getType(); });
+                 [](const BlockArgument arg) { return arg.getType(); });
   func.setType(FunctionType::get(newInputs, func.getType().getResults(), func.getContext()));
 
   // Visit types in nested operations.

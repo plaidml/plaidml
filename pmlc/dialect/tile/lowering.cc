@@ -56,6 +56,11 @@ using mlir::Value;
 
 namespace pmlc::dialect::tile {
 
+static Shape getShape(Type type) {
+  auto rankedTensorType = eltwise::getRankedTensorType(type);
+  return rankedTensorType.getShape();
+}
+
 static stripe::TensorType convertIntoTensorType(Type type) {
   IVLOG(3, "convertIntoTensorType> " << mlir::debugString(type));
   auto rankedTensorType = eltwise::getRankedTensorType(type);
@@ -124,9 +129,9 @@ struct LoweringBase : public ConversionPattern {
       PatternBenefit benefit = 1)
       : ConversionPattern(rootOpName, benefit, lowering->context), lowering(lowering) {}
 
-  PatternMatchResult matchAndRewrite(   //
-      Operation* op,                    //
-      llvm::ArrayRef<Value*> operands,  //
+  PatternMatchResult matchAndRewrite(  //
+      Operation* op,                   //
+      llvm::ArrayRef<Value> operands,  //
       ConversionPatternRewriter& rewriter) const final {
     try {
       return tryMatchAndRewrite(op, operands, rewriter);
@@ -139,7 +144,7 @@ struct LoweringBase : public ConversionPattern {
  protected:
   virtual PatternMatchResult tryMatchAndRewrite(  //
       Operation* op,                              //
-      llvm::ArrayRef<Value*> operands, ConversionPatternRewriter& rewriter) const = 0;
+      llvm::ArrayRef<Value> operands, ConversionPatternRewriter& rewriter) const = 0;
 
  protected:
   LoweringContext* lowering;
@@ -151,7 +156,7 @@ struct AffineConstantOpConversion : public LoweringBase {
 
   PatternMatchResult tryMatchAndRewrite(  //
       Operation* op,                      //
-      llvm::ArrayRef<Value*> operands,    //
+      llvm::ArrayRef<Value> operands,     //
       ConversionPatternRewriter& rewriter) const override {
     IVLOG(2, "AffineConstantOpConversion::matchAndRewrite>");
     auto constOp = llvm::cast<AffineConstantOp>(op);
@@ -167,7 +172,7 @@ struct ReturnOpConversion : public LoweringBase {
 
   PatternMatchResult tryMatchAndRewrite(  //
       Operation* op,                      //
-      llvm::ArrayRef<Value*> operands,    //
+      llvm::ArrayRef<Value> operands,     //
       ConversionPatternRewriter& rewriter) const override {
     IVLOG(2, "ReturnOpConversion::matchAndRewrite>");
     rewriter.create<stripe::TerminateOp>(op->getLoc());
@@ -176,7 +181,7 @@ struct ReturnOpConversion : public LoweringBase {
   }
 };
 
-static Value* findOutputArgument(Operation* op, Value* tensor) {
+static Value findOutputArgument(Operation* op, Value tensor) {
   auto funcOp = op->getParentOfType<FuncOp>();
   auto attr = funcOp.getAttrOfType<IntegerAttr>("inputs");
   if (!attr) {
@@ -194,23 +199,23 @@ static Value* findOutputArgument(Operation* op, Value* tensor) {
   return nullptr;
 }
 
-static StringAttr getTensorName(LoweringContext* context, Value* tensor) {
+static StringAttr getTensorName(LoweringContext* context, Value tensor) {
   if (auto op = tensor->getDefiningOp()) {
     if (op->getNumOperands()) {
       return getTensorName(context, op->getOperand(0));
     }
     return {};
   }
-  auto blockArg = llvm::cast<mlir::BlockArgument>(tensor);
-  return context->names[blockArg->getArgNumber()];
+  auto blockArg = tensor.cast<mlir::BlockArgument>();
+  return context->names[blockArg.getArgNumber()];
 }
 
-static Value* MakeCombination(            //
+static Value MakeCombination(             //
     ConversionPatternRewriter* rewriter,  //
     Location loc,                         //
     CombinationKind combo,                //
     ScalarType scalarType,                //
-    ArrayRef<Value*> operands) {
+    ArrayRef<Value> operands) {
   switch (combo) {
     case CombinationKind::none:
       return operands[0];
@@ -219,7 +224,7 @@ static Value* MakeCombination(            //
     case CombinationKind::cond: {
       auto constOp = createInit(rewriter, loc, scalarType);
       auto cmpEqOp = rewriter->create<eltwise::CmpEqOp>(loc, scalarType, operands.drop_back());
-      llvm::SmallVector<Value*, 3> args{cmpEqOp.result(), operands.back(), constOp.result()};
+      llvm::SmallVector<Value, 3> args{cmpEqOp.result(), operands.back(), constOp.result()};
       return rewriter->create<eltwise::SelectOp>(loc, scalarType, args);
     }
     case CombinationKind::eq:
@@ -236,7 +241,7 @@ struct ContractionOpConversion : public LoweringBase {
 
   PatternMatchResult tryMatchAndRewrite(  //
       Operation* op,                      //
-      llvm::ArrayRef<Value*> operands,    //
+      llvm::ArrayRef<Value> operands,     //
       ConversionPatternRewriter& rewriter) const override {
     IVLOG(2, "ContractionOpConversion::matchAndRewrite> " << mlir::debugString(*op));
     auto cionOp = llvm::cast<ContractionOp>(op);
@@ -245,14 +250,20 @@ struct ContractionOpConversion : public LoweringBase {
     auto resultType = cionOp.result()->getType();
     auto resultTensorType = convertIntoTensorType(resultType);
     IVLOG(3, "resultTensorType: " << mlir::debugString(resultTensorType));
-    llvm::SmallVector<stripe::TensorType, 4> shapes{resultTensorType};
+    llvm::SmallVector<Shape, 4> shapes{getShape(resultType)};
+    llvm::SmallVector<std::vector<int64_t>, 4> tmpShapes;
     for (auto src : cionOp.operands()) {
       auto srcType = src->getType();
       if (srcType.isa<stripe::TensorRefType>()) {
         auto access = stripe::ComputeAccess(src);
-        shapes.emplace_back(access.base_type);
+        std::vector<int64_t> tmpShape;
+        for (auto dim : access.base_type.getShape()) {
+          tmpShape.push_back(dim.size);
+        }
+        tmpShapes.push_back(tmpShape);
+        shapes.emplace_back(tmpShapes.back());
       } else {
-        shapes.emplace_back(convertIntoTensorType(srcType));
+        shapes.emplace_back(getShape(srcType));
       }
     }
 
@@ -298,17 +309,17 @@ struct ContractionOpConversion : public LoweringBase {
     }
     forOp.setAttr("idx_names", ArrayAttr::get(idxNames, rewriter.getContext()));
 
-    llvm::SmallVector<Value*, 4> tensors{outputTensor};
+    llvm::SmallVector<Value, 4> tensors{outputTensor};
     for (auto src : cionOp.operands()) {
       tensors.emplace_back(src);
     }
 
     // add refinements
-    Value* output = nullptr;
-    llvm::SmallVector<Value*, 4> refs;
+    Value output;
+    llvm::SmallVector<Value, 4> refs;
     for (unsigned i = 0; i < contraction.accesses.size(); i++) {
       const auto& access = contraction.accesses[i];
-      llvm::SmallVector<Value*, 4> offsets;
+      llvm::SmallVector<Value, 4> offsets;
       for (const auto& poly : access) {
         auto affine = Integerize(poly, bounds);
         offsets.emplace_back(stripe::AffineIntoMLIR(&rewriter, idxs, affine));
@@ -343,7 +354,7 @@ struct ContractionOpConversion : public LoweringBase {
     }
 
     // add constraints
-    llvm::SmallVector<Value*, 4> affineConstraints;
+    llvm::SmallVector<Value, 4> affineConstraints;
     for (const auto& constraint : constraints) {
       auto lhs = Integerize(constraint.poly, bounds);  // lhs <= rhs;
       lhs -= constraint.rhs;                           // lhs <= 0;
@@ -366,7 +377,7 @@ struct ContractionOpConversion : public LoweringBase {
     }
 
     // LOADs
-    llvm::SmallVector<Value*, 4> inputs;
+    llvm::SmallVector<Value, 4> inputs;
     for (unsigned i = 0; i < refs.size(); i++) {
       auto defOp = refs[i]->getDefiningOp();
       if (defOp && llvm::isa<eltwise::ScalarConstantOp>(defOp)) {
@@ -403,14 +414,14 @@ struct ContractionOpConversion : public LoweringBase {
   }
 
   bool needsInitialize(            //
-      Value* outRef,               //
+      Value outRef,                //
       stripe::TensorType outType,  //
       ArrayRef<int64_t> ranges,    //
-      ArrayRef<Value*> constraints) const {
+      ArrayRef<Value> constraints) const {
     // Check if we have a simple output: 1 unique index per dimension, each full range
     // If not, presume we need initialization for safety
     // We assume here that the 0'th refinement is the output refinement
-    std::unordered_set<mlir::BlockArgument*> outIdxs;
+    mlir::DenseSet<mlir::BlockArgument> outIdxs;
     auto refineOp = llvm::cast<stripe::RefineOp>(outRef->getDefiningOp());
     auto outShape = outType.getShape();
     for (unsigned i = 0; i < outShape.size(); i++) {
@@ -439,7 +450,7 @@ struct ContractionOpConversion : public LoweringBase {
     // Now we check if we have any constraints that are 'output only'
     // Output only indexes actually reduce the range we write to, whereas constraints
     // that use both input + output make writes but only process some of the input
-    for (const auto& constraint : constraints) {
+    for (auto constraint : constraints) {
       stripe::AffinePolynomial poly{constraint};
       bool any_inputs = false;
       for (const auto& [key, value] : poly.terms) {
@@ -460,7 +471,7 @@ struct ContractionOpConversion : public LoweringBase {
       OpBuilder* builder,             //
       ContractionOp contractionOp,    //
       stripe::TensorType tensorType,  //
-      Value* output) const {
+      Value output) const {
     auto loc = contractionOp.getLoc();
     stripe::SymbolValueMap idxs;
     llvm::SmallVector<int64_t, 6> ranges;
@@ -477,7 +488,7 @@ struct ContractionOpConversion : public LoweringBase {
     auto body = builder->createBlock(&forOp.inner());
     builder->setInsertionPointToStart(body);
 
-    llvm::SmallVector<Value*, 6> offsets;
+    llvm::SmallVector<Value, 6> offsets;
     for (unsigned i = 0; i < dims.size(); i++) {
       auto arg = body->addArgument(stripe::AffineType::get(builder->getContext()));
       auto idxName = llvm::formatv("i{0}", i);
@@ -523,7 +534,7 @@ struct EltwiseOpConversion : public LoweringBase {
 
   PatternMatchResult tryMatchAndRewrite(  //
       Operation* op,                      //
-      llvm::ArrayRef<Value*> operands,    //
+      llvm::ArrayRef<Value> operands,     //
       ConversionPatternRewriter& rewriter) const override {
     IVLOG(2, "EltwiseOpConversion::matchAndRewrite> " << mlir::debugString(*op));
 
@@ -566,9 +577,9 @@ struct EltwiseOpConversion : public LoweringBase {
     forOp.setAttr("idx_names", ArrayAttr::get(idxNames, rewriter.getContext()));
 
     // output refinement
-    Value* output;
+    Value output;
     {
-      llvm::SmallVector<Value*, 4> offsets;
+      llvm::SmallVector<Value, 4> offsets;
       for (unsigned i = 0; i < resultTensorType.getRank(); i++) {
         offsets.emplace_back(body->getArgument(i));
       }
@@ -578,7 +589,7 @@ struct EltwiseOpConversion : public LoweringBase {
     }
 
     // input refinements
-    auto inputs = llvm::SmallVector<Value*, 4>();
+    auto inputs = llvm::SmallVector<Value, 4>();
     auto constType = ScalarType::get(rewriter.getContext(), DataType::INT32);
     for (auto operand : operands) {
       auto defOp = operand->getDefiningOp();
@@ -603,7 +614,7 @@ struct EltwiseOpConversion : public LoweringBase {
       if (resultTensorType.getRank() < tensorRefType.getRank()) {
         throw std::runtime_error("Invalid eltwise op: result rank < operand rank");
       }
-      llvm::SmallVector<Value*, 4> offsets(tensorRefType.getRank());
+      llvm::SmallVector<Value, 4> offsets(tensorRefType.getRank());
       for (unsigned i = 0; i < tensorRefType.getRank(); i++) {
         // handle broadcasts
         unsigned j = resultTensorType.getRank() - i - 1;
@@ -653,7 +664,7 @@ struct FuncOpConversion : public LoweringBase {
 
   PatternMatchResult tryMatchAndRewrite(  //
       Operation* op,                      //
-      ArrayRef<Value*> operands,          //
+      ArrayRef<Value> operands,           //
       ConversionPatternRewriter& rewriter) const override {
     auto funcOp = llvm::cast<FuncOp>(op);
     FunctionType type = funcOp.getType();
@@ -738,7 +749,7 @@ struct IndexOpConversion : public LoweringBase {
 
   PatternMatchResult tryMatchAndRewrite(  //
       Operation* op,                      //
-      llvm::ArrayRef<Value*> operands,    //
+      llvm::ArrayRef<Value> operands,     //
       ConversionPatternRewriter& rewriter) const override {
     IVLOG(2, "IndexOpConversion::matchAndRewrite>");
     auto indexOp = llvm::cast<IndexOp>(op);
@@ -781,8 +792,8 @@ struct IndexOpConversion : public LoweringBase {
     forOp.setAttr("idx_names", ArrayAttr::get(idxNames, rewriter.getContext()));
 
     // output refinement
-    Value* output;
-    llvm::SmallVector<Value*, 4> offsets;
+    Value output;
+    llvm::SmallVector<Value, 4> offsets;
     for (unsigned i = 0; i < resultTensorType.getRank(); i++) {
       offsets.emplace_back(body->getArgument(i));
     }
@@ -811,7 +822,7 @@ struct SpecialOpConversion : public LoweringBase {
 
   PatternMatchResult tryMatchAndRewrite(  //
       Operation* op,                      //
-      ArrayRef<Value*> operands,          //
+      ArrayRef<Value> operands,           //
       ConversionPatternRewriter& rewriter) const override {
     IVLOG(2, "SpecialOpConversion::matchAndRewrite>");
 
@@ -827,12 +838,12 @@ struct SpecialOpConversion : public LoweringBase {
       return matchFailure();
     }
 
-    std::vector<Value*> inputs;
+    std::vector<Value> inputs;
     for (unsigned i = 0; i < specialOp->getNumInputs(); i++) {
       inputs.emplace_back(operands[i]);
     }
 
-    std::vector<Value*> outputs;
+    std::vector<Value> outputs;
     for (unsigned i = 0; i < specialOp->getNumOutputs(); i++) {
       auto result = op->getResult(i);
       auto output = findOutputArgument(op, result);
@@ -857,7 +868,7 @@ struct PrngOpConversion : public LoweringBase {
 
   PatternMatchResult tryMatchAndRewrite(  //
       Operation* op,                      //
-      ArrayRef<Value*> operands,          //
+      ArrayRef<Value> operands,           //
       ConversionPatternRewriter& rewriter) const override {
     IVLOG(2, "PrngOpConversion::matchAndRewrite>");
     auto prngOp = llvm::cast<PrngOp>(op);
@@ -875,8 +886,8 @@ struct PrngOpConversion : public LoweringBase {
       return matchFailure();
     }
 
-    std::vector<Value*> inputs{prngOp.state()};
-    std::vector<Value*> outputs;
+    std::vector<Value> inputs{prngOp.state()};
+    std::vector<Value> outputs;
     auto newState = findOutputArgument(op, prngOp.new_state());
     outputs.emplace_back(newState);
     auto result = prngOp.result();

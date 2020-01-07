@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 def __init():
+    """Docstring for function plaidml2.edsl.__init"""
     ffi_call(lib.plaidml_edsl_init)
 
 
@@ -21,6 +22,7 @@ ffi.init_once(__init, 'plaidml_edsl_init')
 
 
 class LogicalShape(ForeignObject):
+    """Docstring for class LogicalShape"""
     __ffi_del__ = lib.plaidml_logical_shape_free
     __ffi_repr__ = lib.plaidml_logical_shape_repr
 
@@ -44,6 +46,15 @@ class LogicalShape(ForeignObject):
 
     @property
     def int_dims(self):
+        """Returns the dimensions of a LogicalShape as a list.
+
+        Args:
+            self (pointer): The object pointer for a LogicalShape
+
+        Returns:
+            list (int): Integer dimensions of the LogicalShape.
+
+        """
         return [
             ffi_call(lib.plaidml_logical_shape_get_dim_int, self.as_ptr(), i)
             for i in range(self.ndims)
@@ -70,6 +81,7 @@ def dim_op(op, *args):
 
 
 class TensorDim(ForeignObject):
+    """Docstring for class TensorDim"""
     __ffi_del__ = lib.plaidml_dim_expr_free
     __ffi_repr__ = lib.plaidml_dim_expr_repr
 
@@ -124,6 +136,7 @@ def poly_op(op, *args):
 
 
 class TensorIndex(ForeignObject):
+    """Docstring for class TensorIndex"""
     __ffi_del__ = lib.plaidml_poly_expr_free
     __ffi_repr__ = lib.plaidml_poly_expr_repr
 
@@ -212,6 +225,7 @@ _ContractionPart = namedtuple('_ContractionPart', ['op', 'args'])
 
 
 class IndexedTensor(object):
+    """Docstring for class IndexedTensor"""
 
     def __init__(self, impl, tensor=None):
         self._impl = impl
@@ -271,6 +285,7 @@ class IndexedTensor(object):
 
 
 class Tensor(ForeignObject):
+    """Docstring for class Tensor"""
     __ffi_del__ = lib.plaidml_expr_free
     __ffi_repr__ = lib.plaidml_expr_repr
 
@@ -492,6 +507,7 @@ class Tensor(ForeignObject):
 
 
 class TensorRef:
+    """Docstring for class TensorRef"""
 
     def __init__(self, tensor):
         self.tensor = tensor
@@ -506,6 +522,7 @@ class TensorRef:
 
 
 class Value(ForeignObject):
+    """Docstring for class Value"""
     __ffi_del__ = lib.plaidml_value_free
     __ffi_repr__ = lib.plaidml_value_repr
 
@@ -555,6 +572,7 @@ def TensorIndexes(count):
 
 
 class ProgramArgument:
+    """Docstring for class ProgramArgument"""
 
     def __init__(self, arg):
         self.is_input = arg.is_input
@@ -568,6 +586,7 @@ class ProgramArgument:
 
 
 class Program(ForeignObject):
+    """Docstring for class Program"""
     __ffi_del__ = lib.plaidml_program_free
     __ffi_repr__ = lib.plaidml_program_repr
 

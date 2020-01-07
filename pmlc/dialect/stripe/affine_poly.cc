@@ -4,8 +4,6 @@
 
 #include <utility>
 
-#include <boost/math/common_factor.hpp>
-
 #include "pmlc/dialect/stripe/dialect.h"
 #include "pmlc/dialect/stripe/ops.h"
 
@@ -17,13 +15,13 @@ AffinePolynomial::AffinePolynomial() : constant(0) {}
 
 AffinePolynomial::AffinePolynomial(int64_t x) : constant(x) {}
 
-AffinePolynomial::AffinePolynomial(Value* value) : constant(0) {
-  if (auto arg = mlir::dyn_cast<mlir::BlockArgument>(value)) {
+AffinePolynomial::AffinePolynomial(Value value) : constant(0) {
+  if (auto arg = value.dyn_cast<BlockArgument>()) {
     // This is a basic index: done
     terms.emplace(arg, 1);
     return;
   }
-  auto defOp = value->getDefiningOp();
+  auto defOp = value.getDefiningOp();
   if (auto op = mlir::dyn_cast<AffinePolyOp>(defOp)) {
     constant = op.offset().getSExtValue();
     for (size_t i = 0; i < op.coeffs().size(); i++) {

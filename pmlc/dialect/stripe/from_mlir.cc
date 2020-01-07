@@ -47,7 +47,19 @@ struct StripeLocation {
   std::vector<StripeDevice> devs;
 };
 
-std::pair<FlatTensorAccess, StripeLocation> ComputeAccessAndLoc(Value* tensor);
+struct BlockIndexKey {
+  stripe::Block* block;
+  BlockArgument arg;
+
+  bool operator<(const BlockIndexKey& rhs) const {
+    if (block == rhs.block) {
+      return arg.getAsOpaquePointer() < rhs.arg.getAsOpaquePointer();
+    }
+    return block < rhs.block;
+  }
+};
+
+std::pair<FlatTensorAccess, StripeLocation> ComputeAccessAndLoc(Value tensor);
 
 TensorShape intoShape(TensorType type) {
   TensorShape ret;
@@ -74,20 +86,20 @@ class StripeBuilder {
 
  private:
   std::string scalar_name(Operation* op, std::string out_name = "");
-  std::string passthru_idx_name(BlockArgument* idx);
+  std::string passthru_idx_name(BlockArgument idx);
   void add_attributes(stripe::Taggable* out, ArrayRef<NamedAttribute> in);
   std::string add_refinements(  //
       Block* block,             //
-      Value* tensor,            //
+      Value tensor,             //
       stripe::RefDir dir,       //
       std::string agg = "",     //
       bool is_special = false);
-  std::string get_idx(stripe::Block* sblock, mlir::BlockArgument* affine);
-  stripe::Affine build_affine(stripe::Block* sblock, Value* affine);
+  std::string get_idx(stripe::Block* sblock, BlockArgument affine);
+  stripe::Affine build_affine(stripe::Block* sblock, Value affine);
   stripe::Location build_location(const StripeLocation& loc, Block* mblock, stripe::Block* sblock);
 
   // Helper to get scalar (possibly inlining constant if needed)
-  std::string get_scalar(mlir::Value*);
+  std::string get_scalar(Value);
 
   void visit(ParallelForOp op);
   void visit(ConstraintOp op, int count);
@@ -104,13 +116,13 @@ class StripeBuilder {
 
   std::shared_ptr<stripe::Block> cur_;
   std::map<stripe::Block*, ScalarInfo> scalar_names_;
-  std::map<std::pair<stripe::Block*, mlir::BlockArgument*>, std::string> idxs_;
-  std::map<mlir::Value*, std::string> scalars_;
+  std::map<BlockIndexKey, std::string> idxs_;
+  llvm::DenseMap<Value, std::string> scalars_;
   // shared state among all StripeBuilders
   std::shared_ptr<std::map<mlir::Block*, BlockInfo>> blocks_;
 };
 
-std::pair<FlatTensorAccess, StripeLocation> ComputeAccessAndLoc(Value* tensor) {
+std::pair<FlatTensorAccess, StripeLocation> ComputeAccessAndLoc(Value tensor) {
   auto ret = ComputeAccess(tensor);
   auto loc = StripeLocation{};
 
@@ -239,7 +251,7 @@ struct RefinementBuilder {
 
   RefinementBuilder(                 //
       StripeBuilder* stripeBuilder,  //
-      Value* tensor,                 //
+      Value tensor,                  //
       stripe::RefDir dir,            //
       const std::string& aggName,    //
       bool isSpecial)
@@ -293,8 +305,8 @@ struct RefinementBuilder {
       std::vector<stripe::Affine> access;
       for (size_t i = 0; i < ndims; i++) {
         stripe::Affine aff;
-        for (const auto& [key, value] : tensorInfo.access[i].terms) {
-          if (key->getOwner() == mblock) {
+        for (auto [key, value] : tensorInfo.access[i].terms) {
+          if (key.getOwner() == mblock) {
             aff += stripe::Affine(stripeBuilder->get_idx(sblock, key), value);
           }
         }
@@ -339,7 +351,7 @@ struct RefinementBuilder {
       auto& ap = tensorInfo.access[i];
       auto& ip = inner[i];
       for (auto it = ap.terms.begin(); it != ap.terms.end(); /* nothing */) {
-        if (it->first->getOwner() == mblock) {
+        if (it->first.getOwner() == mblock) {
           ip.terms.emplace(*it);
           it = ap.terms.erase(it);
         } else {
@@ -356,7 +368,7 @@ struct RefinementBuilder {
 
 std::string StripeBuilder::add_refinements(  //
     Block* mblock,                           //
-    Value* value,                            //
+    Value value,                             //
     stripe::RefDir dir,                      //
     std::string agg_name,                    //
     bool is_special) {
@@ -366,16 +378,16 @@ std::string StripeBuilder::add_refinements(  //
   // The attributes are set only once
   StringAttr nameAttr;
   DictionaryAttr attrs;
-  if (auto op = value->getDefiningOp()) {
+  if (auto op = value.getDefiningOp()) {
     nameAttr = op->getAttrOfType<StringAttr>("name");
     attrs = op->getAttrOfType<DictionaryAttr>(Dialect::getStripeAttrsName());
   }
 
   while (true) {
     // move up the def-chain
-    if (auto blockArg = mlir::dyn_cast<mlir::BlockArgument>(value)) {
+    if (auto blockArg = value.dyn_cast<BlockArgument>()) {
       // this is a block arg
-      while (mblock != blockArg->getOwner()) {
+      while (mblock != blockArg.getOwner()) {
         if (!seen.count(mblock)) {
           builder.addRefinement(mblock);
           seen.insert(mblock);
@@ -389,7 +401,7 @@ std::string StripeBuilder::add_refinements(  //
       builder.adjustRoot();
       break;
     } else {
-      auto op = value->getDefiningOp();
+      auto op = value.getDefiningOp();
       while (mblock != op->getBlock()) {
         if (!seen.count(mblock)) {
           if (builder.addRefinement(mblock, nameAttr, attrs)) {
@@ -418,25 +430,25 @@ std::string StripeBuilder::add_refinements(  //
   return builder.refName;
 }
 
-std::string StripeBuilder::passthru_idx_name(BlockArgument* idx) {
+std::string StripeBuilder::passthru_idx_name(BlockArgument idx) {  //
   return idxName(idx).str() + "_0";
 }
 
-std::string StripeBuilder::get_idx(stripe::Block* block, mlir::BlockArgument* affine) {
-  auto key = std::make_pair(block, affine);
+std::string StripeBuilder::get_idx(stripe::Block* block, BlockArgument affine) {
+  BlockIndexKey key{block, affine};
   auto it = idxs_.find(key);
   if (it == idxs_.end()) {
     // Need to add passthurs
     std::string orig_name = idxName(affine).str();
     std::string passthru_name = passthru_idx_name(affine);
     block->idxs.push_back({passthru_name, 1, stripe::Affine(orig_name)});
-    idxs_.emplace(key, passthru_name);
+    idxs_[key] = passthru_name;
     return passthru_name;
   }
   return it->second;
 }
 
-stripe::Affine StripeBuilder::build_affine(stripe::Block* sblock, Value* base) {
+stripe::Affine StripeBuilder::build_affine(stripe::Block* sblock, Value base) {
   stripe::Affine ret;
   AffinePolynomial poly(base);
   ret += poly.constant;
@@ -454,7 +466,7 @@ stripe::Location StripeBuilder::build_location(const StripeLocation& loc, Block*
     for (const auto& unit : dev.units) {
       auto aff = stripe::Affine{unit.constant};
       for (const auto& [key, value] : unit.terms) {
-        if (key->getOwner() == mblock) {
+        if (key.getOwner() == mblock) {
           aff += stripe::Affine(get_idx(sblock, key), value);
         }
       }
@@ -465,15 +477,15 @@ stripe::Location StripeBuilder::build_location(const StripeLocation& loc, Block*
   return ret;
 }
 
-std::string StripeBuilder::get_scalar(Value* val) {
-  if (auto defOp = val->getDefiningOp()) {
+std::string StripeBuilder::get_scalar(Value val) {
+  if (auto defOp = val.getDefiningOp()) {
     if (auto constOp = llvm::dyn_cast<eltwise::ScalarConstantOp>(defOp)) {
       if (!scalars_.count(val)) {
         visit(constOp);
       }
     }
   }
-  return scalars_.at(val);
+  return scalars_.lookup(val);
 }
 
 void StripeBuilder::visit(ParallelForOp op) {
@@ -489,8 +501,8 @@ void StripeBuilder::visit(ParallelForOp op) {
     cur_->comments = attr.getValue().str();
   }
   // Add the 'true' indexes
-  auto idx_names = op.getAttrOfType<ArrayAttr>(mlir::Identifier::get("idx_names", op.getContext()));
-  auto idx_attrs = op.getAttrOfType<ArrayAttr>(mlir::Identifier::get("idx_attrs", op.getContext()));
+  auto idx_names = op.getAttrOfType<ArrayAttr>("idx_names");
+  auto idx_attrs = op.getAttrOfType<ArrayAttr>("idx_attrs");
   for (size_t i = 0; i < op.ranges().size(); i++) {
     int64_t range = op.ranges().getValue()[i].cast<IntegerAttr>().getInt();
     std::string idx_name = "idx";
@@ -500,7 +512,8 @@ void StripeBuilder::visit(ParallelForOp op) {
       }
     }
     idx_name = cur_->unique_idx_name(idx_name);
-    idxs_.emplace(std::make_pair(cur_.get(), oblock.getArgument(i)), idx_name);
+    BlockIndexKey key{cur_.get(), oblock.getArgument(i)};
+    idxs_[key] = idx_name;
     cur_->idxs.emplace_back(idx_name, range);
     if (idx_attrs && idx_attrs.size() > i) {
       if (auto attrs = idx_attrs.getValue()[i].dyn_cast<DictionaryAttr>()) {
@@ -545,7 +558,7 @@ void StripeBuilder::visit(LoadOp op) {
   IVLOG(3, "StripeBuilder::visit(LoadOp)");
   auto ref_name = add_refinements(op.getOperation()->getBlock(), op.from(), stripe::RefDir::In);
   auto into = scalar_name(op.getOperation(), ref_name);
-  scalars_.emplace(op.into(), into);
+  scalars_[op.into()] = into;
   cur_->stmts.push_back(std::make_shared<stripe::Load>(ref_name, into));
 }
 
@@ -553,7 +566,7 @@ void StripeBuilder::visit(LoadIndexOp op) {
   IVLOG(3, "StripeBuilder::visit(LoadIndexOp)");
   auto from = build_affine(cur_.get(), op.from());
   auto into = scalar_name(op.getOperation());
-  scalars_.emplace(op.into(), into);
+  scalars_[op.into()] = into;
   cur_->stmts.push_back(std::make_shared<stripe::LoadIndex>(from, into));
 }
 
@@ -593,7 +606,7 @@ void StripeBuilder::visit(util::GenericBuilder builder) {
   auto op = builder.getOperation();
   IVLOG(3, "StripeBuilder::visit> " << mlir::debugString(*op));
   auto out_name = scalar_name(op);
-  scalars_.emplace(op->getResult(0), out_name);
+  scalars_[op->getResult(0)] = out_name;
   auto intr = std::make_shared<stripe::Intrinsic>();
   intr->name = util::getOpName(op->getName());
   if (intr->name == "select") {
@@ -622,7 +635,7 @@ void StripeBuilder::visit(eltwise::CastOp castOp) {
 
   // handle the cast operation itself
   auto out_name = scalar_name(op);
-  scalars_.emplace(result, out_name);
+  scalars_[result] = out_name;
   auto intr = std::make_shared<stripe::Intrinsic>();
   if (is_float(dtype)) {
     intr->name = "as_float";
@@ -645,7 +658,7 @@ void StripeBuilder::visit(eltwise::CastOp castOp) {
 
 void StripeBuilder::visit(eltwise::ScalarConstantOp op) {
   auto out_name = scalar_name(op.getOperation());
-  scalars_.emplace(op.result(), out_name);
+  scalars_[op.result()] = out_name;
   std::shared_ptr<stripe::Constant> cnst;
   auto val_attr = op.getValue();
   if (auto attr = val_attr.dyn_cast<IntegerAttr>()) {

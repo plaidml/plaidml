@@ -3,10 +3,10 @@
 #include "pmlc/dialect/stripe/transforms.h"
 
 #include <algorithm>
+#include <string>
 #include <thread>
 
 #include "base/util/logging.h"
-
 #include "pmlc/dialect/stripe/analysis.h"
 #include "pmlc/dialect/stripe/util.h"
 
@@ -148,7 +148,7 @@ void LiftConstraint(ParallelForOp pf) {
   // Get the complete polynomial, and split it into innner + outer
   auto opoly = AffinePolynomial(con.input());
   AffinePolynomial ipoly;
-  for (mlir::BlockArgument* arg : pf_block->getArguments()) {
+  for (auto arg : pf_block->getArguments()) {
     auto it = opoly.terms.find(arg);
     if (it != opoly.terms.end()) {
       ipoly.terms.emplace(*it);
@@ -184,8 +184,10 @@ void LiftConstraint(ParallelForOp pf) {
   pf.getOperation()->erase();
 }
 
-// Parallelize a ParallelForOip for eltwise only
+// Parallelize a ParallelForOp for eltwise only
 void ParallelizeEltwise(ParallelForOp op, unsigned min_inner_size, const std::string& thread_tag) {
+  // TODO: this should come from configuration instead of the current machine
+  //       it's possible that we want to compile for some other machine
   unsigned n_processors = std::thread::hardware_concurrency();
   int64_t inner_size = 1;
   int64_t outer_size = 1;
@@ -201,8 +203,7 @@ void ParallelizeEltwise(ParallelForOp op, unsigned min_inner_size, const std::st
       inner_size *= range;
       outer_size /= range;
       tiles[i] = range;
-    }
-    else {
+    } else {
       int64_t tile = range;
       for (int64_t k = range; k >= 1; --k) {
         if (range % k == 0 && k * inner_size >= min_inner_size) {

@@ -48,7 +48,7 @@ def RefineOp : StripeOpWithPP<"refine", [NoSideEffect]> {
   let arguments = (ins TensorRefType:$in, Variadic<AffineType>:$offsets);
   let results = (outs TensorRefType:$result);
   let extraClassDeclaration = [{
-    Value* getOffset(unsigned i) {
+    Value getOffset(unsigned i) {
       // skip the $in operand
       return getOperand(i + 1);
     }
@@ -125,8 +125,8 @@ def SpecialOpInterface : OpInterface<"SpecialOp"> {
     StaticInterfaceMethod<"TODO", "Operation*", "create", (ins
       "OpBuilder*":$builder,
       "Location":$loc,
-      "ArrayRef<Value*>":$inputs,
-      "ArrayRef<Value*>":$outputs
+      "ArrayRef<Value>":$inputs,
+      "ArrayRef<Value>":$outputs
     ), [{
       OperationState state(loc, ConcreteOp::getOperationName());
       state.addOperands(outputs);
