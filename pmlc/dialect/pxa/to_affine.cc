@@ -100,25 +100,36 @@ struct AffineParallelForOpConversion : public LoweringBase<AffineParallelForOp> 
   }
 };
 
-struct ReduceOpConversion : public LoweringBase<ReduceOp> {
-  explicit ReduceOpConversion(MLIRContext* ctx) : LoweringBase(ctx) {}
+struct AffineReduceOpConversion : public LoweringBase<AffineReduceOp> {
+  explicit AffineReduceOpConversion(MLIRContext* ctx) : LoweringBase(ctx) {}
 
-  void rewrite(ReduceOp op, ArrayRef<Value> operands, ConversionPatternRewriter& rewriter) const override {
-    auto in = rewriter.create<AffineLoadOp>(op.getLoc(), op.out(), op.map(), op.idxs());
-    Value agg;
-    switch (op.agg()) {
-      case AggregationKind::add:
-        agg = rewriter.create<mlir::AddFOp>(op.getLoc(), in, op.val());
-        break;
-      case AggregationKind::mul:
-        agg = rewriter.create<mlir::MulFOp>(op.getLoc(), in, op.val());
-        break;
-      default:
-        llvm_unreachable("Unsupported aggregation for CreateInit");
-    }
-    rewriter.create<AffineStoreOp>(op.getLoc(), agg, op.out(), op.map(), op.idxs());
+  void rewrite(AffineReduceOp op, ArrayRef<Value> operands, ConversionPatternRewriter& rewriter) const override {
+    auto source = rewriter.create<AffineLoadOp>(op.getLoc(), op.out(), op.map(), op.idxs());
+    auto reduce = createReduction(rewriter, op, source.getResult());
+    rewriter.create<AffineStoreOp>(op.getLoc(), reduce, op.out(), op.map(), op.idxs());
     rewriter.create<AffineTerminatorOp>(op.getLoc());
     rewriter.eraseOp(op);
+  }
+
+  Value createReduction(ConversionPatternRewriter& rewriter, AffineReduceOp op, Value source) const {
+    switch (op.agg()) {
+      case AggregationKind::assign:
+        return source;
+      case AggregationKind::add:
+        return rewriter.create<mlir::AddFOp>(op.getLoc(), source, op.val());
+      case AggregationKind::max: {
+        auto cmp = rewriter.create<mlir::CmpFOp>(op.getLoc(), mlir::CmpFPredicate::OGT, op.val(), source);
+        return rewriter.create<mlir::SelectOp>(op.getLoc(), cmp, op.val(), source);
+      }
+      case AggregationKind::min: {
+        auto cmp = rewriter.create<mlir::CmpFOp>(op.getLoc(), mlir::CmpFPredicate::OLT, op.val(), source);
+        return rewriter.create<mlir::SelectOp>(op.getLoc(), cmp, op.val(), source);
+      }
+      case AggregationKind::mul:
+        return rewriter.create<mlir::MulFOp>(op.getLoc(), source, op.val());
+      default:
+        llvm_unreachable("Unsupported aggregation for AffineReduceOpConversion::createReduction");
+    }
   }
 };
 
@@ -132,7 +143,7 @@ void LoweringPass::runOnModule() {
   // Setup rewrite patterns
   mlir::OwningRewritePatternList patterns;
   patterns.insert<AffineParallelForOpConversion>(&getContext());
-  patterns.insert<ReduceOpConversion>(&getContext());
+  patterns.insert<AffineReduceOpConversion>(&getContext());
 
   // Run the conversion
   if (failed(applyPartialConversion(getModule(), target, patterns, nullptr))) {
@@ -144,7 +155,7 @@ void LoweringPass::runOnModule() {
 
 }  // namespace
 
-std::unique_ptr<mlir::Pass> createLowerToAffinePass() {  //
+std::unique_ptr<mlir::Pass> createLowerPXAToAffinePass() {  //
   return std::make_unique<LoweringPass>();
 }
 

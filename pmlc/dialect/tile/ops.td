@@ -28,6 +28,15 @@ def AffineConstraints : Type<CPred<"$_self.isa<AffineConstraintsType>()">, "affi
 def AffineTensorMap : Type<CPred<"$_self.isa<AffineTensorMapType>()">, "affine-tensor-map">;
 def StrType : Type<CPred<"$_self.isa<StringType>()">, "string">;
 
+def IndexAttr : Attr<
+      And<[CPred<"$_self.isa<IntegerAttr>()">,
+           CPred<"$_self.cast<IntegerAttr>().getType().isIndex()">]>,
+      "index attribute"> {
+  let constBuilderCall = "$_builder.getIntegerAttr($_builder.getIndexType(), $0)";
+  let storageType = "IntegerAttr";
+  let returnType = [{ APInt }];
+}
+
 class TileOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
     Op<TileDialect, mnemonic, traits> {}
 
@@ -62,14 +71,15 @@ def StringOp : TileOp<"str"> {
 
 def DimOp : TileOpWithPPV<"dim", [NoSideEffect]>, HasFolder {
   let summary = "dimension index operation";
-  let arguments = (ins RankedTensorOf<[AnyScalar]>:$tensor, APIntAttr:$dim);
+  let arguments = (ins RankedTensorOf<[AnyScalar]>:$tensor, IndexAttr:$dim);
   let results = (outs IndexLike:$result);
 
   let builders = [OpBuilder<
     "Builder* builder, OperationState& result, Value tensor, int64_t value", [{
+      auto indexType = builder->getIndexType();
       result.addOperands(tensor);
-      result.addAttribute("dim", builder->getI64IntegerAttr(value));
-      result.addTypes(builder->getIndexType());
+      result.addAttribute("dim", builder->getIntegerAttr(indexType, value));
+      result.addTypes(indexType);
     }]
   >];
 
@@ -80,13 +90,14 @@ def DimOp : TileOpWithPPV<"dim", [NoSideEffect]>, HasFolder {
 
 def AffineConstantOp : TileOpWithPPV<"affine_const", [NoSideEffect]>, HasFolder {
   let summary = "affine constant";
-  let arguments = (ins I64Attr:$value);
+  let arguments = (ins IndexAttr:$value);
   let results = (outs IndexLike:$result);
 
   let builders = [OpBuilder<
     "Builder* builder, OperationState& result, int64_t value", [{
-      result.addAttribute("value", builder->getI64IntegerAttr(value));
-      result.addTypes(builder->getIndexType());
+      auto indexType = builder->getIndexType();
+      result.addAttribute("value", builder->getIntegerAttr(indexType, value));
+      result.addTypes(indexType);
     }]
   >];
 
