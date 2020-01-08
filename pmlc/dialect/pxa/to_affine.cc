@@ -115,18 +115,36 @@ struct AffineReduceOpConversion : public LoweringBase<AffineReduceOp> {
     switch (op.agg()) {
       case AggregationKind::assign:
         return source;
-      case AggregationKind::add:
-        return rewriter.create<mlir::AddFOp>(op.getLoc(), source, op.val());
+      case AggregationKind::add: {
+        if (source.getType().isa<FloatType>()) {
+          return rewriter.create<mlir::AddFOp>(op.getLoc(), source, op.val());
+        }
+        return rewriter.create<mlir::AddIOp>(op.getLoc(), source, op.val());
+      }
       case AggregationKind::max: {
-        auto cmp = rewriter.create<mlir::CmpFOp>(op.getLoc(), mlir::CmpFPredicate::OGT, op.val(), source);
+        if (source.getType().isa<FloatType>()) {
+          auto cmp = rewriter.create<mlir::CmpFOp>(op.getLoc(), mlir::CmpFPredicate::OGT, op.val(), source);
+          return rewriter.create<mlir::SelectOp>(op.getLoc(), cmp, op.val(), source);
+        }
+        // TODO: determine whether to use signed or unsigned compare
+        auto cmp = rewriter.create<mlir::CmpIOp>(op.getLoc(), mlir::CmpIPredicate::sgt, op.val(), source);
         return rewriter.create<mlir::SelectOp>(op.getLoc(), cmp, op.val(), source);
       }
       case AggregationKind::min: {
-        auto cmp = rewriter.create<mlir::CmpFOp>(op.getLoc(), mlir::CmpFPredicate::OLT, op.val(), source);
+        if (source.getType().isa<FloatType>()) {
+          auto cmp = rewriter.create<mlir::CmpFOp>(op.getLoc(), mlir::CmpFPredicate::OLT, op.val(), source);
+          return rewriter.create<mlir::SelectOp>(op.getLoc(), cmp, op.val(), source);
+        }
+        // TODO: determine whether to use signed or unsigned compare
+        auto cmp = rewriter.create<mlir::CmpIOp>(op.getLoc(), mlir::CmpIPredicate::slt, op.val(), source);
         return rewriter.create<mlir::SelectOp>(op.getLoc(), cmp, op.val(), source);
       }
-      case AggregationKind::mul:
-        return rewriter.create<mlir::MulFOp>(op.getLoc(), source, op.val());
+      case AggregationKind::mul: {
+        if (source.getType().isa<FloatType>()) {
+          return rewriter.create<mlir::MulFOp>(op.getLoc(), source, op.val());
+        }
+        return rewriter.create<mlir::MulIOp>(op.getLoc(), source, op.val());
+      }
       default:
         llvm_unreachable("Unsupported aggregation for AffineReduceOpConversion::createReduction");
     }
