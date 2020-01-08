@@ -24,23 +24,25 @@
 namespace pmlc::conversion::tile_to_pxa {
 
 namespace ew = dialect::eltwise;
+namespace pxa = dialect::pxa;
 
 using dialect::eltwise::ScalarType;
-using dialect::pxa::AffineParallelForOp;
-using dialect::pxa::AffineReduceOp;
-using dialect::pxa::CastOp;
 using dialect::tile::AffineConstantOp;
 using dialect::tile::AggregationKind;
 using dialect::tile::CombinationKind;
 using dialect::tile::Contraction;
 using dialect::tile::ContractionOp;
 using dialect::tile::ContractionOpOperandAdaptor;
+using dialect::tile::IndexOp;
 using dialect::tile::Shape;
+using dialect::tile::ShapeOp;
+using dialect::tile::ShapeOpOperandAdaptor;
 using ::vertexai::tile::DataType;
 
 using llvm::Optional;
 using llvm::SmallVector;
 using mlir::AffineLoadOp;
+using mlir::AffineMap;
 using mlir::AffineMapAttr;
 using mlir::AffineStoreOp;
 using mlir::AffineTerminatorOp;
@@ -150,9 +152,8 @@ struct AffineConstantOpConversion : public OpConversionPattern<AffineConstantOp>
       AffineConstantOp op,             //
       ArrayRef<Value> operands,        //
       ConversionPatternRewriter& rewriter) const final {
-    auto value = op.getValue();
-    auto indexType = rewriter.getIndexType();
-    auto newOp = rewriter.create<mlir::ConstantOp>(op.getLoc(), indexType, value);
+    auto value = op.getValue().cast<IntegerAttr>().getInt();
+    auto newOp = rewriter.create<mlir::ConstantIndexOp>(op.getLoc(), value);
     rewriter.replaceOp(op, {newOp});
     return matchSuccess();
   }
@@ -182,6 +183,42 @@ struct ScalarConstantOpConversion : public OpConversionPattern<ew::ScalarConstan
   }
 };
 
+Value createCastOp(ConversionPatternRewriter& rewriter, Location loc, Value from, Type intoType, bool isSigned) {
+  auto fromType = from.getType();
+  if (fromType == intoType) {
+    return from;
+  }
+  if (auto intoFloatType = intoType.dyn_cast<FloatType>()) {
+    if (auto fromFloatType = fromType.dyn_cast<FloatType>()) {
+      if (fromFloatType.getWidth() < intoFloatType.getWidth()) {
+        // FPExtOp: FloatType -> wider FloatType
+        return rewriter.create<mlir::FPExtOp>(loc, from, intoType).getResult();
+      }
+      // FPTruncOp: FloatType -> narrower FloatType
+      return rewriter.create<mlir::FPTruncOp>(loc, from, intoType).getResult();
+    }
+    if (auto fromIntType = fromType.dyn_cast<IntegerType>()) {
+      // SIToFPOp: IntegerType -> FloatType
+      return rewriter.create<mlir::SIToFPOp>(loc, from, intoType).getResult();
+    }
+  }
+  if (auto intoIntType = intoType.dyn_cast<IntegerType>()) {
+    if (auto fromIntType = fromType.dyn_cast<IntegerType>()) {
+      if (fromIntType.getWidth() < intoIntType.getWidth()) {
+        if (isSigned) {
+          // SignExtendIOp: IntegerType -> wider signed int
+          return rewriter.create<mlir::SignExtendIOp>(loc, from, intoType).getResult();
+        }
+        // ZeroExtendIOp: IntegerType -> wider unsigned int
+        return rewriter.create<mlir::ZeroExtendIOp>(loc, from, intoType).getResult();
+      }
+      // TruncateIOp: IntegerType -> narrower IntegerType
+      return rewriter.create<mlir::TruncateIOp>(loc, from, intoType).getResult();
+    }
+  }
+  llvm_unreachable("Unsupported cast op");
+}
+
 struct Matcher {
   static PatternMatchResult matchSuccess(std::unique_ptr<mlir::PatternState> state = {}) {
     return PatternMatchResult(std::move(state));
@@ -207,12 +244,45 @@ struct ResultIs : Matcher {
 template <typename InnerPredicate>
 struct AnyOperandIs : Matcher {
   bool match(Operation* op) const final {
-    bool ok = false;
     for (auto operand : op->getOperands()) {
       InnerPredicate pred;
-      ok |= pred.match(operand.getType());
+      if (pred.match(operand.getType())) {
+        return true;
+      }
     }
-    return ok;
+    return false;
+  }
+};
+
+template <typename InnerPredicate>
+struct OperandsAre : Matcher {
+  bool match(Operation* op) const final {
+    for (auto operand : op->getOperands()) {
+      InnerPredicate pred;
+      if (!pred.match(operand.getType())) {
+        return false;
+      }
+    }
+    return true;
+  }
+};
+
+template <typename InnerPredicate>
+struct AnyComparandIs : Matcher {
+  bool match(Operation* op) const final {
+    SmallVector<Value, 4> allOperands(op->getOperands());
+    ContractionOpOperandAdaptor adaptor(allOperands);
+    auto operands = adaptor.operands();
+    InnerPredicate pred;
+    return pred.match(operands[0].getType()) || pred.match(operands[1].getType());
+  }
+};
+
+template <typename InnerPredicate>
+struct Not {
+  bool match(Type type) const {
+    InnerPredicate pred;
+    return !pred.match(type);
   }
 };
 
@@ -234,13 +304,21 @@ struct FirstOperand {
   }
 };
 
+void promoteTypes(ArrayRef<Value> operands, llvm::SmallVectorImpl<Value>* into) {
+  // TODO: add cast op for each operand wherever appropriate
+  for (auto operand : operands) {
+    into->push_back(operand);
+  }
+}
+
 template <typename OpType>
 struct StdOp {
   Value create(ConversionPatternRewriter& rewriter, Location loc, Type resultType, ArrayRef<Value> operands) {
-    // TODO: add cast op for each operand wherever appropriate
+    SmallVector<Value, 2> promoted;
+    promoteTypes(operands, &promoted);
     auto attrs = ArrayRef<NamedAttribute>{};
     auto resultTypes = llvm::makeArrayRef(resultType);
-    auto op = rewriter.create<OpType>(loc, resultTypes, operands, attrs);
+    auto op = rewriter.create<OpType>(loc, resultTypes, promoted, attrs);
     return op.getOperation()->getResult(0);
   }
 };
@@ -248,16 +326,18 @@ struct StdOp {
 template <CmpFPredicate predicate>
 struct CmpFloatOp {
   Value create(ConversionPatternRewriter& rewriter, Location loc, Type resultType, ArrayRef<Value> operands) {
-    // TODO: add cast op for each operand wherever appropriate
-    return rewriter.create<mlir::CmpFOp>(loc, predicate, operands[0], operands[1]).getResult();
+    SmallVector<Value, 2> promoted;
+    promoteTypes(operands, &promoted);
+    return rewriter.create<mlir::CmpFOp>(loc, predicate, promoted[0], promoted[1]).getResult();
   }
 };
 
 template <CmpIPredicate predicate>
 struct CmpIntOp {
   Value create(ConversionPatternRewriter& rewriter, Location loc, Type resultType, ArrayRef<Value> operands) {
-    // TODO: add cast op for each operand wherever appropriate
-    return rewriter.create<mlir::CmpIOp>(loc, predicate, operands[0], operands[1]).getResult();
+    SmallVector<Value, 2> promoted;
+    promoteTypes(operands, &promoted);
+    return rewriter.create<mlir::CmpIOp>(loc, predicate, promoted[0], promoted[1]).getResult();
   }
 };
 
@@ -265,8 +345,10 @@ template <typename CmpOpBuilder>
 struct CondOp {
   Value create(ConversionPatternRewriter& rewriter, Location loc, Type resultType, ArrayRef<Value> operands) {
     // TODO: add cast op for each operand wherever appropriate
+    SmallVector<Value, 2> promoted;
+    promoteTypes(operands.take_front(2), &promoted);
     CmpOpBuilder cmpOpBuilder;
-    auto cmp = cmpOpBuilder.create(rewriter, loc, resultType, operands.take_front(2));
+    auto cmp = cmpOpBuilder.create(rewriter, loc, resultType, promoted);
     auto zero = createInit(rewriter, loc, resultType, AggregationKind::add);
     return rewriter.create<mlir::SelectOp>(loc, cmp, operands[2], zero).getResult();
   }
@@ -275,18 +357,18 @@ struct CondOp {
     if (auto floatType = type.dyn_cast<FloatType>()) {
       switch (agg) {
         case AggregationKind::add:
-          return builder.create<mlir::ConstantOp>(loc, type, FloatAttr::get(floatType, 0.0));
+          return builder.create<mlir::ConstantFloatOp>(loc, llvm::APFloat(0.0), floatType);
         case AggregationKind::mul:
-          return builder.create<mlir::ConstantOp>(loc, type, FloatAttr::get(floatType, 1.0));
+          return builder.create<mlir::ConstantFloatOp>(loc, llvm::APFloat(1.0), floatType);
         default:
           llvm_unreachable("Unsupported aggregation for createInit");
       }
     } else if (auto intType = type.dyn_cast<IntegerType>()) {
       switch (agg) {
         case AggregationKind::add:
-          return builder.create<mlir::ConstantOp>(loc, type, IntegerAttr::get(intType, 0));
+          return builder.create<mlir::ConstantIntOp>(loc, 0, intType);
         case AggregationKind::mul:
-          return builder.create<mlir::ConstantOp>(loc, type, IntegerAttr::get(intType, 1));
+          return builder.create<mlir::ConstantIntOp>(loc, 1, intType);
         default:
           llvm_unreachable("Unsupported aggregation for createInit");
       }
@@ -319,7 +401,7 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
     // Make a parallel for loop to fill the result
     auto ranges = rewriter.getI64ArrayAttr(resultMemRefType.getShape());
     auto dynamicRanges = ArrayRef<Value>();
-    auto forOp = rewriter.create<AffineParallelForOp>(loc, ranges, dynamicRanges);
+    auto forOp = rewriter.create<pxa::AffineParallelForOp>(loc, ranges, dynamicRanges);
     auto body = rewriter.createBlock(&forOp.inner());
     SmallVector<Value, 8> idxs;
     for (size_t i = 0; i < ranges.size(); i++) {
@@ -425,9 +507,11 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
       ranges.emplace_back(range);
     }
 
+    // TODO: addInitializer
+
     // Make the outer loops
     auto dynamicRanges = ArrayRef<Value>();
-    auto forOp = rewriter.create<AffineParallelForOp>(loc, rewriter.getI64ArrayAttr(ranges), dynamicRanges);
+    auto forOp = rewriter.create<pxa::AffineParallelForOp>(loc, rewriter.getI64ArrayAttr(ranges), dynamicRanges);
     auto body = rewriter.createBlock(&forOp.inner());
     SmallVector<Value, 8> idxs;
     for (size_t i = 0; i < ranges.size(); i++) {
@@ -457,13 +541,153 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
 
     // Create the store
     auto resultMap = op.sink();
-    rewriter.create<AffineReduceOp>(loc, op.agg(), result, resultMemRef, resultMap, idxs);
+    rewriter.create<pxa::AffineReduceOp>(loc, op.agg(), result, resultMemRef, resultMap, idxs);
 
     // Terminate the inner body
     rewriter.create<AffineTerminatorOp>(loc);
 
     // Replace the op
     rewriter.replaceOp(op, resultMemRef);
+  }
+};
+
+struct IndexOpConversion : public OpConversionPattern<IndexOp> {
+  using OpConversionPattern<IndexOp>::OpConversionPattern;
+
+  PatternMatchResult matchAndRewrite(  //
+      IndexOp op,                      //
+      llvm::ArrayRef<Value> operands,  //
+      ConversionPatternRewriter& rewriter) const override {
+    IVLOG(2, "IndexOpConversion::matchAndRewrite>");
+
+    // Gather some basic info
+    auto loc = op.getLoc();
+    TypeConverter typeConverter;
+    auto resultType = typeConverter.convertType(op.result()->getType()).cast<MemRefType>();
+
+    // Make an allocation for the output
+    auto resultMemRef = rewriter.create<AllocOp>(loc, resultType).getResult();
+
+    // Make a parallel for loop to fill the result
+    auto ranges = rewriter.getI64ArrayAttr(resultType.getShape());
+    auto dynamicRanges = ArrayRef<Value>();
+    auto forOp = rewriter.create<pxa::AffineParallelForOp>(loc, ranges, dynamicRanges);
+    auto body = rewriter.createBlock(&forOp.inner());
+    SmallVector<Value, 8> idxs;
+    for (size_t i = 0; i < ranges.size(); i++) {
+      auto idx = body->addArgument(rewriter.getIndexType());
+      idxs.push_back(idx);
+    }
+
+    // Load the index value
+    // TODO: add check that dim is within range in verifier
+    auto dim = op.dim().getZExtValue();
+    auto map = AffineMap::get(1, 0, {rewriter.getAffineDimExpr(0)});
+    auto apply = rewriter.create<mlir::AffineApplyOp>(loc, map, idxs[dim]);
+
+    // Create the store
+    auto cast = rewriter.create<mlir::IndexCastOp>(loc, apply, rewriter.getIntegerType(32));
+    rewriter.create<AffineStoreOp>(loc, cast, resultMemRef, idxs);
+
+    // Terminate the inner body
+    rewriter.create<AffineTerminatorOp>(loc);
+
+    // Replace the op
+    rewriter.replaceOp(op, resultMemRef);
+
+    return matchSuccess();
+  }
+};
+
+struct ShapeOpConversion : public OpConversionPattern<ShapeOp> {
+  using OpConversionPattern<ShapeOp>::OpConversionPattern;
+
+  PatternMatchResult matchAndRewrite(  //
+      ShapeOp op,                      //
+      llvm::ArrayRef<Value> operands,  //
+      ConversionPatternRewriter& rewriter) const override {
+    IVLOG(2, "ShapeOpConversion::matchAndRewrite>");
+
+    // Create an adaptor
+    ShapeOpOperandAdaptor adaptor(operands);
+
+    // Gather some basic info
+    auto loc = op.getLoc();
+    TypeConverter typeConverter;
+    auto resultType = typeConverter.convertType(op.result()->getType()).cast<MemRefType>();
+
+    // Make an allocation for the output
+    auto resultMemRef = rewriter.create<AllocOp>(loc, resultType).getResult();
+
+    // Populate the buffer with the shape dims
+    auto operandType = adaptor.tensor().getType().cast<MemRefType>();
+    for (unsigned i = 0; i < operandType.getRank(); i++) {
+      auto idx = rewriter.create<mlir::ConstantIndexOp>(loc, i);
+      auto dim = rewriter.create<mlir::DimOp>(loc, adaptor.tensor(), i);
+      auto cast = rewriter.create<mlir::IndexCastOp>(loc, dim, rewriter.getIntegerType(32));
+      SmallVector<Value, 1> idxs = {idx};
+      rewriter.create<mlir::StoreOp>(loc, cast, resultMemRef, idxs);
+    }
+
+    // Replace the op
+    rewriter.replaceOp(op, resultMemRef);
+
+    return matchSuccess();
+  }
+};
+
+struct CastOpConversion : public OpConversionPattern<ew::CastOp> {
+  using OpConversionPattern<ew::CastOp>::OpConversionPattern;
+
+  PatternMatchResult matchAndRewrite(  //
+      ew::CastOp op,                   //
+      llvm::ArrayRef<Value> operands,  //
+      ConversionPatternRewriter& rewriter) const override {
+    IVLOG(2, "CastOpConversion::matchAndRewrite>");
+
+    // Gather some basic info
+    auto loc = op.getLoc();
+    TypeConverter typeConverter;
+    auto resultType = typeConverter.convertType(op.result()->getType()).cast<MemRefType>();
+    auto operand = operands[0];
+    auto operandType = operand.getType().cast<MemRefType>();
+    if (resultType == operandType) {
+      rewriter.replaceOp(op, operand);
+      return matchSuccess();
+    }
+
+    // Make an allocation for the output
+    auto resultMemRef = rewriter.create<AllocOp>(loc, resultType).getResult();
+
+    // Make a parallel for loop to fill the result
+    auto ranges = rewriter.getI64ArrayAttr(resultType.getShape());
+    auto dynamicRanges = ArrayRef<Value>();
+    auto forOp = rewriter.create<pxa::AffineParallelForOp>(loc, ranges, dynamicRanges);
+    auto body = rewriter.createBlock(&forOp.inner());
+    SmallVector<Value, 8> idxs;
+    for (size_t i = 0; i < ranges.size(); i++) {
+      auto idx = body->addArgument(rewriter.getIndexType());
+      idxs.push_back(idx);
+    }
+
+    // Create the load
+    auto scalar = rewriter.create<AffineLoadOp>(loc, operand, idxs);
+
+    // Create the standard cast op
+    auto scalarType = getScalarType(op.tensor());
+    bool isSigned = is_int(scalarType.type());
+    auto result = createCastOp(rewriter, loc, scalar, resultType.getElementType(), isSigned);
+
+    // Create the store
+    rewriter.create<AffineStoreOp>(loc, result, resultMemRef, idxs);
+
+    // Terminate the inner body
+    rewriter.create<AffineTerminatorOp>(loc);
+
+    // Replace the op
+    rewriter.replaceOp(op, resultMemRef);
+
+    return matchSuccess();
   }
 };
 
@@ -484,8 +708,13 @@ struct LoweringPass : public mlir::ModulePass<LoweringPass> {
     OwningRewritePatternList patterns;
     patterns.insert<                 //
         AffineConstantOpConversion,  //
+        CastOpConversion,            //
         FuncOpConversion,            //
+        IndexOpConversion,           //
         ScalarConstantOpConversion,  //
+        ShapeOpConversion,           //
+        // TODO: PrngOpConversion
+        // TODO: SpecialOpConversion (GatherOp, ReshapeOp, ScatterOp, ZeroOp)
         ContractionOpConversion<CombinationKind::none, FirstOperand>,
         ContractionOpConversion<CombinationKind::add, StdOp<mlir::AddFOp>, ResultIs<EltwiseFloat>>,
         ContractionOpConversion<CombinationKind::add, StdOp<mlir::AddIOp>, ResultIs<EltwiseInteger>>,
@@ -493,8 +722,10 @@ struct LoweringPass : public mlir::ModulePass<LoweringPass> {
         ContractionOpConversion<CombinationKind::mul, StdOp<mlir::MulIOp>, ResultIs<EltwiseInteger>>,
         ContractionOpConversion<CombinationKind::eq, CmpFloatOp<CmpFPredicate::OEQ>, ResultIs<EltwiseFloat>>,
         ContractionOpConversion<CombinationKind::eq, CmpIntOp<CmpIPredicate::eq>, ResultIs<EltwiseInteger>>,
-        ContractionOpConversion<CombinationKind::cond, CondOp<CmpFloatOp<CmpFPredicate::OEQ>>, ResultIs<EltwiseFloat>>,
-        ContractionOpConversion<CombinationKind::cond, CondOp<CmpIntOp<CmpIPredicate::eq>>, ResultIs<EltwiseInteger>>,
+        ContractionOpConversion<CombinationKind::cond, CondOp<CmpFloatOp<CmpFPredicate::OEQ>>,
+                                AnyComparandIs<EltwiseFloat>>,
+        ContractionOpConversion<CombinationKind::cond, CondOp<CmpIntOp<CmpIPredicate::eq>>,
+                                AnyComparandIs<EltwiseInteger>>,
         EltwiseOpConversion<ew::ExpOp, StdOp<mlir::ExpOp>>,
         EltwiseOpConversion<ew::NegOp, StdOp<mlir::NegFOp>, ResultIs<EltwiseFloat>>,
         EltwiseOpConversion<ew::AddOp, StdOp<mlir::AddFOp>, ResultIs<EltwiseFloat>>,
@@ -510,12 +741,13 @@ struct LoweringPass : public mlir::ModulePass<LoweringPass> {
         EltwiseOpConversion<ew::ModOp, StdOp<mlir::SignedRemIOp>, ResultIs<EltwiseInteger>>,
         EltwiseOpConversion<ew::ModOp, StdOp<mlir::UnsignedRemIOp>, ResultIs<EltwiseUnsigned>>,
         EltwiseOpConversion<ew::CmpEqOp, CmpFloatOp<CmpFPredicate::OEQ>, AnyOperandIs<EltwiseFloat>>,
-        EltwiseOpConversion<ew::CmpEqOp, CmpIntOp<CmpIPredicate::eq>, AnyOperandIs<EltwiseInteger>>,
-        EltwiseOpConversion<ew::CmpEqOp, CmpIntOp<CmpIPredicate::eq>, AnyOperandIs<EltwiseUnsigned>>,
+        EltwiseOpConversion<ew::CmpEqOp, CmpIntOp<CmpIPredicate::eq>, OperandsAre<Not<EltwiseFloat>>>,
+        // EltwiseOpConversion<ew::CmpEqOp, CmpIntOp<CmpIPredicate::eq>, AnyOperandIs<EltwiseUnsigned>>,
         EltwiseOpConversion<ew::CmpLtOp, CmpFloatOp<CmpFPredicate::OLT>, AnyOperandIs<EltwiseFloat>>,
-        EltwiseOpConversion<ew::CmpLtOp, CmpIntOp<CmpIPredicate::slt>, AnyOperandIs<EltwiseInteger>>,
-        EltwiseOpConversion<ew::CmpLtOp, CmpIntOp<CmpIPredicate::ult>, AnyOperandIs<EltwiseUnsigned>>,
-        EltwiseOpConversion<ew::SelectOp, StdOp<mlir::SelectOp>>  //
+        EltwiseOpConversion<ew::CmpLtOp, CmpIntOp<CmpIPredicate::slt>, OperandsAre<Not<EltwiseFloat>>>,
+        // EltwiseOpConversion<ew::CmpLtOp, CmpIntOp<CmpIPredicate::ult>, AnyOperandIs<EltwiseUnsigned>>,
+        EltwiseOpConversion<ew::SelectOp, StdOp<mlir::SelectOp>>,  //
+        EltwiseOpConversion<ew::IdentOp, FirstOperand>             //
         >(&getContext());
 
     // Run the conversion

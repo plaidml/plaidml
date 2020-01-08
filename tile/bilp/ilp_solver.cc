@@ -41,7 +41,11 @@ std::map<Polynomial<Rational>, ILPResult> ILPSolver::batch_solve(Tableau* tablea
   // Solve a batch of ILP problems, all with the same constraints but different objectives
   // The objective in `tableau` is ignored (in favor of the `objectives` parameter)
   if (!tableau->convertToCanonicalForm()) {
-    throw std::runtime_error("Unable to run ILPSolver::batch_solve: Feasible region empty.");
+    IVLOG(3, "Feasible region empty");
+    if (throw_infeasible) {
+      throw std::runtime_error("Unable to run ILPSolver::batch_solve: Feasible region empty.");
+    }
+    return std::map<Polynomial<Rational>, ILPResult>{};
   }
   var_names_ = tableau->varNames();
   tableau->convertToCanonicalForm();
