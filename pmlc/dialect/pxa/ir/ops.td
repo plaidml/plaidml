@@ -47,8 +47,6 @@ def ImplicitAffineTerminator
     : SingleBlockImplicitTerminator<"AffineTerminatorOp">;
 
 def AffineParallelForOp : PXA_Op<"parallel_for", [ImplicitAffineTerminator]> {
-    // ,
-    //  DeclareOpInterfaceMethods<LoopLikeOpInterface>]> {
   let summary = "multi-index parallel for operation";
   let arguments = (ins I64ArrayAttr:$ranges, Variadic<Index>:$dynamic_ranges);
   let regions = (region SizedRegion<1>:$inner);

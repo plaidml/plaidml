@@ -29,7 +29,6 @@
 #include "pmlc/dialect/stripe/util.h"
 #include "pmlc/dialect/tile/ir/dialect.h"
 #include "pmlc/dialect/tile/ir/ops.h"
-// #include "pmlc/dialect/tile/program.h"
 #include "pmlc/dialect/tile/transforms/contraction.h"
 #include "pmlc/util/util.h"
 
