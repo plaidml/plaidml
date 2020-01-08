@@ -10,9 +10,7 @@
 
 #include "tile/base/buffer.h"
 
-namespace pmlc {
-namespace dialect {
-namespace tile {
+namespace pmlc::dialect::tile {
 
 struct ProgramArgument {
   bool isInput;
@@ -30,6 +28,4 @@ struct TileProgram {
   explicit TileProgram(mlir::ModuleOp module) : module(module) {}
 };
 
-}  // namespace tile
-}  // namespace dialect
-}  // namespace pmlc
+}  // namespace pmlc::dialect::tile

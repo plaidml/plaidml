@@ -11,8 +11,7 @@
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/Value.h"
 
-namespace pmlc {
-namespace util {
+namespace pmlc::util {
 
 namespace {
 
@@ -77,5 +76,4 @@ std::vector<mlir::Value> getBackwardSlice(       //
   return impl.slice;
 }
 
-}  // namespace util
-}  // namespace pmlc
+}  // namespace pmlc::util

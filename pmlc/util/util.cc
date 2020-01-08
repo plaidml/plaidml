@@ -4,8 +4,7 @@
 
 #include "mlir/IR/Function.h"
 
-namespace pmlc {
-namespace util {
+namespace pmlc::util {
 
 llvm::StringRef getOpName(const mlir::OperationName& name) {
   return name.getStringRef().drop_front(name.getDialect().size() + 1);
@@ -25,5 +24,4 @@ void UpdateFuncOpType(mlir::Operation* op) {
   }
 }
 
-}  // namespace util
-}  // namespace pmlc
+}  // namespace pmlc::util

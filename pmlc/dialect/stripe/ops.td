@@ -8,7 +8,7 @@ include "pmlc/util/enums.td"
 #endif
 
 #ifndef __PML_ELTWISE_PREDICATES__
-include "pmlc/dialect/eltwise/predicates.td"
+include "pmlc/dialect/eltwise/ir/predicates.td"
 #endif
 
 def StripeDialect : Dialect {

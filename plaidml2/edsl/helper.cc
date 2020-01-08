@@ -3,8 +3,8 @@
 #include "plaidml2/edsl/helper.h"
 
 #include "plaidml2/core/internal.h"
+#include "pmlc/conversion/tile_to_stripe/lowering.h"
 #include "pmlc/dialect/stripe/transcode.h"
-#include "pmlc/dialect/tile/lowering.h"
 
 namespace plaidml::edsl {
 
