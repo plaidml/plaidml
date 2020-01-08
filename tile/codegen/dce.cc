@@ -183,7 +183,7 @@ void DeadCodeElimination(const AliasMap& alias_map, Block* block) {
     }
   }
 
-  ComputeDepsForBlock(block, alias_map);
+  ComputeDataflowDepsForBlock(block, alias_map);
   // Map a statement to its uses
   std::map<Statement*, std::vector<Statement*>> stmt_uses;
   for (const auto& stmt : block->stmts) {
@@ -231,27 +231,25 @@ void DeadCodeElimination(const AliasMap& alias_map, Block* block) {
 
 void DeadCodeEliminationPass::Apply(CompilerState* state) const {
   auto reqs = stripe::FromProto(options_.reqs());
-  RunOnBlocksBackward(
-      state->entry(), reqs,
-      [](const AliasMap& alias_map, stripe::Block* block) {  //
-        DeadCodeElimination(alias_map, block);
-      },
-      true);
+  RunOnBlocksBackward(state->entry(), reqs,
+                      [](const AliasMap& alias_map, stripe::Block* block) {  //
+                        DeadCodeElimination(alias_map, block);
+                      },
+                      true);
 
-  RunOnBlocks(
-      state->entry(), reqs,
-      [&](const AliasMap& map, stripe::Block* block) {  //
-        if (options_.fix_deps()) {
-          // Rebuild deps
-          ComputeDepsForBlock(block, map);
-        } else {
-          // Clean up deps after use
-          for (auto& stmt : block->stmts) {
-            stmt.get()->deps.clear();
-          }
-        }
-      },
-      true);
+  RunOnBlocks(state->entry(), reqs,
+              [&](const AliasMap& map, stripe::Block* block) {  //
+                if (options_.fix_deps()) {
+                  // Rebuild deps
+                  ComputeDepsForBlock(block, map);
+                } else {
+                  // Clean up deps after use
+                  for (auto& stmt : block->stmts) {
+                    stmt.get()->deps.clear();
+                  }
+                }
+              },
+              true);
 }
 
 namespace {
