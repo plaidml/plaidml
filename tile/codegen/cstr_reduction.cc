@@ -81,6 +81,7 @@ void LightCstrReduction(const AliasMap& alias_map, Block* block, const proto::Li
       }
       if (!idx->affine.getMap().empty()) {
         IVLOG(4, "  Skipping non-constant index=" << *idx);
+        continue;
       }
       int64_t coeff = kvp.second;
       IVLOG(4, "  Considering index=" << *idx << " with coeff=" << coeff);
@@ -149,14 +150,14 @@ void LightCstrReduction(const AliasMap& alias_map, Block* block, const proto::Li
       //     range'(idx) = range(idx) - shift
       //
       // Note that rewriting the use of the index within the current constraint will also affect the current
-      // min_value and lim_value, by adding the shift to each.
+      // min_value, by adding the shift to it.
       //
       // Also, note that reducing the range of the index may cause other constraints (potentially
       // already-processed contraints) to become redundant -- which is why we perform the redundant constraint
       // check after squeezing indicies across all constraints.
       //
-      // TODO: Consider removing the index entirely when when shift == range(idx), since the index will only
-      //       ever take on the value of zero.
+      // TODO: Consider removing the index entirely when when shift == range(idx) - 1, since the index will
+      //       only ever take on the value of zero.
       if (0 < coeff) {
         std::int64_t shift = static_cast<int64_t>(idx->range) - RoundUp(lim_value, coeff);
         if (0 < shift) {
@@ -191,7 +192,6 @@ void LightCstrReduction(const AliasMap& alias_map, Block* block, const proto::Li
             }
           }
           min_value += (shift * coeff);
-          lim_value += (shift * coeff);
           IVLOG(4, "  New idx=" << *idx);
           IVLOG(4, "  New con=" << constraint << " >= 0: min=" << min_value << " lim=" << lim_value);
         }
