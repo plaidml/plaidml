@@ -15,6 +15,14 @@ filegroup(
     srcs = ["interfaces.td"],
 )
 
+filegroup(
+    name = "td_files",
+    srcs = [
+        ":enums-td",
+        ":interfaces-td",
+    ],
+)
+
 gentbl(
     name = "interfaces-gen",
     tbl_outs = [

@@ -23,9 +23,9 @@
 #include "mlir/IR/Value.h"
 #include "mlir/Support/DebugStringHelper.h"
 
-#include "pmlc/dialect/eltwise/types.h"
+#include "pmlc/dialect/eltwise/ir/types.h"
 #include "pmlc/dialect/tile/gradient.h"
-#include "pmlc/dialect/tile/ops.h"
+#include "pmlc/dialect/tile/ir/ops.h"
 #include "pmlc/util/enums.h"
 #endif
 

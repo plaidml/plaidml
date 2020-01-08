@@ -2,22 +2,17 @@
 
 package(default_visibility = ["//visibility:public"])
 
-load("//vendor/mlir:tblgen.bzl", "COPTS", "gentbl")
 load("//bzl:plaidml.bzl", "plaidml_cc_library")
 
 plaidml_cc_library(
     name = "tile_to_pxa",
-    srcs = [
-        "pass.cc",
-    ],
-    hdrs = [
-        "pass.h",
-    ],
-    copts = COPTS,
+    srcs = glob(["*.cc"]),
+    hdrs = glob(["*.h"]),
     tags = ["llvm"],
     deps = [
-        "//pmlc/dialect/pxa",
-        "//pmlc/dialect/tile",
+        "//pmlc/dialect/pxa/ir",
+        "//pmlc/dialect/tile/ir",
+        "//pmlc/dialect/tile/transforms",
     ],
     alwayslink = 1,
 )

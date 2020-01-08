@@ -7,7 +7,7 @@
 #include <string>
 #include <unordered_map>
 
-#include "pmlc/dialect/tile/ops.h"
+#include "pmlc/dialect/tile/ir/ops.h"
 
 namespace mlir {
 class Value;
@@ -15,6 +15,7 @@ class Operation;
 }  // namespace mlir
 
 namespace pmlc::dialect::tile {
+
 class TileBuilder;
 
 // Deriv is a function that builds the gradients ("dXs") from the following inputs:
