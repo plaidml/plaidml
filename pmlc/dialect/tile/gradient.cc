@@ -11,7 +11,7 @@
 
 #include "base/util/logging.h"
 #include "pmlc/dialect/tile/builder.h"
-#include "pmlc/dialect/tile/ops.h"
+#include "pmlc/dialect/tile/ir/ops.h"
 #include "pmlc/util/slice.h"
 
 namespace pmlc::dialect::tile {

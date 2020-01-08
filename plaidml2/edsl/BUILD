@@ -77,6 +77,7 @@ plaidml_cc_library(
     deps = [
         "//base/util",
         "//plaidml2/core:core_mlir",
+        "//pmlc/conversion/tile_to_stripe",
         "//pmlc/dialect/tile",
         "@llvm-project//llvm:support",
     ],

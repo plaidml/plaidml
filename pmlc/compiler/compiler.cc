@@ -18,8 +18,7 @@
 
 #include "base/util/logging.h"
 #include "pmlc/compiler/registry.h"
-#include "pmlc/conversion/tile_to_pxa/pass.h"
-#include "pmlc/dialect/pxa/passes.h"
+#include "pmlc/conversion/tile_to_pxa/tile_to_pxa.h"
 
 using namespace mlir;  // NOLINT[build/namespaces]
 using pmlc::conversion::tile_to_pxa::createLowerTileToPXAPass;

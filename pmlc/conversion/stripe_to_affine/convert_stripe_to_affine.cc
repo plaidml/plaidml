@@ -4,7 +4,7 @@
 #include <utility>
 
 #include "pmlc/conversion/stripe_to_affine/convert_stripe_to_affine.h"
-#include "pmlc/dialect/eltwise/types.h"
+#include "pmlc/dialect/eltwise/ir/types.h"
 #include "pmlc/dialect/stripe/analysis.h"
 #include "pmlc/dialect/stripe/ops.h"
 #include "pmlc/dialect/stripe/populate_tensor_ref_shape_analysis.h"

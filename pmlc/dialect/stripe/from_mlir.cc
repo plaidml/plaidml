@@ -9,7 +9,7 @@
 #include "mlir/Translation.h"
 
 #include "base/util/lookup.h"
-#include "pmlc/dialect/eltwise/ops.h"
+#include "pmlc/dialect/eltwise/ir/ops.h"
 #include "pmlc/dialect/stripe/analysis.h"
 #include "pmlc/dialect/stripe/dialect.h"
 #include "pmlc/dialect/stripe/util.h"

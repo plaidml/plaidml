@@ -8,7 +8,7 @@
 
 #include "mlir/IR/Function.h"
 
-#include "pmlc/dialect/eltwise/ops.h"
+#include "pmlc/dialect/eltwise/ir/ops.h"
 #include "pmlc/dialect/stripe/dialect.h"
 #include "pmlc/dialect/stripe/mlir.h"
 #include "pmlc/dialect/stripe/ops.h"

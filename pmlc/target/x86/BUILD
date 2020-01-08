@@ -10,7 +10,7 @@ plaidml_cc_library(
     hdrs = glob(["*.h"]),
     deps = [
         "//pmlc/compiler",
-        "//pmlc/dialect/pxa",
+        "//pmlc/conversion/pxa_to_affine",
         "@llvm-project//mlir:AffineToStandardTransforms",
         "@llvm-project//mlir:LLVMTransforms",
     ],

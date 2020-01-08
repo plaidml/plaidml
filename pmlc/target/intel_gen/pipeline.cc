@@ -11,10 +11,10 @@
 #include "mlir/Transforms/Passes.h"
 
 #include "pmlc/compiler/registry.h"
-#include "pmlc/dialect/pxa/passes.h"
+#include "pmlc/conversion/pxa_to_affine/pxa_to_affine.h"
 
 using namespace mlir;  // NOLINT[build/namespaces]
-using pmlc::dialect::pxa::createLowerPXAToAffinePass;
+using pmlc::conversion::pxa_to_affine::createLowerPXAToAffinePass;
 
 namespace pmlc::target::intel_gen {
 
