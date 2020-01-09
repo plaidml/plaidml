@@ -230,19 +230,59 @@ static Value MakeCombination(             //
   throw std::runtime_error("Invalid combination op");
 }
 
+// TODO: Organize this function (e.g. in the header)
+mlir::AffineExpr MakeAffineExprFromIntPoly(IndexPoly poly, std::map<std::string, size_t> idxLookup,
+                                           ConversionPatternRewriter& rewriter) {
+  mlir::AffineExpr ret = rewriter.getAffineConstantExpr(0);
+  for (const auto& [var, coeff] : poly.getMap()) {
+    if (denominator(coeff) != 1) {
+      // TODO: Throw like this?
+      throw std::runtime_error("Non-integer polynomial in defractionalized contraction");
+    }
+    auto intCoeff = static_cast<int64_t>(numerator(coeff));
+    if (var == "") {
+      ret = ret + rewriter.getAffineConstantExpr(intCoeff);
+    } else {
+      try {
+        auto idxOrdinal = idxLookup.at(var);
+        auto idxExpr = rewriter.getAffineDimExpr(idxOrdinal);
+        auto multiplierExpr = rewriter.getAffineConstantExpr(intCoeff);
+        auto termExpr = idxExpr * multiplierExpr;
+        ret = termExpr + ret;
+      } catch (const std::out_of_range& ex) {
+        // TODO: Do we want to be doing this error testing in this way
+        throw std::out_of_range("Unexpected variable name " + var +
+                                " in source polynomial. Original message: " + ex.what());
+      }
+    }
+  }
+  return ret;
+}
+
+// TODO: Organize this function (e.g. in the header)
+AffineMap MakeAffineMapFromAccess(IndexAccess access, std::map<std::string, size_t> idxLookup,
+                                  ConversionPatternRewriter& rewriter) {
+  llvm::SmallVector<mlir::AffineExpr, 6> polyExprs;
+  for (const auto& poly : access) {
+    polyExprs.emplace_back(MakeAffineExprFromIntPoly(poly, idxLookup, rewriter));
+  }
+  return AffineMap::get(/*dimCount=*/idxLookup.size(), /*symbolCount=*/0, polyExprs);
+}
+
 struct ContractionOpSimplifyLHSAndBound : public LoweringBase {
   explicit ContractionOpSimplifyLHSAndBound(LoweringContext* lowering)
       : LoweringBase(ContractionOp::getOperationName(), lowering) {}
 
   PatternMatchResult tryMatchAndRewrite(  //
-      Operation* op,  //
-      llvm::ArrayRef<Value> operands, //
+      Operation* op,                      //
+      llvm::ArrayRef<Value> operands,     //
       ConversionPatternRewriter& rewriter) const override {
     IVLOG(1, "ContractionOpSimplifyLHSAndBound::matchAndRewrite> " << mlir::debugString(*op));
     auto cionOp = llvm::cast<ContractionOp>(op);
     auto loc = op->getLoc();
 
-    // TODO: Ultimately want to replace this chunk to avoid stripe::TensorType (by rewriting ComputeBounds to expect `shapes` in a different type/format)
+    // TODO: Ultimately want to replace this chunk to avoid stripe::TensorType (by rewriting ComputeBounds to expect
+    // `shapes` in a different type/format)
     auto resultType = cionOp.result()->getType();
     auto resultTensorType = convertIntoTensorType(resultType);
     IVLOG(3, "resultTensorType: " << mlir::debugString(resultTensorType));
@@ -260,7 +300,8 @@ struct ContractionOpSimplifyLHSAndBound : public LoweringBase {
     Contraction contraction{cionOp};
     bool no_reduce = cionOp.no_reduce().hasValue();
     const auto& [bounds, constraints] = contraction.ComputeBounds(shapes, no_reduce);
-    IVLOG(1, "Returning from ComputeBounds with\nbounds: " << bounds << "\nconstraints: " << constraints <<"\naccesses: " << contraction.accesses);
+    IVLOG(1, "Returning from ComputeBounds with\nbounds: " << bounds << "\nconstraints: " << constraints
+                                                           << "\naccesses: " << contraction.accesses);
 
     // TODO: Just see if this even works
     AffineMap map;
@@ -287,99 +328,59 @@ struct ContractionOpSimplifyLHSAndBound : public LoweringBase {
       IVLOG(2, "There is NO name on the incoming cion");
     }
 
+    // TODO: Retain index names wherever practical
 
-    // auto idx_count = bounds.size();
-    std::map<std::string, size_t> idx_lookup;
-    size_t curr_idx = 0;
-    for (const auto& [key, unused] : bounds) {
-      // TODO: While I'm here, I could write the bounds (currently in the `unused` variable) into the bounds attr
-      idx_lookup[key] = curr_idx;
-      curr_idx++;
+    // The order of the indexes will be whatever order they appear in in `bounds`
+    // Can go from string to ordinal value (its position in `bounds`) via `idx_lookup`
+    // While we're looping through the bounds anyway, write the values for the bounds Attr
+    std::map<std::string, size_t> idxLookup;
+    llvm::SmallVector<int64_t, 8> lower_bounds;
+    llvm::SmallVector<int64_t, 8> upper_bounds;
+    size_t currIdx = 0;
+    for (const auto& [idx_name, both_bounds] : bounds) {
+      IVLOG(1, "Index number " << currIdx << " is named " << idx_name);  // TODO: Don't retain this log
+      idxLookup[idx_name] = currIdx;
+      lower_bounds.push_back(both_bounds.min);
+      upper_bounds.push_back(both_bounds.max);
+      currIdx++;
     }
-    for (auto it = constraints.begin(); it != constraints.end(); it++) {
-      // TODO
+
+    // TODO: must have at least one access (for the output tensor); do we want to throw if not?
+    AffineMap sinkMap = MakeAffineMapFromAccess(contraction.accesses[0], idxLookup, rewriter);
+
+    llvm::SmallVector<Attribute, 3> srcMapAttrs;
+    for (auto it = ++contraction.accesses.begin(); it != contraction.accesses.end(); it++) {
+      // The accesses after the first are for the source maps
+      srcMapAttrs.emplace_back(AffineMapAttr::get(MakeAffineMapFromAccess(*it, idxLookup, rewriter)));
     }
-    // SmallVector<Value, 8> pairs(consOp.pairs());
-    // for (auto it = pairs.begin(); it != pairs.end(); it++) {
-    //   auto lhs = *it++;
-    //   auto rhs = *it;
-    //   cons.emplace_back(mlir::simplifyAffineExpr(makeExpr(lhs), collector.idxs.size(), 0));
-    //   cons.emplace_back(makeConstraint(lhs, rhs));
-    // }
 
+    std::vector<mlir::AffineExpr> affineConstraints;
+    llvm::SmallVector<bool, 4> constraintFlags(bounds.size(), false);
+    for (const auto& constraint : constraints) {
+      // Constraints are received in the form of poly <= rhs, where poly is a Polynomial<Rational> and rhs is int64_t
+      // However, the `poly`'s coeffs & constant are expected to all be integers by now
+      // To get them into a affine >= 0 format, take convert the poly to `affine` and take `rhs - affine` (implied >=0)
+      auto affine = MakeAffineExprFromIntPoly(constraint.poly, idxLookup, rewriter);
+      affineConstraints.emplace_back(mlir::simplifyAffineExpr(constraint.rhs - affine, bounds.size(), 0));
+    }
 
-
-    auto new_cion = rewriter.create<tile::ContractionOp>(loc, resultType,
-        cionOp.init(),
-        cionOp.operands(),
-        cionOp.agg(),
-        cionOp.combo(),
-        cionOp.sink(),  // TODO: Sink
-        ArrayAttr::get(cionOp.srcs(), rewriter.getContext()),  // TODO: Srcs
-        // IntegerSetAttr::get(IntegerSet::getEmptySet(0 /*collector.idxs.size()*/, 0, rewriter.getContext())),// TODO: Cons
-        cionOp.cons().hasValue() ? IntegerSetAttr::get(cionOp.cons().getValue()) : nullptr,  // TODO: Cons
-        cionOp.shape().hasValue() ? AffineMapAttr::get(cionOp.shape().getValue()) : nullptr,
-        cionOp.no_reduce().hasValue() ? UnitAttr::get(rewriter.getContext()) : nullptr,
-        StringAttr::get(cionOp.name().getValueOr(""), rewriter.getContext())
-    );
-    // auto new_cion = rewriter.create<tile::ContractionOp>(loc, resultType, cionOp.init(),
-    //     operands,  //cionOp.operands(),
-    //     cionOp.agg(), cionOp.combo(),
-    //     mapOp.result(),  // AffineMapAttr::get(cionOp.sink()),
-    //     mapOp.result(), //cionOp.srcs(), // ArrayAttr::get(cionOp.srcs(), rewriter.getContext()),
-    //     IntegerSet::getEmptySet(0 /*collector.idxs.size()*/, 0, rewriter.getContext()), //nullptr, //IntegerSetAttr::get(cionOp.cons()),
-    //     // AffineMapAttr::get(map), //nullptr, //cionOp.shape(),   // This is the one not in the 12-long builder
-    //     cionOp.no_reduce().hasValue(), //rewriter.getUnitAttr(cionOp.no_reduce().hasValue()), //nullptr, //cionOp.no_reduce(),
-    //     cionOp.name().getValueOr("")); //rewriter.getStringAttr("")); //nullptr); //cionOp.name());
+    auto new_cion = rewriter.create<tile::ContractionOp>(                                            //
+        loc,                                                                                         //
+        resultType,                                                                                  //
+        cionOp.init(),                                                                               //
+        cionOp.operands(),                                                                           //
+        cionOp.agg(),                                                                                //
+        cionOp.combo(),                                                                              //
+        sinkMap,                                                                                     //
+        ArrayAttr::get(srcMapAttrs, rewriter.getContext()),                                          //
+        IntegerSetAttr::get(IntegerSet::get(bounds.size(), 0, affineConstraints, constraintFlags)),  //
+        cionOp.shape().hasValue() ? AffineMapAttr::get(cionOp.shape().getValue()) : nullptr,         //
+        cionOp.no_reduce().hasValue() ? UnitAttr::get(rewriter.getContext()) : nullptr,              //
+        rewriter.getI64ArrayAttr(lower_bounds), rewriter.getI64ArrayAttr(upper_bounds),              //
+        StringAttr::get(cionOp.name().getValueOr(""), rewriter.getContext()));
     IVLOG(1, "Contraction made");
     IVLOG(1, "Original Contraction: " << mlir::debugString(*cionOp));
     IVLOG(1, "Rewritten Contraction: " << mlir::debugString(*new_cion));
-
-
-    // ContractionBuilder builder(op);   // This is a sym_cion builder
-    // auto newOp = rewriter.create<ContractionOp>(  //
-    //     op.getLoc(),                              //
-    //     resultType,                               //
-    //     op.init(),                                //
-    //     builder.getTensors(),                     //
-    //     op.agg(),                                 //
-    //     op.combo(),                               //
-    //     builder.getSink(),                        //
-    //     builder.getSources(),                     //
-    //     builder.getConstraints(),                 //
-    //     op.no_reduce().hasValue(),                //
-    //     op.name().getValueOr(""));
-
-    // let arguments = (ins
-    //   EltwiseAny:$init,
-    //   Variadic<AnyType>:$operands,
-    //   AggregationKind:$agg,
-    //   CombinationKind:$combo,
-    //   AffineMapAttr:$sink,
-    //   AffineMapArrayAttr:$srcs,
-    //   OptionalAttr<IntegerSetAttr>:$cons,
-    //   OptionalAttr<AffineMapAttr>:$shape,
-    //   OptionalAttr<UnitAttr>:$no_reduce,
-    //   OptionalAttr<StrAttr>:$name
-    // );
-    // let results = (outs RankedTensorOf<[AnyScalar]>:$result);
-    //
-    // let builders = [OpBuilder<
-    //   "Builder* builder, "
-    //   "OperationState& result, "
-    //   "Type resultType, "
-    //   "Value* init, "
-    //   "ArrayRef<Value*> tensors, "
-    //   "AggregationKind agg, "
-    //   "CombinationKind combo, "
-    //   "AffineMap sink, "
-    //   "ArrayRef<AffineMap> srcs, "
-    //   "IntegerSet cons, "
-    //   "bool no_reduce, "
-    //   "StringRef name"
-    // >];
-
-
 
     throw std::runtime_error("Intentional abort for testing");
   }
@@ -1074,12 +1075,12 @@ struct LoweringPass : public mlir::ModulePass<LoweringPass> {
     });
 
     OwningRewritePatternList patterns;
-    patterns.insert<                 //
-        AffineConstantOpConversion,  //
-        ContractionOpSimplifyLHSAndBound,
-        // ContractionOpConversion,     //
-        FuncOpConversion,            //
-        IndexOpConversion,           //
+    patterns.insert<                       //
+        AffineConstantOpConversion,        //
+        ContractionOpSimplifyLHSAndBound,  // TODO
+        // ContractionOpConversion,     // TODO
+        FuncOpConversion,   //
+        IndexOpConversion,  //
         ReturnOpConversion>(&lowering);
     auto eltwiseOps = util::getAllOpsWithInterface<eltwise::EltwiseOp>(&getContext());
     for (auto op : eltwiseOps) {

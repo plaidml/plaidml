@@ -624,6 +624,8 @@ BoundsAndConstraints Contraction::ComputeBounds(llvm::ArrayRef<stripe::TensorTyp
 }
 
 math::Affine Integerize(const IndexPoly& poly, const math::IndexBounds& bounds) {
+  // Rewrites an IndexPoly with integer coefficients and index values ranging over integers in [a_i, b_i)
+  // as an Affine with integer coefficients and index values ranging over integers in [0, b_i - a_i)
   math::Affine result;
   for (const auto& term : poly.getMap()) {
     if (denominator(term.second) != 1) {
