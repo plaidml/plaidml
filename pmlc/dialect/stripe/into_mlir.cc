@@ -179,6 +179,7 @@ static std::map<CastKey, DataType> castMap = {
 };
 
 static void IntrinsicIntoMLIR(OpBuilder* builder, SymbolTable* locals, const stripe::Intrinsic& intrinsic) {
+  IVLOG(1, "IntrinsicIntoMLIR name " << intrinsic.name);
   if (intrinsic.any_tags()) {
     throw std::runtime_error("No tags allowed on intrinsics");
   }
@@ -207,6 +208,8 @@ static void IntrinsicIntoMLIR(OpBuilder* builder, SymbolTable* locals, const str
     return;
   }
   auto opName = eltwise::Dialect::getCanonicalOpName(intrinsic.name);
+  IVLOG(1, "opName " << opName);
+
   auto abstractOp = mlir::AbstractOperation::lookup(opName, builder->getContext());
   if (!abstractOp) {
     throw std::runtime_error("Unknown intrinsic: " + intrinsic.name);
@@ -219,7 +222,14 @@ static void IntrinsicIntoMLIR(OpBuilder* builder, SymbolTable* locals, const str
   for (const auto& in : intrinsic.inputs) {
     operands.push_back(safe_at(locals->scalars, in));
   }
+  IVLOG(1, "intrinsic.type is uint64? " << (intrinsic.type == DataType::UINT64));
+  IVLOG(1, "intrinsic.type is DataType::FLOAT32? " << (intrinsic.type == DataType::FLOAT32));
+  // intrinsic.type.dump();
   ScalarType scalarType = DataTypeIntoMLIR(builder->getContext(), intrinsic.type);
+  IVLOG(1, "scalarType ");
+  scalarType.dump();
+  std::cout << "\n";
+  IVLOG(1, "");
   auto op = genericBuilder->create(builder, builder->getUnknownLoc(), scalarType, operands);
   locals->scalars.emplace(intrinsic.outputs[0], op->getResult(0));
   op->setAttr("scalar_name", builder->getStringAttr(intrinsic.outputs[0]));
@@ -265,6 +275,8 @@ static void SpecialIntoMLIR(OpBuilder* builder, SymbolTable* locals, const strip
 }
 
 static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const stripe::Block& block) {
+  IVLOG(1, "BlockIntoMLIR");
+  IVLOG(1, "Block statemntss size " << block.stmts.size());
   auto unknownLoc = builder->getUnknownLoc();
 
   // Make room for local symbols
@@ -326,12 +338,15 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
   // N.B. We always process the refinements as direct children of the loop, because refinement scanning in the
   // MLIR->Stripe conversion will skip over the fake blocks induced by execution location and constraint
   // operations.
+  IVLOG(1, "Process the refinements " << block.refs.size());
   for (const auto& ref : block.refs) {
+    IVLOG(1, "refinenament " << ref);
     Value from;
     std::vector<Value> offsets;
     Value zero;
     if (ref.from.empty()) {
       auto tensorType = ShapeIntoTensorType(builder->getContext(), ref.interior_shape, ref.location);
+
       from = builder->create<AllocateOp>(unknownLoc, tensorType);
       offsets = LocationIntoTensorOffsets(builder, locals.idxs, ref.location, nullptr);
     } else {
@@ -360,6 +375,7 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
   }
 
   // Process the constraints
+  IVLOG(1, "Process the constraints " << block.constraints.size());
   for (const auto& con : block.constraints) {
     // Make the actual constraint value
     auto aif = builder->create<ConstraintOp>(unknownLoc, AffineIntoMLIR(builder, locals.idxs, con));
@@ -373,14 +389,36 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
   }
 
   // Process the statements
+  IVLOG(1, "Process the statements " << block.stmts.size());
   for (const auto& stmt : block.stmts) {
+    IVLOG(1, "Process the statement " << stmt);
+
     switch (stmt->kind()) {
       case stripe::StmtKind::Load: {
+        IVLOG(1, "stripe::StmtKind::Load");
         const auto& load = stripe::Load::Downcast(stmt);
+
+        IVLOG(1, "from " << load->from);
+        IVLOG(1, "into " << load->into);
+
         Value from = safe_at(locals.refs, load->from);
+        IVLOG(1, "from ");
+        from.dump();
+
         auto tensorRefType = from->getType().cast<TensorRefType>();
         auto elementType = tensorRefType.getElementType();
+        IVLOG(1, "elementType.isF32() " << elementType.isF32());
+        IVLOG(1, "elementType.isInteger(64) " << elementType.isInteger(64));
+        IVLOG(1, "elementType.isInteger(32) " << elementType.isInteger(32));
+        IVLOG(1, "elementType.isIntOrFloat() " << elementType.isIntOrFloat());
+
         auto intoType = eltwise::getRankedTensorType(elementType);
+        IVLOG(1, "intoType.isF32() " << intoType.isF32());
+        IVLOG(1, "intoType.isInteger(64) " << intoType.isInteger(64));
+        IVLOG(1, "intoType.isInteger(32) " << intoType.isInteger(32));
+        IVLOG(1, "intoType.isIntOrFloat() " << intoType.isIntOrFloat());
+
+
         auto op = builder->create<LoadOp>(unknownLoc, intoType, from);
         auto attrs = TagsToDict(builder, *load);
         if (attrs.size()) {
@@ -388,8 +426,13 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
         }
         op.setAttr("scalar_name", builder->getStringAttr(load->into));
         locals.scalars.emplace(load->into, op);
+
+        IVLOG(1, "op");
+        op.getAttr("scalar_name").dump();
+
       } break;
       case stripe::StmtKind::LoadIndex: {
+        IVLOG(1, "stripe::StmtKind::LoadIndex");
         const auto& load_idx = stripe::LoadIndex::Downcast(stmt);
         Value from = AffineIntoMLIR(builder, locals.idxs, load_idx->from);
         Type idx_base = ScalarType::get(builder->getContext(), DataType::INT32);
@@ -399,6 +442,7 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
         locals.scalars.emplace(load_idx->into, op);
       } break;
       case stripe::StmtKind::Store: {
+        IVLOG(1, "stripe::StmtKind::Store");
         const auto& store = stripe::Store::Downcast(stmt);
         std::string agg_str = block.ref_by_into(store->into)->agg_op;
         Value into = safe_at(locals.refs, store->into);
@@ -425,6 +469,7 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
         }
       } break;
       case stripe::StmtKind::Constant: {
+        IVLOG(1, "stripe::StmtKind::Constant");
         const auto cnst = stripe::Constant::Downcast(stmt);
         eltwise::ScalarConstantOp op;
         switch (cnst->type) {
@@ -442,12 +487,20 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
         locals.scalars.emplace(cnst->name, op);
       } break;
       case stripe::StmtKind::Special:
+        IVLOG(1, "stripe::StmtKind::Special");
         SpecialIntoMLIR(builder, &locals, *stripe::Special::Downcast(stmt));
         break;
-      case stripe::StmtKind::Intrinsic:
+      case stripe::StmtKind::Intrinsic: {
+        IVLOG(1, "stripe::StmtKind::Intrinsic");
+        const auto intrinsic_type = (*stripe::Intrinsic::Downcast(stmt)).type;
+        bool is_float = (intrinsic_type == DataType::FLOAT32);
+        IVLOG(1, "tmp instrinsic is float? " << is_float);
+
         IntrinsicIntoMLIR(builder, &locals, *stripe::Intrinsic::Downcast(stmt));
         break;
+      }
       case stripe::StmtKind::Block:
+        IVLOG(1, "stripe::StmtKind::Block");
         BlockIntoMLIR(builder, locals, *stripe::Block::Downcast(stmt));
         break;
     }
@@ -467,6 +520,7 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
   auto loop_op = builder->create<ParallelForOp>(unknownLoc, builder->getI64ArrayAttr(ranges));
   loop_op.setAttr("name", builder->getStringAttr(block.name));
   loop_op.setAttr("comments", builder->getStringAttr(block.comments));
+
   auto attrs = TagsToDict(builder, block);
   if (attrs.size()) {
     loop_op.setAttr(Dialect::getStripeAttrsName(), attrs);
@@ -479,6 +533,8 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
 }
 
 static mlir::FuncOp ProgramIntoMLIR(MLIRContext* ctx, const stripe::Block& block) {
+  IVLOG(1, "ProgramIntoMLIR ");
+
   std::vector<mlir::Type> tensorTypes;
   std::vector<mlir::Type> tensorRefTypes;
   for (const auto& ref : block.refs) {
@@ -499,6 +555,7 @@ static mlir::FuncOp ProgramIntoMLIR(MLIRContext* ctx, const stripe::Block& block
 
   SymbolTable initial;
   size_t argcnt = 0;
+  IVLOG(1, "ProgramIntoMLIR block.refs " << block.refs.size());
   for (const auto& ref : block.refs) {
     auto argIndex = argcnt++;
     auto arg = func.getArgument(argIndex);
@@ -516,6 +573,7 @@ static mlir::FuncOp ProgramIntoMLIR(MLIRContext* ctx, const stripe::Block& block
     }
     // Only 'dialect attrs' are allowed on function arguments
     auto attrName = Dialect::getDialectAttrName("name");
+    IVLOG(1, "attrName " << attrName);
     func.setArgAttr(argIndex, attrName, builder.getStringAttr(ref.into()));
     auto attrLayout = Dialect::getDialectAttrName("layout");
     func.setArgAttr(argIndex, attrLayout, TypeAttr::get(tensorTypes[argIndex]));

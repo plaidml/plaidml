@@ -100,6 +100,7 @@ class ConfigsRegistry {
 }  // namespace
 
 void Optimize(CompilerState* state, const Passes& passes, const OptimizeOptions& options) {
+  IVLOG(1, "Optimize()");
   size_t counter = 0;
   DumpProgram(*state->entry(), options, "initial", counter++);
   bool in_stripe = true;
