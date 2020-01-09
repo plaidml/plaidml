@@ -46,6 +46,61 @@ Tensor Softmax(const Tensor& X) {
   return E / N;
 }
 
+TEST(CppEdsl, Add) {
+  auto A = Placeholder(PLAIDML_DATA_UINT64, {3, 3});
+  auto B = Placeholder(PLAIDML_DATA_UINT64, {3, 3});
+  auto C = A + B;
+  Program program("add", {C});
+
+  IVLOG(1, "fabi prog " << program);
+
+  std::vector<std::uint64_t> input_a = {
+     (1UL << 24) + 1, 2, 3,
+      4, 5, 6,
+      7, 8, 9,
+  };
+  std::vector<std::uint64_t> input_b = {
+     2, 2, 3,
+      4, 5, 6,
+      7, 8, 9,
+  };
+
+  std::vector<std::uint64_t> expected = {
+      (1UL << 24) + 3,  4,  6,
+      8,  10,  12,
+      14, 16, 18
+  };
+
+  auto binder = exec::Binder(program);
+  IVLOG(1, "fabi binded");
+  auto executable = binder.compile();
+  IVLOG(1, "fabi compiled");
+  binder.input(A).copy_from(input_a.data());
+  binder.input(B).copy_from(input_b.data());
+  IVLOG(1, "fabi copied inputs");
+  executable->run();
+  IVLOG(1, "fabi ran executable");
+  {
+    auto view = binder.output(C).mmap_current();
+    ASSERT_THAT(view.size(), expected.size() * sizeof(expected[0]));
+    auto data = reinterpret_cast<std::uint64_t*>(view.data());
+    std::vector<std::uint64_t> actual(data, data + expected.size());
+    EXPECT_THAT(actual, ContainerEq(expected));
+
+    auto input_a_tv = binder.input(A).mmap_current();
+    ASSERT_THAT(input_a_tv.size(), expected.size() * sizeof(expected[0]));
+    auto a_data = reinterpret_cast<std::uint64_t*>(input_a_tv.data());
+    std::vector<std::uint64_t> actual_a_data(a_data, a_data + expected.size());
+
+    IVLOG(1, "actual_a_data " << actual_a_data);
+    IVLOG(1, "input_a " << input_a);
+    IVLOG(1, "input_b " << input_b);
+
+    IVLOG(1, "expected " << expected);
+    IVLOG(1, "actual " << actual);
+  }
+}
+
 TEST(CppEdsl, Dot) {
   auto A = Placeholder(PLAIDML_DATA_FLOAT32, {3, 3});
   auto B = Placeholder(PLAIDML_DATA_FLOAT32, {3, 3});
