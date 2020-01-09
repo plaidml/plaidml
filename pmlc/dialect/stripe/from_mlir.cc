@@ -21,6 +21,12 @@ namespace pmlc {
 namespace dialect {
 namespace stripe {
 
+static DataType DataTypeFromMLIR(/* mlir::MLIRContext* ctx, */ mlir::Type dtype) {
+  return DataType::UINT64;
+  // return DataType::FLOAT32;
+  // return ScalarType::get(ctx, dtype);
+}
+
 using vertexai::safe_at;
 using DataType = vertexai::tile::DataType;
 using TensorShape = vertexai::tile::TensorShape;
@@ -649,6 +655,11 @@ void StripeBuilder::visit(util::GenericBuilder builder) {
   for (auto operand : op->getOperands()) {
     IVLOG(1, "operand " << operand);
     intr->inputs.push_back(get_scalar(operand));
+
+    operand->getType().dump();
+
+    intr->type = DataTypeFromMLIR(operand->getType());
+   // intr->type = operand->getType();
   }
   IVLOG(1, "intr " << *intr);
   IVLOG(1, "intr type == FLOAT32? " <<(intr->type == DataType::FLOAT32));
