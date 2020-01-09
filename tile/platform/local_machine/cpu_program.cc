@@ -50,7 +50,7 @@ CpuProgram::CpuProgram(                              //
   codegen::OptimizeOptions options = {
       !out_dir.empty(),    // dump_passes
       false,               // dump_passes_proto
-      false,               // dump_code
+      true,               // dump_code
       out_dir / "passes",  // dbg_dir
   };
   const auto& cfgs = targets::GetConfigs();
