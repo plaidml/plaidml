@@ -125,8 +125,19 @@ plaidml_cc_test(
 )
 
 py_test(
-    name = "py_test",
+    name = "py_ast_test",
     srcs = ["edsl_test.py"],
+    main = "edsl_test.py",
+    deps = [
+        ":py",
+        "//plaidml2/exec:py",
+    ],
+)
+
+py_test(
+    name = "py_mlir_test",
+    srcs = ["edsl_test.py"],
+    args = ["--mlir"],
     main = "edsl_test.py",
     deps = [
         ":py",
