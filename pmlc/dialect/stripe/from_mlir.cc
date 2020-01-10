@@ -16,17 +16,9 @@
 #include "pmlc/util/util.h"
 #include "tile/stripe/stripe.h"
 
-
 namespace pmlc {
 namespace dialect {
 namespace stripe {
-
-static DataType DataTypeFromMLIR(/* mlir::MLIRContext* ctx, */ mlir::Type dtype) {
-  return DataType::UINT64;
-  // return DataType::FLOAT32;
-  // return ScalarType::get(ctx, dtype);
-}
-
 using vertexai::safe_at;
 using DataType = vertexai::tile::DataType;
 using TensorShape = vertexai::tile::TensorShape;
@@ -183,23 +175,23 @@ StripeBuilder::StripeBuilder(const StripeBuilder& rhs)
       blocks_(rhs.blocks_) {}
 
 StripeBuilder::StripeBuilder(mlir::FuncOp func) : blocks_(std::make_shared<std::map<mlir::Block*, BlockInfo>>()) {
+  std::function<void(vertexai::tile::stripe::StatementList)> print_type =
+      [&](vertexai::tile::stripe::StatementList stmts) {
+        for (const auto& stmt : stmts) {
+          if (stmt->kind() == vertexai::tile::stripe::StmtKind::Block) {
+            IVLOG(1, "Stmt is Block");
+            const auto block = std::dynamic_pointer_cast<vertexai::tile::stripe::Block>(stmt);
+            IVLOG(1, "Block has how many stements " << block->stmts.size());
+            print_type(block->stmts);
+          } else if (stmt->kind() == vertexai::tile::stripe::StmtKind::Intrinsic) {
+            const auto intr = std::dynamic_pointer_cast<vertexai::tile::stripe::Intrinsic>(stmt);
 
-  std::function<void(vertexai::tile::stripe::StatementList)> print_type = [&](vertexai::tile::stripe::StatementList stmts) {
-    for(const auto& stmt : stmts) {
-      if (stmt->kind() == vertexai::tile::stripe::StmtKind::Block) {
-        IVLOG(1, "Stmt is Block");
-        const auto block = std::dynamic_pointer_cast<vertexai::tile::stripe::Block>(stmt);
-        IVLOG(1, "Block has how many stements " << block->stmts.size());
-        print_type(block->stmts);
-      } else  if (stmt->kind() == vertexai::tile::stripe::StmtKind::Intrinsic) {
-          const auto intr = std::dynamic_pointer_cast<vertexai::tile::stripe::Intrinsic>(stmt);
-
-          IVLOG(1, "Got intr");
-          IVLOG(1, "intr type == FLOAT32? " << (intr->type == DataType::FLOAT32));
+            IVLOG(1, "Got intr");
+            IVLOG(1, "intr type == FLOAT32? " << (intr->type == DataType::FLOAT32));
+            IVLOG(1, "intr type == UINT64? " << (intr->type == DataType::UINT64));
+          }
         }
-    }
-  };
-
+      };
 
   IVLOG(1, "Creating StripBuilder from mlir func with name " << func.getName());
   // Construct the block and put it in the table
@@ -641,28 +633,24 @@ void StripeBuilder::visit(util::GenericBuilder builder) {
   auto op = builder.getOperation();
   IVLOG(3, "StripeBuilder::visit GenericBuilder> " << mlir::debugString(*op));
   auto out_name = scalar_name(op);
-  IVLOG(1, "out_name " << out_name);
   scalars_[op->getResult(0)] = out_name;
   auto intr = std::make_shared<stripe::Intrinsic>();
   intr->name = util::getOpName(op->getName());
-  // Foun the problem!
-
-  IVLOG(1, "intr->name " << intr->name);
   if (intr->name == "select") {
     intr->name = "cond";
   }
   intr->outputs.push_back(out_name);
   for (auto operand : op->getOperands()) {
-    IVLOG(1, "operand " << operand);
     intr->inputs.push_back(get_scalar(operand));
-
-    operand->getType().dump();
-
-    intr->type = DataTypeFromMLIR(operand->getType());
-   // intr->type = operand->getType();
   }
-  IVLOG(1, "intr " << *intr);
-  IVLOG(1, "intr type == FLOAT32? " <<(intr->type == DataType::FLOAT32));
+
+  auto result = op->getResult(0);
+  auto tensorType = eltwise::getRankedTensorType(result->getType());
+  auto scalarType = tensorType.getElementType().cast<eltwise::ScalarType>();
+  intr->type = scalarType.type();
+
+  IVLOG(1, "inVtr type == FLOAT32? " << (intr->type == DataType::FLOAT32));
+  IVLOG(1, "inVtr type == UINT64? " << (intr->type == DataType::UINT64));
   cur_->stmts.push_back(intr);
 }
 
@@ -776,22 +764,23 @@ std::string StripeBuilder::scalar_name(Operation* op, std::string out_name) {
 }  // End namespace
 
 std::shared_ptr<stripe::Program> FromMLIR(mlir::ModuleOp module) {
+  std::function<void(vertexai::tile::stripe::StatementList)> print_type =
+      [&](vertexai::tile::stripe::StatementList stmts) {
+        for (const auto& stmt : stmts) {
+          if (stmt->kind() == vertexai::tile::stripe::StmtKind::Block) {
+            IVLOG(1, "Stmt is Block");
+            const auto block = std::dynamic_pointer_cast<vertexai::tile::stripe::Block>(stmt);
+            IVLOG(1, "Block has how many stements " << block->stmts.size());
+            print_type(block->stmts);
+          } else if (stmt->kind() == vertexai::tile::stripe::StmtKind::Intrinsic) {
+            const auto intr = std::dynamic_pointer_cast<vertexai::tile::stripe::Intrinsic>(stmt);
 
-  std::function<void(vertexai::tile::stripe::StatementList)> print_type = [&](vertexai::tile::stripe::StatementList stmts) {
-    for(const auto& stmt : stmts) {
-      if (stmt->kind() == vertexai::tile::stripe::StmtKind::Block) {
-        IVLOG(1, "Stmt is Block");
-        const auto block = std::dynamic_pointer_cast<vertexai::tile::stripe::Block>(stmt);
-        IVLOG(1, "Block has how many stements " << block->stmts.size());
-        print_type(block->stmts);
-      } else  if (stmt->kind() == vertexai::tile::stripe::StmtKind::Intrinsic) {
-          const auto intr = std::dynamic_pointer_cast<vertexai::tile::stripe::Intrinsic>(stmt);
-
-          IVLOG(1, "Got intr");
-          IVLOG(1, "intr type == FLOAT32? " << (intr->type == DataType::FLOAT32));
+            IVLOG(1, "Got intr");
+            IVLOG(1, "intr type == FLOAT32? " << (intr->type == DataType::FLOAT32));
+            IVLOG(1, "intr type == UINT64? " << (intr->type == DataType::UINT64));
+          }
         }
-    }
-  };
+      };
 
   IVLOG(1, "FromMLIR");
   IVLOG(1, "from MLIR module string" << mlir::debugString(module));
@@ -815,8 +804,8 @@ std::shared_ptr<stripe::Program> FromMLIR(mlir::ModuleOp module) {
       ret->output_shapes.emplace(ref.from, ref.interior_shape);
     }
   }
-  //IVLOG(1, *ret->entry);
-  //IVLOG(1, "program " << *ret);
+  // IVLOG(1, *ret->entry);
+  // IVLOG(1, "program " << *ret);
   IVLOG(1, "Done with FromMLIR");
   IVLOG(1, "ret->entry->stmts.size " << ret->entry->stmts.size())
 
