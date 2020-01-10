@@ -617,9 +617,7 @@ void StripeBuilder::visit(util::GenericBuilder builder) {
     intr->inputs.push_back(get_scalar(operand));
   }
 
-  static std::unordered_set<std::string> boolean_op_names{"cmp_eq", "cmp_ne", "cmp_gt", "cmp_lt", "cmp_ge", "cmp_le"};
-
-  if (boolean_op_names.find(intr->name) != boolean_op_names.end()) {
+  if (intr->name.rfind("cmp") == 0) {
     DataType superType = DataType::INVALID;
     for (auto operandType : op->getOperandTypes()) {
       auto tensorType = eltwise::getRankedTensorType(operandType);
