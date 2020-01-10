@@ -303,9 +303,6 @@ struct ContractionOpSimplifyLHSAndBound : public LoweringBase {
     IVLOG(1, "Returning from ComputeBounds with\nbounds: " << bounds << "\nconstraints: " << constraints
                                                            << "\naccesses: " << contraction.accesses);
 
-    // TODO: Just see if this even works
-    AffineMap map;
-    // NO auto mapOp = rewriter.create<tile::AffineMapOp>(loc);
     IVLOG(1, "Making new contraction");
     if (cionOp.cons().hasValue()) {
       IVLOG(2, "The incoming cion DOES have constraints");
