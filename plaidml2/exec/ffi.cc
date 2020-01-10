@@ -196,14 +196,11 @@ plaidml_executable* plaidml_compile(  //
       }
     }
 #ifdef PLAIDML_AST
-    IVLOG(1, "plaidml_compile PLAIDML_AST");
     ConstBufferManager const_bufs;
     const_bufs.allocator = std::make_shared<PlatformAllocator>(device);
     auto exec = std::make_unique<plaidml_executable>();
-    IVLOG(1, "vertexai::tile::lang::GenerateStripe");
     auto stripe = vertexai::tile::lang::GenerateStripe(program->eval.runinfo);
     Context ctx;
-    IVLOG(1, "GetPlatform()->MakeProgram");
     exec->program = GetPlatform()->MakeProgram(ctx, device, target, stripe, &const_bufs);
     std::unordered_map<ExprPtr, BufferPtr> input_bindings;
     for (size_t i = 0; i < ninputs; i++) {
@@ -235,11 +232,9 @@ plaidml_executable* plaidml_compile(  //
     for (const auto& kvp : program->eval.updates) {
       exec->output_bufs[kvp.first] = kvp.second->buffer;
     }
-    IVLOG(1, "Done with plaidml_compile");
     return exec.release();
 #endif
 #ifdef PLAIDML_MLIR
-    IVLOG(1, "plaidml_compile PLAIDML_MLIR")
     auto ctx = GlobalContext::getContext();
     auto args = BindProgramArguments(program, ninputs, inputs, noutputs, outputs);
     if (vertexai::env::Get("PLAIDML_EE") == "1") {

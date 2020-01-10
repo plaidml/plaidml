@@ -100,7 +100,6 @@ class ConfigsRegistry {
 }  // namespace
 
 void Optimize(CompilerState* state, const Passes& passes, const OptimizeOptions& options) {
-  IVLOG(1, "Optimize()");
   size_t counter = 0;
   DumpProgram(*state->entry(), options, "initial", counter++);
   bool in_stripe = true;
@@ -115,16 +114,12 @@ void Optimize(CompilerState* state, const Passes& passes, const OptimizeOptions&
     bool wants_stripe = compile_pass->is_stripe();
     if (!in_stripe && wants_stripe) {
       ConvertFromMLIR(state);
-      IVLOG(1, "Dumpy program from MLIR " << "dummy" + pass.name());
-      DumpProgram(*state->entry(), options, "dummy" + pass.name(), counter);
     } else if (in_stripe && !wants_stripe) {
       ConvertIntoMLIR(state);
     }
     in_stripe = wants_stripe;
     compile_pass->Apply(state);
-    IVLOG(1, "Done applying pass " << pass.name());
     if (in_stripe) {
-      IVLOG(1, "Dumping program after pass " << pass.name());
       DumpProgram(*state->entry(), options, pass.name(), counter);
     } else {
       // DUMP MLIR
