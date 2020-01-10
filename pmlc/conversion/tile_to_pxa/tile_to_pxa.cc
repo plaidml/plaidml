@@ -344,9 +344,7 @@ DataType promoteTypes(ConversionPatternRewriter& rewriter, Location loc, ArrayRe
   // First, determine the 'final' type that wins the promotion
   DataType bestType = DataType::INVALID;
   for (auto type : types) {
-    IVLOG(1, "type: " << to_string(type));
     if (getDataTypeRank(type) > getDataTypeRank(bestType)) {
-      IVLOG(1, "new best");
       bestType = type;
     }
   }
@@ -408,10 +406,8 @@ template <CmpIPredicate signedPred, CmpIPredicate unsignedPred>
 struct CmpIntInequalityOp {
   Value create(ConversionPatternRewriter& rewriter, Location loc, Type resultType, ArrayRef<Value> operands,
                ArrayRef<DataType> types) {
-    IVLOG(1, "CmpIntInequalityOp");
     SmallVector<Value, 2> promoted;
     auto dataType = promoteTypes(rewriter, loc, operands, types, &promoted);
-    IVLOG(1, "dataType: " << to_string(dataType));
     auto predicate = is_int(dataType) ? signedPred : unsignedPred;
     return rewriter.create<mlir::CmpIOp>(loc, predicate, promoted[0], promoted[1]).getResult();
   }
