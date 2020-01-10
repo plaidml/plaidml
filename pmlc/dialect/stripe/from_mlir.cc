@@ -617,11 +617,20 @@ void StripeBuilder::visit(util::GenericBuilder builder) {
     intr->inputs.push_back(get_scalar(operand));
   }
 
-  auto result = op->getResult(0);
-  auto tensorType = eltwise::getRankedTensorType(result->getType());
-  auto scalarType = tensorType.getElementType().cast<eltwise::ScalarType>();
+  static std::unordered_set<std::string> boolean_op_names{"cmp_eq", "cmp_ne", "cmp_gt", "cmp_lt", "cmp_ge", "cmp_le"};
 
-  if (scalarType.type() != DataType::BOOLEAN) {
+  if (boolean_op_names.find(intr->name) != boolean_op_names.end()) {
+    DataType superType = DataType::INVALID;
+    for (auto operandType : op->getOperandTypes()) {
+      auto tensorType = eltwise::getRankedTensorType(operandType);
+      auto scalarType = tensorType.getElementType().cast<eltwise::ScalarType>();
+      superType = CommonSupertype(superType, scalarType.type());
+    }
+    intr->type = superType;
+  } else {
+    auto result = op->getResult(0);
+    auto tensorType = eltwise::getRankedTensorType(result->getType());
+    auto scalarType = tensorType.getElementType().cast<eltwise::ScalarType>();
     intr->type = scalarType.type();
   }
   cur_->stmts.push_back(intr);
