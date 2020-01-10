@@ -6,6 +6,7 @@ dependencies:
   - m2-bison
   - m2-flex
   - m2-perl
+  - nbformat=4.4.0 # Latest version of nbformat breaks the analysis notebook
   - pip
   - python=3.7.4
   - scikit-image
