@@ -253,7 +253,6 @@ std::shared_ptr<tile::Program> Platform::MakeProgram(  //
     const std::string& target,                         //
     const std::shared_ptr<stripe::Program>& program,   //
     ConstBufferManager* const_bufs) {
-      IVLOG(1, "Platform::MakeProgram");
   if (device == kCpuDevice) {
     return std::make_shared<CpuProgram>(target, program, const_bufs);
   }

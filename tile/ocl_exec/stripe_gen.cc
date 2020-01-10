@@ -22,7 +22,6 @@ lang::KernelList GenerateProgram(                    //
     const std::string& cfg_name,                     //
     const std::string& out_dir,                      //
     ConstBufferManager* const_bufs) {
-  IVLOG(1, "GenerateProgram ");
   codegen::OptimizeOptions options;
   options.dump_passes = !out_dir.empty();
   options.dump_passes_proto = !out_dir.empty();

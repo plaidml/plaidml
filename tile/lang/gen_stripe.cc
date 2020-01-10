@@ -101,24 +101,20 @@ class StripeGenerator {
       IVLOG(2, "Processing: " << op);
       switch (op.tag) {
         case Op::CONTRACTION:
-        IVLOG(1, "Processing ProcessContraction OP");
           ProcessContraction(main.get(), op);
           break;
         case Op::FUNCTION:
           if (op.f.is_special()) {
-            IVLOG(1, "Processing special OP");
             ProcessSpecial(main.get(), op_idx);
           } else if (op.f.fn == "reshape") {
             ProcessReshape(main.get(), op);
           } else if (op.f.fn == "index") {
             ProcessIndex(entry.get(), main.get(), op);
           } else {
-            IVLOG(1, "Processing Elmentwise OP");
             ProcessElementwise(entry.get(), main.get(), op);
           }
           break;
         case Op::CONSTANT:
-          IVLOG(1, "Skip processing Constant OP");
           // Do nothing -- these are handed by constant propagation
           break;
       }
@@ -386,13 +382,11 @@ class StripeGenerator {
   }
 
   void ProcessElementwise(Block* program, Block* main, const Op& op) {
-    IVLOG(1, "Process elementwise");
     auto kernel = AddKernel(main, op);
     kernel->set_tag("eltwise");
     kernel->set_tag("eltwise_" + op.f.fn);
 
     auto out_shape = GetShape(op.output);
-    IVLOG(1, "out_shape " << out_shape);
     std::vector<Affine> out_access;
     for (std::size_t i = 0; i < out_shape.dims.size(); ++i) {
       Index idx{
@@ -488,8 +482,6 @@ class StripeGenerator {
       auto input_type = GetShape(input).type;
       output_type = CommonSupertype(input_type, output_type);
     }
-    IVLOG(1, "output_type.is_uint() " << is_uint(output_type));
-    IVLOG(1, "output_type.to_string() " << to_string(output_type));
 
     // Clean up the semantics of cond to be more strict at the Stripe level
     if (op.f.fn == "cond" && GetShape(op.inputs[0]).type != tile::DataType::BOOLEAN) {
@@ -503,8 +495,6 @@ class StripeGenerator {
 
     // STORE
     kernel->stmts.push_back(std::make_shared<Store>(ScalarName(op.output), op.output));
-
-    IVLOG(1, "Done processing elementwise op " << *kernel);
   }
 
   void ProcessSpecial(Block* main, size_t op_idx) {
