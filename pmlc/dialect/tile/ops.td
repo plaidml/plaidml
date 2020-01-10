@@ -229,7 +229,7 @@ def ContractionOp : TileOpWithPPV<"cion", [NoSideEffect]> {
     OptionalAttr<IntegerSetAttr>:$cons,
     OptionalAttr<AffineMapAttr>:$shape,
     OptionalAttr<UnitAttr>:$no_reduce,
-    // TODO: Tuples would be nicer than 2 Attrs, just looking for a quick test for now
+    // TODO: Tuples would be nicer than 2 Attrs, just looking for a quick implementation for now
     OptionalAttr<I64ArrayAttr>:$idx_lower_bounds,
     OptionalAttr<I64ArrayAttr>:$idx_upper_bounds,
     OptionalAttr<StrAttr>:$name

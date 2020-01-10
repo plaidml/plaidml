@@ -230,7 +230,7 @@ static Value MakeCombination(             //
   throw std::runtime_error("Invalid combination op");
 }
 
-// TODO: Organize this function (e.g. in the header)
+// TODO: Add this fcn prototype to the header?
 mlir::AffineExpr MakeAffineExprFromIntPoly(IndexPoly poly, std::map<std::string, size_t> idxLookup,
                                            ConversionPatternRewriter& rewriter) {
   mlir::AffineExpr ret = rewriter.getAffineConstantExpr(0);
@@ -259,7 +259,7 @@ mlir::AffineExpr MakeAffineExprFromIntPoly(IndexPoly poly, std::map<std::string,
   return ret;
 }
 
-// TODO: Organize this function (e.g. in the header)
+// TODO: Add this fcn prototype to the header?
 AffineMap MakeAffineMapFromAccess(IndexAccess access, std::map<std::string, size_t> idxLookup,
                                   ConversionPatternRewriter& rewriter) {
   llvm::SmallVector<mlir::AffineExpr, 6> polyExprs;
@@ -269,6 +269,8 @@ AffineMap MakeAffineMapFromAccess(IndexAccess access, std::map<std::string, size
   return AffineMap::get(/*dimCount=*/idxLookup.size(), /*symbolCount=*/0, polyExprs);
 }
 
+// TODO: I suspect this will best fit long term as a function that `ContractionOpConversion` calls (and equivalently in
+// pxa lowering), rather than its own struct
 struct ContractionOpSimplifyLHSAndBound : public LoweringBase {
   explicit ContractionOpSimplifyLHSAndBound(LoweringContext* lowering)
       : LoweringBase(ContractionOp::getOperationName(), lowering) {}
@@ -300,6 +302,7 @@ struct ContractionOpSimplifyLHSAndBound : public LoweringBase {
     Contraction contraction{cionOp};
     bool no_reduce = cionOp.no_reduce().hasValue();
     const auto& [bounds, constraints] = contraction.ComputeBounds(shapes, no_reduce);
+    // TODO: These logs are likely excessive
     IVLOG(1, "Returning from ComputeBounds with\nbounds: " << bounds << "\nconstraints: " << constraints
                                                            << "\naccesses: " << contraction.accesses);
 
@@ -325,7 +328,7 @@ struct ContractionOpSimplifyLHSAndBound : public LoweringBase {
       IVLOG(2, "There is NO name on the incoming cion");
     }
 
-    // TODO: Retain index names wherever practical
+    // TODO: Retain index names wherever practical (currently `ComputeBounds` rewrites all index names)
 
     // The order of the indexes will be whatever order they appear in in `bounds`
     // Can go from string to ordinal value (its position in `bounds`) via `idx_lookup`
@@ -1074,7 +1077,8 @@ struct LoweringPass : public mlir::ModulePass<LoweringPass> {
     OwningRewritePatternList patterns;
     patterns.insert<                       //
         AffineConstantOpConversion,        //
-        ContractionOpSimplifyLHSAndBound,  // TODO
+        ContractionOpSimplifyLHSAndBound,  // TODO: Added this and removed other as a quick test; almost certainly want
+                                           // to revert long term
         // ContractionOpConversion,     // TODO
         FuncOpConversion,   //
         IndexOpConversion,  //
