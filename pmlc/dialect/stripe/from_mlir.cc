@@ -617,7 +617,7 @@ void StripeBuilder::visit(util::GenericBuilder builder) {
     intr->inputs.push_back(get_scalar(operand));
   }
 
-  if (intr->name.rfind("cmp") == 0) {
+  if (intr->name.rfind("cmp", 0) == 0) {
     DataType superType = DataType::INVALID;
     for (auto operandType : op->getOperandTypes()) {
       auto tensorType = eltwise::getRankedTensorType(operandType);
