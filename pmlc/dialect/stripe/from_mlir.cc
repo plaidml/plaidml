@@ -620,8 +620,10 @@ void StripeBuilder::visit(util::GenericBuilder builder) {
   auto result = op->getResult(0);
   auto tensorType = eltwise::getRankedTensorType(result->getType());
   auto scalarType = tensorType.getElementType().cast<eltwise::ScalarType>();
-  intr->type = scalarType.type();
 
+  if (scalarType.type() != DataType::BOOLEAN) {
+    intr->type = scalarType.type();
+  }
   cur_->stmts.push_back(intr);
 }
 
