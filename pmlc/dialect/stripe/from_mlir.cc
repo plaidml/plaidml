@@ -14,7 +14,6 @@
 #include "pmlc/dialect/stripe/dialect.h"
 #include "pmlc/dialect/stripe/util.h"
 #include "pmlc/util/util.h"
-#include "tile/stripe/stripe.h"
 
 namespace pmlc {
 namespace dialect {
@@ -175,25 +174,6 @@ StripeBuilder::StripeBuilder(const StripeBuilder& rhs)
       blocks_(rhs.blocks_) {}
 
 StripeBuilder::StripeBuilder(mlir::FuncOp func) : blocks_(std::make_shared<std::map<mlir::Block*, BlockInfo>>()) {
-  std::function<void(vertexai::tile::stripe::StatementList)> print_type =
-      [&](vertexai::tile::stripe::StatementList stmts) {
-        for (const auto& stmt : stmts) {
-          if (stmt->kind() == vertexai::tile::stripe::StmtKind::Block) {
-            IVLOG(1, "Stmt is Block");
-            const auto block = std::dynamic_pointer_cast<vertexai::tile::stripe::Block>(stmt);
-            IVLOG(1, "Block has how many stements " << block->stmts.size());
-            print_type(block->stmts);
-          } else if (stmt->kind() == vertexai::tile::stripe::StmtKind::Intrinsic) {
-            const auto intr = std::dynamic_pointer_cast<vertexai::tile::stripe::Intrinsic>(stmt);
-
-            IVLOG(1, "Got intr");
-            IVLOG(1, "intr type == FLOAT32? " << (intr->type == DataType::FLOAT32));
-            IVLOG(1, "intr type == UINT64? " << (intr->type == DataType::UINT64));
-          }
-        }
-      };
-
-  IVLOG(1, "Creating StripBuilder from mlir func with name " << func.getName());
   // Construct the block and put it in the table
   cur_ = std::make_shared<stripe::Block>();
   cur_->name = func.getName();
@@ -203,7 +183,6 @@ StripeBuilder::StripeBuilder(mlir::FuncOp func) : blocks_(std::make_shared<std::
   }
   auto mblock = &func.front();
   BlockInfo blockInfo(cur_.get());
-  IVLOG(1, "func.getNumArguments " << func.getNumArguments());
   for (size_t i = 0; i < func.getNumArguments(); i++) {
     // add refinement for each arg
     auto arg = func.getArgument(i);
@@ -222,20 +201,13 @@ StripeBuilder::StripeBuilder(mlir::FuncOp func) : blocks_(std::make_shared<std::
     ref.set_attr("user");
     auto attrs = func.getArgAttrOfType<DictionaryAttr>(i, Dialect::getStripeAttrsName());
     if (attrs) {
-      IVLOG(1, "Adding attributs");
       add_attributes(&ref, attrs.getValue());
     }
     cur_->refs.emplace(ref);
     blockInfo.refs[tensorInfo] = name.str();
-
-    IVLOG(1, "done with func arg " << i);
-    print_type(cur_->stmts);
   }
   blocks_->emplace(mblock, blockInfo);
   walk_interior(mblock);
-
-  print_type(cur_->stmts);
-  IVLOG(1, "Done creating StripBuilder from mlir func");
 }
 
 void StripeBuilder::add_attributes(stripe::Taggable* out, ArrayRef<NamedAttribute> attrs) {
@@ -631,7 +603,7 @@ void StripeBuilder::visit(SpecialOp specialOp) {
 
 void StripeBuilder::visit(util::GenericBuilder builder) {
   auto op = builder.getOperation();
-  IVLOG(3, "StripeBuilder::visit GenericBuilder> " << mlir::debugString(*op));
+  IVLOG(3, "StripeBuilder::visit> " << mlir::debugString(*op));
   auto out_name = scalar_name(op);
   scalars_[op->getResult(0)] = out_name;
   auto intr = std::make_shared<stripe::Intrinsic>();
@@ -649,14 +621,12 @@ void StripeBuilder::visit(util::GenericBuilder builder) {
   auto scalarType = tensorType.getElementType().cast<eltwise::ScalarType>();
   intr->type = scalarType.type();
 
-  IVLOG(1, "inVtr type == FLOAT32? " << (intr->type == DataType::FLOAT32));
-  IVLOG(1, "inVtr type == UINT64? " << (intr->type == DataType::UINT64));
   cur_->stmts.push_back(intr);
 }
 
 void StripeBuilder::visit(eltwise::CastOp castOp) {
   auto op = castOp.getOperation();
-  IVLOG(3, "StripeBuilder::visit CastOp> " << mlir::debugString(*op));
+  IVLOG(3, "StripeBuilder::visit> " << mlir::debugString(*op));
 
   // handle the bitwidth
   auto result = op->getResult(0);
@@ -693,7 +663,7 @@ void StripeBuilder::visit(eltwise::CastOp castOp) {
 
 void StripeBuilder::visit(eltwise::ScalarConstantOp op) {
   auto out_name = scalar_name(op.getOperation());
-  IVLOG(3, "StripeBuilder::visit ScalarConstantOp> " << mlir::debugString(*op));
+  IVLOG(3, "StripeBuilder::visit> " << mlir::debugString(*op));
   scalars_[op.result()] = out_name;
   std::shared_ptr<stripe::Constant> cnst;
   auto val_attr = op.getValue();
@@ -764,35 +734,12 @@ std::string StripeBuilder::scalar_name(Operation* op, std::string out_name) {
 }  // End namespace
 
 std::shared_ptr<stripe::Program> FromMLIR(mlir::ModuleOp module) {
-  std::function<void(vertexai::tile::stripe::StatementList)> print_type =
-      [&](vertexai::tile::stripe::StatementList stmts) {
-        for (const auto& stmt : stmts) {
-          if (stmt->kind() == vertexai::tile::stripe::StmtKind::Block) {
-            IVLOG(1, "Stmt is Block");
-            const auto block = std::dynamic_pointer_cast<vertexai::tile::stripe::Block>(stmt);
-            IVLOG(1, "Block has how many stements " << block->stmts.size());
-            print_type(block->stmts);
-          } else if (stmt->kind() == vertexai::tile::stripe::StmtKind::Intrinsic) {
-            const auto intr = std::dynamic_pointer_cast<vertexai::tile::stripe::Intrinsic>(stmt);
-
-            IVLOG(1, "Got intr");
-            IVLOG(1, "intr type == FLOAT32? " << (intr->type == DataType::FLOAT32));
-            IVLOG(1, "intr type == UINT64? " << (intr->type == DataType::UINT64));
-          }
-        }
-      };
-
-  IVLOG(1, "FromMLIR");
-  IVLOG(1, "from MLIR module string" << mlir::debugString(module));
+  IVLOG(1, mlir::debugString(module));
   auto func = llvm::dyn_cast<mlir::FuncOp>(module.getBody()->front());
   StripeBuilder builder(func);
-  IVLOG(1, "Created strip builder from func");
   auto ret = std::make_shared<stripe::Program>();
 
-  IVLOG(1, "builder.getResult()");
   ret->entry = builder.getResult();
-  print_type(ret->entry->stmts);
-  IVLOG(1, "done with builder.getResult()");
   auto main = ret->entry->SubBlock(0);
   for (const auto& ref : main->refs) {
     if (IsReadDir(ref.dir)) {
@@ -805,12 +752,6 @@ std::shared_ptr<stripe::Program> FromMLIR(mlir::ModuleOp module) {
     }
   }
   // IVLOG(1, *ret->entry);
-  // IVLOG(1, "program " << *ret);
-  IVLOG(1, "Done with FromMLIR");
-  IVLOG(1, "ret->entry->stmts.size " << ret->entry->stmts.size())
-
-  print_type(ret->entry->stmts);
-
   return ret;
 }
 
