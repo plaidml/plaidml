@@ -18,6 +18,7 @@
 namespace pmlc {
 namespace dialect {
 namespace stripe {
+
 using vertexai::safe_at;
 using DataType = vertexai::tile::DataType;
 using TensorShape = vertexai::tile::TensorShape;
@@ -663,7 +664,6 @@ void StripeBuilder::visit(eltwise::CastOp castOp) {
 
 void StripeBuilder::visit(eltwise::ScalarConstantOp op) {
   auto out_name = scalar_name(op.getOperation());
-  IVLOG(3, "StripeBuilder::visit> " << mlir::debugString(*op));
   scalars_[op.result()] = out_name;
   std::shared_ptr<stripe::Constant> cnst;
   auto val_attr = op.getValue();
@@ -734,11 +734,11 @@ std::string StripeBuilder::scalar_name(Operation* op, std::string out_name) {
 }  // End namespace
 
 std::shared_ptr<stripe::Program> FromMLIR(mlir::ModuleOp module) {
-  IVLOG(1, mlir::debugString(module));
+  IVLOG(1, "FromMLIR");
+  // IVLOG(1, mlir::debugString(module));
   auto func = llvm::dyn_cast<mlir::FuncOp>(module.getBody()->front());
   StripeBuilder builder(func);
   auto ret = std::make_shared<stripe::Program>();
-
   ret->entry = builder.getResult();
   auto main = ret->entry->SubBlock(0);
   for (const auto& ref : main->refs) {

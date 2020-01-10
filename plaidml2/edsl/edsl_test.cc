@@ -52,34 +52,43 @@ TEST(CppEdsl, Add) {
   auto C = A + B;
   Program program("add", {C});
 
-  IVLOG(1, "fabi prog " << program);
-
   std::vector<std::uint64_t> input_a = {
-     (1UL << 24) + 1, 2, 3,
-      4, 5, 6,
-      7, 8, 9,
-  };
-  std::vector<std::uint64_t> input_b = {
-     2, 2, 3,
-      4, 5, 6,
-      7, 8, 9,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6 + (1UL << 12),
+      7 + (1UL << 24),
+      8 + (1UL << 32),
+      9 + (1UL << 40)  //
   };
 
-  std::vector<std::uint64_t> expected = {
-      (1UL << 24) + 3,  4,  6,
-      8,  10,  12,
-      14, 16, 18
-  };
+  std::vector<std::uint64_t> input_b = {1,
+                                        2 + (1UL << 12),
+                                        3,
+                                        4 + (1UL << 24),
+                                        5,
+                                        6 + (1UL << 32),
+                                        7,
+                                        8 + (1UL << 40),  //
+                                        9};
+
+  std::vector<std::uint64_t> expected = {2,
+                                         4 + (1UL << 12),
+                                         6,
+                                         8 + (1UL << 24),
+                                         10,
+                                         12 + (1UL << 12) + (1UL << 32),
+                                         14 + (1UL << 24),
+                                         16 + (1UL << 32) + (1UL << 40),
+                                         18 + (1UL << 40)};
 
   auto binder = exec::Binder(program);
-  IVLOG(1, "fabi binded");
   auto executable = binder.compile();
-  IVLOG(1, "fabi compiled");
   binder.input(A).copy_from(input_a.data());
   binder.input(B).copy_from(input_b.data());
-  IVLOG(1, "fabi copied inputs");
   executable->run();
-  IVLOG(1, "fabi ran executable");
   {
     auto view = binder.output(C).mmap_current();
     ASSERT_THAT(view.size(), expected.size() * sizeof(expected[0]));
@@ -91,13 +100,6 @@ TEST(CppEdsl, Add) {
     ASSERT_THAT(input_a_tv.size(), expected.size() * sizeof(expected[0]));
     auto a_data = reinterpret_cast<std::uint64_t*>(input_a_tv.data());
     std::vector<std::uint64_t> actual_a_data(a_data, a_data + expected.size());
-
-    IVLOG(1, "actual_a_data " << actual_a_data);
-    IVLOG(1, "input_a " << input_a);
-    IVLOG(1, "input_b " << input_b);
-
-    IVLOG(1, "expected " << expected);
-    IVLOG(1, "actual " << actual);
   }
 }
 
