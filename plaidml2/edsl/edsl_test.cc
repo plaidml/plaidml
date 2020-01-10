@@ -95,11 +95,6 @@ TEST(CppEdsl, Add) {
     auto data = reinterpret_cast<std::uint64_t*>(view.data());
     std::vector<std::uint64_t> actual(data, data + expected.size());
     EXPECT_THAT(actual, ContainerEq(expected));
-
-    auto input_a_tv = binder.input(A).mmap_current();
-    ASSERT_THAT(input_a_tv.size(), expected.size() * sizeof(expected[0]));
-    auto a_data = reinterpret_cast<std::uint64_t*>(input_a_tv.data());
-    std::vector<std::uint64_t> actual_a_data(a_data, a_data + expected.size());
   }
 }
 
