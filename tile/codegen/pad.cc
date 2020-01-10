@@ -11,8 +11,6 @@
 #include "tile/codegen/cache.h"
 #include "tile/codegen/localize.h"
 #include "tile/math/util.h"
-#include "tile/codegen/emitc.h"
-
 
 namespace vertexai {
 namespace tile {
@@ -239,18 +237,15 @@ void PrimeDimension(Block* block, const proto::PadPass& options) {
 }
 
 void Pad(Block* block, const AliasMap& map, const RefDefineMap& ref_def_map) {
-  IVLOG(1, "Padding blocK");
   // Generate a map extents for possible padding candidates
   Extents extents;
   // Look for buffers that are used for multiply accumulates
-  IVLOG(1, "block->stmts " << block->stmts.size());
   for (auto stmt : block->stmts) {
     auto inner = Block::Downcast(stmt);
     if (QualifiedBlock(inner.get())) {
       // Add any inputs as possible candidates
       for (auto ref : inner->ref_ins()) {
         std::string bname = map.at(ref->from).base_name;
-        IVLOG(1, "bname " << bname);
         if (extents.count(bname)) {
           continue;
         }
@@ -261,18 +256,13 @@ void Pad(Block* block, const AliasMap& map, const RefDefineMap& ref_def_map) {
       ComputeExtents(inner.get(), map, &extents);
     }
   }
-  IVLOG(1, "extents " << extents.size());
-
   // Now decide which ones we will be padding, and which need caching
   std::set<std::string> to_pad;
   std::set<std::string> to_cache;
-  IVLOG(1, "block->refs " << block->refs.size());
   for (auto& ref : block->refs) {
     std::string bname = map.at(ref.into()).base_name;
-    IVLOG(1, "bname " << bname);
     auto it = extents.find(bname);
     if (it == extents.end()) {
-      IVLOG(1, "bname not in extens; continuing");
       continue;
     }
     const auto& exts = it->second;
@@ -285,16 +275,12 @@ void Pad(Block* block, const AliasMap& map, const RefDefineMap& ref_def_map) {
       }
     }
   }
-  IVLOG(1, "to_pad " << to_pad.size());
-  IVLOG(1, "to_cache " << to_cache.size());
 
   // Remove constraints that will no longer be required
-  IVLOG(1, "block->stmts " << block->stmts.size());
   for (auto stmt : block->stmts) {
     auto inner = Block::Downcast(stmt);
     std::vector<Affine> new_cons;
     if (QualifiedBlock(inner.get())) {
-      IVLOG(1, "QualifiedBlock");
       for (const auto& con : inner->constraints) {
         bool is_safe = false;
         // Remove all constraints that are simple edge checks on inputs.
@@ -325,7 +311,6 @@ void Pad(Block* block, const AliasMap& map, const RefDefineMap& ref_def_map) {
   }
 
   // Do the caching
-  IVLOG(1, "Doing to cacing " << to_cache.size());
   for (const auto& name : to_cache) {
     auto ref_it = block->ref_by_into(name);
     Location loc = ref_it->location;
@@ -337,18 +322,14 @@ void Pad(Block* block, const AliasMap& map, const RefDefineMap& ref_def_map) {
   RefMap old_refs;
 
   // Update the buffer shapes
-  IVLOG(1, "Updating buffer shapes " << block->refs.size());
   for (auto& ref : block->refs) {
     if (!to_pad.count(ref.into())) {
-      IVLOG(1, "No padding; continuing");
       continue;
     }
     std::vector<uint64_t> pad_size;
     old_refs.emplace(ref.into(), ref);
     std::string bname = map.at(ref.into()).base_name;
     const auto& exts = extents.at(bname);
-
-    IVLOG(1, "buffer name " << bname << " with " << exts.size() <<  "extens");
     int64_t stride = 1;
     for (int i = exts.size() - 1; i >= 0; i--) {
       ref.mut().interior_shape.dims[i].stride = stride;
@@ -391,7 +372,6 @@ void Pad(Block* block, const AliasMap& map, const RefDefineMap& ref_def_map) {
     FixupRefs(block, ref.into());
   }
 
-  IVLOG(1, "to_pad size " << to_pad.size());
   for (const auto& name : to_pad) {
     auto ref_it = block->ref_by_into(name);
     auto& ref = *ref_it;
@@ -418,37 +398,28 @@ void Pad(Block* block, const AliasMap& map, const RefDefineMap& ref_def_map) {
   }
 
   // Add the zeros
-  IVLOG(1, "Add the zeros " << to_pad.size());
   for (const auto& name : to_pad) {
     auto zero = std::make_shared<Special>();
     zero->name = "zero";
     zero->outputs = {name};
     block->stmts.push_front(zero);
   }
-
   // For the Out refs initialized by zero, set them as InOut
   for (auto stmt : block->stmts) {
     auto inner = Block::Downcast(stmt);
     if (QualifiedBlock(inner.get())) {
       for (auto ref : inner->ref_outs()) {
         if (to_pad.find(ref->from) != to_pad.end()) {
-
-          IVLOG(1, "For the Out refs initialized by zero, set them as InOut ");
           ref->mut().dir = RefDir::InOut;
           ref->mut().set_tag("initialized");
         }
       }
     }
   }
-  IVLOG(1, "Done padding blocK");
 }
 
 void PadPass::Apply(CompilerState* state) const {
-  IVLOG(1, "Applying pad pass");
   stripe::Block* root = state->entry();
-
-  IVLOG(1, "Before pad pass " << EmitC(*root));
-
   auto reqs = stripe::FromProto(options_.reqs());
   RefDefineMap ref_def_map;
   PrimeDimension(root->SubBlock(0).get(), options_);
@@ -456,9 +427,6 @@ void PadPass::Apply(CompilerState* state) const {
   RunOnBlocks(state->entry(), reqs, [&](const AliasMap& map, stripe::Block* block) {  //
     Pad(block, map, ref_def_map);
   });
-
-  IVLOG(1, "After pad pass " << EmitC(*root));
-  IVLOG(1, "Done applying pad pass");
 }
 
 namespace {
