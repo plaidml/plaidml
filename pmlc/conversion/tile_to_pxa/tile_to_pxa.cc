@@ -349,10 +349,12 @@ DataType promoteTypes(ConversionPatternRewriter& rewriter, Location loc, ArrayRe
     }
   }
   // Next, cast each operand to the 'final' type
-  auto isSigned = is_int(bestType);
   auto scalarType = rewriter.getType<ScalarType>(bestType);
   auto targetType = scalarType.toStandard();
-  for (auto operand : operands) {
+  for (unsigned i = 0; i < operands.size(); i++) {
+    auto dtype = types[i];
+    auto operand = operands[i];
+    auto isSigned = is_int(dtype);
     auto castOp = createCastOp(rewriter, loc, operand, targetType, isSigned);
     into->push_back(castOp);
   }

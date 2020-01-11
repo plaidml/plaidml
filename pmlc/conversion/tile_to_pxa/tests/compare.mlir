@@ -149,7 +149,7 @@ func @cmp_i16_u32(%i16: !i16) -> !bool {
   %c0 = "eltwise.sconst"() {value = 0 : i64} : () -> !u32
   %0 = "eltwise.cmp_lt"(%i16, %c0) {type = !eltwise.fp32} : (!i16, !u32) -> !bool
   // CHECK: pxa.parallel_for
-  // CHECK: zexti
+  // CHECK: sexti
   // CHECK: cmpi "ult"
   return %0 : !bool
 }
@@ -179,7 +179,7 @@ func @cmp_u16_i32(%u16: !u16) -> !bool {
   %c0 = "eltwise.sconst"() {value = 0 : i64} : () -> !i32
   %0 = "eltwise.cmp_lt"(%u16, %c0) {type = !eltwise.fp32} : (!u16, !i32) -> !bool
   // CHECK: pxa.parallel_for
-  // CHECK: sexti
+  // CHECK: zexti
   // CHECK: cmpi "slt"
   return %0 : !bool
 }
