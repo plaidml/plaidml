@@ -14,7 +14,7 @@ exports_files([
 pkg_tar(
     name = "pkg",
     srcs = [
-        # "//plaidbench:wheel",
+        "//plaidbench:wheel",
         "//plaidml2:wheel",
         "//plaidml2/bridge/keras:wheel",
     ],

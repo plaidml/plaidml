@@ -3,6 +3,7 @@
 package(default_visibility = ["//visibility:public"])
 
 load("@rules_python//python:defs.bzl", "py_binary")
+load("//tools/py_setup:build_defs.bzl", "py_setup")
 
 exports_files([
     "requirements.txt",
@@ -65,11 +66,19 @@ py_library(
     ]),
 )
 
-# TODO: use py_setup
-# plaidml_py_wheel(
-#     name = "wheel",
-#     package_name = "plaidbench",
-#     srcs = [":py"],
-#     config = "not_setup.cfg",
-#     python = "py2.py3",
-# )
+py_binary(
+    name = "setup",
+    srcs = ["setup.py"],
+    deps = [
+        ":py",
+        "//tools/py_setup",
+    ],
+)
+
+py_setup(
+    name = "wheel",
+    package_name = "plaidbench",
+    tool = ":setup",
+    universal = True,
+    visibility = ["//visibility:public"],
+)

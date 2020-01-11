@@ -262,7 +262,7 @@ SUITES:
             conda_env: ci/conda/tensorflow-dnnl.yml
 
   train:
-    platforms:
+    platforms: {}
     params:
       ci:
         batch_sizes: [1, 32]
