@@ -291,6 +291,13 @@ struct EltwiseFloat {
 };
 
 struct EltwiseInteger {
+  bool match(Type type) const {
+    auto dtype = getScalarType(type).type();
+    return is_int(dtype) || is_uint(dtype);
+  }
+};
+
+struct EltwiseSigned {
   bool match(Type type) const { return is_int(getScalarType(type).type()); }
 };
 
@@ -735,17 +742,15 @@ struct LoweringPass : public mlir::ModulePass<LoweringPass> {
         EltwiseOpConversion<ew::MulOp, StdOp<mlir::MulFOp>, ResultIs<EltwiseFloat>>,
         EltwiseOpConversion<ew::MulOp, StdOp<mlir::MulIOp>, ResultIs<EltwiseInteger>>,
         EltwiseOpConversion<ew::DivOp, StdOp<mlir::DivFOp>, ResultIs<EltwiseFloat>>,
-        EltwiseOpConversion<ew::DivOp, StdOp<mlir::SignedDivIOp>, ResultIs<EltwiseInteger>>,
+        EltwiseOpConversion<ew::DivOp, StdOp<mlir::SignedDivIOp>, ResultIs<EltwiseSigned>>,
         EltwiseOpConversion<ew::DivOp, StdOp<mlir::UnsignedDivIOp>, ResultIs<EltwiseUnsigned>>,
         EltwiseOpConversion<ew::ModOp, StdOp<mlir::RemFOp>, ResultIs<EltwiseFloat>>,
-        EltwiseOpConversion<ew::ModOp, StdOp<mlir::SignedRemIOp>, ResultIs<EltwiseInteger>>,
+        EltwiseOpConversion<ew::ModOp, StdOp<mlir::SignedRemIOp>, ResultIs<EltwiseSigned>>,
         EltwiseOpConversion<ew::ModOp, StdOp<mlir::UnsignedRemIOp>, ResultIs<EltwiseUnsigned>>,
         EltwiseOpConversion<ew::CmpEqOp, CmpFloatOp<CmpFPredicate::OEQ>, AnyOperandIs<EltwiseFloat>>,
         EltwiseOpConversion<ew::CmpEqOp, CmpIntOp<CmpIPredicate::eq>, OperandsAre<Not<EltwiseFloat>>>,
-        // EltwiseOpConversion<ew::CmpEqOp, CmpIntOp<CmpIPredicate::eq>, AnyOperandIs<EltwiseUnsigned>>,
         EltwiseOpConversion<ew::CmpLtOp, CmpFloatOp<CmpFPredicate::OLT>, AnyOperandIs<EltwiseFloat>>,
         EltwiseOpConversion<ew::CmpLtOp, CmpIntOp<CmpIPredicate::slt>, OperandsAre<Not<EltwiseFloat>>>,
-        // EltwiseOpConversion<ew::CmpLtOp, CmpIntOp<CmpIPredicate::ult>, AnyOperandIs<EltwiseUnsigned>>,
         EltwiseOpConversion<ew::SelectOp, StdOp<mlir::SelectOp>>,  //
         EltwiseOpConversion<ew::IdentOp, FirstOperand>             //
         >(&getContext());

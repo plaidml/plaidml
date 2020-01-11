@@ -46,6 +46,58 @@ Tensor Softmax(const Tensor& X) {
   return E / N;
 }
 
+TEST(CppEdsl, Add) {
+  auto A = Placeholder(PLAIDML_DATA_UINT64, {3, 3});
+  auto B = Placeholder(PLAIDML_DATA_UINT64, {3, 3});
+  auto C = A + B;
+  Program program("add", {C});
+
+  std::vector<std::uint64_t> input_a = {
+      1,
+      2,
+      3,
+      4,
+      5,
+      6 + (1UL << 12),
+      7 + (1UL << 24),
+      8 + (1UL << 32),
+      9 + (1UL << 40)  //
+  };
+
+  std::vector<std::uint64_t> input_b = {1,
+                                        2 + (1UL << 12),
+                                        3,
+                                        4 + (1UL << 24),
+                                        5,
+                                        6 + (1UL << 32),
+                                        7,
+                                        8 + (1UL << 40),  //
+                                        9};
+
+  std::vector<std::uint64_t> expected = {2,
+                                         4 + (1UL << 12),
+                                         6,
+                                         8 + (1UL << 24),
+                                         10,
+                                         12 + (1UL << 12) + (1UL << 32),
+                                         14 + (1UL << 24),
+                                         16 + (1UL << 32) + (1UL << 40),
+                                         18 + (1UL << 40)};
+
+  auto binder = exec::Binder(program);
+  auto executable = binder.compile();
+  binder.input(A).copy_from(input_a.data());
+  binder.input(B).copy_from(input_b.data());
+  executable->run();
+  {
+    auto view = binder.output(C).mmap_current();
+    ASSERT_THAT(view.size(), expected.size() * sizeof(expected[0]));
+    auto data = reinterpret_cast<std::uint64_t*>(view.data());
+    std::vector<std::uint64_t> actual(data, data + expected.size());
+    EXPECT_THAT(actual, ContainerEq(expected));
+  }
+}
+
 TEST(CppEdsl, Dot) {
   auto A = Placeholder(PLAIDML_DATA_FLOAT32, {3, 3});
   auto B = Placeholder(PLAIDML_DATA_FLOAT32, {3, 3});
@@ -208,7 +260,7 @@ Tensor Convolution2(const Tensor& I, const Tensor& K) {
   return R;
 }
 
-TEST(CppEdsl, Convolution) {
+TEST(CppEdsl, DISABLED_Convolution) {
   auto I = Placeholder(PLAIDML_DATA_FLOAT32, {1, 224, 224, 1});
   auto K = Placeholder(PLAIDML_DATA_FLOAT32, {3, 3, 1, 32});
   Program program("convolution", {Convolution2(I, K)});
