@@ -1,11 +1,6 @@
 # Copyright 2019 Intel Corporation.
 
-load(
-    "//bzl:plaidml.bzl",
-    "plaidml_cc_library",
-    "plaidml_cc_test",
-    "plaidml_py_library",
-)
+load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_test")
 
 SDK_HDRS = [
     "exec.h",
@@ -23,39 +18,18 @@ filegroup(
 )
 
 plaidml_cc_library(
-    name = "exec_ast",
+    name = "exec",
     srcs = [
         "ffi.cc",
     ],
     hdrs = SDK_HDRS,
-    defines = [
-        "PLAIDML_AST",
-    ],
     visibility = ["//visibility:public"],
     deps = [
-        "//base/util",
-        "//plaidml2/core:core_ast",
-    ],
-    alwayslink = 1,
-)
-
-plaidml_cc_library(
-    name = "exec_mlir",
-    srcs = [
-        "ffi.cc",
-    ],
-    hdrs = SDK_HDRS,
-    defines = [
-        "PLAIDML_MLIR",
-    ],
-    visibility = ["//visibility:public"],
-    deps = [
-        "//base/util",
-        "//plaidml2/core:core_mlir",
+        "//plaidml2/core",
         "//pmlc/compiler",
-        "//pmlc/conversion/tile_to_stripe",
         "//pmlc/target/intel_gen",
         "//pmlc/target/x86",
+        "//pmlc/util",
     ],
     alwayslink = 1,
 )
@@ -70,7 +44,7 @@ plaidml_cc_library(
     ],
 )
 
-plaidml_py_library(
+py_library(
     name = "py",
     srcs = [
         "__init__.py",

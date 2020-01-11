@@ -4,11 +4,10 @@ licenses(["by_exception_only"])
 
 load("@rules_python//python:defs.bzl", "py_test")
 load("//tools/py_setup:build_defs.bzl", "py_setup")
-load("//bzl:plaidml.bzl", "plaidml_py_library")
 
 package(default_visibility = ["//visibility:public"])
 
-plaidml_py_library(
+py_library(
     name = "keras",
     srcs = [
         "__init__.py",

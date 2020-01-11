@@ -6,7 +6,6 @@ load(
     "plaidml_cc_library",
     "plaidml_cc_test",
     "plaidml_cc_version",
-    "plaidml_py_library",
     "plaidml_py_version",
 )
 
@@ -43,7 +42,7 @@ plaidml_py_version(
 )
 
 plaidml_cc_library(
-    name = "core_ast",
+    name = "core",
     srcs = [
         "ffi.cc",
         "internal.h",
@@ -52,56 +51,13 @@ plaidml_cc_library(
         ":cc_version",
     ],
     hdrs = SDK_HDRS,
-    defines = [
-        "PLAIDML_AST",
-    ],
     visibility = ["//visibility:public"],
     deps = [
-        "//base/util",
-        "//base/eventing/file",
-        "//tile/hal/opencl",
-        "//tile/lang",
-        "//tile/lang/ast",
-        "//tile/platform/local_machine",
-        "//tile/targets",
-        "@boost//:filesystem",
-    ] + select({
-        "//toolchain:macos_x86_64": [
-            "//tile/hal/metal",
-        ],
-        "//conditions:default": [],
-    }),
-    alwayslink = 1,
-)
-
-plaidml_cc_library(
-    name = "core_mlir",
-    srcs = [
-        "ffi.cc",
-        "internal.h",
-        "settings.cc",
-        "settings.h",
-        ":cc_version",
-    ],
-    hdrs = SDK_HDRS,
-    defines = [
-        "PLAIDML_MLIR",
-    ],
-    visibility = ["//visibility:public"],
-    deps = [
-        "//base/util",
-        "//base/eventing/file",
         "//pmlc/dialect/tile",
-        "//tile/hal/opencl",
-        "//tile/platform/local_machine",
-        "//tile/targets",
+        "//pmlc/util",
         "@boost//:filesystem",
-    ] + select({
-        "//toolchain:macos_x86_64": [
-            "//tile/hal/metal",
-        ],
-        "//conditions:default": [],
-    }),
+        "@boost//:thread",
+    ],
     alwayslink = 1,
 )
 
@@ -111,7 +67,7 @@ plaidml_cc_library(
     visibility = ["//visibility:public"],
 )
 
-plaidml_py_library(
+py_library(
     name = "py",
     srcs = [
         "__init__.py",

@@ -4,8 +4,9 @@
 
 #include <boost/filesystem.hpp>
 
-#include "base/util/env.h"
 #include "plaidml2/core/internal.h"
+#include "pmlc/util/env.h"
+#include "pmlc/util/logging.h"
 
 using plaidml::core::ffi_wrap;
 using plaidml::core::ffi_wrap_void;

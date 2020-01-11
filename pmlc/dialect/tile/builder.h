@@ -11,10 +11,9 @@
 
 #include "mlir/IR/StandardTypes.h"
 
-#include "pmlc/dialect/stripe/types.h"
 #include "pmlc/dialect/tile/program.h"
 #include "pmlc/util/enums.h"
-#include "tile/base/shape.h"
+#include "pmlc/util/shape.h"
 
 namespace mlir {
 class Value;
@@ -63,8 +62,8 @@ class TileBuilder {
   void BindShape(mlir::Value tensor, mlir::RankedTensorType type);
   void BindBuffer(mlir::Value tensor, vertexai::tile::BufferPtr buffer);
 
-  stripe::TensorType MakeTensorType(DataType dtype, llvm::ArrayRef<int64_t> sizes, llvm::ArrayRef<int64_t> strides);
-  stripe::TensorType IntoTensorType(mlir::RankedTensorType type);
+  mlir::MemRefType MakeMemRefType(DataType dtype, llvm::ArrayRef<int64_t> sizes, llvm::ArrayRef<int64_t> strides);
+  mlir::MemRefType IntoMemRefType(mlir::RankedTensorType type);
 
   llvm::StringRef GetStringValue(mlir::Value value);
   int64_t GetIntegerValue(mlir::Value value);

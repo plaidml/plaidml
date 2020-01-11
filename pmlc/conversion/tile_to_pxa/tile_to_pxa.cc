@@ -12,13 +12,13 @@
 #include "mlir/Support/DebugStringHelper.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-#include "base/util/logging.h"
 #include "pmlc/dialect/eltwise/ir/dialect.h"
 #include "pmlc/dialect/eltwise/ir/ops.h"
 #include "pmlc/dialect/pxa/ir/dialect.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/dialect/tile/ir/ops.h"
 #include "pmlc/dialect/tile/transforms/contraction.h"
+#include "pmlc/util/logging.h"
 #include "pmlc/util/util.h"
 
 namespace pmlc::conversion::tile_to_pxa {

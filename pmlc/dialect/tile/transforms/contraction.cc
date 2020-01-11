@@ -10,10 +10,10 @@
 #include "mlir/IR/Matchers.h"
 #include "mlir/Support/DebugStringHelper.h"
 
-#include "base/util/logging.h"
+#include "pmlc/util/bilp/ilp_solver.h"
+#include "pmlc/util/logging.h"
+#include "pmlc/util/math/basis.h"
 #include "pmlc/util/util.h"
-#include "tile/bilp/ilp_solver.h"
-#include "tile/math/basis.h"
 
 namespace bilp = vertexai::tile::bilp;
 

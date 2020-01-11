@@ -14,8 +14,8 @@
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/Support/DebugStringHelper.h"
 
-#include "base/util/logging.h"
 #include "pmlc/dialect/eltwise/ir/ops.h"
+#include "pmlc/util/logging.h"
 
 #define DEBUG_TYPE "eltwise"
 

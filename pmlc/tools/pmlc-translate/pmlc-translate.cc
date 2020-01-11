@@ -14,8 +14,8 @@
 #include "mlir/Support/ToolUtilities.h"
 #include "mlir/Support/TranslateClParser.h"
 
-#include "base/util/env.h"
-#include "base/util/logging.h"
+#include "pmlc/util/env.h"
+#include "pmlc/util/logging.h"
 
 using namespace mlir;  // NOLINT(build/namespaces)
 using namespace llvm;  // NOLINT(build/namespaces)

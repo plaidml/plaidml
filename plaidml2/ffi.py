@@ -16,8 +16,6 @@ _TLS = threading.local()
 _TLS.err = ffi.new('plaidml_error*')
 
 _LIBNAME = 'plaidml2'
-if os.getenv('PLAIDML_MLIR') == '1':
-    _LIBNAME = 'plaidml2_mlir'
 
 if platform.system() == 'Windows':
     lib_name = '{}.dll'.format(_LIBNAME)

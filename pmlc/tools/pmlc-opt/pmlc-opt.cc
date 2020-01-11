@@ -12,8 +12,8 @@
 #include "mlir/Support/FileUtilities.h"
 #include "mlir/Support/MlirOptMain.h"
 
-#include "base/util/env.h"
-#include "base/util/logging.h"
+#include "pmlc/util/env.h"
+#include "pmlc/util/logging.h"
 
 using namespace llvm;  // NOLINT(build/namespaces)
 using namespace mlir;  // NOLINT(build/namespaces)

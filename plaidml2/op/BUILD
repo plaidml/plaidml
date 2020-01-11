@@ -2,12 +2,7 @@
 
 load("@rules_python//python:defs.bzl", "py_test")
 load("@rules_pkg//:pkg.bzl", "pkg_tar")
-load(
-    "//bzl:plaidml.bzl",
-    "plaidml_cc_library",
-    "plaidml_cc_test",
-    "plaidml_py_library",
-)
+load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_test")
 
 SDK_HDRS = [
     "ffi.h",
@@ -32,44 +27,19 @@ filegroup(
 )
 
 plaidml_cc_library(
-    name = "op_ast",
+    name = "op",
     srcs = [
         "ffi.cc",
     ],
     hdrs = [
         "ffi.h",
     ],
-    defines = [
-        "PLAIDML_AST",
-    ],
     visibility = ["//visibility:public"],
     deps = [
-        "//base/util",
-        "//plaidml2/core:core_ast",
-        "//plaidml2/edsl:edsl_ast",
-        "//plaidml2/op/lib:lib_ast",
-        "@llvm-project//llvm:support",
-    ],
-    alwayslink = 1,
-)
-
-plaidml_cc_library(
-    name = "op_mlir",
-    srcs = [
-        "ffi.cc",
-    ],
-    hdrs = [
-        "ffi.h",
-    ],
-    defines = [
-        "PLAIDML_MLIR",
-    ],
-    visibility = ["//visibility:public"],
-    deps = [
-        "//base/util",
-        "//plaidml2/core:core_mlir",
-        "//plaidml2/edsl:edsl_mlir",
-        "//plaidml2/op/lib:lib_mlir",
+        "//plaidml2/core",
+        "//plaidml2/edsl",
+        "//plaidml2/op/lib",
+        "//pmlc/util",
         "@llvm-project//llvm:support",
     ],
     alwayslink = 1,
@@ -85,7 +55,7 @@ plaidml_cc_library(
     ],
 )
 
-plaidml_py_library(
+py_library(
     name = "py",
     srcs = [
         "__init__.py",
@@ -98,22 +68,12 @@ plaidml_py_library(
 )
 
 plaidml_cc_test(
-    name = "cc_ast_test",
+    name = "cc_test",
     srcs = ["op_test.cc"],
     deps = [
         ":api",
-        ":op_ast",
-        "//plaidml2:testenv_ast",
-    ],
-)
-
-plaidml_cc_test(
-    name = "cc_mlir_test",
-    srcs = ["op_test.cc"],
-    deps = [
-        ":api",
-        ":op_mlir",
-        "//plaidml2:testenv_mlir",
+        ":op",
+        "//plaidml2:testenv",
     ],
 )
 

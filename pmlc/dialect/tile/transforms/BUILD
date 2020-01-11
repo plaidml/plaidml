@@ -13,11 +13,10 @@ plaidml_cc_library(
         "contraction.h",
     ],
     deps = [
-        "//base/util",
         "//pmlc/dialect/tile/ir",
         "//pmlc/util",
-        "//tile/bilp",
-        "//tile/math",
+        "//pmlc/util/bilp",
+        "//pmlc/util/math",
         "@llvm-project//llvm:support",
         "@llvm-project//mlir:IR",
     ],

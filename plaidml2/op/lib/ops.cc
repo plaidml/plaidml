@@ -9,8 +9,8 @@
 
 #include <boost/format.hpp>
 
-#include "base/util/logging.h"
 #include "plaidml2/op/op.h"
+#include "pmlc/util/logging.h"
 
 using namespace plaidml::edsl;  // NOLINT
 

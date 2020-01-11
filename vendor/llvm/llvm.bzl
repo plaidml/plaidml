@@ -405,7 +405,9 @@ llvm_copts = select({
         "-w14062",
         "-we4238",
     ],
-    "//conditions:default": [],
+    "//conditions:default": [
+        "-Wno-unused-function",
+    ],
 })
 
 # Platform specific sources for libSupport.

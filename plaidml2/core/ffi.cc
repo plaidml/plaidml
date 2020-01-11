@@ -8,46 +8,23 @@
 #include <utility>
 #include <vector>
 
-#include <boost/filesystem.hpp>
+#include "mlir/Support/DebugStringHelper.h"
 
-#include "base/context/context.h"
-#include "base/context/eventlog.h"
-#include "base/eventing/file/eventlog.h"
-#include "base/util/env.h"
 #include "plaidml2/core/internal.h"
 #include "plaidml2/core/settings.h"
-#include "tile/platform/local_machine/platform.h"
-
-#ifdef PLAIDML_AST
-using vertexai::tile::TensorDimension;
-using vertexai::tile::TensorShape;
-#endif
-#ifdef PLAIDML_MLIR
-#include "mlir/Support/DebugStringHelper.h"
-using pmlc::dialect::eltwise::ScalarType;
-#endif
+#include "pmlc/dialect/eltwise/ir/types.h"
+#include "pmlc/util/env.h"
+#include "pmlc/util/logging.h"
 
 using plaidml::core::ffi_wrap;
 using plaidml::core::ffi_wrap_void;
-using plaidml::core::GetPlatform;
 using plaidml::core::GlobalContext;
 using plaidml::core::Settings;
-using vertexai::context::Context;
+using pmlc::dialect::eltwise::ScalarType;
 using vertexai::tile::DataType;
-using LocalPlatform = vertexai::tile::local_machine::Platform;
+using vertexai::tile::SimpleBuffer;
 
 extern const char* PLAIDML_VERSION;
-
-namespace plaidml::core {
-
-PlatformHolder::PlatformHolder() : platform(new LocalPlatform) {}
-
-PlatformHolder& GetPlatform() {
-  static PlatformHolder holder;
-  return holder;
-}
-
-}  // namespace plaidml::core
 
 extern "C" {
 
@@ -65,26 +42,13 @@ void plaidml_init(plaidml_error* err) {
       }
       IVLOG(1, "plaidml_init");
       Settings::Instance()->load();
-      auto ctx = GlobalContext::getContext();
-      GetPlatform();
-      auto eventlog_str = vertexai::env::Get("PLAIDML_EVENTLOG_FILENAME");
-      if (eventlog_str.size()) {
-        IVLOG(1, "Logging events to " << eventlog_str);
-        vertexai::eventing::file::proto::EventLog e_config;
-        e_config.set_filename(eventlog_str);
-        auto eventlog = std::make_shared<vertexai::eventing::file::EventLog>(e_config);
-        ctx->set_eventlog(std::move(eventlog));
-        ctx->set_is_logging_events(true);
-        std::atexit([]() { GlobalContext::getContext()->set_eventlog(nullptr); });
-      }
     });
   });
 }
 
 void plaidml_shutdown(plaidml_error* err) {
-  ffi_wrap_void(err, [&] {
+  ffi_wrap_void(err, [&] {  //
     IVLOG(1, "plaidml_shutdown");
-    GetPlatform().platform.reset(nullptr);
   });
 }
 
@@ -193,45 +157,27 @@ plaidml_shape* plaidml_shape_alloc(  //
     const int64_t* sizes,            //
     const int64_t* strides) {
   return ffi_wrap<plaidml_shape*>(err, nullptr, [&] {
-#ifdef PLAIDML_AST
-    std::vector<TensorDimension> dims(ndims);
-    for (size_t i = 0; i < ndims; i++) {
-      dims[i] = TensorDimension{strides[i], static_cast<uint64_t>(sizes[i])};
-    }
-    return new plaidml_shape{TensorShape{static_cast<DataType>(dtype), dims}};
-#endif
-#ifdef PLAIDML_MLIR
-    auto type = GlobalContext::get()->MakeTensorType(static_cast<DataType>(dtype), {sizes, ndims}, {strides, ndims});
+    auto dataType = static_cast<DataType>(dtype);
+    auto sizesArray = llvm::makeArrayRef(sizes, ndims);
+    auto stridesArray = llvm::makeArrayRef(strides, ndims);
+    auto type = GlobalContext::get()->MakeMemRefType(dataType, sizesArray, stridesArray);
     return new plaidml_shape{type};
-#endif
   });
 }
 
 plaidml_string* plaidml_shape_repr(  //
     plaidml_error* err,              //
     plaidml_shape* shape) {
-  return ffi_wrap<plaidml_string*>(err, nullptr, [&] {
-#ifdef PLAIDML_AST
-    std::stringstream ss;
-    ss << shape->shape;
-    return new plaidml_string{ss.str()};
-#endif
-#ifdef PLAIDML_MLIR
+  return ffi_wrap<plaidml_string*>(err, nullptr, [&] {  //
     return new plaidml_string{mlir::debugString(shape->type)};
-#endif
   });
 }
 
 size_t plaidml_shape_get_ndims(  //
     plaidml_error* err,          //
     plaidml_shape* shape) {
-  return ffi_wrap<size_t>(err, 0, [&] {
-#ifdef PLAIDML_AST
-    return shape->shape.dims.size();
-#endif
-#ifdef PLAIDML_MLIR
+  return ffi_wrap<size_t>(err, 0, [&] {  //
     return shape->type.getRank();
-#endif
   });
 }
 
@@ -239,14 +185,9 @@ plaidml_datatype plaidml_shape_get_dtype(  //
     plaidml_error* err,                    //
     plaidml_shape* shape) {
   return ffi_wrap<plaidml_datatype>(err, PLAIDML_DATA_INVALID, [&] {
-#ifdef PLAIDML_AST
-    return static_cast<plaidml_datatype>(shape->shape.type);
-#endif
-#ifdef PLAIDML_MLIR
     auto elementType = shape->type.getElementType();
     auto scalarType = elementType.dyn_cast<ScalarType>();
     return static_cast<plaidml_datatype>(scalarType.type());
-#endif
   });
 }
 
@@ -255,16 +196,11 @@ int64_t plaidml_shape_get_dim_size(  //
     plaidml_shape* shape,            //
     size_t dim) {
   return ffi_wrap<int64_t>(err, 0, [&] {
-#ifdef PLAIDML_AST
-    return shape->shape.dims.at(dim).size;
-#endif
-#ifdef PLAIDML_MLIR
     const auto& dims = shape->type.getShape();
     if (dims.size() < dim) {
       throw std::range_error("dim index out of range");
     }
-    return dims[dim].size;
-#endif
+    return dims[dim];
   });
 }
 
@@ -273,29 +209,38 @@ int64_t plaidml_shape_get_dim_stride(  //
     plaidml_shape* shape,              //
     size_t dim) {
   return ffi_wrap<int64_t>(err, 0, [&] {
-#ifdef PLAIDML_AST
-    return shape->shape.dims.at(dim).stride;
-#endif
-#ifdef PLAIDML_MLIR
-    const auto& dims = shape->type.getShape();
-    if (dims.size() < dim) {
+    int64_t offset;
+    llvm::SmallVector<int64_t, 8> strides;
+    if (failed(mlir::getStridesAndOffset(shape->type, strides, offset))) {
+      throw std::runtime_error("Could not retrieve strides");
+    }
+    if (strides.size() < dim) {
       throw std::range_error("dim index out of range");
     }
-    return dims[dim].stride;
-#endif
+    return strides[dim];
   });
 }
 
 uint64_t plaidml_shape_get_nbytes(  //
     plaidml_error* err,             //
     plaidml_shape* shape) {
-  return ffi_wrap<int64_t>(err, 0, [&] {
-#ifdef PLAIDML_AST
-    return shape->shape.byte_size();
-#endif
-#ifdef PLAIDML_MLIR
-    return shape->type.getByteSize();
-#endif
+  return ffi_wrap<uint64_t>(err, 0, [&]() -> uint64_t {  //
+    int64_t offset;
+    llvm::SmallVector<int64_t, 8> strides;
+    if (failed(mlir::getStridesAndOffset(shape->type, strides, offset))) {
+      throw std::runtime_error("Could not retrieve strides");
+    }
+    auto sizes = shape->type.getShape();
+    unsigned total = 0;
+    for (unsigned i = 0; i < shape->type.getRank(); i++) {
+      if (!sizes[i]) {
+        return 0;
+      }
+      if (strides[i] > 0) {
+        total += (sizes[i] - 1) * strides[i];
+      }
+    }
+    return (total + 1) * (shape->type.getElementTypeBitWidth() / 8);
   });
 }
 
@@ -321,8 +266,7 @@ plaidml_buffer* plaidml_buffer_alloc(  //
     const char* device_id,             //
     size_t size) {
   return ffi_wrap<plaidml_buffer*>(err, nullptr, [&] {
-    auto ctx = GlobalContext::getContext();
-    auto buffer = GetPlatform()->MakeBuffer(*ctx, device_id, size);
+    auto buffer = std::make_shared<SimpleBuffer>(size);
     return new plaidml_buffer{buffer};
   });
 }
@@ -331,8 +275,7 @@ plaidml_view* plaidml_buffer_mmap_current(  //
     plaidml_error* err,                     //
     plaidml_buffer* buffer) {
   return ffi_wrap<plaidml_view*>(err, nullptr, [&] {  //
-    auto ctx = GlobalContext::getContext();
-    return new plaidml_view{buffer->buffer->MapCurrent(*ctx).get()};
+    return new plaidml_view{buffer->buffer->MapCurrent().get()};
   });
 }
 
@@ -340,8 +283,7 @@ plaidml_view* plaidml_buffer_mmap_discard(  //
     plaidml_error* err,                     //
     plaidml_buffer* buffer) {
   return ffi_wrap<plaidml_view*>(err, nullptr, [&] {  //
-    auto ctx = GlobalContext::getContext();
-    return new plaidml_view{buffer->buffer->MapDiscard(*ctx)};
+    return new plaidml_view{buffer->buffer->MapDiscard()};
   });
 }
 
@@ -372,9 +314,8 @@ size_t plaidml_view_size(  //
 void plaidml_view_writeback(  //
     plaidml_error* err,       //
     plaidml_view* view) {
-  ffi_wrap_void(err, [&] {
-    auto ctx = GlobalContext::getContext();
-    view->view->WriteBack(*ctx);
+  ffi_wrap_void(err, [&] {  //
+    view->view->WriteBack();
   });
 }
 

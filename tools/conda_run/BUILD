@@ -11,7 +11,7 @@ plaidml_cc_binary(
         "//conditions:default": ["conda_unix.cc"],
     }),
     deps = [
-        "//base/util",
+        "//pmlc/util:env",
         "@bazel_tools//tools/cpp/runfiles",
         "@boost//:filesystem",
     ],

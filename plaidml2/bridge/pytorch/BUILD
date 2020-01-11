@@ -1,12 +1,7 @@
 # Copyright 2019, Intel Corporation.
 
 load("@rules_python//python:defs.bzl", "py_test")
-load(
-    "//bzl:plaidml.bzl",
-    "plaidml_cc_binary",
-    "plaidml_cc_library",
-    "plaidml_py_library",
-)
+load("//bzl:plaidml.bzl", "plaidml_cc_binary", "plaidml_cc_library")
 
 # NOTE: We can't statically link against anything unless it was built with _GLIBCXX_USE_CXX11_ABI=0.
 #       This is because the pytorch libs were built with an older gcc (pre-C++ 11 ABI).
@@ -20,7 +15,7 @@ plaidml_cc_library(
     tags = ["pytorch"],
     visibility = ["//visibility:public"],
     deps = [
-        "//plaidml2:api_ast",
+        "//plaidml2:plaidml",
         "@com_intel_plaidml_conda_unix//:pytorch",
     ],
     alwayslink = 1,
@@ -33,7 +28,7 @@ plaidml_cc_binary(
     deps = [":pytorch"],
 )
 
-plaidml_py_library(
+py_library(
     name = "py",
     srcs = ["__init__.py"],
     data = [":plaidml_pytorch.so"],
@@ -42,7 +37,7 @@ plaidml_py_library(
     deps = ["//plaidml2:py"],
 )
 
-plaidml_py_library(
+py_library(
     name = "test_utils",
     srcs = ["test_utils.py"],
     tags = ["pytorch"],

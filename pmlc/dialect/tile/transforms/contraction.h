@@ -9,7 +9,7 @@
 #include <vector>
 
 #include "pmlc/dialect/tile/ir/ops.h"
-#include "tile/math/polynomial.h"
+#include "pmlc/util/math/polynomial.h"
 
 namespace pmlc::dialect::tile {
 

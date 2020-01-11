@@ -16,9 +16,9 @@
 #include "mlir/Target/LLVMIR.h"
 #include "mlir/Transforms/Passes.h"
 
-#include "base/util/logging.h"
 #include "pmlc/compiler/registry.h"
 #include "pmlc/conversion/tile_to_pxa/tile_to_pxa.h"
+#include "pmlc/util/logging.h"
 
 using namespace mlir;  // NOLINT[build/namespaces]
 using pmlc::conversion::tile_to_pxa::createLowerTileToPXAPass;

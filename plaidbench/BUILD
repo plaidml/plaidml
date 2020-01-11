@@ -2,16 +2,11 @@
 
 package(default_visibility = ["//visibility:public"])
 
+load("@rules_python//python:defs.bzl", "py_binary")
+
 exports_files([
     "requirements.txt",
 ])
-
-load("@rules_python//python:defs.bzl", "py_binary")
-load(
-    "//bzl:plaidml.bzl",
-    "plaidml_py_library",
-    "plaidml_py_wheel",
-)
 
 filegroup(
     name = "golden",
@@ -40,12 +35,11 @@ py_binary(
     main = "plaidbench.py",
     deps = [
         ":py",
-        "//plaidml/keras",
         "//plaidml2/bridge/keras",
     ],
 )
 
-plaidml_py_library(
+py_library(
     name = "py",
     srcs = [
         "plaidbench/__init__.py",
@@ -71,10 +65,11 @@ plaidml_py_library(
     ]),
 )
 
-plaidml_py_wheel(
-    name = "wheel",
-    package_name = "plaidbench",
-    srcs = [":py"],
-    config = "not_setup.cfg",
-    python = "py2.py3",
-)
+# TODO: use py_setup
+# plaidml_py_wheel(
+#     name = "wheel",
+#     package_name = "plaidbench",
+#     srcs = [":py"],
+#     config = "not_setup.cfg",
+#     python = "py2.py3",
+# )

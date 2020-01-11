@@ -8,7 +8,7 @@
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Module.h"
 
-#include "tile/base/buffer.h"
+#include "pmlc/util/buffer.h"
 
 namespace pmlc::dialect::tile {
 

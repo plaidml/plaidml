@@ -4,31 +4,16 @@ load("//tools/py_cffi:build_defs.bzl", "py_cffi")
 load("//tools/py_setup:build_defs.bzl", "py_setup")
 load("@rules_python//python:defs.bzl", "py_binary")
 load("@io_bazel_rules_jsonnet//jsonnet:jsonnet.bzl", "jsonnet_to_json")
-load(
-    "//bzl:plaidml.bzl",
-    "plaidml_cc_library",
-    "plaidml_cc_shlib",
-    "plaidml_py_library",
-    "plaidml_py_wheel",
-)
+load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_shlib")
 
 plaidml_cc_library(
-    name = "plaidml_ast",
+    name = "plaidml",
+    visibility = ["//visibility:public"],
     deps = [
-        "//plaidml2/core:core_ast",
-        "//plaidml2/edsl:edsl_ast",
-        "//plaidml2/exec:exec_ast",
-        "//plaidml2/op:op_ast",
-    ],
-)
-
-plaidml_cc_library(
-    name = "plaidml_mlir",
-    deps = [
-        "//plaidml2/core:core_mlir",
-        "//plaidml2/edsl:edsl_mlir",
-        "//plaidml2/exec:exec_mlir",
-        "//plaidml2/op:op_mlir",
+        "//plaidml2/core",
+        "//plaidml2/edsl",
+        "//plaidml2/exec",
+        "//plaidml2/op",
     ],
 )
 
@@ -44,7 +29,7 @@ jsonnet_to_json(
 )
 
 plaidml_cc_shlib(
-    name = "shlib_ast",
+    name = "shlib",
     linkopts = select({
         "@com_intel_plaidml//toolchain:windows_x86_64": [],
         "@com_intel_plaidml//toolchain:macos_x86_64": [
@@ -63,7 +48,7 @@ plaidml_cc_shlib(
     visibility = ["//visibility:public"],
     win_def_file = ":plaidml.def",
     deps = [
-        ":plaidml_ast",
+        ":plaidml",
     ] + select({
         "@com_intel_plaidml//toolchain:windows_x86_64": [],
         "@com_intel_plaidml//toolchain:macos_x86_64": [
@@ -75,60 +60,14 @@ plaidml_cc_shlib(
     }),
 )
 
-plaidml_cc_shlib(
-    name = "shlib_mlir",
-    linkopts = select({
-        "@com_intel_plaidml//toolchain:windows_x86_64": [],
-        "@com_intel_plaidml//toolchain:macos_x86_64": [
-            "-Wl,-exported_symbols_list",
-            "$(location :plaidml.ld)",
-        ],
-        "//conditions:default": [
-            # Prefer internal library definitions.
-            "-Wl,-Bsymbolic-functions",
-            # Use an explicit linker script.
-            "-Wl,--version-script",
-            "$(location :plaidml.lds)",
-        ],
-    }),
-    shlib_name = "plaidml2_mlir",
-    visibility = ["//visibility:public"],
-    win_def_file = ":plaidml.def",
-    deps = [
-        ":plaidml_mlir",
-    ] + select({
-        "@com_intel_plaidml//toolchain:windows_x86_64": [],
-        "@com_intel_plaidml//toolchain:macos_x86_64": [
-            ":plaidml.ld",
-        ],
-        "//conditions:default": [
-            ":plaidml.lds",
-        ],
-    }),
-)
-
-plaidml_cc_library(
-    name = "api_ast",
-    srcs = [":shlib_ast"],
-    linkstatic = 1,
-    visibility = ["//visibility:public"],
-    deps = [
-        "//plaidml2/core:api",
-        "//plaidml2/edsl:api",
-        "//plaidml2/exec:api",
-        "//plaidml2/op:api",
-    ],
-)
-
-plaidml_py_library(
+py_library(
     name = "py",
     srcs = [
         "__init__.py",
         "ffi.py",
     ],
     data = [
-        ":shlib_ast",
-        ":shlib_mlir",
+        ":shlib",
     ],
     visibility = ["//visibility:public"],
     deps = [
@@ -165,7 +104,6 @@ py_binary(
     srcs = ["setup.py"],
     data = [
         "plaidml2-config.cmake",
-        ":api_ast",
         ":setup",
         "//:LICENSE",
         "//plaidml2/core:sdk",
@@ -173,14 +111,11 @@ py_binary(
         "//plaidml2/exec:sdk",
         "//plaidml2/op:sdk",
         "@boost//:LICENSE_1_0.txt",
-        "@com_google_protobuf//:LICENSE",
         "@easylogging//:LICENCE.txt",
         "@gmock//:googlemock/LICENSE",
         "@half//:LICENSE.txt",
-        "@jsoncpp//:LICENSE",
         "@llvm-project//llvm:LICENSE.TXT",
         "@llvm-project//mlir:LICENSE.TXT",
-        "@minizip//:LICENSE",
         "@tbb//:LICENSE",
         "@xsmm//:LICENSE.md",
     ],
@@ -209,24 +144,12 @@ py_setup(
 )
 
 plaidml_cc_library(
-    name = "testenv_ast",
+    name = "testenv",
     testonly = 1,
     srcs = ["testenv.cc"],
     visibility = ["//visibility:public"],
     deps = [
-        ":plaidml_ast",
-        "@gmock//:gtest",
-    ],
-    alwayslink = 1,
-)
-
-plaidml_cc_library(
-    name = "testenv_mlir",
-    testonly = 1,
-    srcs = ["testenv.cc"],
-    visibility = ["//visibility:public"],
-    deps = [
-        ":plaidml_mlir",
+        ":plaidml",
         "@gmock//:gtest",
     ],
     alwayslink = 1,

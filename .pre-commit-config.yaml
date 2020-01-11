@@ -1,6 +1,5 @@
 exclude: >
   (?x)^(
-    base/util/catch.h|
     bzl/version.tpl.cc|
     bzl/version.tpl.py|
     bzl/conda.tpl.py|

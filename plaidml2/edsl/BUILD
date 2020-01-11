@@ -2,12 +2,7 @@
 
 load("@rules_python//python:defs.bzl", "py_test")
 load("@rules_pkg//:pkg.bzl", "pkg_tar")
-load(
-    "//bzl:plaidml.bzl",
-    "plaidml_cc_library",
-    "plaidml_cc_test",
-    "plaidml_py_library",
-)
+load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_test")
 
 SDK_HDRS = [
     "autodiff.h",
@@ -39,52 +34,24 @@ filegroup(
 )
 
 plaidml_cc_library(
-    name = "edsl_ast",
+    name = "edsl",
     srcs = [
         "derivs.cc",
         "derivs.h",
         "ffi.cc",
     ],
     hdrs = SDK_HDRS,
-    defines = [
-        "PLAIDML_AST",
-    ],
     visibility = ["//visibility:public"],
     deps = [
-        "//base/util",
-        "//plaidml2/core:core_ast",
-        "//tile/lang/ast",
-        "@llvm-project//llvm:support",
-    ],
-    alwayslink = 1,
-)
-
-plaidml_cc_library(
-    name = "edsl_mlir",
-    srcs = [
-        "derivs.cc",
-        "derivs.h",
-        "ffi.cc",
-        "helper.cc",
-    ],
-    hdrs = SDK_HDRS + [
-        "helper.h",
-    ],
-    defines = [
-        "PLAIDML_MLIR",
-    ],
-    visibility = ["//visibility:public"],
-    deps = [
-        "//base/util",
-        "//plaidml2/core:core_mlir",
-        "//pmlc/conversion/tile_to_stripe",
+        "//plaidml2/core",
         "//pmlc/dialect/tile",
+        "//pmlc/util",
         "@llvm-project//llvm:support",
     ],
     alwayslink = 1,
 )
 
-plaidml_py_library(
+py_library(
     name = "py",
     srcs = [
         "__init__.py",
@@ -103,41 +70,19 @@ plaidml_cc_library(
 )
 
 plaidml_cc_test(
-    name = "cc_ast_test",
+    name = "cc_test",
     srcs = ["edsl_test.cc"],
     deps = [
         ":api",
-        ":edsl_ast",
-        "//plaidml2:testenv_ast",
-        "//plaidml2/exec:exec_ast",
-    ],
-)
-
-plaidml_cc_test(
-    name = "cc_mlir_test",
-    srcs = ["edsl_test.cc"],
-    deps = [
-        ":api",
-        ":edsl_mlir",
-        "//plaidml2:testenv_mlir",
-        "//plaidml2/exec:exec_mlir",
+        ":edsl",
+        "//plaidml2:testenv",
+        "//plaidml2/exec",
     ],
 )
 
 py_test(
-    name = "py_ast_test",
+    name = "py_test",
     srcs = ["edsl_test.py"],
-    main = "edsl_test.py",
-    deps = [
-        ":py",
-        "//plaidml2/exec:py",
-    ],
-)
-
-py_test(
-    name = "py_mlir_test",
-    srcs = ["edsl_test.py"],
-    args = ["--mlir"],
     main = "edsl_test.py",
     deps = [
         ":py",
