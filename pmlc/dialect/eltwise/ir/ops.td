@@ -85,7 +85,7 @@ class EW_UnaryOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
 
 class EW_BinaryOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
     EltwiseOp<mnemonic, traits>,
-    HasCanonicalizer { 
+    HasCanonicalizer {
   let arguments = (ins EltwiseAny:$lhs, EltwiseAny:$rhs, TypeAttr:$type);
   let results = (outs EltwiseAny:$result);
 
