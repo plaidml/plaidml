@@ -1,8 +1,6 @@
 #include "pmlc/util/bilp/ilp_solver.h"
 
-namespace vertexai {
-namespace tile {
-namespace bilp {
+namespace pmlc::util::bilp {
 
 using namespace math;  // NOLINT
 
@@ -311,6 +309,4 @@ void ILPSolver::clean() {
   var_names_.clear();
 }
 
-}  // namespace bilp
-}  // namespace tile
-}  // namespace vertexai
+}  // namespace pmlc::util::bilp

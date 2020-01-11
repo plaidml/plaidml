@@ -20,7 +20,7 @@ const char logDirPrefix[] = "logs/";  // NOLINT
 #endif
 }  // namespace
 
-namespace vertexai {
+namespace pmlc::util {
 
 el::Configurations LogConfigurationFromFlags(const std::string& app_name) {
   el::Configurations conf;
@@ -41,4 +41,4 @@ el::Configurations LogConfigurationFromFlags(const std::string& app_name) {
 
   return conf;
 }
-}  // namespace vertexai
+}  // namespace pmlc::util

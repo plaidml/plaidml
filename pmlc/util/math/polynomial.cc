@@ -4,9 +4,7 @@
 
 #include <boost/format.hpp>
 
-namespace vertexai {
-namespace tile {
-namespace math {
+namespace pmlc::util::math {
 
 namespace {
 
@@ -438,6 +436,4 @@ RangeConstraint IntersectOpposedSimpleConstraints(  //
   return IntersectParallelConstraintPair(RangeConstraint(merged_poly1, r), constraint2);
 }
 
-}  // namespace math
-}  // namespace tile
-}  // namespace vertexai
+}  // namespace pmlc::util::math

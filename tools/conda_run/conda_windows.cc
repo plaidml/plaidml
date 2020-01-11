@@ -53,7 +53,7 @@ std::string WindowsPath(std::string path) {
 
 class Manifest {
  public:
-  Manifest() : db_(ParseManifest(vertexai::env::Get("RUNFILES_MANIFEST_FILE"))) {}
+  Manifest() : db_(ParseManifest(pmlc::util::getEnvVar("RUNFILES_MANIFEST_FILE"))) {}
 
   std::string GetTargetPath(const std::string& key) {
     auto it = db_.find(key);
@@ -79,13 +79,13 @@ int main(int argc, char* argv[]) {
       return EXIT_FAILURE;
     }
     for (const auto& var : runfiles->EnvVars()) {
-      vertexai::env::Set(var.first, var.second);
+      pmlc::util::setEnvVar(var.first, var.second);
     }
 
     Manifest manifest;
     auto python = fs::path(manifest.GetTargetPath("com_intel_plaidml_conda_windows/env/python.exe"));
     auto conda_env = WindowsPath(python.parent_path().string());
-    auto conda_exe = vertexai::env::Get("CONDA_EXE");
+    auto conda_exe = pmlc::util::getEnvVar("CONDA_EXE");
     if (conda_exe.empty()) {
       conda_exe = R"(C:\tools\Miniconda3\Scripts\conda.exe)";
       if (!fs::exists(conda_exe)) {
@@ -102,8 +102,8 @@ int main(int argc, char* argv[]) {
 #endif
 
     // Adjust environment variables to activate conda environment
-    vertexai::env::Set("CONDA_DEFAULT_ENV", conda_env);
-    vertexai::env::Set("CONDA_PREFIX", conda_env);
+    pmlc::util::setEnvVar("CONDA_DEFAULT_ENV", conda_env);
+    pmlc::util::setEnvVar("CONDA_PREFIX", conda_env);
 
     // Use conda run to adjust the PATH
     bp::opstream os;
@@ -116,7 +116,7 @@ int main(int argc, char* argv[]) {
       // std::cerr << line << std::endl;
       auto pos = line.find_first_of('=');
       if (pos != std::string::npos) {
-        vertexai::env::Set(line.substr(0, pos), line.substr(pos + 1));
+        pmlc::util::setEnvVar(line.substr(0, pos), line.substr(pos + 1));
       }
     }
     proc.wait();

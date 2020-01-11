@@ -5,9 +5,7 @@
 
 #include <boost/math/common_factor_rt.hpp>
 
-namespace vertexai {
-namespace tile {
-namespace math {
+namespace pmlc::util::math {
 
 bool BasisBuilder::addEquation(const Polynomial<Rational>& orig) {
   IVLOG(4, "In basis builder, adding poly " << orig);
@@ -50,6 +48,4 @@ bool BasisBuilder::addEquation(const Polynomial<Rational>& orig) {
   return true;
 }
 
-}  // namespace math
-}  // namespace tile
-}  // namespace vertexai
+}  // namespace pmlc::util::math

@@ -25,8 +25,6 @@
 using plaidml::core::ffi_wrap;
 using plaidml::core::ffi_wrap_void;
 using plaidml::core::GlobalContext;
-using vertexai::tile::DataType;
-
 using pmlc::dialect::eltwise::ScalarType;
 using pmlc::dialect::tile::DerivRegistry;
 using pmlc::dialect::tile::ProgramMutations;
@@ -34,6 +32,7 @@ using pmlc::dialect::tile::ProgramUpdate;
 using pmlc::dialect::tile::TileBuilder;
 using pmlc::util::AggregationKind;
 using pmlc::util::CombinationKind;
+using pmlc::util::DataType;
 
 namespace {
 

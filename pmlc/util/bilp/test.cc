@@ -4,9 +4,7 @@
 #include "pmlc/util/bilp/ilp_solver.h"
 #include "pmlc/util/math/bignum.h"
 
-namespace vertexai {
-namespace tile {
-namespace bilp {
+namespace pmlc::util::bilp {
 
 using namespace math;  // NOLINT
 
@@ -305,6 +303,4 @@ TEST(MilpTest, RandomConstraintsTest) {
   }
 }
 
-}  // namespace bilp
-}  // namespace tile
-}  // namespace vertexai
+}  // namespace pmlc::util::bilp

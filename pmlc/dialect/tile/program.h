@@ -16,7 +16,7 @@ struct ProgramArgument {
   bool isInput;
   mlir::Value value;
   mlir::RankedTensorType shape;
-  vertexai::tile::BufferPtr buffer;
+  pmlc::util::BufferPtr buffer;
 };
 
 struct TileProgram {

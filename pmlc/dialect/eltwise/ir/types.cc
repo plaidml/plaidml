@@ -6,7 +6,7 @@
 
 namespace pmlc::dialect::eltwise {
 
-using vertexai::tile::DataType;
+using util::DataType;
 
 using mlir::FloatType;
 using mlir::IntegerType;

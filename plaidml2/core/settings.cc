@@ -17,16 +17,16 @@ namespace plaidml::core {
 namespace {
 
 fs::path home_path() {
-  auto user_profile = vertexai::env::Get("USERPROFILE");
+  auto user_profile = pmlc::util::getEnvVar("USERPROFILE");
   if (user_profile.size()) {
     return user_profile;
   }
-  auto home = vertexai::env::Get("HOME");
+  auto home = pmlc::util::getEnvVar("HOME");
   if (home.size()) {
     return home;
   }
-  auto home_drive = vertexai::env::Get("HOMEDRIVE");
-  auto home_path = vertexai::env::Get("HOMEPATH");
+  auto home_drive = pmlc::util::getEnvVar("HOMEDRIVE");
+  auto home_path = pmlc::util::getEnvVar("HOMEPATH");
   if (home_drive.size() && home_path.size()) {
     return home_drive + home_path;
   }
@@ -34,7 +34,7 @@ fs::path home_path() {
 }
 
 fs::path settings_path() {
-  fs::path path = vertexai::env::Get("PLAIDML_SETTINGS");
+  fs::path path = pmlc::util::getEnvVar("PLAIDML_SETTINGS");
   if (path.empty()) {
     path = home_path() / ".plaidml2";
   }
@@ -57,7 +57,7 @@ const std::map<std::string, std::string>& Settings::all() const {  //
 }
 
 std::string Settings::get(const std::string& key) const {
-  auto env_var = vertexai::env::Get(key);
+  auto env_var = pmlc::util::getEnvVar(key);
   if (env_var.size()) {
     return env_var;
   }
@@ -70,7 +70,7 @@ std::string Settings::get(const std::string& key) const {
 
 void Settings::set(const std::string& key, const std::string& value) {
   settings_[key] = value;
-  vertexai::env::Set(key, value);
+  pmlc::util::setEnvVar(key, value);
 }
 
 void Settings::load() {
@@ -87,7 +87,7 @@ void Settings::load() {
       auto key = line.substr(0, pos);
       auto value = line.substr(pos + 1);
       IVLOG(1, key << " = " << value);
-      auto env_var = vertexai::env::Get(key);
+      auto env_var = pmlc::util::getEnvVar(key);
       if (env_var.size()) {
         value = env_var;
       }

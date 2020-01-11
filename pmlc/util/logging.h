@@ -17,14 +17,14 @@
 #include <string>
 #include <vector>
 
-namespace vertexai {
+namespace pmlc::util {
 
 // Returns a log configuration built from the command line flags passed to the
 // program.  This should be only be used after command line flag parsing is
 // complete.
 el::Configurations LogConfigurationFromFlags(const std::string& app_name);
 
-}  // namespace vertexai
+}  // namespace pmlc::util
 
 #define IVLOG(N, rest)   \
   do {                   \

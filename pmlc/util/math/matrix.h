@@ -10,9 +10,7 @@
 
 #include "pmlc/util/math/polynomial.h"
 
-namespace vertexai {
-namespace tile {
-namespace math {
+namespace pmlc::util::math {
 
 class Matrix : public boost::numeric::ublas::matrix<Rational> {
  public:
@@ -70,6 +68,4 @@ std::tuple<Matrix, Vector> FromPolynomials(const std::vector<Polynomial<Rational
 // Convert matrix + vector of offsets to Hermite Normal Form
 bool HermiteNormalForm(Matrix& m);  // NOLINT(runtime/references)
 
-}  // namespace math
-}  // namespace tile
-}  // namespace vertexai
+}  // namespace pmlc::util::math

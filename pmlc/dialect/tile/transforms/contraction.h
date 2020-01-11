@@ -13,7 +13,7 @@
 
 namespace pmlc::dialect::tile {
 
-namespace math = vertexai::tile::math;
+namespace math = util::math;
 
 using IndexPoly = math::Polynomial<math::Rational>;
 using IndexAccess = std::vector<IndexPoly>;

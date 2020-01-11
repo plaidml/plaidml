@@ -21,8 +21,8 @@ using plaidml::core::ffi_wrap_void;
 using plaidml::core::GlobalContext;
 using plaidml::core::Settings;
 using pmlc::dialect::eltwise::ScalarType;
-using vertexai::tile::DataType;
-using vertexai::tile::SimpleBuffer;
+using pmlc::util::DataType;
+using pmlc::util::SimpleBuffer;
 
 extern const char* PLAIDML_VERSION;
 
@@ -32,8 +32,7 @@ void plaidml_init(plaidml_error* err) {
   static std::once_flag is_initialized;
   ffi_wrap_void(err, [&] {
     std::call_once(is_initialized, []() {
-      vertexai::env::Set("PLAIDML_CLEANUP_NAMES", "1");
-      auto level_str = vertexai::env::Get("PLAIDML_VERBOSE");
+      auto level_str = pmlc::util::getEnvVar("PLAIDML_VERBOSE");
       if (level_str.size()) {
         auto level = std::atoi(level_str.c_str());
         if (level) {
@@ -275,7 +274,7 @@ plaidml_view* plaidml_buffer_mmap_current(  //
     plaidml_error* err,                     //
     plaidml_buffer* buffer) {
   return ffi_wrap<plaidml_view*>(err, nullptr, [&] {  //
-    return new plaidml_view{buffer->buffer->MapCurrent().get()};
+    return new plaidml_view{buffer->buffer->MapCurrent()};
   });
 }
 

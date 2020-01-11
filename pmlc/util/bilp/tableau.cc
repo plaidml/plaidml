@@ -2,9 +2,7 @@
 
 #include <set>
 
-namespace vertexai {
-namespace tile {
-namespace bilp {
+namespace pmlc::util::bilp {
 
 using namespace math;  // NOLINT
 
@@ -251,6 +249,4 @@ std::vector<Rational> Tableau::getSymbolicSolution() const {
 
 Rational Tableau::reportObjectiveValue() const { return mat()(0, mat().size2() - 1); }
 
-}  // namespace bilp
-}  // namespace tile
-}  // namespace vertexai
+}  // namespace pmlc::util::bilp

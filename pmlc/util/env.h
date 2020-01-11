@@ -4,8 +4,7 @@
 
 #include <string>
 
-namespace vertexai {
-namespace env {
+namespace pmlc::util {
 
 // Environment variable helpers.
 // We use our own environment variable access routines so that we can read them
@@ -14,10 +13,9 @@ namespace env {
 
 // Reads the requested environment variable.  If the variable is not set, an empty
 // string is returned.
-std::string Get(const std::string& key, const std::string& default_value = "");
+std::string getEnvVar(const std::string& key, const std::string& default_value = "");
 
 // Writes the requested environment variable.
-void Set(const std::string& key, const std::string& value);
+void setEnvVar(const std::string& key, const std::string& value);
 
-}  // namespace env
-}  // namespace vertexai
+}  // namespace pmlc::util

@@ -11,9 +11,7 @@
 
 #include "pmlc/util/math/matrix.h"
 
-namespace vertexai {
-namespace tile {
-namespace bilp {
+namespace pmlc::util::bilp {
 
 using boost::numeric::ublas::range;
 
@@ -65,6 +63,4 @@ class Tableau {
   void buildOppositesFromNames();
 };
 
-}  // namespace bilp
-}  // namespace tile
-}  // namespace vertexai
+}  // namespace pmlc::util::bilp

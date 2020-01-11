@@ -12,9 +12,7 @@
 #include "pmlc/util/logging.h"
 #include "pmlc/util/math/bignum.h"
 
-namespace vertexai {
-namespace tile {
-namespace math {
+namespace pmlc::util::math {
 
 // A linear Polynomial<Rational> of Rational coefficients
 template <typename T>
@@ -144,6 +142,4 @@ inline MAKE_LOGGABLE(Bound, b, os) {
   return os;
 }
 
-}  // namespace math
-}  // namespace tile
-}  // namespace vertexai
+}  // namespace pmlc::util::math

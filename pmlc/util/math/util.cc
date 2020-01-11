@@ -3,10 +3,7 @@
 
 #include <algorithm>
 
-namespace vertexai {
-namespace tile {
-namespace math {
-
+namespace pmlc::util::math {
 Seive::Seive(uint64_t size) : first_factor(size) {
   // Intialize each element to be '2' or 'prime' initially
   primes.push_back(2);
@@ -73,6 +70,4 @@ uint64_t NumFactors(uint64_t in) {
 
 bool IsPrime(uint64_t in) { return FirstFactor(in) == in; }
 
-}  // namespace math
-}  // namespace tile
-}  // namespace vertexai
+}  // namespace pmlc::util::math

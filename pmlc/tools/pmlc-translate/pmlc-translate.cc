@@ -41,7 +41,7 @@ static cl::opt<bool> splitInputFile(                  //
 
 int main(int argc, char** argv) {
   START_EASYLOGGINGPP(argc, argv);
-  auto level_str = vertexai::env::Get("PLAIDML_VERBOSE");
+  auto level_str = pmlc::util::getEnvVar("PLAIDML_VERBOSE");
   if (level_str.size()) {
     auto level = std::atoi(level_str.c_str());
     if (level) {

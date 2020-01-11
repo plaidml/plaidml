@@ -37,7 +37,7 @@ using dialect::tile::IndexOp;
 using dialect::tile::Shape;
 using dialect::tile::ShapeOp;
 using dialect::tile::ShapeOpOperandAdaptor;
-using ::vertexai::tile::DataType;
+using util::DataType;
 
 using llvm::Optional;
 using llvm::SmallVector;

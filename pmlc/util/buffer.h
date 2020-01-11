@@ -9,10 +9,7 @@
 #include <utility>
 #include <vector>
 
-#include <boost/thread/future.hpp>
-
-namespace vertexai {
-namespace tile {
+namespace pmlc::util {
 
 // View is an abstract base class representing a mapped view of a buffer's memory.
 class View {
@@ -68,7 +65,7 @@ class Buffer {
   // Asynchronously maps a read/write view of a buffer.  All views of a buffer must be deleted before the buffer is
   // passed to Program::Run.  Note that this API may raise an error synchronously (e.g. under low memory conditions) or
   // asynchronously (e.g. a problem with the underlying device, or with the calls that created the buffer's contents).
-  virtual boost::future<std::unique_ptr<View>> MapCurrent() = 0;
+  virtual std::unique_ptr<View> MapCurrent() = 0;
 
   // Synchronously maps a read/write view of a buffer, optionally (implementation-specific) discarding the buffer's
   // existing contents.
@@ -104,9 +101,9 @@ class SimpleBuffer : public Buffer, public std::enable_shared_from_this<SimpleBu
 
   uint64_t size() const final { return data_.size(); }
 
-  boost::future<std::unique_ptr<View>> MapCurrent() final {
+  std::unique_ptr<View> MapCurrent() final {
     std::unique_ptr<View> view(new SimpleView(data_.data(), data_.size()));
-    return boost::make_ready_future(std::move(view));
+    return view;
   }
 
   std::unique_ptr<View> MapDiscard() final { return std::make_unique<SimpleView>(data_.data(), data_.size()); }
@@ -117,5 +114,4 @@ class SimpleBuffer : public Buffer, public std::enable_shared_from_this<SimpleBu
   std::vector<char> data_;
 };
 
-}  // namespace tile
-}  // namespace vertexai
+}  // namespace pmlc::util

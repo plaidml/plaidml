@@ -34,11 +34,11 @@ struct plaidml_program {
 };
 
 struct plaidml_buffer {
-  std::shared_ptr<vertexai::tile::Buffer> buffer;
+  std::shared_ptr<pmlc::util::Buffer> buffer;
 };
 
 struct plaidml_view {
-  std::shared_ptr<vertexai::tile::View> view;
+  std::shared_ptr<pmlc::util::View> view;
 };
 
 struct VariantHolder;

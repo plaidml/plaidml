@@ -6,9 +6,7 @@
 
 #include "pmlc/util/math/polynomial.h"
 
-namespace vertexai {
-namespace tile {
-namespace math {
+namespace pmlc::util::math {
 
 class BasisBuilder {
  public:
@@ -28,6 +26,4 @@ class BasisBuilder {
   std::set<std::string> vars_set_;             // All the variables found, as a set
 };
 
-}  // namespace math
-}  // namespace tile
-}  // namespace vertexai
+}  // namespace pmlc::util::math

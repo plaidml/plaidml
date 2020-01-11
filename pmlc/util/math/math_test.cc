@@ -4,9 +4,7 @@
 #include "pmlc/util/math/matrix.h"
 #include "pmlc/util/math/polynomial.h"
 
-namespace vertexai {
-namespace tile {
-namespace math {
+namespace pmlc::util::math {
 
 // TEST_CASE("Ceil", "[lattice]") {
 //   REQUIRE(Ceil(Rational(5, 3)) == 2);
@@ -182,6 +180,4 @@ namespace math {
 //   REQUIRE(r == false);
 // }
 
-}  // namespace math
-}  // namespace tile
-}  // namespace vertexai
+}  // namespace pmlc::util::math

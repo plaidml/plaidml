@@ -5,9 +5,7 @@
 #include <cstdint>
 #include <vector>
 
-namespace vertexai {
-namespace tile {
-namespace math {
+namespace pmlc::util::math {
 
 inline uint64_t NearestPo2(uint64_t x) {
   uint64_t po2 = 1;
@@ -50,6 +48,4 @@ uint64_t NumFactors(uint64_t in);
 // Check if a number is prime
 bool IsPrime(uint64_t in);
 
-}  // namespace math
-}  // namespace tile
-}  // namespace vertexai
+}  // namespace pmlc::util::math

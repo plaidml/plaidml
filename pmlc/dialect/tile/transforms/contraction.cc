@@ -15,18 +15,18 @@
 #include "pmlc/util/math/basis.h"
 #include "pmlc/util/util.h"
 
-namespace bilp = vertexai::tile::bilp;
+namespace pmlc::dialect::tile {
+
+namespace bilp = util::bilp;
 
 using mlir::AffineExpr;
 using mlir::AffineExprKind;
 using mlir::ArrayAttr;
 
-using vertexai::tile::math::Integer;
-using vertexai::tile::math::RangeConstraint;
-using vertexai::tile::math::Rational;
-using vertexai::tile::math::SimpleConstraint;
-
-namespace pmlc::dialect::tile {
+using util::math::Integer;
+using util::math::RangeConstraint;
+using util::math::Rational;
+using util::math::SimpleConstraint;
 
 void Constraints::AddTensor(const IndexAccess& access, Shape shape) {
   if (access.size() != shape.size()) {

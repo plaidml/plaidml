@@ -7,9 +7,7 @@
 
 #include <boost/format.hpp>
 
-namespace vertexai {
-namespace tile {
-namespace math {
+namespace pmlc::util::math {
 
 struct DualMatrix {
   size_t size_;
@@ -371,6 +369,4 @@ bool HermiteNormalForm(Matrix& m) {  // NOLINT(runtime/references)
   return r;
 }
 
-}  // namespace math
-}  // namespace tile
-}  // namespace vertexai
+}  // namespace pmlc::util::math

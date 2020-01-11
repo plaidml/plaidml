@@ -6,8 +6,7 @@
 
 #include "pmlc/util/logging.h"
 
-namespace vertexai {
-namespace tile {
+namespace pmlc::util {
 
 std::ostream& operator<<(std::ostream& os, const TensorShape& shape) {
   os << to_string(shape.type);
@@ -83,5 +82,4 @@ DataType CommonSupertype(DataType lhs, DataType rhs) {
   return lhs;
 }
 
-}  // namespace tile
-}  // namespace vertexai
+}  // namespace pmlc::util

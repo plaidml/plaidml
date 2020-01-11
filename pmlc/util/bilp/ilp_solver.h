@@ -10,9 +10,7 @@
 #include "pmlc/util/bilp/tableau.h"
 #include "pmlc/util/math/bignum.h"
 
-namespace vertexai {
-namespace tile {
-namespace bilp {
+namespace pmlc::util::bilp {
 
 enum class BranchMethod { full, face, open };
 
@@ -88,6 +86,4 @@ Tableau makeStandardFormTableau(const std::vector<math::RangeConstraint>& constr
 Tableau makeStandardFormTableau(const std::vector<math::SimpleConstraint>& constraints,
                                 const math::Polynomial<math::Rational> objective = math::Polynomial<math::Rational>());
 
-}  // namespace bilp
-}  // namespace tile
-}  // namespace vertexai
+}  // namespace pmlc::util::bilp

@@ -17,7 +17,7 @@ int main(int argc, char* argv[]) {
     return EXIT_FAILURE;
   }
 
-  el::Loggers::reconfigureAllLoggers(vertexai::LogConfigurationFromFlags("default"));
+  el::Loggers::reconfigureAllLoggers(pmlc::util::LogConfigurationFromFlags("default"));
   try {
     return RUN_ALL_TESTS();
   } catch (const std::exception& ex) {

@@ -21,11 +21,10 @@
 
 using plaidml::core::ffi_wrap;
 using plaidml::core::ffi_wrap_void;
-using vertexai::tile::Buffer;
-using vertexai::tile::BufferPtr;
-
 using pmlc::compiler::Executable;
 using pmlc::dialect::tile::ProgramArgument;
+using pmlc::util::Buffer;
+using pmlc::util::BufferPtr;
 using namespace mlir;  // NOLINT[build/namespaces]
 
 namespace {

@@ -12,7 +12,7 @@
 
 namespace pmlc::dialect::eltwise {
 
-using DataType = vertexai::tile::DataType;
+using DataType = util::DataType;
 
 enum Kinds {
   // A scalar type

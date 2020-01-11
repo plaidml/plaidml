@@ -8,8 +8,7 @@
 #include <utility>
 #include <vector>
 
-namespace vertexai {
-namespace tile {
+namespace pmlc::util {
 
 typedef std::vector<uint64_t> TileShape;
 
@@ -336,5 +335,4 @@ inline TensorShape SimpleShape(DataType type, const std::vector<size_t>& sizes, 
 
 typedef std::map<std::string, TensorShape> ShapeMap;
 
-}  // namespace tile
-}  // namespace vertexai
+}  // namespace pmlc::util

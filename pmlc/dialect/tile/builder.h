@@ -22,7 +22,7 @@ class Operation;
 
 namespace pmlc::dialect::tile {
 
-using DataType = vertexai::tile::DataType;
+using DataType = util::DataType;
 
 struct Shape {
   DataType elementType;
@@ -60,7 +60,7 @@ class TileBuilder {
   void BindTensorDims(mlir::Value from, llvm::ArrayRef<mlir::Value*> into);
   mlir::RankedTensorType ComputeShape(mlir::Value tensor);
   void BindShape(mlir::Value tensor, mlir::RankedTensorType type);
-  void BindBuffer(mlir::Value tensor, vertexai::tile::BufferPtr buffer);
+  void BindBuffer(mlir::Value tensor, pmlc::util::BufferPtr buffer);
 
   mlir::MemRefType MakeMemRefType(DataType dtype, llvm::ArrayRef<int64_t> sizes, llvm::ArrayRef<int64_t> strides);
   mlir::MemRefType IntoMemRefType(mlir::RankedTensorType type);
@@ -82,7 +82,7 @@ class TileBuilder {
   mlir::Value MakePrimitiveOp(llvm::StringRef fn, llvm::ArrayRef<mlir::Value> args);
   mlir::Value MakeCastOp(mlir::Value tensor, DataType dtype);
   mlir::Value MakeDimOp(mlir::Value tensor, unsigned dim);
-  mlir::Value MakePlaceholderOp(mlir::RankedTensorType type, vertexai::tile::BufferPtr buffer, llvm::StringRef name);
+  mlir::Value MakePlaceholderOp(mlir::RankedTensorType type, pmlc::util::BufferPtr buffer, llvm::StringRef name);
   mlir::Value MakeAffineConstantOp(int64_t value);
   mlir::Value MakeAffineIndexOp(llvm::StringRef name = "");
   mlir::Value MakeAffineAddOp(llvm::ArrayRef<mlir::Value> args);

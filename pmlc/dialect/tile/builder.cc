@@ -55,8 +55,8 @@ using mlir::Type;
 using mlir::UnknownLoc;
 using mlir::Value;
 using util::AggregationKind;
+using util::BufferPtr;
 using util::CombinationKind;
-using vertexai::tile::BufferPtr;
 
 struct DomainInfo {
   BlockAndValueMapping mapping;
