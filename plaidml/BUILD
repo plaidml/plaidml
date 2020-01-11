@@ -362,8 +362,6 @@ plaidml_py_wheel(
     }),
     package_prefix = "plaidml",
     platform = select({
-        "//toolchain:linux_arm_32v7": "linux_armv7l",
-        "//toolchain:linux_arm_64v8": "linux_aarch64",
         "//toolchain:macos_x86_64": "macosx_10_10_x86_64",
         "//toolchain:windows_x86_64": "win_amd64",
         "//conditions:default": "manylinux1_x86_64",
