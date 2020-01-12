@@ -36,7 +36,7 @@ py_binary(
     main = "plaidbench.py",
     deps = [
         ":py",
-        "//plaidml2/bridge/keras",
+        "//plaidml/bridge/keras",
     ],
 )
 

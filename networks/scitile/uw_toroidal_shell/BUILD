@@ -8,9 +8,9 @@ py_binary(
     name = "uw_toroidal_shell",
     srcs = ["uw_toroidal_shell.py"],
     deps = [
-        "//plaidml2:py",
-        "//plaidml2/edsl:py",
-        "//plaidml2/exec:py",
+        "//plaidml:py",
+        "//plaidml/edsl:py",
+        "//plaidml/exec:py",
     ],
 )
 
@@ -21,9 +21,8 @@ py_test(
         "uw_toroidal_shell.py",
     ],
     deps = [
-        "//plaidml2:py",
-        "//plaidml2/edsl:py",
-        "//plaidml2/exec:py",
+        "//plaidml:py",
+        "//plaidml/edsl:py",
+        "//plaidml/exec:py",
     ],
 )
-

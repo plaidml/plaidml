@@ -18,7 +18,7 @@ Initialization
 
    .. group-tab:: Python
 
-      .. autofunction:: plaidml2.edsl.__init
+      .. autofunction:: plaidml.edsl.__init
 
 -------
 Objects
@@ -33,16 +33,16 @@ Objects
 
    .. group-tab:: Python
 
-      .. autoclass:: plaidml2.edsl.IndexedTensor
-      .. autoclass:: plaidml2.edsl.LogicalShape
+      .. autoclass:: plaidml.edsl.IndexedTensor
+      .. autoclass:: plaidml.edsl.LogicalShape
          :members:
-      .. autoclass:: plaidml2.edsl.Tensor
-      .. autoclass:: plaidml2.edsl.TensorRef
-      .. autoclass:: plaidml2.edsl.ProgramArgument
-      .. autoclass:: plaidml2.edsl.Program
-      .. autoclass:: plaidml2.edsl.TensorDim
-      .. autoclass:: plaidml2.edsl.TensorIndex
-      .. autoclass:: plaidml2.edsl.Constraint
+      .. autoclass:: plaidml.edsl.Tensor
+      .. autoclass:: plaidml.edsl.TensorRef
+      .. autoclass:: plaidml.edsl.ProgramArgument
+      .. autoclass:: plaidml.edsl.Program
+      .. autoclass:: plaidml.edsl.TensorDim
+      .. autoclass:: plaidml.edsl.TensorIndex
+      .. autoclass:: plaidml.edsl.Constraint
 
 ----------
 Primitives

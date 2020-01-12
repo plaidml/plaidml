@@ -1,5 +1,5 @@
 ---
-bazel: 1.0.0
+bazel: 2.0.0
 tasks:
   ubuntu1804:
     name: PlaidML

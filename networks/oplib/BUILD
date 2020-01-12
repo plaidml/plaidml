@@ -8,7 +8,7 @@ plaidml_cc_binary(
     name = "resnet50",
     srcs = ["resnet50.cc"],
     deps = [
-        "//plaidml2:plaidml",
+        "//plaidml",
         "//pmlc/util",
         "@com_github_google_benchmark//:benchmark_main",
     ],

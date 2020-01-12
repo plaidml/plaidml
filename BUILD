@@ -15,8 +15,8 @@ pkg_tar(
     name = "pkg",
     srcs = [
         "//plaidbench:wheel",
-        "//plaidml2:wheel",
-        "//plaidml2/bridge/keras:wheel",
+        "//plaidml:wheel",
+        "//plaidml/bridge/keras:wheel",
     ],
     extension = "tar.gz",
 )

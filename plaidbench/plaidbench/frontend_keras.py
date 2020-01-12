@@ -325,7 +325,7 @@ class Frontend(core.Frontend):
             except ImportError:
                 raise RuntimeError("Failed to import plaidml module")
             try:
-                importlib.import_module('plaidml2.bridge.keras')
+                importlib.import_module('plaidml.bridge.keras')
             except ImportError:
                 raise RuntimeError("The PlaidML2 EDSL Keras bridge was requested but not found.")
         elif backend == 'tensorflow':

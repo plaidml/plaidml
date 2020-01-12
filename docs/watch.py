@@ -15,7 +15,7 @@ def rebuild():
 rebuild()
 
 server = Server()
-server.watch('plaidml2/', rebuild)
+server.watch('plaidml/', rebuild)
 server.watch('docs/conf.py', sphinx)
 server.watch('docs/**/*.rst', sphinx)
 server.serve(root='docs/_build/html')

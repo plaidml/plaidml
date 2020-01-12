@@ -36,8 +36,8 @@ import logging
 
 import six
 
-import plaidml2.edsl as edsl
-from plaidml2.ffi import ffi, ffi_call, lib
+import plaidml.edsl as edsl
+from plaidml.ffi import ffi, ffi_call, lib
 
 )";
 
