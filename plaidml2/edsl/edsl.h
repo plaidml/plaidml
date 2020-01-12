@@ -122,17 +122,17 @@ class Program {
 class TensorDim {
  public:
   ///
-  /// TODO
+  /// TensorDim constructor
   ///
   TensorDim() : ptr_(details::make_ptr(ffi::call<plaidml_dim_expr*>(plaidml_dim_expr_none))) {}
 
   ///
-  /// TODO
+  /// TensorDim constructor
   ///
   explicit TensorDim(const std::shared_ptr<plaidml_dim_expr>& ptr) : ptr_(ptr) {}
 
   ///
-  /// TODO
+  /// TensorDim constructor
   ///
   explicit TensorDim(int64_t value)
       : ptr_(details::make_ptr(ffi::call<plaidml_dim_expr*>(plaidml_dim_expr_int, value))) {}
@@ -140,19 +140,19 @@ class TensorDim {
   TensorDim(plaidml_int_op op, const std::vector<TensorDim>& args) : ptr_(details::make_ptr(MakeOp(op, args))) {}
 
   ///
-  /// TODO
+  /// Represents a subtraction operator overload.
   ///
   TensorDim operator-() const;
 
   ///
-  /// TODO
+  /// Returns the TensorDim as a string.
   ///
   std::string str() const {  //
     return ffi::str(ffi::call<plaidml_string*>(plaidml_dim_expr_repr, ptr_.get()));
   }
 
   ///
-  /// TODO
+  /// Returns the TensorDim as an int.
   ///
   int64_t as_int() const {
     if (!ptr_) {
@@ -185,18 +185,18 @@ struct Constraint;
 class TensorIndex {
  public:
   ///
-  /// TODO
+  /// TensorIndex constructor
   ///
   TensorIndex() : ptr_(details::make_ptr(ffi::call<plaidml_poly_expr*>(plaidml_poly_expr_index, ""))) {}
 
   ///
-  /// TODO
+  /// TensorIndex constructor
   ///
   explicit TensorIndex(int64_t value)
       : ptr_(details::make_ptr(ffi::call<plaidml_poly_expr*>(plaidml_poly_expr_literal, value))) {}
 
   ///
-  /// TODO
+  /// TensorIndex constructor
   ///
   explicit TensorIndex(const std::string& name)
       : ptr_(details::make_ptr(ffi::call<plaidml_poly_expr*>(plaidml_poly_expr_index, name.c_str()))) {}
@@ -223,7 +223,7 @@ class TensorIndex {
   Constraint operator<(const TensorDim& rhs) const;
 
   ///
-  /// TODO
+  /// Returns the TensorIndex as a string.
   ///
   std::string str() const {  //
     return ffi::str(ffi::call<plaidml_string*>(plaidml_poly_expr_repr, as_ptr()));
@@ -829,16 +829,17 @@ inline Tensor cast(const Tensor& x, plaidml_datatype dtype) {
 /// @{
 
 ///
-/// Compute the elementwise absolute value
-/// \param x - Tensor
+/// Computes the elementwise absolute value of `x`.
+/// \param x Tensor
 /// \return Tensor
-///
-/// Details go here.
 ///
 inline Tensor abs(const Tensor& x) { return Call("abs", x); }
 
 ///
-/// TODO
+/// Performs an elementwise conversion of `x` into a Tensor of floating point numbers with precision `bit_size`.
+/// \param x Tensor
+/// \param bit_size size_t
+/// \return Tensor
 ///
 inline Tensor as_float(const Tensor& x, size_t bit_size) {
   switch (bit_size) {
@@ -854,7 +855,10 @@ inline Tensor as_float(const Tensor& x, size_t bit_size) {
 }
 
 ///
-/// TODO
+/// Performs an elementwise conversion of `x` into a Tensor of integers with width `bit_size`.
+/// \param x Tensor
+/// \param bit_size size_t
+/// \return Tensor
 ///
 inline Tensor as_int(const Tensor& x, size_t bit_size) {
   switch (bit_size) {
@@ -872,7 +876,10 @@ inline Tensor as_int(const Tensor& x, size_t bit_size) {
 }
 
 ///
-/// TODO
+/// Performs an elementwise conversion of `x` into a Tensor of unsigned integers with width `bit_size`.
+/// \param x Tensor
+/// \param bit_size size_t
+/// \return Tensor
 ///
 inline Tensor as_uint(const Tensor& x, size_t bit_size) {
   switch (bit_size) {
@@ -890,52 +897,75 @@ inline Tensor as_uint(const Tensor& x, size_t bit_size) {
 }
 
 ///
-/// TODO
+/// Performs an elementwise conversion of `x` into a Tensor of booleans with width `bit_size`.
+/// \param x Tensor
+/// \param bit_size size_t
+/// \return Tensor
 ///
 inline Tensor as_bool(const Tensor& x) { return cast(x, PLAIDML_DATA_BOOLEAN); }
 
 ///
-/// TODO
+/// Computes the elementwise cosine of `x`.
+/// \param x Tensor
+/// \return Tensor
 ///
 inline Tensor cos(const Tensor& x) { return Call("cos", x); }
 
 ///
-/// TODO
+/// Computes the elementwise hyperbolic cosine of `x`.
+/// \param x Tensor
+/// \return Tensor
 ///
 inline Tensor cosh(const Tensor& x) { return Call("cosh", x); }
 
 ///
-/// TODO
+/// Computes the elementwise natural exponential function of `x`: _e_<sup>x</sup>.
+/// \param x Tensor
+/// \return Tensor
 ///
 inline Tensor exp(const Tensor& x) { return Call("exp", x); }
 
 ///
-/// TODO
+/// Takes an input tensor (`x`) and a set of indices to gather over (`y`), and returns an output tensor that gathers the
+/// input tensor from the indices specified. \param x Tensor \param y Tensor \return Tensor
 ///
 inline Tensor gather(const Tensor& x, const Tensor& y) { return Call("gather", x, y); }
 
 ///
-/// TODO
+/// Returns the identity of `x`.
+/// \param x Tensor
+/// \return Tensor
 ///
 inline Tensor ident(const Tensor& x) { return Call("ident", x); }
 
 ///
-/// TODO
+/// Returns the index of `x` at the specified `axis`.
+/// \param x Tensor
+/// \param axis size_t
+/// \return Tensor
 ///
 inline Tensor index(const Tensor& x, size_t axis) { return Call("index", x, static_cast<int64_t>(axis)); }
 
 ///
-/// TODO
+/// Computes the elementwise natural logarithm of `x`: _ln_(`x`).
+/// \param x Tensor
+/// \return Tensor
 ///
 inline Tensor log(const Tensor& x) { return Call("log", x); }
 
 ///
-/// TODO
+/// Computes the elementwise `y`th power of `x`.
+/// \param x Tensor
+/// \param y Tensor
+/// \return Tensor
 ///
 inline Tensor pow(const Tensor& x, const Tensor& y) { return Call("pow", x, y); }
 
 ///
-/// TODO
+/// Generates a Tensor of elementwise pseudorandom numbers using the seed values specified in `state`.
+/// \param state Tensor
+/// \param dims vector<int64_t>
+/// \return Tensor
 ///
 inline Tensor prng(const Tensor& state, const std::vector<int64_t>& dims) {
   std::vector<Tensor> args = {state};
@@ -946,7 +976,10 @@ inline Tensor prng(const Tensor& state, const std::vector<int64_t>& dims) {
 }
 
 ///
-/// TODO
+/// Takes an input tensor `x` and reshapes it according to `dims`.
+/// \param x Tensor
+/// \param dims vector<int64_t>
+/// \return Tensor
 ///
 inline Tensor reshape(const Tensor& x, const std::vector<int64_t>& dims) {
   std::vector<Tensor> args = {x};
@@ -957,7 +990,10 @@ inline Tensor reshape(const Tensor& x, const std::vector<int64_t>& dims) {
 }
 
 ///
-/// TODO
+/// Takes an input tensor `x` and reshapes it according to `dims`.
+/// \param x Tensor
+/// \param dims vector<TensorDim>
+/// \return Tensor
 ///
 inline Tensor reshape(const Tensor& x, const std::vector<TensorDim>& dims) {
   std::vector<Tensor> args = {x};
@@ -968,49 +1004,72 @@ inline Tensor reshape(const Tensor& x, const std::vector<TensorDim>& dims) {
 }
 
 ///
-/// TODO
+/// Takes an input tensor (`x`), a set of indices to scatter over (`y`), and the number of elements in the scattered
+/// tensor (`z`), and returns an output tensor that scatters the input tensor across the number of elements specified.
+/// \param x Tensor
+/// \param y Tensor
+/// \param z Tensor
+/// \return Tensor
 ///
 inline Tensor scatter(const Tensor& x, const Tensor& y, const Tensor& z) { return Call("scatter", x, y, z); }
 
 ///
 /// TODO
+/// \param cond Tensor
+/// \param true_case Tensor
+/// \param false_case Tensor
+/// \return Tensor
 ///
 inline Tensor select(const Tensor& cond, const Tensor& true_case, const Tensor& false_case) {
   return Call("cond", cond, true_case, false_case);
 }
 
 ///
-/// TODO
+/// Returns the shape of `x` as a Tensor.
+/// \param x Tensor
+/// \return Tensor
 ///
 inline Tensor shape(const Tensor& x) { return Call("shape", x); }
 
 ///
-/// TODO
+/// Computes the elementwise sine of `x`.
+/// \param x Tensor
+/// \return Tensor
 ///
 inline Tensor sin(const Tensor& x) { return Call("sin", x); }
 
 ///
-/// TODO
+/// Computes the elementwise hyperbolic sine of `x`.
+/// \param x Tensor
+/// \return Tensor
 ///
 inline Tensor sinh(const Tensor& x) { return Call("sinh", x); }
 
 ///
-/// TODO
+/// Computes the elementwise square root of `x`.
+/// \param x Tensor
+/// \return Tensor
 ///
 inline Tensor sqrt(const Tensor& x) { return Call("sqrt", x); }
 
 ///
-/// TODO
+/// Computes the elementwise tangent of `x`.
+/// \param x Tensor
+/// \return Tensor
 ///
 inline Tensor tan(const Tensor& x) { return Call("tan", x); }
 
 ///
-/// TODO
+/// Computes the elementwise hyperbolic tangent of `x`.
+/// \param x Tensor
+/// \return Tensor
 ///
 inline Tensor tanh(const Tensor& x) { return Call("tanh", x); }
 
 ///
-/// TODO
+/// Returns a Tensor with a value of 0.
+/// \param None
+/// \return Tensor
 ///
 inline Tensor zero() { return Tensor{0}; }
 

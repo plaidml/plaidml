@@ -9,7 +9,7 @@
 #include "mlir/Support/DebugStringHelper.h"
 #include "mlir/Transforms/Passes.h"
 
-#include "pmlc/dialect/eltwise/util.h"
+#include "pmlc/dialect/eltwise/ir/util.h"
 #include "pmlc/dialect/stripe/agginit_pass.h"
 #include "pmlc/dialect/stripe/autostencil_pass.h"
 #include "pmlc/dialect/stripe/nop_pass.h"

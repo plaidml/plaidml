@@ -4,7 +4,7 @@
 
 #include "mlir/IR/OpDefinition.h"
 
-#include "pmlc/dialect/eltwise/types.h"
+#include "pmlc/dialect/eltwise/ir/types.h"
 #include "pmlc/dialect/stripe/affine_poly.h"
 #include "pmlc/dialect/stripe/types.h"
 #include "pmlc/util/enums.h"

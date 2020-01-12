@@ -9,7 +9,7 @@
 #include "mlir/Translation.h"
 
 #include "base/util/lookup.h"
-#include "pmlc/dialect/eltwise/ops.h"
+#include "pmlc/dialect/eltwise/ir/ops.h"
 #include "pmlc/dialect/stripe/analysis.h"
 #include "pmlc/dialect/stripe/dialect.h"
 #include "pmlc/dialect/stripe/util.h"
@@ -615,6 +615,21 @@ void StripeBuilder::visit(util::GenericBuilder builder) {
   intr->outputs.push_back(out_name);
   for (auto operand : op->getOperands()) {
     intr->inputs.push_back(get_scalar(operand));
+  }
+
+  if (intr->name.rfind("cmp", 0) == 0) {
+    DataType superType = DataType::INVALID;
+    for (auto operandType : op->getOperandTypes()) {
+      auto tensorType = eltwise::getRankedTensorType(operandType);
+      auto scalarType = tensorType.getElementType().cast<eltwise::ScalarType>();
+      superType = CommonSupertype(superType, scalarType.type());
+    }
+    intr->type = superType;
+  } else {
+    auto result = op->getResult(0);
+    auto tensorType = eltwise::getRankedTensorType(result->getType());
+    auto scalarType = tensorType.getElementType().cast<eltwise::ScalarType>();
+    intr->type = scalarType.type();
   }
   cur_->stmts.push_back(intr);
 }

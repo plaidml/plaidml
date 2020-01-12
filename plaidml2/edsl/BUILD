@@ -27,6 +27,12 @@ pkg_tar(
 )
 
 filegroup(
+    name = "docs",
+    srcs = ["edsl.h"],
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
     name = "sdk",
     srcs = SDK_HDRS,
     visibility = ["//visibility:public"],
@@ -71,6 +77,7 @@ plaidml_cc_library(
     deps = [
         "//base/util",
         "//plaidml2/core:core_mlir",
+        "//pmlc/conversion/tile_to_stripe",
         "//pmlc/dialect/tile",
         "@llvm-project//llvm:support",
     ],
@@ -118,8 +125,19 @@ plaidml_cc_test(
 )
 
 py_test(
-    name = "py_test",
+    name = "py_ast_test",
     srcs = ["edsl_test.py"],
+    main = "edsl_test.py",
+    deps = [
+        ":py",
+        "//plaidml2/exec:py",
+    ],
+)
+
+py_test(
+    name = "py_mlir_test",
+    srcs = ["edsl_test.py"],
+    args = ["--mlir"],
     main = "edsl_test.py",
     deps = [
         ":py",

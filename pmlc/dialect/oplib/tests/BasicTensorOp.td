@@ -1,4 +1,4 @@
-// RUN: oplib-tblgen -gen-cpp-wrappers -I llvm-project/mlir/include %s | FileCheck --dump-input-on-failure %s
+// RUN: pmlc-tblgen -gen-cpp-wrappers -I llvm-project/mlir/include %s | FileCheck --dump-input-on-failure %s
 
 include "mlir/IR/OpBase.td"
 

@@ -47,6 +47,9 @@ extensions = [
     'breathe',
     'sphinx_rtd_theme',
     'sphinxcontrib.katex',
+    'sphinx.ext.napoleon',
+    'sphinx.ext.autodoc',
+    'sphinx_tabs.tabs',
 ]
 
 # Setup the breathe extension

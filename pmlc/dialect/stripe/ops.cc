@@ -8,7 +8,7 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Support/DebugStringHelper.h"
 
-#include "pmlc/dialect/eltwise/util.h"
+#include "pmlc/dialect/eltwise/ir/util.h"
 #include "pmlc/dialect/stripe/dialect.h"
 #include "pmlc/dialect/stripe/rewrites.h"
 

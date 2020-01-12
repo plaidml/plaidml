@@ -46,6 +46,58 @@ Tensor Softmax(const Tensor& X) {
   return E / N;
 }
 
+TEST(CppEdsl, Add) {
+  auto A = Placeholder(PLAIDML_DATA_UINT64, {3, 3});
+  auto B = Placeholder(PLAIDML_DATA_UINT64, {3, 3});
+  auto C = A + B;
+  Program program("add", {C});
+
+  std::vector<std::uint64_t> input_a = {
+      1,
+      2,
+      3,
+      4,
+      5,
+      6 + (1UL << 12),
+      7 + (1UL << 24),
+      8 + (1UL << 32),
+      9 + (1UL << 40)  //
+  };
+
+  std::vector<std::uint64_t> input_b = {1,
+                                        2 + (1UL << 12),
+                                        3,
+                                        4 + (1UL << 24),
+                                        5,
+                                        6 + (1UL << 32),
+                                        7,
+                                        8 + (1UL << 40),  //
+                                        9};
+
+  std::vector<std::uint64_t> expected = {2,
+                                         4 + (1UL << 12),
+                                         6,
+                                         8 + (1UL << 24),
+                                         10,
+                                         12 + (1UL << 12) + (1UL << 32),
+                                         14 + (1UL << 24),
+                                         16 + (1UL << 32) + (1UL << 40),
+                                         18 + (1UL << 40)};
+
+  auto binder = exec::Binder(program);
+  auto executable = binder.compile();
+  binder.input(A).copy_from(input_a.data());
+  binder.input(B).copy_from(input_b.data());
+  executable->run();
+  {
+    auto view = binder.output(C).mmap_current();
+    ASSERT_THAT(view.size(), expected.size() * sizeof(expected[0]));
+    auto data = reinterpret_cast<std::uint64_t*>(view.data());
+    std::vector<std::uint64_t> actual(data, data + expected.size());
+    EXPECT_THAT(actual, ContainerEq(expected));
+  }
+}
+
 TEST(CppEdsl, Dot) {
   auto A = Placeholder(PLAIDML_DATA_FLOAT32, {3, 3});
   auto B = Placeholder(PLAIDML_DATA_FLOAT32, {3, 3});
@@ -718,7 +770,7 @@ TEST(CppEdsl, Winograd) {
 }
 
 TEST(CppEdsl, UniqueNames) {
-  LogicalShape shape(PLAIDML_DATA_FLOAT32, {});
+  LogicalShape shape(PLAIDML_DATA_FLOAT32, {1});
   auto A = Placeholder(shape, "A");
   auto B = Placeholder(shape, "B");
   auto C0 = Placeholder(shape, "C");
@@ -726,10 +778,10 @@ TEST(CppEdsl, UniqueNames) {
   Program program("unique_names", {A + B + C0 + C1});
 #ifdef PLAIDML_AST
   EXPECT_THAT(program, Eq(R"(function (
-  A[],
-  B[],
-  C[],
-  C0[]
+  A[A_0],
+  B[B_0],
+  C[C_0],
+  C0[C0_0]
 ) -> (
   _X2
 ) {
@@ -741,13 +793,12 @@ TEST(CppEdsl, UniqueNames) {
 #endif
 #ifdef PLAIDML_MLIR
   EXPECT_THAT(program, Eq(R"#(
-!fp32 = type tensor<!eltwise.fp32>
 module {
-  func @unique_names(%arg0: !fp32 {tile.name = "C"}, %arg1: !fp32 {tile.name = "C_0"}, %arg2: !fp32 {tile.name = "B"}, %arg3: !fp32 {tile.name = "A"}) -> !fp32 {
-    %0 = "eltwise.add"(%arg3, %arg2) {type = !eltwise.fp32} : (!fp32, !fp32) -> !fp32
-    %1 = "eltwise.add"(%0, %arg1) {type = !eltwise.fp32} : (!fp32, !fp32) -> !fp32
-    %2 = "eltwise.add"(%1, %arg0) {type = !eltwise.fp32} : (!fp32, !fp32) -> !fp32
-    return %2 : !fp32
+  func @unique_names(%arg0: tensor<1x!eltwise.fp32> {tile.name = "C"}, %arg1: tensor<1x!eltwise.fp32> {tile.name = "C_0"}, %arg2: tensor<1x!eltwise.fp32> {tile.name = "B"}, %arg3: tensor<1x!eltwise.fp32> {tile.name = "A"}) -> tensor<1x!eltwise.fp32> {
+    %0 = "eltwise.add"(%arg3, %arg2) {type = !eltwise.fp32} : (tensor<1x!eltwise.fp32>, tensor<1x!eltwise.fp32>) -> tensor<1x!eltwise.fp32>
+    %1 = "eltwise.add"(%0, %arg1) {type = !eltwise.fp32} : (tensor<1x!eltwise.fp32>, tensor<1x!eltwise.fp32>) -> tensor<1x!eltwise.fp32>
+    %2 = "eltwise.add"(%1, %arg0) {type = !eltwise.fp32} : (tensor<1x!eltwise.fp32>, tensor<1x!eltwise.fp32>) -> tensor<1x!eltwise.fp32>
+    return %2 : tensor<1x!eltwise.fp32>
   }
 }
 )#"));
@@ -756,6 +807,9 @@ module {
 }
 
 TEST(CppEdsl, GlobalMin) {
+  if (vertexai::env::Get("PLAIDML_EE") == "1") {
+    FAIL() << "Assertion failed: (map.getNumInputs() == mapOperands.size() && \"inconsistent index info\")";
+  }
   auto I = Placeholder(PLAIDML_DATA_FLOAT32, {10, 10, 10}, "I");
   TensorIndex i, j, k;
   auto O_Neg = TensorOutput();
@@ -1036,6 +1090,9 @@ TEST(CppEdsl, GradientDotSqrt) {
 #endif
 
 TEST(CppEdsl, DefractLong) {
+  if (vertexai::env::Get("PLAIDML_EE") == "1") {
+    FAIL() << "Assertion failed: (map.getNumInputs() == mapOperands.size() && \"inconsistent index info\")";
+  }
   std::vector<int64_t> input_shape{1, 3, 3, 1};
   std::vector<int64_t> output_shape{1, 5, 5, 1};
   auto I = Placeholder(PLAIDML_DATA_FLOAT32, input_shape, "I");
@@ -1044,6 +1101,23 @@ TEST(CppEdsl, DefractLong) {
   TensorIndex n, x0, x1, k0, k1, co, ci;
   O(n, x0, x1, co) += I(n, (x0 + k0 - 1) / 2, (x1 + k1 - 1) / 2, ci) * K(2 - k0, 2 - k1, co, ci);
   Program program("defract_long", {O});
+#ifdef PLAIDML_MLIR
+  EXPECT_THAT(program, Eq(R"#(
+#map0 = (d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)
+#map1 = (d0, d1, d2, d3, d4, d5, d6) -> (d0, (d1 + d4 - 1) floordiv 2, (d2 + d5 - 1) floordiv 2, d6)
+#map2 = (d0, d1, d2, d3, d4, d5, d6) -> (-d4 + 2, -d5 + 2, d3, d6)
+
+
+!fp32 = type tensor<!eltwise.fp32>
+module {
+  func @defract_long(%arg0: tensor<1x3x3x1x!eltwise.fp32> {tile.name = "K"}, %arg1: tensor<1x3x3x1x!eltwise.fp32> {tile.name = "I"}) -> tensor<1x5x5x1x!eltwise.fp32> {
+    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !fp32
+    %0 = tile.cion add, mul, %cst, %arg1, %arg0 {sink = #map0, srcs = [#map1, #map2]} : !fp32, tensor<1x3x3x1x!eltwise.fp32>, tensor<1x3x3x1x!eltwise.fp32> -> tensor<1x5x5x1x!eltwise.fp32>
+    return %0 : tensor<1x5x5x1x!eltwise.fp32>
+  }
+}
+)#"));
+#endif
   exec::Binder(program).compile()->run();
 }
 
