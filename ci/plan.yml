@@ -40,21 +40,21 @@ PLATFORMS:
     variant: linux_x86_64
   keras-tf-dnnl-cpu:
     variant: linux_x86_64
-  keras-pml-mtl-uhd630:
+  keras-stripe-mtl-uhd630:
     variant: macos_x86_64
-  keras-pml-llvm-cpu:
+  keras-stripe-llvm-cpu:
     variant: linux_x86_64
   keras-tf-cuda-gp100gl:
     variant: linux_x86_64
-  keras-pml-ocl-gfx900:
+  keras-stripe-ocl-gfx900:
     variant: linux_x86_64
-  keras-pml-ocl-gp100gl:
+  keras-stripe-ocl-gp100gl:
     variant: linux_x86_64
-  keras-pml-ocl-gv100gl:
+  keras-stripe-ocl-gv100gl:
     variant: linux_x86_64
-  keras-pml-ocl-neo:
+  keras-stripe-ocl-neo:
     variant: linux_x86_64
-  keras-pml-ocl-gfx804:
+  keras-stripe-ocl-gfx804:
      variant: windows_x86_64
 
 VARIANTS:
@@ -87,7 +87,7 @@ VARIANTS:
 SUITES:
   smoke:
     platforms:
-      keras-pml-llvm-cpu:
+      keras-stripe-llvm-cpu:
         pipelines: [plaidml, ci]
     params:
       plaidml:
@@ -120,7 +120,7 @@ SUITES:
 
   base:
     platforms:
-      keras-pml-llvm-cpu:
+      keras-stripe-llvm-cpu:
         pipelines: [plaidml, nightly]
 
     params:
@@ -155,12 +155,12 @@ SUITES:
         args: [mnist_mlp_test.py]
         precision: untested
         platform_overrides:
-          keras-pml-mtl-uhd630:
+          keras-stripe-mtl-uhd630:
             soft_fail: true
 
   infer:
     platforms:
-      keras-pml-llvm-cpu:
+      keras-stripe-llvm-cpu:
         pipelines: [plaidml, nightly]
 
     params:
@@ -191,7 +191,7 @@ SUITES:
       imdb_lstm:
         precision: high
         skip_platforms:
-          - keras-pml-llvm-cpu
+          - keras-stripe-llvm-cpu
           - keras-tf-dnnl-cpu
         perf_threshold: 0.7
       inception_v3:
@@ -199,11 +199,11 @@ SUITES:
         platform_overrides:
           keras-tf-dnnl-cpu:
             conda_env: ci/conda/tensorflow-dnnl.yml
-          keras-pml-ocl-gfx804:
+            keras-stripe-ocl-gfx804:
             prepend_args: [--examples, 64]
-          keras-pml-ocl-neo:
+          keras-stripe-ocl-neo:
             prepend_args: [--examples, 512]
-          keras-pml-mtl-uhd630:
+          keras-stripe-mtl-uhd630:
             prepend_args: [--examples, 256]
       mobilenet:
         precision: high
@@ -218,43 +218,43 @@ SUITES:
       resnet50:
         precision: high
         platform_overrides:
-          keras-pml-llvm-cpu:
+          keras-stripe-llvm-cpu:
             prepend_args: [--examples, 128]
-          keras-pml-ocl-gfx804:
+          keras-stripe-ocl-gfx804:
             prepend_args: [--examples, 128]
-          keras-pml-mtl-uhd630:
+          keras-stripe-mtl-uhd630:
             prepend_args: [--examples, 256]
           keras-tf-dnnl-cpu:
             conda_env: ci/conda/tensorflow-dnnl.yml
       vgg19:
         precision: high
         platform_overrides:
-          keras-pml-llvm-cpu:
+          keras-stripe-llvm-cpu:
             prepend_args: [--examples, 64]
-          keras-pml-ocl-gfx804:
+          keras-stripe-ocl-gfx804:
             prepend_args: [--examples, 64]
-          keras-pml-ocl-neo:
+          keras-stripe-ocl-neo:
             prepend_args: [--examples, 256]
-          keras-pml-mtl-uhd630:
+          keras-stripe-mtl-uhd630:
             prepend_args: [--examples, 256]
           keras-tf-dnnl-cpu:
             conda_env: ci/conda/tensorflow-dnnl.yml
         skip_platforms: 
-          - keras-pml-mtl-uhd630
+          - keras-stripe-mtl-uhd630
 
       xception:
         precision: high
         platform_overrides:
-          keras-pml-llvm-cpu:
+          keras-stripe-llvm-cpu:
             prepend_args: [--examples, 64]
-          keras-pml-ocl-gfx804:
+          keras-stripe-ocl-gfx804:
             prepend_args: [--examples, 64]
-          keras-pml-ocl-gv100gl:
+          keras-stripe-ocl-gv100gl:
             prepend_args: [--examples, 512]
-          keras-pml-ocl-neo:
+          keras-stripe-ocl-neo:
             prepend_args: [--examples, 256]
             perf_threshold: 0.7
-          keras-pml-mtl-uhd630:
+          keras-stripe-mtl-uhd630:
             prepend_args: [--examples, 64]
             soft_fail: true
           keras-tf-dnnl-cpu:
