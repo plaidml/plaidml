@@ -185,8 +185,35 @@ plaidml_datatype plaidml_shape_get_dtype(  //
     plaidml_shape* shape) {
   return ffi_wrap<plaidml_datatype>(err, PLAIDML_DATA_INVALID, [&] {
     auto elementType = shape->type.getElementType();
-    auto scalarType = elementType.dyn_cast<ScalarType>();
-    return static_cast<plaidml_datatype>(scalarType.type());
+    if (auto floatType = elementType.dyn_cast<mlir::FloatType>()) {
+      switch (floatType.getWidth()) {
+        case 16:
+          return PLAIDML_DATA_FLOAT16;
+        case 32:
+          return PLAIDML_DATA_FLOAT32;
+        case 64:
+          return PLAIDML_DATA_FLOAT64;
+        default:
+          break;
+      }
+    }
+    if (auto integerType = elementType.dyn_cast<mlir::IntegerType>()) {
+      switch (integerType.getWidth()) {
+        case 1:
+          return PLAIDML_DATA_BOOLEAN;
+        case 8:
+          return PLAIDML_DATA_INT8;
+        case 16:
+          return PLAIDML_DATA_INT16;
+        case 32:
+          return PLAIDML_DATA_INT32;
+        case 64:
+          return PLAIDML_DATA_INT64;
+        default:
+          break;
+      }
+    }
+    throw std::runtime_error("Invalid DType for plaidml_shape");
   });
 }
 

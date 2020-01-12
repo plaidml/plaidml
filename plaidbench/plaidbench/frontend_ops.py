@@ -9,17 +9,13 @@ first, obtain plaidbench results
 """
 
 import importlib
-import math
 import os
-import shutil
 
-import click
-import logging
 import numpy as np
 
+import click
 from plaidbench import core
-
-from plaidbench.networks.ops import dense, conv2d
+from plaidbench.networks.ops import conv2d, dense
 
 MS_OPS = {
     # need to add strides and possibly dialation if TC is coo "resnetup" : lambda p: conv2d.Conv2d(p, 64, 56, 56, 643)
@@ -131,7 +127,7 @@ class Frontend(core.Frontend):
         if backend == 'plaid':
             try:
                 self.configuration['plaid'] = importlib.import_module('plaidml').__version__
-                importlib.import_module('plaidml.keras').install_backend()
+                importlib.import_module('plaidml.bridge.keras')
             except ImportError:
                 raise core.ExtrasNeeded(['plaidml-keras'])
         elif backend == 'tc':

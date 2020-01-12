@@ -137,7 +137,7 @@ SUITES:
     timeout: 30
     conda_env: ci/conda/tensorflow.yml
     compare: no
-    cwd: plaidml/keras
+    cwd: plaidml/bridge/keras
     runner: python
     workloads:
       backend:

@@ -14,10 +14,10 @@
 
 import importlib
 import os
-import tempfile
+
+import numpy as np
 
 import click
-import numpy as np
 from plaidbench import core
 
 
@@ -220,7 +220,7 @@ class Model(core.Model):
 
         self.model._make_predict_function()
         from keras.backend import backend as backend_name
-        if backend_name() == 'plaidml.keras.backend':
+        if backend_name() == 'plaidml':
             self.model.predict_function._invoker.set_const()
 
     def keras_golden_output(self, typename):
@@ -316,16 +316,11 @@ class Frontend(core.Frontend):
         if backend == 'plaid':
             try:
                 self.configuration['plaid'] = importlib.import_module('plaidml').__version__
-                importlib.import_module('plaidml.keras').install_backend()
-            except ImportError:
-                raise core.ExtrasNeeded(['plaidml-keras'])
-        if backend == 'plaid_edsl':
-            try:
-                self.configuration['plaid'] = importlib.import_module('plaidml').__version__
             except ImportError:
                 raise RuntimeError("Failed to import plaidml module")
+            os.environ['KERAS_BACKEND'] = 'plaidml.bridge.keras'
             try:
-                importlib.import_module('plaidml.bridge.keras')
+                importlib.import_module('keras.backend')
             except ImportError:
                 raise RuntimeError("The PlaidML2 EDSL Keras bridge was requested but not found.")
         elif backend == 'tensorflow':
@@ -343,8 +338,7 @@ class Frontend(core.Frontend):
     def model(self, params):
         if self.train:
             return TrainingModel(self, params)
-        use_stripe = os.getenv('PLAIDML_USE_STRIPE', '0') == '1'
-        enable_bn_folding = use_stripe or self.backend == 'plaid_edsl'
+        enable_bn_folding = self.backend == 'plaid'
         return InferenceModel(self, params, enable_bn_folding=enable_bn_folding)
 
     @property
@@ -366,10 +360,6 @@ class Frontend(core.Frontend):
               flag_value='plaid',
               default=True,
               help='Use PlaidML as the backend')
-@click.option('--plaid-edsl',
-              'backend',
-              flag_value='plaid_edsl',
-              help='Use the PlaidML2 (EDSL) backend')
 @click.option('--tensorflow',
               'backend',
               flag_value='tensorflow',

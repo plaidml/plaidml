@@ -17,16 +17,14 @@ from __future__ import division
 import enum
 import errno
 import json
-import logging
 import os
-import signal
 import time
 from abc import ABCMeta, abstractmethod, abstractproperty
 from collections import namedtuple
 
-import click
-
 import numpy as np
+
+import click
 
 
 class GoldenOutputNotAvailableError(Exception):
@@ -236,7 +234,6 @@ def _inner_run(reports,
                network_names,
                params,
                warmup,
-               kernel_timing,
                callgrind,
                print_stacktraces,
                tile=None):
@@ -281,23 +278,10 @@ def _inner_run(reports,
         # So we steal them from the logs
         timef = ProgramTimeFilter()
 
-        if kernel_timing and 'plaid' == params.backend_name:
-            import plaidml
-            og = logging.getLogger(plaidml.__name__)
-            device = plaidml.devices(plaidml.Context())[0]
-            if 'metal' not in str(device):
-                plaidml._lib()._internal_set_vlog(1)
-                if og.level is logging.NOTSET:
-                    plaidml.DEFAULT_LOG_HANDLER.setLevel(logging.WARNING)
-                og.setLevel(logging.DEBUG)
-                og.addFilter(timef)
-
         stop_watch.start()
         _, overrides = model.run()
         stop_watch.stop()
 
-        if kernel_timing and 'plaid' == params.backend_name:
-            og.removeFilter(timef)
         # Record stopwatch times
         execution_duration = overrides.get('time', stop_watch.elapsed())
         tile_exec_per_example = 1e-9 + timef.tot_time_ns / 10.0**9 / params.examples
@@ -390,7 +374,6 @@ class Runner(object):
         self.print_stacktraces = False
         self.reporter = reporter
         self.warmup = True
-        self.kernel_timing = True
         self.timeout_secs = None
         self.tile = None
 
@@ -413,7 +396,6 @@ class Runner(object):
                     network_names,
                     params,
                     self.warmup,
-                    self.kernel_timing,
                     self.callgrind,
                     self.print_stacktraces,
                     self.tile,

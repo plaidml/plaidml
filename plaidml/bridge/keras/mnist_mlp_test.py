@@ -1,7 +1,7 @@
 # Original source: https://github.com/fchollet/keras/raw/master/examples/mnist_mlp.py
 #
 # This example has been slightly modified:
-# ) It uses PlaidML as a backend (by invoking plaidml.keras.install_backend()).
+# ) It uses PlaidML as a backend
 # ) It removes Dropout.
 # ) It's been reworked slightly to act as a functional integration test.
 '''Trains a simple deep NN on the MNIST dataset.

@@ -13,7 +13,7 @@ from keras.layers import Conv2D, Dense, Flatten, Input, MaxPooling2D, Reshape
 from keras.layers.normalization import BatchNormalization
 from keras.models import Model, Sequential
 
-# from plaidml.keras import backend as pkb
+# from plaidml.bridge.keras import backend as pkb
 
 
 class RegressionTests(unittest.TestCase):
