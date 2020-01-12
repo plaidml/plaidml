@@ -16,7 +16,7 @@ cc_library(
 cc_library(
     name = "pytorch",
     srcs = select({
-        "@com_intel_plaidml//toolchain:macos_x86_64": [
+        "@bazel_tools//src/conditions:darwin_x86_64": [
             "env/lib/python3.7/site-packages/torch/lib/libc10.dylib",
             "env/lib/python3.7/site-packages/torch/lib/libtorch.dylib",
         ],

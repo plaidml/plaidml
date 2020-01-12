@@ -7,7 +7,7 @@ load("//bzl:plaidml.bzl", "plaidml_cc_binary")
 plaidml_cc_binary(
     name = "conda_run",
     srcs = select({
-        "//toolchain:windows_x86_64": ["conda_windows.cc"],
+        "@bazel_tools//src/conditions:windows": ["conda_windows.cc"],
         "//conditions:default": ["conda_unix.cc"],
     }),
     deps = [

@@ -2,21 +2,6 @@ load(":build_defs.bzl", "gcc_toolchain_config")
 
 package(default_visibility = ["//visibility:public"])
 
-config_setting(
-    name = "linux_x86_64",
-    values = {"cpu": "linux_x86_64"},
-)
-
-config_setting(
-    name = "macos_x86_64",
-    values = {"cpu": "darwin_x86_64"},
-)
-
-config_setting(
-    name = "windows_x86_64",
-    values = {"cpu": "x64_windows"},
-)
-
 cc_toolchain_suite(
     name = "toolchain",
     tags = ["linux"],

@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <set>
 #include <string>
+#include <tuple>
 #include <utility>
 
 #include <boost/format.hpp>
@@ -68,9 +69,9 @@ struct DualMatrix {
       }
     }
     // Now, zero the upper triangle of the RHS
-    for (ssize_t i = size_ - 1; i >= ssize_t(0); i--) {
+    for (int i = size_ - 1; i >= 0; i--) {
       // Zero this column all the way up
-      for (ssize_t j = i - 1; j >= ssize_t(0); j--) {
+      for (int j = i - 1; j >= 0; j--) {
         addMultRow(j, i, -rhs_(j, i));
       }
     }

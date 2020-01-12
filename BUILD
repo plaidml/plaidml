@@ -24,7 +24,7 @@ pkg_tar(
 py_runtime(
     name = "py3_runtime",
     files = select({
-        "@com_intel_plaidml//toolchain:windows_x86_64": [
+        "@bazel_tools//src/conditions:windows": [
             "@com_intel_plaidml_conda_windows//:python",
         ],
         "//conditions:default": [

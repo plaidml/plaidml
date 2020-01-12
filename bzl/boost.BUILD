@@ -26,8 +26,8 @@ cc_library(
         "BOOST_THREAD_PROVIDES_EXECUTORS",
         "BOOST_ALL_NO_LIB",
     ] + select({
-        "@com_intel_plaidml//toolchain:macos_x86_64": ["BOOST_ASIO_HAS_STD_STRING_VIEW"],
-        "@com_intel_plaidml//toolchain:windows_x86_64": ["BOOST_CONFIG_SUPPRESS_OUTDATED_MESSAGE"],
+        "@bazel_tools//src/conditions:darwin_x86_64": ["BOOST_ASIO_HAS_STD_STRING_VIEW"],
+        "@bazel_tools//src/conditions:windows": ["BOOST_CONFIG_SUPPRESS_OUTDATED_MESSAGE"],
         "//conditions:default": [],
     }),
     includes = ["."],
@@ -45,12 +45,12 @@ cc_library(
 cc_library(
     name = "stacktrace",
     defines = select({
-        "@com_intel_plaidml//toolchain:macos_x86_64": ["BOOST_STACKTRACE_GNU_SOURCE_NOT_REQUIRED"],
+        "@bazel_tools//src/conditions:darwin_x86_64": ["BOOST_STACKTRACE_GNU_SOURCE_NOT_REQUIRED"],
         "//conditions:default": [],
     }),
     linkopts = select({
-        "@com_intel_plaidml//toolchain:macos_x86_64": [],
-        "@com_intel_plaidml//toolchain:windows_x86_64": [],
+        "@bazel_tools//src/conditions:darwin_x86_64": [],
+        "@bazel_tools//src/conditions:windows": [],
         "//conditions:default": ["-ldl"],
     }),
 )
@@ -95,15 +95,15 @@ cc_library(
     name = "thread",
     srcs = glob(["libs/thread/src/*.cpp"]) +
            select({
-               "@com_intel_plaidml//toolchain:windows_x86_64": glob(["libs/thread/src/win32/*.cpp"]),
+               "@bazel_tools//src/conditions:windows": glob(["libs/thread/src/win32/*.cpp"]),
                "//conditions:default": glob(
                    ["libs/thread/src/pthread/*.cpp"],
                    exclude = ["libs/thread/src/pthread/once.cpp"],
                ),
            }),
     linkopts = select({
-        "@com_intel_plaidml//toolchain:macos_x86_64": [],
-        "@com_intel_plaidml//toolchain:windows_x86_64": [],
+        "@bazel_tools//src/conditions:darwin_x86_64": [],
+        "@bazel_tools//src/conditions:windows": [],
         "//conditions:default": ["-pthread"],
     }),
     deps = [

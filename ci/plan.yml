@@ -65,14 +65,13 @@ VARIANTS:
       PLAIDML_DEVICE: llvm_cpu.0
       PLAIDML_TARGET: llvm_cpu
   macos_x86_64:
-    bazel_config: macos_x86_64_ci
     arch: macosx_10_10_x86_64
     system: Darwin
     env:
       PLAIDML_DEVICE: llvm_cpu.0
       PLAIDML_TARGET: llvm_cpu
   macos_x86_64_dbg:
-    bazel_config: macos_x86_64_ci_dbg
+    bazel_config: dbg
     arch: macosx_10_10_x86_64
     system: Darwin
     env:

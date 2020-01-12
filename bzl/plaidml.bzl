@@ -1,7 +1,7 @@
 # Copyright 2020 Intel Corporation.
 
 PLAIDML_COPTS = select({
-    "@com_intel_plaidml//toolchain:windows_x86_64": [
+    "@bazel_tools//src/conditions:windows": [
         "/std:c++17",  # This MUST match all other compilation units
         "/Zc:__cplusplus",
         "/Zc:inline",
@@ -15,8 +15,8 @@ PLAIDML_COPTS = select({
 })
 
 PLAIDML_LINKOPTS = select({
-    "@com_intel_plaidml//toolchain:windows_x86_64": [],
-    "@com_intel_plaidml//toolchain:macos_x86_64": [],
+    "@bazel_tools//src/conditions:windows": [],
+    "@bazel_tools//src/conditions:darwin_x86_64": [],
     "//conditions:default": [
         "-pthread",
         "-lm",
@@ -25,8 +25,8 @@ PLAIDML_LINKOPTS = select({
 })
 
 PLATFORM_TAGS = {
-    "@com_intel_plaidml//toolchain:windows_x86_64": ["msvc"],
-    "@com_intel_plaidml//toolchain:macos_x86_64": ["darwin"],
+    "@bazel_tools//src/conditions:windows": ["windows"],
+    "@bazel_tools//src/conditions:darwin_x86_64": ["macos"],
     "//conditions:default": ["linux"],
 }
 
@@ -89,8 +89,8 @@ plaidml_py_version = rule(
 
 def _shlib_name_patterns(name):
     return {
-        "@com_intel_plaidml//toolchain:windows_x86_64": ["{}.dll".format(name)],
-        "@com_intel_plaidml//toolchain:macos_x86_64": ["lib{}.dylib".format(name)],
+        "@bazel_tools//src/conditions:windows": ["{}.dll".format(name)],
+        "@bazel_tools//src/conditions:darwin_x86_64": ["lib{}.dylib".format(name)],
         "//conditions:default": ["lib{}.so".format(name)],
     }
 
