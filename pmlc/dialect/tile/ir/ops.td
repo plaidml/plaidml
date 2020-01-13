@@ -37,6 +37,10 @@ def IndexAttr : Attr<
   let returnType = [{ APInt }];
 }
 
+def IndexArrayAttr : TypedArrayAttrBase<IndexAttr, "index array attribute"> {
+  let constBuilderCall = "$_builder.getIndexArrayAttr($0)";
+}
+
 class TileOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
     Op<TileDialect, mnemonic, traits> {}
 
@@ -240,9 +244,8 @@ def ContractionOp : TileOpWithPPV<"cion", [NoSideEffect]> {
     OptionalAttr<IntegerSetAttr>:$cons,
     OptionalAttr<AffineMapAttr>:$shape,
     OptionalAttr<UnitAttr>:$no_reduce,
-    // TODO: Tuples would be nicer than 2 Attrs, just looking for a quick implementation for now
-    OptionalAttr<I64ArrayAttr>:$idx_lower_bounds,
-    OptionalAttr<I64ArrayAttr>:$idx_upper_bounds,
+    OptionalAttr<IndexArrayAttr>:$lower_bounds,
+    OptionalAttr<IndexArrayAttr>:$upper_bounds,
     OptionalAttr<StrAttr>:$name
   );
   let results = (outs RankedTensorOf<[AnyScalar]>:$result);
@@ -264,10 +267,22 @@ def ContractionOp : TileOpWithPPV<"cion", [NoSideEffect]> {
 
   let extraClassDeclaration = [{
     static unsigned getNumTensors(CombinationKind combo);
+    static StringRef getSinkAttrName() { return "sink"; }
+    static StringRef getSourcesAttrName() { return "srcs"; }
+    static StringRef getConstraintsAttrName() { return "cons"; }
+    static StringRef getLowerBoundsAttrName() { return "lower_bounds"; }
+    static StringRef getUpperBoundsAttrName() { return "upper_bounds"; }
+
     unsigned getNumTensors();
     unsigned getNumSymbols();
     Value getTensor(unsigned i);
     Value getSymbol(unsigned i);
+
+    void setLowerBounds(ArrayRef<int64_t> bounds);
+    void setUpperBounds(ArrayRef<int64_t> bounds);
+    void setSink(AffineMap sink);
+    void setSources(ArrayRef<AffineMap> srcs);
+    void setConstraints(IntegerSet cons);
   }];
 }
 

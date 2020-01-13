@@ -11,12 +11,14 @@
 #include "mlir/Support/DebugStringHelper.h"
 
 #include "base/util/logging.h"
+#include "pmlc/dialect/tile/transforms/passes.h"
 #include "pmlc/util/util.h"
 #include "tile/bilp/ilp_solver.h"
 #include "tile/math/basis.h"
 
 namespace bilp = vertexai::tile::bilp;
 
+using llvm::SmallVector;
 using mlir::AffineExpr;
 using mlir::AffineExprKind;
 using mlir::ArrayAttr;
@@ -212,7 +214,7 @@ Contraction::Contraction(ContractionOp op) {
   }
 }
 
-void Contraction::GatherConstraints(llvm::ArrayRef<Shape> shapes) {
+void Contraction::GatherConstraints(ArrayRef<Shape> shapes) {
   // Sanity check the shapes
   if (shapes.size() != accesses.size()) {
     throw std::runtime_error(
@@ -288,10 +290,7 @@ std::set<std::string> Contraction::getIndexVars() const {
   return vars;
 }
 
-static IndexPoly ConvertVariables(     //
-    const IndexPoly& in,               //
-    llvm::ArrayRef<std::string> vars,  //
-    llvm::ArrayRef<IndexPoly> polys) {
+static IndexPoly ConvertVariables(const IndexPoly& in, ArrayRef<std::string> vars, ArrayRef<IndexPoly> polys) {
   IndexPoly out;
   for (size_t i = 0; i < vars.size(); i++) {
     out += in[vars[i]] * polys[i];
@@ -600,7 +599,7 @@ void Contraction::DeduceRangeConstraints() {
   }
 }
 
-BoundsAndConstraints Contraction::ComputeBounds(llvm::ArrayRef<Shape> shapes, bool no_reduce) {
+BoundsAndConstraints Contraction::ComputeBounds(ArrayRef<Shape> shapes, bool no_reduce) {
   // Because we construct `range_constraints` from `constraints` and then ignore the information in `constraints` in
   // favor of `range_constraints`, this section is a bit brittle. Check assumptions about whether `constraints` or
   // `range_constraints` are used when working with this code.
@@ -641,6 +640,111 @@ math::Affine Integerize(const IndexPoly& poly, const math::IndexBounds& bounds) 
     }
   }
   return result;
+}
+
+struct ComputeBoundsImpl {
+  ContractionOp op;
+  // The order of the indexes will correspond to the order they appear in `bounds`.
+  // Can go from string to ordinal value (its position in `bounds`) via `idxs`.
+  std::map<std::string, unsigned> idxs;
+  SmallVector<int64_t, 8> lowerBounds;
+  SmallVector<int64_t, 8> upperBounds;
+  SmallVector<AffineMap, 4> affineMaps;
+  SmallVector<AffineExpr, 4> affineConstraints;
+
+  explicit ComputeBoundsImpl(ContractionOp op) : op(op) {
+    SmallVector<Shape, 4> shapes{getShape(op.result()->getType())};
+    for (auto src : op.operands()) {
+      shapes.emplace_back(getShape(src->getType()));
+    }
+
+    Contraction contraction{op};
+    bool no_reduce = op.no_reduce().hasValue();
+    const auto& [bounds, constraints] = contraction.ComputeBounds(shapes, no_reduce);
+
+    unsigned i = 0;
+    for (const auto& [name, extent] : bounds) {
+      idxs[name] = i++;
+      lowerBounds.push_back(extent.min);
+      upperBounds.push_back(extent.max);
+    }
+
+    for (const auto& access : contraction.accesses) {
+      affineMaps.push_back(makeAffineMapFromAccess(access));
+    }
+
+    for (const auto& constraint : constraints) {
+      // Constraints are received in the form of poly <= rhs.
+      // All coefficients and any constant is expected to be integers by now.
+      auto affine = makeAffineExprFromIntPoly(constraint.poly);
+      // Convert into `affine >= 0` format via `rhs - affine` (implied >= 0)
+      auto simplifiedExpr = mlir::simplifyAffineExpr(  //
+          constraint.rhs - affine,                     //
+          /*numDims=*/bounds.size(),                   //
+          /*numSymbols=*/0);
+      affineConstraints.push_back(simplifiedExpr);
+    }
+  }
+
+  Shape getShape(Type type) {
+    auto rankedTensorType = eltwise::getRankedTensorType(type);
+    return rankedTensorType.getShape();
+  }
+
+  AffineExpr makeAffineExprFromIntPoly(IndexPoly poly) {
+    auto expr = mlir::getAffineConstantExpr(0, op.getContext());
+    for (const auto& [var, coeff] : poly.getMap()) {
+      if (denominator(coeff) != 1) {
+        throw std::runtime_error("Non-integer polynomial in defractionalized contraction");
+      }
+      auto intCoeff = static_cast<int64_t>(numerator(coeff));
+      if (var.empty()) {
+        expr = expr + mlir::getAffineConstantExpr(intCoeff, op.getContext());
+      } else {
+        assert(idxs.find(var) != idxs.end() && "Unexpected variable name in polynomial.");
+        auto idxOrdinal = idxs.at(var);
+        auto idxExpr = mlir::getAffineDimExpr(idxOrdinal, op.getContext());
+        auto factorExpr = mlir::getAffineConstantExpr(intCoeff, op.getContext());
+        auto termExpr = idxExpr * factorExpr;
+        expr = termExpr + expr;
+      }
+    }
+    return expr;
+  }
+
+  AffineMap makeAffineMapFromAccess(IndexAccess access) {
+    SmallVector<AffineExpr, 6> exprs;
+    for (const auto& poly : access) {
+      exprs.emplace_back(makeAffineExprFromIntPoly(poly));
+    }
+    return AffineMap::get(/*dimCount=*/idxs.size(), /*symbolCount=*/0, exprs);
+  }
+
+  IntegerSet getConstraints() {
+    if (affineConstraints.empty()) {
+      return IntegerSet::getEmptySet(/*dimCount=*/idxs.size(), /*symbolCount=*/0, op.getContext());
+    }
+    SmallVector<bool, 4> flags(idxs.size(), false);
+    return IntegerSet::get(/*dimCount=*/idxs.size(), /*symbolCount=*/0, affineConstraints, flags);
+  }
+};
+
+void ComputeBoundsPass::runOnFunction() {
+  auto func = getFunction();
+  func.walk([this](ContractionOp op) {
+    try {
+      ComputeBoundsImpl impl(op);
+      auto maps = llvm::makeArrayRef(impl.affineMaps);
+      op.setLowerBounds(impl.lowerBounds);
+      op.setUpperBounds(impl.upperBounds);
+      op.setSink(maps.front());
+      op.setSources(maps.drop_front());
+      op.setConstraints(impl.getConstraints());
+    } catch (const std::exception& ex) {
+      op.emitError(ex.what());
+      signalPassFailure();
+    }
+  });
 }
 
 }  // namespace pmlc::dialect::tile

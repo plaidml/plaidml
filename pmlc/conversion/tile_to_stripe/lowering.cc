@@ -234,162 +234,6 @@ static Value MakeCombination(             //
   throw std::runtime_error("Invalid combination op");
 }
 
-// TODO: Add this fcn prototype to the header?
-mlir::AffineExpr MakeAffineExprFromIntPoly(IndexPoly poly, std::map<std::string, size_t> idxLookup,
-                                           ConversionPatternRewriter& rewriter) {
-  mlir::AffineExpr ret = rewriter.getAffineConstantExpr(0);
-  for (const auto& [var, coeff] : poly.getMap()) {
-    if (denominator(coeff) != 1) {
-      // TODO: Throw like this?
-      throw std::runtime_error("Non-integer polynomial in defractionalized contraction");
-    }
-    auto intCoeff = static_cast<int64_t>(numerator(coeff));
-    if (var == "") {
-      ret = ret + rewriter.getAffineConstantExpr(intCoeff);
-    } else {
-      try {
-        auto idxOrdinal = idxLookup.at(var);
-        auto idxExpr = rewriter.getAffineDimExpr(idxOrdinal);
-        auto multiplierExpr = rewriter.getAffineConstantExpr(intCoeff);
-        auto termExpr = idxExpr * multiplierExpr;
-        ret = termExpr + ret;
-      } catch (const std::out_of_range& ex) {
-        // TODO: Do we want to be doing this error testing in this way
-        throw std::out_of_range("Unexpected variable name " + var +
-                                " in source polynomial. Original message: " + ex.what());
-      }
-    }
-  }
-  return ret;
-}
-
-// TODO: Add this fcn prototype to the header?
-AffineMap MakeAffineMapFromAccess(IndexAccess access, std::map<std::string, size_t> idxLookup,
-                                  ConversionPatternRewriter& rewriter) {
-  llvm::SmallVector<mlir::AffineExpr, 6> polyExprs;
-  for (const auto& poly : access) {
-    polyExprs.emplace_back(MakeAffineExprFromIntPoly(poly, idxLookup, rewriter));
-  }
-  return AffineMap::get(/*dimCount=*/idxLookup.size(), /*symbolCount=*/0, polyExprs);
-}
-
-// TODO: I suspect this will best fit long term as a function that `ContractionOpConversion` calls (and equivalently in
-// pxa lowering), rather than its own struct
-struct ContractionOpSimplifyLHSAndBound : public LoweringBase {
-  explicit ContractionOpSimplifyLHSAndBound(LoweringContext* lowering)
-      : LoweringBase(ContractionOp::getOperationName(), lowering) {}
-
-  PatternMatchResult tryMatchAndRewrite(  //
-      Operation* op,                      //
-      llvm::ArrayRef<Value> operands,     //
-      ConversionPatternRewriter& rewriter) const override {
-    IVLOG(1, "ContractionOpSimplifyLHSAndBound::matchAndRewrite> " << mlir::debugString(*op));
-    auto cionOp = llvm::cast<ContractionOp>(op);
-    auto loc = op->getLoc();
-
-    // TODO: Ultimately want to replace this chunk to avoid stripe::TensorType (by rewriting ComputeBounds to expect
-    // `shapes` in a different type/format)
-    auto resultType = cionOp.result()->getType();
-    auto resultTensorType = convertIntoTensorType(resultType);
-    IVLOG(3, "resultTensorType: " << mlir::debugString(resultTensorType));
-    llvm::SmallVector<stripe::TensorType, 4> shapes{resultTensorType};
-    for (auto src : cionOp.operands()) {
-      auto srcType = src->getType();
-      if (srcType.isa<stripe::TensorRefType>()) {
-        auto access = stripe::ComputeAccess(src);
-        shapes.emplace_back(access.base_type);
-      } else {
-        shapes.emplace_back(convertIntoTensorType(srcType));
-      }
-    }
-
-    Contraction contraction{cionOp};
-    bool no_reduce = cionOp.no_reduce().hasValue();
-    const auto& [bounds, constraints] = contraction.ComputeBounds(shapes, no_reduce);
-    // TODO: These logs are likely excessive
-    IVLOG(1, "Returning from ComputeBounds with\nbounds: " << bounds << "\nconstraints: " << constraints
-                                                           << "\naccesses: " << contraction.accesses);
-
-    IVLOG(1, "Making new contraction");
-    if (cionOp.cons().hasValue()) {
-      IVLOG(2, "The incoming cion DOES have constraints");
-    } else {
-      IVLOG(2, "There is NO constraints on the incoming cion");
-    }
-    if (cionOp.shape().hasValue()) {
-      IVLOG(2, "The incoming cion DOES have a shape");
-    } else {
-      IVLOG(2, "There is NO shape on the incoming cion");
-    }
-    if (cionOp.no_reduce().hasValue()) {
-      IVLOG(2, "The incoming cion DOES have no_reduce");
-    } else {
-      IVLOG(2, "There is NO no_reduce on the incoming cion");
-    }
-    if (cionOp.name().hasValue()) {
-      IVLOG(2, "The incoming cion DOES have a name");
-    } else {
-      IVLOG(2, "There is NO name on the incoming cion");
-    }
-
-    // TODO: Retain index names wherever practical (currently `ComputeBounds` rewrites all index names)
-
-    // The order of the indexes will be whatever order they appear in in `bounds`
-    // Can go from string to ordinal value (its position in `bounds`) via `idx_lookup`
-    // While we're looping through the bounds anyway, write the values for the bounds Attr
-    std::map<std::string, size_t> idxLookup;
-    llvm::SmallVector<int64_t, 8> lower_bounds;
-    llvm::SmallVector<int64_t, 8> upper_bounds;
-    size_t currIdx = 0;
-    for (const auto& [idx_name, both_bounds] : bounds) {
-      IVLOG(1, "Index number " << currIdx << " is named " << idx_name);  // TODO: Don't retain this log
-      idxLookup[idx_name] = currIdx;
-      lower_bounds.push_back(both_bounds.min);
-      upper_bounds.push_back(both_bounds.max);
-      currIdx++;
-    }
-
-    // TODO: must have at least one access (for the output tensor); do we want to throw if not?
-    AffineMap sinkMap = MakeAffineMapFromAccess(contraction.accesses[0], idxLookup, rewriter);
-
-    llvm::SmallVector<Attribute, 3> srcMapAttrs;
-    for (auto it = ++contraction.accesses.begin(); it != contraction.accesses.end(); it++) {
-      // The accesses after the first are for the source maps
-      srcMapAttrs.emplace_back(AffineMapAttr::get(MakeAffineMapFromAccess(*it, idxLookup, rewriter)));
-    }
-
-    std::vector<mlir::AffineExpr> affineConstraints;
-    llvm::SmallVector<bool, 4> constraintFlags(bounds.size(), false);
-    for (const auto& constraint : constraints) {
-      // Constraints are received in the form of poly <= rhs, where poly is a Polynomial<Rational> and rhs is int64_t
-      // However, the `poly`'s coeffs & constant are expected to all be integers by now
-      // To get them into a affine >= 0 format, take convert the poly to `affine` and take `rhs - affine` (implied >=0)
-      auto affine = MakeAffineExprFromIntPoly(constraint.poly, idxLookup, rewriter);
-      affineConstraints.emplace_back(mlir::simplifyAffineExpr(constraint.rhs - affine, bounds.size(), 0));
-    }
-
-    auto new_cion = rewriter.create<tile::ContractionOp>(                                            //
-        loc,                                                                                         //
-        resultType,                                                                                  //
-        cionOp.init(),                                                                               //
-        cionOp.operands(),                                                                           //
-        cionOp.agg(),                                                                                //
-        cionOp.combo(),                                                                              //
-        sinkMap,                                                                                     //
-        ArrayAttr::get(srcMapAttrs, rewriter.getContext()),                                          //
-        IntegerSetAttr::get(IntegerSet::get(bounds.size(), 0, affineConstraints, constraintFlags)),  //
-        cionOp.shape().hasValue() ? AffineMapAttr::get(cionOp.shape().getValue()) : nullptr,         //
-        cionOp.no_reduce().hasValue() ? UnitAttr::get(rewriter.getContext()) : nullptr,              //
-        rewriter.getI64ArrayAttr(lower_bounds), rewriter.getI64ArrayAttr(upper_bounds),              //
-        StringAttr::get(cionOp.name().getValueOr(""), rewriter.getContext()));
-    IVLOG(1, "Contraction made");
-    IVLOG(1, "Original Contraction: " << mlir::debugString(*cionOp));
-    IVLOG(1, "Rewritten Contraction: " << mlir::debugString(*new_cion));
-
-    throw std::runtime_error("Intentional abort for testing");
-  }
-};
-
 struct ContractionOpConversion : public LoweringBase {
   explicit ContractionOpConversion(LoweringContext* lowering)
       : LoweringBase(ContractionOp::getOperationName(), lowering) {}
@@ -1085,13 +929,11 @@ struct LoweringPass : public mlir::ModulePass<LoweringPass> {
     });
 
     OwningRewritePatternList patterns;
-    patterns.insert<                       //
-        AffineConstantOpConversion,        //
-        ContractionOpSimplifyLHSAndBound,  // TODO: Added this and removed other as a quick test; almost certainly want
-                                           // to revert long term
-        // ContractionOpConversion,     // TODO
-        FuncOpConversion,   //
-        IndexOpConversion,  //
+    patterns.insert<                 //
+        AffineConstantOpConversion,  //
+        ContractionOpConversion,     //
+        FuncOpConversion,            //
+        IndexOpConversion,           //
         ReturnOpConversion>(&lowering);
     auto eltwiseOps = util::getAllOpsWithInterface<eltwise::EltwiseOp>(&getContext());
     for (auto op : eltwiseOps) {
