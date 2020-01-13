@@ -83,6 +83,35 @@ TEST(CppEdsl, Cast) {
   }
 }
 
+TEST(CppEdsl, BitXor) {
+  auto A = Placeholder(PLAIDML_DATA_UINT64, {2, 2});
+  auto B = Placeholder(PLAIDML_DATA_UINT64, {2, 2});
+  auto C = A ^ B;
+  Program program("bit_xor", {C});
+
+  std::vector<std::uint64_t> input_a{1, 2, 3,  //
+                                     4, 5, 6,  //
+                                     7, 8, 9};
+  std::vector<std::uint64_t> input_b{10, 11, 12,  //
+                                     13, 14, 15,  //
+                                     16, 17, 18};
+  std::vector<std::uint64_t> expected{1 ^ 10, 2 ^ 11,  //
+                                      3 ^ 12, 4 ^ 13};
+
+  auto binder = exec::Binder(program);
+  auto executable = binder.compile();
+  binder.input(A).copy_from(input_a.data());
+  binder.input(B).copy_from(input_b.data());
+  executable->run();
+  {
+    auto view = binder.output(C).mmap_current();
+    ASSERT_THAT(view.size(), expected.size() * sizeof(expected[0]));
+    auto data = reinterpret_cast<std::uint64_t*>(view.data());
+    std::vector<std::uint64_t> actual(data, data + expected.size());
+    EXPECT_THAT(actual, ContainerEq(expected));
+  }
+}
+
 TEST(CppEdsl, Add) {
   auto A = Placeholder(PLAIDML_DATA_UINT64, {3, 3});
   auto B = Placeholder(PLAIDML_DATA_UINT64, {3, 3});

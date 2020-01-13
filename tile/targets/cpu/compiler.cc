@@ -838,9 +838,8 @@ void Compiler::Visit(const stripe::Intrinsic& intrinsic) {
   static std::map<std::string, std::function<void(Compiler*, const stripe::Intrinsic&)>> builtins{
       {"add", &Compiler::Add},
       {"assign", &Compiler::Assign},
-      {"bit_and", &Compiler::And},
-      {"bit_not", &Compiler::Not},
       {"cond", &Compiler::Conditional},
+      {"div", &Compiler::Add},
       {"eq", &Compiler::Equal},
       {"gt", &Compiler::GreaterThan},
       {"gte", &Compiler::GreaterThanOrEqualTo},
@@ -851,13 +850,15 @@ void Compiler::Visit(const stripe::Intrinsic& intrinsic) {
       {"mul", &Compiler::Multiply},
       {"neg", &Compiler::Negate},
       {"neq", &Compiler::Unequal},
-      {"or", &Compiler::Or},
       {"sub", &Compiler::Subtract},
-      {"xor", &Compiler::Xor},
       // Extra operations defined in tile/lang/ops.cc, which are apparently
       // passed along directly into Stripe
+      {"bit_and", &Compiler::And},
+      {"bit_or", &Compiler::Or},
+      {"bit_not", &Compiler::Not},
       {"bit_left", &Compiler::BitLeft},
       {"bit_right", &Compiler::BitRight},
+      {"bit_xor", &Compiler::Xor},
       {"cmp_eq", &Compiler::Equal},
       {"cmp_ne", &Compiler::Unequal},
       {"cmp_lt", &Compiler::LessThan},
