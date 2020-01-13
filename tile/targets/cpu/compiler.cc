@@ -826,7 +826,6 @@ void Compiler::Visit(const stripe::Special& special) {
 }
 
 void Compiler::Visit(const stripe::Intrinsic& intrinsic) {
-  IVLOG(1, "Compiler::Visit");
   // Find the correct handler for this intrinsic.
   // If the context has provided an external handler for this intrinsic name,
   // we'll use it - that allows the context to override builtin definitions.
