@@ -16,6 +16,12 @@ import util
 #
 # $ROOT/tmp/output/$SUITE/$WORKLOAD/$PLATFORM/{params}/[result.json, result.npy]
 
+OUTPUT_ROOT = {
+    'Darwin': '/usr/local/var/buildkite-agent/bazel',
+    'Linux': '/var/lib/buildkite-agent/bazel',
+    'Windows': 'C:\\buildkite-agent\\bazel',
+}
+
 
 def load_template(name):
     this_dir = os.path.dirname(__file__)
@@ -121,6 +127,14 @@ def cmd_pipeline(args, remainder):
         util.printf(yml)
 
 
+def output_base():
+    root = pathlib.Path(OUTPUT_ROOT.get(platform.system()))
+    agent = os.getenv('BUILDKITE_AGENT_NAME', 'agent')
+    pipeline = os.getenv('BUILDKITE_PIPELINE_SLUG', 'pipeline')
+    branch = os.getenv('BUILDKITE_PULL_REQUEST_BASE_BRANCH', 'branch')
+    return root / agent / pipeline / branch
+
+
 def cmd_build(args, remainder):
     import yaml
     with open('ci/plan.yml') as file_:
@@ -146,6 +160,7 @@ def cmd_build(args, remainder):
     common_args += ['--profile={}'.format(profile_json)]
     common_args += ['--verbose_failures']
     common_args += ['--verbose_explanations']
+    common_args += ['--output_base={}'.format(output_base())]
 
     util.printf('--- :bazel: Running Build...')
     if platform.system() == 'Windows':
