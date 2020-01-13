@@ -46,6 +46,43 @@ Tensor Softmax(const Tensor& X) {
   return E / N;
 }
 
+TEST(CppEdsl, Cast) {
+  auto A = Placeholder(PLAIDML_DATA_UINT64, {3, 3});
+  auto B = as_uint(A, 32);
+  Program program("cast", {B});
+
+  std::vector<std::uint64_t> input{1,
+                                   2,
+                                   3,
+                                   4,
+                                   5,
+                                   6 + (1UL << 12),
+                                   7 + (1UL << 24),
+                                   8 + (1UL << 31),  //
+                                   (1UL << 32) - 1};
+
+  std::vector<std::uint32_t> expected{1,
+                                      2,
+                                      3,
+                                      4,
+                                      5,
+                                      6 + (1UL << 12),
+                                      7 + (1UL << 24),
+                                      8 + (1UL << 31),  //
+                                      (1UL << 32) - 1};
+  auto binder = exec::Binder(program);
+  auto executable = binder.compile();
+  binder.input(A).copy_from(input.data());
+  executable->run();
+  {
+    auto view = binder.output(B).mmap_current();
+    ASSERT_THAT(view.size(), expected.size() * sizeof(expected[0]));
+    auto data = reinterpret_cast<std::uint32_t*>(view.data());
+    std::vector<std::uint32_t> actual(data, data + expected.size());
+    EXPECT_THAT(actual, ContainerEq(expected));
+  }
+}
+
 TEST(CppEdsl, Add) {
   auto A = Placeholder(PLAIDML_DATA_UINT64, {3, 3});
   auto B = Placeholder(PLAIDML_DATA_UINT64, {3, 3});
