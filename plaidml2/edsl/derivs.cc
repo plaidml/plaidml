@@ -30,9 +30,6 @@ void RegisterDerivs() {
   RegisterTensorDeriv("atan", [](DERIV_ARGS) {  //
     return Tensors{DY / (1 + X[0] * X[0])};
   });
-  RegisterTensorDeriv("as_bool", [](DERIV_ARGS) {  //
-    return Tensors{zero()};
-  });
   RegisterTensorDeriv("as_float", [](DERIV_ARGS) {  //
     return Tensors{zero(), zero()};
   });
@@ -42,10 +39,16 @@ void RegisterDerivs() {
   RegisterTensorDeriv("as_uint", [](DERIV_ARGS) {  //
     return Tensors{zero(), zero()};
   });
+  RegisterTensorDeriv("as_bool", [](DERIV_ARGS) {  //
+    return Tensors{zero()};
+  });
   RegisterTensorDeriv("bit_and", [](DERIV_ARGS) {  //
     return Tensors{zero(), zero()};
   });
   RegisterTensorDeriv("bit_or", [](DERIV_ARGS) {  //
+    return Tensors{zero(), zero()};
+  });
+  RegisterTensorDeriv("bit_xor", [](DERIV_ARGS) {  //
     return Tensors{zero(), zero()};
   });
   RegisterTensorDeriv("bit_left", [](DERIV_ARGS) {  //
@@ -56,9 +59,6 @@ void RegisterDerivs() {
   });
   RegisterTensorDeriv("bit_not", [](DERIV_ARGS) {  //
     return Tensors{zero()};
-  });
-  RegisterTensorDeriv("bit_xor", [](DERIV_ARGS) {  //
-    return Tensors{zero(), zero()};
   });
   RegisterTensorDeriv("cmp_eq", [](DERIV_ARGS) {  //
     return Tensors{zero(), zero()};
