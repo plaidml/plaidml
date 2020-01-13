@@ -108,6 +108,7 @@ struct Bound {
   int64_t max;  // Largest value inclusive
 };
 
+// The order of this map is used in Tile dialect lowering; do not change to unordered
 using IndexBounds = std::map<std::string, Bound>;
 
 // True iff `constraint` holds for every choice of index values satisfying `bounds`

@@ -8,6 +8,8 @@
 #include <tuple>
 #include <vector>
 
+#include "mlir/Pass/Pass.h"
+
 #include "pmlc/dialect/tile/ir/ops.h"
 #include "pmlc/util/math/polynomial.h"
 
@@ -66,5 +68,9 @@ struct Contraction {
 };
 
 math::Affine Integerize(const IndexPoly& poly, const math::IndexBounds& bounds);
+
+struct ComputeBoundsPass : public mlir::FunctionPass<ComputeBoundsPass> {
+  void runOnFunction() final;
+};
 
 }  // namespace pmlc::dialect::tile

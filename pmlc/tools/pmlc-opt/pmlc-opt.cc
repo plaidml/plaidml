@@ -51,6 +51,7 @@ int main(int argc, char** argv) {
     if (level) {
       el::Loggers::setVerboseLevel(level);
     }
+    IVLOG(level, "PLAIDML_VERBOSE=" << level);
   }
 
   PrettyStackTraceProgram x(argc, argv);
