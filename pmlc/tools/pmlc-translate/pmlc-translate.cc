@@ -14,8 +14,8 @@
 #include "mlir/Support/ToolUtilities.h"
 #include "mlir/Support/TranslateClParser.h"
 
-#include "base/util/env.h"
-#include "base/util/logging.h"
+#include "pmlc/util/env.h"
+#include "pmlc/util/logging.h"
 
 using namespace mlir;  // NOLINT(build/namespaces)
 using namespace llvm;  // NOLINT(build/namespaces)
@@ -41,7 +41,7 @@ static cl::opt<bool> splitInputFile(                  //
 
 int main(int argc, char** argv) {
   START_EASYLOGGINGPP(argc, argv);
-  auto level_str = vertexai::env::Get("PLAIDML_VERBOSE");
+  auto level_str = pmlc::util::getEnvVar("PLAIDML_VERBOSE");
   if (level_str.size()) {
     auto level = std::atoi(level_str.c_str());
     if (level) {

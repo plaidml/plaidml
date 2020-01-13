@@ -2,8 +2,8 @@
 
 #include "benchmark/benchmark.h"
 
-#include "plaidml2/exec/exec.h"
-#include "plaidml2/op/op.h"
+#include "plaidml/exec/exec.h"
+#include "plaidml/op/op.h"
 
 namespace edsl = plaidml::edsl;
 namespace exec = plaidml::exec;

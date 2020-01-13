@@ -14,14 +14,14 @@
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/Support/DebugStringHelper.h"
 
-#include "base/util/logging.h"
 #include "pmlc/dialect/eltwise/ir/ops.h"
+#include "pmlc/util/logging.h"
 
 #define DEBUG_TYPE "eltwise"
 
 namespace pmlc::dialect::eltwise {
 
-using vertexai::tile::DataTypeFromString;
+using util::DataTypeFromString;
 
 namespace {
 
@@ -46,7 +46,7 @@ struct OpAsmInterface : public mlir::OpAsmDialectInterface {
 
   void getTypeAliases(mlir::SmallVectorImpl<std::pair<Type, StringRef>>& aliases) const final {
     auto ctx = getDialect()->getContext();
-    for (const auto dataType : vertexai::tile::GetDataTypeSet()) {
+    for (const auto dataType : util::GetDataTypeSet()) {
       // Intern the string
       auto alias = mlir::Identifier::get(to_string(dataType), ctx);
       // Get the type

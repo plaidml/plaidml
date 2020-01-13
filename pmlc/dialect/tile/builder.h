@@ -11,10 +11,9 @@
 
 #include "mlir/IR/StandardTypes.h"
 
-#include "pmlc/dialect/stripe/types.h"
 #include "pmlc/dialect/tile/program.h"
 #include "pmlc/util/enums.h"
-#include "tile/base/shape.h"
+#include "pmlc/util/shape.h"
 
 namespace mlir {
 class Value;
@@ -23,7 +22,7 @@ class Operation;
 
 namespace pmlc::dialect::tile {
 
-using DataType = vertexai::tile::DataType;
+using DataType = util::DataType;
 
 struct Shape {
   DataType elementType;
@@ -61,10 +60,10 @@ class TileBuilder {
   void BindTensorDims(mlir::Value from, llvm::ArrayRef<mlir::Value*> into);
   mlir::RankedTensorType ComputeShape(mlir::Value tensor);
   void BindShape(mlir::Value tensor, mlir::RankedTensorType type);
-  void BindBuffer(mlir::Value tensor, vertexai::tile::BufferPtr buffer);
+  void BindBuffer(mlir::Value tensor, pmlc::util::BufferPtr buffer);
 
-  stripe::TensorType MakeTensorType(DataType dtype, llvm::ArrayRef<int64_t> sizes, llvm::ArrayRef<int64_t> strides);
-  stripe::TensorType IntoTensorType(mlir::RankedTensorType type);
+  mlir::MemRefType MakeMemRefType(DataType dtype, llvm::ArrayRef<int64_t> sizes, llvm::ArrayRef<int64_t> strides);
+  mlir::MemRefType IntoMemRefType(mlir::RankedTensorType type);
 
   llvm::StringRef GetStringValue(mlir::Value value);
   int64_t GetIntegerValue(mlir::Value value);
@@ -83,7 +82,7 @@ class TileBuilder {
   mlir::Value MakePrimitiveOp(llvm::StringRef fn, llvm::ArrayRef<mlir::Value> args);
   mlir::Value MakeCastOp(mlir::Value tensor, DataType dtype);
   mlir::Value MakeDimOp(mlir::Value tensor, unsigned dim);
-  mlir::Value MakePlaceholderOp(mlir::RankedTensorType type, vertexai::tile::BufferPtr buffer, llvm::StringRef name);
+  mlir::Value MakePlaceholderOp(mlir::RankedTensorType type, pmlc::util::BufferPtr buffer, llvm::StringRef name);
   mlir::Value MakeAffineConstantOp(int64_t value);
   mlir::Value MakeAffineIndexOp(llvm::StringRef name = "");
   mlir::Value MakeAffineAddOp(llvm::ArrayRef<mlir::Value> args);

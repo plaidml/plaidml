@@ -20,8 +20,8 @@ cc_library(
         "googletest/include",
     ],
     linkopts = select({
-        "@com_intel_plaidml//toolchain:macos_x86_64": [],
-        "@com_intel_plaidml//toolchain:windows_x86_64": [],
+        "@bazel_tools//src/conditions:darwin_x86_64": [],
+        "@bazel_tools//src/conditions:windows": [],
         "//conditions:default": ["-pthread"],
     }),
     visibility = ["//visibility:public"],
@@ -31,8 +31,8 @@ cc_library(
     name = "gtest_main",
     srcs = ["googlemock/src/gmock_main.cc"],
     linkopts = select({
-        "@com_intel_plaidml//toolchain:macos_x86_64": [],
-        "@com_intel_plaidml//toolchain:windows_x86_64": [],
+        "@bazel_tools//src/conditions:darwin_x86_64": [],
+        "@bazel_tools//src/conditions:windows": [],
         "//conditions:default": ["-pthread"],
     }),
     visibility = ["//visibility:public"],

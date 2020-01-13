@@ -1,7 +1,7 @@
 """BUILD extensions for MLIR table generation."""
 
 COPTS = select({
-    "@com_intel_plaidml//toolchain:windows_x86_64": [
+    "@bazel_tools//src/conditions:windows": [
         "/wd4624",
     ],
     "//conditions:default": [],

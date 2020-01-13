@@ -40,7 +40,6 @@ plaidml_cc_library(
         "ops.h",
     ],
     copts = COPTS,
-    tags = ["llvm"],
     deps = [
         ":gen-ops",
         "//pmlc/util",

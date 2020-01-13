@@ -11,7 +11,6 @@ plaidml_cc_library(
     hdrs = [
         "passes.h",
     ],
-    tags = ["llvm"],
     deps = [
         "//pmlc/dialect/pxa/ir",
     ],

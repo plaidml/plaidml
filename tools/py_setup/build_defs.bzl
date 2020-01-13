@@ -9,7 +9,7 @@ def _py_setup_impl(ctx):
         ctx.attr.abi,
         ctx.attr.platform,
     )
-    pkg_path = ctx.label.name + ".pkg"
+    pkg_path = ctx.label.name + ".tmp"
     dist_path = paths.join(pkg_path, "tmp", "dist")
     wheel_path = paths.join(dist_path, wheel_filename)
     pkg_dir = ctx.actions.declare_directory(pkg_path)

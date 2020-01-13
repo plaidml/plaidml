@@ -25,9 +25,9 @@ plaidml_cc_binary(
     ],
     deps = [
         ":model",
-        "//base/util",
         "//pmlc/tools/pmlc-tblgen/cpp",
         "//pmlc/tools/pmlc-tblgen/python",
+        "//pmlc/util",
         "@llvm-project//mlir:MlirTableGenMain",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TableGen",

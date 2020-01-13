@@ -26,14 +26,14 @@
 #include "mlir/Support/DebugStringHelper.h"
 #include "mlir/Transforms/Passes.h"
 
-#include "base/util/env.h"
-#include "base/util/logging.h"
 #include "pmlc/dialect/eltwise/ir/dialect.h"
 #include "pmlc/dialect/eltwise/ir/ops.h"
 #include "pmlc/dialect/tile/gradient.h"
 #include "pmlc/dialect/tile/ir/dialect.h"
 #include "pmlc/dialect/tile/ir/ops.h"
 #include "pmlc/dialect/tile/program.h"
+#include "pmlc/util/env.h"
+#include "pmlc/util/logging.h"
 #include "pmlc/util/slice.h"
 #include "pmlc/util/util.h"
 
@@ -46,6 +46,7 @@ using llvm::SmallVector;
 using llvm::StringRef;
 using mlir::Block;
 using mlir::BlockAndValueMapping;
+using mlir::MemRefType;
 using mlir::MLIRContext;
 using mlir::ModuleOp;
 using mlir::OpBuilder;
@@ -54,8 +55,8 @@ using mlir::Type;
 using mlir::UnknownLoc;
 using mlir::Value;
 using util::AggregationKind;
+using util::BufferPtr;
 using util::CombinationKind;
-using vertexai::tile::BufferPtr;
 
 struct DomainInfo {
   BlockAndValueMapping mapping;
@@ -164,30 +165,18 @@ void TileBuilder::Destroy(Value value) {
   // }
 }
 
-stripe::TensorType TileBuilder::MakeTensorType(  //
-    DataType dtype,                              //
-    llvm::ArrayRef<int64_t> sizes,               //
+MemRefType TileBuilder::MakeMemRefType(  //
+    DataType dtype,                      //
+    llvm::ArrayRef<int64_t> sizes,       //
     llvm::ArrayRef<int64_t> strides) {
-  auto cls = mlir::Identifier::get(stripe::kAddressClassIdentifier, &impl->context);
-  llvm::SmallVector<stripe::TensorDim, 4> dims;
-  for (unsigned i = 0; i < sizes.size(); i++) {
-    dims.emplace_back(stripe::TensorDim{sizes[i], strides[i], cls});
-  }
-  auto elementType = impl->builder.getType<ScalarType>(dtype);
-  return stripe::TensorType::get(elementType, dims, stripe::OffsetsMap{}, false);
+  auto elementType = impl->builder.getType<ScalarType>(dtype).toStandard();
+  auto map = mlir::makeStridedLinearLayoutMap(strides, 0, &impl->context);
+  return MemRefType::get(sizes, elementType, map);
 }
 
-stripe::TensorType TileBuilder::IntoTensorType(RankedTensorType type) {
-  auto shape = type.getShape();
-  auto cls = mlir::Identifier::get(stripe::kAddressClassIdentifier, type.getContext());
-  llvm::SmallVector<stripe::TensorDim, 4> newShape(shape.size(), stripe::TensorDim{0, 0, cls});
-  int64_t stride = 1;
-  for (int i = shape.size() - 1; i >= 0; i--) {
-    newShape[i].stride = stride;
-    newShape[i].size = shape[i];
-    stride *= shape[i];
-  }
-  return stripe::TensorType::get(type.getElementType(), newShape, stripe::OffsetsMap{}, false);
+MemRefType TileBuilder::IntoMemRefType(RankedTensorType type) {  //
+  auto scalarType = type.getElementType().cast<ScalarType>();
+  return MemRefType::get(type.getShape(), scalarType.toStandard());
 }
 
 void TileBuilder::BindShape(Value tensor, RankedTensorType type) {

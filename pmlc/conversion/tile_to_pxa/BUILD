@@ -8,7 +8,6 @@ plaidml_cc_library(
     name = "tile_to_pxa",
     srcs = glob(["*.cc"]),
     hdrs = glob(["*.h"]),
-    tags = ["llvm"],
     deps = [
         "//pmlc/dialect/pxa/ir",
         "//pmlc/dialect/tile/ir",

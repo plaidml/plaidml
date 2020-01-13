@@ -303,7 +303,7 @@ win32_cmake_vars = {
 # TODO(phawkins): use a better method to select the right host triple, rather
 # than hardcoding x86_64.
 llvm_all_cmake_vars = select({
-    "@com_intel_plaidml//toolchain:macos_x86_64": cmake_var_string(
+    "@bazel_tools//src/conditions:darwin_x86_64": cmake_var_string(
         _dict_add(
             cmake_vars,
             llvm_target_cmake_vars("X86", "x86_64-apple-darwin"),
@@ -311,7 +311,7 @@ llvm_all_cmake_vars = select({
             darwin_cmake_vars,
         ),
     ),
-    "@com_intel_plaidml//toolchain:windows_x86_64": cmake_var_string(
+    "@bazel_tools//src/conditions:windows": cmake_var_string(
         _dict_add(
             cmake_vars,
             llvm_target_cmake_vars("X86", "x86_64-pc-win32"),
@@ -329,7 +329,7 @@ llvm_all_cmake_vars = select({
 })
 
 llvm_linkopts = select({
-    "@com_intel_plaidml//toolchain:windows_x86_64": [],
+    "@bazel_tools//src/conditions:windows": [],
     "//conditions:default": [
         "-ldl",
         "-lm",
@@ -338,7 +338,7 @@ llvm_linkopts = select({
 })
 
 llvm_defines = select({
-    "@com_intel_plaidml//toolchain:windows_x86_64": [
+    "@bazel_tools//src/conditions:windows": [
         "_CRT_SECURE_NO_DEPRECATE",
         "_CRT_SECURE_NO_WARNINGS",
         "_CRT_NONSTDC_NO_DEPRECATE",
@@ -358,7 +358,7 @@ llvm_defines = select({
 ]
 
 llvm_copts = select({
-    "@com_intel_plaidml//toolchain:windows_x86_64": [
+    "@bazel_tools//src/conditions:windows": [
         "-Zc:inline",
         "-Zc:strictStrings",
         "-Zc:rvalueCast",
@@ -405,14 +405,16 @@ llvm_copts = select({
         "-w14062",
         "-we4238",
     ],
-    "//conditions:default": [],
+    "//conditions:default": [
+        "-Wno-unused-function",
+    ],
 })
 
 # Platform specific sources for libSupport.
 
 def llvm_support_platform_specific_srcs_glob():
     return select({
-        "@com_intel_plaidml//toolchain:windows_x86_64": native.glob([
+        "@bazel_tools//src/conditions:windows": native.glob([
             "lib/Support/Windows/*.inc",
             "lib/Support/Windows/*.h",
         ]),

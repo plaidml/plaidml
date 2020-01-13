@@ -8,8 +8,6 @@ plaidml_cc_binary(
     name = "pmlc-translate",
     srcs = ["pmlc-translate.cc"],
     deps = [
-        "//pmlc/conversion/tile_to_stripe",
-        "//pmlc/dialect/stripe:transcode",
         "//pmlc/dialect/tile",
         "@llvm-project//llvm:support",
         "@llvm-project//mlir:IR",

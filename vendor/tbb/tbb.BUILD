@@ -27,7 +27,7 @@ cc_library(
         "src/tbb/*.cpp",
         "src/tbb/*.h",
     ]) + select({
-        "@com_intel_plaidml//toolchain:windows_x86_64": [
+        "@bazel_tools//src/conditions:windows": [
             ":gen_cpu_ctl_env",
         ],
         "//conditions:default": [],
@@ -41,11 +41,11 @@ cc_library(
     copts = [
         "-Iexternal/tbb/src",
     ] + select({
-        "@com_intel_plaidml//toolchain:windows_x86_64": [],
-        "@com_intel_plaidml//toolchain:macos_x86_64": [
+        "@bazel_tools//src/conditions:windows": [],
+        "@bazel_tools//src/conditions:darwin_x86_64": [
             "-mrtm",
         ],
-        "@com_intel_plaidml//toolchain:linux_x86_64": [
+        "//conditions:default": [
             "-mrtm",
             # this prevents segfaults
             # see: https://gcc.gnu.org/onlinedocs/gcc/Optimize-Options.html
@@ -62,7 +62,7 @@ cc_library(
         "__TBB_DYNAMIC_LOAD_ENABLED=0",
         "__TBB_SOURCE_DIRECTLY_INCLUDED=1",
     ] + select({
-        "@com_intel_plaidml//toolchain:windows_x86_64": [
+        "@bazel_tools//src/conditions:windows": [
             "__TBB_CPU_CTL_ENV_PRESENT=1",
             "__TBB_x86_64=1",
             "TBB_USE_THREADING_TOOLS",

@@ -37,8 +37,8 @@ static const char* const includeHeader = R"(
 #include <string>
 #include <vector>
 
-#include "plaidml2/edsl/edsl.h"
-#include "plaidml2/op/ffi.h"
+#include "plaidml/edsl/edsl.h"
+#include "plaidml/op/ffi.h"
 
 )";
 

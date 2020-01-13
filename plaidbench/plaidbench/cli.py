@@ -13,11 +13,9 @@
 # limitations under the License.
 
 import os
-import six
 import tempfile
 
 import click
-import plaidml
 
 from . import core
 
@@ -102,8 +100,6 @@ def plaidbench(ctx, verbose, examples, blanket_run, results, callgrind, epochs, 
     else:
         runner.param_builder = core.ExplicitParamBuilder(batch_size, epochs, examples)
         runner.reporter = core.ExplicitReporter(results)
-    if verbose:
-        plaidml._internal_set_vlog(verbose)
     runner.verbose = verbose
     runner.callgrind = callgrind
     runner.warmup = warmup

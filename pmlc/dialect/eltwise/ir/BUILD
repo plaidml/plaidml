@@ -67,7 +67,6 @@ plaidml_cc_library(
         ":gen-interfaces",
         ":gen-ops",
         "//pmlc/util",
-        "//tile/base",
         "@llvm-project//llvm:support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:StandardOps",

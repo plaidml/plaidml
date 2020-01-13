@@ -1,9 +1,7 @@
 exclude: >
   (?x)^(
-    base/util/catch.h|
     bzl/version.tpl.cc|
     bzl/version.tpl.py|
-    bzl/conda.tpl.py|
     ci/pipeline.yml|
     plaidbench/plaidbench/networks/keras/imdb_lstm.h5|
     tile/targets/cpu/heatmap_skx_xeonplat_8180_1-7GHz_mblocked.csv.gz

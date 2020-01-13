@@ -11,9 +11,9 @@
 #include "mlir/Support/DebugStringHelper.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-#include "base/util/logging.h"
 #include "pmlc/dialect/pxa/ir/dialect.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
+#include "pmlc/util/logging.h"
 #include "pmlc/util/util.h"
 
 namespace pmlc::conversion::pxa_to_affine {

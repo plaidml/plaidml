@@ -61,10 +61,8 @@ plaidml_cc_library(
     deps = [
         ":gen-interfaces",
         ":gen-ops",
-        "//base/util",
         "//pmlc/dialect/eltwise/ir",
         "//pmlc/util",
-        "//tile/base",
         "@llvm-project//llvm:support",
         "@llvm-project//mlir:IR",
     ],

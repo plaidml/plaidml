@@ -3,9 +3,9 @@ from collections import OrderedDict
 
 import numpy as np
 
-import plaidml2 as plaidml
-import plaidml2.edsl as edsl
-import plaidml2.exec as plaidml_exec
+import plaidml
+import plaidml.edsl as edsl
+import plaidml.exec
 
 
 def sq(X):
@@ -90,7 +90,7 @@ def toroidal_shell_integral(n, minval, maxval, eps, benchmark=False):
     O = sum(-G * H)
 
     program = edsl.Program('toroidal_shell_integral', [O])
-    binder = plaidml_exec.Binder(program)
+    binder = plaidml.exec.Binder(program)
     executable = binder.compile()
 
     def run():

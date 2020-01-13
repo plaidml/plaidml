@@ -8,12 +8,14 @@
 #include <tuple>
 #include <vector>
 
+#include "mlir/Pass/Pass.h"
+
 #include "pmlc/dialect/tile/ir/ops.h"
-#include "tile/math/polynomial.h"
+#include "pmlc/util/math/polynomial.h"
 
 namespace pmlc::dialect::tile {
 
-namespace math = vertexai::tile::math;
+namespace math = util::math;
 
 using IndexPoly = math::Polynomial<math::Rational>;
 using IndexAccess = std::vector<IndexPoly>;
@@ -66,5 +68,9 @@ struct Contraction {
 };
 
 math::Affine Integerize(const IndexPoly& poly, const math::IndexBounds& bounds);
+
+struct ComputeBoundsPass : public mlir::FunctionPass<ComputeBoundsPass> {
+  void runOnFunction() final;
+};
 
 }  // namespace pmlc::dialect::tile

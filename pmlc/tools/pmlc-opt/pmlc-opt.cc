@@ -12,8 +12,8 @@
 #include "mlir/Support/FileUtilities.h"
 #include "mlir/Support/MlirOptMain.h"
 
-#include "base/util/env.h"
-#include "base/util/logging.h"
+#include "pmlc/util/env.h"
+#include "pmlc/util/logging.h"
 
 using namespace llvm;  // NOLINT(build/namespaces)
 using namespace mlir;  // NOLINT(build/namespaces)
@@ -45,12 +45,13 @@ static cl::opt<bool> verifyPasses(                                //
     cl::init(true));
 
 int main(int argc, char** argv) {
-  auto level_str = vertexai::env::Get("PLAIDML_VERBOSE");
+  auto level_str = pmlc::util::getEnvVar("PLAIDML_VERBOSE");
   if (level_str.size()) {
     auto level = std::atoi(level_str.c_str());
     if (level) {
       el::Loggers::setVerboseLevel(level);
     }
+    IVLOG(level, "PLAIDML_VERBOSE=" << level);
   }
 
   PrettyStackTraceProgram x(argc, argv);

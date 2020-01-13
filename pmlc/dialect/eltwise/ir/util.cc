@@ -15,7 +15,7 @@
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/Support/DebugStringHelper.h"
 
-#include "base/util/logging.h"
+#include "pmlc/util/logging.h"
 
 namespace pmlc::dialect::eltwise {
 

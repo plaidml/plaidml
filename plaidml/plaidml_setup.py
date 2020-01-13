@@ -7,25 +7,25 @@ import sys
 
 from six.moves import input
 
+import numpy as np
 import plaidml
-import plaidml.exceptions
+import plaidml.edsl as edsl
+import plaidml.exec
 import plaidml.settings
 
 
+def choice_prompt(question, choices, default):
+    inp = ""
+    while not inp in choices:
+        inp = input("{0}? ({1})[{2}]:".format(question, ",".join(choices), default))
+        if not inp:
+            inp = default
+        elif inp not in choices:
+            print("Invalid choice: {}".format(inp))
+    return inp
+
+
 def main():
-    ctx = plaidml.Context()
-    plaidml.quiet()
-
-    def choice_prompt(question, choices, default):
-        inp = ""
-        while not inp in choices:
-            inp = input("{0}? ({1})[{2}]:".format(question, ",".join(choices), default))
-            if not inp:
-                inp = default
-            elif inp not in choices:
-                print("Invalid choice: {}".format(inp))
-        return inp
-
     print("""
 PlaidML Setup ({0})
 
@@ -38,109 +38,75 @@ Some Notes:
   * PlaidML is licensed under the Apache License 2.0
  """.format(plaidml.__version__))
 
-    # Placeholder env var
-    if os.getenv("PLAIDML_VERBOSE"):
-        # change verbose settings to PLAIDML_VERBOSE, or 4 if PLAIDML_VERBOSE is invalid
-        try:
-            arg_verbose = int(os.getenv("PLAIDML_VERBOSE"))
-        except ValueError:
-            arg_verbose = 4
-        plaidml._internal_set_vlog(arg_verbose)
-        print("INFO:Verbose logging has been enabled - verbose level", arg_verbose, "\n")
-        if plaidml.settings.default_config:
-            (cfg_path, cfg_file) = os.path.split(plaidml.settings.default_config)
-        else:
-            (cfg_path, cfg_file) = ("Unknown", "Unknown")
-        if plaidml.settings.experimental_config:
-            (exp_path, exp_file) = os.path.split(plaidml.settings.experimental_config)
-        else:
-            (exp_path, exp_file) = ("Unknown", "Unknown")
+    devices = sorted(plaidml.exec.list_devices())
+    targets = sorted(plaidml.exec.list_targets())
 
-    # Operate as if nothing is set
-    plaidml.settings._setup_for_test(plaidml.settings.user_settings)
-
-    plaidml.settings.experimental = False
-    devices, _ = plaidml.devices(ctx, limit=100, return_all=True)
-    plaidml.settings.experimental = True
-    exp_devices, unmatched = plaidml.devices(ctx, limit=100, return_all=True)
-
-    if not (devices or exp_devices):
-        if not unmatched:
-            print("""
+    if not devices:
+        print("""
 No OpenCL devices found. Check driver installation.
 Read the helpful, easy driver installation instructions from our README:
 http://github.com/plaidml/plaidml
 """)
-        else:
-            print("""
-No supported devices found. Run 'clinfo' and file an issue containing the full output.
-""")
         sys.exit(-1)
 
-    if devices and os.getenv("PLAIDML_VERBOSE"):
-        print("Default Config File Location:")
-        print("   {0}/".format(cfg_path))
-
-    print("\nDefault Config Devices:")
-    if not devices:
-        print("   No devices.")
-    for dev in devices:
-        print("   {0} : {1}".format(dev.id.decode(), dev.description.decode()))
-
-    if exp_devices and os.getenv("PLAIDML_VERBOSE"):
-        print("\nExperimental Config File Location:")
-        print("   {0}/".format(exp_path))
-
-    print("\nExperimental Config Devices:")
-    if not exp_devices:
-        print("   No devices.")
-    for dev in exp_devices:
-        print("   {0} : {1}".format(dev.id.decode(), dev.description.decode()))
-
-    print(
-        "\nUsing experimental devices can cause poor performance, crashes, and other nastiness.\n")
-    exp = choice_prompt("Enable experimental device support", ["y", "n"], "n")
-    plaidml.settings.experimental = exp == "y"
-    try:
-        devices = plaidml.devices(ctx, limit=100)
-    except plaidml.exceptions.PlaidMLError:
-        print("\nNo devices available in chosen config. Rerun plaidml-setup.")
-        sys.exit(-1)
-
-    if devices:
-        dev = 1
-        if len(devices) > 1:
-            print("""
-Multiple devices detected (You can override by setting PLAIDML_DEVICE_IDS).
+    dev_idx = 0
+    if len(devices) > 1:
+        print("""
+Multiple devices detected (You can override by setting PLAIDML_DEVICE).
 Please choose a default device:
 """)
-            devrange = range(1, len(devices) + 1)
-            for i in devrange:
-                print("   {0} : {1}".format(i, devices[i - 1].id.decode()))
-            dev = choice_prompt("\nDefault device", [str(i) for i in devrange], "1")
-        plaidml.settings.device_ids = [devices[int(dev) - 1].id.decode()]
+        for i, device in enumerate(devices):
+            print("   {} : {}".format(i + 1, device))
+        choices = [str(i + 1) for i in range(len(devices))]
+        dev_idx = int(choice_prompt("\nDefault device", choices, "1"))
+    plaidml.settings.set('PLAIDML_DEVICE', devices[dev_idx - 1])
+    device = plaidml.settings.get('PLAIDML_DEVICE')
 
-    print("\nSelected device:\n    {0}".format(plaidml.devices(ctx)[0]))
+    print()
+    print("Selected device:")
+    print("    {}".format(device))
 
-    print("\nAlmost done. Multiplying some matrices...")
-    # Reinitialize to send a usage report
+    print()
+    print("A target determines the compiler configuration and should be matched with your device.")
+    print("Please choose a default target:")
+    for i, target in enumerate(targets):
+        print("   {} : {}".format(i + 1, target))
+    choices = [str(i + 1) for i in range(len(targets))]
+    tgt_idx = int(choice_prompt("\nDefault target", choices, "1"))
+    plaidml.settings.set('PLAIDML_TARGET', targets[tgt_idx - 1])
+    target = plaidml.settings.get('PLAIDML_TARGET')
+
+    print()
+    print("Selected target:")
+    print("    {}".format(target))
+
+    print()
+    print("Almost done. Multiplying some matrices...")
     print("Tile code:")
-    print("  function (B[X,Z], C[Z,Y]) -> (A) { A[x,y : X,Y] = +(B[x,z] * C[z,y]); }")
-    with plaidml.open_first_device(ctx) as dev:
-        matmul = plaidml.Function(
-            "function (B[X,Z], C[Z,Y]) -> (A) { A[x,y : X,Y] = +(B[x,z] * C[z,y]); }")
-        shape = plaidml.Shape(ctx, plaidml.DType.FLOAT32, 3, 3)
-        a = plaidml.Tensor(dev, shape)
-        b = plaidml.Tensor(dev, shape)
-        c = plaidml.Tensor(dev, shape)
-        plaidml.run(ctx, matmul, inputs={"B": b, "C": c}, outputs={"A": a})
-    print("Whew. That worked.\n")
+    print("  function (B[X, Z], C[Z, Y]) -> (A) { A[x, y : X, Y] = +(B[x, z] * C[z, y]); }")
 
-    sav = choice_prompt("Save settings to {0}".format(plaidml.settings.user_settings), ["y", "n"],
-                        "y")
-    if sav == "y":
-        plaidml.settings.save(plaidml.settings.user_settings)
-    print("Success!\n")
+    shape = edsl.LogicalShape(plaidml.DType.FLOAT32, [3, 3])
+    B = edsl.Tensor(shape)
+    C = edsl.Tensor(shape)
+
+    X, Y, Z = edsl.TensorDims(3)
+    x, y, z = edsl.TensorIndexes(3)
+    B.bind_dims(X, Z)
+    C.bind_dims(Z, Y)
+    A = edsl.TensorOutput(X, Y)
+    A[x, y] += B[x, z] * C[z, y]
+
+    program = edsl.Program('plaidml_setup', [A])
+    plaidml.exec.run(program, [(B, np.random.rand(3, 3)), (C, np.random.rand(3, 3))])
+    print("Whew. That worked.")
+    print()
+
+    settings_path = plaidml.settings.get('PLAIDML_SETTINGS')
+    save = choice_prompt("Save settings to {0}".format(settings_path), ["y", "n"], "y")
+    if save == "y":
+        plaidml.settings.save()
+    print("Success!")
+    print()
 
 
 if __name__ == "__main__":

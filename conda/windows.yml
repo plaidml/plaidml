@@ -3,8 +3,6 @@ channels:
 dependencies:
   - cffi
   - jupyter
-  - m2-bison
-  - m2-flex
   - m2-perl
   - nbformat=4.4.0 # Latest version of nbformat breaks the analysis notebook
   - pip

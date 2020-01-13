@@ -63,9 +63,15 @@ plaidml_cc_library(
     deps = [
         ":enums-gen",
         ":interfaces-gen",
-        "//base/util",
-        "//tile/base",
+        "@easylogging",
+        "@gflags",
         "@llvm-project//llvm:support",
         "@llvm-project//mlir:IR",
     ],
+)
+
+plaidml_cc_library(
+    name = "env",
+    srcs = ["env.cc"],
+    hdrs = ["env.h"],
 )

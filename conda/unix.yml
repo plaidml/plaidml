@@ -2,10 +2,8 @@ channels:
   - conda-forge
   - pytorch
 dependencies:
-  - bison
   - cffi
   - doxygen
-  - flex
   - jupyter
   - nbformat=4.4.0 # Latest version of nbformat breaks the analysis notebook
   - pip
@@ -30,7 +28,6 @@ dependencies:
     - pygments
     - pystache
     - pyyaml
-    - requests
     - sphinxcontrib.katex
     - sphinxcontrib-napoleon
     - sphinx_rtd_theme

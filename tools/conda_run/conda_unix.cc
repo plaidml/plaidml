@@ -10,7 +10,7 @@
 
 #include <boost/filesystem.hpp>
 
-#include "base/util/env.h"
+#include "pmlc/util/env.h"
 #include "tools/cpp/runfiles/runfiles.h"
 
 // #define DEBUG
@@ -30,7 +30,7 @@ int main(int argc, char* argv[]) {
       return EXIT_FAILURE;
     }
     for (const auto& var : runfiles->EnvVars()) {
-      vertexai::env::Set(var.first, var.second);
+      pmlc::util::setEnvVar(var.first, var.second);
     }
 
     // locate assets within runfiles
@@ -38,17 +38,17 @@ int main(int argc, char* argv[]) {
     auto conda_env = python.parent_path().parent_path().string();
 
     // Adjust environment variables to activate conda environment
-    vertexai::env::Set("CONDA_DEFAULT_ENV", conda_env);
-    auto path = vertexai::env::Get("PATH");
+    pmlc::util::setEnvVar("CONDA_DEFAULT_ENV", conda_env);
+    auto path = pmlc::util::getEnvVar("PATH");
     auto new_path = python.parent_path().string() + ":" + path;
-    vertexai::env::Set("PATH", new_path);
+    pmlc::util::setEnvVar("PATH", new_path);
 
     // This is to support ASAN on macOS.
     // By default, DYLD_INSERT_LIBRARIES is dropped, probably by SIP (I'm not exactly sure).
     // This is a workaround to avoid the exclusion.
-    auto dyld_insert_libs = vertexai::env::Get("_DYLD_INSERT_LIBRARIES");
+    auto dyld_insert_libs = pmlc::util::getEnvVar("_DYLD_INSERT_LIBRARIES");
     if (dyld_insert_libs.size()) {
-      vertexai::env::Set("DYLD_INSERT_LIBRARIES", dyld_insert_libs);
+      pmlc::util::setEnvVar("DYLD_INSERT_LIBRARIES", dyld_insert_libs);
     }
 
 #ifdef DEBUG

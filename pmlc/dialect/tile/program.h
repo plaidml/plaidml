@@ -8,7 +8,7 @@
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Module.h"
 
-#include "tile/base/buffer.h"
+#include "pmlc/util/buffer.h"
 
 namespace pmlc::dialect::tile {
 
@@ -16,7 +16,7 @@ struct ProgramArgument {
   bool isInput;
   mlir::Value value;
   mlir::RankedTensorType shape;
-  vertexai::tile::BufferPtr buffer;
+  pmlc::util::BufferPtr buffer;
 };
 
 struct TileProgram {

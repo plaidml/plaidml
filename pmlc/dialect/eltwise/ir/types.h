@@ -8,11 +8,11 @@
 
 #include "mlir/IR/Types.h"
 
-#include "tile/base/shape.h"
+#include "pmlc/util/shape.h"
 
 namespace pmlc::dialect::eltwise {
 
-using DataType = vertexai::tile::DataType;
+using DataType = util::DataType;
 
 enum Kinds {
   // A scalar type

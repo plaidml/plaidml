@@ -8,7 +8,6 @@ plaidml_cc_library(
     name = "pxa_to_affine",
     srcs = glob(["*.cc"]),
     hdrs = glob(["*.h"]),
-    tags = ["llvm"],
     deps = [
         "//pmlc/dialect/pxa/ir",
         "@llvm-project//mlir:AffineDialectRegistration",

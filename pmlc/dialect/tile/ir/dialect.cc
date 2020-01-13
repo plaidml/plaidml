@@ -9,8 +9,8 @@
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/Support/DebugStringHelper.h"
 
-#include "base/util/logging.h"
 #include "pmlc/dialect/tile/ir/ops.h"
+#include "pmlc/util/logging.h"
 
 namespace pmlc::dialect::tile {
 

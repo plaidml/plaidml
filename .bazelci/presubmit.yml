@@ -1,5 +1,5 @@
 ---
-bazel: 1.0.0
+bazel: 2.0.0
 tasks:
   ubuntu1804:
     name: PlaidML
@@ -13,8 +13,6 @@ tasks:
       PLAIDML_TARGET: llvm_cpu
       PLAIDML_EXPERIMENTAL: 1
     test_flags:
-    - "--config=linux_x86_64"
-    - "--config=bazelci"
     test_targets:
     - "..."
   macos:
@@ -30,6 +28,5 @@ tasks:
       PLAIDML_TARGET: llvm_cpu
       PLAIDML_EXPERIMENTAL: 1
     test_flags:
-    - "--config=macos_x86_64"
     test_targets:
     - "..."

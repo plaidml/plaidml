@@ -17,13 +17,13 @@ py_binary(
     ],
     data = [
         ":docs",
-        "//plaidml2/edsl:docs",
+        "//plaidml/edsl:docs",
     ],
     deps = [
-        "//plaidml2:py",
-        "//plaidml2/edsl:py",
-        "//plaidml2/exec:py",
-        "//plaidml2/op:py",
+        "//plaidml:py",
+        "//plaidml/edsl:py",
+        "//plaidml/exec:py",
+        "//plaidml/op:py",
         "//tools/py_setup",
     ],
 )
