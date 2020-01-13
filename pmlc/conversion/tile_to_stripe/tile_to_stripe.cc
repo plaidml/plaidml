@@ -1,6 +1,6 @@
 // Copyright 2019, Intel Corporation
 
-#include "pmlc/conversion/tile_to_stripe/lowering.h"
+#include "pmlc/conversion/tile_to_stripe/tile_to_stripe.h"
 
 #include <memory>
 #include <unordered_set>
