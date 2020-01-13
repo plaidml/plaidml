@@ -148,6 +148,7 @@ def cmd_build(args, remainder):
     explain_log = 'explain.log'
     profile_json = 'profile.json.gz'
     bazel_config = variant.get('bazel_config')
+    startup_args = ['--output_base={}'.format(output_base())]
 
     common_args = []
     if bazel_config:
@@ -160,7 +161,6 @@ def cmd_build(args, remainder):
     common_args += ['--profile={}'.format(profile_json)]
     common_args += ['--verbose_failures']
     common_args += ['--verbose_explanations']
-    common_args += ['--output_base={}'.format(output_base())]
 
     util.printf('--- :bazel: Running Build...')
     if platform.system() == 'Windows':
@@ -168,7 +168,7 @@ def cmd_build(args, remainder):
         cenv = util.CondaEnv(pathlib.Path('.cenv'))
         cenv.create('environment-windows.yml')
         env.update(cenv.env())
-    util.check_call(['bazelisk', 'test', '...'] + common_args, env=env)
+    util.check_call(['bazelisk'] + startup_args + ['test', '...'] + common_args, env=env)
 
     util.printf('--- :buildkite: Uploading artifacts...')
     util.buildkite_upload(explain_log)
@@ -227,7 +227,8 @@ def cmd_report(args, remainder):
     workdir = pathlib.Path('tmp').resolve()
     make_all_wheels(workdir)
     download_test_artifacts('tmp/test/**/*')
-    cmd = ['bazelisk', 'run', '//ci:report']
+    startup_args = ['--output_base={}'.format(output_base())]
+    cmd = ['bazelisk'] + startup_args + ['run', '//ci:report']
     cmd += ['--']
     cmd += ['--pipeline', args.pipeline]
     cmd += ['--annotate']
