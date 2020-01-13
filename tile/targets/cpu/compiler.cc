@@ -838,7 +838,7 @@ void Compiler::Visit(const stripe::Intrinsic& intrinsic) {
       {"add", &Compiler::Add},
       {"assign", &Compiler::Assign},
       {"cond", &Compiler::Conditional},
-      {"div", &Compiler::Add},
+      {"div", &Compiler::Divide},
       {"eq", &Compiler::Equal},
       {"gt", &Compiler::GreaterThan},
       {"gte", &Compiler::GreaterThanOrEqualTo},
