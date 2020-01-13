@@ -141,6 +141,11 @@ class EW_UnaryFloatOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
     Arguments<(ins EltwiseFloat:$operand, TypeAttr:$type)>,
     Results<(outs EltwiseFloat:$result)>;
 
+class EW_UnaryUnsignedOrIntOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
+    EW_UnaryOp<mnemonic, traits>,
+    Arguments<(ins EltwiseUnsignedOrInteger:$operand, TypeAttr:$type)>,
+    Results<(outs EltwiseUnsignedOrInteger:$result)>;
+
 class EW_BinaryUnsignedOrIntOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
     EW_BinaryOp<mnemonic, traits>,
     Arguments<(ins EltwiseUnsignedOrInteger:$lhs, EltwiseUnsignedOrInteger:$rhs, TypeAttr:$type)>,
@@ -150,10 +155,10 @@ class EW_BinaryUnsignedOrIntOp<string mnemonic, list<OpTrait> traits = [NoSideEf
 def EW_AbsOp : EW_UnaryOp<"abs">;
 def EW_ACosOp : EW_UnaryFloatOp<"acos">;
 def EW_AddOp : EW_BinaryOp<"add", [Commutative, NoSideEffect]>, HasFolder;
-def EW_BitAndOp : EW_BinaryOp<"bit_and", [Commutative, NoSideEffect]>;
-def EW_BitNotOp : EW_UnaryOp<"bit_not">;
-def EW_BitOrOp : EW_BinaryOp<"bit_or", [Commutative, NoSideEffect]>;
-def EW_BitXorOp : EW_BinaryOp<"bit_xor", [Commutative, NoSideEffect]>;
+def EW_BitAndOp : EW_BinaryUnsignedOrIntOp<"bit_and", [Commutative, NoSideEffect]>;
+def EW_BitNotOp : EW_UnaryUnsignedOrIntOp<"bit_not">;
+def EW_BitOrOp : EW_BinaryUnsignedOrIntOp<"bit_or", [Commutative, NoSideEffect]>;
+def EW_BitXorOp : EW_BinaryUnsignedOrIntOp<"bit_xor", [Commutative, NoSideEffect]>;
 def EW_BitLeftOp : EW_BinaryUnsignedOrIntOp<"bit_left">;
 def EW_BitRightOp : EW_BinaryUnsignedOrIntOp<"bit_right">;
 def EW_ASinOp : EW_UnaryFloatOp<"asin">;

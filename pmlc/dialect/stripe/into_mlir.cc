@@ -212,7 +212,6 @@ static void IntrinsicIntoMLIR(OpBuilder* builder, SymbolTable* locals, const str
     throw std::runtime_error("Unknown intrinsic: " + intrinsic.name);
   }
   auto genericBuilder = abstractOp->getInterface<util::GenericBuilder>();
-  IVLOG(1, "genericBuilder");
   if (!genericBuilder) {
     throw std::runtime_error("Unknown intrinsic: " + intrinsic.name);
   }

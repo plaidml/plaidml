@@ -55,7 +55,7 @@ def AnyScalarUnsigned : Type<And<[
   ]>, "scalar-unsigned">;
 
 def AnyScalarUnsignedOrInteger : Type<Or<[
-  AnyScalarInteger.predicate, AnyScalarUnsigned.predicate
+    AnyScalarInteger.predicate, AnyScalarUnsigned.predicate
   ]>, "scalar-unsigned-or-integer">;
 
 def IndexLike : Type<Or<[

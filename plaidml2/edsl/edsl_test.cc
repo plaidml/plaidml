@@ -174,8 +174,8 @@ TEST(CppEdsl, BitRight) {
 }
 
 TEST(CppEdsl, BitXor) {
-  auto A = Placeholder(PLAIDML_DATA_UINT64, {2, 2});
-  auto B = Placeholder(PLAIDML_DATA_UINT64, {2, 2});
+  auto A = Placeholder(PLAIDML_DATA_UINT64, {3, 3});
+  auto B = Placeholder(PLAIDML_DATA_UINT64, {3, 3});
   auto C = A ^ B;
   Program program("bit_xor", {C});
 
@@ -185,8 +185,9 @@ TEST(CppEdsl, BitXor) {
   std::vector<std::uint64_t> input_b{10, 11, 12,  //
                                      13, 14, 15,  //
                                      16, 17, 18};
-  std::vector<std::uint64_t> expected{1 ^ 10, 2 ^ 11,  //
-                                      3 ^ 12, 4 ^ 13};
+  std::vector<std::uint64_t> expected{1 ^ 10, 2 ^ 11, 3 ^ 12,  //
+                                      4 ^ 13, 5 ^ 14, 6 ^ 15,  //
+                                      7 ^ 16, 8 ^ 17, 9 ^ 18};
 
   auto binder = exec::Binder(program);
   auto executable = binder.compile();
