@@ -88,7 +88,7 @@ SUITES:
   smoke:
     platforms:
       keras-stripe-llvm-cpu:
-        pipelines: [plaidml, ci]
+        pipelines: [nightly]
     params:
       plaidml:
         batch_sizes: [0]
@@ -121,7 +121,7 @@ SUITES:
   base:
     platforms:
       keras-stripe-llvm-cpu:
-        pipelines: [plaidml, nightly]
+        pipelines: [nightly]
 
     params:
       ci:
@@ -161,7 +161,7 @@ SUITES:
   infer:
     platforms:
       keras-stripe-llvm-cpu:
-        pipelines: [plaidml, nightly]
+        pipelines: [nightly]
 
     params:
       ci:
