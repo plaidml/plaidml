@@ -154,7 +154,8 @@ class EW_BinaryIntOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
 def EW_AbsOp : EW_UnaryOp<"abs">;
 def EW_ACosOp : EW_UnaryFloatOp<"acos">;
 def EW_AddOp : EW_BinaryOp<"add", [Commutative, NoSideEffect]>, HasFolder;
-def EW_AndOp : EW_BinaryIntOp<"and", [Commutative, NoSideEffect]>;
+def EW_BitAndOp : EW_BinaryIntOp<"bit_and", [Commutative, NoSideEffect]>;
+def EW_BitNotOp : EW_UnaryIntOp<"bit_not">;
 def EW_ASinOp : EW_UnaryFloatOp<"asin">;
 def EW_AssignOp : EW_UnaryOp<"assign">;
 def EW_ATanOp : EW_UnaryFloatOp<"atan">;
@@ -178,7 +179,6 @@ def EW_MinOp : EW_BinaryOp<"min", [Commutative, NoSideEffect]>;
 def EW_ModOp : EW_BinaryOp<"mod">;
 def EW_MulOp : EW_BinaryOp<"mul", [Commutative, NoSideEffect]>, HasFolder;
 def EW_NegOp : EW_UnaryOp<"neg">;
-def EW_NotOp : EW_UnaryIntOp<"not">;
 def EW_OrOp : EW_BinaryIntOp<"or", [Commutative, NoSideEffect]>;
 def EW_PowOp : EW_BinaryOp<"pow">;
 def EW_ReluOp : EW_UnaryOp<"relu">;

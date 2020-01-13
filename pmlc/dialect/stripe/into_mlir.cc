@@ -179,6 +179,7 @@ static std::map<CastKey, DataType> castMap = {
 };
 
 static void IntrinsicIntoMLIR(OpBuilder* builder, SymbolTable* locals, const stripe::Intrinsic& intrinsic) {
+  IVLOG(1, "IntrinsicIntoMLIR");
   if (intrinsic.any_tags()) {
     throw std::runtime_error("No tags allowed on intrinsics");
   }
@@ -207,11 +208,14 @@ static void IntrinsicIntoMLIR(OpBuilder* builder, SymbolTable* locals, const str
     return;
   }
   auto opName = eltwise::Dialect::getCanonicalOpName(intrinsic.name);
+  IVLOG(1, "opName " << opName);
   auto abstractOp = mlir::AbstractOperation::lookup(opName, builder->getContext());
+  IVLOG(1, "Abstract lookup");
   if (!abstractOp) {
     throw std::runtime_error("Unknown intrinsic: " + intrinsic.name);
   }
   auto genericBuilder = abstractOp->getInterface<util::GenericBuilder>();
+  IVLOG(1, "genericBuilder");
   if (!genericBuilder) {
     throw std::runtime_error("Unknown intrinsic: " + intrinsic.name);
   }
@@ -219,7 +223,9 @@ static void IntrinsicIntoMLIR(OpBuilder* builder, SymbolTable* locals, const str
   for (const auto& in : intrinsic.inputs) {
     operands.push_back(safe_at(locals->scalars, in));
   }
+  IVLOG(1, "DataTypeIntoMLIR");
   ScalarType scalarType = DataTypeIntoMLIR(builder->getContext(), intrinsic.type);
+  IVLOG(1, "genericBuilder->create");
   auto op = genericBuilder->create(builder, builder->getUnknownLoc(), scalarType, operands);
   locals->scalars.emplace(intrinsic.outputs[0], op->getResult(0));
   op->setAttr("scalar_name", builder->getStringAttr(intrinsic.outputs[0]));
