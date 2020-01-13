@@ -269,7 +269,6 @@ struct ContractionOpConversion : public LoweringBase {
     Contraction contraction{cionOp};
     bool no_reduce = cionOp.no_reduce().hasValue();
     const auto& [bounds, constraints] = contraction.ComputeBounds(shapes, no_reduce);
-    IVLOG(3, "Returning from ComputeBounds with\nbounds: " << bounds << "\nconstraints: " << constraints);
 
     // add induction vars
     llvm::SmallVector<int64_t, 8> ranges;
@@ -319,7 +318,6 @@ struct ContractionOpConversion : public LoweringBase {
     llvm::SmallVector<Value, 4> refs;
     for (unsigned i = 0; i < contraction.accesses.size(); i++) {
       const auto& access = contraction.accesses[i];
-      IVLOG(3, "Manipulating access " << i << ": " << access);
       llvm::SmallVector<Value, 4> offsets;
       for (const auto& poly : access) {
         auto affine = Integerize(poly, bounds);
