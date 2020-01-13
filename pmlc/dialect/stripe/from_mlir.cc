@@ -652,6 +652,7 @@ void StripeBuilder::visit(eltwise::CastOp castOp) {
   auto out_name = scalar_name(op);
   scalars_[result] = out_name;
   auto intr = std::make_shared<stripe::Intrinsic>();
+  intr->type = dtype;
   if (is_float(dtype)) {
     intr->name = "as_float";
   } else if (is_int(dtype)) {
