@@ -160,7 +160,7 @@ class Compiler : private stripe::ConstStmtVisitor {
   void EnterLoop(Loop* loop, llvm::Value* variable, llvm::Value* init, llvm::Value* limit);
   void LeaveLoop(Loop* loop, llvm::Value* variable);
   Scalar Cast(Scalar, DataType);
-  Scalar CheckBool(Scalar);
+  Scalar CheckNotFloat(Scalar);
   llvm::Type* CType(DataType);
   llvm::Value* ElementPtr(const Buffer& buf);
   llvm::Value* Eval(const stripe::Affine& access);

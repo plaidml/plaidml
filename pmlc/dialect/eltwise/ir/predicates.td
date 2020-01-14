@@ -54,6 +54,10 @@ def AnyScalarUnsigned : Type<And<[
     CPred<"is_uint($_self.cast<ScalarType>().type())">
   ]>, "scalar-unsigned">;
 
+def AnyScalarUnsignedOrInteger : Type<Or<[
+    AnyScalarInteger.predicate, AnyScalarUnsigned.predicate
+  ]>, "scalar-unsigned-or-integer">;
+
 def IndexLike : Type<Or<[
     Index.predicate,
     ScalarIndex.predicate,
@@ -89,6 +93,11 @@ def EltwiseUnsigned : TypeConstraint<Or<[
     AnyScalarUnsigned.predicate,
     RankedTensorOf<[AnyScalarUnsigned]>.predicate
   ]>, "eltwise-unsigned">;
+
+def EltwiseUnsignedOrInteger : TypeConstraint<Or<[
+  AnyScalarUnsignedOrInteger.predicate,
+    RankedTensorOf<[AnyScalarUnsignedOrInteger]>.predicate
+  ]>, "eltwise-unsigned-or-integer">;
 
 def EltwiseIndex : Type<Or<[
     IndexLike.predicate,

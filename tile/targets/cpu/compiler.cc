@@ -836,56 +836,56 @@ void Compiler::Visit(const stripe::Intrinsic& intrinsic) {
   // defined for actual intrinsic names; these have been derived experimentally.
   static std::map<std::string, std::function<void(Compiler*, const stripe::Intrinsic&)>> builtins{
       {"add", &Compiler::Add},
-      {"sub", &Compiler::Subtract},
-      {"neg", &Compiler::Negate},
-      {"mul", &Compiler::Multiply},
+      {"assign", &Compiler::Assign},
+      {"cond", &Compiler::Conditional},
       {"div", &Compiler::Divide},
-      {"mod", &Compiler::Mod},
-      {"lt", &Compiler::LessThan},
-      {"lte", &Compiler::LessThanOrEqualTo},
+      {"eq", &Compiler::Equal},
       {"gt", &Compiler::GreaterThan},
       {"gte", &Compiler::GreaterThanOrEqualTo},
-      {"eq", &Compiler::Equal},
-      {"neq", &Compiler::Unequal},
-      {"and", &Compiler::And},
-      {"or", &Compiler::Or},
-      {"not", &Compiler::Not},
-      {"xor", &Compiler::Xor},
-      {"cond", &Compiler::Conditional},
-      {"assign", &Compiler::Assign},
       {"ident", &Compiler::Assign},
+      {"lt", &Compiler::LessThan},
+      {"lte", &Compiler::LessThanOrEqualTo},
+      {"mod", &Compiler::Mod},
+      {"mul", &Compiler::Multiply},
+      {"neg", &Compiler::Negate},
+      {"neq", &Compiler::Unequal},
+      {"sub", &Compiler::Subtract},
       // Extra operations defined in tile/lang/ops.cc, which are apparently
       // passed along directly into Stripe
+      {"bit_and", &Compiler::And},
+      {"bit_or", &Compiler::Or},
+      {"bit_not", &Compiler::Not},
+      {"bit_left", &Compiler::BitLeft},
+      {"bit_right", &Compiler::BitRight},
+      {"bit_xor", &Compiler::Xor},
       {"cmp_eq", &Compiler::Equal},
       {"cmp_ne", &Compiler::Unequal},
       {"cmp_lt", &Compiler::LessThan},
       {"cmp_gt", &Compiler::GreaterThan},
       {"cmp_le", &Compiler::LessThanOrEqualTo},
       {"cmp_ge", &Compiler::GreaterThanOrEqualTo},
-      {"bit_right", &Compiler::BitRight},
-      {"bit_left", &Compiler::BitLeft},
       // Other undocumented intrinsics, which are apparently necessary in order
       // to successfully run the backend_test:
-      {"sqrt", &Compiler::Sqrt},
-      {"exp", &Compiler::Exp},
-      {"log", &Compiler::Log},
-      {"pow", &Compiler::Pow},
-      {"tanh", &Compiler::Tanh},
-      {"cos", &Compiler::Cos},
+      {"as_bool", &Compiler::AsBool},
       {"as_float", &Compiler::AsFloat},
       {"as_int", &Compiler::AsInt},
       {"as_uint", &Compiler::AsUInt},
-      {"as_bool", &Compiler::AsBool},
-      {"floor", &Compiler::Floor},
       {"ceil", &Compiler::Ceil},
+      {"cos", &Compiler::Cos},
+      {"exp", &Compiler::Exp},
+      {"floor", &Compiler::Floor},
+      {"log", &Compiler::Log},
+      {"pow", &Compiler::Pow},
       {"round", &Compiler::Round},
+      {"sqrt", &Compiler::Sqrt},
+      {"tanh", &Compiler::Tanh},
       // Numeric operations from stdlib mentioned in tile/lang/builtins.cc
       {"abs", &Compiler::Abs},
       {"acos", &Compiler::Acos},
-      {"asin", &Compiler::Asin},
-      {"atan", &Compiler::Atan},
       {"acosh", &Compiler::Acosh},
+      {"asin", &Compiler::Asin},
       {"asinh", &Compiler::Asinh},
+      {"atan", &Compiler::Atan},
       {"atanh", &Compiler::Atanh},
       {"cosh", &Compiler::Cosh},
       {"sin", &Compiler::Sin},
@@ -1315,31 +1315,31 @@ void Compiler::Conditional(const stripe::Intrinsic& cond) {
 
 void Compiler::And(const stripe::Intrinsic& stmt) {
   assert(2 == stmt.inputs.size());
-  Scalar lhs = CheckBool(scalars_[stmt.inputs[0]]);
-  Scalar rhs = CheckBool(scalars_[stmt.inputs[1]]);
+  Scalar lhs = CheckNotFloat(scalars_[stmt.inputs[0]]);
+  Scalar rhs = CheckNotFloat(scalars_[stmt.inputs[1]]);
   llvm::Value* ret = builder_.CreateAnd(lhs.value, rhs.value);
   OutputBool(ret, stmt);
 }
 
 void Compiler::Or(const stripe::Intrinsic& stmt) {
   assert(2 == stmt.inputs.size());
-  Scalar lhs = CheckBool(scalars_[stmt.inputs[0]]);
-  Scalar rhs = CheckBool(scalars_[stmt.inputs[1]]);
+  Scalar lhs = CheckNotFloat(scalars_[stmt.inputs[0]]);
+  Scalar rhs = CheckNotFloat(scalars_[stmt.inputs[1]]);
   llvm::Value* ret = builder_.CreateOr(lhs.value, rhs.value);
   OutputBool(ret, stmt);
 }
 
 void Compiler::Not(const stripe::Intrinsic& stmt) {
   assert(1 == stmt.inputs.size());
-  Scalar op = CheckBool(scalars_[stmt.inputs[0]]);
+  Scalar op = CheckNotFloat(scalars_[stmt.inputs[0]]);
   llvm::Value* ret = builder_.CreateNot(op.value);
   OutputBool(ret, stmt);
 }
 
 void Compiler::Xor(const stripe::Intrinsic& stmt) {
   assert(2 == stmt.inputs.size());
-  Scalar lhs = CheckBool(scalars_[stmt.inputs[0]]);
-  Scalar rhs = CheckBool(scalars_[stmt.inputs[1]]);
+  Scalar lhs = CheckNotFloat(scalars_[stmt.inputs[0]]);
+  Scalar rhs = CheckNotFloat(scalars_[stmt.inputs[1]]);
   llvm::Value* ret = builder_.CreateXor(lhs.value, rhs.value);
   OutputBool(ret, stmt);
 }
@@ -1946,11 +1946,11 @@ Compiler::Scalar Compiler::Cast(Scalar v, DataType to_type) {
   return Scalar{ret, to_type};
 }
 
-Compiler::Scalar Compiler::CheckBool(Scalar v) {
-  if (v.type == DataType::BOOLEAN) {
-    return v;
+Compiler::Scalar Compiler::CheckNotFloat(Scalar v) {
+  if (is_float(v.type) || v.type == DataType::INVALID) {
+    throw Error("Expected non-float, actually found " + to_string(v.type));
   }
-  throw Error("Expected boolean, actually found " + to_string(v.type));
+  return v;
 }
 
 llvm::Type* Compiler::CType(DataType type) {
