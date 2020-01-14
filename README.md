@@ -50,9 +50,9 @@ as version 0.7.0. We are keeping the `master` branch of PlaidML stable and
 maintaining it until `plaidml-v1` is ready for production.
 
 If you’d like to try out some of PlaidML’s newer performance improvements, you
-can try running PlaidML with the environment variable `PLAIDML_USE_STRIPE` set
-to 1. This will act as a precursor to the changes you’ll be seeing in
-`plaidml-v1`, and we’re excited to hear your feedback on Stripe.
+can try running PlaidML with the environment variable `PLAIDML_USE_STRIPE=1`. 
+This will act as a precursor to the changes you’ll be seeing in `plaidml-v1`, 
+and we’re excited to hear your feedback on Stripe.
 
 Your support means a lot to us. Thank you for being understanding of our new
 development process during this new and exciting time for deep learning
