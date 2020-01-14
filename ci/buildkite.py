@@ -16,6 +16,12 @@ import util
 #
 # $ROOT/tmp/output/$SUITE/$WORKLOAD/$PLATFORM/{params}/[result.json, result.npy]
 
+OUTPUT_ROOT = {
+    'Darwin': '/usr/local/var/buildkite-agent/bazel',
+    'Linux': '/var/lib/buildkite-agent/bazel',
+    'Windows': 'C:\\buildkite-agent\\bazel',
+}
+
 
 def load_template(name):
     this_dir = os.path.dirname(__file__)
@@ -121,6 +127,16 @@ def cmd_pipeline(args, remainder):
         util.printf(yml)
 
 
+def output_base():
+    root = pathlib.Path(OUTPUT_ROOT.get(platform.system()))
+    agent = os.getenv('BUILDKITE_AGENT_NAME', 'agent')
+    pipeline = os.getenv('BUILDKITE_PIPELINE_SLUG', 'pipeline')
+    branch = os.getenv('BUILDKITE_PULL_REQUEST_BASE_BRANCH', '')
+    if branch == '':
+        branch = os.getenv('BUILDKITE_BRANCH', 'branch')
+    return root / agent / pipeline / branch
+
+
 def cmd_build(args, remainder):
     import yaml
     with open('ci/plan.yml') as file_:
@@ -133,10 +149,12 @@ def cmd_build(args, remainder):
 
     explain_log = 'explain.log'
     profile_json = 'profile.json.gz'
-    bazel_config = variant.get('bazel_config', args.variant)
+    bazel_config = variant.get('bazel_config')
+    startup_args = ['--output_base={}'.format(output_base())]
 
     common_args = []
-    common_args += ['--config={}'.format(bazel_config)]
+    if bazel_config:
+        common_args += ['--config={}'.format(bazel_config)]
     common_args += ['--define=version={}'.format(args.version)]
     common_args += ['--experimental_generate_json_trace_profile']
     common_args += ['--experimental_json_trace_compression']
@@ -152,7 +170,7 @@ def cmd_build(args, remainder):
         cenv = util.CondaEnv(pathlib.Path('.cenv'))
         cenv.create('environment-windows.yml')
         env.update(cenv.env())
-    util.check_call(['bazelisk', 'test', '...'] + common_args, env=env)
+    util.check_call(['bazelisk'] + startup_args + ['test', '...'] + common_args, env=env)
 
     util.printf('--- :buildkite: Uploading artifacts...')
     util.buildkite_upload(explain_log)
@@ -211,7 +229,8 @@ def cmd_report(args, remainder):
     workdir = pathlib.Path('tmp').resolve()
     make_all_wheels(workdir)
     download_test_artifacts('tmp/test/**/*')
-    cmd = ['bazelisk', 'run', '//ci:report']
+    startup_args = ['--output_base={}'.format(output_base())]
+    cmd = ['bazelisk'] + startup_args + ['run', '//ci:report']
     cmd += ['--']
     cmd += ['--pipeline', args.pipeline]
     cmd += ['--annotate']
