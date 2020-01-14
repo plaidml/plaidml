@@ -131,7 +131,8 @@ def output_base():
     root = pathlib.Path(OUTPUT_ROOT.get(platform.system()))
     agent = os.getenv('BUILDKITE_AGENT_NAME', 'agent')
     pipeline = os.getenv('BUILDKITE_PIPELINE_SLUG', 'pipeline')
-    branch = os.getenv('BUILDKITE_PULL_REQUEST_BASE_BRANCH', 'branch')
+    branch = os.getenv('BUILDKITE_PULL_REQUEST_BASE_BRANCH',
+                       os.getenv('BUILDKITE_BRANCH', 'branch'))
     return root / agent / pipeline / branch
 
 
