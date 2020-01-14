@@ -1,10 +1,21 @@
 pull_request_rules:
-  - name: automatic squash
+  - name: automatic squash (master)
     conditions:
       - "#approved-reviews-by>=1"
       - "#changes-requested-reviews-by=0"
       - status-success=buildkite/plaidml-plaidml/pr
       - base=master
+    actions:
+      merge:
+        method: squash
+        strict: smart
+
+  - name: automatic squash (plaidml-v1)
+    conditions:
+      - "#approved-reviews-by>=1"
+      - "#changes-requested-reviews-by=0"
+      - status-success=buildkite/plaidml-plaidml/pr
+      - base=plaidml-v1
     actions:
       merge:
         method: squash
