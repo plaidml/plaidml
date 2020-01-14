@@ -15,6 +15,51 @@ src="docs/assets/images/plaid-final.png" height="200"></a><br>
 [![License]](https://github.com/plaidml/plaidml/blob/master/LICENSE)
 [![Build status]](https://buildkite.com/plaidml/plaidml-plaidml)
 
+# To Our Users
+
+First off, we’d like to thank you for choosing PlaidML. Whether you’re a new
+user or a multi-year veteran, we greatly appreciate you for the time you’ve
+spent tinkering around with our source code, sending us feedback, and improving
+our codebase. PlaidML would truly not be the same without you.
+
+The feedback we have received from our users indicates an ever-increasing need
+for performance, programmability, and portability.  During the past few months,
+we have been restructuring PlaidML to address those needs. Below is a summary of
+the biggest changes: 
+* We’ve adopted [MLIR], an extensible compiler infrastructure that has gained
+  industry-wide adoption since its release in early 2019. MLIR makes it easier
+  to integrate new software and hardware into our compiler stack, as well as
+  making it easier to write optimizations for our compiler.
+* We’ve worked extensively on [Stripe], our low-level intermediate
+  representation within PlaidML. Stripe contains optimizations that greatly
+  improve the performance of our compiler. While our work on Stripe began before
+  we decided to use MLIR, we are in the process of fully integrating Stripe into
+  MLIR.
+* We created our C++/Python embedded domain-specific language ([EDSL])
+  to improve the programmability of PlaidML.
+
+Today, we’re announcing a new branch of PlaidML — `plaidml-v1`. This will act as
+our development branch going forward and will allow us to more rapidly prototype
+the changes we’re making without breaking our existing user base. As a
+precaution, please note that certain features, tests, and hardware targets may
+be broken in `plaidml-v1`. 
+
+You can continue to use code on the `master` branch or from our releases on
+PyPI. For your convenience, the contents of our `master` branch will be released
+as version 0.7.0. We are keeping the `master` branch of PlaidML stable and
+maintaining it until `plaidml-v1` is ready for production.
+
+If you’d like to try out some of PlaidML’s newer performance improvements, you
+can try running PlaidML with the environment variable `PLAIDML_USE_STRIPE` set
+to 1. This will act as a precursor to the changes you’ll be seeing in
+`plaidml-v1`, and we’re excited to hear your feedback on Stripe.
+
+Your support means a lot to us. Thank you for being understanding of our new
+development process during this new and exciting time for deep learning
+compilers.
+
+-----
+
 PlaidML is an advanced and portable tensor compiler for enabling deep learning
 on laptops, embedded devices, or other devices where the available computing
 hardware is not well supported or the available software stack contains
@@ -191,3 +236,6 @@ correctness as part of our continuous integration system.
 [install-ubuntu]: https://plaidml.github.io/plaidml/docs/install#ubuntu
 [install-macos]: https://plaidml.github.io/plaidml/docs/install#macos
 [install-windows]: https://plaidml.github.io/plaidml/docs/install#windows
+[EDSL]: docs/docs/edsl.md
+[MLIR]: https://mlir.llvm.org/
+[Stripe]: https://arxiv.org/abs/1903.06498
