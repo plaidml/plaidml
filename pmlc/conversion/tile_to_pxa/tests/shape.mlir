@@ -1,9 +1,5 @@
 // RUN: pmlc-opt -tile-legalize-to-pxa -canonicalize -cse %s | FileCheck %s
 
-!fp32 = type tensor<!eltwise.fp32>
-!t_10x20xfp32 = type tensor<10x20x!eltwise.fp32>
-!t_10x20xbool = type tensor<10x20x!eltwise.bool>
-
 func @shape(%arg0: tensor<10x20x!eltwise.fp32>) -> tensor<2x!eltwise.i32> {
   %0 = "tile.shape"(%arg0) {type = !eltwise.fp32} : (tensor<10x20x!eltwise.fp32>) -> tensor<2x!eltwise.i32>
   return %0 : tensor<2x!eltwise.i32>

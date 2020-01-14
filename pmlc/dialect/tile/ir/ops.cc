@@ -467,16 +467,54 @@ void ContractionOp::build(     //
   result.addTypes(resultType);
   result.addAttribute("agg", builder->getI64IntegerAttr(static_cast<int64_t>(agg)));
   result.addAttribute("combo", builder->getI64IntegerAttr(static_cast<int64_t>(combo)));
-  result.addAttribute("sink", AffineMapAttr::get(sink));
-  result.addAttribute("srcs", builder->getAffineMapArrayAttr(srcs));
+  result.addAttribute(getSinkAttrName(), AffineMapAttr::get(sink));
+  result.addAttribute(getSourcesAttrName(), builder->getAffineMapArrayAttr(srcs));
   if (!cons.isEmptyIntegerSet()) {
-    result.addAttribute("cons", IntegerSetAttr::get(cons));
+    result.addAttribute(getConstraintsAttrName(), IntegerSetAttr::get(cons));
   }
   if (no_reduce) {
     result.addAttribute("no_reduce", builder->getUnitAttr());
   }
   if (name.size()) {
     result.addAttribute("name", builder->getStringAttr(name));
+  }
+}
+
+void ContractionOp::setLowerBounds(ArrayRef<int64_t> bounds) {
+  auto indexType = IndexType::get(getContext());
+  SmallVector<Attribute, 8> attrs;
+  for (auto dim : bounds) {
+    attrs.push_back(IntegerAttr::get(indexType, dim));
+  }
+  setAttr(getLowerBoundsAttrName(), ArrayAttr::get(attrs, getContext()));
+}
+
+void ContractionOp::setUpperBounds(ArrayRef<int64_t> bounds) {
+  auto indexType = IndexType::get(getContext());
+  SmallVector<Attribute, 8> attrs;
+  for (auto dim : bounds) {
+    attrs.push_back(IntegerAttr::get(indexType, dim));
+  }
+  setAttr(getUpperBoundsAttrName(), ArrayAttr::get(attrs, getContext()));
+}
+
+void ContractionOp::setSink(AffineMap sink) {  //
+  setAttr(getSinkAttrName(), AffineMapAttr::get(sink));
+}
+
+void ContractionOp::setSources(ArrayRef<AffineMap> srcs) {
+  SmallVector<Attribute, 4> attrs;
+  for (auto src : srcs) {
+    attrs.push_back(AffineMapAttr::get(src));
+  }
+  setAttr(getSourcesAttrName(), ArrayAttr::get(attrs, getContext()));
+}
+
+void ContractionOp::setConstraints(IntegerSet cons) {
+  if (cons.isEmptyIntegerSet()) {
+    removeAttr(getConstraintsAttrName());
+  } else {
+    setAttr(getConstraintsAttrName(), IntegerSetAttr::get(cons));
   }
 }
 
