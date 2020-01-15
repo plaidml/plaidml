@@ -276,8 +276,7 @@ Value TileBuilder::MakePrimitiveOp(StringRef fn, ArrayRef<Value> args) {
   if (!genericBuilder) {
     throw std::runtime_error("Unknown intrinsic: " + fn.str());
   }
-  auto type = impl->builder.getType<ScalarType>(DataType::FLOAT32);  // TODO
-  auto op = genericBuilder->create(&impl->builder, impl->loc, type, args);
+  auto op = genericBuilder->create(&impl->builder, impl->loc, args);
   return op->getResult(0);
 }
 

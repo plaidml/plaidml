@@ -4,7 +4,7 @@ func @eltwise_add(
   %arg0: tensor<10x20x!eltwise.fp32>,
   %arg1: tensor<10x20x!eltwise.fp32>
 ) -> tensor<10x20x!eltwise.fp32> {
-  %0 = "eltwise.add"(%arg1, %arg0) {type = !eltwise.fp32} : (
+  %0 = "eltwise.add"(%arg1, %arg0) : (
     tensor<10x20x!eltwise.fp32>,
     tensor<10x20x!eltwise.fp32>
   ) -> tensor<10x20x!eltwise.fp32>
