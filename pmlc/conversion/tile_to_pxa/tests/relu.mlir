@@ -6,8 +6,8 @@
 
 func @relu(%arg0: !t_10x20xfp32) -> !t_10x20xfp32 {
   %0 = "eltwise.sconst"() {value = 0.0 : f32} : () -> !fp32
-  %1 = "eltwise.cmp_lt"(%arg0, %0) {type = !eltwise.fp32} : (!t_10x20xfp32, !fp32) -> !t_10x20xbool
-  %2 = "eltwise.select"(%1, %0, %arg0) {type = !eltwise.fp32} : (!t_10x20xbool, !fp32, !t_10x20xfp32) -> !t_10x20xfp32
+  %1 = "eltwise.cmp_lt"(%arg0, %0) : (!t_10x20xfp32, !fp32) -> !t_10x20xbool
+  %2 = "eltwise.select"(%1, %0, %arg0) : (!t_10x20xbool, !fp32, !t_10x20xfp32) -> !t_10x20xfp32
   return %2 : !t_10x20xfp32
 }
 
