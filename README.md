@@ -236,6 +236,6 @@ correctness as part of our continuous integration system.
 [install-ubuntu]: https://plaidml.github.io/plaidml/docs/install#ubuntu
 [install-macos]: https://plaidml.github.io/plaidml/docs/install#macos
 [install-windows]: https://plaidml.github.io/plaidml/docs/install#windows
-[EDSL]: docs/docs/edsl.md
+[EDSL]: https://plaidml.github.io/plaidml/docs/edsl
 [MLIR]: https://mlir.llvm.org/
 [Stripe]: https://arxiv.org/abs/1903.06498
