@@ -130,7 +130,7 @@ plaidml_executable* plaidml_compile(  //
     auto exec = std::make_unique<plaidml_executable>();
     std::vector<void*> bufptrs(args.size());
     for (unsigned i = 0; i < args.size(); i++) {
-      auto view = args[i].buffer->MapCurrent().get();
+      auto view = args[i].buffer->MapCurrent();
       bufptrs[i] = view->data();
     }
     exec->exec = std::make_unique<Executable>(program->program->entry, target, *program->program->module, bufptrs);

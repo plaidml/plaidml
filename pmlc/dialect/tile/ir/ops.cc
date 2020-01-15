@@ -481,21 +481,21 @@ void ContractionOp::build(     //
 }
 
 void ContractionOp::setLowerBounds(ArrayRef<int64_t> bounds) {
-  auto indexType = IndexType::get(getContext());
-  SmallVector<Attribute, 8> attrs;
+  SmallVector<AffineExpr, 6> exprs;
   for (auto dim : bounds) {
-    attrs.push_back(IntegerAttr::get(indexType, dim));
+    exprs.push_back(mlir::getAffineConstantExpr(dim, getContext()));
   }
-  setAttr(getLowerBoundsAttrName(), ArrayAttr::get(attrs, getContext()));
+  auto map = AffineMap::get(/*dimCount=*/bounds.size(), /*symbolCount=*/0, exprs);
+  setAttr(getLowerBoundsAttrName(), AffineMapAttr::get(map));
 }
 
 void ContractionOp::setUpperBounds(ArrayRef<int64_t> bounds) {
-  auto indexType = IndexType::get(getContext());
-  SmallVector<Attribute, 8> attrs;
+  SmallVector<AffineExpr, 6> exprs;
   for (auto dim : bounds) {
-    attrs.push_back(IntegerAttr::get(indexType, dim));
+    exprs.push_back(mlir::getAffineConstantExpr(dim, getContext()));
   }
-  setAttr(getUpperBoundsAttrName(), ArrayAttr::get(attrs, getContext()));
+  auto map = AffineMap::get(/*dimCount=*/bounds.size(), /*symbolCount=*/0, exprs);
+  setAttr(getUpperBoundsAttrName(), AffineMapAttr::get(map));
 }
 
 void ContractionOp::setSink(AffineMap sink) {  //

@@ -1,4 +1,4 @@
-// RUN: pmlc-opt -tile-legalize-to-pxa -canonicalize -cse -split-input-file %s | FileCheck %s
+// RUN: pmlc-opt -convert-tile-to-pxa -canonicalize -cse -split-input-file %s | FileCheck %s
 
 !fp32 = type tensor<!eltwise.fp32>
 !bool = type tensor<!eltwise.bool>

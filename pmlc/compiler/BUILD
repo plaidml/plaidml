@@ -10,6 +10,7 @@ plaidml_cc_library(
     hdrs = glob(["*.h"]),
     deps = [
         "//pmlc/conversion/tile_to_pxa",
+        "//pmlc/dialect/tile/transforms",
         "//pmlc/util",
         "@llvm-project//llvm:support",
         "@llvm-project//mlir:AffineToStandardTransforms",

@@ -18,6 +18,7 @@
 
 #include "pmlc/compiler/registry.h"
 #include "pmlc/conversion/tile_to_pxa/tile_to_pxa.h"
+#include "pmlc/dialect/tile/transforms/passes.h"
 #include "pmlc/util/logging.h"
 
 using namespace mlir;  // NOLINT[build/namespaces]
@@ -185,6 +186,7 @@ Executable::Executable(StringRef entry, StringRef target, ModuleOp programModule
   auto shouldPrintAfterPass = [](auto, auto) { return VLOG_IS_ON(3); };
   manager.enableIRPrinting(shouldPrintBeforePass, shouldPrintAfterPass, true, false, llvm::errs());
 
+  manager.addPass(dialect::tile::createComputeBoundsPass());
   manager.addNestedPass<FuncOp>(createCanonicalizerPass());
   manager.addNestedPass<FuncOp>(createCSEPass());
 

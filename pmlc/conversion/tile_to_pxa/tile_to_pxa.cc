@@ -17,7 +17,6 @@
 #include "pmlc/dialect/pxa/ir/dialect.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/dialect/tile/ir/ops.h"
-#include "pmlc/dialect/tile/transforms/contraction.h"
 #include "pmlc/util/logging.h"
 #include "pmlc/util/util.h"
 
@@ -30,17 +29,16 @@ using dialect::eltwise::ScalarType;
 using dialect::tile::AffineConstantOp;
 using dialect::tile::AggregationKind;
 using dialect::tile::CombinationKind;
-using dialect::tile::Contraction;
 using dialect::tile::ContractionOp;
 using dialect::tile::ContractionOpOperandAdaptor;
 using dialect::tile::IndexOp;
-using dialect::tile::Shape;
 using dialect::tile::ShapeOp;
 using dialect::tile::ShapeOpOperandAdaptor;
 using util::DataType;
 
 using llvm::Optional;
 using llvm::SmallVector;
+using mlir::AffineConstantExpr;
 using mlir::AffineLoadOp;
 using mlir::AffineMap;
 using mlir::AffineMapAttr;
@@ -103,11 +101,8 @@ ScalarType getScalarType(Type type) {
   return type.cast<ScalarType>();
 }
 
-ScalarType getScalarType(Value value) { return getScalarType(value->getType()); }
-
-Shape getShape(Type type) {
-  auto rankedTensorType = ew::getRankedTensorType(type);
-  return rankedTensorType.getShape();
+ScalarType getScalarType(Value value) {  //
+  return getScalarType(value->getType());
 }
 
 struct FuncOpConversion : public OpConversionPattern<FuncOp> {
@@ -540,6 +535,10 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
       if (cionOp.combo() != comboKind) {
         return matchFailure();
       }
+      if (!cionOp.lower_bounds().hasValue() || !cionOp.upper_bounds().hasValue()) {
+        cionOp.emitError("contraction bounds must be computed");
+        return matchFailure();
+      }
       Matcher pred;
       return pred(cionOp);
     }
@@ -573,21 +572,14 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
     // Make an allocation for the output
     auto resultMemRef = rewriter.create<AllocOp>(loc, resultType).getResult();
 
-    // Get the shape
-    SmallVector<Shape, 4> shapes{getShape(op.result()->getType())};
-    for (auto src : op.operands()) {
-      shapes.emplace_back(getShape(src->getType()));
-    }
-
-    // Do the actual maths
-    Contraction contraction{op};
-    bool no_reduce = op.no_reduce().hasValue();
-    const auto& [bounds, constraints] = contraction.ComputeBounds(shapes, no_reduce);
-
-    // Extract ranges
+    // Determine ranges
     SmallVector<int64_t, 8> ranges;
-    for (const auto& [key, value] : bounds) {
-      uint64_t range = value.max - value.min + 1;
+    auto lowerBounds = op.lower_bounds().getValue();
+    auto upperBounds = op.upper_bounds().getValue();
+    assert(lowerBounds.getNumDims() == upperBounds.getNumDims() && "mismatched dims for lower and upper bounds");
+    for (unsigned i = 0; i < lowerBounds.getNumDims(); i++) {
+      auto rangeExpr = upperBounds.getResult(i) - lowerBounds.getResult(i) + 1;
+      auto range = rangeExpr.cast<AffineConstantExpr>().getValue();
       ranges.emplace_back(range);
     }
 
@@ -630,7 +622,12 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
 
     // Create the store
     auto resultMap = op.sink();
-    rewriter.create<pxa::AffineReduceOp>(loc, op.agg(), combined, resultMemRef, resultMap, idxs);
+    if (resultMap.isEmpty()) {
+      SmallVector<Value, 0> emptyIdxs;
+      rewriter.create<pxa::AffineReduceOp>(loc, op.agg(), combined, resultMemRef, resultMap, emptyIdxs);
+    } else {
+      rewriter.create<pxa::AffineReduceOp>(loc, op.agg(), combined, resultMemRef, resultMap, idxs);
+    }
 
     // Terminate the inner body
     rewriter.create<AffineTerminatorOp>(loc);
@@ -888,7 +885,7 @@ std::unique_ptr<mlir::Pass> createLowerTileToPXAPass() {  //
 }
 
 static mlir::PassRegistration<LoweringPass> legalize_pass(  //
-    "tile-legalize-to-pxa",                                 //
-    "Legalize from Tile dialect to PXA dialect");
+    "convert-tile-to-pxa",                                  //
+    "Convert from Tile dialect to PXA dialect");
 
 }  // namespace pmlc::conversion::tile_to_pxa

@@ -1,4 +1,4 @@
-// RUN: pmlc-opt -tile-legalize-to-pxa -canonicalize -cse %s | FileCheck %s
+// RUN: pmlc-opt -tile-compute-bounds -convert-tile-to-pxa -canonicalize -cse %s | FileCheck %s
 
 #map0 = (i, j, k) -> (j, k)
 #map1 = (i, j, k) -> (j, i)

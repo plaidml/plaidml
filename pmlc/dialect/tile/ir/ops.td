@@ -37,10 +37,6 @@ def IndexAttr : Attr<
   let returnType = [{ APInt }];
 }
 
-def IndexArrayAttr : TypedArrayAttrBase<IndexAttr, "index array attribute"> {
-  let constBuilderCall = "$_builder.getIndexArrayAttr($0)";
-}
-
 class TileOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
     Op<TileDialect, mnemonic, traits> {}
 
@@ -244,8 +240,8 @@ def ContractionOp : TileOpWithPPV<"cion", [NoSideEffect]> {
     OptionalAttr<IntegerSetAttr>:$cons,
     OptionalAttr<AffineMapAttr>:$shape,
     OptionalAttr<UnitAttr>:$no_reduce,
-    OptionalAttr<IndexArrayAttr>:$lower_bounds,
-    OptionalAttr<IndexArrayAttr>:$upper_bounds,
+    OptionalAttr<AffineMapAttr>:$lower_bounds,
+    OptionalAttr<AffineMapAttr>:$upper_bounds,
     OptionalAttr<StrAttr>:$name
   );
   let results = (outs RankedTensorOf<[AnyScalar]>:$result);

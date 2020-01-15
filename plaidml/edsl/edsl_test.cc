@@ -297,6 +297,7 @@ Tensor Convolution2(const Tensor& I, const Tensor& K) {
   return R;
 }
 
+// TODO: implement constraints in -convert-tile-to-pxa
 TEST(CppEdsl, DISABLED_Convolution) {
   auto I = Placeholder(PLAIDML_DATA_FLOAT32, {1, 224, 224, 1});
   auto K = Placeholder(PLAIDML_DATA_FLOAT32, {3, 3, 1, 32});
@@ -601,6 +602,7 @@ Tensor Winograd(const Tensor& I, const Tensor& K, const Tensor& A, const Tensor&
   return O;
 }
 
+// TODO: implement constraints in -convert-tile-to-pxa
 TEST(CppEdsl, DISABLED_Winograd) {
   const std::int64_t N = 1, X = 224, Y = 224, CI = 3, S = 3, CO = 32, BI = 32, BO = BI - CI + 1;
   auto I = Placeholder(PLAIDML_DATA_FLOAT32, {N, X, Y, CI});
@@ -633,8 +635,8 @@ module {
   exec::Binder(program).compile()->run();
 }
 
+// TODO: fix issues related to reductions into scalars
 TEST(CppEdsl, DISABLED_GlobalMin) {
-  FAIL() << "Assertion failed: (map.getNumInputs() == mapOperands.size() && \"inconsistent index info\")";
   auto I = Placeholder(PLAIDML_DATA_FLOAT32, {10, 10, 10}, "I");
   TensorIndex i, j, k;
   auto O_Neg = TensorOutput();
@@ -750,7 +752,7 @@ module {
   // exec::Binder(program).compile()->run();
 }
 
-TEST(CppEdsl, DISABLED_Reciprocal) {
+TEST(CppEdsl, Reciprocal) {
   auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10}, "A");
   Program program("reciprocal", {1 / A});
   EXPECT_THAT(program, Eq(R"#(
@@ -763,7 +765,8 @@ module {
   }
 }
 )#"));
-  exec::Binder(program).compile()->run();
+  // FIXME: crashes on windows
+  // exec::Binder(program).compile()->run();
 }
 
 // TEST(CppEdsl, GradientDot) {
@@ -857,8 +860,8 @@ module {
 //   exec::Binder(program).compile()->run();
 // }
 
+// TODO: fix -convert-pxa-to-affine pass
 TEST(CppEdsl, DISABLED_DefractLong) {
-  FAIL() << "Assertion failed: (map.getNumInputs() == mapOperands.size() && \"inconsistent index info\")";
   std::vector<int64_t> input_shape{1, 3, 3, 1};
   std::vector<int64_t> output_shape{1, 5, 5, 1};
   auto I = Placeholder(PLAIDML_DATA_FLOAT32, input_shape, "I");
@@ -894,7 +897,7 @@ TEST(CppEdsl, DupOut) {
   exec::Binder(program).compile()->run();
 }
 
-TEST(CppEdsl, DISABLED_Select) {
+TEST(CppEdsl, Select) {
   auto I = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20});
   auto O = select(I == 0, Tensor{0}, Tensor{1});
   Program program("select", {O});

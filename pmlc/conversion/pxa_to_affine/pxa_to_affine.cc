@@ -183,7 +183,7 @@ std::unique_ptr<mlir::Pass> createLowerPXAToAffinePass() {  //
 }
 
 static mlir::PassRegistration<LoweringPass> legalize_pass(  //
-    "pxa-legalize-to-affine",                               //
-    "Legalize from PXA dialect to Affine dialect");
+    "convert-pxa-to-affine",                                //
+    "Convert from PXA dialect to Affine dialect");
 
 }  // namespace pmlc::conversion::pxa_to_affine
