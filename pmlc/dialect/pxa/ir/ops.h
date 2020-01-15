@@ -3,12 +3,13 @@
 #pragma once
 
 #include "mlir/Dialect/AffineOps/AffineOps.h"
-#include "mlir/Transforms/LoopLikeInterface.h"
+#include "mlir/IR/AffineExpr.h"
 
 #include "pmlc/util/enums.h"
 
 namespace pmlc::dialect::pxa {
 
+using mlir::AffineExpr;
 using mlir::AffineMap;
 using mlir::AffineMapAttr;
 using mlir::AffineTerminatorOp;

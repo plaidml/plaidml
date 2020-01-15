@@ -4,8 +4,6 @@
 
 #include "mlir/Dialect/AffineOps/AffineOps.h"
 #include "mlir/Dialect/StandardOps/Ops.h"
-#include "mlir/EDSC/Builders.h"
-#include "mlir/EDSC/Intrinsics.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/DebugStringHelper.h"
@@ -42,12 +40,6 @@ using mlir::ReturnOp;
 using mlir::Type;
 using mlir::Value;
 
-using mlir::edsc::AffineLoopNestBuilder;
-using mlir::edsc::IndexHandle;
-using mlir::edsc::ScopedContext;
-using mlir::edsc::ValueHandle;
-using mlir::edsc::intrinsics::constant_index;
-
 using util::AggregationKind;
 
 namespace {
@@ -69,38 +61,36 @@ struct AffineParallelForOpConversion : public LoweringBase<pxa::AffineParallelFo
 
   void rewrite(pxa::AffineParallelForOp op, ArrayRef<Value> operands,
                ConversionPatternRewriter& rewriter) const override {
-    // Create an Affine loop nest following the order of ranges.
-    ScopedContext scope(rewriter, op.getLoc());
-    llvm::SmallVector<ValueHandle, 8> affineIvs;
-    llvm::SmallVector<ValueHandle*, 8> affineIvPtrs;
-    llvm::SmallVector<ValueHandle, 8> affineLbs;
-    llvm::SmallVector<ValueHandle, 8> affineUbs;
-    llvm::SmallVector<int64_t, 8> affineSteps;
-    auto ranges = op.ranges().getValue();
-
-    for (size_t i = 0; i < ranges.size(); i++) {
-      affineIvs.emplace_back(IndexHandle());
-      affineIvPtrs.emplace_back(&affineIvs.back());
-      affineLbs.emplace_back(constant_index(0));
-      affineUbs.emplace_back(constant_index(ranges[i].cast<IntegerAttr>().getInt()));
-      affineSteps.emplace_back(1);
+    // Create an affine loop nest, capture induction variables
+    llvm::SmallVector<Value, 8> transformOperands;
+    for (unsigned int i = 0; i < op.ranges().getNumResults(); i++) {
+      auto lb = rewriter.getConstantAffineMap(0);
+      auto ub = op.ranges().getSubMap({i});
+      auto af = rewriter.create<mlir::AffineForOp>(op.getLoc(), mlir::ValueRange(), lb, op.rangeMapOperands(), ub);
+      rewriter.setInsertionPointToStart(&af.region().front());
+      transformOperands.push_back(af.getInductionVar());
     }
-
-    // Build the empty Affine loop nest with an innermost loop body containing a terminator.
-    AffineLoopNestBuilder(affineIvPtrs, affineLbs, affineUbs, affineSteps)();
-
+    // Add any additional map ops required
+    for (auto val : op.transformMapOperands()) {
+      transformOperands.push_back(val);
+    }
+    // Do the transform map and make the final IVs
+    llvm::SmallVector<Value, 8> ivs;
+    for (unsigned int i = 0; i < op.transform().getNumResults(); i++) {
+      auto subMap = op.transform().getSubMap({i});
+      auto applyOp = rewriter.create<mlir::AffineApplyOp>(op.getLoc(), subMap, transformOperands);
+      ivs.push_back(applyOp);
+    }
+    // Move ParallelForOp's operations (single block) to Affine innermost loop.
+    auto& innerLoopOps = rewriter.getInsertionBlock()->getOperations();
+    auto& stripeBodyOps = op.region().front().getOperations();
+    innerLoopOps.splice(std::prev(innerLoopOps.end()), stripeBodyOps, stripeBodyOps.begin(),
+                        std::prev(stripeBodyOps.end()));
     // Replace all uses of old values
     size_t idx = 0;
-    for (auto arg : op.inner().front().getArguments()) {
-      arg->replaceAllUsesWith(affineIvs[idx++].getValue());
+    for (auto arg : op.region().front().getArguments()) {
+      arg->replaceAllUsesWith(ivs[idx++]);
     }
-
-    // Move ParallelForOp's operations (single block) to Affine innermost loop.
-    auto& innermostLoopOps = mlir::getForInductionVarOwner(affineIvs[ranges.size() - 1]).getBody()->getOperations();
-    auto& stripeBodyOps = op.inner().front().getOperations();
-    innermostLoopOps.erase(innermostLoopOps.begin(), innermostLoopOps.end());
-    innermostLoopOps.splice(innermostLoopOps.begin(), stripeBodyOps, stripeBodyOps.begin(), stripeBodyOps.end());
-
     // We are done. Remove original op.
     rewriter.eraseOp(op);
   }

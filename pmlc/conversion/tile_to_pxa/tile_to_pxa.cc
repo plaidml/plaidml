@@ -43,7 +43,6 @@ using mlir::AffineLoadOp;
 using mlir::AffineMap;
 using mlir::AffineMapAttr;
 using mlir::AffineStoreOp;
-using mlir::AffineTerminatorOp;
 using mlir::AllocOp;
 using mlir::ArrayRef;
 using mlir::Attribute;
@@ -473,16 +472,14 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
     auto resultMemRef = rewriter.create<AllocOp>(loc, resultMemRefType).getResult();
 
     // Make a parallel for loop to fill the result
-    auto ranges = rewriter.getI64ArrayAttr(resultMemRefType.getShape());
-    auto dynamicRanges = ArrayRef<Value>();
-    auto forOp = rewriter.create<pxa::AffineParallelForOp>(loc, ranges, dynamicRanges);
-    auto body = rewriter.createBlock(&forOp.inner());
+    auto forOp = rewriter.create<pxa::AffineParallelForOp>(loc, resultMemRefType.getShape());
+    auto body = forOp.getBody();
+    rewriter.setInsertionPointToStart(body);
+    // TODO: Maybe fix ValueRange?
     SmallVector<Value, 8> idxs;
-    for (size_t i = 0; i < ranges.size(); i++) {
-      auto idx = body->addArgument(rewriter.getIndexType());
-      idxs.push_back(idx);
+    for (size_t i = 0; i < body->getNumArguments(); i++) {
+      idxs.push_back(body->getArgument(i));
     }
-
     // Create the loads
     SmallVector<Value, 4> scalars;
     for (size_t i = 0; i < operands.size(); i++) {
@@ -517,9 +514,6 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
 
     // Create the store
     rewriter.create<AffineStoreOp>(loc, result, resultMemRef, idxs);
-
-    // Terminate the inner body
-    rewriter.create<AffineTerminatorOp>(loc);
 
     // Replace output with the newly allocated buffer
     rewriter.replaceOp(op, resultMemRef);
@@ -586,13 +580,13 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
     // TODO: addInitializer
 
     // Make the outer loops
-    auto dynamicRanges = ArrayRef<Value>();
-    auto forOp = rewriter.create<pxa::AffineParallelForOp>(loc, rewriter.getI64ArrayAttr(ranges), dynamicRanges);
-    auto body = rewriter.createBlock(&forOp.inner());
+    auto forOp = rewriter.create<pxa::AffineParallelForOp>(loc, ranges);
+    auto body = forOp.getBody();
+    rewriter.setInsertionPointToStart(body);
+    // TODO: Maybe fix ValueRange?
     SmallVector<Value, 8> idxs;
-    for (size_t i = 0; i < ranges.size(); i++) {
-      auto idx = body->addArgument(rewriter.getIndexType());
-      idxs.push_back(idx);
+    for (size_t i = 0; i < body->getNumArguments(); i++) {
+      idxs.push_back(body->getArgument(i));
     }
 
     // Create the loads + casts
@@ -629,9 +623,6 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
       rewriter.create<pxa::AffineReduceOp>(loc, op.agg(), combined, resultMemRef, resultMap, idxs);
     }
 
-    // Terminate the inner body
-    rewriter.create<AffineTerminatorOp>(loc);
-
     // Replace the op
     rewriter.replaceOp(op, resultMemRef);
   }
@@ -655,14 +646,13 @@ struct IndexOpConversion : public OpConversionPattern<IndexOp> {
     auto resultMemRef = rewriter.create<AllocOp>(loc, resultType).getResult();
 
     // Make a parallel for loop to fill the result
-    auto ranges = rewriter.getI64ArrayAttr(resultType.getShape());
-    auto dynamicRanges = ArrayRef<Value>();
-    auto forOp = rewriter.create<pxa::AffineParallelForOp>(loc, ranges, dynamicRanges);
-    auto body = rewriter.createBlock(&forOp.inner());
+    auto forOp = rewriter.create<pxa::AffineParallelForOp>(loc, resultType.getShape());
+    auto body = forOp.getBody();
+    rewriter.setInsertionPointToStart(body);
+    // TODO: Maybe fix ValueRange?
     SmallVector<Value, 8> idxs;
-    for (size_t i = 0; i < ranges.size(); i++) {
-      auto idx = body->addArgument(rewriter.getIndexType());
-      idxs.push_back(idx);
+    for (size_t i = 0; i < body->getNumArguments(); i++) {
+      idxs.push_back(body->getArgument(i));
     }
 
     // Load the index value
@@ -674,9 +664,6 @@ struct IndexOpConversion : public OpConversionPattern<IndexOp> {
     // Create the store
     auto cast = rewriter.create<mlir::IndexCastOp>(loc, apply, rewriter.getIntegerType(32));
     rewriter.create<AffineStoreOp>(loc, cast, resultMemRef, idxs);
-
-    // Terminate the inner body
-    rewriter.create<AffineTerminatorOp>(loc);
 
     // Replace the op
     rewriter.replaceOp(op, resultMemRef);
@@ -746,14 +733,13 @@ struct CastOpConversion : public OpConversionPattern<ew::CastOp> {
     auto resultMemRef = rewriter.create<AllocOp>(loc, resultType).getResult();
 
     // Make a parallel for loop to fill the result
-    auto ranges = rewriter.getI64ArrayAttr(resultType.getShape());
-    auto dynamicRanges = ArrayRef<Value>();
-    auto forOp = rewriter.create<pxa::AffineParallelForOp>(loc, ranges, dynamicRanges);
-    auto body = rewriter.createBlock(&forOp.inner());
+    auto forOp = rewriter.create<pxa::AffineParallelForOp>(loc, resultType.getShape());
+    auto body = forOp.getBody();
+    rewriter.setInsertionPointToStart(body);
+    // TODO: Maybe fix ValueRange?
     SmallVector<Value, 8> idxs;
-    for (size_t i = 0; i < ranges.size(); i++) {
-      auto idx = body->addArgument(rewriter.getIndexType());
-      idxs.push_back(idx);
+    for (size_t i = 0; i < body->getNumArguments(); i++) {
+      idxs.push_back(body->getArgument(i));
     }
 
     // Create the load
@@ -766,9 +752,6 @@ struct CastOpConversion : public OpConversionPattern<ew::CastOp> {
 
     // Create the store
     rewriter.create<AffineStoreOp>(loc, result, resultMemRef, idxs);
-
-    // Terminate the inner body
-    rewriter.create<AffineTerminatorOp>(loc);
 
     // Replace the op
     rewriter.replaceOp(op, resultMemRef);
