@@ -28,11 +28,9 @@ func @double_dot(
 // CHECK:   %2 = affine.load %arg1[%arg4, %arg6] : memref<20x30xf32>
 // CHECK:   %3 = mulf %1, %2 : f32
 // CHECK:   "pxa.reduce"(%3, %0, %arg4, %arg5, %arg6) {agg = 1 : i64, map = #map2} : (f32, memref<10x30xf32>, index, index, index) -> ()
-// CHECK: ranges = [20, 10, 30]
 // CHECK: pxa.parallel_for
 // CHECK: ^bb0(%arg4: index, %arg5: index, %arg6: index):
 // CHECK:   %1 = affine.load %0[%arg5, %arg4] : memref<10x30xf32>
 // CHECK:   %2 = affine.load %arg2[%arg4, %arg6] : memref<30x40xf32>
 // CHECK:   %3 = mulf %1, %2 : f32
 // CHECK:   "pxa.reduce"(%3, %arg3, %arg4, %arg5, %arg6) {agg = 1 : i64, map = #map2} : (f32, memref<10x40xf32>, index, index, index) -> ()
-// CHECK: ranges = [30, 10, 40]

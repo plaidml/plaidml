@@ -23,4 +23,3 @@ func @dot(%arg0: tensor<1x784x!eltwise.fp32>, %arg1: tensor<784x512x!eltwise.fp3
 // CHECK:   %1 = affine.load %arg1[%arg3, %arg5] : memref<784x512xf32>
 // CHECK:   %2 = mulf %0, %1 : f32
 // CHECK:   "pxa.reduce"(%2, %arg2, %arg3, %arg4, %arg5) {agg = 1 : i64, map = #map2} : (f32, memref<1x512xf32>, index, index, index) -> ()
-// CHECK: ranges = [784, 1, 512]
