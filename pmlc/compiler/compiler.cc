@@ -5,9 +5,7 @@
 #include <unordered_map>
 #include <utility>
 
-#include "llvm/Support/FormatVariadic.h"
-#include "llvm/Support/TargetSelect.h"
-
+#include "base/util/env.h"
 #include "mlir/Dialect/StandardOps/Ops.h"
 #include "mlir/ExecutionEngine/ExecutionEngine.h"
 #include "mlir/ExecutionEngine/OptUtils.h"
@@ -15,10 +13,16 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Target/LLVMIR.h"
 #include "mlir/Transforms/Passes.h"
+#include "llvm/Support/FormatVariadic.h"
+#include "llvm/Support/TargetSelect.h"
 
 #include "base/util/logging.h"
 #include "pmlc/compiler/registry.h"
 #include "pmlc/conversion/tile_to_pxa/tile_to_pxa.h"
+
+#include "base/util/file.h"
+#include "mlir/Dialect/SPIRV/SPIRVOps.h"
+#include "mlir/Dialect/SPIRV/Serialization.h"
 
 using namespace mlir;  // NOLINT[build/namespaces]
 using pmlc::conversion::tile_to_pxa::createLowerTileToPXAPass;
@@ -203,6 +207,35 @@ Executable::Executable(StringRef entry, StringRef target, ModuleOp programModule
 
   if (failed(manager.run(*module))) {
     throw std::runtime_error("conversion to the LLVM IR dialect failed");
+  }
+
+  // clone the first spv module from the generated ModuleOp for serialization
+  mlir::spirv::ModuleOp spv_ModuleOp;
+  auto& blocks = module->getOperation()->getRegion(0).getBlocks();
+  for (auto it = blocks.begin(); it != blocks.end(); it++) {
+    auto& ops = it->getOperations();
+    for (auto it = ops.begin(); it != ops.end(); it++) {
+      mlir::Operation& m = *it;
+      auto op_name = m.getName().getStringRef().str();
+      if (!op_name.compare("spv.module")) {
+        spv_ModuleOp = cast<mlir::spirv::ModuleOp>(m.clone());
+        break;
+      }
+    }
+  }
+  // spv_ModuleOp.dump();
+
+  // spirv::serialize
+  mlir::SmallVector<uint32_t, 4> spv_binary;
+  mlir::spirv::serialize(spv_ModuleOp, spv_binary);
+  std::stringstream out;
+  for (int i = 0; i < static_cast<int>(spv_binary.size()); i++) {
+    out.write(reinterpret_cast<char*>(&spv_binary[i]), sizeof(spv_binary[i]));
+  }
+  auto spv_cache = vertexai::env::Get("PLAIDML_SPIRV_CACHE");
+  if (spv_cache.length() > 0) {
+    auto spv_out_path = spv_cache + "spv_module.spv";
+    vertexai::WriteFile(spv_out_path, out.str(), true);
   }
 
   assert(memRefTypes.size() == bufptrs.size() && "memRefTypes and bufptrs size mismatch");

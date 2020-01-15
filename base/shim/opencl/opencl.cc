@@ -199,6 +199,20 @@ cl_program CreateProgramWithSource(cl_context context, cl_uint count, const char
 #endif
 }
 
+cl_program CreateProgramWithIL(cl_context context, const void* il, const size_t length, cl_int* errcode_ret) {
+#ifdef OCL_STATIC_1_0
+
+  return clCreateProgramWithIL(context, il, length, errcode_ret);
+
+#else
+
+  static auto* impl = GetImpl<cl_program (*)(cl_context, const void*, const size_t, cl_int*)>("clCreateProgramWithIL");
+
+  return impl(context, il, length, errcode_ret);
+
+#endif
+}
+
 cl_mem CreateSubBuffer(cl_mem buffer, cl_mem_flags flags, cl_buffer_create_type buffer_create_type,
                        const void* buffer_create_info, cl_int* errcode_ret) {
 #ifdef OCL_STATIC_1_1

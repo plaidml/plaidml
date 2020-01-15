@@ -21,6 +21,8 @@ class Compiler final : public hal::Compiler {
                                                      const std::vector<lang::KernelInfo>& kernels,
                                                      const hal::proto::HardwareSettings& settings) final;
 
+  static int i;
+
  private:
   std::shared_ptr<DeviceState> device_state_;
 };

@@ -108,6 +108,7 @@ typedef cl_bitfield cl_svm_mem_flags;
 #endif  // !defined(CL_VERSION_2_0)
 
 #include <string>
+#include <utility>
 
 #include "base/util/error.h"
 
@@ -142,6 +143,8 @@ extern cl_kernel CreateKernel(cl_program program, const char* kernel_name, cl_in
 
 extern cl_program CreateProgramWithSource(cl_context context, cl_uint count, const char** strings,
                                           const size_t* lengths, cl_int* errcode_ret);
+
+extern cl_program CreateProgramWithIL(cl_context context, const void* il, const size_t length, cl_int* errcode_ret);
 
 extern cl_mem CreateSubBuffer(cl_mem buffer, cl_mem_flags flags, cl_buffer_create_type buffer_create_type,
                               const void* buffer_create_info, cl_int* errcode_ret);
