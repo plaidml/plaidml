@@ -31,8 +31,17 @@ PlaidML Setup ({0})
 
 Thanks for using PlaidML!
 
+The feedback we have received from our users indicates an ever-increasing need
+for performance, programmability, and portability. During the past few months,
+we have been restructuring PlaidML to address those needs.  To make all the
+changes we need to make while supporting our current user base, all development
+of PlaidML has moved to a branch — plaidml-v1. We will continue to maintain and
+support the master branch of PlaidML and the stable 0.7.0 release.
+
+Read more here: https://github.com/plaidml/plaidml 
+
 Some Notes:
-  * Bugs and other issues: https://github.com/plaidml/plaidml
+  * Bugs and other issues: https://github.com/plaidml/plaidml/issues
   * Questions: https://stackoverflow.com/questions/tagged/plaidml
   * Say hello: https://groups.google.com/forum/#!forum/plaidml-dev
   * PlaidML is licensed under the Apache License 2.0
