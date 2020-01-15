@@ -64,17 +64,6 @@ void CastOp::getCanonicalizationPatterns(OwningRewritePatternList& results, MLIR
   results.insert<CastCanonicalizer>(context);
 }
 
-Type CastOp::getResultType(ValueRange operands) {  //
-  llvm_unreachable("CastOp::getResultType not implemented");
-}
-
-Operation* CastOp::create(OpBuilder* builder, Location loc, Type type, ValueRange operands) {
-  OperationState state(loc, getOperationName());
-  state.addOperands(operands);
-  state.addTypes(type);
-  return builder->createOperation(state);
-}
-
 //
 // ---- EltwiseOp ----
 //
@@ -91,13 +80,10 @@ struct EltwiseCanonicalizer : public OpRewritePattern<OpType> {
     if (resultType == eltwiseOp.result()->getType()) {
       return Pattern::matchFailure();
     }
-    if (auto type = eltwiseOp.type().template dyn_cast<ScalarType>()) {
-      auto newOp = rewriter.create<OpType>(op->getLoc(), type, operands);
-      rewriter.replaceOp(op, {newOp});
-      util::UpdateFuncOpType(newOp.getOperation());
-      return Pattern::matchSuccess();
-    }
-    return Pattern::matchFailure();
+    auto newOp = rewriter.create<OpType>(op->getLoc(), operands);
+    rewriter.replaceOp(op, {newOp});
+    util::UpdateFuncOpType(newOp.getOperation());
+    return Pattern::matchSuccess();
   }
 };
 
