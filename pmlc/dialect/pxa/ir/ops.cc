@@ -27,7 +27,7 @@ void AffineParallelForOp::build(Builder* builder, OperationState& result, ArrayR
   auto bodyRegion = result.addRegion();
   auto body = new mlir::Block();
   // Add all the args
-  for (int i = 0; i < ranges.size(); i++) {
+  for (size_t i = 0; i < ranges.size(); i++) {
     body->addArgument(IndexType::get(builder->getContext()));
   }
   bodyRegion->push_back(body);
