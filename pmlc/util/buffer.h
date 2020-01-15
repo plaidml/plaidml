@@ -74,18 +74,6 @@ class Buffer {
   virtual BufferPtr Clone() { throw std::runtime_error("Not implemented"); }
 };
 
-class Allocator {
- public:
-  virtual ~Allocator() {}
-  virtual BufferPtr allocate(size_t size) = 0;
-};
-
-// A mechanism used to modify / optimize constant buffers during compilation
-struct ConstBufferManager {
-  std::shared_ptr<Allocator> allocator;
-  std::map<std::string, BufferPtr> buffers;
-};
-
 // A simple buffer backed by a std::vector
 class SimpleBuffer : public Buffer, public std::enable_shared_from_this<SimpleBuffer> {
   class SimpleView final : public View {
@@ -95,18 +83,19 @@ class SimpleBuffer : public Buffer, public std::enable_shared_from_this<SimpleBu
   };
 
  public:
-  explicit SimpleBuffer(uint64_t size) : data_(size, '\0') {}
+  explicit SimpleBuffer(uint64_t size) : data_(size) {}
 
   explicit SimpleBuffer(const std::vector<char>& data) : data_(data) {}
 
   uint64_t size() const final { return data_.size(); }
 
-  std::unique_ptr<View> MapCurrent() final {
-    std::unique_ptr<View> view(new SimpleView(data_.data(), data_.size()));
-    return view;
+  std::unique_ptr<View> MapCurrent() final {  //
+    return std::make_unique<SimpleView>(data_.data(), data_.size());
   }
 
-  std::unique_ptr<View> MapDiscard() final { return std::make_unique<SimpleView>(data_.data(), data_.size()); }
+  std::unique_ptr<View> MapDiscard() final {  //
+    return std::make_unique<SimpleView>(data_.data(), data_.size());
+  }
 
   BufferPtr Clone() final { return std::make_shared<SimpleBuffer>(data_); }
 

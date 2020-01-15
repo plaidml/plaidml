@@ -1,4 +1,4 @@
-// RUN: pmlc-opt -tile-legalize-to-pxa -canonicalize -cse %s | FileCheck %s
+// RUN: pmlc-opt -convert-tile-to-pxa -canonicalize -cse %s | FileCheck %s
 
 !fp32 = type tensor<!eltwise.fp32>
 !t_10x20xfp32 = type tensor<10x20x!eltwise.fp32>

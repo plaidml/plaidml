@@ -11,7 +11,6 @@ plaidml_cc_library(
     deps = [
         "//pmlc/dialect/pxa/ir",
         "//pmlc/dialect/tile/ir",
-        "//pmlc/dialect/tile/transforms",
     ],
     alwayslink = 1,
 )

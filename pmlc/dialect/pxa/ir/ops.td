@@ -52,10 +52,4 @@ def AffineParallelForOp : PXA_Op<"parallel_for", [ImplicitAffineTerminator]> {
   let regions = (region SizedRegion<1>:$inner);
 }
 
-def PXA_CastOp : PXA_Op<"cast"> {
-  let summary = "cast operation";
-  let arguments = (ins AnyStdScalar:$input, BoolAttr:$in_signed, BoolAttr:$out_signed);
-  let results = (outs AnyStdScalar:$result);
-}
-
 #endif // __PML_PXA_OPS__

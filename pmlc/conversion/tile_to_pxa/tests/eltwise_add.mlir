@@ -1,4 +1,4 @@
-// RUN: pmlc-opt -tile-legalize-to-pxa -canonicalize -cse %s | FileCheck %s
+// RUN: pmlc-opt -convert-tile-to-pxa -canonicalize -cse %s | FileCheck %s
 
 func @eltwise_add(
   %arg0: tensor<10x20x!eltwise.fp32>,

@@ -491,7 +491,7 @@ Value TileBuilder::MakeContractionOp(  //
   IVLOG(5, "TileBuilder::MakeContractionOp> " << util::stringifyAggregationKind(agg).str() << ":"
                                               << util::stringifyCombinationKind(combo).str()
                                               << ", name: " << name.str());
-  IVLOG(5, mlir::debugString(impl->module));
+  IVLOG(5, "\n" << mlir::debugString(impl->module));
   // TODO: handle names (and idx_names)
   // Compute the sink shape of the contraction
   SmallVector<Type, 3> types;
@@ -536,7 +536,7 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(StringRef name, const Prog
     name = "noname";
   }
   IVLOG(1, "TileBuilder::MakeProgram> " << name.str());
-  IVLOG(6, mlir::debugString(impl->module));
+  IVLOG(6, "\n" << mlir::debugString(impl->module));
   // Wrap duplicate outputs and outputs that directly refer to inputs
   llvm::SetVector<Value> outputs;
   for (auto output : mutations.outputs) {
@@ -641,7 +641,7 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(StringRef name, const Prog
   funcOp.setType(finalFuncType);
   // Attach the function to the module
   module.push_back(funcOp);
-  IVLOG(5, mlir::debugString(module));
+  IVLOG(5, "\n" << mlir::debugString(module));
   if (failed(mlir::verify(module))) {
     throw std::runtime_error("Module verification error");
   }
@@ -651,7 +651,7 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(StringRef name, const Prog
   pm.addPass(mlir::createCSEPass());
   auto result = pm.run(module);
   if (failed(result)) {
-    IVLOG(1, mlir::debugString(module));
+    IVLOG(1, "\n" << mlir::debugString(module));
     throw std::runtime_error("Optimization passes failure");
   }
   for (unsigned i = 0; i < returnOp.getNumOperands(); i++) {
@@ -669,7 +669,7 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(StringRef name, const Prog
     program->arguments.emplace_back(programArg);
     program->outputs.emplace_back(finalValue);
   }
-  IVLOG(2, "TileBuilder::MakeProgram>" << mlir::debugString(module));
+  IVLOG(2, "TileBuilder::MakeProgram>\n" << mlir::debugString(module));
   return program;
 }
 
@@ -698,7 +698,7 @@ std::vector<Value> TileBuilder::ComputeGradients(ArrayRef<Value> wrt, Value loss
 }
 
 void TileBuilder::Dump() {  //
-  IVLOG(5, mlir::debugString(impl->module));
+  IVLOG(5, "\n" << mlir::debugString(impl->module));
 }
 
 }  // namespace pmlc::dialect::tile

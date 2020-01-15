@@ -15,14 +15,16 @@ func @dot(%arg0: tensor<1x784x!eltwise.fp32>, %arg1: tensor<784x512x!eltwise.fp3
   return %2 : tensor<1x512x!eltwise.fp32>
 }
 
-// CHECK: #map0 = (d0, d1, d2) -> (d1, d2)
-// CHECK: #map1 = (d0, d1, d2) -> (d1, d0)
-// CHECK: #map2 = (d0, d1, d2) -> (d0, d2)
+// CHECK: #map0 = (d0, d1, d2) -> (0, 0, 0)
+// CHECK: #map1 = (d0, d1, d2) -> (d1, d2)
+// CHECK: #map2 = (d0, d1, d2) -> (d1, d0)
+// CHECK: #map3 = (d0, d1, d2) -> (d0, d2)
+// CHECK: #map4 = (d0, d1, d2) -> (783, 0, 511)
 // CHECK-LABEL: func @dot
 // CHECK: tile.cion
-// CHECK-SAME: lower_bounds = [0 : index, 0 : index, 0 : index]
-// CHECK-SAME: sink = #map0
-// CHECK-SAME: srcs = [#map1, #map2]
-// CHECK-SAME: upper_bounds = [783 : index, 0 : index, 511 : index]
+// CHECK-SAME: lower_bounds = #map0
+// CHECK-SAME: sink = #map1
+// CHECK-SAME: srcs = [#map2, #map3]
+// CHECK-SAME: upper_bounds = #map4
 
 // -----
