@@ -430,19 +430,19 @@ class Tensor(ForeignObject):
     def __ge__(self, rhs):
         return call('cmp_ge', self, rhs)
 
-    # Represents an eltwise bit_left
+    # Represents an eltwise bit_shl
     def __lshift__(self, rhs):
-        return call('bit_left', self, rhs)
+        return call('bit_shl', self, rhs)
 
     def __rlshift__(self, lhs):
-        return call('bit_left', lhs, self)
+        return call('bit_shl', lhs, self)
 
-    # Represents an eltwise bit_right
+    # Represents an eltwise bit_shr
     def __rshift__(self, rhs):
-        return call('bit_right', self, rhs)
+        return call('bit_shr', self, rhs)
 
     def __rrshift__(self, lhs):
-        return call('bit_right', lhs, self)
+        return call('bit_shr', lhs, self)
 
     # Represents an eltwise bit_and
     def __and__(self, rhs):
