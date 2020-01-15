@@ -66,12 +66,12 @@ struct AffineParallelForOpConversion : public LoweringBase<pxa::AffineParallelFo
     for (unsigned int i = 0; i < op.ranges().getNumResults(); i++) {
       auto lb = rewriter.getConstantAffineMap(0);
       auto ub = op.ranges().getSubMap({i});
-      auto af = rewriter.create<mlir::AffineForOp>(op.getLoc(), mlir::ValueRange(), lb, op.rangeMapOperands(), ub);
+      auto af = rewriter.create<mlir::AffineForOp>(op.getLoc(), mlir::ValueRange(), lb, op.getRangeOperands(), ub);
       rewriter.setInsertionPointToStart(&af.region().front());
       transformOperands.push_back(af.getInductionVar());
     }
     // Add any additional map ops required
-    for (auto val : op.transformMapOperands()) {
+    for (auto val : op.getTransformOperands()) {
       transformOperands.push_back(val);
     }
     // Do the transform map and make the final IVs

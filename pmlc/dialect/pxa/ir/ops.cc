@@ -1,7 +1,5 @@
 // Copyright 2019, Intel Corporation
 
-#include <iostream>
-
 #include "pmlc/dialect/pxa/ir/ops.h"
 
 namespace pmlc::dialect::pxa {

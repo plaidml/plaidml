@@ -51,8 +51,8 @@ def AffineParallelForOp : PXA_Op<"parallel_for", [ImplicitAffineTerminator]> {
   let arguments = (ins AffineMapAttr:$ranges, AffineMapAttr:$transform, Variadic<Index>:$mapOperands);
   let regions = (region SizedRegion<1>:$region);
   let extraClassDeclaration = [{
-    ValueRange rangeMapOperands() { return llvm::make_range(operand_begin(), operand_begin() + ranges().getNumInputs()); }
-    ValueRange transformMapOperands() { return llvm::make_range(operand_begin() + ranges().getNumInputs(), operand_end()); }
+    ValueRange getRangeOperands() { return llvm::make_range(operand_begin(), operand_begin() + ranges().getNumInputs()); }
+    ValueRange getTransformOperands() { return llvm::make_range(operand_begin() + ranges().getNumInputs(), operand_end()); }
     mlir::Block *getBody() { return &region().front(); }
     mlir::OpBuilder getBodyBuilder() {
       return mlir::OpBuilder(getBody(), std::prev(getBody()->end()));
