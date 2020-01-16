@@ -47,8 +47,8 @@ Tensor Softmax(const Tensor& X) {
 }
 
 TEST(CppEdsl, Cast) {
-  auto A = Placeholder(PLAIDML_DATA_UINT64, {3, 3});
-  auto B = cast(A, PLAIDML_DATA_UINT32);
+  auto A = Placeholder(DType::UINT64, {3, 3});
+  auto B = cast(A, DType::UINT32);
   Program program("cast", {B});
 
   std::vector<std::uint64_t> input{1,
@@ -84,8 +84,8 @@ TEST(CppEdsl, Cast) {
 }
 
 TEST(CppEdsl, BitOr) {
-  auto A = Placeholder(PLAIDML_DATA_UINT64, {3, 3});
-  auto B = Placeholder(PLAIDML_DATA_UINT64, {3, 3});
+  auto A = Placeholder(DType::UINT64, {3, 3});
+  auto B = Placeholder(DType::UINT64, {3, 3});
   auto C = A | B;
   Program program("bit_or", {C});
 
@@ -114,8 +114,8 @@ TEST(CppEdsl, BitOr) {
 }
 
 TEST(CppEdsl, BitLeft) {
-  auto A = Placeholder(PLAIDML_DATA_UINT64, {3, 3});
-  auto B = Placeholder(PLAIDML_DATA_UINT64, {3, 3});
+  auto A = Placeholder(DType::UINT64, {3, 3});
+  auto B = Placeholder(DType::UINT64, {3, 3});
   auto C = A << B;
   Program program("bit_left", {C});
 
@@ -144,8 +144,8 @@ TEST(CppEdsl, BitLeft) {
 }
 
 TEST(CppEdsl, BitRight) {
-  auto A = Placeholder(PLAIDML_DATA_UINT64, {3, 3});
-  auto B = Placeholder(PLAIDML_DATA_UINT64, {3, 3});
+  auto A = Placeholder(DType::UINT64, {3, 3});
+  auto B = Placeholder(DType::UINT64, {3, 3});
   auto C = A >> B;
   Program program("bit_right", {C});
 
@@ -174,8 +174,8 @@ TEST(CppEdsl, BitRight) {
 }
 
 TEST(CppEdsl, BitXor) {
-  auto A = Placeholder(PLAIDML_DATA_UINT64, {3, 3});
-  auto B = Placeholder(PLAIDML_DATA_UINT64, {3, 3});
+  auto A = Placeholder(DType::UINT64, {3, 3});
+  auto B = Placeholder(DType::UINT64, {3, 3});
   auto C = A ^ B;
   Program program("bit_xor", {C});
 
@@ -204,8 +204,8 @@ TEST(CppEdsl, BitXor) {
 }
 
 TEST(CppEdsl, Add) {
-  auto A = Placeholder(PLAIDML_DATA_UINT64, {3, 3});
-  auto B = Placeholder(PLAIDML_DATA_UINT64, {3, 3});
+  auto A = Placeholder(DType::UINT64, {3, 3});
+  auto B = Placeholder(DType::UINT64, {3, 3});
   auto C = A + B;
   Program program("add", {C});
 
@@ -256,8 +256,8 @@ TEST(CppEdsl, Add) {
 }
 
 TEST(CppEdsl, Dot) {
-  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {3, 3});
-  auto B = Placeholder(PLAIDML_DATA_FLOAT32, {3, 3});
+  auto A = Placeholder(DType::FLOAT32, {3, 3});
+  auto B = Placeholder(DType::FLOAT32, {3, 3});
   auto C = Dot(A, B);
   Program program("dot", {C});
   EXPECT_THAT(program, Eq(R"#(
@@ -266,12 +266,12 @@ TEST(CppEdsl, Dot) {
 #map2 = (d0, d1, d2) -> (d2, d1)
 
 
-!fp32 = type tensor<!eltwise.fp32>
+!f32 = type tensor<!eltwise.f32>
 module {
-  func @dot(%arg0: tensor<3x3x!eltwise.fp32>, %arg1: tensor<3x3x!eltwise.fp32>) -> tensor<3x3x!eltwise.fp32> {
-    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !fp32
-    %0 = tile.cion add, mul, %cst, %arg1, %arg0 {idxs = ["i", "j", "k"], sink = #map0, srcs = [#map1, #map2]} : !fp32, tensor<3x3x!eltwise.fp32>, tensor<3x3x!eltwise.fp32> -> tensor<3x3x!eltwise.fp32>
-    return %0 : tensor<3x3x!eltwise.fp32>
+  func @dot(%arg0: tensor<3x3x!eltwise.f32>, %arg1: tensor<3x3x!eltwise.f32>) -> tensor<3x3x!eltwise.f32> {
+    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
+    %0 = tile.cion add, mul, %cst, %arg1, %arg0 {idxs = ["i", "j", "k"], sink = #map0, srcs = [#map1, #map2]} : !f32, tensor<3x3x!eltwise.f32>, tensor<3x3x!eltwise.f32> -> tensor<3x3x!eltwise.f32>
+    return %0 : tensor<3x3x!eltwise.f32>
   }
 }
 )#"));
@@ -303,9 +303,9 @@ module {
 }
 
 TEST(CppEdsl, DoubleDot) {
-  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20});
-  auto B = Placeholder(PLAIDML_DATA_FLOAT32, {20, 30});
-  auto C = Placeholder(PLAIDML_DATA_FLOAT32, {30, 40});
+  auto A = Placeholder(DType::FLOAT32, {10, 20});
+  auto B = Placeholder(DType::FLOAT32, {20, 30});
+  auto C = Placeholder(DType::FLOAT32, {30, 40});
   Program program("double_dot", {Dot(Dot(A, B), C)});
   EXPECT_THAT(program, Eq(R"#(
 #map0 = (d0, d1, d2) -> (d0, d1)
@@ -313,13 +313,13 @@ TEST(CppEdsl, DoubleDot) {
 #map2 = (d0, d1, d2) -> (d2, d1)
 
 
-!fp32 = type tensor<!eltwise.fp32>
+!f32 = type tensor<!eltwise.f32>
 module {
-  func @double_dot(%arg0: tensor<30x40x!eltwise.fp32>, %arg1: tensor<20x30x!eltwise.fp32>, %arg2: tensor<10x20x!eltwise.fp32>) -> tensor<10x40x!eltwise.fp32> {
-    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !fp32
-    %0 = tile.cion add, mul, %cst, %arg2, %arg1 {idxs = ["i", "j", "k"], sink = #map0, srcs = [#map1, #map2]} : !fp32, tensor<10x20x!eltwise.fp32>, tensor<20x30x!eltwise.fp32> -> tensor<10x30x!eltwise.fp32>
-    %1 = tile.cion add, mul, %cst, %0, %arg0 {idxs = ["i", "j", "k"], sink = #map0, srcs = [#map1, #map2]} : !fp32, tensor<10x30x!eltwise.fp32>, tensor<30x40x!eltwise.fp32> -> tensor<10x40x!eltwise.fp32>
-    return %1 : tensor<10x40x!eltwise.fp32>
+  func @double_dot(%arg0: tensor<30x40x!eltwise.f32>, %arg1: tensor<20x30x!eltwise.f32>, %arg2: tensor<10x20x!eltwise.f32>) -> tensor<10x40x!eltwise.f32> {
+    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
+    %0 = tile.cion add, mul, %cst, %arg2, %arg1 {idxs = ["i", "j", "k"], sink = #map0, srcs = [#map1, #map2]} : !f32, tensor<10x20x!eltwise.f32>, tensor<20x30x!eltwise.f32> -> tensor<10x30x!eltwise.f32>
+    %1 = tile.cion add, mul, %cst, %0, %arg0 {idxs = ["i", "j", "k"], sink = #map0, srcs = [#map1, #map2]} : !f32, tensor<10x30x!eltwise.f32>, tensor<30x40x!eltwise.f32> -> tensor<10x40x!eltwise.f32>
+    return %1 : tensor<10x40x!eltwise.f32>
   }
 }
 )#"));
@@ -327,14 +327,14 @@ module {
 }  // namespace plaidml::edsl
 
 TEST(CppEdsl, EltwiseAdd) {
-  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20});
-  auto B = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20});
+  auto A = Placeholder(DType::FLOAT32, {10, 20});
+  auto B = Placeholder(DType::FLOAT32, {10, 20});
   Program program("eltwise_add", {A + B});
   EXPECT_THAT(program, Eq(R"#(
 module {
-  func @eltwise_add(%arg0: tensor<10x20x!eltwise.fp32>, %arg1: tensor<10x20x!eltwise.fp32>) -> tensor<10x20x!eltwise.fp32> {
-    %0 = "eltwise.add"(%arg1, %arg0) : (tensor<10x20x!eltwise.fp32>, tensor<10x20x!eltwise.fp32>) -> tensor<10x20x!eltwise.fp32>
-    return %0 : tensor<10x20x!eltwise.fp32>
+  func @eltwise_add(%arg0: tensor<10x20x!eltwise.f32>, %arg1: tensor<10x20x!eltwise.f32>) -> tensor<10x20x!eltwise.f32> {
+    %0 = "eltwise.add"(%arg1, %arg0) : (tensor<10x20x!eltwise.f32>, tensor<10x20x!eltwise.f32>) -> tensor<10x20x!eltwise.f32>
+    return %0 : tensor<10x20x!eltwise.f32>
   }
 }
 )#"));
@@ -342,16 +342,16 @@ module {
 }
 
 TEST(CppEdsl, Relu) {
-  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20});
+  auto A = Placeholder(DType::FLOAT32, {10, 20});
   Program program("relu", {Relu(A)});
   EXPECT_THAT(program, Eq(R"#(
-!fp32 = type tensor<!eltwise.fp32>
+!f32 = type tensor<!eltwise.f32>
 module {
-  func @relu(%arg0: tensor<10x20x!eltwise.fp32>) -> tensor<10x20x!eltwise.fp32> {
-    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !fp32
-    %0 = "eltwise.cmp_lt"(%arg0, %cst) : (tensor<10x20x!eltwise.fp32>, !fp32) -> tensor<10x20x!eltwise.bool>
-    %1 = "eltwise.select"(%0, %cst, %arg0) : (tensor<10x20x!eltwise.bool>, !fp32, tensor<10x20x!eltwise.fp32>) -> tensor<10x20x!eltwise.fp32>
-    return %1 : tensor<10x20x!eltwise.fp32>
+  func @relu(%arg0: tensor<10x20x!eltwise.f32>) -> tensor<10x20x!eltwise.f32> {
+    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
+    %0 = "eltwise.cmp_lt"(%arg0, %cst) : (tensor<10x20x!eltwise.f32>, !f32) -> tensor<10x20x!eltwise.i1>
+    %1 = "eltwise.select"(%0, %cst, %arg0) : (tensor<10x20x!eltwise.i1>, !f32, tensor<10x20x!eltwise.f32>) -> tensor<10x20x!eltwise.f32>
+    return %1 : tensor<10x20x!eltwise.f32>
   }
 }
 )#"));
@@ -360,17 +360,17 @@ module {
 
 TEST(CppEdsl, MnistMlp) {
   // model.add(Dense(512, activation='relu', input_shape=(784,)))
-  auto input = Placeholder(PLAIDML_DATA_FLOAT32, {1, 784});
-  auto kernel1 = Placeholder(PLAIDML_DATA_FLOAT32, {784, 512});
-  auto bias1 = Placeholder(PLAIDML_DATA_FLOAT32, {512});
+  auto input = Placeholder(DType::FLOAT32, {1, 784});
+  auto kernel1 = Placeholder(DType::FLOAT32, {784, 512});
+  auto bias1 = Placeholder(DType::FLOAT32, {512});
   auto dense1 = Relu(Dot(input, kernel1) + bias1);
   // model.add(Dense(512, activation='relu'))
-  auto kernel2 = Placeholder(PLAIDML_DATA_FLOAT32, {512, 512});
-  auto bias2 = Placeholder(PLAIDML_DATA_FLOAT32, {512});
+  auto kernel2 = Placeholder(DType::FLOAT32, {512, 512});
+  auto bias2 = Placeholder(DType::FLOAT32, {512});
   auto dense2 = Relu(Dot(dense1, kernel2) + bias2);
   // model.add(Dense(10, activation='softmax'))
-  auto kernel3 = Placeholder(PLAIDML_DATA_FLOAT32, {512, 10});
-  auto bias3 = Placeholder(PLAIDML_DATA_FLOAT32, {10});
+  auto kernel3 = Placeholder(DType::FLOAT32, {512, 10});
+  auto bias3 = Placeholder(DType::FLOAT32, {10});
   auto dense3 = Softmax(Dot(dense2, kernel3) + bias3);
   Program program("mnist_mlp", {dense3});
   EXPECT_THAT(program, Eq(R"#(
@@ -381,26 +381,26 @@ TEST(CppEdsl, MnistMlp) {
 #map4 = (d0, d1) -> (d0, d1)
 
 
-!fp32 = type tensor<!eltwise.fp32>
+!f32 = type tensor<!eltwise.f32>
 module {
-  func @mnist_mlp(%arg0: tensor<10x!eltwise.fp32>, %arg1: tensor<512x10x!eltwise.fp32>, %arg2: tensor<512x!eltwise.fp32>, %arg3: tensor<512x512x!eltwise.fp32>, %arg4: tensor<512x!eltwise.fp32>, %arg5: tensor<784x512x!eltwise.fp32>, %arg6: tensor<1x784x!eltwise.fp32>) -> tensor<1x10x!eltwise.fp32> {
-    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !fp32
-    %0 = tile.cion add, mul, %cst, %arg6, %arg5 {idxs = ["i", "j", "k"], sink = #map0, srcs = [#map1, #map2]} : !fp32, tensor<1x784x!eltwise.fp32>, tensor<784x512x!eltwise.fp32> -> tensor<1x512x!eltwise.fp32>
-    %1 = "eltwise.add"(%0, %arg4) : (tensor<1x512x!eltwise.fp32>, tensor<512x!eltwise.fp32>) -> tensor<1x512x!eltwise.fp32>
-    %2 = "eltwise.cmp_lt"(%1, %cst) : (tensor<1x512x!eltwise.fp32>, !fp32) -> tensor<1x512x!eltwise.bool>
-    %3 = "eltwise.select"(%2, %cst, %1) : (tensor<1x512x!eltwise.bool>, !fp32, tensor<1x512x!eltwise.fp32>) -> tensor<1x512x!eltwise.fp32>
-    %4 = tile.cion add, mul, %cst, %3, %arg3 {idxs = ["i", "j", "k"], sink = #map0, srcs = [#map1, #map2]} : !fp32, tensor<1x512x!eltwise.fp32>, tensor<512x512x!eltwise.fp32> -> tensor<1x512x!eltwise.fp32>
-    %5 = "eltwise.add"(%4, %arg2) : (tensor<1x512x!eltwise.fp32>, tensor<512x!eltwise.fp32>) -> tensor<1x512x!eltwise.fp32>
-    %6 = "eltwise.cmp_lt"(%5, %cst) : (tensor<1x512x!eltwise.fp32>, !fp32) -> tensor<1x512x!eltwise.bool>
-    %7 = "eltwise.select"(%6, %cst, %5) : (tensor<1x512x!eltwise.bool>, !fp32, tensor<1x512x!eltwise.fp32>) -> tensor<1x512x!eltwise.fp32>
-    %8 = tile.cion add, mul, %cst, %7, %arg1 {idxs = ["i", "j", "k"], sink = #map0, srcs = [#map1, #map2]} : !fp32, tensor<1x512x!eltwise.fp32>, tensor<512x10x!eltwise.fp32> -> tensor<1x10x!eltwise.fp32>
-    %9 = "eltwise.add"(%8, %arg0) : (tensor<1x10x!eltwise.fp32>, tensor<10x!eltwise.fp32>) -> tensor<1x10x!eltwise.fp32>
-    %10 = tile.cion max, none, %cst, %9 {sink = #map3, srcs = [#map4]} : !fp32, tensor<1x10x!eltwise.fp32> -> tensor<1x1x!eltwise.fp32>
-    %11 = "eltwise.sub"(%9, %10) : (tensor<1x10x!eltwise.fp32>, tensor<1x1x!eltwise.fp32>) -> tensor<1x10x!eltwise.fp32>
-    %12 = "eltwise.exp"(%11) : (tensor<1x10x!eltwise.fp32>) -> tensor<1x10x!eltwise.fp32>
-    %13 = tile.cion add, none, %cst, %12 {sink = #map3, srcs = [#map4]} : !fp32, tensor<1x10x!eltwise.fp32> -> tensor<1x1x!eltwise.fp32>
-    %14 = "eltwise.div"(%12, %13) : (tensor<1x10x!eltwise.fp32>, tensor<1x1x!eltwise.fp32>) -> tensor<1x10x!eltwise.fp32>
-    return %14 : tensor<1x10x!eltwise.fp32>
+  func @mnist_mlp(%arg0: tensor<10x!eltwise.f32>, %arg1: tensor<512x10x!eltwise.f32>, %arg2: tensor<512x!eltwise.f32>, %arg3: tensor<512x512x!eltwise.f32>, %arg4: tensor<512x!eltwise.f32>, %arg5: tensor<784x512x!eltwise.f32>, %arg6: tensor<1x784x!eltwise.f32>) -> tensor<1x10x!eltwise.f32> {
+    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
+    %0 = tile.cion add, mul, %cst, %arg6, %arg5 {idxs = ["i", "j", "k"], sink = #map0, srcs = [#map1, #map2]} : !f32, tensor<1x784x!eltwise.f32>, tensor<784x512x!eltwise.f32> -> tensor<1x512x!eltwise.f32>
+    %1 = "eltwise.add"(%0, %arg4) : (tensor<1x512x!eltwise.f32>, tensor<512x!eltwise.f32>) -> tensor<1x512x!eltwise.f32>
+    %2 = "eltwise.cmp_lt"(%1, %cst) : (tensor<1x512x!eltwise.f32>, !f32) -> tensor<1x512x!eltwise.i1>
+    %3 = "eltwise.select"(%2, %cst, %1) : (tensor<1x512x!eltwise.i1>, !f32, tensor<1x512x!eltwise.f32>) -> tensor<1x512x!eltwise.f32>
+    %4 = tile.cion add, mul, %cst, %3, %arg3 {idxs = ["i", "j", "k"], sink = #map0, srcs = [#map1, #map2]} : !f32, tensor<1x512x!eltwise.f32>, tensor<512x512x!eltwise.f32> -> tensor<1x512x!eltwise.f32>
+    %5 = "eltwise.add"(%4, %arg2) : (tensor<1x512x!eltwise.f32>, tensor<512x!eltwise.f32>) -> tensor<1x512x!eltwise.f32>
+    %6 = "eltwise.cmp_lt"(%5, %cst) : (tensor<1x512x!eltwise.f32>, !f32) -> tensor<1x512x!eltwise.i1>
+    %7 = "eltwise.select"(%6, %cst, %5) : (tensor<1x512x!eltwise.i1>, !f32, tensor<1x512x!eltwise.f32>) -> tensor<1x512x!eltwise.f32>
+    %8 = tile.cion add, mul, %cst, %7, %arg1 {idxs = ["i", "j", "k"], sink = #map0, srcs = [#map1, #map2]} : !f32, tensor<1x512x!eltwise.f32>, tensor<512x10x!eltwise.f32> -> tensor<1x10x!eltwise.f32>
+    %9 = "eltwise.add"(%8, %arg0) : (tensor<1x10x!eltwise.f32>, tensor<10x!eltwise.f32>) -> tensor<1x10x!eltwise.f32>
+    %10 = tile.cion max, none, %cst, %9 {sink = #map3, srcs = [#map4]} : !f32, tensor<1x10x!eltwise.f32> -> tensor<1x1x!eltwise.f32>
+    %11 = "eltwise.sub"(%9, %10) : (tensor<1x10x!eltwise.f32>, tensor<1x1x!eltwise.f32>) -> tensor<1x10x!eltwise.f32>
+    %12 = "eltwise.exp"(%11) : (tensor<1x10x!eltwise.f32>) -> tensor<1x10x!eltwise.f32>
+    %13 = tile.cion add, none, %cst, %12 {sink = #map3, srcs = [#map4]} : !f32, tensor<1x10x!eltwise.f32> -> tensor<1x1x!eltwise.f32>
+    %14 = "eltwise.div"(%12, %13) : (tensor<1x10x!eltwise.f32>, tensor<1x1x!eltwise.f32>) -> tensor<1x10x!eltwise.f32>
+    return %14 : tensor<1x10x!eltwise.f32>
   }
 }
 )#"));
@@ -418,8 +418,8 @@ Tensor Convolution2(const Tensor& I, const Tensor& K) {
 }
 
 TEST(CppEdsl, Convolution) {
-  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {1, 224, 224, 1});
-  auto K = Placeholder(PLAIDML_DATA_FLOAT32, {3, 3, 1, 32});
+  auto I = Placeholder(DType::FLOAT32, {1, 224, 224, 1});
+  auto K = Placeholder(DType::FLOAT32, {3, 3, 1, 32});
   Program program("convolution", {Convolution2(I, K)});
   // TODO: implement constraints in -convert-tile-to-pxa
   // exec::Binder(program).compile()->run();
@@ -450,27 +450,27 @@ Tensor Flatten(const Tensor& X) {
 
 TEST(CppEdsl, MnistCnn) {
   // model.add(Conv2D(32, kernel_size=(3, 3), activation='relu', input_shape=input_shape))
-  auto input = Placeholder(PLAIDML_DATA_FLOAT32, {1, 224, 224, 1});
-  auto kernel1 = Placeholder(PLAIDML_DATA_FLOAT32, {3, 3, 1, 32});
-  auto bias1 = Placeholder(PLAIDML_DATA_FLOAT32, {32});
+  auto input = Placeholder(DType::FLOAT32, {1, 224, 224, 1});
+  auto kernel1 = Placeholder(DType::FLOAT32, {3, 3, 1, 32});
+  auto bias1 = Placeholder(DType::FLOAT32, {32});
   auto conv1 = Relu(Convolution2(input, kernel1) + bias1);
   // model.add(Conv2D(64, (3, 3), activation='relu'))
-  auto kernel2 = Placeholder(PLAIDML_DATA_FLOAT32, {3, 3, 32, 64});
-  auto bias2 = Placeholder(PLAIDML_DATA_FLOAT32, {64});
+  auto kernel2 = Placeholder(DType::FLOAT32, {3, 3, 32, 64});
+  auto bias2 = Placeholder(DType::FLOAT32, {64});
   auto conv2 = Relu(Convolution2(conv1, kernel2) + bias2);
   // model.add(MaxPooling2D(pool_size=(2, 2)))
   auto pool1 = MaxPooling2(conv2);
   // model.add(Flatten())
   auto flat = Flatten(pool1);
-  EXPECT_THAT(flat.shape(), Eq(LogicalShape(PLAIDML_DATA_FLOAT32, {1, 12100})));
+  EXPECT_THAT(flat.shape(), Eq(LogicalShape(DType::FLOAT32, {1, 12100})));
   // model.add(Dense(128, activation='relu'))
-  auto kernel3 = Placeholder(PLAIDML_DATA_FLOAT32, {12100, 128});
-  auto bias3 = Placeholder(PLAIDML_DATA_FLOAT32, {128});
+  auto kernel3 = Placeholder(DType::FLOAT32, {12100, 128});
+  auto bias3 = Placeholder(DType::FLOAT32, {128});
   auto dense1 = Relu(Dot(flat, kernel3) + bias3);
   const std::int64_t kNumClasses = 100;
   // model.add(Dense(num_classes, activation='softmax'))
-  auto kernel4 = Placeholder(PLAIDML_DATA_FLOAT32, {128, kNumClasses});
-  auto bias4 = Placeholder(PLAIDML_DATA_FLOAT32, {kNumClasses});
+  auto kernel4 = Placeholder(DType::FLOAT32, {128, kNumClasses});
+  auto bias4 = Placeholder(DType::FLOAT32, {kNumClasses});
   auto dense2 = Softmax(Dot(dense1, kernel4) + bias4);
   Program program("mnist_cnn", {dense2});
   EXPECT_THAT(program, Eq(R"#(
@@ -487,34 +487,34 @@ TEST(CppEdsl, MnistCnn) {
 
 #set0 = (d0, d1, d2, d3, d4, d5) : (d4 >= 0, -d4 + 1 >= 0, d5 >= 0, -d5 + 1 >= 0)
 
-!fp32 = type tensor<!eltwise.fp32>
+!f32 = type tensor<!eltwise.f32>
 module {
-  func @mnist_cnn(%arg0: tensor<100x!eltwise.fp32>, %arg1: tensor<128x100x!eltwise.fp32>, %arg2: tensor<128x!eltwise.fp32>, %arg3: tensor<12100x128x!eltwise.fp32>, %arg4: tensor<64x!eltwise.fp32>, %arg5: tensor<3x3x32x64x!eltwise.fp32>, %arg6: tensor<32x!eltwise.fp32>, %arg7: tensor<3x3x1x32x!eltwise.fp32>, %arg8: tensor<1x224x224x1x!eltwise.fp32>) -> tensor<1x100x!eltwise.fp32> {
+  func @mnist_cnn(%arg0: tensor<100x!eltwise.f32>, %arg1: tensor<128x100x!eltwise.f32>, %arg2: tensor<128x!eltwise.f32>, %arg3: tensor<12100x128x!eltwise.f32>, %arg4: tensor<64x!eltwise.f32>, %arg5: tensor<3x3x32x64x!eltwise.f32>, %arg6: tensor<32x!eltwise.f32>, %arg7: tensor<3x3x1x32x!eltwise.f32>, %arg8: tensor<1x224x224x1x!eltwise.f32>) -> tensor<1x100x!eltwise.f32> {
     %c12100 = tile.affine_const 12100
-    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !fp32
+    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
     %c1 = tile.affine_const 1
-    %0 = tile.cion add, mul, %cst, %arg8, %arg7 {sink = #map0, srcs = [#map1, #map2]} : !fp32, tensor<1x224x224x1x!eltwise.fp32>, tensor<3x3x1x32x!eltwise.fp32> -> tensor<1x222x222x32x!eltwise.fp32>
-    %1 = "eltwise.add"(%0, %arg6) : (tensor<1x222x222x32x!eltwise.fp32>, tensor<32x!eltwise.fp32>) -> tensor<1x222x222x32x!eltwise.fp32>
-    %2 = "eltwise.cmp_lt"(%1, %cst) : (tensor<1x222x222x32x!eltwise.fp32>, !fp32) -> tensor<1x222x222x32x!eltwise.bool>
-    %3 = "eltwise.select"(%2, %cst, %1) : (tensor<1x222x222x32x!eltwise.bool>, !fp32, tensor<1x222x222x32x!eltwise.fp32>) -> tensor<1x222x222x32x!eltwise.fp32>
-    %4 = tile.cion add, mul, %cst, %3, %arg5 {sink = #map0, srcs = [#map1, #map2]} : !fp32, tensor<1x222x222x32x!eltwise.fp32>, tensor<3x3x32x64x!eltwise.fp32> -> tensor<1x220x220x64x!eltwise.fp32>
-    %5 = "eltwise.add"(%4, %arg4) : (tensor<1x220x220x64x!eltwise.fp32>, tensor<64x!eltwise.fp32>) -> tensor<1x220x220x64x!eltwise.fp32>
-    %6 = "eltwise.cmp_lt"(%5, %cst) : (tensor<1x220x220x64x!eltwise.fp32>, !fp32) -> tensor<1x220x220x64x!eltwise.bool>
-    %7 = "eltwise.select"(%6, %cst, %5) : (tensor<1x220x220x64x!eltwise.bool>, !fp32, tensor<1x220x220x64x!eltwise.fp32>) -> tensor<1x220x220x64x!eltwise.fp32>
-    %8 = tile.cion max, none, %cst, %7 {cons = #set0, sink = #map3, srcs = [#map4]} : !fp32, tensor<1x220x220x64x!eltwise.fp32> -> tensor<1x110x110x64x!eltwise.fp32>
-    %9 = "tile.reshape"(%8, %c1, %c12100) : (tensor<1x110x110x64x!eltwise.fp32>, index, index) -> tensor<1x12100x!eltwise.fp32>
-    %10 = tile.cion add, mul, %cst, %9, %arg3 {idxs = ["i", "j", "k"], sink = #map5, srcs = [#map6, #map7]} : !fp32, tensor<1x12100x!eltwise.fp32>, tensor<12100x128x!eltwise.fp32> -> tensor<1x128x!eltwise.fp32>
-    %11 = "eltwise.add"(%10, %arg2) : (tensor<1x128x!eltwise.fp32>, tensor<128x!eltwise.fp32>) -> tensor<1x128x!eltwise.fp32>
-    %12 = "eltwise.cmp_lt"(%11, %cst) : (tensor<1x128x!eltwise.fp32>, !fp32) -> tensor<1x128x!eltwise.bool>
-    %13 = "eltwise.select"(%12, %cst, %11) : (tensor<1x128x!eltwise.bool>, !fp32, tensor<1x128x!eltwise.fp32>) -> tensor<1x128x!eltwise.fp32>
-    %14 = tile.cion add, mul, %cst, %13, %arg1 {idxs = ["i", "j", "k"], sink = #map5, srcs = [#map6, #map7]} : !fp32, tensor<1x128x!eltwise.fp32>, tensor<128x100x!eltwise.fp32> -> tensor<1x100x!eltwise.fp32>
-    %15 = "eltwise.add"(%14, %arg0) : (tensor<1x100x!eltwise.fp32>, tensor<100x!eltwise.fp32>) -> tensor<1x100x!eltwise.fp32>
-    %16 = tile.cion max, none, %cst, %15 {sink = #map8, srcs = [#map9]} : !fp32, tensor<1x100x!eltwise.fp32> -> tensor<1x1x!eltwise.fp32>
-    %17 = "eltwise.sub"(%15, %16) : (tensor<1x100x!eltwise.fp32>, tensor<1x1x!eltwise.fp32>) -> tensor<1x100x!eltwise.fp32>
-    %18 = "eltwise.exp"(%17) : (tensor<1x100x!eltwise.fp32>) -> tensor<1x100x!eltwise.fp32>
-    %19 = tile.cion add, none, %cst, %18 {sink = #map8, srcs = [#map9]} : !fp32, tensor<1x100x!eltwise.fp32> -> tensor<1x1x!eltwise.fp32>
-    %20 = "eltwise.div"(%18, %19) : (tensor<1x100x!eltwise.fp32>, tensor<1x1x!eltwise.fp32>) -> tensor<1x100x!eltwise.fp32>
-    return %20 : tensor<1x100x!eltwise.fp32>
+    %0 = tile.cion add, mul, %cst, %arg8, %arg7 {sink = #map0, srcs = [#map1, #map2]} : !f32, tensor<1x224x224x1x!eltwise.f32>, tensor<3x3x1x32x!eltwise.f32> -> tensor<1x222x222x32x!eltwise.f32>
+    %1 = "eltwise.add"(%0, %arg6) : (tensor<1x222x222x32x!eltwise.f32>, tensor<32x!eltwise.f32>) -> tensor<1x222x222x32x!eltwise.f32>
+    %2 = "eltwise.cmp_lt"(%1, %cst) : (tensor<1x222x222x32x!eltwise.f32>, !f32) -> tensor<1x222x222x32x!eltwise.i1>
+    %3 = "eltwise.select"(%2, %cst, %1) : (tensor<1x222x222x32x!eltwise.i1>, !f32, tensor<1x222x222x32x!eltwise.f32>) -> tensor<1x222x222x32x!eltwise.f32>
+    %4 = tile.cion add, mul, %cst, %3, %arg5 {sink = #map0, srcs = [#map1, #map2]} : !f32, tensor<1x222x222x32x!eltwise.f32>, tensor<3x3x32x64x!eltwise.f32> -> tensor<1x220x220x64x!eltwise.f32>
+    %5 = "eltwise.add"(%4, %arg4) : (tensor<1x220x220x64x!eltwise.f32>, tensor<64x!eltwise.f32>) -> tensor<1x220x220x64x!eltwise.f32>
+    %6 = "eltwise.cmp_lt"(%5, %cst) : (tensor<1x220x220x64x!eltwise.f32>, !f32) -> tensor<1x220x220x64x!eltwise.i1>
+    %7 = "eltwise.select"(%6, %cst, %5) : (tensor<1x220x220x64x!eltwise.i1>, !f32, tensor<1x220x220x64x!eltwise.f32>) -> tensor<1x220x220x64x!eltwise.f32>
+    %8 = tile.cion max, none, %cst, %7 {cons = #set0, sink = #map3, srcs = [#map4]} : !f32, tensor<1x220x220x64x!eltwise.f32> -> tensor<1x110x110x64x!eltwise.f32>
+    %9 = "tile.reshape"(%8, %c1, %c12100) : (tensor<1x110x110x64x!eltwise.f32>, index, index) -> tensor<1x12100x!eltwise.f32>
+    %10 = tile.cion add, mul, %cst, %9, %arg3 {idxs = ["i", "j", "k"], sink = #map5, srcs = [#map6, #map7]} : !f32, tensor<1x12100x!eltwise.f32>, tensor<12100x128x!eltwise.f32> -> tensor<1x128x!eltwise.f32>
+    %11 = "eltwise.add"(%10, %arg2) : (tensor<1x128x!eltwise.f32>, tensor<128x!eltwise.f32>) -> tensor<1x128x!eltwise.f32>
+    %12 = "eltwise.cmp_lt"(%11, %cst) : (tensor<1x128x!eltwise.f32>, !f32) -> tensor<1x128x!eltwise.i1>
+    %13 = "eltwise.select"(%12, %cst, %11) : (tensor<1x128x!eltwise.i1>, !f32, tensor<1x128x!eltwise.f32>) -> tensor<1x128x!eltwise.f32>
+    %14 = tile.cion add, mul, %cst, %13, %arg1 {idxs = ["i", "j", "k"], sink = #map5, srcs = [#map6, #map7]} : !f32, tensor<1x128x!eltwise.f32>, tensor<128x100x!eltwise.f32> -> tensor<1x100x!eltwise.f32>
+    %15 = "eltwise.add"(%14, %arg0) : (tensor<1x100x!eltwise.f32>, tensor<100x!eltwise.f32>) -> tensor<1x100x!eltwise.f32>
+    %16 = tile.cion max, none, %cst, %15 {sink = #map8, srcs = [#map9]} : !f32, tensor<1x100x!eltwise.f32> -> tensor<1x1x!eltwise.f32>
+    %17 = "eltwise.sub"(%15, %16) : (tensor<1x100x!eltwise.f32>, tensor<1x1x!eltwise.f32>) -> tensor<1x100x!eltwise.f32>
+    %18 = "eltwise.exp"(%17) : (tensor<1x100x!eltwise.f32>) -> tensor<1x100x!eltwise.f32>
+    %19 = tile.cion add, none, %cst, %18 {sink = #map8, srcs = [#map9]} : !f32, tensor<1x100x!eltwise.f32> -> tensor<1x1x!eltwise.f32>
+    %20 = "eltwise.div"(%18, %19) : (tensor<1x100x!eltwise.f32>, tensor<1x1x!eltwise.f32>) -> tensor<1x100x!eltwise.f32>
+    return %20 : tensor<1x100x!eltwise.f32>
   }
 }
 )#"));
@@ -545,8 +545,8 @@ std::tuple<Tensor, Tensor> LarsMomentum(  //
 }
 
 TEST(CppEdsl, LarsMomentum4d) {
-  auto X_shape = LogicalShape(PLAIDML_DATA_FLOAT32, {4, 7, 3, 9});
-  auto LR_shape = LogicalShape(PLAIDML_DATA_FLOAT32, {});
+  auto X_shape = LogicalShape(DType::FLOAT32, {4, 7, 3, 9});
+  auto LR_shape = LogicalShape(DType::FLOAT32, {});
   auto X = Placeholder(X_shape);
   auto Grad = Placeholder(X_shape);
   auto Veloc = Placeholder(X_shape);
@@ -558,31 +558,31 @@ TEST(CppEdsl, LarsMomentum4d) {
 #map1 = (d0, d1, d2, d3) -> (d0, d1, d2, d3)
 
 
-!fp32 = type tensor<!eltwise.fp32>
+!f32 = type tensor<!eltwise.f32>
 module {
-  func @lars_momentum4d(%arg0: tensor<4x7x3x9x!eltwise.fp32>, %arg1: tensor<4x7x3x9x!eltwise.fp32>, %arg2: !fp32, %arg3: tensor<4x7x3x9x!eltwise.fp32>) -> (tensor<4x7x3x9x!eltwise.fp32>, tensor<4x7x3x9x!eltwise.fp32>) {
-    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !fp32
-    %cst_0 = "eltwise.sconst"() {value = 4.8828125E-4 : f64} : () -> !fp32
-    %cst_1 = "eltwise.sconst"() {value = 9.765625E-4 : f64} : () -> !fp32
-    %cst_2 = "eltwise.sconst"() {value = 1.250000e-01 : f64} : () -> !fp32
-    %0 = "eltwise.mul"(%arg0, %cst_0) : (tensor<4x7x3x9x!eltwise.fp32>, !fp32) -> tensor<4x7x3x9x!eltwise.fp32>
-    %1 = "eltwise.add"(%arg1, %0) : (tensor<4x7x3x9x!eltwise.fp32>, tensor<4x7x3x9x!eltwise.fp32>) -> tensor<4x7x3x9x!eltwise.fp32>
-    %2 = "eltwise.mul"(%arg0, %arg0) : (tensor<4x7x3x9x!eltwise.fp32>, tensor<4x7x3x9x!eltwise.fp32>) -> tensor<4x7x3x9x!eltwise.fp32>
-    %3 = tile.cion add, none, %cst, %2 {sink = #map0, srcs = [#map1]} : !fp32, tensor<4x7x3x9x!eltwise.fp32> -> !fp32
-    %4 = "eltwise.sqrt"(%3) : (!fp32) -> !fp32
-    %5 = "eltwise.mul"(%4, %cst_0) : (!fp32, !fp32) -> !fp32
-    %6 = "eltwise.mul"(%arg1, %arg1) : (tensor<4x7x3x9x!eltwise.fp32>, tensor<4x7x3x9x!eltwise.fp32>) -> tensor<4x7x3x9x!eltwise.fp32>
-    %7 = tile.cion add, none, %cst, %6 {sink = #map0, srcs = [#map1]} : !fp32, tensor<4x7x3x9x!eltwise.fp32> -> !fp32
-    %8 = "eltwise.sqrt"(%7) : (!fp32) -> !fp32
-    %9 = "eltwise.add"(%8, %5) : (!fp32, !fp32) -> !fp32
-    %10 = "eltwise.mul"(%arg2, %cst_1) : (!fp32, !fp32) -> !fp32
-    %11 = "eltwise.mul"(%10, %4) : (!fp32, !fp32) -> !fp32
-    %12 = "eltwise.div"(%11, %9) : (!fp32, !fp32) -> !fp32
-    %13 = "eltwise.mul"(%12, %1) : (!fp32, tensor<4x7x3x9x!eltwise.fp32>) -> tensor<4x7x3x9x!eltwise.fp32>
-    %14 = "eltwise.mul"(%arg3, %cst_2) : (tensor<4x7x3x9x!eltwise.fp32>, !fp32) -> tensor<4x7x3x9x!eltwise.fp32>
-    %15 = "eltwise.add"(%14, %13) : (tensor<4x7x3x9x!eltwise.fp32>, tensor<4x7x3x9x!eltwise.fp32>) -> tensor<4x7x3x9x!eltwise.fp32>
-    %16 = "eltwise.sub"(%arg0, %15) : (tensor<4x7x3x9x!eltwise.fp32>, tensor<4x7x3x9x!eltwise.fp32>) -> tensor<4x7x3x9x!eltwise.fp32>
-    return %16, %15 : tensor<4x7x3x9x!eltwise.fp32>, tensor<4x7x3x9x!eltwise.fp32>
+  func @lars_momentum4d(%arg0: tensor<4x7x3x9x!eltwise.f32>, %arg1: tensor<4x7x3x9x!eltwise.f32>, %arg2: !f32, %arg3: tensor<4x7x3x9x!eltwise.f32>) -> (tensor<4x7x3x9x!eltwise.f32>, tensor<4x7x3x9x!eltwise.f32>) {
+    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
+    %cst_0 = "eltwise.sconst"() {value = 4.8828125E-4 : f64} : () -> !f32
+    %cst_1 = "eltwise.sconst"() {value = 9.765625E-4 : f64} : () -> !f32
+    %cst_2 = "eltwise.sconst"() {value = 1.250000e-01 : f64} : () -> !f32
+    %0 = "eltwise.mul"(%arg0, %cst_0) : (tensor<4x7x3x9x!eltwise.f32>, !f32) -> tensor<4x7x3x9x!eltwise.f32>
+    %1 = "eltwise.add"(%arg1, %0) : (tensor<4x7x3x9x!eltwise.f32>, tensor<4x7x3x9x!eltwise.f32>) -> tensor<4x7x3x9x!eltwise.f32>
+    %2 = "eltwise.mul"(%arg0, %arg0) : (tensor<4x7x3x9x!eltwise.f32>, tensor<4x7x3x9x!eltwise.f32>) -> tensor<4x7x3x9x!eltwise.f32>
+    %3 = tile.cion add, none, %cst, %2 {sink = #map0, srcs = [#map1]} : !f32, tensor<4x7x3x9x!eltwise.f32> -> !f32
+    %4 = "eltwise.sqrt"(%3) : (!f32) -> !f32
+    %5 = "eltwise.mul"(%4, %cst_0) : (!f32, !f32) -> !f32
+    %6 = "eltwise.mul"(%arg1, %arg1) : (tensor<4x7x3x9x!eltwise.f32>, tensor<4x7x3x9x!eltwise.f32>) -> tensor<4x7x3x9x!eltwise.f32>
+    %7 = tile.cion add, none, %cst, %6 {sink = #map0, srcs = [#map1]} : !f32, tensor<4x7x3x9x!eltwise.f32> -> !f32
+    %8 = "eltwise.sqrt"(%7) : (!f32) -> !f32
+    %9 = "eltwise.add"(%8, %5) : (!f32, !f32) -> !f32
+    %10 = "eltwise.mul"(%arg2, %cst_1) : (!f32, !f32) -> !f32
+    %11 = "eltwise.mul"(%10, %4) : (!f32, !f32) -> !f32
+    %12 = "eltwise.div"(%11, %9) : (!f32, !f32) -> !f32
+    %13 = "eltwise.mul"(%12, %1) : (!f32, tensor<4x7x3x9x!eltwise.f32>) -> tensor<4x7x3x9x!eltwise.f32>
+    %14 = "eltwise.mul"(%arg3, %cst_2) : (tensor<4x7x3x9x!eltwise.f32>, !f32) -> tensor<4x7x3x9x!eltwise.f32>
+    %15 = "eltwise.add"(%14, %13) : (tensor<4x7x3x9x!eltwise.f32>, tensor<4x7x3x9x!eltwise.f32>) -> tensor<4x7x3x9x!eltwise.f32>
+    %16 = "eltwise.sub"(%arg0, %15) : (tensor<4x7x3x9x!eltwise.f32>, tensor<4x7x3x9x!eltwise.f32>) -> tensor<4x7x3x9x!eltwise.f32>
+    return %16, %15 : tensor<4x7x3x9x!eltwise.f32>, tensor<4x7x3x9x!eltwise.f32>
   }
 }
 )#"));
@@ -591,7 +591,7 @@ module {
 }
 
 TEST(CppEdsl, RepeatElements) {
-  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {10, 10, 10});
+  auto I = Placeholder(DType::FLOAT32, {10, 10, 10});
   TensorDim N0, N1, N2;
   TensorIndex n0, n1, n2, k;
   I.bind_dims(N0, N1, N2);
@@ -606,12 +606,12 @@ TEST(CppEdsl, RepeatElements) {
 
 #set0 = (d0, d1, d2, d3) : (d2 >= 0, -d2 + 2 >= 0)
 
-!fp32 = type tensor<!eltwise.fp32>
+!f32 = type tensor<!eltwise.f32>
 module {
-  func @repeat_elts(%arg0: tensor<10x10x10x!eltwise.fp32>) -> tensor<10x30x10x!eltwise.fp32> {
-    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !fp32
-    %0 = tile.cion assign, none, %cst, %arg0 {cons = #set0, no_reduce, sink = #map0, srcs = [#map1]} : !fp32, tensor<10x10x10x!eltwise.fp32> -> tensor<10x30x10x!eltwise.fp32>
-    return %0 : tensor<10x30x10x!eltwise.fp32>
+  func @repeat_elts(%arg0: tensor<10x10x10x!eltwise.f32>) -> tensor<10x30x10x!eltwise.f32> {
+    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
+    %0 = tile.cion assign, none, %cst, %arg0 {cons = #set0, no_reduce, sink = #map0, srcs = [#map1]} : !f32, tensor<10x10x10x!eltwise.f32> -> tensor<10x30x10x!eltwise.f32>
+    return %0 : tensor<10x30x10x!eltwise.f32>
   }
 }
 )#"));
@@ -619,8 +619,8 @@ module {
 }
 
 TEST(CppEdsl, UseDefault) {
-  auto P = Placeholder(PLAIDML_DATA_FLOAT32, {1, 7, 10, 10});
-  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {1, 10, 10});
+  auto P = Placeholder(DType::FLOAT32, {1, 7, 10, 10});
+  auto I = Placeholder(DType::FLOAT32, {1, 10, 10});
   TensorDim B, N1, N2;
   TensorIndex b, i1, i2;
   I.bind_dims(B, N1, N2);
@@ -634,9 +634,9 @@ TEST(CppEdsl, UseDefault) {
 
 
 module {
-  func @use_default(%arg0: tensor<1x10x10x!eltwise.fp32>, %arg1: tensor<1x7x10x10x!eltwise.fp32>) -> tensor<1x7x10x10x!eltwise.fp32> {
-    %0 = tile.cion assign, none, %arg1, %arg0 {sink = #map0, srcs = [#map1]} : tensor<1x7x10x10x!eltwise.fp32>, tensor<1x10x10x!eltwise.fp32> -> tensor<1x7x10x10x!eltwise.fp32>
-    return %0 : tensor<1x7x10x10x!eltwise.fp32>
+  func @use_default(%arg0: tensor<1x10x10x!eltwise.f32>, %arg1: tensor<1x7x10x10x!eltwise.f32>) -> tensor<1x7x10x10x!eltwise.f32> {
+    %0 = tile.cion assign, none, %arg1, %arg0 {sink = #map0, srcs = [#map1]} : tensor<1x7x10x10x!eltwise.f32>, tensor<1x10x10x!eltwise.f32> -> tensor<1x7x10x10x!eltwise.f32>
+    return %0 : tensor<1x7x10x10x!eltwise.f32>
   }
 }
 )#"));
@@ -655,14 +655,14 @@ Tensor ArgMax(const Tensor& I) {
   Tensor IX = index(T, 0);
   auto O = TensorOutput(X0, X2);
   O(x0, x2) >= cond(I(x0, x1, x2), Max(x0, x2), IX(x1));
-  return cast(O, PLAIDML_DATA_UINT32);
+  return cast(O, DType::UINT32);
 }
 
 TEST(CppEdsl, ArgMax) {
-  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {1, 10, 10});
+  auto I = Placeholder(DType::FLOAT32, {1, 10, 10});
   auto X = ArgMax(I);
   Program program("arg_max", {X});
-  EXPECT_THAT(X.shape(), Eq(LogicalShape(PLAIDML_DATA_UINT32, {1, 10})));
+  EXPECT_THAT(X.shape(), Eq(LogicalShape(DType::UINT32, {1, 10})));
   EXPECT_THAT(program, Eq(R"#(
 #map0 = (d0) -> (d0)
 #map1 = () -> ()
@@ -672,15 +672,15 @@ TEST(CppEdsl, ArgMax) {
 
 
 !i32 = type tensor<!eltwise.i32>
-!fp32 = type tensor<!eltwise.fp32>
+!f32 = type tensor<!eltwise.f32>
 module {
-  func @arg_max(%arg0: tensor<1x10x10x!eltwise.fp32>) -> tensor<1x10x!eltwise.u32> {
+  func @arg_max(%arg0: tensor<1x10x10x!eltwise.f32>) -> tensor<1x10x!eltwise.u32> {
     %c1 = "eltwise.sconst"() {value = 1 : i64} : () -> !i32
-    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !fp32
-    %0 = tile.cion assign, none, %cst, %c1 {sink = #map0, srcs = [#map1]} : !fp32, !i32 -> tensor<10x!eltwise.i32>
+    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
+    %0 = tile.cion assign, none, %cst, %c1 {sink = #map0, srcs = [#map1]} : !f32, !i32 -> tensor<10x!eltwise.i32>
     %1 = "tile.index"(%0) {dim = 0 : i64} : (tensor<10x!eltwise.i32>) -> tensor<10x!eltwise.i32>
-    %2 = tile.cion max, none, %cst, %arg0 {sink = #map2, srcs = [#map3]} : !fp32, tensor<1x10x10x!eltwise.fp32> -> tensor<1x10x!eltwise.fp32>
-    %3 = tile.cion max, cond, %cst, %arg0, %2, %1 {sink = #map2, srcs = [#map3, #map2, #map4]} : !fp32, tensor<1x10x10x!eltwise.fp32>, tensor<1x10x!eltwise.fp32>, tensor<10x!eltwise.i32> -> tensor<1x10x!eltwise.i32>
+    %2 = tile.cion max, none, %cst, %arg0 {sink = #map2, srcs = [#map3]} : !f32, tensor<1x10x10x!eltwise.f32> -> tensor<1x10x!eltwise.f32>
+    %3 = tile.cion max, cond, %cst, %arg0, %2, %1 {sink = #map2, srcs = [#map3, #map2, #map4]} : !f32, tensor<1x10x10x!eltwise.f32>, tensor<1x10x!eltwise.f32>, tensor<10x!eltwise.i32> -> tensor<1x10x!eltwise.i32>
     %4 = "eltwise.cast"(%3) : (tensor<1x10x!eltwise.i32>) -> tensor<1x10x!eltwise.u32>
     return %4 : tensor<1x10x!eltwise.u32>
   }
@@ -723,11 +723,11 @@ Tensor Winograd(const Tensor& I, const Tensor& K, const Tensor& A, const Tensor&
 
 TEST(CppEdsl, Winograd) {
   const std::int64_t N = 1, X = 224, Y = 224, CI = 3, S = 3, CO = 32, BI = 32, BO = BI - CI + 1;
-  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {N, X, Y, CI});
-  auto K = Placeholder(PLAIDML_DATA_FLOAT32, {S, S, CI, CO});
-  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {BI, BO});
-  auto B = Placeholder(PLAIDML_DATA_FLOAT32, {BI, BI});
-  auto G = Placeholder(PLAIDML_DATA_FLOAT32, {BI, S});
+  auto I = Placeholder(DType::FLOAT32, {N, X, Y, CI});
+  auto K = Placeholder(DType::FLOAT32, {S, S, CI, CO});
+  auto A = Placeholder(DType::FLOAT32, {BI, BO});
+  auto B = Placeholder(DType::FLOAT32, {BI, BI});
+  auto G = Placeholder(DType::FLOAT32, {BI, S});
   auto W = Winograd(I, K, A, B, G);
   Program program("winograd", {W});
   // TODO: implement constraints in -convert-tile-to-pxa
@@ -735,7 +735,7 @@ TEST(CppEdsl, Winograd) {
 }
 
 TEST(CppEdsl, UniqueNames) {
-  LogicalShape shape(PLAIDML_DATA_FLOAT32, {1});
+  LogicalShape shape(DType::FLOAT32, {1});
   auto A = Placeholder(shape, "A");
   auto B = Placeholder(shape, "B");
   auto C0 = Placeholder(shape, "C");
@@ -743,11 +743,11 @@ TEST(CppEdsl, UniqueNames) {
   Program program("unique_names", {A + B + C0 + C1});
   EXPECT_THAT(program, Eq(R"#(
 module {
-  func @unique_names(%arg0: tensor<1x!eltwise.fp32> {tile.name = "C"}, %arg1: tensor<1x!eltwise.fp32> {tile.name = "C_0"}, %arg2: tensor<1x!eltwise.fp32> {tile.name = "B"}, %arg3: tensor<1x!eltwise.fp32> {tile.name = "A"}) -> tensor<1x!eltwise.fp32> {
-    %0 = "eltwise.add"(%arg3, %arg2) : (tensor<1x!eltwise.fp32>, tensor<1x!eltwise.fp32>) -> tensor<1x!eltwise.fp32>
-    %1 = "eltwise.add"(%0, %arg1) : (tensor<1x!eltwise.fp32>, tensor<1x!eltwise.fp32>) -> tensor<1x!eltwise.fp32>
-    %2 = "eltwise.add"(%1, %arg0) : (tensor<1x!eltwise.fp32>, tensor<1x!eltwise.fp32>) -> tensor<1x!eltwise.fp32>
-    return %2 : tensor<1x!eltwise.fp32>
+  func @unique_names(%arg0: tensor<1x!eltwise.f32> {tile.name = "C"}, %arg1: tensor<1x!eltwise.f32> {tile.name = "C_0"}, %arg2: tensor<1x!eltwise.f32> {tile.name = "B"}, %arg3: tensor<1x!eltwise.f32> {tile.name = "A"}) -> tensor<1x!eltwise.f32> {
+    %0 = "eltwise.add"(%arg3, %arg2) : (tensor<1x!eltwise.f32>, tensor<1x!eltwise.f32>) -> tensor<1x!eltwise.f32>
+    %1 = "eltwise.add"(%0, %arg1) : (tensor<1x!eltwise.f32>, tensor<1x!eltwise.f32>) -> tensor<1x!eltwise.f32>
+    %2 = "eltwise.add"(%1, %arg0) : (tensor<1x!eltwise.f32>, tensor<1x!eltwise.f32>) -> tensor<1x!eltwise.f32>
+    return %2 : tensor<1x!eltwise.f32>
   }
 }
 )#"));
@@ -755,7 +755,7 @@ module {
 }
 
 TEST(CppEdsl, GlobalMin) {
-  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {10, 10, 10}, "I");
+  auto I = Placeholder(DType::FLOAT32, {10, 10, 10}, "I");
   TensorIndex i, j, k;
   auto O_Neg = TensorOutput();
   auto Neg = -I;
@@ -767,14 +767,14 @@ TEST(CppEdsl, GlobalMin) {
 #map1 = (d0, d1, d2) -> (d0, d1, d2)
 
 
-!fp32 = type tensor<!eltwise.fp32>
+!f32 = type tensor<!eltwise.f32>
 module {
-  func @global_min(%arg0: tensor<10x10x10x!eltwise.fp32> {tile.name = "I"}) -> !fp32 {
-    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !fp32
-    %0 = "eltwise.neg"(%arg0) : (tensor<10x10x10x!eltwise.fp32>) -> tensor<10x10x10x!eltwise.fp32>
-    %1 = tile.cion max, none, %cst, %0 {sink = #map0, srcs = [#map1]} : !fp32, tensor<10x10x10x!eltwise.fp32> -> !fp32
-    %2 = "eltwise.neg"(%1) : (!fp32) -> !fp32
-    return %2 : !fp32
+  func @global_min(%arg0: tensor<10x10x10x!eltwise.f32> {tile.name = "I"}) -> !f32 {
+    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
+    %0 = "eltwise.neg"(%arg0) : (tensor<10x10x10x!eltwise.f32>) -> tensor<10x10x10x!eltwise.f32>
+    %1 = tile.cion max, none, %cst, %0 {sink = #map0, srcs = [#map1]} : !f32, tensor<10x10x10x!eltwise.f32> -> !f32
+    %2 = "eltwise.neg"(%1) : (!f32) -> !f32
+    return %2 : !f32
   }
 }
 )#"));
@@ -782,7 +782,7 @@ module {
 }
 
 TEST(CppEdsl, CumSum) {
-  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {10}, "I");
+  auto I = Placeholder(DType::FLOAT32, {10}, "I");
   TensorDim N;
   TensorIndex i, k;
   I.bind_dims(N);
@@ -796,12 +796,12 @@ TEST(CppEdsl, CumSum) {
 
 #set0 = (d0, d1) : (d0 - d1 >= 0, -d0 + d1 + 9 >= 0)
 
-!fp32 = type tensor<!eltwise.fp32>
+!f32 = type tensor<!eltwise.f32>
 module {
-  func @cumsum(%arg0: tensor<10x!eltwise.fp32> {tile.name = "I"}) -> tensor<10x!eltwise.fp32> {
-    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !fp32
-    %0 = tile.cion add, none, %cst, %arg0 {cons = #set0, sink = #map0, srcs = [#map1]} : !fp32, tensor<10x!eltwise.fp32> -> tensor<10x!eltwise.fp32>
-    return %0 : tensor<10x!eltwise.fp32>
+  func @cumsum(%arg0: tensor<10x!eltwise.f32> {tile.name = "I"}) -> tensor<10x!eltwise.f32> {
+    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
+    %0 = tile.cion add, none, %cst, %arg0 {cons = #set0, sink = #map0, srcs = [#map1]} : !f32, tensor<10x!eltwise.f32> -> tensor<10x!eltwise.f32>
+    return %0 : tensor<10x!eltwise.f32>
   }
 }
 )#"));
@@ -847,8 +847,8 @@ Tensor ComplexConv2d(              //
 }
 
 TEST(CppEdsl, ComplexConv2d) {
-  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {1, 224, 224, 3, 3});
-  auto K = Placeholder(PLAIDML_DATA_FLOAT32, {3, 3, 3, 3, 32});
+  auto I = Placeholder(DType::FLOAT32, {1, 224, 224, 3, 3});
+  auto K = Placeholder(DType::FLOAT32, {3, 3, 3, 3, 32});
   auto O = ComplexConv2d(I, K, {2, 2}, {3, 3});
   Program program("complex_conv_2d", {O});
   EXPECT_THAT(program, Eq(R"#(
@@ -857,12 +857,12 @@ TEST(CppEdsl, ComplexConv2d) {
 #map2 = (d0, d1, d2, d3, d4, d5, d6, d7) -> (d5, d6, d3, d7, d4)
 
 
-!fp32 = type tensor<!eltwise.fp32>
+!f32 = type tensor<!eltwise.f32>
 module {
-  func @complex_conv_2d(%arg0: tensor<3x3x3x3x32x!eltwise.fp32>, %arg1: tensor<1x224x224x3x3x!eltwise.fp32>) -> tensor<1x112x112x3x32x!eltwise.fp32> {
-    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !fp32
-    %0 = tile.cion add, mul, %cst, %arg1, %arg0 {sink = #map0, srcs = [#map1, #map2]} : !fp32, tensor<1x224x224x3x3x!eltwise.fp32>, tensor<3x3x3x3x32x!eltwise.fp32> -> tensor<1x112x112x3x32x!eltwise.fp32>
-    return %0 : tensor<1x112x112x3x32x!eltwise.fp32>
+  func @complex_conv_2d(%arg0: tensor<3x3x3x3x32x!eltwise.f32>, %arg1: tensor<1x224x224x3x3x!eltwise.f32>) -> tensor<1x112x112x3x32x!eltwise.f32> {
+    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
+    %0 = tile.cion add, mul, %cst, %arg1, %arg0 {sink = #map0, srcs = [#map1, #map2]} : !f32, tensor<1x224x224x3x3x!eltwise.f32>, tensor<3x3x3x3x32x!eltwise.f32> -> tensor<1x112x112x3x32x!eltwise.f32>
+    return %0 : tensor<1x112x112x3x32x!eltwise.f32>
   }
 }
 )#"));
@@ -871,15 +871,15 @@ module {
 }
 
 TEST(CppEdsl, Reciprocal) {
-  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10}, "A");
+  auto A = Placeholder(DType::FLOAT32, {10}, "A");
   Program program("reciprocal", {1 / A});
   EXPECT_THAT(program, Eq(R"#(
 !i32 = type tensor<!eltwise.i32>
 module {
-  func @reciprocal(%arg0: tensor<10x!eltwise.fp32> {tile.name = "A"}) -> tensor<10x!eltwise.fp32> {
+  func @reciprocal(%arg0: tensor<10x!eltwise.f32> {tile.name = "A"}) -> tensor<10x!eltwise.f32> {
     %c1 = "eltwise.sconst"() {value = 1 : i64} : () -> !i32
-    %0 = "eltwise.div"(%c1, %arg0) : (!i32, tensor<10x!eltwise.fp32>) -> tensor<10x!eltwise.fp32>
-    return %0 : tensor<10x!eltwise.fp32>
+    %0 = "eltwise.div"(%c1, %arg0) : (!i32, tensor<10x!eltwise.f32>) -> tensor<10x!eltwise.f32>
+    return %0 : tensor<10x!eltwise.f32>
   }
 }
 )#"));
@@ -888,8 +888,8 @@ module {
 }
 
 // TEST(CppEdsl, GradientDot) {
-//   auto A = Placeholder(PLAIDML_DATA_FLOAT32, {100, 100}, "A");
-//   auto B = Placeholder(PLAIDML_DATA_FLOAT32, {100, 100}, "B");
+//   auto A = Placeholder(DType::FLOAT32, {100, 100}, "A");
+//   auto B = Placeholder(DType::FLOAT32, {100, 100}, "B");
 //   auto O = Dot(A, B);
 //   auto grads = Gradient({A, B}, O);
 //   Program program("gradient_dot", {grads});
@@ -920,8 +920,8 @@ module {
 // }
 
 // TEST(CppEdsl, GradientMultiDot) {
-//   auto A = Placeholder(PLAIDML_DATA_FLOAT32, {100, 100}, "A");
-//   auto B = Placeholder(PLAIDML_DATA_FLOAT32, {100, 100}, "B");
+//   auto A = Placeholder(DType::FLOAT32, {100, 100}, "A");
+//   auto B = Placeholder(DType::FLOAT32, {100, 100}, "B");
 //   auto C = Dot(A, B);
 //   auto D = Dot(A, C);
 //   auto O = Max2Da0(D);
@@ -951,8 +951,8 @@ module {
 // }
 
 // TEST(CppEdsl, GradientDotSqrt) {
-//   auto A = Placeholder(PLAIDML_DATA_FLOAT32, {100, 100}, "A");
-//   auto B = Placeholder(PLAIDML_DATA_FLOAT32, {100, 100}, "B");
+//   auto A = Placeholder(DType::FLOAT32, {100, 100}, "A");
+//   auto B = Placeholder(DType::FLOAT32, {100, 100}, "B");
 //   auto C = Dot(A, B);
 //   auto O = sqrt(C);
 //   auto grads = Gradient({A, B}, O);
@@ -981,8 +981,8 @@ module {
 TEST(CppEdsl, DefractLong) {
   std::vector<int64_t> input_shape{1, 3, 3, 1};
   std::vector<int64_t> output_shape{1, 5, 5, 1};
-  auto I = Placeholder(PLAIDML_DATA_FLOAT32, input_shape, "I");
-  auto K = Placeholder(PLAIDML_DATA_FLOAT32, input_shape, "K");
+  auto I = Placeholder(DType::FLOAT32, input_shape, "I");
+  auto K = Placeholder(DType::FLOAT32, input_shape, "K");
   auto O = TensorOutput(output_shape);
   TensorIndex n, x0, x1, k0, k1, co, ci;
   O(n, x0, x1, co) += I(n, (x0 + k0 - 1) / 2, (x1 + k1 - 1) / 2, ci) * K(2 - k0, 2 - k1, co, ci);
@@ -993,12 +993,12 @@ TEST(CppEdsl, DefractLong) {
 #map2 = (d0, d1, d2, d3, d4, d5, d6) -> (-d4 + 2, -d5 + 2, d3, d6)
 
 
-!fp32 = type tensor<!eltwise.fp32>
+!f32 = type tensor<!eltwise.f32>
 module {
-  func @defract_long(%arg0: tensor<1x3x3x1x!eltwise.fp32> {tile.name = "K"}, %arg1: tensor<1x3x3x1x!eltwise.fp32> {tile.name = "I"}) -> tensor<1x5x5x1x!eltwise.fp32> {
-    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !fp32
-    %0 = tile.cion add, mul, %cst, %arg1, %arg0 {sink = #map0, srcs = [#map1, #map2]} : !fp32, tensor<1x3x3x1x!eltwise.fp32>, tensor<1x3x3x1x!eltwise.fp32> -> tensor<1x5x5x1x!eltwise.fp32>
-    return %0 : tensor<1x5x5x1x!eltwise.fp32>
+  func @defract_long(%arg0: tensor<1x3x3x1x!eltwise.f32> {tile.name = "K"}, %arg1: tensor<1x3x3x1x!eltwise.f32> {tile.name = "I"}) -> tensor<1x5x5x1x!eltwise.f32> {
+    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
+    %0 = tile.cion add, mul, %cst, %arg1, %arg0 {sink = #map0, srcs = [#map1, #map2]} : !f32, tensor<1x3x3x1x!eltwise.f32>, tensor<1x3x3x1x!eltwise.f32> -> tensor<1x5x5x1x!eltwise.f32>
+    return %0 : tensor<1x5x5x1x!eltwise.f32>
   }
 }
 )#"));
@@ -1006,26 +1006,26 @@ module {
 }
 
 TEST(CppEdsl, DupOut) {
-  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20});
-  auto B = Placeholder(PLAIDML_DATA_FLOAT32, {20, 30});
-  auto C = Placeholder(PLAIDML_DATA_FLOAT32, {30, 40});
+  auto A = Placeholder(DType::FLOAT32, {10, 20});
+  auto B = Placeholder(DType::FLOAT32, {20, 30});
+  auto C = Placeholder(DType::FLOAT32, {30, 40});
   auto R = Dot(Dot(A, B), C);
   Program program("dup_out", {R, R, R});
   exec::Binder(program).compile()->run();
 }
 
 TEST(CppEdsl, Select) {
-  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20});
+  auto I = Placeholder(DType::FLOAT32, {10, 20});
   auto O = select(I == 0, Tensor{0}, Tensor{1});
   Program program("select", {O});
   EXPECT_THAT(program, Eq(R"#(
 !i32 = type tensor<!eltwise.i32>
 module {
-  func @select(%arg0: tensor<10x20x!eltwise.fp32>) -> tensor<10x20x!eltwise.i32> {
+  func @select(%arg0: tensor<10x20x!eltwise.f32>) -> tensor<10x20x!eltwise.i32> {
     %c1 = "eltwise.sconst"() {value = 1 : i64} : () -> !i32
     %c0 = "eltwise.sconst"() {value = 0 : i64} : () -> !i32
-    %0 = "eltwise.cmp_eq"(%arg0, %c0) : (tensor<10x20x!eltwise.fp32>, !i32) -> tensor<10x20x!eltwise.bool>
-    %1 = "eltwise.select"(%0, %c0, %c1) : (tensor<10x20x!eltwise.bool>, !i32, !i32) -> tensor<10x20x!eltwise.i32>
+    %0 = "eltwise.cmp_eq"(%arg0, %c0) : (tensor<10x20x!eltwise.f32>, !i32) -> tensor<10x20x!eltwise.i1>
+    %1 = "eltwise.select"(%0, %c0, %c1) : (tensor<10x20x!eltwise.i1>, !i32, !i32) -> tensor<10x20x!eltwise.i32>
     return %1 : tensor<10x20x!eltwise.i32>
   }
 }
@@ -1034,13 +1034,13 @@ module {
 }
 
 TEST(CppEdsl, Shape) {
-  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20});
+  auto I = Placeholder(DType::FLOAT32, {10, 20});
   auto O = shape(I);
   Program program("shape", {O});
   EXPECT_THAT(program, Eq(R"#(
 module {
-  func @shape(%arg0: tensor<10x20x!eltwise.fp32>) -> tensor<2x!eltwise.i32> {
-    %0 = "tile.shape"(%arg0) : (tensor<10x20x!eltwise.fp32>) -> tensor<2x!eltwise.i32>
+  func @shape(%arg0: tensor<10x20x!eltwise.f32>) -> tensor<2x!eltwise.i32> {
+    %0 = "tile.shape"(%arg0) : (tensor<10x20x!eltwise.f32>) -> tensor<2x!eltwise.i32>
     return %0 : tensor<2x!eltwise.i32>
   }
 }
@@ -1056,19 +1056,19 @@ module {
 }
 
 TEST(CppEdsl, Prng) {
-  auto S = Placeholder(PLAIDML_DATA_UINT32, {3, 2048});
+  auto S = Placeholder(DType::UINT32, {3, 2048});
   auto O = prng(S, {2, 3, 4, 5});
   Program program("prng", {O});
   EXPECT_THAT(program, Eq(R"#(
 !i32 = type tensor<!eltwise.i32>
 module {
-  func @prng(%arg0: tensor<3x2048x!eltwise.u32>) -> (tensor<2x3x4x5x!eltwise.fp32>, tensor<3x2048x!eltwise.u32>) {
+  func @prng(%arg0: tensor<3x2048x!eltwise.u32>) -> (tensor<2x3x4x5x!eltwise.f32>, tensor<3x2048x!eltwise.u32>) {
     %c5 = "eltwise.sconst"() {value = 5 : i64} : () -> !i32
     %c4 = "eltwise.sconst"() {value = 4 : i64} : () -> !i32
     %c3 = "eltwise.sconst"() {value = 3 : i64} : () -> !i32
     %c2 = "eltwise.sconst"() {value = 2 : i64} : () -> !i32
-    %result, %new_state = "tile.prng"(%arg0, %c2, %c3, %c4, %c5) : (tensor<3x2048x!eltwise.u32>, !i32, !i32, !i32, !i32) -> (tensor<2x3x4x5x!eltwise.fp32>, tensor<3x2048x!eltwise.u32>)
-    return %result, %new_state : tensor<2x3x4x5x!eltwise.fp32>, tensor<3x2048x!eltwise.u32>
+    %result, %new_state = "tile.prng"(%arg0, %c2, %c3, %c4, %c5) : (tensor<3x2048x!eltwise.u32>, !i32, !i32, !i32, !i32) -> (tensor<2x3x4x5x!eltwise.f32>, tensor<3x2048x!eltwise.u32>)
+    return %result, %new_state : tensor<2x3x4x5x!eltwise.f32>, tensor<3x2048x!eltwise.u32>
   }
 }
 )#"));

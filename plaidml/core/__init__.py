@@ -33,21 +33,19 @@ def __shutdown():
 class DType(enum.IntEnum):
     """Describes the type of a tensor element."""
     INVALID = 0
-    BOOLEAN = 2
-    INT8 = 0x10
-    INT16 = 0x11
-    INT32 = 0x12
-    INT64 = 0x13
-    INT128 = 0x14
-    UINT8 = 0x20
-    UINT16 = 0x21
-    UINT32 = 0x22
-    UINT64 = 0x23
-    FLOAT16 = 0x31
-    FLOAT32 = 0x32
-    FLOAT64 = 0x33
-    BFLOAT16 = 0x38
-    PRNG = 0x40
+    BOOLEAN = 1
+    INT8 = 2
+    UINT8 = 3
+    INT16 = 4
+    UINT16 = 5
+    INT32 = 6
+    UINT32 = 7
+    INT64 = 8
+    UINT64 = 9
+    BFLOAT16 = 10
+    FLOAT16 = 11
+    FLOAT32 = 12
+    FLOAT64 = 13
 
     def into_numpy(self):
         try:

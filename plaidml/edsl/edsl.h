@@ -381,9 +381,9 @@ class LogicalShape {
   ///
   /// LogicalShape constructor
   ///
-  LogicalShape(plaidml_datatype dtype, const std::vector<int64_t>& dims)
-      : ptr_(details::make_ptr(
-            ffi::call<plaidml_logical_shape*>(plaidml_logical_shape_alloc, dtype, dims.size(), dims.data()))) {}
+  LogicalShape(DType dtype, const std::vector<int64_t>& dims)
+      : ptr_(details::make_ptr(ffi::call<plaidml_logical_shape*>(
+            plaidml_logical_shape_alloc, static_cast<plaidml_datatype>(dtype), dims.size(), dims.data()))) {}
 
   ///
   /// Returns a LogicalShape as a string
@@ -395,8 +395,9 @@ class LogicalShape {
   ///
   /// Returns the datatype of the LogicalShape
   ///
-  plaidml_datatype dtype() const {  //
-    return ffi::call<plaidml_datatype>(plaidml_logical_shape_get_dtype, ptr_.get());
+  DType dtype() const {
+    auto ret = ffi::call<plaidml_datatype>(plaidml_logical_shape_get_dtype, ptr_.get());
+    return static_cast<DType>(ret);
   }
 
   ///
@@ -780,7 +781,7 @@ inline Tensor Placeholder(      //
 }
 
 inline Tensor Placeholder(             //
-    plaidml_datatype dtype,            //
+    DType dtype,                       //
     const std::vector<int64_t>& dims,  //
     const std::string& name = "") {
   LogicalShape shape(dtype, dims);
@@ -844,13 +845,13 @@ Tensor Call(const std::string& fn, Ts... args) {
 inline Tensor abs(const Tensor& x) { return Call("abs", x); }
 
 ///
-/// Casts the elements of `x` to the datatype specified by `dtype`.
+/// Casts the element type of a tensor `x` to the type specified by `dtype`.
 /// \param x Tensor
 /// \param dtype DType
 /// \return Tensor
 ///
-inline Tensor cast(const Tensor& x, plaidml_datatype dtype) {
-  auto ptr = ffi::call<plaidml_expr*>(plaidml_expr_cast, x.as_ptr(), dtype);
+inline Tensor cast(const Tensor& x, DType dtype) {
+  auto ptr = ffi::call<plaidml_expr*>(plaidml_expr_cast, x.as_ptr(), static_cast<plaidml_datatype>(dtype));
   return Tensor{ptr};
 }
 
