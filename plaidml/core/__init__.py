@@ -11,6 +11,9 @@ from plaidml.ffi import Error, ForeignObject, ffi, ffi_call, lib
 
 
 def __init():
+    """
+    Initializes PlaidML's Core API.
+    """
     ffi_call(lib.plaidml_init)
     lib_version = ffi.string(ffi_call(lib.plaidml_version)).decode()
     if lib_version != PLAIDML_VERSION:
@@ -118,6 +121,7 @@ DTYPE_INFOS = {
 
 
 class TensorShape(ForeignObject):
+    """Docstring for class TensorShape"""
     __ffi_del__ = lib.plaidml_shape_free
     __ffi_repr__ = lib.plaidml_shape_repr
 
@@ -165,6 +169,7 @@ class TensorShape(ForeignObject):
 
 
 class _View(ForeignObject):
+    """Docstring for class _View"""
     __ffi_del__ = lib.plaidml_view_free
 
     def __init__(self, ffi_obj, shape):
@@ -194,6 +199,7 @@ class _View(ForeignObject):
 
 
 class Buffer(ForeignObject):
+    """Docstring for class Buffer"""
     __ffi_del__ = lib.plaidml_buffer_free
 
     def __init__(self, shape, device=None, ptr=None):

@@ -64,9 +64,18 @@ inline std::shared_ptr<plaidml_view> make_plaidml_view(plaidml_view* ptr) {
 
 }  // namespace details
 
+///
+/// Initializes PlaidML's Core API.
+///
 inline void init() {  //
   ffi::call_void(plaidml_init);
 }
+
+
+///
+/// \defgroup core_objects Objects
+///
+
 
 enum class DType {
   INVALID = PLAIDML_DATA_INVALID,
@@ -85,6 +94,11 @@ enum class DType {
   FLOAT64 = PLAIDML_DATA_FLOAT64,
 };
 
+///
+/// \ingroup core_objects
+/// \class TensorShape
+/// This is a TensorShape.
+///
 class TensorShape {
  public:
   TensorShape()
@@ -126,6 +140,11 @@ class TensorShape {
   std::shared_ptr<plaidml_shape> ptr_;
 };
 
+///
+/// \ingroup core_objects
+/// \class View
+/// This is a View.
+///
 class View {
   friend class Buffer;
 
@@ -149,6 +168,11 @@ class View {
   std::shared_ptr<plaidml_view> ptr_;
 };
 
+///
+/// \ingroup core_objects
+/// \class Buffer
+/// This is a Buffer.
+///
 class Buffer {
  public:
   Buffer() = default;
@@ -188,6 +212,11 @@ class Buffer {
   TensorShape shape_;
 };
 
+///
+/// \ingroup core_objects
+/// \struct Settings
+/// These are the Settings.
+///
 struct Settings {
   static std::string get(const std::string& key) {
     return ffi::str(ffi::call<plaidml_string*>(plaidml_settings_get, key.c_str()));

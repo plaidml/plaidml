@@ -14,6 +14,9 @@
 namespace plaidml {
 namespace exec {
 
+///
+/// Initializes PlaidML's Execution API.
+///
 inline void init() {
   plaidml::init();
   ffi::call_void(plaidml_exec_init);
@@ -33,6 +36,15 @@ inline std::shared_ptr<T> make_ptr(T* ptr) {
 
 }  // namespace details
 
+///
+/// \defgroup exec_objects Objects
+///
+
+///
+/// \ingroup exec_objects
+/// \struct Binding
+/// This is a Binding.
+///
 struct Binding {
   edsl::Tensor tensor;
   Buffer buffer;
@@ -56,6 +68,11 @@ inline std::vector<std::string> list_targets() {
   return ret;
 }
 
+///
+/// \ingroup exec_objects
+/// \class Executable
+/// This is an Executable.
+///
 class Executable {
  public:
   Executable(const edsl::Program& program,        //
@@ -108,6 +125,11 @@ class Executable {
   std::shared_ptr<plaidml_executable> ptr_;
 };
 
+///
+/// \ingroup exec_objects
+/// \struct Binder
+/// This is a Binder.
+///
 class Binder {
  private:
   using BindingMap = std::map<edsl::TensorRef, Buffer>;
