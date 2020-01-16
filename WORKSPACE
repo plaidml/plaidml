@@ -36,3 +36,49 @@ register_toolchains(
 load("@bazel_latex//:repositories.bzl", "latex_repositories")
 
 latex_repositories()
+
+new_local_repository(
+    name = "vulkan_sdk_include",
+    build_file_content = """
+package(default_visibility = ["//visibility:public"])
+cc_library(
+    name = "inc",
+    hdrs = glob(["**/*.h"])
+)
+""",
+    path = "/home/yangleiz/Downloads/1.1.130.0/x86_64/include",
+)
+
+new_local_repository(
+    name = "vulkan_sdk_lib",
+    build_file_content = """
+package(default_visibility = ["//visibility:public"])
+cc_library(
+    name = "lib",
+    srcs = glob(["**/*.so"])
+)
+""",
+    path = "/home/yangleiz/Downloads/1.1.130.0/x86_64/lib",
+)
+
+new_local_repository(
+    name = "xcd",
+    build_file_content = """
+package(default_visibility = ["//visibility:public"])
+cc_library(
+    name = "lib",
+    srcs =[
+    "libxcb.so",
+    "libxcb-keysyms.so",
+    "libwayland-client.so",
+    "libxcb-randr.so",
+    "libxcb-ewmh.so",
+    "libXau.so",
+    "libXdmcp.so",
+    "libffi.so",
+    #"crt1.o",
+    ]
+)
+""",
+    path = "/usr/lib/x86_64-linux-gnu/",
+)

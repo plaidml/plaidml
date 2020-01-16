@@ -2,11 +2,20 @@
 
 #include "pmlc/compiler/compiler.h"
 
-#include <boost/filesystem.hpp>
 #include <unordered_map>
 #include <utility>
 
+#include <boost/filesystem.hpp>
+
 #include "base/util/env.h"
+#include "base/util/file.h"
+#include "base/util/logging.h"
+
+#include "llvm/Support/FormatVariadic.h"
+#include "llvm/Support/TargetSelect.h"
+
+#include "mlir/Dialect/SPIRV/SPIRVOps.h"
+#include "mlir/Dialect/SPIRV/Serialization.h"
 #include "mlir/Dialect/StandardOps/Ops.h"
 #include "mlir/ExecutionEngine/ExecutionEngine.h"
 #include "mlir/ExecutionEngine/OptUtils.h"
@@ -14,16 +23,10 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Target/LLVMIR.h"
 #include "mlir/Transforms/Passes.h"
-#include "llvm/Support/FormatVariadic.h"
-#include "llvm/Support/TargetSelect.h"
 
-#include "base/util/logging.h"
 #include "pmlc/compiler/registry.h"
 #include "pmlc/conversion/tile_to_pxa/tile_to_pxa.h"
-
-#include "base/util/file.h"
-#include "mlir/Dialect/SPIRV/SPIRVOps.h"
-#include "mlir/Dialect/SPIRV/Serialization.h"
+#include "pmlc/tools/pmlc-vulkan-runner/Runtime.h"
 
 using namespace mlir;  // NOLINT[build/namespaces]
 using pmlc::conversion::tile_to_pxa::createLowerTileToPXAPass;
@@ -225,48 +228,22 @@ Executable::Executable(StringRef entry, StringRef target, ModuleOp programModule
       }
     }
   }
-  // spv_ModuleOp.dump();
+  spv_ModuleOp.dump();
 
-  // spirv::serialize
-  mlir::SmallVector<uint32_t, 4> spv_binary;
-  mlir::spirv::serialize(spv_ModuleOp, spv_binary);
-  std::stringstream out;
-  for (int i = 0; i < static_cast<int>(spv_binary.size()); i++) {
-    out.write(reinterpret_cast<char*>(&spv_binary[i]), sizeof(spv_binary[i]));
-  }
-  auto spv_cache = vertexai::env::Get("PLAIDML_SPIRV_CACHE");
-  if (spv_cache.length() > 0) {
-    fs::path spv_cache_path = spv_cache;
-    auto spv_out_path = spv_cache_path / "spv_module.spv";
-    vertexai::WriteFile(spv_out_path, out.str(), true);
-  }
+  pmlc::vulkan::RuntimeTest rt;
+  pmlc::vulkan::NumWorkGroups numWorkGroups;
+  numWorkGroups.x = 3;
+  numWorkGroups.y = 3;
 
-  assert(memRefTypes.size() == bufptrs.size() && "memRefTypes and bufptrs size mismatch");
+  auto resOne = rt.createResourceVarFloat(0, 0, 3);
+  auto resTwo = rt.createResourceVarFloat(0, 1, 3);
+  auto resThree = rt.createResourceVarFloat(1, 0, 3);
+  auto resFour = rt.createResourceVarFloat(1, 1, 3);
 
-  auto optPipeline = makeOptimizingTransformer(
-      /*optLevel=*/0, /*sizeLevel=*/0,
-      /*targetMachine=*/nullptr);
-
-  if (VLOG_IS_ON(6)) {
-    auto llvmModule = translateModuleToLLVMIR(*module);
-    if (!llvmModule) {
-      throw std::runtime_error("could not convert to LLVM IR");
-    }
-    llvmModule->print(llvm::errs(), nullptr);
-  }
-
-  auto maybeEngine = ExecutionEngine::create(*module, optPipeline);
-  llvm::handleAllErrors(maybeEngine.takeError(), [](const llvm::ErrorInfoBase& b) {
-    b.log(llvm::errs());
-    throw std::runtime_error("Failed to create ExecutionEngine");
-  });
-  engine = std::move(*maybeEngine);
-
-  descriptors.reserve(args.size());
-  for (unsigned i = 0; i < args.size(); i++) {
-    descriptors.emplace_back(bufptrs[i], memRefTypes[i]);
-    ptrs[i] = descriptors[i].ptr();
-    args[i] = &ptrs[i];
+  if (failed(pmlc::vulkan::runOnVulkan(cast<mlir::ModuleOp>(spv_ModuleOp), rt.vars, numWorkGroups))) {
+    std::cout << "runOnVulkan failed" << std::endl;
+  } else {
+    std::cout << "runOnVulkan success" << std::endl;
   }
 }
 
