@@ -48,7 +48,7 @@ Tensor Softmax(const Tensor& X) {
 
 TEST(CppEdsl, Cast) {
   auto A = Placeholder(PLAIDML_DATA_UINT64, {3, 3});
-  auto B = as_uint(A, 32);
+  auto B = cast(A, PLAIDML_DATA_UINT32);
   Program program("cast", {B});
 
   std::vector<std::uint64_t> input{1,
@@ -655,7 +655,7 @@ Tensor ArgMax(const Tensor& I) {
   Tensor IX = index(T, 0);
   auto O = TensorOutput(X0, X2);
   O(x0, x2) >= cond(I(x0, x1, x2), Max(x0, x2), IX(x1));
-  return as_uint(O, 32);
+  return cast(O, PLAIDML_DATA_UINT32);
 }
 
 TEST(CppEdsl, ArgMax) {
@@ -686,7 +686,6 @@ module {
   }
 }
 )#"));
-  // TODO: cpu backend is missing cast ops (as_uint)
   exec::Binder(program).compile()->run();
 }
 
