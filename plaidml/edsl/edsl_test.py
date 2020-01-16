@@ -11,10 +11,6 @@ import plaidml.exec
 from plaidml.edsl import *
 
 
-def compare_results(ref, program, expected):
-    ref.assertMultiLineEqual(str(program).lstrip(), expected.lstrip())
-
-
 def dot(X, Y):
     I, J, K = TensorDims(3)
     i, j, k = TensorIndexes(3)
@@ -168,7 +164,7 @@ def arg_max(I):
     IX = index(T, 0)
     O = TensorOutput(X0, X2)
     O[x0, x2] >= cond(I[x0, x1, x2], Max[x0, x2], IX[x1])
-    return as_uint(O, 32)
+    return cast(O, DType.UINT32)
 
 
 def sum_over_axis(I):
@@ -259,6 +255,9 @@ def csum(I):
 class TestEdsl(unittest.TestCase):
     maxDiff = None
 
+    def compare_results(self, program, expected):
+        self.assertMultiLineEqual(str(program).lstrip(), expected.lstrip())
+
     def test_sum_over_axis(self):
         I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 784]))
         O = sum_over_axis(I)
@@ -277,7 +276,7 @@ module {
   }
 }
 '''
-        compare_results(self, program, expected)
+        self.compare_results(program, expected)
 
     def test_max_over_axis(self):
         I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 784]))
@@ -297,14 +296,14 @@ module {
   }
 }
 '''
-        compare_results(self, program, expected)
+        self.compare_results(program, expected)
 
     def test_matmul(self):
         A = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 784]))
         B = Tensor(LogicalShape(plaidml.DType.FLOAT32, [784, 784]))
         O = matmul(A, B)
         program = Program('matmul', [O])
-        expected = '''         
+        expected = '''
 #map0 = (d0, d1, d2) -> (d0, d1)
 #map1 = (d0, d1, d2) -> (d0, d2)
 #map2 = (d0, d1, d2) -> (d2, d1)
@@ -319,13 +318,13 @@ module {
   }
 }
 '''
-        compare_results(self, program, expected)
+        self.compare_results(program, expected)
 
     def test_avg(self):
         I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 784]))
         O = avg(I)
         program = Program('avg', [O])
-        expected = '''      
+        expected = '''
 #map0 = (d0, d1) -> (d0)
 #map1 = (d0, d1) -> (d1, d0)
 
@@ -339,7 +338,7 @@ module {
   }
 }
 '''
-        compare_results(self, program, expected)
+        self.compare_results(program, expected)
 
     def test_avg_stages(self):
         I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 784]))
@@ -361,13 +360,13 @@ module {
   }
 }
 '''
-        compare_results(self, program, expected)
+        self.compare_results(program, expected)
 
     def test_avg_merge(self):
         I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 784]))
         O = avg_merge(I)
         program = Program('avg_merge', [O])
-        expected = '''           
+        expected = '''
 #map0 = () -> ()
 #map1 = (d0, d1) -> (d0, d1)
 
@@ -383,13 +382,13 @@ module {
   }
 }
 '''
-        compare_results(self, program, expected)
+        self.compare_results(program, expected)
 
     def test_max_pool_1d(self):
         I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [10]), name='I')
         O = max_pool_1d(I)
         program = Program('max_pool_1d', [O])
-        expected = '''           
+        expected = '''
 #map0 = (d0, d1) -> (d0)
 #map1 = (d0, d1) -> (d0 * 2 + d1)
 
@@ -404,13 +403,13 @@ module {
   }
 }
 '''
-        compare_results(self, program, expected)
+        self.compare_results(program, expected)
 
     def test_skip(self):
         I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 784]))
         O = skip(I)
         program = Program('skip', [O])
-        expected = '''             
+        expected = '''
 #map0 = (d0, d1) -> (d0 * 2)
 #map1 = (d0, d1) -> (d0 * 2, d1)
 
@@ -424,14 +423,14 @@ module {
   }
 }
 '''
-        compare_results(self, program, expected)
+        self.compare_results(program, expected)
 
     def test_conv_1d(self):
         I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 224, 3]))
         K = Tensor(LogicalShape(plaidml.DType.FLOAT32, [3, 3, 1]))
         O = conv_1d(I, K)
         program = Program('conv_1d', [O])
-        expected = '''              
+        expected = '''
 #map0 = (d0, d1, d2, d3, d4) -> (d0, d1, d2)
 #map1 = (d0, d1, d2, d3, d4) -> (d0, d1 + d3, d4)
 #map2 = (d0, d1, d2, d3, d4) -> (d3, d4, d2)
@@ -446,14 +445,14 @@ module {
   }
 }
 '''
-        compare_results(self, program, expected)
+        self.compare_results(program, expected)
 
     def test_conv_2d_dilated(self):
         I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 224, 224, 1]))
         K = Tensor(LogicalShape(plaidml.DType.FLOAT32, [3, 3, 1, 32]))
         O = conv_2d_dilated(I, K)
         program = Program('conv_2d_dilated', [O])
-        expected = '''             
+        expected = '''
 #map0 = (d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)
 #map1 = (d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4 * 2, d2 + d5 * 3, d6)
 #map2 = (d0, d1, d2, d3, d4, d5, d6) -> (d4, d5, d6, d3)
@@ -468,7 +467,7 @@ module {
   }
 }
 '''
-        compare_results(self, program, expected)
+        self.compare_results(program, expected)
 
     def test_complex_conv_2d(self):
         I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 224, 224, 3, 3]))
@@ -490,7 +489,7 @@ module {
   }
 }
 '''
-        compare_results(self, program, expected)
+        self.compare_results(program, expected)
 
     @unittest.skip(
         'TODO: currently segfaults mismatched dimensions error needs to be printed correctly')
@@ -500,7 +499,7 @@ module {
         O = complex_conv_2d(I, K, 1, 2, 1, 2)
         program = Program('complex_conv_2d', [O])
         # expected = '''?'''
-        # compare_results(self, program, expected)
+        # self.compare_results(program, expected)
 
     def test_mnist_mlp(self):
         # model.add(Dense(512, activation='relu', input_shape=(784,)))
@@ -548,7 +547,7 @@ module {
   }
 }
 '''
-        compare_results(self, program, expected)
+        self.compare_results(program, expected)
 
     def test_mnist_cnn(self):
         # model.add(Conv2D(32, kernel_size=(3, 3), activation='relu', input_shape=input_shape))
@@ -619,14 +618,14 @@ module {
   }
 }
 '''
-        compare_results(self, program, expected)
+        self.compare_results(program, expected)
 
     def test_arg_max(self):
         I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 10, 10]))
         O = arg_max(I)
         program = Program('arg_max', [O])
         self.assertEqual(str(O.shape), 'tensor<1x10x!eltwise.u32>')
-        expected = '''           
+        expected = '''
 #map0 = (d0) -> (d0)
 #map1 = () -> ()
 #map2 = (d0, d1, d2) -> (d0, d1)
@@ -647,7 +646,7 @@ module {
   }
 }
 '''
-        compare_results(self, program, expected)
+        self.compare_results(program, expected)
 
     def test_global_min(self):
         I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [10, 10, 10]), name='I')
@@ -669,7 +668,7 @@ module {
   }
 }
 '''
-        compare_results(self, program, expected)
+        self.compare_results(program, expected)
 
     def test_cum_sum(self):
         I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [10]), name='I')
@@ -690,7 +689,7 @@ module {
   }
 }
 '''
-        compare_results(self, program, expected)
+        self.compare_results(program, expected)
 
     def test_invalid_shape_error(self):
         O = TensorOutput(TensorDims(3))
@@ -716,7 +715,7 @@ module {
   }
 }
 '''
-        compare_results(self, program, expected)
+        self.compare_results(program, expected)
 
     def test_lars_momentum_4d(self):
         X_shape = LogicalShape(plaidml.DType.FLOAT32, [4, 7, 3, 9])
@@ -760,7 +759,7 @@ module {
   }
 }
 '''
-        compare_results(self, program, expected)
+        self.compare_results(program, expected)
 
     def test_repeat_elts(self):
         I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [10, 10, 10]))
@@ -787,7 +786,7 @@ module {
   }
 }
 '''
-        compare_results(self, program, expected)
+        self.compare_results(program, expected)
 
     def test_use_default(self):
         P = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 7, 10, 10]))
@@ -811,7 +810,7 @@ module {
   }
 }
 '''
-        compare_results(self, program, expected)
+        self.compare_results(program, expected)
 
     @unittest.skip('TODO: Finish bounds pass')
     def test_defract(self):
@@ -821,7 +820,7 @@ module {
         O = TensorOutput(5)
         O[i] += (I[(i - j + 1) // 2] * K[j])
         program = Program('defract_test', [O])
-        expected = '''             
+        expected = '''
 #map0 = (d0, d1) -> (d0)
 #map1 = (d0, d1) -> ((d0 - d1 + 1) floordiv 2)
 #map2 = (d0, d1) -> (d1)
@@ -836,7 +835,7 @@ module {
   }
 }
 '''
-        compare_results(self, program, expected)
+        self.compare_results(program, expected)
 
         outputs = plaidml.exec.run(program, [(I, np.array([1, 2, 3])), (K, np.array([1, 2, 3]))])
         self.assertEqual(outputs[0].tolist(), [2, 5, 4, 9, 6])
@@ -848,7 +847,7 @@ module {
         O = TensorOutput(6)
         O[i] += (I[(i - 1) // 2])
         program = Program('defract_short_test', [O])
-        expected = '''            
+        expected = '''
 #map0 = (d0) -> (d0)
 #map1 = (d0) -> ((d0 - 1) floordiv 2)
 
@@ -862,7 +861,7 @@ module {
   }
 }
 '''
-        compare_results(self, program, expected)
+        self.compare_results(program, expected)
         outputs = plaidml.exec.run(program, [(I, np.array([1, 2, 3]))])
         self.assertEqual(outputs[0].tolist(), [0, 1, 0, 2, 0, 3])
 
@@ -891,7 +890,7 @@ module {
   }
 }
 '''
-        compare_results(self, program, expected)
+        self.compare_results(program, expected)
         outputs = plaidml.exec.run(program, [
             (I, np.array([[
                 [[1], [3], [-1]],
@@ -944,11 +943,10 @@ module {
   }
 }
 '''
-        compare_results(self, program, expected)
+        self.compare_results(program, expected)
         outputs = plaidml.exec.run(program, [(I, np.array([1, 2, 3])), (K, np.array([1, 2, 3]))])
         self.assertEqual(outputs[0].tolist(), [2, 5, 4, 9, 6])
 
-    @unittest.skip('FIXME')
     def test_identity(self):
         I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [3]), name='I')
         program = Program('identity', [I])
@@ -960,7 +958,7 @@ module {
   }
 }
 '''
-        compare_results(self, program, expected)
+        self.compare_results(program, expected)
         outputs = plaidml.exec.run(program, [(I, np.array([(1, 2, 3)]))])
         self.assertEqual(outputs[0].tolist(), [1, 2, 3])
 
@@ -975,22 +973,33 @@ module {
         O = TensorOutput(L, N)
         O[i, j] = A[i, k] * B[k, j]
         program = Program('assignment_non_exception', [O])
-        self.assertMultiLineEqual(
-            str(program), '''
-function (
-  A[A_0, A_1],
-  B[B_0, B_1]
-) -> (
-  _X0
-) {
-  _X0[x0, x2 : 5, 5] = =(A[x0, x1] * B[x1, x2]);
+        expected = '''
+#map0 = (d0, d1, d2) -> (d0, d1)
+#map1 = (d0, d1, d2) -> (d0, d2)
+#map2 = (d0, d1, d2) -> (d2, d1)
+
+
+!fp32 = type tensor<!eltwise.fp32>
+module {
+  func @assignment_non_exception(%arg0: tensor<1x5x!eltwise.fp32> {tile.name = "B"}, %arg1: tensor<5x1x!eltwise.fp32> {tile.name = "A"}) -> tensor<5x5x!eltwise.fp32> {
+    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !fp32
+    %0 = tile.cion assign, mul, %cst, %arg1, %arg0 {sink = #map0, srcs = [#map1, #map2]} : !fp32, tensor<5x1x!eltwise.fp32>, tensor<1x5x!eltwise.fp32> -> tensor<5x5x!eltwise.fp32>
+    return %0 : tensor<5x5x!eltwise.fp32>
+  }
 }
-''')
-        outputs = plaidml.exec.run(program, [(A, np.array([[1], [2], [3], [4], [5]])),
-                                             (B, np.array([1, 2, 3, 4, 5]))])
-        self.assertEqual(outputs[0].tolist(),
-                         [[1., 2., 3., 4., 5.], [2., 4., 6., 8., 10.], [3., 6., 9., 12., 15.],
-                          [4., 8., 12., 16., 20.], [5., 10., 15., 20., 25.]])
+'''
+        self.compare_results(program, expected)
+        outputs = plaidml.exec.run(program, [
+            (A, np.array([[1], [2], [3], [4], [5]])),
+            (B, np.array([1, 2, 3, 4, 5])),
+        ])
+        self.assertEqual(outputs[0].tolist(), [
+            [1., 2., 3., 4., 5.],
+            [2., 4., 6., 8., 10.],
+            [3., 6., 9., 12., 15.],
+            [4., 8., 12., 16., 20.],
+            [5., 10., 15., 20., 25.],
+        ])
 
         O = TensorOutput(L, N)
         O[i, j] = B[i, k] * A[k, j]
@@ -998,12 +1007,10 @@ function (
             program = Program('assignment_exception', [O])
         self.assertTrue("illegal assignment aggregation" in str(cm.exception))
 
-    @unittest.skip('FIXME')
     def test_two_outputs(self):
         I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [3]), name='I')
         program1 = Program('two_outputs', [I, I])
         expected = '''
-
 module {
   func @two_outputs(%arg0: tensor<3x!eltwise.f32> {tile.name = "I"}) -> (tensor<3x!eltwise.f32>, tensor<3x!eltwise.f32>) {
     %0 = "eltwise.ident"(%arg0) : (tensor<3x!eltwise.f32>) -> tensor<3x!eltwise.f32>
@@ -1012,7 +1019,7 @@ module {
   }
 }
 '''
-        compare_results(self, program1, expected)
+        self.compare_results(program1, expected)
 
         outputs = plaidml.exec.run(program1, [(I, np.array([(1, 2, 3)]))])
         self.assertEqual(outputs[0].tolist(), [1, 2, 3])

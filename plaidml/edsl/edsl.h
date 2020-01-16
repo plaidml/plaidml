@@ -817,11 +817,6 @@ Tensor Call(const std::string& fn, Ts... args) {
   return Call(fn, vec);
 }
 
-inline Tensor cast(const Tensor& x, DType dtype) {
-  auto ptr = ffi::call<plaidml_expr*>(plaidml_expr_cast, x.as_ptr(), static_cast<plaidml_datatype>(dtype));
-  return Tensor{ptr};
-}
-
 ///
 /// \defgroup edsl_primitives EDSL Primitives
 ///
@@ -837,73 +832,15 @@ inline Tensor cast(const Tensor& x, DType dtype) {
 inline Tensor abs(const Tensor& x) { return Call("abs", x); }
 
 ///
-/// Performs an elementwise conversion of `x` into a Tensor of floating point numbers with precision `bit_size`.
+/// Casts the element type of a tensor `x` to the type specified by `dtype`.
 /// \param x Tensor
-/// \param bit_size size_t
+/// \param dtype DType
 /// \return Tensor
 ///
-inline Tensor as_float(const Tensor& x, size_t bit_size) {
-  switch (bit_size) {
-    case 16:
-      return cast(x, DType::FLOAT16);
-    case 32:
-      return cast(x, DType::FLOAT32);
-    case 64:
-      return cast(x, DType::FLOAT64);
-    default:
-      throw std::runtime_error("Invalid bit size for as_float");
-  }
+inline Tensor cast(const Tensor& x, DType dtype) {
+  auto ptr = ffi::call<plaidml_expr*>(plaidml_expr_cast, x.as_ptr(), static_cast<plaidml_datatype>(dtype));
+  return Tensor{ptr};
 }
-
-///
-/// Performs an elementwise conversion of `x` into a Tensor of integers with width `bit_size`.
-/// \param x Tensor
-/// \param bit_size size_t
-/// \return Tensor
-///
-inline Tensor as_int(const Tensor& x, size_t bit_size) {
-  switch (bit_size) {
-    case 8:
-      return cast(x, DType::INT8);
-    case 16:
-      return cast(x, DType::INT16);
-    case 32:
-      return cast(x, DType::INT32);
-    case 64:
-      return cast(x, DType::INT64);
-    default:
-      throw std::runtime_error("Invalid bit size for as_int");
-  }
-}
-
-///
-/// Performs an elementwise conversion of `x` into a Tensor of unsigned integers with width `bit_size`.
-/// \param x Tensor
-/// \param bit_size size_t
-/// \return Tensor
-///
-inline Tensor as_uint(const Tensor& x, size_t bit_size) {
-  switch (bit_size) {
-    case 8:
-      return cast(x, DType::UINT8);
-    case 16:
-      return cast(x, DType::UINT16);
-    case 32:
-      return cast(x, DType::UINT32);
-    case 64:
-      return cast(x, DType::UINT64);
-    default:
-      throw std::runtime_error("Invalid bit size for as_uint");
-  }
-}
-
-///
-/// Performs an elementwise conversion of `x` into a Tensor of booleans with width `bit_size`.
-/// \param x Tensor
-/// \param bit_size size_t
-/// \return Tensor
-///
-inline Tensor as_bool(const Tensor& x) { return cast(x, DType::BOOLEAN); }
 
 ///
 /// Computes the elementwise cosine of `x`.

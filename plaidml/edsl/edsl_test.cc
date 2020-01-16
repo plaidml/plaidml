@@ -48,7 +48,7 @@ Tensor Softmax(const Tensor& X) {
 
 TEST(CppEdsl, Cast) {
   auto A = Placeholder(DType::UINT64, {3, 3});
-  auto B = as_uint(A, 32);
+  auto B = cast(A, DType::UINT32);
   Program program("cast", {B});
 
   std::vector<std::uint64_t> input{1,
@@ -417,12 +417,12 @@ Tensor Convolution2(const Tensor& I, const Tensor& K) {
   return R;
 }
 
-// TODO: implement constraints in -convert-tile-to-pxa
-TEST(CppEdsl, DISABLED_Convolution) {
+TEST(CppEdsl, Convolution) {
   auto I = Placeholder(DType::FLOAT32, {1, 224, 224, 1});
   auto K = Placeholder(DType::FLOAT32, {3, 3, 1, 32});
   Program program("convolution", {Convolution2(I, K)});
-  exec::Binder(program).compile()->run();
+  // TODO: implement constraints in -convert-tile-to-pxa
+  // exec::Binder(program).compile()->run();
 }
 
 Tensor MaxPooling2(const Tensor& I) {
@@ -544,8 +544,7 @@ std::tuple<Tensor, Tensor> LarsMomentum(  //
   return std::make_tuple(X - NewVeloc, NewVeloc);
 }
 
-// TODO: add 'sqrt' to std and llvm dialects
-TEST(CppEdsl, DISABLED_LarsMomentum4d) {
+TEST(CppEdsl, LarsMomentum4d) {
   auto X_shape = LogicalShape(DType::FLOAT32, {4, 7, 3, 9});
   auto LR_shape = LogicalShape(DType::FLOAT32, {});
   auto X = Placeholder(X_shape);
@@ -587,7 +586,8 @@ module {
   }
 }
 )#"));
-  exec::Binder(program).compile()->run();
+  // TODO: add 'sqrt' to std and llvm dialects
+  // exec::Binder(program).compile()->run();
 }
 
 TEST(CppEdsl, RepeatElements) {
@@ -655,7 +655,7 @@ Tensor ArgMax(const Tensor& I) {
   Tensor IX = index(T, 0);
   auto O = TensorOutput(X0, X2);
   O(x0, x2) >= cond(I(x0, x1, x2), Max(x0, x2), IX(x1));
-  return as_uint(O, 32);
+  return cast(O, DType::UINT32);
 }
 
 TEST(CppEdsl, ArgMax) {
@@ -686,7 +686,6 @@ module {
   }
 }
 )#"));
-  // TODO: cpu backend is missing cast ops (as_uint)
   exec::Binder(program).compile()->run();
 }
 
@@ -722,8 +721,7 @@ Tensor Winograd(const Tensor& I, const Tensor& K, const Tensor& A, const Tensor&
   return O;
 }
 
-// TODO: implement constraints in -convert-tile-to-pxa
-TEST(CppEdsl, DISABLED_Winograd) {
+TEST(CppEdsl, Winograd) {
   const std::int64_t N = 1, X = 224, Y = 224, CI = 3, S = 3, CO = 32, BI = 32, BO = BI - CI + 1;
   auto I = Placeholder(DType::FLOAT32, {N, X, Y, CI});
   auto K = Placeholder(DType::FLOAT32, {S, S, CI, CO});
@@ -732,7 +730,8 @@ TEST(CppEdsl, DISABLED_Winograd) {
   auto G = Placeholder(DType::FLOAT32, {BI, S});
   auto W = Winograd(I, K, A, B, G);
   Program program("winograd", {W});
-  exec::Binder(program).compile()->run();
+  // TODO: implement constraints in -convert-tile-to-pxa
+  // exec::Binder(program).compile()->run();
 }
 
 TEST(CppEdsl, UniqueNames) {
@@ -755,8 +754,7 @@ module {
   exec::Binder(program).compile()->run();
 }
 
-// TODO: fix issues related to reductions into scalars
-TEST(CppEdsl, DISABLED_GlobalMin) {
+TEST(CppEdsl, GlobalMin) {
   auto I = Placeholder(DType::FLOAT32, {10, 10, 10}, "I");
   TensorIndex i, j, k;
   auto O_Neg = TensorOutput();
@@ -980,8 +978,7 @@ module {
 //   exec::Binder(program).compile()->run();
 // }
 
-// TODO: fix -convert-pxa-to-affine pass
-TEST(CppEdsl, DISABLED_DefractLong) {
+TEST(CppEdsl, DefractLong) {
   std::vector<int64_t> input_shape{1, 3, 3, 1};
   std::vector<int64_t> output_shape{1, 5, 5, 1};
   auto I = Placeholder(DType::FLOAT32, input_shape, "I");
@@ -1058,8 +1055,7 @@ module {
   EXPECT_THAT(data[1], 20);
 }
 
-// TODO: lowering for PrngOp
-TEST(CppEdsl, DISABLED_Prng) {
+TEST(CppEdsl, Prng) {
   auto S = Placeholder(DType::UINT32, {3, 2048});
   auto O = prng(S, {2, 3, 4, 5});
   Program program("prng", {O});
@@ -1076,7 +1072,8 @@ module {
   }
 }
 )#"));
-  exec::Binder(program).compile()->run();
+  // TODO: lowering for PrngOp
+  // exec::Binder(program).compile()->run();
 }
 
 }  // namespace
