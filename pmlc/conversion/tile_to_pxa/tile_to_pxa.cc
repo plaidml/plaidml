@@ -281,22 +281,19 @@ struct Not {
 };
 
 struct EltwiseFloat {
-  bool match(Type type) const { return is_float(getScalarType(type).type()); }
+  bool match(Type type) const { return isFloat(getScalarType(type).type()); }
 };
 
 struct EltwiseInteger {
-  bool match(Type type) const {
-    auto dtype = getScalarType(type).type();
-    return is_int(dtype) || is_uint(dtype);
-  }
+  bool match(Type type) const { return isInteger(getScalarType(type).type()); }
 };
 
 struct EltwiseSigned {
-  bool match(Type type) const { return is_int(getScalarType(type).type()); }
+  bool match(Type type) const { return isSigned(getScalarType(type).type()); }
 };
 
 struct EltwiseUnsigned {
-  bool match(Type type) const { return is_uint(getScalarType(type).type()); }
+  bool match(Type type) const { return isUnsigned(getScalarType(type).type()); }
 };
 
 struct FirstOperand {
@@ -306,48 +303,12 @@ struct FirstOperand {
   }
 };
 
-// Returns the Plaid arithmetic conversion rank of a type.
-unsigned getDataTypeRank(DataType dtype) {
-  switch (dtype) {
-    case DataType::INVALID:
-      return 0;
-    case DataType::BOOLEAN:
-      return 2;
-    case DataType::INT8:
-      return 3;
-    case DataType::UINT8:
-      return 4;
-    case DataType::INT16:
-      return 5;
-    case DataType::UINT16:
-      return 6;
-    case DataType::INT32:
-      return 7;
-    case DataType::UINT32:
-      return 8;
-    case DataType::INT64:
-      return 9;
-    case DataType::UINT64:
-      return 10;
-    case DataType::FLOAT16:
-      return 11;
-    case DataType::FLOAT32:
-      return 12;
-    case DataType::FLOAT64:
-      return 13;
-    default:
-      throw std::logic_error{"Invalid type found in typecheck"};
-  }
-}
-
 DataType promoteTypes(ConversionPatternRewriter& rewriter, Location loc, ArrayRef<Value> operands,
                       ArrayRef<DataType> types, llvm::SmallVectorImpl<Value>* into) {
   // First, determine the 'final' type that wins the promotion
-  DataType bestType = DataType::INVALID;
+  DataType bestType = DataType::invalid;
   for (auto type : types) {
-    if (getDataTypeRank(type) > getDataTypeRank(bestType)) {
-      bestType = type;
-    }
+    bestType = promoteTypes(bestType, type);
   }
   // Next, cast each operand to the 'final' type
   auto scalarType = rewriter.getType<ScalarType>(bestType);
@@ -355,8 +316,7 @@ DataType promoteTypes(ConversionPatternRewriter& rewriter, Location loc, ArrayRe
   for (unsigned i = 0; i < operands.size(); i++) {
     auto dtype = types[i];
     auto operand = operands[i];
-    auto isSigned = is_int(dtype);
-    auto castOp = createCastOp(rewriter, loc, operand, targetType, isSigned);
+    auto castOp = createCastOp(rewriter, loc, operand, targetType, isSigned(dtype));
     into->push_back(castOp);
   }
   return bestType;
@@ -411,7 +371,7 @@ struct CmpIntInequalityOp {
                ArrayRef<DataType> types) {
     SmallVector<Value, 2> promoted;
     auto dataType = promoteTypes(rewriter, loc, operands, types, &promoted);
-    auto predicate = is_int(dataType) ? signedPred : unsignedPred;
+    auto predicate = isSigned(dataType) ? signedPred : unsignedPred;
     return rewriter.create<mlir::CmpIOp>(loc, predicate, promoted[0], promoted[1]).getResult();
   }
 };
@@ -747,8 +707,8 @@ struct CastOpConversion : public OpConversionPattern<ew::CastOp> {
 
     // Create the standard cast op
     auto scalarType = getScalarType(op.tensor());
-    bool isSigned = is_int(scalarType.type());
-    auto result = createCastOp(rewriter, loc, scalar, resultType.getElementType(), isSigned);
+    auto dtype = scalarType.type();
+    auto result = createCastOp(rewriter, loc, scalar, resultType.getElementType(), isSigned(dtype));
 
     // Create the store
     rewriter.create<AffineStoreOp>(loc, result, resultMemRef, idxs);

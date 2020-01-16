@@ -21,8 +21,6 @@
 
 namespace pmlc::dialect::eltwise {
 
-using util::DataTypeFromString;
-
 namespace {
 
 struct OpAsmInterface : public mlir::OpAsmDialectInterface {
@@ -46,11 +44,13 @@ struct OpAsmInterface : public mlir::OpAsmDialectInterface {
 
   void getTypeAliases(mlir::SmallVectorImpl<std::pair<Type, StringRef>>& aliases) const final {
     auto ctx = getDialect()->getContext();
-    for (const auto dataType : util::GetDataTypeSet()) {
+    for (uint64_t i = 1; i <= util::getMaxEnumValForDataType(); i++) {
+      auto dtype = util::symbolizeDataType(i).getValue();
+      auto dtypeStr = util::stringifyDataType(dtype);
       // Intern the string
-      auto alias = mlir::Identifier::get(to_string(dataType), ctx);
+      auto alias = mlir::Identifier::get(dtypeStr, ctx);
       // Get the type
-      auto type = getRankedTensorType(ScalarType::get(ctx, dataType));
+      auto type = getRankedTensorType(ScalarType::get(ctx, dtype));
       // Add the alias
       aliases.emplace_back(type, alias);
     }
@@ -75,14 +75,18 @@ std::string Dialect::getCanonicalOpName(llvm::StringRef name) {
   return llvm::formatv("{0}.{1}", getDialectNamespace(), name).str();
 }
 
-mlir::Type Dialect::parseType(mlir::DialectAsmParser& parser) const {  //
-  return ScalarType::get(getContext(), DataTypeFromString(parser.getFullSymbolSpec()));
+mlir::Type Dialect::parseType(mlir::DialectAsmParser& parser) const {
+  auto dtype = util::symbolizeDataType(parser.getFullSymbolSpec());
+  if (!dtype.hasValue()) {
+    return {};
+  }
+  return ScalarType::get(getContext(), dtype.getValue());
 }
 
 void Dialect::printType(mlir::Type type, mlir::DialectAsmPrinter& printer) const {
   auto& os = printer.getStream();
-  if (auto t = type.dyn_cast<ScalarType>()) {
-    os << to_string(t.type());
+  if (auto scalarType = type.dyn_cast<ScalarType>()) {
+    os << util::stringifyDataType(scalarType.type());
   } else {
     llvm_unreachable("unhandled scalar type");
   }

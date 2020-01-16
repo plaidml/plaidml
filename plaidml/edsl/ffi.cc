@@ -127,7 +127,11 @@ plaidml_logical_shape* plaidml_logical_shape_alloc(  //
       dimsVec.emplace_back(dims[i]);
     }
     auto ret = new plaidml_logical_shape;
-    ret->type = GlobalContext::get()->MakeRankedTensorType(static_cast<DataType>(dtype), dimsVec);
+    auto dataType = pmlc::util::symbolizeDataType(dtype);
+    if (!dataType.hasValue()) {
+      throw std::runtime_error("Invalid dtype");
+    }
+    ret->type = GlobalContext::get()->MakeRankedTensorType(dataType.getValue(), dimsVec);
     return ret;
   });
 }
@@ -351,7 +355,11 @@ plaidml_expr* plaidml_expr_cast(  //
     plaidml_datatype dtype) {
   return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
     IVLOG(3, "plaidml_expr_cast");
-    return new plaidml_expr{GlobalContext::get()->MakeCastOp(tensor->value, static_cast<DataType>(dtype))};
+    auto dataType = pmlc::util::symbolizeDataType(dtype);
+    if (!dataType.hasValue()) {
+      throw std::runtime_error("Invalid dtype");
+    }
+    return new plaidml_expr{GlobalContext::get()->MakeCastOp(tensor->value, dataType.getValue())};
   });
 }
 

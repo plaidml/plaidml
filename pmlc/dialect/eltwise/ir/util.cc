@@ -92,13 +92,13 @@ bool MergeTypes(Type* into, Type from, DataType dtype) {
     }
   }
 
-  if (dtype == DataType::INVALID) {
+  if (dtype == DataType::invalid) {
     auto intoElementType = intoShapedType.getElementType().dyn_cast<ScalarType>();
     auto fromElementType = fromShapedType.getElementType().dyn_cast<ScalarType>();
     if (!intoElementType || !fromElementType) {
       throw std::runtime_error("NYI: Only scalar element types are supported");
     }
-    dtype = CommonSupertype(intoElementType.type(), fromElementType.type());
+    dtype = promoteTypes(intoElementType.type(), fromElementType.type());
   }
   auto elementType = ScalarType::get(into->getContext(), dtype);
   *into = RankedTensorType::get(resultShape, elementType);
@@ -114,7 +114,7 @@ RankedTensorType getRankedTensorType(Type type) {
   }
   SmallVector<int64_t, 0> shape;
   if (type.isa<IndexType>()) {
-    return RankedTensorType::get(shape, ScalarType::get(type.getContext(), DataType::INT32));
+    return RankedTensorType::get(shape, ScalarType::get(type.getContext(), DataType::i32));
   }
   if (type.isa<ScalarType>()) {
     return RankedTensorType::get(shape, type);

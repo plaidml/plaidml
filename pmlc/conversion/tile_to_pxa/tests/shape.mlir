@@ -1,7 +1,7 @@
 // RUN: pmlc-opt -convert-tile-to-pxa -canonicalize -cse %s | FileCheck %s
 
-func @shape(%arg0: tensor<10x20x!eltwise.fp32>) -> tensor<2x!eltwise.i32> {
-  %0 = "tile.shape"(%arg0) : (tensor<10x20x!eltwise.fp32>) -> tensor<2x!eltwise.i32>
+func @shape(%arg0: tensor<10x20x!eltwise.f32>) -> tensor<2x!eltwise.i32> {
+  %0 = "tile.shape"(%arg0) : (tensor<10x20x!eltwise.f32>) -> tensor<2x!eltwise.i32>
   return %0 : tensor<2x!eltwise.i32>
 }
 
