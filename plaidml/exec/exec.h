@@ -15,7 +15,7 @@ namespace plaidml {
 namespace exec {
 
 ///
-/// Initializes PlaidML's execution engine
+/// Initializes PlaidML's execution APIs.
 ///
 inline void init() {
   plaidml::init();

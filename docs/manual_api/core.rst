@@ -18,7 +18,11 @@ Initialization
 
    .. group-tab:: Python
 
-      .. autofunction:: plaidml.core.__init
+      .. note::
+
+         Initialization in Python follows standard conventions: the PlaidML Core
+         APIs are initialized automatically wherever the namespace
+         `plaidml.core` is imported.
 
 -------
 Objects

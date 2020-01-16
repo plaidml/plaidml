@@ -61,7 +61,7 @@ void into_vector(std::vector<T>* into, Head&& head, Tail&&... tail) {
 }  // namespace details
 
 ///
-/// Initializes PlaidML's EDSL.
+/// Initializes PlaidML's EDSL APIs.
 ///
 inline void init() {
   plaidml::init();
@@ -829,25 +829,6 @@ Tensor Call(const std::string& fn, Ts... args) {
   return Call(fn, vec);
 }
 
-inline Tensor cast(const Tensor& x, plaidml_datatype dtype) {
-  auto ptr = ffi::call<plaidml_expr*>(plaidml_expr_cast, x.as_ptr(), dtype);
-  return Tensor{ptr};
-}
-
-///
-/// \defgroup edsl_primitives EDSL Primitives
-///
-
-/// \addtogroup edsl_primitives
-/// @{
-
-///
-/// Computes the elementwise absolute value of `x`.
-/// \param x Tensor
-/// \return Tensor
-///
-inline Tensor abs(const Tensor& x) { return Call("abs", x); }
-
 ///
 /// Performs an elementwise conversion of `x` into a Tensor of floating point numbers with precision `bit_size`.
 /// \param x Tensor
@@ -915,6 +896,31 @@ inline Tensor as_uint(const Tensor& x, size_t bit_size) {
 /// \return Tensor
 ///
 inline Tensor as_bool(const Tensor& x) { return cast(x, PLAIDML_DATA_BOOLEAN); }
+
+///
+/// \defgroup edsl_primitives EDSL Primitives
+///
+
+/// \addtogroup edsl_primitives
+/// @{
+
+///
+/// Computes the elementwise absolute value of `x`.
+/// \param x Tensor
+/// \return Tensor
+///
+inline Tensor abs(const Tensor& x) { return Call("abs", x); }
+
+///
+/// Casts the elements of `x` to the datatype specified by `dtype`.
+/// \param x Tensor
+/// \param dtype DType
+/// \return Tensor
+///
+inline Tensor cast(const Tensor& x, plaidml_datatype dtype) {
+  auto ptr = ffi::call<plaidml_expr*>(plaidml_expr_cast, x.as_ptr(), dtype);
+  return Tensor{ptr};
+}
 
 ///
 /// Computes the elementwise cosine of `x`.

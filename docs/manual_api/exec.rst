@@ -18,7 +18,11 @@ Initialization
 
    .. group-tab:: Python
 
-      .. autofunction:: plaidml.exec.__init
+      .. note::
+
+         Initialization in Python follows standard conventions: the PlaidML
+         Execution APIs are initialized automatically wherever the namespace
+         `plaidml.exec` is imported.
 
 -------
 Objects

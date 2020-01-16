@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 def __init():
     """
-    Initializes PlaidML's EDSL.
+    Initializes PlaidML's EDSL APIs.
     """
     ffi_call(lib.plaidml_edsl_init)
 
@@ -33,7 +33,7 @@ class LogicalShape(ForeignObject):
 
         Args:
             self (pointer): The object pointer for a LogicalShape
-            dtype: Description of dtype
+            dtype (DType): Description of dtype
             dims (list): The dimensions of the LogicalShape
             ptr (pointer): Description of ptr
 

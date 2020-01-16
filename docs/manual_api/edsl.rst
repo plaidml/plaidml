@@ -18,7 +18,10 @@ Initialization
 
    .. group-tab:: Python
 
-      .. autofunction:: plaidml.edsl.__init
+      .. note::
+
+         Initialization in Python follows standard conventions: the PlaidML EDSL is
+         initialized automatically wherever the namespace `plaidml.edsl` is imported.
 
 -------
 Objects
@@ -66,10 +69,7 @@ Primitives
    .. group-tab:: Python
 
       .. autofunction:: plaidml.edsl.abs
-      .. autofunction:: plaidml.edsl.as_float
-      .. autofunction:: plaidml.edsl.as_int
-      .. autofunction:: plaidml.edsl.as_uint
-      .. autofunction:: plaidml.edsl.as_bool
+      .. autofunction:: plaidml.edsl.cast
       .. autofunction:: plaidml.edsl.cos
       .. autofunction:: plaidml.edsl.cosh
       .. autofunction:: plaidml.edsl.exp
@@ -79,7 +79,6 @@ Primitives
       .. autofunction:: plaidml.edsl.log
       .. autofunction:: plaidml.edsl.pow
       .. autofunction:: plaidml.edsl.prng
-      .. autofunction:: plaidml.edsl.reshape
       .. autofunction:: plaidml.edsl.reshape
       .. autofunction:: plaidml.edsl.scatter
       .. autofunction:: plaidml.edsl.select
