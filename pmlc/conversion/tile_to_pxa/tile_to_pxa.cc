@@ -847,6 +847,12 @@ struct LoweringPass : public mlir::ModulePass<LoweringPass> {
         EltwiseOpConversion<ew::CmpGtOp, CmpIntGtOp, OperandsAre<Not<EltwiseFloat>>>,
         EltwiseOpConversion<ew::CmpGeOp, CmpFloatOp<CmpFPredicate::OGE>, AnyOperandIs<EltwiseFloat>>,
         EltwiseOpConversion<ew::CmpGeOp, CmpIntGeOp, OperandsAre<Not<EltwiseFloat>>>,
+        EltwiseOpConversion<ew::BitAndOp, StdOp<mlir::AndOp>, OperandsAre<EltwiseInteger>>,
+        EltwiseOpConversion<ew::BitOrOp, StdOp<mlir::OrOp>, OperandsAre<EltwiseInteger>>,
+        EltwiseOpConversion<ew::BitXorOp, StdOp<mlir::XOrOp>, OperandsAre<EltwiseInteger>>,
+        EltwiseOpConversion<ew::BitShlOp, StdOp<mlir::ShiftLeftOp>, OperandsAre<EltwiseInteger>>,
+        EltwiseOpConversion<ew::BitShrOp, StdOp<mlir::SignedShiftRightOp>, OperandsAre<EltwiseSigned>>,
+        EltwiseOpConversion<ew::BitShrOp, StdOp<mlir::UnsignedShiftRightOp>, OperandsAre<EltwiseUnsigned>>,
         EltwiseOpConversion<ew::SelectOp, SelectOp>,    //
         EltwiseOpConversion<ew::IdentOp, FirstOperand>  //
         >(&getContext());
