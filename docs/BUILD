@@ -17,7 +17,9 @@ py_binary(
     ],
     data = [
         ":docs",
+        "//plaidml/core:docs",
         "//plaidml/edsl:docs",
+        "//plaidml/exec:docs",
     ],
     deps = [
         "//plaidml:py",

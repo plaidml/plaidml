@@ -11,7 +11,6 @@ def GenericBuilderInterface : OpInterface<"GenericBuilder"> {
     StaticInterfaceMethod<"TODO", "Operation*", "create", (ins
       "OpBuilder*":$builder,
       "Location":$loc,
-      "Type":$type,
       "ArrayRef<Value>":$operands
     )>,
   ];

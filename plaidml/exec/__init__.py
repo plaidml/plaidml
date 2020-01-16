@@ -13,6 +13,9 @@ logger = logging.getLogger(__name__)
 
 
 def __init():
+    """
+    Initializes PlaidML's Execution API.
+    """
     ffi_call(lib.plaidml_exec_init)
 
 
@@ -36,6 +39,7 @@ def list_targets():
 
 
 class Executable(ForeignObject):
+    """Docstring for class Executable"""
     __ffi_del__ = lib.plaidml_executable_free
 
     def __init__(self, program, inputs=[], outputs=[], device=None, target=None):
@@ -66,6 +70,7 @@ class Executable(ForeignObject):
 
 
 class Binder:
+    """Docstring for class Binder"""
 
     def __init__(self, program, device=None, target=None):
         self.program = program

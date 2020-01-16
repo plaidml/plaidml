@@ -48,14 +48,17 @@ def ImplicitAffineTerminator
 
 def AffineParallelForOp : PXA_Op<"parallel_for", [ImplicitAffineTerminator]> {
   let summary = "multi-index parallel for operation";
-  let arguments = (ins I64ArrayAttr:$ranges, Variadic<Index>:$dynamic_ranges);
-  let regions = (region SizedRegion<1>:$inner);
-}
-
-def PXA_CastOp : PXA_Op<"cast"> {
-  let summary = "cast operation";
-  let arguments = (ins AnyStdScalar:$input, BoolAttr:$in_signed, BoolAttr:$out_signed);
-  let results = (outs AnyStdScalar:$result);
+  let arguments = (ins AffineMapAttr:$ranges, AffineMapAttr:$transform, Variadic<Index>:$mapOperands);
+  let regions = (region SizedRegion<1>:$region);
+  let extraClassDeclaration = [{
+    ValueRange getRangeOperands() { return llvm::make_range(operand_begin(), operand_begin() + ranges().getNumInputs()); }
+    ValueRange getTransformOperands() { return llvm::make_range(operand_begin() + ranges().getNumInputs(), operand_end()); }
+    mlir::Block *getBody() { return &region().front(); }
+    mlir::OpBuilder getBodyBuilder() {
+      return mlir::OpBuilder(getBody(), std::prev(getBody()->end()));
+    }
+  }];
+  let builders = [OpBuilder<"Builder* builder, OperationState& result, ArrayRef<int64_t> ranges">];
 }
 
 #endif // __PML_PXA_OPS__

@@ -13,6 +13,8 @@ namespace networks::oplib {
 
 namespace {
 
+using plaidml::DType;
+
 edsl::Tensor block(                      //
     const edsl::Tensor& I,               //
     const std::vector<edsl::Tensor>& W,  //
@@ -106,164 +108,164 @@ edsl::Tensor block(                      //
 std::vector<edsl::Tensor> weight_placeholders() {
   return {
       // conv1
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {7, 7, 3, 64}),
+      edsl::Placeholder(DType::FLOAT32, {7, 7, 3, 64}),
 
       // block2a
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {1, 1, 64, 64}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {3, 3, 64, 64}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {1, 1, 64, 256}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {1, 1, 64, 256}),
+      edsl::Placeholder(DType::FLOAT32, {1, 1, 64, 64}),
+      edsl::Placeholder(DType::FLOAT32, {3, 3, 64, 64}),
+      edsl::Placeholder(DType::FLOAT32, {1, 1, 64, 256}),
+      edsl::Placeholder(DType::FLOAT32, {1, 1, 64, 256}),
       // block2b
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {1, 1, 256, 64}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {3, 3, 64, 64}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {1, 1, 64, 256}),
+      edsl::Placeholder(DType::FLOAT32, {1, 1, 256, 64}),
+      edsl::Placeholder(DType::FLOAT32, {3, 3, 64, 64}),
+      edsl::Placeholder(DType::FLOAT32, {1, 1, 64, 256}),
       // block2c
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {1, 1, 256, 64}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {3, 3, 64, 64}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {1, 1, 64, 256}),
+      edsl::Placeholder(DType::FLOAT32, {1, 1, 256, 64}),
+      edsl::Placeholder(DType::FLOAT32, {3, 3, 64, 64}),
+      edsl::Placeholder(DType::FLOAT32, {1, 1, 64, 256}),
 
       // block3a
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {1, 1, 256, 128}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {3, 3, 128, 128}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {1, 1, 128, 512}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {1, 1, 256, 512}),
+      edsl::Placeholder(DType::FLOAT32, {1, 1, 256, 128}),
+      edsl::Placeholder(DType::FLOAT32, {3, 3, 128, 128}),
+      edsl::Placeholder(DType::FLOAT32, {1, 1, 128, 512}),
+      edsl::Placeholder(DType::FLOAT32, {1, 1, 256, 512}),
       // block3b
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {1, 1, 512, 128}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {3, 3, 128, 128}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {1, 1, 128, 512}),
+      edsl::Placeholder(DType::FLOAT32, {1, 1, 512, 128}),
+      edsl::Placeholder(DType::FLOAT32, {3, 3, 128, 128}),
+      edsl::Placeholder(DType::FLOAT32, {1, 1, 128, 512}),
       // block3c
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {1, 1, 512, 128}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {3, 3, 128, 128}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {1, 1, 128, 512}),
+      edsl::Placeholder(DType::FLOAT32, {1, 1, 512, 128}),
+      edsl::Placeholder(DType::FLOAT32, {3, 3, 128, 128}),
+      edsl::Placeholder(DType::FLOAT32, {1, 1, 128, 512}),
       // block3d
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {1, 1, 512, 128}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {3, 3, 128, 128}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {1, 1, 128, 512}),
+      edsl::Placeholder(DType::FLOAT32, {1, 1, 512, 128}),
+      edsl::Placeholder(DType::FLOAT32, {3, 3, 128, 128}),
+      edsl::Placeholder(DType::FLOAT32, {1, 1, 128, 512}),
 
       // block4a
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {1, 1, 512, 256}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {3, 3, 256, 256}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {1, 1, 256, 1024}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {1, 1, 512, 1024}),
+      edsl::Placeholder(DType::FLOAT32, {1, 1, 512, 256}),
+      edsl::Placeholder(DType::FLOAT32, {3, 3, 256, 256}),
+      edsl::Placeholder(DType::FLOAT32, {1, 1, 256, 1024}),
+      edsl::Placeholder(DType::FLOAT32, {1, 1, 512, 1024}),
       // block4b
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {1, 1, 1024, 256}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {3, 3, 256, 256}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {1, 1, 256, 1024}),
+      edsl::Placeholder(DType::FLOAT32, {1, 1, 1024, 256}),
+      edsl::Placeholder(DType::FLOAT32, {3, 3, 256, 256}),
+      edsl::Placeholder(DType::FLOAT32, {1, 1, 256, 1024}),
       // block4c
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {1, 1, 1024, 256}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {3, 3, 256, 256}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {1, 1, 256, 1024}),
+      edsl::Placeholder(DType::FLOAT32, {1, 1, 1024, 256}),
+      edsl::Placeholder(DType::FLOAT32, {3, 3, 256, 256}),
+      edsl::Placeholder(DType::FLOAT32, {1, 1, 256, 1024}),
       // block4d
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {1, 1, 1024, 256}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {3, 3, 256, 256}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {1, 1, 256, 1024}),
+      edsl::Placeholder(DType::FLOAT32, {1, 1, 1024, 256}),
+      edsl::Placeholder(DType::FLOAT32, {3, 3, 256, 256}),
+      edsl::Placeholder(DType::FLOAT32, {1, 1, 256, 1024}),
       // block4e
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {1, 1, 1024, 256}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {3, 3, 256, 256}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {1, 1, 256, 1024}),
+      edsl::Placeholder(DType::FLOAT32, {1, 1, 1024, 256}),
+      edsl::Placeholder(DType::FLOAT32, {3, 3, 256, 256}),
+      edsl::Placeholder(DType::FLOAT32, {1, 1, 256, 1024}),
       // block4f
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {1, 1, 1024, 256}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {3, 3, 256, 256}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {1, 1, 256, 1024}),
+      edsl::Placeholder(DType::FLOAT32, {1, 1, 1024, 256}),
+      edsl::Placeholder(DType::FLOAT32, {3, 3, 256, 256}),
+      edsl::Placeholder(DType::FLOAT32, {1, 1, 256, 1024}),
 
       // block5a
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {1, 1, 1024, 512}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {3, 3, 512, 512}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {1, 1, 512, 2048}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {1, 1, 1024, 2048}),
+      edsl::Placeholder(DType::FLOAT32, {1, 1, 1024, 512}),
+      edsl::Placeholder(DType::FLOAT32, {3, 3, 512, 512}),
+      edsl::Placeholder(DType::FLOAT32, {1, 1, 512, 2048}),
+      edsl::Placeholder(DType::FLOAT32, {1, 1, 1024, 2048}),
       // block5b
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {1, 1, 2048, 512}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {3, 3, 512, 512}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {1, 1, 512, 2048}),
+      edsl::Placeholder(DType::FLOAT32, {1, 1, 2048, 512}),
+      edsl::Placeholder(DType::FLOAT32, {3, 3, 512, 512}),
+      edsl::Placeholder(DType::FLOAT32, {1, 1, 512, 2048}),
       // block5c
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {1, 1, 2048, 512}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {3, 3, 512, 512}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {1, 1, 512, 2048}),
+      edsl::Placeholder(DType::FLOAT32, {1, 1, 2048, 512}),
+      edsl::Placeholder(DType::FLOAT32, {3, 3, 512, 512}),
+      edsl::Placeholder(DType::FLOAT32, {1, 1, 512, 2048}),
 
       // dense
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {2048, 1000}),
+      edsl::Placeholder(DType::FLOAT32, {2048, 1000}),
   };
 }
 
 std::vector<edsl::Tensor> bias_placeholders() {
   return {
       // conv1
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {64}),
+      edsl::Placeholder(DType::FLOAT32, {64}),
 
       // block2a
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {64}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {64}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {256}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {256}),
+      edsl::Placeholder(DType::FLOAT32, {64}),
+      edsl::Placeholder(DType::FLOAT32, {64}),
+      edsl::Placeholder(DType::FLOAT32, {256}),
+      edsl::Placeholder(DType::FLOAT32, {256}),
       // block2b
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {64}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {64}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {256}),
+      edsl::Placeholder(DType::FLOAT32, {64}),
+      edsl::Placeholder(DType::FLOAT32, {64}),
+      edsl::Placeholder(DType::FLOAT32, {256}),
       // block2c
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {64}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {64}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {256}),
+      edsl::Placeholder(DType::FLOAT32, {64}),
+      edsl::Placeholder(DType::FLOAT32, {64}),
+      edsl::Placeholder(DType::FLOAT32, {256}),
 
       // block3a
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {128}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {128}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {512}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {512}),
+      edsl::Placeholder(DType::FLOAT32, {128}),
+      edsl::Placeholder(DType::FLOAT32, {128}),
+      edsl::Placeholder(DType::FLOAT32, {512}),
+      edsl::Placeholder(DType::FLOAT32, {512}),
       // block3b
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {128}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {128}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {512}),
+      edsl::Placeholder(DType::FLOAT32, {128}),
+      edsl::Placeholder(DType::FLOAT32, {128}),
+      edsl::Placeholder(DType::FLOAT32, {512}),
       // block3c
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {128}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {128}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {512}),
+      edsl::Placeholder(DType::FLOAT32, {128}),
+      edsl::Placeholder(DType::FLOAT32, {128}),
+      edsl::Placeholder(DType::FLOAT32, {512}),
       // block3d
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {128}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {128}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {512}),
+      edsl::Placeholder(DType::FLOAT32, {128}),
+      edsl::Placeholder(DType::FLOAT32, {128}),
+      edsl::Placeholder(DType::FLOAT32, {512}),
 
       // block4a
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {256}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {256}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {1024}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {1024}),
+      edsl::Placeholder(DType::FLOAT32, {256}),
+      edsl::Placeholder(DType::FLOAT32, {256}),
+      edsl::Placeholder(DType::FLOAT32, {1024}),
+      edsl::Placeholder(DType::FLOAT32, {1024}),
       // block4b
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {256}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {256}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {1024}),
+      edsl::Placeholder(DType::FLOAT32, {256}),
+      edsl::Placeholder(DType::FLOAT32, {256}),
+      edsl::Placeholder(DType::FLOAT32, {1024}),
       // block4c
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {256}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {256}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {1024}),
+      edsl::Placeholder(DType::FLOAT32, {256}),
+      edsl::Placeholder(DType::FLOAT32, {256}),
+      edsl::Placeholder(DType::FLOAT32, {1024}),
       // block4d
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {256}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {256}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {1024}),
+      edsl::Placeholder(DType::FLOAT32, {256}),
+      edsl::Placeholder(DType::FLOAT32, {256}),
+      edsl::Placeholder(DType::FLOAT32, {1024}),
       // block4e
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {256}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {256}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {1024}),
+      edsl::Placeholder(DType::FLOAT32, {256}),
+      edsl::Placeholder(DType::FLOAT32, {256}),
+      edsl::Placeholder(DType::FLOAT32, {1024}),
       // block4f
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {256}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {256}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {1024}),
+      edsl::Placeholder(DType::FLOAT32, {256}),
+      edsl::Placeholder(DType::FLOAT32, {256}),
+      edsl::Placeholder(DType::FLOAT32, {1024}),
 
       // block5a
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {512}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {512}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {2048}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {2048}),
+      edsl::Placeholder(DType::FLOAT32, {512}),
+      edsl::Placeholder(DType::FLOAT32, {512}),
+      edsl::Placeholder(DType::FLOAT32, {2048}),
+      edsl::Placeholder(DType::FLOAT32, {2048}),
       // block5b
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {512}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {512}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {2048}),
+      edsl::Placeholder(DType::FLOAT32, {512}),
+      edsl::Placeholder(DType::FLOAT32, {512}),
+      edsl::Placeholder(DType::FLOAT32, {2048}),
       // block5c
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {512}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {512}),
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {2048}),
+      edsl::Placeholder(DType::FLOAT32, {512}),
+      edsl::Placeholder(DType::FLOAT32, {512}),
+      edsl::Placeholder(DType::FLOAT32, {2048}),
 
       // dense
-      edsl::Placeholder(PLAIDML_DATA_FLOAT32, {1000}),
+      edsl::Placeholder(DType::FLOAT32, {1000}),
   };
 }
 
@@ -387,7 +389,7 @@ struct resnet50 : public benchmark::Fixture {
   }
 
   auto compile(int64_t batch_size = 1) {
-    auto I = edsl::Placeholder(PLAIDML_DATA_FLOAT32, {batch_size, 224, 224, 3});
+    auto I = edsl::Placeholder(DType::FLOAT32, {batch_size, 224, 224, 3});
     auto W = weight_placeholders();
     auto B = bias_placeholders();
     auto program = build(batch_size, I, W, B);

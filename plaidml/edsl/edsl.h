@@ -61,7 +61,7 @@ void into_vector(std::vector<T>* into, Head&& head, Tail&&... tail) {
 }  // namespace details
 
 ///
-/// TODO
+/// Initializes PlaidML's EDSL API.
 ///
 inline void init() {
   plaidml::init();
@@ -75,6 +75,7 @@ inline void init() {
 ///
 /// \ingroup edsl_objects
 /// \class Program
+/// This is a program.
 ///
 class Program {
  public:
@@ -117,6 +118,7 @@ class Program {
 
 ///
 /// \class TensorDim
+/// Specifies the dimensions of an input tensor
 /// \ingroup edsl_objects
 ///
 class TensorDim {
@@ -208,7 +210,7 @@ class TensorIndex {
       : ptr_(details::make_ptr(MakeDimPolyOp(op, idx, dim, lhs_first))) {}
 
   ///
-  /// TODO
+  /// Represents an subtraction operator overload on a TensorIndex
   ///
   TensorIndex operator-() const;
 
@@ -260,6 +262,7 @@ class TensorIndex {
 
 ///
 /// \struct Constraint
+/// This is a constraint.
 /// \ingroup edsl_objects
 ///
 struct Constraint {
@@ -376,35 +379,36 @@ class LogicalShape {
 
  public:
   ///
-  /// TODO
+  /// LogicalShape constructor
   ///
-  LogicalShape(plaidml_datatype dtype, const std::vector<int64_t>& dims)
-      : ptr_(details::make_ptr(
-            ffi::call<plaidml_logical_shape*>(plaidml_logical_shape_alloc, dtype, dims.size(), dims.data()))) {}
+  LogicalShape(DType dtype, const std::vector<int64_t>& dims)
+      : ptr_(details::make_ptr(ffi::call<plaidml_logical_shape*>(
+            plaidml_logical_shape_alloc, static_cast<plaidml_datatype>(dtype), dims.size(), dims.data()))) {}
 
   ///
-  /// TODO
+  /// Returns a LogicalShape as a string
   ///
   std::string str() const {  //
     return ffi::str(ffi::call<plaidml_string*>(plaidml_logical_shape_repr, ptr_.get()));
   }
 
   ///
-  /// TODO
+  /// Returns the datatype of the LogicalShape
   ///
-  plaidml_datatype dtype() const {  //
-    return ffi::call<plaidml_datatype>(plaidml_logical_shape_get_dtype, ptr_.get());
+  DType dtype() const {
+    auto ret = ffi::call<plaidml_datatype>(plaidml_logical_shape_get_dtype, ptr_.get());
+    return static_cast<DType>(ret);
   }
 
   ///
-  /// TODO
+  /// Returns the number of dimensions of the LogicalShape
   ///
   size_t ndims() const {  //
     return ffi::call<size_t>(plaidml_logical_shape_get_ndims, ptr_.get());
   }
 
   ///
-  /// TODO
+  /// Returns the dimensions of the LogicalShape as a vector of integers.
   ///
   std::vector<int64_t> int_dims() const {
     std::vector<int64_t> ret(ndims());
@@ -444,7 +448,7 @@ class Tensor {
 
  public:
   ///
-  /// TODO
+  /// Tensor constructor
   ///
   Tensor() : impl_(new Impl) {}
 
@@ -453,42 +457,50 @@ class Tensor {
   }
 
   ///
-  /// TODO
+  /// Tensor constructor
+  /// \param value int
+  /// \return Tensor
   ///
   explicit Tensor(int value) : impl_(new Impl) {  //
     impl_->ptr = details::make_ptr(ffi::call<plaidml_expr*>(plaidml_expr_int, value));
   }
 
   ///
-  /// TODO
+  /// Tensor constructor
+  /// \param value unsigned int
+  /// \return Tensor
   ///
   explicit Tensor(unsigned value) : impl_(new Impl) {  //
     impl_->ptr = details::make_ptr(ffi::call<plaidml_expr*>(plaidml_expr_int, value));
   }
 
   ///
-  /// TODO
+  /// Tensor constructor
+  /// \param value int64_t
+  /// \return Tensor
   ///
   explicit Tensor(int64_t value) : impl_(new Impl) {
     impl_->ptr = details::make_ptr(ffi::call<plaidml_expr*>(plaidml_expr_int, value));
   }
 
   ///
-  /// TODO
+  /// Tensor constructor
+  /// \param value double
+  /// \return Tensor
   ///
   explicit Tensor(double value) : impl_(new Impl) {
     impl_->ptr = details::make_ptr(ffi::call<plaidml_expr*>(plaidml_expr_float, value));
   }
 
   ///
-  /// TODO
+  /// Tensor constructor
   ///
   explicit Tensor(const TensorDim& dim) : impl_(new Impl) {
     impl_->ptr = details::make_ptr(ffi::call<plaidml_expr*>(plaidml_expr_dim, dim.as_ptr()));
   }
 
   ///
-  /// TODO
+  /// Tensor constructor
   ///
   explicit Tensor(const std::vector<int64_t>& dims) : impl_(new Impl) {
     for (auto dim : dims) {
@@ -498,7 +510,7 @@ class Tensor {
   }
 
   ///
-  /// TODO
+  /// Tensor constructor
   ///
   explicit Tensor(const std::vector<TensorDim>& dims) : impl_(new Impl) {
     impl_->dims = dims;
@@ -506,7 +518,7 @@ class Tensor {
   }
 
   ///
-  /// Tensor
+  /// Tensor constructor
   ///
   explicit Tensor(const std::initializer_list<TensorDim>& dims) : impl_(new Impl) {
     impl_->dims = dims;
@@ -514,7 +526,7 @@ class Tensor {
   }
 
   ///
-  /// Tensor
+  /// Tensor constructor
   ///
   Tensor(const std::string& name, const std::vector<TensorDim>& dims) : impl_(new Impl) {
     impl_->name = name;
@@ -523,7 +535,7 @@ class Tensor {
   }
 
   ///
-  /// TODO
+  /// Tensor constructor
   ///
   Tensor(const std::string& name, const std::initializer_list<TensorDim>& dims) : impl_(new Impl) {
     impl_->name = name;
@@ -532,12 +544,12 @@ class Tensor {
   }
 
   ///
-  /// TODO
+  /// Tensor constructor
   ///
   Tensor(const Tensor& rhs) { *this = rhs; }
 
   ///
-  /// TODO
+  /// Represents an operator overload for `=` for a `Tensor`
   ///
   Tensor& operator=(const Tensor& rhs) {
     if (this != &rhs) {
@@ -675,16 +687,18 @@ class Tensor {
 };
 
 ///
+/// \struct TensorRef
+/// A reference to a Tensor
 /// \ingroup edsl_objects
 ///
 struct TensorRef {
   ///
-  /// TODO
+  /// The `Tensor` that the `TensorRef` is referencing
   ///
   Tensor tensor;
 
   ///
-  /// TODO
+  /// TensorRef constructor
   ///
   TensorRef(const Tensor& tensor) : tensor(tensor) {}  // NOLINT[runtime/explicit]
 
@@ -767,7 +781,7 @@ inline Tensor Placeholder(      //
 }
 
 inline Tensor Placeholder(             //
-    plaidml_datatype dtype,            //
+    DType dtype,                       //
     const std::vector<int64_t>& dims,  //
     const std::string& name = "") {
   LogicalShape shape(dtype, dims);
@@ -816,11 +830,6 @@ Tensor Call(const std::string& fn, Ts... args) {
   return Call(fn, vec);
 }
 
-inline Tensor cast(const Tensor& x, plaidml_datatype dtype) {
-  auto ptr = ffi::call<plaidml_expr*>(plaidml_expr_cast, x.as_ptr(), dtype);
-  return Tensor{ptr};
-}
-
 ///
 /// \defgroup edsl_primitives EDSL Primitives
 ///
@@ -836,73 +845,15 @@ inline Tensor cast(const Tensor& x, plaidml_datatype dtype) {
 inline Tensor abs(const Tensor& x) { return Call("abs", x); }
 
 ///
-/// Performs an elementwise conversion of `x` into a Tensor of floating point numbers with precision `bit_size`.
+/// Casts the element type of a tensor `x` to the type specified by `dtype`.
 /// \param x Tensor
-/// \param bit_size size_t
+/// \param dtype DType
 /// \return Tensor
 ///
-inline Tensor as_float(const Tensor& x, size_t bit_size) {
-  switch (bit_size) {
-    case 16:
-      return cast(x, PLAIDML_DATA_FLOAT16);
-    case 32:
-      return cast(x, PLAIDML_DATA_FLOAT32);
-    case 64:
-      return cast(x, PLAIDML_DATA_FLOAT64);
-    default:
-      throw std::runtime_error("Invalid bit size for as_float");
-  }
+inline Tensor cast(const Tensor& x, DType dtype) {
+  auto ptr = ffi::call<plaidml_expr*>(plaidml_expr_cast, x.as_ptr(), static_cast<plaidml_datatype>(dtype));
+  return Tensor{ptr};
 }
-
-///
-/// Performs an elementwise conversion of `x` into a Tensor of integers with width `bit_size`.
-/// \param x Tensor
-/// \param bit_size size_t
-/// \return Tensor
-///
-inline Tensor as_int(const Tensor& x, size_t bit_size) {
-  switch (bit_size) {
-    case 8:
-      return cast(x, PLAIDML_DATA_INT8);
-    case 16:
-      return cast(x, PLAIDML_DATA_INT16);
-    case 32:
-      return cast(x, PLAIDML_DATA_INT32);
-    case 64:
-      return cast(x, PLAIDML_DATA_INT64);
-    default:
-      throw std::runtime_error("Invalid bit size for as_int");
-  }
-}
-
-///
-/// Performs an elementwise conversion of `x` into a Tensor of unsigned integers with width `bit_size`.
-/// \param x Tensor
-/// \param bit_size size_t
-/// \return Tensor
-///
-inline Tensor as_uint(const Tensor& x, size_t bit_size) {
-  switch (bit_size) {
-    case 8:
-      return cast(x, PLAIDML_DATA_UINT8);
-    case 16:
-      return cast(x, PLAIDML_DATA_UINT16);
-    case 32:
-      return cast(x, PLAIDML_DATA_UINT32);
-    case 64:
-      return cast(x, PLAIDML_DATA_UINT64);
-    default:
-      throw std::runtime_error("Invalid bit size for as_uint");
-  }
-}
-
-///
-/// Performs an elementwise conversion of `x` into a Tensor of booleans with width `bit_size`.
-/// \param x Tensor
-/// \param bit_size size_t
-/// \return Tensor
-///
-inline Tensor as_bool(const Tensor& x) { return cast(x, PLAIDML_DATA_BOOLEAN); }
 
 ///
 /// Computes the elementwise cosine of `x`.
@@ -1068,7 +1019,6 @@ inline Tensor tanh(const Tensor& x) { return Call("tanh", x); }
 
 ///
 /// Returns a Tensor with a value of 0.
-/// \param None
 /// \return Tensor
 ///
 inline Tensor zero() { return Tensor{0}; }
@@ -1201,8 +1151,8 @@ PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(<, "cmp_lt");
 PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(>, "cmp_gt");
 PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(<=, "cmp_le");
 PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(>=, "cmp_ge");
-PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(<<, "bit_left");
-PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(>>, "bit_right");
+PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(<<, "bit_shl");
+PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(>>, "bit_shr");
 PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(&, "bit_and");
 PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(|, "bit_or");
 PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(^, "bit_xor");

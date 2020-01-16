@@ -113,7 +113,6 @@ py_binary(
         "@boost//:LICENSE_1_0.txt",
         "@easylogging//:LICENCE.txt",
         "@gmock//:googlemock/LICENSE",
-        "@half//:LICENSE.txt",
         "@llvm-project//llvm:LICENSE.TXT",
         "@llvm-project//mlir:LICENSE.TXT",
         "@tbb//:LICENSE",

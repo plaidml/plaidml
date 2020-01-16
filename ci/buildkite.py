@@ -3,12 +3,12 @@
 import argparse
 import glob
 import os
-import pathlib
 import platform
 import shutil
 import subprocess
 import sys
 import tarfile
+from pathlib import Path
 
 import util
 
@@ -128,7 +128,7 @@ def cmd_pipeline(args, remainder):
 
 
 def output_base():
-    root = pathlib.Path(OUTPUT_ROOT.get(platform.system()))
+    root = Path(OUTPUT_ROOT.get(platform.system()))
     agent = os.getenv('BUILDKITE_AGENT_NAME', 'agent')
     pipeline = os.getenv('BUILDKITE_PIPELINE_SLUG', 'pipeline')
     branch = os.getenv('BUILDKITE_PULL_REQUEST_BASE_BRANCH', '')
@@ -167,9 +167,11 @@ def cmd_build(args, remainder):
     util.printf('--- :bazel: Running Build...')
     if platform.system() == 'Windows':
         util.check_call(['git', 'config', 'core.symlinks', 'true'])
-        cenv = util.CondaEnv(pathlib.Path('.cenv'))
+        cenv = util.CondaEnv(Path('.cenv'))
         cenv.create('environment-windows.yml')
         env.update(cenv.env())
+        for path in Path('.').glob('bazel-*'):
+            path.unlink()
     util.check_call(['bazelisk'] + startup_args + ['test', '...'] + common_args, env=env)
 
     util.printf('--- :buildkite: Uploading artifacts...')
@@ -219,14 +221,14 @@ def download_test_artifacts(pattern):
     util.buildkite_download(pattern, '.')
     util.buildkite_download(pattern.replace('/', '\\'), '.')
     for path in glob.glob(pattern):
-        src = pathlib.Path(path)
-        tgt = pathlib.Path(path.replace('\\', '/'))
+        src = Path(path)
+        tgt = Path(path.replace('\\', '/'))
         tgt.parent.mkdir(parents=True, exist_ok=True)
         src.rename(tgt)
 
 
 def cmd_report(args, remainder):
-    workdir = pathlib.Path('tmp').resolve()
+    workdir = Path('tmp').resolve()
     make_all_wheels(workdir)
     download_test_artifacts('tmp/test/**/*')
     startup_args = ['--output_base={}'.format(output_base())]

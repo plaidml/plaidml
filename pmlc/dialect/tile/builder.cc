@@ -57,6 +57,7 @@ using mlir::Value;
 using util::AggregationKind;
 using util::BufferPtr;
 using util::CombinationKind;
+using util::DataType;
 
 struct DomainInfo {
   BlockAndValueMapping mapping;
@@ -83,11 +84,11 @@ struct TileBuilder::Impl {
   }
 
   Type inferElementType(ArrayRef<Type> types) {
-    DataType ret = DataType::INVALID;
+    DataType ret = DataType::invalid;
     for (auto type : types) {
       auto rankedTensorType = eltwise::getRankedTensorType(type);
       auto dtype = rankedTensorType.getElementType().cast<ScalarType>().type();
-      ret = CommonSupertype(ret, dtype);
+      ret = promoteTypes(ret, dtype);
     }
     return builder.getType<ScalarType>(ret);
   }
@@ -108,7 +109,7 @@ struct TileBuilder::Impl {
   std::vector<Value> getBackwardSliceOfAffine(const llvm::SetVector<Value>& values) {
     return util::getBackwardSlice(values, false, [](Value value) {
       if (auto scalarType = value->getType().dyn_cast<ScalarType>()) {
-        return scalarType.type() == DataType::INT32;
+        return scalarType.type() == DataType::i32;
       }
       return false;
     });
@@ -136,7 +137,7 @@ struct TileBuilder::Impl {
     auto state = args.front();
     auto dims = args.drop_front();
     auto resultType = PrngOp::getResultType(args);
-    auto elementType = builder.getType<ScalarType>(DataType::UINT32);
+    auto elementType = builder.getType<ScalarType>(DataType::u32);
     auto stateType = RankedTensorType::get({3, 2048}, elementType);
     auto op = builder.create<PrngOp>(loc, resultType, stateType, state, dims);
     implicitUpdates.insert(std::make_pair(op.new_state(), op.state()));
@@ -144,7 +145,7 @@ struct TileBuilder::Impl {
   }
 
   Value makeScalarConstantOp(double value) {
-    auto type = builder.getType<ScalarType>(DataType::FLOAT32);
+    auto type = builder.getType<ScalarType>(DataType::f32);
     return builder.create<ScalarConstantOp>(loc, type, value).result();
   }
 };
@@ -249,7 +250,7 @@ RankedTensorType TileBuilder::ComputeShape(Value tensor) {
 }
 
 Value TileBuilder::MakeCastOp(Value tensor, DataType dtype) {
-  IVLOG(5, "TileBuilder::MakeCastOp> " << to_string(dtype));
+  IVLOG(5, "TileBuilder::MakeCastOp> " << stringifyDataType(dtype).str());
   IVLOG(6, "  arg: " << mlir::debugString(tensor));
   auto elementType = impl->builder.getType<ScalarType>(dtype);
   auto tensorType = eltwise::getRankedTensorType(tensor->getType());
@@ -276,8 +277,7 @@ Value TileBuilder::MakePrimitiveOp(StringRef fn, ArrayRef<Value> args) {
   if (!genericBuilder) {
     throw std::runtime_error("Unknown intrinsic: " + fn.str());
   }
-  auto type = impl->builder.getType<ScalarType>(DataType::FLOAT32);  // TODO
-  auto op = genericBuilder->create(&impl->builder, impl->loc, type, args);
+  auto op = genericBuilder->create(&impl->builder, impl->loc, args);
   return op->getResult(0);
 }
 
@@ -329,7 +329,7 @@ std::vector<Value> TileBuilder::GetTupleElements(Value value) {
 
 Value TileBuilder::MakeScalarConstantOp(int64_t value) {
   IVLOG(5, "TileBuilder::MakeScalarConstantOp> " << value);
-  auto type = impl->builder.getType<ScalarType>(DataType::INT32);
+  auto type = impl->builder.getType<ScalarType>(DataType::i32);
   return impl->builder.create<ScalarConstantOp>(impl->loc, type, value).result();
 }
 
@@ -358,7 +358,7 @@ Value TileBuilder::MakeDimOp(Value tensor, unsigned dim) {
 }
 
 RankedTensorType TileBuilder::MakeRankedTensorType(DataType dtype, ArrayRef<int64_t> dims) {
-  IVLOG(5, "TileBuilder::MakeRankedTensorType> " << to_string(dtype));
+  IVLOG(5, "TileBuilder::MakeRankedTensorType> " << stringifyDataType(dtype).str());
   auto elementType = impl->builder.getType<ScalarType>(dtype);
   // Convert dims: PlaidML semantics use 0 for unknown size, MLIR uses -1.
   SmallVector<int64_t, 4> shape(dims.begin(), dims.end());
@@ -491,7 +491,7 @@ Value TileBuilder::MakeContractionOp(  //
   IVLOG(5, "TileBuilder::MakeContractionOp> " << util::stringifyAggregationKind(agg).str() << ":"
                                               << util::stringifyCombinationKind(combo).str()
                                               << ", name: " << name.str());
-  IVLOG(5, mlir::debugString(impl->module));
+  IVLOG(5, "\n" << mlir::debugString(impl->module));
   // TODO: handle names (and idx_names)
   // Compute the sink shape of the contraction
   SmallVector<Type, 3> types;
@@ -501,7 +501,7 @@ Value TileBuilder::MakeContractionOp(  //
   }
   Type elementType;
   if (combo == CombinationKind::eq) {
-    elementType = ScalarType::get(&impl->context, DataType::BOOLEAN);
+    elementType = ScalarType::get(&impl->context, DataType::i1);
   } else if (combo == CombinationKind::cond) {
     auto rankedTensorType = eltwise::getRankedTensorType(types[2]);
     elementType = rankedTensorType.getElementType();
@@ -536,7 +536,7 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(StringRef name, const Prog
     name = "noname";
   }
   IVLOG(1, "TileBuilder::MakeProgram> " << name.str());
-  IVLOG(6, mlir::debugString(impl->module));
+  IVLOG(6, "\n" << mlir::debugString(impl->module));
   // Wrap duplicate outputs and outputs that directly refer to inputs
   llvm::SetVector<Value> outputs;
   for (auto output : mutations.outputs) {
@@ -641,7 +641,7 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(StringRef name, const Prog
   funcOp.setType(finalFuncType);
   // Attach the function to the module
   module.push_back(funcOp);
-  IVLOG(5, mlir::debugString(module));
+  IVLOG(5, "\n" << mlir::debugString(module));
   if (failed(mlir::verify(module))) {
     throw std::runtime_error("Module verification error");
   }
@@ -651,7 +651,7 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(StringRef name, const Prog
   pm.addPass(mlir::createCSEPass());
   auto result = pm.run(module);
   if (failed(result)) {
-    IVLOG(1, mlir::debugString(module));
+    IVLOG(1, "\n" << mlir::debugString(module));
     throw std::runtime_error("Optimization passes failure");
   }
   for (unsigned i = 0; i < returnOp.getNumOperands(); i++) {
@@ -669,7 +669,7 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(StringRef name, const Prog
     program->arguments.emplace_back(programArg);
     program->outputs.emplace_back(finalValue);
   }
-  IVLOG(2, "TileBuilder::MakeProgram>" << mlir::debugString(module));
+  IVLOG(2, "TileBuilder::MakeProgram>\n" << mlir::debugString(module));
   return program;
 }
 
@@ -698,7 +698,7 @@ std::vector<Value> TileBuilder::ComputeGradients(ArrayRef<Value> wrt, Value loss
 }
 
 void TileBuilder::Dump() {  //
-  IVLOG(5, mlir::debugString(impl->module));
+  IVLOG(5, "\n" << mlir::debugString(impl->module));
 }
 
 }  // namespace pmlc::dialect::tile
