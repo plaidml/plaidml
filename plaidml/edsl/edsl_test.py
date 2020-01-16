@@ -164,7 +164,7 @@ def arg_max(I):
     IX = index(T, 0)
     O = TensorOutput(X0, X2)
     O[x0, x2] >= cond(I[x0, x1, x2], Max[x0, x2], IX[x1])
-    return as_uint(O, 32)
+    return cast(O, DType.UINT32)
 
 
 def sum_over_axis(I):
