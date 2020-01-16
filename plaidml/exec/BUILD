@@ -12,6 +12,12 @@ exports_files([
 ])
 
 filegroup(
+    name = "docs",
+    srcs = ["exec.h"],
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
     name = "sdk",
     srcs = SDK_HDRS,
     visibility = ["//visibility:public"],

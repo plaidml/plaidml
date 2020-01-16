@@ -26,6 +26,12 @@ pkg_tar(
 )
 
 filegroup(
+    name = "docs",
+    srcs = ["core.h"],
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
     name = "sdk",
     srcs = SDK_HDRS,
     visibility = ["//visibility:public"],
