@@ -35,7 +35,7 @@ The feedback we have received from our users indicates an ever-increasing need
 for performance, programmability, and portability. During the past few months,
 we have been restructuring PlaidML to address those needs.  To make all the
 changes we need to make while supporting our current user base, all development
-of PlaidML has moved to a branch — plaidml-v1. We will continue to maintain and
+of PlaidML has moved to a branch - plaidml-v1. We will continue to maintain and
 support the master branch of PlaidML and the stable 0.7.0 release.
 
 Read more here: https://github.com/plaidml/plaidml 
