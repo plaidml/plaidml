@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 def __init():
     """
-    Initializes PlaidML's execution APIs.
+    Initializes PlaidML's Execution API.
     """
     ffi_call(lib.plaidml_exec_init)
 

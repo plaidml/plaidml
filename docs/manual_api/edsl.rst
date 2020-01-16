@@ -20,8 +20,8 @@ Initialization
 
       .. note::
 
-         Initialization in Python follows standard conventions: the PlaidML EDSL is
-         initialized automatically wherever the namespace `plaidml.edsl` is imported.
+         Initialization of PlaidML's EDSL Python API happens automatically
+         wherever the module ``plaidml.edsl`` is imported.
 
 -------
 Objects

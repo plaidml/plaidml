@@ -20,9 +20,8 @@ Initialization
 
       .. note::
 
-         Initialization in Python follows standard conventions: the PlaidML Core
-         APIs are initialized automatically wherever the namespace
-         `plaidml.core` is imported.
+         Initialization of PlaidML's Core Python API happens automatically
+         wherever the module ``plaidml.core`` is imported.
 
 -------
 Objects

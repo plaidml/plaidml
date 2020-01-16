@@ -61,7 +61,7 @@ void into_vector(std::vector<T>* into, Head&& head, Tail&&... tail) {
 }  // namespace details
 
 ///
-/// Initializes PlaidML's EDSL APIs.
+/// Initializes PlaidML's EDSL API.
 ///
 inline void init() {
   plaidml::init();

@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 def __init():
     """
-    Initializes PlaidML's EDSL APIs.
+    Initializes PlaidML's EDSL API.
     """
     ffi_call(lib.plaidml_edsl_init)
 

@@ -65,7 +65,7 @@ inline std::shared_ptr<plaidml_view> make_plaidml_view(plaidml_view* ptr) {
 }  // namespace details
 
 ///
-/// Initializes PlaidML's core APIs.
+/// Initializes PlaidML's Core API.
 ///
 inline void init() {  //
   ffi::call_void(plaidml_init);

@@ -12,7 +12,7 @@ from plaidml.ffi import Error, ForeignObject, ffi, ffi_call, lib
 
 def __init():
     """
-    Initializes PlaidML's core APIs.
+    Initializes PlaidML's Core API.
     """
     ffi_call(lib.plaidml_init)
     lib_version = ffi.string(ffi_call(lib.plaidml_version)).decode()

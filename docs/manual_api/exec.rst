@@ -20,9 +20,8 @@ Initialization
 
       .. note::
 
-         Initialization in Python follows standard conventions: the PlaidML
-         Execution APIs are initialized automatically wherever the namespace
-         `plaidml.exec` is imported.
+         Initialization of PlaidML's Execution Python API happens
+         automatically wherever the module ``plaidml.exec`` is imported.
 
 -------
 Objects
