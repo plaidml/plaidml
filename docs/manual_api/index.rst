@@ -7,5 +7,6 @@ API
 
    core
    edsl
+   cpp_tile_edsl
    exec
 
