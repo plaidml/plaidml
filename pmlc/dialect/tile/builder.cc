@@ -58,7 +58,6 @@ using util::AggregationKind;
 using util::BufferPtr;
 using util::CombinationKind;
 using util::DataType;
-using util::stringifyDataType;
 
 struct DomainInfo {
   BlockAndValueMapping mapping;
@@ -251,7 +250,7 @@ RankedTensorType TileBuilder::ComputeShape(Value tensor) {
 }
 
 Value TileBuilder::MakeCastOp(Value tensor, DataType dtype) {
-  IVLOG(5, "TileBuilder::MakeCastOp> " << stringifyDataType(dtype));
+  IVLOG(5, "TileBuilder::MakeCastOp> " << stringifyDataType(dtype).str());
   IVLOG(6, "  arg: " << mlir::debugString(tensor));
   auto elementType = impl->builder.getType<ScalarType>(dtype);
   auto tensorType = eltwise::getRankedTensorType(tensor->getType());
@@ -359,7 +358,7 @@ Value TileBuilder::MakeDimOp(Value tensor, unsigned dim) {
 }
 
 RankedTensorType TileBuilder::MakeRankedTensorType(DataType dtype, ArrayRef<int64_t> dims) {
-  IVLOG(5, "TileBuilder::MakeRankedTensorType> " << stringifyDataType(dtype));
+  IVLOG(5, "TileBuilder::MakeRankedTensorType> " << stringifyDataType(dtype).str());
   auto elementType = impl->builder.getType<ScalarType>(dtype);
   // Convert dims: PlaidML semantics use 0 for unknown size, MLIR uses -1.
   SmallVector<int64_t, 4> shape(dims.begin(), dims.end());
