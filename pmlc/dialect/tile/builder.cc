@@ -57,6 +57,8 @@ using mlir::Value;
 using util::AggregationKind;
 using util::BufferPtr;
 using util::CombinationKind;
+using util::DataType;
+using util::stringifyDataType;
 
 struct DomainInfo {
   BlockAndValueMapping mapping;

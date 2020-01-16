@@ -378,9 +378,9 @@ class LogicalShape {
   ///
   /// TODO
   ///
-  LogicalShape(plaidml_datatype dtype, const std::vector<int64_t>& dims)
-      : ptr_(details::make_ptr(
-            ffi::call<plaidml_logical_shape*>(plaidml_logical_shape_alloc, dtype, dims.size(), dims.data()))) {}
+  LogicalShape(DType dtype, const std::vector<int64_t>& dims)
+      : ptr_(details::make_ptr(ffi::call<plaidml_logical_shape*>(
+            plaidml_logical_shape_alloc, static_cast<plaidml_datatype>(dtype), dims.size(), dims.data()))) {}
 
   ///
   /// TODO
@@ -392,8 +392,9 @@ class LogicalShape {
   ///
   /// TODO
   ///
-  plaidml_datatype dtype() const {  //
-    return ffi::call<plaidml_datatype>(plaidml_logical_shape_get_dtype, ptr_.get());
+  DType dtype() const {
+    auto ret = ffi::call<plaidml_datatype>(plaidml_logical_shape_get_dtype, ptr_.get());
+    return static_cast<DType>(ret);
   }
 
   ///
@@ -767,7 +768,7 @@ inline Tensor Placeholder(      //
 }
 
 inline Tensor Placeholder(             //
-    plaidml_datatype dtype,            //
+    DType dtype,                       //
     const std::vector<int64_t>& dims,  //
     const std::string& name = "") {
   LogicalShape shape(dtype, dims);
@@ -816,8 +817,8 @@ Tensor Call(const std::string& fn, Ts... args) {
   return Call(fn, vec);
 }
 
-inline Tensor cast(const Tensor& x, plaidml_datatype dtype) {
-  auto ptr = ffi::call<plaidml_expr*>(plaidml_expr_cast, x.as_ptr(), dtype);
+inline Tensor cast(const Tensor& x, DType dtype) {
+  auto ptr = ffi::call<plaidml_expr*>(plaidml_expr_cast, x.as_ptr(), static_cast<plaidml_datatype>(dtype));
   return Tensor{ptr};
 }
 
@@ -844,11 +845,11 @@ inline Tensor abs(const Tensor& x) { return Call("abs", x); }
 inline Tensor as_float(const Tensor& x, size_t bit_size) {
   switch (bit_size) {
     case 16:
-      return cast(x, PLAIDML_DATA_FLOAT16);
+      return cast(x, DType::FLOAT16);
     case 32:
-      return cast(x, PLAIDML_DATA_FLOAT32);
+      return cast(x, DType::FLOAT32);
     case 64:
-      return cast(x, PLAIDML_DATA_FLOAT64);
+      return cast(x, DType::FLOAT64);
     default:
       throw std::runtime_error("Invalid bit size for as_float");
   }
@@ -863,13 +864,13 @@ inline Tensor as_float(const Tensor& x, size_t bit_size) {
 inline Tensor as_int(const Tensor& x, size_t bit_size) {
   switch (bit_size) {
     case 8:
-      return cast(x, PLAIDML_DATA_INT8);
+      return cast(x, DType::INT8);
     case 16:
-      return cast(x, PLAIDML_DATA_INT16);
+      return cast(x, DType::INT16);
     case 32:
-      return cast(x, PLAIDML_DATA_INT32);
+      return cast(x, DType::INT32);
     case 64:
-      return cast(x, PLAIDML_DATA_INT64);
+      return cast(x, DType::INT64);
     default:
       throw std::runtime_error("Invalid bit size for as_int");
   }
@@ -884,13 +885,13 @@ inline Tensor as_int(const Tensor& x, size_t bit_size) {
 inline Tensor as_uint(const Tensor& x, size_t bit_size) {
   switch (bit_size) {
     case 8:
-      return cast(x, PLAIDML_DATA_UINT8);
+      return cast(x, DType::UINT8);
     case 16:
-      return cast(x, PLAIDML_DATA_UINT16);
+      return cast(x, DType::UINT16);
     case 32:
-      return cast(x, PLAIDML_DATA_UINT32);
+      return cast(x, DType::UINT32);
     case 64:
-      return cast(x, PLAIDML_DATA_UINT64);
+      return cast(x, DType::UINT64);
     default:
       throw std::runtime_error("Invalid bit size for as_uint");
   }
@@ -902,7 +903,7 @@ inline Tensor as_uint(const Tensor& x, size_t bit_size) {
 /// \param bit_size size_t
 /// \return Tensor
 ///
-inline Tensor as_bool(const Tensor& x) { return cast(x, PLAIDML_DATA_BOOLEAN); }
+inline Tensor as_bool(const Tensor& x) { return cast(x, DType::BOOLEAN); }
 
 ///
 /// Computes the elementwise cosine of `x`.

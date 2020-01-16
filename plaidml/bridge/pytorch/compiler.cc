@@ -532,7 +532,7 @@ std::shared_ptr<Executable> Compiler::compile(at::ArrayRef<IValue> inputs) {
       sizes.emplace_back(size);
     }
     // TODO: convert dtype
-    auto input_tensor = edsl::Placeholder(PLAIDML_DATA_FLOAT32, sizes);
+    auto input_tensor = edsl::Placeholder(plaidml::DType::FLOAT32, sizes);
     input_tensors.push_back(input_tensor);
     const auto& input = subgraph_->inputs()[i];
     value_map.emplace(input, input_tensor);

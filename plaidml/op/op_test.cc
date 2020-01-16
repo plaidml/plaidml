@@ -24,7 +24,7 @@ namespace plaidml::op {
 namespace {
 
 TEST(Op, Abs) {
-  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {1, 224, 224, 3}, "I");
+  auto I = Placeholder(DType::FLOAT32, {1, 224, 224, 3}, "I");
   auto abs = op::abs(I);
   Program program("abs", {abs});
   IVLOG(1, program);
@@ -45,7 +45,7 @@ module {
 }
 
 TEST(Op, All) {
-  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {1, 224, 224, 3}, "I");
+  auto I = Placeholder(DType::FLOAT32, {1, 224, 224, 3}, "I");
   Program program("all", {op::all(I)});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"#(
@@ -72,7 +72,7 @@ module {
 }
 
 TEST(Op, Any) {
-  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {1, 224, 224, 3}, "I");
+  auto I = Placeholder(DType::FLOAT32, {1, 224, 224, 3}, "I");
   Program program("any", {op::any(I)});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"#(
@@ -102,7 +102,7 @@ module {
 }
 
 TEST(Op, Argmax) {
-  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {1, 224, 224, 3}, "I");
+  auto I = Placeholder(DType::FLOAT32, {1, 224, 224, 3}, "I");
   Program program("argmax", {op::argmax(I)});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"#(
@@ -129,8 +129,8 @@ module {
 }
 
 TEST(Op, BinaryCrossentropy) {
-  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {7, 7, 3, 64}, "I");
-  auto O = Placeholder(PLAIDML_DATA_FLOAT32, {7, 7, 3, 64}, "O");
+  auto I = Placeholder(DType::FLOAT32, {7, 7, 3, 64}, "I");
+  auto O = Placeholder(DType::FLOAT32, {7, 7, 3, 64}, "O");
   Program program("binary_crossentropy", {op::binary_crossentropy(I, O, 0.0)});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"#(
@@ -162,9 +162,9 @@ module {
 }
 
 TEST(Op, Clip) {
-  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {7, 7, 3, 64}, "I");
-  auto raw_min = Placeholder(PLAIDML_DATA_FLOAT32, {7, 7, 3, 64}, "raw_min");
-  auto raw_max = Placeholder(PLAIDML_DATA_FLOAT32, {7, 7, 3, 64}, "raw_max");
+  auto I = Placeholder(DType::FLOAT32, {7, 7, 3, 64}, "I");
+  auto raw_min = Placeholder(DType::FLOAT32, {7, 7, 3, 64}, "raw_min");
+  auto raw_max = Placeholder(DType::FLOAT32, {7, 7, 3, 64}, "raw_max");
   Program program("clip", {op::clip(I, raw_min, raw_max)});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"#(
@@ -182,8 +182,8 @@ module {
 }
 
 TEST(Op, Concatenate) {
-  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {7, 7, 3, 64}, "A");
-  auto B = Placeholder(PLAIDML_DATA_FLOAT32, {7, 7, 3, 64}, "B");
+  auto A = Placeholder(DType::FLOAT32, {7, 7, 3, 64}, "A");
+  auto B = Placeholder(DType::FLOAT32, {7, 7, 3, 64}, "B");
   Program program("concatenate", {op::concatenate({A, B}, 2)});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"#(
@@ -205,8 +205,8 @@ module {
 }
 
 TEST(Op, Convolution) {
-  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {1, 224, 224, 3}, "I");
-  auto K = Placeholder(PLAIDML_DATA_FLOAT32, {7, 7, 3, 64}, "K");
+  auto I = Placeholder(DType::FLOAT32, {1, 224, 224, 3}, "I");
+  auto K = Placeholder(DType::FLOAT32, {7, 7, 3, 64}, "K");
   auto O = op::convolution(  //
       I,                     // I_or_O
       K,                     // F_or_O
@@ -245,7 +245,7 @@ module {
 }
 
 TEST(Op, CumProd) {
-  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {7, 7, 3, 64}, "I");
+  auto I = Placeholder(DType::FLOAT32, {7, 7, 3, 64}, "I");
   Program program("cumprod", {op::cumprod(I, 2)});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"#(
@@ -266,7 +266,7 @@ module {
 }
 
 TEST(Op, CumSum) {
-  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {7, 7, 3, 64}, "I");
+  auto I = Placeholder(DType::FLOAT32, {7, 7, 3, 64}, "I");
   Program program("cumsum", {op::cumsum(I, 2)});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"#(
@@ -287,8 +287,8 @@ module {
 }
 
 TEST(Op, Dot) {
-  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {7, 7, 3, 64}, "I");
-  auto K = Placeholder(PLAIDML_DATA_FLOAT32, {7, 7, 3, 64}, "K");
+  auto I = Placeholder(DType::FLOAT32, {7, 7, 3, 64}, "I");
+  auto K = Placeholder(DType::FLOAT32, {7, 7, 3, 64}, "K");
   Program program("dot", {op::dot(I, K)});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"#(
@@ -309,7 +309,7 @@ module {
 }
 
 TEST(Op, Elu) {
-  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {7, 7, 3, 64}, "I");
+  auto I = Placeholder(DType::FLOAT32, {7, 7, 3, 64}, "I");
   Program program("elu", {op::elu(I, 0.1)});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"#(
@@ -332,7 +332,7 @@ module {
 }
 
 TEST(Op, ExpandDims) {
-  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {7, 7, 3, 64}, "I");
+  auto I = Placeholder(DType::FLOAT32, {7, 7, 3, 64}, "I");
   Program program("expand_dims", {op::expand_dims(I, 2)});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"#(
@@ -352,7 +352,7 @@ module {
 }
 
 TEST(Op, Flip) {
-  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {7, 7, 3, 64}, "I");
+  auto I = Placeholder(DType::FLOAT32, {7, 7, 3, 64}, "I");
   Program program("flip", {op::flip(I, 2)});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"#(
@@ -372,7 +372,7 @@ module {
 }
 
 TEST(Op, HardSigmoid) {
-  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "A");
+  auto A = Placeholder(DType::FLOAT32, {10, 20}, "A");
   Program program("hard_sigmoid", {op::hard_sigmoid(A, 0.05)});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"#(
@@ -399,14 +399,14 @@ module {
 }
 
 TEST(Op, ImageResize) {
-  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {1, 224, 224, 3}, "I");
+  auto I = Placeholder(DType::FLOAT32, {1, 224, 224, 3}, "I");
   auto image_resize = op::image_resize(I, std::vector<int>{5, 4}, "bilinear", "nxc");
   Program program("image_resize", {image_resize});
   IVLOG(1, program);
 }
 
 TEST(Op, Max) {
-  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {1, 224, 224, 3}, "I");
+  auto I = Placeholder(DType::FLOAT32, {1, 224, 224, 3}, "I");
   Program program("max", {op::max(I)});  // NOLINT(build/include_what_you_use)
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"#(
@@ -426,8 +426,8 @@ module {
 }
 
 TEST(Op, Maximum) {
-  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "A");
-  auto B = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "B");
+  auto A = Placeholder(DType::FLOAT32, {10, 20}, "A");
+  auto B = Placeholder(DType::FLOAT32, {10, 20}, "B");
   Program program("maximum", {op::maximum(A, B)});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"#(
@@ -443,7 +443,7 @@ module {
 }
 
 TEST(Op, Mean) {
-  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "A");
+  auto A = Placeholder(DType::FLOAT32, {10, 20}, "A");
   Program program("mean", {op::mean(A)});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"#(
@@ -466,7 +466,7 @@ module {
 }
 
 TEST(Op, Min) {
-  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "A");
+  auto A = Placeholder(DType::FLOAT32, {10, 20}, "A");
   Program program("min", {op::min(A)});  // NOLINT(build/include_what_you_use)
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"#(
@@ -486,8 +486,8 @@ module {
 }
 
 TEST(Op, Minimum) {
-  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "A");
-  auto B = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "B");
+  auto A = Placeholder(DType::FLOAT32, {10, 20}, "A");
+  auto B = Placeholder(DType::FLOAT32, {10, 20}, "B");
   Program program("minimum", {op::minimum(A, B)});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"#(
@@ -503,7 +503,7 @@ module {
 }
 
 TEST(Op, Pool) {
-  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20, 30, 40, 50}, "I");
+  auto I = Placeholder(DType::FLOAT32, {10, 20, 30, 40, 50}, "I");
   Program program("pool", {op::pool(I, "sum", {1, 2, 3}, {1, 2, 3}, "none", {1, 2}, "nwc", true, true)});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"#(
@@ -524,7 +524,7 @@ module {
 }
 
 TEST(Op, Prod) {
-  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "A");
+  auto A = Placeholder(DType::FLOAT32, {10, 20}, "A");
   Program program("prod", {op::prod(A)});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"#(
@@ -544,9 +544,9 @@ module {
 }
 
 TEST(Op, Relu) {
-  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "I");
-  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "A");
-  auto M = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "M");
+  auto I = Placeholder(DType::FLOAT32, {10, 20}, "I");
+  auto A = Placeholder(DType::FLOAT32, {10, 20}, "A");
+  auto M = Placeholder(DType::FLOAT32, {10, 20}, "M");
   Program program("relu", {op::relu(I).alpha(A).max_value(M).threshold(0.05)});
   EXPECT_THAT(program, Eq(R"#(
 
@@ -567,8 +567,8 @@ module {
 }
 
 TEST(Op, ReluNoAlpha) {
-  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "I");
-  auto M = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "M");
+  auto I = Placeholder(DType::FLOAT32, {10, 20}, "I");
+  auto M = Placeholder(DType::FLOAT32, {10, 20}, "M");
   Program program("relu", {op::relu(I).max_value(M).threshold(0.05)});
   EXPECT_THAT(program, Eq(R"#(
 
@@ -588,8 +588,8 @@ module {
 }
 
 TEST(Op, ReluNoMaxValue) {
-  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "I");
-  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "A");
+  auto I = Placeholder(DType::FLOAT32, {10, 20}, "I");
+  auto A = Placeholder(DType::FLOAT32, {10, 20}, "A");
   Program program("relu", {op::relu(I).alpha(A).threshold(0.05)});
   EXPECT_THAT(program, Eq(R"#(
 
@@ -608,7 +608,7 @@ module {
 }
 
 TEST(Op, ReluOnlyThreshold) {
-  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "I");
+  auto I = Placeholder(DType::FLOAT32, {10, 20}, "I");
   Program program("relu", {op::relu(I).threshold(0.05)});
   EXPECT_THAT(program, Eq(R"#(
 
@@ -626,7 +626,7 @@ module {
 }
 
 TEST(Op, ReluNoParams) {
-  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "I");
+  auto I = Placeholder(DType::FLOAT32, {10, 20}, "I");
   Program program("relu", {op::relu(I)});
   EXPECT_THAT(program, Eq(R"#(
 
@@ -643,7 +643,7 @@ module {
 }
 
 TEST(Op, Repeat) {
-  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {32, 1, 4, 1}, "A");
+  auto A = Placeholder(DType::FLOAT32, {32, 1, 4, 1}, "A");
   auto X = op::repeat(  //
       A,                // tensor to repeat
       3,                // number of repeats
@@ -668,7 +668,7 @@ module {
 }
 
 TEST(Op, Reshape) {
-  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "A");
+  auto A = Placeholder(DType::FLOAT32, {10, 20}, "A");
   TensorDim I, J;
   A.bind_dims(I, J);
   Program program("reshape", {op::reshape(A, make_tuple(J, I))});
@@ -686,7 +686,7 @@ module {
 }
 
 TEST(Op, Sigmoid) {
-  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10}, "A");
+  auto A = Placeholder(DType::FLOAT32, {10}, "A");
   Program program("sigmoid", {op::sigmoid(A)});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"#(
@@ -707,7 +707,7 @@ module {
 }
 
 TEST(Op, Slice) {
-  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "A");
+  auto A = Placeholder(DType::FLOAT32, {10, 20}, "A");
   auto X = op::slice(  //
       A,               // tensor to perform spatial padding on
       {2, 10});        // slices
@@ -730,7 +730,7 @@ module {
 }
 
 TEST(Op, Softmax) {
-  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "A");
+  auto A = Placeholder(DType::FLOAT32, {10, 20}, "A");
   Program program("softmax", {op::softmax(A, 1)});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"#(
@@ -755,7 +755,7 @@ module {
 }
 
 TEST(Op, SpatialPadding) {
-  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {64, 4, 32, 32}, "A");
+  auto A = Placeholder(DType::FLOAT32, {64, 4, 32, 32}, "A");
   auto X = op::spatial_padding(  //
       A,                         // tensor to perform spatial padding on
       {1, 3},                    // low pads
@@ -780,7 +780,7 @@ module {
 }
 
 TEST(Op, Square) {
-  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10}, "A");
+  auto A = Placeholder(DType::FLOAT32, {10}, "A");
   Program program("square", {op::square(A)});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"#(
@@ -795,7 +795,7 @@ module {
 }
 
 TEST(Op, Sum) {
-  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "A");
+  auto A = Placeholder(DType::FLOAT32, {10, 20}, "A");
   Program program("sum", {op::sum(A)});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"#(
@@ -815,7 +815,7 @@ module {
 }
 
 TEST(Op, Squeeze) {
-  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {32, 1, 4, 1}, "A");
+  auto A = Placeholder(DType::FLOAT32, {32, 1, 4, 1}, "A");
   auto X = op::squeeze(  //
       A,                 // tensor to squeeze
       {1, 3});           // axes to squeeze
@@ -834,7 +834,7 @@ module {
 }
 
 TEST(Op, Tile) {
-  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "A");
+  auto A = Placeholder(DType::FLOAT32, {10, 20}, "A");
   auto X = op::tile(  //
       A,              // tensor to tile
       {5, 4});        // tiling factors
@@ -857,7 +857,7 @@ module {
 }
 
 TEST(Op, Transpose) {
-  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "A");
+  auto A = Placeholder(DType::FLOAT32, {10, 20}, "A");
   Program program("transpose", {op::transpose(A)});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"#(
@@ -877,7 +877,7 @@ module {
 }
 
 TEST(Op, Variance) {
-  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20}, "A");
+  auto A = Placeholder(DType::FLOAT32, {10, 20}, "A");
   Program program("variance", {op::variance(A)});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"#(

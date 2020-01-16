@@ -47,7 +47,7 @@ Tensor Softmax(const Tensor& X) {
 }
 
 TEST(CppEdsl, Cast) {
-  auto A = Placeholder(PLAIDML_DATA_UINT64, {3, 3});
+  auto A = Placeholder(DType::UINT64, {3, 3});
   auto B = as_uint(A, 32);
   Program program("cast", {B});
 
@@ -84,8 +84,8 @@ TEST(CppEdsl, Cast) {
 }
 
 TEST(CppEdsl, BitOr) {
-  auto A = Placeholder(PLAIDML_DATA_UINT64, {3, 3});
-  auto B = Placeholder(PLAIDML_DATA_UINT64, {3, 3});
+  auto A = Placeholder(DType::UINT64, {3, 3});
+  auto B = Placeholder(DType::UINT64, {3, 3});
   auto C = A | B;
   Program program("bit_or", {C});
 
@@ -114,8 +114,8 @@ TEST(CppEdsl, BitOr) {
 }
 
 TEST(CppEdsl, BitLeft) {
-  auto A = Placeholder(PLAIDML_DATA_UINT64, {3, 3});
-  auto B = Placeholder(PLAIDML_DATA_UINT64, {3, 3});
+  auto A = Placeholder(DType::UINT64, {3, 3});
+  auto B = Placeholder(DType::UINT64, {3, 3});
   auto C = A << B;
   Program program("bit_left", {C});
 
@@ -144,8 +144,8 @@ TEST(CppEdsl, BitLeft) {
 }
 
 TEST(CppEdsl, BitRight) {
-  auto A = Placeholder(PLAIDML_DATA_UINT64, {3, 3});
-  auto B = Placeholder(PLAIDML_DATA_UINT64, {3, 3});
+  auto A = Placeholder(DType::UINT64, {3, 3});
+  auto B = Placeholder(DType::UINT64, {3, 3});
   auto C = A >> B;
   Program program("bit_right", {C});
 
@@ -174,8 +174,8 @@ TEST(CppEdsl, BitRight) {
 }
 
 TEST(CppEdsl, BitXor) {
-  auto A = Placeholder(PLAIDML_DATA_UINT64, {3, 3});
-  auto B = Placeholder(PLAIDML_DATA_UINT64, {3, 3});
+  auto A = Placeholder(DType::UINT64, {3, 3});
+  auto B = Placeholder(DType::UINT64, {3, 3});
   auto C = A ^ B;
   Program program("bit_xor", {C});
 
@@ -204,8 +204,8 @@ TEST(CppEdsl, BitXor) {
 }
 
 TEST(CppEdsl, Add) {
-  auto A = Placeholder(PLAIDML_DATA_UINT64, {3, 3});
-  auto B = Placeholder(PLAIDML_DATA_UINT64, {3, 3});
+  auto A = Placeholder(DType::UINT64, {3, 3});
+  auto B = Placeholder(DType::UINT64, {3, 3});
   auto C = A + B;
   Program program("add", {C});
 
@@ -256,8 +256,8 @@ TEST(CppEdsl, Add) {
 }
 
 TEST(CppEdsl, Dot) {
-  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {3, 3});
-  auto B = Placeholder(PLAIDML_DATA_FLOAT32, {3, 3});
+  auto A = Placeholder(DType::FLOAT32, {3, 3});
+  auto B = Placeholder(DType::FLOAT32, {3, 3});
   auto C = Dot(A, B);
   Program program("dot", {C});
   EXPECT_THAT(program, Eq(R"#(
@@ -303,9 +303,9 @@ module {
 }
 
 TEST(CppEdsl, DoubleDot) {
-  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20});
-  auto B = Placeholder(PLAIDML_DATA_FLOAT32, {20, 30});
-  auto C = Placeholder(PLAIDML_DATA_FLOAT32, {30, 40});
+  auto A = Placeholder(DType::FLOAT32, {10, 20});
+  auto B = Placeholder(DType::FLOAT32, {20, 30});
+  auto C = Placeholder(DType::FLOAT32, {30, 40});
   Program program("double_dot", {Dot(Dot(A, B), C)});
   EXPECT_THAT(program, Eq(R"#(
 #map0 = (d0, d1, d2) -> (d0, d1)
@@ -327,8 +327,8 @@ module {
 }  // namespace plaidml::edsl
 
 TEST(CppEdsl, EltwiseAdd) {
-  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20});
-  auto B = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20});
+  auto A = Placeholder(DType::FLOAT32, {10, 20});
+  auto B = Placeholder(DType::FLOAT32, {10, 20});
   Program program("eltwise_add", {A + B});
   EXPECT_THAT(program, Eq(R"#(
 module {
@@ -342,7 +342,7 @@ module {
 }
 
 TEST(CppEdsl, Relu) {
-  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20});
+  auto A = Placeholder(DType::FLOAT32, {10, 20});
   Program program("relu", {Relu(A)});
   EXPECT_THAT(program, Eq(R"#(
 !f32 = type tensor<!eltwise.f32>
@@ -360,17 +360,17 @@ module {
 
 TEST(CppEdsl, MnistMlp) {
   // model.add(Dense(512, activation='relu', input_shape=(784,)))
-  auto input = Placeholder(PLAIDML_DATA_FLOAT32, {1, 784});
-  auto kernel1 = Placeholder(PLAIDML_DATA_FLOAT32, {784, 512});
-  auto bias1 = Placeholder(PLAIDML_DATA_FLOAT32, {512});
+  auto input = Placeholder(DType::FLOAT32, {1, 784});
+  auto kernel1 = Placeholder(DType::FLOAT32, {784, 512});
+  auto bias1 = Placeholder(DType::FLOAT32, {512});
   auto dense1 = Relu(Dot(input, kernel1) + bias1);
   // model.add(Dense(512, activation='relu'))
-  auto kernel2 = Placeholder(PLAIDML_DATA_FLOAT32, {512, 512});
-  auto bias2 = Placeholder(PLAIDML_DATA_FLOAT32, {512});
+  auto kernel2 = Placeholder(DType::FLOAT32, {512, 512});
+  auto bias2 = Placeholder(DType::FLOAT32, {512});
   auto dense2 = Relu(Dot(dense1, kernel2) + bias2);
   // model.add(Dense(10, activation='softmax'))
-  auto kernel3 = Placeholder(PLAIDML_DATA_FLOAT32, {512, 10});
-  auto bias3 = Placeholder(PLAIDML_DATA_FLOAT32, {10});
+  auto kernel3 = Placeholder(DType::FLOAT32, {512, 10});
+  auto bias3 = Placeholder(DType::FLOAT32, {10});
   auto dense3 = Softmax(Dot(dense2, kernel3) + bias3);
   Program program("mnist_mlp", {dense3});
   EXPECT_THAT(program, Eq(R"#(
@@ -419,8 +419,8 @@ Tensor Convolution2(const Tensor& I, const Tensor& K) {
 
 // TODO: implement constraints in -convert-tile-to-pxa
 TEST(CppEdsl, DISABLED_Convolution) {
-  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {1, 224, 224, 1});
-  auto K = Placeholder(PLAIDML_DATA_FLOAT32, {3, 3, 1, 32});
+  auto I = Placeholder(DType::FLOAT32, {1, 224, 224, 1});
+  auto K = Placeholder(DType::FLOAT32, {3, 3, 1, 32});
   Program program("convolution", {Convolution2(I, K)});
   exec::Binder(program).compile()->run();
 }
@@ -450,27 +450,27 @@ Tensor Flatten(const Tensor& X) {
 
 TEST(CppEdsl, MnistCnn) {
   // model.add(Conv2D(32, kernel_size=(3, 3), activation='relu', input_shape=input_shape))
-  auto input = Placeholder(PLAIDML_DATA_FLOAT32, {1, 224, 224, 1});
-  auto kernel1 = Placeholder(PLAIDML_DATA_FLOAT32, {3, 3, 1, 32});
-  auto bias1 = Placeholder(PLAIDML_DATA_FLOAT32, {32});
+  auto input = Placeholder(DType::FLOAT32, {1, 224, 224, 1});
+  auto kernel1 = Placeholder(DType::FLOAT32, {3, 3, 1, 32});
+  auto bias1 = Placeholder(DType::FLOAT32, {32});
   auto conv1 = Relu(Convolution2(input, kernel1) + bias1);
   // model.add(Conv2D(64, (3, 3), activation='relu'))
-  auto kernel2 = Placeholder(PLAIDML_DATA_FLOAT32, {3, 3, 32, 64});
-  auto bias2 = Placeholder(PLAIDML_DATA_FLOAT32, {64});
+  auto kernel2 = Placeholder(DType::FLOAT32, {3, 3, 32, 64});
+  auto bias2 = Placeholder(DType::FLOAT32, {64});
   auto conv2 = Relu(Convolution2(conv1, kernel2) + bias2);
   // model.add(MaxPooling2D(pool_size=(2, 2)))
   auto pool1 = MaxPooling2(conv2);
   // model.add(Flatten())
   auto flat = Flatten(pool1);
-  EXPECT_THAT(flat.shape(), Eq(LogicalShape(PLAIDML_DATA_FLOAT32, {1, 12100})));
+  EXPECT_THAT(flat.shape(), Eq(LogicalShape(DType::FLOAT32, {1, 12100})));
   // model.add(Dense(128, activation='relu'))
-  auto kernel3 = Placeholder(PLAIDML_DATA_FLOAT32, {12100, 128});
-  auto bias3 = Placeholder(PLAIDML_DATA_FLOAT32, {128});
+  auto kernel3 = Placeholder(DType::FLOAT32, {12100, 128});
+  auto bias3 = Placeholder(DType::FLOAT32, {128});
   auto dense1 = Relu(Dot(flat, kernel3) + bias3);
   const std::int64_t kNumClasses = 100;
   // model.add(Dense(num_classes, activation='softmax'))
-  auto kernel4 = Placeholder(PLAIDML_DATA_FLOAT32, {128, kNumClasses});
-  auto bias4 = Placeholder(PLAIDML_DATA_FLOAT32, {kNumClasses});
+  auto kernel4 = Placeholder(DType::FLOAT32, {128, kNumClasses});
+  auto bias4 = Placeholder(DType::FLOAT32, {kNumClasses});
   auto dense2 = Softmax(Dot(dense1, kernel4) + bias4);
   Program program("mnist_cnn", {dense2});
   EXPECT_THAT(program, Eq(R"#(
@@ -546,8 +546,8 @@ std::tuple<Tensor, Tensor> LarsMomentum(  //
 
 // TODO: add 'sqrt' to std and llvm dialects
 TEST(CppEdsl, DISABLED_LarsMomentum4d) {
-  auto X_shape = LogicalShape(PLAIDML_DATA_FLOAT32, {4, 7, 3, 9});
-  auto LR_shape = LogicalShape(PLAIDML_DATA_FLOAT32, {});
+  auto X_shape = LogicalShape(DType::FLOAT32, {4, 7, 3, 9});
+  auto LR_shape = LogicalShape(DType::FLOAT32, {});
   auto X = Placeholder(X_shape);
   auto Grad = Placeholder(X_shape);
   auto Veloc = Placeholder(X_shape);
@@ -591,7 +591,7 @@ module {
 }
 
 TEST(CppEdsl, RepeatElements) {
-  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {10, 10, 10});
+  auto I = Placeholder(DType::FLOAT32, {10, 10, 10});
   TensorDim N0, N1, N2;
   TensorIndex n0, n1, n2, k;
   I.bind_dims(N0, N1, N2);
@@ -619,8 +619,8 @@ module {
 }
 
 TEST(CppEdsl, UseDefault) {
-  auto P = Placeholder(PLAIDML_DATA_FLOAT32, {1, 7, 10, 10});
-  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {1, 10, 10});
+  auto P = Placeholder(DType::FLOAT32, {1, 7, 10, 10});
+  auto I = Placeholder(DType::FLOAT32, {1, 10, 10});
   TensorDim B, N1, N2;
   TensorIndex b, i1, i2;
   I.bind_dims(B, N1, N2);
@@ -659,10 +659,10 @@ Tensor ArgMax(const Tensor& I) {
 }
 
 TEST(CppEdsl, ArgMax) {
-  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {1, 10, 10});
+  auto I = Placeholder(DType::FLOAT32, {1, 10, 10});
   auto X = ArgMax(I);
   Program program("arg_max", {X});
-  EXPECT_THAT(X.shape(), Eq(LogicalShape(PLAIDML_DATA_UINT32, {1, 10})));
+  EXPECT_THAT(X.shape(), Eq(LogicalShape(DType::UINT32, {1, 10})));
   EXPECT_THAT(program, Eq(R"#(
 #map0 = (d0) -> (d0)
 #map1 = () -> ()
@@ -725,18 +725,18 @@ Tensor Winograd(const Tensor& I, const Tensor& K, const Tensor& A, const Tensor&
 // TODO: implement constraints in -convert-tile-to-pxa
 TEST(CppEdsl, DISABLED_Winograd) {
   const std::int64_t N = 1, X = 224, Y = 224, CI = 3, S = 3, CO = 32, BI = 32, BO = BI - CI + 1;
-  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {N, X, Y, CI});
-  auto K = Placeholder(PLAIDML_DATA_FLOAT32, {S, S, CI, CO});
-  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {BI, BO});
-  auto B = Placeholder(PLAIDML_DATA_FLOAT32, {BI, BI});
-  auto G = Placeholder(PLAIDML_DATA_FLOAT32, {BI, S});
+  auto I = Placeholder(DType::FLOAT32, {N, X, Y, CI});
+  auto K = Placeholder(DType::FLOAT32, {S, S, CI, CO});
+  auto A = Placeholder(DType::FLOAT32, {BI, BO});
+  auto B = Placeholder(DType::FLOAT32, {BI, BI});
+  auto G = Placeholder(DType::FLOAT32, {BI, S});
   auto W = Winograd(I, K, A, B, G);
   Program program("winograd", {W});
   exec::Binder(program).compile()->run();
 }
 
 TEST(CppEdsl, UniqueNames) {
-  LogicalShape shape(PLAIDML_DATA_FLOAT32, {1});
+  LogicalShape shape(DType::FLOAT32, {1});
   auto A = Placeholder(shape, "A");
   auto B = Placeholder(shape, "B");
   auto C0 = Placeholder(shape, "C");
@@ -757,7 +757,7 @@ module {
 
 // TODO: fix issues related to reductions into scalars
 TEST(CppEdsl, DISABLED_GlobalMin) {
-  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {10, 10, 10}, "I");
+  auto I = Placeholder(DType::FLOAT32, {10, 10, 10}, "I");
   TensorIndex i, j, k;
   auto O_Neg = TensorOutput();
   auto Neg = -I;
@@ -784,7 +784,7 @@ module {
 }
 
 TEST(CppEdsl, CumSum) {
-  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {10}, "I");
+  auto I = Placeholder(DType::FLOAT32, {10}, "I");
   TensorDim N;
   TensorIndex i, k;
   I.bind_dims(N);
@@ -849,8 +849,8 @@ Tensor ComplexConv2d(              //
 }
 
 TEST(CppEdsl, ComplexConv2d) {
-  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {1, 224, 224, 3, 3});
-  auto K = Placeholder(PLAIDML_DATA_FLOAT32, {3, 3, 3, 3, 32});
+  auto I = Placeholder(DType::FLOAT32, {1, 224, 224, 3, 3});
+  auto K = Placeholder(DType::FLOAT32, {3, 3, 3, 3, 32});
   auto O = ComplexConv2d(I, K, {2, 2}, {3, 3});
   Program program("complex_conv_2d", {O});
   EXPECT_THAT(program, Eq(R"#(
@@ -873,7 +873,7 @@ module {
 }
 
 TEST(CppEdsl, Reciprocal) {
-  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10}, "A");
+  auto A = Placeholder(DType::FLOAT32, {10}, "A");
   Program program("reciprocal", {1 / A});
   EXPECT_THAT(program, Eq(R"#(
 !i32 = type tensor<!eltwise.i32>
@@ -890,8 +890,8 @@ module {
 }
 
 // TEST(CppEdsl, GradientDot) {
-//   auto A = Placeholder(PLAIDML_DATA_FLOAT32, {100, 100}, "A");
-//   auto B = Placeholder(PLAIDML_DATA_FLOAT32, {100, 100}, "B");
+//   auto A = Placeholder(DType::FLOAT32, {100, 100}, "A");
+//   auto B = Placeholder(DType::FLOAT32, {100, 100}, "B");
 //   auto O = Dot(A, B);
 //   auto grads = Gradient({A, B}, O);
 //   Program program("gradient_dot", {grads});
@@ -922,8 +922,8 @@ module {
 // }
 
 // TEST(CppEdsl, GradientMultiDot) {
-//   auto A = Placeholder(PLAIDML_DATA_FLOAT32, {100, 100}, "A");
-//   auto B = Placeholder(PLAIDML_DATA_FLOAT32, {100, 100}, "B");
+//   auto A = Placeholder(DType::FLOAT32, {100, 100}, "A");
+//   auto B = Placeholder(DType::FLOAT32, {100, 100}, "B");
 //   auto C = Dot(A, B);
 //   auto D = Dot(A, C);
 //   auto O = Max2Da0(D);
@@ -953,8 +953,8 @@ module {
 // }
 
 // TEST(CppEdsl, GradientDotSqrt) {
-//   auto A = Placeholder(PLAIDML_DATA_FLOAT32, {100, 100}, "A");
-//   auto B = Placeholder(PLAIDML_DATA_FLOAT32, {100, 100}, "B");
+//   auto A = Placeholder(DType::FLOAT32, {100, 100}, "A");
+//   auto B = Placeholder(DType::FLOAT32, {100, 100}, "B");
 //   auto C = Dot(A, B);
 //   auto O = sqrt(C);
 //   auto grads = Gradient({A, B}, O);
@@ -984,8 +984,8 @@ module {
 TEST(CppEdsl, DISABLED_DefractLong) {
   std::vector<int64_t> input_shape{1, 3, 3, 1};
   std::vector<int64_t> output_shape{1, 5, 5, 1};
-  auto I = Placeholder(PLAIDML_DATA_FLOAT32, input_shape, "I");
-  auto K = Placeholder(PLAIDML_DATA_FLOAT32, input_shape, "K");
+  auto I = Placeholder(DType::FLOAT32, input_shape, "I");
+  auto K = Placeholder(DType::FLOAT32, input_shape, "K");
   auto O = TensorOutput(output_shape);
   TensorIndex n, x0, x1, k0, k1, co, ci;
   O(n, x0, x1, co) += I(n, (x0 + k0 - 1) / 2, (x1 + k1 - 1) / 2, ci) * K(2 - k0, 2 - k1, co, ci);
@@ -1009,16 +1009,16 @@ module {
 }
 
 TEST(CppEdsl, DupOut) {
-  auto A = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20});
-  auto B = Placeholder(PLAIDML_DATA_FLOAT32, {20, 30});
-  auto C = Placeholder(PLAIDML_DATA_FLOAT32, {30, 40});
+  auto A = Placeholder(DType::FLOAT32, {10, 20});
+  auto B = Placeholder(DType::FLOAT32, {20, 30});
+  auto C = Placeholder(DType::FLOAT32, {30, 40});
   auto R = Dot(Dot(A, B), C);
   Program program("dup_out", {R, R, R});
   exec::Binder(program).compile()->run();
 }
 
 TEST(CppEdsl, Select) {
-  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20});
+  auto I = Placeholder(DType::FLOAT32, {10, 20});
   auto O = select(I == 0, Tensor{0}, Tensor{1});
   Program program("select", {O});
   EXPECT_THAT(program, Eq(R"#(
@@ -1037,7 +1037,7 @@ module {
 }
 
 TEST(CppEdsl, Shape) {
-  auto I = Placeholder(PLAIDML_DATA_FLOAT32, {10, 20});
+  auto I = Placeholder(DType::FLOAT32, {10, 20});
   auto O = shape(I);
   Program program("shape", {O});
   EXPECT_THAT(program, Eq(R"#(
@@ -1060,7 +1060,7 @@ module {
 
 // TODO: lowering for PrngOp
 TEST(CppEdsl, DISABLED_Prng) {
-  auto S = Placeholder(PLAIDML_DATA_UINT32, {3, 2048});
+  auto S = Placeholder(DType::UINT32, {3, 2048});
   auto O = prng(S, {2, 3, 4, 5});
   Program program("prng", {O});
   EXPECT_THAT(program, Eq(R"#(

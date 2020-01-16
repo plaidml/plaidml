@@ -1354,7 +1354,7 @@ Value dot(const Value& value) {
   auto Y_shape = Y.shape();
   if (X_shape.dtype() != Y_shape.dtype()) {
     throw std::runtime_error(str(boost::format("Invalid dtype in dot: X.dtype = '%1%', Y.dtype = '%2%'") %
-                                 X_shape.dtype() % Y_shape.dtype()));
+                                 static_cast<int>(X_shape.dtype()) % static_cast<int>(Y_shape.dtype())));
   }
   if (X_shape.ndims() == 1 && Y_shape.ndims() == 1) {
     TensorDim I;
@@ -1683,7 +1683,7 @@ Value mean(const Value& value) {
   }
 
   // TODO: Move this commented block to Keras?
-  // if (I_shape.dtype() == PLAIDML_DATA_BOOLEAN) {
+  // if (I_shape.dtype() == DType::BOOLEAN) {
   //   I = cast(I, floatx());
   // }
 
@@ -1755,7 +1755,7 @@ Value prod(const Value& value) {
   }
 
   // TODO: Move this commented block to Keras?
-  // if (I_shape.dtype() == PLAIDML_DATA_BOOLEAN) {
+  // if (I_shape.dtype() == DType::BOOLEAN) {
   //   I = cast(I, floatx());  // TODO: cast if * is not && for bools, don't if it is &&
   // }
 
@@ -2586,7 +2586,7 @@ Value sum(const Value& value) {
   }
 
   // TODO: Move this commented block to Keras?
-  // if (I_shape.dtype() == PLAIDML_DATA_BOOLEAN) {
+  // if (I_shape.dtype() == DType::BOOLEAN) {
   //   I = cast(I, floatx());
   // }
 
@@ -2723,7 +2723,7 @@ Value variance(const Value& value) {
   }
 
   // TODO: Move this commented block to Keras?
-  // if (I.shape().dtype() == PLAIDML_DATA_BOOLEAN) {
+  // if (I.shape().dtype() == DType::BOOLEAN) {
   //   I = cast(I, floatx());
   // }
 
