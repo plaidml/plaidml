@@ -234,9 +234,9 @@ boost::future<std::unique_ptr<hal::Library>> Compiler::Build(const context::Cont
         auto kname = ki.kname + "_" + std::to_string(i);
         i++;
 
-        auto spv_binary_path = env::Get("PLAIDML_SPIRV_CACHE");
+        fs::path spv_binary_path = env::Get("PLAIDML_SPIRV_CACHE");
         auto spv_binary_suffix = env::Get("PLAIDML_SPIRV_BINARY_SUFFIX");
-        auto spv_binary_file = spv_binary_path + kname + spv_binary_suffix;
+        auto spv_binary_file = spv_binary_path / (kname + spv_binary_suffix);
 
         VLOG(1) << "Reading SPIRV_BINARY to OpenCL backend: " << spv_binary_file << std::endl;
 
@@ -249,7 +249,7 @@ boost::future<std::unique_ptr<hal::Library>> Compiler::Build(const context::Cont
             ocl::CreateProgramWithIL(device_state_->cl_ctx().get(), spv_binary, spv_binary_str.size(), err.ptr());
 
         if (!program) {
-          throw std::runtime_error(std::string("Creating an OpenCL program object from  ") + spv_binary_file + ": " +
+          throw std::runtime_error(std::string("Creating an OpenCL program object from  ") + spv_binary_file.c_str() + ": " +
                                    err.str());
         }
 

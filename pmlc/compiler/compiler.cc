@@ -2,6 +2,7 @@
 
 #include "pmlc/compiler/compiler.h"
 
+#include <boost/filesystem.hpp>
 #include <unordered_map>
 #include <utility>
 
@@ -26,6 +27,7 @@
 
 using namespace mlir;  // NOLINT[build/namespaces]
 using pmlc::conversion::tile_to_pxa::createLowerTileToPXAPass;
+namespace fs = boost::filesystem;
 
 namespace pmlc::compiler {
 
@@ -234,7 +236,8 @@ Executable::Executable(StringRef entry, StringRef target, ModuleOp programModule
   }
   auto spv_cache = vertexai::env::Get("PLAIDML_SPIRV_CACHE");
   if (spv_cache.length() > 0) {
-    auto spv_out_path = spv_cache + "spv_module.spv";
+    fs::path spv_cache_path = spv_cache;
+    auto spv_out_path = spv_cache_path / "spv_module.spv";
     vertexai::WriteFile(spv_out_path, out.str(), true);
   }
 
