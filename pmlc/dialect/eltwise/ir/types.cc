@@ -16,28 +16,28 @@ using mlir::Type;
 Type ScalarType::toStandard() {
   MLIRContext* ctx = getContext();
   switch (type()) {
-    case DataType::BOOLEAN:
+    case DataType::i1:
       return IntegerType::get(1, ctx);
-    case DataType::INT8:
-    case DataType::UINT8:
+    case DataType::i8:
+    case DataType::u8:
       return IntegerType::get(8, ctx);
-    case DataType::INT16:
-    case DataType::UINT16:
+    case DataType::i16:
+    case DataType::u16:
       return IntegerType::get(16, ctx);
-    case DataType::INT32:
-    case DataType::UINT32:
+    case DataType::i32:
+    case DataType::u32:
       return IntegerType::get(32, ctx);
-    case DataType::INT64:
-    case DataType::UINT64:
+    case DataType::i64:
+    case DataType::u64:
       return IntegerType::get(64, ctx);
-    case DataType::FLOAT16:
-      return FloatType::getF16(ctx);
-    case DataType::FLOAT32:
-      return FloatType::getF32(ctx);
-    case DataType::FLOAT64:
-      return FloatType::getF64(ctx);
-    case DataType::BFLOAT16:
+    case DataType::bf16:
       return FloatType::getBF16(ctx);
+    case DataType::f16:
+      return FloatType::getF16(ctx);
+    case DataType::f32:
+      return FloatType::getF32(ctx);
+    case DataType::f64:
+      return FloatType::getF64(ctx);
     default:
       return {};
   }

@@ -4,19 +4,19 @@
 #map1 = (i, j, k) -> (j, i)
 #map2 = (i, j, k) -> (i, k)
 
-!fp32 = type !eltwise.fp32
+!f32 = type !eltwise.f32
 !i32 = type !eltwise.i32
 func @double_dot(
-  %arg0: tensor<10x20x!eltwise.fp32>,
-  %arg1: tensor<20x30x!eltwise.fp32>,
-  %arg2: tensor<30x40x!eltwise.fp32>
-) -> tensor<10x40x!eltwise.fp32> {
-  %cst = "eltwise.sconst"() {value = 0.0 : f64} : () -> !fp32
+  %arg0: tensor<10x20x!eltwise.f32>,
+  %arg1: tensor<20x30x!eltwise.f32>,
+  %arg2: tensor<30x40x!eltwise.f32>
+) -> tensor<10x40x!eltwise.f32> {
+  %cst = "eltwise.sconst"() {value = 0.0 : f64} : () -> !f32
   %0 = tile.cion add, mul, %cst, %arg0, %arg1 {sink = #map0, srcs = [#map1, #map2]} :
-    !fp32, tensor<10x20x!eltwise.fp32>, tensor<20x30x!eltwise.fp32> -> tensor<10x30x!eltwise.fp32>
+    !f32, tensor<10x20x!eltwise.f32>, tensor<20x30x!eltwise.f32> -> tensor<10x30x!eltwise.f32>
   %1 = tile.cion add, mul, %cst, %0, %arg2 {sink = #map0, srcs = [#map1, #map2]} :
-    !fp32, tensor<10x30x!eltwise.fp32>, tensor<30x40x!eltwise.fp32> -> tensor<10x40x!eltwise.fp32>
-  return %1 : tensor<10x40x!eltwise.fp32>
+    !f32, tensor<10x30x!eltwise.f32>, tensor<30x40x!eltwise.f32> -> tensor<10x40x!eltwise.f32>
+  return %1 : tensor<10x40x!eltwise.f32>
 }
 
 // CHECK-DAG: [[map_dot_1:#map[0-9]+]] = () -> (20, 10, 30)
