@@ -36,8 +36,6 @@ Objects
 
    .. group-tab:: Python
 
-      .. autoclass:: plaidml.exec.Binding
-         :members:
       .. autoclass:: plaidml.exec.Executable
          :members:
       .. autoclass:: plaidml.exec.Binder
