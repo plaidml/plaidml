@@ -485,7 +485,7 @@ void ContractionOp::setLowerBounds(ArrayRef<int64_t> bounds) {
   for (auto dim : bounds) {
     exprs.push_back(mlir::getAffineConstantExpr(dim, getContext()));
   }
-  auto map = AffineMap::get(/*dimCount=*/bounds.size(), /*symbolCount=*/0, exprs);
+  auto map = AffineMap::get(/*dimCount=*/0, /*symbolCount=*/0, exprs);
   setAttr(getLowerBoundsAttrName(), AffineMapAttr::get(map));
 }
 
@@ -494,7 +494,7 @@ void ContractionOp::setUpperBounds(ArrayRef<int64_t> bounds) {
   for (auto dim : bounds) {
     exprs.push_back(mlir::getAffineConstantExpr(dim, getContext()));
   }
-  auto map = AffineMap::get(/*dimCount=*/bounds.size(), /*symbolCount=*/0, exprs);
+  auto map = AffineMap::get(/*dimCount=*/0, /*symbolCount=*/0, exprs);
   setAttr(getUpperBoundsAttrName(), AffineMapAttr::get(map));
 }
 
