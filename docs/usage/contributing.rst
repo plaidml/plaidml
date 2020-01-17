@@ -9,7 +9,6 @@ Before starting any work, please ensure you are able to build and test PlaidML.
 Guidelines
 **********
 * Create unit tests for new features and bug fixes. Integration tests are required for larger features.
-* Pre-commit linters will be available soon.
   * C++ code conforms to the `Google Style Guide for CPP <https://google.github.io/styleguide/cppguide.html>`_.
   * Python code conforms to the `Google Python Style Guide <https://google.github.io/styleguide/pyguide.html>`_.
 Process
