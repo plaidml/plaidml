@@ -550,8 +550,8 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
     SmallVector<int64_t, 8> ranges;
     auto lowerBounds = op.lower_bounds().getValue();
     auto upperBounds = op.upper_bounds().getValue();
-    assert(lowerBounds.getNumDims() == upperBounds.getNumDims() && "mismatched dims for lower and upper bounds");
-    for (unsigned i = 0; i < lowerBounds.getNumDims(); i++) {
+    assert(lowerBounds.getNumResults() == upperBounds.getNumResults() && "mismatched dims for lower and upper bounds");
+    for (unsigned i = 0; i < lowerBounds.getNumResults(); i++) {
       auto rangeExpr = upperBounds.getResult(i) - lowerBounds.getResult(i) + 1;
       auto range = rangeExpr.cast<AffineConstantExpr>().getValue();
       ranges.emplace_back(range);
