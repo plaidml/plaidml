@@ -117,9 +117,9 @@ class Program {
 };
 
 ///
-/// \class TensorDim
-/// Specifies the dimensions of an input tensor
 /// \ingroup edsl_objects
+/// \class TensorDim
+/// A symbolic object used to specify the dimensions of a Tensor
 ///
 class TensorDim {
  public:
@@ -181,8 +181,9 @@ class TensorDim {
 struct Constraint;
 
 ///
-/// \class TensorIndex
 /// \ingroup edsl_objects
+/// \class TensorIndex
+/// A symbolic object used to directly index a Tensor or to compute a Tensor's index as part of a formula.
 ///
 class TensorIndex {
  public:
@@ -261,9 +262,9 @@ class TensorIndex {
 };
 
 ///
+/// \ingroup edsl_objects
 /// \struct Constraint
 /// This is a constraint.
-/// \ingroup edsl_objects
 ///
 struct Constraint {
   ///
@@ -279,6 +280,8 @@ struct Constraint {
 
 ///
 /// \ingroup edsl_objects
+/// \class IndexedTensor
+/// This is an IndexedTensor
 ///
 class IndexedTensor {
   friend class Tensor;
@@ -372,6 +375,8 @@ class IndexedTensor {
 
 ///
 /// \ingroup edsl_objects
+/// \class LogicalShape
+/// This is a LogicalShape.
 ///
 class LogicalShape {
   friend class Program;
@@ -434,6 +439,8 @@ class LogicalShape {
 
 ///
 /// \ingroup edsl_objects
+/// \class Tensor
+/// A multidimensional array of a fixed shape.
 ///
 class Tensor {
   friend class IndexedTensor;
@@ -687,9 +694,9 @@ class Tensor {
 };
 
 ///
+/// \ingroup edsl_objects
 /// \struct TensorRef
 /// A reference to a Tensor
-/// \ingroup edsl_objects
 ///
 struct TensorRef {
   ///
@@ -720,6 +727,8 @@ struct TensorRef {
 
 ///
 /// \ingroup edsl_objects
+/// \struct ProgramArgument
+/// Description for ProgramArgument
 ///
 struct ProgramArgument {
   ///
@@ -856,6 +865,13 @@ inline Tensor cast(const Tensor& x, DType dtype) {
 }
 
 ///
+/// Computes the elementwise ceiling of `x`.
+/// \param x Tensor
+/// \return Tensor
+///
+inline Tensor ceil(const Tensor& x) { return Call("ceil", x); }
+
+///
 /// Computes the elementwise cosine of `x`.
 /// \param x Tensor
 /// \return Tensor
@@ -877,8 +893,18 @@ inline Tensor cosh(const Tensor& x) { return Call("cosh", x); }
 inline Tensor exp(const Tensor& x) { return Call("exp", x); }
 
 ///
+/// Computes the elementwise floor of `x`.
+/// \param x Tensor
+/// \return Tensor
+///
+inline Tensor floor(const Tensor& x) { return Call("floor", x); }
+
+///
 /// Takes an input tensor (`x`) and a set of indices to gather over (`y`), and returns an output tensor that gathers the
-/// input tensor from the indices specified. \param x Tensor \param y Tensor \return Tensor
+/// input tensor from the indices specified.
+/// \param x Tensor
+/// \param y Tensor
+/// \return Tensor
 ///
 inline Tensor gather(const Tensor& x, const Tensor& y) { return Call("gather", x, y); }
 
@@ -928,9 +954,9 @@ inline Tensor prng(const Tensor& state, const std::vector<int64_t>& dims) {
 
 ///
 /// Takes an input tensor `x` and reshapes it according to `dims`.
-/// \param x Tensor
+/// \param x `Tensor`
 /// \param dims vector<int64_t>
-/// \return Tensor
+/// \return `Tensor`
 ///
 inline Tensor reshape(const Tensor& x, const std::vector<int64_t>& dims) {
   std::vector<Tensor> args = {x};
@@ -955,6 +981,13 @@ inline Tensor reshape(const Tensor& x, const std::vector<TensorDim>& dims) {
 }
 
 ///
+/// Rounds `x` elementwise.
+/// \param x Tensor
+/// \return Tensor
+///
+inline Tensor round(const Tensor& x) { return Call("round", x); }
+
+///
 /// Takes an input tensor (`x`), a set of indices to scatter over (`y`), and the number of elements in the scattered
 /// tensor (`z`), and returns an output tensor that scatters the input tensor across the number of elements specified.
 /// \param x Tensor
@@ -965,7 +998,10 @@ inline Tensor reshape(const Tensor& x, const std::vector<TensorDim>& dims) {
 inline Tensor scatter(const Tensor& x, const Tensor& y, const Tensor& z) { return Call("scatter", x, y, z); }
 
 ///
-/// TODO
+/// Performs an elementwise conditional which returns the corresponding
+/// element in `true_case` if the condition is evaluated to be true or the
+/// corresponding element in `false_case` if the condition is evaluated to be
+/// false.
 /// \param cond Tensor
 /// \param true_case Tensor
 /// \param false_case Tensor
