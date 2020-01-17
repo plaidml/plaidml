@@ -954,9 +954,9 @@ inline Tensor prng(const Tensor& state, const std::vector<int64_t>& dims) {
 
 ///
 /// Takes an input tensor `x` and reshapes it according to `dims`.
-/// \param x `Tensor`
+/// \param x Tensor
 /// \param dims vector<int64_t>
-/// \return `Tensor`
+/// \return Tensor
 ///
 inline Tensor reshape(const Tensor& x, const std::vector<int64_t>& dims) {
   std::vector<Tensor> args = {x};

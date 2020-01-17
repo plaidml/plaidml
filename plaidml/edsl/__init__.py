@@ -796,42 +796,112 @@ def gradients(loss, variables):
 
 
 def ident(x):
-    """A placeholder docstring."""
+    """Returns the identity of ``x``.
+
+        Args:
+            x (Tensor): The input Tensor.
+
+        Returns:
+            r (Tensor): The resultant tensor.
+
+    """
     return call('ident', x)
 
 
 def index(x, axis):
-    """A placeholder docstring."""
+    """Returns the index of ``x`` at the specified ``axis``.
+
+        Args:
+            x (Tensor): The Tensor to index.
+            axis (Tensor): The axis used for indexing.
+
+        Returns:
+            r (Tensor): The indexed tensor.
+
+    """
     return call('index', x, axis)
 
 
 def log(x):
-    """A placeholder docstring."""
+    """Computes the elementwise natural logarithm of ``x``.
+
+        Args:
+            x (Tensor): The input Tensor.
+
+        Returns:
+            r (Tensor): The resultant tensor.
+
+    """
     return call('log', x)
 
 
 def max(x, y):
-    """A placeholder docstring."""
+    """Computes the elementwise maximum of ``x`` and ``y``.
+
+        Args:
+            x (Tensor): The first input Tensor.
+            y (Tensor): The second input Tensor.
+
+        Returns:
+            r (Tensor): The resultant tensor.
+
+    """
     return call('max', x, y)
 
 
 def min(x, y):
-    """A placeholder docstring."""
+    """Computes the elementwise minimum of ``x`` and ``y``.
+
+        Args:
+            x (Tensor): The first input Tensor.
+            y (Tensor): The second input Tensor.
+
+        Returns:
+            r (Tensor): The resultant tensor.
+
+    """
     return call('min', x, y)
 
 
 def pow(x, y):
-    """A placeholder docstring."""
+    """Computes the elementwise ``y``th power of ``x``.
+
+        Args:
+            x (Tensor): The base Tensor.
+            y (Tensor): The exponent Tensor.
+
+        Returns:
+            r (Tensor): The resultant tensor.
+
+    """
     return call('pow', x, y)
 
 
 def prng(state, shape):
-    """A placeholder docstring."""
+    """Generates a Tensor of elementwise pseudorandom numbers using the seed values specified in ``state``.
+
+        Args:
+            state (Tensor): The seed values for the ``prng`` operation.
+            shape (Tensor): The desired shape of the tensor of pseudorandom numbers.
+
+        Returns:
+            y (Tensor): The tensor of pseudorandom numbers.
+
+    """
     return call('prng', state, *shape)
 
 
 def reshape(x, dims):
-    """A placeholder docstring."""
+    """Takes a tensor ``x`` and reshapes it according to ``dims``.
+
+        Args:
+            x (Tensor): The tensor to reshape.
+            dims (list): The desired shape of the tensor.
+
+        Returns:
+            y (Tensor): The reshaped tensor.
+
+    """
     return call('reshape', x, *dims)
 
 
