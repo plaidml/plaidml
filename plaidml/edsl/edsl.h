@@ -478,7 +478,16 @@ class Tensor {
   /// \return Tensor
   ///
   explicit Tensor(unsigned value) : impl_(new Impl) {  //
-    impl_->ptr = details::make_ptr(ffi::call<plaidml_expr*>(plaidml_expr_int, value));
+    impl_->ptr = details::make_ptr(ffi::call<plaidml_expr*>(plaidml_expr_uint, value));
+  }
+
+  ///
+  /// Tensor constructor
+  /// \param value unsigned 64-bit int
+  /// \return Tensor
+  ///
+  explicit Tensor(uint64_t value) : impl_(new Impl) {  //
+    impl_->ptr = details::make_ptr(ffi::call<plaidml_expr*>(plaidml_expr_uint, value));
   }
 
   ///
@@ -1168,13 +1177,15 @@ PLAIDML_EDSL_DEFINE_TENSOR_DIM_BINARY_FN(min, PLAIDML_INT_OP_MIN);
 inline Tensor Tensor::operator-() const { return Call("neg", {*this}); }
 inline Tensor Tensor::operator~() const { return Call("bit_not", {*this}); }
 
-#define PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(_op_, _fn_)                                              \
-  inline Tensor operator _op_(const Tensor& lhs, const Tensor& rhs) { return Call(_fn_, lhs, rhs); }   \
-  inline Tensor operator _op_(const Tensor& lhs, int rhs) { return Call(_fn_, lhs, Tensor{rhs}); }     \
-  inline Tensor operator _op_(const Tensor& lhs, int64_t rhs) { return Call(_fn_, lhs, Tensor{rhs}); } \
-  inline Tensor operator _op_(const Tensor& lhs, double rhs) { return Call(_fn_, lhs, Tensor{rhs}); }  \
-  inline Tensor operator _op_(int lhs, const Tensor& rhs) { return Call(_fn_, Tensor{lhs}, rhs); }     \
-  inline Tensor operator _op_(int64_t lhs, const Tensor& rhs) { return Call(_fn_, Tensor{lhs}, rhs); } \
+#define PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(_op_, _fn_)                                               \
+  inline Tensor operator _op_(const Tensor& lhs, const Tensor& rhs) { return Call(_fn_, lhs, rhs); }    \
+  inline Tensor operator _op_(const Tensor& lhs, int rhs) { return Call(_fn_, lhs, Tensor{rhs}); }      \
+  inline Tensor operator _op_(const Tensor& lhs, int64_t rhs) { return Call(_fn_, lhs, Tensor{rhs}); }  \
+  inline Tensor operator _op_(const Tensor& lhs, uint64_t rhs) { return Call(_fn_, lhs, Tensor{rhs}); } \
+  inline Tensor operator _op_(const Tensor& lhs, double rhs) { return Call(_fn_, lhs, Tensor{rhs}); }   \
+  inline Tensor operator _op_(int lhs, const Tensor& rhs) { return Call(_fn_, Tensor{lhs}, rhs); }      \
+  inline Tensor operator _op_(int64_t lhs, const Tensor& rhs) { return Call(_fn_, Tensor{lhs}, rhs); }  \
+  inline Tensor operator _op_(uint64_t lhs, const Tensor& rhs) { return Call(_fn_, Tensor{lhs}, rhs); } \
   inline Tensor operator _op_(double lhs, const Tensor& rhs) { return Call(_fn_, Tensor{lhs}, rhs); }
 
 PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(+, "add");

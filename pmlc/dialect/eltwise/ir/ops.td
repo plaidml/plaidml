@@ -52,6 +52,11 @@ def ScalarConstantOp :
       result.addAttribute("value", builder->getI64IntegerAttr(value));
       result.addTypes(RankedTensorType::get({}, type));
     }]
+  >, OpBuilder<
+    "Builder* builder, OperationState& result, Type type, uint64_t value", [{
+      result.addAttribute("value", builder->getI64IntegerAttr(value));
+      result.addTypes(RankedTensorType::get({}, type));
+    }]
   >];
 
   let extraClassDeclaration = [{
@@ -143,6 +148,12 @@ class EW_BinaryIntOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
     Arguments<(ins EltwiseInteger:$lhs, EltwiseInteger:$rhs)>,
     Results<(outs EltwiseInteger:$result)>;
 
+class EWBinaryIntUnsignedOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
+    EW_BinaryOp<mnemonic, traits>,
+    Arguments<(ins EltwiseInteger:$lhs, EltwiseUnsigned:$rhs)>,
+    Results<(outs EltwiseInteger:$result)>;
+
+
 def EW_AbsOp : EW_UnaryOp<"abs">;
 def EW_ACosOp : EW_UnaryFloatOp<"acos">;
 def EW_AddOp : EW_BinaryOp<"add", [Commutative, NoSideEffect]>, HasFolder;
@@ -186,7 +197,7 @@ def EW_BitNotOp : EW_UnaryIntOp<"bit_not">;
 def EW_BitOrOp : EW_BinaryIntOp<"bit_or", [Commutative, NoSideEffect]>;
 def EW_BitXorOp : EW_BinaryIntOp<"bit_xor", [Commutative, NoSideEffect]>;
 def EW_BitShlOp : EW_BinaryIntOp<"bit_shl">;
-def EW_BitShrOp : EW_BinaryIntOp<"bit_shr">;
+def EW_BitShrOp : EWBinaryIntUnsignedOp<"bit_shr">;
 
 
 def EW_SelectOp : EltwiseOp<"select">, HasCanonicalizer {

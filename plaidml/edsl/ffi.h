@@ -213,6 +213,10 @@ plaidml_expr* plaidml_expr_int(  //
     plaidml_error* err,          //
     int64_t value);
 
+plaidml_expr* plaidml_expr_uint(  //
+    plaidml_error* err,           //
+    uint64_t value);
+
 plaidml_expr* plaidml_expr_float(  //
     plaidml_error* err,            //
     double value);

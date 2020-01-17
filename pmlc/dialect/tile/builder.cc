@@ -145,7 +145,14 @@ struct TileBuilder::Impl {
   }
 
   Value makeScalarConstantOp(double value) {
+    IVLOG(1, "makeScalarConstantOp double " << value);
     auto type = builder.getType<ScalarType>(DataType::f32);
+    return builder.create<ScalarConstantOp>(loc, type, value).result();
+  }
+
+  Value makeScalarConstantOp(uint64_t value) {
+    IVLOG(1, "makeScalarConstantOp uint64_t " << value);
+    auto type = builder.getType<ScalarType>(DataType::u64);
     return builder.create<ScalarConstantOp>(loc, type, value).result();
   }
 };
@@ -327,12 +334,6 @@ std::vector<Value> TileBuilder::GetTupleElements(Value value) {
   throw std::runtime_error("Expected TupleOp");
 }
 
-Value TileBuilder::MakeScalarConstantOp(int64_t value) {
-  IVLOG(5, "TileBuilder::MakeScalarConstantOp> " << value);
-  auto type = impl->builder.getType<ScalarType>(DataType::i32);
-  return impl->builder.create<ScalarConstantOp>(impl->loc, type, value).result();
-}
-
 int64_t TileBuilder::GetIntegerValue(Value value) {
   if (auto op = llvm::dyn_cast_or_null<ScalarConstantOp>(value->getDefiningOp())) {
     return op.getIntAttr().getInt();
@@ -340,8 +341,20 @@ int64_t TileBuilder::GetIntegerValue(Value value) {
   throw std::runtime_error("Expected ScalarConstantOp");
 }
 
+Value TileBuilder::MakeScalarConstantOp(int64_t value) {
+  IVLOG(5, "TileBuilder::MakeScalarConstantOp int64_t> " << value);
+  auto type = impl->builder.getType<ScalarType>(DataType::i64);
+  return impl->builder.create<ScalarConstantOp>(impl->loc, type, value).result();
+}
+
+Value TileBuilder::MakeScalarConstantOp(uint64_t value) {
+  IVLOG(5, "TileBuilder::MakeScalarConstantOp uint64_t> " << value);
+  auto type = impl->builder.getType<ScalarType>(DataType::u64);
+  return impl->builder.create<ScalarConstantOp>(impl->loc, type, value).result();
+}
+
 Value TileBuilder::MakeScalarConstantOp(double value) {
-  IVLOG(5, "TileBuilder::MakeScalarConstantOp> " << value);
+  IVLOG(5, "TileBuilder::MakeScalarConstantOp double> " << value);
   return impl->makeScalarConstantOp(value);
 }
 

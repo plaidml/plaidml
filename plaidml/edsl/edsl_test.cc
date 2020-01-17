@@ -143,9 +143,9 @@ TEST(CppEdsl, BitLeft) {
   }
 }
 
-TEST(CppEdsl, BitRightSignedScalarSigned) {
+TEST(CppEdsl, BitRightSignedScalar) {
   auto A = Placeholder(DType::INT64, {3, 3});
-  auto C = A >> 1;
+  auto C = A >> std::uint64_t{1};
   Program program("bit_right", {C});
 
   std::vector<std::int64_t> input_a{1 << 1, 2 << 1, 3 << 1,  //
@@ -168,9 +168,9 @@ TEST(CppEdsl, BitRightSignedScalarSigned) {
   }
 }
 
-TEST(CppEdsl, BitRightUnsignedScalarSigned) {
+TEST(CppEdsl, BitRightUnsignedScalar) {
   auto A = Placeholder(DType::UINT64, {3, 3});
-  auto C = A >> 1;
+  auto C = A >> std::uint64_t{1};
   Program program("bit_right", {C});
 
   std::vector<std::uint64_t> input_a{1 << 1, 2 << 1, 3 << 1,  //

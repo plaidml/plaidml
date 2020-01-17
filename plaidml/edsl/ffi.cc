@@ -340,6 +340,15 @@ plaidml_expr* plaidml_expr_int(  //
   });
 }
 
+plaidml_expr* plaidml_expr_uint(  //
+    plaidml_error* err,           //
+    uint64_t value) {
+  return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
+    IVLOG(3, "plaidml_expr_uint> " << value);
+    return new plaidml_expr{GlobalContext::get()->MakeScalarConstantOp(value)};
+  });
+}
+
 plaidml_expr* plaidml_expr_float(  //
     plaidml_error* err,            //
     double value) {

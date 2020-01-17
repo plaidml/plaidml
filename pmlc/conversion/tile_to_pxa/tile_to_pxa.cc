@@ -261,23 +261,14 @@ struct OperandsAre : Matcher {
   }
 };
 
-template <typename FirstPredicate, typename RestPredicate>
-struct FirstOperandIsAndRestAre : Matcher {
+template <typename InnerPredicate>
+struct FirstOperandIs : Matcher {
   bool match(Operation* op) const final {
-    FirstPredicate first_pred;
-    RestPredicate rest_pred;
+    InnerPredicate pred;
     if (op->getNumOperands() == 0) {
       return false;
     }
-    if (!first_pred.match(op->getOperand(0).getType())) {
-      return false;
-    }
-    for (size_t index = 1; index < op->getNumOperands(); ++index) {
-      if (!rest_pred.match(op->getOperand(index).getType())) {
-        return false;
-      }
-    }
-    return true;
+    return pred.match(op->getOperand(0).getType());
   }
 };
 
@@ -831,10 +822,8 @@ struct LoweringPass : public mlir::ModulePass<LoweringPass> {
         EltwiseOpConversion<ew::BitOrOp, StdOp<mlir::OrOp>, OperandsAre<EltwiseInteger>>,
         EltwiseOpConversion<ew::BitXorOp, StdOp<mlir::XOrOp>, OperandsAre<EltwiseInteger>>,
         EltwiseOpConversion<ew::BitShlOp, StdOp<mlir::ShiftLeftOp>, OperandsAre<EltwiseInteger>>,
-        EltwiseOpConversion<ew::BitShrOp, StdOp<mlir::SignedShiftRightOp>,
-                            FirstOperandIsAndRestAre<EltwiseSigned, EltwiseInteger>>,
-        EltwiseOpConversion<ew::BitShrOp, StdOp<mlir::UnsignedShiftRightOp>,
-                            FirstOperandIsAndRestAre<EltwiseUnsigned, EltwiseInteger>>,
+        EltwiseOpConversion<ew::BitShrOp, StdOp<mlir::SignedShiftRightOp>, FirstOperandIs<EltwiseSigned>>,
+        EltwiseOpConversion<ew::BitShrOp, StdOp<mlir::UnsignedShiftRightOp>, FirstOperandIs<EltwiseUnsigned>>,
         EltwiseOpConversion<ew::SelectOp, SelectOp>,    //
         EltwiseOpConversion<ew::IdentOp, FirstOperand>  //
         >(&getContext());
