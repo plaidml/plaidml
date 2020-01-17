@@ -12,5 +12,8 @@ Welcome to plaidml's documentation!
 
    usage/install
    usage/building
+   usage/contributing
+   usage/troubleshooting
+   usage/tile_edsl
    manual_api/index
-
+   usage/configuration

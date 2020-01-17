@@ -50,6 +50,7 @@ extensions = [
     'sphinx.ext.napoleon',
     'sphinx.ext.autodoc',
     'sphinx_tabs.tabs',
+    'sphinx.ext.autosectionlabel',
 ]
 
 # Setup the breathe extension
@@ -59,6 +60,7 @@ breathe_projects = {
 
 breathe_default_project = "PlaidML"
 
+pygments_style = 'sphinx'
 # breathe_doxygen_config_options = {
 #     'HIDE_FRIEND_COMPOUNDS': 'YES',
 #     'HIDE_UNDOC_CLASSES': 'YES',
