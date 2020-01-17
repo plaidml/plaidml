@@ -8,7 +8,7 @@
 
 #include "mlir/IR/Types.h"
 
-#include "pmlc/util/shape.h"
+#include "pmlc/util/enums.h"
 
 namespace pmlc::dialect::eltwise {
 

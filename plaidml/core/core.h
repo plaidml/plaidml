@@ -64,17 +64,48 @@ inline std::shared_ptr<plaidml_view> make_plaidml_view(plaidml_view* ptr) {
 
 }  // namespace details
 
+///
+/// Initializes PlaidML's Core API.
+///
 inline void init() {  //
   ffi::call_void(plaidml_init);
 }
 
+
+///
+/// \defgroup core_objects Objects
+///
+
+
+enum class DType {
+  INVALID = PLAIDML_DATA_INVALID,
+  BOOLEAN = PLAIDML_DATA_BOOLEAN,
+  INT8 = PLAIDML_DATA_INT8,
+  UINT8 = PLAIDML_DATA_UINT8,
+  INT16 = PLAIDML_DATA_INT16,
+  UINT16 = PLAIDML_DATA_UINT16,
+  INT32 = PLAIDML_DATA_INT32,
+  UINT32 = PLAIDML_DATA_UINT32,
+  INT64 = PLAIDML_DATA_INT64,
+  UINT64 = PLAIDML_DATA_UINT64,
+  BFLOAT16 = PLAIDML_DATA_BFLOAT16,
+  FLOAT16 = PLAIDML_DATA_FLOAT16,
+  FLOAT32 = PLAIDML_DATA_FLOAT32,
+  FLOAT64 = PLAIDML_DATA_FLOAT64,
+};
+
+///
+/// \ingroup core_objects
+/// \class TensorShape
+/// This is a TensorShape.
+///
 class TensorShape {
  public:
   TensorShape()
       : ptr_(details::make_plaidml_shape(
             ffi::call<plaidml_shape*>(plaidml_shape_alloc, PLAIDML_DATA_INVALID, 0, nullptr, nullptr))) {}
 
-  TensorShape(plaidml_datatype dtype,  //
+  TensorShape(DType dtype,  //
               const std::vector<int64_t>& sizes) {
     size_t stride = 1;
     std::vector<int64_t> strides(sizes.size());
@@ -82,23 +113,23 @@ class TensorShape {
       strides[i] = stride;
       stride *= sizes[i];
     }
-    ptr_ = details::make_plaidml_shape(
-        ffi::call<plaidml_shape*>(plaidml_shape_alloc, dtype, sizes.size(), sizes.data(), strides.data()));
+    ptr_ = details::make_plaidml_shape(ffi::call<plaidml_shape*>(
+        plaidml_shape_alloc, static_cast<plaidml_datatype>(dtype), sizes.size(), sizes.data(), strides.data()));
   }
 
-  TensorShape(plaidml_datatype dtype,             //
+  TensorShape(DType dtype,                        //
               const std::vector<int64_t>& sizes,  //
               const std::vector<int64_t>& strides) {
     if (sizes.size() != strides.size()) {
       throw std::runtime_error("Sizes and strides must have the same rank.");
     }
-    ptr_ = details::make_plaidml_shape(
-        ffi::call<plaidml_shape*>(plaidml_shape_alloc, dtype, sizes.size(), sizes.data(), strides.data()));
+    ptr_ = details::make_plaidml_shape(ffi::call<plaidml_shape*>(
+        plaidml_shape_alloc, static_cast<plaidml_datatype>(dtype), sizes.size(), sizes.data(), strides.data()));
   }
 
   explicit TensorShape(const std::shared_ptr<plaidml_shape>& ptr) : ptr_(ptr) {}
 
-  plaidml_datatype dtype() const { return ffi::call<plaidml_datatype>(plaidml_shape_get_dtype, ptr_.get()); }
+  DType dtype() const { return static_cast<DType>(ffi::call<plaidml_datatype>(plaidml_shape_get_dtype, ptr_.get())); }
   size_t ndims() const { return ffi::call<size_t>(plaidml_shape_get_ndims, ptr_.get()); }
   uint64_t nbytes() const { return ffi::call<uint64_t>(plaidml_shape_get_nbytes, ptr_.get()); }
   std::string str() const { return ffi::str(ffi::call<plaidml_string*>(plaidml_shape_repr, ptr_.get())); }
@@ -109,6 +140,11 @@ class TensorShape {
   std::shared_ptr<plaidml_shape> ptr_;
 };
 
+///
+/// \ingroup core_objects
+/// \class View
+/// This is a View.
+///
 class View {
   friend class Buffer;
 
@@ -132,6 +168,11 @@ class View {
   std::shared_ptr<plaidml_view> ptr_;
 };
 
+///
+/// \ingroup core_objects
+/// \class Buffer
+/// This is a Buffer.
+///
 class Buffer {
  public:
   Buffer() = default;
@@ -171,6 +212,11 @@ class Buffer {
   TensorShape shape_;
 };
 
+///
+/// \ingroup core_objects
+/// \struct Settings
+/// These are the Settings.
+///
 struct Settings {
   static std::string get(const std::string& key) {
     return ffi::str(ffi::call<plaidml_string*>(plaidml_settings_get, key.c_str()));

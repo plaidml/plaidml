@@ -549,10 +549,10 @@ Value all(const Value& value) {
   auto I_as_bool = select(I == 0, Tensor{0}, Tensor{1});
   auto I_shape = I.shape();
   if (I_shape.ndims() == 0) {
-    return Value{as_uint(I_as_bool, 8)};
+    return Value{cast(I_as_bool, DType::UINT8)};
   }
   if (axes.is_tuple() && axes.as_tuple().empty()) {
-    return Value{as_uint(I_as_bool, 8)};
+    return Value{cast(I_as_bool, DType::UINT8)};
   }
 
   AggregationAxes agg(I_shape.ndims(), axes, keepdims);
@@ -560,7 +560,7 @@ Value all(const Value& value) {
   I.bind_dims(agg.src_dims);
   auto O = TensorOutput(agg.dst_dims);
   O(agg.dst_idxs) *= I_as_bool(agg.src_idxs);
-  return Value{as_uint(O, 8)};
+  return Value{cast(O, DType::UINT8)};
 }
 
 Value any(const Value& value) {
@@ -576,10 +576,10 @@ Value any(const Value& value) {
   auto I_as_bool = select(I == 0, Tensor{0}, Tensor{1});
   auto I_shape = I.shape();
   if (I_shape.ndims() == 0) {
-    return Value{as_uint(I_as_bool, 8)};
+    return Value{cast(I_as_bool, DType::UINT8)};
   }
   if (axes.is_tuple() && axes.as_tuple().empty()) {
-    return Value{as_uint(I_as_bool, 8)};
+    return Value{cast(I_as_bool, DType::UINT8)};
   }
 
   AggregationAxes agg(I_shape.ndims(), axes, keepdims);
@@ -588,7 +588,7 @@ Value any(const Value& value) {
   auto S = TensorOutput(agg.dst_dims);
   S(agg.dst_idxs) += I_as_bool(agg.src_idxs);
   auto O = select(S == 0, Tensor{0}, Tensor{1});
-  return Value{as_uint(O, 8)};
+  return Value{cast(O, DType::UINT8)};
 }
 
 Value argmax(const Value& value) {
@@ -610,7 +610,7 @@ Value argmax(const Value& value) {
   auto IX = index(T, 0);
   auto AM = TensorOutput(agg.dst_dims);
   AM(agg.dst_idxs) >= cond(I(agg.src_idxs), M(agg.dst_idxs), IX(agg.reduce_idxs));
-  auto O = as_uint(AM, 32);
+  auto O = cast(AM, DType::UINT32);
   return Value{O};
 }
 
@@ -1354,7 +1354,7 @@ Value dot(const Value& value) {
   auto Y_shape = Y.shape();
   if (X_shape.dtype() != Y_shape.dtype()) {
     throw std::runtime_error(str(boost::format("Invalid dtype in dot: X.dtype = '%1%', Y.dtype = '%2%'") %
-                                 X_shape.dtype() % Y_shape.dtype()));
+                                 static_cast<int>(X_shape.dtype()) % static_cast<int>(Y_shape.dtype())));
   }
   if (X_shape.ndims() == 1 && Y_shape.ndims() == 1) {
     TensorDim I;
@@ -1683,7 +1683,7 @@ Value mean(const Value& value) {
   }
 
   // TODO: Move this commented block to Keras?
-  // if (I_shape.dtype() == PLAIDML_DATA_BOOLEAN) {
+  // if (I_shape.dtype() == DType::BOOLEAN) {
   //   I = cast(I, floatx());
   // }
 
@@ -1755,7 +1755,7 @@ Value prod(const Value& value) {
   }
 
   // TODO: Move this commented block to Keras?
-  // if (I_shape.dtype() == PLAIDML_DATA_BOOLEAN) {
+  // if (I_shape.dtype() == DType::BOOLEAN) {
   //   I = cast(I, floatx());  // TODO: cast if * is not && for bools, don't if it is &&
   // }
 
@@ -2586,7 +2586,7 @@ Value sum(const Value& value) {
   }
 
   // TODO: Move this commented block to Keras?
-  // if (I_shape.dtype() == PLAIDML_DATA_BOOLEAN) {
+  // if (I_shape.dtype() == DType::BOOLEAN) {
   //   I = cast(I, floatx());
   // }
 
@@ -2723,7 +2723,7 @@ Value variance(const Value& value) {
   }
 
   // TODO: Move this commented block to Keras?
-  // if (I.shape().dtype() == PLAIDML_DATA_BOOLEAN) {
+  // if (I.shape().dtype() == DType::BOOLEAN) {
   //   I = cast(I, floatx());
   // }
 
