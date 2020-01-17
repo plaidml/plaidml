@@ -6,6 +6,7 @@
 
 #include "llvm/ADT/SetVector.h"
 
+#include "mlir/ADT/TypeSwitch.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Matchers.h"
@@ -125,39 +126,47 @@ OpFoldResult DimOp::fold(ArrayRef<Attribute> operands) {
 
 template <typename T, typename R = void>
 class AffineVisitor {
+ protected:
+  AffineVisitor() = default;
+
  public:
   R visit(Value value) {
-    static_assert(std::is_base_of<AffineVisitor, T>::value, "Must instantiate with a derived type of AffineVisitor");
-    auto defOp = value->getDefiningOp();
-    if (auto op = llvm::dyn_cast<AffineIndexOp>(defOp)) {
-      return static_cast<T*>(this)->visitIndexOp(op);
-    } else if (auto op = llvm::dyn_cast<AffineConstantOp>(defOp)) {
-      return static_cast<T*>(this)->visitConstantOp(op);
-    } else if (auto op = llvm::dyn_cast<AffineAddOp>(defOp)) {
-      visitOperands(op.lhs(), op.rhs());
-      return static_cast<T*>(this)->visitAddOp(op);
-    } else if (auto op = llvm::dyn_cast<AffineMulOp>(defOp)) {
-      visitOperands(op.lhs(), op.rhs());
-      return static_cast<T*>(this)->visitMulOp(op);
-    } else if (auto op = llvm::dyn_cast<AffineDivOp>(defOp)) {
-      visitOperands(op.lhs(), op.rhs());
-      return static_cast<T*>(this)->visitDivOp(op);
-    } else if (auto op = llvm::dyn_cast<AffineNegOp>(defOp)) {
-      visit(op.input());
-      return static_cast<T*>(this)->visitNegOp(op);
-    } else if (auto op = llvm::dyn_cast<AffineSubOp>(defOp)) {
-      visitOperands(op.lhs(), op.rhs());
-      return static_cast<T*>(this)->visitSubOp(op);
-    } else if (auto op = llvm::dyn_cast<AffineMaxOp>(defOp)) {
-      visitOperands(op.lhs(), op.rhs());
-      return static_cast<T*>(this)->visitMaxOp(op);
-    } else if (auto op = llvm::dyn_cast<AffineMinOp>(defOp)) {
-      visitOperands(op.lhs(), op.rhs());
-      return static_cast<T*>(this)->visitMinOp(op);
-    } else if (auto op = llvm::dyn_cast<DimOp>(defOp)) {
-      return static_cast<T*>(this)->visitDimOp(op);
-    }
-    llvm_unreachable("Unknown Affine op");
+    return mlir::TypeSwitch<Operation*, R>(value->getDefiningOp())
+        .template Case<AffineIndexOp>([this](auto op) { return static_cast<T*>(this)->visitIndexOp(op); })
+        .template Case<AffineConstantOp>([this](auto op) { return static_cast<T*>(this)->visitConstantOp(op); })
+        .template Case<AffineAddOp>([this](auto op) {
+          visitOperands(op.lhs(), op.rhs());
+          return static_cast<T*>(this)->visitAddOp(op);
+        })
+        .template Case<AffineMulOp>([this](auto op) {
+          visitOperands(op.lhs(), op.rhs());
+          return static_cast<T*>(this)->visitMulOp(op);
+        })
+        .template Case<AffineDivOp>([this](auto op) {
+          visitOperands(op.lhs(), op.rhs());
+          return static_cast<T*>(this)->visitDivOp(op);
+        })
+        .template Case<AffineSubOp>([this](auto op) {
+          visitOperands(op.lhs(), op.rhs());
+          return static_cast<T*>(this)->visitSubOp(op);
+        })
+        .template Case<AffineNegOp>([this](auto op) {
+          visit(op.input());
+          return static_cast<T*>(this)->visitNegOp(op);
+        })
+        .template Case<AffineMaxOp>([this](auto op) {
+          visitOperands(op.lhs(), op.rhs());
+          return static_cast<T*>(this)->visitMaxOp(op);
+        })
+        .template Case<AffineMinOp>([this](auto op) {
+          visitOperands(op.lhs(), op.rhs());
+          return static_cast<T*>(this)->visitMinOp(op);
+        })
+        .template Case<DimOp>([this](auto op) { return static_cast<T*>(this)->visitDimOp(op); })
+        .Default([](Operation* op) {
+          llvm_unreachable("Unknown Affine op");
+          return R();
+        });
   }
 
   void visitIndexOp(AffineIndexOp op) {}
