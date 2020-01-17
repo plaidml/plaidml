@@ -70,9 +70,11 @@ Primitives
 
       .. autofunction:: plaidml.edsl.abs
       .. autofunction:: plaidml.edsl.cast
+      .. autofunction:: plaidml.edsl.ceil
       .. autofunction:: plaidml.edsl.cos
       .. autofunction:: plaidml.edsl.cosh
       .. autofunction:: plaidml.edsl.exp
+      .. autofunction:: plaidml.edsl.floor
       .. autofunction:: plaidml.edsl.gather
       .. autofunction:: plaidml.edsl.ident
       .. autofunction:: plaidml.edsl.index
@@ -80,6 +82,7 @@ Primitives
       .. autofunction:: plaidml.edsl.pow
       .. autofunction:: plaidml.edsl.prng
       .. autofunction:: plaidml.edsl.reshape
+      .. autofunction:: plaidml.edsl.round
       .. autofunction:: plaidml.edsl.scatter
       .. autofunction:: plaidml.edsl.select
       .. autofunction:: plaidml.edsl.shape

@@ -669,17 +669,42 @@ def call(fn, *args):
 
 
 def abs(x):
-    """A placeholder docstring."""
+    """Computes the elementwise absolute value of ``x``.
+
+        Args:
+            x (Tensor): The tensor used to peform the elementwise ``abs``.
+
+        Returns:
+            y (Tensor): The result of the elementwise ``abs`` operation.
+
+    """
     return call('abs', x)
 
 
 def cast(x, dtype):
-    """A placeholder docstring."""
+    """Casts the element type of a tensor ``x`` to the type specified by ``dtype``.
+
+        Args:
+            x (Tensor): The tensor used to peform the elementwise ``cast``.
+            dtype (DType): The datatype to ``cast`` to
+
+        Returns:
+            y (Tensor): The result of the elementwise ``cast`` operation.
+
+    """
     return Tensor(expr=ffi_call(lib.plaidml_expr_cast, wrap_tensor(x).as_ptr(), dtype))
 
 
 def ceil(x):
-    """A placeholder docstring."""
+    """Computes the elementwise ceiling of ``x``.
+
+        Args:
+            x (Tensor): The tensor used to peform the elementwise ``ceil``.
+
+        Returns:
+            y (Tensor): The result of the elementwise ``ceil`` operation.
+
+    """
     return call('ceil', x)
 
 
@@ -689,22 +714,70 @@ def cond(lhs, rhs, true_case):
 
 
 def cos(x):
-    """A placeholder docstring."""
+    """Computes the elementwise cosine of ``x``.
+
+        Args:
+            x (Tensor): The tensor used to peform the elementwise ``cos``.
+
+        Returns:
+            y (Tensor): The result of the elementwise ``cos`` operation.
+
+    """
     return call('cos', x)
 
 
+def cosh(x):
+    """Computes the elementwise hyperbolic cosine of ``x``.
+
+        Args:
+            x (Tensor): The tensor used to peform the elementwise ``cosh``.
+
+        Returns:
+            y (Tensor): The result of the elementwise ``cosh`` operation.
+
+    """
+    return call('cosh', x)
+
+
 def exp(x):
-    """A placeholder docstring."""
+    """Computes the elementwise natural exponential function of ``x``.
+
+        Args:
+            x (Tensor): The tensor used to peform the elementwise ``exp``.
+
+        Returns:
+            y (Tensor): The result of the elementwise ``exp`` operation.
+
+    """
     return call('exp', x)
 
 
 def floor(x):
-    """A placeholder docstring."""
+    """Computes the elementwise floor of ``x``.
+
+        Args:
+            x (Tensor): The tensor used to peform the elementwise ``floor``.
+
+        Returns:
+            y (Tensor): The result of the elementwise ``floor`` operation.
+
+    """
     return call('floor', x)
 
 
 def gather(x, y):
-    """A placeholder docstring."""
+    """Takes an input tensor (``x``) and a set of indices to gather over
+    (``y``), and returns an output tensor that gathers the input tensor from the
+    indices specified.
+
+        Args:
+            x (Tensor): The tensor to peform ``gather`` on.
+            y (Tensor): The set of indices to ``gather`` over.
+
+        Returns:
+            r (Tensor): The result of the ``gather`` operation.
+
+    """
     return call('gather', x, y)
 
 
@@ -723,57 +796,161 @@ def gradients(loss, variables):
 
 
 def ident(x):
-    """A placeholder docstring."""
+    """Returns the identity of ``x``.
+
+        Args:
+            x (Tensor): The input Tensor.
+
+        Returns:
+            r (Tensor): The resultant tensor.
+
+    """
     return call('ident', x)
 
 
 def index(x, axis):
-    """A placeholder docstring."""
+    """Returns the index of ``x`` at the specified ``axis``.
+
+        Args:
+            x (Tensor): The Tensor to index.
+            axis (Tensor): The axis used for indexing.
+
+        Returns:
+            r (Tensor): The indexed tensor.
+
+    """
     return call('index', x, axis)
 
 
 def log(x):
-    """A placeholder docstring."""
+    """Computes the elementwise natural logarithm of ``x``.
+
+        Args:
+            x (Tensor): The input Tensor.
+
+        Returns:
+            r (Tensor): The resultant tensor.
+
+    """
     return call('log', x)
 
 
 def max(x, y):
-    """A placeholder docstring."""
+    """Computes the elementwise maximum of ``x`` and ``y``.
+
+        Args:
+            x (Tensor): The first input Tensor.
+            y (Tensor): The second input Tensor.
+
+        Returns:
+            r (Tensor): The resultant tensor.
+
+    """
     return call('max', x, y)
 
 
 def min(x, y):
-    """A placeholder docstring."""
+    """Computes the elementwise minimum of ``x`` and ``y``.
+
+        Args:
+            x (Tensor): The first input Tensor.
+            y (Tensor): The second input Tensor.
+
+        Returns:
+            r (Tensor): The resultant tensor.
+
+    """
     return call('min', x, y)
 
 
 def pow(x, y):
-    """A placeholder docstring."""
+    """Computes the elementwise ``y``th power of ``x``.
+
+        Args:
+            x (Tensor): The base Tensor.
+            y (Tensor): The exponent Tensor.
+
+        Returns:
+            r (Tensor): The resultant tensor.
+
+    """
     return call('pow', x, y)
 
 
 def prng(state, shape):
-    """A placeholder docstring."""
+    """Generates a Tensor of elementwise pseudorandom numbers using the seed values specified in ``state``.
+
+        Args:
+            state (Tensor): The seed values for the ``prng`` operation.
+            shape (Tensor): The desired shape of the tensor of pseudorandom numbers.
+
+        Returns:
+            y (Tensor): The tensor of pseudorandom numbers.
+
+    """
     return call('prng', state, *shape)
 
 
 def reshape(x, dims):
-    """A placeholder docstring."""
+    """Takes a tensor ``x`` and reshapes it according to ``dims``.
+
+        Args:
+            x (Tensor): The tensor to reshape.
+            dims (list): The desired shape of the tensor.
+
+        Returns:
+            y (Tensor): The reshaped tensor.
+
+    """
     return call('reshape', x, *dims)
 
 
 def round(x):
-    """A placeholder docstring."""
+    """Rounds ``x`` elementwise.
+
+        Args:
+            x (Tensor): The tensor to round.
+
+        Returns:
+            y (Tensor): The rounded tensor.
+
+    """
     return call('round', x)
 
 
 def scatter(x, y, z):
-    """A placeholder docstring."""
+    """Takes an input tensor (``x``), a set of indices to scatter over (``y``),
+       and the number of elements in the scattered tensor (``z``), and returns an
+       output tensor that scatters the input tensor across the number of elements
+       specified.
+
+       Args:
+           x (Tensor): The tensor to perform ``scatter`` on.
+           y (Tensor): The tensor containing the indices to scatter over.
+           z (Tensor): The number of elements in the scattered tensor.
+
+       Returns:
+           r (Tensor): The scattered tensor.
+
+    """
     return call('scatter', x, y, z)
 
 
 def select(cond, true_case, false_case):
-    """A placeholder docstring."""
+    """Performs an elementwise conditional which returns the corresponding
+       element in ``true_case`` if the condition is evaluated to be true or the
+       corresponding element in ``false_case`` if the condition is evaluated to be
+       false.
+
+       Args:
+           cond (Tensor): The tensor used to perform the conditional.
+           true_case (Tensor): The tensor whose elements are selected if the condition evaluates to be true.
+           false_case (Tensor): The tensor whose elements are selected if the condition evaluates to be false.
+
+       Returns:
+           y (Tensor): The tensor with the conditionally selected elements.
+
+    """
     return call('cond', cond, true_case, false_case)
 
 

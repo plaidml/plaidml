@@ -25,10 +25,10 @@ pip install sphinx-tabs
 
 ### Building Documentation Locally
 
-The file `watch.py` will perform local rebuilds/reloads of the documentation in real time as you make local changes.
+The file `docs.py` will perform local rebuilds/reloads of the documentation in real time as you make local changes.
 
-Run `watch.py` using Bazel:
+Run `docs.py` using Bazel:
 
 ```
-bazelisk run //docs:watch
+bazelisk run //docs
 ```
