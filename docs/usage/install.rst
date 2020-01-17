@@ -1,228 +1,165 @@
 Installation Instructions
 #########################
-
 PlaidML supports :ref:`Ubuntu`, :ref:`macOS` , and :ref:`Microsoft Windows` operating systems.
 
-Ubuntu
-******
+.. tabs::
 
-If necessary, install Python's ``pip`` tool. OpenCL 1.2 or greater is also
+    .. tab:: Ubuntu
 
-required.
+        If necessary, install Python's ``pip`` tool. OpenCL 1.2 or greater is alsorequired.
 
-.. code-block::
+        .. code-block::
 
-    sudo add-apt-repository universe && sudo apt update
+            sudo add-apt-repository universe && sudo apt update
+            sudo apt install python3-pip
+            sudo apt install clinfo
 
-    sudo apt install python3-pip
+        Run ``clinfo``, and if it reports ``"Number of platforms" == 0``, you can install a driver (GPU) or enable a CPU via one of these options:
 
-    sudo apt install clinfo
-    
-Run ``clinfo``, and if it reports ``"Number of platforms" == 0``, you
+        *  **Nvidia** -- For Nvidia GPUs, run:
 
-can install a driver (GPU) or enable a CPU via one of these options:
+        .. code-block::
 
-* **Nvidia** -- For Nvidia GPUs, run:
+            sudo add-apt-repository ppa:graphics-drivers/ppa && sudo apt update
+            sudo apt install nvidia-modprobe nvidia-384 nvidia-opencl-icd-384 libcuda1-384
 
-.. code-block::
+        *  **AMD** -- For AMD graphics cards, `download the AMDGPU PRO driver <http://support.amd.com/en-us/kb-articles/Pages/AMDGPU-PRO-Driver-for-Linux-Release-Notes.aspx>`_ and follow the 
+           instructions provided by AMD for the chip.
 
-    sudo add-apt-repository ppa:graphics-drivers/ppa && sudo apt update
+        *  **Intel® Xeon® Processors OR Intel® Core™ Processors** -- In lieu of installing specific drivers, 
+           you can `install ngraph with pip <https://github.com/NervanaSystems/ngraph/blob/master/README.md#quick-start>`_, or you can `build the nGraph Library <https://ngraph.nervanasys.com/docs/latest/buildlb.html>`_ with the 
+           cmake flag `-DNGRAPH*PLAIDML*ENABLE=TRUE`.
 
-    sudo apt install nvidia-modprobe nvidia-384 nvidia-opencl-icd-384 libcuda1-384
+        **Python**
+        
+        Although PlaidML can be run with Python2, we recommend Python3, as well as judicious use of a `Virtualenv <https://virtualenv.pypa.io/en/stable>`_.  To create one just for using PlaidML:
 
+        .. code-block::
 
+            python3 -m venv plaidml-venv
+            source plaidml-venv/bin/activate
 
-* **AMD** -- For AMD graphics cards, `download the AMDGPU PRO driver <http://support.amd.com/en-us/kb-articles/Pages/AMDGPU-PRO-Driver-for-Linux-Release-Notes.aspx>`_ and follow
+        **Keras**
+       
+        There are two ways to get Keras working on your system:
 
-the instructions provided by AMD for the chip.
+        1. Isolate it to your `venv` as follows:
 
-* **Intel® Xeon® Processors OR Intel® Core™ Processors** -- In lieu of
+        .. code-block:: shell
 
-installing specific drivers, you can [install nGraph with pip], or you can
+            pip install -U plaidml-keras
 
-[build the nGraph Library] with the cmake flag `-DNGRAPH*PLAIDML*ENABLE=TRUE`.
+        2. Alternatively, install the PlaidML wheels system-wide with:
 
+        .. code-block::
 
-Python
-======
+            sudo -H pip install -U plaidml-keras
 
-Although PlaidML can be run with Python2, we recommend Python3, as well as
+        Finally, set up PlaidML to use a preferred computing device:
 
-judicious use of a `Virtualenv <https://virtualenv.pypa.io/en/stable>`_.  To create one just for using PlaidML:
+        .. code-block::
 
-.. code-block::
+            plaidml-setup
 
-    python3 -m venv plaidml-venv
+        You can test the installation by running MobileNet in `plaidbench <https://github.com/plaidml/plaidml/tree/plaidml-v1/plaidbench>`_. Remember to use ``sudo -H`` if you're working outside of a virtual environment.
 
-    source plaidml-venv/bin/activate
+        .. code-block::
 
+            pip install plaidml-keras plaidbench
+            plaidbench keras mobilenet
 
-Keras
-=====
+        You can adapt any Keras code by using the PlaidML backend instead of the TensorFlow, CNTK, or Theano backend that you'd normally use; simply change the Keras backend to ``plaidml.keras.backend``. 
+        You can do this by modifying
 
-There are two ways to get Keras working on your system:
+        ``~/.keras/keras.json`` so that the backend line reads ``"backend":
+        "plaidml.keras.backend"`` If this file does not exist, see the [Backend
+        instructions for Keras]. If you don't need anything special in your Keras
+        settings, you can set the ``~/.keras/keras.json`` as follows:
 
-1. Isolate it to your `venv` as follows:
+        .. code-block:: 
+            
+            {
+                "epsilon": 1e-07,
+                "floatx": "float32",
+                "image*data*format": "channels_last",
+                "backend": "plaidml.keras.backend"
+            }
 
-.. code-block:: shell
+        Another option is to globally set the ``KERAS_BACKEND`` environment variable
+        to `plaidml.keras.backend`.
+        A monkey-patch technique involving ``plaidml.keras.install_backend()`` may still
+        work, but should be considered deprecated in favor of the above methods.
 
-    pip install -U plaidml-keras
 
+    .. tab:: macOS
 
-2. Alternatively, install the PlaidML wheels system-wide with:
+        A computer listed on `Apple's compatibility list <https://support.apple.com/en-us/HT202823>`_ with support for OpenCL 1.2 is
+        required; those from 2011 and later usually fit this requirement.
 
-.. code-block::
+        **Python**
+        
+        Although PlaidML can be run with Python2, we recommend Python3, as well as
+        judicious use of a `Virtualenv <https://virtualenv.pypa.io/en/stable>`_.  To create one just for using PlaidML:
 
-    sudo -H pip install -U plaidml-keras
+        .. code-block:: 
 
+            python3 -m venv plaidml-venv
+            source plaidml-venv/bin/activate
 
+        **Keras**
+        
+        To install PlaidML with Keras, run the following:
 
-Finally, set up PlaidML to use a preferred computing device:
+        .. code-block::
 
-.. code-block::
+            pip install -U plaidml-keras
 
-    plaidml-setup
+        Finally, set up PlaidML to use a preferred computing device:
 
+        .. code-block::
 
+            plaidml-setup
 
-You can test the installation by running MobileNet in `plaidbench <https://github.com/plaidml/plaidbench>`_. Remember to
+        PlaidML should now be installed! You can test the installation by running
+        MobileNet in `plaidbench <https://github.com/plaidml/plaidml/tree/plaidml-v1/plaidbench>`_.
 
-use ``sudo -H`` if you're working outside of a virtual environment.
+        .. code-block::
 
-.. code-block::
+            pip install plaidml-keras plaidbench
+            plaidbench keras mobilenet
 
-    pip install plaidml-keras plaidbench
+    .. tab:: Microsoft Windows
 
-    plaidbench keras mobilenet
+        These instructions assume Windows 10 without Python installed; adapt accordingly.
 
+        1. First install `Chocolatey <https://chocolatey.org/>`_ by starting an Administrator PowerShell and running:
 
-You can adapt any Keras code by using the PlaidML backend instead of the
+        .. code-block::
 
-TensorFlow, CNTK, or Theano backend that you'd normally use; simply change
+            Set-ExecutionPolicy Bypass -Scope Process -Force; iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
 
-the Keras backend to ``plaidml.keras.backend``. You can do this by modifying
+        You'll likely need to reboot your shell at this point.
 
-``~/.keras/keras.json`` so that the backend line reads ``"backend":
+        2. Install Python:
 
-"plaidml.keras.backend"`` If this file does not exist, see the [Backend
+        .. code-block::
 
-instructions for Keras]. If you don't need anything special in your Keras
+            choco install -y python git vcredist2015
 
-settings, you can set the ``~/.keras/keras.json`` as follows:
+        3. Switch to an unprivileged PowerShell to install and set up PlaidML with Keras
 
-.. code-block:: 
-    
-    {
-        "epsilon": 1e-07,
+        .. code-block:: shell
 
-        "floatx": "float32",
+            pip install -U plaidml-keras
+            plaidml-setup
 
-        "image*data*format": "channels_last",
+        PlaidML should now be installed! You can test the installation by running
+        MobileNet in `plaidbench <https://github.com/plaidml/plaidml/tree/plaidml-v1/plaidbench>`_.
 
-        "backend": "plaidml.keras.backend"
-    }
+        .. code-block:: shell
 
-
-Another option is to globally set the ``KERAS_BACKEND`` environment variable
-
-to `plaidml.keras.backend`.
-
-A monkey-patch technique involving ``plaidml.keras.install_backend()`` may still
-
-work, but should be considered deprecated in favor of the above methods.
-
-macOS
-*****
-
-A computer listed on `Apple's compatibility list <https://support.apple.com/en-us/HT202823>`_ with support for OpenCL 1.2 is
-
-required; those from 2011 and later usually fit this requirement.
-
-Python
-======
-
-Although PlaidML can be run with Python2, we recommend Python3, as well as
-
-judicious use of a `Virtualenv <https://virtualenv.pypa.io/en/stable>`_.  To create one just for using PlaidML:
-
-.. code-block:: 
-
-    python3 -m venv plaidml-venv
-
-    source plaidml-venv/bin/activate
-
-Keras
-=====
-
-To install PlaidML with Keras, run the following:
-
-.. code-block::
-
-    pip install -U plaidml-keras
-
-
-Finally, set up PlaidML to use a preferred computing device:
-
-.. code-block::
-
-    plaidml-setup
-
-PlaidML should now be installed! You can test the installation by running
-
-MobileNet in `plaidbench <https://github.com/plaidml/plaidbench>`_.
-
-.. code-block::
-
-    pip install plaidml-keras plaidbench
-
-    plaidbench keras mobilenet
-
-Microsoft Windows
-*****************
-
-These instructions assume Windows 10 without Python installed; adapt
-
-accordingly.
-
-1. First install `Chocolatey <https://chocolatey.org/>`_ by starting an Administrator PowerShell
-
-   and running:
-.. code-block:: shell
-
-    Set-ExecutionPolicy Bypass -Scope Process -Force; iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
-
-
-
-You'll likely need to reboot your shell at this point.
-
-
-1. Install Python:
-
-.. code-block:: shell
-
-    choco install -y python git vcredist2015
-
-
-1. Switch to an unprivileged PowerShell to install and set up PlaidML with
-
-Keras
-
-.. code-block:: shell
-
-    pip install -U plaidml-keras
-
-    plaidml-setup
-
-PlaidML should now be installed! You can test the installation by running
-
-MobileNet in `plaidbench <https://github.com/plaidml/plaidbench>`_.
-
-.. code-block:: shell
-
-    pip install plaidml-keras plaidbench
-
-    plaidbench keras mobilenet
-
+            pip install plaidml-keras plaidbench
+            plaidbench keras mobilenet
 
 
 
