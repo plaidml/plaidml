@@ -143,6 +143,56 @@ TEST(CppEdsl, BitLeft) {
   }
 }
 
+TEST(CppEdsl, BitRightSignedScalarSigned) {
+  auto A = Placeholder(DType::INT64, {3, 3});
+  auto C = A >> 1;
+  Program program("bit_right", {C});
+
+  std::vector<std::int64_t> input_a{1 << 1, 2 << 1, 3 << 1,  //
+                                    4 << 1, 5 << 1, 6 << 1,  //
+                                    7 << 1, 8 << 1, 9 << 1};
+  std::vector<std::int64_t> expected{1, 2, 3,  //
+                                     4, 5, 6,  //
+                                     7, 8, 9};
+
+  auto binder = exec::Binder(program);
+  auto executable = binder.compile();
+  binder.input(A).copy_from(input_a.data());
+  executable->run();
+  {
+    auto view = binder.output(C).mmap_current();
+    ASSERT_THAT(view.size(), expected.size() * sizeof(expected[0]));
+    auto data = reinterpret_cast<std::int64_t*>(view.data());
+    std::vector<std::int64_t> actual(data, data + expected.size());
+    EXPECT_THAT(actual, ContainerEq(expected));
+  }
+}
+
+TEST(CppEdsl, BitRightUnsignedScalarSigned) {
+  auto A = Placeholder(DType::UINT64, {3, 3});
+  auto C = A >> 1;
+  Program program("bit_right", {C});
+
+  std::vector<std::uint64_t> input_a{1 << 1, 2 << 1, 3 << 1,  //
+                                     4 << 1, 5 << 1, 6 << 1,  //
+                                     7 << 1, 8 << 1, 9 << 1};
+  std::vector<std::uint64_t> expected{1, 2, 3,  //
+                                      4, 5, 6,  //
+                                      7, 8, 9};
+
+  auto binder = exec::Binder(program);
+  auto executable = binder.compile();
+  binder.input(A).copy_from(input_a.data());
+  executable->run();
+  {
+    auto view = binder.output(C).mmap_current();
+    ASSERT_THAT(view.size(), expected.size() * sizeof(expected[0]));
+    auto data = reinterpret_cast<std::uint64_t*>(view.data());
+    std::vector<std::uint64_t> actual(data, data + expected.size());
+    EXPECT_THAT(actual, ContainerEq(expected));
+  }
+}
+
 TEST(CppEdsl, BitRight) {
   auto A = Placeholder(DType::UINT64, {3, 3});
   auto B = Placeholder(DType::UINT64, {3, 3});
@@ -324,7 +374,7 @@ module {
 }
 )#"));
   exec::Binder(program).compile()->run();
-}  // namespace plaidml::edsl
+}
 
 TEST(CppEdsl, EltwiseAdd) {
   auto A = Placeholder(DType::FLOAT32, {10, 20});

@@ -258,6 +258,44 @@ class TestEdsl(unittest.TestCase):
     def compare_results(self, program, expected):
         self.assertMultiLineEqual(str(program).lstrip(), expected.lstrip())
 
+    def test_bit_right_scalar_signed(self):
+        I = Tensor(LogicalShape(plaidml.DType.INT64, [3, 3]))
+        O = I >> 1
+        program = Program('bit_right', [O])
+        # TODO: expected
+
+        outputs = plaidml.exec.run(program, [
+            (I, np.array([
+                [1 << 1, 2 << 1, 3 << 1],
+                [4 << 1, 5 << 1, 6 << 1],
+                [7 << 1, 8 << 1, 9 << 1]]))
+        ])
+        np.testing.assert_array_equal(
+            outputs[0],
+            np.array([
+                [1, 2, 3],
+                [4, 5, 6],
+                [7, 8, 9]]))
+
+    def test_bit_right_scalar_unsigned(self):
+        I = Tensor(LogicalShape(plaidml.DType.UINT64, [3, 3]))
+        O = I >> 1
+        program = Program('bit_right', [O])
+        # TODO: expected
+
+        outputs = plaidml.exec.run(program, [
+            (I, np.array([
+                [1 << 1, 2 << 1, 3 << 1],
+                [4 << 1, 5 << 1, 6 << 1],
+                [7 << 1, 8 << 1, 9 << 1]]))
+        ])
+        np.testing.assert_array_equal(
+            outputs[0],
+            np.array([
+                [1, 2, 3],
+                [4, 5, 6],
+                [7, 8, 9]]))
+
     def test_sum_over_axis(self):
         I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 784]))
         O = sum_over_axis(I)
