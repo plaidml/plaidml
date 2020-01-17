@@ -56,14 +56,6 @@ def plaidml_workspace():
     )
 
     http_archive(
-        name = "half",
-        url = "https://github.com/plaidml/depot/raw/master/half-1.11.0.zip",
-        sha256 = "9e5ddb4b43abeafe190e780b5b606b081acb511e6edd4ef6fbe5de863a4affaf",
-        strip_prefix = "half-1.11.0",
-        build_file = clean_dep("//bzl:half.BUILD"),
-    )
-
-    http_archive(
         name = "jsonnet",
         url = "https://github.com/google/jsonnet/archive/v0.13.0.zip",
         sha256 = "e9f7095dd2a383001188aa622edaf82059732e11d74f8d0bfdfa84f2682dd547",
@@ -136,7 +128,7 @@ def plaidml_workspace():
 
     LLVM_COMMIT = "498856fca5b9306f545554aeec93c7c058f03eb3"
     LLVM_SHA256 = "f5d102b2215bdf109b76c4cd0c809059561fd01161c6956e0deb8fdb8b8bad4f"
-    LLVM_URL = "https://github.com/llvm/llvm-project/archive/{commit}.tar.gz".format(commit = LLVM_COMMIT)
+    LLVM_URL = "https://github.com/plaidml/llvm-project/archive/{commit}.tar.gz".format(commit = LLVM_COMMIT)
     http_archive(
         name = "llvm-project",
         url = LLVM_URL,
@@ -147,7 +139,6 @@ def plaidml_workspace():
             clean_dep("//vendor/mlir:mlir.BUILD"): "mlir/BUILD.bazel",
             clean_dep("//vendor/mlir:test.BUILD"): "mlir/test/BUILD.bazel",
         },
-        patches = [clean_dep("//vendor/mlir:mlir.patch")],
         override = "PLAIDML_LLVM_REPO",
     )
 

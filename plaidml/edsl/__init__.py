@@ -14,7 +14,9 @@ logger = logging.getLogger(__name__)
 
 
 def __init():
-    """Docstring for function plaidml.edsl.__init"""
+    """
+    Initializes PlaidML's EDSL API.
+    """
     ffi_call(lib.plaidml_edsl_init)
 
 
@@ -27,6 +29,15 @@ class LogicalShape(ForeignObject):
     __ffi_repr__ = lib.plaidml_logical_shape_repr
 
     def __init__(self, dtype=None, dims=[], ptr=None):
+        """Initializes the LogicalShape.
+
+        Args:
+            self (pointer): The object pointer for a LogicalShape
+            dtype (DType): Description of dtype
+            dims (list): The dimensions of the LogicalShape
+            ptr (pointer): Description of ptr
+
+        """
         if ptr:
             ffi_obj = ptr
         elif dtype is not None:
@@ -61,6 +72,15 @@ class LogicalShape(ForeignObject):
         ]
 
     def into_TensorShape(self):
+        """Converts a LogicalShape into a TensorShape.
+
+        Args:
+            self (pointer): The object pointer for a LogicalShape
+
+        Returns:
+            TensorShape: The resultant TensorShape.
+
+        """
         return TensorShape(
             ptr=ffi_call(lib.plaidml_logical_shape_into_tensor_shape, self.as_ptr()))
 
@@ -234,32 +254,41 @@ class IndexedTensor(object):
     def __repr__(self):
         return repr(self._impl)
 
-    # Represents an aggregation_op of SUM in a contraction
     def __iadd__(self, rhs):
+        """Represents an aggregation_op of SUM in a contraction.
+
+        Args:
+            self (pointer): The object pointer for an IndexedTensor
+            rhs (IndexedTensor): The rhs
+
+        Returns:
+            y (IndexedTensor): The result
+
+        """
         return IndexedTensor(self._make_contraction(lib.PLAIDML_AGG_OP_SUM, rhs))
 
-    # Represents an aggregation_op of PROD in a contraction
     def __imul__(self, rhs):
+        """Represents an aggregation_op of PROD in a contraction"""
         return IndexedTensor(self._make_contraction(lib.PLAIDML_AGG_OP_PROD, rhs))
 
-    # Represents an aggregation_op of MAX in a contraction
     def __ge__(self, rhs):
+        """Represents an aggregation_op of MAX in a contraction"""
         self._tensor._set_contraction(self._make_contraction(lib.PLAIDML_AGG_OP_MAX, rhs))
 
-    # Represents an aggregation_op of MIN in a contraction
     def __le__(self, rhs):
+        """Represents an aggregation_op of MIN in a contraction"""
         self._tensor._set_contraction(self._make_contraction(lib.PLAIDML_AGG_OP_MIN, rhs))
 
-    # Represents a combo_op of PLUS in a contraction
     def __add__(self, rhs):
+        """Represents a combo_op of PLUS in a contraction"""
         return IndexedTensor(_ContractionPart(lib.PLAIDML_COMBO_OP_ADD, (self, rhs)))
 
-    # Represents a combo_op of MULTIPLY in a contraction
     def __mul__(self, rhs):
+        """Represents a combo_op of MULTIPLY in a contraction"""
         return IndexedTensor(_ContractionPart(lib.PLAIDML_COMBO_OP_MUL, (self, rhs)))
 
-    # Represents a combo_op of EQ in a contraction
     def __eq__(self, rhs):
+        """Represents a combo_op of EQ in a contraction"""
         return IndexedTensor(_ContractionPart(lib.PLAIDML_COMBO_OP_EQ, (self, rhs)))
 
     def _make_contraction(self, agg_op, rhs):
@@ -430,19 +459,19 @@ class Tensor(ForeignObject):
     def __ge__(self, rhs):
         return call('cmp_ge', self, rhs)
 
-    # Represents an eltwise bit_left
+    # Represents an eltwise bit_shl
     def __lshift__(self, rhs):
-        return call('bit_left', self, rhs)
+        return call('bit_shl', self, rhs)
 
     def __rlshift__(self, lhs):
-        return call('bit_left', lhs, self)
+        return call('bit_shl', lhs, self)
 
-    # Represents an eltwise bit_right
+    # Represents an eltwise bit_shr
     def __rshift__(self, rhs):
-        return call('bit_right', self, rhs)
+        return call('bit_shr', self, rhs)
 
     def __rrshift__(self, lhs):
-        return call('bit_right', lhs, self)
+        return call('bit_shr', lhs, self)
 
     # Represents an eltwise bit_and
     def __and__(self, rhs):
@@ -639,77 +668,121 @@ def call(fn, *args):
     return Tensor(expr=ffi_call(lib.plaidml_expr_call, fn.encode(), len(args), raw_args))
 
 
+def abs(x):
+    """Computes the elementwise absolute value of ``x``.
+
+        Args:
+            x (Tensor): The tensor used to peform the elementwise ``abs``.
+
+        Returns:
+            y (Tensor): The result of the elementwise ``abs`` operation.
+
+    """
+    return call('abs', x)
+
+
 def cast(x, dtype):
+    """Casts the element type of a tensor ``x`` to the type specified by ``dtype``.
+
+        Args:
+            x (Tensor): The tensor used to peform the elementwise ``cast``.
+            dtype (DType): The datatype to ``cast`` to
+
+        Returns:
+            y (Tensor): The result of the elementwise ``cast`` operation.
+
+    """
     return Tensor(expr=ffi_call(lib.plaidml_expr_cast, wrap_tensor(x).as_ptr(), dtype))
 
 
-def as_bool(x):
-    return cast(x, DType.BOOLEAN)
-
-
-def as_float(x, bit_size):
-    map = {
-        16: DType.FLOAT16,
-        32: DType.FLOAT32,
-        64: DType.FLOAT64,
-    }
-    dtype = map.get(bit_size)
-    if not dtype:
-        raise 'Unsupport bit_size for as_float'
-    return cast(x, dtype)
-
-
-def as_int(x, bit_size):
-    map = {
-        8: DType.INT8,
-        16: DType.INT16,
-        32: DType.INT32,
-        64: DType.INT64,
-    }
-    dtype = map.get(bit_size)
-    if not dtype:
-        raise 'Unsupport bit_size for as_int'
-    return cast(x, dtype)
-
-
-def as_uint(x, bit_size):
-    map = {
-        8: DType.UINT8,
-        16: DType.UINT16,
-        32: DType.UINT32,
-        64: DType.UINT64,
-    }
-    dtype = map.get(bit_size)
-    if not dtype:
-        raise 'Unsupport bit_size for as_uint'
-    return cast(x, dtype)
-
-
 def ceil(x):
+    """Computes the elementwise ceiling of ``x``.
+
+        Args:
+            x (Tensor): The tensor used to peform the elementwise ``ceil``.
+
+        Returns:
+            y (Tensor): The result of the elementwise ``ceil`` operation.
+
+    """
     return call('ceil', x)
 
 
 def cond(lhs, rhs, true_case):
+    """A placeholder docstring."""
     return IndexedTensor(_ContractionPart(lib.PLAIDML_COMBO_OP_COND, (lhs, rhs, true_case)))
 
 
 def cos(x):
+    """Computes the elementwise cosine of ``x``.
+
+        Args:
+            x (Tensor): The tensor used to peform the elementwise ``cos``.
+
+        Returns:
+            y (Tensor): The result of the elementwise ``cos`` operation.
+
+    """
     return call('cos', x)
 
 
+def cosh(x):
+    """Computes the elementwise hyperbolic cosine of ``x``.
+
+        Args:
+            x (Tensor): The tensor used to peform the elementwise ``cosh``.
+
+        Returns:
+            y (Tensor): The result of the elementwise ``cosh`` operation.
+
+    """
+    return call('cosh', x)
+
+
 def exp(x):
+    """Computes the elementwise natural exponential function of ``x``.
+
+        Args:
+            x (Tensor): The tensor used to peform the elementwise ``exp``.
+
+        Returns:
+            y (Tensor): The result of the elementwise ``exp`` operation.
+
+    """
     return call('exp', x)
 
 
 def floor(x):
+    """Computes the elementwise floor of ``x``.
+
+        Args:
+            x (Tensor): The tensor used to peform the elementwise ``floor``.
+
+        Returns:
+            y (Tensor): The result of the elementwise ``floor`` operation.
+
+    """
     return call('floor', x)
 
 
 def gather(x, y):
+    """Takes an input tensor (``x``) and a set of indices to gather over
+    (``y``), and returns an output tensor that gathers the input tensor from the
+    indices specified.
+
+        Args:
+            x (Tensor): The tensor to peform ``gather`` on.
+            y (Tensor): The set of indices to ``gather`` over.
+
+        Returns:
+            r (Tensor): The result of the ``gather`` operation.
+
+    """
     return call('gather', x, y)
 
 
 def gradients(loss, variables):
+    """A placeholder docstring."""
     wrts = [x.as_ptr() for x in variables]
     raw_grads = ffi.new('plaidml_expr*[]', len(wrts))
     ffi_call(
@@ -723,64 +796,237 @@ def gradients(loss, variables):
 
 
 def ident(x):
+    """Returns the identity of ``x``.
+
+        Args:
+            x (Tensor): The input Tensor.
+
+        Returns:
+            r (Tensor): The resultant tensor.
+
+    """
     return call('ident', x)
 
 
 def index(x, axis):
+    """Returns the index of ``x`` at the specified ``axis``.
+
+        Args:
+            x (Tensor): The Tensor to index.
+            axis (Tensor): The axis used for indexing.
+
+        Returns:
+            r (Tensor): The indexed tensor.
+
+    """
     return call('index', x, axis)
 
 
 def log(x):
+    """Computes the elementwise natural logarithm of ``x``.
+
+        Args:
+            x (Tensor): The input Tensor.
+
+        Returns:
+            r (Tensor): The resultant tensor.
+
+    """
     return call('log', x)
 
 
 def max(x, y):
+    """Computes the elementwise maximum of ``x`` and ``y``.
+
+        Args:
+            x (Tensor): The first input Tensor.
+            y (Tensor): The second input Tensor.
+
+        Returns:
+            r (Tensor): The resultant tensor.
+
+    """
     return call('max', x, y)
 
 
 def min(x, y):
+    """Computes the elementwise minimum of ``x`` and ``y``.
+
+        Args:
+            x (Tensor): The first input Tensor.
+            y (Tensor): The second input Tensor.
+
+        Returns:
+            r (Tensor): The resultant tensor.
+
+    """
     return call('min', x, y)
 
 
 def pow(x, y):
+    """Computes the elementwise ``y``th power of ``x``.
+
+        Args:
+            x (Tensor): The base Tensor.
+            y (Tensor): The exponent Tensor.
+
+        Returns:
+            r (Tensor): The resultant tensor.
+
+    """
     return call('pow', x, y)
 
 
 def prng(state, shape):
+    """Generates a Tensor of elementwise pseudorandom numbers using the seed values specified in ``state``.
+
+        Args:
+            state (Tensor): The seed values for the ``prng`` operation.
+            shape (Tensor): The desired shape of the tensor of pseudorandom numbers.
+
+        Returns:
+            y (Tensor): The tensor of pseudorandom numbers.
+
+    """
     return call('prng', state, *shape)
 
 
 def reshape(x, dims):
+    """Takes a tensor ``x`` and reshapes it according to ``dims``.
+
+        Args:
+            x (Tensor): The tensor to reshape.
+            dims (list): The desired shape of the tensor.
+
+        Returns:
+            y (Tensor): The reshaped tensor.
+
+    """
     return call('reshape', x, *dims)
 
 
 def round(x):
+    """Rounds ``x`` elementwise.
+
+        Args:
+            x (Tensor): The tensor to round.
+
+        Returns:
+            y (Tensor): The rounded tensor.
+
+    """
     return call('round', x)
 
 
 def scatter(x, y, z):
+    """Takes an input tensor (``x``), a set of indices to scatter over (``y``),
+       and the number of elements in the scattered tensor (``z``), and returns an
+       output tensor that scatters the input tensor across the number of elements
+       specified.
+
+       Args:
+           x (Tensor): The tensor to perform ``scatter`` on.
+           y (Tensor): The tensor containing the indices to scatter over.
+           z (Tensor): The number of elements in the scattered tensor.
+
+       Returns:
+           r (Tensor): The scattered tensor.
+
+    """
     return call('scatter', x, y, z)
 
 
 def select(cond, true_case, false_case):
+    """Performs an elementwise conditional which returns the corresponding
+       element in ``true_case`` if the condition is evaluated to be true or the
+       corresponding element in ``false_case`` if the condition is evaluated to be
+       false.
+
+       Args:
+           cond (Tensor): The tensor used to perform the conditional.
+           true_case (Tensor): The tensor whose elements are selected if the condition evaluates to be true.
+           false_case (Tensor): The tensor whose elements are selected if the condition evaluates to be false.
+
+       Returns:
+           y (Tensor): The tensor with the conditionally selected elements.
+
+    """
     return call('cond', cond, true_case, false_case)
 
 
 def shape(x):
+    """Returns the shape of ``x`` as a Tensor.
+
+        Args:
+            x (Tensor): The tensor used to calculate the shape.
+
+        Returns:
+            y (Tensor): The shape of the tensor.
+
+    """
     return call('shape', x)
 
 
 def sin(x):
+    """Computes the elementwise sine of ``x``.
+
+        Args:
+            x (Tensor): The tensor used to peform the elementwise ``sin``.
+
+        Returns:
+            y (Tensor): The result of the elementwise ``sin`` operation.
+
+    """
+    return call('sin', x)
+
+
+def sinh(x):
+    """Computes the elementwise hyperbolic sine of ``x``.
+
+        Args:
+            x (Tensor): The tensor used to peform the elementwise ``sinh``.
+
+        Returns:
+            y (Tensor): The result of the elementwise ``sinh`` operation.
+
+    """
     return call('sin', x)
 
 
 def sqrt(x):
+    """Computes the elementwise square root of ``x``.
+
+        Args:
+            x (Tensor): The tensor used to peform the elementwise ``sqrt``.
+
+        Returns:
+            y (Tensor): The result of the elementwise ``sqrt`` operation.
+
+    """
     return call('sqrt', x)
 
 
 def tan(x):
+    """Computes the elementwise tangent of ``x``.
+
+        Args:
+            x (Tensor): The tensor used to peform the elementwise ``tan``.
+
+        Returns:
+            y (Tensor): The result of the elementwise ``tan`` operation.
+
+    """
     return call('tan', x)
 
 
 def tanh(x):
+    """Computes the elementwise hyperbolic tangent of ``x``.
+
+        Args:
+            x (Tensor): The tensor used to peform the elementwise ``tanh``.
+
+        Returns:
+            y (Tensor): The result of the elementwise ``tanh`` operation.
+
+    """
     return call('tanh', x)

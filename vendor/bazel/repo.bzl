@@ -51,7 +51,7 @@ def _http_archive_impl(ctx):
 http_archive = repository_rule(
     implementation = _http_archive_impl,
     attrs = {
-        "sha256": attr.string(mandatory = True),
+        "sha256": attr.string(),
         "url": attr.string(mandatory = True),
         "strip_prefix": attr.string(),
         "type": attr.string(),

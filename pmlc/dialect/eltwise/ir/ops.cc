@@ -64,17 +64,6 @@ void CastOp::getCanonicalizationPatterns(OwningRewritePatternList& results, MLIR
   results.insert<CastCanonicalizer>(context);
 }
 
-Type CastOp::getResultType(ValueRange operands) {  //
-  llvm_unreachable("CastOp::getResultType not implemented");
-}
-
-Operation* CastOp::create(OpBuilder* builder, Location loc, Type type, ValueRange operands) {
-  OperationState state(loc, getOperationName());
-  state.addOperands(operands);
-  state.addTypes(type);
-  return builder->createOperation(state);
-}
-
 //
 // ---- EltwiseOp ----
 //
@@ -91,13 +80,10 @@ struct EltwiseCanonicalizer : public OpRewritePattern<OpType> {
     if (resultType == eltwiseOp.result()->getType()) {
       return Pattern::matchFailure();
     }
-    if (auto type = eltwiseOp.type().template dyn_cast<ScalarType>()) {
-      auto newOp = rewriter.create<OpType>(op->getLoc(), type, operands);
-      rewriter.replaceOp(op, {newOp});
-      util::UpdateFuncOpType(newOp.getOperation());
-      return Pattern::matchSuccess();
-    }
-    return Pattern::matchFailure();
+    auto newOp = rewriter.create<OpType>(op->getLoc(), operands);
+    rewriter.replaceOp(op, {newOp});
+    util::UpdateFuncOpType(newOp.getOperation());
+    return Pattern::matchSuccess();
   }
 };
 
@@ -109,10 +95,15 @@ struct EltwiseCanonicalizer : public OpRewritePattern<OpType> {
 DEFINE_CANONICALIZER(AbsOp);
 DEFINE_CANONICALIZER(ACosOp);
 DEFINE_CANONICALIZER(AddOp);
-DEFINE_CANONICALIZER(AndOp);
 DEFINE_CANONICALIZER(ASinOp);
 DEFINE_CANONICALIZER(AssignOp);
 DEFINE_CANONICALIZER(ATanOp);
+DEFINE_CANONICALIZER(BitAndOp);
+DEFINE_CANONICALIZER(BitNotOp);
+DEFINE_CANONICALIZER(BitOrOp);
+DEFINE_CANONICALIZER(BitXorOp);
+DEFINE_CANONICALIZER(BitShlOp);
+DEFINE_CANONICALIZER(BitShrOp);
 DEFINE_CANONICALIZER(CeilOp);
 DEFINE_CANONICALIZER(CmpEqOp);
 DEFINE_CANONICALIZER(CmpGeOp);
@@ -132,13 +123,9 @@ DEFINE_CANONICALIZER(MinOp);
 DEFINE_CANONICALIZER(ModOp);
 DEFINE_CANONICALIZER(MulOp);
 DEFINE_CANONICALIZER(NegOp);
-DEFINE_CANONICALIZER(NotOp);
-DEFINE_CANONICALIZER(OrOp);
 DEFINE_CANONICALIZER(PowOp);
 DEFINE_CANONICALIZER(ReluOp);
 DEFINE_CANONICALIZER(RoundOp);
-DEFINE_CANONICALIZER(ShlOp);
-DEFINE_CANONICALIZER(ShrOp);
 DEFINE_CANONICALIZER(SignOp);
 DEFINE_CANONICALIZER(SinHOp);
 DEFINE_CANONICALIZER(SinOp);
@@ -146,7 +133,6 @@ DEFINE_CANONICALIZER(SqrtOp);
 DEFINE_CANONICALIZER(SubOp);
 DEFINE_CANONICALIZER(TanHOp);
 DEFINE_CANONICALIZER(TanOp);
-DEFINE_CANONICALIZER(XorOp);
 DEFINE_CANONICALIZER(SelectOp);
 
 OpFoldResult AddOp::fold(ArrayRef<Attribute> operands) {

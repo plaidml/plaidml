@@ -156,10 +156,13 @@ plaidml_shape* plaidml_shape_alloc(  //
     const int64_t* sizes,            //
     const int64_t* strides) {
   return ffi_wrap<plaidml_shape*>(err, nullptr, [&] {
-    auto dataType = static_cast<DataType>(dtype);
+    auto dataType = pmlc::util::symbolizeDataType(dtype);
+    if (!dataType.hasValue()) {
+      throw std::runtime_error("Invalid dtype");
+    }
     auto sizesArray = llvm::makeArrayRef(sizes, ndims);
     auto stridesArray = llvm::makeArrayRef(strides, ndims);
-    auto type = GlobalContext::get()->MakeMemRefType(dataType, sizesArray, stridesArray);
+    auto type = GlobalContext::get()->MakeMemRefType(dataType.getValue(), sizesArray, stridesArray);
     return new plaidml_shape{type};
   });
 }

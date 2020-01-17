@@ -4,6 +4,7 @@
 
 #include <limits>
 #include <list>
+#include <memory>
 
 #include "llvm/Support/FormatVariadic.h"
 
@@ -717,14 +718,17 @@ struct ComputeBoundsImpl {
     for (const auto& poly : access) {
       exprs.emplace_back(makeAffineExprFromIntPoly(poly));
     }
-    return AffineMap::get(/*dimCount=*/idxs.size(), /*symbolCount=*/0, exprs);
+    if (exprs.size()) {
+      return AffineMap::get(/*dimCount=*/idxs.size(), /*symbolCount=*/0, exprs);
+    }
+    return AffineMap::get(op.getContext());
   }
 
   IntegerSet getConstraints() {
     if (affineConstraints.empty()) {
       return IntegerSet::getEmptySet(/*dimCount=*/idxs.size(), /*symbolCount=*/0, op.getContext());
     }
-    SmallVector<bool, 4> flags(idxs.size(), false);
+    SmallVector<bool, 4> flags(affineConstraints.size(), false);
     return IntegerSet::get(/*dimCount=*/idxs.size(), /*symbolCount=*/0, affineConstraints, flags);
   }
 };
@@ -745,6 +749,11 @@ void ComputeBoundsPass::runOnFunction() {
       signalPassFailure();
     }
   });
+}
+
+std::unique_ptr<mlir::OpPassBase<mlir::FuncOp>> createComputeBoundsPass() {
+  std::unique_ptr<mlir::OpPassBase<mlir::FuncOp>> pass = std::make_unique<ComputeBoundsPass>();
+  return pass;
 }
 
 }  // namespace pmlc::dialect::tile

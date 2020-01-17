@@ -1,13 +1,13 @@
-// RUN: pmlc-opt -tile-legalize-to-pxa -canonicalize -cse %s | FileCheck %s
+// RUN: pmlc-opt -convert-tile-to-pxa -canonicalize -cse %s | FileCheck %s
 
-!fp32 = type tensor<!eltwise.fp32>
-!t_10x20xfp32 = type tensor<10x20x!eltwise.fp32>
-!t_10x20xbool = type tensor<10x20x!eltwise.bool>
+!f32 = type tensor<!eltwise.f32>
+!t_10x20xfp32 = type tensor<10x20x!eltwise.f32>
+!t_10x20xbool = type tensor<10x20x!eltwise.i1>
 
 func @relu(%arg0: !t_10x20xfp32) -> !t_10x20xfp32 {
-  %0 = "eltwise.sconst"() {value = 0.0 : f32} : () -> !fp32
-  %1 = "eltwise.cmp_lt"(%arg0, %0) {type = !eltwise.fp32} : (!t_10x20xfp32, !fp32) -> !t_10x20xbool
-  %2 = "eltwise.select"(%1, %0, %arg0) {type = !eltwise.fp32} : (!t_10x20xbool, !fp32, !t_10x20xfp32) -> !t_10x20xfp32
+  %0 = "eltwise.sconst"() {value = 0.0 : f32} : () -> !f32
+  %1 = "eltwise.cmp_lt"(%arg0, %0) : (!t_10x20xfp32, !f32) -> !t_10x20xbool
+  %2 = "eltwise.select"(%1, %0, %arg0) : (!t_10x20xbool, !f32, !t_10x20xfp32) -> !t_10x20xfp32
   return %2 : !t_10x20xfp32
 }
 

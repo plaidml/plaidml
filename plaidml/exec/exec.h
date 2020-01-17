@@ -14,6 +14,9 @@
 namespace plaidml {
 namespace exec {
 
+///
+/// Initializes PlaidML's Execution API.
+///
 inline void init() {
   plaidml::init();
   ffi::call_void(plaidml_exec_init);
@@ -33,11 +36,32 @@ inline std::shared_ptr<T> make_ptr(T* ptr) {
 
 }  // namespace details
 
+///
+/// \defgroup exec_objects Objects
+///
+
+///
+/// \ingroup exec_objects
+/// \struct Binding
+/// Bindings bind a Tensor to a Buffer.
+///
 struct Binding {
+  /// The tensor to bind.
   edsl::Tensor tensor;
+  /// The buffer to be bound to.
   Buffer buffer;
 };
 
+///
+/// \defgroup exec_functions Functions
+///
+
+///
+/// \ingroup exec_functions
+/// Lists the available devices.
+/// Use this list of devices to set the environment variable `PLAIDML_DEVICE`.
+/// \return vector<string>
+///
 inline std::vector<std::string> list_devices() {
   auto strs = details::make_ptr(ffi::call<plaidml_strings*>(plaidml_devices_get));
   std::vector<std::string> ret(strs->nstrs);
@@ -47,6 +71,12 @@ inline std::vector<std::string> list_devices() {
   return ret;
 }
 
+///
+/// \ingroup exec_functions
+/// Lists the available targets.
+/// Use this list of targets to set the environment variable `PLAIDML_TARGET`.
+/// \return vector<string>
+///
 inline std::vector<std::string> list_targets() {
   auto strs = details::make_ptr(ffi::call<plaidml_strings*>(plaidml_targets_get));
   std::vector<std::string> ret(strs->nstrs);
@@ -56,8 +86,16 @@ inline std::vector<std::string> list_targets() {
   return ret;
 }
 
+///
+/// \ingroup exec_objects
+/// \class Executable
+/// This is an Executable.
+///
 class Executable {
  public:
+  ///
+  /// Executable constructor
+  ///
   Executable(const edsl::Program& program,        //
              const std::vector<Binding>& inputs,  //
              const std::vector<Binding>& outputs)
@@ -69,6 +107,9 @@ class Executable {
             outputs)                          //
   {}
 
+  ///
+  /// Executable constructor
+  ///
   Executable(const edsl::Program& program,        //
              const std::string& device,           //
              const std::string& target,           //
@@ -100,6 +141,9 @@ class Executable {
             raw_outputs.data()));
   }
 
+  ///
+  /// run
+  ///
   void run() {  //
     ffi::call_void(plaidml_executable_run, ptr_.get());
   }
@@ -108,11 +152,21 @@ class Executable {
   std::shared_ptr<plaidml_executable> ptr_;
 };
 
+///
+/// \ingroup exec_objects
+/// \struct Binder
+/// This is a Binder.
+///
 class Binder {
  private:
   using BindingMap = std::map<edsl::TensorRef, Buffer>;
 
  public:
+  ///
+  /// Constructs a Binder.
+  /// By default, this constructor uses the environment variables `PLAIDML_DEVICE` and `PLAIDML_TARGET` to specify your
+  /// device and target. You can override these using the `set_device` and `set_target` functions
+  ///
   explicit Binder(const edsl::Program& program)
       : program_(program),  //
         device_(Settings::get("PLAIDML_DEVICE")),
@@ -129,34 +183,69 @@ class Binder {
     }
   }
 
+  ///
+  /// Set the device for the Binder to use.
+  /// \param value string
+  /// \return Binder
+  ///
   Binder& set_device(const std::string& value) {
     device_ = value;
     return *this;
   }
 
+  ///
+  /// Set the target for the Binder to use.
+  /// \param value string
+  /// \return Binder
+  ///
   Binder& set_target(const std::string& value) {
     target_ = value;
     return *this;
   }
 
+  ///
+  /// input
+  /// \param tensor Tensor
+  /// \return Buffer
+  ///
   Buffer input(const edsl::Tensor& tensor) {  //
     return inputs_.at(tensor);
   }
 
+  ///
+  /// output
+  /// \param tensor Tensor
+  /// \return Buffer
+  ///
   Buffer output(const edsl::Tensor& tensor) {  //
     return outputs_.at(tensor);
   }
 
+  ///
+  /// set_input
+  /// \param tensor Tensor
+  /// \param buffer Buffer
+  /// \return Binder
+  ///
   Binder& set_input(const edsl::Tensor& tensor, const Buffer& buffer) {
     inputs_[tensor] = buffer;
     return *this;
   }
 
+  ///
+  /// set_output
+  /// \param tensor Tensor
+  /// \param buffer Buffer
+  /// \return Binder
+  ///
   Binder& set_output(const edsl::Tensor& tensor, const Buffer& buffer) {
     outputs_[tensor] = buffer;
     return *this;
   }
 
+  ///
+  /// compile
+  /// \return shared_ptr<Executable>
   std::shared_ptr<Executable> compile() {
     std::vector<Binding> input_bindings;
     std::vector<Binding> output_bindings;

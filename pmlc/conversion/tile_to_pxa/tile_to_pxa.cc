@@ -17,7 +17,6 @@
 #include "pmlc/dialect/pxa/ir/dialect.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/dialect/tile/ir/ops.h"
-#include "pmlc/dialect/tile/transforms/contraction.h"
 #include "pmlc/util/logging.h"
 #include "pmlc/util/util.h"
 
@@ -30,22 +29,20 @@ using dialect::eltwise::ScalarType;
 using dialect::tile::AffineConstantOp;
 using dialect::tile::AggregationKind;
 using dialect::tile::CombinationKind;
-using dialect::tile::Contraction;
 using dialect::tile::ContractionOp;
 using dialect::tile::ContractionOpOperandAdaptor;
 using dialect::tile::IndexOp;
-using dialect::tile::Shape;
 using dialect::tile::ShapeOp;
 using dialect::tile::ShapeOpOperandAdaptor;
 using util::DataType;
 
 using llvm::Optional;
 using llvm::SmallVector;
+using mlir::AffineConstantExpr;
 using mlir::AffineLoadOp;
 using mlir::AffineMap;
 using mlir::AffineMapAttr;
 using mlir::AffineStoreOp;
-using mlir::AffineTerminatorOp;
 using mlir::AllocOp;
 using mlir::ArrayRef;
 using mlir::Attribute;
@@ -103,11 +100,8 @@ ScalarType getScalarType(Type type) {
   return type.cast<ScalarType>();
 }
 
-ScalarType getScalarType(Value value) { return getScalarType(value->getType()); }
-
-Shape getShape(Type type) {
-  auto rankedTensorType = ew::getRankedTensorType(type);
-  return rankedTensorType.getShape();
+ScalarType getScalarType(Value value) {  //
+  return getScalarType(value->getType());
 }
 
 struct FuncOpConversion : public OpConversionPattern<FuncOp> {
@@ -287,22 +281,19 @@ struct Not {
 };
 
 struct EltwiseFloat {
-  bool match(Type type) const { return is_float(getScalarType(type).type()); }
+  bool match(Type type) const { return isFloat(getScalarType(type).type()); }
 };
 
 struct EltwiseInteger {
-  bool match(Type type) const {
-    auto dtype = getScalarType(type).type();
-    return is_int(dtype) || is_uint(dtype);
-  }
+  bool match(Type type) const { return isInteger(getScalarType(type).type()); }
 };
 
 struct EltwiseSigned {
-  bool match(Type type) const { return is_int(getScalarType(type).type()); }
+  bool match(Type type) const { return isSigned(getScalarType(type).type()); }
 };
 
 struct EltwiseUnsigned {
-  bool match(Type type) const { return is_uint(getScalarType(type).type()); }
+  bool match(Type type) const { return isUnsigned(getScalarType(type).type()); }
 };
 
 struct FirstOperand {
@@ -312,48 +303,12 @@ struct FirstOperand {
   }
 };
 
-// Returns the Plaid arithmetic conversion rank of a type.
-unsigned getDataTypeRank(DataType dtype) {
-  switch (dtype) {
-    case DataType::INVALID:
-      return 0;
-    case DataType::BOOLEAN:
-      return 2;
-    case DataType::INT8:
-      return 3;
-    case DataType::UINT8:
-      return 4;
-    case DataType::INT16:
-      return 5;
-    case DataType::UINT16:
-      return 6;
-    case DataType::INT32:
-      return 7;
-    case DataType::UINT32:
-      return 8;
-    case DataType::INT64:
-      return 9;
-    case DataType::UINT64:
-      return 10;
-    case DataType::FLOAT16:
-      return 11;
-    case DataType::FLOAT32:
-      return 12;
-    case DataType::FLOAT64:
-      return 13;
-    default:
-      throw std::logic_error{"Invalid type found in typecheck"};
-  }
-}
-
 DataType promoteTypes(ConversionPatternRewriter& rewriter, Location loc, ArrayRef<Value> operands,
                       ArrayRef<DataType> types, llvm::SmallVectorImpl<Value>* into) {
   // First, determine the 'final' type that wins the promotion
-  DataType bestType = DataType::INVALID;
+  DataType bestType = DataType::invalid;
   for (auto type : types) {
-    if (getDataTypeRank(type) > getDataTypeRank(bestType)) {
-      bestType = type;
-    }
+    bestType = promoteTypes(bestType, type);
   }
   // Next, cast each operand to the 'final' type
   auto scalarType = rewriter.getType<ScalarType>(bestType);
@@ -361,8 +316,7 @@ DataType promoteTypes(ConversionPatternRewriter& rewriter, Location loc, ArrayRe
   for (unsigned i = 0; i < operands.size(); i++) {
     auto dtype = types[i];
     auto operand = operands[i];
-    auto isSigned = is_int(dtype);
-    auto castOp = createCastOp(rewriter, loc, operand, targetType, isSigned);
+    auto castOp = createCastOp(rewriter, loc, operand, targetType, isSigned(dtype));
     into->push_back(castOp);
   }
   return bestType;
@@ -417,7 +371,7 @@ struct CmpIntInequalityOp {
                ArrayRef<DataType> types) {
     SmallVector<Value, 2> promoted;
     auto dataType = promoteTypes(rewriter, loc, operands, types, &promoted);
-    auto predicate = is_int(dataType) ? signedPred : unsignedPred;
+    auto predicate = isSigned(dataType) ? signedPred : unsignedPred;
     return rewriter.create<mlir::CmpIOp>(loc, predicate, promoted[0], promoted[1]).getResult();
   }
 };
@@ -478,16 +432,14 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
     auto resultMemRef = rewriter.create<AllocOp>(loc, resultMemRefType).getResult();
 
     // Make a parallel for loop to fill the result
-    auto ranges = rewriter.getI64ArrayAttr(resultMemRefType.getShape());
-    auto dynamicRanges = ArrayRef<Value>();
-    auto forOp = rewriter.create<pxa::AffineParallelForOp>(loc, ranges, dynamicRanges);
-    auto body = rewriter.createBlock(&forOp.inner());
+    auto forOp = rewriter.create<pxa::AffineParallelForOp>(loc, resultMemRefType.getShape());
+    auto body = forOp.getBody();
+    rewriter.setInsertionPointToStart(body);
+    // TODO: Maybe fix ValueRange?
     SmallVector<Value, 8> idxs;
-    for (size_t i = 0; i < ranges.size(); i++) {
-      auto idx = body->addArgument(rewriter.getIndexType());
-      idxs.push_back(idx);
+    for (size_t i = 0; i < body->getNumArguments(); i++) {
+      idxs.push_back(body->getArgument(i));
     }
-
     // Create the loads
     SmallVector<Value, 4> scalars;
     for (size_t i = 0; i < operands.size(); i++) {
@@ -523,9 +475,6 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
     // Create the store
     rewriter.create<AffineStoreOp>(loc, result, resultMemRef, idxs);
 
-    // Terminate the inner body
-    rewriter.create<AffineTerminatorOp>(loc);
-
     // Replace output with the newly allocated buffer
     rewriter.replaceOp(op, resultMemRef);
   }
@@ -538,6 +487,10 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
   PatternMatchResult match(Operation* op) const final {
     if (auto cionOp = llvm::dyn_cast<ContractionOp>(op)) {
       if (cionOp.combo() != comboKind) {
+        return matchFailure();
+      }
+      if (!cionOp.lower_bounds().hasValue() || !cionOp.upper_bounds().hasValue()) {
+        cionOp.emitError("contraction bounds must be computed");
         return matchFailure();
       }
       Matcher pred;
@@ -573,34 +526,27 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
     // Make an allocation for the output
     auto resultMemRef = rewriter.create<AllocOp>(loc, resultType).getResult();
 
-    // Get the shape
-    SmallVector<Shape, 4> shapes{getShape(op.result()->getType())};
-    for (auto src : op.operands()) {
-      shapes.emplace_back(getShape(src->getType()));
-    }
-
-    // Do the actual maths
-    Contraction contraction{op};
-    bool no_reduce = op.no_reduce().hasValue();
-    const auto& [bounds, constraints] = contraction.ComputeBounds(shapes, no_reduce);
-
-    // Extract ranges
+    // Determine ranges
     SmallVector<int64_t, 8> ranges;
-    for (const auto& [key, value] : bounds) {
-      uint64_t range = value.max - value.min + 1;
+    auto lowerBounds = op.lower_bounds().getValue();
+    auto upperBounds = op.upper_bounds().getValue();
+    assert(lowerBounds.getNumResults() == upperBounds.getNumResults() && "mismatched dims for lower and upper bounds");
+    for (unsigned i = 0; i < lowerBounds.getNumResults(); i++) {
+      auto rangeExpr = upperBounds.getResult(i) - lowerBounds.getResult(i) + 1;
+      auto range = rangeExpr.cast<AffineConstantExpr>().getValue();
       ranges.emplace_back(range);
     }
 
     // TODO: addInitializer
 
     // Make the outer loops
-    auto dynamicRanges = ArrayRef<Value>();
-    auto forOp = rewriter.create<pxa::AffineParallelForOp>(loc, rewriter.getI64ArrayAttr(ranges), dynamicRanges);
-    auto body = rewriter.createBlock(&forOp.inner());
+    auto forOp = rewriter.create<pxa::AffineParallelForOp>(loc, ranges);
+    auto body = forOp.getBody();
+    rewriter.setInsertionPointToStart(body);
+    // TODO: Maybe fix ValueRange?
     SmallVector<Value, 8> idxs;
-    for (size_t i = 0; i < ranges.size(); i++) {
-      auto idx = body->addArgument(rewriter.getIndexType());
-      idxs.push_back(idx);
+    for (size_t i = 0; i < body->getNumArguments(); i++) {
+      idxs.push_back(body->getArgument(i));
     }
 
     // Create the loads + casts
@@ -630,10 +576,12 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
 
     // Create the store
     auto resultMap = op.sink();
-    rewriter.create<pxa::AffineReduceOp>(loc, op.agg(), combined, resultMemRef, resultMap, idxs);
-
-    // Terminate the inner body
-    rewriter.create<AffineTerminatorOp>(loc);
+    if (resultMap.isEmpty()) {
+      SmallVector<Value, 0> emptyIdxs;
+      rewriter.create<pxa::AffineReduceOp>(loc, op.agg(), combined, resultMemRef, resultMap, emptyIdxs);
+    } else {
+      rewriter.create<pxa::AffineReduceOp>(loc, op.agg(), combined, resultMemRef, resultMap, idxs);
+    }
 
     // Replace the op
     rewriter.replaceOp(op, resultMemRef);
@@ -658,14 +606,13 @@ struct IndexOpConversion : public OpConversionPattern<IndexOp> {
     auto resultMemRef = rewriter.create<AllocOp>(loc, resultType).getResult();
 
     // Make a parallel for loop to fill the result
-    auto ranges = rewriter.getI64ArrayAttr(resultType.getShape());
-    auto dynamicRanges = ArrayRef<Value>();
-    auto forOp = rewriter.create<pxa::AffineParallelForOp>(loc, ranges, dynamicRanges);
-    auto body = rewriter.createBlock(&forOp.inner());
+    auto forOp = rewriter.create<pxa::AffineParallelForOp>(loc, resultType.getShape());
+    auto body = forOp.getBody();
+    rewriter.setInsertionPointToStart(body);
+    // TODO: Maybe fix ValueRange?
     SmallVector<Value, 8> idxs;
-    for (size_t i = 0; i < ranges.size(); i++) {
-      auto idx = body->addArgument(rewriter.getIndexType());
-      idxs.push_back(idx);
+    for (size_t i = 0; i < body->getNumArguments(); i++) {
+      idxs.push_back(body->getArgument(i));
     }
 
     // Load the index value
@@ -677,9 +624,6 @@ struct IndexOpConversion : public OpConversionPattern<IndexOp> {
     // Create the store
     auto cast = rewriter.create<mlir::IndexCastOp>(loc, apply, rewriter.getIntegerType(32));
     rewriter.create<AffineStoreOp>(loc, cast, resultMemRef, idxs);
-
-    // Terminate the inner body
-    rewriter.create<AffineTerminatorOp>(loc);
 
     // Replace the op
     rewriter.replaceOp(op, resultMemRef);
@@ -749,14 +693,13 @@ struct CastOpConversion : public OpConversionPattern<ew::CastOp> {
     auto resultMemRef = rewriter.create<AllocOp>(loc, resultType).getResult();
 
     // Make a parallel for loop to fill the result
-    auto ranges = rewriter.getI64ArrayAttr(resultType.getShape());
-    auto dynamicRanges = ArrayRef<Value>();
-    auto forOp = rewriter.create<pxa::AffineParallelForOp>(loc, ranges, dynamicRanges);
-    auto body = rewriter.createBlock(&forOp.inner());
+    auto forOp = rewriter.create<pxa::AffineParallelForOp>(loc, resultType.getShape());
+    auto body = forOp.getBody();
+    rewriter.setInsertionPointToStart(body);
+    // TODO: Maybe fix ValueRange?
     SmallVector<Value, 8> idxs;
-    for (size_t i = 0; i < ranges.size(); i++) {
-      auto idx = body->addArgument(rewriter.getIndexType());
-      idxs.push_back(idx);
+    for (size_t i = 0; i < body->getNumArguments(); i++) {
+      idxs.push_back(body->getArgument(i));
     }
 
     // Create the load
@@ -764,14 +707,11 @@ struct CastOpConversion : public OpConversionPattern<ew::CastOp> {
 
     // Create the standard cast op
     auto scalarType = getScalarType(op.tensor());
-    bool isSigned = is_int(scalarType.type());
-    auto result = createCastOp(rewriter, loc, scalar, resultType.getElementType(), isSigned);
+    auto dtype = scalarType.type();
+    auto result = createCastOp(rewriter, loc, scalar, resultType.getElementType(), isSigned(dtype));
 
     // Create the store
     rewriter.create<AffineStoreOp>(loc, result, resultMemRef, idxs);
-
-    // Terminate the inner body
-    rewriter.create<AffineTerminatorOp>(loc);
 
     // Replace the op
     rewriter.replaceOp(op, resultMemRef);
@@ -867,6 +807,12 @@ struct LoweringPass : public mlir::ModulePass<LoweringPass> {
         EltwiseOpConversion<ew::CmpGtOp, CmpIntGtOp, OperandsAre<Not<EltwiseFloat>>>,
         EltwiseOpConversion<ew::CmpGeOp, CmpFloatOp<CmpFPredicate::OGE>, AnyOperandIs<EltwiseFloat>>,
         EltwiseOpConversion<ew::CmpGeOp, CmpIntGeOp, OperandsAre<Not<EltwiseFloat>>>,
+        EltwiseOpConversion<ew::BitAndOp, StdOp<mlir::AndOp>, OperandsAre<EltwiseInteger>>,
+        EltwiseOpConversion<ew::BitOrOp, StdOp<mlir::OrOp>, OperandsAre<EltwiseInteger>>,
+        EltwiseOpConversion<ew::BitXorOp, StdOp<mlir::XOrOp>, OperandsAre<EltwiseInteger>>,
+        EltwiseOpConversion<ew::BitShlOp, StdOp<mlir::ShiftLeftOp>, OperandsAre<EltwiseInteger>>,
+        EltwiseOpConversion<ew::BitShrOp, StdOp<mlir::SignedShiftRightOp>, OperandsAre<EltwiseSigned>>,
+        EltwiseOpConversion<ew::BitShrOp, StdOp<mlir::UnsignedShiftRightOp>, OperandsAre<EltwiseUnsigned>>,
         EltwiseOpConversion<ew::SelectOp, SelectOp>,    //
         EltwiseOpConversion<ew::IdentOp, FirstOperand>  //
         >(&getContext());
@@ -888,7 +834,7 @@ std::unique_ptr<mlir::Pass> createLowerTileToPXAPass() {  //
 }
 
 static mlir::PassRegistration<LoweringPass> legalize_pass(  //
-    "tile-legalize-to-pxa",                                 //
-    "Legalize from Tile dialect to PXA dialect");
+    "convert-tile-to-pxa",                                  //
+    "Convert from Tile dialect to PXA dialect");
 
 }  // namespace pmlc::conversion::tile_to_pxa

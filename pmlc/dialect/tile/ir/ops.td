@@ -37,10 +37,6 @@ def IndexAttr : Attr<
   let returnType = [{ APInt }];
 }
 
-def IndexArrayAttr : TypedArrayAttrBase<IndexAttr, "index array attribute"> {
-  let constBuilderCall = "$_builder.getIndexArrayAttr($0)";
-}
-
 class TileOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
     Op<TileDialect, mnemonic, traits> {}
 
@@ -244,8 +240,8 @@ def ContractionOp : TileOpWithPPV<"cion", [NoSideEffect]> {
     OptionalAttr<IntegerSetAttr>:$cons,
     OptionalAttr<AffineMapAttr>:$shape,
     OptionalAttr<UnitAttr>:$no_reduce,
-    OptionalAttr<IndexArrayAttr>:$lower_bounds,
-    OptionalAttr<IndexArrayAttr>:$upper_bounds,
+    OptionalAttr<AffineMapAttr>:$lower_bounds,
+    OptionalAttr<AffineMapAttr>:$upper_bounds,
     OptionalAttr<StrAttr>:$name
   );
   let results = (outs RankedTensorOf<[AnyScalar]>:$result);
@@ -302,10 +298,9 @@ class SpecialOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
   let extraClassDeclaration = [{
     static Type getResultType(ArrayRef<Value> operands);
 
-    static Operation* create(OpBuilder* builder, Location loc, Type type, ArrayRef<Value> operands) {
+    static Operation* create(OpBuilder* builder, Location loc, ArrayRef<Value> operands) {
       OperationState state(loc, getOperationName());
       state.addOperands(operands);
-      state.addAttribute("type", TypeAttr::get(type));
       state.addTypes(getResultType(operands));
       return builder->createOperation(state);
     }

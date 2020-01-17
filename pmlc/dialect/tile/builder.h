@@ -13,7 +13,6 @@
 
 #include "pmlc/dialect/tile/program.h"
 #include "pmlc/util/enums.h"
-#include "pmlc/util/shape.h"
 
 namespace mlir {
 class Value;

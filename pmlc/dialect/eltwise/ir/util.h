@@ -13,7 +13,7 @@ namespace pmlc::dialect::eltwise {
 
 llvm::SmallVector<int64_t, 4> ComputeShape(llvm::ArrayRef<mlir::Value> operands);
 
-mlir::Type ComputeResultType(mlir::ValueRange operands, DataType override = DataType::INVALID);
+mlir::Type ComputeResultType(mlir::ValueRange operands, DataType override = DataType::invalid);
 
 mlir::RankedTensorType getRankedTensorType(mlir::Type type);
 
