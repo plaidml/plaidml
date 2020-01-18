@@ -8,6 +8,9 @@ plaidml_cc_library(
     name = "compiler",
     srcs = glob(["*.cc"]),
     hdrs = glob(["*.h"]),
+    copts = [
+    	"-Iexternal/vulkan_sdk_include",
+    ],
     deps = [
         "//base/util",
         "//pmlc/conversion/tile_to_pxa",

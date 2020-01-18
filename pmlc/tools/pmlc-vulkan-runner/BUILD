@@ -11,6 +11,8 @@ plaidml_cc_library(
         "VulkanRuntime.cpp",
     ],
     hdrs = [
+    	"VulkanRuntime.h",
+    	"VulkanRuntimeTests.h",
     ],
     copts = [
     	"-Iexternal/vulkan_sdk_include",
@@ -30,10 +32,11 @@ plaidml_cc_library(
 plaidml_cc_binary(
     name = "runtime_tests",
     srcs = [
-    	"RuntimeTests.cpp",
-    	"Runtime.h",
+    	"VulkanRuntimeTests.cpp",
     ],
-    copts = COPTS,
+    copts = [
+    	"-Iexternal/vulkan_sdk_include",
+    ],
     tags = [
         "llvm",
         "windows_fail",

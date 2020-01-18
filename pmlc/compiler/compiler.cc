@@ -26,10 +26,12 @@
 
 #include "pmlc/compiler/registry.h"
 #include "pmlc/conversion/tile_to_pxa/tile_to_pxa.h"
-#include "pmlc/tools/pmlc-vulkan-runner/Runtime.h"
+#include "pmlc/tools/pmlc-vulkan-runner/VulkanRuntime.h"
+#include "pmlc/tools/pmlc-vulkan-runner/VulkanRuntimeTests.h"
 
 using namespace mlir;  // NOLINT[build/namespaces]
 using pmlc::conversion::tile_to_pxa::createLowerTileToPXAPass;
+
 namespace fs = boost::filesystem;
 
 namespace pmlc::compiler {
@@ -76,7 +78,7 @@ void printMemRef(StridedMemRefType<T, N>* memref) {
   std::cout << std::endl;
 }
 
-class InjectTracingPass : public FunctionPass<InjectTracingPass> {
+class InjectTracingPass : public mlir::FunctionPass<InjectTracingPass> {
  public:
   void runOnFunction() override {
     auto funcOp = getFunction();
@@ -89,7 +91,7 @@ class InjectTracingPass : public FunctionPass<InjectTracingPass> {
       auto genericType = MemRefType::get(shape, memRefType.getElementType());
       auto printRef = getOrInsertPrint(moduleOp, genericType);
       auto castOp = builder.create<MemRefCastOp>(builder.getUnknownLoc(), genericType, arg);
-      builder.create<CallOp>(builder.getUnknownLoc(), printRef, ArrayRef<Type>{}, castOp.getResult());
+      builder.create<CallOp>(builder.getUnknownLoc(), printRef, ArrayRef<mlir::Type>{}, castOp.getResult());
     }
   }
 
@@ -102,7 +104,7 @@ class InjectTracingPass : public FunctionPass<InjectTracingPass> {
     }
     OpBuilder builder(context);
     builder.setInsertionPointToStart(module.getBody());
-    auto funcType = FunctionType::get(memRefType, {}, context);
+    auto funcType = mlir::FunctionType::get(memRefType, {}, context);
     builder.create<FuncOp>(module.getLoc(), symbol, funcType, ArrayRef<NamedAttribute>{});
     return SymbolRefAttr::get(symbol, context);
   }
@@ -112,7 +114,7 @@ class InjectTracingPass : public FunctionPass<InjectTracingPass> {
 
 using MemRefTypes = std::vector<MemRefType>;
 
-class ArgumentCollectorPass : public FunctionPass<ArgumentCollectorPass> {
+class ArgumentCollectorPass : public mlir::FunctionPass<ArgumentCollectorPass> {
  public:
   explicit ArgumentCollectorPass(MemRefTypes* into) : into(into) {}
 
@@ -188,7 +190,7 @@ Executable::Executable(StringRef entry, StringRef target, ModuleOp programModule
     : entry(entry), args(bufptrs.size()), ptrs(bufptrs.size()) {
   auto copy = cast<ModuleOp>(programModule.getOperation()->clone());
   OwningModuleRef module(copy);
-  PassManager manager(module->getContext());
+  mlir::PassManager manager(module->getContext());
 
   auto shouldPrintBeforePass = [](auto, auto) { return false; };
   auto shouldPrintAfterPass = [](auto, auto) { return VLOG_IS_ON(3); };
