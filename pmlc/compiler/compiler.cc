@@ -232,21 +232,22 @@ Executable::Executable(StringRef entry, StringRef target, ModuleOp programModule
   }
   spv_ModuleOp.dump();
 
-  pmlc::vulkan::RuntimeTest rt;
+  pmlc::vulkan::RuntimeTest* rt;
   pmlc::vulkan::NumWorkGroups numWorkGroups;
   numWorkGroups.x = 3;
   numWorkGroups.y = 3;
 
-  auto resOne = rt.createResourceVarFloat(0, 0, 3);
-  auto resTwo = rt.createResourceVarFloat(0, 1, 3);
-  auto resThree = rt.createResourceVarFloat(1, 0, 3);
-  auto resFour = rt.createResourceVarFloat(1, 1, 3);
+  auto resOne = rt->createResourceVarFloat(0, 0, 3);
+  auto resTwo = rt->createResourceVarFloat(0, 1, 3);
+  auto resThree = rt->createResourceVarFloat(1, 0, 3);
+  auto resFour = rt->createResourceVarFloat(1, 1, 3);
 
-  if (failed(pmlc::vulkan::runOnVulkan(cast<mlir::ModuleOp>(spv_ModuleOp), rt.vars, numWorkGroups))) {
+  if (failed(pmlc::vulkan::runOnVulkan(cast<mlir::ModuleOp>(spv_ModuleOp), rt->vars, numWorkGroups))) {
     std::cout << "runOnVulkan failed" << std::endl;
   } else {
     std::cout << "runOnVulkan success" << std::endl;
   }
+  rt = nullptr;
 }
 
 Executable::~Executable() = default;

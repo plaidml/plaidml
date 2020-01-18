@@ -29,7 +29,7 @@ plaidml_cc_library(
 )
 
 
-plaidml_cc_binary(
+plaidml_cc_test(
     name = "runtime_tests",
     srcs = [
     	"VulkanRuntimeTests.cpp",
@@ -44,5 +44,6 @@ plaidml_cc_binary(
     deps = [
         ":MLIRVulkanRuntime",
         "@llvm-project//mlir:SPIRVDialect",
+        "@gmock//:gtest",
     ],
 )
