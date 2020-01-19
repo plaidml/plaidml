@@ -1,12 +1,9 @@
 #pragma once
 
-#include <gtest/gtest.h>
 #include <memory>
 #include <random>
 #include <string>
 #include <utility>
-
-#include "gmock/gmock.h"
 
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
@@ -28,7 +25,8 @@ using namespace mlir;  // NOLINT[build/namespaces]
 using namespace llvm;  // NOLINT[build/namespaces]
 
 namespace pmlc::vulkan {
-class RuntimeTest : public ::testing::Test {
+class RuntimeSupport {
+  // class RuntimeTest {
  public:
   LogicalResult parseAndRunModule(llvm::StringRef sourceFile, NumWorkGroups numWorkGroups) {
     std::string errorMessage;

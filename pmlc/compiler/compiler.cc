@@ -27,7 +27,7 @@
 #include "pmlc/compiler/registry.h"
 #include "pmlc/conversion/tile_to_pxa/tile_to_pxa.h"
 #include "pmlc/tools/pmlc-vulkan-runner/VulkanRuntime.h"
-#include "pmlc/tools/pmlc-vulkan-runner/VulkanRuntimeTests.h"
+#include "pmlc/tools/pmlc-vulkan-runner/VulkanRuntimeSupport.h"
 
 using namespace mlir;  // NOLINT[build/namespaces]
 using pmlc::conversion::tile_to_pxa::createLowerTileToPXAPass;
@@ -216,6 +216,20 @@ Executable::Executable(StringRef entry, StringRef target, ModuleOp programModule
     throw std::runtime_error("conversion to the LLVM IR dialect failed");
   }
 
+  assert(memRefTypes.size() == bufptrs.size() && "memRefTypes and bufptrs size mismatch");
+
+  auto optPipeline = makeOptimizingTransformer(
+      /*optLevel=*/0, /*sizeLevel=*/0,
+      /*targetMachine=*/nullptr);
+
+  if (VLOG_IS_ON(6)) {
+    auto llvmModule = translateModuleToLLVMIR(*module);
+    if (!llvmModule) {
+      throw std::runtime_error("could not convert to LLVM IR");
+    }
+    llvmModule->print(llvm::errs(), nullptr);
+  }
+
   // clone the first spv module from the generated ModuleOp for serialization
   mlir::spirv::ModuleOp spv_ModuleOp;
   auto& blocks = module->getOperation()->getRegion(0).getBlocks();
@@ -230,24 +244,43 @@ Executable::Executable(StringRef entry, StringRef target, ModuleOp programModule
       }
     }
   }
+
+  spv_ModuleOp.removeAttr("addressing_model");
+  spv_ModuleOp.removeAttr("capabilities");
+  spv_ModuleOp.removeAttr("extensions");
+  spv_ModuleOp.removeAttr("memory_model");
+
   spv_ModuleOp.dump();
 
-  pmlc::vulkan::RuntimeTest* rt;
+  pmlc::vulkan::RuntimeSupport rt;
   pmlc::vulkan::NumWorkGroups numWorkGroups;
   numWorkGroups.x = 3;
   numWorkGroups.y = 3;
 
-  auto resOne = rt->createResourceVarFloat(0, 0, 3);
-  auto resTwo = rt->createResourceVarFloat(0, 1, 3);
-  auto resThree = rt->createResourceVarFloat(1, 0, 3);
-  auto resFour = rt->createResourceVarFloat(1, 1, 3);
+  auto resOne = rt.createResourceVarFloat(0, 0, 3);
+  auto resTwo = rt.createResourceVarFloat(0, 1, 3);
+  auto resThree = rt.createResourceVarFloat(1, 0, 3);
+  auto resFour = rt.createResourceVarFloat(1, 1, 3);
 
-  if (failed(pmlc::vulkan::runOnVulkan(cast<mlir::ModuleOp>(spv_ModuleOp), rt->vars, numWorkGroups))) {
-    std::cout << "runOnVulkan failed" << std::endl;
+  if (failed(pmlc::vulkan::runOnVulkan(cast<mlir::ModuleOp>(spv_ModuleOp), rt.vars, numWorkGroups))) {
+    throw std::runtime_error("Failed to runOnVulkan");
   } else {
     std::cout << "runOnVulkan success" << std::endl;
   }
-  rt = nullptr;
+
+  auto maybeEngine = mlir::ExecutionEngine::create(*module, optPipeline);
+  llvm::handleAllErrors(maybeEngine.takeError(), [](const llvm::ErrorInfoBase& b) {
+    b.log(llvm::errs());
+    throw std::runtime_error("Failed to create ExecutionEngine");
+  });
+  engine = std::move(*maybeEngine);
+
+  descriptors.reserve(args.size());
+  for (unsigned i = 0; i < args.size(); i++) {
+    descriptors.emplace_back(bufptrs[i], memRefTypes[i]);
+    ptrs[i] = descriptors[i].ptr();
+    args[i] = &ptrs[i];
+  }
 }
 
 Executable::~Executable() = default;

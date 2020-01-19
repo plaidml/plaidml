@@ -12,15 +12,12 @@ plaidml_cc_library(
     ],
     hdrs = [
     	"VulkanRuntime.h",
-    	"VulkanRuntimeTests.h",
-    ],
-    copts = [
-    	"-Iexternal/vulkan_sdk_include",
+    	"VulkanRuntimeSupport.h",
     ],
     deps = [
-    	"@vulkan_sdk_include//:inc",
-    	"@vulkan_sdk_lib//:lib",
     	"@xcd//:lib",
+    	"@vulkan_sdk_lib//:lib",
+        "@vulkan_headers//:inc",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:SPIRVSerialization",
         "@llvm-project//mlir:SPIRVDialect",
@@ -34,16 +31,25 @@ plaidml_cc_test(
     srcs = [
     	"VulkanRuntimeTests.cpp",
     ],
-    copts = [
-    	"-Iexternal/vulkan_sdk_include",
-    ],
     tags = [
         "llvm",
         "windows_fail",
     ],
     deps = [
         ":MLIRVulkanRuntime",
-        "@llvm-project//mlir:SPIRVDialect",
         "@gmock//:gtest",
+    ],
+)
+
+
+plaidml_cc_binary(
+    name = "vulkan_test",
+    srcs = [
+    	"VulkanTest.cpp",
+    ],
+    deps = [
+    	"@xcd//:lib",
+    	"@vulkan_sdk_lib//:lib",
+    	"@vulkan_headers//:inc",
     ],
 )
