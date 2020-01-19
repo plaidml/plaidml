@@ -885,13 +885,13 @@ module {
 
 TEST(CppEdsl, Reciprocal) {
   auto A = Placeholder(DType::FLOAT32, {10}, "A");
-  Program program("reciprocal", {1 / A});
+  Program program("reciprocal", {1.0 / A});
   EXPECT_THAT(program, Eq(R"#(
-!i32 = type tensor<!eltwise.i32>
+!f32 = type tensor<!eltwise.f32>
 module {
   func @reciprocal(%arg0: tensor<10x!eltwise.f32> {tile.name = "A"}) -> tensor<10x!eltwise.f32> {
-    %c1 = "eltwise.sconst"() {value = 1 : i64} : () -> !i32
-    %0 = "eltwise.div"(%c1, %arg0) : (!i32, tensor<10x!eltwise.f32>) -> tensor<10x!eltwise.f32>
+    %cst = "eltwise.sconst"() {value = 1.000000e+00 : f64} : () -> !f32
+    %0 = "eltwise.div"(%cst, %arg0) : (!f32, tensor<10x!eltwise.f32>) -> tensor<10x!eltwise.f32>
     return %0 : tensor<10x!eltwise.f32>
   }
 }
