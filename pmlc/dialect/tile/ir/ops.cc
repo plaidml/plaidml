@@ -128,7 +128,7 @@ class AffineVisitor {
  public:
   R visit(Value value) {
     static_assert(std::is_base_of<AffineVisitor, T>::value, "Must instantiate with a derived type of AffineVisitor");
-    auto defOp = value->getDefiningOp();
+    auto defOp = value.getDefiningOp();
     if (auto op = llvm::dyn_cast<AffineIndexOp>(defOp)) {
       return static_cast<T*>(this)->visitIndexOp(op);
     } else if (auto op = llvm::dyn_cast<AffineConstantOp>(defOp)) {
@@ -190,24 +190,24 @@ struct IsFoldableVisitor : public AffineVisitor<IsFoldableVisitor> {
 
   bool is_foldable(SymbolicContractionOp op) {
     foldable = true;
-    auto sinkMapOp = llvm::cast<AffineMapOp>(op.sink()->getDefiningOp());
+    auto sinkMapOp = llvm::cast<AffineMapOp>(op.sink().getDefiningOp());
     for (auto dim : sinkMapOp.dims()) {
       visit(dim);
     }
 
-    auto sizeMapOp = llvm::cast<AffineMapOp>(op.size()->getDefiningOp());
+    auto sizeMapOp = llvm::cast<AffineMapOp>(op.size().getDefiningOp());
     for (auto dim : sizeMapOp.dims()) {
       visit(dim);
     }
 
     for (auto src : op.srcs()) {
-      auto mapOp = llvm::cast<AffineTensorMapOp>(src->getDefiningOp());
+      auto mapOp = llvm::cast<AffineTensorMapOp>(src.getDefiningOp());
       for (auto dim : mapOp.dims()) {
         visit(dim);
       }
     }
 
-    auto consOp = llvm::cast<AffineConstraintsOp>(op.cons()->getDefiningOp());
+    auto consOp = llvm::cast<AffineConstraintsOp>(op.cons().getDefiningOp());
     for (auto pair : consOp.pairs()) {
       visit(pair);
     }
@@ -220,8 +220,8 @@ struct ContractionBuilder : public AffineVisitor<ContractionBuilder, AffineExpr>
 
  public:
   explicit ContractionBuilder(SymbolicContractionOp op) : context(op.getContext()) {
-    auto sinkMapOp = llvm::cast<AffineMapOp>(op.sink()->getDefiningOp());
-    auto consOp = llvm::cast<AffineConstraintsOp>(op.cons()->getDefiningOp());
+    auto sinkMapOp = llvm::cast<AffineMapOp>(op.sink().getDefiningOp());
+    auto consOp = llvm::cast<AffineConstraintsOp>(op.cons().getDefiningOp());
 
     // first collect all the indexes
     for (auto dim : sinkMapOp.dims()) {
@@ -229,7 +229,7 @@ struct ContractionBuilder : public AffineVisitor<ContractionBuilder, AffineExpr>
     }
 
     for (auto src : op.srcs()) {
-      auto mapOp = llvm::cast<AffineTensorMapOp>(src->getDefiningOp());
+      auto mapOp = llvm::cast<AffineTensorMapOp>(src.getDefiningOp());
       for (auto dim : mapOp.dims()) {
         collector.visit(dim);
       }
@@ -243,7 +243,7 @@ struct ContractionBuilder : public AffineVisitor<ContractionBuilder, AffineExpr>
     sink = addDims(sinkMapOp.dims());
 
     for (auto src : op.srcs()) {
-      auto mapOp = llvm::cast<AffineTensorMapOp>(src->getDefiningOp());
+      auto mapOp = llvm::cast<AffineTensorMapOp>(src.getDefiningOp());
       addSourceMap(mapOp);
     }
 
@@ -377,7 +377,7 @@ struct SymbolicContractionCanonicalizer : OpRewritePattern<SymbolicContractionOp
   using OpRewritePattern<SymbolicContractionOp>::OpRewritePattern;
 
   PatternMatchResult matchAndRewrite(SymbolicContractionOp op, PatternRewriter& rewriter) const override {
-    auto sizeMapOp = llvm::cast<AffineMapOp>(op.size()->getDefiningOp());
+    auto sizeMapOp = llvm::cast<AffineMapOp>(op.size().getDefiningOp());
     SmallVector<Value, 4> sizeDims(sizeMapOp.dims());
     auto shape = eltwise::ComputeShape(sizeDims);
     auto sourceType = op.result()->getType().cast<RankedTensorType>();
@@ -408,7 +408,7 @@ struct SymbolicContractionCanonicalizer : OpRewritePattern<SymbolicContractionOp
     SmallVector<Attribute, 8> idxNames;
     for (unsigned i = 0; i < idxs.size(); i++) {
       auto idx = idxs[i];
-      auto indexOp = llvm::cast<AffineIndexOp>(idx->getDefiningOp());
+      auto indexOp = llvm::cast<AffineIndexOp>(idx.getDefiningOp());
       if (auto attr = indexOp.getAttrOfType<StringAttr>("name")) {
         idxNames.emplace_back(attr);
         hasNames = true;
