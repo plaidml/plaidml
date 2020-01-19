@@ -49,8 +49,8 @@ TEST(Op, All) {
   Program program("all", {op::all(I)});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"#(
-#map0 = () -> ()
-#map1 = (d0, d1, d2, d3) -> (d0, d1, d2, d3)
+#map0 = affine_map<() -> ()>
+#map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 
 
 !i32 = type tensor<!eltwise.i32>
@@ -76,8 +76,8 @@ TEST(Op, Any) {
   Program program("any", {op::any(I)});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"#(
-#map0 = () -> ()
-#map1 = (d0, d1, d2, d3) -> (d0, d1, d2, d3)
+#map0 = affine_map<() -> ()>
+#map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 
 
 !i32 = type tensor<!eltwise.i32>
@@ -106,8 +106,8 @@ TEST(Op, Argmax) {
   Program program("argmax", {op::argmax(I)});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"#(
-#map0 = (d0, d1, d2, d3) -> (d0, d1, d2, d3)
-#map1 = () -> ()
+#map0 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+#map1 = affine_map<() -> ()>
 
 
 !i32 = type tensor<!eltwise.i32>
@@ -187,8 +187,8 @@ TEST(Op, Concatenate) {
   Program program("concatenate", {op::concatenate({A, B}, 2)});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"#(
-#map0 = (d0, d1, d2, d3) -> (d0, d1, d2 + 3, d3)
-#map1 = (d0, d1, d2, d3) -> (d0, d1, d2, d3)
+#map0 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2 + 3, d3)>
+#map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 
 
 !f32 = type tensor<!eltwise.f32>
@@ -228,9 +228,9 @@ TEST(Op, Convolution) {
   Program program("convolution", {O});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"#(
-#map0 = (d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)
-#map1 = (d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 * 2 + d4 - 3, d2 * 2 + d5 - 3, d6)
-#map2 = (d0, d1, d2, d3, d4, d5, d6) -> (d4, d5, d6, d3)
+#map0 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 * 2 + d4 - 3, d2 * 2 + d5 - 3, d6)>
+#map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d5, d6, d3)>
 
 
 !f32 = type tensor<!eltwise.f32>
@@ -249,10 +249,10 @@ TEST(Op, CumProd) {
   Program program("cumprod", {op::cumprod(I, 2)});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"#(
-#map0 = (d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)
-#map1 = (d0, d1, d2, d3, d4) -> (d0, d1, d2 - d4, d3)
+#map0 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>
+#map1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2 - d4, d3)>
 
-#set0 = (d0, d1, d2, d3, d4) : (d4 >= 0, -d4 + 2 >= 0)
+#set0 = affine_set<(d0, d1, d2, d3, d4) : (d4 >= 0, -d4 + 2 >= 0)>
 
 !f32 = type tensor<!eltwise.f32>
 module {
@@ -270,10 +270,10 @@ TEST(Op, CumSum) {
   Program program("cumsum", {op::cumsum(I, 2)});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"#(
-#map0 = (d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)
-#map1 = (d0, d1, d2, d3, d4) -> (d0, d1, d2 - d4, d3)
+#map0 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>
+#map1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2 - d4, d3)>
 
-#set0 = (d0, d1, d2, d3, d4) : (d4 >= 0, -d4 + 2 >= 0)
+#set0 = affine_set<(d0, d1, d2, d3, d4) : (d4 >= 0, -d4 + 2 >= 0)>
 
 !f32 = type tensor<!eltwise.f32>
 module {
@@ -292,9 +292,9 @@ TEST(Op, Dot) {
   Program program("dot", {op::dot(I, K)});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"#(
-#map0 = (d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3, d4, d5)
-#map1 = (d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d6)
-#map2 = (d0, d1, d2, d3, d4, d5, d6) -> (d3, d4, d6, d5)
+#map0 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3, d4, d5)>
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d6)>
+#map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d3, d4, d6, d5)>
 
 
 !f32 = type tensor<!eltwise.f32>
@@ -336,8 +336,8 @@ TEST(Op, ExpandDims) {
   Program program("expand_dims", {op::expand_dims(I, 2)});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"#(
-#map0 = (d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)
-#map1 = (d0, d1, d2, d3, d4) -> (d0, d1, d3, d4)
+#map0 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>
+#map1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3, d4)>
 
 
 !f32 = type tensor<!eltwise.f32>
@@ -356,8 +356,8 @@ TEST(Op, Flip) {
   Program program("flip", {op::flip(I, 2)});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"#(
-#map0 = (d0, d1, d2, d3) -> (d0, d1, -d2 + 2, d3)
-#map1 = (d0, d1, d2, d3) -> (d0, d1, d2, d3)
+#map0 = affine_map<(d0, d1, d2, d3) -> (d0, d1, -d2 + 2, d3)>
+#map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 
 
 !f32 = type tensor<!eltwise.f32>
@@ -410,8 +410,8 @@ TEST(Op, Max) {
   Program program("max", {op::max(I)});  // NOLINT(build/include_what_you_use)
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"#(
-#map0 = () -> ()
-#map1 = (d0, d1, d2, d3) -> (d0, d1, d2, d3)
+#map0 = affine_map<() -> ()>
+#map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 
 
 !f32 = type tensor<!eltwise.f32>
@@ -447,8 +447,8 @@ TEST(Op, Mean) {
   Program program("mean", {op::mean(A)});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"#(
-#map0 = () -> ()
-#map1 = (d0, d1) -> (d0, d1)
+#map0 = affine_map<() -> ()>
+#map1 = affine_map<(d0, d1) -> (d0, d1)>
 
 
 !i32 = type tensor<!eltwise.i32>
@@ -470,8 +470,8 @@ TEST(Op, Min) {
   Program program("min", {op::min(A)});  // NOLINT(build/include_what_you_use)
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"#(
-#map0 = () -> ()
-#map1 = (d0, d1) -> (d0, d1)
+#map0 = affine_map<() -> ()>
+#map1 = affine_map<(d0, d1) -> (d0, d1)>
 
 
 !f32 = type tensor<!eltwise.f32>
@@ -507,10 +507,10 @@ TEST(Op, Pool) {
   Program program("pool", {op::pool(I, "sum", {1, 2, 3}, {1, 2, 3}, "none", {1, 2}, "nwc", true, true)});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"#(
-#map0 = (d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4)
-#map1 = (d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1 + d5 - 1, d2 * 2 + d6 - 2, d3 * 3 + d7, d4)
+#map0 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4)>
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1 + d5 - 1, d2 * 2 + d6 - 2, d3 * 3 + d7, d4)>
 
-#set0 = (d0, d1, d2, d3, d4, d5, d6, d7) : (d5 >= 0, -d5 >= 0, d6 >= 0, -d6 + 1 >= 0, d7 >= 0, -d7 + 2 >= 0)
+#set0 = affine_set<(d0, d1, d2, d3, d4, d5, d6, d7) : (d5 >= 0, -d5 >= 0, d6 >= 0, -d6 + 1 >= 0, d7 >= 0, -d7 + 2 >= 0)>
 
 !f32 = type tensor<!eltwise.f32>
 module {
@@ -528,8 +528,8 @@ TEST(Op, Prod) {
   Program program("prod", {op::prod(A)});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"#(
-#map0 = () -> ()
-#map1 = (d0, d1) -> (d0, d1)
+#map0 = affine_map<() -> ()>
+#map1 = affine_map<(d0, d1) -> (d0, d1)>
 
 
 !f32 = type tensor<!eltwise.f32>
@@ -651,10 +651,10 @@ TEST(Op, Repeat) {
   Program program("repeat", {X});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"#(
-#map0 = (d0, d1, d2, d3, d4) -> (d0, d1, d2 * 3 + d3, d4)
-#map1 = (d0, d1, d2, d3, d4) -> (d0, d1, d2, d4)
+#map0 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2 * 3 + d3, d4)>
+#map1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d4)>
 
-#set0 = (d0, d1, d2, d3, d4) : (d3 >= 0, -d3 + 2 >= 0)
+#set0 = affine_set<(d0, d1, d2, d3, d4) : (d3 >= 0, -d3 + 2 >= 0)>
 
 !f32 = type tensor<!eltwise.f32>
 module {
@@ -714,8 +714,8 @@ TEST(Op, Slice) {
   Program program("slice", {X});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"#(
-#map0 = () -> ()
-#map1 = () -> (2, 10)
+#map0 = affine_map<() -> ()>
+#map1 = affine_map<() -> (2, 10)>
 
 
 !f32 = type tensor<!eltwise.f32>
@@ -734,8 +734,8 @@ TEST(Op, Softmax) {
   Program program("softmax", {op::softmax(A, 1)});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"#(
-#map0 = (d0, d1) -> (d0, 0)
-#map1 = (d0, d1) -> (d0, d1)
+#map0 = affine_map<(d0, d1) -> (d0, 0)>
+#map1 = affine_map<(d0, d1) -> (d0, d1)>
 
 
 !f32 = type tensor<!eltwise.f32>
@@ -764,8 +764,8 @@ TEST(Op, SpatialPadding) {
   Program program("spatial_padding", {X});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"#(
-#map0 = (d0, d1, d2, d3) -> (d0, d1, d2 + 1, d3 + 3)
-#map1 = (d0, d1, d2, d3) -> (d0, d1, d2, d3)
+#map0 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2 + 1, d3 + 3)>
+#map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 
 
 !f32 = type tensor<!eltwise.f32>
@@ -799,8 +799,8 @@ TEST(Op, Sum) {
   Program program("sum", {op::sum(A)});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"#(
-#map0 = () -> ()
-#map1 = (d0, d1) -> (d0, d1)
+#map0 = affine_map<() -> ()>
+#map1 = affine_map<(d0, d1) -> (d0, d1)>
 
 
 !f32 = type tensor<!eltwise.f32>
@@ -841,8 +841,8 @@ TEST(Op, Tile) {
   Program program("tile", {X});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"#(
-#map0 = (d0, d1, d2, d3) -> (d0 * 10 + d1, d2 * 20 + d3)
-#map1 = (d0, d1, d2, d3) -> (d1, d3)
+#map0 = affine_map<(d0, d1, d2, d3) -> (d0 * 10 + d1, d2 * 20 + d3)>
+#map1 = affine_map<(d0, d1, d2, d3) -> (d1, d3)>
 
 
 !f32 = type tensor<!eltwise.f32>
@@ -861,8 +861,8 @@ TEST(Op, Transpose) {
   Program program("transpose", {op::transpose(A)});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"#(
-#map0 = (d0, d1) -> (d0, d1)
-#map1 = (d0, d1) -> (d1, d0)
+#map0 = affine_map<(d0, d1) -> (d0, d1)>
+#map1 = affine_map<(d0, d1) -> (d1, d0)>
 
 
 !f32 = type tensor<!eltwise.f32>
@@ -881,10 +881,10 @@ TEST(Op, Variance) {
   Program program("variance", {op::variance(A)});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"#(
-#map0 = (d0, d1, d2, d3) -> (d0, d1)
-#map1 = (d0, d1, d2, d3) -> (d2, d3)
-#map2 = () -> ()
-#map3 = (d0, d1) -> (d0, d1)
+#map0 = affine_map<(d0, d1, d2, d3) -> (d0, d1)>
+#map1 = affine_map<(d0, d1, d2, d3) -> (d2, d3)>
+#map2 = affine_map<() -> ()>
+#map3 = affine_map<(d0, d1) -> (d0, d1)>
 
 
 !i32 = type tensor<!eltwise.i32>

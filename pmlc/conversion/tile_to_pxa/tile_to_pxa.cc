@@ -101,7 +101,7 @@ ScalarType getScalarType(Type type) {
 }
 
 ScalarType getScalarType(Value value) {  //
-  return getScalarType(value->getType());
+  return getScalarType(value.getType());
 }
 
 struct FuncOpConversion : public OpConversionPattern<FuncOp> {
@@ -425,7 +425,7 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
       ConversionPatternRewriter& rewriter) const final {
     TypeConverter typeConverter;
     auto loc = op.getLoc();
-    auto resultType = op.result()->getType();
+    auto resultType = op.result().getType();
     auto resultMemRefType = typeConverter.convertType(resultType).template cast<MemRefType>();
 
     // Allocate the result
@@ -521,7 +521,7 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
     // Gather some basic info
     auto loc = op.getLoc();
     TypeConverter typeConverter;
-    auto resultType = typeConverter.convertType(op.result()->getType()).cast<MemRefType>();
+    auto resultType = typeConverter.convertType(op.result().getType()).cast<MemRefType>();
 
     // Make an allocation for the output
     auto resultMemRef = rewriter.create<AllocOp>(loc, resultType).getResult();
@@ -600,7 +600,7 @@ struct IndexOpConversion : public OpConversionPattern<IndexOp> {
     // Gather some basic info
     auto loc = op.getLoc();
     TypeConverter typeConverter;
-    auto resultType = typeConverter.convertType(op.result()->getType()).cast<MemRefType>();
+    auto resultType = typeConverter.convertType(op.result().getType()).cast<MemRefType>();
 
     // Make an allocation for the output
     auto resultMemRef = rewriter.create<AllocOp>(loc, resultType).getResult();
@@ -647,7 +647,7 @@ struct ShapeOpConversion : public OpConversionPattern<ShapeOp> {
     // Gather some basic info
     auto loc = op.getLoc();
     TypeConverter typeConverter;
-    auto resultType = typeConverter.convertType(op.result()->getType()).cast<MemRefType>();
+    auto resultType = typeConverter.convertType(op.result().getType()).cast<MemRefType>();
 
     // Make an allocation for the output
     auto resultMemRef = rewriter.create<AllocOp>(loc, resultType).getResult();
@@ -681,7 +681,7 @@ struct CastOpConversion : public OpConversionPattern<ew::CastOp> {
     // Gather some basic info
     auto loc = op.getLoc();
     TypeConverter typeConverter;
-    auto resultType = typeConverter.convertType(op.result()->getType()).cast<MemRefType>();
+    auto resultType = typeConverter.convertType(op.result().getType()).cast<MemRefType>();
     auto operand = operands[0];
     auto operandType = operand.getType().cast<MemRefType>();
     if (resultType == operandType) {

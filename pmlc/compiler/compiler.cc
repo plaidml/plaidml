@@ -76,7 +76,7 @@ class InjectTracingPass : public FunctionPass<InjectTracingPass> {
 
     OpBuilder builder(funcOp.getBody());
     for (auto arg : funcOp.getArguments()) {
-      auto memRefType = arg->getType().cast<MemRefType>();
+      auto memRefType = arg.getType().cast<MemRefType>();
       SmallVector<int64_t, 2> shape(memRefType.getRank(), MemRefType::kDynamicSize);
       auto genericType = MemRefType::get(shape, memRefType.getElementType());
       auto printRef = getOrInsertPrint(moduleOp, genericType);
@@ -111,7 +111,7 @@ class ArgumentCollectorPass : public FunctionPass<ArgumentCollectorPass> {
   void runOnFunction() override {
     auto funcOp = getFunction();
     for (auto arg : funcOp.getArguments()) {
-      into->emplace_back(arg->getType().cast<MemRefType>());
+      into->emplace_back(arg.getType().cast<MemRefType>());
     }
   }
 

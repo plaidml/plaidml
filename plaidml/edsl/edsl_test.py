@@ -256,15 +256,15 @@ class TestEdsl(unittest.TestCase):
     maxDiff = None
 
     def compare_results(self, program, expected):
-        self.assertMultiLineEqual(str(program).lstrip(), expected.lstrip())
+        self.assertMultiLineEqual(str(program).strip(), expected.strip())
 
     def test_sum_over_axis(self):
         I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 784]))
         O = sum_over_axis(I)
         program = Program('sum_over_axis', [O])
         expected = '''
-#map0 = (d0, d1) -> (d0)
-#map1 = (d0, d1) -> (d1, d0)
+#map0 = affine_map<(d0, d1) -> (d0)>
+#map1 = affine_map<(d0, d1) -> (d1, d0)>
 
 
 !f32 = type tensor<!eltwise.f32>
@@ -283,8 +283,8 @@ module {
         O = max_over_axis(I)
         program = Program('max_over_axis', [O])
         expected = '''
-#map0 = (d0, d1) -> (d0)
-#map1 = (d0, d1) -> (d1, d0)
+#map0 = affine_map<(d0, d1) -> (d0)>
+#map1 = affine_map<(d0, d1) -> (d1, d0)>
 
 
 !f32 = type tensor<!eltwise.f32>
@@ -304,9 +304,9 @@ module {
         O = matmul(A, B)
         program = Program('matmul', [O])
         expected = '''
-#map0 = (d0, d1, d2) -> (d0, d1)
-#map1 = (d0, d1, d2) -> (d0, d2)
-#map2 = (d0, d1, d2) -> (d2, d1)
+#map0 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#map1 = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map2 = affine_map<(d0, d1, d2) -> (d2, d1)>
 
 
 !f32 = type tensor<!eltwise.f32>
@@ -325,8 +325,8 @@ module {
         O = avg(I)
         program = Program('avg', [O])
         expected = '''
-#map0 = (d0, d1) -> (d0)
-#map1 = (d0, d1) -> (d1, d0)
+#map0 = affine_map<(d0, d1) -> (d0)>
+#map1 = affine_map<(d0, d1) -> (d1, d0)>
 
 
 !f32 = type tensor<!eltwise.f32>
@@ -345,8 +345,8 @@ module {
         O = avg_stages(I)
         program = Program('avg_stages', [O])
         expected = '''
-#map0 = () -> ()
-#map1 = (d0, d1) -> (d0, d1)
+#map0 = affine_map<() -> ()>
+#map1 = affine_map<(d0, d1) -> (d0, d1)>
 
 
 !f32 = type tensor<!eltwise.f32>
@@ -367,8 +367,8 @@ module {
         O = avg_merge(I)
         program = Program('avg_merge', [O])
         expected = '''
-#map0 = () -> ()
-#map1 = (d0, d1) -> (d0, d1)
+#map0 = affine_map<() -> ()>
+#map1 = affine_map<(d0, d1) -> (d0, d1)>
 
 
 !f32 = type tensor<!eltwise.f32>
@@ -389,10 +389,10 @@ module {
         O = max_pool_1d(I)
         program = Program('max_pool_1d', [O])
         expected = '''
-#map0 = (d0, d1) -> (d0)
-#map1 = (d0, d1) -> (d0 * 2 + d1)
+#map0 = affine_map<(d0, d1) -> (d0)>
+#map1 = affine_map<(d0, d1) -> (d0 * 2 + d1)>
 
-#set0 = (d0, d1) : (d1 >= 0, -d1 + 1 >= 0)
+#set0 = affine_set<(d0, d1) : (d1 >= 0, -d1 + 1 >= 0)>
 
 !f32 = type tensor<!eltwise.f32>
 module {
@@ -410,8 +410,8 @@ module {
         O = skip(I)
         program = Program('skip', [O])
         expected = '''
-#map0 = (d0, d1) -> (d0 * 2)
-#map1 = (d0, d1) -> (d0 * 2, d1)
+#map0 = affine_map<(d0, d1) -> (d0 * 2)>
+#map1 = affine_map<(d0, d1) -> (d0 * 2, d1)>
 
 
 !f32 = type tensor<!eltwise.f32>
@@ -431,9 +431,9 @@ module {
         O = conv_1d(I, K)
         program = Program('conv_1d', [O])
         expected = '''
-#map0 = (d0, d1, d2, d3, d4) -> (d0, d1, d2)
-#map1 = (d0, d1, d2, d3, d4) -> (d0, d1 + d3, d4)
-#map2 = (d0, d1, d2, d3, d4) -> (d3, d4, d2)
+#map0 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>
+#map1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1 + d3, d4)>
+#map2 = affine_map<(d0, d1, d2, d3, d4) -> (d3, d4, d2)>
 
 
 !f32 = type tensor<!eltwise.f32>
@@ -453,9 +453,9 @@ module {
         O = conv_2d_dilated(I, K)
         program = Program('conv_2d_dilated', [O])
         expected = '''
-#map0 = (d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)
-#map1 = (d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4 * 2, d2 + d5 * 3, d6)
-#map2 = (d0, d1, d2, d3, d4, d5, d6) -> (d4, d5, d6, d3)
+#map0 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4 * 2, d2 + d5 * 3, d6)>
+#map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d5, d6, d3)>
 
 
 !f32 = type tensor<!eltwise.f32>
@@ -475,9 +475,9 @@ module {
         O = complex_conv_2d(I, K, 1, 2, 1, 2)
         program = Program('complex_conv_2d', [O])
         expected = '''
-#map0 = (d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4)
-#map1 = (d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d2 + d5 - 1, d2 * 2 + d6 * 2 - 1, d3, d7)
-#map2 = (d0, d1, d2, d3, d4, d5, d6, d7) -> (d5, d6, d3, d7, d4)
+#map0 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4)>
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d2 + d5 - 1, d2 * 2 + d6 * 2 - 1, d3, d7)>
+#map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d5, d6, d3, d7, d4)>
 
 
 !f32 = type tensor<!eltwise.f32>
@@ -517,11 +517,11 @@ module {
         D3 = softmax(dot(D2, K3) + B3)
         program = Program('mnist_mlp', [D3])
         expected = '''
-#map0 = (d0, d1, d2) -> (d0, d1)
-#map1 = (d0, d1, d2) -> (d0, d2)
-#map2 = (d0, d1, d2) -> (d2, d1)
-#map3 = (d0, d1) -> (d0, 0)
-#map4 = (d0, d1) -> (d0, d1)
+#map0 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#map1 = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map2 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map3 = affine_map<(d0, d1) -> (d0, 0)>
+#map4 = affine_map<(d0, d1) -> (d0, d1)>
 
 
 !f32 = type tensor<!eltwise.f32>
@@ -573,18 +573,18 @@ module {
         D2 = softmax(dot(D1, K4) + B4)
         program = Program('mnist_cnn', [D2])
         expected = '''
-#map0 = (d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)
-#map1 = (d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4 - 1, d2 + d5 - 1, d6)
-#map2 = (d0, d1, d2, d3, d4, d5, d6) -> (d4, d5, d6, d3)
-#map3 = (d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)
-#map4 = (d0, d1, d2, d3, d4, d5) -> (d0, d1 * 2 + d4, d2 * 2 + d5, d3)
-#map5 = (d0, d1, d2) -> (d0, d1)
-#map6 = (d0, d1, d2) -> (d0, d2)
-#map7 = (d0, d1, d2) -> (d2, d1)
-#map8 = (d0, d1) -> (d0, 0)
-#map9 = (d0, d1) -> (d0, d1)
+#map0 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4 - 1, d2 + d5 - 1, d6)>
+#map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d5, d6, d3)>
+#map3 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>
+#map4 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1 * 2 + d4, d2 * 2 + d5, d3)>
+#map5 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#map6 = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map7 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map8 = affine_map<(d0, d1) -> (d0, 0)>
+#map9 = affine_map<(d0, d1) -> (d0, d1)>
 
-#set0 = (d0, d1, d2, d3, d4, d5) : (d4 >= 0, -d4 + 1 >= 0, d5 >= 0, -d5 + 1 >= 0)
+#set0 = affine_set<(d0, d1, d2, d3, d4, d5) : (d4 >= 0, -d4 + 1 >= 0, d5 >= 0, -d5 + 1 >= 0)>
 
 !i32 = type tensor<!eltwise.i32>
 !f32 = type tensor<!eltwise.f32>
@@ -626,11 +626,11 @@ module {
         program = Program('arg_max', [O])
         self.assertEqual(str(O.shape), 'tensor<1x10x!eltwise.u32>')
         expected = '''
-#map0 = (d0) -> (d0)
-#map1 = () -> ()
-#map2 = (d0, d1, d2) -> (d0, d1)
-#map3 = (d0, d1, d2) -> (d0, d2, d1)
-#map4 = (d0, d1, d2) -> (d2)
+#map0 = affine_map<(d0) -> (d0)>
+#map1 = affine_map<() -> ()>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#map3 = affine_map<(d0, d1, d2) -> (d0, d2, d1)>
+#map4 = affine_map<(d0, d1, d2) -> (d2)>
 
 
 !f32 = type tensor<!eltwise.f32>
@@ -653,8 +653,8 @@ module {
         O = global_min(I)
         program = Program('global_min', [O])
         expected = '''
-#map0 = () -> ()
-#map1 = (d0, d1, d2) -> (d0, d1, d2)
+#map0 = affine_map<() -> ()>
+#map1 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 
 
 !f32 = type tensor<!eltwise.f32>
@@ -675,10 +675,10 @@ module {
         O = csum(I)
         program = Program('cum_sum', [O])
         expected = '''
-#map0 = (d0, d1) -> (d0)
-#map1 = (d0, d1) -> (d1)
+#map0 = affine_map<(d0, d1) -> (d0)>
+#map1 = affine_map<(d0, d1) -> (d1)>
 
-#set0 = (d0, d1) : (d0 - d1 >= 0, -d0 + d1 + 9 >= 0)
+#set0 = affine_set<(d0, d1) : (d0 - d1 >= 0, -d0 + d1 + 9 >= 0)>
 
 !f32 = type tensor<!eltwise.f32>
 module {
@@ -727,8 +727,8 @@ module {
         R = lars_momentum(X, Grad, Veloc, LR, 1. / 1024., 1. / 2048., 1. / 8.)
         program = Program('lars_momentum_4d', R)
         expected = '''
-#map0 = () -> ()
-#map1 = (d0, d1, d2, d3) -> (d0, d1, d2, d3)
+#map0 = affine_map<() -> ()>
+#map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 
 
 !f32 = type tensor<!eltwise.f32>
@@ -772,10 +772,10 @@ module {
         O.no_reduce()
         program = Program('repeat_elts', [O])
         expected = '''
-#map0 = (d0, d1, d2, d3) -> (d0, d1 * 3 + d2, d3)
-#map1 = (d0, d1, d2, d3) -> (d0, d1, d3)
+#map0 = affine_map<(d0, d1, d2, d3) -> (d0, d1 * 3 + d2, d3)>
+#map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
 
-#set0 = (d0, d1, d2, d3) : (d2 >= 0, -d2 + 2 >= 0)
+#set0 = affine_set<(d0, d1, d2, d3) : (d2 >= 0, -d2 + 2 >= 0)>
 
 !f32 = type tensor<!eltwise.f32>
 module {
@@ -799,8 +799,8 @@ module {
         O.use_default(P)
         program = Program('use_default', [O])
         expected = '''
-#map0 = (d0, d1, d2) -> (d0, 3, d1, d2)
-#map1 = (d0, d1, d2) -> (d0, d1, d2)
+#map0 = affine_map<(d0, d1, d2) -> (d0, 3, d1, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 
 
 module {
@@ -821,9 +821,9 @@ module {
         O[i] += (I[(i - j + 1) // 2] * K[j])
         program = Program('defract_test', [O])
         expected = '''
-#map0 = (d0, d1) -> (d0)
-#map1 = (d0, d1) -> ((d0 - d1 + 1) floordiv 2)
-#map2 = (d0, d1) -> (d1)
+#map0 = affine_map<(d0, d1) -> (d0)>
+#map1 = affine_map<(d0, d1) -> ((d0 - d1 + 1) floordiv 2)>
+#map2 = affine_map<(d0, d1) -> (d1)>
 
 
 !f32 = type tensor<!eltwise.f32>
@@ -848,8 +848,8 @@ module {
         O[i] += (I[(i - 1) // 2])
         program = Program('defract_short_test', [O])
         expected = '''
-#map0 = (d0) -> (d0)
-#map1 = (d0) -> ((d0 - 1) floordiv 2)
+#map0 = affine_map<(d0) -> (d0)>
+#map1 = affine_map<(d0) -> ((d0 - 1) floordiv 2)>
 
 
 !f32 = type tensor<!eltwise.f32>
@@ -876,9 +876,9 @@ module {
                                (x1 + k1 - 1) // 2, ci] * K[2 - k0, 2 - k1, co, ci])
         program = Program('defract_long', [O])
         expected = '''
-#map0 = (d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)
-#map1 = (d0, d1, d2, d3, d4, d5, d6) -> (d0, (d1 + d4 - 1) floordiv 2, (d2 + d5 - 1) floordiv 2, d6)
-#map2 = (d0, d1, d2, d3, d4, d5, d6) -> (-d4 + 2, -d5 + 2, d3, d6)
+#map0 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, (d1 + d4 - 1) floordiv 2, (d2 + d5 - 1) floordiv 2, d6)>
+#map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (-d4 + 2, -d5 + 2, d3, d6)>
 
 
 !f32 = type tensor<!eltwise.f32>
@@ -929,9 +929,9 @@ module {
         O[i] += (I[(i - j + 1) // 2] * K[j])
         program = Program('this-is-not an identifier', [O])
         expected = '''
-#map0 = (d0, d1) -> (d0)
-#map1 = (d0, d1) -> ((d0 - d1 + 1) floordiv 2)
-#map2 = (d0, d1) -> (d1)
+#map0 = affine_map<(d0, d1) -> (d0)>
+#map1 = affine_map<(d0, d1) -> ((d0 - d1 + 1) floordiv 2)>
+#map2 = affine_map<(d0, d1) -> (d1)>
 
 
 !f32 = type tensor<!eltwise.f32>
@@ -974,9 +974,9 @@ module {
         O[i, j] = A[i, k] * B[k, j]
         program = Program('assignment_non_exception', [O])
         expected = '''
-#map0 = (d0, d1, d2) -> (d0, d1)
-#map1 = (d0, d1, d2) -> (d0, d2)
-#map2 = (d0, d1, d2) -> (d2, d1)
+#map0 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#map1 = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map2 = affine_map<(d0, d1, d2) -> (d2, d1)>
 
 
 !fp32 = type tensor<!eltwise.fp32>

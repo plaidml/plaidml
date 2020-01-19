@@ -46,8 +46,8 @@ struct CastCanonicalizer : public OpRewritePattern<CastOp> {
     IVLOG(5, "CastCanonicalizer::matchAndRewrite> " << mlir::debugString(castOp));
     auto op = castOp.getOperation();
     auto tensor = castOp.tensor();
-    auto tensorType = getRankedTensorType(tensor->getType());
-    auto existingType = getRankedTensorType(castOp.result()->getType());
+    auto tensorType = getRankedTensorType(tensor.getType());
+    auto existingType = getRankedTensorType(castOp.result().getType());
     auto elementType = existingType.getElementType();
     auto resultType = RankedTensorType::get(tensorType.getShape(), elementType);
     if (resultType == existingType) {
@@ -77,7 +77,7 @@ struct EltwiseCanonicalizer : public OpRewritePattern<OpType> {
     auto op = eltwiseOp.getOperation();
     auto operands = llvm::to_vector<2>(op->getOperands());
     auto resultType = OpType::getResultType(operands);
-    if (resultType == eltwiseOp.result()->getType()) {
+    if (resultType == eltwiseOp.result().getType()) {
       return Pattern::matchFailure();
     }
     auto newOp = rewriter.create<OpType>(op->getLoc(), operands);
