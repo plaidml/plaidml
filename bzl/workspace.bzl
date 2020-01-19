@@ -126,8 +126,8 @@ def plaidml_workspace():
         build_file = clean_dep("//vendor/tbb:tbb.BUILD"),
     )
 
-    LLVM_COMMIT = "498856fca5b9306f545554aeec93c7c058f03eb3"
-    LLVM_SHA256 = "f5d102b2215bdf109b76c4cd0c809059561fd01161c6956e0deb8fdb8b8bad4f"
+    LLVM_COMMIT = "a919919fcc1bf813402531c3ad20e1fa378e3d5d"
+    LLVM_SHA256 = "bacac0e027ebe6d2a1236e13b2bee89bacdeb7796d533139f7b5645fd75c38db"
     LLVM_URL = "https://github.com/plaidml/llvm-project/archive/{commit}.tar.gz".format(commit = LLVM_COMMIT)
     http_archive(
         name = "llvm-project",
