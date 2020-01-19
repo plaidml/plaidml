@@ -324,7 +324,7 @@ module {
 }
 )#"));
   exec::Binder(program).compile()->run();
-}  // namespace plaidml::edsl
+}
 
 TEST(CppEdsl, EltwiseAdd) {
   auto A = Placeholder(DType::FLOAT32, {10, 20});
@@ -421,8 +421,22 @@ TEST(CppEdsl, Convolution) {
   auto I = Placeholder(DType::FLOAT32, {1, 224, 224, 1});
   auto K = Placeholder(DType::FLOAT32, {3, 3, 1, 32});
   Program program("convolution", {Convolution2(I, K)});
-  // TODO: implement constraints in -convert-tile-to-pxa
-  // exec::Binder(program).compile()->run();
+  EXPECT_THAT(program, Eq(R"#(
+#map0 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4 - 1, d2 + d5 - 1, d6)>
+#map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d5, d6, d3)>
+
+
+!f32 = type tensor<!eltwise.f32>
+module {
+  func @convolution(%arg0: tensor<3x3x1x32x!eltwise.f32>, %arg1: tensor<1x224x224x1x!eltwise.f32>) -> tensor<1x222x222x32x!eltwise.f32> {
+    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
+    %0 = tile.cion add, mul, %cst, %arg1, %arg0 {sink = #map0, srcs = [#map1, #map2]} : !f32, tensor<1x224x224x1x!eltwise.f32>, tensor<3x3x1x32x!eltwise.f32> -> tensor<1x222x222x32x!eltwise.f32>
+    return %0 : tensor<1x222x222x32x!eltwise.f32>
+  }
+}
+)#"));
+  exec::Binder(program).compile()->run();
 }
 
 Tensor MaxPooling2(const Tensor& I) {
@@ -518,6 +532,7 @@ module {
   }
 }
 )#"));
+  // TODO: error: failed to legalize operation 'tile.reshape'
   // exec::Binder(program).compile()->run();
 }
 
@@ -730,8 +745,7 @@ TEST(CppEdsl, Winograd) {
   auto G = Placeholder(DType::FLOAT32, {BI, S});
   auto W = Winograd(I, K, A, B, G);
   Program program("winograd", {W});
-  // TODO: implement constraints in -convert-tile-to-pxa
-  // exec::Binder(program).compile()->run();
+  exec::Binder(program).compile()->run();
 }
 
 TEST(CppEdsl, UniqueNames) {
@@ -866,8 +880,7 @@ module {
   }
 }
 )#"));
-  // FIXME: crashes on windows
-  // exec::Binder(program).compile()->run();
+  exec::Binder(program).compile()->run();
 }
 
 TEST(CppEdsl, Reciprocal) {
@@ -883,8 +896,7 @@ module {
   }
 }
 )#"));
-  // FIXME: crashes on windows
-  // exec::Binder(program).compile()->run();
+  exec::Binder(program).compile()->run();
 }
 
 // TEST(CppEdsl, GradientDot) {
