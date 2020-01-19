@@ -89,7 +89,7 @@ struct AffineParallelForOpConversion : public LoweringBase<pxa::AffineParallelFo
     // Replace all uses of old values
     size_t idx = 0;
     for (auto arg : op.region().front().getArguments()) {
-      arg->replaceAllUsesWith(ivs[idx++]);
+      arg.replaceAllUsesWith(ivs[idx++]);
     }
     // We are done. Remove original op.
     rewriter.eraseOp(op);

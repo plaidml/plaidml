@@ -261,9 +261,9 @@ TEST(CppEdsl, Dot) {
   auto C = Dot(A, B);
   Program program("dot", {C});
   EXPECT_THAT(program, Eq(R"#(
-#map0 = (d0, d1, d2) -> (d0, d1)
-#map1 = (d0, d1, d2) -> (d0, d2)
-#map2 = (d0, d1, d2) -> (d2, d1)
+#map0 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#map1 = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map2 = affine_map<(d0, d1, d2) -> (d2, d1)>
 
 
 !f32 = type tensor<!eltwise.f32>
@@ -308,9 +308,9 @@ TEST(CppEdsl, DoubleDot) {
   auto C = Placeholder(DType::FLOAT32, {30, 40});
   Program program("double_dot", {Dot(Dot(A, B), C)});
   EXPECT_THAT(program, Eq(R"#(
-#map0 = (d0, d1, d2) -> (d0, d1)
-#map1 = (d0, d1, d2) -> (d0, d2)
-#map2 = (d0, d1, d2) -> (d2, d1)
+#map0 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#map1 = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map2 = affine_map<(d0, d1, d2) -> (d2, d1)>
 
 
 !f32 = type tensor<!eltwise.f32>
@@ -374,11 +374,11 @@ TEST(CppEdsl, MnistMlp) {
   auto dense3 = Softmax(Dot(dense2, kernel3) + bias3);
   Program program("mnist_mlp", {dense3});
   EXPECT_THAT(program, Eq(R"#(
-#map0 = (d0, d1, d2) -> (d0, d1)
-#map1 = (d0, d1, d2) -> (d0, d2)
-#map2 = (d0, d1, d2) -> (d2, d1)
-#map3 = (d0, d1) -> (d0, 0)
-#map4 = (d0, d1) -> (d0, d1)
+#map0 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#map1 = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map2 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map3 = affine_map<(d0, d1) -> (d0, 0)>
+#map4 = affine_map<(d0, d1) -> (d0, d1)>
 
 
 !f32 = type tensor<!eltwise.f32>
@@ -474,18 +474,18 @@ TEST(CppEdsl, MnistCnn) {
   auto dense2 = Softmax(Dot(dense1, kernel4) + bias4);
   Program program("mnist_cnn", {dense2});
   EXPECT_THAT(program, Eq(R"#(
-#map0 = (d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)
-#map1 = (d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4 - 1, d2 + d5 - 1, d6)
-#map2 = (d0, d1, d2, d3, d4, d5, d6) -> (d4, d5, d6, d3)
-#map3 = (d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)
-#map4 = (d0, d1, d2, d3, d4, d5) -> (d0, d1 * 2 + d4, d2 * 2 + d5, d3)
-#map5 = (d0, d1, d2) -> (d0, d1)
-#map6 = (d0, d1, d2) -> (d0, d2)
-#map7 = (d0, d1, d2) -> (d2, d1)
-#map8 = (d0, d1) -> (d0, 0)
-#map9 = (d0, d1) -> (d0, d1)
+#map0 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4 - 1, d2 + d5 - 1, d6)>
+#map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d5, d6, d3)>
+#map3 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>
+#map4 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1 * 2 + d4, d2 * 2 + d5, d3)>
+#map5 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#map6 = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map7 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map8 = affine_map<(d0, d1) -> (d0, 0)>
+#map9 = affine_map<(d0, d1) -> (d0, d1)>
 
-#set0 = (d0, d1, d2, d3, d4, d5) : (d4 >= 0, -d4 + 1 >= 0, d5 >= 0, -d5 + 1 >= 0)
+#set0 = affine_set<(d0, d1, d2, d3, d4, d5) : (d4 >= 0, -d4 + 1 >= 0, d5 >= 0, -d5 + 1 >= 0)>
 
 !f32 = type tensor<!eltwise.f32>
 module {
@@ -554,8 +554,8 @@ TEST(CppEdsl, LarsMomentum4d) {
   auto R = LarsMomentum(X, Grad, Veloc, LR, 1. / 1024., 1. / 2048., 1. / 8.);
   Program program("lars_momentum4d", {std::get<0>(R), std::get<1>(R)});
   EXPECT_THAT(program, Eq(R"#(
-#map0 = () -> ()
-#map1 = (d0, d1, d2, d3) -> (d0, d1, d2, d3)
+#map0 = affine_map<() -> ()>
+#map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 
 
 !f32 = type tensor<!eltwise.f32>
@@ -601,10 +601,10 @@ TEST(CppEdsl, RepeatElements) {
   O.no_reduce();
   Program program("repeat_elts", {O});
   EXPECT_THAT(program, Eq(R"#(
-#map0 = (d0, d1, d2, d3) -> (d0, d1 * 3 + d2, d3)
-#map1 = (d0, d1, d2, d3) -> (d0, d1, d3)
+#map0 = affine_map<(d0, d1, d2, d3) -> (d0, d1 * 3 + d2, d3)>
+#map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
 
-#set0 = (d0, d1, d2, d3) : (d2 >= 0, -d2 + 2 >= 0)
+#set0 = affine_set<(d0, d1, d2, d3) : (d2 >= 0, -d2 + 2 >= 0)>
 
 !f32 = type tensor<!eltwise.f32>
 module {
@@ -629,8 +629,8 @@ TEST(CppEdsl, UseDefault) {
   O.use_default(P);
   Program program("use_default", {O});
   EXPECT_THAT(program, Eq(R"#(
-#map0 = (d0, d1, d2) -> (d0, 3, d1, d2)
-#map1 = (d0, d1, d2) -> (d0, d1, d2)
+#map0 = affine_map<(d0, d1, d2) -> (d0, 3, d1, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 
 
 module {
@@ -664,11 +664,11 @@ TEST(CppEdsl, ArgMax) {
   Program program("arg_max", {X});
   EXPECT_THAT(X.shape(), Eq(LogicalShape(DType::UINT32, {1, 10})));
   EXPECT_THAT(program, Eq(R"#(
-#map0 = (d0) -> (d0)
-#map1 = () -> ()
-#map2 = (d0, d1, d2) -> (d0, d1)
-#map3 = (d0, d1, d2) -> (d0, d2, d1)
-#map4 = (d0, d1, d2) -> (d2)
+#map0 = affine_map<(d0) -> (d0)>
+#map1 = affine_map<() -> ()>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#map3 = affine_map<(d0, d1, d2) -> (d0, d2, d1)>
+#map4 = affine_map<(d0, d1, d2) -> (d2)>
 
 
 !i32 = type tensor<!eltwise.i32>
@@ -763,8 +763,8 @@ TEST(CppEdsl, GlobalMin) {
   auto O = -O_Neg;
   Program program("global_min", {O});
   EXPECT_THAT(program, Eq(R"#(
-#map0 = () -> ()
-#map1 = (d0, d1, d2) -> (d0, d1, d2)
+#map0 = affine_map<() -> ()>
+#map1 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 
 
 !f32 = type tensor<!eltwise.f32>
@@ -791,10 +791,10 @@ TEST(CppEdsl, CumSum) {
   O.add_constraint(i - k < N);
   Program program("cumsum", {O});
   EXPECT_THAT(program, Eq(R"#(
-#map0 = (d0, d1) -> (d0)
-#map1 = (d0, d1) -> (d1)
+#map0 = affine_map<(d0, d1) -> (d0)>
+#map1 = affine_map<(d0, d1) -> (d1)>
 
-#set0 = (d0, d1) : (d0 - d1 >= 0, -d0 + d1 + 9 >= 0)
+#set0 = affine_set<(d0, d1) : (d0 - d1 >= 0, -d0 + d1 + 9 >= 0)>
 
 !f32 = type tensor<!eltwise.f32>
 module {
@@ -852,9 +852,9 @@ TEST(CppEdsl, ComplexConv2d) {
   auto O = ComplexConv2d(I, K, {2, 2}, {3, 3});
   Program program("complex_conv_2d", {O});
   EXPECT_THAT(program, Eq(R"#(
-#map0 = (d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4)
-#map1 = (d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1 * 2 + d5 * 3 - 2, d2 * 2 + d6 * 3 - 2, d3, d7)
-#map2 = (d0, d1, d2, d3, d4, d5, d6, d7) -> (d5, d6, d3, d7, d4)
+#map0 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4)>
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1 * 2 + d5 * 3 - 2, d2 * 2 + d6 * 3 - 2, d3, d7)>
+#map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d5, d6, d3, d7, d4)>
 
 
 !f32 = type tensor<!eltwise.f32>
@@ -988,9 +988,9 @@ TEST(CppEdsl, DefractLong) {
   O(n, x0, x1, co) += I(n, (x0 + k0 - 1) / 2, (x1 + k1 - 1) / 2, ci) * K(2 - k0, 2 - k1, co, ci);
   Program program("defract_long", {O});
   EXPECT_THAT(program, Eq(R"#(
-#map0 = (d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)
-#map1 = (d0, d1, d2, d3, d4, d5, d6) -> (d0, (d1 + d4 - 1) floordiv 2, (d2 + d5 - 1) floordiv 2, d6)
-#map2 = (d0, d1, d2, d3, d4, d5, d6) -> (-d4 + 2, -d5 + 2, d3, d6)
+#map0 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, (d1 + d4 - 1) floordiv 2, (d2 + d5 - 1) floordiv 2, d6)>
+#map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (-d4 + 2, -d5 + 2, d3, d6)>
 
 
 !f32 = type tensor<!eltwise.f32>

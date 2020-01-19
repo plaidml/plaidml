@@ -330,11 +330,7 @@ llvm_all_cmake_vars = select({
 
 llvm_linkopts = select({
     "@bazel_tools//src/conditions:windows": [],
-    "//conditions:default": [
-        "-ldl",
-        "-lm",
-        "-lpthread",
-    ],
+    "//conditions:default": ["-ldl", "-lm", "-lpthread"],
 })
 
 llvm_defines = select({
@@ -405,9 +401,7 @@ llvm_copts = select({
         "-w14062",
         "-we4238",
     ],
-    "//conditions:default": [
-        "-Wno-unused-function",
-    ],
+    "//conditions:default": [],
 })
 
 # Platform specific sources for libSupport.

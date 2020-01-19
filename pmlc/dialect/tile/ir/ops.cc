@@ -128,7 +128,7 @@ class AffineVisitor {
  public:
   R visit(Value value) {
     static_assert(std::is_base_of<AffineVisitor, T>::value, "Must instantiate with a derived type of AffineVisitor");
-    auto defOp = value->getDefiningOp();
+    auto defOp = value.getDefiningOp();
     if (auto op = llvm::dyn_cast<AffineIndexOp>(defOp)) {
       return static_cast<T*>(this)->visitIndexOp(op);
     } else if (auto op = llvm::dyn_cast<AffineConstantOp>(defOp)) {
@@ -190,24 +190,24 @@ struct IsFoldableVisitor : public AffineVisitor<IsFoldableVisitor> {
 
   bool is_foldable(SymbolicContractionOp op) {
     foldable = true;
-    auto sinkMapOp = llvm::cast<AffineMapOp>(op.sink()->getDefiningOp());
+    auto sinkMapOp = llvm::cast<AffineMapOp>(op.sink().getDefiningOp());
     for (auto dim : sinkMapOp.dims()) {
       visit(dim);
     }
 
-    auto sizeMapOp = llvm::cast<AffineMapOp>(op.size()->getDefiningOp());
+    auto sizeMapOp = llvm::cast<AffineMapOp>(op.size().getDefiningOp());
     for (auto dim : sizeMapOp.dims()) {
       visit(dim);
     }
 
     for (auto src : op.srcs()) {
-      auto mapOp = llvm::cast<AffineTensorMapOp>(src->getDefiningOp());
+      auto mapOp = llvm::cast<AffineTensorMapOp>(src.getDefiningOp());
       for (auto dim : mapOp.dims()) {
         visit(dim);
       }
     }
 
-    auto consOp = llvm::cast<AffineConstraintsOp>(op.cons()->getDefiningOp());
+    auto consOp = llvm::cast<AffineConstraintsOp>(op.cons().getDefiningOp());
     for (auto pair : consOp.pairs()) {
       visit(pair);
     }
@@ -220,8 +220,8 @@ struct ContractionBuilder : public AffineVisitor<ContractionBuilder, AffineExpr>
 
  public:
   explicit ContractionBuilder(SymbolicContractionOp op) : context(op.getContext()) {
-    auto sinkMapOp = llvm::cast<AffineMapOp>(op.sink()->getDefiningOp());
-    auto consOp = llvm::cast<AffineConstraintsOp>(op.cons()->getDefiningOp());
+    auto sinkMapOp = llvm::cast<AffineMapOp>(op.sink().getDefiningOp());
+    auto consOp = llvm::cast<AffineConstraintsOp>(op.cons().getDefiningOp());
 
     // first collect all the indexes
     for (auto dim : sinkMapOp.dims()) {
@@ -229,7 +229,7 @@ struct ContractionBuilder : public AffineVisitor<ContractionBuilder, AffineExpr>
     }
 
     for (auto src : op.srcs()) {
-      auto mapOp = llvm::cast<AffineTensorMapOp>(src->getDefiningOp());
+      auto mapOp = llvm::cast<AffineTensorMapOp>(src.getDefiningOp());
       for (auto dim : mapOp.dims()) {
         collector.visit(dim);
       }
@@ -243,7 +243,7 @@ struct ContractionBuilder : public AffineVisitor<ContractionBuilder, AffineExpr>
     sink = addDims(sinkMapOp.dims());
 
     for (auto src : op.srcs()) {
-      auto mapOp = llvm::cast<AffineTensorMapOp>(src->getDefiningOp());
+      auto mapOp = llvm::cast<AffineTensorMapOp>(src.getDefiningOp());
       addSourceMap(mapOp);
     }
 
@@ -377,10 +377,10 @@ struct SymbolicContractionCanonicalizer : OpRewritePattern<SymbolicContractionOp
   using OpRewritePattern<SymbolicContractionOp>::OpRewritePattern;
 
   PatternMatchResult matchAndRewrite(SymbolicContractionOp op, PatternRewriter& rewriter) const override {
-    auto sizeMapOp = llvm::cast<AffineMapOp>(op.size()->getDefiningOp());
+    auto sizeMapOp = llvm::cast<AffineMapOp>(op.size().getDefiningOp());
     SmallVector<Value, 4> sizeDims(sizeMapOp.dims());
     auto shape = eltwise::ComputeShape(sizeDims);
-    auto sourceType = op.result()->getType().cast<RankedTensorType>();
+    auto sourceType = op.result().getType().cast<RankedTensorType>();
     auto resultType = RankedTensorType::get(shape, sourceType.getElementType());
     if (!resultType.hasStaticShape()) {
       return matchFailure();
@@ -408,7 +408,7 @@ struct SymbolicContractionCanonicalizer : OpRewritePattern<SymbolicContractionOp
     SmallVector<Attribute, 8> idxNames;
     for (unsigned i = 0; i < idxs.size(); i++) {
       auto idx = idxs[i];
-      auto indexOp = llvm::cast<AffineIndexOp>(idx->getDefiningOp());
+      auto indexOp = llvm::cast<AffineIndexOp>(idx.getDefiningOp());
       if (auto attr = indexOp.getAttrOfType<StringAttr>("name")) {
         idxNames.emplace_back(attr);
         hasNames = true;
@@ -530,7 +530,7 @@ struct GatherCanonicalizer : public OpRewritePattern<GatherOp> {
     auto op = gatherOp.getOperation();
     SmallVector<Value, 2> operands(op->getOperands());
     auto resultType = GatherOp::getResultType(operands);
-    if (resultType == gatherOp.result()->getType()) {
+    if (resultType == gatherOp.result().getType()) {
       return Pattern::matchFailure();
     }
     auto newOp = rewriter.create<GatherOp>(op->getLoc(), resultType, gatherOp.tensor(), gatherOp.dims());
@@ -550,13 +550,13 @@ Type GatherOp::getResultType(ArrayRef<Value> operands) {
     throw std::runtime_error("GatherOp requires 2 operands");
   }
   auto tensor = operands[0];
-  auto tensorType = eltwise::getRankedTensorType(tensor->getType());
+  auto tensorType = eltwise::getRankedTensorType(tensor.getType());
   auto tensorElementType = tensorType.getElementType();
   if (!tensorType.getRank()) {
     throw std::runtime_error("'gather' requires first operand to have at least one dimension.");
   }
   auto index = operands[1];
-  auto indexType = eltwise::getRankedTensorType(index->getType());
+  auto indexType = eltwise::getRankedTensorType(index.getType());
   auto indexElementType = indexType.getElementType().dyn_cast<ScalarType>();
   if (!indexElementType || indexElementType.type() != eltwise::DataType::i32) {
     throw std::runtime_error("'gather' requires the data type for the second argument to be i32.");
@@ -587,7 +587,7 @@ struct IndexCanonicalizer : public OpRewritePattern<IndexOp> {
     auto op = indexOp.getOperation();
     SmallVector<Value, 2> operands(op->getOperands());
     auto resultType = IndexOp::getResultType(operands);
-    if (resultType == indexOp.result()->getType()) {
+    if (resultType == indexOp.result().getType()) {
       return Pattern::matchFailure();
     }
     auto dim = indexOp.getAttrOfType<IntegerAttr>("dim");
@@ -611,8 +611,8 @@ Type IndexOp::getResultType(ArrayRef<Value> operands) {
     throw std::runtime_error("IndexOp requires 1 operand");
   }
   auto tensor = operands.front();
-  auto tensorType = eltwise::getRankedTensorType(tensor->getType());
-  auto elementType = ScalarType::get(tensor->getContext(), eltwise::DataType::i32);
+  auto tensorType = eltwise::getRankedTensorType(tensor.getType());
+  auto elementType = ScalarType::get(tensor.getContext(), eltwise::DataType::i32);
   IVLOG(6, "  elementType: " << mlir::debugString(elementType));
   auto resultType = RankedTensorType::get(tensorType.getShape(), elementType);
   IVLOG(6, "  resultType: " << mlir::debugString(resultType));
@@ -631,10 +631,10 @@ struct PrngCanonicalizer : public OpRewritePattern<PrngOp> {
     auto op = prngOp.getOperation();
     SmallVector<Value, 5> operands(op->getOperands());
     auto resultType = PrngOp::getResultType(operands);
-    if (resultType == prngOp.result()->getType()) {
+    if (resultType == prngOp.result().getType()) {
       return Pattern::matchFailure();
     }
-    auto stateType = prngOp.new_state()->getType();
+    auto stateType = prngOp.new_state().getType();
     SmallVector<Value, 4> dims(prngOp.dims());
     auto newOp = rewriter.create<PrngOp>(op->getLoc(), resultType, stateType, prngOp.state(), dims);
     rewriter.replaceOp(op, {newOp.result(), newOp.new_state()});
@@ -655,7 +655,7 @@ Type PrngOp::getResultType(ArrayRef<Value> operands) {
   auto state = operands.front();
   auto dims = operands.drop_front();
   auto shape = eltwise::ComputeShape(dims);
-  auto elementType = ScalarType::get(state->getContext(), DataType::f32);
+  auto elementType = ScalarType::get(state.getContext(), DataType::f32);
   return RankedTensorType::get(shape, elementType);
 }
 
@@ -671,7 +671,7 @@ struct ReshapeCanonicalizer : public OpRewritePattern<ReshapeOp> {
     auto op = reshapeOp.getOperation();
     SmallVector<Value, 5> operands(op->getOperands());
     auto resultType = ReshapeOp::getResultType(operands);
-    if (resultType == reshapeOp.result()->getType()) {
+    if (resultType == reshapeOp.result().getType()) {
       return Pattern::matchFailure();
     }
     SmallVector<Value, 4> dims(reshapeOp.dims());
@@ -693,7 +693,7 @@ Type ReshapeOp::getResultType(ArrayRef<Value> operands) {
   }
   auto tensor = operands.front();
   auto dims = operands.drop_front();
-  auto tensorType = eltwise::getRankedTensorType(tensor->getType());
+  auto tensorType = eltwise::getRankedTensorType(tensor.getType());
   auto elementType = tensorType.getElementType();
   auto shape = eltwise::ComputeShape(dims);
   return RankedTensorType::get(shape, elementType);
@@ -711,7 +711,7 @@ struct ScatterCanonicalizer : public OpRewritePattern<ScatterOp> {
     auto op = scatterOp.getOperation();
     SmallVector<Value, 3> operands(op->getOperands());
     auto resultType = ScatterOp::getResultType(operands);
-    if (resultType == scatterOp.result()->getType()) {
+    if (resultType == scatterOp.result().getType()) {
       return Pattern::matchFailure();
     }
     auto newOp =
@@ -732,20 +732,20 @@ Type ScatterOp::getResultType(ArrayRef<Value> operands) {
     throw std::runtime_error("ScatterOp requires 3 operands");
   }
   auto tensor = operands[0];
-  auto tensorType = eltwise::getRankedTensorType(tensor->getType());
+  auto tensorType = eltwise::getRankedTensorType(tensor.getType());
   auto tensorElementType = tensorType.getElementType();
   const auto& tensorShape = tensorType.getShape();
   if (!tensorType.getRank()) {
     throw std::runtime_error("'scatter' requires first operand to have at least one dimension.");
   }
   auto index = operands[1];
-  auto indexType = eltwise::getRankedTensorType(index->getType());
+  auto indexType = eltwise::getRankedTensorType(index.getType());
   auto indexElementType = indexType.getElementType().dyn_cast<ScalarType>();
   if (!indexElementType || indexElementType.type() != eltwise::DataType::i32) {
     throw std::runtime_error("'scatter' requires the data type for the second argument to be i32.");
   }
   auto other = operands[2];
-  auto otherType = eltwise::getRankedTensorType(other->getType());
+  auto otherType = eltwise::getRankedTensorType(other.getType());
   const auto& otherShape = otherType.getShape();
   SmallVector<int64_t, 4> shape{otherShape[0]};
   for (unsigned i = indexType.getRank(); i < tensorType.getRank(); i++) {
@@ -768,7 +768,7 @@ struct ShapeCanonicalizer : public OpRewritePattern<ShapeOp> {
     auto op = shapeOp.getOperation();
     SmallVector<Value, 1> operands(op->getOperands());
     auto resultType = ShapeOp::getResultType(operands);
-    if (resultType == shapeOp.result()->getType()) {
+    if (resultType == shapeOp.result().getType()) {
       return Pattern::matchFailure();
     }
     auto newOp = rewriter.create<ShapeOp>(op->getLoc(), resultType, shapeOp.tensor());
@@ -788,15 +788,15 @@ Type ShapeOp::getResultType(ArrayRef<Value> operands) {
     throw std::runtime_error("ShapeOp requires 1 operand");
   }
   auto tensor = operands[0];
-  auto tensorType = eltwise::getRankedTensorType(tensor->getType());
-  auto elementType = ScalarType::get(tensor->getContext(), eltwise::DataType::i32);  // TODO: index type?
+  auto tensorType = eltwise::getRankedTensorType(tensor.getType());
+  auto elementType = ScalarType::get(tensor.getContext(), eltwise::DataType::i32);  // TODO: index type?
   return RankedTensorType::get({tensorType.getRank()}, elementType);
 }
 
 // ---- DimOp ----
 
 IntegerAttr DimOp::resolve() {  //
-  auto type = tensor()->getType().dyn_cast<mlir::TensorType>();
+  auto type = tensor().getType().dyn_cast<mlir::TensorType>();
   if (!type) {
     return {};
   }
@@ -915,7 +915,6 @@ void printAffineMapOp(OpAsmPrinter* printer, AffineMapOp op) {
 ParseResult parseAffineMapOp(OpAsmParser* parser, OperationState& result) {
   auto indexType = parser->getBuilder().getIndexType();
   SmallVector<OpAsmParser::OperandType, 4> dims;
-  Type type;
   if (parser->parseOperandList(dims) ||  //
       parser->resolveOperands(dims, indexType, result.operands)) {
     return failure();
@@ -940,7 +939,6 @@ void printAffineConstraintsOp(OpAsmPrinter* printer, AffineConstraintsOp op) {
 ParseResult parseAffineConstraintsOp(OpAsmParser* parser, OperationState& result) {
   auto indexType = parser->getBuilder().getIndexType();
   SmallVector<OpAsmParser::OperandType, 4> dims;
-  Type type;
   if (parser->parseOperandList(dims, OpAsmParser::Delimiter::Paren) ||  //
       parser->resolveOperands(dims, indexType, result.operands)) {
     return failure();
@@ -971,9 +969,9 @@ void printSymbolicContractionOp(OpAsmPrinter* printer, SymbolicContractionOp op)
   *printer << ", ";
   printer->printOperands(op.srcs());
   *printer << " : ";
-  printer->printType(op.init()->getType());
+  printer->printType(op.init().getType());
   *printer << " -> ";
-  printer->printType(op.result()->getType());
+  printer->printType(op.result().getType());
 }
 
 ParseResult parseSymbolicContractionOp(OpAsmParser* parser, OperationState& result) {
@@ -1083,16 +1081,16 @@ void printContractionOp(OpAsmPrinter* printer, ContractionOp op) {
   }
   printer->printOptionalAttrDict(op.getAttrs(), elidedAttrs);
   *printer << " : ";
-  printer->printType(op.init()->getType());
+  printer->printType(op.init().getType());
   *printer << ", ";
   for (unsigned i = 0; i < numTensors; i++) {
     if (i) {
       *printer << ", ";
     }
-    printer->printType(op.getTensor(i)->getType());
+    printer->printType(op.getTensor(i).getType());
   }
   *printer << " -> ";
-  printer->printType(op.result()->getType());
+  printer->printType(op.result().getType());
 }
 
 ParseResult parseContractionOp(OpAsmParser* parser, OperationState& result) {
@@ -1171,7 +1169,7 @@ LogicalResult verifyContractionOp(ContractionOp op) {
                                      << " tensor operands";
   }
   auto shape = op.shape();
-  auto resultType = op.result()->getType().cast<RankedTensorType>();
+  auto resultType = op.result().getType().cast<RankedTensorType>();
   if (!resultType.hasStaticShape() && !shape.hasValue()) {
     return op.emitOpError("attribute 'shape' is required when result type is dynamic");
   }
@@ -1191,13 +1189,13 @@ LogicalResult verifyContractionOp(ContractionOp op) {
            << expectedSymbols << " but found " << numSymbols;
   }
   for (unsigned i = 0; i < numTensors; i++) {
-    auto type = op.getTensor(i)->getType();
+    auto type = op.getTensor(i).getType();
     if (!isEltwiseAny(type)) {
       return op.emitOpError("tensor #") << i << " must be eltwise-any, but got " << type;
     }
   }
   for (unsigned i = 0; i < numSymbols; i++) {
-    auto type = op.getSymbol(i)->getType();
+    auto type = op.getSymbol(i).getType();
     if (!type.isa<IndexType>()) {
       return op.emitOpError("symbol #") << i << " must be index, but got " << type;
     }

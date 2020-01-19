@@ -18,9 +18,9 @@ func @dot(%arg0: tensor<1x2x!eltwise.f32>, %arg1: tensor<2x3x!eltwise.f32>) -> t
   return %10 : tensor<?x?x!eltwise.f32>
 }
 
-// CHECK: #[[MAP0:map[0-9]+]] = (d0, d1, d2) -> (d0, d1)
-// CHECK: #[[MAP1:map[0-9]+]] = (d0, d1, d2) -> (d0, d2)
-// CHECK: #[[MAP2:map[0-9]+]] = (d0, d1, d2) -> (d2, d1)
+// CHECK: #[[MAP0:map[0-9]+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
+// CHECK: #[[MAP1:map[0-9]+]] = affine_map<(d0, d1, d2) -> (d0, d2)>
+// CHECK: #[[MAP2:map[0-9]+]] = affine_map<(d0, d1, d2) -> (d2, d1)>
 
 // CHECK: func @dot(%arg0: tensor<1x2x!eltwise.f32>, %arg1: tensor<2x3x!eltwise.f32>) -> tensor<1x3x!eltwise.f32> {
 // CHECK:   %[[CST:.*]] = "eltwise.sconst"() {value = 0.000000e+00 : f32} : () -> !f32
@@ -48,9 +48,9 @@ func @cumsum(%arg0: tensor<10x!eltwise.f32>) -> tensor<?x!eltwise.f32> {
   return %8 : tensor<?x!eltwise.f32>
 }
 
-// CHECK: #[[MAP0:map[0-9]+]] = (d0, d1) -> (d0)
-// CHECK: #[[MAP1:map[0-9]+]] = (d0, d1) -> (d1)
-// CHECK: #[[SET0:set[0-9]+]] = (d0, d1) : (d0 - d1 >= 0, -d0 + d1 + 9 >= 0)
+// CHECK: #[[MAP0:map[0-9]+]] = affine_map<(d0, d1) -> (d0)>
+// CHECK: #[[MAP1:map[0-9]+]] = affine_map<(d0, d1) -> (d1)>
+// CHECK: #[[SET0:set[0-9]+]] = affine_set<(d0, d1) : (d0 - d1 >= 0, -d0 + d1 + 9 >= 0)>
 
 // CHECK: func @cumsum(%arg0: tensor<10x!eltwise.f32>) -> tensor<10x!eltwise.f32> {
 // CHECK:   %[[CST:.*]] = "eltwise.sconst"() {value = 0.000000e+00 : f32} : () -> !f32
