@@ -884,19 +884,33 @@ module {
 }
 
 TEST(CppEdsl, Reciprocal) {
-  auto A = Placeholder(DType::FLOAT32, {10}, "A");
-  Program program("reciprocal", {1.0 / A});
+  auto A = Placeholder(DType::FLOAT32, {6}, "A");
+  auto R = 1.0 / A;
+  Program program("reciprocal", {R});
   EXPECT_THAT(program, Eq(R"#(
 !f32 = type tensor<!eltwise.f32>
 module {
-  func @reciprocal(%arg0: tensor<10x!eltwise.f32> {tile.name = "A"}) -> tensor<10x!eltwise.f32> {
+  func @reciprocal(%arg0: tensor<6x!eltwise.f32> {tile.name = "A"}) -> tensor<6x!eltwise.f32> {
     %cst = "eltwise.sconst"() {value = 1.000000e+00 : f64} : () -> !f32
-    %0 = "eltwise.div"(%cst, %arg0) : (!f32, tensor<10x!eltwise.f32>) -> tensor<10x!eltwise.f32>
-    return %0 : tensor<10x!eltwise.f32>
+    %0 = "eltwise.div"(%cst, %arg0) : (!f32, tensor<6x!eltwise.f32>) -> tensor<6x!eltwise.f32>
+    return %0 : tensor<6x!eltwise.f32>
   }
 }
 )#"));
-  exec::Binder(program).compile()->run();
+  std::vector<float> input = {1.0f, 2.0f, 4.0f, 5.0f, 8.0f, 10.0f};
+  std::vector<float> expected = {1.0, 0.5, 0.25, 0.2, 0.125, 0.1};
+
+  auto binder = exec::Binder(program);
+  auto executable = binder.compile();
+  binder.input(A).copy_from(input.data());
+  executable->run();
+  {
+    auto view = binder.output(R).mmap_current();
+    ASSERT_THAT(view.size(), expected.size() * sizeof(expected[0]));
+    auto data = reinterpret_cast<float*>(view.data());
+    std::vector<float> actual(data, data + expected.size());
+    EXPECT_THAT(actual, ContainerEq(expected));
+  }
 }
 
 // TEST(CppEdsl, GradientDot) {
