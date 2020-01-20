@@ -53,7 +53,7 @@ build:macos --apple_platform_type=macos
 build:macos --build_tag_filters=-large,-linux,-windows
 test:macos --test_tag_filters=-large,-linux,-windows
 
-build:windows --cxxopt=/std:c++17 --cxxopt=/Zc:__cplusplus
+build:windows --cxxopt=/std:c++17 --cxxopt=/Zc:__cplusplus --cxxopt=/wd4624
 build:windows --build_tag_filters=-docs,-latex,-linux,-macos,-pytorch
 build:windows --action_env=CONDA_EXE
 build:windows --action_env=NUMBER_OF_PROCESSORS

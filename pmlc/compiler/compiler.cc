@@ -209,9 +209,19 @@ Executable::Executable(StringRef entry, StringRef target, ModuleOp programModule
 
   assert(memRefTypes.size() == bufptrs.size() && "memRefTypes and bufptrs size mismatch");
 
+  auto tmBuilderOrError = llvm::orc::JITTargetMachineBuilder::detectHost();
+  if (!tmBuilderOrError) {
+    throw std::runtime_error("Failed to create a JITTargetMachineBuilder for the host");
+  }
+
+  auto tmOrError = tmBuilderOrError->createTargetMachine();
+  if (!tmOrError) {
+    throw std::runtime_error("Failed to create a TargetMachine for the host");
+  }
+
   auto optPipeline = makeOptimizingTransformer(
-      /*optLevel=*/0, /*sizeLevel=*/0,
-      /*targetMachine=*/nullptr);
+      /*optLevel=*/3, /*sizeLevel=*/0,
+      /*targetMachine=*/tmOrError->get());
 
   if (VLOG_IS_ON(6)) {
     auto llvmModule = translateModuleToLLVMIR(*module);
