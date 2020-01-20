@@ -501,7 +501,7 @@ Value TileBuilder::MakeContractionOp(  //
   }
   Type elementType;
   if (combo == CombinationKind::eq) {
-    elementType = ScalarType::get(&impl->context, DataType::i1);
+    elementType = ScalarType::get(&impl->context, DataType::u1);
   } else if (combo == CombinationKind::cond) {
     auto rankedTensorType = eltwise::getRankedTensorType(types[2]);
     elementType = rankedTensorType.getElementType();

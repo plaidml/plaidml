@@ -39,6 +39,7 @@ inline bool isSigned(DataType dtype) {
 
 inline bool isUnsigned(DataType dtype) {
   switch (dtype) {
+    case DataType::u1:
     case DataType::u8:
     case DataType::u16:
     case DataType::u32:

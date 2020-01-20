@@ -40,7 +40,7 @@ def DataType : I64EnumAttr<
     "Core data types",
     [
       I64EnumAttrCase<"invalid", 0>,
-      I64EnumAttrCase<"i1",      1>,
+      I64EnumAttrCase<"u1",      1>,
       I64EnumAttrCase<"i8",      2>,
       I64EnumAttrCase<"u8",      3>,
       I64EnumAttrCase<"i16",     4>,
