@@ -1,8 +1,8 @@
 // RUN: pmlc-opt -tile-compute-bounds -convert-tile-to-pxa -canonicalize -cse %s | FileCheck %s
 
-#map0 = (i, j, k) -> (j, k)
-#map1 = (i, j, k) -> (j, i)
-#map2 = (i, j, k) -> (i, k)
+#map0 = affine_map<(i, j, k) -> (j, k)>
+#map1 = affine_map<(i, j, k) -> (j, i)>
+#map2 = affine_map<(i, j, k) -> (i, k)>
 
 !f32 = type !eltwise.f32
 !i32 = type !eltwise.i32
@@ -19,8 +19,8 @@ func @double_dot(
   return %1 : tensor<10x40x!eltwise.f32>
 }
 
-// CHECK-DAG: [[map_dot_1:#map[0-9]+]] = () -> (20, 10, 30)
-// CHECK-DAG: [[map_dot_2:#map[0-9]+]] = () -> (30, 10, 40)
+// CHECK-DAG: [[map_dot_1:#map[0-9]+]] = affine_map<() -> (20, 10, 30)>
+// CHECK-DAG: [[map_dot_2:#map[0-9]+]] = affine_map<() -> (30, 10, 40)>
 // CHECK-LABEL: func @double_dot
 // CHECK-SAME: %arg0: memref<10x20xf32>, %arg1: memref<20x30xf32>, %arg2: memref<30x40xf32>, %arg3: memref<10x40xf32>
 // CHECK: %0 = alloc() : memref<10x30xf32>

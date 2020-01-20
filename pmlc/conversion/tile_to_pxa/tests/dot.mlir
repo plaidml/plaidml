@@ -1,8 +1,8 @@
 // RUN: pmlc-opt -tile-compute-bounds -convert-tile-to-pxa -canonicalize -cse %s | FileCheck %s
 
-#map0 = (i, j, k) -> (j, k)
-#map1 = (i, j, k) -> (j, i)
-#map2 = (i, j, k) -> (i, k)
+#map0 = affine_map<(i, j, k) -> (j, k)>
+#map1 = affine_map<(i, j, k) -> (j, i)>
+#map2 = affine_map<(i, j, k) -> (i, k)>
 
 !f32 = type !eltwise.f32
 !i32 = type !eltwise.i32
@@ -15,7 +15,7 @@ func @dot(%arg0: tensor<1x784x!eltwise.f32>, %arg1: tensor<784x512x!eltwise.f32>
   return %2 : tensor<1x512x!eltwise.f32>
 }
 
-// CHECK-DAG: [[map_dot:#map[0-9]+]] = () -> (784, 1, 512)
+// CHECK-DAG: [[map_dot:#map[0-9]+]] = affine_map<() -> (784, 1, 512)>
 // CHECK-LABEL: func @dot
 // CHECK-SAME: %arg0: memref<1x784xf32>, %arg1: memref<784x512xf32>, %arg2: memref<1x512xf32>
 // CHECK: pxa.parallel_for

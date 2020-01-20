@@ -654,9 +654,9 @@ struct ComputeBoundsImpl {
   SmallVector<AffineExpr, 4> affineConstraints;
 
   explicit ComputeBoundsImpl(ContractionOp op) : op(op) {
-    SmallVector<Shape, 4> shapes{getShape(op.result()->getType())};
+    SmallVector<Shape, 4> shapes{getShape(op.result().getType())};
     for (auto src : op.operands()) {
-      shapes.emplace_back(getShape(src->getType()));
+      shapes.emplace_back(getShape(src.getType()));
     }
 
     Contraction contraction{op};
