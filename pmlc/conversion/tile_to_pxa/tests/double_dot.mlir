@@ -22,20 +22,19 @@ func @double_dot(
 // CHECK-DAG: [[map_dot_1:#map[0-9]+]] = affine_map<() -> (20, 10, 30)>
 // CHECK-DAG: [[map_dot_2:#map[0-9]+]] = affine_map<() -> (30, 10, 40)>
 // CHECK-LABEL: func @double_dot
-// CHECK-SAME: %arg0: memref<10x20xf32>, %arg1: memref<20x30xf32>, %arg2: memref<30x40xf32>, %arg3: memref<10x40xf32>
-// CHECK: %0 = alloc() : memref<10x30xf32>
+// CHECK-SAME: %{{.*}}: memref<10x20xf32>, %{{.*}}: memref<20x30xf32>, %{{.*}}: memref<30x40xf32>, %{{.*}}: memref<10x40xf32>
+// CHECK: alloc() : memref<10x30xf32>
 // CHECK: pxa.parallel_for
-// CHECK: ^bb0(%arg4: index, %arg5: index, %arg6: index):
-// CHECK:   %1 = affine.load %arg0[%arg5, %arg4] : memref<10x20xf32>
-// CHECK:   %2 = affine.load %arg1[%arg4, %arg6] : memref<20x30xf32>
-// CHECK:   %3 = mulf %1, %2 : f32
-// CHECK:   "pxa.reduce"(%3, %0, %arg4, %arg5, %arg6) {agg = 1 : i64, map = #map2} : (f32, memref<10x30xf32>, index, index, index) -> ()
+// CHECK: ^bb0(%{{.*}}: index, %a{{.*}}: index, %{{.*}}: index):
+// CHECK:   affine.load %{{.*}}[%{{.*}}, %{{.*}}] : memref<10x20xf32>
+// CHECK:   affine.load %{{.*}}[%{{.*}}, %{{.*}}] : memref<20x30xf32>
+// CHECK:   mulf %{{.*}}, %{{.*}} : f32
+// CHECK:   pxa.reduce add %{{.*}}, %{{.*}}[%{{.*}}, %{{.*}}] : memref<10x30xf32>
 // CHECK: ranges = [[map_dot_1]]
 // CHECK: pxa.parallel_for
-// CHECK: ^bb0(%arg4: index, %arg5: index, %arg6: index):
-// CHECK:   %1 = affine.load %0[%arg5, %arg4] : memref<10x30xf32>
-// CHECK:   %2 = affine.load %arg2[%arg4, %arg6] : memref<30x40xf32>
-// CHECK:   %3 = mulf %1, %2 : f32
-// CHECK:   "pxa.reduce"(%3, %arg3, %arg4, %arg5, %arg6) {agg = 1 : i64, map = #map2} : (f32, memref<10x40xf32>, index, index, index) -> ()
+// CHECK: ^bb0(%{{.*}}: index, %{{.*}}: index, %{{.*}}: index):
+// CHECK:   affine.load %{{.*}}[%{{.*}}, %{{.*}}] : memref<10x30xf32>
+// CHECK:   affine.load %{{.*}}[%{{.*}}, %{{.*}}] : memref<30x40xf32>
+// CHECK:   mulf %{{.*}}, %{{.*}} : f32
+// CHECK:   pxa.reduce add %{{.*}}, %{{.*}}[%{{.*}}, %{{.*}}] : memref<10x40xf32>
 // CHECK: ranges = [[map_dot_2]]
-
