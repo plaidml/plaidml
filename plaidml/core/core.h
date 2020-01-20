@@ -152,20 +152,20 @@ class TensorShape {
   /// dtype
   /// \return DType
   ///
-  DType dtype() const { return static_cast<DType>(ffi::call<plaidml_datatype>(plaidml_shape_get_dtype, ptr_.get())); }
+  DType dtype() const { return static_cast<DType>(ffi::call<plaidml_datatype>(plaidml_shape_get_dtype, as_ptr())); }
 
   ///
   /// Returns the number of dimensions in the TensorShape
   /// \return size_t
   ///
-  size_t ndims() const { return ffi::call<size_t>(plaidml_shape_get_ndims, ptr_.get()); }
+  size_t ndims() const { return ffi::call<size_t>(plaidml_shape_get_ndims, as_ptr()); }
 
   ///
   /// nbytes
   /// \return uint64_t
   ///
-  uint64_t nbytes() const { return ffi::call<uint64_t>(plaidml_shape_get_nbytes, ptr_.get()); }
-  std::string str() const { return ffi::str(ffi::call<plaidml_string*>(plaidml_shape_repr, ptr_.get())); }
+  uint64_t nbytes() const { return ffi::call<uint64_t>(plaidml_shape_get_nbytes, as_ptr()); }
+  std::string str() const { return ffi::str(ffi::call<plaidml_string*>(plaidml_shape_repr, as_ptr())); }
   bool operator==(const TensorShape& rhs) const { return str() == rhs.str(); }
   plaidml_shape* as_ptr() const { return ptr_.get(); }
 
@@ -252,7 +252,7 @@ class Buffer {
   /// \return View
   ///
   View mmap_current() {
-    return View(details::make_plaidml_view(ffi::call<plaidml_view*>(plaidml_buffer_mmap_current, ptr_.get())));
+    return View(details::make_plaidml_view(ffi::call<plaidml_view*>(plaidml_buffer_mmap_current, as_ptr())));
   }
 
   ///
@@ -260,7 +260,7 @@ class Buffer {
   /// \return View
   ///
   View mmap_discard() {
-    return View(details::make_plaidml_view(ffi::call<plaidml_view*>(plaidml_buffer_mmap_discard, ptr_.get())));
+    return View(details::make_plaidml_view(ffi::call<plaidml_view*>(plaidml_buffer_mmap_discard, as_ptr())));
   }
 
   void copy_into(void* dst) {

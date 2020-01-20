@@ -39,6 +39,7 @@ using util::DataType;
 using llvm::Optional;
 using llvm::SmallVector;
 using mlir::AffineConstantExpr;
+using mlir::AffineIfOp;
 using mlir::AffineLoadOp;
 using mlir::AffineMap;
 using mlir::AffineMapAttr;
@@ -547,6 +548,13 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
     SmallVector<Value, 8> idxs;
     for (size_t i = 0; i < body->getNumArguments(); i++) {
       idxs.push_back(body->getArgument(i));
+    }
+
+    // add constraints
+    if (op.cons()) {
+      auto cons = op.cons().getValue();
+      auto ifOp = rewriter.create<AffineIfOp>(loc, cons, idxs, false);
+      rewriter.setInsertionPointToStart(&ifOp.thenRegion().front());
     }
 
     // Create the loads + casts

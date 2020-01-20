@@ -59,7 +59,7 @@ TEST(CppEdsl, Cast) {
                                    6 + (1UL << 12),
                                    7 + (1UL << 24),
                                    8 + (1UL << 31),  //
-                                   (1UL << 32) - 1};
+                                   (1ULL << 32) - 1};
 
   std::vector<std::uint32_t> expected{1,
                                       2,
@@ -69,7 +69,7 @@ TEST(CppEdsl, Cast) {
                                       6 + (1UL << 12),
                                       7 + (1UL << 24),
                                       8 + (1UL << 31),  //
-                                      (1UL << 32) - 1};
+                                      (1ULL << 32) - 1};
   auto binder = exec::Binder(program);
   auto executable = binder.compile();
   binder.input(A).copy_from(input.data());
@@ -217,8 +217,8 @@ TEST(CppEdsl, Add) {
       5,
       6 + (1UL << 12),
       7 + (1UL << 24),
-      8 + (1UL << 32),
-      9 + (1UL << 40)  //
+      8 + (1ULL << 32),
+      9 + (1ULL << 40)  //
   };
 
   std::vector<std::uint64_t> input_b = {1,
@@ -226,9 +226,9 @@ TEST(CppEdsl, Add) {
                                         3,
                                         4 + (1UL << 24),
                                         5,
-                                        6 + (1UL << 32),
+                                        6 + (1ULL << 32),
                                         7,
-                                        8 + (1UL << 40),  //
+                                        8 + (1ULL << 40),  //
                                         9};
 
   std::vector<std::uint64_t> expected = {2,
@@ -236,10 +236,10 @@ TEST(CppEdsl, Add) {
                                          6,
                                          8 + (1UL << 24),
                                          10,
-                                         12 + (1UL << 12) + (1UL << 32),
+                                         12 + (1UL << 12) + (1ULL << 32),
                                          14 + (1UL << 24),
-                                         16 + (1UL << 32) + (1UL << 40),
-                                         18 + (1UL << 40)};
+                                         16 + (1ULL << 32) + (1ULL << 40),
+                                         18 + (1ULL << 40)};
 
   auto binder = exec::Binder(program);
   auto executable = binder.compile();
@@ -324,7 +324,7 @@ module {
 }
 )#"));
   exec::Binder(program).compile()->run();
-}  // namespace plaidml::edsl
+}
 
 TEST(CppEdsl, EltwiseAdd) {
   auto A = Placeholder(DType::FLOAT32, {10, 20});
@@ -404,7 +404,9 @@ module {
   }
 }
 )#"));
+#if !defined(_WIN32)
   exec::Binder(program).compile()->run();
+#endif
 }
 
 Tensor Convolution2(const Tensor& I, const Tensor& K) {
@@ -421,8 +423,22 @@ TEST(CppEdsl, Convolution) {
   auto I = Placeholder(DType::FLOAT32, {1, 224, 224, 1});
   auto K = Placeholder(DType::FLOAT32, {3, 3, 1, 32});
   Program program("convolution", {Convolution2(I, K)});
-  // TODO: implement constraints in -convert-tile-to-pxa
-  // exec::Binder(program).compile()->run();
+  EXPECT_THAT(program, Eq(R"#(
+#map0 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4 - 1, d2 + d5 - 1, d6)>
+#map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d5, d6, d3)>
+
+
+!f32 = type tensor<!eltwise.f32>
+module {
+  func @convolution(%arg0: tensor<3x3x1x32x!eltwise.f32>, %arg1: tensor<1x224x224x1x!eltwise.f32>) -> tensor<1x222x222x32x!eltwise.f32> {
+    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
+    %0 = tile.cion add, mul, %cst, %arg1, %arg0 {sink = #map0, srcs = [#map1, #map2]} : !f32, tensor<1x224x224x1x!eltwise.f32>, tensor<3x3x1x32x!eltwise.f32> -> tensor<1x222x222x32x!eltwise.f32>
+    return %0 : tensor<1x222x222x32x!eltwise.f32>
+  }
+}
+)#"));
+  exec::Binder(program).compile()->run();
 }
 
 Tensor MaxPooling2(const Tensor& I) {
@@ -518,6 +534,7 @@ module {
   }
 }
 )#"));
+  // TODO: error: failed to legalize operation 'tile.reshape'
   // exec::Binder(program).compile()->run();
 }
 
@@ -730,8 +747,7 @@ TEST(CppEdsl, Winograd) {
   auto G = Placeholder(DType::FLOAT32, {BI, S});
   auto W = Winograd(I, K, A, B, G);
   Program program("winograd", {W});
-  // TODO: implement constraints in -convert-tile-to-pxa
-  // exec::Binder(program).compile()->run();
+  exec::Binder(program).compile()->run();
 }
 
 TEST(CppEdsl, UniqueNames) {
@@ -778,7 +794,9 @@ module {
   }
 }
 )#"));
+#if !defined(_WIN32)
   exec::Binder(program).compile()->run();
+#endif
 }
 
 TEST(CppEdsl, CumSum) {
@@ -866,25 +884,39 @@ module {
   }
 }
 )#"));
-  // FIXME: crashes on windows
-  // exec::Binder(program).compile()->run();
+  exec::Binder(program).compile()->run();
 }
 
 TEST(CppEdsl, Reciprocal) {
-  auto A = Placeholder(DType::FLOAT32, {10}, "A");
-  Program program("reciprocal", {1 / A});
+  auto A = Placeholder(DType::FLOAT32, {6}, "A");
+  auto R = 1.0 / A;
+  Program program("reciprocal", {R});
   EXPECT_THAT(program, Eq(R"#(
-!i32 = type tensor<!eltwise.i32>
+!f32 = type tensor<!eltwise.f32>
 module {
-  func @reciprocal(%arg0: tensor<10x!eltwise.f32> {tile.name = "A"}) -> tensor<10x!eltwise.f32> {
-    %c1 = "eltwise.sconst"() {value = 1 : i64} : () -> !i32
-    %0 = "eltwise.div"(%c1, %arg0) : (!i32, tensor<10x!eltwise.f32>) -> tensor<10x!eltwise.f32>
-    return %0 : tensor<10x!eltwise.f32>
+  func @reciprocal(%arg0: tensor<6x!eltwise.f32> {tile.name = "A"}) -> tensor<6x!eltwise.f32> {
+    %cst = "eltwise.sconst"() {value = 1.000000e+00 : f64} : () -> !f32
+    %0 = "eltwise.div"(%cst, %arg0) : (!f32, tensor<6x!eltwise.f32>) -> tensor<6x!eltwise.f32>
+    return %0 : tensor<6x!eltwise.f32>
   }
 }
 )#"));
-  // FIXME: crashes on windows
-  // exec::Binder(program).compile()->run();
+  std::vector<float> input = {1.0f, 2.0f, 4.0f, 5.0f, 8.0f, 10.0f};
+  std::vector<float> expected = {1.0, 0.5, 0.25, 0.2, 0.125, 0.1};
+
+#if !defined(_WIN32)
+  auto binder = exec::Binder(program);
+  auto executable = binder.compile();
+  binder.input(A).copy_from(input.data());
+  executable->run();
+  {
+    auto view = binder.output(R).mmap_current();
+    ASSERT_THAT(view.size(), expected.size() * sizeof(expected[0]));
+    auto data = reinterpret_cast<float*>(view.data());
+    std::vector<float> actual(data, data + expected.size());
+    EXPECT_THAT(actual, ContainerEq(expected));
+  }
+#endif
 }
 
 // TEST(CppEdsl, GradientDot) {
