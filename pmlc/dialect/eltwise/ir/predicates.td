@@ -26,7 +26,7 @@ def AnyScalar : Type<Or<[
 
 def ScalarBool : Type<And<[
     IsScalarPred,
-    CPred<"$_self.cast<ScalarType>().type() == DataType::i1">
+    CPred<"$_self.cast<ScalarType>().type() == DataType::u1">
   ]>, "scalar-bool">;
 
 def ScalarIndex : Type<And<[

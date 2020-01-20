@@ -530,12 +530,12 @@ module {
     %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
     %0 = tile.cion add, mul, %cst, %arg6, %arg5 {sink = #map0, srcs = [#map1, #map2]} : !f32, tensor<1x784x!eltwise.f32>, tensor<784x512x!eltwise.f32> -> tensor<1x512x!eltwise.f32>
     %1 = "eltwise.add"(%0, %arg4) : (tensor<1x512x!eltwise.f32>, tensor<512x!eltwise.f32>) -> tensor<1x512x!eltwise.f32>
-    %2 = "eltwise.cmp_lt"(%1, %cst) : (tensor<1x512x!eltwise.f32>, !f32) -> tensor<1x512x!eltwise.i1>
-    %3 = "eltwise.select"(%2, %cst, %1) : (tensor<1x512x!eltwise.i1>, !f32, tensor<1x512x!eltwise.f32>) -> tensor<1x512x!eltwise.f32>
+    %2 = "eltwise.cmp_lt"(%1, %cst) : (tensor<1x512x!eltwise.f32>, !f32) -> tensor<1x512x!eltwise.u1>
+    %3 = "eltwise.select"(%2, %cst, %1) : (tensor<1x512x!eltwise.u1>, !f32, tensor<1x512x!eltwise.f32>) -> tensor<1x512x!eltwise.f32>
     %4 = tile.cion add, mul, %cst, %3, %arg3 {sink = #map0, srcs = [#map1, #map2]} : !f32, tensor<1x512x!eltwise.f32>, tensor<512x512x!eltwise.f32> -> tensor<1x512x!eltwise.f32>
     %5 = "eltwise.add"(%4, %arg2) : (tensor<1x512x!eltwise.f32>, tensor<512x!eltwise.f32>) -> tensor<1x512x!eltwise.f32>
-    %6 = "eltwise.cmp_lt"(%5, %cst) : (tensor<1x512x!eltwise.f32>, !f32) -> tensor<1x512x!eltwise.i1>
-    %7 = "eltwise.select"(%6, %cst, %5) : (tensor<1x512x!eltwise.i1>, !f32, tensor<1x512x!eltwise.f32>) -> tensor<1x512x!eltwise.f32>
+    %6 = "eltwise.cmp_lt"(%5, %cst) : (tensor<1x512x!eltwise.f32>, !f32) -> tensor<1x512x!eltwise.u1>
+    %7 = "eltwise.select"(%6, %cst, %5) : (tensor<1x512x!eltwise.u1>, !f32, tensor<1x512x!eltwise.f32>) -> tensor<1x512x!eltwise.f32>
     %8 = tile.cion add, mul, %cst, %7, %arg1 {sink = #map0, srcs = [#map1, #map2]} : !f32, tensor<1x512x!eltwise.f32>, tensor<512x10x!eltwise.f32> -> tensor<1x10x!eltwise.f32>
     %9 = "eltwise.add"(%8, %arg0) : (tensor<1x10x!eltwise.f32>, tensor<10x!eltwise.f32>) -> tensor<1x10x!eltwise.f32>
     %10 = tile.cion max, none, %cst, %9 {sink = #map3, srcs = [#map4]} : !f32, tensor<1x10x!eltwise.f32> -> tensor<1x1x!eltwise.f32>
@@ -595,18 +595,18 @@ module {
     %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
     %0 = tile.cion add, mul, %cst, %arg8, %arg7 {sink = #map0, srcs = [#map1, #map2]} : !f32, tensor<1x224x224x1x!eltwise.f32>, tensor<3x3x1x32x!eltwise.f32> -> tensor<1x222x222x32x!eltwise.f32>
     %1 = "eltwise.add"(%0, %arg6) : (tensor<1x222x222x32x!eltwise.f32>, tensor<32x!eltwise.f32>) -> tensor<1x222x222x32x!eltwise.f32>
-    %2 = "eltwise.cmp_lt"(%1, %cst) : (tensor<1x222x222x32x!eltwise.f32>, !f32) -> tensor<1x222x222x32x!eltwise.i1>
-    %3 = "eltwise.select"(%2, %cst, %1) : (tensor<1x222x222x32x!eltwise.i1>, !f32, tensor<1x222x222x32x!eltwise.f32>) -> tensor<1x222x222x32x!eltwise.f32>
+    %2 = "eltwise.cmp_lt"(%1, %cst) : (tensor<1x222x222x32x!eltwise.f32>, !f32) -> tensor<1x222x222x32x!eltwise.u1>
+    %3 = "eltwise.select"(%2, %cst, %1) : (tensor<1x222x222x32x!eltwise.u1>, !f32, tensor<1x222x222x32x!eltwise.f32>) -> tensor<1x222x222x32x!eltwise.f32>
     %4 = tile.cion add, mul, %cst, %3, %arg5 {sink = #map0, srcs = [#map1, #map2]} : !f32, tensor<1x222x222x32x!eltwise.f32>, tensor<3x3x32x64x!eltwise.f32> -> tensor<1x220x220x64x!eltwise.f32>
     %5 = "eltwise.add"(%4, %arg4) : (tensor<1x220x220x64x!eltwise.f32>, tensor<64x!eltwise.f32>) -> tensor<1x220x220x64x!eltwise.f32>
-    %6 = "eltwise.cmp_lt"(%5, %cst) : (tensor<1x220x220x64x!eltwise.f32>, !f32) -> tensor<1x220x220x64x!eltwise.i1>
-    %7 = "eltwise.select"(%6, %cst, %5) : (tensor<1x220x220x64x!eltwise.i1>, !f32, tensor<1x220x220x64x!eltwise.f32>) -> tensor<1x220x220x64x!eltwise.f32>
+    %6 = "eltwise.cmp_lt"(%5, %cst) : (tensor<1x220x220x64x!eltwise.f32>, !f32) -> tensor<1x220x220x64x!eltwise.u1>
+    %7 = "eltwise.select"(%6, %cst, %5) : (tensor<1x220x220x64x!eltwise.u1>, !f32, tensor<1x220x220x64x!eltwise.f32>) -> tensor<1x220x220x64x!eltwise.f32>
     %8 = tile.cion max, none, %cst, %7 {cons = #set0, sink = #map3, srcs = [#map4]} : !f32, tensor<1x220x220x64x!eltwise.f32> -> tensor<1x110x110x64x!eltwise.f32>
     %9 = "tile.reshape"(%8, %c1, %c12100) : (tensor<1x110x110x64x!eltwise.f32>, !i32, index) -> tensor<1x12100x!eltwise.f32>
     %10 = tile.cion add, mul, %cst, %9, %arg3 {sink = #map5, srcs = [#map6, #map7]} : !f32, tensor<1x12100x!eltwise.f32>, tensor<12100x128x!eltwise.f32> -> tensor<1x128x!eltwise.f32>
     %11 = "eltwise.add"(%10, %arg2) : (tensor<1x128x!eltwise.f32>, tensor<128x!eltwise.f32>) -> tensor<1x128x!eltwise.f32>
-    %12 = "eltwise.cmp_lt"(%11, %cst) : (tensor<1x128x!eltwise.f32>, !f32) -> tensor<1x128x!eltwise.i1>
-    %13 = "eltwise.select"(%12, %cst, %11) : (tensor<1x128x!eltwise.i1>, !f32, tensor<1x128x!eltwise.f32>) -> tensor<1x128x!eltwise.f32>
+    %12 = "eltwise.cmp_lt"(%11, %cst) : (tensor<1x128x!eltwise.f32>, !f32) -> tensor<1x128x!eltwise.u1>
+    %13 = "eltwise.select"(%12, %cst, %11) : (tensor<1x128x!eltwise.u1>, !f32, tensor<1x128x!eltwise.f32>) -> tensor<1x128x!eltwise.f32>
     %14 = tile.cion add, mul, %cst, %13, %arg1 {sink = #map5, srcs = [#map6, #map7]} : !f32, tensor<1x128x!eltwise.f32>, tensor<128x100x!eltwise.f32> -> tensor<1x100x!eltwise.f32>
     %15 = "eltwise.add"(%14, %arg0) : (tensor<1x100x!eltwise.f32>, tensor<100x!eltwise.f32>) -> tensor<1x100x!eltwise.f32>
     %16 = tile.cion max, none, %cst, %15 {sink = #map8, srcs = [#map9]} : !f32, tensor<1x100x!eltwise.f32> -> tensor<1x1x!eltwise.f32>
