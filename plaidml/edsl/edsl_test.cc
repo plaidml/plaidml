@@ -59,7 +59,7 @@ TEST(CppEdsl, Cast) {
                                    6 + (1UL << 12),
                                    7 + (1UL << 24),
                                    8 + (1UL << 31),  //
-                                   (1UL << 32) - 1};
+                                   (1ULL << 32) - 1};
 
   std::vector<std::uint32_t> expected{1,
                                       2,
@@ -69,7 +69,7 @@ TEST(CppEdsl, Cast) {
                                       6 + (1UL << 12),
                                       7 + (1UL << 24),
                                       8 + (1UL << 31),  //
-                                      (1UL << 32) - 1};
+                                      (1ULL << 32) - 1};
   auto binder = exec::Binder(program);
   auto executable = binder.compile();
   binder.input(A).copy_from(input.data());
@@ -217,8 +217,8 @@ TEST(CppEdsl, Add) {
       5,
       6 + (1UL << 12),
       7 + (1UL << 24),
-      8 + (1UL << 32),
-      9 + (1UL << 40)  //
+      8 + (1ULL << 32),
+      9 + (1ULL << 40)  //
   };
 
   std::vector<std::uint64_t> input_b = {1,
@@ -226,9 +226,9 @@ TEST(CppEdsl, Add) {
                                         3,
                                         4 + (1UL << 24),
                                         5,
-                                        6 + (1UL << 32),
+                                        6 + (1ULL << 32),
                                         7,
-                                        8 + (1UL << 40),  //
+                                        8 + (1ULL << 40),  //
                                         9};
 
   std::vector<std::uint64_t> expected = {2,
@@ -236,10 +236,10 @@ TEST(CppEdsl, Add) {
                                          6,
                                          8 + (1UL << 24),
                                          10,
-                                         12 + (1UL << 12) + (1UL << 32),
+                                         12 + (1UL << 12) + (1ULL << 32),
                                          14 + (1UL << 24),
-                                         16 + (1UL << 32) + (1UL << 40),
-                                         18 + (1UL << 40)};
+                                         16 + (1ULL << 32) + (1ULL << 40),
+                                         18 + (1ULL << 40)};
 
   auto binder = exec::Binder(program);
   auto executable = binder.compile();
