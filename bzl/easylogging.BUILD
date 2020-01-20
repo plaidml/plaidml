@@ -22,10 +22,3 @@ cc_library(
     includes = ["."],
     visibility = ["//visibility:public"],
 )
-
-genrule(
-    name = "license",
-    srcs = ["LICENCE.txt"],
-    outs = ["easylogging-LICENSE"],
-    cmd = "cp $(SRCS) $@",
-)

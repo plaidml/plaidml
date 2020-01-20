@@ -16,7 +16,7 @@ using mlir::Type;
 Type ScalarType::toStandard() {
   MLIRContext* ctx = getContext();
   switch (type()) {
-    case DataType::i1:
+    case DataType::u1:
       return IntegerType::get(1, ctx);
     case DataType::i8:
     case DataType::u8:

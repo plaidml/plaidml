@@ -61,8 +61,7 @@ plaidml_cc_library(
     deps = [
         "//pmlc/dialect/tile",
         "//pmlc/util",
-        "@boost//:filesystem",
-        "@boost//:thread",
+        "@llvm-project//llvm:support",
     ],
     alwayslink = 1,
 )
