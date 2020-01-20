@@ -18,10 +18,3 @@ cc_library(
     ],
     alwayslink = 1,
 )
-
-genrule(
-    name = "license",
-    srcs = ["documentation/LICENSE.md"],
-    outs = ["xsmm-LICENSE"],
-    cmd = "cp $(SRCS) $@",
-)
