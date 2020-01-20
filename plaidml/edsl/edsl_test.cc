@@ -404,7 +404,9 @@ module {
   }
 }
 )#"));
+#if !defined(_WIN32)
   exec::Binder(program).compile()->run();
+#endif
 }
 
 Tensor Convolution2(const Tensor& I, const Tensor& K) {
@@ -792,7 +794,9 @@ module {
   }
 }
 )#"));
+#if !defined(_WIN32)
   exec::Binder(program).compile()->run();
+#endif
 }
 
 TEST(CppEdsl, CumSum) {
@@ -900,6 +904,7 @@ module {
   std::vector<float> input = {1.0f, 2.0f, 4.0f, 5.0f, 8.0f, 10.0f};
   std::vector<float> expected = {1.0, 0.5, 0.25, 0.2, 0.125, 0.1};
 
+#if !defined(_WIN32)
   auto binder = exec::Binder(program);
   auto executable = binder.compile();
   binder.input(A).copy_from(input.data());
@@ -911,6 +916,7 @@ module {
     std::vector<float> actual(data, data + expected.size());
     EXPECT_THAT(actual, ContainerEq(expected));
   }
+#endif
 }
 
 // TEST(CppEdsl, GradientDot) {
