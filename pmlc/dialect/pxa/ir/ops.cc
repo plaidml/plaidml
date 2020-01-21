@@ -59,7 +59,8 @@ void AffineParallelOp::build(Builder* builder, OperationState& result, ArrayRef<
     result.addAttribute("lowerBoundsMap", AffineMapAttr::get(AffineMap::get(builder->getContext())));
     result.addAttribute("upperBoundsMap", AffineMapAttr::get(AffineMap::get(builder->getContext())));
   }
-  result.addAttribute("steps", builder->getI64ArrayAttr(ranges));
+  SmallVector<int64_t, 8> steps(ranges.size(), 1);
+  result.addAttribute("steps", builder->getI64ArrayAttr(steps));
   // Create a region and a block for the body.
   auto bodyRegion = result.addRegion();
   auto body = new Block();
