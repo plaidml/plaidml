@@ -24,17 +24,17 @@ func @double_dot(
 // CHECK-LABEL: func @double_dot
 // CHECK-SAME: %{{.*}}: memref<10x20xf32>, %{{.*}}: memref<20x30xf32>, %{{.*}}: memref<30x40xf32>, %{{.*}}: memref<10x40xf32>
 // CHECK: alloc() : memref<10x30xf32>
-// CHECK: pxa.parallel_for
+// CHECK: pxa.parallel
 // CHECK: ^bb0(%{{.*}}: index, %a{{.*}}: index, %{{.*}}: index):
 // CHECK:   affine.load %{{.*}}[%{{.*}}, %{{.*}}] : memref<10x20xf32>
 // CHECK:   affine.load %{{.*}}[%{{.*}}, %{{.*}}] : memref<20x30xf32>
 // CHECK:   mulf %{{.*}}, %{{.*}} : f32
 // CHECK:   pxa.reduce add %{{.*}}, %{{.*}}[%{{.*}}, %{{.*}}] : memref<10x30xf32>
-// CHECK: ranges = [[map_dot_1]]
-// CHECK: pxa.parallel_for
+// CHECK: upperBoundsMap = [[map_dot_1]]
+// CHECK: pxa.parallel
 // CHECK: ^bb0(%{{.*}}: index, %{{.*}}: index, %{{.*}}: index):
 // CHECK:   affine.load %{{.*}}[%{{.*}}, %{{.*}}] : memref<10x30xf32>
 // CHECK:   affine.load %{{.*}}[%{{.*}}, %{{.*}}] : memref<30x40xf32>
 // CHECK:   mulf %{{.*}}, %{{.*}} : f32
 // CHECK:   pxa.reduce add %{{.*}}, %{{.*}}[%{{.*}}, %{{.*}}] : memref<10x40xf32>
-// CHECK: ranges = [[map_dot_2]]
+// CHECK: upperBoundsMap = [[map_dot_2]]

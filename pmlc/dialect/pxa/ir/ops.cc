@@ -41,20 +41,25 @@ ParseResult parseKeywordIntoEnumAttr(OpAsmParser& parser, OperationState& result
 
 }  // namespace
 
-void AffineParallelForOp::build(Builder* builder, OperationState& result, ArrayRef<int64_t> ranges) {
-  SmallVector<AffineExpr, 8> range_exprs;
+// ---- AffineParallelOp ----
+
+void AffineParallelOp::build(Builder* builder, OperationState& result, ArrayRef<int64_t> ranges) {
+  SmallVector<AffineExpr, 8> lbExprs;
+  SmallVector<AffineExpr, 8> ubExprs;
   // Make range expressions for each range
   for (int64_t range : ranges) {
-    range_exprs.push_back(builder->getAffineConstantExpr(range));
+    lbExprs.push_back(builder->getAffineConstantExpr(0));
+    ubExprs.push_back(builder->getAffineConstantExpr(range));
   }
   // Make the maps (handling the 0-dim case carefully)
   if (ranges.size()) {
-    result.addAttribute("ranges", AffineMapAttr::get(AffineMap::get(0, 0, range_exprs)));
-    result.addAttribute("transform", AffineMapAttr::get(builder->getMultiDimIdentityMap(ranges.size())));
+    result.addAttribute("lowerBoundsMap", AffineMapAttr::get(AffineMap::get(0, 0, lbExprs)));
+    result.addAttribute("upperBoundsMap", AffineMapAttr::get(AffineMap::get(0, 0, ubExprs)));
   } else {
-    result.addAttribute("ranges", AffineMapAttr::get(AffineMap::get(builder->getContext())));
-    result.addAttribute("transform", AffineMapAttr::get(AffineMap::get(builder->getContext())));
+    result.addAttribute("lowerBoundsMap", AffineMapAttr::get(AffineMap::get(builder->getContext())));
+    result.addAttribute("upperBoundsMap", AffineMapAttr::get(AffineMap::get(builder->getContext())));
   }
+  result.addAttribute("steps", builder->getI64ArrayAttr(ranges));
   // Create a region and a block for the body.
   auto bodyRegion = result.addRegion();
   auto body = new Block();
@@ -66,6 +71,18 @@ void AffineParallelForOp::build(Builder* builder, OperationState& result, ArrayR
   // Terminate
   ensureTerminator(*bodyRegion, *builder, result.location);
 }
+
+AffineParallelOp::operand_range AffineParallelOp::getLowerBoundsOperands() {
+  return {operand_begin(), operand_begin() + lowerBoundsMap().getNumInputs()};
+}
+
+AffineParallelOp::operand_range AffineParallelOp::getUpperBoundsOperands() {
+  return {operand_begin() + lowerBoundsMap().getNumInputs(), operand_end()};
+}
+
+mlir::Block* AffineParallelOp::getBody() { return &region().front(); }
+
+mlir::OpBuilder AffineParallelOp::getBodyBuilder() { return mlir::OpBuilder(getBody(), std::prev(getBody()->end())); }
 
 // ---- AffineReduceOp ----
 
