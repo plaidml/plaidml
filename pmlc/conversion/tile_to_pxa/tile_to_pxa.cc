@@ -39,6 +39,7 @@ using util::DataType;
 using llvm::Optional;
 using llvm::SmallVector;
 using mlir::AffineConstantExpr;
+using mlir::AffineIfOp;
 using mlir::AffineLoadOp;
 using mlir::AffineMap;
 using mlir::AffineMapAttr;
@@ -101,7 +102,7 @@ ScalarType getScalarType(Type type) {
 }
 
 ScalarType getScalarType(Value value) {  //
-  return getScalarType(value->getType());
+  return getScalarType(value.getType());
 }
 
 struct FuncOpConversion : public OpConversionPattern<FuncOp> {
@@ -425,7 +426,7 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
       ConversionPatternRewriter& rewriter) const final {
     TypeConverter typeConverter;
     auto loc = op.getLoc();
-    auto resultType = op.result()->getType();
+    auto resultType = op.result().getType();
     auto resultMemRefType = typeConverter.convertType(resultType).template cast<MemRefType>();
 
     // Allocate the result
@@ -521,7 +522,7 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
     // Gather some basic info
     auto loc = op.getLoc();
     TypeConverter typeConverter;
-    auto resultType = typeConverter.convertType(op.result()->getType()).cast<MemRefType>();
+    auto resultType = typeConverter.convertType(op.result().getType()).cast<MemRefType>();
 
     // Make an allocation for the output
     auto resultMemRef = rewriter.create<AllocOp>(loc, resultType).getResult();
@@ -530,8 +531,8 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
     SmallVector<int64_t, 8> ranges;
     auto lowerBounds = op.lower_bounds().getValue();
     auto upperBounds = op.upper_bounds().getValue();
-    assert(lowerBounds.getNumDims() == upperBounds.getNumDims() && "mismatched dims for lower and upper bounds");
-    for (unsigned i = 0; i < lowerBounds.getNumDims(); i++) {
+    assert(lowerBounds.getNumResults() == upperBounds.getNumResults() && "mismatched dims for lower and upper bounds");
+    for (unsigned i = 0; i < lowerBounds.getNumResults(); i++) {
       auto rangeExpr = upperBounds.getResult(i) - lowerBounds.getResult(i) + 1;
       auto range = rangeExpr.cast<AffineConstantExpr>().getValue();
       ranges.emplace_back(range);
@@ -547,6 +548,13 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
     SmallVector<Value, 8> idxs;
     for (size_t i = 0; i < body->getNumArguments(); i++) {
       idxs.push_back(body->getArgument(i));
+    }
+
+    // add constraints
+    if (op.cons()) {
+      auto cons = op.cons().getValue();
+      auto ifOp = rewriter.create<AffineIfOp>(loc, cons, idxs, false);
+      rewriter.setInsertionPointToStart(&ifOp.thenRegion().front());
     }
 
     // Create the loads + casts
@@ -600,7 +608,7 @@ struct IndexOpConversion : public OpConversionPattern<IndexOp> {
     // Gather some basic info
     auto loc = op.getLoc();
     TypeConverter typeConverter;
-    auto resultType = typeConverter.convertType(op.result()->getType()).cast<MemRefType>();
+    auto resultType = typeConverter.convertType(op.result().getType()).cast<MemRefType>();
 
     // Make an allocation for the output
     auto resultMemRef = rewriter.create<AllocOp>(loc, resultType).getResult();
@@ -647,7 +655,7 @@ struct ShapeOpConversion : public OpConversionPattern<ShapeOp> {
     // Gather some basic info
     auto loc = op.getLoc();
     TypeConverter typeConverter;
-    auto resultType = typeConverter.convertType(op.result()->getType()).cast<MemRefType>();
+    auto resultType = typeConverter.convertType(op.result().getType()).cast<MemRefType>();
 
     // Make an allocation for the output
     auto resultMemRef = rewriter.create<AllocOp>(loc, resultType).getResult();
@@ -681,7 +689,7 @@ struct CastOpConversion : public OpConversionPattern<ew::CastOp> {
     // Gather some basic info
     auto loc = op.getLoc();
     TypeConverter typeConverter;
-    auto resultType = typeConverter.convertType(op.result()->getType()).cast<MemRefType>();
+    auto resultType = typeConverter.convertType(op.result().getType()).cast<MemRefType>();
     auto operand = operands[0];
     auto operandType = operand.getType().cast<MemRefType>();
     if (resultType == operandType) {

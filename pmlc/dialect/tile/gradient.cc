@@ -23,7 +23,7 @@ Gradient::Gradient(mlir::Value loss, TileBuilder* builder) : builder_(builder) {
   loss_setvec.insert(loss);
   auto defs = util::getBackwardSlice(  //
       loss_setvec, false, std::function<bool(mlir::Value)>{[](mlir::Value val) {
-        auto op = val->getDefiningOp();
+        auto op = val.getDefiningOp();
         // TODO: This is an ad hoc list of what to filter out; make it principled
         return !mlir::isa<AffineConstraintsOp>(op) &&  //
                !mlir::isa<AffineMapOp>(op) &&          //
@@ -62,7 +62,7 @@ void Gradient::AddToGradient(Value source_op, Value deriv) {
 void Gradient::ComputeOperandDerivs(mlir::Value val) {
   IVLOG(4, "Gradient::ComputeDerivative> " << mlir::debugString(val));
   // TODO: Throw on ops with multiple results?
-  auto op = val->getDefiningOp();
+  auto op = val.getDefiningOp();
   if (mlir::isa<AffineConstraintsOp>(op) ||  //
       mlir::isa<AffineMapOp>(op) ||          //
       mlir::isa<AffineIndexOp>(op) ||        //
@@ -114,7 +114,7 @@ void Gradient::ComputeOperandDerivs(mlir::Value val) {
   } else if (auto reshape_op = mlir::dyn_cast<ReshapeOp>(op)) {
     auto tensor_input = reshape_op.tensor();
     std::vector<mlir::Value> args{grads_[val]};
-    for (int i = 0; i < tensor_input->getType().dyn_cast<RankedTensorType>().getRank(); ++i) {
+    for (int i = 0; i < tensor_input.getType().dyn_cast<RankedTensorType>().getRank(); ++i) {
       args.push_back(builder_->MakeDimOp(tensor_input, i));
     }
     auto dop = builder_->MakePrimitiveOp("reshape", args);
@@ -153,7 +153,7 @@ mlir::Value Gradient::GetDerivative(mlir::Value val) {
 }
 
 mlir::Value Gradient::DeriveEltwise(mlir::Value dout, mlir::Value out, size_t idx) {
-  auto op = out->getDefiningOp();
+  auto op = out.getDefiningOp();
   IVLOG(5, "Gradient::DeriveEltwise> dout=" << mlir::debugString(dout) << ", op=" << mlir::debugString(*op)
                                             << ", idx=" << idx);
   auto deriv = DerivRegistry::Instance()->Resolve(op->getName().getStringRef());
@@ -165,7 +165,7 @@ mlir::Value Gradient::DeriveEltwise(mlir::Value dout, mlir::Value out, size_t id
 mlir::Value Gradient::DeriveContraction(mlir::Value dout, mlir::Value out, size_t idx) {
   IVLOG(5, "Gradient::DeriveContraction> dout=" << mlir::debugString(dout) << ", out=" << mlir::debugString(out)
                                                 << ", idx=" << idx);
-  auto op = llvm::dyn_cast_or_null<SymbolicContractionOp>(out->getDefiningOp());
+  auto op = llvm::dyn_cast_or_null<SymbolicContractionOp>(out.getDefiningOp());
   if (!op) {
     throw std::runtime_error("DeriveContraction called on non-contraction");
   }
@@ -185,13 +185,13 @@ mlir::Value Gradient::DeriveContraction(mlir::Value dout, mlir::Value out, size_
       for (auto src : op.srcs()) {
         if (i == idx) {
           combo_kind = util::CombinationKind::cond;
-          auto src_op = mlir::dyn_cast_or_null<AffineTensorMapOp>(src->getDefiningOp());
+          auto src_op = mlir::dyn_cast_or_null<AffineTensorMapOp>(src.getDefiningOp());
           if (!src_op) {
             throw std::runtime_error("src_op as cast is null");
           }
           new_srcs.push_back(src_op);
           std::vector<Value> dout_idxs;
-          for (const auto& dim : llvm::cast<AffineMapOp>(op.sink()->getDefiningOp()).dims()) {
+          for (const auto& dim : llvm::cast<AffineMapOp>(op.sink().getDefiningOp()).dims()) {
             dout_idxs.push_back(dim);
           }
           new_srcs.push_back(builder_->MakeAffineSourceIndexMapOp(op, dout_idxs));
@@ -211,7 +211,7 @@ mlir::Value Gradient::DeriveContraction(mlir::Value dout, mlir::Value out, size_
         if (i == idx) {
           // This is the differentiated input; so swap in dout here to create the new op
           std::vector<Value> dout_idxs;
-          for (const auto& dim : llvm::cast<AffineMapOp>(op.sink()->getDefiningOp()).dims()) {
+          for (const auto& dim : llvm::cast<AffineMapOp>(op.sink().getDefiningOp()).dims()) {
             dout_idxs.push_back(dim);
           }
           new_srcs.push_back(builder_->MakeAffineSourceIndexMapOp(dout, dout_idxs));
@@ -258,9 +258,9 @@ mlir::Value Gradient::DeriveContraction(mlir::Value dout, mlir::Value out, size_
     throw std::runtime_error(
         llvm::formatv("Trying to derive contraction at out of range index (requested source operand {0})", idx).str());
   }
-  auto target_src_op = llvm::cast<AffineTensorMapOp>(target_src->getDefiningOp());
+  auto target_src_op = llvm::cast<AffineTensorMapOp>(target_src.getDefiningOp());
   std::vector<mlir::Value> sizes;
-  for (int i = 0; i < target_src_op.tensor()->getType().dyn_cast<RankedTensorType>().getRank(); ++i) {
+  for (int i = 0; i < target_src_op.tensor().getType().dyn_cast<RankedTensorType>().getRank(); ++i) {
     sizes.push_back(builder_->MakeDimOp(target_src_op.tensor(), i));
   }
   std::vector<mlir::Value> dsrc_idxs;
@@ -282,9 +282,9 @@ mlir::Value Gradient::DeriveContraction(mlir::Value dout, mlir::Value out, size_
       builder_->MakeAffineSizeMapOp(sizes),           //
       new_name);
   // Copy the constraints from the forward pass contraction
-  auto src_cons = llvm::dyn_cast<AffineConstraintsOp>(op.cons()->getDefiningOp());
-  auto dop = llvm::dyn_cast<SymbolicContractionOp>(dop_val->getDefiningOp());
-  auto dst_cons = llvm::dyn_cast<AffineConstraintsOp>(dop.cons()->getDefiningOp());
+  auto src_cons = llvm::dyn_cast<AffineConstraintsOp>(op.cons().getDefiningOp());
+  auto dop = llvm::dyn_cast<SymbolicContractionOp>(dop_val.getDefiningOp());
+  auto dst_cons = llvm::dyn_cast<AffineConstraintsOp>(dop.cons().getDefiningOp());
   mlir::SmallVector<mlir::Value, 6> pairs{src_cons.pairs()};
   for (const auto& pair : src_cons.pairs()) {
     pairs.emplace_back(pair);

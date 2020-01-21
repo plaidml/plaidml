@@ -126,14 +126,14 @@ Type ComputeResultType(ValueRange operands, DataType override) {
   if (VLOG_IS_ON(6)) {
     std::vector<std::string> types;
     for (auto operand : operands) {
-      auto type = operand->getType();
+      auto type = operand.getType();
       types.push_back(debugString(type));
     }
     IVLOG(6, "ComputeResultType> " << types);
   }
-  Type ret = (*operands.begin())->getType();
+  Type ret = (*operands.begin()).getType();
   for (auto operand : operands.drop_front()) {
-    auto type = operand->getType();
+    auto type = operand.getType();
     if (!MergeTypes(&ret, type, override)) {
       std::stringstream ss;
       ss << "Incompatible types: (";
@@ -141,7 +141,7 @@ Type ComputeResultType(ValueRange operands, DataType override) {
         if (i) {
           ss << ", ";
         }
-        auto type = operands[i]->getType();
+        auto type = operands[i].getType();
         ss << debugString(type);
       }
       ss << ")";
@@ -154,7 +154,7 @@ Type ComputeResultType(ValueRange operands, DataType override) {
 SmallVector<int64_t, 4> ComputeShape(ArrayRef<Value> operands) {
   SmallVector<int64_t, 4> shape;
   for (auto operand : operands) {
-    auto op = operand->getDefiningOp();
+    auto op = operand.getDefiningOp();
     IntegerAttr attr;
     if (m_Constant(&attr).match(op)) {
       shape.push_back(attr.getInt());

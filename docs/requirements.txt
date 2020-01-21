@@ -1,0 +1,5 @@
+breathe
+sphinx-rtd-theme
+sphinx-tabs
+sphinxcontrib-katex
+sphinxcontrib-napoleon

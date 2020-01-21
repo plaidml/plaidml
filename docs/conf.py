@@ -10,14 +10,15 @@
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
-# import os
-# import sys
-# sys.path.insert(0, os.path.abspath('.'))
+import os
+import sys
+sys.path.insert(0, os.path.abspath('.'))
+sys.path.insert(0, os.path.abspath('..'))
 
 # -- Project information -----------------------------------------------------
 
 project = 'plaidml'
-copyright = '2019, Intel Corporation'
+copyright = '2020, Intel Corporation'
 author = 'plaidml'
 
 # -- General configuration ---------------------------------------------------
@@ -35,7 +36,6 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-# html_theme = 'alabaster'
 html_theme = 'sphinx_rtd_theme'
 
 # Add any paths that contain custom static files (such as style sheets) here,
@@ -46,19 +46,28 @@ html_theme = 'sphinx_rtd_theme'
 extensions = [
     'breathe',
     'sphinx_rtd_theme',
-    'sphinxcontrib.katex',
-    'sphinx.ext.napoleon',
-    'sphinx.ext.autodoc',
     'sphinx_tabs.tabs',
+    'sphinx.ext.autodoc',
+    'sphinx.ext.autosectionlabel',
+    'sphinx.ext.napoleon',
+    'sphinxcontrib.katex',
 ]
+
+autodoc_mock_imports = [
+    'plaidml.core._version',
+    'plaidml.ffi',
+]
+
+autosectionlabel_prefix_document = True
 
 # Setup the breathe extension
 breathe_projects = {
-    "PlaidML": "./xml",
+    'PlaidML': './xml',
 }
 
-breathe_default_project = "PlaidML"
+breathe_default_project = 'PlaidML'
 
+pygments_style = 'sphinx'
 # breathe_doxygen_config_options = {
 #     'HIDE_FRIEND_COMPOUNDS': 'YES',
 #     'HIDE_UNDOC_CLASSES': 'YES',
@@ -70,3 +79,9 @@ breathe_default_project = "PlaidML"
 
 # Tell sphinx what the pygments highlight language should be.
 # highlight_language = 'cpp'
+
+if os.environ.get('READTHEDOCS') == 'True':
+    import subprocess
+    import util
+    subprocess.run(['doxygen'])
+    util.fix_doxyxml('xml/*.xml')

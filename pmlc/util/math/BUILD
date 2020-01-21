@@ -20,6 +20,7 @@ plaidml_cc_library(
     deps = [
         "//pmlc/util",
         "@boost",
+        "@llvm-project//llvm:support",
     ],
 )
 

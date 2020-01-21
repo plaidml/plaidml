@@ -59,7 +59,7 @@ TEST(CppEdsl, Cast) {
                                    6 + (1UL << 12),
                                    7 + (1UL << 24),
                                    8 + (1UL << 31),  //
-                                   (1UL << 32) - 1};
+                                   (1ULL << 32) - 1};
 
   std::vector<std::uint32_t> expected{1,
                                       2,
@@ -69,7 +69,7 @@ TEST(CppEdsl, Cast) {
                                       6 + (1UL << 12),
                                       7 + (1UL << 24),
                                       8 + (1UL << 31),  //
-                                      (1UL << 32) - 1};
+                                      (1ULL << 32) - 1};
   auto binder = exec::Binder(program);
   auto executable = binder.compile();
   binder.input(A).copy_from(input.data());
@@ -217,8 +217,8 @@ TEST(CppEdsl, Add) {
       5,
       6 + (1UL << 12),
       7 + (1UL << 24),
-      8 + (1UL << 32),
-      9 + (1UL << 40)  //
+      8 + (1ULL << 32),
+      9 + (1ULL << 40)  //
   };
 
   std::vector<std::uint64_t> input_b = {1,
@@ -226,9 +226,9 @@ TEST(CppEdsl, Add) {
                                         3,
                                         4 + (1UL << 24),
                                         5,
-                                        6 + (1UL << 32),
+                                        6 + (1ULL << 32),
                                         7,
-                                        8 + (1UL << 40),  //
+                                        8 + (1ULL << 40),  //
                                         9};
 
   std::vector<std::uint64_t> expected = {2,
@@ -236,10 +236,10 @@ TEST(CppEdsl, Add) {
                                          6,
                                          8 + (1UL << 24),
                                          10,
-                                         12 + (1UL << 12) + (1UL << 32),
+                                         12 + (1UL << 12) + (1ULL << 32),
                                          14 + (1UL << 24),
-                                         16 + (1UL << 32) + (1UL << 40),
-                                         18 + (1UL << 40)};
+                                         16 + (1ULL << 32) + (1ULL << 40),
+                                         18 + (1ULL << 40)};
 
   auto binder = exec::Binder(program);
   auto executable = binder.compile();
@@ -261,9 +261,9 @@ TEST(CppEdsl, Dot) {
   auto C = Dot(A, B);
   Program program("dot", {C});
   EXPECT_THAT(program, Eq(R"#(
-#map0 = (d0, d1, d2) -> (d0, d1)
-#map1 = (d0, d1, d2) -> (d0, d2)
-#map2 = (d0, d1, d2) -> (d2, d1)
+#map0 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#map1 = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map2 = affine_map<(d0, d1, d2) -> (d2, d1)>
 
 
 !f32 = type tensor<!eltwise.f32>
@@ -308,9 +308,9 @@ TEST(CppEdsl, DoubleDot) {
   auto C = Placeholder(DType::FLOAT32, {30, 40});
   Program program("double_dot", {Dot(Dot(A, B), C)});
   EXPECT_THAT(program, Eq(R"#(
-#map0 = (d0, d1, d2) -> (d0, d1)
-#map1 = (d0, d1, d2) -> (d0, d2)
-#map2 = (d0, d1, d2) -> (d2, d1)
+#map0 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#map1 = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map2 = affine_map<(d0, d1, d2) -> (d2, d1)>
 
 
 !f32 = type tensor<!eltwise.f32>
@@ -324,7 +324,7 @@ module {
 }
 )#"));
   exec::Binder(program).compile()->run();
-}  // namespace plaidml::edsl
+}
 
 TEST(CppEdsl, EltwiseAdd) {
   auto A = Placeholder(DType::FLOAT32, {10, 20});
@@ -349,8 +349,8 @@ TEST(CppEdsl, Relu) {
 module {
   func @relu(%arg0: tensor<10x20x!eltwise.f32>) -> tensor<10x20x!eltwise.f32> {
     %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
-    %0 = "eltwise.cmp_lt"(%arg0, %cst) : (tensor<10x20x!eltwise.f32>, !f32) -> tensor<10x20x!eltwise.i1>
-    %1 = "eltwise.select"(%0, %cst, %arg0) : (tensor<10x20x!eltwise.i1>, !f32, tensor<10x20x!eltwise.f32>) -> tensor<10x20x!eltwise.f32>
+    %0 = "eltwise.cmp_lt"(%arg0, %cst) : (tensor<10x20x!eltwise.f32>, !f32) -> tensor<10x20x!eltwise.u1>
+    %1 = "eltwise.select"(%0, %cst, %arg0) : (tensor<10x20x!eltwise.u1>, !f32, tensor<10x20x!eltwise.f32>) -> tensor<10x20x!eltwise.f32>
     return %1 : tensor<10x20x!eltwise.f32>
   }
 }
@@ -374,11 +374,11 @@ TEST(CppEdsl, MnistMlp) {
   auto dense3 = Softmax(Dot(dense2, kernel3) + bias3);
   Program program("mnist_mlp", {dense3});
   EXPECT_THAT(program, Eq(R"#(
-#map0 = (d0, d1, d2) -> (d0, d1)
-#map1 = (d0, d1, d2) -> (d0, d2)
-#map2 = (d0, d1, d2) -> (d2, d1)
-#map3 = (d0, d1) -> (d0, 0)
-#map4 = (d0, d1) -> (d0, d1)
+#map0 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#map1 = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map2 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map3 = affine_map<(d0, d1) -> (d0, 0)>
+#map4 = affine_map<(d0, d1) -> (d0, d1)>
 
 
 !f32 = type tensor<!eltwise.f32>
@@ -387,12 +387,12 @@ module {
     %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
     %0 = tile.cion add, mul, %cst, %arg6, %arg5 {idxs = ["i", "j", "k"], sink = #map0, srcs = [#map1, #map2]} : !f32, tensor<1x784x!eltwise.f32>, tensor<784x512x!eltwise.f32> -> tensor<1x512x!eltwise.f32>
     %1 = "eltwise.add"(%0, %arg4) : (tensor<1x512x!eltwise.f32>, tensor<512x!eltwise.f32>) -> tensor<1x512x!eltwise.f32>
-    %2 = "eltwise.cmp_lt"(%1, %cst) : (tensor<1x512x!eltwise.f32>, !f32) -> tensor<1x512x!eltwise.i1>
-    %3 = "eltwise.select"(%2, %cst, %1) : (tensor<1x512x!eltwise.i1>, !f32, tensor<1x512x!eltwise.f32>) -> tensor<1x512x!eltwise.f32>
+    %2 = "eltwise.cmp_lt"(%1, %cst) : (tensor<1x512x!eltwise.f32>, !f32) -> tensor<1x512x!eltwise.u1>
+    %3 = "eltwise.select"(%2, %cst, %1) : (tensor<1x512x!eltwise.u1>, !f32, tensor<1x512x!eltwise.f32>) -> tensor<1x512x!eltwise.f32>
     %4 = tile.cion add, mul, %cst, %3, %arg3 {idxs = ["i", "j", "k"], sink = #map0, srcs = [#map1, #map2]} : !f32, tensor<1x512x!eltwise.f32>, tensor<512x512x!eltwise.f32> -> tensor<1x512x!eltwise.f32>
     %5 = "eltwise.add"(%4, %arg2) : (tensor<1x512x!eltwise.f32>, tensor<512x!eltwise.f32>) -> tensor<1x512x!eltwise.f32>
-    %6 = "eltwise.cmp_lt"(%5, %cst) : (tensor<1x512x!eltwise.f32>, !f32) -> tensor<1x512x!eltwise.i1>
-    %7 = "eltwise.select"(%6, %cst, %5) : (tensor<1x512x!eltwise.i1>, !f32, tensor<1x512x!eltwise.f32>) -> tensor<1x512x!eltwise.f32>
+    %6 = "eltwise.cmp_lt"(%5, %cst) : (tensor<1x512x!eltwise.f32>, !f32) -> tensor<1x512x!eltwise.u1>
+    %7 = "eltwise.select"(%6, %cst, %5) : (tensor<1x512x!eltwise.u1>, !f32, tensor<1x512x!eltwise.f32>) -> tensor<1x512x!eltwise.f32>
     %8 = tile.cion add, mul, %cst, %7, %arg1 {idxs = ["i", "j", "k"], sink = #map0, srcs = [#map1, #map2]} : !f32, tensor<1x512x!eltwise.f32>, tensor<512x10x!eltwise.f32> -> tensor<1x10x!eltwise.f32>
     %9 = "eltwise.add"(%8, %arg0) : (tensor<1x10x!eltwise.f32>, tensor<10x!eltwise.f32>) -> tensor<1x10x!eltwise.f32>
     %10 = tile.cion max, none, %cst, %9 {sink = #map3, srcs = [#map4]} : !f32, tensor<1x10x!eltwise.f32> -> tensor<1x1x!eltwise.f32>
@@ -404,7 +404,9 @@ module {
   }
 }
 )#"));
+#if !defined(_WIN32)
   exec::Binder(program).compile()->run();
+#endif
 }
 
 Tensor Convolution2(const Tensor& I, const Tensor& K) {
@@ -421,8 +423,22 @@ TEST(CppEdsl, Convolution) {
   auto I = Placeholder(DType::FLOAT32, {1, 224, 224, 1});
   auto K = Placeholder(DType::FLOAT32, {3, 3, 1, 32});
   Program program("convolution", {Convolution2(I, K)});
-  // TODO: implement constraints in -convert-tile-to-pxa
-  // exec::Binder(program).compile()->run();
+  EXPECT_THAT(program, Eq(R"#(
+#map0 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4 - 1, d2 + d5 - 1, d6)>
+#map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d5, d6, d3)>
+
+
+!f32 = type tensor<!eltwise.f32>
+module {
+  func @convolution(%arg0: tensor<3x3x1x32x!eltwise.f32>, %arg1: tensor<1x224x224x1x!eltwise.f32>) -> tensor<1x222x222x32x!eltwise.f32> {
+    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
+    %0 = tile.cion add, mul, %cst, %arg1, %arg0 {sink = #map0, srcs = [#map1, #map2]} : !f32, tensor<1x224x224x1x!eltwise.f32>, tensor<3x3x1x32x!eltwise.f32> -> tensor<1x222x222x32x!eltwise.f32>
+    return %0 : tensor<1x222x222x32x!eltwise.f32>
+  }
+}
+)#"));
+  exec::Binder(program).compile()->run();
 }
 
 Tensor MaxPooling2(const Tensor& I) {
@@ -474,18 +490,18 @@ TEST(CppEdsl, MnistCnn) {
   auto dense2 = Softmax(Dot(dense1, kernel4) + bias4);
   Program program("mnist_cnn", {dense2});
   EXPECT_THAT(program, Eq(R"#(
-#map0 = (d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)
-#map1 = (d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4 - 1, d2 + d5 - 1, d6)
-#map2 = (d0, d1, d2, d3, d4, d5, d6) -> (d4, d5, d6, d3)
-#map3 = (d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)
-#map4 = (d0, d1, d2, d3, d4, d5) -> (d0, d1 * 2 + d4, d2 * 2 + d5, d3)
-#map5 = (d0, d1, d2) -> (d0, d1)
-#map6 = (d0, d1, d2) -> (d0, d2)
-#map7 = (d0, d1, d2) -> (d2, d1)
-#map8 = (d0, d1) -> (d0, 0)
-#map9 = (d0, d1) -> (d0, d1)
+#map0 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4 - 1, d2 + d5 - 1, d6)>
+#map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d5, d6, d3)>
+#map3 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>
+#map4 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1 * 2 + d4, d2 * 2 + d5, d3)>
+#map5 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#map6 = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map7 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map8 = affine_map<(d0, d1) -> (d0, 0)>
+#map9 = affine_map<(d0, d1) -> (d0, d1)>
 
-#set0 = (d0, d1, d2, d3, d4, d5) : (d4 >= 0, -d4 + 1 >= 0, d5 >= 0, -d5 + 1 >= 0)
+#set0 = affine_set<(d0, d1, d2, d3, d4, d5) : (d4 >= 0, -d4 + 1 >= 0, d5 >= 0, -d5 + 1 >= 0)>
 
 !f32 = type tensor<!eltwise.f32>
 module {
@@ -495,18 +511,18 @@ module {
     %c1 = tile.affine_const 1
     %0 = tile.cion add, mul, %cst, %arg8, %arg7 {sink = #map0, srcs = [#map1, #map2]} : !f32, tensor<1x224x224x1x!eltwise.f32>, tensor<3x3x1x32x!eltwise.f32> -> tensor<1x222x222x32x!eltwise.f32>
     %1 = "eltwise.add"(%0, %arg6) : (tensor<1x222x222x32x!eltwise.f32>, tensor<32x!eltwise.f32>) -> tensor<1x222x222x32x!eltwise.f32>
-    %2 = "eltwise.cmp_lt"(%1, %cst) : (tensor<1x222x222x32x!eltwise.f32>, !f32) -> tensor<1x222x222x32x!eltwise.i1>
-    %3 = "eltwise.select"(%2, %cst, %1) : (tensor<1x222x222x32x!eltwise.i1>, !f32, tensor<1x222x222x32x!eltwise.f32>) -> tensor<1x222x222x32x!eltwise.f32>
+    %2 = "eltwise.cmp_lt"(%1, %cst) : (tensor<1x222x222x32x!eltwise.f32>, !f32) -> tensor<1x222x222x32x!eltwise.u1>
+    %3 = "eltwise.select"(%2, %cst, %1) : (tensor<1x222x222x32x!eltwise.u1>, !f32, tensor<1x222x222x32x!eltwise.f32>) -> tensor<1x222x222x32x!eltwise.f32>
     %4 = tile.cion add, mul, %cst, %3, %arg5 {sink = #map0, srcs = [#map1, #map2]} : !f32, tensor<1x222x222x32x!eltwise.f32>, tensor<3x3x32x64x!eltwise.f32> -> tensor<1x220x220x64x!eltwise.f32>
     %5 = "eltwise.add"(%4, %arg4) : (tensor<1x220x220x64x!eltwise.f32>, tensor<64x!eltwise.f32>) -> tensor<1x220x220x64x!eltwise.f32>
-    %6 = "eltwise.cmp_lt"(%5, %cst) : (tensor<1x220x220x64x!eltwise.f32>, !f32) -> tensor<1x220x220x64x!eltwise.i1>
-    %7 = "eltwise.select"(%6, %cst, %5) : (tensor<1x220x220x64x!eltwise.i1>, !f32, tensor<1x220x220x64x!eltwise.f32>) -> tensor<1x220x220x64x!eltwise.f32>
+    %6 = "eltwise.cmp_lt"(%5, %cst) : (tensor<1x220x220x64x!eltwise.f32>, !f32) -> tensor<1x220x220x64x!eltwise.u1>
+    %7 = "eltwise.select"(%6, %cst, %5) : (tensor<1x220x220x64x!eltwise.u1>, !f32, tensor<1x220x220x64x!eltwise.f32>) -> tensor<1x220x220x64x!eltwise.f32>
     %8 = tile.cion max, none, %cst, %7 {cons = #set0, sink = #map3, srcs = [#map4]} : !f32, tensor<1x220x220x64x!eltwise.f32> -> tensor<1x110x110x64x!eltwise.f32>
     %9 = "tile.reshape"(%8, %c1, %c12100) : (tensor<1x110x110x64x!eltwise.f32>, index, index) -> tensor<1x12100x!eltwise.f32>
     %10 = tile.cion add, mul, %cst, %9, %arg3 {idxs = ["i", "j", "k"], sink = #map5, srcs = [#map6, #map7]} : !f32, tensor<1x12100x!eltwise.f32>, tensor<12100x128x!eltwise.f32> -> tensor<1x128x!eltwise.f32>
     %11 = "eltwise.add"(%10, %arg2) : (tensor<1x128x!eltwise.f32>, tensor<128x!eltwise.f32>) -> tensor<1x128x!eltwise.f32>
-    %12 = "eltwise.cmp_lt"(%11, %cst) : (tensor<1x128x!eltwise.f32>, !f32) -> tensor<1x128x!eltwise.i1>
-    %13 = "eltwise.select"(%12, %cst, %11) : (tensor<1x128x!eltwise.i1>, !f32, tensor<1x128x!eltwise.f32>) -> tensor<1x128x!eltwise.f32>
+    %12 = "eltwise.cmp_lt"(%11, %cst) : (tensor<1x128x!eltwise.f32>, !f32) -> tensor<1x128x!eltwise.u1>
+    %13 = "eltwise.select"(%12, %cst, %11) : (tensor<1x128x!eltwise.u1>, !f32, tensor<1x128x!eltwise.f32>) -> tensor<1x128x!eltwise.f32>
     %14 = tile.cion add, mul, %cst, %13, %arg1 {idxs = ["i", "j", "k"], sink = #map5, srcs = [#map6, #map7]} : !f32, tensor<1x128x!eltwise.f32>, tensor<128x100x!eltwise.f32> -> tensor<1x100x!eltwise.f32>
     %15 = "eltwise.add"(%14, %arg0) : (tensor<1x100x!eltwise.f32>, tensor<100x!eltwise.f32>) -> tensor<1x100x!eltwise.f32>
     %16 = tile.cion max, none, %cst, %15 {sink = #map8, srcs = [#map9]} : !f32, tensor<1x100x!eltwise.f32> -> tensor<1x1x!eltwise.f32>
@@ -518,6 +534,7 @@ module {
   }
 }
 )#"));
+  // TODO: error: failed to legalize operation 'tile.reshape'
   // exec::Binder(program).compile()->run();
 }
 
@@ -554,8 +571,8 @@ TEST(CppEdsl, LarsMomentum4d) {
   auto R = LarsMomentum(X, Grad, Veloc, LR, 1. / 1024., 1. / 2048., 1. / 8.);
   Program program("lars_momentum4d", {std::get<0>(R), std::get<1>(R)});
   EXPECT_THAT(program, Eq(R"#(
-#map0 = () -> ()
-#map1 = (d0, d1, d2, d3) -> (d0, d1, d2, d3)
+#map0 = affine_map<() -> ()>
+#map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 
 
 !f32 = type tensor<!eltwise.f32>
@@ -601,10 +618,10 @@ TEST(CppEdsl, RepeatElements) {
   O.no_reduce();
   Program program("repeat_elts", {O});
   EXPECT_THAT(program, Eq(R"#(
-#map0 = (d0, d1, d2, d3) -> (d0, d1 * 3 + d2, d3)
-#map1 = (d0, d1, d2, d3) -> (d0, d1, d3)
+#map0 = affine_map<(d0, d1, d2, d3) -> (d0, d1 * 3 + d2, d3)>
+#map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
 
-#set0 = (d0, d1, d2, d3) : (d2 >= 0, -d2 + 2 >= 0)
+#set0 = affine_set<(d0, d1, d2, d3) : (d2 >= 0, -d2 + 2 >= 0)>
 
 !f32 = type tensor<!eltwise.f32>
 module {
@@ -629,8 +646,8 @@ TEST(CppEdsl, UseDefault) {
   O.use_default(P);
   Program program("use_default", {O});
   EXPECT_THAT(program, Eq(R"#(
-#map0 = (d0, d1, d2) -> (d0, 3, d1, d2)
-#map1 = (d0, d1, d2) -> (d0, d1, d2)
+#map0 = affine_map<(d0, d1, d2) -> (d0, 3, d1, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 
 
 module {
@@ -664,11 +681,11 @@ TEST(CppEdsl, ArgMax) {
   Program program("arg_max", {X});
   EXPECT_THAT(X.shape(), Eq(LogicalShape(DType::UINT32, {1, 10})));
   EXPECT_THAT(program, Eq(R"#(
-#map0 = (d0) -> (d0)
-#map1 = () -> ()
-#map2 = (d0, d1, d2) -> (d0, d1)
-#map3 = (d0, d1, d2) -> (d0, d2, d1)
-#map4 = (d0, d1, d2) -> (d2)
+#map0 = affine_map<(d0) -> (d0)>
+#map1 = affine_map<() -> ()>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#map3 = affine_map<(d0, d1, d2) -> (d0, d2, d1)>
+#map4 = affine_map<(d0, d1, d2) -> (d2)>
 
 
 !i32 = type tensor<!eltwise.i32>
@@ -730,8 +747,7 @@ TEST(CppEdsl, Winograd) {
   auto G = Placeholder(DType::FLOAT32, {BI, S});
   auto W = Winograd(I, K, A, B, G);
   Program program("winograd", {W});
-  // TODO: implement constraints in -convert-tile-to-pxa
-  // exec::Binder(program).compile()->run();
+  exec::Binder(program).compile()->run();
 }
 
 TEST(CppEdsl, UniqueNames) {
@@ -763,8 +779,8 @@ TEST(CppEdsl, GlobalMin) {
   auto O = -O_Neg;
   Program program("global_min", {O});
   EXPECT_THAT(program, Eq(R"#(
-#map0 = () -> ()
-#map1 = (d0, d1, d2) -> (d0, d1, d2)
+#map0 = affine_map<() -> ()>
+#map1 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 
 
 !f32 = type tensor<!eltwise.f32>
@@ -778,7 +794,9 @@ module {
   }
 }
 )#"));
+#if !defined(_WIN32)
   exec::Binder(program).compile()->run();
+#endif
 }
 
 TEST(CppEdsl, CumSum) {
@@ -791,10 +809,10 @@ TEST(CppEdsl, CumSum) {
   O.add_constraint(i - k < N);
   Program program("cumsum", {O});
   EXPECT_THAT(program, Eq(R"#(
-#map0 = (d0, d1) -> (d0)
-#map1 = (d0, d1) -> (d1)
+#map0 = affine_map<(d0, d1) -> (d0)>
+#map1 = affine_map<(d0, d1) -> (d1)>
 
-#set0 = (d0, d1) : (d0 - d1 >= 0, -d0 + d1 + 9 >= 0)
+#set0 = affine_set<(d0, d1) : (d0 - d1 >= 0, -d0 + d1 + 9 >= 0)>
 
 !f32 = type tensor<!eltwise.f32>
 module {
@@ -852,9 +870,9 @@ TEST(CppEdsl, ComplexConv2d) {
   auto O = ComplexConv2d(I, K, {2, 2}, {3, 3});
   Program program("complex_conv_2d", {O});
   EXPECT_THAT(program, Eq(R"#(
-#map0 = (d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4)
-#map1 = (d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1 * 2 + d5 * 3 - 2, d2 * 2 + d6 * 3 - 2, d3, d7)
-#map2 = (d0, d1, d2, d3, d4, d5, d6, d7) -> (d5, d6, d3, d7, d4)
+#map0 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4)>
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1 * 2 + d5 * 3 - 2, d2 * 2 + d6 * 3 - 2, d3, d7)>
+#map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d5, d6, d3, d7, d4)>
 
 
 !f32 = type tensor<!eltwise.f32>
@@ -866,25 +884,39 @@ module {
   }
 }
 )#"));
-  // FIXME: crashes on windows
-  // exec::Binder(program).compile()->run();
+  exec::Binder(program).compile()->run();
 }
 
 TEST(CppEdsl, Reciprocal) {
-  auto A = Placeholder(DType::FLOAT32, {10}, "A");
-  Program program("reciprocal", {1 / A});
+  auto A = Placeholder(DType::FLOAT32, {6}, "A");
+  auto R = 1.0 / A;
+  Program program("reciprocal", {R});
   EXPECT_THAT(program, Eq(R"#(
-!i32 = type tensor<!eltwise.i32>
+!f32 = type tensor<!eltwise.f32>
 module {
-  func @reciprocal(%arg0: tensor<10x!eltwise.f32> {tile.name = "A"}) -> tensor<10x!eltwise.f32> {
-    %c1 = "eltwise.sconst"() {value = 1 : i64} : () -> !i32
-    %0 = "eltwise.div"(%c1, %arg0) : (!i32, tensor<10x!eltwise.f32>) -> tensor<10x!eltwise.f32>
-    return %0 : tensor<10x!eltwise.f32>
+  func @reciprocal(%arg0: tensor<6x!eltwise.f32> {tile.name = "A"}) -> tensor<6x!eltwise.f32> {
+    %cst = "eltwise.sconst"() {value = 1.000000e+00 : f64} : () -> !f32
+    %0 = "eltwise.div"(%cst, %arg0) : (!f32, tensor<6x!eltwise.f32>) -> tensor<6x!eltwise.f32>
+    return %0 : tensor<6x!eltwise.f32>
   }
 }
 )#"));
-  // FIXME: crashes on windows
-  // exec::Binder(program).compile()->run();
+  std::vector<float> input = {1.0f, 2.0f, 4.0f, 5.0f, 8.0f, 10.0f};
+  std::vector<float> expected = {1.0, 0.5, 0.25, 0.2, 0.125, 0.1};
+
+#if !defined(_WIN32)
+  auto binder = exec::Binder(program);
+  auto executable = binder.compile();
+  binder.input(A).copy_from(input.data());
+  executable->run();
+  {
+    auto view = binder.output(R).mmap_current();
+    ASSERT_THAT(view.size(), expected.size() * sizeof(expected[0]));
+    auto data = reinterpret_cast<float*>(view.data());
+    std::vector<float> actual(data, data + expected.size());
+    EXPECT_THAT(actual, ContainerEq(expected));
+  }
+#endif
 }
 
 // TEST(CppEdsl, GradientDot) {
@@ -988,9 +1020,9 @@ TEST(CppEdsl, DefractLong) {
   O(n, x0, x1, co) += I(n, (x0 + k0 - 1) / 2, (x1 + k1 - 1) / 2, ci) * K(2 - k0, 2 - k1, co, ci);
   Program program("defract_long", {O});
   EXPECT_THAT(program, Eq(R"#(
-#map0 = (d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)
-#map1 = (d0, d1, d2, d3, d4, d5, d6) -> (d0, (d1 + d4 - 1) floordiv 2, (d2 + d5 - 1) floordiv 2, d6)
-#map2 = (d0, d1, d2, d3, d4, d5, d6) -> (-d4 + 2, -d5 + 2, d3, d6)
+#map0 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, (d1 + d4 - 1) floordiv 2, (d2 + d5 - 1) floordiv 2, d6)>
+#map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (-d4 + 2, -d5 + 2, d3, d6)>
 
 
 !f32 = type tensor<!eltwise.f32>
@@ -1024,8 +1056,8 @@ module {
   func @select(%arg0: tensor<10x20x!eltwise.f32>) -> tensor<10x20x!eltwise.i32> {
     %c1 = "eltwise.sconst"() {value = 1 : i64} : () -> !i32
     %c0 = "eltwise.sconst"() {value = 0 : i64} : () -> !i32
-    %0 = "eltwise.cmp_eq"(%arg0, %c0) : (tensor<10x20x!eltwise.f32>, !i32) -> tensor<10x20x!eltwise.i1>
-    %1 = "eltwise.select"(%0, %c0, %c1) : (tensor<10x20x!eltwise.i1>, !i32, !i32) -> tensor<10x20x!eltwise.i32>
+    %0 = "eltwise.cmp_eq"(%arg0, %c0) : (tensor<10x20x!eltwise.f32>, !i32) -> tensor<10x20x!eltwise.u1>
+    %1 = "eltwise.select"(%0, %c0, %c1) : (tensor<10x20x!eltwise.u1>, !i32, !i32) -> tensor<10x20x!eltwise.i32>
     return %1 : tensor<10x20x!eltwise.i32>
   }
 }

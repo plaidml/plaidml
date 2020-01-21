@@ -38,10 +38,3 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [":gtest"],
 )
-
-genrule(
-    name = "license",
-    srcs = ["googlemock/LICENSE"],
-    outs = ["gmock-LICENSE"],
-    cmd = "cp $(SRCS) $@",
-)

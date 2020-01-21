@@ -108,7 +108,7 @@ struct TileBuilder::Impl {
 
   std::vector<Value> getBackwardSliceOfAffine(const llvm::SetVector<Value>& values) {
     return util::getBackwardSlice(values, false, [](Value value) {
-      if (auto scalarType = value->getType().dyn_cast<ScalarType>()) {
+      if (auto scalarType = value.getType().dyn_cast<ScalarType>()) {
         return scalarType.type() == DataType::i32;
       }
       return false;
@@ -123,7 +123,7 @@ struct TileBuilder::Impl {
     auto dim = args[1];
     auto resultType = IndexOp::getResultType(args.take_front());
     IntegerAttr dimAttr;
-    if (!m_Constant(&dimAttr).match(dim->getDefiningOp())) {
+    if (!m_Constant(&dimAttr).match(dim.getDefiningOp())) {
       throw std::runtime_error("index op expect argument 2 to be a constant integer");
     }
     auto op = builder.create<IndexOp>(loc, resultType, tensor, dimAttr);
@@ -182,7 +182,7 @@ MemRefType TileBuilder::IntoMemRefType(RankedTensorType type) {  //
 
 void TileBuilder::BindShape(Value tensor, RankedTensorType type) {
   IVLOG(5, "TileBuilder::BindShape>");
-  tensor->setType(type);
+  tensor.setType(type);
 }
 
 void TileBuilder::BindBuffer(Value tensor, BufferPtr buffer) {
@@ -202,13 +202,13 @@ void TileBuilder::BindTensorDims(Value from, ArrayRef<Value*> intos) {
     }
     if (*into) {
       IVLOG(6, "into: " << mlir::debugString(*into));
-      auto fromType = from->getType().dyn_cast<RankedTensorType>();
+      auto fromType = from.getType().dyn_cast<RankedTensorType>();
       if (!fromType) {
         throw std::runtime_error("Unexpected type");
       }
       auto fromSize = fromType.getDimSize(i);
       if (!mlir::ShapedType::isDynamic(fromSize)) {
-        auto op = (*into)->getDefiningOp();
+        auto op = (*into).getDefiningOp();
         if (!op) {
           throw std::runtime_error("No defining op");
         }
@@ -233,7 +233,7 @@ void TileBuilder::BindTensorDims(Value from, ArrayRef<Value*> intos) {
 
 RankedTensorType TileBuilder::ComputeShape(Value tensor) {
   IVLOG(5, "TileBuilder::ComputeShape>");
-  auto type = eltwise::getRankedTensorType(tensor->getType());
+  auto type = eltwise::getRankedTensorType(tensor.getType());
   if (type.hasStaticShape()) {
     return type;
   }
@@ -244,7 +244,7 @@ RankedTensorType TileBuilder::ComputeShape(Value tensor) {
   ProgramMutations mutations;
   mutations.outputs.emplace_back(tensor);
   auto program = MakeProgram("compute_shape", mutations);
-  auto shape = program->outputs[0]->getType().dyn_cast<RankedTensorType>();
+  auto shape = program->outputs[0].getType().dyn_cast<RankedTensorType>();
   impl->shapeCache.insert(std::make_pair(tensor, shape));
   return shape;
 }
@@ -253,7 +253,7 @@ Value TileBuilder::MakeCastOp(Value tensor, DataType dtype) {
   IVLOG(5, "TileBuilder::MakeCastOp> " << stringifyDataType(dtype).str());
   IVLOG(6, "  arg: " << mlir::debugString(tensor));
   auto elementType = impl->builder.getType<ScalarType>(dtype);
-  auto tensorType = eltwise::getRankedTensorType(tensor->getType());
+  auto tensorType = eltwise::getRankedTensorType(tensor.getType());
   auto resultType = RankedTensorType::get(tensorType.getShape(), elementType);
   return impl->builder.create<eltwise::CastOp>(impl->loc, resultType, tensor).result();
 }
@@ -283,7 +283,7 @@ Value TileBuilder::MakePrimitiveOp(StringRef fn, ArrayRef<Value> args) {
 
 Value TileBuilder::Clone(Value value) {
   IVLOG(5, "TileBuilder::Clone> " << mlir::debugString(value));
-  return impl->builder.clone(*value->getDefiningOp())->getResult(0);
+  return impl->builder.clone(*value.getDefiningOp())->getResult(0);
 }
 
 Value TileBuilder::MakeNoneOp() {
@@ -303,7 +303,7 @@ Value TileBuilder::MakeStringOp(StringRef value) {
 }
 
 llvm::StringRef TileBuilder::GetStringValue(Value value) {
-  if (auto op = llvm::dyn_cast_or_null<StringOp>(value->getDefiningOp())) {
+  if (auto op = llvm::dyn_cast_or_null<StringOp>(value.getDefiningOp())) {
     return op.getValue().getValue();
   }
   throw std::runtime_error("Expected StringOp");
@@ -313,7 +313,7 @@ Value TileBuilder::MakeTupleOp(ArrayRef<Value> elts) {
   IVLOG(5, "TileBuilder::MakeTupleOp> elts: " << elts.size());
   std::vector<Type> types;
   for (auto elt : elts) {
-    types.push_back(elt->getType());
+    types.push_back(elt.getType());
   }
   auto tupleType = impl->builder.getTupleType(types);
   return impl->builder.create<TupleOp>(impl->loc, tupleType, elts).result();
@@ -321,7 +321,7 @@ Value TileBuilder::MakeTupleOp(ArrayRef<Value> elts) {
 
 std::vector<Value> TileBuilder::GetTupleElements(Value value) {
   IVLOG(5, "TileBuilder::GetTupleElements> " << mlir::debugString(value));
-  if (auto op = llvm::dyn_cast_or_null<TupleOp>(value->getDefiningOp())) {
+  if (auto op = llvm::dyn_cast_or_null<TupleOp>(value.getDefiningOp())) {
     return std::vector<Value>(op.elts().begin(), op.elts().end());
   }
   throw std::runtime_error("Expected TupleOp");
@@ -334,7 +334,7 @@ Value TileBuilder::MakeScalarConstantOp(int64_t value) {
 }
 
 int64_t TileBuilder::GetIntegerValue(Value value) {
-  if (auto op = llvm::dyn_cast_or_null<ScalarConstantOp>(value->getDefiningOp())) {
+  if (auto op = llvm::dyn_cast_or_null<ScalarConstantOp>(value.getDefiningOp())) {
     return op.getIntAttr().getInt();
   }
   throw std::runtime_error("Expected ScalarConstantOp");
@@ -346,7 +346,7 @@ Value TileBuilder::MakeScalarConstantOp(double value) {
 }
 
 double TileBuilder::GetFloatValue(Value value) {
-  if (auto op = llvm::dyn_cast_or_null<ScalarConstantOp>(value->getDefiningOp())) {
+  if (auto op = llvm::dyn_cast_or_null<ScalarConstantOp>(value.getDefiningOp())) {
     return op.getFloatAttr().getValueAsDouble();
   }
   throw std::runtime_error("Expected ScalarConstantOp");
@@ -444,13 +444,13 @@ Value TileBuilder::MakeAffineSizeMapOp(ArrayRef<Value> sizes) {
 
 void TileBuilder::AddConstraint(Value cion, Value lhs, Value rhs) {
   IVLOG(5, "TileBuilder::AddConstraint>");
-  auto op = cion->getDefiningOp();
+  auto op = cion.getDefiningOp();
   auto cionOp = llvm::dyn_cast_or_null<SymbolicContractionOp>(op);
   if (!cionOp) {
     throw std::runtime_error("add_constraint can only be specified on a contraction.");
   }
 
-  auto consOp = llvm::cast<AffineConstraintsOp>(cionOp.cons()->getDefiningOp());
+  auto consOp = llvm::cast<AffineConstraintsOp>(cionOp.cons().getDefiningOp());
   SmallVector<Value, 6> pairs{consOp.pairs()};
   pairs.emplace_back(lhs);
   pairs.emplace_back(rhs);
@@ -459,7 +459,7 @@ void TileBuilder::AddConstraint(Value cion, Value lhs, Value rhs) {
 
 void TileBuilder::SetUseDefault(Value cion, Value init) {
   IVLOG(2, "TileBuilder::SetUseDefault>");
-  auto op = cion->getDefiningOp();
+  auto op = cion.getDefiningOp();
   auto cionOp = llvm::dyn_cast_or_null<SymbolicContractionOp>(op);
   if (!cionOp) {
     throw std::runtime_error("no_reduce can only be specified on a contraction.");
@@ -469,7 +469,7 @@ void TileBuilder::SetUseDefault(Value cion, Value init) {
 
 void TileBuilder::SetNoReduce(Value cion, bool no_reduce) {
   IVLOG(2, "TileBuilder::SetNoReduce> " << no_reduce);
-  auto op = cion->getDefiningOp();
+  auto op = cion.getDefiningOp();
   auto cionOp = llvm::dyn_cast_or_null<SymbolicContractionOp>(op);
   if (!cionOp) {
     throw std::runtime_error("no_reduce can only be specified on a contraction.");
@@ -496,19 +496,19 @@ Value TileBuilder::MakeContractionOp(  //
   // Compute the sink shape of the contraction
   SmallVector<Type, 3> types;
   for (auto src : srcs) {
-    auto mapOp = llvm::cast<AffineTensorMapOp>(src->getDefiningOp());
-    types.push_back(mapOp.tensor()->getType());
+    auto mapOp = llvm::cast<AffineTensorMapOp>(src.getDefiningOp());
+    types.push_back(mapOp.tensor().getType());
   }
   Type elementType;
   if (combo == CombinationKind::eq) {
-    elementType = ScalarType::get(&impl->context, DataType::i1);
+    elementType = ScalarType::get(&impl->context, DataType::u1);
   } else if (combo == CombinationKind::cond) {
     auto rankedTensorType = eltwise::getRankedTensorType(types[2]);
     elementType = rankedTensorType.getElementType();
   } else {
     elementType = impl->inferElementType(types);
   }
-  auto sizeMapOp = llvm::cast<AffineMapOp>(sizes->getDefiningOp());
+  auto sizeMapOp = llvm::cast<AffineMapOp>(sizes.getDefiningOp());
   SmallVector<Value, 4> sizeDims(sizeMapOp.dims());
   auto shape = eltwise::ComputeShape(sizeDims);
 
@@ -543,7 +543,7 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(StringRef name, const Prog
     if (!output) {
       throw std::runtime_error("Invalid output");
     }
-    if (outputs.count(output) || llvm::isa<PlaceholderOp>(output->getDefiningOp())) {
+    if (outputs.count(output) || llvm::isa<PlaceholderOp>(output.getDefiningOp())) {
       outputs.insert(MakePrimitiveOp("ident", {output}));
     } else {
       outputs.insert(output);
@@ -556,9 +556,9 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(StringRef name, const Prog
   // Compute the input types
   std::vector<Type> inputTypes;
   for (auto value : slice) {
-    auto op = value->getDefiningOp();
+    auto op = value.getDefiningOp();
     if (auto placeholderOp = llvm::dyn_cast_or_null<PlaceholderOp>(op)) {
-      inputTypes.push_back(placeholderOp.result()->getType());
+      inputTypes.push_back(placeholderOp.result().getType());
     }
   }
   // Construct a module
@@ -577,7 +577,7 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(StringRef name, const Prog
   std::map<Operation*, Operation*> opMap;
   BlockAndValueMapping mapper;
   for (auto value : slice) {
-    auto op = value->getDefiningOp();
+    auto op = value.getDefiningOp();
     // Only copy over top-level ops (those owned by the workspace module)
     if (op && op->getBlock() == impl->module.getBody()) {
       if (auto placeholderOp = llvm::dyn_cast<PlaceholderOp>(op)) {
@@ -586,11 +586,11 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(StringRef name, const Prog
         if (auto attr = placeholderOp.getAttrOfType<StringAttr>("name")) {
           auto uniqueName = util::getUniqueName(&names, attr.getValue());
           auto uniqueAttr = builder.getStringAttr(uniqueName);
-          funcOp.setArgAttr(blockArg->getArgNumber(), attrName, uniqueAttr);
+          funcOp.setArgAttr(blockArg.getArgNumber(), attrName, uniqueAttr);
         }
         IVLOG(5, "BlockArgument mapping: " << value << " -> " << blockArg);
         mapper.map(value, blockArg);
-        ProgramArgument programArg{true, value, value->getType().cast<RankedTensorType>()};
+        ProgramArgument programArg{true, value, value.getType().cast<RankedTensorType>()};
         auto itBinding = impl->implicitBindings.find(value);
         if (itBinding != impl->implicitBindings.end()) {
           programArg.buffer = itBinding->second;
@@ -632,7 +632,7 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(StringRef name, const Prog
     if (!value) {
       throw std::runtime_error("Output not found in mapper");
     }
-    resultTypes.emplace_back(value->getType());
+    resultTypes.emplace_back(value.getType());
     returnOperands.emplace_back(value);
   }
   auto returnOp = builder.create<mlir::ReturnOp>(loc, returnOperands);
@@ -661,7 +661,7 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(StringRef name, const Prog
     if (itUpdate != impl->implicitUpdates.end()) {
       userValue = itUpdate->second;
     }
-    ProgramArgument programArg{false, userValue, finalValue->getType().cast<RankedTensorType>()};
+    ProgramArgument programArg{false, userValue, finalValue.getType().cast<RankedTensorType>()};
     auto itBinding = impl->implicitBindings.find(finalValue);
     if (itBinding != impl->implicitBindings.end()) {
       programArg.buffer = itBinding->second;

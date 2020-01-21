@@ -6,7 +6,7 @@
 #include <tuple>
 #include <utility>
 
-#include <boost/format.hpp>
+#include "llvm/Support/FormatVariadic.h"
 
 namespace pmlc::util::math {
 
@@ -34,11 +34,11 @@ struct DualMatrix {
     std::string r = "";
     for (size_t i = 0; i < size_; i++) {
       for (size_t j = 0; j < size_; j++) {
-        r += str(boost::format("%4s, ") % to_string(lhs_(i, j)));
+        r += llvm::formatv("{0,4}, ", to_string(lhs_(i, j)));
       }
       r += "      ";
       for (size_t j = 0; j < size_; j++) {
-        r += str(boost::format("%4s, ") % to_string(rhs_(i, j)));
+        r += llvm::formatv("{0,4}, ", to_string(rhs_(i, j)));
       }
       r += "\n";
     }

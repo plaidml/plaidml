@@ -25,13 +25,13 @@ class PXA_Op<string mnemonic, list<OpTrait> traits = []> :
 
 class PXA_OpWithPP<string mnemonic, list<OpTrait> traits = []> :
     PXA_Op<mnemonic, traits> {
-  let printer = [{ print$cppClass(&p, *this); }];
-  let parser = [{ return parse$cppClass(&parser, result); }];
+  let printer = [{ print$cppClass(p, *this); }];
+  let parser = [{ return parse$cppClass(parser, result); }];
 }
 
 def AnyStdScalar : AnyTypeOf<[AnyFloat, AnyInteger]> {}
 
-def AffineReduceOp : PXA_Op<"reduce"> {
+def AffineReduceOp : PXA_OpWithPP<"reduce"> {
   let summary = "Reduce into memory";
   let arguments = (ins
     AggregationKind:$agg,
@@ -40,7 +40,6 @@ def AffineReduceOp : PXA_Op<"reduce"> {
     AffineMapAttr:$map,
     Variadic<Index>:$idxs
   );
-  let results = (outs);
 }
 
 def ImplicitAffineTerminator
@@ -50,10 +49,18 @@ def AffineParallelForOp : PXA_Op<"parallel_for", [ImplicitAffineTerminator]> {
   let summary = "multi-index parallel for operation";
   let arguments = (ins AffineMapAttr:$ranges, AffineMapAttr:$transform, Variadic<Index>:$mapOperands);
   let regions = (region SizedRegion<1>:$region);
+
   let extraClassDeclaration = [{
-    ValueRange getRangeOperands() { return llvm::make_range(operand_begin(), operand_begin() + ranges().getNumInputs()); }
-    ValueRange getTransformOperands() { return llvm::make_range(operand_begin() + ranges().getNumInputs(), operand_end()); }
+    ValueRange getRangeOperands() {
+      return llvm::make_range(operand_begin(), operand_begin() + ranges().getNumInputs());
+    }
+
+    ValueRange getTransformOperands() {
+      return llvm::make_range(operand_begin() + ranges().getNumInputs(), operand_end());
+    }
+    
     mlir::Block *getBody() { return &region().front(); }
+    
     mlir::OpBuilder getBodyBuilder() {
       return mlir::OpBuilder(getBody(), std::prev(getBody()->end()));
     }

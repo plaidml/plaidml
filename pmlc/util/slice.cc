@@ -33,7 +33,7 @@ class BackwardSliceImpl {
       } else if (!seen.count(value)) {
         seen.insert(value);
         stack.push(std::make_pair(value, true));
-        auto op = value->getDefiningOp();
+        auto op = value.getDefiningOp();
         if (op) {
           Push(op, enter_regions, filter);
         }
