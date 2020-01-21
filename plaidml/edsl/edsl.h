@@ -1054,6 +1054,14 @@ inline Tensor tan(const Tensor& x) { return Call("tan", x); }
 inline Tensor tanh(const Tensor& x) { return Call("tanh", x); }
 
 ///
+/// Adds a tracepoint to the graph
+///
+inline Tensor trace(const Tensor& x, const std::string& msg) {
+  auto ptr = ffi::call<plaidml_expr*>(plaidml_expr_trace, x.as_ptr(), msg.c_str());
+  return Tensor{ptr};
+}
+
+///
 /// Returns a Tensor with a value of 0.
 /// \return Tensor
 ///

@@ -7,8 +7,6 @@
 #include <string>
 #include <vector>
 
-#include "llvm/ADT/StringSwitch.h"
-
 #include "mlir/Dialect/StandardOps/Ops.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"

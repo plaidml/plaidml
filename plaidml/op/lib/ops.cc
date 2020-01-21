@@ -9,7 +9,6 @@
 
 #include "llvm/Support/FormatVariadic.h"
 
-#include "plaidml/op/op.h"
 #include "pmlc/util/logging.h"
 
 using namespace plaidml::edsl;  // NOLINT

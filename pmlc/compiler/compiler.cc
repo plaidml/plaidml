@@ -13,6 +13,7 @@
 #include "mlir/ExecutionEngine/OptUtils.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
+#include "mlir/Support/DebugStringHelper.h"
 #include "mlir/Target/LLVMIR.h"
 #include "mlir/Transforms/Passes.h"
 
@@ -108,6 +109,7 @@ Executable::Executable(StringRef entry, StringRef target, ModuleOp programModule
   auto shouldPrintAfterPass = [](auto, auto) { return VLOG_IS_ON(3); };
   manager.enableIRPrinting(shouldPrintBeforePass, shouldPrintAfterPass, true, false, llvm::errs());
 
+  manager.addNestedPass<FuncOp>(createCanonicalizerPass());
   manager.addPass(dialect::tile::createComputeBoundsPass());
   manager.addNestedPass<FuncOp>(createCanonicalizerPass());
   manager.addNestedPass<FuncOp>(createCSEPass());

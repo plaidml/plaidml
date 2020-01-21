@@ -67,6 +67,7 @@ local exports = [
   'plaidml_expr_float',
   'plaidml_expr_cast',
   'plaidml_expr_call',
+  'plaidml_expr_trace',
   'plaidml_expr_index_map',
   'plaidml_expr_size_map',
   'plaidml_expr_contraction',

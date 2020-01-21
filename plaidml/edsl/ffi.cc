@@ -363,6 +363,16 @@ plaidml_expr* plaidml_expr_cast(  //
   });
 }
 
+plaidml_expr* plaidml_expr_trace(  //
+    plaidml_error* err,            //
+    plaidml_expr* tensor,          //
+    const char* msg) {
+  return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
+    IVLOG(3, "plaidml_expr_trace");
+    return new plaidml_expr{GlobalContext::get()->MakeTraceOp(tensor->value, msg)};
+  });
+}
+
 plaidml_expr* plaidml_expr_call(  //
     plaidml_error* err,           //
     const char* fn,               //

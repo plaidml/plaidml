@@ -228,6 +228,11 @@ plaidml_expr* plaidml_expr_cast(  //
     plaidml_expr* tensor,         //
     plaidml_datatype dtype);
 
+plaidml_expr* plaidml_expr_trace(  //
+    plaidml_error* err,            //
+    plaidml_expr* tensor,          //
+    const char* msg);
+
 plaidml_expr* plaidml_expr_index_map(  //
     plaidml_error* err,                //
     plaidml_expr* ref,                 //

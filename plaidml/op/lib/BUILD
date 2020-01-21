@@ -14,7 +14,6 @@ plaidml_cc_library(
     deps = [
         "//plaidml/core",
         "//plaidml/edsl",
-        "//plaidml/op:api",
         "//pmlc/util",
         "@llvm-project//llvm:support",
     ],

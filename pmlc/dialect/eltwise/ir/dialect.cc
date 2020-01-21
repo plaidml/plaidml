@@ -78,6 +78,7 @@ std::string Dialect::getCanonicalOpName(llvm::StringRef name) {
 mlir::Type Dialect::parseType(mlir::DialectAsmParser& parser) const {
   auto dtype = util::symbolizeDataType(parser.getFullSymbolSpec());
   if (!dtype.hasValue()) {
+    parser.emitError(parser.getNameLoc(), "unknown eltwise type: ") << parser.getFullSymbolSpec();
     return {};
   }
   return ScalarType::get(getContext(), dtype.getValue());

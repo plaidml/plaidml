@@ -843,6 +843,6 @@ std::unique_ptr<mlir::Pass> createLowerTileToPXAPass() {  //
 
 static mlir::PassRegistration<LoweringPass> legalize_pass(  //
     "convert-tile-to-pxa",                                  //
-    "Convert from Tile dialect to PXA dialect");
+    "Convert Tile dialect to PXA dialect");
 
 }  // namespace pmlc::conversion::tile_to_pxa

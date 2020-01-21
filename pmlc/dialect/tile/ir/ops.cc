@@ -1226,6 +1226,27 @@ ParseResult parseAffineBinaryOp(OpAsmParser* parser, OperationState& result) {
   return success();
 }
 
+// ---- TraceOp ----
+
+struct TraceOpCanonicalizer : public OpRewritePattern<TraceOp> {
+  using OpRewritePattern<TraceOp>::OpRewritePattern;
+
+  PatternMatchResult matchAndRewrite(TraceOp op, PatternRewriter& rewriter) const override {
+    IVLOG(5, "TraceOpCanonicalizer::matchAndRewrite> " << mlir::debugString(op));
+    if (op.tensor().getType() == op.result().getType()) {
+      return Pattern::matchFailure();
+    }
+    auto newOp = rewriter.create<TraceOp>(op.getLoc(), op.tensor(), op.msg());
+    rewriter.replaceOp(op, {newOp});
+    util::UpdateFuncOpType(newOp.getOperation());
+    return Pattern::matchSuccess();
+  }
+};
+
+void TraceOp::getCanonicalizationPatterns(OwningRewritePatternList& results, MLIRContext* context) {
+  results.insert<TraceOpCanonicalizer>(context);
+}
+
 #include "pmlc/dialect/tile/ir/interfaces.cc.inc"
 
 #define GET_OP_CLASSES
