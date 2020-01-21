@@ -1606,6 +1606,17 @@ def separable_conv(x,
 
 
 @_log_call
+def separable_conv1d(x,
+                     depthwise_kernel,
+                     pointwise_kernel,
+                     strides=(1,),
+                     padding='valid',
+                     data_format=None,
+                     dilation_rate=(1,)):
+    return separable_conv(x, depthwise_kernel, pointwise_kernel, strides, padding, data_format,
+                          dilation_rate)
+
+@_log_call
 def separable_conv2d(x,
                      depthwise_kernel,
                      pointwise_kernel,
