@@ -45,25 +45,21 @@ def AffineReduceOp : PXA_OpWithPP<"reduce"> {
 def ImplicitAffineTerminator
     : SingleBlockImplicitTerminator<"AffineTerminatorOp">;
 
-def AffineParallelForOp : PXA_Op<"parallel_for", [ImplicitAffineTerminator]> {
+def AffineParallelOp : PXA_Op<"parallel", [ImplicitAffineTerminator]> {
   let summary = "multi-index parallel for operation";
-  let arguments = (ins AffineMapAttr:$ranges, AffineMapAttr:$transform, Variadic<Index>:$mapOperands);
+  let arguments = (ins 
+     AffineMapAttr:$lowerBoundsMap,
+     AffineMapAttr:$upperBoundsMap,
+     I64ArrayAttr:$steps,
+     Variadic<Index>:$mapOperands);
   let regions = (region SizedRegion<1>:$region);
 
   let extraClassDeclaration = [{
-    ValueRange getRangeOperands() {
-      return llvm::make_range(operand_begin(), operand_begin() + ranges().getNumInputs());
-    }
-
-    ValueRange getTransformOperands() {
-      return llvm::make_range(operand_begin() + ranges().getNumInputs(), operand_end());
-    }
+    operand_range getLowerBoundsOperands();
+    operand_range getUpperBoundsOperands();
     
-    mlir::Block *getBody() { return &region().front(); }
-    
-    mlir::OpBuilder getBodyBuilder() {
-      return mlir::OpBuilder(getBody(), std::prev(getBody()->end()));
-    }
+    mlir::Block *getBody();
+    mlir::OpBuilder getBodyBuilder();
   }];
   let builders = [OpBuilder<"Builder* builder, OperationState& result, ArrayRef<int64_t> ranges">];
 }
