@@ -169,9 +169,13 @@ class base_shape {
 template <typename T>
 class shape : public base_shape {
  public:
-  explicit shape(const std::shared_ptr<ctx>& ctx, datatype dt = to_plaidml_datatype<T>::value) : base_shape(ctx, dt) {}
+  explicit shape(const std::shared_ptr<ctx>& ctx) : shape(ctx, to_plaidml_datatype<T>::value) {}
 
-  explicit shape(const base_shape& base, datatype dt = to_plaidml_datatype<T>::value) : base_shape(base) {
+  explicit shape(const std::shared_ptr<ctx>& ctx, datatype dt) : base_shape(ctx, dt) {}
+
+  explicit shape(const base_shape& base) : shape(base, to_plaidml_datatype<T>::value) {}
+
+  explicit shape(const base_shape& base, datatype dt) : base_shape(base) {
     if (dt != base.type()) {
       throw vai_exception(VAI_STATUS_INVALID_ARGUMENT, "Mismatched shape");
     }
