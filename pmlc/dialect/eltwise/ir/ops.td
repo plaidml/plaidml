@@ -128,7 +128,7 @@ class EW_CompareOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
 
   let extraClassDeclaration = [{
     static Type getResultType(ValueRange operands) {
-      return ComputeResultType(operands, DataType::i1);
+      return ComputeResultType(operands, DataType::u1);
     }
   }] # EltwiseBuilderImpl_create;
 }

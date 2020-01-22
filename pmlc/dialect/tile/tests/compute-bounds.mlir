@@ -2,9 +2,9 @@
 
 !f32 = type !eltwise.f32
 
-#map0 = (i, j, k) -> (j, k)
-#map1 = (i, j, k) -> (j, i)
-#map2 = (i, j, k) -> (i, k)
+#map0 = affine_map<(i, j, k) -> (j, k)>
+#map1 = affine_map<(i, j, k) -> (j, i)>
+#map2 = affine_map<(i, j, k) -> (i, k)>
 
 func @dot(%arg0: tensor<1x784x!eltwise.f32>, %arg1: tensor<784x512x!eltwise.f32>) -> tensor<1x512x!eltwise.f32> {
   %c0 = "eltwise.sconst"() {value = 0.0 : f64} : () -> !f32
@@ -15,11 +15,11 @@ func @dot(%arg0: tensor<1x784x!eltwise.f32>, %arg1: tensor<784x512x!eltwise.f32>
   return %2 : tensor<1x512x!eltwise.f32>
 }
 
-// CHECK: #map0 = () -> (0, 0, 0)
-// CHECK: #map1 = (d0, d1, d2) -> (d1, d2)
-// CHECK: #map2 = (d0, d1, d2) -> (d1, d0)
-// CHECK: #map3 = (d0, d1, d2) -> (d0, d2)
-// CHECK: #map4 = () -> (783, 0, 511)
+// CHECK: #map0 = affine_map<() -> (0, 0, 0)>
+// CHECK: #map1 = affine_map<(d0, d1, d2) -> (d1, d2)>
+// CHECK: #map2 = affine_map<(d0, d1, d2) -> (d1, d0)>
+// CHECK: #map3 = affine_map<(d0, d1, d2) -> (d0, d2)>
+// CHECK: #map4 = affine_map<() -> (783, 0, 511)>
 // CHECK-LABEL: func @dot
 // CHECK: tile.cion
 // CHECK-SAME: lower_bounds = #map0

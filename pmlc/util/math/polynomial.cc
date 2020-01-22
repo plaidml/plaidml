@@ -2,7 +2,7 @@
 
 #include <limits>
 
-#include <boost/format.hpp>
+#include "llvm/Support/FormatVariadic.h"
 
 namespace pmlc::util::math {
 
@@ -105,7 +105,7 @@ T Polynomial<T>::eval(const std::map<std::string, T>& values) const {
       res += kvp.second * values.at(kvp.first);
     } else {
       throw std::runtime_error(
-          str(boost::format("Failed to find value for %s, when evaluating %s") % kvp.first % toString()));
+          llvm::formatv("Failed to find value for {0}, when evaluating {1}", kvp.first, toString()));
     }
   }
   return res;

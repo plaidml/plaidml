@@ -21,6 +21,8 @@ plaidml_cc_library(
         "//pmlc/dialect/tile/transforms",
         "//pmlc/util",
         "@llvm-project//llvm:support",
+        "@llvm-project//mlir:Analysis",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Transforms",
     ],
 )

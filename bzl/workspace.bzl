@@ -126,9 +126,9 @@ def plaidml_workspace():
         build_file = clean_dep("//vendor/tbb:tbb.BUILD"),
     )
 
-    LLVM_COMMIT = "a21beccea2020f950845cbb68db663d0737e174c"
-    LLVM_SHA256 = "73682f2b78c1c46621afb69b850e50c4d787f9c77fb3b53ac50fc42ffbac0493"
-    LLVM_URL = "https://github.com/llvm/llvm-project/archive/{commit}.tar.gz".format(commit = LLVM_COMMIT)
+    LLVM_COMMIT = "a919919fcc1bf813402531c3ad20e1fa378e3d5d"
+    LLVM_SHA256 = "bacac0e027ebe6d2a1236e13b2bee89bacdeb7796d533139f7b5645fd75c38db"
+    LLVM_URL = "https://github.com/plaidml/llvm-project/archive/{commit}.tar.gz".format(commit = LLVM_COMMIT)
     http_archive(
         name = "llvm-project",
         url = LLVM_URL,
@@ -137,8 +137,8 @@ def plaidml_workspace():
         link_files = {
             clean_dep("//vendor/llvm:llvm.BUILD"): "llvm/BUILD.bazel",
             clean_dep("//vendor/mlir:mlir.BUILD"): "mlir/BUILD.bazel",
+            clean_dep("//vendor/mlir:test.BUILD"): "mlir/test/BUILD.bazel",
         },
-        patches = [clean_dep("//vendor/mlir:mlir.patch")],
         override = "PLAIDML_LLVM_REPO",
     )
 

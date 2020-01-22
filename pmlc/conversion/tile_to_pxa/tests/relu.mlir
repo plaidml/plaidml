@@ -2,7 +2,7 @@
 
 !f32 = type tensor<!eltwise.f32>
 !t_10x20xfp32 = type tensor<10x20x!eltwise.f32>
-!t_10x20xbool = type tensor<10x20x!eltwise.i1>
+!t_10x20xbool = type tensor<10x20x!eltwise.u1>
 
 func @relu(%arg0: !t_10x20xfp32) -> !t_10x20xfp32 {
   %0 = "eltwise.sconst"() {value = 0.0 : f32} : () -> !f32
@@ -13,11 +13,11 @@ func @relu(%arg0: !t_10x20xfp32) -> !t_10x20xfp32 {
 
 // CHECK-LABEL: func @relu
 // CHECK: alloc
-// CHECK: pxa.parallel_for
+// CHECK: pxa.parallel
 // CHECK: affine.load
 // CHECK: cmpf "olt"
 // CHECK: affine.store
-// CHECK: pxa.parallel_for
+// CHECK: pxa.parallel
 // CHECK: affine.load
 // CHECK: affine.load
 // CHECK: select

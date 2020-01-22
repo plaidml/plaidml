@@ -56,32 +56,21 @@ struct LoweringBase : public OpConversionPattern<OpType> {
   PatternMatchResult match(Operation* op) const override { return this->matchSuccess(); }
 };
 
-struct AffineParallelForOpConversion : public LoweringBase<pxa::AffineParallelForOp> {
-  explicit AffineParallelForOpConversion(MLIRContext* ctx) : LoweringBase(ctx) {}
+struct AffineParallelOpConversion : public LoweringBase<pxa::AffineParallelOp> {
+  explicit AffineParallelOpConversion(MLIRContext* ctx) : LoweringBase(ctx) {}
 
-  void rewrite(pxa::AffineParallelForOp op, ArrayRef<Value> operands,
-               ConversionPatternRewriter& rewriter) const override {
+  void rewrite(pxa::AffineParallelOp op, ArrayRef<Value> operands, ConversionPatternRewriter& rewriter) const override {
     // Create an affine loop nest, capture induction variables
-    llvm::SmallVector<Value, 8> transformOperands;
-    for (unsigned int i = 0; i < op.ranges().getNumResults(); i++) {
-      auto lb = rewriter.getConstantAffineMap(0);
-      auto ub = op.ranges().getSubMap({i});
-      auto af = rewriter.create<mlir::AffineForOp>(op.getLoc(), mlir::ValueRange(), lb, op.getRangeOperands(), ub);
-      rewriter.setInsertionPointToStart(&af.region().front());
-      transformOperands.push_back(af.getInductionVar());
-    }
-    // Add any additional map ops required
-    for (auto val : op.getTransformOperands()) {
-      transformOperands.push_back(val);
-    }
-    // Do the transform map and make the final IVs
     llvm::SmallVector<Value, 8> ivs;
-    for (unsigned int i = 0; i < op.transform().getNumResults(); i++) {
-      auto subMap = op.transform().getSubMap({i});
-      auto applyOp = rewriter.create<mlir::AffineApplyOp>(op.getLoc(), subMap, transformOperands);
-      ivs.push_back(applyOp);
+    for (unsigned int i = 0; i < op.lowerBoundsMap().getNumResults(); i++) {
+      auto step = op.steps().getValue()[i].cast<IntegerAttr>().getInt();
+      auto af = rewriter.create<mlir::AffineForOp>(op.getLoc(), op.getLowerBoundsOperands(),
+                                                   op.lowerBoundsMap().getSubMap({i}), op.getUpperBoundsOperands(),
+                                                   op.upperBoundsMap().getSubMap({i}), step);
+      rewriter.setInsertionPointToStart(&af.region().front());
+      ivs.push_back(af.getInductionVar());
     }
-    // Move ParallelForOp's operations (single block) to Affine innermost loop.
+    // Move ParallelOp's operations (single block) to Affine innermost loop.
     auto& innerLoopOps = rewriter.getInsertionBlock()->getOperations();
     auto& stripeBodyOps = op.region().front().getOperations();
     innerLoopOps.splice(std::prev(innerLoopOps.end()), stripeBodyOps, stripeBodyOps.begin(),
@@ -89,7 +78,7 @@ struct AffineParallelForOpConversion : public LoweringBase<pxa::AffineParallelFo
     // Replace all uses of old values
     size_t idx = 0;
     for (auto arg : op.region().front().getArguments()) {
-      arg->replaceAllUsesWith(ivs[idx++]);
+      arg.replaceAllUsesWith(ivs[idx++]);
     }
     // We are done. Remove original op.
     rewriter.eraseOp(op);
@@ -155,7 +144,7 @@ void LoweringPass::runOnModule() {
 
   // Setup rewrite patterns
   mlir::OwningRewritePatternList patterns;
-  patterns.insert<AffineParallelForOpConversion>(&getContext());
+  patterns.insert<AffineParallelOpConversion>(&getContext());
   patterns.insert<AffineReduceOpConversion>(&getContext());
 
   // Run the conversion

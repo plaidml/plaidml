@@ -43,47 +43,6 @@ cc_library(
 )
 
 cc_library(
-    name = "stacktrace",
-    defines = select({
-        "@bazel_tools//src/conditions:darwin_x86_64": ["BOOST_STACKTRACE_GNU_SOURCE_NOT_REQUIRED"],
-        "//conditions:default": [],
-    }),
-    linkopts = select({
-        "@bazel_tools//src/conditions:darwin_x86_64": [],
-        "@bazel_tools//src/conditions:windows": [],
-        "//conditions:default": ["-ldl"],
-    }),
-)
-
-cc_library(
-    name = "program_options",
-    srcs = glob(["libs/program_options/src/*.cpp"]),
-    deps = [
-        ":boost",
-    ],
-)
-
-cc_library(
-    name = "graph",
-    srcs = glob(["libs/graph/src/*.cpp"]),
-    deps = [
-        ":boost",
-        ":regex",
-    ],
-)
-
-cc_library(
-    name = "regex",
-    srcs = glob([
-        "libs/regex/src/*.cpp",
-        "libs/regex/src/*.hpp",
-    ]),
-    deps = [
-        ":boost",
-    ],
-)
-
-cc_library(
     name = "system",
     srcs = glob(["libs/system/src/*.cpp"]),
     deps = [
@@ -110,11 +69,4 @@ cc_library(
         ":boost",
         ":system",
     ],
-)
-
-genrule(
-    name = "license",
-    srcs = ["LICENSE_1_0.txt"],
-    outs = ["boost-LICENSE"],
-    cmd = "cp $(SRCS) $@",
 )
