@@ -168,9 +168,36 @@ TEST(CppEdsl, BitRightSignedScalar) {
   }
 }
 
+TEST(CppEdsl, BitRightSignedNegativeScalar) {
+  auto A = Placeholder(DType::INT64, {3, 3});
+  auto C = A >> -1;
+  Program program("bit_right", {C});
+
+  std::vector<std::int64_t> input_a{1 << 1, 2 << 1, 3 << 1,  //
+                                    4 << 1, 5 << 1, 6 << 1,  //
+                                    7 << 1, 8 << 1, 9 << 1};
+  std::vector<std::int64_t> expected{0, 0, 0,  //
+                                     0, 0, 0,  //
+                                     0, 0, 0};
+
+  // TODO: don't allow negatives in shift
+
+  auto binder = exec::Binder(program);
+  auto executable = binder.compile();
+  binder.input(A).copy_from(input_a.data());
+  executable->run();
+  {
+    auto view = binder.output(C).mmap_current();
+    ASSERT_THAT(view.size(), expected.size() * sizeof(expected[0]));
+    auto data = reinterpret_cast<std::int64_t*>(view.data());
+    std::vector<std::int64_t> actual(data, data + expected.size());
+    EXPECT_THAT(actual, ContainerEq(expected));
+  }
+}
+
 TEST(CppEdsl, BitRightUnsignedScalar) {
   auto A = Placeholder(DType::UINT64, {3, 3});
-  auto C = A >> std::uint64_t{1};
+  auto C = A >> 1;
   Program program("bit_right", {C});
 
   std::vector<std::uint64_t> input_a{1 << 1, 2 << 1, 3 << 1,  //
@@ -738,14 +765,14 @@ TEST(CppEdsl, ArgMax) {
 #map4 = affine_map<(d0, d1, d2) -> (d2)>
 
 
-!i32 = type tensor<!eltwise.i32>
+!i64 = type tensor<!eltwise.i64>
 !f32 = type tensor<!eltwise.f32>
 module {
   func @arg_max(%arg0: tensor<1x10x10x!eltwise.f32>) -> tensor<1x10x!eltwise.u32> {
-    %c1 = "eltwise.sconst"() {value = 1 : i64} : () -> !i32
+    %c1 = "eltwise.sconst"() {value = 1 : i64} : () -> !i64
     %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
-    %0 = tile.cion assign, none, %cst, %c1 {sink = #map0, srcs = [#map1]} : !f32, !i32 -> tensor<10x!eltwise.i32>
-    %1 = "tile.index"(%0) {dim = 0 : i64} : (tensor<10x!eltwise.i32>) -> tensor<10x!eltwise.i32>
+    %0 = tile.cion assign, none, %cst, %c1 {sink = #map0, srcs = [#map1]} : !f32, !i64 -> tensor<10x!eltwise.i64>
+    %1 = "tile.index"(%0) {dim = 0 : i64} : (tensor<10x!eltwise.i64>) -> tensor<10x!eltwise.i32>
     %2 = tile.cion max, none, %cst, %arg0 {sink = #map2, srcs = [#map3]} : !f32, tensor<1x10x10x!eltwise.f32> -> tensor<1x10x!eltwise.f32>
     %3 = tile.cion max, cond, %cst, %arg0, %2, %1 {sink = #map2, srcs = [#map3, #map2, #map4]} : !f32, tensor<1x10x10x!eltwise.f32>, tensor<1x10x!eltwise.f32>, tensor<10x!eltwise.i32> -> tensor<1x10x!eltwise.i32>
     %4 = "eltwise.cast"(%3) : (tensor<1x10x!eltwise.i32>) -> tensor<1x10x!eltwise.u32>
@@ -1101,14 +1128,14 @@ TEST(CppEdsl, Select) {
   auto O = select(I == 0, Tensor{0}, Tensor{1});
   Program program("select", {O});
   EXPECT_THAT(program, Eq(R"#(
-!i32 = type tensor<!eltwise.i32>
+!i64 = type tensor<!eltwise.i64>
 module {
-  func @select(%arg0: tensor<10x20x!eltwise.f32>) -> tensor<10x20x!eltwise.i32> {
-    %c1 = "eltwise.sconst"() {value = 1 : i64} : () -> !i32
-    %c0 = "eltwise.sconst"() {value = 0 : i64} : () -> !i32
-    %0 = "eltwise.cmp_eq"(%arg0, %c0) : (tensor<10x20x!eltwise.f32>, !i32) -> tensor<10x20x!eltwise.u1>
-    %1 = "eltwise.select"(%0, %c0, %c1) : (tensor<10x20x!eltwise.u1>, !i32, !i32) -> tensor<10x20x!eltwise.i32>
-    return %1 : tensor<10x20x!eltwise.i32>
+  func @select(%arg0: tensor<10x20x!eltwise.f32>) -> tensor<10x20x!eltwise.i64> {
+    %c1 = "eltwise.sconst"() {value = 1 : i64} : () -> !i64
+    %c0 = "eltwise.sconst"() {value = 0 : i64} : () -> !i64
+    %0 = "eltwise.cmp_eq"(%arg0, %c0) : (tensor<10x20x!eltwise.f32>, !i64) -> tensor<10x20x!eltwise.u1>
+    %1 = "eltwise.select"(%0, %c0, %c1) : (tensor<10x20x!eltwise.u1>, !i64, !i64) -> tensor<10x20x!eltwise.i64>
+    return %1 : tensor<10x20x!eltwise.i64>
   }
 }
 )#"));
