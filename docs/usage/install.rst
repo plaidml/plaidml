@@ -81,7 +81,7 @@ PlaidML supports :ref:`Ubuntu`, :ref:`macOS` , and :ref:`Microsoft Windows` oper
             {
                 "epsilon": 1e-07,
                 "floatx": "float32",
-                "image*data*format": "channels_last",
+                "image_data_format": "channels_last",
                 "backend": "plaidml.keras.backend"
             }
 
