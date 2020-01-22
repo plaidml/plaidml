@@ -145,7 +145,7 @@ TEST(CppEdsl, BitLeft) {
 
 TEST(CppEdsl, BitRightSignedScalar) {
   auto A = Placeholder(DType::INT64, {3, 3});
-  auto C = A >> std::uint64_t{1};
+  auto C = A >> 1;
   Program program("bit_right", {C});
 
   std::vector<std::int64_t> input_a{1 << 1, 2 << 1, 3 << 1,  //
