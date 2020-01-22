@@ -9,6 +9,7 @@ INITIALIZE_EASYLOGGINGPP;
 DEFINE_bool(logtofile, false, "enable logfile output");
 DEFINE_int32(v, 0, "enable verbose (DEBUG) logging");
 DEFINE_string(vmodule, "", "enable verbose (DEBUG) logging");
+DEFINE_string(logconf, "", "enable logging configuration from file");
 
 namespace {
 #if ELPP_OS_WINDOWS
@@ -22,7 +23,11 @@ namespace vertexai {
 
 el::Configurations LogConfigurationFromFlags(const std::string& app_name) {
   el::Configurations conf;
-  conf.setToDefault();
+  if (FLAGS_logconf.empty()) {
+    conf.setToDefault();
+  } else {
+    conf = el::Configurations(FLAGS_logconf.c_str());
+  }
   if (!FLAGS_logtofile) {
     conf.set(el::Level::Global, el::ConfigurationType::ToFile, "false");
   } else {

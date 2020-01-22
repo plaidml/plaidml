@@ -1032,6 +1032,16 @@ class TestBackendOps(unittest.TestCase):
             b.conv2d(im, km, padding='same') if b == pkb else b.conv2d(im, km, padding='same'),
         ]
 
+    @opTest([
+        [m(12, 12, 3), m(3, 3, 3), m(1, 9, 3), 'channels_last'],
+        [m(256, 256, 1), m(1, 1, 1), m(1, 1, 3), 'channels_last'],
+        [m(3, 12, 12), m(1, 12, 3), m(1, 36, 4), 'channels_first']
+    ], skip_theano=True)
+    def testSeparableConv1d(self, b, im, dkm, pkm, df):
+        return [
+            b.separable_conv1d(im, dkm, pkm, data_format=df)
+        ]
+
     # Asymmetric stride examples not included for separable convolutions b/c they
     # aren't implemented in tensorflow (and theano doesn't do separable convs)
     @opTest(

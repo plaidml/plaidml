@@ -136,25 +136,31 @@ class EW_CompareOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
   }] # EltwiseBuilderImpl_create;
 }
 
-class EW_UnaryIntOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
-    EW_UnaryOp<mnemonic, traits>,
-    Arguments<(ins EltwiseInteger:$operand, TypeAttr:$type)>,
-    Results<(outs EltwiseInteger:$result)>;
-
 class EW_UnaryFloatOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
     EW_UnaryOp<mnemonic, traits>,
     Arguments<(ins EltwiseFloat:$operand, TypeAttr:$type)>,
     Results<(outs EltwiseFloat:$result)>;
 
-class EW_BinaryIntOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
+class EW_UnaryUnsignedOrIntOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
+    EW_UnaryOp<mnemonic, traits>,
+    Arguments<(ins EltwiseUnsignedOrInteger:$operand, TypeAttr:$type)>,
+    Results<(outs EltwiseUnsignedOrInteger:$result)>;
+
+class EW_BinaryUnsignedOrIntOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
     EW_BinaryOp<mnemonic, traits>,
-    Arguments<(ins EltwiseInteger:$lhs, EltwiseInteger:$rhs, TypeAttr:$type)>,
-    Results<(outs EltwiseInteger:$result)>;
+    Arguments<(ins EltwiseUnsignedOrInteger:$lhs, EltwiseUnsignedOrInteger:$rhs, TypeAttr:$type)>,
+    Results<(outs EltwiseUnsignedOrInteger:$result)>;
+
 
 def EW_AbsOp : EW_UnaryOp<"abs">;
 def EW_ACosOp : EW_UnaryFloatOp<"acos">;
 def EW_AddOp : EW_BinaryOp<"add", [Commutative, NoSideEffect]>, HasFolder;
-def EW_AndOp : EW_BinaryIntOp<"and", [Commutative, NoSideEffect]>;
+def EW_BitAndOp : EW_BinaryUnsignedOrIntOp<"bit_and", [Commutative, NoSideEffect]>;
+def EW_BitNotOp : EW_UnaryUnsignedOrIntOp<"bit_not">;
+def EW_BitOrOp : EW_BinaryUnsignedOrIntOp<"bit_or", [Commutative, NoSideEffect]>;
+def EW_BitXorOp : EW_BinaryUnsignedOrIntOp<"bit_xor", [Commutative, NoSideEffect]>;
+def EW_BitLeftOp : EW_BinaryUnsignedOrIntOp<"bit_left">;
+def EW_BitRightOp : EW_BinaryUnsignedOrIntOp<"bit_right">;
 def EW_ASinOp : EW_UnaryFloatOp<"asin">;
 def EW_AssignOp : EW_UnaryOp<"assign">;
 def EW_ATanOp : EW_UnaryFloatOp<"atan">;
@@ -178,13 +184,9 @@ def EW_MinOp : EW_BinaryOp<"min", [Commutative, NoSideEffect]>;
 def EW_ModOp : EW_BinaryOp<"mod">;
 def EW_MulOp : EW_BinaryOp<"mul", [Commutative, NoSideEffect]>, HasFolder;
 def EW_NegOp : EW_UnaryOp<"neg">;
-def EW_NotOp : EW_UnaryIntOp<"not">;
-def EW_OrOp : EW_BinaryIntOp<"or", [Commutative, NoSideEffect]>;
 def EW_PowOp : EW_BinaryOp<"pow">;
 def EW_ReluOp : EW_UnaryOp<"relu">;
 def EW_RoundOp : EW_UnaryOp<"round">;
-def EW_ShlOp : EW_BinaryIntOp<"shl">;
-def EW_ShrOp : EW_BinaryIntOp<"shr">;
 def EW_SignOp : EW_UnaryOp<"sign">;
 def EW_SinHOp : EW_UnaryFloatOp<"sinh">;
 def EW_SinOp : EW_UnaryFloatOp<"sin">;
@@ -192,7 +194,6 @@ def EW_SqrtOp : EW_UnaryFloatOp<"sqrt">;
 def EW_SubOp : EW_BinaryOp<"sub">, HasFolder;
 def EW_TanHOp : EW_UnaryFloatOp<"tanh">;
 def EW_TanOp : EW_UnaryFloatOp<"tan">;
-def EW_XorOp : EW_BinaryIntOp<"xor", [Commutative, NoSideEffect]>;
 
 def EW_SelectOp : EltwiseOp<"select">, HasCanonicalizer {
   let summary = "conditional selection";

@@ -7,10 +7,10 @@ load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_test")
 plaidml_cc_library(
     name = "tile_to_stripe",
     srcs = [
-        "lowering.cc",
+        "tile_to_stripe.cc",
     ],
     hdrs = [
-        "lowering.h",
+        "tile_to_stripe.h",
     ],
     deps = [
         "//base/util",

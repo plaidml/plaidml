@@ -22,7 +22,7 @@
 #ifdef PLAIDML_MLIR
 #include "pmlc/compiler/compiler.h"
 #include "pmlc/compiler/registry.h"
-#include "pmlc/conversion/tile_to_stripe/lowering.h"
+#include "pmlc/conversion/tile_to_stripe/tile_to_stripe.h"
 #include "pmlc/dialect/stripe/dialect.h"
 #include "pmlc/dialect/stripe/transcode.h"
 #include "pmlc/dialect/tile/program.h"
