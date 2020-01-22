@@ -433,7 +433,7 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
     auto resultMemRef = rewriter.create<AllocOp>(loc, resultMemRefType).getResult();
 
     // Make a parallel for loop to fill the result
-    auto forOp = rewriter.create<pxa::AffineParallelForOp>(loc, resultMemRefType.getShape());
+    auto forOp = rewriter.create<pxa::AffineParallelOp>(loc, resultMemRefType.getShape());
     auto body = forOp.getBody();
     rewriter.setInsertionPointToStart(body);
     // TODO: Maybe fix ValueRange?
@@ -541,7 +541,7 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
     // TODO: addInitializer
 
     // Make the outer loops
-    auto forOp = rewriter.create<pxa::AffineParallelForOp>(loc, ranges);
+    auto forOp = rewriter.create<pxa::AffineParallelOp>(loc, ranges);
     auto body = forOp.getBody();
     rewriter.setInsertionPointToStart(body);
     // TODO: Maybe fix ValueRange?
@@ -614,7 +614,7 @@ struct IndexOpConversion : public OpConversionPattern<IndexOp> {
     auto resultMemRef = rewriter.create<AllocOp>(loc, resultType).getResult();
 
     // Make a parallel for loop to fill the result
-    auto forOp = rewriter.create<pxa::AffineParallelForOp>(loc, resultType.getShape());
+    auto forOp = rewriter.create<pxa::AffineParallelOp>(loc, resultType.getShape());
     auto body = forOp.getBody();
     rewriter.setInsertionPointToStart(body);
     // TODO: Maybe fix ValueRange?
@@ -701,7 +701,7 @@ struct CastOpConversion : public OpConversionPattern<ew::CastOp> {
     auto resultMemRef = rewriter.create<AllocOp>(loc, resultType).getResult();
 
     // Make a parallel for loop to fill the result
-    auto forOp = rewriter.create<pxa::AffineParallelForOp>(loc, resultType.getShape());
+    auto forOp = rewriter.create<pxa::AffineParallelOp>(loc, resultType.getShape());
     auto body = forOp.getBody();
     rewriter.setInsertionPointToStart(body);
     // TODO: Maybe fix ValueRange?
