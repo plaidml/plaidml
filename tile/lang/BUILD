@@ -92,7 +92,6 @@ plaidml_cc_library(
     copts = select({
         "//toolchain:windows_x86_64": [],
         "//conditions:default": [
-            "-Wno-format",
             "-Wno-sign-compare",
             "-Wno-macro-redefined",
             "-Wno-unused-variable",
