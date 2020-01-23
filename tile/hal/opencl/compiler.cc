@@ -34,7 +34,7 @@ namespace tile {
 namespace hal {
 namespace opencl {
 
-int Compiler::i = 0;
+int Compiler::cache_file_index = 0;
 
 namespace {
 
@@ -231,8 +231,8 @@ boost::future<std::unique_ptr<hal::Library>> Compiler::Build(const context::Cont
       } else if (!knames.count(ki.kfunc->name)) {
         knames.insert(ki.kfunc->name);
 
-        auto kname = ki.kname + "_" + std::to_string(i);
-        i++;
+        auto kname = ki.kname + "_" + std::to_string(cache_file_index);
+        cache_file_index++;
 
         fs::path spv_binary_path = env::Get("PLAIDML_SPIRV_CACHE");
         auto spv_binary_suffix = env::Get("PLAIDML_SPIRV_BINARY_SUFFIX");
@@ -249,8 +249,8 @@ boost::future<std::unique_ptr<hal::Library>> Compiler::Build(const context::Cont
             ocl::CreateProgramWithIL(device_state_->cl_ctx().get(), spv_binary, spv_binary_str.size(), err.ptr());
 
         if (!program) {
-          throw std::runtime_error(std::string("Creating an OpenCL program object from  ") + spv_binary_file.c_str() + ": " +
-                                   err.str());
+          throw std::runtime_error(std::string("Creating an OpenCL program object from  ") + spv_binary_file.c_str() +
+                                   ": " + err.str());
         }
 
         proto::BuildInfo binfo;
@@ -320,8 +320,8 @@ boost::future<std::unique_ptr<hal::Library>> Compiler::Build(const context::Cont
         src << "// lid: " << ki.lwork[0] << " " << ki.lwork[1] << " " << ki.lwork[2] << "\n";
         src << ki.comments << ocl.str();
 
-        auto kname = ki.kname + "_" + std::to_string(i);
-        i++;
+        auto kname = ki.kname + "_" + std::to_string(cache_file_index);
+        cache_file_index++;
         if (is_directory(cache_dir)) {
           fs::path src_path = (cache_dir / kname).replace_extension("cl");
           if (fs::is_regular_file(src_path)) {

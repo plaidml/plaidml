@@ -1,6 +1,7 @@
 #pragma once
 
-#include "pmlc/tools/pmlc-vulkan-runner/vulkan_pfn.h"
+#define VK_NO_PROTOTYPES
+#include <vulkan/vulkan.h>
 
 #include "mlir/Analysis/Passes.h"
 #include "mlir/Dialect/SPIRV/SPIRVOps.h"

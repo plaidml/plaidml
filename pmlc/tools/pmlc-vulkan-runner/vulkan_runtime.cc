@@ -21,6 +21,7 @@
 //
 //===----------------------------------------------------------------------===//
 #include "pmlc/tools/pmlc-vulkan-runner/vulkan_runtime.h"
+#include "pmlc/tools/pmlc-vulkan-runner/vulkan_pfn.h"
 
 #include <string>
 

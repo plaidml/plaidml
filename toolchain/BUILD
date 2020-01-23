@@ -48,7 +48,7 @@ cc_toolchain(
 
 gcc_toolchain_config(
     name = "cc_linux_x86_64-gcc_8.3.0",
-    libc_version = "glibc_2.17.1",
+    libc_version = "glibc_2.12.1",
     tags = ["linux"],
     target = "linux_x86_64",
     version = "8.3.0",

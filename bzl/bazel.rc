@@ -35,7 +35,6 @@ test --test_env=PLAIDML_EXPERIMENTAL
 test --test_env=PLAIDML_TARGET
 test --test_env=PLAIDML_SETTINGS
 test --test_sharding_strategy=disabled
-
 run --test_env=HOME
 run --test_env=PLAIDML_DEVICE
 run --test_env=PLAIDML_DEVICE_IDS
