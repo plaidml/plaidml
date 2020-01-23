@@ -1169,14 +1169,14 @@ TEST(CppEdsl, Prng) {
   auto O = prng(S, {2, 3, 4, 5});
   Program program("prng", {O});
   EXPECT_THAT(program, Eq(R"#(
-!i32 = type tensor<!eltwise.i32>
+!i64 = type tensor<!eltwise.i64>
 module {
   func @prng(%arg0: tensor<3x2048x!eltwise.u32>) -> (tensor<2x3x4x5x!eltwise.f32>, tensor<3x2048x!eltwise.u32>) {
-    %c5 = "eltwise.sconst"() {value = 5 : i64} : () -> !i32
-    %c4 = "eltwise.sconst"() {value = 4 : i64} : () -> !i32
-    %c3 = "eltwise.sconst"() {value = 3 : i64} : () -> !i32
-    %c2 = "eltwise.sconst"() {value = 2 : i64} : () -> !i32
-    %result, %new_state = "tile.prng"(%arg0, %c2, %c3, %c4, %c5) : (tensor<3x2048x!eltwise.u32>, !i32, !i32, !i32, !i32) -> (tensor<2x3x4x5x!eltwise.f32>, tensor<3x2048x!eltwise.u32>)
+    %c5 = "eltwise.sconst"() {value = 5 : i64} : () -> !i64
+    %c4 = "eltwise.sconst"() {value = 4 : i64} : () -> !i64
+    %c3 = "eltwise.sconst"() {value = 3 : i64} : () -> !i64
+    %c2 = "eltwise.sconst"() {value = 2 : i64} : () -> !i64
+    %result, %new_state = "tile.prng"(%arg0, %c2, %c3, %c4, %c5) : (tensor<3x2048x!eltwise.u32>, !i64, !i64, !i64, !i64) -> (tensor<2x3x4x5x!eltwise.f32>, tensor<3x2048x!eltwise.u32>)
     return %result, %new_state : tensor<2x3x4x5x!eltwise.f32>, tensor<3x2048x!eltwise.u32>
   }
 }

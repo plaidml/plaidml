@@ -31,7 +31,7 @@ def ScalarBool : Type<And<[
 
 def ScalarIndex : Type<And<[
     IsScalarPred,
-    CPred<"$_self.cast<ScalarType>().type() == DataType::i32">
+    CPred<"$_self.cast<ScalarType>().type() == DataType::i32 || $_self.cast<ScalarType>().type() == DataType::i64">
   ]>, "scalar-index">;
 
 def ScalarUINT32 : Type<And<[

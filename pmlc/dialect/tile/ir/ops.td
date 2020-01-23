@@ -315,8 +315,8 @@ def GatherOp : SpecialOp<"gather">, HasCanonicalizer {
 
 def PrngOp : SpecialOp<"prng", []>, HasCanonicalizer {
   let summary = "pseudorandom number generator";
-  let arguments = (ins RankedTensorOf<[ScalarUINT32]>:$state, Variadic<EltwiseIndex>:$dims);
-  let results = (outs RankedTensorOf<[AnyScalarFloat]>:$result, RankedTensorOf<[ScalarUINT32]>:$new_state);
+  let arguments = (ins RankedTensorOf<[AnyScalarUnsigned]>:$state, Variadic<EltwiseIndex>:$dims);
+  let results = (outs RankedTensorOf<[AnyScalarFloat]>:$result, RankedTensorOf<[AnyScalarUnsigned]>:$new_state);
 }
 
 def ReshapeOp : SpecialOp<"reshape">, HasCanonicalizer {

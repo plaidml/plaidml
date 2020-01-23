@@ -262,7 +262,6 @@ class TestEdsl(unittest.TestCase):
         I = Tensor(LogicalShape(plaidml.DType.INT64, [3, 3]))
         O = I >> 1
         program = Program('bit_right', [O])
-        # TODO: expected
 
         outputs = plaidml.exec.run(program, [
             (I, np.array([
@@ -281,7 +280,6 @@ class TestEdsl(unittest.TestCase):
         I = Tensor(LogicalShape(plaidml.DType.UINT64, [3, 3]))
         O = I >> 1
         program = Program('bit_right', [O])
-        # TODO: expected
 
         outputs = plaidml.exec.run(program, [
             (I, np.array([
@@ -624,12 +622,12 @@ module {
 
 #set0 = affine_set<(d0, d1, d2, d3, d4, d5) : (d4 >= 0, -d4 + 1 >= 0, d5 >= 0, -d5 + 1 >= 0)>
 
-!i32 = type tensor<!eltwise.i32>
+!i64 = type tensor<!eltwise.i64>
 !f32 = type tensor<!eltwise.f32>
 module {
   func @mnist_cnn(%arg0: tensor<100x!eltwise.f32>, %arg1: tensor<128x100x!eltwise.f32>, %arg2: tensor<128x!eltwise.f32>, %arg3: tensor<12100x128x!eltwise.f32>, %arg4: tensor<64x!eltwise.f32>, %arg5: tensor<3x3x32x64x!eltwise.f32>, %arg6: tensor<32x!eltwise.f32>, %arg7: tensor<3x3x1x32x!eltwise.f32>, %arg8: tensor<1x224x224x1x!eltwise.f32>) -> tensor<1x100x!eltwise.f32> {
     %c12100 = tile.affine_const 12100
-    %c1 = "eltwise.sconst"() {value = 1 : i64} : () -> !i32
+    %c1 = "eltwise.sconst"() {value = 1 : i64} : () -> !i64
     %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
     %0 = tile.cion add, mul, %cst, %arg8, %arg7 {sink = #map0, srcs = [#map1, #map2]} : !f32, tensor<1x224x224x1x!eltwise.f32>, tensor<3x3x1x32x!eltwise.f32> -> tensor<1x222x222x32x!eltwise.f32>
     %1 = "eltwise.add"(%0, %arg6) : (tensor<1x222x222x32x!eltwise.f32>, tensor<32x!eltwise.f32>) -> tensor<1x222x222x32x!eltwise.f32>
@@ -640,7 +638,7 @@ module {
     %6 = "eltwise.cmp_lt"(%5, %cst) : (tensor<1x220x220x64x!eltwise.f32>, !f32) -> tensor<1x220x220x64x!eltwise.u1>
     %7 = "eltwise.select"(%6, %cst, %5) : (tensor<1x220x220x64x!eltwise.u1>, !f32, tensor<1x220x220x64x!eltwise.f32>) -> tensor<1x220x220x64x!eltwise.f32>
     %8 = tile.cion max, none, %cst, %7 {cons = #set0, sink = #map3, srcs = [#map4]} : !f32, tensor<1x220x220x64x!eltwise.f32> -> tensor<1x110x110x64x!eltwise.f32>
-    %9 = "tile.reshape"(%8, %c1, %c12100) : (tensor<1x110x110x64x!eltwise.f32>, !i32, index) -> tensor<1x12100x!eltwise.f32>
+    %9 = "tile.reshape"(%8, %c1, %c12100) : (tensor<1x110x110x64x!eltwise.f32>, !i64, index) -> tensor<1x12100x!eltwise.f32>
     %10 = tile.cion add, mul, %cst, %9, %arg3 {sink = #map5, srcs = [#map6, #map7]} : !f32, tensor<1x12100x!eltwise.f32>, tensor<12100x128x!eltwise.f32> -> tensor<1x128x!eltwise.f32>
     %11 = "eltwise.add"(%10, %arg2) : (tensor<1x128x!eltwise.f32>, tensor<128x!eltwise.f32>) -> tensor<1x128x!eltwise.f32>
     %12 = "eltwise.cmp_lt"(%11, %cst) : (tensor<1x128x!eltwise.f32>, !f32) -> tensor<1x128x!eltwise.u1>
