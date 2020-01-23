@@ -25,4 +25,4 @@ def build_model():
     from keras.backend import floatx
     from keras.layers import Input
     inputLayer = Input(shape=(224, 224, 3), dtype=floatx())
-    return kapp.ResNet50(input_tensor=inputLayer)
+    return kapp.ResNet50V2(input_tensor=inputLayer)
