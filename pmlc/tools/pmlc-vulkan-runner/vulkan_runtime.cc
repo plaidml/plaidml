@@ -20,14 +20,14 @@
 // utility functions to extract information from a spirv::ModuleOp.
 //
 //===----------------------------------------------------------------------===//
-#include "pmlc/tools/pmlc-vulkan-runner/VulkanRuntime.h"
+#include "pmlc/tools/pmlc-vulkan-runner/vulkan_runtime.h"
 
 #include <string>
 
 namespace pmlc::vulkan {
 
 inline void emitVulkanError(const llvm::Twine& message, VkResult error) {
-  llvm::errs() << message.concat(" failed with error code ").concat(llvm::Twine{error});
+  llvm::errs() << message.concat(" failed with error code ").concat(llvm::Twine{error}) << "\n";
 }
 
 #define RETURN_ON_VULKAN_ERROR(result, msg) \
@@ -86,8 +86,6 @@ void SPIRVModuleInfoCollector::processGlobalVariable(spirv::GlobalVariableOp var
   }
 }
 }  // namespace
-
-namespace {
 
 /// Vulkan runtime.
 /// The purpose of this class is to run SPIR-V computation shader on Vulkan
@@ -323,11 +321,11 @@ LogicalResult VulkanRuntime::run() {
       failed(createShaderModule())) {
     return failure();
   }
-
   // Descriptor bindings divided into sets. Each descriptor binding
   // must have a layout binding attached into a descriptor set layout.
   // Each layout set must be binded into a pipeline layout.
   initDescriptorSetLayoutBindingMap();
+
   if (failed(createDescriptorSetLayout()) || failed(createPipelineLayout()) ||
       // Each descriptor set must be allocated from a descriptor pool.
       failed(createComputePipeline()) || failed(createDescriptorPool()) || failed(allocateDescriptorSets()) ||
@@ -368,7 +366,6 @@ LogicalResult VulkanRuntime::createInstance() {
   instanceCreateInfo.ppEnabledLayerNames = 0;
   instanceCreateInfo.enabledExtensionCount = 0;
   instanceCreateInfo.ppEnabledExtensionNames = 0;
-
   RETURN_ON_VULKAN_ERROR(vkCreateInstance(&instanceCreateInfo, 0, &instance), "vkCreateInstance");
   return success();
 }
@@ -660,6 +657,7 @@ LogicalResult VulkanRuntime::createComputePipeline() {
   computePipelineCreateInfo.layout = pipelineLayout;
   computePipelineCreateInfo.basePipelineHandle = 0;
   computePipelineCreateInfo.basePipelineIndex = 0;
+
   RETURN_ON_VULKAN_ERROR(vkCreateComputePipelines(device, 0, 1, &computePipelineCreateInfo, 0, &pipeline),
                          "vkCreateComputePipelines");
   return success();
@@ -812,7 +810,6 @@ LogicalResult VulkanRuntime::updateHostMemoryBuffers() {
   }
   return success();
 }
-}  // namespace
 
 static LogicalResult runOnVulkan(spirv::ModuleOp module, ResourceData& resourceData,
                                  const NumWorkGroups& numWorkGroups) {
@@ -836,6 +833,7 @@ static LogicalResult runOnVulkan(spirv::ModuleOp module, ResourceData& resourceD
       failed(runtime.destroy())) {
     return failure();
   }
+
   return success();
 }
 

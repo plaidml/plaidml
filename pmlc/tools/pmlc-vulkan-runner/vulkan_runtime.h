@@ -1,6 +1,6 @@
 #pragma once
 
-#include <vulkan/vulkan.h>
+#include "pmlc/tools/pmlc-vulkan-runner/vulkan_pfn.h"
 
 #include "mlir/Analysis/Passes.h"
 #include "mlir/Dialect/SPIRV/SPIRVOps.h"
@@ -59,4 +59,5 @@ using ResourceStorageClassData =
     llvm::DenseMap<DescriptorSetIndex, llvm::DenseMap<BindingIndex, mlir::spirv::StorageClass>>;
 
 LogicalResult runOnVulkan(mlir::ModuleOp module, ResourceData& resourceData, const NumWorkGroups& numWorkGroups);
+
 }  // namespace pmlc::vulkan

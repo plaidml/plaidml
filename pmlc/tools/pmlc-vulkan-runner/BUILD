@@ -2,21 +2,22 @@
 
 package(default_visibility = ["//visibility:public"])
 
-load("//vendor/mlir:tblgen.bzl", "COPTS", "gentbl")
-load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_binary", "plaidml_cc_test")
+load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_test")
 
 plaidml_cc_library(
-    name = "MLIRVulkanRuntime",
+    name = "vulkan_runtime",
     srcs = [
-        "VulkanRuntime.cpp",
+        "vulkan_runtime.cc",
     ],
     hdrs = [
-    	"VulkanRuntime.h",
-    	"VulkanRuntimeSupport.h",
+    	"vulkan_pfn.h",
+    	"vulkan_runtime.h",
+    	"vulkan_runtime_support.h",
+    ],
+    linkopts = [
+    	"-ldl",
     ],
     deps = [
-    	"@xcd//:lib",
-    	"@vulkan_sdk_lib//:lib",
         "@vulkan_headers//:inc",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:SPIRVSerialization",
@@ -27,29 +28,18 @@ plaidml_cc_library(
 
 
 plaidml_cc_test(
-    name = "runtime_tests",
+    name = "vulkan_runtime_tests",
     srcs = [
-    	"VulkanRuntimeTests.cpp",
+    	"vulkan_runtime_tests.cc",
     ],
-    tags = [
-        "llvm",
-        "windows_fail",
+    linkopts = [
+    	"-ldl",
     ],
     deps = [
-        ":MLIRVulkanRuntime",
+        ":vulkan_runtime",
+        "//plaidml2:testenv_mlir",
+        "//testing:matchers",
+        "//tile/codegen",
         "@gmock//:gtest",
-    ],
-)
-
-
-plaidml_cc_binary(
-    name = "vulkan_test",
-    srcs = [
-    	"VulkanTest.cpp",
-    ],
-    deps = [
-    	"@xcd//:lib",
-    	"@vulkan_sdk_lib//:lib",
-    	"@vulkan_headers//:inc",
     ],
 )

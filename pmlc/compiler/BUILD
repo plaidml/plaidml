@@ -8,13 +8,10 @@ plaidml_cc_library(
     name = "compiler",
     srcs = glob(["*.cc"]),
     hdrs = glob(["*.h"]),
-    copts = [
-    	"-Iexternal/vulkan_sdk_include",
-    ],
     deps = [
         "//base/util",
         "//pmlc/conversion/tile_to_pxa",
-        "//pmlc/tools/pmlc-vulkan-runner:MLIRVulkanRuntime",
+        "//pmlc/tools/pmlc-vulkan-runner:vulkan_runtime",
         "@llvm-project//llvm:support",
         "@llvm-project//mlir:AffineToStandardTransforms",
         "@llvm-project//mlir:ExecutionEngine",
