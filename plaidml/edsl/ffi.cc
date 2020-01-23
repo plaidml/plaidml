@@ -915,10 +915,8 @@ plaidml_string* plaidml_value_repr(  //
           } else if constexpr (std::is_same_v<T, plaidml_expr>) {
             return mlir::debugString(arg.value);
           } else if constexpr (std::is_same_v<T, double>) {
-            IVLOG(1, "value _rep is double");
             return std::to_string(arg);
           } else if constexpr (std::is_same_v<T, float>) {
-            IVLOG(1, "value _rep is double");
             return std::to_string(arg);
           } else if constexpr (std::is_same_v<T, int64_t>) {
             return std::to_string(arg);
