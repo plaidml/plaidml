@@ -145,13 +145,13 @@ struct TileBuilder::Impl {
   }
 
   Value makeScalarConstantOp(double value) {
-    IVLOG(1, "makeScalarConstantOp double " << value);
+    IVLOG(5, "makeScalarConstantOp double " << value);
     auto type = builder.getType<ScalarType>(DataType::f32);
     return builder.create<ScalarConstantOp>(loc, type, value).result();
   }
 
   Value makeScalarConstantOp(uint64_t value) {
-    IVLOG(1, "makeScalarConstantOp uint64_t " << value);
+    IVLOG(5, "makeScalarConstantOp uint64_t " << value);
     auto type = builder.getType<ScalarType>(DataType::u64);
     return builder.create<ScalarConstantOp>(loc, type, value).result();
   }

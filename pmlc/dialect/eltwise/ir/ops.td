@@ -148,12 +148,6 @@ class EW_BinaryIntOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
     Arguments<(ins EltwiseInteger:$lhs, EltwiseInteger:$rhs)>,
     Results<(outs EltwiseInteger:$result)>;
 
-class EW_BinaryIntUnsignedOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
-    EW_BinaryOp<mnemonic, traits>,
-    Arguments<(ins EltwiseInteger:$lhs, EltwiseUnsigned:$rhs)>,
-    Results<(outs EltwiseInteger:$result)>;
-
-
 def EW_AbsOp : EW_UnaryOp<"abs">;
 def EW_ACosOp : EW_UnaryFloatOp<"acos">;
 def EW_AddOp : EW_BinaryOp<"add", [Commutative, NoSideEffect]>, HasFolder;
