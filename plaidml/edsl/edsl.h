@@ -14,6 +14,7 @@
 
 #include "plaidml/core/core.h"
 #include "plaidml/edsl/ffi.h"
+#include "pmlc/util/enums.h"
 
 namespace plaidml {
 namespace edsl {
@@ -81,10 +82,12 @@ class Program {
  public:
   ///
   /// Program constructor
-  ///
+  /// constant_datatype should be a tuple of (PLAIDML_DATA_*INT*8, PLAIDML_DATA_FLOAT*)
+  /// and is used to specify the underlying datatype of integers and float-point constants.
   Program(                                 //
       const std::string& name,             //
       const std::vector<Tensor>& outputs,  //
+      const std::tuple<DType, DType>& const_dtypes = std::make_tuple<DType, DType>(DType::INT32, DType::FLOAT32),
       const std::vector<std::tuple<Tensor, Tensor>>& updates = {});
 
   ///
@@ -114,6 +117,7 @@ class Program {
   std::vector<ProgramArgument> args_;
   std::vector<ProgramArgument> inputs_;
   std::vector<ProgramArgument> outputs_;
+  std::tuple<DType, DType> const_dtypes_;
 };
 
 ///
@@ -1064,7 +1068,18 @@ inline Tensor zero() { return Tensor{0}; }
 inline Program::Program(                 //
     const std::string& name,             //
     const std::vector<Tensor>& outputs,  //
-    const std::vector<std::tuple<Tensor, Tensor>>& updates) {
+    const std::tuple<DType, DType>& const_dtypes, const std::vector<std::tuple<Tensor, Tensor>>& updates) {
+  const_dtypes_ = const_dtypes;
+
+  auto datatype = pmlc::util::DataType(std::get<0>(const_dtypes));
+
+  if (pmlc::util::isInteger(datatype)) {
+    std::stringstream ss;
+    ss << "Not iteger";
+    // ss << "Invalid integer detype requested by Program: " << std::get<0>(const_dtypes);
+    throw std::runtime_error(ss.str());
+  }
+
   std::vector<plaidml_expr*> raw_outputs(outputs.size());
   std::vector<plaidml_expr*> new_outputs(outputs.size());
   for (size_t i = 0; i < raw_outputs.size(); i++) {
