@@ -48,6 +48,11 @@ def ScalarConstantOp :
       result.addTypes(RankedTensorType::get({}, type));
     }]
   >, OpBuilder<
+    "Builder* builder, OperationState& result, Type type, float value", [{
+      result.addAttribute("value", builder->getF32FloatAttr(value));
+      result.addTypes(RankedTensorType::get({}, type));
+    }]
+  >, OpBuilder<
     "Builder* builder, OperationState& result, Type type, int64_t value", [{
       result.addAttribute("value", builder->getI64IntegerAttr(value));
       result.addTypes(RankedTensorType::get({}, type));

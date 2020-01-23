@@ -79,6 +79,7 @@ class TileBuilder {
   mlir::Value MakeScalarConstantOp(int64_t value);
   mlir::Value MakeScalarConstantOp(uint64_t value);
   mlir::Value MakeScalarConstantOp(double value);
+  mlir::Value MakeScalarConstantOp(float value);
   mlir::Value MakePrimitiveOp(llvm::StringRef fn, llvm::ArrayRef<mlir::Value> args);
   mlir::Value MakeCastOp(mlir::Value tensor, DataType dtype);
   mlir::Value MakeDimOp(mlir::Value tensor, unsigned dim);

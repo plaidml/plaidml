@@ -80,7 +80,7 @@ struct TileBuilder::Impl {
         builder(module.getBody()),
         loc(builder.getUnknownLoc()) {
     builder.setInsertionPointToStart(module.getBody());
-    defaultInit = makeScalarConstantOp(0.0);
+    defaultInit = makeScalarConstantOp(0.0f);
   }
 
   Type inferElementType(ArrayRef<Type> types) {
@@ -146,6 +146,12 @@ struct TileBuilder::Impl {
 
   Value makeScalarConstantOp(double value) {
     IVLOG(5, "makeScalarConstantOp double " << value);
+    auto type = builder.getType<ScalarType>(DataType::f64);
+    return builder.create<ScalarConstantOp>(loc, type, value).result();
+  }
+
+  Value makeScalarConstantOp(float value) {
+    IVLOG(5, "makeScalarConstantOp float " << value);
     auto type = builder.getType<ScalarType>(DataType::f32);
     return builder.create<ScalarConstantOp>(loc, type, value).result();
   }
@@ -153,6 +159,12 @@ struct TileBuilder::Impl {
   Value makeScalarConstantOp(uint64_t value) {
     IVLOG(5, "makeScalarConstantOp uint64_t " << value);
     auto type = builder.getType<ScalarType>(DataType::u64);
+    return builder.create<ScalarConstantOp>(loc, type, value).result();
+  }
+
+  Value makeScalarConstantOp(int64_t value) {
+    IVLOG(5, "makeScalarConstantOp int64_t " << value);
+    auto type = builder.getType<ScalarType>(DataType::i64);
     return builder.create<ScalarConstantOp>(loc, type, value).result();
   }
 };
@@ -355,6 +367,11 @@ Value TileBuilder::MakeScalarConstantOp(uint64_t value) {
 
 Value TileBuilder::MakeScalarConstantOp(double value) {
   IVLOG(5, "TileBuilder::MakeScalarConstantOp double> " << value);
+  return impl->makeScalarConstantOp(value);
+}
+
+Value TileBuilder::MakeScalarConstantOp(float value) {
+  IVLOG(5, "TileBuilder::MakeScalarConstantOp float> " << value);
   return impl->makeScalarConstantOp(value);
 }
 

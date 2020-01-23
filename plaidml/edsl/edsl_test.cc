@@ -422,13 +422,14 @@ TEST(CppEdsl, Relu) {
   auto A = Placeholder(DType::FLOAT32, {10, 20});
   Program program("relu", {Relu(A)});
   EXPECT_THAT(program, Eq(R"#(
-!f32 = type tensor<!eltwise.f32>
+
+!f64 = type tensor<!eltwise.f64>
 module {
-  func @relu(%arg0: tensor<10x20x!eltwise.f32>) -> tensor<10x20x!eltwise.f32> {
-    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
-    %0 = "eltwise.cmp_lt"(%arg0, %cst) : (tensor<10x20x!eltwise.f32>, !f32) -> tensor<10x20x!eltwise.u1>
-    %1 = "eltwise.select"(%0, %cst, %arg0) : (tensor<10x20x!eltwise.u1>, !f32, tensor<10x20x!eltwise.f32>) -> tensor<10x20x!eltwise.f32>
-    return %1 : tensor<10x20x!eltwise.f32>
+  func @relu(%arg0: tensor<10x20x!eltwise.f32>) -> tensor<10x20x!eltwise.f64> {
+    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f64
+    %0 = "eltwise.cmp_lt"(%arg0, %cst) : (tensor<10x20x!eltwise.f32>, !f64) -> tensor<10x20x!eltwise.u1>
+    %1 = "eltwise.select"(%0, %cst, %arg0) : (tensor<10x20x!eltwise.u1>, !f64, tensor<10x20x!eltwise.f32>) -> tensor<10x20x!eltwise.f64>
+    return %1 : tensor<10x20x!eltwise.f64>
   }
 }
 )#"));
@@ -966,7 +967,7 @@ module {
 
 TEST(CppEdsl, Reciprocal) {
   auto A = Placeholder(DType::FLOAT32, {6}, "A");
-  auto R = 1.0 / A;
+  auto R = 1.0f / A;
   Program program("reciprocal", {R});
   EXPECT_THAT(program, Eq(R"#(
 !f32 = type tensor<!eltwise.f32>
@@ -1105,7 +1106,7 @@ TEST(CppEdsl, DefractLong) {
 !f32 = type tensor<!eltwise.f32>
 module {
   func @defract_long(%arg0: tensor<1x3x3x1x!eltwise.f32> {tile.name = "K"}, %arg1: tensor<1x3x3x1x!eltwise.f32> {tile.name = "I"}) -> tensor<1x5x5x1x!eltwise.f32> {
-    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
+    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f32} : () -> !f32
     %0 = tile.cion add, mul, %cst, %arg1, %arg0 {sink = #map0, srcs = [#map1, #map2]} : !f32, tensor<1x3x3x1x!eltwise.f32>, tensor<1x3x3x1x!eltwise.f32> -> tensor<1x5x5x1x!eltwise.f32>
     return %0 : tensor<1x5x5x1x!eltwise.f32>
   }
