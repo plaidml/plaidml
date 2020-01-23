@@ -49,7 +49,8 @@ using Variant = std::variant<  //
     std::monostate,            // PLAIDML_VALUE_NONE
     plaidml_dim_expr,          // PLAIDML_VALUE_DIM
     plaidml_expr,              // PLAIDML_VALUE_EXPR
-    double,                    // PLAIDML_VALUE_FLOAT
+    double,                    // PLAIDML_VALUE_DOUBLE
+    float,                     // PLAIDML_VALUE_FLOAT
     int64_t,                   // PLAIDML_VALUE_INT
     std::string,               // PLAIDML_VALUE_STR
     Tuple                      // PLAIDML_VALUE_TUPLE

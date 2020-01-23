@@ -50,7 +50,7 @@ inline edsl::Tensor argmax(const edsl::Tensor& I, const edsl::Value& axes = edsl
   return details::op("argmax", args).as_tensor();
 }
 
-inline edsl::Tensor binary_crossentropy(const edsl::Tensor& I, const edsl::Tensor& O, double epsilon) {
+inline edsl::Tensor binary_crossentropy(const edsl::Tensor& I, const edsl::Tensor& O, float epsilon) {
   auto args = edsl::make_tuple(I, O, epsilon);
   return details::op("binary_crossentropy", args).as_tensor();
 }
@@ -120,7 +120,7 @@ inline edsl::Tensor dot(const edsl::Tensor& I, const edsl::Tensor& K) {
   return details::op("dot", args).as_tensor();
 }
 
-inline edsl::Tensor elu(const edsl::Tensor& I, double alpha) {
+inline edsl::Tensor elu(const edsl::Tensor& I, float alpha) {
   auto args = edsl::make_tuple(I, alpha);
   return details::op("elu", args).as_tensor();
 }
@@ -135,7 +135,7 @@ inline edsl::Tensor flip(const edsl::Tensor& I, int axis) {
   return details::op("flip", args).as_tensor();
 }
 
-inline edsl::Tensor hard_sigmoid(const edsl::Tensor& I, double slope) {
+inline edsl::Tensor hard_sigmoid(const edsl::Tensor& I, float slope) {
   auto args = edsl::make_tuple(I, slope);
   return details::op("hard_sigmoid", args).as_tensor();
 }
@@ -207,7 +207,7 @@ class relu {
   edsl::Tensor I_;
   edsl::Tensor alpha_;
   edsl::Tensor max_value_;
-  double threshold_ = 0.0;
+  float threshold_ = 0.0f;
 
  public:
   explicit relu(const edsl::Tensor& I) : I_(I) {}
@@ -222,7 +222,7 @@ class relu {
     return *this;
   }
 
-  relu threshold(double threshold) {
+  relu threshold(float threshold) {
     threshold_ = threshold;
     return *this;
   }

@@ -351,9 +351,18 @@ plaidml_expr* plaidml_expr_uint(  //
 
 plaidml_expr* plaidml_expr_float(  //
     plaidml_error* err,            //
-    double value) {
+    float value) {
   return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
     IVLOG(3, "plaidml_expr_float");
+    return new plaidml_expr{GlobalContext::get()->MakeScalarConstantOp(value)};
+  });
+}
+
+plaidml_expr* plaidml_expr_double(  //
+    plaidml_error* err,             //
+    double value) {
+  return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
+    IVLOG(3, "plaidml_expr_double");
     return new plaidml_expr{GlobalContext::get()->MakeScalarConstantOp(value)};
   });
 }
@@ -724,6 +733,8 @@ plaidml_value_kind plaidml_value_get_kind(  //
           } else if constexpr (std::is_same_v<T, plaidml_expr>) {
             return PLAIDML_VALUE_EXPR;
           } else if constexpr (std::is_same_v<T, double>) {
+            return PLAIDML_VALUE_DOUBLE;
+          } else if constexpr (std::is_same_v<T, float>) {
             return PLAIDML_VALUE_FLOAT;
           } else if constexpr (std::is_same_v<T, int64_t>) {
             return PLAIDML_VALUE_INT;
@@ -781,9 +792,18 @@ plaidml_value* plaidml_value_expr(  //
   });
 }
 
+plaidml_value* plaidml_value_double(  //
+    plaidml_error* err,               //
+    double value) {
+  return ffi_wrap<plaidml_value*>(err, nullptr, [&] {
+    IVLOG(3, "plaidml_value_double");
+    return new plaidml_value{value};
+  });
+}
+
 plaidml_value* plaidml_value_float(  //
     plaidml_error* err,              //
-    double value) {
+    float value) {
   return ffi_wrap<plaidml_value*>(err, nullptr, [&] {
     IVLOG(3, "plaidml_value_float");
     return new plaidml_value{value};
@@ -832,11 +852,19 @@ plaidml_expr* plaidml_value_expr_get(  //
   });
 }
 
-double plaidml_value_float_get(  //
-    plaidml_error* err,          //
+float plaidml_value_float_get(  //
+    plaidml_error* err,         //
+    plaidml_value* value) {
+  return ffi_wrap<float>(err, 0, [&] {
+    IVLOG(3, "plaidml_value_float_get");
+    return std::get<float>(value->variant);
+  });
+}
+double plaidml_value_double_get(  //
+    plaidml_error* err,           //
     plaidml_value* value) {
   return ffi_wrap<double>(err, 0, [&] {
-    IVLOG(3, "plaidml_value_float_get");
+    IVLOG(3, "plaidml_value_double_get");
     return std::get<double>(value->variant);
   });
 }
@@ -884,11 +912,13 @@ plaidml_string* plaidml_value_repr(  //
           using T = std::decay_t<decltype(arg)>;
           if constexpr (std::is_same_v<T, plaidml_dim_expr>) {
             return mlir::debugString(arg.value);
-
           } else if constexpr (std::is_same_v<T, plaidml_expr>) {
             return mlir::debugString(arg.value);
-
           } else if constexpr (std::is_same_v<T, double>) {
+            IVLOG(1, "value _rep is double");
+            return std::to_string(arg);
+          } else if constexpr (std::is_same_v<T, float>) {
+            IVLOG(1, "value _rep is double");
             return std::to_string(arg);
           } else if constexpr (std::is_same_v<T, int64_t>) {
             return std::to_string(arg);

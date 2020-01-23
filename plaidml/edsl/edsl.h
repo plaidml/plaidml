@@ -1270,7 +1270,9 @@ class Value {
 
   explicit Value(int64_t value) : ptr_(details::make_ptr(ffi::call<plaidml_value*>(plaidml_value_int, value))) {}
 
-  explicit Value(double value) : ptr_(details::make_ptr(ffi::call<plaidml_value*>(plaidml_value_float, value))) {}
+  explicit Value(double value) : ptr_(details::make_ptr(ffi::call<plaidml_value*>(plaidml_value_double, value))) {}
+
+  explicit Value(float value) : ptr_(details::make_ptr(ffi::call<plaidml_value*>(plaidml_value_float, value))) {}
 
   explicit Value(const std::string& value)
       : ptr_(details::make_ptr(ffi::call<plaidml_value*>(plaidml_value_str, value.c_str()))) {}
@@ -1306,6 +1308,10 @@ class Value {
     return ffi::call<plaidml_value_kind>(plaidml_value_get_kind, as_ptr()) == PLAIDML_VALUE_INT;
   }
 
+  bool is_double() const {  //
+    return ffi::call<plaidml_value_kind>(plaidml_value_get_kind, as_ptr()) == PLAIDML_VALUE_DOUBLE;
+  }
+
   bool is_float() const {  //
     return ffi::call<plaidml_value_kind>(plaidml_value_get_kind, as_ptr()) == PLAIDML_VALUE_FLOAT;
   }
@@ -1335,7 +1341,11 @@ class Value {
     return ffi::call<int64_t>(plaidml_value_int_get, as_ptr());
   }
 
-  double as_float() const {  //
+  float as_float() const {  //
+    return ffi::call<float>(plaidml_value_float_get, as_ptr());
+  }
+
+  double as_double() const {  //
     return ffi::call<double>(plaidml_value_float_get, as_ptr());
   }
 
@@ -1349,6 +1359,9 @@ class Value {
     }
     if (is_dim()) {
       return Tensor(as_dim());
+    }
+    if (is_double()) {
+      return Tensor(as_double());
     }
     if (is_float()) {
       return Tensor(as_float());

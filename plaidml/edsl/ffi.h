@@ -22,6 +22,7 @@ typedef enum {
   PLAIDML_VALUE_NONE,
   PLAIDML_VALUE_DIM,
   PLAIDML_VALUE_EXPR,
+  PLAIDML_VALUE_DOUBLE,
   PLAIDML_VALUE_FLOAT,
   PLAIDML_VALUE_INT,
   PLAIDML_VALUE_STR,
@@ -217,9 +218,13 @@ plaidml_expr* plaidml_expr_uint(  //
     plaidml_error* err,           //
     uint64_t value);
 
+plaidml_expr* plaidml_expr_double(  //
+    plaidml_error* err,             //
+    double value);
+
 plaidml_expr* plaidml_expr_float(  //
     plaidml_error* err,            //
-    double value);
+    float value);
 
 plaidml_expr* plaidml_expr_call(  //
     plaidml_error* err,           //
@@ -331,9 +336,13 @@ plaidml_value* plaidml_value_expr(  //
     plaidml_error* err,             //
     plaidml_expr* expr);
 
+plaidml_value* plaidml_value_double(  //
+    plaidml_error* err,               //
+    double value);
+
 plaidml_value* plaidml_value_float(  //
     plaidml_error* err,              //
-    double value);
+    float value);
 
 plaidml_value* plaidml_value_int(  //
     plaidml_error* err,            //
@@ -356,8 +365,12 @@ plaidml_expr* plaidml_value_expr_get(  //
     plaidml_error* err,                //
     plaidml_value* value);
 
-double plaidml_value_float_get(  //
-    plaidml_error* err,          //
+double plaidml_value_double_get(  //
+    plaidml_error* err,           //
+    plaidml_value* value);
+
+float plaidml_value_float_get(  //
+    plaidml_error* err,         //
     plaidml_value* value);
 
 int64_t plaidml_value_int_get(  //

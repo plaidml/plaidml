@@ -629,13 +629,13 @@ Value binary_crossentropy(const Value& value) {
     throw std::runtime_error(
         llvm::formatv("The epsilon used in binary_crossentropy must be between 0 and 0.5, received {0}", epsilon));
   }
-  auto clip_inputs = make_tuple(raw_P, Value{epsilon}, Value{1. - epsilon});
+  auto clip_inputs = make_tuple(raw_P, Value{epsilon}, Value{1.f - epsilon});
   auto P = clip(clip_inputs).as_tensor();
   auto O = -T * log(P) - (1 - T) * log(1 - P);
   TensorDeriv deriv = [](const Tensor& Y, const Tensor& DY, const std::vector<Tensor>& X) {  //
     auto T = X[0];
     auto P = X[1];
-    Tensor One{1.0};
+    Tensor One{1.0f};
     auto ndims = T.shape().ndims();
     std::vector<TensorDim> dims(ndims);
     T.bind_dims(dims);
@@ -1402,6 +1402,10 @@ Value elu(const Value& value) {
   }
   auto I = args[0].as_tensor();
 
+  IVLOG(1, "args[i] " << args[1].str());
+  IVLOG(1, "args[i].is_double() " << args[1].is_double());
+  IVLOG(1, "args[i].is_float() " << args[1].is_float());
+
   // Same algorithm, but alpha may be either int or float
   if (args[1].is_float()) {
     auto alpha = args[1].as_float();
@@ -1922,7 +1926,7 @@ Value relu(const Value& value) {
   auto threshold = args[3].as_float();
   Tensor A;
   if (alpha.is_none()) {
-    A = Tensor(0.0);
+    A = Tensor(0.0f);
   } else {
     A = alpha.as_tensor();
   }
@@ -2050,7 +2054,7 @@ Value scale_gradient(const Value& value) {
   }
   auto O = I;  // Forward pass is NoOp
   TensorDeriv deriv = [](const Tensor& Y, const Tensor& DY, const std::vector<Tensor>& X) {
-    return std::vector<Tensor>{X[1] * DY, Tensor{0.0}};
+    return std::vector<Tensor>{X[1] * DY, Tensor{0.0f}};
   };
   return Value{OverrideGrads(deriv, std::vector<Tensor>{I, scale}, O)};
 }
@@ -2062,9 +2066,9 @@ Value sigmoid(const Value& value) {
     throw std::runtime_error("sigmoid expects 1 argument");
   }
   auto I = ident(args[0].as_tensor());  // Copy for safe gradient override
-  auto O = 1.0 / (1.0 + exp(-I));
+  auto O = 1.0f / (1.0f + exp(-I));
   TensorDeriv deriv = [](const Tensor& Y, const Tensor& DY, const std::vector<Tensor>& X) {  //
-    return std::vector<Tensor>{Y * (1.0 - Y) * DY};
+    return std::vector<Tensor>{Y * (1.0f - Y) * DY};
   };
   return Value{OverrideGrads(deriv, std::vector<Tensor>{I}, O)};
 }
