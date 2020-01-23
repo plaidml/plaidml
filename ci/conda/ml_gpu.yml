@@ -10,8 +10,8 @@ dependencies:
       - click
       - cairocffi
       - editdistance
-      - keras==2.2.4
-      - keras-applications==1.0.6
+      - keras==2.2.5
+      - keras-applications==1.0.8
       - https://github.com/keras-team/keras-contrib/archive/3b510b0a3f5e729c3d253164119f97f92037fbb7.zip
       - matplotlib
       - olefile

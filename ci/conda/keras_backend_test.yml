@@ -6,7 +6,7 @@ dependencies:
   - pip
   - python=3.7
   - pip:
-      - keras==2.2.4
+      - keras==2.2.5
       - keras-applications==1.0.8
       - six
       - tensorflow==1.14.0
