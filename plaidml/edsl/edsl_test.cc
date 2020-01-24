@@ -46,6 +46,44 @@ Tensor Softmax(const Tensor& X) {
   return E / N;
 }
 
+TEST(CppEdsl, LowerPrecision) {
+  auto A = Placeholder(DType::FLOAT64, {3, 3});
+  auto C = A + 1 + 2.0;
+
+  Program program("lower_precision", {C}, DType::FLOAT32, DType::INT32);
+
+  // consatnt_types pass doesn't lower precision to float32/int32 until program is compiled
+  EXPECT_THAT(program, Eq(R"#(
+
+!f32 = type tensor<!eltwise.f32>
+!i32 = type tensor<!eltwise.i32>
+module {
+  func @lower_precision(%arg0: tensor<3x3x!eltwise.f64>) -> tensor<3x3x!eltwise.f64> {
+    %cst = "eltwise.sconst"() {value = 2.000000e+00 : f64} : () -> !f32
+    %c1 = "eltwise.sconst"() {value = 1 : i64} : () -> !i32
+    %0 = "eltwise.add"(%arg0, %c1) : (tensor<3x3x!eltwise.f64>, !i32) -> tensor<3x3x!eltwise.f64>
+    %1 = "eltwise.add"(%0, %cst) : (tensor<3x3x!eltwise.f64>, !f32) -> tensor<3x3x!eltwise.f64>
+    return %1 : tensor<3x3x!eltwise.f64>
+  }
+}
+)#"));
+
+  std::vector<double> input_a = {1, 2, 3, 4, 5, 6, 7, 8, 9};
+  std::vector<double> expected = {4, 5, 6, 7, 8, 9, 10, 11, 12};
+
+  auto binder = exec::Binder(program);
+  auto executable = binder.compile();
+  binder.input(A).copy_from(input_a.data());
+  executable->run();
+  {
+    auto view = binder.output(C).mmap_current();
+    ASSERT_THAT(view.size(), expected.size() * sizeof(expected[0]));
+    auto data = reinterpret_cast<double*>(view.data());
+    std::vector<double> actual(data, data + expected.size());
+    EXPECT_THAT(actual, ContainerEq(expected));
+  }
+}
+
 TEST(CppEdsl, Cast) {
   auto A = Placeholder(DType::UINT64, {3, 3});
   auto B = cast(A, DType::UINT32);
