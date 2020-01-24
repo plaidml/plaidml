@@ -3,7 +3,7 @@ channels:
 dependencies:
   - conda=4.6
   - numpy=1.16
-  - pip
+  - pip=19
   - posix
   - pre_commit=1.17.0
   - python=3.7.0
