@@ -951,7 +951,6 @@ plaidml_program* plaidml_program_evaluate(  //
     }
 
     auto context = ret->program->module->getContext();
-
     ret->program->dtypes.floatx =
         pmlc::dialect::eltwise::ScalarType::get(context, static_cast<pmlc::util::DataType>(floatx))
             .toStandard()

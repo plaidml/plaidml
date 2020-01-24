@@ -2,12 +2,6 @@
 
 #pragma once
 
-#include <map>
-#include <set>
-#include <string>
-#include <tuple>
-#include <vector>
-
 #include "mlir/Pass/Pass.h"
 
 #include "pmlc/dialect/eltwise/ir/ops.h"

@@ -127,7 +127,9 @@ plaidml_executable* plaidml_compile(  //
     size_t noutputs,                  //
     plaidml_binding** outputs) {
   return ffi_wrap<plaidml_executable*>(err, nullptr, [&] {
-    IVLOG(1, "Compiling with device: " << device << ", target: " << target);
+    IVLOG(1, "Compiling with device: " << device << ", target: " << target << ", floatx width "
+                                       << program->program->dtypes.floatx.getWidth() << ", intx width "
+                                       << program->program->dtypes.intx.getWidth());
     auto args = BindProgramArguments(program, ninputs, inputs, noutputs, outputs);
     auto exec = std::make_unique<plaidml_executable>();
     std::vector<void*> bufptrs(args.size());
@@ -135,9 +137,6 @@ plaidml_executable* plaidml_compile(  //
       auto view = args[i].buffer->MapCurrent();
       bufptrs[i] = view->data();
     }
-
-    IVLOG(1, "Compiling with floatx");
-    IVLOG(1, "floatx " << program->program->dtypes.floatx.getWidth());
 
     exec->exec = std::make_unique<Executable>(program->program->entry, target, *program->program->module, bufptrs,
                                               program->program->dtypes.floatx, program->program->dtypes.intx);

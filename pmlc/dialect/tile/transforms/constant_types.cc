@@ -2,8 +2,6 @@
 
 #include "pmlc/dialect/tile/transforms/constant_types.h"
 
-#include <limits>
-#include <list>
 #include <memory>
 
 #include "llvm/Support/FormatVariadic.h"
@@ -37,10 +35,8 @@ void ConstantTypesPass::runOnFunction() {
       } else if (auto float_attr = op.getFloatAttr()) {
         double value = float_attr.getValueAsDouble();
         if (floatx_.getWidth() == 32) {
-          IVLOG(1, "floatx_.getWidth() == 32");
           op.setValue(builder.getF32FloatAttr(value));
         } else if (floatx_.getWidth() == 64) {
-          IVLOG(1, "floatx_.getWidth() == 64");
           op.setValue(builder.getF64FloatAttr(value));
         } else {
           IVLOG(1, "Warning: unknown float width " << floatx_.getWidth());
@@ -55,14 +51,10 @@ void ConstantTypesPass::runOnFunction() {
 
 std::unique_ptr<mlir::OpPassBase<mlir::FuncOp>> createConstantTypesPass(mlir::FloatType floatx,
                                                                         mlir::IntegerType intx) {
-  auto const_pass = std::make_unique<ConstantTypesPass>();
+  auto pass = std::make_unique<ConstantTypesPass>();
+  pass->floatx_ = floatx;
+  pass->intx_ = intx;
 
-  IVLOG(1, "Creating createConstantTypesPass");
-  IVLOG(1, "with float width " << floatx.getWidth());
-  const_pass->floatx_ = floatx;
-  const_pass->intx_ = intx;
-
-  std::unique_ptr<mlir::OpPassBase<mlir::FuncOp>> pass = std::move(const_pass);
   return pass;
 }
 

@@ -808,7 +808,7 @@ TEST(CppEdsl, CumSum) {
   auto O = TensorOutput(N);
   O(i) += I(k);
   O.add_constraint(i - k < N);
-  Program program("cumsum", {O}, DType::FLOAT64, DType::INT32);
+  Program program("cumsum", {O});
   EXPECT_THAT(program, Eq(R"#(
 #map0 = affine_map<(d0, d1) -> (d0)>
 #map1 = affine_map<(d0, d1) -> (d1)>
