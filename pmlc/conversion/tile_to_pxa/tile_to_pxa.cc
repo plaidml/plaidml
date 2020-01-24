@@ -154,9 +154,7 @@ struct AffineConstantOpConversion : public OpConversionPattern<AffineConstantOp>
       ArrayRef<Value> operands,        //
       ConversionPatternRewriter& rewriter) const final {
     auto value = op.getValue().cast<IntegerAttr>().getInt();
-    // rewriter.replaceOpWithNewOp<mlir::ConstantIndexOp>(op, value);
-    auto newOp = rewriter.create<mlir::ConstantIndexOp>(op.getLoc(), value);
-    rewriter.replaceOp(op, {newOp});
+    rewriter.replaceOpWithNewOp<mlir::ConstantIndexOp>(op, value);
     return matchSuccess();
   }
 };
@@ -179,8 +177,7 @@ struct ScalarConstantOpConversion : public OpConversionPattern<ew::ScalarConstan
     } else {
       llvm_unreachable("Invalid scalar constant op");
     }
-    auto newOp = rewriter.create<mlir::ConstantOp>(op.getLoc(), stdType, value);
-    rewriter.replaceOp(op, {newOp});
+    rewriter.replaceOpWithNewOp<mlir::ConstantOp>(op, stdType, value);
     return matchSuccess();
   }
 };
