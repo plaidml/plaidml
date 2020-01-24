@@ -56,6 +56,7 @@ def ScalarConstantOp :
 
   let extraClassDeclaration = [{
     Attribute getValue() { return getAttr("value"); }
+    void setValue(Attribute attr) {setAttr("value", attr); }
     IntegerAttr getIntAttr() { return getAttrOfType<IntegerAttr>("value"); }
     FloatAttr getFloatAttr() { return getAttrOfType<FloatAttr>("value"); }
   }];

@@ -1132,7 +1132,8 @@ inline Program::Program(                 //
       updates.size(),                                    //
       src_updates.data(),                                //
       dst_updates.data(),                                //
-      &args));
+      static_cast<plaidml_datatype>(floatx),             //
+      static_cast<plaidml_datatype>(intx), &args));
   for (size_t i = 0; i < args->nargs; i++) {
     const auto& arg = args->args[i];
     Tensor tensor(ffi::call<plaidml_expr*>(plaidml_expr_clone, arg.tensor));

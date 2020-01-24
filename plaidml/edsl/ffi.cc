@@ -913,6 +913,8 @@ plaidml_program* plaidml_program_evaluate(  //
     size_t nupdates,                        //
     plaidml_expr** src_updates,             //
     plaidml_expr** dst_updates,             //
+    plaidml_datatype floatx,                //
+    plaidml_datatype intx,                  //
     plaidml_program_args** raw_args) {
   return ffi_wrap<plaidml_program*>(err, nullptr, [&] {
     IVLOG(3, "plaidml_program_evaluate");
@@ -947,6 +949,18 @@ plaidml_program* plaidml_program_evaluate(  //
         args[i].buffer = nullptr;
       }
     }
+
+    auto context = ret->program->module->getContext();
+
+    ret->program->dtypes.floatx =
+        pmlc::dialect::eltwise::ScalarType::get(context, static_cast<pmlc::util::DataType>(floatx))
+            .toStandard()
+            .dyn_cast<mlir::FloatType>();
+    ret->program->dtypes.intx =
+        pmlc::dialect::eltwise::ScalarType::get(context, static_cast<pmlc::util::DataType>(intx))
+            .toStandard()
+            .dyn_cast<mlir::IntegerType>();
+
     *raw_args = new plaidml_program_args{nargs, args};
     return ret;
   });

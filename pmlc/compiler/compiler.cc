@@ -113,6 +113,9 @@ Executable::Executable(StringRef entry, StringRef target, ModuleOp programModule
   manager.addNestedPass<FuncOp>(createCanonicalizerPass());
   manager.addNestedPass<FuncOp>(createCSEPass());
 
+  IVLOG(1, "Creating executable with floatx");
+  IVLOG(1, "floatx " << floatx.getWidth());
+
   manager.addPass(dialect::tile::createConstantTypesPass(floatx, intx));
   manager.addNestedPass<FuncOp>(createCanonicalizerPass());
   manager.addNestedPass<FuncOp>(createCSEPass());

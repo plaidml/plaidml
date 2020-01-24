@@ -15,6 +15,7 @@
 #include "plaidml/core/internal.h"
 #include "pmlc/compiler/compiler.h"
 #include "pmlc/compiler/registry.h"
+#include "pmlc/dialect/eltwise/ir/types.h"
 #include "pmlc/dialect/tile/program.h"
 #include "pmlc/util/env.h"
 #include "pmlc/util/logging.h"
@@ -134,6 +135,10 @@ plaidml_executable* plaidml_compile(  //
       auto view = args[i].buffer->MapCurrent();
       bufptrs[i] = view->data();
     }
+
+    IVLOG(1, "Compiling with floatx");
+    IVLOG(1, "floatx " << program->program->dtypes.floatx.getWidth());
+
     exec->exec = std::make_unique<Executable>(program->program->entry, target, *program->program->module, bufptrs,
                                               program->program->dtypes.floatx, program->program->dtypes.intx);
     return exec.release();
