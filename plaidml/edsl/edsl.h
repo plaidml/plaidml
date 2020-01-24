@@ -89,7 +89,7 @@ class Program {
   Program(                                   //
       const std::string& name,               //
       const std::vector<Tensor>& outputs,    //
-      const DType& floatx = DType::FLOAT32,  //
+      const DType& floatx = DType::FLOAT64,  //
       const DType& intx = DType::INT64,      //
       const std::vector<std::tuple<Tensor, Tensor>>& updates = {});
 

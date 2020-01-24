@@ -290,6 +290,7 @@ module {
 
   auto binder = exec::Binder(program);
   auto executable = binder.compile();
+
   binder.input(A).copy_from(input.data());
   binder.input(B).copy_from(input.data());
   executable->run();

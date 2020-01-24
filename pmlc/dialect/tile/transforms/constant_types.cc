@@ -22,20 +22,10 @@ namespace pmlc::dialect::tile {
 
 void ConstantTypesPass::runOnFunction() {
   auto func = getFunction();
-  IVLOG(1, "ConstantTypesPass::runOnFunction");
   func.walk([this](pmlc::dialect::eltwise::ScalarConstantOp op) {
     try {
-      IVLOG(1, "ConstantTypesPass found ScalarConstantOp");
-
       mlir::Builder builder(&getContext());
-
-      auto value = op.getValue();
-      value.dump();
-
       if (auto int_attr = op.getIntAttr()) {
-        IVLOG(1, "got int_attr");
-        int_attr.dump();
-
         int64_t value = int_attr.getInt();
         if (intx_.getWidth() == 32) {
           op.setValue(builder.getI32IntegerAttr(value));
@@ -44,13 +34,8 @@ void ConstantTypesPass::runOnFunction() {
         } else {
           IVLOG(1, "Warning: unknown integer width " << floatx_.getWidth());
         }
-
       } else if (auto float_attr = op.getFloatAttr()) {
-        IVLOG(1, "got float_attr");
-
         double value = float_attr.getValueAsDouble();
-        IVLOG(1, "got value " << value);
-
         if (floatx_.getWidth() == 32) {
           IVLOG(1, "floatx_.getWidth() == 32");
           op.setValue(builder.getF32FloatAttr(value));
@@ -61,7 +46,6 @@ void ConstantTypesPass::runOnFunction() {
           IVLOG(1, "Warning: unknown float width " << floatx_.getWidth());
         }
       }
-
     } catch (const std::exception& ex) {
       op.emitError(ex.what());
       signalPassFailure();
