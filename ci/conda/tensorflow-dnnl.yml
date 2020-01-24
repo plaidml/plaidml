@@ -2,6 +2,6 @@ channels:
   - anaconda
   - conda-forge
 dependencies:
-  - pip
+  - pip=19
   - python=3.7
   - anaconda::tensorflow=1.14.0

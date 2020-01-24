@@ -234,6 +234,36 @@ void* plaidml_expr_ptr(  //
   });
 }
 
+plaidml_datatype plaidml_expr_get_dtype(  //
+    plaidml_error* err,                   //
+    plaidml_expr* expr) {
+  return ffi_wrap<plaidml_datatype>(err, PLAIDML_DATA_INVALID, [&] {
+    IVLOG(3, "plaidml_expr_get_dtype");
+    auto tensorType = expr->value.getType().dyn_cast<mlir::RankedTensorType>();
+    if (!tensorType) {
+      throw std::runtime_error("Expected RankedTensorType");
+    }
+    auto elementType = tensorType.getElementType();
+    auto scalarType = elementType.dyn_cast<ScalarType>();
+    if (!scalarType) {
+      throw std::runtime_error("Expected ScalarType");
+    }
+    return static_cast<plaidml_datatype>(scalarType.type());
+  });
+}
+
+size_t plaidml_expr_get_rank(  //
+    plaidml_error* err,        //
+    plaidml_expr* expr) {
+  return ffi_wrap<size_t>(err, 0, [&] {
+    auto tensorType = expr->value.getType().dyn_cast<mlir::RankedTensorType>();
+    if (!tensorType) {
+      throw std::runtime_error("Expected RankedTensorType");
+    }
+    return tensorType.getRank();
+  });
+}
+
 plaidml_logical_shape* plaidml_expr_get_shape(  //
     plaidml_error* err,                         //
     plaidml_expr* expr) {
@@ -363,6 +393,16 @@ plaidml_expr* plaidml_expr_cast(  //
   });
 }
 
+plaidml_expr* plaidml_expr_trace(  //
+    plaidml_error* err,            //
+    plaidml_expr* tensor,          //
+    const char* msg) {
+  return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
+    IVLOG(3, "plaidml_expr_trace");
+    return new plaidml_expr{GlobalContext::get()->MakeTraceOp(tensor->value, msg)};
+  });
+}
+
 plaidml_expr* plaidml_expr_call(  //
     plaidml_error* err,           //
     const char* fn,               //
@@ -404,9 +444,9 @@ plaidml_expr* plaidml_expr_index_map(  //
       idx_values[i] = raw_idxs[i]->value;
     }
     if (ref) {
-      return new plaidml_expr{GlobalContext::get()->MakeAffineSourceIndexMapOp(ref->value, idx_values)};
+      return new plaidml_expr{GlobalContext::get()->MakeAffineTensorMapOp(ref->value, idx_values)};
     }
-    return new plaidml_expr{GlobalContext::get()->MakeAffineSinkIndexMapOp(idx_values)};
+    return new plaidml_expr{GlobalContext::get()->MakeAffineMapOp(idx_values)};
   });
 }
 
@@ -420,7 +460,7 @@ plaidml_expr* plaidml_expr_size_map(  //
     for (size_t i = 0; i < ndims; i++) {
       dim_values.emplace_back(raw_dims[i]->value);
     }
-    return new plaidml_expr{GlobalContext::get()->MakeAffineSizeMapOp(dim_values)};
+    return new plaidml_expr{GlobalContext::get()->MakeAffineMapOp(dim_values)};
   });
 }
 

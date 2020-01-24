@@ -96,7 +96,7 @@ class Program {
   ///
   /// Return the Program as a string.
   ///
-  std::string str() const { return ffi::str(ffi::call<plaidml_string*>(plaidml_program_repr, ptr_.get())); }
+  std::string str() const { return ffi::str(ffi::call<plaidml_string*>(plaidml_program_repr, as_ptr())); }
 
   ///
   /// args
@@ -186,7 +186,7 @@ class TensorDim {
   /// Returns the TensorDim as a string.
   ///
   std::string str() const {  //
-    return ffi::str(ffi::call<plaidml_string*>(plaidml_dim_expr_repr, ptr_.get()));
+    return ffi::str(ffi::call<plaidml_string*>(plaidml_dim_expr_repr, as_ptr()));
   }
 
   ///
@@ -196,7 +196,7 @@ class TensorDim {
     if (!ptr_) {
       throw std::runtime_error("as_int() only available on TensorDim with an integer value");
     }
-    return ffi::call<int64_t>(plaidml_dim_expr_get_int, ptr_.get());
+    return ffi::call<int64_t>(plaidml_dim_expr_get_int, as_ptr());
   }
 
   plaidml_dim_expr* as_ptr() const { return ptr_.get(); }
@@ -430,14 +430,14 @@ class LogicalShape {
   /// Returns a LogicalShape as a string
   ///
   std::string str() const {  //
-    return ffi::str(ffi::call<plaidml_string*>(plaidml_logical_shape_repr, ptr_.get()));
+    return ffi::str(ffi::call<plaidml_string*>(plaidml_logical_shape_repr, as_ptr()));
   }
 
   ///
   /// Returns the datatype of the LogicalShape
   ///
   DType dtype() const {
-    auto ret = ffi::call<plaidml_datatype>(plaidml_logical_shape_get_dtype, ptr_.get());
+    auto ret = ffi::call<plaidml_datatype>(plaidml_logical_shape_get_dtype, as_ptr());
     return static_cast<DType>(ret);
   }
 
@@ -445,7 +445,7 @@ class LogicalShape {
   /// Returns the number of dimensions of the LogicalShape
   ///
   size_t ndims() const {  //
-    return ffi::call<size_t>(plaidml_logical_shape_get_ndims, ptr_.get());
+    return ffi::call<size_t>(plaidml_logical_shape_get_ndims, as_ptr());
   }
 
   ///
@@ -454,7 +454,7 @@ class LogicalShape {
   std::vector<int64_t> int_dims() const {
     std::vector<int64_t> ret(ndims());
     for (size_t i = 0; i < ret.size(); i++) {
-      ret[i] = ffi::call<int64_t>(plaidml_logical_shape_get_dim_int, ptr_.get(), i);
+      ret[i] = ffi::call<int64_t>(plaidml_logical_shape_get_dim_int, as_ptr(), i);
     }
     return ret;
   }
@@ -693,8 +693,17 @@ class Tensor {
   ///
   /// Return the tensor's shape
   ///
-  LogicalShape shape() const {
+  LogicalShape compute_shape() const {
     return LogicalShape(ffi::call<plaidml_logical_shape*>(plaidml_expr_get_shape, as_ptr()));
+  }
+
+  DType dtype() const {  //
+    auto ret = ffi::call<plaidml_datatype>(plaidml_expr_get_dtype, as_ptr());
+    return static_cast<DType>(ret);
+  }
+
+  size_t rank() const {  //
+    return ffi::call<size_t>(plaidml_expr_get_rank, as_ptr());
   }
 
   ///
@@ -1088,6 +1097,14 @@ inline Tensor tan(const Tensor& x) { return Call("tan", x); }
 /// \return Tensor
 ///
 inline Tensor tanh(const Tensor& x) { return Call("tanh", x); }
+
+///
+/// Adds a tracepoint to the graph
+///
+inline Tensor trace(const Tensor& x, const std::string& msg) {
+  auto ptr = ffi::call<plaidml_expr*>(plaidml_expr_trace, x.as_ptr(), msg.c_str());
+  return Tensor{ptr};
+}
 
 ///
 /// Returns a Tensor with a value of 0.

@@ -32,13 +32,13 @@ edsl::Tensor addmm(const std::vector<edsl::Value>& args) {
   IVLOG(1, "addmm");
 
   const auto& A = args[0].as_tensor();
-  IVLOG(2, "  A: " << A.shape().str());
+  IVLOG(2, "  A: " << A.compute_shape().str());
 
   const auto& B = args[1].as_tensor();
-  IVLOG(2, "  B: " << B.shape().str());
+  IVLOG(2, "  B: " << B.compute_shape().str());
 
   const auto& C = args[2].as_tensor();
-  IVLOG(2, "  C: " << C.shape().str());
+  IVLOG(2, "  C: " << C.compute_shape().str());
 
   const auto& beta = args[3].as_tensor();
   IVLOG(2, "  beta: " << beta);
@@ -61,7 +61,7 @@ edsl::Tensor add(const std::vector<edsl::Value>& args) {
   auto A = args[0].as_tensor();
   auto B = args[1].as_tensor();
   auto C = args[2].as_tensor();
-  IVLOG(2, "  " << A.shape().str() << " + " << B.shape().str() << " * " << C);
+  IVLOG(2, "  " << A.compute_shape().str() << " + " << B.compute_shape().str() << " * " << C);
   return A + B * C;
 }
 
@@ -70,7 +70,7 @@ edsl::Tensor mul(const std::vector<edsl::Value>& args) {
   IVLOG(1, "mul");
   auto A = args[0].as_tensor();
   auto B = args[1].as_tensor();
-  IVLOG(2, "  " << A.shape().str() << " * " << B.shape().str());
+  IVLOG(2, "  " << A.compute_shape().str() << " * " << B.compute_shape().str());
   return A * B;
 }
 
@@ -89,7 +89,7 @@ edsl::Tensor batch_norm(const std::vector<edsl::Value>& args) {
   IVLOG(1, "batch_norm");
 
   const auto& I = args[0].as_tensor();  // input
-  IVLOG(2, "  I: " << I.shape().str());
+  IVLOG(2, "  I: " << I.compute_shape().str());
 
   edsl::TensorDim N, C, H, W;
   I.bind_dims(N, C, H, W);
@@ -151,7 +151,7 @@ edsl::Tensor convolution(const std::vector<edsl::Value>& args) {
   IVLOG(1, "convolution");
 
   auto I = args[0].as_tensor();  // input
-  IVLOG(2, "  I: " << I.shape());
+  IVLOG(2, "  I: " << I.compute_shape());
 
   auto K = args[1].as_tensor();  // weight
   IVLOG(2, "  K: " << K);
@@ -236,7 +236,7 @@ edsl::Tensor avg_pool2d(const std::vector<edsl::Value>& args) {
   IVLOG(1, "avg_pool2d");
 
   const auto& I = args[0].as_tensor();
-  IVLOG(2, "  I: " << I.shape().str());
+  IVLOG(2, "  I: " << I.compute_shape().str());
 
   const auto& kernel_size = args[1].as_tuple();
   IVLOG(2, "  kernel_size: " << args[1].str());
@@ -273,7 +273,7 @@ edsl::Tensor adaptive_avg_pool2d(const std::vector<edsl::Value>& args) {
   IVLOG(1, "adaptive_avg_pool2d");
 
   const auto& I = args[0].as_tensor();
-  IVLOG(2, "  I: " << I.shape().str());
+  IVLOG(2, "  I: " << I.compute_shape().str());
 
   const auto& output_size = args[1].as_tuple();
   IVLOG(2, "  output_size: " << args[1].str());
@@ -319,7 +319,7 @@ edsl::Tensor max_pool2d(const std::vector<edsl::Value>& args) {
   IVLOG(1, "max_pool2d");
 
   const auto& I = args[0].as_tensor();
-  IVLOG(2, "  I: " << I.shape().str());
+  IVLOG(2, "  I: " << I.compute_shape().str());
 
   const auto& kernel_size = args[1].as_tuple();
   IVLOG(2, "  kernel_size: " << args[1].str());
@@ -363,7 +363,7 @@ edsl::Tensor relu(const std::vector<edsl::Value>& args) {
   IVLOG(1, "relu");
 
   const auto& I = args[0].as_tensor();
-  IVLOG(2, "  I: " << I.shape().str());
+  IVLOG(2, "  I: " << I.compute_shape().str());
 
   edsl::Tensor Z{0.0};
   return edsl::select(I < Z, Z, I);
@@ -374,8 +374,8 @@ edsl::Tensor reshape(const std::vector<edsl::Value>& args) {
   IVLOG(1, "reshape");
 
   const auto& I = args[0].as_tensor();
-  auto I_dims = I.shape().int_dims();
-  IVLOG(2, "  I: " << I.shape().str());
+  auto I_dims = I.compute_shape().int_dims();
+  IVLOG(2, "  I: " << I.compute_shape().str());
 
   const auto& shape = args[1].as_tuple();
   IVLOG(2, "  shape: " << args[1].str());
@@ -413,7 +413,7 @@ edsl::Tensor transpose(const std::vector<edsl::Value>& args) {
   IVLOG(1, "transpose");
 
   const auto& I = args[0].as_tensor();
-  IVLOG(2, "  I: " << I.shape().str());
+  IVLOG(2, "  I: " << I.compute_shape().str());
 
   edsl::TensorDim X, Y;
   edsl::TensorIndex x, y;
@@ -428,7 +428,7 @@ edsl::Tensor linear(const std::vector<edsl::Value>& args) {
   IVLOG(1, "linear");
 
   const auto& input = args[0].as_tensor();
-  IVLOG(2, "  input: " << input.shape().str());
+  IVLOG(2, "  input: " << input.compute_shape().str());
 
   const auto& weight = args[1].as_tensor();
   IVLOG(2, "  weight: " << weight.str());
@@ -612,7 +612,7 @@ Executable::Executable(                       //
       // input_bindings_(inputs.size()),
       output_ivalues_(outputs.size()) {
   // for (size_t i = 0; i < inputs.size(); i++) {
-  //   auto shape = inputs[i].shape();
+  //   auto shape = inputs[i].compute_shape();
   //   plaidml::TensorShape tensor_shape(shape.dtype(), shape.int_dims());
   //   plaidml::Buffer buffer(device_id, tensor_shape);
   //   input_bindings_[i] = plaidml::exec::Binding{inputs[i], buffer};
@@ -626,7 +626,7 @@ Executable::Executable(                       //
   IVLOG(2, program.str());
   binder_ = std::make_unique<plaidml::exec::Binder>(program);
   // for (size_t i = 0; i < outputs.size(); i++) {
-  //   // auto shape = outputs[i].shape();
+  //   // auto shape = outputs[i].compute_shape();
   //   // plaidml::TensorShape tensor_shape(shape.dtype(), shape.int_dims());
   //   // output_bindings_.emplace_back(plaidml::exec::Binding{
   //   //     program_->outputs().at(i),                // tensor

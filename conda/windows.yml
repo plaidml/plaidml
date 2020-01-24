@@ -5,7 +5,7 @@ dependencies:
   - jupyter
   - m2-perl
   - nbformat=4.4.0 # Latest version of nbformat breaks the analysis notebook
-  - pip
+  - pip=19
   - python=3.7.4
   - scikit-image
   - pip:

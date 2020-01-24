@@ -13,13 +13,6 @@ exports_files([
     "ffi.h",
 ])
 
-pkg_tar(
-    name = "include_pkg",
-    srcs = SDK_HDRS,
-    package_dir = "include/plaidml/op",
-    visibility = ["//visibility:public"],
-)
-
 filegroup(
     name = "sdk",
     srcs = SDK_HDRS,
@@ -33,6 +26,7 @@ plaidml_cc_library(
     ],
     hdrs = [
         "ffi.h",
+        "op.h",
     ],
     visibility = ["//visibility:public"],
     deps = [
@@ -41,17 +35,6 @@ plaidml_cc_library(
         "//plaidml/op/lib",
         "//pmlc/util",
         "@llvm-project//llvm:support",
-    ],
-    alwayslink = 1,
-)
-
-plaidml_cc_library(
-    name = "api",
-    hdrs = SDK_HDRS,
-    visibility = ["//visibility:public"],
-    deps = [
-        "//plaidml/core:api",
-        "//plaidml/edsl:api",
     ],
 )
 
@@ -71,7 +54,6 @@ plaidml_cc_test(
     name = "cc_test",
     srcs = ["op_test.cc"],
     deps = [
-        ":api",
         ":op",
         "//plaidml:testenv",
     ],

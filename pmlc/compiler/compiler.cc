@@ -13,6 +13,7 @@
 #include "mlir/ExecutionEngine/OptUtils.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
+#include "mlir/Support/DebugStringHelper.h"
 #include "mlir/Target/LLVMIR.h"
 #include "mlir/Transforms/Passes.h"
 
@@ -105,9 +106,18 @@ Executable::Executable(StringRef entry, StringRef target, ModuleOp programModule
   OwningModuleRef module(copy);
   PassManager manager(module->getContext());
 
-  auto shouldPrintBeforePass = [](auto, auto) { return false; };
-  auto shouldPrintAfterPass = [](auto, auto) { return VLOG_IS_ON(3); };
+  auto shouldPrintBeforePass = [](auto pass, auto op) { return false; };
+  auto shouldPrintAfterPass = [&](auto pass, auto op) {
+    if (auto funcOp = llvm::dyn_cast<FuncOp>(op)) {
+      return VLOG_IS_ON(3) && funcOp.getName() == entry;
+    }
+    return VLOG_IS_ON(3);
+  };
   manager.enableIRPrinting(shouldPrintBeforePass, shouldPrintAfterPass, true, false, llvm::errs());
+  if (VLOG_IS_ON(1)) {
+    manager.enableStatistics();
+    manager.enableTiming();
+  }
 
   manager.addPass(dialect::tile::createComputeBoundsPass());
   manager.addNestedPass<FuncOp>(createCanonicalizerPass());
@@ -125,7 +135,7 @@ Executable::Executable(StringRef entry, StringRef target, ModuleOp programModule
   manager.addPass(ArgumentCollectorPass::create(&memRefTypes));
 
   auto pipelineBuilder = resolveTarget(target);
-  pipelineBuilder(&manager);
+  pipelineBuilder(manager);
 
   if (failed(manager.run(*module))) {
     throw std::runtime_error("conversion to the LLVM IR dialect failed");
@@ -144,7 +154,7 @@ Executable::Executable(StringRef entry, StringRef target, ModuleOp programModule
   }
 
   auto optPipeline = makeOptimizingTransformer(
-      /*optLevel=*/3, /*sizeLevel=*/0,
+      /*optLevel=*/0, /*sizeLevel=*/0,
       /*targetMachine=*/tmOrError->get());
 
   if (VLOG_IS_ON(6)) {
