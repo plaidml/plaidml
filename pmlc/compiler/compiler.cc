@@ -98,8 +98,9 @@ void Executable::initialize() {
   initializeLLVMPasses();
 }
 
-Executable::Executable(StringRef entry, StringRef target, ModuleOp programModule, ArrayRef<void*> bufptrs)
-    : entry(entry), args(bufptrs.size()), ptrs(bufptrs.size()) {
+Executable::Executable(StringRef entry, StringRef target, ModuleOp programModule, ArrayRef<void*> bufptrs,
+                       FloatType floatx, IntegerType intx)
+    : entry(entry), args(bufptrs.size()), ptrs(bufptrs.size()), floatx(floatx), intx(intx) {
   auto copy = cast<ModuleOp>(programModule.getOperation()->clone());
   OwningModuleRef module(copy);
   PassManager manager(module->getContext());

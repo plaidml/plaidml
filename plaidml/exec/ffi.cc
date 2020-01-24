@@ -23,6 +23,7 @@ using plaidml::core::ffi_wrap;
 using plaidml::core::ffi_wrap_void;
 using pmlc::compiler::Executable;
 using pmlc::dialect::tile::ProgramArgument;
+using pmlc::dialect::tile::ProgramDType;
 using pmlc::util::Buffer;
 using pmlc::util::BufferPtr;
 using namespace mlir;  // NOLINT[build/namespaces]
@@ -133,7 +134,8 @@ plaidml_executable* plaidml_compile(  //
       auto view = args[i].buffer->MapCurrent();
       bufptrs[i] = view->data();
     }
-    exec->exec = std::make_unique<Executable>(program->program->entry, target, *program->program->module, bufptrs);
+    exec->exec = std::make_unique<Executable>(program->program->entry, target, *program->program->module, bufptrs,
+                                              program->program->dtypes.floatx, program->program->dtypes.intx);
     return exec.release();
   });
 }

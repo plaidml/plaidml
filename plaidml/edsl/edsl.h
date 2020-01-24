@@ -82,12 +82,15 @@ class Program {
  public:
   ///
   /// Program constructor
-  /// constant_datatype should be a tuple of (PLAIDML_DATA_*INT*8, PLAIDML_DATA_FLOAT*)
-  /// and is used to specify the underlying datatype of integers and float-point constants.
-  Program(                                 //
-      const std::string& name,             //
-      const std::vector<Tensor>& outputs,  //
-      const std::tuple<DType, DType>& const_dtypes = std::make_tuple<DType, DType>(DType::INT32, DType::FLOAT32),
+  /// floatx is used to specify the underlying datatype of floating-point constants
+  /// and should be either DType::FLOAT32 or DType::FLOAT64.
+  /// intx is used to specify the underlying datatype of integer constants
+  /// and should be either DType::INT32 or DType::INT64.
+  Program(                                   //
+      const std::string& name,               //
+      const std::vector<Tensor>& outputs,    //
+      const DType& floatx = DType::FLOAT32,  //
+      const DType& intx = DType::INT64,      //
       const std::vector<std::tuple<Tensor, Tensor>>& updates = {});
 
   ///
@@ -110,6 +113,34 @@ class Program {
   ///
   const std::vector<ProgramArgument>& outputs() const { return outputs_; }
 
+  ///
+  /// floatx
+  ///
+  const DType& floatx() const { return floatx_; }
+
+  void set_floatx(const DType& floatx) {
+    if (floatx != DType::FLOAT32 && floatx != DType::FLOAT64) {
+      std::stringstream ss;
+      ss << "Invalid floatx_ requested by Program. Expected either float32 or float64";
+      throw std::runtime_error(ss.str());
+    }
+    floatx_ = floatx;
+  }
+
+  ///
+  /// intx
+  ///
+  const DType& intx() const { return intx_; }
+
+  void set_intx(const DType& intx) {
+    if (intx != DType::INT32 && intx != DType::INT64) {
+      std::stringstream ss;
+      ss << "Invalid intx_ requested by Program. Expected either int32 or int64";
+      throw std::runtime_error(ss.str());
+    }
+    intx_ = intx;
+  }
+
   plaidml_program* as_ptr() const { return ptr_.get(); }
 
  private:
@@ -117,7 +148,8 @@ class Program {
   std::vector<ProgramArgument> args_;
   std::vector<ProgramArgument> inputs_;
   std::vector<ProgramArgument> outputs_;
-  std::tuple<DType, DType> const_dtypes_;
+  DType floatx_;
+  DType intx_;
 };
 
 ///
@@ -1068,17 +1100,11 @@ inline Tensor zero() { return Tensor{0}; }
 inline Program::Program(                 //
     const std::string& name,             //
     const std::vector<Tensor>& outputs,  //
-    const std::tuple<DType, DType>& const_dtypes, const std::vector<std::tuple<Tensor, Tensor>>& updates) {
-  const_dtypes_ = const_dtypes;
-
-  auto datatype = pmlc::util::DataType(std::get<0>(const_dtypes));
-
-  if (pmlc::util::isInteger(datatype)) {
-    std::stringstream ss;
-    ss << "Not iteger";
-    // ss << "Invalid integer detype requested by Program: " << std::get<0>(const_dtypes);
-    throw std::runtime_error(ss.str());
-  }
+    const DType& floatx,                 //
+    const DType& intx,                   //
+    const std::vector<std::tuple<Tensor, Tensor>>& updates) {
+  set_floatx(floatx);
+  set_intx(intx);
 
   std::vector<plaidml_expr*> raw_outputs(outputs.size());
   std::vector<plaidml_expr*> new_outputs(outputs.size());
