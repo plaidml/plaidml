@@ -3,7 +3,7 @@ channels:
 dependencies:
   - h5py
   - numpy
-  - pip
+  - pip=19
   - python=3.6
   - scipy=1.2.1
   - pip:
