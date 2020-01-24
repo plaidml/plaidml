@@ -2,7 +2,7 @@ channels:
   - conda-forge
 dependencies:
   - numpy=1.16.4
-  - pip
+  - pip=19
   - pre_commit=1.17.0
   - python=3.7.4
   - pyyaml=5.1.2
