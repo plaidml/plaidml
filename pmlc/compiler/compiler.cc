@@ -113,6 +113,10 @@ Executable::Executable(StringRef entry, StringRef target, ModuleOp programModule
   manager.addNestedPass<FuncOp>(createCanonicalizerPass());
   manager.addNestedPass<FuncOp>(createCSEPass());
 
+  manager.addPass(dialect::tile::createConstantTypesPass(floatx, intx));
+  manager.addNestedPass<FuncOp>(createCanonicalizerPass());
+  manager.addNestedPass<FuncOp>(createCSEPass());
+
   manager.addPass(createLowerTileToPXAPass());
   manager.addNestedPass<FuncOp>(createCanonicalizerPass());
   manager.addNestedPass<FuncOp>(createCSEPass());

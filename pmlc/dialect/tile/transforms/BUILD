@@ -8,9 +8,11 @@ plaidml_cc_library(
     name = "lib",
     srcs = [
         "contraction.cc",
+        "constant_types.cc"
     ],
     hdrs = [
         "contraction.h",
+        "constant_types.h",
         "passes.h",
     ],
     deps = [
