@@ -619,21 +619,14 @@ class Program(ForeignObject):
     __ffi_del__ = lib.plaidml_program_free
     __ffi_repr__ = lib.plaidml_program_repr
 
-    def __init__(self, name, outputs, updates=[]):
+    def __init__(self, name, outputs, updates=[], floatx=DType.FLOAT64, intx=DType.INT64):
         raw_outputs = [x.as_ptr() for x in outputs]
         dst_updates = [x[0].as_ptr() for x in updates]
         src_updates = [x[1].as_ptr() for x in updates]
         raw_args = ffi.new('plaidml_program_args**')
-        ffi_obj = ffi_call(
-            lib.plaidml_program_evaluate,
-            name.encode(),
-            len(raw_outputs),
-            raw_outputs,
-            len(updates),
-            src_updates,
-            dst_updates,
-            raw_args,
-        )
+        ffi_obj = ffi_call(lib.plaidml_program_evaluate, name.encode(), len(raw_outputs),
+                           raw_outputs, len(updates), src_updates, dst_updates, floatx, intx,
+                           raw_args)
         self.args = [ProgramArgument(raw_args[0].args[i]) for i in range(raw_args[0].nargs)]
         ffi_call(lib.plaidml_program_args_free, raw_args[0])
         super(Program, self).__init__(ffi_obj)
