@@ -266,12 +266,12 @@ class TestEdsl(unittest.TestCase):
             'lower_precision', [O], floatx=plaidml.DType.FLOAT32, intx=plaidml.DType.INT32)
         expected = '''
 
-!f32 = type tensor<!eltwise.f32>
 !i32 = type tensor<!eltwise.i32>
+!f32 = type tensor<!eltwise.f32>
 module {
   func @lower_precision(%arg0: tensor<3x3x!eltwise.f64>) -> tensor<3x3x!eltwise.f64> {
-    %cst = "eltwise.sconst"() {value = 2.000000e+00 : f64} : () -> !f32
     %c1 = "eltwise.sconst"() {value = 1 : i64} : () -> !i32
+    %cst = "eltwise.sconst"() {value = 2.000000e+00 : f64} : () -> !f32
     %0 = "eltwise.add"(%arg0, %c1) : (tensor<3x3x!eltwise.f64>, !i32) -> tensor<3x3x!eltwise.f64>
     %1 = "eltwise.add"(%0, %cst) : (tensor<3x3x!eltwise.f64>, !f32) -> tensor<3x3x!eltwise.f64>
     return %1 : tensor<3x3x!eltwise.f64>
