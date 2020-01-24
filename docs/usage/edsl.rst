@@ -1,20 +1,20 @@
 Tile eDSL 
 #############
-The C++ Tile eDSL (Embedded Domain Specific Language) provides developers with a
+The Tile eDSL (Embedded Domain Specific Language) provides developers with a
 way of describing a neural network so that the Stripe-based PlaidML compiler can
 construct an efficient implementation.
 This tutorial is intended to help machine learning practitioners (or anyone with
-a background in software engineering and mathematics) get started using the C++
+a background in software engineering and mathematics) get started using the C++/Python
 Tile eDSL.
 
 Scope and Warning
 *******************
-This tutorial provides an introduction to the C++ Tile eDSL. It is intended to
+This tutorial provides an introduction to the Tile eDSL. It is intended to
 help machine learning practitioners get started writing Tile code as quickly as
 possible, and as such covers core features, not every language detail. This is a
 tutorial, not a spec, and as such will consist of a series of examples, with a
 summary reference section at the end.
-This tutorial covers how to use the C++ Tile eDSL, not how Tile code is
+This tutorial covers how to use the Tile eDSL, not how Tile code is
 constructed and manipulated by PlaidML. It does not cover the workings of
 PlaidML utilities such as the pmlc compiler.
 Tile and PlaidML are still being developed and the APIs discussed here are subject
@@ -25,7 +25,7 @@ How to Write Tile Code
 
 Sum Over Axis
 ================
-We're ready to look at some C++ Tile code! Here's an operation that takes the
+We're ready to look at some Tile code! Here's an operation that takes the
 sum over axis `0` of a 2D tensor (in Keras this would be ``K.sum(I, axis=0)``):
 
 .. tabs::
@@ -58,7 +58,7 @@ sum over axis `0` of a 2D tensor (in Keras this would be ``K.sum(I, axis=0)``):
 
 An operation such as this which merges together values across one or more
 indices is called a *contraction*. The syntax may look a bit odd at first, but
-it's related to summation notation. Below we show how this C++ Tile code is
+it's related to summation notation. Below we show how this Tile code is
 related to the mathematical formula for the operation by using colors to
 highlight corresponding pieces:
 
@@ -75,7 +75,7 @@ highlight corresponding pieces:
   \color{green}\verb| += |
   \color{blue}\verb|I(m, n)|\color{default}\verb|;|
 
-In green, notice that the summation symbol is represented as ``+=`` in C++ Tile
+In green, notice that the summation symbol is represented as ``+=`` in Tile
 code. Some portions of the notation do not perfectly correspond. Here's why:
 
 - Summation notation includes a ``m`` subscript to indicate that ``m`` is the
@@ -107,7 +107,6 @@ code. Some portions of the notation do not perfectly correspond. Here's why:
   would result in a `0` as the last element of `O` if we're still assuming `N`
   is the size of the last dimension of `I`.
 
-- As is the case for all C++ statements, they must end with a semicolon.
 
 Max Over Axis
 ================
@@ -169,7 +168,7 @@ detail:
 
   C[i, j] = \sum_{k} (A[i, k] \cdot B[k, j])
 
-We can convert this to C++ Tile code using the same correspondence as the
+We can convert this to Tile code using the same correspondence as the
 previous example: The summation sign becomes plus-assignment, the summation
 index is omitted, dimensions are given for the output tensor, and the statement
 ends in a semicolon. Here's the result:
@@ -384,7 +383,7 @@ Max Pool 1D
 Next let's implement a size 2 stride 2 maxpool in Tile. This is the operation
 that splits a tensor into groups of 2 and takes the larger element from each
 group, yielding a tensor of half the original size. This is straightforward to
-implement in straight C++:
+implement in straight C++/Python:
 
 .. tabs:: 
 
@@ -447,7 +446,7 @@ Tile. The most direct (and, sadly, wrong) implementation in Tile is:
 
 If you were to run this code, every entry of ``O`` would equal the global max of
 ``I``. We correctly determined that this was a maximization operation, and the
-indices for ``O`` and ``I`` match those used in the straight C++ code, so what went wrong?
+indices for ``O`` and ``I`` match those used in the straight C++/Python code, so what went wrong?
 The problem with this Tile code is that there are too many "valid" indices. For
 example, the case ``i = 1`` , ``j = 3`` means that ``O[1]`` checks ``I[5]`` as one of the
 potential maximum values, even though ``O[1]`` is intended to be ``max(I[2], I[3])``.
@@ -583,7 +582,7 @@ or invalid set of index variables. For example, in the code:
 
 
 with ``N = 5``, the indices ``i = 1``, ``j = 1`` are valid indices.
-However, ``i = 2, j = 1`` are not valid indices for this operation, nor are ``i = -1000, j = 1``.
+However, ``i = 2``, ``j = 1`` are not valid indices for this operation, nor are ``i = -1000``, ``j = 1``.
 A set of indices are *valid* if and only if:
 
 1. All the index variables are integers.
@@ -633,7 +632,7 @@ otherwise valid entries. For example, consider the Tile function:
           O[2 * i] += I[2 * i, j]
           return O
 
-This operation only writes to even entries of ``O``; while ``i = 1/2, j = 1`` does
+This operation only writes to even entries of ``O``; while ``i = 1/2`` , ``j = 1`` does
 yield valid index expressions (``O[1]`` and ``I[1, 1]``), using a fractional index
 variable ``i`` makes these indices invalid. Note that some elements of ``O`` are
 never written to. Any unwritten elements in the output of a contraction are
