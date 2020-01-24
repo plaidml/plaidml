@@ -39,7 +39,7 @@ using mlir::TypeSwitch;
 using mlir::Value;
 
 OpFoldResult AffineConstantOp::fold(ArrayRef<Attribute> operands) {
-  IVLOG(5, "AffineConstantOp::fold");
+  // IVLOG(5, "AffineConstantOp::fold> " << mlir::debugString(*getOperation()));
   assert(operands.empty() && "constant has no operands");
   return getValue();
 }
@@ -83,10 +83,7 @@ OpFoldResult AffineMulOp::fold(ArrayRef<Attribute> operands) {
     IVLOG(5, "mul(x, 1) -> x");
     return lhs();
   }
-  return constFoldBinaryOp(operands, [](double a, double b) {
-    IVLOG(5, a << " * " << b << " = " << a * b);
-    return a * b;
-  });
+  return constFoldBinaryOp(operands, [](double a, double b) { return a * b; });
 }
 
 OpFoldResult AffineNegOp::fold(ArrayRef<Attribute> operands) {
@@ -118,11 +115,6 @@ OpFoldResult AffineSubOp::fold(ArrayRef<Attribute> operands) {
     return lhs();
   }
   return constFoldBinaryOp(operands, [](double a, double b) { return a - b; });
-}
-
-OpFoldResult DimOp::fold(ArrayRef<Attribute> operands) {
-  IVLOG(5, "DimOp::fold");
-  return resolve();
 }
 
 template <typename T, typename R = void>
@@ -395,6 +387,7 @@ struct SymbolicContractionCanonicalizer : OpRewritePattern<SymbolicContractionOp
     if (!resultType.hasStaticShape()) {
       return matchFailure();
     }
+
     IsFoldableVisitor foldable_checker;
     if (!foldable_checker.is_foldable(op)) {
       return matchFailure();
@@ -805,40 +798,42 @@ Type ShapeOp::getResultType(ArrayRef<Value> operands) {
 
 // ---- DimOp ----
 
+OpFoldResult DimOp::fold(ArrayRef<Attribute> operands) {
+  IVLOG(5, "DimOp::fold> " << mlir::debugString(*getOperation()));
+  return resolve();
+}
+
 IntegerAttr DimOp::resolve() {  //
   auto type = tensor().getType().dyn_cast<mlir::TensorType>();
   if (!type) {
     return {};
   }
-  auto size = type.getDimSize(dim().getSExtValue());
-  if (mlir::ShapedType::isDynamic(size)) {
+  auto value = type.getDimSize(dim().getSExtValue());
+  if (mlir::ShapedType::isDynamic(value)) {
     return {};
   }
-  auto indexType = mlir::IndexType::get(getContext());
-  return IntegerAttr::get(indexType, size);
+  auto indexType = IndexType::get(getContext());
+  return IntegerAttr::get(indexType, value);
 }
 
 void printDimOp(OpAsmPrinter* printer, DimOp op) {  //
   *printer << op.getOperation()->getName() << ' ';
   printer->printOperand(op.tensor());
-  *printer << '[' << op.dim().getZExtValue() << ']';
+  *printer << '[' << op.dim().getZExtValue() << "] : " << op.tensor().getType();
 }
 
 ParseResult parseDimOp(OpAsmParser* parser, OperationState& result) {
   auto indexType = parser->getBuilder().getIndexType();
-  OpAsmParser::OperandType tensor;
-  IntegerAttr dim;
-  Type type;
-  if (parser->parseOperand(tensor) ||                                      //
-      parser->parseLSquare() ||                                            //
-      parser->parseAttribute(dim, indexType, "dim", result.attributes) ||  //
-      parser->parseRSquare() ||                                            //
-      parser->parseColonType(type) ||                                      //
-      parser->resolveOperand(tensor, type, result.operands)) {
-    return failure();
-  }
   result.addTypes(indexType);
-  return success();
+  Type type;
+  IntegerAttr dim;
+  OpAsmParser::OperandType tensor;
+  return failure(parser->parseOperand(tensor) ||                                      //
+                 parser->parseLSquare() ||                                            //
+                 parser->parseAttribute(dim, indexType, "dim", result.attributes) ||  //
+                 parser->parseRSquare() ||                                            //
+                 parser->parseColonType(type) ||                                      //
+                 parser->resolveOperand(tensor, type, result.operands));
 }
 
 LogicalResult verifyDimOp(DimOp op) {  //
@@ -853,12 +848,9 @@ void printAffineConstantOp(OpAsmPrinter* printer, AffineConstantOp op) {  //
 
 ParseResult parseAffineConstantOp(OpAsmParser* parser, OperationState& result) {
   auto indexType = parser->getBuilder().getIndexType();
-  IntegerAttr value;
-  if (parser->parseAttribute(value, indexType, "value", result.attributes)) {
-    return failure();
-  }
   result.addTypes(indexType);
-  return success();
+  IntegerAttr value;
+  return parser->parseAttribute(value, indexType, "value", result.attributes);
 }
 
 LogicalResult verifyAffineConstantOp(AffineConstantOp op) {  //
@@ -872,13 +864,10 @@ void printAffineIndexOp(OpAsmPrinter* printer, AffineIndexOp op) {  //
 }
 
 ParseResult parseAffineIndexOp(OpAsmParser* parser, OperationState& result) {
-  IntegerAttr id;
-  if (parser->parseAttribute(id, "id", result.attributes)) {
-    return failure();
-  }
   auto indexType = parser->getBuilder().getIndexType();
   result.addTypes(indexType);
-  return success();
+  IntegerAttr id;
+  return parser->parseAttribute(id, "id", result.attributes);
 }
 
 LogicalResult verifyAffineIndexOp(AffineIndexOp op) {  //
@@ -892,23 +881,20 @@ void printAffineTensorMapOp(OpAsmPrinter* printer, AffineTensorMapOp op) {
   printer->printOperand(op.tensor());
   *printer << '[';
   printer->printOperands(op.dims());
-  *printer << ']';
+  *printer << "] : " << op.tensor().getType();
 }
 
 ParseResult parseAffineTensorMapOp(OpAsmParser* parser, OperationState& result) {
   auto indexType = parser->getBuilder().getIndexType();
+  result.addTypes(AffineTensorMapType::get(result.getContext()));
+  Type type;
   OpAsmParser::OperandType tensor;
   SmallVector<OpAsmParser::OperandType, 4> dims;
-  Type type;
-  if (parser->parseOperand(tensor) ||                                    //
-      parser->parseOperandList(dims, OpAsmParser::Delimiter::Square) ||  //
-      parser->parseColonType(type) ||                                    //
-      parser->resolveOperand(tensor, type, result.operands) ||           //
-      parser->resolveOperands(dims, indexType, result.operands)) {
-    return failure();
-  }
-  result.addTypes(AffineTensorMapType::get(result.getContext()));
-  return success();
+  return failure(parser->parseOperand(tensor) ||                                    //
+                 parser->parseOperandList(dims, OpAsmParser::Delimiter::Square) ||  //
+                 parser->parseColonType(type) ||                                    //
+                 parser->resolveOperand(tensor, type, result.operands) ||           //
+                 parser->resolveOperands(dims, indexType, result.operands));
 }
 
 LogicalResult verifyAffineTensorMapOp(AffineTensorMapOp op) {  //
@@ -924,13 +910,10 @@ void printAffineMapOp(OpAsmPrinter* printer, AffineMapOp op) {
 
 ParseResult parseAffineMapOp(OpAsmParser* parser, OperationState& result) {
   auto indexType = parser->getBuilder().getIndexType();
-  SmallVector<OpAsmParser::OperandType, 4> dims;
-  if (parser->parseOperandList(dims) ||  //
-      parser->resolveOperands(dims, indexType, result.operands)) {
-    return failure();
-  }
   result.addTypes(AffineMapType::get(result.getContext()));
-  return success();
+  SmallVector<OpAsmParser::OperandType, 4> dims;
+  return failure(parser->parseOperandList(dims) ||  //
+                 parser->resolveOperands(dims, indexType, result.operands));
 }
 
 LogicalResult verifyAffineMapOp(AffineMapOp op) {  //
@@ -948,13 +931,10 @@ void printAffineConstraintsOp(OpAsmPrinter* printer, AffineConstraintsOp op) {
 
 ParseResult parseAffineConstraintsOp(OpAsmParser* parser, OperationState& result) {
   auto indexType = parser->getBuilder().getIndexType();
-  SmallVector<OpAsmParser::OperandType, 4> dims;
-  if (parser->parseOperandList(dims, OpAsmParser::Delimiter::Paren) ||  //
-      parser->resolveOperands(dims, indexType, result.operands)) {
-    return failure();
-  }
   result.addTypes(AffineConstraintsType::get(result.getContext()));
-  return success();
+  SmallVector<OpAsmParser::OperandType, 4> dims;
+  return failure(parser->parseOperandList(dims, OpAsmParser::Delimiter::Paren) ||
+                 parser->resolveOperands(dims, indexType, result.operands));
 }
 
 LogicalResult verifyAffineConstraintsOp(AffineConstraintsOp op) {  //
@@ -1012,11 +992,8 @@ ParseResult parseSymbolicContractionOp(OpAsmParser* parser, OperationState& resu
       parser->parseOperandList(srcs) ||    //
       parser->parseColonType(initType) ||  //
       parser->parseArrow() ||              //
-      parser->parseType(resultType)) {
-    return failure();
-  }
-
-  if (parser->resolveOperand(init, initType, result.operands) ||
+      parser->parseType(resultType) ||     //
+      parser->resolveOperand(init, initType, result.operands) ||
       parser->resolveOperand(cons, consType, result.operands) ||
       parser->resolveOperand(size, mapType, result.operands) ||
       parser->resolveOperand(sink, mapType, result.operands) ||
@@ -1142,6 +1119,8 @@ ParseResult parseContractionOp(OpAsmParser* parser, OperationState& result) {
     return failure();
   }
 
+  // TODO: parse a FunctionType here
+
   auto loc = parser->getCurrentLocation();
   auto indexType = parser->getBuilder().getIndexType();
   auto tensorTypes = llvm::makeArrayRef(types).drop_front();
@@ -1223,17 +1202,13 @@ void printAffineBinaryOp(OpAsmPrinter* printer, AffineBinaryOp op) {
 
 ParseResult parseAffineBinaryOp(OpAsmParser* parser, OperationState& result) {
   auto indexType = parser->getBuilder().getIndexType();
-  OpAsmParser::OperandType lhs;
-  OpAsmParser::OperandType rhs;
-  if (parser->parseOperand(lhs) ||                                //
-      parser->parseComma() ||                                     //
-      parser->parseOperand(rhs) ||                                //
-      parser->resolveOperand(lhs, indexType, result.operands) ||  //
-      parser->resolveOperand(rhs, indexType, result.operands)) {
-    return failure();
-  }
   result.addTypes(IndexType::get(result.getContext()));
-  return success();
+  OpAsmParser::OperandType lhs, rhs;
+  return failure(parser->parseOperand(lhs) ||                                //
+                 parser->parseComma() ||                                     //
+                 parser->parseOperand(rhs) ||                                //
+                 parser->resolveOperand(lhs, indexType, result.operands) ||  //
+                 parser->resolveOperand(rhs, indexType, result.operands));
 }
 
 // ---- TraceOp ----

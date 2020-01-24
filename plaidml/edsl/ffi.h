@@ -167,6 +167,14 @@ void* plaidml_expr_ptr(  //
     plaidml_error* err,  //
     plaidml_expr* expr);
 
+plaidml_datatype plaidml_expr_get_dtype(  //
+    plaidml_error* err,                   //
+    plaidml_expr* expr);
+
+size_t plaidml_expr_get_rank(  //
+    plaidml_error* err,        //
+    plaidml_expr* expr);
+
 plaidml_logical_shape* plaidml_expr_get_shape(  //
     plaidml_error* err,                         //
     plaidml_expr* expr);

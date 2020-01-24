@@ -21,10 +21,12 @@
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/Module.h"
 #include "mlir/IR/Operation.h"
+#include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/DebugStringHelper.h"
+#include "mlir/Transforms/FoldUtils.h"
 #include "mlir/Transforms/Passes.h"
 
 #include "pmlc/dialect/eltwise/ir/dialect.h"
@@ -56,7 +58,10 @@ using mlir::MemRefType;
 using mlir::MLIRContext;
 using mlir::ModuleOp;
 using mlir::OpBuilder;
+using mlir::OperationFolder;
+using mlir::PatternRewriter;
 using mlir::RankedTensorType;
+using mlir::RewritePatternMatcher;
 using mlir::Type;
 using mlir::UnknownLoc;
 using mlir::Value;
@@ -429,19 +434,14 @@ Value TileBuilder::MakeAffineMinOp(ArrayRef<Value> args) {
   return impl->builder.create<AffineMinOp>(impl->loc, args).result();
 }
 
-Value TileBuilder::MakeAffineSourceIndexMapOp(Value tensor, ArrayRef<Value> idxs) {
-  IVLOG(5, "TileBuilder::MakeAffineSourceIndexMapOp>");
+Value TileBuilder::MakeAffineTensorMapOp(Value tensor, ArrayRef<Value> idxs) {
+  IVLOG(5, "TileBuilder::MakeAffineTensorMapOp>");
   return impl->builder.create<AffineTensorMapOp>(impl->loc, tensor, idxs).result();
 }
 
-Value TileBuilder::MakeAffineSinkIndexMapOp(ArrayRef<Value> idxs) {
-  IVLOG(5, "TileBuilder::MakeAffineSinkIndexMapOp>");
+Value TileBuilder::MakeAffineMapOp(ArrayRef<Value> idxs) {
+  IVLOG(5, "TileBuilder::MakeAffineMapOp>");
   return impl->builder.create<AffineMapOp>(impl->loc, idxs).result();
-}
-
-Value TileBuilder::MakeAffineSizeMapOp(ArrayRef<Value> sizes) {
-  IVLOG(5, "TileBuilder::MakeAffineSizeMapOp>");
-  return impl->builder.create<AffineMapOp>(impl->loc, sizes).result();
 }
 
 void TileBuilder::AddConstraint(Value cion, Value lhs, Value rhs) {
@@ -532,6 +532,49 @@ Value TileBuilder::MakeContractionOp(  //
       nameAttr);
   return op.result();
 }
+
+class MakeProgramDriver : public PatternRewriter {
+ public:
+  MakeProgramDriver(MLIRContext* ctx, const OwningRewritePatternList& patterns)
+      : PatternRewriter(ctx), matcher(patterns), folder(ctx) {}
+
+  void run(FuncOp funcOp) {
+    funcOp.walk([&](Operation* op) {
+      // Try to fold this op.
+      if (succeeded(folder.tryToFold(op))) {
+        return;
+      }
+
+      // Make sure that any new operations are inserted at this point.
+      setInsertionPoint(op);
+
+      // Try to match one of the patterns.
+      matcher.matchAndRewrite(op, *this);
+    });
+  }
+
+ protected:
+  Operation* insert(Operation* op) final { return OpBuilder::insert(op); }
+
+ private:
+  RewritePatternMatcher matcher;
+  OperationFolder folder;
+};
+
+struct MakeProgramPass : public mlir::FunctionPass<MakeProgramPass> {
+  void runOnFunction() final {
+    OwningRewritePatternList patterns;
+    auto context = &getContext();
+    for (auto op : context->getRegisteredOperations()) {
+      op->getCanonicalizationPatterns(patterns, context);
+    }
+
+    MakeProgramDriver driver(context, patterns);
+    driver.run(getFunction());
+  }
+
+  static std::unique_ptr<mlir::Pass> create() { return std::make_unique<MakeProgramPass>(); }
+};
 
 std::shared_ptr<TileProgram> TileBuilder::MakeProgram(StringRef name, const ProgramMutations& mutations) {
   if (name.empty()) {
@@ -649,6 +692,7 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(StringRef name, const Prog
   }
   // Do some optimization passes
   mlir::PassManager pm(&impl->context);
+  pm.addPass(MakeProgramPass::create());
   pm.addPass(mlir::createCanonicalizerPass());
   pm.addPass(mlir::createCSEPass());
   auto result = pm.run(module);
@@ -671,7 +715,7 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(StringRef name, const Prog
     program->arguments.emplace_back(programArg);
     program->outputs.emplace_back(finalValue);
   }
-  IVLOG(2, "TileBuilder::MakeProgram>\n" << mlir::debugString(module));
+  // IVLOG(2, "TileBuilder::MakeProgram>\n" << mlir::debugString(module));
   return program;
 }
 
@@ -684,11 +728,11 @@ std::vector<Value> TileBuilder::ComputeGradients(ArrayRef<Value> wrt, Value loss
     for (size_t i = 0; i < ndims; ++i) {
       src_idxs.emplace_back(MakeAffineIndexOp(""));
     }
-    ArrayRef<Value> srcs{MakeAffineSourceIndexMapOp(loss, src_idxs)};
-    auto sink = MakeAffineSinkIndexMapOp(ArrayRef<Value>{});
-    auto sizes = MakeAffineSizeMapOp(ArrayRef<Value>{});
+    auto src = MakeAffineTensorMapOp(loss, src_idxs);
+    auto sink = MakeAffineMapOp(ArrayRef<Value>{});
+    auto sizes = MakeAffineMapOp(ArrayRef<Value>{});
     auto cion =
-        MakeContractionOp(util::AggregationKind::add, util::CombinationKind::none, srcs, sink, sizes, "net_loss");
+        MakeContractionOp(util::AggregationKind::add, util::CombinationKind::none, {src}, sink, sizes, "net_loss");
     value = cion;
   }
   Gradient grad(value, this);

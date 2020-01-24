@@ -54,6 +54,8 @@ local exports = [
   'plaidml_dim_expr_op',
   'plaidml_expr_free',
   'plaidml_expr_ptr',
+  'plaidml_expr_get_dtype',
+  'plaidml_expr_get_rank',
   'plaidml_expr_get_shape',
   'plaidml_expr_bind_shape',
   'plaidml_expr_bind_dims',

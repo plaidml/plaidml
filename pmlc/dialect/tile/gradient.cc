@@ -194,8 +194,8 @@ mlir::Value Gradient::DeriveContraction(mlir::Value dout, mlir::Value out, size_
           for (const auto& dim : llvm::cast<AffineMapOp>(op.sink().getDefiningOp()).dims()) {
             dout_idxs.push_back(dim);
           }
-          new_srcs.push_back(builder_->MakeAffineSourceIndexMapOp(op, dout_idxs));
-          new_srcs.push_back(builder_->MakeAffineSourceIndexMapOp(dout, dout_idxs));
+          new_srcs.push_back(builder_->MakeAffineTensorMapOp(op, dout_idxs));
+          new_srcs.push_back(builder_->MakeAffineTensorMapOp(dout, dout_idxs));
           // Also track that this is the differentiated source for later use
           target_src = src;
         } else {
@@ -214,7 +214,7 @@ mlir::Value Gradient::DeriveContraction(mlir::Value dout, mlir::Value out, size_
           for (const auto& dim : llvm::cast<AffineMapOp>(op.sink().getDefiningOp()).dims()) {
             dout_idxs.push_back(dim);
           }
-          new_srcs.push_back(builder_->MakeAffineSourceIndexMapOp(dout, dout_idxs));
+          new_srcs.push_back(builder_->MakeAffineTensorMapOp(dout, dout_idxs));
           // Also track that this is the differentiated source for later use
           target_src = src;
         } else {
@@ -274,12 +274,12 @@ mlir::Value Gradient::DeriveContraction(mlir::Value dout, mlir::Value out, size_
   // if (src_name) {
   //   new_name = llvm::formatv("d{0}", op.name()).str();
   // } // else use the empty string (already initialized by default ctor)
-  auto dop_val = builder_->MakeContractionOp(         //
-      util::AggregationKind::add,                     //
-      combo_kind,                                     //
-      new_srcs,                                       //
-      builder_->MakeAffineSinkIndexMapOp(dsrc_idxs),  //
-      builder_->MakeAffineSizeMapOp(sizes),           //
+  auto dop_val = builder_->MakeContractionOp(  //
+      util::AggregationKind::add,              //
+      combo_kind,                              //
+      new_srcs,                                //
+      builder_->MakeAffineMapOp(dsrc_idxs),    //
+      builder_->MakeAffineMapOp(sizes),        //
       new_name);
   // Copy the constraints from the forward pass contraction
   auto src_cons = llvm::dyn_cast<AffineConstraintsOp>(op.cons().getDefiningOp());

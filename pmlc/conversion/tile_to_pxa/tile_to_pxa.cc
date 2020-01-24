@@ -34,6 +34,7 @@ using dialect::tile::ContractionOpOperandAdaptor;
 using dialect::tile::IndexOp;
 using dialect::tile::ShapeOp;
 using dialect::tile::ShapeOpOperandAdaptor;
+using dialect::tile::TraceOp;
 using util::DataType;
 
 using llvm::Optional;
@@ -47,10 +48,12 @@ using mlir::AffineStoreOp;
 using mlir::AllocOp;
 using mlir::ArrayRef;
 using mlir::Attribute;
+using mlir::CallOp;
 using mlir::CmpFPredicate;
 using mlir::CmpIPredicate;
 using mlir::ConversionPattern;
 using mlir::ConversionPatternRewriter;
+using mlir::FlatSymbolRefAttr;
 using mlir::FloatAttr;
 using mlir::FloatType;
 using mlir::FuncOp;
@@ -60,6 +63,7 @@ using mlir::IntegerType;
 using mlir::Location;
 using mlir::MemRefType;
 using mlir::MLIRContext;
+using mlir::ModuleOp;
 using mlir::NamedAttribute;
 using mlir::OpBuilder;
 using mlir::OpConversionPattern;
@@ -69,6 +73,8 @@ using mlir::Pattern;
 using mlir::PatternMatchResult;
 using mlir::RankedTensorType;
 using mlir::ReturnOp;
+using mlir::StringAttr;
+using mlir::SymbolRefAttr;
 using mlir::Type;
 using mlir::Value;
 
@@ -148,6 +154,7 @@ struct AffineConstantOpConversion : public OpConversionPattern<AffineConstantOp>
       ArrayRef<Value> operands,        //
       ConversionPatternRewriter& rewriter) const final {
     auto value = op.getValue().cast<IntegerAttr>().getInt();
+    // rewriter.replaceOpWithNewOp<mlir::ConstantIndexOp>(op, value);
     auto newOp = rewriter.create<mlir::ConstantIndexOp>(op.getLoc(), value);
     rewriter.replaceOp(op, {newOp});
     return matchSuccess();
@@ -416,6 +423,7 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
   using OpConversionPattern<FromOpType>::OpConversionPattern;
 
   PatternMatchResult match(Operation* op) const final {
+    IVLOG(2, "EltwiseOpConversion::match>");
     Matcher pred;
     return pred(op);
   }
@@ -486,6 +494,7 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
   using OpConversionPattern<ContractionOp>::OpConversionPattern;
 
   PatternMatchResult match(Operation* op) const final {
+    IVLOG(2, "ContractionOpConversion::match>");
     if (auto cionOp = llvm::dyn_cast<ContractionOp>(op)) {
       if (cionOp.combo() != comboKind) {
         return matchFailure();
@@ -735,6 +744,7 @@ struct ReturnOpConversion : public OpConversionPattern<ReturnOp> {
       ReturnOp op,                     //
       ArrayRef<Value> operands,        //
       ConversionPatternRewriter& rewriter) const final {
+    IVLOG(2, "ReturnOpConversion::matchAndRewrite>");
     auto& block = op.getParentRegion()->front();
     auto funcOp = op.getParentOfType<FuncOp>();
     auto blockArg = funcOp.getType().getNumInputs() - op.getNumOperands();
@@ -746,6 +756,34 @@ struct ReturnOpConversion : public OpConversionPattern<ReturnOp> {
   }
 };
 
+struct TraceOpConversion : public OpConversionPattern<TraceOp> {
+  using OpConversionPattern<TraceOp>::OpConversionPattern;
+
+  PatternMatchResult matchAndRewrite(  //
+      TraceOp op,                      //
+      ArrayRef<Value> operands,        //
+      ConversionPatternRewriter& rewriter) const final {
+    // auto module = op.getParentOfType<ModuleOp>();
+    // auto symbol = createStubFunc(module, op.msgAttr());
+    // rewriter.create<CallOp>(op.getLoc(), symbol, ArrayRef<Type>{});
+    rewriter.replaceOp(op, op.tensor());
+    return matchSuccess();
+  }
+
+  FlatSymbolRefAttr createStubFunc(ModuleOp module, StringAttr msg) const {
+    static unsigned uniqueId = 0;
+    auto symbol = llvm::formatv("plaidml_rt_trace_{0}", uniqueId++).str();
+    auto context = module.getContext();
+    OpBuilder builder(context);
+    builder.setInsertionPointToStart(module.getBody());
+    auto funcType = FunctionType::get({}, {}, context);
+    auto funcOp = builder.create<FuncOp>(module.getLoc(), symbol, funcType, ArrayRef<NamedAttribute>{});
+    funcOp.setAttr("msg", msg);
+    funcOp.setAttr("trace", mlir::UnitAttr::get(context));
+    return SymbolRefAttr::get(symbol, context);
+  }
+};
+
 struct LoweringPass : public mlir::ModulePass<LoweringPass> {
   void runOnModule() final {
     // Set up target (i.e. what is legal)
@@ -754,11 +792,11 @@ struct LoweringPass : public mlir::ModulePass<LoweringPass> {
     target.addLegalDialect<mlir::StandardOpsDialect>();
     target.addLegalDialect<dialect::pxa::Dialect>();
     target.addLegalOp<mlir::ModuleOp, mlir::ModuleTerminatorOp>();
-    target.addDynamicallyLegalOp<FuncOp>([&](FuncOp op) {
+    target.addDynamicallyLegalOp<FuncOp>([](FuncOp op) {
       auto funcType = op.getType();
       return funcType.getNumResults() == 0;
     });
-    target.addDynamicallyLegalOp<ReturnOp>([&](ReturnOp op) {  //
+    target.addDynamicallyLegalOp<ReturnOp>([](ReturnOp op) {  //
       return op.getNumOperands() == 0;
     });
 
@@ -773,9 +811,10 @@ struct LoweringPass : public mlir::ModulePass<LoweringPass> {
         CastOpConversion,            //
         FuncOpConversion,            //
         IndexOpConversion,           //
+        ReturnOpConversion,          //
         ScalarConstantOpConversion,  //
         ShapeOpConversion,           //
-        ReturnOpConversion,          //
+        TraceOpConversion,           //
         // TODO: PrngOpConversion
         // TODO: SpecialOpConversion (GatherOp, ReshapeOp, ScatterOp, ZeroOp)
         ContractionOpConversion<CombinationKind::none, FirstOperand>,
@@ -827,8 +866,6 @@ struct LoweringPass : public mlir::ModulePass<LoweringPass> {
 
     // Run the conversion
     if (failed(applyFullConversion(getModule(), target, patterns, nullptr))) {
-      getModule().dump();
-      emitError(mlir::UnknownLoc::get(&getContext()), "Error lowering tile -> pxa\n");
       signalPassFailure();
       return;
     }

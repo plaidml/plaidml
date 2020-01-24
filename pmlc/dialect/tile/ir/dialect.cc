@@ -95,7 +95,7 @@ Operation* Dialect::materializeConstant(  //
     Attribute value,                      //
     Type type,                            //
     Location loc) {
-  IVLOG(5, "tile::Dialect::materializeConstant");
+  IVLOG(5, "tile::Dialect::materializeConstant> " << mlir::debugString(value) << " : " << mlir::debugString(type));
   if (auto attr = value.dyn_cast<IntegerAttr>()) {
     auto indexType = builder.getIndexType();
     auto indexAttr = builder.getIntegerAttr(indexType, attr.getInt());
