@@ -13,6 +13,7 @@ plaidml_cc_binary(
         "//pmlc/dialect/eltwise",
         "//pmlc/dialect/pxa",
         "//pmlc/dialect/tile",
+        "//pmlc/target/x86",
         "@llvm-project//mlir:AffineDialectRegistration",
         "@llvm-project//mlir:EDSC",
         "@llvm-project//mlir:MlirOptLib",
