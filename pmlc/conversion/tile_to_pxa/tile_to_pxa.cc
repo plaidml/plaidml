@@ -760,23 +760,25 @@ struct TraceOpConversion : public OpConversionPattern<TraceOp> {
       TraceOp op,                      //
       ArrayRef<Value> operands,        //
       ConversionPatternRewriter& rewriter) const final {
-    // auto module = op.getParentOfType<ModuleOp>();
-    // auto symbol = createStubFunc(module, op.msgAttr());
-    // rewriter.create<CallOp>(op.getLoc(), symbol, ArrayRef<Type>{});
+    auto module = op.getParentOfType<ModuleOp>();
+    auto symbol = createStubFunc(module, op.msgAttr());
+    rewriter.create<CallOp>(op.getLoc(), symbol, ArrayRef<Type>{});
     rewriter.replaceOp(op, op.tensor());
     return matchSuccess();
   }
 
   FlatSymbolRefAttr createStubFunc(ModuleOp module, StringAttr msg) const {
-    static unsigned uniqueId = 0;
-    auto symbol = llvm::formatv("plaidml_rt_trace_{0}", uniqueId++).str();
+    static unsigned idCounter = 0;
+    auto uniqueId = idCounter++;
+    auto symbol = llvm::formatv("__trace_{0}", uniqueId).str();
     auto context = module.getContext();
     OpBuilder builder(context);
     builder.setInsertionPointToStart(module.getBody());
     auto funcType = FunctionType::get({}, {}, context);
     auto funcOp = builder.create<FuncOp>(module.getLoc(), symbol, funcType, ArrayRef<NamedAttribute>{});
     funcOp.setAttr("msg", msg);
-    funcOp.setAttr("trace", mlir::UnitAttr::get(context));
+    funcOp.setAttr("trace", builder.getUnitAttr());
+    funcOp.setAttr("id", builder.getI64IntegerAttr(uniqueId));
     return SymbolRefAttr::get(symbol, context);
   }
 };

@@ -161,9 +161,8 @@ Executable::Executable(StringRef entry, StringRef target, ModuleOp programModule
   }
 
   auto maybeEngine = ExecutionEngine::create(*module, optPipeline);
-  llvm::handleAllErrors(maybeEngine.takeError(), [](const llvm::ErrorInfoBase& b) {
-    b.log(llvm::errs());
-    throw std::runtime_error("Failed to create ExecutionEngine");
+  llvm::handleAllErrors(maybeEngine.takeError(), [](const llvm::ErrorInfoBase& err) {
+    throw std::runtime_error("Failed to create ExecutionEngine: " + err.message());
   });
   engine = std::move(*maybeEngine);
 
