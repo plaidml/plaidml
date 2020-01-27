@@ -113,34 +113,6 @@ class Program {
   ///
   const std::vector<ProgramArgument>& outputs() const { return outputs_; }
 
-  ///
-  /// floatx
-  ///
-  const DType& floatx() const { return floatx_; }
-
-  void set_floatx(const DType& floatx) {
-    if (floatx != DType::FLOAT32 && floatx != DType::FLOAT64) {
-      std::stringstream ss;
-      ss << "Invalid floatx_ requested by Program. Expected either float32 or float64";
-      throw std::runtime_error(ss.str());
-    }
-    floatx_ = floatx;
-  }
-
-  ///
-  /// intx
-  ///
-  const DType& intx() const { return intx_; }
-
-  void set_intx(const DType& intx) {
-    if (intx != DType::INT32 && intx != DType::INT64) {
-      std::stringstream ss;
-      ss << "Invalid intx_ requested by Program. Expected either int32 or int64";
-      throw std::runtime_error(ss.str());
-    }
-    intx_ = intx;
-  }
-
   plaidml_program* as_ptr() const { return ptr_.get(); }
 
  private:
@@ -1119,9 +1091,19 @@ inline Program::Program(                 //
     const std::vector<Tensor>& outputs,  //
     const DType& floatx,                 //
     const DType& intx,                   //
-    const std::vector<std::tuple<Tensor, Tensor>>& updates) {
-  set_floatx(floatx);
-  set_intx(intx);
+    const std::vector<std::tuple<Tensor, Tensor>>& updates)
+    : floatx_(floatx), intx_(intx) {
+  if (floatx != DType::FLOAT32 && floatx != DType::FLOAT64) {
+    std::stringstream ss;
+    ss << "Invalid floatx_ requested by Program. Expected either float32 or float64";
+    throw std::runtime_error(ss.str());
+  }
+
+  if (intx != DType::INT32 && intx != DType::INT64) {
+    std::stringstream ss;
+    ss << "Invalid intx_ requested by Program. Expected either int32 or int64";
+    throw std::runtime_error(ss.str());
+  }
 
   std::vector<plaidml_expr*> raw_outputs(outputs.size());
   std::vector<plaidml_expr*> new_outputs(outputs.size());

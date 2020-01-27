@@ -44,6 +44,8 @@ struct ProgramUpdate {
 struct ProgramMutations {
   std::vector<mlir::Value> outputs;
   std::set<ProgramUpdate> updates;
+  DataType floatx = DataType::invalid;
+  DataType intx = DataType::invalid;
 };
 
 class TileBuilder {

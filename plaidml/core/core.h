@@ -10,8 +10,11 @@
 #include <vector>
 
 #include "plaidml/core/ffi.h"
+#include "pmlc/util/enums.h"
 
 namespace plaidml {
+
+using DataType = pmlc::util::DataType;
 
 namespace ffi {
 
@@ -125,6 +128,41 @@ inline const char* to_string(DType dtype) {
       return "float64";
     default:
       return "<invalid>";
+  }
+}
+
+inline DataType from_dtype(DType dtype) {
+  switch (dtype) {
+    case DType::INVALID:
+      return DataType::invalid;
+    case DType::BOOLEAN:
+      return DataType::u1;
+    case DType::INT8:
+      return DataType::i8;
+    case DType::UINT8:
+      return DataType::u8;
+    case DType::INT16:
+      return DataType::i16;
+    case DType::UINT16:
+      return DataType::u16;
+    case DType::INT32:
+      return DataType::i32;
+    case DType::UINT32:
+      return DataType::u32;
+    case DType::INT64:
+      return DataType::i64;
+    case DType::UINT64:
+      return DataType::u64;
+    case DType::BFLOAT16:
+      return DataType::bf16;
+    case DType::FLOAT16:
+      return DataType::f16;
+    case DType::FLOAT32:
+      return DataType::f32;
+    case DType::FLOAT64:
+      return DataType::f64;
+    default:
+      return DataType::invalid;
   }
 }
 

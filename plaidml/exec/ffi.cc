@@ -24,7 +24,6 @@ using plaidml::core::ffi_wrap;
 using plaidml::core::ffi_wrap_void;
 using pmlc::compiler::Executable;
 using pmlc::dialect::tile::ProgramArgument;
-using pmlc::dialect::tile::ProgramDType;
 using pmlc::util::Buffer;
 using pmlc::util::BufferPtr;
 using namespace mlir;  // NOLINT[build/namespaces]
@@ -127,9 +126,7 @@ plaidml_executable* plaidml_compile(  //
     size_t noutputs,                  //
     plaidml_binding** outputs) {
   return ffi_wrap<plaidml_executable*>(err, nullptr, [&] {
-    IVLOG(1, "Compiling with device: " << device << ", target: " << target << ", floatx width "
-                                       << program->program->dtypes.floatx.getWidth() << ", intx width "
-                                       << program->program->dtypes.intx.getWidth());
+    IVLOG(1, "Compiling with device: " << device << ", target: " << target);
     auto args = BindProgramArguments(program, ninputs, inputs, noutputs, outputs);
     auto exec = std::make_unique<plaidml_executable>();
     std::vector<void*> bufptrs(args.size());
@@ -138,8 +135,7 @@ plaidml_executable* plaidml_compile(  //
       bufptrs[i] = view->data();
     }
 
-    exec->exec = std::make_unique<Executable>(program->program->entry, target, *program->program->module, bufptrs,
-                                              program->program->dtypes.floatx, program->program->dtypes.intx);
+    exec->exec = std::make_unique<Executable>(program->program->entry, target, *program->program->module, bufptrs);
     return exec.release();
   });
 }

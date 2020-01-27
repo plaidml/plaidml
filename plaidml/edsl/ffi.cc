@@ -9,6 +9,7 @@
 
 #include "llvm/Support/FormatVariadic.h"
 
+#include "plaidml/core/core.h"
 #include "plaidml/core/internal.h"
 #include "plaidml/edsl/derivs.h"
 #include "pmlc/util/logging.h"
@@ -975,6 +976,15 @@ plaidml_program* plaidml_program_evaluate(  //
       }
       mutations.updates.emplace(ProgramUpdate{src_updates[i]->value, dst_updates[i]->value});
     }
+
+    mutations.floatx = plaidml::from_dtype(static_cast<plaidml::DType>(floatx));
+    mutations.intx = plaidml::from_dtype(static_cast<plaidml::DType>(intx));
+
+    IVLOG(1, "floatx " << static_cast<int>(floatx));
+    IVLOG(1, "mutations.floatx " << static_cast<int>(mutations.floatx));
+    IVLOG(1, "intx " << static_cast<int>(intx));
+    IVLOG(1, "mutations.intx " << static_cast<int>(mutations.intx));
+
     auto ret = new plaidml_program{GlobalContext::get()->MakeProgram(name, mutations)};
     assert(noutputs <= ret->program->outputs.size());
     auto nargs = ret->program->arguments.size();
@@ -989,16 +999,6 @@ plaidml_program* plaidml_program_evaluate(  //
         args[i].buffer = nullptr;
       }
     }
-
-    auto context = ret->program->module->getContext();
-    ret->program->dtypes.floatx =
-        pmlc::dialect::eltwise::ScalarType::get(context, static_cast<pmlc::util::DataType>(floatx))
-            .toStandard()
-            .dyn_cast<mlir::FloatType>();
-    ret->program->dtypes.intx =
-        pmlc::dialect::eltwise::ScalarType::get(context, static_cast<pmlc::util::DataType>(intx))
-            .toStandard()
-            .dyn_cast<mlir::IntegerType>();
 
     *raw_args = new plaidml_program_args{nargs, args};
     return ret;

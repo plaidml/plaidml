@@ -3,6 +3,7 @@
 #include "pmlc/dialect/eltwise/ir/types.h"
 
 #include "mlir/IR/StandardTypes.h"
+#include "pmlc/util/enums.h"
 
 namespace pmlc::dialect::eltwise {
 

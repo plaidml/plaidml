@@ -35,6 +35,7 @@
 #include "pmlc/dialect/tile/ir/dialect.h"
 #include "pmlc/dialect/tile/ir/ops.h"
 #include "pmlc/dialect/tile/program.h"
+#include "pmlc/dialect/tile/transforms/passes.h"
 #include "pmlc/util/env.h"
 #include "pmlc/util/logging.h"
 #include "pmlc/util/slice.h"
@@ -690,9 +691,14 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(StringRef name, const Prog
   if (failed(mlir::verify(module))) {
     throw std::runtime_error("Module verification error");
   }
+
+  // IVLOG(1, "mutations.floatx " << static_cast<int>(plaidml::from_dtype(mutations.floatx)));
+  // IVLOG(1, "mutations.intx " << static_cast<int>(plaidml::from_dtype(mutations.intx));
+
   // Do some optimization passes
   mlir::PassManager pm(&impl->context);
   pm.addPass(MakeProgramPass::create());
+  pm.addPass(dialect::tile::createConstantTypesPass(mutations.floatx, mutations.intx));
   pm.addPass(mlir::createCanonicalizerPass());
   pm.addPass(mlir::createCSEPass());
   auto result = pm.run(module);
