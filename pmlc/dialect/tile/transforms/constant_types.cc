@@ -12,7 +12,9 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/DebugStringHelper.h"
 
+#include "pmlc/dialect/eltwise/ir/util.h"
 #include "pmlc/dialect/tile/transforms/passes.h"
+#include "pmlc/util/enums.h"
 #include "pmlc/util/logging.h"
 #include "pmlc/util/util.h"
 
@@ -23,7 +25,55 @@ PatternMatchResult ConstantTypesRewriter::matchAndRewrite(ScalarConstantOp const
   IVLOG(1, "float_x " << static_cast<int>(floatx_));
   IVLOG(1, "int " << static_cast<int>(intx_));
 
-  return matchSuccess();
+  auto type = constOp.getType();
+  IVLOG(2, "ConstantTypesRewriter::type> " << mlir::debugString(type));
+
+  auto shape = pmlc::dialect::eltwise::getRankedTensorType(type).getShape();
+
+  // auto cur_type = pmlc::dialect::eltwise::getRankedTensorType(type);
+  // IVLOG(2, "ConstantTypesRewriter::cur_type> " << mlir::debugString(cur_type));
+  // auto scalar_type = type.cast<eltwise::ScalarType>();
+  // IVLOG(2, "ConstantTypesRewriter::scalar_type> " << mlir::debugString(scalar_type));
+
+  if (auto float_attr = constOp.getFloatAttr()) {
+    double value = float_attr.getValueAsDouble();
+    auto elementType = ScalarType::get(type.getContext(), floatx_);
+    auto new_type = RankedTensorType::get(shape, elementType);
+    IVLOG(2, "ConstantTypesRewriter::new_type> " << mlir::debugString(new_type));
+
+    if (new_type == type) {
+      IVLOG(1, "return match failure");
+      return matchFailure();
+    } else {
+      rewriter.replaceOpWithNewOp<ScalarConstantOp>(constOp, elementType, value);
+      IVLOG(1, "return match success");
+      return matchSuccess();
+    }
+
+  } else if (auto int_attr = constOp.getIntAttr()) {
+    int64_t value = int_attr.getInt();
+
+    if (pmlc::util::isUnsigned(intx_) && (value < 0)) {
+      std::stringstream ss;
+      ss << "Invalid datatype for negative constant";
+      throw std::runtime_error(ss.str());
+    }
+    auto elementType = ScalarType::get(type.getContext(), intx_);
+    auto new_type = RankedTensorType::get(shape, elementType);
+    IVLOG(2, "ConstantTypesRewriter::new_type> " << mlir::debugString(new_type));
+
+    if (new_type == type) {
+      IVLOG(1, "return match failure");
+      return matchFailure();
+    } else {
+      rewriter.replaceOpWithNewOp<ScalarConstantOp>(constOp, elementType, value);
+      IVLOG(1, "return match success");
+      return matchSuccess();
+    }
+  } else {
+    IVLOG(1, "Warning: non-float, non-int type");
+  }
+  return matchFailure();
 }
 
 /*

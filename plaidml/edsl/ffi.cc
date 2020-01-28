@@ -977,8 +977,8 @@ plaidml_program* plaidml_program_evaluate(  //
       mutations.updates.emplace(ProgramUpdate{src_updates[i]->value, dst_updates[i]->value});
     }
 
-    mutations.floatx = plaidml::from_dtype(static_cast<plaidml::DType>(floatx));
-    mutations.intx = plaidml::from_dtype(static_cast<plaidml::DType>(intx));
+    mutations.floatx = plaidml::to_datatype(static_cast<plaidml::DType>(floatx));
+    mutations.intx = plaidml::to_datatype(static_cast<plaidml::DType>(intx));
 
     IVLOG(1, "floatx " << static_cast<int>(floatx));
     IVLOG(1, "mutations.floatx " << static_cast<int>(mutations.floatx));

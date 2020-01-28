@@ -131,7 +131,7 @@ inline const char* to_string(DType dtype) {
   }
 }
 
-inline DataType from_dtype(DType dtype) {
+inline DataType to_datatype(DType dtype) {
   switch (dtype) {
     case DType::INVALID:
       return DataType::invalid;

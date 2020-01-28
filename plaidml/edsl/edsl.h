@@ -1093,13 +1093,13 @@ inline Program::Program(                 //
     const DType& intx,                   //
     const std::vector<std::tuple<Tensor, Tensor>>& updates)
     : floatx_(floatx), intx_(intx) {
-  if (floatx != DType::FLOAT32 && floatx != DType::FLOAT64) {
+  if (!isFloat(to_datatype(floatx))) {
     std::stringstream ss;
-    ss << "Invalid floatx_ requested by Program. Expected either float32 or float64";
+    ss << "Invalid floatx requested by Program.";
     throw std::runtime_error(ss.str());
   }
 
-  if (intx != DType::INT32 && intx != DType::INT64) {
+  if (!isInteger(to_datatype(intx))) {
     std::stringstream ss;
     ss << "Invalid intx_ requested by Program. Expected either int32 or int64";
     throw std::runtime_error(ss.str());
