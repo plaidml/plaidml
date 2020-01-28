@@ -4,5 +4,5 @@ dependencies:
   - pip=19
   - python=3.6
   - pip:
-      - tensorflow==2.0.0; platform_system == 'Darwin'
-      - tensorflow-gpu==2.0.0; platform_system != 'Darwin'
+      - tensorflow==1.15.0; platform_system == 'Darwin'
+      - tensorflow-gpu==1.15.0; platform_system != 'Darwin'
