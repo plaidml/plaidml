@@ -1,7 +1,5 @@
 // Copyright 2019, Intel Corporation
 
-#include "pmlc/dialect/tile/transforms/constant_types.h"
-
 #include <memory>
 
 #include "llvm/Support/FormatVariadic.h"
@@ -9,24 +7,34 @@
 #include "mlir/Dialect/StandardOps/Ops.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Matchers.h"
+#include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/DebugStringHelper.h"
 
+#include "pmlc/dialect/eltwise/ir/ops.h"
 #include "pmlc/dialect/eltwise/ir/util.h"
+#include "pmlc/dialect/tile/ir/ops.h"
 #include "pmlc/dialect/tile/transforms/passes.h"
 #include "pmlc/util/enums.h"
 #include "pmlc/util/logging.h"
 #include "pmlc/util/util.h"
 
 namespace pmlc::dialect::tile {
+using mlir::OperationPass;
+using mlir::OpRewritePattern;
+using mlir::OwningRewritePatternList;
+using mlir::PatternMatchResult;
+using mlir::PatternRewriter;
+
+using pmlc::dialect::eltwise::ScalarConstantOp;
 
 static llvm::cl::OptionCategory constant_types_options("tile-constant-types options");
 
-static llvm::cl::opt<std::string> constant_types_option_floatx("tile-constant-types-floatx",
+static llvm::cl::opt<std::string> constant_types_option_floatx("tile-constant-types-floatx", llvm::cl::init("float64"),
                                                                llvm::cl::desc("set floating-point constant precision"),
                                                                llvm::cl::cat(constant_types_options));
 
-static llvm::cl::opt<std::string> constant_types_option_intx("tile-constant-types-intx",
+static llvm::cl::opt<std::string> constant_types_option_intx("tile-constant-types-intx", llvm::cl::init("int64"),
                                                              llvm::cl::desc("set integer constant precision"),
                                                              llvm::cl::cat(constant_types_options));
 
@@ -98,8 +106,27 @@ PatternMatchResult ConstantTypesRewriter::matchAndRewrite(ScalarConstantOp const
 
 struct ConstantTypesPass : public OperationPass<ConstantTypesPass> {
   ConstantTypesPass(const std::string& floatx = constant_types_option_floatx,
-                    const std::string& intx = constant_types_option_intx){
-      // TODO set floatx / intx
+                    const std::string& intx = constant_types_option_intx) {
+    floatx_ = pmlc::util::from_string(floatx);
+    intx_ = pmlc::util::from_string(intx);
+
+    if (floatx_ == DataType::invalid) {
+      std::stringstream ss;
+      ss << "Invalid floatx option " << floatx;
+      throw std::runtime_error(ss.str());
+    }
+    if (intx_ == DataType::invalid) {
+      std::stringstream ss;
+      ss << "Invalid intx option " << intx;
+      throw std::runtime_error(ss.str());
+    }
+
+    IVLOG(1, "creating ConstantTypesPass with floatx " << floatx);
+    // IVLOG(1, "floatx_ " << floatx_);
+    IVLOG(1, "creating ConstantTypesPass with floatx " << floatx);
+    // IVLOG(1, "intx_ " << intx_);
+
+    // TODO set floatx / intx
   };
 
   void runOnOperation() final;

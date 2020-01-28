@@ -1,31 +1,45 @@
-// RUN: pmlc-opt -tile-constant-types -split-input-file %s | FileCheck %s
+// RUN: pmlc-opt -canonicalize %s | FileCheck %s
 
-// RUN: mlir-opt %s -split-input-file -affine-data-copy-generate -affine-data-copy-generate-dma=false -affine-data-copy-generate-fast-mem-space=0 -affine-data-copy-generate-skip-non-unit-stride-loops | FileCheck %s
-
-
-!f32 = type !eltwise.f32
-
-#map0 = affine_map<(i, j, k) -> (j, k)>
-#map1 = affine_map<(i, j, k) -> (j, i)>
-#map2 = affine_map<(i, j, k) -> (i, k)>
-
-func @dot(%arg0: tensor<1x784x!eltwise.f32>, %arg1: tensor<784x512x!eltwise.f32>) -> tensor<1x512x!eltwise.f32> {
-  %c0 = "eltwise.sconst"() {value = 0.0 : f64} : () -> !f32
-  %0 = tile.affine_const 512
-  %1 = tile.affine_const 1
-  %2 = tile.cion add, mul, %c0, %arg0, %arg1 {sink=#map0, srcs=[#map1, #map2]} :
-    !f32, tensor<1x784x!eltwise.f32>, tensor<784x512x!eltwise.f32> -> tensor<1x512x!eltwise.f32>
-  return %2 : tensor<1x512x!eltwise.f32>
+// CHECK-LABEL: @basic
+func @basic(%arg0: index) -> index {
+  %c1 = tile.affine_const 1
+  %0 = tile.affine_add %arg0, %arg0
+  %1 = tile.affine_mul %0, %c1
+  return %1 : index
+  // CHECK-NEXT: %0 = tile.affine_add %arg0, %arg0
+  // CHECK-NEXT: return %0
 }
 
-// CHECK: #map0 = affine_map<() -> (0, 0, 0)>
-// CHECK: #map1 = affine_map<(d0, d1, d2) -> (d1, d2)>
-// CHECK: #map2 = affine_map<(d0, d1, d2) -> (d1, d0)>
-// CHECK: #map3 = affine_map<(d0, d1, d2) -> (d0, d2)>
-// CHECK: #map4 = affine_map<() -> (783, 0, 511)>
-// CHECK-LABEL: func @dot
-// CHECK: tile.cion
-// CHECK-SAME: lower_bounds = #map0
-// CHECK-SAME: sink = #map1
-// CHECK-SAME: srcs = [#map2, #map3]
-// CHECK-SAME: upper_bounds = #map4
+// CHECK-LABEL: @fold_mul_1
+func @fold_mul_1(%arg0: index) -> index {
+  %cst = tile.affine_const 1
+  %0 = tile.affine_mul %arg0, %cst
+  return %0 : index
+  // CHECK-NEXT: return %arg0
+}
+
+// CHECK-LABEL: @fold_add_0
+func @fold_add_0(%arg0: index) -> index {
+  %cst = tile.affine_const 0
+  %0 = tile.affine_add %arg0, %cst
+  return %0 : index
+  // CHECK-NEXT: return %arg0
+}
+
+// CHECK-LABEL: @fold_add_cst_cst
+func @fold_add_cst_cst() -> index {
+  %c0 = tile.affine_const 1
+  %c1 = tile.affine_const 3
+  %0 = tile.affine_add %c0, %c1
+  return %0 : index
+  // CHECK-NEXT: %c4 = tile.affine_const 4
+  // CHECK-NEXT: return %c4 : index
+}
+
+// CHECK-LABEL: @fold_sub_x_x
+func @fold_sub_x_x(%arg0: index) -> index {
+  %0 = tile.affine_sub %arg0, %arg0
+  return %0 : index
+  // CHECK-NEXT: %c0 = tile.affine_const 0
+  // CHECK-NEXT: return %c0
+}
