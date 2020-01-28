@@ -692,9 +692,6 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(StringRef name, const Prog
     throw std::runtime_error("Module verification error");
   }
 
-  // IVLOG(1, "mutations.floatx " << static_cast<int>(plaidml::from_dtype(mutations.floatx)));
-  // IVLOG(1, "mutations.intx " << static_cast<int>(plaidml::from_dtype(mutations.intx));
-
   // Do some optimization passes
   mlir::PassManager pm(&impl->context);
   pm.addPass(MakeProgramPass::create());

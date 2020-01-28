@@ -30,11 +30,11 @@ using pmlc::dialect::eltwise::ScalarConstantOp;
 
 static llvm::cl::OptionCategory constant_types_options("tile-constant-types options");
 
-static llvm::cl::opt<std::string> constant_types_option_floatx("tile-constant-types-floatx", llvm::cl::init("float64"),
+static llvm::cl::opt<std::string> constant_types_option_floatx("tile-constant-types-floatx", llvm::cl::init("float32"),
                                                                llvm::cl::desc("set floating-point constant precision"),
                                                                llvm::cl::cat(constant_types_options));
 
-static llvm::cl::opt<std::string> constant_types_option_intx("tile-constant-types-intx", llvm::cl::init("int64"),
+static llvm::cl::opt<std::string> constant_types_option_intx("tile-constant-types-intx", llvm::cl::init("int32"),
                                                              llvm::cl::desc("set integer constant precision"),
                                                              llvm::cl::cat(constant_types_options));
 
@@ -62,8 +62,10 @@ PatternMatchResult ConstantTypesRewriter::matchAndRewrite(ScalarConstantOp const
   // IVLOG(2, "ConstantTypesRewriter::cur_type> " << mlir::debugString(cur_type));
   // auto scalar_type = type.cast<eltwise::ScalarType>();
   // IVLOG(2, "ConstantTypesRewriter::scalar_type> " << mlir::debugString(scalar_type));
+  auto float_attr = constOp.getFloatAttr();
+  auto int_attr = constOp.getIntAttr();
 
-  if (auto float_attr = constOp.getFloatAttr()) {
+  if (float_attr && floatx_ != DataType::invalid) {
     double value = float_attr.getValueAsDouble();
     auto elementType = ScalarType::get(type.getContext(), floatx_);
     auto new_type = RankedTensorType::get(shape, elementType);
@@ -78,7 +80,7 @@ PatternMatchResult ConstantTypesRewriter::matchAndRewrite(ScalarConstantOp const
       return matchSuccess();
     }
 
-  } else if (auto int_attr = constOp.getIntAttr()) {
+  } else if (int_attr && intx_ != DataType::invalid) {
     int64_t value = int_attr.getInt();
 
     if (pmlc::util::isUnsigned(intx_) && (value < 0)) {
@@ -107,26 +109,10 @@ PatternMatchResult ConstantTypesRewriter::matchAndRewrite(ScalarConstantOp const
 struct ConstantTypesPass : public OperationPass<ConstantTypesPass> {
   ConstantTypesPass(const std::string& floatx = constant_types_option_floatx,
                     const std::string& intx = constant_types_option_intx) {
+    IVLOG(1, "creating ConstantTypesPass with floatx " << floatx);
+    IVLOG(1, "creating ConstantTypesPass with floatx " << floatx);
     floatx_ = pmlc::util::from_string(floatx);
     intx_ = pmlc::util::from_string(intx);
-
-    if (floatx_ == DataType::invalid) {
-      std::stringstream ss;
-      ss << "Invalid floatx option " << floatx;
-      throw std::runtime_error(ss.str());
-    }
-    if (intx_ == DataType::invalid) {
-      std::stringstream ss;
-      ss << "Invalid intx option " << intx;
-      throw std::runtime_error(ss.str());
-    }
-
-    IVLOG(1, "creating ConstantTypesPass with floatx " << floatx);
-    // IVLOG(1, "floatx_ " << floatx_);
-    IVLOG(1, "creating ConstantTypesPass with floatx " << floatx);
-    // IVLOG(1, "intx_ " << intx_);
-
-    // TODO set floatx / intx
   };
 
   void runOnOperation() final;
@@ -154,13 +140,10 @@ std::unique_ptr<mlir::Pass> createConstantTypesPass(const DataType& floatx, cons
   std::string floatx_str = pmlc::util::stringifyDataType(floatx);
   std::string intx_str = pmlc::util::stringifyDataType(intx);
 
-  IVLOG(1, "Creating pass with floatx " << static_cast<int>(floatx));
-  IVLOG(1, "Creating pass with intx " << static_cast<int>(intx));
+  IVLOG(1, "Created pass with floatx_str " << floatx_str);
+  IVLOG(1, "Created pass with intx_str " << intx_str);
 
   auto pass = std::make_unique<ConstantTypesPass>(floatx_str, intx_str);
-
-  IVLOG(1, "Created pass with floatx_str " << static_cast<int>(pass->floatx_));
-  IVLOG(1, "Created pass with intx_str " << static_cast<int>(pass->intx_));
 
   return pass;
 }

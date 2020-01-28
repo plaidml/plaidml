@@ -83,14 +83,12 @@ class Program {
   ///
   /// Program constructor
   /// floatx is used to specify the underlying datatype of floating-point constants
-  /// and should be either DType::FLOAT32 or DType::FLOAT64.
   /// intx is used to specify the underlying datatype of integer constants
-  /// and should be either DType::INT32 or DType::INT64.
   Program(                                   //
       const std::string& name,               //
       const std::vector<Tensor>& outputs,    //
-      const DType& floatx = DType::FLOAT64,  //
-      const DType& intx = DType::INT64,      //
+      const DType& floatx = DType::FLOAT32,  //
+      const DType& intx = DType::INT32,      //
       const std::vector<std::tuple<Tensor, Tensor>>& updates = {});
 
   ///
@@ -1101,7 +1099,7 @@ inline Program::Program(                 //
 
   if (!isInteger(to_datatype(intx))) {
     std::stringstream ss;
-    ss << "Invalid intx_ requested by Program. Expected either int32 or int64";
+    ss << "Invalid intx requested by Program.";
     throw std::runtime_error(ss.str());
   }
 
