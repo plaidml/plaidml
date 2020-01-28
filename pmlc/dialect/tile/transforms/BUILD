@@ -7,8 +7,7 @@ load("//bzl:plaidml.bzl", "plaidml_cc_library")
 plaidml_cc_library(
     name = "lib",
     srcs = [
-        "contraction.cc",
-        "constant_types.cc"
+        "contraction.cc"
     ],
     hdrs = [
         "contraction.h",
@@ -27,7 +26,7 @@ plaidml_cc_library(
 
 plaidml_cc_library(
     name = "transforms",
-    srcs = ["registration.cc"],
+    srcs = ["registration.cc", "constant_types.cc"],
     deps = [":lib"],
     alwayslink = 1,
 )

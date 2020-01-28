@@ -20,6 +20,26 @@
 
 namespace pmlc::dialect::tile {
 
+static llvm::cl::OptionCategory constant_types_options("tile-constant-types options");
+
+static llvm::cl::opt<std::string> constant_types_option_floatx("tile-constant-types-floatx",
+                                                               llvm::cl::desc("set floating-point constant precision"),
+                                                               llvm::cl::cat(constant_types_options));
+
+static llvm::cl::opt<std::string> constant_types_option_intx("tile-constant-types-intx",
+                                                             llvm::cl::desc("set integer constant precision"),
+                                                             llvm::cl::cat(constant_types_options));
+
+struct ConstantTypesRewriter : public OpRewritePattern<ScalarConstantOp> {
+  ConstantTypesRewriter(mlir::MLIRContext* context, DataType floatx, DataType intx)
+      : OpRewritePattern<ScalarConstantOp>(context), floatx_(floatx), intx_(intx) {}
+
+  DataType floatx_;
+  DataType intx_;
+
+  PatternMatchResult matchAndRewrite(ScalarConstantOp constOp, PatternRewriter& rewriter) const override;
+};
+
 PatternMatchResult ConstantTypesRewriter::matchAndRewrite(ScalarConstantOp constOp, PatternRewriter& rewriter) const {
   IVLOG(1, "ConstantTypesPass::matchAndRewrite");
   IVLOG(1, "float_x " << static_cast<int>(floatx_));
@@ -76,58 +96,49 @@ PatternMatchResult ConstantTypesRewriter::matchAndRewrite(ScalarConstantOp const
   return matchFailure();
 }
 
-/*
-void ConstantTypesPass::runOnFunction() {
-  IVLOG(1, "ConstantTypesPass::runOnFunction");
-  IVLOG(1, "float_x " << static_cast<int>(floatx_));
-  IVLOG(1, "int " << static_cast<int>(intx_));
+struct ConstantTypesPass : public OperationPass<ConstantTypesPass> {
+  ConstantTypesPass(const std::string& floatx = constant_types_option_floatx,
+                    const std::string& intx = constant_types_option_intx){
+      // TODO set floatx / intx
+  };
 
-  // TODO: check compute_shape pass
+  void runOnOperation() final;
 
-  if (floatx_ != DataType::invalid && !isFloat(floatx_)) {
-    throw std::runtime_error("floatx is not floating-point type ");
-  }
-  if (intx_ != DataType::invalid && !isInteger(intx_)) {
-    throw std::runtime_error("intx is not integer");
-  }
+  DataType floatx_;
+  DataType intx_;
+};
 
-  auto func = getFunction();
-  func.walk([this](pmlc::dialect::eltwise::ScalarConstantOp* op) {
-    try {
-      mlir::Builder builder(&getContext());
+void ConstantTypesPass::runOnOperation() {
+  OwningRewritePatternList patterns;
 
-      if (auto int_attr = op->getIntAttr()) {
-        int64_t value = int_attr.getInt();
-        IVLOG(1, "value " << value);
+  patterns.insert<ConstantTypesRewriter>(&getContext(), floatx_, intx_);
 
-        switch (intx_) {
-          case DataType::u1:
-          default:
-            break;
-        }
-      } else if (auto float_attr = op->getFloatAttr()) {
-        double value = float_attr.getValueAsDouble();
-        IVLOG(1, "value " << value);
+  // TODO: Instead of adding all known patterns from the whole system lazily
+  // add and cache the canonicalization patterns for ops we see in practice
+  // when building the worklist.  For now, we just grab everything.
+  // auto* context = &getContext();
+  // for (auto* op : context->getRegisteredOperations()) op->getCanonicalizationPatterns//(patterns, context);
 
-      }
-    } catch (const std::exception& ex) {
-      op->emitError(ex.what());
-      signalPassFailure();
-    }
-  });
-}  // namespace pmlc::dialect::tile
-*/
+  Operation* op = getOperation();
+  applyPatternsGreedily(op->getRegions(), patterns);
+}
 
 std::unique_ptr<mlir::Pass> createConstantTypesPass(const DataType& floatx, const DataType& intx) {
-  auto pass = std::make_unique<ConstantTypesPass>(floatx, intx);
+  std::string floatx_str = pmlc::util::stringifyDataType(floatx);
+  std::string intx_str = pmlc::util::stringifyDataType(intx);
 
   IVLOG(1, "Creating pass with floatx " << static_cast<int>(floatx));
   IVLOG(1, "Creating pass with intx " << static_cast<int>(intx));
 
-  IVLOG(1, "Created pass with floatx " << static_cast<int>(pass->floatx_));
-  IVLOG(1, "Created pass with intx " << static_cast<int>(pass->intx_));
+  auto pass = std::make_unique<ConstantTypesPass>(floatx_str, intx_str);
+
+  IVLOG(1, "Created pass with floatx_str " << static_cast<int>(pass->floatx_));
+  IVLOG(1, "Created pass with intx_str " << static_cast<int>(pass->intx_));
 
   return pass;
 }
+
+static mlir::PassRegistration<ConstantTypesPass> constant_types_pass("tile-constant-types",
+                                                                     "Set constant types precision");
 
 }  // namespace pmlc::dialect::tile
