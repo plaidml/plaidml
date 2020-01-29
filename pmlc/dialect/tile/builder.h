@@ -4,6 +4,7 @@
 
 #include <memory>
 #include <set>
+#include <string>
 #include <vector>
 
 #include "llvm/ADT/ArrayRef.h"
@@ -46,6 +47,19 @@ struct ProgramMutations {
   std::set<ProgramUpdate> updates;
   DataType floatx = DataType::invalid;
   DataType intx = DataType::invalid;
+
+  void set_floatx(const char* floatx_str) {
+    floatx = util::from_string(floatx_str);
+    if (!isFloat(floatx)) {
+      throw std::runtime_error("Invalid floatx string " + std::string(floatx_str));
+    }
+  }
+  void set_intx(const char* intx_str) {
+    intx = util::from_string(intx_str);
+    if (!isInteger(intx)) {
+      throw std::runtime_error("Invalid intx string " + std::string(intx_str));
+    }
+  }
 };
 
 class TileBuilder {

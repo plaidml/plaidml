@@ -20,6 +20,6 @@ class ContractionOp;
 
 std::unique_ptr<mlir::OpPassBase<mlir::FuncOp>> createComputeBoundsPass();
 
-std::unique_ptr<mlir::Pass> createConstantTypesPass(const DataType& floatx, const DataType& intx);
+std::unique_ptr<mlir::Pass> createConstantTypesPass(DataType floatx, DataType intx);
 
 }  // namespace pmlc::dialect::tile

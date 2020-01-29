@@ -693,8 +693,8 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(StringRef name, const Prog
   }
   // Do some optimization passes
   mlir::PassManager pm(&impl->context);
+  pm.addPass(createConstantTypesPass(mutations.floatx, mutations.intx));
   pm.addPass(MakeProgramPass::create());
-  pm.addPass(dialect::tile::createConstantTypesPass(mutations.floatx, mutations.intx));
   pm.addPass(mlir::createCanonicalizerPass());
   pm.addPass(mlir::createCSEPass());
   auto result = pm.run(module);

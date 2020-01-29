@@ -1,4 +1,4 @@
-// RUN: pmlc-opt -tile-constant-types -tile-constant-types-floatx=float16 -tile-constant-types-intx=int16 -split-input-file %s | FileCheck %s
+// RUN: pmlc-opt -tile-constant-types -tile-constant-types-floatx=f16 -tile-constant-types-intx=i16 -split-input-file %s | FileCheck %s
 
 !i64 = type tensor<!eltwise.i64>
 !f64 = type tensor<!eltwise.f64>

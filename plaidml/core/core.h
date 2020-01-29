@@ -10,11 +10,8 @@
 #include <vector>
 
 #include "plaidml/core/ffi.h"
-#include "pmlc/util/enums.h"
 
 namespace plaidml {
-
-using DataType = pmlc::util::DataType;
 
 namespace ffi {
 
@@ -131,36 +128,42 @@ inline const char* to_string(DType dtype) {
   }
 }
 
-inline DataType to_datatype(DType dtype) {
+inline bool isSigned(DType dtype) {
+  switch (dtype) {
+    case DType::INT8:
+    case DType::INT16:
+    case DType::INT32:
+    case DType::INT64:
+      return true;
+    default:
+      return false;
+  }
+}
+
+inline bool isUnsigned(DType dtype) {
   switch (dtype) {
     case DType::BOOLEAN:
-      return DataType::u1;
-    case DType::INT8:
-      return DataType::i8;
     case DType::UINT8:
-      return DataType::u8;
-    case DType::INT16:
-      return DataType::i16;
     case DType::UINT16:
-      return DataType::u16;
-    case DType::INT32:
-      return DataType::i32;
     case DType::UINT32:
-      return DataType::u32;
-    case DType::INT64:
-      return DataType::i64;
     case DType::UINT64:
-      return DataType::u64;
-    case DType::BFLOAT16:
-      return DataType::bf16;
-    case DType::FLOAT16:
-      return DataType::f16;
-    case DType::FLOAT32:
-      return DataType::f32;
-    case DType::FLOAT64:
-      return DataType::f64;
+      return true;
     default:
-      return DataType::invalid;
+      return false;
+  }
+}
+
+inline bool isInteger(DType dtype) { return isSigned(dtype) || isUnsigned(dtype); }
+
+inline bool isFloat(DType dtype) {
+  switch (dtype) {
+    case DType::BFLOAT16:
+    case DType::FLOAT16:
+    case DType::FLOAT32:
+    case DType::FLOAT64:
+      return true;
+    default:
+      return false;
   }
 }
 

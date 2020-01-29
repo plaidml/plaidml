@@ -977,8 +977,8 @@ plaidml_program* plaidml_program_evaluate(  //
       mutations.updates.emplace(ProgramUpdate{src_updates[i]->value, dst_updates[i]->value});
     }
 
-    mutations.floatx = plaidml::to_datatype(static_cast<plaidml::DType>(floatx));
-    mutations.intx = plaidml::to_datatype(static_cast<plaidml::DType>(intx));
+    mutations.set_floatx(to_string(static_cast<plaidml::DType>(floatx)));
+    mutations.set_intx(to_string(static_cast<plaidml::DType>(intx)));
 
     auto ret = new plaidml_program{GlobalContext::get()->MakeProgram(name, mutations)};
     assert(noutputs <= ret->program->outputs.size());

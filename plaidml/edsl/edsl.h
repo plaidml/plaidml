@@ -14,7 +14,6 @@
 
 #include "plaidml/core/core.h"
 #include "plaidml/edsl/ffi.h"
-#include "pmlc/util/enums.h"
 
 namespace plaidml {
 namespace edsl {
@@ -1088,13 +1087,13 @@ inline Program::Program(                 //
     const DType& floatx,                 //
     const DType& intx,                   //
     const std::vector<std::tuple<Tensor, Tensor>>& updates) {
-  if (!isFloat(to_datatype(floatx))) {
+  if (!isFloat(floatx)) {
     std::stringstream ss;
     ss << "Invalid floatx requested by Program.";
     throw std::runtime_error(ss.str());
   }
 
-  if (!isInteger(to_datatype(intx))) {
+  if (!isInteger(intx)) {
     std::stringstream ss;
     ss << "Invalid intx requested by Program.";
     throw std::runtime_error(ss.str());
