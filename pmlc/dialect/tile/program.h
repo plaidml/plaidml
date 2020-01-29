@@ -7,7 +7,6 @@
 
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Module.h"
-#include "mlir/IR/StandardTypes.h"
 
 #include "pmlc/util/buffer.h"
 

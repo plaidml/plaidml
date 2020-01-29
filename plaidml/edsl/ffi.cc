@@ -980,11 +980,6 @@ plaidml_program* plaidml_program_evaluate(  //
     mutations.floatx = plaidml::to_datatype(static_cast<plaidml::DType>(floatx));
     mutations.intx = plaidml::to_datatype(static_cast<plaidml::DType>(intx));
 
-    IVLOG(1, "floatx " << static_cast<int>(floatx));
-    IVLOG(1, "mutations.floatx " << static_cast<int>(mutations.floatx));
-    IVLOG(1, "intx " << static_cast<int>(intx));
-    IVLOG(1, "mutations.intx " << static_cast<int>(mutations.intx));
-
     auto ret = new plaidml_program{GlobalContext::get()->MakeProgram(name, mutations)};
     assert(noutputs <= ret->program->outputs.size());
     auto nargs = ret->program->arguments.size();
@@ -999,7 +994,6 @@ plaidml_program* plaidml_program_evaluate(  //
         args[i].buffer = nullptr;
       }
     }
-
     *raw_args = new plaidml_program_args{nargs, args};
     return ret;
   });

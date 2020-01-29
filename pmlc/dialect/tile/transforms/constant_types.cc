@@ -49,19 +49,11 @@ struct ConstantTypesRewriter : public OpRewritePattern<ScalarConstantOp> {
 };
 
 PatternMatchResult ConstantTypesRewriter::matchAndRewrite(ScalarConstantOp constOp, PatternRewriter& rewriter) const {
-  IVLOG(1, "ConstantTypesPass::matchAndRewrite");
-  IVLOG(1, "float_x " << static_cast<int>(floatx_));
-  IVLOG(1, "int " << static_cast<int>(intx_));
+  IVLOG(3, "ConstantTypesPass::matchAndRewrite");
 
   auto type = constOp.getType();
-  IVLOG(2, "ConstantTypesRewriter::type> " << mlir::debugString(type));
+  auto shape = eltwise::getRankedTensorType(type).getShape();
 
-  auto shape = pmlc::dialect::eltwise::getRankedTensorType(type).getShape();
-
-  // auto cur_type = pmlc::dialect::eltwise::getRankedTensorType(type);
-  // IVLOG(2, "ConstantTypesRewriter::cur_type> " << mlir::debugString(cur_type));
-  // auto scalar_type = type.cast<eltwise::ScalarType>();
-  // IVLOG(2, "ConstantTypesRewriter::scalar_type> " << mlir::debugString(scalar_type));
   auto float_attr = constOp.getFloatAttr();
   auto int_attr = constOp.getIntAttr();
 
@@ -69,16 +61,12 @@ PatternMatchResult ConstantTypesRewriter::matchAndRewrite(ScalarConstantOp const
     double value = float_attr.getValueAsDouble();
     auto elementType = ScalarType::get(type.getContext(), floatx_);
     auto new_type = RankedTensorType::get(shape, elementType);
-    IVLOG(2, "ConstantTypesRewriter::new_type> " << mlir::debugString(new_type));
 
     if (new_type == type) {
-      IVLOG(1, "return match failure");
       return matchFailure();
-    } else {
-      rewriter.replaceOpWithNewOp<ScalarConstantOp>(constOp, elementType, value);
-      IVLOG(1, "return match success");
-      return matchSuccess();
     }
+    rewriter.replaceOpWithNewOp<ScalarConstantOp>(constOp, elementType, value);
+    return matchSuccess();
 
   } else if (int_attr && intx_ != DataType::invalid) {
     int64_t value = int_attr.getInt();
@@ -90,16 +78,12 @@ PatternMatchResult ConstantTypesRewriter::matchAndRewrite(ScalarConstantOp const
     }
     auto elementType = ScalarType::get(type.getContext(), intx_);
     auto new_type = RankedTensorType::get(shape, elementType);
-    IVLOG(2, "ConstantTypesRewriter::new_type> " << mlir::debugString(new_type));
 
     if (new_type == type) {
-      IVLOG(1, "return match failure");
       return matchFailure();
-    } else {
-      rewriter.replaceOpWithNewOp<ScalarConstantOp>(constOp, elementType, value);
-      IVLOG(1, "return match success");
-      return matchSuccess();
     }
+    rewriter.replaceOpWithNewOp<ScalarConstantOp>(constOp, elementType, value);
+    return matchSuccess();
   } else {
     IVLOG(1, "Warning: non-float, non-int type");
   }
@@ -109,8 +93,6 @@ PatternMatchResult ConstantTypesRewriter::matchAndRewrite(ScalarConstantOp const
 struct ConstantTypesPass : public OperationPass<ConstantTypesPass> {
   ConstantTypesPass(const std::string& floatx = constant_types_option_floatx,
                     const std::string& intx = constant_types_option_intx) {
-    IVLOG(1, "creating ConstantTypesPass with floatx " << floatx);
-    IVLOG(1, "creating ConstantTypesPass with floatx " << floatx);
     floatx_ = pmlc::util::from_string(floatx);
     intx_ = pmlc::util::from_string(intx);
   };
@@ -123,29 +105,14 @@ struct ConstantTypesPass : public OperationPass<ConstantTypesPass> {
 
 void ConstantTypesPass::runOnOperation() {
   OwningRewritePatternList patterns;
-
   patterns.insert<ConstantTypesRewriter>(&getContext(), floatx_, intx_);
-
-  // TODO: Instead of adding all known patterns from the whole system lazily
-  // add and cache the canonicalization patterns for ops we see in practice
-  // when building the worklist.  For now, we just grab everything.
-  // auto* context = &getContext();
-  // for (auto* op : context->getRegisteredOperations()) op->getCanonicalizationPatterns//(patterns, context);
-
-  Operation* op = getOperation();
-  applyPatternsGreedily(op->getRegions(), patterns);
+  applyPatternsGreedily(getOperation()->getRegions(), patterns);
 }
 
 std::unique_ptr<mlir::Pass> createConstantTypesPass(const DataType& floatx, const DataType& intx) {
-  std::string floatx_str = pmlc::util::stringifyDataType(floatx);
-  std::string intx_str = pmlc::util::stringifyDataType(intx);
-
-  IVLOG(1, "Created pass with floatx_str " << floatx_str);
-  IVLOG(1, "Created pass with intx_str " << intx_str);
-
-  auto pass = std::make_unique<ConstantTypesPass>(floatx_str, intx_str);
-
-  return pass;
+  const auto& floatx_str = pmlc::util::stringifyDataType(floatx);
+  const auto& intx_str = pmlc::util::stringifyDataType(intx);
+  return std::make_unique<ConstantTypesPass>(floatx_str, intx_str);
 }
 
 static mlir::PassRegistration<ConstantTypesPass> constant_types_pass("tile-constant-types",

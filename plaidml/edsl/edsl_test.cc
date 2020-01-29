@@ -334,7 +334,6 @@ module {
 
   auto binder = exec::Binder(program);
   auto executable = binder.compile();
-
   binder.input(A).copy_from(input.data());
   binder.input(B).copy_from(input.data());
   executable->run();
@@ -390,7 +389,6 @@ TEST(CppEdsl, Relu) {
   auto A = Placeholder(DType::FLOAT32, {10, 20});
   Program program("relu", {Relu(A)});
   EXPECT_THAT(program, Eq(R"#(
-
 !f32 = type tensor<!eltwise.f32>
 module {
   func @relu(%arg0: tensor<10x20x!eltwise.f32>) -> tensor<10x20x!eltwise.f32> {

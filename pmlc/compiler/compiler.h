@@ -7,7 +7,6 @@
 #include <vector>
 
 #include "mlir/IR/Module.h"
-#include "mlir/IR/StandardTypes.h"
 
 namespace mlir {
 class ExecutionEngine;

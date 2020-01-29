@@ -133,8 +133,6 @@ inline const char* to_string(DType dtype) {
 
 inline DataType to_datatype(DType dtype) {
   switch (dtype) {
-    case DType::INVALID:
-      return DataType::invalid;
     case DType::BOOLEAN:
       return DataType::u1;
     case DType::INT8:

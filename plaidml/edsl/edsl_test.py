@@ -104,8 +104,8 @@ def complex_conv_2d(
     O = TensorOutput(N, Y0, Y1, G, GCO)
 
     # Compute the convolution
-    O[n, x0, x1, g, gco] += I[n, s0 * x1 + d0 * k0 - P0, s1 * x1 + d1 * k1 - P1, g, gci] * K[
-        k0, k1, g, gci, gco]
+    O[n, x0, x1, g, gco] += I[n, s0 * x1 + d0 * k0 - P0, s1 * x1 + d1 * k1 -
+                              P1, g, gci] * K[k0, k1, g, gci, gco]
     return O
 
 
@@ -263,18 +263,20 @@ class TestEdsl(unittest.TestCase):
         O = I * (-2)
 
         try:
-          program = Program(
-            'lower_precision', [O], floatx=plaidml.DType.FLOAT16, intx=plaidml.DType.UINT16)
+            program = Program('lower_precision', [O],
+                              floatx=plaidml.DType.FLOAT16,
+                              intx=plaidml.DType.UINT16)
         except Exception:
-          return
+            return
         self.fail("expected exception")
 
     def test_lower_precision(self):
         I = Tensor(LogicalShape(plaidml.DType.FLOAT64, [3, 3]))
         O = I + 1 + 2.0
 
-        program = Program(
-            'lower_precision', [O], floatx=plaidml.DType.FLOAT32, intx=plaidml.DType.INT32)
+        program = Program('lower_precision', [O],
+                          floatx=plaidml.DType.FLOAT32,
+                          intx=plaidml.DType.INT32)
         expected = '''
 
 !i32 = type tensor<!eltwise.i32>
@@ -908,8 +910,8 @@ module {
         K = Tensor(LogicalShape(plaidml.DType.FLOAT32, shape), name='K')
         n, x0, x1, c0, c1, co, ci, k0, k1 = TensorIndexes(9)
         O = TensorOutput(1, 5, 5, 1)
-        O[n, x0, x1, co] += (I[n, (x0 + k0 - 1) // 2, (
-            x1 + k1 - 1) // 2, ci] * K[2 - k0, 2 - k1, co, ci])
+        O[n, x0, x1, co] += (I[n, (x0 + k0 - 1) // 2,
+                               (x1 + k1 - 1) // 2, ci] * K[2 - k0, 2 - k1, co, ci])
         program = Program('defract_long', [O])
         expected = '''
 #map0 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
@@ -939,14 +941,15 @@ module {
                 [[-1], [-2], [1]],
             ]])),
         ])
-        np.testing.assert_array_equal(outputs[0],
-                                      np.array([[
-                                          [[0], [0], [0], [0], [0]],
-                                          [[0], [4], [12], [6], [24]],
-                                          [[0], [0], [0], [0], [0]],
-                                          [[6], [-3], [-6], [-3], [-12]],
-                                          [[0], [0], [0], [0], [0]],
-                                      ]]))
+        np.testing.assert_array_equal(
+            outputs[0],
+            np.array([[
+                [[0], [0], [0], [0], [0]],
+                [[0], [4], [12], [6], [24]],
+                [[0], [0], [0], [0], [0]],
+                [[6], [-3], [-6], [-3], [-12]],
+                [[0], [0], [0], [0], [0]],
+            ]]))
 
     @unittest.skip('FIXME')
     def test_funky_names(self):

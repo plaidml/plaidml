@@ -691,7 +691,6 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(StringRef name, const Prog
   if (failed(mlir::verify(module))) {
     throw std::runtime_error("Module verification error");
   }
-
   // Do some optimization passes
   mlir::PassManager pm(&impl->context);
   pm.addPass(MakeProgramPass::create());
