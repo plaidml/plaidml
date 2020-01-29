@@ -12,6 +12,7 @@ plaidml_cc_binary(
         "//pmlc/conversion/tile_to_pxa",
         "//pmlc/dialect/eltwise",
         "//pmlc/dialect/pxa",
+        "//pmlc/dialect/stdx",
         "//pmlc/dialect/tile",
         "//pmlc/target/x86",
         "@llvm-project//mlir:AffineDialectRegistration",
