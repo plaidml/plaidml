@@ -7,7 +7,7 @@
 
 namespace mlir {
 class FuncOp;
-class MLIRContext;
+class Pass;
 template <typename T>
 class OpPassBase;
 }  // namespace mlir
@@ -17,7 +17,6 @@ namespace pmlc::dialect::tile {
 using DataType = util::DataType;
 
 class ContractionOp;
-class ConstantTypesPass;
 
 std::unique_ptr<mlir::OpPassBase<mlir::FuncOp>> createComputeBoundsPass();
 
