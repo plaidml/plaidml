@@ -164,8 +164,7 @@ class TensorShape(ForeignObject):
     @property
     def strides(self):
         return [
-            ffi_call(lib.plaidml_shape_get_dim_stride, self.as_ptr(), i)
-            for i in range(self.ndims)
+            ffi_call(lib.plaidml_shape_get_dim_stride, self.as_ptr(), i) for i in range(self.ndims)
         ]
 
 
@@ -226,8 +225,8 @@ class Buffer(ForeignObject):
 
     def as_ndarray(self):
         if self._ndarray is None:
-            self._ndarray = np.ndarray(
-                tuple(x for x in self.shape.sizes), dtype=self.shape.dtype.into_numpy())
+            self._ndarray = np.ndarray(tuple(x for x in self.shape.sizes),
+                                       dtype=self.shape.dtype.into_numpy())
         with self.mmap_current() as view:
             view.copy_to_ndarray(self._ndarray)
         return self._ndarray
