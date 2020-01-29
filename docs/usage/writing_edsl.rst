@@ -7,6 +7,7 @@ This tutorial is intended to help machine learning practitioners (or anyone with
 a background in software engineering and mathematics) get started using the C++/Python
 Tile eDSL.
 
+
 Scope and Warning
 *******************
 This tutorial provides an introduction to the Tile eDSL. It is intended to
@@ -32,29 +33,14 @@ sum over axis `0` of a 2D tensor (in Keras this would be ``K.sum(I, axis=0)``):
 
    .. group-tab:: C++
 
-        .. code-block:: cpp
-
-          Tensor sum_over_axis(const Tensor& I) {
-            TensorDim M, N;
-            TensorIndex m, n;
-            I.bind_dims(M, N);
-            auto O = TensorOutput(N);
-            O(n) += I(m, n); // contraction
-            return O;
-          }
+      .. literalinclude:: ../codeexamples/writing_edsl.cc
+        :language: cpp
+        :lines: 27-34
 
    .. group-tab:: Python
 
-        .. code-block:: python
-
-          def sum_over_axis(I):
-            M, N = TensorDims(2)
-            m, n = TensorIndexes(2)
-            I.bind_dims(M, N)
-            O = TensorOutput(N)
-            # contraction
-            O[n] += I[m, n]
-            return O
+      .. literalinclude:: ../codeexamples/writing_edsl.py
+        :lines: 21-27
 
 An operation such as this which merges together values across one or more
 indices is called a *contraction*. The syntax may look a bit odd at first, but
@@ -119,28 +105,14 @@ change from sum over axis ``0``. Let's look at it as a Tile function:
 
   .. group-tab:: C++
 
-      .. code-block:: c++
-
-        Tensor max_over_axis(const Tensor& I) {
-          TensorDim M, N;
-          TensorIndex m, n;
-          I.bind_dims(M, N);
-          auto O = TensorOutput(N);
-          O(n) >= I(m, n);
-          return O;
-        }
+      .. literalinclude:: ../codeexamples/writing_edsl.cc
+        :language: cpp
+        :lines: 36-43
 
   .. group-tab:: Python
 
-      .. code-block:: python
-
-            def max_over_axis(I):
-              M, N = TensorDims(2)
-              m, n = TensorIndexes(2)
-              I.bind_dims(M, N)
-              O = TensorOutput(N)
-              O[n] >= I[m, n]
-              return O
+      .. literalinclude:: ../codeexamples/writing_edsl.py
+        :lines: 29-35
 
 Again, this corresponds closely to mathematical notation:
 
@@ -177,15 +149,14 @@ ends in a semicolon. Here's the result:
 
   .. group-tab:: C++
 
-      .. code-block:: c++
-
-        C(i, j) += A(i, k) * B(k, j);
+      .. literalinclude:: ../codeexamples/writing_edsl.cc
+        :language: cpp
+        :lines: 51
 
   .. group-tab:: Python
 
-      .. code-block:: python
-      
-        C[i, j] += A[i, k] * B[k, j];
+      .. literalinclude:: ../codeexamples/writing_edsl.py
+        :lines: 43
 
 To have correct dimensions, we need ``I`` to be the first dimension of ``A`` and ``J``
 the last dimension of ``B``. Here's how this looks as part of a full Tile
@@ -195,30 +166,14 @@ function:
 
   .. group-tab:: C++
   
-    .. code-block:: c++
-
-        Tensor matmul(const Tensor& A, const Tensor& B) {
-          TensorDim I, J, K;
-          TensorIndex i, j, k;
-          A.bind_dims(I, K);
-          B.bind_dims(K, J);
-          auto C = TensorOutput(I, J);
-          C(i, j) += A(i, k) * B(k, j);
-          return C;
-        }
+    .. literalinclude:: ../codeexamples/writing_edsl.cc
+        :language: cpp
+        :lines: 45-53
 
   .. group-tab:: Python
-
-    .. code-block:: python
     
-        def matmul(A, B):
-          I, J, K = TensorDims(3)
-          i, j, k = TensorIndexes(3)
-          A.bind_dims(I, K)
-          B.bind_dims(K, J)
-          C = TensorOutput(I, J)
-          C[i, j] += A[i, k] * B[k, j]
-          return C
+      .. literalinclude:: ../codeexamples/writing_edsl.py
+        :lines: 37-44
 
 Notice that we use ``bind_dims`` on inputs and we use ``TensorOutput`` on
 outputs. Input dimensions can be repeated, which results in an error if the Tile
@@ -240,28 +195,14 @@ as follows:
   
   .. group-tab:: C++
 
-      .. code-block:: c++
-
-        Tensor global_min(const Tensor& I) {
-          TensorIndex i, j, k;
-          auto Neg = -I;
-          auto O_Neg = TensorOutput();
-          O_Neg() >= Neg(i, j, k);
-          auto O = -O_Neg;
-          return O;
-        }
+      .. literalinclude:: ../codeexamples/writing_edsl.cc
+        :language: cpp
+        :lines: 55-62
 
   .. group-tab:: Python
 
-      .. code-block:: python
-      
-        def global_min(I):
-          i, j, k = TensorIndexes(3)
-          Neg = -I
-          O_Neg = TensorOutput()
-          O_Neg[()] >= Neg[i, j, k]
-          O = -O_Neg
-          return O
+      .. literalinclude:: ../codeexamples/writing_edsl.py
+        :lines: 46-52
 
 
 There are several novel pieces in this example. First, note that the elementwise
@@ -292,28 +233,14 @@ write:
   
   .. group-tab:: C++
 
-    .. code-block:: c++
-
-      Tensor avg(const Tensor& I) {
-        TensorDim X, Y;
-        TensorIndex x, y;
-        I.bind_dims(X, Y);
-        auto Sum = TensorOutput();
-        Sum(y) += I(x, y);
-        return Sum / X;
-      }
+    .. literalinclude:: ../codeexamples/writing_edsl.cc
+      :language: cpp
+      :lines: 64-71
 
   .. group-tab:: Python
 
-    .. code-block:: python
-
-      def avg(I):
-        X, Y = TensorDims(2)
-        x, y = TensorIndexes(2)
-        I.bind_dims(X, Y)
-        Sum = TensorOutput()
-        Sum[y] += I[x, y]
-        return Sum / X
+    .. literalinclude:: ../codeexamples/writing_edsl.py
+      :lines: 54-60
 
 We can perform multiple elementwise operations on the same line, including
 operations on constants and input dimensions. So, while it would be possible to
@@ -323,30 +250,14 @@ take a global mean of a 2D tensor in stages as so:
   
   .. group-tab:: C++
 
-    .. code-block:: c++
-
-      Tensor avg(const Tensor& I) {
-        TensorDim X, Y;
-        TensorIndex x, y;
-        I.bind_dims(X, Y);
-        auto Sum = TensorOutput();
-        Sum() += I(x, y);
-        PartialMean = Sum / X;
-        return PartialMean / Y;
-      }
+    .. literalinclude:: ../codeexamples/writing_edsl.cc
+      :language: cpp
+      :lines: 73-81
 
   .. group-tab:: Python
 
-    .. code-block:: python
-
-      def avg_stages(I):
-        X, Y = TensorDims(2)
-        x, y = TensorIndexes(2)
-        I.bind_dims(X, Y)
-        Sum = TensorOutput()
-        Sum[()] += I[x, y]
-        PartialMean = Sum / X
-        return PartialMean / Y
+    .. literalinclude:: ../codeexamples/writing_edsl.py
+      :lines: 62-69
 
 it is more straightforward to merge the elementwise operations:
 
@@ -354,28 +265,14 @@ it is more straightforward to merge the elementwise operations:
 
   .. group-tab:: C++
 
-    .. code-block:: c++
-
-      Tensor avg(const Tensor& I) {
-        TensorDim X, Y;
-        TensorIndex x, y;
-        I.bind_dims(X, Y);
-        auto Sum = TensorOutput();
-        Sum() += I(x, y);
-        return Sum / (X * Y);
-      }
+   .. literalinclude:: ../codeexamples/writing_edsl.cc
+      :language: cpp
+      :lines: 83-90
 
   .. group-tab:: Python
     
-    .. code-block:: python 
-    
-      def avg_merge(I):
-        X, Y = TensorDims(2)
-        x, y = TensorIndexes(2)
-        I.bind_dims(X, Y)
-        Sum = TensorOutput()
-        Sum[()] += I[x, y]
-        return Sum / (X * Y)
+    .. literalinclude:: ../codeexamples/writing_edsl.py
+      :lines: 71-77
 
 Max Pool 1D
 ==============
@@ -389,29 +286,14 @@ implement in straight C++/Python:
 
   .. group-tab:: C++
 
-    .. code-block:: cpp
-
-      float I[N], O[N / 2];
-      for (int i = 0; i < N/2; ++i) {
-        float curr_max = FLT_MIN;
-        for (int j = 0; j < 2; ++j) {
-          if (I[2 * i + j] > curr_max) {
-            curr_max = I[2 * i + j];
-          }
-        }
-        O[i] = curr_max;
-      }
+    .. literalinclude:: ../codeexamples/writing_edsl.cc
+      :language: cpp
+      :lines: 94-103
     
   .. group-tab:: Python
 
-      .. code-block:: python
-
-        for i in range (1 , N//2):
-          curr_max = numpy.finfo(float).eps
-          for j in range (1 , 2):
-            if I[2*i*j] > curr_max:
-              curr_max = I[2*i+j]
-          O[i] = curr_max
+      .. literalinclude:: ../codeexamples/writing_edsl.py
+        :lines: 80-85
 
 
 ``for`` loops over tensor indices get translated into contractions when written in
@@ -421,28 +303,14 @@ Tile. The most direct (and, sadly, wrong) implementation in Tile is:
 
   .. group-tab:: C++
 
-    .. code-block:: c++
-
-        Tensor wrong_max_pool_1d(const Tensor& I) {
-          TensorDim N;
-          TensorIndex i, j;
-          I.bind_dims(N);
-          auto O = TensorOutput(N / 2);
-          O(i) >= I(2 * i + j);
-          return O;
-        }
+    .. literalinclude:: ../codeexamples/writing_edsl.cc
+      :language: cpp
+      :lines: 106-113
 
   .. group-tab:: Python
 
-    .. code-block:: python
-
-         def wrong_max_pool_1d(I):
-            N = TensorDim()
-            i, j = TensorIndexes(2)
-            I.bind_dims(N)
-            O = TensorOutput(N // 2)
-            O[i] >= I[2 * i + j]
-            return O
+    .. literalinclude:: ../codeexamples/writing_edsl.py
+      :lines: 87-93
 
 If you were to run this code, every entry of ``O`` would equal the global max of
 ``I``. We correctly determined that this was a maximization operation, and the
@@ -458,32 +326,16 @@ When can use ``add_constraint`` in Tile to handle such situations:
 
 .. tabs::
 
-.. global-tab:: C++
+  .. group-tab:: C++
 
-  .. code-block:: c++
+    .. literalinclude:: ../codeexamples/writing_edsl.cc
+      :language: cpp
+      :lines: 115-123
 
-    Tensor max_pool_1d(const Tensor& I) {
-      TensorDim N;
-      TensorIndex i, j;
-      I.bind_dims(N);
-      auto O = TensorOutput(N / 2);
-      O(i) >= I(2 * i + j);
-      O.add_constraint(j < 2);
-      return O;
-    }
+  .. group-tab:: Python
 
-  .. global-tab:: Python
-
-    .. code-block:: python
-
-      def max_pool_1d(I):
-        N = TensorDim()
-        i, j = TensorIndexes(2)
-        I.bind_dims(N)
-        O = TensorOutput(N // 2)
-        O[i] >= I[2 * i + j]
-        O.add_constraint(j < 2)
-        return O
+    .. literalinclude:: ../codeexamples/writing_edsl.py
+      :lines: 95-102
 
 Something important to note here is that while we wrote ``j < 2``, this constraint
 actually means ``0<= j < 2``. Constraints are always bounded below by ``0``.
@@ -521,30 +373,14 @@ pool at the edge. This can be accomplished by simply adjusting the size of ``O``
 
   .. group-tab:: C++
 
-    .. code-block:: c++
-
-      Tensor max_pool_1d(const Tensor& I) {
-        TensorDim N;
-        TensorIndex i, j;
-        I.bind_dims(N);
-        auto O = TensorOutput((N + 1) / 2);
-        O(i) >= I(2 * i + j);
-        O.add_constraint(j < 2);
-        return O;
-      }
+    .. literalinclude:: ../codeexamples/writing_edsl.cc
+      :language: cpp
+      :lines: 125-133
 
   .. group-tab:: Python
 
-    .. code-block:: python
-
-      def max_pool_1d(I):
-        N = TensorDim()
-        i, j = TensorIndexes(2)
-        I.bind_dims(N)
-        O = TensorOutput((N + 1) // 2)
-        O[i] >= I[2 * i + j]
-        O.add_constraint(j < 2)
-        return O
+    .. literalinclude:: ../codeexamples/writing_edsl.py
+      :lines: 104-111
 
 No special handling is needed for the case ``i = (N - 1) / 2``, ``j = 1``; this is
 out of range for ``I`` and so is ignored by Tile, which is exactly the intended
@@ -564,22 +400,14 @@ or invalid set of index variables. For example, in the code:
 
   .. group-tab:: C++
 
-    .. code-block:: c++
-
-      I.bind_dims(N);
-      auto O = TensorOutput((N + 1) / 2);
-      O(i) >= I(2 * i + j);
-      O.add_constraint(j < 2);
+    .. literalinclude:: ../codeexamples/writing_edsl.cc
+      :language: cpp
+      :lines: 128-131
     
   .. group-tab:: Python
 
-    .. code-block:: python
-
-      I.bind_dims(N)
-      O = TensorOutput[(N + 1) // 2];
-      O[i] >= I[2 * i + j];
-      O.add_constraint(j < 2);
-
+    .. literalinclude:: ../codeexamples/writing_edsl.py
+      :lines: 107-110
 
 with ``N = 5``, the indices ``i = 1``, ``j = 1`` are valid indices.
 However, ``i = 2``, ``j = 1`` are not valid indices for this operation, nor are ``i = -1000``, ``j = 1``.
@@ -609,28 +437,14 @@ otherwise valid entries. For example, consider the Tile function:
   
   .. group-tab:: C++
 
-    .. code-block:: c++
-
-      Tensor skip(const Tensor& I) {
-        TensorDim M, N;
-        TensorIndex i, j;
-        I.bind_dims(M, N);
-        auto O = TensorOutput(N);
-        O(2 * i) += I(2 * i, j);
-        return O;
-      }
+    .. literalinclude:: ../codeexamples/writing_edsl.cc
+      :language: cpp
+      :lines: 135-142
   
   .. group-tab:: Python
 
-    .. code-block:: python
-
-        def skip(I):
-          M, N = TensorDims(2)
-          i, j = TensorIndexes(2)
-          I.bind_dims(M, N)
-          O = TensorOutput(N)
-          O[2 * i] += I[2 * i, j]
-          return O
+    .. literalinclude:: ../codeexamples/writing_edsl.py
+      :lines: 113-119
 
 This operation only writes to even entries of ``O``; while ``i = 1/2`` , ``j = 1`` does
 yield valid index expressions (``O[1]`` and ``I[1, 1]``), using a fractional index
@@ -659,30 +473,14 @@ and so ``N`` is an appropriate upper bound. The resulting Tile code is:
 
     .. group-tab:: C++
 
-      .. code-block:: cpp
-
-        Tensor csum(const Tensor& I) {
-          TensorDim N;
-          TensorIndex i, k;
-          I.bind_dims(N);
-          auto O = TensorOutput(N);
-          O(i) += I(k);
-          O.add_constraint(i - k < N);
-          return O;
-        }
+      .. literalinclude:: ../codeexamples/writing_edsl.cc
+        :language: cpp
+        :lines: 144-152
 
     .. group-tab:: Python
 
-      .. code-block:: python
-
-        def csum(I):
-          N = TensorDim()
-          i, k = TensorIndexes(2)
-          I.bind_dims(N)
-          O = TensorOutput(N)
-          O[i] += I[k]
-          O.add_constraint(i - k < N)
-          return O
+      .. literalinclude:: ../codeexamples/writing_edsl.py
+        :lines: 121-128
 
 Convolution
 ===========
@@ -748,30 +546,14 @@ the kernel size relative to the spatial dimension of the input:
 
   .. group-tab:: C++
 
-    .. code-block:: c++
-
-      Tensor conv_1d(const Tensor& I, const Tensor& K) {
-        TensorDim N, X, KX, CI, CO;
-        TensorIndex n, x, k, ci, co;
-        I.bind_dims(N, X, CI);
-        K.bind_dims(KX, CI, CO);
-        auto O = TensorOutput(N, X - KX + 1, CO);
-        O(n, x, co) += I(n, x + k, ci) * K(k, ci, co);
-        return O;
-      }
+    .. literalinclude:: ../codeexamples/writing_edsl.cc
+      :language: cpp
+      :lines: 154-162
 
   .. group-tab:: Python
 
-    .. code-block:: python
-
-        def conv_1d(I, K):
-          N, X, KX, CI, CO = TensorDims(5)
-          n, x, k, ci, co = TensorIndexes(5)
-          I.bind_dims(N, X, CI)
-          K.bind_dims(KX, CI, CO)
-          O = TensorOutput(N, X - KX + 1, CO)
-          O[n, x, co] += I[n, x + k, ci] * K[k, ci, co]
-          return O
+    .. literalinclude:: ../codeexamples/writing_edsl.py
+      :lines: 130-137
 
 
 Dilated 2D Convolution
@@ -809,30 +591,14 @@ directly to the formula, and so we get:
 
   .. group-tab:: C++
 
-    .. code-block:: c++
-
-      Tensor conv_2d(const Tensor& I, const Tensor& K) {
-        TensorDim N, X, Y, KX, KY, CI, CO;
-        TensorIndex n, x, y, kx, ky, ci, co;
-        I.bind_dims(N, X, Y, CI);
-        K.bind_dims(KX, KY, CI, CO);
-        auto O = TensorOutput(N, X - 2 * (KX - 1), Y - 3 * (KY - 1), CO);
-        O(n, x, y, co) += I(n, x + 2 * kx, y + 3 * ky, ci) * K(kx, ky, ci, co);
-        return O;
-      }
+    .. literalinclude:: ../codeexamples/writing_edsl.cc
+      :language: cpp
+      :lines: 164-172
 
   .. group-tab:: Python
 
-    .. code-block:: python
-    
-        def conv_2d_dilated(I, K):
-          N, X, Y, KX, KY, CI, CO = TensorDims(7)
-          n, x, y, kx, ky, ci, co = TensorIndexes(7)
-          I.bind_dims(N, X, Y, CI)
-          K.bind_dims(KX, KY, CI, CO)
-          O = TensorOutput(N, X - 2 * (KX - 1), Y - 3 * (KY - 1), CO)
-          O[n, x, y, co] += I[n, x + 2 * kx, y + 3 * ky, ci] * K[kx, ky, ci, co]
-          return O
+    .. literalinclude:: ../codeexamples/writing_edsl.py
+      :lines: 139-146
 
 Complex Convolution
 ===================
@@ -856,91 +622,14 @@ coefficients, and *`P`* gives the padding offsets.
 
   .. group-tab:: C++
 
-    .. code-block:: c++
-        
-        Tensor complex_conv_2d(
-          const Tensor& I,
-          const Tensor& K,
-          const std::vector<size\_t>& s,  // stride coeffs
-          const std::vector<size\_t>& d   // dilation coeffs
-        ) {
-            // "same-lower" autopadding will be applied
-            TensorDim N, G, GCI, GCO;
-            std::vector<TensorDim> X(2);
-            std::vector<TensorDim> K(2);
-            TensorIndex n, g, gci, gco;
-            std::vector<TensorIndex> x(2);
-            std::vector<TensorIndex> k(2);
-            I.bind_dims(N, X[0], X[1], G, GCI);
-            K.bind_dims(K[0], K[1], G, GCI, GCO);
-            // Compute output spatial dimensions
-            std::vector<TensorDim> Y(2);
-            for (size_t i = 0; i < Y.size(); ++i) {
-              Y[i] = (X[i] + s[i] \- 1) / s[i];
-            }
-            // Compute the effective kernel size after dilation
-            std::vector<TensorDim> EK(2);
-            for (size_t i = 0; i < EK.size(); ++i) {
-              EK[i] = d[i] \* (K[i] \- 1) + 1;
-            }
-            // Compute the padding offset
-            std::vector<TensorDim> P(2);
-            for (size_t i = 0; i < P.size(); ++i) {
-              P[i] = ((Y[i] \- 1) \* s[i] + EK[i] \- X[i]) / 2;
-            }
-            // Specify the output size
-            auto O = TensorOutput(N, Y0, Y1, G, GCO);
-            // Compute the convolution
-            O(n, x[0], x[1], g, gco) +=
-              I(n, s[0]\*x[0] + d[0]\*k[0] \- P[0], s[1]\*x[1] + d[1]\*k[1] \- P[1], g, gci) \*
-              K(k0, k1, g, gci, gco);
-            return O;
-        }
+    .. literalinclude:: ../codeexamples/writing_edsl.cc
+      :language: cpp
+      :lines: 174-208
 
   .. group-tab:: Python
 
-    .. code-block:: python
-
-        def complex_conv_2d(
-            I,
-            K,
-            s0,
-            s1,  # stride coeffs
-            d0,
-            d1  # dilation coeffs
-            ):
-                # "same-lower" autopadding will be applied
-                N, G, GCI, GCO = TensorDims(4)
-                X0, X1 = TensorDims(2)
-                K0, K1 = TensorDims(2)
-                n, g, gci, gco = TensorIndexes(4)
-                x0, x1 = TensorIndexes(2)
-                k0, k1 = TensorIndexes(2)
-                I.bind_dims(N, X0, X1, G, GCI)
-                K.bind_dims(K0, K1, G, GCI, GCO)
-
-                # Compute output spatial dimensions
-                Y0, Y1 = TensorDims(2)
-                Y0 = (X0 + s0 - 1) // s0
-                Y1 = (X1 + s1 - 1) // s1
-
-                #Compute the effective kernel size after dilation
-                EK0, EK1 = TensorDims(2)
-                EK0 = d0 * (K0 - 1) + 1
-                EK1 = d1 * (K1 - 1) + 1
-
-                #Compute the padding offset
-                P0, P1 = TensorDims(2)
-                P0 = ((Y0 - 1) * s0 + EK0 - X0) // 2
-                P1 = ((Y1 - 1) * s1 + EK1 - X1) // 2
-
-                # Specify the output size
-                O = TensorOutput(N, Y0, Y1, G, GCO)
-
-                # Compute the convolution
-                O[n, x0, x1, g, gco] += I[n, s0 * x1 + d0 * k0 - P0, s1 * x1 + d1 * k1 -
-                                          P1, g, gci] * K[k0, k1, g, gci, gco]
-                return O
+    .. literalinclude:: ../codeexamples/writing_edsl.py
+      :lines: 148-180
 
 
 
