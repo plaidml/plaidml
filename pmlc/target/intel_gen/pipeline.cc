@@ -18,29 +18,37 @@ using pmlc::conversion::pxa_to_affine::createLowerPXAToAffinePass;
 
 namespace pmlc::target::intel_gen {
 
-static compiler::TargetRegistration pipeline("intel_gen", [](OpPassManager* pm) {
+namespace {
+
+void addToPipeline(OpPassManager& pm) {
   // TODO: do optimizations here
 
-  pm->addPass(createLowerPXAToAffinePass());
-  pm->addNestedPass<FuncOp>(createCanonicalizerPass());
-  pm->addNestedPass<FuncOp>(createCSEPass());
+  pm.addPass(createLowerPXAToAffinePass());
+  pm.addNestedPass<FuncOp>(createCanonicalizerPass());
+  pm.addNestedPass<FuncOp>(createCSEPass());
 
-  pm->addPass(createLowerAffinePass());
-  pm->addNestedPass<FuncOp>(createCanonicalizerPass());
-  pm->addNestedPass<FuncOp>(createCSEPass());
+  pm.addPass(createLowerAffinePass());
+  pm.addNestedPass<FuncOp>(createCanonicalizerPass());
+  pm.addNestedPass<FuncOp>(createCSEPass());
 
-  pm->addPass(createSimpleLoopsToGPUPass(1, 1));
-  pm->addNestedPass<FuncOp>(createCanonicalizerPass());
-  pm->addNestedPass<FuncOp>(createCSEPass());
+  pm.addPass(createSimpleLoopsToGPUPass(1, 1));
+  pm.addNestedPass<FuncOp>(createCanonicalizerPass());
+  pm.addNestedPass<FuncOp>(createCSEPass());
 
-  pm->addPass(createGpuKernelOutliningPass());
+  pm.addPass(createGpuKernelOutliningPass());
   // NOTE: canonicalizer/cse at this stage causes later passes to fail
 
-  pm->addNestedPass<ModuleOp>(createConvertGPUToSPIRVPass({1, 1}));
-  pm->addPass(createCanonicalizerPass());
-  pm->addPass(createCSEPass());
+  pm.addNestedPass<ModuleOp>(createConvertGPUToSPIRVPass({1, 1}));
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
 
-  // pm->addPass(createLowerToLLVMPass(true));
-});
+  // pm.addPass(createLowerToLLVMPass(true));
+}
+
+static PassPipelineRegistration<> passPipelineReg("target-intel_gen", "Target pipeline for Intel GEN iGPUs",
+                                                  addToPipeline);
+static compiler::TargetRegistration targetReg("intel_gen", addToPipeline);
+
+}  // namespace
 
 }  // namespace pmlc::target::intel_gen

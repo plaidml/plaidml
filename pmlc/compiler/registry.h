@@ -13,7 +13,7 @@ class OpPassManager;
 
 namespace pmlc::compiler {
 
-using TargetRegistryFunction = std::function<void(mlir::OpPassManager*)>;
+using TargetRegistryFunction = std::function<void(mlir::OpPassManager&)>;
 
 void registerTarget(llvm::StringRef name, const TargetRegistryFunction& function);
 TargetRegistryFunction resolveTarget(llvm::StringRef name);

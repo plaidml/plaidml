@@ -9,7 +9,6 @@
 
 #include "llvm/Support/FormatVariadic.h"
 
-#include "plaidml/op/op.h"
 #include "pmlc/util/logging.h"
 
 using namespace plaidml::edsl;  // NOLINT
@@ -545,15 +544,14 @@ Value all(const Value& value) {
   auto keepdims = args[2].as_bool();
 
   auto I_as_bool = select(I == 0, Tensor{0}, Tensor{1});
-  auto I_shape = I.shape();
-  if (I_shape.ndims() == 0) {
+  if (I.rank() == 0) {
     return Value{cast(I_as_bool, DType::UINT8)};
   }
   if (axes.is_tuple() && axes.as_tuple().empty()) {
     return Value{cast(I_as_bool, DType::UINT8)};
   }
 
-  AggregationAxes agg(I_shape.ndims(), axes, keepdims);
+  AggregationAxes agg(I.rank(), axes, keepdims);
 
   I.bind_dims(agg.src_dims);
   auto O = TensorOutput(agg.dst_dims);
@@ -572,15 +570,14 @@ Value any(const Value& value) {
   auto keepdims = args[2].as_bool();
 
   auto I_as_bool = select(I == 0, Tensor{0}, Tensor{1});
-  auto I_shape = I.shape();
-  if (I_shape.ndims() == 0) {
+  if (I.rank() == 0) {
     return Value{cast(I_as_bool, DType::UINT8)};
   }
   if (axes.is_tuple() && axes.as_tuple().empty()) {
     return Value{cast(I_as_bool, DType::UINT8)};
   }
 
-  AggregationAxes agg(I_shape.ndims(), axes, keepdims);
+  AggregationAxes agg(I.rank(), axes, keepdims);
 
   I.bind_dims(agg.src_dims);
   auto S = TensorOutput(agg.dst_dims);
@@ -596,9 +593,8 @@ Value argmax(const Value& value) {
     throw std::runtime_error("argmax expects 2 arguments");
   }
   auto I = args[0].as_tensor();
-  auto I_shape = I.shape();
   auto axes = args[1];
-  AggregationAxes agg(I_shape.ndims(), axes, false);
+  AggregationAxes agg(I.rank(), axes, false);
   I.bind_dims(agg.src_dims);
   auto M = TensorOutput(agg.dst_dims);
   M(agg.dst_idxs) >= I(agg.src_idxs);
@@ -636,7 +632,7 @@ Value binary_crossentropy(const Value& value) {
     auto T = X[0];
     auto P = X[1];
     Tensor One{1.0};
-    auto ndims = T.shape().ndims();
+    auto ndims = T.rank();
     std::vector<TensorDim> dims(ndims);
     T.bind_dims(dims);
     auto dims_prod = Tensor{1};
@@ -693,7 +689,7 @@ Value concatenate(const Value& value) {
   if (tensors.empty()) {
     throw std::runtime_error("The concatenate op requires at least one input tensor");
   }
-  auto ndims = tensors[0].shape().ndims();
+  auto ndims = tensors[0].rank();
   auto axis = normalize_axis(raw_axis, ndims, "concatenate");
   std::vector<TensorDim> dims(ndims);
   std::vector<TensorIndex> I_idxs;  // These will be named
@@ -824,21 +820,21 @@ Value convolution(const Value& value) {
   if (!is_filter_layout(filter_layout)) {
     throw std::runtime_error("Filter tensor layout requested in conv op does not apply to convolution filter tensors");
   }
-  if (deriv_mode != ConvDerivMode::DATA && I.shape().ndims() - spatial_rank != nonspatial_dims(input_layout)) {
+  if (deriv_mode != ConvDerivMode::DATA && I.rank() - spatial_rank != nonspatial_dims(input_layout)) {
     // If we ever extend possible layouts so that I and O may have different layouts, we will
     // need to do this check in different ways depending on whether deriv_mode is DATA or not
     throw std::runtime_error(
         llvm::formatv("Inconsistent spatial rank in conv op (received {0} spatial dimensions based on strides but "
                       "input tensor has {1} dimensions, and thus {2} spatial dims). (This error can also occur if "
                       "the layout of I is incorrectly specified or interpreted.)",
-                      spatial_rank, I.shape().ndims(), (I.shape().ndims() - nonspatial_dims(input_layout))));
+                      spatial_rank, I.rank(), (I.rank() - nonspatial_dims(input_layout))));
   }
-  if (deriv_mode != ConvDerivMode::FILTER && F.shape().ndims() - spatial_rank != nonspatial_dims(filter_layout)) {
+  if (deriv_mode != ConvDerivMode::FILTER && F.rank() - spatial_rank != nonspatial_dims(filter_layout)) {
     throw std::runtime_error(
         llvm::formatv("Inconsistent spatial rank in conv op (received {0} spatial dimensions based on strides "
                       "but filter tensor has {1} dimensions, and thus {2} spatial dims). (This error can also occur "
                       "if the layout of F is incorrectly specified or interpreted.)",
-                      spatial_rank, F.shape().ndims(), (F.shape().ndims() - nonspatial_dims(filter_layout))));
+                      spatial_rank, F.rank(), (F.rank() - nonspatial_dims(filter_layout))));
   }
   if (filter_shape.size() && (filter_shape.size() != spatial_rank)) {
     throw std::runtime_error(
@@ -1300,8 +1296,7 @@ Value cumprod(const Value& value) {
   auto I = args[0].as_tensor();
   auto raw_axis = args[1].as_int();
 
-  auto I_shape = I.shape();
-  auto ndims = I_shape.ndims();
+  auto ndims = I.rank();
   auto axis = normalize_axis(raw_axis, ndims, "cumprod");
   std::vector<TensorDim> dims(ndims);
   I.bind_dims(dims);
@@ -1324,8 +1319,7 @@ Value cumsum(const Value& value) {
   auto I = args[0].as_tensor();
   auto raw_axis = args[1].as_int();
 
-  auto I_shape = I.shape();
-  auto ndims = I_shape.ndims();
+  auto ndims = I.rank();
   auto axis = normalize_axis(raw_axis, ndims, "cumsum");
   std::vector<TensorDim> dims(ndims);
   I.bind_dims(dims);
@@ -1346,14 +1340,12 @@ Value dot(const Value& value) {
     throw std::runtime_error("dot expects 2 arguments");
   }
   auto X = args[0].as_tensor();
-  auto X_shape = X.shape();
   auto Y = args[1].as_tensor();
-  auto Y_shape = Y.shape();
-  if (X_shape.dtype() != Y_shape.dtype()) {
+  if (X.dtype() != Y.dtype()) {
     throw std::runtime_error(llvm::formatv("Invalid dtype in dot: X.dtype = '{0}', Y.dtype = '{1}'",
-                                           static_cast<int>(X_shape.dtype()), static_cast<int>(Y_shape.dtype())));
+                                           to_string(X.dtype()), to_string(Y.dtype())));
   }
-  if (X_shape.ndims() == 1 && Y_shape.ndims() == 1) {
+  if (X.rank() == 1 && Y.rank() == 1) {
     TensorDim I;
     TensorIndex i;
     X.bind_dims(I);
@@ -1362,34 +1354,34 @@ Value dot(const Value& value) {
     O(i) += X(i) * Y(i);
     return Value{O};
   }
-  if (1 <= X_shape.ndims() && 2 <= Y_shape.ndims()) {
-    std::vector<TensorDim> X_dims(X_shape.ndims());
-    std::vector<TensorDim> Y_dims(Y_shape.ndims());
+  if (1 <= X.rank() && 2 <= Y.rank()) {
+    std::vector<TensorDim> X_dims(X.rank());
+    std::vector<TensorDim> Y_dims(Y.rank());
     TensorIndex z;
-    std::vector<TensorIndex> X_idxs(X_shape.ndims());
-    std::vector<TensorIndex> Y_idxs(Y_shape.ndims());
-    X_idxs[X_shape.ndims() - 1] = z;
-    Y_idxs[Y_shape.ndims() - 2] = z;
+    std::vector<TensorIndex> X_idxs(X.rank());
+    std::vector<TensorIndex> Y_idxs(Y.rank());
+    X_idxs[X.rank() - 1] = z;
+    Y_idxs[Y.rank() - 2] = z;
     X.bind_dims(X_dims);
     Y.bind_dims(Y_dims);
     std::vector<TensorDim> O_dims;
     std::vector<TensorIndex> O_idxs;
-    for (size_t i = 0; i < X_shape.ndims() - 1; i++) {
+    for (size_t i = 0; i < X.rank() - 1; i++) {
       O_dims.push_back(X_dims[i]);
       O_idxs.push_back(X_idxs[i]);
     }
-    for (size_t i = 0; i < Y_shape.ndims() - 2; i++) {
+    for (size_t i = 0; i < Y.rank() - 2; i++) {
       O_dims.push_back(Y_dims[i]);
       O_idxs.push_back(Y_idxs[i]);
     }
-    O_dims.push_back(Y_dims[Y_shape.ndims() - 1]);
-    O_idxs.push_back(Y_idxs[Y_shape.ndims() - 1]);
+    O_dims.push_back(Y_dims[Y.rank() - 1]);
+    O_idxs.push_back(Y_idxs[Y.rank() - 1]);
     auto O = TensorOutput(O_dims);
     O(O_idxs) += X(X_idxs) * Y(Y_idxs);
     return Value{O};
   }
-  throw std::runtime_error(llvm::formatv("Unsupported dims for dot operation: X.dims = {0}, Y.dims = {1}",
-                                         X_shape.ndims(), Y_shape.ndims()));
+  throw std::runtime_error(
+      llvm::formatv("Unsupported dims for dot operation: X.dims = {0}, Y.dims = {1}", X.rank(), Y.rank()));
 }
 
 Value elu(const Value& value) {
@@ -1427,7 +1419,7 @@ Value expand_dims(const Value& value) {
   auto raw_axis = args[1].as_int();
 
   // Initialize useful values
-  auto ndims = I.shape().ndims();
+  auto ndims = I.rank();
   // Axis is relative to _output_ tensor, which has one more dim than I
   size_t axis = normalize_axis(raw_axis, ndims + 1, "expand_dims");
   std::vector<TensorDim> I_dims(ndims);
@@ -1468,8 +1460,7 @@ Value flip(const Value& value) {
   // Hold off on reading the axis arg
 
   // Set up useful variables
-  auto I_shape = I.shape();
-  auto ndims = I_shape.ndims();
+  auto ndims = I.rank();
   if (args[1].is_int()) {
     raw_axes.push_back(args[1].as_int());
   } else if (args[1].is_none()) {
@@ -1539,7 +1530,7 @@ Value image_resize(const Value& value) {
   size_t rank;  // an error if this isn't 2
   size_t pre_axes;
   auto I = raw_I.as_tensor();
-  auto ndims = I.shape().ndims();
+  auto ndims = I.rank();
   switch (layout) {
     case TensorLayout::NCX:
       rank = ndims - 2;
@@ -1643,10 +1634,9 @@ Value max(const Value& value) {
     throw std::runtime_error("max expects 3 arguments");
   }
   auto I = args[0].as_tensor();
-  auto I_shape = I.shape();
   auto axes = args[1];
   auto keepdims = args[2].as_bool();
-  AggregationAxes agg(I_shape.ndims(), axes, keepdims);
+  AggregationAxes agg(I.rank(), axes, keepdims);
   I.bind_dims(agg.src_dims);
   auto O = TensorOutput(agg.dst_dims);
   O(agg.dst_idxs) >= I(agg.src_idxs);
@@ -1673,8 +1663,7 @@ Value mean(const Value& value) {
   }
 
   auto I = args[0].as_tensor();
-  auto I_shape = I.shape();
-  if (I_shape.ndims() == 0) {
+  if (I.rank() == 0) {
     return Value{I};
   }
 
@@ -1690,7 +1679,7 @@ Value mean(const Value& value) {
 
   auto keepdims = args[2].as_bool();
 
-  AggregationAxes agg(I_shape.ndims(), axes, keepdims);
+  AggregationAxes agg(I.rank(), axes, keepdims);
 
   I.bind_dims(agg.src_dims);
   auto SO = TensorOutput(agg.dst_dims);
@@ -1709,10 +1698,9 @@ Value min(const Value& value) {
     throw std::runtime_error("min expects 3 arguments");
   }
   auto I = args[0].as_tensor();
-  auto I_shape = I.shape();
   auto axes = args[1];
   auto keepdims = args[2].as_bool();
-  AggregationAxes agg(I_shape.ndims(), axes, keepdims);
+  AggregationAxes agg(I.rank(), axes, keepdims);
   I.bind_dims(agg.src_dims);
   auto O = TensorOutput(agg.dst_dims);
   O(agg.dst_idxs) <= I(agg.src_idxs);
@@ -1742,8 +1730,7 @@ Value prod(const Value& value) {
   auto raw_axes = args[1];
   auto keepdims = args[2].as_bool();
 
-  auto I_shape = I.shape();
-  if (I_shape.ndims() == 0) {
+  if (I.rank() == 0) {
     return Value{I};
   }
   if (raw_axes.is_tuple() && raw_axes.as_tuple().empty()) {
@@ -1755,7 +1742,7 @@ Value prod(const Value& value) {
   //   I = cast(I, floatx());  // TODO: cast if * is not && for bools, don't if it is &&
   // }
 
-  AggregationAxes agg(I_shape.ndims(), raw_axes, keepdims);
+  AggregationAxes agg(I.rank(), raw_axes, keepdims);
 
   I.bind_dims(agg.src_dims);
   auto O = TensorOutput(agg.dst_dims);
@@ -1800,8 +1787,7 @@ Value pool(const Value& value) {
 
   // Initialize useful values
   auto spatial_rank = pool_size.size();
-  auto I_shape = I.shape();
-  auto I_channel_dims = I_shape.ndims() - spatial_rank - 1;
+  auto I_channel_dims = I.rank() - spatial_rank - 1;
 
   // Verify inputs are consistent
   if (manual_padding.size() && autopad_mode != AutopadMode::NONE) {
@@ -1816,7 +1802,7 @@ Value pool(const Value& value) {
     throw std::runtime_error(
         llvm::formatv("Inconsistent spatial rank in pool op (pool_size has {0} spatial dimensions but input tensor "
                       "has {1} dimensions, and thus {2} spatial dims)",
-                      spatial_rank, I.shape().ndims(), (I.shape().ndims() - 2)));
+                      spatial_rank, I.rank(), (I.rank() - 2)));
   }
   if (!is_input_layout(input_layout)) {
     throw std::runtime_error("Tensor layout requested in pool op does not apply to pooling");
@@ -1950,8 +1936,7 @@ Value repeat(const Value& value) {
   auto raw_axis = args[2].as_int();
 
   // Set up useful variables
-  auto I_shape = I.shape();
-  auto ndims = I_shape.ndims();
+  auto ndims = I.rank();
   auto axis = normalize_axis(raw_axis, ndims, "repeat");
 
   std::vector<TensorDim> I_dims(ndims);
@@ -1977,7 +1962,7 @@ Value reshape(const Value& value) {
 
   auto I = args[0].as_tensor();
   std::vector<TensorDim> O_dims;
-  std::vector<TensorDim> I_dims(I.shape().ndims());
+  std::vector<TensorDim> I_dims(I.rank());
   I.bind_dims(I_dims);
 
   TensorDim* fill_dim = nullptr;
@@ -2081,8 +2066,7 @@ Value slice(const Value& value) {
   auto slices = args[1].as_tuple();
 
   // Useful values and correctness checks
-  auto I_shape = I.shape();
-  auto ndims = I_shape.ndims();
+  auto ndims = I.rank();
   if (slices.size() != ndims) {
     throw std::runtime_error(
         llvm::formatv("{0} slice axes provided to slice {1}-dimensional tensor", slices.size(), ndims));
@@ -2209,7 +2193,7 @@ Value softmax(const Value& value) {
   auto raw_axis = args[1].as_int();
   auto I = ident(I_original);  // Copy for safe gradient override
 
-  auto ndims = I.shape().ndims();
+  auto ndims = I.rank();
   auto axis = normalize_axis(raw_axis, ndims, "softmax");
 
   // Ensure the axis is the last dimension, to make the derivative code happy
@@ -2246,7 +2230,7 @@ Value softmax(const Value& value) {
   auto O = E / N;
   TensorDeriv deriv = [](const Tensor& Y, const Tensor& DY, const std::vector<Tensor>& X) {  //
     auto I = X[0];
-    auto ndims = I.shape().ndims();
+    auto ndims = I.rank();
     std::vector<TensorDim> I_dims(ndims);
     std::vector<TensorIndex> I_idxs(ndims);
     I.bind_dims(I_dims);
@@ -2283,27 +2267,27 @@ Value spatial_padding(const Value& value) {
 
   // validate inputs
   auto nonspatial_ndims = nonspatial_dims(data_layout);
-  auto spatial_rank = I.shape().ndims() - nonspatial_ndims;
+  auto spatial_rank = I.rank() - nonspatial_ndims;
 
   if (spatial_rank < 1) {
     throw std::runtime_error(llvm::formatv(
         "Insufficient spatial rank in spatial_padding op (At least 1 spatial dim required; received {0} spatial "
         "dims based on an input tensor with {1} dims with a specified layout with {2} nonspatial dims.",
-        spatial_rank, I.shape().ndims(), nonspatial_ndims));
+        spatial_rank, I.rank(), nonspatial_ndims));
   }
   if (lo_pads.size() != spatial_rank) {
     throw std::runtime_error(
         llvm::formatv("Inconsistent spatial rank in spatial_padding op (received {0} spatial dim(s) based on an "
                       "input tensor with {1} dims with a specified layout with {2} nonspatial dims, but received "
                       "lower padding for {3} spatial dims.",
-                      spatial_rank, I.shape().ndims(), nonspatial_ndims, lo_pads.size()));
+                      spatial_rank, I.rank(), nonspatial_ndims, lo_pads.size()));
   }
   if (hi_pads.size() != spatial_rank) {
     throw std::runtime_error(
         llvm::formatv("Inconsistent spatial rank in spatial_padding op (received {0} spatial dim(s) based on an "
                       "input tensor with {1} dims with a specified layout with {2} nonspatial dims, but received "
                       "upper padding for {3} spatial dims.",
-                      spatial_rank, I.shape().ndims(), nonspatial_ndims, hi_pads.size()));
+                      spatial_rank, I.rank(), nonspatial_ndims, hi_pads.size()));
   }
 
   std::vector<TensorDim> I_dims;
@@ -2537,7 +2521,7 @@ Value squeeze(const Value& value) {
 
   // argument 0: tensor to be squeezed
   auto I = args[0].as_tensor();
-  auto ndims = I.shape().ndims();
+  auto ndims = I.rank();
   std::vector<TensorDim> I_dims(ndims);
   std::vector<TensorDim> O_dims;
   I.bind_dims(I_dims);
@@ -2574,8 +2558,7 @@ Value sum(const Value& value) {
   }
 
   auto I = args[0].as_tensor();
-  auto I_shape = I.shape();
-  if (I_shape.ndims() == 0) {
+  if (I.rank() == 0) {
     return Value{I};
   }
 
@@ -2591,7 +2574,7 @@ Value sum(const Value& value) {
 
   auto keepdims = args[2].as_bool();
 
-  AggregationAxes agg(I_shape.ndims(), axes, keepdims);
+  AggregationAxes agg(I.rank(), axes, keepdims);
 
   I.bind_dims(agg.src_dims);
   auto O = TensorOutput(agg.dst_dims);
@@ -2612,7 +2595,7 @@ Value tile(const Value& value) {
   auto reps = args[1].as_int_tuple();
 
   // Validate args
-  auto ndims = I.shape().ndims();
+  auto ndims = I.rank();
   if (reps.empty()) {
     throw std::runtime_error("No tiling factors provided to tile operation");
   }
@@ -2652,8 +2635,7 @@ Value transpose(const Value& value) {
   auto pattern_val = args[1];
 
   // Normalize pattern value
-  auto I_shape = I.shape();
-  auto ndims = I_shape.ndims();
+  auto ndims = I.rank();
   std::vector<int64_t> pattern;
   if (pattern_val.is_none()) {
     // Default is to reverse the dimensions
@@ -2703,12 +2685,12 @@ Value variance(const Value& value) {
   auto axes = args[1];
   auto keepdims = args[2].as_bool();
 
-  IVLOG(2, "I: " << I.shape().str());
+  IVLOG(2, "I: " << I.str());
   IVLOG(2, "axes: " << axes);
   IVLOG(2, "keep_dims: " << keepdims);
 
   // Handle trivial cases
-  if (I.shape().ndims() == 0) {
+  if (I.rank() == 0) {
     // TODO: Adjust for dtype?
     return Value{0};
   }
@@ -2722,7 +2704,7 @@ Value variance(const Value& value) {
   // }
 
   auto Mean = mean(edsl::make_tuple(I, axes, true)).as_tensor();
-  AggregationAxes agg(I.shape().ndims(), axes, keepdims);
+  AggregationAxes agg(I.rank(), axes, keepdims);
 
   I.bind_dims(agg.src_dims);
 

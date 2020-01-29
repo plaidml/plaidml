@@ -327,7 +327,10 @@ def ReshapeOp : SpecialOp<"reshape">, HasCanonicalizer {
 
 def ScatterOp : SpecialOp<"scatter">, HasCanonicalizer {
   let summary = "special scatter operation";
-  let arguments = (ins RankedTensorOf<[AnyScalar]>:$tensor, RankedTensorOf<[ScalarIndex]>:$dims, RankedTensorOf<[AnyScalar]>:$other);
+  let arguments = (ins
+    RankedTensorOf<[AnyScalar]>:$tensor,
+    RankedTensorOf<[ScalarIndex]>:$dims,
+    RankedTensorOf<[AnyScalar]>:$other);
   let results = (outs RankedTensorOf<[AnyScalar]>:$result);
 }
 
@@ -335,4 +338,18 @@ def ShapeOp : SpecialOp<"shape">, HasCanonicalizer {
   let summary = "tensor shape operation";
   let arguments = (ins RankedTensorOf<[AnyScalar]>:$tensor);
   let results = (outs RankedTensorOf<[ScalarIndex]>:$result);
+}
+
+def TraceOp : Op<TileDialect, "trace", []>, HasCanonicalizer {
+  let summary = "tracepoint operation";
+  let arguments = (ins RankedTensorOf<[AnyScalar]>:$tensor, StrAttr:$msg);
+  let results = (outs RankedTensorOf<[AnyScalar]>:$result);
+
+  let builders = [OpBuilder<
+    "Builder* builder, OperationState& result, Value tensor, StringRef msg", [{
+      result.addTypes(tensor.getType());
+      result.addOperands(tensor);
+      result.addAttribute("msg", builder->getStringAttr(msg));
+    }]
+  >];
 }

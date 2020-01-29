@@ -22,7 +22,7 @@ class TargetRegistry {
     return &registry;
   }
 
-  void registerTarget(StringRef name, const TargetRegistryFunction& function) {  //
+  void registerTarget(StringRef name, const TargetRegistryFunction& function) {
     if (registry.count(name)) {
       throw std::runtime_error(formatv("Target is already registered: {0}", name));
     }
