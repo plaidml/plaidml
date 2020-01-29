@@ -44,28 +44,53 @@ ParseResult parseKeywordIntoEnumAttr(OpAsmParser& parser, OperationState& result
 // ---- AffineParallelOp ----
 
 void AffineParallelOp::build(Builder* builder, OperationState& result, ArrayRef<int64_t> ranges) {
-  SmallVector<AffineExpr, 8> lbExprs;
-  SmallVector<AffineExpr, 8> ubExprs;
-  // Make range expressions for each range
-  for (int64_t range : ranges) {
-    lbExprs.push_back(builder->getAffineConstantExpr(0));
-    ubExprs.push_back(builder->getAffineConstantExpr(range));
-  }
-  // Make the maps (handling the 0-dim case carefully)
+  // Default initalize empty maps
+  auto lb_map = AffineMap::get(builder->getContext());
+  auto ub_map = AffineMap::get(builder->getContext());
+  // If ranges, set to [0, N) for each range
   if (ranges.size()) {
-    result.addAttribute("lowerBoundsMap", AffineMapAttr::get(AffineMap::get(0, 0, lbExprs)));
-    result.addAttribute("upperBoundsMap", AffineMapAttr::get(AffineMap::get(0, 0, ubExprs)));
-  } else {
-    result.addAttribute("lowerBoundsMap", AffineMapAttr::get(AffineMap::get(builder->getContext())));
-    result.addAttribute("upperBoundsMap", AffineMapAttr::get(AffineMap::get(builder->getContext())));
+    SmallVector<AffineExpr, 8> lbExprs;
+    SmallVector<AffineExpr, 8> ubExprs;
+    // Make range expressions for each range
+    for (int64_t range : ranges) {
+      lbExprs.push_back(builder->getAffineConstantExpr(0));
+      ubExprs.push_back(builder->getAffineConstantExpr(range));
+    }
+    lb_map = AffineMap::get(0, 0, lbExprs);
+    ub_map = AffineMap::get(0, 0, ubExprs);
   }
-  SmallVector<int64_t, 8> steps(ranges.size(), 1);
+  // Fall through
+  build(builder, result, lb_map, {}, ub_map, {});
+}
+
+void AffineParallelOp::build(Builder* builder, OperationState& result, AffineMap lb_map, ValueRange lb_args,
+                             AffineMap ub_map, ValueRange ub_args) {
+  // Verify sizes
+  size_t idxCount = lb_map.getNumResults();
+  assert(idxCount == ub_map.getNumResults());
+  // Make default step sizes of 1
+  SmallVector<int64_t, 8> steps(idxCount, 1);
+  // Call through
+  build(builder, result, lb_map, lb_args, ub_map, ub_args, steps);
+}
+
+void AffineParallelOp::build(Builder* builder, OperationState& result, AffineMap lb_map, ValueRange lb_args,
+                             AffineMap ub_map, ValueRange ub_args, ArrayRef<int64_t> steps) {
+  // Verify sizes
+  size_t idxCount = lb_map.getNumResults();
+  assert(idxCount == ub_map.getNumResults());
+  assert(idxCount == steps.size());
+  // Set all of the attributes
+  result.addAttribute("lowerBoundsMap", AffineMapAttr::get(lb_map));
+  result.addAttribute("upperBoundsMap", AffineMapAttr::get(ub_map));
   result.addAttribute("steps", builder->getI64ArrayAttr(steps));
+  result.addOperands(lb_args);
+  result.addOperands(ub_args);
   // Create a region and a block for the body.
   auto bodyRegion = result.addRegion();
   auto body = new Block();
   // Add all the args
-  for (size_t i = 0; i < ranges.size(); i++) {
+  for (size_t i = 0; i < idxCount; i++) {
     body->addArgument(IndexType::get(builder->getContext()));
   }
   bodyRegion->push_back(body);

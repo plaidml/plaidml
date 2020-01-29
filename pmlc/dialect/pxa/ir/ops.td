@@ -61,7 +61,11 @@ def AffineParallelOp : PXA_Op<"parallel", [ImplicitAffineTerminator]> {
     mlir::Block *getBody();
     mlir::OpBuilder getBodyBuilder();
   }];
-  let builders = [OpBuilder<"Builder* builder, OperationState& result, ArrayRef<int64_t> ranges">];
+  let builders = [
+    OpBuilder<"Builder* builder, OperationState& result, ArrayRef<int64_t> ranges">,
+    OpBuilder<"Builder* builder, OperationState& result, AffineMap lb_map, ValueRange lb_args, AffineMap ub_map, ValueRange ub_args">,
+    OpBuilder<"Builder* builder, OperationState& result, AffineMap lb_map, ValueRange lb_args, AffineMap ub_map, ValueRange ub_args, ArrayRef<int64_t> steps">
+  ];
 }
 
 #endif // __PML_PXA_OPS__
