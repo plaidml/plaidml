@@ -258,6 +258,17 @@ class TestEdsl(unittest.TestCase):
     def compare_results(self, program, expected):
         self.assertMultiLineEqual(str(program).strip(), expected.strip())
 
+    def test_lower_precision_invalid_negative(self):
+        I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [3, 3]))
+        O = I * (-2)
+
+        try:
+          program = Program(
+            'lower_precision', [O], floatx=plaidml.DType.FLOAT16, intx=plaidml.DType.UINT16)
+        except Exception:
+          return
+        self.fail("expected exception")
+
     def test_lower_precision(self):
         I = Tensor(LogicalShape(plaidml.DType.FLOAT64, [3, 3]))
         O = I + 1 + 2.0
