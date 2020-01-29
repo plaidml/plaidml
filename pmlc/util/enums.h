@@ -3,6 +3,7 @@
 #pragma once
 
 #include <algorithm>
+#include <unordered_map>
 
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/Optional.h"

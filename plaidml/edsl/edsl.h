@@ -118,8 +118,6 @@ class Program {
   std::vector<ProgramArgument> args_;
   std::vector<ProgramArgument> inputs_;
   std::vector<ProgramArgument> outputs_;
-  DType floatx_;
-  DType intx_;
 };
 
 ///
@@ -1089,8 +1087,7 @@ inline Program::Program(                 //
     const std::vector<Tensor>& outputs,  //
     const DType& floatx,                 //
     const DType& intx,                   //
-    const std::vector<std::tuple<Tensor, Tensor>>& updates)
-    : floatx_(floatx), intx_(intx) {
+    const std::vector<std::tuple<Tensor, Tensor>>& updates) {
   if (!isFloat(to_datatype(floatx))) {
     std::stringstream ss;
     ss << "Invalid floatx requested by Program.";
