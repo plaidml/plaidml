@@ -1,21 +1,21 @@
-Tile EDSL 
+Tile eDSL 
 #############
-The Tile EDSL (Embedded Domain Specific Language) provides developers with a
+The Tile eDSL (Embedded Domain Specific Language) provides developers with a
 way of describing a neural network so that the Stripe-based PlaidML compiler can
 construct an efficient implementation.
 This tutorial is intended to help machine learning practitioners (or anyone with
 a background in software engineering and mathematics) get started using the C++/Python
-Tile EDSL.
+Tile eDSL.
 
 
 Scope and Warning
 *******************
-This tutorial provides an introduction to the Tile EDSL. It is intended to
+This tutorial provides an introduction to the Tile eDSL. It is intended to
 help machine learning practitioners get started writing Tile code as quickly as
 possible, and as such covers core features, not every language detail. This is a
 tutorial, not a spec, and as such will consist of a series of examples, with a
 summary reference section at the end.
-This tutorial covers how to use the Tile EDSL, not how Tile code is
+This tutorial covers how to use the Tile eDSL, not how Tile code is
 constructed and manipulated by PlaidML. It does not cover the workings of
 PlaidML utilities such as the pmlc compiler.
 Tile and PlaidML are still being developed and the APIs discussed here are subject
@@ -295,8 +295,8 @@ implement in straight C++/Python:
 
     .. literalinclude:: ../../plaidml/edsl/edsl_doc.cc
       :language: cpp
-      :start-after: for_loop_max_pool_1d_start
-      :end-before: for_loop_max_pool_1d_end
+      :start-after: for_loop_max_pool_start
+      :end-before: for_loop_max_pool_end
     
   .. group-tab:: Python
 
@@ -414,12 +414,14 @@ or invalid set of index variables. For example, in the code:
 
     .. literalinclude:: ../../plaidml/edsl/edsl_doc.cc
       :language: cpp
-      :lines: 133-136
+      :start-after: valid_indices_start
+      :end-before: valid_indices_end
     
   .. group-tab:: Python
 
     .. literalinclude:: ../../plaidml/edsl/edsl_doc.py
-      :lines: 107-110
+      :start-after: valid_indices_start
+      :end-before: valid_indices_end
 
 with ``N = 5``, the indices ``i = 1``, ``j = 1`` are valid indices.
 However, ``i = 2``, ``j = 1`` are not valid indices for this operation, nor are ``i = -1000``, ``j = 1``.
@@ -608,8 +610,8 @@ directly to the formula, and so we get:
 
     .. literalinclude:: ../../plaidml/edsl/edsl_doc.cc
       :language: cpp
-      :start-after: onv_2d_dilated_start
-      :end-before: onv_2d_dilated_end
+      :start-after: conv_2d_dilated_start
+      :end-before: conv_2d_dilated_end
 
   .. group-tab:: Python
 

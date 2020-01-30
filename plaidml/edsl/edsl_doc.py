@@ -103,6 +103,17 @@ class TestEdslHelper:
         O.add_constraint(j < 2)
         return O
 
+    def valid_indices(I):
+        N = TensorDim()
+        i, j = TensorIndexes(2)
+        # valid_indices_start
+        I.bind_dims(N)
+        O = TensorOutput(N + 1 // 2)
+        O[i] >= I[2 * i + j]
+        O.add_constraint(j < 2)
+        # valid_indices_end
+        return O
+
     def max_pool_1d_odd(I):
         N = TensorDim()
         i, j = TensorIndexes(2)

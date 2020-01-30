@@ -105,7 +105,7 @@ Tensor AvgMerge(const Tensor& I) {
 
 void ForLoopMaxPool1D() {
   int N = 10;
-  // for_loop_max_pool_1d_start
+  // for_loop_max_pool_start
   float I[N], O[N / 2];
   for (int i = 0; i < N / 2; ++i) {
     float curr_max = FLT_MIN;
@@ -116,7 +116,7 @@ void ForLoopMaxPool1D() {
     }
     O[i] = curr_max;
   }
-  // for_loop_max_pool_1d_end
+  // for_loop_max_pool_end
 }
 
 // wrong_max_pool_start
@@ -129,6 +129,18 @@ Tensor WrongMaxPool1D(const Tensor& I) {
   return O;
 }
 // wrong_max_pool_end
+
+Tensor ValidIndices(const Tensor& I) {
+  TensorDim N;
+  TensorIndex i, j;
+  // valid_indices_start
+  I.bind_dims(N);
+  auto O = TensorOutput(N / 2);
+  O(i) >= I(2 * i + j);
+  O.add_constraint(j < 2);
+  // valid_indices_end
+  return O;
+}
 
 // max_pool_1d_start
 Tensor MaxPool1D(const Tensor& I) {
