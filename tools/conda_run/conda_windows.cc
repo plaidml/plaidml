@@ -87,10 +87,7 @@ int main(int argc, char* argv[]) {
     auto conda_env = WindowsPath(python.parent_path().string());
     auto conda_exe = vertexai::env::Get("CONDA_EXE");
     if (conda_exe.empty()) {
-      conda_exe = R"(C:\tools\Miniconda3\Scripts\conda.exe)";
-      if (!fs::exists(conda_exe)) {
-        throw std::runtime_error("Missing environment variable: CONDA_EXE");
-      }
+      throw std::runtime_error("Missing environment variable: CONDA_EXE");
     }
     auto conda = WindowsPath(fs::canonical(conda_exe).string());
 
