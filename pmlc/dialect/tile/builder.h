@@ -111,12 +111,6 @@ class TileBuilder {
                                            util::DataType floatx = DataType::invalid,
                                            util::DataType intx = DataType::invalid);
 
-  std::shared_ptr<TileProgram> MakeProgram(llvm::StringRef name, const ProgramMutations& mutations,
-                                           std::uint64_t floatx, std::uint64_t intx) {
-    return MakeProgram(name, mutations, util::symbolizeDataType(floatx).getValueOr(DataType::invalid),
-                       util::symbolizeDataType(intx).getValueOr(DataType::invalid));
-  }
-
   void Dump();
 
  private:

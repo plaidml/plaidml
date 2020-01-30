@@ -9,7 +9,6 @@
 
 #include "llvm/Support/FormatVariadic.h"
 
-#include "plaidml/core/core.h"
 #include "plaidml/core/internal.h"
 #include "plaidml/edsl/derivs.h"
 #include "pmlc/util/logging.h"
@@ -977,15 +976,16 @@ plaidml_program* plaidml_program_evaluate(  //
       mutations.updates.emplace(ProgramUpdate{src_updates[i]->value, dst_updates[i]->value});
     }
 
-    if (!pmlc::util::isFloat(static_cast<pmlc::util::DataType>(floatx))) {
+    auto floatx_dtype = pmlc::util::symbolizeDataType(static_cast<std::uint64_t>(floatx)).getValueOr(DataType::invalid);
+    auto intx_dtype = pmlc::util::symbolizeDataType(static_cast<std::uint64_t>(intx)).getValueOr(DataType::invalid);
+    if (!pmlc::util::isFloat(floatx_dtype)) {
       throw std::runtime_error("Invalid floatx in plaidml_program_evaluate");
     }
-    if (!pmlc::util::isInteger(static_cast<pmlc::util::DataType>(intx))) {
+    if (!pmlc::util::isInteger(intx_dtype)) {
       throw std::runtime_error("Invalid intx in plaidml_program_evaluate");
     }
 
-    auto ret = new plaidml_program{GlobalContext::get()->MakeProgram(
-        name, mutations, static_cast<std::uint64_t>(floatx), static_cast<std::uint64_t>(intx))};
+    auto ret = new plaidml_program{GlobalContext::get()->MakeProgram(name, mutations, floatx_dtype, intx_dtype)};
     assert(noutputs <= ret->program->outputs.size());
     auto nargs = ret->program->arguments.size();
     auto args = new plaidml_program_arg[nargs];
