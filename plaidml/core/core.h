@@ -128,45 +128,6 @@ inline const char* to_string(DType dtype) {
   }
 }
 
-inline bool isSigned(DType dtype) {
-  switch (dtype) {
-    case DType::INT8:
-    case DType::INT16:
-    case DType::INT32:
-    case DType::INT64:
-      return true;
-    default:
-      return false;
-  }
-}
-
-inline bool isUnsigned(DType dtype) {
-  switch (dtype) {
-    case DType::BOOLEAN:
-    case DType::UINT8:
-    case DType::UINT16:
-    case DType::UINT32:
-    case DType::UINT64:
-      return true;
-    default:
-      return false;
-  }
-}
-
-inline bool isInteger(DType dtype) { return isSigned(dtype) || isUnsigned(dtype); }
-
-inline bool isFloat(DType dtype) {
-  switch (dtype) {
-    case DType::BFLOAT16:
-    case DType::FLOAT16:
-    case DType::FLOAT32:
-    case DType::FLOAT64:
-      return true;
-    default:
-      return false;
-  }
-}
-
 ///
 /// \ingroup core_objects
 /// \class TensorShape

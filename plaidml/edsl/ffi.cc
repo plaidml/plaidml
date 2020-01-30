@@ -977,10 +977,10 @@ plaidml_program* plaidml_program_evaluate(  //
       mutations.updates.emplace(ProgramUpdate{src_updates[i]->value, dst_updates[i]->value});
     }
 
-    if (!plaidml::isFloat(static_cast<plaidml::DType>(floatx))) {
+    if (!pmlc::util::isFloat(static_cast<pmlc::util::DataType>(floatx))) {
       throw std::runtime_error("Invalid floatx in plaidml_program_evaluate");
     }
-    if (!plaidml::isInteger(static_cast<plaidml::DType>(intx))) {
+    if (!pmlc::util::isInteger(static_cast<pmlc::util::DataType>(intx))) {
       throw std::runtime_error("Invalid intx in plaidml_program_evaluate");
     }
 
