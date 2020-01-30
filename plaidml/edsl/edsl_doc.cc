@@ -99,10 +99,8 @@ Tensor AvgMerge(const Tensor& I) {
 }
 // avg_merge_end
 
-void ForLoopMaxPool1D() {
-  int N = 10;
+void ForLoopMaxPool1D(float* I, float* O, int N) {
   // for_loop_max_pool_start
-  float I[N], O[N / 2];
   for (int i = 0; i < N / 2; ++i) {
     float curr_max = FLT_MIN;
     for (int j = 0; j < 2; ++j) {
@@ -281,6 +279,22 @@ TEST(CppEdsl, AvgStages) {
 TEST(CppEdsl, AvgMerge) {
   auto I = Placeholder(DType::UINT64, {3, 3});
   Program program("avg_merge", {AvgMerge(I)});
+}
+
+TEST(CppEdsl, WrongMaxPool1D) {
+  auto I = Placeholder(DType::UINT64, {3, 3});
+  Program program("wrong_max_pool_1d", {WrongMaxPool1D(I)});
+}
+
+TEST(CppEdsl, ForLoopMaxPool1D) {
+  int N = 10;
+  float I[N], O[N / 2];
+  ForLoopMaxPool1D(I, O, N);
+}
+
+TEST(CppEdsl, ValidIndices) {
+  auto I = Placeholder(DType::UINT64, {3, 3});
+  Program program("valid_indices", {ValidIndices(I)});
 }
 
 TEST(CppEdsl, MaxPool1D) {

@@ -151,14 +151,15 @@ ends in a semicolon. Here's the result:
 
   .. group-tab:: C++
 
-      .. literalinclude:: ../../plaidml/edsl/edsl_doc.cc
-        :language: cpp
-        :lines: 56
+      .. code-block:: c++
+       
+        C(i, j) += A(i, k) * B(k, j);
 
   .. group-tab:: Python
 
-      .. literalinclude:: ../../plaidml/edsl/edsl_doc.py
-        :lines: 43
+      .. code-block:: python
+        
+        C[i, j] += A[i, k] * B[k, j]
 
 To have correct dimensions, we need ``I`` to be the first dimension of ``A`` and ``J``
 the last dimension of ``B``. Here's how this looks as part of a full Tile
