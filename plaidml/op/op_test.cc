@@ -456,7 +456,7 @@ TEST(Op, Mean) {
 module {
   func @mean(%arg0: tensor<10x20x!eltwise.f32> {tile.name = "A"}) -> !f32 {
     %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
-    %c200 = "eltwise.sconst"() {value = 200 : i64} : () -> !i32
+    %c200 = "eltwise.sconst"() {value = 200 : index} : () -> !i32
     %0 = tile.cion add, none, %cst, %arg0 {sink = #map0, srcs = [#map1]} : !f32, tensor<10x20x!eltwise.f32> -> !f32
     %1 = "eltwise.div"(%0, %c200) : (!f32, !i32) -> !f32
     return %1 : !f32
@@ -575,10 +575,10 @@ TEST(Op, ReluNoAlpha) {
 !f32 = type tensor<!eltwise.f32>
 module {
   func @relu(%arg0: tensor<10x20x!eltwise.f32> {tile.name = "M"}, %arg1: tensor<10x20x!eltwise.f32> {tile.name = "I"}) -> tensor<10x20x!eltwise.f32> {
-    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
-    %cst_0 = "eltwise.sconst"() {value = 5.000000e-02 : f64} : () -> !f32
-    %0 = "eltwise.cmp_lt"(%arg1, %cst_0) : (tensor<10x20x!eltwise.f32>, !f32) -> tensor<10x20x!eltwise.u1>
-    %1 = "eltwise.select"(%0, %cst, %arg1) : (tensor<10x20x!eltwise.u1>, !f32, tensor<10x20x!eltwise.f32>) -> tensor<10x20x!eltwise.f32>
+    %cst = "eltwise.sconst"() {value = 5.000000e-02 : f64} : () -> !f32
+    %cst_0 = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
+    %0 = "eltwise.cmp_lt"(%arg1, %cst) : (tensor<10x20x!eltwise.f32>, !f32) -> tensor<10x20x!eltwise.u1>
+    %1 = "eltwise.select"(%0, %cst_0, %arg1) : (tensor<10x20x!eltwise.u1>, !f32, tensor<10x20x!eltwise.f32>) -> tensor<10x20x!eltwise.f32>
     %2 = "eltwise.cmp_lt"(%1, %arg0) : (tensor<10x20x!eltwise.f32>, tensor<10x20x!eltwise.f32>) -> tensor<10x20x!eltwise.u1>
     %3 = "eltwise.select"(%2, %1, %arg0) : (tensor<10x20x!eltwise.u1>, tensor<10x20x!eltwise.f32>, tensor<10x20x!eltwise.f32>) -> tensor<10x20x!eltwise.f32>
     return %3 : tensor<10x20x!eltwise.f32>
@@ -615,10 +615,10 @@ TEST(Op, ReluOnlyThreshold) {
 !f32 = type tensor<!eltwise.f32>
 module {
   func @relu(%arg0: tensor<10x20x!eltwise.f32> {tile.name = "I"}) -> tensor<10x20x!eltwise.f32> {
-    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
-    %cst_0 = "eltwise.sconst"() {value = 5.000000e-02 : f64} : () -> !f32
-    %0 = "eltwise.cmp_lt"(%arg0, %cst_0) : (tensor<10x20x!eltwise.f32>, !f32) -> tensor<10x20x!eltwise.u1>
-    %1 = "eltwise.select"(%0, %cst, %arg0) : (tensor<10x20x!eltwise.u1>, !f32, tensor<10x20x!eltwise.f32>) -> tensor<10x20x!eltwise.f32>
+    %cst = "eltwise.sconst"() {value = 5.000000e-02 : f64} : () -> !f32
+    %cst_0 = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
+    %0 = "eltwise.cmp_lt"(%arg0, %cst) : (tensor<10x20x!eltwise.f32>, !f32) -> tensor<10x20x!eltwise.u1>
+    %1 = "eltwise.select"(%0, %cst_0, %arg0) : (tensor<10x20x!eltwise.u1>, !f32, tensor<10x20x!eltwise.f32>) -> tensor<10x20x!eltwise.f32>
     return %1 : tensor<10x20x!eltwise.f32>
   }
 }
@@ -892,7 +892,7 @@ TEST(Op, Variance) {
 module {
   func @variance(%arg0: tensor<10x20x!eltwise.f32> {tile.name = "A"}) -> !f32 {
     %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
-    %c200 = "eltwise.sconst"() {value = 200 : i64} : () -> !i32
+    %c200 = "eltwise.sconst"() {value = 200 : index} : () -> !i32
     %0 = tile.cion add, none, %cst, %arg0 {sink = #map0, srcs = [#map1]} : !f32, tensor<10x20x!eltwise.f32> -> tensor<1x1x!eltwise.f32>
     %1 = "eltwise.div"(%0, %c200) : (tensor<1x1x!eltwise.f32>, !i32) -> tensor<1x1x!eltwise.f32>
     %2 = "eltwise.sub"(%arg0, %1) : (tensor<10x20x!eltwise.f32>, tensor<1x1x!eltwise.f32>) -> tensor<10x20x!eltwise.f32>
