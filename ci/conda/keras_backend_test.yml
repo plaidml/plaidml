@@ -9,5 +9,5 @@ dependencies:
       - keras==2.2.4
       - keras-applications==1.0.8
       - six
-      - tensorflow==1.14.0
+      - tensorflow==1.15
       - theano

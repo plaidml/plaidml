@@ -33,7 +33,7 @@ dependencies:
     - sphinxcontrib-napoleon
     - sphinx_rtd_theme
     - sphinx-tabs
-    - tensorflow==1.14.0
+    - tensorflow==1.15
     - theano
     - voila
     - https://download.pytorch.org/whl/nightly/cpu/torch_nightly-1.2.0.dev20190618-cp37-none-macosx_10_7_x86_64.whl; platform_system == 'Darwin'
