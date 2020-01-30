@@ -46,13 +46,6 @@ Tensor Softmax(const Tensor& X) {
   return E / N;
 }
 
-TEST(CppEdsl, HigherPrecisionInvalidNegative) {
-  auto A = Placeholder(DType::FLOAT32, {3, 3});
-  auto C = A * (-2);
-
-  EXPECT_ANY_THROW({ auto program = Program("higher_precision_constants", {C}, DType::FLOAT64, DType::UINT64); });
-}
-
 TEST(CppEdsl, HigherPrecisionConstants) {
   auto A = Placeholder(DType::FLOAT32, {3, 3});
   auto C = A + 1 + 2.0;
@@ -87,6 +80,13 @@ module {
     std::vector<double> actual(data, data + expected.size());
     EXPECT_THAT(actual, ContainerEq(expected));
   }
+}
+
+TEST(CppEdsl, HigherPrecisionInvalidNegative) {
+  auto A = Placeholder(DType::FLOAT32, {3, 3});
+  auto C = A * (-2);
+
+  EXPECT_ANY_THROW({ auto program = Program("higher_precision_constants", {C}, DType::FLOAT64, DType::UINT64); });
 }
 
 TEST(CppEdsl, Cast) {
