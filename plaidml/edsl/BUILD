@@ -23,7 +23,11 @@ pkg_tar(
 
 filegroup(
     name = "docs",
-    srcs = ["edsl.h"],
+    srcs = [
+        "edsl.h",
+        "edsl_doc.cc",
+        "edsl_doc.py",
+    ],
     visibility = ["//visibility:public"],
 )
 
@@ -86,6 +90,25 @@ py_test(
     main = "edsl_test.py",
     deps = [
         ":py",
+        "//plaidml/exec:py",
+    ],
+)
+
+plaidml_cc_library(
+    name = "cc_doc",
+    srcs = ["edsl_doc.cc"],
+    deps = [
+        "//plaidml/edsl",
+        "//plaidml/edsl:api",
+        "//plaidml/exec",
+    ],
+)
+
+py_library(
+    name = "py_doc",
+    srcs = ["edsl_doc.py"],
+    deps = [
+        "//plaidml/edsl:py",
         "//plaidml/exec:py",
     ],
 )

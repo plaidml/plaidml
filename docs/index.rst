@@ -3,7 +3,7 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Plaidml Documentation
+Welcome to PlaidML's documentation!
 ===================================
 
 .. toctree::
@@ -14,6 +14,6 @@ Plaidml Documentation
    usage/building
    usage/contributing
    usage/troubleshooting
-   usage/writing_edsl
+   usage/edsl
    api/index
    usage/configuration

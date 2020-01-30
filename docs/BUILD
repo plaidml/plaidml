@@ -17,7 +17,6 @@ py_binary(
     ],
     data = [
         ":runfiles",
-        "//docs/codeexamples:code_files",
         "//plaidml/core:docs",
         "//plaidml/edsl:docs",
         "//plaidml/exec:docs",
