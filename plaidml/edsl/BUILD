@@ -94,7 +94,7 @@ py_test(
     ],
 )
 
-plaidml_cc_library(
+plaidml_cc_test(
     name = "cc_doc",
     srcs = ["edsl_doc.cc"],
     deps = [
@@ -104,9 +104,10 @@ plaidml_cc_library(
     ],
 )
 
-py_library(
+py_test(
     name = "py_doc",
     srcs = ["edsl_doc.py"],
+    main = "edsl_doc.py",
     deps = [
         "//plaidml/edsl:py",
         "//plaidml/exec:py",

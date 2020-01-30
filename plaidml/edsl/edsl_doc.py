@@ -191,3 +191,71 @@ class TestEdslHelper:
         O[n, x0, x1, g, gco] += I[n, s0 * x1 + d0 * k0 - P0, s1 * x1 + d1 * k1 -
                                   P1, g, gci] * K[k0, k1, g, gci, gco]
         return O
+
+
+class TestEdslDocs(unittest.TestCase):
+    maxDiff = None
+
+    def test_sum_over_axis(self):
+        I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 78]))
+        O = TestEdslHelper.sum_over_axis(I)
+        program = Program('sum_over_axis', [O])
+
+    def test_max_over_axis(self):
+        I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 78]))
+        O = TestEdslHelper.max_over_axis(I)
+        program = Program('max_over_axis', [O])
+
+    def test_matmul(self):
+        A = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 78]))
+        B = Tensor(LogicalShape(plaidml.DType.FLOAT32, [78, 78]))
+        O = TestEdslHelper.matmul(A, B)
+        program = Program('matmul', [O])
+
+    def test_avg(self):
+        I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 78]))
+        O = TestEdslHelper.avg(I)
+        program = Program('avg', [O])
+
+    def test_avg_stages(self):
+        I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 78]))
+        O = TestEdslHelper.avg_stages(I)
+        program = Program('avg_stages', [O])
+
+    def test_avg_merge(self):
+        I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 78]))
+        O = TestEdslHelper.avg_merge(I)
+        program = Program('avg_merge', [O])
+
+    def test_max_pool_1d(self):
+        I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [10]), name='I')
+        O = TestEdslHelper.max_pool_1d(I)
+        program = Program('max_pool_1d', [O])
+
+    def test_max_pool_1d_odd(self):
+        I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [10]), name='I')
+        O = TestEdslHelper.max_pool_1d_odd(I)
+        program = Program('max_pool_1d_odd', [O])
+
+    def test_skip(self):
+        I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 78]))
+        O = TestEdslHelper.skip(I)
+        program = Program('skip', [O])
+
+    def test_conv_1d(self):
+        I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 224, 3]))
+        K = Tensor(LogicalShape(plaidml.DType.FLOAT32, [3, 3, 1]))
+        O = TestEdslHelper.conv_1d(I, K)
+        program = Program('conv_1d', [O])
+
+    def test_conv_2d_dilated(self):
+        I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 224, 224, 1]))
+        K = Tensor(LogicalShape(plaidml.DType.FLOAT32, [3, 3, 1, 32]))
+        O = TestEdslHelper.conv_2d_dilated(I, K)
+        program = Program('conv_2d_dilated', [O])
+
+    def test_complex_conv_2d(self):
+        I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 224, 224, 3, 3]))
+        K = Tensor(LogicalShape(plaidml.DType.FLOAT32, [3, 3, 3, 3, 32]))
+        O = TestEdslHelper.complex_conv_2d(I, K, 1, 2, 1, 2)
+        program = Program('complex_conv_2d', [O])
