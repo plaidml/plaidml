@@ -1,5 +1,5 @@
 
-// Copyright 2019 Intel Corporation.
+// Copyright 2020 Intel Corporation.
 // DO NOT TOUCH THIS FILE
 // Note: This file is being used by sphinx docs to pull in code blocks.
 //       Any changes made here may upset the docs.
@@ -103,6 +103,7 @@ void ForLoopMaxPool1D() {
   }
 }
 
+// wrong_max_pool_start
 Tensor WrongMaxPool1D(const Tensor& I) {
   TensorDim N;
   TensorIndex i, j;
@@ -111,7 +112,9 @@ Tensor WrongMaxPool1D(const Tensor& I) {
   O(i) >= I(2 * i + j);
   return O;
 }
+// wrong_max_pool_end
 
+// max_pool_1d_start
 Tensor MaxPool1D(const Tensor& I) {
   TensorDim N;
   TensorIndex i, j;
@@ -121,7 +124,9 @@ Tensor MaxPool1D(const Tensor& I) {
   O.add_constraint(j < 2);
   return O;
 }
+// max_pool_1d_end
 
+// max_pool_1d_odd_start
 Tensor MaxPool1DOdd(const Tensor& I) {
   TensorDim N;
   TensorIndex i, j;
@@ -131,7 +136,9 @@ Tensor MaxPool1DOdd(const Tensor& I) {
   O.add_constraint(j < 2);
   return O;
 }
+// max_pool_1d_odd_end
 
+// skip_start
 Tensor Skip(const Tensor& I) {
   TensorDim M, N;
   TensorIndex i, j;
@@ -140,7 +147,9 @@ Tensor Skip(const Tensor& I) {
   O(2 * i) += I(2 * i, j);
   return O;
 }
+// skip_end
 
+// cumsum_start
 Tensor CumSum(const Tensor& I) {
   TensorDim N;
   TensorIndex i, k;
@@ -150,7 +159,9 @@ Tensor CumSum(const Tensor& I) {
   O.add_constraint(i - k < N);
   return O;
 }
+// cumsum_end
 
+// conv_1d_start
 Tensor Conv1D(const Tensor& I, const Tensor& K) {
   TensorDim N, X, KX, CI, CO;
   TensorIndex n, x, k, ci, co;
@@ -160,7 +171,9 @@ Tensor Conv1D(const Tensor& I, const Tensor& K) {
   O(n, x, co) += I(n, x + k, ci) * K(k, ci, co);
   return O;
 }
+// conv_1d_end
 
+// conv_2d_dilated_start
 Tensor Conv2DDilated(const Tensor& I, const Tensor& K) {
   TensorDim N, X, Y, KX, KY, CI, CO;
   TensorIndex n, x, y, kx, ky, ci, co;
@@ -170,7 +183,9 @@ Tensor Conv2DDilated(const Tensor& I, const Tensor& K) {
   O(n, x, y, co) += I(n, x + 2 * kx, y + 3 * ky, ci) * K(kx, ky, ci, co);
   return O;
 }
+// conv_2d_dilated_end
 
+// complex_conv_start
 Tensor ComplexConv2D(const Tensor& I, const Tensor& K,
                      const std::vector<size_t>& s,  // stride coeffs
                      const std::vector<size_t>& d   // dilation coeffs
@@ -206,6 +221,7 @@ Tensor ComplexConv2D(const Tensor& I, const Tensor& K,
       I(n, s[0] * x[0] + d[0] * k[0] - P[0], s[1] * x[1] + d[1] * k[1] - P[1], g, gci) * K(k[0], k[1], g, gci, gco);
   return O;
 }
+// complex_conv_end
 
 TEST(CppEdsl, SumOveAxis) {
   auto I = Placeholder(DType::UINT64, {3, 3});

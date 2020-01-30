@@ -1,21 +1,21 @@
-Tile eDSL 
+Tile EDSL 
 #############
-The Tile eDSL (Embedded Domain Specific Language) provides developers with a
+The Tile EDSL (Embedded Domain Specific Language) provides developers with a
 way of describing a neural network so that the Stripe-based PlaidML compiler can
 construct an efficient implementation.
 This tutorial is intended to help machine learning practitioners (or anyone with
 a background in software engineering and mathematics) get started using the C++/Python
-Tile eDSL.
+Tile EDSL.
 
 
 Scope and Warning
 *******************
-This tutorial provides an introduction to the Tile eDSL. It is intended to
+This tutorial provides an introduction to the Tile EDSL. It is intended to
 help machine learning practitioners get started writing Tile code as quickly as
 possible, and as such covers core features, not every language detail. This is a
 tutorial, not a spec, and as such will consist of a series of examples, with a
 summary reference section at the end.
-This tutorial covers how to use the Tile eDSL, not how Tile code is
+This tutorial covers how to use the Tile EDSL, not how Tile code is
 constructed and manipulated by PlaidML. It does not cover the workings of
 PlaidML utilities such as the pmlc compiler.
 Tile and PlaidML are still being developed and the APIs discussed here are subject
@@ -40,7 +40,7 @@ sum over axis `0` of a 2D tensor (in Keras this would be ``K.sum(I, axis=0)``):
    .. group-tab:: Python
 
       .. literalinclude:: ../codeexamples/writing_edsl.py
-        :lines: 21-27
+        :pyobject: TestEdslHelper.sum_over_axis
 
 An operation such as this which merges together values across one or more
 indices is called a *contraction*. The syntax may look a bit odd at first, but
@@ -112,7 +112,7 @@ change from sum over axis ``0``. Let's look at it as a Tile function:
   .. group-tab:: Python
 
       .. literalinclude:: ../codeexamples/writing_edsl.py
-        :lines: 29-35
+        :pyobject: TestEdslHelper.max_over_axis
 
 Again, this corresponds closely to mathematical notation:
 
@@ -173,7 +173,7 @@ function:
   .. group-tab:: Python
     
       .. literalinclude:: ../codeexamples/writing_edsl.py
-        :lines: 37-44
+        :pyobject: TestEdslHelper.matmul
 
 Notice that we use ``bind_dims`` on inputs and we use ``TensorOutput`` on
 outputs. Input dimensions can be repeated, which results in an error if the Tile
@@ -202,7 +202,7 @@ as follows:
   .. group-tab:: Python
 
       .. literalinclude:: ../codeexamples/writing_edsl.py
-        :lines: 46-52
+        :pyobject: TestEdslHelper.global_min
 
 
 There are several novel pieces in this example. First, note that the elementwise
@@ -240,7 +240,7 @@ write:
   .. group-tab:: Python
 
     .. literalinclude:: ../codeexamples/writing_edsl.py
-      :lines: 54-60
+      :pyobject: TestEdslHelper.avg
 
 We can perform multiple elementwise operations on the same line, including
 operations on constants and input dimensions. So, while it would be possible to
@@ -257,7 +257,7 @@ take a global mean of a 2D tensor in stages as so:
   .. group-tab:: Python
 
     .. literalinclude:: ../codeexamples/writing_edsl.py
-      :lines: 62-69
+      :pyobject: TestEdslHelper.avg_stages
 
 it is more straightforward to merge the elementwise operations:
 
@@ -272,7 +272,7 @@ it is more straightforward to merge the elementwise operations:
   .. group-tab:: Python
     
     .. literalinclude:: ../codeexamples/writing_edsl.py
-      :lines: 71-77
+      :pyobject: TestEdslHelper.avg_merge
 
 Max Pool 1D
 ==============
@@ -305,12 +305,13 @@ Tile. The most direct (and, sadly, wrong) implementation in Tile is:
 
     .. literalinclude:: ../codeexamples/writing_edsl.cc
       :language: cpp
-      :lines: 106-113
+      :start-after: wrong_max_pool_start
+      :end-before: wrong_max_pool_end
 
   .. group-tab:: Python
 
     .. literalinclude:: ../codeexamples/writing_edsl.py
-      :lines: 87-93
+      :pyobject: TestEdslHelper.wrong_max_pool_1d
 
 If you were to run this code, every entry of ``O`` would equal the global max of
 ``I``. We correctly determined that this was a maximization operation, and the
@@ -330,12 +331,13 @@ When can use ``add_constraint`` in Tile to handle such situations:
 
     .. literalinclude:: ../codeexamples/writing_edsl.cc
       :language: cpp
-      :lines: 115-123
+      :start-after: max_pool_1d_start
+      :end-before: max_pool_1d_end
 
   .. group-tab:: Python
 
     .. literalinclude:: ../codeexamples/writing_edsl.py
-      :lines: 95-102
+      :pyobject: TestEdslHelper.max_pool_1d
 
 Something important to note here is that while we wrote ``j < 2``, this constraint
 actually means ``0<= j < 2``. Constraints are always bounded below by ``0``.
@@ -375,12 +377,13 @@ pool at the edge. This can be accomplished by simply adjusting the size of ``O``
 
     .. literalinclude:: ../codeexamples/writing_edsl.cc
       :language: cpp
-      :lines: 125-133
+      :start-after: max_pool_1d_odd_start
+      :end-before: max_pool_1d_odd_end
 
   .. group-tab:: Python
 
     .. literalinclude:: ../codeexamples/writing_edsl.py
-      :lines: 104-111
+      :pyobject: TestEdslHelper.max_pool_1d_odd
 
 No special handling is needed for the case ``i = (N - 1) / 2``, ``j = 1``; this is
 out of range for ``I`` and so is ignored by Tile, which is exactly the intended
@@ -402,7 +405,7 @@ or invalid set of index variables. For example, in the code:
 
     .. literalinclude:: ../codeexamples/writing_edsl.cc
       :language: cpp
-      :lines: 128-131
+      :lines: 133-136
     
   .. group-tab:: Python
 
@@ -439,12 +442,13 @@ otherwise valid entries. For example, consider the Tile function:
 
     .. literalinclude:: ../codeexamples/writing_edsl.cc
       :language: cpp
-      :lines: 135-142
+      :start-after: skip_start
+      :end-before: skip_end
   
   .. group-tab:: Python
 
     .. literalinclude:: ../codeexamples/writing_edsl.py
-      :lines: 113-119
+      :pyobject: TestEdslHelper.skip
 
 This operation only writes to even entries of ``O``; while ``i = 1/2`` , ``j = 1`` does
 yield valid index expressions (``O[1]`` and ``I[1, 1]``), using a fractional index
@@ -475,12 +479,13 @@ and so ``N`` is an appropriate upper bound. The resulting Tile code is:
 
       .. literalinclude:: ../codeexamples/writing_edsl.cc
         :language: cpp
-        :lines: 144-152
+        :start-after: cumsum_start
+        :end-before: cumsum_end
 
     .. group-tab:: Python
 
       .. literalinclude:: ../codeexamples/writing_edsl.py
-        :lines: 121-128
+        :pyobject: TestEdslHelper.csum
 
 Convolution
 ===========
@@ -548,12 +553,13 @@ the kernel size relative to the spatial dimension of the input:
 
     .. literalinclude:: ../codeexamples/writing_edsl.cc
       :language: cpp
-      :lines: 154-162
+      :start-after: conv_1d_start
+      :end-before: conv_1d_end
 
   .. group-tab:: Python
 
     .. literalinclude:: ../codeexamples/writing_edsl.py
-      :lines: 130-137
+      :pyobject: TestEdslHelper.conv_1d
 
 
 Dilated 2D Convolution
@@ -593,12 +599,13 @@ directly to the formula, and so we get:
 
     .. literalinclude:: ../codeexamples/writing_edsl.cc
       :language: cpp
-      :lines: 164-172
+      :start-after: onv_2d_dilated_start
+      :end-before: onv_2d_dilated_end
 
   .. group-tab:: Python
 
     .. literalinclude:: ../codeexamples/writing_edsl.py
-      :lines: 139-146
+      :pyobject: TestEdslHelper.conv_2d_dilated
 
 Complex Convolution
 ===================
@@ -624,12 +631,13 @@ coefficients, and *`P`* gives the padding offsets.
 
     .. literalinclude:: ../codeexamples/writing_edsl.cc
       :language: cpp
-      :lines: 174-208
+      :start-after: complex_conv_start
+      :end-before: complex_conv_end
 
   .. group-tab:: Python
 
     .. literalinclude:: ../codeexamples/writing_edsl.py
-      :lines: 148-180
+      :pyobject: TestEdslHelper.complex_conv_2d
 
 
 

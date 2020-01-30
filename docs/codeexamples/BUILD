@@ -30,3 +30,27 @@ py_test(
         "//plaidml/exec:py",
     ],
 )
+
+py_binary(
+    name = "monte_carlo_pi",
+    srcs = ["monte_carlo_pi.py"],
+    deps = [
+        "//plaidml:py",
+        "//plaidml/edsl:py",
+        "//plaidml/exec:py",
+    ],
+)
+
+py_test(
+    name = "monte_carlo_pi_tests",
+    srcs = [
+        "monte_carlo_pi.py",
+        "monte_carlo_pi_tests.py",
+    ],
+    main = "monte_carlo_pi_tests.py",
+    deps = [
+        "//plaidml:py",
+        "//plaidml/edsl:py",
+        "//plaidml/exec:py",
+    ],
+)
