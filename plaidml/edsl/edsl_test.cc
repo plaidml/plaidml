@@ -76,8 +76,8 @@ module {
   std::vector<float> input_a = {1, 2, 3, 4, 5, 6, 7, 8, 9};
   std::vector<double> expected = {4, 5, 6, 7, 8, 9, 10, 11, 12};
 
+#if !defined(_WIN32)
   auto binder = exec::Binder(program);
-  #if !defined(_WIN32)
   auto executable = binder.compile();
   binder.input(A).copy_from(input_a.data());
   executable->run();
@@ -88,7 +88,7 @@ module {
     std::vector<double> actual(data, data + expected.size());
     EXPECT_THAT(actual, ContainerEq(expected));
   }
-  #endif
+#endif
 }
 
 TEST(CppEdsl, Cast) {
