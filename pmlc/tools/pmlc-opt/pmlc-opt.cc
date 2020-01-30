@@ -54,7 +54,6 @@ int main(int argc, char** argv) {
     IVLOG(level, "PLAIDML_VERBOSE=" << level);
   }
 
-  PrettyStackTraceProgram x(argc, argv);
   InitLLVM y(argc, argv);
 
   // Register any pass manager command line options.

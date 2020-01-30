@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "llvm/ADT/SetVector.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/FormatVariadic.h"
 
 #include "mlir/Analysis/Verifier.h"
@@ -20,10 +21,12 @@
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/Module.h"
 #include "mlir/IR/Operation.h"
+#include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/DebugStringHelper.h"
+#include "mlir/Transforms/FoldUtils.h"
 #include "mlir/Transforms/Passes.h"
 
 #include "pmlc/dialect/eltwise/ir/dialect.h"
@@ -32,6 +35,7 @@
 #include "pmlc/dialect/tile/ir/dialect.h"
 #include "pmlc/dialect/tile/ir/ops.h"
 #include "pmlc/dialect/tile/program.h"
+#include "pmlc/dialect/tile/transforms/passes.h"
 #include "pmlc/util/env.h"
 #include "pmlc/util/logging.h"
 #include "pmlc/util/slice.h"
@@ -42,15 +46,23 @@ namespace pmlc::dialect::tile {
 using eltwise::ScalarConstantOp;
 using eltwise::ScalarType;
 using llvm::ArrayRef;
+using llvm::SetVector;
 using llvm::SmallVector;
 using llvm::StringRef;
+using llvm::StringSwitch;
+using mlir::AbstractOperation;
 using mlir::Block;
 using mlir::BlockAndValueMapping;
+using mlir::FuncOp;
+using mlir::FunctionType;
 using mlir::MemRefType;
 using mlir::MLIRContext;
 using mlir::ModuleOp;
 using mlir::OpBuilder;
+using mlir::OperationFolder;
+using mlir::PatternRewriter;
 using mlir::RankedTensorType;
+using mlir::RewritePatternMatcher;
 using mlir::Type;
 using mlir::UnknownLoc;
 using mlir::Value;
@@ -93,20 +105,20 @@ struct TileBuilder::Impl {
     return builder.getType<ScalarType>(ret);
   }
 
-  const mlir::AbstractOperation* lookupOperation(StringRef op) {
+  const AbstractOperation* lookupOperation(StringRef op) {
     auto opName = eltwise::Dialect::getCanonicalOpName(op);
-    auto abstractOp = mlir::AbstractOperation::lookup(opName, &context);
+    auto abstractOp = AbstractOperation::lookup(opName, &context);
     if (!abstractOp) {
       opName = tile::Dialect::getCanonicalOpName(op);
-      abstractOp = mlir::AbstractOperation::lookup(opName, &context);
+      abstractOp = AbstractOperation::lookup(opName, &context);
       if (!abstractOp) {
-        throw std::runtime_error("Unknown op: " + op.str());
+        throw std::runtime_error("Unknown EDSL primitive: " + op.str());
       }
     }
     return abstractOp;
   }
 
-  std::vector<Value> getBackwardSliceOfAffine(const llvm::SetVector<Value>& values) {
+  std::vector<Value> getBackwardSliceOfAffine(const SetVector<Value>& values) {
     return util::getBackwardSlice(values, false, [](Value value) {
       if (auto scalarType = value.getType().dyn_cast<ScalarType>()) {
         return scalarType.type() == DataType::i32;
@@ -115,24 +127,24 @@ struct TileBuilder::Impl {
     });
   }
 
-  Value makeIndexOp(StringRef fn, ArrayRef<Value> args) {
+  Value makeIndexOp(ArrayRef<Value> args) {
     if (args.size() != 2) {
-      throw std::runtime_error("index op expects 2 operands");
+      throw std::runtime_error("'index' primitive expects 2 operands");
     }
     auto tensor = args[0];
     auto dim = args[1];
     auto resultType = IndexOp::getResultType(args.take_front());
     IntegerAttr dimAttr;
     if (!m_Constant(&dimAttr).match(dim.getDefiningOp())) {
-      throw std::runtime_error("index op expect argument 2 to be a constant integer");
+      throw std::runtime_error("'index' primitive expect argument 2 to be a constant integer");
     }
     auto op = builder.create<IndexOp>(loc, resultType, tensor, dimAttr);
     return op.result();
   }
 
-  Value makePrngOp(StringRef fn, ArrayRef<Value> args) {
+  Value makePrngOp(ArrayRef<Value> args) {
     if (args.size() < 1) {
-      throw std::runtime_error("prng op expects at least one operand");
+      throw std::runtime_error("'prng' primitive expects at least one operand");
     }
     auto state = args.front();
     auto dims = args.drop_front();
@@ -166,10 +178,7 @@ void TileBuilder::Destroy(Value value) {
   // }
 }
 
-MemRefType TileBuilder::MakeMemRefType(  //
-    DataType dtype,                      //
-    llvm::ArrayRef<int64_t> sizes,       //
-    llvm::ArrayRef<int64_t> strides) {
+MemRefType TileBuilder::MakeMemRefType(DataType dtype, ArrayRef<int64_t> sizes, ArrayRef<int64_t> strides) {
   auto elementType = impl->builder.getType<ScalarType>(dtype).toStandard();
   auto map = mlir::makeStridedLinearLayoutMap(strides, 0, &impl->context);
   return MemRefType::get(sizes, elementType, map);
@@ -258,27 +267,26 @@ Value TileBuilder::MakeCastOp(Value tensor, DataType dtype) {
   return impl->builder.create<eltwise::CastOp>(impl->loc, resultType, tensor).result();
 }
 
+Value TileBuilder::MakeTraceOp(Value tensor, const char* msg) {
+  IVLOG(5, "TileBuilder::MakeTraceOp> " << msg);
+  return impl->builder.create<TraceOp>(impl->loc, tensor, msg).result();
+}
+
 Value TileBuilder::MakePrimitiveOp(StringRef fn, ArrayRef<Value> args) {
-  using PrimitiveBuilder = Value (Impl::*)(StringRef fn, ArrayRef<Value> args);
-  static std::map<StringRef, PrimitiveBuilder> primitives = {
-      {"index", &Impl::makeIndexOp},
-      {"prng", &Impl::makePrngOp},
-  };
-  IVLOG(5, "TileBuilder::MakePrimitiveOp> " << fn.str());
-  for (auto arg : args) {
-    IVLOG(6, "  arg: " << mlir::debugString(arg));
-  }
-  auto it = primitives.find(fn);
-  if (it != primitives.end()) {
-    return (impl.get()->*it->second)(fn, args);
-  }
-  auto abstractOp = impl->lookupOperation(fn);
-  auto genericBuilder = abstractOp->getInterface<util::GenericBuilder>();
-  if (!genericBuilder) {
-    throw std::runtime_error("Unknown intrinsic: " + fn.str());
-  }
-  auto op = genericBuilder->create(&impl->builder, impl->loc, args);
-  return op->getResult(0);
+  using PrimitiveBuilder = std::function<Value()>;
+  auto builder = StringSwitch<PrimitiveBuilder>(fn)
+                     .Case("index", [this, args]() { return impl->makeIndexOp(args); })
+                     .Case("prng", [this, args]() { return impl->makePrngOp(args); })
+                     .Default([this, fn, args]() {
+                       auto abstractOp = impl->lookupOperation(fn);
+                       auto genericBuilder = abstractOp->getInterface<util::GenericBuilder>();
+                       if (!genericBuilder) {
+                         throw std::runtime_error("Unknown intrinsic: " + fn.str());
+                       }
+                       auto op = genericBuilder->create(&impl->builder, impl->loc, args);
+                       return op->getResult(0);
+                     });
+  return builder();
 }
 
 Value TileBuilder::Clone(Value value) {
@@ -302,7 +310,7 @@ Value TileBuilder::MakeStringOp(StringRef value) {
   return impl->builder.create<StringOp>(impl->loc, type, attr).result();
 }
 
-llvm::StringRef TileBuilder::GetStringValue(Value value) {
+StringRef TileBuilder::GetStringValue(Value value) {
   if (auto op = llvm::dyn_cast_or_null<StringOp>(value.getDefiningOp())) {
     return op.getValue().getValue();
   }
@@ -427,19 +435,14 @@ Value TileBuilder::MakeAffineMinOp(ArrayRef<Value> args) {
   return impl->builder.create<AffineMinOp>(impl->loc, args).result();
 }
 
-Value TileBuilder::MakeAffineSourceIndexMapOp(Value tensor, ArrayRef<Value> idxs) {
-  IVLOG(5, "TileBuilder::MakeAffineSourceIndexMapOp>");
+Value TileBuilder::MakeAffineTensorMapOp(Value tensor, ArrayRef<Value> idxs) {
+  IVLOG(5, "TileBuilder::MakeAffineTensorMapOp>");
   return impl->builder.create<AffineTensorMapOp>(impl->loc, tensor, idxs).result();
 }
 
-Value TileBuilder::MakeAffineSinkIndexMapOp(ArrayRef<Value> idxs) {
-  IVLOG(5, "TileBuilder::MakeAffineSinkIndexMapOp>");
+Value TileBuilder::MakeAffineMapOp(ArrayRef<Value> idxs) {
+  IVLOG(5, "TileBuilder::MakeAffineMapOp>");
   return impl->builder.create<AffineMapOp>(impl->loc, idxs).result();
-}
-
-Value TileBuilder::MakeAffineSizeMapOp(ArrayRef<Value> sizes) {
-  IVLOG(5, "TileBuilder::MakeAffineSizeMapOp>");
-  return impl->builder.create<AffineMapOp>(impl->loc, sizes).result();
 }
 
 void TileBuilder::AddConstraint(Value cion, Value lhs, Value rhs) {
@@ -531,14 +534,58 @@ Value TileBuilder::MakeContractionOp(  //
   return op.result();
 }
 
-std::shared_ptr<TileProgram> TileBuilder::MakeProgram(StringRef name, const ProgramMutations& mutations) {
+class MakeProgramDriver : public PatternRewriter {
+ public:
+  MakeProgramDriver(MLIRContext* ctx, const OwningRewritePatternList& patterns)
+      : PatternRewriter(ctx), matcher(patterns), folder(ctx) {}
+
+  void run(FuncOp funcOp) {
+    funcOp.walk([&](Operation* op) {
+      // Try to fold this op.
+      if (succeeded(folder.tryToFold(op))) {
+        return;
+      }
+
+      // Make sure that any new operations are inserted at this point.
+      setInsertionPoint(op);
+
+      // Try to match one of the patterns.
+      matcher.matchAndRewrite(op, *this);
+    });
+  }
+
+ protected:
+  Operation* insert(Operation* op) final { return OpBuilder::insert(op); }
+
+ private:
+  RewritePatternMatcher matcher;
+  OperationFolder folder;
+};
+
+struct MakeProgramPass : public mlir::FunctionPass<MakeProgramPass> {
+  void runOnFunction() final {
+    OwningRewritePatternList patterns;
+    auto context = &getContext();
+    for (auto op : context->getRegisteredOperations()) {
+      op->getCanonicalizationPatterns(patterns, context);
+    }
+
+    MakeProgramDriver driver(context, patterns);
+    driver.run(getFunction());
+  }
+
+  static std::unique_ptr<mlir::Pass> create() { return std::make_unique<MakeProgramPass>(); }
+};
+
+std::shared_ptr<TileProgram> TileBuilder::MakeProgram(StringRef name, const ProgramMutations& mutations,
+                                                      util::DataType floatx, util::DataType intx) {
   if (name.empty()) {
     name = "noname";
   }
   IVLOG(1, "TileBuilder::MakeProgram> " << name.str());
   IVLOG(6, "\n" << mlir::debugString(impl->module));
   // Wrap duplicate outputs and outputs that directly refer to inputs
-  llvm::SetVector<Value> outputs;
+  SetVector<Value> outputs;
   for (auto output : mutations.outputs) {
     if (!output) {
       throw std::runtime_error("Invalid output");
@@ -562,13 +609,13 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(StringRef name, const Prog
     }
   }
   // Construct a module
-  auto loc = mlir::UnknownLoc::get(&impl->context);
+  auto loc = UnknownLoc::get(&impl->context);
   auto module = ModuleOp::create(loc);
   auto program = std::make_shared<TileProgram>(module);
   program->entry = name;
   // Construct a function to represent the entire program
-  auto initialFuncType = mlir::FunctionType::get(inputTypes, {}, &impl->context);
-  auto funcOp = mlir::FuncOp::create(loc, name, initialFuncType, {});
+  auto initialFuncType = FunctionType::get(inputTypes, {}, &impl->context);
+  auto funcOp = FuncOp::create(loc, name, initialFuncType, {});
   funcOp.addEntryBlock();
   OpBuilder builder(funcOp.getBody());
   std::set<std::string> names;
@@ -637,7 +684,7 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(StringRef name, const Prog
   }
   auto returnOp = builder.create<mlir::ReturnOp>(loc, returnOperands);
   // compute final function type
-  auto finalFuncType = mlir::FunctionType::get(inputTypes, resultTypes, &impl->context);
+  auto finalFuncType = FunctionType::get(inputTypes, resultTypes, &impl->context);
   funcOp.setType(finalFuncType);
   // Attach the function to the module
   module.push_back(funcOp);
@@ -647,6 +694,8 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(StringRef name, const Prog
   }
   // Do some optimization passes
   mlir::PassManager pm(&impl->context);
+  pm.addPass(createConstantTypesPass(floatx, intx));
+  pm.addPass(MakeProgramPass::create());
   pm.addPass(mlir::createCanonicalizerPass());
   pm.addPass(mlir::createCSEPass());
   auto result = pm.run(module);
@@ -669,7 +718,7 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(StringRef name, const Prog
     program->arguments.emplace_back(programArg);
     program->outputs.emplace_back(finalValue);
   }
-  IVLOG(2, "TileBuilder::MakeProgram>\n" << mlir::debugString(module));
+  // IVLOG(2, "TileBuilder::MakeProgram>\n" << mlir::debugString(module));
   return program;
 }
 
@@ -682,11 +731,11 @@ std::vector<Value> TileBuilder::ComputeGradients(ArrayRef<Value> wrt, Value loss
     for (size_t i = 0; i < ndims; ++i) {
       src_idxs.emplace_back(MakeAffineIndexOp(""));
     }
-    ArrayRef<Value> srcs{MakeAffineSourceIndexMapOp(loss, src_idxs)};
-    auto sink = MakeAffineSinkIndexMapOp(ArrayRef<Value>{});
-    auto sizes = MakeAffineSizeMapOp(ArrayRef<Value>{});
+    auto src = MakeAffineTensorMapOp(loss, src_idxs);
+    auto sink = MakeAffineMapOp(ArrayRef<Value>{});
+    auto sizes = MakeAffineMapOp(ArrayRef<Value>{});
     auto cion =
-        MakeContractionOp(util::AggregationKind::add, util::CombinationKind::none, srcs, sink, sizes, "net_loss");
+        MakeContractionOp(util::AggregationKind::add, util::CombinationKind::none, {src}, sink, sizes, "net_loss");
     value = cion;
   }
   Gradient grad(value, this);

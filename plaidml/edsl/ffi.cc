@@ -234,6 +234,36 @@ void* plaidml_expr_ptr(  //
   });
 }
 
+plaidml_datatype plaidml_expr_get_dtype(  //
+    plaidml_error* err,                   //
+    plaidml_expr* expr) {
+  return ffi_wrap<plaidml_datatype>(err, PLAIDML_DATA_INVALID, [&] {
+    IVLOG(3, "plaidml_expr_get_dtype");
+    auto tensorType = expr->value.getType().dyn_cast<mlir::RankedTensorType>();
+    if (!tensorType) {
+      throw std::runtime_error("Expected RankedTensorType");
+    }
+    auto elementType = tensorType.getElementType();
+    auto scalarType = elementType.dyn_cast<ScalarType>();
+    if (!scalarType) {
+      throw std::runtime_error("Expected ScalarType");
+    }
+    return static_cast<plaidml_datatype>(scalarType.type());
+  });
+}
+
+size_t plaidml_expr_get_rank(  //
+    plaidml_error* err,        //
+    plaidml_expr* expr) {
+  return ffi_wrap<size_t>(err, 0, [&] {
+    auto tensorType = expr->value.getType().dyn_cast<mlir::RankedTensorType>();
+    if (!tensorType) {
+      throw std::runtime_error("Expected RankedTensorType");
+    }
+    return tensorType.getRank();
+  });
+}
+
 plaidml_logical_shape* plaidml_expr_get_shape(  //
     plaidml_error* err,                         //
     plaidml_expr* expr) {
@@ -363,6 +393,16 @@ plaidml_expr* plaidml_expr_cast(  //
   });
 }
 
+plaidml_expr* plaidml_expr_trace(  //
+    plaidml_error* err,            //
+    plaidml_expr* tensor,          //
+    const char* msg) {
+  return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
+    IVLOG(3, "plaidml_expr_trace");
+    return new plaidml_expr{GlobalContext::get()->MakeTraceOp(tensor->value, msg)};
+  });
+}
+
 plaidml_expr* plaidml_expr_call(  //
     plaidml_error* err,           //
     const char* fn,               //
@@ -404,9 +444,9 @@ plaidml_expr* plaidml_expr_index_map(  //
       idx_values[i] = raw_idxs[i]->value;
     }
     if (ref) {
-      return new plaidml_expr{GlobalContext::get()->MakeAffineSourceIndexMapOp(ref->value, idx_values)};
+      return new plaidml_expr{GlobalContext::get()->MakeAffineTensorMapOp(ref->value, idx_values)};
     }
-    return new plaidml_expr{GlobalContext::get()->MakeAffineSinkIndexMapOp(idx_values)};
+    return new plaidml_expr{GlobalContext::get()->MakeAffineMapOp(idx_values)};
   });
 }
 
@@ -420,7 +460,7 @@ plaidml_expr* plaidml_expr_size_map(  //
     for (size_t i = 0; i < ndims; i++) {
       dim_values.emplace_back(raw_dims[i]->value);
     }
-    return new plaidml_expr{GlobalContext::get()->MakeAffineSizeMapOp(dim_values)};
+    return new plaidml_expr{GlobalContext::get()->MakeAffineMapOp(dim_values)};
   });
 }
 
@@ -913,6 +953,8 @@ plaidml_program* plaidml_program_evaluate(  //
     size_t nupdates,                        //
     plaidml_expr** src_updates,             //
     plaidml_expr** dst_updates,             //
+    plaidml_datatype floatx,                //
+    plaidml_datatype intx,                  //
     plaidml_program_args** raw_args) {
   return ffi_wrap<plaidml_program*>(err, nullptr, [&] {
     IVLOG(3, "plaidml_program_evaluate");
@@ -933,7 +975,17 @@ plaidml_program* plaidml_program_evaluate(  //
       }
       mutations.updates.emplace(ProgramUpdate{src_updates[i]->value, dst_updates[i]->value});
     }
-    auto ret = new plaidml_program{GlobalContext::get()->MakeProgram(name, mutations)};
+
+    auto floatx_dtype = pmlc::util::symbolizeDataType(static_cast<std::uint64_t>(floatx)).getValueOr(DataType::invalid);
+    auto intx_dtype = pmlc::util::symbolizeDataType(static_cast<std::uint64_t>(intx)).getValueOr(DataType::invalid);
+    if (!pmlc::util::isFloat(floatx_dtype)) {
+      throw std::runtime_error("Invalid floatx in plaidml_program_evaluate");
+    }
+    if (!pmlc::util::isInteger(intx_dtype)) {
+      throw std::runtime_error("Invalid intx in plaidml_program_evaluate");
+    }
+
+    auto ret = new plaidml_program{GlobalContext::get()->MakeProgram(name, mutations, floatx_dtype, intx_dtype)};
     assert(noutputs <= ret->program->outputs.size());
     auto nargs = ret->program->arguments.size();
     auto args = new plaidml_program_arg[nargs];

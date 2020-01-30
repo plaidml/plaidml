@@ -40,16 +40,6 @@ plaidml_cc_library(
     alwayslink = 1,
 )
 
-plaidml_cc_library(
-    name = "api",
-    hdrs = SDK_HDRS,
-    visibility = ["//visibility:public"],
-    deps = [
-        "//plaidml/core:api",
-        "//plaidml/edsl:api",
-    ],
-)
-
 py_library(
     name = "py",
     srcs = [

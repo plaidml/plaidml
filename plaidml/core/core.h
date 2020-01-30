@@ -97,6 +97,37 @@ enum class DType {
   FLOAT64 = PLAIDML_DATA_FLOAT64,
 };
 
+inline const char* to_string(DType dtype) {
+  switch (dtype) {
+    case DType::BOOLEAN:
+      return "bool";
+    case DType::INT8:
+      return "int8";
+    case DType::UINT8:
+      return "uint8";
+    case DType::INT16:
+      return "int16";
+    case DType::UINT16:
+      return "uint16";
+    case DType::INT32:
+      return "int32";
+    case DType::UINT32:
+      return "uint32";
+    case DType::INT64:
+      return "uint64";
+    case DType::BFLOAT16:
+      return "bfloat16";
+    case DType::FLOAT16:
+      return "float16";
+    case DType::FLOAT32:
+      return "float32";
+    case DType::FLOAT64:
+      return "float64";
+    default:
+      return "<invalid>";
+  }
+}
+
 ///
 /// \ingroup core_objects
 /// \class TensorShape

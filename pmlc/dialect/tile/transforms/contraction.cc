@@ -752,8 +752,7 @@ void ComputeBoundsPass::runOnFunction() {
 }
 
 std::unique_ptr<mlir::OpPassBase<mlir::FuncOp>> createComputeBoundsPass() {
-  std::unique_ptr<mlir::OpPassBase<mlir::FuncOp>> pass = std::make_unique<ComputeBoundsPass>();
-  return pass;
+  return std::make_unique<ComputeBoundsPass>();
 }
 
 }  // namespace pmlc::dialect::tile

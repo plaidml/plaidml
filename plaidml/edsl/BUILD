@@ -14,13 +14,6 @@ exports_files([
     "ffi.h",
 ])
 
-pkg_tar(
-    name = "include_pkg",
-    srcs = SDK_HDRS,
-    package_dir = "include/plaidml/edsl",
-    visibility = ["//visibility:public"],
-)
-
 filegroup(
     name = "docs",
     srcs = [
@@ -66,18 +59,10 @@ py_library(
     ],
 )
 
-plaidml_cc_library(
-    name = "api",
-    hdrs = SDK_HDRS,
-    visibility = ["//visibility:public"],
-    deps = ["//plaidml/core:api"],
-)
-
 plaidml_cc_test(
     name = "cc_test",
     srcs = ["edsl_test.cc"],
     deps = [
-        ":api",
         ":edsl",
         "//plaidml:testenv",
         "//plaidml/exec",

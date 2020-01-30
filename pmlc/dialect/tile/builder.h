@@ -80,6 +80,7 @@ class TileBuilder {
   mlir::Value MakeScalarConstantOp(double value);
   mlir::Value MakePrimitiveOp(llvm::StringRef fn, llvm::ArrayRef<mlir::Value> args);
   mlir::Value MakeCastOp(mlir::Value tensor, DataType dtype);
+  mlir::Value MakeTraceOp(mlir::Value tensor, const char* msg);
   mlir::Value MakeDimOp(mlir::Value tensor, unsigned dim);
   mlir::Value MakePlaceholderOp(mlir::RankedTensorType type, pmlc::util::BufferPtr buffer, llvm::StringRef name);
   mlir::Value MakeAffineConstantOp(int64_t value);
@@ -91,9 +92,8 @@ class TileBuilder {
   mlir::Value MakeAffineNegOp(llvm::ArrayRef<mlir::Value> args);
   mlir::Value MakeAffineMaxOp(llvm::ArrayRef<mlir::Value> args);
   mlir::Value MakeAffineMinOp(llvm::ArrayRef<mlir::Value> args);
-  mlir::Value MakeAffineSourceIndexMapOp(mlir::Value tensor, llvm::ArrayRef<mlir::Value> idxs);
-  mlir::Value MakeAffineSinkIndexMapOp(llvm::ArrayRef<mlir::Value> idxs);
-  mlir::Value MakeAffineSizeMapOp(llvm::ArrayRef<mlir::Value> sizes);
+  mlir::Value MakeAffineTensorMapOp(mlir::Value tensor, llvm::ArrayRef<mlir::Value> idxs);
+  mlir::Value MakeAffineMapOp(llvm::ArrayRef<mlir::Value> idxs);
 
   mlir::Value MakeContractionOp(         //
       util::AggregationKind agg,         //
@@ -107,7 +107,9 @@ class TileBuilder {
   void SetUseDefault(mlir::Value cion, mlir::Value defaultValue);
   void SetNoReduce(mlir::Value cion, bool no_reduce);
 
-  std::shared_ptr<TileProgram> MakeProgram(llvm::StringRef name, const ProgramMutations& mutations);
+  std::shared_ptr<TileProgram> MakeProgram(llvm::StringRef name, const ProgramMutations& mutations,
+                                           util::DataType floatx = DataType::invalid,
+                                           util::DataType intx = DataType::invalid);
 
   void Dump();
 

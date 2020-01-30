@@ -167,6 +167,14 @@ void* plaidml_expr_ptr(  //
     plaidml_error* err,  //
     plaidml_expr* expr);
 
+plaidml_datatype plaidml_expr_get_dtype(  //
+    plaidml_error* err,                   //
+    plaidml_expr* expr);
+
+size_t plaidml_expr_get_rank(  //
+    plaidml_error* err,        //
+    plaidml_expr* expr);
+
 plaidml_logical_shape* plaidml_expr_get_shape(  //
     plaidml_error* err,                         //
     plaidml_expr* expr);
@@ -227,6 +235,11 @@ plaidml_expr* plaidml_expr_cast(  //
     plaidml_error* err,           //
     plaidml_expr* tensor,         //
     plaidml_datatype dtype);
+
+plaidml_expr* plaidml_expr_trace(  //
+    plaidml_error* err,            //
+    plaidml_expr* tensor,          //
+    const char* msg);
 
 plaidml_expr* plaidml_expr_index_map(  //
     plaidml_error* err,                //
@@ -400,6 +413,8 @@ plaidml_program* plaidml_program_evaluate(  //
     size_t nupdates,                        //
     plaidml_expr** src_updates,             //
     plaidml_expr** dst_updates,             //
+    plaidml_datatype floatx,                //
+    plaidml_datatype intx,                  //
     plaidml_program_args** args);
 
 plaidml_string* plaidml_program_repr(  //
