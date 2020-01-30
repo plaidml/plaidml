@@ -20,10 +20,6 @@ using ::testing::Eq;
 
 namespace plaidml::edsl {
 
-bool operator==(const Program& lhs, const std::string& rhs) {  //
-  return llvm::StringRef(lhs.str()).trim() == llvm::StringRef(rhs).trim();
-}
-
 // sum_over_axis_start
 Tensor SumOveAxis(const Tensor& I) {
   TensorDim M, N;
@@ -250,6 +246,7 @@ Tensor ComplexConv2D(const Tensor& I, const Tensor& K,
   return O;
 }
 // complex_conv_end
+
 TEST(CppEdsl, SumOveAxis) {
   auto I = Placeholder(DType::UINT64, {3, 3});
   Program program("sum_over_axis", {SumOveAxis(I)});
