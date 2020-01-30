@@ -46,35 +46,35 @@ Tensor Softmax(const Tensor& X) {
   return E / N;
 }
 
-TEST(CppEdsl, LowerPrecisionInvalidNegative) {
+TEST(CppEdsl, HigherPrecisionInvalidNegative) {
   auto A = Placeholder(DType::FLOAT32, {3, 3});
   auto C = A * (-2);
 
-  EXPECT_ANY_THROW({ Program("lower_precision_constants", {C}, DType::FLOAT16, DType::UINT16); });
+  EXPECT_ANY_THROW({ Program("higher_precision_constants", {C}, DType::FLOAT64, DType::UINT64); });
 }
 
-TEST(CppEdsl, LowerPrecisionConstants) {
+TEST(CppEdsl, HigherPrecisionConstants) {
   auto A = Placeholder(DType::FLOAT32, {3, 3});
   auto C = A + 1 + 2.0;
 
-  Program program("lower_precision_constants", {C}, DType::FLOAT16, DType::INT16);
+  Program program("higher_precision_constants", {C}, DType::FLOAT64, DType::UINT64);
 
   EXPECT_THAT(program, Eq(R"#(
-!i16 = type tensor<!eltwise.i16>
-!f16 = type tensor<!eltwise.f16>
+!u64 = type tensor<!eltwise.u64>
+!f64 = type tensor<!eltwise.f64>
 module {
-  func @lower_precision_constants(%arg0: tensor<3x3x!eltwise.f32>) -> tensor<3x3x!eltwise.f32> {
-    %c1 = "eltwise.sconst"() {value = 1 : i64} : () -> !i16
-    %cst = "eltwise.sconst"() {value = 2.000000e+00 : f64} : () -> !f16
-    %0 = "eltwise.add"(%arg0, %c1) : (tensor<3x3x!eltwise.f32>, !i16) -> tensor<3x3x!eltwise.f32>
-    %1 = "eltwise.add"(%0, %cst) : (tensor<3x3x!eltwise.f32>, !f16) -> tensor<3x3x!eltwise.f32>
-    return %1 : tensor<3x3x!eltwise.f32>
+  func @higher_precision_constants(%arg0: tensor<3x3x!eltwise.f32>) -> tensor<3x3x!eltwise.f64> {
+    %c1 = "eltwise.sconst"() {value = 1 : i64} : () -> !u64
+    %cst = "eltwise.sconst"() {value = 2.000000e+00 : f64} : () -> !f64
+    %0 = "eltwise.add"(%arg0, %c1) : (tensor<3x3x!eltwise.f32>, !u64) -> tensor<3x3x!eltwise.f32>
+    %1 = "eltwise.add"(%0, %cst) : (tensor<3x3x!eltwise.f32>, !f64) -> tensor<3x3x!eltwise.f64>
+    return %1 : tensor<3x3x!eltwise.f64>
   }
 }
 )#"));
 
   std::vector<float> input_a = {1, 2, 3, 4, 5, 6, 7, 8, 9};
-  std::vector<float> expected = {4, 5, 6, 7, 8, 9, 10, 11, 12};
+  std::vector<double> expected = {4, 5, 6, 7, 8, 9, 10, 11, 12};
 
   auto binder = exec::Binder(program);
   auto executable = binder.compile();
@@ -83,8 +83,8 @@ module {
   {
     auto view = binder.output(C).mmap_current();
     ASSERT_THAT(view.size(), expected.size() * sizeof(expected[0]));
-    auto data = reinterpret_cast<float*>(view.data());
-    std::vector<float> actual(data, data + expected.size());
+    auto data = reinterpret_cast<double*>(view.data());
+    std::vector<double> actual(data, data + expected.size());
     EXPECT_THAT(actual, ContainerEq(expected));
   }
 }

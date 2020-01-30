@@ -4,7 +4,6 @@
 
 #include <memory>
 #include <set>
-#include <string>
 #include <vector>
 
 #include "llvm/ADT/ArrayRef.h"
@@ -45,21 +44,6 @@ struct ProgramUpdate {
 struct ProgramMutations {
   std::vector<mlir::Value> outputs;
   std::set<ProgramUpdate> updates;
-  DataType floatx = DataType::invalid;
-  DataType intx = DataType::invalid;
-
-  void set_floatx(const char* floatx_str) {
-    floatx = util::from_string(floatx_str);
-    if (!isFloat(floatx)) {
-      throw std::runtime_error("Invalid floatx string " + std::string(floatx_str));
-    }
-  }
-  void set_intx(const char* intx_str) {
-    intx = util::from_string(intx_str);
-    if (!isInteger(intx)) {
-      throw std::runtime_error("Invalid intx string " + std::string(intx_str));
-    }
-  }
 };
 
 class TileBuilder {
@@ -123,7 +107,15 @@ class TileBuilder {
   void SetUseDefault(mlir::Value cion, mlir::Value defaultValue);
   void SetNoReduce(mlir::Value cion, bool no_reduce);
 
-  std::shared_ptr<TileProgram> MakeProgram(llvm::StringRef name, const ProgramMutations& mutations);
+  std::shared_ptr<TileProgram> MakeProgram(llvm::StringRef name, const ProgramMutations& mutations,
+                                           util::DataType floatx = DataType::invalid,
+                                           util::DataType intx = DataType::invalid);
+
+  std::shared_ptr<TileProgram> MakeProgram(llvm::StringRef name, const ProgramMutations& mutations,
+                                           std::uint64_t floatx, std::uint64_t intx) {
+    return MakeProgram(name, mutations, util::symbolizeDataType(floatx).getValueOr(DataType::invalid),
+                       util::symbolizeDataType(intx).getValueOr(DataType::invalid));
+  }
 
   void Dump();
 

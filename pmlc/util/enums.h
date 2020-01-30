@@ -3,8 +3,6 @@
 #pragma once
 
 #include <algorithm>
-#include <string>
-#include <unordered_map>
 
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/Optional.h"
@@ -50,22 +48,6 @@ inline bool isUnsigned(DataType dtype) {
     default:
       return false;
   }
-}
-
-inline DataType from_string(const std::string& dtype_str) {
-  auto data_type = pmlc::util::symbolizeDataType(dtype_str).getValueOr(DataType::invalid);
-
-  static std::unordered_map<std::string, DataType> long_str_to_type{
-      {"bool", DataType::u1},       {"int8", DataType::i8},          {"uint8", DataType::u8},
-      {"int16", DataType::i16},     {"uint16", DataType::u16},       {"int32", DataType::i32},
-      {"uint32", DataType::u32},    {"int64", DataType::i64},        {"uint64", DataType::u64},
-      {"bfloat16", DataType::bf16}, {"float16", DataType::f16},      {"float32", DataType::f32},
-      {"float64", DataType::f64},   {"<invalid>", DataType::invalid}};
-
-  if (data_type == DataType::invalid && long_str_to_type.find(dtype_str) != long_str_to_type.end()) {
-    return long_str_to_type[dtype_str];
-  }
-  return data_type;
 }
 
 inline bool isInteger(DataType dtype) {  //

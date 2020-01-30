@@ -977,10 +977,15 @@ plaidml_program* plaidml_program_evaluate(  //
       mutations.updates.emplace(ProgramUpdate{src_updates[i]->value, dst_updates[i]->value});
     }
 
-    mutations.set_floatx(to_string(static_cast<plaidml::DType>(floatx)));
-    mutations.set_intx(to_string(static_cast<plaidml::DType>(intx)));
+    if (!plaidml::isFloat(static_cast<plaidml::DType>(floatx))) {
+      throw std::runtime_error("Invalid floatx in plaidml_program_evaluate");
+    }
+    if (!plaidml::isInteger(static_cast<plaidml::DType>(intx))) {
+      throw std::runtime_error("Invalid intx in plaidml_program_evaluate");
+    }
 
-    auto ret = new plaidml_program{GlobalContext::get()->MakeProgram(name, mutations)};
+    auto ret = new plaidml_program{GlobalContext::get()->MakeProgram(
+        name, mutations, static_cast<std::uint64_t>(floatx), static_cast<std::uint64_t>(intx))};
     assert(noutputs <= ret->program->outputs.size());
     auto nargs = ret->program->arguments.size();
     auto args = new plaidml_program_arg[nargs];

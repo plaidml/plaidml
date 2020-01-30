@@ -258,35 +258,35 @@ class TestEdsl(unittest.TestCase):
     def compare_results(self, program, expected):
         self.assertMultiLineEqual(str(program).strip(), expected.strip())
 
-    def test_lower_precision_constants_invalid_negative(self):
+    def test_higher_precision_constants_invalid_negative(self):
         I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [3, 3]))
         O = I * (-2)
 
         try:
-            program = Program('lower_precision_constants', [O],
-                              floatx=plaidml.DType.FLOAT16,
-                              intx=plaidml.DType.UINT16)
+            program = Program('higher_precision_constants', [O],
+                              floatx=plaidml.DType.FLOAT64,
+                              intx=plaidml.DType.UINT64)
         except Exception:
             return
         self.fail("expected exception")
 
-    def test_lower_precision_constants(self):
-        I = Tensor(LogicalShape(plaidml.DType.FLOAT64, [3, 3]))
+    def test_higher_precision_constants(self):
+        I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [3, 3]))
         O = I + 1 + 2.0
 
-        program = Program('lower_precision_constants', [O],
-                          floatx=plaidml.DType.FLOAT32,
-                          intx=plaidml.DType.INT32)
+        program = Program('higher_precision_constants', [O],
+                          floatx=plaidml.DType.FLOAT64,
+                          intx=plaidml.DType.UINT64)
         expected = '''
 
-!i32 = type tensor<!eltwise.i32>
-!f32 = type tensor<!eltwise.f32>
+!u64 = type tensor<!eltwise.u64>
+!f64 = type tensor<!eltwise.f64>
 module {
-  func @lower_precision_constants(%arg0: tensor<3x3x!eltwise.f64>) -> tensor<3x3x!eltwise.f64> {
-    %c1 = "eltwise.sconst"() {value = 1 : i64} : () -> !i32
-    %cst = "eltwise.sconst"() {value = 2.000000e+00 : f64} : () -> !f32
-    %0 = "eltwise.add"(%arg0, %c1) : (tensor<3x3x!eltwise.f64>, !i32) -> tensor<3x3x!eltwise.f64>
-    %1 = "eltwise.add"(%0, %cst) : (tensor<3x3x!eltwise.f64>, !f32) -> tensor<3x3x!eltwise.f64>
+  func @higher_precision_constants(%arg0: tensor<3x3x!eltwise.f32>) -> tensor<3x3x!eltwise.f64> {
+    %c1 = "eltwise.sconst"() {value = 1 : i64} : () -> !u64
+    %cst = "eltwise.sconst"() {value = 2.000000e+00 : f64} : () -> !f64
+    %0 = "eltwise.add"(%arg0, %c1) : (tensor<3x3x!eltwise.f32>, !u64) -> tensor<3x3x!eltwise.f32>
+    %1 = "eltwise.add"(%0, %cst) : (tensor<3x3x!eltwise.f32>, !f64) -> tensor<3x3x!eltwise.f64>
     return %1 : tensor<3x3x!eltwise.f64>
   }
 }

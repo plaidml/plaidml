@@ -2,8 +2,9 @@
 
 #pragma once
 
-#include "pmlc/util/enums.h"
 #include <memory>
+
+#include "pmlc/util/enums.h"
 
 namespace mlir {
 class FuncOp;
