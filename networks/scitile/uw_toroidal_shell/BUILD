@@ -20,6 +20,7 @@ py_test(
         "uw_tests.py",
         "uw_toroidal_shell.py",
     ],
+    args = ["-v"],
     deps = [
         "//plaidml:py",
         "//plaidml/edsl:py",

@@ -3,6 +3,9 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include <map>
+#include <variant>
+
 #include "llvm/ADT/StringRef.h"
 
 #include "plaidml/edsl/autodiff.h"
@@ -11,13 +14,14 @@
 #include "pmlc/util/env.h"
 #include "pmlc/util/logging.h"
 
+using llvm::StringRef;
 using ::testing::ContainerEq;
 using ::testing::Eq;
 
 namespace plaidml::edsl {
 
 bool operator==(const Program& lhs, const std::string& rhs) {  //
-  return llvm::StringRef(lhs.str()).trim() == llvm::StringRef(rhs).trim();
+  return StringRef(lhs.str()).trim() == StringRef(rhs).trim();
 }
 
 namespace {
@@ -46,14 +50,58 @@ Tensor Softmax(const Tensor& X) {
   return E / N;
 }
 
-TEST(CppEdsl, HigherPrecisionInvalidNegative) {
+using MultiBuffer = std::variant<  //
+    std::vector<float>,            //
+    std::vector<double>,           //
+    std::vector<int>,              //
+    std::vector<std::int32_t>,     //
+    std::vector<std::int64_t>,     //
+    std::vector<std::uint32_t>,    //
+    std::vector<std::uint64_t>>;
+
+class CppEdsl : public ::testing::Test {
+ protected:
+  template <typename T>
+  void compareBuffers(plaidml::View view, const std::vector<T>& expected) {
+    ASSERT_THAT(view.size(), expected.size() * sizeof(expected[0]));
+    auto data = reinterpret_cast<T*>(view.data());
+    std::vector<T> actual(data, data + expected.size());
+    EXPECT_THAT(actual, ContainerEq(expected));
+  }
+
+  void checkProgram(                                   //
+      const Program& program,                          //
+      const std::map<TensorRef, MultiBuffer>& inputs,  //
+      const std::map<TensorRef, MultiBuffer>& expected) {
+#if !defined(_WIN32)
+    auto binder = exec::Binder(program);
+    auto executable = binder.compile();
+    for (const auto& kvp : inputs) {
+      std::visit([&](auto&& vec) { binder.input(kvp.first).copy_from(vec.data()); }, kvp.second);
+    }
+    executable->run();
+    for (auto kvp : expected) {
+      auto view = binder.output(kvp.first).mmap_current();
+      std::visit([&](auto&& vec) { compareBuffers(view, vec); }, kvp.second);
+    }
+#endif
+  }
+
+  void runProgram(const Program& program) {
+#if !defined(_WIN32)
+    exec::Binder(program).compile()->run();
+#endif
+  }
+};
+
+TEST_F(CppEdsl, HigherPrecisionInvalidNegative) {
   auto A = Placeholder(DType::FLOAT32, {3, 3});
   auto C = A * (-2);
 
-  EXPECT_ANY_THROW({ auto program = Program("higher_precision_constants", {C}, DType::FLOAT64, DType::UINT64); });
+  EXPECT_ANY_THROW({ Program("higher_precision_constants", {C}, DType::FLOAT64, DType::UINT64); });
 }
 
-TEST(CppEdsl, HigherPrecisionConstants) {
+TEST_F(CppEdsl, HigherPrecisionConstants) {
   auto A = Placeholder(DType::FLOAT32, {3, 3});
   auto C = A + 1 + 2.0;
 
@@ -73,40 +121,26 @@ module {
 }
 )#"));
 
-  std::vector<float> input_a = {1, 2, 3, 4, 5, 6, 7, 8, 9};
-  std::vector<double> expected = {4, 5, 6, 7, 8, 9, 10, 11, 12};
-
-#if !defined(_WIN32)
-  auto binder = exec::Binder(program);
-  auto executable = binder.compile();
-  binder.input(A).copy_from(input_a.data());
-  executable->run();
-  {
-    auto view = binder.output(C).mmap_current();
-    ASSERT_THAT(view.size(), expected.size() * sizeof(expected[0]));
-    auto data = reinterpret_cast<double*>(view.data());
-    std::vector<double> actual(data, data + expected.size());
-    EXPECT_THAT(actual, ContainerEq(expected));
-  }
-#endif
+  std::vector<float> A_input{1, 2, 3, 4, 5, 6, 7, 8, 9};
+  std::vector<double> C_output{4, 5, 6, 7, 8, 9, 10, 11, 12};
+  checkProgram(program, {{A, A_input}}, {{C, C_output}});
 }
 
-TEST(CppEdsl, Cast) {
+TEST_F(CppEdsl, Cast) {
   auto A = Placeholder(DType::UINT64, {3, 3});
   auto B = cast(A, DType::UINT32);
   Program program("cast", {B});
 
-  std::vector<std::uint64_t> input{1,
-                                   2,
-                                   3,
-                                   4,
-                                   5,
-                                   6 + (1UL << 12),
-                                   7 + (1UL << 24),
-                                   8 + (1UL << 31),  //
-                                   (1ULL << 32) - 1};
-
-  std::vector<std::uint32_t> expected{1,
+  std::vector<std::uint64_t> A_input{1,
+                                     2,
+                                     3,
+                                     4,
+                                     5,
+                                     6 + (1UL << 12),
+                                     7 + (1UL << 24),
+                                     8 + (1UL << 31),  //
+                                     (1ULL << 32) - 1};
+  std::vector<std::uint32_t> B_output{1,
                                       2,
                                       3,
                                       4,
@@ -115,146 +149,88 @@ TEST(CppEdsl, Cast) {
                                       7 + (1UL << 24),
                                       8 + (1UL << 31),  //
                                       (1ULL << 32) - 1};
-  auto binder = exec::Binder(program);
-  auto executable = binder.compile();
-  binder.input(A).copy_from(input.data());
-  executable->run();
-  {
-    auto view = binder.output(B).mmap_current();
-    ASSERT_THAT(view.size(), expected.size() * sizeof(expected[0]));
-    auto data = reinterpret_cast<std::uint32_t*>(view.data());
-    std::vector<std::uint32_t> actual(data, data + expected.size());
-    EXPECT_THAT(actual, ContainerEq(expected));
-  }
+  checkProgram(program, {{A, A_input}}, {{B, B_output}});
 }
 
-TEST(CppEdsl, BitOr) {
+TEST_F(CppEdsl, BitOr) {
   auto A = Placeholder(DType::UINT64, {3, 3});
   auto B = Placeholder(DType::UINT64, {3, 3});
   auto C = A | B;
   Program program("bit_or", {C});
 
-  std::vector<std::uint64_t> input_a{1, 2, 3,  //
+  std::vector<std::uint64_t> A_input{1, 2, 3,  //
                                      4, 5, 6,  //
                                      7, 8, 9};
-  std::vector<std::uint64_t> input_b{10, 11, 12,  //
+  std::vector<std::uint64_t> B_input{10, 11, 12,  //
                                      13, 14, 15,  //
                                      16, 17, 18};
-  std::vector<std::uint64_t> expected{1 | 10, 2 | 11, 3 | 12,  //
+  std::vector<std::uint64_t> C_output{1 | 10, 2 | 11, 3 | 12,  //
                                       4 | 13, 5 | 14, 6 | 15,  //
                                       7 | 16, 8 | 17, 9 | 18};
-
-  auto binder = exec::Binder(program);
-  auto executable = binder.compile();
-  binder.input(A).copy_from(input_a.data());
-  binder.input(B).copy_from(input_b.data());
-  executable->run();
-  {
-    auto view = binder.output(C).mmap_current();
-    ASSERT_THAT(view.size(), expected.size() * sizeof(expected[0]));
-    auto data = reinterpret_cast<std::uint64_t*>(view.data());
-    std::vector<std::uint64_t> actual(data, data + expected.size());
-    EXPECT_THAT(actual, ContainerEq(expected));
-  }
+  checkProgram(program, {{A, A_input}, {B, B_input}}, {{C, C_output}});
 }
 
-TEST(CppEdsl, BitLeft) {
+TEST_F(CppEdsl, BitLeft) {
   auto A = Placeholder(DType::UINT64, {3, 3});
   auto B = Placeholder(DType::UINT64, {3, 3});
   auto C = A << B;
   Program program("bit_left", {C});
 
-  std::vector<std::uint64_t> input_a{1, 2, 3,  //
+  std::vector<std::uint64_t> A_input{1, 2, 3,  //
                                      4, 5, 6,  //
                                      7, 8, 9};
-  std::vector<std::uint64_t> input_b{10, 11, 12,  //
+  std::vector<std::uint64_t> B_input{10, 11, 12,  //
                                      13, 14, 15,  //
                                      16, 17, 18};
-  std::vector<std::uint64_t> expected{1 << 10, 2 << 11, 3 << 12,  //
+  std::vector<std::uint64_t> C_output{1 << 10, 2 << 11, 3 << 12,  //
                                       4 << 13, 5 << 14, 6 << 15,  //
                                       7 << 16, 8 << 17, 9 << 18};
-
-  auto binder = exec::Binder(program);
-  auto executable = binder.compile();
-  binder.input(A).copy_from(input_a.data());
-  binder.input(B).copy_from(input_b.data());
-  executable->run();
-  {
-    auto view = binder.output(C).mmap_current();
-    ASSERT_THAT(view.size(), expected.size() * sizeof(expected[0]));
-    auto data = reinterpret_cast<std::uint64_t*>(view.data());
-    std::vector<std::uint64_t> actual(data, data + expected.size());
-    EXPECT_THAT(actual, ContainerEq(expected));
-  }
+  checkProgram(program, {{A, A_input}, {B, B_input}}, {{C, C_output}});
 }
 
-TEST(CppEdsl, BitRight) {
+TEST_F(CppEdsl, BitRight) {
   auto A = Placeholder(DType::UINT64, {3, 3});
   auto B = Placeholder(DType::UINT64, {3, 3});
   auto C = A >> B;
   Program program("bit_right", {C});
 
-  std::vector<std::uint64_t> input_a{1 << 10, 2 << 11, 3 << 12,  //
+  std::vector<std::uint64_t> A_input{1 << 10, 2 << 11, 3 << 12,  //
                                      4 << 13, 5 << 14, 6 << 15,  //
                                      7 << 16, 8 << 17, 9 << 18};
-  std::vector<std::uint64_t> input_b{10, 11, 12,  //
+  std::vector<std::uint64_t> B_input{10, 11, 12,  //
                                      13, 14, 15,  //
                                      16, 17, 18};
-  std::vector<std::uint64_t> expected{1, 2, 3,  //
+  std::vector<std::uint64_t> C_output{1, 2, 3,  //
                                       4, 5, 6,  //
                                       7, 8, 9};
-
-  auto binder = exec::Binder(program);
-  auto executable = binder.compile();
-  binder.input(A).copy_from(input_a.data());
-  binder.input(B).copy_from(input_b.data());
-  executable->run();
-  {
-    auto view = binder.output(C).mmap_current();
-    ASSERT_THAT(view.size(), expected.size() * sizeof(expected[0]));
-    auto data = reinterpret_cast<std::uint64_t*>(view.data());
-    std::vector<std::uint64_t> actual(data, data + expected.size());
-    EXPECT_THAT(actual, ContainerEq(expected));
-  }
+  checkProgram(program, {{A, A_input}, {B, B_input}}, {{C, C_output}});
 }
 
-TEST(CppEdsl, BitXor) {
+TEST_F(CppEdsl, BitXor) {
   auto A = Placeholder(DType::UINT64, {3, 3});
   auto B = Placeholder(DType::UINT64, {3, 3});
   auto C = A ^ B;
   Program program("bit_xor", {C});
 
-  std::vector<std::uint64_t> input_a{1, 2, 3,  //
+  std::vector<std::uint64_t> A_input{1, 2, 3,  //
                                      4, 5, 6,  //
                                      7, 8, 9};
-  std::vector<std::uint64_t> input_b{10, 11, 12,  //
+  std::vector<std::uint64_t> B_input{10, 11, 12,  //
                                      13, 14, 15,  //
                                      16, 17, 18};
-  std::vector<std::uint64_t> expected{1 ^ 10, 2 ^ 11, 3 ^ 12,  //
+  std::vector<std::uint64_t> C_output{1 ^ 10, 2 ^ 11, 3 ^ 12,  //
                                       4 ^ 13, 5 ^ 14, 6 ^ 15,  //
                                       7 ^ 16, 8 ^ 17, 9 ^ 18};
-
-  auto binder = exec::Binder(program);
-  auto executable = binder.compile();
-  binder.input(A).copy_from(input_a.data());
-  binder.input(B).copy_from(input_b.data());
-  executable->run();
-  {
-    auto view = binder.output(C).mmap_current();
-    ASSERT_THAT(view.size(), expected.size() * sizeof(expected[0]));
-    auto data = reinterpret_cast<std::uint64_t*>(view.data());
-    std::vector<std::uint64_t> actual(data, data + expected.size());
-    EXPECT_THAT(actual, ContainerEq(expected));
-  }
+  checkProgram(program, {{A, A_input}, {B, B_input}}, {{C, C_output}});
 }
 
-TEST(CppEdsl, Add) {
+TEST_F(CppEdsl, Add) {
   auto A = Placeholder(DType::UINT64, {3, 3});
   auto B = Placeholder(DType::UINT64, {3, 3});
   auto C = A + B;
   Program program("add", {C});
 
-  std::vector<std::uint64_t> input_a = {
+  std::vector<std::uint64_t> A_input = {
       1,
       2,
       3,
@@ -266,7 +242,7 @@ TEST(CppEdsl, Add) {
       9 + (1ULL << 40)  //
   };
 
-  std::vector<std::uint64_t> input_b = {1,
+  std::vector<std::uint64_t> B_input = {1,
                                         2 + (1UL << 12),
                                         3,
                                         4 + (1UL << 24),
@@ -276,7 +252,7 @@ TEST(CppEdsl, Add) {
                                         8 + (1ULL << 40),  //
                                         9};
 
-  std::vector<std::uint64_t> expected = {2,
+  std::vector<std::uint64_t> C_output = {2,
                                          4 + (1UL << 12),
                                          6,
                                          8 + (1UL << 24),
@@ -286,21 +262,10 @@ TEST(CppEdsl, Add) {
                                          16 + (1ULL << 32) + (1ULL << 40),
                                          18 + (1ULL << 40)};
 
-  auto binder = exec::Binder(program);
-  auto executable = binder.compile();
-  binder.input(A).copy_from(input_a.data());
-  binder.input(B).copy_from(input_b.data());
-  executable->run();
-  {
-    auto view = binder.output(C).mmap_current();
-    ASSERT_THAT(view.size(), expected.size() * sizeof(expected[0]));
-    auto data = reinterpret_cast<std::uint64_t*>(view.data());
-    std::vector<std::uint64_t> actual(data, data + expected.size());
-    EXPECT_THAT(actual, ContainerEq(expected));
-  }
+  checkProgram(program, {{A, A_input}, {B, B_input}}, {{C, C_output}});
 }
 
-TEST(CppEdsl, Dot) {
+TEST_F(CppEdsl, Dot) {
   auto A = Placeholder(DType::FLOAT32, {3, 3});
   auto B = Placeholder(DType::FLOAT32, {3, 3});
   auto C = Dot(A, B);
@@ -332,22 +297,10 @@ module {
       66.0f,  81.0f,  96.0f,   //
       102.0f, 126.0f, 150.0f,  //
   };
-
-  auto binder = exec::Binder(program);
-  auto executable = binder.compile();
-  binder.input(A).copy_from(input.data());
-  binder.input(B).copy_from(input.data());
-  executable->run();
-  {
-    auto view = binder.output(C).mmap_current();
-    ASSERT_THAT(view.size(), expected.size() * sizeof(expected[0]));
-    auto data = reinterpret_cast<float*>(view.data());
-    std::vector<float> actual(data, data + expected.size());
-    EXPECT_THAT(actual, ContainerEq(expected));
-  }
+  checkProgram(program, {{A, input}, {B, input}}, {{C, expected}});
 }
 
-TEST(CppEdsl, DoubleDot) {
+TEST_F(CppEdsl, DoubleDot) {
   auto A = Placeholder(DType::FLOAT32, {10, 20});
   auto B = Placeholder(DType::FLOAT32, {20, 30});
   auto C = Placeholder(DType::FLOAT32, {30, 40});
@@ -368,10 +321,10 @@ module {
   }
 }
 )#"));
-  exec::Binder(program).compile()->run();
+  runProgram(program);
 }
 
-TEST(CppEdsl, EltwiseAdd) {
+TEST_F(CppEdsl, EltwiseAdd) {
   auto A = Placeholder(DType::FLOAT32, {10, 20});
   auto B = Placeholder(DType::FLOAT32, {10, 20});
   Program program("eltwise_add", {A + B});
@@ -383,10 +336,10 @@ module {
   }
 }
 )#"));
-  exec::Binder(program).compile()->run();
+  runProgram(program);
 }
 
-TEST(CppEdsl, Relu) {
+TEST_F(CppEdsl, Relu) {
   auto A = Placeholder(DType::FLOAT32, {10, 20});
   Program program("relu", {Relu(A)});
   EXPECT_THAT(program, Eq(R"#(
@@ -400,10 +353,10 @@ module {
   }
 }
 )#"));
-  exec::Binder(program).compile()->run();
+  runProgram(program);
 }
 
-TEST(CppEdsl, MnistMlp) {
+TEST_F(CppEdsl, MnistMlp) {
   // model.add(Dense(512, activation='relu', input_shape=(784,)))
   auto input = Placeholder(DType::FLOAT32, {1, 784});
   auto kernel1 = Placeholder(DType::FLOAT32, {784, 512});
@@ -449,9 +402,7 @@ module {
   }
 }
 )#"));
-#if !defined(_WIN32)
-  exec::Binder(program).compile()->run();
-#endif
+  runProgram(program);
 }
 
 Tensor Convolution2(const Tensor& I, const Tensor& K) {
@@ -464,7 +415,7 @@ Tensor Convolution2(const Tensor& I, const Tensor& K) {
   return R;
 }
 
-TEST(CppEdsl, Convolution) {
+TEST_F(CppEdsl, Convolution) {
   auto I = Placeholder(DType::FLOAT32, {1, 224, 224, 1});
   auto K = Placeholder(DType::FLOAT32, {3, 3, 1, 32});
   Program program("convolution", {Convolution2(I, K)});
@@ -483,7 +434,7 @@ module {
   }
 }
 )#"));
-  exec::Binder(program).compile()->run();
+  runProgram(program);
 }
 
 Tensor MaxPooling2(const Tensor& I) {
@@ -509,7 +460,7 @@ Tensor Flatten(const Tensor& X) {
   return reshape(X, {TensorDim{1}, product});
 }
 
-TEST(CppEdsl, MnistCnn) {
+TEST_F(CppEdsl, MnistCnn) {
   // model.add(Conv2D(32, kernel_size=(3, 3), activation='relu', input_shape=input_shape))
   auto input = Placeholder(DType::FLOAT32, {1, 224, 224, 1});
   auto kernel1 = Placeholder(DType::FLOAT32, {3, 3, 1, 32});
@@ -580,7 +531,7 @@ module {
 }
 )#"));
   // TODO: error: failed to legalize operation 'tile.reshape'
-  // exec::Binder(program).compile()->run();
+  // runProgram(program);
 }
 
 Tensor Normalize(const Tensor& X) {
@@ -606,7 +557,7 @@ std::tuple<Tensor, Tensor> LarsMomentum(  //
   return std::make_tuple(X - NewVeloc, NewVeloc);
 }
 
-TEST(CppEdsl, LarsMomentum4d) {
+TEST_F(CppEdsl, LarsMomentum4d) {
   auto X_shape = LogicalShape(DType::FLOAT32, {4, 7, 3, 9});
   auto LR_shape = LogicalShape(DType::FLOAT32, {});
   auto X = Placeholder(X_shape);
@@ -649,10 +600,10 @@ module {
 }
 )#"));
   // TODO: add 'sqrt' to std and llvm dialects
-  // exec::Binder(program).compile()->run();
+  // runProgram(program);
 }
 
-TEST(CppEdsl, RepeatElements) {
+TEST_F(CppEdsl, RepeatElements) {
   auto I = Placeholder(DType::FLOAT32, {10, 10, 10});
   TensorDim N0, N1, N2;
   TensorIndex n0, n1, n2, k;
@@ -677,10 +628,10 @@ module {
   }
 }
 )#"));
-  exec::Binder(program).compile()->run();
+  runProgram(program);
 }
 
-TEST(CppEdsl, UseDefault) {
+TEST_F(CppEdsl, UseDefault) {
   auto P = Placeholder(DType::FLOAT32, {1, 7, 10, 10});
   auto I = Placeholder(DType::FLOAT32, {1, 10, 10});
   TensorDim B, N1, N2;
@@ -702,7 +653,7 @@ module {
   }
 }
 )#"));
-  exec::Binder(program).compile()->run();
+  runProgram(program);
 }
 
 Tensor ArgMax(const Tensor& I) {
@@ -720,7 +671,7 @@ Tensor ArgMax(const Tensor& I) {
   return cast(O, DType::UINT32);
 }
 
-TEST(CppEdsl, ArgMax) {
+TEST_F(CppEdsl, ArgMax) {
   auto I = Placeholder(DType::FLOAT32, {1, 10, 10});
   auto X = ArgMax(I);
   Program program("arg_max", {X});
@@ -748,7 +699,7 @@ module {
   }
 }
 )#"));
-  exec::Binder(program).compile()->run();
+  runProgram(program);
 }
 
 Tensor Winograd(const Tensor& I, const Tensor& K, const Tensor& A, const Tensor& B, const Tensor& G) {
@@ -783,7 +734,7 @@ Tensor Winograd(const Tensor& I, const Tensor& K, const Tensor& A, const Tensor&
   return O;
 }
 
-TEST(CppEdsl, Winograd) {
+TEST_F(CppEdsl, Winograd) {
   const std::int64_t N = 1, X = 224, Y = 224, CI = 3, S = 3, CO = 32, BI = 32, BO = BI - CI + 1;
   auto I = Placeholder(DType::FLOAT32, {N, X, Y, CI});
   auto K = Placeholder(DType::FLOAT32, {S, S, CI, CO});
@@ -792,10 +743,10 @@ TEST(CppEdsl, Winograd) {
   auto G = Placeholder(DType::FLOAT32, {BI, S});
   auto W = Winograd(I, K, A, B, G);
   Program program("winograd", {W});
-  exec::Binder(program).compile()->run();
+  runProgram(program);
 }
 
-TEST(CppEdsl, UniqueNames) {
+TEST_F(CppEdsl, UniqueNames) {
   LogicalShape shape(DType::FLOAT32, {1});
   auto A = Placeholder(shape, "A");
   auto B = Placeholder(shape, "B");
@@ -812,10 +763,10 @@ module {
   }
 }
 )#"));
-  exec::Binder(program).compile()->run();
+  runProgram(program);
 }
 
-TEST(CppEdsl, GlobalMin) {
+TEST_F(CppEdsl, GlobalMin) {
   auto I = Placeholder(DType::FLOAT32, {10, 10, 10}, "I");
   TensorIndex i, j, k;
   auto O_Neg = TensorOutput();
@@ -839,12 +790,10 @@ module {
   }
 }
 )#"));
-#if !defined(_WIN32)
-  exec::Binder(program).compile()->run();
-#endif
+  runProgram(program);
 }
 
-TEST(CppEdsl, CumSum) {
+TEST_F(CppEdsl, CumSum) {
   auto I = Placeholder(DType::FLOAT32, {10}, "I");
   TensorDim N;
   TensorIndex i, k;
@@ -868,7 +817,7 @@ module {
   }
 }
 )#"));
-  exec::Binder(program).compile()->run();
+  runProgram(program);
 }
 
 Tensor ComplexConv2d(              //
@@ -909,7 +858,7 @@ Tensor ComplexConv2d(              //
   return O;
 }
 
-TEST(CppEdsl, ComplexConv2d) {
+TEST_F(CppEdsl, ComplexConv2d) {
   auto I = Placeholder(DType::FLOAT32, {1, 224, 224, 3, 3});
   auto K = Placeholder(DType::FLOAT32, {3, 3, 3, 3, 32});
   auto O = ComplexConv2d(I, K, {2, 2}, {3, 3});
@@ -929,10 +878,10 @@ module {
   }
 }
 )#"));
-  exec::Binder(program).compile()->run();
+  runProgram(program);
 }
 
-TEST(CppEdsl, Reciprocal) {
+TEST_F(CppEdsl, Reciprocal) {
   auto A = Placeholder(DType::FLOAT32, {6}, "A");
   auto R = 1.0 / A;
   Program program("reciprocal", {R});
@@ -946,25 +895,12 @@ module {
   }
 }
 )#"));
-  std::vector<float> input = {1.0f, 2.0f, 4.0f, 5.0f, 8.0f, 10.0f};
+  std::vector<float> input = {1, 2, 4, 5, 8, 10};
   std::vector<float> expected = {1.0, 0.5, 0.25, 0.2, 0.125, 0.1};
-
-#if !defined(_WIN32)
-  auto binder = exec::Binder(program);
-  auto executable = binder.compile();
-  binder.input(A).copy_from(input.data());
-  executable->run();
-  {
-    auto view = binder.output(R).mmap_current();
-    ASSERT_THAT(view.size(), expected.size() * sizeof(expected[0]));
-    auto data = reinterpret_cast<float*>(view.data());
-    std::vector<float> actual(data, data + expected.size());
-    EXPECT_THAT(actual, ContainerEq(expected));
-  }
-#endif
+  checkProgram(program, {{A, input}}, {{R, expected}});
 }
 
-// TEST(CppEdsl, GradientDot) {
+// TEST_F(CppEdsl, GradientDot) {
 //   auto A = Placeholder(DType::FLOAT32, {100, 100}, "A");
 //   auto B = Placeholder(DType::FLOAT32, {100, 100}, "B");
 //   auto O = Dot(A, B);
@@ -983,7 +919,7 @@ module {
 //   _X3[i, k : 100, 100] = +(_X1[i, j] * B[k, j]);
 // }
 // )"));
-//   exec::Binder(program).compile()->run();
+//   runProgram(program);
 // }
 
 // Tensor Max2Da0(const Tensor& A) {
@@ -996,7 +932,7 @@ module {
 //   return O;
 // }
 
-// TEST(CppEdsl, GradientMultiDot) {
+// TEST_F(CppEdsl, GradientMultiDot) {
 //   auto A = Placeholder(DType::FLOAT32, {100, 100}, "A");
 //   auto B = Placeholder(DType::FLOAT32, {100, 100}, "B");
 //   auto C = Dot(A, B);
@@ -1024,10 +960,10 @@ module {
 //   _X9 = add(_X7, _X8);
 // }
 // )"));
-//   exec::Binder(program).compile()->run();
+//   runProgram(program);
 // }
 
-// TEST(CppEdsl, GradientDotSqrt) {
+// TEST_F(CppEdsl, GradientDotSqrt) {
 //   auto A = Placeholder(DType::FLOAT32, {100, 100}, "A");
 //   auto B = Placeholder(DType::FLOAT32, {100, 100}, "B");
 //   auto C = Dot(A, B);
@@ -1052,10 +988,10 @@ module {
 //   _X8[i, k : 100, 100] = +(_X6[i, j] * B[k, j]);
 // }
 // )"));
-//   exec::Binder(program).compile()->run();
+//   runProgram(program);
 // }
 
-TEST(CppEdsl, DefractLong) {
+TEST_F(CppEdsl, DefractLong) {
   std::vector<int64_t> input_shape{1, 3, 3, 1};
   std::vector<int64_t> output_shape{1, 5, 5, 1};
   auto I = Placeholder(DType::FLOAT32, input_shape, "I");
@@ -1079,19 +1015,19 @@ module {
   }
 }
 )#"));
-  exec::Binder(program).compile()->run();
+  runProgram(program);
 }
 
-TEST(CppEdsl, DupOut) {
+TEST_F(CppEdsl, DupOut) {
   auto A = Placeholder(DType::FLOAT32, {10, 20});
   auto B = Placeholder(DType::FLOAT32, {20, 30});
   auto C = Placeholder(DType::FLOAT32, {30, 40});
   auto R = Dot(Dot(A, B), C);
   Program program("dup_out", {R, R, R});
-  exec::Binder(program).compile()->run();
+  runProgram(program);
 }
 
-TEST(CppEdsl, Select) {
+TEST_F(CppEdsl, Select) {
   auto I = Placeholder(DType::FLOAT32, {10, 20});
   auto O = select(I == 0, Tensor{0}, Tensor{1});
   Program program("select", {O});
@@ -1107,10 +1043,10 @@ module {
   }
 }
 )#"));
-  exec::Binder(program).compile()->run();
+  runProgram(program);
 }
 
-TEST(CppEdsl, Shape) {
+TEST_F(CppEdsl, Shape) {
   auto I = Placeholder(DType::FLOAT32, {10, 20});
   auto O = shape(I);
   Program program("shape", {O});
@@ -1132,7 +1068,7 @@ module {
   EXPECT_THAT(data[1], 20);
 }
 
-TEST(CppEdsl, Prng) {
+TEST_F(CppEdsl, Prng) {
   auto S = Placeholder(DType::UINT32, {3, 2048});
   auto O = prng(S, {2, 3, 4, 5});
   Program program("prng", {O});
@@ -1150,7 +1086,7 @@ module {
 }
 )#"));
   // TODO: lowering for PrngOp
-  // exec::Binder(program).compile()->run();
+  // runProgram(program);
 }
 
 }  // namespace
