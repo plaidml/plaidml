@@ -35,6 +35,7 @@
 #include "pmlc/dialect/tile/ir/dialect.h"
 #include "pmlc/dialect/tile/ir/ops.h"
 #include "pmlc/dialect/tile/program.h"
+#include "pmlc/dialect/tile/transforms/passes.h"
 #include "pmlc/util/env.h"
 #include "pmlc/util/logging.h"
 #include "pmlc/util/slice.h"
@@ -576,7 +577,8 @@ struct MakeProgramPass : public mlir::FunctionPass<MakeProgramPass> {
   static std::unique_ptr<mlir::Pass> create() { return std::make_unique<MakeProgramPass>(); }
 };
 
-std::shared_ptr<TileProgram> TileBuilder::MakeProgram(StringRef name, const ProgramMutations& mutations) {
+std::shared_ptr<TileProgram> TileBuilder::MakeProgram(StringRef name, const ProgramMutations& mutations,
+                                                      util::DataType floatx, util::DataType intx) {
   if (name.empty()) {
     name = "noname";
   }
@@ -692,6 +694,7 @@ std::shared_ptr<TileProgram> TileBuilder::MakeProgram(StringRef name, const Prog
   }
   // Do some optimization passes
   mlir::PassManager pm(&impl->context);
+  pm.addPass(createConstantTypesPass(floatx, intx));
   pm.addPass(MakeProgramPass::create());
   pm.addPass(mlir::createCanonicalizerPass());
   pm.addPass(mlir::createCSEPass());

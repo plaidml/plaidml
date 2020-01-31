@@ -107,7 +107,9 @@ class TileBuilder {
   void SetUseDefault(mlir::Value cion, mlir::Value defaultValue);
   void SetNoReduce(mlir::Value cion, bool no_reduce);
 
-  std::shared_ptr<TileProgram> MakeProgram(llvm::StringRef name, const ProgramMutations& mutations);
+  std::shared_ptr<TileProgram> MakeProgram(llvm::StringRef name, const ProgramMutations& mutations,
+                                           util::DataType floatx = DataType::invalid,
+                                           util::DataType intx = DataType::invalid);
 
   void Dump();
 
