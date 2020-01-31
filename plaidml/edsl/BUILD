@@ -72,6 +72,7 @@ plaidml_cc_test(
 py_test(
     name = "py_test",
     srcs = ["edsl_test.py"],
+    args = ["-v"],
     main = "edsl_test.py",
     deps = [
         ":py",
