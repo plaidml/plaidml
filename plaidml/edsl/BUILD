@@ -16,7 +16,11 @@ exports_files([
 
 filegroup(
     name = "docs",
-    srcs = ["edsl.h"],
+    srcs = [
+        "edsl.h",
+        "edsl_doc.cc",
+        "edsl_doc.py",
+    ],
     visibility = ["//visibility:public"],
 )
 
@@ -72,6 +76,26 @@ py_test(
     main = "edsl_test.py",
     deps = [
         ":py",
+        "//plaidml/exec:py",
+    ],
+)
+
+plaidml_cc_test(
+    name = "cc_doc",
+    srcs = ["edsl_doc.cc"],
+    deps = [
+        ":edsl",
+        "//plaidml:testenv",
+        "//plaidml/exec",
+    ],
+)
+
+py_test(
+    name = "py_doc",
+    srcs = ["edsl_doc.py"],
+    main = "edsl_doc.py",
+    deps = [
+        "//plaidml/edsl:py",
         "//plaidml/exec:py",
     ],
 )
