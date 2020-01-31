@@ -168,13 +168,13 @@ class TensorShape(ForeignObject):
         ]
 
 
-class _View(ForeignObject):
-    """Docstring for class _View"""
+class View(ForeignObject):
+    """Docstring for class View"""
     __ffi_del__ = lib.plaidml_view_free
 
     def __init__(self, ffi_obj, shape):
         self.shape = shape
-        super(_View, self).__init__(ffi_obj)
+        super(View, self).__init__(ffi_obj)
 
     @property
     def data(self):
@@ -217,11 +217,11 @@ class Buffer(ForeignObject):
 
     @contextlib.contextmanager
     def mmap_current(self):
-        yield _View(ffi_call(lib.plaidml_buffer_mmap_current, self.as_ptr()), self.shape)
+        yield View(ffi_call(lib.plaidml_buffer_mmap_current, self.as_ptr()), self.shape)
 
     @contextlib.contextmanager
     def mmap_discard(self):
-        yield _View(ffi_call(lib.plaidml_buffer_mmap_discard, self.as_ptr()), self.shape)
+        yield View(ffi_call(lib.plaidml_buffer_mmap_discard, self.as_ptr()), self.shape)
 
     def as_ndarray(self):
         if self._ndarray is None:

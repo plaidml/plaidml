@@ -18,8 +18,8 @@ filegroup(
     name = "docs",
     srcs = [
         "edsl.h",
-        "edsl_doc.cc",
-        "edsl_doc.py",
+        "edsl_docs.cc",
+        "edsl_docs.py",
     ],
     visibility = ["//visibility:public"],
 )
@@ -81,8 +81,8 @@ py_test(
 )
 
 plaidml_cc_test(
-    name = "cc_doc",
-    srcs = ["edsl_doc.cc"],
+    name = "cc_docs",
+    srcs = ["edsl_docs.cc"],
     deps = [
         ":edsl",
         "//plaidml:testenv",
@@ -91,9 +91,9 @@ plaidml_cc_test(
 )
 
 py_test(
-    name = "py_doc",
-    srcs = ["edsl_doc.py"],
-    main = "edsl_doc.py",
+    name = "py_docs",
+    srcs = ["edsl_docs.py"],
+    main = "edsl_docs.py",
     deps = [
         "//plaidml/edsl:py",
         "//plaidml/exec:py",
