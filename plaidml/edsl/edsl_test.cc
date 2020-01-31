@@ -224,6 +224,22 @@ TEST_F(CppEdsl, BitXor) {
   checkProgram(program, {{A, A_input}, {B, B_input}}, {{C, C_output}});
 }
 
+TEST_F(CppEdsl, BroadcastCmp) {
+  auto A = Placeholder(DType::UINT64, {3, 4});
+  auto B = Placeholder(DType::UINT64, {3, 1});
+  auto C = cast(A >= B, DType::UINT64);
+  Program program("broadcast_cmp", {C});
+
+  std::vector<std::uint64_t> A_input = {0, 1, 2,  3,  //
+                                        4, 5, 6,  7,  //
+                                        8, 9, 10, 11};
+  std::vector<std::uint64_t> B_input = {0, 6, 12};
+  std::vector<std::uint64_t> C_output = {1, 1, 1, 1,  //
+                                         0, 0, 1, 1,  //
+                                         0, 0, 0, 0};
+  checkProgram(program, {{A, A_input}, {B, B_input}}, {{C, C_output}});
+}
+
 TEST_F(CppEdsl, Add) {
   auto A = Placeholder(DType::UINT64, {3, 3});
   auto B = Placeholder(DType::UINT64, {3, 3});
