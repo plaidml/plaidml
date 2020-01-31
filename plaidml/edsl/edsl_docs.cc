@@ -1,4 +1,3 @@
-
 // Copyright 2020 Intel Corporation.
 // Note:
 //    This file is being used by sphinx docs to pull in code blocks.
@@ -13,7 +12,7 @@
 namespace plaidml::edsl {
 
 // sum_over_axis_start
-Tensor SumOveAxis(const Tensor& I) {
+Tensor SumOverAxis(const Tensor& I) {
   TensorDim M, N;
   TensorIndex m, n;
   I.bind_dims(M, N);
@@ -239,7 +238,7 @@ Tensor ComplexConv2D(const Tensor& I, const Tensor& K,
 
 TEST(DocCppEdsl, SumOveAxis) {
   auto I = Placeholder(DType::UINT64, {3, 3});
-  Program program("sum_over_axis", {SumOveAxis(I)});
+  Program program("sum_over_axis", {SumOverAxis(I)});
 }
 
 TEST(DocCppEdsl, MaxOverAxis) {
@@ -321,4 +320,5 @@ TEST(DocCppEdsl, ComplexConv2d) {
   auto O = ComplexConv2D(I, K, {2, 2}, {3, 3});
   Program program("complex_conv_2d", {O});
 }
+
 }  // namespace plaidml::edsl

@@ -40,7 +40,7 @@ Objects
          :members:
       .. autoclass:: plaidml.core.TensorShape
          :members:
-      .. autoclass:: plaidml.core._View
+      .. autoclass:: plaidml.core.View
          :members:
       .. autoclass:: plaidml.core.Buffer
          :members:

@@ -136,7 +136,7 @@ def skip(I):
     return O
 
 
-def csum(I):
+def cumsum(I):
     N = TensorDim()
     i, k = TensorIndexes(2)
     I.bind_dims(N)

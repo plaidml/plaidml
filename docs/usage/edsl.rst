@@ -33,14 +33,14 @@ sum over axis `0` of a 2D tensor (in Keras this would be ``K.sum(I, axis=0)``):
 
    .. group-tab:: C++
 
-      .. literalinclude:: ../../plaidml/edsl/edsl_doc.cc
+      .. literalinclude:: ../../plaidml/edsl/edsl_docs.cc
         :language: cpp
         :start-after: sum_over_axis_start
         :end-before: sum_over_axis_end
 
    .. group-tab:: Python
 
-      .. literalinclude:: ../../plaidml/edsl/edsl_doc.py
+      .. literalinclude:: ../../plaidml/edsl/edsl_docs.py
         :pyobject: sum_over_axis
 
 An operation such as this which merges together values across one or more
@@ -106,14 +106,14 @@ change from sum over axis ``0``. Let's look at it as a Tile function:
 
   .. group-tab:: C++
 
-      .. literalinclude:: ../../plaidml/edsl/edsl_doc.cc
+      .. literalinclude:: ../../plaidml/edsl/edsl_docs.cc
         :language: cpp
         :start-after: max_over_axis_start
         :end-before: max_over_axis_end
 
   .. group-tab:: Python
 
-      .. literalinclude:: ../../plaidml/edsl/edsl_doc.py
+      .. literalinclude:: ../../plaidml/edsl/edsl_docs.py
         :pyobject: max_over_axis
 
 Again, this corresponds closely to mathematical notation:
@@ -169,14 +169,14 @@ function:
 
   .. group-tab:: C++
   
-    .. literalinclude:: ../../plaidml/edsl/edsl_doc.cc
+    .. literalinclude:: ../../plaidml/edsl/edsl_docs.cc
         :language: cpp
         :start-after: matmul_start
         :end-before: matmul_end
 
   .. group-tab:: Python
     
-      .. literalinclude:: ../../plaidml/edsl/edsl_doc.py
+      .. literalinclude:: ../../plaidml/edsl/edsl_docs.py
         :pyobject: matmul
 
 Notice that we use ``bind_dims`` on inputs and we use ``TensorOutput`` on
@@ -199,14 +199,14 @@ as follows:
   
   .. group-tab:: C++
 
-      .. literalinclude:: ../../plaidml/edsl/edsl_doc.cc
+      .. literalinclude:: ../../plaidml/edsl/edsl_docs.cc
         :language: cpp
         :start-after: global_min_start
         :end-before: global_min_end
 
   .. group-tab:: Python
 
-      .. literalinclude:: ../../plaidml/edsl/edsl_doc.py
+      .. literalinclude:: ../../plaidml/edsl/edsl_docs.py
         :pyobject: global_min
 
 
@@ -238,14 +238,14 @@ write:
   
   .. group-tab:: C++
 
-    .. literalinclude:: ../../plaidml/edsl/edsl_doc.cc
+    .. literalinclude:: ../../plaidml/edsl/edsl_docs.cc
       :language: cpp
       :start-after: avg_start
       :end-before: avg_end
 
   .. group-tab:: Python
 
-    .. literalinclude:: ../../plaidml/edsl/edsl_doc.py
+    .. literalinclude:: ../../plaidml/edsl/edsl_docs.py
       :pyobject: avg
 
 We can perform multiple elementwise operations on the same line, including
@@ -256,14 +256,14 @@ take a global mean of a 2D tensor in stages as so:
   
   .. group-tab:: C++
 
-    .. literalinclude:: ../../plaidml/edsl/edsl_doc.cc
+    .. literalinclude:: ../../plaidml/edsl/edsl_docs.cc
       :language: cpp
       :start-after: avg_stages_start
       :end-before: avg_stages_end
 
   .. group-tab:: Python
 
-    .. literalinclude:: ../../plaidml/edsl/edsl_doc.py
+    .. literalinclude:: ../../plaidml/edsl/edsl_docs.py
       :pyobject: avg_stages
 
 it is more straightforward to merge the elementwise operations:
@@ -272,14 +272,14 @@ it is more straightforward to merge the elementwise operations:
 
   .. group-tab:: C++
 
-   .. literalinclude:: ../../plaidml/edsl/edsl_doc.cc
+   .. literalinclude:: ../../plaidml/edsl/edsl_docs.cc
       :language: cpp
       :start-after: avg_merge_start
       :end-before: avg_merge_end
 
   .. group-tab:: Python
     
-    .. literalinclude:: ../../plaidml/edsl/edsl_doc.py
+    .. literalinclude:: ../../plaidml/edsl/edsl_docs.py
       :pyobject: avg_merge
 
 Max Pool 1D
@@ -294,14 +294,14 @@ implement in straight C++/Python:
 
   .. group-tab:: C++
 
-    .. literalinclude:: ../../plaidml/edsl/edsl_doc.cc
+    .. literalinclude:: ../../plaidml/edsl/edsl_docs.cc
       :language: cpp
       :start-after: for_loop_max_pool_start
       :end-before: for_loop_max_pool_end
     
   .. group-tab:: Python
 
-      .. literalinclude:: ../../plaidml/edsl/edsl_doc.py
+      .. literalinclude:: ../../plaidml/edsl/edsl_docs.py
         :start-after: for_loop_max_pool_1d_start
         :end-before: for_loop_max_pool_1d_end
 
@@ -313,14 +313,14 @@ Tile. The most direct (and, sadly, wrong) implementation in Tile is:
 
   .. group-tab:: C++
 
-    .. literalinclude:: ../../plaidml/edsl/edsl_doc.cc
+    .. literalinclude:: ../../plaidml/edsl/edsl_docs.cc
       :language: cpp
       :start-after: wrong_max_pool_start
       :end-before: wrong_max_pool_end
 
   .. group-tab:: Python
 
-    .. literalinclude:: ../../plaidml/edsl/edsl_doc.py
+    .. literalinclude:: ../../plaidml/edsl/edsl_docs.py
       :pyobject: wrong_max_pool_1d
 
 If you were to run this code, every entry of ``O`` would equal the global max of
@@ -339,14 +339,14 @@ When can use ``add_constraint`` in Tile to handle such situations:
 
   .. group-tab:: C++
 
-    .. literalinclude:: ../../plaidml/edsl/edsl_doc.cc
+    .. literalinclude:: ../../plaidml/edsl/edsl_docs.cc
       :language: cpp
       :start-after: max_pool_1d_start
       :end-before: max_pool_1d_end
 
   .. group-tab:: Python
 
-    .. literalinclude:: ../../plaidml/edsl/edsl_doc.py
+    .. literalinclude:: ../../plaidml/edsl/edsl_docs.py
       :pyobject: max_pool_1d
 
 Something important to note here is that while we wrote ``j < 2``, this constraint
@@ -385,14 +385,14 @@ pool at the edge. This can be accomplished by simply adjusting the size of ``O``
 
   .. group-tab:: C++
 
-    .. literalinclude:: ../../plaidml/edsl/edsl_doc.cc
+    .. literalinclude:: ../../plaidml/edsl/edsl_docs.cc
       :language: cpp
       :start-after: max_pool_1d_odd_start
       :end-before: max_pool_1d_odd_end
 
   .. group-tab:: Python
 
-    .. literalinclude:: ../../plaidml/edsl/edsl_doc.py
+    .. literalinclude:: ../../plaidml/edsl/edsl_docs.py
       :pyobject: max_pool_1d_odd
 
 No special handling is needed for the case ``i = (N - 1) / 2``, ``j = 1``; this is
@@ -413,14 +413,14 @@ or invalid set of index variables. For example, in the code:
 
   .. group-tab:: C++
 
-    .. literalinclude:: ../../plaidml/edsl/edsl_doc.cc
+    .. literalinclude:: ../../plaidml/edsl/edsl_docs.cc
       :language: cpp
       :start-after: valid_indices_start
       :end-before: valid_indices_end
     
   .. group-tab:: Python
 
-    .. literalinclude:: ../../plaidml/edsl/edsl_doc.py
+    .. literalinclude:: ../../plaidml/edsl/edsl_docs.py
       :start-after: valid_indices_start
       :end-before: valid_indices_end
 
@@ -452,14 +452,14 @@ otherwise valid entries. For example, consider the Tile function:
   
   .. group-tab:: C++
 
-    .. literalinclude:: ../../plaidml/edsl/edsl_doc.cc
+    .. literalinclude:: ../../plaidml/edsl/edsl_docs.cc
       :language: cpp
       :start-after: skip_start
       :end-before: skip_end
   
   .. group-tab:: Python
 
-    .. literalinclude:: ../../plaidml/edsl/edsl_doc.py
+    .. literalinclude:: ../../plaidml/edsl/edsl_docs.py
       :pyobject: skip
 
 This operation only writes to even entries of ``O``; while ``i = 1/2`` , ``j = 1`` does
@@ -489,15 +489,15 @@ and so ``N`` is an appropriate upper bound. The resulting Tile code is:
 
     .. group-tab:: C++
 
-      .. literalinclude:: ../../plaidml/edsl/edsl_doc.cc
+      .. literalinclude:: ../../plaidml/edsl/edsl_docs.cc
         :language: cpp
         :start-after: cumsum_start
         :end-before: cumsum_end
 
     .. group-tab:: Python
 
-      .. literalinclude:: ../../plaidml/edsl/edsl_doc.py
-        :pyobject: csum
+      .. literalinclude:: ../../plaidml/edsl/edsl_docs.py
+        :pyobject: cumsum
 
 Convolution
 ===========
@@ -563,14 +563,14 @@ the kernel size relative to the spatial dimension of the input:
 
   .. group-tab:: C++
 
-    .. literalinclude:: ../../plaidml/edsl/edsl_doc.cc
+    .. literalinclude:: ../../plaidml/edsl/edsl_docs.cc
       :language: cpp
       :start-after: conv_1d_start
       :end-before: conv_1d_end
 
   .. group-tab:: Python
 
-    .. literalinclude:: ../../plaidml/edsl/edsl_doc.py
+    .. literalinclude:: ../../plaidml/edsl/edsl_docs.py
       :pyobject: conv_1d
 
 
@@ -609,14 +609,14 @@ directly to the formula, and so we get:
 
   .. group-tab:: C++
 
-    .. literalinclude:: ../../plaidml/edsl/edsl_doc.cc
+    .. literalinclude:: ../../plaidml/edsl/edsl_docs.cc
       :language: cpp
       :start-after: conv_2d_dilated_start
       :end-before: conv_2d_dilated_end
 
   .. group-tab:: Python
 
-    .. literalinclude:: ../../plaidml/edsl/edsl_doc.py
+    .. literalinclude:: ../../plaidml/edsl/edsl_docs.py
       :pyobject: conv_2d_dilated
 
 Complex Convolution
@@ -634,21 +634,21 @@ This final example demonstrates a strided dilated padded grouped convolution.
   )
   \end{aligned}
 
-where *`s`* gives the stride coefficients, *`d`* gives the dilation
-coefficients, and *`P`* gives the padding offsets.
+where ``s`` gives the stride coefficients, ``d`` gives the dilation
+coefficients, and ``P`` gives the padding offsets.
 
 .. tabs::
 
   .. group-tab:: C++
 
-    .. literalinclude:: ../../plaidml/edsl/edsl_doc.cc
+    .. literalinclude:: ../../plaidml/edsl/edsl_docs.cc
       :language: cpp
       :start-after: complex_conv_start
       :end-before: complex_conv_end
 
   .. group-tab:: Python
 
-    .. literalinclude:: ../../plaidml/edsl/edsl_doc.py
+    .. literalinclude:: ../../plaidml/edsl/edsl_docs.py
       :pyobject: complex_conv_2d
 
 
