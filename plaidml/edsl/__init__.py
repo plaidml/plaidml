@@ -600,38 +600,25 @@ def TensorIndexes(count):
     return [TensorIndex() for i in range(count)]
 
 
-def Placeholder(*args, **kwargs):
+def Placeholder(dtype_or_shape, dims=[], name=''):
     """Creates a placeholder tensor, specified either by a combination of data
        type and dimensions or by passing in a LogicalShape.
 
         Args:
-            dtype (DType): Specifies the data type of the ``Placeholder``.
+            dtype_or_shape (DType | LogicalShape): Specifies either the data 
+            type or the logical shape of the ``Placeholder``.
             dims (list): Specifies the dimensions of the ``Placeholder``.
-            shape (LogicalShape): Specifies the shape of the ``Placeholder``.
- 
-        Keyword Args:
             name (string): Optional name to be assigned to the ``Tensor``.
 
         Returns:
             (Tensor): The placeholder ``Tensor``.
 
     """
-    name = ""
-    if "name" in kwargs.keys():
-        name = kwargs["name"]
-    if args and isinstance(args[0], LogicalShape):
-        shape = args[0]
+    if isinstance(dtype_or_shape, LogicalShape):
+        shape = dtype_or_shape
     else:
-        dtype = None
-        dims = []
-        for arg in args:
-            if isinstance(arg, DType):
-                dtype = arg
-            if isinstance(arg, list):
-                dims = arg
-        shape = LogicalShape(dtype=dtype, dims=dims)
-    ptr = ffi_call(lib.plaidml_expr_placeholder, shape.as_ptr(), ffi.NULL, name.encode())
-    return Tensor(expr=ptr)
+        shape = LogicalShape(dtype=dtype_or_shape, dims=dims)
+    return Tensor(shape=shape, name=name)
 
 
 class ProgramArgument:
