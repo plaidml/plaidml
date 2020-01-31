@@ -264,6 +264,18 @@ class TestEdsl(unittest.TestCase):
         for i in range(len(expected)):
             self.assertEqual(outputs[i].tolist(), expected[i])
 
+    def test_broadcast_cmp(self):
+        A = Tensor(LogicalShape(plaidml.DType.UINT64, [3, 4]))
+        B = Tensor(LogicalShape(plaidml.DType.UINT64, [3, 1]))
+        O = cast(A >= B, DType.UINT64)
+
+        program = Program('broadcast_cmp', [O])
+        self.checkProgram(program, [
+            (A, np.array([[0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11]])), (B, np.array([[0], [6], [12]])),
+        ], [
+            [[1, 1, 1, 1], [0, 0, 1, 1], [0, 0, 0, 0]],
+        ])
+
     def test_higher_precision_constants_invalid_negative(self):
         I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [3, 3]))
         O = I * (-2)

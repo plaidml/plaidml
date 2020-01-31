@@ -458,11 +458,16 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
         // handle broadcasts
         auto operandType = operand.getType().cast<MemRefType>();
         assert(operandType.getRank() <= resultMemRefType.getRank() && "result rank < operand rank");
+        auto op_shape = operandType.getShape();
         SmallVector<Value, 8> operandIdxs(operandType.getRank());
         for (unsigned i = 0; i < operandType.getRank(); i++) {
           unsigned j = resultMemRefType.getRank() - i - 1;
           unsigned k = operandType.getRank() - i - 1;
-          operandIdxs[k] = body->getArgument(j);
+          if (op_shape[k] == 1) {
+            operandIdxs[k] = rewriter.create<AffineConstantOp>(loc, 0);
+          } else {
+            operandIdxs[k] = body->getArgument(j);
+          }
         }
         scalars.push_back(rewriter.create<AffineLoadOp>(loc, operand, operandIdxs));
       }
