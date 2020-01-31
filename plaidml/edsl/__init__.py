@@ -616,8 +616,11 @@ def Placeholder(dtype_or_shape, dims=[], name=''):
     """
     if isinstance(dtype_or_shape, LogicalShape):
         shape = dtype_or_shape
-    else:
+    elif isinstance(dtype_or_shape, DType):
         shape = LogicalShape(dtype=dtype_or_shape, dims=dims)
+    else:
+        raise TypeError('Unsupported type {} for dtype_or_shape={}'.format(
+            type(dtype_or_shape), dtype_or_shape))
     return Tensor(shape=shape, name=name)
 
 
