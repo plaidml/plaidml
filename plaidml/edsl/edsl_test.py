@@ -270,7 +270,6 @@ class TestEdsl(unittest.TestCase):
         O = cast(A >= B, DType.UINT64)
 
         program = Program('broadcast_cmp', [O])
-        0, 0, 0, 0, 1, 2, 3, 4, 0, 5, 0, 6
         self.checkProgram(program, [
             (A, np.array([[0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11]])), (B, np.array([[0], [6], [12]])),
         ], [
