@@ -1,9 +1,7 @@
-# Copyright 2019 Intel Corporation.
+# Copyright 2019 Intel Corporation
 
-import argparse
 import functools
-import os
-import sys
+import platform
 import unittest
 
 import plaidml
@@ -255,8 +253,16 @@ def csum(I):
 class TestEdsl(unittest.TestCase):
     maxDiff = None
 
-    def compare_results(self, program, expected):
+    def assertMultiLineEqualsStripped(self, program, expected):
         self.assertMultiLineEqual(str(program).strip(), expected.strip())
+
+    def checkProgram(self, program, inputs, expected):
+        if platform.system() == 'Windows':
+            # the Orc JIT in LLVM is currently broken on windows.
+            return
+        outputs = plaidml.exec.run(program, inputs)
+        for i in range(len(expected)):
+            self.assertEqual(outputs[i].tolist(), expected[i])
 
     def test_higher_precision_constants_invalid_negative(self):
         I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [3, 3]))
@@ -291,10 +297,12 @@ module {
   }
 }
 '''
-        self.compare_results(program, expected)
-
-        outputs = plaidml.exec.run(program, [(I, np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9]]))])
-        self.assertEqual(outputs[0].tolist(), [[4, 5, 6], [7, 8, 9], [10, 11, 12]])
+        self.assertMultiLineEqualsStripped(program, expected)
+        self.checkProgram(program, [
+            (I, np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9]])),
+        ], [
+            [[4, 5, 6], [7, 8, 9], [10, 11, 12]],
+        ])
 
     def test_sum_over_axis(self):
         I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 784]))
@@ -314,7 +322,7 @@ module {
   }
 }
 '''
-        self.compare_results(program, expected)
+        self.assertMultiLineEqualsStripped(program, expected)
 
     def test_max_over_axis(self):
         I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 784]))
@@ -334,7 +342,7 @@ module {
   }
 }
 '''
-        self.compare_results(program, expected)
+        self.assertMultiLineEqualsStripped(program, expected)
 
     def test_matmul(self):
         A = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 784]))
@@ -356,7 +364,7 @@ module {
   }
 }
 '''
-        self.compare_results(program, expected)
+        self.assertMultiLineEqualsStripped(program, expected)
 
     def test_avg(self):
         I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 784]))
@@ -376,7 +384,7 @@ module {
   }
 }
 '''
-        self.compare_results(program, expected)
+        self.assertMultiLineEqualsStripped(program, expected)
 
     def test_avg_stages(self):
         I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 784]))
@@ -398,7 +406,7 @@ module {
   }
 }
 '''
-        self.compare_results(program, expected)
+        self.assertMultiLineEqualsStripped(program, expected)
 
     def test_avg_merge(self):
         I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 784]))
@@ -420,7 +428,7 @@ module {
   }
 }
 '''
-        self.compare_results(program, expected)
+        self.assertMultiLineEqualsStripped(program, expected)
 
     def test_max_pool_1d(self):
         I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [10]), name='I')
@@ -441,7 +449,7 @@ module {
   }
 }
 '''
-        self.compare_results(program, expected)
+        self.assertMultiLineEqualsStripped(program, expected)
 
     def test_skip(self):
         I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 784]))
@@ -461,7 +469,7 @@ module {
   }
 }
 '''
-        self.compare_results(program, expected)
+        self.assertMultiLineEqualsStripped(program, expected)
 
     def test_conv_1d(self):
         I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 224, 3]))
@@ -483,7 +491,7 @@ module {
   }
 }
 '''
-        self.compare_results(program, expected)
+        self.assertMultiLineEqualsStripped(program, expected)
 
     def test_conv_2d_dilated(self):
         I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 224, 224, 1]))
@@ -505,7 +513,7 @@ module {
   }
 }
 '''
-        self.compare_results(program, expected)
+        self.assertMultiLineEqualsStripped(program, expected)
 
     def test_complex_conv_2d(self):
         I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 224, 224, 3, 3]))
@@ -527,7 +535,7 @@ module {
   }
 }
 '''
-        self.compare_results(program, expected)
+        self.assertMultiLineEqualsStripped(program, expected)
 
     @unittest.skip(
         'TODO: currently segfaults mismatched dimensions error needs to be printed correctly')
@@ -537,7 +545,7 @@ module {
         O = complex_conv_2d(I, K, 1, 2, 1, 2)
         program = Program('complex_conv_2d', [O])
         # expected = '''?'''
-        # self.compare_results(program, expected)
+        # self.assertMultiLineEqualsStripped(program, expected)
 
     def test_mnist_mlp(self):
         # model.add(Dense(512, activation='relu', input_shape=(784,)))
@@ -585,7 +593,7 @@ module {
   }
 }
 '''
-        self.compare_results(program, expected)
+        self.assertMultiLineEqualsStripped(program, expected)
 
     def test_mnist_cnn(self):
         # model.add(Conv2D(32, kernel_size=(3, 3), activation='relu', input_shape=input_shape))
@@ -656,7 +664,7 @@ module {
   }
 }
 '''
-        self.compare_results(program, expected)
+        self.assertMultiLineEqualsStripped(program, expected)
 
     def test_arg_max(self):
         I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 10, 10]))
@@ -684,7 +692,7 @@ module {
   }
 }
 '''
-        self.compare_results(program, expected)
+        self.assertMultiLineEqualsStripped(program, expected)
 
     def test_global_min(self):
         I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [10, 10, 10]), name='I')
@@ -706,7 +714,7 @@ module {
   }
 }
 '''
-        self.compare_results(program, expected)
+        self.assertMultiLineEqualsStripped(program, expected)
 
     def test_cum_sum(self):
         I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [10]), name='I')
@@ -727,7 +735,7 @@ module {
   }
 }
 '''
-        self.compare_results(program, expected)
+        self.assertMultiLineEqualsStripped(program, expected)
 
     def test_invalid_shape_error(self):
         O = TensorOutput(TensorDims(3))
@@ -753,7 +761,7 @@ module {
   }
 }
 '''
-        self.compare_results(program, expected)
+        self.assertMultiLineEqualsStripped(program, expected)
 
     def test_lars_momentum4d(self):
         X_shape = LogicalShape(plaidml.DType.FLOAT32, [4, 7, 3, 9])
@@ -797,7 +805,7 @@ module {
   }
 }
 '''
-        self.compare_results(program, expected)
+        self.assertMultiLineEqualsStripped(program, expected)
 
     def test_repeat_elts(self):
         I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [10, 10, 10]))
@@ -824,7 +832,7 @@ module {
   }
 }
 '''
-        self.compare_results(program, expected)
+        self.assertMultiLineEqualsStripped(program, expected)
 
     def test_use_default(self):
         P = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 7, 10, 10]))
@@ -848,7 +856,7 @@ module {
   }
 }
 '''
-        self.compare_results(program, expected)
+        self.assertMultiLineEqualsStripped(program, expected)
 
     @unittest.skip('TODO: Finish bounds pass')
     def test_defract(self):
@@ -873,10 +881,13 @@ module {
   }
 }
 '''
-        self.compare_results(program, expected)
-
-        outputs = plaidml.exec.run(program, [(I, np.array([1, 2, 3])), (K, np.array([1, 2, 3]))])
-        self.assertEqual(outputs[0].tolist(), [2, 5, 4, 9, 6])
+        self.assertMultiLineEqualsStripped(program, expected)
+        self.checkProgram(program, [
+            (I, np.array([1, 2, 3])),
+            (K, np.array([1, 2, 3])),
+        ], [
+            [2, 5, 4, 9, 6],
+        ])
 
     @unittest.skip('TODO: Finish bounds pass')
     def test_defract_short(self):
@@ -899,9 +910,12 @@ module {
   }
 }
 '''
-        self.compare_results(program, expected)
-        outputs = plaidml.exec.run(program, [(I, np.array([1, 2, 3]))])
-        self.assertEqual(outputs[0].tolist(), [0, 1, 0, 2, 0, 3])
+        self.assertMultiLineEqualsStripped(program, expected)
+        self.checkProgram(program, [
+            (I, np.array([1, 2, 3])),
+        ], [
+            [0, 1, 0, 2, 0, 3],
+        ])
 
     @unittest.skip('TODO: Finish bounds pass')
     def test_defract_long(self):
@@ -928,8 +942,8 @@ module {
   }
 }
 '''
-        self.compare_results(program, expected)
-        outputs = plaidml.exec.run(program, [
+        self.assertMultiLineEqualsStripped(program, expected)
+        self.checkProgram(program, [
             (I, np.array([[
                 [[1], [3], [-1]],
                 [[0], [2], [4]],
@@ -940,16 +954,13 @@ module {
                 [[6], [-3], [-1]],
                 [[-1], [-2], [1]],
             ]])),
-        ])
-        np.testing.assert_array_equal(
-            outputs[0],
-            np.array([[
-                [[0], [0], [0], [0], [0]],
-                [[0], [4], [12], [6], [24]],
-                [[0], [0], [0], [0], [0]],
-                [[6], [-3], [-6], [-3], [-12]],
-                [[0], [0], [0], [0], [0]],
-            ]]))
+        ], [[[
+            [[0], [0], [0], [0], [0]],
+            [[0], [4], [12], [6], [24]],
+            [[0], [0], [0], [0], [0]],
+            [[6], [-3], [-6], [-3], [-12]],
+            [[0], [0], [0], [0], [0]],
+        ]]])
 
     @unittest.skip('FIXME')
     def test_funky_names(self):
@@ -981,9 +992,13 @@ module {
   }
 }
 '''
-        self.compare_results(program, expected)
-        outputs = plaidml.exec.run(program, [(I, np.array([1, 2, 3])), (K, np.array([1, 2, 3]))])
-        self.assertEqual(outputs[0].tolist(), [2, 5, 4, 9, 6])
+        self.assertMultiLineEqualsStripped(program, expected)
+        self.checkProgram(program, [
+            (I, np.array([1, 2, 3])),
+            (K, np.array([1, 2, 3])),
+        ], [
+            [2, 5, 4, 9, 6],
+        ])
 
     def test_identity(self):
         I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [3]), name='I')
@@ -996,9 +1011,12 @@ module {
   }
 }
 '''
-        self.compare_results(program, expected)
-        outputs = plaidml.exec.run(program, [(I, np.array([(1, 2, 3)]))])
-        self.assertEqual(outputs[0].tolist(), [1, 2, 3])
+        self.assertMultiLineEqualsStripped(program, expected)
+        self.checkProgram(program, [
+            (I, np.array([(1, 2, 3)])),
+        ], [
+            [1, 2, 3],
+        ])
 
     @unittest.skip('TODO: exception needs to be thrown')
     def test_assignment_exceptions(self):
@@ -1026,18 +1044,17 @@ module {
   }
 }
 '''
-        self.compare_results(program, expected)
-        outputs = plaidml.exec.run(program, [
+        self.assertMultiLineEqualsStripped(program, expected)
+        self.checkProgram(program, [
             (A, np.array([[1], [2], [3], [4], [5]])),
             (B, np.array([1, 2, 3, 4, 5])),
-        ])
-        self.assertEqual(outputs[0].tolist(), [
+        ], [[
             [1., 2., 3., 4., 5.],
             [2., 4., 6., 8., 10.],
             [3., 6., 9., 12., 15.],
             [4., 8., 12., 16., 20.],
             [5., 10., 15., 20., 25.],
-        ])
+        ]])
 
         O = TensorOutput(L, N)
         O[i, j] = B[i, k] * A[k, j]
@@ -1057,20 +1074,24 @@ module {
   }
 }
 '''
-        self.compare_results(program1, expected)
-
-        outputs = plaidml.exec.run(program1, [(I, np.array([(1, 2, 3)]))])
-        self.assertEqual(outputs[0].tolist(), [1, 2, 3])
-        self.assertEqual(outputs[1].tolist(), [1, 2, 3])
+        self.assertMultiLineEqualsStripped(program1, expected)
+        self.checkProgram(program1, [
+            (I, np.array([(1, 2, 3)])),
+        ], [
+            [1, 2, 3],
+            [1, 2, 3],
+        ])
 
         O1 = I
         O2 = I
         program2 = Program('two_outputs', [O1, O2])
         self.assertMultiLineEqual(str(program1), str(program2))
-
-        outputs = plaidml.exec.run(program2, [(I, np.array([(1, 2, 3)]))])
-        self.assertEqual(outputs[0].tolist(), [1, 2, 3])
-        self.assertEqual(outputs[1].tolist(), [1, 2, 3])
+        self.checkProgram(program2, [
+            (I, np.array([(1, 2, 3)])),
+        ], [
+            [1, 2, 3],
+            [1, 2, 3],
+        ])
 
 
 if __name__ == '__main__':
