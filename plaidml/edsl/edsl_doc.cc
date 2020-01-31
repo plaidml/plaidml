@@ -1,22 +1,15 @@
 
 // Copyright 2020 Intel Corporation.
-// DO NOT TOUCH THIS FILE
-// Note: This file is being used by sphinx docs to pull in code blocks.
-//       Any changes made here may upset the docs.
-//       Code blocks are pulled into docs/usage/writing_edsl.rst if line numbers change here
-//       please update docs/usage/edsl.rst
+// Note:
+//      This file is being used by sphinx docs to pull in code blocks.
+//      Code blocks are pulled into docs/usage/writing_edsl.rs
+//      Any changes made here may upset the docs.
+
 #include <float.h>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
 #include "plaidml/edsl/edsl.h"
-#include "plaidml/exec/exec.h"
-#include "pmlc/util/env.h"
-#include "pmlc/util/logging.h"
-#include "llvm/ADT/StringRef.h"
-
-using ::testing::ContainerEq;
-using ::testing::Eq;
 
 namespace plaidml::edsl {
 
@@ -245,91 +238,85 @@ Tensor ComplexConv2D(const Tensor& I, const Tensor& K,
 }
 // complex_conv_end
 
-TEST(CppEdsl, SumOveAxis) {
+TEST(DocCppEdsl, SumOveAxis) {
   auto I = Placeholder(DType::UINT64, {3, 3});
   Program program("sum_over_axis", {SumOveAxis(I)});
 }
 
-TEST(CppEdsl, MaxOveAxis) {
+TEST(DocCppEdsl, MaxOverAxis) {
   auto I = Placeholder(DType::UINT64, {3, 3});
   Program program("max_over_axis", {MaxOverAxis(I)});
 }
 
-TEST(CppEdsl, MatMul) {
+TEST(DocCppEdsl, MatMul) {
   auto A = Placeholder(DType::UINT64, {3, 3});
   auto B = Placeholder(DType::UINT64, {3, 3});
   Program program("mat_mul", {MatMul(A, B)});
 }
 
-TEST(CppEdsl, GlobalMin) {
+TEST(DocCppEdsl, GlobalMin) {
   auto I = Placeholder(DType::FLOAT32, {10, 10, 10}, "I");
   Program program("global_min", {GlobalMin(I)});
 }
 
-TEST(CppEdsl, Avg) {
+TEST(DocCppEdsl, Avg) {
   auto I = Placeholder(DType::UINT64, {3, 3});
   Program program("avg", {Avg(I)});
 }
 
-TEST(CppEdsl, AvgStages) {
+TEST(DocCppEdsl, AvgStages) {
   auto I = Placeholder(DType::UINT64, {3, 3});
   Program program("avg_stages", {AvgStages(I)});
 }
 
-TEST(CppEdsl, AvgMerge) {
+TEST(DocCppEdsl, AvgMerge) {
   auto I = Placeholder(DType::UINT64, {3, 3});
   Program program("avg_merge", {AvgMerge(I)});
 }
 
-TEST(CppEdsl, WrongMaxPool1D) {
+TEST(DocCppEdsl, WrongMaxPool1D) {
   auto I = Placeholder(DType::UINT64, {3, 3});
   Program program("wrong_max_pool_1d", {WrongMaxPool1D(I)});
 }
 
-TEST(CppEdsl, ForLoopMaxPool1D) {
-  int N = 10;
-  float I[N], O[N / 2];
-  ForLoopMaxPool1D(I, O, N);
-}
-
-TEST(CppEdsl, ValidIndices) {
+TEST(DocCppEdsl, ValidIndices) {
   auto I = Placeholder(DType::UINT64, {3, 3});
   Program program("valid_indices", {ValidIndices(I)});
 }
 
-TEST(CppEdsl, MaxPool1D) {
+TEST(DocCppEdsl, MaxPool1D) {
   auto I = Placeholder(DType::UINT64, {3, 3});
   Program program("max_pool_1d", {MaxPool1D(I)});
 }
 
-TEST(CppEdsl, MaxPool1DOdd) {
+TEST(DocCppEdsl, MaxPool1DOdd) {
   auto I = Placeholder(DType::UINT64, {3, 3});
   Program program("max_poo_1d_odd", {MaxPool1DOdd(I)});
 }
 
-TEST(CppEdsl, Skip) {
+TEST(DocCppEdsl, Skip) {
   auto I = Placeholder(DType::UINT64, {3, 3});
   Program program("skip", {Skip(I)});
 }
 
-TEST(CppEdsl, CumSum) {
+TEST(DocCppEdsl, CumSum) {
   auto I = Placeholder(DType::FLOAT32, {10}, "I");
   Program program("cumsum", {CumSum(I)});
 }
 
-TEST(CppEdsl, Conv1D) {
+TEST(DocCppEdsl, Conv1D) {
   auto I = Placeholder(DType::UINT64, {1, 244, 3});
   auto K = Placeholder(DType::UINT64, {3, 3, 1});
   Program program("conv_1d", {Conv1D(I, K)});
 }
 
-TEST(CppEdsl, Conv2DDilated) {
+TEST(DocCppEdsl, Conv2DDilated) {
   auto I = Placeholder(DType::UINT64, {1, 244, 244, 1});
   auto K = Placeholder(DType::UINT64, {3, 3, 1, 32});
   Program program("conv_2d_dilated", {Conv2DDilated(I, K)});
 }
 
-TEST(CppEdsl, ComplexConv2d) {
+TEST(DocCppEdsl, ComplexConv2d) {
   auto I = Placeholder(DType::FLOAT32, {1, 224, 224, 3, 3});
   auto K = Placeholder(DType::FLOAT32, {3, 3, 3, 3, 32});
   auto O = ComplexConv2D(I, K, {2, 2}, {3, 3});

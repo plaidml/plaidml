@@ -83,8 +83,8 @@ plaidml_cc_test(
     name = "cc_doc",
     srcs = ["edsl_doc.cc"],
     deps = [
-        "//plaidml/edsl",
-        "//plaidml/edsl:api",
+        ":edsl",
+        "//plaidml:testenv",
         "//plaidml/exec",
     ],
 )

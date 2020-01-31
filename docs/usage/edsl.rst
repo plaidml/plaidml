@@ -41,7 +41,7 @@ sum over axis `0` of a 2D tensor (in Keras this would be ``K.sum(I, axis=0)``):
    .. group-tab:: Python
 
       .. literalinclude:: ../../plaidml/edsl/edsl_doc.py
-        :pyobject: TestEdslHelper.sum_over_axis
+        :pyobject: sum_over_axis
 
 An operation such as this which merges together values across one or more
 indices is called a *contraction*. The syntax may look a bit odd at first, but
@@ -114,7 +114,7 @@ change from sum over axis ``0``. Let's look at it as a Tile function:
   .. group-tab:: Python
 
       .. literalinclude:: ../../plaidml/edsl/edsl_doc.py
-        :pyobject: TestEdslHelper.max_over_axis
+        :pyobject: max_over_axis
 
 Again, this corresponds closely to mathematical notation:
 
@@ -177,7 +177,7 @@ function:
   .. group-tab:: Python
     
       .. literalinclude:: ../../plaidml/edsl/edsl_doc.py
-        :pyobject: TestEdslHelper.matmul
+        :pyobject: matmul
 
 Notice that we use ``bind_dims`` on inputs and we use ``TensorOutput`` on
 outputs. Input dimensions can be repeated, which results in an error if the Tile
@@ -207,7 +207,7 @@ as follows:
   .. group-tab:: Python
 
       .. literalinclude:: ../../plaidml/edsl/edsl_doc.py
-        :pyobject: TestEdslHelper.global_min
+        :pyobject: global_min
 
 
 There are several novel pieces in this example. First, note that the elementwise
@@ -246,7 +246,7 @@ write:
   .. group-tab:: Python
 
     .. literalinclude:: ../../plaidml/edsl/edsl_doc.py
-      :pyobject: TestEdslHelper.avg
+      :pyobject: avg
 
 We can perform multiple elementwise operations on the same line, including
 operations on constants and input dimensions. So, while it would be possible to
@@ -264,7 +264,7 @@ take a global mean of a 2D tensor in stages as so:
   .. group-tab:: Python
 
     .. literalinclude:: ../../plaidml/edsl/edsl_doc.py
-      :pyobject: TestEdslHelper.avg_stages
+      :pyobject: avg_stages
 
 it is more straightforward to merge the elementwise operations:
 
@@ -280,7 +280,7 @@ it is more straightforward to merge the elementwise operations:
   .. group-tab:: Python
     
     .. literalinclude:: ../../plaidml/edsl/edsl_doc.py
-      :pyobject: TestEdslHelper.avg_merge
+      :pyobject: avg_merge
 
 Max Pool 1D
 ==============
@@ -321,7 +321,7 @@ Tile. The most direct (and, sadly, wrong) implementation in Tile is:
   .. group-tab:: Python
 
     .. literalinclude:: ../../plaidml/edsl/edsl_doc.py
-      :pyobject: TestEdslHelper.wrong_max_pool_1d
+      :pyobject: wrong_max_pool_1d
 
 If you were to run this code, every entry of ``O`` would equal the global max of
 ``I``. We correctly determined that this was a maximization operation, and the
@@ -347,7 +347,7 @@ When can use ``add_constraint`` in Tile to handle such situations:
   .. group-tab:: Python
 
     .. literalinclude:: ../../plaidml/edsl/edsl_doc.py
-      :pyobject: TestEdslHelper.max_pool_1d
+      :pyobject: max_pool_1d
 
 Something important to note here is that while we wrote ``j < 2``, this constraint
 actually means ``0<= j < 2``. Constraints are always bounded below by ``0``.
@@ -393,7 +393,7 @@ pool at the edge. This can be accomplished by simply adjusting the size of ``O``
   .. group-tab:: Python
 
     .. literalinclude:: ../../plaidml/edsl/edsl_doc.py
-      :pyobject: TestEdslHelper.max_pool_1d_odd
+      :pyobject: max_pool_1d_odd
 
 No special handling is needed for the case ``i = (N - 1) / 2``, ``j = 1``; this is
 out of range for ``I`` and so is ignored by Tile, which is exactly the intended
@@ -460,7 +460,7 @@ otherwise valid entries. For example, consider the Tile function:
   .. group-tab:: Python
 
     .. literalinclude:: ../../plaidml/edsl/edsl_doc.py
-      :pyobject: TestEdslHelper.skip
+      :pyobject: skip
 
 This operation only writes to even entries of ``O``; while ``i = 1/2`` , ``j = 1`` does
 yield valid index expressions (``O[1]`` and ``I[1, 1]``), using a fractional index
@@ -497,7 +497,7 @@ and so ``N`` is an appropriate upper bound. The resulting Tile code is:
     .. group-tab:: Python
 
       .. literalinclude:: ../../plaidml/edsl/edsl_doc.py
-        :pyobject: TestEdslHelper.csum
+        :pyobject: csum
 
 Convolution
 ===========
@@ -571,7 +571,7 @@ the kernel size relative to the spatial dimension of the input:
   .. group-tab:: Python
 
     .. literalinclude:: ../../plaidml/edsl/edsl_doc.py
-      :pyobject: TestEdslHelper.conv_1d
+      :pyobject: conv_1d
 
 
 Dilated 2D Convolution
@@ -617,7 +617,7 @@ directly to the formula, and so we get:
   .. group-tab:: Python
 
     .. literalinclude:: ../../plaidml/edsl/edsl_doc.py
-      :pyobject: TestEdslHelper.conv_2d_dilated
+      :pyobject: conv_2d_dilated
 
 Complex Convolution
 ===================
@@ -649,7 +649,7 @@ coefficients, and *`P`* gives the padding offsets.
   .. group-tab:: Python
 
     .. literalinclude:: ../../plaidml/edsl/edsl_doc.py
-      :pyobject: TestEdslHelper.complex_conv_2d
+      :pyobject: complex_conv_2d
 
 
 
