@@ -1100,7 +1100,7 @@ module {
         program2 = Program('placeholder_noshape', [I2])
         self.assertEqual(str(I1.shape), "tensor<!eltwise.i32>")
         self.assertEqual(str(I2.shape), "tensor<!eltwise.i32>")
-        self.compare_results(program1, str(program2))
+        self.assertMultiLineEqualsStripped(program1, str(program2))
 
     def test_placeholder_noname(self):
         I1 = Placeholder(plaidml.DType.INT32, [1, 1])
@@ -1109,7 +1109,7 @@ module {
         program2 = Program('placeholder_noname', [I2])
         self.assertEqual(str(I1.shape), "tensor<1x1x!eltwise.i32>")
         self.assertEqual(str(I2.shape), "tensor<1x1x!eltwise.i32>")
-        self.compare_results(program1, str(program2))
+        self.assertMultiLineEqualsStripped(program1, str(program2))
 
     def test_placeholder_with_name(self):
         I1 = Placeholder(plaidml.DType.INT32, [1, 1], name='I')
@@ -1118,7 +1118,7 @@ module {
         program2 = Program('placeholder_with_name', [I2])
         self.assertEqual(str(I1.shape), "tensor<1x1x!eltwise.i32>")
         self.assertEqual(str(I2.shape), "tensor<1x1x!eltwise.i32>")
-        self.compare_results(program1, str(program2))
+        self.assertMultiLineEqualsStripped(program1, str(program2))
 
 
 if __name__ == '__main__':
