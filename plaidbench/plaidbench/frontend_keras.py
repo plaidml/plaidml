@@ -304,6 +304,8 @@ class Frontend(core.Frontend):
         'nasnet_large',
         'nasnet_mobile',
         'resnet50',
+        'resnet50_v2',
+        'resnext50',
         'vgg16',
         'vgg19',
         'xception',
