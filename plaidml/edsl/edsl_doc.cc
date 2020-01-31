@@ -1,7 +1,10 @@
 
 // Copyright 2020 Intel Corporation.
+// Note:
+//    This file is being used by sphinx docs to pull in code blocks.
+//    Code blocks are pulled into docs/usage/writing_edsl.rs
+//    Any changes made here may upset the docs.
 
-#include <float.h>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
@@ -91,7 +94,7 @@ Tensor AvgMerge(const Tensor& I) {
 void ForLoopMaxPool1D(float* I, float* O, int N) {
   // for_loop_max_pool_start
   for (int i = 0; i < N / 2; ++i) {
-    float curr_max = FLT_MIN;
+    float curr_max = std::numeric_limits<float>::min();
     for (int j = 0; j < 2; ++j) {
       if (I[2 * i + j] > curr_max) {
         curr_max = I[2 * i + j];
