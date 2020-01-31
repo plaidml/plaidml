@@ -1034,85 +1034,32 @@ module {
         self.assertEqual(outputs[0].tolist(), [1, 2, 3])
         self.assertEqual(outputs[1].tolist(), [1, 2, 3])
 
-    def test_placeholder_dtype_only(self):
-        I = Placeholder(plaidml.DType.INT32)
-        program = Program('placeholder_dtype_only', [I])
-        expected = '''
-!i32 = type tensor<!eltwise.i32>
-module {
-  func @placeholder_dtype_only(%arg0: !i32) -> !i32 {
-    %0 = "eltwise.ident"(%arg0) : (!i32) -> !i32
-    return %0 : !i32
-  }
-}
-'''
-        self.compare_results(program, expected)
+    def test_placeholder_noshape(self):
+        I1 = Placeholder(plaidml.DType.INT32)
+        program1 = Program('placeholder_noshape', [I1])
+        I2 = Placeholder(LogicalShape(plaidml.DType.INT32))
+        program2 = Program('placeholder_noshape', [I2])
+        self.assertEqual(str(I1.shape), "tensor<!eltwise.i32>")
+        self.assertEqual(str(I2.shape), "tensor<!eltwise.i32>")
+        self.compare_results(program1, str(program2))
 
-    def test_placeholder_dtype_and_dims(self):
-        I = Placeholder(plaidml.DType.INT32, [1, 1])
-        program = Program('placeholder_dtype_and_dims', [I])
-        expected = '''
-module {
-  func @placeholder_dtype_and_dims(%arg0: tensor<1x1x!eltwise.i32>) -> tensor<1x1x!eltwise.i32> {
-    %0 = "eltwise.ident"(%arg0) : (tensor<1x1x!eltwise.i32>) -> tensor<1x1x!eltwise.i32>
-    return %0 : tensor<1x1x!eltwise.i32>
-  }
-}
-'''
-        self.compare_results(program, expected)
+    def test_placeholder_noname(self):
+        I1 = Placeholder(plaidml.DType.INT32, [1, 1])
+        program1 = Program('placeholder_noname', [I1])
+        I2 = Placeholder(LogicalShape(plaidml.DType.INT32, [1, 1]))
+        program2 = Program('placeholder_noname', [I2])
+        self.assertEqual(str(I1.shape), "tensor<1x1x!eltwise.i32>")
+        self.assertEqual(str(I2.shape), "tensor<1x1x!eltwise.i32>")
+        self.compare_results(program1, str(program2))
 
     def test_placeholder_with_name(self):
-        I = Placeholder(plaidml.DType.INT32, [1, 1], 'I')
-        program = Program('placeholder_with_name', [I])
-        expected = '''
-module {
-  func @placeholder_with_name(%arg0: tensor<1x1x!eltwise.i32> {tile.name = "I"}) -> tensor<1x1x!eltwise.i32> {
-    %0 = "eltwise.ident"(%arg0) : (tensor<1x1x!eltwise.i32>) -> tensor<1x1x!eltwise.i32>
-    return %0 : tensor<1x1x!eltwise.i32>
-  }
-}
-'''
-        self.compare_results(program, expected)
-
-    def test_placeholder_logicalshape_dtype_only(self):
-        I = Placeholder(LogicalShape(plaidml.DType.INT32))
-        program = Program('placeholder_logicalshape_dtype_only', [I])
-        expected = '''
-!i32 = type tensor<!eltwise.i32>
-module {
-  func @placeholder_logicalshape_dtype_only(%arg0: !i32) -> !i32 {
-    %0 = "eltwise.ident"(%arg0) : (!i32) -> !i32
-    return %0 : !i32
-  }
-}
-'''
-        self.compare_results(program, expected)
-
-    def test_placeholder_logicalshape_dtype_and_dims(self):
-        I = Placeholder(LogicalShape(plaidml.DType.INT32, [1, 1]))
-        program = Program('placeholder_logicalshape_dtype_and_dims', [I])
-        expected = '''
-module {
-  func @placeholder_logicalshape_dtype_and_dims(%arg0: tensor<1x1x!eltwise.i32>) -> tensor<1x1x!eltwise.i32> {
-    %0 = "eltwise.ident"(%arg0) : (tensor<1x1x!eltwise.i32>) -> tensor<1x1x!eltwise.i32>
-    return %0 : tensor<1x1x!eltwise.i32>
-  }
-}
-'''
-        self.compare_results(program, expected)
-
-    def test_placeholder_logicalshape_with_name(self):
-        I = Placeholder(LogicalShape(plaidml.DType.INT32, [1, 1]), 'I')
-        program = Program('placeholder_logicalshape_with_name', [I])
-        expected = '''
-module {
-  func @placeholder_logicalshape_with_name(%arg0: tensor<1x1x!eltwise.i32>) -> tensor<1x1x!eltwise.i32> {
-    %0 = "eltwise.ident"(%arg0) : (tensor<1x1x!eltwise.i32>) -> tensor<1x1x!eltwise.i32>
-    return %0 : tensor<1x1x!eltwise.i32>
-  }
-}
-'''
-        self.compare_results(program, expected)
+        I1 = Placeholder(plaidml.DType.INT32, [1, 1], name='I')
+        program1 = Program('placeholder_with_name', [I1])
+        I2 = Placeholder(LogicalShape(plaidml.DType.INT32, [1, 1]), name='I')
+        program2 = Program('placeholder_with_name', [I2])
+        self.assertEqual(str(I1.shape), "tensor<1x1x!eltwise.i32>")
+        self.assertEqual(str(I2.shape), "tensor<1x1x!eltwise.i32>")
+        self.compare_results(program1, str(program2))
 
 
 if __name__ == '__main__':
