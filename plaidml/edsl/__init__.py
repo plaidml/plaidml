@@ -600,6 +600,30 @@ def TensorIndexes(count):
     return [TensorIndex() for i in range(count)]
 
 
+def Placeholder(dtype_or_shape, dims=[], name=''):
+    """Creates a placeholder tensor, specified either by a combination of data
+       type and dimensions or by passing in a LogicalShape.
+
+        Args:
+            dtype_or_shape (DType | LogicalShape): Specifies either the data 
+            type or the logical shape of the ``Placeholder``.
+            dims (list): Specifies the dimensions of the ``Placeholder``.
+            name (string): Optional name to be assigned to the ``Tensor``.
+
+        Returns:
+            (Tensor): The placeholder ``Tensor``.
+
+    """
+    if isinstance(dtype_or_shape, LogicalShape):
+        shape = dtype_or_shape
+    elif isinstance(dtype_or_shape, DType):
+        shape = LogicalShape(dtype=dtype_or_shape, dims=dims)
+    else:
+        raise TypeError('Unsupported type {} for dtype_or_shape={}'.format(
+            type(dtype_or_shape), dtype_or_shape))
+    return Tensor(shape=shape, name=name)
+
+
 class ProgramArgument:
     """Docstring for class ProgramArgument"""
 
