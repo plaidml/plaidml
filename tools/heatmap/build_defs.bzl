@@ -11,6 +11,7 @@ def _heatmap_impl(ctx):
         inputs = [ctx.file.csv, ctx.file.template],
         outputs = [ctx.outputs.out],
         tools = [ctx.executable._tool],
+        use_default_shell_env = True,
     )
 
     return DefaultInfo(files = depset([ctx.outputs.out]))
