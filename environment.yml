@@ -8,4 +8,5 @@ dependencies:
   - pyyaml=5.1.2
   - pip:
     - cpplint==1.4.4
+    - nbstripout
     - yapf==0.27.0
