@@ -2,7 +2,7 @@
 
 namespace pmlc::util::bilp {
 
-using namespace math;  // NOLINT
+using namespace math; // NOLINT
 
 std::map<std::string, Rational> ILPSolver::reportSolution() const {
   std::vector<Rational> sym_soln = getSymbolicSolution();
@@ -18,30 +18,35 @@ std::map<std::string, Rational> ILPSolver::reportSolution() const {
   return soln;
 }
 
-std::map<Polynomial<Rational>, ILPResult> ILPSolver::batch_solve(const std::vector<RangeConstraint>& constraints,
-                                                                 const std::vector<Polynomial<Rational>>& objectives) {
-  // Solve a batch of ILP problems, all with the same constraints but different objectives
-  // A wrapper for the Tableau version
+std::map<Polynomial<Rational>, ILPResult>
+ILPSolver::batch_solve(const std::vector<RangeConstraint> &constraints,
+                       const std::vector<Polynomial<Rational>> &objectives) {
+  // Solve a batch of ILP problems, all with the same constraints but different
+  // objectives A wrapper for the Tableau version
   Tableau t = makeStandardFormTableau(constraints);
   return batch_solve(&t, objectives);
 }
 
-std::map<Polynomial<Rational>, ILPResult> ILPSolver::batch_solve(const std::vector<SimpleConstraint>& constraints,
-                                                                 const std::vector<Polynomial<Rational>>& objectives) {
-  // Solve a batch of ILP problems, all with the same constraints but different objectives
-  // A wrapper for the Tableau version
+std::map<Polynomial<Rational>, ILPResult>
+ILPSolver::batch_solve(const std::vector<SimpleConstraint> &constraints,
+                       const std::vector<Polynomial<Rational>> &objectives) {
+  // Solve a batch of ILP problems, all with the same constraints but different
+  // objectives A wrapper for the Tableau version
   Tableau t = makeStandardFormTableau(constraints);
   return batch_solve(&t, objectives);
 }
 
-std::map<Polynomial<Rational>, ILPResult> ILPSolver::batch_solve(Tableau* tableau,
-                                                                 const std::vector<Polynomial<Rational>>& objectives) {
-  // Solve a batch of ILP problems, all with the same constraints but different objectives
-  // The objective in `tableau` is ignored (in favor of the `objectives` parameter)
+std::map<Polynomial<Rational>, ILPResult>
+ILPSolver::batch_solve(Tableau *tableau,
+                       const std::vector<Polynomial<Rational>> &objectives) {
+  // Solve a batch of ILP problems, all with the same constraints but different
+  // objectives The objective in `tableau` is ignored (in favor of the
+  // `objectives` parameter)
   if (!tableau->convertToCanonicalForm()) {
     IVLOG(3, "Feasible region empty");
     if (throw_infeasible) {
-      throw std::runtime_error("Unable to run ILPSolver::batch_solve: Feasible region empty.");
+      throw std::runtime_error(
+          "Unable to run ILPSolver::batch_solve: Feasible region empty.");
     }
     return std::map<Polynomial<Rational>, ILPResult>{};
   }
@@ -49,7 +54,7 @@ std::map<Polynomial<Rational>, ILPResult> ILPSolver::batch_solve(Tableau* tablea
   tableau->convertToCanonicalForm();
 
   std::map<Polynomial<Rational>, ILPResult> ret;
-  for (const Polynomial<Rational>& obj : objectives) {
+  for (const Polynomial<Rational> &obj : objectives) {
     clean();
     var_names_ = tableau->varNames();
 
@@ -65,23 +70,26 @@ std::map<Polynomial<Rational>, ILPResult> ILPSolver::batch_solve(Tableau* tablea
       } else if (var.substr(var.size() - 4, 4) == "_neg") {
         specific_t.mat()(0, i + 1) = obj[var.substr(1, var.size() - 5)];
       } else {
-        // Do nothing: We're on a slack variable or other artificially added variable
+        // Do nothing: We're on a slack variable or other artificially added
+        // variable
       }
     }
 
     // Since objective was reset, need to price out to make canonical
     specific_t.priceOut();
-    ret.emplace(std::piecewise_construct, std::make_tuple(obj), std::make_tuple(solve(specific_t, true)));
+    ret.emplace(std::piecewise_construct, std::make_tuple(obj),
+                std::make_tuple(solve(specific_t, true)));
   }
   return ret;
 }
 
-ILPResult ILPSolver::solve(const std::vector<RangeConstraint>& constraints, const Polynomial<Rational> objective) {
+ILPResult ILPSolver::solve(const std::vector<RangeConstraint> &constraints,
+                           const Polynomial<Rational> objective) {
   // A logging-enabled wrapper for make-Tableau-and-solve
   if (VLOG_IS_ON(3)) {
     std::ostringstream msg;
     msg << "Starting ILPSolver with constraints\n";
-    for (const RangeConstraint& c : constraints) {
+    for (const RangeConstraint &c : constraints) {
       msg << "  " << c << "\n";
     }
     msg << "and objective " << objective;
@@ -91,12 +99,13 @@ ILPResult ILPSolver::solve(const std::vector<RangeConstraint>& constraints, cons
   return solve(t);
 }
 
-ILPResult ILPSolver::solve(const std::vector<SimpleConstraint>& constraints, const Polynomial<Rational> objective) {
+ILPResult ILPSolver::solve(const std::vector<SimpleConstraint> &constraints,
+                           const Polynomial<Rational> objective) {
   // A logging-enabled wrapper for make-Tableau-and-solve
   if (VLOG_IS_ON(3)) {
     std::ostringstream msg;
     msg << "Starting ILPSolver with constraints\n";
-    for (const SimpleConstraint& c : constraints) {
+    for (const SimpleConstraint &c : constraints) {
       msg << "  " << c << "\n";
     }
     msg << "and objective " << objective;
@@ -106,7 +115,7 @@ ILPResult ILPSolver::solve(const std::vector<SimpleConstraint>& constraints, con
   return solve(t);
 }
 
-ILPResult ILPSolver::solve(Tableau& tableau, bool already_canonical) {
+ILPResult ILPSolver::solve(Tableau &tableau, bool already_canonical) {
   clean();
   var_names_ = tableau.varNames();
   IVLOG(5, "Starting ILPSolver with tableau " << tableau.mat().toString());
@@ -120,7 +129,7 @@ ILPResult ILPSolver::solve(Tableau& tableau, bool already_canonical) {
   return ILPResult(reportObjective(), reportSolution());
 }
 
-void ILPSolver::solve_step(Tableau& tableau, bool already_canonical) {
+void ILPSolver::solve_step(Tableau &tableau, bool already_canonical) {
   // Check feasible region exists for this subproblem
   if (!tableau.makeOptimal(already_canonical)) {
     // Feasible region empty (or unbounded), no solution from this branch
@@ -138,7 +147,8 @@ void ILPSolver::solve_step(Tableau& tableau, bool already_canonical) {
   Rational greatest_fractional = 0;
   size_t greatest_fractional_row = 0;
   for (size_t i = 1; i < tableau.mat().size1(); ++i) {
-    Rational frac = tableau.mat()(i, tableau.mat().size2() - 1) - Floor(tableau.mat()(i, tableau.mat().size2() - 1));
+    Rational frac = tableau.mat()(i, tableau.mat().size2() - 1) -
+                    Floor(tableau.mat()(i, tableau.mat().size2() - 1));
     if (frac > greatest_fractional) {
       greatest_fractional = frac;
       greatest_fractional_row = i;
@@ -175,20 +185,26 @@ void ILPSolver::solve_step(Tableau& tableau, bool already_canonical) {
       IVLOG(6, "  from tableau:" << tableau.mat().toString());
     }
 
-    IVLOG(5, "Requesting Gomory cut at row " << greatest_fractional_row << " with value " << greatest_fractional);
+    IVLOG(5, "Requesting Gomory cut at row " << greatest_fractional_row
+                                             << " with value "
+                                             << greatest_fractional);
     Tableau with_cut = addGomoryCut(tableau, greatest_fractional_row);
     IVLOG(6, "Adding Gomory cut yielded: " << with_cut.mat().toString());
     solve_step(with_cut);
   }
 }
 
-Tableau ILPSolver::addGomoryCut(const Tableau& t, size_t row) {
+Tableau ILPSolver::addGomoryCut(const Tableau &t, size_t row) {
   IVLOG(6, "Adding Gomory cut along row " << row);
-  Tableau ret(t.mat().size1() + 1, t.mat().size2() + 1, t.varNames(), &t.getOpposites());
+  Tableau ret(t.mat().size1() + 1, t.mat().size2() + 1, t.varNames(),
+              &t.getOpposites());
   project(ret.mat(), range(0, t.mat().size1()), range(0, t.mat().size2() - 1)) =
-      project(t.mat(), range(0, t.mat().size1()), range(0, t.mat().size2() - 1));
-  project(ret.mat(), range(0, t.mat().size1()), range(t.mat().size2(), t.mat().size2() + 1)) =
-      project(t.mat(), range(0, t.mat().size1()), range(t.mat().size2() - 1, t.mat().size2()));
+      project(t.mat(), range(0, t.mat().size1()),
+              range(0, t.mat().size2() - 1));
+  project(ret.mat(), range(0, t.mat().size1()),
+          range(t.mat().size2(), t.mat().size2() + 1)) =
+      project(t.mat(), range(0, t.mat().size1()),
+              range(t.mat().size2() - 1, t.mat().size2()));
   // Note: Assumes the uninitialized column was set to all 0s, which appears to
   // be an undocumented feature of ublas.
   for (size_t j = 0; j < t.mat().size2() - 1; ++j) {
@@ -196,46 +212,55 @@ Tableau ILPSolver::addGomoryCut(const Tableau& t, size_t row) {
   }
   ret.mat()(t.mat().size1(), t.mat().size2() - 1) = -1;
   ret.mat()(t.mat().size1(), t.mat().size2()) =
-      t.mat()(row, t.mat().size2() - 1) - Floor(t.mat()(row, t.mat().size2() - 1));
+      t.mat()(row, t.mat().size2() - 1) -
+      Floor(t.mat()(row, t.mat().size2() - 1));
   return ret;
 }
 
-Tableau makeStandardFormTableau(const std::vector<math::SimpleConstraint>& constraints,
-                                const math::Polynomial<math::Rational> objective) {
-  // Create the standard form linear program for minimizing objective subject to constraints
+Tableau
+makeStandardFormTableau(const std::vector<math::SimpleConstraint> &constraints,
+                        const math::Polynomial<math::Rational> objective) {
+  // Create the standard form linear program for minimizing objective subject to
+  // constraints
 
-  std::vector<Polynomial<Rational>> lp_constraints;  // The represented constraint is poly == 0
+  std::vector<Polynomial<Rational>>
+      lp_constraints; // The represented constraint is poly == 0
   unsigned int slack_count = 0;
 
-  std::vector<std::string> var_names;  // Ordered list of variable names used in this Tableau
+  std::vector<std::string>
+      var_names; // Ordered list of variable names used in this Tableau
 
-  // var_index indicates what column in the Tableau will go with the variable name
-  // Note that these are indexed from 0 but have 1 as the smallest value as the first
-  // column in the Tableau is for the objective and does not have a variable name
+  // var_index indicates what column in the Tableau will go with the variable
+  // name Note that these are indexed from 0 but have 1 as the smallest value as
+  // the first column in the Tableau is for the objective and does not have a
+  // variable name
   std::map<std::string, size_t> var_index;
-  for (const SimpleConstraint& c : constraints) {
+  for (const SimpleConstraint &c : constraints) {
     Polynomial<Rational> poly(c.poly);
 
     // Split each variable into + and - parts
     // First extract keys (i.e. var names)
     std::vector<std::string> local_vars;
-    for (const auto& kvp : poly.getMap()) {
-      const std::string& key = kvp.first;
-      if (key != "") {  // Do nothing for constant term
+    for (const auto &kvp : poly.getMap()) {
+      const std::string &key = kvp.first;
+      if (key != "") { // Do nothing for constant term
         local_vars.emplace_back(key);
       }
     }
 
     // Replace each var with + and - parts
-    for (const std::string& var : local_vars) {
+    for (const std::string &var : local_vars) {
       std::map<std::string, size_t>::iterator unused;
       bool added_new_var;
-      poly.substitute(var, Polynomial<Rational>("_" + var + "_pos") - Polynomial<Rational>("_" + var + "_neg"));
-      std::tie(unused, added_new_var) = var_index.emplace("_" + var + "_pos", var_index.size() + 1);
+      poly.substitute(var, Polynomial<Rational>("_" + var + "_pos") -
+                               Polynomial<Rational>("_" + var + "_neg"));
+      std::tie(unused, added_new_var) =
+          var_index.emplace("_" + var + "_pos", var_index.size() + 1);
       if (added_new_var) {
         var_names.emplace_back("_" + var + "_pos");
       }
-      std::tie(unused, added_new_var) = var_index.emplace("_" + var + "_neg", var_index.size() + 1);
+      std::tie(unused, added_new_var) =
+          var_index.emplace("_" + var + "_neg", var_index.size() + 1);
       if (added_new_var) {
         var_names.emplace_back("_" + var + "_neg");
       }
@@ -249,39 +274,45 @@ Tableau makeStandardFormTableau(const std::vector<math::SimpleConstraint>& const
     ++slack_count;
   }
 
-  // The tableau has a row for each lp_constraint plus a row for the objective, and a
-  // column for each variable plus a column for the constant terms and a column for the objective.
+  // The tableau has a row for each lp_constraint plus a row for the objective,
+  // and a column for each variable plus a column for the constant terms and a
+  // column for the objective.
   Tableau tableau(lp_constraints.size() + 1, var_index.size() + 2, var_names);
 
   // Put the data in the Tableau
   // First the objective:
   tableau.mat()(0, 0) = 1;
-  for (const auto& kvp : objective.getMap()) {
+  for (const auto &kvp : objective.getMap()) {
     if (kvp.first != "") {
-      // The positive and negative parts have reversed sign because the algorithm
-      // needs to use -objective for the coeffs of the first row
+      // The positive and negative parts have reversed sign because the
+      // algorithm needs to use -objective for the coeffs of the first row
       try {
         tableau.mat()(0, var_index.at("_" + kvp.first + "_pos")) = -kvp.second;
         tableau.mat()(0, var_index.at("_" + kvp.first + "_neg")) = kvp.second;
-      } catch (const std::out_of_range& e) {
-        throw std::out_of_range("Bad index given to Tableau objective: " + kvp.first);
+      } catch (const std::out_of_range &e) {
+        throw std::out_of_range("Bad index given to Tableau objective: " +
+                                kvp.first);
       }
     }
   }
 
   // Now the constraints:
-  size_t constraint_idx = 1;  // Start from 1 b/c the first row is for the object
-  for (const Polynomial<Rational>& poly : lp_constraints) {
-    short const_sign = 1;  // NOLINT (runtime/int)
+  size_t constraint_idx = 1; // Start from 1 b/c the first row is for the object
+  for (const Polynomial<Rational> &poly : lp_constraints) {
+    short const_sign = 1; // NOLINT (runtime/int)
     if (poly.constant() <= 0) {
-      const_sign = -1;  // Last column must be positive, so negate everything if const term is positive
+      const_sign = -1; // Last column must be positive, so negate everything if
+                       // const term is positive
     }
-    for (const auto& kvp : poly.getMap()) {
+    for (const auto &kvp : poly.getMap()) {
       if (kvp.first == "") {
-        // The negative of the constant term goes in the last column of the tableau
-        tableau.mat()(constraint_idx, tableau.mat().size2() - 1) = -const_sign * -kvp.second;
+        // The negative of the constant term goes in the last column of the
+        // tableau
+        tableau.mat()(constraint_idx, tableau.mat().size2() - 1) =
+            -const_sign * -kvp.second;
       } else {
-        tableau.mat()(constraint_idx, var_index.at(kvp.first)) = -const_sign * kvp.second;
+        tableau.mat()(constraint_idx, var_index.at(kvp.first)) =
+            -const_sign * kvp.second;
       }
     }
     ++constraint_idx;
@@ -290,11 +321,13 @@ Tableau makeStandardFormTableau(const std::vector<math::SimpleConstraint>& const
   return tableau;
 }
 
-Tableau makeStandardFormTableau(const std::vector<RangeConstraint>& constraints, const Polynomial<Rational> objective) {
-  // Create the standard form linear program for minimizing objective subject to the given constraints
+Tableau makeStandardFormTableau(const std::vector<RangeConstraint> &constraints,
+                                const Polynomial<Rational> objective) {
+  // Create the standard form linear program for minimizing objective subject to
+  // the given constraints
   std::vector<math::SimpleConstraint> simple_constraints;
 
-  for (const auto& c : constraints) {
+  for (const auto &c : constraints) {
     simple_constraints.emplace_back(c.lowerBound());
     simple_constraints.emplace_back(c.upperBound());
   }
@@ -309,4 +342,4 @@ void ILPSolver::clean() {
   var_names_.clear();
 }
 
-}  // namespace pmlc::util::bilp
+} // namespace pmlc::util::bilp

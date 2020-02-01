@@ -147,23 +147,21 @@ namespace pmlc::util::math {
 // }
 
 // TEST_CASE("HNFMatrix", "[hnf]") {
-//   Matrix m = MatrixLit({{0, Rational(1, 2)}, {Rational(1, 2), Rational(1, 2)}, {1, 0}});
-//   bool r = HermiteNormalForm(m);
-//   REQUIRE(r == true);
+//   Matrix m = MatrixLit({{0, Rational(1, 2)}, {Rational(1, 2), Rational(1,
+//   2)}, {1, 0}}); bool r = HermiteNormalForm(m); REQUIRE(r == true);
 // }
 // TEST_CASE("HNFMatrix Matches Mathematica", "[hnf]") {
-//   Matrix m = MatrixLit({{2, 6, -3, 2}, {2, 6, -3, 2}, {2, 18, 3, 2}, {-6, -3, -6, 2}, {8, 9, -3, 4}, {4, 9, -3, 2}});
-//   bool r = HermiteNormalForm(m);
+//   Matrix m = MatrixLit({{2, 6, -3, 2}, {2, 6, -3, 2}, {2, 18, 3, 2}, {-6, -3,
+//   -6, 2}, {8, 9, -3, 4}, {4, 9, -3, 2}}); bool r = HermiteNormalForm(m);
 //   REQUIRE(r == true);
-//   Matrix correct = MatrixLit({{2, 0, 3, 0}, {0, 3, 3, 0}, {0, 0, 6, 0}, {0, 0, 0, 2}, {0, 0, 0, 0}, {0, 0, 0, 0}});
-//   bool match = (m == correct);
+//   Matrix correct = MatrixLit({{2, 0, 3, 0}, {0, 3, 3, 0}, {0, 0, 6, 0}, {0,
+//   0, 0, 2}, {0, 0, 0, 0}, {0, 0, 0, 0}}); bool match = (m == correct);
 //   REQUIRE(match);
 // }
 
 // TEST_CASE("HNFMatrix Low Rank ", "[hnf]") {
-//   Matrix m = MatrixLit({{Rational(1, 5), -Rational(2, 5)}, {-Rational(2, 5), Rational(4, 5)}});
-//   bool r = HermiteNormalForm(m);
-//   REQUIRE(r == true);
+//   Matrix m = MatrixLit({{Rational(1, 5), -Rational(2, 5)}, {-Rational(2, 5),
+//   Rational(4, 5)}}); bool r = HermiteNormalForm(m); REQUIRE(r == true);
 //   REQUIRE(m(1, 0) == 0);
 //   REQUIRE(m(1, 1) == 0);
 // }
@@ -180,4 +178,4 @@ namespace pmlc::util::math {
 //   REQUIRE(r == false);
 // }
 
-}  // namespace pmlc::util::math
+} // namespace pmlc::util::math

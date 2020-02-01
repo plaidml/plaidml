@@ -10,7 +10,8 @@
 
 namespace pmlc::util {
 
-std::string getEnvVar(const std::string& key, const std::string& default_value) {
+std::string getEnvVar(const std::string &key,
+                      const std::string &default_value) {
 #ifdef _MSC_VER
   char var[1024];
   auto rv = GetEnvironmentVariableA(key.c_str(), var, sizeof(var));
@@ -19,12 +20,12 @@ std::string getEnvVar(const std::string& key, const std::string& default_value) 
   }
   return var;
 #else
-  char const* val = std::getenv(key.c_str());
+  char const *val = std::getenv(key.c_str());
   return val == nullptr ? default_value : val;
 #endif
 }
 
-void setEnvVar(const std::string& key, const std::string& value) {
+void setEnvVar(const std::string &key, const std::string &value) {
 #ifdef _MSC_VER
   SetEnvironmentVariableA(key.c_str(), value.c_str());
 #else
@@ -32,4 +33,4 @@ void setEnvVar(const std::string& key, const std::string& value) {
 #endif
 }
 
-}  // namespace pmlc::util
+} // namespace pmlc::util

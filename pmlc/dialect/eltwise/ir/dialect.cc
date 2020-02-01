@@ -27,7 +27,8 @@ struct OpAsmInterface : public mlir::OpAsmDialectInterface {
   using mlir::OpAsmDialectInterface::OpAsmDialectInterface;
 
   /// Get a special name to use when printing the given operation.
-  void getAsmResultNames(Operation* op, mlir::OpAsmSetValueNameFn setNameFn) const final {
+  void getAsmResultNames(Operation *op,
+                         mlir::OpAsmSetValueNameFn setNameFn) const final {
     llvm::SmallString<32> osbuf;
     llvm::raw_svector_ostream os(osbuf);
     if (auto attr = op->getAttrOfType<mlir::StringAttr>("scalar_name")) {
@@ -42,7 +43,8 @@ struct OpAsmInterface : public mlir::OpAsmDialectInterface {
     setNameFn(op->getResult(0), os.str());
   }
 
-  void getTypeAliases(mlir::SmallVectorImpl<std::pair<Type, StringRef>>& aliases) const final {
+  void getTypeAliases(
+      mlir::SmallVectorImpl<std::pair<Type, StringRef>> &aliases) const final {
     auto ctx = getDialect()->getContext();
     for (uint64_t i = 1; i <= util::getMaxEnumValForDataType(); i++) {
       auto dtype = util::symbolizeDataType(i).getValue();
@@ -57,9 +59,10 @@ struct OpAsmInterface : public mlir::OpAsmDialectInterface {
   }
 };
 
-}  // namespace
+} // namespace
 
-Dialect::Dialect(mlir::MLIRContext* ctx) : mlir::Dialect(getDialectNamespace(), ctx) {
+Dialect::Dialect(mlir::MLIRContext *ctx)
+    : mlir::Dialect(getDialectNamespace(), ctx) {
   addTypes<ScalarType>();
   addOperations<
 #define GET_OP_LIST
@@ -75,17 +78,19 @@ std::string Dialect::getCanonicalOpName(llvm::StringRef name) {
   return llvm::formatv("{0}.{1}", getDialectNamespace(), name).str();
 }
 
-mlir::Type Dialect::parseType(mlir::DialectAsmParser& parser) const {
+mlir::Type Dialect::parseType(mlir::DialectAsmParser &parser) const {
   auto dtype = util::symbolizeDataType(parser.getFullSymbolSpec());
   if (!dtype.hasValue()) {
-    parser.emitError(parser.getNameLoc(), "unknown eltwise type: ") << parser.getFullSymbolSpec();
+    parser.emitError(parser.getNameLoc(), "unknown eltwise type: ")
+        << parser.getFullSymbolSpec();
     return {};
   }
   return ScalarType::get(getContext(), dtype.getValue());
 }
 
-void Dialect::printType(mlir::Type type, mlir::DialectAsmPrinter& printer) const {
-  auto& os = printer.getStream();
+void Dialect::printType(mlir::Type type,
+                        mlir::DialectAsmPrinter &printer) const {
+  auto &os = printer.getStream();
   if (auto scalarType = type.dyn_cast<ScalarType>()) {
     os << util::stringifyDataType(scalarType.type());
   } else {
@@ -93,13 +98,13 @@ void Dialect::printType(mlir::Type type, mlir::DialectAsmPrinter& printer) const
   }
 }
 
-mlir::Operation* Dialect::materializeConstant(  //
-    mlir::OpBuilder& builder,                   //
-    mlir::Attribute value,                      //
-    mlir::Type type,                            //
-    mlir::Location loc) {
-  IVLOG(5, "eltwise::Dialect::materializeConstant> " << mlir::debugString(type));
+mlir::Operation *Dialect::materializeConstant(mlir::OpBuilder &builder,
+                                              mlir::Attribute value,
+                                              mlir::Type type,
+                                              mlir::Location loc) {
+  IVLOG(5,
+        "eltwise::Dialect::materializeConstant> " << mlir::debugString(type));
   return builder.create<ScalarConstantOp>(loc, type, value);
 }
 
-}  // namespace pmlc::dialect::eltwise
+} // namespace pmlc::dialect::eltwise

@@ -33,15 +33,15 @@ mlir::OpFoldResult ScalarConstantOp::fold(ArrayRef<Attribute> operands) {
   return getValue();
 }
 
-//
 // ---- CastOp ----
-//
 
 struct CastCanonicalizer : public OpRewritePattern<CastOp> {
   using OpRewritePattern<CastOp>::OpRewritePattern;
 
-  PatternMatchResult matchAndRewrite(CastOp castOp, PatternRewriter& rewriter) const override {
-    IVLOG(5, "CastCanonicalizer::matchAndRewrite> " << mlir::debugString(castOp));
+  PatternMatchResult matchAndRewrite(CastOp castOp,
+                                     PatternRewriter &rewriter) const override {
+    IVLOG(5,
+          "CastCanonicalizer::matchAndRewrite> " << mlir::debugString(castOp));
     auto op = castOp.getOperation();
     auto tensor = castOp.tensor();
     auto tensorType = getRankedTensorType(tensor.getType());
@@ -58,20 +58,21 @@ struct CastCanonicalizer : public OpRewritePattern<CastOp> {
   }
 };
 
-void CastOp::getCanonicalizationPatterns(OwningRewritePatternList& results, MLIRContext* context) {
+void CastOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+                                         MLIRContext *context) {
   results.insert<CastCanonicalizer>(context);
 }
 
-//
 // ---- EltwiseOp ----
-//
 
 template <typename OpType>
 struct EltwiseCanonicalizer : public OpRewritePattern<OpType> {
   using OpRewritePattern<OpType>::OpRewritePattern;
 
-  PatternMatchResult matchAndRewrite(OpType eltwiseOp, PatternRewriter& rewriter) const override {
-    IVLOG(5, "EltwiseCanonicalizer::matchAndRewrite> " << mlir::debugString(eltwiseOp));
+  PatternMatchResult matchAndRewrite(OpType eltwiseOp,
+                                     PatternRewriter &rewriter) const override {
+    IVLOG(5, "EltwiseCanonicalizer::matchAndRewrite> "
+                 << mlir::debugString(eltwiseOp));
     auto op = eltwiseOp.getOperation();
     auto operands = llvm::to_vector<2>(op->getOperands());
     auto resultType = OpType::getResultType(operands);
@@ -85,9 +86,10 @@ struct EltwiseCanonicalizer : public OpRewritePattern<OpType> {
   }
 };
 
-#define DEFINE_CANONICALIZER(_op_)                                                                  \
-  void _op_::getCanonicalizationPatterns(OwningRewritePatternList& results, MLIRContext* context) { \
-    results.insert<EltwiseCanonicalizer<_op_>>(context);                                            \
+#define DEFINE_CANONICALIZER(_op_)                                             \
+  void _op_::getCanonicalizationPatterns(OwningRewritePatternList &results,    \
+                                         MLIRContext *context) {               \
+    results.insert<EltwiseCanonicalizer<_op_>>(context);                       \
   }
 
 DEFINE_CANONICALIZER(AbsOp);
@@ -172,8 +174,10 @@ OpFoldResult MulOp::fold(ArrayRef<Attribute> operands) {
 
 Type SelectOp::getResultType(ValueRange operands) {
   auto inferShapeType = getRankedTensorType(ComputeResultType(operands));
-  auto inferElementType = getRankedTensorType(ComputeResultType(operands.drop_front()));
-  return RankedTensorType::get(inferShapeType.getShape(), inferElementType.getElementType());
+  auto inferElementType =
+      getRankedTensorType(ComputeResultType(operands.drop_front()));
+  return RankedTensorType::get(inferShapeType.getShape(),
+                               inferElementType.getElementType());
 }
 
 OpFoldResult SubOp::fold(ArrayRef<Attribute> operands) {
@@ -189,4 +193,4 @@ OpFoldResult SubOp::fold(ArrayRef<Attribute> operands) {
 #define GET_OP_CLASSES
 #include "pmlc/dialect/eltwise/ir/ops.cc.inc"
 
-}  // namespace pmlc::dialect::eltwise
+} // namespace pmlc::dialect::eltwise

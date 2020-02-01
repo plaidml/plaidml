@@ -12,7 +12,7 @@
 
 #include "pmlc/util/logging.h"
 
-using namespace mlir;  // NOLINT[build/namespaces]
+using namespace mlir; // NOLINT[build/namespaces]
 
 namespace pmlc::target::x86 {
 
@@ -37,8 +37,10 @@ struct TraceLinkingPass : public ModulePass<TraceLinkingPass> {
       auto msgStr = op.getAttrOfType<StringAttr>("msg").getValue().str();
       auto msg = StringRef(msgStr.c_str(), msgStr.size() + 1);
       auto msgSymbol = llvm::formatv("__trace_msg_{0}", id).str();
-      auto msgValue = getOrCreateGlobalString(loc, builder, msgSymbol, msg, module, llvmDialect);
-      builder.create<LLVM::CallOp>(loc, voidTy, traceRef, ArrayRef<Value>{msgValue});
+      auto msgValue = getOrCreateGlobalString(loc, builder, msgSymbol, msg,
+                                              module, llvmDialect);
+      builder.create<LLVM::CallOp>(loc, voidTy, traceRef,
+                                   ArrayRef<Value>{msgValue});
       builder.create<LLVM::ReturnOp>(loc, ArrayRef<Value>{});
       op.removeAttr("id");
       op.removeAttr("msg");
@@ -48,29 +50,36 @@ struct TraceLinkingPass : public ModulePass<TraceLinkingPass> {
 
   /// Return a value representing an access into a global string with the given
   /// name, creating the string if necessary.
-  static Value getOrCreateGlobalString(Location loc, OpBuilder& builder, StringRef name, StringRef value,
-                                       ModuleOp module, LLVM::LLVMDialect* llvmDialect) {
+  static Value getOrCreateGlobalString(Location loc, OpBuilder &builder,
+                                       StringRef name, StringRef value,
+                                       ModuleOp module,
+                                       LLVM::LLVMDialect *llvmDialect) {
     // Create the global at the entry of the module.
     LLVM::GlobalOp global;
     if (!(global = module.lookupSymbol<LLVM::GlobalOp>(name))) {
       OpBuilder::InsertionGuard insertGuard(builder);
       builder.setInsertionPointToStart(module.getBody());
-      auto type = LLVM::LLVMType::getArrayTy(LLVM::LLVMType::getInt8Ty(llvmDialect), value.size());
-      global = builder.create<LLVM::GlobalOp>(loc, type, /*isConstant=*/true, LLVM::Linkage::Internal, name,
+      auto type = LLVM::LLVMType::getArrayTy(
+          LLVM::LLVMType::getInt8Ty(llvmDialect), value.size());
+      global = builder.create<LLVM::GlobalOp>(loc, type, /*isConstant=*/true,
+                                              LLVM::Linkage::Internal, name,
                                               builder.getStringAttr(value));
     }
 
     // Get the pointer to the first character in the global string.
     Value globalPtr = builder.create<LLVM::AddressOfOp>(loc, global);
-    Value cst0 = builder.create<LLVM::ConstantOp>(loc, LLVM::LLVMType::getInt64Ty(llvmDialect),
-                                                  builder.getIntegerAttr(builder.getIndexType(), 0));
-    return builder.create<LLVM::GEPOp>(loc, LLVM::LLVMType::getInt8PtrTy(llvmDialect), globalPtr,
-                                       ArrayRef<Value>({cst0, cst0}));
+    Value cst0 = builder.create<LLVM::ConstantOp>(
+        loc, LLVM::LLVMType::getInt64Ty(llvmDialect),
+        builder.getIntegerAttr(builder.getIndexType(), 0));
+    return builder.create<LLVM::GEPOp>(
+        loc, LLVM::LLVMType::getInt8PtrTy(llvmDialect), globalPtr,
+        ArrayRef<Value>({cst0, cst0}));
   }
 
-  static FlatSymbolRefAttr getOrInsertTrace(Location loc, OpBuilder& builder, ModuleOp module,
-                                            LLVM::LLVMDialect* llvmDialect) {
-    const char* symbol = "plaidml_rt_trace";
+  static FlatSymbolRefAttr getOrInsertTrace(Location loc, OpBuilder &builder,
+                                            ModuleOp module,
+                                            LLVM::LLVMDialect *llvmDialect) {
+    const char *symbol = "plaidml_rt_trace";
     auto context = module.getContext();
     if (module.lookupSymbol(symbol)) {
       return SymbolRefAttr::get(symbol, context);
@@ -85,14 +94,17 @@ struct TraceLinkingPass : public ModulePass<TraceLinkingPass> {
   }
 };
 
-static PassRegistration<TraceLinkingPass> pass("trace-linking", "Link trace ops to runtime functions");
+static PassRegistration<TraceLinkingPass>
+    pass("trace-linking", "Link trace ops to runtime functions");
 
-}  // namespace
+} // namespace
 
-std::unique_ptr<mlir::Pass> createTraceLinkingPass() { return std::make_unique<TraceLinkingPass>(); }
+std::unique_ptr<mlir::Pass> createTraceLinkingPass() {
+  return std::make_unique<TraceLinkingPass>();
+}
 
-}  // namespace pmlc::target::x86
+} // namespace pmlc::target::x86
 
-extern "C" void plaidml_rt_trace(const char* msg) {  //
+extern "C" void plaidml_rt_trace(const char *msg) {
   llvm::errs() << msg << "\n";
 }

@@ -6,10 +6,10 @@
 
 namespace mlir {
 class Pass;
-}  // namespace mlir
+} // namespace mlir
 
 namespace pmlc::conversion::tile_to_pxa {
 
 std::unique_ptr<mlir::Pass> createLowerTileToPXAPass();
 
-}  // namespace pmlc::conversion::tile_to_pxa
+} // namespace pmlc::conversion::tile_to_pxa

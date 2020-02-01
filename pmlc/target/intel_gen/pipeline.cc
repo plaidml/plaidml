@@ -13,14 +13,14 @@
 #include "pmlc/compiler/registry.h"
 #include "pmlc/conversion/pxa_to_affine/pxa_to_affine.h"
 
-using namespace mlir;  // NOLINT[build/namespaces]
+using namespace mlir; // NOLINT[build/namespaces]
 using pmlc::conversion::pxa_to_affine::createLowerPXAToAffinePass;
 
 namespace pmlc::target::intel_gen {
 
 namespace {
 
-void addToPipeline(OpPassManager& pm) {
+void addToPipeline(OpPassManager &pm) {
   // TODO: do optimizations here
 
   pm.addPass(createLowerPXAToAffinePass());
@@ -45,10 +45,11 @@ void addToPipeline(OpPassManager& pm) {
   // pm.addPass(createLowerToLLVMPass(true));
 }
 
-static PassPipelineRegistration<> passPipelineReg("target-intel_gen", "Target pipeline for Intel GEN iGPUs",
-                                                  addToPipeline);
+static PassPipelineRegistration<>
+    passPipelineReg("target-intel_gen", "Target pipeline for Intel GEN iGPUs",
+                    addToPipeline);
 static compiler::TargetRegistration targetReg("intel_gen", addToPipeline);
 
-}  // namespace
+} // namespace
 
-}  // namespace pmlc::target::intel_gen
+} // namespace pmlc::target::intel_gen

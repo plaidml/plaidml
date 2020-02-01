@@ -15,15 +15,15 @@ DEFINE_string(logconf, "", "enable logging configuration from file");
 
 namespace {
 #if ELPP_OS_WINDOWS
-const char logDirPrefix[] = "logs\\";  // NOLINT
+const char logDirPrefix[] = "logs\\"; // NOLINT
 #else
-const char logDirPrefix[] = "logs/";  // NOLINT
+const char logDirPrefix[] = "logs/"; // NOLINT
 #endif
-}  // namespace
+} // namespace
 
 namespace pmlc::util {
 
-el::Configurations LogConfigurationFromFlags(const std::string& app_name) {
+el::Configurations LogConfigurationFromFlags(const std::string &app_name) {
   el::Configurations conf;
   if (FLAGS_logconf.empty()) {
     conf.setToDefault();
@@ -33,7 +33,8 @@ el::Configurations LogConfigurationFromFlags(const std::string& app_name) {
   if (!FLAGS_logtofile) {
     conf.set(el::Level::Global, el::ConfigurationType::ToFile, "false");
   } else {
-    conf.set(el::Level::Global, el::ConfigurationType::Filename, std::string(logDirPrefix) + app_name + ".log");
+    conf.set(el::Level::Global, el::ConfigurationType::Filename,
+             std::string(logDirPrefix) + app_name + ".log");
   }
   if (!FLAGS_v) {
     conf.set(el::Level::Debug, el::ConfigurationType::Enabled, "false");
@@ -46,4 +47,4 @@ el::Configurations LogConfigurationFromFlags(const std::string& app_name) {
 
   return conf;
 }
-}  // namespace pmlc::util
+} // namespace pmlc::util

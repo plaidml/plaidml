@@ -30,7 +30,8 @@ inline constexpr size_t Align(size_t count, size_t alignment) {
 inline int64_t Sign(int64_t a) { return (a == 0 ? 0 : (a < 0 ? -1 : 1)); }
 
 struct Seive {
-  // First factor for each number.  We leave 0 + 1 in the list to make things easier to read
+  // First factor for each number.  We leave 0 + 1 in the list to make things
+  // easier to read
   std::vector<uint64_t> first_factor;
   std::vector<uint64_t> primes;
   explicit Seive(uint64_t size);
@@ -48,4 +49,4 @@ uint64_t NumFactors(uint64_t in);
 // Check if a number is prime
 bool IsPrime(uint64_t in);
 
-}  // namespace pmlc::util::math
+} // namespace pmlc::util::math
