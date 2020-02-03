@@ -274,6 +274,17 @@ struct OperandsAre : Matcher {
 };
 
 template <typename InnerPredicate>
+struct FirstOperandIs : Matcher {
+  bool match(Operation *op) const final {
+    InnerPredicate pred;
+    if (op->getNumOperands() == 0) {
+      return false;
+    }
+    return pred.match(op->getOperand(0).getType());
+  }
+};
+
+template <typename InnerPredicate>
 struct AnyComparandIs : Matcher {
   bool match(Operation *op) const final {
     SmallVector<Value, 4> allOperands(op->getOperands());
@@ -944,9 +955,9 @@ struct LoweringPass : public mlir::ModulePass<LoweringPass> {
         EltwiseOpConversion<ew::BitShlOp, StdOp<mlir::ShiftLeftOp>,
                             OperandsAre<EltwiseInteger>>,
         EltwiseOpConversion<ew::BitShrOp, StdOp<mlir::SignedShiftRightOp>,
-                            OperandsAre<EltwiseSigned>>,
+                            FirstOperandIs<EltwiseSigned>>,
         EltwiseOpConversion<ew::BitShrOp, StdOp<mlir::UnsignedShiftRightOp>,
-                            OperandsAre<EltwiseUnsigned>>,
+                            FirstOperandIs<EltwiseUnsigned>>,
         EltwiseOpConversion<ew::SelectOp, SelectOp>,
         EltwiseOpConversion<ew::IdentOp, FirstOperand>>(&getContext());
 
