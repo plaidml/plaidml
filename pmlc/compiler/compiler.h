@@ -10,27 +10,28 @@
 
 namespace mlir {
 class ExecutionEngine;
-}  // namespace mlir
+} // namespace mlir
 
 namespace pmlc::compiler {
 
 class MemRefDescriptor;
 
 class Executable {
- public:
-  Executable(mlir::StringRef entry, mlir::StringRef target, mlir::ModuleOp module, mlir::ArrayRef<void*> bufptrs);
+public:
+  Executable(mlir::StringRef entry, mlir::StringRef target,
+             mlir::ModuleOp module, mlir::ArrayRef<void *> bufptrs);
   ~Executable();
 
   void invoke();
 
   static void initialize();
 
- private:
+private:
   std::string entry;
   std::unique_ptr<mlir::ExecutionEngine> engine;
   std::vector<MemRefDescriptor> descriptors;
-  std::vector<void*> args;
-  std::vector<void*> ptrs;
+  std::vector<void *> args;
+  std::vector<void *> ptrs;
 };
 
-}  // namespace pmlc::compiler
+} // namespace pmlc::compiler

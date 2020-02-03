@@ -7,9 +7,9 @@
 namespace pmlc::dialect::stdx {
 
 class Dialect : public mlir::Dialect {
- public:
-  explicit Dialect(mlir::MLIRContext* ctx);
+public:
+  explicit Dialect(mlir::MLIRContext *ctx);
   static llvm::StringRef getDialectNamespace();
 };
 
-}  // namespace pmlc::dialect::stdx
+} // namespace pmlc::dialect::stdx

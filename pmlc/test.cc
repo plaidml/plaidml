@@ -2,7 +2,7 @@
 
 #include "mlir/Transforms/DialectConversion.h"
 
-using namespace mlir;  // NOLINT
+using namespace mlir; // NOLINT
 
 namespace {
 
@@ -25,4 +25,4 @@ TEST(InconsistentCppStd, CanCrash) {
 //   map[op] = "";
 // }
 
-}  // end namespace
+} // end namespace

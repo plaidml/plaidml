@@ -19,5 +19,5 @@ using mlir::Value;
 
 #include "pmlc/util/interfaces.h.inc"
 
-}  // namespace util
-}  // namespace pmlc
+} // namespace util
+} // namespace pmlc
