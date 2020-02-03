@@ -1,115 +1,105 @@
 #pragma once
 
+#include <limits>
 #include <memory>
 #include <vector>
 
+#include "mlir/Analysis/AffineStructures.h"
 #include "mlir/Pass/Pass.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/dialect/pxa/transforms/tile.h"
 
 namespace pmlc::dialect::pxa {
 
-// Abstract tile generator class
-class TileSizeGenerator {
+// A tile size generator is a functor from range -> list of sizes
+
+// Produces all powers of 2 <= range
+std::vector<int64_t> PowerOfTwoGenerator(int64_t range);
+
+// Produces all divisors of range (including the full range)
+std::vector<int64_t> EvenTilingGenerator(int64_t range);
+
+// Produces only 'range' itself
+inline std::vector<int64_t> ExactRangeGenerator(int64_t range) { return {range}; }
+
+// Produces only a specific value
+class FixedTileSizeGenerator {
  public:
-  virtual bool initialize(int64_t newRange) = 0;
-  virtual int64_t current() const = 0;
-  virtual bool next() = 0;
+  explicit FixedTileSizeGenerator(int64_t val) : val(val) {}
+  std::vector<int64_t> operator()(int64_t range) const { return {val}; }
+
+ private:
+  int64_t val;
 };
 
-// A partially concrete base class that fits most cases, and only requires implementing
-// the next function
-class BaseTileSizeGenerator : public TileSizeGenerator {
+// Producs the union of multiple generators
+template <typename Head, typename... Rest>
+class UnionGenerator {
  public:
-  bool initialize(int64_t newRange) override {
-    range = newRange;
-    cur = 1;
-    return true;
+  UnionGenerator(const Head& head, const Rest&... rest) : head(head), rest(rest...) {}
+  std::vector<int64_t> operator()(int64_t range) const {
+    auto v1 = head(range);
+    auto v2 = rest(range);
+    std::vector<int64_t> vout;
+    std::set_union(v1.begin(), v1.end(), v2.begin(), v2.end(), std::back_inserter(vout));
   }
-  int64_t current() const override { return cur; }
 
- protected:
-  int64_t range;
-  int64_t cur;
+ private:
+  const Head& head;
+  UnionGenerator<Rest...> rest;
 };
 
-class AllTilesGenerator : public BaseTileSizeGenerator {
+template <typename Single>
+class UnionGenerator<Single> {
  public:
-  bool next() override {
-    cur++;
-    return cur <= range;
+  explicit UnionGenerator(const Single& single) : single(single) {}
+  std::vector<int64_t> operator()(int64_t range) const { return single(range); }
+
+ private:
+  const Single& single;
+};
+
+// A tile cost model is a functor from an array of tile sizes (i.e.
+// ArrayRef<int64_t>) to a double, which is 'inf' for infeasible tilings.  For
+// example:
+
+inline double DummyCostModel(ArrayRef<int64_t> tile) { return 1.0; }
+
+// Given a generator and cost model, find the best tile size, return empty
+// tiling when all tiles are infeasible
+template <typename Generator, typename CostModel>
+llvm::SmallVector<int64_t, 8> FindBestTileSize(const Generator& generator, const CostModel& costModel,
+                                               ArrayRef<int64_t> ranges) {
+  // Build a list of potential tile sizes for each dimension.
+  // Basically, we are caching the output of the generator in case it is
+  // expensive.
+  std::vector<std::vector<int64_t>> allowedTileSizes;
+  for (int64_t range : ranges) {
+    allowedTileSizes.emplace_back(generator(range));
   }
-};
-
-class PowerOfTwoGenerator : public BaseTileSizeGenerator {
- public:
-  bool next() override {
-    cur *= 2;
-    return cur <= range;
-  }
-};
-
-class EvenTilingGenerator : public BaseTileSizeGenerator {
- public:
-  bool next() override {
-    if (cur == range) {
-      return false;
+  // Initialize cost + tile sizes
+  double bestCost = std::numeric_limits<float>::infinity();
+  llvm::SmallVector<int64_t, 8> bestTileSize;
+  llvm::SmallVector<int64_t, 8> curTileSize(ranges.size());
+  // Build a recursive lambda to walk over the options (thanks c++14!)
+  auto recurse = [&](auto& self, int idx) -> void {
+    if (idx == allowedTileSizes.size()) {
+      double newCost = costModel(curTileSize);
+      if (newCost < bestCost) {
+        bestCost = newCost;
+        bestTileSize = curTileSize;
+      }
+    } else {
+      for (int64_t tileSize : allowedTileSizes[idx]) {
+        curTileSize[idx] = tileSize;
+        self(self, idx + 1);
+      }
     }
-    cur++;
-    while (range % cur != 0) cur++;
-    return true;
-  }
-};
-
-class ExactRangeGenerator : public TileSizeGenerator {
- public:
-  bool initialize(int64_t newRange) override {
-    range = newRange;
-    return true;
-  }
-  int64_t current() const override { return range; }
-  bool next() override { return false; }
-
- private:
-  int64_t range;
-};
-
-class FixedTileSizeGenerator : public TileSizeGenerator {
- public:
-  explicit FixedTileSizeGenerator(int64_t size) : size(size) {}
-  bool initialize(int64_t newRange) override { return true; }
-  int64_t current() const override { return size; }
-  bool next() override { return false; }
-
- private:
-  int64_t size;
-};
-
-class TileCostModel {
-  // Return false to skip optimizing this PF, otherwise prepare
-  virtual bool prepare(AffineParallelOp op) = 0;
-  // For a given tile size, return a cost, or +inf if not feasible
-  virtual double computeCost(ArrayRef<int64_t> tile) const = 0;
-};
-
-// Always returns a cost of 1
-class DummyCostModel : public TileCostModel {
-  // Return false to skip optimizing this PF, otherwise prepare
-  bool prepare(AffineParallelOp op) override { return true; }
-  // For a given tile size, return a cost, or +inf if not feasible
-  double computeCost(ArrayRef<int64_t> tile) const override { return 1.0; }
-};
-
-struct AutotilePass : public mlir::FunctionPass<AutotilePass> {
-  AutotilePass() {}
-  AutotilePass(std::shared_ptr<TileSizeGenerator> generator, std::shared_ptr<TileCostModel> costModel)
-      : generator(generator), costModel(costModel) {}
-  void runOnFunction() override {
-    auto func = this->getFunction();
-    func.walk([](AffineParallelOp op) { Tile(op, {10, 10, 10}); });
-  }
-  std::shared_ptr<TileSizeGenerator> generator;
-  std::shared_ptr<TileCostModel> costModel;
-};
+  };
+  // Call the recursive lambda
+  recurse(recurse, 0);
+  // Return the final result
+  return bestTileSize;
+}
 
 }  // namespace pmlc::dialect::pxa

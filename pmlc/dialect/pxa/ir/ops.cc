@@ -106,6 +106,47 @@ AffineParallelOp::operand_range AffineParallelOp::getUpperBoundsOperands() {
   return {operand_begin() + lowerBoundsMap().getNumInputs(), operand_end()};
 }
 
+size_t AffineParallelOp::getNumDims() { return steps().cast<ArrayAttr>().size(); }
+
+AffineValueMap AffineParallelOp::getLowerBoundsValueMap() {
+  llvm::SmallVector<Value, 8> ops;
+  for (auto op : getLowerBoundsOperands()) {
+    ops.push_back(op);
+  }
+  return AffineValueMap(lowerBoundsMap(), ops);
+}
+
+AffineValueMap AffineParallelOp::getUpperBoundsValueMap() {
+  llvm::SmallVector<Value, 8> ops;
+  for (auto op : getUpperBoundsOperands()) {
+    ops.push_back(op);
+  }
+  return AffineValueMap(upperBoundsMap(), ops);
+}
+
+AffineValueMap AffineParallelOp::getRangesValueMap() {
+  AffineValueMap out;
+  AffineValueMap::difference(getUpperBoundsValueMap(), getLowerBoundsValueMap(), &out);
+  return out;
+}
+
+bool AffineParallelOp::getConstantRanges(llvm::SmallVectorImpl<int64_t>& out) {
+  llvm::SmallVector<int64_t, 8> cache;
+  // Get the ranges
+  AffineValueMap rangesValueMap = getRangesValueMap();
+  // Try to convert them to constants
+  for (size_t i = 0; i < rangesValueMap.getNumResults(); i++) {
+    auto expr = rangesValueMap.getResult(i);
+    if (auto cst = expr.dyn_cast<mlir::AffineConstantExpr>()) {
+      cache.push_back(cst.getValue());
+    } else {
+      return false;
+    }
+  }
+  out = cache;
+  return true;
+}
+
 mlir::Block* AffineParallelOp::getBody() { return &region().front(); }
 
 mlir::OpBuilder AffineParallelOp::getBodyBuilder() { return mlir::OpBuilder(getBody(), std::prev(getBody()->end())); }

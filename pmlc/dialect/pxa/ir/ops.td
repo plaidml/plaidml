@@ -57,7 +57,21 @@ def AffineParallelOp : PXA_Op<"parallel", [ImplicitAffineTerminator]> {
   let extraClassDeclaration = [{
     operand_range getLowerBoundsOperands();
     operand_range getUpperBoundsOperands();
+
+    // Get the number of dimensions (i.e. number of induction variables)    
+    size_t getNumDims();
+
+    // Get various AffineValueMaps
+    AffineValueMap getLowerBoundsValueMap(); 
+    AffineValueMap getUpperBoundsValueMap(); 
+    AffineValueMap getRangesValueMap();
+
+    // Get ranges as constants, return true if it worked (non-dynamic case)
+    bool getConstantRanges(llvm::SmallVectorImpl<int64_t>& out);
     
+    // For a given dimension, check if range is constant.  If so, return, otherwise return -1
+    int64_t getRange(size_t dim);
+
     mlir::Block *getBody();
     mlir::OpBuilder getBodyBuilder();
   }];

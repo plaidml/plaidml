@@ -5,7 +5,7 @@ package(default_visibility = ["//visibility:public"])
 load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_test")
 
 plaidml_cc_library(
-    name = "transforms",
+    name = "lib",
     srcs = [
 	"autotile.cc",
 	"tile.cc",
@@ -18,5 +18,12 @@ plaidml_cc_library(
     deps = [
         "//pmlc/dialect/pxa/ir",
     ],
-    alwayslink=1,
 )
+
+plaidml_cc_library(
+  name = "transforms",
+  srcs = ["registration.cc"],
+  deps = [":lib"],
+  alwayslink = 1,
+)
+

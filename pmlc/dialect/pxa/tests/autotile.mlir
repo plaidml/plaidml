@@ -1,4 +1,4 @@
-// RUN: pmlc-opt -canonicalize %s | FileCheck %s
+// RUN: pmlc-opt -canonicalize -autotile-10 %s | FileCheck %s
 
 #map0 = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<() -> (0, 0, 0)>
@@ -17,6 +17,8 @@ module {
     }) {lowerBoundsMap = #map1, steps = [1, 1, 1], upperBoundsMap = #map2} : () -> ()
     return
   }
+  // CHECK: pxa.parallel
+  // CHECK: pxa.parallel
 }
 
 
