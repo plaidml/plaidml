@@ -953,6 +953,8 @@ plaidml_program* plaidml_program_evaluate(  //
     size_t nupdates,                        //
     plaidml_expr** src_updates,             //
     plaidml_expr** dst_updates,             //
+    plaidml_datatype floatx,                //
+    plaidml_datatype intx,                  //
     plaidml_program_args** raw_args) {
   return ffi_wrap<plaidml_program*>(err, nullptr, [&] {
     IVLOG(3, "plaidml_program_evaluate");
@@ -973,7 +975,17 @@ plaidml_program* plaidml_program_evaluate(  //
       }
       mutations.updates.emplace(ProgramUpdate{src_updates[i]->value, dst_updates[i]->value});
     }
-    auto ret = new plaidml_program{GlobalContext::get()->MakeProgram(name, mutations)};
+
+    auto floatx_dtype = pmlc::util::symbolizeDataType(static_cast<std::uint64_t>(floatx)).getValueOr(DataType::invalid);
+    auto intx_dtype = pmlc::util::symbolizeDataType(static_cast<std::uint64_t>(intx)).getValueOr(DataType::invalid);
+    if (!pmlc::util::isFloat(floatx_dtype)) {
+      throw std::runtime_error("Invalid floatx in plaidml_program_evaluate");
+    }
+    if (!pmlc::util::isInteger(intx_dtype)) {
+      throw std::runtime_error("Invalid intx in plaidml_program_evaluate");
+    }
+
+    auto ret = new plaidml_program{GlobalContext::get()->MakeProgram(name, mutations, floatx_dtype, intx_dtype)};
     assert(noutputs <= ret->program->outputs.size());
     auto nargs = ret->program->arguments.size();
     auto args = new plaidml_program_arg[nargs];

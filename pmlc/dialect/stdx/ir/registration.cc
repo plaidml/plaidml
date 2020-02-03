@@ -6,4 +6,4 @@ namespace pmlc::dialect::stdx {
 
 static mlir::DialectRegistration<Dialect> theDialect;
 
-}  // namespace pmlc::dialect::stdx
+} // namespace pmlc::dialect::stdx

@@ -72,6 +72,7 @@ py_library(
 py_test(
     name = "py_test",
     srcs = ["core_test.py"],
+    args = ["-v"],
     main = "core_test.py",
     deps = [
         ":py",

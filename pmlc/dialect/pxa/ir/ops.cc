@@ -19,8 +19,9 @@ using mlir::success;
 namespace {
 
 template <typename Symbolizer>
-ParseResult parseKeywordIntoEnumAttr(OpAsmParser& parser, OperationState& result, StringRef attrName, Type attrType,
-                                     Symbolizer symbolizer) {
+ParseResult parseKeywordIntoEnumAttr(OpAsmParser &parser,
+                                     OperationState &result, StringRef attrName,
+                                     Type attrType, Symbolizer symbolizer) {
   llvm::SMLoc loc;
   StringRef keyword;
   if (parser.getCurrentLocation(&loc) || parser.parseKeyword(&keyword)) {
@@ -29,7 +30,9 @@ ParseResult parseKeywordIntoEnumAttr(OpAsmParser& parser, OperationState& result
 
   auto enumValue = symbolizer(keyword);
   if (!enumValue) {
-    return parser.emitError(loc) << "'" << keyword << "' is an incorrect value of the '" << attrName << "' attribute";
+    return parser.emitError(loc)
+           << "'" << keyword << "' is an incorrect value of the '" << attrName
+           << "' attribute";
   }
 
   auto intValue = static_cast<int64_t>(enumValue.getValue());
@@ -39,11 +42,12 @@ ParseResult parseKeywordIntoEnumAttr(OpAsmParser& parser, OperationState& result
   return success();
 }
 
-}  // namespace
+} // namespace
 
 // ---- AffineParallelOp ----
 
-void AffineParallelOp::build(Builder* builder, OperationState& result, ArrayRef<int64_t> ranges) {
+void AffineParallelOp::build(Builder *builder, OperationState &result,
+                             ArrayRef<int64_t> ranges) {
   // Default initalize empty maps
   auto lb_map = AffineMap::get(builder->getContext());
   auto ub_map = AffineMap::get(builder->getContext());
@@ -63,7 +67,8 @@ void AffineParallelOp::build(Builder* builder, OperationState& result, ArrayRef<
   build(builder, result, lb_map, {}, ub_map, {});
 }
 
-void AffineParallelOp::build(Builder* builder, OperationState& result, AffineMap lb_map, ValueRange lb_args,
+void AffineParallelOp::build(Builder *builder, OperationState &result,
+                             AffineMap lb_map, ValueRange lb_args,
                              AffineMap ub_map, ValueRange ub_args) {
   // Verify sizes
   size_t idxCount = lb_map.getNumResults();
@@ -74,8 +79,10 @@ void AffineParallelOp::build(Builder* builder, OperationState& result, AffineMap
   build(builder, result, lb_map, lb_args, ub_map, ub_args, steps);
 }
 
-void AffineParallelOp::build(Builder* builder, OperationState& result, AffineMap lb_map, ValueRange lb_args,
-                             AffineMap ub_map, ValueRange ub_args, ArrayRef<int64_t> steps) {
+void AffineParallelOp::build(Builder *builder, OperationState &result,
+                             AffineMap lb_map, ValueRange lb_args,
+                             AffineMap ub_map, ValueRange ub_args,
+                             ArrayRef<int64_t> steps) {
   // Verify sizes
   size_t idxCount = lb_map.getNumResults();
   assert(idxCount == ub_map.getNumResults());
@@ -106,7 +113,9 @@ AffineParallelOp::operand_range AffineParallelOp::getUpperBoundsOperands() {
   return {operand_begin() + lowerBoundsMap().getNumInputs(), operand_end()};
 }
 
-size_t AffineParallelOp::getNumDims() { return steps().cast<ArrayAttr>().size(); }
+size_t AffineParallelOp::getNumDims() {
+  return steps().cast<ArrayAttr>().size();
+}
 
 AffineValueMap AffineParallelOp::getLowerBoundsValueMap() {
   llvm::SmallVector<Value, 8> ops;
@@ -126,11 +135,12 @@ AffineValueMap AffineParallelOp::getUpperBoundsValueMap() {
 
 AffineValueMap AffineParallelOp::getRangesValueMap() {
   AffineValueMap out;
-  AffineValueMap::difference(getUpperBoundsValueMap(), getLowerBoundsValueMap(), &out);
+  AffineValueMap::difference(getUpperBoundsValueMap(), getLowerBoundsValueMap(),
+                             &out);
   return out;
 }
 
-bool AffineParallelOp::getConstantRanges(llvm::SmallVectorImpl<int64_t>& out) {
+bool AffineParallelOp::getConstantRanges(llvm::SmallVectorImpl<int64_t> &out) {
   llvm::SmallVector<int64_t, 8> cache;
   // Get the ranges
   AffineValueMap rangesValueMap = getRangesValueMap();
@@ -147,13 +157,15 @@ bool AffineParallelOp::getConstantRanges(llvm::SmallVectorImpl<int64_t>& out) {
   return true;
 }
 
-mlir::Block* AffineParallelOp::getBody() { return &region().front(); }
+mlir::Block *AffineParallelOp::getBody() { return &region().front(); }
 
-mlir::OpBuilder AffineParallelOp::getBodyBuilder() { return mlir::OpBuilder(getBody(), std::prev(getBody()->end())); }
+mlir::OpBuilder AffineParallelOp::getBodyBuilder() {
+  return mlir::OpBuilder(getBody(), std::prev(getBody()->end()));
+}
 
 // ---- AffineReduceOp ----
 
-void printAffineReduceOp(OpAsmPrinter& p, AffineReduceOp op) {
+void printAffineReduceOp(OpAsmPrinter &p, AffineReduceOp op) {
   p << op.getOperation()->getName() << ' ';
   p << util::stringifyAggregationKind(op.agg()) << ' ';
   p << op.val() << ", ";
@@ -168,24 +180,30 @@ void printAffineReduceOp(OpAsmPrinter& p, AffineReduceOp op) {
 
 // <operation> ::= `pxa.reduce` keyword ssa-use `,` ssa-use `[` ssa-use-list `]`
 //                 attribute-dict? `:` type
-ParseResult parseAffineReduceOp(OpAsmParser& parser, OperationState& result) {
+ParseResult parseAffineReduceOp(OpAsmParser &parser, OperationState &result) {
   auto indexTy = parser.getBuilder().getIndexType();
   auto i64Ty = parser.getBuilder().getIntegerType(64);
   MemRefType type;
   AffineMapAttr mapAttr;
   OpAsmParser::OperandType val, out;
   SmallVector<OpAsmParser::OperandType, 4> idxs;
-  auto symbolizeAggregationKind = [](StringRef str) { return util::symbolizeAggregationKind(str); };
-  return failure(parseKeywordIntoEnumAttr(parser, result, "agg", i64Ty, symbolizeAggregationKind) ||
-                 parser.parseOperand(val) || parser.parseComma() || parser.parseOperand(out) ||
-                 parser.parseAffineMapOfSSAIds(idxs, mapAttr, "map", result.attributes) ||
-                 parser.parseOptionalAttrDict(result.attributes) || parser.parseColonType(type) ||
-                 parser.resolveOperand(val, type.getElementType(), result.operands) ||
-                 parser.resolveOperand(out, type, result.operands) ||
-                 parser.resolveOperands(idxs, indexTy, result.operands));
+  auto symbolizeAggregationKind = [](StringRef str) {
+    return util::symbolizeAggregationKind(str);
+  };
+  return failure(
+      parseKeywordIntoEnumAttr(parser, result, "agg", i64Ty,
+                               symbolizeAggregationKind) ||
+      parser.parseOperand(val) || parser.parseComma() ||
+      parser.parseOperand(out) ||
+      parser.parseAffineMapOfSSAIds(idxs, mapAttr, "map", result.attributes) ||
+      parser.parseOptionalAttrDict(result.attributes) ||
+      parser.parseColonType(type) ||
+      parser.resolveOperand(val, type.getElementType(), result.operands) ||
+      parser.resolveOperand(out, type, result.operands) ||
+      parser.resolveOperands(idxs, indexTy, result.operands));
 }
 
 #define GET_OP_CLASSES
 #include "pmlc/dialect/pxa/ir/ops.cc.inc"
 
-}  // namespace pmlc::dialect::pxa
+} // namespace pmlc::dialect::pxa

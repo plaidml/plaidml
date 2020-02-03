@@ -600,6 +600,30 @@ def TensorIndexes(count):
     return [TensorIndex() for i in range(count)]
 
 
+def Placeholder(dtype_or_shape, dims=[], name=''):
+    """Creates a placeholder tensor, specified either by a combination of data
+       type and dimensions or by passing in a LogicalShape.
+
+        Args:
+            dtype_or_shape (DType | LogicalShape): Specifies either the data 
+            type or the logical shape of the ``Placeholder``.
+            dims (list): Specifies the dimensions of the ``Placeholder``.
+            name (string): Optional name to be assigned to the ``Tensor``.
+
+        Returns:
+            (Tensor): The placeholder ``Tensor``.
+
+    """
+    if isinstance(dtype_or_shape, LogicalShape):
+        shape = dtype_or_shape
+    elif isinstance(dtype_or_shape, DType):
+        shape = LogicalShape(dtype=dtype_or_shape, dims=dims)
+    else:
+        raise TypeError('Unsupported type {} for dtype_or_shape={}'.format(
+            type(dtype_or_shape), dtype_or_shape))
+    return Tensor(shape=shape, name=name)
+
+
 class ProgramArgument:
     """Docstring for class ProgramArgument"""
 
@@ -619,7 +643,7 @@ class Program(ForeignObject):
     __ffi_del__ = lib.plaidml_program_free
     __ffi_repr__ = lib.plaidml_program_repr
 
-    def __init__(self, name, outputs, updates=[]):
+    def __init__(self, name, outputs, updates=[], floatx=DType.FLOAT32, intx=DType.INT32):
         raw_outputs = [x.as_ptr() for x in outputs]
         dst_updates = [x[0].as_ptr() for x in updates]
         src_updates = [x[1].as_ptr() for x in updates]
@@ -632,6 +656,8 @@ class Program(ForeignObject):
             len(updates),
             src_updates,
             dst_updates,
+            floatx,
+            intx,
             raw_args,
         )
         self.args = [ProgramArgument(raw_args[0].args[i]) for i in range(raw_args[0].nargs)]

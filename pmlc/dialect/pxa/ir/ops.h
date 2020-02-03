@@ -54,4 +54,4 @@ namespace OpTrait = mlir::OpTrait;
 #define GET_OP_CLASSES
 #include "pmlc/dialect/pxa/ir/ops.h.inc"
 
-}  // namespace pmlc::dialect::pxa
+} // namespace pmlc::dialect::pxa

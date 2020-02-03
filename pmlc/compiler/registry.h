@@ -9,20 +9,21 @@
 
 namespace mlir {
 class OpPassManager;
-}  // namespace mlir
+} // namespace mlir
 
 namespace pmlc::compiler {
 
-using TargetRegistryFunction = std::function<void(mlir::OpPassManager&)>;
+using TargetRegistryFunction = std::function<void(mlir::OpPassManager &)>;
 
-void registerTarget(llvm::StringRef name, const TargetRegistryFunction& function);
+void registerTarget(llvm::StringRef name,
+                    const TargetRegistryFunction &function);
 TargetRegistryFunction resolveTarget(llvm::StringRef name);
 std::vector<llvm::StringRef> listTargets();
 
 struct TargetRegistration {
-  TargetRegistration(llvm::StringRef name, TargetRegistryFunction builder) {  //
+  TargetRegistration(llvm::StringRef name, TargetRegistryFunction builder) {
     registerTarget(name, builder);
   }
 };
 
-}  // namespace pmlc::compiler
+} // namespace pmlc::compiler

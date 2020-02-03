@@ -38,6 +38,11 @@ repos:
         args:
           - --filter=-legal/copyright,-readability/todo,-build/c++11
           - --linelength=120
+      - id: nbstripout
+        name: nbstripout
+        entry: nbstripout
+        language: python
+        files: '\.ipynb$'
       - id: yapf
         name: yapf
         entry: yapf

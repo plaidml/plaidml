@@ -81,10 +81,13 @@ class Program {
  public:
   ///
   /// Program constructor
-  ///
+  /// floatx is used to specify the underlying datatype of floating-point constants
+  /// intx is used to specify the underlying datatype of integer constants
   Program(                                 //
       const std::string& name,             //
       const std::vector<Tensor>& outputs,  //
+      DType floatx = DType::FLOAT32,       //
+      DType intx = DType::INT32,           //
       const std::vector<std::tuple<Tensor, Tensor>>& updates = {});
 
   ///
@@ -1081,6 +1084,8 @@ inline Tensor zero() { return Tensor{0}; }
 inline Program::Program(                 //
     const std::string& name,             //
     const std::vector<Tensor>& outputs,  //
+    DType floatx,                        //
+    DType intx,                          //
     const std::vector<std::tuple<Tensor, Tensor>>& updates) {
   std::vector<plaidml_expr*> raw_outputs(outputs.size());
   std::vector<plaidml_expr*> new_outputs(outputs.size());
@@ -1108,7 +1113,8 @@ inline Program::Program(                 //
       updates.size(),                                    //
       src_updates.data(),                                //
       dst_updates.data(),                                //
-      &args));
+      static_cast<plaidml_datatype>(floatx),             //
+      static_cast<plaidml_datatype>(intx), &args));
   for (size_t i = 0; i < args->nargs; i++) {
     const auto& arg = args->args[i];
     Tensor tensor(ffi::call<plaidml_expr*>(plaidml_expr_clone, arg.tensor));

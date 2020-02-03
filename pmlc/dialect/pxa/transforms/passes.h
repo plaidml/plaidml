@@ -2,8 +2,4 @@
 
 #pragma once
 
-namespace pmlc::dialect::pxa {
-
-//
-
-}  // namespace pmlc::dialect::pxa
+namespace pmlc::dialect::pxa {} // namespace pmlc::dialect::pxa

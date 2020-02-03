@@ -1,14 +1,9 @@
 //===- utils.cc - MLIR op lib dialect tblgen utils for C++ ----------------===//
-//
 // Copyright 2019 Intel Corporation.
-//
 // =============================================================================
-//
 // Tablegen utilities for the C++ outputs of the op lib dialect. This
 // encompasses things such as headers, includes, and type mappings.
-//
-//===----------------------------------------------------------------------===//
-
+//===----------------------------------------------------------------------===
 #pragma once
 
 #include <map>
@@ -20,7 +15,8 @@ using mlir::StringRef;
 
 namespace pmlc::tools::tblgen::cpp {
 
-static const char* const fileCommentHeader = R"( // Copyright 2019 Intel Corporation.
+static const char *const fileCommentHeader =
+    R"( // Copyright 2019 Intel Corporation.
 /*===- TableGen'erated file -------------------------------------*- C++ -*-===*\
 |*                                                                            *|
 |* Op Lib C++ EDSL Wrapper                                                    *|
@@ -31,7 +27,7 @@ static const char* const fileCommentHeader = R"( // Copyright 2019 Intel Corpora
 
 )";
 
-static const char* const includeHeader = R"(
+static const char *const includeHeader = R"(
 #pragma once
 
 #include <string>
@@ -42,14 +38,12 @@ static const char* const includeHeader = R"(
 
 )";
 
-static const char* const commentHeader = R"(
-//===----------------------------------------------------------------------===//
-// {0} {1}
-//===----------------------------------------------------------------------===//
-
+static const char *const commentHeader = R"(
+//===----------------------------------------------------------------------===// {0} {1}
+//===----------------------------------------------------------------------===
 )";
 
-static const char* const ffiFunction = R"(
+static const char *const ffiFunction = R"(
 namespace details {
 
 inline edsl::Value op(const std::string& name, const edsl::Value& args) {
@@ -60,9 +54,8 @@ inline edsl::Value op(const std::string& name, const edsl::Value& args) {
 
 )";
 
-static const char* const initFunction = R"(
-inline void init() {  //
-  plaidml::init();
+static const char *const initFunction = R"(
+inline void init() {    plaidml::init();
   plaidml::edsl::init();
   ffi::call_void(plaidml_op_init);
 }
@@ -95,4 +88,4 @@ static inline StringRef convertType(const StringRef type) {
   return edslType;
 }
 
-}  // namespace pmlc::tools::tblgen::cpp
+} // namespace pmlc::tools::tblgen::cpp

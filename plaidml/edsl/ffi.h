@@ -413,6 +413,8 @@ plaidml_program* plaidml_program_evaluate(  //
     size_t nupdates,                        //
     plaidml_expr** src_updates,             //
     plaidml_expr** dst_updates,             //
+    plaidml_datatype floatx,                //
+    plaidml_datatype intx,                  //
     plaidml_program_args** args);
 
 plaidml_string* plaidml_program_repr(  //

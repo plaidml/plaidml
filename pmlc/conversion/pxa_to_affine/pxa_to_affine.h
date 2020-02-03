@@ -6,10 +6,10 @@
 
 namespace mlir {
 class Pass;
-}  // namespace mlir
+} // namespace mlir
 
 namespace pmlc::conversion::pxa_to_affine {
 
 std::unique_ptr<mlir::Pass> createLowerPXAToAffinePass();
 
-}  // namespace pmlc::conversion::pxa_to_affine
+} // namespace pmlc::conversion::pxa_to_affine

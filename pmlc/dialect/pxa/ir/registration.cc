@@ -7,4 +7,4 @@ namespace pmlc::dialect::pxa {
 // Static initialization for PXA dialect registration.
 static mlir::DialectRegistration<Dialect> theDialect;
 
-}  // namespace pmlc::dialect::pxa
+} // namespace pmlc::dialect::pxa

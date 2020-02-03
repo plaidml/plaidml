@@ -7,4 +7,4 @@ namespace pmlc::dialect::tile {
 // Static initialization for Tile dialect registration.
 static mlir::DialectRegistration<Dialect> theDialect;
 
-}  // namespace pmlc::dialect::tile
+} // namespace pmlc::dialect::tile

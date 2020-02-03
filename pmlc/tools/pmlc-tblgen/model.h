@@ -1,13 +1,8 @@
-//===- OpModel.h - MLIR op lib model structs -------------------------------===//
-//
-// Copyright 2019 Intel Corporation.
-//
+//===- OpModel.h - MLIR op lib model structs
+//-------------------------------===// Copyright 2019 Intel Corporation.
 // =============================================================================
-//
 // OpModel
-//
-//===----------------------------------------------------------------------===//
-
+//===----------------------------------------------------------------------===
 #pragma once
 
 #include <map>
@@ -33,20 +28,20 @@ struct OpInfo {
   StringRef returnType_;
   MapVector<StringRef, StringRef> attributes_;
   MapVector<StringRef, StringRef> operands_;
-  explicit OpInfo(const Operator& op);
+  explicit OpInfo(const Operator &op);
 };
 
 struct TypeInfo {
   StringRef name_;
   MapVector<StringRef, int> opts_;
   StringRef returnType_;
-  explicit TypeInfo(const EnumAttr& ea);
+  explicit TypeInfo(const EnumAttr &ea);
 };
 
 struct DialectInfo {
   std::vector<OpInfo> all_ops_;
   std::vector<TypeInfo> all_types_;
-  explicit DialectInfo(const RecordKeeper& recordKeeper);
+  explicit DialectInfo(const RecordKeeper &recordKeeper);
 };
 
-}  // namespace pmlc::tools::tblgen
+} // namespace pmlc::tools::tblgen
