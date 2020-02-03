@@ -15,7 +15,8 @@ struct DualMatrix {
   Matrix lhs_;
   Matrix rhs_;
 
-  explicit DualMatrix(const Matrix& m) : size_(m.size1()), lhs_(IdentityMatrix(size_)), rhs_(m) {}
+  explicit DualMatrix(const Matrix &m)
+      : size_(m.size1()), lhs_(IdentityMatrix(size_)), rhs_(m) {}
 
   void swapRows(size_t r1, size_t r2) {
     lhs_.swapRows(r1, r2);
@@ -91,7 +92,8 @@ void Matrix::multRow(size_t r, Rational multiplier) {
   }
 }
 
-void Matrix::addRowMultToRow(size_t dest_row, size_t src_row, const Rational& multiplier) {
+void Matrix::addRowMultToRow(size_t dest_row, size_t src_row,
+                             const Rational &multiplier) {
   if (multiplier != 0) {
     for (size_t i = 0; i < size2(); i++) {
       (*this)(dest_row, i) += multiplier * (*this)(src_row, i);
@@ -137,7 +139,7 @@ std::string Matrix::toString() const {
   return ret;
 }
 
-bool Matrix::operator==(const Matrix& m) {
+bool Matrix::operator==(const Matrix &m) {
   if (size1() != m.size1()) {
     return false;
   }
@@ -154,7 +156,7 @@ bool Matrix::operator==(const Matrix& m) {
   return true;
 }
 
-Vector VectorLit(const std::vector<Rational>& vec) {
+Vector VectorLit(const std::vector<Rational> &vec) {
   Vector r(vec.size());
   for (size_t i = 0; i < vec.size(); i++) {
     r(i) = vec[i];
@@ -162,7 +164,7 @@ Vector VectorLit(const std::vector<Rational>& vec) {
   return r;
 }
 
-Matrix MatrixLit(const std::vector<std::vector<Rational>>& vecs) {
+Matrix MatrixLit(const std::vector<std::vector<Rational>> &vecs) {
   size_t rows = vecs.size();
   size_t columns = vecs[0].size();
   Matrix r(rows, columns);
@@ -177,7 +179,7 @@ Matrix MatrixLit(const std::vector<std::vector<Rational>>& vecs) {
   return r;
 }
 
-bool operator==(const Vector& a, const Vector& b) {
+bool operator==(const Vector &a, const Vector &b) {
   if (a.size() != b.size()) {
     return false;
   }
@@ -189,10 +191,11 @@ bool operator==(const Vector& a, const Vector& b) {
   return true;
 }
 
-std::tuple<Matrix, Vector> FromPolynomials(const std::vector<Polynomial<Rational>>& polys) {
+std::tuple<Matrix, Vector>
+FromPolynomials(const std::vector<Polynomial<Rational>> &polys) {
   std::set<std::string> vars;
   for (size_t i = 0; i < polys.size(); i++) {
-    for (const auto& kvp : polys[i].getMap()) {
+    for (const auto &kvp : polys[i].getMap()) {
       if (kvp.first != "") {
         vars.insert(kvp.first);
       }
@@ -203,7 +206,7 @@ std::tuple<Matrix, Vector> FromPolynomials(const std::vector<Polynomial<Rational
   for (size_t i = 0; i < polys.size(); i++) {
     vec(i) = polys[i].constant();
     size_t j = 0;
-    for (const auto& v : vars) {
+    for (const auto &v : vars) {
       mat(i, j) = polys[i][v];
       j++;
     }
@@ -220,7 +223,8 @@ struct HermiteCompute {
 
   void mult(size_t i, Integer m) {
     if (m != 1 && m != -1) {
-      throw std::runtime_error("Cannot multiply row by nonunit constant in computing HNF.");
+      throw std::runtime_error(
+          "Cannot multiply row by nonunit constant in computing HNF.");
     }
     lhs_.multRow(i, m);
   }
@@ -313,8 +317,9 @@ struct HermiteCompute {
     return ss.str();
   }
 
- public:
-  explicit HermiteCompute(const Matrix& m) : rows_(m.size1()), columns_(m.size2()), lhs_(m) {}
+public:
+  explicit HermiteCompute(const Matrix &m)
+      : rows_(m.size1()), columns_(m.size2()), lhs_(m) {}
 
   bool compute() {
     if (rows_ < columns_) {
@@ -363,11 +368,11 @@ struct HermiteCompute {
   }
 };
 
-bool HermiteNormalForm(Matrix& m) {  // NOLINT(runtime/references)
+bool HermiteNormalForm(Matrix &m) { // NOLINT(runtime/references)
   HermiteCompute hc(m);
   bool r = hc.compute();
   m = hc.lhs_;
   return r;
 }
 
-}  // namespace pmlc::util::math
+} // namespace pmlc::util::math

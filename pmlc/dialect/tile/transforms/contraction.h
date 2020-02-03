@@ -27,7 +27,7 @@ using Shape = llvm::ArrayRef<int64_t>;
 struct Constraints {
   RangeConstraints constraints;
 
-  void AddTensor(const IndexAccess& access, Shape shape);
+  void AddTensor(const IndexAccess &access, Shape shape);
 
   // Searches for any parallel constraints and merges them
   void MergeParallelConstraints();
@@ -43,21 +43,24 @@ struct Constraints {
 struct Contraction {
   explicit Contraction(ContractionOp op);
 
-  BoundsAndConstraints ComputeBounds(llvm::ArrayRef<Shape> shapes, bool no_reduce);
+  BoundsAndConstraints ComputeBounds(llvm::ArrayRef<Shape> shapes,
+                                     bool no_reduce);
   void DeduceRangeConstraints();
 
   std::vector<IndexAccess> accesses;
   SimpleConstraints constraints;
-  // During lowering, will transform all constraints to range constraints, which we track in range_constraints
+  // During lowering, will transform all constraints to range constraints, which
+  // we track in range_constraints
   Constraints range_constraints;
 
- private:
+private:
   std::set<std::string> getIndexVars() const;
 
   // Gathers boths explicit and implied constraints, and removes dups.
   void GatherConstraints(llvm::ArrayRef<Shape> shapes);
 
-  // Adds constraints to the contraction forcing every variable used to be an integer
+  // Adds constraints to the contraction forcing every variable used to be an
+  // integer
   void ConstrainIndexVarsToInts();
 
   bool NeedReduce() const;
@@ -67,10 +70,10 @@ struct Contraction {
   void Defractionalize();
 };
 
-math::Affine Integerize(const IndexPoly& poly, const math::IndexBounds& bounds);
+math::Affine Integerize(const IndexPoly &poly, const math::IndexBounds &bounds);
 
 struct ComputeBoundsPass : public mlir::FunctionPass<ComputeBoundsPass> {
   void runOnFunction() final;
 };
 
-}  // namespace pmlc::dialect::tile
+} // namespace pmlc::dialect::tile

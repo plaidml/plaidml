@@ -7,7 +7,7 @@
 
 namespace pmlc::util::math {
 
-bool BasisBuilder::addEquation(const Polynomial<Rational>& orig) {
+bool BasisBuilder::addEquation(const Polynomial<Rational> &orig) {
   IVLOG(4, "In basis builder, adding poly " << orig);
   // Remove any constants
   Polynomial<Rational> nc = orig - orig.constant();
@@ -30,13 +30,14 @@ bool BasisBuilder::addEquation(const Polynomial<Rational>& orig) {
   added_.push_back(nc);
   reduced_.push_back(p);
   // Add in new variables if any
-  for (const auto& kvp : p.getMap()) {
+  for (const auto &kvp : p.getMap()) {
     if (vars_set_.count(kvp.first) == 0) {
       vars_set_.insert(kvp.first);
       vars_.push_back(kvp.first);
     }
   }
-  // Swap the variable names to make the nth variable nonzero for the nth polynomial
+  // Swap the variable names to make the nth variable nonzero for the nth
+  // polynomial
   size_t i = added_.size() - 1;
   for (size_t j = i; j < vars_.size(); j++) {
     if (p[vars_[j]] != 0) {
@@ -48,4 +49,4 @@ bool BasisBuilder::addEquation(const Polynomial<Rational>& orig) {
   return true;
 }
 
-}  // namespace pmlc::util::math
+} // namespace pmlc::util::math

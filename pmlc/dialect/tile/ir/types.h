@@ -15,32 +15,38 @@ enum Kind {
 };
 }
 
-class AffineTensorMapType : public mlir::Type::TypeBase<AffineTensorMapType, mlir::Type> {
- public:
+class AffineTensorMapType
+    : public mlir::Type::TypeBase<AffineTensorMapType, mlir::Type> {
+public:
   using Base::Base;
-  static AffineTensorMapType get(mlir::MLIRContext* context);
-  static bool kindof(unsigned kind) { return kind == TypeKinds::AffineTensorMap; }
+  static AffineTensorMapType get(mlir::MLIRContext *context);
+  static bool kindof(unsigned kind) {
+    return kind == TypeKinds::AffineTensorMap;
+  }
 };
 
 class AffineMapType : public mlir::Type::TypeBase<AffineMapType, mlir::Type> {
- public:
+public:
   using Base::Base;
-  static AffineMapType get(mlir::MLIRContext* context);
+  static AffineMapType get(mlir::MLIRContext *context);
   static bool kindof(unsigned kind) { return kind == TypeKinds::AffineMap; }
 };
 
-class AffineConstraintsType : public mlir::Type::TypeBase<AffineConstraintsType, mlir::Type> {
- public:
+class AffineConstraintsType
+    : public mlir::Type::TypeBase<AffineConstraintsType, mlir::Type> {
+public:
   using Base::Base;
-  static AffineConstraintsType get(mlir::MLIRContext* context);
-  static bool kindof(unsigned kind) { return kind == TypeKinds::AffineConstraints; }
+  static AffineConstraintsType get(mlir::MLIRContext *context);
+  static bool kindof(unsigned kind) {
+    return kind == TypeKinds::AffineConstraints;
+  }
 };
 
 class StringType : public mlir::Type::TypeBase<StringType, mlir::Type> {
- public:
+public:
   using Base::Base;
-  static StringType get(mlir::MLIRContext* context);
+  static StringType get(mlir::MLIRContext *context);
   static bool kindof(unsigned kind) { return kind == TypeKinds::String; }
 };
 
-}  // namespace pmlc::dialect::tile
+} // namespace pmlc::dialect::tile

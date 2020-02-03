@@ -6,10 +6,10 @@
 
 namespace mlir {
 class Pass;
-}  // namespace mlir
+} // namespace mlir
 
 namespace pmlc::target::x86 {
 
 std::unique_ptr<mlir::Pass> createTraceLinkingPass();
 
-}  // namespace pmlc::target::x86
+} // namespace pmlc::target::x86

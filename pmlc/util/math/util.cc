@@ -14,7 +14,7 @@ Seive::Seive(uint64_t size) : first_factor(size) {
   for (uint64_t i = 3; i < size; i += 2) {
     if (first_factor[i] != i) {
       continue;
-    }  // Skip non-prime
+    } // Skip non-prime
     primes.push_back(i);
     for (uint64_t j = 3 * i; j < size; j += 2 * i) {
       first_factor[j] = std::min(first_factor[j], i);
@@ -70,4 +70,4 @@ uint64_t NumFactors(uint64_t in) {
 
 bool IsPrime(uint64_t in) { return FirstFactor(in) == in; }
 
-}  // namespace pmlc::util::math
+} // namespace pmlc::util::math

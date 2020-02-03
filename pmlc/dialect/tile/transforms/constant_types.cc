@@ -28,17 +28,22 @@ using mlir::PatternRewriter;
 
 using pmlc::dialect::eltwise::ScalarConstantOp;
 
-static llvm::cl::OptionCategory constant_types_options("tile-constant-types options");
+static llvm::cl::OptionCategory
+    constant_types_options("tile-constant-types options");
 
-static llvm::cl::opt<std::string> constant_types_option_floatx("tile-constant-types-floatx", llvm::cl::init("f32"),
-                                                               llvm::cl::desc("set floating-point constant precision"),
-                                                               llvm::cl::cat(constant_types_options));
+static llvm::cl::opt<std::string> constant_types_option_floatx(
+    "tile-constant-types-floatx", llvm::cl::init("f32"),
+    llvm::cl::desc("set floating-point constant precision"),
+    llvm::cl::cat(constant_types_options));
 
-static llvm::cl::opt<std::string> constant_types_option_intx("tile-constant-types-intx", llvm::cl::init("i32"),
-                                                             llvm::cl::desc("set integer constant precision"),
-                                                             llvm::cl::cat(constant_types_options));
+static llvm::cl::opt<std::string>
+    constant_types_option_intx("tile-constant-types-intx",
+                               llvm::cl::init("i32"),
+                               llvm::cl::desc("set integer constant precision"),
+                               llvm::cl::cat(constant_types_options));
 
-static DataType parse_command_line_opt(const llvm::cl::opt<std::string>& option) {
+static DataType
+parse_command_line_opt(const llvm::cl::opt<std::string> &option) {
   auto opt = pmlc::util::symbolizeDataType(option);
   if (!opt.hasValue()) {
     std::stringstream ss;
@@ -49,16 +54,21 @@ static DataType parse_command_line_opt(const llvm::cl::opt<std::string>& option)
 }
 
 struct ConstantTypesRewriter : public OpRewritePattern<ScalarConstantOp> {
-  ConstantTypesRewriter(mlir::MLIRContext* context, DataType floatx, DataType intx)
-      : OpRewritePattern<ScalarConstantOp>(context), floatx_(floatx), intx_(intx) {}
+  ConstantTypesRewriter(mlir::MLIRContext *context, DataType floatx,
+                        DataType intx)
+      : OpRewritePattern<ScalarConstantOp>(context), floatx_(floatx),
+        intx_(intx) {}
 
   DataType floatx_;
   DataType intx_;
 
-  PatternMatchResult matchAndRewrite(ScalarConstantOp constOp, PatternRewriter& rewriter) const override;
+  PatternMatchResult matchAndRewrite(ScalarConstantOp constOp,
+                                     PatternRewriter &rewriter) const override;
 };
 
-PatternMatchResult ConstantTypesRewriter::matchAndRewrite(ScalarConstantOp constOp, PatternRewriter& rewriter) const {
+PatternMatchResult
+ConstantTypesRewriter::matchAndRewrite(ScalarConstantOp constOp,
+                                       PatternRewriter &rewriter) const {
   IVLOG(3, "ConstantTypesPass::matchAndRewrite");
 
   auto type = constOp.getType();
@@ -99,8 +109,9 @@ PatternMatchResult ConstantTypesRewriter::matchAndRewrite(ScalarConstantOp const
 }
 
 struct ConstantTypesPass : public OperationPass<ConstantTypesPass> {
-  ConstantTypesPass(DataType floatx = parse_command_line_opt(constant_types_option_floatx),
-                    DataType intx = parse_command_line_opt(constant_types_option_intx))
+  ConstantTypesPass(
+      DataType floatx = parse_command_line_opt(constant_types_option_floatx),
+      DataType intx = parse_command_line_opt(constant_types_option_intx))
       : floatx_(floatx), intx_(intx) {}
 
   void runOnOperation() final;
@@ -115,11 +126,12 @@ void ConstantTypesPass::runOnOperation() {
   applyPatternsGreedily(getOperation()->getRegions(), patterns);
 }
 
-std::unique_ptr<mlir::Pass> createConstantTypesPass(DataType floatx, DataType intx) {
+std::unique_ptr<mlir::Pass> createConstantTypesPass(DataType floatx,
+                                                    DataType intx) {
   return std::make_unique<ConstantTypesPass>(floatx, intx);
 }
 
-static mlir::PassRegistration<ConstantTypesPass> constant_types_pass("tile-constant-types",
-                                                                     "Set constant types precision");
+static mlir::PassRegistration<ConstantTypesPass>
+    constant_types_pass("tile-constant-types", "Set constant types precision");
 
-}  // namespace pmlc::dialect::tile
+} // namespace pmlc::dialect::tile

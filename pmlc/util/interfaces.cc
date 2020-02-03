@@ -6,4 +6,4 @@ namespace pmlc::util {
 
 #include "pmlc/util/interfaces.cc.inc"
 
-}  // namespace pmlc::util
+} // namespace pmlc::util
