@@ -1,21 +1,17 @@
 // Copyright 2019, Intel Corporation
 
-#include "mlir/Conversion/LoopToStandard/ConvertLoopToStandard.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
-#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
-#include "mlir/IR/Builders.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
-#include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
 
 #include "pmlc/compiler/registry.h"
 #include "pmlc/conversion/pxa_to_affine/pxa_to_affine.h"
+#include "pmlc/conversion/stdx_to_llvm/stdx_to_llvm.h"
 #include "pmlc/target/x86/trace_linking.h"
 #include "pmlc/util/logging.h"
 
 using namespace mlir;  // NOLINT[build/namespaces]
-using pmlc::conversion::pxa_to_affine::createLowerPXAToAffinePass;
 
 namespace pmlc::target::x86 {
 
@@ -24,7 +20,7 @@ namespace {
 void addToPipeline(OpPassManager& pm) {
   // TODO: do optimizations here
 
-  pm.addPass(createLowerPXAToAffinePass());
+  pm.addPass(conversion::pxa_to_affine::createLowerPXAToAffinePass());
   pm.addNestedPass<FuncOp>(createCanonicalizerPass());
   pm.addNestedPass<FuncOp>(createCSEPass());
 
@@ -32,7 +28,7 @@ void addToPipeline(OpPassManager& pm) {
   pm.addNestedPass<FuncOp>(createCanonicalizerPass());
   pm.addNestedPass<FuncOp>(createCSEPass());
 
-  pm.addPass(createLowerToLLVMPass(true));
+  pm.addPass(conversion::stdx_to_llvm::createLowerToLLVMPass());
   pm.addPass(createTraceLinkingPass());
 }
 

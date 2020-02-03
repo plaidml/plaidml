@@ -1,48 +1,108 @@
-// namespace {
+// Copyright 2020, Intel Corporation
 
-// /// A pass converting MLIR operations into the LLVM IR dialect.
-// struct LLVMLoweringPass : public ModulePass<LLVMLoweringPass> {
-//   // By default, the patterns are those converting Standard operations to the
-//   // LLVMIR dialect.
-//   explicit LLVMLoweringPass(bool useAlloca = false,
-//                             LLVMPatternListFiller patternListFiller = populateStdToLLVMConversionPatterns,
-//                             LLVMTypeConverterMaker converterBuilder = makeStandardToLLVMTypeConverter)
-//       : patternListFiller(patternListFiller), typeConverterMaker(converterBuilder) {}
+#include "pmlc/conversion/stdx_to_llvm/stdx_to_llvm.h"
 
-//   // Run the dialect converter on the module.
-//   void runOnModule() override {
-//     if (!typeConverterMaker || !patternListFiller) return signalPassFailure();
+#include "mlir/ADT/TypeSwitch.h"
+#include "mlir/Conversion/LoopToStandard/ConvertLoopToStandard.h"
+#include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
+#include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
+#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/Dialect/StandardOps/Ops.h"
+#include "mlir/Pass/Pass.h"
 
-//     ModuleOp m = getModule();
-//     LLVM::ensureDistinctSuccessors(m);
-//     std::unique_ptr<LLVMTypeConverter> typeConverter = typeConverterMaker(&getContext());
-//     if (!typeConverter) return signalPassFailure();
+#include "pmlc/dialect/stdx/ir/ops.h"
 
-//     OwningRewritePatternList patterns;
-//     populateLoopToStdConversionPatterns(patterns, m.getContext());
-//     patternListFiller(*typeConverter, patterns);
+using namespace mlir;  // NOLINT[build/namespaces]
 
-//     ConversionTarget target(getContext());
-//     target.addLegalDialect<LLVM::LLVMDialect>();
-//     if (failed(applyPartialConversion(m, target, patterns, &*typeConverter))) signalPassFailure();
-//   }
+namespace pmlc::conversion::stdx_to_llvm {
 
-//   // Callback for creating a list of patterns.  It is called every time in
-//   // runOnModule since applyPartialConversion consumes the list.
-//   LLVMPatternListFiller patternListFiller;
+namespace stdx = dialect::stdx;
 
-//   // Callback for creating an instance of type converter.  The converter
-//   // constructor needs an MLIRContext, which is not available until runOnModule.
-//   LLVMTypeConverterMaker typeConverterMaker;
-// };
+namespace {
 
-// }  // end namespace
+template <typename SourceOp>
+class LLVMLegalizationPattern : public LLVMOpLowering {
+ public:
+  explicit LLVMLegalizationPattern(LLVMTypeConverter& converter)
+      : LLVMOpLowering(SourceOp::getOperationName(), converter.getDialect()->getContext(), converter) {}
 
-// static PassRegistration<LLVMLoweringPass> pass(  //
-//     "convert-std-to-llvm",
-//     "Convert scalar and vector operations from the "
-//     "Standard to the LLVM dialect",
-//     [] {
-//       return std::make_unique<LLVMLoweringPass>(clUseAlloca.getValue(), populateStdToLLVMConversionPatterns,
-//                                                 makeStandardToLLVMTypeConverter);
-//     });
+ protected:
+  LLVM::LLVMDialect& getDialect() const { return lowering.getDialect(); }
+};
+
+Optional<LLVM::AtomicBinOp> matchBinOp(stdx::AtomicRMWOp op) {
+  auto* body = op.getBody();
+  auto* terminator = body->getTerminator();
+  auto yieldOp = llvm::cast<stdx::AtomicRMWYieldOp>(terminator);
+  auto defOp = yieldOp.result().getDefiningOp();
+  return TypeSwitch<Operation*, Optional<LLVM::AtomicBinOp>>(defOp)
+      .Case<AddFOp>([](AddFOp op) { return LLVM::AtomicBinOp::fadd; })
+      .Case<SubFOp>([](SubFOp op) { return LLVM::AtomicBinOp::fsub; })
+      .Case<AddIOp>([](AddIOp op) { return LLVM::AtomicBinOp::add; })
+      .Case<SubIOp>([](SubIOp op) { return LLVM::AtomicBinOp::sub; })
+      .Default([](Operation* op) { return llvm::None; });
+}
+
+struct AtomicRMWOpLowering : public LLVMLegalizationPattern<stdx::AtomicRMWOp> {
+  using LLVMLegalizationPattern<stdx::AtomicRMWOp>::LLVMLegalizationPattern;
+
+  PatternMatchResult matchAndRewrite(Operation* op, ArrayRef<Value> operands,
+                                     ConversionPatternRewriter& rewriter) const override {
+    auto atomicOp = llvm::cast<stdx::AtomicRMWOp>(op);
+    auto binOp = matchBinOp(atomicOp);
+    if (!binOp.hasValue()) {
+      return matchFailure();
+    }
+    rewriter.eraseOp(op);
+    return matchSuccess();
+  }
+};
+
+struct CmpXchgLowering : public LLVMLegalizationPattern<stdx::AtomicRMWOp> {
+  using LLVMLegalizationPattern<stdx::AtomicRMWOp>::LLVMLegalizationPattern;
+
+  PatternMatchResult matchAndRewrite(Operation* op, ArrayRef<Value> operands,
+                                     ConversionPatternRewriter& rewriter) const override {
+    auto atomicOp = llvm::cast<stdx::AtomicRMWOp>(op);
+    auto binOp = matchBinOp(atomicOp);
+    if (binOp.hasValue()) {
+      return matchFailure();
+    }
+    rewriter.eraseOp(op);
+    return matchSuccess();
+  }
+};
+
+void populateStdXToLLVMConversionPatterns(LLVMTypeConverter& converter, OwningRewritePatternList& patterns) {
+  patterns.insert<AtomicRMWOpLowering, CmpXchgLowering>(converter);
+}
+
+/// A pass converting MLIR operations into the LLVM IR dialect.
+struct LLVMLoweringPass : public ModulePass<LLVMLoweringPass> {
+  // Run the dialect converter on the module.
+  void runOnModule() override {
+    ModuleOp module = getModule();
+    auto context = module.getContext();
+    LLVM::ensureDistinctSuccessors(module);
+    LLVMTypeConverter typeConverter(context);
+
+    OwningRewritePatternList patterns;
+    populateLoopToStdConversionPatterns(patterns, context);
+    populateStdToLLVMConversionPatterns(typeConverter, patterns);
+    populateStdXToLLVMConversionPatterns(typeConverter, patterns);
+
+    ConversionTarget target(*context);
+    target.addLegalDialect<LLVM::LLVMDialect>();
+    if (failed(applyPartialConversion(module, target, patterns, &typeConverter))) {
+      signalPassFailure();
+    }
+  }
+};
+
+static PassRegistration<LLVMLoweringPass> pass("convert-stdx-to-llvm", "Convert stdx to the LLVM dialect");
+
+}  // namespace
+
+std::unique_ptr<mlir::Pass> createLowerToLLVMPass() { return std::make_unique<LLVMLoweringPass>(); }
+
+}  // namespace pmlc::conversion::stdx_to_llvm

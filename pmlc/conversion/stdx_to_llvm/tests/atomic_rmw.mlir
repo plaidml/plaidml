@@ -1,13 +1,10 @@
 // RUN: pmlc-opt %s | pmlc-opt | FileCheck %s
 
-func @std_for(%A: memref<10xf32>) {
-  %c0 = constant 0 : index
-  %c1 = constant 1 : index
-  %c10 = constant 10 : index
+func @atomic_rmw(%I: memref<10xf32>, %i : index) {
   %cst = constant 1.0 : f32
-  loop.for %i = %c0 to %c10 step %c1 {
-    %0 = load %A[%i] : memref<10xf32>
-    %sum = addf %0, %cst : f32
+  stdx.atomic_rmw %val = %I[%i] : memref<10xf32> {
+    %0 = addf %val, %cst : f32
+    stdx.atomic_rmw.yield %0 : f32
   }
   return
 }
