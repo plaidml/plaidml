@@ -188,11 +188,11 @@ TEST_F(CppEdsl, BitLeft) {
   checkProgram(program, {{A, A_input}, {B, B_input}}, {{C, C_output}});
 }
 
-TEST_F(CppEdsl, BitRight) {
+TEST_F(CppEdsl, BitRightTensor) {
   auto A = Placeholder(DType::UINT64, {3, 3});
   auto B = Placeholder(DType::UINT64, {3, 3});
   auto C = A >> B;
-  Program program("bit_right", {C});
+  Program program("bit_right_tensor", {C});
 
   std::vector<std::uint64_t> A_input{1 << 10, 2 << 11, 3 << 12,  //
                                      4 << 13, 5 << 14, 6 << 15,  //
@@ -204,6 +204,20 @@ TEST_F(CppEdsl, BitRight) {
                                       4, 5, 6,  //
                                       7, 8, 9};
   checkProgram(program, {{A, A_input}, {B, B_input}}, {{C, C_output}});
+}
+
+TEST_F(CppEdsl, BitRightScalar) {
+  auto A = Placeholder(DType::UINT64, {3, 3});
+  auto B = A >> 9;
+  Program program("bit_right_scalar", {B});
+
+  std::vector<std::uint64_t> A_input{1 << 10, 2 << 11, 3 << 12,  //
+                                     4 << 13, 5 << 14, 6 << 15,  //
+                                     7 << 16, 8 << 17, 9 << 18};
+  std::vector<std::uint64_t> B_output{1 << 1, 2 << 2, 3 << 3,  //
+                                      4 << 4, 5 << 5, 6 << 6,  //
+                                      7 << 7, 8 << 8, 9 << 9};
+  checkProgram(program, {{A, A_input}}, {{B, B_output}});
 }
 
 TEST_F(CppEdsl, BitXor) {
