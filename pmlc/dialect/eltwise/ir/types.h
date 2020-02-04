@@ -23,24 +23,29 @@ struct ScalarTypeStorage : public mlir::TypeStorage {
   explicit ScalarTypeStorage(DataType type) : type(type) {}
 
   using KeyTy = int;
-  bool operator==(const KeyTy& key) const { return static_cast<int>(type) == key; }
-  static llvm::hash_code hashKey(const KeyTy& key) { return key; }
+  bool operator==(const KeyTy &key) const {
+    return static_cast<int>(type) == key;
+  }
+  static llvm::hash_code hashKey(const KeyTy &key) { return key; }
   static KeyTy getKey(DataType type) { return static_cast<int>(type); }
 
-  static ScalarTypeStorage* construct(mlir::TypeStorageAllocator& allocator, const KeyTy& key) {
-    return new (allocator.allocate<ScalarTypeStorage>()) ScalarTypeStorage(static_cast<DataType>(key));
+  static ScalarTypeStorage *construct(mlir::TypeStorageAllocator &allocator,
+                                      const KeyTy &key) {
+    return new (allocator.allocate<ScalarTypeStorage>()) ScalarTypeStorage(
+        static_cast<DataType>(key)); // NOLINT [runtime/explicit]
   }
 
   DataType type;
 };
 
-class ScalarType : public mlir::Type::TypeBase<ScalarType, mlir::Type, ScalarTypeStorage> {
- public:
+class ScalarType
+    : public mlir::Type::TypeBase<ScalarType, mlir::Type, ScalarTypeStorage> {
+public:
   using Base::Base;
 
   static bool kindof(unsigned kind) { return kind == Kinds::Scalar; }
 
-  static ScalarType get(mlir::MLIRContext* context, DataType type) {  //
+  static ScalarType get(mlir::MLIRContext *context, DataType type) {
     return Base::get(context, Kinds::Scalar, type);
   }
 
@@ -48,4 +53,4 @@ class ScalarType : public mlir::Type::TypeBase<ScalarType, mlir::Type, ScalarTyp
   Type toStandard();
 };
 
-}  // namespace pmlc::dialect::eltwise
+} // namespace pmlc::dialect::eltwise

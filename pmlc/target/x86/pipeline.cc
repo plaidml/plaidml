@@ -11,13 +11,13 @@
 #include "pmlc/target/x86/trace_linking.h"
 #include "pmlc/util/logging.h"
 
-using namespace mlir;  // NOLINT[build/namespaces]
+using namespace mlir; // NOLINT[build/namespaces]
 
 namespace pmlc::target::x86 {
 
 namespace {
 
-void addToPipeline(OpPassManager& pm) {
+void addToPipeline(OpPassManager &pm) {
   // TODO: do optimizations here
 
   pm.addPass(conversion::pxa_to_affine::createLowerPXAToAffinePass());
@@ -32,9 +32,10 @@ void addToPipeline(OpPassManager& pm) {
   pm.addPass(createTraceLinkingPass());
 }
 
-static PassPipelineRegistration<> passPipelineReg("target-cpu", "Target pipeline for CPU", addToPipeline);
+static PassPipelineRegistration<>
+    passPipelineReg("target-cpu", "Target pipeline for CPU", addToPipeline);
 static compiler::TargetRegistration targetReg("llvm_cpu", addToPipeline);
 
-}  // namespace
+} // namespace
 
-}  // namespace pmlc::target::x86
+} // namespace pmlc::target::x86

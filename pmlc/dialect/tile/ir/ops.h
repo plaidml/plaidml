@@ -70,4 +70,4 @@ namespace OpTrait = mlir::OpTrait;
 #define GET_OP_CLASSES
 #include "pmlc/dialect/tile/ir/ops.h.inc"
 
-}  // namespace pmlc::dialect::tile
+} // namespace pmlc::dialect::tile

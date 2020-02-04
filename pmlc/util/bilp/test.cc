@@ -6,7 +6,7 @@
 
 namespace pmlc::util::bilp {
 
-using namespace math;  // NOLINT
+using namespace math; // NOLINT
 
 TEST(BilpTest, TestTest) { EXPECT_EQ(0, 0); }
 
@@ -101,10 +101,12 @@ TEST(BilpTest, SimpleOptimizeTest) {
 
 TEST(BilpTest, OptimizeTest2D) {
   std::vector<RangeConstraint> constraints;
-  constraints.emplace_back(Polynomial<Rational>("x") + Polynomial<Rational>("y") + 2, 4);
+  constraints.emplace_back(
+      Polynomial<Rational>("x") + Polynomial<Rational>("y") + 2, 4);
   constraints.emplace_back(Polynomial<Rational>("x") + 1, 4);
   constraints.emplace_back(Polynomial<Rational>("y") + 2, 5);
-  Polynomial<Rational> obj = -3 * Polynomial<Rational>("x") + 2 * Polynomial<Rational>("y");
+  Polynomial<Rational> obj =
+      -3 * Polynomial<Rational>("x") + 2 * Polynomial<Rational>("y");
   Tableau t = makeStandardFormTableau(constraints, obj);
   EXPECT_EQ(t.makeOptimal(), true);
 
@@ -122,10 +124,12 @@ TEST(BilpTest, OptimizeTest2D) {
 
 TEST(BilpTest, TrivialILPTest) {
   std::vector<RangeConstraint> constraints;
-  constraints.emplace_back(Polynomial<Rational>("x") + Polynomial<Rational>("y") + 2, 4);
+  constraints.emplace_back(
+      Polynomial<Rational>("x") + Polynomial<Rational>("y") + 2, 4);
   constraints.emplace_back(Polynomial<Rational>("x") + 1, 4);
   constraints.emplace_back(Polynomial<Rational>("y") + 2, 5);
-  Polynomial<Rational> obj = -3 * Polynomial<Rational>("x") + 2 * Polynomial<Rational>("y");
+  Polynomial<Rational> obj =
+      -3 * Polynomial<Rational>("x") + 2 * Polynomial<Rational>("y");
   ILPSolver solver;
   Tableau t = makeStandardFormTableau(constraints, obj);
   ILPResult res = solver.solve(t);
@@ -138,10 +142,12 @@ TEST(BilpTest, TrivialILPTest) {
 
 TEST(BilpTest, ILPTest2D) {
   std::vector<RangeConstraint> constraints;
-  constraints.emplace_back(2 * Polynomial<Rational>("x") + Polynomial<Rational>("y") + 2, 6);
+  constraints.emplace_back(
+      2 * Polynomial<Rational>("x") + Polynomial<Rational>("y") + 2, 6);
   constraints.emplace_back(Polynomial<Rational>("x") + 1, 4);
   constraints.emplace_back(Polynomial<Rational>("y") + 2, 5);
-  Polynomial<Rational> obj = -3 * Polynomial<Rational>("x") + 2 * Polynomial<Rational>("y");
+  Polynomial<Rational> obj =
+      -3 * Polynomial<Rational>("x") + 2 * Polynomial<Rational>("y");
   ILPSolver solver;
   ILPResult res = solver.solve(constraints, obj);
 
@@ -154,9 +160,14 @@ TEST(BilpTest, ILPTest2D) {
 TEST(BilpTest, Subdivision1D) {
   std::vector<RangeConstraint> constraints;
   constraints.emplace_back(Polynomial<Rational>("i_0"), 2);
-  constraints.emplace_back(Polynomial<Rational>("i_0") + 2 * Polynomial<Rational>("k_0"), 5);
-  constraints.emplace_back(Polynomial<Rational>("i_0") + Polynomial<Rational>("i_1") + Polynomial<Rational>("k_0"), 35);
-  constraints.emplace_back(Polynomial<Rational>("i_0") + 2 * Polynomial<Rational>("i_1"), 70);
+  constraints.emplace_back(
+      Polynomial<Rational>("i_0") + 2 * Polynomial<Rational>("k_0"), 5);
+  constraints.emplace_back(Polynomial<Rational>("i_0") +
+                               Polynomial<Rational>("i_1") +
+                               Polynomial<Rational>("k_0"),
+                           35);
+  constraints.emplace_back(
+      Polynomial<Rational>("i_0") + 2 * Polynomial<Rational>("i_1"), 70);
 
   std::vector<Polynomial<Rational>> objectives;
   objectives.emplace_back(Polynomial<Rational>("i_0"));
@@ -166,7 +177,8 @@ TEST(BilpTest, Subdivision1D) {
   objectives.emplace_back(Polynomial<Rational>("k_0"));
   objectives.emplace_back(-Polynomial<Rational>("k_0"));
   ILPSolver solver;
-  std::map<Polynomial<Rational>, ILPResult> res = solver.batch_solve(constraints, objectives);
+  std::map<Polynomial<Rational>, ILPResult> res =
+      solver.batch_solve(constraints, objectives);
 
   EXPECT_EQ(res[Polynomial<Rational>("i_0")].obj_val, 0);
   EXPECT_EQ(res[-Polynomial<Rational>("i_0")].obj_val, -1);
@@ -184,14 +196,21 @@ TEST(MilpTest, RandomConstraintsTest) {
     constraints.emplace_back(Polynomial<Rational>("y"), varSize);
     constraints.emplace_back(Polynomial<Rational>("z"), varSize);
     constraints.emplace_back(Polynomial<Rational>("w"), varSize);
-    for (int i = 0; i < rand() % 4 + 2; ++i) {                           // NOLINT (runtime/threadsafe_fn)
-      Rational x_coeff = Rational(rand() % 9 - 4, rand() % 4 + 1);       // NOLINT (runtime/threadsafe_fn)
-      Rational y_coeff = Rational(rand() % 11 - 5, rand() % 3 + 1);      // NOLINT (runtime/threadsafe_fn)
-      Rational z_coeff = Rational(rand() % 11 - 5, rand() % 5 + 1);      // NOLINT (runtime/threadsafe_fn)
-      Rational w_coeff = Rational(rand() % 15 - 7, rand() % 4 + 1);      // NOLINT (runtime/threadsafe_fn)
-      Rational const_term = Rational(rand() % 31 - 20, rand() % 4 + 1);  // NOLINT (runtime/threadsafe_fn)
-      constraints.emplace_back(x_coeff * Polynomial<Rational>("x") + y_coeff * Polynomial<Rational>("y") +
-                                   z_coeff * Polynomial<Rational>("z") + w_coeff * Polynomial<Rational>("w") +
+    for (int i = 0; i < rand() % 4 + 2; ++i) { // NOLINT (runtime/threadsafe_fn)
+      Rational x_coeff = Rational(
+          rand() % 9 - 4, rand() % 4 + 1); // NOLINT (runtime/threadsafe_fn)
+      Rational y_coeff = Rational(
+          rand() % 11 - 5, rand() % 3 + 1); // NOLINT (runtime/threadsafe_fn)
+      Rational z_coeff = Rational(
+          rand() % 11 - 5, rand() % 5 + 1); // NOLINT (runtime/threadsafe_fn)
+      Rational w_coeff = Rational(
+          rand() % 15 - 7, rand() % 4 + 1); // NOLINT (runtime/threadsafe_fn)
+      Rational const_term = Rational(
+          rand() % 31 - 20, rand() % 4 + 1); // NOLINT (runtime/threadsafe_fn)
+      constraints.emplace_back(x_coeff * Polynomial<Rational>("x") +
+                                   y_coeff * Polynomial<Rational>("y") +
+                                   z_coeff * Polynomial<Rational>("z") +
+                                   w_coeff * Polynomial<Rational>("w") +
                                    const_term,
                                rand() % 10 + 12);
     }
@@ -216,7 +235,7 @@ TEST(MilpTest, RandomConstraintsTest) {
           for (int w = 0; w < varSize; ++w) {
             values["w"] = w;
             bool is_feasible_here = true;
-            for (const RangeConstraint& c : constraints) {
+            for (const RangeConstraint &c : constraints) {
               Rational value = c.poly.eval(values);
               if (value < 0 || c.range <= value || value != Floor(value)) {
                 is_feasible_here = false;
@@ -265,12 +284,14 @@ TEST(MilpTest, RandomConstraintsTest) {
     objectives.emplace_back(Polynomial<Rational>("w", -1));
     if (is_feasible) {
       ILPSolver solver;
-      std::map<Polynomial<Rational>, ILPResult> result = solver.batch_solve(constraints, objectives);
-      for (const auto& kvp : result) {
+      std::map<Polynomial<Rational>, ILPResult> result =
+          solver.batch_solve(constraints, objectives);
+      for (const auto &kvp : result) {
         std::string var = kvp.first.GetNonzeroIndex();
         Rational obj_val = kvp.second.obj_val;
         if (obj_val < 0 || obj_val >= varSize) {
-          // This result would not have been found in brute force search, so skip
+          // This result would not have been found in brute force search, so
+          // skip
           continue;
         }
         if (kvp.first[var] == 1) {
@@ -283,7 +304,8 @@ TEST(MilpTest, RandomConstraintsTest) {
           } else if (var == "w") {
             EXPECT_EQ(w_min, obj_val);
           } else {
-            throw std::logic_error("Unexpected variable in RandomConstraintsTest");
+            throw std::logic_error(
+                "Unexpected variable in RandomConstraintsTest");
           }
         } else if (kvp.first[var] == -1) {
           if (var == "x") {
@@ -295,7 +317,8 @@ TEST(MilpTest, RandomConstraintsTest) {
           } else if (var == "w") {
             EXPECT_EQ(w_max, -obj_val);
           } else {
-            throw std::logic_error("Unexpected variable in RandomConstraintsTest");
+            throw std::logic_error(
+                "Unexpected variable in RandomConstraintsTest");
           }
         }
       }
@@ -303,4 +326,4 @@ TEST(MilpTest, RandomConstraintsTest) {
   }
 }
 
-}  // namespace pmlc::util::bilp
+} // namespace pmlc::util::bilp

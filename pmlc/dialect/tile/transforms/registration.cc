@@ -6,8 +6,7 @@
 
 namespace pmlc::dialect::tile {
 
-static mlir::PassRegistration<ComputeBoundsPass> pass(  //
-    "tile-compute-bounds",                              //
-    "Compute bounds for contractions");
+static mlir::PassRegistration<ComputeBoundsPass>
+    pass("tile-compute-bounds", "Compute bounds for contractions");
 
-}  // namespace pmlc::dialect::tile
+} // namespace pmlc::dialect::tile

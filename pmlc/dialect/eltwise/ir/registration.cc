@@ -7,4 +7,4 @@ namespace pmlc::dialect::eltwise {
 // Static initialization for Eltwise dialect registration.
 static mlir::DialectRegistration<Dialect> theDialect;
 
-}  // namespace pmlc::dialect::eltwise
+} // namespace pmlc::dialect::eltwise

@@ -19,8 +19,9 @@ using mlir::success;
 namespace {
 
 template <typename Symbolizer>
-ParseResult parseKeywordIntoEnumAttr(OpAsmParser& parser, OperationState& result, StringRef attrName, Type attrType,
-                                     Symbolizer symbolizer) {
+ParseResult parseKeywordIntoEnumAttr(OpAsmParser &parser,
+                                     OperationState &result, StringRef attrName,
+                                     Type attrType, Symbolizer symbolizer) {
   llvm::SMLoc loc;
   StringRef keyword;
   if (parser.getCurrentLocation(&loc) || parser.parseKeyword(&keyword)) {
@@ -29,7 +30,9 @@ ParseResult parseKeywordIntoEnumAttr(OpAsmParser& parser, OperationState& result
 
   auto enumValue = symbolizer(keyword);
   if (!enumValue) {
-    return parser.emitError(loc) << "'" << keyword << "' is an incorrect value of the '" << attrName << "' attribute";
+    return parser.emitError(loc)
+           << "'" << keyword << "' is an incorrect value of the '" << attrName
+           << "' attribute";
   }
 
   auto intValue = static_cast<int64_t>(enumValue.getValue());
@@ -39,11 +42,12 @@ ParseResult parseKeywordIntoEnumAttr(OpAsmParser& parser, OperationState& result
   return success();
 }
 
-}  // namespace
+} // namespace
 
 // ---- AffineParallelOp ----
 
-void AffineParallelOp::build(Builder* builder, OperationState& result, ArrayRef<int64_t> ranges) {
+void AffineParallelOp::build(Builder *builder, OperationState &result,
+                             ArrayRef<int64_t> ranges) {
   SmallVector<AffineExpr, 8> lbExprs;
   SmallVector<AffineExpr, 8> ubExprs;
   // Make range expressions for each range
@@ -53,11 +57,15 @@ void AffineParallelOp::build(Builder* builder, OperationState& result, ArrayRef<
   }
   // Make the maps (handling the 0-dim case carefully)
   if (ranges.size()) {
-    result.addAttribute("lowerBoundsMap", AffineMapAttr::get(AffineMap::get(0, 0, lbExprs)));
-    result.addAttribute("upperBoundsMap", AffineMapAttr::get(AffineMap::get(0, 0, ubExprs)));
+    result.addAttribute("lowerBoundsMap",
+                        AffineMapAttr::get(AffineMap::get(0, 0, lbExprs)));
+    result.addAttribute("upperBoundsMap",
+                        AffineMapAttr::get(AffineMap::get(0, 0, ubExprs)));
   } else {
-    result.addAttribute("lowerBoundsMap", AffineMapAttr::get(AffineMap::get(builder->getContext())));
-    result.addAttribute("upperBoundsMap", AffineMapAttr::get(AffineMap::get(builder->getContext())));
+    result.addAttribute("lowerBoundsMap", AffineMapAttr::get(AffineMap::get(
+                                              builder->getContext())));
+    result.addAttribute("upperBoundsMap", AffineMapAttr::get(AffineMap::get(
+                                              builder->getContext())));
   }
   SmallVector<int64_t, 8> steps(ranges.size(), 1);
   result.addAttribute("steps", builder->getI64ArrayAttr(steps));
@@ -81,13 +89,15 @@ AffineParallelOp::operand_range AffineParallelOp::getUpperBoundsOperands() {
   return {operand_begin() + lowerBoundsMap().getNumInputs(), operand_end()};
 }
 
-mlir::Block* AffineParallelOp::getBody() { return &region().front(); }
+mlir::Block *AffineParallelOp::getBody() { return &region().front(); }
 
-mlir::OpBuilder AffineParallelOp::getBodyBuilder() { return mlir::OpBuilder(getBody(), std::prev(getBody()->end())); }
+mlir::OpBuilder AffineParallelOp::getBodyBuilder() {
+  return mlir::OpBuilder(getBody(), std::prev(getBody()->end()));
+}
 
 // ---- AffineReduceOp ----
 
-void printAffineReduceOp(OpAsmPrinter& p, AffineReduceOp op) {
+void printAffineReduceOp(OpAsmPrinter &p, AffineReduceOp op) {
   p << op.getOperation()->getName() << ' ';
   p << util::stringifyAggregationKind(op.agg()) << ' ';
   p << op.val() << ", ";
@@ -102,24 +112,30 @@ void printAffineReduceOp(OpAsmPrinter& p, AffineReduceOp op) {
 
 // <operation> ::= `pxa.reduce` keyword ssa-use `,` ssa-use `[` ssa-use-list `]`
 //                 attribute-dict? `:` type
-ParseResult parseAffineReduceOp(OpAsmParser& parser, OperationState& result) {
+ParseResult parseAffineReduceOp(OpAsmParser &parser, OperationState &result) {
   auto indexTy = parser.getBuilder().getIndexType();
   auto i64Ty = parser.getBuilder().getIntegerType(64);
   MemRefType type;
   AffineMapAttr mapAttr;
   OpAsmParser::OperandType val, out;
   SmallVector<OpAsmParser::OperandType, 4> idxs;
-  auto symbolizeAggregationKind = [](StringRef str) { return util::symbolizeAggregationKind(str); };
-  return failure(parseKeywordIntoEnumAttr(parser, result, "agg", i64Ty, symbolizeAggregationKind) ||
-                 parser.parseOperand(val) || parser.parseComma() || parser.parseOperand(out) ||
-                 parser.parseAffineMapOfSSAIds(idxs, mapAttr, "map", result.attributes) ||
-                 parser.parseOptionalAttrDict(result.attributes) || parser.parseColonType(type) ||
-                 parser.resolveOperand(val, type.getElementType(), result.operands) ||
-                 parser.resolveOperand(out, type, result.operands) ||
-                 parser.resolveOperands(idxs, indexTy, result.operands));
+  auto symbolizeAggregationKind = [](StringRef str) {
+    return util::symbolizeAggregationKind(str);
+  };
+  return failure(
+      parseKeywordIntoEnumAttr(parser, result, "agg", i64Ty,
+                               symbolizeAggregationKind) ||
+      parser.parseOperand(val) || parser.parseComma() ||
+      parser.parseOperand(out) ||
+      parser.parseAffineMapOfSSAIds(idxs, mapAttr, "map", result.attributes) ||
+      parser.parseOptionalAttrDict(result.attributes) ||
+      parser.parseColonType(type) ||
+      parser.resolveOperand(val, type.getElementType(), result.operands) ||
+      parser.resolveOperand(out, type, result.operands) ||
+      parser.resolveOperands(idxs, indexTy, result.operands));
 }
 
 #define GET_OP_CLASSES
 #include "pmlc/dialect/pxa/ir/ops.cc.inc"
 
-}  // namespace pmlc::dialect::pxa
+} // namespace pmlc::dialect::pxa

@@ -54,4 +54,4 @@ namespace OpTrait = mlir::OpTrait;
 #define GET_OP_CLASSES
 #include "pmlc/dialect/eltwise/ir/ops.h.inc"
 
-}  // namespace pmlc::dialect::eltwise
+} // namespace pmlc::dialect::eltwise

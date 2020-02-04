@@ -33,4 +33,4 @@ namespace OpTrait = mlir::OpTrait;
 #define GET_OP_CLASSES
 #include "pmlc/dialect/stdx/ir/ops.h.inc"
 
-}  // namespace pmlc::dialect::stdx
+} // namespace pmlc::dialect::stdx

@@ -36,7 +36,7 @@ using mlir::ValueRange;
 
 namespace {
 
-bool MergeTypes(Type* into, Type from, DataType dtype) {
+bool MergeTypes(Type *into, Type from, DataType dtype) {
   IVLOG(6, "MergeTypes> " << debugString(*into) << ", " << debugString(from));
   auto intoShapedType = getRankedTensorType(*into);
   auto fromShapedType = getRankedTensorType(from);
@@ -51,7 +51,8 @@ bool MergeTypes(Type* into, Type from, DataType dtype) {
   SmallVector<int64_t, 4> resultShape;
   auto shape1 = intoShapedType.getShape();
   auto shape2 = fromShapedType.getShape();
-  IVLOG(6, "  Checking compatibility between " << shape1.vec() << " and " << shape2.vec());
+  IVLOG(6, "  Checking compatibility between " << shape1.vec() << " and "
+                                               << shape2.vec());
   if (shape1.size() > shape2.size()) {
     std::copy(shape1.begin(), shape1.end(), std::back_inserter(resultShape));
   } else {
@@ -93,8 +94,10 @@ bool MergeTypes(Type* into, Type from, DataType dtype) {
   }
 
   if (dtype == DataType::invalid) {
-    auto intoElementType = intoShapedType.getElementType().dyn_cast<ScalarType>();
-    auto fromElementType = fromShapedType.getElementType().dyn_cast<ScalarType>();
+    auto intoElementType =
+        intoShapedType.getElementType().dyn_cast<ScalarType>();
+    auto fromElementType =
+        fromShapedType.getElementType().dyn_cast<ScalarType>();
     if (!intoElementType || !fromElementType) {
       throw std::runtime_error("NYI: Only scalar element types are supported");
     }
@@ -106,7 +109,7 @@ bool MergeTypes(Type* into, Type from, DataType dtype) {
   return true;
 }
 
-}  // namespace
+} // namespace
 
 RankedTensorType getRankedTensorType(Type type) {
   if (auto rankedType = type.dyn_cast<RankedTensorType>()) {
@@ -114,12 +117,16 @@ RankedTensorType getRankedTensorType(Type type) {
   }
   SmallVector<int64_t, 0> shape;
   if (type.isa<IndexType>()) {
-    return RankedTensorType::get(shape, ScalarType::get(type.getContext(), DataType::i32));
+    return RankedTensorType::get(
+        shape, ScalarType::get(type.getContext(), DataType::i32));
   }
   if (type.isa<ScalarType>()) {
     return RankedTensorType::get(shape, type);
   }
-  throw std::runtime_error(llvm::formatv("Unsupported elementType for tensor: {0}", debugString(type)).str());
+  throw std::runtime_error(
+      llvm::formatv("Unsupported elementType for tensor: {0}",
+                    debugString(type))
+          .str());
 }
 
 Type ComputeResultType(ValueRange operands, DataType override) {
@@ -165,7 +172,8 @@ SmallVector<int64_t, 4> ComputeShape(ArrayRef<Value> operands) {
   return shape;
 }
 
-Attribute constFoldUnaryOp(ArrayRef<Attribute> operands, UnaryCalculate calculate) {
+Attribute constFoldUnaryOp(ArrayRef<Attribute> operands,
+                           UnaryCalculate calculate) {
   assert(operands.size() == 1 && "unary op takes one operand");
   if (auto op = operands[0].dyn_cast_or_null<FloatAttr>()) {
     return FloatAttr::get(op.getType(), calculate(op.getValueAsDouble()));
@@ -176,27 +184,32 @@ Attribute constFoldUnaryOp(ArrayRef<Attribute> operands, UnaryCalculate calculat
   return {};
 }
 
-Attribute constFoldBinaryOp(ArrayRef<Attribute> operands, BinaryCalculate calculate) {
+Attribute constFoldBinaryOp(ArrayRef<Attribute> operands,
+                            BinaryCalculate calculate) {
   assert(operands.size() == 2 && "binary op takes two operands");
   if (auto lhs = operands[0].dyn_cast_or_null<FloatAttr>()) {
     if (auto rhs = operands[1].dyn_cast_or_null<FloatAttr>()) {
-      return FloatAttr::get(lhs.getType(), calculate(lhs.getValueAsDouble(), rhs.getValueAsDouble()));
+      return FloatAttr::get(lhs.getType(), calculate(lhs.getValueAsDouble(),
+                                                     rhs.getValueAsDouble()));
     }
     if (auto rhs = operands[1].dyn_cast_or_null<IntegerAttr>()) {
-      return FloatAttr::get(lhs.getType(), calculate(lhs.getValueAsDouble(), rhs.getInt()));
+      return FloatAttr::get(lhs.getType(),
+                            calculate(lhs.getValueAsDouble(), rhs.getInt()));
     }
   } else if (auto lhs = operands[0].dyn_cast_or_null<IntegerAttr>()) {
     if (auto rhs = operands[1].dyn_cast_or_null<FloatAttr>()) {
-      return FloatAttr::get(rhs.getType(), calculate(lhs.getInt(), rhs.getValueAsDouble()));
+      return FloatAttr::get(rhs.getType(),
+                            calculate(lhs.getInt(), rhs.getValueAsDouble()));
     }
     if (auto rhs = operands[1].dyn_cast_or_null<IntegerAttr>()) {
-      return IntegerAttr::get(lhs.getType(), calculate(lhs.getInt(), rhs.getInt()));
+      return IntegerAttr::get(lhs.getType(),
+                              calculate(lhs.getInt(), rhs.getInt()));
     }
   }
   return {};
 }
 
-bool ConstantValueMatcher::match(Operation* op) {
+bool ConstantValueMatcher::match(Operation *op) {
   Attribute attr;
   if (!mlir::detail::constant_op_binder<Attribute>(&attr).match(op)) {
     return false;
@@ -210,4 +223,4 @@ bool ConstantValueMatcher::match(Operation* op) {
   return false;
 }
 
-}  // namespace pmlc::dialect::eltwise
+} // namespace pmlc::dialect::eltwise

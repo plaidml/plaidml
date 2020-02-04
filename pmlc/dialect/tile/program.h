@@ -28,4 +28,4 @@ struct TileProgram {
   explicit TileProgram(mlir::ModuleOp module) : module(module) {}
 };
 
-}  // namespace pmlc::dialect::tile
+} // namespace pmlc::dialect::tile
