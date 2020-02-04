@@ -2,6 +2,7 @@
 
 #include <limits>
 #include <memory>
+#include <utility>
 #include <vector>
 
 #include "mlir/Analysis/AffineStructures.h"
@@ -14,32 +15,34 @@ namespace pmlc::dialect::pxa {
 // A tile size generator is a functor from range -> list of sizes
 
 // Produces all powers of 2 <= range
-std::vector<int64_t> PowerOfTwoGenerator(int64_t range);
+struct PowerOfTwoGenerator {
+  std::vector<int64_t> operator()(int64_t range);
+};
 
 // Produces all divisors of range (including the full range)
-std::vector<int64_t> EvenTilingGenerator(int64_t range);
+struct EvenTilingGenerator {
+  std::vector<int64_t> operator()(int64_t range);
+};
 
 // Produces only 'range' itself
-inline std::vector<int64_t> ExactRangeGenerator(int64_t range) {
-  return {range};
-}
+struct ExactRangeGenerator {
+  std::vector<int64_t> operator()(int64_t range) { return {range}; }
+};
 
 // Produces only a specific value
-class FixedTileSizeGenerator {
-public:
+struct FixedTileSizeGenerator {
   explicit FixedTileSizeGenerator(int64_t val) : val(val) {}
   std::vector<int64_t> operator()(int64_t range) const { return {val}; }
 
-private:
   int64_t val;
 };
 
-// Producs the union of multiple generators
+// Produces the union of multiple generators
 template <typename Head, typename... Rest>
 class UnionGenerator {
 public:
-  UnionGenerator(const Head &head, const Rest &... rest)
-      : head(head), rest(rest...) {}
+  explicit UnionGenerator(Head &&head, const Rest &&... rest)
+      : head(std::forward<Head>(head)), rest(std::forward<Rest...>(rest...)) {}
   std::vector<int64_t> operator()(int64_t range) const {
     auto v1 = head(range);
     auto v2 = rest(range);
@@ -50,18 +53,19 @@ public:
   }
 
 private:
-  const Head &head;
+  Head head;
   UnionGenerator<Rest...> rest;
 };
 
 template <typename Single>
 class UnionGenerator<Single> {
 public:
-  explicit UnionGenerator(const Single &single) : single(single) {}
+  explicit UnionGenerator(Single &&single)
+      : single(std::forward<Single>(single)) {}
   std::vector<int64_t> operator()(int64_t range) const { return single(range); }
 
 private:
-  const Single &single;
+  Single single;
 };
 
 // A tile cost model is a functor from an array of tile sizes (i.e.

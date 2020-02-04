@@ -6,6 +6,6 @@
 
 namespace pmlc::dialect::pxa {
 
-void Tile(AffineParallelOp op, llvm::ArrayRef<int64_t> tileSizes);
+void performTiling(AffineParallelOp op, llvm::ArrayRef<int64_t> tileSizes);
 
-}  // namespace pmlc::dialect::pxa
+} // namespace pmlc::dialect::pxa

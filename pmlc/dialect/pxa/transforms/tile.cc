@@ -6,7 +6,7 @@
 
 namespace pmlc::dialect::pxa {
 
-void Tile(AffineParallelOp op, llvm::ArrayRef<int64_t> tileSizes) {
+void performTiling(AffineParallelOp op, llvm::ArrayRef<int64_t> tileSizes) {
   auto builder = op.getBodyBuilder();
   mlir::Block *outerBody = op.getBody();
   // Verify sizes match
@@ -44,7 +44,7 @@ void Tile(AffineParallelOp op, llvm::ArrayRef<int64_t> tileSizes) {
   for (size_t i = 0; i < dimCount; i++) {
     newSteps.push_back(oldSteps[i].cast<IntegerAttr>().getInt() * tileSizes[i]);
   }
-  op.setAttr("steps", builder.getI64ArrayAttr(newSteps));
+  op.setSteps(newSteps);
 }
 
 } // namespace pmlc::dialect::pxa

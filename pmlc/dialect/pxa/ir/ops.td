@@ -53,6 +53,7 @@ def AffineParallelOp : PXA_Op<"parallel", [ImplicitAffineTerminator]> {
      I64ArrayAttr:$steps,
      Variadic<Index>:$mapOperands);
   let regions = (region SizedRegion<1>:$region);
+  let verifier = [{ return verifyAffineParallelOp(*this); }];
 
   let extraClassDeclaration = [{
     operand_range getLowerBoundsOperands();
@@ -66,19 +67,19 @@ def AffineParallelOp : PXA_Op<"parallel", [ImplicitAffineTerminator]> {
     AffineValueMap getUpperBoundsValueMap(); 
     AffineValueMap getRangesValueMap();
 
-    // Get ranges as constants, return true if it worked (non-dynamic case)
-    bool getConstantRanges(llvm::SmallVectorImpl<int64_t>& out);
+    // Get ranges as constants, may fail in dynamic case
+    llvm::Optional<llvm::SmallVector<int64_t, 8>> getConstantRanges();
     
-    // For a given dimension, check if range is constant.  If so, return, otherwise return -1
-    int64_t getRange(size_t dim);
-
+    // Some helpers for rewrites
     mlir::Block *getBody();
     mlir::OpBuilder getBodyBuilder();
+
+    void setSteps(ArrayRef<int64_t> newSteps);
   }];
   let builders = [
     OpBuilder<"Builder* builder, OperationState& result, ArrayRef<int64_t> ranges">,
-    OpBuilder<"Builder* builder, OperationState& result, AffineMap lb_map, ValueRange lb_args, AffineMap ub_map, ValueRange ub_args">,
-    OpBuilder<"Builder* builder, OperationState& result, AffineMap lb_map, ValueRange lb_args, AffineMap ub_map, ValueRange ub_args, ArrayRef<int64_t> steps">
+    OpBuilder<"Builder* builder, OperationState& result, AffineMap lbMap, ValueRange lbArgs, AffineMap ubMap, ValueRange ubArgs">,
+    OpBuilder<"Builder* builder, OperationState& result, AffineMap lbMap, ValueRange lbArgs, AffineMap ubMap, ValueRange ubArgs, ArrayRef<int64_t> steps">
   ];
 }
 
