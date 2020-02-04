@@ -6,10 +6,10 @@
 
 namespace mlir {
 class Pass;
-}  // namespace mlir
+} // namespace mlir
 
 namespace pmlc::conversion::stdx_to_llvm {
 
 std::unique_ptr<mlir::Pass> createLowerToLLVMPass();
 
-}  // namespace pmlc::conversion::stdx_to_llvm
+} // namespace pmlc::conversion::stdx_to_llvm
