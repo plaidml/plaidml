@@ -1,35 +1,92 @@
-// RUN: pmlc-opt %s | pmlc-opt | FileCheck %s
+// RUN: pmlc-opt %s -convert-stdx-to-llvm -split-input-file | FileCheck %s
 
-func @atomic_rmw(%I: memref<10xf32>, %i : index) {
-  %cst = constant 1.0 : f32
-  stdx.atomic_rmw %val = %I[%i] : memref<10xf32> {
-    %0 = addf %val, %cst : f32
+// CHECK-LABEL: func @atomic_rmw
+func @atomic_rmw(%I : memref<10xi32>, %ival : i32, %F : memref<10xf32>, %fval : f32, %i : index) {
+  // CHECK: llvm.atomicrmw "xchg" "acq_rel" %{{.*}}, %{{.*}}
+  stdx.atomic_rmw %iv = %F[%i] : memref<10xf32> {
+    stdx.atomic_rmw.yield %fval : f32
+  }
+  // CHECK: llvm.atomicrmw "add" "acq_rel" %{{.*}}, %{{.*}}
+  stdx.atomic_rmw %iv = %I[%i] : memref<10xi32> {
+    %0 = addi %iv, %ival : i32
+    stdx.atomic_rmw.yield %0 : i32
+  }
+  // CHECK: llvm.atomicrmw "sub" "acq_rel" %{{.*}}, %{{.*}}
+  stdx.atomic_rmw %iv = %I[%i] : memref<10xi32> {
+    %0 = subi %iv, %ival : i32
+    stdx.atomic_rmw.yield %0 : i32
+  }
+  // CHECK: llvm.atomicrmw "_and" "acq_rel" %{{.*}}, %{{.*}}
+  stdx.atomic_rmw %iv = %I[%i] : memref<10xi32> {
+    %0 = and %iv, %ival : i32
+    stdx.atomic_rmw.yield %0 : i32
+  }
+  // CHECK: llvm.atomicrmw "_or" "acq_rel" %{{.*}}, %{{.*}}
+  stdx.atomic_rmw %iv = %I[%i] : memref<10xi32> {
+    %0 = or %iv, %ival : i32
+    stdx.atomic_rmw.yield %0 : i32
+  }
+  // CHECK: llvm.atomicrmw "_xor" "acq_rel" %{{.*}}, %{{.*}}
+  stdx.atomic_rmw %iv = %I[%i] : memref<10xi32> {
+    %0 = xor %iv, %ival : i32
+    stdx.atomic_rmw.yield %0 : i32
+  }
+  // CHECK: llvm.atomicrmw "max" "acq_rel" %{{.*}}, %{{.*}}
+  stdx.atomic_rmw %iv = %I[%i] : memref<10xi32> {
+    %cmp = cmpi "sgt", %iv, %ival : i32
+    %max = select %cmp, %iv, %ival : i32
+    stdx.atomic_rmw.yield %max : i32
+  }
+  // CHECK: llvm.atomicrmw "min" "acq_rel" %{{.*}}, %{{.*}}
+  stdx.atomic_rmw %iv = %I[%i] : memref<10xi32> {
+    %cmp = cmpi "slt", %iv, %ival : i32
+    %min = select %cmp, %iv, %ival : i32
+    stdx.atomic_rmw.yield %min : i32
+  }
+  // CHECK: llvm.atomicrmw "umax" "acq_rel" %{{.*}}, %{{.*}}
+  stdx.atomic_rmw %iv = %I[%i] : memref<10xi32> {
+    %cmp = cmpi "ugt", %iv, %ival : i32
+    %max = select %cmp, %iv, %ival : i32
+    stdx.atomic_rmw.yield %max : i32
+  }
+  // CHECK: llvm.atomicrmw "umin" "acq_rel" %{{.*}}, %{{.*}}
+  stdx.atomic_rmw %iv = %I[%i] : memref<10xi32> {
+    %cmp = cmpi "ult", %iv, %ival : i32
+    %min = select %cmp, %iv, %ival : i32
+    stdx.atomic_rmw.yield %min : i32
+  }
+  // CHECK: llvm.atomicrmw "fadd" "acq_rel" %{{.*}}, %{{.*}}
+  stdx.atomic_rmw %iv = %F[%i] : memref<10xf32> {
+    %0 = addf %iv, %fval : f32
+    stdx.atomic_rmw.yield %0 : f32
+  }
+  // CHECK: llvm.atomicrmw "fsub" "acq_rel" %{{.*}}, %{{.*}}
+  stdx.atomic_rmw %iv = %F[%i] : memref<10xf32> {
+    %0 = subf %iv, %fval : f32
     stdx.atomic_rmw.yield %0 : f32
   }
   return
 }
 
-// llvm.func @std_for(%arg0: !llvm<"{ float*, float*, i64, [1 x i64], [1 x i64] }*">) {
-//   %0 = llvm.load %arg0 : !llvm<"{ float*, float*, i64, [1 x i64], [1 x i64] }*">
-//   %1 = llvm.mlir.constant(0 : index) : !llvm.i64
-//   %2 = llvm.mlir.constant(1 : index) : !llvm.i64
-//   %3 = llvm.mlir.constant(10 : index) : !llvm.i64
-//   %4 = llvm.mlir.constant(1.000000e+00 : f32) : !llvm.float
-//   llvm.br ^bb1(%1 : !llvm.i64)
-// ^bb1(%5: !llvm.i64):	// 2 preds: ^bb0, ^bb2
-//   %6 = llvm.icmp "slt" %5, %3 : !llvm.i64
-//   llvm.cond_br %6, ^bb2, ^bb3
-// ^bb2:	// pred: ^bb1
-//   %7 = llvm.extractvalue %0[1] : !llvm<"{ float*, float*, i64, [1 x i64], [1 x i64] }">
-//   %8 = llvm.mlir.constant(0 : index) : !llvm.i64
-//   %9 = llvm.mlir.constant(1 : index) : !llvm.i64
-//   %10 = llvm.mul %5, %9 : !llvm.i64
-//   %11 = llvm.add %8, %10 : !llvm.i64
-//   %12 = llvm.getelementptr %7[%11] : (!llvm<"float*">, !llvm.i64) -> !llvm<"float*">
-//   %13 = llvm.load %12 : !llvm<"float*">
-//   %14 = llvm.fadd %13, %4 : !llvm.float
-//   %15 = llvm.add %5, %2 : !llvm.i64
-//   llvm.br ^bb1(%15 : !llvm.i64)
-// ^bb3:	// pred: ^bb1
-//   llvm.return
-// }
+// -----
+
+// CHECK-LABEL: func @cmpxchg
+func @cmpxchg(%F : memref<10xf32>, %fval : f32, %i : index) {
+  // CHECK: llvm.br ^bb1(%{{.*}} : !llvm.float)
+  stdx.atomic_rmw %iv = %F[%i] : memref<10xf32> {
+    %cmp = cmpf "ogt", %iv, %fval : f32
+    %max = select %cmp, %iv, %fval : f32
+    stdx.atomic_rmw.yield %max : f32
+    // CHECK-NEXT: ^bb1(%[[iv:.*]]: !llvm.float):
+    // CHECK-NEXT: %[[cmp:.*]] = llvm.fcmp "ogt" %[[iv]], %{{.*}} : !llvm.float
+    // CHECK-NEXT: %[[max:.*]] = llvm.select %[[cmp]], %[[iv]], %{{.*}} : !llvm.i1, !llvm.float
+    // TODO:  %[[pair:.*]] = llvm.cmpxchg %{{.*}}, %[[iv]], %[[max]] acq_rel monotonic : !llvm.float
+    // TODO:  %[[new:.*]] = llvm.extractvalue %[[pair]][0] : !llvm<"{ float, i1 }">
+    // TODO:  %[[ok:.*]] = llvm.extractvalue %[[pair]][1] : !llvm<"{ float, i1 }">
+    // TODO:  llvm.cond_br %[[ok]], ^bb2, ^bb1(%[[new]] : !llvm.float)
+    // CHECK: llvm.cond_br %{{.*}} ^bb2, ^bb1(%[[max]] : !llvm.float)
+  }
+  // CHECK: ^bb2:
+  // CHECK: llvm.return
+  return
+}
