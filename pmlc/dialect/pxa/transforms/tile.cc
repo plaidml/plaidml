@@ -8,10 +8,10 @@ namespace pmlc::dialect::pxa {
 
 void Tile(AffineParallelOp op, llvm::ArrayRef<int64_t> tileSizes) {
   auto builder = op.getBodyBuilder();
-  mlir::Block* outerBody = op.getBody();
+  mlir::Block *outerBody = op.getBody();
   // Verify sizes match
   size_t dimCount = tileSizes.size();
-  assert(op.lowerBoundsMap().numResults() == dimCount());
+  assert(op.lowerBoundsMap().getNumResults() == dimCount);
   // Fail on no dimensions (TODO: should we handle this case anyway?)
   assert(dimCount > 0);
   // Make the maps for the inner parallel
@@ -31,12 +31,13 @@ void Tile(AffineParallelOp op, llvm::ArrayRef<int64_t> tileSizes) {
     outerIdxs.push_back(outerBody->getArgument(i));
   }
   // Make the inner parallel for
-  auto inner = builder.create<AffineParallelOp>(op.getLoc(), lbMap, outerIdxs, ubMap, outerIdxs);
+  auto inner = builder.create<AffineParallelOp>(op.getLoc(), lbMap, outerIdxs,
+                                                ubMap, outerIdxs);
   // Splice instructions into the interior
-  auto& innerLoopOps = inner.getBody()->getOperations();
-  auto& outerLoopOps = outerBody->getOperations();
-  innerLoopOps.splice(std::prev(innerLoopOps.end()), outerLoopOps, outerLoopOps.begin(),
-                      std::prev(outerLoopOps.end(), 2));
+  auto &innerLoopOps = inner.getBody()->getOperations();
+  auto &outerLoopOps = outerBody->getOperations();
+  innerLoopOps.splice(std::prev(innerLoopOps.end()), outerLoopOps,
+                      outerLoopOps.begin(), std::prev(outerLoopOps.end(), 2));
   // Update outer step size
   llvm::SmallVector<int64_t, 8> newSteps;
   auto oldSteps = op.steps().cast<ArrayAttr>().getValue();
@@ -46,4 +47,4 @@ void Tile(AffineParallelOp op, llvm::ArrayRef<int64_t> tileSizes) {
   op.setAttr("steps", builder.getI64ArrayAttr(newSteps));
 }
 
-}  // namespace pmlc::dialect::pxa
+} // namespace pmlc::dialect::pxa
