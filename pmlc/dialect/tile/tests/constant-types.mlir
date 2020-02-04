@@ -19,6 +19,3 @@ module {
 // CHECK-SAME: {value = 2.000000e+00 : f64} : () -> !f64
 // CHECK: return
 // CHECK-SAME: tensor<3x3x!eltwise.f64>
-
-
-// -----

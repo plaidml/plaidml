@@ -28,7 +28,7 @@ edsl::Tensor block(             //
     bool use_shortcut_conv,     //
     StringRef base_name) {
   // Add a tracepoint for diagnostics
-  auto I = edsl::trace(I_raw, base_name);
+  auto I = edsl::trace(I_raw, base_name.str());
   // Note: The branch1 weights/biases are at the _end_ of the input vectors,
   // as their existence depends on use_shortcut_conv
   auto conv_2a = op::convolution(     //
