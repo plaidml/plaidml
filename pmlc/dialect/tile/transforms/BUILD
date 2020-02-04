@@ -25,7 +25,10 @@ plaidml_cc_library(
 
 plaidml_cc_library(
     name = "transforms",
-    srcs = ["registration.cc", "constant_types.cc"],
+    srcs = [
+        "constant_types.cc",
+        "registration.cc",
+    ],
     deps = [":lib"],
     alwayslink = 1,
 )
