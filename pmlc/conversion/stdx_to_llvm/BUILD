@@ -1,18 +1,15 @@
-# Copyright 2019 Intel Corporation.
+# Copyright 2020 Intel Corporation
 
 package(default_visibility = ["//visibility:public"])
 
 load("//bzl:plaidml.bzl", "plaidml_cc_library")
 
 plaidml_cc_library(
-    name = "x86",
+    name = "stdx_to_llvm",
     srcs = glob(["*.cc"]),
     hdrs = glob(["*.h"]),
     deps = [
-        "//pmlc/compiler",
-        "//pmlc/conversion/pxa_to_affine",
-        "//pmlc/conversion/stdx_to_llvm",
-        "@llvm-project//mlir:AffineToStandardTransforms",
+        "//pmlc/dialect/stdx/ir",
         "@llvm-project//mlir:LLVMTransforms",
     ],
     alwayslink = 1,

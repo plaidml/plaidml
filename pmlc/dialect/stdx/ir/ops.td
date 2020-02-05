@@ -21,6 +21,7 @@ class StdX_Op<string mnemonic, list<OpTrait> traits = []> :
 
 def AtomicRMWOp : StdX_Op<"atomic_rmw"> {
   let arguments = (ins AnyMemRef:$memref, Variadic<Index>:$indices);
+  let results = (outs AnyType:$res);
   let regions = (region SizedRegion<1>:$body);
 
   let extraClassDeclaration = [{
@@ -37,7 +38,7 @@ def AtomicRMWOp : StdX_Op<"atomic_rmw"> {
 
 def AtomicRMWYieldOp :
     StdX_Op<"atomic_rmw.yield", [HasParent<"AtomicRMWOp">, Terminator]> {
-  let summary = "terminator for reduce operation";
+  let summary = "terminator for atomic_rmw operation";
   let arguments = (ins AnyType:$result);
 }
 

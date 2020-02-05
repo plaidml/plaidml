@@ -31,15 +31,18 @@ ParseResult parseAtomicRMWOp(OpAsmParser &parser, OperationState &result) {
   auto indexTy = parser.getBuilder().getIndexType();
   SmallVector<OpAsmParser::OperandType, 4> idxs;
   Region *body = result.addRegion();
-  return failure(
-      parser.parseRegionArgument(iv) || parser.parseEqual() ||
+  if (parser.parseRegionArgument(iv) || parser.parseEqual() ||
       parser.parseOperand(memref) ||
       parser.parseOperandList(idxs, OpAsmParser::Delimiter::Square) ||
       parser.parseOptionalAttrDict(result.attributes) ||
       parser.parseColonType(type) ||
       parser.resolveOperand(memref, type, result.operands) ||
       parser.resolveOperands(idxs, indexTy, result.operands) ||
-      parser.parseRegion(*body, iv, type.getElementType()));
+      parser.parseRegion(*body, iv, type.getElementType())) {
+    return failure();
+  }
+  result.addTypes(type.getElementType());
+  return success();
 }
 
 LogicalResult verifyAtomicRMWOp(AtomicRMWOp op) {
