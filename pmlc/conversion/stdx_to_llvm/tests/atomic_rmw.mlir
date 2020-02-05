@@ -80,13 +80,12 @@ func @cmpxchg(%F : memref<10xf32>, %fval : f32, %i : index) {
     // CHECK-NEXT: ^bb1(%[[iv:.*]]: !llvm.float):
     // CHECK-NEXT: %[[cmp:.*]] = llvm.fcmp "ogt" %[[iv]], %{{.*}} : !llvm.float
     // CHECK-NEXT: %[[max:.*]] = llvm.select %[[cmp]], %[[iv]], %{{.*}} : !llvm.i1, !llvm.float
-    // TODO:  %[[pair:.*]] = llvm.cmpxchg %{{.*}}, %[[iv]], %[[max]] acq_rel monotonic : !llvm.float
-    // TODO:  %[[new:.*]] = llvm.extractvalue %[[pair]][0] : !llvm<"{ float, i1 }">
-    // TODO:  %[[ok:.*]] = llvm.extractvalue %[[pair]][1] : !llvm<"{ float, i1 }">
-    // TODO:  llvm.cond_br %[[ok]], ^bb2, ^bb1(%[[new]] : !llvm.float)
-    // CHECK: llvm.cond_br %{{.*}} ^bb2, ^bb1(%[[max]] : !llvm.float)
+    // CHECK-NEXT: %[[pair:.*]] = llvm.cmpxchg %{{.*}}, %[[iv]], %[[max]] acq_rel monotonic : !llvm.float
+    // CHECK-NEXT: %[[new:.*]] = llvm.extractvalue %[[pair]][0] : !llvm<"{ float, i1 }">
+    // CHECK-NEXT: %[[ok:.*]] = llvm.extractvalue %[[pair]][1] : !llvm<"{ float, i1 }">
+    // CHECK-NEXT: llvm.cond_br %[[ok]], ^bb2, ^bb1(%[[new]] : !llvm.float)
   }
-  // CHECK: ^bb2:
-  // CHECK: llvm.return
+  // CHECK-NEXT: ^bb2:
+  // CHECK-NEXT: llvm.return
   return
 }

@@ -292,38 +292,44 @@ struct CmpXchgLowering : public LoadStoreOpLowering<stdx::AtomicRMWOp> {
     auto *loopBlock = &loopRegion.front();
     auto *terminator = loopBlock->getTerminator();
     auto yieldOp = cast<stdx::AtomicRMWYieldOp>(terminator);
+    auto loc = op->getLoc();
 
     // Compute the initial IV and branch to the loop block.
     rewriter.setInsertionPointToEnd(initBlock);
     OperandAdaptor<stdx::AtomicRMWOp> adaptor(operands);
     auto type = atomicOp.getMemRefType();
-    auto dataPtr = getDataPtr(op->getLoc(), type, adaptor.memref(),
-                              adaptor.indices(), rewriter, getModule());
-    auto init = rewriter.create<LLVM::LoadOp>(op->getLoc(), dataPtr);
+    auto dataPtr = getDataPtr(loc, type, adaptor.memref(), adaptor.indices(),
+                              rewriter, getModule());
+    auto init = rewriter.create<LLVM::LoadOp>(loc, dataPtr);
     SmallVector<Value, 1> brProperOperands;
     SmallVector<Block *, 1> brDestinations{loopBlock};
     SmallVector<Value, 1> brRegionOperands{init.res()};
     SmallVector<ValueRange, 1> brOperands{brRegionOperands};
-    rewriter.create<LLVM::BrOp>(op->getLoc(), brProperOperands, brDestinations,
+    rewriter.create<LLVM::BrOp>(loc, brProperOperands, brDestinations,
                                 brOperands);
 
     // Prepare the epilog of the loop block.
     rewriter.setInsertionPointToEnd(loopBlock);
     // Append the cmpxchg op to the end of the loop block.
-    // TODO:
-    // %pair = llvm.cmpxchg %ptr, %loaded, %max acq_rel monotonic : !llvm.float
-    // %new_loaded = llvm.extractvalue %pair[0] : !llvm<"{ float, i1 }">
-    // %success = llvm.extractvalue %pair[1] : !llvm<"{ float, i1 }">
+    auto successOrdering = LLVM::AtomicOrdering::acq_rel;
+    auto failureOrdering = LLVM::AtomicOrdering::monotonic;
+    auto iv = atomicOp.getInductionVar();
+    auto resultType = lowering.convertType(iv.getType()).cast<LLVM::LLVMType>();
     auto boolType = LLVM::LLVMType::getInt1Ty(&getDialect());
-    auto trueAttr = rewriter.getI64IntegerAttr(1);
-    auto condOp =
-        rewriter.create<LLVM::ConstantOp>(op->getLoc(), boolType, trueAttr);
-    // Conditionally branch to the end or back to the loop depending on success.
-    // TODO:
-    // llvm.cond_br %success, ^end, ^loop(%new_loaded : !llvm.float)
-    SmallVector<Value, 1> condBrProperOperands{condOp.res()};
+    auto pairType = LLVM::LLVMType::getStructTy(resultType, boolType);
+    auto cmpxchg = rewriter.create<LLVM::AtomicCmpXchgOp>(
+        loc, pairType, dataPtr, iv, yieldOp.result(), successOrdering,
+        failureOrdering);
+    // Extract the %new_loaded and %ok values from the pair.
+    auto newLoaded = rewriter.create<LLVM::ExtractValueOp>(
+        loc, resultType, cmpxchg.res(), rewriter.getI64ArrayAttr({0}));
+    auto ok = rewriter.create<LLVM::ExtractValueOp>(
+        loc, boolType, cmpxchg.res(), rewriter.getI64ArrayAttr({1}));
+
+    // Conditionally branch to the end or back to the loop depending on %ok.
+    SmallVector<Value, 1> condBrProperOperands{ok.res()};
     SmallVector<Block *, 2> condBrDestinations{endBlock, loopBlock};
-    SmallVector<Value, 1> condBrRegionOperands{yieldOp.result()};
+    SmallVector<Value, 1> condBrRegionOperands{newLoaded.res()};
     SmallVector<ValueRange, 2> condBrOperands{{}, condBrRegionOperands};
     rewriter.replaceOpWithNewOp<LLVM::CondBrOp>(
         terminator, condBrProperOperands, condBrDestinations, condBrOperands);
@@ -332,7 +338,7 @@ struct CmpXchgLowering : public LoadStoreOpLowering<stdx::AtomicRMWOp> {
     // the ending block.
     rewriter.inlineRegionBefore(loopRegion, endBlock);
 
-    // Remove the original atomic_rmw op
+    // Remove the original atomic_rmw op.
     rewriter.eraseOp(op);
     return matchSuccess();
   }
