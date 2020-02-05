@@ -128,6 +128,15 @@ def plaidml_workspace():
     )
 
     http_archive(
+        name = "vulkan_loader",
+        url = "https://github.com/KhronosGroup/Vulkan-Loader/archive/v1.2.132.zip",
+        sha256 = "f42c10bdfaf2ec29d1e4276bf115387852a1dc6aee940f25aff804cc0138d10a",
+        strip_prefix = "Vulkan-Loader-1.2.132",
+        build_file = clean_dep("//vendor/vulkan_loader:vulkan_loader.BUILD"),
+        patches = [clean_dep("//vendor/vulkan_loader:vulkan_loader.patch")],
+    )
+
+    http_archive(
         name = "pybind11",
         url = "https://github.com/pybind/pybind11/archive/v2.2.4.tar.gz",
         sha256 = "b69e83658513215b8d1443544d0549b7d231b9f201f6fc787a2b2218b408181e",

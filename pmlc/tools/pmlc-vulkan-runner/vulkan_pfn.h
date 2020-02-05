@@ -56,7 +56,7 @@ PFN_vkEnumerateInstanceExtensionProperties vkEnumerateInstanceExtensionPropertie
 PFN_vkEnumerateInstanceLayerProperties vkEnumerateInstanceLayerProperties;
 
 PFN_vkGetInstanceProcAddr vkGetInstanceProcAddr =
-    reinterpret_cast<PFN_vkGetInstanceProcAddr>(dlsym(dlopen("libvulkan.so.1", RTLD_NOW), "vkGetInstanceProcAddr"));
+    reinterpret_cast<PFN_vkGetInstanceProcAddr>(dlsym(dlopen("libvulkan.so", RTLD_NOW), "vkGetInstanceProcAddr"));
 
 void exportAllFunctions() {
   EXPORT_VULKAN_FUNCTION(*_pInstance, vkDestroyCommandPool)
