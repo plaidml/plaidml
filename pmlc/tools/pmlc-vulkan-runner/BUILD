@@ -19,6 +19,7 @@ plaidml_cc_library(
     ],
     deps = [
         "@vulkan_headers//:inc",
+        "@vulkan_loader//:vulkan1",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:SPIRVSerialization",
         "@llvm-project//mlir:SPIRVDialect",

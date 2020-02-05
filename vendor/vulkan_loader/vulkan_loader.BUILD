@@ -50,7 +50,7 @@ cc_binary(
 #)
 
 cc_library(
-    name = "vulkan",
+    name = "vulkan1",
     srcs = [
         ":NORMAL_LOADER_SRCS",
         ":OPT_LOADER_SRCS",
