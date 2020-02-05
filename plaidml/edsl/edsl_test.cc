@@ -629,8 +629,7 @@ module {
   }
 }
 )#"));
-  // TODO: add 'sqrt' to std and llvm dialects
-  // runProgram(program);
+  runProgram(program);
 }
 
 TEST_F(CppEdsl, RepeatElements) {
