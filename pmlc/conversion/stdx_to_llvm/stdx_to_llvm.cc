@@ -338,12 +338,6 @@ struct CmpXchgLowering : public LoadStoreOpLowering<stdx::AtomicRMWOp> {
   }
 };
 
-void populateStdXToLLVMConversionPatterns(LLVMTypeConverter &converter,
-                                          OwningRewritePatternList &patterns) {
-  patterns.insert<AtomicRMWOpLowering, CmpXchgLowering>(*converter.getDialect(),
-                                                        converter);
-}
-
 /// A pass converting MLIR operations into the LLVM IR dialect.
 struct LLVMLoweringPass : public ModulePass<LLVMLoweringPass> {
   // Run the dialect converter on the module.
@@ -371,6 +365,12 @@ static PassRegistration<LLVMLoweringPass>
     pass("convert-stdx-to-llvm", "Convert stdx to the LLVM dialect");
 
 } // namespace
+
+void populateStdXToLLVMConversionPatterns(LLVMTypeConverter &converter,
+                                          OwningRewritePatternList &patterns) {
+  patterns.insert<AtomicRMWOpLowering, CmpXchgLowering>(*converter.getDialect(),
+                                                        converter);
+}
 
 std::unique_ptr<mlir::Pass> createLowerToLLVMPass() {
   return std::make_unique<LLVMLoweringPass>();

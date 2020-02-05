@@ -46,7 +46,7 @@ struct OpAsmInterface : public mlir::OpAsmDialectInterface {
   void getTypeAliases(
       mlir::SmallVectorImpl<std::pair<Type, StringRef>> &aliases) const final {
     auto ctx = getDialect()->getContext();
-    for (uint64_t i = 1; i <= util::getMaxEnumValForDataType(); i++) {
+    for (uint64_t i = 1, e = util::getMaxEnumValForDataType(); i <= e; ++i) {
       auto dtype = util::symbolizeDataType(i).getValue();
       auto dtypeStr = util::stringifyDataType(dtype);
       // Intern the string

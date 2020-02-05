@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "mlir/Analysis/AffineStructures.h"
 #include "mlir/Dialect/AffineOps/AffineOps.h"
 #include "mlir/IR/AffineExpr.h"
 
@@ -13,6 +14,7 @@ using mlir::AffineExpr;
 using mlir::AffineMap;
 using mlir::AffineMapAttr;
 using mlir::AffineTerminatorOp;
+using mlir::AffineValueMap;
 using mlir::ArrayAttr;
 using mlir::ArrayRef;
 using mlir::Attribute;
