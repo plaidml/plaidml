@@ -9,6 +9,7 @@ plaidml_cc_binary(
     srcs = ["pmlc-opt.cc"],
     deps = [
         "//pmlc/conversion/pxa_to_affine",
+        "//pmlc/conversion/stdx_to_llvm",
         "//pmlc/conversion/tile_to_pxa",
         "//pmlc/dialect/eltwise",
         "//pmlc/dialect/pxa",

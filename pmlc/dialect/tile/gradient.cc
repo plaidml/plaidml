@@ -1,7 +1,8 @@
-// Copyright 2019 Intel Corporation.
+// Copyright 2019 Intel Corporation
 
 #include "pmlc/dialect/tile/gradient.h"
 
+#include <string>
 #include <vector>
 
 #include "llvm/ADT/SetVector.h"
@@ -334,6 +335,31 @@ mlir::Value Gradient::DeriveContraction(mlir::Value dout, mlir::Value out,
 mlir::Value Gradient::DeriveSpecial(const mlir::Value dout, SpecialOp *op,
                                     size_t idx) {
   throw std::runtime_error("Made it to DeriveSpecial!");
+}
+
+DerivRegistry *DerivRegistry::Instance() {
+  static DerivRegistry registry;
+  return &registry;
+}
+
+void DerivRegistry::Register(llvm::StringRef name, const Deriv &fn,
+                             void *user_fn, void *user_ctx) {
+  if (registry.count(name)) {
+    throw std::runtime_error(
+        llvm::formatv("Attempted to register deriv '{0}', which was already in "
+                      "the DerivRegistry",
+                      name));
+  }
+  registry[name] = DerivEntry{fn, user_fn, user_ctx};
+}
+
+DerivEntry DerivRegistry::Resolve(llvm::StringRef name) const {
+  auto it = registry.find(name);
+  if (it == registry.end()) {
+    throw std::runtime_error(
+        llvm::formatv("Invalid derivative: Unknown function '{0}'", name));
+  }
+  return it->second;
 }
 
 } // namespace pmlc::dialect::tile

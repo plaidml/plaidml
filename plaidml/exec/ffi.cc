@@ -109,7 +109,7 @@ plaidml_strings* plaidml_targets_get(  //
     const auto& targets = pmlc::compiler::listTargets();
     auto strs = new plaidml_string*[targets.size()];
     for (unsigned i = 0; i < targets.size(); i++) {
-      strs[i] = new plaidml_string{targets[i]};
+      strs[i] = new plaidml_string{targets[i].str()};
     }
     return new plaidml_strings{targets.size(), strs};
   });
