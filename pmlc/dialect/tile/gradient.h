@@ -3,9 +3,9 @@
 #pragma once
 
 #include <functional>
-#include <map>
-#include <string>
-#include <unordered_map>
+
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/StringMap.h"
 
 #include "pmlc/dialect/tile/ir/ops.h"
 
@@ -38,30 +38,15 @@ struct DerivEntry {
 
 class DerivRegistry {
 public:
-  static DerivRegistry *Instance() {
-    static DerivRegistry registry;
-    return &registry;
-  }
+  static DerivRegistry *Instance();
 
-  void Register(const std::string &name, const Deriv &fn, void *user_fn,
-                void *user_ctx) {
-    if (registry_.count(name)) {
-      throw std::runtime_error("Attempted to register deriv '" + name +
-                               "', which was already in the DerivRegistry");
-    }
-    registry_[name] = DerivEntry{fn, user_fn, user_ctx};
-  }
+  void Register(llvm::StringRef name, const Deriv &fn, void *user_fn,
+                void *user_ctx);
 
-  DerivEntry Resolve(const std::string &name) const {
-    auto it = registry_.find(name);
-    if (it == registry_.end()) {
-      throw std::runtime_error("Invalid derivative: Unknown function " + name);
-    }
-    return it->second;
-  }
+  DerivEntry Resolve(llvm::StringRef name) const;
 
 private:
-  std::unordered_map<std::string, DerivEntry> registry_;
+  llvm::StringMap<DerivEntry> registry;
 };
 
 class Gradient {
