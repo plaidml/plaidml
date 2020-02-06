@@ -916,6 +916,7 @@ struct LoweringPass : public mlir::ModulePass<LoweringPass> {
                             ResultIs<EltwiseSigned>>,
         EltwiseOpConversion<ew::DivOp, StdOp<mlir::UnsignedDivIOp>,
                             ResultIs<EltwiseUnsigned>>,
+        EltwiseOpConversion<ew::SqrtOp, StdOp<mlir::SqrtOp>>,
         EltwiseOpConversion<ew::ModOp, StdOp<mlir::RemFOp>,
                             ResultIs<EltwiseFloat>>,
         EltwiseOpConversion<ew::ModOp, StdOp<mlir::SignedRemIOp>,
