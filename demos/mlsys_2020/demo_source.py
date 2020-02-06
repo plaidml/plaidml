@@ -53,7 +53,7 @@ class Demo:
                         stroke_width=grid_size,  # outline size
                         stroke='black',  # outline color
                         fill=color))  # fill color
-                string_output = str(vals[x][y])
+                string_output = str(vals[dims[1] - 1 - y][x])
                 font_size = 50 / len(string_output) + 25
                 group.draw(
                     draw.Text(
