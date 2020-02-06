@@ -1,4 +1,4 @@
-// Copyright 2019, Intel Corporation
+// Copyright 2020 Intel Corporation
 
 #include <memory>
 
@@ -20,6 +20,7 @@
 #include "pmlc/util/util.h"
 
 namespace pmlc::dialect::tile {
+
 using mlir::OperationPass;
 using mlir::OpRewritePattern;
 using mlir::OwningRewritePatternList;
@@ -28,27 +29,23 @@ using mlir::PatternRewriter;
 
 using pmlc::dialect::eltwise::ScalarConstantOp;
 
-static llvm::cl::OptionCategory
-    constant_types_options("tile-constant-types options");
-
-static llvm::cl::opt<std::string> constant_types_option_floatx(
-    "tile-constant-types-floatx", llvm::cl::init("f32"),
-    llvm::cl::desc("set floating-point constant precision"),
-    llvm::cl::cat(constant_types_options));
+static llvm::cl::OptionCategory optionCategory("tile-constant-types options");
 
 static llvm::cl::opt<std::string>
-    constant_types_option_intx("tile-constant-types-intx",
-                               llvm::cl::init("i32"),
-                               llvm::cl::desc("set integer constant precision"),
-                               llvm::cl::cat(constant_types_options));
+    clFloatxOption("tile-constant-types-floatx", llvm::cl::init("f32"),
+                   llvm::cl::desc("set floating-point constant precision"),
+                   llvm::cl::cat(optionCategory));
 
-static DataType
-parse_command_line_opt(const llvm::cl::opt<std::string> &option) {
+static llvm::cl::opt<std::string>
+    clIntxOption("tile-constant-types-intx", llvm::cl::init("i32"),
+                 llvm::cl::desc("set integer constant precision"),
+                 llvm::cl::cat(optionCategory));
+
+static DataType parseOption(const llvm::cl::opt<std::string> &option) {
   auto opt = pmlc::util::symbolizeDataType(option);
   if (!opt.hasValue()) {
-    std::stringstream ss;
-    ss << " Invalid runtime option " << option;
-    throw std::runtime_error(ss.str());
+    throw std::runtime_error(
+        llvm::formatv("Invalid runtime option: '{0}'", option));
   }
   return opt.getValue();
 }
@@ -56,75 +53,66 @@ parse_command_line_opt(const llvm::cl::opt<std::string> &option) {
 struct ConstantTypesRewriter : public OpRewritePattern<ScalarConstantOp> {
   ConstantTypesRewriter(mlir::MLIRContext *context, DataType floatx,
                         DataType intx)
-      : OpRewritePattern<ScalarConstantOp>(context), floatx_(floatx),
-        intx_(intx) {}
-
-  DataType floatx_;
-  DataType intx_;
+      : OpRewritePattern<ScalarConstantOp>(context), floatx(floatx),
+        intx(intx) {}
 
   PatternMatchResult matchAndRewrite(ScalarConstantOp constOp,
-                                     PatternRewriter &rewriter) const override;
+                                     PatternRewriter &rewriter) const override {
+    IVLOG(3, "ConstantTypesPass::matchAndRewrite");
+
+    auto type = constOp.getType();
+    auto shape = eltwise::getRankedTensorType(type).getShape();
+
+    auto floatAttr = constOp.getFloatAttr();
+    if (floatAttr && floatx != DataType::invalid) {
+      double value = floatAttr.getValueAsDouble();
+      auto elementType = ScalarType::get(type.getContext(), floatx);
+      auto tensorType = RankedTensorType::get(shape, elementType);
+      if (tensorType == type) {
+        return matchFailure();
+      }
+      rewriter.replaceOpWithNewOp<ScalarConstantOp>(constOp, elementType,
+                                                    value);
+      return matchSuccess();
+    }
+
+    auto intAttr = constOp.getIntAttr();
+    if (intAttr && intx != DataType::invalid) {
+      int64_t value = intAttr.getInt();
+      if (pmlc::util::isUnsigned(intx) && (value < 0)) {
+        throw std::runtime_error("Invalid datatype for negative constant");
+      }
+      auto elementType = ScalarType::get(type.getContext(), intx);
+      auto tensorType = RankedTensorType::get(shape, elementType);
+      if (tensorType == type) {
+        return matchFailure();
+      }
+      rewriter.replaceOpWithNewOp<ScalarConstantOp>(constOp, elementType,
+                                                    value);
+      return matchSuccess();
+    }
+
+    return matchFailure();
+  }
+
+  DataType floatx;
+  DataType intx;
 };
-
-PatternMatchResult
-ConstantTypesRewriter::matchAndRewrite(ScalarConstantOp constOp,
-                                       PatternRewriter &rewriter) const {
-  IVLOG(3, "ConstantTypesPass::matchAndRewrite");
-
-  auto type = constOp.getType();
-  auto shape = eltwise::getRankedTensorType(type).getShape();
-
-  auto float_attr = constOp.getFloatAttr();
-  auto int_attr = constOp.getIntAttr();
-
-  if (float_attr && floatx_ != DataType::invalid) {
-    double value = float_attr.getValueAsDouble();
-    auto elementType = ScalarType::get(type.getContext(), floatx_);
-    auto new_type = RankedTensorType::get(shape, elementType);
-
-    if (new_type == type) {
-      return matchFailure();
-    }
-    rewriter.replaceOpWithNewOp<ScalarConstantOp>(constOp, elementType, value);
-    return matchSuccess();
-  }
-  if (int_attr && intx_ != DataType::invalid) {
-    int64_t value = int_attr.getInt();
-
-    if (pmlc::util::isUnsigned(intx_) && (value < 0)) {
-      std::stringstream ss;
-      ss << "Invalid datatype for negative constant";
-      throw std::runtime_error(ss.str());
-    }
-    auto elementType = ScalarType::get(type.getContext(), intx_);
-    auto new_type = RankedTensorType::get(shape, elementType);
-
-    if (new_type == type) {
-      return matchFailure();
-    }
-    rewriter.replaceOpWithNewOp<ScalarConstantOp>(constOp, elementType, value);
-    return matchSuccess();
-  }
-  return matchFailure();
-}
 
 struct ConstantTypesPass : public OperationPass<ConstantTypesPass> {
-  ConstantTypesPass(
-      DataType floatx = parse_command_line_opt(constant_types_option_floatx),
-      DataType intx = parse_command_line_opt(constant_types_option_intx))
-      : floatx_(floatx), intx_(intx) {}
+  ConstantTypesPass() = default;
+  ConstantTypesPass(DataType floatx, DataType intx)
+      : floatx(floatx), intx(intx) {}
 
-  void runOnOperation() final;
+  void runOnOperation() final {
+    OwningRewritePatternList patterns;
+    patterns.insert<ConstantTypesRewriter>(&getContext(), floatx, intx);
+    applyPatternsGreedily(getOperation()->getRegions(), patterns);
+  }
 
-  DataType floatx_;
-  DataType intx_;
+  DataType floatx = parseOption(clFloatxOption);
+  DataType intx = parseOption(clIntxOption);
 };
-
-void ConstantTypesPass::runOnOperation() {
-  OwningRewritePatternList patterns;
-  patterns.insert<ConstantTypesRewriter>(&getContext(), floatx_, intx_);
-  applyPatternsGreedily(getOperation()->getRegions(), patterns);
-}
 
 std::unique_ptr<mlir::Pass> createConstantTypesPass(DataType floatx,
                                                     DataType intx) {
@@ -132,6 +120,6 @@ std::unique_ptr<mlir::Pass> createConstantTypesPass(DataType floatx,
 }
 
 static mlir::PassRegistration<ConstantTypesPass>
-    constant_types_pass("tile-constant-types", "Set constant types precision");
+    pass("tile-constant-types", "Set constant types precision");
 
 } // namespace pmlc::dialect::tile

@@ -30,6 +30,14 @@ def __shutdown():
     ffi_call(lib.plaidml_shutdown)
 
 
+def list_targets():
+    strs = ffi_call(lib.plaidml_targets_get)
+    try:
+        return [decode_str(strs[0].strs[i]) for i in range(strs.nstrs)]
+    finally:
+        ffi_call(lib.plaidml_strings_free, strs)
+
+
 class DType(enum.IntEnum):
     """Describes the type of a tensor element."""
     INVALID = 0

@@ -101,20 +101,15 @@ void Executable::initialize() {
   initializeLLVMPasses();
 }
 
-Executable::Executable(StringRef entry, StringRef target,
-                       ModuleOp programModule, ArrayRef<void *> bufptrs)
-    : entry(entry), args(bufptrs.size()), ptrs(bufptrs.size()) {
-  auto copy = cast<ModuleOp>(programModule.getOperation()->clone());
-  OwningModuleRef module(copy);
+void Program::compile(StringRef target) {
+  if (target.empty()) {
+    return;
+  }
+
   PassManager manager(module->getContext());
 
   auto shouldPrintBeforePass = [](auto pass, auto op) { return false; };
-  auto shouldPrintAfterPass = [&](auto pass, auto op) {
-    if (auto funcOp = llvm::dyn_cast<FuncOp>(op)) {
-      return VLOG_IS_ON(3) && funcOp.getName() == entry;
-    }
-    return VLOG_IS_ON(3);
-  };
+  auto shouldPrintAfterPass = [&](auto pass, auto op) { return VLOG_IS_ON(3); };
   manager.enableIRPrinting(shouldPrintBeforePass, shouldPrintAfterPass, true,
                            false, llvm::errs());
   if (VLOG_IS_ON(1)) {
@@ -130,7 +125,6 @@ Executable::Executable(StringRef entry, StringRef target,
   manager.addNestedPass<FuncOp>(createCanonicalizerPass());
   manager.addNestedPass<FuncOp>(createCSEPass());
 
-  std::vector<MemRefType> memRefTypes;
   manager.addPass(ArgumentCollectorPass::create(&memRefTypes));
 
   auto pipelineBuilder = resolveTarget(target);
@@ -139,9 +133,14 @@ Executable::Executable(StringRef entry, StringRef target,
   if (failed(manager.run(*module))) {
     throw std::runtime_error("conversion to the LLVM IR dialect failed");
   }
+}
 
-  assert(memRefTypes.size() == bufptrs.size() &&
-         "memRefTypes and bufptrs size mismatch");
+Executable::Executable(const std::shared_ptr<Program> &program,
+                       ArrayRef<void *> bufptrs)
+    : program(program), args(bufptrs.size()), ptrs(bufptrs.size()) {
+  if (program->memRefTypes.size() != bufptrs.size()) {
+    throw std::runtime_error("memRefTypes and bufptrs size mismatch");
+  }
 
   auto tmBuilderOrError = llvm::orc::JITTargetMachineBuilder::detectHost();
   if (!tmBuilderOrError) {
@@ -159,14 +158,14 @@ Executable::Executable(StringRef entry, StringRef target,
       /*targetMachine=*/tmOrError->get());
 
   if (VLOG_IS_ON(6)) {
-    auto llvmModule = translateModuleToLLVMIR(*module);
+    auto llvmModule = translateModuleToLLVMIR(*program->module);
     if (!llvmModule) {
       throw std::runtime_error("could not convert to LLVM IR");
     }
     llvmModule->print(llvm::errs(), nullptr);
   }
 
-  auto maybeEngine = ExecutionEngine::create(*module, optPipeline);
+  auto maybeEngine = ExecutionEngine::create(*program->module, optPipeline);
   llvm::handleAllErrors(
       maybeEngine.takeError(), [](const llvm::ErrorInfoBase &err) {
         throw std::runtime_error("Failed to create ExecutionEngine: " +
@@ -176,7 +175,7 @@ Executable::Executable(StringRef entry, StringRef target,
 
   descriptors.reserve(args.size());
   for (unsigned i = 0; i < args.size(); i++) {
-    descriptors.emplace_back(bufptrs[i], memRefTypes[i]);
+    descriptors.emplace_back(bufptrs[i], program->memRefTypes[i]);
     ptrs[i] = descriptors[i].ptr();
     args[i] = &ptrs[i];
   }
@@ -185,7 +184,8 @@ Executable::Executable(StringRef entry, StringRef target,
 Executable::~Executable() = default;
 
 void Executable::invoke() {
-  auto result = engine->invoke(entry, llvm::MutableArrayRef<void *>(args));
+  auto result =
+      engine->invoke(program->entry, llvm::MutableArrayRef<void *>(args));
   if (result) {
     throw std::runtime_error("JIT invocation failed");
   }

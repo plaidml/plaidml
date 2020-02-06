@@ -6,8 +6,9 @@ from collections import namedtuple
 import numpy as np
 import six
 
+import plaidml.settings
 from plaidml import DType
-from plaidml.core import TensorShape, Buffer
+from plaidml.core import Buffer, TensorShape
 from plaidml.ffi import ForeignObject, ffi, ffi_call, lib
 
 logger = logging.getLogger(__name__)
@@ -643,14 +644,23 @@ class Program(ForeignObject):
     __ffi_del__ = lib.plaidml_program_free
     __ffi_repr__ = lib.plaidml_program_repr
 
-    def __init__(self, name, outputs, updates=[], floatx=DType.FLOAT32, intx=DType.INT32):
+    def __init__(self,
+                 name,
+                 outputs,
+                 updates=[],
+                 floatx=DType.FLOAT32,
+                 intx=DType.INT32,
+                 target=None):
+        if target is None:
+            target = plaidml.settings.get('PLAIDML_TARGET')
         raw_outputs = [x.as_ptr() for x in outputs]
         dst_updates = [x[0].as_ptr() for x in updates]
         src_updates = [x[1].as_ptr() for x in updates]
         raw_args = ffi.new('plaidml_program_args**')
         ffi_obj = ffi_call(
-            lib.plaidml_program_evaluate,
+            lib.plaidml_compile,
             name.encode(),
+            target.encode(),
             len(raw_outputs),
             raw_outputs,
             len(updates),

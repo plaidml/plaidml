@@ -11,7 +11,7 @@
 
 #include "mlir/IR/StandardTypes.h"
 
-#include "pmlc/dialect/tile/program.h"
+#include "pmlc/compiler/compiler.h"
 #include "pmlc/util/enums.h"
 
 namespace mlir {
@@ -113,7 +113,7 @@ public:
   void SetUseDefault(mlir::Value cion, mlir::Value defaultValue);
   void SetNoReduce(mlir::Value cion, bool no_reduce);
 
-  std::shared_ptr<TileProgram>
+  std::shared_ptr<compiler::Program>
   MakeProgram(llvm::StringRef name, const ProgramMutations &mutations,
               util::DataType floatx = DataType::invalid,
               util::DataType intx = DataType::invalid);

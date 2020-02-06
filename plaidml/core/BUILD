@@ -52,6 +52,7 @@ plaidml_cc_library(
     hdrs = SDK_HDRS,
     visibility = ["//visibility:public"],
     deps = [
+        "//pmlc/compiler",
         "//pmlc/dialect/tile",
         "//pmlc/util",
         "@llvm-project//llvm:support",

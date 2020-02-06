@@ -271,7 +271,8 @@ class TestEdsl(unittest.TestCase):
 
         program = Program('broadcast_cmp', [O])
         self.checkProgram(program, [
-            (A, np.array([[0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11]])), (B, np.array([[0], [6], [12]])),
+            (A, np.array([[0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11]])),
+            (B, np.array([[0], [6], [12]])),
         ], [
             [[1, 1, 1, 1], [0, 0, 1, 1], [0, 0, 0, 0]],
         ])
@@ -381,7 +382,7 @@ module {
     def test_avg(self):
         I = Placeholder(plaidml.DType.FLOAT32, [1, 784])
         O = avg(I)
-        program = Program('avg', [O])
+        program = Program('avg', [O], target='')
         expected = '''
 #map0 = affine_map<(d0, d1) -> (d0)>
 #map1 = affine_map<(d0, d1) -> (d1, d0)>
@@ -401,7 +402,7 @@ module {
     def test_avg_stages(self):
         I = Placeholder(plaidml.DType.FLOAT32, [1, 784])
         O = avg_stages(I)
-        program = Program('avg_stages', [O])
+        program = Program('avg_stages', [O], target='')
         expected = '''
 #map0 = affine_map<() -> ()>
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
@@ -423,7 +424,7 @@ module {
     def test_avg_merge(self):
         I = Placeholder(plaidml.DType.FLOAT32, [1, 784])
         O = avg_merge(I)
-        program = Program('avg_merge', [O])
+        program = Program('avg_merge', [O], target='')
         expected = '''
 #map0 = affine_map<() -> ()>
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
@@ -629,7 +630,7 @@ module {
         K4 = Placeholder(plaidml.DType.FLOAT32, [128, 100])
         B4 = Placeholder(plaidml.DType.FLOAT32, [100])
         D2 = softmax(dot(D1, K4) + B4)
-        program = Program('mnist_cnn', [D2])
+        program = Program('mnist_cnn', [D2], target='')
         expected = '''
 #map0 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
 #map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4 - 1, d2 + d5 - 1, d6)>
@@ -681,7 +682,7 @@ module {
     def test_arg_max(self):
         I = Placeholder(plaidml.DType.FLOAT32, [1, 10, 10])
         O = arg_max(I)
-        program = Program('arg_max', [O])
+        program = Program('arg_max', [O], target='')
         self.assertEqual(str(O.shape), 'tensor<1x10x!eltwise.u32>')
         expected = '''
 #map0 = affine_map<(d0) -> (d0)>
@@ -783,7 +784,7 @@ module {
         Veloc = Tensor(X_shape)
         LR = Tensor(LR_Shape)
         R = lars_momentum(X, Grad, Veloc, LR, 1. / 1024., 1. / 2048., 1. / 8.)
-        program = Program('lars_momentum4d', R)
+        program = Program('lars_momentum4d', R, target='')
         expected = '''
 #map0 = affine_map<() -> ()>
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>

@@ -17,6 +17,7 @@
 #include "mlir/IR/Value.h"
 #include "mlir/Support/DebugStringHelper.h"
 
+#include "pmlc/compiler/registry.h"
 #include "pmlc/dialect/eltwise/ir/types.h"
 #include "pmlc/dialect/tile/gradient.h"
 #include "pmlc/dialect/tile/ir/ops.h"
@@ -945,47 +946,50 @@ void plaidml_program_free(  //
   });
 }
 
-plaidml_program* plaidml_program_evaluate(  //
-    plaidml_error* err,                     //
-    const char* name,                       //
-    size_t noutputs,                        //
-    plaidml_expr** raw_outputs,             //
-    size_t nupdates,                        //
-    plaidml_expr** src_updates,             //
-    plaidml_expr** dst_updates,             //
-    plaidml_datatype floatx,                //
-    plaidml_datatype intx,                  //
+plaidml_program* plaidml_compile(  //
+    plaidml_error* err,            //
+    const char* name,              //
+    const char* target,            //
+    size_t noutputs,               //
+    plaidml_expr** raw_outputs,    //
+    size_t nupdates,               //
+    plaidml_expr** src_updates,    //
+    plaidml_expr** dst_updates,    //
+    plaidml_datatype floatx,       //
+    plaidml_datatype intx,         //
     plaidml_program_args** raw_args) {
   return ffi_wrap<plaidml_program*>(err, nullptr, [&] {
-    IVLOG(3, "plaidml_program_evaluate");
-    IVLOG(5, "  plaidml_program_evaluate>> noutputs: " << noutputs << ", nupdates: " << nupdates);
+    IVLOG(3, "plaidml_compile");
+    IVLOG(5, "  plaidml_compile>> noutputs: " << noutputs << ", nupdates: " << nupdates);
     ProgramMutations mutations;
     for (size_t i = 0; i < noutputs; i++) {
       if (!raw_outputs[i]) {
-        throw std::runtime_error("Undefined output in plaidml_program_evaluate");
+        throw std::runtime_error("Undefined output in plaidml_compile");
       }
       mutations.outputs.emplace_back(raw_outputs[i]->value);
     }
     for (size_t i = 0; i < nupdates; i++) {
       if (!src_updates[i]) {
-        throw std::runtime_error("Undefined update src in plaidml_program_evaluate");
+        throw std::runtime_error("Undefined update src in plaidml_compile");
       }
       if (!dst_updates[i]) {
-        throw std::runtime_error("Undefined update dst in plaidml_program_evaluate");
+        throw std::runtime_error("Undefined update dst in plaidml_compile");
       }
       mutations.updates.emplace(ProgramUpdate{src_updates[i]->value, dst_updates[i]->value});
     }
 
-    auto floatx_dtype = pmlc::util::symbolizeDataType(static_cast<std::uint64_t>(floatx)).getValueOr(DataType::invalid);
-    auto intx_dtype = pmlc::util::symbolizeDataType(static_cast<std::uint64_t>(intx)).getValueOr(DataType::invalid);
-    if (!pmlc::util::isFloat(floatx_dtype)) {
-      throw std::runtime_error("Invalid floatx in plaidml_program_evaluate");
-    }
-    if (!pmlc::util::isInteger(intx_dtype)) {
-      throw std::runtime_error("Invalid intx in plaidml_program_evaluate");
+    auto floatx_dtype = pmlc::util::symbolizeDataType(floatx);
+    if (!floatx_dtype || !pmlc::util::isFloat(*floatx_dtype)) {
+      throw std::runtime_error("Invalid floatx in plaidml_compile");
     }
 
-    auto ret = new plaidml_program{GlobalContext::get()->MakeProgram(name, mutations, floatx_dtype, intx_dtype)};
+    auto intx_dtype = pmlc::util::symbolizeDataType(intx);
+    if (!intx_dtype || !pmlc::util::isInteger(*intx_dtype)) {
+      throw std::runtime_error("Invalid intx in plaidml_compile");
+    }
+
+    auto program = GlobalContext::get()->MakeProgram(name, mutations, *floatx_dtype, *intx_dtype);
+    auto ret = new plaidml_program{program};
     assert(noutputs <= ret->program->outputs.size());
     auto nargs = ret->program->arguments.size();
     auto args = new plaidml_program_arg[nargs];
@@ -1000,6 +1004,7 @@ plaidml_program* plaidml_program_evaluate(  //
       }
     }
     *raw_args = new plaidml_program_args{nargs, args};
+    program->compile(target);
     return ret;
   });
 }
@@ -1009,8 +1014,7 @@ plaidml_string* plaidml_program_repr(  //
     plaidml_program* program) {
   return ffi_wrap<plaidml_string*>(err, nullptr, [&] {
     IVLOG(3, "plaidml_program_repr");
-    auto module = *program->program->module;
-    return new plaidml_string{mlir::debugString(module)};
+    return new plaidml_string{program->program->tileIR};
   });
 }
 
@@ -1026,6 +1030,18 @@ void plaidml_program_args_free(  //
     }
     delete[] args->args;
     delete args;
+  });
+}
+
+plaidml_strings* plaidml_targets_get(  //
+    plaidml_error* err) {
+  return ffi_wrap<plaidml_strings*>(err, nullptr, [&] {
+    const auto& targets = pmlc::compiler::listTargets();
+    auto strs = new plaidml_string*[targets.size()];
+    for (unsigned i = 0; i < targets.size(); i++) {
+      strs[i] = new plaidml_string{targets[i].str()};
+    }
+    return new plaidml_strings{targets.size(), strs};
   });
 }
 

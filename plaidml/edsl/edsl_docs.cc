@@ -11,6 +11,14 @@
 
 namespace plaidml::edsl {
 
+namespace {
+
+Program makeProgram(const std::string& name, const std::vector<Tensor>& outputs) {
+  return ProgramBuilder(name, outputs).target("").compile();
+}
+
+}  // namespace
+
 // sum_over_axis_start
 Tensor SumOverAxis(const Tensor& I) {
   TensorDim M, N;
@@ -238,87 +246,87 @@ Tensor ComplexConv2D(const Tensor& I, const Tensor& K,
 
 TEST(DocCppEdsl, SumOveAxis) {
   auto I = Placeholder(DType::UINT64, {3, 3});
-  Program program("sum_over_axis", {SumOverAxis(I)});
+  makeProgram("sum_over_axis", {SumOverAxis(I)});
 }
 
 TEST(DocCppEdsl, MaxOverAxis) {
   auto I = Placeholder(DType::UINT64, {3, 3});
-  Program program("max_over_axis", {MaxOverAxis(I)});
+  makeProgram("max_over_axis", {MaxOverAxis(I)});
 }
 
 TEST(DocCppEdsl, MatMul) {
   auto A = Placeholder(DType::UINT64, {3, 3});
   auto B = Placeholder(DType::UINT64, {3, 3});
-  Program program("mat_mul", {MatMul(A, B)});
+  makeProgram("mat_mul", {MatMul(A, B)});
 }
 
 TEST(DocCppEdsl, GlobalMin) {
   auto I = Placeholder(DType::FLOAT32, {10, 10, 10}, "I");
-  Program program("global_min", {GlobalMin(I)});
+  makeProgram("global_min", {GlobalMin(I)});
 }
 
 TEST(DocCppEdsl, Avg) {
   auto I = Placeholder(DType::UINT64, {3, 3});
-  Program program("avg", {Avg(I)});
+  makeProgram("avg", {Avg(I)});
 }
 
 TEST(DocCppEdsl, AvgStages) {
   auto I = Placeholder(DType::UINT64, {3, 3});
-  Program program("avg_stages", {AvgStages(I)});
+  makeProgram("avg_stages", {AvgStages(I)});
 }
 
 TEST(DocCppEdsl, AvgMerge) {
   auto I = Placeholder(DType::UINT64, {3, 3});
-  Program program("avg_merge", {AvgMerge(I)});
+  makeProgram("avg_merge", {AvgMerge(I)});
 }
 
 TEST(DocCppEdsl, WrongMaxPool1D) {
   auto I = Placeholder(DType::UINT64, {3, 3});
-  Program program("wrong_max_pool_1d", {WrongMaxPool1D(I)});
+  makeProgram("wrong_max_pool_1d", {WrongMaxPool1D(I)});
 }
 
 TEST(DocCppEdsl, ValidIndices) {
   auto I = Placeholder(DType::UINT64, {3, 3});
-  Program program("valid_indices", {ValidIndices(I)});
+  makeProgram("valid_indices", {ValidIndices(I)});
 }
 
 TEST(DocCppEdsl, MaxPool1D) {
   auto I = Placeholder(DType::UINT64, {3, 3});
-  Program program("max_pool_1d", {MaxPool1D(I)});
+  makeProgram("max_pool_1d", {MaxPool1D(I)});
 }
 
 TEST(DocCppEdsl, MaxPool1DOdd) {
   auto I = Placeholder(DType::UINT64, {3, 3});
-  Program program("max_poo_1d_odd", {MaxPool1DOdd(I)});
+  makeProgram("max_poo_1d_odd", {MaxPool1DOdd(I)});
 }
 
 TEST(DocCppEdsl, Skip) {
   auto I = Placeholder(DType::UINT64, {3, 3});
-  Program program("skip", {Skip(I)});
+  makeProgram("skip", {Skip(I)});
 }
 
 TEST(DocCppEdsl, CumSum) {
   auto I = Placeholder(DType::FLOAT32, {10}, "I");
-  Program program("cumsum", {CumSum(I)});
+  makeProgram("cumsum", {CumSum(I)});
 }
 
 TEST(DocCppEdsl, Conv1D) {
   auto I = Placeholder(DType::UINT64, {1, 244, 3});
   auto K = Placeholder(DType::UINT64, {3, 3, 1});
-  Program program("conv_1d", {Conv1D(I, K)});
+  makeProgram("conv_1d", {Conv1D(I, K)});
 }
 
 TEST(DocCppEdsl, Conv2DDilated) {
   auto I = Placeholder(DType::UINT64, {1, 244, 244, 1});
   auto K = Placeholder(DType::UINT64, {3, 3, 1, 32});
-  Program program("conv_2d_dilated", {Conv2DDilated(I, K)});
+  makeProgram("conv_2d_dilated", {Conv2DDilated(I, K)});
 }
 
 TEST(DocCppEdsl, ComplexConv2d) {
   auto I = Placeholder(DType::FLOAT32, {1, 224, 224, 3, 3});
   auto K = Placeholder(DType::FLOAT32, {3, 3, 3, 3, 32});
   auto O = ComplexConv2D(I, K, {2, 2}, {3, 3});
-  Program program("complex_conv_2d", {O});
+  makeProgram("complex_conv_2d", {O});
 }
 
 }  // namespace plaidml::edsl

@@ -12,7 +12,10 @@ plaidml_cc_library(
         "*.cc",
         "*.h",
     ]),
-    tags = ["pytorch"],
+    tags = [
+        "manual",
+        "pytorch",
+    ],
     visibility = ["//visibility:public"],
     deps = [
         "//plaidml",
@@ -24,7 +27,10 @@ plaidml_cc_library(
 plaidml_cc_binary(
     name = "plaidml_pytorch.so",
     linkshared = 1,
-    tags = ["pytorch"],
+    tags = [
+        "manual",
+        "pytorch",
+    ],
     deps = [":pytorch"],
 )
 
@@ -32,7 +38,10 @@ py_library(
     name = "py",
     srcs = ["__init__.py"],
     data = [":plaidml_pytorch.so"],
-    tags = ["pytorch"],
+    tags = [
+        "manual",
+        "pytorch",
+    ],
     visibility = ["//visibility:public"],
     deps = ["//plaidml:py"],
 )
@@ -40,7 +49,10 @@ py_library(
 py_library(
     name = "test_utils",
     srcs = ["test_utils.py"],
-    tags = ["pytorch"],
+    tags = [
+        "manual",
+        "pytorch",
+    ],
     deps = [":py"],
 )
 

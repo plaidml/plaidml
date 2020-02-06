@@ -381,7 +381,7 @@ edsl::Program build(int64_t batch_size, const edsl::Tensor& I, ArrayRef<edsl::Te
   auto B_dense = B[53];
   auto dense = op::dot(global_mean, W_dense) + B_dense;
   auto softmax = op::softmax(dense, 1);
-  return edsl::Program("resnet50", {edsl::trace(softmax, "done")});
+  return edsl::ProgramBuilder("resnet50", {edsl::trace(softmax, "done")}).compile();
 }
 
 }  // namespace

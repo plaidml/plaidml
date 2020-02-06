@@ -386,9 +386,15 @@ plaidml_string* plaidml_value_repr(  //
     plaidml_value* value);
 
 //
-// plaidml_program
+// plaidml_targets
 //
 
+plaidml_strings* plaidml_targets_get(  //
+    plaidml_error* err);
+
+//
+// plaidml_program_args
+//
 typedef struct plaidml_program_arg {
   bool is_input;
   plaidml_expr* tensor;
@@ -401,29 +407,34 @@ typedef struct plaidml_program_args {
   plaidml_program_arg* args;
 } plaidml_program_args;
 
+void plaidml_program_args_free(  //
+    plaidml_error* err,          //
+    plaidml_program_args* args);
+
+//
+// plaidml_program
+//
+
 void plaidml_program_free(  //
     plaidml_error* err,     //
     plaidml_program* program);
 
-plaidml_program* plaidml_program_evaluate(  //
-    plaidml_error* err,                     //
-    const char* name,                       //
-    size_t noutputs,                        //
-    plaidml_expr** outputs,                 //
-    size_t nupdates,                        //
-    plaidml_expr** src_updates,             //
-    plaidml_expr** dst_updates,             //
-    plaidml_datatype floatx,                //
-    plaidml_datatype intx,                  //
+plaidml_program* plaidml_compile(  //
+    plaidml_error* err,            //
+    const char* name,              //
+    const char* target,            //
+    size_t noutputs,               //
+    plaidml_expr** outputs,        //
+    size_t nupdates,               //
+    plaidml_expr** src_updates,    //
+    plaidml_expr** dst_updates,    //
+    plaidml_datatype floatx,       //
+    plaidml_datatype intx,         //
     plaidml_program_args** args);
 
 plaidml_string* plaidml_program_repr(  //
     plaidml_error* err,                //
     plaidml_program* program);
-
-void plaidml_program_args_free(  //
-    plaidml_error* err,          //
-    plaidml_program_args* args);
 
 #ifdef __cplusplus
 }  // extern "C"
