@@ -64,9 +64,9 @@ struct Binding {
 ///
 inline std::vector<std::string> list_devices() {
   auto strs = details::make_ptr(ffi::call<plaidml_strings*>(plaidml_devices_get));
-  std::vector<std::string> ret(strs->nstrs);
+  std::vector<std::string> ret(strs->size);
   for (size_t i = 0; i < ret.size(); i++) {
-    ret[i] = ffi::str(strs->strs[i]);
+    ret[i] = ffi::str(strs->elts[i]);
   }
   return ret;
 }

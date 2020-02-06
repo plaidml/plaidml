@@ -1133,6 +1133,20 @@ module {
         self.assertEqual(str(I2.shape), "tensor<1x1x!eltwise.i32>")
         self.assertMultiLineEqualsStripped(program1, str(program2))
 
+    def test_collect_passes(self):
+        A = Placeholder(plaidml.DType.FLOAT32, [10, 10])
+        B = Placeholder(plaidml.DType.FLOAT32, [10, 10])
+        C = dot(A, B)
+        program = Program('collect_passes', [C], debug=True)
+
+        first_pass = program.passes[0]
+        self.assertEqual('tile', first_pass[0])
+        self.assertEqual(str(program), first_pass[1])
+
+        last_pass = program.passes[-1]
+        self.assertEqual('trace-linking', last_pass[0])
+        self.assertIn('llvm.func', last_pass[1])
+
 
 if __name__ == '__main__':
     unittest.main()

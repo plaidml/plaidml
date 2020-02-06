@@ -600,7 +600,7 @@ TEST_F(CppEdsl, LarsMomentum4d) {
   auto Veloc = Placeholder(X_shape);
   auto LR = Placeholder(LR_shape);
   auto R = LarsMomentum(X, Grad, Veloc, LR, 1. / 1024., 1. / 2048., 1. / 8.);
-  auto program = ProgramBuilder("lars_momentum4d", {std::get<0>(R), std::get<1>(R)}).target("").compile();
+  auto program = makeProgram("lars_momentum4d", {std::get<0>(R), std::get<1>(R)});
   EXPECT_THAT(program, Eq(R"#(
 #map0 = affine_map<() -> ()>
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>

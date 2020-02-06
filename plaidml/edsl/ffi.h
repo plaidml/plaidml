@@ -307,8 +307,8 @@ void plaidml_expr_contraction_set_use_default(  //
 // plaidml_value
 //
 
-typedef struct plaidml_tuple {
-  size_t nelts;
+typedef struct {
+  size_t size;
   plaidml_value** elts;
 } plaidml_tuple;
 
@@ -395,16 +395,16 @@ plaidml_strings* plaidml_targets_get(  //
 //
 // plaidml_program_args
 //
-typedef struct plaidml_program_arg {
+typedef struct {
   bool is_input;
   plaidml_expr* tensor;
   plaidml_logical_shape* shape;
   plaidml_buffer* buffer;
 } plaidml_program_arg;
 
-typedef struct plaidml_program_args {
-  size_t nargs;
-  plaidml_program_arg* args;
+typedef struct {
+  size_t size;
+  plaidml_program_arg* elts;
 } plaidml_program_args;
 
 void plaidml_program_args_free(  //
@@ -430,10 +430,15 @@ plaidml_program* plaidml_compile(  //
     plaidml_expr** dst_updates,    //
     plaidml_datatype floatx,       //
     plaidml_datatype intx,         //
+    bool debug,                    //
     plaidml_program_args** args);
 
 plaidml_string* plaidml_program_repr(  //
     plaidml_error* err,                //
+    plaidml_program* program);
+
+plaidml_kvps* plaidml_program_get_passes(  //
+    plaidml_error* err,                    //
     plaidml_program* program);
 
 #ifdef __cplusplus

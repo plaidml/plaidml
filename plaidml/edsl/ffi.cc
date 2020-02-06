@@ -591,7 +591,6 @@ void plaidml_poly_expr_free(plaidml_error* err, plaidml_poly_expr* expr) {
   ffi_wrap_void(err, [&] {
     IVLOG(3, "plaidml_poly_expr_free> " << mlir::debugString(expr->value));
     GlobalContext::get()->Destroy(expr->value);
-
     delete expr;
   });
 }
@@ -653,7 +652,6 @@ void plaidml_dim_expr_free(  //
   ffi_wrap_void(err, [&] {
     IVLOG(3, "plaidml_dim_expr_free> " << mlir::debugString(expr->value));
     GlobalContext::get()->Destroy(expr->value);
-
     delete expr;
   });
 }
@@ -717,7 +715,7 @@ void plaidml_tuple_free(  //
     plaidml_tuple* tuple) {
   ffi_wrap_void(err, [&] {
     IVLOG(3, "plaidml_tuple_free");
-    for (size_t i = 0; i < tuple->nelts; i++) {
+    for (size_t i = 0; i < tuple->size; i++) {
       delete tuple->elts[i];
     }
     delete[] tuple->elts;
@@ -833,12 +831,12 @@ plaidml_value* plaidml_value_str(  //
 
 plaidml_value* plaidml_value_tuple(  //
     plaidml_error* err,              //
-    size_t nelts,                    //
+    size_t size,                     //
     plaidml_value** elts) {
   return ffi_wrap<plaidml_value*>(err, nullptr, [&] {
     IVLOG(3, "plaidml_value_tuple");
-    Tuple tuple(nelts);
-    for (size_t i = 0; i < nelts; i++) {
+    Tuple tuple(size);
+    for (size_t i = 0; i < size; i++) {
       tuple[i] = std::make_shared<VariantHolder>(elts[i]->variant);
     }
     return new plaidml_value{tuple};
@@ -888,12 +886,12 @@ plaidml_tuple* plaidml_value_tuple_get(  //
   return ffi_wrap<plaidml_tuple*>(err, nullptr, [&] {
     IVLOG(3, "plaidml_value_tuple_get");
     auto tuple = std::get<Tuple>(value->variant);
-    auto nelts = tuple.size();
-    auto elts = new plaidml_value*[nelts];
-    for (size_t i = 0; i < nelts; i++) {
+    auto size = tuple.size();
+    auto elts = new plaidml_value*[size];
+    for (size_t i = 0; i < size; i++) {
       elts[i] = new plaidml_value{tuple[i]->inner};
     }
-    return new plaidml_tuple{nelts, elts};
+    return new plaidml_tuple{size, elts};
   });
 }
 
@@ -957,6 +955,7 @@ plaidml_program* plaidml_compile(  //
     plaidml_expr** dst_updates,    //
     plaidml_datatype floatx,       //
     plaidml_datatype intx,         //
+    bool debug,                    //
     plaidml_program_args** raw_args) {
   return ffi_wrap<plaidml_program*>(err, nullptr, [&] {
     IVLOG(3, "plaidml_compile");
@@ -1004,7 +1003,7 @@ plaidml_program* plaidml_compile(  //
       }
     }
     *raw_args = new plaidml_program_args{nargs, args};
-    program->compile(target);
+    program->compile(target, debug);
     return ret;
   });
 }
@@ -1018,17 +1017,32 @@ plaidml_string* plaidml_program_repr(  //
   });
 }
 
+plaidml_kvps* plaidml_program_get_passes(  //
+    plaidml_error* err,                    //
+    plaidml_program* program) {
+  return ffi_wrap<plaidml_kvps*>(err, nullptr, [&] {
+    const auto& passes = program->program->passes;
+    auto ret = new plaidml_kvps{passes.size(), new plaidml_kvp[passes.size()]};
+    size_t i = 0;
+    for (auto it = passes.begin(), eit = passes.end(); it != eit; ++it, ++i) {
+      ret->elts[i].key = new plaidml_string{it->name};
+      ret->elts[i].value = new plaidml_string{it->ir};
+    }
+    return ret;
+  });
+}
+
 void plaidml_program_args_free(  //
     plaidml_error* err,          //
     plaidml_program_args* args) {
   ffi_wrap_void(err, [&] {
     IVLOG(3, "plaidml_program_args_free");
-    for (unsigned i = 0; i < args->nargs; i++) {
-      delete args->args[i].shape;
-      delete args->args[i].tensor;
-      delete args->args[i].buffer;
+    for (unsigned i = 0; i < args->size; i++) {
+      delete args->elts[i].shape;
+      delete args->elts[i].tensor;
+      delete args->elts[i].buffer;
     }
-    delete[] args->args;
+    delete[] args->elts;
     delete args;
   });
 }

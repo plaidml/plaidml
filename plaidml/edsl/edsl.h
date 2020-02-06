@@ -75,9 +75,9 @@ inline void init() {
 ///
 inline std::vector<std::string> list_targets() {
   auto strs = details::make_ptr(ffi::call<plaidml_strings*>(plaidml_targets_get));
-  std::vector<std::string> ret(strs->nstrs);
+  std::vector<std::string> ret(strs->size);
   for (size_t i = 0; i < ret.size(); i++) {
-    ret[i] = ffi::str(strs->strs[i]);
+    ret[i] = ffi::str(strs->elts[i]);
   }
   return ret;
 }
@@ -1179,9 +1179,11 @@ inline Program::Program(const ProgramBuilder& builder) {
       src_updates.data(),                                //
       dst_updates.data(),                                //
       static_cast<plaidml_datatype>(builder.floatx_),    //
-      static_cast<plaidml_datatype>(builder.intx_), &args));
-  for (size_t i = 0; i < args->nargs; i++) {
-    const auto& arg = args->args[i];
+      static_cast<plaidml_datatype>(builder.intx_),      //
+      builder.debug_,                                    //
+      &args));
+  for (size_t i = 0; i < args->size; i++) {
+    const auto& arg = args->elts[i];
     Tensor tensor(ffi::call<plaidml_expr*>(plaidml_expr_clone, arg.tensor));
     LogicalShape shape(ffi::call<plaidml_logical_shape*>(plaidml_logical_shape_clone, arg.shape));
     ProgramArgument programArg{arg.is_input, tensor, shape};
@@ -1442,7 +1444,7 @@ class Value {
 
   std::vector<Value> as_tuple() const {
     auto tuple = details::make_ptr(ffi::call<plaidml_tuple*>(plaidml_value_tuple_get, as_ptr()));
-    std::vector<Value> ret(tuple->nelts);
+    std::vector<Value> ret(tuple->size);
     for (size_t i = 0; i < ret.size(); i++) {
       ret[i] = Value{tuple->elts[i]};
     }
@@ -1451,7 +1453,7 @@ class Value {
 
   std::vector<int64_t> as_int_tuple() const {
     auto tuple = details::make_ptr(ffi::call<plaidml_tuple*>(plaidml_value_tuple_get, as_ptr()));
-    std::vector<int64_t> ret(tuple->nelts);
+    std::vector<int64_t> ret(tuple->size);
     for (size_t i = 0; i < ret.size(); i++) {
       ret[i] = Value{tuple->elts[i]}.as_int();
     }

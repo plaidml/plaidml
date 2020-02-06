@@ -23,11 +23,7 @@ ffi.init_once(__init, 'plaidml_exec_init')
 
 
 def list_devices():
-    strs = ffi_call(lib.plaidml_devices_get)
-    try:
-        return [decode_str(strs[0].strs[i]) for i in range(strs.nstrs)]
-    finally:
-        ffi_call(lib.plaidml_strings_free, strs)
+    return plaidml.get_strs(lib.plaidml_devices_get)
 
 
 class Executable(ForeignObject):
@@ -55,7 +51,7 @@ class Executable(ForeignObject):
         super(Executable, self).__init__(ffi_obj)
 
     def run(self):
-        ffi_call(lib.plaidml_executable_run, self.as_ptr())
+        self._methodcall(lib.plaidml_executable_run)
 
 
 class Binder:

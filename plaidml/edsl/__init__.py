@@ -50,11 +50,11 @@ class LogicalShape(ForeignObject):
 
     @property
     def dtype(self):
-        return DType(ffi_call(lib.plaidml_logical_shape_get_dtype, self.as_ptr()))
+        return DType(self._methodcall(lib.plaidml_logical_shape_get_dtype))
 
     @property
     def ndims(self):
-        return ffi_call(lib.plaidml_logical_shape_get_ndims, self.as_ptr())
+        return self._methodcall(lib.plaidml_logical_shape_get_ndims)
 
     @property
     def int_dims(self):
@@ -68,8 +68,7 @@ class LogicalShape(ForeignObject):
 
         """
         return [
-            ffi_call(lib.plaidml_logical_shape_get_dim_int, self.as_ptr(), i)
-            for i in range(self.ndims)
+            self._methodcall(lib.plaidml_logical_shape_get_dim_int, i) for i in range(self.ndims)
         ]
 
     def into_TensorShape(self):
@@ -82,8 +81,7 @@ class LogicalShape(ForeignObject):
             TensorShape: The resultant TensorShape.
 
         """
-        return TensorShape(
-            ptr=ffi_call(lib.plaidml_logical_shape_into_tensor_shape, self.as_ptr()))
+        return TensorShape(ptr=self._methodcall(lib.plaidml_logical_shape_into_tensor_shape))
 
 
 Constraint = namedtuple('Constraint', ['lhs', 'rhs'])
@@ -499,14 +497,14 @@ class Tensor(ForeignObject):
     def no_reduce(self):
         if not self._is_contraction:
             raise TypeError('no_reduce can only be specified on a contraction.')
-        ffi_call(lib.plaidml_expr_contraction_set_no_reduce, self.as_ptr(), True)
+        self._methodcall(lib.plaidml_expr_contraction_set_no_reduce, True)
         return self
 
     # Set use_default on a contraction
     def use_default(self, rhs):
         if not self._is_contraction:
             raise TypeError('use_default can only be specified on a contraction.')
-        ffi_call(lib.plaidml_expr_contraction_set_use_default, self.as_ptr(), rhs.as_ptr())
+        self._methodcall(lib.plaidml_expr_contraction_set_use_default, rhs.as_ptr())
         return self
 
     def add_constraint(self, constraint):
@@ -524,16 +522,16 @@ class Tensor(ForeignObject):
     # Return the tensor's shape
     @property
     def shape(self):
-        return LogicalShape(ptr=ffi_call(lib.plaidml_expr_get_shape, self.as_ptr()))
+        return LogicalShape(ptr=self._methodcall(lib.plaidml_expr_get_shape))
 
     # Verify that the specified dims match the dims of this tensor.
     def bind_dims(self, *dims):
         raw_dims = [x.as_ptr() for x in dims]
-        ffi_call(lib.plaidml_expr_bind_dims, self.as_ptr(), len(raw_dims), raw_dims)
+        self._methodcall(lib.plaidml_expr_bind_dims, len(raw_dims), raw_dims)
 
     # bind a concrete shape to this tensor
     def bind(self, shape):
-        ffi_call(lib.plaidml_expr_bind_shape, self.as_ptr(), shape.as_ptr())
+        self._methodcall(lib.plaidml_expr_bind_shape, shape.as_ptr())
 
 
 class TensorRef:
@@ -586,7 +584,7 @@ class Value(ForeignObject):
         super(Value, self).__init__(ffi_obj)
 
     def as_tensor(self):
-        return Tensor(expr=ffi_call(lib.plaidml_value_expr_get, self.as_ptr()))
+        return Tensor(expr=self._methodcall(lib.plaidml_value_expr_get))
 
 
 def TensorOutput(*args):
@@ -650,6 +648,7 @@ class Program(ForeignObject):
                  updates=[],
                  floatx=DType.FLOAT32,
                  intx=DType.INT32,
+                 debug=False,
                  target=None):
         if target is None:
             target = plaidml.settings.get('PLAIDML_TARGET')
@@ -668,9 +667,10 @@ class Program(ForeignObject):
             dst_updates,
             floatx,
             intx,
+            debug,
             raw_args,
         )
-        self.args = [ProgramArgument(raw_args[0].args[i]) for i in range(raw_args[0].nargs)]
+        self.args = [ProgramArgument(raw_args[0].elts[i]) for i in range(raw_args[0].size)]
         ffi_call(lib.plaidml_program_args_free, raw_args[0])
         super(Program, self).__init__(ffi_obj)
 
@@ -681,6 +681,16 @@ class Program(ForeignObject):
     @property
     def outputs(self):
         return [x for x in self.args if not x.is_input]
+
+    @property
+    def passes(self):
+        """Returns a list of passes in to form: [(name, ir), ...]
+
+        Where `name` is the name of the pass and `ir` is the IR after that pass was performed.
+
+        Note that `debug` must be enabled when compiling the program.
+        """
+        return plaidml.kvps_to_list(self._methodcall(lib.plaidml_program_get_passes))
 
 
 def wrap_tensor(x):

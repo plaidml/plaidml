@@ -26,6 +26,11 @@ struct ProgramArgument {
   pmlc::util::BufferPtr buffer;
 };
 
+struct PassInfo {
+  std::string name;
+  std::string ir;
+};
+
 struct Program {
   std::string entry;
   std::string tileIR;
@@ -33,10 +38,11 @@ struct Program {
   std::vector<mlir::Value> outputs;
   std::vector<ProgramArgument> arguments;
   std::vector<mlir::MemRefType> memRefTypes;
+  std::vector<PassInfo> passes;
 
   explicit Program(mlir::ModuleOp module) : module(module) {}
 
-  void compile(mlir::StringRef target);
+  void compile(mlir::StringRef target, bool collectPasses = false);
 };
 
 class Executable {

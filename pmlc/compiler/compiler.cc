@@ -50,6 +50,51 @@ private:
   MemRefTypes *into;
 };
 
+class IRCollector : public PassInstrumentation {
+public:
+  explicit IRCollector(std::vector<PassInfo> *into) : into(into) {}
+
+private:
+  bool isHiddenPass(Pass *pass) {
+    return pass->getName().startswith("detail::");
+  }
+
+  void runAfterPass(Pass *pass, Operation *op) override {
+    if (isHiddenPass(pass))
+      return;
+
+    std::string ir;
+    llvm::raw_string_ostream os(ir);
+
+    // Find the top-level module operation.
+    auto *topLevelOp = op;
+    while (auto *parentOp = topLevelOp->getParentOp()) {
+      topLevelOp = parentOp;
+    }
+
+    // Check to see if the top-level operation is actually a module in the case
+    // of invalid-ir.
+    if (auto module = dyn_cast<ModuleOp>(topLevelOp)) {
+      module.print(os);
+    } else {
+      topLevelOp->print(os);
+    }
+
+    os.flush();
+
+    auto name = pass->getName().str();
+    if (auto passInfo = pass->lookupPassInfo()) {
+      auto passArg = passInfo->getPassArgument();
+      if (!passArg.empty()) {
+        name = passArg.str();
+      }
+    }
+    into->emplace_back(PassInfo{name, ir});
+  }
+
+  std::vector<PassInfo> *into;
+};
+
 } // namespace
 
 class MemRefDescriptor {
@@ -101,36 +146,46 @@ void Executable::initialize() {
   initializeLLVMPasses();
 }
 
-void Program::compile(StringRef target) {
+void Program::compile(StringRef target, bool collectPasses) {
   if (target.empty()) {
     return;
   }
 
-  PassManager manager(module->getContext());
+  PassManager pm(module->getContext());
+
+  if (collectPasses) {
+    std::string ir;
+    llvm::raw_string_ostream os(ir);
+    module->print(os);
+    os.flush();
+    passes.emplace_back(PassInfo{"tile", ir});
+    pm.addInstrumentation(std::make_unique<IRCollector>(&passes));
+  }
 
   auto shouldPrintBeforePass = [](auto pass, auto op) { return false; };
   auto shouldPrintAfterPass = [&](auto pass, auto op) { return VLOG_IS_ON(3); };
-  manager.enableIRPrinting(shouldPrintBeforePass, shouldPrintAfterPass, true,
-                           false, llvm::errs());
+  pm.enableIRPrinting(shouldPrintBeforePass, shouldPrintAfterPass, true, false,
+                      llvm::errs());
+
   if (VLOG_IS_ON(1)) {
-    manager.enableStatistics();
-    manager.enableTiming();
+    pm.enableStatistics();
+    pm.enableTiming();
   }
 
-  manager.addPass(dialect::tile::createComputeBoundsPass());
-  manager.addNestedPass<FuncOp>(createCanonicalizerPass());
-  manager.addNestedPass<FuncOp>(createCSEPass());
+  pm.addPass(dialect::tile::createComputeBoundsPass());
+  pm.addNestedPass<FuncOp>(createCanonicalizerPass());
+  pm.addNestedPass<FuncOp>(createCSEPass());
 
-  manager.addPass(createLowerTileToPXAPass());
-  manager.addNestedPass<FuncOp>(createCanonicalizerPass());
-  manager.addNestedPass<FuncOp>(createCSEPass());
+  pm.addPass(createLowerTileToPXAPass());
+  pm.addNestedPass<FuncOp>(createCanonicalizerPass());
+  pm.addNestedPass<FuncOp>(createCSEPass());
 
-  manager.addPass(ArgumentCollectorPass::create(&memRefTypes));
+  pm.addPass(ArgumentCollectorPass::create(&memRefTypes));
 
   auto pipelineBuilder = resolveTarget(target);
-  pipelineBuilder(manager);
+  pipelineBuilder(pm);
 
-  if (failed(manager.run(*module))) {
+  if (failed(pm.run(*module))) {
     throw std::runtime_error("conversion to the LLVM IR dialect failed");
   }
 }
