@@ -2,7 +2,10 @@ package(default_visibility = ["//visibility:public"])
 
 py_binary(
     name = "demo",
-    srcs = ["demo.py"],
+    srcs = [
+        "demo.py",
+        "demo_source.py"
+    ],
     data = ["demo.ipynb"],
     deps = [
         "//plaidml:py",
