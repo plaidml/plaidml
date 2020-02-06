@@ -82,12 +82,7 @@ def edsl_program(X, Y):
         return R
 """.format(textbox_value), edsl_context)
         edsl_program = edsl_context['edsl_program']
-        print('edsl_program:', edsl_program)
         R = edsl_program(X, Y)
-        print('R:', R)
-        #R = edsl_code(X, Y)
-        #R = X + Y
-        #print(R)
         program = Program('edsl_program', [R])
 
         # Create the binder and the executable so that the program can run.
