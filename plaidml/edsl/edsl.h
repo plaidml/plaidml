@@ -558,7 +558,7 @@ class Tensor {
   /// \param value uint64_t
   /// \return Tensor
   ///
-  explicit Tensor(std::uint64_t value) : impl_(new Impl) {  //
+  explicit Tensor(uint64_t value) : impl_(new Impl) {  //
     impl_->ptr = details::make_ptr(ffi::call<plaidml_expr*>(plaidml_expr_uint, value));
   }
 
