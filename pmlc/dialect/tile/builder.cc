@@ -198,6 +198,7 @@ struct TileBuilder::Impl {
         return makeScalarConstantOp(int64_t(0));
       }
     }
+    llvm_unreachable("Invalid aggregation kind");
   }
 };
 
