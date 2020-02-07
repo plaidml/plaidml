@@ -80,6 +80,7 @@ public:
   mlir::Value MakeStringOp(llvm::StringRef value);
   mlir::Value MakeTupleOp(llvm::ArrayRef<mlir::Value> elts);
 
+  mlir::Value MakeScalarConstantOp(uint64_t value);
   mlir::Value MakeScalarConstantOp(int64_t value);
   mlir::Value MakeScalarConstantOp(double value);
   mlir::Value MakePrimitiveOp(llvm::StringRef fn,

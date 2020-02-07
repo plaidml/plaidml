@@ -157,6 +157,39 @@ TEST_F(CppEdsl, Cast) {
   checkProgram(program, {{A, A_input}}, {{B, B_output}});
 }
 
+TEST_F(CppEdsl, BitAndScalar) {
+  auto A = Placeholder(DType::UINT64, {3, 3});
+  std::uint64_t mask = UINT32_MAX;
+  auto B = A & mask;
+  auto program = ProgramBuilder("bit_and", {B}).intx(DType::UINT64).compile();
+
+  std::vector<std::uint64_t> A_input{(1UL << 32),     (1UL << 33) + 1, (1UL << 34) + 2,  //
+                                     (1UL << 35) + 3, (1UL << 36) + 4, (1UL << 37) + 5,  //
+                                     (1UL << 38) + 6, (1UL << 39) + 7, (1UL << 40) + 8};
+  std::vector<std::uint64_t> B_output{0, 1, 2,  //
+                                      3, 4, 5,  //
+                                      6, 7, 8};
+  checkProgram(program, {{A, A_input}}, {{B, B_output}});
+}
+
+TEST_F(CppEdsl, BitAnd) {
+  auto A = Placeholder(DType::UINT64, {3, 3});
+  auto B = Placeholder(DType::UINT64, {3, 3});
+  auto C = A & B;
+  auto program = makeProgram("bit_and", {C});
+
+  std::vector<std::uint64_t> A_input{1, 2, 3,  //
+                                     4, 5, 6,  //
+                                     7, 8, 9};
+  std::vector<std::uint64_t> B_input{10, 11, 12,  //
+                                     13, 14, 15,  //
+                                     16, 17, 18};
+  std::vector<std::uint64_t> C_output{1 & 10, 2 & 11, 3 & 12,  //
+                                      4 & 13, 5 & 14, 6 & 15,  //
+                                      7 & 16, 8 & 17, 9 & 18};
+  checkProgram(program, {{A, A_input}, {B, B_input}}, {{C, C_output}});
+}
+
 TEST_F(CppEdsl, BitOr) {
   auto A = Placeholder(DType::UINT64, {3, 3});
   auto B = Placeholder(DType::UINT64, {3, 3});
