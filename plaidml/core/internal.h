@@ -1,4 +1,4 @@
-// Copyright 2019 Intel Corporation.
+// Copyright 2019 Intel Corporation
 
 #pragma once
 
@@ -26,11 +26,11 @@ struct plaidml_dim_expr {
 
 struct plaidml_expr {
   mlir::Value value;
-  std::shared_ptr<pmlc::dialect::tile::TileProgram> program;
+  std::shared_ptr<pmlc::compiler::Program> program;
 };
 
 struct plaidml_program {
-  std::shared_ptr<pmlc::dialect::tile::TileProgram> program;
+  std::shared_ptr<pmlc::compiler::Program> program;
 };
 
 struct plaidml_buffer {

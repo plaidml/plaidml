@@ -13,9 +13,9 @@ plaidml_cc_library(
     ],
     hdrs = [
         "builder.h",
-        "program.h",
     ],
     deps = [
+        "//pmlc/compiler",
         "//pmlc/dialect/eltwise",
         "//pmlc/dialect/tile/ir",
         "//pmlc/dialect/tile/transforms",

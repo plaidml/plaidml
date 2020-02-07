@@ -39,7 +39,7 @@ Some Notes:
  """.format(plaidml.__version__))
 
     devices = sorted(plaidml.exec.list_devices())
-    targets = sorted(plaidml.exec.list_targets())
+    targets = sorted(plaidml.list_targets())
 
     if not devices:
         print("""

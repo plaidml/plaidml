@@ -22,8 +22,8 @@ typedef struct plaidml_string plaidml_string;
 typedef struct plaidml_shape plaidml_shape;
 
 typedef struct plaidml_strings {
-  size_t nstrs;
-  plaidml_string** strs;
+  size_t size;
+  plaidml_string** elts;
 } plaidml_strings;
 
 //
@@ -84,9 +84,9 @@ typedef struct {
 } plaidml_kvp;
 
 typedef struct {
-  size_t nkvps;
-  plaidml_kvp* kvps;
-} plaidml_settings;
+  size_t size;
+  plaidml_kvp* elts;
+} plaidml_kvps;
 
 void plaidml_init(  //
     plaidml_error* err);
@@ -97,12 +97,12 @@ void plaidml_shutdown(  //
 const char* plaidml_version(  //
     plaidml_error* err);
 
-void plaidml_settings_free(  //
-    plaidml_error* err,      //
-    plaidml_settings* settings);
+void plaidml_kvps_free(  //
+    plaidml_error* err,  //
+    plaidml_kvps* kvps);
 
-plaidml_settings* plaidml_settings_list(  //
-    plaidml_error* err                    //
+plaidml_kvps* plaidml_settings_list(  //
+    plaidml_error* err                //
 );
 
 plaidml_string* plaidml_settings_get(  //

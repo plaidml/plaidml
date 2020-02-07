@@ -6,8 +6,9 @@ import enum
 from collections import namedtuple
 
 import numpy as np
+
 from plaidml.core._version import PLAIDML_VERSION
-from plaidml.ffi import Error, ForeignObject, ffi, ffi_call, lib
+from plaidml.ffi import Error, ForeignObject, decode_str, ffi, ffi_call, lib
 
 
 def __init():
@@ -28,6 +29,34 @@ __version__ = ffi.init_once(__init, 'plaidml_init')
 @atexit.register
 def __shutdown():
     ffi_call(lib.plaidml_shutdown)
+
+
+def get_strs(ffi_list):
+    strs = ffi_call(ffi_list)
+    try:
+        return [decode_str(strs[0].strs[i]) for i in range(strs.nstrs)]
+    finally:
+        ffi_call(lib.plaidml_strings_free, strs)
+
+
+def kvps_to_dict(kvps):
+    try:
+        x = kvps.elts
+        return {decode_str(x[i].key): decode_str(x[i].value) for i in range(kvps.size)}
+    finally:
+        ffi_call(lib.plaidml_kvps_free, kvps)
+
+
+def kvps_to_list(kvps):
+    try:
+        x = kvps.elts
+        return [(decode_str(x[i].key), decode_str(x[i].value)) for i in range(kvps.size)]
+    finally:
+        ffi_call(lib.plaidml_kvps_free, kvps)
+
+
+def list_targets():
+    return get_strs(lib.plaidml_targets_get)
 
 
 class DType(enum.IntEnum):
@@ -145,27 +174,23 @@ class TensorShape(ForeignObject):
 
     @property
     def dtype(self):
-        return DType(ffi_call(lib.plaidml_shape_get_dtype, self.as_ptr()))
+        return DType(self._methodcall(lib.plaidml_shape_get_dtype))
 
     @property
     def ndims(self):
-        return ffi_call(lib.plaidml_shape_get_ndims, self.as_ptr())
+        return self._methodcall(lib.plaidml_shape_get_ndims)
 
     @property
     def nbytes(self):
-        return ffi_call(lib.plaidml_shape_get_nbytes, self.as_ptr())
+        return self._methodcall(lib.plaidml_shape_get_nbytes)
 
     @property
     def sizes(self):
-        return [
-            ffi_call(lib.plaidml_shape_get_dim_size, self.as_ptr(), i) for i in range(self.ndims)
-        ]
+        return [self._methodcall(lib.plaidml_shape_get_dim_size, i) for i in range(self.ndims)]
 
     @property
     def strides(self):
-        return [
-            ffi_call(lib.plaidml_shape_get_dim_stride, self.as_ptr(), i) for i in range(self.ndims)
-        ]
+        return [self._methodcall(lib.plaidml_shape_get_dim_stride, i) for i in range(self.ndims)]
 
 
 class View(ForeignObject):
@@ -178,14 +203,14 @@ class View(ForeignObject):
 
     @property
     def data(self):
-        return ffi.buffer(ffi_call(lib.plaidml_view_data, self.as_ptr()), self.size)
+        return ffi.buffer(self._methodcall(lib.plaidml_view_data), self.size)
 
     @property
     def size(self):
-        return ffi_call(lib.plaidml_view_size, self.as_ptr())
+        return self._methodcall(lib.plaidml_view_size)
 
     def writeback(self):
-        ffi_call(lib.plaidml_view_writeback, self.as_ptr())
+        self._methodcall(lib.plaidml_view_writeback)
 
     def copy_from_ndarray(self, src):
         dst = np.frombuffer(self.data, dtype=self.shape.dtype.into_numpy())
@@ -217,11 +242,11 @@ class Buffer(ForeignObject):
 
     @contextlib.contextmanager
     def mmap_current(self):
-        yield View(ffi_call(lib.plaidml_buffer_mmap_current, self.as_ptr()), self.shape)
+        yield View(self._methodcall(lib.plaidml_buffer_mmap_current), self.shape)
 
     @contextlib.contextmanager
     def mmap_discard(self):
-        yield View(ffi_call(lib.plaidml_buffer_mmap_discard, self.as_ptr()), self.shape)
+        yield View(self._methodcall(lib.plaidml_buffer_mmap_discard), self.shape)
 
     def as_ndarray(self):
         if self._ndarray is None:

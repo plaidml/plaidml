@@ -64,24 +64,9 @@ struct Binding {
 ///
 inline std::vector<std::string> list_devices() {
   auto strs = details::make_ptr(ffi::call<plaidml_strings*>(plaidml_devices_get));
-  std::vector<std::string> ret(strs->nstrs);
+  std::vector<std::string> ret(strs->size);
   for (size_t i = 0; i < ret.size(); i++) {
-    ret[i] = ffi::str(strs->strs[i]);
-  }
-  return ret;
-}
-
-///
-/// \ingroup exec_functions
-/// Lists the available targets.
-/// Use this list of targets to set the environment variable `PLAIDML_TARGET`.
-/// \return vector<string>
-///
-inline std::vector<std::string> list_targets() {
-  auto strs = details::make_ptr(ffi::call<plaidml_strings*>(plaidml_targets_get));
-  std::vector<std::string> ret(strs->nstrs);
-  for (size_t i = 0; i < ret.size(); i++) {
-    ret[i] = ffi::str(strs->strs[i]);
+    ret[i] = ffi::str(strs->elts[i]);
   }
   return ret;
 }
@@ -102,7 +87,6 @@ class Executable {
       : Executable(                           //
             program,                          //
             Settings::get("PLAIDML_DEVICE"),  //
-            Settings::get("PLAIDML_TARGET"),  //
             inputs,                           //
             outputs)                          //
   {}
@@ -112,7 +96,6 @@ class Executable {
   ///
   Executable(const edsl::Program& program,        //
              const std::string& device,           //
-             const std::string& target,           //
              const std::vector<Binding>& inputs,  //
              const std::vector<Binding>& outputs) {
     std::vector<plaidml_binding> inputs_storage(inputs.size());
@@ -131,10 +114,9 @@ class Executable {
     }
     ptr_ = details::make_ptr(            //
         ffi::call<plaidml_executable*>(  //
-            plaidml_compile,             //
+            plaidml_jit,                 //
             program.as_ptr(),            //
             device.c_str(),              //
-            target.c_str(),              //
             raw_inputs.size(),           //
             raw_inputs.data(),           //
             raw_outputs.size(),          //
@@ -164,13 +146,10 @@ class Binder {
  public:
   ///
   /// Constructs a Binder.
-  /// By default, this constructor uses the environment variables `PLAIDML_DEVICE` and `PLAIDML_TARGET` to specify your
-  /// device and target. You can override these using the `set_device` and `set_target` functions
   ///
   explicit Binder(const edsl::Program& program)
       : program_(program),  //
-        device_(Settings::get("PLAIDML_DEVICE")),
-        target_(Settings::get("PLAIDML_TARGET")) {
+        device_(Settings::get("PLAIDML_DEVICE")) {
     for (const auto& arg : program.inputs()) {
       if (arg.buffer) {
         inputs_[arg.tensor] = *arg.buffer;
@@ -190,16 +169,6 @@ class Binder {
   ///
   Binder& set_device(const std::string& value) {
     device_ = value;
-    return *this;
-  }
-
-  ///
-  /// Set the target for the Binder to use.
-  /// \param value string
-  /// \return Binder
-  ///
-  Binder& set_target(const std::string& value) {
-    target_ = value;
     return *this;
   }
 
@@ -256,7 +225,7 @@ class Binder {
         output_bindings.emplace_back(Binding{arg.tensor, get_buffer(&outputs_, arg)});
       }
     }
-    return std::make_shared<Executable>(program_, device_, target_, input_bindings, output_bindings);
+    return std::make_shared<Executable>(program_, device_, input_bindings, output_bindings);
   }
 
  private:
@@ -274,7 +243,6 @@ class Binder {
  private:
   edsl::Program program_;
   std::string device_;
-  std::string target_;
   std::map<edsl::TensorRef, Buffer> inputs_;
   std::map<edsl::TensorRef, Buffer> outputs_;
 };

@@ -6,7 +6,7 @@ local exports = [
   'plaidml_init',
   'plaidml_shutdown',
   'plaidml_version',
-  'plaidml_settings_free',
+  'plaidml_kvps_free',
   'plaidml_settings_list',
   'plaidml_settings_get',
   'plaidml_settings_set',
@@ -78,9 +78,10 @@ local exports = [
   'plaidml_expr_contraction_set_use_default',
   'plaidml_expr_gradient',
   'plaidml_deriv_register',
+  'plaidml_compile',
   'plaidml_program_free',
-  'plaidml_program_evaluate',
   'plaidml_program_repr',
+  'plaidml_program_get_passes',
   'plaidml_program_args_free',
   'plaidml_tuple_free',
   'plaidml_value_free',
@@ -100,6 +101,7 @@ local exports = [
   'plaidml_value_str_get',
   'plaidml_value_tuple',
   'plaidml_value_tuple_get',
+  'plaidml_targets_get',
 
   // op/ffi.h
   'plaidml_op_init',
@@ -108,8 +110,7 @@ local exports = [
   // exec/ffi.h
   'plaidml_exec_init',
   'plaidml_devices_get',
-  'plaidml_targets_get',
-  'plaidml_compile',
+  'plaidml_jit',
   'plaidml_executable_free',
   'plaidml_executable_run',
 ];

@@ -7,6 +7,9 @@
 #include <vector>
 
 #include "mlir/IR/Module.h"
+#include "mlir/IR/StandardTypes.h"
+
+#include "pmlc/util/buffer.h"
 
 namespace mlir {
 class ExecutionEngine;
@@ -16,10 +19,36 @@ namespace pmlc::compiler {
 
 class MemRefDescriptor;
 
+struct ProgramArgument {
+  bool isInput;
+  mlir::Value value;
+  mlir::RankedTensorType shape;
+  pmlc::util::BufferPtr buffer;
+};
+
+struct PassInfo {
+  std::string name;
+  std::string ir;
+};
+
+struct Program {
+  std::string entry;
+  std::string tileIR;
+  mlir::OwningModuleRef module;
+  std::vector<mlir::Value> outputs;
+  std::vector<ProgramArgument> arguments;
+  std::vector<mlir::MemRefType> memRefTypes;
+  std::vector<PassInfo> passes;
+
+  explicit Program(mlir::ModuleOp module) : module(module) {}
+
+  void compile(mlir::StringRef target, bool collectPasses = false);
+};
+
 class Executable {
 public:
-  Executable(mlir::StringRef entry, mlir::StringRef target,
-             mlir::ModuleOp module, mlir::ArrayRef<void *> bufptrs);
+  Executable(const std::shared_ptr<Program> &program,
+             mlir::ArrayRef<void *> bufptrs);
   ~Executable();
 
   void invoke();
@@ -27,7 +56,7 @@ public:
   static void initialize();
 
 private:
-  std::string entry;
+  std::shared_ptr<Program> program;
   std::unique_ptr<mlir::ExecutionEngine> engine;
   std::vector<MemRefDescriptor> descriptors;
   std::vector<void *> args;

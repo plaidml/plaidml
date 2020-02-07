@@ -26,6 +26,10 @@ bool operator==(const Program& lhs, const std::string& rhs) {  //
 
 namespace {
 
+Program makeProgram(const std::string& name, const std::vector<Tensor>& outputs) {
+  return ProgramBuilder(name, outputs).compile();
+}
+
 Tensor Dot(const Tensor& X, const Tensor& Y) {
   TensorDim I, J, K;
   TensorIndex i("i"), j("j"), k("k");
@@ -98,14 +102,15 @@ TEST_F(CppEdsl, HigherPrecisionInvalidNegative) {
   auto A = Placeholder(DType::FLOAT32, {3, 3});
   auto C = A * (-2);
 
-  EXPECT_ANY_THROW({ Program("higher_precision_constants", {C}, DType::FLOAT64, DType::UINT64); });
+  EXPECT_ANY_THROW(
+      { ProgramBuilder("higher_precision_constants", {C}).floatx(DType::FLOAT64).intx(DType::UINT64).compile(); });
 }
 
 TEST_F(CppEdsl, HigherPrecisionConstants) {
   auto A = Placeholder(DType::FLOAT32, {3, 3});
   auto C = A + 1 + 2.0;
 
-  Program program("higher_precision_constants", {C}, DType::FLOAT64, DType::UINT64);
+  auto program = ProgramBuilder("higher_precision_constants", {C}).floatx(DType::FLOAT64).intx(DType::UINT64).compile();
 
   EXPECT_THAT(program, Eq(R"#(
 !u64 = type tensor<!eltwise.u64>
@@ -129,7 +134,7 @@ module {
 TEST_F(CppEdsl, Cast) {
   auto A = Placeholder(DType::UINT64, {3, 3});
   auto B = cast(A, DType::UINT32);
-  Program program("cast", {B});
+  auto program = makeProgram("cast", {B});
 
   std::vector<std::uint64_t> A_input{1,
                                      2,
@@ -156,7 +161,7 @@ TEST_F(CppEdsl, BitOr) {
   auto A = Placeholder(DType::UINT64, {3, 3});
   auto B = Placeholder(DType::UINT64, {3, 3});
   auto C = A | B;
-  Program program("bit_or", {C});
+  auto program = makeProgram("bit_or", {C});
 
   std::vector<std::uint64_t> A_input{1, 2, 3,  //
                                      4, 5, 6,  //
@@ -174,7 +179,7 @@ TEST_F(CppEdsl, BitLeft) {
   auto A = Placeholder(DType::UINT64, {3, 3});
   auto B = Placeholder(DType::UINT64, {3, 3});
   auto C = A << B;
-  Program program("bit_left", {C});
+  auto program = makeProgram("bit_left", {C});
 
   std::vector<std::uint64_t> A_input{1, 2, 3,  //
                                      4, 5, 6,  //
@@ -192,7 +197,7 @@ TEST_F(CppEdsl, BitRightTensor) {
   auto A = Placeholder(DType::UINT64, {3, 3});
   auto B = Placeholder(DType::UINT64, {3, 3});
   auto C = A >> B;
-  Program program("bit_right_tensor", {C});
+  auto program = makeProgram("bit_right_tensor", {C});
 
   std::vector<std::uint64_t> A_input{1 << 10, 2 << 11, 3 << 12,  //
                                      4 << 13, 5 << 14, 6 << 15,  //
@@ -209,7 +214,7 @@ TEST_F(CppEdsl, BitRightTensor) {
 TEST_F(CppEdsl, BitRightScalar) {
   auto A = Placeholder(DType::UINT64, {3, 3});
   auto B = A >> 9;
-  Program program("bit_right_scalar", {B});
+  auto program = makeProgram("bit_right_scalar", {B});
 
   std::vector<std::uint64_t> A_input{1 << 10, 2 << 11, 3 << 12,  //
                                      4 << 13, 5 << 14, 6 << 15,  //
@@ -224,7 +229,7 @@ TEST_F(CppEdsl, BitXor) {
   auto A = Placeholder(DType::UINT64, {3, 3});
   auto B = Placeholder(DType::UINT64, {3, 3});
   auto C = A ^ B;
-  Program program("bit_xor", {C});
+  auto program = makeProgram("bit_xor", {C});
 
   std::vector<std::uint64_t> A_input{1, 2, 3,  //
                                      4, 5, 6,  //
@@ -242,7 +247,7 @@ TEST_F(CppEdsl, BroadcastCmp) {
   auto A = Placeholder(DType::UINT64, {3, 4});
   auto B = Placeholder(DType::UINT64, {3, 1});
   auto C = cast(A >= B, DType::UINT64);
-  Program program("broadcast_cmp", {C});
+  auto program = makeProgram("broadcast_cmp", {C});
 
   std::vector<std::uint64_t> A_input = {0, 1, 2,  3,  //
                                         4, 5, 6,  7,  //
@@ -258,7 +263,7 @@ TEST_F(CppEdsl, Add) {
   auto A = Placeholder(DType::UINT64, {3, 3});
   auto B = Placeholder(DType::UINT64, {3, 3});
   auto C = A + B;
-  Program program("add", {C});
+  auto program = makeProgram("add", {C});
 
   std::vector<std::uint64_t> A_input = {
       1,
@@ -299,7 +304,7 @@ TEST_F(CppEdsl, Dot) {
   auto A = Placeholder(DType::FLOAT32, {3, 3});
   auto B = Placeholder(DType::FLOAT32, {3, 3});
   auto C = Dot(A, B);
-  Program program("dot", {C});
+  auto program = makeProgram("dot", {C});
   EXPECT_THAT(program, Eq(R"#(
 #map0 = affine_map<(d0, d1, d2) -> (d0, d1)>
 #map1 = affine_map<(d0, d1, d2) -> (d0, d2)>
@@ -334,7 +339,7 @@ TEST_F(CppEdsl, DoubleDot) {
   auto A = Placeholder(DType::FLOAT32, {10, 20});
   auto B = Placeholder(DType::FLOAT32, {20, 30});
   auto C = Placeholder(DType::FLOAT32, {30, 40});
-  Program program("double_dot", {Dot(Dot(A, B), C)});
+  auto program = makeProgram("double_dot", {Dot(Dot(A, B), C)});
   EXPECT_THAT(program, Eq(R"#(
 #map0 = affine_map<(d0, d1, d2) -> (d0, d1)>
 #map1 = affine_map<(d0, d1, d2) -> (d0, d2)>
@@ -357,7 +362,7 @@ module {
 TEST_F(CppEdsl, EltwiseAdd) {
   auto A = Placeholder(DType::FLOAT32, {10, 20});
   auto B = Placeholder(DType::FLOAT32, {10, 20});
-  Program program("eltwise_add", {A + B});
+  auto program = makeProgram("eltwise_add", {A + B});
   EXPECT_THAT(program, Eq(R"#(
 module {
   func @eltwise_add(%arg0: tensor<10x20x!eltwise.f32>, %arg1: tensor<10x20x!eltwise.f32>) -> tensor<10x20x!eltwise.f32> {
@@ -371,7 +376,7 @@ module {
 
 TEST_F(CppEdsl, Relu) {
   auto A = Placeholder(DType::FLOAT32, {10, 20});
-  Program program("relu", {Relu(A)});
+  auto program = makeProgram("relu", {Relu(A)});
   EXPECT_THAT(program, Eq(R"#(
 !f32 = type tensor<!eltwise.f32>
 module {
@@ -400,7 +405,7 @@ TEST_F(CppEdsl, MnistMlp) {
   auto kernel3 = Placeholder(DType::FLOAT32, {512, 10});
   auto bias3 = Placeholder(DType::FLOAT32, {10});
   auto dense3 = Softmax(Dot(dense2, kernel3) + bias3);
-  Program program("mnist_mlp", {dense3});
+  auto program = makeProgram("mnist_mlp", {dense3});
   EXPECT_THAT(program, Eq(R"#(
 #map0 = affine_map<(d0, d1, d2) -> (d0, d1)>
 #map1 = affine_map<(d0, d1, d2) -> (d0, d2)>
@@ -448,7 +453,7 @@ Tensor Convolution2(const Tensor& I, const Tensor& K) {
 TEST_F(CppEdsl, Convolution) {
   auto I = Placeholder(DType::FLOAT32, {1, 224, 224, 1});
   auto K = Placeholder(DType::FLOAT32, {3, 3, 1, 32});
-  Program program("convolution", {Convolution2(I, K)});
+  auto program = makeProgram("convolution", {Convolution2(I, K)});
   EXPECT_THAT(program, Eq(R"#(
 #map0 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
 #map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4 - 1, d2 + d5 - 1, d6)>
@@ -514,7 +519,7 @@ TEST_F(CppEdsl, MnistCnn) {
   auto kernel4 = Placeholder(DType::FLOAT32, {128, kNumClasses});
   auto bias4 = Placeholder(DType::FLOAT32, {kNumClasses});
   auto dense2 = Softmax(Dot(dense1, kernel4) + bias4);
-  Program program("mnist_cnn", {dense2});
+  auto program = ProgramBuilder("mnist_cnn", {dense2}).target("").compile();
   EXPECT_THAT(program, Eq(R"#(
 #map0 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
 #map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4 - 1, d2 + d5 - 1, d6)>
@@ -595,7 +600,7 @@ TEST_F(CppEdsl, LarsMomentum4d) {
   auto Veloc = Placeholder(X_shape);
   auto LR = Placeholder(LR_shape);
   auto R = LarsMomentum(X, Grad, Veloc, LR, 1. / 1024., 1. / 2048., 1. / 8.);
-  Program program("lars_momentum4d", {std::get<0>(R), std::get<1>(R)});
+  auto program = makeProgram("lars_momentum4d", {std::get<0>(R), std::get<1>(R)});
   EXPECT_THAT(program, Eq(R"#(
 #map0 = affine_map<() -> ()>
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
@@ -641,7 +646,7 @@ TEST_F(CppEdsl, RepeatElements) {
   O(n0, 3 * n1 + k, n2) = I(n0, n1, n2);
   O.add_constraint(k < 3);
   O.no_reduce();
-  Program program("repeat_elts", {O});
+  auto program = makeProgram("repeat_elts", {O});
   EXPECT_THAT(program, Eq(R"#(
 #map0 = affine_map<(d0, d1, d2, d3) -> (d0, d1 * 3 + d2, d3)>
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
@@ -669,7 +674,7 @@ TEST_F(CppEdsl, UseDefault) {
   auto O = TensorOutput(B, 7, N1, N2);
   O(b, 3, i1, i2) = I(b, i1, i2);
   O.use_default(P);
-  Program program("use_default", {O});
+  auto program = makeProgram("use_default", {O});
   EXPECT_THAT(program, Eq(R"#(
 #map0 = affine_map<(d0, d1, d2) -> (d0, 3, d1, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
@@ -703,7 +708,7 @@ Tensor ArgMax(const Tensor& I) {
 TEST_F(CppEdsl, ArgMax) {
   auto I = Placeholder(DType::FLOAT32, {1, 10, 10});
   auto X = ArgMax(I);
-  Program program("arg_max", {X});
+  auto program = makeProgram("arg_max", {X});
   EXPECT_THAT(X.compute_shape(), Eq(LogicalShape(DType::UINT32, {1, 10})));
   EXPECT_THAT(program, Eq(R"#(
 #map0 = affine_map<(d0) -> (d0)>
@@ -771,7 +776,7 @@ TEST_F(CppEdsl, Winograd) {
   auto B = Placeholder(DType::FLOAT32, {BI, BI});
   auto G = Placeholder(DType::FLOAT32, {BI, S});
   auto W = Winograd(I, K, A, B, G);
-  Program program("winograd", {W});
+  auto program = makeProgram("winograd", {W});
   runProgram(program);
 }
 
@@ -781,7 +786,7 @@ TEST_F(CppEdsl, UniqueNames) {
   auto B = Placeholder(shape, "B");
   auto C0 = Placeholder(shape, "C");
   auto C1 = Placeholder(shape, "C");
-  Program program("unique_names", {A + B + C0 + C1});
+  auto program = makeProgram("unique_names", {A + B + C0 + C1});
   EXPECT_THAT(program, Eq(R"#(
 module {
   func @unique_names(%arg0: tensor<1x!eltwise.f32> {tile.name = "C"}, %arg1: tensor<1x!eltwise.f32> {tile.name = "C_0"}, %arg2: tensor<1x!eltwise.f32> {tile.name = "B"}, %arg3: tensor<1x!eltwise.f32> {tile.name = "A"}) -> tensor<1x!eltwise.f32> {
@@ -802,7 +807,7 @@ TEST_F(CppEdsl, GlobalMin) {
   auto Neg = -I;
   O_Neg() >= Neg(i, j, k);
   auto O = -O_Neg;
-  Program program("global_min", {O});
+  auto program = makeProgram("global_min", {O});
   EXPECT_THAT(program, Eq(R"#(
 #map0 = affine_map<() -> ()>
 #map1 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
@@ -830,7 +835,7 @@ TEST_F(CppEdsl, CumSum) {
   auto O = TensorOutput(N);
   O(i) += I(k);
   O.add_constraint(i - k < N);
-  Program program("cumsum", {O});
+  auto program = makeProgram("cumsum", {O});
   EXPECT_THAT(program, Eq(R"#(
 #map0 = affine_map<(d0, d1) -> (d0)>
 #map1 = affine_map<(d0, d1) -> (d1)>
@@ -891,7 +896,7 @@ TEST_F(CppEdsl, ComplexConv2d) {
   auto I = Placeholder(DType::FLOAT32, {1, 224, 224, 3, 3});
   auto K = Placeholder(DType::FLOAT32, {3, 3, 3, 3, 32});
   auto O = ComplexConv2d(I, K, {2, 2}, {3, 3});
-  Program program("complex_conv_2d", {O});
+  auto program = makeProgram("complex_conv_2d", {O});
   EXPECT_THAT(program, Eq(R"#(
 #map0 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4)>
 #map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1 * 2 + d5 * 3 - 2, d2 * 2 + d6 * 3 - 2, d3, d7)>
@@ -913,7 +918,7 @@ module {
 TEST_F(CppEdsl, Reciprocal) {
   auto A = Placeholder(DType::FLOAT32, {6}, "A");
   auto R = 1.0 / A;
-  Program program("reciprocal", {R});
+  auto program = makeProgram("reciprocal", {R});
   EXPECT_THAT(program, Eq(R"#(
 !f32 = type tensor<!eltwise.f32>
 module {
@@ -934,7 +939,7 @@ module {
 //   auto B = Placeholder(DType::FLOAT32, {100, 100}, "B");
 //   auto O = Dot(A, B);
 //   auto grads = Gradient({A, B}, O);
-//   Program program("gradient_dot", {grads});
+//   auto program = makeProgram("gradient_dot", {grads});
 //   EXPECT_THAT(program, Eq(R"(function (
 //   A[A_0, A_1],
 //   B[B_0, B_1]
@@ -968,7 +973,7 @@ module {
 //   auto D = Dot(A, C);
 //   auto O = Max2Da0(D);
 //   auto grads = Gradient({A, B}, O);
-//   Program program("gradient_dot", {grads});
+//   auto program = makeProgram("gradient_dot", {grads});
 //   EXPECT_THAT(program, Eq(R"(function (
 //   A[A_0, A_1],
 //   B[B_0, B_1]
@@ -998,7 +1003,7 @@ module {
 //   auto C = Dot(A, B);
 //   auto O = sqrt(C);
 //   auto grads = Gradient({A, B}, O);
-//   Program program("gradient_dot", {grads});
+//   auto program = makeProgram("gradient_dot", {grads});
 //   EXPECT_THAT(program, Eq(R"(function (
 //   A[A_0, A_1],
 //   B[B_0, B_1]
@@ -1028,7 +1033,7 @@ TEST_F(CppEdsl, DefractLong) {
   auto O = TensorOutput(output_shape);
   TensorIndex n, x0, x1, k0, k1, co, ci;
   O(n, x0, x1, co) += I(n, (x0 + k0 - 1) / 2, (x1 + k1 - 1) / 2, ci) * K(2 - k0, 2 - k1, co, ci);
-  Program program("defract_long", {O});
+  auto program = makeProgram("defract_long", {O});
   EXPECT_THAT(program, Eq(R"#(
 #map0 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
 #map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, (d1 + d4 - 1) floordiv 2, (d2 + d5 - 1) floordiv 2, d6)>
@@ -1052,14 +1057,14 @@ TEST_F(CppEdsl, DupOut) {
   auto B = Placeholder(DType::FLOAT32, {20, 30});
   auto C = Placeholder(DType::FLOAT32, {30, 40});
   auto R = Dot(Dot(A, B), C);
-  Program program("dup_out", {R, R, R});
+  auto program = makeProgram("dup_out", {R, R, R});
   runProgram(program);
 }
 
 TEST_F(CppEdsl, Select) {
   auto I = Placeholder(DType::FLOAT32, {10, 20});
   auto O = select(I == 0, Tensor{0}, Tensor{1});
-  Program program("select", {O});
+  auto program = makeProgram("select", {O});
   EXPECT_THAT(program, Eq(R"#(
 !i32 = type tensor<!eltwise.i32>
 module {
@@ -1078,7 +1083,7 @@ module {
 TEST_F(CppEdsl, Shape) {
   auto I = Placeholder(DType::FLOAT32, {10, 20});
   auto O = shape(I);
-  Program program("shape", {O});
+  auto program = makeProgram("shape", {O});
   EXPECT_THAT(program, Eq(R"#(
 module {
   func @shape(%arg0: tensor<10x20x!eltwise.f32>) -> tensor<2x!eltwise.i32> {
@@ -1100,7 +1105,7 @@ module {
 TEST_F(CppEdsl, Prng) {
   auto S = Placeholder(DType::UINT32, {3, 2048});
   auto O = prng(S, {2, 3, 4, 5});
-  Program program("prng", {O});
+  auto program = ProgramBuilder("prng", {O}).target("").compile();
   EXPECT_THAT(program, Eq(R"#(
 !i32 = type tensor<!eltwise.i32>
 module {

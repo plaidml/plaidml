@@ -14,15 +14,13 @@
 
 #include "plaidml/core/internal.h"
 #include "pmlc/compiler/compiler.h"
-#include "pmlc/compiler/registry.h"
-#include "pmlc/dialect/tile/program.h"
 #include "pmlc/util/env.h"
 #include "pmlc/util/logging.h"
 
 using plaidml::core::ffi_wrap;
 using plaidml::core::ffi_wrap_void;
 using pmlc::compiler::Executable;
-using pmlc::dialect::tile::ProgramArgument;
+using pmlc::compiler::ProgramArgument;
 using pmlc::util::Buffer;
 using pmlc::util::BufferPtr;
 using namespace mlir;  // NOLINT[build/namespaces]
@@ -103,29 +101,16 @@ plaidml_strings* plaidml_devices_get(  //
   });
 }
 
-plaidml_strings* plaidml_targets_get(  //
-    plaidml_error* err) {
-  return ffi_wrap<plaidml_strings*>(err, nullptr, [&] {
-    const auto& targets = pmlc::compiler::listTargets();
-    auto strs = new plaidml_string*[targets.size()];
-    for (unsigned i = 0; i < targets.size(); i++) {
-      strs[i] = new plaidml_string{targets[i].str()};
-    }
-    return new plaidml_strings{targets.size(), strs};
-  });
-}
-
-plaidml_executable* plaidml_compile(  //
-    plaidml_error* err,               //
-    plaidml_program* program,         //
-    const char* device,               //
-    const char* target,               //
-    size_t ninputs,                   //
-    plaidml_binding** inputs,         //
-    size_t noutputs,                  //
+plaidml_executable* plaidml_jit(  //
+    plaidml_error* err,           //
+    plaidml_program* program,     //
+    const char* device,           //
+    size_t ninputs,               //
+    plaidml_binding** inputs,     //
+    size_t noutputs,              //
     plaidml_binding** outputs) {
   return ffi_wrap<plaidml_executable*>(err, nullptr, [&] {
-    IVLOG(1, "Compiling with device: " << device << ", target: " << target);
+    IVLOG(1, "JITing for device: " << device);
     auto args = BindProgramArguments(program, ninputs, inputs, noutputs, outputs);
     auto exec = std::make_unique<plaidml_executable>();
     std::vector<void*> bufptrs(args.size());
@@ -133,7 +118,7 @@ plaidml_executable* plaidml_compile(  //
       auto view = args[i].buffer->MapCurrent();
       bufptrs[i] = view->data();
     }
-    exec->exec = std::make_unique<Executable>(program->program->entry, target, *program->program->module, bufptrs);
+    exec->exec = std::make_unique<Executable>(program->program, bufptrs);
     return exec.release();
   });
 }

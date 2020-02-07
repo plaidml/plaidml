@@ -16,6 +16,7 @@
 
 #include "mlir/Analysis/Verifier.h"
 #include "mlir/Dialect/StandardOps/Ops.h"
+#include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Function.h"
 #include "mlir/IR/Matchers.h"
@@ -34,7 +35,6 @@
 #include "pmlc/dialect/tile/gradient.h"
 #include "pmlc/dialect/tile/ir/dialect.h"
 #include "pmlc/dialect/tile/ir/ops.h"
-#include "pmlc/dialect/tile/program.h"
 #include "pmlc/dialect/tile/transforms/passes.h"
 #include "pmlc/util/env.h"
 #include "pmlc/util/logging.h"
@@ -593,7 +593,7 @@ struct MakeProgramPass : public mlir::FunctionPass<MakeProgramPass> {
   }
 };
 
-std::shared_ptr<TileProgram>
+std::shared_ptr<compiler::Program>
 TileBuilder::MakeProgram(StringRef name, const ProgramMutations &mutations,
                          util::DataType floatx, util::DataType intx) {
   if (name.empty()) {
@@ -629,7 +629,7 @@ TileBuilder::MakeProgram(StringRef name, const ProgramMutations &mutations,
   // Construct a module
   auto loc = UnknownLoc::get(&impl->context);
   auto module = ModuleOp::create(loc);
-  auto program = std::make_shared<TileProgram>(module);
+  auto program = std::make_shared<compiler::Program>(module);
   program->entry = name;
   // Construct a function to represent the entire program
   auto initialFuncType = FunctionType::get(inputTypes, {}, &impl->context);
@@ -655,8 +655,8 @@ TileBuilder::MakeProgram(StringRef name, const ProgramMutations &mutations,
         }
         IVLOG(5, "BlockArgument mapping: " << value << " -> " << blockArg);
         mapper.map(value, blockArg);
-        ProgramArgument programArg{true, value,
-                                   value.getType().cast<RankedTensorType>()};
+        compiler::ProgramArgument programArg{
+            true, value, value.getType().cast<RankedTensorType>()};
         auto itBinding = impl->implicitBindings.find(value);
         if (itBinding != impl->implicitBindings.end()) {
           programArg.buffer = itBinding->second;
@@ -730,8 +730,8 @@ TileBuilder::MakeProgram(StringRef name, const ProgramMutations &mutations,
     if (itUpdate != impl->implicitUpdates.end()) {
       userValue = itUpdate->second;
     }
-    ProgramArgument programArg{false, userValue,
-                               finalValue.getType().cast<RankedTensorType>()};
+    compiler::ProgramArgument programArg{
+        false, userValue, finalValue.getType().cast<RankedTensorType>()};
     auto itBinding = impl->implicitBindings.find(finalValue);
     if (itBinding != impl->implicitBindings.end()) {
       programArg.buffer = itBinding->second;
@@ -739,6 +739,7 @@ TileBuilder::MakeProgram(StringRef name, const ProgramMutations &mutations,
     program->arguments.emplace_back(programArg);
     program->outputs.emplace_back(finalValue);
   }
+  program->tileIR = mlir::debugString(module);
   // IVLOG(2, "TileBuilder::MakeProgram>\n" << mlir::debugString(module));
   return program;
 }

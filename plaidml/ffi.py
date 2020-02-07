@@ -85,7 +85,7 @@ class ForeignObject(object):
         return super(ForeignObject, self).__repr__()
 
     def _methodcall(self, func, *args):
-        return ffi_call(func, self.__ffi_obj__, *args)
+        return ffi_call(func, self.as_ptr(), *args)
 
     def as_ptr(self, release=False):
         if self.__ffi_obj__ is None:
