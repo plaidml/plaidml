@@ -362,6 +362,15 @@ plaidml_dim_expr* plaidml_expr_get_dim(  //
   });
 }
 
+plaidml_expr* plaidml_expr_uint(  //
+    plaidml_error* err,           //
+    uint64_t value) {
+  return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
+    IVLOG(3, "plaidml_expr_uint> " << value);
+    return new plaidml_expr{GlobalContext::get()->MakeScalarConstantOp(value)};
+  });
+}
+
 plaidml_expr* plaidml_expr_int(  //
     plaidml_error* err,          //
     int64_t value) {
