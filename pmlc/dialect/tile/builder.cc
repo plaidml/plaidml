@@ -2,6 +2,7 @@
 
 #include "pmlc/dialect/tile/builder.h"
 
+#include <limits>
 #include <map>
 #include <queue>
 #include <set>
@@ -83,7 +84,6 @@ struct TileBuilder::Impl {
   llvm::DenseMap<Value, BufferPtr> implicitBindings;
   llvm::DenseMap<Value, RankedTensorType> shapeCache;
   NoneOp noneOp;
-  Value defaultInit;
   Location loc;
   unsigned idxCounter = 0;
 
@@ -91,7 +91,6 @@ struct TileBuilder::Impl {
       : module(ModuleOp::create(UnknownLoc::get(&context))),
         builder(module.getBody()), loc(builder.getUnknownLoc()) {
     builder.setInsertionPointToStart(module.getBody());
-    defaultInit = makeScalarConstantOp(0.0);
   }
 
   Type inferElementType(ArrayRef<Type> types) {
@@ -156,9 +155,50 @@ struct TileBuilder::Impl {
     return op.result();
   }
 
+  Value makeScalarConstantOp(int64_t value) {
+    auto type = builder.getType<ScalarType>(DataType::i32);
+    return builder.create<ScalarConstantOp>(loc, type, value).result();
+  }
+
   Value makeScalarConstantOp(double value) {
     auto type = builder.getType<ScalarType>(DataType::f32);
     return builder.create<ScalarConstantOp>(loc, type, value).result();
+  }
+
+  Value makeIdentity(ScalarType elemType, util::AggregationKind agg) {
+    switch (agg) {
+    case util::AggregationKind::assign:
+    case util::AggregationKind::add:
+      if (isFloat(elemType.type())) {
+        return makeScalarConstantOp(0.0);
+      } else {
+        return makeScalarConstantOp(int64_t(0));
+      }
+    case util::AggregationKind::mul:
+      if (isFloat(elemType.type())) {
+        return makeScalarConstantOp(1.0);
+      } else {
+        return makeScalarConstantOp(int64_t(1));
+      }
+    case util::AggregationKind::min:
+      if (isFloat(elemType.type())) {
+        return makeScalarConstantOp(std::numeric_limits<double>::infinity());
+      } else if (isSigned(elemType.type())) {
+        return makeScalarConstantOp(std::numeric_limits<int64_t>::max());
+      } else {
+        return makeScalarConstantOp(
+            static_cast<int64_t>(std::numeric_limits<uint64_t>::max()));
+      }
+    case util::AggregationKind::max:
+      if (isFloat(elemType.type())) {
+        return makeScalarConstantOp(-std::numeric_limits<double>::infinity());
+      } else if (isSigned(elemType.type())) {
+        return makeScalarConstantOp(std::numeric_limits<int64_t>::min());
+      } else {
+        return makeScalarConstantOp(int64_t(0));
+      }
+    }
+    llvm_unreachable("Invalid aggregation kind");
   }
 };
 
@@ -352,9 +392,7 @@ Value TileBuilder::MakeScalarConstantOp(uint64_t value) {
 
 Value TileBuilder::MakeScalarConstantOp(int64_t value) {
   IVLOG(5, "TileBuilder::MakeScalarConstantOp> " << value);
-  auto type = impl->builder.getType<ScalarType>(DataType::i32);
-  return impl->builder.create<ScalarConstantOp>(impl->loc, type, value)
-      .result();
+  return impl->makeScalarConstantOp(value);
 }
 
 int64_t TileBuilder::GetIntegerValue(Value value) {
@@ -546,8 +584,9 @@ Value TileBuilder::MakeContractionOp(util::AggregationKind agg,
   if (name.size()) {
     nameAttr = impl->builder.getStringAttr(name);
   }
+  Value ident = impl->makeIdentity(elementType.cast<ScalarType>(), agg);
   auto op = impl->builder.create<SymbolicContractionOp>(
-      impl->loc, RankedTensorType::get(shape, elementType), impl->defaultInit,
+      impl->loc, RankedTensorType::get(shape, elementType), ident,
       impl->builder.create<AffineConstraintsOp>(impl->loc), sizes, sink, srcs,
       impl->builder.getI64IntegerAttr(static_cast<int64_t>(agg)),
       impl->builder.getI64IntegerAttr(static_cast<int64_t>(combo)), UnitAttr{},
