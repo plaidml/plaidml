@@ -3,7 +3,7 @@ channels:
 dependencies:
   - h5py
   - numpy
-  - pip
+  - pip=19
   - python=3.6
   - scipy=1.2.1
   - pip:
@@ -21,6 +21,6 @@ dependencies:
       - six
       - scikit-learn[alldeps]
       - sklearn
-      - tensorflow==1.8.0; platform_system == 'Darwin'
-      - tensorflow-gpu==1.8.0; platform_system != 'Darwin'
+      - tensorflow==1.15; platform_system == 'Darwin'
+      - tensorflow-gpu==1.15; platform_system != 'Darwin'
       - theano

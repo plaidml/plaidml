@@ -7,7 +7,7 @@ dependencies:
   - m2-flex
   - m2-perl
   - nbformat=4.4.0 # Latest version of nbformat breaks the analysis notebook
-  - pip
+  - pip=19
   - python=3.7.4
   - scikit-image
   - pip:
@@ -22,5 +22,5 @@ dependencies:
     - pandas
     - pcpp==1.20.1
     - pystache
-    - tensorflow==1.14.0
+    - tensorflow==1.15
     - theano
