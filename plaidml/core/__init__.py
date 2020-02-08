@@ -34,7 +34,7 @@ def __shutdown():
 def get_strs(ffi_list):
     strs = ffi_call(ffi_list)
     try:
-        return [decode_str(strs[0].strs[i]) for i in range(strs.nstrs)]
+        return [decode_str(strs[0].elts[i]) for i in range(strs.size)]
     finally:
         ffi_call(lib.plaidml_strings_free, strs)
 
