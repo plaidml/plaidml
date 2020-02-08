@@ -42,45 +42,4 @@ def AffineReduceOp : PXA_OpWithPP<"reduce"> {
   );
 }
 
-def ImplicitAffineTerminator
-    : SingleBlockImplicitTerminator<"AffineTerminatorOp">;
-
-def AffineParallelOp : PXA_Op<"parallel", [ImplicitAffineTerminator]> {
-  let summary = "multi-index parallel for operation";
-  let arguments = (ins 
-     AffineMapAttr:$lowerBoundsMap,
-     AffineMapAttr:$upperBoundsMap,
-     I64ArrayAttr:$steps,
-     Variadic<Index>:$mapOperands);
-  let regions = (region SizedRegion<1>:$region);
-  let verifier = [{ return verifyAffineParallelOp(*this); }];
-
-  let extraClassDeclaration = [{
-    operand_range getLowerBoundsOperands();
-    operand_range getUpperBoundsOperands();
-
-    // Get the number of dimensions (i.e. number of induction variables)    
-    size_t getNumDims();
-
-    // Get various AffineValueMaps
-    AffineValueMap getLowerBoundsValueMap(); 
-    AffineValueMap getUpperBoundsValueMap(); 
-    AffineValueMap getRangesValueMap();
-
-    // Get ranges as constants, may fail in dynamic case
-    llvm::Optional<llvm::SmallVector<int64_t, 8>> getConstantRanges();
-    
-    // Some helpers for rewrites
-    mlir::Block *getBody();
-    mlir::OpBuilder getBodyBuilder();
-
-    void setSteps(ArrayRef<int64_t> newSteps);
-  }];
-  let builders = [
-    OpBuilder<"Builder* builder, OperationState& result, ArrayRef<int64_t> ranges">,
-    OpBuilder<"Builder* builder, OperationState& result, AffineMap lbMap, ValueRange lbArgs, AffineMap ubMap, ValueRange ubArgs">,
-    OpBuilder<"Builder* builder, OperationState& result, AffineMap lbMap, ValueRange lbArgs, AffineMap ubMap, ValueRange ubArgs, ArrayRef<int64_t> steps">
-  ];
-}
-
 #endif // __PML_PXA_OPS__

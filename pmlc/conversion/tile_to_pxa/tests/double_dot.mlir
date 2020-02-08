@@ -25,7 +25,7 @@ func @double_dot(
 // CHECK-LABEL: func @double_dot
 // CHECK-SAME: %{{.*}}: memref<10x20xf32>, %{{.*}}: memref<20x30xf32>, %{{.*}}: memref<30x40xf32>, %{{.*}}: memref<10x40xf32>
 // CHECK: alloc() : memref<10x30xf32>
-// CHECK: pxa.parallel
+// CHECK: affine.parallel
 // CHECK: ^bb0(%{{.*}}: index, %a{{.*}}: index, %{{.*}}: index):
 // CHECK:   affine.load %{{.*}}[%{{.*}}, %{{.*}}] : memref<10x20xf32>
 // CHECK:   affine.load %{{.*}}[%{{.*}}, %{{.*}}] : memref<20x30xf32>
@@ -34,7 +34,7 @@ func @double_dot(
 // CHECK-DAG: lowerBoundsMap = [[map_dot_lb]]
 // CHECK-DAG: upperBoundsMap = [[map_dot_1_ub]]
 // CHECK-DAG: steps = [1, 1, 1]
-// CHECK: pxa.parallel
+// CHECK: affine.parallel
 // CHECK: ^bb0(%{{.*}}: index, %{{.*}}: index, %{{.*}}: index):
 // CHECK:   affine.load %{{.*}}[%{{.*}}, %{{.*}}] : memref<10x30xf32>
 // CHECK:   affine.load %{{.*}}[%{{.*}}, %{{.*}}] : memref<30x40xf32>

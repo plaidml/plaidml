@@ -19,7 +19,7 @@ func @dot(%arg0: tensor<1x784x!eltwise.f32>, %arg1: tensor<784x512x!eltwise.f32>
 // CHECK-DAG: [[map_ub:#map[0-9]+]] = affine_map<() -> (784, 1, 512)>
 // CHECK-LABEL: func @dot
 // CHECK-SAME: %{{.*}}: memref<1x784xf32>, %{{.*}}: memref<784x512xf32>, %{{.*}}: memref<1x512xf32>
-// CHECK: pxa.parallel
+// CHECK: affine.parallel
 // CHECK: ^bb0(%{{.*}}: index, %{{.*}}: index, %{{.*}}: index):
 // CHECK:   affine.load %{{.*}}[%{{.*}}, %{{.*}}] : memref<1x784xf32>
 // CHECK:   affine.load %{{.*}}[%{{.*}}, %{{.*}}] : memref<784x512xf32>

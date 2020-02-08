@@ -1,3 +1,5 @@
+// Copyright 2020 Intel Corporation
+
 #pragma once
 
 #include <limits>
@@ -77,7 +79,7 @@ inline double DummyCostModel(ArrayRef<int64_t> tile) { return 1.0; }
 // Given a generator and cost model, find the best tile size, return empty
 // tiling when all tiles are infeasible
 template <typename Generator, typename CostModel>
-llvm::SmallVector<int64_t, 8> FindBestTileSize(const Generator &generator,
+llvm::SmallVector<int64_t, 8> findBestTileSize(const Generator &generator,
                                                const CostModel &costModel,
                                                ArrayRef<int64_t> ranges) {
   // Build a list of potential tile sizes for each dimension.

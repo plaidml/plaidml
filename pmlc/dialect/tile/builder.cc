@@ -506,13 +506,12 @@ void TileBuilder::SetNoReduce(Value cion, bool no_reduce) {
   }
 }
 
-Value TileBuilder::MakeContractionOp(util::AggregationKind agg,
-                                     util::CombinationKind combo,
+Value TileBuilder::MakeContractionOp(AggregationKind agg, CombinationKind combo,
                                      ArrayRef<Value> srcs, Value sink,
                                      Value sizes, StringRef name) {
   IVLOG(5, "TileBuilder::MakeContractionOp> "
-               << util::stringifyAggregationKind(agg).str() << ":"
-               << util::stringifyCombinationKind(combo).str()
+               << stringifyAggregationKind(agg).str() << ":"
+               << stringifyCombinationKind(combo).str()
                << ", name: " << name.str());
   IVLOG(5, "\n" << mlir::debugString(impl->module));
   // TODO: handle names (and idx_names)
@@ -595,7 +594,7 @@ struct MakeProgramPass : public mlir::FunctionPass<MakeProgramPass> {
 
 std::shared_ptr<compiler::Program>
 TileBuilder::MakeProgram(StringRef name, const ProgramMutations &mutations,
-                         util::DataType floatx, util::DataType intx) {
+                         DataType floatx, DataType intx) {
   if (name.empty()) {
     name = "noname";
   }
@@ -757,9 +756,8 @@ std::vector<Value> TileBuilder::ComputeGradients(ArrayRef<Value> wrt,
     auto src = MakeAffineTensorMapOp(loss, src_idxs);
     auto sink = MakeAffineMapOp(ArrayRef<Value>{});
     auto sizes = MakeAffineMapOp(ArrayRef<Value>{});
-    auto cion = MakeContractionOp(util::AggregationKind::add,
-                                  util::CombinationKind::none, {src}, sink,
-                                  sizes, "net_loss");
+    auto cion = MakeContractionOp(AggregationKind::add, CombinationKind::none,
+                                  {src}, sink, sizes, "net_loss");
     value = cion;
   }
   Gradient grad(value, this);

@@ -10,7 +10,7 @@ module {
 }
 
 // CHECK-LABEL: func @bit_right_scalar
-// CHECK: pxa.parallel
+// CHECK: affine.parallel
 // CHECK: affine.load
 // CHECK: shift_right_unsigned
 // CHECK: affine.store
