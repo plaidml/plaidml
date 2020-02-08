@@ -609,7 +609,7 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
 
     // Do initialization
     auto initFor =
-        rewriter.create<pxa::AffineParallelOp>(loc, resultType.getShape());
+        rewriter.create<AffineParallelOp>(loc, resultType.getShape());
     auto initForBuilder = initFor.getBodyBuilder();
     auto initLoad = buildBroadcastLoad(initForBuilder, loc, cionAdaptor.init(),
                                        resultType.getRank());
