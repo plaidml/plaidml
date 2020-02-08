@@ -132,7 +132,7 @@ def plaidml_workspace():
     http_archive(
         name = "llvm-project",
         url = LLVM_URL,
-        # sha256 = LLVM_SHA256,
+        sha256 = LLVM_SHA256,
         strip_prefix = "llvm-project-" + LLVM_COMMIT,
         link_files = {
             clean_dep("//vendor/llvm:llvm.BUILD"): "llvm/BUILD.bazel",
