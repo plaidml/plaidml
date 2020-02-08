@@ -4,6 +4,7 @@ import unittest
 
 import plaidml as plaidml
 import plaidml.core as pcore
+from plaidml.ffi import lib
 
 
 class TestCore(unittest.TestCase):
@@ -14,6 +15,10 @@ class TestCore(unittest.TestCase):
         settings = pcore.settings.all()
         print(settings)
         self.assertIn('FOO', settings)
+
+    def test_get_strs(self):
+        devices = pcore.get_strs(lib.plaidml_targets_get)
+        self.assertIn('llvm_cpu', devices)
 
 
 if __name__ == '__main__':
