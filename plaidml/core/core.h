@@ -44,28 +44,22 @@ void call_void(F fn, Args... args) {
 
 namespace details {
 
-template <typename T>
 struct Deleter {
-  std::function<void(plaidml_error*, T*)> fn;
-  void operator()(T* ptr) { ffi::call_void(fn, ptr); }
+  void operator()(plaidml_buffer* ptr) { ffi::call_void(plaidml_buffer_free, ptr); }
+  void operator()(plaidml_integers* ptr) { ffi::call_void(plaidml_integers_free, ptr); }
+  void operator()(plaidml_shape* ptr) { ffi::call_void(plaidml_shape_free, ptr); }
+  void operator()(plaidml_view* ptr) { ffi::call_void(plaidml_view_free, ptr); }
 };
 
-inline std::shared_ptr<plaidml_shape> make_plaidml_shape(plaidml_shape* ptr) {
-  return std::shared_ptr<plaidml_shape>(ptr, Deleter<plaidml_shape>{plaidml_shape_free});
-}
-
-inline std::shared_ptr<plaidml_buffer> make_plaidml_buffer(plaidml_buffer* ptr) {
-  return std::shared_ptr<plaidml_buffer>(ptr, Deleter<plaidml_buffer>{plaidml_buffer_free});
-}
-
-inline std::shared_ptr<plaidml_view> make_plaidml_view(plaidml_view* ptr) {
-  return std::shared_ptr<plaidml_view>(ptr, Deleter<plaidml_view>{plaidml_view_free});
+template <typename T>
+inline std::shared_ptr<T> make_ptr(T* ptr) {
+  return std::shared_ptr<T>(ptr, Deleter{});
 }
 
 }  // namespace details
 
 ///
-/// Initializes PlaidML's Core API.
+/// Initializes the PlaidML Core API.
 ///
 inline void init() {  //
   ffi::call_void(plaidml_init);
@@ -78,7 +72,7 @@ inline void init() {  //
 ///
 /// \ingroup core_objects
 /// \enum DType
-/// Enumerates all of the data types in PlaidML.
+/// Defines the set of supported element types in a Tensor.
 ///
 enum class DType {
   INVALID = PLAIDML_DATA_INVALID,
@@ -131,73 +125,97 @@ inline const char* to_string(DType dtype) {
 ///
 /// \ingroup core_objects
 /// \class TensorShape
-/// This is a TensorShape.
+/// Represents the shape of a Tensor.
 ///
 class TensorShape {
  public:
   ///
-  /// TensorShape constructor
+  /// The default constructor for a TensorShape.
   ///
   TensorShape()
-      : ptr_(details::make_plaidml_shape(
+      : ptr_(details::make_ptr(
             ffi::call<plaidml_shape*>(plaidml_shape_alloc, PLAIDML_DATA_INVALID, 0, nullptr, nullptr))) {}
 
   ///
   /// TensorShape constructor
   /// \param dtype DType
   ///
-  TensorShape(DType dtype,  //
-              const std::vector<int64_t>& sizes) {
+  TensorShape(DType dtype, const std::vector<int64_t>& sizes) {
     size_t stride = 1;
     std::vector<int64_t> strides(sizes.size());
     for (int i = sizes.size() - 1; i >= 0; --i) {
       strides[i] = stride;
       stride *= sizes[i];
     }
-    ptr_ = details::make_plaidml_shape(ffi::call<plaidml_shape*>(
-        plaidml_shape_alloc, static_cast<plaidml_datatype>(dtype), sizes.size(), sizes.data(), strides.data()));
+    ptr_ = details::make_ptr(ffi::call<plaidml_shape*>(plaidml_shape_alloc, static_cast<plaidml_datatype>(dtype),
+                                                       sizes.size(), sizes.data(), strides.data()));
   }
 
   ///
-  /// TensorShape constructor
+  /// Constructor for the TensorShape type.
   /// \param dtype DType
   /// \param sizes const vector<int64_t>
   /// \param strides const vector<int64_t>
+  ///
   TensorShape(DType dtype,                        //
               const std::vector<int64_t>& sizes,  //
               const std::vector<int64_t>& strides) {
     if (sizes.size() != strides.size()) {
       throw std::runtime_error("Sizes and strides must have the same rank.");
     }
-    ptr_ = details::make_plaidml_shape(ffi::call<plaidml_shape*>(
-        plaidml_shape_alloc, static_cast<plaidml_datatype>(dtype), sizes.size(), sizes.data(), strides.data()));
+    ptr_ = details::make_ptr(ffi::call<plaidml_shape*>(plaidml_shape_alloc, static_cast<plaidml_datatype>(dtype),
+                                                       sizes.size(), sizes.data(), strides.data()));
   }
 
-  ///
-  /// TensorShape constructor
-  /// \param ptr const shared_ptr<plaidml_shape>
-  ///
+  // This is an internal constructor.
+  explicit TensorShape(plaidml_shape* ptr) : ptr_(details::make_ptr(ptr)) {}
+
+  // This is an internal constructor.
   explicit TensorShape(const std::shared_ptr<plaidml_shape>& ptr) : ptr_(ptr) {}
 
   ///
-  /// dtype
-  /// \return DType
+  /// Returns the element DType of this TensorShape.
   ///
   DType dtype() const { return static_cast<DType>(ffi::call<plaidml_datatype>(plaidml_shape_get_dtype, as_ptr())); }
 
   ///
-  /// Returns the number of dimensions in the TensorShape
-  /// \return size_t
+  /// Returns the number of dimensions in this TensorShape.
   ///
-  size_t ndims() const { return ffi::call<size_t>(plaidml_shape_get_ndims, as_ptr()); }
+  size_t rank() const { return ffi::call<size_t>(plaidml_shape_get_rank, as_ptr()); }
 
   ///
-  /// nbytes
-  /// \return uint64_t
+  /// Returns the sizes of this TensorShape.
   ///
-  uint64_t nbytes() const { return ffi::call<uint64_t>(plaidml_shape_get_nbytes, as_ptr()); }
+  std::vector<int64_t> sizes() const {
+    auto dims = details::make_ptr(ffi::call<plaidml_integers*>(plaidml_shape_get_sizes, as_ptr()));
+    return std::vector<int64_t>(dims->elts, dims->elts + dims->size);
+  }
+
+  ///
+  /// Returns the strides of this TensorShape.
+  ///
+  std::vector<int64_t> strides() const {
+    auto dims = details::make_ptr(ffi::call<plaidml_integers*>(plaidml_shape_get_strides, as_ptr()));
+    return std::vector<int64_t>(dims->elts, dims->elts + dims->size);
+  }
+
+  ///
+  /// Returns the amount of memory that a Tensor with this TensorShape would
+  /// occupy in bytes.
+  ///
+  uint64_t byte_size() const { return ffi::call<uint64_t>(plaidml_shape_get_nbytes, as_ptr()); }
+
+  ///
+  /// Returns a string representation of this TensorShape.
+  ///
   std::string str() const { return ffi::str(ffi::call<plaidml_string*>(plaidml_shape_repr, as_ptr())); }
+
+  ///
+  /// Equality comparison for TensorShape types.
+  ///
   bool operator==(const TensorShape& rhs) const { return str() == rhs.str(); }
+
+  // This is an internal method.
   plaidml_shape* as_ptr() const { return ptr_.get(); }
 
  private:
@@ -207,7 +225,6 @@ class TensorShape {
 ///
 /// \ingroup core_objects
 /// \class View
-/// This is a View.
 ///
 class View {
   friend class Buffer;
@@ -244,7 +261,6 @@ class View {
 ///
 /// \ingroup core_objects
 /// \class Buffer
-/// This is a Buffer.
 ///
 class Buffer {
  public:
@@ -259,16 +275,14 @@ class Buffer {
   /// \param shape TensorShape
   ///
   Buffer(const std::string& device, const TensorShape& shape)
-      : ptr_(details::make_plaidml_buffer(
-            ffi::call<plaidml_buffer*>(plaidml_buffer_alloc, device.c_str(), shape.nbytes()))),
+      : ptr_(details::make_ptr(ffi::call<plaidml_buffer*>(plaidml_buffer_alloc, device.c_str(), shape.byte_size()))),
         shape_(shape) {}
 
   ///
   /// Buffer constructor
   /// \param ptr plaidml_buffer*
   /// \param shape TensorShape
-  explicit Buffer(plaidml_buffer* ptr, const TensorShape& shape)
-      : ptr_(details::make_plaidml_buffer(ptr)), shape_(shape) {}
+  explicit Buffer(plaidml_buffer* ptr, const TensorShape& shape) : ptr_(details::make_ptr(ptr)), shape_(shape) {}
 
   ///
   /// Returns a pointer to the Buffer.
@@ -283,7 +297,7 @@ class Buffer {
   /// \return View
   ///
   View mmap_current() {
-    return View(details::make_plaidml_view(ffi::call<plaidml_view*>(plaidml_buffer_mmap_current, as_ptr())));
+    return View(details::make_ptr(ffi::call<plaidml_view*>(plaidml_buffer_mmap_current, as_ptr())));
   }
 
   ///
@@ -291,7 +305,7 @@ class Buffer {
   /// \return View
   ///
   View mmap_discard() {
-    return View(details::make_plaidml_view(ffi::call<plaidml_view*>(plaidml_buffer_mmap_discard, as_ptr())));
+    return View(details::make_ptr(ffi::call<plaidml_view*>(plaidml_buffer_mmap_discard, as_ptr())));
   }
 
   void copy_into(void* dst) {
@@ -311,13 +325,17 @@ class Buffer {
 };
 
 ///
-/// \ingroup core_objects
+/// \defgroup core_settings Settings
+///
+
+///
+/// \ingroup core_settings
 /// \struct Settings
-/// These are the Settings.
+/// Settings represent global key/value pairs used for configuration purposes.
 ///
 struct Settings {
   ///
-  /// Gets the setting specified by `key`
+  /// Returns the setting specified by `key`.
   /// \param key string
   /// \return string
   ///
@@ -334,5 +352,10 @@ struct Settings {
     ffi::call_void(plaidml_settings_set, key.c_str(), value.c_str());
   }
 };
+
+inline std::ostream& operator<<(std::ostream& os, const TensorShape& x) {
+  os << x.str();
+  return os;
+}
 
 }  // namespace plaidml

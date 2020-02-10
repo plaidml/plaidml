@@ -2,8 +2,6 @@
 Core
 ====
 
-PlaidML Core
-
 .. contents::
 
 --------------
@@ -20,8 +18,8 @@ Initialization
 
       .. note::
 
-         Initialization of PlaidML's Core Python API happens automatically
-         wherever the module ``plaidml.core`` is imported.
+         Initialization of the PlaidML Core API occurs when the ``plaidml``
+         module is imported.
 
 -------
 Objects
@@ -36,11 +34,25 @@ Objects
 
    .. group-tab:: Python
 
-      .. autoclass:: plaidml.core.DType
+      .. automodule:: plaidml.core
          :members:
-      .. autoclass:: plaidml.core.TensorShape
+
+--------
+Settings
+--------
+
+.. tabs::
+   .. group-tab:: C++
+
+      .. doxygengroup:: core_settings
+         :content-only:
          :members:
-      .. autoclass:: plaidml.core.View
-         :members:
-      .. autoclass:: plaidml.core.Buffer
-         :members:
+
+   .. group-tab:: Python
+
+      .. autofunction:: plaidml.settings.all
+      .. autofunction:: plaidml.settings.get
+      .. autofunction:: plaidml.settings.set
+      .. autofunction:: plaidml.settings.load
+      .. autofunction:: plaidml.settings.save
+
