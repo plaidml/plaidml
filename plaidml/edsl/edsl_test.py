@@ -128,14 +128,14 @@ def max_pool_2d(I):
 
 
 def flatten(X):
-    X_dims = TensorDims(X.shape.ndims)
+    X_dims = TensorDims(X.rank)
     X.bind_dims(*X_dims)
     product = functools.reduce(lambda x, y: x * y, X_dims[1:-1])
     return reshape(X, (1, product))
 
 
 def normalize(X):
-    idxs = TensorIndexes(X.shape.ndims)
+    idxs = TensorIndexes(X.rank)
     XSqr = X * X
     X_MS = TensorOutput()
     X_MS[()] += XSqr[idxs]
@@ -623,7 +623,7 @@ module {
         P1 = max_pool_2d(C2)
         # model.add(Flatten())
         F = flatten(P1)
-        self.assertEqual(str(F.shape), 'tensor<1x12100x!eltwise.f32>')
+        self.assertEqual(str(F.compute_shape()), 'tensor<1x12100x!eltwise.f32>')
         K3 = Placeholder(plaidml.DType.FLOAT32, [12100, 128])
         B3 = Placeholder(plaidml.DType.FLOAT32, [128])
         D1 = relu(dot(F, K3) + B3)
@@ -684,7 +684,7 @@ module {
         I = Placeholder(plaidml.DType.FLOAT32, [1, 10, 10])
         O = arg_max(I)
         program = Program('arg_max', [O], target='')
-        self.assertEqual(str(O.shape), 'tensor<1x10x!eltwise.u32>')
+        self.assertEqual(str(O.compute_shape()), 'tensor<1x10x!eltwise.u32>')
         expected = '''
 #map0 = affine_map<(d0) -> (d0)>
 #map1 = affine_map<() -> ()>
@@ -754,7 +754,7 @@ module {
     def test_invalid_shape_error(self):
         O = TensorOutput(TensorDims(3))
         with self.assertRaises(plaidml.Error) as err:
-            shape = O.shape
+            shape = O.compute_shape()
         self.assertTrue('Cannot compute shape' in str(err.exception))
 
     def test_unique_names(self):
@@ -1112,8 +1112,8 @@ module {
         program1 = Program('placeholder_noshape', [I1])
         I2 = Placeholder(LogicalShape(plaidml.DType.INT32))
         program2 = Program('placeholder_noshape', [I2])
-        self.assertEqual(str(I1.shape), "tensor<!eltwise.i32>")
-        self.assertEqual(str(I2.shape), "tensor<!eltwise.i32>")
+        self.assertEqual(str(I1.compute_shape()), "tensor<!eltwise.i32>")
+        self.assertEqual(str(I2.compute_shape()), "tensor<!eltwise.i32>")
         self.assertMultiLineEqualsStripped(program1, str(program2))
 
     def test_placeholder_noname(self):
@@ -1121,8 +1121,8 @@ module {
         program1 = Program('placeholder_noname', [I1])
         I2 = Placeholder(LogicalShape(plaidml.DType.INT32, [1, 1]))
         program2 = Program('placeholder_noname', [I2])
-        self.assertEqual(str(I1.shape), "tensor<1x1x!eltwise.i32>")
-        self.assertEqual(str(I2.shape), "tensor<1x1x!eltwise.i32>")
+        self.assertEqual(str(I1.compute_shape()), "tensor<1x1x!eltwise.i32>")
+        self.assertEqual(str(I2.compute_shape()), "tensor<1x1x!eltwise.i32>")
         self.assertMultiLineEqualsStripped(program1, str(program2))
 
     def test_placeholder_with_name(self):
@@ -1130,8 +1130,8 @@ module {
         program1 = Program('placeholder_with_name', [I1])
         I2 = Placeholder(LogicalShape(plaidml.DType.INT32, [1, 1]), name='I')
         program2 = Program('placeholder_with_name', [I2])
-        self.assertEqual(str(I1.shape), "tensor<1x1x!eltwise.i32>")
-        self.assertEqual(str(I2.shape), "tensor<1x1x!eltwise.i32>")
+        self.assertEqual(str(I1.compute_shape()), "tensor<1x1x!eltwise.i32>")
+        self.assertEqual(str(I2.compute_shape()), "tensor<1x1x!eltwise.i32>")
         self.assertMultiLineEqualsStripped(program1, str(program2))
 
     def test_collect_passes(self):

@@ -16,8 +16,8 @@ class TestCore(unittest.TestCase):
         print(settings)
         self.assertIn('FOO', settings)
 
-    def test_get_strs(self):
-        devices = pcore.get_strs(lib.plaidml_targets_get)
+    def test_get_strings(self):
+        devices = pcore.get_strings(lib.plaidml_targets_get)
         self.assertIn('llvm_cpu', devices)
 
 

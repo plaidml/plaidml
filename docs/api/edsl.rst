@@ -2,8 +2,6 @@
 EDSL
 ====
 
-Embedded Domain Specific Language
-
 .. contents::
 
 --------------
@@ -20,8 +18,8 @@ Initialization
 
       .. note::
 
-         Initialization of PlaidML's EDSL Python API happens automatically
-         wherever the module ``plaidml.edsl`` is imported.
+         Initialization of the PlaidML EDSL API occurs when the ``plaidml.edsl``
+         module is imported.
 
 -------
 Objects
@@ -41,19 +39,22 @@ Objects
          :special-members:
       .. autoclass:: plaidml.edsl.LogicalShape
          :members:
+      .. autoclass:: plaidml.edsl.TensorDim
+         :members:
+         :special-members:
+      .. autoclass:: plaidml.edsl.TensorIndex
+         :members:
+         :special-members:
       .. autoclass:: plaidml.edsl.Tensor
          :members:
+         :special-members:
       .. autoclass:: plaidml.edsl.TensorRef
          :members:
       .. autoclass:: plaidml.edsl.ProgramArgument
          :members:
       .. autoclass:: plaidml.edsl.Program
          :members:
-      .. autoclass:: plaidml.edsl.TensorDim
-         :members:
-      .. autoclass:: plaidml.edsl.TensorIndex
-         :members:
-      .. autoclass:: plaidml.edsl.Constraint
+      .. autoclass:: plaidml.edsl.Value
          :members:
 
 ----------
@@ -68,6 +69,10 @@ Primitives
 
    .. group-tab:: Python
 
+      .. autofunction:: plaidml.edsl.Placeholder
+      .. autofunction:: plaidml.edsl.TensorDims
+      .. autofunction:: plaidml.edsl.TensorIndexes
+      .. autofunction:: plaidml.edsl.TensorOutput
       .. autofunction:: plaidml.edsl.abs
       .. autofunction:: plaidml.edsl.cast
       .. autofunction:: plaidml.edsl.ceil

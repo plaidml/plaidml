@@ -38,12 +38,13 @@ namespace details {
 struct Deleter {
   void operator()(plaidml_dim_expr* ptr) { ffi::call_void(plaidml_dim_expr_free, ptr); }
   void operator()(plaidml_expr* ptr) { ffi::call_void(plaidml_expr_free, ptr); }
+  void operator()(plaidml_integers* ptr) { ffi::call_void(plaidml_integers_free, ptr); }
   void operator()(plaidml_logical_shape* ptr) { ffi::call_void(plaidml_logical_shape_free, ptr); }
   void operator()(plaidml_poly_expr* ptr) { ffi::call_void(plaidml_poly_expr_free, ptr); }
   void operator()(plaidml_program* ptr) { ffi::call_void(plaidml_program_free, ptr); }
+  void operator()(plaidml_strings* ptr) { ffi::call_void(plaidml_strings_free, ptr); }
   void operator()(plaidml_tuple* ptr) { ffi::call_void(plaidml_tuple_free, ptr); }
   void operator()(plaidml_value* ptr) { ffi::call_void(plaidml_value_free, ptr); }
-  void operator()(plaidml_strings* ptr) { ffi::call_void(plaidml_strings_free, ptr); }
 };
 
 template <typename T>
@@ -63,7 +64,7 @@ void into_vector(std::vector<T>* into, Head&& head, Tail&&... tail) {
 }  // namespace details
 
 ///
-/// Initializes PlaidML's EDSL API.
+/// Initializes the PlaidML EDSL API.
 ///
 inline void init() {
   plaidml::init();
@@ -448,7 +449,6 @@ class IndexedTensor {
 ///
 /// \ingroup edsl_objects
 /// \class LogicalShape
-/// This is a LogicalShape.
 ///
 class LogicalShape {
   friend class Program;
@@ -456,21 +456,21 @@ class LogicalShape {
 
  public:
   ///
-  /// LogicalShape constructor
+  /// Constructor for the LogicalShape type.
   ///
   LogicalShape(DType dtype, const std::vector<int64_t>& dims)
       : ptr_(details::make_ptr(ffi::call<plaidml_logical_shape*>(
             plaidml_logical_shape_alloc, static_cast<plaidml_datatype>(dtype), dims.size(), dims.data()))) {}
 
   ///
-  /// Returns a LogicalShape as a string
+  /// Returns a string representation of this LogicalShape.
   ///
   std::string str() const {  //
     return ffi::str(ffi::call<plaidml_string*>(plaidml_logical_shape_repr, as_ptr()));
   }
 
   ///
-  /// Returns the datatype of the LogicalShape
+  /// Returns the element DType of this LogicalShape.
   ///
   DType dtype() const {
     auto ret = ffi::call<plaidml_datatype>(plaidml_logical_shape_get_dtype, as_ptr());
@@ -478,28 +478,26 @@ class LogicalShape {
   }
 
   ///
-  /// Returns the number of dimensions of the LogicalShape
+  /// Returns the number of dimensions in this LogicalShape.
   ///
-  size_t ndims() const {  //
-    return ffi::call<size_t>(plaidml_logical_shape_get_ndims, as_ptr());
+  size_t rank() const {  //
+    return ffi::call<size_t>(plaidml_logical_shape_get_rank, as_ptr());
   }
 
   ///
-  /// Returns the dimensions of the LogicalShape as a vector of integers.
+  /// Returns the sizes of this LogicalShape.
   ///
-  std::vector<int64_t> int_dims() const {
-    std::vector<int64_t> ret(ndims());
-    for (size_t i = 0; i < ret.size(); i++) {
-      ret[i] = ffi::call<int64_t>(plaidml_logical_shape_get_dim_int, as_ptr(), i);
-    }
-    return ret;
+  std::vector<int64_t> sizes() const {
+    auto ints = details::make_ptr(ffi::call<plaidml_integers*>(plaidml_logical_shape_get_sizes, as_ptr()));
+    return std::vector<int64_t>(ints->elts, ints->elts + ints->size);
   }
 
   ///
-  /// TODO
+  /// Equality comparison for LogicalShape types.
   ///
   bool operator==(const LogicalShape& rhs) const { return str() == rhs.str(); }
 
+  // This is an internal method.
   plaidml_logical_shape* as_ptr() const { return ptr_.get(); }
 
  private:
@@ -1197,7 +1195,7 @@ inline Program::Program(const ProgramBuilder& builder) {
     LogicalShape shape(ffi::call<plaidml_logical_shape*>(plaidml_logical_shape_clone, arg.shape));
     ProgramArgument programArg{arg.is_input, tensor, shape};
     if (arg.buffer) {
-      TensorShape tensor_shape(shape.dtype(), shape.int_dims());
+      TensorShape tensor_shape(shape.dtype(), shape.sizes());
       auto bufptr = ffi::call<plaidml_buffer*>(plaidml_buffer_clone, arg.buffer);
       programArg.buffer = std::make_shared<Buffer>(bufptr, tensor_shape);
     }

@@ -153,3 +153,15 @@ plaidml_cc_library(
     ],
     alwayslink = 1,
 )
+
+py_binary(
+    name = "interact",
+    srcs = ["interact.py"],
+    deps = [
+        ":py",
+        "//plaidml/core:py",
+        "//plaidml/edsl:py",
+        "//plaidml/exec:py",
+        "//plaidml/op:py",
+    ],
+)
