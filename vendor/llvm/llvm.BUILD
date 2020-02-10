@@ -601,7 +601,10 @@ gentbl(
             "include/llvm/Target/*.td",
             "include/llvm/Target/GlobalISel/*.td",
         ]),
-        deps = target.get("tbl_deps", []),
+        deps = target.get(
+            "tbl_deps",
+            [],
+        ),
     )
     for target in llvm_target_list
 ]
@@ -2215,6 +2218,7 @@ cc_library(
         ":bit_writer",
         ":config",
         ":core",
+        ":frontend_open_mp",
         ":inst_combine",
         ":instrumentation",
         ":ir_reader",
