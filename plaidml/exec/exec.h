@@ -15,7 +15,7 @@ namespace plaidml {
 namespace exec {
 
 ///
-/// Initializes PlaidML's Execution API.
+/// Initializes the PlaidML Execution API.
 ///
 inline void init() {
   plaidml::init();
@@ -234,7 +234,7 @@ class Binder {
     if (it != map->end()) {
       return it->second;
     }
-    TensorShape shape(arg.shape.dtype(), arg.shape.int_dims());
+    TensorShape shape(arg.shape.dtype(), arg.shape.sizes());
     Buffer buffer{device_, shape};
     map->emplace(arg.tensor, buffer);
     return buffer;

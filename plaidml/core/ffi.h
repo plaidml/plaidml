@@ -1,4 +1,4 @@
-// Copyright 2019 Intel Corporation.
+// Copyright 2020 Intel Corporation
 
 #pragma once
 
@@ -21,10 +21,25 @@ extern "C" {
 typedef struct plaidml_string plaidml_string;
 typedef struct plaidml_shape plaidml_shape;
 
-typedef struct plaidml_strings {
+typedef struct {
   size_t size;
   plaidml_string** elts;
 } plaidml_strings;
+
+typedef struct {
+  size_t size;
+  int64_t* elts;
+} plaidml_integers;
+
+typedef struct {
+  plaidml_string* key;
+  plaidml_string* value;
+} plaidml_kvp;
+
+typedef struct {
+  size_t size;
+  plaidml_kvp* elts;
+} plaidml_kvps;
 
 //
 // Execution
@@ -70,23 +85,9 @@ typedef struct {
   plaidml_string* msg;
 } plaidml_error;
 
-void plaidml_strings_free(  //
-    plaidml_error* err,     //
-    plaidml_strings* strs);
-
 //
 // Library
 //
-
-typedef struct {
-  plaidml_string* key;
-  plaidml_string* value;
-} plaidml_kvp;
-
-typedef struct {
-  size_t size;
-  plaidml_kvp* elts;
-} plaidml_kvps;
 
 void plaidml_init(  //
     plaidml_error* err);
@@ -96,6 +97,14 @@ void plaidml_shutdown(  //
 
 const char* plaidml_version(  //
     plaidml_error* err);
+
+void plaidml_integers_free(  //
+    plaidml_error* err,      //
+    plaidml_integers* ints);
+
+void plaidml_strings_free(  //
+    plaidml_error* err,     //
+    plaidml_strings* strs);
 
 void plaidml_kvps_free(  //
     plaidml_error* err,  //
@@ -124,8 +133,6 @@ void plaidml_settings_save(  //
 // Shape
 //
 
-// A PlaidML datatype indicates the type of data stored within a buffer, as
-// observed by a program.
 typedef enum {
   PLAIDML_DATA_INVALID = 0,
   PLAIDML_DATA_BOOLEAN = 1,
@@ -150,31 +157,33 @@ void plaidml_shape_free(  //
 plaidml_shape* plaidml_shape_alloc(  //
     plaidml_error* err,              //
     plaidml_datatype dtype,          //
-    size_t ndims,                    //
+    size_t rank,                     //
     const int64_t* sizes,            //
     const int64_t* strides);
+
+plaidml_shape* plaidml_shape_clone(  //
+    plaidml_error* err,              //
+    plaidml_shape* shape);
 
 plaidml_string* plaidml_shape_repr(  //
     plaidml_error* err,              //
     plaidml_shape* shape);
 
-size_t plaidml_shape_get_ndims(  //
-    plaidml_error* err,          //
+size_t plaidml_shape_get_rank(  //
+    plaidml_error* err,         //
     plaidml_shape* shape);
 
 plaidml_datatype plaidml_shape_get_dtype(  //
     plaidml_error* err,                    //
     plaidml_shape* shape);
 
-int64_t plaidml_shape_get_dim_size(  //
-    plaidml_error* err,              //
-    plaidml_shape* shape,            //
-    size_t dim);
+plaidml_integers* plaidml_shape_get_sizes(  //
+    plaidml_error* err,                     //
+    plaidml_shape* shape);
 
-int64_t plaidml_shape_get_dim_stride(  //
-    plaidml_error* err,                //
-    plaidml_shape* shape,              //
-    size_t dim);
+plaidml_integers* plaidml_shape_get_strides(  //
+    plaidml_error* err,                       //
+    plaidml_shape* shape);
 
 uint64_t plaidml_shape_get_nbytes(  //
     plaidml_error* err,             //

@@ -2,8 +2,6 @@
 Execution
 =========
 
-PlaidML Execution
-
 .. contents::
 
 --------------
@@ -20,8 +18,8 @@ Initialization
 
       .. note::
 
-         Initialization of PlaidML's Execution Python API happens
-         automatically wherever the module ``plaidml.exec`` is imported.
+         Initialization of the PlaidML Execution API occurs when the
+         ``plaidml.exec`` module is imported.
 
 -------
 Objects

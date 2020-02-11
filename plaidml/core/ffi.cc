@@ -130,6 +130,15 @@ void plaidml_string_free(plaidml_string* str) {
   });
 }
 
+void plaidml_integers_free(  //
+    plaidml_error* err,      //
+    plaidml_integers* ints) {
+  ffi_wrap_void(err, [&] {
+    delete[] ints->elts;
+    delete ints;
+  });
+}
+
 void plaidml_strings_free(  //
     plaidml_error* err,     //
     plaidml_strings* strs) {
@@ -165,6 +174,15 @@ plaidml_shape* plaidml_shape_alloc(  //
   });
 }
 
+plaidml_shape* plaidml_shape_clone(  //
+    plaidml_error* err,              //
+    plaidml_shape* shape) {
+  return ffi_wrap<plaidml_shape*>(err, nullptr, [&] {
+    IVLOG(3, "plaidml_shape");
+    return new plaidml_shape{shape->type};
+  });
+}
+
 plaidml_string* plaidml_shape_repr(  //
     plaidml_error* err,              //
     plaidml_shape* shape) {
@@ -173,8 +191,8 @@ plaidml_string* plaidml_shape_repr(  //
   });
 }
 
-size_t plaidml_shape_get_ndims(  //
-    plaidml_error* err,          //
+size_t plaidml_shape_get_rank(  //
+    plaidml_error* err,         //
     plaidml_shape* shape) {
   return ffi_wrap<size_t>(err, 0, [&] {  //
     return shape->type.getRank();
@@ -218,33 +236,37 @@ plaidml_datatype plaidml_shape_get_dtype(  //
   });
 }
 
-int64_t plaidml_shape_get_dim_size(  //
-    plaidml_error* err,              //
-    plaidml_shape* shape,            //
-    size_t dim) {
-  return ffi_wrap<int64_t>(err, 0, [&] {
-    const auto& dims = shape->type.getShape();
-    if (dims.size() < dim) {
-      throw std::range_error("dim index out of range");
+plaidml_integers* plaidml_shape_get_sizes(  //
+    plaidml_error* err,                     //
+    plaidml_shape* shape) {
+  return ffi_wrap<plaidml_integers*>(err, 0, [&] {
+    const auto& sizes = shape->type.getShape();
+    auto ret = new plaidml_integers{sizes.size(), new int64_t[sizes.size()]};
+    for (unsigned i = 0; i < sizes.size(); i++) {
+      if (sizes[i] < 0) {
+        ret->elts[i] = 0;
+      } else {
+        ret->elts[i] = sizes[i];
+      }
     }
-    return dims[dim];
+    return ret;
   });
 }
 
-int64_t plaidml_shape_get_dim_stride(  //
-    plaidml_error* err,                //
-    plaidml_shape* shape,              //
-    size_t dim) {
-  return ffi_wrap<int64_t>(err, 0, [&] {
+plaidml_integers* plaidml_shape_get_strides(  //
+    plaidml_error* err,                       //
+    plaidml_shape* shape) {
+  return ffi_wrap<plaidml_integers*>(err, 0, [&] {
     int64_t offset;
     llvm::SmallVector<int64_t, 8> strides;
     if (failed(mlir::getStridesAndOffset(shape->type, strides, offset))) {
       throw std::runtime_error("Could not retrieve strides");
     }
-    if (strides.size() < dim) {
-      throw std::range_error("dim index out of range");
+    auto ret = new plaidml_integers{strides.size(), new int64_t[strides.size()]};
+    for (unsigned i = 0; i < strides.size(); i++) {
+      ret->elts[i] = strides[i];
     }
-    return strides[dim];
+    return ret;
   });
 }
 
