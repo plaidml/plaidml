@@ -4,8 +4,14 @@
 """
 
 # Default values used by the test runner.
-_default_test_file_exts = ["mlir", "pbtxt", "td"]
+_default_test_file_exts = [
+    "mlir",
+    "pbtxt",
+    "td",
+]
+
 _default_size = "small"
+
 _default_tags = []
 
 # These are patterns which we should never match, for tests, subdirectories, or

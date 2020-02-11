@@ -1,12 +1,50 @@
-# Copyright 2019 Intel Corporation
+# Copyright 2020 Intel Corporation
+# RUN: py_test -v | FileCheck %s
 
 import functools
 import platform
+import sys
 import unittest
 
 import plaidml
 import plaidml.exec
 from plaidml.edsl import *
+
+DEFAULT_DEVICE = 'llvm_cpu.0'
+DEFAULT_TARGET = 'llvm_cpu'
+
+# HACKs for getting lit/FileCheck to integrate with python
+
+# Redirect stderr to stdout
+sys.stderr = sys.stdout
+
+
+# Ensure that the order that tests run are the order that they are specified in the source file.
+def suiteFactory(*testcases):
+
+    ln = lambda f: getattr(tc, f).__code__.co_firstlineno
+    lncmp = lambda a, b: ln(a) - ln(b)
+
+    test_suite = unittest.TestSuite()
+    for tc in testcases:
+        test_suite.addTest(unittest.makeSuite(tc, sortUsing=lncmp))
+
+    return test_suite
+
+
+def caseFactory():
+
+    from inspect import findsource
+
+    g = globals().copy()
+
+    cases = [
+        g[obj] for obj in g if obj.startswith("Test") and issubclass(g[obj], unittest.TestCase)
+    ]
+
+    ordered_cases = sorted(cases, key=lambda f: findsource(f)[1])
+
+    return ordered_cases
 
 
 def dot(X, Y):
@@ -253,10 +291,6 @@ def csum(I):
 class TestEdsl(unittest.TestCase):
     maxDiff = None
 
-    def assertMultiLineEqualsStripped(self, program, expected):
-        return True  # TODO: re-enable brittle tests by replacing with lit.
-        self.assertMultiLineEqual(str(program).strip(), expected.strip())
-
     def checkProgram(self, program, inputs, expected):
         if platform.system() == 'Windows':
             # the Orc JIT in LLVM is currently broken on windows.
@@ -297,6 +331,7 @@ class TestEdsl(unittest.TestCase):
         program = Program('higher_precision_constants', [O],
                           floatx=plaidml.DType.FLOAT64,
                           intx=plaidml.DType.UINT64)
+        # CHECK-LABEL: test_higher_precision_constants
         expected = '''
 
 !u64 = type tensor<!eltwise.u64>
@@ -311,7 +346,6 @@ module {
   }
 }
 '''
-        self.assertMultiLineEqualsStripped(program, expected)
         self.checkProgram(program, [
             (I, np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9]])),
         ], [
@@ -322,6 +356,7 @@ module {
         I = Placeholder(plaidml.DType.FLOAT32, [1, 784])
         O = sum_over_axis(I)
         program = Program('sum_over_axis', [O])
+        # CHECK-LABEL: test_sum_over_axis
         expected = '''
 #map0 = affine_map<(d0, d1) -> (d0)>
 #map1 = affine_map<(d0, d1) -> (d1, d0)>
@@ -336,12 +371,12 @@ module {
   }
 }
 '''
-        self.assertMultiLineEqualsStripped(program, expected)
 
     def test_max_over_axis(self):
         I = Placeholder(plaidml.DType.FLOAT32, [1, 784])
         O = max_over_axis(I)
         program = Program('max_over_axis', [O])
+        # CHECK-LABEL: test_max_over_axis
         expected = '''
 #map0 = affine_map<(d0, d1) -> (d0)>
 #map1 = affine_map<(d0, d1) -> (d1, d0)>
@@ -356,13 +391,13 @@ module {
   }
 }
 '''
-        self.assertMultiLineEqualsStripped(program, expected)
 
     def test_matmul(self):
         A = Placeholder(plaidml.DType.FLOAT32, [1, 784])
         B = Placeholder(plaidml.DType.FLOAT32, [784, 784])
         O = matmul(A, B)
         program = Program('matmul', [O])
+        # CHECK-LABEL: test_matmul
         expected = '''
 #map0 = affine_map<(d0, d1, d2) -> (d0, d1)>
 #map1 = affine_map<(d0, d1, d2) -> (d0, d2)>
@@ -378,11 +413,11 @@ module {
   }
 }
 '''
-        self.assertMultiLineEqualsStripped(program, expected)
 
     def test_avg(self):
         I = Placeholder(plaidml.DType.FLOAT32, [1, 784])
         O = avg(I)
+        # CHECK-LABEL: test_avg
         program = Program('avg', [O], target='')
         expected = '''
 #map0 = affine_map<(d0, d1) -> (d0)>
@@ -398,12 +433,12 @@ module {
   }
 }
 '''
-        self.assertMultiLineEqualsStripped(program, expected)
 
     def test_avg_stages(self):
         I = Placeholder(plaidml.DType.FLOAT32, [1, 784])
         O = avg_stages(I)
         program = Program('avg_stages', [O], target='')
+        # CHECK-LABEL: test_avg_stages
         expected = '''
 #map0 = affine_map<() -> ()>
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
@@ -420,12 +455,12 @@ module {
   }
 }
 '''
-        self.assertMultiLineEqualsStripped(program, expected)
 
     def test_avg_merge(self):
         I = Placeholder(plaidml.DType.FLOAT32, [1, 784])
         O = avg_merge(I)
         program = Program('avg_merge', [O], target='')
+        # CHECK-LABEL: test_avg_merge
         expected = '''
 #map0 = affine_map<() -> ()>
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
@@ -442,12 +477,12 @@ module {
   }
 }
 '''
-        self.assertMultiLineEqualsStripped(program, expected)
 
     def test_max_pool_1d(self):
         I = Placeholder(plaidml.DType.FLOAT32, [10], name='I')
         O = max_pool_1d(I)
         program = Program('max_pool_1d', [O])
+        # CHECK-LABEL: test_max_pool_1d
         expected = '''
 #map0 = affine_map<(d0, d1) -> (d0)>
 #map1 = affine_map<(d0, d1) -> (d0 * 2 + d1)>
@@ -463,12 +498,12 @@ module {
   }
 }
 '''
-        self.assertMultiLineEqualsStripped(program, expected)
 
     def test_skip(self):
         I = Placeholder(plaidml.DType.FLOAT32, [1, 784])
         O = skip(I)
         program = Program('skip', [O])
+        # CHECK-LABEL: test_skip
         expected = '''
 #map0 = affine_map<(d0, d1) -> (d0 * 2)>
 #map1 = affine_map<(d0, d1) -> (d0 * 2, d1)>
@@ -483,13 +518,13 @@ module {
   }
 }
 '''
-        self.assertMultiLineEqualsStripped(program, expected)
 
     def test_conv_1d(self):
         I = Placeholder(plaidml.DType.FLOAT32, [1, 224, 3])
         K = Placeholder(plaidml.DType.FLOAT32, [3, 3, 1])
         O = conv_1d(I, K)
         program = Program('conv_1d', [O])
+        # CHECK-LABEL: test_conv_1d
         expected = '''
 #map0 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>
 #map1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1 + d3, d4)>
@@ -505,13 +540,13 @@ module {
   }
 }
 '''
-        self.assertMultiLineEqualsStripped(program, expected)
 
     def test_conv_2d_dilated(self):
         I = Placeholder(plaidml.DType.FLOAT32, [1, 224, 224, 1])
         K = Placeholder(plaidml.DType.FLOAT32, [3, 3, 1, 32])
         O = conv_2d_dilated(I, K)
         program = Program('conv_2d_dilated', [O])
+        # CHECK-LABEL: test_conv_2d_dilated
         expected = '''
 #map0 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
 #map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4 * 2, d2 + d5 * 3, d6)>
@@ -527,13 +562,13 @@ module {
   }
 }
 '''
-        self.assertMultiLineEqualsStripped(program, expected)
 
     def test_complex_conv_2d(self):
         I = Placeholder(plaidml.DType.FLOAT32, [1, 224, 224, 3, 3])
         K = Placeholder(plaidml.DType.FLOAT32, [3, 3, 3, 3, 32])
         O = complex_conv_2d(I, K, 1, 2, 1, 2)
         program = Program('complex_conv_2d', [O])
+        # CHECK-LABEL: test_complex_conv_2d
         expected = '''
 #map0 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4)>
 #map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d2 + d5 - 1, d2 * 2 + d6 * 2 - 1, d3, d7)>
@@ -549,7 +584,6 @@ module {
   }
 }
 '''
-        self.assertMultiLineEqualsStripped(program, expected)
 
     @unittest.skip(
         'TODO: currently segfaults mismatched dimensions error needs to be printed correctly')
@@ -558,8 +592,6 @@ module {
         K = Placeholder(plaidml.DType.FLOAT32, [1, 1, 1, 1, 1])
         O = complex_conv_2d(I, K, 1, 2, 1, 2)
         program = Program('complex_conv_2d', [O])
-        # expected = '''?'''
-        # self.assertMultiLineEqualsStripped(program, expected)
 
     def test_mnist_mlp(self):
         # model.add(Dense(512, activation='relu', input_shape=(784,)))
@@ -576,6 +608,7 @@ module {
         B3 = Placeholder(plaidml.DType.FLOAT32, [10])
         D3 = softmax(dot(D2, K3) + B3)
         program = Program('mnist_mlp', [D3])
+        # CHECK-LABEL: test_mnist_mlp
         expected = '''
 #map0 = affine_map<(d0, d1, d2) -> (d0, d1)>
 #map1 = affine_map<(d0, d1, d2) -> (d0, d2)>
@@ -607,7 +640,6 @@ module {
   }
 }
 '''
-        self.assertMultiLineEqualsStripped(program, expected)
 
     def test_mnist_cnn(self):
         # model.add(Conv2D(32, kernel_size=(3, 3), activation='relu', input_shape=input_shape))
@@ -632,6 +664,7 @@ module {
         B4 = Placeholder(plaidml.DType.FLOAT32, [100])
         D2 = softmax(dot(D1, K4) + B4)
         program = Program('mnist_cnn', [D2], target='')
+        # CHECK-LABEL: test_mnist_cnn
         expected = '''
 #map0 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
 #map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4 - 1, d2 + d5 - 1, d6)>
@@ -678,13 +711,13 @@ module {
   }
 }
 '''
-        self.assertMultiLineEqualsStripped(program, expected)
 
     def test_arg_max(self):
         I = Placeholder(plaidml.DType.FLOAT32, [1, 10, 10])
         O = arg_max(I)
         program = Program('arg_max', [O], target='')
         self.assertEqual(str(O.compute_shape()), 'tensor<1x10x!eltwise.u32>')
+        # CHECK-LABEL: test_arg_max
         expected = '''
 #map0 = affine_map<(d0) -> (d0)>
 #map1 = affine_map<() -> ()>
@@ -706,12 +739,12 @@ module {
   }
 }
 '''
-        self.assertMultiLineEqualsStripped(program, expected)
 
     def test_global_min(self):
         I = Placeholder(plaidml.DType.FLOAT32, [10, 10, 10], name='I')
         O = global_min(I)
         program = Program('global_min', [O])
+        # CHECK-LABEL: test_global_min
         expected = '''
 #map0 = affine_map<() -> ()>
 #map1 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
@@ -728,12 +761,12 @@ module {
   }
 }
 '''
-        self.assertMultiLineEqualsStripped(program, expected)
 
     def test_cum_sum(self):
         I = Placeholder(plaidml.DType.FLOAT32, [10], name='I')
         O = csum(I)
         program = Program('cum_sum', [O])
+        # CHECK-LABEL: test_cum_sum
         expected = '''
 #map0 = affine_map<(d0, d1) -> (d0)>
 #map1 = affine_map<(d0, d1) -> (d1)>
@@ -749,7 +782,6 @@ module {
   }
 }
 '''
-        self.assertMultiLineEqualsStripped(program, expected)
 
     def test_invalid_shape_error(self):
         O = TensorOutput(TensorDims(3))
@@ -763,6 +795,7 @@ module {
         C0 = Placeholder(plaidml.DType.FLOAT32, name='C')
         C1 = Placeholder(plaidml.DType.FLOAT32, name='C')
         program = Program('unique_names', [A + B + C0 + C1])
+        # CHECK-LABEL: test_unique_names
         expected = '''
 
 !f32 = type tensor<!eltwise.f32>
@@ -775,7 +808,6 @@ module {
   }
 }
 '''
-        self.assertMultiLineEqualsStripped(program, expected)
 
     def test_lars_momentum4d(self):
         X_shape = LogicalShape(plaidml.DType.FLOAT32, [4, 7, 3, 9])
@@ -786,6 +818,7 @@ module {
         LR = Tensor(LR_Shape)
         R = lars_momentum(X, Grad, Veloc, LR, 1. / 1024., 1. / 2048., 1. / 8.)
         program = Program('lars_momentum4d', R, target='')
+        # CHECK-LABEL: test_lars_momentum4d
         expected = '''
 #map0 = affine_map<() -> ()>
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
@@ -819,7 +852,6 @@ module {
   }
 }
 '''
-        self.assertMultiLineEqualsStripped(program, expected)
 
     def test_repeat_elts(self):
         I = Placeholder(plaidml.DType.FLOAT32, [10, 10, 10])
@@ -831,6 +863,7 @@ module {
         O.add_constraint(k < 3)
         O.no_reduce()
         program = Program('repeat_elts', [O])
+        # CHECK-LABEL: test_repeat_elts
         expected = '''
 #map0 = affine_map<(d0, d1, d2, d3) -> (d0, d1 * 3 + d2, d3)>
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
@@ -846,7 +879,6 @@ module {
   }
 }
 '''
-        self.assertMultiLineEqualsStripped(program, expected)
 
     def test_use_default(self):
         P = Placeholder(plaidml.DType.FLOAT32, [1, 7, 10, 10])
@@ -858,6 +890,7 @@ module {
         O[b, 3, i1, i2] = I[b, i1, i2]
         O.use_default(P)
         program = Program('use_default', [O])
+        # CHECK-LABEL: test_use_default
         expected = '''
 #map0 = affine_map<(d0, d1, d2) -> (d0, 3, d1, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
@@ -870,9 +903,7 @@ module {
   }
 }
 '''
-        self.assertMultiLineEqualsStripped(program, expected)
 
-    @unittest.skip('TODO: Finish bounds pass')
     def test_defract(self):
         I = Placeholder(plaidml.DType.FLOAT32, [3], name='I')
         K = Placeholder(plaidml.DType.FLOAT32, [3], name='K')
@@ -880,6 +911,7 @@ module {
         O = TensorOutput(5)
         O[i] += (I[(i - j + 1) // 2] * K[j])
         program = Program('defract_test', [O])
+        # CHECK-LABEL: test_defract
         expected = '''
 #map0 = affine_map<(d0, d1) -> (d0)>
 #map1 = affine_map<(d0, d1) -> ((d0 - d1 + 1) floordiv 2)>
@@ -895,7 +927,6 @@ module {
   }
 }
 '''
-        self.assertMultiLineEqualsStripped(program, expected)
         self.checkProgram(program, [
             (I, np.array([1, 2, 3])),
             (K, np.array([1, 2, 3])),
@@ -903,13 +934,14 @@ module {
             [2, 5, 4, 9, 6],
         ])
 
-    @unittest.skip('TODO: Finish bounds pass')
+    @unittest.skip('FIXME: incorrect output')
     def test_defract_short(self):
         I = Placeholder(plaidml.DType.FLOAT32, [3], name='I')
         i, j = TensorIndexes(2)
         O = TensorOutput(6)
         O[i] += (I[(i - 1) // 2])
         program = Program('defract_short_test', [O])
+        # SKIP-CHECK-LABEL: test_defract_short
         expected = '''
 #map0 = affine_map<(d0) -> (d0)>
 #map1 = affine_map<(d0) -> ((d0 - 1) floordiv 2)>
@@ -924,14 +956,13 @@ module {
   }
 }
 '''
-        self.assertMultiLineEqualsStripped(program, expected)
         self.checkProgram(program, [
             (I, np.array([1, 2, 3])),
         ], [
             [0, 1, 0, 2, 0, 3],
         ])
 
-    @unittest.skip('TODO: Finish bounds pass')
+    @unittest.skip('FIXME: incorrect output')
     def test_defract_long(self):
         shape = [1, 3, 3, 1]
         I = Placeholder(plaidml.DType.FLOAT32, shape, name='I')
@@ -941,6 +972,7 @@ module {
         O[n, x0, x1, co] += (I[n, (x0 + k0 - 1) // 2,
                                (x1 + k1 - 1) // 2, ci] * K[2 - k0, 2 - k1, co, ci])
         program = Program('defract_long', [O])
+        # SKIP-CHECK-LABEL: test_defract_long
         expected = '''
 #map0 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
 #map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, (d1 + d4 - 1) floordiv 2, (d2 + d5 - 1) floordiv 2, d6)>
@@ -956,7 +988,6 @@ module {
   }
 }
 '''
-        self.assertMultiLineEqualsStripped(program, expected)
         self.checkProgram(program, [
             (I, np.array([[
                 [[1], [3], [-1]],
@@ -976,7 +1007,6 @@ module {
             [[0], [0], [0], [0], [0]],
         ]]])
 
-    @unittest.skip('FIXME')
     def test_funky_names(self):
         '''Exercises fix for plaidml bug #241
 
@@ -991,6 +1021,7 @@ module {
         O = TensorOutput(5)
         O[i] += (I[(i - j + 1) // 2] * K[j])
         program = Program('this-is-not an identifier', [O])
+        # CHECK-LABEL: test_funky_names
         expected = '''
 #map0 = affine_map<(d0, d1) -> (d0)>
 #map1 = affine_map<(d0, d1) -> ((d0 - d1 + 1) floordiv 2)>
@@ -1006,7 +1037,6 @@ module {
   }
 }
 '''
-        self.assertMultiLineEqualsStripped(program, expected)
         self.checkProgram(program, [
             (I, np.array([1, 2, 3])),
             (K, np.array([1, 2, 3])),
@@ -1017,6 +1047,7 @@ module {
     def test_identity(self):
         I = Placeholder(plaidml.DType.FLOAT32, [3], name='I')
         program = Program('identity', [I])
+        # CHECK-LABEL: test_identity
         expected = '''
 module {
   func @identity(%arg0: tensor<3x!eltwise.f32> {tile.name = "I"}) -> tensor<3x!eltwise.f32> {
@@ -1025,7 +1056,6 @@ module {
   }
 }
 '''
-        self.assertMultiLineEqualsStripped(program, expected)
         self.checkProgram(program, [
             (I, np.array([(1, 2, 3)])),
         ], [
@@ -1043,22 +1073,6 @@ module {
         O = TensorOutput(L, N)
         O[i, j] = A[i, k] * B[k, j]
         program = Program('assignment_non_exception', [O])
-        expected = '''
-#map0 = affine_map<(d0, d1, d2) -> (d0, d1)>
-#map1 = affine_map<(d0, d1, d2) -> (d0, d2)>
-#map2 = affine_map<(d0, d1, d2) -> (d2, d1)>
-
-
-!fp32 = type tensor<!eltwise.fp32>
-module {
-  func @assignment_non_exception(%arg0: tensor<1x5x!eltwise.fp32> {tile.name = "B"}, %arg1: tensor<5x1x!eltwise.fp32> {tile.name = "A"}) -> tensor<5x5x!eltwise.fp32> {
-    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !fp32
-    %0 = tile.cion assign, mul, %cst, %arg1, %arg0 {sink = #map0, srcs = [#map1, #map2]} : !fp32, tensor<5x1x!eltwise.fp32>, tensor<1x5x!eltwise.fp32> -> tensor<5x5x!eltwise.fp32>
-    return %0 : tensor<5x5x!eltwise.fp32>
-  }
-}
-'''
-        self.assertMultiLineEqualsStripped(program, expected)
         self.checkProgram(program, [
             (A, np.array([[1], [2], [3], [4], [5]])),
             (B, np.array([1, 2, 3, 4, 5])),
@@ -1079,6 +1093,7 @@ module {
     def test_two_outputs(self):
         I = Placeholder(plaidml.DType.FLOAT32, [3], name='I')
         program1 = Program('two_outputs', [I, I])
+        # CHECK-LABEL: test_two_outputs
         expected = '''
 module {
   func @two_outputs(%arg0: tensor<3x!eltwise.f32> {tile.name = "I"}) -> (tensor<3x!eltwise.f32>, tensor<3x!eltwise.f32>) {
@@ -1088,7 +1103,6 @@ module {
   }
 }
 '''
-        self.assertMultiLineEqualsStripped(program1, expected)
         self.checkProgram(program1, [
             (I, np.array([(1, 2, 3)])),
         ], [
@@ -1114,7 +1128,7 @@ module {
         program2 = Program('placeholder_noshape', [I2])
         self.assertEqual(str(I1.compute_shape()), "tensor<!eltwise.i32>")
         self.assertEqual(str(I2.compute_shape()), "tensor<!eltwise.i32>")
-        self.assertMultiLineEqualsStripped(program1, str(program2))
+        self.assertMultiLineEqual(str(program1), str(program2))
 
     def test_placeholder_noname(self):
         I1 = Placeholder(plaidml.DType.INT32, [1, 1])
@@ -1123,7 +1137,7 @@ module {
         program2 = Program('placeholder_noname', [I2])
         self.assertEqual(str(I1.compute_shape()), "tensor<1x1x!eltwise.i32>")
         self.assertEqual(str(I2.compute_shape()), "tensor<1x1x!eltwise.i32>")
-        self.assertMultiLineEqualsStripped(program1, str(program2))
+        self.assertMultiLineEqual(str(program1), str(program2))
 
     def test_placeholder_with_name(self):
         I1 = Placeholder(plaidml.DType.INT32, [1, 1], name='I')
@@ -1132,7 +1146,7 @@ module {
         program2 = Program('placeholder_with_name', [I2])
         self.assertEqual(str(I1.compute_shape()), "tensor<1x1x!eltwise.i32>")
         self.assertEqual(str(I2.compute_shape()), "tensor<1x1x!eltwise.i32>")
-        self.assertMultiLineEqualsStripped(program1, str(program2))
+        self.assertMultiLineEqual(str(program1), str(program2))
 
     def test_collect_passes(self):
         A = Placeholder(plaidml.DType.FLOAT32, [10, 10])
@@ -1150,4 +1164,8 @@ module {
 
 
 if __name__ == '__main__':
-    unittest.main()
+    plaidml.settings.set('PLAIDML_DEVICE', DEFAULT_DEVICE)
+    plaidml.settings.set('PLAIDML_TARGET', DEFAULT_TARGET)
+    cases = suiteFactory(*caseFactory())
+    runner = unittest.TextTestRunner(verbosity=2)
+    runner.run(cases)
