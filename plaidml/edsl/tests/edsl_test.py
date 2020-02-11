@@ -10,6 +10,9 @@ import plaidml
 import plaidml.exec
 from plaidml.edsl import *
 
+DEFAULT_DEVICE = 'llvm_cpu.0'
+DEFAULT_TARGET = 'llvm_cpu'
+
 # HACKs for getting lit/FileCheck to integrate with python
 
 # Redirect stderr to stdout
@@ -901,7 +904,6 @@ module {
 }
 '''
 
-    # @unittest.skip('TODO: Finish bounds pass')
     def test_defract(self):
         I = Placeholder(plaidml.DType.FLOAT32, [3], name='I')
         K = Placeholder(plaidml.DType.FLOAT32, [3], name='K')
@@ -1162,6 +1164,8 @@ module {
 
 
 if __name__ == '__main__':
+    plaidml.settings.set('PLAIDML_DEVICE', DEFAULT_DEVICE)
+    plaidml.settings.set('PLAIDML_TARGET', DEFAULT_TARGET)
     cases = suiteFactory(*caseFactory())
     runner = unittest.TextTestRunner(verbosity=2)
     runner.run(cases)
