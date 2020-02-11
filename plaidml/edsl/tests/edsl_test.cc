@@ -1,4 +1,5 @@
-// Copyright 2019 Intel Corporation.
+// Copyright 2020 Intel Corporation
+// RUN: cc_test | FileCheck %s
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -20,15 +21,12 @@ using ::testing::Eq;
 
 namespace plaidml::edsl {
 
-bool operator==(const Program& lhs, const std::string& rhs) {  //
-  return true;                                                 // TODO: re-enable brittle tests by replacing with lit
-  // return StringRef(lhs.str()).trim() == StringRef(rhs).trim();
-}
-
 namespace {
 
 Program makeProgram(const std::string& name, const std::vector<Tensor>& outputs) {
-  return ProgramBuilder(name, outputs).compile();
+  auto program = ProgramBuilder(name, outputs).compile();
+  std::cout << program << std::endl;
+  return program;
 }
 
 Tensor Dot(const Tensor& X, const Tensor& Y) {
@@ -112,20 +110,15 @@ TEST_F(CppEdsl, HigherPrecisionConstants) {
   auto C = A + 1 + 2.0;
 
   auto program = ProgramBuilder("higher_precision_constants", {C}).floatx(DType::FLOAT64).intx(DType::UINT64).compile();
+  std::cout << program << std::endl;
 
-  EXPECT_THAT(program, Eq(R"#(
-!u64 = type tensor<!eltwise.u64>
-!f64 = type tensor<!eltwise.f64>
-module {
-  func @higher_precision_constants(%arg0: tensor<3x3x!eltwise.f32>) -> tensor<3x3x!eltwise.f64> {
-    %c1 = "eltwise.sconst"() {value = 1 : i64} : () -> !u64
-    %cst = "eltwise.sconst"() {value = 2.000000e+00 : f64} : () -> !f64
-    %0 = "eltwise.add"(%arg0, %c1) : (tensor<3x3x!eltwise.f32>, !u64) -> tensor<3x3x!eltwise.f32>
-    %1 = "eltwise.add"(%0, %cst) : (tensor<3x3x!eltwise.f32>, !f64) -> tensor<3x3x!eltwise.f64>
-    return %1 : tensor<3x3x!eltwise.f64>
-  }
-}
-)#"));
+  // CHECK-LABEL: CppEdsl.HigherPrecisionConstants
+  // CHECK: func @higher_precision_constants
+  // CHECK-DAG: %[[c1:.*]] = "eltwise.sconst"() {value = 1 : i64} : () -> !u64
+  // CHECK-DAG: %[[cst:.*]] = "eltwise.sconst"() {value = 2.000000e+00 : f64} : () -> !f64
+  // CHECK: %[[A:.*]] = "eltwise.add"(%{{.*}}, %[[c1]]) : (tensor<3x3x!eltwise.f32>, !u64) -> tensor<3x3x!eltwise.f32>
+  // CHECK: %[[B:.*]] = "eltwise.add"(%[[A]], %[[cst]]) : (tensor<3x3x!eltwise.f32>, !f64) -> tensor<3x3x!eltwise.f64>
+  // CHECK: return %[[B]] : tensor<3x3x!eltwise.f64>
 
   std::vector<float> A_input{1, 2, 3, 4, 5, 6, 7, 8, 9};
   std::vector<double> C_output{4, 5, 6, 7, 8, 9, 10, 11, 12};
@@ -163,6 +156,7 @@ TEST_F(CppEdsl, BitAndScalar) {
   std::uint64_t mask = UINT32_MAX;
   auto B = A & mask;
   auto program = ProgramBuilder("bit_and", {B}).intx(DType::UINT64).compile();
+  std::cout << program << std::endl;
 
   std::vector<std::uint64_t> A_input{(1UL << 32),     (1UL << 33) + 1, (1UL << 34) + 2,  //
                                      (1UL << 35) + 3, (1UL << 36) + 4, (1UL << 37) + 5,  //
@@ -339,21 +333,13 @@ TEST_F(CppEdsl, Dot) {
   auto B = Placeholder(DType::FLOAT32, {3, 3});
   auto C = Dot(A, B);
   auto program = makeProgram("dot", {C});
-  EXPECT_THAT(program, Eq(R"#(
-#map0 = affine_map<(d0, d1, d2) -> (d0, d1)>
-#map1 = affine_map<(d0, d1, d2) -> (d0, d2)>
-#map2 = affine_map<(d0, d1, d2) -> (d2, d1)>
 
-
-!f32 = type tensor<!eltwise.f32>
-module {
-  func @dot(%arg0: tensor<3x3x!eltwise.f32>, %arg1: tensor<3x3x!eltwise.f32>) -> tensor<3x3x!eltwise.f32> {
-    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
-    %0 = tile.cion add, mul, %cst, %arg1, %arg0 {idxs = ["i", "j", "k"], sink = #map0, srcs = [#map1, #map2]} : !f32, tensor<3x3x!eltwise.f32>, tensor<3x3x!eltwise.f32> -> tensor<3x3x!eltwise.f32>
-    return %0 : tensor<3x3x!eltwise.f32>
-  }
-}
-)#"));
+  // CHECK-LABEL: CppEdsl.Dot
+  // CHECK: func @dot
+  // CHECK: %[[cst:.*]] = "eltwise.sconst"{{.*}}-> !f32
+  // CHECK: %[[cion:.*]] = tile.cion add, mul, %[[cst]], %{{.*}}, %{{.*}} {{{.*}}}
+  // CHECK-SAME: !f32, tensor<3x3x!eltwise.f32>, tensor<3x3x!eltwise.f32> -> tensor<3x3x!eltwise.f32>
+  // CHECK: return %[[cion]] : tensor<3x3x!eltwise.f32>
 
   std::vector<float> input = {
       1.0f, 2.0f, 3.0f,  //
@@ -374,22 +360,16 @@ TEST_F(CppEdsl, DoubleDot) {
   auto B = Placeholder(DType::FLOAT32, {20, 30});
   auto C = Placeholder(DType::FLOAT32, {30, 40});
   auto program = makeProgram("double_dot", {Dot(Dot(A, B), C)});
-  EXPECT_THAT(program, Eq(R"#(
-#map0 = affine_map<(d0, d1, d2) -> (d0, d1)>
-#map1 = affine_map<(d0, d1, d2) -> (d0, d2)>
-#map2 = affine_map<(d0, d1, d2) -> (d2, d1)>
 
-
-!f32 = type tensor<!eltwise.f32>
-module {
-  func @double_dot(%arg0: tensor<30x40x!eltwise.f32>, %arg1: tensor<20x30x!eltwise.f32>, %arg2: tensor<10x20x!eltwise.f32>) -> tensor<10x40x!eltwise.f32> {
-    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
-    %0 = tile.cion add, mul, %cst, %arg2, %arg1 {idxs = ["i", "j", "k"], sink = #map0, srcs = [#map1, #map2]} : !f32, tensor<10x20x!eltwise.f32>, tensor<20x30x!eltwise.f32> -> tensor<10x30x!eltwise.f32>
-    %1 = tile.cion add, mul, %cst, %0, %arg0 {idxs = ["i", "j", "k"], sink = #map0, srcs = [#map1, #map2]} : !f32, tensor<10x30x!eltwise.f32>, tensor<30x40x!eltwise.f32> -> tensor<10x40x!eltwise.f32>
-    return %1 : tensor<10x40x!eltwise.f32>
-  }
-}
-)#"));
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.DoubleDot
+  // CHECK: func @double_dot
+  // CHECK: tensor<10x20x!eltwise.f32>) -> tensor<10x40x!eltwise.f32> {
+  // CHECK: %[[cst:.*]] = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
+  // CHECK: %{{.*}} = tile.cion add, mul, %[[cst]], %{{.*}}, %{{.*}} {idxs = ["i", "j", "k"], sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : !f32, tensor<10x20x!eltwise.f32>, tensor<20x30x!eltwise.f32> -> tensor<10x30x!eltwise.f32>
+  // CHECK: %{{.*}} = tile.cion add, mul, %[[cst]], %{{.*}}, %{{.*}} {idxs = ["i", "j", "k"], sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : !f32, tensor<10x30x!eltwise.f32>, tensor<30x40x!eltwise.f32> -> tensor<10x40x!eltwise.f32>
+  // CHECK: return %{{.*}} : tensor<10x40x!eltwise.f32>
+  // clang-format on
   runProgram(program);
 }
 
@@ -414,31 +394,27 @@ TEST_F(CppEdsl, EltwiseAdd) {
   auto A = Placeholder(DType::FLOAT32, {10, 20});
   auto B = Placeholder(DType::FLOAT32, {10, 20});
   auto program = makeProgram("eltwise_add", {A + B});
-  EXPECT_THAT(program, Eq(R"#(
-module {
-  func @eltwise_add(%arg0: tensor<10x20x!eltwise.f32>, %arg1: tensor<10x20x!eltwise.f32>) -> tensor<10x20x!eltwise.f32> {
-    %0 = "eltwise.add"(%arg1, %arg0) : (tensor<10x20x!eltwise.f32>, tensor<10x20x!eltwise.f32>) -> tensor<10x20x!eltwise.f32>
-    return %0 : tensor<10x20x!eltwise.f32>
-  }
-}
-)#"));
+
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.EltwiseAdd
+  // CHECK: func @eltwise_add
+  // CHECK: %{{.*}} = "eltwise.add"(%{{.*}}, %{{.*}}) : (tensor<10x20x!eltwise.f32>, tensor<10x20x!eltwise.f32>) -> tensor<10x20x!eltwise.f32>
+  // CHECK: return %{{.*}} : tensor<10x20x!eltwise.f32>
+  // clang-format on
   runProgram(program);
 }
 
 TEST_F(CppEdsl, Relu) {
   auto A = Placeholder(DType::FLOAT32, {10, 20});
   auto program = makeProgram("relu", {Relu(A)});
-  EXPECT_THAT(program, Eq(R"#(
-!f32 = type tensor<!eltwise.f32>
-module {
-  func @relu(%arg0: tensor<10x20x!eltwise.f32>) -> tensor<10x20x!eltwise.f32> {
-    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
-    %0 = "eltwise.cmp_lt"(%arg0, %cst) : (tensor<10x20x!eltwise.f32>, !f32) -> tensor<10x20x!eltwise.u1>
-    %1 = "eltwise.select"(%0, %cst, %arg0) : (tensor<10x20x!eltwise.u1>, !f32, tensor<10x20x!eltwise.f32>) -> tensor<10x20x!eltwise.f32>
-    return %1 : tensor<10x20x!eltwise.f32>
-  }
-}
-)#"));
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.Relu
+  // CHECK: func @relu
+  // CHECK: %[[cst:.*]] = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
+  // CHECK: %{{.*}} = "eltwise.cmp_lt"(%{{.*}}, %[[cst]]) : (tensor<10x20x!eltwise.f32>, !f32) -> tensor<10x20x!eltwise.u1>
+  // CHECK: %{{.*}} = "eltwise.select"(%{{.*}}, %[[cst]], %{{.*}}) : (tensor<10x20x!eltwise.u1>, !f32, tensor<10x20x!eltwise.f32>) -> tensor<10x20x!eltwise.f32>
+  // CHECK: return %{{.*}} : tensor<10x20x!eltwise.f32>
+  // clang-format on
   runProgram(program);
 }
 
@@ -457,37 +433,28 @@ TEST_F(CppEdsl, MnistMlp) {
   auto bias3 = Placeholder(DType::FLOAT32, {10});
   auto dense3 = Softmax(Dot(dense2, kernel3) + bias3);
   auto program = makeProgram("mnist_mlp", {dense3});
-  EXPECT_THAT(program, Eq(R"#(
-#map0 = affine_map<(d0, d1, d2) -> (d0, d1)>
-#map1 = affine_map<(d0, d1, d2) -> (d0, d2)>
-#map2 = affine_map<(d0, d1, d2) -> (d2, d1)>
-#map3 = affine_map<(d0, d1) -> (d0, 0)>
-#map4 = affine_map<(d0, d1) -> (d0, d1)>
-
-
-!f32 = type tensor<!eltwise.f32>
-module {
-  func @mnist_mlp(%arg0: tensor<10x!eltwise.f32>, %arg1: tensor<512x10x!eltwise.f32>, %arg2: tensor<512x!eltwise.f32>, %arg3: tensor<512x512x!eltwise.f32>, %arg4: tensor<512x!eltwise.f32>, %arg5: tensor<784x512x!eltwise.f32>, %arg6: tensor<1x784x!eltwise.f32>) -> tensor<1x10x!eltwise.f32> {
-    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
-    %0 = tile.cion add, mul, %cst, %arg6, %arg5 {idxs = ["i", "j", "k"], sink = #map0, srcs = [#map1, #map2]} : !f32, tensor<1x784x!eltwise.f32>, tensor<784x512x!eltwise.f32> -> tensor<1x512x!eltwise.f32>
-    %1 = "eltwise.add"(%0, %arg4) : (tensor<1x512x!eltwise.f32>, tensor<512x!eltwise.f32>) -> tensor<1x512x!eltwise.f32>
-    %2 = "eltwise.cmp_lt"(%1, %cst) : (tensor<1x512x!eltwise.f32>, !f32) -> tensor<1x512x!eltwise.u1>
-    %3 = "eltwise.select"(%2, %cst, %1) : (tensor<1x512x!eltwise.u1>, !f32, tensor<1x512x!eltwise.f32>) -> tensor<1x512x!eltwise.f32>
-    %4 = tile.cion add, mul, %cst, %3, %arg3 {idxs = ["i", "j", "k"], sink = #map0, srcs = [#map1, #map2]} : !f32, tensor<1x512x!eltwise.f32>, tensor<512x512x!eltwise.f32> -> tensor<1x512x!eltwise.f32>
-    %5 = "eltwise.add"(%4, %arg2) : (tensor<1x512x!eltwise.f32>, tensor<512x!eltwise.f32>) -> tensor<1x512x!eltwise.f32>
-    %6 = "eltwise.cmp_lt"(%5, %cst) : (tensor<1x512x!eltwise.f32>, !f32) -> tensor<1x512x!eltwise.u1>
-    %7 = "eltwise.select"(%6, %cst, %5) : (tensor<1x512x!eltwise.u1>, !f32, tensor<1x512x!eltwise.f32>) -> tensor<1x512x!eltwise.f32>
-    %8 = tile.cion add, mul, %cst, %7, %arg1 {idxs = ["i", "j", "k"], sink = #map0, srcs = [#map1, #map2]} : !f32, tensor<1x512x!eltwise.f32>, tensor<512x10x!eltwise.f32> -> tensor<1x10x!eltwise.f32>
-    %9 = "eltwise.add"(%8, %arg0) : (tensor<1x10x!eltwise.f32>, tensor<10x!eltwise.f32>) -> tensor<1x10x!eltwise.f32>
-    %10 = tile.cion max, none, %cst, %9 {sink = #map3, srcs = [#map4]} : !f32, tensor<1x10x!eltwise.f32> -> tensor<1x1x!eltwise.f32>
-    %11 = "eltwise.sub"(%9, %10) : (tensor<1x10x!eltwise.f32>, tensor<1x1x!eltwise.f32>) -> tensor<1x10x!eltwise.f32>
-    %12 = "eltwise.exp"(%11) : (tensor<1x10x!eltwise.f32>) -> tensor<1x10x!eltwise.f32>
-    %13 = tile.cion add, none, %cst, %12 {sink = #map3, srcs = [#map4]} : !f32, tensor<1x10x!eltwise.f32> -> tensor<1x1x!eltwise.f32>
-    %14 = "eltwise.div"(%12, %13) : (tensor<1x10x!eltwise.f32>, tensor<1x1x!eltwise.f32>) -> tensor<1x10x!eltwise.f32>
-    return %14 : tensor<1x10x!eltwise.f32>
-  }
-}
-)#"));
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.MnistMlp
+  // CHECK: func @mnist_mlp
+  // CHECK-DAG: %[[cst:.*]] = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
+  // CHECK-DAG: %[[cst0:.*]] = "eltwise.sconst"() {value = 0xFFF0000000000000 : f64} : () -> !f32
+  // CHECK: %[[X0:.*]] = tile.cion add, mul, %[[cst]], %{{.*}}, %{{.*}} {idxs = ["i", "j", "k"], sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : !f32, tensor<1x784x!eltwise.f32>, tensor<784x512x!eltwise.f32> -> tensor<1x512x!eltwise.f32>
+  // CHECK: %[[X1:.*]] = "eltwise.add"(%{{.*}}, %{{.*}}) : (tensor<1x512x!eltwise.f32>, tensor<512x!eltwise.f32>) -> tensor<1x512x!eltwise.f32>
+  // CHECK: %[[X2:.*]] = "eltwise.cmp_lt"(%{{.*}}, %[[cst]]) : (tensor<1x512x!eltwise.f32>, !f32) -> tensor<1x512x!eltwise.u1>
+  // CHECK: %[[X3:.*]] = "eltwise.select"(%{{.*}}, %[[cst]], %{{.*}}) : (tensor<1x512x!eltwise.u1>, !f32, tensor<1x512x!eltwise.f32>) -> tensor<1x512x!eltwise.f32>
+  // CHECK: %[[X4:.*]] = tile.cion add, mul, %[[cst]], %{{.*}}, %{{.*}} {idxs = ["i", "j", "k"], sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : !f32, tensor<1x512x!eltwise.f32>, tensor<512x512x!eltwise.f32> -> tensor<1x512x!eltwise.f32>
+  // CHECK: %[[X5:.*]] = "eltwise.add"(%{{.*}}, %{{.*}}) : (tensor<1x512x!eltwise.f32>, tensor<512x!eltwise.f32>) -> tensor<1x512x!eltwise.f32>
+  // CHECK: %[[X6:.*]] = "eltwise.cmp_lt"(%{{.*}}, %[[cst]]) : (tensor<1x512x!eltwise.f32>, !f32) -> tensor<1x512x!eltwise.u1>
+  // CHECK: %[[X7:.*]] = "eltwise.select"(%{{.*}}, %[[cst]], %{{.*}}) : (tensor<1x512x!eltwise.u1>, !f32, tensor<1x512x!eltwise.f32>) -> tensor<1x512x!eltwise.f32>
+  // CHECK: %[[X8:.*]] = tile.cion add, mul, %[[cst]], %{{.*}}, %{{.*}} {idxs = ["i", "j", "k"], sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : !f32, tensor<1x512x!eltwise.f32>, tensor<512x10x!eltwise.f32> -> tensor<1x10x!eltwise.f32>
+  // CHECK: %[[X9:.*]] = "eltwise.add"(%{{.*}}, %{{.*}}) : (tensor<1x10x!eltwise.f32>, tensor<10x!eltwise.f32>) -> tensor<1x10x!eltwise.f32>
+  // CHECK: %[[X10:.*]] = tile.cion max, none, %[[cst0]], %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}]} : !f32, tensor<1x10x!eltwise.f32> -> tensor<1x1x!eltwise.f32>
+  // CHECK: %[[X11:.*]] = "eltwise.sub"(%{{.*}}, %{{.*}}) : (tensor<1x10x!eltwise.f32>, tensor<1x1x!eltwise.f32>) -> tensor<1x10x!eltwise.f32>
+  // CHECK: %[[X12:.*]] = "eltwise.exp"(%{{.*}}) : (tensor<1x10x!eltwise.f32>) -> tensor<1x10x!eltwise.f32>
+  // CHECK: %[[X13:.*]] = tile.cion add, none, %[[cst]], %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}]} : !f32, tensor<1x10x!eltwise.f32> -> tensor<1x1x!eltwise.f32>
+  // CHECK: %[[X14:.*]] = "eltwise.div"(%{{.*}}, %{{.*}}) : (tensor<1x10x!eltwise.f32>, tensor<1x1x!eltwise.f32>) -> tensor<1x10x!eltwise.f32>
+  // CHECK: return %{{.*}} : tensor<1x10x!eltwise.f32>
+  // clang-format on
   runProgram(program);
 }
 
@@ -505,21 +472,13 @@ TEST_F(CppEdsl, Convolution) {
   auto I = Placeholder(DType::FLOAT32, {1, 224, 224, 1});
   auto K = Placeholder(DType::FLOAT32, {3, 3, 1, 32});
   auto program = makeProgram("convolution", {Convolution2(I, K)});
-  EXPECT_THAT(program, Eq(R"#(
-#map0 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
-#map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4 - 1, d2 + d5 - 1, d6)>
-#map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d5, d6, d3)>
-
-
-!f32 = type tensor<!eltwise.f32>
-module {
-  func @convolution(%arg0: tensor<3x3x1x32x!eltwise.f32>, %arg1: tensor<1x224x224x1x!eltwise.f32>) -> tensor<1x222x222x32x!eltwise.f32> {
-    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
-    %0 = tile.cion add, mul, %cst, %arg1, %arg0 {sink = #map0, srcs = [#map1, #map2]} : !f32, tensor<1x224x224x1x!eltwise.f32>, tensor<3x3x1x32x!eltwise.f32> -> tensor<1x222x222x32x!eltwise.f32>
-    return %0 : tensor<1x222x222x32x!eltwise.f32>
-  }
-}
-)#"));
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.Convolution
+  // CHECK: func @convolution
+  // CHECK: %[[cst:.*]] = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
+  // CHECK: %{{.*}} = tile.cion add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : !f32, tensor<1x224x224x1x!eltwise.f32>, tensor<3x3x1x32x!eltwise.f32> -> tensor<1x222x222x32x!eltwise.f32>
+  // CHECK: return %{{.*}} : tensor<1x222x222x32x!eltwise.f32>
+  // clang-format on
   runProgram(program);
 }
 
@@ -571,51 +530,37 @@ TEST_F(CppEdsl, MnistCnn) {
   auto bias4 = Placeholder(DType::FLOAT32, {kNumClasses});
   auto dense2 = Softmax(Dot(dense1, kernel4) + bias4);
   auto program = ProgramBuilder("mnist_cnn", {dense2}).target("").compile();
-  EXPECT_THAT(program, Eq(R"#(
-#map0 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
-#map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4 - 1, d2 + d5 - 1, d6)>
-#map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d5, d6, d3)>
-#map3 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>
-#map4 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1 * 2 + d4, d2 * 2 + d5, d3)>
-#map5 = affine_map<(d0, d1, d2) -> (d0, d1)>
-#map6 = affine_map<(d0, d1, d2) -> (d0, d2)>
-#map7 = affine_map<(d0, d1, d2) -> (d2, d1)>
-#map8 = affine_map<(d0, d1) -> (d0, 0)>
-#map9 = affine_map<(d0, d1) -> (d0, d1)>
-
-#set0 = affine_set<(d0, d1, d2, d3, d4, d5) : (d4 >= 0, -d4 + 1 >= 0, d5 >= 0, -d5 + 1 >= 0)>
-
-!f32 = type tensor<!eltwise.f32>
-module {
-  func @mnist_cnn(%arg0: tensor<100x!eltwise.f32>, %arg1: tensor<128x100x!eltwise.f32>, %arg2: tensor<128x!eltwise.f32>, %arg3: tensor<12100x128x!eltwise.f32>, %arg4: tensor<64x!eltwise.f32>, %arg5: tensor<3x3x32x64x!eltwise.f32>, %arg6: tensor<32x!eltwise.f32>, %arg7: tensor<3x3x1x32x!eltwise.f32>, %arg8: tensor<1x224x224x1x!eltwise.f32>) -> tensor<1x100x!eltwise.f32> {
-    %c12100 = tile.affine_const 12100
-    %c1 = tile.affine_const 1
-    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
-    %0 = tile.cion add, mul, %cst, %arg8, %arg7 {sink = #map0, srcs = [#map1, #map2]} : !f32, tensor<1x224x224x1x!eltwise.f32>, tensor<3x3x1x32x!eltwise.f32> -> tensor<1x222x222x32x!eltwise.f32>
-    %1 = "eltwise.add"(%0, %arg6) : (tensor<1x222x222x32x!eltwise.f32>, tensor<32x!eltwise.f32>) -> tensor<1x222x222x32x!eltwise.f32>
-    %2 = "eltwise.cmp_lt"(%1, %cst) : (tensor<1x222x222x32x!eltwise.f32>, !f32) -> tensor<1x222x222x32x!eltwise.u1>
-    %3 = "eltwise.select"(%2, %cst, %1) : (tensor<1x222x222x32x!eltwise.u1>, !f32, tensor<1x222x222x32x!eltwise.f32>) -> tensor<1x222x222x32x!eltwise.f32>
-    %4 = tile.cion add, mul, %cst, %3, %arg5 {sink = #map0, srcs = [#map1, #map2]} : !f32, tensor<1x222x222x32x!eltwise.f32>, tensor<3x3x32x64x!eltwise.f32> -> tensor<1x220x220x64x!eltwise.f32>
-    %5 = "eltwise.add"(%4, %arg4) : (tensor<1x220x220x64x!eltwise.f32>, tensor<64x!eltwise.f32>) -> tensor<1x220x220x64x!eltwise.f32>
-    %6 = "eltwise.cmp_lt"(%5, %cst) : (tensor<1x220x220x64x!eltwise.f32>, !f32) -> tensor<1x220x220x64x!eltwise.u1>
-    %7 = "eltwise.select"(%6, %cst, %5) : (tensor<1x220x220x64x!eltwise.u1>, !f32, tensor<1x220x220x64x!eltwise.f32>) -> tensor<1x220x220x64x!eltwise.f32>
-    %8 = tile.cion max, none, %cst, %7 {cons = #set0, sink = #map3, srcs = [#map4]} : !f32, tensor<1x220x220x64x!eltwise.f32> -> tensor<1x110x110x64x!eltwise.f32>
-    %9 = "tile.reshape"(%8, %c1, %c12100) : (tensor<1x110x110x64x!eltwise.f32>, index, index) -> tensor<1x12100x!eltwise.f32>
-    %10 = tile.cion add, mul, %cst, %9, %arg3 {idxs = ["i", "j", "k"], sink = #map5, srcs = [#map6, #map7]} : !f32, tensor<1x12100x!eltwise.f32>, tensor<12100x128x!eltwise.f32> -> tensor<1x128x!eltwise.f32>
-    %11 = "eltwise.add"(%10, %arg2) : (tensor<1x128x!eltwise.f32>, tensor<128x!eltwise.f32>) -> tensor<1x128x!eltwise.f32>
-    %12 = "eltwise.cmp_lt"(%11, %cst) : (tensor<1x128x!eltwise.f32>, !f32) -> tensor<1x128x!eltwise.u1>
-    %13 = "eltwise.select"(%12, %cst, %11) : (tensor<1x128x!eltwise.u1>, !f32, tensor<1x128x!eltwise.f32>) -> tensor<1x128x!eltwise.f32>
-    %14 = tile.cion add, mul, %cst, %13, %arg1 {idxs = ["i", "j", "k"], sink = #map5, srcs = [#map6, #map7]} : !f32, tensor<1x128x!eltwise.f32>, tensor<128x100x!eltwise.f32> -> tensor<1x100x!eltwise.f32>
-    %15 = "eltwise.add"(%14, %arg0) : (tensor<1x100x!eltwise.f32>, tensor<100x!eltwise.f32>) -> tensor<1x100x!eltwise.f32>
-    %16 = tile.cion max, none, %cst, %15 {sink = #map8, srcs = [#map9]} : !f32, tensor<1x100x!eltwise.f32> -> tensor<1x1x!eltwise.f32>
-    %17 = "eltwise.sub"(%15, %16) : (tensor<1x100x!eltwise.f32>, tensor<1x1x!eltwise.f32>) -> tensor<1x100x!eltwise.f32>
-    %18 = "eltwise.exp"(%17) : (tensor<1x100x!eltwise.f32>) -> tensor<1x100x!eltwise.f32>
-    %19 = tile.cion add, none, %cst, %18 {sink = #map8, srcs = [#map9]} : !f32, tensor<1x100x!eltwise.f32> -> tensor<1x1x!eltwise.f32>
-    %20 = "eltwise.div"(%18, %19) : (tensor<1x100x!eltwise.f32>, tensor<1x1x!eltwise.f32>) -> tensor<1x100x!eltwise.f32>
-    return %20 : tensor<1x100x!eltwise.f32>
-  }
-}
-)#"));
+  std::cout << program << std::endl;
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.MnistCnn
+  // CHECK: func @mnist_cnn
+  // CHECK-DAG: %[[c12100:.*]] = tile.affine_const 12100
+  // CHECK-DAG: %[[cst:.*]] = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
+  // CHECK-DAG: %[[c1:.*]] = tile.affine_const 1
+  // CHECK-DAG: %[[cst_0:.*]] = "eltwise.sconst"() {value = 0xFFF0000000000000 : f64} : () -> !f32
+  // CHECK: %{{.*}} = tile.cion add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : !f32, tensor<1x224x224x1x!eltwise.f32>, tensor<3x3x1x32x!eltwise.f32> -> tensor<1x222x222x32x!eltwise.f32>
+  // CHECK: %{{.*}} = "eltwise.add"(%{{.*}}, %{{.*}}) : (tensor<1x222x222x32x!eltwise.f32>, tensor<32x!eltwise.f32>) -> tensor<1x222x222x32x!eltwise.f32>
+  // CHECK: %{{.*}} = "eltwise.cmp_lt"(%{{.*}}, %[[cst]]) : (tensor<1x222x222x32x!eltwise.f32>, !f32) -> tensor<1x222x222x32x!eltwise.u1>
+  // CHECK: %{{.*}} = "eltwise.select"(%{{.*}}, %[[cst]], %{{.*}}) : (tensor<1x222x222x32x!eltwise.u1>, !f32, tensor<1x222x222x32x!eltwise.f32>) -> tensor<1x222x222x32x!eltwise.f32>
+  // CHECK: %{{.*}} = tile.cion add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : !f32, tensor<1x222x222x32x!eltwise.f32>, tensor<3x3x32x64x!eltwise.f32> -> tensor<1x220x220x64x!eltwise.f32>
+  // CHECK: %{{.*}} = "eltwise.add"(%{{.*}}, %{{.*}}) : (tensor<1x220x220x64x!eltwise.f32>, tensor<64x!eltwise.f32>) -> tensor<1x220x220x64x!eltwise.f32>
+  // CHECK: %{{.*}} = "eltwise.cmp_lt"(%{{.*}}, %[[cst]]) : (tensor<1x220x220x64x!eltwise.f32>, !f32) -> tensor<1x220x220x64x!eltwise.u1>
+  // CHECK: %{{.*}} = "eltwise.select"(%{{.*}}, %[[cst]], %{{.*}}) : (tensor<1x220x220x64x!eltwise.u1>, !f32, tensor<1x220x220x64x!eltwise.f32>) -> tensor<1x220x220x64x!eltwise.f32>
+  // CHECK: %{{.*}} = tile.cion max, none, %[[cst_0]], %{{.*}} {cons = #set{{[0-9]+}}, sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}]} : !f32, tensor<1x220x220x64x!eltwise.f32> -> tensor<1x110x110x64x!eltwise.f32>
+  // CHECK: %{{.*}} = "tile.reshape"(%{{.*}}, %[[c1]], %[[c12100]]) : (tensor<1x110x110x64x!eltwise.f32>, index, index) -> tensor<1x12100x!eltwise.f32>
+  // CHECK: %{{.*}} = tile.cion add, mul, %[[cst]], %{{.*}}, %{{.*}} {idxs = ["i", "j", "k"], sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : !f32, tensor<1x12100x!eltwise.f32>, tensor<12100x128x!eltwise.f32> -> tensor<1x128x!eltwise.f32>
+  // CHECK: %{{.*}} = "eltwise.add"(%{{.*}}, %{{.*}}) : (tensor<1x128x!eltwise.f32>, tensor<128x!eltwise.f32>) -> tensor<1x128x!eltwise.f32>
+  // CHECK: %{{.*}} = "eltwise.cmp_lt"(%{{.*}}, %[[cst]]) : (tensor<1x128x!eltwise.f32>, !f32) -> tensor<1x128x!eltwise.u1>
+  // CHECK: %{{.*}} = "eltwise.select"(%{{.*}}, %[[cst]], %{{.*}}) : (tensor<1x128x!eltwise.u1>, !f32, tensor<1x128x!eltwise.f32>) -> tensor<1x128x!eltwise.f32>
+  // CHECK: %{{.*}} = tile.cion add, mul, %[[cst]], %{{.*}}, %{{.*}} {idxs = ["i", "j", "k"], sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : !f32, tensor<1x128x!eltwise.f32>, tensor<128x100x!eltwise.f32> -> tensor<1x100x!eltwise.f32>
+  // CHECK: %{{.*}} = "eltwise.add"(%{{.*}}, %{{.*}}) : (tensor<1x100x!eltwise.f32>, tensor<100x!eltwise.f32>) -> tensor<1x100x!eltwise.f32>
+  // CHECK: %{{.*}} = tile.cion max, none,  %[[cst_0]], %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}]} : !f32, tensor<1x100x!eltwise.f32> -> tensor<1x1x!eltwise.f32>
+  // CHECK: %{{.*}} = "eltwise.sub"(%{{.*}}, %{{.*}}) : (tensor<1x100x!eltwise.f32>, tensor<1x1x!eltwise.f32>) -> tensor<1x100x!eltwise.f32>
+  // CHECK: %{{.*}} = "eltwise.exp"(%{{.*}}) : (tensor<1x100x!eltwise.f32>) -> tensor<1x100x!eltwise.f32>
+  // CHECK: %{{.*}} = tile.cion add, none, %[[cst]], %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}]} : !f32, tensor<1x100x!eltwise.f32> -> tensor<1x1x!eltwise.f32>
+  // CHECK: %{{.*}} = "eltwise.div"(%{{.*}}, %{{.*}}) : (tensor<1x100x!eltwise.f32>, tensor<1x1x!eltwise.f32>) -> tensor<1x100x!eltwise.f32>
+  // CHECK: return %{{.*}} : tensor<1x100x!eltwise.f32>
+  // clang-format on
   // TODO: error: failed to legalize operation 'tile.reshape'
   // runProgram(program);
 }
@@ -652,39 +597,32 @@ TEST_F(CppEdsl, LarsMomentum4d) {
   auto LR = Placeholder(LR_shape);
   auto R = LarsMomentum(X, Grad, Veloc, LR, 1. / 1024., 1. / 2048., 1. / 8.);
   auto program = makeProgram("lars_momentum4d", {std::get<0>(R), std::get<1>(R)});
-  EXPECT_THAT(program, Eq(R"#(
-#map0 = affine_map<() -> ()>
-#map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
-
-
-!f32 = type tensor<!eltwise.f32>
-module {
-  func @lars_momentum4d(%arg0: tensor<4x7x3x9x!eltwise.f32>, %arg1: tensor<4x7x3x9x!eltwise.f32>, %arg2: !f32, %arg3: tensor<4x7x3x9x!eltwise.f32>) -> (tensor<4x7x3x9x!eltwise.f32>, tensor<4x7x3x9x!eltwise.f32>) {
-    %cst = "eltwise.sconst"() {value = 1.250000e-01 : f64} : () -> !f32
-    %cst_0 = "eltwise.sconst"() {value = 9.765625E-4 : f64} : () -> !f32
-    %cst_1 = "eltwise.sconst"() {value = 4.8828125E-4 : f64} : () -> !f32
-    %cst_2 = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
-    %0 = "eltwise.mul"(%arg0, %cst_1) : (tensor<4x7x3x9x!eltwise.f32>, !f32) -> tensor<4x7x3x9x!eltwise.f32>
-    %1 = "eltwise.add"(%arg1, %0) : (tensor<4x7x3x9x!eltwise.f32>, tensor<4x7x3x9x!eltwise.f32>) -> tensor<4x7x3x9x!eltwise.f32>
-    %2 = "eltwise.mul"(%arg0, %arg0) : (tensor<4x7x3x9x!eltwise.f32>, tensor<4x7x3x9x!eltwise.f32>) -> tensor<4x7x3x9x!eltwise.f32>
-    %3 = tile.cion add, none, %cst_2, %2 {sink = #map0, srcs = [#map1]} : !f32, tensor<4x7x3x9x!eltwise.f32> -> !f32
-    %4 = "eltwise.sqrt"(%3) : (!f32) -> !f32
-    %5 = "eltwise.mul"(%4, %cst_1) : (!f32, !f32) -> !f32
-    %6 = "eltwise.mul"(%arg1, %arg1) : (tensor<4x7x3x9x!eltwise.f32>, tensor<4x7x3x9x!eltwise.f32>) -> tensor<4x7x3x9x!eltwise.f32>
-    %7 = tile.cion add, none, %cst_2, %6 {sink = #map0, srcs = [#map1]} : !f32, tensor<4x7x3x9x!eltwise.f32> -> !f32
-    %8 = "eltwise.sqrt"(%7) : (!f32) -> !f32
-    %9 = "eltwise.add"(%8, %5) : (!f32, !f32) -> !f32
-    %10 = "eltwise.mul"(%arg2, %cst_0) : (!f32, !f32) -> !f32
-    %11 = "eltwise.mul"(%10, %4) : (!f32, !f32) -> !f32
-    %12 = "eltwise.div"(%11, %9) : (!f32, !f32) -> !f32
-    %13 = "eltwise.mul"(%12, %1) : (!f32, tensor<4x7x3x9x!eltwise.f32>) -> tensor<4x7x3x9x!eltwise.f32>
-    %14 = "eltwise.mul"(%arg3, %cst) : (tensor<4x7x3x9x!eltwise.f32>, !f32) -> tensor<4x7x3x9x!eltwise.f32>
-    %15 = "eltwise.add"(%14, %13) : (tensor<4x7x3x9x!eltwise.f32>, tensor<4x7x3x9x!eltwise.f32>) -> tensor<4x7x3x9x!eltwise.f32>
-    %16 = "eltwise.sub"(%arg0, %15) : (tensor<4x7x3x9x!eltwise.f32>, tensor<4x7x3x9x!eltwise.f32>) -> tensor<4x7x3x9x!eltwise.f32>
-    return %16, %15 : tensor<4x7x3x9x!eltwise.f32>, tensor<4x7x3x9x!eltwise.f32>
-  }
-}
-)#"));
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.LarsMomentum4d
+  // CHECK: func @lars_momentum4d
+  // CHECK-DAG: %[[cst:.*]] = "eltwise.sconst"() {value = 1.250000e-01 : f64} : () -> !f32
+  // CHECK-DAG: %[[cst_0:.*]] = "eltwise.sconst"() {value = 9.765625E-4 : f64} : () -> !f32
+  // CHECK-DAG: %[[cst_1:.*]] = "eltwise.sconst"() {value = 4.8828125E-4 : f64} : () -> !f32
+  // CHECK-DAG: %[[cst_2:.*]] = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
+  // CHECK: %{{.*}} = "eltwise.mul"(%{{.*}}, %[[cst_1]]) : (tensor<4x7x3x9x!eltwise.f32>, !f32) -> tensor<4x7x3x9x!eltwise.f32>
+  // CHECK: %{{.*}} = "eltwise.add"(%{{.*}}, %{{.*}}) : (tensor<4x7x3x9x!eltwise.f32>, tensor<4x7x3x9x!eltwise.f32>) -> tensor<4x7x3x9x!eltwise.f32>
+  // CHECK: %{{.*}} = "eltwise.mul"(%{{.*}}, %{{.*}}) : (tensor<4x7x3x9x!eltwise.f32>, tensor<4x7x3x9x!eltwise.f32>) -> tensor<4x7x3x9x!eltwise.f32>
+  // CHECK: %{{.*}} = tile.cion add, none, %[[cst_2]], %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}]} : !f32, tensor<4x7x3x9x!eltwise.f32> -> !f32
+  // CHECK: %{{.*}} = "eltwise.sqrt"(%{{.*}}) : (!f32) -> !f32
+  // CHECK: %{{.*}} = "eltwise.mul"(%{{.*}}, %[[cst_1]]) : (!f32, !f32) -> !f32
+  // CHECK: %{{.*}} = "eltwise.mul"(%{{.*}}, %{{.*}}) : (tensor<4x7x3x9x!eltwise.f32>, tensor<4x7x3x9x!eltwise.f32>) -> tensor<4x7x3x9x!eltwise.f32>
+  // CHECK: %{{.*}} = tile.cion add, none, %[[cst_2]], %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}]} : !f32, tensor<4x7x3x9x!eltwise.f32> -> !f32
+  // CHECK: %{{.*}} = "eltwise.sqrt"(%{{.*}}) : (!f32) -> !f32
+  // CHECK: %{{.*}} = "eltwise.add"(%{{.*}}, %{{.*}}) : (!f32, !f32) -> !f32
+  // CHECK: %{{.*}} = "eltwise.mul"(%{{.*}}, %[[cst_0]]) : (!f32, !f32) -> !f32
+  // CHECK: %{{.*}} = "eltwise.mul"(%{{.*}}, %{{.*}}) : (!f32, !f32) -> !f32
+  // CHECK: %{{.*}} = "eltwise.div"(%{{.*}}, %{{.*}}) : (!f32, !f32) -> !f32
+  // CHECK: %{{.*}} = "eltwise.mul"(%{{.*}}, %{{.*}}) : (!f32, tensor<4x7x3x9x!eltwise.f32>) -> tensor<4x7x3x9x!eltwise.f32>
+  // CHECK: %{{.*}} = "eltwise.mul"(%{{.*}}, %[[cst]]) : (tensor<4x7x3x9x!eltwise.f32>, !f32) -> tensor<4x7x3x9x!eltwise.f32>
+  // CHECK: %{{.*}} = "eltwise.add"(%{{.*}}, %{{.*}}) : (tensor<4x7x3x9x!eltwise.f32>, tensor<4x7x3x9x!eltwise.f32>) -> tensor<4x7x3x9x!eltwise.f32>
+  // CHECK: %{{.*}} = "eltwise.sub"(%{{.*}}, %{{.*}}) : (tensor<4x7x3x9x!eltwise.f32>, tensor<4x7x3x9x!eltwise.f32>) -> tensor<4x7x3x9x!eltwise.f32>
+  // CHECK: return %{{.*}}, %{{.*}} : tensor<4x7x3x9x!eltwise.f32>, tensor<4x7x3x9x!eltwise.f32>
+  // clang-format on
   runProgram(program);
 }
 
@@ -698,21 +636,13 @@ TEST_F(CppEdsl, RepeatElements) {
   O.add_constraint(k < 3);
   O.no_reduce();
   auto program = makeProgram("repeat_elts", {O});
-  EXPECT_THAT(program, Eq(R"#(
-#map0 = affine_map<(d0, d1, d2, d3) -> (d0, d1 * 3 + d2, d3)>
-#map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
-
-#set0 = affine_set<(d0, d1, d2, d3) : (d2 >= 0, -d2 + 2 >= 0)>
-
-!f32 = type tensor<!eltwise.f32>
-module {
-  func @repeat_elts(%arg0: tensor<10x10x10x!eltwise.f32>) -> tensor<10x30x10x!eltwise.f32> {
-    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
-    %0 = tile.cion assign, none, %cst, %arg0 {cons = #set0, no_reduce, sink = #map0, srcs = [#map1]} : !f32, tensor<10x10x10x!eltwise.f32> -> tensor<10x30x10x!eltwise.f32>
-    return %0 : tensor<10x30x10x!eltwise.f32>
-  }
-}
-)#"));
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.RepeatElements
+  // CHECK: func @repeat_elts
+  // CHECK: %[[cst:.*]] = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
+  // CHECK: %{{.*}} = tile.cion assign, none, %[[cst]], %{{.*}} {cons = #set{{[0-9]+}}, no_reduce, sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}]} : !f32, tensor<10x10x10x!eltwise.f32> -> tensor<10x30x10x!eltwise.f32>
+  // CHECK: return %{{.*}} : tensor<10x30x10x!eltwise.f32>
+  // clang-format on
   runProgram(program);
 }
 
@@ -726,18 +656,12 @@ TEST_F(CppEdsl, UseDefault) {
   O(b, 3, i1, i2) = I(b, i1, i2);
   O.use_default(P);
   auto program = makeProgram("use_default", {O});
-  EXPECT_THAT(program, Eq(R"#(
-#map0 = affine_map<(d0, d1, d2) -> (d0, 3, d1, d2)>
-#map1 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
-
-
-module {
-  func @use_default(%arg0: tensor<1x10x10x!eltwise.f32>, %arg1: tensor<1x7x10x10x!eltwise.f32>) -> tensor<1x7x10x10x!eltwise.f32> {
-    %0 = tile.cion assign, none, %arg1, %arg0 {sink = #map0, srcs = [#map1]} : tensor<1x7x10x10x!eltwise.f32>, tensor<1x10x10x!eltwise.f32> -> tensor<1x7x10x10x!eltwise.f32>
-    return %0 : tensor<1x7x10x10x!eltwise.f32>
-  }
-}
-)#"));
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.UseDefault
+  // CHECK: func @use_default
+  // CHECK: %{{.*}} = tile.cion assign, none, %{{.*}}, %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}]} : tensor<1x7x10x10x!eltwise.f32>, tensor<1x10x10x!eltwise.f32> -> tensor<1x7x10x10x!eltwise.f32>
+  // CHECK: return %{{.*}} : tensor<1x7x10x10x!eltwise.f32>
+  // clang-format on
   runProgram(program);
 }
 
@@ -761,29 +685,20 @@ TEST_F(CppEdsl, ArgMax) {
   auto X = ArgMax(I);
   auto program = makeProgram("arg_max", {X});
   EXPECT_THAT(X.compute_shape(), Eq(LogicalShape(DType::UINT32, {1, 10})));
-  EXPECT_THAT(program, Eq(R"#(
-#map0 = affine_map<(d0) -> (d0)>
-#map1 = affine_map<() -> ()>
-#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
-#map3 = affine_map<(d0, d1, d2) -> (d0, d2, d1)>
-#map4 = affine_map<(d0, d1, d2) -> (d2)>
-
-
-!f32 = type tensor<!eltwise.f32>
-!i32 = type tensor<!eltwise.i32>
-module {
-  func @arg_max(%arg0: tensor<1x10x10x!eltwise.f32>) -> tensor<1x10x!eltwise.u32> {
-    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
-    %c1 = "eltwise.sconst"() {value = 1 : i64} : () -> !i32
-    %0 = tile.cion assign, none, %cst, %c1 {sink = #map0, srcs = [#map1]} : !f32, !i32 -> tensor<10x!eltwise.i32>
-    %1 = "tile.index"(%0) {dim = 0 : i64} : (tensor<10x!eltwise.i32>) -> tensor<10x!eltwise.i32>
-    %2 = tile.cion max, none, %cst, %arg0 {sink = #map2, srcs = [#map3]} : !f32, tensor<1x10x10x!eltwise.f32> -> tensor<1x10x!eltwise.f32>
-    %3 = tile.cion max, cond, %cst, %arg0, %2, %1 {sink = #map2, srcs = [#map3, #map2, #map4]} : !f32, tensor<1x10x10x!eltwise.f32>, tensor<1x10x!eltwise.f32>, tensor<10x!eltwise.i32> -> tensor<1x10x!eltwise.i32>
-    %4 = "eltwise.cast"(%3) : (tensor<1x10x!eltwise.i32>) -> tensor<1x10x!eltwise.u32>
-    return %4 : tensor<1x10x!eltwise.u32>
-  }
-}
-)#"));
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.ArgMax
+  // CHECK: func @arg_max
+  // CHECK-DAG: %[[i64_min:.*]] = "eltwise.sconst"() {value = -9223372036854775808 : i64} : () -> !i32
+  // CHECK-DAG: %[[cst:.*]] = "eltwise.sconst"() {value = 0xFFF0000000000000 : f64} : () -> !f32
+  // CHECK-DAG: %[[c0:.*]] = "eltwise.sconst"() {value = 0 : i64} : () -> !i32
+  // CHECK-DAG: %[[c1:.*]] = "eltwise.sconst"() {value = 1 : i64} : () -> !i32
+  // CHECK: %{{.*}} = tile.cion assign, none, %[[c0]], %[[c1]] {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}]} : !i32, !i32 -> tensor<10x!eltwise.i32>
+  // CHECK: %{{.*}} = "tile.index"(%{{.*}}) {dim = 0 : i64} : (tensor<10x!eltwise.i32>) -> tensor<10x!eltwise.i32>
+  // CHECK: %{{.*}} = tile.cion max, none, %[[cst]], %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}]} : !f32, tensor<1x10x10x!eltwise.f32> -> tensor<1x10x!eltwise.f32>
+  // CHECK: %{{.*}} = tile.cion max, cond, %[[i64_min]], %{{.*}}, %{{.*}}, %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}, #map{{[0-9]+}}]} : !i32, tensor<1x10x10x!eltwise.f32>, tensor<1x10x!eltwise.f32>, tensor<10x!eltwise.i32> -> tensor<1x10x!eltwise.i32>
+  // CHECK: %{{.*}} = "eltwise.cast"(%{{.*}}) : (tensor<1x10x!eltwise.i32>) -> tensor<1x10x!eltwise.u32>
+  // CHECK: return %{{.*}} : tensor<1x10x!eltwise.u32>
+  // clang-format on
   runProgram(program);
 }
 
@@ -838,16 +753,14 @@ TEST_F(CppEdsl, UniqueNames) {
   auto C0 = Placeholder(shape, "C");
   auto C1 = Placeholder(shape, "C");
   auto program = makeProgram("unique_names", {A + B + C0 + C1});
-  EXPECT_THAT(program, Eq(R"#(
-module {
-  func @unique_names(%arg0: tensor<1x!eltwise.f32> {tile.name = "C"}, %arg1: tensor<1x!eltwise.f32> {tile.name = "C_0"}, %arg2: tensor<1x!eltwise.f32> {tile.name = "B"}, %arg3: tensor<1x!eltwise.f32> {tile.name = "A"}) -> tensor<1x!eltwise.f32> {
-    %0 = "eltwise.add"(%arg3, %arg2) : (tensor<1x!eltwise.f32>, tensor<1x!eltwise.f32>) -> tensor<1x!eltwise.f32>
-    %1 = "eltwise.add"(%0, %arg1) : (tensor<1x!eltwise.f32>, tensor<1x!eltwise.f32>) -> tensor<1x!eltwise.f32>
-    %2 = "eltwise.add"(%1, %arg0) : (tensor<1x!eltwise.f32>, tensor<1x!eltwise.f32>) -> tensor<1x!eltwise.f32>
-    return %2 : tensor<1x!eltwise.f32>
-  }
-}
-)#"));
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.UniqueNames
+  // CHECK: func @unique_names
+  // CHECK: %{{.*}} = "eltwise.add"(%{{.*}}, %{{.*}}) : (tensor<1x!eltwise.f32>, tensor<1x!eltwise.f32>) -> tensor<1x!eltwise.f32>
+  // CHECK: %{{.*}} = "eltwise.add"(%{{.*}}, %{{.*}}) : (tensor<1x!eltwise.f32>, tensor<1x!eltwise.f32>) -> tensor<1x!eltwise.f32>
+  // CHECK: %{{.*}} = "eltwise.add"(%{{.*}}, %{{.*}}) : (tensor<1x!eltwise.f32>, tensor<1x!eltwise.f32>) -> tensor<1x!eltwise.f32>
+  // CHECK: return %{{.*}} : tensor<1x!eltwise.f32>
+  // clang-format on
   runProgram(program);
 }
 
@@ -859,22 +772,15 @@ TEST_F(CppEdsl, GlobalMin) {
   O_Neg() >= Neg(i, j, k);
   auto O = -O_Neg;
   auto program = makeProgram("global_min", {O});
-  EXPECT_THAT(program, Eq(R"#(
-#map0 = affine_map<() -> ()>
-#map1 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
-
-
-!f32 = type tensor<!eltwise.f32>
-module {
-  func @global_min(%arg0: tensor<10x10x10x!eltwise.f32> {tile.name = "I"}) -> !f32 {
-    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
-    %0 = "eltwise.neg"(%arg0) : (tensor<10x10x10x!eltwise.f32>) -> tensor<10x10x10x!eltwise.f32>
-    %1 = tile.cion max, none, %cst, %0 {sink = #map0, srcs = [#map1]} : !f32, tensor<10x10x10x!eltwise.f32> -> !f32
-    %2 = "eltwise.neg"(%1) : (!f32) -> !f32
-    return %2 : !f32
-  }
-}
-)#"));
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.GlobalMin
+  // CHECK: func @global_min
+  // CHECK: %[[cst:.*]] = "eltwise.sconst"() {value = 0xFFF0000000000000 : f64} : () -> !f32
+  // CHECK: %{{.*}} = "eltwise.neg"(%{{.*}}) : (tensor<10x10x10x!eltwise.f32>) -> tensor<10x10x10x!eltwise.f32>
+  // CHECK: %{{.*}} = tile.cion max, none, %[[cst]], %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}]} : !f32, tensor<10x10x10x!eltwise.f32> -> !f32
+  // CHECK: %{{.*}} = "eltwise.neg"(%{{.*}}) : (!f32) -> !f32
+  // CHECK: return %{{.*}} : !f32
+  // clang-format on
   runProgram(program);
 }
 
@@ -887,21 +793,13 @@ TEST_F(CppEdsl, CumSum) {
   O(i) += I(k);
   O.add_constraint(i - k < N);
   auto program = makeProgram("cumsum", {O});
-  EXPECT_THAT(program, Eq(R"#(
-#map0 = affine_map<(d0, d1) -> (d0)>
-#map1 = affine_map<(d0, d1) -> (d1)>
-
-#set0 = affine_set<(d0, d1) : (d0 - d1 >= 0, -d0 + d1 + 9 >= 0)>
-
-!f32 = type tensor<!eltwise.f32>
-module {
-  func @cumsum(%arg0: tensor<10x!eltwise.f32> {tile.name = "I"}) -> tensor<10x!eltwise.f32> {
-    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
-    %0 = tile.cion add, none, %cst, %arg0 {cons = #set0, sink = #map0, srcs = [#map1]} : !f32, tensor<10x!eltwise.f32> -> tensor<10x!eltwise.f32>
-    return %0 : tensor<10x!eltwise.f32>
-  }
-}
-)#"));
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.CumSum
+  // CHECK: func @cumsum
+  // CHECK: %[[cst:.*]] = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
+  // CHECK: %{{.*}} = tile.cion add, none, %[[cst]], %{{.*}} {cons = #set{{[0-9]+}}, sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}]} : !f32, tensor<10x!eltwise.f32> -> tensor<10x!eltwise.f32>
+  // CHECK: return %{{.*}} : tensor<10x!eltwise.f32>
+  // clang-format on
   runProgram(program);
 }
 
@@ -948,21 +846,13 @@ TEST_F(CppEdsl, ComplexConv2d) {
   auto K = Placeholder(DType::FLOAT32, {3, 3, 3, 3, 32});
   auto O = ComplexConv2d(I, K, {2, 2}, {3, 3});
   auto program = makeProgram("complex_conv_2d", {O});
-  EXPECT_THAT(program, Eq(R"#(
-#map0 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4)>
-#map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1 * 2 + d5 * 3 - 2, d2 * 2 + d6 * 3 - 2, d3, d7)>
-#map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d5, d6, d3, d7, d4)>
-
-
-!f32 = type tensor<!eltwise.f32>
-module {
-  func @complex_conv_2d(%arg0: tensor<3x3x3x3x32x!eltwise.f32>, %arg1: tensor<1x224x224x3x3x!eltwise.f32>) -> tensor<1x112x112x3x32x!eltwise.f32> {
-    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
-    %0 = tile.cion add, mul, %cst, %arg1, %arg0 {sink = #map0, srcs = [#map1, #map2]} : !f32, tensor<1x224x224x3x3x!eltwise.f32>, tensor<3x3x3x3x32x!eltwise.f32> -> tensor<1x112x112x3x32x!eltwise.f32>
-    return %0 : tensor<1x112x112x3x32x!eltwise.f32>
-  }
-}
-)#"));
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.ComplexConv2d
+  // CHECK: func @complex_conv_2d
+  // CHECK: %[[cst:.*]] = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
+  // CHECK: %{{.*}} = tile.cion add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : !f32, tensor<1x224x224x3x3x!eltwise.f32>, tensor<3x3x3x3x32x!eltwise.f32> -> tensor<1x112x112x3x32x!eltwise.f32>
+  // CHECK: return %{{.*}} : tensor<1x112x112x3x32x!eltwise.f32>
+  // clang-format on
   runProgram(program);
 }
 
@@ -970,16 +860,13 @@ TEST_F(CppEdsl, Reciprocal) {
   auto A = Placeholder(DType::FLOAT32, {6}, "A");
   auto R = 1.0 / A;
   auto program = makeProgram("reciprocal", {R});
-  EXPECT_THAT(program, Eq(R"#(
-!f32 = type tensor<!eltwise.f32>
-module {
-  func @reciprocal(%arg0: tensor<6x!eltwise.f32> {tile.name = "A"}) -> tensor<6x!eltwise.f32> {
-    %cst = "eltwise.sconst"() {value = 1.000000e+00 : f64} : () -> !f32
-    %0 = "eltwise.div"(%cst, %arg0) : (!f32, tensor<6x!eltwise.f32>) -> tensor<6x!eltwise.f32>
-    return %0 : tensor<6x!eltwise.f32>
-  }
-}
-)#"));
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.Reciprocal
+  // CHECK: func @reciprocal
+  // CHECK: %[[cst:.*]] = "eltwise.sconst"() {value = 1.000000e+00 : f64} : () -> !f32
+  // CHECK: %{{.*}} = "eltwise.div"(%[[cst]], %{{.*}}) : (!f32, tensor<6x!eltwise.f32>) -> tensor<6x!eltwise.f32>
+  // CHECK: return %{{.*}} : tensor<6x!eltwise.f32>
+  // clang-format on
   std::vector<float> input = {1, 2, 4, 5, 8, 10};
   std::vector<float> expected = {1.0, 0.5, 0.25, 0.2, 0.125, 0.1};
   checkProgram(program, {{A, input}}, {{R, expected}});
@@ -991,6 +878,7 @@ module {
 //   auto O = Dot(A, B);
 //   auto grads = Gradient({A, B}, O);
 //   auto program = makeProgram("gradient_dot", {grads});
+// clang-format off
 //   EXPECT_THAT(program, Eq(R"(function (
 //   A[A_0, A_1],
 //   B[B_0, B_1]
@@ -1004,6 +892,7 @@ module {
 //   _X3[i, k : 100, 100] = +(_X1[i, j] * B[k, j]);
 // }
 // )"));
+// clang-format on
 //   runProgram(program);
 // }
 
@@ -1025,6 +914,7 @@ module {
 //   auto O = Max2Da0(D);
 //   auto grads = Gradient({A, B}, O);
 //   auto program = makeProgram("gradient_dot", {grads});
+// clang-format off
 //   EXPECT_THAT(program, Eq(R"(function (
 //   A[A_0, A_1],
 //   B[B_0, B_1]
@@ -1045,6 +935,7 @@ module {
 //   _X9 = add(_X7, _X8);
 // }
 // )"));
+// clang-format on
 //   runProgram(program);
 // }
 
@@ -1055,6 +946,7 @@ module {
 //   auto O = sqrt(C);
 //   auto grads = Gradient({A, B}, O);
 //   auto program = makeProgram("gradient_dot", {grads});
+// clang-format off
 //   EXPECT_THAT(program, Eq(R"(function (
 //   A[A_0, A_1],
 //   B[B_0, B_1]
@@ -1073,6 +965,7 @@ module {
 //   _X8[i, k : 100, 100] = +(_X6[i, j] * B[k, j]);
 // }
 // )"));
+// clang-format on
 //   runProgram(program);
 // }
 
@@ -1085,21 +978,13 @@ TEST_F(CppEdsl, DefractLong) {
   TensorIndex n, x0, x1, k0, k1, co, ci;
   O(n, x0, x1, co) += I(n, (x0 + k0 - 1) / 2, (x1 + k1 - 1) / 2, ci) * K(2 - k0, 2 - k1, co, ci);
   auto program = makeProgram("defract_long", {O});
-  EXPECT_THAT(program, Eq(R"#(
-#map0 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
-#map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, (d1 + d4 - 1) floordiv 2, (d2 + d5 - 1) floordiv 2, d6)>
-#map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (-d4 + 2, -d5 + 2, d3, d6)>
-
-
-!f32 = type tensor<!eltwise.f32>
-module {
-  func @defract_long(%arg0: tensor<1x3x3x1x!eltwise.f32> {tile.name = "K"}, %arg1: tensor<1x3x3x1x!eltwise.f32> {tile.name = "I"}) -> tensor<1x5x5x1x!eltwise.f32> {
-    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
-    %0 = tile.cion add, mul, %cst, %arg1, %arg0 {sink = #map0, srcs = [#map1, #map2]} : !f32, tensor<1x3x3x1x!eltwise.f32>, tensor<1x3x3x1x!eltwise.f32> -> tensor<1x5x5x1x!eltwise.f32>
-    return %0 : tensor<1x5x5x1x!eltwise.f32>
-  }
-}
-)#"));
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.DefractLong
+  // CHECK: func @defract_long
+  // CHECK: %[[cst:.*]] = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
+  // CHECK: %{{.*}} = tile.cion add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : !f32, tensor<1x3x3x1x!eltwise.f32>, tensor<1x3x3x1x!eltwise.f32> -> tensor<1x5x5x1x!eltwise.f32>
+  // CHECK: return %{{.*}} : tensor<1x5x5x1x!eltwise.f32>
+  // clang-format on
   runProgram(program);
 }
 
@@ -1116,18 +1001,15 @@ TEST_F(CppEdsl, Select) {
   auto I = Placeholder(DType::FLOAT32, {10, 20});
   auto O = select(I == 0, Tensor{0}, Tensor{1});
   auto program = makeProgram("select", {O});
-  EXPECT_THAT(program, Eq(R"#(
-!i32 = type tensor<!eltwise.i32>
-module {
-  func @select(%arg0: tensor<10x20x!eltwise.f32>) -> tensor<10x20x!eltwise.i32> {
-    %c0 = "eltwise.sconst"() {value = 0 : i64} : () -> !i32
-    %c1 = "eltwise.sconst"() {value = 1 : i64} : () -> !i32
-    %0 = "eltwise.cmp_eq"(%arg0, %c0) : (tensor<10x20x!eltwise.f32>, !i32) -> tensor<10x20x!eltwise.u1>
-    %1 = "eltwise.select"(%0, %c0, %c1) : (tensor<10x20x!eltwise.u1>, !i32, !i32) -> tensor<10x20x!eltwise.i32>
-    return %1 : tensor<10x20x!eltwise.i32>
-  }
-}
-)#"));
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.Select
+  // CHECK: func @select
+  // CHECK-DAG: %[[c0.*]] = "eltwise.sconst"() {value = 0 : i64} : () -> !i32
+  // CHECK-DAG: %[[c1:.*]] = "eltwise.sconst"() {value = 1 : i64} : () -> !i32
+  // CHECK: %{{.*}} = "eltwise.cmp_eq"(%{{.*}}, %[[c0]]) : (tensor<10x20x!eltwise.f32>, !i32) -> tensor<10x20x!eltwise.u1>
+  // CHECK: %{{.*}} = "eltwise.select"(%{{.*}}, %[[c0]], %[[c1]]) : (tensor<10x20x!eltwise.u1>, !i32, !i32) -> tensor<10x20x!eltwise.i32>
+  // CHECK: return %{{.*}} : tensor<10x20x!eltwise.i32>
+  // clang-format on
   runProgram(program);
 }
 
@@ -1135,14 +1017,12 @@ TEST_F(CppEdsl, Shape) {
   auto I = Placeholder(DType::FLOAT32, {10, 20});
   auto O = shape(I);
   auto program = makeProgram("shape", {O});
-  EXPECT_THAT(program, Eq(R"#(
-module {
-  func @shape(%arg0: tensor<10x20x!eltwise.f32>) -> tensor<2x!eltwise.i32> {
-    %0 = "tile.shape"(%arg0) : (tensor<10x20x!eltwise.f32>) -> tensor<2x!eltwise.i32>
-    return %0 : tensor<2x!eltwise.i32>
-  }
-}
-)#"));
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.Shape
+  // CHECK: func @shape
+  // CHECK: %{{.*}} = "tile.shape"(%{{.*}}) : (tensor<10x20x!eltwise.f32>) -> tensor<2x!eltwise.i32>
+  // CHECK: return %{{.*}} : tensor<2x!eltwise.i32>
+  // clang-format on
   exec::Binder binder(program);
   binder.compile()->run();
   IVLOG(1, "output: " << O.as_ptr());
@@ -1157,19 +1037,17 @@ TEST_F(CppEdsl, Prng) {
   auto S = Placeholder(DType::UINT32, {3, 2048});
   auto O = prng(S, {2, 3, 4, 5});
   auto program = ProgramBuilder("prng", {O}).target("").compile();
-  EXPECT_THAT(program, Eq(R"#(
-!i32 = type tensor<!eltwise.i32>
-module {
-  func @prng(%arg0: tensor<3x2048x!eltwise.u32>) -> (tensor<2x3x4x5x!eltwise.f32>, tensor<3x2048x!eltwise.u32>) {
-    %c2 = "eltwise.sconst"() {value = 2 : i64} : () -> !i32
-    %c3 = "eltwise.sconst"() {value = 3 : i64} : () -> !i32
-    %c4 = "eltwise.sconst"() {value = 4 : i64} : () -> !i32
-    %c5 = "eltwise.sconst"() {value = 5 : i64} : () -> !i32
-    %result, %new_state = "tile.prng"(%arg0, %c2, %c3, %c4, %c5) : (tensor<3x2048x!eltwise.u32>, !i32, !i32, !i32, !i32) -> (tensor<2x3x4x5x!eltwise.f32>, tensor<3x2048x!eltwise.u32>)
-    return %result, %new_state : tensor<2x3x4x5x!eltwise.f32>, tensor<3x2048x!eltwise.u32>
-  }
-}
-)#"));
+  std::cout << program << std::endl;
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.Prng
+  // CHECK: func @prng
+  // CHECK-DAG: %[[c2:.*]] = "eltwise.sconst"() {value = 2 : i64} : () -> !i32
+  // CHECK-DAG: %[[c3:.*]] = "eltwise.sconst"() {value = 3 : i64} : () -> !i32
+  // CHECK-DAG: %[[c4:.*]] = "eltwise.sconst"() {value = 4 : i64} : () -> !i32
+  // CHECK-DAG: %[[c5:.*]] = "eltwise.sconst"() {value = 5 : i64} : () -> !i32
+  // CHECK: %result, %new_state = "tile.prng"(%{{.*}}, %[[c2]], %[[c3]], %[[c4]], %[[c5]]) : (tensor<3x2048x!eltwise.u32>, !i32, !i32, !i32, !i32) -> (tensor<2x3x4x5x!eltwise.f32>, tensor<3x2048x!eltwise.u32>)
+  // CHECK: return %result, %new_state : tensor<2x3x4x5x!eltwise.f32>, tensor<3x2048x!eltwise.u32>
+  // clang-format on
   // TODO: lowering for PrngOp
   // runProgram(program);
 }

@@ -44,6 +44,8 @@ tool_names = [
     'pmlc-opt',
     'pmlc-tblgen',
     'pmlc-translate',
+    'cc_test',
+    'py_test',
 ]
 tools = [ToolSubst(s, unresolved='ignore') for s in tool_names]
 llvm_config.add_tool_substitutions(tools, tool_dirs)
