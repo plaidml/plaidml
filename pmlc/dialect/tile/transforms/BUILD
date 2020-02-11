@@ -8,6 +8,7 @@ plaidml_cc_library(
     name = "lib",
     srcs = [
         "contraction.cc",
+        "padding.cc",
     ],
     hdrs = [
         "contraction.h",

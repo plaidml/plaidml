@@ -799,7 +799,7 @@ void ComputeBoundsPass::runOnFunction() {
   });
 }
 
-std::unique_ptr<mlir::OpPassBase<mlir::FuncOp>> createComputeBoundsPass() {
+std::unique_ptr<mlir::Pass> createComputeBoundsPass() {
   return std::make_unique<ComputeBoundsPass>();
 }
 

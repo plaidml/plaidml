@@ -22,9 +22,9 @@ func @dot(%arg0: tensor<1x784x!eltwise.f32>, %arg1: tensor<784x512x!eltwise.f32>
 // CHECK: #map4 = affine_map<() -> (783, 0, 511)>
 // CHECK-LABEL: func @dot
 // CHECK: tile.cion
-// CHECK-SAME: lower_bounds = #map0
+// CHECK-SAME: lowerBounds = #map0
 // CHECK-SAME: sink = #map1
 // CHECK-SAME: srcs = [#map2, #map3]
-// CHECK-SAME: upper_bounds = #map4
+// CHECK-SAME: upperBounds = #map4
 
 // -----

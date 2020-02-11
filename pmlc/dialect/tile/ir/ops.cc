@@ -475,6 +475,10 @@ void ContractionOp::build(Builder *builder, OperationState &result,
   }
 }
 
+AffineMap ContractionOp::getSourceMap(unsigned i) {
+  return srcs().getValue()[i].cast<AffineMapAttr>().getValue();
+}
+
 void ContractionOp::setLowerBounds(ArrayRef<int64_t> bounds) {
   SmallVector<AffineExpr, 6> exprs;
   for (auto dim : bounds) {
