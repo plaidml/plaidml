@@ -1,10 +1,12 @@
-// Copyright 2019, Intel Corporation
+// Copyright 2020 Intel Corporation
 
 #include <iostream>
 
 #include "pmlc/dialect/pxa/transforms/tile.h"
 
 namespace pmlc::dialect::pxa {
+
+using mlir::AffineParallelOp;
 
 void performTiling(AffineParallelOp op, llvm::ArrayRef<int64_t> tileSizes) {
   auto builder = op.getBodyBuilder();

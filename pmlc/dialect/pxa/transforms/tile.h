@@ -1,4 +1,4 @@
-// Copyright 2019, Intel Corporation
+// Copyright 2020 Intel Corporation
 
 #pragma once
 
@@ -6,6 +6,7 @@
 
 namespace pmlc::dialect::pxa {
 
-void performTiling(AffineParallelOp op, llvm::ArrayRef<int64_t> tileSizes);
+void performTiling(mlir::AffineParallelOp op,
+                   llvm::ArrayRef<int64_t> tileSizes);
 
 } // namespace pmlc::dialect::pxa

@@ -1,4 +1,4 @@
-// Copyright 2020, Intel Corporation
+// Copyright 2020 Intel Corporation
 
 #include "pmlc/conversion/pxa_to_affine/pxa_to_affine.h"
 
@@ -15,10 +15,10 @@
 #include "pmlc/util/util.h"
 
 namespace pmlc::conversion::pxa_to_affine {
-
 namespace pxa = dialect::pxa;
 
 using mlir::AffineLoadOp;
+using mlir::AffineParallelOp;
 using mlir::AffineStoreOp;
 using mlir::AllocOp;
 using mlir::ArrayRef;
@@ -59,10 +59,10 @@ struct LoweringBase : public OpConversionPattern<OpType> {
   }
 };
 
-struct AffineParallelOpConversion : public LoweringBase<pxa::AffineParallelOp> {
+struct AffineParallelOpConversion : public LoweringBase<AffineParallelOp> {
   explicit AffineParallelOpConversion(MLIRContext *ctx) : LoweringBase(ctx) {}
 
-  void rewrite(pxa::AffineParallelOp op, ArrayRef<Value> operands,
+  void rewrite(AffineParallelOp op, ArrayRef<Value> operands,
                ConversionPatternRewriter &rewriter) const override {
     // Create an affine loop nest, capture induction variables
     llvm::SmallVector<Value, 8> ivs;
@@ -159,6 +159,7 @@ void LoweringPass::runOnModule() {
   target.addLegalDialect<mlir::AffineOpsDialect>();
   target.addLegalDialect<mlir::StandardOpsDialect>();
   target.addIllegalDialect<pxa::Dialect>();
+  target.addIllegalOp<AffineParallelOp>();
 
   // Setup rewrite patterns
   mlir::OwningRewritePatternList patterns;
@@ -169,7 +170,7 @@ void LoweringPass::runOnModule() {
   if (failed(applyPartialConversion(getModule(), target, patterns, nullptr))) {
     getModule().dump();
     emitError(mlir::UnknownLoc::get(&getContext()),
-              "Error lowering tile -> pxa\n");
+              "Error lowering pxa -> affine\n");
     signalPassFailure();
   }
 }
