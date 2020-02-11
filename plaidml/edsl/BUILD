@@ -78,36 +78,3 @@ py_test(
         "//plaidml/exec:py",
     ],
 )
-
-# plaidml_cc_test(
-#     name = "cc_test",
-#     srcs = ["edsl_test.cc"],
-#     tags = ["manual"],  # the `edsl_test.cc.test` rule will run this test via lit
-#     deps = [
-#         ":edsl",
-#         "//plaidml:testenv",
-#         "//plaidml/exec",
-#     ],
-# )
-
-# py_test(
-#     name = "py_test",
-#     srcs = ["edsl_test.py"],
-#     args = ["-v"],
-#     main = "edsl_test.py",
-#     tags = ["manual"],  # the `edsl_test.py.test` rule will run this test via lit
-#     deps = [
-#         ":py",
-#         "//plaidml/exec:py",
-#     ],
-# )
-
-# lit_test(
-#     name = "edsl_test.cc",
-#     data = [":cc_test"],
-# )
-
-# lit_test(
-#     name = "edsl_test.py",
-#     data = [":py_test"],
-# )
