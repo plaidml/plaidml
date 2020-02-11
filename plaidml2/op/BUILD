@@ -40,7 +40,6 @@ plaidml_cc_library(
         "ffi.h",
     ],
     defines = [
-        "PLAIDML_OP_DLL",
         "PLAIDML_AST",
     ],
     visibility = ["//visibility:public"],
@@ -49,7 +48,7 @@ plaidml_cc_library(
         "//plaidml2/core:core_ast",
         "//plaidml2/edsl:edsl_ast",
         "//plaidml2/op/lib:lib_ast",
-        "@llvm//:support",
+        "@llvm-project//llvm:support",
     ],
     alwayslink = 1,
 )
@@ -63,7 +62,6 @@ plaidml_cc_library(
         "ffi.h",
     ],
     defines = [
-        "PLAIDML_OP_DLL",
         "PLAIDML_MLIR",
     ],
     visibility = ["//visibility:public"],
@@ -72,7 +70,7 @@ plaidml_cc_library(
         "//plaidml2/core:core_mlir",
         "//plaidml2/edsl:edsl_mlir",
         "//plaidml2/op/lib:lib_mlir",
-        "@llvm//:support",
+        "@llvm-project//llvm:support",
     ],
     alwayslink = 1,
 )

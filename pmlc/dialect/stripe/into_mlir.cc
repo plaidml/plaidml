@@ -10,9 +10,9 @@
 #include "mlir/Translation.h"
 
 #include "base/util/lookup.h"
-#include "pmlc/dialect/eltwise/dialect.h"
-#include "pmlc/dialect/eltwise/ops.h"
-#include "pmlc/dialect/eltwise/util.h"
+#include "pmlc/dialect/eltwise/ir/dialect.h"
+#include "pmlc/dialect/eltwise/ir/ops.h"
+#include "pmlc/dialect/eltwise/ir/util.h"
 #include "pmlc/dialect/stripe/analysis.h"
 #include "pmlc/dialect/stripe/dialect.h"
 
@@ -114,12 +114,12 @@ static DictionaryAttr TagsToDict(Builder* builder, const stripe::Taggable& tagga
   return builder->getDictionaryAttr(vec);
 }
 
-Value* AffineIntoMLIR(           //
+Value AffineIntoMLIR(            //
     OpBuilder* builder,          //
     const SymbolValueMap& idxs,  //
     const stripe::Affine& affine) {
   auto unknownLoc = builder->getUnknownLoc();
-  llvm::SmallVector<Value*, 8> vars;
+  llvm::SmallVector<Value, 8> vars;
   llvm::SmallVector<int64_t, 8> coeffs;
   int64_t offset = 0;
   for (const auto& kvp : affine.getMap()) {
@@ -138,9 +138,9 @@ Value* AffineIntoMLIR(           //
       builder->getI64IntegerAttr(offset));
 }
 
-static std::vector<Value*> LocationIntoTensorOffsets(OpBuilder* builder, const SymbolValueMap& idxs,
-                                                     const stripe::Location& loc, bool* any_non_zero_offsets) {
-  std::vector<Value*> offsets;
+static std::vector<Value> LocationIntoTensorOffsets(OpBuilder* builder, const SymbolValueMap& idxs,
+                                                    const stripe::Location& loc, bool* any_non_zero_offsets) {
+  std::vector<Value> offsets;
   if (any_non_zero_offsets) {
     *any_non_zero_offsets = false;
   }
@@ -215,7 +215,7 @@ static void IntrinsicIntoMLIR(OpBuilder* builder, SymbolTable* locals, const str
   if (!genericBuilder) {
     throw std::runtime_error("Unknown intrinsic: " + intrinsic.name);
   }
-  llvm::SmallVector<Value*, 8> operands;
+  llvm::SmallVector<Value, 8> operands;
   for (const auto& in : intrinsic.inputs) {
     operands.push_back(safe_at(locals->scalars, in));
   }
@@ -228,7 +228,7 @@ static void IntrinsicIntoMLIR(OpBuilder* builder, SymbolTable* locals, const str
 template <typename T>
 static void SpecialConvertImpl(OpBuilder* builder, SymbolTable* locals, const stripe::Special& special) {
   std::vector<Type> no_types;
-  std::vector<Value*> vals;
+  std::vector<Value> vals;
   std::vector<NamedAttribute> no_attrs;
   for (size_t i = 0; i < special.outputs.size(); i++) {
     vals.push_back(safe_at(locals->refs, special.outputs[i]));
@@ -257,7 +257,7 @@ static void SpecialIntoMLIR(OpBuilder* builder, SymbolTable* locals, const strip
     SpecialConvertImpl<ScatterOp>(builder, locals, special);
   } else if (special.name == "shape") {
     SpecialConvertImpl<ShapeOp>(builder, locals, special);
-  }else if (special.name == "zero") {
+  } else if (special.name == "zero") {
     SpecialConvertImpl<ZeroOp>(builder, locals, special);
   } else {
     throw std::runtime_error("Unknown special: " + special.name);
@@ -305,7 +305,7 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
   }
 
   // Process the block's execution location.
-  mlir::Value* executor = nullptr;
+  mlir::Value executor;
   if (!block.location.empty()) {
     auto dims = llvm::SmallVector<TensorDim, 8>{};
     LocationIntoTensorDims(builder->getContext(), block.location, std::back_inserter(dims));
@@ -327,9 +327,9 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
   // MLIR->Stripe conversion will skip over the fake blocks induced by execution location and constraint
   // operations.
   for (const auto& ref : block.refs) {
-    Value* from;
-    std::vector<Value*> offsets;
-    Value* zero = nullptr;
+    Value from;
+    std::vector<Value> offsets;
+    Value zero;
     if (ref.from.empty()) {
       auto tensorType = ShapeIntoTensorType(builder->getContext(), ref.interior_shape, ref.location);
       from = builder->create<AllocateOp>(unknownLoc, tensorType);
@@ -377,7 +377,7 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
     switch (stmt->kind()) {
       case stripe::StmtKind::Load: {
         const auto& load = stripe::Load::Downcast(stmt);
-        Value* from = safe_at(locals.refs, load->from);
+        Value from = safe_at(locals.refs, load->from);
         auto tensorRefType = from->getType().cast<TensorRefType>();
         auto elementType = tensorRefType.getElementType();
         auto intoType = eltwise::getRankedTensorType(elementType);
@@ -391,7 +391,7 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
       } break;
       case stripe::StmtKind::LoadIndex: {
         const auto& load_idx = stripe::LoadIndex::Downcast(stmt);
-        Value* from = AffineIntoMLIR(builder, locals.idxs, load_idx->from);
+        Value from = AffineIntoMLIR(builder, locals.idxs, load_idx->from);
         Type idx_base = ScalarType::get(builder->getContext(), DataType::INT32);
         Type idx_type = eltwise::getRankedTensorType(idx_base);
         auto op = builder->create<LoadIndexOp>(unknownLoc, idx_type, from);
@@ -401,8 +401,8 @@ static void BlockIntoMLIR(OpBuilder* builder, const SymbolTable& outer, const st
       case stripe::StmtKind::Store: {
         const auto& store = stripe::Store::Downcast(stmt);
         std::string agg_str = block.ref_by_into(store->into)->agg_op;
-        Value* into = safe_at(locals.refs, store->into);
-        Value* from = safe_at(locals.scalars, store->from);
+        Value into = safe_at(locals.refs, store->into);
+        Value from = safe_at(locals.scalars, store->from);
         auto attrs = TagsToDict(builder, *store);
         if (agg_str == "" || agg_str == "assign") {
           // Simple case, just an assignment

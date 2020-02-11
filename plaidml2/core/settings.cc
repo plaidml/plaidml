@@ -11,8 +11,7 @@ using plaidml::core::ffi_wrap;
 using plaidml::core::ffi_wrap_void;
 namespace fs = boost::filesystem;
 
-namespace plaidml {
-namespace core {
+namespace plaidml::core {
 
 namespace {
 
@@ -107,5 +106,4 @@ void Settings::save() {
   }
 }
 
-}  // namespace core
-}  // namespace plaidml
+}  // namespace plaidml::core

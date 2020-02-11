@@ -8,7 +8,7 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Support/DebugStringHelper.h"
 
-#include "pmlc/dialect/eltwise/util.h"
+#include "pmlc/dialect/eltwise/ir/util.h"
 #include "pmlc/dialect/stripe/dialect.h"
 #include "pmlc/dialect/stripe/rewrites.h"
 
@@ -291,7 +291,7 @@ void printParallelForOp(OpAsmPrinter* printer, ParallelForOp op) {
   llvm::SmallVector<StringRef, 8> skip;
   skip.push_back("ranges");
   skip.push_back("idx_names");
-  auto names = op.getAttrOfType<ArrayAttr>(mlir::Identifier::get("idx_names", op.getContext()));
+  auto names = op.getAttrOfType<ArrayAttr>("idx_names");
   for (size_t i = 0; i < op.ranges().size(); i++) {
     auto idx_name = StringAttr::get("", op.getContext());
     if (names && names.size() > i) {

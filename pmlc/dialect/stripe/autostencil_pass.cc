@@ -1,26 +1,24 @@
 // Copyright 2019, Intel Corporation
 
-#include "pmlc/dialect/stripe/transcode.h"
 #include "pmlc/dialect/stripe/autostencil_pass.h"
 
-#include <filesystem>
-#include <sstream>
+#include <limits>
+#include <map>
+#include <tuple>
+#include <utility>
 #include <vector>
-
-#include <boost/algorithm/string.hpp>
-
-#include "base/util/env.h"
-#include "base/util/logging.h"
 
 #include "mlir/IR/Matchers.h"
 #include "mlir/Translation.h"
 
+#include "base/util/env.h"
+#include "base/util/logging.h"
 #include "pmlc/dialect/stripe/analysis.h"
 #include "pmlc/dialect/stripe/dialect.h"
 #include "pmlc/dialect/stripe/ops.h"
+#include "pmlc/dialect/stripe/transcode.h"
 #include "pmlc/dialect/stripe/transforms.h"
 #include "pmlc/dialect/stripe/util.h"
-
 #include "tile/targets/cpu/heatmap.h"
 
 namespace pmlc {
@@ -28,10 +26,10 @@ namespace dialect {
 namespace stripe {
 
 using vertexai::tile::codegen::proto::MLIR_AutoStencilPass;
-using vertexai::tile::targets::cpu::kHeatmapSize;
 using vertexai::tile::targets::cpu::kHeatmapKeys;
+using vertexai::tile::targets::cpu::kHeatmapSize;
 using vertexai::tile::targets::cpu::kHeatmapValues;
-using BlockArgumentSet = llvm::SmallPtrSet<mlir::BlockArgument*, kIndexLimit>;
+using BlockArgumentSet = llvm::SmallPtrSet<mlir::BlockArgument, 8>;
 
 // Number of tensors for the matrix multiplication
 const unsigned kNumTensors = 3;
@@ -39,11 +37,12 @@ const unsigned kNumTensors = 3;
 const unsigned kNumIndex = 3;
 
 class AutoStencil {
-public:
+ public:
   explicit AutoStencil(const MLIR_AutoStencilPass& opts);
   // Main function
   void Stencil(ParallelForOp op);
-private:
+
+ private:
   // The throughput and startup cost of M*N*K matrix multiplication
   std::pair<double, unsigned> Throughput(unsigned m, unsigned n, unsigned k);
   // Evaluate the performance of the current searching state
@@ -60,15 +59,19 @@ private:
   void Transform();
 
   // Collect the index used by value's RefineOp
-  BlockArgumentSet RefUsedIdxs(Value* value, bool with_conflict);
+  BlockArgumentSet RefUsedIdxs(Value value, bool with_conflict);
   // Test if idx is conflict with any index in innerIdxs
-  bool ConflictInnerIndex(BlockArgument* idx);
+  bool ConflictInnerIndex(BlockArgument idx);
   // Test if idx in tensors[tensor_idx] is stride one index
-  bool IsStrideOne(BlockArgument* idx, unsigned tensor_idx);
+  bool IsStrideOne(BlockArgument idx, unsigned tensor_idx);
   // Test if idx in the tensors are stride one
-  bool ValidateStrideOne(BlockArgument* idx, unsigned matrix_idx);
+  bool ValidateStrideOne(BlockArgument idx, unsigned matrix_idx);
+  // Test if idx exists in tensorIdxs[tensor_idx]
+  bool IndexExists(BlockArgument idx, unsigned tensor_idx);
+  // Test if idx exists in the right place
+  bool ValidateIndexExistance(BlockArgument idx, unsigned matrix_idx);
 
-  // Number of processors
+  // Optimization options
   const MLIR_AutoStencilPass& options;
   // Stencil efficiency heatmap
   std::map<std::tuple<unsigned, unsigned, unsigned>, double> kHeatmap;
@@ -77,13 +80,13 @@ private:
   // Tensors' order
   unsigned tensorsOrder[kNumTensors];
   // M, N, K in inner block
-  BlockArgument* innerIdxs[kNumIndex];
+  BlockArgument innerIdxs[kNumIndex];
   // M, N, K's tiles
   unsigned tiles[kNumIndex];
   // The matrix_idx for the next search
   unsigned nextMatrixIdx[kNumIndex] = {2, 3, 1};
   // Target tensors, the first two are load, the third is aggregate
-  llvm::SmallVector<Value*, kNumTensors> tensors;
+  llvm::SmallVector<Value, kNumTensors> tensors;
   // Stride one index for the tensors
   BlockArgumentSet strideOne[kNumTensors];
   // The index used by the output tensor
@@ -92,14 +95,16 @@ private:
   BlockArgumentSet accIdxs;
   // All used index
   BlockArgumentSet allIdxs;
+  // Index in tensors
+  BlockArgumentSet tensorIdxs[kNumTensors];
   // Each index has a set of conflict index that can't be choosed into inner block together
-  llvm::DenseMap<BlockArgument*, BlockArgumentSet> conflict;
+  llvm::DenseMap<BlockArgument, BlockArgumentSet> conflict;
   // The best performance
   double bestPerf;
   // The best tensors' order
   unsigned bestTensorsOrder[kNumTensors];
   // The best index (M, N, K)
-  BlockArgument* bestIdxs[kNumIndex];
+  BlockArgument bestIdxs[kNumIndex];
   // The best tiles for (M, N, K)
   unsigned bestTiles[kNumIndex];
 };
@@ -120,9 +125,9 @@ std::pair<double, unsigned> AutoStencil::Throughput(unsigned m, unsigned n, unsi
   auto iter0 = kHeatmap.find(std::make_tuple(m, n - 1, k));
   if (n == 1 || iter0 != kHeatmap.end()) {
     auto iter1 = kHeatmap.find(std::make_tuple(m, n + 1, k));
-     if (iter1 != kHeatmap.end()) {
-       return std::make_pair((n > 1) ? ((iter0->second + iter1->second) / 2) : iter1->second, options.startup_cost());
-     }
+    if (iter1 != kHeatmap.end()) {
+      return std::make_pair((n > 1) ? ((iter0->second + iter1->second) / 2) : iter1->second, options.startup_cost());
+    }
   }
   // If we cannot find (m, n, k) in the heatmap, try the special cases
   for (const auto& spec : options.special_stencils()) {
@@ -133,14 +138,12 @@ std::pair<double, unsigned> AutoStencil::Throughput(unsigned m, unsigned n, unsi
           match = false;
           break;
         }
-      }
-      else if (rule.name() == "n") {
+      } else if (rule.name() == "n") {
         if (rule.size() > 0 && static_cast<unsigned>(rule.size()) != n) {
           match = false;
           break;
         }
-      }
-      else if (rule.name() == "k") {
+      } else if (rule.name() == "k") {
         if (rule.size() > 0 && static_cast<unsigned>(rule.size()) != k) {
           match = false;
           break;
@@ -168,7 +171,7 @@ double AutoStencil::Evaluate() {
     IVLOG(3, idxName(innerIdxs[i]).str() << ": " << tiles[i]);
   }
 
-  llvm::DenseMap<BlockArgument*, unsigned> middle_idxs;
+  llvm::DenseMap<BlockArgument, unsigned> middle_idxs;
   for (auto idx : accIdxs) {
     middle_idxs.try_emplace(idx, idxRange(idx));
   }
@@ -189,7 +192,7 @@ double AutoStencil::Evaluate() {
     }
   }
 
-  llvm::DenseMap<BlockArgument*, unsigned> outer_idxs; 
+  llvm::DenseMap<BlockArgument, unsigned> outer_idxs;
   for (auto idx : outIdxs) {
     outer_idxs.try_emplace(idx, idxRange(idx));
   }
@@ -210,10 +213,7 @@ double AutoStencil::Evaluate() {
     }
   }
 
-  // If the CPUs support hyperthreading, the outermost loop's product should be greater
-  // than the processor bumber. Otherwise, the CPUs are nut fully utilized.
-  size_t processors = options.hyperthreading() ? (options.processors() * 2) : options.processors();
-  unsigned outer_batches = (tot_outer_loop - 1) / processors + 1;
+  unsigned outer_batches = (tot_outer_loop - 1) / std::thread::hardware_concurrency() + 1;
   double perf = outer_batches * tot_middle_loop * (startup_cost + inner_time);
   IVLOG(3, "Performance = " << perf);
 
@@ -243,8 +243,7 @@ void AutoStencil::SearchTiles(unsigned idx) {
       SearchTiles(idx + 1);
       i /= 2;
     }
-  }
-  else {
+  } else {
     for (unsigned i = range; i > 0; --i) {
       if (options.only_even()[idx] && (range % i != 0)) {
         continue;
@@ -255,7 +254,7 @@ void AutoStencil::SearchTiles(unsigned idx) {
   }
 }
 
-bool AutoStencil::ConflictInnerIndex(BlockArgument* idx) {
+bool AutoStencil::ConflictInnerIndex(BlockArgument idx) {
   BlockArgumentSet& conflict_set = conflict[idx];
   for (auto& elem : innerIdxs) {
     if (elem == idx) {
@@ -269,12 +268,12 @@ bool AutoStencil::ConflictInnerIndex(BlockArgument* idx) {
 }
 
 // Test if idx in tensors[tensor_idx] is stride one index
-bool AutoStencil::IsStrideOne(BlockArgument* idx, unsigned tensor_idx) {
+bool AutoStencil::IsStrideOne(BlockArgument idx, unsigned tensor_idx) {
   return strideOne[tensor_idx].find(idx) != strideOne[tensor_idx].end();
 }
 
 // Test if idx in the tensors are stride one
-bool AutoStencil::ValidateStrideOne(BlockArgument* idx, unsigned matrix_idx) {
+bool AutoStencil::ValidateStrideOne(BlockArgument idx, unsigned matrix_idx) {
   switch (matrix_idx) {
     case 0: {
       // Test if M is stride one for B(1) and C(2)
@@ -295,6 +294,38 @@ bool AutoStencil::ValidateStrideOne(BlockArgument* idx, unsigned matrix_idx) {
   return false;
 }
 
+bool AutoStencil::IndexExists(BlockArgument idx, unsigned tensor_idx) {
+  return tensorIdxs[tensor_idx].find(idx) != tensorIdxs[tensor_idx].end();
+}
+
+// Confirm if idx exists in the right place
+bool AutoStencil::ValidateIndexExistance(BlockArgument idx, unsigned matrix_idx) {
+  switch (matrix_idx) {
+    case 0: {
+      // Test if M exists in B and C, does not exist in A
+      return !IndexExists(idx, tensorsOrder[0]) &&  //
+             IndexExists(idx, tensorsOrder[1]) &&   //
+             IndexExists(idx, tensorsOrder[2]);
+    }
+    case 1: {
+      // Test if N exists in A and C, does not exist in B
+      return IndexExists(idx, tensorsOrder[0]) &&   //
+             !IndexExists(idx, tensorsOrder[1]) &&  //
+             IndexExists(idx, tensorsOrder[2]);
+    }
+    case 2: {
+      // Test if K exists in A and B, does not exist in C
+      return IndexExists(idx, tensorsOrder[0]) &&  //
+             IndexExists(idx, tensorsOrder[1]) &&  //
+             !IndexExists(idx, tensorsOrder[2]);
+    }
+    default: {
+      throw std::runtime_error("Wrong matrix_idx.");
+    }
+  }
+  return false;
+}
+
 // Search for matrix index (0 for M, 1 for N, 2 for K)
 void AutoStencil::SearchIndex(unsigned matrix_idx) {
   if (matrix_idx >= kNumIndex) {
@@ -304,7 +335,9 @@ void AutoStencil::SearchIndex(unsigned matrix_idx) {
   }
   auto& idxs = (matrix_idx == kNumIndex - 1) ? allIdxs : outIdxs;
   for (auto idx : idxs) {
-    if (!ConflictInnerIndex(idx) && ValidateStrideOne(idx, matrix_idx)) {
+    if (!ConflictInnerIndex(idx) &&            //
+        ValidateStrideOne(idx, matrix_idx) &&  //
+        ValidateIndexExistance(idx, matrix_idx)) {
       innerIdxs[matrix_idx] = idx;
       SearchIndex(nextMatrixIdx[matrix_idx]);
     }
@@ -312,12 +345,12 @@ void AutoStencil::SearchIndex(unsigned matrix_idx) {
 }
 
 void AutoStencil::SearchTensorsOrder() {
-  // A B C, Search M(0) first as N is most restricted index
+  // A B C, Search M(0) first as M is most restricted index
   tensorsOrder[0] = 0;
   tensorsOrder[1] = 1;
   tensorsOrder[2] = 2;
   SearchIndex(0);
-  // B A C, Search M(0) first as N is most restricted index
+  // B A C, Search M(0) first as M is most restricted index
   tensorsOrder[0] = 1;
   tensorsOrder[1] = 0;
   SearchIndex(0);
@@ -325,7 +358,7 @@ void AutoStencil::SearchTensorsOrder() {
 
 // Collect the index used by value's RefineOp
 // If with_conflict is true, specify the conflict between index, i.e., both index can't be in the inner block
-BlockArgumentSet AutoStencil::RefUsedIdxs(Value* value, bool with_conflict) {
+BlockArgumentSet AutoStencil::RefUsedIdxs(Value value, bool with_conflict) {
   BlockArgumentSet used_idxs;
   auto ref_op = mlir::dyn_cast<RefineOp>(value->getDefiningOp());
   auto tensor = value->getType().cast<TensorRefType>();
@@ -354,18 +387,20 @@ void AutoStencil::Transform() {
     IVLOG(1, "No tile plan for stencil.");
     return;
   }
-  llvm::SmallVector<std::pair<StringRef, unsigned>, kIndexLimit> idxs = getAllIndex(curOp);
+
+  llvm::SmallVector<std::pair<StringRef, unsigned>, 8> idxs;
+  getAllIndex(curOp, &idxs);
   llvm::StringMap<unsigned> bestTileByName;
   for (unsigned i = 0; i < kNumIndex; ++i) {
     bestTileByName[idxName(bestIdxs[i])] = bestTiles[i];
   }
-  llvm::SmallVector<int64_t, kIndexLimit> inner_sizes;
-  for (auto& idx : idxs) {
+  llvm::SmallVector<int64_t, 8> inner_sizes;
+  for (const auto& idx : idxs) {
     auto it = bestTileByName.find(idx.first);
     inner_sizes.push_back(it == bestTileByName.end() ? 1 : it->second);
   }
   // The first tiling: split outer&middle and inner
-  Tile(curOp, inner_sizes); 
+  Tile(curOp, inner_sizes);
   ParallelForOp inner = mlir::dyn_cast<ParallelForOp>(curOp.inner().front().front());
 
   // Set ParallelForOp tags
@@ -395,14 +430,14 @@ bool AutoStencil::CollectTensors() {
   Block* obody = curOp.getBody();
 
   // Collect all load ops to summarize the input tensors
-  obody->walk([&](LoadOp op) {
+  obody->walk([&](LoadOp op) {  //
     tensors.push_back(op.from());
   });
   if (tensors.size() != kNumTensors - 1) {
     return false;
   }
   // Collect all store ops to summarize the output tensors
-  obody->walk([&](AggregateOp op) {
+  obody->walk([&](AggregateOp op) {  //
     tensors.push_back(op.into());
   });
   return tensors.size() == kNumTensors;
@@ -419,11 +454,12 @@ void AutoStencil::Stencil(ParallelForOp op) {
   }
 
   // The last tensor is the output.
-  outIdxs = RefUsedIdxs(tensors[kNumIndex - 1], true);
+  tensorIdxs[kNumIndex - 1] = RefUsedIdxs(tensors[kNumIndex - 1], true);
+  outIdxs = tensorIdxs[kNumIndex - 1];
   accIdxs.clear();
   for (unsigned i = 0; i < kNumIndex - 1; ++i) {
-    BlockArgumentSet used_idxs = RefUsedIdxs(tensors[i], true);
-    for (auto idx : used_idxs) {
+    tensorIdxs[i] = RefUsedIdxs(tensors[i], true);
+    for (auto idx : tensorIdxs[i]) {
       if (outIdxs.find(idx) == outIdxs.end()) {
         accIdxs.insert(idx);
       }
@@ -434,7 +470,8 @@ void AutoStencil::Stencil(ParallelForOp op) {
 
   // Collect stride-one index
   for (unsigned i = 0; i < kNumTensors; ++i) {
-    auto idxs = strideOneIdxs(tensors[i]);
+    llvm::SmallVector<mlir::BlockArgument, 8> idxs;
+    strideOneIdxs(tensors[i], &idxs);
     strideOne[i].insert(idxs.begin(), idxs.end());
   }
 
@@ -446,7 +483,6 @@ void AutoStencil::Stencil(ParallelForOp op) {
 }
 
 void AutoStencilPass::runOnFunction() {
-
 #if defined(_WIN32) || defined(_WIN64)
   // As XSMM is not stable on Windows now, we disable this pass on Windows.
   // When the XSMM issue is solved, remove this section.
@@ -459,7 +495,7 @@ void AutoStencilPass::runOnFunction() {
     throw std::runtime_error("The size of only_po2 array or only_even array is incorrect.");
   }
   AutoStencil as(options);
-  f.walk([&reqs, &as] (ParallelForOp op) {
+  f.walk([&reqs, &as](ParallelForOp op) {
     if (hasAttrs(op.getOperation(), reqs)) {
       as.Stencil(op);
     }

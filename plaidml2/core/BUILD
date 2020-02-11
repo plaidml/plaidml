@@ -53,7 +53,6 @@ plaidml_cc_library(
     ],
     hdrs = SDK_HDRS,
     defines = [
-        "PLAIDML_CORE_DLL",
         "PLAIDML_AST",
     ],
     visibility = ["//visibility:public"],
@@ -86,7 +85,6 @@ plaidml_cc_library(
     ],
     hdrs = SDK_HDRS,
     defines = [
-        "PLAIDML_CORE_DLL",
         "PLAIDML_MLIR",
     ],
     visibility = ["//visibility:public"],
@@ -121,4 +119,14 @@ plaidml_py_library(
         ":py_version",
     ],
     visibility = ["//visibility:public"],
+)
+
+py_test(
+    name = "py_test",
+    srcs = ["core_test.py"],
+    main = "core_test.py",
+    deps = [
+        ":py",
+        "//plaidml2:py",
+    ],
 )

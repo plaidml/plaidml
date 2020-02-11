@@ -8,7 +8,7 @@ load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_test")
 filegroup(
     name = "td_files",
     srcs = [
-        "//pmlc/dialect/eltwise:td_files",
+        "//pmlc/dialect/eltwise/ir:td_files",
     ],
 )
 
@@ -68,11 +68,11 @@ plaidml_cc_library(
         "//pmlc/dialect/eltwise",
         "//tile/base",
         "@boost",
-        "@llvm//:support",
-        "@mlir//:IR",
-        "@mlir//:Parser",
-        "@mlir//:StandardOps",
-        "@mlir//:Transforms",
+        "@llvm-project//llvm:support",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Parser",
+        "@llvm-project//mlir:StandardOps",
+        "@llvm-project//mlir:Transforms",
     ],
     alwayslink = 1,
 )
@@ -92,8 +92,8 @@ plaidml_cc_library(
         ":stripe",
         "//pmlc/util",
         "//tile/stripe",
-        "@mlir//:IR",
-        "@mlir//:Translation",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Translation",
     ],
     alwayslink = 1,
 )
@@ -101,11 +101,13 @@ plaidml_cc_library(
 plaidml_cc_library(
     name = "passes",
     srcs = [
+        "agginit_pass.cc",
         "autostencil_pass.cc",
         "padding_pass.cc",
         "populate_tensor_ref_shape_analysis.cc",
     ],
     hdrs = [
+        "agginit_pass.h",
         "autostencil_pass.h",
         "nop_pass.h",
         "padding_pass.h",

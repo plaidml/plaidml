@@ -2,10 +2,8 @@
 
 #include "pmlc/util/interfaces.h"
 
-namespace pmlc {
-namespace util {
+namespace pmlc::util {
 
 #include "pmlc/util/interfaces.cc.inc"
 
-}  // namespace util
-}  // namespace pmlc
+}  // namespace pmlc::util

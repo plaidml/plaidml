@@ -37,18 +37,18 @@ def _run_lit_test(name, data, size, tags, features):
 
     native.py_test(
         name = name,
-        srcs = ["@llvm//:lit"],
+        srcs = ["@llvm-project//llvm:lit"],
         tags = tags,
         args = [
             "pmlc --config-prefix=runlit -v",
         ] + features,
         data = data + [
-            "//pmlc:pmlc-opt",
-            "//pmlc:pmlc-translate",
+            "//pmlc/tools/pmlc-opt",
+            "//pmlc/tools/pmlc-translate",
             "//pmlc:litfiles",
-            "@llvm//:FileCheck",
-            "@llvm//:count",
-            "@llvm//:not",
+            "@llvm-project//llvm:FileCheck",
+            "@llvm-project//llvm:count",
+            "@llvm-project//llvm:not",
         ],
         size = size,
         main = "lit.py",

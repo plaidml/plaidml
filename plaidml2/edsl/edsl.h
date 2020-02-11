@@ -60,23 +60,53 @@ void into_vector(std::vector<T>* into, Head&& head, Tail&&... tail) {
 
 }  // namespace details
 
+///
+/// TODO
+///
 inline void init() {
   plaidml::init();
   ffi::call_void(plaidml_edsl_init);
 }
 
+///
+/// \defgroup edsl_objects Objects
+///
+
+///
+/// \ingroup edsl_objects
+/// \class Program
+///
 class Program {
  public:
+  ///
+  /// Program constructor
+  ///
   Program(                                 //
       const std::string& name,             //
       const std::vector<Tensor>& outputs,  //
       const std::vector<std::tuple<Tensor, Tensor>>& updates = {});
 
-  plaidml_program* as_ptr() const { return ptr_.get(); }
+  ///
+  /// Return the Program as a string.
+  ///
   std::string str() const { return ffi::str(ffi::call<plaidml_string*>(plaidml_program_repr, ptr_.get())); }
+
+  ///
+  /// args
+  ///
   const std::vector<ProgramArgument>& args() const { return args_; }
+
+  ///
+  /// inputs
+  ///
   const std::vector<ProgramArgument>& inputs() const { return inputs_; }
+
+  ///
+  /// outputs
+  ///
   const std::vector<ProgramArgument>& outputs() const { return outputs_; }
+
+  plaidml_program* as_ptr() const { return ptr_.get(); }
 
  private:
   std::shared_ptr<plaidml_program> ptr_;
@@ -85,23 +115,45 @@ class Program {
   std::vector<ProgramArgument> outputs_;
 };
 
+///
+/// \class TensorDim
+/// \ingroup edsl_objects
+///
 class TensorDim {
  public:
+  ///
+  /// TensorDim constructor
+  ///
   TensorDim() : ptr_(details::make_ptr(ffi::call<plaidml_dim_expr*>(plaidml_dim_expr_none))) {}
 
+  ///
+  /// TensorDim constructor
+  ///
   explicit TensorDim(const std::shared_ptr<plaidml_dim_expr>& ptr) : ptr_(ptr) {}
 
+  ///
+  /// TensorDim constructor
+  ///
   explicit TensorDim(int64_t value)
       : ptr_(details::make_ptr(ffi::call<plaidml_dim_expr*>(plaidml_dim_expr_int, value))) {}
 
   TensorDim(plaidml_int_op op, const std::vector<TensorDim>& args) : ptr_(details::make_ptr(MakeOp(op, args))) {}
 
+  ///
+  /// Represents a subtraction operator overload.
+  ///
   TensorDim operator-() const;
 
+  ///
+  /// Returns the TensorDim as a string.
+  ///
   std::string str() const {  //
     return ffi::str(ffi::call<plaidml_string*>(plaidml_dim_expr_repr, ptr_.get()));
   }
 
+  ///
+  /// Returns the TensorDim as an int.
+  ///
   int64_t as_int() const {
     if (!ptr_) {
       throw std::runtime_error("as_int() only available on TensorDim with an integer value");
@@ -126,13 +178,26 @@ class TensorDim {
 
 struct Constraint;
 
+///
+/// \class TensorIndex
+/// \ingroup edsl_objects
+///
 class TensorIndex {
  public:
+  ///
+  /// TensorIndex constructor
+  ///
   TensorIndex() : ptr_(details::make_ptr(ffi::call<plaidml_poly_expr*>(plaidml_poly_expr_index, ""))) {}
 
+  ///
+  /// TensorIndex constructor
+  ///
   explicit TensorIndex(int64_t value)
       : ptr_(details::make_ptr(ffi::call<plaidml_poly_expr*>(plaidml_poly_expr_literal, value))) {}
 
+  ///
+  /// TensorIndex constructor
+  ///
   explicit TensorIndex(const std::string& name)
       : ptr_(details::make_ptr(ffi::call<plaidml_poly_expr*>(plaidml_poly_expr_index, name.c_str()))) {}
 
@@ -142,12 +207,24 @@ class TensorIndex {
   TensorIndex(plaidml_int_op op, const TensorIndex& idx, const TensorDim& dim, bool lhs_first)
       : ptr_(details::make_ptr(MakeDimPolyOp(op, idx, dim, lhs_first))) {}
 
+  ///
+  /// TODO
+  ///
   TensorIndex operator-() const;
 
+  ///
+  /// TODO
+  ///
   Constraint operator<(int64_t rhs) const;
 
+  ///
+  /// TODO
+  ///
   Constraint operator<(const TensorDim& rhs) const;
 
+  ///
+  /// Returns the TensorIndex as a string.
+  ///
   std::string str() const {  //
     return ffi::str(ffi::call<plaidml_string*>(plaidml_poly_expr_repr, as_ptr()));
   }
@@ -181,11 +258,25 @@ class TensorIndex {
   std::shared_ptr<plaidml_poly_expr> ptr_;
 };
 
+///
+/// \struct Constraint
+/// \ingroup edsl_objects
+///
 struct Constraint {
+  ///
+  /// lhs
+  ///
   TensorIndex lhs;
+
+  ///
+  /// rhs
+  ///
   TensorDim rhs;
 };
 
+///
+/// \ingroup edsl_objects
+///
 class IndexedTensor {
   friend class Tensor;
 
@@ -216,43 +307,59 @@ class IndexedTensor {
   // Movable constructor
   IndexedTensor(IndexedTensor&& rhs) noexcept : impl_(std::move(rhs.impl_)) {}
 
-  // Represents an aggregation_op of SUM in a contraction
+  ///
+  /// Represents an aggregation_op of SUM in a contraction
+  ///
   IndexedTensor& operator+=(const IndexedTensor& rhs) {
     impl_->MakeContraction(PLAIDML_AGG_OP_SUM, rhs);
     return *this;
   }
 
-  // Represents an aggregation_op of PROD in a contraction
+  ///
+  /// Represents an aggregation_op of PROD in a contraction
+  ///
   IndexedTensor& operator*=(const IndexedTensor& rhs) {
     impl_->MakeContraction(PLAIDML_AGG_OP_PROD, rhs);
     return *this;
   }
 
-  // Represents an aggregation_op of MAX in a contraction
+  ///
+  /// Represents an aggregation_op of MAX in a contraction
+  ///
   IndexedTensor& operator>=(const IndexedTensor& rhs) {
     impl_->MakeContraction(PLAIDML_AGG_OP_MAX, rhs);
     return *this;
   }
 
-  // Represents an aggregation_op of MIN in a contraction
+  ///
+  /// Represents an aggregation_op of MIN in a contraction
+  ///
   IndexedTensor& operator<=(const IndexedTensor& rhs) {
     impl_->MakeContraction(PLAIDML_AGG_OP_MIN, rhs);
     return *this;
   }
 
-  // Represents an aggregation_op of ASSIGN in a contraction
+  ///
+  /// Represents an aggregation_op of ASSIGN in a contraction
+  ///
   IndexedTensor& operator=(const IndexedTensor& rhs) {
     impl_->MakeContraction(PLAIDML_AGG_OP_ASSIGN, rhs);
     return *this;
   }
 
-  // Represents a combo_op of PLUS in a contraction
+  ///
+  /// Represents a combo_op of PLUS in a contraction
+  ///
   IndexedTensor operator+(const IndexedTensor& rhs) const;
 
-  // Represents a combo_op of MULTIPLY in a contraction
+  ///
+  /// Represents a combo_op of MULTIPLY in a contraction
+  ///
   IndexedTensor operator*(const IndexedTensor& rhs) const;
 
-  // Represents a combo_op of EQ in a contraction
+  ///
+  /// Represents a combo_op of EQ in a contraction
+  ///
   IndexedTensor operator==(const IndexedTensor& rhs) const;
 
  private:
@@ -260,29 +367,45 @@ class IndexedTensor {
   explicit IndexedTensor(std::unique_ptr<Impl> impl) : impl_(std::move(impl)) {}
 };
 
+///
+/// \ingroup edsl_objects
+///
 class LogicalShape {
   friend class Program;
   friend class Tensor;
 
  public:
+  ///
+  /// TODO
+  ///
   LogicalShape(plaidml_datatype dtype, const std::vector<int64_t>& dims)
       : ptr_(details::make_ptr(
             ffi::call<plaidml_logical_shape*>(plaidml_logical_shape_alloc, dtype, dims.size(), dims.data()))) {}
 
-  plaidml_logical_shape* as_ptr() const { return ptr_.get(); }
-
+  ///
+  /// TODO
+  ///
   std::string str() const {  //
     return ffi::str(ffi::call<plaidml_string*>(plaidml_logical_shape_repr, ptr_.get()));
   }
 
+  ///
+  /// TODO
+  ///
   plaidml_datatype dtype() const {  //
     return ffi::call<plaidml_datatype>(plaidml_logical_shape_get_dtype, ptr_.get());
   }
 
+  ///
+  /// TODO
+  ///
   size_t ndims() const {  //
     return ffi::call<size_t>(plaidml_logical_shape_get_ndims, ptr_.get());
   }
 
+  ///
+  /// TODO
+  ///
   std::vector<int64_t> int_dims() const {
     std::vector<int64_t> ret(ndims());
     for (size_t i = 0; i < ret.size(); i++) {
@@ -291,7 +414,12 @@ class LogicalShape {
     return ret;
   }
 
+  ///
+  /// TODO
+  ///
   bool operator==(const LogicalShape& rhs) const { return str() == rhs.str(); }
+
+  plaidml_logical_shape* as_ptr() const { return ptr_.get(); }
 
  private:
   explicit LogicalShape(plaidml_logical_shape* ptr) : ptr_(details::make_ptr(ptr)) {}
@@ -300,6 +428,9 @@ class LogicalShape {
   std::shared_ptr<plaidml_logical_shape> ptr_;
 };
 
+///
+/// \ingroup edsl_objects
+///
 class Tensor {
   friend class IndexedTensor;
   friend class Value;
@@ -312,32 +443,53 @@ class Tensor {
   };
 
  public:
+  ///
+  /// TODO
+  ///
   Tensor() : impl_(new Impl) {}
 
   explicit Tensor(plaidml_expr* ptr) : impl_(new Impl) {  //
     impl_->ptr = details::make_ptr(ptr);
   }
 
+  ///
+  /// TODO
+  ///
   explicit Tensor(int value) : impl_(new Impl) {  //
     impl_->ptr = details::make_ptr(ffi::call<plaidml_expr*>(plaidml_expr_int, value));
   }
 
-  explicit Tensor(size_t value) : impl_(new Impl) {  //
+  ///
+  /// TODO
+  ///
+  explicit Tensor(unsigned value) : impl_(new Impl) {  //
     impl_->ptr = details::make_ptr(ffi::call<plaidml_expr*>(plaidml_expr_int, value));
   }
 
+  ///
+  /// TODO
+  ///
   explicit Tensor(int64_t value) : impl_(new Impl) {
     impl_->ptr = details::make_ptr(ffi::call<plaidml_expr*>(plaidml_expr_int, value));
   }
 
+  ///
+  /// TODO
+  ///
   explicit Tensor(double value) : impl_(new Impl) {
     impl_->ptr = details::make_ptr(ffi::call<plaidml_expr*>(plaidml_expr_float, value));
   }
 
+  ///
+  /// TODO
+  ///
   explicit Tensor(const TensorDim& dim) : impl_(new Impl) {
     impl_->ptr = details::make_ptr(ffi::call<plaidml_expr*>(plaidml_expr_dim, dim.as_ptr()));
   }
 
+  ///
+  /// TODO
+  ///
   explicit Tensor(const std::vector<int64_t>& dims) : impl_(new Impl) {
     for (auto dim : dims) {
       impl_->dims.emplace_back(dim);
@@ -345,31 +497,48 @@ class Tensor {
     impl_->has_dims = true;
   }
 
+  ///
+  /// TODO
+  ///
   explicit Tensor(const std::vector<TensorDim>& dims) : impl_(new Impl) {
     impl_->dims = dims;
     impl_->has_dims = true;
   }
 
+  ///
+  /// Tensor
+  ///
   explicit Tensor(const std::initializer_list<TensorDim>& dims) : impl_(new Impl) {
     impl_->dims = dims;
     impl_->has_dims = true;
   }
 
+  ///
+  /// Tensor
+  ///
   Tensor(const std::string& name, const std::vector<TensorDim>& dims) : impl_(new Impl) {
     impl_->name = name;
     impl_->dims = dims;
     impl_->has_dims = true;
   }
 
+  ///
+  /// TODO
+  ///
   Tensor(const std::string& name, const std::initializer_list<TensorDim>& dims) : impl_(new Impl) {
     impl_->name = name;
     impl_->dims = dims;
     impl_->has_dims = true;
   }
 
-  // Copyable
+  ///
+  /// TODO
+  ///
   Tensor(const Tensor& rhs) { *this = rhs; }
 
+  ///
+  /// TODO
+  ///
   Tensor& operator=(const Tensor& rhs) {
     if (this != &rhs) {
       impl_.reset(new Impl(*rhs.impl_));
@@ -415,37 +584,50 @@ class Tensor {
     return operator()(vec);
   }
 
-  // Represents an eltwise negation
+  ///
+  /// Represents an eltwise negation
+  ///
   Tensor operator-() const;
 
-  // Represents an eltwise bit_not
+  ///
+  /// Represents an eltwise bit_not
+  ///
   Tensor operator~() const;
 
+  ///
+  /// TODO
+  ///
   std::string str() const {  //
     return ffi::str(ffi::call<plaidml_string*>(plaidml_expr_repr, as_ptr()));
   }
 
-  plaidml_expr* as_ptr() const { return impl_->ptr.get(); }
-
-  void* raw_ptr() const { return ffi::call<void*>(plaidml_expr_ptr, as_ptr()); }
-
-  // Enable no_reduce on a contraction
+  ///
+  /// Enable no_reduce on a contraction
+  ///
   Tensor& no_reduce() {
     ffi::call_void(plaidml_expr_contraction_set_no_reduce, as_ptr(), true);
     return *this;
   }
 
-  // Set use_default on a contraction
+  ///
+  /// Set use_default on a contraction
+  ///
   Tensor& use_default(const Tensor& rhs) {
     ffi::call_void(plaidml_expr_contraction_set_use_default, as_ptr(), rhs.as_ptr());
     return *this;
   }
 
+  ///
+  /// TODO
+  ///
   Tensor& add_constraint(const Constraint& constraint) {
     ffi::call_void(plaidml_expr_contraction_add_constraint, as_ptr(), constraint.lhs.as_ptr(), constraint.rhs.as_ptr());
     return *this;
   }
 
+  ///
+  /// TODO
+  ///
   Tensor& add_constraints(const std::vector<Constraint>& constraints) {
     for (const auto& constraint : constraints) {
       add_constraint(constraint);
@@ -453,12 +635,16 @@ class Tensor {
     return *this;
   }
 
-  // Return the tensor's shape
+  ///
+  /// Return the tensor's shape
+  ///
   LogicalShape shape() const {
     return LogicalShape(ffi::call<plaidml_logical_shape*>(plaidml_expr_get_shape, as_ptr()));
   }
 
-  // Verify that the specified dims match the dims of this tensor.
+  ///
+  /// Verify that the specified dims match the dims of this tensor.
+  ///
   void bind_dims(const std::vector<TensorDim>& dims) const {
     std::vector<plaidml_dim_expr*> raw_dims(dims.size());
     for (size_t i = 0; i < dims.size(); i++) {
@@ -467,12 +653,19 @@ class Tensor {
     ffi::call_void(plaidml_expr_bind_dims, as_ptr(), raw_dims.size(), raw_dims.data());
   }
 
+  ///
+  /// TODO
+  ///
   template <typename... Ts>
   void bind_dims(Ts... dims) const {
     std::vector<TensorDim> vec;
     details::into_vector(&vec, std::forward<Ts>(dims)...);
     bind_dims(vec);
   }
+
+  plaidml_expr* as_ptr() const { return impl_->ptr.get(); }
+
+  void* raw_ptr() const { return ffi::call<void*>(plaidml_expr_ptr, as_ptr()); }
 
  private:
   explicit Tensor(std::unique_ptr<Impl> impl) : impl_(std::move(impl)) {}
@@ -481,18 +674,58 @@ class Tensor {
   std::unique_ptr<Impl> impl_;
 };
 
+///
+/// \ingroup edsl_objects
+///
 struct TensorRef {
+  ///
+  /// TODO
+  ///
   Tensor tensor;
+
+  ///
+  /// TODO
+  ///
   TensorRef(const Tensor& tensor) : tensor(tensor) {}  // NOLINT[runtime/explicit]
+
+  ///
+  /// TODO
+  ///
   operator Tensor() const { return tensor; }
+
+  ///
+  /// TODO
+  ///
   bool operator<(const TensorRef& rhs) const { return tensor.raw_ptr() < rhs.tensor.raw_ptr(); }
+
+  ///
+  /// TODO
+  ///
   bool operator==(const TensorRef& rhs) const { return tensor.raw_ptr() == rhs.tensor.raw_ptr(); }
 };
 
+///
+/// \ingroup edsl_objects
+///
 struct ProgramArgument {
+  ///
+  /// TODO
+  ///
   bool is_input;
+
+  ///
+  /// TODO
+  ///
   TensorRef tensor;
+
+  ///
+  /// TODO
+  ///
   LogicalShape shape;
+
+  ///
+  /// TODO
+  ///
   std::shared_ptr<Buffer> buffer;
 };
 
@@ -588,8 +821,26 @@ inline Tensor cast(const Tensor& x, plaidml_datatype dtype) {
   return Tensor{ptr};
 }
 
+///
+/// \defgroup edsl_primitives EDSL Primitives
+///
+
+/// \addtogroup edsl_primitives
+/// @{
+
+///
+/// Computes the elementwise absolute value of `x`.
+/// \param x Tensor
+/// \return Tensor
+///
 inline Tensor abs(const Tensor& x) { return Call("abs", x); }
 
+///
+/// Performs an elementwise conversion of `x` into a Tensor of floating point numbers with precision `bit_size`.
+/// \param x Tensor
+/// \param bit_size size_t
+/// \return Tensor
+///
 inline Tensor as_float(const Tensor& x, size_t bit_size) {
   switch (bit_size) {
     case 16:
@@ -603,6 +854,12 @@ inline Tensor as_float(const Tensor& x, size_t bit_size) {
   }
 }
 
+///
+/// Performs an elementwise conversion of `x` into a Tensor of integers with width `bit_size`.
+/// \param x Tensor
+/// \param bit_size size_t
+/// \return Tensor
+///
 inline Tensor as_int(const Tensor& x, size_t bit_size) {
   switch (bit_size) {
     case 8:
@@ -618,6 +875,12 @@ inline Tensor as_int(const Tensor& x, size_t bit_size) {
   }
 }
 
+///
+/// Performs an elementwise conversion of `x` into a Tensor of unsigned integers with width `bit_size`.
+/// \param x Tensor
+/// \param bit_size size_t
+/// \return Tensor
+///
 inline Tensor as_uint(const Tensor& x, size_t bit_size) {
   switch (bit_size) {
     case 8:
@@ -633,24 +896,77 @@ inline Tensor as_uint(const Tensor& x, size_t bit_size) {
   }
 }
 
+///
+/// Performs an elementwise conversion of `x` into a Tensor of booleans with width `bit_size`.
+/// \param x Tensor
+/// \param bit_size size_t
+/// \return Tensor
+///
 inline Tensor as_bool(const Tensor& x) { return cast(x, PLAIDML_DATA_BOOLEAN); }
 
+///
+/// Computes the elementwise cosine of `x`.
+/// \param x Tensor
+/// \return Tensor
+///
 inline Tensor cos(const Tensor& x) { return Call("cos", x); }
 
+///
+/// Computes the elementwise hyperbolic cosine of `x`.
+/// \param x Tensor
+/// \return Tensor
+///
 inline Tensor cosh(const Tensor& x) { return Call("cosh", x); }
 
+///
+/// Computes the elementwise natural exponential function of `x`: _e_<sup>x</sup>.
+/// \param x Tensor
+/// \return Tensor
+///
 inline Tensor exp(const Tensor& x) { return Call("exp", x); }
 
+///
+/// Takes an input tensor (`x`) and a set of indices to gather over (`y`), and returns an output tensor that gathers the
+/// input tensor from the indices specified. \param x Tensor \param y Tensor \return Tensor
+///
 inline Tensor gather(const Tensor& x, const Tensor& y) { return Call("gather", x, y); }
 
+///
+/// Returns the identity of `x`.
+/// \param x Tensor
+/// \return Tensor
+///
 inline Tensor ident(const Tensor& x) { return Call("ident", x); }
 
+///
+/// Returns the index of `x` at the specified `axis`.
+/// \param x Tensor
+/// \param axis size_t
+/// \return Tensor
+///
 inline Tensor index(const Tensor& x, size_t axis) { return Call("index", x, static_cast<int64_t>(axis)); }
 
+///
+/// Computes the elementwise natural logarithm of `x`: _ln_(`x`).
+/// \param x Tensor
+/// \return Tensor
+///
 inline Tensor log(const Tensor& x) { return Call("log", x); }
 
+///
+/// Computes the elementwise `y`th power of `x`.
+/// \param x Tensor
+/// \param y Tensor
+/// \return Tensor
+///
 inline Tensor pow(const Tensor& x, const Tensor& y) { return Call("pow", x, y); }
 
+///
+/// Generates a Tensor of elementwise pseudorandom numbers using the seed values specified in `state`.
+/// \param state Tensor
+/// \param dims vector<int64_t>
+/// \return Tensor
+///
 inline Tensor prng(const Tensor& state, const std::vector<int64_t>& dims) {
   std::vector<Tensor> args = {state};
   for (const auto& dim : dims) {
@@ -659,6 +975,12 @@ inline Tensor prng(const Tensor& state, const std::vector<int64_t>& dims) {
   return Call("prng", args);
 }
 
+///
+/// Takes an input tensor `x` and reshapes it according to `dims`.
+/// \param x Tensor
+/// \param dims vector<int64_t>
+/// \return Tensor
+///
 inline Tensor reshape(const Tensor& x, const std::vector<int64_t>& dims) {
   std::vector<Tensor> args = {x};
   for (const auto& dim : dims) {
@@ -667,6 +989,12 @@ inline Tensor reshape(const Tensor& x, const std::vector<int64_t>& dims) {
   return Call("reshape", args);
 }
 
+///
+/// Takes an input tensor `x` and reshapes it according to `dims`.
+/// \param x Tensor
+/// \param dims vector<TensorDim>
+/// \return Tensor
+///
 inline Tensor reshape(const Tensor& x, const std::vector<TensorDim>& dims) {
   std::vector<Tensor> args = {x};
   for (const auto& dim : dims) {
@@ -675,25 +1003,77 @@ inline Tensor reshape(const Tensor& x, const std::vector<TensorDim>& dims) {
   return Call("reshape", args);
 }
 
+///
+/// Takes an input tensor (`x`), a set of indices to scatter over (`y`), and the number of elements in the scattered
+/// tensor (`z`), and returns an output tensor that scatters the input tensor across the number of elements specified.
+/// \param x Tensor
+/// \param y Tensor
+/// \param z Tensor
+/// \return Tensor
+///
 inline Tensor scatter(const Tensor& x, const Tensor& y, const Tensor& z) { return Call("scatter", x, y, z); }
 
+///
+/// TODO
+/// \param cond Tensor
+/// \param true_case Tensor
+/// \param false_case Tensor
+/// \return Tensor
+///
 inline Tensor select(const Tensor& cond, const Tensor& true_case, const Tensor& false_case) {
   return Call("cond", cond, true_case, false_case);
 }
 
+///
+/// Returns the shape of `x` as a Tensor.
+/// \param x Tensor
+/// \return Tensor
+///
 inline Tensor shape(const Tensor& x) { return Call("shape", x); }
 
+///
+/// Computes the elementwise sine of `x`.
+/// \param x Tensor
+/// \return Tensor
+///
 inline Tensor sin(const Tensor& x) { return Call("sin", x); }
 
+///
+/// Computes the elementwise hyperbolic sine of `x`.
+/// \param x Tensor
+/// \return Tensor
+///
 inline Tensor sinh(const Tensor& x) { return Call("sinh", x); }
 
+///
+/// Computes the elementwise square root of `x`.
+/// \param x Tensor
+/// \return Tensor
+///
 inline Tensor sqrt(const Tensor& x) { return Call("sqrt", x); }
 
+///
+/// Computes the elementwise tangent of `x`.
+/// \param x Tensor
+/// \return Tensor
+///
 inline Tensor tan(const Tensor& x) { return Call("tan", x); }
 
+///
+/// Computes the elementwise hyperbolic tangent of `x`.
+/// \param x Tensor
+/// \return Tensor
+///
 inline Tensor tanh(const Tensor& x) { return Call("tanh", x); }
 
+///
+/// Returns a Tensor with a value of 0.
+/// \param None
+/// \return Tensor
+///
 inline Tensor zero() { return Tensor{0}; }
+
+/// @}
 
 inline Program::Program(                 //
     const std::string& name,             //

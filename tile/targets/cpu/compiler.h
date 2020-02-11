@@ -46,15 +46,17 @@ class Compiler : private stripe::ConstStmtVisitor {
   // Internal data type definitions.
  private:
   struct XSMMCallData {
-    XSMMCallData() : in0(nullptr), in1(nullptr), out0(nullptr), lda_a_value(0), lda_b_value(0), lda_c_value(0) {}
+    const stripe::Refinement* in0 = nullptr;
+    const stripe::Refinement* in1 = nullptr;
+    const stripe::Refinement* out0 = nullptr;
 
-    const stripe::Refinement* in0;
-    const stripe::Refinement* in1;
-    const stripe::Refinement* out0;
+    int32_t lda_a_value = 0;
+    int32_t lda_b_value = 0;
+    int32_t lda_c_value = 0;
 
-    int32_t lda_a_value;
-    int32_t lda_b_value;
-    int32_t lda_c_value;
+    int32_t offset_in0 = 0;
+    int32_t offset_in1 = 0;
+    int32_t offset_out0 = 0;
   };
 
  protected:
@@ -158,7 +160,7 @@ class Compiler : private stripe::ConstStmtVisitor {
   void EnterLoop(Loop* loop, llvm::Value* variable, llvm::Value* init, llvm::Value* limit);
   void LeaveLoop(Loop* loop, llvm::Value* variable);
   Scalar Cast(Scalar, DataType);
-  Scalar CheckBool(Scalar);
+  Scalar CheckNotFloat(Scalar);
   llvm::Type* CType(DataType);
   llvm::Value* ElementPtr(const Buffer& buf);
   llvm::Value* Eval(const stripe::Affine& access);
@@ -183,7 +185,7 @@ class Compiler : private stripe::ConstStmtVisitor {
   const XSMMDispatch GetXSMMDispatch(const stripe::Block& block);
   llvm::Value* RunTimeLogEntry(void);
   void EmitRunTimeLogEntry(const std::string& str, const std::string& extra, llvm::Value* value = nullptr);
-  void PrintOutputAssembly();
+  void PrintOutputAssembly(llvm::TargetMachine* machine);
   void AggInit(const Buffer& dest, llvm::Value* init_val);
   void ParallelFor(llvm::Value* refs, llvm::Value* idxs, size_t range, llvm::Function* func);
   CompileFor getCompileFor(const stripe::Block& block);

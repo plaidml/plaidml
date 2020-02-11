@@ -102,18 +102,28 @@ size_t plaidml_settings_list_count(  //
   });
 }
 
-void plaidml_settings_list(  //
+void plaidml_settings_free(  //
     plaidml_error* err,      //
-    size_t nitems,           //
-    plaidml_string** keys,   //
-    plaidml_string** values) {
+    plaidml_settings* settings) {
   ffi_wrap_void(err, [&] {
-    size_t i = 0;
+    delete[] settings->kvps;
+    delete settings;
+  });
+}
+
+plaidml_settings* plaidml_settings_list(  //
+    plaidml_error* err) {
+  return ffi_wrap<plaidml_settings*>(err, nullptr, [&] {
     const auto& settings = Settings::Instance()->all();
-    for (auto it = settings.begin(); it != settings.end() && i < nitems; it++, i++) {
-      keys[i] = new plaidml_string{it->first};
-      values[i] = new plaidml_string{it->second};
+    auto ret = new plaidml_settings;
+    ret->nkvps = settings.size();
+    ret->kvps = new plaidml_kvp[settings.size()];
+    size_t i = 0;
+    for (auto it = settings.begin(); it != settings.end(); it++, i++) {
+      ret->kvps[i].key = new plaidml_string{it->first};
+      ret->kvps[i].value = new plaidml_string{it->second};
     }
+    return ret;
   });
 }
 
@@ -148,12 +158,23 @@ void plaidml_settings_set(  //
   });
 }
 
-const char* plaidml_string_ptr(plaidml_string* str) { return str->str.c_str(); }
+const char* plaidml_string_ptr(plaidml_string* str) {  //
+  return str->str.c_str();
+}
 
 void plaidml_string_free(plaidml_string* str) {
   plaidml_error err;
   ffi_wrap_void(&err, [&] {  //
     delete str;
+  });
+}
+
+void plaidml_strings_free(  //
+    plaidml_error* err,     //
+    plaidml_strings* strs) {
+  ffi_wrap_void(err, [&] {
+    delete[] strs->strs;
+    delete strs;
   });
 }
 

@@ -11,8 +11,7 @@
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/StandardTypes.h"
 
-namespace pmlc {
-namespace util {
+namespace pmlc::util {
 
 // Adjust the result types on the containing FuncOp if this op relates to an output
 void UpdateFuncOpType(mlir::Operation* op);
@@ -46,5 +45,4 @@ std::string getUniqueName(Set* names, llvm::StringRef name) {
   return next;
 }
 
-}  // namespace util
-}  // namespace pmlc
+}  // namespace pmlc::util

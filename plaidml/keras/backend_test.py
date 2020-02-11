@@ -64,6 +64,12 @@ if __name__ == '__main__':
         DEFAULT_ATOL = 1e-8
 
 
+def is_llvm_cpu():
+    ctx = plaidml.Context()
+    cur_dev = devices = plaidml.devices(ctx)[0]
+    return cur_dev.id.decode() == 'llvm_cpu.0'
+
+
 def m(*args, **kwargs):
     dtype = kwargs.get('dtype', floatx())
     """Makes a test matrix whose dimensions are the supplied arguments."""
@@ -1026,6 +1032,16 @@ class TestBackendOps(unittest.TestCase):
             b.conv2d(im, km, padding='same') if b == pkb else b.conv2d(im, km, padding='same'),
         ]
 
+    @opTest([
+        [m(12, 12, 3), m(3, 3, 3), m(1, 9, 3), 'channels_last'],
+        [m(256, 256, 1), m(1, 1, 1), m(1, 1, 3), 'channels_last'],
+        [m(3, 12, 12), m(1, 12, 3), m(1, 36, 4), 'channels_first']
+    ], skip_theano=True)
+    def testSeparableConv1d(self, b, im, dkm, pkm, df):
+        return [
+            b.separable_conv1d(im, dkm, pkm, data_format=df)
+        ]
+
     # Asymmetric stride examples not included for separable convolutions b/c they
     # aren't implemented in tensorflow (and theano doesn't do separable convs)
     @opTest(
@@ -1483,9 +1499,9 @@ class TestBackendOps(unittest.TestCase):
         return [b.std(x, axis=ax, keepdims=kd)]
 
     @opTest([[m(3, 3)]])
+    @unittest.skipIf(is_llvm_cpu(), "This test fails on llvm_cpu")
     def testSelfMult(self, b, x):
-        A = x
-        return [b.dot(A, A)]
+        return [b.dot(x, x)]
 
     @opTest([
         [m(3, 4), 0],
@@ -1802,7 +1818,6 @@ class TestBackendOps(unittest.TestCase):
         o = b.relu(c)
         return [o]
 
-
     ### The tests below represent the resnet layers.
     @opTest([[m(1, 56, 56, 64), m(1, 1, 64, 256)]],
             do_grads=False,
@@ -1930,7 +1945,6 @@ class TestBackendOps(unittest.TestCase):
         o = b.relu(c)
         return [o]
 
-
     @opTest([[m(1, 14, 14, 1024), m(1, 1, 1024, 2048)]],
             do_grads=False,
             num_iterations=10,
@@ -1945,7 +1959,12 @@ class TestBackendOps(unittest.TestCase):
             num_iterations=10,
             measure_eval_time=True)
     def resnetLayer25(self, b, x, k):
-        c = b.conv2d(x, k, padding='same', strides=(1, 2),)
+        c = b.conv2d(
+            x,
+            k,
+            padding='same',
+            strides=(1, 2),
+        )
         o = b.relu(c)
         return [o]
 

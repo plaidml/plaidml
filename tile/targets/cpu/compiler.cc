@@ -9,6 +9,7 @@
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Verifier.h>
 #include <llvm/Support/DynamicLibrary.h>
+#include <llvm/Support/TargetRegistry.h>
 #include <llvm/Support/ToolOutputFile.h>
 #include <llvm/Transforms/IPO/PassManagerBuilder.h>
 #include <llvm/Transforms/Utils/Cloning.h>
@@ -55,6 +56,14 @@ ProgramModule Compiler::CompileProgram(const stripe::Block& program) {
   ProgramModule ret;
   ret.module = std::make_unique<llvm::Module>("stripe", context_);
   module_ = ret.module.get();
+
+  auto targetTriple = llvm::sys::getProcessTriple();
+  std::string errorMessage;
+  auto target = llvm::TargetRegistry::lookupTarget(targetTriple, errorMessage);
+  std::unique_ptr<llvm::TargetMachine> machine(target->createTargetMachine(targetTriple, "generic", "", {}, {}));
+  module_->setDataLayout(machine->createDataLayout());
+  module_->setTargetTriple(targetTriple);
+
   GenerateArena(program);
   llvm::Function* main = CompileBlock(program);
   ret.externals = external_funcptrs_;
@@ -84,16 +93,10 @@ ProgramModule Compiler::CompileProgram(const stripe::Block& program) {
     llvm::errs() << "LLVM IR, after optimization: ================\n";
     module_->print(llvm::errs(), nullptr);
   }
-#ifndef _MSC_VER
-  // This apparently trips an assertion on Windows with:
-  // Assertion failed: Target.isCompatibleDataLayout(getDataLayout()) &&
-  // "Can't create a MachineFunction using a Module with a " "Target-incompatible DataLayout attached\n",
-  // file external/llvm/lib/CodeGen/MachineFunction.cpp, line 201
   if (config_.print_assembly) {
     llvm::errs() << "Assembly code: ================\n";
-    PrintOutputAssembly();
+    PrintOutputAssembly(machine.get());
   }
-#endif
   // Wrap the finished module and the parameter names into a ProgramModule.
   for (auto& ref : program.refs) {
     if (ref.has_tag("user")) {
@@ -338,8 +341,20 @@ llvm::Function* Compiler::CompileXSMMBlock(const stripe::Block& block, const XSM
   llvm::FunctionType* rftype = llvm::FunctionType::get(builder_.getVoidTy(), param_types, false);
   llvm::FunctionType* xsmmCallHelperType = llvm::FunctionType::get(builder_.getVoidTy(), param_types, false);
   auto xmmCallFunc = module_->getOrInsertFunction("XSMMRTCaller", xsmmCallHelperType).getCallee();
-  std::vector<llvm::Value*> args2 = {func, buffers_[xsmmCallData.in1->into()].base,
-                                     buffers_[xsmmCallData.in0->into()].base, buffers_[xsmmCallData.out0->into()].base};
+
+#define CREATE_OFFSET_STMTS(name)                                                          \
+  llvm::Value* arg_##name;                                                                 \
+  if (xsmmCallData.offset_##name == 0) {                                                   \
+    arg_##name = buffers_[xsmmCallData.name->into()].base;                                 \
+  } else {                                                                                 \
+    llvm::Value* idx_list[1] = {llvm::ConstantInt::get(i32t, xsmmCallData.offset_##name)}; \
+    arg_##name = builder_.CreateGEP(buffers_[xsmmCallData.name->into()].base, idx_list);   \
+  }
+  CREATE_OFFSET_STMTS(in0);
+  CREATE_OFFSET_STMTS(in1);
+  CREATE_OFFSET_STMTS(out0);
+
+  std::vector<llvm::Value*> args2 = {func, arg_in1, arg_in0, arg_out0};
   builder_.CreateCall(rftype, xmmCallFunc, args2);
   builder_.CreateRetVoid();
   return function;
@@ -381,18 +396,24 @@ bool Compiler::GetXSMMCallData(XSMMCallData* xsmmCallData, const stripe::Block& 
 
   for (const auto& ref : block.refs) {
     if (ref.has_tag("A")) {
+      auto flat = ref.FlatAccess();
       if (useSpecialN) {
         xsmmCallData->lda_b_value = 0;
       } else {
-        xsmmCallData->lda_b_value = ref.FlatAccess()[n_name];
+        xsmmCallData->lda_b_value = flat[n_name];
       }
       xsmmCallData->in0 = &ref;
+      xsmmCallData->offset_in0 = flat.constant();
     } else if (ref.has_tag("B")) {
-      xsmmCallData->lda_a_value = ref.FlatAccess()[k_name];
+      auto flat = ref.FlatAccess();
+      xsmmCallData->lda_a_value = flat[k_name];
       xsmmCallData->in1 = &ref;
+      xsmmCallData->offset_in1 = flat.constant();
     } else if (ref.has_tag("C")) {
-      xsmmCallData->lda_c_value = ref.FlatAccess()[n_name];
+      auto flat = ref.FlatAccess();
+      xsmmCallData->lda_c_value = flat[n_name];
       xsmmCallData->out0 = &ref;
+      xsmmCallData->offset_out0 = flat.constant();
     }
   }
 
@@ -815,56 +836,56 @@ void Compiler::Visit(const stripe::Intrinsic& intrinsic) {
   // defined for actual intrinsic names; these have been derived experimentally.
   static std::map<std::string, std::function<void(Compiler*, const stripe::Intrinsic&)>> builtins{
       {"add", &Compiler::Add},
-      {"sub", &Compiler::Subtract},
-      {"neg", &Compiler::Negate},
-      {"mul", &Compiler::Multiply},
+      {"assign", &Compiler::Assign},
+      {"cond", &Compiler::Conditional},
       {"div", &Compiler::Divide},
-      {"mod", &Compiler::Mod},
-      {"lt", &Compiler::LessThan},
-      {"lte", &Compiler::LessThanOrEqualTo},
+      {"eq", &Compiler::Equal},
       {"gt", &Compiler::GreaterThan},
       {"gte", &Compiler::GreaterThanOrEqualTo},
-      {"eq", &Compiler::Equal},
-      {"neq", &Compiler::Unequal},
-      {"and", &Compiler::And},
-      {"or", &Compiler::Or},
-      {"not", &Compiler::Not},
-      {"xor", &Compiler::Xor},
-      {"cond", &Compiler::Conditional},
-      {"assign", &Compiler::Assign},
       {"ident", &Compiler::Assign},
+      {"lt", &Compiler::LessThan},
+      {"lte", &Compiler::LessThanOrEqualTo},
+      {"mod", &Compiler::Mod},
+      {"mul", &Compiler::Multiply},
+      {"neg", &Compiler::Negate},
+      {"neq", &Compiler::Unequal},
+      {"sub", &Compiler::Subtract},
       // Extra operations defined in tile/lang/ops.cc, which are apparently
       // passed along directly into Stripe
+      {"bit_and", &Compiler::And},
+      {"bit_or", &Compiler::Or},
+      {"bit_not", &Compiler::Not},
+      {"bit_left", &Compiler::BitLeft},
+      {"bit_right", &Compiler::BitRight},
+      {"bit_xor", &Compiler::Xor},
       {"cmp_eq", &Compiler::Equal},
       {"cmp_ne", &Compiler::Unequal},
       {"cmp_lt", &Compiler::LessThan},
       {"cmp_gt", &Compiler::GreaterThan},
       {"cmp_le", &Compiler::LessThanOrEqualTo},
       {"cmp_ge", &Compiler::GreaterThanOrEqualTo},
-      {"bit_right", &Compiler::BitRight},
-      {"bit_left", &Compiler::BitLeft},
       // Other undocumented intrinsics, which are apparently necessary in order
       // to successfully run the backend_test:
-      {"sqrt", &Compiler::Sqrt},
-      {"exp", &Compiler::Exp},
-      {"log", &Compiler::Log},
-      {"pow", &Compiler::Pow},
-      {"tanh", &Compiler::Tanh},
-      {"cos", &Compiler::Cos},
+      {"as_bool", &Compiler::AsBool},
       {"as_float", &Compiler::AsFloat},
       {"as_int", &Compiler::AsInt},
       {"as_uint", &Compiler::AsUInt},
-      {"as_bool", &Compiler::AsBool},
-      {"floor", &Compiler::Floor},
       {"ceil", &Compiler::Ceil},
+      {"cos", &Compiler::Cos},
+      {"exp", &Compiler::Exp},
+      {"floor", &Compiler::Floor},
+      {"log", &Compiler::Log},
+      {"pow", &Compiler::Pow},
       {"round", &Compiler::Round},
+      {"sqrt", &Compiler::Sqrt},
+      {"tanh", &Compiler::Tanh},
       // Numeric operations from stdlib mentioned in tile/lang/builtins.cc
       {"abs", &Compiler::Abs},
       {"acos", &Compiler::Acos},
-      {"asin", &Compiler::Asin},
-      {"atan", &Compiler::Atan},
       {"acosh", &Compiler::Acosh},
+      {"asin", &Compiler::Asin},
       {"asinh", &Compiler::Asinh},
+      {"atan", &Compiler::Atan},
       {"atanh", &Compiler::Atanh},
       {"cosh", &Compiler::Cosh},
       {"sin", &Compiler::Sin},
@@ -1294,31 +1315,31 @@ void Compiler::Conditional(const stripe::Intrinsic& cond) {
 
 void Compiler::And(const stripe::Intrinsic& stmt) {
   assert(2 == stmt.inputs.size());
-  Scalar lhs = CheckBool(scalars_[stmt.inputs[0]]);
-  Scalar rhs = CheckBool(scalars_[stmt.inputs[1]]);
+  Scalar lhs = CheckNotFloat(scalars_[stmt.inputs[0]]);
+  Scalar rhs = CheckNotFloat(scalars_[stmt.inputs[1]]);
   llvm::Value* ret = builder_.CreateAnd(lhs.value, rhs.value);
   OutputBool(ret, stmt);
 }
 
 void Compiler::Or(const stripe::Intrinsic& stmt) {
   assert(2 == stmt.inputs.size());
-  Scalar lhs = CheckBool(scalars_[stmt.inputs[0]]);
-  Scalar rhs = CheckBool(scalars_[stmt.inputs[1]]);
+  Scalar lhs = CheckNotFloat(scalars_[stmt.inputs[0]]);
+  Scalar rhs = CheckNotFloat(scalars_[stmt.inputs[1]]);
   llvm::Value* ret = builder_.CreateOr(lhs.value, rhs.value);
   OutputBool(ret, stmt);
 }
 
 void Compiler::Not(const stripe::Intrinsic& stmt) {
   assert(1 == stmt.inputs.size());
-  Scalar op = CheckBool(scalars_[stmt.inputs[0]]);
+  Scalar op = CheckNotFloat(scalars_[stmt.inputs[0]]);
   llvm::Value* ret = builder_.CreateNot(op.value);
   OutputBool(ret, stmt);
 }
 
 void Compiler::Xor(const stripe::Intrinsic& stmt) {
   assert(2 == stmt.inputs.size());
-  Scalar lhs = CheckBool(scalars_[stmt.inputs[0]]);
-  Scalar rhs = CheckBool(scalars_[stmt.inputs[1]]);
+  Scalar lhs = CheckNotFloat(scalars_[stmt.inputs[0]]);
+  Scalar rhs = CheckNotFloat(scalars_[stmt.inputs[1]]);
   llvm::Value* ret = builder_.CreateXor(lhs.value, rhs.value);
   OutputBool(ret, stmt);
 }
@@ -1505,7 +1526,7 @@ void Compiler::Reshape(const stripe::Special& reshape) {
   assert(1 == reshape.outputs.size());
   Buffer dst = buffers_[reshape.outputs[0]];
   auto size = IndexConst(dst.refinement->interior_shape.byte_size());
-  builder_.CreateMemCpy(dst.base, 0, src.base, 0, size);
+  builder_.CreateMemCpy(dst.base, llvm::MaybeAlign(0), src.base, llvm::MaybeAlign(0), size);
 }
 
 void Compiler::PrngStep(const stripe::Special& prng_step) {
@@ -1925,11 +1946,11 @@ Compiler::Scalar Compiler::Cast(Scalar v, DataType to_type) {
   return Scalar{ret, to_type};
 }
 
-Compiler::Scalar Compiler::CheckBool(Scalar v) {
-  if (v.type == DataType::BOOLEAN) {
-    return v;
+Compiler::Scalar Compiler::CheckNotFloat(Scalar v) {
+  if (is_float(v.type) || v.type == DataType::INVALID) {
+    throw Error("Expected non-float, actually found " + to_string(v.type));
   }
-  throw Error("Expected boolean, actually found " + to_string(v.type));
+  return v;
 }
 
 llvm::Type* Compiler::CType(DataType type) {
@@ -2274,24 +2295,13 @@ std::string Compiler::ProfileBlockID(const stripe::Block& block) {
   return block.name + "@" + std::to_string((uintptr_t)&block);
 }
 
-void Compiler::PrintOutputAssembly() {
-  // duplicate the output module, so we can create an execution engine, which
-  // will give us a target machine, which we can use to disassemble
-  std::unique_ptr<llvm::Module> clone(llvm::CloneModule(*module_));
-  std::string builderErrorStr;
-  auto ee =
-      llvm::EngineBuilder(std::move(clone)).setErrorStr(&builderErrorStr).setEngineKind(llvm::EngineKind::JIT).create();
-  if (ee) {
-    ee->finalizeObject();
-  } else {
-    throw Error("Failed to create ExecutionEngine: " + builderErrorStr);
-  }
+void Compiler::PrintOutputAssembly(llvm::TargetMachine* machine) {
   std::string outputStr;
   {
-    llvm::legacy::PassManager pm;
     llvm::raw_string_ostream stream(outputStr);
     llvm::buffer_ostream pstream(stream);
-    ee->getTargetMachine()->addPassesToEmitFile(pm, pstream, nullptr, llvm::CGFT_AssemblyFile);
+    llvm::legacy::PassManager pm;
+    machine->addPassesToEmitFile(pm, pstream, nullptr, llvm::CGFT_AssemblyFile);
     pm.run(*module_);
   }
   llvm::errs() << outputStr << "\n";

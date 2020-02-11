@@ -15,7 +15,7 @@ def gentbl(
         td_includes = [],
         strip_include_prefix = None,
         test = False,
-        tblgen = "@mlir//:mlir-tblgen"):
+        tblgen = "@llvm-project//mlir:mlir-tblgen"):
     """gentbl() generates tabular code from a table definition file.
 
     Args:
@@ -35,7 +35,7 @@ def gentbl(
     if td_file not in td_srcs:
         srcs += [td_file]
 
-    td_includes_cmd = ["-I external/mlir/include -I external/com_intel_plaidml"]
+    td_includes_cmd = ["-I external/llvm-project/mlir/include -I external/com_intel_plaidml"]
     for td_include in td_includes:
         td_includes_cmd += ["-I%s" % td_include]
     local_inc = "-I $$(dirname $(location %s))" % td_file

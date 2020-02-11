@@ -21,14 +21,14 @@ inline void init() {
 
 namespace details {
 
-template <typename T>
 struct Deleter {
-  std::function<void(plaidml_error*, T*)> fn;
-  void operator()(T* ptr) { ffi::call_void(fn, ptr); }
+  void operator()(plaidml_executable* ptr) { ffi::call_void(plaidml_executable_free, ptr); }
+  void operator()(plaidml_strings* ptr) { ffi::call_void(plaidml_strings_free, ptr); }
 };
 
-inline std::shared_ptr<plaidml_executable> make_plaidml_executable(plaidml_executable* ptr) {
-  return std::shared_ptr<plaidml_executable>(ptr, Deleter<plaidml_executable>{plaidml_executable_free});
+template <typename T>
+inline std::shared_ptr<T> make_ptr(T* ptr) {
+  return std::shared_ptr<T>(ptr, Deleter{});
 }
 
 }  // namespace details
@@ -37,6 +37,24 @@ struct Binding {
   edsl::Tensor tensor;
   Buffer buffer;
 };
+
+inline std::vector<std::string> list_devices() {
+  auto strs = details::make_ptr(ffi::call<plaidml_strings*>(plaidml_devices_get));
+  std::vector<std::string> ret(strs->nstrs);
+  for (size_t i = 0; i < ret.size(); i++) {
+    ret[i] = ffi::str(strs->strs[i]);
+  }
+  return ret;
+}
+
+inline std::vector<std::string> list_targets() {
+  auto strs = details::make_ptr(ffi::call<plaidml_strings*>(plaidml_targets_get));
+  std::vector<std::string> ret(strs->nstrs);
+  for (size_t i = 0; i < ret.size(); i++) {
+    ret[i] = ffi::str(strs->strs[i]);
+  }
+  return ret;
+}
 
 class Executable {
  public:
@@ -70,15 +88,15 @@ class Executable {
       outputs_storage[i].buffer = outputs[i].buffer.as_ptr();
       raw_outputs[i] = &outputs_storage[i];
     }
-    ptr_ = details::make_plaidml_executable(  //
-        ffi::call<plaidml_executable*>(       //
-            plaidml_compile,                  //
-            program.as_ptr(),                 //
-            device.c_str(),                   //
-            target.c_str(),                   //
-            raw_inputs.size(),                //
-            raw_inputs.data(),                //
-            raw_outputs.size(),               //
+    ptr_ = details::make_ptr(            //
+        ffi::call<plaidml_executable*>(  //
+            plaidml_compile,             //
+            program.as_ptr(),            //
+            device.c_str(),              //
+            target.c_str(),              //
+            raw_inputs.size(),           //
+            raw_inputs.data(),           //
+            raw_outputs.size(),          //
             raw_outputs.data()));
   }
 
@@ -171,28 +189,6 @@ class Binder {
   std::map<edsl::TensorRef, Buffer> inputs_;
   std::map<edsl::TensorRef, Buffer> outputs_;
 };
-
-inline std::vector<std::string> list_devices() {
-  auto count = ffi::call<size_t>(plaidml_device_list_count);
-  std::vector<plaidml_string*> strs(count);
-  ffi::call_void(plaidml_device_list, strs.size(), strs.data());
-  std::vector<std::string> ret(count);
-  for (size_t i = 0; i < ret.size(); i++) {
-    ret[i] = ffi::str(strs[i]);
-  }
-  return ret;
-}
-
-inline std::vector<std::string> list_targets() {
-  auto count = ffi::call<size_t>(plaidml_target_list_count);
-  std::vector<plaidml_string*> strs(count);
-  ffi::call_void(plaidml_target_list, strs.size(), strs.data());
-  std::vector<std::string> ret(count);
-  for (size_t i = 0; i < ret.size(); i++) {
-    ret[i] = ffi::str(strs[i]);
-  }
-  return ret;
-}
 
 }  // namespace exec
 

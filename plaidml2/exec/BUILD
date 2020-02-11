@@ -29,7 +29,6 @@ plaidml_cc_library(
     ],
     hdrs = SDK_HDRS,
     defines = [
-        "PLAIDML_EXEC_DLL",
         "PLAIDML_AST",
     ],
     visibility = ["//visibility:public"],
@@ -47,14 +46,16 @@ plaidml_cc_library(
     ],
     hdrs = SDK_HDRS,
     defines = [
-        "PLAIDML_EXEC_DLL",
         "PLAIDML_MLIR",
     ],
     visibility = ["//visibility:public"],
     deps = [
         "//base/util",
         "//plaidml2/core:core_mlir",
-        "//pmlc/dialect/stripe:transcode",
+        "//pmlc/compiler",
+        "//pmlc/conversion/tile_to_stripe",
+        "//pmlc/target/intel_gen",
+        "//pmlc/target/x86",
     ],
     alwayslink = 1,
 )

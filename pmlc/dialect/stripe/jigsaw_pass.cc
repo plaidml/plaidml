@@ -2,12 +2,11 @@
 
 // A very naive vectorization pass as a demo of Stripe dialect
 
-#include "base/util/logging.h"
-
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 
+#include "base/util/logging.h"
 #include "pmlc/dialect/stripe/analysis.h"
 #include "pmlc/dialect/stripe/ops.h"
 #include "pmlc/dialect/stripe/rewrites.h"
@@ -40,8 +39,8 @@ void JigsawPass::runOnFunction() {
       int64_t best_split = 0;
       for (auto [arg, scale] : poly.terms) {
         // Get the range of the index at hand
-        auto pf = mlir::cast<ParallelForOp>(arg->getOwner()->getParentOp());
-        int64_t idx_range = pf.getRange(arg->getArgNumber());
+        auto pf = mlir::cast<ParallelForOp>(arg.getOwner()->getParentOp());
+        int64_t idx_range = pf.getRange(arg.getArgNumber());
         // Make a version of the poly remainder without the current argument
         auto rem_poly = poly;
         rem_poly.terms.erase(arg);
@@ -59,7 +58,7 @@ void JigsawPass::runOnFunction() {
         if (benefit > best_benefit) {
           best_benefit = benefit;
           best_pf = pf;
-          best_index = arg->getArgNumber();
+          best_index = arg.getArgNumber();
           best_split = split;
         }
       }

@@ -16,14 +16,15 @@
 import os
 import lit.llvm
 
-config.llvm_tools_dir = os.path.join(os.environ['TEST_SRCDIR'], 'llvm')
+config.llvm_tools_dir = os.path.join(os.environ['TEST_SRCDIR'], 'llvm-project', 'llvm')
 config.mlir_obj_root = os.path.join(os.environ['TEST_SRCDIR'])
-config.mlir_tools_dir = os.path.join(os.environ['TEST_SRCDIR'], 'mlir')
+config.mlir_tools_dir = os.path.join(os.environ['TEST_SRCDIR'], 'llvm-project', 'mlir')
 config.suffixes = ['.td', '.mlir', '.pbtxt']
 
 mlir_pmlc_tools_dirs = [
-    'pmlc',
-    'pmlc/dialect/oplib',
+    'pmlc/tools/pmlc-opt',
+    'pmlc/tools/pmlc-tblgen',
+    'pmlc/tools/pmlc-translate',
 ]
 config.mlir_pmlc_tools_dirs = [
     os.path.join(os.environ['TEST_SRCDIR'], os.environ['TEST_WORKSPACE'], s)

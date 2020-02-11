@@ -7,7 +7,7 @@
 #include <utility>
 #include <vector>
 
-#include "pmlc/dialect/eltwise/types.h"
+#include "pmlc/dialect/eltwise/ir/types.h"
 #include "pmlc/dialect/stripe/mlir.h"
 #include "tile/base/shape.h"
 

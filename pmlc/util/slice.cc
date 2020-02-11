@@ -11,20 +11,19 @@
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/Value.h"
 
-namespace pmlc {
-namespace util {
+namespace pmlc::util {
 
 namespace {
 
 class BackwardSliceImpl {
  public:
-  std::vector<mlir::Value*> slice;
+  std::vector<mlir::Value> slice;
 
-  BackwardSliceImpl(const llvm::SetVector<mlir::Value*>& values, bool enter_regions, TransitiveFilter filter) {
+  BackwardSliceImpl(const llvm::SetVector<mlir::Value>& values, bool enter_regions, TransitiveFilter filter) {
     for (auto it = values.rbegin(); it != values.rend(); it++) {
-      Push(*it, [](mlir::Value*) { return true; });
+      Push(*it, [](mlir::Value) { return true; });
     }
-    std::unordered_set<const mlir::Value*> seen;
+    llvm::DenseSet<mlir::Value> seen;
     while (stack.size()) {
       auto entry = stack.top();
       stack.pop();
@@ -43,7 +42,7 @@ class BackwardSliceImpl {
   }
 
  private:
-  void Push(mlir::Value* value, TransitiveFilter filter) {
+  void Push(mlir::Value value, TransitiveFilter filter) {
     if (filter(value)) {
       stack.push(std::make_pair(value, false));
     }
@@ -64,18 +63,17 @@ class BackwardSliceImpl {
     }
   }
 
-  std::stack<std::pair<mlir::Value*, bool>> stack;
+  std::stack<std::pair<mlir::Value, bool>> stack;
 };
 
 }  // namespace
 
-std::vector<mlir::Value*> getBackwardSlice(       //
-    const llvm::SetVector<mlir::Value*>& values,  //
-    bool enter_regions,                           //
+std::vector<mlir::Value> getBackwardSlice(       //
+    const llvm::SetVector<mlir::Value>& values,  //
+    bool enter_regions,                          //
     TransitiveFilter filter) {
   BackwardSliceImpl impl(values, enter_regions, filter);
   return impl.slice;
 }
 
-}  // namespace util
-}  // namespace pmlc
+}  // namespace pmlc::util
