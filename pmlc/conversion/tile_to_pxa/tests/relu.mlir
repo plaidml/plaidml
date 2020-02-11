@@ -13,11 +13,11 @@ func @relu(%arg0: !t_10x20xfp32) -> !t_10x20xfp32 {
 
 // CHECK-LABEL: func @relu
 // CHECK: alloc
-// CHECK: pxa.parallel
+// CHECK: affine.parallel
 // CHECK: affine.load
 // CHECK: cmpf "olt"
 // CHECK: affine.store
-// CHECK: pxa.parallel
+// CHECK: affine.parallel
 // CHECK: affine.load
 // CHECK: affine.load
 // CHECK: select

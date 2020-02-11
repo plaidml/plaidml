@@ -19,27 +19,19 @@ func @double_dot(
   return %1 : tensor<10x40x!eltwise.f32>
 }
 
-// CHECK-DAG: [[map_dot_lb:#map[0-9]+]] = affine_map<() -> (0, 0, 0)>
-// CHECK-DAG: [[map_dot_1_ub:#map[0-9]+]] = affine_map<() -> (20, 10, 30)>
-// CHECK-DAG: [[map_dot_2_ub:#map[0-9]+]] = affine_map<() -> (30, 10, 40)>
 // CHECK-LABEL: func @double_dot
-// CHECK-SAME: %{{.*}}: memref<10x20xf32>, %{{.*}}: memref<20x30xf32>, %{{.*}}: memref<30x40xf32>, %{{.*}}: memref<10x40xf32>
-// CHECK: alloc() : memref<10x30xf32>
-// CHECK: pxa.parallel
-// CHECK: ^bb0(%{{.*}}: index, %a{{.*}}: index, %{{.*}}: index):
+// CHECK-SAME: %{{.*}}: memref<10x20xf32>
+// CHECK-SAME: %{{.*}}: memref<20x30xf32>
+// CHECK-SAME: %{{.*}}: memref<30x40xf32>
+// CHECK-SAME: %{{.*}}: memref<10x40xf32>
+// CHECK: %[[TMP:.*]]  = alloc() : memref<10x30xf32>
+// CHECK: affine.parallel [%{{.*}}, %{{.*}}, %{{.*}}] = [0, 0, 0] to [20, 10, 30]
 // CHECK:   affine.load %{{.*}}[%{{.*}}, %{{.*}}] : memref<10x20xf32>
 // CHECK:   affine.load %{{.*}}[%{{.*}}, %{{.*}}] : memref<20x30xf32>
 // CHECK:   mulf %{{.*}}, %{{.*}} : f32
 // CHECK:   pxa.reduce add %{{.*}}, %{{.*}}[%{{.*}}, %{{.*}}] : memref<10x30xf32>
-// CHECK-DAG: lowerBoundsMap = [[map_dot_lb]]
-// CHECK-DAG: upperBoundsMap = [[map_dot_1_ub]]
-// CHECK-DAG: steps = [1, 1, 1]
-// CHECK: pxa.parallel
-// CHECK: ^bb0(%{{.*}}: index, %{{.*}}: index, %{{.*}}: index):
-// CHECK:   affine.load %{{.*}}[%{{.*}}, %{{.*}}] : memref<10x30xf32>
+// CHECK: affine.parallel [%{{.*}}, %{{.*}}, %{{.*}}] = [0, 0, 0] to [30, 10, 40]
+// CHECK:   affine.load %[[TMP]][%{{.*}}, %{{.*}}] : memref<10x30xf32>
 // CHECK:   affine.load %{{.*}}[%{{.*}}, %{{.*}}] : memref<30x40xf32>
 // CHECK:   mulf %{{.*}}, %{{.*}} : f32
 // CHECK:   pxa.reduce add %{{.*}}, %{{.*}}[%{{.*}}, %{{.*}}] : memref<10x40xf32>
-// CHECK-DAG: lowerBoundsMap = [[map_dot_lb]]
-// CHECK-DAG: upperBoundsMap = [[map_dot_2_ub]]
-// CHECK-DAG: steps = [1, 1, 1]

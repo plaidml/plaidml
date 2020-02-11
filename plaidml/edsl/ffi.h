@@ -38,7 +38,7 @@ void plaidml_edsl_init(  //
 plaidml_logical_shape* plaidml_logical_shape_alloc(  //
     plaidml_error* err,                              //
     plaidml_datatype dtype,                          //
-    size_t ndims,                                    //
+    size_t rank,                                     //
     const int64_t* dims);
 
 void plaidml_logical_shape_free(  //
@@ -57,18 +57,17 @@ plaidml_string* plaidml_logical_shape_repr(  //
     plaidml_error* err,                      //
     plaidml_logical_shape* shape);
 
-size_t plaidml_logical_shape_get_ndims(  //
-    plaidml_error* err,                  //
+size_t plaidml_logical_shape_get_rank(  //
+    plaidml_error* err,                 //
     plaidml_logical_shape* shape);
 
 plaidml_datatype plaidml_logical_shape_get_dtype(  //
     plaidml_error* err,                            //
     plaidml_logical_shape* shape);
 
-int64_t plaidml_logical_shape_get_dim_int(  //
-    plaidml_error* err,                     //
-    plaidml_logical_shape* shape,           //
-    size_t dim);
+plaidml_integers* plaidml_logical_shape_get_sizes(  //
+    plaidml_error* err,                             //
+    plaidml_logical_shape* shape);
 
 //
 // plaidml_poly_expr
@@ -187,7 +186,7 @@ void plaidml_expr_bind_shape(  //
 void plaidml_expr_bind_dims(  //
     plaidml_error* err,       //
     plaidml_expr* expr,       //
-    size_t ndims,             //
+    size_t rank,              //
     plaidml_dim_expr** dims);
 
 plaidml_string* plaidml_expr_repr(  //
@@ -248,12 +247,12 @@ plaidml_expr* plaidml_expr_trace(  //
 plaidml_expr* plaidml_expr_index_map(  //
     plaidml_error* err,                //
     plaidml_expr* ref,                 //
-    size_t ndims,                      //
+    size_t rank,                       //
     plaidml_poly_expr** idxs);
 
 plaidml_expr* plaidml_expr_size_map(  //
     plaidml_error* err,               //
-    size_t ndims,                     //
+    size_t rank,                      //
     plaidml_dim_expr** sizes);
 
 plaidml_expr* plaidml_expr_grad_override(  //

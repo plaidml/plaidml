@@ -43,6 +43,7 @@ py_test(
     srcs = [
         "backend_test.py",
     ],
+    args = ["-v"],
     tags = [
         "keras",
         "manual",

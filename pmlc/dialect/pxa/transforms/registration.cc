@@ -1,4 +1,4 @@
-// Copyright 2020, Intel Corporation
+// Copyright 2020 Intel Corporation
 
 #include "pmlc/dialect/pxa/transforms/autotile.h"
 
@@ -8,12 +8,12 @@ struct Autotile10Pass : public mlir::FunctionPass<Autotile10Pass> {
   void runOnFunction() override {
     auto func = getFunction();
     FixedTileSizeGenerator always10(10);
-    func.walk([&](AffineParallelOp op) {
+    func.walk([&](mlir::AffineParallelOp op) {
       auto ranges = op.getConstantRanges();
       if (!ranges) {
         return;
       }
-      auto tileSize = FindBestTileSize(always10, DummyCostModel, *ranges);
+      auto tileSize = findBestTileSize(always10, DummyCostModel, *ranges);
       if (tileSize.empty()) {
         return;
       }

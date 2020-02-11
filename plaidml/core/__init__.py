@@ -1,4 +1,4 @@
-# Copyright 2019 Intel Corporation.
+# Copyright 2020 Intel Corporation
 
 import atexit
 import contextlib
@@ -13,7 +13,7 @@ from plaidml.ffi import Error, ForeignObject, decode_str, ffi, ffi_call, lib
 
 def __init():
     """
-    Initializes PlaidML's Core API.
+    Initializes the PlaidML Core API.
     """
     ffi_call(lib.plaidml_init)
     lib_version = ffi.string(ffi_call(lib.plaidml_version)).decode()
@@ -31,12 +31,20 @@ def __shutdown():
     ffi_call(lib.plaidml_shutdown)
 
 
-def get_strs(ffi_list):
-    strs = ffi_call(ffi_list)
+def get_strings(ffi_list, *args):
+    strs = ffi_call(ffi_list, *args)
     try:
         return [decode_str(strs[0].elts[i]) for i in range(strs.size)]
     finally:
         ffi_call(lib.plaidml_strings_free, strs)
+
+
+def get_integers(ffi_list, *args):
+    ints = ffi_call(ffi_list, *args)
+    try:
+        return [ints[0].elts[i] for i in range(ints.size)]
+    finally:
+        ffi_call(lib.plaidml_integers_free, ints)
 
 
 def kvps_to_dict(kvps):
@@ -56,25 +64,53 @@ def kvps_to_list(kvps):
 
 
 def list_targets():
-    return get_strs(lib.plaidml_targets_get)
+    return get_strings(lib.plaidml_targets_get)
 
 
 class DType(enum.IntEnum):
-    """Describes the type of a tensor element."""
+    """Defines the set of supported element types in a Tensor."""
+
     INVALID = 0
+    """An invalid data type"""
+
     BOOLEAN = 1
+    """A boolean data type"""
+
     INT8 = 2
+    """An 8-bit signed integer data type"""
+
     UINT8 = 3
+    """An 8-bit unsigned integer data type"""
+
     INT16 = 4
+    """A 16-bit signed integer data type"""
+
     UINT16 = 5
+    """A 16-bit unsigned integer data type"""
+
     INT32 = 6
+    """A 32-bit signed integer data type"""
+
     UINT32 = 7
+    """A 32-bit unsigned integer data type"""
+
     INT64 = 8
+    """A 64-bit signed integer data type"""
+
     UINT64 = 9
+    """A 64-bit unsigned integer data type"""
+
     BFLOAT16 = 10
+    """A 16-bit blocked floating point data type"""
+
     FLOAT16 = 11
+    """A 16-bit floating point data type"""
+
     FLOAT32 = 12
+    """A 32-bit floating point data type"""
+
     FLOAT64 = 13
+    """A 64-bit floating point data type"""
 
     def into_numpy(self):
         try:
@@ -150,7 +186,6 @@ DTYPE_INFOS = {
 
 
 class TensorShape(ForeignObject):
-    """Docstring for class TensorShape"""
     __ffi_del__ = lib.plaidml_shape_free
     __ffi_repr__ = lib.plaidml_shape_repr
 
@@ -177,24 +212,23 @@ class TensorShape(ForeignObject):
         return DType(self._methodcall(lib.plaidml_shape_get_dtype))
 
     @property
-    def ndims(self):
-        return self._methodcall(lib.plaidml_shape_get_ndims)
+    def rank(self):
+        return self._methodcall(lib.plaidml_shape_get_rank)
 
     @property
-    def nbytes(self):
+    def byte_size(self):
         return self._methodcall(lib.plaidml_shape_get_nbytes)
 
     @property
     def sizes(self):
-        return [self._methodcall(lib.plaidml_shape_get_dim_size, i) for i in range(self.ndims)]
+        return get_integers(lib.plaidml_shape_get_sizes, self.as_ptr())
 
     @property
     def strides(self):
-        return [self._methodcall(lib.plaidml_shape_get_dim_stride, i) for i in range(self.ndims)]
+        return get_integers(lib.plaidml_shape_get_strides, self.as_ptr())
 
 
 class View(ForeignObject):
-    """Docstring for class View"""
     __ffi_del__ = lib.plaidml_view_free
 
     def __init__(self, ffi_obj, shape):
@@ -224,7 +258,6 @@ class View(ForeignObject):
 
 
 class Buffer(ForeignObject):
-    """Docstring for class Buffer"""
     __ffi_del__ = lib.plaidml_buffer_free
 
     def __init__(self, shape, device=None, ptr=None):
@@ -233,7 +266,7 @@ class Buffer(ForeignObject):
         if ptr:
             ffi_obj = ptr
         elif device:
-            ffi_obj = ffi_call(lib.plaidml_buffer_alloc, device.encode(), shape.nbytes)
+            ffi_obj = ffi_call(lib.plaidml_buffer_alloc, device.encode(), shape.byte_size)
         super(Buffer, self).__init__(ffi_obj)
 
     @property

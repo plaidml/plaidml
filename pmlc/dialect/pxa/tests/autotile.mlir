@@ -7,7 +7,7 @@
 module {
   // CHECK-LABEL: @dot
   func @dot(%arg0: memref<100x100xf32>, %arg1: memref<100x100xf32>, %arg2: memref<100x100xf32>) {
-    "pxa.parallel"() ( {
+    "affine.parallel"() ( {
     ^bb0(%arg3: index, %arg4: index, %arg5: index):	// no predecessors
       %0 = affine.load %arg1[%arg3, %arg5] : memref<100x100xf32>
       %1 = affine.load %arg0[%arg5, %arg4] : memref<100x100xf32>
@@ -17,8 +17,8 @@ module {
     }) {lowerBoundsMap = #map1, steps = [1, 1, 1], upperBoundsMap = #map2} : () -> ()
     return
   }
-  // CHECK: pxa.parallel
-  // CHECK: pxa.parallel
+  // CHECK: affine.parallel
+  // CHECK: affine.parallel
 }
 
 

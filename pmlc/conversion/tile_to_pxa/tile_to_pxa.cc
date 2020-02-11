@@ -44,6 +44,7 @@ using mlir::AffineIfOp;
 using mlir::AffineLoadOp;
 using mlir::AffineMap;
 using mlir::AffineMapAttr;
+using mlir::AffineParallelOp;
 using mlir::AffineStoreOp;
 using mlir::AllocOp;
 using mlir::ArrayRef;
@@ -517,8 +518,8 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
         rewriter.create<AllocOp>(loc, resultMemRefType).getResult();
 
     // Make a parallel for loop to fill the result
-    auto forOp = rewriter.create<pxa::AffineParallelOp>(
-        loc, resultMemRefType.getShape());
+    auto forOp =
+        rewriter.create<AffineParallelOp>(loc, resultMemRefType.getShape());
     auto body = forOp.getBody();
     rewriter.setInsertionPointToStart(body);
 
@@ -608,14 +609,14 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
 
     // Do initialization
     auto initFor =
-        rewriter.create<pxa::AffineParallelOp>(loc, resultType.getShape());
+        rewriter.create<AffineParallelOp>(loc, resultType.getShape());
     auto initForBuilder = initFor.getBodyBuilder();
     auto initLoad = buildBroadcastLoad(initForBuilder, loc, cionAdaptor.init(),
                                        resultType.getRank());
     buildSimpleStore(initForBuilder, loc, initLoad, resultMemRef);
 
     // Make the outer loops
-    auto forOp = rewriter.create<pxa::AffineParallelOp>(loc, ranges);
+    auto forOp = rewriter.create<AffineParallelOp>(loc, ranges);
     auto body = forOp.getBody();
     rewriter.setInsertionPointToStart(body);
     // TODO: Maybe fix ValueRange?
@@ -692,8 +693,7 @@ struct IndexOpConversion : public OpConversionPattern<IndexOp> {
     auto resultMemRef = rewriter.create<AllocOp>(loc, resultType).getResult();
 
     // Make a parallel for loop to fill the result
-    auto forOp =
-        rewriter.create<pxa::AffineParallelOp>(loc, resultType.getShape());
+    auto forOp = rewriter.create<AffineParallelOp>(loc, resultType.getShape());
     auto body = forOp.getBody();
     rewriter.setInsertionPointToStart(body);
     // TODO: Maybe fix ValueRange?
@@ -782,8 +782,7 @@ struct CastOpConversion : public OpConversionPattern<ew::CastOp> {
     auto resultMemRef = rewriter.create<AllocOp>(loc, resultType).getResult();
 
     // Make a parallel for loop to fill the result
-    auto forOp =
-        rewriter.create<pxa::AffineParallelOp>(loc, resultType.getShape());
+    auto forOp = rewriter.create<AffineParallelOp>(loc, resultType.getShape());
     auto body = forOp.getBody();
     rewriter.setInsertionPointToStart(body);
     // TODO: Maybe fix ValueRange?

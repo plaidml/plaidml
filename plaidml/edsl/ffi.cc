@@ -120,11 +120,11 @@ void plaidml_edsl_init(  //
 plaidml_logical_shape* plaidml_logical_shape_alloc(  //
     plaidml_error* err,                              //
     plaidml_datatype dtype,                          //
-    size_t ndims,                                    //
+    size_t rank,                                     //
     const int64_t* dims) {
   return ffi_wrap<plaidml_logical_shape*>(err, nullptr, [&] {
     llvm::SmallVector<int64_t, 6> dimsVec;
-    for (size_t i = 0; i < ndims; i++) {
+    for (size_t i = 0; i < rank; i++) {
       dimsVec.emplace_back(dims[i]);
     }
     auto ret = new plaidml_logical_shape;
@@ -142,7 +142,6 @@ plaidml_logical_shape* plaidml_logical_shape_clone(  //
     plaidml_logical_shape* shape) {
   return ffi_wrap<plaidml_logical_shape*>(err, nullptr, [&] {
     IVLOG(3, "plaidml_logical_shape");
-    // TODO(MLIR): deal with clone
     return new plaidml_logical_shape{shape->type};
   });
 }
@@ -153,8 +152,8 @@ plaidml_string* plaidml_logical_shape_repr(  //
   return ffi_wrap<plaidml_string*>(err, nullptr, [&] { return new plaidml_string{mlir::debugString(shape->type)}; });
 }
 
-size_t plaidml_logical_shape_get_ndims(  //
-    plaidml_error* err,                  //
+size_t plaidml_logical_shape_get_rank(  //
+    plaidml_error* err,                 //
     plaidml_logical_shape* shape) {
   return ffi_wrap<size_t>(err, 0, [&] { return shape->type.getRank(); });
 }
@@ -172,30 +171,20 @@ plaidml_datatype plaidml_logical_shape_get_dtype(  //
   });
 }
 
-int64_t plaidml_logical_shape_get_dim_int(  //
-    plaidml_error* err,                     //
-    plaidml_logical_shape* shape,           //
-    size_t dim) {
-  return ffi_wrap<int64_t>(err, 0, [&] {
-    const auto& dims = shape->type.getShape();
-    if (dims.size() < dim) {
-      throw std::range_error("Index out of range");
-    }
-    auto ret = dims[dim];
-    if (ret < 0) {
-      return static_cast<int64_t>(0);
+plaidml_integers* plaidml_logical_shape_get_sizes(  //
+    plaidml_error* err,                             //
+    plaidml_logical_shape* shape) {
+  return ffi_wrap<plaidml_integers*>(err, 0, [&] {
+    const auto& sizes = shape->type.getShape();
+    auto ret = new plaidml_integers{sizes.size(), new int64_t[sizes.size()]};
+    for (unsigned i = 0; i < sizes.size(); i++) {
+      if (sizes[i] < 0) {
+        ret->elts[i] = 0;
+      } else {
+        ret->elts[i] = sizes[i];
+      }
     }
     return ret;
-  });
-}
-
-plaidml_dim_expr* plaidml_logical_shape_get_dim_expr(  //
-    plaidml_error* err,                                //
-    plaidml_logical_shape* shape,                      //
-    size_t dim) {
-  return ffi_wrap<plaidml_dim_expr*>(err, 0, [&] {  //
-    throw std::runtime_error("NYI: plaidml_logical_shape_get_dim_expr");
-    return nullptr;
   });
 }
 
@@ -291,12 +280,12 @@ void plaidml_expr_bind_shape(  //
 void plaidml_expr_bind_dims(  //
     plaidml_error* err,       //
     plaidml_expr* expr,       //
-    size_t ndims,             //
+    size_t rank,              //
     plaidml_dim_expr** dims) {
   return ffi_wrap_void(err, [&] {
     IVLOG(3, "plaidml_expr_bind_dims> " << mlir::debugString(expr->value));
     llvm::SmallVector<mlir::Value*, 6> into;
-    for (size_t i = 0; i < ndims; i++) {
+    for (size_t i = 0; i < rank; i++) {
       IVLOG(3, "bind_dims> i: " << i << ", from: " << expr->value << ", into: " << dims[i]->value);
       into.emplace_back(&dims[i]->value);
     }
@@ -347,7 +336,6 @@ plaidml_expr* plaidml_expr_clone(  //
     plaidml_expr* expr) {
   return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
     IVLOG(3, "plaidml_expr_clone> " << mlir::debugString(expr->value));
-    // TODO(MLIR): deal with clone of expr->value
     return new plaidml_expr{expr->value};
   });
 }
@@ -357,7 +345,6 @@ plaidml_dim_expr* plaidml_expr_get_dim(  //
     plaidml_expr* expr) {
   return ffi_wrap<plaidml_dim_expr*>(err, nullptr, [&] {
     IVLOG(3, "plaidml_expr_get_dim> " << mlir::debugString(expr->value));
-    // TODO(MLIR): deal with clone of expr->value
     return new plaidml_dim_expr{expr->value};
   });
 }
@@ -445,12 +432,12 @@ plaidml_expr* plaidml_expr_grad_override(  //
 plaidml_expr* plaidml_expr_index_map(  //
     plaidml_error* err,                //
     plaidml_expr* ref,                 //
-    size_t ndims,                      //
+    size_t rank,                       //
     plaidml_poly_expr** raw_idxs) {
   return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
     IVLOG(3, "plaidml_expr_index_map");
-    std::vector<mlir::Value> idx_values(ndims);
-    for (size_t i = 0; i < ndims; i++) {
+    std::vector<mlir::Value> idx_values(rank);
+    for (size_t i = 0; i < rank; i++) {
       idx_values[i] = raw_idxs[i]->value;
     }
     if (ref) {
@@ -462,12 +449,12 @@ plaidml_expr* plaidml_expr_index_map(  //
 
 plaidml_expr* plaidml_expr_size_map(  //
     plaidml_error* err,               //
-    size_t ndims,                     //
+    size_t rank,                      //
     plaidml_dim_expr** raw_dims) {
   return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
     IVLOG(3, "plaidml_expr_size_map");
     std::vector<mlir::Value> dim_values;
-    for (size_t i = 0; i < ndims; i++) {
+    for (size_t i = 0; i < rank; i++) {
       dim_values.emplace_back(raw_dims[i]->value);
     }
     return new plaidml_expr{GlobalContext::get()->MakeAffineMapOp(dim_values)};

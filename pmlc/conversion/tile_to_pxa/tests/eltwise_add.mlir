@@ -12,7 +12,7 @@ func @eltwise_add(
 }
 
 // CHECK-LABEL: func @eltwise_add
-// CHECK: pxa.parallel
+// CHECK: affine.parallel
 // CHECK: affine.load
 // CHECK: affine.load
 // CHECK: addf
