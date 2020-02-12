@@ -132,11 +132,11 @@ void PadPass::runOnFunction() {
                                          *op.upperBounds());
       // Check if there are any out-of-bounds reads.
       auto shape =
-          op.getTensor(i).getType().cast<mlir::MemRefType>().getShape();
+          op.getTensor(i).getType().cast<mlir::RankedTensorType>().getShape();
       assert(bounds.size() == shape.size());
       bool needsPadding = false;
       for (size_t i = 0; i < bounds.size(); i++) {
-        if (shape[i] == mlir::MemRefType::kDynamicSize) {
+        if (shape[i] == mlir::RankedTensorType::kDynamicSize) {
           op.emitRemark("padding cannot support dynamic memref sizes");
           return;
         }
