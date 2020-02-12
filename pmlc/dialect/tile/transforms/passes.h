@@ -24,10 +24,10 @@ std::unique_ptr<mlir::Pass> createComputeBoundsPass();
 std::unique_ptr<mlir::Pass> createConstantTypesPass(DataType floatx,
                                                     DataType intx);
 
-struct PaddingPass : public mlir::FunctionPass<PaddingPass> {
+struct PadPass : public mlir::FunctionPass<PadPass> {
   void runOnFunction() final;
 };
 
-std::unique_ptr<mlir::Pass> createPaddingPass();
+std::unique_ptr<mlir::Pass> createPadPass();
 
 } // namespace pmlc::dialect::tile
