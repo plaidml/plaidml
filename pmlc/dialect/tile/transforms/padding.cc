@@ -75,7 +75,6 @@ computePaddingBounds(AffineMap access, AffineMap lower, AffineMap upper) {
   size_t size = access.getNumResults();
   assert(lower.getNumResults() == idxs);
   assert(upper.getNumResults() == idxs);
-  assert(access.isPureAffine());
   std::vector<BoundRange> dimRanges;
   for (size_t i = 0; i < idxs; i++) {
     int64_t lowerBoundInt =
