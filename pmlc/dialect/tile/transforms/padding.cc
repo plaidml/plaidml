@@ -64,7 +64,7 @@ private:
 };
 
 llvm::SmallVector<BoundRange, 4>
-computeBounds(AffineMap access, AffineMap lower, AffineMap upper) {
+computePaddingBounds(AffineMap access, AffineMap lower, AffineMap upper) {
   // We only handle the 'easy' cases.
   assert(access.getNumSymbols() == 0);
   assert(lower.getNumSymbols() == 0);
@@ -129,8 +129,8 @@ void PadPass::runOnFunction() {
     }
     for (size_t i = 0; i < op.getNumTensors(); i++) {
       // Compute the largest region the source may access.
-      auto bounds = computeBounds(op.getSourceMap(i), *op.lowerBounds(),
-                                  *op.upperBounds());
+      auto bounds = computePaddingBounds(op.getSourceMap(i), *op.lowerBounds(),
+                                         *op.upperBounds());
       // Check if there are any out-of-bounds reads.
       auto shape =
           op.getTensor(i).getType().cast<mlir::MemRefType>().getShape();
@@ -145,10 +145,10 @@ void PadPass::runOnFunction() {
           needsPadding = true;
         }
       }
-      // If there is no need to pad, don't bother adding an entry
+      // If there is no need to pad, don't bother adding an entry.
       if (!needsPadding)
         return;
-      // Merge discovered padding into the recorded data
+      // Merge discovered padding into the recorded data.
       auto &info = toPad[op.getTensor(i)][op.agg()];
       info.padBelow.resize(bounds.size());
       info.padAbove.resize(bounds.size());
@@ -161,7 +161,7 @@ void PadPass::runOnFunction() {
   });
   Builder builder(&getContext());
   for (const auto &kvp : toPad) {
-    // Get the value which we want to pad
+    // Get the value which we want to pad.
     Value def = kvp.first;
     // If there are two conflicting ways to pad, don't pad.
     if (kvp.second.size() != 1) {
@@ -170,33 +170,35 @@ void PadPass::runOnFunction() {
       }
       continue;
     }
-    // Check if it's a block argument, and if so add a 'copy'
+    // Check if it's a block argument, and if so add an IdentOp to copy the
+    // value.
     if (auto arg = def.dyn_cast<mlir::BlockArgument>()) {
-      // Construct an initial identity operation
+      // Construct an initial identity operation.
       auto block = arg.getOwner();
       OpBuilder inner(block, block->begin());
-      auto ident = inner.create<eltwise::IdentOp>(inner.getUnknownLoc(), def);
-      // Replace all uses with ident (expect for newly generated use)
+      auto ident =
+          inner.create<eltwise::IdentOp>(block->getParentOp()->getLoc(), def);
+      // Replace all uses with ident (except for newly generated use).
       // TODO: This seems like the wrong way to do things?
       auto use = def.use_begin();
       while (use != def.use_end()) {
-        // Copy and increment since we will destroy use
+        // Copy and increment since we will destroy use.
         auto newUse = use;
         newUse++;
-        // Change if not the ident itself
+        // Change if not the IdentOp itself.
         if (use->getOwner() != ident.getOperation()) {
           use->set(ident);
         }
         use = newUse;
       }
-      // Now use ident for all further work
+      // Now use ident for all further work.
       def = ident;
     }
     // Get defining operation (should now always work).
     Operation *op = def.getDefiningOp();
     assert(op);
 
-    // Attach attributes specifying the padding details
+    // Attach attributes specifying the padding details.
     AggregationKind agg = kvp.second.begin()->first;
     op->setAttr("padType",
                 builder.getI64IntegerAttr(static_cast<int64_t>(agg)));
