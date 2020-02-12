@@ -19,9 +19,15 @@ using DataType = util::DataType;
 
 class ContractionOp;
 
-std::unique_ptr<mlir::OpPassBase<mlir::FuncOp>> createComputeBoundsPass();
+std::unique_ptr<mlir::Pass> createComputeBoundsPass();
 
 std::unique_ptr<mlir::Pass> createConstantTypesPass(DataType floatx,
                                                     DataType intx);
+
+struct PadPass : public mlir::FunctionPass<PadPass> {
+  void runOnFunction() final;
+};
+
+std::unique_ptr<mlir::Pass> createPadPass();
 
 } // namespace pmlc::dialect::tile

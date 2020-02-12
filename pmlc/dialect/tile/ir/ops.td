@@ -240,8 +240,8 @@ def ContractionOp : TileOpWithPPV<"cion", [NoSideEffect]> {
     OptionalAttr<IntegerSetAttr>:$cons,
     OptionalAttr<AffineMapAttr>:$shape,
     OptionalAttr<UnitAttr>:$no_reduce,
-    OptionalAttr<AffineMapAttr>:$lower_bounds,
-    OptionalAttr<AffineMapAttr>:$upper_bounds,
+    OptionalAttr<AffineMapAttr>:$lowerBounds,
+    OptionalAttr<AffineMapAttr>:$upperBounds,
     OptionalAttr<StrAttr>:$name
   );
   let results = (outs RankedTensorOf<[AnyScalar]>:$result);
@@ -266,13 +266,14 @@ def ContractionOp : TileOpWithPPV<"cion", [NoSideEffect]> {
     static StringRef getSinkAttrName() { return "sink"; }
     static StringRef getSourcesAttrName() { return "srcs"; }
     static StringRef getConstraintsAttrName() { return "cons"; }
-    static StringRef getLowerBoundsAttrName() { return "lower_bounds"; }
-    static StringRef getUpperBoundsAttrName() { return "upper_bounds"; }
+    static StringRef getLowerBoundsAttrName() { return "lowerBounds"; }
+    static StringRef getUpperBoundsAttrName() { return "upperBounds"; }
 
     unsigned getNumTensors();
     unsigned getNumSymbols();
     Value getTensor(unsigned i);
     Value getSymbol(unsigned i);
+    AffineMap getSourceMap(unsigned i);
 
     void setLowerBounds(ArrayRef<int64_t> bounds);
     void setUpperBounds(ArrayRef<int64_t> bounds);
