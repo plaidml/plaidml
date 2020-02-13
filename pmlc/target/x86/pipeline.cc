@@ -12,6 +12,8 @@
 #include "pmlc/compiler/registry.h"
 #include "pmlc/conversion/pxa_to_affine/pxa_to_affine.h"
 #include "pmlc/conversion/stdx_to_llvm/stdx_to_llvm.h"
+#include "pmlc/conversion/tile_to_pxa/tile_to_pxa.h"
+#include "pmlc/dialect/tile/transforms/passes.h"
 #include "pmlc/target/x86/trace_linking.h"
 #include "pmlc/util/logging.h"
 
@@ -26,12 +28,15 @@ struct ConvertToLLVMPass : public ModulePass<ConvertToLLVMPass> {
     auto module = getModule();
     auto *context = module.getContext();
     LLVM::ensureDistinctSuccessors(module);
-    LLVMTypeConverter typeConverter(context);
+
+    LLVMTypeConverterCustomization customs;
+    customs.funcArgConverter = barePtrFuncArgTypeConverter;
+    LLVMTypeConverter typeConverter(&getContext(), customs);
 
     OwningRewritePatternList patterns;
     populateAffineToStdConversionPatterns(patterns, context);
     populateLoopToStdConversionPatterns(patterns, context);
-    populateStdToLLVMConversionPatterns(typeConverter, patterns);
+    populateStdToLLVMBarePtrConversionPatterns(typeConverter, patterns);
     conversion::stdx_to_llvm::populateStdXToLLVMConversionPatterns(
         typeConverter, patterns);
 
@@ -49,6 +54,14 @@ struct ConvertToLLVMPass : public ModulePass<ConvertToLLVMPass> {
 };
 
 void addToPipeline(OpPassManager &pm) {
+  pm.addPass(pmlc::dialect::tile::createComputeBoundsPass());
+  pm.addNestedPass<FuncOp>(createCanonicalizerPass());
+  pm.addNestedPass<FuncOp>(createCSEPass());
+
+  pm.addPass(pmlc::conversion::tile_to_pxa::createLowerTileToPXAPass());
+  pm.addNestedPass<FuncOp>(createCanonicalizerPass());
+  pm.addNestedPass<FuncOp>(createCSEPass());
+
   // TODO: do optimizations here
 
   pm.addPass(conversion::pxa_to_affine::createLowerPXAToAffinePass());

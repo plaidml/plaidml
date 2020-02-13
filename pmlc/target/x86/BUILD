@@ -12,6 +12,8 @@ plaidml_cc_library(
         "//pmlc/compiler",
         "//pmlc/conversion/pxa_to_affine",
         "//pmlc/conversion/stdx_to_llvm",
+        "//pmlc/conversion/tile_to_pxa",
+        "//pmlc/dialect/tile/transforms",
         "@llvm-project//mlir:AffineToStandardTransforms",
         "@llvm-project//mlir:LLVMTransforms",
     ],

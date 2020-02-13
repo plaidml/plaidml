@@ -458,7 +458,7 @@ struct CondOp {
 };
 
 static Value buildBroadcastLoad(OpBuilder &builder, Location loc, Value operand,
-                                size_t outRank) {
+                                unsigned outRank) {
   auto body = builder.getBlock();
   auto defOp = operand.getDefiningOp();
   Attribute attr;

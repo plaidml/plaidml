@@ -9,8 +9,7 @@ plaidml_cc_library(
     srcs = glob(["*.cc"]),
     hdrs = glob(["*.h"]),
     deps = [
-        "//pmlc/conversion/tile_to_pxa",
-        "//pmlc/dialect/tile/transforms",
+        "//pmlc",
         "//pmlc/util",
         "@llvm-project//llvm:support",
         "@llvm-project//mlir:AffineToStandardTransforms",
@@ -18,5 +17,7 @@ plaidml_cc_library(
         "@llvm-project//mlir:ExecutionEngineUtils",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LLVMTransforms",
+        "@llvm-project//mlir:MlirOptLib",
+        "@llvm-project//mlir:OpenMPDialect",
     ],
 )

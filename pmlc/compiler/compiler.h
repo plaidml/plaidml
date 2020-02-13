@@ -1,4 +1,4 @@
-// Copyright 2019, Intel Corporation
+// Copyright 2020 Intel Corporation
 
 #pragma once
 
@@ -37,12 +37,13 @@ struct Program {
   mlir::OwningModuleRef module;
   std::vector<mlir::Value> outputs;
   std::vector<ProgramArgument> arguments;
-  std::vector<mlir::MemRefType> memRefTypes;
   std::vector<PassInfo> passes;
 
   explicit Program(mlir::ModuleOp module) : module(module) {}
 
   void compile(mlir::StringRef target, bool collectPasses = false);
+
+  static void initialize();
 };
 
 class Executable {
@@ -59,7 +60,6 @@ private:
   std::shared_ptr<Program> program;
   std::unique_ptr<mlir::ExecutionEngine> engine;
   std::vector<MemRefDescriptor> descriptors;
-  std::vector<void *> args;
   std::vector<void *> ptrs;
 };
 

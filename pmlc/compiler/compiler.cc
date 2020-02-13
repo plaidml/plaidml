@@ -1,8 +1,7 @@
-// Copyright 2019, Intel Corporation
+// Copyright 2020 Intel Corporation
 
 #include "pmlc/compiler/compiler.h"
 
-#include <unordered_map>
 #include <utility>
 
 #include "llvm/Support/FormatVariadic.h"
@@ -17,38 +16,16 @@
 #include "mlir/Target/LLVMIR.h"
 #include "mlir/Transforms/Passes.h"
 
+#include "pmlc/all_dialects.h"
+#include "pmlc/all_passes.h"
 #include "pmlc/compiler/registry.h"
-#include "pmlc/conversion/tile_to_pxa/tile_to_pxa.h"
-#include "pmlc/dialect/tile/transforms/passes.h"
 #include "pmlc/util/logging.h"
 
 using namespace mlir; // NOLINT[build/namespaces]
-using pmlc::conversion::tile_to_pxa::createLowerTileToPXAPass;
 
 namespace pmlc::compiler {
 
 namespace {
-
-using MemRefTypes = std::vector<MemRefType>;
-
-class ArgumentCollectorPass : public FunctionPass<ArgumentCollectorPass> {
-public:
-  explicit ArgumentCollectorPass(MemRefTypes *into) : into(into) {}
-
-  void runOnFunction() override {
-    auto funcOp = getFunction();
-    for (auto arg : funcOp.getArguments()) {
-      into->emplace_back(arg.getType().cast<MemRefType>());
-    }
-  }
-
-  static std::unique_ptr<Pass> create(MemRefTypes *into) {
-    return std::make_unique<ArgumentCollectorPass>(into);
-  }
-
-private:
-  MemRefTypes *into;
-};
 
 class IRCollector : public PassInstrumentation {
 public:
@@ -106,30 +83,17 @@ private:
   };
 
 public:
-  MemRefDescriptor(void *data, MemRefType type) : memory(computeSize(type)) {
-    int64_t offset;
-    SmallVector<int64_t, 4> strides;
-    auto maybeStrides = getStridesAndOffset(type, strides, offset);
-    if (failed(maybeStrides)) {
-      throw std::runtime_error("unexpected non-strided memref");
-    }
+  MemRefDescriptor(void *data, RankedTensorType type)
+      : memory(computeSize(type)) {
     auto base = reinterpret_cast<Base *>(memory.data());
     base->basePtr = data;
     base->data = data;
-    base->offset = offset;
-    auto var = reinterpret_cast<int64_t *>(memory.data() + sizeof(Base));
-    auto rank = type.getRank();
-    auto sizes = type.getShape();
-    for (unsigned i = 0; i < rank; i++) {
-      var[i] = sizes[i];
-      var[i + rank] = strides[i];
-    }
   }
 
   void *ptr() { return memory.data(); }
 
 private:
-  static unsigned computeSize(MemRefType type) {
+  static unsigned computeSize(RankedTensorType type) {
     return sizeof(void *) +                   // allocatedPtr
            sizeof(void *) +                   // alignedPtr
            sizeof(int64_t) +                  // offset
@@ -139,6 +103,11 @@ private:
 
   std::vector<char> memory;
 };
+
+void Program::initialize() {
+  registerAllDialects();
+  registerAllPasses();
+}
 
 void Executable::initialize() {
   llvm::InitializeNativeTarget();
@@ -172,16 +141,6 @@ void Program::compile(StringRef target, bool collectPasses) {
     pm.enableTiming();
   }
 
-  pm.addPass(dialect::tile::createComputeBoundsPass());
-  pm.addNestedPass<FuncOp>(createCanonicalizerPass());
-  pm.addNestedPass<FuncOp>(createCSEPass());
-
-  pm.addPass(createLowerTileToPXAPass());
-  pm.addNestedPass<FuncOp>(createCanonicalizerPass());
-  pm.addNestedPass<FuncOp>(createCSEPass());
-
-  pm.addPass(ArgumentCollectorPass::create(&memRefTypes));
-
   auto pipelineBuilder = resolveTarget(target);
   pipelineBuilder(pm);
 
@@ -192,9 +151,9 @@ void Program::compile(StringRef target, bool collectPasses) {
 
 Executable::Executable(const std::shared_ptr<Program> &program,
                        ArrayRef<void *> bufptrs)
-    : program(program), args(bufptrs.size()), ptrs(bufptrs.size()) {
-  if (program->memRefTypes.size() != bufptrs.size()) {
-    throw std::runtime_error("memRefTypes and bufptrs size mismatch");
+    : program(program), ptrs(bufptrs.size()) {
+  if (program->arguments.size() != bufptrs.size()) {
+    throw std::runtime_error("Program arguments and bufptrs size mismatch");
   }
 
   auto tmBuilderOrError = llvm::orc::JITTargetMachineBuilder::detectHost();
@@ -228,19 +187,18 @@ Executable::Executable(const std::shared_ptr<Program> &program,
       });
   engine = std::move(*maybeEngine);
 
-  descriptors.reserve(args.size());
-  for (unsigned i = 0; i < args.size(); i++) {
-    descriptors.emplace_back(bufptrs[i], program->memRefTypes[i]);
+  descriptors.reserve(bufptrs.size());
+  for (unsigned i = 0; i < bufptrs.size(); i++) {
+    descriptors.emplace_back(bufptrs[i], program->arguments[i].shape);
     ptrs[i] = descriptors[i].ptr();
-    args[i] = &ptrs[i];
   }
 }
 
 Executable::~Executable() = default;
 
 void Executable::invoke() {
-  auto result =
-      engine->invoke(program->entry, llvm::MutableArrayRef<void *>(args));
+  auto arrayRef = MutableArrayRef<void *>(ptrs);
+  auto result = engine->invoke(program->entry, arrayRef);
   if (result) {
     throw std::runtime_error("JIT invocation failed");
   }

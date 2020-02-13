@@ -112,6 +112,7 @@ void plaidml_edsl_init(  //
   ffi_wrap_void(err, [&] {
     std::call_once(is_initialized, []() {
       IVLOG(1, "plaidml_edsl_init");
+      pmlc::compiler::Program::initialize();
       plaidml::edsl::RegisterDerivs();
     });
   });
