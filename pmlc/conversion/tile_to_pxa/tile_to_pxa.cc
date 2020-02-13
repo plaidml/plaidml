@@ -560,8 +560,8 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
       if (cionOp.combo() != comboKind) {
         return matchFailure();
       }
-      if (!cionOp.lower_bounds().hasValue() ||
-          !cionOp.upper_bounds().hasValue()) {
+      if (!cionOp.lowerBounds().hasValue() ||
+          !cionOp.upperBounds().hasValue()) {
         cionOp.emitError("contraction bounds must be computed");
         return matchFailure();
       }
@@ -597,8 +597,8 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
 
     // Determine ranges
     SmallVector<int64_t, 8> ranges;
-    auto lowerBounds = op.lower_bounds().getValue();
-    auto upperBounds = op.upper_bounds().getValue();
+    auto lowerBounds = op.lowerBounds().getValue();
+    auto upperBounds = op.upperBounds().getValue();
     assert(lowerBounds.getNumResults() == upperBounds.getNumResults() &&
            "mismatched dims for lower and upper bounds");
     for (unsigned i = 0; i < lowerBounds.getNumResults(); i++) {
