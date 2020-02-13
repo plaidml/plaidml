@@ -1,0 +1,27 @@
+From d55e73b45239a12a9d9c6b54cd40f0d2a29c2f2e Mon Sep 17 00:00:00 2001
+From: "xin1.wang" <xin1.wang@intel.com>
+Date: Wed, 5 Feb 2020 05:43:46 -0500
+Subject: [PATCH] Add loader_cmake_config.h which shall be produced by cmake.
+
+Signed-off-by: xin1.wang <xin1.wang@intel.com>
+---
+ loader/loader_cmake_config.h | 7 +++++++
+ 1 file changed, 7 insertions(+)
+ create mode 100644 loader/loader_cmake_config.h
+
+diff --git a/loader/loader_cmake_config.h b/loader/loader_cmake_config.h
+new file mode 100644
+index 0000000..a874b0b
+--- /dev/null
++++ b/loader/loader_cmake_config.h
+@@ -0,0 +1,7 @@
++/* #define HAVE_SECURE_GETENV */
++/* #undef HAVE___SECURE_GETENV  */
++
++#define FALLBACK_CONFIG_DIRS "/etc/xdg"
++#define FALLBACK_DATA_DIRS "/usr/local/share:/usr/share"
++#define SYSCONFDIR "/usr/local/etc"
++
+-- 
+2.7.4
+
