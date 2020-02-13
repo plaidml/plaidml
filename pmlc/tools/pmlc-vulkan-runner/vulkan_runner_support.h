@@ -19,7 +19,7 @@
 #include "mlir/Support/FileUtilities.h"
 #include "mlir/Support/LogicalResult.h"
 
-#include "pmlc/tools/pmlc-vulkan-runner/vulkan_runtime.h"
+#include "pmlc/tools/pmlc-vulkan-runner/vulkan_runner.h"
 
 using namespace mlir;  // NOLINT[build/namespaces]
 using namespace llvm;  // NOLINT[build/namespaces]

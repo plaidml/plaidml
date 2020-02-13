@@ -26,8 +26,6 @@
 
 #include "pmlc/compiler/registry.h"
 #include "pmlc/conversion/tile_to_pxa/tile_to_pxa.h"
-#include "pmlc/tools/pmlc-vulkan-runner/vulkan_runtime.h"
-#include "pmlc/tools/pmlc-vulkan-runner/vulkan_runtime_support.h"
 
 using namespace mlir;  // NOLINT[build/namespaces]
 using pmlc::conversion::tile_to_pxa::createLowerTileToPXAPass;
@@ -243,27 +241,6 @@ Executable::Executable(StringRef entry, StringRef target, ModuleOp programModule
         break;
       }
     }
-  }
-
-  spv_ModuleOp.removeAttr("addressing_model");
-  spv_ModuleOp.removeAttr("capabilities");
-  spv_ModuleOp.removeAttr("extensions");
-  spv_ModuleOp.removeAttr("memory_model");
-
-  spv_ModuleOp.dump();
-
-  pmlc::vulkan::RuntimeSupport rt;
-  pmlc::vulkan::NumWorkGroups numWorkGroups;
-  numWorkGroups.x = 3;
-  numWorkGroups.y = 3;
-
-  auto resOne = rt.createResourceVarFloat(0, 0, 3);
-  auto resTwo = rt.createResourceVarFloat(0, 1, 3);
-  auto resThree = rt.createResourceVarFloat(1, 0, 3);
-  auto resFour = rt.createResourceVarFloat(1, 1, 3);
-
-  if (failed(pmlc::vulkan::runOnVulkan(cast<mlir::ModuleOp>(spv_ModuleOp), rt.vars, numWorkGroups))) {
-    throw std::runtime_error("Failed to runOnVulkan");
   }
 
   auto maybeEngine = mlir::ExecutionEngine::create(*module, optPipeline);

@@ -5,21 +5,21 @@ package(default_visibility = ["//visibility:public"])
 load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_test")
 
 plaidml_cc_library(
-    name = "vulkan_runtime",
+    name = "vulkan_runner",
     srcs = [
-        "vulkan_runtime.cc",
+        "vulkan_runner.cc",
     ],
     hdrs = [
-    	"vulkan_pfn.h",
-    	"vulkan_runtime.h",
-    	"vulkan_runtime_support.h",
+    	"vulkan_fn.h",
+    	"vulkan_runner.h",
+    	"vulkan_runner_support.h",
     ],
     linkopts = [
     	"-ldl",
     ],
     deps = [
         "@vulkan_headers//:inc",
-        "@vulkan_loader//:vulkan1",
+        "@vulkan_loader//:vulkan_loader",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:SPIRVSerialization",
         "@llvm-project//mlir:SPIRVDialect",
@@ -29,15 +29,17 @@ plaidml_cc_library(
 
 
 plaidml_cc_test(
-    name = "vulkan_runtime_tests",
-    srcs = [
-    	"vulkan_runtime_tests.cc",
-    ],
-    linkopts = [
-    	"-ldl",
-    ],
+    name = "vulkan_runner_tests",
+    srcs = select({
+        "//toolchain:linux_x86_64": ["vulkan_runner_tests.cc"],
+        "//conditions:default": [],
+    }),
+    linkopts = select({
+        "//toolchain:linux_x86_64": ["-ldl"],
+        "//conditions:default": [],
+    }),
     deps = [
-        ":vulkan_runtime",
+        ":vulkan_runner",
         "//plaidml2:testenv_mlir",
         "//testing:matchers",
         "//tile/codegen",

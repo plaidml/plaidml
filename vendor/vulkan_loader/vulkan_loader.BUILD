@@ -31,33 +31,58 @@ filegroup(
     ],
 )
 
+config_setting(
+    name = "ASSEMBLER_WORKS",
+    values = {
+        "define": "MODE=ASM",
+    },
+)
+
 #for asm path
 cc_binary(
     name = "asm_offset",
     srcs = [
-        "asm_offset.c",
+        "loader/asm_offset.c",
+    ],
+    includes = [
+        "loader",
+        "loader/generated",
+    ],
+    deps = [
+        "@vulkan_headers//:inc",
     ],
 )
 
 #shall use asm_offset to create gen_defines.asm
-#genrule(
-#    name = "gen_asm",
-#    srcs = [
-#        ":asm_offset",
-#    ],
-#    outputs = ["gen_defines.asm"],
-#    cmd = "asm_offset",
-#)
+genrule(
+    name = "gen_asm",
+    outs = ["gen_defines.asm"],
+    cmd = "\n".join([
+        " $(location :asm_offset) GAS ",
+        " cp gen_defines.asm $@ ",
+    ]),
+    tools = [
+        ":asm_offset",
+    ],
+)
 
 cc_library(
-    name = "vulkan1",
+    name = "vulkan_loader",
     srcs = [
         ":NORMAL_LOADER_SRCS",
         ":OPT_LOADER_SRCS",
-        ":OPT_LOADER_SRCS_NO_ASM",
-    ],
+    ] + select({
+        ":ASSEMBLER_WORKS": ["loader/unknown_ext_chain_gas.S"],
+        "//conditions:default": [":OPT_LOADER_SRCS_NO_ASM"],
+    }),
     hdrs = [
         "loader/generated/vk_loader_extensions.c",
+    ] + select({
+        "ASSEMBLER_WORKS": [":gen_asm"],
+        "//conditions:default": [],
+    }),
+    copts = [
+        "-I loader",
     ],
     includes = [
         "loader",
