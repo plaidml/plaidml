@@ -1,4 +1,4 @@
-# Copyright 2019 Intel Corporation.
+# Copyright 2020 Intel Corporation
 
 load("//bzl:plaidml.bzl", "plaidml_cc_test")
 
@@ -15,4 +15,13 @@ plaidml_cc_test(
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Transforms",
     ],
+)
+
+cc_library(
+    name = "pmlc",
+    hdrs = [
+        "all_dialects.h",
+        "all_passes.h",
+    ],
+    visibility = ["//visibility:public"],
 )

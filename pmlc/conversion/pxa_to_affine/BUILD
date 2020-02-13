@@ -10,8 +10,6 @@ plaidml_cc_library(
     hdrs = glob(["*.h"]),
     deps = [
         "//pmlc/dialect/pxa/ir",
-        "@llvm-project//mlir:AffineDialectRegistration",
-        "@llvm-project//mlir:LoopDialectRegistration",
     ],
     alwayslink = 1,
 )

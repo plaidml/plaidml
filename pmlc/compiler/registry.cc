@@ -3,7 +3,6 @@
 #include "pmlc/compiler/registry.h"
 
 #include <string>
-#include <unordered_map>
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringMap.h"

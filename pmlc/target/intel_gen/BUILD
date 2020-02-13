@@ -11,16 +11,13 @@ plaidml_cc_library(
     deps = [
         "//pmlc/compiler",
         "//pmlc/conversion/pxa_to_affine",
-        "@llvm-project//mlir:AffineDialectRegistration",
+        "//pmlc/conversion/tile_to_pxa",
+        "//pmlc/dialect/tile/transforms",
         "@llvm-project//mlir:AffineToStandardTransforms",
-        "@llvm-project//mlir:GPUDialectRegistration",
         "@llvm-project//mlir:GPUToSPIRVTransforms",
         "@llvm-project//mlir:GPUTransforms",
         "@llvm-project//mlir:LLVMTransforms",
-        "@llvm-project//mlir:LoopDialectRegistration",
         "@llvm-project//mlir:LoopsToGPUPass",
-        "@llvm-project//mlir:SPIRVDialectRegistration",
-        "@llvm-project//mlir:StandardDialectRegistration",
     ],
     alwayslink = 1,
 )

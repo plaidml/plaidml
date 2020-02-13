@@ -1,4 +1,4 @@
-# Copyright 2019 Intel Corporation.
+# Copyright 2020 Intel Corporation
 
 package(default_visibility = ["//visibility:public"])
 
@@ -8,6 +8,7 @@ plaidml_cc_binary(
     name = "pmlc-opt",
     srcs = ["pmlc-opt.cc"],
     deps = [
+        "//pmlc",
         "//pmlc/conversion/pxa_to_affine",
         "//pmlc/conversion/stdx_to_llvm",
         "//pmlc/conversion/tile_to_pxa",
@@ -16,11 +17,11 @@ plaidml_cc_binary(
         "//pmlc/dialect/stdx",
         "//pmlc/dialect/tile",
         "//pmlc/target/x86",
-        "@llvm-project//mlir:AffineDialectRegistration",
         "@llvm-project//mlir:EDSC",
+        "@llvm-project//mlir:LoopsToGPUPass",
         "@llvm-project//mlir:MlirOptLib",
+        "@llvm-project//mlir:OpenMPDialect",
         "@llvm-project//mlir:Parser",
-        "@llvm-project//mlir:StandardDialectRegistration",
         "@llvm-project//mlir:Transforms",
     ],
 )

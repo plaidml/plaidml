@@ -69,8 +69,8 @@ struct AffineParallelOpConversion : public LoweringBase<AffineParallelOp> {
     for (unsigned int i = 0; i < op.lowerBoundsMap().getNumResults(); i++) {
       auto step = op.steps().getValue()[i].cast<IntegerAttr>().getInt();
       auto af = rewriter.create<mlir::AffineForOp>(
-          op.getLoc(), op.lowerBoundsOperands(),
-          op.lowerBoundsMap().getSubMap({i}), op.upperBoundsOperands(),
+          op.getLoc(), op.getLowerBoundsOperands(),
+          op.lowerBoundsMap().getSubMap({i}), op.getUpperBoundsOperands(),
           op.upperBoundsMap().getSubMap({i}), step);
       rewriter.setInsertionPointToStart(&af.region().front());
       ivs.push_back(af.getInductionVar());
