@@ -315,7 +315,7 @@ Value TileBuilder::MakeCastOp(Value tensor, DataType dtype) {
 
 Value TileBuilder::MakeTraceOp(Value tensor, const char *msg) {
   IVLOG(5, "TileBuilder::MakeTraceOp> " << msg);
-  return impl->builder.create<TraceOp>(impl->loc, tensor, msg).result();
+  return impl->builder.create<TraceOp>(impl->loc, tensor, msg).out();
 }
 
 Value TileBuilder::MakePrimitiveOp(StringRef fn, ArrayRef<Value> args) {

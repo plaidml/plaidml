@@ -315,7 +315,6 @@ cc_library(
         ":Support",
         ":Transforms",
     ],
-    alwayslink = 1,  # contains pass registration
 )
 
 # SDBM dialect only contains attribute components that can be constructed given
@@ -336,7 +335,6 @@ cc_library(
         ":Support",
         "@llvm-project//llvm:support",
     ],
-    alwayslink = 1,
 )
 
 cc_library(
@@ -506,7 +504,6 @@ cc_library(
         "@llvm-project//llvm:core",
         "@llvm-project//llvm:support",
     ],
-    alwayslink = 1,
 )
 
 filegroup(
@@ -574,7 +571,6 @@ cc_library(
         ":Support",
         ":Transforms",
     ],
-    alwayslink = 1,
 )
 
 filegroup(
@@ -640,7 +636,6 @@ cc_library(
         ":Transforms",
         "@llvm-project//llvm:support",
     ],
-    alwayslink = 1,
 )
 
 cc_library(
@@ -658,7 +653,6 @@ cc_library(
         ":ROCDLDialect",
         ":Transforms",
     ],
-    alwayslink = 1,
 )
 
 cc_library(
@@ -676,12 +670,11 @@ cc_library(
         ":Pass",
         ":Support",
         ":TargetNVVMIR",
+        "@llvm-project//llvm:all_targets",
         "@llvm-project//llvm:core",
-        "@llvm-project//llvm:nvptx_target",  # buildcleaner: keep
         "@llvm-project//llvm:support",
         "@llvm-project//llvm:target",
     ],
-    alwayslink = 1,
 )
 
 gentbl(
@@ -727,7 +720,6 @@ cc_library(
         ":Support",
         ":Transforms",
     ],
-    alwayslink = 1,
 )
 
 gentbl(
@@ -801,7 +793,6 @@ cc_library(
         "@llvm-project//llvm:core",
         "@llvm-project//llvm:support",
     ],
-    alwayslink = 1,
 )
 
 filegroup(
@@ -868,7 +859,6 @@ cc_library(
         "@llvm-project//llvm:core",
         "@llvm-project//llvm:support",
     ],
-    alwayslink = 1,
 )
 
 filegroup(
@@ -1118,7 +1108,6 @@ cc_library(
         ":Transforms",
         "@llvm-project//llvm:support",
     ],
-    alwayslink = 1,
 )
 
 cc_library(
@@ -1146,7 +1135,6 @@ cc_library(
         ":Transforms",
         "@llvm-project//llvm:support",
     ],
-    alwayslink = 1,
 )
 
 cc_library(
@@ -1173,7 +1161,6 @@ cc_library(
         ":Transforms",
         "@llvm-project//llvm:support",
     ],
-    alwayslink = 1,
 )
 
 cc_library(
@@ -1265,7 +1252,6 @@ cc_library(
         ":VectorOps",
         "@llvm-project//llvm:support",
     ],
-    alwayslink = 1,
 )
 
 cc_library(
@@ -1324,7 +1310,6 @@ cc_library(
         ":Support",
         "@llvm-project//llvm:support",
     ],
-    alwayslink = 1,
 )
 
 cc_library(
@@ -1346,7 +1331,6 @@ cc_library(
         ":TransformUtils",
         ":Transforms",
     ],
-    alwayslink = 1,
 )
 
 cc_library(
@@ -1370,7 +1354,6 @@ cc_library(
         "@llvm-project//llvm:core",
         "@llvm-project//llvm:support",
     ],
-    alwayslink = 1,
 )
 
 gentbl(
@@ -1445,7 +1428,6 @@ cc_library(
         ":Support",
         "@llvm-project//llvm:support",
     ],
-    alwayslink = 1,
 )
 
 cc_library(
@@ -1510,7 +1492,6 @@ cc_library(
         "@llvm-project//llvm:ir_reader",
         "@llvm-project//llvm:support",
     ],
-    alwayslink = 1,
 )
 
 cc_library(
@@ -1534,7 +1515,6 @@ cc_library(
         "@llvm-project//llvm:core",
         "@llvm-project//llvm:support",
     ],
-    alwayslink = 1,
 )
 
 cc_library(
@@ -1558,7 +1538,6 @@ cc_library(
         "@llvm-project//llvm:core",
         "@llvm-project//llvm:support",
     ],
-    alwayslink = 1,
 )
 
 # TODO(zinenko): Update these so that we can simplify mapping to cmake.
@@ -1662,6 +1641,7 @@ cc_library(
     name = "MlirTranslateMain",
     srcs = ["tools/mlir-translate/mlir-translate.cpp"],
     deps = [
+        ":AllPassesAndDialectsNoRegistration",
         ":IR",
         ":Parser",
         ":Support",
@@ -1681,6 +1661,53 @@ cc_binary(
     ],
 )
 
+cc_library(
+    name = "AllPassesAndDialectsNoRegistration",
+    hdrs = [
+        "include/mlir/InitAllDialects.h",
+        "include/mlir/InitAllPasses.h",
+    ],
+    deps = [
+        ":AffineOps",
+        ":Analysis",
+        ":FxpMathOps",
+        ":GPUDialect",
+        ":GPUToCUDATransforms",
+        ":GPUToNVVMTransforms",
+        ":GPUToROCDLTransforms",
+        ":GPUToSPIRVTransforms",
+        ":GPUTransforms",
+        ":IR",
+        ":LLVMDialect",
+        ":LinalgOps",
+        ":LinalgToLLVM",
+        ":LinalgToSPIRV",
+        ":LinalgTransforms",
+        ":LoopOps",
+        ":LoopsToGPUPass",
+        ":NVVMDialect",
+        ":OpenMPDialect",
+        ":QuantOps",
+        ":QuantizerTransforms",
+        ":ROCDLDialect",
+        ":SDBM",
+        ":SPIRVDialect",
+        ":SPIRVLowering",
+        ":StandardOps",
+        ":StandardToSPIRVConversions",
+        ":Transforms",
+        ":VectorOps",
+    ],
+)
+
+cc_library(
+    name = "AllPassesAndDialects",
+    deps = [
+        ":AllPassesAndDialectsNoRegistration",
+    ],
+    alwayslink = 1,
+)
+
 # TODO(jpienaar): This library should be removed.
 cc_library(
     name = "MlirOptMain",
@@ -1688,6 +1715,7 @@ cc_library(
         "tools/mlir-opt/mlir-opt.cpp",
     ],
     deps = [
+        ":AllPassesAndDialectsNoRegistration",
         ":Analysis",
         ":MlirOptLib",
         ":Pass",
@@ -1707,8 +1735,8 @@ cc_binary(
         ":MlirOptMain",
         ":OpenMPDialect",
         ":QuantOps",
-        ":ROCDLDialect",
         ":Transforms",
+        "@llvm-project//llvm:all_targets",
         "@llvm-project//llvm:support",
         "@llvm-project//mlir/test:TestDialect",
         "@llvm-project//mlir/test:TestIR",
@@ -1724,6 +1752,7 @@ cc_library(
     hdrs = ["include/mlir/Support/JitRunner.h"],
     includes = ["include"],
     deps = [
+        ":AllPassesAndDialectsNoRegistration",
         ":CFGTransforms",
         ":ExecutionEngine",
         ":ExecutionEngineUtils",
@@ -1736,7 +1765,6 @@ cc_library(
         "@llvm-project//llvm:orc_jit",
         "@llvm-project//llvm:support",
     ],
-    alwayslink = 1,
 )
 
 cc_binary(
@@ -1875,7 +1903,6 @@ cc_library(
         ":OpenMPOpsIncGen",
         "@llvm-project//llvm:support",
     ],
-    alwayslink = 1,
 )
 
 filegroup(
@@ -1944,7 +1971,6 @@ cc_library(
         ":TransformUtils",
         "@llvm-project//llvm:support",
     ],
-    alwayslink = 1,
 )
 
 filegroup(
@@ -2004,7 +2030,6 @@ cc_library(
         ":TransformUtils",
         "@llvm-project//llvm:support",
     ],
-    alwayslink = 1,
 )
 
 filegroup(
@@ -2154,7 +2179,6 @@ cc_library(
         "@llvm-project//llvm:core",
         "@llvm-project//llvm:support",
     ],
-    alwayslink = 1,
 )
 
 cc_library(
@@ -2177,7 +2201,6 @@ cc_library(
         ":SPIRVLowering",
         ":StandardOps",
     ],
-    alwayslink = 1,
 )
 
 cc_library(
@@ -2202,7 +2225,6 @@ cc_library(
         ":Support",
         "@llvm-project//llvm:support",
     ],
-    alwayslink = 1,
 )
 
 cc_library(
@@ -2251,7 +2273,6 @@ cc_library(
         "@llvm-project//llvm:core",
         "@llvm-project//llvm:support",
     ],
-    alwayslink = 1,
 )
 
 cc_library(
@@ -2295,7 +2316,6 @@ cc_library(
         ":Support",
         "@llvm-project//llvm:support",
     ],
-    alwayslink = 1,
 )
 
 filegroup(
@@ -2382,7 +2402,6 @@ cc_library(
         "@llvm-project//llvm:core",
         "@llvm-project//llvm:support",
     ],
-    alwayslink = 1,
 )
 
 cc_library(
@@ -2410,7 +2429,6 @@ cc_library(
         "@llvm-project//llvm:core",
         "@llvm-project//llvm:support",
     ],
-    alwayslink = 1,
 )
 
 # To reference all tablegen files here when checking for updates to them.

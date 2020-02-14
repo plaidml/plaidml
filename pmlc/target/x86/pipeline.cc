@@ -74,6 +74,9 @@ void addToPipeline(OpPassManager &pm) {
 
   pm.addPass(ConvertToLLVMPass::create());
   pm.addPass(createTraceLinkingPass());
+
+  pm.addNestedPass<FuncOp>(createCanonicalizerPass());
+  pm.addNestedPass<FuncOp>(createCSEPass());
 }
 
 static PassPipelineRegistration<>
