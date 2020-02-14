@@ -8,6 +8,7 @@ plaidml_cc_library(
     name = "pxa",
     deps = [
         "//pmlc/dialect/pxa/ir",
+        "//pmlc/dialect/pxa/analysis",
         "//pmlc/dialect/pxa/transforms",
     ],
 )
