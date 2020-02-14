@@ -41,6 +41,8 @@ run --test_sharding_strategy=disabled
 
 build:dbg -c dbg
 
+build:llvm --incompatible_enable_cc_toolchain_resolution
+
 build:linux --cpu=linux_x86_64
 build:linux --crosstool_top=//toolchain:toolchain
 build:linux --host_crosstool_top=//toolchain:toolchain

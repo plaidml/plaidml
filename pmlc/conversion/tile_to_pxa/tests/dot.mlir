@@ -21,7 +21,7 @@ func @dot(%arg0: tensor<1x784x!eltwise.f32>, %arg1: tensor<784x512x!eltwise.f32>
 // CHECK-SAME: %[[ARG0:.*]]: memref<1x784xf32>
 // CHECK-SAME: %[[ARG1:.*]]: memref<784x512xf32>
 // CHECK-SAME: %[[ARG2:.*]]: memref<1x512xf32>
-// CHECK: affine.parallel [%[[I:.*]], %[[J:.*]], %[[K:.*]]] = [0, 0, 0] to [784, 1, 512]
+// CHECK: affine.parallel (%[[I:.*]], %[[J:.*]], %[[K:.*]]) = (0, 0, 0) to (784, 1, 512)
 // CHECK-DAG: %[[A:.*]] = affine.load %[[ARG0]][%[[J]], %[[I]]] : memref<1x784xf32>
 // CHECK-DAG: %[[B:.*]] = affine.load %[[ARG1]][%[[I]], %[[K]]] : memref<784x512xf32>
 // CHECK:     %[[C:.*]] = mulf %[[A]], %[[B]] : f32

@@ -25,12 +25,12 @@ func @double_dot(
 // CHECK-SAME: %{{.*}}: memref<30x40xf32>
 // CHECK-SAME: %{{.*}}: memref<10x40xf32>
 // CHECK: %[[TMP:.*]]  = alloc() : memref<10x30xf32>
-// CHECK: affine.parallel [%{{.*}}, %{{.*}}, %{{.*}}] = [0, 0, 0] to [20, 10, 30]
+// CHECK: affine.parallel (%{{.*}}, %{{.*}}, %{{.*}}) = (0, 0, 0) to (20, 10, 30)
 // CHECK:   affine.load %{{.*}}[%{{.*}}, %{{.*}}] : memref<10x20xf32>
 // CHECK:   affine.load %{{.*}}[%{{.*}}, %{{.*}}] : memref<20x30xf32>
 // CHECK:   mulf %{{.*}}, %{{.*}} : f32
 // CHECK:   pxa.reduce add %{{.*}}, %{{.*}}[%{{.*}}, %{{.*}}] : memref<10x30xf32>
-// CHECK: affine.parallel [%{{.*}}, %{{.*}}, %{{.*}}] = [0, 0, 0] to [30, 10, 40]
+// CHECK: affine.parallel (%{{.*}}, %{{.*}}, %{{.*}}) = (0, 0, 0) to (30, 10, 40)
 // CHECK:   affine.load %[[TMP]][%{{.*}}, %{{.*}}] : memref<10x30xf32>
 // CHECK:   affine.load %{{.*}}[%{{.*}}, %{{.*}}] : memref<30x40xf32>
 // CHECK:   mulf %{{.*}}, %{{.*}} : f32

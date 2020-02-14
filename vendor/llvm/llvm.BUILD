@@ -2,8 +2,6 @@
 #
 # This BUILD file is auto-generated; do not edit!
 
-licenses(["notice"])
-
 exports_files(["LICENSE.TXT"])
 
 load(
