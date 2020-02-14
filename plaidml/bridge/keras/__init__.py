@@ -124,7 +124,7 @@ class _Function(object):
 
     def _compile(self, inputs):
         for node, data in zip(self._inputs, inputs):
-            dtype = node.tensor.shape.dtype
+            dtype = node.tensor.dtype
             shape = edsl.LogicalShape(dtype, data.shape)
             node.tensor.bind(shape)
         inputs = [x.tensor for x in self._inputs]
@@ -193,7 +193,7 @@ class _KerasNode(object):
         except ValueError:
             ellipsis_idx = None
         I = self.tensor
-        ndims = I.shape.ndims
+        ndims = I.rank
         extension_length = ndims - len(key)
         if ellipsis_idx is not None:
             # The ellipsis is counted in the length of the key, but does not persist as an axis for slicing, so undo that count
@@ -337,7 +337,7 @@ def batch_dot(x, y, axes=None, name=None):
     if isinstance(axes, six.integer_types):
         axes = (axes, axes)
     if axes is None:
-        axes = (X.shape.ndims - 1, Y.shape.ndims - 2)
+        axes = (X.rank - 1, Y.rank - 2)
     PLAIDML_BATCHDOT_TF_BEHAVIOR = os.getenv('PLAIDML_BATCHDOT_TF_BEHAVIOR')
     if PLAIDML_BATCHDOT_TF_BEHAVIOR:
         _report_unimplemented('batch_dot')
@@ -347,16 +347,16 @@ def batch_dot(x, y, axes=None, name=None):
         first_idx = edsl.TensorIndex()
         batch_dim = edsl.TensorDim()
         batch_idx = edsl.TensorIndex()
-        xdims = edsl.TensorDims(X.shape.ndims)
+        xdims = edsl.TensorDims(X.rank)
         xdims[0] = first_dim
         xdims[axes[0]] = batch_dim
-        xidxs = edsl.TensorIndexes(X.shape.ndims)
+        xidxs = edsl.TensorIndexes(X.rank)
         xidxs[0] = first_idx
         xidxs[axes[0]] = batch_idx
-        ydims = edsl.TensorDims(Y.shape.ndims)
+        ydims = edsl.TensorDims(Y.rank)
         ydims[0] = first_dim
         ydims[axes[1]] = batch_dim
-        yidxs = edsl.TensorIndexes(Y.shape.ndims)
+        yidxs = edsl.TensorIndexes(Y.rank)
         yidxs[0] = first_idx
         yidxs[axes[1]] = batch_idx
         odims = [xdims[N] for N in range(len(xdims)) if N != axes[0]
@@ -375,7 +375,7 @@ def batch_dot(x, y, axes=None, name=None):
 @_log_call
 def batch_flatten(x):
     I = x.tensor
-    I_dims = edsl.TensorDims(I.shape.ndims)
+    I_dims = edsl.TensorDims(I.rank)
     I.bind_dims(*I_dims)
     if len(I_dims) == 1:
         return reshape(x, [I_dims[0], 1])
@@ -463,7 +463,7 @@ def cast(x, dtype):
     except ValueError:
         raise PlaidMLKerasException('Unsupported cast (%s -> %s)' % (x.shape.dtype, dtype))
 
-    if x.tensor.shape.dtype == dtype:
+    if x.tensor.dtype == dtype:
         return x
 
     return _KerasNode('cast', tensor=edsl.cast(x.tensor, dtype))
@@ -478,7 +478,7 @@ def categorical_crossentropy(target, output, from_logits=False):
         output = clip(output, epsilon(), 1.0 - epsilon())
     T = target.tensor
     O = output.tensor
-    ndims = O.shape.ndims
+    ndims = O.rank
     fixed_dims = edsl.TensorDims(ndims - 1)
     fixed_idxs = edsl.TensorIndexes(ndims - 1)
     Y = edsl.TensorDim()
@@ -550,7 +550,7 @@ def conv(x,
     else:
         group_layout = 'none'
         autogroup_mode = 'ungrouped'
-    rank = x.tensor.shape.ndims - 2
+    rank = x.tensor.rank - 2
     if strides is None:
         strides = tuple(1 for _ in range(rank))
     if dilation_rate is None:
@@ -587,7 +587,7 @@ def conv_transpose(x, kernel, output_shape, strides, padding, data_format, dilat
         output_shape = output_shape[2:]
     else:
         raise ValueError('Could not parse data_format "{}"'.format(data_format))
-    rank = x.tensor.shape.ndims - 2
+    rank = x.tensor.rank - 2
     if strides is None:
         strides = tuple(1 for _ in range(rank))
     if dilation_rate is None:
@@ -679,7 +679,7 @@ def conv3d_transpose(x,
 @_log_call
 def count_params(x):
     result = 1
-    for dim in x.tensor.shape.int_dims:
+    for dim in x.tensor.compute_shape().into_TensorShape().sizes:
         result *= dim
     return result
 
@@ -734,10 +734,11 @@ def dot(x, y, name=None):
 @_log_call
 def dropout(x, level, noise_shape=None, seed=None):
     I = x.tensor
-    if noise_shape is not None and len(noise_shape) != I.shape.ndims:
+    ndims = I.rank
+    if noise_shape is not None and len(noise_shape) != ndims:
         raise ValueError('noise_shape ndims doesn\'t match input ndims')
     if noise_shape is None:
-        shape = edsl.TensorDims(I.shape.ndims)
+        shape = edsl.TensorDims(ndims)
         I.bind_dims(*shape)
     else:
         shape = noise_shape
@@ -799,7 +800,7 @@ def eye(size, dtype=None, name=None):
 @_log_call
 def flatten(x):
     I = x.tensor
-    I_dims = edsl.TensorDims(I.shape.ndims)
+    I_dims = edsl.TensorDims(I.rank)
     I.bind_dims(*I_dims)
     O_dim = functools.reduce(lambda x, y: x * y, I_dims)
     return reshape(x, [O_dim])
@@ -929,7 +930,8 @@ def in_train_phase(x, alt, training=None):
 
 @_log_call
 def int_shape(x):
-    return tuple(None if x == 0 else x for x in x.tensor.shape.int_dims)
+    shape = x.tensor.compute_shape().into_TensorShape()
+    return tuple(None if x == 0 else x for x in shape.sizes)
 
 
 @_log_call
@@ -1072,7 +1074,7 @@ def not_equal(lhs, rhs):
 @_log_call
 def normalize_batch_in_training(x, gamma, beta, reduction_axes, epsilon=1e-3):
     I = x.tensor
-    ndims = I.shape.ndims
+    ndims = I.rank
     if reduction_axes == None:
         raw_axes = [ndims - 1]
     else:
@@ -1110,7 +1112,7 @@ def one_hot(indices, num_classes):
     #Note: does not error check for entries in indices that are >= num_classes
     count = variable(np.array(range(num_classes)), dtype='int32').tensor
     I = indices.tensor
-    I_ndims = I.shape.ndims
+    I_ndims = I.rank
     I_dims = edsl.TensorDims(I_ndims)
     I_idxs = edsl.TensorIndexes(I_ndims)
     C = edsl.TensorDim()
@@ -1135,7 +1137,7 @@ def ones_like(x, dtype=None, name=None):
     value = np.full((1), 1, dtype=dtype or floatx())
     one = _create_var('a_one', value)
     I = x.tensor
-    ndim = I.shape.ndims
+    ndim = I.rank
     dims = edsl.TensorDims(ndim)
     idxs = edsl.TensorIndexes(ndim)
     I.bind_dims(*dims)
@@ -1357,7 +1359,7 @@ def rnn(step_function,
         unroll=False,
         input_length=None):
     if input_length is None:
-        input_length = inputs.tensor.shape.int_dims[1]
+        input_length = inputs.tensor.compute_shape().into_TensorShape().sizes[1]
     if not isinstance(input_length, six.integer_types):
         raise NotImplementedError('rnn is not implemented for variable sized inputs')
     if mask is not None:
@@ -1367,7 +1369,7 @@ def rnn(step_function,
 
     def time_expand(val, ii, t, prev):
         I = val.tensor
-        ndmo = I.shape.ndims - 1
+        ndmo = I.rank - 1
         if (ndmo < 0):
             raise PlaidMLKerasException('output values must have a batch size dimension')
         dims = edsl.TensorDims(ndmo)
@@ -1434,7 +1436,7 @@ def separable_conv(x,
                         data_format=data_format,
                         dilation_rate=dilation_rate,
                         channelwise=True)
-    rank = x.tensor.shape.ndims - 2
+    rank = x.tensor.rank - 2
     ones = tuple(1 for _ in range(rank))
     return conv(intermediate,
                 pointwise_kernel,
@@ -1491,7 +1493,7 @@ def set_value(x, value):
 def shape(x):
     ret = _KerasNode('shape', tensor=edsl.shape(x.tensor))
     # Save the TensorDims directly on the _KerasNode, where they can be extracted if needed
-    ret._RawTensorDims = edsl.TensorDims(x.tensor.shape.ndims)
+    ret._RawTensorDims = edsl.TensorDims(x.tensor.rank)
     x.tensor.bind_dims(*ret._RawTensorDims)
     return ret
 
@@ -1518,7 +1520,7 @@ def softmax(x, axis=None, name=None):
     if name is None:
         name = 'softmax'
     if axis is None:
-        axis = I.shape.ndims - 1
+        axis = I.rank - 1
     y = plaidml_op.softmax(I, axis=axis)
     return _KerasNode('softmax', name=name, tensor=y)
 
@@ -1535,11 +1537,13 @@ def softsign(x):
 
 @_log_call
 def sparse_categorical_crossentropy(target, output, from_logits=False):
-    dims = edsl.TensorDims(output.tensor.shape.ndims)
+    shape = output.tensor.compute_shape()
+    dims = edsl.TensorDims(shape.rank)
     output.tensor.bind_dims(*dims)
     # FIXME: tensor.shape is expensive
     return categorical_crossentropy(
-        reshape(one_hot(target, output.tensor.shape.int_dims[-1]), dims), output, from_logits)
+        reshape(one_hot(target,
+                        shape.into_TensorShape().sizes[-1]), dims), output, from_logits)
 
 
 @_log_call
@@ -1711,7 +1715,7 @@ def zeros_like(x, dtype=None, name=None):
     value = np.full((1), 0, dtype=dtype or floatx())
     zero = _create_var('a_zero', value)
     I = x.tensor
-    ndim = I.shape.ndims
+    ndim = I.rank
     dims = edsl.TensorDims(ndim)
     idxs = edsl.TensorIndexes(ndim)
     I.bind_dims(*dims)

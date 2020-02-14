@@ -1,6 +1,7 @@
 // Copyright 2020 Intel Corporation
 
 #include "pmlc/dialect/pxa/transforms/autotile.h"
+#include "pmlc/dialect/pxa/transforms/test_analysis.h"
 
 namespace pmlc::dialect::pxa {
 
@@ -22,7 +23,11 @@ struct Autotile10Pass : public mlir::FunctionPass<Autotile10Pass> {
   }
 };
 
-static mlir::PassRegistration<Autotile10Pass> pass( //
+static mlir::PassRegistration<Autotile10Pass> regAutotile10( //
     "autotile-10", "Tile all dimensions by 10");
+
+static mlir::PassRegistration<TestStrideInfoPass> regTestStrideInfo( //
+    "test-stride-info",
+    "Report stride data for all loads/stores for unit tests");
 
 } // namespace pmlc::dialect::pxa
