@@ -9,6 +9,7 @@ plaidml_cc_binary(
     srcs = ["pmlc-jit.cc"],
     linkopts = ["-ldl"],
     deps = [
+        "//pmlc/rt:rt_shlib",
         "//pmlc/target/x86",
         "@llvm-project//mlir:MlirJitRunner",
     ],

@@ -1,4 +1,4 @@
-# Copyright 2018 Intel Corporation.
+# Copyright 2020 Intel Corporation
 
 load("//bzl:plaidml.bzl", "plaidml_cc_binary", "plaidml_cc_library")
 
@@ -21,6 +21,7 @@ plaidml_cc_binary(
     deps = [
         ":oplib",
         "//plaidml/exec",
+        "//pmlc/rt:rt_shlib",
         "//pmlc/util",
         "@com_github_google_benchmark//:benchmark",
     ],
@@ -32,6 +33,7 @@ plaidml_cc_binary(
     deps = [
         ":oplib",
         "//plaidml/exec",
+        "//pmlc/rt:rt_shlib",
         "//pmlc/util",
     ],
 )

@@ -103,7 +103,3 @@ std::unique_ptr<mlir::Pass> createTraceLinkingPass() {
 }
 
 } // namespace pmlc::target::x86
-
-extern "C" void plaidml_rt_trace(const char *msg) {
-  llvm::errs() << msg << "\n";
-}

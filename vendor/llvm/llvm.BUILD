@@ -649,11 +649,11 @@ cc_binary(
 cc_library(
     name = "all_targets",
     deps = [
-        ":aarch64_code_gen",
+        # ":aarch64_code_gen",
         ":amdgpu_code_gen",
-        ":arm_code_gen",
+        # ":arm_code_gen",
         ":nvptx_code_gen",
-        ":powerpc_code_gen",
+        # ":powerpc_code_gen",
         ":x86_code_gen",
     ],
 )
