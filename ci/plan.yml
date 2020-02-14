@@ -122,7 +122,7 @@ SUITES:
   base:
     platforms:
       keras-stripe-llvm-cpu:
-        pipelines: [nightly]
+        pipelines: [nightly, ci]
 
     params:
       ci:
@@ -142,22 +142,82 @@ SUITES:
     runner: python
     workloads:
       backend:
-        args: [backend_test.py]
+        args:
+          - backend_test.py
+          - TestBackendOps.testArgmax
+          - TestBackendOps.testShape
+          - TestBackendOps.testPassthrough
+          - TestBackendOps.testArgmaxWithAxis
+          - TestBackendOps.testArgmin
+          - TestBackendOps.testArange
+          - TestBackendOps.testDot
+          - TestBackendOps.testEye
+          - TestBackendOps.testAddElements
+          - TestBackendOps.testAddElementsRepeated
+          - TestBackendOps.testAddConstant
+          - TestBackendOps.testSubConstant
+          - TestBackendOps.testSubElements
+          - TestBackendOps.testMulElements
+          - TestBackendOps.testMulConstant
+          - TestBackendOps.testDivElements
+          - TestBackendOps.testProdKeepdims
+          - TestBackendOps.testProdAxis
+          - TestBackendOps.testProdAxisNumpy
+          - TestBackendOps.testProdNegAxis
+          - TestBackendOps.testMaximum
+          - TestBackendOps.testMinimum
+          - TestBackendOps.testClip
+          - TestBackendOps.testElu
+          - TestBackendOps.testRelu
+          - TestBackendOps.testHardSigmoid
+          - TestBackendOps.testAbs
+          - TestBackendOps.testSquare
+          - TestBackendOps.testSqrt
+          - TestBackendOps.testSoftsign
+          - TestBackendOps.testSign
+          - TestBackendOps.testCategoricalCrossentropyGarbageIn
+          - TestBackendOps.testExp
+          - TestBackendOps.testDepthwiseConv2d
+          - TestBackendOps.testReshapeMatchDim
+          - TestBackendOps.testZeros
+          - TestBackendOps.testOnes
+          - TestBackendOps.testConstant
+          - TestBackendOps.testIsPlaceholder
+          - TestBackendOps.testUpdate
+          - TestBackendOps.testMovingAverageUpdate
+          - TestBackendOps.testBatchNormalization
+          - TestBackendOps.testBatchNormalizationVar
+          - TestBackendOps.testBatchNormalizationMean
+          - TestBackendOps.testBatchNormalizationOneElement
+          - TestBackendOps.testBatchNormalizationNoBeta
+          - TestBackendOps.testBatchNormalizationNoGamma
+          - TestBackendOps.testSelfMult
+          - TestBackendOps.testL2Normalize
+          - TestBackendOps.testZerosLike
+          - TestBackendOps.testConvParameterRankExceptions
+          - TestBackendOps.testCastToFloat
+          - TestBackendOps.testCumProd
+          - TestBackendOps.resnetLayer1
+          - TestBackendOps.resnetLayer2
+          - TestBackendOps.res3a_branch2a
+          - TestBackendOps.res2a_branch2b
+          - TestBackendOps.fc_1000
+          - TestBackendOps.bigMatMul
+          - TestBackendOps.testDupOutputs
         conda_env: ci/conda/keras_backend_test.yml
         precision: untested
-        shards: 3
       regression:
         args: [regression_test.py]
         precision: untested
+        soft_fail: true
       trivial_model:
         args: [trivial_model_test.py]
         precision: untested
+        soft_fail: true
       mnist_mlp:
         args: [mnist_mlp_test.py]
         precision: untested
-        platform_overrides:
-          keras-stripe-mtl-uhd630:
-            soft_fail: true
+        soft_fail: true
 
   infer:
     platforms:
