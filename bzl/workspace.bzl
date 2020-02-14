@@ -126,6 +126,24 @@ def plaidml_workspace():
         build_file = clean_dep("//vendor/tbb:tbb.BUILD"),
     )
 
+
+    http_archive(
+        name = "vulkan_headers",
+        url = "https://github.com/KhronosGroup/Vulkan-Headers/archive/v1.2.132.zip",
+        sha256 = "e6b5418e3d696ffc7c97991094ece7cafc4c279c8a88029cc60e587bc0c26068",
+        strip_prefix = "Vulkan-Headers-1.2.132",
+        build_file = clean_dep("//bzl:vulkan_headers.BUILD"),
+    )
+
+    http_archive(
+        name = "vulkan_loader",
+        url = "https://github.com/KhronosGroup/Vulkan-Loader/archive/v1.2.132.zip",
+        sha256 = "f42c10bdfaf2ec29d1e4276bf115387852a1dc6aee940f25aff804cc0138d10a",
+        strip_prefix = "Vulkan-Loader-1.2.132",
+        build_file = clean_dep("//vendor/vulkan_loader:vulkan_loader.BUILD"),
+        patches = [clean_dep("//vendor/vulkan_loader:vulkan_loader.patch")],
+    )
+    
     LLVM_COMMIT = "fdc7a16a8275b4ef69a17bb61c54c445ef506f90"
     LLVM_SHA256 = "b16eb184bd6bef5207e991ba6e04e6405f40740bcd53862ca0f088105758599b"
     LLVM_URL = "https://github.com/plaidml/llvm-project/archive/{commit}.tar.gz".format(commit = LLVM_COMMIT)
