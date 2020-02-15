@@ -986,7 +986,6 @@ plaidml_program* plaidml_compile(  //
 
     auto program = GlobalContext::get()->MakeProgram(name, mutations, *floatx_dtype, *intx_dtype);
     auto ret = new plaidml_program{program};
-    assert(noutputs <= ret->program->outputs.size());
     auto nargs = ret->program->arguments.size();
     auto args = new plaidml_program_arg[nargs];
     for (unsigned i = 0; i < nargs; i++) {
