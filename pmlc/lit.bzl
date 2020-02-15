@@ -49,6 +49,7 @@ def _run_lit_test(name, data, size, tags, features):
             "pmlc --config-prefix=runlit -v",
         ] + features,
         data = data + [
+            "//pmlc/tools/pmlc-jit",
             "//pmlc/tools/pmlc-opt",
             "//pmlc/tools/pmlc-translate",
             "//pmlc:litfiles",

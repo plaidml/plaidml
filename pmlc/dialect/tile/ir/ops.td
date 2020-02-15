@@ -343,8 +343,8 @@ def ShapeOp : SpecialOp<"shape">, HasCanonicalizer {
 
 def TraceOp : Op<TileDialect, "trace", []>, HasCanonicalizer {
   let summary = "tracepoint operation";
-  let arguments = (ins RankedTensorOf<[AnyScalar]>:$tensor, StrAttr:$msg);
-  let results = (outs RankedTensorOf<[AnyScalar]>:$result);
+  let arguments = (ins AnyType:$in, StrAttr:$msg);
+  let results = (outs AnyType:$out);
 
   let builders = [OpBuilder<
     "Builder* builder, OperationState& result, Value tensor, StringRef msg", [{

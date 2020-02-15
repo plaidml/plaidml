@@ -22,6 +22,7 @@ config.mlir_tools_dir = os.path.join(os.environ['TEST_SRCDIR'], 'llvm-project', 
 config.suffixes = ['.td', '.mlir', '.pbtxt', '.cc', '.py']
 
 mlir_pmlc_tools_dirs = [
+    'pmlc/tools/pmlc-jit',
     'pmlc/tools/pmlc-opt',
     'pmlc/tools/pmlc-tblgen',
     'pmlc/tools/pmlc-translate',

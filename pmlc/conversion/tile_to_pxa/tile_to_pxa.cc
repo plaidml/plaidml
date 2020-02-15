@@ -837,7 +837,7 @@ struct TraceOpConversion : public OpConversionPattern<TraceOp> {
     auto module = op.getParentOfType<ModuleOp>();
     auto symbol = createStubFunc(module, op.msgAttr());
     rewriter.create<CallOp>(op.getLoc(), symbol, ArrayRef<Type>{});
-    rewriter.replaceOp(op, op.tensor());
+    rewriter.replaceOp(op, op.in());
     return matchSuccess();
   }
 

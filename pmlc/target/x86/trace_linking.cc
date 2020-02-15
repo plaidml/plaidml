@@ -32,14 +32,13 @@ struct TraceLinkingPass : public ModulePass<TraceLinkingPass> {
       auto traceRef = getOrInsertTrace(loc, builder, module, llvmDialect);
       auto block = op.addEntryBlock();
       builder.setInsertionPointToStart(block);
-      auto voidTy = LLVM::LLVMType::getVoidTy(llvmDialect);
       auto id = op.getAttrOfType<IntegerAttr>("id").getValue().getZExtValue();
       auto msgStr = op.getAttrOfType<StringAttr>("msg").getValue().str();
       auto msg = StringRef(msgStr.c_str(), msgStr.size() + 1);
       auto msgSymbol = llvm::formatv("__trace_msg_{0}", id).str();
       auto msgValue = getOrCreateGlobalString(loc, builder, msgSymbol, msg,
                                               module, llvmDialect);
-      builder.create<LLVM::CallOp>(loc, voidTy, traceRef,
+      builder.create<LLVM::CallOp>(loc, ArrayRef<Type>{}, traceRef,
                                    ArrayRef<Value>{msgValue});
       builder.create<LLVM::ReturnOp>(loc, ArrayRef<Value>{});
       op.removeAttr("id");
@@ -104,7 +103,3 @@ std::unique_ptr<mlir::Pass> createTraceLinkingPass() {
 }
 
 } // namespace pmlc::target::x86
-
-extern "C" void plaidml_rt_trace(const char *msg) {
-  llvm::errs() << msg << "\n";
-}
