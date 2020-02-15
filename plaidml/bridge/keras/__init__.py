@@ -752,7 +752,7 @@ def dropout(x, level, noise_shape=None, seed=None):
 
 @_log_call
 def dtype(x):
-    return x.tensor.shape.dtype.into_numpy()
+    return x.tensor.dtype.into_numpy()
 
 
 @_log_call
