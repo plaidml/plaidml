@@ -10,6 +10,7 @@
 #include "mlir/Dialect/StandardOps/Ops.h"
 #include "mlir/ExecutionEngine/ExecutionEngine.h"
 #include "mlir/ExecutionEngine/OptUtils.h"
+#include "mlir/Parser.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/DebugStringHelper.h"
@@ -113,6 +114,15 @@ void Executable::initialize() {
   llvm::InitializeNativeTarget();
   llvm::InitializeNativeTargetAsmPrinter();
   initializeLLVMPasses();
+}
+
+Program::Program(mlir::ModuleOp module) : module(module) {}
+
+Program::Program(mlir::StringRef source) {
+  auto inputBuffer = llvm::MemoryBuffer::getMemBuffer(source);
+  llvm::SourceMgr sourceMgr;
+  sourceMgr.AddNewSourceBuffer(std::move(inputBuffer), llvm::SMLoc());
+  module = mlir::parseSourceFile(sourceMgr, &context);
 }
 
 void Program::compile(StringRef target, bool collectPasses) {
