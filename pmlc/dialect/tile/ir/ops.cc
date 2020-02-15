@@ -1225,10 +1225,10 @@ struct TraceOpCanonicalizer : public OpRewritePattern<TraceOp> {
                                      PatternRewriter &rewriter) const override {
     IVLOG(5,
           "TraceOpCanonicalizer::matchAndRewrite> " << mlir::debugString(op));
-    if (op.tensor().getType() == op.result().getType()) {
+    if (op.in().getType() == op.out().getType()) {
       return Pattern::matchFailure();
     }
-    auto newOp = rewriter.create<TraceOp>(op.getLoc(), op.tensor(), op.msg());
+    auto newOp = rewriter.create<TraceOp>(op.getLoc(), op.in(), op.msg());
     rewriter.replaceOp(op, {newOp});
     util::UpdateFuncOpType(newOp.getOperation());
     return Pattern::matchSuccess();
