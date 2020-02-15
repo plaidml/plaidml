@@ -298,7 +298,13 @@ RankedTensorType TileBuilder::ComputeShape(Value tensor) {
   ProgramMutations mutations;
   mutations.outputs.emplace_back(tensor);
   auto program = MakeProgram("compute_shape", mutations);
-  auto shape = program->outputs[0].getType().dyn_cast<RankedTensorType>();
+  RankedTensorType shape;
+  for (const auto &arg : program->arguments) {
+    if (!arg.isInput) {
+      shape = arg.shape;
+      break;
+    }
+  }
   impl->shapeCache.insert(std::make_pair(tensor, shape));
   return shape;
 }
@@ -782,7 +788,6 @@ TileBuilder::MakeProgram(StringRef name, const ProgramMutations &mutations,
       programArg.buffer = itBinding->second;
     }
     program->arguments.emplace_back(programArg);
-    program->outputs.emplace_back(finalValue);
   }
   program->tileIR = mlir::debugString(module);
   // IVLOG(2, "TileBuilder::MakeProgram>\n" << mlir::debugString(module));

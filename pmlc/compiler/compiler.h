@@ -35,11 +35,12 @@ struct Program {
   std::string entry;
   std::string tileIR;
   mlir::OwningModuleRef module;
-  std::vector<mlir::Value> outputs;
   std::vector<ProgramArgument> arguments;
   std::vector<PassInfo> passes;
+  mlir::MLIRContext context;
 
-  explicit Program(mlir::ModuleOp module) : module(module) {}
+  explicit Program(mlir::ModuleOp module);
+  explicit Program(mlir::StringRef source);
 
   void compile(mlir::StringRef target, bool collectPasses = false);
 
