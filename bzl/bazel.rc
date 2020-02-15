@@ -27,7 +27,7 @@ build --action_env=https_proxy
 
 build --define=version=0.0.0.dev0
 test --test_timeout_filters=-eternal
-test --test_output=streamed
+#test --test_output=streamed
 test --test_env=HOME
 test --test_env=PLAIDML_DEVICE
 test --test_env=PLAIDML_TARGET

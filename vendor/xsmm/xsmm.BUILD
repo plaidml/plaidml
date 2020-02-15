@@ -10,11 +10,6 @@ cc_library(
         "src/**/*.h",
         "include/*",
     ]),
-    copts = ["-w"],
-    defines = ["__BLAS=0"],
-    includes = [
-        "include",
-        "src",
-    ],
-    alwayslink = 1,
+    defines = ["LIBXSMM_NO_BLAS"],
+    includes = ["include"],
 )

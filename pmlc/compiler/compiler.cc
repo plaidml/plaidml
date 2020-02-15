@@ -16,9 +16,9 @@
 #include "mlir/Target/LLVMIR.h"
 #include "mlir/Transforms/Passes.h"
 
-#include "pmlc/all_dialects.h"
-#include "pmlc/all_passes.h"
 #include "pmlc/compiler/registry.h"
+#include "pmlc/util/all_dialects.h"
+#include "pmlc/util/all_passes.h"
 #include "pmlc/util/logging.h"
 
 using namespace mlir; // NOLINT[build/namespaces]

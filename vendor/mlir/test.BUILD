@@ -170,3 +170,12 @@ cc_library(
     ],
     alwayslink = 1,
 )
+
+cc_library(
+    name = "mlir_runner_utils",
+    srcs = [
+        "mlir-cpu-runner/include/mlir_runner_utils.h",
+        "mlir-cpu-runner/mlir_runner_utils.cpp",
+    ],
+    alwayslink = 1,
+)

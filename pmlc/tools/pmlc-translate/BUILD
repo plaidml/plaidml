@@ -1,11 +1,11 @@
-# Copyright 2019 Intel Corporation.
+# Copyright 2020 Intel Corporation
 
 package(default_visibility = ["//visibility:public"])
 
-load("//bzl:plaidml.bzl", "plaidml_cc_binary")
+load("//bzl:plaidml.bzl", "plaidml_cc_binary", "plaidml_cc_library")
 
-plaidml_cc_binary(
-    name = "pmlc-translate",
+plaidml_cc_library(
+    name = "lib",
     srcs = ["pmlc-translate.cc"],
     deps = [
         "//pmlc/dialect/tile",
@@ -15,4 +15,9 @@ plaidml_cc_binary(
         "@llvm-project//mlir:TranslateClParser",
         "@llvm-project//mlir:Translation",
     ],
+)
+
+plaidml_cc_binary(
+    name = "pmlc-translate",
+    deps = [":lib"],
 )

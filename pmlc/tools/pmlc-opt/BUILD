@@ -2,13 +2,12 @@
 
 package(default_visibility = ["//visibility:public"])
 
-load("//bzl:plaidml.bzl", "plaidml_cc_binary")
+load("//bzl:plaidml.bzl", "plaidml_cc_binary", "plaidml_cc_library")
 
-plaidml_cc_binary(
-    name = "pmlc-opt",
+plaidml_cc_library(
+    name = "lib",
     srcs = ["pmlc-opt.cc"],
     deps = [
-        "//pmlc",
         "//pmlc/conversion/pxa_to_affine",
         "//pmlc/conversion/stdx_to_llvm",
         "//pmlc/conversion/tile_to_pxa",
@@ -17,6 +16,7 @@ plaidml_cc_binary(
         "//pmlc/dialect/stdx",
         "//pmlc/dialect/tile",
         "//pmlc/target/x86",
+        "//pmlc/util",
         "@llvm-project//mlir:EDSC",
         "@llvm-project//mlir:LoopsToGPUPass",
         "@llvm-project//mlir:MlirOptLib",
@@ -24,4 +24,10 @@ plaidml_cc_binary(
         "@llvm-project//mlir:Parser",
         "@llvm-project//mlir:Transforms",
     ],
+    alwayslink = 1,
+)
+
+plaidml_cc_binary(
+    name = "pmlc-opt",
+    deps = [":lib"],
 )

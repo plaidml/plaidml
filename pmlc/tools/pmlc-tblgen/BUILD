@@ -1,8 +1,7 @@
-# Copyright 2019 Intel Corporation.
+# Copyright 2020 Intel Corporation
 
 package(default_visibility = ["//visibility:public"])
 
-load("//vendor/mlir:tblgen.bzl", "COPTS", "gentbl")
 load("//bzl:plaidml.bzl", "plaidml_cc_binary", "plaidml_cc_library")
 
 plaidml_cc_library(
@@ -18,8 +17,8 @@ plaidml_cc_library(
     ],
 )
 
-plaidml_cc_binary(
-    name = "pmlc-tblgen",
+plaidml_cc_library(
+    name = "lib",
     srcs = [
         "oplib_gen.cc",
     ],
@@ -32,4 +31,10 @@ plaidml_cc_binary(
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TableGen",
     ],
+    alwayslink = 1,
+)
+
+plaidml_cc_binary(
+    name = "pmlc-tblgen",
+    deps = [":lib"],
 )
