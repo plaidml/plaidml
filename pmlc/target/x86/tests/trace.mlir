@@ -1,9 +1,9 @@
 // RUN: pmlc-opt -convert-tile-to-pxa -target-cpu %s | FileCheck %s
-// -e test_trace -entry-point-result=void
+// RUN: pmlc-opt -convert-tile-to-pxa -target-cpu %s | pmlc-jit -entry-point-result=void | FileCheck %s --check-prefix=JIT
 
-func @test_trace() {
-  %c1 = constant 1 : i32
-  "tile.trace"(%c1) {msg = "msg"} : (i32) -> (i32)
+func @main() {
+  %c1 = constant 1.0 : f32
+  "tile.trace"(%c1) {msg = "msg"} : (f32) -> (f32)
   return
 }
 
@@ -14,5 +14,7 @@ func @test_trace() {
 // CHECK:        llvm.mlir.constant
 // CHECK:        llvm.getelementptr
 // CHECK:        llvm.call @plaidml_rt_trace(%{{.*}})
-// CHECK:      llvm.func @test_trace
+// CHECK:      llvm.func @main
 // CHECK:        llvm.call @__trace{{.*}}()
+
+// JIT: msg
