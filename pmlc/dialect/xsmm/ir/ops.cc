@@ -10,64 +10,65 @@ using llvm::SmallVector;
 using mlir::failure;
 using mlir::success;
 
-namespace {
+//
+// ---- GemmOp ----
+//
 
-// ---- SMMDispatchOp ----
-
-void printSMMDispatchOp(OpAsmPrinter &p, SMMDispatchOp op) {
-  // p << op.getOperation()->getName() << ' ' << op.getInductionVar();
-  // p << " = " << op.memref() << '[' << op.indices() << ']';
-  // p.printOptionalAttrDict(op.getAttrs());
-  // p << " : " << op.memref().getType();
-  // p.printRegion(op.body(), /*printEntryBlockArgs=*/false);
+GemmOp::operand_range GemmOp::getOperandsForA() {
+  return getOperands().slice(3 + cMap().getNumInputs(), aMap().getNumInputs());
 }
 
-// <operation> ::= `xsmm.atomic_rmw` argument `=` ssa-use `[` ssa-use-list `]`
-//                 attribute-dict? `:` type region
-ParseResult parseSMMDispatchOp(OpAsmParser &parser, OperationState &result) {
-  // MemRefType type;
-  // OpAsmParser::OperandType iv;
-  // OpAsmParser::OperandType memref;
-  // auto indexTy = parser.getBuilder().getIndexType();
-  // SmallVector<OpAsmParser::OperandType, 4> idxs;
-  // Region *body = result.addRegion();
-  // if (parser.parseRegionArgument(iv) || parser.parseEqual() ||
-  //     parser.parseOperand(memref) ||
-  //     parser.parseOperandList(idxs, OpAsmParser::Delimiter::Square) ||
-  //     parser.parseOptionalAttrDict(result.attributes) ||
-  //     parser.parseColonType(type) ||
-  //     parser.resolveOperand(memref, type, result.operands) ||
-  //     parser.resolveOperands(idxs, indexTy, result.operands) ||
-  //     parser.parseRegion(*body, iv, type.getElementType())) {
-  //   return failure();
-  // }
-  // result.addTypes(type.getElementType());
-  return success();
+GemmOp::operand_range GemmOp::getOperandsForB() {
+  return getOperands().slice(3 + cMap().getNumInputs() + aMap().getNumInputs(),
+                             bMap().getNumInputs());
 }
 
-LogicalResult verifySMMDispatchOp(SMMDispatchOp op) {
-  // if (op.getMemRefType().getRank() != op.getNumOperands() - 1)
-  //   return op.emitOpError(
-  //       "expects the number of subscripts to be equal to memref rank");
-  // auto block = op.getBody();
-  // if (block->empty()) {
-  //   return op.emitOpError("expects a non-empty body");
-  // }
-  // auto elementType = op.getMemRefType().getElementType();
-  // if (block->getNumArguments() != 1 ||
-  //     block->getArgument(0).getType() != elementType) {
-  //   return op.emitOpError()
-  //          << "expects a body with one argument of type " << elementType;
-  // }
-  // if (!llvm::isa<AtomicRMWYieldOp>(block->getTerminator())) {
-  //   return op.emitOpError(
-  //       "expects the body to be terminated with a 'xsmm.atomic_rmw.yield'
-  //       op");
-  // }
-  return success();
+GemmOp::operand_range GemmOp::getOperandsForC() {
+  return getOperands().slice(3, cMap().getNumInputs());
 }
 
-} // namespace
+void printGemmOp(OpAsmPrinter &p, GemmOp op) {
+  p << op.getOperation()->getName() << ' ';
+  p << op.c() << '[';
+  p.printAffineMapOfSSAIds(op.cMapAttr(), op.getOperandsForC());
+  p << "] = " << op.a() << '[';
+  p.printAffineMapOfSSAIds(op.aMapAttr(), op.getOperandsForA());
+  p << "], " << op.b() << '[';
+  p.printAffineMapOfSSAIds(op.bMapAttr(), op.getOperandsForB());
+  p << "], " << op.tile() << " : " << op.c().getType() << ", "
+    << op.a().getType() << ", " << op.b().getType();
+}
+
+ParseResult parseGemmOp(OpAsmParser &parser, OperationState &result) {
+  auto &builder = parser.getBuilder();
+  auto indexType = builder.getIndexType();
+  SmallVector<Type, 3> operandTypes;
+  OpAsmParser::OperandType a, b, c;
+  AffineMapAttr aMapAttr, bMapAttr, cMapAttr;
+  SmallVector<OpAsmParser::OperandType, 4> aOperands, bOperands, cOperands;
+  ArrayAttr tileAttr;
+  return failure(
+      parser.parseOperand(c) ||
+      parser.parseAffineMapOfSSAIds(cOperands, cMapAttr, "cMap",
+                                    result.attributes) ||
+      parser.parseEqual() || parser.parseOperand(a) ||
+      parser.parseAffineMapOfSSAIds(aOperands, aMapAttr, "aMap",
+                                    result.attributes) ||
+      parser.parseComma() || parser.parseOperand(b) ||
+      parser.parseAffineMapOfSSAIds(bOperands, bMapAttr, "bMap",
+                                    result.attributes) ||
+      parser.parseComma() ||
+      parser.parseAttribute(tileAttr, indexType, "tile", result.attributes) ||
+      parser.parseColonTypeList(operandTypes) ||
+      parser.resolveOperand(c, operandTypes[0], result.operands) ||
+      parser.resolveOperand(a, operandTypes[1], result.operands) ||
+      parser.resolveOperand(b, operandTypes[2], result.operands) ||
+      parser.resolveOperands(cOperands, indexType, result.operands) ||
+      parser.resolveOperands(aOperands, indexType, result.operands) ||
+      parser.resolveOperands(bOperands, indexType, result.operands));
+}
+
+LogicalResult verifyGemmOp(GemmOp op) { return success(); }
 
 #define GET_OP_CLASSES
 #include "pmlc/dialect/xsmm/ir/ops.cc.inc"

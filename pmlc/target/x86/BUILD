@@ -14,6 +14,7 @@ plaidml_cc_library(
         "//pmlc/conversion/stdx_to_llvm",
         "//pmlc/conversion/tile_to_pxa",
         "//pmlc/dialect/tile/transforms",
+        "//pmlc/dialect/xsmm",
         "//pmlc/rt",
         "@llvm-project//mlir:AffineToStandardTransforms",
         "@llvm-project//mlir:LLVMTransforms",

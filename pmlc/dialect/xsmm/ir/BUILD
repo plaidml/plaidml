@@ -8,6 +8,7 @@ load("//vendor/mlir:tblgen.bzl", "gentbl")
 filegroup(
     name = "td_files",
     srcs = [
+        "@llvm-project//mlir:AffineOpsTdFiles",
         "@llvm-project//mlir:OpBaseTdFiles",
     ],
 )
@@ -41,6 +42,7 @@ plaidml_cc_library(
     deps = [
         ":gen-ops",
         "@llvm-project//llvm:support",
+        "@llvm-project//mlir:AffineOps",
         "@llvm-project//mlir:IR",
     ],
 )

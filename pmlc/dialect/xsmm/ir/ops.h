@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "mlir/IR/AffineMap.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/StandardTypes.h"
@@ -10,9 +11,14 @@ namespace pmlc::dialect::xsmm {
 
 using llvm::ArrayRef;
 using llvm::StringRef;
+using mlir::AffineMap;
+using mlir::AffineMapAttr;
+using mlir::ArrayAttr;
+using mlir::Attribute;
 using mlir::Block;
 using mlir::Builder;
 using mlir::IndexType;
+using mlir::IntegerAttr;
 using mlir::LogicalResult;
 using mlir::MemRefType;
 using mlir::NamedAttribute;

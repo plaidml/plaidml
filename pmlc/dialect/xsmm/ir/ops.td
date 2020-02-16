@@ -7,6 +7,8 @@
 include "mlir/IR/OpBase.td"
 #endif
 
+include "mlir/Dialect/AffineOps/AffineOpsBase.td"
+
 def XSMM_Dialect : Dialect {
   let name = "xsmm";
   let cppNamespace = "pmlc::dialect::xsmm";
@@ -19,14 +21,22 @@ class XSMM_Op<string mnemonic, list<OpTrait> traits = []> :
   let verifier = [{ return verify$cppClass(*this); }];
 }
 
-def XSMM_SMMDispatchOp : XSMM_Op<"smmdispatch"> {
-  let arguments = (ins AnyMemRef:$memref, Variadic<Index>:$indices);
-  let results = (outs AnyType:$res);
-}
+def XSMM_GemmOp : XSMM_Op<"gemm"> {
+  let arguments = (ins
+    AnyMemRef:$c,
+    AffineMapAttr:$cMap,
+    AnyMemRef:$a,
+    AffineMapAttr:$aMap,
+    AnyMemRef:$b,
+    AffineMapAttr:$bMap,
+    I64ArrayAttr:$tile,
+    Variadic<Index>:$mapOperands);
 
-//def XSMM_DMMDispatchOp : XSMM_Op<"dmmdispatch"> {
-//  let arguments = (ins AnyMemRef:$memref, Variadic<Index>:$indices);
-//  let results = (outs AnyType:$res);
-//}
+  let extraClassDeclaration = [{
+    operand_range getOperandsForA();
+    operand_range getOperandsForB();
+    operand_range getOperandsForC();
+  }];
+}
 
 #endif // __PML_XSMM__OPS__

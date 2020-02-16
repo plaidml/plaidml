@@ -18,6 +18,7 @@ filegroup(
         "//pmlc/dialect/pxa/tests:all",
         "//pmlc/dialect/stdx/tests:all",
         "//pmlc/dialect/tile/tests:all",
+        "//pmlc/dialect/xsmm/tests:all",
         "//pmlc/target/x86/tests:all",
     ],
     visibility = ["//visibility:public"],

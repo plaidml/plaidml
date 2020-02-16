@@ -15,6 +15,7 @@ plaidml_cc_library(
         "//pmlc/dialect/pxa",
         "//pmlc/dialect/stdx",
         "//pmlc/dialect/tile",
+        "//pmlc/dialect/xsmm",
         "//pmlc/target/x86",
         "//pmlc/util",
         "@llvm-project//mlir:EDSC",
