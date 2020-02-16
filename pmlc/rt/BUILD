@@ -26,7 +26,10 @@ plaidml_cc_shlib(
 
 plaidml_cc_library(
     name = "rt_shlib",
-    srcs = [":shlib"],
+    srcs = select({
+        "@bazel_tools//src/conditions:darwin_x86_64": [],
+        "//conditions:default": [":shlib"],
+    }),
     linkstatic = 1,
     visibility = ["//visibility:public"],
 )

@@ -4,6 +4,12 @@
 
 #include "pmlc/rt/memref.h"
 
+struct Initializer {
+  Initializer() { libxsmm_init(); }
+};
+
+static Initializer init;
+
 extern "C" void plaidml_rt_xsmm_gemm_f32(UnrankedMemRefType a,
                                          UnrankedMemRefType b,
                                          UnrankedMemRefType c, int32_t lda,
