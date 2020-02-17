@@ -9,6 +9,7 @@
 
 namespace pmlc::dialect::xsmm {
 
+using llvm::APInt;
 using llvm::ArrayRef;
 using llvm::StringRef;
 using mlir::AffineMap;

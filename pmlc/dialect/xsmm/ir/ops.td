@@ -7,7 +7,9 @@
 include "mlir/IR/OpBase.td"
 #endif
 
+#ifndef AFFINE_OPS_BASE
 include "mlir/Dialect/AffineOps/AffineOpsBase.td"
+#endif
 
 def XSMM_Dialect : Dialect {
   let name = "xsmm";
@@ -22,13 +24,27 @@ class XSMM_Op<string mnemonic, list<OpTrait> traits = []> :
 }
 
 def XSMM_GemmOp : XSMM_Op<"gemm"> {
+  let summary = "general matrix multiply operation";
+  let description = [{
+    Perform a dense matrix-matrix multiplication.
+
+    C_m,n = A_m,k * B_k,n
+
+    lda: Leading dimension (stride) for A
+    ldb: Leading dimension (stride) for B
+    ldc: Leading dimension (stride) for C
+
+    Example:
+      affine.parallel (%i, %j, %k) = (0, 0, 0) to (8, 8, 8) step (2, 2, 2) {
+        xsmm.gemm %C[%i, %j]:8 = %A[%i, %k]:8, %B[%k, %j]:8, [2, 2, 2]
+          : memref<8x8xf32>, memref<8x8xf32>, memref<8x8xf32>
+      }
+  }];
+
   let arguments = (ins
-    AnyMemRef:$c,
-    AffineMapAttr:$cMap,
-    AnyMemRef:$a,
-    AffineMapAttr:$aMap,
-    AnyMemRef:$b,
-    AffineMapAttr:$bMap,
+    AnyMemRef:$c, AffineMapAttr:$cMap, I64Attr:$ldc,
+    AnyMemRef:$a, AffineMapAttr:$aMap, I64Attr:$lda,
+    AnyMemRef:$b, AffineMapAttr:$bMap, I64Attr:$ldb,
     I64ArrayAttr:$tile,
     Variadic<Index>:$mapOperands);
 
