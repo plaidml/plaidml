@@ -1,10 +1,26 @@
 # Copyright 2020 Intel Corporation
 
-load("//bzl:plaidml.bzl", "plaidml_cc_test")
+load("//bzl:plaidml.bzl", "plaidml_cc_binary", "plaidml_cc_test")
 
 filegroup(
-    name = "litfiles",
-    srcs = glob(["runlit*py"]),
+    name = "lit_files",
+    srcs = glob(["lit*cfg.py"]),
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "lit_tests",
+    srcs = [
+        "//pmlc/conversion/stdx_to_llvm/tests:all",
+        "//pmlc/conversion/tile_to_pxa/tests:all",
+        "//pmlc/dialect/eltwise/tests:all",
+        "//pmlc/dialect/oplib/tests:all",
+        "//pmlc/dialect/pxa/tests:all",
+        "//pmlc/dialect/stdx/tests:all",
+        "//pmlc/dialect/tile/tests:all",
+        "//pmlc/dialect/xsmm/tests:all",
+        "//pmlc/target/x86/tests:all",
+    ],
     visibility = ["//visibility:public"],
 )
 
@@ -17,11 +33,32 @@ plaidml_cc_test(
     ],
 )
 
-cc_library(
-    name = "pmlc",
-    hdrs = [
-        "all_dialects.h",
-        "all_passes.h",
-    ],
-    visibility = ["//visibility:public"],
+# The following rules are helpers to make it quicker and easier to launch the
+# pmlc tools manually.  Because they include all lit test files in their
+# runfiles, relative paths can be used from the command line.
+# Example:
+#   bazelisk run //pmlc:opt -- pmlc/dialect/tile/tests/constant-fold.mlir
+
+plaidml_cc_binary(
+    name = "jit",
+    data = [":lit_tests"],
+    deps = ["//pmlc/tools/pmlc-jit:lib"],
+)
+
+plaidml_cc_binary(
+    name = "opt",
+    data = [":lit_tests"],
+    deps = ["//pmlc/tools/pmlc-opt:lib"],
+)
+
+plaidml_cc_binary(
+    name = "tblgen",
+    data = [":lit_tests"],
+    deps = ["//pmlc/tools/pmlc-tblgen:lib"],
+)
+
+plaidml_cc_binary(
+    name = "translate",
+    data = [":lit_tests"],
+    deps = ["//pmlc/tools/pmlc-translate:lib"],
 )

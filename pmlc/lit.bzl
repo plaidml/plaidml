@@ -45,14 +45,12 @@ def _run_lit_test(name, data, size, tags, features):
         name = name,
         srcs = ["@llvm-project//llvm:lit"],
         tags = tags,
-        args = [
-            "pmlc --config-prefix=runlit -v",
-        ] + features,
+        args = ["pmlc", "-v"] + features,
         data = data + [
             "//pmlc/tools/pmlc-jit",
             "//pmlc/tools/pmlc-opt",
             "//pmlc/tools/pmlc-translate",
-            "//pmlc:litfiles",
+            "//pmlc:lit_files",
             "@llvm-project//llvm:FileCheck",
             "@llvm-project//llvm:count",
             "@llvm-project//llvm:not",
@@ -93,11 +91,15 @@ def glob_lit_tests(
         exclude = exclude,
     )
 
+    native.filegroup(
+        name = "all",
+        srcs = tests,
+        visibility = ["//visibility:public"],
+    )
+
     # Run tests individually such that errors can be attributed to a specific
     # failure.
-    for i in range(len(tests)):
-        curr_test = tests[i]
-
+    for curr_test in tests:
         # Instantiate this test with updated parameters.
         lit_test(
             name = curr_test,

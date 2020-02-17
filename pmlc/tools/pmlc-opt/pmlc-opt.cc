@@ -1,4 +1,4 @@
-// Copyright 2019 Intel Corporation.
+// Copyright 2020 Intel Corporation
 
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/InitLLVM.h"
@@ -12,8 +12,8 @@
 #include "mlir/Support/FileUtilities.h"
 #include "mlir/Support/MlirOptMain.h"
 
-#include "pmlc/all_dialects.h"
-#include "pmlc/all_passes.h"
+#include "pmlc/util/all_dialects.h"
+#include "pmlc/util/all_passes.h"
 #include "pmlc/util/env.h"
 #include "pmlc/util/logging.h"
 

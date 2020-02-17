@@ -48,5 +48,5 @@ lit_config.load_config(
         os.path.join(
             os.environ['TEST_SRCDIR'],
             os.environ['TEST_WORKSPACE'],
-            'pmlc/runlit.cfg.py',
+            'pmlc/lit.cfg.py',
         )))

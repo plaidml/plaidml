@@ -1,8 +1,8 @@
-# Copyright 2019 Intel Corporation
+# Copyright 2020 Intel Corporation
 
+load("//vendor/bazel:repo.bzl", "http_archive")
 load("//vendor/conda:repo.bzl", "conda_repo")
 load("//vendor/xsmm:repo.bzl", "xsmm_repo")
-load("//vendor/bazel:repo.bzl", "http_archive")
 
 # Sanitize a dependency so that it works correctly from code that includes it as a submodule.
 def clean_dep(dep):
