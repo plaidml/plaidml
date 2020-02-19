@@ -15,9 +15,12 @@ namespace mlir {
 // the loop moves a pure affine expression by a fixed distance, 'strides' holds
 // that distance.  Additionally it holds a fixed offset.
 struct StrideInfo {
-  StrideInfo() : offset(0) {}
+  explicit StrideInfo(int64_t offset = 0) : offset(offset) {}
   int64_t offset;
   DenseMap<BlockArgument, int64_t> strides;
+
+  StrideInfo &operator*=(int64_t factor);
+  StrideInfo &operator+=(const StrideInfo &rhs);
 };
 
 // Compute stride info for a given affine value (such an an induction variable
