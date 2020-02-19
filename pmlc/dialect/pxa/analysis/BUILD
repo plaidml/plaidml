@@ -16,4 +16,3 @@ plaidml_cc_library(
         "//pmlc/dialect/pxa/ir",
     ],
 )
-
