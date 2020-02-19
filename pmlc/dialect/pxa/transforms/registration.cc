@@ -23,11 +23,11 @@ struct Autotile10Pass : public mlir::FunctionPass<Autotile10Pass> {
   }
 };
 
-static mlir::PassRegistration<Autotile10Pass> regAutotile10( //
-    "autotile-10", "Tile all dimensions by 10");
+static mlir::PassRegistration<Autotile10Pass>
+    regAutotile10("autotile-10", "Tile all dimensions by 10");
 
-static mlir::PassRegistration<TestStrideInfoPass> regTestStrideInfo( //
-    "test-stride-info",
-    "Report stride data for all loads/stores for unit tests");
+static mlir::PassRegistration<TestStrideInfoPass>
+    regTestStrideInfo("test-stride-info",
+                      "Report stride data for all loads/stores for unit tests");
 
 } // namespace pmlc::dialect::pxa

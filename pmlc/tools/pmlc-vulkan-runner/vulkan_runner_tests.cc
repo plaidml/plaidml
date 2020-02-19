@@ -143,7 +143,7 @@ TEST_F(RuntimeTest, SimpleTest) {
     spv.globalVariable @var1 bind(0, 1) : !spv.ptr<!spv.struct<!spv.array<1024 x f32 [4]> [0]>, StorageBuffer>
     spv.globalVariable @var0 bind(0, 0) : !spv.ptr<!spv.struct<!spv.array<1024 x f32 [4]> [0]>, StorageBuffer>
     spv.globalVariable @globalInvocationID built_in("GlobalInvocationId") : !spv.ptr<vector<3xi32>, Input>
-    func @kernel() {
+    spv.func @kernel() "None"{
       %0 = spv.constant 0 : i32
       %1 = spv._address_of @var0 : !spv.ptr<!spv.struct<!spv.array<1024 x f32 [4]> [0]>, StorageBuffer>
       %2 = spv._address_of @var1 : !spv.ptr<!spv.struct<!spv.array<1024 x f32 [4]> [0]>, StorageBuffer>

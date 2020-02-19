@@ -5,20 +5,22 @@
 
 namespace mlir {
 
-// Multiple all strides/offets by a constant
-static void mulStrides(StrideInfo &val, int64_t mul) {
-  val.offset *= mul;
-  for (auto &kvp : val.strides) {
-    kvp.second *= mul;
+// Multiply all strides/offets by a constant
+StrideInfo &StrideInfo::operator*=(int64_t factor) {
+  offset *= factor;
+  for (auto &kvp : strides) {
+    kvp.second *= factor;
   }
+  return *this;
 }
 
-// Add the second stride info into the first
-static void addStrides(StrideInfo &val, const StrideInfo &toAdd) {
-  val.offset += toAdd.offset;
-  for (const auto &kvp : toAdd.strides) {
-    val.strides[kvp.first] += kvp.second;
+// Add the rhs into a StrideInfo
+StrideInfo &StrideInfo::operator+=(const StrideInfo &rhs) {
+  offset += rhs.offset;
+  for (const auto &kvp : rhs.strides) {
+    strides[kvp.first] += kvp.second;
   }
+  return *this;
 }
 
 static Optional<StrideInfo> computeStrideInfo(AffineParallelOp op,
@@ -84,11 +86,8 @@ Optional<StrideInfo> computeStrideInfo(Value expr) {
 
 Optional<StrideInfo> computeStrideInfo(AffineExpr expr, ValueRange args) {
   // If we are a constant affine expression, it's a simple offset.
-  if (auto cexpr = expr.dyn_cast<AffineConstantExpr>()) {
-    StrideInfo r;
-    r.offset = cexpr.getValue();
-    return r;
-  }
+  if (auto cexpr = expr.dyn_cast<AffineConstantExpr>())
+    return StrideInfo(cexpr.getValue());
 
   // If we are a dim, it's just a Value.
   if (auto dexpr = expr.dyn_cast<AffineDimExpr>())
@@ -99,30 +98,31 @@ Optional<StrideInfo> computeStrideInfo(AffineExpr expr, ValueRange args) {
     if (bexpr.getKind() == AffineExprKind::Mul) {
       // For multiplies, RHS should always be constant of symbolic, and symbols
       // fail, so we cast to constant and give up if it doesn't work
-      auto cexpr = bexpr.getRHS().dyn_cast<AffineConstantExpr>();
-      if (!cexpr)
+      auto rhs = bexpr.getRHS().dyn_cast<AffineConstantExpr>();
+      if (!rhs)
         return None;
 
       // Now compute the LHS via recursion
-      auto out = computeStrideInfo(bexpr.getLHS(), args);
-      if (!out)
+      auto lhs = computeStrideInfo(bexpr.getLHS(), args);
+      if (!lhs)
         return None;
 
       // Multiply by the multiplier and return
-      mulStrides(*out, cexpr.getValue());
-      return out;
+      *lhs *= rhs.getValue();
+      return lhs;
     }
+
     if (bexpr.getKind() == AffineExprKind::Add) {
       // For add, we compute both sides and add them (presuming they both return
       // valid outputs).
-      auto out1 = computeStrideInfo(bexpr.getLHS(), args);
-      if (!out1)
+      auto lhs = computeStrideInfo(bexpr.getLHS(), args);
+      if (!lhs)
         return None;
-      auto out2 = computeStrideInfo(bexpr.getRHS(), args);
-      if (!out2)
+      auto rhs = computeStrideInfo(bexpr.getRHS(), args);
+      if (!rhs)
         return None;
-      addStrides(*out1, *out2);
-      return out1;
+      *lhs += *rhs;
+      return lhs;
     }
   }
 
@@ -136,23 +136,22 @@ Optional<StrideInfo> computeStrideInfo(MemRefType memRefType, AffineMap map,
   assert(map.getNumResults() == memRefType.getRank());
   assert(map.getNumInputs() == values.size());
 
-  // Get the memRef strides/offsets, and fail early is there is an isssue.
+  // Get the memRef strides/offsets, and fail early if there is an isssue.
   int64_t memRefOffset;
   SmallVector<int64_t, 4> memRefStrides;
   if (failed(getStridesAndOffset(memRefType, memRefStrides, memRefOffset)))
     return None;
 
   // Fail if anything is dynamic.
-  if (memRefOffset == MemRefType::kDynamicStrideOrOffset)
+  if (ShapedType::isDynamicStrideOrOffset(memRefOffset))
     return None;
 
   for (size_t i = 0; i < memRefStrides.size(); i++) {
-    if (memRefStrides[i] == MemRefType::kDynamicStrideOrOffset)
+    if (ShapedType::isDynamicStrideOrOffset(memRefStrides[i]))
       return None;
   }
 
-  StrideInfo out;
-  out.offset = memRefOffset;
+  StrideInfo out(memRefOffset);
   for (size_t i = 0; i < map.getNumResults(); i++) {
     // Collect the output for each dimension of the memRef.
     auto perDim = computeStrideInfo(map.getResult(i), values);
@@ -162,8 +161,8 @@ Optional<StrideInfo> computeStrideInfo(MemRefType memRefType, AffineMap map,
       return None;
 
     // Otherwise multiply by memRef stride and add in
-    mulStrides(*perDim, memRefStrides[i]);
-    addStrides(out, *perDim);
+    *perDim *= memRefStrides[i];
+    out += *perDim;
   }
   // Return the accumulated results
   return out;
