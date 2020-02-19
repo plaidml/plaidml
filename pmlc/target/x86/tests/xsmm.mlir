@@ -1,18 +1,43 @@
-// RUN: pmlc-opt \
-// RUN:   -convert-linalg-to-loops \
-// RUN:   -convert-pxa-to-affine \
-// RUN:   -lower-affine \
-// RUN:   -convert-loop-to-std \
-// RUN:   -convert-std-to-llvm \
-// RUN:   %s | \
-// RUN: pmlc-jit -entry-point-result=void | FileCheck %s
+// RUN: pmlc-opt -convert-linalg-to-loops -convert-pxa-to-affine -lower-affine \
+// RUN:     -convert-loop-to-std -convert-std-to-llvm %s | \
+// RUN:   pmlc-jit -e baseline -entry-point-result=void | FileCheck %s
+// RUN: pmlc-opt -convert-linalg-to-loops -convert-pxa-to-affine -lower-affine \
+// RUN:     -convert-loop-to-std -convert-std-to-llvm %s | \
+// RUN:   pmlc-jit -e tiled -entry-point-result=void | FileCheck %s
+// RUN: pmlc-opt -convert-linalg-to-loops -convert-pxa-to-affine -lower-affine \
+// RUN:     -convert-loop-to-std -convert-std-to-llvm %s | \
+// RUN:   pmlc-jit -e xsmm -entry-point-result=void | FileCheck %s
 
 func @print_memref_f32(memref<*xf32>)
 func @plaidml_rt_xsmm_gemm_f32(memref<*xf32>, memref<*xf32>, memref<*xf32>, i32, i32, i32, i32, i32, i32)
 
-func @main() {
-  call @test_dot() : () -> ()
-  call @test_conv2() : () -> ()
+func @baseline() {
+  %dot = constant @dot : (memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>) -> ()
+  call @test_dot(%dot) : ((memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>) -> ()) -> ()
+
+  %conv2 = constant @conv2 : (memref<?x?x?x?xf32>, memref<?x?x?x?xf32>, memref<?x?x?x?xf32>) -> ()
+  call @test_conv2(%conv2) : ((memref<?x?x?x?xf32>, memref<?x?x?x?xf32>, memref<?x?x?x?xf32>) -> ()) -> ()
+
+  return
+}
+
+func @tiled() {
+  %dot = constant @dot_tiled : (memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>) -> ()
+  call @test_dot(%dot) : ((memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>) -> ()) -> ()
+
+  %conv2 = constant @conv2_tiled : (memref<?x?x?x?xf32>, memref<?x?x?x?xf32>, memref<?x?x?x?xf32>) -> ()
+  call @test_conv2(%conv2) : ((memref<?x?x?x?xf32>, memref<?x?x?x?xf32>, memref<?x?x?x?xf32>) -> ()) -> ()
+
+  return
+}
+
+func @xsmm() {
+  %dot = constant @dot_xsmm : (memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>) -> ()
+  call @test_dot(%dot) : ((memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>) -> ()) -> ()
+
+  %conv2 = constant @conv2_xsmm : (memref<?x?x?x?xf32>, memref<?x?x?x?xf32>, memref<?x?x?x?xf32>) -> ()
+  call @test_conv2(%conv2) : ((memref<?x?x?x?xf32>, memref<?x?x?x?xf32>, memref<?x?x?x?xf32>) -> ()) -> ()
+
   return
 }
 
@@ -60,7 +85,7 @@ func @fill_4d(%buf : memref<?x?x?x?xf32>, %alt : i1) {
   return
 }
 
-func @test_dot() {
+func @test_dot(%impl : (memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>) -> ()) {
   %false = constant 0 : i1
   %true = constant 1 : i1
   %f0 = constant 0.0 : f32
@@ -68,42 +93,18 @@ func @test_dot() {
   %A_2d = memref_cast %A : memref<8x8xf32> to memref<?x?xf32>
   %A_ud = memref_cast %A : memref<8x8xf32> to memref<*xf32>
   call @fill_2d(%A_2d, %false) : (memref<?x?xf32>, i1) -> ()
-  //call @print_memref_f32(%A_ud) : (memref<*xf32>) -> ()
+  // call @print_memref_f32(%A_ud) : (memref<*xf32>) -> ()
   %B = alloc() : memref<8x8xf32>
   %B_2d = memref_cast %B : memref<8x8xf32> to memref<?x?xf32>
   %B_ud = memref_cast %B : memref<8x8xf32> to memref<*xf32>
   call @fill_2d(%B_2d, %true) : (memref<?x?xf32>, i1) -> ()
-  //call @print_memref_f32(%B_ud) : (memref<*xf32>) -> ()
+  // call @print_memref_f32(%B_ud) : (memref<*xf32>) -> ()
   %C = alloc() : memref<8x8xf32>
   %C_2d = memref_cast %C : memref<8x8xf32> to memref<?x?xf32>
   %C_ud = memref_cast %C : memref<8x8xf32> to memref<*xf32>
 
   linalg.fill(%C, %f0) : memref<8x8xf32>, f32
-  call @dot(%A_2d, %B_2d, %C_2d) : (memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>) -> ()
-  call @print_memref_f32(%C_ud) : (memref<*xf32>) -> ()
-  // CHECK:  [60,   36,   12,   -12,   -36,   -60,   -84,   -108],
-  // CHECK:  [272,   264,   256,   248,   240,   232,   224,   216],
-  // CHECK:  [484,   492,   500,   508,   516,   524,   532,   540],
-  // CHECK:  [696,   720,   744,   768,   792,   816,   840,   864],
-  // CHECK:  [908,   948,   988,   1028,   1068,   1108,   1148,   1188],
-  // CHECK:  [1120,   1176,   1232,   1288,   1344,   1400,   1456,   1512],
-  // CHECK:  [1332,   1404,   1476,   1548,   1620,   1692,   1764,   1836],
-  // CHECK:  [1544,   1632,   1720,   1808,   1896,   1984,   2072,   2160]
-
-  linalg.fill(%C, %f0) : memref<8x8xf32>, f32
-  call @dot_tiled(%A_2d, %B_2d, %C_2d) : (memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>) -> ()
-  call @print_memref_f32(%C_ud) : (memref<*xf32>) -> ()
-  // CHECK:  [60,   36,   12,   -12,   -36,   -60,   -84,   -108],
-  // CHECK:  [272,   264,   256,   248,   240,   232,   224,   216],
-  // CHECK:  [484,   492,   500,   508,   516,   524,   532,   540],
-  // CHECK:  [696,   720,   744,   768,   792,   816,   840,   864],
-  // CHECK:  [908,   948,   988,   1028,   1068,   1108,   1148,   1188],
-  // CHECK:  [1120,   1176,   1232,   1288,   1344,   1400,   1456,   1512],
-  // CHECK:  [1332,   1404,   1476,   1548,   1620,   1692,   1764,   1836],
-  // CHECK:  [1544,   1632,   1720,   1808,   1896,   1984,   2072,   2160]
-
-  linalg.fill(%C, %f0) : memref<8x8xf32>, f32
-  call @dot_xsmm(%A_2d, %B_2d, %C_2d) : (memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>) -> ()
+  call_indirect %impl(%A_2d, %B_2d, %C_2d) : (memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>) -> ()
   call @print_memref_f32(%C_ud) : (memref<*xf32>) -> ()
   // CHECK:  [60,   36,   12,   -12,   -36,   -60,   -84,   -108],
   // CHECK:  [272,   264,   256,   248,   240,   232,   224,   216],
@@ -174,7 +175,7 @@ func @dot_xsmm(%A: memref<?x?xf32>, %B: memref<?x?xf32>, %C: memref<?x?xf32>) {
   return
 }
 
-func @test_conv2() {
+func @test_conv2(%impl : (memref<?x?x?x?xf32>, memref<?x?x?x?xf32>, memref<?x?x?x?xf32>) -> ()) {
   %false = constant 0 : i1
   %true = constant 1 : i1
   %f0 = constant 0.0 : f32
@@ -182,86 +183,18 @@ func @test_conv2() {
   %I_2d = memref_cast %I : memref<1x6x5x7xf32> to memref<?x?x?x?xf32>
   %I_ud = memref_cast %I : memref<1x6x5x7xf32> to memref<*xf32>
   call @fill_4d(%I_2d, %false) : (memref<?x?x?x?xf32>, i1) -> ()
-  call @print_memref_f32(%I_ud) : (memref<*xf32>) -> ()
+  // call @print_memref_f32(%I_ud) : (memref<*xf32>) -> ()
   %K = alloc() : memref<1x1x7x11xf32>
   %K_2d = memref_cast %K : memref<1x1x7x11xf32> to memref<?x?x?x?xf32>
   %K_ud = memref_cast %K : memref<1x1x7x11xf32> to memref<*xf32>
   call @fill_4d(%K_2d, %true) : (memref<?x?x?x?xf32>, i1) -> ()
-  call @print_memref_f32(%K_ud) : (memref<*xf32>) -> ()
+  // call @print_memref_f32(%K_ud) : (memref<*xf32>) -> ()
   %O = alloc() : memref<1x6x5x11xf32>
   %O_2d = memref_cast %O : memref<1x6x5x11xf32> to memref<?x?x?x?xf32>
   %O_ud = memref_cast %O : memref<1x6x5x11xf32> to memref<*xf32>
 
   linalg.fill(%O, %f0) : memref<1x6x5x11xf32>, f32
-  call @conv2(%I_2d, %K_2d, %O_2d) : (memref<?x?x?x?xf32>, memref<?x?x?x?xf32>, memref<?x?x?x?xf32>) -> ()
-  call @print_memref_f32(%O_ud) : (memref<*xf32>) -> ()
-  // CHECK: [-98,     -126,     -154,     -182,     -210,     -238,     -266,     -294,     -322,     -350,     -378],
-  // CHECK: [119,     105,     91,     77,     63,     49,     35,     21,     7,     -7,     -21],
-  // CHECK: [336,     336,     336,     336,     336,     336,     336,     336,     336,     336,     336],
-  // CHECK: [553,     567,     581,     595,     609,     623,     637,     651,     665,     679,     693],
-  // CHECK: [770,     798,     826,     854,     882,     910,     938,     966,     994,     1022,     1050]],
-  // CHECK: [119,     105,     91,     77,     63,     49,     35,     21,     7,     -7,     -21],
-  // CHECK: [336,     336,     336,     336,     336,     336,     336,     336,     336,     336,     336],
-  // CHECK: [553,     567,     581,     595,     609,     623,     637,     651,     665,     679,     693],
-  // CHECK: [770,     798,     826,     854,     882,     910,     938,     966,     994,     1022,     1050],
-  // CHECK: [987,     1029,     1071,     1113,     1155,     1197,     1239,     1281,     1323,     1365,     1407]],
-  // CHECK: [336,     336,     336,     336,     336,     336,     336,     336,     336,     336,     336],
-  // CHECK: [553,     567,     581,     595,     609,     623,     637,     651,     665,     679,     693],
-  // CHECK: [770,     798,     826,     854,     882,     910,     938,     966,     994,     1022,     1050],
-  // CHECK: [987,     1029,     1071,     1113,     1155,     1197,     1239,     1281,     1323,     1365,     1407],
-  // CHECK: [1204,     1260,     1316,     1372,     1428,     1484,     1540,     1596,     1652,     1708,     1764]],
-  // CHECK: [553,     567,     581,     595,     609,     623,     637,     651,     665,     679,     693],
-  // CHECK: [770,     798,     826,     854,     882,     910,     938,     966,     994,     1022,     1050],
-  // CHECK: [987,     1029,     1071,     1113,     1155,     1197,     1239,     1281,     1323,     1365,     1407],
-  // CHECK: [1204,     1260,     1316,     1372,     1428,     1484,     1540,     1596,     1652,     1708,     1764],
-  // CHECK: [1421,     1491,     1561,     1631,     1701,     1771,     1841,     1911,     1981,     2051,     2121]],
-  // CHECK: [770,     798,     826,     854,     882,     910,     938,     966,     994,     1022,     1050],
-  // CHECK: [987,     1029,     1071,     1113,     1155,     1197,     1239,     1281,     1323,     1365,     1407],
-  // CHECK: [1204,     1260,     1316,     1372,     1428,     1484,     1540,     1596,     1652,     1708,     1764],
-  // CHECK: [1421,     1491,     1561,     1631,     1701,     1771,     1841,     1911,     1981,     2051,     2121],
-  // CHECK: [1638,     1722,     1806,     1890,     1974,     2058,     2142,     2226,     2310,     2394,     2478]],
-  // CHECK: [987,     1029,     1071,     1113,     1155,     1197,     1239,     1281,     1323,     1365,     1407],
-  // CHECK: [1204,     1260,     1316,     1372,     1428,     1484,     1540,     1596,     1652,     1708,     1764],
-  // CHECK: [1421,     1491,     1561,     1631,     1701,     1771,     1841,     1911,     1981,     2051,     2121],
-  // CHECK: [1638,     1722,     1806,     1890,     1974,     2058,     2142,     2226,     2310,     2394,     2478],
-  // CHECK: [1855,     1953,     2051,     2149,     2247,     2345,     2443,     2541,     2639,     2737,     2835]]]]
-
-  linalg.fill(%O, %f0) : memref<1x6x5x11xf32>, f32
-  call @conv2_tiled(%I_2d, %K_2d, %O_2d) : (memref<?x?x?x?xf32>, memref<?x?x?x?xf32>, memref<?x?x?x?xf32>) -> ()
-  call @print_memref_f32(%O_ud) : (memref<*xf32>) -> ()
-  // CHECK: [-98,     -126,     -154,     -182,     -210,     -238,     -266,     -294,     -322,     -350,     -378],
-  // CHECK: [119,     105,     91,     77,     63,     49,     35,     21,     7,     -7,     -21],
-  // CHECK: [336,     336,     336,     336,     336,     336,     336,     336,     336,     336,     336],
-  // CHECK: [553,     567,     581,     595,     609,     623,     637,     651,     665,     679,     693],
-  // CHECK: [770,     798,     826,     854,     882,     910,     938,     966,     994,     1022,     1050]],
-  // CHECK: [119,     105,     91,     77,     63,     49,     35,     21,     7,     -7,     -21],
-  // CHECK: [336,     336,     336,     336,     336,     336,     336,     336,     336,     336,     336],
-  // CHECK: [553,     567,     581,     595,     609,     623,     637,     651,     665,     679,     693],
-  // CHECK: [770,     798,     826,     854,     882,     910,     938,     966,     994,     1022,     1050],
-  // CHECK: [987,     1029,     1071,     1113,     1155,     1197,     1239,     1281,     1323,     1365,     1407]],
-  // CHECK: [336,     336,     336,     336,     336,     336,     336,     336,     336,     336,     336],
-  // CHECK: [553,     567,     581,     595,     609,     623,     637,     651,     665,     679,     693],
-  // CHECK: [770,     798,     826,     854,     882,     910,     938,     966,     994,     1022,     1050],
-  // CHECK: [987,     1029,     1071,     1113,     1155,     1197,     1239,     1281,     1323,     1365,     1407],
-  // CHECK: [1204,     1260,     1316,     1372,     1428,     1484,     1540,     1596,     1652,     1708,     1764]],
-  // CHECK: [553,     567,     581,     595,     609,     623,     637,     651,     665,     679,     693],
-  // CHECK: [770,     798,     826,     854,     882,     910,     938,     966,     994,     1022,     1050],
-  // CHECK: [987,     1029,     1071,     1113,     1155,     1197,     1239,     1281,     1323,     1365,     1407],
-  // CHECK: [1204,     1260,     1316,     1372,     1428,     1484,     1540,     1596,     1652,     1708,     1764],
-  // CHECK: [1421,     1491,     1561,     1631,     1701,     1771,     1841,     1911,     1981,     2051,     2121]],
-  // CHECK: [770,     798,     826,     854,     882,     910,     938,     966,     994,     1022,     1050],
-  // CHECK: [987,     1029,     1071,     1113,     1155,     1197,     1239,     1281,     1323,     1365,     1407],
-  // CHECK: [1204,     1260,     1316,     1372,     1428,     1484,     1540,     1596,     1652,     1708,     1764],
-  // CHECK: [1421,     1491,     1561,     1631,     1701,     1771,     1841,     1911,     1981,     2051,     2121],
-  // CHECK: [1638,     1722,     1806,     1890,     1974,     2058,     2142,     2226,     2310,     2394,     2478]],
-  // CHECK: [987,     1029,     1071,     1113,     1155,     1197,     1239,     1281,     1323,     1365,     1407],
-  // CHECK: [1204,     1260,     1316,     1372,     1428,     1484,     1540,     1596,     1652,     1708,     1764],
-  // CHECK: [1421,     1491,     1561,     1631,     1701,     1771,     1841,     1911,     1981,     2051,     2121],
-  // CHECK: [1638,     1722,     1806,     1890,     1974,     2058,     2142,     2226,     2310,     2394,     2478],
-  // CHECK: [1855,     1953,     2051,     2149,     2247,     2345,     2443,     2541,     2639,     2737,     2835]]]]
-
-  linalg.fill(%O, %f0) : memref<1x6x5x11xf32>, f32
-  call @conv2_xsmm(%I_2d, %K_2d, %O_2d) : (memref<?x?x?x?xf32>, memref<?x?x?x?xf32>, memref<?x?x?x?xf32>) -> ()
+  call_indirect %impl(%I_2d, %K_2d, %O_2d) : (memref<?x?x?x?xf32>, memref<?x?x?x?xf32>, memref<?x?x?x?xf32>) -> ()
   call @print_memref_f32(%O_ud) : (memref<*xf32>) -> ()
   // CHECK: [-98,     -126,     -154,     -182,     -210,     -238,     -266,     -294,     -322,     -350,     -378],
   // CHECK: [119,     105,     91,     77,     63,     49,     35,     21,     7,     -7,     -21],
