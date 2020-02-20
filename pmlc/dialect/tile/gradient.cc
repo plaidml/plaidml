@@ -28,12 +28,12 @@ Gradient::Gradient(mlir::Value loss, TileBuilder *builder) : builder_(builder) {
         // TODO: This is an ad hoc list of what to filter out; make it
         // principled
         return !mlir::isa<AffineConstraintsOp>(op) &&
-               !mlir::isa<AffineMapOp>(op) && !mlir::isa<AffineIndexOp>(op) &&
-               !mlir::isa<DimOp>(op) && !mlir::isa<AffineConstantOp>(op) &&
-               !mlir::isa<AffineAddOp>(op) && !mlir::isa<AffineDivOp>(op) &&
-               !mlir::isa<AffineMulOp>(op) && !mlir::isa<AffineNegOp>(op) &&
-               !mlir::isa<AffineSubOp>(op) && !mlir::isa<AffineMaxOp>(op) &&
-               !mlir::isa<AffineMinOp>(op) &&
+               !mlir::isa<AffineMapOp>(op) && !mlir::isa<PolyIndexOp>(op) &&
+               !mlir::isa<DimOp>(op) && !mlir::isa<ConstantOp>(op) &&
+               !mlir::isa<PolyAddOp>(op) && !mlir::isa<PolyDivOp>(op) &&
+               !mlir::isa<PolyMulOp>(op) && !mlir::isa<PolyNegOp>(op) &&
+               !mlir::isa<PolySubOp>(op) && !mlir::isa<PolyMaxOp>(op) &&
+               !mlir::isa<PolyMinOp>(op) &&
                !mlir::isa<eltwise::ScalarConstantOp>(op);
       }});
   for (auto def = defs.rbegin(); def != defs.rend(); def++) {
@@ -64,7 +64,7 @@ void Gradient::ComputeOperandDerivs(mlir::Value val) {
   // TODO: Throw on ops with multiple results?
   auto op = val.getDefiningOp();
   if (mlir::isa<AffineConstraintsOp>(op) || mlir::isa<AffineMapOp>(op) ||
-      mlir::isa<AffineIndexOp>(op) || mlir::isa<PrngOp>(op) ||
+      mlir::isa<PolyIndexOp>(op) || mlir::isa<PrngOp>(op) ||
       mlir::isa<ShapeOp>(op)) {
     // TODO: Make the list of which ops these are more principled. Also, should
     // these all be caught in the backwards slice filter? If so, probably throw

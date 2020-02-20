@@ -91,15 +91,15 @@ public:
   mlir::Value MakePlaceholderOp(mlir::RankedTensorType type,
                                 pmlc::util::BufferPtr buffer,
                                 llvm::StringRef name);
-  mlir::Value MakeAffineConstantOp(int64_t value);
-  mlir::Value MakeAffineIndexOp(llvm::StringRef name = "");
-  mlir::Value MakeAffineAddOp(llvm::ArrayRef<mlir::Value> args);
-  mlir::Value MakeAffineSubOp(llvm::ArrayRef<mlir::Value> args);
-  mlir::Value MakeAffineMulOp(llvm::ArrayRef<mlir::Value> args);
-  mlir::Value MakeAffineDivOp(llvm::ArrayRef<mlir::Value> args);
-  mlir::Value MakeAffineNegOp(llvm::ArrayRef<mlir::Value> args);
-  mlir::Value MakeAffineMaxOp(llvm::ArrayRef<mlir::Value> args);
-  mlir::Value MakeAffineMinOp(llvm::ArrayRef<mlir::Value> args);
+  mlir::Value MakeConstantOp(int64_t value);
+  mlir::Value MakePolyIndexOp(llvm::StringRef name = "");
+  mlir::Value MakePolyAddOp(llvm::ArrayRef<mlir::Value> args);
+  mlir::Value MakePolySubOp(llvm::ArrayRef<mlir::Value> args);
+  mlir::Value MakePolyMulOp(llvm::ArrayRef<mlir::Value> args);
+  mlir::Value MakePolyDivOp(llvm::ArrayRef<mlir::Value> args);
+  mlir::Value MakePolyNegOp(llvm::ArrayRef<mlir::Value> args);
+  mlir::Value MakePolyMaxOp(llvm::ArrayRef<mlir::Value> args);
+  mlir::Value MakePolyMinOp(llvm::ArrayRef<mlir::Value> args);
   mlir::Value MakeAffineTensorMapOp(mlir::Value tensor,
                                     llvm::ArrayRef<mlir::Value> idxs);
   mlir::Value MakeAffineMapOp(llvm::ArrayRef<mlir::Value> idxs);
