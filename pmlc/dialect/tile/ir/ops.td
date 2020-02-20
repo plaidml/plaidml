@@ -96,13 +96,6 @@ class SpecialOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
 
   let extraClassDeclaration = [{
     static Type getResultType(ArrayRef<Value> operands);
-
-    static Operation* create(OpBuilder* builder, Location loc, ArrayRef<Value> operands) {
-      OperationState state(loc, getOperationName());
-      state.addOperands(operands);
-      state.addTypes(getResultType(operands));
-      return builder->createOperation(state);
-    }
   }];
 }
 
