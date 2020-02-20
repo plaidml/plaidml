@@ -24,11 +24,12 @@ namespace pmlc::conversion::tile_to_pxa {
 
 namespace ew = dialect::eltwise;
 namespace pxa = dialect::pxa;
+using namespace mlir; // NOLINT
 
 using dialect::eltwise::ScalarType;
-using dialect::tile::AffineConstantOp;
 using dialect::tile::AggregationKind;
 using dialect::tile::CombinationKind;
+using dialect::tile::ConstantOp;
 using dialect::tile::ContractionOp;
 using dialect::tile::ContractionOpOperandAdaptor;
 using dialect::tile::IndexOp;
@@ -36,48 +37,6 @@ using dialect::tile::ShapeOp;
 using dialect::tile::ShapeOpOperandAdaptor;
 using dialect::tile::TraceOp;
 using util::DataType;
-
-using llvm::Optional;
-using llvm::SmallVector;
-using mlir::AffineConstantExpr;
-using mlir::AffineIfOp;
-using mlir::AffineLoadOp;
-using mlir::AffineMap;
-using mlir::AffineMapAttr;
-using mlir::AffineParallelOp;
-using mlir::AffineStoreOp;
-using mlir::AllocOp;
-using mlir::ArrayRef;
-using mlir::Attribute;
-using mlir::CallOp;
-using mlir::CmpFPredicate;
-using mlir::CmpIPredicate;
-using mlir::ConversionPattern;
-using mlir::ConversionPatternRewriter;
-using mlir::FlatSymbolRefAttr;
-using mlir::FloatAttr;
-using mlir::FloatType;
-using mlir::FuncOp;
-using mlir::FunctionType;
-using mlir::IntegerAttr;
-using mlir::IntegerType;
-using mlir::Location;
-using mlir::MemRefType;
-using mlir::MLIRContext;
-using mlir::ModuleOp;
-using mlir::NamedAttribute;
-using mlir::OpBuilder;
-using mlir::OpConversionPattern;
-using mlir::Operation;
-using mlir::OwningRewritePatternList;
-using mlir::Pattern;
-using mlir::PatternMatchResult;
-using mlir::RankedTensorType;
-using mlir::ReturnOp;
-using mlir::StringAttr;
-using mlir::SymbolRefAttr;
-using mlir::Type;
-using mlir::Value;
 
 namespace {
 
@@ -147,12 +106,11 @@ struct FuncOpConversion : public OpConversionPattern<FuncOp> {
   }
 };
 
-struct AffineConstantOpConversion
-    : public OpConversionPattern<AffineConstantOp> {
-  using OpConversionPattern<AffineConstantOp>::OpConversionPattern;
+struct ConstantOpConversion : public OpConversionPattern<ConstantOp> {
+  using OpConversionPattern<ConstantOp>::OpConversionPattern;
 
   PatternMatchResult
-  matchAndRewrite(AffineConstantOp op, ArrayRef<Value> operands,
+  matchAndRewrite(ConstantOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
     auto value = op.getValue().cast<IntegerAttr>().getInt();
     rewriter.replaceOpWithNewOp<mlir::ConstantIndexOp>(op, value);
@@ -884,7 +842,7 @@ struct LoweringPass : public mlir::ModulePass<LoweringPass> {
         CmpIntInequalityOp<CmpIPredicate::sge, CmpIPredicate::uge>;
     OwningRewritePatternList patterns;
     patterns.insert<
-        AffineConstantOpConversion, CastOpConversion, FuncOpConversion,
+        ConstantOpConversion, CastOpConversion, FuncOpConversion,
         IndexOpConversion, ReturnOpConversion, ScalarConstantOpConversion,
         ShapeOpConversion,
         TraceOpConversion, // TODO: PrngOpConversion

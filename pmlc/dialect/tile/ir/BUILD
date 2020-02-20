@@ -8,7 +8,10 @@ load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_test")
 filegroup(
     name = "td_files",
     srcs = [
+        "base.td",
+        "builder.td",
         "interfaces.td",
+        "ops.td",
         "//pmlc/dialect/eltwise/ir:td_files",
     ],
 )

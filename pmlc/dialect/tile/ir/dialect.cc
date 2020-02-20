@@ -24,9 +24,9 @@ struct OpAsmInterface : public mlir::OpAsmDialectInterface {
                          mlir::OpAsmSetValueNameFn setNameFn) const final {
     llvm::SmallString<32> osbuf;
     llvm::raw_svector_ostream os(osbuf);
-    if (auto constOp = llvm::dyn_cast<AffineConstantOp>(op)) {
+    if (auto constOp = llvm::dyn_cast<ConstantOp>(op)) {
       os << 'c' << constOp.value().getSExtValue();
-    } else if (auto indexOp = llvm::dyn_cast<AffineIndexOp>(op)) {
+    } else if (auto indexOp = llvm::dyn_cast<PolyIndexOp>(op)) {
       if (indexOp.name().hasValue()) {
         os << *indexOp.name();
       }
@@ -97,7 +97,7 @@ Operation *Dialect::materializeConstant(mlir::OpBuilder &builder,
   if (auto attr = value.dyn_cast<IntegerAttr>()) {
     auto indexType = builder.getIndexType();
     auto indexAttr = builder.getIntegerAttr(indexType, attr.getInt());
-    return builder.create<AffineConstantOp>(loc, indexType, indexAttr);
+    return builder.create<ConstantOp>(loc, indexType, indexAttr);
   }
   return nullptr;
 }
