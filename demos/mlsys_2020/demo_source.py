@@ -3,10 +3,13 @@ import numpy as np
 import drawSvg as draw
 from drawSvg.widgets import DrawingWidget, AsyncAnimation
 import ipywidgets as widgets
+from IPython.display import display
+from ipywidgets import Layout
 
 import plaidml
 import plaidml.exec
 from plaidml.edsl import *
+from ipywidgets import Textarea, VBox
 
 
 class Demo:
@@ -83,9 +86,23 @@ def edsl_program(X, Y):
 """.format(textbox_value), edsl_context)
         edsl_program = edsl_context['edsl_program']
         R = edsl_program(X, Y)
-        program = Program('edsl_program', [R])
+        program = Program('edsl_program', [R], debug=True)
+        for p in program.passes:
+            name = p[0]
+            print('\n')
+            print(name)
+            text = widgets.Textarea(value=''.join(p),
+                                    placeholder='Passes',
+                                    disabled=False,
+                                    layout=Layout(
+                                        height='100%',
+                                        width='auto',
+                                    ))
+            box = VBox([text], layout={'height': '350px'})
+            display(box)
 
-        # Create the binder and the executable so that the program can run.
+
+# Create the binder and the executable so that the program can run.
         binder = plaidml.exec.Binder(program)
         executable = binder.compile()
         binder.input(X).copy_from_ndarray(self.input_x_vals)
