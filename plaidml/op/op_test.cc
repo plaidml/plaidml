@@ -14,8 +14,9 @@ using namespace plaidml::edsl;  // NOLINT
 
 namespace plaidml::edsl {
 
-bool operator==(const Program& lhs, const std::string& rhs) {  //
-  return true;                                                 // TODO: re-enable brittle tests by replacing with lit.
+bool operator==(const Program& lhs, const std::string& rhs) {
+  // TODO: re-enable brittle tests by replacing with lit.
+  return true;
   // return llvm::StringRef(lhs.str()).trim() == llvm::StringRef(rhs).trim();
 }
 

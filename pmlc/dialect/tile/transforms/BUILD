@@ -12,6 +12,7 @@ plaidml_cc_library(
     ],
     hdrs = [
         "contraction.h",
+        "padding.h",
         "passes.h",
     ],
     deps = [
