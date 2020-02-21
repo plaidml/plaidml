@@ -33,13 +33,13 @@ Value createIndexAttrConstant(OpBuilder &builder, Location loc, Type resultType,
 // provided as template argument.  Carries a reference to the LLVM dialect in
 // case it is necessary for rewriters.
 template <typename SourceOp>
-class LLVMLegalizationPattern : public LLVMOpLowering {
+class LLVMLegalizationPattern : public ConvertToLLVMPattern {
 public:
   // Construct a conversion pattern.
   explicit LLVMLegalizationPattern(LLVM::LLVMDialect &dialect_,
-                                   LLVMTypeConverter &lowering_)
-      : LLVMOpLowering(SourceOp::getOperationName(), dialect_.getContext(),
-                       lowering_),
+                                   LLVMTypeConverter &typeConverter_)
+      : ConvertToLLVMPattern(SourceOp::getOperationName(),
+                             dialect_.getContext(), typeConverter_),
         dialect(dialect_) {}
 
   // Get the LLVM IR dialect.
@@ -232,7 +232,7 @@ struct AtomicRMWOpLowering : public LoadStoreOpLowering<stdx::AtomicRMWOp> {
     }
     OperandAdaptor<stdx::AtomicRMWOp> adaptor(operands);
     auto type = atomicOp.getMemRefType();
-    auto resultType = lowering.convertType(simpleMatch->val.getType());
+    auto resultType = typeConverter.convertType(simpleMatch->val.getType());
     auto dataPtr = getDataPtr(op->getLoc(), type, adaptor.memref(),
                               adaptor.indices(), rewriter, getModule());
     rewriter.create<LLVM::AtomicRMWOp>(
@@ -314,7 +314,8 @@ struct CmpXchgLowering : public LoadStoreOpLowering<stdx::AtomicRMWOp> {
     auto successOrdering = LLVM::AtomicOrdering::acq_rel;
     auto failureOrdering = LLVM::AtomicOrdering::monotonic;
     auto iv = atomicOp.getInductionVar();
-    auto resultType = lowering.convertType(iv.getType()).cast<LLVM::LLVMType>();
+    auto resultType =
+        typeConverter.convertType(iv.getType()).cast<LLVM::LLVMType>();
     auto boolType = LLVM::LLVMType::getInt1Ty(&getDialect());
     auto pairType = LLVM::LLVMType::getStructTy(resultType, boolType);
     auto cmpxchg = rewriter.create<LLVM::AtomicCmpXchgOp>(
