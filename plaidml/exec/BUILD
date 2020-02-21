@@ -33,6 +33,7 @@ plaidml_cc_library(
     deps = [
         "//plaidml/core",
         "//pmlc/compiler",
+        "//pmlc/target/demo",
         "//pmlc/target/intel_gen",
         "//pmlc/target/x86",
         "//pmlc/util",
