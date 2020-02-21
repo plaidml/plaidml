@@ -77,12 +77,13 @@ VARIANTS:
     env:
       PLAIDML_DEVICE: llvm_cpu.0
       PLAIDML_TARGET: llvm_cpu
-  windows_x86_64:
-    arch: win_amd64
-    system: Windows
-    env:
-      PLAIDML_DEVICE: llvm_cpu.0
-      PLAIDML_TARGET: llvm_cpu
+  # TODO: LLVM builds on windows are currently broken upstream, re-enable when fixed
+  # windows_x86_64:
+  #   arch: win_amd64
+  #   system: Windows
+  #   env:
+  #     PLAIDML_DEVICE: llvm_cpu.0
+  #     PLAIDML_TARGET: llvm_cpu
 
 SUITES:
   smoke:
