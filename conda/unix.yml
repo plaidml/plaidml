@@ -14,6 +14,7 @@ dependencies:
     - autodoc
     - bokeh
     - breathe
+    - cairosvg
     - click
     - defaultlist
     - drawSvg
