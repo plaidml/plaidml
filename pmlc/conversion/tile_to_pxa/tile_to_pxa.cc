@@ -43,23 +43,13 @@ using util::DataType;
 namespace {
 
 struct TypeConverter : public mlir::TypeConverter {
-  using mlir::TypeConverter::convertType;
-
-  Type convertType(Type type) final {
-    IVLOG(2, "TypeConverter::convertType> " << mlir::debugString(type));
-    if (type.isa<FunctionType>()) {
-      IVLOG(4, "  FunctionType");
-      return type;
-    }
-    if (auto scalarType = type.dyn_cast<ScalarType>()) {
-      return scalarType.toStandard();
-    }
-    if (auto rankedTensorType = type.dyn_cast<RankedTensorType>()) {
-      IVLOG(4, "  RankedTensorType");
-      return MemRefType::get(rankedTensorType.getShape(),
-                             convertType(rankedTensorType.getElementType()));
-    }
-    return {};
+  TypeConverter() {
+    addConversion([](FunctionType type) { return type; });
+    addConversion([](ScalarType type) { return type.toStandard(); });
+    addConversion([this](RankedTensorType type) {
+      return MemRefType::get(type.getShape(),
+                             convertType(type.getElementType()));
+    });
   }
 };
 
