@@ -17,8 +17,7 @@ plaidml_cc_library(
         "-ldl",
     ],
     tags = [
-        "linux",
-        "macos",
+        "skip_windows",
     ],
     deps = [
         "@llvm-project//mlir:SPIRVDialect",
@@ -39,9 +38,8 @@ plaidml_cc_test(
         "-ldl",
     ],
     tags = [
-        "linux",
-        "macos",
         "manual",
+        "skip_windows",
     ],
     deps = [
         ":vulkan_runner",
