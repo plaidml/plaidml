@@ -463,21 +463,21 @@ Tensor Convolution2(const Tensor& I, const Tensor& K) {
   TensorIndex n, x0, x1, co, ci, k0, k1;
   I.bind_dims(N, X0, X1, CI);
   K.bind_dims(K0, K1, CI, CO);
-  auto R = TensorOutput(N, X0 - (K0 - 1), X1 - (K1 - 1), CO);
+  auto R = TensorOutput(N, X0, X1, CO);
   R(n, x0, x1, co) += I(n, x0 + k0 - (K0 / 2), x1 + k1 - (K1 / 2), ci) * K(k0, k1, ci, co);
   return R;
 }
 
 TEST_F(CppEdsl, Convolution) {
-  auto I = Placeholder(DType::FLOAT32, {1, 224, 224, 1});
+  auto I = Placeholder(DType::FLOAT32, {1, 224, 224, 3});
   auto K = Placeholder(DType::FLOAT32, {3, 3, 1, 32});
   auto program = makeProgram("convolution", {Convolution2(I, K)});
   // clang-format off
   // CHECK-LABEL: CppEdsl.Convolution
   // CHECK: func @convolution
   // CHECK: %[[cst:.*]] = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
-  // CHECK: %{{.*}} = tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : !f32, tensor<1x224x224x1x!eltwise.f32>, tensor<3x3x1x32x!eltwise.f32> -> tensor<1x222x222x32x!eltwise.f32>
-  // CHECK: return %{{.*}} : tensor<1x222x222x32x!eltwise.f32>
+  // CHECK: %{{.*}} = tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : !f32, tensor<1x224x224x3x!eltwise.f32>, tensor<3x3x1x32x!eltwise.f32> -> tensor<1x224x224x32x!eltwise.f32>
+  // CHECK: return %{{.*}} : tensor<1x224x224x32x!eltwise.f32>
   // clang-format on
   runProgram(program);
 }
@@ -519,9 +519,9 @@ TEST_F(CppEdsl, MnistCnn) {
   auto pool1 = MaxPooling2(conv2);
   // model.add(Flatten())
   auto flat = Flatten(pool1);
-  EXPECT_THAT(flat.compute_shape(), Eq(LogicalShape(DType::FLOAT32, {1, 12100})));
+  EXPECT_THAT(flat.compute_shape(), Eq(LogicalShape(DType::FLOAT32, {1, 12544})));
   // model.add(Dense(128, activation='relu'))
-  auto kernel3 = Placeholder(DType::FLOAT32, {12100, 128});
+  auto kernel3 = Placeholder(DType::FLOAT32, {12544, 128});
   auto bias3 = Placeholder(DType::FLOAT32, {128});
   auto dense1 = Relu(Dot(flat, kernel3) + bias3);
   const std::int64_t kNumClasses = 100;
@@ -534,21 +534,21 @@ TEST_F(CppEdsl, MnistCnn) {
   // clang-format off
   // CHECK-LABEL: CppEdsl.MnistCnn
   // CHECK: func @mnist_cnn
-  // CHECK-DAG: %[[c12100:.*]] = tile.constant 12100
+  // CHECK-DAG: %[[c12544:.*]] = tile.constant 12544
   // CHECK-DAG: %[[cst:.*]] = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
   // CHECK-DAG: %[[c1:.*]] = tile.constant 1
   // CHECK-DAG: %[[cst_0:.*]] = "eltwise.sconst"() {value = 0xFFF0000000000000 : f64} : () -> !f32
-  // CHECK: %{{.*}} = tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : !f32, tensor<1x224x224x1x!eltwise.f32>, tensor<3x3x1x32x!eltwise.f32> -> tensor<1x222x222x32x!eltwise.f32>
-  // CHECK: %{{.*}} = "eltwise.add"(%{{.*}}, %{{.*}}) : (tensor<1x222x222x32x!eltwise.f32>, tensor<32x!eltwise.f32>) -> tensor<1x222x222x32x!eltwise.f32>
-  // CHECK: %{{.*}} = "eltwise.cmp_lt"(%{{.*}}, %[[cst]]) : (tensor<1x222x222x32x!eltwise.f32>, !f32) -> tensor<1x222x222x32x!eltwise.u1>
-  // CHECK: %{{.*}} = "eltwise.select"(%{{.*}}, %[[cst]], %{{.*}}) : (tensor<1x222x222x32x!eltwise.u1>, !f32, tensor<1x222x222x32x!eltwise.f32>) -> tensor<1x222x222x32x!eltwise.f32>
-  // CHECK: %{{.*}} = tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : !f32, tensor<1x222x222x32x!eltwise.f32>, tensor<3x3x32x64x!eltwise.f32> -> tensor<1x220x220x64x!eltwise.f32>
-  // CHECK: %{{.*}} = "eltwise.add"(%{{.*}}, %{{.*}}) : (tensor<1x220x220x64x!eltwise.f32>, tensor<64x!eltwise.f32>) -> tensor<1x220x220x64x!eltwise.f32>
-  // CHECK: %{{.*}} = "eltwise.cmp_lt"(%{{.*}}, %[[cst]]) : (tensor<1x220x220x64x!eltwise.f32>, !f32) -> tensor<1x220x220x64x!eltwise.u1>
-  // CHECK: %{{.*}} = "eltwise.select"(%{{.*}}, %[[cst]], %{{.*}}) : (tensor<1x220x220x64x!eltwise.u1>, !f32, tensor<1x220x220x64x!eltwise.f32>) -> tensor<1x220x220x64x!eltwise.f32>
-  // CHECK: %{{.*}} = tile.contract max, none, %[[cst_0]], %{{.*}} {cons = #set{{[0-9]+}}, sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}]} : !f32, tensor<1x220x220x64x!eltwise.f32> -> tensor<1x110x110x64x!eltwise.f32>
-  // CHECK: %{{.*}} = "tile.reshape"(%{{.*}}, %[[c1]], %[[c12100]]) : (tensor<1x110x110x64x!eltwise.f32>, index, index) -> tensor<1x12100x!eltwise.f32>
-  // CHECK: %{{.*}} = tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {idxs = ["i", "j", "k"], sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : !f32, tensor<1x12100x!eltwise.f32>, tensor<12100x128x!eltwise.f32> -> tensor<1x128x!eltwise.f32>
+  // CHECK: %{{.*}} = tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : !f32, tensor<1x224x224x1x!eltwise.f32>, tensor<3x3x1x32x!eltwise.f32> -> tensor<1x224x224x32x!eltwise.f32>
+  // CHECK: %{{.*}} = "eltwise.add"(%{{.*}}, %{{.*}}) : (tensor<1x224x224x32x!eltwise.f32>, tensor<32x!eltwise.f32>) -> tensor<1x224x224x32x!eltwise.f32>
+  // CHECK: %{{.*}} = "eltwise.cmp_lt"(%{{.*}}, %[[cst]]) : (tensor<1x224x224x32x!eltwise.f32>, !f32) -> tensor<1x224x224x32x!eltwise.u1>
+  // CHECK: %{{.*}} = "eltwise.select"(%{{.*}}, %[[cst]], %{{.*}}) : (tensor<1x224x224x32x!eltwise.u1>, !f32, tensor<1x224x224x32x!eltwise.f32>) -> tensor<1x224x224x32x!eltwise.f32>
+  // CHECK: %{{.*}} = tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : !f32, tensor<1x224x224x32x!eltwise.f32>, tensor<3x3x32x64x!eltwise.f32> -> tensor<1x224x224x64x!eltwise.f32>
+  // CHECK: %{{.*}} = "eltwise.add"(%{{.*}}, %{{.*}}) : (tensor<1x224x224x64x!eltwise.f32>, tensor<64x!eltwise.f32>) -> tensor<1x224x224x64x!eltwise.f32>
+  // CHECK: %{{.*}} = "eltwise.cmp_lt"(%{{.*}}, %[[cst]]) : (tensor<1x224x224x64x!eltwise.f32>, !f32) -> tensor<1x224x224x64x!eltwise.u1>
+  // CHECK: %{{.*}} = "eltwise.select"(%{{.*}}, %[[cst]], %{{.*}}) : (tensor<1x224x224x64x!eltwise.u1>, !f32, tensor<1x224x224x64x!eltwise.f32>) -> tensor<1x224x224x64x!eltwise.f32>
+  // CHECK: %{{.*}} = tile.contract max, none, %[[cst_0]], %{{.*}} {cons = #set{{[0-9]+}}, sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}]} : !f32, tensor<1x224x224x64x!eltwise.f32> -> tensor<1x112x112x64x!eltwise.f32>
+  // CHECK: %{{.*}} = "tile.reshape"(%{{.*}}, %[[c1]], %[[c12544]]) : (tensor<1x112x112x64x!eltwise.f32>, index, index) -> tensor<1x12544x!eltwise.f32>
+  // CHECK: %{{.*}} = tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {idxs = ["i", "j", "k"], sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : !f32, tensor<1x12544x!eltwise.f32>, tensor<12544x128x!eltwise.f32> -> tensor<1x128x!eltwise.f32>
   // CHECK: %{{.*}} = "eltwise.add"(%{{.*}}, %{{.*}}) : (tensor<1x128x!eltwise.f32>, tensor<128x!eltwise.f32>) -> tensor<1x128x!eltwise.f32>
   // CHECK: %{{.*}} = "eltwise.cmp_lt"(%{{.*}}, %[[cst]]) : (tensor<1x128x!eltwise.f32>, !f32) -> tensor<1x128x!eltwise.u1>
   // CHECK: %{{.*}} = "eltwise.select"(%{{.*}}, %[[cst]], %{{.*}}) : (tensor<1x128x!eltwise.u1>, !f32, tensor<1x128x!eltwise.f32>) -> tensor<1x128x!eltwise.f32>

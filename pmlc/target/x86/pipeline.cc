@@ -55,8 +55,7 @@ struct ConvertToLLVMPass : public ModulePass<ConvertToLLVMPass> {
 
 void addToPipeline(OpPassManager &pm) {
   pm.addPass(pmlc::dialect::tile::createComputeBoundsPass());
-  // FIXME: this is not working yet.
-  // pm.addPass(pmlc::dialect::tile::createPadPass());
+  pm.addPass(pmlc::dialect::tile::createPadPass());
   pm.addNestedPass<FuncOp>(createCanonicalizerPass());
   pm.addNestedPass<FuncOp>(createCSEPass());
 

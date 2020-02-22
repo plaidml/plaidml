@@ -122,6 +122,14 @@ struct TileConstantOpConversion : public OpConversionPattern<ConstantOp> {
   }
 };
 
+static llvm::APFloat convertFloatUsingType(llvm::APFloat value,
+                                           FloatType type) {
+  bool losesInfo = false;
+  value.convert(type.getFloatSemantics(), APFloat::rmNearestTiesToEven,
+                &losesInfo);
+  return value;
+}
+
 struct ScalarConstantOpConversion
     : public OpConversionPattern<ew::ScalarConstantOp> {
   using OpConversionPattern<ew::ScalarConstantOp>::OpConversionPattern;
@@ -133,7 +141,8 @@ struct ScalarConstantOpConversion
     auto value = op.getValue();
     if (auto floatType = stdType.dyn_cast<FloatType>()) {
       auto floatAttr = value.cast<FloatAttr>();
-      value = FloatAttr::get(floatType, floatAttr.getValueAsDouble());
+      auto floatValue = convertFloatUsingType(floatAttr.getValue(), floatType);
+      value = FloatAttr::get(floatType, floatValue);
     } else if (auto intType = stdType.dyn_cast<IntegerType>()) {
       auto intAttr = value.cast<IntegerAttr>();
       value = IntegerAttr::get(intType, intAttr.getInt());
@@ -383,12 +392,14 @@ static Value createInit(OpBuilder &builder, Location loc, Type type,
                         AggregationKind agg) {
   if (auto floatType = type.dyn_cast<FloatType>()) {
     switch (agg) {
-    case AggregationKind::add:
-      return builder.create<mlir::ConstantFloatOp>(loc, llvm::APFloat(0.0),
-                                                   floatType);
-    case AggregationKind::mul:
-      return builder.create<mlir::ConstantFloatOp>(loc, llvm::APFloat(1.0),
-                                                   floatType);
+    case AggregationKind::add: {
+      auto value = convertFloatUsingType(llvm::APFloat(0.0), floatType);
+      return builder.create<mlir::ConstantFloatOp>(loc, value, floatType);
+    }
+    case AggregationKind::mul: {
+      auto value = convertFloatUsingType(llvm::APFloat(1.0), floatType);
+      return builder.create<mlir::ConstantFloatOp>(loc, value, floatType);
+    }
     default:
       llvm_unreachable("Unsupported aggregation for createInit");
     }
@@ -480,10 +491,12 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
         typeConverter.convertType(resultTensorType.getElementType());
     auto originalShape = resultTensorType.getShape();
     auto shape = llvm::to_vector<8>(originalShape);
+
+    // If padding is detected, expand the shape to accomodate.
     auto maybePadding = getPaddingInfo(op.getOperation());
     if (maybePadding) {
       for (unsigned i = 0, e = shape.size(); i < e; ++i) {
-        shape[i] += maybePadding->upper[i] + maybePadding->lower[i];
+        shape[i] += maybePadding->lower[i] + maybePadding->upper[i];
       }
     }
 
@@ -498,19 +511,15 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
           createInit(rewriter, loc, elementType, maybePadding->agg);
       fillBuffer(rewriter, loc, initValue, resultMemRef, resultMemRefType);
       // Construct a subview of the interior.
-      SmallVector<int64_t, 4> resultStrides;
-      int64_t resultOffset;
-      getStridesAndOffset(resultMemRefType, resultStrides, resultOffset);
+      auto one = rewriter.create<mlir::ConstantIndexOp>(loc, 1);
       SmallVector<Value, 4> offsets;
       SmallVector<Value, 4> sizes;
-      SmallVector<Value, 4> strides;
+      SmallVector<Value, 4> strides(shape.size(), one);
       for (unsigned i = 0, e = shape.size(); i < e; ++i) {
-        offsets.push_back(rewriter.create<mlir::ConstantIndexOp>(
-            loc, maybePadding->lower[i]));
-        sizes.push_back(
-            rewriter.create<mlir::ConstantIndexOp>(loc, originalShape[i]));
-        strides.push_back(
-            rewriter.create<mlir::ConstantIndexOp>(loc, resultStrides[i]));
+        auto offset = maybePadding->lower[i];
+        auto size = originalShape[i];
+        offsets.push_back(rewriter.create<mlir::ConstantIndexOp>(loc, offset));
+        sizes.push_back(rewriter.create<mlir::ConstantIndexOp>(loc, size));
       }
       resultMemRef = rewriter.create<SubViewOp>(loc, resultMemRef, offsets,
                                                 sizes, strides);

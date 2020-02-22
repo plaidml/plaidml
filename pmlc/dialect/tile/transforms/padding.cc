@@ -206,6 +206,7 @@ void PadPass::runOnFunction() {
       // Replace all uses with ident (except for newly generated use).
       arg.replaceAllUsesWith(ident);
       ident.getOperation()->replaceUsesOfWith(stub, arg);
+      stub.erase();
       // Now use ident for all further work.
       def = ident;
     }
