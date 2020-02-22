@@ -1,6 +1,5 @@
-// Copyright 2019, Intel Corporation
+// Copyright 2020, Intel Corporation
 
-#include "mlir/Conversion/LoopToStandard/ConvertLoopToStandard.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
@@ -39,7 +38,7 @@ void addToPipeline(OpPassManager &pm) {
 }
 
 static PassPipelineRegistration<>
-    passPipelineReg("target_demo", "Target pipeline for demonstrations",
+    passPipelineReg("target-demo", "Target pipeline for demonstrations",
                     addToPipeline);
 static compiler::TargetRegistration targetReg("demo", addToPipeline);
 

@@ -14,10 +14,7 @@ plaidml_cc_library(
         "//pmlc/conversion/tile_to_pxa",
         "//pmlc/dialect/tile/transforms",
         "@llvm-project//mlir:AffineToStandardTransforms",
-        "@llvm-project//mlir:GPUToSPIRVTransforms",
-        "@llvm-project//mlir:GPUTransforms",
         "@llvm-project//mlir:LLVMTransforms",
-        "@llvm-project//mlir:LoopsToGPUPass",
     ],
     alwayslink = 1,
 )

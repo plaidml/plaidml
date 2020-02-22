@@ -1,15 +1,15 @@
 # Begin with some imports
-import numpy as np
-import drawSvg as draw
-from drawSvg.widgets import DrawingWidget, AsyncAnimation
-import ipywidgets as widgets
-from IPython.display import display
-from ipywidgets import Layout
 
+import drawSvg as draw
+import ipywidgets as widgets
+import numpy as np
 import plaidml
 import plaidml.exec
+
+from drawSvg.widgets import DrawingWidget, AsyncAnimation
+from ipywidgets import Layout, Textarea, VBox
+from IPython.display import display
 from plaidml.edsl import *
-from ipywidgets import Textarea, VBox
 
 
 class Demo:
@@ -101,8 +101,7 @@ def edsl_program(X, Y):
             box = VBox([text], layout={'height': '350px'})
             display(box)
 
-
-# Create the binder and the executable so that the program can run.
+        # Create the binder and the executable so that the program can run.
         binder = plaidml.exec.Binder(program)
         executable = binder.compile()
         binder.input(X).copy_from_ndarray(self.input_x_vals)
