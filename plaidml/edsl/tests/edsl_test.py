@@ -1158,10 +1158,6 @@ module {
         self.assertEqual('tile', first_pass[0])
         self.assertEqual(str(program), first_pass[1])
 
-        last_pass = program.passes[-1]
-        self.assertEqual('trace-linking', last_pass[0])
-        self.assertIn('llvm.func', last_pass[1])
-
 
 if __name__ == '__main__':
     plaidml.settings.set('PLAIDML_DEVICE', DEFAULT_DEVICE)
