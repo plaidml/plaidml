@@ -3203,6 +3203,7 @@ cc_library(
         ":code_gen",
         ":config",
         ":core",
+        ":coroutines",
         ":inst_combine",
         ":instrumentation",
         ":ipo",

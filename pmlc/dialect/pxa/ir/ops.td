@@ -29,7 +29,7 @@ class PXA_OpWithPP<string mnemonic, list<OpTrait> traits = []> :
   let parser = [{ return parse$cppClass(parser, result); }];
 }
 
-def AnyStdScalar : AnyTypeOf<[AnyFloat, AnyInteger]> {}
+def AnyStdScalar : AnyTypeOf<[AnyFloat, AnySignlessInteger]> {}
 
 def AffineReduceOp : PXA_OpWithPP<"reduce"> {
   let summary = "Reduce into memory";
