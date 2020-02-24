@@ -73,25 +73,25 @@ CombinationKind getCombinationKind(plaidml_combo_op combo_op) {
   throw std::runtime_error("Unsupported combo_op");
 }
 
-mlir::Value MakeAffineOp(plaidml_int_op op, const std::vector<mlir::Value> operands) {
+mlir::Value MakePolyOp(plaidml_int_op op, const std::vector<mlir::Value> operands) {
   auto builder = GlobalContext::get();
   switch (op) {
     case PLAIDML_INT_OP_ADD:
-      return builder->MakeAffineAddOp(operands);
+      return builder->MakePolyAddOp(operands);
     case PLAIDML_INT_OP_DIV:
-      return builder->MakeAffineDivOp(operands);
+      return builder->MakePolyDivOp(operands);
     case PLAIDML_INT_OP_MUL:
-      return builder->MakeAffineMulOp(operands);
+      return builder->MakePolyMulOp(operands);
     case PLAIDML_INT_OP_NEG:
-      return builder->MakeAffineNegOp(operands);
+      return builder->MakePolyNegOp(operands);
     case PLAIDML_INT_OP_SUB:
-      return builder->MakeAffineSubOp(operands);
+      return builder->MakePolySubOp(operands);
     case PLAIDML_INT_OP_MAX:
-      return builder->MakeAffineMaxOp(operands);
+      return builder->MakePolyMaxOp(operands);
     case PLAIDML_INT_OP_MIN:
-      return builder->MakeAffineMinOp(operands);
+      return builder->MakePolyMinOp(operands);
   }
-  throw std::runtime_error("Unknown affine op");
+  throw std::runtime_error("Unknown polynomial op");
 }
 
 }  // namespace
@@ -615,7 +615,7 @@ plaidml_poly_expr* plaidml_poly_expr_index(  //
     const char* name) {
   return ffi_wrap<plaidml_poly_expr*>(err, nullptr, [&] {
     IVLOG(3, "plaidml_poly_expr_index");
-    return new plaidml_poly_expr{GlobalContext::get()->MakeAffineIndexOp(name)};
+    return new plaidml_poly_expr{GlobalContext::get()->MakePolyIndexOp(name)};
   });
 }
 
@@ -624,7 +624,7 @@ plaidml_poly_expr* plaidml_poly_expr_literal(  //
     int64_t value) {
   return ffi_wrap<plaidml_poly_expr*>(err, nullptr, [&] {
     IVLOG(3, "plaidml_poly_expr_literal> " << value);
-    return new plaidml_poly_expr{GlobalContext::get()->MakeAffineConstantOp(value)};
+    return new plaidml_poly_expr{GlobalContext::get()->MakeConstantOp(value)};
   });
 }
 
@@ -639,7 +639,7 @@ plaidml_poly_expr* plaidml_poly_expr_op(  //
     for (size_t i = 0; i < nargs; i++) {
       values[i] = args[i]->value;
     }
-    return new plaidml_poly_expr{MakeAffineOp(op, values)};
+    return new plaidml_poly_expr{MakePolyOp(op, values)};
   });
 }
 
@@ -676,7 +676,7 @@ plaidml_dim_expr* plaidml_dim_expr_int(  //
     int64_t value) {
   return ffi_wrap<plaidml_dim_expr*>(err, nullptr, [&] {
     IVLOG(3, "plaidml_dim_expr_int> " << value);
-    return new plaidml_dim_expr{GlobalContext::get()->MakeAffineConstantOp(value)};
+    return new plaidml_dim_expr{GlobalContext::get()->MakeConstantOp(value)};
   });
 }
 
@@ -703,7 +703,7 @@ plaidml_dim_expr* plaidml_dim_expr_op(  //
     for (size_t i = 0; i < nargs; i++) {
       values[i] = args[i]->value;
     }
-    return new plaidml_dim_expr{MakeAffineOp(op, values)};
+    return new plaidml_dim_expr{MakePolyOp(op, values)};
   });
 }
 

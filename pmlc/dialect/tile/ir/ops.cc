@@ -38,14 +38,14 @@ using mlir::success;
 using mlir::TypeSwitch;
 using mlir::Value;
 
-OpFoldResult AffineConstantOp::fold(ArrayRef<Attribute> operands) {
-  // IVLOG(5, "AffineConstantOp::fold> " << mlir::debugString(*getOperation()));
+OpFoldResult ConstantOp::fold(ArrayRef<Attribute> operands) {
+  // IVLOG(5, "ConstantOp::fold> " << mlir::debugString(*getOperation()));
   assert(operands.empty() && "constant has no operands");
   return getValue();
 }
 
-OpFoldResult AffineAddOp::fold(ArrayRef<Attribute> operands) {
-  IVLOG(5, "AffineAddOp::fold");
+OpFoldResult PolyAddOp::fold(ArrayRef<Attribute> operands) {
+  IVLOG(5, "PolyAddOp::fold");
   /// add(x, 0) -> x
   if (matchPattern(rhs(), m_Zero())) {
     return lhs();
@@ -53,8 +53,8 @@ OpFoldResult AffineAddOp::fold(ArrayRef<Attribute> operands) {
   return constFoldBinaryOp(operands, [](double a, double b) { return a + b; });
 }
 
-OpFoldResult AffineDivOp::fold(ArrayRef<Attribute> operands) {
-  IVLOG(5, "AffineDivOp::fold");
+OpFoldResult PolyDivOp::fold(ArrayRef<Attribute> operands) {
+  IVLOG(5, "PolyDivOp::fold");
   // Don't fold if it requires division by zero.
   if (matchPattern(rhs(), m_Zero())) {
     return {};
@@ -71,8 +71,8 @@ OpFoldResult AffineDivOp::fold(ArrayRef<Attribute> operands) {
   return constFoldBinaryOp(operands, [](double a, double b) { return a / b; });
 }
 
-OpFoldResult AffineMulOp::fold(ArrayRef<Attribute> operands) {
-  IVLOG(5, "AffineMulOp::fold");
+OpFoldResult PolyMulOp::fold(ArrayRef<Attribute> operands) {
+  IVLOG(5, "PolyMulOp::fold");
   // mul(x, 0) -> 0
   if (matchPattern(rhs(), m_Zero())) {
     IVLOG(5, "mul(x, 0) -> 0");
@@ -86,25 +86,25 @@ OpFoldResult AffineMulOp::fold(ArrayRef<Attribute> operands) {
   return constFoldBinaryOp(operands, [](double a, double b) { return a * b; });
 }
 
-OpFoldResult AffineNegOp::fold(ArrayRef<Attribute> operands) {
-  IVLOG(5, "AffineNegOp::fold");
+OpFoldResult PolyNegOp::fold(ArrayRef<Attribute> operands) {
+  IVLOG(5, "PolyNegOp::fold");
   return constFoldUnaryOp(operands, [](double x) { return -x; });
 }
 
-OpFoldResult AffineMaxOp::fold(ArrayRef<Attribute> operands) {
-  IVLOG(5, "AffineMaxOp::fold");
+OpFoldResult PolyMaxOp::fold(ArrayRef<Attribute> operands) {
+  IVLOG(5, "PolyMaxOp::fold");
   return constFoldBinaryOp(operands,
                            [](double a, double b) { return fmax(a, b); });
 }
 
-OpFoldResult AffineMinOp::fold(ArrayRef<Attribute> operands) {
-  IVLOG(5, "AffineMinOp::fold");
+OpFoldResult PolyMinOp::fold(ArrayRef<Attribute> operands) {
+  IVLOG(5, "PolyMinOp::fold");
   return constFoldBinaryOp(operands,
                            [](double a, double b) { return fmin(a, b); });
 }
 
-OpFoldResult AffineSubOp::fold(ArrayRef<Attribute> operands) {
-  IVLOG(5, "AffineSubOp::fold");
+OpFoldResult PolySubOp::fold(ArrayRef<Attribute> operands) {
+  IVLOG(5, "PolySubOp::fold");
   // sub(x, x) -> 0
   if (lhs() == rhs()) {
     IVLOG(5, "sub(x, x) -> 0");
@@ -120,64 +120,64 @@ OpFoldResult AffineSubOp::fold(ArrayRef<Attribute> operands) {
 }
 
 template <typename T, typename R = void>
-class AffineVisitor {
+class PolyVisitor {
 protected:
-  AffineVisitor() = default;
+  PolyVisitor() = default;
 
 public:
   R visit(Value value) {
     return TypeSwitch<Operation *, R>(value.getDefiningOp())
-        .template Case<AffineIndexOp>([this](auto op) {
+        .template Case<PolyIndexOp>([this](auto op) {
           return static_cast<T *>(this)->visitIndexOp(op);
         })
-        .template Case<AffineConstantOp>([this](auto op) {
+        .template Case<ConstantOp>([this](auto op) {
           return static_cast<T *>(this)->visitConstantOp(op);
         })
-        .template Case<AffineAddOp>([this](auto op) {
+        .template Case<PolyAddOp>([this](auto op) {
           visitOperands(op.lhs(), op.rhs());
           return static_cast<T *>(this)->visitAddOp(op);
         })
-        .template Case<AffineMulOp>([this](auto op) {
+        .template Case<PolyMulOp>([this](auto op) {
           visitOperands(op.lhs(), op.rhs());
           return static_cast<T *>(this)->visitMulOp(op);
         })
-        .template Case<AffineDivOp>([this](auto op) {
+        .template Case<PolyDivOp>([this](auto op) {
           visitOperands(op.lhs(), op.rhs());
           return static_cast<T *>(this)->visitDivOp(op);
         })
-        .template Case<AffineSubOp>([this](auto op) {
+        .template Case<PolySubOp>([this](auto op) {
           visitOperands(op.lhs(), op.rhs());
           return static_cast<T *>(this)->visitSubOp(op);
         })
-        .template Case<AffineNegOp>([this](auto op) {
+        .template Case<PolyNegOp>([this](auto op) {
           visit(op.input());
           return static_cast<T *>(this)->visitNegOp(op);
         })
-        .template Case<AffineMaxOp>([this](auto op) {
+        .template Case<PolyMaxOp>([this](auto op) {
           visitOperands(op.lhs(), op.rhs());
           return static_cast<T *>(this)->visitMaxOp(op);
         })
-        .template Case<AffineMinOp>([this](auto op) {
+        .template Case<PolyMinOp>([this](auto op) {
           visitOperands(op.lhs(), op.rhs());
           return static_cast<T *>(this)->visitMinOp(op);
         })
         .template Case<DimOp>(
             [this](auto op) { return static_cast<T *>(this)->visitDimOp(op); })
         .Default([](Operation *op) {
-          llvm_unreachable("Unknown Affine op");
+          llvm_unreachable("Unknown poly op");
           return R();
         });
   }
 
-  void visitIndexOp(AffineIndexOp op) {}
-  void visitConstantOp(AffineConstantOp op) {}
-  void visitAddOp(AffineAddOp op) {}
-  void visitMulOp(AffineMulOp op) {}
-  void visitDivOp(AffineDivOp op) {}
-  void visitSubOp(AffineSubOp op) {}
-  void visitNegOp(AffineNegOp op) {}
-  void visitMaxOp(AffineMaxOp op) {}
-  void visitMinOp(AffineMinOp op) {}
+  void visitIndexOp(PolyIndexOp op) {}
+  void visitConstantOp(ConstantOp op) {}
+  void visitAddOp(PolyAddOp op) {}
+  void visitMulOp(PolyMulOp op) {}
+  void visitDivOp(PolyDivOp op) {}
+  void visitSubOp(PolySubOp op) {}
+  void visitNegOp(PolyNegOp op) {}
+  void visitMaxOp(PolyMaxOp op) {}
+  void visitMinOp(PolyMinOp op) {}
   void visitDimOp(DimOp op) {}
 
 private:
@@ -187,15 +187,15 @@ private:
   }
 };
 
-struct AffineIndexCollector : public AffineVisitor<AffineIndexCollector> {
+struct AffineIndexCollector : public PolyVisitor<AffineIndexCollector> {
   SetVector<Value> idxs;
-  void visitIndexOp(AffineIndexOp op) { idxs.insert(op.result()); }
+  void visitIndexOp(PolyIndexOp op) { idxs.insert(op.result()); }
 };
 
-struct IsFoldableVisitor : public AffineVisitor<IsFoldableVisitor> {
+struct IsFoldableVisitor : public PolyVisitor<IsFoldableVisitor> {
   bool foldable = true;
-  void visitMaxOp(AffineMaxOp op) { foldable = false; }
-  void visitMinOp(AffineMinOp op) { foldable = false; }
+  void visitMaxOp(PolyMaxOp op) { foldable = false; }
+  void visitMinOp(PolyMinOp op) { foldable = false; }
 
   bool is_foldable(SymbolicContractionOp op) {
     foldable = true;
@@ -224,9 +224,8 @@ struct IsFoldableVisitor : public AffineVisitor<IsFoldableVisitor> {
   }
 };
 
-struct ContractionBuilder
-    : public AffineVisitor<ContractionBuilder, AffineExpr> {
-  friend class AffineVisitor<ContractionBuilder, AffineExpr>;
+struct ContractionBuilder : public PolyVisitor<ContractionBuilder, AffineExpr> {
+  friend class PolyVisitor<ContractionBuilder, AffineExpr>;
 
 public:
   explicit ContractionBuilder(SymbolicContractionOp op)
@@ -331,41 +330,41 @@ private:
 
   AffineExpr makeExpr(Value value) { return visit(value); }
 
-  AffineExpr visitIndexOp(AffineIndexOp op) {
+  AffineExpr visitIndexOp(PolyIndexOp op) {
     auto value = op.result();
     auto pos = std::distance(collector.idxs.begin(),
                              llvm::find(collector.idxs, value));
     return mlir::getAffineDimExpr(pos, context);
   }
 
-  AffineExpr visitConstantOp(AffineConstantOp op) {
+  AffineExpr visitConstantOp(ConstantOp op) {
     return mlir::getAffineConstantExpr(op.value().getSExtValue(), context);
   }
 
-  AffineExpr visitAddOp(AffineAddOp op) {
+  AffineExpr visitAddOp(PolyAddOp op) {
     return makeExpr(op.lhs()) + makeExpr(op.rhs());
   }
 
-  AffineExpr visitMulOp(AffineMulOp op) {
+  AffineExpr visitMulOp(PolyMulOp op) {
     return makeExpr(op.lhs()) * makeExpr(op.rhs());
   }
 
-  AffineExpr visitSubOp(AffineSubOp op) {
+  AffineExpr visitSubOp(PolySubOp op) {
     return makeExpr(op.lhs()) - makeExpr(op.rhs());
   }
 
-  AffineExpr visitDivOp(AffineDivOp op) {
+  AffineExpr visitDivOp(PolyDivOp op) {
     return makeExpr(op.lhs()).floorDiv(makeExpr(op.rhs()));
   }
 
-  AffineExpr visitNegOp(AffineNegOp op) { return -makeExpr(op.input()); }
+  AffineExpr visitNegOp(PolyNegOp op) { return -makeExpr(op.input()); }
 
-  AffineExpr visitMaxOp(AffineMaxOp op) {
+  AffineExpr visitMaxOp(PolyMaxOp op) {
     llvm_unreachable("Max op not legal in ContractionBuilder affines, this "
                      "should have been folded earlier");
   }
 
-  AffineExpr visitMinOp(AffineMinOp op) {
+  AffineExpr visitMinOp(PolyMinOp op) {
     llvm_unreachable("Min op not legal in ContractionBuilder affines, this "
                      "should have been folded earlier");
   }
@@ -409,7 +408,7 @@ struct SymbolicContractionCanonicalizer
     SmallVector<Attribute, 8> idxNames;
     for (unsigned i = 0; i < idxs.size(); i++) {
       auto idx = idxs[i];
-      auto indexOp = llvm::cast<AffineIndexOp>(idx.getDefiningOp());
+      auto indexOp = llvm::cast<PolyIndexOp>(idx.getDefiningOp());
       if (auto attr = indexOp.getAttrOfType<StringAttr>("name")) {
         idxNames.emplace_back(attr);
         hasNames = true;
@@ -851,35 +850,35 @@ ParseResult parseDimOp(OpAsmParser *parser, OperationState &result) {
 
 LogicalResult verifyDimOp(DimOp op) { return success(); }
 
-// ---- AffineConstantOp ----
+// ---- ConstantOp ----
 
-void printAffineConstantOp(OpAsmPrinter *printer, AffineConstantOp op) {
+void printConstantOp(OpAsmPrinter *printer, ConstantOp op) {
   *printer << op.getOperation()->getName() << ' ' << op.value().getZExtValue();
 }
 
-ParseResult parseAffineConstantOp(OpAsmParser *parser, OperationState &result) {
+ParseResult parseConstantOp(OpAsmParser *parser, OperationState &result) {
   auto indexType = parser->getBuilder().getIndexType();
   result.addTypes(indexType);
   IntegerAttr value;
   return parser->parseAttribute(value, indexType, "value", result.attributes);
 }
 
-LogicalResult verifyAffineConstantOp(AffineConstantOp op) { return success(); }
+LogicalResult verifyConstantOp(ConstantOp op) { return success(); }
 
-// ---- AffineIndexOp ----
+// ---- PolyIndexOp ----
 
-void printAffineIndexOp(OpAsmPrinter *printer, AffineIndexOp op) {
+void printPolyIndexOp(OpAsmPrinter *printer, PolyIndexOp op) {
   *printer << op.getOperation()->getName() << ' ' << op.id().getSExtValue();
 }
 
-ParseResult parseAffineIndexOp(OpAsmParser *parser, OperationState &result) {
+ParseResult parsePolyIndexOp(OpAsmParser *parser, OperationState &result) {
   auto indexType = parser->getBuilder().getIndexType();
   result.addTypes(indexType);
   IntegerAttr id;
   return parser->parseAttribute(id, "id", result.attributes);
 }
 
-LogicalResult verifyAffineIndexOp(AffineIndexOp op) { return success(); }
+LogicalResult verifyPolyIndexOp(PolyIndexOp op) { return success(); }
 
 // ---- AffineTensorMapOp ----
 
@@ -1198,15 +1197,15 @@ LogicalResult verifyContractionOp(ContractionOp op) {
   return success();
 }
 
-// ---- AffineBinaryOp ----
+// ---- PolyBinaryOp ----
 
-template <typename AffineBinaryOp>
-void printAffineBinaryOp(OpAsmPrinter *printer, AffineBinaryOp op) {
+template <typename PolyBinaryOp>
+void printPolyBinaryOp(OpAsmPrinter *printer, PolyBinaryOp op) {
   *printer << op.getOperation()->getName() << ' ';
   printer->printOperands(op.getOperands());
 }
 
-ParseResult parseAffineBinaryOp(OpAsmParser *parser, OperationState &result) {
+ParseResult parsePolyBinaryOp(OpAsmParser *parser, OperationState &result) {
   auto indexType = parser->getBuilder().getIndexType();
   result.addTypes(IndexType::get(result.getContext()));
   OpAsmParser::OperandType lhs, rhs;

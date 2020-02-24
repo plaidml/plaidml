@@ -7,12 +7,27 @@ include "mlir/IR/OpBase.td"
 
 def GenericBuilderInterface : OpInterface<"GenericBuilder"> {
   let methods = [
-    StaticInterfaceMethod<"TODO", "Type", "getResultType", (ins "ArrayRef<Value>":$operands)>,
-    StaticInterfaceMethod<"TODO", "Operation*", "create", (ins
-      "OpBuilder*":$builder,
-      "Location":$loc,
-      "ArrayRef<Value>":$operands
-    )>,
+    StaticInterfaceMethod<
+      /*desc=*/"TODO",
+      /*retTy=*/"Type",
+      /*methodName=*/"getResultType",
+      /*args=*/(ins "ArrayRef<Value>":$operands)
+    >,
+    StaticInterfaceMethod<
+      /*desc=*/"TODO",
+      /*retTy=*/"Operation*",
+      /*methodName=*/"create",
+      /*args=*/(ins
+        "OpBuilder*":$builder,
+        "Location":$loc,
+        "ArrayRef<Value>":$operands),
+      /*methodBody=*/[{
+        OperationState state(loc, ConcreteOp::getOperationName());
+        state.addOperands(operands);
+        state.addTypes(getResultType(operands));
+        return builder->createOperation(state);
+      }]
+    >,
   ];
 }
 

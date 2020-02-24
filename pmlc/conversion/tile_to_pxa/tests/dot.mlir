@@ -8,9 +8,9 @@
 !i32 = type !eltwise.i32
 func @dot(%arg0: tensor<1x784x!eltwise.f32>, %arg1: tensor<784x512x!eltwise.f32>) -> tensor<1x512x!eltwise.f32> {
   %c0 = "eltwise.sconst"() {value = 0.0 : f64} : () -> !f32
-  %0 = tile.affine_const 512
-  %1 = tile.affine_const 1
-  %2 = tile.cion add, mul, %c0, %arg0, %arg1 {sink=#map0, srcs=[#map1, #map2]} :
+  %0 = tile.constant 512
+  %1 = tile.constant 1
+  %2 = tile.contract add, mul, %c0, %arg0, %arg1 {sink=#map0, srcs=[#map1, #map2]} :
     !f32, tensor<1x784x!eltwise.f32>, tensor<784x512x!eltwise.f32> -> tensor<1x512x!eltwise.f32>
   return %2 : tensor<1x512x!eltwise.f32>
 }
