@@ -38,4 +38,5 @@ lit_test(
 lit_test(
     name = "edsl_test.py",
     data = [":py_test"],
+    tags = ["skip_windows"],
 )
