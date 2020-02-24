@@ -174,9 +174,12 @@ SUITES:
           - TestBackendOps.testSquare
           - TestBackendOps.testSqrt
           - TestBackendOps.testSoftsign
+          - TestBackendOps.testSoftplus
           - TestBackendOps.testSign
           - TestBackendOps.testCategoricalCrossentropyGarbageIn
           - TestBackendOps.testExp
+          - TestBackendOps.testLog
+          - TestBackendOps.testTanh
           - TestBackendOps.testDepthwiseConv2d
           - TestBackendOps.testReshapeMatchDim
           - TestBackendOps.testZeros
@@ -196,6 +199,7 @@ SUITES:
           - TestBackendOps.testZerosLike
           - TestBackendOps.testConvParameterRankExceptions
           - TestBackendOps.testCastToFloat
+          - TestBackendOps.testCeil
           - TestBackendOps.testCumProd
           - TestBackendOps.resnetLayer1
           - TestBackendOps.resnetLayer2
