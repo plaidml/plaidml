@@ -15,6 +15,7 @@
 #include "pmlc/conversion/tile_to_pxa/tile_to_pxa.h"
 #include "pmlc/dialect/tile/transforms/passes.h"
 #include "pmlc/target/x86/trace_linking.h"
+#include "pmlc/target/x86/xsmm_lowering.h"
 #include "pmlc/util/logging.h"
 
 using namespace mlir; // NOLINT[build/namespaces]
@@ -34,6 +35,7 @@ struct ConvertToLLVMPass : public ModulePass<ConvertToLLVMPass> {
     LLVMTypeConverter typeConverter(&getContext(), customs);
 
     OwningRewritePatternList patterns;
+    populateXSMMConversionPatterns(patterns, context);
     populateAffineToStdConversionPatterns(patterns, context);
     populateLoopToStdConversionPatterns(patterns, context);
     populateStdToLLVMBarePtrConversionPatterns(typeConverter, patterns);

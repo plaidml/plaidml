@@ -168,7 +168,7 @@ func @dot_xsmm(%A: memref<?x?xf32>, %B: memref<?x?xf32>, %C: memref<?x?xf32>) {
     %a_ref = memref_cast %a_view : memref<2x2xf32, offset: ?, strides: [?, ?]> to memref<*xf32>
     %b_ref = memref_cast %b_view : memref<2x2xf32, offset: ?, strides: [?, ?]> to memref<*xf32>
     %c_ref = memref_cast %c_view : memref<2x2xf32, offset: ?, strides: [?, ?]> to memref<*xf32>
-    // NOTE: a and b are swapped in this call to XSMM (why is this required?)
+    // NOTE: we need to swap the A, B and lda, ldb operands due to column-major vs row-major differences
     call @plaidml_rt_xsmm_gemm_f32(%b_ref, %a_ref, %c_ref, %ldb, %lda, %ldc, %tile_m, %tile_n, %tile_k)
       : (memref<*xf32>, memref<*xf32>, memref<*xf32>, i32, i32, i32, i32, i32, i32) -> ()
   }
@@ -280,7 +280,7 @@ func @conv2_xsmm(%I: memref<?x?x?x?xf32>, %K: memref<?x?x?x?xf32>, %O: memref<?x
     %I_ref = memref_cast %I_view : memref<1x3x5x7xf32, offset: ?, strides: [?, ?, ?, ?]> to memref<*xf32>
     %K_ref = memref_cast %K_view : memref<1x1x7x11xf32, offset: ?, strides: [?, ?, ?, ?]> to memref<*xf32>
     %O_ref = memref_cast %O_view : memref<1x3x5x11xf32, offset: ?, strides: [?, ?, ?, ?]> to memref<*xf32>
-    // NOTE: we need to swap the A, B and lda, ldb operands for some reason....
+    // NOTE: we need to swap the A, B and lda, ldb operands due to column-major vs row-major differences
     call @plaidml_rt_xsmm_gemm_f32(%K_ref, %I_ref, %O_ref, %ldb, %lda, %ldc, %m, %n, %k)
       : (memref<*xf32>, memref<*xf32>, memref<*xf32>, i32, i32, i32, i32, i32, i32) -> ()
   }
