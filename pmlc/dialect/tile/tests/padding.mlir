@@ -151,3 +151,16 @@ func @no_pad_add_add(%arg0: tensor<10x!f32>, %arg1: tensor<3x!f32>) -> tensor<10
   // CHECK-NOT: pad
   // CHECK: return
 }
+
+func @pad_contraction(%A: tensor<10x!f32>, %B: tensor<3x!f32>) -> tensor<10x!f32> {
+  %c0 = "eltwise.sconst"() {value = 0.0 : f64} : () -> !f32
+  %0 = tile.contract add, mul, %c0, %A, %B {srcs=[#conv1dcenter, #second], sink=#first}
+    : !f32, tensor<10x!f32>, tensor<3x!f32> -> tensor<10x!f32>
+  %1 = tile.contract add, mul, %c0, %0, %B {srcs=[#conv1dcenter, #second], sink=#first}
+    : !f32, tensor<10x!f32>, tensor<3x!f32> -> tensor<10x!f32>
+  // CHECK: tile.contract
+  // CHECK-SAME: padLower = [1]
+  // CHECK-SAME: padType = 1
+  // CHECK-SAME: padUpper = [1]
+  return %1 : tensor<10x!f32>
+}

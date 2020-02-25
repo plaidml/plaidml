@@ -2,19 +2,13 @@
 
 #include "pmlc/dialect/pxa/ir/ops.h"
 
+#include "mlir/Dialect/StandardOps/Ops.h"
 #include "mlir/IR/OpImplementation.h"
+#include "mlir/IR/PatternMatch.h"
 
 namespace pmlc::dialect::pxa {
 
-using llvm::SmallVector;
-using mlir::AffineExpr;
-using mlir::AffineMap;
-using mlir::AffineMapAttr;
-using mlir::Block;
-using mlir::failure;
-using mlir::OpAsmParser;
-using mlir::OpAsmPrinter;
-using mlir::success;
+using namespace mlir; // NOLINT
 
 namespace {
 
@@ -40,6 +34,81 @@ ParseResult parseKeywordIntoEnumAttr(OpAsmParser &parser,
   result.addAttribute(attrName, attr);
 
   return success();
+}
+
+/// Implements `map` and `operands` composition and simplification to support
+/// `makeComposedAffineApply`. This can be called to achieve the same effects
+/// on `map` and `operands` without creating an AffineApplyOp that needs to be
+/// immediately deleted.
+static void composeAffineMapAndOperands(AffineMap *map,
+                                        SmallVectorImpl<Value> *operands) {
+  AffineApplyNormalizer normalizer(*map, *operands);
+  auto normalizedMap = normalizer.getAffineMap();
+  auto normalizedOperands = normalizer.getOperands();
+  canonicalizeMapAndOperands(&normalizedMap, &normalizedOperands);
+  *map = normalizedMap;
+  *operands = normalizedOperands;
+  assert(*map);
+}
+
+/// Simplify AffineApply, AffineLoad, and AffineStore operations by composing
+/// maps that supply results into them.
+///
+template <typename AffineOpTy>
+struct SimplifyAffineOp : public OpRewritePattern<AffineOpTy> {
+  using OpRewritePattern<AffineOpTy>::OpRewritePattern;
+
+  /// Replace the affine op with another instance of it with the supplied
+  /// map and mapOperands.
+  void replaceAffineOp(PatternRewriter &rewriter, AffineOpTy affineOp,
+                       AffineMap map, ArrayRef<Value> mapOperands) const;
+
+  PatternMatchResult matchAndRewrite(AffineOpTy affineOp,
+                                     PatternRewriter &rewriter) const override {
+    static_assert(
+        // std::is_same<AffineOpTy, AffineLoadOp>::value ||
+        // std::is_same<AffineOpTy, AffinePrefetchOp>::value ||
+        // std::is_same<AffineOpTy, AffineStoreOp>::value ||
+        std::is_same<AffineOpTy, AffineApplyOp>::value ||
+            std::is_same<AffineOpTy, AffineReduceOp>::value,
+        "affine load/store/apply/reduce op expected");
+    auto map = affineOp.getAffineMap();
+    AffineMap oldMap = map;
+    auto oldOperands = affineOp.getMapOperands();
+    SmallVector<Value, 8> resultOperands(oldOperands);
+    composeAffineMapAndOperands(&map, &resultOperands);
+    if (map == oldMap && std::equal(oldOperands.begin(), oldOperands.end(),
+                                    resultOperands.begin()))
+      return this->matchFailure();
+
+    replaceAffineOp(rewriter, affineOp, map, resultOperands);
+    return this->matchSuccess();
+  }
+};
+
+// Specialize the template to account for the different build signatures for
+// affine load, store, reduce, and apply ops.
+template <>
+void SimplifyAffineOp<AffineReduceOp>::replaceAffineOp(
+    PatternRewriter &rewriter, AffineReduceOp op, AffineMap map,
+    ArrayRef<Value> mapOperands) const {
+  rewriter.replaceOpWithNewOp<AffineReduceOp>(op, op.agg(), op.val(), op.out(),
+                                              map, mapOperands);
+}
+
+/// This is a common class used for patterns of the form
+/// "someop(memrefcast) -> someop".  It folds the source of any memref_cast
+/// into the root operation directly.
+static LogicalResult foldMemRefCast(Operation *op) {
+  bool folded = false;
+  for (OpOperand &operand : op->getOpOperands()) {
+    auto cast = dyn_cast_or_null<MemRefCastOp>(operand.get().getDefiningOp());
+    if (cast && !cast.getOperand().getType().isa<UnrankedMemRefType>()) {
+      operand.set(cast.getOperand());
+      folded = true;
+    }
+  }
+  return success(folded);
 }
 
 } // namespace
@@ -82,6 +151,17 @@ ParseResult parseAffineReduceOp(OpAsmParser &parser, OperationState &result) {
       parser.resolveOperand(val, type.getElementType(), result.operands) ||
       parser.resolveOperand(out, type, result.operands) ||
       parser.resolveOperands(idxs, indexTy, result.operands));
+}
+
+void AffineReduceOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<SimplifyAffineOp<AffineReduceOp>>(context);
+}
+
+LogicalResult AffineReduceOp::fold(ArrayRef<Attribute> cstOperands,
+                                   SmallVectorImpl<OpFoldResult> &results) {
+  /// reduce(memrefcast) -> reduce
+  return foldMemRefCast(*this);
 }
 
 #define GET_OP_CLASSES
