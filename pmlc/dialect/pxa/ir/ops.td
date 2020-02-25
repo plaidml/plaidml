@@ -32,7 +32,7 @@ class PXA_OpWithPP<string mnemonic, list<OpTrait> traits = []> :
 def AnyStdScalar : AnyTypeOf<[AnyFloat, AnySignlessInteger]> {}
 
 def AffineReduceOp : PXA_OpWithPP<"reduce"> {
-  let summary = "Reduce into memory";
+  let summary = "affine reduction operation";
   let arguments = (ins
     AggregationKind:$agg,
     AnyStdScalar:$val,
@@ -40,6 +40,14 @@ def AffineReduceOp : PXA_OpWithPP<"reduce"> {
     AffineMapAttr:$map,
     Variadic<Index>:$idxs
   );
+
+  let hasCanonicalizer = 1;
+  let hasFolder = 1;
+
+  let extraClassDeclaration = [{
+    AffineMap getAffineMap() { return map(); }
+    operand_range getMapOperands() { return idxs(); }
+  }];
 }
 
 #endif // __PML_PXA_OPS__

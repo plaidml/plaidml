@@ -1,5 +1,12 @@
 // Copyright 2019, Intel Corporation
 
+#include "pmlc/dialect/tile/transforms/padding.h"
+
+#include <algorithm>
+#include <memory>
+#include <utility>
+#include <vector>
+
 #include "mlir/IR/AffineExprVisitor.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/Pass/Pass.h"
@@ -15,11 +22,15 @@ using mlir::AffineMap;
 struct BoundRange {
   int64_t min;
   int64_t max;
+
   explicit BoundRange(int64_t val) : min(val), max(val) {}
+
   BoundRange(int64_t min, int64_t max) : min(min), max(max) {}
+
   BoundRange operator+(const BoundRange &rhs) const {
     return {min + rhs.min, max + rhs.max};
   }
+
   BoundRange operator*(const BoundRange &rhs) const {
     return {std::min(std::min(min * rhs.min, max * rhs.min),
                      std::min(min * rhs.max, max * rhs.max)),
@@ -37,24 +48,31 @@ public:
   BoundRange visitMulExpr(mlir::AffineBinaryOpExpr expr) {
     return visit(expr.getLHS()) * visit(expr.getRHS());
   }
+
   BoundRange visitAddExpr(mlir::AffineBinaryOpExpr expr) {
     return visit(expr.getLHS()) + visit(expr.getRHS());
   }
+
   BoundRange visitDimExpr(mlir::AffineDimExpr expr) {
     return dimRanges[expr.getPosition()];
   }
+
   BoundRange visitSymbolExpr(mlir::AffineSymbolExpr expr) {
     llvm_unreachable("Invalid symbol in ComputeRangeVisitor");
   }
+
   BoundRange visitConstantExpr(mlir::AffineConstantExpr expr) {
     return BoundRange(expr.getValue());
   }
+
   BoundRange visitModExpr(mlir::AffineBinaryOpExpr expr) {
     llvm_unreachable("Invalid mod in ComputeRangeVisitor");
   }
+
   BoundRange visitCeilDivExpr(mlir::AffineBinaryOpExpr expr) {
     llvm_unreachable("Invalid ceil in ComputeRangeVisitor");
   }
+
   BoundRange visitFloorDivExpr(mlir::AffineBinaryOpExpr expr) {
     llvm_unreachable("Invalid floor in ComputeRangeVisitor");
   }
@@ -71,12 +89,12 @@ computePaddingBounds(AffineMap access, AffineMap lower, AffineMap upper) {
   assert(upper.getNumSymbols() == 0);
   assert(lower.getNumDims() == 0);
   assert(upper.getNumDims() == 0);
-  size_t idxs = access.getNumDims();
-  size_t size = access.getNumResults();
+  unsigned idxs = access.getNumDims();
+  unsigned size = access.getNumResults();
   assert(lower.getNumResults() == idxs);
   assert(upper.getNumResults() == idxs);
   std::vector<BoundRange> dimRanges;
-  for (size_t i = 0; i < idxs; i++) {
+  for (unsigned i = 0; i < idxs; i++) {
     int64_t lowerBoundInt =
         lower.getResult(i).cast<mlir::AffineConstantExpr>().getValue();
     int64_t upperBoundInt =
@@ -85,16 +103,11 @@ computePaddingBounds(AffineMap access, AffineMap lower, AffineMap upper) {
   }
   ComputeRangeVisitor visitor(std::move(dimRanges));
   llvm::SmallVector<BoundRange, 4> outRanges;
-  for (size_t i = 0; i < size; i++) {
+  for (unsigned i = 0; i < size; i++) {
     outRanges.push_back(visitor.visit(access.getResult(i)));
   }
   return outRanges;
 }
-
-struct PaddingInfo {
-  llvm::SmallVector<int64_t, 4> padBelow;
-  llvm::SmallVector<int64_t, 4> padAbove;
-};
 
 static bool validForPadding(AggregationKind agg, CombinationKind comb) {
   if (agg == AggregationKind::assign) {
@@ -112,99 +125,130 @@ static bool validForPadding(AggregationKind agg, CombinationKind comb) {
 void PadPass::runOnFunction() {
   auto func = getFunction();
   llvm::DenseMap<Value, llvm::DenseMap<AggregationKind, PaddingInfo>> toPad;
+
   func.walk([&](ContractionOp op) {
     // Skip some cases where the padding pass can't operate.
     if (op.getNumSymbols()) {
       op.emitRemark("padding cannot be run on symbolic contractions");
       return;
     }
-    if (!op.lowerBounds().hasValue() || !op.upperBounds().hasValue()) {
+
+    if (!op.lowerBounds() || !op.upperBounds()) {
       op.emitRemark("contraction bounds must be computed");
       return;
     }
+
     if (!validForPadding(op.agg(), op.combo())) {
       op.emitRemark("invalid agg/comb for use in padding");
       return;
     }
-    for (size_t i = 0; i < op.getNumTensors(); i++) {
+
+    for (unsigned i = 0; i < op.getNumTensors(); i++) {
+      auto tensor = op.getTensor(i);
+      auto rankedTensorType = tensor.getType().cast<mlir::RankedTensorType>();
+      if (!rankedTensorType.hasStaticShape()) {
+        op.emitRemark("padding cannot support dynamic memref sizes");
+        return;
+      }
+
       // Compute the largest region the source may access.
       auto bounds = computePaddingBounds(op.getSourceMap(i), *op.lowerBounds(),
                                          *op.upperBounds());
+
       // Check if there are any out-of-bounds reads.
-      auto shape =
-          op.getTensor(i).getType().cast<mlir::RankedTensorType>().getShape();
+      auto shape = rankedTensorType.getShape();
       assert(bounds.size() == shape.size());
       bool needsPadding = false;
-      for (size_t i = 0; i < bounds.size(); i++) {
-        if (shape[i] == mlir::RankedTensorType::kDynamicSize) {
-          op.emitRemark("padding cannot support dynamic memref sizes");
-          return;
-        }
+      for (unsigned i = 0, e = bounds.size(); i < e; ++i) {
         if (bounds[i].min < 0 || bounds[i].max >= shape[i]) {
           needsPadding = true;
         }
       }
+
       // If there is no need to pad, don't bother adding an entry.
       if (!needsPadding)
         return;
+
       // Merge discovered padding into the recorded data.
-      auto &info = toPad[op.getTensor(i)][op.agg()];
-      info.padBelow.resize(bounds.size());
-      info.padAbove.resize(bounds.size());
-      for (size_t i = 0; i < bounds.size(); i++) {
-        info.padBelow[i] = std::max(info.padBelow[i], -bounds[i].min);
-        info.padAbove[i] =
-            std::max(info.padAbove[i], bounds[i].max + 1 - shape[i]);
+      auto &info = toPad[tensor][op.agg()];
+      info.lower.resize(bounds.size());
+      info.upper.resize(bounds.size());
+      for (unsigned i = 0, e = bounds.size(); i < e; ++i) {
+        info.lower[i] = std::max(info.lower[i], -bounds[i].min);
+        info.upper[i] = std::max(info.upper[i], bounds[i].max + 1 - shape[i]);
       }
     }
   });
+
   Builder builder(&getContext());
   for (const auto &kvp : toPad) {
     // Get the value which we want to pad.
     Value def = kvp.first;
+    const auto &map = kvp.second;
+
     // If there are two conflicting ways to pad, don't pad.
-    if (kvp.second.size() != 1) {
+    if (map.size() != 1) {
       if (Operation *op = def.getDefiningOp()) {
         op->emitRemark("padding would require multiple initialization values");
       }
       continue;
     }
+
     // Check if it's a block argument, and if so add an IdentOp to copy the
     // value.
     if (auto arg = def.dyn_cast<mlir::BlockArgument>()) {
-      // Construct an initial identity operation.
       auto block = arg.getOwner();
-      OpBuilder inner(block, block->begin());
-      auto ident =
-          inner.create<eltwise::IdentOp>(block->getParentOp()->getLoc(), def);
+      auto loc = block->getParentOp()->getLoc();
+      OpBuilder inner(block->getParent());
+      auto stub = inner.create<PlaceholderOp>(loc, arg.getType());
+      // Construct an initial identity operation.
+      auto ident = inner.create<eltwise::IdentOp>(loc, stub.result());
       // Replace all uses with ident (except for newly generated use).
-      // TODO: This seems like the wrong way to do things?
-      auto use = def.use_begin();
-      while (use != def.use_end()) {
-        // Copy and increment since we will destroy use.
-        auto newUse = use;
-        newUse++;
-        // Change if not the IdentOp itself.
-        if (use->getOwner() != ident.getOperation()) {
-          use->set(ident);
-        }
-        use = newUse;
-      }
+      arg.replaceAllUsesWith(ident);
+      ident.getOperation()->replaceUsesOfWith(stub, arg);
+      stub.erase();
       // Now use ident for all further work.
       def = ident;
     }
+
     // Get defining operation (should now always work).
     Operation *op = def.getDefiningOp();
     assert(op);
 
     // Attach attributes specifying the padding details.
-    AggregationKind agg = kvp.second.begin()->first;
+    AggregationKind agg = map.begin()->first;
+    const auto &info = map.begin()->second;
     op->setAttr("padType",
                 builder.getI64IntegerAttr(static_cast<int64_t>(agg)));
-    const auto &info = kvp.second.begin()->second;
-    op->setAttr("padBelow", builder.getI64ArrayAttr(info.padBelow));
-    op->setAttr("padAbove", builder.getI64ArrayAttr(info.padAbove));
+    op->setAttr("padLower", builder.getI64ArrayAttr(info.lower));
+    op->setAttr("padUpper", builder.getI64ArrayAttr(info.upper));
   }
+}
+
+llvm::Optional<PaddingInfo> getPaddingInfo(Operation *op) {
+  auto padType = op->getAttrOfType<IntegerAttr>("padType");
+  if (!padType)
+    return llvm::None;
+  auto agg = util::symbolizeAggregationKind(padType.getInt());
+  if (!agg)
+    return llvm::None;
+
+  PaddingInfo ret{*agg};
+  auto padLower = op->getAttrOfType<ArrayAttr>("padLower");
+  if (!padLower)
+    return llvm::None;
+  for (auto attr : padLower.getAsRange<IntegerAttr>()) {
+    ret.lower.push_back(attr.getInt());
+  }
+
+  auto padUpper = op->getAttrOfType<ArrayAttr>("padUpper");
+  if (!padUpper)
+    return llvm::None;
+  for (auto attr : padUpper.getAsRange<IntegerAttr>()) {
+    ret.upper.push_back(attr.getInt());
+  }
+
+  return ret;
 }
 
 std::unique_ptr<mlir::Pass> createPadPass() {

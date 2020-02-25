@@ -17,6 +17,7 @@
 #include "pmlc/dialect/pxa/ir/dialect.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/dialect/tile/ir/ops.h"
+#include "pmlc/dialect/tile/transforms/padding.h"
 #include "pmlc/util/logging.h"
 #include "pmlc/util/util.h"
 
@@ -32,6 +33,7 @@ using dialect::tile::CombinationKind;
 using dialect::tile::ConstantOp;
 using dialect::tile::ContractionOp;
 using dialect::tile::ContractionOpOperandAdaptor;
+using dialect::tile::getPaddingInfo;
 using dialect::tile::IndexOp;
 using dialect::tile::ShapeOp;
 using dialect::tile::ShapeOpOperandAdaptor;
@@ -51,14 +53,26 @@ struct TypeConverter : public mlir::TypeConverter {
   }
 };
 
-ScalarType getScalarType(Type type) {
-  if (auto tensorType = type.dyn_cast<mlir::TensorType>()) {
+static ScalarType getScalarType(Type type) {
+  if (auto tensorType = type.dyn_cast<TensorType>()) {
     type = tensorType.getElementType();
   }
   return type.cast<ScalarType>();
 }
 
-ScalarType getScalarType(Value value) { return getScalarType(value.getType()); }
+static ScalarType getScalarType(Value value) {
+  return getScalarType(value.getType());
+}
+
+static RankedTensorType getRankedTensorType(Type type) {
+  if (auto rankedTensorType = type.dyn_cast<RankedTensorType>()) {
+    return rankedTensorType;
+  }
+  if (auto scalarType = type.dyn_cast<ScalarType>()) {
+    return RankedTensorType::get({}, scalarType);
+  }
+  llvm_unreachable("Could not create RankedTensorType from type");
+}
 
 struct FuncOpConversion : public OpConversionPattern<FuncOp> {
   using OpConversionPattern<FuncOp>::OpConversionPattern;
@@ -96,7 +110,7 @@ struct FuncOpConversion : public OpConversionPattern<FuncOp> {
   }
 };
 
-struct ConstantOpConversion : public OpConversionPattern<ConstantOp> {
+struct TileConstantOpConversion : public OpConversionPattern<ConstantOp> {
   using OpConversionPattern<ConstantOp>::OpConversionPattern;
 
   PatternMatchResult
@@ -107,6 +121,14 @@ struct ConstantOpConversion : public OpConversionPattern<ConstantOp> {
     return matchSuccess();
   }
 };
+
+static llvm::APFloat convertFloatUsingType(llvm::APFloat value,
+                                           FloatType type) {
+  bool losesInfo = false;
+  value.convert(type.getFloatSemantics(), APFloat::rmNearestTiesToEven,
+                &losesInfo);
+  return value;
+}
 
 struct ScalarConstantOpConversion
     : public OpConversionPattern<ew::ScalarConstantOp> {
@@ -119,7 +141,8 @@ struct ScalarConstantOpConversion
     auto value = op.getValue();
     if (auto floatType = stdType.dyn_cast<FloatType>()) {
       auto floatAttr = value.cast<FloatAttr>();
-      value = FloatAttr::get(floatType, floatAttr.getValueAsDouble());
+      auto floatValue = convertFloatUsingType(floatAttr.getValue(), floatType);
+      value = FloatAttr::get(floatType, floatValue);
     } else if (auto intType = stdType.dyn_cast<IntegerType>()) {
       auto intAttr = value.cast<IntegerAttr>();
       value = IntegerAttr::get(intType, intAttr.getInt());
@@ -131,8 +154,8 @@ struct ScalarConstantOpConversion
   }
 };
 
-Value createCastOp(ConversionPatternRewriter &rewriter, Location loc,
-                   Value from, Type intoType, bool isSigned) {
+static Value createCastOp(ConversionPatternRewriter &rewriter, Location loc,
+                          Value from, Type intoType, bool isSigned) {
   auto fromType = from.getType();
   if (fromType == intoType) {
     return from;
@@ -277,9 +300,9 @@ struct FirstOperand {
   }
 };
 
-DataType promoteTypes(ConversionPatternRewriter &rewriter, Location loc,
-                      ArrayRef<Value> operands, ArrayRef<DataType> types,
-                      llvm::SmallVectorImpl<Value> *into) {
+static DataType promoteTypes(ConversionPatternRewriter &rewriter, Location loc,
+                             ArrayRef<Value> operands, ArrayRef<DataType> types,
+                             llvm::SmallVectorImpl<Value> *into) {
   // First, determine the 'final' type that wins the promotion
   DataType bestType = DataType::invalid;
   for (auto type : types) {
@@ -365,6 +388,34 @@ struct CmpIntInequalityOp {
   }
 };
 
+static Value createInit(OpBuilder &builder, Location loc, Type type,
+                        AggregationKind agg) {
+  if (auto floatType = type.dyn_cast<FloatType>()) {
+    switch (agg) {
+    case AggregationKind::add: {
+      auto value = convertFloatUsingType(llvm::APFloat(0.0), floatType);
+      return builder.create<mlir::ConstantFloatOp>(loc, value, floatType);
+    }
+    case AggregationKind::mul: {
+      auto value = convertFloatUsingType(llvm::APFloat(1.0), floatType);
+      return builder.create<mlir::ConstantFloatOp>(loc, value, floatType);
+    }
+    default:
+      llvm_unreachable("Unsupported aggregation for createInit");
+    }
+  } else if (auto intType = type.dyn_cast<IntegerType>()) {
+    switch (agg) {
+    case AggregationKind::add:
+      return builder.create<mlir::ConstantIntOp>(loc, 0, intType);
+    case AggregationKind::mul:
+      return builder.create<mlir::ConstantIntOp>(loc, 1, intType);
+    default:
+      llvm_unreachable("Unsupported aggregation for createInit");
+    }
+  }
+  llvm_unreachable("Unknown type for createInit");
+}
+
 template <typename CmpOpBuilder>
 struct CondOp {
   Value create(ConversionPatternRewriter &rewriter, Location loc,
@@ -376,32 +427,6 @@ struct CondOp {
     auto zero = createInit(rewriter, loc, resultType, AggregationKind::add);
     return rewriter.create<mlir::SelectOp>(loc, cmp, operands[2], zero)
         .getResult();
-  }
-
-  Value createInit(OpBuilder &builder, Location loc, Type type,
-                   AggregationKind agg) const {
-    if (auto floatType = type.dyn_cast<FloatType>()) {
-      switch (agg) {
-      case AggregationKind::add:
-        return builder.create<mlir::ConstantFloatOp>(loc, llvm::APFloat(0.0),
-                                                     floatType);
-      case AggregationKind::mul:
-        return builder.create<mlir::ConstantFloatOp>(loc, llvm::APFloat(1.0),
-                                                     floatType);
-      default:
-        llvm_unreachable("Unsupported aggregation for createInit");
-      }
-    } else if (auto intType = type.dyn_cast<IntegerType>()) {
-      switch (agg) {
-      case AggregationKind::add:
-        return builder.create<mlir::ConstantIntOp>(loc, 0, intType);
-      case AggregationKind::mul:
-        return builder.create<mlir::ConstantIntOp>(loc, 1, intType);
-      default:
-        llvm_unreachable("Unsupported aggregation for createInit");
-      }
-    }
-    llvm_unreachable("Unknown type for createInit");
   }
 };
 
@@ -434,13 +459,64 @@ static Value buildBroadcastLoad(OpBuilder &builder, Location loc, Value operand,
 static void buildSimpleStore(OpBuilder &builder, Location loc, Value scalar,
                              Value memRef) {
   auto body = builder.getBlock();
-  // TODO: Maybe fix ValueRange to support arguments?
-  SmallVector<Value, 8> idxs;
-  for (size_t i = 0; i < body->getNumArguments(); i++) {
-    idxs.push_back(body->getArgument(i));
-  }
-  builder.create<AffineStoreOp>(loc, scalar, memRef, idxs);
+  builder.create<AffineStoreOp>(loc, scalar, memRef, body->getArguments());
 }
+
+static void fillBuffer(OpBuilder &builder, Location loc, Value value,
+                       Value memref, ArrayRef<int64_t> shape) {
+  auto parallel = builder.create<AffineParallelOp>(loc, shape);
+  auto parallelBuilder = parallel.getBodyBuilder();
+  auto load = buildBroadcastLoad(parallelBuilder, loc, value, shape.size());
+  buildSimpleStore(parallelBuilder, loc, load, memref);
+}
+
+struct BufferAllocator {
+  Value resultMemRef;
+  RankedTensorType rankedTensorType;
+  MemRefType memRefType;
+  Type elementType;
+
+  BufferAllocator(OpBuilder &builder, Operation *op, Type resultType) {
+    // Gather some basic info
+    TypeConverter typeConverter;
+    auto loc = op->getLoc();
+    rankedTensorType = getRankedTensorType(resultType);
+    elementType = typeConverter.convertType(rankedTensorType.getElementType());
+    auto originalShape = rankedTensorType.getShape();
+    auto shape = llvm::to_vector<8>(originalShape);
+
+    // If padding is detected, expand the shape to accomodate.
+    auto maybePadding = getPaddingInfo(op);
+    if (maybePadding) {
+      for (unsigned i = 0, e = shape.size(); i < e; ++i) {
+        shape[i] += maybePadding->lower[i] + maybePadding->upper[i];
+      }
+    }
+
+    // Make an allocation for the output
+    memRefType = MemRefType::get(shape, elementType);
+    resultMemRef = builder.create<AllocOp>(loc, memRefType).getResult();
+
+    if (maybePadding) {
+      // Initialize the entire buffer, including the halo.
+      auto initValue = createInit(builder, loc, elementType, maybePadding->agg);
+      fillBuffer(builder, loc, initValue, resultMemRef, shape);
+      // Construct a subview of the interior.
+      auto one = builder.create<mlir::ConstantIndexOp>(loc, 1);
+      SmallVector<Value, 4> offsets;
+      SmallVector<Value, 4> sizes;
+      SmallVector<Value, 4> strides(shape.size(), one);
+      for (unsigned i = 0, e = shape.size(); i < e; ++i) {
+        auto offset = maybePadding->lower[i];
+        auto size = originalShape[i];
+        offsets.push_back(builder.create<mlir::ConstantIndexOp>(loc, offset));
+        sizes.push_back(builder.create<mlir::ConstantIndexOp>(loc, size));
+      }
+      resultMemRef =
+          builder.create<SubViewOp>(loc, resultMemRef, offsets, sizes, strides);
+    }
+  }
+};
 
 template <typename FromOpType, typename IntoOpBuilder,
           typename Matcher = AlwaysTrue>
@@ -455,19 +531,12 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
 
   void rewrite(FromOpType op, ArrayRef<Value> operands,
                ConversionPatternRewriter &rewriter) const final {
-    TypeConverter typeConverter;
     auto loc = op.getLoc();
-    auto resultType = op.result().getType();
-    auto resultMemRefType =
-        typeConverter.convertType(resultType).template cast<MemRefType>();
-
-    // Allocate the result
-    auto resultMemRef =
-        rewriter.create<AllocOp>(loc, resultMemRefType).getResult();
+    BufferAllocator alloc(rewriter, op.getOperation(), op.result().getType());
 
     // Make a parallel for loop to fill the result
-    auto forOp =
-        rewriter.create<AffineParallelOp>(loc, resultMemRefType.getShape());
+    auto forOp = rewriter.create<AffineParallelOp>(
+        loc, alloc.rankedTensorType.getShape());
     auto body = forOp.getBody();
     rewriter.setInsertionPointToStart(body);
 
@@ -475,25 +544,24 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
     SmallVector<Value, 4> scalars;
     for (size_t i = 0; i < operands.size(); i++) {
       scalars.push_back(buildBroadcastLoad(rewriter, loc, operands[i],
-                                           resultMemRefType.getRank()));
+                                           alloc.memRefType.getRank()));
     }
 
     // Create the standard op
-    auto elementType = resultMemRefType.getElementType();
     SmallVector<DataType, 4> operandDataTypes;
     for (auto type : op.getOperation()->getOperandTypes()) {
       auto scalarType = getScalarType(type);
       operandDataTypes.push_back(scalarType.type());
     }
     IntoOpBuilder intoOpBuilder;
-    auto result = intoOpBuilder.create(rewriter, loc, elementType, scalars,
-                                       operandDataTypes);
+    auto result = intoOpBuilder.create(rewriter, loc, alloc.elementType,
+                                       scalars, operandDataTypes);
 
     // Create the store
-    buildSimpleStore(rewriter, loc, result, resultMemRef);
+    buildSimpleStore(rewriter, loc, result, alloc.resultMemRef);
 
     // Replace output with the newly allocated buffer
-    rewriter.replaceOp(op, resultMemRef);
+    rewriter.replaceOp(op, alloc.resultMemRef);
   }
 };
 
@@ -534,14 +602,12 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
     ContractionOpOperandAdaptor cionAdaptor(operands);
     auto cionOperands = cionAdaptor.operands();
 
-    // Gather some basic info
     auto loc = op.getLoc();
-    TypeConverter typeConverter;
-    auto resultType =
-        typeConverter.convertType(op.result().getType()).cast<MemRefType>();
+    BufferAllocator alloc(rewriter, op.getOperation(), op.result().getType());
 
-    // Make an allocation for the output
-    auto resultMemRef = rewriter.create<AllocOp>(loc, resultType).getResult();
+    // Do initialization
+    fillBuffer(rewriter, loc, cionAdaptor.init(), alloc.resultMemRef,
+               alloc.rankedTensorType.getShape());
 
     // Determine ranges
     SmallVector<int64_t, 8> ranges;
@@ -555,23 +621,11 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
       ranges.emplace_back(range);
     }
 
-    // Do initialization
-    auto initFor =
-        rewriter.create<AffineParallelOp>(loc, resultType.getShape());
-    auto initForBuilder = initFor.getBodyBuilder();
-    auto initLoad = buildBroadcastLoad(initForBuilder, loc, cionAdaptor.init(),
-                                       resultType.getRank());
-    buildSimpleStore(initForBuilder, loc, initLoad, resultMemRef);
-
     // Make the outer loops
     auto forOp = rewriter.create<AffineParallelOp>(loc, ranges);
     auto body = forOp.getBody();
     rewriter.setInsertionPointToStart(body);
-    // TODO: Maybe fix ValueRange?
-    SmallVector<Value, 8> idxs;
-    for (size_t i = 0; i < body->getNumArguments(); i++) {
-      idxs.push_back(body->getArgument(i));
-    }
+    auto idxs = body->getArguments();
 
     // add constraints
     if (op.cons()) {
@@ -598,28 +652,27 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
 
     // Do the combination op
     ComboBuilder comboBuilder;
-    auto elementType = resultType.getElementType();
     SmallVector<DataType, 4> operandDataTypes;
     for (auto type : op.operands().getTypes()) {
       auto scalarType = getScalarType(type);
       operandDataTypes.push_back(scalarType.type());
     }
-    auto combined = comboBuilder.create(rewriter, loc, elementType, scalars,
-                                        operandDataTypes);
+    auto combined = comboBuilder.create(rewriter, loc, alloc.elementType,
+                                        scalars, operandDataTypes);
 
     // Create the store
     auto resultMap = op.sink();
     if (resultMap.isEmpty()) {
       SmallVector<Value, 0> emptyIdxs;
-      rewriter.create<pxa::AffineReduceOp>(loc, op.agg(), combined,
-                                           resultMemRef, resultMap, emptyIdxs);
+      rewriter.create<pxa::AffineReduceOp>(
+          loc, op.agg(), combined, alloc.resultMemRef, resultMap, emptyIdxs);
     } else {
       rewriter.create<pxa::AffineReduceOp>(loc, op.agg(), combined,
-                                           resultMemRef, resultMap, idxs);
+                                           alloc.resultMemRef, resultMap, idxs);
     }
 
     // Replace the op
-    rewriter.replaceOp(op, resultMemRef);
+    rewriter.replaceOp(op, alloc.resultMemRef);
   }
 };
 
@@ -644,11 +697,7 @@ struct IndexOpConversion : public OpConversionPattern<IndexOp> {
     auto forOp = rewriter.create<AffineParallelOp>(loc, resultType.getShape());
     auto body = forOp.getBody();
     rewriter.setInsertionPointToStart(body);
-    // TODO: Maybe fix ValueRange?
-    SmallVector<Value, 8> idxs;
-    for (size_t i = 0; i < body->getNumArguments(); i++) {
-      idxs.push_back(body->getArgument(i));
-    }
+    auto idxs = body->getArguments();
 
     // Load the index value
     // TODO: add check that dim is within range in verifier
@@ -733,11 +782,7 @@ struct CastOpConversion : public OpConversionPattern<ew::CastOp> {
     auto forOp = rewriter.create<AffineParallelOp>(loc, resultType.getShape());
     auto body = forOp.getBody();
     rewriter.setInsertionPointToStart(body);
-    // TODO: Maybe fix ValueRange?
-    SmallVector<Value, 8> idxs;
-    for (size_t i = 0; i < body->getNumArguments(); i++) {
-      idxs.push_back(body->getArgument(i));
-    }
+    auto idxs = body->getArguments();
 
     // Create the load
     auto scalar = rewriter.create<AffineLoadOp>(loc, operand, idxs);
@@ -832,12 +877,12 @@ struct LoweringPass : public mlir::ModulePass<LoweringPass> {
         CmpIntInequalityOp<CmpIPredicate::sge, CmpIPredicate::uge>;
     OwningRewritePatternList patterns;
     patterns.insert<
-        ConstantOpConversion, CastOpConversion, FuncOpConversion,
+        TileConstantOpConversion, CastOpConversion, FuncOpConversion,
         IndexOpConversion, ReturnOpConversion, ScalarConstantOpConversion,
-        ShapeOpConversion,
-        TraceOpConversion, // TODO: PrngOpConversion
-                           // TODO: SpecialOpConversion (GatherOp, ReshapeOp,
-                           // ScatterOp, ZeroOp)
+        ShapeOpConversion, TraceOpConversion,
+        // TODO: PrngOpConversion
+        // TODO: SpecialOpConversion (GatherOp, ReshapeOp,
+        // ScatterOp, ZeroOp)
         ContractionOpConversion<CombinationKind::none, FirstOperand>,
         ContractionOpConversion<CombinationKind::add, StdOp<mlir::AddFOp>,
                                 ResultIs<EltwiseFloat>>,
