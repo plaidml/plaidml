@@ -10,31 +10,36 @@ plaidml_cc_library(
         "vulkan_runner.cc",
     ],
     hdrs = [
-    	"vulkan_fn.h",
-    	"vulkan_runner.h",
+        "vulkan_fn.h",
+        "vulkan_runner.h",
     ],
     linkopts = [
-    	"-ldl",
+        "-ldl",
+    ],
+    tags = [
+        "skip_windows",
     ],
     deps = [
-        "@vulkan_headers//:inc",
-        "@vulkan_loader//:vulkan_loader",
-        "@llvm-project//mlir:Support",
-        "@llvm-project//mlir:SPIRVSerialization",
         "@llvm-project//mlir:SPIRVDialect",
+        "@llvm-project//mlir:SPIRVSerialization",
+        "@llvm-project//mlir:Support",
+        "@vulkan_headers//:inc",
+        "@vulkan_loader",
     ],
-    alwayslink=1,
+    alwayslink = 1,
 )
-
 
 plaidml_cc_test(
     name = "vulkan_runner_tests",
-    tags = ["manual"],
     srcs = [
-   	"vulkan_runner_tests.cc"
+        "vulkan_runner_tests.cc",
     ],
-   linkopts = [
-    	"-ldl"
+    linkopts = [
+        "-ldl",
+    ],
+    tags = [
+        "manual",
+        "skip_windows",
     ],
     deps = [
         ":vulkan_runner",

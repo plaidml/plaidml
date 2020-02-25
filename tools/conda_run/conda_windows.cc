@@ -20,54 +20,10 @@ using bazel::tools::cpp::runfiles::Runfiles;
 namespace fs = boost::filesystem;
 namespace bp = boost::process;
 
-std::map<std::string, std::string> ParseManifest(const std::string& path) {
-  std::map<std::string, std::string> ret;
-  std::ifstream stm(path);
-  if (!stm.is_open()) {
-    std::ostringstream err;
-    err << "ERROR: " << __FILE__ << "(" << __LINE__ << "): cannot open runfiles manifest \"" << path << "\"";
-    throw std::runtime_error(err.str());
-  }
-  std::string line;
-  std::getline(stm, line);
-  size_t line_count = 1;
-  while (!line.empty()) {
-    std::string::size_type idx = line.find_first_of(' ');
-    if (idx == std::string::npos) {
-      std::ostringstream err;
-      err << "ERROR: " << __FILE__ << "(" << __LINE__ << "): bad runfiles manifest entry in \"" << path << "\" line #"
-          << line_count << ": \"" << line << "\"";
-      throw std::runtime_error(err.str());
-    }
-    ret[line.substr(0, idx)] = line.substr(idx + 1);
-    std::getline(stm, line);
-    ++line_count;
-  }
-  return ret;
-}
-
 std::string WindowsPath(std::string path) {
   std::replace(path.begin(), path.end(), '/', '\\');
   return path;
 }
-
-class Manifest {
- public:
-  Manifest() : db_(ParseManifest(pmlc::util::getEnvVar("RUNFILES_MANIFEST_FILE"))) {}
-
-  std::string GetTargetPath(const std::string& key) {
-    auto it = db_.find(key);
-    if (it == db_.end()) {
-      std::stringstream ss;
-      ss << "Key not found in manifest: " << key;
-      throw std::runtime_error(ss.str());
-    }
-    return it->second;
-  }
-
- private:
-  std::map<std::string, std::string> db_;
-};
 
 int main(int argc, char* argv[]) {
   try {
@@ -82,8 +38,7 @@ int main(int argc, char* argv[]) {
       pmlc::util::setEnvVar(var.first, var.second);
     }
 
-    Manifest manifest;
-    auto python = fs::path(manifest.GetTargetPath("com_intel_plaidml_conda_windows/env/python.exe"));
+    auto python = fs::canonical(runfiles->Rlocation("com_intel_plaidml_conda_windows/env/python.exe"));
     auto conda_env = WindowsPath(python.parent_path().string());
     auto conda_exe = pmlc::util::getEnvVar("CONDA_EXE");
     if (conda_exe.empty()) {
