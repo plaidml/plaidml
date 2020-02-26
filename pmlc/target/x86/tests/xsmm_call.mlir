@@ -274,6 +274,7 @@ func @conv2_xsmm(%I: memref<?x?x?x?xf32>, %K: memref<?x?x?x?xf32>, %O: memref<?x
   %ldb = constant 11 : i32
   %ldc = constant 55 : i32
   affine.parallel (%x, %y) = (0, 0) to (%X, %Y) step (2, 1) {
+    // xsmm.gemm %O[%c0, %x, %y, %c0] = %K[%c0, %c0, %c0, %c0], %I[%c0, %x, %y, %c0], [co:11, x:2, ci:7]
     %I_view = subview %I[%c0,  %x,  %y, %c0][][] : memref<?x?x?x?xf32> to memref<1x3x5x7xf32, offset: ?, strides: [?, ?, ?, ?]>
     %K_view = subview %K[%c0, %c0, %c0, %c0][][] : memref<?x?x?x?xf32> to memref<1x1x7x11xf32, offset: ?, strides: [?, ?, ?, ?]>
     %O_view = subview %O[%c0,  %x,  %y, %c0][][] : memref<?x?x?x?xf32> to memref<1x3x5x11xf32, offset: ?, strides: [?, ?, ?, ?]>

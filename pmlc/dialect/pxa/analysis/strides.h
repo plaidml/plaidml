@@ -21,6 +21,8 @@ struct StrideInfo {
 
   StrideInfo &operator*=(int64_t factor);
   StrideInfo &operator+=(const StrideInfo &rhs);
+
+  void print(raw_ostream &os, Block *relative = nullptr);
 };
 
 // Compute stride info for a given affine value (such an an induction variable

@@ -10,6 +10,7 @@
 #include "mlir/Support/Functional.h"
 #include "mlir/Transforms/DialectConversion.h"
 
+#include "pmlc/dialect/pxa/analysis/strides.h"
 #include "pmlc/dialect/xsmm/ir/dialect.h"
 #include "pmlc/dialect/xsmm/ir/ops.h"
 #include "pmlc/util/logging.h"
@@ -246,10 +247,6 @@ public:
       args.push_back(value);
     }
     rewriter.replaceOpWithNewOp<CallOp>(op, symbol, ArrayRef<Type>{}, args);
-    // auto call =
-    //     rewriter.create<CallOp>(impl.loc, symbol, ArrayRef<Type>{}, args);
-    // IVLOG(1, "here: " << mlir::debugString(*call));
-    // rewriter.eraseOp(op);
     return matchSuccess();
   }
 
@@ -260,14 +257,15 @@ public:
     ModuleOp module;
     Type i32Type;
     Type elementType;
-    UnrankedMemRefType memRefType;
+    UnrankedMemRefType unrankedType;
 
     Impl(xsmm::GemmOp op, PatternRewriter &rewriter)
         : op(op), rewriter(rewriter), loc(op.getLoc()),
           module(op.getParentOfType<ModuleOp>()),
           i32Type(rewriter.getIntegerType(32)),
           elementType(rewriter.getF32Type()),
-          memRefType(UnrankedMemRefType::get(elementType, /*memorySpace=*/0)) {}
+          unrankedType(
+              UnrankedMemRefType::get(elementType, /*memorySpace=*/0)) {}
 
     FlatSymbolRefAttr getOrInsertFunc() {
       const char *symbol = "plaidml_rt_xsmm_gemm_f32";
@@ -275,24 +273,35 @@ public:
       if (module.lookupSymbol(symbol)) {
         return SymbolRefAttr::get(symbol, context);
       }
-      OpBuilder::InsertionGuard insertGuard(rewriter);
-      rewriter.setInsertionPointToStart(module.getBody());
-      std::array<Type, 9> inputs{memRefType, memRefType, memRefType,
-                                 i32Type,    i32Type,    i32Type,
-                                 i32Type,    i32Type,    i32Type};
+      OpBuilder builder(module.getBodyRegion());
+      std::array<Type, 9> inputs{unrankedType, unrankedType, unrankedType,
+                                 i32Type,      i32Type,      i32Type,
+                                 i32Type,      i32Type,      i32Type};
       ArrayRef<Type> results{};
-      auto funcType = rewriter.getFunctionType(inputs, results);
+      auto funcType = builder.getFunctionType(inputs, results);
       ArrayRef<NamedAttribute> attrs{};
-      rewriter.create<FuncOp>(loc, symbol, funcType, attrs);
+      builder.create<FuncOp>(loc, symbol, funcType, attrs);
       return SymbolRefAttr::get(symbol, context);
     }
 
     Value prepareOperand(Value operand, AffineMap map, ValueRange mapOperands) {
-      auto resultOperands = expandAffineMap(rewriter, loc, map, mapOperands);
+      auto offsets = expandAffineMap(rewriter, loc, map, mapOperands);
       ArrayRef<Value> empty{};
-      auto subview = rewriter.create<SubViewOp>(loc, operand, *resultOperands,
-                                                empty, empty);
-      return rewriter.create<MemRefCastOp>(loc, subview, memRefType);
+      auto memRefType = operand.getType().cast<MemRefType>();
+      auto strideInfo = computeStrideInfo(memRefType, map, mapOperands);
+      if (strideInfo) {
+        IVLOG(1, "strides: " << mlir::debugString(*strideInfo));
+      }
+      SmallVector<int64_t, 8> shape(memRefType.getRank(), 2);
+      SmallVector<int64_t, 8> strides(memRefType.getRank(),
+                                      MemRefType::getDynamicStrideOrOffset());
+      auto layout = makeStridedLinearLayoutMap(
+          strides, MemRefType::getDynamicStrideOrOffset(), module.getContext());
+      auto resultType = MemRefType::get(shape, elementType, layout);
+      IVLOG(1, "resultType: " << mlir::debugString(resultType));
+      auto subview = rewriter.create<SubViewOp>(loc, operand, *offsets, empty,
+                                                empty, resultType);
+      return rewriter.create<MemRefCastOp>(loc, subview, unrankedType);
     }
 
     Value createConstantIntOp(int64_t value) {
@@ -316,7 +325,7 @@ class LowerXSMMPass : public FunctionPass<LowerXSMMPass> {
     populateXSMMConversionPatterns(patterns, &getContext());
     ConversionTarget target(getContext());
     target.addLegalDialect<AffineOpsDialect, StandardOpsDialect>();
-    // target.addIllegalDialect<xsmm::Dialect>();
+    target.addIllegalDialect<xsmm::Dialect>();
     if (failed(applyPartialConversion(getFunction(), target, patterns)))
       signalPassFailure();
   }
