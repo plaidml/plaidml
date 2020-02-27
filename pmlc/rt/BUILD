@@ -4,16 +4,25 @@ load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_shlib")
 
 plaidml_cc_library(
     name = "rt",
-    srcs = glob([
-        "*.cc",
-        "*.h",
-    ]),
+    srcs = [
+        "runtime.cc",
+        "memref.h",
+    ] + select({
+        "@bazel_tools//src/conditions:windows": [],
+        "//conditions:default": [
+            "xsmm.cc",
+        ],
+    }),
     visibility = ["//visibility:public"],
     deps = [
         "@llvm-project//llvm:support",
         "@llvm-project//mlir/test:mlir_runner_utils",
-        "@xsmm",
-    ],
+    ] + select({
+        "@bazel_tools//src/conditions:windows": [],
+        "//conditions:default": [
+            "@xsmm",
+        ],
+    }),
     alwayslink = 1,
 )
 

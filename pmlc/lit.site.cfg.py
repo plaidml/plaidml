@@ -39,6 +39,7 @@ config.mlir_test_dir = os.path.join(
     os.environ['TEST_WORKSPACE'],
     test_dir,
 )
+config.lit_tools_dir = ''  # This is needed for Windows support
 lit.llvm.initialize(lit_config, config)
 
 # Let the main config do the real work.
