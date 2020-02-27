@@ -366,7 +366,7 @@ module {
 module {
   func @sum_over_axis(%arg0: tensor<1x784x!eltwise.f32>) -> tensor<784x!eltwise.f32> {
     %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
-    %0 = tile.cion add, none, %cst, %arg0 {sink = #map0, srcs = [#map1]} : !f32, tensor<1x784x!eltwise.f32> -> tensor<784x!eltwise.f32>
+    %0 = tile.contract add, none, %cst, %arg0 {sink = #map0, srcs = [#map1]} : !f32, tensor<1x784x!eltwise.f32> -> tensor<784x!eltwise.f32>
     return %0 : tensor<784x!eltwise.f32>
   }
 }
@@ -386,7 +386,7 @@ module {
 module {
   func @max_over_axis(%arg0: tensor<1x784x!eltwise.f32>) -> tensor<784x!eltwise.f32> {
     %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
-    %0 = tile.cion max, none, %cst, %arg0 {sink = #map0, srcs = [#map1]} : !f32, tensor<1x784x!eltwise.f32> -> tensor<784x!eltwise.f32>
+    %0 = tile.contract max, none, %cst, %arg0 {sink = #map0, srcs = [#map1]} : !f32, tensor<1x784x!eltwise.f32> -> tensor<784x!eltwise.f32>
     return %0 : tensor<784x!eltwise.f32>
   }
 }
@@ -408,7 +408,7 @@ module {
 module {
   func @matmul(%arg0: tensor<784x784x!eltwise.f32>, %arg1: tensor<1x784x!eltwise.f32>) -> tensor<1x784x!eltwise.f32> {
     %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
-    %0 = tile.cion add, mul, %cst, %arg1, %arg0 {sink = #map0, srcs = [#map1, #map2]} : !f32, tensor<1x784x!eltwise.f32>, tensor<784x784x!eltwise.f32> -> tensor<1x784x!eltwise.f32>
+    %0 = tile.contract add, mul, %cst, %arg1, %arg0 {sink = #map0, srcs = [#map1, #map2]} : !f32, tensor<1x784x!eltwise.f32>, tensor<784x784x!eltwise.f32> -> tensor<1x784x!eltwise.f32>
     return %0 : tensor<1x784x!eltwise.f32>
   }
 }
@@ -428,7 +428,7 @@ module {
 module {
   func @avg(%arg0: tensor<1x784x!eltwise.f32>) -> !f32 {
     %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
-    %0 = tile.cion add, none, %cst, %arg0 {sink = #map0, srcs = [#map1]} : !f32, tensor<1x784x!eltwise.f32> -> !f32
+    %0 = tile.contract add, none, %cst, %arg0 {sink = #map0, srcs = [#map1]} : !f32, tensor<1x784x!eltwise.f32> -> !f32
     return %0 : !f32
   }
 }
@@ -448,8 +448,8 @@ module {
 module {
   func @avg_stages(%arg0: tensor<1x784x!eltwise.f32>) -> !f32 {
     %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
-    %c784 = tile.affine_const 784
-    %0 = tile.cion add, none, %cst, %arg0 {sink = #map0, srcs = [#map1]} : !f32, tensor<1x784x!eltwise.f32> -> !f32
+    %c784 = tile.constant 784
+    %0 = tile.contract add, none, %cst, %arg0 {sink = #map0, srcs = [#map1]} : !f32, tensor<1x784x!eltwise.f32> -> !f32
     %1 = "eltwise.div"(%0, %c784) : (!f32, index) -> !f32
     return %1 : !f32
   }
@@ -470,8 +470,8 @@ module {
 module {
   func @avg_merge(%arg0: tensor<1x784x!eltwise.f32>) -> !f32 {
     %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
-    %c784 = tile.affine_const 784
-    %0 = tile.cion add, none, %cst, %arg0 {sink = #map0, srcs = [#map1]} : !f32, tensor<1x784x!eltwise.f32> -> !f32
+    %c784 = tile.constant 784
+    %0 = tile.contract add, none, %cst, %arg0 {sink = #map0, srcs = [#map1]} : !f32, tensor<1x784x!eltwise.f32> -> !f32
     %1 = "eltwise.div"(%0, %c784) : (!f32, index) -> !f32
     return %1 : !f32
   }
@@ -493,7 +493,7 @@ module {
 module {
   func @max_pool_1d(%arg0: tensor<10x!eltwise.f32> {tile.name = "I"}) -> tensor<5x!eltwise.f32> {
     %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
-    %0 = tile.cion max, none, %cst, %arg0 {cons = #set0, sink = #map0, srcs = [#map1]} : !f32, tensor<10x!eltwise.f32> -> tensor<5x!eltwise.f32>
+    %0 = tile.contract max, none, %cst, %arg0 {cons = #set0, sink = #map0, srcs = [#map1]} : !f32, tensor<10x!eltwise.f32> -> tensor<5x!eltwise.f32>
     return %0 : tensor<5x!eltwise.f32>
   }
 }
@@ -513,7 +513,7 @@ module {
 module {
   func @skip(%arg0: tensor<1x784x!eltwise.f32>) -> tensor<784x!eltwise.f32> {
     %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
-    %0 = tile.cion add, none, %cst, %arg0 {sink = #map0, srcs = [#map1]} : !f32, tensor<1x784x!eltwise.f32> -> tensor<784x!eltwise.f32>
+    %0 = tile.contract add, none, %cst, %arg0 {sink = #map0, srcs = [#map1]} : !f32, tensor<1x784x!eltwise.f32> -> tensor<784x!eltwise.f32>
     return %0 : tensor<784x!eltwise.f32>
   }
 }
@@ -535,7 +535,7 @@ module {
 module {
   func @conv_1d(%arg0: tensor<3x3x1x!eltwise.f32>, %arg1: tensor<1x224x3x!eltwise.f32>) -> tensor<1x222x1x!eltwise.f32> {
     %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
-    %0 = tile.cion add, mul, %cst, %arg1, %arg0 {sink = #map0, srcs = [#map1, #map2]} : !f32, tensor<1x224x3x!eltwise.f32>, tensor<3x3x1x!eltwise.f32> -> tensor<1x222x1x!eltwise.f32>
+    %0 = tile.contract add, mul, %cst, %arg1, %arg0 {sink = #map0, srcs = [#map1, #map2]} : !f32, tensor<1x224x3x!eltwise.f32>, tensor<3x3x1x!eltwise.f32> -> tensor<1x222x1x!eltwise.f32>
     return %0 : tensor<1x222x1x!eltwise.f32>
   }
 }
@@ -557,7 +557,7 @@ module {
 module {
   func @conv_2d_dilated(%arg0: tensor<3x3x1x32x!eltwise.f32>, %arg1: tensor<1x224x224x1x!eltwise.f32>) -> tensor<1x220x218x32x!eltwise.f32> {
     %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
-    %0 = tile.cion add, mul, %cst, %arg1, %arg0 {sink = #map0, srcs = [#map1, #map2]} : !f32, tensor<1x224x224x1x!eltwise.f32>, tensor<3x3x1x32x!eltwise.f32> -> tensor<1x220x218x32x!eltwise.f32>
+    %0 = tile.contract add, mul, %cst, %arg1, %arg0 {sink = #map0, srcs = [#map1, #map2]} : !f32, tensor<1x224x224x1x!eltwise.f32>, tensor<3x3x1x32x!eltwise.f32> -> tensor<1x220x218x32x!eltwise.f32>
     return %0 : tensor<1x220x218x32x!eltwise.f32>
   }
 }
@@ -579,7 +579,7 @@ module {
 module {
   func @complex_conv_2d(%arg0: tensor<3x3x3x3x32x!eltwise.f32>, %arg1: tensor<1x224x224x3x3x!eltwise.f32>) -> tensor<1x224x112x3x32x!eltwise.f32> {
     %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
-    %0 = tile.cion add, mul, %cst, %arg1, %arg0 {sink = #map0, srcs = [#map1, #map2]} : !f32, tensor<1x224x224x3x3x!eltwise.f32>, tensor<3x3x3x3x32x!eltwise.f32> -> tensor<1x224x112x3x32x!eltwise.f32>
+    %0 = tile.contract add, mul, %cst, %arg1, %arg0 {sink = #map0, srcs = [#map1, #map2]} : !f32, tensor<1x224x224x3x3x!eltwise.f32>, tensor<3x3x3x3x32x!eltwise.f32> -> tensor<1x224x112x3x32x!eltwise.f32>
     return %0 : tensor<1x224x112x3x32x!eltwise.f32>
   }
 }
@@ -621,20 +621,20 @@ module {
 module {
   func @mnist_mlp(%arg0: tensor<10x!eltwise.f32>, %arg1: tensor<512x10x!eltwise.f32>, %arg2: tensor<512x!eltwise.f32>, %arg3: tensor<512x512x!eltwise.f32>, %arg4: tensor<512x!eltwise.f32>, %arg5: tensor<784x512x!eltwise.f32>, %arg6: tensor<1x784x!eltwise.f32>) -> tensor<1x10x!eltwise.f32> {
     %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
-    %0 = tile.cion add, mul, %cst, %arg6, %arg5 {sink = #map0, srcs = [#map1, #map2]} : !f32, tensor<1x784x!eltwise.f32>, tensor<784x512x!eltwise.f32> -> tensor<1x512x!eltwise.f32>
+    %0 = tile.contract add, mul, %cst, %arg6, %arg5 {sink = #map0, srcs = [#map1, #map2]} : !f32, tensor<1x784x!eltwise.f32>, tensor<784x512x!eltwise.f32> -> tensor<1x512x!eltwise.f32>
     %1 = "eltwise.add"(%0, %arg4) : (tensor<1x512x!eltwise.f32>, tensor<512x!eltwise.f32>) -> tensor<1x512x!eltwise.f32>
     %2 = "eltwise.cmp_lt"(%1, %cst) : (tensor<1x512x!eltwise.f32>, !f32) -> tensor<1x512x!eltwise.u1>
     %3 = "eltwise.select"(%2, %cst, %1) : (tensor<1x512x!eltwise.u1>, !f32, tensor<1x512x!eltwise.f32>) -> tensor<1x512x!eltwise.f32>
-    %4 = tile.cion add, mul, %cst, %3, %arg3 {sink = #map0, srcs = [#map1, #map2]} : !f32, tensor<1x512x!eltwise.f32>, tensor<512x512x!eltwise.f32> -> tensor<1x512x!eltwise.f32>
+    %4 = tile.contract add, mul, %cst, %3, %arg3 {sink = #map0, srcs = [#map1, #map2]} : !f32, tensor<1x512x!eltwise.f32>, tensor<512x512x!eltwise.f32> -> tensor<1x512x!eltwise.f32>
     %5 = "eltwise.add"(%4, %arg2) : (tensor<1x512x!eltwise.f32>, tensor<512x!eltwise.f32>) -> tensor<1x512x!eltwise.f32>
     %6 = "eltwise.cmp_lt"(%5, %cst) : (tensor<1x512x!eltwise.f32>, !f32) -> tensor<1x512x!eltwise.u1>
     %7 = "eltwise.select"(%6, %cst, %5) : (tensor<1x512x!eltwise.u1>, !f32, tensor<1x512x!eltwise.f32>) -> tensor<1x512x!eltwise.f32>
-    %8 = tile.cion add, mul, %cst, %7, %arg1 {sink = #map0, srcs = [#map1, #map2]} : !f32, tensor<1x512x!eltwise.f32>, tensor<512x10x!eltwise.f32> -> tensor<1x10x!eltwise.f32>
+    %8 = tile.contract add, mul, %cst, %7, %arg1 {sink = #map0, srcs = [#map1, #map2]} : !f32, tensor<1x512x!eltwise.f32>, tensor<512x10x!eltwise.f32> -> tensor<1x10x!eltwise.f32>
     %9 = "eltwise.add"(%8, %arg0) : (tensor<1x10x!eltwise.f32>, tensor<10x!eltwise.f32>) -> tensor<1x10x!eltwise.f32>
-    %10 = tile.cion max, none, %cst, %9 {sink = #map3, srcs = [#map4]} : !f32, tensor<1x10x!eltwise.f32> -> tensor<1x1x!eltwise.f32>
+    %10 = tile.contract max, none, %cst, %9 {sink = #map3, srcs = [#map4]} : !f32, tensor<1x10x!eltwise.f32> -> tensor<1x1x!eltwise.f32>
     %11 = "eltwise.sub"(%9, %10) : (tensor<1x10x!eltwise.f32>, tensor<1x1x!eltwise.f32>) -> tensor<1x10x!eltwise.f32>
     %12 = "eltwise.exp"(%11) : (tensor<1x10x!eltwise.f32>) -> tensor<1x10x!eltwise.f32>
-    %13 = tile.cion add, none, %cst, %12 {sink = #map3, srcs = [#map4]} : !f32, tensor<1x10x!eltwise.f32> -> tensor<1x1x!eltwise.f32>
+    %13 = tile.contract add, none, %cst, %12 {sink = #map3, srcs = [#map4]} : !f32, tensor<1x10x!eltwise.f32> -> tensor<1x1x!eltwise.f32>
     %14 = "eltwise.div"(%12, %13) : (tensor<1x10x!eltwise.f32>, tensor<1x1x!eltwise.f32>) -> tensor<1x10x!eltwise.f32>
     return %14 : tensor<1x10x!eltwise.f32>
   }
@@ -683,29 +683,29 @@ module {
 !i32 = type tensor<!eltwise.i32>
 module {
   func @mnist_cnn(%arg0: tensor<100x!eltwise.f32>, %arg1: tensor<128x100x!eltwise.f32>, %arg2: tensor<128x!eltwise.f32>, %arg3: tensor<12100x128x!eltwise.f32>, %arg4: tensor<64x!eltwise.f32>, %arg5: tensor<3x3x32x64x!eltwise.f32>, %arg6: tensor<32x!eltwise.f32>, %arg7: tensor<3x3x1x32x!eltwise.f32>, %arg8: tensor<1x224x224x1x!eltwise.f32>) -> tensor<1x100x!eltwise.f32> {
-    %c12100 = tile.affine_const 12100
+    %c12100 = tile.constant 12100
     %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
     %c1 = "eltwise.sconst"() {value = 1 : i64} : () -> !i32
-    %0 = tile.cion add, mul, %cst, %arg8, %arg7 {sink = #map0, srcs = [#map1, #map2]} : !f32, tensor<1x224x224x1x!eltwise.f32>, tensor<3x3x1x32x!eltwise.f32> -> tensor<1x222x222x32x!eltwise.f32>
+    %0 = tile.contract add, mul, %cst, %arg8, %arg7 {sink = #map0, srcs = [#map1, #map2]} : !f32, tensor<1x224x224x1x!eltwise.f32>, tensor<3x3x1x32x!eltwise.f32> -> tensor<1x222x222x32x!eltwise.f32>
     %1 = "eltwise.add"(%0, %arg6) : (tensor<1x222x222x32x!eltwise.f32>, tensor<32x!eltwise.f32>) -> tensor<1x222x222x32x!eltwise.f32>
     %2 = "eltwise.cmp_lt"(%1, %cst) : (tensor<1x222x222x32x!eltwise.f32>, !f32) -> tensor<1x222x222x32x!eltwise.u1>
     %3 = "eltwise.select"(%2, %cst, %1) : (tensor<1x222x222x32x!eltwise.u1>, !f32, tensor<1x222x222x32x!eltwise.f32>) -> tensor<1x222x222x32x!eltwise.f32>
-    %4 = tile.cion add, mul, %cst, %3, %arg5 {sink = #map0, srcs = [#map1, #map2]} : !f32, tensor<1x222x222x32x!eltwise.f32>, tensor<3x3x32x64x!eltwise.f32> -> tensor<1x220x220x64x!eltwise.f32>
+    %4 = tile.contract add, mul, %cst, %3, %arg5 {sink = #map0, srcs = [#map1, #map2]} : !f32, tensor<1x222x222x32x!eltwise.f32>, tensor<3x3x32x64x!eltwise.f32> -> tensor<1x220x220x64x!eltwise.f32>
     %5 = "eltwise.add"(%4, %arg4) : (tensor<1x220x220x64x!eltwise.f32>, tensor<64x!eltwise.f32>) -> tensor<1x220x220x64x!eltwise.f32>
     %6 = "eltwise.cmp_lt"(%5, %cst) : (tensor<1x220x220x64x!eltwise.f32>, !f32) -> tensor<1x220x220x64x!eltwise.u1>
     %7 = "eltwise.select"(%6, %cst, %5) : (tensor<1x220x220x64x!eltwise.u1>, !f32, tensor<1x220x220x64x!eltwise.f32>) -> tensor<1x220x220x64x!eltwise.f32>
-    %8 = tile.cion max, none, %cst, %7 {cons = #set0, sink = #map3, srcs = [#map4]} : !f32, tensor<1x220x220x64x!eltwise.f32> -> tensor<1x110x110x64x!eltwise.f32>
+    %8 = tile.contract max, none, %cst, %7 {cons = #set0, sink = #map3, srcs = [#map4]} : !f32, tensor<1x220x220x64x!eltwise.f32> -> tensor<1x110x110x64x!eltwise.f32>
     %9 = "tile.reshape"(%8, %c1, %c12100) : (tensor<1x110x110x64x!eltwise.f32>, !i32, index) -> tensor<1x12100x!eltwise.f32>
-    %10 = tile.cion add, mul, %cst, %9, %arg3 {sink = #map5, srcs = [#map6, #map7]} : !f32, tensor<1x12100x!eltwise.f32>, tensor<12100x128x!eltwise.f32> -> tensor<1x128x!eltwise.f32>
+    %10 = tile.contract add, mul, %cst, %9, %arg3 {sink = #map5, srcs = [#map6, #map7]} : !f32, tensor<1x12100x!eltwise.f32>, tensor<12100x128x!eltwise.f32> -> tensor<1x128x!eltwise.f32>
     %11 = "eltwise.add"(%10, %arg2) : (tensor<1x128x!eltwise.f32>, tensor<128x!eltwise.f32>) -> tensor<1x128x!eltwise.f32>
     %12 = "eltwise.cmp_lt"(%11, %cst) : (tensor<1x128x!eltwise.f32>, !f32) -> tensor<1x128x!eltwise.u1>
     %13 = "eltwise.select"(%12, %cst, %11) : (tensor<1x128x!eltwise.u1>, !f32, tensor<1x128x!eltwise.f32>) -> tensor<1x128x!eltwise.f32>
-    %14 = tile.cion add, mul, %cst, %13, %arg1 {sink = #map5, srcs = [#map6, #map7]} : !f32, tensor<1x128x!eltwise.f32>, tensor<128x100x!eltwise.f32> -> tensor<1x100x!eltwise.f32>
+    %14 = tile.contract add, mul, %cst, %13, %arg1 {sink = #map5, srcs = [#map6, #map7]} : !f32, tensor<1x128x!eltwise.f32>, tensor<128x100x!eltwise.f32> -> tensor<1x100x!eltwise.f32>
     %15 = "eltwise.add"(%14, %arg0) : (tensor<1x100x!eltwise.f32>, tensor<100x!eltwise.f32>) -> tensor<1x100x!eltwise.f32>
-    %16 = tile.cion max, none, %cst, %15 {sink = #map8, srcs = [#map9]} : !f32, tensor<1x100x!eltwise.f32> -> tensor<1x1x!eltwise.f32>
+    %16 = tile.contract max, none, %cst, %15 {sink = #map8, srcs = [#map9]} : !f32, tensor<1x100x!eltwise.f32> -> tensor<1x1x!eltwise.f32>
     %17 = "eltwise.sub"(%15, %16) : (tensor<1x100x!eltwise.f32>, tensor<1x1x!eltwise.f32>) -> tensor<1x100x!eltwise.f32>
     %18 = "eltwise.exp"(%17) : (tensor<1x100x!eltwise.f32>) -> tensor<1x100x!eltwise.f32>
-    %19 = tile.cion add, none, %cst, %18 {sink = #map8, srcs = [#map9]} : !f32, tensor<1x100x!eltwise.f32> -> tensor<1x1x!eltwise.f32>
+    %19 = tile.contract add, none, %cst, %18 {sink = #map8, srcs = [#map9]} : !f32, tensor<1x100x!eltwise.f32> -> tensor<1x1x!eltwise.f32>
     %20 = "eltwise.div"(%18, %19) : (tensor<1x100x!eltwise.f32>, tensor<1x1x!eltwise.f32>) -> tensor<1x100x!eltwise.f32>
     return %20 : tensor<1x100x!eltwise.f32>
   }
@@ -730,10 +730,10 @@ module {
 module {
   func @arg_max(%arg0: !f32, %arg1: tensor<1x10x10x!eltwise.f32>) -> tensor<1x10x!eltwise.u32> {
     %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
-    %0 = tile.cion assign, none, %cst, %arg0 {sink = #map0, srcs = [#map1]} : !f32, !f32 -> tensor<10x!eltwise.f32>
+    %0 = tile.contract assign, none, %cst, %arg0 {sink = #map0, srcs = [#map1]} : !f32, !f32 -> tensor<10x!eltwise.f32>
     %1 = "tile.index"(%0) {dim = 0 : i64} : (tensor<10x!eltwise.f32>) -> tensor<10x!eltwise.i32>
-    %2 = tile.cion max, none, %cst, %arg1 {sink = #map2, srcs = [#map3]} : !f32, tensor<1x10x10x!eltwise.f32> -> tensor<1x10x!eltwise.f32>
-    %3 = tile.cion max, cond, %cst, %arg1, %2, %1 {sink = #map2, srcs = [#map3, #map2, #map4]} : !f32, tensor<1x10x10x!eltwise.f32>, tensor<1x10x!eltwise.f32>, tensor<10x!eltwise.i32> -> tensor<1x10x!eltwise.i32>
+    %2 = tile.contract max, none, %cst, %arg1 {sink = #map2, srcs = [#map3]} : !f32, tensor<1x10x10x!eltwise.f32> -> tensor<1x10x!eltwise.f32>
+    %3 = tile.contract max, cond, %cst, %arg1, %2, %1 {sink = #map2, srcs = [#map3, #map2, #map4]} : !f32, tensor<1x10x10x!eltwise.f32>, tensor<1x10x!eltwise.f32>, tensor<10x!eltwise.i32> -> tensor<1x10x!eltwise.i32>
     %4 = "eltwise.cast"(%3) : (tensor<1x10x!eltwise.i32>) -> tensor<1x10x!eltwise.u32>
     return %4 : tensor<1x10x!eltwise.u32>
   }
@@ -755,7 +755,7 @@ module {
   func @global_min(%arg0: tensor<10x10x10x!eltwise.f32> {tile.name = "I"}) -> !f32 {
     %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
     %0 = "eltwise.neg"(%arg0) : (tensor<10x10x10x!eltwise.f32>) -> tensor<10x10x10x!eltwise.f32>
-    %1 = tile.cion max, none, %cst, %0 {sink = #map0, srcs = [#map1]} : !f32, tensor<10x10x10x!eltwise.f32> -> !f32
+    %1 = tile.contract max, none, %cst, %0 {sink = #map0, srcs = [#map1]} : !f32, tensor<10x10x10x!eltwise.f32> -> !f32
     %2 = "eltwise.neg"(%1) : (!f32) -> !f32
     return %2 : !f32
   }
@@ -777,7 +777,7 @@ module {
 module {
   func @cum_sum(%arg0: tensor<10x!eltwise.f32> {tile.name = "I"}) -> tensor<10x!eltwise.f32> {
     %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
-    %0 = tile.cion add, none, %cst, %arg0 {cons = #set0, sink = #map0, srcs = [#map1]} : !f32, tensor<10x!eltwise.f32> -> tensor<10x!eltwise.f32>
+    %0 = tile.contract add, none, %cst, %arg0 {cons = #set0, sink = #map0, srcs = [#map1]} : !f32, tensor<10x!eltwise.f32> -> tensor<10x!eltwise.f32>
     return %0 : tensor<10x!eltwise.f32>
   }
 }
@@ -834,11 +834,11 @@ module {
     %0 = "eltwise.mul"(%arg0, %cst_1) : (tensor<4x7x3x9x!eltwise.f32>, !f32) -> tensor<4x7x3x9x!eltwise.f32>
     %1 = "eltwise.add"(%arg1, %0) : (tensor<4x7x3x9x!eltwise.f32>, tensor<4x7x3x9x!eltwise.f32>) -> tensor<4x7x3x9x!eltwise.f32>
     %2 = "eltwise.mul"(%arg0, %arg0) : (tensor<4x7x3x9x!eltwise.f32>, tensor<4x7x3x9x!eltwise.f32>) -> tensor<4x7x3x9x!eltwise.f32>
-    %3 = tile.cion add, none, %cst_2, %2 {sink = #map0, srcs = [#map1]} : !f32, tensor<4x7x3x9x!eltwise.f32> -> !f32
+    %3 = tile.contract add, none, %cst_2, %2 {sink = #map0, srcs = [#map1]} : !f32, tensor<4x7x3x9x!eltwise.f32> -> !f32
     %4 = "eltwise.sqrt"(%3) : (!f32) -> !f32
     %5 = "eltwise.mul"(%4, %cst_1) : (!f32, !f32) -> !f32
     %6 = "eltwise.mul"(%arg1, %arg1) : (tensor<4x7x3x9x!eltwise.f32>, tensor<4x7x3x9x!eltwise.f32>) -> tensor<4x7x3x9x!eltwise.f32>
-    %7 = tile.cion add, none, %cst_2, %6 {sink = #map0, srcs = [#map1]} : !f32, tensor<4x7x3x9x!eltwise.f32> -> !f32
+    %7 = tile.contract add, none, %cst_2, %6 {sink = #map0, srcs = [#map1]} : !f32, tensor<4x7x3x9x!eltwise.f32> -> !f32
     %8 = "eltwise.sqrt"(%7) : (!f32) -> !f32
     %9 = "eltwise.add"(%8, %5) : (!f32, !f32) -> !f32
     %10 = "eltwise.mul"(%arg2, %cst_0) : (!f32, !f32) -> !f32
@@ -874,7 +874,7 @@ module {
 module {
   func @repeat_elts(%arg0: tensor<10x10x10x!eltwise.f32>) -> tensor<10x30x10x!eltwise.f32> {
     %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
-    %0 = tile.cion assign, none, %cst, %arg0 {cons = #set0, no_reduce, sink = #map0, srcs = [#map1]} : !f32, tensor<10x10x10x!eltwise.f32> -> tensor<10x30x10x!eltwise.f32>
+    %0 = tile.contract assign, none, %cst, %arg0 {cons = #set0, no_reduce, sink = #map0, srcs = [#map1]} : !f32, tensor<10x10x10x!eltwise.f32> -> tensor<10x30x10x!eltwise.f32>
     return %0 : tensor<10x30x10x!eltwise.f32>
   }
 }
@@ -898,7 +898,7 @@ module {
 
 module {
   func @use_default(%arg0: tensor<1x10x10x!eltwise.f32>, %arg1: tensor<1x7x10x10x!eltwise.f32>) -> tensor<1x7x10x10x!eltwise.f32> {
-    %0 = tile.cion assign, none, %arg1, %arg0 {sink = #map0, srcs = [#map1]} : tensor<1x7x10x10x!eltwise.f32>, tensor<1x10x10x!eltwise.f32> -> tensor<1x7x10x10x!eltwise.f32>
+    %0 = tile.contract assign, none, %arg1, %arg0 {sink = #map0, srcs = [#map1]} : tensor<1x7x10x10x!eltwise.f32>, tensor<1x10x10x!eltwise.f32> -> tensor<1x7x10x10x!eltwise.f32>
     return %0 : tensor<1x7x10x10x!eltwise.f32>
   }
 }
@@ -922,7 +922,7 @@ module {
 module {
   func @defract_test(%arg0: tensor<3x!eltwise.f32> {tile.name = "K"}, %arg1: tensor<3x!eltwise.f32> {tile.name = "I"}) -> tensor<5x!eltwise.f32> {
     %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
-    %0 = tile.cion add, mul, %cst, %arg1, %arg0 {sink = #map0, srcs = [#map1, #map2]} : !f32, tensor<3x!eltwise.f32>, tensor<3x!eltwise.f32> -> tensor<5x!eltwise.f32>
+    %0 = tile.contract add, mul, %cst, %arg1, %arg0 {sink = #map0, srcs = [#map1, #map2]} : !f32, tensor<3x!eltwise.f32>, tensor<3x!eltwise.f32> -> tensor<5x!eltwise.f32>
     return %0 : tensor<5x!eltwise.f32>
   }
 }
@@ -951,7 +951,7 @@ module {
 module {
   func @defract_short_test(%arg0: tensor<3x!eltwise.f32> {tile.name = "I"}) -> tensor<6x!eltwise.f32> {
     %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
-    %0 = tile.cion add, none, %cst, %arg0 {sink = #map0, srcs = [#map1]} : !f32, tensor<3x!eltwise.f32> -> tensor<6x!eltwise.f32>
+    %0 = tile.contract add, none, %cst, %arg0 {sink = #map0, srcs = [#map1]} : !f32, tensor<3x!eltwise.f32> -> tensor<6x!eltwise.f32>
     return %0 : tensor<6x!eltwise.f32>
   }
 }
@@ -983,7 +983,7 @@ module {
 module {
   func @defract_long(%arg0: tensor<1x3x3x1x!eltwise.f32> {tile.name = "K"}, %arg1: tensor<1x3x3x1x!eltwise.f32> {tile.name = "I"}) -> tensor<1x5x5x1x!eltwise.f32> {
     %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
-    %0 = tile.cion add, mul, %cst, %arg1, %arg0 {sink = #map0, srcs = [#map1, #map2]} : !f32, tensor<1x3x3x1x!eltwise.f32>, tensor<1x3x3x1x!eltwise.f32> -> tensor<1x5x5x1x!eltwise.f32>
+    %0 = tile.contract add, mul, %cst, %arg1, %arg0 {sink = #map0, srcs = [#map1, #map2]} : !f32, tensor<1x3x3x1x!eltwise.f32>, tensor<1x3x3x1x!eltwise.f32> -> tensor<1x5x5x1x!eltwise.f32>
     return %0 : tensor<1x5x5x1x!eltwise.f32>
   }
 }
@@ -1032,7 +1032,7 @@ module {
 module {
   func @"this-is-not an identifier"(%arg0: tensor<3x!eltwise.f32> {tile.name = "K"}, %arg1: tensor<3x!eltwise.f32> {tile.name = "I"}) -> tensor<5x!eltwise.f32> {
     %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> !f32
-    %0 = tile.cion add, mul, %cst, %arg1, %arg0 {sink = #map0, srcs = [#map1, #map2]} : !f32, tensor<3x!eltwise.f32>, tensor<3x!eltwise.f32> -> tensor<5x!eltwise.f32>
+    %0 = tile.contract add, mul, %cst, %arg1, %arg0 {sink = #map0, srcs = [#map1, #map2]} : !f32, tensor<3x!eltwise.f32>, tensor<3x!eltwise.f32> -> tensor<5x!eltwise.f32>
     return %0 : tensor<5x!eltwise.f32>
   }
 }

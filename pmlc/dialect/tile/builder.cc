@@ -262,11 +262,11 @@ void TileBuilder::BindTensorDims(Value from, ArrayRef<Value *> intos) {
         if (!op) {
           throw std::runtime_error("No defining op");
         }
-        if (auto const_op = llvm::dyn_cast<AffineConstantOp>(op)) {
+        if (auto const_op = llvm::dyn_cast<ConstantOp>(op)) {
           auto attr = const_op.getValue().dyn_cast<IntegerAttr>();
           if (!attr) {
             throw std::runtime_error(
-                "Expected IntegerAttr for value of AffineConstantOp");
+                "Expected IntegerAttr for value of ConstantOp");
           }
           IVLOG(6, "dim: " << i << ", from: " << fromSize
                            << ", into: " << attr.getInt());
@@ -457,51 +457,50 @@ Value TileBuilder::MakePlaceholderOp(RankedTensorType type, BufferPtr buffer,
   return op.result();
 }
 
-Value TileBuilder::MakeAffineConstantOp(int64_t value) {
-  IVLOG(5, "TileBuilder::MakeAffineConstantOp> " << value);
-  return impl->builder.create<AffineConstantOp>(impl->loc, value).result();
+Value TileBuilder::MakeConstantOp(int64_t value) {
+  IVLOG(5, "TileBuilder::MakeConstantOp> " << value);
+  return impl->builder.create<ConstantOp>(impl->loc, value).result();
 }
 
-Value TileBuilder::MakeAffineIndexOp(StringRef name) {
-  IVLOG(5, "TileBuilder::MakeAffineIndexOp> " << name.str());
-  return impl->builder
-      .create<AffineIndexOp>(impl->loc, impl->idxCounter++, name)
+Value TileBuilder::MakePolyIndexOp(StringRef name) {
+  IVLOG(5, "TileBuilder::MakePolyIndexOp> " << name.str());
+  return impl->builder.create<PolyIndexOp>(impl->loc, impl->idxCounter++, name)
       .result();
 }
 
-Value TileBuilder::MakeAffineAddOp(ArrayRef<Value> args) {
-  IVLOG(5, "TileBuilder::MakeAffineAddOp>");
-  return impl->builder.create<AffineAddOp>(impl->loc, args).result();
+Value TileBuilder::MakePolyAddOp(ArrayRef<Value> args) {
+  IVLOG(5, "TileBuilder::MakePolyAddOp>");
+  return impl->builder.create<PolyAddOp>(impl->loc, args).result();
 }
 
-Value TileBuilder::MakeAffineSubOp(ArrayRef<Value> args) {
-  IVLOG(5, "TileBuilder::MakeAffineSubOp>");
-  return impl->builder.create<AffineSubOp>(impl->loc, args).result();
+Value TileBuilder::MakePolySubOp(ArrayRef<Value> args) {
+  IVLOG(5, "TileBuilder::MakePolySubOp>");
+  return impl->builder.create<PolySubOp>(impl->loc, args).result();
 }
 
-Value TileBuilder::MakeAffineMulOp(ArrayRef<Value> args) {
-  IVLOG(5, "TileBuilder::MakeAffineMulOp>");
-  return impl->builder.create<AffineMulOp>(impl->loc, args).result();
+Value TileBuilder::MakePolyMulOp(ArrayRef<Value> args) {
+  IVLOG(5, "TileBuilder::MakePolyMulOp>");
+  return impl->builder.create<PolyMulOp>(impl->loc, args).result();
 }
 
-Value TileBuilder::MakeAffineDivOp(ArrayRef<Value> args) {
-  IVLOG(5, "TileBuilder::MakeAffineDivOp>");
-  return impl->builder.create<AffineDivOp>(impl->loc, args).result();
+Value TileBuilder::MakePolyDivOp(ArrayRef<Value> args) {
+  IVLOG(5, "TileBuilder::MakePolyDivOp>");
+  return impl->builder.create<PolyDivOp>(impl->loc, args).result();
 }
 
-Value TileBuilder::MakeAffineNegOp(ArrayRef<Value> args) {
-  IVLOG(5, "TileBuilder::MakeAffineNegOp>");
-  return impl->builder.create<AffineNegOp>(impl->loc, args).result();
+Value TileBuilder::MakePolyNegOp(ArrayRef<Value> args) {
+  IVLOG(5, "TileBuilder::MakePolyNegOp>");
+  return impl->builder.create<PolyNegOp>(impl->loc, args).result();
 }
 
-Value TileBuilder::MakeAffineMaxOp(ArrayRef<Value> args) {
-  IVLOG(5, "TileBuilder::MakeAffineMaxOp>");
-  return impl->builder.create<AffineMaxOp>(impl->loc, args).result();
+Value TileBuilder::MakePolyMaxOp(ArrayRef<Value> args) {
+  IVLOG(5, "TileBuilder::MakePolyMaxOp>");
+  return impl->builder.create<PolyMaxOp>(impl->loc, args).result();
 }
 
-Value TileBuilder::MakeAffineMinOp(ArrayRef<Value> args) {
-  IVLOG(5, "TileBuilder::MakeAffineMinOp>");
-  return impl->builder.create<AffineMinOp>(impl->loc, args).result();
+Value TileBuilder::MakePolyMinOp(ArrayRef<Value> args) {
+  IVLOG(5, "TileBuilder::MakePolyMinOp>");
+  return impl->builder.create<PolyMinOp>(impl->loc, args).result();
 }
 
 Value TileBuilder::MakeAffineTensorMapOp(Value tensor, ArrayRef<Value> idxs) {
@@ -802,7 +801,7 @@ std::vector<Value> TileBuilder::ComputeGradients(ArrayRef<Value> wrt,
   if (ndims) {
     std::vector<Value> src_idxs;
     for (size_t i = 0; i < ndims; ++i) {
-      src_idxs.emplace_back(MakeAffineIndexOp(""));
+      src_idxs.emplace_back(MakePolyIndexOp(""));
     }
     auto src = MakeAffineTensorMapOp(loss, src_idxs);
     auto sink = MakeAffineMapOp(ArrayRef<Value>{});

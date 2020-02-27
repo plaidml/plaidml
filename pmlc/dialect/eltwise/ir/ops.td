@@ -19,21 +19,11 @@ def EltwiseDialect : Dialect {
   let cppNamespace = "pmlc::dialect::eltwise";
 }
 
-class EltwiseBuilderImpl {
-  code EltwiseBuilderImpl_create = [{
-    static Operation* create(OpBuilder* builder, Location loc, ValueRange operands) {
-      OperationState state(loc, getOperationName());
-      state.addOperands(operands);
-      state.addTypes(getResultType(operands));
-      return builder->createOperation(state);
-    }
-  }];
-}
-
 class EltwiseOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
-    Op<EltwiseDialect, mnemonic, !listconcat(traits, [EltwiseOpInterface, GenericBuilderInterface])>,
-    EltwiseBuilderImpl {
-}
+    Op<EltwiseDialect, mnemonic, !listconcat(traits, [
+      EltwiseOpInterface,
+      GenericBuilderInterface
+    ])>;
 
 def ScalarConstantOp :
     Op<EltwiseDialect, "sconst", [NoSideEffect]>,
@@ -82,7 +72,7 @@ class EW_UnaryOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
     static Type getResultType(ValueRange operands) {
       return ComputeResultType(operands);
     }
-  }] # EltwiseBuilderImpl_create;
+  }];
 }
 
 class EW_BinaryOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
@@ -102,7 +92,7 @@ class EW_BinaryOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
     static Type getResultType(ValueRange operands) {
       return ComputeResultType(operands);
     }
-  }] # EltwiseBuilderImpl_create;
+  }];
 }
 
 def EW_CastOp : Op<EltwiseDialect, "cast", [EltwiseOpInterface, NoSideEffect]>,
@@ -129,7 +119,7 @@ class EW_CompareOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
     static Type getResultType(ValueRange operands) {
       return ComputeResultType(operands, DataType::u1);
     }
-  }] # EltwiseBuilderImpl_create;
+  }];
 }
 
 class EW_UnaryIntOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
@@ -207,7 +197,7 @@ def EW_SelectOp : EltwiseOp<"select">, HasCanonicalizer {
 
   let extraClassDeclaration = [{
     static Type getResultType(ValueRange operands);
-  }] # EltwiseBuilderImpl_create;
+  }];
 }
 
 #endif // __PML_ELTWISE_OPS__
