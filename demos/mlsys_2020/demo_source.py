@@ -1,13 +1,9 @@
-# Begin with some imports
-
 import drawSvg as draw
 import ipywidgets as widgets
 import numpy as np
 import plaidml
 import plaidml.exec
 
-from drawSvg.widgets import DrawingWidget, AsyncAnimation
-from ipywidgets import Layout, Textarea, VBox
 from IPython.display import display
 from plaidml.edsl import *
 
@@ -94,11 +90,11 @@ def edsl_program(X, Y):
             text = widgets.Textarea(value=''.join(p),
                                     placeholder='Passes',
                                     disabled=False,
-                                    layout=Layout(
+                                    layout=widgets.Layout(
                                         height='100%',
                                         width='auto',
                                     ))
-            box = VBox([text], layout={'height': '350px'})
+            box = widgets.VBox([text], layout={'height': '350px'})
             display(box)
 
         # Create the binder and the executable so that the program can run.

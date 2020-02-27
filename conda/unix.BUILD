@@ -7,6 +7,11 @@ filegroup(
     srcs = ["env/bin/python"],
 )
 
+filegroup(
+    name = "voila",
+    srcs = ["env/bin/voila"],
+)
+
 cc_library(
     name = "python_headers",
     hdrs = glob(["env/include/python3.7m/**/*.h"]),
