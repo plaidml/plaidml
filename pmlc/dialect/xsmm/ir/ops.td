@@ -42,9 +42,9 @@ def XSMM_GemmOp : XSMM_Op<"gemm"> {
   }];
 
   let arguments = (ins
-    AnyMemRef:$c, AffineMapAttr:$cMap, I64Attr:$ldc,
-    AnyMemRef:$a, AffineMapAttr:$aMap, I64Attr:$lda,
-    AnyMemRef:$b, AffineMapAttr:$bMap, I64Attr:$ldb,
+    AnyMemRef:$c, AffineMapAttr:$cAccessMap, AffineMapAttr:$cTileMap,
+    AnyMemRef:$a, AffineMapAttr:$aAccessMap, AffineMapAttr:$aTileMap,
+    AnyMemRef:$b, AffineMapAttr:$bAccessMap, AffineMapAttr:$bTileMap,
     I64ArrayAttr:$tile,
     Variadic<Index>:$mapOperands);
 

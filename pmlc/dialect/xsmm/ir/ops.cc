@@ -15,28 +15,36 @@ using mlir::success;
 //
 
 GemmOp::operand_range GemmOp::getOperandsForA() {
-  return getOperands().slice(3 + cMap().getNumInputs(), aMap().getNumInputs());
+  return getOperands().slice(3 + cAccessMap().getNumInputs(),
+                             aAccessMap().getNumInputs());
 }
 
 GemmOp::operand_range GemmOp::getOperandsForB() {
-  return getOperands().slice(3 + cMap().getNumInputs() + aMap().getNumInputs(),
-                             bMap().getNumInputs());
+  return getOperands().slice(3 + cAccessMap().getNumInputs() +
+                                 aAccessMap().getNumInputs(),
+                             bAccessMap().getNumInputs());
 }
 
 GemmOp::operand_range GemmOp::getOperandsForC() {
-  return getOperands().slice(3, cMap().getNumInputs());
+  return getOperands().slice(3, cAccessMap().getNumInputs());
 }
 
 void printGemmOp(OpAsmPrinter &p, GemmOp op) {
   p << op.getOperation()->getName() << ' ';
   p << op.c() << '[';
-  p.printAffineMapOfSSAIds(op.cMapAttr(), op.getOperandsForC());
-  p << "]:" << op.ldc() << " = " << op.a() << '[';
-  p.printAffineMapOfSSAIds(op.aMapAttr(), op.getOperandsForA());
-  p << "]:" << op.lda() << ", " << op.b() << '[';
-  p.printAffineMapOfSSAIds(op.bMapAttr(), op.getOperandsForB());
-  p << "]:" << op.ldb() << ", " << op.tile() << " : " << op.c().getType()
-    << ", " << op.a().getType() << ", " << op.b().getType();
+  p.printAffineMapOfSSAIds(op.cAccessMapAttr(), op.getOperandsForC());
+  p << "]:";
+  p.printAttribute(op.cTileMapAttr());
+  p << " = " << op.a() << '[';
+  p.printAffineMapOfSSAIds(op.aAccessMapAttr(), op.getOperandsForA());
+  p << "]:";
+  p.printAttribute(op.aTileMapAttr());
+  p << ", " << op.b() << '[';
+  p.printAffineMapOfSSAIds(op.bAccessMapAttr(), op.getOperandsForB());
+  p << "]:";
+  p.printAttribute(op.bTileMapAttr());
+  p << ", " << op.tile() << " : " << op.c().getType() << ", "
+    << op.a().getType() << ", " << op.b().getType();
 }
 
 ParseResult parseGemmOp(OpAsmParser &parser, OperationState &result) {
@@ -45,26 +53,30 @@ ParseResult parseGemmOp(OpAsmParser &parser, OperationState &result) {
   auto i64Type = builder.getIntegerType(64);
   SmallVector<Type, 3> operandTypes;
   OpAsmParser::OperandType a, b, c;
-  AffineMapAttr aMapAttr, bMapAttr, cMapAttr;
+  AffineMapAttr aAccessMapAttr, bAccessMapAttr, cAccessMapAttr;
+  AffineMapAttr aTileMapAttr, bTileMapAttr, cTileMapAttr;
   SmallVector<OpAsmParser::OperandType, 4> aOperands, bOperands, cOperands;
-  IntegerAttr ldaAttr, ldbAttr, ldcAttr;
+  // IntegerAttr ldaAttr, ldbAttr, ldcAttr;
   ArrayAttr tileAttr;
   return failure(
       parser.parseOperand(c) ||
-      parser.parseAffineMapOfSSAIds(cOperands, cMapAttr, "cMap",
+      parser.parseAffineMapOfSSAIds(cOperands, cAccessMapAttr, "cAccessMap",
                                     result.attributes) ||
       parser.parseColon() ||
-      parser.parseAttribute(ldcAttr, i64Type, "ldc", result.attributes) ||
+      parser.parseAttribute(cTileMapAttr, "cTileMap", result.attributes) ||
+      // parser.parseAttribute(ldcAttr, i64Type, "ldc", result.attributes) ||
       parser.parseEqual() || parser.parseOperand(a) ||
-      parser.parseAffineMapOfSSAIds(aOperands, aMapAttr, "aMap",
+      parser.parseAffineMapOfSSAIds(aOperands, aAccessMapAttr, "aAccessMap",
                                     result.attributes) ||
       parser.parseColon() ||
-      parser.parseAttribute(ldaAttr, i64Type, "lda", result.attributes) ||
+      parser.parseAttribute(aTileMapAttr, "aTileMap", result.attributes) ||
+      // parser.parseAttribute(ldaAttr, i64Type, "lda", result.attributes) ||
       parser.parseComma() || parser.parseOperand(b) ||
-      parser.parseAffineMapOfSSAIds(bOperands, bMapAttr, "bMap",
+      parser.parseAffineMapOfSSAIds(bOperands, bAccessMapAttr, "bAccessMap",
                                     result.attributes) ||
       parser.parseColon() ||
-      parser.parseAttribute(ldbAttr, i64Type, "ldb", result.attributes) ||
+      parser.parseAttribute(bTileMapAttr, "bTileMap", result.attributes) ||
+      // parser.parseAttribute(ldbAttr, i64Type, "ldb", result.attributes) ||
       parser.parseComma() ||
       parser.parseAttribute(tileAttr, i64Type, "tile", result.attributes) ||
       parser.parseColonTypeList(operandTypes) ||

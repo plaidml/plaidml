@@ -209,7 +209,7 @@ Value expandAffineExpr(OpBuilder &builder, Location loc, AffineExpr expr,
 
 /// Create a sequence of operations that implement the `affineMap` applied to
 /// the given `operands` (as it it were an AffineApplyOp).
-Optional<SmallVector<Value, 8>> static expandAffineMap(OpBuilder &builder,
+static Optional<SmallVector<Value, 8>> expandAffineMap(OpBuilder &builder,
                                                        Location loc,
                                                        AffineMap affineMap,
                                                        ValueRange operands) {
@@ -226,6 +226,20 @@ Optional<SmallVector<Value, 8>> static expandAffineMap(OpBuilder &builder,
   return None;
 }
 
+static constexpr int64_t kUnusedDimension = -1;
+
+static SmallVector<int64_t, 8> getFlattenedTileDimMapping(AffineMap map) {
+  SmallVector<int64_t, 8> ret;
+  for (const auto &expr : map.getResults()) {
+    if (auto dimExpr = expr.dyn_cast<AffineDimExpr>()) {
+      ret.push_back(dimExpr.getPosition());
+    } else {
+      ret.push_back(kUnusedDimension);
+    }
+  }
+  return ret;
+}
+
 class XSMMGemmLowering : public OpRewritePattern<xsmm::GemmOp> {
 public:
   using OpRewritePattern<xsmm::GemmOp>::OpRewritePattern;
@@ -234,17 +248,17 @@ public:
                                      PatternRewriter &rewriter) const override {
     Impl impl(op, rewriter);
     auto symbol = impl.getOrInsertFunc();
-    auto a = impl.prepareOperand(op.a(), op.aMap(), op.getOperandsForA());
-    auto b = impl.prepareOperand(op.b(), op.bMap(), op.getOperandsForB());
-    auto c = impl.prepareOperand(op.c(), op.cMap(), op.getOperandsForC());
-    auto lda = impl.createConstantIntOp(op.lda().getSExtValue());
-    auto ldb = impl.createConstantIntOp(op.ldb().getSExtValue());
-    auto ldc = impl.createConstantIntOp(op.ldc().getSExtValue());
-    SmallVector<Value, 9> args{a, b, c, lda, ldb, ldc};
-    for (auto attr : op.tile().getValue()) {
-      auto intValue = attr.cast<IntegerAttr>().getInt();
-      auto value = impl.createConstantIntOp(intValue);
-      args.push_back(value);
+    auto a = impl.prepareOperand(op.a(), op.aAccessMap(), op.getOperandsForA(),
+                                 op.aTileMap());
+    auto b = impl.prepareOperand(op.b(), op.bAccessMap(), op.getOperandsForB(),
+                                 op.bTileMap());
+    auto c = impl.prepareOperand(op.c(), op.cAccessMap(), op.getOperandsForC(),
+                                 op.cTileMap());
+    SmallVector<Value, 9> args{a.memref,           b.memref,
+                               c.memref,           a.leadingDimStride,
+                               b.leadingDimStride, c.leadingDimStride};
+    for (auto i : impl.tile) {
+      args.push_back(impl.createConstantIntOp(i));
     }
     rewriter.replaceOpWithNewOp<CallOp>(op, symbol, ArrayRef<Type>{}, args);
     return matchSuccess();
@@ -258,6 +272,12 @@ public:
     Type i32Type;
     Type elementType;
     UnrankedMemRefType unrankedType;
+    SmallVector<unsigned, 3> tile;
+
+    struct PreparedOperand {
+      Value memref;
+      Value leadingDimStride;
+    };
 
     Impl(xsmm::GemmOp op, PatternRewriter &rewriter)
         : op(op), rewriter(rewriter), loc(op.getLoc()),
@@ -265,7 +285,11 @@ public:
           i32Type(rewriter.getIntegerType(32)),
           elementType(rewriter.getF32Type()),
           unrankedType(
-              UnrankedMemRefType::get(elementType, /*memorySpace=*/0)) {}
+              UnrankedMemRefType::get(elementType, /*memorySpace=*/0)) {
+      for (auto attr : op.tile().getValue()) {
+        tile.push_back(attr.cast<IntegerAttr>().getInt());
+      }
+    }
 
     FlatSymbolRefAttr getOrInsertFunc() {
       const char *symbol = "plaidml_rt_xsmm_gemm_f32";
@@ -284,24 +308,42 @@ public:
       return SymbolRefAttr::get(symbol, context);
     }
 
-    Value prepareOperand(Value operand, AffineMap map, ValueRange mapOperands) {
-      auto offsets = expandAffineMap(rewriter, loc, map, mapOperands);
+    PreparedOperand prepareOperand(Value operand, AffineMap accessMap,
+                                   ValueRange mapOperands, AffineMap tileMap) {
       ArrayRef<Value> empty{};
+      auto offsets = expandAffineMap(rewriter, loc, accessMap, mapOperands);
       auto memRefType = operand.getType().cast<MemRefType>();
-      auto strideInfo = computeStrideInfo(memRefType, map, mapOperands);
+
+      SmallVector<int64_t, 8> shape;
+      auto flat = getFlattenedTileDimMapping(tileMap);
+      for (auto dim : flat) {
+        if (dim == kUnusedDimension) {
+          shape.push_back(1);
+        } else {
+          shape.push_back(tile[dim]);
+        }
+      }
+
+      auto strideInfo = computeStrideInfo(memRefType, accessMap, mapOperands);
       if (strideInfo) {
         IVLOG(1, "strides: " << mlir::debugString(*strideInfo));
       }
-      SmallVector<int64_t, 8> shape(memRefType.getRank(), 2);
-      SmallVector<int64_t, 8> strides(memRefType.getRank(),
-                                      MemRefType::getDynamicStrideOrOffset());
+
+      int64_t outerOffset;
+      SmallVector<int64_t, 4> outerStrides;
+      getStridesAndOffset(memRefType, outerStrides, outerOffset);
+
       auto layout = makeStridedLinearLayoutMap(
-          strides, MemRefType::getDynamicStrideOrOffset(), module.getContext());
+          outerStrides, MemRefType::getDynamicStrideOrOffset(),
+          module.getContext());
       auto resultType = MemRefType::get(shape, elementType, layout);
       IVLOG(1, "resultType: " << mlir::debugString(resultType));
-      auto subview = rewriter.create<SubViewOp>(loc, operand, *offsets, empty,
-                                                empty, resultType);
-      return rewriter.create<MemRefCastOp>(loc, subview, unrankedType);
+      auto subview =
+          rewriter.create<SubViewOp>(loc, operand, *offsets, /*sizes=*/empty,
+                                     /*strides=*/empty, resultType);
+      auto cast = rewriter.create<MemRefCastOp>(loc, subview, unrankedType);
+
+      return {cast, createConstantIntOp(1)};
     }
 
     Value createConstantIntOp(int64_t value) {
