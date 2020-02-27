@@ -6,9 +6,15 @@
 #conv1djustify = affine_map<(i, j) -> (i + j)>
 #first = affine_map<(i, j) -> (i)>
 #second = affine_map<(i, j) -> (j)>
+#conv2dinput= affine_map<(x, y, i, j) -> (x + i - 1, y + j - 1)>
+#conv2doutput = affine_map<(x, y, i, j) -> (x, y)>
+#conv2dkernel= affine_map<(x, y, i, j) -> (i, j)>
 
 #jin0to3 = affine_set<(i, j) : (j >= 0, 2 - j >= 0)>
 #jis0 = affine_set<(i, j) : (j >= 0, -j >= 0)>
+#complex = affine_set<(x, y, i, j) : (x + i - 1 >= 0, y + j - 1 >= 0, 10 - x - i >= 0, 10 - y - j >= 0, x + y -4 >= 0, 100 - x - y >= 0, x + i + y + j - 2 >= 0, 100 - x - i - y - j >= 0)>
+
+// CHECK: #[[complexOut:.*]] = affine_set<(d0, d1, d2, d3) : (d0 + d1 - 4 >= 0)>
 
 func @pad_input(%arg0: tensor<10x!f32>) -> tensor<10x!f32> {
   %c0 = "eltwise.sconst"() {value = 0.0 : f64} : () -> !f32
@@ -20,6 +26,8 @@ func @pad_input(%arg0: tensor<10x!f32>) -> tensor<10x!f32> {
   // CHECK-SAME: padLower = [1]
   // CHECK-SAME: padType = 1
   // CHECK-SAME: padUpper = [1]
+  // CHECK: tile.contract
+  // CHECK-NOT: cons=
 }
 
 func @in_place(%arg0: tensor<10x!f32>) -> tensor<10x!f32> {
@@ -33,6 +41,8 @@ func @in_place(%arg0: tensor<10x!f32>) -> tensor<10x!f32> {
   // CHECK-SAME: padLower = [1]
   // CHECK-SAME: padType = 1
   // CHECK-SAME: padUpper = [1]
+  // CHECK: tile.contract
+  // CHECK-NOT: cons=
 }
 
 func @justify(%arg0: tensor<10x!f32>) -> tensor<10x!f32> {
@@ -45,6 +55,8 @@ func @justify(%arg0: tensor<10x!f32>) -> tensor<10x!f32> {
   // CHECK: eltwise.sin
   // CHECK-SAME: padLower = [0]
   // CHECK-SAME: padUpper = [2]
+  // CHECK: tile.contract
+  // CHECK-NOT: cons=
 }
 
 func @valid_no_pad(%arg0: tensor<12x!f32>) -> tensor<10x!f32> {
@@ -66,6 +78,8 @@ func @pad_max(%arg0: tensor<10x!f32>) -> tensor<10x!f32> {
   return %0 : tensor<10x!f32>
   // CHECK-LABEL: func @pad_max
   // CHECK: padType = 2
+  // CHECK: tile.contract
+  // CHECK-NOT: cons=
 }
 
 func @pad_min(%arg0: tensor<10x!f32>) -> tensor<10x!f32> {
@@ -75,6 +89,8 @@ func @pad_min(%arg0: tensor<10x!f32>) -> tensor<10x!f32> {
   return %0 : tensor<10x!f32>
   // CHECK-LABEL: func @pad_min
   // CHECK: padType = 3
+  // CHECK: tile.contract
+  // CHECK-NOT: cons=
 }
 
 func @no_pad_assign(%arg0: tensor<10x!f32>) -> tensor<10x!f32> {
@@ -112,6 +128,8 @@ func @pad_fake_conflict(%arg0: tensor<10x!f32>) -> tensor<10x!f32> {
   return %2 : tensor<10x!f32>
   // CHECK-LABEL: func @pad_fake_conflict
   // CHECK: padType = 2
+  // CHECK: tile.contract
+  // CHECK-NOT: cons=
 }
 
 func @pad_worst_case(%arg0: tensor<10x!f32>) -> tensor<10x!f32> {
@@ -127,6 +145,8 @@ func @pad_worst_case(%arg0: tensor<10x!f32>) -> tensor<10x!f32> {
   // CHECK-SAME: padLower = [1]
   // CHECK-SAME: padType = 3
   // CHECK-SAME: padUpper = [2]
+  // CHECK: tile.contract
+  // CHECK-NOT: cons=
 }
 
 func @pad_add_mul(%arg0: tensor<10x!f32>, %arg1: tensor<3x!f32>) -> tensor<10x!f32> {
@@ -139,6 +159,8 @@ func @pad_add_mul(%arg0: tensor<10x!f32>, %arg1: tensor<3x!f32>) -> tensor<10x!f
   // CHECK-SAME: padLower = [1]
   // CHECK-SAME: padType = 1
   // CHECK-SAME: padUpper = [1]
+  // CHECK: tile.contract
+  // CHECK-NOT: cons=
 }
 
 func @no_pad_add_add(%arg0: tensor<10x!f32>, %arg1: tensor<3x!f32>) -> tensor<10x!f32> {
@@ -149,6 +171,8 @@ func @no_pad_add_add(%arg0: tensor<10x!f32>, %arg1: tensor<3x!f32>) -> tensor<10
   // CHECK-LABEL: func @no_pad_add_add
   // CHECK-NOT: ident
   // CHECK-NOT: pad
+  // CHECK: tile.contract
+  // CHECK-NOT: cons=
   // CHECK: return
 }
 
@@ -158,9 +182,25 @@ func @pad_contraction(%A: tensor<10x!f32>, %B: tensor<3x!f32>) -> tensor<10x!f32
     : !f32, tensor<10x!f32>, tensor<3x!f32> -> tensor<10x!f32>
   %1 = tile.contract add, mul, %c0, %0, %B {srcs=[#conv1dcenter, #second], sink=#first}
     : !f32, tensor<10x!f32>, tensor<3x!f32> -> tensor<10x!f32>
+  return %1 : tensor<10x!f32>
   // CHECK: tile.contract
   // CHECK-SAME: padLower = [1]
   // CHECK-SAME: padType = 1
   // CHECK-SAME: padUpper = [1]
-  return %1 : tensor<10x!f32>
+  // CHECK: tile.contract
+  // CHECK-NOT: cons=
 }
+
+func @check_cons_removal(%A: tensor<10x10x!f32>, %B: tensor<3x3x!f32>) -> tensor<10x10x!f32> {
+  %c0 = "eltwise.sconst"() {value = 0.0 : f64} : () -> !f32
+  %0 = tile.contract add, mul, %c0, %A, %B {srcs=[#conv2dinput, #conv2dkernel], sink=#conv2doutput, cons=#complex}
+    : !f32, tensor<10x10x!f32>, tensor<3x3x!f32> -> tensor<10x10x!f32>
+  return %0 : tensor<10x10x!f32>
+  // CHECK: ident 
+  // CHECK-SAME: padLower = [1, 1]
+  // CHECK-SAME: padType = 1
+  // CHECK-SAME: padUpper = [1, 1]
+  // CHECK: tile.contract
+  // CHECK: cons = #[[complexOut]]
+}
+

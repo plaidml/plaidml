@@ -247,7 +247,7 @@ void PadPass::runOnFunction() {
       // If it's not padded, forget it.
       if (!getPaddingInfo(in.getDefiningOp()))
         continue;
-      // Get the memRef and the map associted with the tensor
+      // Get the tensor and the map associated with the tensor
       auto ttype = in.getType().cast<mlir::TensorType>();
       auto map = op.getSourceMap(i);
       // The should have the same rank.
@@ -255,7 +255,7 @@ void PadPass::runOnFunction() {
       // Add all of the constraints that define the valid region of a tensor
       inputs.emplace_back();
       auto &cons = inputs.back();
-      for (size_t dim = 0; dim < ttype.getRank(); dim++) {
+      for (int64_t dim = 0; dim < ttype.getRank(); dim++) {
         // Get dimension specific expression
         auto expr = map.getResult(dim);
         // Lower bound (expr >= 0)
@@ -268,7 +268,7 @@ void PadPass::runOnFunction() {
     // If no padded inputs, early exit
     if (inputs.empty())
       return;
-    // Check each constraint by adding it's inverse to each input polyhedra.
+    // Check each constraint by adding its inverse to each input polyhedra.
     // If the resulting integer set is empty, then all of the false cases are
     // outside of the valid region (i.e. in the padded region).  Thus any loads
     // when the constraint is false will load the padding value, and thus have
@@ -297,14 +297,19 @@ void PadPass::runOnFunction() {
           keep = false;
         // Remove
         cons.pop_back();
+        // If we've decided not to keep the constraint, don't bother considering
+        // more inputs.
+        if (!keep) {
+          break;
+        }
       }
       if (keep)
         savedConstraints.push_back(expr);
     }
-    if (savedConstraints.size() > 0) {
-      op.setConstraints(makeConstraintSet(numDims, savedConstraints));
-    } else {
+    if (savedConstraints.empty()) {
       op.removeAttr(ContractionOp::getConstraintsAttrName());
+    } else {
+      op.setConstraints(makeConstraintSet(numDims, savedConstraints));
     }
   });
 }
