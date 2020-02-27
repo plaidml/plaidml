@@ -4,7 +4,9 @@ py_binary(
     name = "demo",
     srcs = [
         "demo.py",
+        "demo_handler.py",
         "demo_source.py",
+        "lowering_demo_handler.py",
     ],
     data = [
         "demo.ipynb",
