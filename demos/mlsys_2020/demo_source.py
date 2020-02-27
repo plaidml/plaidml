@@ -1,11 +1,14 @@
 # Begin with some imports
-import numpy as np
-import drawSvg as draw
-from drawSvg.widgets import DrawingWidget, AsyncAnimation
-import ipywidgets as widgets
 
+import drawSvg as draw
+import ipywidgets as widgets
+import numpy as np
 import plaidml
 import plaidml.exec
+
+from drawSvg.widgets import DrawingWidget, AsyncAnimation
+from ipywidgets import Layout, Textarea, VBox
+from IPython.display import display
 from plaidml.edsl import *
 
 
@@ -83,7 +86,20 @@ def edsl_program(X, Y):
 """.format(textbox_value), edsl_context)
         edsl_program = edsl_context['edsl_program']
         R = edsl_program(X, Y)
-        program = Program('edsl_program', [R])
+        program = Program('edsl_program', [R], debug=True)
+        for p in program.passes:
+            name = p[0]
+            print('\n')
+            print(name)
+            text = widgets.Textarea(value=''.join(p),
+                                    placeholder='Passes',
+                                    disabled=False,
+                                    layout=Layout(
+                                        height='100%',
+                                        width='auto',
+                                    ))
+            box = VBox([text], layout={'height': '350px'})
+            display(box)
 
         # Create the binder and the executable so that the program can run.
         binder = plaidml.exec.Binder(program)
