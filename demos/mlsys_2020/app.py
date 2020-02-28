@@ -121,13 +121,19 @@ def run():
         return my_demo.output_anim
 
     right = widgets.VBox([
-        widgets.HTML(value="<h2>Inputs</h2>"),
         widgets.HBox([
-            draw_widgets.DrawingWidget(my_demo.input_x_anim),
-            draw_widgets.DrawingWidget(my_demo.input_y_anim)
+            widgets.VBox([
+                widgets.HTML(value="<h2>Input Array: X</h2>"),
+                draw_widgets.DrawingWidget(my_demo.input_x_anim)
+            ]),
+            widgets.VBox([
+                widgets.HTML(value="<h2>Input Array: Y</h2>"),
+                draw_widgets.DrawingWidget(my_demo.input_y_anim)
+            ])
         ]),
-        widgets.HTML(value="<h2>Result</h2>"),
+        widgets.HTML(value="<h2>Output Array: R</h2>"),
         draw_widgets.AsyncAnimation(1, output_anim, click_pause=False),
+        widgets.Label(value="Note: all matrices are shown in row-major order")
     ])
 
     # Full-screen layout
