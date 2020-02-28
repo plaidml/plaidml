@@ -6,6 +6,7 @@ py_binary(
         "demo.py",
         "app.py",
         "core.py",
+        "style/custom_html.py"
     ],
     data = [
         "edsl_demo.ipynb",

@@ -25,7 +25,13 @@ class Demo:
                 "Square Root": "R = sqrt(X)"
             }
         }
-        self.boilerplate_inputs = {"Matrix Multiplication": ['X', 'Y'], "Sum Over Axis": ['X']}
+        self.boilerplate_inputs = {
+            "Matrix Multiplication": ['X', 'Y'],
+            "Sum Over Axis": ['X'],
+            "Sum": ['X', 'Y'],
+            "Multiply": ['X', 'Y'],
+            "Square Root": ['X']
+        }
         self.boilerplate_edsl = {
             "Matrix Multiplication":
                 """
@@ -47,8 +53,23 @@ def edsl_program(X):
         R = TensorOutput(I)
         {}
         return R
+""",
+            "Generic_Two_Input_Eltwise":
+                """
+def edsl_program(X, Y):
+        {}
+        return R
+""",
+            "Generic_One_Input_Eltwise":
+                """
+def edsl_program(X):
+        {}
+        return R
 """
         }
+        self.boilerplate_edsl["Square Root"] = self.boilerplate_edsl["Generic_One_Input_Eltwise"]
+        self.boilerplate_edsl['Sum'] = self.boilerplate_edsl["Generic_Two_Input_Eltwise"]
+        self.boilerplate_edsl['Multiply'] = self.boilerplate_edsl["Generic_Two_Input_Eltwise"]
         self.boilerplate_html = {
             "Generic_One_Input_Eltwise":
                 f"""
@@ -63,10 +84,44 @@ def edsl_program(X):
 {html.code_directive}def{html.font_close} {html.code_function_name}edsl_program{html.font_close}
 ({html.code_input_param}X{html.font_close}, {html.code_input_param}Y{html.font_close}):{html.br}
 {html.code_close}
-"""
+""",
+            "Matrix Multiplication":
+                f"""
+{html.code_open}
+{html.code_directive}def{html.font_close} {html.code_function_name}edsl_program{html.font_close}
+({html.code_input_param}X{html.font_close}, {html.code_input_param}Y{html.font_close}):{html.br}
+{html.sp}{html.code_tensor_dim}I{html.font_close}, {html.code_tensor_dim}J{html.font_close}, {html.code_tensor_dim}K{html.font_close}
+ = {html.code_directive}TensorDims{html.font_close}({html.code_numeric}3{html.font_close}){html.br}
+{html.sp}{html.code_tensor_index}i{html.font_close}, {html.code_tensor_index}j{html.font_close}, {html.code_tensor_index}k{html.font_close}
+ = {html.code_directive}TensorIndexes{html.font_close}({html.code_numeric}3{html.font_close}){html.br}
+{html.sp}{html.code_input_param}X{html.font_close}.{html.code_directive}bind_dims{html.font_close}
+({html.code_tensor_dim}I{html.font_close},{html.code_tensor_dim}K{html.font_close}){html.br}
+{html.sp}{html.code_input_param}Y{html.font_close}.{html.code_directive}bind_dims{html.font_close}
+({html.code_tensor_dim}K{html.font_close},{html.code_tensor_dim}J{html.font_close}){html.br}
+{html.sp}{html.code_output_param}R{html.font_close} = {html.code_directive}TensorOutput{html.font_close}
+({html.code_tensor_dim}I{html.font_close},{html.code_tensor_dim}J{html.font_close}){html.br}
+{html.code_close}
+""",
+            "Sum Over Axis":
+                f"""
+{html.code_open}
+{html.code_directive}def{html.font_close} {html.code_function_name}edsl_program{html.font_close}
+({html.code_input_param}X{html.font_close}):{html.br}
+{html.sp}{html.code_tensor_dim}I{html.font_close}, {html.code_tensor_dim}J{html.font_close}
+ = {html.code_directive}TensorDims{html.font_close}({html.code_numeric}2{html.font_close}){html.br}
+{html.sp}{html.code_tensor_index}i{html.font_close}, {html.code_tensor_index}j{html.font_close}
+ = {html.code_directive}TensorIndexes{html.font_close}({html.code_numeric}2{html.font_close}){html.br}
+{html.sp}{html.code_input_param}X{html.font_close}.{html.code_directive}bind_dims{html.font_close}
+({html.code_tensor_dim}I{html.font_close},{html.code_tensor_dim}J{html.font_close}){html.br}
+{html.sp}{html.code_output_param}R{html.font_close} = {html.code_directive}TensorOutput{html.font_close}
+({html.code_tensor_dim}I{html.font_close}){html.br}
+{html.code_close}
+""",
         }
         self.boilerplate_html_footer = f"""
+{html.code_open}
 {html.code_directive}return{html.font_close} {html.code_output_param}R{html.font_close}
+{html.code_close}
 """
         self.boilerplate_html["Square Root"] = self.boilerplate_html["Generic_One_Input_Eltwise"]
         self.boilerplate_html['Sum'] = self.boilerplate_html["Generic_Two_Input_Eltwise"]
@@ -144,14 +199,7 @@ def edsl_program(X):
         X = Placeholder(plaidml.DType.INT32, [3, 3])
         Y = Placeholder(plaidml.DType.INT32, [3, 3])
         edsl_context = globals()
-        if op_type == "Contraction":
-            exec(self.boilerplate_edsl[op_name].format(textbox_value), edsl_context)
-        else:
-            exec("""
-def edsl_program(X, Y):
-        {}
-        return R
-""".format(textbox_value), edsl_context)
+        exec(self.boilerplate_edsl[op_name].format(textbox_value), edsl_context)
         edsl_program = edsl_context['edsl_program']
         if len(self.boilerplate_inputs[op_name]) == 1:
             if 'X' in self.boilerplate_inputs[op_name]:
