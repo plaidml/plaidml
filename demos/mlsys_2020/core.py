@@ -209,19 +209,6 @@ def edsl_program(X):
         else:
             R = edsl_program(X, Y)
         program = Program('edsl_program', [R], debug=True)
-        for p in program.passes:
-            name = p[0]
-            print('\n')
-            print(name)
-            text = widgets.Textarea(value=''.join(p),
-                                    placeholder='Passes',
-                                    disabled=False,
-                                    layout=widgets.Layout(
-                                        height='100%',
-                                        width='auto',
-                                    ))
-            box = widgets.VBox([text], layout={'height': '350px'})
-            #display(box)
 
         # Create the binder and the executable so that the program can run.
         binder = plaidml.exec.Binder(program)
@@ -243,3 +230,4 @@ def edsl_program(X):
             self.output_anim = self.draw_grid(self.output_vals.shape,
                                               self.output_vals,
                                               color='#aaddff')
+        return program
