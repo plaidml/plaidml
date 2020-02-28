@@ -7,7 +7,7 @@ import plaidml
 import plaidml.exec
 
 
-def run():
+def run(demo_name):
 
     my_demo = demo.Demo()
 
@@ -98,15 +98,30 @@ def run():
                             tooltip='Compiles and executes your EDSL program',
                             icon='check')
 
+    mlir_out = widgets.Output()
+
     def on_run_click(cb):
         op_type = op_tab_titles[op_tabs.selected_index]
         textbox_value = textboxes[op_tabs.selected_index].value
         dropdown_value = dropdowns[op_type].value
-        my_demo.runtime_handler(op_type, dropdown_value, textbox_value)
-
         program = my_demo.runtime_handler(op_type, dropdown_value, textbox_value)
-        for p in program.passes:
-            return list(p)
+        passes = program.passes
+        tile_pass = ""
+        affine_pass = ""
+        loop_pass = ""
+        for elem in passes:
+            if elem[0] == "tile":
+                tile_pass = elem[1]
+            elif elem[0] == "convert-pxa-to-affine":
+                affine_pass = elem[1]
+            elif elem[0] == "lower-affine":
+                loop_pass = elem[1]
+        with mlir_out:
+            display(
+                widgets.Textarea(value=str(tile_pass).strip()),
+                widgets.Textarea(value=str(affine_pass).strip()),
+                widgets.Textarea(value=str(loop_pass).strip()),
+            )
 
     op_run.on_click(on_run_click)
 
@@ -124,35 +139,26 @@ def run():
     def output_anim(arg):
         return my_demo.output_anim
 
-    p = on_run_click(on_run_click)
-    text = widgets.Textarea(value=''.join(p),
-                            placeholder='Passes',
-                            disabled=False,
-                            layout=widgets.Layout(
-                                height='100%',
-                                width='auto',
-                            ))
+    if demo_name == "mlir":
+        right = widgets.VBox([widgets.HTML(value="<h2>Passes</h2>"), mlir_out])
 
-    box = widgets.VBox([text], layout={'height': '350px'})
-
-    lowering = widgets.VBox([widgets.HTML(value="<h2>Passes</h2>")]), box
-    '''
-    right = widgets.VBox([
-        widgets.HBox([
-            widgets.VBox([
-                widgets.HTML(value="<h2>Input Array: X</h2>"),
-                draw_widgets.DrawingWidget(my_demo.input_x_anim)
+    if demo_name == "edsl":
+        right = widgets.VBox([
+            widgets.HBox([
+                widgets.VBox([
+                    widgets.HTML(value="<h2>Input Array: X</h2>"),
+                    draw_widgets.DrawingWidget(my_demo.input_x_anim)
+                ]),
+                widgets.VBox([
+                    widgets.HTML(value="<h2>Input Array: Y</h2>"),
+                    draw_widgets.DrawingWidget(my_demo.input_y_anim)
+                ])
             ]),
-            widgets.VBox([
-                widgets.HTML(value="<h2>Input Array: Y</h2>"),
-                draw_widgets.DrawingWidget(my_demo.input_y_anim)
-            ])
-        ]),
-        widgets.HTML(value="<h2>Output Array: R</h2>"),
-        draw_widgets.AsyncAnimation(1, output_anim, click_pause=False),
-        widgets.Label(value="Note: all matrices are shown in row-major order")
-    ])
-    '''
+            widgets.HTML(value="<h2>Output Array: R</h2>"),
+            draw_widgets.AsyncAnimation(1, output_anim, click_pause=False),
+            widgets.Label(value="Note: all matrices are shown in row-major order")
+        ])
+
     # Full-screen layout
 
     hbox_layout = widgets.Layout()
@@ -162,7 +168,7 @@ def run():
     # do this in a flexbox-friendlier way
     edsl_title = widgets.HTML(value='<div style="text-align:center"><h1>EDSL Demo</h1></div>')
 
-    edsl_subdemo = widgets.HBox([left])
+    edsl_subdemo = widgets.HBox([left, right])
     edsl_subdemo.layout = hbox_layout
 
     edsl_demo = widgets.VBox([edsl_title, edsl_subdemo])
