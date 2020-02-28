@@ -8,6 +8,7 @@ import plaidml.exec
 
 from IPython.display import display
 from plaidml.edsl import *
+#import demos.mlsys_2020.style.custom_html as html
 
 
 class Demo:
@@ -48,7 +49,7 @@ def edsl_program(X):
         return R
 """
         }
-        self.boilerplate_html = ""
+        self.boilerplate_html = {}
         # Placeholders
         self.input_x_vals = np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9]])
         self.input_y_vals = np.array([[9, 8, 7], [6, 5, 4], [3, 2, 1]])
