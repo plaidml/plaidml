@@ -345,6 +345,42 @@ struct CmpXchgLowering : public LoadStoreOpLowering<stdx::AtomicRMWOp> {
   }
 };
 
+struct FPToSILowering : public LLVMLegalizationPattern<stdx::FPToSIOp> {
+  using LLVMLegalizationPattern<stdx::FPToSIOp>::LLVMLegalizationPattern;
+  using Base = LLVMLegalizationPattern<stdx::FPToSIOp>;
+
+  PatternMatchResult
+  matchAndRewrite(Operation *op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override {
+    if (auto fptosiOp = cast<stdx::FPToSIOp>(op)) {
+      auto value = fptosiOp.getOperand();
+      auto stdxType = fptosiOp.getOperation()->getResult(0).getType();
+      auto llvmType = typeConverter.convertType(stdxType);
+      rewriter.replaceOpWithNewOp<LLVM::FPToSIOp>(op, llvmType, value);
+      return matchSuccess();
+    }
+    return matchFailure();
+  }
+};
+
+struct FPToUILowering : public LLVMLegalizationPattern<stdx::FPToUIOp> {
+  using LLVMLegalizationPattern<stdx::FPToUIOp>::LLVMLegalizationPattern;
+  using Base = LLVMLegalizationPattern<stdx::FPToUIOp>;
+
+  PatternMatchResult
+  matchAndRewrite(Operation *op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override {
+    if (auto fptouiOp = cast<stdx::FPToUIOp>(op)) {
+      auto value = fptouiOp.getOperand();
+      auto stdxType = fptouiOp.getOperation()->getResult(0).getType();
+      auto llvmType = typeConverter.convertType(stdxType);
+      rewriter.replaceOpWithNewOp<LLVM::FPToUIOp>(op, llvmType, value);
+      return matchSuccess();
+    }
+    return matchFailure();
+  }
+};
+
 /// A pass converting MLIR operations into the LLVM IR dialect.
 struct LLVMLoweringPass : public ModulePass<LLVMLoweringPass> {
   // Run the dialect converter on the module.
@@ -375,8 +411,8 @@ static PassRegistration<LLVMLoweringPass>
 
 void populateStdXToLLVMConversionPatterns(LLVMTypeConverter &converter,
                                           OwningRewritePatternList &patterns) {
-  patterns.insert<AtomicRMWOpLowering, CmpXchgLowering>(*converter.getDialect(),
-                                                        converter);
+  patterns.insert<AtomicRMWOpLowering, CmpXchgLowering, FPToSILowering,
+                  FPToUILowering>(*converter.getDialect(), converter);
 }
 
 std::unique_ptr<mlir::Pass> createLowerToLLVMPass() {

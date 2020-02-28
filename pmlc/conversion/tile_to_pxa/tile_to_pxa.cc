@@ -16,6 +16,8 @@
 #include "pmlc/dialect/eltwise/ir/ops.h"
 #include "pmlc/dialect/pxa/ir/dialect.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
+#include "pmlc/dialect/stdx/ir/dialect.h"
+#include "pmlc/dialect/stdx/ir/ops.h"
 #include "pmlc/dialect/tile/ir/ops.h"
 #include "pmlc/dialect/tile/transforms/padding.h"
 #include "pmlc/util/logging.h"
@@ -25,6 +27,8 @@ namespace pmlc::conversion::tile_to_pxa {
 
 namespace ew = dialect::eltwise;
 namespace pxa = dialect::pxa;
+namespace stdx = dialect::stdx;
+
 using namespace mlir; // NOLINT
 
 using dialect::eltwise::ScalarType;
@@ -189,6 +193,17 @@ static Value createCastOp(ConversionPatternRewriter &rewriter, Location loc,
       // TruncateIOp: IntegerType -> narrower IntegerType
       return rewriter.create<mlir::TruncateIOp>(loc, from, intoType)
           .getResult();
+    }
+    if (auto fromFloatType = fromType.dyn_cast<FloatType>()) {
+      if (isSigned) {
+        // FPToSIOp: FloatType -> signed IntegerType
+        IVLOG(3, "rewriter.create stdx::FPToSIOp");
+        return rewriter.create<stdx::FPToSIOp>(loc, from, intoType).getResult();
+      } else {
+        // FPToUIOp: FloatType -> unsigned IntegerType
+        IVLOG(3, "rewriter.create stdx::FPToUIOp");
+        return rewriter.create<stdx::FPToUIOp>(loc, from, intoType).getResult();
+      }
     }
   }
   llvm_unreachable("Unsupported cast op");
@@ -799,6 +814,7 @@ struct CastOpConversion : public OpConversionPattern<ew::CastOp> {
     // Replace the op
     rewriter.replaceOp(op, resultMemRef);
 
+    IVLOG(2, "CastOpConversion::matchAndRewrite returns matchSuccess");
     return matchSuccess();
   }
 };
@@ -858,6 +874,7 @@ struct LoweringPass : public mlir::ModulePass<LoweringPass> {
     target.addLegalDialect<mlir::AffineOpsDialect>();
     target.addLegalDialect<mlir::StandardOpsDialect>();
     target.addLegalDialect<dialect::pxa::Dialect>();
+    target.addLegalDialect<dialect::stdx::Dialect>();
     target.addLegalOp<mlir::ModuleOp, mlir::ModuleTerminatorOp>();
     target.addDynamicallyLegalOp<FuncOp>([](FuncOp op) {
       auto funcType = op.getType();
