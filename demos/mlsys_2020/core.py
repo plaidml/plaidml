@@ -22,7 +22,7 @@ class Demo:
             "Elementwise": {
                 "Sum": "R = X + Y",
                 "Multiply": "R = X * Y",
-                "Square Root": "R = sqrt(X)"
+                "Identity": "R = ident(X)"
             }
         }
         self.boilerplate_inputs = {
@@ -30,7 +30,7 @@ class Demo:
             "Sum Over Axis": ['X'],
             "Sum": ['X', 'Y'],
             "Multiply": ['X', 'Y'],
-            "Square Root": ['X']
+            "Identity": ['X']
         }
         self.boilerplate_edsl = {
             "Matrix Multiplication":
@@ -67,7 +67,7 @@ def edsl_program(X):
         return R
 """
         }
-        self.boilerplate_edsl["Square Root"] = self.boilerplate_edsl["Generic_One_Input_Eltwise"]
+        self.boilerplate_edsl["Identity"] = self.boilerplate_edsl["Generic_One_Input_Eltwise"]
         self.boilerplate_edsl['Sum'] = self.boilerplate_edsl["Generic_Two_Input_Eltwise"]
         self.boilerplate_edsl['Multiply'] = self.boilerplate_edsl["Generic_Two_Input_Eltwise"]
         self.boilerplate_html = {
@@ -123,7 +123,7 @@ def edsl_program(X):
 {html.code_directive}return{html.font_close} {html.code_output_param}R{html.font_close}
 {html.code_close}
 """
-        self.boilerplate_html["Square Root"] = self.boilerplate_html["Generic_One_Input_Eltwise"]
+        self.boilerplate_html["Identity"] = self.boilerplate_html["Generic_One_Input_Eltwise"]
         self.boilerplate_html['Sum'] = self.boilerplate_html["Generic_Two_Input_Eltwise"]
         self.boilerplate_html['Multiply'] = self.boilerplate_html["Generic_Two_Input_Eltwise"]
         # Placeholders
