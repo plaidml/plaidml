@@ -118,6 +118,7 @@ def run(demo_name):
                     affine_pass = elem[1]
                 elif elem[0] == "lower-affine":
                     loop_pass = elem[1]
+            mlir_out.clear_output()
             with mlir_out:
                 display(
                     widgets.Textarea(value=str(tile_pass).strip()),
