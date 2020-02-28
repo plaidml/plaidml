@@ -23,6 +23,7 @@ py_binary(
     name = "voila",
     srcs = glob([
         "*.py",
+        "style/*.py"
     ]),
     args = [
         "--no-browser",

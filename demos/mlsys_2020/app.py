@@ -59,23 +59,28 @@ def run():
 
     elementwise_dropdown = op_dropdown("Elementwise")
 
+    elementwise_boilerplate = widgets.HTML(
+        value=myDemo.boilerplate_html[elementwise_dropdown.value])
+
+    elementwise_out = widgets.Output()
+    with elementwise_out:
+        display(elementwise_boilerplate)
+
     def elementwise_dropdown_handler(change):
         elementwise_textbox.value = myDemo.edsl_snippets["Elementwise"][change["new"]]
         elementwise_textbox.placeholder = elementwise_textbox.value
+        elementwise_boilerplate = widgets.HTML(value=myDemo.boilerplate_html[change["new"]])
+        elementwise_out.clear_output()
+        with elementwise_out:
+            display(elementwise_boilerplate)
 
     elementwise_dropdown.observe(elementwise_dropdown_handler, names='value')
 
     elementwise_op_widget = widgets.VBox([
         widgets.HBox([widgets.Label(value="Pick an operation:"), elementwise_dropdown]),
-        widgets.HTML(value="<code> \
-            def edsl_program(X, Y): <br>\
-            </code>"),
-        widgets.VBox([
-            elementwise_textbox,
-            widgets.HTML(value="<code> \
-                    return R <br>\
-                    </code>")
-        ],
+        elementwise_out,
+        widgets.VBox([elementwise_textbox,
+                      widgets.HTML(value=myDemo.boilerplate_html_footer)],
                      layout=widgets.Layout(margin='0 0 0 5%'))
     ])
 

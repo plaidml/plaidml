@@ -8,7 +8,7 @@ import plaidml.exec
 
 from IPython.display import display
 from plaidml.edsl import *
-#import demos.mlsys_2020.style.custom_html as html
+import demos.mlsys_2020.style.custom_html as html
 
 
 class Demo:
@@ -49,7 +49,28 @@ def edsl_program(X):
         return R
 """
         }
-        self.boilerplate_html = {}
+        self.boilerplate_html = {
+            "Generic_One_Input_Eltwise":
+                f"""
+{html.code_open}
+{html.code_directive}def{html.font_close} {html.code_function_name}edsl_program{html.font_close}
+({html.code_input_param}X{html.font_close}):{html.br}
+{html.code_close}
+""",
+            "Generic_Two_Input_Eltwise":
+                f"""
+{html.code_open}
+{html.code_directive}def{html.font_close} {html.code_function_name}edsl_program{html.font_close}
+({html.code_input_param}X{html.font_close}, {html.code_input_param}Y{html.font_close}):{html.br}
+{html.code_close}
+"""
+        }
+        self.boilerplate_html_footer = f"""
+{html.code_directive}return{html.font_close} {html.code_output_param}R{html.font_close}
+"""
+        self.boilerplate_html["Square Root"] = self.boilerplate_html["Generic_One_Input_Eltwise"]
+        self.boilerplate_html['Sum'] = self.boilerplate_html["Generic_Two_Input_Eltwise"]
+        self.boilerplate_html['Multiply'] = self.boilerplate_html["Generic_Two_Input_Eltwise"]
         # Placeholders
         self.input_x_vals = np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9]])
         self.input_y_vals = np.array([[9, 8, 7], [6, 5, 4], [3, 2, 1]])
