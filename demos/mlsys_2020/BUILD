@@ -4,14 +4,33 @@ py_binary(
     name = "demo",
     srcs = [
         "demo.py",
-        "demo_handler.py",
-        "demo_source.py",
-        "lowering_demo_handler.py",
+        "app.py",
+        "core.py",
     ],
     data = [
-        "demo.ipynb",
+        "edsl_demo.ipynb",
         "lowering_demo.ipynb",
     ],
+    deps = [
+        "//plaidml:py",
+        "//plaidml/edsl:py",
+        "//plaidml/exec:py",
+        "//plaidml/op:py",
+    ],
+)
+
+py_binary(
+    name = "voila",
+    srcs = glob([
+        "*.py",
+    ]),
+    args = [
+        "--no-browser",
+        "$(location :lowering_demo.ipynb)",
+    ],
+    data = glob([
+        "*.ipynb",
+    ]),
     deps = [
         "//plaidml:py",
         "//plaidml/edsl:py",
