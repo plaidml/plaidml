@@ -1,8 +1,8 @@
-import drawSvg.widgets as draw_widgets
 import ipywidgets as widgets
 from IPython.display import display
 
 import demos.mlsys_2020.core as demo
+import drawSvg.widgets as draw_widgets
 import plaidml
 import plaidml.exec
 
@@ -99,34 +99,41 @@ def run(demo_name):
                             icon='check')
 
     if demo_name == "mlir":
+
+        def createTextarea(text):
+            return widgets.Textarea(value=text,
+                                    layout=widgets.Layout(width='100%', height='350px'))
+
+        def on_run_click(cb):
+            try:
+                op_type = op_tab_titles[op_tabs.selected_index]
+                textbox_value = textboxes[op_tabs.selected_index].value
+                dropdown_value = dropdowns[op_type].value
+                program = my_demo.compile(dropdown_value, textbox_value)
+                mlir_out.clear_output()
+                with mlir_out:
+                    display(
+                        createTextarea(program.passes[0][1]),
+                        createTextarea(program.passes[6][1]),
+                        createTextarea(program.passes[-1][1]),
+                    )
+            except Exception as ex:
+                mlir_out.clear_output()
+                with mlir_out:
+                    display(createTextarea(str(ex)))
+
         mlir_out = widgets.Output()
+        op_run.on_click(on_run_click)
 
-    def on_run_click(cb):
-        op_type = op_tab_titles[op_tabs.selected_index]
-        textbox_value = textboxes[op_tabs.selected_index].value
-        dropdown_value = dropdowns[op_type].value
-        program = my_demo.runtime_handler(op_type, dropdown_value, textbox_value)
-        if demo_name == "mlir":
-            passes = program.passes
-            tile_pass = ""
-            affine_pass = ""
-            loop_pass = ""
-            for elem in passes:
-                if elem[0] == "tile":
-                    tile_pass = elem[1]
-                elif elem[0] == "convert-pxa-to-affine":
-                    affine_pass = elem[1]
-                elif elem[0] == "lower-affine":
-                    loop_pass = elem[1]
-            mlir_out.clear_output()
-            with mlir_out:
-                display(
-                    widgets.Textarea(value=str(tile_pass).strip()),
-                    widgets.Textarea(value=str(affine_pass).strip()),
-                    widgets.Textarea(value=str(loop_pass).strip()),
-                )
+    if demo_name == 'edsl':
 
-    op_run.on_click(on_run_click)
+        def on_run_click(cb):
+            op_type = op_tab_titles[op_tabs.selected_index]
+            textbox_value = textboxes[op_tabs.selected_index].value
+            dropdown_value = dropdowns[op_type].value
+            my_demo.runtime_handler(dropdown_value, textbox_value)
+
+        op_run.on_click(on_run_click)
 
     # Interactive user interface (visible on the left side of the display)
     left = widgets.VBox([
@@ -143,7 +150,8 @@ def run(demo_name):
         return my_demo.output_anim
 
     if demo_name == "mlir":
-        right = widgets.VBox([widgets.HTML(value="<h2>Passes</h2>"), mlir_out])
+        right = widgets.VBox([widgets.HTML(value="<h2>Passes</h2>"), mlir_out],
+                             layout=widgets.Layout(width='100%'))
         title = widgets.HTML(
             value='<div style="text-align:center"><h1>MLIR Lowering Demo</h1></div>')
 
