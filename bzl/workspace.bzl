@@ -3,6 +3,8 @@
 load("//vendor/bazel:repo.bzl", "http_archive")
 load("//vendor/conda:repo.bzl", "conda_repo")
 load("//vendor/xsmm:repo.bzl", "xsmm_repo")
+load("//vendor/bazel:repo.bzl", "http_archive")
+load("//vendor/openvino:repo.bzl", "openvino_workspace")
 
 # Sanitize a dependency so that it works correctly from code that includes it as a submodule.
 def clean_dep(dep):
@@ -56,17 +58,17 @@ def plaidml_workspace():
     )
 
     http_archive(
-        name = "jsonnet",
-        url = "https://github.com/google/jsonnet/archive/v0.13.0.zip",
-        sha256 = "e9f7095dd2a383001188aa622edaf82059732e11d74f8d0bfdfa84f2682dd547",
-        strip_prefix = "jsonnet-0.13.0",
-    )
-
-    http_archive(
         name = "io_bazel_rules_jsonnet",
         sha256 = "d05d719c4738e8aac5f13b32f745ff4832b9638ecc89ddcb6e36c379a1ada025",
         strip_prefix = "rules_jsonnet-0.1.0",
         url = "https://github.com/bazelbuild/rules_jsonnet/archive/0.1.0.zip",
+    )
+
+    http_archive(
+        name = "jsonnet",
+        url = "https://github.com/google/jsonnet/archive/v0.13.0.zip",
+        sha256 = "e9f7095dd2a383001188aa622edaf82059732e11d74f8d0bfdfa84f2682dd547",
+        strip_prefix = "jsonnet-0.13.0",
     )
 
     http_archive(
@@ -120,9 +122,9 @@ def plaidml_workspace():
 
     http_archive(
         name = "tbb",
-        url = "https://github.com/intel/tbb/archive/tbb_2019.zip",
-        sha256 = "078c969b1bbd6b2afb01f65cf9d513bb80636363b206f1e2ae221b614d7ae197",
-        strip_prefix = "tbb-tbb_2019",
+        url = "https://github.com/intel/tbb/archive/v2020.1.zip",
+        sha256 = "b81f5dcd7614b7fde305d540d598e3abede9379402615c9514daf09c484333de",
+        strip_prefix = "tbb-2020.1",
         build_file = clean_dep("//vendor/tbb:tbb.BUILD"),
     )
 
@@ -159,6 +161,8 @@ def plaidml_workspace():
         },
         override = "PLAIDML_LLVM_REPO",
     )
+
+    openvino_workspace()
 
 def configure_toolchain():
     http_archive(

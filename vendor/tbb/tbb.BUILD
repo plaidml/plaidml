@@ -35,6 +35,7 @@ cc_library(
     hdrs = glob([
         "include/serial/**",
         "include/tbb/**/**",
+        "include/tbb/*",
     ]) + [
         ":version_string",
     ],
