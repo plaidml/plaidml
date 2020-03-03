@@ -15,34 +15,17 @@ namespace pmlc::dialect::pxa {
 using namespace llvm; // NOLINT
 using namespace mlir; // NOLINT
 
-static std::string getUniqueName(Block *ref, BlockArgument arg) {
-  unsigned reverseDepth = 0;
-  while (arg.getOwner() != ref) {
-    ref = ref->getParentOp()->getBlock();
-    reverseDepth++;
-  }
-  return llvm::formatv("^bb{0}:%arg{1}", reverseDepth, arg.getArgNumber())
-      .str();
-}
-
 template <typename T>
 static void printStrideInfo(T op) {
   auto info = computeStrideInfo(op);
-  llvm::outs() << "stride begin\n";
+  llvm::outs() << "strides: ";
   if (!info) {
-    llvm::outs() << "stride none\n";
+    llvm::outs() << "none";
   } else {
-    llvm::outs() << "offset = " << info->offset << "\n";
-    std::map<std::string, unsigned> ordered;
     auto block = op.getOperation()->getBlock();
-    for (auto kvp : info->strides) {
-      ordered.emplace(getUniqueName(block, kvp.first), kvp.second);
-    }
-    for (auto kvp : ordered) {
-      llvm::outs() << kvp.first << " = " << kvp.second << "\n";
-    }
+    info->print(llvm::outs(), block);
   }
-  llvm::outs() << "stride end\n";
+  llvm::outs() << '\n';
   llvm::outs().flush();
 }
 

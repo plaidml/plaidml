@@ -1,12 +1,19 @@
 // RUN: pmlc-opt -convert-linalg-to-loops -convert-pxa-to-affine -lower-affine \
-// RUN:     -convert-loop-to-std -convert-std-to-llvm %s | \
+// RUN:     -convert-loop-to-std -xsmm -convert-std-to-llvm %s | \
 // RUN:   pmlc-jit -e baseline -entry-point-result=void | FileCheck %s
 // RUN: pmlc-opt -convert-linalg-to-loops -convert-pxa-to-affine -lower-affine \
-// RUN:     -convert-loop-to-std -convert-std-to-llvm %s | \
+// RUN:     -convert-loop-to-std -xsmm -convert-std-to-llvm %s | \
 // RUN:   pmlc-jit -e tiled -entry-point-result=void | FileCheck %s
 // RUN: pmlc-opt -convert-linalg-to-loops -convert-pxa-to-affine -lower-affine \
-// RUN:     -convert-loop-to-std -convert-std-to-llvm %s | \
-// RUN:   pmlc-jit -e xsmm -entry-point-result=void | FileCheck %s
+// RUN:     -convert-loop-to-std -xsmm -convert-std-to-llvm %s | \
+// RUN:   pmlc-jit -e xsmm_call -entry-point-result=void | FileCheck %s
+// RUN: pmlc-opt -convert-linalg-to-loops -convert-pxa-to-affine -lower-affine \
+// RUN:     -convert-loop-to-std -xsmm -convert-std-to-llvm %s | \
+// RUN:   pmlc-jit -e xsmm_op -entry-point-result=void | FileCheck %s
+
+!I_memref = type memref<1x6x5x7xf32>
+!K_memref = type memref<1x1x7x11xf32>
+!O_memref = type memref<1x6x5x11xf32>
 
 func @print_memref_f32(memref<*xf32>)
 func @plaidml_rt_xsmm_gemm_f32(memref<*xf32>, memref<*xf32>, memref<*xf32>, i32, i32, i32, i32, i32, i32)
@@ -15,8 +22,8 @@ func @baseline() {
   %dot = constant @dot : (memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>) -> ()
   call @test_dot(%dot) : ((memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>) -> ()) -> ()
 
-  %conv2 = constant @conv2 : (memref<?x?x?x?xf32>, memref<?x?x?x?xf32>, memref<?x?x?x?xf32>) -> ()
-  call @test_conv2(%conv2) : ((memref<?x?x?x?xf32>, memref<?x?x?x?xf32>, memref<?x?x?x?xf32>) -> ()) -> ()
+  %conv2 = constant @conv2 : (!I_memref, !K_memref, !O_memref) -> ()
+  call @test_conv2(%conv2) : ((!I_memref, !K_memref, !O_memref) -> ()) -> ()
 
   return
 }
@@ -25,18 +32,28 @@ func @tiled() {
   %dot = constant @dot_tiled : (memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>) -> ()
   call @test_dot(%dot) : ((memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>) -> ()) -> ()
 
-  %conv2 = constant @conv2_tiled : (memref<?x?x?x?xf32>, memref<?x?x?x?xf32>, memref<?x?x?x?xf32>) -> ()
-  call @test_conv2(%conv2) : ((memref<?x?x?x?xf32>, memref<?x?x?x?xf32>, memref<?x?x?x?xf32>) -> ()) -> ()
+  %conv2 = constant @conv2_tiled : (!I_memref, !K_memref, !O_memref) -> ()
+  call @test_conv2(%conv2) : ((!I_memref, !K_memref, !O_memref) -> ()) -> ()
 
   return
 }
 
-func @xsmm() {
-  %dot = constant @dot_xsmm : (memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>) -> ()
+func @xsmm_call() {
+  %dot = constant @dot_xsmm_call : (memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>) -> ()
   call @test_dot(%dot) : ((memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>) -> ()) -> ()
 
-  %conv2 = constant @conv2_xsmm : (memref<?x?x?x?xf32>, memref<?x?x?x?xf32>, memref<?x?x?x?xf32>) -> ()
-  call @test_conv2(%conv2) : ((memref<?x?x?x?xf32>, memref<?x?x?x?xf32>, memref<?x?x?x?xf32>) -> ()) -> ()
+  %conv2 = constant @conv2_xsmm_call : (!I_memref, !K_memref, !O_memref) -> ()
+  call @test_conv2(%conv2) : ((!I_memref, !K_memref, !O_memref) -> ()) -> ()
+
+  return
+}
+
+func @xsmm_op() {
+  %dot = constant @dot : (memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>) -> ()
+  call @test_dot(%dot) : ((memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>) -> ()) -> ()
+
+  %conv2 = constant @conv2_xsmm_op : (!I_memref, !K_memref, !O_memref) -> ()
+  call @test_conv2(%conv2) : ((!I_memref, !K_memref, !O_memref) -> ()) -> ()
 
   return
 }
@@ -149,7 +166,7 @@ func @dot_tiled(%A: memref<?x?xf32>, %B: memref<?x?xf32>, %C: memref<?x?xf32>) {
   return
 }
 
-func @dot_xsmm(%A: memref<?x?xf32>, %B: memref<?x?xf32>, %C: memref<?x?xf32>) {
+func @dot_xsmm_call(%A: memref<?x?xf32>, %B: memref<?x?xf32>, %C: memref<?x?xf32>) {
   %c0 = constant 0 : index
   %c2 = constant 2 : index
   %tile_m = constant 2 : i32
@@ -168,33 +185,33 @@ func @dot_xsmm(%A: memref<?x?xf32>, %B: memref<?x?xf32>, %C: memref<?x?xf32>) {
     %a_ref = memref_cast %a_view : memref<2x2xf32, offset: ?, strides: [?, ?]> to memref<*xf32>
     %b_ref = memref_cast %b_view : memref<2x2xf32, offset: ?, strides: [?, ?]> to memref<*xf32>
     %c_ref = memref_cast %c_view : memref<2x2xf32, offset: ?, strides: [?, ?]> to memref<*xf32>
-    // NOTE: a and b are swapped in this call to XSMM (why is this required?)
+    // NOTE: we need to swap the A, B and lda, ldb operands due to column-major vs row-major differences
     call @plaidml_rt_xsmm_gemm_f32(%b_ref, %a_ref, %c_ref, %ldb, %lda, %ldc, %tile_m, %tile_n, %tile_k)
       : (memref<*xf32>, memref<*xf32>, memref<*xf32>, i32, i32, i32, i32, i32, i32) -> ()
   }
   return
 }
 
-func @test_conv2(%impl : (memref<?x?x?x?xf32>, memref<?x?x?x?xf32>, memref<?x?x?x?xf32>) -> ()) {
+func @test_conv2(%impl : (!I_memref, !K_memref, !O_memref) -> ()) {
   %false = constant 0 : i1
   %true = constant 1 : i1
   %f0 = constant 0.0 : f32
-  %I = alloc() : memref<1x6x5x7xf32>
-  %I_2d = memref_cast %I : memref<1x6x5x7xf32> to memref<?x?x?x?xf32>
-  %I_ud = memref_cast %I : memref<1x6x5x7xf32> to memref<*xf32>
+  %I = alloc() : !I_memref
+  %I_2d = memref_cast %I : !I_memref to memref<?x?x?x?xf32>
+  %I_ud = memref_cast %I : !I_memref to memref<*xf32>
   call @fill_4d(%I_2d, %false) : (memref<?x?x?x?xf32>, i1) -> ()
   // call @print_memref_f32(%I_ud) : (memref<*xf32>) -> ()
-  %K = alloc() : memref<1x1x7x11xf32>
-  %K_2d = memref_cast %K : memref<1x1x7x11xf32> to memref<?x?x?x?xf32>
-  %K_ud = memref_cast %K : memref<1x1x7x11xf32> to memref<*xf32>
+  %K = alloc() : !K_memref
+  %K_2d = memref_cast %K : !K_memref to memref<?x?x?x?xf32>
+  %K_ud = memref_cast %K : !K_memref to memref<*xf32>
   call @fill_4d(%K_2d, %true) : (memref<?x?x?x?xf32>, i1) -> ()
   // call @print_memref_f32(%K_ud) : (memref<*xf32>) -> ()
-  %O = alloc() : memref<1x6x5x11xf32>
-  %O_2d = memref_cast %O : memref<1x6x5x11xf32> to memref<?x?x?x?xf32>
-  %O_ud = memref_cast %O : memref<1x6x5x11xf32> to memref<*xf32>
+  %O = alloc() : !O_memref
+  %O_2d = memref_cast %O : !O_memref to memref<?x?x?x?xf32>
+  %O_ud = memref_cast %O : !O_memref to memref<*xf32>
 
-  linalg.fill(%O, %f0) : memref<1x6x5x11xf32>, f32
-  call_indirect %impl(%I_2d, %K_2d, %O_2d) : (memref<?x?x?x?xf32>, memref<?x?x?x?xf32>, memref<?x?x?x?xf32>) -> ()
+  linalg.fill(%O, %f0) : !O_memref, f32
+  call_indirect %impl(%I, %K, %O) : (!I_memref, !K_memref, !O_memref) -> ()
   call @print_memref_f32(%O_ud) : (memref<*xf32>) -> ()
   // CHECK: [-98,     -126,     -154,     -182,     -210,     -238,     -266,     -294,     -322,     -350,     -378],
   // CHECK: [119,     105,     91,     77,     63,     49,     35,     21,     7,     -7,     -21],
@@ -227,46 +244,66 @@ func @test_conv2(%impl : (memref<?x?x?x?xf32>, memref<?x?x?x?xf32>, memref<?x?x?
   // CHECK: [1638,     1722,     1806,     1890,     1974,     2058,     2142,     2226,     2310,     2394,     2478],
   // CHECK: [1855,     1953,     2051,     2149,     2247,     2345,     2443,     2541,     2639,     2737,     2835]]]]
 
-  dealloc %O : memref<1x6x5x11xf32>
-  dealloc %K : memref<1x1x7x11xf32>
-  dealloc %I : memref<1x6x5x7xf32>
+  dealloc %O : !O_memref
+  dealloc %K : !K_memref
+  dealloc %I : !I_memref
   return
 }
 
-func @conv2(%I: memref<?x?x?x?xf32>, %K: memref<?x?x?x?xf32>, %O: memref<?x?x?x?xf32>) {
-  %X = dim %I, 1 : memref<?x?x?x?xf32>
-  %Y = dim %I, 2 : memref<?x?x?x?xf32>
-  %CI = dim %I, 3 : memref<?x?x?x?xf32>
-  %CO = dim %O, 3 : memref<?x?x?x?xf32>
+func @conv2(%I: !I_memref, %K: !K_memref, %O: !O_memref) {
+  %X = dim %I, 1 : !I_memref
+  %Y = dim %I, 2 : !I_memref
+  %CI = dim %I, 3 : !I_memref
+  %CO = dim %O, 3 : !O_memref
   affine.parallel (%x, %y, %ci, %co) = (0, 0, 0, 0) to (%X, %Y, %CI, %CO) {
-    %0 = affine.load %I[0, %x, %y, %ci] : memref<?x?x?x?xf32>
-    %1 = affine.load %K[0, 0, %ci, %co] : memref<?x?x?x?xf32>
+    %0 = affine.load %I[0, %x, %y, %ci] : !I_memref
+    %1 = affine.load %K[0, 0, %ci, %co] : !K_memref
     %2 = mulf %0, %1 : f32
-    pxa.reduce add %2, %O[0, %x, %y, %co] : memref<?x?x?x?xf32>
+    pxa.reduce add %2, %O[0, %x, %y, %co] : !O_memref
   }
   return
 }
 
-func @conv2_tiled(%I: memref<?x?x?x?xf32>, %K: memref<?x?x?x?xf32>, %O: memref<?x?x?x?xf32>) {
-  %X = dim %I, 1 : memref<?x?x?x?xf32>
-  %Y = dim %I, 2 : memref<?x?x?x?xf32>
-  %CI = dim %I, 3 : memref<?x?x?x?xf32>
-  %CO = dim %O, 3 : memref<?x?x?x?xf32>
+func @conv2_tiled(%I: !I_memref, %K: !K_memref, %O: !O_memref) {
+  %X = dim %I, 1 : !I_memref
+  %Y = dim %I, 2 : !I_memref
+  %CI = dim %I, 3 : !I_memref
+  %CO = dim %O, 3 : !O_memref
   affine.parallel (%x0, %y) = (0, 0) to (%X, %Y) step (2, 1) {
     affine.parallel (%x1, %ci, %co) = (%x0, 0, 0) to (%x0 + 2, %CI, %CO) {
-      %0 = affine.load %I[0, %x1, %y, %ci] : memref<?x?x?x?xf32>
-      %1 = affine.load %K[0, 0, %ci, %co] : memref<?x?x?x?xf32>
+      %0 = affine.load %I[0, %x1, %y, %ci] : !I_memref
+      %1 = affine.load %K[0, 0, %ci, %co] : !K_memref
       %2 = mulf %0, %1 : f32
-      pxa.reduce add %2, %O[0, %x1, %y, %co] : memref<?x?x?x?xf32>
+      pxa.reduce add %2, %O[0, %x1, %y, %co] : !O_memref
     }
   }
   return
 }
 
-func @conv2_xsmm(%I: memref<?x?x?x?xf32>, %K: memref<?x?x?x?xf32>, %O: memref<?x?x?x?xf32>) {
+#O_tile = affine_map<(m, n, k) -> (0, n, 0, m)>
+#K_tile = affine_map<(m, n, k) -> (0, 0, m, k)>
+#I_tile = affine_map<(m, n, k) -> (0, n, 0, k)>
+
+func @conv2_xsmm_op(%I: !I_memref, %K: !K_memref, %O: !O_memref) {
+  %X = dim %I, 1 : !I_memref
+  %Y = dim %I, 2 : !I_memref
+  %CI = dim %I, 3 : !I_memref
+  %CO = dim %O, 3 : !O_memref
   %c0 = constant 0 : index
-  %X = dim %I, 1 : memref<?x?x?x?xf32>
-  %Y = dim %I, 2 : memref<?x?x?x?xf32>
+  affine.parallel (%x, %y) = (0, 0) to (%X, %Y) step (2, 1) {
+    xsmm.gemm %O[%c0, %x, %y, %c0]:#O_tile = %K[%c0, %c0, %c0, %c0]:#K_tile, %I[%c0, %x, %y, %c0]:#I_tile, [11, 2, 7]
+      : !O_memref, !K_memref, !I_memref
+  }
+  return
+}
+
+// I: 1x6x5x7xf32
+// K: 1x1x7x11xf32
+// O: 1x6x5x11xf32
+func @conv2_xsmm_call(%I: !I_memref, %K: !K_memref, %O: !O_memref) {
+  %c0 = constant 0 : index
+  %X = dim %I, 1 : !I_memref
+  %Y = dim %I, 2 : !I_memref
   %m = constant 11 : i32
   %n = constant 2 : i32
   %k = constant 7 : i32
@@ -274,13 +311,14 @@ func @conv2_xsmm(%I: memref<?x?x?x?xf32>, %K: memref<?x?x?x?xf32>, %O: memref<?x
   %ldb = constant 11 : i32
   %ldc = constant 55 : i32
   affine.parallel (%x, %y) = (0, 0) to (%X, %Y) step (2, 1) {
-    %I_view = subview %I[%c0,  %x,  %y, %c0][][] : memref<?x?x?x?xf32> to memref<1x3x5x7xf32, offset: ?, strides: [?, ?, ?, ?]>
-    %K_view = subview %K[%c0, %c0, %c0, %c0][][] : memref<?x?x?x?xf32> to memref<1x1x7x11xf32, offset: ?, strides: [?, ?, ?, ?]>
-    %O_view = subview %O[%c0,  %x,  %y, %c0][][] : memref<?x?x?x?xf32> to memref<1x3x5x11xf32, offset: ?, strides: [?, ?, ?, ?]>
-    %I_ref = memref_cast %I_view : memref<1x3x5x7xf32, offset: ?, strides: [?, ?, ?, ?]> to memref<*xf32>
+    // xsmm.gemm %O[%c0, %x, %y, %c0] = %K[%c0, %c0, %c0, %c0], %I[%c0, %x, %y, %c0], [co:11, x:2, ci:7]
+    %I_view = subview %I[%c0,  %x,  %y, %c0][][] : !I_memref to memref<1x2x1x7xf32, offset: ?, strides: [?, ?, ?, ?]>
+    %K_view = subview %K[%c0, %c0, %c0, %c0][][] : !K_memref to memref<1x1x7x11xf32, offset: ?, strides: [?, ?, ?, ?]>
+    %O_view = subview %O[%c0,  %x,  %y, %c0][][] : !O_memref to memref<1x2x1x11xf32, offset: ?, strides: [?, ?, ?, ?]>
+    %I_ref = memref_cast %I_view : memref<1x2x1x7xf32, offset: ?, strides: [?, ?, ?, ?]> to memref<*xf32>
     %K_ref = memref_cast %K_view : memref<1x1x7x11xf32, offset: ?, strides: [?, ?, ?, ?]> to memref<*xf32>
-    %O_ref = memref_cast %O_view : memref<1x3x5x11xf32, offset: ?, strides: [?, ?, ?, ?]> to memref<*xf32>
-    // NOTE: we need to swap the A, B and lda, ldb operands for some reason....
+    %O_ref = memref_cast %O_view : memref<1x2x1x11xf32, offset: ?, strides: [?, ?, ?, ?]> to memref<*xf32>
+    // NOTE: we need to swap the A, B and lda, ldb operands due to column-major vs row-major differences
     call @plaidml_rt_xsmm_gemm_f32(%K_ref, %I_ref, %O_ref, %ldb, %lda, %ldc, %m, %n, %k)
       : (memref<*xf32>, memref<*xf32>, memref<*xf32>, i32, i32, i32, i32, i32, i32) -> ()
   }

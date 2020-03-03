@@ -15,12 +15,15 @@ namespace mlir {
 // the loop moves a pure affine expression by a fixed distance, 'strides' holds
 // that distance.  Additionally it holds a fixed offset.
 struct StrideInfo {
-  explicit StrideInfo(int64_t offset = 0) : offset(offset) {}
   int64_t offset;
   DenseMap<BlockArgument, int64_t> strides;
 
+  explicit StrideInfo(int64_t offset = 0) : offset(offset) {}
+
   StrideInfo &operator*=(int64_t factor);
   StrideInfo &operator+=(const StrideInfo &rhs);
+
+  void print(raw_ostream &os, Block *relative = nullptr);
 };
 
 // Compute stride info for a given affine value (such an an induction variable
@@ -39,5 +42,21 @@ Optional<StrideInfo> computeStrideInfo(MemRefType memRef, AffineMap map,
 Optional<StrideInfo> computeStrideInfo(AffineLoadOp op);
 Optional<StrideInfo> computeStrideInfo(AffineStoreOp op);
 Optional<StrideInfo> computeStrideInfo(pmlc::dialect::pxa::AffineReduceOp op);
+
+// A StrideArray contains a set of constant factors and a constant offset.
+struct StrideArray {
+  int64_t offset;
+  SmallVector<int64_t, 8> strides;
+
+  explicit StrideArray(unsigned numDims, int64_t offset = 0);
+  StrideArray &operator*=(int64_t factor);
+  StrideArray &operator+=(const StrideArray &rhs);
+
+  void print(raw_ostream &os);
+};
+
+// Compute the StrideArray for a given AffineMap. The map must have a single
+// AffineExpr result and this result must be purely affine.
+Optional<StrideArray> computeStrideArray(AffineMap map);
 
 } // namespace mlir
