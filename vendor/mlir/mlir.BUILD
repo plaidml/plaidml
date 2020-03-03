@@ -89,12 +89,11 @@ cc_library(
     ]),
     hdrs = glob([
         "include/mlir/Pass/*.h",
-    ]) + [
-        "include/mlir/Analysis/Verifier.h",
-    ],
+    ]),
     includes = ["include"],
     linkopts = LINKOPTS,
     deps = [
+        ":Analysis",
         ":IR",
         ":Support",
         "@llvm-project//llvm:support",
@@ -203,11 +202,28 @@ gentbl(
     ],
 )
 
+cc_library(
+    name = "LoopOpsTransforms",
+    srcs = glob(["lib/Dialect/LoopOps/Transforms/*.cpp"]),
+    hdrs = ["include/mlir/Dialect/LoopOps/Passes.h"],
+    includes = ["include"],
+    deps = [
+        ":AffineOps",
+        ":IR",
+        ":LoopOps",
+        ":Pass",
+        ":StandardOps",
+        ":Transforms",
+        "@llvm-project//llvm:support",
+    ],
+    alwayslink = 1,
+)
+
 filegroup(
     name = "StdOpsTdFiles",
     srcs = [
         "include/mlir/Analysis/CallInterfaces.td",
-        "include/mlir/Dialect/StandardOps/Ops.td",
+        "include/mlir/Dialect/StandardOps/IR/Ops.td",
         "include/mlir/IR/OpAsmInterface.td",
         ":OpBaseTdFiles",
     ],
@@ -219,23 +235,23 @@ gentbl(
     tbl_outs = [
         (
             "-gen-op-decls",
-            "include/mlir/Dialect/StandardOps/Ops.h.inc",
+            "include/mlir/Dialect/StandardOps/IR/Ops.h.inc",
         ),
         (
             "-gen-op-defs",
-            "include/mlir/Dialect/StandardOps/Ops.cpp.inc",
+            "include/mlir/Dialect/StandardOps/IR/Ops.cpp.inc",
         ),
         (
             "-gen-enum-decls",
-            "include/mlir/Dialect/StandardOps/OpsEnums.h.inc",
+            "include/mlir/Dialect/StandardOps/IR/OpsEnums.h.inc",
         ),
         (
             "-gen-enum-defs",
-            "include/mlir/Dialect/StandardOps/OpsEnums.cpp.inc",
+            "include/mlir/Dialect/StandardOps/IR/OpsEnums.cpp.inc",
         ),
     ],
     tblgen = ":mlir-tblgen",
-    td_file = "include/mlir/Dialect/StandardOps/Ops.td",
+    td_file = "include/mlir/Dialect/StandardOps/IR/Ops.td",
     td_srcs = [
         ":StdOpsTdFiles",
     ],
@@ -280,11 +296,12 @@ cc_library(
         [
             "lib/Dialect/AffineOps/*.cpp",
             "lib/Dialect/AffineOps/*.h",
-            "include/mlir/Transforms/InliningUtils.h",
-            "include/mlir/Transforms/LoopLikeInterface.h",
             "lib/Dialect/AffineOps/EDSC/*.cpp",
         ],
-    ),
+    ) + [
+        "include/mlir/Transforms/InliningUtils.h",
+        "include/mlir/Transforms/LoopLikeInterface.h",
+    ],
     hdrs = glob([
         "include/mlir/Dialect/AffineOps/*.h",
         "include/mlir/Dialect/AffineOps/EDSC/*.h",
@@ -344,11 +361,13 @@ cc_library(
 
 cc_library(
     name = "LoopOps",
-    srcs = glob([
-        "lib/Dialect/LoopOps/*.cpp",
-        "lib/Dialect/LoopOps/*.h",
-        "lib/Dialect/LoopOps/EDSC/*.cpp",
-    ]),
+    srcs = glob(
+        [
+            "lib/Dialect/LoopOps/*.cpp",
+            "lib/Dialect/LoopOps/*.h",
+            "lib/Dialect/LoopOps/EDSC/*.cpp",
+        ],
+    ),
     hdrs = glob([
         "include/mlir/Dialect/LoopOps/*.h",
         "include/mlir/Dialect/LoopOps/EDSC/*.h",
@@ -370,13 +389,15 @@ cc_library(
 
 cc_library(
     name = "StandardOps",
-    srcs = glob([
-        "lib/Dialect/StandardOps/*.cpp",
-        "lib/Dialect/StandardOps/*.h",
-        "lib/Dialect/StandardOps/EDSC/*.cpp",
-    ]),
+    srcs = glob(
+        [
+            "lib/Dialect/StandardOps/IR/*.cpp",
+            "lib/Dialect/StandardOps/IR/*.h",
+            "lib/Dialect/StandardOps/EDSC/*.cpp",
+        ],
+    ),
     hdrs = glob([
-        "include/mlir/Dialect/StandardOps/*.h",
+        "include/mlir/Dialect/StandardOps/IR/*.h",
         "include/mlir/Dialect/StandardOps/EDSC/*.h",
     ]) + [
         "include/mlir/Analysis/CallInterfaces.h",
@@ -396,12 +417,14 @@ cc_library(
 
 cc_library(
     name = "VectorOps",
-    srcs = glob([
-        "lib/Dialect/VectorOps/*.cpp",
-        "lib/Dialect/VectorOps/*.h",
-        "lib/Dialect/VectorOps/EDSC/*.cpp",
-        "lib/Dialect/VectorOps/EDSC/*.h",
-    ]),
+    srcs = glob(
+        [
+            "lib/Dialect/VectorOps/*.cpp",
+            "lib/Dialect/VectorOps/*.h",
+            "lib/Dialect/VectorOps/EDSC/*.cpp",
+            "lib/Dialect/VectorOps/EDSC/*.h",
+        ],
+    ),
     hdrs = glob([
         "include/mlir/Dialect/VectorOps/*.h",
         "include/mlir/Dialect/VectorOps/EDSC/*.h",
@@ -464,9 +487,9 @@ cc_library(
         "lib/Parser/*.cpp",
         "lib/Parser/*.h",
     ]),
-    hdrs = glob([
-        "include/mlir/*.h",
-    ]),
+    hdrs = [
+        "include/mlir/Parser.h",
+    ],
     includes = ["include"],
     deps = [
         ":Analysis",
@@ -542,10 +565,12 @@ gentbl(
 
 cc_library(
     name = "GPUDialect",
-    srcs = glob([
-        "lib/Dialect/GPU/IR/*.cpp",
-        "lib/Dialect/GPU/IR/*.h",
-    ]),
+    srcs = glob(
+        [
+            "lib/Dialect/GPU/IR/*.cpp",
+            "lib/Dialect/GPU/IR/*.h",
+        ],
+    ),
     hdrs = glob([
         "include/mlir/Dialect/GPU/*.h",
     ]),
@@ -560,10 +585,12 @@ cc_library(
 
 cc_library(
     name = "GPUTransforms",
-    srcs = glob([
-        "lib/Dialect/GPU/Transforms/*.cpp",
-        "lib/Dialect/GPU/Transforms/*.h",
-    ]),
+    srcs = glob(
+        [
+            "lib/Dialect/GPU/Transforms/*.cpp",
+            "lib/Dialect/GPU/Transforms/*.h",
+        ],
+    ),
     hdrs = ["include/mlir/Dialect/GPU/Passes.h"],
     includes = ["include"],
     deps = [
@@ -657,6 +684,26 @@ cc_library(
         ":Pass",
         ":ROCDLDialect",
         ":Transforms",
+    ],
+)
+
+cc_library(
+    name = "GPUToVulkanTransforms",
+    srcs = [
+        "lib/Conversion/GPUToVulkan/ConvertLaunchFuncToVulkanCalls.cpp",
+    ],
+    hdrs = ["include/mlir/Conversion/GPUToVulkan/ConvertGPUToVulkanPass.h"],
+    includes = ["include"],
+    deps = [
+        ":GPUDialect",
+        ":IR",
+        ":LLVMDialect",
+        ":Pass",
+        ":SPIRVDialect",
+        ":SPIRVSerialization",
+        ":StandardOps",
+        ":Support",
+        "@llvm-project//llvm:support",
     ],
 )
 
@@ -1170,9 +1217,14 @@ cc_library(
 
 cc_library(
     name = "SPIRVSerialization",
-    srcs = glob([
-        "lib/Dialect/SPIRV/Serialization/*.cpp",
-    ]),
+    srcs = glob(
+        [
+            "lib/Dialect/SPIRV/Serialization/*.cpp",
+        ],
+        exclude = [
+            "lib/Dialect/SPIRV/Serialization/TranslateRegistration.cpp",
+        ],
+    ),
     hdrs = [
         "include/mlir/Dialect/SPIRV/SPIRVBinaryUtils.h",
         "include/mlir/Dialect/SPIRV/Serialization.h",
@@ -1188,6 +1240,24 @@ cc_library(
         ":Transforms",
         "@llvm-project//llvm:support",
     ],
+)
+
+cc_library(
+    name = "SPIRVTranslateRegistration",
+    srcs = [
+        "lib/Dialect/SPIRV/Serialization/TranslateRegistration.cpp",
+    ],
+    includes = ["include"],
+    deps = [
+        ":IR",
+        ":Parser",
+        ":SPIRVDialect",
+        ":SPIRVSerialization",
+        ":Support",
+        ":Translation",
+        "@llvm-project//llvm:support",
+    ],
+    alwayslink = 1,
 )
 
 cc_library(
@@ -1287,8 +1357,8 @@ cc_library(
         ":AffineToStandardTransforms",
         ":GPUDialect",
         ":IR",
-        ":LinalgTransforms",
         ":LoopOps",
+        ":Pass",
         ":StandardOps",
         ":Support",
         ":TransformUtils",
@@ -1308,11 +1378,13 @@ cc_library(
     includes = ["include"],
     deps = [
         ":AffineOps",
+        ":GPUDialect",
         ":LoopOps",
         ":LoopsToGPU",
         ":Pass",
         ":StandardOps",
         ":Support",
+        ":Transforms",
         "@llvm-project//llvm:support",
     ],
 )
@@ -1428,7 +1500,6 @@ cc_library(
         ":IR",
         ":InferTypeOpInterfaceIncGen",
         ":LoopOps",
-        ":Pass",
         ":StandardOps",
         ":Support",
         "@llvm-project//llvm:support",
@@ -1441,9 +1512,9 @@ cc_library(
         "lib/Translation/*.cpp",
         "lib/Translation/*.h",
     ]),
-    hdrs = glob([
-        "include/mlir/*.h",
-    ]),
+    hdrs = [
+        "include/mlir/Translation.h",
+    ],
     includes = ["include"],
     deps = [
         ":IR",
@@ -1497,6 +1568,7 @@ cc_library(
         "@llvm-project//llvm:ir_reader",
         "@llvm-project//llvm:support",
     ],
+    alwayslink = 1,
 )
 
 cc_library(
@@ -1520,6 +1592,7 @@ cc_library(
         "@llvm-project//llvm:core",
         "@llvm-project//llvm:support",
     ],
+    alwayslink = 1,
 )
 
 cc_library(
@@ -1543,6 +1616,7 @@ cc_library(
         "@llvm-project//llvm:core",
         "@llvm-project//llvm:support",
     ],
+    alwayslink = 1,
 )
 
 # TODO(zinenko): Update these so that we can simplify mapping to cmake.
@@ -1614,6 +1688,7 @@ cc_library(
         ":LLVMTransforms",
         ":LinalgToLLVM",
         ":LinalgToSPIRV",
+        ":LoopOpsTransforms",
         ":NVVMDialect",
         ":Parser",
         ":Pass",
@@ -1624,6 +1699,11 @@ cc_library(
         ":VectorToLLVM",
         ":VectorToLoops",
         "@llvm-project//llvm:support",
+        "@llvm-project//mlir/test:TestDialect",
+        "@llvm-project//mlir/test:TestIR",
+        "@llvm-project//mlir/test:TestPass",
+        "@llvm-project//mlir/test:TestSPIRV",
+        "@llvm-project//mlir/test:TestTransforms",
     ],
 )
 
@@ -1660,6 +1740,7 @@ cc_binary(
     name = "mlir-translate",
     deps = [
         ":MlirTranslateMain",
+        ":SPIRVTranslateRegistration",
         ":TargetLLVMIR",
         ":TargetNVVMIR",
         ":TargetROCDLIR",
@@ -1672,6 +1753,7 @@ cc_library(
         "include/mlir/InitAllDialects.h",
         "include/mlir/InitAllPasses.h",
     ],
+    defines = ["MLIR_CUDA_CONVERSIONS_ENABLED"],
     deps = [
         ":AffineOps",
         ":Analysis",
@@ -1681,6 +1763,7 @@ cc_library(
         ":GPUToNVVMTransforms",
         ":GPUToROCDLTransforms",
         ":GPUToSPIRVTransforms",
+        ":GPUToVulkanTransforms",
         ":GPUTransforms",
         ":IR",
         ":LLVMDialect",
@@ -1689,6 +1772,7 @@ cc_library(
         ":LinalgToSPIRV",
         ":LinalgTransforms",
         ":LoopOps",
+        ":LoopOpsTransforms",
         ":LoopsToGPUPass",
         ":NVVMDialect",
         ":OpenMPDialect",
@@ -1722,6 +1806,7 @@ cc_library(
     deps = [
         ":AllPassesAndDialectsNoRegistration",
         ":Analysis",
+        ":IR",
         ":MlirOptLib",
         ":Pass",
         ":Support",
@@ -1746,8 +1831,8 @@ cc_binary(
         "@llvm-project//mlir/test:TestDialect",
         "@llvm-project//mlir/test:TestIR",
         "@llvm-project//mlir/test:TestPass",
+        "@llvm-project//mlir/test:TestSPIRV",
         "@llvm-project//mlir/test:TestTransforms",
-        # "@llvm-project//mlir/test/Dialect/SPIRV:TestPasses",
     ],
 )
 
@@ -1772,11 +1857,55 @@ cc_library(
     ],
 )
 
+cc_library(
+    name = "mlir_runner_c_utils_header",
+    hdrs = [
+        "include/mlir/ExecutionEngine/CRunnerUtils.h",
+    ],
+    includes = ["include"],
+)
+
+cc_library(
+    name = "mlir_runner_utils_header",
+    hdrs = [
+        "include/mlir/ExecutionEngine/CRunnerUtils.h",
+        "include/mlir/ExecutionEngine/RunnerUtils.h",
+    ],
+    includes = ["include"],
+)
+
+cc_library(
+    name = "mlir_c_runner_utils",
+    srcs = [
+        "lib/ExecutionEngine/CRunnerUtils.cpp",
+    ],
+    deps = [
+        ":mlir_runner_c_utils_header",
+    ],
+)
+
+cc_library(
+    name = "mlir_runner_utils",
+    srcs = [
+        "lib/ExecutionEngine/RunnerUtils.cpp",
+    ],
+    deps = [
+        ":mlir_c_runner_utils",
+        ":mlir_runner_utils_header",
+    ],
+    alwayslink = 1,
+)
+
 cc_binary(
     name = "mlir-cpu-runner",
     srcs = ["tools/mlir-cpu-runner/mlir-cpu-runner.cpp"],
     linkopts = ["-ldl"],
-    deps = [":MlirJitRunner"],
+    deps = [
+        ":AllPassesAndDialectsNoRegistration",
+        ":ExecutionEngineUtils",
+        ":MlirJitRunner",
+        "@llvm-project//llvm:support",
+    ],
 )
 
 # cc_binary(
@@ -1799,8 +1928,9 @@ cc_binary(
 #         "@llvm-project//mlir/test/mlir-cpu-runner:libmlir_runner_utils.so",
 #     ],
 #     deps = [
+#         ":AllPassesAndDialectsNoRegistration",
+#         ":ExecutionEngineUtils",
 #         ":GPUDialect",
-#         ":GPUDialectRegistration",
 #         ":GPUToNVVMTransforms",
 #         ":GPUToROCDLTransforms",
 #         ":GPUTransforms",
@@ -2039,7 +2169,6 @@ filegroup(
     srcs = [
         "include/mlir/Dialect/Linalg/IR/LinalgBase.td",
         "include/mlir/Dialect/Linalg/IR/LinalgOps.td",
-        "include/mlir/Dialect/Linalg/IR/LinalgStructuredOps.td",
         ":AffineOpsTdFiles",
         ":OpBaseTdFiles",
     ],
@@ -2068,9 +2197,10 @@ gentbl(
 filegroup(
     name = "LinalgStructuredOpsTdFiles",
     srcs = [
-        "include/mlir/Dialect/Linalg/IR/LinalgBase.td",
         "include/mlir/Dialect/Linalg/IR/LinalgStructuredOps.td",
+        "include/mlir/Dialect/Linalg/IR/LinalgStructuredOpsInterface.td",
         ":AffineOpsTdFiles",
+        ":LinalgOpsTdFiles",
         ":OpBaseTdFiles",
     ],
 )
@@ -2108,6 +2238,7 @@ filegroup(
     srcs = [
         "include/mlir/Dialect/Linalg/IR/LinalgDoc.td",
         ":LinalgOpsTdFiles",
+        ":LinalgStructuredOpsTdFiles",
     ],
 )
 
@@ -2444,7 +2575,7 @@ exports_files(
         "include/mlir/Analysis/CallInterfaces.h",
         "include/mlir/Analysis/CallInterfaces.td",
         "include/mlir/Dialect/LLVMIR/LLVMOpBase.td",
-        "include/mlir/Dialect/StandardOps/Ops.td",
+        "include/mlir/Dialect/StandardOps/IR/Ops.td",
         "include/mlir/IR/OpAsmInterface.td",
         "include/mlir/IR/OpBase.td",
         "include/mlir/Transforms/InliningUtils.h",

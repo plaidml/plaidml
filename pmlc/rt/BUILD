@@ -16,7 +16,7 @@ plaidml_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "@llvm-project//llvm:support",
-        "@llvm-project//mlir/test:mlir_runner_utils",
+        "@llvm-project//mlir:mlir_runner_utils",
     ] + select({
         "@bazel_tools//src/conditions:windows": [],
         "//conditions:default": [
