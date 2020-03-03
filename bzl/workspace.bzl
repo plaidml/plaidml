@@ -144,8 +144,8 @@ def plaidml_workspace():
         patches = [clean_dep("//vendor/vulkan_loader:vulkan_loader.patch")],
     )
 
-    LLVM_COMMIT = "9fff6e823cf79075d1f386e1e875b73405368620"
-    LLVM_SHA256 = "ff6cfa15aba95405f3ee47580daf34aafebbf07306518e6ab3dced9b18437523"
+    LLVM_COMMIT = "82f7c207f51b28c834d71bbb3b0f818f51c8b090"
+    LLVM_SHA256 = "ce4550f5c5fe92d498f7d059ee14fd1afff9b034d05d501aa57e67b02f815dee"
     LLVM_URL = "https://github.com/plaidml/llvm-project/archive/{commit}.tar.gz".format(commit = LLVM_COMMIT)
     http_archive(
         name = "llvm-project",
