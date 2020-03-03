@@ -8,17 +8,21 @@ plaidml_cc_library(
     name = "lib",
     srcs = [
         "autotile.cc",
+        "stencil.cc",
+        "test_analysis.cc",
         "tile.cc",
-	"test_analysis.cc"
     ],
     hdrs = [
         "autotile.h",
         "tile.h",
-	"test_analysis.h"
+        "passes.h",
+        "test_analysis.h",
     ],
     deps = [
-        "//pmlc/dialect/pxa/ir",
         "//pmlc/dialect/pxa/analysis",
+        "//pmlc/dialect/pxa/ir",
+        "//pmlc/dialect/tile/ir",
+        "//pmlc/dialect/eltwise/ir",
     ],
 )
 
