@@ -13,9 +13,6 @@ plaidml_cc_library(
         "vulkan_fn.h",
         "vulkan_runner.h",
     ],
-    linkopts = [
-        "-ldl",
-    ],
     tags = [
         "skip_windows",
     ],
@@ -33,9 +30,6 @@ plaidml_cc_test(
     name = "vulkan_runner_tests",
     srcs = [
         "vulkan_runner_tests.cc",
-    ],
-    linkopts = [
-        "-ldl",
     ],
     tags = [
         "manual",

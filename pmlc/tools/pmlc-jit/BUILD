@@ -7,7 +7,6 @@ load("//bzl:plaidml.bzl", "plaidml_cc_binary", "plaidml_cc_library")
 plaidml_cc_library(
     name = "lib",
     srcs = ["pmlc-jit.cc"],
-    linkopts = ["-ldl"],
     deps = [
         "//pmlc/rt:rt_shlib",
         "//pmlc/target/x86",
