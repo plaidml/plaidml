@@ -23,6 +23,14 @@ exports_files([
     "run_lit.sh",
 ])
 
+LINKOPTS = select({
+    "@bazel_tools//src/conditions:windows": [],
+    "//conditions:default": [
+        "-lm",
+        "-pthread",
+    ],
+})
+
 cc_library(
     name = "DialectSymbolRegistry",
     # strip_include_prefix does not apply to textual_hdrs.
@@ -85,10 +93,7 @@ cc_library(
         "include/mlir/Analysis/Verifier.h",
     ],
     includes = ["include"],
-    linkopts = [
-        "-lm",
-        "-lpthread",
-    ],
+    linkopts = LINKOPTS,
     deps = [
         ":IR",
         ":Support",
@@ -1847,10 +1852,7 @@ cc_binary(
         "tools/mlir-tblgen/*.h",
         "tools/mlir-tblgen/*.cpp",
     ]),
-    linkopts = [
-        "-lm",
-        "-lpthread",
-    ],
+    linkopts = LINKOPTS,
     deps = [
         ":MlirTableGenMain",
         ":Support",
