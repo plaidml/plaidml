@@ -227,6 +227,8 @@ static Optional<SmallVector<Value, 8>> expandAffineMap(OpBuilder &builder,
 }
 
 static constexpr int64_t kUnusedDimension = -1;
+static constexpr unsigned kDimensionM = 0;
+static constexpr unsigned kDimensionN = 1;
 
 static SmallVector<int64_t, 8> getFlattenedTileDimMapping(AffineMap map) {
   SmallVector<int64_t, 8> ret;
@@ -249,11 +251,11 @@ public:
     Impl impl(op, rewriter);
     auto symbol = impl.getOrInsertFunc();
     auto a = impl.prepareOperand(op.a(), op.aAccessMap(), op.getOperandsForA(),
-                                 op.aTileMap());
+                                 op.aTileMap(), kDimensionM);
     auto b = impl.prepareOperand(op.b(), op.bAccessMap(), op.getOperandsForB(),
-                                 op.bTileMap());
+                                 op.bTileMap(), kDimensionN);
     auto c = impl.prepareOperand(op.c(), op.cAccessMap(), op.getOperandsForC(),
-                                 op.cTileMap());
+                                 op.cTileMap(), kDimensionN);
     SmallVector<Value, 9> args{a.memref,           b.memref,
                                c.memref,           a.leadingDimStride,
                                b.leadingDimStride, c.leadingDimStride};
@@ -309,7 +311,8 @@ public:
     }
 
     PreparedOperand prepareOperand(Value operand, AffineMap accessMap,
-                                   ValueRange mapOperands, AffineMap tileMap) {
+                                   ValueRange mapOperands, AffineMap tileMap,
+                                   unsigned leadingDimPos) {
       ArrayRef<Value> empty{};
       auto offsets = expandAffineMap(rewriter, loc, accessMap, mapOperands);
       auto memRefType = operand.getType().cast<MemRefType>();
@@ -317,33 +320,34 @@ public:
       SmallVector<int64_t, 8> shape;
       auto flat = getFlattenedTileDimMapping(tileMap);
       for (auto dim : flat) {
-        if (dim == kUnusedDimension) {
+        if (dim == kUnusedDimension)
           shape.push_back(1);
-        } else {
+        else
           shape.push_back(tile[dim]);
-        }
-      }
-
-      auto strideInfo = computeStrideInfo(memRefType, accessMap, mapOperands);
-      if (strideInfo) {
-        IVLOG(1, "strides: " << mlir::debugString(*strideInfo));
       }
 
       int64_t outerOffset;
       SmallVector<int64_t, 4> outerStrides;
       getStridesAndOffset(memRefType, outerStrides, outerOffset);
 
-      auto layout = makeStridedLinearLayoutMap(
+      auto subviewMap = makeStridedLinearLayoutMap(
           outerStrides, MemRefType::getDynamicStrideOrOffset(),
           module.getContext());
-      auto resultType = MemRefType::get(shape, elementType, layout);
-      IVLOG(1, "resultType: " << mlir::debugString(resultType));
+
+      auto resultType = MemRefType::get(shape, elementType, subviewMap);
       auto subview =
           rewriter.create<SubViewOp>(loc, operand, *offsets, /*sizes=*/empty,
                                      /*strides=*/empty, resultType);
       auto cast = rewriter.create<MemRefCastOp>(loc, subview, unrankedType);
 
-      return {cast, createConstantIntOp(1)};
+      auto layoutMap = makeStridedLinearLayoutMap(outerStrides, outerOffset,
+                                                  module.getContext());
+      auto stridesArray = computeStrideArray(layoutMap.compose(tileMap));
+      assert(stridesArray.hasValue() && "computeStrideArray must succeed");
+
+      int64_t leadingDimStride = stridesArray->strides[leadingDimPos];
+      auto leadingDimValue = createConstantIntOp(leadingDimStride);
+      return {cast, leadingDimValue};
     }
 
     Value createConstantIntOp(int64_t value) {

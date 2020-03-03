@@ -1,12 +1,15 @@
 // RUN: pmlc-opt -convert-linalg-to-loops -convert-pxa-to-affine -lower-affine \
-// RUN:     -convert-loop-to-std -convert-std-to-llvm %s | \
+// RUN:     -convert-loop-to-std -xsmm -convert-std-to-llvm %s | \
 // RUN:   pmlc-jit -e baseline -entry-point-result=void | FileCheck %s
 // RUN: pmlc-opt -convert-linalg-to-loops -convert-pxa-to-affine -lower-affine \
-// RUN:     -convert-loop-to-std -convert-std-to-llvm %s | \
+// RUN:     -convert-loop-to-std -xsmm -convert-std-to-llvm %s | \
 // RUN:   pmlc-jit -e tiled -entry-point-result=void | FileCheck %s
 // RUN: pmlc-opt -convert-linalg-to-loops -convert-pxa-to-affine -lower-affine \
-// RUN:     -convert-loop-to-std -convert-std-to-llvm %s | \
-// RUN:   pmlc-jit -e xsmm -entry-point-result=void | FileCheck %s
+// RUN:     -convert-loop-to-std -xsmm -convert-std-to-llvm %s | \
+// RUN:   pmlc-jit -e xsmm_call -entry-point-result=void | FileCheck %s
+// RUN: pmlc-opt -convert-linalg-to-loops -convert-pxa-to-affine -lower-affine \
+// RUN:     -convert-loop-to-std -xsmm -convert-std-to-llvm %s | \
+// RUN:   pmlc-jit -e xsmm_op -entry-point-result=void | FileCheck %s
 
 !I_memref = type memref<1x6x5x7xf32>
 !K_memref = type memref<1x1x7x11xf32>
@@ -35,11 +38,21 @@ func @tiled() {
   return
 }
 
-func @xsmm() {
-  %dot = constant @dot_xsmm : (memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>) -> ()
+func @xsmm_call() {
+  %dot = constant @dot_xsmm_call : (memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>) -> ()
   call @test_dot(%dot) : ((memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>) -> ()) -> ()
 
-  %conv2 = constant @conv2_xsmm : (!I_memref, !K_memref, !O_memref) -> ()
+  %conv2 = constant @conv2_xsmm_call : (!I_memref, !K_memref, !O_memref) -> ()
+  call @test_conv2(%conv2) : ((!I_memref, !K_memref, !O_memref) -> ()) -> ()
+
+  return
+}
+
+func @xsmm_op() {
+  %dot = constant @dot : (memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>) -> ()
+  call @test_dot(%dot) : ((memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>) -> ()) -> ()
+
+  %conv2 = constant @conv2_xsmm_op : (!I_memref, !K_memref, !O_memref) -> ()
   call @test_conv2(%conv2) : ((!I_memref, !K_memref, !O_memref) -> ()) -> ()
 
   return
@@ -153,7 +166,7 @@ func @dot_tiled(%A: memref<?x?xf32>, %B: memref<?x?xf32>, %C: memref<?x?xf32>) {
   return
 }
 
-func @dot_xsmm(%A: memref<?x?xf32>, %B: memref<?x?xf32>, %C: memref<?x?xf32>) {
+func @dot_xsmm_call(%A: memref<?x?xf32>, %B: memref<?x?xf32>, %C: memref<?x?xf32>) {
   %c0 = constant 0 : index
   %c2 = constant 2 : index
   %tile_m = constant 2 : i32
@@ -267,10 +280,27 @@ func @conv2_tiled(%I: !I_memref, %K: !K_memref, %O: !O_memref) {
   return
 }
 
+#O_tile = affine_map<(m, n, k) -> (0, n, 0, m)>
+#K_tile = affine_map<(m, n, k) -> (0, 0, m, k)>
+#I_tile = affine_map<(m, n, k) -> (0, n, 0, k)>
+
+func @conv2_xsmm_op(%I: !I_memref, %K: !K_memref, %O: !O_memref) {
+  %X = dim %I, 1 : !I_memref
+  %Y = dim %I, 2 : !I_memref
+  %CI = dim %I, 3 : !I_memref
+  %CO = dim %O, 3 : !O_memref
+  %c0 = constant 0 : index
+  affine.parallel (%x, %y) = (0, 0) to (%X, %Y) step (2, 1) {
+    xsmm.gemm %O[%c0, %x, %y, %c0]:#O_tile = %K[%c0, %c0, %c0, %c0]:#K_tile, %I[%c0, %x, %y, %c0]:#I_tile, [11, 2, 7]
+      : !O_memref, !K_memref, !I_memref
+  }
+  return
+}
+
 // I: 1x6x5x7xf32
 // K: 1x1x7x11xf32
 // O: 1x6x5x11xf32
-func @conv2_xsmm(%I: !I_memref, %K: !K_memref, %O: !O_memref) {
+func @conv2_xsmm_call(%I: !I_memref, %K: !K_memref, %O: !O_memref) {
   %c0 = constant 0 : index
   %X = dim %I, 1 : !I_memref
   %Y = dim %I, 2 : !I_memref
