@@ -26,7 +26,7 @@ cc_library(
         "src/rml/**/*.h",
         "src/tbb/*.cpp",
         "src/tbb/*.h",
-    ]) + select({
+    ], exclude = ["src/tbb/tbb_bind.cpp"]) + select({
         "@bazel_tools//src/conditions:windows": [
             ":gen_cpu_ctl_env",
         ],
