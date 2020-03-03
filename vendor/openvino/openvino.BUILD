@@ -40,9 +40,7 @@ cc_library(
     name = "mkldnn_plugin",
     alwayslink = True,
     srcs = glob([
-        #"inference-engine/thirdparty/mkl-dnn/src/*pp",
         "inference-engine/thirdparty/mkl-dnn/src/**/*pp",
-        #"inference-engine/src/mkldnn_plugin/*pp",
         "inference-engine/src/mkldnn_plugin/**/*pp",
     ], exclude=[
         "inference-engine/src/mkldnn_plugin/**/win/*",
@@ -52,7 +50,6 @@ cc_library(
     hdrs = glob([
         "inference-engine/thirdparty/mkl-dnn/include/*",
         "inference-engine/thirdparty/mkl-dnn/src/common/*.hpp",
-        #"inference-engine/thirdparty/mkl-dnn/src/cpu/*.hpp",
         "inference-engine/thirdparty/mkl-dnn/src/cpu/**/*.h*",
         "inference-engine/thirdparty/mkl-dnn/src/*.hpp",
         "inference-engine/src/mkldnn_plugin/**/*h*",
@@ -83,8 +80,9 @@ cc_library(
             "inference-engine/src/inference_engine/builders/*pp",
             "inference-engine/src/inference_engine/dumper/*.cpp",
             "inference-engine/src/inference_engine/ngraph_ops/*pp",
-            "inference-engine/src/inference_engine/cpp_interfaces/*.*pp",
-            "inference-engine/src/inference_engine/shape_infer/**/*.cpp",
+            "inference-engine/src/inference_engine/cpp_interfaces/**/*pp",
+            "inference-engine/src/inference_engine/low_precision_transformations/**/*pp",
+            "inference-engine/src/inference_engine/shape_infer/**/*pp",
             "inference-engine/src/preprocessing/*.cpp",
             "inference-engine/samples/*.cpp",
             "inference-engine/samples/common/**/*.cpp",
@@ -99,6 +97,7 @@ cc_library(
             "inference-engine/samples/common/**/*.h*",
             "inference-engine/src/inference_engine/*.h",
             "inference-engine/src/inference_engine/cpp_interfaces/**/*.h*",
+            "inference-engine/src/inference_engine/low_precision_transformations/**/*.h*",
             "inference-engine/src/inference_engine/shape_infer/**/.h*",
             "inference-engine/src/preprocessing/*.h*",
         ],
