@@ -1,7 +1,7 @@
 // Copyright 2020 Intel Corporation
 
-#ifndef __PML_XSMM__OPS__
-#define __PML_XSMM__OPS__
+#ifndef __PML_XSMM_OPS__
+#define __PML_XSMM_OPS__
 
 #ifndef OP_BASE
 include "mlir/IR/OpBase.td"
@@ -30,13 +30,9 @@ def XSMM_GemmOp : XSMM_Op<"gemm"> {
 
     C_m,n = A_m,k * B_k,n
 
-    lda: Leading dimension (stride) for A
-    ldb: Leading dimension (stride) for B
-    ldc: Leading dimension (stride) for C
-
     Example:
       affine.parallel (%i, %j, %k) = (0, 0, 0) to (8, 8, 8) step (2, 2, 2) {
-        xsmm.gemm %C[%i, %j]:8 = %A[%i, %k]:8, %B[%k, %j]:8, [2, 2, 2]
+        xsmm.gemm %C[%i, %j]:#tileC = %A[%i, %k]:#tileA, %B[%k, %j]:#tileB, [2, 2, 2]
           : memref<8x8xf32>, memref<8x8xf32>, memref<8x8xf32>
       }
   }];
@@ -55,4 +51,4 @@ def XSMM_GemmOp : XSMM_Op<"gemm"> {
   }];
 }
 
-#endif // __PML_XSMM__OPS__
+#endif // __PML_XSMM_OPS__

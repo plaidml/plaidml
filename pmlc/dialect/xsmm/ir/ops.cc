@@ -56,7 +56,6 @@ ParseResult parseGemmOp(OpAsmParser &parser, OperationState &result) {
   AffineMapAttr aAccessMapAttr, bAccessMapAttr, cAccessMapAttr;
   AffineMapAttr aTileMapAttr, bTileMapAttr, cTileMapAttr;
   SmallVector<OpAsmParser::OperandType, 4> aOperands, bOperands, cOperands;
-  // IntegerAttr ldaAttr, ldbAttr, ldcAttr;
   ArrayAttr tileAttr;
   return failure(
       parser.parseOperand(c) ||
@@ -64,19 +63,16 @@ ParseResult parseGemmOp(OpAsmParser &parser, OperationState &result) {
                                     result.attributes) ||
       parser.parseColon() ||
       parser.parseAttribute(cTileMapAttr, "cTileMap", result.attributes) ||
-      // parser.parseAttribute(ldcAttr, i64Type, "ldc", result.attributes) ||
       parser.parseEqual() || parser.parseOperand(a) ||
       parser.parseAffineMapOfSSAIds(aOperands, aAccessMapAttr, "aAccessMap",
                                     result.attributes) ||
       parser.parseColon() ||
       parser.parseAttribute(aTileMapAttr, "aTileMap", result.attributes) ||
-      // parser.parseAttribute(ldaAttr, i64Type, "lda", result.attributes) ||
       parser.parseComma() || parser.parseOperand(b) ||
       parser.parseAffineMapOfSSAIds(bOperands, bAccessMapAttr, "bAccessMap",
                                     result.attributes) ||
       parser.parseColon() ||
       parser.parseAttribute(bTileMapAttr, "bTileMap", result.attributes) ||
-      // parser.parseAttribute(ldbAttr, i64Type, "ldb", result.attributes) ||
       parser.parseComma() ||
       parser.parseAttribute(tileAttr, i64Type, "tile", result.attributes) ||
       parser.parseColonTypeList(operandTypes) ||
