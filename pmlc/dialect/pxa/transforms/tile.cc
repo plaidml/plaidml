@@ -27,11 +27,7 @@ void performTiling(AffineParallelOp op, llvm::ArrayRef<int64_t> tileSizes) {
   }
   auto lbMap = AffineMap::get(dimCount, 0, lbExprs);
   auto ubMap = AffineMap::get(dimCount, 0, ubExprs);
-  // TODO: Maybe fix ValueRange?
-  llvm::SmallVector<mlir::Value, 8> outerIdxs;
-  for (size_t i = 0; i < outerBody->getNumArguments(); i++) {
-    outerIdxs.push_back(outerBody->getArgument(i));
-  }
+  auto outerIdxs = outerBody->getArguments();
   // Make the inner parallel for
   auto inner = builder.create<AffineParallelOp>(op.getLoc(), lbMap, outerIdxs,
                                                 ubMap, outerIdxs);

@@ -2,6 +2,7 @@
 
 #include "pmlc/dialect/pxa/transforms/autotile.h"
 #include "pmlc/dialect/pxa/transforms/test_analysis.h"
+#include "pmlc/dialect/pxa/transforms/passes.h"
 
 namespace pmlc::dialect::pxa {
 
@@ -29,5 +30,8 @@ static mlir::PassRegistration<Autotile10Pass>
 static mlir::PassRegistration<TestStrideInfoPass>
     regTestStrideInfo("test-stride-info",
                       "Report stride data for all loads/stores for unit tests");
+
+static mlir::PassRegistration<StencilPass>
+    stencil_pass("affine-stencil", "Stencil the inputs to create \"micro\" GEMM operations.");
 
 } // namespace pmlc::dialect::pxa

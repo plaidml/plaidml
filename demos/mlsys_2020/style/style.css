@@ -1,0 +1,61 @@
+div, button, code, input, select, .fa {
+	font-size: 20px;
+}
+
+h1 {
+	font-size: 50px;
+}
+
+h2 {
+	font-size: 32px;
+}
+
+.code-directive {
+	color: #fb660a;
+	font-weight: bold;
+}
+
+input {
+	font-family:Consolas,Monaco,Lucida Console,Liberation Mono,DejaVu Sans Mono,Bitstream Vera Sans Mono,Courier New;
+}
+
+.code-function-name {
+	color: #06287e;
+	font-weight: bold;
+}
+
+.code-input-param {
+	color: #007020;
+}
+
+.code-numeric {
+	color: #0086f7;
+}
+
+.code-output-param {
+	color: #007020;
+}
+
+.code-tensor-dim, .tensors .dims {
+	color: #AA22FF;
+}
+
+.code-tensor-index, .tensors .indexes {
+	color: #550000;
+}
+
+.widget-textarea, .widget-text {
+    width: 90%;
+}
+
+.jupyter-widgets.widget-tab > .p-TabBar .p-TabBar-tabIcon, .jupyter-widgets.widget-tab > .p-TabBar .p-TabBar-tabLabel, .jupyter-widgets.widget-tab > .p-TabBar .p-TabBar-tabCloseIcon {
+    line-height: 50px;
+}
+
+button.p-Widget.jupyter-widgets.jupyter-button.widget-button.mod-success {
+    height: 50px;
+}
+
+.jupyter-widgets.widget-tab > .widget-tab-contents {
+    height: 400px;
+}

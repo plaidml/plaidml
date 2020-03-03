@@ -10,6 +10,7 @@
 
 namespace pmlc::dialect::pxa {
 
+using llvm::SmallVectorImpl;
 using mlir::AffineExpr;
 using mlir::AffineMap;
 using mlir::AffineMapAttr;
@@ -28,6 +29,7 @@ using mlir::Location;
 using mlir::LogicalResult;
 using mlir::LoopLikeOpInterface;
 using mlir::MemRefType;
+using mlir::MLIRContext;
 using mlir::NamedAttribute;
 using mlir::Op;
 using mlir::OpAsmParser;
