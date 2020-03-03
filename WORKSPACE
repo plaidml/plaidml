@@ -39,9 +39,9 @@ latex_repositories()
 
 http_archive(
     name = "com_grail_bazel_toolchain",
-    sha256 = "7ca9ecdb45466163ffc53bf36b83ef4db6ff07be4fa4cd2ec4ab2f535365c02f",
-    strip_prefix = "bazel-toolchain-6f99e79bb4f8ad1c8c362745d648197e536826ab",
-    urls = ["https://github.com/grailbio/bazel-toolchain/archive/6f99e79bb4f8ad1c8c362745d648197e536826ab.zip"],
+    sha256 = "17e12dfba5ae4fc735dded73500e24546ca74459bac68b8d6f68c7785e3e4500",
+    strip_prefix = "bazel-toolchain-7abc442059ea5b08f9c9bc7f0c1450b914aca090",
+    urls = ["https://github.com/plaidml/bazel-toolchain/archive/7abc442059ea5b08f9c9bc7f0c1450b914aca090.zip"],
 )
 
 load("@com_grail_bazel_toolchain//toolchain:deps.bzl", "bazel_toolchain_dependencies")
