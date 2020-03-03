@@ -26,6 +26,7 @@ static void printStrideInfo(T op) {
     info->print(llvm::outs(), block);
   }
   llvm::outs() << '\n';
+  llvm::outs().flush();
 }
 
 void TestStrideInfoPass::runOnOperation() {
