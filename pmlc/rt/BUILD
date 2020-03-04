@@ -34,7 +34,7 @@ plaidml_cc_shlib(
 )
 
 plaidml_cc_library(
-    name = "rt_shlib",
+    name = "link",
     srcs = select({
         "@bazel_tools//src/conditions:darwin_x86_64": [],
         "//conditions:default": [":shlib"],
