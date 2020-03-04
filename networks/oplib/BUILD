@@ -21,7 +21,7 @@ plaidml_cc_binary(
     deps = [
         ":oplib",
         "//plaidml/exec",
-        "//pmlc/rt:rt_shlib",
+        "//pmlc/rt:link",
         "//pmlc/util",
         "@com_github_google_benchmark//:benchmark",
     ],
@@ -33,7 +33,7 @@ plaidml_cc_binary(
     deps = [
         ":oplib",
         "//plaidml/exec",
-        "//pmlc/rt:rt_shlib",
+        "//pmlc/rt:link",
         "//pmlc/util",
     ],
 )

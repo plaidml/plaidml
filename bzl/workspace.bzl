@@ -142,39 +142,47 @@ def plaidml_workspace():
         build_file = clean_dep("//vendor/vulkan_headers:vulkan_headers.BUILD"),
     )
 
-    http_archive(
-        name = "vulkan_loader",
-        url = "https://github.com/KhronosGroup/Vulkan-Loader/archive/v1.2.132.zip",
-        sha256 = "f42c10bdfaf2ec29d1e4276bf115387852a1dc6aee940f25aff804cc0138d10a",
-        strip_prefix = "Vulkan-Loader-1.2.132",
-        build_file = clean_dep("//vendor/vulkan_loader:overlay.BUILD"),
-        link_files = {
-            clean_dep("//vendor/vulkan_loader:loader_cmake_config.h"): "loader/loader_cmake_config.h",
-        },
-    )
+    # http_archive(
+    #     name = "vulkan_loader",
+    #     url = "https://github.com/KhronosGroup/Vulkan-Loader/archive/v1.2.132.zip",
+    #     sha256 = "f42c10bdfaf2ec29d1e4276bf115387852a1dc6aee940f25aff804cc0138d10a",
+    #     strip_prefix = "Vulkan-Loader-1.2.132",
+    #     build_file = clean_dep("//vendor/vulkan_loader:overlay.BUILD"),
+    #     link_files = {
+    #         clean_dep("//vendor/vulkan_loader:loader_cmake_config.h"): "loader/loader_cmake_config.h",
+    #     },
+    # )
+
+    # http_archive(
+    #     name = "vulkan_sdk_linux",
+    #     url = "https://sdk.lunarg.com/sdk/download/1.2.131.2/linux/vulkansdk-linux-x86_64-1.2.131.2.tar.gz",
+    #     sha256 = "8ac309392785b798e5d526795f9258e2c1e2858ee40e866bcb292a54c891f082",
+    #     strip_prefix = "1.2.131.2",
+    #     build_file = clean_dep("//vendor/vulkan_sdk:linux.BUILD"),
+    # )
+
+    # http_archive(
+    #     name = "vulkan_sdk_macos",
+    #     url = "https://sdk.lunarg.com/sdk/download/1.2.131.2/mac/vulkansdk-macos-1.2.131.2.tar.gz",
+    #     sha256 = "e28363ae0bdb3d881ebf93cdd7a721d052f6a2e5686d0fb3447e6edd585bb53f",
+    #     strip_prefix = "vulkansdk-macos-1.2.131.2",
+    #     build_file = clean_dep("//vendor/vulkan_sdk:macos.BUILD"),
+    # )
+
+    # http_archive(
+    #     name = "vulkan_sdk_windows",
+    #     url = "https://sdk.lunarg.com/sdk/download/1.2.131.2/windows/vulkan-runtime-components.zip",
+    #     sha256 = "c1f8ba4dba50c1e9ba46d561eb711d33882f42d07377cd9d063ff77775096f33",
+    #     strip_prefix = "VulkanRT-1.2.131.2-Components",
+    #     build_file = clean_dep("//vendor/vulkan_sdk:windows.BUILD"),
+    # )
 
     http_archive(
-        name = "vulkan_sdk_linux",
-        url = "https://sdk.lunarg.com/sdk/download/1.2.131.2/linux/vulkansdk-linux-x86_64-1.2.131.2.tar.gz",
-        sha256 = "8ac309392785b798e5d526795f9258e2c1e2858ee40e866bcb292a54c891f082",
-        strip_prefix = "1.2.131.2",
-        build_file = clean_dep("//vendor/vulkan_sdk:linux.BUILD"),
-    )
-
-    http_archive(
-        name = "vulkan_sdk_macos",
-        url = "https://sdk.lunarg.com/sdk/download/1.2.131.2/mac/vulkansdk-macos-1.2.131.2.tar.gz",
-        sha256 = "e28363ae0bdb3d881ebf93cdd7a721d052f6a2e5686d0fb3447e6edd585bb53f",
-        strip_prefix = "vulkansdk-macos-1.2.131.2",
-        build_file = clean_dep("//vendor/vulkan_sdk:macos.BUILD"),
-    )
-
-    http_archive(
-        name = "vulkan_sdk_windows",
-        url = "https://sdk.lunarg.com/sdk/download/1.2.131.2/windows/vulkan-runtime-components.zip",
-        sha256 = "c1f8ba4dba50c1e9ba46d561eb711d33882f42d07377cd9d063ff77775096f33",
-        strip_prefix = "VulkanRT-1.2.131.2-Components",
-        build_file = clean_dep("//vendor/vulkan_sdk:windows.BUILD"),
+        name = "volk",
+        url = "https://github.com/zeux/volk/archive/2638ad1b2b40f1ad402a0a6ac55b60bc51a23058.zip",
+        sha256 = "4a5fb828e05d8c86f696f8754e90302d6446b950236256bcb4857408357d2b60",
+        strip_prefix = "volk-2638ad1b2b40f1ad402a0a6ac55b60bc51a23058",
+        build_file = clean_dep("//vendor/volk:overlay.BUILD"),
     )
 
     LLVM_COMMIT = "216ef5b9abb85a8116366dfa1bd712c988e08cb0"
