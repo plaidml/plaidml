@@ -198,11 +198,9 @@ static Value createCastOp(ConversionPatternRewriter &rewriter, Location loc,
     if (auto fromFloatType = fromType.dyn_cast<FloatType>()) {
       if (intoSigned) {
         // FPToSIOp: FloatType -> signed IntegerType
-        IVLOG(3, "rewriter.create stdx::FPToSIOp");
         return rewriter.create<stdx::FPToSIOp>(loc, from, intoType).getResult();
       } else {
         // FPToUIOp: FloatType -> unsigned IntegerType
-        IVLOG(3, "rewriter.create stdx::FPToUIOp");
         return rewriter.create<stdx::FPToUIOp>(loc, from, intoType).getResult();
       }
     }
