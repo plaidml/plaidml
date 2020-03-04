@@ -1,43 +1,46 @@
-# Copyright 2019 Intel Corporation.
+# Copyright 2020 Intel Corporation
 
 package(default_visibility = ["//visibility:public"])
 
-load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_test")
-
-plaidml_cc_library(
-    name = "vulkan_runner",
-    srcs = [
-        "vulkan_runner.cc",
-    ],
-    hdrs = [
-        "vulkan_fn.h",
-        "vulkan_runner.h",
-    ],
-    tags = [
-        "skip_windows",
-    ],
-    deps = [
-        "@llvm-project//mlir:SPIRVDialect",
-        "@llvm-project//mlir:SPIRVSerialization",
-        "@llvm-project//mlir:Support",
-        "@vulkan_headers//:inc",
-        "@vulkan_loader",
-    ],
-    alwayslink = 1,
+load(
+    "//bzl:plaidml.bzl",
+    "plaidml_cc_binary",
+    "plaidml_cc_library",
+    "plaidml_cc_shlib",
 )
 
-plaidml_cc_test(
-    name = "vulkan_runner_tests",
+plaidml_cc_binary(
+    name = "pmlc-vulkan-runner",
     srcs = [
-        "vulkan_runner_tests.cc",
+        "pmlc-vulkan-runner.cc",
     ],
-    tags = [
-        "manual",
-        "skip_windows",
+    data = [
+        "addf.mlir",
     ],
     deps = [
-        ":vulkan_runner",
-        "//plaidml:testenv",
-        "@gmock//:gtest",
+        ":vulkan_shlib",
+        "@llvm-project//mlir:MlirJitRunner",
+    ] + select({
+        "@bazel_tools//src/conditions:darwin_x86_64": ["@vulkan_sdk_macos//:sdk"],
+        "@bazel_tools//src/conditions:windows": ["@vulkan_sdk_windows//:sdk"],
+        "//conditions:default": ["@vulkan_sdk_linux//:sdk"],
+    }),
+)
+
+plaidml_cc_shlib(
+    name = "shlib",
+    shlib_name = "vulkan_rt",
+    deps = [
+        "//pmlc/rt",
+        "@llvm-project//mlir/tools/mlir-vulkan-runner:VulkanRuntime",
     ],
+)
+
+plaidml_cc_library(
+    name = "vulkan_shlib",
+    srcs = select({
+        "@bazel_tools//src/conditions:darwin_x86_64": [],
+        "//conditions:default": [":shlib"],
+    }),
+    linkstatic = 1,
 )

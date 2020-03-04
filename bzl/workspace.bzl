@@ -131,16 +131,31 @@ def plaidml_workspace():
         url = "https://github.com/KhronosGroup/Vulkan-Headers/archive/v1.2.132.zip",
         sha256 = "e6b5418e3d696ffc7c97991094ece7cafc4c279c8a88029cc60e587bc0c26068",
         strip_prefix = "Vulkan-Headers-1.2.132",
-        build_file = clean_dep("//bzl:vulkan_headers.BUILD"),
+        build_file = clean_dep("//vendor/vulkan_headers:vulkan_headers.BUILD"),
     )
 
     http_archive(
-        name = "vulkan_loader",
-        url = "https://github.com/KhronosGroup/Vulkan-Loader/archive/v1.2.132.zip",
-        sha256 = "f42c10bdfaf2ec29d1e4276bf115387852a1dc6aee940f25aff804cc0138d10a",
-        strip_prefix = "Vulkan-Loader-1.2.132",
-        build_file = clean_dep("//vendor/vulkan_loader:vulkan_loader.BUILD"),
-        patches = [clean_dep("//vendor/vulkan_loader:vulkan_loader.patch")],
+        name = "vulkan_sdk_linux",
+        url = "https://sdk.lunarg.com/sdk/download/1.2.131.2/linux/vulkansdk-linux-x86_64-1.2.131.2.tar.gz",
+        sha256 = "8ac309392785b798e5d526795f9258e2c1e2858ee40e866bcb292a54c891f082",
+        strip_prefix = "1.2.131.2",
+        build_file = clean_dep("//vendor/vulkan_sdk:linux.BUILD"),
+    )
+
+    http_archive(
+        name = "vulkan_sdk_macos",
+        url = "https://sdk.lunarg.com/sdk/download/1.2.131.2/macos/vulkansdk-macos-1.2.131.2.tar.gz",
+        sha256 = "e28363ae0bdb3d881ebf93cdd7a721d052f6a2e5686d0fb3447e6edd585bb53f",
+        strip_prefix = "vulkansdk-macos-1.2.131.2",
+        build_file = clean_dep("//vendor/vulkan_sdk:macos.BUILD"),
+    )
+
+    http_archive(
+        name = "vulkan_sdk_windows",
+        url = "https://sdk.lunarg.com/sdk/download/1.2.131.2/windows/vulkan-runtime-components.zip",
+        sha256 = "c1f8ba4dba50c1e9ba46d561eb711d33882f42d07377cd9d063ff77775096f33",
+        strip_prefix = "VulkanRT-1.2.131.2-Components",
+        build_file = clean_dep("//vendor/vulkan_sdk:windows.BUILD"),
     )
 
     LLVM_COMMIT = "216ef5b9abb85a8116366dfa1bd712c988e08cb0"
@@ -153,9 +168,9 @@ def plaidml_workspace():
         strip_prefix = "llvm-project-" + LLVM_COMMIT,
         link_files = {
             clean_dep("//vendor/llvm:llvm.BUILD"): "llvm/BUILD.bazel",
-            clean_dep("//vendor/mlir:mlir.BUILD"): "mlir/BUILD.bazel",
-            clean_dep("//vendor/mlir:test.BUILD"): "mlir/test/BUILD.bazel",
-            clean_dep("//vendor/mlir:vulkan.BUILD"): "mlir/tools/mlir-vulkan-runner/BUILD.bazel",
+            clean_dep("//vendor/mlir:overlay.BUILD"): "mlir/BUILD.bazel",
+            clean_dep("//vendor/mlir:test/overlay.BUILD"): "mlir/test/BUILD.bazel",
+            clean_dep("//vendor/mlir:tools/mlir-vulkan-runner/overlay.BUILD"): "mlir/tools/mlir-vulkan-runner/BUILD.bazel",
         },
         override = "PLAIDML_LLVM_REPO",
     )

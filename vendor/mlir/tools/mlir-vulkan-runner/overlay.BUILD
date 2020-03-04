@@ -9,4 +9,10 @@ cc_library(
     hdrs = [
         "VulkanRuntime.h",
     ],
+    deps = [
+        "//mlir:Pass",
+        "//mlir:SPIRVLowering",
+        "@vulkan_headers//:vulkan_headers",
+    ],
+    alwayslink = 1,
 )
