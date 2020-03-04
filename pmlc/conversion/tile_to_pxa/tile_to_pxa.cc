@@ -159,7 +159,8 @@ struct ScalarConstantOpConversion
 };
 
 static Value createCastOp(ConversionPatternRewriter &rewriter, Location loc,
-                          Value from, Type intoType, bool isSigned) {
+                          Value from, bool fromSigned, Type intoType,
+                          bool intoSigned) {
   auto fromType = from.getType();
   if (fromType == intoType) {
     return from;
@@ -181,7 +182,7 @@ static Value createCastOp(ConversionPatternRewriter &rewriter, Location loc,
   if (auto intoIntType = intoType.dyn_cast<IntegerType>()) {
     if (auto fromIntType = fromType.dyn_cast<IntegerType>()) {
       if (fromIntType.getWidth() < intoIntType.getWidth()) {
-        if (isSigned) {
+        if (fromSigned) {
           // SignExtendIOp: IntegerType -> wider signed int
           return rewriter.create<mlir::SignExtendIOp>(loc, from, intoType)
               .getResult();
@@ -195,7 +196,7 @@ static Value createCastOp(ConversionPatternRewriter &rewriter, Location loc,
           .getResult();
     }
     if (auto fromFloatType = fromType.dyn_cast<FloatType>()) {
-      if (isSigned) {
+      if (intoSigned) {
         // FPToSIOp: FloatType -> signed IntegerType
         IVLOG(3, "rewriter.create stdx::FPToSIOp");
         return rewriter.create<stdx::FPToSIOp>(loc, from, intoType).getResult();
@@ -325,12 +326,13 @@ static DataType promoteTypes(ConversionPatternRewriter &rewriter, Location loc,
   }
   // Next, cast each operand to the 'final' type
   auto scalarType = rewriter.getType<ScalarType>(bestType);
+  bool intoSigned = util::isSigned(scalarType.type());
   auto targetType = scalarType.toStandard();
   for (unsigned i = 0; i < operands.size(); i++) {
     auto dtype = types[i];
     auto operand = operands[i];
-    auto castOp =
-        createCastOp(rewriter, loc, operand, targetType, isSigned(dtype));
+    auto castOp = createCastOp(rewriter, loc, operand, isSigned(dtype),
+                               targetType, intoSigned);
     into->push_back(castOp);
   }
   return bestType;
@@ -781,6 +783,7 @@ struct CastOpConversion : public OpConversionPattern<ew::CastOp> {
     // Gather some basic info
     auto loc = op.getLoc();
     TypeConverter typeConverter;
+
     auto resultType =
         typeConverter.convertType(op.result().getType()).cast<MemRefType>();
     auto operand = operands[0];
@@ -789,6 +792,7 @@ struct CastOpConversion : public OpConversionPattern<ew::CastOp> {
       rewriter.replaceOp(op, operand);
       return matchSuccess();
     }
+    bool resultIsSigned = isSigned(getScalarType(op.result().getType()).type());
 
     // Make an allocation for the output
     auto resultMemRef = rewriter.create<AllocOp>(loc, resultType).getResult();
@@ -805,8 +809,8 @@ struct CastOpConversion : public OpConversionPattern<ew::CastOp> {
     // Create the standard cast op
     auto scalarType = getScalarType(op.tensor());
     auto dtype = scalarType.type();
-    auto result = createCastOp(rewriter, loc, scalar,
-                               resultType.getElementType(), isSigned(dtype));
+    auto result = createCastOp(rewriter, loc, scalar, isSigned(dtype),
+                               resultType.getElementType(), resultIsSigned);
 
     // Create the store
     rewriter.create<AffineStoreOp>(loc, result, resultMemRef, idxs);
