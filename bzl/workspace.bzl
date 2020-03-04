@@ -126,14 +126,6 @@ def plaidml_workspace():
     )
 
     http_archive(
-        name = "swiftshader",
-        url = "https://github.com/google/swiftshader/archive/126720bd2e578fec077a57d877ac64c46b18cd52.zip",
-        sha256 = "09313298e01c59db8a65b7c1199fd1e53a55c4dd8d90a719bf244d8ed1e8f479",
-        strip_prefix = "swiftshader-126720bd2e578fec077a57d877ac64c46b18cd52",
-        build_file = clean_dep("//vendor/swiftshader:swiftshader.BUILD"),
-    )
-
-    http_archive(
         name = "tbb",
         url = "https://github.com/intel/tbb/archive/tbb_2019.zip",
         sha256 = "078c969b1bbd6b2afb01f65cf9d513bb80636363b206f1e2ae221b614d7ae197",
