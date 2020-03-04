@@ -9,8 +9,6 @@ def clean_dep(dep):
     return str(Label(dep))
 
 def plaidml_workspace():
-    configure_toolchain()
-
     http_archive(
         name = "bazel_latex",
         sha256 = "5119802a5fbe2f27914af455c59b4ecdaaf57c0bc6c63da38098a30d94f48c9a",
@@ -31,6 +29,26 @@ def plaidml_workspace():
         url = "https://github.com/google/benchmark/archive/v1.5.0.tar.gz",
         sha256 = "3c6a165b6ecc948967a1ead710d4a181d7b0fbcaa183ef7ea84604994966221a",
         strip_prefix = "benchmark-1.5.0",
+    )
+
+    conda_repo(
+        name = "com_intel_plaidml_conda_unix",
+        env = clean_dep("//conda:unix.yml"),
+        build_file = clean_dep("//conda:unix.BUILD"),
+    )
+
+    conda_repo(
+        name = "com_intel_plaidml_conda_windows",
+        env = clean_dep("//conda:windows.yml"),
+        build_file = clean_dep("//conda:windows.BUILD"),
+    )
+
+    http_archive(
+        name = "crosstool_ng_linux_x86_64_gcc_8.3.0",
+        build_file = clean_dep("//toolchain:crosstool_ng/linux_x86_64.BUILD"),
+        sha256 = "091f5732882a499c6b9fb5fcb895176d0c96e958236e16b61d1a9cafec4271ad",
+        strip_prefix = "x86_64-unknown-linux-gnu",
+        url = "https://github.com/plaidml/depot/raw/master/toolchain/gcc-8.3/x86_64-unknown-linux-gnu-20191010.tgz",
     )
 
     http_archive(
@@ -56,17 +74,33 @@ def plaidml_workspace():
     )
 
     http_archive(
+        name = "io_bazel_rules_jsonnet",
+        sha256 = "d05d719c4738e8aac5f13b32f745ff4832b9638ecc89ddcb6e36c379a1ada025",
+        strip_prefix = "rules_jsonnet-0.1.0",
+        url = "https://github.com/bazelbuild/rules_jsonnet/archive/0.1.0.zip",
+    )
+
+    http_archive(
         name = "jsonnet",
         url = "https://github.com/google/jsonnet/archive/v0.13.0.zip",
         sha256 = "e9f7095dd2a383001188aa622edaf82059732e11d74f8d0bfdfa84f2682dd547",
         strip_prefix = "jsonnet-0.13.0",
     )
 
+    LLVM_COMMIT = "216ef5b9abb85a8116366dfa1bd712c988e08cb0"
+    LLVM_SHA256 = "9e55b9835715dc32b17bdb88e68d35440f2077fcaad6ecb59b839e4173d6b55e"
+    LLVM_URL = "https://github.com/plaidml/llvm-project/archive/{commit}.tar.gz".format(commit = LLVM_COMMIT)
     http_archive(
-        name = "io_bazel_rules_jsonnet",
-        sha256 = "d05d719c4738e8aac5f13b32f745ff4832b9638ecc89ddcb6e36c379a1ada025",
-        strip_prefix = "rules_jsonnet-0.1.0",
-        url = "https://github.com/bazelbuild/rules_jsonnet/archive/0.1.0.zip",
+        name = "llvm-project",
+        url = LLVM_URL,
+        sha256 = LLVM_SHA256,
+        strip_prefix = "llvm-project-" + LLVM_COMMIT,
+        link_files = {
+            clean_dep("//vendor/llvm:llvm.BUILD"): "llvm/BUILD.bazel",
+            clean_dep("//vendor/mlir:mlir.BUILD"): "mlir/BUILD.bazel",
+            clean_dep("//vendor/mlir:test.BUILD"): "mlir/test/BUILD.bazel",
+        },
+        override = "PLAIDML_LLVM_REPO",
     )
 
     http_archive(
@@ -92,38 +126,11 @@ def plaidml_workspace():
     )
 
     http_archive(
-        name = "zlib",
-        url = "https://github.com/plaidml/depot/raw/master/zlib-1.2.8.tar.gz",
-        sha256 = "36658cb768a54c1d4dec43c3116c27ed893e88b02ecfcb44f2166f9c0b7f2a0d",
-        build_file = clean_dep("//bzl:zlib.BUILD"),
-    )
-
-    conda_repo(
-        name = "com_intel_plaidml_conda_unix",
-        env = clean_dep("//conda:unix.yml"),
-        build_file = clean_dep("//conda:unix.BUILD"),
-    )
-
-    conda_repo(
-        name = "com_intel_plaidml_conda_windows",
-        env = clean_dep("//conda:windows.yml"),
-        build_file = clean_dep("//conda:windows.BUILD"),
-    )
-
-    xsmm_repo(
-        name = "xsmm",
-        url = "https://github.com/hfp/libxsmm/archive/1.12.1.zip",
-        sha256 = "451ec9d30f0890bf3081aa3d0d264942a6dea8f9d29c17bececc8465a10a832b",
-        strip_prefix = "libxsmm-1.12.1",
-        build_file = clean_dep("//vendor/xsmm:xsmm.BUILD"),
-    )
-
-    http_archive(
         name = "swiftshader",
         url = "https://github.com/google/swiftshader/archive/126720bd2e578fec077a57d877ac64c46b18cd52.zip",
-        # sha256 = "",
+        sha256 = "09313298e01c59db8a65b7c1199fd1e53a55c4dd8d90a719bf244d8ed1e8f479",
         strip_prefix = "swiftshader-126720bd2e578fec077a57d877ac64c46b18cd52",
-        build_file = clean_dep("//vendor/swiftshader:overlay.BUILD"),
+        build_file = clean_dep("//vendor/swiftshader:swiftshader.BUILD"),
     )
 
     http_archive(
@@ -135,6 +142,14 @@ def plaidml_workspace():
     )
 
     http_archive(
+        name = "volk",
+        url = "https://github.com/zeux/volk/archive/2638ad1b2b40f1ad402a0a6ac55b60bc51a23058.zip",
+        sha256 = "4a5fb828e05d8c86f696f8754e90302d6446b950236256bcb4857408357d2b60",
+        strip_prefix = "volk-2638ad1b2b40f1ad402a0a6ac55b60bc51a23058",
+        build_file = clean_dep("//vendor/volk:volk.BUILD"),
+    )
+
+    http_archive(
         name = "vulkan_headers",
         url = "https://github.com/KhronosGroup/Vulkan-Headers/archive/v1.2.132.zip",
         sha256 = "e6b5418e3d696ffc7c97991094ece7cafc4c279c8a88029cc60e587bc0c26068",
@@ -142,71 +157,17 @@ def plaidml_workspace():
         build_file = clean_dep("//vendor/vulkan_headers:vulkan_headers.BUILD"),
     )
 
-    # http_archive(
-    #     name = "vulkan_loader",
-    #     url = "https://github.com/KhronosGroup/Vulkan-Loader/archive/v1.2.132.zip",
-    #     sha256 = "f42c10bdfaf2ec29d1e4276bf115387852a1dc6aee940f25aff804cc0138d10a",
-    #     strip_prefix = "Vulkan-Loader-1.2.132",
-    #     build_file = clean_dep("//vendor/vulkan_loader:overlay.BUILD"),
-    #     link_files = {
-    #         clean_dep("//vendor/vulkan_loader:loader_cmake_config.h"): "loader/loader_cmake_config.h",
-    #     },
-    # )
-
-    # http_archive(
-    #     name = "vulkan_sdk_linux",
-    #     url = "https://sdk.lunarg.com/sdk/download/1.2.131.2/linux/vulkansdk-linux-x86_64-1.2.131.2.tar.gz",
-    #     sha256 = "8ac309392785b798e5d526795f9258e2c1e2858ee40e866bcb292a54c891f082",
-    #     strip_prefix = "1.2.131.2",
-    #     build_file = clean_dep("//vendor/vulkan_sdk:linux.BUILD"),
-    # )
-
-    # http_archive(
-    #     name = "vulkan_sdk_macos",
-    #     url = "https://sdk.lunarg.com/sdk/download/1.2.131.2/mac/vulkansdk-macos-1.2.131.2.tar.gz",
-    #     sha256 = "e28363ae0bdb3d881ebf93cdd7a721d052f6a2e5686d0fb3447e6edd585bb53f",
-    #     strip_prefix = "vulkansdk-macos-1.2.131.2",
-    #     build_file = clean_dep("//vendor/vulkan_sdk:macos.BUILD"),
-    # )
-
-    # http_archive(
-    #     name = "vulkan_sdk_windows",
-    #     url = "https://sdk.lunarg.com/sdk/download/1.2.131.2/windows/vulkan-runtime-components.zip",
-    #     sha256 = "c1f8ba4dba50c1e9ba46d561eb711d33882f42d07377cd9d063ff77775096f33",
-    #     strip_prefix = "VulkanRT-1.2.131.2-Components",
-    #     build_file = clean_dep("//vendor/vulkan_sdk:windows.BUILD"),
-    # )
-
-    http_archive(
-        name = "volk",
-        url = "https://github.com/zeux/volk/archive/2638ad1b2b40f1ad402a0a6ac55b60bc51a23058.zip",
-        sha256 = "4a5fb828e05d8c86f696f8754e90302d6446b950236256bcb4857408357d2b60",
-        strip_prefix = "volk-2638ad1b2b40f1ad402a0a6ac55b60bc51a23058",
-        build_file = clean_dep("//vendor/volk:overlay.BUILD"),
+    xsmm_repo(
+        name = "xsmm",
+        url = "https://github.com/hfp/libxsmm/archive/1.12.1.zip",
+        sha256 = "451ec9d30f0890bf3081aa3d0d264942a6dea8f9d29c17bececc8465a10a832b",
+        strip_prefix = "libxsmm-1.12.1",
+        build_file = clean_dep("//vendor/xsmm:xsmm.BUILD"),
     )
 
-    LLVM_COMMIT = "216ef5b9abb85a8116366dfa1bd712c988e08cb0"
-    LLVM_SHA256 = "9e55b9835715dc32b17bdb88e68d35440f2077fcaad6ecb59b839e4173d6b55e"
-    LLVM_URL = "https://github.com/plaidml/llvm-project/archive/{commit}.tar.gz".format(commit = LLVM_COMMIT)
     http_archive(
-        name = "llvm-project",
-        url = LLVM_URL,
-        sha256 = LLVM_SHA256,
-        strip_prefix = "llvm-project-" + LLVM_COMMIT,
-        link_files = {
-            clean_dep("//vendor/llvm:llvm.BUILD"): "llvm/BUILD.bazel",
-            clean_dep("//vendor/mlir:overlay.BUILD"): "mlir/BUILD.bazel",
-            clean_dep("//vendor/mlir:test/overlay.BUILD"): "mlir/test/BUILD.bazel",
-            clean_dep("//vendor/mlir:tools/mlir-vulkan-runner/overlay.BUILD"): "mlir/tools/mlir-vulkan-runner/BUILD.bazel",
-        },
-        override = "PLAIDML_LLVM_REPO",
-    )
-
-def configure_toolchain():
-    http_archive(
-        name = "crosstool_ng_linux_x86_64_gcc_8.3.0",
-        build_file = clean_dep("//toolchain:crosstool_ng/linux_x86_64.BUILD"),
-        sha256 = "091f5732882a499c6b9fb5fcb895176d0c96e958236e16b61d1a9cafec4271ad",
-        strip_prefix = "x86_64-unknown-linux-gnu",
-        url = "https://github.com/plaidml/depot/raw/master/toolchain/gcc-8.3/x86_64-unknown-linux-gnu-20191010.tgz",
+        name = "zlib",
+        url = "https://github.com/plaidml/depot/raw/master/zlib-1.2.8.tar.gz",
+        sha256 = "36658cb768a54c1d4dec43c3116c27ed893e88b02ecfcb44f2166f9c0b7f2a0d",
+        build_file = clean_dep("//bzl:zlib.BUILD"),
     )
