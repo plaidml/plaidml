@@ -126,7 +126,6 @@ def plaidml_workspace():
         build_file = clean_dep("//vendor/tbb:tbb.BUILD"),
     )
 
-
     http_archive(
         name = "vulkan_headers",
         url = "https://github.com/KhronosGroup/Vulkan-Headers/archive/v1.2.132.zip",
@@ -156,6 +155,7 @@ def plaidml_workspace():
             clean_dep("//vendor/llvm:llvm.BUILD"): "llvm/BUILD.bazel",
             clean_dep("//vendor/mlir:mlir.BUILD"): "mlir/BUILD.bazel",
             clean_dep("//vendor/mlir:test.BUILD"): "mlir/test/BUILD.bazel",
+            clean_dep("//vendor/mlir:vulkan.BUILD"): "mlir/tools/mlir-vulkan-runner/BUILD.bazel",
         },
         override = "PLAIDML_LLVM_REPO",
     )

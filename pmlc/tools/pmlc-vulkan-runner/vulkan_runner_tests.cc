@@ -134,9 +134,7 @@ TEST_F(RuntimeTest, SimpleTest) {
   // SPIRV module embedded into the string.
   // This module contains 4 resource variables devided into 2 sets.
 
-  std::string spirvModuleSource = // NOLINT
-      R"***(
-
+  std::string spirvModuleSource = R"***(
   spv.module "Logical" "GLSL450" {
     spv.globalVariable @var3 bind(1, 1) : !spv.ptr<!spv.struct<!spv.array<1024 x f32 [4]> [0]>, StorageBuffer>
     spv.globalVariable @var2 bind(1, 0) : !spv.ptr<!spv.struct<!spv.array<1024 x f32 [4]> [0]>, StorageBuffer>
@@ -167,8 +165,7 @@ TEST_F(RuntimeTest, SimpleTest) {
     spv.EntryPoint "GLCompute" @kernel, @globalInvocationID
     spv.ExecutionMode @kernel "LocalSize", 1, 1, 1
   } attributes {capabilities = ["Shader"], extensions = ["SPV_KHR_storage_buffer_storage_class"]}
-
-  )***";                          // NOLINT
+)***";
 
   auto resOne = createResourceVarFloat(0, 0, 1024);
   auto resTwo = createResourceVarFloat(0, 1, 1024);
