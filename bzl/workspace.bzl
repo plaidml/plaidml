@@ -143,6 +143,17 @@ def plaidml_workspace():
     )
 
     http_archive(
+        name = "vulkan_loader",
+        url = "https://github.com/KhronosGroup/Vulkan-Loader/archive/v1.2.132.zip",
+        sha256 = "f42c10bdfaf2ec29d1e4276bf115387852a1dc6aee940f25aff804cc0138d10a",
+        strip_prefix = "Vulkan-Loader-1.2.132",
+        build_file = clean_dep("//vendor/vulkan_loader:overlay.BUILD"),
+        link_files = {
+            clean_dep("//vendor/vulkan_loader:loader_cmake_config.h"): "loader/loader_cmake_config.h",
+        },
+    )
+
+    http_archive(
         name = "vulkan_sdk_linux",
         url = "https://sdk.lunarg.com/sdk/download/1.2.131.2/linux/vulkansdk-linux-x86_64-1.2.131.2.tar.gz",
         sha256 = "8ac309392785b798e5d526795f9258e2c1e2858ee40e866bcb292a54c891f082",

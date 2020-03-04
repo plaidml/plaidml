@@ -18,15 +18,12 @@ plaidml_cc_binary(
         "addf.mlir",
     ],
     deps = [
-        "//pmlc/rt",
         ":vulkan_shlib",
+        "//pmlc/rt",
         "@llvm-project//mlir:MlirJitRunner",
         "@llvm-project//mlir/tools/mlir-vulkan-runner:VulkanRuntime",
-    ] + select({
-        "@bazel_tools//src/conditions:darwin_x86_64": ["@vulkan_sdk_macos//:sdk"],
-        "@bazel_tools//src/conditions:windows": ["@vulkan_sdk_windows//:sdk"],
-        "//conditions:default": ["@vulkan_sdk_linux//:sdk"],
-    }),
+        "@vulkan_loader",
+    ],
 )
 
 plaidml_cc_shlib(
