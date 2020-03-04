@@ -119,6 +119,14 @@ def plaidml_workspace():
     )
 
     http_archive(
+        name = "swiftshader",
+        url = "https://github.com/google/swiftshader/archive/126720bd2e578fec077a57d877ac64c46b18cd52.zip",
+        # sha256 = "",
+        strip_prefix = "swiftshader-126720bd2e578fec077a57d877ac64c46b18cd52",
+        build_file = clean_dep("//vendor/swiftshader:overlay.BUILD"),
+    )
+
+    http_archive(
         name = "tbb",
         url = "https://github.com/intel/tbb/archive/tbb_2019.zip",
         sha256 = "078c969b1bbd6b2afb01f65cf9d513bb80636363b206f1e2ae221b614d7ae197",
@@ -144,7 +152,7 @@ def plaidml_workspace():
 
     http_archive(
         name = "vulkan_sdk_macos",
-        url = "https://sdk.lunarg.com/sdk/download/1.2.131.2/macos/vulkansdk-macos-1.2.131.2.tar.gz",
+        url = "https://sdk.lunarg.com/sdk/download/1.2.131.2/mac/vulkansdk-macos-1.2.131.2.tar.gz",
         sha256 = "e28363ae0bdb3d881ebf93cdd7a721d052f6a2e5686d0fb3447e6edd585bb53f",
         strip_prefix = "vulkansdk-macos-1.2.131.2",
         build_file = clean_dep("//vendor/vulkan_sdk:macos.BUILD"),
