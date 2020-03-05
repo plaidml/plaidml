@@ -50,6 +50,7 @@ def _run_lit_test(name, data, size, tags, features):
             "//pmlc/tools/pmlc-jit",
             "//pmlc/tools/pmlc-opt",
             "//pmlc/tools/pmlc-translate",
+            "//pmlc/tools/pmlc-vulkan-runner",
             "//pmlc:lit_files",
             "@llvm-project//llvm:FileCheck",
             "@llvm-project//llvm:count",
@@ -91,6 +92,8 @@ def glob_lit_tests(
         exclude = exclude,
     )
 
+    local_cfg = native.glob(["lit.local.cfg"])
+
     native.filegroup(
         name = "all",
         srcs = tests,
@@ -103,7 +106,7 @@ def glob_lit_tests(
         # Instantiate this test with updated parameters.
         lit_test(
             name = curr_test,
-            data = data + per_test_extra_data.pop(curr_test, []),
+            data = data + per_test_extra_data.pop(curr_test, []) + local_cfg,
             size = size_override.pop(curr_test, default_size),
             tags = ["lit"] + default_tags + tags_override.pop(curr_test, []),
             features = features,

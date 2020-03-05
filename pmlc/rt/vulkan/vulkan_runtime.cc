@@ -1,247 +1,38 @@
 //===- VulkanRuntime.cpp - MLIR Vulkan runtime ------------------*- C++ -*-===//
 //
-// Copyright 2019 The MLIR Authors.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//   http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// =============================================================================
-//
-// This file provides a library for running a module on a Vulkan device.
-// Implements a Vulkan runtime to run a spirv::ModuleOp. It also defines a few
-// utility functions to extract information from a spirv::ModuleOp.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
-#include "pmlc/tools/pmlc-vulkan-runner/vulkan_runner.h"
-#include "pmlc/tools/pmlc-vulkan-runner/vulkan_fn.h"
+//
+// This file provides a library for running a module on a Vulkan device.
+// Implements a Vulkan runtime.
+//
+//===----------------------------------------------------------------------===//
 
-#include <string>
+#include "pmlc/rt/vulkan/vulkan_runtime.h"
 
-namespace pmlc::vulkan {
+using namespace mlir; // NOLINT[build/namespaces]
 
-inline void emitVulkanError(const llvm::Twine &message, VkResult error) {
-  llvm::errs()
-      << message.concat(" failed with error code ").concat(llvm::Twine{error})
-      << "\n";
+void VulkanRuntime::setNumWorkGroups(const NumWorkGroups &numberWorkGroups) {
+  numWorkGroups = numberWorkGroups;
 }
 
-#define RETURN_ON_VULKAN_ERROR(result, msg)                                    \
-  if ((result) != VK_SUCCESS) {                                                \
-    emitVulkanError(msg, (result));                                            \
-    return failure();                                                          \
-  }
-
-namespace {
-/// Processes spv.module and collects all needed information for VulkanRuntime.
-class SPIRVModuleInfoCollector {
-public:
-  SPIRVModuleInfoCollector() = default;
-  std::string getEntryPoint() { return entryPoint; }
-  ResourceStorageClassData &getResourceStorageClassData() {
-    return resourceStorageClassData;
-  }
-  void processModule(spirv::ModuleOp module);
-
-private:
-  SPIRVModuleInfoCollector(const SPIRVModuleInfoCollector &) = delete;
-  SPIRVModuleInfoCollector &
-  operator=(const SPIRVModuleInfoCollector &) = delete;
-  void processGlobalVariable(spirv::GlobalVariableOp varOp);
-  void processEntryPoint(spirv::EntryPointOp op);
-
-  std::string entryPoint;
-  ResourceStorageClassData resourceStorageClassData;
-};
-
-/// Processes ModuleOp to collect module specific information.
-/// Note: ModuleOp must be valid.
-void SPIRVModuleInfoCollector::processModule(spirv::ModuleOp module) {
-  for (auto &op : module.getBlock()) {
-    if (auto entryPointOp = dyn_cast<spirv::EntryPointOp>(op)) {
-      processEntryPoint(entryPointOp);
-    } else if (auto varOp = dyn_cast<spirv::GlobalVariableOp>(op)) {
-      processGlobalVariable(varOp);
-    }
-  }
-}
-
-/// Processes EntryPointOp to collect entry point.
-void SPIRVModuleInfoCollector::processEntryPoint(spirv::EntryPointOp op) {
-  entryPoint = op.fn();
-}
-
-/// Processes GlobalVariableOp to collect storage classes for resource data.
-void SPIRVModuleInfoCollector::processGlobalVariable(
-    spirv::GlobalVariableOp varOp) {
-  auto descriptorSetName =
-      convertToSnakeCase(stringifyDecoration(spirv::Decoration::DescriptorSet));
-  auto bindingName =
-      convertToSnakeCase(stringifyDecoration(spirv::Decoration::Binding));
-  auto descriptorSet = varOp.getAttrOfType<IntegerAttr>(descriptorSetName);
-  auto binding = varOp.getAttrOfType<IntegerAttr>(bindingName);
-
-  if (descriptorSet && binding) {
-    if (auto ptrType = varOp.type().dyn_cast<spirv::PointerType>()) {
-      auto descriptorBindingIndex = binding.getInt();
-      auto descriptorSetIndex = descriptorSet.getInt();
-      resourceStorageClassData[descriptorSetIndex][descriptorBindingIndex] =
-          ptrType.getStorageClass();
-    }
-  }
-}
-} // namespace
-
-/// Vulkan runtime.
-/// The purpose of this class is to run SPIR-V computation shader on Vulkan
-/// device.
-/// Before the run, user must provide and set resource data with descriptors,
-/// spir-v shader, number of work groups and entry point. After the creation of
-/// VulkanRuntime, special methods must be called in the following
-/// sequence: initRuntime(), run(), updateHostMemoryBuffers(), destroy();
-/// each method in the sequence returns succes or failure depends on the Vulkan
-/// result code.
-class VulkanRuntime {
-public:
-  VulkanRuntime() = default;
-  VulkanRuntime(const VulkanRuntime &) = delete;
-  VulkanRuntime &operator=(const VulkanRuntime &) = delete;
-
-  /// Sets needed data for Vulkan runtime.
-  void setResourceData(const ResourceData &resData);
-  void setShaderModule(llvm::ArrayRef<uint32_t> binaryRef);
-  void setNumWorkGroups(const NumWorkGroups &nWorkGroups);
-  void setResourceStorageClassData(const ResourceStorageClassData &stClassData);
-  void setEntryPoint(llvm::StringRef entryPointName);
-
-  /// Runtime initialization.
-  LogicalResult initRuntime();
-
-  /// Runs runtime.
-  LogicalResult run();
-
-  /// Updates host memory buffers.
-  LogicalResult updateHostMemoryBuffers();
-
-  /// Destroys all created vulkan objects and resources.
-  LogicalResult destroy();
-
-private:
-  //===--------------------------------------------------------------------===//
-  // Pipeline creation methods.
-  //===--------------------------------------------------------------------===//
-
-  LogicalResult createInstance();
-  LogicalResult createDevice();
-  LogicalResult getBestComputeQueue(const VkPhysicalDevice &physicalDevice);
-  LogicalResult createMemoryBuffers();
-  LogicalResult createShaderModule();
-  void initDescriptorSetLayoutBindingMap();
-  LogicalResult createDescriptorSetLayout();
-  LogicalResult createPipelineLayout();
-  LogicalResult createComputePipeline();
-  LogicalResult createDescriptorPool();
-  LogicalResult allocateDescriptorSets();
-  LogicalResult setWriteDescriptors();
-  LogicalResult createCommandPool();
-  LogicalResult createComputeCommandBuffer();
-  LogicalResult submitCommandBuffersToQueue();
-
-  //===--------------------------------------------------------------------===//
-  // Helper methods.
-  //===--------------------------------------------------------------------===//
-
-  /// Maps storage class to a descriptor type.
-  LogicalResult
-  mapStorageClassToDescriptorType(spirv::StorageClass storageClass,
-                                  VkDescriptorType &descriptorType);
-
-  /// Maps storage class to buffer usage flags.
-  LogicalResult
-  mapStorageClassToBufferUsageFlag(spirv::StorageClass storageClass,
-                                   VkBufferUsageFlagBits &bufferUsage);
-
-  LogicalResult countDeviceMemorySize();
-
-  //===--------------------------------------------------------------------===//
-  // Vulkan objects.
-  //===--------------------------------------------------------------------===//
-
-  VkInstance instance;
-  VkDevice device;
-  VkQueue queue;
-
-  /// Specifies VulkanDeviceMemoryBuffers divided into sets.
-  llvm::DenseMap<DescriptorSetIndex,
-                 llvm::SmallVector<VulkanDeviceMemoryBuffer, 1>>
-      deviceMemoryBufferMap;
-
-  /// Specifies shader module.
-  VkShaderModule shaderModule;
-
-  /// Specifies layout bindings.
-  llvm::DenseMap<DescriptorSetIndex,
-                 llvm::SmallVector<VkDescriptorSetLayoutBinding, 1>>
-      descriptorSetLayoutBindingMap;
-
-  /// Specifies layouts of descriptor sets.
-  llvm::SmallVector<VkDescriptorSetLayout, 1> descriptorSetLayouts;
-  VkPipelineLayout pipelineLayout;
-
-  /// Specifies descriptor sets.
-  llvm::SmallVector<VkDescriptorSet, 1> descriptorSets;
-
-  /// Specifies a pool of descriptor set info, each descriptor set must have
-  /// information such as type, index and amount of bindings.
-  llvm::SmallVector<DescriptorSetInfo, 1> descriptorSetInfoPool;
-  VkDescriptorPool descriptorPool;
-
-  /// Computation pipeline.
-  VkPipeline pipeline;
-  VkCommandPool commandPool;
-  llvm::SmallVector<VkCommandBuffer, 1> commandBuffers;
-
-  //===--------------------------------------------------------------------===//
-  // Vulkan memory context.
-  //===--------------------------------------------------------------------===//
-
-  uint32_t queueFamilyIndex{0};
-  uint32_t memoryTypeIndex{VK_MAX_MEMORY_TYPES};
-  VkDeviceSize memorySize{0};
-
-  //===--------------------------------------------------------------------===//
-  // Vulkan execution context.
-  //===--------------------------------------------------------------------===//
-
-  NumWorkGroups numWorkGroups;
-  std::string entryPoint;
-  llvm::SmallVector<uint32_t, 0> binary;
-
-  //===--------------------------------------------------------------------===//
-  // Vulkan resource data and storage classes.
-  //===--------------------------------------------------------------------===//
-
-  ResourceData resourceData;
-  ResourceStorageClassData resourceStorageClassData;
-};
-
-void VulkanRuntime::setNumWorkGroups(const NumWorkGroups &nWorkGroups) {
-  numWorkGroups = nWorkGroups;
-}
-
-void VulkanRuntime::setResourceStorageClassData(
-    const ResourceStorageClassData &stClassData) {
+void VulkanRuntime::setResourceStorageClassBindingMap(
+    const ResourceStorageClassBindingMap &stClassData) {
   resourceStorageClassData = stClassData;
 }
 
-void VulkanRuntime::setEntryPoint(llvm::StringRef entryPointName) {
+void VulkanRuntime::setResourceData(
+    const DescriptorSetIndex desIndex, const BindingIndex bindIndex,
+    const VulkanHostMemoryBuffer &hostMemBuffer) {
+  resourceData[desIndex][bindIndex] = hostMemBuffer;
+  resourceStorageClassData[desIndex][bindIndex] =
+      spirv::StorageClass::StorageBuffer;
+}
+
+void VulkanRuntime::setEntryPoint(const char *entryPointName) {
   entryPoint = entryPointName;
 }
 
@@ -249,8 +40,9 @@ void VulkanRuntime::setResourceData(const ResourceData &resData) {
   resourceData = resData;
 }
 
-void VulkanRuntime::setShaderModule(llvm::ArrayRef<uint32_t> binaryRef) {
-  binary = SmallVector<uint32_t, 0>(binaryRef.begin(), binaryRef.end());
+void VulkanRuntime::setShaderModule(uint8_t *shader, uint32_t size) {
+  binary = shader;
+  binarySize = size;
 }
 
 LogicalResult VulkanRuntime::mapStorageClassToDescriptorType(
@@ -263,6 +55,7 @@ LogicalResult VulkanRuntime::mapStorageClassToDescriptorType(
     descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     break;
   default:
+    llvm::errs() << "unsupported storage class";
     return failure();
   }
   return success();
@@ -278,6 +71,7 @@ LogicalResult VulkanRuntime::mapStorageClassToBufferUsageFlag(
     bufferUsage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
     break;
   default:
+    llvm::errs() << "unsupported storage class";
     return failure();
   }
   return success();
@@ -290,6 +84,8 @@ LogicalResult VulkanRuntime::countDeviceMemorySize() {
       if (resourceDataBindingPair.second.size) {
         memorySize += resourceDataBindingPair.second.size;
       } else {
+        llvm::errs()
+            << "expected buffer size greater than zero for resource data";
         return failure();
       }
     }
@@ -302,7 +98,7 @@ LogicalResult VulkanRuntime::initRuntime() {
     llvm::errs() << "Vulkan runtime needs at least one resource";
     return failure();
   }
-  if (!binary.size()) {
+  if (!binarySize || !binary) {
     llvm::errs() << "binary shader size must be greater than zero";
     return failure();
   }
@@ -313,6 +109,14 @@ LogicalResult VulkanRuntime::initRuntime() {
 }
 
 LogicalResult VulkanRuntime::destroy() {
+  // According to Vulkan spec:
+  // "To ensure that no work is active on the device, vkDeviceWaitIdle can be
+  // used to gate the destruction of the device. Prior to destroying a device,
+  // an application is responsible for destroying/freeing any Vulkan objects
+  // that were created using that device as the first parameter of the
+  // corresponding vkCreate* or vkAllocate* command."
+  RETURN_ON_VULKAN_ERROR(vkDeviceWaitIdle(device), "vkDeviceWaitIdle");
+
   // Free and destroy.
   vkFreeCommandBuffers(device, commandPool, commandBuffers.size(),
                        commandBuffers.data());
@@ -337,8 +141,6 @@ LogicalResult VulkanRuntime::destroy() {
     }
   }
 
-  // Wait for device.
-  RETURN_ON_VULKAN_ERROR(vkDeviceWaitIdle(device), "vkDeviceWaitIdle");
   vkDestroyDevice(device, nullptr);
   vkDestroyInstance(instance, nullptr);
   return success();
@@ -350,11 +152,11 @@ LogicalResult VulkanRuntime::run() {
       failed(createMemoryBuffers()) || failed(createShaderModule())) {
     return failure();
   }
+
   // Descriptor bindings divided into sets. Each descriptor binding
   // must have a layout binding attached into a descriptor set layout.
   // Each layout set must be binded into a pipeline layout.
   initDescriptorSetLayoutBindingMap();
-
   if (failed(createDescriptorSetLayout()) || failed(createPipelineLayout()) ||
       // Each descriptor set must be allocated from a descriptor pool.
       failed(createComputePipeline()) || failed(createDescriptorPool()) ||
@@ -368,15 +170,16 @@ LogicalResult VulkanRuntime::run() {
   vkGetDeviceQueue(device, queueFamilyIndex, 0, &queue);
 
   // Submit command buffer into the queue.
-  if (failed(submitCommandBuffersToQueue())) {
+  if (failed(submitCommandBuffersToQueue()))
     return failure();
-  }
 
   RETURN_ON_VULKAN_ERROR(vkQueueWaitIdle(queue), "vkQueueWaitIdle");
   return success();
 }
 
 LogicalResult VulkanRuntime::createInstance() {
+  RETURN_ON_VULKAN_ERROR(volkInitialize(), "volkInitialize");
+
   VkApplicationInfo applicationInfo = {};
   applicationInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
   applicationInfo.pNext = nullptr;
@@ -395,8 +198,12 @@ LogicalResult VulkanRuntime::createInstance() {
   instanceCreateInfo.ppEnabledLayerNames = 0;
   instanceCreateInfo.enabledExtensionCount = 0;
   instanceCreateInfo.ppEnabledExtensionNames = 0;
+
   RETURN_ON_VULKAN_ERROR(vkCreateInstance(&instanceCreateInfo, 0, &instance),
                          "vkCreateInstance");
+
+  volkLoadInstance(instance);
+
   return success();
 }
 
@@ -624,9 +431,9 @@ LogicalResult VulkanRuntime::createShaderModule() {
   shaderModuleCreateInfo.pNext = nullptr;
   shaderModuleCreateInfo.flags = 0;
   // Set size in bytes.
-  shaderModuleCreateInfo.codeSize = binary.size() * sizeof(uint32_t);
+  shaderModuleCreateInfo.codeSize = binarySize;
   // Set pointer to the binary shader.
-  shaderModuleCreateInfo.pCode = reinterpret_cast<uint32_t *>(binary.data());
+  shaderModuleCreateInfo.pCode = reinterpret_cast<uint32_t *>(binary);
   RETURN_ON_VULKAN_ERROR(
       vkCreateShaderModule(device, &shaderModuleCreateInfo, 0, &shaderModule),
       "vkCreateShaderModule");
@@ -724,7 +531,7 @@ LogicalResult VulkanRuntime::createComputePipeline() {
   stageInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
   stageInfo.module = shaderModule;
   // Set entry point.
-  stageInfo.pName = entryPoint.c_str();
+  stageInfo.pName = entryPoint;
   stageInfo.pSpecializationInfo = 0;
 
   VkComputePipelineCreateInfo computePipelineCreateInfo = {};
@@ -736,7 +543,6 @@ LogicalResult VulkanRuntime::createComputePipeline() {
   computePipelineCreateInfo.layout = pipelineLayout;
   computePipelineCreateInfo.basePipelineHandle = 0;
   computePipelineCreateInfo.basePipelineIndex = 0;
-
   RETURN_ON_VULKAN_ERROR(vkCreateComputePipelines(device, 0, 1,
                                                   &computePipelineCreateInfo, 0,
                                                   &pipeline),
@@ -846,11 +652,11 @@ LogicalResult VulkanRuntime::createComputeCommandBuffer() {
                                                   &commandBuffer),
                          "vkAllocateCommandBuffers");
 
-  VkCommandBufferBeginInfo commandBufferBeginInfo;
+  VkCommandBufferBeginInfo commandBufferBeginInfo = {};
   commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
   commandBufferBeginInfo.pNext = nullptr;
   commandBufferBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-  commandBufferBeginInfo.pInheritanceInfo = 0;
+  commandBufferBeginInfo.pInheritanceInfo = nullptr;
 
   // Commands begin.
   RETURN_ON_VULKAN_ERROR(
@@ -874,7 +680,7 @@ LogicalResult VulkanRuntime::createComputeCommandBuffer() {
 }
 
 LogicalResult VulkanRuntime::submitCommandBuffersToQueue() {
-  VkSubmitInfo submitInfo;
+  VkSubmitInfo submitInfo = {};
   submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
   submitInfo.pNext = nullptr;
   submitInfo.waitSemaphoreCount = 0;
@@ -913,63 +719,3 @@ LogicalResult VulkanRuntime::updateHostMemoryBuffers() {
   }
   return success();
 }
-
-static LogicalResult runOnVulkan(spirv::ModuleOp module,
-                                 ResourceData &resourceData,
-                                 const NumWorkGroups &numWorkGroups) {
-  SPIRVModuleInfoCollector moduleHandler;
-  moduleHandler.processModule(module);
-
-  SmallVector<uint32_t, 0> binary;
-  if (failed(spirv::serialize(module, binary))) {
-    llvm::errs() << "cannot serialize module" << '\n';
-    return failure();
-  }
-
-  VulkanRuntime runtime;
-  runtime.setEntryPoint(moduleHandler.getEntryPoint());
-  runtime.setNumWorkGroups(numWorkGroups);
-  runtime.setResourceData(resourceData);
-  runtime.setShaderModule(binary);
-  runtime.setResourceStorageClassData(
-      moduleHandler.getResourceStorageClassData());
-
-  if (failed(runtime.initRuntime()) || failed(runtime.run()) ||
-      failed(runtime.updateHostMemoryBuffers()) || failed(runtime.destroy())) {
-    return failure();
-  }
-
-  return success();
-}
-
-/// The purpose of the function is to run spirv::ModuleOp on Vulkan device.
-///
-/// This function:
-/// 1. Consumes mlir::ModuleOp, ResouceData and NumWorkGroups;
-/// 2. Verifies mlir::ModuleOp and gets spirv::ModuleOp from mlir::ModuleOp;
-/// 3. Collects entry point and storage classes of resource data;
-/// 4. Serializes spirv::ModuleOp into the binary form;
-/// 5. Creates Vulkan runtime and runs shader on Vulkan device;
-/// 6. Updates resource data after the run;
-LogicalResult runOnVulkan(mlir::ModuleOp module, ResourceData &resourceData,
-                          const NumWorkGroups &numWorkGroups) {
-  if (failed(module.verify())) {
-    return failure();
-  }
-
-  auto result = failure();
-  bool done = false;
-  for (auto spirvModule : module.getOps<spirv::ModuleOp>()) {
-    if (done) {
-      spirvModule.emitError("found more than one spv.module");
-    }
-    done = true;
-    result = runOnVulkan(spirvModule, resourceData, numWorkGroups);
-  }
-
-  if (failed(result)) {
-    return failure();
-  }
-  return success();
-}
-} // namespace pmlc::vulkan

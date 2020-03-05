@@ -9,7 +9,7 @@ plaidml_cc_library(
     srcs = ["pmlc-jit.cc"],
     deps = [
         "//pmlc:all_passes_and_dialects_no_registration",
-        "//pmlc/rt:rt_shlib",
+        "//pmlc/rt:link",
         "//pmlc/util",
         "@llvm-project//mlir:MlirJitRunner",
     ],
