@@ -16,6 +16,8 @@
 #include "pmlc/dialect/eltwise/ir/ops.h"
 #include "pmlc/dialect/pxa/ir/dialect.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
+#include "pmlc/dialect/stdx/ir/dialect.h"
+#include "pmlc/dialect/stdx/ir/ops.h"
 #include "pmlc/dialect/tile/ir/ops.h"
 #include "pmlc/dialect/tile/transforms/padding.h"
 #include "pmlc/util/logging.h"
@@ -25,6 +27,8 @@ namespace pmlc::conversion::tile_to_pxa {
 
 namespace ew = dialect::eltwise;
 namespace pxa = dialect::pxa;
+namespace stdx = dialect::stdx;
+
 using namespace mlir; // NOLINT
 
 using dialect::eltwise::ScalarType;
@@ -155,7 +159,8 @@ struct ScalarConstantOpConversion
 };
 
 static Value createCastOp(ConversionPatternRewriter &rewriter, Location loc,
-                          Value from, Type intoType, bool isSigned) {
+                          Value from, bool fromSigned, Type intoType,
+                          bool intoSigned) {
   auto fromType = from.getType();
   if (fromType == intoType) {
     return from;
@@ -177,7 +182,7 @@ static Value createCastOp(ConversionPatternRewriter &rewriter, Location loc,
   if (auto intoIntType = intoType.dyn_cast<IntegerType>()) {
     if (auto fromIntType = fromType.dyn_cast<IntegerType>()) {
       if (fromIntType.getWidth() < intoIntType.getWidth()) {
-        if (isSigned) {
+        if (fromSigned) {
           // SignExtendIOp: IntegerType -> wider signed int
           return rewriter.create<mlir::SignExtendIOp>(loc, from, intoType)
               .getResult();
@@ -189,6 +194,15 @@ static Value createCastOp(ConversionPatternRewriter &rewriter, Location loc,
       // TruncateIOp: IntegerType -> narrower IntegerType
       return rewriter.create<mlir::TruncateIOp>(loc, from, intoType)
           .getResult();
+    }
+    if (auto fromFloatType = fromType.dyn_cast<FloatType>()) {
+      if (intoSigned) {
+        // FPToSIOp: FloatType -> signed IntegerType
+        return rewriter.create<stdx::FPToSIOp>(loc, from, intoType).getResult();
+      } else {
+        // FPToUIOp: FloatType -> unsigned IntegerType
+        return rewriter.create<stdx::FPToUIOp>(loc, from, intoType).getResult();
+      }
     }
   }
   llvm_unreachable("Unsupported cast op");
@@ -310,12 +324,13 @@ static DataType promoteTypes(ConversionPatternRewriter &rewriter, Location loc,
   }
   // Next, cast each operand to the 'final' type
   auto scalarType = rewriter.getType<ScalarType>(bestType);
+  bool intoSigned = util::isSigned(scalarType.type());
   auto targetType = scalarType.toStandard();
   for (unsigned i = 0; i < operands.size(); i++) {
     auto dtype = types[i];
     auto operand = operands[i];
-    auto castOp =
-        createCastOp(rewriter, loc, operand, targetType, isSigned(dtype));
+    auto castOp = createCastOp(rewriter, loc, operand, isSigned(dtype),
+                               targetType, intoSigned);
     into->push_back(castOp);
   }
   return bestType;
@@ -766,6 +781,7 @@ struct CastOpConversion : public OpConversionPattern<ew::CastOp> {
     // Gather some basic info
     auto loc = op.getLoc();
     TypeConverter typeConverter;
+
     auto resultType =
         typeConverter.convertType(op.result().getType()).cast<MemRefType>();
     auto operand = operands[0];
@@ -774,6 +790,7 @@ struct CastOpConversion : public OpConversionPattern<ew::CastOp> {
       rewriter.replaceOp(op, operand);
       return matchSuccess();
     }
+    bool resultIsSigned = isSigned(getScalarType(op.result().getType()).type());
 
     // Make an allocation for the output
     auto resultMemRef = rewriter.create<AllocOp>(loc, resultType).getResult();
@@ -790,8 +807,8 @@ struct CastOpConversion : public OpConversionPattern<ew::CastOp> {
     // Create the standard cast op
     auto scalarType = getScalarType(op.tensor());
     auto dtype = scalarType.type();
-    auto result = createCastOp(rewriter, loc, scalar,
-                               resultType.getElementType(), isSigned(dtype));
+    auto result = createCastOp(rewriter, loc, scalar, isSigned(dtype),
+                               resultType.getElementType(), resultIsSigned);
 
     // Create the store
     rewriter.create<AffineStoreOp>(loc, result, resultMemRef, idxs);
@@ -799,6 +816,7 @@ struct CastOpConversion : public OpConversionPattern<ew::CastOp> {
     // Replace the op
     rewriter.replaceOp(op, resultMemRef);
 
+    IVLOG(2, "CastOpConversion::matchAndRewrite returns matchSuccess");
     return matchSuccess();
   }
 };
@@ -858,6 +876,7 @@ struct LoweringPass : public mlir::ModulePass<LoweringPass> {
     target.addLegalDialect<mlir::AffineOpsDialect>();
     target.addLegalDialect<mlir::StandardOpsDialect>();
     target.addLegalDialect<dialect::pxa::Dialect>();
+    target.addLegalDialect<dialect::stdx::Dialect>();
     target.addLegalOp<mlir::ModuleOp, mlir::ModuleTerminatorOp>();
     target.addDynamicallyLegalOp<FuncOp>([](FuncOp op) {
       auto funcType = op.getType();

@@ -197,7 +197,9 @@ SUITES:
           - TestBackendOps.testL2Normalize
           - TestBackendOps.testZerosLike
           - TestBackendOps.testConvParameterRankExceptions
+          - TestBackendOps.testCastToInt
           - TestBackendOps.testCastToFloat
+          - TestBackendOps.testCastToUInt
           - TestBackendOps.testCeil
           - TestBackendOps.testCumProd
           - TestBackendOps.resnetLayer1

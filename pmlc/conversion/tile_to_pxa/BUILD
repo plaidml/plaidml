@@ -10,6 +10,7 @@ plaidml_cc_library(
     hdrs = glob(["*.h"]),
     deps = [
         "//pmlc/dialect/pxa/ir",
+        "//pmlc/dialect/stdx/ir",
         "//pmlc/dialect/tile",
     ],
     alwayslink = 1,
