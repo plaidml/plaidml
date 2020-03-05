@@ -69,8 +69,8 @@ private:
 
   void PopulateOpBlockArgumentSet();
   BlockArgumentSet UsedIdxs(unsigned strideInfoIndex);
-  void CollectUsedIndeces();
-  void CollectStrideOneIndeces();
+  void CollectUsedIndices();
+  void CollectStrideOneIndices();
   void strideOneIdxs(unsigned indx);
 
 public:
@@ -218,7 +218,7 @@ void Stencil::PopulateOpBlockArgumentSet() {
 
 // Collect the indices that are not constants for the ParallelOp
 // and also the accumulation indices.
-void Stencil::CollectUsedIndeces() {
+void Stencil::CollectUsedIndices() {
   // The last tensor is the output.
   tensorIdxs[kNumIndex - 1] = UsedIdxs(kNumIndex - 1);
   outIdxs = tensorIdxs[kNumIndex - 1];
@@ -246,7 +246,7 @@ void Stencil::strideOneIdxs(unsigned indx) {
   }
 }
 
-void Stencil::CollectStrideOneIndeces() {
+void Stencil::CollectStrideOneIndices() {
   // Collect stride-one index
   for (unsigned i = 0; i < kNumTensors; ++i) {
     strideOneIdxs(i);
@@ -267,8 +267,8 @@ void Stencil::DoStenciling() {
     return;
 
   PopulateOpBlockArgumentSet();
-  CollectUsedIndeces();
-  CollectStrideOneIndeces();
+  CollectUsedIndices();
+  CollectStrideOneIndices();
 
   op.setAttr("is_gemm", mlir::UnitAttr::get(op.getContext()));
 }
