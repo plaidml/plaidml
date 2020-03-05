@@ -1,14 +1,12 @@
-import re
-
-import drawSvg as draw
 import ipywidgets as widgets
 import numpy as np
+from IPython.display import display
+
+import demos.mlsys_2020.style.custom_html as html
+import drawSvg as draw
 import plaidml
 import plaidml.exec
-
-from IPython.display import display
 from plaidml.edsl import *
-import demos.mlsys_2020.style.custom_html as html
 
 
 class Demo:
@@ -195,7 +193,7 @@ def edsl_program(X):
             anim.append(group)
         return anim
 
-    def runtime_handler(self, op_type, op_name, textbox_value):
+    def runtime_handler(self, op_name, textbox_value):
         X = Placeholder(plaidml.DType.INT32, [3, 3])
         Y = Placeholder(plaidml.DType.INT32, [3, 3])
         edsl_context = globals()
@@ -208,20 +206,7 @@ def edsl_program(X):
                 R = edsl_program(Y)
         else:
             R = edsl_program(X, Y)
-        program = Program('edsl_program', [R], debug=True)
-        for p in program.passes:
-            name = p[0]
-            print('\n')
-            print(name)
-            text = widgets.Textarea(value=''.join(p),
-                                    placeholder='Passes',
-                                    disabled=False,
-                                    layout=widgets.Layout(
-                                        height='100%',
-                                        width='auto',
-                                    ))
-            box = widgets.VBox([text], layout={'height': '350px'})
-            #display(box)
+        program = Program('edsl_program', [R])
 
         # Create the binder and the executable so that the program can run.
         binder = plaidml.exec.Binder(program)
@@ -243,3 +228,20 @@ def edsl_program(X):
             self.output_anim = self.draw_grid(self.output_vals.shape,
                                               self.output_vals,
                                               color='#aaddff')
+        return program
+
+    def compile(self, op_name, textbox_value):
+        X = Placeholder(plaidml.DType.INT32, [3, 3])
+        Y = Placeholder(plaidml.DType.INT32, [3, 3])
+        edsl_context = globals()
+        code = self.boilerplate_edsl[op_name].format(textbox_value)
+        exec(code, edsl_context)
+        edsl_program = edsl_context['edsl_program']
+        if len(self.boilerplate_inputs[op_name]) == 1:
+            if 'X' in self.boilerplate_inputs[op_name]:
+                R = edsl_program(X)
+            if 'Y' in self.boilerplate_inputs[op_name]:
+                R = edsl_program(Y)
+        else:
+            R = edsl_program(X, Y)
+        return Program('edsl_program', [R], debug=True, target='demo')

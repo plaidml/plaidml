@@ -34,14 +34,14 @@ PLATFORM_TAGS = {
 def clean_dep(dep):
     return str(Label(dep))
 
-def plaidml_cc_library(copts = [], linkopts = [], **kwargs):
-    native.cc_library(copts = PLAIDML_COPTS + copts, linkopts = PLAIDML_LINKOPTS + linkopts, **kwargs)
+def plaidml_cc_library(copts = [], **kwargs):
+    native.cc_library(copts = PLAIDML_COPTS + copts, **kwargs)
 
 def plaidml_objc_library(copts = [], linkopts = [], **kwargs):
     native.objc_library(copts = PLAIDML_COPTS + copts + ["-Wno-shorten-64-to-32"], **kwargs)
 
-def plaidml_cc_binary(copts = [], **kwargs):
-    native.cc_binary(copts = PLAIDML_COPTS + copts, **kwargs)
+def plaidml_cc_binary(copts = [], linkopts = [], **kwargs):
+    native.cc_binary(copts = PLAIDML_COPTS + copts, linkopts = PLAIDML_LINKOPTS + linkopts, **kwargs)
 
 def plaidml_cc_test(copts = [], deps = (), linkopts = [], **kwargs):
     native.cc_test(

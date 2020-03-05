@@ -7,7 +7,7 @@
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/TargetSelect.h"
 
-#include "mlir/Dialect/StandardOps/Ops.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/ExecutionEngine/ExecutionEngine.h"
 #include "mlir/ExecutionEngine/OptUtils.h"
 #include "mlir/Parser.h"
@@ -141,14 +141,16 @@ void Program::compile(StringRef target, bool collectPasses) {
     pm.addInstrumentation(std::make_unique<IRCollector>(&passes));
   }
 
-  auto shouldPrintBeforePass = [](auto pass, auto op) { return false; };
-  auto shouldPrintAfterPass = [&](auto pass, auto op) { return VLOG_IS_ON(3); };
-  pm.enableIRPrinting(shouldPrintBeforePass, shouldPrintAfterPass, true, false,
-                      llvm::errs());
-
   if (VLOG_IS_ON(1)) {
     pm.enableStatistics();
     pm.enableTiming();
+    auto shouldPrintBeforePass = [](auto pass, auto op) { return false; };
+    auto shouldPrintAfterPass = [&](auto pass, auto op) {
+      return VLOG_IS_ON(3);
+    };
+    pm.disableMultithreading();
+    pm.enableIRPrinting(shouldPrintBeforePass, shouldPrintAfterPass, true,
+                        false, llvm::errs());
   }
 
   auto pipelineBuilder = resolveTarget(target);

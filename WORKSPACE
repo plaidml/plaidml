@@ -29,28 +29,30 @@ load("@rules_python//python:repositories.bzl", "py_repositories")
 
 py_repositories()
 
-register_toolchains(
-    "//:py_toolchain",
-)
+register_toolchains("//:py_toolchain")
 
 load("@bazel_latex//:repositories.bzl", "latex_repositories")
 
 latex_repositories()
 
-# http_archive(
-#     name = "com_grail_bazel_toolchain",
-#     sha256 = "015454eb86330cd20bce951468652ce572e8c04421eda456926ea658d861a939",
-#     strip_prefix = "bazel-toolchain-8570c4ccb39f750452b0b5607c9f54a093214f26",
-#     urls = ["https://github.com/grailbio/bazel-toolchain/archive/8570c4ccb39f750452b0b5607c9f54a093214f26.zip"],
-# )
+http_archive(
+    name = "com_grail_bazel_toolchain",
+    sha256 = "17e12dfba5ae4fc735dded73500e24546ca74459bac68b8d6f68c7785e3e4500",
+    strip_prefix = "bazel-toolchain-7abc442059ea5b08f9c9bc7f0c1450b914aca090",
+    urls = ["https://github.com/plaidml/bazel-toolchain/archive/7abc442059ea5b08f9c9bc7f0c1450b914aca090.zip"],
+)
 
-# load("@com_grail_bazel_toolchain//toolchain:rules.bzl", "llvm_toolchain")
+load("@com_grail_bazel_toolchain//toolchain:deps.bzl", "bazel_toolchain_dependencies")
 
-# llvm_toolchain(
-#     name = "llvm_toolchain",
-#     llvm_version = "8.0.0",
-# )
+bazel_toolchain_dependencies()
 
-# load("@llvm_toolchain//:toolchains.bzl", "llvm_register_toolchains")
+load("@com_grail_bazel_toolchain//toolchain:rules.bzl", "llvm_toolchain")
 
-# llvm_register_toolchains()
+llvm_toolchain(
+    name = "llvm_toolchain",
+    llvm_version = "8.0.0",
+)
+
+load("@llvm_toolchain//:toolchains.bzl", "llvm_register_toolchains")
+
+llvm_register_toolchains()

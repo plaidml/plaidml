@@ -1,11 +1,28 @@
-// Copyright 2020, Intel Corporation
+// Copyright 2020 Intel Corporation
 
 #include "pmlc/dialect/pxa/analysis/strides.h"
-#include "pmlc/util/logging.h"
+
+#include <map>
+#include <string>
+#include <vector>
+
+#include "llvm/Support/FormatVariadic.h"
 
 namespace mlir {
 
-// Multiply all strides/offets by a constant
+const char *kBlockAndArgFormat = "^bb{0}:%arg{1}";
+
+static std::string getUniqueName(Block *ref, BlockArgument arg) {
+  unsigned reverseDepth = 0;
+  while (arg.getOwner() != ref) {
+    ref = ref->getParentOp()->getBlock();
+    reverseDepth++;
+  }
+  return llvm::formatv(kBlockAndArgFormat, reverseDepth, arg.getArgNumber())
+      .str();
+}
+
+// Multiply the offset and all strides by a constant.
 StrideInfo &StrideInfo::operator*=(int64_t factor) {
   offset *= factor;
   for (auto &kvp : strides) {
@@ -14,7 +31,7 @@ StrideInfo &StrideInfo::operator*=(int64_t factor) {
   return *this;
 }
 
-// Add the rhs into a StrideInfo
+// StrideInfo addition operation.
 StrideInfo &StrideInfo::operator+=(const StrideInfo &rhs) {
   offset += rhs.offset;
   for (const auto &kvp : rhs.strides) {
@@ -23,9 +40,30 @@ StrideInfo &StrideInfo::operator+=(const StrideInfo &rhs) {
   return *this;
 }
 
+void StrideInfo::print(raw_ostream &os, Block *relative) {
+  std::map<std::string, unsigned> ordered;
+  std::map<Block *, unsigned> blockIds;
+  for (auto kvp : strides) {
+    if (relative) {
+      ordered.emplace(getUniqueName(relative, kvp.first), kvp.second);
+    } else {
+      auto itNew = blockIds.emplace(kvp.first.getOwner(), blockIds.size());
+      ordered.emplace(llvm::formatv(kBlockAndArgFormat, itNew.first->second,
+                                    kvp.first.getArgNumber()),
+                      kvp.second);
+    }
+  }
+  os << offset << ":[";
+  for (auto item : llvm::enumerate(ordered)) {
+    if (item.index())
+      os << ", ";
+    os << item.value().first << "=" << item.value().second;
+  }
+  os << ']';
+}
+
 static Optional<StrideInfo> computeStrideInfo(AffineParallelOp op,
                                               BlockArgument arg) {
-  IVLOG(1, "PFOR");
   // Start at the lower bound, fail early if lower bound fails.
   size_t idx = arg.getArgNumber();
   auto out = computeStrideInfo(op.lowerBoundsMap().getResult(idx),
@@ -181,6 +219,48 @@ Optional<StrideInfo> computeStrideInfo(AffineStoreOp op) {
 Optional<StrideInfo> computeStrideInfo(pmlc::dialect::pxa::AffineReduceOp op) {
   return computeStrideInfo(op.out().getType().cast<MemRefType>(), op.map(),
                            op.idxs());
+}
+
+StrideArray::StrideArray(unsigned numDims, int64_t offset)
+    : offset(offset), strides(numDims) {}
+
+StrideArray &StrideArray::operator*=(int64_t factor) {
+  offset *= factor;
+  for (auto &dim : strides)
+    dim *= factor;
+  return *this;
+}
+
+StrideArray &StrideArray::operator+=(const StrideArray &rhs) {
+  assert(strides.size() == rhs.strides.size() && "strides sizes much match");
+  offset += rhs.offset;
+  for (unsigned i = 0, e = strides.size(); i < e; ++i) {
+    strides[i] += rhs.strides[i];
+  }
+  return *this;
+}
+
+void StrideArray::print(raw_ostream &os) {
+  os << offset << ":[";
+  for (auto item : llvm::enumerate(strides)) {
+    if (item.index())
+      os << ", ";
+    os << item.value();
+  }
+  os << ']';
+}
+
+Optional<StrideArray> computeStrideArray(AffineMap map) {
+  std::vector<SmallVector<int64_t, 8>> flat;
+  if (failed(getFlattenedAffineExprs(map, &flat, nullptr)))
+    return llvm::None;
+
+  StrideArray ret(map.getNumDims(), flat.front().back());
+  for (unsigned i = 0, e = map.getNumDims(); i < e; i++) {
+    ret.strides[i] = flat.front()[i];
+  }
+
+  return ret;
 }
 
 } // namespace mlir

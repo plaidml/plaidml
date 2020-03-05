@@ -1,6 +1,6 @@
 # Copyright 2020 Intel Corporation
 
-load("//bzl:plaidml.bzl", "plaidml_cc_binary", "plaidml_cc_test")
+load("//bzl:plaidml.bzl", "plaidml_cc_binary", "plaidml_cc_library", "plaidml_cc_test")
 
 filegroup(
     name = "lit_files",
@@ -19,6 +19,7 @@ filegroup(
         "//pmlc/dialect/stdx/tests:all",
         "//pmlc/dialect/tile/tests:all",
         "//pmlc/dialect/xsmm/tests:all",
+        "//pmlc/rt/vulkan/tests:all",
         "//pmlc/target/x86/tests:all",
     ],
     visibility = ["//visibility:public"],
@@ -31,6 +32,29 @@ plaidml_cc_test(
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Transforms",
     ],
+)
+
+plaidml_cc_library(
+    name = "all_passes_and_dialects_no_registration",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//pmlc/conversion/pxa_to_affine",
+        "//pmlc/conversion/stdx_to_llvm",
+        "//pmlc/conversion/tile_to_pxa",
+        "//pmlc/dialect/eltwise",
+        "//pmlc/dialect/pxa",
+        "//pmlc/dialect/stdx",
+        "//pmlc/dialect/tile",
+        "//pmlc/dialect/xsmm",
+        "//pmlc/target/x86",
+    ],
+)
+
+plaidml_cc_library(
+    name = "all_passes_and_dialects",
+    visibility = ["//visibility:public"],
+    deps = [":all_passes_and_dialects_no_registration"],
+    alwayslink = 1,
 )
 
 # The following rules are helpers to make it quicker and easier to launch the
@@ -61,4 +85,10 @@ plaidml_cc_binary(
     name = "translate",
     data = [":lit_tests"],
     deps = ["//pmlc/tools/pmlc-translate:lib"],
+)
+
+plaidml_cc_binary(
+    name = "vulkan",
+    data = [":lit_tests"],
+    deps = ["//pmlc/tools/pmlc-vulkan-runner:lib"],
 )

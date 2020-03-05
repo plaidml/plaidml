@@ -1,13 +1,13 @@
-import drawSvg.widgets as draw_widgets
 import ipywidgets as widgets
 from IPython.display import display
 
 import demos.mlsys_2020.core as demo
+import drawSvg.widgets as draw_widgets
 import plaidml
 import plaidml.exec
 
 
-def run():
+def run(demo_name):
 
     my_demo = demo.Demo()
 
@@ -98,13 +98,42 @@ def run():
                             tooltip='Compiles and executes your EDSL program',
                             icon='check')
 
-    def on_run_click(cb):
-        op_type = op_tab_titles[op_tabs.selected_index]
-        textbox_value = textboxes[op_tabs.selected_index].value
-        dropdown_value = dropdowns[op_type].value
-        my_demo.runtime_handler(op_type, dropdown_value, textbox_value)
+    if demo_name == "mlir":
 
-    op_run.on_click(on_run_click)
+        def createTextarea(text):
+            return widgets.Textarea(value=text,
+                                    layout=widgets.Layout(width='100%', height='350px'))
+
+        def on_run_click(cb):
+            try:
+                op_type = op_tab_titles[op_tabs.selected_index]
+                textbox_value = textboxes[op_tabs.selected_index].value
+                dropdown_value = dropdowns[op_type].value
+                program = my_demo.compile(dropdown_value, textbox_value)
+                mlir_out.clear_output()
+                with mlir_out:
+                    display(
+                        createTextarea(program.passes[0][1]),
+                        createTextarea(program.passes[6][1]),
+                        createTextarea(program.passes[-1][1]),
+                    )
+            except Exception as ex:
+                mlir_out.clear_output()
+                with mlir_out:
+                    display(createTextarea(str(ex)))
+
+        mlir_out = widgets.Output()
+        op_run.on_click(on_run_click)
+
+    if demo_name == 'edsl':
+
+        def on_run_click(cb):
+            op_type = op_tab_titles[op_tabs.selected_index]
+            textbox_value = textboxes[op_tabs.selected_index].value
+            dropdown_value = dropdowns[op_type].value
+            my_demo.runtime_handler(dropdown_value, textbox_value)
+
+        op_run.on_click(on_run_click)
 
     # Interactive user interface (visible on the left side of the display)
     left = widgets.VBox([
@@ -120,21 +149,29 @@ def run():
     def output_anim(arg):
         return my_demo.output_anim
 
-    right = widgets.VBox([
-        widgets.HBox([
-            widgets.VBox([
-                widgets.HTML(value="<h2>Input Array: X</h2>"),
-                draw_widgets.DrawingWidget(my_demo.input_x_anim)
+    if demo_name == "mlir":
+        right = widgets.VBox([widgets.HTML(value="<h2>Passes</h2>"), mlir_out],
+                             layout=widgets.Layout(width='100%'))
+        title = widgets.HTML(
+            value='<div style="text-align:center"><h1>MLIR Lowering Demo</h1></div>')
+
+    if demo_name == "edsl":
+        right = widgets.VBox([
+            widgets.HBox([
+                widgets.VBox([
+                    widgets.HTML(value="<h2>Input Array: X</h2>"),
+                    draw_widgets.DrawingWidget(my_demo.input_x_anim)
+                ]),
+                widgets.VBox([
+                    widgets.HTML(value="<h2>Input Array: Y</h2>"),
+                    draw_widgets.DrawingWidget(my_demo.input_y_anim)
+                ])
             ]),
-            widgets.VBox([
-                widgets.HTML(value="<h2>Input Array: Y</h2>"),
-                draw_widgets.DrawingWidget(my_demo.input_y_anim)
-            ])
-        ]),
-        widgets.HTML(value="<h2>Output Array: R</h2>"),
-        draw_widgets.AsyncAnimation(1, output_anim, click_pause=False),
-        widgets.Label(value="Note: all matrices are shown in row-major order")
-    ])
+            widgets.HTML(value="<h2>Output Array: R</h2>"),
+            draw_widgets.AsyncAnimation(1, output_anim, click_pause=False),
+            widgets.Label(value="Note: all matrices are shown in row-major order")
+        ])
+        title = widgets.HTML(value='<div style="text-align:center"><h1>EDSL Demo</h1></div>')
 
     # Full-screen layout
 
@@ -142,11 +179,8 @@ def run():
     hbox_layout.width = '100%'
     hbox_layout.justify_content = 'space-around'
 
-    # do this in a flexbox-friendlier way
-    edsl_title = widgets.HTML(value='<div style="text-align:center"><h1>EDSL Demo</h1></div>')
+    subdemo = widgets.HBox([left, right])
+    subdemo.layout = hbox_layout
 
-    edsl_subdemo = widgets.HBox([left, right])
-    edsl_subdemo.layout = hbox_layout
-
-    edsl_demo = widgets.VBox([edsl_title, edsl_subdemo])
-    display(edsl_demo)
+    full_demo = widgets.VBox([title, subdemo])
+    display(full_demo)

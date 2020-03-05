@@ -46,14 +46,14 @@ build:llvm --incompatible_enable_cc_toolchain_resolution
 build:linux --cpu=linux_x86_64
 build:linux --crosstool_top=//toolchain:toolchain
 build:linux --host_crosstool_top=//toolchain:toolchain
-build:linux --build_tag_filters=-latex,-macos,-pytorch,-windows
-test:linux --test_tag_filters=-latex,-macos,-pytorch,-windows
+build:linux --build_tag_filters=-latex,-macos,-pytorch,-skip_linux,-windows
+test:linux --test_tag_filters=-latex,-macos,-pytorch,-skip_linux,-windows
 
 build:macos --cxxopt=-std=c++17
 build:macos --cpu=darwin_x86_64
 build:macos --apple_platform_type=macos
-build:macos --build_tag_filters=-large,-linux,-windows
-test:macos --test_tag_filters=-large,-linux,-windows
+build:macos --build_tag_filters=-large,-linux,-skip_macos,-windows
+test:macos --test_tag_filters=-large,-linux,-skip_macos,-windows
 
 build:windows --enable_runfiles
 build:windows --cxxopt=/std:c++17 --cxxopt=/Zc:__cplusplus --cxxopt=/wd4624

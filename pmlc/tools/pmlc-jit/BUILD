@@ -7,10 +7,10 @@ load("//bzl:plaidml.bzl", "plaidml_cc_binary", "plaidml_cc_library")
 plaidml_cc_library(
     name = "lib",
     srcs = ["pmlc-jit.cc"],
-    linkopts = ["-ldl"],
     deps = [
-        "//pmlc/rt:rt_shlib",
-        "//pmlc/target/x86",
+        "//pmlc:all_passes_and_dialects_no_registration",
+        "//pmlc/rt:link",
+        "//pmlc/util",
         "@llvm-project//mlir:MlirJitRunner",
     ],
 )
