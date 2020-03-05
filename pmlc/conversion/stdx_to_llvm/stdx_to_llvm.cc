@@ -352,14 +352,11 @@ struct FPToSILowering : public LLVMLegalizationPattern<stdx::FPToSIOp> {
   PatternMatchResult
   matchAndRewrite(Operation *op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
-    if (auto fptosiOp = cast<stdx::FPToSIOp>(op)) {
-      auto value = fptosiOp.getOperand();
-      auto stdxType = fptosiOp.getOperation()->getResult(0).getType();
-      auto llvmType = typeConverter.convertType(stdxType);
-      rewriter.replaceOpWithNewOp<LLVM::FPToSIOp>(op, llvmType, value);
-      return matchSuccess();
-    }
-    return matchFailure();
+    auto value = op->getOperand(0);
+    auto stdxType = op->getResult(0).getType();
+    auto llvmType = typeConverter.convertType(stdxType);
+    rewriter.replaceOpWithNewOp<LLVM::FPToSIOp>(op, llvmType, value);
+    return matchSuccess();
   }
 };
 
@@ -370,14 +367,11 @@ struct FPToUILowering : public LLVMLegalizationPattern<stdx::FPToUIOp> {
   PatternMatchResult
   matchAndRewrite(Operation *op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
-    if (auto fptouiOp = cast<stdx::FPToUIOp>(op)) {
-      auto value = fptouiOp.getOperand();
-      auto stdxType = fptouiOp.getOperation()->getResult(0).getType();
-      auto llvmType = typeConverter.convertType(stdxType);
-      rewriter.replaceOpWithNewOp<LLVM::FPToUIOp>(op, llvmType, value);
-      return matchSuccess();
-    }
-    return matchFailure();
+    auto value = op->getOperand(0);
+    auto stdxType = op->getResult(0).getType();
+    auto llvmType = typeConverter.convertType(stdxType);
+    rewriter.replaceOpWithNewOp<LLVM::FPToUIOp>(op, llvmType, value);
+    return matchSuccess();
   }
 };
 
