@@ -33,7 +33,7 @@ int main(int argc, char **argv) {
   VkInstance instance;
   result = vkCreateInstance(&instanceCreateInfo, 0, &instance);
   if (result != VK_SUCCESS) {
-    std::cerr << "volkInitialize failed" << std::endl;
+    std::cerr << "vkCreateInstance failed" << std::endl;
     return 1;
   }
 
