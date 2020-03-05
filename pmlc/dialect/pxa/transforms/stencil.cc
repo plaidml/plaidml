@@ -24,8 +24,12 @@ enum MulOperationType {
   IntTy,
 };
 
+using BlockArgumentSet = llvm::SmallPtrSet<mlir::BlockArgument, 8>;
+
 // Number of tensors for the matrix multiplication
 const unsigned kNumTensors = 3;
+// Number of indices to search for (e.g. M, N, K)
+const unsigned kNumIndex = 3;
 
 class Stencil {
 private:
@@ -43,11 +47,31 @@ private:
   // Target tensors strides, the first two are load, the third is aggregate
   llvm::SmallVector<mlir::StrideInfo, kNumTensors> tensorsStrides;
 
+  // Set of the op's BlockArguments.
+  BlockArgumentSet opBlockArguments;
+
+  // Index in tensors
+  BlockArgumentSet tensorIdxs[kNumTensors];
+  // Stride one index for the tensors
+  BlockArgumentSet strideOne[kNumTensors];
+  // The indices used by the output tensor
+  BlockArgumentSet outIdxs;
+  // The accumulation indices
+  BlockArgumentSet accIdxs;
+  // All used indices
+  BlockArgumentSet allIdxs;
+
   // Found Gemm operation data
   MulOperationType mulOpType;
   mlir::AffineLoadOp in1Op;
   mlir::AffineLoadOp in2Op;
   AffineReduceOp outOp;
+
+  void PopulateOpBlockArgumentSet();
+  BlockArgumentSet UsedIdxs(unsigned strideInfoIndex);
+  void CollectUsedIndices();
+  void CollectStrideOneIndices();
+  void strideOneIdxs(unsigned indx);
 
 public:
   explicit Stencil(mlir::AffineParallelOp opIn) : op(opIn) {}
@@ -169,6 +193,66 @@ bool Stencil::ComputeStrideInfo() {
   return tensorsStrides.size() == kNumTensors;
 }
 
+// Collect the non constant indices used to index the memref at specific index.
+// Ignore indices that are constant for the ParallelOp.
+BlockArgumentSet Stencil::UsedIdxs(unsigned strideInfoIndex) {
+  assert(strideInfoIndex < kNumTensors);
+
+  BlockArgumentSet used_idxs;
+  for (auto kv : tensorsStrides[strideInfoIndex].strides) {
+    // Make sure the BlockArgument is in the list of the ParallelOp's
+    // BlockArguments.
+    if (opBlockArguments.find(kv.first) != opBlockArguments.end()) {
+      used_idxs.insert(kv.first);
+    }
+  }
+
+  return used_idxs;
+}
+
+void Stencil::PopulateOpBlockArgumentSet() {
+  for (auto blkArg : op.getBody()->getArguments()) {
+    opBlockArguments.insert(blkArg);
+  }
+}
+
+// Collect the indices that are not constants for the ParallelOp
+// and also the accumulation indices.
+void Stencil::CollectUsedIndices() {
+  // The last tensor is the output.
+  tensorIdxs[kNumIndex - 1] = UsedIdxs(kNumIndex - 1);
+  outIdxs = tensorIdxs[kNumIndex - 1];
+  accIdxs.clear();
+  for (unsigned i = 0; i < kNumIndex - 1; ++i) {
+    tensorIdxs[i] = UsedIdxs(i);
+    for (auto idx : tensorIdxs[i]) {
+      if (outIdxs.find(idx) == outIdxs.end()) {
+        accIdxs.insert(idx);
+      }
+    }
+  }
+
+  // Add the out used indices to the all the used indices collection as well.
+  allIdxs = accIdxs;
+  allIdxs.insert(outIdxs.begin(), outIdxs.end());
+}
+
+// Get the indices with stride of one.
+void Stencil::strideOneIdxs(unsigned indx) {
+  for (auto kv : tensorsStrides[indx].strides) {
+    if (kv.second == 1) {
+      strideOne[indx].insert(kv.first);
+    }
+  }
+}
+
+void Stencil::CollectStrideOneIndices() {
+  // Collect stride-one index
+  for (unsigned i = 0; i < kNumTensors; ++i) {
+    strideOneIdxs(i);
+  }
+}
+
 void Stencil::DoStenciling() {
   // Initialization
   if (!TryIdentifyGemmOperation()) {
@@ -181,6 +265,10 @@ void Stencil::DoStenciling() {
 
   if (!ComputeStrideInfo())
     return;
+
+  PopulateOpBlockArgumentSet();
+  CollectUsedIndices();
+  CollectStrideOneIndices();
 
   op.setAttr("is_gemm", mlir::UnitAttr::get(op.getContext()));
 }
