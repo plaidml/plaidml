@@ -50,6 +50,7 @@ def _run_lit_test(name, data, size, tags, features):
             "//pmlc/tools/pmlc-jit",
             "//pmlc/tools/pmlc-opt",
             "//pmlc/tools/pmlc-translate",
+            "//pmlc/tools/pmlc-vulkan-runner",
             "//pmlc:lit_files",
             "@llvm-project//llvm:FileCheck",
             "@llvm-project//llvm:count",

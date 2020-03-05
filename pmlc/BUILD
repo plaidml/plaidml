@@ -19,6 +19,7 @@ filegroup(
         "//pmlc/dialect/stdx/tests:all",
         "//pmlc/dialect/tile/tests:all",
         "//pmlc/dialect/xsmm/tests:all",
+        "//pmlc/rt/vulkan/tests:all",
         "//pmlc/target/x86/tests:all",
     ],
     visibility = ["//visibility:public"],
@@ -84,4 +85,10 @@ plaidml_cc_binary(
     name = "translate",
     data = [":lit_tests"],
     deps = ["//pmlc/tools/pmlc-translate:lib"],
+)
+
+plaidml_cc_binary(
+    name = "vulkan",
+    data = [":lit_tests"],
+    deps = ["//pmlc/tools/pmlc-vulkan-runner:lib"],
 )
