@@ -43,7 +43,7 @@ def AtomicRMWYieldOp :
 }
 
 def FPToSIOp :
-    StdX_Op<"fptosi"> {
+    StdX_Op<"fptosi", [NoSideEffect]> {
   let summary = "cast from floating-point to signed integer type";
   let arguments = (ins AnyType:$result);
   let results = (outs AnyType);
@@ -54,7 +54,7 @@ def FPToSIOp :
 }
 
 def FPToUIOp :
-    StdX_Op<"fptoui"> {
+    StdX_Op<"fptoui", [NoSideEffect]> {
   let summary = "cast from floating-point to unsigned integer type";
   let arguments = (ins AnyType:$result);
   let results = (outs AnyType);
