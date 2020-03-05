@@ -32,10 +32,7 @@ plaidml_cc_shlib(
 
 plaidml_cc_library(
     name = "link",
-    srcs = select({
-        "@bazel_tools//src/conditions:darwin_x86_64": [],
-        "//conditions:default": [":shlib"],
-    }),
+    srcs = [":shlib"],
     linkstatic = 1,
 )
 
