@@ -92,6 +92,8 @@ def glob_lit_tests(
         exclude = exclude,
     )
 
+    local_cfg = native.glob(["lit.local.cfg"])
+
     native.filegroup(
         name = "all",
         srcs = tests,
@@ -104,7 +106,7 @@ def glob_lit_tests(
         # Instantiate this test with updated parameters.
         lit_test(
             name = curr_test,
-            data = data + per_test_extra_data.pop(curr_test, []),
+            data = data + per_test_extra_data.pop(curr_test, []) + local_cfg,
             size = size_override.pop(curr_test, default_size),
             tags = ["lit"] + default_tags + tags_override.pop(curr_test, []),
             features = features,

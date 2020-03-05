@@ -2,7 +2,7 @@
 
 package(default_visibility = ["//visibility:public"])
 
-load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_shlib")
+load("//bzl:plaidml.bzl", "plaidml_cc_binary", "plaidml_cc_library", "plaidml_cc_shlib")
 
 plaidml_cc_library(
     name = "vulkan",
@@ -37,4 +37,10 @@ plaidml_cc_library(
         "//conditions:default": [":shlib"],
     }),
     linkstatic = 1,
+)
+
+plaidml_cc_binary(
+    name = "vkprobe",
+    srcs = ["vkprobe.cc"],
+    deps = ["@volk"],
 )
