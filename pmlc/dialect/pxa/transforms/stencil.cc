@@ -60,18 +60,60 @@ private:
   BlockArgumentSet accIdxs;
   // All used indices
   BlockArgumentSet allIdxs;
+  // Tensors' order
+  unsigned tensorsOrder[kNumTensors];
+  // M, N, K in inner block
+  mlir::BlockArgument innerIdxs[kNumIndex];
+  // The matrix_idx for the next search
+  unsigned nextMatrixIdx[kNumIndex] = {2, 3, 1};
+  // M, N, K's tiles
+  unsigned tiles[kNumIndex];
+
+  // Even index split only. Specified for each index.
+  bool onlyEven[kNumIndex] = {true, true, true};
 
   // Found Gemm operation data
   MulOperationType mulOpType;
   mlir::AffineLoadOp in1Op;
   mlir::AffineLoadOp in2Op;
   AffineReduceOp outOp;
+  // The best tensors' order
+  unsigned bestTensorsOrder[kNumTensors];
+  // The best index (M, N, K)
+  mlir::BlockArgument bestIdxs[kNumIndex];
+  // The best tiles for (M, N, K)
+  unsigned bestTiles[kNumIndex];
+
+  // The best performance
+  double bestPerf;
 
   void PopulateOpBlockArgumentSet();
   BlockArgumentSet UsedIdxs(unsigned strideInfoIndex);
   void CollectUsedIndices();
   void CollectStrideOneIndices();
   void strideOneIdxs(unsigned indx);
+
+  // Search tensors' order
+  void SearchTensorsOrder();
+  // Search the index, i.e., M, N, K, for the inner block
+  void SearchIndex(unsigned matrix_idx);
+  // Test if idx in tensors[tensor_idx] is stride one index
+  bool IsStrideOne(mlir::BlockArgument idx, unsigned tensor_idx);
+  // Test if idx in the tensors are stride one
+  bool ValidateStrideOne(mlir::BlockArgument idx, unsigned matrix_idx);
+  // Test if idx exists in tensorIdxs[tensor_idx]
+  bool IndexExists(mlir::BlockArgument idx, unsigned tensor_idx);
+  // Test if idx exists in the right place
+  bool ValidateIndexExistance(mlir::BlockArgument idx, unsigned matrix_idx);
+  // For (M, N, K) in the inner block, search their tiles
+  void SearchTiles(unsigned idx);
+
+  int64_t idxRange(mlir::BlockArgument idx);
+
+  // The throughput and startup cost of M*N*K matrix multiplication
+  std::pair<double, unsigned> Throughput(unsigned m, unsigned n, unsigned k);
+  // Evaluate the performance of the current searching state
+  double Evaluate();
 
 public:
   explicit Stencil(mlir::AffineParallelOp opIn) : op(opIn) {}
@@ -253,8 +295,210 @@ void Stencil::CollectStrideOneIndices() {
   }
 }
 
+// Test if idx in tensors[tensor_idx] is stride one index
+bool Stencil::IsStrideOne(mlir::BlockArgument idx, unsigned tensor_idx) {
+  return strideOne[tensor_idx].find(idx) != strideOne[tensor_idx].end();
+}
+
+// Test if idx in the tensors are stride one
+bool Stencil::ValidateStrideOne(mlir::BlockArgument idx, unsigned matrix_idx) {
+  switch (matrix_idx) {
+  case 0: {
+    // Test if M is stride one for B(3) and C(2)
+    return IsStrideOne(idx, tensorsOrder[1]) &&
+           IsStrideOne(idx, tensorsOrder[2]);
+  }
+  case 1: {
+    // N is not restricted for stride one
+    return true;
+  }
+  case 2: {
+    // Test if K is stride one for A(0)
+    return IsStrideOne(idx, tensorsOrder[0]);
+  }
+  default: {
+    assert(!"Wrong matrix_idx");
+  }
+  }
+  return false;
+}
+
+bool Stencil::IndexExists(mlir::BlockArgument idx, unsigned tensor_idx) {
+  return tensorIdxs[tensor_idx].find(idx) != tensorIdxs[tensor_idx].end();
+}
+
+// Confirm if idx exists in the right place
+bool Stencil::ValidateIndexExistance(mlir::BlockArgument idx,
+                                     unsigned matrix_idx) {
+  switch (matrix_idx) {
+  case 0: {
+    // Test if M exists in B and C, does not exist in A
+    return !IndexExists(idx, tensorsOrder[0]) && //
+           IndexExists(idx, tensorsOrder[1]) &&  //
+           IndexExists(idx, tensorsOrder[2]);
+  }
+  case 1: {
+    // Test if N exists in A and C, does not exist in B
+    return IndexExists(idx, tensorsOrder[0]) &&  //
+           !IndexExists(idx, tensorsOrder[1]) && //
+           IndexExists(idx, tensorsOrder[2]);
+  }
+  case 2: {
+    // Test if K exists in A and B, does not exist in C
+    return IndexExists(idx, tensorsOrder[0]) && //
+           IndexExists(idx, tensorsOrder[1]) && //
+           !IndexExists(idx, tensorsOrder[2]);
+  }
+  default: {
+    throw std::runtime_error("Wrong matrix_idx.");
+  }
+  }
+  return false;
+}
+
+// Search for matrix index (0 for M, 1 for N, 2 for K)
+void Stencil::SearchIndex(unsigned matrix_idx) {
+  if (matrix_idx >= kNumIndex) {
+    // We have the index and then search the tiles for these index
+    SearchTiles(0);
+    return;
+  }
+  auto &idxs = (matrix_idx == kNumIndex - 1) ? allIdxs : outIdxs;
+  for (auto idx : idxs) {
+    if (ValidateStrideOne(idx, matrix_idx) &&
+        ValidateIndexExistance(idx, matrix_idx)) {
+      innerIdxs[matrix_idx] = idx;
+      SearchIndex(nextMatrixIdx[matrix_idx]);
+    }
+  }
+}
+
+void Stencil::SearchTensorsOrder() {
+  // A B C, Search M(0) first as M is most restricted index
+  tensorsOrder[0] = 0;
+  tensorsOrder[1] = 1;
+  tensorsOrder[2] = 2;
+  SearchIndex(0);
+  // B A C, Search M(0) first as M is most restricted index
+  tensorsOrder[0] = 1;
+  tensorsOrder[1] = 0;
+  SearchIndex(0);
+}
+
+void Stencil::SearchTiles(unsigned idx) {
+  if (idx >= kNumIndex) {
+    double performance = Evaluate();
+    if (performance < bestPerf) {
+      bestPerf = performance;
+      for (unsigned i = 0; i < kNumTensors; ++i) {
+        bestTensorsOrder[i] = tensorsOrder[i];
+      }
+      for (unsigned i = 0; i < kNumIndex; ++i) {
+        bestIdxs[i] = innerIdxs[i];
+        bestTiles[i] = tiles[i];
+      }
+    }
+    return;
+  }
+
+  unsigned range = idxRange(innerIdxs[idx]);
+  for (unsigned i = range; i > 0; --i) {
+    if (onlyEven[idx] && (range % i != 0)) {
+      continue;
+    }
+    tiles[idx] = i;
+    SearchTiles(idx + 1);
+  }
+}
+
+int64_t Stencil::idxRange(mlir::BlockArgument idx) {
+  auto pf = mlir::cast<mlir::AffineParallelOp>(idx.getOwner()->getParentOp());
+  auto ranges = pf.getConstantRanges();
+  if (ranges != llvm::None) {
+    return (*ranges)[idx.getArgNumber()];
+  }
+  return -1;
+}
+
+double Stencil::Evaluate() {
+  unsigned tot_inner_loop = tiles[0] * tiles[1] * tiles[2];
+  double throughput;
+  unsigned startup_cost;
+  std::tie(throughput, startup_cost) = Throughput(tiles[0], tiles[1], tiles[2]);
+  if (throughput == 0) {
+    return std::numeric_limits<double>::max();
+  }
+  double inner_time = tot_inner_loop / throughput;
+  IVLOG(3,
+        "Inner: loop = " << tot_inner_loop << " inner_time = " << inner_time);
+  for (unsigned i = 0; i < kNumIndex; ++i) {
+    IVLOG(3, innerIdxs[i] << ": " << tiles[i]);
+  }
+
+  llvm::DenseMap<mlir::BlockArgument, unsigned> middle_idxs;
+  for (auto idx : accIdxs) {
+    middle_idxs.try_emplace(idx, idxRange(idx));
+  }
+  for (unsigned i = 0; i < kNumIndex; ++i) {
+    auto it = middle_idxs.find(innerIdxs[i]);
+    if (it != middle_idxs.end()) {
+      it->second = (it->second - 1) / tiles[i] + 1;
+    }
+  }
+  unsigned tot_middle_loop = 1;
+  for (auto &kvp : middle_idxs) {
+    tot_middle_loop *= kvp.second;
+  }
+
+  IVLOG(3, "Middle: loop = " << tot_middle_loop);
+
+  for (auto &kvp : middle_idxs) {
+    if (kvp.second > 1) {
+      IVLOG(3, kvp.first << ": " << kvp.second);
+    }
+  }
+
+  llvm::DenseMap<mlir::BlockArgument, unsigned> outer_idxs;
+  for (auto idx : outIdxs) {
+    outer_idxs.try_emplace(idx, idxRange(idx));
+  }
+  for (unsigned i = 0; i < kNumIndex; ++i) {
+    auto it = outer_idxs.find(innerIdxs[i]);
+    if (it != outer_idxs.end()) {
+      it->second = (it->second - 1) / tiles[i] + 1;
+    }
+  }
+  unsigned tot_outer_loop = 1;
+  for (auto &kvp : outer_idxs) {
+    tot_outer_loop *= kvp.second;
+  }
+
+  IVLOG(3, "Outer: loop = " << tot_outer_loop);
+
+  for (auto &kvp : outer_idxs) {
+    if (kvp.second > 1) {
+      IVLOG(3, kvp.first << ": " << kvp.second);
+    }
+  }
+
+  unsigned outer_batches =
+      (tot_outer_loop - 1) / std::thread::hardware_concurrency() + 1;
+  double perf = outer_batches * tot_middle_loop * (startup_cost + inner_time);
+
+  IVLOG(3, "Performance = " << perf);
+  return perf;
+}
+
+std::pair<double, unsigned> Stencil::Throughput(unsigned m, unsigned n,
+                                                unsigned k) {
+  // TODO: Hook up heatmap code.
+  return std::make_pair(3.0, 32);
+}
+
 void Stencil::DoStenciling() {
   // Initialization
+  tensors.clear();
+  bestPerf = std::numeric_limits<double>::max();
   if (!TryIdentifyGemmOperation()) {
     IVLOG(3, "Not a Gemm match.");
     return;
@@ -269,6 +513,18 @@ void Stencil::DoStenciling() {
   PopulateOpBlockArgumentSet();
   CollectUsedIndices();
   CollectStrideOneIndices();
+
+  // Search tensors' order, inner index and their tiles
+  SearchTensorsOrder();
+
+  IVLOG(1, "Best Perf: " << bestPerf);
+  IVLOG(1, "Best Tiles: " << bestTiles[0] << ":" << bestTiles[1] << ":"
+                          << bestTiles[2]);
+
+  if (bestPerf == std::numeric_limits<double>::max()) {
+    IVLOG(1, "No tile plan for stencil.");
+    return;
+  }
 
   op.setAttr("is_gemm", mlir::UnitAttr::get(op.getContext()));
 }
