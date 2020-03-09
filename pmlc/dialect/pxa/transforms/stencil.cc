@@ -115,8 +115,15 @@ private:
   // Evaluate the performance of the current searching state
   double Evaluate();
 
+  // Set the number of threads to a default value if not set from outside.
+  void SetNumberThreads();
+
+  // Number of threads
+  // TODO: Have a way to pass in dynamically the number of threads
+  unsigned numThreads;
+
 public:
-  explicit Stencil(mlir::AffineParallelOp opIn) : op(opIn) {}
+  explicit Stencil(mlir::AffineParallelOp opIn) : op(opIn), numThreads(0) {}
 
   // Main function
   void DoStenciling();
@@ -303,22 +310,18 @@ bool Stencil::IsStrideOne(mlir::BlockArgument idx, unsigned tensor_idx) {
 // Test if idx in the tensors are stride one
 bool Stencil::ValidateStrideOne(mlir::BlockArgument idx, unsigned matrix_idx) {
   switch (matrix_idx) {
-  case 0: {
+  case 0:
     // Test if M is stride one for B(3) and C(2)
     return IsStrideOne(idx, tensorsOrder[1]) &&
            IsStrideOne(idx, tensorsOrder[2]);
-  }
-  case 1: {
+  case 1:
     // N is not restricted for stride one
     return true;
-  }
-  case 2: {
+  case 2:
     // Test if K is stride one for A(0)
     return IsStrideOne(idx, tensorsOrder[0]);
-  }
-  default: {
+  default:
     assert(!"Wrong matrix_idx");
-  }
   }
   return false;
 }
@@ -331,27 +334,23 @@ bool Stencil::IndexExists(mlir::BlockArgument idx, unsigned tensor_idx) {
 bool Stencil::ValidateIndexExistance(mlir::BlockArgument idx,
                                      unsigned matrix_idx) {
   switch (matrix_idx) {
-  case 0: {
+  case 0:
     // Test if M exists in B and C, does not exist in A
     return !IndexExists(idx, tensorsOrder[0]) && //
            IndexExists(idx, tensorsOrder[1]) &&  //
            IndexExists(idx, tensorsOrder[2]);
-  }
-  case 1: {
+  case 1:
     // Test if N exists in A and C, does not exist in B
     return IndexExists(idx, tensorsOrder[0]) &&  //
            !IndexExists(idx, tensorsOrder[1]) && //
            IndexExists(idx, tensorsOrder[2]);
-  }
-  case 2: {
+  case 2:
     // Test if K exists in A and B, does not exist in C
     return IndexExists(idx, tensorsOrder[0]) && //
            IndexExists(idx, tensorsOrder[1]) && //
            !IndexExists(idx, tensorsOrder[2]);
-  }
-  default: {
-    throw std::runtime_error("Wrong matrix_idx.");
-  }
+  default:
+    assert(!"Wrong matrix_idx.");
   }
   return false;
 }
@@ -495,8 +494,15 @@ std::pair<double, unsigned> Stencil::Throughput(unsigned m, unsigned n,
   return std::make_pair(3.0, 32);
 }
 
+void Stencil::SetNumberThreads() {
+  if (numThreads == 0) {
+    numThreads = std::thread::hardware_concurrency() + 1;
+  }
+}
+
 void Stencil::DoStenciling() {
   // Initialization
+  SetNumberThreads();
   tensors.clear();
   bestPerf = std::numeric_limits<double>::max();
   if (!TryIdentifyGemmOperation()) {
