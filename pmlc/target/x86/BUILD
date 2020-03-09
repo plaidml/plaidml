@@ -7,7 +7,7 @@ load("//bzl:plaidml.bzl", "plaidml_cc_library")
 plaidml_cc_library(
     name = "x86",
     srcs = glob(["*.cc"]),
-    hdrs = glob(["*.h"]),
+    hdrs = glob(["*.h", "*.gz"]),
     deps = [
         "//pmlc/compiler",
         "//pmlc/conversion/pxa_to_affine",

@@ -12,7 +12,7 @@ plaidml_cc_library(
         "stencil.cc",
         "test_analysis.cc",
         "tile.cc",
-        ":heatmap"
+        ":heatmap",
     ],
     hdrs = [
         "autotile.h",
@@ -26,6 +26,7 @@ plaidml_cc_library(
         "//pmlc/dialect/pxa/ir",
         "//pmlc/dialect/tile/ir",
         "//pmlc/dialect/eltwise/ir",
+        "//pmlc/target/x86",
     ],
 )
 
@@ -39,6 +40,6 @@ plaidml_cc_library(
 heatmap(
     name = "heatmap",
     out = "heatmap.cc",
-    csv = "heatmap_skx_xeonplat_8180_1-7GHz_mblocked.csv.gz",
+    csv = "//pmlc/target/x86:heatmap_skx_xeonplat_8180_1-7GHz_mblocked.csv.gz",
     template = "heatmap.tpl.cc",
 )

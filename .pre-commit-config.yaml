@@ -4,7 +4,7 @@ exclude: >
     bzl/version.tpl.py|
     ci/pipeline.yml|
     plaidbench/plaidbench/networks/keras/imdb_lstm.h5|
-    pmlc/dialect/pxa/transforms/heatmap_skx_xeonplat_8180_1-7GHz_mblocked.csv.gz
+    pmlc/target/x86/heatmap_skx_xeonplat_8180_1-7GHz_mblocked.csv.gz
   )$
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
