@@ -16,6 +16,7 @@
 #include <memory>
 
 #include "mlir/IR/Module.h"
+#include "mlir/Pass/Pass.h"
 #include "mlir/Support/LLVM.h"
 
 std::unique_ptr<mlir::OpPassBase<mlir::ModuleOp>>
