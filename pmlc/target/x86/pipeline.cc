@@ -58,22 +58,22 @@ struct ConvertToLLVMPass : public ModulePass<ConvertToLLVMPass> {
 void addToPipeline(OpPassManager &pm) {
   pm.addPass(pmlc::dialect::tile::createComputeBoundsPass());
   pm.addPass(pmlc::dialect::tile::createPadPass());
-  pm.addNestedPass<FuncOp>(createCanonicalizerPass());
-  pm.addNestedPass<FuncOp>(createCSEPass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
 
   pm.addPass(pmlc::conversion::tile_to_pxa::createLowerTileToPXAPass());
-  pm.addNestedPass<FuncOp>(createCanonicalizerPass());
-  pm.addNestedPass<FuncOp>(createCSEPass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
 
   // TODO: do optimizations here
 
   pm.addPass(conversion::pxa_to_affine::createLowerPXAToAffinePass());
-  pm.addNestedPass<FuncOp>(createCanonicalizerPass());
-  pm.addNestedPass<FuncOp>(createCSEPass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
 
   pm.addPass(createLowerAffinePass());
-  pm.addNestedPass<FuncOp>(createCanonicalizerPass());
-  pm.addNestedPass<FuncOp>(createCSEPass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
 
   pm.addPass(ConvertToLLVMPass::create());
   pm.addPass(createTraceLinkingPass());

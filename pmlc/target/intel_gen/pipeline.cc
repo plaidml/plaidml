@@ -1,10 +1,13 @@
 // Copyright 2019, Intel Corporation
 
 #include "mlir/Conversion/GPUToSPIRV/ConvertGPUToSPIRVPass.h"
+#include "mlir/Conversion/GPUToVulkan/ConvertGPUToVulkanPass.h"
 #include "mlir/Conversion/LoopToStandard/ConvertLoopToStandard.h"
 #include "mlir/Conversion/LoopsToGPU/LoopsToGPUPass.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
+#include "mlir/Conversion/StandardToSPIRV/ConvertStandardToSPIRVPass.h"
 #include "mlir/Dialect/GPU/Passes.h"
+#include "mlir/Dialect/SPIRV/Passes.h"
 #include "mlir/Dialect/SPIRV/SPIRVOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
@@ -16,43 +19,52 @@
 #include "pmlc/dialect/tile/transforms/passes.h"
 
 using namespace mlir; // NOLINT[build/namespaces]
-using pmlc::conversion::pxa_to_affine::createLowerPXAToAffinePass;
 
 namespace pmlc::target::intel_gen {
 
 namespace {
 
 void addToPipeline(OpPassManager &pm) {
-  pm.addPass(pmlc::dialect::tile::createComputeBoundsPass());
-  pm.addNestedPass<FuncOp>(createCanonicalizerPass());
-  pm.addNestedPass<FuncOp>(createCSEPass());
-
-  pm.addPass(pmlc::conversion::tile_to_pxa::createLowerTileToPXAPass());
-  pm.addNestedPass<FuncOp>(createCanonicalizerPass());
-  pm.addNestedPass<FuncOp>(createCSEPass());
-
-  // TODO: do optimizations here
-
-  pm.addPass(createLowerPXAToAffinePass());
-  pm.addNestedPass<FuncOp>(createCanonicalizerPass());
-  pm.addNestedPass<FuncOp>(createCSEPass());
-
-  pm.addPass(createLowerAffinePass());
-  pm.addNestedPass<FuncOp>(createCanonicalizerPass());
-  pm.addNestedPass<FuncOp>(createCSEPass());
-
-  pm.addPass(createSimpleLoopsToGPUPass(1, 1));
-  pm.addNestedPass<FuncOp>(createCanonicalizerPass());
-  pm.addNestedPass<FuncOp>(createCSEPass());
-
-  pm.addPass(createGpuKernelOutliningPass());
-  // NOTE: canonicalizer/cse at this stage causes later passes to fail
-
-  pm.addNestedPass<ModuleOp>(createConvertGPUToSPIRVPass());
+  pm.addPass(dialect::tile::createComputeBoundsPass());
+  // pm.addPass(dialect::tile::createPadPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
-  // pm.addPass(createLowerToLLVMPass(true));
+  pm.addPass(conversion::tile_to_pxa::createLowerTileToPXAPass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
+
+  // TODO: do optimizations here
+
+  // pm.addPass(std::make_unique<UpdateWorkGroupSizePass>(workGroupSize));
+  // pm.addPass(std::make_unique<IREETileLinalgPass>());
+  // pm.addPass(createConvertLinalgToLoopsPass());
+  pm.addPass(conversion::pxa_to_affine::createLowerPXAToAffinePass());
+  pm.addPass(createLowerAffinePass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
+
+  // pm.addPass(std::make_unique<LoopsToGPUPass>());
+  pm.addPass(createSimpleLoopsToGPUPass(1, 1));
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createGpuKernelOutliningPass());
+  // pm.addPass(createConvertStandardToSPIRVPass());
+
+  // GPU to SPIR-V.
+  pm.addPass(createLegalizeStdOpsForSPIRVLoweringPass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
+  pm.addPass(createConvertGPUToSPIRVPass());
+  // pm.addPass(std::make_unique<IREEGPUToSPIRVPass>());
+
+  // SPIR-V passes for lowering attributes.
+  pm.addNestedPass<spirv::ModuleOp>(spirv::createLowerABIAttributesPass());
+  pm.addNestedPass<spirv::ModuleOp>(createCanonicalizerPass());
+  pm.addNestedPass<spirv::ModuleOp>(createCSEPass());
+
+  // GPU to Vulkan.
+  pm.addPass(createConvertGpuLaunchFuncToVulkanCallsPass());
+  pm.addPass(createLowerToLLVMPass());
 }
 
 static PassPipelineRegistration<>

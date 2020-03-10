@@ -20,6 +20,7 @@ filegroup(
         "//pmlc/dialect/tile/tests:all",
         "//pmlc/dialect/xsmm/tests:all",
         "//pmlc/rt/vulkan/tests:all",
+        "//pmlc/target/intel_gen/tests:all",
         "//pmlc/target/x86/tests:all",
     ],
     visibility = ["//visibility:public"],
@@ -46,6 +47,7 @@ plaidml_cc_library(
         "//pmlc/dialect/stdx",
         "//pmlc/dialect/tile",
         "//pmlc/dialect/xsmm",
+        "//pmlc/target/intel_gen",
         "//pmlc/target/x86",
     ],
 )

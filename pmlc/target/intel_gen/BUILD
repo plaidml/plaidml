@@ -15,6 +15,7 @@ plaidml_cc_library(
         "//pmlc/dialect/tile/transforms",
         "@llvm-project//mlir:AffineToStandardTransforms",
         "@llvm-project//mlir:GPUToSPIRVTransforms",
+        "@llvm-project//mlir:GPUToVulkanTransforms",
         "@llvm-project//mlir:GPUTransforms",
         "@llvm-project//mlir:LLVMTransforms",
         "@llvm-project//mlir:LoopsToGPUPass",
