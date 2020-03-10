@@ -4,9 +4,22 @@ module attributes {gpu.container_module} {
   func @dot(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>, %arg2: memref<3x3xf32>) {
     %c3 = constant 3 : index
     %c1 = constant 1 : index
+    "gpu.launch_func"(%c3, %c1, %c1, %c3, %c1, %c1, %arg2) {kernel = "dot_kernel_init", kernel_module = @dot_kernel_init} : (index, index, index, index, index, index, memref<3x3xf32>) -> ()
     "gpu.launch_func"(%c3, %c1, %c1, %c3, %c1, %c1, %arg1, %arg0, %arg2) {kernel = "dot_kernel", kernel_module = @dot_kernel_0} : (index, index, index, index, index, index, memref<3x3xf32>, memref<3x3xf32>, memref<3x3xf32>) -> ()
     return
   }
+
+  gpu.module @dot_kernel_init {
+    gpu.func @dot_kernel_init(%arg3: memref<3x3xf32>) 
+    attributes {gpu.kernel, spv.entry_point_abi = {local_size = dense<[3, 1, 1]>: vector<3xi32>}}{
+      %cst = constant 0.10000e+00 : f32
+      %0 = "gpu.block_id"() {dimension = "x"} : () -> index
+      %1 = "gpu.thread_id"() {dimension = "x"} : () -> index
+      store %cst, %arg3[%0, %1] : memref<3x3xf32>
+      gpu.return
+    }
+  }
+
   gpu.module @dot_kernel_0 {
     gpu.func @dot_kernel(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>, %arg2: memref<3x3xf32>) 
       attributes {gpu.kernel, spv.entry_point_abi = {local_size = dense<[3, 1, 1]>: vector<3xi32>}}{

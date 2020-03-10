@@ -27,6 +27,8 @@
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/TargetSelect.h"
 
+#include "pmlc/tools/pmlc-vulkan-runner/multi-gpu-launch-funcs-to-vulkan-calls.h"
+
 using namespace mlir; // NOLINT[build/namespaces]
 
 static LogicalResult runMLIRPasses(ModuleOp module) {
@@ -38,8 +40,9 @@ static LogicalResult runMLIRPasses(ModuleOp module) {
   passManager.addPass(createConvertGPUToSPIRVPass());
   OpPassManager &modulePM = passManager.nest<spirv::ModuleOp>();
   modulePM.addPass(spirv::createLowerABIAttributesPass());
-  passManager.addPass(createConvertGpuLaunchFuncToVulkanCallsPass());
+  passManager.addPass(createConvertMultiGpuLaunchFuncsToVulkanCallsPass());
   passManager.addPass(createLowerToLLVMPass());
+
   return passManager.run(module);
 }
 

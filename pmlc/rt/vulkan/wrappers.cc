@@ -45,6 +45,10 @@ public:
     free(value[0]);
     free(value[1]);
     free(value[2]);
+
+    if (failed(vulkanRuntime.destroy())) {
+      llvm::errs() << "runOnVulkan failed";
+    }
   }
 
   void setResourceData(DescriptorSetIndex setIndex, BindingIndex bindIndex,
@@ -71,8 +75,7 @@ public:
   void runOnVulkan() {
     std::lock_guard<std::mutex> lock(mutex);
     if (failed(vulkanRuntime.initRuntime()) || failed(vulkanRuntime.run()) ||
-        failed(vulkanRuntime.updateHostMemoryBuffers()) ||
-        failed(vulkanRuntime.destroy())) {
+        failed(vulkanRuntime.updateHostMemoryBuffers())) {
       llvm::errs() << "runOnVulkan failed";
     }
   }
