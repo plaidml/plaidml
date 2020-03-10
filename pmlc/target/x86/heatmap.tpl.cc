@@ -1,8 +1,8 @@
 // Copyright 2018, Intel Corporation
 
-#include "pmlc/dialect/pxa/transforms/heatmap.h"
+#include "pmlc/target/x86/heatmap.h"
 
-namespace vertexai::tile::targets::cpu {
+namespace pmlc::target::x86 {
 
 uint64_t kHeatmapSize = {{#size}} {{SIZE}} {{ / size}};
 
@@ -22,4 +22,4 @@ float kHeatmapValues[] = {
     // clang-format on
 };
 
-} // namespace vertexai::tile::targets::cpu
+} // namespace pmlc::target::x86

@@ -47,7 +47,7 @@ module {
   // CHECK: affine.parallel
   // CHECK-NOT: is_gemm
 
-// CHECK-LABEL: @gemm_operation_rewrite_i32
+  // CHECK-LABEL: @gemm_operation_rewrite_i32
   func @gemm_operation_rewrite_i32(%arg0: memref<100x100xi32>, %arg1: memref<100x100xi32>, %arg2: memref<100x100xi32>) {
     affine.parallel (%i, %j, %k) = (0, 0, 0) to (100, 100, 100) {
       %0 = affine.load %arg1[%i, %k] : memref<100x100xi32>

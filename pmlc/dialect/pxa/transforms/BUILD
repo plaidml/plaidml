@@ -3,7 +3,6 @@
 package(default_visibility = ["//visibility:public"])
 
 load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_test")
-load("//tools/heatmap:build_defs.bzl", "heatmap")
 
 plaidml_cc_library(
     name = "lib",
@@ -12,11 +11,9 @@ plaidml_cc_library(
         "stencil.cc",
         "test_analysis.cc",
         "tile.cc",
-        ":heatmap",
     ],
     hdrs = [
         "autotile.h",
-        "heatmap.h",
         "tile.h",
         "passes.h",
         "test_analysis.h",
@@ -35,11 +32,4 @@ plaidml_cc_library(
     srcs = ["registration.cc"],
     deps = [":lib"],
     alwayslink = 1,
-)
-
-heatmap(
-    name = "heatmap",
-    out = "heatmap.cc",
-    csv = "//pmlc/target/x86:heatmap_skx_xeonplat_8180_1-7GHz_mblocked.csv.gz",
-    template = "heatmap.tpl.cc",
 )
