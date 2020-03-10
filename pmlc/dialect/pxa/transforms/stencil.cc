@@ -87,6 +87,8 @@ private:
   // The best performance
   double bestPerf;
 
+  llvm::Optional<llvm::SmallVector<int64_t, 8>> opConstRanges;
+
   void PopulateOpBlockArgumentSet();
   BlockArgumentSet UsedIdxs(unsigned strideInfoIndex);
   void CollectUsedIndices();
@@ -119,11 +121,11 @@ private:
   void SetNumberThreads();
 
   // Number of threads
-  // TODO: Have a way to pass in dynamically the number of threads
   unsigned numThreads;
 
 public:
-  explicit Stencil(mlir::AffineParallelOp opIn) : op(opIn), numThreads(0) {}
+  explicit Stencil(mlir::AffineParallelOp opIn, int numThreadsIn)
+      : op(opIn), numThreads(numThreadsIn) {}
 
   // Main function
   void DoStenciling();
@@ -311,17 +313,14 @@ bool Stencil::IsStrideOne(mlir::BlockArgument idx, unsigned tensor_idx) {
 bool Stencil::ValidateStrideOne(mlir::BlockArgument idx, unsigned matrix_idx) {
   switch (matrix_idx) {
   case 0:
-    // Test if M is stride one for B(3) and C(2)
     return IsStrideOne(idx, tensorsOrder[1]) &&
            IsStrideOne(idx, tensorsOrder[2]);
   case 1:
-    // N is not restricted for stride one
     return true;
   case 2:
-    // Test if K is stride one for A(0)
     return IsStrideOne(idx, tensorsOrder[0]);
   default:
-    assert(!"Wrong matrix_idx");
+    llvm_unreachable("Wrong matrix_idx");
   }
   return false;
 }
@@ -350,7 +349,7 @@ bool Stencil::ValidateIndexExistance(mlir::BlockArgument idx,
            IndexExists(idx, tensorsOrder[1]) && //
            !IndexExists(idx, tensorsOrder[2]);
   default:
-    assert(!"Wrong matrix_idx.");
+    llvm_unreachable("Wrong matrix_idx.");
   }
   return false;
 }
@@ -411,10 +410,8 @@ void Stencil::SearchTiles(unsigned idx) {
 }
 
 int64_t Stencil::idxRange(mlir::BlockArgument idx) {
-  auto pf = mlir::cast<mlir::AffineParallelOp>(idx.getOwner()->getParentOp());
-  auto ranges = pf.getConstantRanges();
-  if (ranges != llvm::None) {
-    return (*ranges)[idx.getArgNumber()];
+  if (opConstRanges != llvm::None) {
+    return (*opConstRanges)[idx.getArgNumber()];
   }
   return -1;
 }
@@ -520,6 +517,10 @@ void Stencil::DoStenciling() {
   CollectUsedIndices();
   CollectStrideOneIndices();
 
+  opConstRanges = op.getConstantRanges();
+  if (!opConstRanges)
+    return;
+
   // Search tensors' order, inner index and their tiles
   SearchTensorsOrder();
 
@@ -538,13 +539,14 @@ void Stencil::DoStenciling() {
 void StencilPass::runOnFunction() {
   auto func = getFunction();
   func.walk([&](mlir::AffineParallelOp op) {
-    Stencil as(op);
+    Stencil as(op, numberOfThreadsOption.getValue());
     as.DoStenciling();
   });
 }
 
-std::unique_ptr<mlir::Pass> createStencilPass() {
-  return std::make_unique<StencilPass>();
+void createStencilPass(mlir::OpPassManager &pm,
+                       const StencilPassOptions &options) {
+  return pm.addPass(std::make_unique<StencilPass>(options));
 }
 
 } // namespace pmlc::dialect::pxa

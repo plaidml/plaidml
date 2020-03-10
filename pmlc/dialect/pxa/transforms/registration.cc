@@ -31,8 +31,13 @@ static mlir::PassRegistration<TestStrideInfoPass>
     regTestStrideInfo("test-stride-info",
                       "Report stride data for all loads/stores for unit tests");
 
-static mlir::PassRegistration<StencilPass>
+static mlir::PassPipelineRegistration<StencilPassOptions>
     stencil_pass("affine-stencil",
-                 "Stencil the inputs to create \"micro\" GEMM operations.");
+                 "Stencil the inputs to create \"micro\" GEMM operations.",
+                 createStencilPass);
+// Lubo static mlir::PassRegistration<StencilPass>
+// Lubo     stencil_pass("affine-stencil",
+// Lubo                  "Stencil the inputs to create \"micro\" GEMM
+// operations.");
 
 } // namespace pmlc::dialect::pxa
