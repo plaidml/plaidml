@@ -87,7 +87,7 @@ private:
   // The best performance
   double bestPerf;
 
-  llvm::Optional<llvm::SmallVector<int64_t, 8>> opConstRanges;
+  llvm::SmallVector<int64_t, 8> opConstRanges;
 
   void PopulateOpBlockArgumentSet();
   BlockArgumentSet UsedIdxs(unsigned strideInfoIndex);
@@ -410,10 +410,8 @@ void Stencil::SearchTiles(unsigned idx) {
 }
 
 int64_t Stencil::idxRange(mlir::BlockArgument idx) {
-  if (opConstRanges != llvm::None) {
-    return (*opConstRanges)[idx.getArgNumber()];
-  }
-  return -1;
+  assert(idx.getArgNumber() < opConstRanges.size());
+  return opConstRanges[idx.getArgNumber()];
 }
 
 double Stencil::Evaluate() {
@@ -517,9 +515,11 @@ void Stencil::DoStenciling() {
   CollectUsedIndices();
   CollectStrideOneIndices();
 
-  opConstRanges = op.getConstantRanges();
-  if (!opConstRanges)
+  auto ranges = op.getConstantRanges();
+  if (!ranges)
     return;
+
+  opConstRanges = *ranges;
 
   // Search tensors' order, inner index and their tiles
   SearchTensorsOrder();
@@ -542,6 +542,10 @@ void StencilPass::runOnFunction() {
     Stencil as(op, numberOfThreadsOption.getValue());
     as.DoStenciling();
   });
+}
+
+StencilPass::StencilPass(const StencilPassOptions &options) {
+  numberOfThreadsOption.setValue(options.numberOfThreadsOption);
 }
 
 void createStencilPass(mlir::OpPassManager &pm,

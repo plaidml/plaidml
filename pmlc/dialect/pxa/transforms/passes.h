@@ -33,10 +33,6 @@ struct StencilPass : public mlir::FunctionPass<StencilPass> {
   void runOnFunction() final;
 };
 
-StencilPass::StencilPass(const StencilPassOptions &options) {
-  numberOfThreadsOption.setValue(options.numberOfThreadsOption);
-}
-
 void createStencilPass(mlir::OpPassManager &pm, const StencilPassOptions &);
 
 } // namespace pmlc::dialect::pxa
