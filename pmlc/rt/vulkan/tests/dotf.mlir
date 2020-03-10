@@ -1,6 +1,12 @@
 // RUN: pmlc-vulkan-runner %s --entry-point-result=void 
 
 module attributes {gpu.container_module} {
+  func @dot(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>, %arg2: memref<3x3xf32>) {
+    %c3 = constant 3 : index
+    %c1 = constant 1 : index
+    "gpu.launch_func"(%c3, %c1, %c1, %c3, %c1, %c1, %arg1, %arg0, %arg2) {kernel = "dot_kernel", kernel_module = @dot_kernel_0} : (index, index, index, index, index, index, memref<3x3xf32>, memref<3x3xf32>, memref<3x3xf32>) -> ()
+    return
+  }
   gpu.module @dot_kernel_0 {
     gpu.func @dot_kernel(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>, %arg2: memref<3x3xf32>) 
       attributes {gpu.kernel, spv.entry_point_abi = {local_size = dense<[3, 1, 1]>: vector<3xi32>}}{
@@ -35,10 +41,8 @@ module attributes {gpu.container_module} {
     call @setResourceData2D(%0, %1, %arg4, %1) : (i32, i32, memref<?x?xf32>, i32) -> ()
     call @setResourceData2D(%0, %2, %arg5, %2) : (i32, i32, memref<?x?xf32>, i32) -> ()
 
-    %cst1 = constant 1 : index
-    %cst8 = constant 3 : index
-    "gpu.launch_func"(%cst8, %cst1, %cst1, %cst1, %cst1, %cst1, %arg0, %arg1, %arg2) { kernel = "dot_kernel", kernel_module = @dot_kernel_0 }
-        : (index, index, index, index, index, index, memref<3x3xf32>, memref<3x3xf32>, memref<3x3xf32>) -> ()
+    call @dot(%arg0, %arg1, %arg2) : ( memref<3x3xf32>, memref<3x3xf32>, memref<3x3xf32>) -> ()
+    
     %arg6 = memref_cast %arg5 : memref<?x?xf32> to memref<*xf32>
     call @print_memref_f32(%arg6) : (memref<*xf32>) -> ()
     return

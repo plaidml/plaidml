@@ -105,8 +105,8 @@ void setResourceData2D(const DescriptorSetIndex setIndex,
   int64_t size = size_0 * size_1;
   memcpy(allocated, vkRuntimeManager->value[buffer_index],
          size * sizeof(float));
-  VulkanHostMemoryBuffer memBuffer{
-      allocated, static_cast<uint32_t>(size_0 * size_1 * sizeof(float))};
+  VulkanHostMemoryBuffer memBuffer{allocated,
+                                   static_cast<uint32_t>(size * sizeof(float))};
   vkRuntimeManager->setResourceData(setIndex, bindIndex, memBuffer);
 }
 
