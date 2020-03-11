@@ -13,7 +13,7 @@ CONSOLE_SCRIPTS = [
 
 REQUIRED_PACKAGES = [
     'cffi',
-    'enum34 == 1.1.9',
+    'enum34 >= 1.1.6',
     'numpy',
     'six',
 ]
