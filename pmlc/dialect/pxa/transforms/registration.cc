@@ -31,7 +31,7 @@ static mlir::PassRegistration<TestStrideInfoPass>
     regTestStrideInfo("test-stride-info",
                       "Report stride data for all loads/stores for unit tests");
 
-static mlir::PassPipelineRegistration<StencilPassOptions>
+static mlir::PassRegistration<StencilPass>
     stencil_pass("affine-stencil",
                  "Stencil the inputs to create \"micro\" GEMM operations.",
                  createStencilPass);

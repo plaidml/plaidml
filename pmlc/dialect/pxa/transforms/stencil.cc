@@ -533,22 +533,17 @@ void Stencil::DoStenciling() {
 void StencilPass::runOnFunction() {
   auto func = getFunction();
   unsigned threads = numThreads.getValue();
+  if (threads == 0)
+    threads = std::thread::hardware_concurrency();
+
   func.walk([&](mlir::AffineParallelOp op) {
-    if (threads == 0) {
-      threads = std::thread::hardware_concurrency();
-    }
     Stencil as(op, threads);
     as.DoStenciling();
   });
 }
 
-StencilPass::StencilPass(const StencilPassOptions &options) {
-  numThreads.setValue(options.numThreads);
-}
-
-void createStencilPass(mlir::OpPassManager &pm,
-                       const StencilPassOptions &options) {
-  return pm.addPass(std::make_unique<StencilPass>(options));
+std::unique_ptr<mlir::Pass> createStencilPass() {
+  return std::make_unique<StencilPass>();
 }
 
 } // namespace pmlc::dialect::pxa

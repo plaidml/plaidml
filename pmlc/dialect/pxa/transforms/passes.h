@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include <memory>
+
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassOptions.h"
@@ -15,17 +17,10 @@ class OpPassBase;
 
 namespace pmlc::dialect::pxa {
 
-struct StencilPassOptions
-    : public mlir::PassPipelineOptions<StencilPassOptions> {
-  Option<unsigned> numThreads{
-      *this, "threads",
-      llvm::cl::desc("Specifies number of threads for the stencilling pass")};
-};
-
 struct StencilPass : public mlir::FunctionPass<StencilPass> {
   StencilPass() = default;
   StencilPass(const StencilPass &) {}
-  explicit StencilPass(const StencilPassOptions &options);
+  // explicit StencilPass(const StencilPassOptions &options);
 
   Option<unsigned> numThreads{
       *this, "threads",
@@ -33,6 +28,6 @@ struct StencilPass : public mlir::FunctionPass<StencilPass> {
   void runOnFunction() final;
 };
 
-void createStencilPass(mlir::OpPassManager &pm, const StencilPassOptions &);
+std::unique_ptr<mlir::Pass> createStencilPass();
 
 } // namespace pmlc::dialect::pxa
