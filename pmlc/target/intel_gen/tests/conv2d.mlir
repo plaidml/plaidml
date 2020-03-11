@@ -1,4 +1,4 @@
-// RUN: pmlc-opt | pmlc-vulkan-runner %s --target-intel_gen | FileCheck %s
+// RUN: pmlc-opt  %s -tile-compute-bounds -convert-tile-to-pxa -convert-pxa-to-affine -lower-affine -canonicalize -convert-loops-to-gpu -gpu-kernel-outlining 
 
 #map0 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
 #map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4 - 1, d2 + d5 - 1, d6)>
