@@ -125,7 +125,9 @@ private:
 
 public:
   explicit Stencil(mlir::AffineParallelOp opIn, int numThreadsIn)
-      : op(opIn), numThreads(numThreadsIn) {}
+      : op(opIn), numThreads(numThreadsIn) {
+    assert(numThreads != 0);
+  }
 
   // Main function
   void DoStenciling();
@@ -489,15 +491,8 @@ std::pair<double, unsigned> Stencil::Throughput(unsigned m, unsigned n,
   return std::make_pair(3.0, 32);
 }
 
-void Stencil::SetNumberThreads() {
-  if (numThreads == 0) {
-    numThreads = std::thread::hardware_concurrency() + 1;
-  }
-}
-
 void Stencil::DoStenciling() {
   // Initialization
-  SetNumberThreads();
   tensors.clear();
   bestPerf = std::numeric_limits<double>::max();
   if (!TryIdentifyGemmOperation()) {

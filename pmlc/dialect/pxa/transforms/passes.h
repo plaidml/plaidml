@@ -23,7 +23,6 @@ struct StencilPassOptions
 };
 
 struct StencilPass : public mlir::FunctionPass<StencilPass> {
-  StencilPass() = default;
   StencilPass(const StencilPass &) {}
   explicit StencilPass(const StencilPassOptions &options);
 
