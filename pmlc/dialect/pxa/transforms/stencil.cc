@@ -539,13 +539,13 @@ void Stencil::DoStenciling() {
 void StencilPass::runOnFunction() {
   auto func = getFunction();
   func.walk([&](mlir::AffineParallelOp op) {
-    Stencil as(op, numberOfThreadsOption.getValue());
+    Stencil as(op, numThreads.getValue());
     as.DoStenciling();
   });
 }
 
 StencilPass::StencilPass(const StencilPassOptions &options) {
-  numberOfThreadsOption.setValue(options.numberOfThreadsOption);
+  numThreads.setValue(options.numThreads);
 }
 
 void createStencilPass(mlir::OpPassManager &pm,

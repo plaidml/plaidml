@@ -5,8 +5,8 @@
 #map2 = affine_map<() -> (100, 100, 100)>
 
 module {
-  // CHECK-LABEL: @no_gem_mul_reduce_operation
-  func @no_gem_mul_reduce_operation(%arg0: memref<100x100xf32>, %arg1: memref<100x100xf32>, %arg2: memref<100x100xf32>) {
+  // CHECK-LABEL: @no_gemm_mul_reduce_operation
+  func @no_gemm_mul_reduce_operation(%arg0: memref<100x100xf32>, %arg1: memref<100x100xf32>, %arg2: memref<100x100xf32>) {
     affine.parallel (%i, %j, %k) = (0, 0, 0) to (100, 100, 100) {
       %0 = affine.load %arg1[%i, %k] : memref<100x100xf32>
       %1 = affine.load %arg0[%k, %j] : memref<100x100xf32>
@@ -19,8 +19,8 @@ module {
   // CHECK-NOT: is_gemm
 
 
-  // CHECK-LABEL: @no_gem_no_mul_before_reduce_operation
-  func @no_gem_no_mul_before_reduce_operation(%arg0: memref<100x100xf32>, %arg1: memref<100x100xf32>, %arg2: memref<100x100xf32>) {
+  // CHECK-LABEL: @no_gemm_no_mul_before_reduce_operation
+  func @no_gemm_no_mul_before_reduce_operation(%arg0: memref<100x100xf32>, %arg1: memref<100x100xf32>, %arg2: memref<100x100xf32>) {
     affine.parallel (%i, %j, %k) = (0, 0, 0) to (100, 100, 100) {
       %0 = affine.load %arg1[%i, %k] : memref<100x100xf32>
       %1 = affine.load %arg0[%k, %j] : memref<100x100xf32>
@@ -32,8 +32,8 @@ module {
   // CHECK: affine.parallel
   // CHECK-NOT: is_gemm
 
-  // CHECK-LABEL: @no_gem_mul_params_not_affine_loads
-  func @no_gem_mul_params_not_affine_loads(%arg0: memref<100x100xf32>, %arg1: memref<100x100xf32>, %arg2: memref<100x100xf32>) {
+  // CHECK-LABEL: @no_gemm_mul_params_not_affine_loads
+  func @no_gemm_mul_params_not_affine_loads(%arg0: memref<100x100xf32>, %arg1: memref<100x100xf32>, %arg2: memref<100x100xf32>) {
     affine.parallel (%i, %j, %k) = (0, 0, 0) to (100, 100, 100) {
       %0 = affine.load %arg1[%i, %k] : memref<100x100xf32>
       %1 = affine.load %arg0[%k, %j] : memref<100x100xf32>
@@ -47,8 +47,8 @@ module {
   // CHECK: affine.parallel
   // CHECK-NOT: is_gemm
 
-  // CHECK-LABEL: @no_gem_no_stride_one_1
-  func @no_gem_no_stride_one_1(%arg0: memref<100x100xf32>, %arg1: memref<100x100xf32>, %arg2: memref<100x100xf32>) {
+  // CHECK-LABEL: @no_gemm_no_stride_one_1
+  func @no_gemm_no_stride_one_1(%arg0: memref<100x100xf32>, %arg1: memref<100x100xf32>, %arg2: memref<100x100xf32>) {
     affine.parallel (%i, %j, %k) = (0, 0, 0) to (100, 100, 100) {
       %0 = affine.load %arg1[%k, %i] : memref<100x100xf32>
       %1 = affine.load %arg0[%k, %j] : memref<100x100xf32>
@@ -62,8 +62,8 @@ module {
   // CHECK: affine.parallel
   // CHECK-NOT: is_gemm
 
-  // CHECK-LABEL: @no_gem_no_stride_one_2
-  func @no_gem_no_stride_one_2(%arg0: memref<100x100xf32>, %arg1: memref<100x100xf32>, %arg2: memref<100x100xf32>) {
+  // CHECK-LABEL: @no_gemm_no_stride_one_2
+  func @no_gemm_no_stride_one_2(%arg0: memref<100x100xf32>, %arg1: memref<100x100xf32>, %arg2: memref<100x100xf32>) {
     affine.parallel (%i, %j, %k) = (0, 0, 0) to (100, 100, 100) {
       %0 = affine.load %arg1[%k, %i] : memref<100x100xf32>
       %1 = affine.load %arg0[%k, 2*%j] : memref<100x100xf32>
