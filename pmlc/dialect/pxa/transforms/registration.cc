@@ -35,9 +35,5 @@ static mlir::PassPipelineRegistration<StencilPassOptions>
     stencil_pass("affine-stencil",
                  "Stencil the inputs to create \"micro\" GEMM operations.",
                  createStencilPass);
-// Lubo static mlir::PassRegistration<StencilPass>
-// Lubo     stencil_pass("affine-stencil",
-// Lubo                  "Stencil the inputs to create \"micro\" GEMM
-// operations.");
 
 } // namespace pmlc::dialect::pxa
