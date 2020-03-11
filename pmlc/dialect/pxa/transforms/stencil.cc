@@ -532,8 +532,8 @@ void Stencil::DoStenciling() {
 
 void StencilPass::runOnFunction() {
   auto func = getFunction();
+  unsigned threads = numThreads.getValue();
   func.walk([&](mlir::AffineParallelOp op) {
-    unsigned threads = numThreads.getValue();
     if (threads == 0) {
       threads = std::thread::hardware_concurrency();
     }
