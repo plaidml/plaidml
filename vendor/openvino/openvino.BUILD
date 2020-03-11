@@ -18,6 +18,45 @@ cc_binary(
     linkstatic = False,
 )
 
+cc_library(
+    name = "testing",
+    srcs = glob([
+        "inference-engine/tests/helpers/*common*cpp",
+    ]),
+    hdrs = glob([
+        "inference-engine/tests/helpers/*common*hpp",
+    ]),
+    deps = [
+        ":inference_engine",
+    ],
+    includes = [
+        "inference-engine/tests/helpers" ,
+    ],
+    defines = [
+        "DATA_PATH=NULL",
+    ]
+)
+
+cc_library(
+    name = "smoke_tests",
+    srcs = [
+        "inference-engine/tests/unit/engines/mkldnn/dump_test.cpp",
+        "inference-engine/tests/unit/engines/mkldnn/dump_test.cpp",
+    ],
+    hdrs = [
+        "inference-engine/tests/unit/engines/mkldnn/graph/test_graph.hpp"
+    ],
+    includes = [
+        "inference-engine/tests/unit/engines/mkldnn/graph"
+    ],
+    data = [":plugins"],
+    deps = [
+        ":testing",
+        "@gmock//:gtest",
+        "mkldnn_plugin",
+    ],
+)
+
 genrule(
     name = "plugins",
     outs = ["plugins.xml"],
@@ -62,7 +101,7 @@ cc_library(
         "inference-engine/src/mkldnn_plugin/",
         "inference-engine/src/mkldnn_plugin/mkldnn",
     ],
-    defines = [
+    local_defines = [
         "COMPILED_CPU_MKLDNN_QUANTIZE_NODE",
     ],
     deps = [ "inference_engine" ],
@@ -108,8 +147,8 @@ cc_library(
         "inference-engine/src/extension/common",
         "inference-engine/src/inference_engine/",
         "inference-engine/src/preprocessing/",
-        "inference-engine/include/",
         "inference-engine/",
+        "inference-engine/include/",
         "inference-engine/samples/common/format_reader",
         "inference-engine/samples/common/",
     ],
