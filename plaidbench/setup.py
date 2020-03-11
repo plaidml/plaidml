@@ -13,7 +13,7 @@ CONSOLE_SCRIPTS = [
 INSTALL_REQUIRES = [
     'click>=6.0.0',
     'colorama',
-    'enum34>=1.1.6',
+    'enum34 == 1.1.6',
     'h5py>=2.7.0',
     'numpy',
     'plaidml',
