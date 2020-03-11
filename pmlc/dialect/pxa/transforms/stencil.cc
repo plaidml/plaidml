@@ -124,8 +124,8 @@ private:
   unsigned numThreads;
 
 public:
-  explicit Stencil(mlir::AffineParallelOp opIn, int numThreadsIn)
-      : op(opIn), numThreads(numThreadsIn) {
+  explicit Stencil(mlir::AffineParallelOp op, int numThreads)
+      : op(op), numThreads(numThreads) {
     assert(numThreads != 0);
   }
 
