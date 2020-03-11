@@ -477,8 +477,7 @@ double Stencil::Evaluate() {
     }
   }
 
-  unsigned outer_batches =
-      (tot_outer_loop - 1) / std::thread::hardware_concurrency() + 1;
+  unsigned outer_batches = (tot_outer_loop - 1) / numThreads + 1;
   double perf = outer_batches * tot_middle_loop * (startup_cost + inner_time);
 
   IVLOG(3, "Performance = " << perf);
@@ -534,7 +533,11 @@ void Stencil::DoStenciling() {
 void StencilPass::runOnFunction() {
   auto func = getFunction();
   func.walk([&](mlir::AffineParallelOp op) {
-    Stencil as(op, numThreads.getValue());
+    unsigned threads = numThreads.getValue();
+    if (threads == 0) {
+      threads = std::thread::hardware_concurrency();
+    }
+    Stencil as(op, threads);
     as.DoStenciling();
   });
 }

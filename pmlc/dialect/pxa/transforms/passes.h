@@ -17,7 +17,7 @@ namespace pmlc::dialect::pxa {
 
 struct StencilPassOptions
     : public mlir::PassPipelineOptions<StencilPassOptions> {
-  Option<int> numThreads{
+  Option<unsigned> numThreads{
       *this, "threads",
       llvm::cl::desc("Specifies number of threads for the stencilling pass")};
 };
@@ -26,7 +26,7 @@ struct StencilPass : public mlir::FunctionPass<StencilPass> {
   StencilPass(const StencilPass &) {}
   explicit StencilPass(const StencilPassOptions &options);
 
-  Option<int> numThreads{
+  Option<unsigned> numThreads{
       *this, "threads",
       llvm::cl::desc("Specifies number of threads for the stencilling pass")};
   void runOnFunction() final;
