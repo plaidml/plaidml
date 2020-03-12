@@ -33,6 +33,7 @@ static mlir::PassRegistration<TestStrideInfoPass>
 
 static mlir::PassRegistration<StencilPass>
     stencil_pass("affine-stencil",
-                 "Stencil the inputs to create \"micro\" GEMM operations.");
+                 "Stencil the inputs to create \"micro\" GEMM operations.",
+                 createStencilPass);
 
 } // namespace pmlc::dialect::pxa

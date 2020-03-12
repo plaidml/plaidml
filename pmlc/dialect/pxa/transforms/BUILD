@@ -23,7 +23,6 @@ plaidml_cc_library(
         "//pmlc/dialect/pxa/ir",
         "//pmlc/dialect/tile/ir",
         "//pmlc/dialect/eltwise/ir",
-        "//pmlc/target/x86",
     ],
 )
 
