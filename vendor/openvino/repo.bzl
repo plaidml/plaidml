@@ -29,3 +29,4 @@ def openvino_workspace():
         url = "https://github.com/opencv/dldt/archive/2020.1.zip",
         build_file = clean_dep("//vendor/openvino:openvino.BUILD"),
     )
+    

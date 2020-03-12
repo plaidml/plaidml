@@ -12,8 +12,8 @@ cc_binary(
     ]),
     data = [":plugins"],
     deps = [
-        "inference_engine",
-        "mkldnn_plugin",
+        ":inference_engine",
+        ":mkldnn_plugin",
     ],
     linkstatic = False,
 )
@@ -40,7 +40,6 @@ cc_library(
 cc_library(
     name = "smoke_tests",
     srcs = [
-        "inference-engine/tests/unit/engines/mkldnn/dump_test.cpp",
         "inference-engine/tests/unit/engines/mkldnn/dump_test.cpp",
     ],
     hdrs = [
@@ -77,7 +76,7 @@ template_rule(
 
 cc_library(
     name = "mkldnn_plugin",
-    alwayslink = True,
+    alwayslink = 1,
     srcs = glob([
         "inference-engine/thirdparty/mkl-dnn/src/**/*pp",
         "inference-engine/src/mkldnn_plugin/**/*pp",
