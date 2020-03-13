@@ -70,6 +70,14 @@ private:
 
 } // namespace
 
+void setResourceData1(const DescriptorSetIndex setIndex, BindingIndex bindIndex,
+                      int64_t *allocated, int64_t *aligned, int64_t offset,
+                      int64_t size, int64_t stride) {
+  VulkanHostMemoryBuffer memBuffer{
+      allocated, static_cast<uint32_t>(size * sizeof(int64_t))};
+  vkRuntimeManager->setResourceData(setIndex, bindIndex, memBuffer);
+}
+
 extern "C" {
 /// Fills the given memref with the given value.
 /// Binds the given memref to the given descriptor set and descriptor index.

@@ -28,6 +28,10 @@ using namespace mlir; // NOLINT[build/namespaces]
 using DescriptorSetIndex = uint32_t;
 using BindingIndex = uint32_t;
 
+void setResourceData1(const DescriptorSetIndex setIndex, BindingIndex bindIndex,
+                      int64_t *allocated, int64_t *aligned, int64_t offset,
+                      int64_t size, int64_t stride);
+
 /// Struct containing information regarding to a device memory buffer.
 struct VulkanDeviceMemoryBuffer {
   BindingIndex bindingIndex{0};
