@@ -1,4 +1,4 @@
-// RUN: pmlc-opt -legalize-gpu %s
+// RUN: pmlc-opt -legalize-gpu %s | FileCheck %s
 
 module attributes {gpu.container_module} {
   func @get_value(%arg0: memref<3x3xf32> {tile.name = "anon"}, %arg1: memref<3x3xf32> {tile.name = "anon_0"}, %arg2: memref<3x3xf32>) {

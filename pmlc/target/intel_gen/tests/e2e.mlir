@@ -1,4 +1,4 @@
-// RUN: pmlc-opt | pmlc-vulkan-runner %s --entry-point-result=void | FileCheck %s
+// RUN: pmlc-opt --target-intel_gen | FileCheck %s
 
 !tensor = type tensor<2x4x!eltwise.f32>
 
