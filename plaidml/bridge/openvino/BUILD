@@ -1,14 +1,15 @@
 package(default_visibility = ["//visibility:public"])
 
+load("//bzl:plaidml.bzl", "plaidml_cc_test")
+
 licenses(["notice"])  # BSD/MIT-like license
 
-cc_test(
+plaidml_cc_test(
     name = "smoke",
     tags = [
         "skip_windows",
     ],
     deps = [
-        "//pmlc/testing:gtest_main",
         "@openvino//:smoke_tests",
     ],
 )

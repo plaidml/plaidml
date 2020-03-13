@@ -151,7 +151,6 @@ cc_library(
     defines = [
         "CI_BUILD_NUMBER=\\\"33\\\"",
         "IE_BUILD_POSTFIX=\\\"pml\\\"",
-        "GAPI_STANDALONE",
     ],
     includes = [
         "inference-engine/",
