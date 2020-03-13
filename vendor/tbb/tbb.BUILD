@@ -21,12 +21,15 @@ copy_file(
 
 cc_library(
     name = "tbb",
-    srcs = glob([
-        "src/rml/client/rml_tbb.cpp",
-        "src/rml/**/*.h",
-        "src/tbb/*.cpp",
-        "src/tbb/*.h",
-    ], exclude = ["src/tbb/tbb_bind.cpp"]) + select({
+    srcs = glob(
+        [
+            "src/rml/client/rml_tbb.cpp",
+            "src/rml/**/*.h",
+            "src/tbb/*.cpp",
+            "src/tbb/*.h",
+        ],
+        exclude = ["src/tbb/tbb_bind.cpp"],
+    ) + select({
         "@bazel_tools//src/conditions:windows": [
             ":gen_cpu_ctl_env",
         ],
@@ -42,16 +45,16 @@ cc_library(
     copts = [
         "-Iexternal/tbb/src",
     ] + select({
-        "@bazel_tools//src/conditions:windows": [],
-        "@bazel_tools//src/conditions:darwin_x86_64": [
+        "@com_intel_plaidml//:clang": [
             "-mrtm",
         ],
-        "//conditions:default": [
+        "@com_intel_plaidml//:gcc": [
             "-mrtm",
             # this prevents segfaults
             # see: https://gcc.gnu.org/onlinedocs/gcc/Optimize-Options.html
             "-flifetime-dse=1",
         ],
+        "//conditions:default": [],
     }),
     defines = [
         "TBB_SUPPRESS_DEPRECATED_MESSAGES=1",

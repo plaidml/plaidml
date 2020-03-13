@@ -1,8 +1,9 @@
 # Copyright 2020 Intel Corporation.
 
 PLAIDML_COPTS = select({
-    "@bazel_tools//src/conditions:windows": [
+    "//:msvc": [
         "/std:c++17",  # This MUST match all other compilation units
+        "/wd4624",
         "/Zc:__cplusplus",
         "/Zc:inline",
         "/Zc:strictStrings",
