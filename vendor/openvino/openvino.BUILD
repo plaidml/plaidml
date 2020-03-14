@@ -11,6 +11,15 @@ cc_binary(
         "inference-engine/samples/benchmark_app/**/*.cpp",
     ]),
     data = [":plugins"],
+    linkopts = select({
+        "@bazel_tools//src/conditions:windows": [],
+        "@bazel_tools//src/conditions:darwin_x86_64": [],
+        "//conditions:default": [
+            "-pthread",
+            "-lm",
+            "-ldl",
+        ],
+    }),
     linkstatic = 0,
     deps = [
         ":inference_engine",
@@ -86,6 +95,7 @@ cc_library(
             "inference-engine/src/mkldnn_plugin/nodes/ext_convert.cpp",
         ],
     ) + select({
+        "@bazel_tools//src/conditions:darwin_x86_64": [],
         "@bazel_tools//src/conditions:windows": glob([
             "inference-engine/src/mkldnn_plugin/mkldnn/os/win/*.cpp",
         ]),
