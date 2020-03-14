@@ -2,6 +2,7 @@
 
 load("//vendor/bazel:repo.bzl", "http_archive")
 load("//vendor/conda:repo.bzl", "conda_repo")
+load("//vendor/openvino:repo.bzl", "openvino_workspace")
 load("//vendor/xsmm:repo.bzl", "xsmm_repo")
 
 # Sanitize a dependency so that it works correctly from code that includes it as a submodule.
@@ -127,9 +128,9 @@ def plaidml_workspace():
 
     http_archive(
         name = "tbb",
-        url = "https://github.com/intel/tbb/archive/tbb_2019.zip",
-        sha256 = "078c969b1bbd6b2afb01f65cf9d513bb80636363b206f1e2ae221b614d7ae197",
-        strip_prefix = "tbb-tbb_2019",
+        url = "https://github.com/intel/tbb/archive/v2020.1.zip",
+        sha256 = "b81f5dcd7614b7fde305d540d598e3abede9379402615c9514daf09c484333de",
+        strip_prefix = "tbb-2020.1",
         build_file = clean_dep("//vendor/tbb:tbb.BUILD"),
     )
 
@@ -163,3 +164,5 @@ def plaidml_workspace():
         sha256 = "36658cb768a54c1d4dec43c3116c27ed893e88b02ecfcb44f2166f9c0b7f2a0d",
         build_file = clean_dep("//bzl:zlib.BUILD"),
     )
+
+    openvino_workspace()

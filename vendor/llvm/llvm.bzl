@@ -358,7 +358,7 @@ llvm_defines = select({
 ]
 
 llvm_copts = select({
-    "@bazel_tools//src/conditions:windows": [
+    "@com_intel_plaidml//:msvc": [
         "-Zc:inline",
         "-Zc:strictStrings",
         "-Zc:rvalueCast",
