@@ -79,6 +79,7 @@ void setResourceData1(const DescriptorSetIndex setIndex, BindingIndex bindIndex,
 }
 
 extern "C" {
+
 /// Fills the given memref with the given value.
 /// Binds the given memref to the given descriptor set and descriptor index.
 void setResourceData(const DescriptorSetIndex setIndex, BindingIndex bindIndex,
@@ -103,4 +104,5 @@ void setBinaryShader(uint8_t *shader, uint32_t size) {
 }
 
 void runOnVulkan() { vkRuntimeManager->runOnVulkan(); }
-}
+
+} // extern "C"

@@ -13,6 +13,9 @@
 
 #include "pmlc/rt/vulkan/vulkan_runtime.h"
 
+#include <memory>
+#include <vector>
+
 using namespace mlir; // NOLINT[build/namespaces]
 
 void VulkanRuntime::setNumWorkGroups(const NumWorkGroups &numberWorkGroups) {
@@ -213,7 +216,7 @@ LogicalResult VulkanRuntime::createDevice() {
       vkEnumeratePhysicalDevices(instance, &physicalDeviceCount, 0),
       "vkEnumeratePhysicalDevices");
 
-  llvm::SmallVector<VkPhysicalDevice, 1> physicalDevices(physicalDeviceCount);
+  SmallVector<VkPhysicalDevice, 1> physicalDevices(physicalDeviceCount);
   RETURN_ON_VULKAN_ERROR(vkEnumeratePhysicalDevices(instance,
                                                     &physicalDeviceCount,
                                                     physicalDevices.data()),
@@ -551,7 +554,7 @@ LogicalResult VulkanRuntime::createComputePipeline() {
 }
 
 LogicalResult VulkanRuntime::createDescriptorPool() {
-  llvm::SmallVector<VkDescriptorPoolSize, 1> descriptorPoolSizes;
+  SmallVector<VkDescriptorPoolSize, 1> descriptorPoolSizes;
   for (const auto &descriptorSetInfo : descriptorSetInfoPool) {
     // For each descriptor set populate descriptor pool size.
     VkDescriptorPoolSize descriptorPoolSize = {};
@@ -717,5 +720,99 @@ LogicalResult VulkanRuntime::updateHostMemoryBuffers() {
       }
     }
   }
+  return success();
+}
+
+struct Action {
+  virtual ~Action() {}
+};
+
+using ActionPtr = std::shared_ptr<Action>;
+
+struct LaunchKernelAction : Action {
+  VkPipeline pipeline;
+  VkPipelineLayout pipelineLayout;
+  SmallVector<VkDescriptorSet, 4> descriptorSets;
+  NumWorkGroups workGroups;
+  SmallVector<VkBufferMemoryBarrier, 4> deps;
+};
+
+struct MemoryTransferAction : Action {
+  VkBuffer src;
+  VkBuffer dst;
+  SmallVector<VkBufferCopy, 1> regions;
+};
+
+LogicalResult VulkanRuntime::createSchedule() {
+  std::vector<ActionPtr> schedule;
+
+  VkCommandBufferAllocateInfo allocInfo = {};
+  allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+  allocInfo.pNext = nullptr;
+  allocInfo.commandPool = commandPool;
+  allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+  allocInfo.commandBufferCount = 1;
+
+  VkCommandBuffer commandBuffer;
+  RETURN_ON_VULKAN_ERROR(
+      vkAllocateCommandBuffers(device, &allocInfo, &commandBuffer),
+      "vkAllocateCommandBuffers");
+
+  VkCommandBufferBeginInfo beginInfo = {};
+  beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+  beginInfo.pNext = nullptr;
+  beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+  beginInfo.pInheritanceInfo = nullptr;
+
+  RETURN_ON_VULKAN_ERROR(vkBeginCommandBuffer(commandBuffer, &beginInfo),
+                         "vkBeginCommandBuffer");
+
+  for (const auto &action : schedule) {
+    if (auto kernel = std::dynamic_pointer_cast<LaunchKernelAction>(action)) {
+      if (kernel->deps.size()) {
+        vkCmdPipelineBarrier(
+            commandBuffer,
+            /*srcStageMask=*/VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            /*dstStageMask=*/VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            /*dependencyFlags=*/0, /*memoryBarrierCount=*/0,
+            /*pMemoryBarriers=*/nullptr,
+            /*bufferMemoryBarrierCount=*/kernel->deps.size(),
+            /*pBufferMemoryBarriers=*/kernel->deps.data(),
+            /*imageMemoryBarrierCount=*/0,
+            /*pImageMemoryBarriers=*/nullptr);
+      }
+
+      vkCmdBindPipeline(commandBuffer,
+                        /*pipelineBindPoint=*/VK_PIPELINE_BIND_POINT_COMPUTE,
+                        kernel->pipeline);
+
+      vkCmdBindDescriptorSets(
+          commandBuffer,
+          /*pipelineBindPoint=*/VK_PIPELINE_BIND_POINT_COMPUTE,
+          /*layout=*/kernel->pipelineLayout,
+          /*firstSet=*/0,
+          /*descriptorSetCount=*/kernel->descriptorSets.size(),
+          /*pDescriptorSets=*/kernel->descriptorSets.data(),
+          /*dynamicOffsetCount=*/0,
+          /*pDynamicOffsets=*/0);
+
+      vkCmdDispatch(commandBuffer,
+                    /*groupCountX=*/kernel->workGroups.x,
+                    /*groupCountY=*/kernel->workGroups.y,
+                    /*groupCountZ=*/kernel->workGroups.z);
+    }
+
+    if (auto xfer = std::dynamic_pointer_cast<MemoryTransferAction>(action)) {
+      vkCmdCopyBuffer(commandBuffer,
+                      /*srcBuffer=*/xfer->src,
+                      /*dstBuffer=*/xfer->dst,
+                      /*regionCount=*/xfer->regions.size(),
+                      /*pRegions=*/xfer->regions.data());
+    }
+  }
+
+  RETURN_ON_VULKAN_ERROR(vkEndCommandBuffer(commandBuffer),
+                         "vkEndCommandBuffer");
+
   return success();
 }

@@ -1,7 +1,6 @@
 // Copyright 2019, Intel Corporation
 
 #include "mlir/Conversion/GPUToSPIRV/ConvertGPUToSPIRVPass.h"
-#include "mlir/Conversion/GPUToVulkan/ConvertGPUToVulkanPass.h"
 #include "mlir/Conversion/LoopToStandard/ConvertLoopToStandard.h"
 #include "mlir/Conversion/LoopsToGPU/LoopsToGPUPass.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
@@ -15,7 +14,7 @@
 #include "mlir/Transforms/Passes.h"
 
 #include "pmlc/compiler/registry.h"
-#include "pmlc/conversion/gpu_legal/LegalizeGpuOpForGpuLowering.h"
+#include "pmlc/conversion/gpu/lowering.h"
 #include "pmlc/conversion/pxa_to_affine/pxa_to_affine.h"
 #include "pmlc/conversion/tile_to_pxa/tile_to_pxa.h"
 #include "pmlc/dialect/tile/transforms/passes.h"
@@ -55,19 +54,23 @@ void addToPipeline(OpPassManager &pm) {
   pm.addPass(createLegalizeStdOpsForSPIRVLoweringPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
-  pm.addPass(
-      pmlc::conversion::legalize_gpu::createLegalizeGpuOpForGpuLoweringPass());
+  pm.addPass(conversion::gpu::createLegalizeGpuOpForGpuLoweringPass());
   pm.addPass(createConvertGPUToSPIRVPass());
   // pm.addPass(std::make_unique<IREEGPUToSPIRVPass>());
 
   // SPIR-V passes for lowering attributes.
-  pm.addNestedPass<spirv::ModuleOp>(spirv::createLowerABIAttributesPass());
-  pm.addNestedPass<spirv::ModuleOp>(createCanonicalizerPass());
-  pm.addNestedPass<spirv::ModuleOp>(createCSEPass());
+  // pm.addNestedPass<spirv::ModuleOp>(spirv::createLowerABIAttributesPass());
+  // pm.addNestedPass<spirv::ModuleOp>(createCanonicalizerPass());
+  // pm.addNestedPass<spirv::ModuleOp>(createCSEPass());
+
+  pm.addPass(spirv::createLowerABIAttributesPass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
 
   // GPU to Vulkan.
-  pm.addPass(createConvertGpuLaunchFuncToVulkanCallsPass());
-  pm.addPass(createLowerToLLVMPass());
+  // pm.addPass(
+  //     conversion::gpu::createConvertGpuLaunchFuncToVulkanCallsPass());
+  // pm.addPass(createLowerToLLVMPass());
 }
 
 static PassPipelineRegistration<>

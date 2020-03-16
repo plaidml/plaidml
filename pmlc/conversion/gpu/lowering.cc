@@ -1,6 +1,7 @@
 // Copyright 2020 Intel Corporation
 
-#include "pmlc/conversion/gpu_legal/LegalizeGpuOpForGpuLowering.h"
+#include "pmlc/conversion/gpu/lowering.h"
+
 #include <vector>
 
 #include "mlir/Dialect/GPU/GPUDialect.h"
@@ -17,7 +18,7 @@
 
 using namespace mlir; // NOLINT[build/namespaces]
 
-namespace pmlc::conversion::legalize_gpu {
+namespace pmlc::conversion::gpu {
 
 // Add spv.entry_point_abi to gpufunc
 struct LegalizeGpuOpForGpuLoweringPass
@@ -28,7 +29,7 @@ struct LegalizeGpuOpForGpuLoweringPass
 void LegalizeGpuOpForGpuLoweringPass::runOnOperation() {
   auto op = getOperation();
 
-  op->walk([&](gpu::GPUFuncOp func) {
+  op->walk([&](mlir::gpu::GPUFuncOp func) {
     if (auto attr = func.getAttrOfType<spirv::EntryPointABIAttr>(
             spirv::getEntryPointABIAttrName())) {
       return;
@@ -36,13 +37,8 @@ void LegalizeGpuOpForGpuLoweringPass::runOnOperation() {
 
     // TODO local sizes should be set according to gpu.block_size, waiting for
     // upstream update
-    std::vector<int32_t> local_sizes;
-    local_sizes.push_back(3);
-    local_sizes.push_back(1);
-    local_sizes.push_back(1);
-
-    auto entryPointAbiAttr = spirv::getEntryPointABIAttr(
-        llvm::makeArrayRef(local_sizes), func.getContext());
+    auto entryPointAbiAttr =
+        spirv::getEntryPointABIAttr({3, 1, 1}, func.getContext());
     func.setAttr(spirv::getEntryPointABIAttrName(), entryPointAbiAttr);
     return;
   });
@@ -55,4 +51,4 @@ std::unique_ptr<mlir::Pass> createLegalizeGpuOpForGpuLoweringPass() {
 static mlir::PassRegistration<LegalizeGpuOpForGpuLoweringPass>
     legalize_pass("legalize-gpu", "Legalize gpu.funcOp attributes");
 
-} // namespace pmlc::conversion::legalize_gpu
+} // namespace pmlc::conversion::gpu

@@ -10,7 +10,6 @@ plaidml_cc_library(
     hdrs = glob(["*.h"]),
     deps = [
         "//pmlc/util",
-        "//pmlc/rt/vulkan:vulkan",
         "@llvm-project//llvm:support",
         "@llvm-project//mlir:AffineToStandardTransforms",
         "@llvm-project//mlir:ExecutionEngine",

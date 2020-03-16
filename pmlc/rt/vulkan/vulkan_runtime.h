@@ -147,6 +147,8 @@ private:
   LogicalResult createComputeCommandBuffer();
   LogicalResult submitCommandBuffersToQueue();
 
+  LogicalResult createSchedule();
+
   //===--------------------------------------------------------------------===//
   // Helper methods.
   //===--------------------------------------------------------------------===//
