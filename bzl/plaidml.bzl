@@ -1,7 +1,7 @@
 # Copyright 2020 Intel Corporation.
 
 PLAIDML_COPTS = select({
-    "//:msvc": [
+    "@com_intel_plaidml//:msvc": [
         "/std:c++17",  # This MUST match all other compilation units
         "/wd4624",
         "/Zc:__cplusplus",

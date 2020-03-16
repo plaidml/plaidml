@@ -1999,6 +1999,7 @@ cc_library(
         "include/llvm/ExecutionEngine/IntelJITEvents/*.h",
     ]),
     copts = llvm_copts,
+    linkopts = llvm_linkopts,
     deps = [
         ":config",
         ":core",
