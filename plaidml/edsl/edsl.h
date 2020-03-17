@@ -886,6 +886,9 @@ inline Tensor Placeholder(             //
 }
 
 inline plaidml_deriv ThunkTensorDeriv(TensorDeriv fn) {
+  if (fn) {  // nolint
+  }          // TODO: No-op fake use HACK
+
   return [](void* user_ctx,          //
             plaidml_expr* Y_expr,    //
             plaidml_expr* dY_expr,   //
@@ -1193,7 +1196,7 @@ inline Program::Program(const ProgramBuilder& builder) {
     const auto& arg = args->elts[i];
     Tensor tensor(ffi::call<plaidml_expr*>(plaidml_expr_clone, arg.tensor));
     LogicalShape shape(ffi::call<plaidml_logical_shape*>(plaidml_logical_shape_clone, arg.shape));
-    ProgramArgument programArg{arg.is_input, tensor, shape};
+    ProgramArgument programArg{arg.is_input, tensor, shape, nullptr};
     if (arg.buffer) {
       TensorShape tensor_shape(shape.dtype(), shape.sizes());
       auto bufptr = ffi::call<plaidml_buffer*>(plaidml_buffer_clone, arg.buffer);
