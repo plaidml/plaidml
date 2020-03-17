@@ -1,4 +1,4 @@
-// RUN: pmlc-opt --target-intel_gen | FileCheck %s
+// RUN: pmlc-opt --target-intel_gen %s | FileCheck %s
 
 !tensor = type tensor<2x4x!eltwise.f32>
 

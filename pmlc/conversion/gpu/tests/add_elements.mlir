@@ -19,3 +19,5 @@ module attributes {gpu.container_module} {
     }
   }
 }
+
+// CHECK: attributes {spv.entry_point_abi = {local_size = dense<[3, 1, 1]> : vector<3xi32>}}
