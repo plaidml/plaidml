@@ -16,6 +16,7 @@ plaidml_cc_library(
         "@llvm-project//mlir:ExecutionEngineUtils",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LLVMTransforms",
+        "@llvm-project//mlir:LoopsToGPUPass",
         "@llvm-project//mlir:MlirOptLib",
         "@llvm-project//mlir:OpenMPDialect",
     ],
