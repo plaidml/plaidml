@@ -57,10 +57,11 @@ gentbl(
 
 plaidml_cc_library(
     name = "util",
-    srcs = glob(["*.cc"]),
-    hdrs = glob(["*.h"]),
+    srcs = glob(["*.cc"], exclude=["env.cc"]),
+    hdrs = glob(["*.h"], exclude=["env.h"]),
     copts = COPTS,
     deps = [
+        ":env",
         ":enums-gen",
         ":interfaces-gen",
         "@easylogging",
