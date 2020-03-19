@@ -13,8 +13,8 @@
 // runtime.
 //
 //===----------------------------------------------------------------------===//
-
 #include "pmlc/conversion/gpu/lowering.h"
+#include "pmlc/util/logging.h"
 
 #include "mlir/Dialect/GPU/GPUDialect.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
@@ -35,7 +35,9 @@ using namespace mlir; // NOLINT[build/namespaces]
 static constexpr const char *kSetBinaryShader = "setBinaryShader";
 static constexpr const char *kSetEntryPoint = "setEntryPoint";
 static constexpr const char *kSetNumWorkGroups = "setNumWorkGroups";
+static constexpr const char *kBindBuffer2DFloat = "bindBuffer2DFloat";
 static constexpr const char *kRunOnVulkan = "runOnVulkan";
+static constexpr const char *kPrint_memref_f32 = "print_memref_f32";
 static constexpr const char *kSPIRVBinary = "SPIRV_BIN";
 
 namespace {
@@ -62,6 +64,28 @@ private:
     llvmVoidType = LLVM::LLVMType::getVoidTy(llvmDialect);
     llvmPointerType = LLVM::LLVMType::getInt8PtrTy(llvmDialect);
     llvmInt32Type = LLVM::LLVMType::getInt32Ty(llvmDialect);
+
+    OpBuilder builder(getModule());
+    mlirInt32Type = builder.getIntegerType(32);
+    mlirFloat32Type = builder.getF32Type();
+    mlirUnrankedMemRefF32Type =
+        UnrankedMemRefType::get(mlirFloat32Type, /*memorySpace=*/0);
+
+    SmallVector<int64_t, 4> shapeConstants1D = {-1};
+    mlir1DDynamicMemRefF32Type =
+        MemRefType::get(shapeConstants1D, mlirFloat32Type);
+
+    SmallVector<int64_t, 4> shapeConstants2D = {-1, -1};
+    mlir2DDynamicMemRefF32Type =
+        MemRefType::get(shapeConstants2D, mlirFloat32Type);
+
+    SmallVector<int64_t, 4> shapeConstants3D = {-1, -1, -1};
+    mlir3DDynamicMemRefF32Type =
+        MemRefType::get(shapeConstants3D, mlirFloat32Type);
+
+    SmallVector<int64_t, 4> shapeConstants4D = {-1, -1, -1, -1};
+    mlir4DDynamicMemRefF32Type =
+        MemRefType::get(shapeConstants4D, mlirFloat32Type);
   }
 
   LLVM::LLVMType getVoidType() { return llvmVoidType; }
@@ -89,6 +113,12 @@ private:
   /// Translates the given `launcOp` op to the sequence of Vulkan runtime calls
   void translateGpuLaunchCalls(mlir::gpu::LaunchFuncOp launchOp);
 
+  LogicalResult printLauchOpBuffers(Location loc, OpBuilder &builder,
+                                    mlir::gpu::LaunchFuncOp launchOp);
+
+  LogicalResult bindBuffers(Location loc, OpBuilder &builder,
+                            mlir::gpu::LaunchFuncOp launchOp);
+
 public:
   void runOnModule() override;
 
@@ -97,6 +127,14 @@ private:
   LLVM::LLVMType llvmVoidType;
   LLVM::LLVMType llvmPointerType;
   LLVM::LLVMType llvmInt32Type;
+
+  mlir::Type mlirInt32Type;
+  mlir::Type mlirFloat32Type;
+  mlir::Type mlir1DDynamicMemRefF32Type;
+  mlir::Type mlir2DDynamicMemRefF32Type;
+  mlir::Type mlir3DDynamicMemRefF32Type;
+  mlir::Type mlir4DDynamicMemRefF32Type;
+  mlir::Type mlirUnrankedMemRefF32Type;
 };
 
 } // anonymous namespace
@@ -149,6 +187,26 @@ void GpuLaunchFuncToVulkanCallsPass::declareVulkanFunctions(Location loc) {
         loc, kRunOnVulkan,
         LLVM::LLVMType::getFunctionTy(getVoidType(), {},
                                       /*isVarArg=*/false));
+  }
+
+  if (!module.lookupSymbol(kPrint_memref_f32)) {
+    auto &ctx = getContext();
+    builder.create<FuncOp>(
+        loc, kPrint_memref_f32,
+        FunctionType::get({ArrayRef<Type>{mlirUnrankedMemRefF32Type}}, {},
+                          &ctx),
+        ArrayRef<std::pair<mlir::Identifier, mlir::Attribute>>());
+  }
+
+  // TODO: add 1D 3D 4D buffer binding support
+  if (!module.lookupSymbol(kBindBuffer2DFloat)) {
+    auto &ctx = getContext();
+    builder.create<FuncOp>(
+        loc, kBindBuffer2DFloat,
+        FunctionType::get({ArrayRef<Type>{mlirInt32Type, mlirInt32Type,
+                                          mlir2DDynamicMemRefF32Type}},
+                          {}, &ctx),
+        ArrayRef<std::pair<mlir::Identifier, mlir::Attribute>>());
   }
 }
 
@@ -203,11 +261,51 @@ LogicalResult GpuLaunchFuncToVulkanCallsPass::createNumWorkGroups(
   return success();
 }
 
+LogicalResult GpuLaunchFuncToVulkanCallsPass::printLauchOpBuffers(
+    Location loc, OpBuilder &builder, mlir::gpu::LaunchFuncOp launchOp) {
+  auto buffers = launchOp.operands();
+  for (auto buffer : buffers) {
+    auto dynamicBuffer = builder.create<mlir::MemRefCastOp>(
+        loc, buffer, mlir2DDynamicMemRefF32Type);
+    auto unrankedBuffer = builder.create<mlir::MemRefCastOp>(
+        loc, dynamicBuffer, mlirUnrankedMemRefF32Type);
+
+    builder.create<CallOp>(loc, ArrayRef<Type>{},
+                           builder.getSymbolRefAttr(kPrint_memref_f32),
+                           ArrayRef<Value>(unrankedBuffer));
+  }
+  return success();
+}
+
+LogicalResult
+GpuLaunchFuncToVulkanCallsPass::bindBuffers(Location loc, OpBuilder &builder,
+                                            mlir::gpu::LaunchFuncOp launchOp) {
+  auto buffers = launchOp.operands();
+
+  auto c_0 = builder.create<ConstantOp>(
+      loc, mlirInt32Type, builder.getIntegerAttr(mlirInt32Type, 0));
+  for (size_t i = 0; i < buffers.size(); i++) {
+    auto c_i = builder.create<ConstantOp>(
+        loc, mlirInt32Type, builder.getIntegerAttr(mlirInt32Type, i));
+    auto dynamicBuffer = builder.create<mlir::MemRefCastOp>(
+        loc, buffers[i], mlir2DDynamicMemRefF32Type);
+    builder.create<CallOp>(loc, ArrayRef<Type>{},
+                           builder.getSymbolRefAttr(kBindBuffer2DFloat),
+                           ArrayRef<Value>{c_0, c_i, dynamicBuffer});
+  }
+  return success();
+}
+
 void GpuLaunchFuncToVulkanCallsPass::translateGpuLaunchCalls(
     mlir::gpu::LaunchFuncOp launchOp) {
   ModuleOp module = getModule();
   OpBuilder builder(launchOp);
   Location loc = launchOp.getLoc();
+
+  // Buffer binding
+  if (failed(bindBuffers(loc, builder, launchOp))) {
+    return signalPassFailure();
+  }
 
   // Serialize `spirv::Module` into binary form.
   std::vector<char> binary;
@@ -254,6 +352,12 @@ void GpuLaunchFuncToVulkanCallsPass::translateGpuLaunchCalls(
   builder.create<LLVM::CallOp>(loc, ArrayRef<Type>{getVoidType()},
                                builder.getSymbolRefAttr(kRunOnVulkan),
                                ArrayRef<Value>{});
+
+  if (VLOG_IS_ON(1)) {
+    if (failed(printLauchOpBuffers(loc, builder, launchOp))) {
+      return signalPassFailure();
+    }
+  }
 
   // Declare runtime functions.
   declareVulkanFunctions(loc);

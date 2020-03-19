@@ -83,6 +83,16 @@ void setResourceData(const DescriptorSetIndex setIndex, BindingIndex bindIndex,
   vkRuntimeManager->setResourceData(setIndex, bindIndex, memBuffer);
 }
 
+void bindBuffer2DFloat(const DescriptorSetIndex setIndex,
+                       BindingIndex bindIndex, float *allocated, float *aligned,
+                       int64_t offset, int64_t size_0, int64_t size_1,
+                       int64_t stride_0, int64_t stride_1) {
+  int64_t size = size_0 * size_1;
+  VulkanHostMemoryBuffer memBuffer{allocated,
+                                   static_cast<uint32_t>(size * sizeof(float))};
+  vkRuntimeManager->setResourceData(setIndex, bindIndex, memBuffer);
+}
+
 void setEntryPoint(const char *entryPoint) {
   vkRuntimeManager->setEntryPoint(entryPoint);
 }
