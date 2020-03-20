@@ -7,8 +7,10 @@ namespace pmlc::target::x86 {
 static const unsigned STARTUP_COST = 32;
 static const unsigned SPEC_STENCIL_TUPLES = 1;
 static const unsigned SPEC_STENCIL_INDICES = 3;
-static unsigned special_stencils[1][3] = {{64, 16, 3}};
-
+// clang-format off
+// Need the spaces between braces, so the macro replacement logic doesnt trigger.
+static unsigned special_stencils[1][3] = { {64, 16, 3} };
+// clang-format on
 uint64_t kHeatmapSize = {{#size}} {{SIZE}} {{ / size}};
 
 uint16_t kHeatmapKeys[][3] = {
