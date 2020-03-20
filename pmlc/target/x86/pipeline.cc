@@ -13,6 +13,7 @@
 #include "pmlc/conversion/pxa_to_affine/pxa_to_affine.h"
 #include "pmlc/conversion/stdx_to_llvm/stdx_to_llvm.h"
 #include "pmlc/conversion/tile_to_pxa/tile_to_pxa.h"
+#include "pmlc/dialect/pxa/transforms/passes.h"
 #include "pmlc/dialect/tile/transforms/passes.h"
 #include "pmlc/target/x86/trace_linking.h"
 #include "pmlc/target/x86/xsmm_lowering.h"
@@ -21,6 +22,10 @@
 using namespace mlir; // NOLINT[build/namespaces]
 
 namespace pmlc::target::x86 {
+
+// Prototipe for the heat-map costing function.
+std::pair<double, unsigned> HeatmapCoster(const unsigned *ranges,
+                                          const unsigned count);
 
 namespace {
 

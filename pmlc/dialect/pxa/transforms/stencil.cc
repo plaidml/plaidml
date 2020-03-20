@@ -112,8 +112,6 @@ private:
 
   int64_t idxRange(mlir::BlockArgument idx);
 
-  // The throughput and startup cost of M*N*K matrix multiplication
-  std::pair<double, unsigned> Throughput(unsigned m, unsigned n, unsigned k);
   // Evaluate the performance of the current searching state
   double Evaluate();
 
@@ -123,9 +121,22 @@ private:
   // Number of threads
   unsigned numThreads;
 
+  // The throughput and startup cost of M*N*K matrix multiplication
+  std::pair<double, unsigned> Throughput(const unsigned *ranges,
+                                         const unsigned count);
+
+  // Whether the copster function was set
+  bool costerSet;
+  // External coster function.
+  std::function<std::pair<double, unsigned>(const unsigned *, const unsigned)>
+      coster;
+
 public:
-  explicit Stencil(mlir::AffineParallelOp op, int numThreads)
-      : op(op), numThreads(numThreads) {
+  explicit Stencil(mlir::AffineParallelOp op, int numThreads, bool costerSet,
+                   std::function<std::pair<double, unsigned>(const unsigned *,
+                                                             const unsigned)>
+                       coster)
+      : op(op), numThreads(numThreads), costerSet(costerSet), coster(coster) {
     assert(numThreads != 0);
   }
 
@@ -420,7 +431,8 @@ double Stencil::Evaluate() {
   unsigned tot_inner_loop = tiles[0] * tiles[1] * tiles[2];
   double throughput;
   unsigned startup_cost;
-  std::tie(throughput, startup_cost) = Throughput(tiles[0], tiles[1], tiles[2]);
+  std::tie(throughput, startup_cost) =
+      Throughput(tiles, 3); // tiles 0, 1, 2 --> m, n, k
   if (throughput == 0) {
     return std::numeric_limits<double>::max();
   }
@@ -484,10 +496,13 @@ double Stencil::Evaluate() {
   return perf;
 }
 
-std::pair<double, unsigned> Stencil::Throughput(unsigned m, unsigned n,
-                                                unsigned k) {
-  // TODO: Hook up heatmap code.
-  return std::make_pair(3.0, 32);
+std::pair<double, unsigned> Stencil::Throughput(const unsigned *ranges,
+                                                const unsigned count) {
+  if (costerSet) {
+    return coster(ranges, count);
+  }
+
+  return std::make_pair(1.0, 32);
 }
 
 void Stencil::DoStenciling() {
@@ -537,13 +552,21 @@ void StencilPass::runOnFunction() {
     threads = std::thread::hardware_concurrency();
 
   func.walk([&](mlir::AffineParallelOp op) {
-    Stencil as(op, threads);
+    Stencil as(op, threads, costerSet, coster);
     as.DoStenciling();
   });
 }
 
 std::unique_ptr<mlir::Pass> createStencilPass() {
   return std::make_unique<StencilPass>();
+}
+
+std::unique_ptr<mlir::Pass> createStencilPassWithCoster(
+    std::function<std::pair<double, unsigned>(const unsigned *, const unsigned)>
+        coster) {
+  auto stencilPass = std::make_unique<StencilPass>();
+  stencilPass->setCoster(coster);
+  return stencilPass;
 }
 
 } // namespace pmlc::dialect::pxa

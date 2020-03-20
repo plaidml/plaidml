@@ -21,6 +21,7 @@ plaidml_cc_library(
         "//pmlc/conversion/tile_to_pxa",
         "//pmlc/dialect/pxa/analysis",
         "//pmlc/dialect/tile/transforms",
+        "//pmlc/dialect/pxa/transforms",
         "//pmlc/dialect/xsmm",
         "//pmlc/rt",
         "@llvm-project//mlir:AffineToStandardTransforms",
