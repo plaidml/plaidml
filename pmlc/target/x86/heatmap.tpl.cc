@@ -1,4 +1,5 @@
 // Copyright 2018, Intel Corporation
+#include <cassert>
 
 #include "pmlc/target/x86/heatmap.h"
 
@@ -70,9 +71,9 @@ std::pair<double, unsigned> HeatmapCoster(
     }
   }
   // If we cannot find (m, n, k) in the heatmap, try the special cases
-  for (int i = 0; i < SPEC_STENCIL_TUPLES; i++) {
+  for (unsigned i = 0; i < SPEC_STENCIL_TUPLES; i++) {
     bool match = true;
-    for (int j = 0; j < SPEC_STENCIL_INDICES; j++) {
+    for (unsigned j = 0; j < SPEC_STENCIL_INDICES; j++) {
       if (special_stencils[i][0] != ranges[0]) {
         match = false;
         break;
