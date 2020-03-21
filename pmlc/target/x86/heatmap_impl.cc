@@ -39,7 +39,7 @@ static Heatmap heatmap;
 StencilCost heatmapCost(llvm::ArrayRef<unsigned> ranges) {
   assert(ranges.size() == 3 && "heatmapCost expects a 3D tile");
 
-  auto tile = Tile(ranges[0], ranges[1], ranges[2]);
+  auto tile = Tile{ranges[0], ranges[1], ranges[2]};
   auto it = heatmap.byTile.find(tile);
   if (it != heatmap.byTile.end()) {
     return StencilCost{it->second, kStartupCost};

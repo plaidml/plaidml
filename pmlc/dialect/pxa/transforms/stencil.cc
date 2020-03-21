@@ -514,7 +514,11 @@ void Stencil::DoStenciling() {
 
 struct StencilPass : public mlir::FunctionPass<StencilPass> {
   StencilPass() { assert(false && "StencilPass must be configured"); }
-  StencilPass(const StencilPass &) {}
+
+  StencilPass(const StencilPass &rhs) : costFn(rhs.costFn) {
+    numThreads = rhs.numThreads.getValue();
+  }
+
   StencilPass(unsigned numThreads_, StencilCostFunction costFn)
       : costFn(costFn) {
     numThreads = numThreads_;
@@ -522,7 +526,7 @@ struct StencilPass : public mlir::FunctionPass<StencilPass> {
 
   void runOnFunction() final {
     auto func = getFunction();
-    func.walk([&](mlir::AffineParallelOp op) {
+    func.walk([this](mlir::AffineParallelOp op) {
       Stencil stencil(op, numThreads.getValue(), costFn);
       stencil.DoStenciling();
     });
