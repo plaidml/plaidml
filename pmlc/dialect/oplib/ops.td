@@ -1,5 +1,7 @@
 // Copyright 2019, Intel Corporation
 
+include "mlir/Interfaces/SideEffects.td"
+
 include "pmlc/util/interfaces.td"
 
 //===----------------------------------------------------------------------===//

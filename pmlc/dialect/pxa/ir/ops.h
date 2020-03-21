@@ -3,7 +3,7 @@
 #pragma once
 
 #include "mlir/Analysis/AffineStructures.h"
-#include "mlir/Dialect/AffineOps/AffineOps.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/IR/AffineExpr.h"
 
 #include "pmlc/util/enums.h"

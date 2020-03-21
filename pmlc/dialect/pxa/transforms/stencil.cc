@@ -1,7 +1,7 @@
 // Copyright 2019, Intel Corporation
 
 #include "mlir/ADT/TypeSwitch.h"
-#include "mlir/Dialect/AffineOps/AffineOps.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/AffineExprVisitor.h"
 #include "mlir/Support/DebugStringHelper.h"

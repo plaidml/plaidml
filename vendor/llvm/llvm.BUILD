@@ -2,6 +2,8 @@
 #
 # This BUILD file is auto-generated; do not edit!
 
+licenses(["notice"])
+
 exports_files(["LICENSE.TXT"])
 
 load(
@@ -600,10 +602,7 @@ gentbl(
             "include/llvm/Target/*.td",
             "include/llvm/Target/GlobalISel/*.td",
         ]),
-        deps = target.get(
-            "tbl_deps",
-            [],
-        ),
+        deps = target.get("tbl_deps", []),
     )
     for target in llvm_target_list
 ]
@@ -737,11 +736,11 @@ cc_library(
         ":aarch64_target_gen",
         ":aarch64_utils",
         ":attributes_gen",
+        ":binary_format",
         ":config",
         ":intrinsic_enums_gen",
         ":intrinsics_impl_gen",
         ":mc",
-        ":object",
         ":support",
     ],
 )
@@ -1153,12 +1152,12 @@ cc_library(
         ":arm_target_gen",
         ":arm_utils",
         ":attributes_gen",
+        ":binary_format",
         ":config",
         ":intrinsic_enums_gen",
         ":intrinsics_impl_gen",
         ":mc",
         ":mc_disassembler",
-        ":object",
         ":support",
     ],
 )
@@ -1895,6 +1894,7 @@ cc_library(
         ":config",
         ":debug_info_dwarf",
         ":mc",
+        ":object",
         ":support",
     ],
 )
@@ -2385,6 +2385,7 @@ cc_library(
     deps = [
         ":aggressive_inst_combine",
         ":analysis",
+        ":binary_format",
         ":bit_reader",
         ":bit_writer",
         ":code_gen",
@@ -3291,11 +3292,11 @@ cc_library(
     copts = llvm_copts + ["-Iexternal/llvm-project/llvm/lib/Target/PowerPC"],
     deps = [
         ":attributes_gen",
+        ":binary_format",
         ":config",
         ":intrinsic_enums_gen",
         ":intrinsics_impl_gen",
         ":mc",
-        ":object",
         ":powerpc_info",
         ":powerpc_target_gen",
         ":support",
@@ -4376,10 +4377,10 @@ cc_library(
     ]),
     copts = llvm_copts + ["-Iexternal/llvm-project/llvm/lib/Target/X86"],
     deps = [
+        ":binary_format",
         ":config",
         ":mc",
         ":mc_disassembler",
-        ":object",
         ":support",
         ":x86_info",
         ":x86_utils",

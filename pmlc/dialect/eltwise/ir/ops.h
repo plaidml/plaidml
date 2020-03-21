@@ -7,6 +7,7 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/StandardTypes.h"
+#include "mlir/Interfaces/SideEffects.h"
 
 #include "pmlc/dialect/eltwise/ir/types.h"
 #include "pmlc/dialect/eltwise/ir/util.h"
@@ -27,6 +28,7 @@ using mlir::IntegerAttr;
 using mlir::IntegerType;
 using mlir::Location;
 using mlir::LogicalResult;
+using mlir::MemoryEffectOpInterface;
 using mlir::MLIRContext;
 using mlir::NamedAttribute;
 using mlir::Op;
@@ -38,6 +40,7 @@ using mlir::OpInterface;
 using mlir::OwningRewritePatternList;
 using mlir::RankedTensorType;
 using mlir::ShapedType;
+using mlir::SmallVectorImpl;
 using mlir::StringRef;
 using mlir::TensorType;
 using mlir::Type;
@@ -47,7 +50,9 @@ using mlir::ValueRange;
 using mlir::VectorType;
 using util::GenericBuilder;
 
+namespace MemoryEffects = mlir::MemoryEffects;
 namespace OpTrait = mlir::OpTrait;
+namespace SideEffects = mlir::SideEffects;
 
 #include "pmlc/dialect/eltwise/ir/interfaces.h.inc"
 

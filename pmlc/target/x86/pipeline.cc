@@ -28,7 +28,6 @@ struct ConvertToLLVMPass : public ModulePass<ConvertToLLVMPass> {
   void runOnModule() override {
     auto module = getModule();
     auto *context = module.getContext();
-    LLVM::ensureDistinctSuccessors(module);
 
     LLVMTypeConverterCustomization customs;
     customs.funcArgConverter = barePtrFuncArgTypeConverter;

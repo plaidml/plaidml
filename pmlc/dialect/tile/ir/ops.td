@@ -6,7 +6,7 @@ include "pmlc/dialect/tile/ir/base.td"
 
 include "pmlc/dialect/tile/ir/builder.td"
 
-def ConstantOp : TileOpWithPPV<"constant", [NoSideEffect]>, HasFolder {
+def ConstantOp : TileOpWithPPV<"constant", [ConstantLike, NoSideEffect]>, HasFolder {
   let summary = "constant operation";
   let arguments = (ins IndexAttr:$value);
   let results = (outs IndexLike:$result);

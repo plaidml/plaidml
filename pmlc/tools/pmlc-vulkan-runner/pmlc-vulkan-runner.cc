@@ -20,12 +20,14 @@
 #include "mlir/Dialect/SPIRV/Passes.h"
 #include "mlir/Dialect/SPIRV/SPIRVOps.h"
 #include "mlir/ExecutionEngine/OptUtils.h"
-#include "mlir/InitAllDialects.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/JitRunner.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/TargetSelect.h"
+
+#include "pmlc/util/all_dialects.h"
+#include "pmlc/util/all_passes.h"
 
 using namespace mlir; // NOLINT[build/namespaces]
 
@@ -38,7 +40,7 @@ static LogicalResult runMLIRPasses(ModuleOp module) {
   passManager.addPass(createConvertGPUToSPIRVPass());
   OpPassManager &modulePM = passManager.nest<spirv::ModuleOp>();
   modulePM.addPass(spirv::createLowerABIAttributesPass());
-  passManager.addPass(createConvertGpuLaunchFuncToVulkanCallsPass());
+  passManager.addPass(createConvertVulkanLaunchFuncToVulkanCallsPass());
   passManager.addPass(createLowerToLLVMPass());
   return passManager.run(module);
 }
@@ -47,7 +49,7 @@ int main(int argc, char **argv) {
   llvm::llvm_shutdown_obj x;
   registerPassManagerCLOptions();
 
-  mlir::registerAllDialects();
+  registerAllDialects();
   llvm::InitLLVM y(argc, argv);
   llvm::InitializeNativeTarget();
   llvm::InitializeNativeTargetAsmPrinter();

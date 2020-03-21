@@ -2,7 +2,7 @@
 
 #include "pmlc/conversion/pxa_to_affine/pxa_to_affine.h"
 
-#include "mlir/Dialect/AffineOps/AffineOps.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
@@ -30,11 +30,11 @@ using mlir::FuncOp;
 using mlir::FunctionType;
 using mlir::IntegerAttr;
 using mlir::IntegerType;
+using mlir::LogicalResult;
 using mlir::MLIRContext;
 using mlir::OpBuilder;
 using mlir::OpConversionPattern;
 using mlir::Operation;
-using mlir::PatternMatchResult;
 using mlir::RankedTensorType;
 using mlir::ReturnOp;
 using mlir::Type;
@@ -54,9 +54,7 @@ struct LoweringBase : public OpConversionPattern<OpType> {
 
   explicit LoweringBase(MLIRContext *ctx)
       : OpConversionPattern<OpType>(ctx), ctx(ctx) {}
-  PatternMatchResult match(Operation *op) const override {
-    return this->matchSuccess();
-  }
+  LogicalResult match(Operation *op) const override { return mlir::success(); }
 };
 
 struct AffineParallelOpConversion : public LoweringBase<AffineParallelOp> {
@@ -156,7 +154,7 @@ struct AffineReduceOpConversion : public LoweringBase<pxa::AffineReduceOp> {
 void LoweringPass::runOnModule() {
   // Set up target (i.e. what is legal)
   mlir::ConversionTarget target(getContext());
-  target.addLegalDialect<mlir::AffineOpsDialect>();
+  target.addLegalDialect<mlir::AffineDialect>();
   target.addLegalDialect<mlir::StandardOpsDialect>();
   target.addIllegalDialect<pxa::Dialect>();
   target.addIllegalOp<AffineParallelOp>();

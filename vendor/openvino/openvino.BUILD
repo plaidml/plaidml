@@ -10,6 +10,7 @@ cc_binary(
         "inference-engine/samples/benchmark_app/**/*.hpp",
         "inference-engine/samples/benchmark_app/**/*.cpp",
     ]),
+    copts = ["-w"],
     data = [":plugins"],
     linkopts = select({
         "@bazel_tools//src/conditions:windows": [],
@@ -35,6 +36,7 @@ cc_library(
     hdrs = glob([
         "inference-engine/tests/helpers/*common*hpp",
     ]),
+    copts = ["-w"],
     defines = [
         "DATA_PATH=NULL",
     ],
@@ -54,6 +56,7 @@ cc_library(
     hdrs = [
         "inference-engine/tests/unit/engines/mkldnn/graph/test_graph.hpp",
     ],
+    copts = ["-w"],
     data = [":plugins"],
     includes = [
         "inference-engine/tests/unit/engines/mkldnn/graph",
@@ -109,6 +112,7 @@ cc_library(
         "inference-engine/thirdparty/mkl-dnn/src/cpu/**/*.h*",
         "inference-engine/thirdparty/mkl-dnn/src/*.hpp",
     ]) + [":mkldnn_version"],
+    copts = ["-w"],
     includes = [
         "inference-engine/src/mkldnn_plugin/",
         "inference-engine/src/mkldnn_plugin/mkldnn",
@@ -158,6 +162,7 @@ cc_library(
             "inference-engine/src/preprocessing/*.h*",
         ],
     ),
+    copts = ["-w"],
     defines = [
         "CI_BUILD_NUMBER=\\\"33\\\"",
         "IE_BUILD_POSTFIX=\\\"pml\\\"",
@@ -206,6 +211,7 @@ cc_library(
         "inference-engine/thirdparty/fluid/modules/gapi/include/opencv2/*.hpp",
         "inference-engine/thirdparty/fluid/modules/gapi/include/opencv2/gapi/*.hpp",
     ]),
+    copts = ["-w"],
     defines = [
         "GAPI_STANDALONE",
     ],
@@ -224,6 +230,7 @@ cc_library(
     hdrs = glob([
         "inference-engine/thirdparty/pugixml/src/*.hpp",
     ]),
+    copts = ["-w"],
     includes = [
         "inference-engine/thirdparty/pugixml/src",
     ],

@@ -3,8 +3,10 @@
 #ifndef __PML_TILE_BASE__
 #define __PML_TILE_BASE__
 
+include "mlir/Interfaces/SideEffects.td"
+
 #ifndef AFFINE_OPS_BASE
-include "mlir/Dialect/AffineOps/AffineOpsBase.td"
+include "mlir/Dialect/Affine/IR/AffineOpsBase.td"
 #endif
 
 include "pmlc/util/enums.td"

@@ -7,6 +7,7 @@
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/StandardTypes.h"
+#include "mlir/Interfaces/SideEffects.h"
 
 #include "pmlc/dialect/eltwise/ir/ops.h"
 #include "pmlc/dialect/eltwise/ir/types.h"
@@ -32,6 +33,7 @@ using mlir::IntegerSet;
 using mlir::IntegerSetAttr;
 using mlir::Location;
 using mlir::LogicalResult;
+using mlir::MemoryEffectOpInterface;
 using mlir::MLIRContext;
 using mlir::NamedAttribute;
 using mlir::NoneType;
@@ -50,6 +52,7 @@ using mlir::ParseResult;
 using mlir::RankedTensorType;
 using mlir::Region;
 using mlir::ShapedType;
+using mlir::SmallVectorImpl;
 using mlir::StringAttr;
 using mlir::StringRef;
 using mlir::TupleType;
@@ -63,7 +66,9 @@ using util::AggregationKind;
 using util::CombinationKind;
 using util::GenericBuilder;
 
+namespace MemoryEffects = mlir::MemoryEffects;
 namespace OpTrait = mlir::OpTrait;
+namespace SideEffects = mlir::SideEffects;
 
 #include "pmlc/dialect/tile/ir/interfaces.h.inc"
 
