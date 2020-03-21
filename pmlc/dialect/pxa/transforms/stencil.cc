@@ -1,11 +1,7 @@
-// Copyright 2019, Intel Corporation
+// Copyright 2020 Intel Corporation
 
-#include "mlir/ADT/TypeSwitch.h"
 #include "mlir/Dialect/AffineOps/AffineOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
-#include "mlir/IR/AffineExprVisitor.h"
-#include "mlir/Support/DebugStringHelper.h"
-#include "llvm/ADT/Optional.h"
 
 #include "pmlc/dialect/eltwise/ir/ops.h"
 #include "pmlc/dialect/pxa/analysis/strides.h"
@@ -122,22 +118,13 @@ private:
   unsigned numThreads;
 
   // The throughput and startup cost of M*N*K matrix multiplication
-  std::pair<double, unsigned> Throughput(const unsigned *ranges,
-                                         const unsigned count);
-
-  // Whether the copster function was set
-  bool costerSet;
-  // External coster function.
-  std::function<std::pair<double, unsigned>(const unsigned *, const unsigned)>
-      coster;
+  StencilCostFunction costFn;
 
 public:
-  explicit Stencil(mlir::AffineParallelOp op, int numThreads, bool costerSet,
-                   std::function<std::pair<double, unsigned>(const unsigned *,
-                                                             const unsigned)>
-                       coster)
-      : op(op), numThreads(numThreads), costerSet(costerSet), coster(coster) {
-    assert(numThreads != 0);
+  explicit Stencil(mlir::AffineParallelOp op, int numThreads,
+                   StencilCostFunction costFn)
+      : op(op), numThreads(numThreads), costFn(costFn) {
+    assert(numThreads && "numThreads must be non-zero!");
   }
 
   // Main function
@@ -429,14 +416,12 @@ int64_t Stencil::idxRange(mlir::BlockArgument idx) {
 
 double Stencil::Evaluate() {
   unsigned tot_inner_loop = tiles[0] * tiles[1] * tiles[2];
-  double throughput;
-  unsigned startup_cost;
-  std::tie(throughput, startup_cost) =
-      Throughput(tiles, 3); // tiles 0, 1, 2 --> m, n, k
-  if (throughput == 0) {
+  // tiles 0, 1, 2 --> m, n, k
+  auto cost = costFn(tiles);
+  if (cost.throughput == 0) {
     return std::numeric_limits<double>::max();
   }
-  double inner_time = tot_inner_loop / throughput;
+  double inner_time = tot_inner_loop / cost.throughput;
   IVLOG(3,
         "Inner: loop = " << tot_inner_loop << " inner_time = " << inner_time);
   for (unsigned i = 0; i < kNumIndex; ++i) {
@@ -490,19 +475,11 @@ double Stencil::Evaluate() {
   }
 
   unsigned outer_batches = (tot_outer_loop - 1) / numThreads + 1;
-  double perf = outer_batches * tot_middle_loop * (startup_cost + inner_time);
+  double perf =
+      outer_batches * tot_middle_loop * (cost.startupCost + inner_time);
 
   IVLOG(3, "Performance = " << perf);
   return perf;
-}
-
-std::pair<double, unsigned> Stencil::Throughput(const unsigned *ranges,
-                                                const unsigned count) {
-  if (costerSet) {
-    return coster(ranges, count);
-  }
-
-  return std::make_pair(1.0, 32);
 }
 
 void Stencil::DoStenciling() {
@@ -545,28 +522,32 @@ void Stencil::DoStenciling() {
   op.setAttr("is_gemm", mlir::UnitAttr::get(op.getContext()));
 }
 
-void StencilPass::runOnFunction() {
-  auto func = getFunction();
-  unsigned threads = numThreads.getValue();
-  if (threads == 0)
-    threads = std::thread::hardware_concurrency();
+struct StencilPass : public mlir::FunctionPass<StencilPass> {
+  StencilPass() { assert(false && "StencilPass must be configured"); }
+  StencilPass(const StencilPass &) {}
+  StencilPass(unsigned numThreads_, StencilCostFunction costFn)
+      : costFn(costFn) {
+    numThreads = numThreads_;
+  }
 
-  func.walk([&](mlir::AffineParallelOp op) {
-    Stencil as(op, threads, costerSet, coster);
-    as.DoStenciling();
-  });
-}
+  void runOnFunction() final {
+    auto func = getFunction();
+    func.walk([&](mlir::AffineParallelOp op) {
+      Stencil stencil(op, numThreads.getValue(), costFn);
+      stencil.DoStenciling();
+    });
+  }
 
-std::unique_ptr<mlir::Pass> createStencilPass() {
-  return std::make_unique<StencilPass>();
-}
+  Option<unsigned> numThreads{
+      *this, "threads",
+      llvm::cl::desc("Specifies number of threads for the stencil pass")};
 
-std::unique_ptr<mlir::Pass> createStencilPassWithCoster(
-    std::function<std::pair<double, unsigned>(const unsigned *, const unsigned)>
-        coster) {
-  auto stencilPass = std::make_unique<StencilPass>();
-  stencilPass->setCoster(coster);
-  return stencilPass;
+  StencilCostFunction costFn;
+};
+
+std::unique_ptr<mlir::Pass> createStencilPass(unsigned numThreads,
+                                              StencilCostFunction costFn) {
+  return std::make_unique<StencilPass>(numThreads, costFn);
 }
 
 } // namespace pmlc::dialect::pxa
