@@ -2,6 +2,8 @@
 
 #include "mlir/Dialect/AffineOps/AffineOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Pass/Pass.h"
+#include "mlir/Pass/PassOptions.h"
 
 #include "pmlc/dialect/eltwise/ir/ops.h"
 #include "pmlc/dialect/pxa/analysis/strides.h"
@@ -14,8 +16,8 @@
 
 namespace pmlc::dialect::pxa {
 
-enum MulOperationType {
-  NoneMulOpType,
+enum class MulOperandType {
+  None,
   FloatTy,
   IntTy,
 };
@@ -69,7 +71,7 @@ private:
   bool onlyEven[kNumIndex] = {true, true, true};
 
   // Found Gemm operation data
-  MulOperationType mulOpType;
+  MulOperandType mulOpType = MulOperandType::None;
   mlir::AffineLoadOp in1Op;
   mlir::AffineLoadOp in2Op;
   AffineReduceOp outOp;
@@ -121,7 +123,7 @@ private:
   StencilCostFunction costFn;
 
 public:
-  explicit Stencil(mlir::AffineParallelOp op, int numThreads,
+  explicit Stencil(mlir::AffineParallelOp op, unsigned numThreads,
                    StencilCostFunction costFn)
       : op(op), numThreads(numThreads), costFn(costFn) {
     assert(numThreads && "numThreads must be non-zero!");
@@ -150,9 +152,8 @@ bool Stencil::TryIdentifyGemmOperation() {
     return false;
   }
 
-  auto beforeLastInstr = std::prev(body->end(), 2);
-  AffineReduceOp reduceOp = llvm::dyn_cast<AffineReduceOp>(*beforeLastInstr);
-
+  auto it = std::prev(body->end(), 2);
+  auto reduceOp = llvm::dyn_cast<AffineReduceOp>(*it);
   if (!reduceOp) {
     return false;
   }
@@ -165,53 +166,43 @@ bool Stencil::TryIdentifyGemmOperation() {
     return false;
   }
 
-  // Get the in tensors for the reduce op.
-  Value reduceIn = reduceOp.val();
-  MulOperationType mulOpType = MulOperationType::NoneMulOpType;
-
-  // Make sure the in for the reduce is a result of a multiplication.
-  auto valDef = reduceIn.getDefiningOp();
-
-  if (!valDef) {
+  // Get the operand for the reduce op and make sure it is the result of a
+  // multiplication.
+  auto defOp = reduceOp.val().getDefiningOp();
+  if (!defOp) {
     IVLOG(3, "the source of the reduce operation is not defined in this block");
-    return false;
-  }
-
-  mlir::MulFOp mulfOp = llvm::dyn_cast_or_null<mlir::MulFOp>(valDef);
-  mlir::MulIOp muliOp = llvm::dyn_cast_or_null<mlir::MulIOp>(valDef);
-  if (!mulfOp && !muliOp) {
-    IVLOG(3, "The source of the reduce is not a multiplication operation");
     return false;
   }
 
   mlir::AffineLoadOp lhs;
   mlir::AffineLoadOp rhs;
-  if (mulfOp) {
-    mulOpType = MulOperationType::FloatTy;
+  if (auto mulfOp = llvm::dyn_cast_or_null<mlir::MulFOp>(defOp)) {
+    mulOpType = MulOperandType::FloatTy;
     lhs = llvm::dyn_cast_or_null<mlir::AffineLoadOp>(
         mulfOp.lhs().getDefiningOp());
     rhs = llvm::dyn_cast_or_null<mlir::AffineLoadOp>(
         mulfOp.rhs().getDefiningOp());
-  } else if (muliOp) {
-    mulOpType = MulOperationType::IntTy;
+  } else if (auto muliOp = llvm::dyn_cast_or_null<mlir::MulIOp>(defOp)) {
+    mulOpType = MulOperandType::IntTy;
     lhs = llvm::dyn_cast_or_null<mlir::AffineLoadOp>(
         muliOp.lhs().getDefiningOp());
     rhs = llvm::dyn_cast_or_null<mlir::AffineLoadOp>(
         muliOp.rhs().getDefiningOp());
+  } else {
+    IVLOG(3, "The source of the reduce is not a multiplication operation");
+    return false;
   }
 
   // Now verify the types of the operands of the mulOp must be affine.load
   // operations.
-  if (!lhs || !rhs || mulOpType == NoneMulOpType) {
-    IVLOG(
-        3,
-        "the lhs or rhs of the mul operation are not an affne.load operations "
-        "or the type of the multiplication is not on floats or ints.");
+  if (!lhs || !rhs || mulOpType == MulOperandType::None) {
+    IVLOG(3,
+          "the lhs or rhs of the mul operation are not affine.load operations "
+          "or the type of the multiplication is not on floats or ints.");
     return false;
   }
 
   // Fill the values for the in/out/type of multiplication, etc.
-  this->mulOpType = mulOpType;
   in1Op = lhs;
   in2Op = rhs;
   outOp = reduceOp;
@@ -234,7 +225,6 @@ bool Stencil::ComputeStrideInfo() {
   auto in1OpOptional = computeStrideInfo(in1Op);
   auto in2OpOptional = computeStrideInfo(in2Op);
   auto outOpOptional = computeStrideInfo(outOp);
-
   if (!in1OpOptional || !in2OpOptional || !outOpOptional)
     return false;
 

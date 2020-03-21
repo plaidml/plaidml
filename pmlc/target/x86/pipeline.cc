@@ -36,10 +36,6 @@ static mlir::PassRegistration<StencilPass> xsmmStencilPass(
 
 namespace pmlc::target::x86 {
 
-// Prototipe for the heat-map costing function.
-std::pair<double, unsigned> HeatmapCoster(const unsigned *ranges,
-                                          const unsigned count);
-
 namespace {
 
 struct ConvertToLLVMPass : public ModulePass<ConvertToLLVMPass> {

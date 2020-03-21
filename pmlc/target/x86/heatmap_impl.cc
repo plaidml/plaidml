@@ -25,9 +25,9 @@ static std::array<Tile, 1> specialStencils = {
 struct Heatmap {
   Heatmap() {
     for (unsigned i = 0; i < kHeatmapSize; ++i) {
-      byTile.emplace(std::make_tuple(kHeatmapKeys[i][0], kHeatmapKeys[i][1],
-                                     kHeatmapKeys[i][2]),
-                     kHeatmapValues[i]);
+      byTile.emplace(
+          Tile{kHeatmapKeys[i][0], kHeatmapKeys[i][1], kHeatmapKeys[i][2]},
+          kHeatmapValues[i]);
     }
   }
 
@@ -39,7 +39,7 @@ static Heatmap heatmap;
 StencilCost heatmapCost(llvm::ArrayRef<unsigned> ranges) {
   assert(ranges.size() == 3 && "heatmapCost expects a 3D tile");
 
-  auto tile = std::make_tuple(ranges[0], ranges[1], ranges[2]);
+  auto tile = Tile(ranges[0], ranges[1], ranges[2]);
   auto it = heatmap.byTile.find(tile);
   if (it != heatmap.byTile.end()) {
     return StencilCost{it->second, kStartupCost};
@@ -47,11 +47,10 @@ StencilCost heatmapCost(llvm::ArrayRef<unsigned> ranges) {
 
   // We mainly care about M and K. If both (m, n - 1, k) and (m, n + 1, k)
   // exist, we may use their average value for prediction.
-  auto itLower =
-      heatmap.byTile.find(std::make_tuple(ranges[0], ranges[1] - 1, ranges[2]));
+  auto itLower = heatmap.byTile.find(Tile{ranges[0], ranges[1] - 1, ranges[2]});
   if (ranges[1] == 1 || itLower != heatmap.byTile.end()) {
-    auto itUpper = heatmap.byTile.find(
-        std::make_tuple(ranges[0], ranges[1] + 1, ranges[2]));
+    auto itUpper =
+        heatmap.byTile.find(Tile{ranges[0], ranges[1] + 1, ranges[2]});
     if (itUpper != heatmap.byTile.end()) {
       auto throughput = (ranges[1] > 1)
                             ? ((itLower->second + itUpper->second) / 2)

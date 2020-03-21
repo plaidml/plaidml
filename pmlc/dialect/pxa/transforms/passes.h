@@ -2,18 +2,13 @@
 
 #pragma once
 
+#include <functional>
 #include <memory>
-#include <utility>
 
-#include "mlir/Pass/Pass.h"
-#include "mlir/Pass/PassManager.h"
-#include "mlir/Pass/PassOptions.h"
+#include "llvm/ADT/ArrayRef.h"
 
 namespace mlir {
-class FuncOp;
 class Pass;
-template <typename T>
-class OpPassBase;
 } // namespace mlir
 
 namespace pmlc::dialect::pxa {
