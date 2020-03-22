@@ -14,6 +14,7 @@ plaidml_cc_library(
     hdrs = [
         "vulkan_runtime.h",
     ],
+    local_defines = ["VULKAN_RT_BUILD"],
     deps = [
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:SPIRVLowering",
@@ -70,6 +71,10 @@ plaidml_cc_library(
     name = "link",
     srcs = [":shlib"],
     linkstatic = 1,
+    deps = select({
+        "@bazel_tools//src/conditions:windows": [":vulkan"],
+        "//conditions:default": [],
+    }),
 )
 
 plaidml_cc_binary(

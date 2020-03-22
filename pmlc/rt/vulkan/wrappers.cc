@@ -17,6 +17,20 @@
 
 #include "pmlc/rt/vulkan/vulkan_runtime.h"
 
+#ifdef _WIN32
+#ifndef VULKAN_RT_EXPORT
+#ifdef VULKAN_RT_BUILD
+/* We are building this library */
+#define VULKAN_RT_EXPORT __declspec(dllexport)
+#else
+/* We are using this library */
+#define VULKAN_RT_EXPORT __declspec(dllimport)
+#endif // VULKAN_RT_BUILD
+#endif // VULKAN_RT_EXPORT
+#else
+#define VULKAN_RT_EXPORT
+#endif // _WIN32
+
 namespace {
 
 class VulkanRuntimeManager {
@@ -73,6 +87,22 @@ struct MemRefDescriptor {
 };
 
 extern "C" {
+
+VULKAN_RT_EXPORT void *initVulkan();
+VULKAN_RT_EXPORT void deinitVulkan(void *vkRuntimeManager);
+VULKAN_RT_EXPORT void runOnVulkan(void *vkRuntimeManager);
+VULKAN_RT_EXPORT void setEntryPoint(void *vkRuntimeManager,
+                                    const char *entryPoint);
+VULKAN_RT_EXPORT void setNumWorkGroups(void *vkRuntimeManager, uint32_t x,
+                                       uint32_t y, uint32_t z);
+VULKAN_RT_EXPORT void setBinaryShader(void *vkRuntimeManager, uint8_t *shader,
+                                      uint32_t size);
+VULKAN_RT_EXPORT void bindMemRef1DFloat(void *vkRuntimeManager,
+                                        DescriptorSetIndex setIndex,
+                                        BindingIndex bindIndex,
+                                        MemRefDescriptor<float, 1> *ptr);
+VULKAN_RT_EXPORT void
+_mlir_ciface_fillResource1DFloat(MemRefDescriptor<float, 1> *ptr, float value);
 
 /// Initializes `VulkanRuntimeManager` and returns a pointer to it.
 void *initVulkan() { return new VulkanRuntimeManager(); }
