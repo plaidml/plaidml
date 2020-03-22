@@ -1,7 +1,6 @@
 // RUN: pmlc-opt -convert-tile-to-pxa -canonicalize -cse %s | FileCheck %s
 
-!f32 = type tensor<!eltwise.f32>
-!t_10x20xfp32 = type tensor<10x20x!eltwise.f32>
+!t_10x20xfp32 = type tensor<10x20xf32>
 !t_10x20xbool = type tensor<10x20x!eltwise.u1>
 
 func @relu(%arg0: !t_10x20xfp32) -> !t_10x20xfp32 {

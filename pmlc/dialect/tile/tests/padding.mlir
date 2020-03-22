@@ -1,6 +1,6 @@
 // RUN: pmlc-opt -tile-compute-bounds -tile-pad %s | FileCheck %s
 
-!f32 = type !eltwise.f32
+!f32 = type f32
 
 #conv1dcenter = affine_map<(i, j) -> (i + j - 1)>
 #conv1djustify = affine_map<(i, j) -> (i + j)>

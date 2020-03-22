@@ -9,7 +9,7 @@
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/Interfaces/SideEffects.h"
 
-#include "pmlc/dialect/eltwise/ir/types.h"
+// #include "pmlc/dialect/eltwise/ir/types.h"
 #include "pmlc/dialect/eltwise/ir/util.h"
 #include "pmlc/util/interfaces.h"
 

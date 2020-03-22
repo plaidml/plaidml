@@ -1,6 +1,5 @@
 // RUN: pmlc-opt -convert-tile-to-pxa -canonicalize -cse -split-input-file %s | FileCheck %s
 
-!f32 = type tensor<!eltwise.f32>
 !u1 = type tensor<!eltwise.u1>
 
 // CHECK-LABEL: func @cmp_f32_f32
@@ -58,7 +57,6 @@ func @cmp_i32_i32(%i32: !i32) -> (!u1, !u1, !u1, !u1, !u1, !u1) {
 
 // -----
 
-!f32 = type tensor<!eltwise.f32>
 !i32  = type tensor<!eltwise.i32>
 !u1 = type tensor<!eltwise.u1>
 

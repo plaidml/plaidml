@@ -1,18 +1,18 @@
 // RUN: pmlc-opt -tile-compute-bounds -cse -split-input-file %s | FileCheck %s
 
-!f32 = type !eltwise.f32
+!f32 = type f32
 
 #map0 = affine_map<(i, j, k) -> (j, k)>
 #map1 = affine_map<(i, j, k) -> (j, i)>
 #map2 = affine_map<(i, j, k) -> (i, k)>
 
-func @dot(%arg0: tensor<1x784x!eltwise.f32>, %arg1: tensor<784x512x!eltwise.f32>) -> tensor<1x512x!eltwise.f32> {
+func @dot(%arg0: tensor<1x784xf32>, %arg1: tensor<784x512xf32>) -> tensor<1x512xf32> {
   %c0 = "eltwise.sconst"() {value = 0.0 : f64} : () -> !f32
   %0 = tile.constant 512
   %1 = tile.constant 1
   %2 = tile.contract add, mul, %c0, %arg0, %arg1 {sink=#map0, srcs=[#map1, #map2]} :
-    !f32, tensor<1x784x!eltwise.f32>, tensor<784x512x!eltwise.f32> -> tensor<1x512x!eltwise.f32>
-  return %2 : tensor<1x512x!eltwise.f32>
+    !f32, tensor<1x784xf32>, tensor<784x512xf32> -> tensor<1x512xf32>
+  return %2 : tensor<1x512xf32>
 }
 
 // CHECK: #map0 = affine_map<() -> (0, 0, 0)>

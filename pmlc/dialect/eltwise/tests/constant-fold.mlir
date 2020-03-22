@@ -1,6 +1,5 @@
 // RUN: pmlc-opt %s -canonicalize | FileCheck %s
 
-!f32 = type tensor<!eltwise.f32>
 !i32 = type tensor<!eltwise.i32>
 
 // CHECK-LABEL: @basic

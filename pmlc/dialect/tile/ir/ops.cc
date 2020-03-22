@@ -30,6 +30,7 @@ using mlir::ArrayAttr;
 using mlir::failure;
 using mlir::FloatAttr;
 using mlir::IntegerAttr;
+using mlir::IntegerType;
 using mlir::LogicalResult;
 using mlir::OpRewritePattern;
 using mlir::PatternRewriter;
@@ -558,8 +559,8 @@ Type GatherOp::getResultType(ArrayRef<Value> operands) {
   }
   auto index = operands[1];
   auto indexType = eltwise::getRankedTensorType(index.getType());
-  auto indexElementType = indexType.getElementType().dyn_cast<ScalarType>();
-  if (!indexElementType || indexElementType.type() != eltwise::DataType::i32) {
+  auto indexElementType = indexType.getElementType();
+  if (!indexElementType.isSignedInteger(32)) {
     throw std::runtime_error(
         "'gather' requires the data type for the second argument to be i32.");
   }
@@ -617,7 +618,7 @@ Type IndexOp::getResultType(ArrayRef<Value> operands) {
   auto tensor = operands.front();
   auto tensorType = eltwise::getRankedTensorType(tensor.getType());
   auto elementType =
-      ScalarType::get(tensor.getContext(), eltwise::DataType::i32);
+      IntegerType::get(32, IntegerType::Signed, tensor.getContext());
   IVLOG(6, "  elementType: " << mlir::debugString(elementType));
   auto resultType = RankedTensorType::get(tensorType.getShape(), elementType);
   IVLOG(6, "  resultType: " << mlir::debugString(resultType));
@@ -662,7 +663,7 @@ Type PrngOp::getResultType(ArrayRef<Value> operands) {
   auto state = operands.front();
   auto dims = operands.drop_front();
   auto shape = eltwise::ComputeShape(dims);
-  auto elementType = ScalarType::get(state.getContext(), DataType::f32);
+  auto elementType = FloatType::getF32(state.getContext());
   return RankedTensorType::get(shape, elementType);
 }
 
@@ -752,8 +753,8 @@ Type ScatterOp::getResultType(ArrayRef<Value> operands) {
   }
   auto index = operands[1];
   auto indexType = eltwise::getRankedTensorType(index.getType());
-  auto indexElementType = indexType.getElementType().dyn_cast<ScalarType>();
-  if (!indexElementType || indexElementType.type() != eltwise::DataType::i32) {
+  auto indexElementType = indexType.getElementType();
+  if (!indexElementType.isSignedInteger(32)) {
     throw std::runtime_error(
         "'scatter' requires the data type for the second argument to be i32.");
   }
@@ -804,8 +805,8 @@ Type ShapeOp::getResultType(ArrayRef<Value> operands) {
   }
   auto tensor = operands[0];
   auto tensorType = eltwise::getRankedTensorType(tensor.getType());
-  auto elementType = ScalarType::get(
-      tensor.getContext(), eltwise::DataType::i32); // TODO: index type?
+  auto elementType = IntegerType::get(32, IntegerType::Signed,
+                                      tensor.getContext()); // TODO: index type?
   return RankedTensorType::get({tensorType.getRank()}, elementType);
 }
 
@@ -1141,11 +1142,12 @@ bool isEltwiseAny(Type type) {
     if (elementType.isa<IndexType>()) {
       return true;
     }
-    if (auto scalarType = elementType.dyn_cast<ScalarType>()) {
-      if (scalarType.type() != DataType::invalid) {
-        return true;
-      }
-    }
+    // TODO
+    // if (auto scalarType = elementType.dyn_cast<ScalarType>()) {
+    //   if (scalarType.type() != DataType::invalid) {
+    //     return true;
+    //   }
+    // }
   }
   return false;
 }

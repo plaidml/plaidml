@@ -1,6 +1,6 @@
 // RUN: pmlc-opt -tile-compute-bounds -tile-pad -convert-tile-to-pxa -canonicalize -split-input-file %s | FileCheck %s
 
-!f32 = type !eltwise.f32
+!f32 = type f32
 
 #conv1dcenter = affine_map<(i, j) -> (i + j - 1)>
 #first = affine_map<(i, j) -> (i)>
@@ -30,7 +30,7 @@ func @pad_input(%arg0: tensor<10x!f32>) -> tensor<10x!f32> {
 
 // -----
 
-!f32 = type !eltwise.f32
+!f32 = type f32
 
 #conv1dcenter = affine_map<(i, j) -> (i + j - 1)>
 #first = affine_map<(i, j) -> (i)>

@@ -15,9 +15,9 @@ public:
   static llvm::StringRef getDialectNamespace() { return "eltwise"; }
   static std::string getCanonicalOpName(llvm::StringRef name);
 
-  mlir::Type parseType(mlir::DialectAsmParser &parser) const override;
-  void printType(mlir::Type type,
-                 mlir::DialectAsmPrinter &printer) const override;
+  // mlir::Type parseType(mlir::DialectAsmParser &parser) const override;
+  // void printType(mlir::Type type,
+  //                mlir::DialectAsmPrinter &printer) const override;
 
   mlir::Operation *materializeConstant(mlir::OpBuilder &builder,
                                        mlir::Attribute value, mlir::Type type,

@@ -18,7 +18,6 @@
 #include "mlir/Support/DebugStringHelper.h"
 
 #include "pmlc/compiler/registry.h"
-#include "pmlc/dialect/eltwise/ir/types.h"
 #include "pmlc/dialect/tile/gradient.h"
 #include "pmlc/dialect/tile/ir/ops.h"
 #include "pmlc/util/enums.h"
@@ -26,14 +25,12 @@
 using plaidml::core::ffi_wrap;
 using plaidml::core::ffi_wrap_void;
 using plaidml::core::GlobalContext;
-using pmlc::dialect::eltwise::ScalarType;
 using pmlc::dialect::tile::DerivRegistry;
 using pmlc::dialect::tile::ProgramMutations;
 using pmlc::dialect::tile::ProgramUpdate;
 using pmlc::dialect::tile::TileBuilder;
 using pmlc::util::AggregationKind;
 using pmlc::util::CombinationKind;
-using pmlc::util::DataType;
 
 namespace {
 
@@ -92,6 +89,11 @@ mlir::Value MakePolyOp(plaidml_int_op op, const std::vector<mlir::Value> operand
       return builder->MakePolyMinOp(operands);
   }
   throw std::runtime_error("Unknown polynomial op");
+}
+
+plaidml_datatype getDataType(Type type) {
+  assert(false && "TODO");
+  return 0;
 }
 
 }  // namespace
@@ -164,11 +166,7 @@ plaidml_datatype plaidml_logical_shape_get_dtype(  //
     plaidml_logical_shape* shape) {
   return ffi_wrap<plaidml_datatype>(err, PLAIDML_DATA_INVALID, [&] {
     auto elementType = shape->type.getElementType();
-    auto scalarType = elementType.dyn_cast<ScalarType>();
-    if (!scalarType) {
-      throw std::runtime_error("Expected scalar type");
-    }
-    return static_cast<plaidml_datatype>(scalarType.type());
+    return getDataType(elementType);
   });
 }
 
@@ -235,11 +233,7 @@ plaidml_datatype plaidml_expr_get_dtype(  //
       throw std::runtime_error("Expected RankedTensorType");
     }
     auto elementType = tensorType.getElementType();
-    auto scalarType = elementType.dyn_cast<ScalarType>();
-    if (!scalarType) {
-      throw std::runtime_error("Expected ScalarType");
-    }
-    return static_cast<plaidml_datatype>(scalarType.type());
+    return getDataType(elementType);
   });
 }
 

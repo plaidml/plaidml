@@ -21,10 +21,8 @@ class Operation;
 
 namespace pmlc::dialect::tile {
 
-using DataType = util::DataType;
-
 struct Shape {
-  DataType elementType;
+  mlir::Type elementType;
   llvm::ArrayRef<int64_t> dims;
 };
 
@@ -56,14 +54,15 @@ public:
 
   void Destroy(mlir::Value value);
 
-  mlir::RankedTensorType MakeRankedTensorType(DataType dtype,
+  mlir::RankedTensorType MakeRankedTensorType(mlir::Type dtype,
                                               llvm::ArrayRef<int64_t> dims);
   void BindTensorDims(mlir::Value from, llvm::ArrayRef<mlir::Value *> into);
   mlir::RankedTensorType ComputeShape(mlir::Value tensor);
   void BindShape(mlir::Value tensor, mlir::RankedTensorType type);
   void BindBuffer(mlir::Value tensor, pmlc::util::BufferPtr buffer);
 
-  mlir::MemRefType MakeMemRefType(DataType dtype, llvm::ArrayRef<int64_t> sizes,
+  mlir::MemRefType MakeMemRefType(mlir::Type dtype,
+                                  llvm::ArrayRef<int64_t> sizes,
                                   llvm::ArrayRef<int64_t> strides);
   mlir::MemRefType IntoMemRefType(mlir::RankedTensorType type);
 
@@ -85,7 +84,7 @@ public:
   mlir::Value MakeScalarConstantOp(double value);
   mlir::Value MakePrimitiveOp(llvm::StringRef fn,
                               llvm::ArrayRef<mlir::Value> args);
-  mlir::Value MakeCastOp(mlir::Value tensor, DataType dtype);
+  mlir::Value MakeCastOp(mlir::Value tensor, mlir::Type dtype);
   mlir::Value MakeTraceOp(mlir::Value tensor, const char *msg);
   mlir::Value MakeDimOp(mlir::Value tensor, unsigned dim);
   mlir::Value MakePlaceholderOp(mlir::RankedTensorType type,
@@ -116,8 +115,8 @@ public:
 
   std::shared_ptr<compiler::Program>
   MakeProgram(llvm::StringRef name, const ProgramMutations &mutations,
-              util::DataType floatx = DataType::invalid,
-              util::DataType intx = DataType::invalid);
+              mlir::Type concreteFloat = mlir::Type(),
+              mlir::Type concreteInt = mlir::Type());
 
   void Dump();
 

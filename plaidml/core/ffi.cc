@@ -12,7 +12,6 @@
 
 #include "plaidml/core/internal.h"
 #include "plaidml/core/settings.h"
-#include "pmlc/dialect/eltwise/ir/types.h"
 #include "pmlc/util/env.h"
 #include "pmlc/util/logging.h"
 
@@ -20,8 +19,6 @@ using plaidml::core::ffi_wrap;
 using plaidml::core::ffi_wrap_void;
 using plaidml::core::GlobalContext;
 using plaidml::core::Settings;
-using pmlc::dialect::eltwise::ScalarType;
-using pmlc::util::DataType;
 using pmlc::util::SimpleBuffer;
 
 extern const char* PLAIDML_VERSION;

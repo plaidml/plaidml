@@ -7,15 +7,15 @@
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/IR/Value.h"
 
-#include "pmlc/dialect/eltwise/ir/types.h"
-
 namespace pmlc::dialect::eltwise {
+
+mlir::Type promoteTypes(mlir::Type lhs, mlir::Type rhs);
 
 llvm::SmallVector<int64_t, 4>
 ComputeShape(llvm::ArrayRef<mlir::Value> operands);
 
 mlir::Type ComputeResultType(mlir::ValueRange operands,
-                             DataType override = DataType::invalid);
+                             mlir::Type override = mlir::Type());
 
 mlir::RankedTensorType getRankedTensorType(mlir::Type type);
 
@@ -35,5 +35,7 @@ struct ConstantValueMatcher {
 inline ConstantValueMatcher m_Zero() { return ConstantValueMatcher{0}; }
 
 inline ConstantValueMatcher m_One() { return ConstantValueMatcher{1}; }
+
+mlir::Type toSignlessType(mlir::Type type);
 
 } // namespace pmlc::dialect::eltwise
