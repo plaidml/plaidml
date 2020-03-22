@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include <cstdint>
+
 struct UnrankedMemRefType {
   int64_t rank;
   void *descriptor;
