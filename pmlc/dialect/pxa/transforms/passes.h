@@ -2,32 +2,26 @@
 
 #pragma once
 
+#include <functional>
 #include <memory>
 
-#include "mlir/Pass/Pass.h"
-#include "mlir/Pass/PassManager.h"
-#include "mlir/Pass/PassOptions.h"
+#include "llvm/ADT/ArrayRef.h"
 
 namespace mlir {
-class FuncOp;
 class Pass;
-template <typename T>
-class OpPassBase;
 } // namespace mlir
 
 namespace pmlc::dialect::pxa {
 
-struct StencilPass : public mlir::FunctionPass<StencilPass> {
-  StencilPass() = default;
-  StencilPass(const StencilPass &) {}
-  // explicit StencilPass(const StencilPassOptions &options);
-
-  Option<unsigned> numThreads{
-      *this, "threads",
-      llvm::cl::desc("Specifies number of threads for the stencilling pass")};
-  void runOnFunction() final;
+struct StencilCost {
+  double throughput;
+  unsigned startupCost;
 };
 
-std::unique_ptr<mlir::Pass> createStencilPass();
+using StencilCostFunction =
+    std::function<StencilCost(llvm::ArrayRef<unsigned>)>;
+
+std::unique_ptr<mlir::Pass> createStencilPass(unsigned numThreads,
+                                              StencilCostFunction costFn);
 
 } // namespace pmlc::dialect::pxa
