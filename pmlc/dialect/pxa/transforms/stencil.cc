@@ -1,11 +1,10 @@
-// Copyright 2019, Intel Corporation
+// Copyright 2020 Intel Corporation
 
 #include "mlir/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
-#include "mlir/IR/AffineExprVisitor.h"
-#include "mlir/Support/DebugStringHelper.h"
-#include "llvm/ADT/Optional.h"
+#include "mlir/Pass/Pass.h"
+#include "mlir/Pass/PassOptions.h"
 
 #include "pmlc/dialect/eltwise/ir/ops.h"
 #include "pmlc/dialect/pxa/analysis/strides.h"
@@ -18,8 +17,8 @@
 
 namespace pmlc::dialect::pxa {
 
-enum MulOperationType {
-  NoneMulOpType,
+enum class MulOperandType {
+  None,
   FloatTy,
   IntTy,
 };
@@ -73,7 +72,7 @@ private:
   bool onlyEven[kNumIndex] = {true, true, true};
 
   // Found Gemm operation data
-  MulOperationType mulOpType;
+  MulOperandType mulOpType = MulOperandType::None;
   mlir::AffineLoadOp in1Op;
   mlir::AffineLoadOp in2Op;
   AffineReduceOp outOp;
@@ -112,8 +111,6 @@ private:
 
   int64_t idxRange(mlir::BlockArgument idx);
 
-  // The throughput and startup cost of M*N*K matrix multiplication
-  std::pair<double, unsigned> Throughput(unsigned m, unsigned n, unsigned k);
   // Evaluate the performance of the current searching state
   double Evaluate();
 
@@ -123,10 +120,14 @@ private:
   // Number of threads
   unsigned numThreads;
 
+  // The throughput and startup cost of M*N*K matrix multiplication
+  StencilCostFunction costFn;
+
 public:
-  explicit Stencil(mlir::AffineParallelOp op, int numThreads)
-      : op(op), numThreads(numThreads) {
-    assert(numThreads != 0);
+  explicit Stencil(mlir::AffineParallelOp op, unsigned numThreads,
+                   StencilCostFunction costFn)
+      : op(op), numThreads(numThreads), costFn(costFn) {
+    assert(numThreads && "numThreads must be non-zero!");
   }
 
   // Main function
@@ -152,9 +153,8 @@ bool Stencil::TryIdentifyGemmOperation() {
     return false;
   }
 
-  auto beforeLastInstr = std::prev(body->end(), 2);
-  AffineReduceOp reduceOp = llvm::dyn_cast<AffineReduceOp>(*beforeLastInstr);
-
+  auto it = std::prev(body->end(), 2);
+  auto reduceOp = llvm::dyn_cast<AffineReduceOp>(*it);
   if (!reduceOp) {
     return false;
   }
@@ -167,53 +167,43 @@ bool Stencil::TryIdentifyGemmOperation() {
     return false;
   }
 
-  // Get the in tensors for the reduce op.
-  Value reduceIn = reduceOp.val();
-  MulOperationType mulOpType = MulOperationType::NoneMulOpType;
-
-  // Make sure the in for the reduce is a result of a multiplication.
-  auto valDef = reduceIn.getDefiningOp();
-
-  if (!valDef) {
+  // Get the operand for the reduce op and make sure it is the result of a
+  // multiplication.
+  auto defOp = reduceOp.val().getDefiningOp();
+  if (!defOp) {
     IVLOG(3, "the source of the reduce operation is not defined in this block");
-    return false;
-  }
-
-  mlir::MulFOp mulfOp = llvm::dyn_cast_or_null<mlir::MulFOp>(valDef);
-  mlir::MulIOp muliOp = llvm::dyn_cast_or_null<mlir::MulIOp>(valDef);
-  if (!mulfOp && !muliOp) {
-    IVLOG(3, "The source of the reduce is not a multiplication operation");
     return false;
   }
 
   mlir::AffineLoadOp lhs;
   mlir::AffineLoadOp rhs;
-  if (mulfOp) {
-    mulOpType = MulOperationType::FloatTy;
+  if (auto mulfOp = llvm::dyn_cast_or_null<mlir::MulFOp>(defOp)) {
+    mulOpType = MulOperandType::FloatTy;
     lhs = llvm::dyn_cast_or_null<mlir::AffineLoadOp>(
         mulfOp.lhs().getDefiningOp());
     rhs = llvm::dyn_cast_or_null<mlir::AffineLoadOp>(
         mulfOp.rhs().getDefiningOp());
-  } else if (muliOp) {
-    mulOpType = MulOperationType::IntTy;
+  } else if (auto muliOp = llvm::dyn_cast_or_null<mlir::MulIOp>(defOp)) {
+    mulOpType = MulOperandType::IntTy;
     lhs = llvm::dyn_cast_or_null<mlir::AffineLoadOp>(
         muliOp.lhs().getDefiningOp());
     rhs = llvm::dyn_cast_or_null<mlir::AffineLoadOp>(
         muliOp.rhs().getDefiningOp());
+  } else {
+    IVLOG(3, "The source of the reduce is not a multiplication operation");
+    return false;
   }
 
   // Now verify the types of the operands of the mulOp must be affine.load
   // operations.
-  if (!lhs || !rhs || mulOpType == NoneMulOpType) {
-    IVLOG(
-        3,
-        "the lhs or rhs of the mul operation are not an affne.load operations "
-        "or the type of the multiplication is not on floats or ints.");
+  if (!lhs || !rhs || mulOpType == MulOperandType::None) {
+    IVLOG(3,
+          "the lhs or rhs of the mul operation are not affine.load operations "
+          "or the type of the multiplication is not on floats or ints.");
     return false;
   }
 
   // Fill the values for the in/out/type of multiplication, etc.
-  this->mulOpType = mulOpType;
   in1Op = lhs;
   in2Op = rhs;
   outOp = reduceOp;
@@ -236,7 +226,6 @@ bool Stencil::ComputeStrideInfo() {
   auto in1OpOptional = computeStrideInfo(in1Op);
   auto in2OpOptional = computeStrideInfo(in2Op);
   auto outOpOptional = computeStrideInfo(outOp);
-
   if (!in1OpOptional || !in2OpOptional || !outOpOptional)
     return false;
 
@@ -418,13 +407,12 @@ int64_t Stencil::idxRange(mlir::BlockArgument idx) {
 
 double Stencil::Evaluate() {
   unsigned tot_inner_loop = tiles[0] * tiles[1] * tiles[2];
-  double throughput;
-  unsigned startup_cost;
-  std::tie(throughput, startup_cost) = Throughput(tiles[0], tiles[1], tiles[2]);
-  if (throughput == 0) {
+  // tiles 0, 1, 2 --> m, n, k
+  auto cost = costFn(tiles);
+  if (cost.throughput == 0) {
     return std::numeric_limits<double>::max();
   }
-  double inner_time = tot_inner_loop / throughput;
+  double inner_time = tot_inner_loop / cost.throughput;
   IVLOG(3,
         "Inner: loop = " << tot_inner_loop << " inner_time = " << inner_time);
   for (unsigned i = 0; i < kNumIndex; ++i) {
@@ -478,16 +466,11 @@ double Stencil::Evaluate() {
   }
 
   unsigned outer_batches = (tot_outer_loop - 1) / numThreads + 1;
-  double perf = outer_batches * tot_middle_loop * (startup_cost + inner_time);
+  double perf =
+      outer_batches * tot_middle_loop * (cost.startupCost + inner_time);
 
   IVLOG(3, "Performance = " << perf);
   return perf;
-}
-
-std::pair<double, unsigned> Stencil::Throughput(unsigned m, unsigned n,
-                                                unsigned k) {
-  // TODO: Hook up heatmap code.
-  return std::make_pair(3.0, 32);
 }
 
 void Stencil::DoStenciling() {
@@ -530,20 +513,36 @@ void Stencil::DoStenciling() {
   op.setAttr("is_gemm", mlir::UnitAttr::get(op.getContext()));
 }
 
-void StencilPass::runOnFunction() {
-  auto func = getFunction();
-  unsigned threads = numThreads.getValue();
-  if (threads == 0)
-    threads = std::thread::hardware_concurrency();
+struct StencilPass : public mlir::FunctionPass<StencilPass> {
+  StencilPass() { assert(false && "StencilPass must be configured"); }
 
-  func.walk([&](mlir::AffineParallelOp op) {
-    Stencil as(op, threads);
-    as.DoStenciling();
-  });
-}
+  StencilPass(const StencilPass &rhs) : costFn(rhs.costFn) {
+    numThreads = rhs.numThreads.getValue();
+  }
 
-std::unique_ptr<mlir::Pass> createStencilPass() {
-  return std::make_unique<StencilPass>();
+  StencilPass(unsigned numThreads_, StencilCostFunction costFn)
+      : costFn(costFn) {
+    numThreads = numThreads_;
+  }
+
+  void runOnFunction() final {
+    auto func = getFunction();
+    func.walk([this](mlir::AffineParallelOp op) {
+      Stencil stencil(op, numThreads.getValue(), costFn);
+      stencil.DoStenciling();
+    });
+  }
+
+  Option<unsigned> numThreads{
+      *this, "threads",
+      llvm::cl::desc("Specifies number of threads for the stencil pass")};
+
+  StencilCostFunction costFn;
+};
+
+std::unique_ptr<mlir::Pass> createStencilPass(unsigned numThreads,
+                                              StencilCostFunction costFn) {
+  return std::make_unique<StencilPass>(numThreads, costFn);
 }
 
 } // namespace pmlc::dialect::pxa

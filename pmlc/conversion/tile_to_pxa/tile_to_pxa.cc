@@ -158,9 +158,8 @@ struct ScalarConstantOpConversion
   }
 };
 
-static Value createCastOp(ConversionPatternRewriter &rewriter, Location loc,
-                          Value from, bool fromSigned, Type intoType,
-                          bool intoSigned) {
+static Value createCastOp(OpBuilder &builder, Location loc, Value from,
+                          bool fromSigned, Type intoType, bool intoSigned) {
   auto fromType = from.getType();
   if (fromType == intoType) {
     return from;
@@ -169,14 +168,14 @@ static Value createCastOp(ConversionPatternRewriter &rewriter, Location loc,
     if (auto fromFloatType = fromType.dyn_cast<FloatType>()) {
       if (fromFloatType.getWidth() < intoFloatType.getWidth()) {
         // FPExtOp: FloatType -> wider FloatType
-        return rewriter.create<mlir::FPExtOp>(loc, from, intoType).getResult();
+        return builder.create<mlir::FPExtOp>(loc, from, intoType).getResult();
       }
       // FPTruncOp: FloatType -> narrower FloatType
-      return rewriter.create<mlir::FPTruncOp>(loc, from, intoType).getResult();
+      return builder.create<mlir::FPTruncOp>(loc, from, intoType).getResult();
     }
     if (auto fromIntType = fromType.dyn_cast<IntegerType>()) {
       // SIToFPOp: IntegerType -> FloatType
-      return rewriter.create<mlir::SIToFPOp>(loc, from, intoType).getResult();
+      return builder.create<mlir::SIToFPOp>(loc, from, intoType).getResult();
     }
   }
   if (auto intoIntType = intoType.dyn_cast<IntegerType>()) {
@@ -184,24 +183,23 @@ static Value createCastOp(ConversionPatternRewriter &rewriter, Location loc,
       if (fromIntType.getWidth() < intoIntType.getWidth()) {
         if (fromSigned) {
           // SignExtendIOp: IntegerType -> wider signed int
-          return rewriter.create<mlir::SignExtendIOp>(loc, from, intoType)
+          return builder.create<mlir::SignExtendIOp>(loc, from, intoType)
               .getResult();
         }
         // ZeroExtendIOp: IntegerType -> wider unsigned int
-        return rewriter.create<mlir::ZeroExtendIOp>(loc, from, intoType)
+        return builder.create<mlir::ZeroExtendIOp>(loc, from, intoType)
             .getResult();
       }
       // TruncateIOp: IntegerType -> narrower IntegerType
-      return rewriter.create<mlir::TruncateIOp>(loc, from, intoType)
-          .getResult();
+      return builder.create<mlir::TruncateIOp>(loc, from, intoType).getResult();
     }
     if (auto fromFloatType = fromType.dyn_cast<FloatType>()) {
       if (intoSigned) {
         // FPToSIOp: FloatType -> signed IntegerType
-        return rewriter.create<stdx::FPToSIOp>(loc, from, intoType).getResult();
+        return builder.create<stdx::FPToSIOp>(loc, from, intoType).getResult();
       } else {
         // FPToUIOp: FloatType -> unsigned IntegerType
-        return rewriter.create<stdx::FPToUIOp>(loc, from, intoType).getResult();
+        return builder.create<stdx::FPToUIOp>(loc, from, intoType).getResult();
       }
     }
   }
@@ -321,9 +319,9 @@ static DataType promoteTypes(ConversionPatternRewriter &rewriter, Location loc,
   for (unsigned i = 0; i < operands.size(); i++) {
     auto dtype = types[i];
     auto operand = operands[i];
-    auto castOp = createCastOp(rewriter, loc, operand, isSigned(dtype),
-                               targetType, intoSigned);
-    into->push_back(castOp);
+    auto castedValue = createCastOp(rewriter, loc, operand, isSigned(dtype),
+                                    targetType, intoSigned);
+    into->push_back(castedValue);
   }
   return bestType;
 }
@@ -466,6 +464,11 @@ static Value buildBroadcastLoad(OpBuilder &builder, Location loc, Value operand,
 static void buildSimpleStore(OpBuilder &builder, Location loc, Value scalar,
                              Value memRef) {
   auto body = builder.getBlock();
+  auto memRefType = memRef.getType().cast<MemRefType>();
+  auto elementType = memRefType.getElementType();
+  if (elementType != scalar.getType()) {
+    scalar = createCastOp(builder, loc, scalar, false, elementType, false);
+  }
   builder.create<AffineStoreOp>(loc, scalar, memRef, body->getArguments());
 }
 
