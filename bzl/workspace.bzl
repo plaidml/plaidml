@@ -129,8 +129,8 @@ def plaidml_workspace():
     http_archive(
         name = "tbb",
         url = "https://github.com/intel/tbb/archive/v2020.1.zip",
-        sha256 = "b81f5dcd7614b7fde305d540d598e3abede9379402615c9514daf09c484333de",
-        strip_prefix = "tbb-2020.1",
+        sha256 = "1550c9cbf629435acd6699f9dd3d8841c1d5e0eaf0708f54d328c8cd020951c1",
+        strip_prefix = "oneTBB-2020.1",
         build_file = clean_dep("//vendor/tbb:tbb.BUILD"),
     )
 

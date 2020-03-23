@@ -1,14 +1,16 @@
-// Copyright 2018, Intel Corporation
+// Copyright 2020 Intel Corporation
 
 #pragma once
 
 #include <map>
 #include <tuple>
 
+#include "llvm/ADT/ArrayRef.h"
+
+#include "pmlc/dialect/pxa/transforms/passes.h"
+
 namespace pmlc::target::x86 {
 
-extern uint64_t kHeatmapSize;
-extern uint16_t kHeatmapKeys[][3];
-extern float kHeatmapValues[];
+dialect::pxa::StencilCost heatmapCost(llvm::ArrayRef<unsigned> tile);
 
 } // namespace pmlc::target::x86
