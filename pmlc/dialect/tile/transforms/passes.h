@@ -12,8 +12,6 @@ class Pass;
 
 namespace pmlc::dialect::tile {
 
-// using DataType = util::DataType;
-
 class ContractionOp;
 
 std::unique_ptr<mlir::Pass> createComputeBoundsPass();

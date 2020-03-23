@@ -20,7 +20,6 @@ namespace pmlc::dialect::pxa {
 struct StencilPass : public mlir::FunctionPass<StencilPass> {
   StencilPass() = default;
   StencilPass(const StencilPass &) {}
-  // explicit StencilPass(const StencilPassOptions &options);
 
   Option<unsigned> numThreads{
       *this, "threads",
