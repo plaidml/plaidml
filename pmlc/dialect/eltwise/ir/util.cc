@@ -168,7 +168,7 @@ unsigned typeScore(Type type) {
 }
 
 Type promoteTypes(Type lhs, Type rhs) {
-  return typeScore(lhs) < typeScore(rhs) ? lhs : rhs;
+  return typeScore(lhs) > typeScore(rhs) ? lhs : rhs;
 }
 
 RankedTensorType getRankedTensorType(Type type) {
@@ -280,34 +280,10 @@ bool ConstantValueMatcher::match(Operation *op) {
 }
 
 Type toSignlessType(Type type) {
-  // MLIRContext *ctx = getContext();
-  // switch (type()) {
-  // case DataType::u1:
-  //   return IntegerType::get(1, ctx);
-  // case DataType::i8:
-  // case DataType::u8:
-  //   return IntegerType::get(8, ctx);
-  // case DataType::i16:
-  // case DataType::u16:
-  //   return IntegerType::get(16, ctx);
-  // case DataType::i32:
-  // case DataType::u32:
-  //   return IntegerType::get(32, ctx);
-  // case DataType::i64:
-  // case DataType::u64:
-  //   return IntegerType::get(64, ctx);
-  // case DataType::bf16:
-  //   return FloatType::getBF16(ctx);
-  // case DataType::f16:
-  //   return FloatType::getF16(ctx);
-  // case DataType::f32:
-  //   return FloatType::getF32(ctx);
-  // case DataType::f64:
-  //   return FloatType::getF64(ctx);
-  // default:
-  //   return {};
-  // }
-  llvm_unreachable("TODO");
+  if (auto integerType = type.dyn_cast<IntegerType>()) {
+    return IntegerType::get(integerType.getWidth(), type.getContext());
+  }
+  return type;
 }
 
 } // namespace pmlc::dialect::eltwise

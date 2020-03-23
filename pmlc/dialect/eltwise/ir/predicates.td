@@ -40,6 +40,7 @@ class HasFolder {
 def AnyScalar : Type<Or<[
     Index.predicate,
     AnyFloat.predicate,
+    I1.predicate,
     AnySignedInteger.predicate,
     AnyUnsignedInteger.predicate
   ]>, "scalar">;
@@ -90,10 +91,10 @@ def IsRankedTensorTypePred : CPred<"$_self.isa<RankedTensorType>()">;
 class RankedTensorOf<list<Type> allowedTypes> :
     ShapedContainerType<allowedTypes, IsRankedTensorTypePred, "ranked-tensor">;
 
-def EltwiseAny : Type<Or<[
+def EltwiseAny : TypeConstraint<Or<[
     AnyScalar.predicate,
     RankedTensorOf<[AnyScalar]>.predicate
-  ]>, "eltwise-any">;
+  ]>, "eltwise-anyx">;
 
 def EltwiseBool : TypeConstraint<Or<[
     I1.predicate,
@@ -124,7 +125,9 @@ def EltwiseUnsigned : TypeConstraint<Or<[
 
 def EltwiseIndex : Type<Or<[
     Index.predicate,
-    RankedTensorOf<[Index]>.predicate
+    SI32.predicate,
+    RankedTensorOf<[Index]>.predicate,
+    RankedTensorOf<[SI32]>.predicate
   ]>, "eltwise-index">;
 
 #endif // __PML_ELTWISE_PREDICATES__

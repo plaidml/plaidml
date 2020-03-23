@@ -1,16 +1,14 @@
 // RUN: pmlc-opt -tile-compute-bounds -tile-pad -convert-tile-to-pxa -canonicalize -split-input-file %s | FileCheck %s
 
-!f32 = type f32
-
 #conv1dcenter = affine_map<(i, j) -> (i + j - 1)>
 #first = affine_map<(i, j) -> (i)>
 #jin0to3 = affine_set<(i, j) : (j >= 0, 2 - j >= 0)>
 
-func @pad_input(%arg0: tensor<10x!f32>) -> tensor<10x!f32> {
-  %c0 = "eltwise.sconst"() {value = 0.0 : f64} : () -> !f32
+func @pad_input(%arg0: tensor<10xf32>) -> tensor<10xf32> {
+  %c0 = "eltwise.sconst"() {value = 0.0 : f64} : () -> f32
   %0 = tile.contract add, none, %c0, %arg0 {cons=#jin0to3, srcs=[#conv1dcenter], sink=#first}
-    : !f32, tensor<10x!f32> -> tensor<10x!f32>
-  return %0 : tensor<10x!f32>
+    : f32, tensor<10xf32> -> tensor<10xf32>
+  return %0 : tensor<10xf32>
 }
 
 // CHECK: #[[LAYOUT:.*]] = affine_map<(d0) -> (d0 + 1)>
@@ -30,19 +28,17 @@ func @pad_input(%arg0: tensor<10x!f32>) -> tensor<10x!f32> {
 
 // -----
 
-!f32 = type f32
-
 #conv1dcenter = affine_map<(i, j) -> (i + j - 1)>
 #first = affine_map<(i, j) -> (i)>
 #second = affine_map<(i, j) -> (j)>
 
-func @pad_contraction(%A: tensor<10x!f32>, %B: tensor<1x!f32>, %C: tensor<3x!f32>) -> tensor<10x!f32> {
-  %c0 = "eltwise.sconst"() {value = 0.0 : f64} : () -> !f32
+func @pad_contraction(%A: tensor<10xf32>, %B: tensor<1xf32>, %C: tensor<3xf32>) -> tensor<10xf32> {
+  %c0 = "eltwise.sconst"() {value = 0.0 : f64} : () -> f32
   %0 = tile.contract add, mul, %c0, %A, %B {srcs=[#conv1dcenter, #second], sink=#first}
-    : !f32, tensor<10x!f32>, tensor<1x!f32> -> tensor<10x!f32>
+    : f32, tensor<10xf32>, tensor<1xf32> -> tensor<10xf32>
   %1 = tile.contract add, mul, %c0, %0, %C {srcs=[#conv1dcenter, #second], sink=#first}
-    : !f32, tensor<10x!f32>, tensor<3x!f32> -> tensor<10x!f32>
-  return %1 : tensor<10x!f32>
+    : f32, tensor<10xf32>, tensor<3xf32> -> tensor<10xf32>
+  return %1 : tensor<10xf32>
 }
 
 // CHECK: #[[LAYOUT:.*]] = affine_map<(d0) -> (d0 + 1)>

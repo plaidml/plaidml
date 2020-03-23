@@ -4,14 +4,12 @@
 #map1 = affine_map<(i, j, k) -> (j, i)>
 #map2 = affine_map<(i, j, k) -> (i, k)>
 
-!f32 = type f32
-!i32 = type !eltwise.i32
 func @dot(%arg0: tensor<1x784xf32>, %arg1: tensor<784x512xf32>) -> tensor<1x512xf32> {
-  %c0 = "eltwise.sconst"() {value = 0.0 : f64} : () -> !f32
+  %c0 = "eltwise.sconst"() {value = 0.0 : f64} : () -> f32
   %0 = tile.constant 512
   %1 = tile.constant 1
   %2 = tile.contract add, mul, %c0, %arg0, %arg1 {sink=#map0, srcs=[#map1, #map2]} :
-    !f32, tensor<1x784xf32>, tensor<784x512xf32> -> tensor<1x512xf32>
+    f32, tensor<1x784xf32>, tensor<784x512xf32> -> tensor<1x512xf32>
   return %2 : tensor<1x512xf32>
 }
 

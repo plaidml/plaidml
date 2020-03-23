@@ -137,7 +137,7 @@ def ScatterOp : SpecialOp<"scatter">, HasCanonicalizer {
 def ShapeOp : SpecialOp<"shape">, HasCanonicalizer {
   let summary = "tensor shape operation";
   let arguments = (ins RankedTensorOf<[AnyScalar]>:$tensor);
-  let results = (outs RankedTensorOf<[Index]>:$result);
+  let results = (outs RankedTensorOf<[SI32]>:$result);
 }
 
 def TraceOp : Op<TileDialect, "trace", []>, HasCanonicalizer {

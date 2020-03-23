@@ -15,6 +15,10 @@
 #include "pmlc/util/env.h"
 #include "pmlc/util/logging.h"
 
+using mlir::FloatType;
+using mlir::IntegerType;
+using mlir::MLIRContext;
+using mlir::Type;
 using plaidml::core::ffi_wrap;
 using plaidml::core::ffi_wrap_void;
 using plaidml::core::GlobalContext;
@@ -22,6 +26,87 @@ using plaidml::core::Settings;
 using pmlc::util::SimpleBuffer;
 
 extern const char* PLAIDML_VERSION;
+
+namespace plaidml::core {
+
+plaidml_datatype convertIntoDataType(Type type) {
+  if (type.isInteger(1)) {
+    return PLAIDML_DATA_BOOLEAN;
+  }
+  if (type.isSignedInteger(8)) {
+    return PLAIDML_DATA_INT8;
+  }
+  if (type.isUnsignedInteger(8)) {
+    return PLAIDML_DATA_UINT8;
+  }
+  if (type.isSignedInteger(16)) {
+    return PLAIDML_DATA_INT16;
+  }
+  if (type.isUnsignedInteger(16)) {
+    return PLAIDML_DATA_UINT16;
+  }
+  if (type.isSignedInteger(32)) {
+    return PLAIDML_DATA_INT32;
+  }
+  if (type.isUnsignedInteger(32)) {
+    return PLAIDML_DATA_UINT32;
+  }
+  if (type.isSignedInteger(64)) {
+    return PLAIDML_DATA_INT64;
+  }
+  if (type.isUnsignedInteger(64)) {
+    return PLAIDML_DATA_UINT64;
+  }
+  if (type.isBF16()) {
+    return PLAIDML_DATA_BFLOAT16;
+  }
+  if (type.isF16()) {
+    return PLAIDML_DATA_FLOAT16;
+  }
+  if (type.isF32()) {
+    return PLAIDML_DATA_FLOAT32;
+  }
+  if (type.isF64()) {
+    return PLAIDML_DATA_FLOAT64;
+  }
+  llvm_unreachable("Cannot convert into plaidml_datatype");
+}
+
+Type convertFromDataType(plaidml_datatype dtype, MLIRContext* context) {
+  switch (dtype) {
+    case PLAIDML_DATA_BOOLEAN:
+      return IntegerType::get(1, context);
+    case PLAIDML_DATA_BFLOAT16:
+      return FloatType::getBF16(context);
+    case PLAIDML_DATA_FLOAT16:
+      return FloatType::getF16(context);
+    case PLAIDML_DATA_FLOAT32:
+      return FloatType::getF32(context);
+    case PLAIDML_DATA_FLOAT64:
+      return FloatType::getF64(context);
+    case PLAIDML_DATA_INT8:
+      return IntegerType::get(8, IntegerType::Signed, context);
+    case PLAIDML_DATA_INT16:
+      return IntegerType::get(16, IntegerType::Signed, context);
+    case PLAIDML_DATA_INT32:
+      return IntegerType::get(32, IntegerType::Signed, context);
+    case PLAIDML_DATA_INT64:
+      return IntegerType::get(64, IntegerType::Signed, context);
+    case PLAIDML_DATA_UINT8:
+      return IntegerType::get(8, IntegerType::Unsigned, context);
+    case PLAIDML_DATA_UINT16:
+      return IntegerType::get(16, IntegerType::Unsigned, context);
+    case PLAIDML_DATA_UINT32:
+      return IntegerType::get(32, IntegerType::Unsigned, context);
+    case PLAIDML_DATA_UINT64:
+      return IntegerType::get(64, IntegerType::Unsigned, context);
+    default:
+      break;
+  }
+  llvm_unreachable("Invalid plaidml_datatype");
+}
+
+}  // namespace plaidml::core
 
 extern "C" {
 
@@ -160,13 +245,11 @@ plaidml_shape* plaidml_shape_alloc(  //
     const int64_t* sizes,            //
     const int64_t* strides) {
   return ffi_wrap<plaidml_shape*>(err, nullptr, [&] {
-    auto dataType = pmlc::util::symbolizeDataType(dtype);
-    if (!dataType.hasValue()) {
-      throw std::runtime_error("Invalid dtype");
-    }
+    auto ctx = GlobalContext::get();
+    auto elementType = plaidml::core::convertFromDataType(dtype, ctx->getContext());
     auto sizesArray = llvm::makeArrayRef(sizes, ndims);
     auto stridesArray = llvm::makeArrayRef(strides, ndims);
-    auto type = GlobalContext::get()->MakeMemRefType(dataType.getValue(), sizesArray, stridesArray);
+    auto type = ctx->MakeMemRefType(elementType, sizesArray, stridesArray);
     return new plaidml_shape{type};
   });
 }

@@ -47,23 +47,26 @@ namespace {
 struct TypeConverter : public mlir::TypeConverter {
   TypeConverter() {
     addConversion([](FunctionType type) { return type; });
+    addConversion([](FloatType type) { return type; });
     addConversion([](IntegerType type) { return ew::toSignlessType(type); });
     addConversion([this](RankedTensorType type) {
-      return MemRefType::get(type.getShape(),
-                             convertType(type.getElementType()));
+      auto elementType = type.getElementType();
+      auto newType = convertType(elementType);
+      assert(newType && "could not convert type");
+      return MemRefType::get(type.getShape(), newType);
     });
   }
 };
 
-static Type getScalarType(Type type) {
+static Type getElementType(Type type) {
   if (auto tensorType = type.dyn_cast<TensorType>()) {
     return tensorType.getElementType();
   }
   return type;
 }
 
-static Type getScalarType(Value value) {
-  return getScalarType(value.getType());
+static Type getElementType(Value value) {
+  return getElementType(value.getType());
 }
 
 static RankedTensorType getRankedTensorType(Type type) {
@@ -136,7 +139,7 @@ struct ScalarConstantOpConversion
   LogicalResult
   matchAndRewrite(ew::ScalarConstantOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
-    auto stdType = ew::toSignlessType(getScalarType(op));
+    auto stdType = ew::toSignlessType(getElementType(op));
     auto value = op.getValue();
     if (auto floatType = stdType.dyn_cast<FloatType>()) {
       auto floatAttr = value.cast<FloatAttr>();
@@ -278,20 +281,22 @@ struct Not {
 };
 
 struct EltwiseFloat {
-  bool match(Type type) const { return type.isa<FloatType>(); }
+  bool match(Type type) const { return getElementType(type).isa<FloatType>(); }
 };
 
 struct EltwiseInteger {
-  bool match(Type type) const { return type.isa<IntegerType>(); }
+  bool match(Type type) const {
+    return getElementType(type).isa<IntegerType>();
+  }
 };
 
 struct EltwiseSigned {
-  bool match(Type type) const { return getScalarType(type).isSignedInteger(); }
+  bool match(Type type) const { return getElementType(type).isSignedInteger(); }
 };
 
 struct EltwiseUnsigned {
   bool match(Type type) const {
-    return getScalarType(type).isUnsignedInteger();
+    return getElementType(type).isUnsignedInteger();
   }
 };
 
@@ -553,7 +558,7 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
     // Create the standard op
     SmallVector<Type, 4> operandTypes;
     for (auto type : op.getOperation()->getOperandTypes()) {
-      operandTypes.push_back(getScalarType(type));
+      operandTypes.push_back(getElementType(type));
     }
     IntoOpBuilder intoOpBuilder;
     auto result = intoOpBuilder.create(rewriter, loc, alloc.elementType,
@@ -656,7 +661,7 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
     ComboBuilder comboBuilder;
     SmallVector<Type, 4> operandTypes;
     for (auto type : op.operands().getTypes()) {
-      operandTypes.push_back(getScalarType(type));
+      operandTypes.push_back(getElementType(type));
     }
     auto combined = comboBuilder.create(rewriter, loc, alloc.elementType,
                                         scalars, operandTypes);
@@ -768,16 +773,16 @@ struct CastOpConversion : public OpConversionPattern<ew::CastOp> {
     auto loc = op.getLoc();
     TypeConverter typeConverter;
 
+    auto oldResultType = op.result().getType();
     auto resultType =
-        typeConverter.convertType(op.result().getType()).cast<MemRefType>();
+        typeConverter.convertType(oldResultType).cast<MemRefType>();
     auto operand = operands[0];
     auto operandType = operand.getType().cast<MemRefType>();
     if (resultType == operandType) {
       rewriter.replaceOp(op, operand);
       return success();
     }
-    bool resultIsSigned =
-        getScalarType(op.result().getType()).isSignedInteger();
+    bool resultIsSigned = getElementType(oldResultType).isSignedInteger();
 
     // Make an allocation for the output
     auto resultMemRef = rewriter.create<AllocOp>(loc, resultType).getResult();
@@ -792,7 +797,7 @@ struct CastOpConversion : public OpConversionPattern<ew::CastOp> {
     auto scalar = rewriter.create<AffineLoadOp>(loc, operand, idxs);
 
     // Create the standard cast op
-    auto dtype = getScalarType(op.tensor());
+    auto dtype = getElementType(op.tensor());
     auto result = createCastOp(rewriter, loc, scalar, dtype.isSignedInteger(),
                                resultType.getElementType(), resultIsSigned);
 

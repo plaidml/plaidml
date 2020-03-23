@@ -54,6 +54,8 @@ public:
 
   void Destroy(mlir::Value value);
 
+  mlir::MLIRContext *getContext();
+
   mlir::RankedTensorType MakeRankedTensorType(mlir::Type dtype,
                                               llvm::ArrayRef<int64_t> dims);
   void BindTensorDims(mlir::Value from, llvm::ArrayRef<mlir::Value *> into);

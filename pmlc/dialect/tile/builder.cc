@@ -214,6 +214,8 @@ void TileBuilder::Destroy(Value value) {
   // }
 }
 
+MLIRContext *TileBuilder::getContext() { return &impl->context; }
+
 MemRefType TileBuilder::MakeMemRefType(Type dtype, ArrayRef<int64_t> sizes,
                                        ArrayRef<int64_t> strides) {
   auto elementType = eltwise::toSignlessType(dtype);

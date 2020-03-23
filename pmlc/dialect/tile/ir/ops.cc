@@ -1136,20 +1136,17 @@ ParseResult parseContractionOp(OpAsmParser *parser, OperationState &result) {
   return success();
 }
 
+bool isAnyScalar(Type type) {
+  return type.isIndex() || type.isa<FloatType>() || type.isInteger(1) ||
+         type.isSignedInteger() || type.isUnsignedInteger();
+}
+
 bool isEltwiseAny(Type type) {
   if (auto rankedTensorType = type.dyn_cast<RankedTensorType>()) {
     auto elementType = rankedTensorType.getElementType();
-    if (elementType.isa<IndexType>()) {
-      return true;
-    }
-    // TODO
-    // if (auto scalarType = elementType.dyn_cast<ScalarType>()) {
-    //   if (scalarType.type() != DataType::invalid) {
-    //     return true;
-    //   }
-    // }
+    return isAnyScalar(elementType);
   }
-  return false;
+  return isAnyScalar(type);
 }
 
 LogicalResult verifyContractionOp(ContractionOp op) {
