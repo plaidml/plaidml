@@ -1,4 +1,4 @@
-// RUN: pmlc-opt --pass-pipeline='affine-stencil{threads=4}' %s | FileCheck %s
+// RUN: pmlc-opt --pass-pipeline='affine-stencil-xsmm{threads=4}' %s | FileCheck %s
 
 #map0 = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<() -> (0, 0, 0)>
