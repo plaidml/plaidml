@@ -1052,5 +1052,19 @@ TEST_F(CppEdsl, Prng) {
   // runProgram(program);
 }
 
+TEST_F(CppEdsl, ConvI8) {
+  auto I = Placeholder(DType::INT8, {1, 224, 224, 3});
+  auto K = Placeholder(DType::INT8, {3, 3, 1, 32});
+  auto program = makeProgram("convolution", {Convolution2(I, K)});
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.ConvI8
+  // CHECK: func @convolution
+  // CHECK: %[[cst:.*]] = "eltwise.sconst"() {value = 0 : i64} : () -> tensor<si32>
+  // CHECK: %{{.*}} = tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : tensor<si32>, tensor<1x224x224x3xsi8>, tensor<3x3x1x32xsi8> -> tensor<1x224x224x32xsi8>
+  // CHECK: return %{{.*}} : tensor<1x224x224x32xsi8>
+  // clang-format on
+  runProgram(program);
+}
+
 }  // namespace
 }  // namespace plaidml::edsl
