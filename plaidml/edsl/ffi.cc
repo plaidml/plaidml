@@ -18,22 +18,21 @@
 #include "mlir/Support/DebugStringHelper.h"
 
 #include "pmlc/compiler/registry.h"
-#include "pmlc/dialect/eltwise/ir/types.h"
 #include "pmlc/dialect/tile/gradient.h"
 #include "pmlc/dialect/tile/ir/ops.h"
 #include "pmlc/util/enums.h"
 
+using plaidml::core::convertFromDataType;
+using plaidml::core::convertIntoDataType;
 using plaidml::core::ffi_wrap;
 using plaidml::core::ffi_wrap_void;
 using plaidml::core::GlobalContext;
-using pmlc::dialect::eltwise::ScalarType;
 using pmlc::dialect::tile::DerivRegistry;
 using pmlc::dialect::tile::ProgramMutations;
 using pmlc::dialect::tile::ProgramUpdate;
 using pmlc::dialect::tile::TileBuilder;
 using pmlc::util::AggregationKind;
 using pmlc::util::CombinationKind;
-using pmlc::util::DataType;
 
 namespace {
 
@@ -129,11 +128,9 @@ plaidml_logical_shape* plaidml_logical_shape_alloc(  //
       dimsVec.emplace_back(dims[i]);
     }
     auto ret = new plaidml_logical_shape;
-    auto dataType = pmlc::util::symbolizeDataType(dtype);
-    if (!dataType.hasValue()) {
-      throw std::runtime_error("Invalid dtype");
-    }
-    ret->type = GlobalContext::get()->MakeRankedTensorType(dataType.getValue(), dimsVec);
+    auto ctx = GlobalContext::get();
+    auto elementType = convertFromDataType(dtype, ctx->getContext());
+    ret->type = ctx->MakeRankedTensorType(elementType, dimsVec);
     return ret;
   });
 }
@@ -164,11 +161,7 @@ plaidml_datatype plaidml_logical_shape_get_dtype(  //
     plaidml_logical_shape* shape) {
   return ffi_wrap<plaidml_datatype>(err, PLAIDML_DATA_INVALID, [&] {
     auto elementType = shape->type.getElementType();
-    auto scalarType = elementType.dyn_cast<ScalarType>();
-    if (!scalarType) {
-      throw std::runtime_error("Expected scalar type");
-    }
-    return static_cast<plaidml_datatype>(scalarType.type());
+    return convertIntoDataType(elementType);
   });
 }
 
@@ -235,11 +228,7 @@ plaidml_datatype plaidml_expr_get_dtype(  //
       throw std::runtime_error("Expected RankedTensorType");
     }
     auto elementType = tensorType.getElementType();
-    auto scalarType = elementType.dyn_cast<ScalarType>();
-    if (!scalarType) {
-      throw std::runtime_error("Expected ScalarType");
-    }
-    return static_cast<plaidml_datatype>(scalarType.type());
+    return convertIntoDataType(elementType);
   });
 }
 
@@ -383,11 +372,9 @@ plaidml_expr* plaidml_expr_cast(  //
     plaidml_datatype dtype) {
   return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
     IVLOG(3, "plaidml_expr_cast");
-    auto dataType = pmlc::util::symbolizeDataType(dtype);
-    if (!dataType.hasValue()) {
-      throw std::runtime_error("Invalid dtype");
-    }
-    return new plaidml_expr{GlobalContext::get()->MakeCastOp(tensor->value, dataType.getValue())};
+    auto ctx = GlobalContext::get();
+    auto targetType = convertFromDataType(dtype, ctx->getContext());
+    return new plaidml_expr{ctx->MakeCastOp(tensor->value, targetType)};
   });
 }
 
@@ -974,17 +961,18 @@ plaidml_program* plaidml_compile(  //
       mutations.updates.emplace(ProgramUpdate{src_updates[i]->value, dst_updates[i]->value});
     }
 
-    auto floatx_dtype = pmlc::util::symbolizeDataType(floatx);
-    if (!floatx_dtype || !pmlc::util::isFloat(*floatx_dtype)) {
+    auto ctx = GlobalContext::get();
+    auto floatType = convertFromDataType(floatx, ctx->getContext());
+    if (!floatType.isa<mlir::FloatType>()) {
       throw std::runtime_error("Invalid floatx in plaidml_compile");
     }
 
-    auto intx_dtype = pmlc::util::symbolizeDataType(intx);
-    if (!intx_dtype || !pmlc::util::isInteger(*intx_dtype)) {
+    auto intType = convertFromDataType(intx, ctx->getContext());
+    if (!intType.isa<mlir::IntegerType>()) {
       throw std::runtime_error("Invalid intx in plaidml_compile");
     }
 
-    auto program = GlobalContext::get()->MakeProgram(name, mutations, *floatx_dtype, *intx_dtype);
+    auto program = ctx->MakeProgram(name, mutations, floatType, intType);
     auto ret = new plaidml_program{program};
     auto nargs = ret->program->arguments.size();
     auto args = new plaidml_program_arg[nargs];

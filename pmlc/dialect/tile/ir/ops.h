@@ -10,14 +10,11 @@
 #include "mlir/Interfaces/SideEffects.h"
 
 #include "pmlc/dialect/eltwise/ir/ops.h"
-#include "pmlc/dialect/eltwise/ir/types.h"
 #include "pmlc/dialect/tile/ir/types.h"
 #include "pmlc/util/enums.h"
 
 namespace pmlc::dialect::tile {
 
-using eltwise::DataType;
-using eltwise::ScalarType;
 using llvm::APInt;
 using llvm::Optional;
 using mlir::AffineMap;
@@ -27,6 +24,7 @@ using mlir::ArrayRef;
 using mlir::Attribute;
 using mlir::BoolAttr;
 using mlir::Builder;
+using mlir::FloatType;
 using mlir::IndexType;
 using mlir::IntegerAttr;
 using mlir::IntegerSet;

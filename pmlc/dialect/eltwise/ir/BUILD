@@ -53,13 +53,11 @@ plaidml_cc_library(
         "dialect.cc",
         "ops.cc",
         "ops.cc.inc",
-        "types.cc",
         "util.cc",
     ],
     hdrs = [
         "dialect.h",
         "ops.h",
-        "types.h",
         "util.h",
     ],
     copts = COPTS,

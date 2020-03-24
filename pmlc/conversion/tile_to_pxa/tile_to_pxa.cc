@@ -31,7 +31,6 @@ namespace stdx = dialect::stdx;
 
 using namespace mlir; // NOLINT
 
-using dialect::eltwise::ScalarType;
 using dialect::tile::AggregationKind;
 using dialect::tile::CombinationKind;
 using dialect::tile::ConstantOp;
@@ -42,40 +41,39 @@ using dialect::tile::IndexOp;
 using dialect::tile::ShapeOp;
 using dialect::tile::ShapeOpOperandAdaptor;
 using dialect::tile::TraceOp;
-using util::DataType;
 
 namespace {
 
 struct TypeConverter : public mlir::TypeConverter {
   TypeConverter() {
     addConversion([](FunctionType type) { return type; });
-    addConversion([](ScalarType type) { return type.toStandard(); });
+    addConversion([](FloatType type) { return type; });
+    addConversion([](IntegerType type) { return ew::toSignlessType(type); });
     addConversion([this](RankedTensorType type) {
-      return MemRefType::get(type.getShape(),
-                             convertType(type.getElementType()));
+      auto elementType = type.getElementType();
+      auto newType = convertType(elementType);
+      assert(newType && "could not convert type");
+      return MemRefType::get(type.getShape(), newType);
     });
   }
 };
 
-static ScalarType getScalarType(Type type) {
+static Type getElementType(Type type) {
   if (auto tensorType = type.dyn_cast<TensorType>()) {
-    type = tensorType.getElementType();
+    return tensorType.getElementType();
   }
-  return type.cast<ScalarType>();
+  return type;
 }
 
-static ScalarType getScalarType(Value value) {
-  return getScalarType(value.getType());
+static Type getElementType(Value value) {
+  return getElementType(value.getType());
 }
 
 static RankedTensorType getRankedTensorType(Type type) {
   if (auto rankedTensorType = type.dyn_cast<RankedTensorType>()) {
     return rankedTensorType;
   }
-  if (auto scalarType = type.dyn_cast<ScalarType>()) {
-    return RankedTensorType::get({}, scalarType);
-  }
-  llvm_unreachable("Could not create RankedTensorType from type");
+  return RankedTensorType::get({}, type);
 }
 
 struct FuncOpConversion : public OpConversionPattern<FuncOp> {
@@ -141,7 +139,7 @@ struct ScalarConstantOpConversion
   LogicalResult
   matchAndRewrite(ew::ScalarConstantOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
-    auto stdType = getScalarType(op).toStandard();
+    auto stdType = ew::toSignlessType(getElementType(op));
     auto value = op.getValue();
     if (auto floatType = stdType.dyn_cast<FloatType>()) {
       auto floatAttr = value.cast<FloatAttr>();
@@ -281,46 +279,50 @@ struct Not {
 };
 
 struct EltwiseFloat {
-  bool match(Type type) const { return isFloat(getScalarType(type).type()); }
+  bool match(Type type) const { return getElementType(type).isa<FloatType>(); }
 };
 
 struct EltwiseInteger {
-  bool match(Type type) const { return isInteger(getScalarType(type).type()); }
+  bool match(Type type) const {
+    return getElementType(type).isa<IntegerType>();
+  }
 };
 
 struct EltwiseSigned {
-  bool match(Type type) const { return isSigned(getScalarType(type).type()); }
+  bool match(Type type) const { return getElementType(type).isSignedInteger(); }
 };
 
 struct EltwiseUnsigned {
-  bool match(Type type) const { return isUnsigned(getScalarType(type).type()); }
+  bool match(Type type) const {
+    return getElementType(type).isUnsignedInteger();
+  }
 };
 
 struct FirstOperand {
   Value create(ConversionPatternRewriter &rewriter, Location loc,
                Type resultType, ArrayRef<Value> operands,
-               ArrayRef<DataType> types) {
+               ArrayRef<Type> types) {
     return operands.front();
   }
 };
 
-static DataType promoteTypes(ConversionPatternRewriter &rewriter, Location loc,
-                             ArrayRef<Value> operands, ArrayRef<DataType> types,
-                             llvm::SmallVectorImpl<Value> *into) {
+static Type promoteTypes(ConversionPatternRewriter &rewriter, Location loc,
+                         ArrayRef<Value> operands, ArrayRef<Type> types,
+                         llvm::SmallVectorImpl<Value> *into) {
   // First, determine the 'final' type that wins the promotion
-  DataType bestType = DataType::invalid;
+  Type bestType;
   for (auto type : types) {
-    bestType = promoteTypes(bestType, type);
+    bestType = ew::promoteTypes(bestType, type);
   }
   // Next, cast each operand to the 'final' type
-  auto scalarType = rewriter.getType<ScalarType>(bestType);
-  bool intoSigned = util::isSigned(scalarType.type());
-  auto targetType = scalarType.toStandard();
+  bool intoSigned = bestType.isSignedInteger();
+  auto targetType = ew::toSignlessType(bestType);
   for (unsigned i = 0; i < operands.size(); i++) {
     auto dtype = types[i];
     auto operand = operands[i];
-    auto castedValue = createCastOp(rewriter, loc, operand, isSigned(dtype),
-                                    targetType, intoSigned);
+    auto castedValue =
+        createCastOp(rewriter, loc, operand, dtype.isSignedInteger(),
+                     targetType, intoSigned);
     into->push_back(castedValue);
   }
   return bestType;
@@ -330,7 +332,7 @@ template <typename OpType>
 struct StdOp {
   Value create(ConversionPatternRewriter &rewriter, Location loc,
                Type resultType, ArrayRef<Value> operands,
-               ArrayRef<DataType> types) {
+               ArrayRef<Type> types) {
     SmallVector<Value, 2> promoted;
     promoteTypes(rewriter, loc, operands, types, &promoted);
     auto attrs = ArrayRef<NamedAttribute>{};
@@ -343,7 +345,7 @@ struct StdOp {
 struct SelectOp {
   Value create(ConversionPatternRewriter &rewriter, Location loc,
                Type resultType, ArrayRef<Value> operands,
-               ArrayRef<DataType> types) {
+               ArrayRef<Type> types) {
     SmallVector<Value, 2> promoted;
     promoteTypes(rewriter, loc, operands.drop_front(), types.drop_front(),
                  &promoted);
@@ -357,7 +359,7 @@ template <CmpFPredicate predicate>
 struct CmpFloatOp {
   Value create(ConversionPatternRewriter &rewriter, Location loc,
                Type resultType, ArrayRef<Value> operands,
-               ArrayRef<DataType> types) {
+               ArrayRef<Type> types) {
     SmallVector<Value, 2> promoted;
     promoteTypes(rewriter, loc, operands, types, &promoted);
     return rewriter
@@ -370,7 +372,7 @@ template <CmpIPredicate predicate>
 struct CmpIntOp {
   Value create(ConversionPatternRewriter &rewriter, Location loc,
                Type resultType, ArrayRef<Value> operands,
-               ArrayRef<DataType> types) {
+               ArrayRef<Type> types) {
     SmallVector<Value, 2> promoted;
     promoteTypes(rewriter, loc, operands, types, &promoted);
     return rewriter
@@ -383,10 +385,10 @@ template <CmpIPredicate signedPred, CmpIPredicate unsignedPred>
 struct CmpIntInequalityOp {
   Value create(ConversionPatternRewriter &rewriter, Location loc,
                Type resultType, ArrayRef<Value> operands,
-               ArrayRef<DataType> types) {
+               ArrayRef<Type> types) {
     SmallVector<Value, 2> promoted;
-    auto dataType = promoteTypes(rewriter, loc, operands, types, &promoted);
-    auto predicate = isSigned(dataType) ? signedPred : unsignedPred;
+    auto bestType = promoteTypes(rewriter, loc, operands, types, &promoted);
+    auto predicate = bestType.isSignedInteger() ? signedPred : unsignedPred;
     return rewriter
         .create<mlir::CmpIOp>(loc, predicate, promoted[0], promoted[1])
         .getResult();
@@ -425,7 +427,7 @@ template <typename CmpOpBuilder>
 struct CondOp {
   Value create(ConversionPatternRewriter &rewriter, Location loc,
                Type resultType, ArrayRef<Value> operands,
-               ArrayRef<DataType> types) {
+               ArrayRef<Type> types) {
     CmpOpBuilder cmpOpBuilder;
     auto cmp = cmpOpBuilder.create(rewriter, loc, resultType,
                                    operands.take_front(2), types.take_front(2));
@@ -558,14 +560,13 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
     }
 
     // Create the standard op
-    SmallVector<DataType, 4> operandDataTypes;
+    SmallVector<Type, 4> operandTypes;
     for (auto type : op.getOperation()->getOperandTypes()) {
-      auto scalarType = getScalarType(type);
-      operandDataTypes.push_back(scalarType.type());
+      operandTypes.push_back(getElementType(type));
     }
     IntoOpBuilder intoOpBuilder;
     auto result = intoOpBuilder.create(rewriter, loc, alloc.elementType,
-                                       scalars, operandDataTypes);
+                                       scalars, operandTypes);
 
     // Create the store
     buildSimpleStore(rewriter, loc, result, alloc.resultMemRef);
@@ -662,13 +663,12 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
 
     // Do the combination op
     ComboBuilder comboBuilder;
-    SmallVector<DataType, 4> operandDataTypes;
+    SmallVector<Type, 4> operandTypes;
     for (auto type : op.operands().getTypes()) {
-      auto scalarType = getScalarType(type);
-      operandDataTypes.push_back(scalarType.type());
+      operandTypes.push_back(getElementType(type));
     }
     auto combined = comboBuilder.create(rewriter, loc, alloc.elementType,
-                                        scalars, operandDataTypes);
+                                        scalars, operandTypes);
 
     // Create the store
     auto resultMap = op.sink();
@@ -777,15 +777,16 @@ struct CastOpConversion : public OpConversionPattern<ew::CastOp> {
     auto loc = op.getLoc();
     TypeConverter typeConverter;
 
+    auto oldResultType = op.result().getType();
     auto resultType =
-        typeConverter.convertType(op.result().getType()).cast<MemRefType>();
+        typeConverter.convertType(oldResultType).cast<MemRefType>();
     auto operand = operands[0];
     auto operandType = operand.getType().cast<MemRefType>();
     if (resultType == operandType) {
       rewriter.replaceOp(op, operand);
       return success();
     }
-    bool resultIsSigned = isSigned(getScalarType(op.result().getType()).type());
+    bool resultIsSigned = getElementType(oldResultType).isSignedInteger();
 
     // Make an allocation for the output
     auto resultMemRef = rewriter.create<AllocOp>(loc, resultType).getResult();
@@ -800,9 +801,8 @@ struct CastOpConversion : public OpConversionPattern<ew::CastOp> {
     auto scalar = rewriter.create<AffineLoadOp>(loc, operand, idxs);
 
     // Create the standard cast op
-    auto scalarType = getScalarType(op.tensor());
-    auto dtype = scalarType.type();
-    auto result = createCastOp(rewriter, loc, scalar, isSigned(dtype),
+    auto dtype = getElementType(op.tensor());
+    auto result = createCastOp(rewriter, loc, scalar, dtype.isSignedInteger(),
                                resultType.getElementType(), resultIsSigned);
 
     // Create the store

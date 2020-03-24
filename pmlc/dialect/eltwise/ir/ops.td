@@ -119,7 +119,8 @@ class EW_CompareOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
 
   let extraClassDeclaration = [{
     static Type getResultType(ValueRange operands) {
-      return ComputeResultType(operands, DataType::u1);
+      return ComputeResultType(operands,
+        IntegerType::get(1, operands[0].getContext()));
     }
   }];
 }

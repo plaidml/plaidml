@@ -12,7 +12,11 @@ include "mlir/Dialect/Affine/IR/AffineOpsBase.td"
 include "pmlc/util/enums.td"
 include "pmlc/util/interfaces.td"
 include "pmlc/dialect/eltwise/ir/interfaces.td"
+
+#ifndef __PML_ELTWISE_PREDICATES__
 include "pmlc/dialect/eltwise/ir/predicates.td"
+#endif
+
 include "pmlc/dialect/tile/ir/interfaces.td"
 
 // TODO: this should be defined upstream
