@@ -4,7 +4,7 @@
 
 #include <utility>
 
-#include "mlir/Dialect/AffineOps/AffineOps.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/Pass/Pass.h"
@@ -81,7 +81,7 @@ static RankedTensorType getRankedTensorType(Type type) {
 struct FuncOpConversion : public OpConversionPattern<FuncOp> {
   using OpConversionPattern<FuncOp>::OpConversionPattern;
 
-  PatternMatchResult
+  LogicalResult
   matchAndRewrite(FuncOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
     FunctionType type = op.getType();
@@ -110,19 +110,19 @@ struct FuncOpConversion : public OpConversionPattern<FuncOp> {
     // Finally cause the old func op to be erased
     rewriter.eraseOp(op);
 
-    return matchSuccess();
+    return success();
   }
 };
 
 struct TileConstantOpConversion : public OpConversionPattern<ConstantOp> {
   using OpConversionPattern<ConstantOp>::OpConversionPattern;
 
-  PatternMatchResult
+  LogicalResult
   matchAndRewrite(ConstantOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
     auto value = op.getValue().cast<IntegerAttr>().getInt();
     rewriter.replaceOpWithNewOp<mlir::ConstantIndexOp>(op, value);
-    return matchSuccess();
+    return success();
   }
 };
 
@@ -138,7 +138,7 @@ struct ScalarConstantOpConversion
     : public OpConversionPattern<ew::ScalarConstantOp> {
   using OpConversionPattern<ew::ScalarConstantOp>::OpConversionPattern;
 
-  PatternMatchResult
+  LogicalResult
   matchAndRewrite(ew::ScalarConstantOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
     auto stdType = getScalarType(op).toStandard();
@@ -154,7 +154,7 @@ struct ScalarConstantOpConversion
       llvm_unreachable("Invalid scalar constant op");
     }
     rewriter.replaceOpWithNewOp<mlir::ConstantOp>(op, stdType, value);
-    return matchSuccess();
+    return success();
   }
 };
 
@@ -207,15 +207,7 @@ static Value createCastOp(OpBuilder &builder, Location loc, Value from,
 }
 
 struct Matcher {
-  static PatternMatchResult
-  matchSuccess(std::unique_ptr<mlir::PatternState> state = {}) {
-    return PatternMatchResult(std::move(state));
-  }
-
-  PatternMatchResult operator()(Operation *op) {
-    return match(op) ? matchSuccess() : llvm::None;
-  }
-
+  LogicalResult operator()(Operation *op) { return success(match(op)); }
   virtual bool match(Operation *op) const { return false; }
 };
 
@@ -541,7 +533,7 @@ template <typename FromOpType, typename IntoOpBuilder,
 struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
   using OpConversionPattern<FromOpType>::OpConversionPattern;
 
-  PatternMatchResult match(Operation *op) const final {
+  LogicalResult match(Operation *op) const final {
     IVLOG(2, "EltwiseOpConversion::match>");
     Matcher pred;
     return pred(op);
@@ -588,21 +580,21 @@ template <CombinationKind comboKind, typename ComboBuilder,
 struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
   using OpConversionPattern<ContractionOp>::OpConversionPattern;
 
-  PatternMatchResult match(Operation *op) const final {
+  LogicalResult match(Operation *op) const final {
     IVLOG(2, "ContractionOpConversion::match>");
     if (auto cionOp = llvm::dyn_cast<ContractionOp>(op)) {
       if (cionOp.combo() != comboKind) {
-        return matchFailure();
+        return failure();
       }
       if (!cionOp.lowerBounds().hasValue() ||
           !cionOp.upperBounds().hasValue()) {
         cionOp.emitError("contraction bounds must be computed");
-        return matchFailure();
+        return failure();
       }
       Matcher pred;
       return pred(cionOp);
     }
-    return matchFailure();
+    return failure();
   }
 
   void rewrite(ContractionOp op, ArrayRef<Value> operands,
@@ -697,7 +689,7 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
 struct IndexOpConversion : public OpConversionPattern<IndexOp> {
   using OpConversionPattern<IndexOp>::OpConversionPattern;
 
-  PatternMatchResult
+  LogicalResult
   matchAndRewrite(IndexOp op, llvm::ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
     IVLOG(2, "IndexOpConversion::matchAndRewrite>");
@@ -731,14 +723,14 @@ struct IndexOpConversion : public OpConversionPattern<IndexOp> {
     // Replace the op
     rewriter.replaceOp(op, resultMemRef);
 
-    return matchSuccess();
+    return success();
   }
 };
 
 struct ShapeOpConversion : public OpConversionPattern<ShapeOp> {
   using OpConversionPattern<ShapeOp>::OpConversionPattern;
 
-  PatternMatchResult
+  LogicalResult
   matchAndRewrite(ShapeOp op, llvm::ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
     IVLOG(2, "ShapeOpConversion::matchAndRewrite>");
@@ -769,14 +761,14 @@ struct ShapeOpConversion : public OpConversionPattern<ShapeOp> {
     // Replace the op
     rewriter.replaceOp(op, resultMemRef);
 
-    return matchSuccess();
+    return success();
   }
 };
 
 struct CastOpConversion : public OpConversionPattern<ew::CastOp> {
   using OpConversionPattern<ew::CastOp>::OpConversionPattern;
 
-  PatternMatchResult
+  LogicalResult
   matchAndRewrite(ew::CastOp op, llvm::ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
     IVLOG(2, "CastOpConversion::matchAndRewrite>");
@@ -791,7 +783,7 @@ struct CastOpConversion : public OpConversionPattern<ew::CastOp> {
     auto operandType = operand.getType().cast<MemRefType>();
     if (resultType == operandType) {
       rewriter.replaceOp(op, operand);
-      return matchSuccess();
+      return success();
     }
     bool resultIsSigned = isSigned(getScalarType(op.result().getType()).type());
 
@@ -819,15 +811,15 @@ struct CastOpConversion : public OpConversionPattern<ew::CastOp> {
     // Replace the op
     rewriter.replaceOp(op, resultMemRef);
 
-    IVLOG(2, "CastOpConversion::matchAndRewrite returns matchSuccess");
-    return matchSuccess();
+    IVLOG(2, "CastOpConversion::matchAndRewrite returns success");
+    return success();
   }
 };
 
 struct ReturnOpConversion : public OpConversionPattern<ReturnOp> {
   using OpConversionPattern<ReturnOp>::OpConversionPattern;
 
-  PatternMatchResult
+  LogicalResult
   matchAndRewrite(ReturnOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
     IVLOG(2, "ReturnOpConversion::matchAndRewrite>");
@@ -838,21 +830,21 @@ struct ReturnOpConversion : public OpConversionPattern<ReturnOp> {
       operand.replaceAllUsesWith(block.getArgument(blockArg++));
     }
     rewriter.replaceOpWithNewOp<ReturnOp>(op);
-    return matchSuccess();
+    return success();
   }
 };
 
 struct TraceOpConversion : public OpConversionPattern<TraceOp> {
   using OpConversionPattern<TraceOp>::OpConversionPattern;
 
-  PatternMatchResult
+  LogicalResult
   matchAndRewrite(TraceOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
     auto module = op.getParentOfType<ModuleOp>();
     auto symbol = createStubFunc(module, op.msgAttr());
     rewriter.create<CallOp>(op.getLoc(), symbol, ArrayRef<Type>{});
     rewriter.replaceOp(op, op.in());
-    return matchSuccess();
+    return success();
   }
 
   FlatSymbolRefAttr createStubFunc(ModuleOp module, StringAttr msg) const {
@@ -876,7 +868,7 @@ struct LoweringPass : public mlir::ModulePass<LoweringPass> {
   void runOnModule() final {
     // Set up target (i.e. what is legal)
     mlir::ConversionTarget target(getContext());
-    target.addLegalDialect<mlir::AffineOpsDialect>();
+    target.addLegalDialect<mlir::AffineDialect>();
     target.addLegalDialect<mlir::StandardOpsDialect>();
     target.addLegalDialect<dialect::pxa::Dialect>();
     target.addLegalDialect<dialect::stdx::Dialect>();

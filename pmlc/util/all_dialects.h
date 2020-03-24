@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "mlir/Dialect/AffineOps/AffineOps.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/FxpMathOps/FxpMathOps.h"
 #include "mlir/Dialect/GPU/GPUDialect.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
@@ -11,11 +11,11 @@
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/LoopOps/LoopOps.h"
 #include "mlir/Dialect/OpenMP/OpenMPDialect.h"
-#include "mlir/Dialect/QuantOps/QuantOps.h"
+#include "mlir/Dialect/Quant/QuantOps.h"
 #include "mlir/Dialect/SDBM/SDBMDialect.h"
 #include "mlir/Dialect/SPIRV/SPIRVDialect.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
-#include "mlir/Dialect/VectorOps/VectorOps.h"
+#include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/IR/Dialect.h"
 
 using namespace mlir; // NOLINT [build/namespaces]
@@ -24,7 +24,7 @@ using namespace mlir; // NOLINT [build/namespaces]
 // all the possible dialects to be made available to the context automatically.
 inline void registerAllDialects() {
   static bool init_once = []() {
-    registerDialect<AffineOpsDialect>();
+    registerDialect<AffineDialect>();
     registerDialect<fxpmath::FxpMathOpsDialect>();
     registerDialect<gpu::GPUDialect>();
     registerDialect<LLVM::LLVMDialect>();
@@ -34,7 +34,7 @@ inline void registerAllDialects() {
     registerDialect<quant::QuantizationDialect>();
     registerDialect<spirv::SPIRVDialect>();
     registerDialect<StandardOpsDialect>();
-    registerDialect<vector::VectorOpsDialect>();
+    registerDialect<vector::VectorDialect>();
     return true;
   }();
   (void)init_once;

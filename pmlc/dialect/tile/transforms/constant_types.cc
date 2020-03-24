@@ -21,13 +21,15 @@
 
 namespace pmlc::dialect::tile {
 
+using mlir::failure;
+using mlir::LogicalResult;
 using mlir::OperationPass;
 using mlir::OpRewritePattern;
 using mlir::OwningRewritePatternList;
-using mlir::PatternMatchResult;
 using mlir::PatternRewriter;
+using mlir::success;
 
-using pmlc::dialect::eltwise::ScalarConstantOp;
+using eltwise::ScalarConstantOp;
 
 static llvm::cl::OptionCategory optionCategory("tile-constant-types options");
 
@@ -50,14 +52,26 @@ static DataType parseOption(const llvm::cl::opt<std::string> &option) {
   return opt.getValue();
 }
 
+struct ConstantTypesPass : public OperationPass<ConstantTypesPass> {
+  ConstantTypesPass() = default;
+  ConstantTypesPass(DataType floatx, DataType intx)
+      : floatx(floatx), intx(intx) {}
+
+  void runOnOperation() final;
+  void notifyPassFailure() { signalPassFailure(); }
+
+  DataType floatx = parseOption(clFloatxOption);
+  DataType intx = parseOption(clIntxOption);
+};
+
 struct ConstantTypesRewriter : public OpRewritePattern<ScalarConstantOp> {
-  ConstantTypesRewriter(mlir::MLIRContext *context, DataType floatx,
-                        DataType intx)
-      : OpRewritePattern<ScalarConstantOp>(context), floatx(floatx),
+  ConstantTypesRewriter(MLIRContext *context, ConstantTypesPass *pass,
+                        DataType floatx, DataType intx)
+      : OpRewritePattern<ScalarConstantOp>(context), pass(pass), floatx(floatx),
         intx(intx) {}
 
-  PatternMatchResult matchAndRewrite(ScalarConstantOp constOp,
-                                     PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(ScalarConstantOp constOp,
+                                PatternRewriter &rewriter) const override {
     IVLOG(3, "ConstantTypesPass::matchAndRewrite");
 
     auto type = constOp.getType();
@@ -69,50 +83,43 @@ struct ConstantTypesRewriter : public OpRewritePattern<ScalarConstantOp> {
       auto elementType = ScalarType::get(type.getContext(), floatx);
       auto tensorType = RankedTensorType::get(shape, elementType);
       if (tensorType == type) {
-        return matchFailure();
+        return failure();
       }
       rewriter.replaceOpWithNewOp<ScalarConstantOp>(constOp, elementType,
                                                     value);
-      return matchSuccess();
+      return success();
     }
 
     auto intAttr = constOp.getIntAttr();
     if (intAttr && intx != DataType::invalid) {
       int64_t value = intAttr.getInt();
       if (pmlc::util::isUnsigned(intx) && (value < 0)) {
-        throw std::runtime_error("Invalid datatype for negative constant");
+        pass->notifyPassFailure();
+        return constOp.emitOpError("Invalid datatype for negative constant");
       }
       auto elementType = ScalarType::get(type.getContext(), intx);
       auto tensorType = RankedTensorType::get(shape, elementType);
       if (tensorType == type) {
-        return matchFailure();
+        return failure();
       }
       rewriter.replaceOpWithNewOp<ScalarConstantOp>(constOp, elementType,
                                                     value);
-      return matchSuccess();
+      return success();
     }
 
-    return matchFailure();
+    return failure();
   }
 
+  ConstantTypesPass *pass;
   DataType floatx;
   DataType intx;
 };
 
-struct ConstantTypesPass : public OperationPass<ConstantTypesPass> {
-  ConstantTypesPass() = default;
-  ConstantTypesPass(DataType floatx, DataType intx)
-      : floatx(floatx), intx(intx) {}
-
-  void runOnOperation() final {
-    OwningRewritePatternList patterns;
-    patterns.insert<ConstantTypesRewriter>(&getContext(), floatx, intx);
-    applyPatternsGreedily(getOperation()->getRegions(), patterns);
-  }
-
-  DataType floatx = parseOption(clFloatxOption);
-  DataType intx = parseOption(clIntxOption);
-};
+void ConstantTypesPass::runOnOperation() {
+  OwningRewritePatternList patterns;
+  patterns.insert<ConstantTypesRewriter>(&getContext(), this, floatx, intx);
+  applyPatternsGreedily(getOperation()->getRegions(), patterns);
+}
 
 std::unique_ptr<mlir::Pass> createConstantTypesPass(DataType floatx,
                                                     DataType intx) {

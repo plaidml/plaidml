@@ -63,8 +63,8 @@ struct SimplifyAffineOp : public OpRewritePattern<AffineOpTy> {
   void replaceAffineOp(PatternRewriter &rewriter, AffineOpTy affineOp,
                        AffineMap map, ArrayRef<Value> mapOperands) const;
 
-  PatternMatchResult matchAndRewrite(AffineOpTy affineOp,
-                                     PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(AffineOpTy affineOp,
+                                PatternRewriter &rewriter) const override {
     static_assert(
         // std::is_same<AffineOpTy, AffineLoadOp>::value ||
         // std::is_same<AffineOpTy, AffinePrefetchOp>::value ||
@@ -79,10 +79,10 @@ struct SimplifyAffineOp : public OpRewritePattern<AffineOpTy> {
     composeAffineMapAndOperands(&map, &resultOperands);
     if (map == oldMap && std::equal(oldOperands.begin(), oldOperands.end(),
                                     resultOperands.begin()))
-      return this->matchFailure();
+      return failure();
 
     replaceAffineOp(rewriter, affineOp, map, resultOperands);
-    return this->matchSuccess();
+    return success();
   }
 };
 

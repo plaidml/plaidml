@@ -18,7 +18,7 @@ func @pad_input(%arg0: tensor<10x!f32>) -> tensor<10x!f32> {
 // CHECK: %[[TMP:.*]] = alloc() : memref<12xf32>
 // CHECK: affine.parallel (%{{.*}}) = (0) to (12)
 // CHECK:   affine.store %{{.*}}, %[[TMP]][%{{.*}}] : memref<12xf32>
-// CHECK: %[[SUBVIEW:.*]] = std.subview %[[TMP]][][][] : memref<12xf32> to memref<10xf32, #[[LAYOUT]]>
+// CHECK: %[[SUBVIEW:.*]] = subview %[[TMP]][] [] [] : memref<12xf32> to memref<10xf32, #[[LAYOUT]]>
 // CHECK: affine.parallel (%{{.*}}) = (0) to (10)
 // CHECK:   %[[X0:.*]] = affine.load %{{.*}}[%{{.*}}] : memref<10xf32>
 // CHECK:   affine.store %[[X0]], %[[SUBVIEW]][%{{.*}}] : memref<10xf32, #[[LAYOUT]]>
@@ -51,7 +51,7 @@ func @pad_contraction(%A: tensor<10x!f32>, %B: tensor<1x!f32>, %C: tensor<3x!f32
 // fill exterior
 // CHECK: affine.parallel (%{{.*}}) = (0) to (12)
 // CHECK:   affine.store %{{.*}}, %[[TMP]][%{{.*}}] : memref<12xf32>
-// CHECK: %[[SUBVIEW:.*]] = std.subview %[[TMP]][][][] : memref<12xf32> to memref<10xf32, #[[LAYOUT]]>
+// CHECK: %[[SUBVIEW:.*]] = subview %[[TMP]][] [] [] : memref<12xf32> to memref<10xf32, #[[LAYOUT]]>
 // fill interior
 // CHECK: affine.parallel (%{{.*}}) = (0) to (10)
 // CHECK:   affine.store %{{.*}}, %[[SUBVIEW]][%{{.*}}] : memref<10xf32, #[[LAYOUT]]>

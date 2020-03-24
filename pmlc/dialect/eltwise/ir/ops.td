@@ -2,6 +2,8 @@
 #ifndef __PML_ELTWISE_OPS__
 #define __PML_ELTWISE_OPS__
 
+include "mlir/Interfaces/SideEffects.td"
+
 #ifndef __PML_UTIL_INTERFACES__
 include "pmlc/util/interfaces.td"
 #endif
@@ -26,7 +28,7 @@ class EltwiseOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
     ])>;
 
 def ScalarConstantOp :
-    Op<EltwiseDialect, "sconst", [NoSideEffect]>,
+    Op<EltwiseDialect, "sconst", [ConstantLike, NoSideEffect]>,
     HasFolder {
   let summary = "constant";
   let arguments = (ins AnyAttr:$value);
