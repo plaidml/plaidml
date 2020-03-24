@@ -35,28 +35,4 @@ def CombinationKind : I64EnumAttr<
   let convertFromStorage = "static_cast<" # returnType # ">($_self.getValue().getZExtValue())";
 }
 
-// def DataType : I64EnumAttr<
-//     "DataType",
-//     "Core data types",
-//     [
-//       I64EnumAttrCase<"invalid", 0>,
-//       I64EnumAttrCase<"u1",      1>,
-//       I64EnumAttrCase<"i8",      2>,
-//       I64EnumAttrCase<"u8",      3>,
-//       I64EnumAttrCase<"i16",     4>,
-//       I64EnumAttrCase<"u16",     5>,
-//       I64EnumAttrCase<"i32",     6>,
-//       I64EnumAttrCase<"u32",     7>,
-//       I64EnumAttrCase<"i64",     8>,
-//       I64EnumAttrCase<"u64",     9>,
-//       I64EnumAttrCase<"bf16",   10>,
-//       I64EnumAttrCase<"f16",    11>,
-//       I64EnumAttrCase<"f32",    12>,
-//       I64EnumAttrCase<"f64",    13>,
-//     ]> {
-//   let cppNamespace = "pmlc::util";
-//   let returnType = "DataType";
-//   let convertFromStorage = "static_cast<" # returnType # ">($_self.getValue().getZExtValue())";
-// }
-
 #endif // __PML_UTIL_ENUMS__
