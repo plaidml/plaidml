@@ -32,7 +32,7 @@ inline std::vector<Tensor> Gradient(const std::vector<Tensor>& wrt, const Tensor
 }
 
 inline void RegisterTensorDeriv(const std::string& name, TensorDeriv fn) {
-  auto thunk = ThunkTensorDeriv(fn);
+  auto thunk = TensorDerivThunk();
   ffi::call_void(plaidml_deriv_register, name.c_str(), thunk, reinterpret_cast<void*>(fn));
 }
 
