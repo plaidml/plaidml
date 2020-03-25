@@ -107,4 +107,7 @@ void ffi_wrap_void(plaidml_error* err, F fn) {
   }
 }
 
+plaidml_datatype convertIntoDataType(mlir::Type type);
+mlir::Type convertFromDataType(plaidml_datatype dtype, mlir::MLIRContext* context);
+
 }  // namespace plaidml::core

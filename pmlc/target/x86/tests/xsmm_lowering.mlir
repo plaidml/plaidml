@@ -12,11 +12,11 @@ func @dot(%A: memref<4x8xf32>, %B: memref<8x6xf32>, %C: memref<4x6xf32>) -> () {
   affine.parallel (%i, %j, %k) = (0, 0, 0) to (8, 8, 8) step (2, 2, 2) {
     xsmm.gemm %C[%i, %j]:#C_tile = %A[%i, %k]:#A_tile, %B[%k, %j]:#B_tile, [2, 2, 2]
       : memref<4x6xf32>, memref<4x8xf32>, memref<8x6xf32>
-    // CHECK: subview %{{.*}}[{{.*}}][][] : memref<4x8xf32> to memref<2x2xf32, #{{.*}}>
+    // CHECK: subview %{{.*}}[{{.*}}] [] [] : memref<4x8xf32> to memref<2x2xf32, #{{.*}}>
     // CHECK: memref_cast
-    // CHECK: subview %{{.*}}[{{.*}}][][] : memref<8x6xf32> to memref<2x2xf32, #{{.*}}>
+    // CHECK: subview %{{.*}}[{{.*}}] [] [] : memref<8x6xf32> to memref<2x2xf32, #{{.*}}>
     // CHECK: memref_cast
-    // CHECK: subview %{{.*}}[{{.*}}][][] : memref<4x6xf32> to memref<2x2xf32, #{{.*}}>
+    // CHECK: subview %{{.*}}[{{.*}}] [] [] : memref<4x6xf32> to memref<2x2xf32, #{{.*}}>
     // CHECK: memref_cast
     // CHECK: call @plaidml_rt_xsmm_gemm_f32
     // CHECK-SAME: (%{{.*}}, %{{.*}}, %{{.*}}, %[[c8]], %[[c1]], %[[c1]], %[[c2]], %[[c2]], %[[c2]])
@@ -40,11 +40,11 @@ func @res2a_branch2a(%I: memref<1x56x56x64xf32>, %K: memref<1x1x64x64xf32>, %O: 
     xsmm.gemm %O[%c0, 14 * %x, %y, %c0]:#O_tile
       = %K[%c0, %c0, %c0, %c0]:#K_tile, %I[%c0, 14 * %x, %y, %c0]:#I_tile, [64, 14, 64]
       : memref<1x56x56x64xf32>, memref<1x1x64x64xf32>, memref<1x56x56x64xf32>
-    // CHECK: subview %{{.*}}[{{.*}}][][] : memref<1x1x64x64xf32> to memref<1x1x64x64xf32, #{{.*}}>
+    // CHECK: subview %{{.*}}[{{.*}}] [] [] : memref<1x1x64x64xf32> to memref<1x1x64x64xf32, #{{.*}}>
     // CHECK: memref_cast
-    // CHECK: subview %{{.*}}[{{.*}}][][] : memref<1x56x56x64xf32> to memref<1x14x1x64xf32, #{{.*}}>
+    // CHECK: subview %{{.*}}[{{.*}}] [] [] : memref<1x56x56x64xf32> to memref<1x14x1x64xf32, #{{.*}}>
     // CHECK: memref_cast
-    // CHECK: subview %{{.*}}[{{.*}}][][] : memref<1x56x56x64xf32> to memref<1x14x1x64xf32, #{{.*}}>
+    // CHECK: subview %{{.*}}[{{.*}}] [] [] : memref<1x56x56x64xf32> to memref<1x14x1x64xf32, #{{.*}}>
     // CHECK: memref_cast
     // CHECK: call @plaidml_rt_xsmm_gemm_f32
     // CHECK-SAME: (%{{.*}}, %{{.*}}, %{{.*}}, %[[c64]], %[[c3584]], %[[c3584]], %[[c64]], %[[c14]], %[[c64]])

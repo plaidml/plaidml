@@ -29,7 +29,7 @@ def StringOp : TileOp<"str"> {
 def DimOp : TileOpWithPPV<"dim", [NoSideEffect]>, HasFolder {
   let summary = "dimension index operation";
   let arguments = (ins RankedTensorOf<[AnyScalar]>:$tensor, IndexAttr:$dim);
-  let results = (outs IndexLike:$result);
+  let results = (outs Index:$result);
 
   let builders = [OpBuilder<
     "Builder* builder, OperationState& result, Value tensor, int64_t value", [{
@@ -48,7 +48,7 @@ def DimOp : TileOpWithPPV<"dim", [NoSideEffect]>, HasFolder {
 def PolyIndexOp : TileOpWithPPV<"idx", [NoSideEffect]> {
   let summary = "polynomial index operation";
   let arguments = (ins I64Attr:$id, OptionalAttr<StrAttr>:$name);
-  let results = (outs IndexLike:$result);
+  let results = (outs Index:$result);
 
   let builders = [OpBuilder<
     "Builder* builder, OperationState& result, int64_t id, StringRef name", [{
@@ -64,7 +64,7 @@ def PolyIndexOp : TileOpWithPPV<"idx", [NoSideEffect]> {
 class PolyOp<string mnemonic, list<OpTrait> traits = []> :
     TileOp<mnemonic, !listconcat(traits, [NoSideEffect])>,
     HasFolder {
-  let results = (outs IndexLike:$result);
+  let results = (outs Index:$result);
 
   let builders = [OpBuilder<
     "Builder* builder, OperationState& result, ArrayRef<Value> operands", [{
@@ -76,12 +76,12 @@ class PolyOp<string mnemonic, list<OpTrait> traits = []> :
 
 class PolyUnaryOp<string mnemonic, list<OpTrait> traits = []> :
     PolyOp<mnemonic, traits> {
-  let arguments = (ins IndexLike:$in);
+  let arguments = (ins Index:$in);
 }
 
 class PolyBinaryOp<string mnemonic, list<OpTrait> traits = []> :
     PolyOp<mnemonic, traits> {
-  let arguments = (ins IndexLike:$lhs, IndexLike:$rhs);
+  let arguments = (ins Index:$lhs, Index:$rhs);
   let printer = [{ printPolyBinaryOp(&p, *this); }];
   let parser = [{ return parsePolyBinaryOp(&parser, result); }];
 }
@@ -100,7 +100,7 @@ def PolyMulOp : PolyBinaryOp<"poly_mul", [Commutative]> {
 
 def PolyNegOp : PolyUnaryOp<"poly_neg"> {
   let summary = "Polynomial negative operation";
-  let arguments = (ins IndexLike:$input);
+  let arguments = (ins Index:$input);
 }
 
 def PolySubOp : PolyBinaryOp<"poly_sub"> {

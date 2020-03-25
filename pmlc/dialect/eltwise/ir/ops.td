@@ -2,6 +2,8 @@
 #ifndef __PML_ELTWISE_OPS__
 #define __PML_ELTWISE_OPS__
 
+include "mlir/Interfaces/SideEffects.td"
+
 #ifndef __PML_UTIL_INTERFACES__
 include "pmlc/util/interfaces.td"
 #endif
@@ -26,7 +28,7 @@ class EltwiseOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
     ])>;
 
 def ScalarConstantOp :
-    Op<EltwiseDialect, "sconst", [NoSideEffect]>,
+    Op<EltwiseDialect, "sconst", [ConstantLike, NoSideEffect]>,
     HasFolder {
   let summary = "constant";
   let arguments = (ins AnyAttr:$value);
@@ -117,7 +119,8 @@ class EW_CompareOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
 
   let extraClassDeclaration = [{
     static Type getResultType(ValueRange operands) {
-      return ComputeResultType(operands, DataType::u1);
+      return ComputeResultType(operands,
+        IntegerType::get(1, operands[0].getContext()));
     }
   }];
 }

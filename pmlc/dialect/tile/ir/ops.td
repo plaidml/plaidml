@@ -6,10 +6,10 @@ include "pmlc/dialect/tile/ir/base.td"
 
 include "pmlc/dialect/tile/ir/builder.td"
 
-def ConstantOp : TileOpWithPPV<"constant", [NoSideEffect]>, HasFolder {
+def ConstantOp : TileOpWithPPV<"constant", [ConstantLike, NoSideEffect]>, HasFolder {
   let summary = "constant operation";
   let arguments = (ins IndexAttr:$value);
-  let results = (outs IndexLike:$result);
+  let results = (outs Index:$result);
 
   let builders = [OpBuilder<
     "Builder* builder, OperationState& result, int64_t value", [{
@@ -103,18 +103,18 @@ def GatherOp : SpecialOp<"gather">, HasCanonicalizer {
   let summary = "special gather operation";
   let arguments = (ins
     RankedTensorOf<[AnyScalar]>:$tensor,
-    RankedTensorOf<[ScalarIndex]>:$dims);
+    RankedTensorOf<[Index]>:$dims);
   let results = (outs RankedTensorOf<[AnyScalar]>:$result);
 }
 
 def PrngOp : SpecialOp<"prng", []>, HasCanonicalizer {
   let summary = "pseudorandom number generator";
   let arguments = (ins
-    RankedTensorOf<[ScalarUINT32]>:$state,
+    RankedTensorOf<[UI32]>:$state,
     Variadic<EltwiseIndex>:$dims);
   let results = (outs
-    RankedTensorOf<[AnyScalarFloat]>:$result,
-    RankedTensorOf<[ScalarUINT32]>:$new_state);
+    RankedTensorOf<[AnyFloat]>:$result,
+    RankedTensorOf<[UI32]>:$new_state);
 }
 
 def ReshapeOp : SpecialOp<"reshape">, HasCanonicalizer {
@@ -129,7 +129,7 @@ def ScatterOp : SpecialOp<"scatter">, HasCanonicalizer {
   let summary = "special scatter operation";
   let arguments = (ins
     RankedTensorOf<[AnyScalar]>:$tensor,
-    RankedTensorOf<[ScalarIndex]>:$dims,
+    RankedTensorOf<[Index]>:$dims,
     RankedTensorOf<[AnyScalar]>:$other);
   let results = (outs RankedTensorOf<[AnyScalar]>:$result);
 }
@@ -137,7 +137,7 @@ def ScatterOp : SpecialOp<"scatter">, HasCanonicalizer {
 def ShapeOp : SpecialOp<"shape">, HasCanonicalizer {
   let summary = "tensor shape operation";
   let arguments = (ins RankedTensorOf<[AnyScalar]>:$tensor);
-  let results = (outs RankedTensorOf<[ScalarIndex]>:$result);
+  let results = (outs RankedTensorOf<[SI32]>:$result);
 }
 
 def TraceOp : Op<TileDialect, "trace", []>, HasCanonicalizer {

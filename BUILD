@@ -11,6 +11,27 @@ exports_files([
     "LICENSE",
 ])
 
+config_setting(
+    name = "clang",
+    values = {
+        "define": "compiler=clang",
+    },
+)
+
+config_setting(
+    name = "gcc",
+    values = {
+        "define": "compiler=gcc",
+    },
+)
+
+config_setting(
+    name = "msvc",
+    values = {
+        "define": "compiler=msvc",
+    },
+)
+
 pkg_tar(
     name = "pkg",
     srcs = [

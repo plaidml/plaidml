@@ -1,4 +1,4 @@
-// Copyright 2019, Intel Corporation
+// Copyright 2020 Intel Corporation
 
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/LoopToStandard/ConvertLoopToStandard.h"
@@ -13,12 +13,26 @@
 #include "pmlc/conversion/pxa_to_affine/pxa_to_affine.h"
 #include "pmlc/conversion/stdx_to_llvm/stdx_to_llvm.h"
 #include "pmlc/conversion/tile_to_pxa/tile_to_pxa.h"
+#include "pmlc/dialect/pxa/transforms/passes.h"
 #include "pmlc/dialect/tile/transforms/passes.h"
+#include "pmlc/target/x86/heatmap.h"
 #include "pmlc/target/x86/trace_linking.h"
 #include "pmlc/target/x86/xsmm_lowering.h"
 #include "pmlc/util/logging.h"
 
 using namespace mlir; // NOLINT[build/namespaces]
+
+namespace pmlc::dialect::pxa {
+
+struct StencilPass;
+static mlir::PassRegistration<StencilPass> xsmmStencilPass(
+    "affine-stencil-xsmm",
+    "Find a tiling for extracting 'micro' GEMMs suitable for XSMM.", []() {
+      auto numThreads = std::thread::hardware_concurrency();
+      return createStencilPass(numThreads, target::x86::heatmapCost);
+    });
+
+} // namespace pmlc::dialect::pxa
 
 namespace pmlc::target::x86 {
 
@@ -28,7 +42,6 @@ struct ConvertToLLVMPass : public ModulePass<ConvertToLLVMPass> {
   void runOnModule() override {
     auto module = getModule();
     auto *context = module.getContext();
-    LLVM::ensureDistinctSuccessors(module);
 
     LLVMTypeConverterCustomization customs;
     customs.funcArgConverter = barePtrFuncArgTypeConverter;

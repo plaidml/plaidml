@@ -4,11 +4,7 @@
 #define __PML_PXA_OPS__
 
 #ifndef AFFINE_OPS_BASE
-include "mlir/Dialect/AffineOps/AffineOpsBase.td"
-#endif
-
-#ifndef MLIR_LOOPLIKEINTERFACE
-include "mlir/Transforms/LoopLikeInterface.td"
+include "mlir/Dialect/Affine/IR/AffineOpsBase.td"
 #endif
 
 #ifndef __PML_UTIL_ENUMS__
