@@ -1,15 +1,20 @@
 // Copyright 2020 Intel Corporation
 
+#ifndef _WIN32
 #include "libxsmm_source.h" // NOLINT [build/include_subdir]
+#endif
 
 #include "pmlc/rt/memref.h"
 
+#ifndef _WIN32
 struct Initializer {
   Initializer() { libxsmm_init(); }
 };
 
 static Initializer init;
+#endif
 
+#ifndef _WIN32
 extern "C" void plaidml_rt_xsmm_gemm_f32(            //
     size_t aRank, StridedMemRefType<float, 2> *aRef, //
     size_t bRank, StridedMemRefType<float, 2> *bRef, //
@@ -34,4 +39,5 @@ extern "C" void plaidml_rt_xsmm_gemm_f32(            //
   libxsmm_gemm(/*transa=*/nullptr, /*transb=*/nullptr, &m_int, &n_int, &k_int,
                /*alpha=*/nullptr, bPtr, &ldb_int, aPtr, &lda_int,
                /*beta=*/nullptr, cPtr, &ldc_int);
+#endif
 }

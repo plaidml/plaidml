@@ -13,7 +13,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "mlir/ExecutionEngine/OptUtils.h"
-#include "mlir/InitAllDialects.h"
 #include "mlir/Support/JitRunner.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/TargetSelect.h"
@@ -22,7 +21,7 @@
 #include "pmlc/util/all_passes.h"
 
 int main(int argc, char **argv) {
-  mlir::registerAllDialects();
+  registerAllDialects();
   llvm::InitLLVM y(argc, argv);
   llvm::InitializeNativeTarget();
   llvm::InitializeNativeTargetAsmPrinter();

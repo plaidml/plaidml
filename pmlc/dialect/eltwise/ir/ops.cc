@@ -20,13 +20,15 @@
 
 namespace pmlc::dialect::eltwise {
 
+using mlir::failure;
 using mlir::FloatAttr;
 using mlir::IntegerAttr;
 using mlir::Location;
+using mlir::LogicalResult;
 using mlir::OpRewritePattern;
 using mlir::Pattern;
-using mlir::PatternMatchResult;
 using mlir::PatternRewriter;
+using mlir::success;
 
 mlir::OpFoldResult ScalarConstantOp::fold(ArrayRef<Attribute> operands) {
   assert(operands.empty() && "constant has no operands");
@@ -38,8 +40,8 @@ mlir::OpFoldResult ScalarConstantOp::fold(ArrayRef<Attribute> operands) {
 struct CastCanonicalizer : public OpRewritePattern<CastOp> {
   using OpRewritePattern<CastOp>::OpRewritePattern;
 
-  PatternMatchResult matchAndRewrite(CastOp castOp,
-                                     PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(CastOp castOp,
+                                PatternRewriter &rewriter) const override {
     IVLOG(5,
           "CastCanonicalizer::matchAndRewrite> " << mlir::debugString(castOp));
     auto op = castOp.getOperation();
@@ -49,12 +51,12 @@ struct CastCanonicalizer : public OpRewritePattern<CastOp> {
     auto elementType = existingType.getElementType();
     auto resultType = RankedTensorType::get(tensorType.getShape(), elementType);
     if (resultType == existingType) {
-      return Pattern::matchFailure();
+      return failure();
     }
     auto newOp = rewriter.create<CastOp>(op->getLoc(), resultType, tensor);
     rewriter.replaceOp(op, {newOp});
     util::UpdateFuncOpType(newOp.getOperation());
-    return Pattern::matchSuccess();
+    return success();
   }
 };
 
@@ -69,20 +71,20 @@ template <typename OpType>
 struct EltwiseCanonicalizer : public OpRewritePattern<OpType> {
   using OpRewritePattern<OpType>::OpRewritePattern;
 
-  PatternMatchResult matchAndRewrite(OpType eltwiseOp,
-                                     PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(OpType eltwiseOp,
+                                PatternRewriter &rewriter) const override {
     IVLOG(5, "EltwiseCanonicalizer::matchAndRewrite> "
                  << mlir::debugString(eltwiseOp));
     auto op = eltwiseOp.getOperation();
     auto operands = llvm::to_vector<2>(op->getOperands());
     auto resultType = OpType::getResultType(operands);
     if (resultType == eltwiseOp.result().getType()) {
-      return Pattern::matchFailure();
+      return failure();
     }
     auto newOp = rewriter.create<OpType>(op->getLoc(), operands);
     rewriter.replaceOp(op, {newOp});
     util::UpdateFuncOpType(newOp.getOperation());
-    return Pattern::matchSuccess();
+    return success();
   }
 };
 

@@ -27,6 +27,7 @@ using mlir::FloatAttr;
 using mlir::FuncOp;
 using mlir::IndexType;
 using mlir::IntegerAttr;
+using mlir::IntegerType;
 using mlir::m_Constant;
 using mlir::Operation;
 using mlir::RankedTensorType;
@@ -36,7 +37,7 @@ using mlir::ValueRange;
 
 namespace {
 
-bool MergeTypes(Type *into, Type from, DataType dtype) {
+bool MergeTypes(Type *into, Type from, Type dtype) {
   IVLOG(6, "MergeTypes> " << debugString(*into) << ", " << debugString(from));
   auto intoShapedType = getRankedTensorType(*into);
   auto fromShapedType = getRankedTensorType(from);
@@ -93,23 +94,82 @@ bool MergeTypes(Type *into, Type from, DataType dtype) {
     }
   }
 
-  if (dtype == DataType::invalid) {
-    auto intoElementType =
-        intoShapedType.getElementType().dyn_cast<ScalarType>();
-    auto fromElementType =
-        fromShapedType.getElementType().dyn_cast<ScalarType>();
-    if (!intoElementType || !fromElementType) {
-      throw std::runtime_error("NYI: Only scalar element types are supported");
-    }
-    dtype = promoteTypes(intoElementType.type(), fromElementType.type());
+  if (!dtype) {
+    auto intoElementType = intoShapedType.getElementType();
+    auto fromElementType = fromShapedType.getElementType();
+    dtype = promoteTypes(intoElementType, fromElementType);
   }
-  auto elementType = ScalarType::get(into->getContext(), dtype);
-  *into = RankedTensorType::get(resultShape, elementType);
+  *into = RankedTensorType::get(resultShape, dtype);
   IVLOG(6, "  Resulting type: " << debugString(*into));
   return true;
 }
 
 } // namespace
+
+// I64EnumAttrCase<"invalid", 0>,
+// I64EnumAttrCase<"u1",      1>,
+// I64EnumAttrCase<"i8",      2>,
+// I64EnumAttrCase<"u8",      3>,
+// I64EnumAttrCase<"i16",     4>,
+// I64EnumAttrCase<"u16",     5>,
+// I64EnumAttrCase<"i32",     6>,
+// I64EnumAttrCase<"u32",     7>,
+// I64EnumAttrCase<"i64",     8>,
+// I64EnumAttrCase<"u64",     9>,
+// I64EnumAttrCase<"bf16",   10>,
+// I64EnumAttrCase<"f16",    11>,
+// I64EnumAttrCase<"f32",    12>,
+// I64EnumAttrCase<"f64",    13>,
+unsigned typeScore(Type type) {
+  if (!type) {
+    return 0;
+  }
+  if (type.isInteger(1)) {
+    return 1;
+  }
+  if (type.isSignedInteger(8)) {
+    return 2;
+  }
+  if (type.isUnsignedInteger(8)) {
+    return 3;
+  }
+  if (type.isSignedInteger(16)) {
+    return 4;
+  }
+  if (type.isUnsignedInteger(16)) {
+    return 5;
+  }
+  if (type.isSignedInteger(32)) {
+    return 6;
+  }
+  if (type.isUnsignedInteger(32)) {
+    return 7;
+  }
+  if (type.isSignedInteger(64)) {
+    return 8;
+  }
+  if (type.isUnsignedInteger(64)) {
+    return 9;
+  }
+  if (type.isBF16()) {
+    return 10;
+  }
+  if (type.isF16()) {
+    return 11;
+  }
+  if (type.isF32()) {
+    return 12;
+  }
+  if (type.isF64()) {
+    return 13;
+  }
+  assert(false && "Undefined typeScore");
+  return 0;
+}
+
+Type promoteTypes(Type lhs, Type rhs) {
+  return typeScore(lhs) > typeScore(rhs) ? lhs : rhs;
+}
 
 RankedTensorType getRankedTensorType(Type type) {
   if (auto rankedType = type.dyn_cast<RankedTensorType>()) {
@@ -117,19 +177,15 @@ RankedTensorType getRankedTensorType(Type type) {
   }
   SmallVector<int64_t, 0> shape;
   if (type.isa<IndexType>()) {
+    // TODO: reify this when we lower to a specific target.
     return RankedTensorType::get(
-        shape, ScalarType::get(type.getContext(), DataType::i32));
+        shape, IntegerType::get(32, IntegerType::SignednessSemantics::Signed,
+                                type.getContext()));
   }
-  if (type.isa<ScalarType>()) {
-    return RankedTensorType::get(shape, type);
-  }
-  throw std::runtime_error(
-      llvm::formatv("Unsupported elementType for tensor: {0}",
-                    debugString(type))
-          .str());
+  return RankedTensorType::get(shape, type);
 }
 
-Type ComputeResultType(ValueRange operands, DataType override) {
+Type ComputeResultType(ValueRange operands, Type override) {
   if (VLOG_IS_ON(6)) {
     std::vector<std::string> types;
     for (auto operand : operands) {
@@ -221,6 +277,13 @@ bool ConstantValueMatcher::match(Operation *op) {
     return floatAttr.getValueAsDouble() == value;
   }
   return false;
+}
+
+Type toSignlessType(Type type) {
+  if (auto integerType = type.dyn_cast<IntegerType>()) {
+    return IntegerType::get(integerType.getWidth(), type.getContext());
+  }
+  return type;
 }
 
 } // namespace pmlc::dialect::eltwise

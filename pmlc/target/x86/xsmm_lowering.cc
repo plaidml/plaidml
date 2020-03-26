@@ -3,7 +3,7 @@
 #include "pmlc/target/x86/xsmm_lowering.h"
 
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
-#include "mlir/Dialect/AffineOps/AffineOps.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/AffineExprVisitor.h"
 #include "mlir/Pass/Pass.h"
@@ -24,25 +24,6 @@ namespace xsmm = dialect::xsmm;
 
 namespace {
 
-/// Create a sequence of operations that implement the `affineMap` applied to
-/// the given `operands` (as it it were an AffineApplyOp).
-static Optional<SmallVector<Value, 8>> expandAffineMap(OpBuilder &builder,
-                                                       Location loc,
-                                                       AffineMap affineMap,
-                                                       ValueRange operands) {
-  auto numDims = affineMap.getNumDims();
-  auto expanded = functional::map(
-      [numDims, &builder, loc, operands](AffineExpr expr) {
-        return expandAffineExpr(builder, loc, expr,
-                                operands.take_front(numDims),
-                                operands.drop_front(numDims));
-      },
-      affineMap.getResults());
-  if (llvm::all_of(expanded, [](Value v) { return v; }))
-    return expanded;
-  return None;
-}
-
 static constexpr int64_t kUnusedDimension = -1;
 
 static SmallVector<int64_t, 8> getFlattenedTileDimMapping(AffineMap map) {
@@ -61,8 +42,8 @@ class XSMMGemmLowering : public OpRewritePattern<xsmm::GemmOp> {
 public:
   using OpRewritePattern<xsmm::GemmOp>::OpRewritePattern;
 
-  PatternMatchResult matchAndRewrite(xsmm::GemmOp op,
-                                     PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(xsmm::GemmOp op,
+                                PatternRewriter &rewriter) const override {
     Impl impl(op, rewriter);
     auto &tile = impl.tile;
     auto symbol = impl.getOrInsertFunc();
@@ -79,7 +60,7 @@ public:
       args.push_back(impl.createConstantIntOp(i));
     }
     rewriter.replaceOpWithNewOp<CallOp>(op, symbol, ArrayRef<Type>{}, args);
-    return matchSuccess();
+    return success();
   }
 
   struct Impl {
@@ -186,7 +167,7 @@ class LowerXSMMPass : public FunctionPass<LowerXSMMPass> {
     OwningRewritePatternList patterns;
     populateXSMMConversionPatterns(patterns, &getContext());
     ConversionTarget target(getContext());
-    target.addLegalDialect<AffineOpsDialect, StandardOpsDialect>();
+    target.addLegalDialect<AffineDialect, StandardOpsDialect>();
     target.addIllegalDialect<xsmm::Dialect>();
     if (failed(applyPartialConversion(getFunction(), target, patterns)))
       signalPassFailure();

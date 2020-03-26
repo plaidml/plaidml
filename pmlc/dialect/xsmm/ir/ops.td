@@ -8,7 +8,7 @@ include "mlir/IR/OpBase.td"
 #endif
 
 #ifndef AFFINE_OPS_BASE
-include "mlir/Dialect/AffineOps/AffineOpsBase.td"
+include "mlir/Dialect/Affine/IR/AffineOpsBase.td"
 #endif
 
 def XSMM_Dialect : Dialect {

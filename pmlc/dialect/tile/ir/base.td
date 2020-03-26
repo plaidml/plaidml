@@ -3,14 +3,20 @@
 #ifndef __PML_TILE_BASE__
 #define __PML_TILE_BASE__
 
+include "mlir/Interfaces/SideEffects.td"
+
 #ifndef AFFINE_OPS_BASE
-include "mlir/Dialect/AffineOps/AffineOpsBase.td"
+include "mlir/Dialect/Affine/IR/AffineOpsBase.td"
 #endif
 
 include "pmlc/util/enums.td"
 include "pmlc/util/interfaces.td"
 include "pmlc/dialect/eltwise/ir/interfaces.td"
+
+#ifndef __PML_ELTWISE_PREDICATES__
 include "pmlc/dialect/eltwise/ir/predicates.td"
+#endif
+
 include "pmlc/dialect/tile/ir/interfaces.td"
 
 // TODO: this should be defined upstream
