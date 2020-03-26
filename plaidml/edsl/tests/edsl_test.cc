@@ -5,6 +5,7 @@
 #include <gtest/gtest.h>
 
 #include <map>
+#include <random>
 #include <variant>
 
 #include "llvm/ADT/StringRef.h"
@@ -65,11 +66,19 @@ using MultiBuffer = std::variant<  //
 class CppEdsl : public ::testing::Test {
  protected:
   template <typename T>
+  void compareElements(T a, T b) {
+    EXPECT_EQ(a, b);
+  }
+  void compareElements(float a, float b) { EXPECT_NEAR(a, b, (fabs(a) + fabs(b)) / 10000.0); }
+  void compareElements(double a, double b) { EXPECT_NEAR(a, b, (fabs(a) + fabs(b)) / 10000.0); }
+  template <typename T>
   void compareBuffers(plaidml::View view, const std::vector<T>& expected) {
     ASSERT_THAT(view.size(), expected.size() * sizeof(expected[0]));
     auto data = reinterpret_cast<T*>(view.data());
     std::vector<T> actual(data, data + expected.size());
-    EXPECT_THAT(actual, ContainerEq(expected));
+    for (size_t i = 0; i < actual.size(); i++) {
+      compareElements(actual[i], expected[i]);
+    }
   }
 
   void checkProgram(                                   //
@@ -329,8 +338,11 @@ TEST_F(CppEdsl, Add) {
 }
 
 TEST_F(CppEdsl, Dot) {
-  auto A = Placeholder(DType::FLOAT32, {3, 3});
-  auto B = Placeholder(DType::FLOAT32, {3, 3});
+  int64_t M = 8;
+  int64_t N = 32;
+  int64_t K = 16;
+  auto A = Placeholder(DType::FLOAT32, {M, K});
+  auto B = Placeholder(DType::FLOAT32, {K, N});
   auto C = Dot(A, B);
   auto program = makeProgram("dot", {C});
 
@@ -338,21 +350,29 @@ TEST_F(CppEdsl, Dot) {
   // CHECK: func @dot
   // CHECK: %[[cst:.*]] = "eltwise.sconst"{{.*}}-> !f32
   // CHECK: %[[cion:.*]] = tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {{{.*}}}
-  // CHECK-SAME: !f32, tensor<3x3x!eltwise.f32>, tensor<3x3x!eltwise.f32> -> tensor<3x3x!eltwise.f32>
-  // CHECK: return %[[cion]] : tensor<3x3x!eltwise.f32>
+  // CHECK-SAME: !f32, tensor<8x16x!eltwise.f32>, tensor<16x32x!eltwise.f32> -> tensor<8x32x!eltwise.f32>
+  // CHECK: return %[[cion]] : tensor<8x32x!eltwise.f32>
 
-  std::vector<float> input = {
-      1.0f, 2.0f, 3.0f,  //
-      4.0f, 5.0f, 6.0f,  //
-      7.0f, 8.0f, 9.0f,  //
-  };
+  std::default_random_engine rng(2);
+  std::normal_distribution<float> normal_dist(0.0, 1.0);
 
-  std::vector<float> expected = {
-      30.0f,  36.0f,  42.0f,   //
-      66.0f,  81.0f,  96.0f,   //
-      102.0f, 126.0f, 150.0f,  //
-  };
-  checkProgram(program, {{A, input}, {B, input}}, {{C, expected}});
+  std::vector<float> in1(M * K);
+  for (int i = 0; i < in1.size(); i++) {
+    in1[i] = normal_dist(rng);
+  }
+  std::vector<float> in2(K * N);
+  for (int i = 0; i < in2.size(); i++) {
+    in2[i] = normal_dist(rng);
+  }
+  std::vector<float> expected(M * N);
+  for (size_t i = 0; i < M; i++) {
+    for (size_t j = 0; j < N; j++) {
+      for (size_t k = 0; k < K; k++) {
+        expected[i * N + j] += in1[i * K + k] * in2[k * N + j];
+      }
+    }
+  }
+  checkProgram(program, {{A, in1}, {B, in2}}, {{C, expected}});
 }
 
 TEST_F(CppEdsl, DoubleDot) {

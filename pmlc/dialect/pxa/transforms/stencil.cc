@@ -63,8 +63,6 @@ private:
   unsigned tensorsOrder[kNumTensors];
   // M, N, K in inner block
   mlir::BlockArgument innerIdxs[kNumIndex];
-  // The matrix_idx for the next search
-  unsigned nextMatrixIdx[kNumIndex] = {2, 3, 1};
   // M, N, K's tiles
   unsigned tiles[kNumIndex];
 
@@ -357,7 +355,7 @@ void Stencil::SearchIndex(unsigned matrix_idx) {
     if (ValidateStrideOne(idx, matrix_idx) &&
         ValidateIndexExistance(idx, matrix_idx)) {
       innerIdxs[matrix_idx] = idx;
-      SearchIndex(nextMatrixIdx[matrix_idx]);
+      SearchIndex(matrix_idx + 1);
     }
   }
 }
@@ -410,7 +408,7 @@ double Stencil::Evaluate() {
   // tiles 0, 1, 2 --> m, n, k
   auto cost = costFn(tiles);
   if (cost.throughput == 0) {
-    return std::numeric_limits<double>::max();
+    return std::numeric_limits<double>::infinity();
   }
   double inner_time = tot_inner_loop / cost.throughput;
   IVLOG(3,
@@ -476,7 +474,7 @@ double Stencil::Evaluate() {
 void Stencil::DoStenciling() {
   // Initialization
   tensors.clear();
-  bestPerf = std::numeric_limits<double>::max();
+  bestPerf = std::numeric_limits<double>::infinity();
   if (!TryIdentifyGemmOperation()) {
     IVLOG(3, "Not a Gemm match.");
     return;
@@ -501,17 +499,17 @@ void Stencil::DoStenciling() {
   // Search tensors' order, inner index and their tiles
   SearchTensorsOrder();
 
+  if (bestPerf == std::numeric_limits<double>::infinity()) {
+    IVLOG(1, "No tile plan for stencil.");
+    return;
+  }
+
   IVLOG(1, "Best Perf: " << bestPerf);
   IVLOG(1, "Best Tiles: " << bestTiles[0] << ":" << bestTiles[1] << ":"
                           << bestTiles[2]);
   IVLOG(1, "Best idxs: " << bestIdxs[0].getArgNumber() << ":"
                          << bestIdxs[1].getArgNumber() << ":"
                          << bestIdxs[2].getArgNumber());
-
-  if (bestPerf == std::numeric_limits<double>::max()) {
-    IVLOG(1, "No tile plan for stencil.");
-    return;
-  }
 
   // Do actual translation into XSMM
 

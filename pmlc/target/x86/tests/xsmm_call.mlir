@@ -280,9 +280,9 @@ func @conv2_tiled(%I: !I_memref, %K: !K_memref, %O: !O_memref) {
   return
 }
 
-#O_tile = affine_map<(m, n, k) -> (0, n, 0, m)>
-#K_tile = affine_map<(m, n, k) -> (0, 0, m, k)>
-#I_tile = affine_map<(m, n, k) -> (0, n, 0, k)>
+#O_tile = affine_map<(m, n) -> (0, m, 0, n)>
+#I_tile = affine_map<(m, k) -> (0, m, 0, k)>
+#K_tile = affine_map<(k, n) -> (0, 0, k, n)>
 
 func @conv2_xsmm_op(%I: !I_memref, %K: !K_memref, %O: !O_memref) {
   %X = dim %I, 1 : !I_memref
@@ -291,8 +291,8 @@ func @conv2_xsmm_op(%I: !I_memref, %K: !K_memref, %O: !O_memref) {
   %CO = dim %O, 3 : !O_memref
   %c0 = constant 0 : index
   affine.parallel (%x, %y) = (0, 0) to (%X, %Y) step (2, 1) {
-    xsmm.gemm %O[%c0, %x, %y, %c0]:#O_tile = %K[%c0, %c0, %c0, %c0]:#K_tile, %I[%c0, %x, %y, %c0]:#I_tile, [11, 2, 7]
-      : !O_memref, !K_memref, !I_memref
+    xsmm.gemm %O[%c0, %x, %y, %c0]:#O_tile = %I[%c0, %x, %y, %c0]:#I_tile, %K[%c0, %c0, %c0, %c0]:#K_tile, [2, 11, 7]
+      : !O_memref, !I_memref, !K_memref
   }
   return
 }
