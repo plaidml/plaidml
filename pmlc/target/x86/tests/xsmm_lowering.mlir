@@ -45,7 +45,7 @@ func @res2a_branch2a(%I: memref<1x56x56x64xf32>, %K: memref<1x1x64x64xf32>, %O: 
     // CHECK: subview %{{.*}}[{{.*}}] [] [] : memref<1x56x56x64xf32> to memref<1x14x1x64xf32, #{{.*}}>
     // CHECK: memref_cast
     // CHECK: call @plaidml_rt_xsmm_gemm_f32
-    // CHECK-SAME: (%{{.*}}, %{{.*}}, %{{.*}}, %[[c3584]], %[[c64]], %[[c3584]], %[[c64]], %[[c14]], %[[c64]])
+    // CHECK-SAME: (%{{.*}}, %{{.*}}, %{{.*}}, %[[c3584]], %[[c64]], %[[c3584]], %[[c14]], %[[c64]], %[[c64]])
     // CHECK-SAME: (memref<*xf32>, memref<*xf32>, memref<*xf32>, i32, i32, i32, i32, i32, i32) -> ()
   }
   return
