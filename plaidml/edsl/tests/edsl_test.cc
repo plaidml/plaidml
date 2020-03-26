@@ -357,17 +357,17 @@ TEST_F(CppEdsl, Dot) {
   std::normal_distribution<float> normal_dist(0.0, 1.0);
 
   std::vector<float> in1(M * K);
-  for (int i = 0; i < in1.size(); i++) {
+  for (unsigned i = 0; i < in1.size(); i++) {
     in1[i] = normal_dist(rng);
   }
   std::vector<float> in2(K * N);
-  for (int i = 0; i < in2.size(); i++) {
+  for (unsigned i = 0; i < in2.size(); i++) {
     in2[i] = normal_dist(rng);
   }
   std::vector<float> expected(M * N);
-  for (size_t i = 0; i < M; i++) {
-    for (size_t j = 0; j < N; j++) {
-      for (size_t k = 0; k < K; k++) {
+  for (int i = 0; i < M; i++) {
+    for (int j = 0; j < N; j++) {
+      for (int k = 0; k < K; k++) {
         expected[i * N + j] += in1[i * K + k] * in2[k * N + j];
       }
     }
