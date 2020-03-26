@@ -89,9 +89,29 @@ public:
     auto base = reinterpret_cast<Base *>(memory.data());
     base->basePtr = data;
     base->data = data;
+
+    void **p_base = reinterpret_cast<void **>(memory.data());
+    int64_t *p_params = reinterpret_cast<int64_t *>(p_base + 2);
+
+    // TODO: set offset according to data
+    p_params[0] = 0;
+
+    // set size to memory
+    auto rank = type.getRank();
+    for (auto i = 0; i < rank; i++) {
+      p_params[i + 1] = type.getDimSize(i);
+    }
+
+    // set stride to memory
+    int64_t stride = 1;
+    for (auto i = rank - 1; i >= 0; i--) {
+      p_params[rank + 1 + i] = stride;
+      stride *= type.getDimSize(i);
+    }
   }
 
   void *ptr() { return memory.data(); }
+  unsigned byteSize() { return memory.size(); }
 
 private:
   static unsigned computeSize(RankedTensorType type) {
@@ -159,6 +179,7 @@ void Program::compile(StringRef target, bool collectPasses) {
   if (failed(pm.run(*module))) {
     throw std::runtime_error("conversion to the LLVM IR dialect failed");
   }
+  this->target = target;
 }
 
 Executable::Executable(const std::shared_ptr<Program> &program,
@@ -202,7 +223,20 @@ Executable::Executable(const std::shared_ptr<Program> &program,
   descriptors.reserve(bufptrs.size());
   for (unsigned i = 0; i < bufptrs.size(); i++) {
     descriptors.emplace_back(bufptrs[i], program->arguments[i].shape);
-    ptrs[i] = descriptors[i].ptr();
+    if (program->target == "llvm_cpu") {
+      ptrs[i] = descriptors[i].ptr();
+    } else if (program->target == "intel_gen") {
+      // TODO: set createLowerToLLVMPass(false,true,false) so that llvm host
+      // function takes memref as parameters
+      void **p_base = reinterpret_cast<void **>(descriptors[i].ptr());
+      int num_elements = descriptors[i].byteSize() / sizeof(void *);
+      ptrs.resize(num_elements * bufptrs.size());
+      for (int j = 0; j < num_elements; j++) {
+        ptrs[num_elements * i + j] = p_base + j;
+      }
+    } else {
+      throw std::runtime_error("unknown target");
+    }
   }
 }
 

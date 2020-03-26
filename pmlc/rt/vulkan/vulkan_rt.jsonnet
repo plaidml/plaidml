@@ -2,6 +2,7 @@ local exports = [
     // vulkan_rt
     '_mlir_ciface_fillResource1DFloat',
     'bindMemRef1DFloat',
+    'bindMemRef2DFloat',
     'deinitVulkan',
     'initVulkan',
     'runOnVulkan',

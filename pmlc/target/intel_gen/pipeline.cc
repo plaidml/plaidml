@@ -1,6 +1,7 @@
 // Copyright 2019, Intel Corporation
 
 #include "mlir/Conversion/GPUToSPIRV/ConvertGPUToSPIRVPass.h"
+#include "mlir/Conversion/GPUToVulkan/ConvertGPUToVulkanPass.h"
 #include "mlir/Conversion/LoopToStandard/ConvertLoopToStandard.h"
 #include "mlir/Conversion/LoopsToGPU/LoopsToGPUPass.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
@@ -59,21 +60,15 @@ void addToPipeline(OpPassManager &pm) {
   // pm.addPass(std::make_unique<IREEGPUToSPIRVPass>());
 
   // SPIR-V passes for lowering attributes.
-  // pm.addNestedPass<spirv::ModuleOp>(spirv::createLowerABIAttributesPass());
-  // pm.addNestedPass<spirv::ModuleOp>(createCanonicalizerPass());
-  // pm.addNestedPass<spirv::ModuleOp>(createCSEPass());
-
   pm.addPass(spirv::createLowerABIAttributesPass());
+  pm.addPass(spirv::createUpdateVersionCapabilityExtensionPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
   // GPU to Vulkan.
   pm.addPass(conversion::gpu::createConvertGpuLaunchFuncToVulkanCallsPass());
-  // pm.addPass(createLowerToLLVMPass());
-  pm.addPass(createLowerToLLVMPass(/*useAlloca=*/false,
-                                   /*useBarePtrCallConv=*/false,
-                                   /*emitCWrappers=*/true));
-  pm.addPass(createConvertVulkanLaunchFuncToVulkanCallsPass());
+  pm.addPass(createLowerToLLVMPass(false, false, true));
+  pm.addPass(conversion::gpu::createConvertVulkanLaunchFuncToVulkanCallsPass());
 }
 
 static PassPipelineRegistration<>

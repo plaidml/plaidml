@@ -14,4 +14,5 @@ std::unique_ptr<mlir::Pass> createLegalizeGpuOpForGpuLoweringPass();
 
 std::unique_ptr<mlir::Pass> createConvertGpuLaunchFuncToVulkanCallsPass();
 
+std::unique_ptr<mlir::Pass> createConvertVulkanLaunchFuncToVulkanCallsPass();
 } // namespace pmlc::conversion::gpu
