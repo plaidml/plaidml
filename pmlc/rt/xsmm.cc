@@ -14,13 +14,13 @@ struct Initializer {
 static Initializer init;
 #endif
 
-#ifndef _WIN32
 extern "C" void plaidml_rt_xsmm_gemm_f32(            //
     size_t aRank, StridedMemRefType<float, 2> *aRef, //
     size_t bRank, StridedMemRefType<float, 2> *bRef, //
     size_t cRank, StridedMemRefType<float, 2> *cRef, //
     int32_t lda, int32_t ldb, int32_t ldc,           //
     int32_t m, int32_t n, int32_t k) {
+#ifndef _WIN32
   auto aPtr = aRef->data + aRef->offset;
   auto bPtr = bRef->data + bRef->offset;
   auto cPtr = cRef->data + cRef->offset;
