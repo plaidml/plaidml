@@ -191,7 +191,15 @@ Executable::Executable(const std::shared_ptr<Program> &program,
     llvmModule->print(llvm::errs(), nullptr);
   }
 
-  auto maybeEngine = ExecutionEngine::create(*program->module, optPipeline);
+#ifdef __linux__
+  std::vector<StringRef> sharedLibPaths{"plaidml/libplaidml.so"};
+#else
+  std::vector<StringRef> sharedLibPaths;
+#endif
+
+  auto maybeEngine = ExecutionEngine::create(*program->module, optPipeline,
+                                             /*jitCodeGenOptLevel=*/llvm::None,
+                                             sharedLibPaths);
   llvm::handleAllErrors(
       maybeEngine.takeError(), [](const llvm::ErrorInfoBase &err) {
         throw std::runtime_error("Failed to create ExecutionEngine: " +
