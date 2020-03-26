@@ -25,8 +25,6 @@ namespace xsmm = dialect::xsmm;
 namespace {
 
 static constexpr int64_t kUnusedDimension = -1;
-static constexpr unsigned kDimensionM = 0;
-static constexpr unsigned kDimensionN = 1;
 
 static SmallVector<int64_t, 8> getFlattenedTileDimMapping(AffineMap map) {
   SmallVector<int64_t, 8> ret;
@@ -47,13 +45,14 @@ public:
   LogicalResult matchAndRewrite(xsmm::GemmOp op,
                                 PatternRewriter &rewriter) const override {
     Impl impl(op, rewriter);
+    auto &tile = impl.tile;
     auto symbol = impl.getOrInsertFunc();
     auto a = impl.prepareOperand(op.a(), op.aAccessMap(), op.getOperandsForA(),
-                                 op.aTileMap(), kDimensionM);
+                                 op.aTileMap(), {tile[0], tile[2]});
     auto b = impl.prepareOperand(op.b(), op.bAccessMap(), op.getOperandsForB(),
-                                 op.bTileMap(), kDimensionN);
+                                 op.bTileMap(), {tile[2], tile[1]});
     auto c = impl.prepareOperand(op.c(), op.cAccessMap(), op.getOperandsForC(),
-                                 op.cTileMap(), kDimensionN);
+                                 op.cTileMap(), {tile[0], tile[1]});
     SmallVector<Value, 9> args{a.memref,           b.memref,
                                c.memref,           a.leadingDimStride,
                                b.leadingDimStride, c.leadingDimStride};
@@ -110,7 +109,7 @@ public:
 
     PreparedOperand prepareOperand(Value operand, AffineMap accessMap,
                                    ValueRange mapOperands, AffineMap tileMap,
-                                   unsigned leadingDimPos) {
+                                   ArrayRef<unsigned int> sizes) {
       ArrayRef<Value> empty{};
       auto offsets = expandAffineMap(rewriter, loc, accessMap, mapOperands);
       auto memRefType = operand.getType().cast<MemRefType>();
@@ -121,7 +120,7 @@ public:
         if (dim == kUnusedDimension)
           shape.push_back(1);
         else
-          shape.push_back(tile[dim]);
+          shape.push_back(sizes[dim]);
       }
 
       int64_t outerOffset;
@@ -143,7 +142,7 @@ public:
       auto stridesArray = computeStrideArray(layoutMap.compose(tileMap));
       assert(stridesArray.hasValue() && "computeStrideArray must succeed");
 
-      int64_t leadingDimStride = stridesArray->strides[leadingDimPos];
+      int64_t leadingDimStride = stridesArray->strides[0];
       auto leadingDimValue = createConstantIntOp(leadingDimStride);
       return {cast, leadingDimValue};
     }
@@ -176,6 +175,10 @@ class LowerXSMMPass : public FunctionPass<LowerXSMMPass> {
 };
 
 } // namespace
+
+std::unique_ptr<mlir::Pass> createXSMMLoweringPass() {
+  return std::make_unique<LowerXSMMPass>();
+}
 
 static PassRegistration<LowerXSMMPass> pass("xsmm",
                                             "XSMM to standard conversion");

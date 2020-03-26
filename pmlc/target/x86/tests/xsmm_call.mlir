@@ -185,8 +185,7 @@ func @dot_xsmm_call(%A: memref<?x?xf32>, %B: memref<?x?xf32>, %C: memref<?x?xf32
     %a_ref = memref_cast %a_view : memref<2x2xf32, offset: ?, strides: [?, ?]> to memref<*xf32>
     %b_ref = memref_cast %b_view : memref<2x2xf32, offset: ?, strides: [?, ?]> to memref<*xf32>
     %c_ref = memref_cast %c_view : memref<2x2xf32, offset: ?, strides: [?, ?]> to memref<*xf32>
-    // NOTE: we need to swap the A, B and lda, ldb operands due to column-major vs row-major differences
-    call @plaidml_rt_xsmm_gemm_f32(%b_ref, %a_ref, %c_ref, %ldb, %lda, %ldc, %tile_m, %tile_n, %tile_k)
+    call @plaidml_rt_xsmm_gemm_f32(%a_ref, %b_ref, %c_ref, %lda, %ldb, %ldc, %tile_m, %tile_n, %tile_k)
       : (memref<*xf32>, memref<*xf32>, memref<*xf32>, i32, i32, i32, i32, i32, i32) -> ()
   }
   return
@@ -280,9 +279,9 @@ func @conv2_tiled(%I: !I_memref, %K: !K_memref, %O: !O_memref) {
   return
 }
 
-#O_tile = affine_map<(m, n, k) -> (0, n, 0, m)>
-#K_tile = affine_map<(m, n, k) -> (0, 0, m, k)>
-#I_tile = affine_map<(m, n, k) -> (0, n, 0, k)>
+#O_tile = affine_map<(m, n) -> (0, m, 0, n)>
+#I_tile = affine_map<(m, k) -> (0, m, 0, k)>
+#K_tile = affine_map<(k, n) -> (0, 0, k, n)>
 
 func @conv2_xsmm_op(%I: !I_memref, %K: !K_memref, %O: !O_memref) {
   %X = dim %I, 1 : !I_memref
@@ -291,8 +290,8 @@ func @conv2_xsmm_op(%I: !I_memref, %K: !K_memref, %O: !O_memref) {
   %CO = dim %O, 3 : !O_memref
   %c0 = constant 0 : index
   affine.parallel (%x, %y) = (0, 0) to (%X, %Y) step (2, 1) {
-    xsmm.gemm %O[%c0, %x, %y, %c0]:#O_tile = %K[%c0, %c0, %c0, %c0]:#K_tile, %I[%c0, %x, %y, %c0]:#I_tile, [11, 2, 7]
-      : !O_memref, !K_memref, !I_memref
+    xsmm.gemm %O[%c0, %x, %y, %c0]:#O_tile = %I[%c0, %x, %y, %c0]:#I_tile, %K[%c0, %c0, %c0, %c0]:#K_tile, [11, 2, 7]
+      : !O_memref, !I_memref, !K_memref
   }
   return
 }
@@ -318,8 +317,7 @@ func @conv2_xsmm_call(%I: !I_memref, %K: !K_memref, %O: !O_memref) {
     %I_ref = memref_cast %I_view : memref<1x2x1x7xf32, offset: ?, strides: [?, ?, ?, ?]> to memref<*xf32>
     %K_ref = memref_cast %K_view : memref<1x1x7x11xf32, offset: ?, strides: [?, ?, ?, ?]> to memref<*xf32>
     %O_ref = memref_cast %O_view : memref<1x2x1x11xf32, offset: ?, strides: [?, ?, ?, ?]> to memref<*xf32>
-    // NOTE: we need to swap the A, B and lda, ldb operands due to column-major vs row-major differences
-    call @plaidml_rt_xsmm_gemm_f32(%K_ref, %I_ref, %O_ref, %ldb, %lda, %ldc, %m, %n, %k)
+    call @plaidml_rt_xsmm_gemm_f32(%I_ref, %K_ref, %O_ref, %lda, %ldb, %ldc, %m, %n, %k)
       : (memref<*xf32>, memref<*xf32>, memref<*xf32>, i32, i32, i32, i32, i32, i32) -> ()
   }
   return
