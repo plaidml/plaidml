@@ -91,7 +91,6 @@ struct ConvertToLLVMPass : public ModulePass<ConvertToLLVMPass> {
     LLVMTypeConverter typeConverter(&getContext(), customs);
 
     OwningRewritePatternList patterns;
-    // populateXSMMConversionPatterns(patterns, context);
     populateAffineToStdConversionPatterns(patterns, context);
     populateLoopToStdConversionPatterns(patterns, context);
     populateStdToLLVMBarePtrConversionPatterns(typeConverter, patterns);

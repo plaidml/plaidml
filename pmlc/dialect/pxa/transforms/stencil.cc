@@ -585,7 +585,6 @@ void Stencil::DoStenciling() {
     auto prev_it = std::prev(xsmm_it);
     op.getBody()->getOperations().erase(prev_it);
   }
-  op.setAttr("is_gemm", mlir::UnitAttr::get(op.getContext()));
 }
 
 struct StencilPass : public mlir::FunctionPass<StencilPass> {
