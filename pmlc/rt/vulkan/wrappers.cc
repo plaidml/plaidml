@@ -35,19 +35,28 @@ namespace {
 
 class VulkanRuntimeManager {
 public:
-  VulkanRuntimeManager() { vulkanRuntime.init(); }
+  VulkanRuntimeManager() {
+    if (failed(vulkanRuntime.init())) {
+      llvm::errs() << "vulkanRuntime.init() failed";
+    }
+  }
   VulkanRuntimeManager(const VulkanRuntimeManager &) = delete;
   VulkanRuntimeManager operator=(const VulkanRuntimeManager &) = delete;
   ~VulkanRuntimeManager() {
-    if (failed(vulkanRuntime.submitBuffer())) {
-      llvm::errs() << "vulkanRuntime.submitBuffer() failed";
-    }
-
     if (failed(vulkanRuntime.destroy())) {
       llvm::errs() << "vulkanRuntime.destroy() failed";
     }
   }
-  void createAction() { vulkanRuntime.createAction(); }
+
+  void createLaunchKernelAction() {
+    std::lock_guard<std::mutex> lock(mutex);
+    vulkanRuntime.createLaunchKernelAction();
+  }
+
+  void createMemoryTransferAction() {
+    std::lock_guard<std::mutex> lock(mutex);
+    vulkanRuntime.createMemoryTransferAction();
+  }
 
   void setResourceData(DescriptorSetIndex setIndex, BindingIndex bindIndex,
                        const VulkanHostMemoryBuffer &memBuffer) {
@@ -72,8 +81,15 @@ public:
 
   void runOnVulkan() {
     std::lock_guard<std::mutex> lock(mutex);
-    if (failed(vulkanRuntime.run())) {
+    if (failed(vulkanRuntime.setLaunchKernelAction())) {
       llvm::errs() << "runOnVulkan failed";
+    }
+  }
+
+  void submitCommandBuffers() {
+    std::lock_guard<std::mutex> lock(mutex);
+    if (failed(vulkanRuntime.submitCommandBuffers())) {
+      llvm::errs() << "vulkanRuntime.submitBuffer() failed";
     }
   }
 
@@ -96,15 +112,16 @@ struct MemRefDescriptor {
 extern "C" {
 VULKAN_RT_EXPORT void *initVulkan();
 VULKAN_RT_EXPORT void deinitVulkan(void *vkRuntimeManager);
-VULKAN_RT_EXPORT void createAction(void *vkRuntimeManager);
+VULKAN_RT_EXPORT void createLaunchKernelAction(void *vkRuntimeManager);
+VULKAN_RT_EXPORT void createMemoryTransferAction(void *vkRuntimeManager);
 VULKAN_RT_EXPORT void runOnVulkan(void *vkRuntimeManager);
+VULKAN_RT_EXPORT void submitCommandBuffers(void *vkRuntimeManager);
 VULKAN_RT_EXPORT void setEntryPoint(void *vkRuntimeManager,
                                     const char *entryPoint);
 VULKAN_RT_EXPORT void setNumWorkGroups(void *vkRuntimeManager, uint32_t x,
                                        uint32_t y, uint32_t z);
 VULKAN_RT_EXPORT void setBinaryShader(void *vkRuntimeManager, uint8_t *shader,
                                       uint32_t size);
-
 VULKAN_RT_EXPORT void bindMemRef1DFloat(void *vkRuntimeManager,
                                         DescriptorSetIndex setIndex,
                                         BindingIndex bindIndex,
@@ -119,8 +136,14 @@ _mlir_ciface_fillResource1DFloat(MemRefDescriptor<float, 1> *ptr, float value);
 /// Initializes `VulkanRuntimeManager` and returns a pointer to it.
 void *initVulkan() { return new VulkanRuntimeManager(); }
 
-void createAction(void *vkRuntimeManager) {
-  reinterpret_cast<VulkanRuntimeManager *>(vkRuntimeManager)->createAction();
+void createLaunchKernelAction(void *vkRuntimeManager) {
+  reinterpret_cast<VulkanRuntimeManager *>(vkRuntimeManager)
+      ->createLaunchKernelAction();
+}
+
+void createMemoryTransferAction(void *vkRuntimeManager) {
+  reinterpret_cast<VulkanRuntimeManager *>(vkRuntimeManager)
+      ->createMemoryTransferAction();
 }
 
 /// Deinitializes `VulkanRuntimeManager` by the given pointer.
@@ -130,6 +153,11 @@ void deinitVulkan(void *vkRuntimeManager) {
 
 void runOnVulkan(void *vkRuntimeManager) {
   reinterpret_cast<VulkanRuntimeManager *>(vkRuntimeManager)->runOnVulkan();
+}
+
+void submitCommandBuffers(void *vkRuntimeManager) {
+  reinterpret_cast<VulkanRuntimeManager *>(vkRuntimeManager)
+      ->submitCommandBuffers();
 }
 
 void setEntryPoint(void *vkRuntimeManager, const char *entryPoint) {

@@ -94,8 +94,6 @@ struct Action {
 using ActionPtr = std::shared_ptr<Action>;
 
 struct LaunchKernelAction : Action {
-  SmallVector<VkBufferMemoryBarrier, 4> deps;
-
   /// Specifies VulkanDeviceMemoryBuffers divided into sets.
   llvm::DenseMap<DescriptorSetIndex,
                  llvm::SmallVector<VulkanDeviceMemoryBuffer, 1>>
@@ -123,7 +121,6 @@ struct LaunchKernelAction : Action {
 
   /// Computation pipeline.
   VkPipeline pipeline;
-  VkCommandPool commandPool;
 
   //===--------------------------------------------------------------------===//
   // Vulkan execution context.
@@ -141,9 +138,7 @@ struct LaunchKernelAction : Action {
   ResourceData resourceData;
   ResourceStorageClassBindingMap resourceStorageClassData;
 
-  //===--------------------------------------------------------------------===//
-  // Vulkan memory context.
-  //===--------------------------------------------------------------------===//
+  SmallVector<VkBufferMemoryBarrier, 4> deps;
 };
 
 struct MemoryTransferAction : Action {
@@ -179,21 +174,17 @@ public:
   void setEntryPoint(const char *entryPointName);
 
   LogicalResult init();
-  LogicalResult createAction();
-
-  /// Runtime initialization.
-  LogicalResult initRuntime();
-
-  /// Runs runtime.
-  LogicalResult run();
+  LogicalResult createLaunchKernelAction();
+  LogicalResult createMemoryTransferAction();
+  LogicalResult setLaunchKernelAction();
+  LogicalResult submitCommandBuffers();
+  LogicalResult checkResourceData();
 
   /// Updates host memory buffers.
   LogicalResult updateHostMemoryBuffers();
 
   /// Destroys all created vulkan objects and resources.
   LogicalResult destroy();
-
-  LogicalResult submitBuffer();
 
 private:
   //===--------------------------------------------------------------------===//
@@ -213,7 +204,6 @@ private:
   LogicalResult allocateDescriptorSets();
   LogicalResult setWriteDescriptors();
   LogicalResult createCommandPool();
-  LogicalResult createComputeCommandBuffer();
   LogicalResult submitCommandBuffersToQueue();
 
   LogicalResult createSchedule();
@@ -240,7 +230,11 @@ private:
   VkInstance instance;
   VkDevice device;
   VkQueue queue;
+  VkCommandPool commandPool;
 
+  //===--------------------------------------------------------------------===//
+  // Vulkan memory context.
+  //===--------------------------------------------------------------------===//
   uint32_t queueFamilyIndex{0};
   uint32_t memoryTypeIndex{VK_MAX_MEMORY_TYPES};
   VkDeviceSize memorySize{0};

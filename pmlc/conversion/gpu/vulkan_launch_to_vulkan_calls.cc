@@ -32,7 +32,8 @@ static constexpr const char *kBindMemRef2DFloat = "bindMemRef2DFloat";
 static constexpr const char *kCInterfaceVulkanLaunch =
     "_mlir_ciface_vulkanLaunch";
 static constexpr const char *kRunOnVulkan = "runOnVulkan";
-static constexpr const char *kCreateAction = "createAction";
+static constexpr const char *kCreateLaunchKernelAction =
+    "createLaunchKernelAction";
 static constexpr const char *kSetBinaryShader = "setBinaryShader";
 static constexpr const char *kSetEntryPoint = "setEntryPoint";
 static constexpr const char *kSetNumWorkGroups = "setNumWorkGroups";
@@ -96,6 +97,7 @@ private:
         {llvmPtrToFloatType, llvmPtrToFloatType, getInt64Type(),
          llvmArrayOneElementSizeType, llvmArrayOneElementSizeType});
 
+    // Create a type `!llvm<"{ float*, float*, i64, [2 x i64], [2 x i64]}">`.
     llvmMemRef2DFloat = LLVM::LLVMType::getStructTy(
         llvmDialect,
         {llvmPtrToFloatType, llvmPtrToFloatType, getInt64Type(),
@@ -155,6 +157,9 @@ private:
   LLVM::LLVMType llvmInt64Type;
   LLVM::LLVMType llvmMemRef1DFloat;
   LLVM::LLVMType llvmMemRef2DFloat;
+
+  size_t spv_entry_index = 0;
+  size_t spv_binary_index = 0;
 
   // TODO: Use an associative array to support multiple vulkan launch calls.
   std::pair<StringAttr, StringAttr> spirvAttributes;
@@ -288,9 +293,9 @@ void VulkanLaunchFuncToVulkanCallsPass::declareVulkanFunctions(Location loc) {
                                       /*isVarArg=*/false));
   }
 
-  if (!module.lookupSymbol(kCreateAction)) {
+  if (!module.lookupSymbol(kCreateLaunchKernelAction)) {
     builder.create<LLVM::LLVMFuncOp>(
-        loc, kCreateAction,
+        loc, kCreateLaunchKernelAction,
         LLVM::LLVMType::getFunctionTy(
             LLVM::LLVMType::getVoidTy(llvmDialect),
             {LLVM::LLVMType::getInt8PtrTy(llvmDialect)},
@@ -298,7 +303,6 @@ void VulkanLaunchFuncToVulkanCallsPass::declareVulkanFunctions(Location loc) {
   }
 }
 
-static int spv_entry_index = 0;
 Value VulkanLaunchFuncToVulkanCallsPass::createEntryPointNameConstant(
     StringRef name, Location loc, OpBuilder &builder) {
   SmallString<16> shaderName(name.begin(), name.end());
@@ -308,6 +312,7 @@ Value VulkanLaunchFuncToVulkanCallsPass::createEntryPointNameConstant(
 
   std::string entryPointGlobalName =
       (name + "_spv_entry_point_name" + std::to_string(spv_entry_index)).str();
+  spv_entry_index++;
   return LLVM::createGlobalString(loc, builder, entryPointGlobalName,
                                   shaderName, LLVM::Linkage::Internal,
                                   getLLVMDialect());
@@ -323,16 +328,18 @@ void VulkanLaunchFuncToVulkanCallsPass::translateVulkanLaunchCall(
 
   auto vulkanRuntime = cInterfaceVulkanLaunchCallOp.getOperand(0);
 
-  builder.create<LLVM::CallOp>(loc, ArrayRef<Type>{getVoidType()},
-                               builder.getSymbolRefAttr(kCreateAction),
-                               ArrayRef<Value>{vulkanRuntime});
+  builder.create<LLVM::CallOp>(
+      loc, ArrayRef<Type>{getVoidType()},
+      builder.getSymbolRefAttr(kCreateLaunchKernelAction),
+      ArrayRef<Value>{vulkanRuntime});
 
   // Create LLVM global with SPIR-V binary data, so we can pass a pointer with
   // that data to runtime call.
   Value ptrToSPIRVBinary = LLVM::createGlobalString(
-      loc, builder, kSPIRVBinary + std::to_string(spv_entry_index),
+      loc, builder, kSPIRVBinary + std::to_string(spv_binary_index),
       spirvAttributes.first.getValue(), LLVM::Linkage::Internal,
       getLLVMDialect());
+  spv_binary_index++;
 
   // Create LLVM constant for the size of SPIR-V binary shader.
   Value binarySize = builder.create<LLVM::ConstantOp>(
@@ -374,8 +381,6 @@ void VulkanLaunchFuncToVulkanCallsPass::translateVulkanLaunchCall(
   declareVulkanFunctions(loc);
 
   cInterfaceVulkanLaunchCallOp.erase();
-
-  spv_entry_index++;
 }
 
 namespace pmlc::conversion::gpu {
