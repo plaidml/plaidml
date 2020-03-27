@@ -108,6 +108,8 @@ inline const char* to_string(DType dtype) {
     case DType::UINT32:
       return "uint32";
     case DType::INT64:
+      return "int64";
+    case DType::UINT64:
       return "uint64";
     case DType::BFLOAT16:
       return "bfloat16";
