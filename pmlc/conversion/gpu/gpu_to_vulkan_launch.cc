@@ -34,6 +34,11 @@ static constexpr const char *kSPIRVEntryPointAttrName = "spirv_entry_point";
 static constexpr const char *kVulkanLaunch = "vulkanLaunch";
 static constexpr const char *kPrint_memref_f32 = "print_memref_f32";
 
+#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "llvm/ADT/SmallString.h"
+static constexpr const char *kInitVulkan = "initVulkan";
+static constexpr const char *kDeinitVulkan = "deinitVulkan";
+
 namespace {
 
 static int gpu_launch_index = 0;
@@ -105,6 +110,10 @@ private:
   mlir::Type mlir3DDynamicMemRefF32Type;
   mlir::Type mlir4DDynamicMemRefF32Type;
   mlir::Type mlirUnrankedMemRefF32Type;
+  mlir::Value vulkanRuntime;
+
+  int numKernel = 0;
+  int kernelID = 0;
 };
 
 } // anonymous namespace
@@ -112,7 +121,12 @@ private:
 void ConvertGpuLaunchFuncToVulkanLaunchFunc::runOnModule() {
   getMlirTypes();
 
-  getModule().walk([this](gpu::LaunchFuncOp op) { convertGpuLaunchFunc(op); });
+  getModule().walk([this](gpu::LaunchFuncOp op) { numKernel++; });
+
+  getModule().walk([this](gpu::LaunchFuncOp op) {
+    convertGpuLaunchFunc(op);
+    kernelID++;
+  });
 
   // Erase `gpu::GPUModuleOp` and `spirv::Module` operations.
   for (auto gpuModule :
@@ -131,6 +145,7 @@ LogicalResult ConvertGpuLaunchFuncToVulkanLaunchFunc::declareVulkanLaunchFunc(
   // vulkan launch, we cannot have the local workgroup size configuration here.
   SmallVector<Type, 8> vulkanLaunchTypes{launchOp.getOperandTypes()};
 
+  vulkanLaunchTypes.insert(vulkanLaunchTypes.begin(), vulkanRuntime.getType());
   // Check that all operands have supported types except those for the launch
   // configuration.
   /*
@@ -205,6 +220,15 @@ void ConvertGpuLaunchFuncToVulkanLaunchFunc::convertGpuLaunchFunc(
   OpBuilder builder(launchOp);
   Location loc = launchOp.getLoc();
 
+  if (kernelID == 0) {
+    // Create call to `initVulkan`.
+    auto llvmDialect = getContext().getRegisteredDialect<LLVM::LLVMDialect>();
+    auto initVulkanCall = builder.create<LLVM::CallOp>(
+        loc, ArrayRef<Type>{LLVM::LLVMType::getInt8PtrTy(llvmDialect)},
+        builder.getSymbolRefAttr(kInitVulkan), ArrayRef<Value>{});
+    vulkanRuntime = initVulkanCall.getResult(0);
+  }
+
   // Serialize `spirv::Module` into binary form.
   std::vector<char> binary;
   if (failed(createBinaryShader(module, binary)))
@@ -214,12 +238,14 @@ void ConvertGpuLaunchFuncToVulkanLaunchFunc::convertGpuLaunchFunc(
   if (failed(declareVulkanLaunchFunc(loc, launchOp)))
     return signalPassFailure();
 
+  auto test = SmallVector<Value, 4>(launchOp.getOperands());
+  test.insert(test.begin(), vulkanRuntime);
   // Create vulkan launch call op.
   auto vulkanLaunchCallOp = builder.create<CallOp>(
       loc, ArrayRef<Type>{},
       builder.getSymbolRefAttr(kVulkanLaunch +
                                std::to_string(gpu_launch_index)),
-      launchOp.getOperands());
+      test);
 
   // Set SPIR-V binary shader data as an attribute.
   vulkanLaunchCallOp.setAttr(
@@ -233,7 +259,7 @@ void ConvertGpuLaunchFuncToVulkanLaunchFunc::convertGpuLaunchFunc(
 
   // Print buffers after vulkan launch call.
 
-  if (VLOG_IS_ON(1)) {
+  if (VLOG_IS_ON(4)) {
     if (failed(printLauchOpBuffers(loc, builder, launchOp))) {
       return signalPassFailure();
     }
@@ -241,6 +267,15 @@ void ConvertGpuLaunchFuncToVulkanLaunchFunc::convertGpuLaunchFunc(
 
   // Declare runtime functions.
   declareVulkanFunctions(loc);
+
+  if (kernelID == numKernel - 1) {
+    // Create call to 'deinitVulkan' runtime function.
+    auto llvmDialect = getContext().getRegisteredDialect<LLVM::LLVMDialect>();
+    builder.create<LLVM::CallOp>(
+        loc, ArrayRef<Type>{LLVM::LLVMType::getVoidTy(llvmDialect)},
+        builder.getSymbolRefAttr(kDeinitVulkan),
+        ArrayRef<Value>{vulkanRuntime});
+  }
 
   launchOp.erase();
 

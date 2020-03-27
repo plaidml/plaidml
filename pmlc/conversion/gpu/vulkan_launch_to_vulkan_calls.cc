@@ -219,7 +219,7 @@ void VulkanLaunchFuncToVulkanCallsPass::createBindMemRefCalls(
 
   for (auto en :
        llvm::enumerate(cInterfaceVulkanLaunchCallOp.getOperands().drop_front(
-           gpu::LaunchOp::kNumConfigOperands))) {
+           gpu::LaunchOp::kNumConfigOperands + 1))) {
     // Create LLVM constant for the descriptor binding index.
     Value descriptorBinding = builder.create<LLVM::ConstantOp>(
         loc, getInt32Type(), builder.getI32IntegerAttr(en.index()));
@@ -323,13 +323,11 @@ void VulkanLaunchFuncToVulkanCallsPass::translateVulkanLaunchCall(
     LLVM::CallOp cInterfaceVulkanLaunchCallOp) {
   OpBuilder builder(cInterfaceVulkanLaunchCallOp);
   Location loc = cInterfaceVulkanLaunchCallOp.getLoc();
-  // Create call to `initVulkan`.
-  auto initVulkanCall = builder.create<LLVM::CallOp>(
-      loc, ArrayRef<Type>{getPointerType()},
-      builder.getSymbolRefAttr(kInitVulkan), ArrayRef<Value>{});
-  // The result of `initVulkan` function is a pointer to Vulkan runtime, we
-  // need to pass that pointer to each Vulkan runtime call.
-  auto vulkanRuntime = initVulkanCall.getResult(0);
+
+  // The first operand of cInterfaceVulkanLaunchCallOp is a pointer to Vulkan
+  // runtime, we need to pass that pointer to each Vulkan runtime call.
+
+  auto vulkanRuntime = cInterfaceVulkanLaunchCallOp.getOperand(0);
 
   // Create LLVM global with SPIR-V binary data, so we can pass a pointer with
   // that data to runtime call.
@@ -365,18 +363,13 @@ void VulkanLaunchFuncToVulkanCallsPass::translateVulkanLaunchCall(
   builder.create<LLVM::CallOp>(
       loc, ArrayRef<Type>{getVoidType()},
       builder.getSymbolRefAttr(kSetNumWorkGroups),
-      ArrayRef<Value>{vulkanRuntime, cInterfaceVulkanLaunchCallOp.getOperand(0),
-                      cInterfaceVulkanLaunchCallOp.getOperand(1),
-                      cInterfaceVulkanLaunchCallOp.getOperand(2)});
+      ArrayRef<Value>{vulkanRuntime, cInterfaceVulkanLaunchCallOp.getOperand(1),
+                      cInterfaceVulkanLaunchCallOp.getOperand(2),
+                      cInterfaceVulkanLaunchCallOp.getOperand(3)});
 
   // Create call to `runOnVulkan` runtime function.
   builder.create<LLVM::CallOp>(loc, ArrayRef<Type>{getVoidType()},
                                builder.getSymbolRefAttr(kRunOnVulkan),
-                               ArrayRef<Value>{vulkanRuntime});
-
-  // Create call to 'deinitVulkan' runtime function.
-  builder.create<LLVM::CallOp>(loc, ArrayRef<Type>{getVoidType()},
-                               builder.getSymbolRefAttr(kDeinitVulkan),
                                ArrayRef<Value>{vulkanRuntime});
 
   // Declare runtime functions.
