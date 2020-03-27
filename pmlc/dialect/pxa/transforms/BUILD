@@ -21,8 +21,8 @@ plaidml_cc_library(
     deps = [
         "//pmlc/dialect/pxa/analysis",
         "//pmlc/dialect/pxa/ir",
-        "//pmlc/dialect/tile/ir",
         "//pmlc/dialect/eltwise/ir",
+        "//pmlc/dialect/xsmm/ir",
     ],
 )
 

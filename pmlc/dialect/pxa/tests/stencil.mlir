@@ -16,7 +16,7 @@ module {
     return
   }
   // CHECK: affine.parallel
-  // CHECK-NOT: is_gemm
+  // CHECK-NOT: xsmm 
 
 
   // CHECK-LABEL: @no_gemm_no_mul_before_reduce_operation
@@ -30,7 +30,7 @@ module {
     return
   }
   // CHECK: affine.parallel
-  // CHECK-NOT: is_gemm
+  // CHECK-NOT: xsmm 
 
   // CHECK-LABEL: @no_gemm_mul_params_not_affine_loads
   func @no_gemm_mul_params_not_affine_loads(%arg0: memref<100x100xf32>, %arg1: memref<100x100xf32>, %arg2: memref<100x100xf32>) {
@@ -45,7 +45,7 @@ module {
     return
   }
   // CHECK: affine.parallel
-  // CHECK-NOT: is_gemm
+  // CHECK-NOT: xsmm 
 
   // CHECK-LABEL: @no_gemm_no_stride_one_1
   func @no_gemm_no_stride_one_1(%arg0: memref<100x100xf32>, %arg1: memref<100x100xf32>, %arg2: memref<100x100xf32>) {
@@ -60,7 +60,7 @@ module {
     return
   }
   // CHECK: affine.parallel
-  // CHECK-NOT: is_gemm
+  // CHECK-NOT: xsmm 
 
   // CHECK-LABEL: @no_gemm_no_stride_one_2
   func @no_gemm_no_stride_one_2(%arg0: memref<100x100xf32>, %arg1: memref<100x100xf32>, %arg2: memref<100x100xf32>) {
@@ -75,7 +75,7 @@ module {
     return
   }
   // CHECK: affine.parallel
-  // CHECK-NOT: is_gemm
+  // CHECK-NOT: xsmm 
 
   // CHECK-LABEL: @gemm_operation_rewrite_i32
   func @gemm_operation_rewrite_i32(%arg0: memref<100x100xi32>, %arg1: memref<100x100xi32>, %arg2: memref<100x100xi32>) {
@@ -88,7 +88,7 @@ module {
     return
   }
   // CHECK: affine.parallel
-  // CHECK: is_gemm
+  // CHECK: xsmm 
 
   // CHECK-LABEL: @gemm_operation_rewrite_fl32
   func @gemm_operation_rewrite_fl32(%arg0: memref<100x100xf32>, %arg1: memref<100x100xf32>, %arg2: memref<100x100xf32>) {
@@ -101,5 +101,5 @@ module {
     return
   }
   // CHECK: affine.parallel
-  // CHECK: is_gemm
+  // CHECK: xsmm 
 }
