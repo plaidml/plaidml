@@ -149,10 +149,40 @@ LogicalResult VulkanRuntime::destroy() {
   return success();
 }
 
+LogicalResult VulkanRuntime::init() {
+  createInstance();
+  createDevice();
+
+  // Get working queue.
+  vkGetDeviceQueue(device, queueFamilyIndex, 0, &queue);
+
+  return success();
+}
+/*
+struct Action {
+  virtual ~Action() {}
+};
+
+using ActionPtr = std::shared_ptr<Action>;
+
+struct LaunchKernelAction : Action {
+  VkPipeline pipeline;
+  VkPipelineLayout pipelineLayout;
+  SmallVector<VkDescriptorSet, 4> descriptorSets;
+  NumWorkGroups workGroups;
+  SmallVector<VkBufferMemoryBarrier, 4> deps;
+};
+
+struct MemoryTransferAction : Action {
+  VkBuffer src;
+  VkBuffer dst;
+  SmallVector<VkBufferCopy, 1> regions;
+};
+*/
 LogicalResult VulkanRuntime::run() {
+  initRuntime();
   // Create logical device, shader module and memory buffers.
-  if (failed(createInstance()) || failed(createDevice()) ||
-      failed(createMemoryBuffers()) || failed(createShaderModule())) {
+  if (failed(createMemoryBuffers()) || failed(createShaderModule())) {
     return failure();
   }
 
@@ -165,18 +195,33 @@ LogicalResult VulkanRuntime::run() {
       failed(createComputePipeline()) || failed(createDescriptorPool()) ||
       failed(allocateDescriptorSets()) || failed(setWriteDescriptors()) ||
       // Create command buffer.
-      failed(createCommandPool()) || failed(createComputeCommandBuffer())) {
+      failed(createCommandPool())) {
     return failure();
   }
 
-  // Get working queue.
-  vkGetDeviceQueue(device, queueFamilyIndex, 0, &queue);
+  auto action = std::make_shared<LaunchKernelAction>();
+  action->pipeline = pipeline;
+  action->pipelineLayout = pipelineLayout;
+  action->descriptorSets.swap(descriptorSets);
+  action->workGroups = numWorkGroups;
 
+  schedule.push_back(action);
+
+  if (failed(createSchedule())) {
+    return failure();
+  }
+
+  return success();
+}
+
+LogicalResult VulkanRuntime::submitBuffer() {
   // Submit command buffer into the queue.
   if (failed(submitCommandBuffersToQueue()))
     return failure();
 
   RETURN_ON_VULKAN_ERROR(vkQueueWaitIdle(queue), "vkQueueWaitIdle");
+
+  updateHostMemoryBuffers();
   return success();
 }
 
@@ -723,29 +768,7 @@ LogicalResult VulkanRuntime::updateHostMemoryBuffers() {
   return success();
 }
 
-struct Action {
-  virtual ~Action() {}
-};
-
-using ActionPtr = std::shared_ptr<Action>;
-
-struct LaunchKernelAction : Action {
-  VkPipeline pipeline;
-  VkPipelineLayout pipelineLayout;
-  SmallVector<VkDescriptorSet, 4> descriptorSets;
-  NumWorkGroups workGroups;
-  SmallVector<VkBufferMemoryBarrier, 4> deps;
-};
-
-struct MemoryTransferAction : Action {
-  VkBuffer src;
-  VkBuffer dst;
-  SmallVector<VkBufferCopy, 1> regions;
-};
-
 LogicalResult VulkanRuntime::createSchedule() {
-  std::vector<ActionPtr> schedule;
-
   VkCommandBufferAllocateInfo allocInfo = {};
   allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
   allocInfo.pNext = nullptr;
@@ -814,5 +837,6 @@ LogicalResult VulkanRuntime::createSchedule() {
   RETURN_ON_VULKAN_ERROR(vkEndCommandBuffer(commandBuffer),
                          "vkEndCommandBuffer");
 
+  commandBuffers.push_back(commandBuffer);
   return success();
 }

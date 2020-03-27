@@ -212,6 +212,25 @@ void ConvertGpuLaunchFuncToVulkanLaunchFunc::declareVulkanFunctions(
                           &ctx),
         ArrayRef<std::pair<mlir::Identifier, mlir::Attribute>>());
   }
+
+  auto llvmDialect = getContext().getRegisteredDialect<LLVM::LLVMDialect>();
+
+  if (!module.lookupSymbol(kInitVulkan)) {
+    builder.create<LLVM::LLVMFuncOp>(
+        loc, kInitVulkan,
+        LLVM::LLVMType::getFunctionTy(LLVM::LLVMType::getInt8PtrTy(llvmDialect),
+                                      {},
+                                      /*isVarArg=*/false));
+  }
+
+  if (!module.lookupSymbol(kDeinitVulkan)) {
+    builder.create<LLVM::LLVMFuncOp>(
+        loc, kDeinitVulkan,
+        LLVM::LLVMType::getFunctionTy(
+            LLVM::LLVMType::getVoidTy(llvmDialect),
+            {LLVM::LLVMType::getInt8PtrTy(llvmDialect)},
+            /*isVarArg=*/false));
+  }
 }
 
 void ConvertGpuLaunchFuncToVulkanLaunchFunc::convertGpuLaunchFunc(
@@ -259,12 +278,6 @@ void ConvertGpuLaunchFuncToVulkanLaunchFunc::convertGpuLaunchFunc(
 
   // Print buffers after vulkan launch call.
 
-  if (VLOG_IS_ON(4)) {
-    if (failed(printLauchOpBuffers(loc, builder, launchOp))) {
-      return signalPassFailure();
-    }
-  }
-
   // Declare runtime functions.
   declareVulkanFunctions(loc);
 
@@ -275,6 +288,11 @@ void ConvertGpuLaunchFuncToVulkanLaunchFunc::convertGpuLaunchFunc(
         loc, ArrayRef<Type>{LLVM::LLVMType::getVoidTy(llvmDialect)},
         builder.getSymbolRefAttr(kDeinitVulkan),
         ArrayRef<Value>{vulkanRuntime});
+  }
+  if (VLOG_IS_ON(4)) {
+    if (failed(printLauchOpBuffers(loc, builder, launchOp))) {
+      return signalPassFailure();
+    }
   }
 
   launchOp.erase();

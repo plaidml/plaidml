@@ -35,10 +35,14 @@ namespace {
 
 class VulkanRuntimeManager {
 public:
-  VulkanRuntimeManager() = default;
+  VulkanRuntimeManager() { vulkanRuntime.init(); }
   VulkanRuntimeManager(const VulkanRuntimeManager &) = delete;
   VulkanRuntimeManager operator=(const VulkanRuntimeManager &) = delete;
   ~VulkanRuntimeManager() {
+    if (failed(vulkanRuntime.submitBuffer())) {
+      llvm::errs() << "vulkanRuntime.submitBuffer() failed";
+    }
+
     if (failed(vulkanRuntime.destroy())) {
       llvm::errs() << "vulkanRuntime.destroy() failed";
     }
@@ -67,8 +71,7 @@ public:
 
   void runOnVulkan() {
     std::lock_guard<std::mutex> lock(mutex);
-    if (failed(vulkanRuntime.initRuntime()) || failed(vulkanRuntime.run()) ||
-        failed(vulkanRuntime.updateHostMemoryBuffers())) {
+    if (failed(vulkanRuntime.run())) {
       llvm::errs() << "runOnVulkan failed";
     }
   }

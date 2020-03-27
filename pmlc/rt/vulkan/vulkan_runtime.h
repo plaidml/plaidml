@@ -12,6 +12,9 @@
 
 #pragma once
 
+#include <memory>
+#include <vector>
+
 #include "mlir/Analysis/Passes.h"
 #include "mlir/Dialect/SPIRV/SPIRVOps.h"
 #include "mlir/Dialect/SPIRV/Serialization.h"
@@ -84,6 +87,26 @@ inline void emitVulkanError(const llvm::Twine &message, VkResult error) {
     return failure();                                                          \
   }
 
+struct Action {
+  virtual ~Action() {}
+};
+
+using ActionPtr = std::shared_ptr<Action>;
+
+struct LaunchKernelAction : Action {
+  VkPipeline pipeline;
+  VkPipelineLayout pipelineLayout;
+  SmallVector<VkDescriptorSet, 4> descriptorSets;
+  NumWorkGroups workGroups;
+  SmallVector<VkBufferMemoryBarrier, 4> deps;
+};
+
+struct MemoryTransferAction : Action {
+  VkBuffer src;
+  VkBuffer dst;
+  SmallVector<VkBufferCopy, 1> regions;
+};
+
 /// Vulkan runtime.
 /// The purpose of this class is to run SPIR-V compute shader on Vulkan
 /// device.
@@ -110,6 +133,8 @@ public:
       const ResourceStorageClassBindingMap &stClassData);
   void setEntryPoint(const char *entryPointName);
 
+  LogicalResult init();
+
   /// Runtime initialization.
   LogicalResult initRuntime();
 
@@ -121,6 +146,8 @@ public:
 
   /// Destroys all created vulkan objects and resources.
   LogicalResult destroy();
+
+  LogicalResult submitBuffer();
 
 private:
   //===--------------------------------------------------------------------===//
@@ -164,6 +191,8 @@ private:
   //===--------------------------------------------------------------------===//
   // Vulkan objects.
   //===--------------------------------------------------------------------===//
+
+  std::vector<ActionPtr> schedule;
 
   VkInstance instance;
   VkDevice device;

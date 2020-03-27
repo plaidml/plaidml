@@ -31,9 +31,7 @@ static constexpr const char *kBindMemRef1DFloat = "bindMemRef1DFloat";
 static constexpr const char *kBindMemRef2DFloat = "bindMemRef2DFloat";
 static constexpr const char *kCInterfaceVulkanLaunch =
     "_mlir_ciface_vulkanLaunch";
-static constexpr const char *kDeinitVulkan = "deinitVulkan";
 static constexpr const char *kRunOnVulkan = "runOnVulkan";
-static constexpr const char *kInitVulkan = "initVulkan";
 static constexpr const char *kSetBinaryShader = "setBinaryShader";
 static constexpr const char *kSetEntryPoint = "setEntryPoint";
 static constexpr const char *kSetNumWorkGroups = "setNumWorkGroups";
@@ -286,20 +284,6 @@ void VulkanLaunchFuncToVulkanCallsPass::declareVulkanFunctions(Location loc) {
                                       {getPointerType(), getInt32Type(),
                                        getInt32Type(),
                                        getMemRef2DFloat().getPointerTo()},
-                                      /*isVarArg=*/false));
-  }
-
-  if (!module.lookupSymbol(kInitVulkan)) {
-    builder.create<LLVM::LLVMFuncOp>(
-        loc, kInitVulkan,
-        LLVM::LLVMType::getFunctionTy(getPointerType(), {},
-                                      /*isVarArg=*/false));
-  }
-
-  if (!module.lookupSymbol(kDeinitVulkan)) {
-    builder.create<LLVM::LLVMFuncOp>(
-        loc, kDeinitVulkan,
-        LLVM::LLVMType::getFunctionTy(getVoidType(), {getPointerType()},
                                       /*isVarArg=*/false));
   }
 }
