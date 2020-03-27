@@ -8,5 +8,6 @@ plaidml_cc_library(
     name = "stdx",
     deps = [
         "//pmlc/dialect/stdx/ir",
+        "//pmlc/dialect/stdx/transforms",
     ],
 )
