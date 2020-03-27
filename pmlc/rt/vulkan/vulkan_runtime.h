@@ -94,11 +94,67 @@ struct Action {
 using ActionPtr = std::shared_ptr<Action>;
 
 struct LaunchKernelAction : Action {
-  VkPipeline pipeline;
-  VkPipelineLayout pipelineLayout;
-  SmallVector<VkDescriptorSet, 4> descriptorSets;
-  NumWorkGroups workGroups;
   SmallVector<VkBufferMemoryBarrier, 4> deps;
+
+  /// Specifies VulkanDeviceMemoryBuffers divided into sets.
+  llvm::DenseMap<DescriptorSetIndex,
+                 llvm::SmallVector<VulkanDeviceMemoryBuffer, 1>>
+      deviceMemoryBufferMap;
+
+  /// Specifies shader module.
+  VkShaderModule shaderModule;
+
+  /// Specifies layout bindings.
+  llvm::DenseMap<DescriptorSetIndex,
+                 llvm::SmallVector<VkDescriptorSetLayoutBinding, 1>>
+      descriptorSetLayoutBindingMap;
+
+  /// Specifies layouts of descriptor sets.
+  llvm::SmallVector<VkDescriptorSetLayout, 1> descriptorSetLayouts;
+  VkPipelineLayout pipelineLayout;
+
+  /// Specifies descriptor sets.
+  llvm::SmallVector<VkDescriptorSet, 1> descriptorSets;
+
+  /// Specifies a pool of descriptor set info, each descriptor set must have
+  /// information such as type, index and amount of bindings.
+  llvm::SmallVector<DescriptorSetInfo, 1> descriptorSetInfoPool;
+  VkDescriptorPool descriptorPool;
+
+  /// Computation pipeline.
+  VkPipeline pipeline;
+  VkCommandPool commandPool;
+
+  //===--------------------------------------------------------------------===//
+  // Vulkan execution context.
+  //===--------------------------------------------------------------------===//
+
+  NumWorkGroups workGroups;
+  const char *entryPoint{nullptr};
+  uint8_t *binary{nullptr};
+  uint32_t binarySize{0};
+
+  //===--------------------------------------------------------------------===//
+  // Vulkan resource data and storage classes.
+  //===--------------------------------------------------------------------===//
+
+  ResourceData resourceData;
+  ResourceStorageClassBindingMap resourceStorageClassData;
+
+  ///////
+  VkInstance instance;
+  VkDevice device;
+  VkQueue queue;
+
+  //===--------------------------------------------------------------------===//
+  // Vulkan memory context.
+  //===--------------------------------------------------------------------===//
+
+  uint32_t memoryTypeIndex{VK_MAX_MEMORY_TYPES};
+  uint32_t queueFamilyIndex{0};
+  VkDeviceSize memorySize{0};
+
+  llvm::SmallVector<VkCommandBuffer, 1> commandBuffers;
 };
 
 struct MemoryTransferAction : Action {
@@ -134,6 +190,7 @@ public:
   void setEntryPoint(const char *entryPointName);
 
   LogicalResult init();
+  LogicalResult createAction();
 
   /// Runtime initialization.
   LogicalResult initRuntime();
@@ -193,62 +250,4 @@ private:
   //===--------------------------------------------------------------------===//
 
   std::vector<ActionPtr> schedule;
-
-  VkInstance instance;
-  VkDevice device;
-  VkQueue queue;
-
-  /// Specifies VulkanDeviceMemoryBuffers divided into sets.
-  llvm::DenseMap<DescriptorSetIndex,
-                 llvm::SmallVector<VulkanDeviceMemoryBuffer, 1>>
-      deviceMemoryBufferMap;
-
-  /// Specifies shader module.
-  VkShaderModule shaderModule;
-
-  /// Specifies layout bindings.
-  llvm::DenseMap<DescriptorSetIndex,
-                 llvm::SmallVector<VkDescriptorSetLayoutBinding, 1>>
-      descriptorSetLayoutBindingMap;
-
-  /// Specifies layouts of descriptor sets.
-  llvm::SmallVector<VkDescriptorSetLayout, 1> descriptorSetLayouts;
-  VkPipelineLayout pipelineLayout;
-
-  /// Specifies descriptor sets.
-  llvm::SmallVector<VkDescriptorSet, 1> descriptorSets;
-
-  /// Specifies a pool of descriptor set info, each descriptor set must have
-  /// information such as type, index and amount of bindings.
-  llvm::SmallVector<DescriptorSetInfo, 1> descriptorSetInfoPool;
-  VkDescriptorPool descriptorPool;
-
-  /// Computation pipeline.
-  VkPipeline pipeline;
-  VkCommandPool commandPool;
-  llvm::SmallVector<VkCommandBuffer, 1> commandBuffers;
-
-  //===--------------------------------------------------------------------===//
-  // Vulkan memory context.
-  //===--------------------------------------------------------------------===//
-
-  uint32_t queueFamilyIndex{0};
-  uint32_t memoryTypeIndex{VK_MAX_MEMORY_TYPES};
-  VkDeviceSize memorySize{0};
-
-  //===--------------------------------------------------------------------===//
-  // Vulkan execution context.
-  //===--------------------------------------------------------------------===//
-
-  NumWorkGroups numWorkGroups;
-  const char *entryPoint{nullptr};
-  uint8_t *binary{nullptr};
-  uint32_t binarySize{0};
-
-  //===--------------------------------------------------------------------===//
-  // Vulkan resource data and storage classes.
-  //===--------------------------------------------------------------------===//
-
-  ResourceData resourceData;
-  ResourceStorageClassBindingMap resourceStorageClassData;
 };

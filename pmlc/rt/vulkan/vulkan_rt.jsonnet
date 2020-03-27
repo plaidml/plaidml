@@ -5,6 +5,7 @@ local exports = [
     'bindMemRef2DFloat',
     'deinitVulkan',
     'initVulkan',
+    'createAction',
     'runOnVulkan',
     'setBinaryShader',
     'setEntryPoint',

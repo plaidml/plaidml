@@ -32,6 +32,7 @@ static constexpr const char *kBindMemRef2DFloat = "bindMemRef2DFloat";
 static constexpr const char *kCInterfaceVulkanLaunch =
     "_mlir_ciface_vulkanLaunch";
 static constexpr const char *kRunOnVulkan = "runOnVulkan";
+static constexpr const char *kCreateAction = "createAction";
 static constexpr const char *kSetBinaryShader = "setBinaryShader";
 static constexpr const char *kSetEntryPoint = "setEntryPoint";
 static constexpr const char *kSetNumWorkGroups = "setNumWorkGroups";
@@ -286,6 +287,15 @@ void VulkanLaunchFuncToVulkanCallsPass::declareVulkanFunctions(Location loc) {
                                        getMemRef2DFloat().getPointerTo()},
                                       /*isVarArg=*/false));
   }
+
+  if (!module.lookupSymbol(kCreateAction)) {
+    builder.create<LLVM::LLVMFuncOp>(
+        loc, kCreateAction,
+        LLVM::LLVMType::getFunctionTy(
+            LLVM::LLVMType::getVoidTy(llvmDialect),
+            {LLVM::LLVMType::getInt8PtrTy(llvmDialect)},
+            /*isVarArg=*/false));
+  }
 }
 
 static int spv_entry_index = 0;
@@ -312,6 +322,10 @@ void VulkanLaunchFuncToVulkanCallsPass::translateVulkanLaunchCall(
   // runtime, we need to pass that pointer to each Vulkan runtime call.
 
   auto vulkanRuntime = cInterfaceVulkanLaunchCallOp.getOperand(0);
+
+  builder.create<LLVM::CallOp>(loc, ArrayRef<Type>{getVoidType()},
+                               builder.getSymbolRefAttr(kCreateAction),
+                               ArrayRef<Value>{vulkanRuntime});
 
   // Create LLVM global with SPIR-V binary data, so we can pass a pointer with
   // that data to runtime call.

@@ -47,6 +47,7 @@ public:
       llvm::errs() << "vulkanRuntime.destroy() failed";
     }
   }
+  void createAction() { vulkanRuntime.createAction(); }
 
   void setResourceData(DescriptorSetIndex setIndex, BindingIndex bindIndex,
                        const VulkanHostMemoryBuffer &memBuffer) {
@@ -79,7 +80,7 @@ public:
 private:
   VulkanRuntime vulkanRuntime;
   std::mutex mutex;
-};
+}; // namespace
 
 } // namespace
 
@@ -95,6 +96,7 @@ struct MemRefDescriptor {
 extern "C" {
 VULKAN_RT_EXPORT void *initVulkan();
 VULKAN_RT_EXPORT void deinitVulkan(void *vkRuntimeManager);
+VULKAN_RT_EXPORT void createAction(void *vkRuntimeManager);
 VULKAN_RT_EXPORT void runOnVulkan(void *vkRuntimeManager);
 VULKAN_RT_EXPORT void setEntryPoint(void *vkRuntimeManager,
                                     const char *entryPoint);
@@ -116,6 +118,10 @@ _mlir_ciface_fillResource1DFloat(MemRefDescriptor<float, 1> *ptr, float value);
 
 /// Initializes `VulkanRuntimeManager` and returns a pointer to it.
 void *initVulkan() { return new VulkanRuntimeManager(); }
+
+void createAction(void *vkRuntimeManager) {
+  reinterpret_cast<VulkanRuntimeManager *>(vkRuntimeManager)->createAction();
+}
 
 /// Deinitializes `VulkanRuntimeManager` by the given pointer.
 void deinitVulkan(void *vkRuntimeManager) {
