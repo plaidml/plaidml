@@ -141,20 +141,9 @@ struct LaunchKernelAction : Action {
   ResourceData resourceData;
   ResourceStorageClassBindingMap resourceStorageClassData;
 
-  ///////
-  VkInstance instance;
-  VkDevice device;
-  VkQueue queue;
-
   //===--------------------------------------------------------------------===//
   // Vulkan memory context.
   //===--------------------------------------------------------------------===//
-
-  uint32_t memoryTypeIndex{VK_MAX_MEMORY_TYPES};
-  uint32_t queueFamilyIndex{0};
-  VkDeviceSize memorySize{0};
-
-  llvm::SmallVector<VkCommandBuffer, 1> commandBuffers;
 };
 
 struct MemoryTransferAction : Action {
@@ -248,6 +237,15 @@ private:
   //===--------------------------------------------------------------------===//
   // Vulkan objects.
   //===--------------------------------------------------------------------===//
+  VkInstance instance;
+  VkDevice device;
+  VkQueue queue;
+
+  uint32_t queueFamilyIndex{0};
+  uint32_t memoryTypeIndex{VK_MAX_MEMORY_TYPES};
+  VkDeviceSize memorySize{0};
 
   std::vector<ActionPtr> schedule;
+
+  llvm::SmallVector<VkCommandBuffer, 1> commandBuffers;
 };

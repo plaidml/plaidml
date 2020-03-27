@@ -16,6 +16,8 @@
 #include <memory>
 #include <vector>
 
+#include <iostream>
+
 using namespace mlir; // NOLINT[build/namespaces]
 
 void VulkanRuntime::setNumWorkGroups(const NumWorkGroups &numberWorkGroups) {
@@ -93,7 +95,7 @@ LogicalResult VulkanRuntime::countDeviceMemorySize() {
     const auto &resourceDataMap = resourceDataMapPair.second;
     for (const auto &resourceDataBindingPair : resourceDataMap) {
       if (resourceDataBindingPair.second.size) {
-        kernel->memorySize += resourceDataBindingPair.second.size;
+        memorySize += resourceDataBindingPair.second.size;
       } else {
         llvm::errs()
             << "expected buffer size greater than zero for resource data";
@@ -154,44 +156,25 @@ vkDestroyBuffer(device, memoryBuffer.buffer, nullptr);
 }
 }
 */
-  // vkDestroyDevice(device, nullptr);
-  // vkDestroyInstance(instance, nullptr);
+  vkDestroyDevice(device, nullptr);
+  vkDestroyInstance(instance, nullptr);
   return success();
 }
-LogicalResult VulkanRuntime::init() { return success(); }
-LogicalResult VulkanRuntime::createAction() {
-  schedule.push_back(std::make_shared<LaunchKernelAction>());
-  auto kernel = std::dynamic_pointer_cast<LaunchKernelAction>(schedule.back());
-
+LogicalResult VulkanRuntime::init() {
   createInstance();
   createDevice();
 
   // Get working queue.
-  vkGetDeviceQueue(kernel->device, kernel->queueFamilyIndex, 0, &kernel->queue);
+  vkGetDeviceQueue(device, queueFamilyIndex, 0, &queue);
 
   return success();
 }
-/*
-struct Action {
-  virtual ~Action() {}
-};
 
-using ActionPtr = std::shared_ptr<Action>;
+LogicalResult VulkanRuntime::createAction() {
+  schedule.push_back(std::make_shared<LaunchKernelAction>());
+  return success();
+}
 
-struct LaunchKernelAction : Action {
-  VkPipeline pipeline;
-  VkPipelineLayout pipelineLayout;
-  SmallVector<VkDescriptorSet, 4> descriptorSets;
-  NumWorkGroups workGroups;
-  SmallVector<VkBufferMemoryBarrier, 4> deps;
-};
-
-struct MemoryTransferAction : Action {
-  VkBuffer src;
-  VkBuffer dst;
-  SmallVector<VkBufferCopy, 1> regions;
-};
-*/
 LogicalResult VulkanRuntime::run() {
   initRuntime();
   // Create logical device, shader module and memory buffers.
@@ -220,19 +203,17 @@ LogicalResult VulkanRuntime::run() {
 }
 
 LogicalResult VulkanRuntime::submitBuffer() {
-  auto kernel = std::dynamic_pointer_cast<LaunchKernelAction>(schedule.back());
   // Submit command buffer into the queue.
   if (failed(submitCommandBuffersToQueue()))
     return failure();
 
-  RETURN_ON_VULKAN_ERROR(vkQueueWaitIdle(kernel->queue), "vkQueueWaitIdle");
+  RETURN_ON_VULKAN_ERROR(vkQueueWaitIdle(queue), "vkQueueWaitIdle");
 
   updateHostMemoryBuffers();
   return success();
 }
 
 LogicalResult VulkanRuntime::createInstance() {
-  auto kernel = std::dynamic_pointer_cast<LaunchKernelAction>(schedule.back());
   RETURN_ON_VULKAN_ERROR(volkInitialize(), "volkInitialize");
 
   VkApplicationInfo applicationInfo = {};
@@ -254,21 +235,18 @@ LogicalResult VulkanRuntime::createInstance() {
   instanceCreateInfo.enabledExtensionCount = 0;
   instanceCreateInfo.ppEnabledExtensionNames = 0;
 
-  RETURN_ON_VULKAN_ERROR(
-      vkCreateInstance(&instanceCreateInfo, 0, &kernel->instance),
-      "vkCreateInstance");
+  RETURN_ON_VULKAN_ERROR(vkCreateInstance(&instanceCreateInfo, 0, &instance),
+                         "vkCreateInstance");
 
-  volkLoadInstance(kernel->instance);
+  volkLoadInstance(instance);
 
   return success();
 }
 
 LogicalResult VulkanRuntime::createDevice() {
-  auto kernel = std::dynamic_pointer_cast<LaunchKernelAction>(schedule.back());
-  auto instance = kernel->instance;
   uint32_t physicalDeviceCount = 0;
   RETURN_ON_VULKAN_ERROR(
-      vkEnumeratePhysicalDevices(kernel->instance, &physicalDeviceCount, 0),
+      vkEnumeratePhysicalDevices(instance, &physicalDeviceCount, 0),
       "vkEnumeratePhysicalDevices");
 
   SmallVector<VkPhysicalDevice, 1> physicalDevices(physicalDeviceCount);
@@ -289,7 +267,7 @@ LogicalResult VulkanRuntime::createDevice() {
   deviceQueueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
   deviceQueueCreateInfo.pNext = nullptr;
   deviceQueueCreateInfo.flags = 0;
-  deviceQueueCreateInfo.queueFamilyIndex = kernel->queueFamilyIndex;
+  deviceQueueCreateInfo.queueFamilyIndex = queueFamilyIndex;
   deviceQueueCreateInfo.queueCount = 1;
   deviceQueueCreateInfo.pQueuePriorities = &queuePrioritory;
 
@@ -307,7 +285,7 @@ LogicalResult VulkanRuntime::createDevice() {
   deviceCreateInfo.pEnabledFeatures = nullptr;
 
   RETURN_ON_VULKAN_ERROR(
-      vkCreateDevice(physicalDevice, &deviceCreateInfo, 0, &kernel->device),
+      vkCreateDevice(physicalDevice, &deviceCreateInfo, 0, &device),
       "vkCreateDevice");
 
   VkPhysicalDeviceMemoryProperties properties = {};
@@ -325,23 +303,21 @@ LogicalResult VulkanRuntime::createDevice() {
          properties.memoryTypes[i].propertyFlags) &&
         (VK_MEMORY_PROPERTY_HOST_COHERENT_BIT &
          properties.memoryTypes[i].propertyFlags) &&
-        (kernel->memorySize <=
+        (memorySize <=
          properties.memoryHeaps[properties.memoryTypes[i].heapIndex].size)) {
-      kernel->memoryTypeIndex = i;
+      memoryTypeIndex = i;
       break;
     }
   }
 
-  RETURN_ON_VULKAN_ERROR(kernel->memoryTypeIndex == VK_MAX_MEMORY_TYPES
-                             ? VK_INCOMPLETE
-                             : VK_SUCCESS,
+  RETURN_ON_VULKAN_ERROR(memoryTypeIndex == VK_MAX_MEMORY_TYPES ? VK_INCOMPLETE
+                                                                : VK_SUCCESS,
                          "invalid memoryTypeIndex");
   return success();
 }
 
 LogicalResult
 VulkanRuntime::getBestComputeQueue(const VkPhysicalDevice &physicalDevice) {
-  auto kernel = std::dynamic_pointer_cast<LaunchKernelAction>(schedule.back());
   uint32_t queueFamilyPropertiesCount = 0;
   vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice,
                                            &queueFamilyPropertiesCount, 0);
@@ -361,7 +337,7 @@ VulkanRuntime::getBestComputeQueue(const VkPhysicalDevice &physicalDevice) {
 
     if (!(VK_QUEUE_GRAPHICS_BIT & maskedFlags) &&
         (VK_QUEUE_COMPUTE_BIT & maskedFlags)) {
-      kernel->queueFamilyIndex = i;
+      queueFamilyIndex = i;
       return success();
     }
   }
@@ -372,7 +348,7 @@ VulkanRuntime::getBestComputeQueue(const VkPhysicalDevice &physicalDevice) {
          queueFamilyProperties[i].queueFlags);
 
     if (VK_QUEUE_COMPUTE_BIT & maskedFlags) {
-      kernel->queueFamilyIndex = i;
+      queueFamilyIndex = i;
       return success();
     }
   }
@@ -439,22 +415,21 @@ LogicalResult VulkanRuntime::createMemoryBuffers() {
       memoryAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
       memoryAllocateInfo.pNext = nullptr;
       memoryAllocateInfo.allocationSize = bufferSize;
-      memoryAllocateInfo.memoryTypeIndex = kernel->memoryTypeIndex;
+      memoryAllocateInfo.memoryTypeIndex = memoryTypeIndex;
 
       // Allocate device memory.
-      RETURN_ON_VULKAN_ERROR(vkAllocateMemory(kernel->device,
-                                              &memoryAllocateInfo, 0,
+      RETURN_ON_VULKAN_ERROR(vkAllocateMemory(device, &memoryAllocateInfo, 0,
                                               &memoryBuffer.deviceMemory),
                              "vkAllocateMemory");
       void *payload;
-      RETURN_ON_VULKAN_ERROR(
-          vkMapMemory(kernel->device, memoryBuffer.deviceMemory, 0, bufferSize,
-                      0, reinterpret_cast<void **>(&payload)),
-          "vkMapMemory");
+      RETURN_ON_VULKAN_ERROR(vkMapMemory(device, memoryBuffer.deviceMemory, 0,
+                                         bufferSize, 0,
+                                         reinterpret_cast<void **>(&payload)),
+                             "vkMapMemory");
 
       // Copy host memory into the mapped area.
       std::memcpy(payload, resourceDataBindingPair.second.ptr, bufferSize);
-      vkUnmapMemory(kernel->device, memoryBuffer.deviceMemory);
+      vkUnmapMemory(device, memoryBuffer.deviceMemory);
 
       VkBufferCreateInfo bufferCreateInfo = {};
       bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -464,14 +439,13 @@ LogicalResult VulkanRuntime::createMemoryBuffers() {
       bufferCreateInfo.usage = bufferUsage;
       bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
       bufferCreateInfo.queueFamilyIndexCount = 1;
-      bufferCreateInfo.pQueueFamilyIndices = &kernel->queueFamilyIndex;
-      RETURN_ON_VULKAN_ERROR(vkCreateBuffer(kernel->device, &bufferCreateInfo,
-                                            0, &memoryBuffer.buffer),
-                             "vkCreateBuffer");
+      bufferCreateInfo.pQueueFamilyIndices = &queueFamilyIndex;
+      RETURN_ON_VULKAN_ERROR(
+          vkCreateBuffer(device, &bufferCreateInfo, 0, &memoryBuffer.buffer),
+          "vkCreateBuffer");
 
       // Bind buffer and device memory.
-      RETURN_ON_VULKAN_ERROR(vkBindBufferMemory(kernel->device,
-                                                memoryBuffer.buffer,
+      RETURN_ON_VULKAN_ERROR(vkBindBufferMemory(device, memoryBuffer.buffer,
                                                 memoryBuffer.deviceMemory, 0),
                              "vkBindBufferMemory");
 
@@ -490,7 +464,6 @@ LogicalResult VulkanRuntime::createMemoryBuffers() {
 
 LogicalResult VulkanRuntime::createShaderModule() {
   auto kernel = std::dynamic_pointer_cast<LaunchKernelAction>(schedule.back());
-  auto device = kernel->device;
   VkShaderModuleCreateInfo shaderModuleCreateInfo = {};
   shaderModuleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
   shaderModuleCreateInfo.pNext = nullptr;
@@ -561,10 +534,10 @@ LogicalResult VulkanRuntime::createDescriptorSetLayout() {
         descriptorSetLayoutBindings.size();
     descriptorSetLayoutCreateInfo.pBindings =
         descriptorSetLayoutBindings.data();
-    RETURN_ON_VULKAN_ERROR(vkCreateDescriptorSetLayout(
-                               kernel->device, &descriptorSetLayoutCreateInfo,
-                               0, &descriptorSetLayout),
-                           "vkCreateDescriptorSetLayout");
+    RETURN_ON_VULKAN_ERROR(
+        vkCreateDescriptorSetLayout(device, &descriptorSetLayoutCreateInfo, 0,
+                                    &descriptorSetLayout),
+        "vkCreateDescriptorSetLayout");
 
     kernel->descriptorSetLayouts.push_back(descriptorSetLayout);
     kernel->descriptorSetInfoPool.push_back(
@@ -585,7 +558,7 @@ LogicalResult VulkanRuntime::createPipelineLayout() {
   pipelineLayoutCreateInfo.pSetLayouts = kernel->descriptorSetLayouts.data();
   pipelineLayoutCreateInfo.pushConstantRangeCount = 0;
   pipelineLayoutCreateInfo.pPushConstantRanges = 0;
-  RETURN_ON_VULKAN_ERROR(vkCreatePipelineLayout(kernel->device,
+  RETURN_ON_VULKAN_ERROR(vkCreatePipelineLayout(device,
                                                 &pipelineLayoutCreateInfo, 0,
                                                 &kernel->pipelineLayout),
                          "vkCreatePipelineLayout");
@@ -613,7 +586,7 @@ LogicalResult VulkanRuntime::createComputePipeline() {
   computePipelineCreateInfo.layout = kernel->pipelineLayout;
   computePipelineCreateInfo.basePipelineHandle = 0;
   computePipelineCreateInfo.basePipelineIndex = 0;
-  RETURN_ON_VULKAN_ERROR(vkCreateComputePipelines(kernel->device, 0, 1,
+  RETURN_ON_VULKAN_ERROR(vkCreateComputePipelines(device, 0, 1,
                                                   &computePipelineCreateInfo, 0,
                                                   &kernel->pipeline),
                          "vkCreateComputePipelines");
@@ -639,7 +612,7 @@ LogicalResult VulkanRuntime::createDescriptorPool() {
   descriptorPoolCreateInfo.maxSets = descriptorPoolSizes.size();
   descriptorPoolCreateInfo.poolSizeCount = descriptorPoolSizes.size();
   descriptorPoolCreateInfo.pPoolSizes = descriptorPoolSizes.data();
-  RETURN_ON_VULKAN_ERROR(vkCreateDescriptorPool(kernel->device,
+  RETURN_ON_VULKAN_ERROR(vkCreateDescriptorPool(device,
                                                 &descriptorPoolCreateInfo, 0,
                                                 &kernel->descriptorPool),
                          "vkCreateDescriptorPool");
@@ -659,7 +632,7 @@ LogicalResult VulkanRuntime::allocateDescriptorSets() {
       kernel->descriptorSetLayouts.size();
   descriptorSetAllocateInfo.pSetLayouts = kernel->descriptorSetLayouts.data();
   RETURN_ON_VULKAN_ERROR(
-      vkAllocateDescriptorSets(kernel->device, &descriptorSetAllocateInfo,
+      vkAllocateDescriptorSets(device, &descriptorSetAllocateInfo,
                                kernel->descriptorSets.data()),
       "vkAllocateDescriptorSets");
   return success();
@@ -692,7 +665,7 @@ LogicalResult VulkanRuntime::setWriteDescriptors() {
       wSet.pImageInfo = nullptr;
       wSet.pBufferInfo = &memoryBuffer.bufferInfo;
       wSet.pTexelBufferView = nullptr;
-      vkUpdateDescriptorSets(kernel->device, 1, &wSet, 0, nullptr);
+      vkUpdateDescriptorSets(device, 1, &wSet, 0, nullptr);
     }
     // Increment descriptor set iterator.
     ++descriptorSetIt;
@@ -706,9 +679,8 @@ LogicalResult VulkanRuntime::createCommandPool() {
   commandPoolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
   commandPoolCreateInfo.pNext = nullptr;
   commandPoolCreateInfo.flags = 0;
-  commandPoolCreateInfo.queueFamilyIndex = kernel->queueFamilyIndex;
-  RETURN_ON_VULKAN_ERROR(vkCreateCommandPool(kernel->device,
-                                             &commandPoolCreateInfo, 0,
+  commandPoolCreateInfo.queueFamilyIndex = queueFamilyIndex;
+  RETURN_ON_VULKAN_ERROR(vkCreateCommandPool(device, &commandPoolCreateInfo, 0,
                                              &kernel->commandPool),
                          "vkCreateCommandPool");
   return success();
@@ -758,18 +730,17 @@ commandBuffers.push_back(commandBuffer);
 }
 
 LogicalResult VulkanRuntime::submitCommandBuffersToQueue() {
-  auto kernel = std::dynamic_pointer_cast<LaunchKernelAction>(schedule.back());
   VkSubmitInfo submitInfo = {};
   submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
   submitInfo.pNext = nullptr;
   submitInfo.waitSemaphoreCount = 0;
   submitInfo.pWaitSemaphores = 0;
   submitInfo.pWaitDstStageMask = 0;
-  submitInfo.commandBufferCount = kernel->commandBuffers.size();
-  submitInfo.pCommandBuffers = kernel->commandBuffers.data();
+  submitInfo.commandBufferCount = commandBuffers.size();
+  submitInfo.pCommandBuffers = commandBuffers.data();
   submitInfo.signalSemaphoreCount = 0;
   submitInfo.pSignalSemaphores = nullptr;
-  RETURN_ON_VULKAN_ERROR(vkQueueSubmit(kernel->queue, 1, &submitInfo, 0),
+  RETURN_ON_VULKAN_ERROR(vkQueueSubmit(queue, 1, &submitInfo, 0),
                          "vkQueueSubmit");
   return success();
 }
@@ -787,13 +758,13 @@ LogicalResult VulkanRuntime::updateHostMemoryBuffers() {
         void *payload;
         auto &hostMemoryBuffer =
             resourceDataMap[deviceMemoryBuffer.bindingIndex];
-        RETURN_ON_VULKAN_ERROR(vkMapMemory(kernel->device,
+        RETURN_ON_VULKAN_ERROR(vkMapMemory(device,
                                            deviceMemoryBuffer.deviceMemory, 0,
                                            hostMemoryBuffer.size, 0,
                                            reinterpret_cast<void **>(&payload)),
                                "vkMapMemory");
         std::memcpy(hostMemoryBuffer.ptr, payload, hostMemoryBuffer.size);
-        vkUnmapMemory(kernel->device, deviceMemoryBuffer.deviceMemory);
+        vkUnmapMemory(device, deviceMemoryBuffer.deviceMemory);
       }
     }
   }
@@ -811,7 +782,7 @@ LogicalResult VulkanRuntime::createSchedule() {
 
   VkCommandBuffer commandBuffer;
   RETURN_ON_VULKAN_ERROR(
-      vkAllocateCommandBuffers(kernel->device, &allocInfo, &commandBuffer),
+      vkAllocateCommandBuffers(device, &allocInfo, &commandBuffer),
       "vkAllocateCommandBuffers");
 
   VkCommandBufferBeginInfo beginInfo = {};
@@ -870,6 +841,6 @@ LogicalResult VulkanRuntime::createSchedule() {
   RETURN_ON_VULKAN_ERROR(vkEndCommandBuffer(commandBuffer),
                          "vkEndCommandBuffer");
 
-  kernel->commandBuffers.push_back(commandBuffer);
+  commandBuffers.push_back(commandBuffer);
   return success();
 }
