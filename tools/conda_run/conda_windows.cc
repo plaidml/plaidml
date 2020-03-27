@@ -38,25 +38,21 @@ int main(int argc, char* argv[]) {
       pmlc::util::setEnvVar(var.first, var.second);
     }
 
-    auto python = fs::canonical(runfiles->Rlocation("com_intel_plaidml_conda_windows/env/python.exe"));
-    auto conda_env = WindowsPath(python.parent_path().string());
-    auto conda_exe = pmlc::util::getEnvVar("CONDA_EXE");
-    if (conda_exe.empty()) {
-      conda_exe = R"(C:\tools\Miniconda3\Scripts\conda.exe)";
-      if (!fs::exists(conda_exe)) {
-        throw std::runtime_error("Missing environment variable: CONDA_EXE");
-      }
-    }
-    auto conda = WindowsPath(fs::canonical(conda_exe).string());
+    auto python_path = fs::canonical(runfiles->Rlocation("com_intel_plaidml_conda_windows/env/python.exe"));
+    auto conda_path = fs::canonical(runfiles->Rlocation("com_intel_plaidml_conda_windows/env/Scripts/conda.exe"));
+
+    auto python = WindowsPath(python_path.string());
+    auto conda_env = WindowsPath(python_path.parent_path().string());
+    auto conda = WindowsPath(conda_path.string());
 
 #ifdef DEBUG
     std::cerr << "python: " << python << std::endl;
     std::cerr << "conda_env: " << conda_env << std::endl;
-    std::cerr << "conda_exe: " << conda_exe << std::endl;
     std::cerr << "conda: " << conda << std::endl;
 #endif
 
     // Adjust environment variables to activate conda environment
+    pmlc::util::setEnvVar("CONDA_EXE", conda);
     pmlc::util::setEnvVar("CONDA_DEFAULT_ENV", conda_env);
     pmlc::util::setEnvVar("CONDA_PREFIX", conda_env);
 
@@ -96,7 +92,7 @@ int main(int argc, char* argv[]) {
     for (int i = 1; i < argc; i++) {
       args.push_back(argv[i]);
     }
-    return bp::system(bp::exe = python.string(), bp::args = args);
+    return bp::system(bp::exe = python, bp::args = args);
   } catch (const std::exception& ex) {
     std::cerr << "Caught unhandled exception: " << ex.what() << std::endl;
   } catch (...) {

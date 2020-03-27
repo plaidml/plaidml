@@ -2,6 +2,7 @@ channels:
   - conda-forge
 dependencies:
   - cffi
+  - conda=4.6
   - jupyter
   - m2-perl
   - nbformat=4.4.0 # Latest version of nbformat breaks the analysis notebook
