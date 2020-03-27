@@ -16,7 +16,6 @@ plaidml_cc_binary(
             "@com_intel_plaidml_conda_windows//:python",
         ],
         "//conditions:default": [
-            "@com_intel_plaidml_conda_unix//:conda",
             "@com_intel_plaidml_conda_unix//:python",
         ],
     }),
