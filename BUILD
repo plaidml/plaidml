@@ -46,6 +46,7 @@ py_runtime(
     name = "py3_runtime",
     files = select({
         "@bazel_tools//src/conditions:windows": [
+            "@com_intel_plaidml_conda_windows//:conda",
             "@com_intel_plaidml_conda_windows//:python",
         ],
         "//conditions:default": [

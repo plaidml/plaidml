@@ -6,3 +6,8 @@ filegroup(
     name = "python",
     srcs = ["env/python.exe"],
 )
+
+filegroup(
+    name = "conda",
+    srcs = ["env/Scripts/conda.exe"],
+)
