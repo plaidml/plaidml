@@ -1,4 +1,5 @@
 load("@bazel_skylib//lib:paths.bzl", "paths")
+load("//bzl:python.bzl", "run_python_attrs", "run_python_tool")
 
 def _py_setup_impl(ctx):
     version = ctx.var.get("version", default = "0.0.0")
@@ -16,7 +17,6 @@ def _py_setup_impl(ctx):
     wheel = ctx.actions.declare_file(wheel_path)
 
     args = ctx.actions.args()
-    args.add(ctx.executable.tool)
     args.add("--no-user-cfg")
     args.add(ctx.attr.action)
     if ctx.attr.universal:
@@ -24,12 +24,12 @@ def _py_setup_impl(ctx):
     if ctx.attr.platform != "any":
         args.add("--plat-name", ctx.attr.platform)
 
-    ctx.actions.run(
-        mnemonic = "PySetup",
-        executable = ctx.file.python,
-        arguments = [args],
+    run_python_tool(
+        ctx,
+        python = ctx.file._python,
+        tool = ctx.executable.tool,
+        args = args,
         outputs = [pkg_dir, wheel],
-        tools = [ctx.file.python, ctx.executable.tool],
         env = {
             "BZL_SRC": ctx.executable.tool.path,
             "BZL_TGT": pkg_dir.path,
@@ -41,11 +41,7 @@ def _py_setup_impl(ctx):
     return DefaultInfo(files = depset([wheel]))
 
 py_setup = rule(
-    attrs = {
-        "python": attr.label(
-            allow_single_file = True,
-            mandatory = True,
-        ),
+    attrs = run_python_attrs({
         "tool": attr.label(
             mandatory = True,
             executable = True,
@@ -57,6 +53,6 @@ py_setup = rule(
         "package_name": attr.string(mandatory = True),
         "platform": attr.string(default = "any"),
         "python_version": attr.string(default = "py2.py3"),
-    },
+    }),
     implementation = _py_setup_impl,
 )
