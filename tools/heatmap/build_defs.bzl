@@ -21,8 +21,8 @@ def _heatmap_impl(ctx):
 heatmap = rule(
     attrs = {
         "python": attr.label(
+            default = "@com_intel_plaidml_conda//:python",
             allow_single_file = True,
-            mandatory = True,
         ),
         "_tool": attr.label(
             default = Label("//tools/heatmap"),

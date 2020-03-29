@@ -33,15 +33,11 @@ def plaidml_workspace():
     )
 
     conda_repo(
-        name = "com_intel_plaidml_conda_unix",
-        env = clean_dep("//conda:unix.yml"),
-        build_file = clean_dep("//conda:unix.BUILD"),
-    )
-
-    conda_repo(
-        name = "com_intel_plaidml_conda_windows",
-        env = clean_dep("//conda:windows.yml"),
-        build_file = clean_dep("//conda:windows.BUILD"),
+        name = "com_intel_plaidml_conda",
+        env_unix = clean_dep("//conda:unix.yml"),
+        build_file_unix = clean_dep("//conda:unix.BUILD"),
+        env_windows = clean_dep("//conda:windows.yml"),
+        build_file_windows = clean_dep("//conda:windows.BUILD"),
     )
 
     http_archive(

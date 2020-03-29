@@ -44,8 +44,8 @@ def _py_setup_impl(ctx):
 py_setup = rule(
     attrs = {
         "python": attr.label(
+            default = "@com_intel_plaidml_conda//:python",
             allow_single_file = True,
-            mandatory = True,
         ),
         "tool": attr.label(
             mandatory = True,

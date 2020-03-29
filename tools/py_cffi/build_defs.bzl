@@ -22,8 +22,8 @@ def _py_cffi_impl(ctx):
 py_cffi_rule = rule(
     attrs = {
         "python": attr.label(
+            default = "@com_intel_plaidml_conda//:python",
             allow_single_file = True,
-            mandatory = True,
         ),
         "srcs": attr.label_list(
             allow_files = True,
@@ -43,11 +43,10 @@ py_cffi_rule = rule(
 )
 
 # It's named srcs_ordered because we want to prevent buildifier from automatically sorting this list.
-def py_cffi(name, python, module, srcs_ordered, **kwargs):
+def py_cffi(name, module, srcs_ordered, **kwargs):
     out = name + ".py"
     py_cffi_rule(
         name = name + "_py_cffi",
-        python = python,
         module = module,
         srcs = srcs_ordered,
         out = out,
