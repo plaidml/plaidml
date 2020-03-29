@@ -1,4 +1,4 @@
-load("//bzl:python.bzl", "run_python_attrs", "run_python_tool")
+load("//bzl:python.bzl", "run_python_tool")
 
 def _heatmap_impl(ctx):
     args = ctx.actions.args()
@@ -9,7 +9,7 @@ def _heatmap_impl(ctx):
     run_python_tool(
         ctx,
         mnemonic = "heatmap",
-        python = ctx.file._python,
+        python = ctx.file.python,
         tool = ctx.executable._tool,
         args = args,
         inputs = [ctx.file.csv, ctx.file.template],
@@ -19,7 +19,11 @@ def _heatmap_impl(ctx):
     return DefaultInfo(files = depset([ctx.outputs.out]))
 
 heatmap = rule(
-    attrs = run_python_attrs({
+    attrs = {
+        "python": attr.label(
+            allow_single_file = True,
+            mandatory = True,
+        ),
         "_tool": attr.label(
             default = Label("//tools/heatmap"),
             executable = True,
@@ -34,6 +38,6 @@ heatmap = rule(
             mandatory = True,
         ),
         "out": attr.output(),
-    }),
+    },
     implementation = _heatmap_impl,
 )
