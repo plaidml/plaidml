@@ -5,7 +5,7 @@ def _py_setup_impl(ctx):
     wheel_filename = "%s-%s-%s-%s-%s.whl" % (
         ctx.attr.package_name,
         version,
-        ctx.attr.python,
+        ctx.attr.python_version,
         ctx.attr.abi,
         ctx.attr.platform,
     )
@@ -16,6 +16,7 @@ def _py_setup_impl(ctx):
     wheel = ctx.actions.declare_file(wheel_path)
 
     args = ctx.actions.args()
+    args.add(ctx.executable.tool)
     args.add("--no-user-cfg")
     args.add(ctx.attr.action)
     if ctx.attr.universal:
@@ -25,10 +26,10 @@ def _py_setup_impl(ctx):
 
     ctx.actions.run(
         mnemonic = "PySetup",
-        executable = ctx.executable.tool,
+        executable = ctx.file.python,
         arguments = [args],
         outputs = [pkg_dir, wheel],
-        tools = [ctx.executable.tool],
+        tools = [ctx.file.python, ctx.executable.tool],
         env = {
             "BZL_SRC": ctx.executable.tool.path,
             "BZL_TGT": pkg_dir.path,
@@ -41,6 +42,10 @@ def _py_setup_impl(ctx):
 
 py_setup = rule(
     attrs = {
+        "python": attr.label(
+            allow_single_file = True,
+            mandatory = True,
+        ),
         "tool": attr.label(
             mandatory = True,
             executable = True,
@@ -51,7 +56,7 @@ py_setup = rule(
         "action": attr.string(default = "bdist_wheel"),
         "package_name": attr.string(mandatory = True),
         "platform": attr.string(default = "any"),
-        "python": attr.string(default = "py2.py3"),
+        "python_version": attr.string(default = "py2.py3"),
     },
     implementation = _py_setup_impl,
 )

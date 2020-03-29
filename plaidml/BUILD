@@ -79,6 +79,10 @@ py_library(
 py_cffi(
     name = "_ffi",
     module = "plaidml._ffi",
+    python = select({
+        "@bazel_tools//src/conditions:windows": "@com_intel_plaidml_conda_windows//:python",
+        "//conditions:default": "@com_intel_plaidml_conda_unix//:python",
+    }),
     srcs_ordered = [
         "//plaidml/core:ffi.h",
         "//plaidml/edsl:ffi.h",
@@ -136,6 +140,10 @@ py_setup(
         "@bazel_tools//src/conditions:darwin_x86_64": "macosx_10_10_x86_64",
         "@bazel_tools//src/conditions:windows": "win_amd64",
         "//conditions:default": "manylinux1_x86_64",
+    }),
+    python = select({
+        "@bazel_tools//src/conditions:windows": "@com_intel_plaidml_conda_windows//:python",
+        "//conditions:default": "@com_intel_plaidml_conda_unix//:python",
     }),
     tool = ":py_setup",
     universal = True,

@@ -24,6 +24,10 @@ py_binary(
 py_setup(
     name = "wheel",
     package_name = "plaidbench",
+    python = select({
+        "@bazel_tools//src/conditions:windows": "@com_intel_plaidml_conda_windows//:python",
+        "//conditions:default": "@com_intel_plaidml_conda_unix//:python",
+    }),
     tool = ":setup",
     universal = True,
     visibility = ["//visibility:public"],

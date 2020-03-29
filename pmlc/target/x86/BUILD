@@ -9,6 +9,10 @@ heatmap(
     name = "heatmap",
     out = "heatmap.cc",
     csv = "heatmap_skx_xeonplat_8180_1-7GHz_mblocked.csv.gz",
+    python = select({
+        "@bazel_tools//src/conditions:windows": "@com_intel_plaidml_conda_windows//:python",
+        "//conditions:default": "@com_intel_plaidml_conda_unix//:python",
+    }),
     template = "heatmap.tpl.cc",
 )
 
