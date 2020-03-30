@@ -4,6 +4,10 @@
 
 #include <stdexcept>
 
+// This function is called from the BoundsCheckPass.
+// index is the index for a dimension that is accessed by load/store operation
+// range is the upper bound of the range for this dimension (it is always 0 -
+// range)
 extern "C" void plaidml_rt_bounds_check(intptr_t index, unsigned range) {
   int64_t accessIndex = (int64_t)index;
   int64_t upperRange = (int64_t)range;
