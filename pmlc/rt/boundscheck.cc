@@ -1,7 +1,6 @@
 // Copyright 2020 Intel Corporation
 
-#include <stdint.h>
-
+#include <cstdint>
 #include <stdexcept>
 
 // This function is called from the BoundsCheckPass.
