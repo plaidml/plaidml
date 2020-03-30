@@ -6,6 +6,7 @@ load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_shlib")
 plaidml_cc_library(
     name = "rt",
     srcs = [
+        "boundscheck.cc",
         "memref.h",
         "runtime.cc",
         "xsmm.cc",
