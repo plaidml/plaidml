@@ -11,5 +11,6 @@
 extern "C" void plaidml_rt_bounds_check(intptr_t index, int64_t range) {
   int64_t accessIndex = static_cast<int64_t>(index);
   if (accessIndex < 0 || accessIndex >= range)
-    std::runtime_error("Out of bounds index for mlir::LoadOp or mlir::StoreOp");
+    throw std::runtime_error(
+        "Out of bounds index for mlir::LoadOp or mlir::StoreOp");
 }
