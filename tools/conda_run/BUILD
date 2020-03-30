@@ -12,11 +12,11 @@ plaidml_cc_binary(
     }),
     data = select({
         "@bazel_tools//src/conditions:windows": [
-            "@com_intel_plaidml_conda_windows//:conda",
-            "@com_intel_plaidml_conda_windows//:python",
+            "@com_intel_plaidml_conda//:conda",
+            "@com_intel_plaidml_conda//:python",
         ],
         "//conditions:default": [
-            "@com_intel_plaidml_conda_unix//:python",
+            "@com_intel_plaidml_conda//:python",
         ],
     }),
     deps = [
