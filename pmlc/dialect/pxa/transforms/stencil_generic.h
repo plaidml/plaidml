@@ -50,8 +50,8 @@ struct LoadStoreOps {
       stores; // TODO: Might be either store or reduce
 };
 
-// TODO: May want something more like an autotile.h UnionGenerator?
-using TileSizeGenerator = std::function<std::vector<size_t>(size_t)>;
+// TODO: size_t or int64_t?
+using TileSizeGenerator = std::function<std::vector<int64_t>(int64_t)>;
 
 class StencilGeneric {
   // TODO

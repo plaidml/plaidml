@@ -2,6 +2,8 @@
 
 #include "pmlc/dialect/pxa/transforms/stencil_generic.h"
 
+#include "pmlc/dialect/pxa/transforms/autotile.h" // TODO: for PowerOfTwoGenerator
+
 // TODO: Just seeing if the stencil.cc includes work
 #include "mlir/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -21,18 +23,6 @@
 // TODO: includes etc
 
 namespace pmlc::dialect::pxa {
-
-namespace {
-
-std::vector<size_t> TODOTempPowerOfTwoGenerator(size_t range) {
-  std::vector<size_t> out;
-  for (size_t r = 1; r <= range; r *= 2) {
-    out.push_back(r);
-  }
-  return out;
-}
-
-} // namespace
 
 class StencilXSMM : public StencilGeneric {
 private:
@@ -150,7 +140,7 @@ public:
             // {{2, 2}, [](mlir::Value v, mlir::BlockArgument a){ return
             // stride_of(v, a) == 0 }},
         };
-    tiling_generators.push_back(TODOTempPowerOfTwoGenerator);
+    tiling_generators.push_back(PowerOfTwoGenerator());
   }
 };
 
