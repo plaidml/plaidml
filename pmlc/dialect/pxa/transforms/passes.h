@@ -28,4 +28,6 @@ std::unique_ptr<mlir::Pass> createStencilPass(unsigned numThreads,
 
 std::unique_ptr<mlir::Pass> createTestStrideInfoPass();
 
+std::unique_ptr<mlir::Pass> createXSMMStencilPass();
+
 } // namespace pmlc::dialect::pxa

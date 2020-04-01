@@ -33,6 +33,11 @@ std::unique_ptr<Pass> createXSMMStencilPass() {
   return pmlc::dialect::pxa::createStencilPass(numThreads, heatmapCost);
 }
 
+// TODO: Merge up when ready
+std::unique_ptr<Pass> createNewXSMMStencilPass() {
+  return pmlc::dialect::pxa::createXSMMStencilPass();
+}
+
 namespace {
 
 static LLVM::LLVMType unwrap(Type type) {

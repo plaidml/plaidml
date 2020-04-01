@@ -1,132 +1,176 @@
 // Copyright 2020 Intel Corporation
 
-// TODO: includes etc
+#include "pmlc/dialect/pxa/transforms/stencil_generic.h"
 
-#include "stencil_generic.h"
+// TODO: Just seeing if the stencil.cc includes work
+#include "mlir/ADT/TypeSwitch.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Pass/Pass.h"
+#include "mlir/Pass/PassOptions.h"
+
+#include "pmlc/dialect/eltwise/ir/ops.h"
+#include "pmlc/dialect/pxa/analysis/strides.h"
+#include "pmlc/dialect/pxa/ir/ops.h"
+#include "pmlc/dialect/pxa/transforms/passes.h"
+#include "pmlc/dialect/tile/ir/ops.h"
+
+#include "pmlc/util/logging.h"
+#include "pmlc/util/util.h"
+
+// TODO: includes etc
 
 namespace pmlc::dialect::pxa {
 
 namespace {
-// Default / standard stenciling functions
 
-bool default_capture_fn(const mlir::AffineParallelOp& op,
-                        llvm::SmallVector<mlir::Op, 2>* load_ops,
-                        llvm::SmallVector<mlir::Op, 1>* compute_ops,
-                        llvm::SmallVector<mlir::Op, 1>* store_ops)
-{
-  // Closely follows TryIdentifyGemmOperation from the previous stenciling pass
-  // TODO: Do I want to clear the ops lists when I return false?
-
-  assert(load_ops.empty() && compute_ops.empty() && store_ops.empty() && "expected op lists to be empty at start of capture");
-
-  const unsigned kNumValidInstrInGemmRegion = 5;
-  auto *body = op.getBody();
-  // Looking for load..load..mul..reduce..terminator
-  if (body->getOperations().size() != kNumValidInstrInGemmRegion) {
-    IVLOG(3, "the ParallelOp region didn't have the right number of "
-             "instructions for a Gemm");
-    return false;
+std::vector<size_t> TODOTempPowerOfTwoGenerator(size_t range) {
+  std::vector<size_t> out;
+  for (size_t r = 1; r <= range; r *= 2) {
+    out.push_back(r);
   }
-
-  auto it = std::prev(body->end(), 2);
-  auto reduceOp = llvm::dyn_cast<AffineReduceOp>(*it);
-  if (!reduceOp) {
-    return false;
-  }
-  store_ops->push_back(reduceOp);
-  IVLOG(3, "Found ReduceOp");
-
-  // Now check the reduceOp aggregation.
-  if (reduceOp.agg() != AggregationKind::add) {
-    IVLOG(3, "the reduce operation is not addition");
-    return false;
-  }
-
-  // Get the operand for the reduce op and make sure it is the result of a
-  // multiplication.
-  auto defOp = reduceOp.val().getDefiningOp();
-  if (!defOp) {
-    IVLOG(3, "the source of the reduce operation is not defined in this block");
-    return false;
-  }
-
-  mlir::AffineLoadOp lhs;
-  mlir::AffineLoadOp rhs;
-  if (auto mulfOp = llvm::dyn_cast_or_null<mlir::MulFOp>(defOp)) {
-    compute_ops->push_back(mulfOp);
-    mulOpType = MulOperandType::FloatTy;
-    lhs = llvm::dyn_cast_or_null<mlir::AffineLoadOp>(
-        mulfOp.lhs().getDefiningOp());
-    rhs = llvm::dyn_cast_or_null<mlir::AffineLoadOp>(
-        mulfOp.rhs().getDefiningOp());
-  } else if (auto muliOp = llvm::dyn_cast_or_null<mlir::MulIOp>(defOp)) {
-    compute_ops->push_back(muliOp);
-    mulOpType = MulOperandType::IntTy;
-    lhs = llvm::dyn_cast_or_null<mlir::AffineLoadOp>(
-        muliOp.lhs().getDefiningOp());
-    rhs = llvm::dyn_cast_or_null<mlir::AffineLoadOp>(
-        muliOp.rhs().getDefiningOp());
-  } else {
-    IVLOG(3, "The source of the reduce is not a multiplication operation");
-    return false;
-  }
-
-  // Now verify the types of the operands of the mulOp must be affine.load
-  // operations.
-  if (!lhs || !rhs || mulOpType == MulOperandType::None) {
-    IVLOG(3,
-          "the lhs or rhs of the mul operation are not affine.load operations "
-          "or the type of the multiplication is not on floats or ints.");
-    return false;
-  }
-  load_ops->push_back(lhs);
-  load_ops->push_back(rhs);
-
-  return true;
+  return out;
 }
 
-std::list<TensorAndIndexPermutation> default_preflight_fn(
-    const llvm::SmallVector<mlir::Op, 2>& load_ops,
-    const llvm::SmallVector<mlir::Op, 1>& compute_ops,
-    const llvm::SmallVector<mlir::Op, 1>& store_ops)
-{
-  // TODO
-}
-
-// TODO: Might be able to do a prettier generator than "return a list"?
-std::list<StencilTiling> default_tiling_generator(const TensorAndIndexPermutation& permutation)
-{
-  // TODO
-}
-
-double default_cost_fn(const StencilTiling& tiling,
-                       const TensorAndIndexPermutation& permutation,
-                       const llvm::SmallVector<mlir::Op, 2>& load_ops,
-                       const llvm::SmallVector<mlir::Op, 1>& compute_ops,
-                       const llvm::SmallVector<mlir::Op, 1>& store_ops)
-{
-  // TODO
-}
-
-}  // namespace
+} // namespace
 
 class StencilXSMM : public StencilGeneric {
 private:
-  // TODO
+  llvm::Optional<LoadStoreOps> capture() {
+    // Looking for load..load..mul..reduce..terminator
+    LoadStoreOps ret;
+    const unsigned kNumValidInstrInGemmRegion = 5;
+    auto *body = op.getBody();
 
-public:
-  explicit StencilXSMM(mlir::AffineParallelOp op)
-      : StencilGeneric{ 
-          op,
-          default_capture_fn,
-          default_preflight_fn,
-          default_tiling_generator,
-          default_cost_fn
-        }
-  {
-      // TODO ctor
+    // Verify the number of ops
+    if (body->getOperations().size() != kNumValidInstrInGemmRegion) {
+      IVLOG(5, "The AffineParallelOp region didn't have the right number of "
+               "instructions for a GEMM");
+      return llvm::Optional<LoadStoreOps>(); // i.e. fail to pattern-match
+    }
+
+    // Find the Reduce Op
+    auto it = std::prev(body->end(), 2);
+    auto reduceOp = llvm::dyn_cast<AffineReduceOp>(*it);
+    if (!reduceOp) {
+      IVLOG(5, "The AffineParallelOp region didn't have a reduce as its last "
+               "non-terminator");
+      return llvm::Optional<LoadStoreOps>(); // i.e. fail to pattern-match
+    }
+    ret.stores.push_back(reduceOp);
+    IVLOG(5, "Found ReduceOp");
+
+    // Now check the reduceOp aggregation.
+    if (reduceOp.agg() != AggregationKind::add) {
+      IVLOG(5, "the reduce operation is not addition");
+      return llvm::Optional<LoadStoreOps>(); // i.e. fail to pattern-match
+    }
+
+    // Get the operand for the reduce op and make sure it is the result of a
+    // multiplication.
+    auto defOp = reduceOp.val().getDefiningOp();
+    if (!defOp) {
+      IVLOG(5,
+            "the source of the reduce operation is not defined in this block");
+      return llvm::Optional<LoadStoreOps>(); // i.e. fail to pattern-match
+    }
+
+    mlir::AffineLoadOp lhs;
+    mlir::AffineLoadOp rhs;
+    if (auto mulfOp = llvm::dyn_cast_or_null<mlir::MulFOp>(defOp)) {
+      lhs = llvm::dyn_cast_or_null<mlir::AffineLoadOp>(
+          mulfOp.lhs().getDefiningOp());
+      rhs = llvm::dyn_cast_or_null<mlir::AffineLoadOp>(
+          mulfOp.rhs().getDefiningOp());
+    } else if (auto muliOp = llvm::dyn_cast_or_null<mlir::MulIOp>(defOp)) {
+      lhs = llvm::dyn_cast_or_null<mlir::AffineLoadOp>(
+          muliOp.lhs().getDefiningOp());
+      rhs = llvm::dyn_cast_or_null<mlir::AffineLoadOp>(
+          muliOp.rhs().getDefiningOp());
+    } else {
+      IVLOG(5, "The source of the reduce is not a multiplication operation");
+      return llvm::Optional<LoadStoreOps>(); // i.e. fail to pattern-match
+    }
+
+    // Now verify the types of the operands of the mulOp must be affine.load
+    // operations.
+    if (!lhs || !rhs) {
+      IVLOG(3, "the lhs or rhs of the mul operation are not affine.load "
+               "operations.");
+      return llvm::Optional<LoadStoreOps>(); // i.e. fail to pattern-match
+    }
+    ret.loads.push_back(lhs);
+    ret.loads.push_back(rhs);
+
+    return llvm::Optional<LoadStoreOps>(std::move(ret));
   }
 
+  double getCost(TensorAndIndexPermutation perm, ArrayRef<size_t> tileSize) {
+    // TODO: This is random garbage just to make some sort of test run (and
+    // presumably fail)
+    return 3;
+  }
+
+  void transform(TensorAndIndexPermutation perm, ArrayRef<size_t> tileSize) {
+    IVLOG(2, "Best Perf: " << best_cost);
+    IVLOG(2, "Best Tensor/Index Permutations: TODO: print");
+    IVLOG(2, "Best Tiling: " << best_tiling[0]);
+
+    op.setAttr("is_gemm", mlir::UnitAttr::get(op.getContext()));
+  }
+
+public:
+  explicit StencilXSMM(mlir::AffineParallelOp op) : StencilGeneric{op} {
+    // TODO ctor
+    // TODO: Probably want to move these to be params on StencilGeneric ctor...
+    semantic_idx_count = 1; // TODO
+    requirements =
+        std::map<std::pair<size_t, size_t>,
+                 std::function<bool(mlir::Value, mlir::BlockArgument)>>{
+            {{0, 0}, [](mlir::Value v, mlir::BlockArgument a) { return true; }},
+            {{1, 0}, [](mlir::Value v, mlir::BlockArgument a) { return true; }},
+            {{2, 0}, [](mlir::Value v, mlir::BlockArgument a) { return true; }},
+            // TODO: Define `stride_of`...
+            // {{0, 0}, [](mlir::Value v, mlir::BlockArgument a){ return
+            // stride_of(v, a) != 0 }},
+            // {{0, 1}, [](mlir::Value v, mlir::BlockArgument a){ return
+            // stride_of(v, a) == 0 }},
+            // {{0, 2}, [](mlir::Value v, mlir::BlockArgument a){ return
+            // stride_of(v, a) == 1 }},
+            // {{1, 0}, [](mlir::Value v, mlir::BlockArgument a){ return
+            // stride_of(v, a) == 0 }},
+            // {{1, 1}, [](mlir::Value v, mlir::BlockArgument a){ return
+            // stride_of(v, a) == 1 }},
+            // {{1, 2}, [](mlir::Value v, mlir::BlockArgument a){ return
+            // stride_of(v, a) != 0 }},
+            // {{2, 0}, [](mlir::Value v, mlir::BlockArgument a){ return
+            // stride_of(v, a) != 0 }},
+            // {{2, 1}, [](mlir::Value v, mlir::BlockArgument a){ return
+            // stride_of(v, a) == 1 }},
+            // {{2, 2}, [](mlir::Value v, mlir::BlockArgument a){ return
+            // stride_of(v, a) == 0 }},
+        };
+    tiling_generators.push_back(TODOTempPowerOfTwoGenerator);
+  }
+};
+
+struct XSMMStencilPass : public mlir::FunctionPass<XSMMStencilPass> {
+  // I probably actually need config for requirements & tiling_generators
+
+  XSMMStencilPass() {}
+
+  void runOnFunction() final {
+    auto func = getFunction();
+    func.walk([/*this*/](mlir::AffineParallelOp
+                             op) { // TODO: Use `this` once pass has parameters
+      StencilXSMM stencil(op);
+      stencil.DoStenciling();
+    });
+  }
+};
+
+std::unique_ptr<mlir::Pass> createXSMMStencilPass() {
+  return std::make_unique<XSMMStencilPass>();
 }
 
 } // namespace pmlc::dialect::pxa
