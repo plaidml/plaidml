@@ -38,6 +38,8 @@ using dialect::tile::ContractionOp;
 using dialect::tile::ContractionOpOperandAdaptor;
 using dialect::tile::getPaddingInfo;
 using dialect::tile::IndexOp;
+using dialect::tile::ReshapeOp;
+using dialect::tile::ReshapeOpOperandAdaptor;
 using dialect::tile::ShapeOp;
 using dialect::tile::ShapeOpOperandAdaptor;
 using dialect::tile::TraceOp;
@@ -727,6 +729,79 @@ struct IndexOpConversion : public OpConversionPattern<IndexOp> {
   }
 };
 
+struct ReshapeOpConversion : public OpConversionPattern<ReshapeOp> {
+  using OpConversionPattern<ReshapeOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(ReshapeOp op, llvm::ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override {
+    IVLOG(2, "ReshapeOpConversion::matchAndRewrite>");
+
+    ModuleOp module(op.getParentOfType<ModuleOp>());
+
+    // Create an adaptor, to interpret the operands
+    ReshapeOpOperandAdaptor adaptor(operands);
+
+    auto loc = op.getLoc();
+    TypeConverter typeConverter;
+    auto resultType =
+        typeConverter.convertType(op.result().getType()).cast<MemRefType>();
+
+    // Make an allocation for the output
+    auto resultMemRef = rewriter.create<AllocOp>(loc, resultType).getResult();
+
+    // Get an unranked memref type for the same element type.
+    // Crude hack for getting it going: assume f32 all the time
+    auto elementType = rewriter.getF32Type();
+    auto unrankedType = UnrankedMemRefType::get(elementType, /*memorySpace*/ 0);
+
+    // The source is adaptor.tensor()
+    auto source =
+        rewriter.create<MemRefCastOp>(loc, adaptor.tensor(), unrankedType);
+    // The dest is op.result()
+    auto dest = rewriter.create<MemRefCastOp>(loc, op.result(), unrankedType);
+
+    // The new shape is adaptor.dims()
+    auto i32Type = rewriter.getIntegerType(32);
+    Value count = adaptor.dims()[0];
+    // Multiply all the dims together to get total number of elements
+    for (size_t i = 1; i < adaptor.dims().size(); ++i) {
+      count = rewriter.create<MulIOp>(loc, count, adaptor.dims()[i]);
+    }
+    count = rewriter.create<IndexCastOp>(loc, count, i32Type);
+
+    // Value count = rewriter.create<ConstantIntOp>(loc, totalDims, i32Type);
+
+    // generate a std.call to our memcpy wrapper function
+    // we can't call memcpy directly because unranked memrefs are provided
+    // as a (rank, descriptor) pair; we can't get a plain base pointer here
+    std::array<Value, 3> argVals{dest, source, count};
+    std::array<Type, 3> argTypes{unrankedType, unrankedType, i32Type};
+
+    FlatSymbolRefAttr symbol = createCopyFunc(loc, module, argTypes);
+    rewriter.create<CallOp>(loc, symbol, ArrayRef<Type>{}, argVals);
+    rewriter.replaceOp(op, resultMemRef);
+
+    return success();
+  }
+
+  FlatSymbolRefAttr createCopyFunc(Location loc, ModuleOp module,
+                                   std::array<Type, 3> &inputs) const {
+    const char *symbol = "plaidml_rt_copy_f32";
+    // const char *symbol = "memcpy";
+    auto context = module.getContext();
+    if (module.lookupSymbol(symbol)) {
+      return SymbolRefAttr::get(symbol, context);
+    }
+    OpBuilder builder(module.getBodyRegion());
+    ArrayRef<Type> results{};
+    auto funcType = builder.getFunctionType(inputs, results);
+    ArrayRef<NamedAttribute> attrs{};
+    builder.create<FuncOp>(loc, symbol, funcType, attrs);
+    return SymbolRefAttr::get(symbol, context);
+  }
+};
+
 struct ShapeOpConversion : public OpConversionPattern<ShapeOp> {
   using OpConversionPattern<ShapeOp>::OpConversionPattern;
 
@@ -892,8 +967,8 @@ struct LoweringPass : public mlir::ModulePass<LoweringPass> {
     OwningRewritePatternList patterns;
     patterns.insert<
         TileConstantOpConversion, CastOpConversion, FuncOpConversion,
-        IndexOpConversion, ReturnOpConversion, ScalarConstantOpConversion,
-        ShapeOpConversion, TraceOpConversion,
+        IndexOpConversion, ReshapeOpConversion, ReturnOpConversion,
+        ScalarConstantOpConversion, ShapeOpConversion, TraceOpConversion,
         // TODO: PrngOpConversion
         // TODO: SpecialOpConversion (GatherOp, ReshapeOp,
         // ScatterOp, ZeroOp)

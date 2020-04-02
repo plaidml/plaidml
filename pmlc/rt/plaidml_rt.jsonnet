@@ -1,4 +1,5 @@
 local exports = [
+    'plaidml_rt_copy_f32',
     'plaidml_rt_trace',
     'plaidml_rt_xsmm_gemm_f32',
     'print_memref_f32',
