@@ -11,7 +11,8 @@ import plaidml2.op as plaidml_op
 # handling the offset is an issue
 # no implementaton exists in keras but a recommended approach is described here : https://github.com/thtrieu/darkflow/issues/173 suggests permute
 # might be good to have
-# TODO: test against pytorch implementation
+# TODO: write python unittests
+# TODO: write backend_test style test against pytorch implementation
 
 
 def reorgyolo(I, s, forward=False):
@@ -34,13 +35,15 @@ def reorgyolo(I, s, forward=False):
     if forward == False:
         #print(str(dims[0]) + "," + str(dims[1]*(s*s)) + "," + str(int(dims[2]/s))+ "," + str(int(dims[3]/s)))
         O_linear = plaidml_op.reshape(I, [total_dims])
-        O = edsl.TensorOutput(total_dims)
+        O_intermediate = edsl.TensorOutput(total_dims)
         i = edsl.TensorIndex()
         n, c, h, w = edsl.TensorIndexes(4)
         no, co, ho, wo = edsl.TensorIndexes(4)
-        O[w * s + W * s * ((h * s) + H * s * (c + C_out * n))] += O_linear[w + W * (h + H *
-                                                                                    (c + C * n))]
-
+        O_intermediate[w * s + W * s * ((h * s) + H * s *
+                                        (c + C_out * n))] += O_linear[w + W * (h + H *
+                                                                               (c + C * n))]
+        O = O = edsl.TensorOutput(N_out, C_out, H_out, W_out)
+        O = plaidml_op.reshape(I, [N_out, C_out, H_out, W_out])
         # dims_out = edsl.TensorDims(1)
         # #O_linear.bind_dims(*dims)
         # O = edsl.TensorOutput(*dims)
