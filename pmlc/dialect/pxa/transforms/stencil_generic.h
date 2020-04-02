@@ -62,9 +62,6 @@ private:
 
 protected: // TODO: private backend for some of this?
   virtual llvm::Optional<LoadStoreOps> capture() = 0;
-  // std::map<std::pair<size_t, size_t>, std::function<bool(mlir::Value,
-  // mlir::BlockArgument)>> getRequirements();
-  // llvm::SmallVector<TileSizeGenerator, 5> getGenerators();
   virtual double getCost(TensorAndIndexPermutation perm,
                          ArrayRef<size_t> tileSize) = 0;
   virtual void transform(TensorAndIndexPermutation perm,
@@ -81,6 +78,9 @@ protected: // TODO: private backend for some of this?
 
   // The load and store ops
   LoadStoreOps loads_and_stores;
+
+  // The range of each index (cached result of op.getConstantRanges())
+  llvm::SmallVector<int64_t, 8> ranges;
 
   // For each tensor/index semantic pair (given as a pair of size_ts), a
   // function to determine if a Value & BlockArg meet the requirements of that

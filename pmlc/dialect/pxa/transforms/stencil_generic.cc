@@ -75,26 +75,28 @@ void StencilGeneric::RecursiveBindIndex(
 
 void StencilGeneric::DoStenciling() {
   // Initialization
-  // TODO: Something like?: tensors.clear();
-  {
-    auto maybe_loads_and_stores = capture();
-    if (maybe_loads_and_stores) {
-      loads_and_stores = maybe_loads_and_stores.getValue();
-    } else {
-      IVLOG(4, "Cannot Stencil: Operations fail to pattern-match.");
-      return;
-    }
+  auto maybe_ranges = op.getConstantRanges();
+  if (maybe_ranges) {
+    ranges = maybe_ranges.getValue(); // TODO: Is this how to use Optional?
+  } else {
+    IVLOG(4, "Cannot Stencil: Requires constant ranges");
+    return;
+  }
+
+  auto maybe_loads_and_stores = capture();
+  if (maybe_loads_and_stores) {
+    loads_and_stores = maybe_loads_and_stores.getValue();
+  } else {
+    IVLOG(4, "Cannot Stencil: Operations fail to pattern-match.");
+    return;
   }
 
   llvm::SmallVector<mlir::Value, 3> tensors;
   for (auto &load_op : loads_and_stores.loads) {
-    // TODO: It's probably fine, but I'm a little worried `getMemRef` isn't
-    // const
     tensors.push_back(load_op.getMemRef());
   }
   size_t first_store_idx = tensors.size();
   for (auto &store_op : loads_and_stores.stores) {
-    // TODO: It's probably fine, but I'm a little worried `out` isn't const
     tensors.push_back(store_op.out());
     // TODO: Probably should handle reduces vs. true stores in a different way
     // if (auto reduce_op = llvm::dyn_cast_or_null<AffineReduceOp>(store_op)) {
@@ -108,35 +110,26 @@ void StencilGeneric::DoStenciling() {
     //   return;
     // }
   }
-  std::sort(tensors.begin(), tensors.begin() + first_store_idx);
+  auto last_load_first_store_it = tensors.begin() + first_store_idx;
+  std::sort(tensors.begin(), last_load_first_store_it);
   do { // Each load tensor permutation
-    std::sort(tensors.begin() + first_store_idx, tensors.end());
+    std::sort(last_load_first_store_it, tensors.end());
     do { // Each store tensor permutation
       // Add all legal permutations to legal_permutations
       RecursiveBindIndex(llvm::SmallVector<mlir::BlockArgument, 8>(), tensors);
-    } while (std::next_permutation(tensors.begin() + first_store_idx,
-                                   tensors.end()));
-  } while (std::next_permutation(tensors.begin(),
-                                 tensors.begin() + first_store_idx));
+    } while (std::next_permutation(last_load_first_store_it, tensors.end()));
+  } while (std::next_permutation(tensors.begin(), last_load_first_store_it));
 
   // TODO: If we desire more complex requirements than pairwise tensor-to-index
   // stride requirements, that function could go here
 
   for (const auto &perm : legal_permutations) {
     // TODO: Clean, try to get everything on the same unsigned type/width
-    auto ranges = op.getConstantRanges();
-    if (!ranges) {
-      // Can't stencil without constant ranges TODO: Check this earlier, not in
-      // the middle of some late loop!
-      IVLOG(1, "NO CONSTANT RANGES TODO");
-      break;
-    }
     for (size_t i = 0; i < perm.indexes.size(); i++) {
       llvm::SmallVector<size_t, 8> tile_size;
       size_t idx_in_block = perm.indexes[i].getArgNumber();
       try { // TODO: probably don't keep long term
-        for (const auto &size :
-             tiling_generators[i](ranges.getValue()[idx_in_block])) {
+        for (const auto &size : tiling_generators[i](ranges[idx_in_block])) {
           tile_size.push_back(size);
         }
       } catch (const std::bad_function_call &e) {
