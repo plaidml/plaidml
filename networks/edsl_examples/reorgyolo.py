@@ -8,7 +8,6 @@ import plaidml2.op as plaidml_op
 # Notes:
 # the reorg function provided here https://gist.github.com/leimao/ece7217b5d07fe4e685c47af5e76744a is being used for local testing
 # a number of approaches were tried out in EDSL none of them have led to the correct result so far
-# handling the offset is an issue
 # no implementaton exists in keras but a recommended approach is described here : https://github.com/thtrieu/darkflow/issues/173 suggests permute
 # might be good to have
 # TODO: write python unittests
@@ -38,7 +37,6 @@ def reorgyolo(I, stride, forward=False):
         I.bind_dims(N, C, H, W)
         O = edsl.TensorOutput(N_out, C_out, H_out, W_out)
         O[n, c2, (h * stride) + offset, (w * stride) + offset] = I[n, c, h, w]
-        #mod support might be useful TODO: figure out a way to use constraints to accomplish this
         O.add_constraint(c2 < C_out)
         O.add_constraint(offset < stride)
     elif forward == True:
@@ -52,7 +50,6 @@ def reorgyolo(I, stride, forward=False):
         I.bind_dims(N, C, H, W)
         O = edsl.TensorOutput(N_out, C_out, H_out, W_out)
         O[n, c2, h, w] = I[n, c, (h * stride) + offset, (w * stride) + offset]
-        #mod support might be useful TODO: figure out a way to use constraints to accomplish this
         O.add_constraint(c2 < C_out)
         O.add_constraint(offset < stride)
 
