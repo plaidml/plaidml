@@ -25,6 +25,49 @@
 
 namespace pmlc::dialect::pxa {
 
+namespace {
+
+// A simple wrapper to provide an ordering to object vectors that
+// we're going to be processing with std::next_permutation() --
+// e.g. if we used pointers as comparison values, our order of
+// iteration could vary run-to-run, creating non-determinism.
+template <typename V>
+class Orderer {
+public:
+  Orderer(unsigned ord, V value) : ord_{ord}, value_{std::forward<V>(value)} {}
+
+  void set_ord(unsigned ord) { ord_ = ord; }
+  unsigned ord() const { return ord_; }
+
+  V &operator*() { return value_; }
+  const V &operator*() const { return value_; }
+
+  V &operator->() { return value_; }
+  const V &operator->() const { return value_; }
+
+  bool operator<(const Orderer<V> &other) const { return ord() < other.ord(); }
+
+private:
+  unsigned ord_;
+  V value_;
+};
+
+template <typename V>
+std::ostream &operator<<(std::ostream &os, const Orderer<V> &v) {
+  os << *v << ":" << v.ord();
+  return os;
+}
+
+template <typename V>
+void swap(Orderer<V> &v1, Orderer<V> &v2) {
+  unsigned v1o = v1.ord();
+  v1.set_ord(v2.ord());
+  v2.set_ord(v1o);
+  std::swap(*v1, *v2);
+}
+
+} // namespace
+
 void StencilGeneric::BindIndexes(
     const llvm::SmallVector<mlir::Value, 3> &tensors) {
   llvm::SmallVector<mlir::BlockArgument, 8> empty_bound_idxs_vector;
@@ -123,13 +166,16 @@ void StencilGeneric::DoStenciling() {
     return;
   }
 
-  llvm::SmallVector<mlir::Value, 3> tensors;
+  llvm::SmallVector<Orderer<mlir::Value>, 3> order_tracked_tensors;
+  unsigned ord = 0;
   for (auto &load_op : loads_and_stores.loads) {
-    tensors.push_back(load_op.getMemRef());
+    order_tracked_tensors.push_back(
+        Orderer<mlir::Value>(ord++, load_op.getMemRef()));
   }
-  size_t first_store_idx = tensors.size();
+  size_t first_store_idx = order_tracked_tensors.size();
   for (auto &store_op : loads_and_stores.stores) {
-    tensors.push_back(store_op.out());
+    order_tracked_tensors.push_back(
+        Orderer<mlir::Value>(ord++, store_op.out()));
     // TODO: Probably should handle reduces vs. true stores in a different way
     // if (auto reduce_op = llvm::dyn_cast_or_null<AffineReduceOp>(store_op)) {
     //   tensors.push_back(reduce_op.out());
@@ -142,15 +188,22 @@ void StencilGeneric::DoStenciling() {
     //   return;
     // }
   }
-  auto last_load_first_store_it = tensors.begin() + first_store_idx;
-  std::sort(tensors.begin(), last_load_first_store_it);
+  auto last_load_first_store_it =
+      order_tracked_tensors.begin() + first_store_idx;
+  std::sort(order_tracked_tensors.begin(), last_load_first_store_it);
   do { // Each load tensor permutation
-    std::sort(last_load_first_store_it, tensors.end());
+    std::sort(last_load_first_store_it, order_tracked_tensors.end());
     do { // Each store tensor permutation
       // Add all legal permutations to legal_permutations
+      llvm::SmallVector<mlir::Value, 3> tensors;
+      for (const auto &ott : order_tracked_tensors) {
+        tensors.push_back(*ott);
+      }
       BindIndexes(tensors);
-    } while (std::next_permutation(last_load_first_store_it, tensors.end()));
-  } while (std::next_permutation(tensors.begin(), last_load_first_store_it));
+    } while (std::next_permutation(last_load_first_store_it,
+                                   order_tracked_tensors.end()));
+  } while (std::next_permutation(order_tracked_tensors.begin(),
+                                 last_load_first_store_it));
 
   if (best_cost < std::numeric_limits<double>::infinity()) {
     transform(best_permutation, best_tiling);
