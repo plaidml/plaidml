@@ -203,7 +203,6 @@ LogicalResult VulkanRuntime::init() {
   }
   // Get working queue.
   vkGetDeviceQueue(device, queueFamilyIndex, 0, &queue);
-
   return success();
 }
 
@@ -212,9 +211,50 @@ LogicalResult VulkanRuntime::createLaunchKernelAction() {
   return success();
 }
 
-LogicalResult VulkanRuntime::createMemoryTransferAction() {
-  // TODO: copy buffer between kernels in this action
-  schedule.push_back(std::make_shared<MemoryTransferAction>());
+LogicalResult VulkanRuntime::createMemoryTransferAction(uint64_t src_index,
+                                                        uint64_t src_binding,
+                                                        uint64_t dst_index,
+                                                        uint64_t dst_binding) {
+  auto kernel_src =
+      std::dynamic_pointer_cast<LaunchKernelAction>(schedule[src_index]);
+  auto kernel_dst =
+      std::dynamic_pointer_cast<LaunchKernelAction>(schedule[dst_index]);
+
+  if ((!kernel_src) || (!kernel_dst)) {
+    llvm::errs() << "expected LaunchKernelAction";
+    return failure();
+  }
+  auto transfer_action = std::make_shared<MemoryTransferAction>();
+
+  auto descriptorSetIndex = 0;
+  auto memoryBuffersSrc = kernel_src->deviceMemoryBufferMap[descriptorSetIndex];
+  auto memoryBuffersDst = kernel_dst->deviceMemoryBufferMap[descriptorSetIndex];
+
+  size_t bufferSizeSrc = 0;
+  size_t bufferSizeDst = 0;
+
+  for (auto memoryBuffer : memoryBuffersSrc) {
+    if (memoryBuffer.bindingIndex == src_binding) {
+      transfer_action->src = memoryBuffer.buffer;
+      bufferSizeSrc = memoryBuffer.bufferSize;
+    }
+  }
+
+  for (auto memoryBuffer : memoryBuffersDst) {
+    if (memoryBuffer.bindingIndex == dst_binding) {
+      transfer_action->dst = memoryBuffer.buffer;
+      bufferSizeDst = memoryBuffer.bufferSize;
+    }
+  }
+
+  if (bufferSizeSrc != bufferSizeDst) {
+    llvm::errs() << "src and dst buffers have different sizes!";
+    return failure();
+  }
+
+  const VkBufferCopy copy = {0, 0, bufferSizeDst};
+  transfer_action->regions.push_back(copy);
+  kernel_dst->bufferMoves.push_back(transfer_action);
   return success();
 }
 
@@ -493,6 +533,8 @@ LogicalResult VulkanRuntime::createMemoryBuffers() {
       RETURN_ON_VULKAN_ERROR(vkBindBufferMemory(device, memoryBuffer.buffer,
                                                 memoryBuffer.deviceMemory, 0),
                              "vkBindBufferMemory");
+
+      memoryBuffer.bufferSize = bufferSize;
 
       // Update buffer info.
       memoryBuffer.bufferInfo.buffer = memoryBuffer.buffer;
@@ -787,30 +829,28 @@ LogicalResult VulkanRuntime::submitCommandBuffersToQueue() {
 }
 
 LogicalResult VulkanRuntime::updateHostMemoryBuffers() {
-  auto kernel = std::dynamic_pointer_cast<LaunchKernelAction>(schedule.back());
-  if (!kernel) {
-    llvm::errs() << "expected LaunchKernelAction";
-    return failure();
-  }
-
-  // For each descriptor set.
-  for (auto &resourceDataMapPair : kernel->resourceData) {
-    auto &resourceDataMap = resourceDataMapPair.second;
-    auto &deviceMemoryBuffers =
-        kernel->deviceMemoryBufferMap[resourceDataMapPair.first];
-    // For each device memory buffer in the set.
-    for (auto &deviceMemoryBuffer : deviceMemoryBuffers) {
-      if (resourceDataMap.count(deviceMemoryBuffer.bindingIndex)) {
-        void *payload;
-        auto &hostMemoryBuffer =
-            resourceDataMap[deviceMemoryBuffer.bindingIndex];
-        RETURN_ON_VULKAN_ERROR(vkMapMemory(device,
-                                           deviceMemoryBuffer.deviceMemory, 0,
-                                           hostMemoryBuffer.size, 0,
-                                           reinterpret_cast<void **>(&payload)),
-                               "vkMapMemory");
-        std::memcpy(hostMemoryBuffer.ptr, payload, hostMemoryBuffer.size);
-        vkUnmapMemory(device, deviceMemoryBuffer.deviceMemory);
+  for (const auto &action : schedule) {
+    if (auto kernel = std::dynamic_pointer_cast<LaunchKernelAction>(action)) {
+      // For each descriptor set.
+      for (auto &resourceDataMapPair : kernel->resourceData) {
+        auto &resourceDataMap = resourceDataMapPair.second;
+        auto &deviceMemoryBuffers =
+            kernel->deviceMemoryBufferMap[resourceDataMapPair.first];
+        // For each device memory buffer in the set.
+        for (auto &deviceMemoryBuffer : deviceMemoryBuffers) {
+          if (resourceDataMap.count(deviceMemoryBuffer.bindingIndex)) {
+            void *payload;
+            auto &hostMemoryBuffer =
+                resourceDataMap[deviceMemoryBuffer.bindingIndex];
+            RETURN_ON_VULKAN_ERROR(
+                vkMapMemory(device, deviceMemoryBuffer.deviceMemory, 0,
+                            hostMemoryBuffer.size, 0,
+                            reinterpret_cast<void **>(&payload)),
+                "vkMapMemory");
+            std::memcpy(hostMemoryBuffer.ptr, payload, hostMemoryBuffer.size);
+            vkUnmapMemory(device, deviceMemoryBuffer.deviceMemory);
+          }
+        }
       }
     }
   }
@@ -841,6 +881,18 @@ LogicalResult VulkanRuntime::createSchedule() {
 
   for (const auto &action : schedule) {
     if (auto kernel = std::dynamic_pointer_cast<LaunchKernelAction>(action)) {
+      if (kernel->bufferMoves.size() > 0) {
+        for (auto move : kernel->bufferMoves) {
+          if (auto xfer =
+                  std::dynamic_pointer_cast<MemoryTransferAction>(move)) {
+            vkCmdCopyBuffer(commandBuffer,
+                            /*srcBuffer=*/xfer->src,
+                            /*dstBuffer=*/xfer->dst,
+                            /*regionCount=*/xfer->regions.size(),
+                            /*pRegions=*/xfer->regions.data());
+          }
+        }
+      }
       if (kernel->deps.size()) {
         vkCmdPipelineBarrier(
             commandBuffer,
@@ -872,14 +924,6 @@ LogicalResult VulkanRuntime::createSchedule() {
                     /*groupCountX=*/kernel->workGroups.x,
                     /*groupCountY=*/kernel->workGroups.y,
                     /*groupCountZ=*/kernel->workGroups.z);
-    }
-
-    if (auto xfer = std::dynamic_pointer_cast<MemoryTransferAction>(action)) {
-      vkCmdCopyBuffer(commandBuffer,
-                      /*srcBuffer=*/xfer->src,
-                      /*dstBuffer=*/xfer->dst,
-                      /*regionCount=*/xfer->regions.size(),
-                      /*pRegions=*/xfer->regions.data());
     }
   }
 

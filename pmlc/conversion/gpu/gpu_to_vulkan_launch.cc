@@ -38,6 +38,8 @@ static constexpr const char *kPrint_memref_f32 = "print_memref_f32";
 static constexpr const char *kInitVulkan = "initVulkan";
 static constexpr const char *kSubmitCommandBuffers = "submitCommandBuffers";
 static constexpr const char *kDeinitVulkan = "deinitVulkan";
+static constexpr const char *kCreateMemoryTransferAction =
+    "createMemoryTransferAction";
 
 namespace {
 /// A pass to convert gpu launch op to vulkan launch call op, by creating a
@@ -74,6 +76,8 @@ private:
 
   void getCachedTypes() {
     llvmDialect = getContext().getRegisteredDialect<LLVM::LLVMDialect>();
+    llvmInt64Type = LLVM::LLVMType::getInt64Ty(llvmDialect);
+    llvmVoidType = LLVM::LLVMType::getVoidTy(llvmDialect);
 
     OpBuilder builder(getModule());
     mlirInt32Type = builder.getIntegerType(32);
@@ -95,6 +99,8 @@ private:
                                         gpu::LaunchFuncOp launchOp);
 
   LLVM::LLVMDialect *llvmDialect;
+  LLVM::LLVMType llvmInt64Type;
+  LLVM::LLVMType llvmVoidType;
   mlir::Type mlirInt32Type;
   mlir::Type mlirFloat32Type;
   mlir::Type mlir1DDynamicMemRefF32Type;
@@ -104,6 +110,7 @@ private:
 
   size_t numKernel = 0;
   size_t lauchFuncIndex = 0;
+  llvm::DenseMap<Value, llvm::SmallVector<uint, 2>> buffer_map;
 };
 
 } // anonymous namespace
@@ -225,6 +232,16 @@ void ConvertGpuLaunchFuncToVulkanLaunchFunc::declareVulkanFunctions(
             {LLVM::LLVMType::getInt8PtrTy(llvmDialect)},
             /*isVarArg=*/false));
   }
+
+  if (!module.lookupSymbol(kCreateMemoryTransferAction)) {
+    builder.create<LLVM::LLVMFuncOp>(
+        loc, kCreateMemoryTransferAction,
+        LLVM::LLVMType::getFunctionTy(
+            LLVM::LLVMType::getVoidTy(llvmDialect),
+            {LLVM::LLVMType::getInt8PtrTy(llvmDialect), llvmInt64Type,
+             llvmInt64Type, llvmInt64Type, llvmInt64Type},
+            /*isVarArg=*/false));
+  }
 }
 
 void ConvertGpuLaunchFuncToVulkanLaunchFunc::convertGpuLaunchFunc(
@@ -251,6 +268,7 @@ void ConvertGpuLaunchFuncToVulkanLaunchFunc::convertGpuLaunchFunc(
     return signalPassFailure();
 
   auto operands = SmallVector<Value, 4>(launchOp.getOperands());
+
   operands.insert(operands.begin(), vulkanRuntime);
   // Create vulkan launch call op.
   auto vulkanLaunchCallOp = builder.create<CallOp>(
@@ -267,6 +285,35 @@ void ConvertGpuLaunchFuncToVulkanLaunchFunc::convertGpuLaunchFunc(
   vulkanLaunchCallOp.setAttr(
       kSPIRVEntryPointAttrName,
       StringAttr::get(launchOp.kernel(), loc->getContext()));
+
+  auto buffers = launchOp.operands();
+  for (size_t i = 0; i < buffers.size(); i++) {
+    for (auto pair : buffer_map) {
+      if (pair.first == buffers[i]) {
+        Value dst_index = builder.create<LLVM::ConstantOp>(
+            loc, llvmInt64Type, builder.getI64IntegerAttr(lauchFuncIndex));
+
+        Value dst_binding = builder.create<LLVM::ConstantOp>(
+            loc, llvmInt64Type, builder.getI64IntegerAttr(i));
+
+        Value src_index = builder.create<LLVM::ConstantOp>(
+            loc, llvmInt64Type, builder.getI64IntegerAttr(pair.second[0]));
+
+        Value src_binding = builder.create<LLVM::ConstantOp>(
+            loc, llvmInt64Type, builder.getI64IntegerAttr(pair.second[1]));
+
+        builder.create<LLVM::CallOp>(
+            loc, ArrayRef<Type>{llvmVoidType},
+            builder.getSymbolRefAttr(kCreateMemoryTransferAction),
+            ArrayRef<Value>{vulkanRuntime, src_index, src_binding, dst_index,
+                            dst_binding});
+      }
+    }
+    llvm::SmallVector<uint, 2> second;
+    second.push_back(lauchFuncIndex);
+    second.push_back(i);
+    buffer_map[buffers[i]] = second;
+  }
 
   // Declare runtime functions.
   declareVulkanFunctions(loc);

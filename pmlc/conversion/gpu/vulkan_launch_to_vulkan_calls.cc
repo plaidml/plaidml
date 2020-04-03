@@ -162,7 +162,7 @@ private:
   size_t spv_binary_index = 0;
 
   // TODO: Use an associative array to support multiple vulkan launch calls.
-  std::pair<StringAttr, StringAttr> spirvAttributes;
+  SmallVector<std::pair<StringAttr, StringAttr>, 1> spirvAttributes;
 };
 
 } // anonymous namespace
@@ -204,7 +204,8 @@ void VulkanLaunchFuncToVulkanCallsPass::collectSPIRVAttributes(
     return signalPassFailure();
   }
 
-  spirvAttributes = std::make_pair(spirvBlobAttr, spirvEntryPointNameAttr);
+  spirvAttributes.push_back(
+      std::make_pair(spirvBlobAttr, spirvEntryPointNameAttr));
 }
 
 void VulkanLaunchFuncToVulkanCallsPass::createBindMemRefCalls(
@@ -337,14 +338,14 @@ void VulkanLaunchFuncToVulkanCallsPass::translateVulkanLaunchCall(
   // that data to runtime call.
   Value ptrToSPIRVBinary = LLVM::createGlobalString(
       loc, builder, kSPIRVBinary + std::to_string(spv_binary_index),
-      spirvAttributes.first.getValue(), LLVM::Linkage::Internal,
-      getLLVMDialect());
-  spv_binary_index++;
+      spirvAttributes[spv_binary_index].first.getValue(),
+      LLVM::Linkage::Internal, getLLVMDialect());
 
   // Create LLVM constant for the size of SPIR-V binary shader.
   Value binarySize = builder.create<LLVM::ConstantOp>(
       loc, getInt32Type(),
-      builder.getI32IntegerAttr(spirvAttributes.first.getValue().size()));
+      builder.getI32IntegerAttr(
+          spirvAttributes[spv_binary_index].first.getValue().size()));
 
   // Create call to `bindMemRef` for each memref operand.
   createBindMemRefCalls(cInterfaceVulkanLaunchCallOp, vulkanRuntime);
@@ -357,7 +358,7 @@ void VulkanLaunchFuncToVulkanCallsPass::translateVulkanLaunchCall(
       ArrayRef<Value>{vulkanRuntime, ptrToSPIRVBinary, binarySize});
   // Create LLVM global with entry point name.
   Value entryPointName = createEntryPointNameConstant(
-      spirvAttributes.second.getValue(), loc, builder);
+      spirvAttributes[spv_binary_index].second.getValue(), loc, builder);
   // Create call to `setEntryPoint` runtime function with the given pointer to
   // entry point name.
   builder.create<LLVM::CallOp>(loc, ArrayRef<Type>{getVoidType()},
@@ -381,6 +382,7 @@ void VulkanLaunchFuncToVulkanCallsPass::translateVulkanLaunchCall(
   declareVulkanFunctions(loc);
 
   cInterfaceVulkanLaunchCallOp.erase();
+  spv_binary_index++;
 }
 
 namespace pmlc::conversion::gpu {

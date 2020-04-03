@@ -26,6 +26,7 @@
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/TargetSelect.h"
 
+#include "pmlc/conversion/gpu/lowering.h"
 #include "pmlc/util/all_dialects.h"
 #include "pmlc/util/all_passes.h"
 
@@ -41,11 +42,13 @@ static LogicalResult runMLIRPasses(ModuleOp module) {
   OpPassManager &modulePM = passManager.nest<spirv::ModuleOp>();
   modulePM.addPass(spirv::createLowerABIAttributesPass());
   modulePM.addPass(spirv::createUpdateVersionCapabilityExtensionPass());
-  passManager.addPass(createConvertGpuLaunchFuncToVulkanLaunchFuncPass());
+  passManager.addPass(
+      pmlc::conversion::gpu::createConvertGpuLaunchFuncToVulkanCallsPass());
   passManager.addPass(createLowerToLLVMPass(/*useAlloca=*/false,
                                             /*useBarePtrCallConv=*/false,
                                             /*emitCWrappers=*/true));
-  passManager.addPass(createConvertVulkanLaunchFuncToVulkanCallsPass());
+  passManager.addPass(
+      pmlc::conversion::gpu::createConvertVulkanLaunchFuncToVulkanCallsPass());
   return passManager.run(module);
 }
 

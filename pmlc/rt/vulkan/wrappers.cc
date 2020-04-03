@@ -53,9 +53,11 @@ public:
     vulkanRuntime.createLaunchKernelAction();
   }
 
-  void createMemoryTransferAction() {
+  void createMemoryTransferAction(uint64_t src_index, uint64_t src_binding,
+                                  uint64_t dst_index, uint64_t dst_binding) {
     std::lock_guard<std::mutex> lock(mutex);
-    vulkanRuntime.createMemoryTransferAction();
+    vulkanRuntime.createMemoryTransferAction(src_index, src_binding, dst_index,
+                                             dst_binding);
   }
 
   void setResourceData(DescriptorSetIndex setIndex, BindingIndex bindIndex,
@@ -113,7 +115,11 @@ extern "C" {
 VULKAN_RT_EXPORT void *initVulkan();
 VULKAN_RT_EXPORT void deinitVulkan(void *vkRuntimeManager);
 VULKAN_RT_EXPORT void createLaunchKernelAction(void *vkRuntimeManager);
-VULKAN_RT_EXPORT void createMemoryTransferAction(void *vkRuntimeManager);
+VULKAN_RT_EXPORT void createMemoryTransferAction(void *vkRuntimeManager,
+                                                 uint64_t src_index,
+                                                 uint64_t src_binding,
+                                                 uint64_t dst_index,
+                                                 uint64_t dst_binding);
 VULKAN_RT_EXPORT void runOnVulkan(void *vkRuntimeManager);
 VULKAN_RT_EXPORT void submitCommandBuffers(void *vkRuntimeManager);
 VULKAN_RT_EXPORT void setEntryPoint(void *vkRuntimeManager,
@@ -141,9 +147,12 @@ void createLaunchKernelAction(void *vkRuntimeManager) {
       ->createLaunchKernelAction();
 }
 
-void createMemoryTransferAction(void *vkRuntimeManager) {
+void createMemoryTransferAction(void *vkRuntimeManager, uint64_t src_index,
+                                uint64_t src_binding, uint64_t dst_index,
+                                uint64_t dst_binding) {
   reinterpret_cast<VulkanRuntimeManager *>(vkRuntimeManager)
-      ->createMemoryTransferAction();
+      ->createMemoryTransferAction(src_index, src_binding, dst_index,
+                                   dst_binding);
 }
 
 /// Deinitializes `VulkanRuntimeManager` by the given pointer.

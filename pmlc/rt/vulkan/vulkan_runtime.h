@@ -38,6 +38,7 @@ struct VulkanDeviceMemoryBuffer {
   VkDescriptorBufferInfo bufferInfo{};
   VkBuffer buffer{VK_NULL_HANDLE};
   VkDeviceMemory deviceMemory{VK_NULL_HANDLE};
+  size_t bufferSize{0};
 };
 
 /// Struct containing information regarding to a host memory buffer.
@@ -138,6 +139,7 @@ struct LaunchKernelAction : Action {
   ResourceData resourceData;
   ResourceStorageClassBindingMap resourceStorageClassData;
 
+  std::vector<ActionPtr> bufferMoves;
   SmallVector<VkBufferMemoryBarrier, 4> deps;
 };
 
@@ -175,7 +177,10 @@ public:
 
   LogicalResult init();
   LogicalResult createLaunchKernelAction();
-  LogicalResult createMemoryTransferAction();
+  LogicalResult createMemoryTransferAction(uint64_t src_index,
+                                           uint64_t src_binding,
+                                           uint64_t dst_index,
+                                           uint64_t dst_binding);
   LogicalResult setLaunchKernelAction();
   LogicalResult submitCommandBuffers();
   LogicalResult checkResourceData();
