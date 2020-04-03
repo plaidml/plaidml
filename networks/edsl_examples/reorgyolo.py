@@ -15,7 +15,7 @@ import plaidml2.op as plaidml_op
 # TODO: write backend_test style test against pytorch implementation
 
 
-def reorgyolo(I, s, forward=False):
+def reorgyolo(I, stride, forward=False):
 
     #forward = false ->chennel increase [N,C,H,W] -> [N, C*(s^2), H/s, W/s]
     #forward = true -> channel decrease [N,C,H,W] -> [N, C/(s^2), H*s, W*s]
@@ -26,42 +26,35 @@ def reorgyolo(I, s, forward=False):
     C = dims[1]
     H = dims[2]
     W = dims[3]
-    total_dims = dims[0] * dims[1] * dims[2] * dims[3]
-    N_out = N
-    C_out = C * (s * s)
-    H_out = int(H / s)
-    W_out = int(W / s)
 
     if forward == False:
-        #print(str(dims[0]) + "," + str(dims[1]*(s*s)) + "," + str(int(dims[2]/s))+ "," + str(int(dims[3]/s)))
-        O_linear = plaidml_op.reshape(I, [total_dims])
-        O_intermediate = edsl.TensorOutput(total_dims)
-        i = edsl.TensorIndex()
-        n, c, h, w = edsl.TensorIndexes(4)
-        no, co, ho, wo = edsl.TensorIndexes(4)
-        O_intermediate[w * s + W * s * ((h * s) + H * s *
-                                        (c + C_out * n))] += O_linear[w + W * (h + H *
-                                                                               (c + C * n))]
-        O = O = edsl.TensorOutput(N_out, C_out, H_out, W_out)
-        O = plaidml_op.reshape(I, [N_out, C_out, H_out, W_out])
-        # dims_out = edsl.TensorDims(1)
-        # #O_linear.bind_dims(*dims)
-        # O = edsl.TensorOutput(*dims)
-        # O[i] = O_linear[i+1]
-
-        # N,C,H,W = edsl.TensorDims(4)
-        # n,c,h,w = edsl.TensorIndexes(4)
-        # no,co,ho,wo = edsl.TensorIndexes(4)
-        # I.bind_dims(N,C,H,W)
-        # O = edsl.TensorOutput(N_out,C_out,H_out,W_out)
-        # O[no,co+(c%C_out),ho*s,wo*s]=I[n,c,h,w] #mod support might be useful TODO: figure out a way to use constraints to accomplish this
-        # O = plaidml_op.reshape(I,[dims[0],int (dims[1]*(s*s)),int(dims[2]/s),int(dims[3]/s)])
+        N_out = N
+        C_out = int(C // (stride * stride))
+        H_out = int(H * stride)
+        W_out = int(W * stride)
+        print(str(N_out) + "," + str(C_out) + "," + str(H_out) + "," + str(W_out))
+        N, C, H, W = edsl.TensorDims(4)
+        n, c, c2, h, w, offset = edsl.TensorIndexes(6)
+        I.bind_dims(N, C, H, W)
+        O = edsl.TensorOutput(N_out, C_out, H_out, W_out)
+        O[n, c2, (h * stride) + offset, (w * stride) + offset] = I[n, c, h, w]
+        #mod support might be useful TODO: figure out a way to use constraints to accomplish this
+        O.add_constraint(c2 < C_out)
+        O.add_constraint(offset < stride)
     elif forward == True:
-        #print(str(dims[0]) + "," + str(int(dims[1]/(s*s))) + "," + str(dims[2]*s)+ "," + str(dims[3]*s))
-        O = plaidml_op.reshape(
-            I,
-            [dims[0], int(dims[1] / (s * s)),
-             int(dims[2] * s), int(dims[3] * s)])
+        N_out = N
+        C_out = int(C * (stride * stride))
+        H_out = int(H / stride)
+        W_out = int(W / stride)
+        print(str(N_out) + "," + str(C_out) + "," + str(H_out) + "," + str(W_out))
+        N, C, H, W = edsl.TensorDims(4)
+        n, c, c2, h, w, offset = edsl.TensorIndexes(6)
+        I.bind_dims(N, C, H, W)
+        O = edsl.TensorOutput(N_out, C_out, H_out, W_out)
+        O[n, c2, h, w] = I[n, c, (h * stride) + offset, (w * stride) + offset]
+        #mod support might be useful TODO: figure out a way to use constraints to accomplish this
+        O.add_constraint(c2 < C_out)
+        O.add_constraint(offset < stride)
 
     return O
 
@@ -83,7 +76,7 @@ def main():
     print("_______________________________________________")
 
     I = edsl.Tensor(edsl.LogicalShape(plaidml.DType.FLOAT32, I_data.shape))
-    O = reorgyolo(I, stride, False)
+    O = reorgyolo(I, stride, True)
 
     c_o = c_i * stride * stride
     h_o = h_i // stride
