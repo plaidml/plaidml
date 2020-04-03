@@ -110,6 +110,7 @@ py_binary(
         "//plaidml/edsl:sdk",
         "//plaidml/exec:sdk",
         "//plaidml/op:sdk",
+        "@boost//:LICENSE_1_0.txt",
         "@easylogging//:LICENSE",
         "@gmock//:googlemock/LICENSE",
         "@llvm-project//llvm:LICENSE.TXT",

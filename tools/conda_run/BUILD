@@ -23,8 +23,5 @@ plaidml_cc_binary(
         "//pmlc/util:env",
         "@bazel_tools//tools/cpp/runfiles",
         "@boost//:filesystem",
-    ] + select({
-        "@bazel_tools//src/conditions:windows": ["@boost//:process"],
-        "//conditions:default": [],
-    }),
+    ],
 )

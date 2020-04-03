@@ -56,14 +56,3 @@ llvm_toolchain(
 load("@llvm_toolchain//:toolchains.bzl", "llvm_register_toolchains")
 
 llvm_register_toolchains()
-
-http_archive(
-    name = "com_github_nelhage_rules_boost",
-    sha256 = "0b98f3657ef65badd7f00af00172fc5aa1c1f6aff4b6599c1aa979e1320f71de",
-    strip_prefix = "rules_boost-4ee400beca08f524e7ea3be3ca41cce34454272f",
-    url = "https://github.com/nelhage/rules_boost/archive/4ee400beca08f524e7ea3be3ca41cce34454272f.zip",
-)
-
-load("@com_github_nelhage_rules_boost//:boost/boost.bzl", "boost_deps")
-
-boost_deps()

@@ -76,6 +76,7 @@ def main():
                 'com_intel_plaidml/LICENSE',
                 'com_intel_plaidml/plaidml/plaidml-config.cmake',
             ]),
+            ('share/plaidml/boost', ['boost/LICENSE_1_0.txt']),
             ('share/plaidml/easylogging', ['easylogging/LICENSE']),
             ('share/plaidml/gmock', ['gmock/googlemock/LICENSE']),
             ('share/plaidml/llvm', ['llvm-project/llvm/LICENSE.TXT']),

@@ -12,7 +12,7 @@ plaidml_cc_library(
     deps = [
         "//pmlc/util",
         "//pmlc/util/math",
-        "@boost//:numeric_ublas",
+        "@boost",
         "@gmock//:gtest",
     ],
 )

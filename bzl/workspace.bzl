@@ -18,6 +18,14 @@ def plaidml_workspace():
     )
 
     http_archive(
+        name = "boost",
+        url = "https://dl.bintray.com/boostorg/release/1.72.0/source/boost_1_72_0.tar.gz",
+        sha256 = "c66e88d5786f2ca4dbebb14e06b566fb642a1a6947ad8cc9091f9f445134143f",
+        strip_prefix = "boost_1_72_0",
+        build_file = clean_dep("//bzl:boost.BUILD"),
+    )
+
+    http_archive(
         name = "com_github_google_benchmark",
         url = "https://github.com/google/benchmark/archive/v1.5.0.tar.gz",
         sha256 = "3c6a165b6ecc948967a1ead710d4a181d7b0fbcaa183ef7ea84604994966221a",

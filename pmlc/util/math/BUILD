@@ -19,9 +19,7 @@ plaidml_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pmlc/util",
-        "@boost//:math",
-        "@boost//:multiprecision",
-        "@boost//:operators",
+        "@boost",
         "@llvm-project//llvm:support",
     ],
 )
