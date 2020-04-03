@@ -95,13 +95,13 @@ private:
     return llvm::Optional<LoadStoreOps>(std::move(ret));
   }
 
-  double getCost(TensorAndIndexPermutation perm, ArrayRef<size_t> tileSize) {
+  double getCost(TensorAndIndexPermutation perm, ArrayRef<int64_t> tileSize) {
     // TODO: This is random garbage just to make some sort of test run (and
     // presumably fail)
     return 3;
   }
 
-  void transform(TensorAndIndexPermutation perm, ArrayRef<size_t> tileSize) {
+  void transform(TensorAndIndexPermutation perm, ArrayRef<int64_t> tileSize) {
     IVLOG(2, "Best Perf: " << best_cost);
     IVLOG(2, "Best Tensor/Index Permutations: TODO: print");
     IVLOG(2, "Best Tiling: " << best_tiling[0]);
@@ -115,7 +115,7 @@ public:
     // TODO: Probably want to move these to be params on StencilGeneric ctor...
     semantic_idx_count = 1; // TODO
     requirements =
-        std::map<std::pair<size_t, size_t>,
+        std::map<std::pair<int64_t, int64_t>,
                  std::function<bool(mlir::Value, mlir::BlockArgument)>>{
             {{0, 0}, [](mlir::Value v, mlir::BlockArgument a) { return true; }},
             {{1, 0}, [](mlir::Value v, mlir::BlockArgument a) { return true; }},

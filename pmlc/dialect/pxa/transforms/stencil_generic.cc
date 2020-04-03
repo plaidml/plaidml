@@ -25,29 +25,36 @@
 
 namespace pmlc::dialect::pxa {
 
+void StencilGeneric::BindIndexes(
+    const llvm::SmallVector<mlir::Value, 3> &tensors) {
+  llvm::SmallVector<mlir::BlockArgument, 8> empty_bound_idxs_vector;
+  RecursiveBindIndex(&empty_bound_idxs_vector, tensors);
+}
+
 // TODO: Better to maintain bound_idxs as both set & vector, or just vector?
 //   Or could maintain as map from BlockArg to numeric index (i.e. where it
 //   would have been were it a vector)
 // TODO: Also, should probably at least be a small vector (how small?)
 void StencilGeneric::RecursiveBindIndex(
-    const llvm::SmallVector<mlir::BlockArgument, 8> &bound_idxs,
+    llvm::SmallVector<mlir::BlockArgument, 8> *bound_idxs,
     const llvm::SmallVector<mlir::Value, 3> &tensors) {
-  auto curr_idx = bound_idxs.size();
+  auto curr_idx = bound_idxs->size();
   if (curr_idx == semantic_idx_count) {
-    // This is a legal binding, append it and we're done with this branch
-    legal_permutations.push_back(
-        TensorAndIndexPermutation(tensors, bound_idxs));
+    // This is a legal binding, go find a tiling for it
+    llvm::SmallVector<int64_t, 8> curr_tile_size(semantic_idx_count);
+    RecursiveTileIndex(TensorAndIndexPermutation(tensors, *bound_idxs),
+                       &curr_tile_size, 0);
   } else {
     for (const auto &block_arg : block_args) {
       // Don't bind same index twice
-      if (std::find(bound_idxs.begin(), bound_idxs.end(), block_arg) !=
-          bound_idxs.end()) {
+      if (std::find(bound_idxs->begin(), bound_idxs->end(), block_arg) !=
+          bound_idxs->end()) {
         continue;
       }
 
       // Verify the requirements for this index with each tensor are all met
       bool reqs_met = true;
-      for (size_t i = 0; i < tensors.size(); i++) {
+      for (unsigned i = 0; i < tensors.size(); i++) {
         try { // TODO: probably don't keep long term
           if (!requirements.at(std::make_pair(i, curr_idx))(tensors[i],
                                                             block_arg)) {
@@ -66,9 +73,34 @@ void StencilGeneric::RecursiveBindIndex(
 
       // If we made it to here, this index has appropriate semantics; bind it
       // and recurse
-      llvm::SmallVector<mlir::BlockArgument, 8> new_bound_idxs(bound_idxs);
-      new_bound_idxs.push_back(block_arg);
-      RecursiveBindIndex(new_bound_idxs, tensors);
+      bound_idxs->push_back(block_arg);
+      RecursiveBindIndex(bound_idxs, tensors);
+      bound_idxs->pop_back();
+    }
+  }
+}
+
+void StencilGeneric::RecursiveTileIndex(      //
+    const TensorAndIndexPermutation &perm,    //
+    llvm::SmallVector<int64_t, 8> *tile_size, //
+    int64_t curr_idx) {
+  assert(tile_size->size() == semantic_idx_count);
+  if (curr_idx == semantic_idx_count) {
+    auto cost = getCost(perm, *tile_size);
+    if (cost < best_cost) {
+      best_cost = cost;
+      best_permutation = perm;
+      best_tiling = llvm::SmallVector<int64_t, 8>(tile_size->size());
+      for (auto sz : *tile_size) {
+        best_tiling[sz] = (*tile_size)[sz];
+      }
+    }
+  } else {
+    // TODO: Setup cache for the generator
+    for (int64_t curr_idx_tile_size : tiling_generators[curr_idx](
+             ranges[perm.indexes[curr_idx].getArgNumber()])) {
+      (*tile_size)[curr_idx] = curr_idx_tile_size;
+      RecursiveTileIndex(perm, tile_size, curr_idx + 1);
     }
   }
 }
@@ -116,36 +148,9 @@ void StencilGeneric::DoStenciling() {
     std::sort(last_load_first_store_it, tensors.end());
     do { // Each store tensor permutation
       // Add all legal permutations to legal_permutations
-      RecursiveBindIndex(llvm::SmallVector<mlir::BlockArgument, 8>(), tensors);
+      BindIndexes(tensors);
     } while (std::next_permutation(last_load_first_store_it, tensors.end()));
   } while (std::next_permutation(tensors.begin(), last_load_first_store_it));
-
-  // TODO: If we desire more complex requirements than pairwise tensor-to-index
-  // stride requirements, that function could go here
-
-  for (const auto &perm : legal_permutations) {
-    // TODO: Clean, try to get everything on the same unsigned type/width
-    for (size_t i = 0; i < perm.indexes.size(); i++) {
-      llvm::SmallVector<size_t, 8> tile_size;
-      size_t idx_in_block = perm.indexes[i].getArgNumber();
-      try { // TODO: probably don't keep long term
-        for (const auto &size : tiling_generators[i](ranges[idx_in_block])) {
-          tile_size.push_back(size);
-        }
-      } catch (const std::bad_function_call &e) {
-        IVLOG(1, e.what());
-        IVLOG(1, "Failed to find function for tiling_generators[" << i << "]");
-        throw;
-      }
-
-      auto cost = getCost(perm, tile_size);
-      if (cost < best_cost) {
-        best_cost = cost;
-        best_permutation = perm;
-        best_tiling = std::move(tile_size);
-      }
-    }
-  }
 
   if (best_cost < std::numeric_limits<double>::infinity()) {
     transform(best_permutation, best_tiling);

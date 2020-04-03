@@ -56,19 +56,22 @@ using TileSizeGenerator = std::function<std::vector<int64_t>(int64_t)>;
 class StencilGeneric {
   // TODO
 private:
-  void RecursiveBindIndex(
-      const llvm::SmallVector<mlir::BlockArgument, 8> &bound_idxs,
-      const llvm::SmallVector<mlir::Value, 3> &tensors);
+  void BindIndexes(const llvm::SmallVector<mlir::Value, 3> &tensors);
+  void RecursiveBindIndex(llvm::SmallVector<mlir::BlockArgument, 8> *bound_idxs,
+                          const llvm::SmallVector<mlir::Value, 3> &tensors);
+  void RecursiveTileIndex(const TensorAndIndexPermutation &perm,
+                          llvm::SmallVector<int64_t, 8> *tile_size,
+                          int64_t curr_idx);
 
 protected: // TODO: private backend for some of this?
   virtual llvm::Optional<LoadStoreOps> capture() = 0;
   virtual double getCost(TensorAndIndexPermutation perm,
-                         ArrayRef<size_t> tileSize) = 0;
+                         ArrayRef<int64_t> tileSize) = 0;
   virtual void transform(TensorAndIndexPermutation perm,
-                         ArrayRef<size_t> tileSize) = 0;
+                         ArrayRef<int64_t> tileSize) = 0;
 
   // The number of indexes whose semantics must be considered in the tiling
-  size_t semantic_idx_count; // TODO: how/where to initialize?
+  unsigned semantic_idx_count; // TODO: how/where to initialize?
 
   // The ParallelOp that is being stenciled.
   mlir::AffineParallelOp op;
@@ -85,7 +88,7 @@ protected: // TODO: private backend for some of this?
   // For each tensor/index semantic pair (given as a pair of size_ts), a
   // function to determine if a Value & BlockArg meet the requirements of that
   // pair
-  std::map<std::pair<size_t, size_t>,
+  std::map<std::pair<int64_t, int64_t>,
            std::function<bool(mlir::Value, mlir::BlockArgument)>>
       requirements;
 
@@ -95,7 +98,7 @@ protected: // TODO: private backend for some of this?
 
   double best_cost;
   TensorAndIndexPermutation best_permutation;
-  llvm::SmallVector<size_t, 8>
+  llvm::SmallVector<int64_t, 8>
       best_tiling; // only makes sense paired with `best_permutation`
   std::list<TensorAndIndexPermutation> legal_permutations;
 
