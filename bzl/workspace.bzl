@@ -18,14 +18,6 @@ def plaidml_workspace():
     )
 
     http_archive(
-        name = "boost",
-        url = "https://github.com/plaidml/depot/raw/master/boost_1_66_0.tar.gz",
-        sha256 = "bd0df411efd9a585e5a2212275f8762079fed8842264954675a4fddc46cfcf60",
-        strip_prefix = "boost_1_66_0",
-        build_file = clean_dep("//bzl:boost.BUILD"),
-    )
-
-    http_archive(
         name = "com_github_google_benchmark",
         url = "https://github.com/google/benchmark/archive/v1.5.0.tar.gz",
         sha256 = "3c6a165b6ecc948967a1ead710d4a181d7b0fbcaa183ef7ea84604994966221a",
@@ -50,9 +42,10 @@ def plaidml_workspace():
 
     http_archive(
         name = "easylogging",
-        url = "https://github.com/muflihun/easyloggingpp/releases/download/v9.95.0/easyloggingpp_v9.95.0.tar.gz",
-        sha256 = "4b1aebe19e383349c6e438aac357eccfabb0ce34430e872508ed8ee0d1629e0f",
+        url = "https://github.com/amrayn/easyloggingpp/archive/v9.96.7.tar.gz",
+        sha256 = "237c80072b9b480a9f2942b903b4b0179f65e146e5dcc64864dc91792dedd722",
         build_file = clean_dep("//bzl:easylogging.BUILD"),
+        strip_prefix = "easyloggingpp-9.96.7",
     )
 
     http_archive(
@@ -156,8 +149,9 @@ def plaidml_workspace():
 
     http_archive(
         name = "zlib",
-        url = "https://github.com/plaidml/depot/raw/master/zlib-1.2.8.tar.gz",
-        sha256 = "36658cb768a54c1d4dec43c3116c27ed893e88b02ecfcb44f2166f9c0b7f2a0d",
+        url = "https://www.zlib.net/zlib-1.2.11.tar.gz",
+        sha256 = "c3e5e9fdd5004dcb542feda5ee4f0ff0744628baf8ed2dd5d66f8ca1197cb1a1",
+        strip_prefix = "zlib-1.2.11",
         build_file = clean_dep("//bzl:zlib.BUILD"),
     )
 
