@@ -10,6 +10,9 @@
 // CPU by translating MLIR to LLVM IR before JIT-compiling and executing the
 // latter.
 //
+// The implementation also supports specifying an expected runtime_error being
+// thrown and validates with no failure the expected string is correctly
+// thrown.
 //===----------------------------------------------------------------------===//
 
 #include <iostream>
@@ -65,4 +68,6 @@ int main(int argc, char **argv) {
       throw e;
     }
   }
+
+  return 0;
 }
