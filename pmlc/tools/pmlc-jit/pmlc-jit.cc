@@ -12,6 +12,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <iostream>
+#include <stdexcept>
+#include <string>
+
 #include "mlir/ExecutionEngine/OptUtils.h"
 #include "mlir/Support/JitRunner.h"
 #include "llvm/Support/InitLLVM.h"
@@ -20,11 +24,45 @@
 #include "pmlc/util/all_dialects.h"
 #include "pmlc/util/all_passes.h"
 
+#define EXPECTED_EXCEPTION_FLG_START_LEN 35
+#define EXPECTED_EXCEPTION_FLAG_START "-expected-runtime-exception-string="
+
 int main(int argc, char **argv) {
   registerAllDialects();
   llvm::InitLLVM y(argc, argv);
   llvm::InitializeNativeTarget();
   llvm::InitializeNativeTargetAsmPrinter();
   mlir::initializeLLVMPasses();
-  return mlir::JitRunnerMain(argc, argv, nullptr);
+
+  // Get the expected-runtime-exception-string and remove the parameters
+  // unknown to the tool that is being delegated to.
+  std::string expectedString;
+  int fixedUpCounter = 0;
+
+  for (int i = 0; i < argc; i++) {
+    if (fixedUpCounter != i) {
+      argv[fixedUpCounter] = argv[i];
+    }
+
+    std::string arg = argv[i];
+    if (arg.find(EXPECTED_EXCEPTION_FLAG_START) == 0) {
+      expectedString = arg.substr(EXPECTED_EXCEPTION_FLG_START_LEN);
+      continue;
+    }
+
+    fixedUpCounter++;
+  }
+
+  // Zero up the fixed parameters that have been moved forward.
+  for (int i = fixedUpCounter; i < argc; i++) {
+    argv[i] = nullptr;
+  }
+
+  try {
+    return mlir::JitRunnerMain(fixedUpCounter, argv, nullptr);
+  } catch (std::runtime_error e) {
+    if (e.what() != expectedString) {
+      throw e;
+    }
+  }
 }
