@@ -63,7 +63,7 @@ int main(int argc, char **argv) {
 
   try {
     return mlir::JitRunnerMain(fixedUpCounter, argv, nullptr);
-  } catch (std::runtime_error e) {
+  } catch (const std::runtime_error &e) {
     if (e.what() != expectedString) {
       throw e;
     }
