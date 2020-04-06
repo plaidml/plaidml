@@ -13,6 +13,7 @@ steps:
       PLATFORM: '{{name}}'
     artifact_paths:
       - "tmp/build/**/*"
+      - "bazel-testlogs/**/*.log"
 {{/variants}}
 
 
