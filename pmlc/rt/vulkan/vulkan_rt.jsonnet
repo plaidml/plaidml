@@ -12,6 +12,7 @@ local exports = [
     // rt
     '_mlir_ciface_print_memref_f32',
     'plaidml_rt_trace',
+    'plaidml_rt_bounds_check',
     'plaidml_rt_xsmm_gemm_f32',
     'print_memref_f32',
 ];
