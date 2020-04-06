@@ -20,6 +20,15 @@ filegroup(
 )
 
 plaidml_cc_library(
+    name = "headers",
+    hdrs = [
+        "ffi.h",
+        "op.h",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+plaidml_cc_library(
     name = "op",
     srcs = [
         "ffi.cc",
@@ -36,7 +45,7 @@ plaidml_cc_library(
         "//pmlc/util",
         "@llvm-project//llvm:support",
     ],
-    alwayslink=1,
+    alwayslink = 1,
 )
 
 py_library(

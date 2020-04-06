@@ -31,81 +31,41 @@ edsl::Tensor block(             //
   auto I = edsl::trace(I_raw, base_name.str());
   // Note: The branch1 weights/biases are at the _end_ of the input vectors,
   // as their existence depends on use_shortcut_conv
-  auto conv_2a = op::convolution(     //
-      I,                              // input
-      W[0],                           // weights
-      strides,                        // strides
-      {1, 1},                         // dilations
-      {1, 1},                         // data dilations
-      {},                             // filter shape (ie for transposed)
-      1,                              // # of groups
-      "valid",                        // autopadding
-      {},                             // manual padding
-      "nxc",                          // input layout
-      "xck",                          // filter layout
-      "none",                         // group layout
-      false,                          // Winograd OK?
-      base_name.str() + "_branch2a",  // name
-      "ungrouped",                    // autogroup (ie for grouped)
-      "none",                         // deriv (ie for transposed)
-      {});
+  auto conv_2a = op::convolution(I, W[0])
+                     .name(base_name.str() + "_branch2a")
+                     .strides(strides)
+                     .dilations({1, 1})
+                     .data_dilations({1, 1})
+                     .autopad_mode(op::AutoPadMode::VALID)
+                     .input_layout(op::TensorLayout::NXC)
+                     .filter_layout(op::TensorLayout::XCK);
   auto relu_2a = op::relu(conv_2a + B[0]);
-  auto conv_2b = op::convolution(     //
-      relu_2a,                        // input
-      W[1],                           // weights
-      {1, 1},                         // strides
-      {1, 1},                         // dilations
-      {1, 1},                         // data dilations
-      {},                             // filter shape (ie for transposed)
-      1,                              // # of groups
-      "same_upper",                   // autopadding
-      {},                             // manual padding
-      "nxc",                          // input layout
-      "xck",                          // filter layout
-      "none",                         // group layout
-      false,                          // Winograd OK?
-      base_name.str() + "_branch2b",  // name
-      "ungrouped",                    // autogroup (ie for grouped)
-      "none",                         // deriv (ie for transposed)
-      {});
+  auto conv_2b = op::convolution(relu_2a, W[1])
+                     .name(base_name.str() + "_branch2b")
+                     .strides({1, 1})
+                     .dilations({1, 1})
+                     .data_dilations({1, 1})
+                     .autopad_mode(op::AutoPadMode::SAME_UPPER)
+                     .input_layout(op::TensorLayout::NXC)
+                     .filter_layout(op::TensorLayout::XCK);
   auto relu_2b = op::relu(conv_2b + B[1]);
-  auto conv_2c = op::convolution(     //
-      relu_2b,                        // input
-      W[2],                           // weights
-      {1, 1},                         // strides
-      {1, 1},                         // dilations
-      {1, 1},                         // data dilations
-      {},                             // filter shape (ie for transposed)
-      1,                              // # of groups
-      "valid",                        // autopadding
-      {},                             // manual padding
-      "nxc",                          // input layout
-      "xck",                          // filter layout
-      "none",                         // group layout
-      false,                          // Winograd OK?
-      base_name.str() + "_branch2c",  // name
-      "ungrouped",                    // autogroup (ie for grouped)
-      "none",                         // deriv (ie for transposed)
-      {});
+  auto conv_2c = op::convolution(relu_2b, W[2])
+                     .name(base_name.str() + "_branch2b")
+                     .strides({1, 1})
+                     .dilations({1, 1})
+                     .data_dilations({1, 1})
+                     .autopad_mode(op::AutoPadMode::VALID)
+                     .input_layout(op::TensorLayout::NXC)
+                     .filter_layout(op::TensorLayout::XCK);
   if (use_shortcut_conv) {
-    auto conv_1 = op::convolution(     //
-        I,                             // input
-        W[3],                          // weights
-        strides,                       // strides
-        {1, 1},                        // dilations
-        {1, 1},                        // data dilations
-        {},                            // filter shape (ie for transposed)
-        1,                             // # of groups
-        "valid",                       // autopadding
-        {},                            // manual padding
-        "nxc",                         // input layout
-        "xck",                         // filter layout
-        "none",                        // group layout
-        false,                         // Winograd OK?
-        base_name.str() + "_branch1",  // name
-        "ungrouped",                   // autogroup (ie for grouped)
-        "none",                        // deriv (ie for transposed)
-        {});
+    auto conv_1 = op::convolution(I, W[3])
+                      .name(base_name.str() + "_branch1")
+                      .strides(strides)
+                      .dilations({1, 1})
+                      .data_dilations({1, 1})
+                      .autopad_mode(op::AutoPadMode::VALID)
+                      .input_layout(op::TensorLayout::NXC)
+                      .filter_layout(op::TensorLayout::XCK);
     return op::relu(conv_2c + B[2] + conv_1 + B[3]);
   } else {
     return op::relu(conv_2c + B[2] + I);
@@ -279,33 +239,24 @@ std::vector<edsl::Tensor> bias_placeholders() {
 edsl::Program build(int64_t batch_size, const edsl::Tensor& I, ArrayRef<edsl::Tensor> W, ArrayRef<edsl::Tensor> B) {
   auto W_conv1 = W[0];
   auto B_conv1 = B[0];
-  auto conv1 = op::convolution(  //
-      I,                         // input
-      W_conv1,                   // weights
-      {2, 2},                    // strides
-      {1, 1},                    // dilations
-      {1, 1},                    // data dilations
-      {},                        // filter shape (ie for transposed)
-      1,                         // # of groups
-      "none",                    // autopadding
-      {3, 3},                    // manual padding
-      "nxc",                     // input layout
-      "xck",                     // filter layout
-      "none",                    // group layout
-      false,                     // Winograd OK?
-      "conv1",                   // name
-      "ungrouped",               // autogroup (ie for grouped)
-      "none",                    // deriv (ie for transposed)
-      {});
+  auto conv1 = op::convolution(I, W_conv1)
+                   .name("conv1")
+                   .strides({2, 2})
+                   .dilations({1, 1})
+                   .data_dilations({1, 1})
+                   .autopad_mode(op::AutoPadMode::NONE)
+                   .manual_padding({3, 3})
+                   .input_layout(op::TensorLayout::NXC)
+                   .filter_layout(op::TensorLayout::XCK);
   auto relu1 = op::relu(conv1 + B_conv1);
-  auto pool1 = op::pool(  //
-      relu1,              // input
-      "max",              // pool mode
-      {3, 3},             // pool shape
-      {2, 2},             // strides
-      "none",             // autopadding
-      {1, 1},             // manual padding
-      "nxc");             // input layout
+  auto pool1 = op::pool(       //
+      relu1,                   // input
+      op::PoolMode::MAX,       // pool mode
+      {3, 3},                  // pool shape
+      {2, 2},                  // strides
+      op::AutoPadMode::NONE,   // autopadding
+      {1, 1},                  // manual padding
+      op::TensorLayout::NXC);  // input layout
 
   // 2
   SmallVector<edsl::Tensor, 4> W_block2a = {W[1], W[2], W[3], W[4]};

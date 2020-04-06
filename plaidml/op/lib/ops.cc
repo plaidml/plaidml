@@ -9,9 +9,11 @@
 
 #include "llvm/Support/FormatVariadic.h"
 
+#include "plaidml/op/op.h"
 #include "pmlc/util/logging.h"
 
 using namespace plaidml::edsl;  // NOLINT
+using namespace plaidml::op;    // NOLINT
 
 namespace plaidml::op::lib {
 
@@ -111,156 +113,30 @@ struct AggregationAxes {
   }
 };
 
-enum class AutoDimMode {
-  MATCH,  // 0
-  FILL    // -1
-};
-
-enum class AutogroupMode {
-  UNGROUPED,  // Group size explicitly 1
-  EXPLICIT,   // Group size explicitly specified, > 1
-  AUTO,       // Group size determined from shapes of I and F
-  DEPTHWISE   // for channelized convolutions (i.e. where G = CI)
-};
-
-enum class AutopadMode : char {
-  NONE = '-',
-  NOTSET = NONE,
-  EXPLICIT = NONE,
-  SAME_LOWER = 'L',
-  SAME_UPPER = 'U',
-  VALID = 'V'
-};
-
-enum class ConvDerivMode {
-  NONE,   // Forward Pass
-  DATA,   // Computing derivative of input data (or equivalently a transposed conv)
-  FILTER  // Computing derivative of filters
-};
-
-// For grouped convolutions, in the filters (i.e. weights/kernel) tensor, there
-// are multiple ways of laying out the channels. For a convolution with:
-//  G groups
-//  C input channels
-//  K output channels
-// there must be a total of (C * K) / G channel combinations. This is generally
-// accomplished by having one of the input or output channel dimensions include
-// the group and having the other be the within-group channel; but the group
-// can also be included as a separate dimension. This gives the following total
-// sizes for the channel dimensions:
-//  SEPARATE: G, C/G, K/G
-//  IN_C:     C, K/G
-//  IN_K:     C/G, K
-// SEPARATE is the layout with the group given as a separate dimension. IN_C is
-// the layout with the group included in C, and with the K dim representing the
-// within-group output channel. IN_K is the layout with the group included in K
-// with the C dim representing the within-group input channel.
-// The NONE layout is used for convolutions that aren't grouped.
-enum class GroupLayout {
-  NONE,      // Not grouped
-  SEPARATE,  // Group given as a separate dimension
-  IN_C,      // Group included in the input channels dimension
-  IN_K       // Group included in the output channels dimensiono
-};
-
-enum class InterpolationMode { NEAREST, BILINEAR };
-
-enum class PoolMode : char { AVG = 'A', MAX = '>', MIN = '<', SUM = '+' };
-
-enum class TensorLayout { NXC, NCX, KCX, XCK, GKCX, XGCK };
-
 namespace {
 // TODO: I haven't decided whether to make these helper functions visible to the outside world
 
-AutoDimMode autodim_mode_from_str(const std::string& s) {
-  if (s == "fill") {
-    return AutoDimMode::FILL;
+template <typename T>
+T validate(int raw) {
+  if (raw < 0 || raw >= static_cast<int>(T::_LAST)) {
+    throw std::runtime_error("Invalid enumeration value");
   }
-  if (s == "match") {
-    return AutoDimMode::MATCH;
-  }
-  throw std::runtime_error(llvm::formatv("Unable to parse string '{0}' as an autodim mode", s));
+  return static_cast<T>(raw);
 }
 
-AutogroupMode autogroup_mode_from_str(const std::string& s) {
-  if (s == "ungrouped") {
-    return AutogroupMode::UNGROUPED;
-  }
-  if (s == "explicit") {
-    return AutogroupMode::EXPLICIT;
-  }
-  if (s == "auto") {
-    return AutogroupMode::AUTO;
-  }
-  if (s == "max") {
-    return AutogroupMode::DEPTHWISE;
-  }
-  throw std::runtime_error(llvm::formatv("Unable to parse string '{0}' as an autogroup mode", s));
-}
-
-AutopadMode autopad_mode_from_str(const std::string& s) {
-  if (s == "none") {
-    return AutopadMode::NONE;
-  }
-  if (s == "notset") {
-    return AutopadMode::NOTSET;
-  }
-  if (s == "explicit") {
-    return AutopadMode::EXPLICIT;
-  }
-  if (s == "same_lower") {
-    return AutopadMode::SAME_LOWER;
-  }
-  if (s == "same_upper") {
-    return AutopadMode::SAME_UPPER;
-  }
-  if (s == "valid") {
-    return AutopadMode::VALID;
-  }
-  throw std::runtime_error(llvm::formatv("Unable to parse string '{0}' as an autopadding mode", s));
-}
-
-std::string to_string(AutopadMode m) {
+std::string to_string(AutoPadMode m) {
   switch (m) {
-    case AutopadMode::NONE:
+    case AutoPadMode::NONE:
       return "none";
-    case AutopadMode::SAME_LOWER:
+    case AutoPadMode::SAME_LOWER:
       return "same_lower";
-    case AutopadMode::SAME_UPPER:
+    case AutoPadMode::SAME_UPPER:
       return "same_upper";
-    case AutopadMode::VALID:
+    case AutoPadMode::VALID:
       return "valid";
+    default:
+      throw std::runtime_error("Unable to convert autopadding mode to string due to unrecognized mode");
   }
-  throw std::runtime_error("Unable to convert autopadding mode to string due to unrecognized mode");
-}
-
-ConvDerivMode conv_deriv_mode_from_str(const std::string& s) {
-  if (s == "none") {
-    return ConvDerivMode::NONE;
-  }
-  if (s == "data") {
-    return ConvDerivMode::DATA;
-  }
-  if (s == "filter") {
-    return ConvDerivMode::FILTER;
-  }
-  throw std::runtime_error(llvm::formatv("Unable to parse string '{0}' as a convolution derivative mode", s));
-}
-
-GroupLayout group_layout_from_str(const std::string& s) {
-  if (s == "none") {
-    return GroupLayout::NONE;
-  }
-  if (s == "in_C") {
-    return GroupLayout::IN_C;
-  }
-  if (s == "in_K") {
-    return GroupLayout::IN_K;
-  }
-  if (s == "separate") {
-    return GroupLayout::SEPARATE;
-  }
-  throw std::runtime_error(llvm::formatv("Unable to parse string '{0}' as a group layout", s));
 }
 
 std::string to_string(GroupLayout l) {
@@ -273,34 +149,9 @@ std::string to_string(GroupLayout l) {
       return "none";
     case GroupLayout::SEPARATE:
       return "separate";
+    default:
+      throw std::runtime_error("Unable to convert group layout to string due to unrecognized layout");
   }
-  throw std::runtime_error("Unable to convert group layout to string due to unrecognized layout");
-}
-
-InterpolationMode interpolation_mode_from_str(const std::string& s) {
-  if (s == "nearest") {
-    return InterpolationMode::NEAREST;
-  }
-  if (s == "bilinear") {
-    return InterpolationMode::BILINEAR;
-  }
-  throw std::runtime_error(llvm::formatv("Unable to parse string '{0}' as an interpolation mode", s));
-}
-
-PoolMode pool_mode_from_str(const std::string& s) {
-  if (s == "avg" || s == "average") {
-    return PoolMode::AVG;
-  }
-  if (s == "max") {
-    return PoolMode::MAX;
-  }
-  if (s == "min") {
-    return PoolMode::MIN;
-  }
-  if (s == "sum") {
-    return PoolMode::SUM;
-  }
-  throw std::runtime_error(llvm::formatv("Unable to parse string '{0}' as a pooling mode", s));
 }
 
 // TODO: Enable when needed
@@ -317,28 +168,6 @@ PoolMode pool_mode_from_str(const std::string& s) {
 //   }
 //   throw std::runtime_error("Unable to convert pooling mode to string due to unrecognized mode");
 // }
-
-TensorLayout tensor_layout_from_str(const std::string& s) {
-  if (s == "nxc" || s == "nwc" || s == "nhwc" || s == "ndhwc") {
-    return TensorLayout::NXC;
-  }
-  if (s == "ncx" || s == "ncw" || s == "nchw" || s == "ncdhw") {
-    return TensorLayout::NCX;
-  }
-  if (s == "kcx" || s == "kcw" || s == "kchw" || s == "kcdhw") {
-    return TensorLayout::KCX;
-  }
-  if (s == "xck" || s == "wck" || s == "hwck" || s == "dhwck") {
-    return TensorLayout::XCK;
-  }
-  if (s == "gkcx" || s == "gkcw" || s == "gkchw" || s == "gkcdhw") {
-    return TensorLayout::GKCX;
-  }
-  if (s == "xgck" || s == "wgck" || s == "hwgck" || s == "dhwgck") {
-    return TensorLayout::XGCK;
-  }
-  throw std::runtime_error(llvm::formatv("Unable to parse string '{0}' as a tensor layout", s));
-}
 
 size_t nonspatial_dims(TensorLayout layout) {
   switch (layout) {
@@ -369,8 +198,9 @@ std::string to_string(TensorLayout m) {
       return "GKCX";
     case TensorLayout::XGCK:
       return "XGCK";
+    default:
+      throw std::runtime_error("Unable to convert tensor layout to string due to unrecognized layout");
   }
-  throw std::runtime_error("Unable to convert tensor layout to string due to unrecognized layout");
 }
 
 bool is_input_layout(TensorLayout layout) {  //
@@ -386,7 +216,7 @@ bool is_filter_layout_with_separate_groups(TensorLayout layout) {
   return (layout == TensorLayout::GKCX || layout == TensorLayout::XGCK);
 }
 
-void normalize_grouping_strategy(int64_t* groups, AutogroupMode* autogroup_mode, GroupLayout* group_layout) {
+void normalize_grouping_strategy(int64_t* groups, AutoGroupMode* autogroup_mode, GroupLayout* group_layout) {
   // This normalization enforces:
   //  * If group_layout is NONE:
   //      - autogroup_mode is UNGROUPED
@@ -413,39 +243,39 @@ void normalize_grouping_strategy(int64_t* groups, AutogroupMode* autogroup_mode,
   //      - groups is to be ignored
   //      - group_layout is not NONE
   switch (*autogroup_mode) {
-    case AutogroupMode::UNGROUPED:
+    case AutoGroupMode::UNGROUPED:
       if (*groups != 1) {
-        throw std::runtime_error("Convolution AutogroupMode::UNGROUPED requires groups == 1");
+        throw std::runtime_error("Convolution AutoGroupMode::UNGROUPED requires groups == 1");
       }
       break;
-    case AutogroupMode::AUTO:
+    case AutoGroupMode::AUTO:
       if (*group_layout == GroupLayout::NONE) {
         *groups = 1;
-        *autogroup_mode = AutogroupMode::UNGROUPED;
+        *autogroup_mode = AutoGroupMode::UNGROUPED;
       }
       if (*group_layout == GroupLayout::IN_C) {
         // TODO: This and related cases may depend on the deriv_mode; take that into account
         throw std::runtime_error("Cannot automatically detect group size of convolution with IN_C GroupLayout");
       }
       break;
-    case AutogroupMode::EXPLICIT:
+    case AutoGroupMode::EXPLICIT:
       if (*groups < 1) {
         throw std::runtime_error("Requested grouped convolution with fewer than 1 groups");
       }
       if (*groups == 1) {
-        *autogroup_mode = AutogroupMode::UNGROUPED;
+        *autogroup_mode = AutoGroupMode::UNGROUPED;
       }
       if (*group_layout == GroupLayout::NONE && *groups != 1) {
         throw std::runtime_error("GroupLayout not specified for grouped convolution");
       }
       break;
-    case AutogroupMode::DEPTHWISE:
+    case AutoGroupMode::DEPTHWISE:
       if (*group_layout == GroupLayout::NONE) {
-        throw std::runtime_error("Convolution GroupLayout must be specified to use DEPTHWISE AutogroupMode");
+        throw std::runtime_error("Convolution GroupLayout must be specified to use DEPTHWISE AutoGroupMode");
       }
       break;
     default:
-      throw std::runtime_error("Unrecognized AutogroupMode");
+      throw std::runtime_error("Unrecognized AutoGroupMode");
   }
 }
 
@@ -470,7 +300,7 @@ std::pair<TensorDim, TensorDim> compute_padding_and_output_size(  //
     const TensorDim& input_size,                                  //
     const TensorDim& filter_size,                                 //
     int64_t stride,                                               //
-    AutopadMode autopad_mode,                                     //
+    AutoPadMode autopad_mode,                                     //
     int64_t pad_lo,                                               //
     int64_t pad_hi,                                               //
     int64_t dilation,                                             //
@@ -484,19 +314,19 @@ std::pair<TensorDim, TensorDim> compute_padding_and_output_size(  //
   auto F_eff = (dilation * (filter_size - 1)) + 1;      // Effective Filter Size
   int64_t ceil_term =
       use_ceil_for_output_shape ? stride - 1 : 0;  // TODO: Will need to confirm that this is the intended behavior
-  if (autopad_mode == AutopadMode::NONE) {
+  if (autopad_mode == AutoPadMode::NONE) {
     TensorDim pad_before(pad_lo);
     TensorDim output_size((I_eff + pad_lo + pad_hi - F_eff + stride + ceil_term) / stride);
     return std::pair<TensorDim, TensorDim>(pad_before, output_size);
   }
-  if (autopad_mode == AutopadMode::VALID) {
+  if (autopad_mode == AutoPadMode::VALID) {
     TensorDim pad_before(0);
     TensorDim output_size((I_eff - F_eff + stride + ceil_term) / stride);
     return std::pair<TensorDim, TensorDim>(pad_before, output_size);
   }
-  if (autopad_mode == AutopadMode::SAME_LOWER || autopad_mode == AutopadMode::SAME_UPPER) {
+  if (autopad_mode == AutoPadMode::SAME_LOWER || autopad_mode == AutoPadMode::SAME_UPPER) {
     TensorDim output_size((I_eff + stride - 1 + ceil_term) / stride);
-    int64_t lower_term = (autopad_mode == AutopadMode::SAME_LOWER) ? 1 : 0;
+    int64_t lower_term = (autopad_mode == AutoPadMode::SAME_LOWER) ? 1 : 0;
     TensorDim pad_before((max(0, (output_size - 1) * stride + F_eff - I_eff) + lower_term) / 2);
     return std::pair<TensorDim, TensorDim>(pad_before, output_size);
   }
@@ -765,15 +595,15 @@ Value convolution(const Value& value) {
   // TODO: Perhaps could upgrade use of filter_shape?
   auto filter_shape = args[5].as_int_tuple();  // This is the shape of the _spatial_ filter dims _only_
   auto groups = args[6].as_int();              // will be 1 for non-grouped convolutions
-  auto autopad_mode = autopad_mode_from_str(args[7].as_str());
+  auto autopad_mode = validate<AutoPadMode>(args[7].as_int());
   auto manual_padding = args[8].as_int_tuple();
-  auto input_layout = tensor_layout_from_str(args[9].as_str());
-  auto filter_layout = tensor_layout_from_str(args[10].as_str());
-  auto group_layout = group_layout_from_str(args[11].as_str());
+  auto input_layout = validate<TensorLayout>(args[9].as_int());
+  auto filter_layout = validate<TensorLayout>(args[10].as_int());
+  auto group_layout = validate<GroupLayout>(args[11].as_int());
   // auto winograd_allowed = args[12].as_bool();  // TODO: Implement Winograd
   auto name = args[13].as_str();
-  auto autogroup_mode = autogroup_mode_from_str(args[14].as_str());
-  auto deriv_mode = conv_deriv_mode_from_str(args[15].as_str());
+  auto autogroup_mode = validate<AutoGroupMode>(args[14].as_int());
+  auto deriv_mode = validate<ConvDerivMode>(args[15].as_int());
   auto result_shape = args[16].as_int_tuple();
 
   Tensor I;       // Inputs (i.e. Data) tensor
@@ -795,13 +625,15 @@ Value convolution(const Value& value) {
       I = I_or_O;
       O = F_or_O;
       break;
+    default:
+      throw std::runtime_error("Invalid ConvDerivMode");
   }
 
   // Initialize useful values
   auto spatial_rank = strides.size();
 
   // Verify inputs are consistent
-  if (manual_padding.size() && autopad_mode != AutopadMode::NONE) {
+  if (manual_padding.size() && autopad_mode != AutoPadMode::NONE) {
     throw std::runtime_error("Autopadding and manual padding both requested for single conv operation");
   }
   if (dilations.size() != spatial_rank) {
@@ -903,11 +735,11 @@ Value convolution(const Value& value) {
   // G may be explicit or automatically set, based on autogroup_mode
   TensorDim G_explicit(groups);
   switch (autogroup_mode) {
-    case AutogroupMode::EXPLICIT:
-    case AutogroupMode::UNGROUPED:
+    case AutoGroupMode::EXPLICIT:
+    case AutoGroupMode::UNGROUPED:
       G = G_explicit;
       break;
-    case AutogroupMode::DEPTHWISE:
+    case AutoGroupMode::DEPTHWISE:
       G = CI;
       if (group_layout == GroupLayout::IN_K || group_layout == GroupLayout::SEPARATE) {
         F_CI = TensorDim(1);
@@ -918,7 +750,7 @@ Value convolution(const Value& value) {
                                                to_string(group_layout)));
       }
       break;
-    case AutogroupMode::AUTO:
+    case AutoGroupMode::AUTO:
       if (group_layout == GroupLayout::SEPARATE || group_layout == GroupLayout::IN_K) {
         // just let G be inferred; i.e. do nothing  // nolint(whitespace/empty_if_body)
       } else {
@@ -927,7 +759,7 @@ Value convolution(const Value& value) {
       }
       break;
     default:
-      throw std::runtime_error("Unrecognized AutogroupMode");
+      throw std::runtime_error("Unrecognized AutoGroupMode");
   }
 
   // Set up dimensions of the inputs first so they can be bound Group layout
@@ -952,6 +784,8 @@ Value convolution(const Value& value) {
       // Later: F_CO = CO / G;
       // Later: F_CI = CI / G;
       break;
+    default:
+      throw std::runtime_error("Invalid group_layout");
   }
 
   // The input data dims
@@ -1061,6 +895,8 @@ Value convolution(const Value& value) {
       CO = F_CO * G;
       CI = F_CI * G;
       break;
+    default:
+      throw std::runtime_error("Invalid group_layout");
   }
 
   // Determine the padding and the shape of the result tensor
@@ -1516,8 +1352,8 @@ Value image_resize(const Value& value) {
   }
   auto raw_I = args[0];
   auto factors = args[1].as_int_tuple();
-  auto interp = interpolation_mode_from_str(args[2].as_str());
-  auto layout = tensor_layout_from_str(args[3].as_str());
+  auto interp = validate<InterpolationMode>(args[2].as_int());
+  auto layout = validate<TensorLayout>(args[3].as_int());
 
   for (const auto& scale_factor : factors) {
     if (scale_factor <= 0) {
@@ -1776,12 +1612,12 @@ Value pool(const Value& value) {
     throw std::runtime_error(llvm::formatv("PlaidML pool op expects 9 arguments (received {0})", args.size()));
   }
   auto I = args[0].as_tensor();
-  auto pool_mode = pool_mode_from_str(args[1].as_str());
+  auto pool_mode = validate<PoolMode>(args[1].as_int());
   auto pool_size = args[2].as_int_tuple();
   auto strides = args[3].as_int_tuple();
-  auto autopad_mode = autopad_mode_from_str(args[4].as_str());
+  auto autopad_mode = validate<AutoPadMode>(args[4].as_int());
   auto manual_padding = args[5].as_int_tuple();
-  auto input_layout = tensor_layout_from_str(args[6].as_str());
+  auto input_layout = validate<TensorLayout>(args[6].as_int());
   auto include_padding_in_avg = args[7].as_bool();
   auto use_ceil_for_output_shape = args[8].as_bool();
 
@@ -1790,7 +1626,7 @@ Value pool(const Value& value) {
   auto I_channel_dims = I.rank() - spatial_rank - 1;
 
   // Verify inputs are consistent
-  if (manual_padding.size() && autopad_mode != AutopadMode::NONE) {
+  if (manual_padding.size() && autopad_mode != AutoPadMode::NONE) {
     throw std::runtime_error("Autopadding and manual padding both requested for single pool operation");
   }
   if (strides.size() != spatial_rank) {
@@ -1970,13 +1806,9 @@ Value reshape(const Value& value) {
   auto target_shape = args[1].as_tuple();
   for (size_t i = 0; i < target_shape.size(); i++) {
     if (target_shape[i].is_int()) {
-      O_dims.emplace_back(target_shape[i].as_int());
-    } else if (target_shape[i].is_dim()) {
-      O_dims.emplace_back(target_shape[i].as_dim());
-    } else if (target_shape[i].is_str()) {
-      auto autodim_mode = autodim_mode_from_str(target_shape[i].as_str());
-      switch (autodim_mode) {
-        case (AutoDimMode::MATCH):
+      auto dim = target_shape[i].as_int();
+      switch (dim) {
+        case (AUTO_DIM_MATCH):
           if (i < I_dims.size()) {
             O_dims.emplace_back(I_dims[i]);
           } else {
@@ -1985,7 +1817,7 @@ Value reshape(const Value& value) {
           }
           break;
 
-        case (AutoDimMode::FILL):
+        case (AUTO_DIM_FILL):
           if (fill_dim) {
             throw std::runtime_error("at most one dimension's size may be inferred");
           }
@@ -1993,8 +1825,11 @@ Value reshape(const Value& value) {
           fill_dim = &O_dims.back();
           break;
         default:
-          throw std::runtime_error("Unrecognized AutoDimMode");
+          O_dims.emplace_back(dim);
+          break;
       }
+    } else if (target_shape[i].is_dim()) {
+      O_dims.emplace_back(target_shape[i].as_dim());
     } else if (target_shape[i].is_none()) {
       if (i < I_dims.size()) {
         O_dims.emplace_back(I_dims[i]);
@@ -2263,7 +2098,7 @@ Value spatial_padding(const Value& value) {
   auto I = args[0].as_tensor();
   auto lo_pads = args[1].as_int_tuple();
   auto hi_pads = args[2].as_int_tuple();
-  auto data_layout = tensor_layout_from_str(args[3].as_str());
+  auto data_layout = validate<TensorLayout>(args[3].as_int());
 
   // validate inputs
   auto nonspatial_ndims = nonspatial_dims(data_layout);

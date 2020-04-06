@@ -58,21 +58,40 @@ def _normalize_axis(axis, ndims, name=''):
 def _normalize_data_format(data_format):
     if data_format is None:
         data_format = image_data_format()
-    if data_format == 'channels_last':
-        return 'nxc'
-    if data_format == 'channels_first':
-        return 'ncx'
-    if data_format in ['nxc', 'ncx']:
-        return data_format
+    table = {
+        'channels_last': plaidml_op.TensorLayout.NXC,
+        'nxc': plaidml_op.TensorLayout.NXC,
+        'channels_first': plaidml_op.TensorLayout.NCX,
+        'ncx': plaidml_op.TensorLayout.NCX,
+    }
+    if data_format in table:
+        return table[data_format]
     raise ValueError('Unrecognized data_format "{}"'.format(data_format))
 
 
 def _normalize_padding(padding):
-    if padding == 'same':
-        return 'same_upper'
-    if padding in ['same_lower', 'same_upper', 'valid', 'full']:
-        return padding
+    table = {
+        'same': plaidml_op.AutoPadMode.SAME_UPPER,
+        'same_lower': plaidml_op.AutoPadMode.SAME_LOWER,
+        'same_upper': plaidml_op.AutoPadMode.SAME_UPPER,
+        'valid': plaidml_op.AutoPadMode.VALID,
+    }
+    if padding in table:
+        return table[padding]
     raise ValueError('Unrecognized padding type "{}"'.format(padding))
+
+
+def _normalize_pool_mode(mode):
+    table = {
+        'avg': plaidml_op.PoolMode.AVG,
+        'average': plaidml_op.PoolMode.AVG,
+        'max': plaidml_op.PoolMode.MAX,
+        'min': plaidml_op.PoolMode.MIN,
+        'sum': plaidml_op.PoolMode.SUM,
+    }
+    if mode in table:
+        return table[mode]
+    raise ValueError('Unrecognized pooling mode type "{}"'.format(mode))
 
 
 def _log_call(func):
@@ -545,11 +564,11 @@ def conv(x,
          dilation_rate=None,
          channelwise=False):
     if channelwise:
-        group_layout = 'in_C'
-        autogroup_mode = 'max'
+        group_layout = plaidml_op.GroupLayout.IN_C
+        autogroup_mode = plaidml_op.AutoGroupMode.DEPTHWISE
     else:
-        group_layout = 'none'
-        autogroup_mode = 'ungrouped'
+        group_layout = plaidml_op.GroupLayout.NONE
+        autogroup_mode = plaidml_op.AutoGroupMode.UNGROUPED
     rank = x.tensor.rank - 2
     if strides is None:
         strides = tuple(1 for _ in range(rank))
@@ -568,22 +587,23 @@ def conv(x,
             _normalize_padding(padding),
             [],
             _normalize_data_format(data_format),
-            'xck',
+            plaidml_op.TensorLayout.XCK,
             group_layout,
             False,  # winograd_allowed
             cur_name(),
             autogroup_mode,
-            'none',
-            []))
+            plaidml_op.ConvDerivMode.NONE,
+            [],
+        ))
 
 
 @_log_call
 def conv_transpose(x, kernel, output_shape, strides, padding, data_format, dilation_rate):
     # Keras gives every dim on the output_shape, but PlaidML expects to infer the channel dims; so restrict to spatial dims
     data_format = _normalize_data_format(data_format)
-    if data_format == 'nxc':
+    if data_format == plaidml_op.TensorLayout.NXC:
         output_shape = output_shape[1:-1]
-    elif data_format == 'ncx':
+    elif data_format == plaidml_op.TensorLayout.NCX:
         output_shape = output_shape[2:]
     else:
         raise ValueError('Could not parse data_format "{}"'.format(data_format))
@@ -605,13 +625,14 @@ def conv_transpose(x, kernel, output_shape, strides, padding, data_format, dilat
             _normalize_padding(padding),
             [],
             data_format,
-            'xck',
-            'none',
+            plaidml_op.TensorLayout.XCK,
+            plaidml_op.GroupLayout.NONE,
             False,  # winograd_allowed
             cur_name(),
-            'ungrouped',
-            'data',
-            output_shape))
+            plaidml_op.AutoGroupMode.UNGROUPED,
+            plaidml_op.ConvDerivMode.DATA,
+            output_shape,
+        ))
 
 
 @_log_call
@@ -1167,7 +1188,7 @@ def pool(x, pool_size, strides=None, padding='valid', data_format=None, pool_mod
     return _KerasNode('pool',
                       tensor=plaidml_op.pool(
                           x.tensor,
-                          pool_mode,
+                          _normalize_pool_mode(pool_mode),
                           pool_size,
                           strides,
                           _normalize_padding(padding),
@@ -1185,7 +1206,7 @@ def pool2d(x, pool_size, strides=(1, 1), padding='valid', data_format=None, pool
                 strides=strides,
                 padding=padding,
                 data_format=data_format,
-                pool_mode=pool_mode)
+                pool_mode=_normalize_pool_mode(pool_mode))
 
 
 @_log_call
@@ -1195,7 +1216,7 @@ def pool3d(x, pool_size, strides=(1, 1, 1), padding='valid', data_format=None, p
                 strides=strides,
                 padding=padding,
                 data_format=data_format,
-                pool_mode=pool_mode)
+                pool_mode=_normalize_pool_mode(pool_mode))
 
 
 @_log_call
@@ -1308,18 +1329,24 @@ def reshape(x, dims):
             else:
                 raise RuntimeError('Cannot parse dimension from {} for reshape'.format(s))
         if s == -1:
-            dims[i] = 'fill'
+            dims[i] = plaidml_op.AutoDimMode.FILL
             continue
         if s == 0:
-            dims[i] = 'match'
+            dims[i] = plaidml_op.AutoDimMode.MATCH
     return _KerasNode('reshape', tensor=plaidml_op.reshape(I, dims))
 
 
 @_log_call
 def resize_images(x, height_factor, width_factor, data_format, interpolation='nearest'):
+    table = {
+        'nearest': plaidml_op.InterpolationMode.NEAREST,
+        'bilinear': plaidml_op.InterpolationMode.BILINEAR,
+    }
+    if interpolation not in table:
+        raise ValueError('Unrecognized interpolation "{}"'.format(interpolation))
     return _KerasNode('resize_images',
                       tensor=plaidml_op.image_resize(x.tensor, (height_factor, width_factor),
-                                                     interpolation,
+                                                     table[interpolation],
                                                      _normalize_data_format(data_format)))
 
 

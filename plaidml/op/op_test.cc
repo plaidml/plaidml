@@ -198,24 +198,14 @@ module {
 TEST(Op, Convolution) {
   auto I = Placeholder(DType::FLOAT32, {1, 224, 224, 3}, "I");
   auto K = Placeholder(DType::FLOAT32, {7, 7, 3, 64}, "K");
-  auto O = op::convolution(  //
-      I,                     // I_or_O
-      K,                     // F_or_O
-      {2, 2},                // strides
-      {1, 1},                // dilations
-      {1, 1},                // data_dilations
-      {},                    // filter_shape
-      1,                     // groups
-      "explicit",            // autopad_mode
-      {3, 3},                // manual_padding
-      "nxc",                 // input_layout
-      "xck",                 // filter_layout
-      "none",                // group_layout
-      false,                 // winograd_allowed
-      "",                    // name
-      "ungrouped",           // autogroup_mode
-      "none",                // deriv_mode
-      {});                   // result_shape
+  auto O = op::convolution(I, K)
+               .strides({2, 2})
+               .dilations({1, 1})
+               .data_dilations({1, 1})
+               .autopad_mode(AutoPadMode::EXPLICIT)
+               .manual_padding({3, 3})
+               .input_layout(TensorLayout::NXC)
+               .filter_layout(TensorLayout::XCK);
   auto program = makeProgram("convolution", {O});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"#(
@@ -381,7 +371,7 @@ module {
 
 TEST(Op, ImageResize) {
   auto I = Placeholder(DType::FLOAT32, {1, 224, 224, 3}, "I");
-  auto image_resize = op::image_resize(I, std::vector<int>{5, 4}, "bilinear", "nxc");
+  auto image_resize = op::image_resize(I, std::vector<int>{5, 4}, InterpolationMode::BILINEAR, TensorLayout::NXC);
   auto program = makeProgram("image_resize", {image_resize});
   IVLOG(1, program);
 }
@@ -481,7 +471,8 @@ module {
 
 TEST(Op, Pool) {
   auto I = Placeholder(DType::FLOAT32, {10, 20, 30, 40, 50}, "I");
-  auto program = makeProgram("pool", {op::pool(I, "sum", {1, 2, 3}, {1, 2, 3}, "none", {1, 2}, "nwc", true, true)});
+  auto program = makeProgram("pool", {op::pool(I, PoolMode::SUM, {1, 2, 3}, {1, 2, 3}, AutoPadMode::NONE, {1, 2},
+                                               TensorLayout::NXC, true, true)});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"#(
 #map0 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4)>
@@ -726,7 +717,7 @@ TEST(Op, SpatialPadding) {
       A,                         // tensor to perform spatial padding on
       {1, 3},                    // low pads
       {3, 3},                    // high pads
-      "nchw");                   // data layout
+      TensorLayout::NXC);        // data layout
   auto program = makeProgram("spatial_padding", {X});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"#(
