@@ -8,11 +8,14 @@ namespace mlir {
 class Pass;
 } // namespace mlir
 
-namespace pmlc::conversion::gpu {
+namespace pmlc::conversion::gpu_to_vulkan {
 
 std::unique_ptr<mlir::Pass> createLegalizeGpuOpForGpuLoweringPass();
 
 std::unique_ptr<mlir::Pass> createConvertGpuLaunchFuncToVulkanCallsPass();
 
 std::unique_ptr<mlir::Pass> createConvertVulkanLaunchFuncToVulkanCallsPass();
-} // namespace pmlc::conversion::gpu
+
+std::unique_ptr<mlir::Pass> createLowerGpuToVulkanCallsPass();
+
+} // namespace pmlc::conversion::gpu_to_vulkan

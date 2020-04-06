@@ -98,9 +98,7 @@ public:
 private:
   VulkanRuntime vulkanRuntime;
   std::mutex mutex;
-}; // namespace
-
-} // namespace
+};
 
 template <typename T, int N>
 struct MemRefDescriptor {
@@ -111,93 +109,76 @@ struct MemRefDescriptor {
   int64_t strides[N];
 };
 
+} // namespace
+
 extern "C" {
-VULKAN_RT_EXPORT void *initVulkan();
-VULKAN_RT_EXPORT void deinitVulkan(void *vkRuntimeManager);
-VULKAN_RT_EXPORT void createLaunchKernelAction(void *vkRuntimeManager);
-VULKAN_RT_EXPORT void createMemoryTransferAction(void *vkRuntimeManager,
-                                                 uint64_t src_index,
-                                                 uint64_t src_binding,
-                                                 uint64_t dst_index,
-                                                 uint64_t dst_binding);
-VULKAN_RT_EXPORT void runOnVulkan(void *vkRuntimeManager);
-VULKAN_RT_EXPORT void submitCommandBuffers(void *vkRuntimeManager);
-VULKAN_RT_EXPORT void setEntryPoint(void *vkRuntimeManager,
-                                    const char *entryPoint);
-VULKAN_RT_EXPORT void setNumWorkGroups(void *vkRuntimeManager, uint32_t x,
-                                       uint32_t y, uint32_t z);
-VULKAN_RT_EXPORT void setBinaryShader(void *vkRuntimeManager, uint8_t *shader,
-                                      uint32_t size);
-VULKAN_RT_EXPORT void bindMemRef1DFloat(void *vkRuntimeManager,
-                                        DescriptorSetIndex setIndex,
-                                        BindingIndex bindIndex,
-                                        MemRefDescriptor<float, 1> *ptr);
-VULKAN_RT_EXPORT void bindMemRef2DFloat(void *vkRuntimeManager,
-                                        DescriptorSetIndex setIndex,
-                                        BindingIndex bindIndex,
-                                        MemRefDescriptor<float, 2> *ptr);
-VULKAN_RT_EXPORT void
-_mlir_ciface_fillResource1DFloat(MemRefDescriptor<float, 1> *ptr, float value);
 
 /// Initializes `VulkanRuntimeManager` and returns a pointer to it.
-void *initVulkan() { return new VulkanRuntimeManager(); }
+VULKAN_RT_EXPORT void *initVulkan() { return new VulkanRuntimeManager(); }
 
-void createLaunchKernelAction(void *vkRuntimeManager) {
+/// Deinitializes `VulkanRuntimeManager` by the given pointer.
+VULKAN_RT_EXPORT void deinitVulkan(void *vkRuntimeManager) {
+  delete reinterpret_cast<VulkanRuntimeManager *>(vkRuntimeManager);
+}
+
+VULKAN_RT_EXPORT void createLaunchKernelAction(void *vkRuntimeManager) {
   reinterpret_cast<VulkanRuntimeManager *>(vkRuntimeManager)
       ->createLaunchKernelAction();
 }
 
-void createMemoryTransferAction(void *vkRuntimeManager, uint64_t src_index,
-                                uint64_t src_binding, uint64_t dst_index,
-                                uint64_t dst_binding) {
+VULKAN_RT_EXPORT void createMemoryTransferAction(void *vkRuntimeManager,
+                                                 uint64_t src_index,
+                                                 uint64_t src_binding,
+                                                 uint64_t dst_index,
+                                                 uint64_t dst_binding) {
   reinterpret_cast<VulkanRuntimeManager *>(vkRuntimeManager)
       ->createMemoryTransferAction(src_index, src_binding, dst_index,
                                    dst_binding);
 }
 
-/// Deinitializes `VulkanRuntimeManager` by the given pointer.
-void deinitVulkan(void *vkRuntimeManager) {
-  delete reinterpret_cast<VulkanRuntimeManager *>(vkRuntimeManager);
-}
-
-void runOnVulkan(void *vkRuntimeManager) {
+VULKAN_RT_EXPORT void runOnVulkan(void *vkRuntimeManager) {
   reinterpret_cast<VulkanRuntimeManager *>(vkRuntimeManager)->runOnVulkan();
 }
 
-void submitCommandBuffers(void *vkRuntimeManager) {
+VULKAN_RT_EXPORT void submitCommandBuffers(void *vkRuntimeManager) {
   reinterpret_cast<VulkanRuntimeManager *>(vkRuntimeManager)
       ->submitCommandBuffers();
 }
 
-void setEntryPoint(void *vkRuntimeManager, const char *entryPoint) {
+VULKAN_RT_EXPORT void setEntryPoint(void *vkRuntimeManager,
+                                    const char *entryPoint) {
   reinterpret_cast<VulkanRuntimeManager *>(vkRuntimeManager)
       ->setEntryPoint(entryPoint);
 }
 
-void setNumWorkGroups(void *vkRuntimeManager, uint32_t x, uint32_t y,
-                      uint32_t z) {
+VULKAN_RT_EXPORT void setNumWorkGroups(void *vkRuntimeManager, uint32_t x,
+                                       uint32_t y, uint32_t z) {
   reinterpret_cast<VulkanRuntimeManager *>(vkRuntimeManager)
       ->setNumWorkGroups({x, y, z});
 }
 
-void setBinaryShader(void *vkRuntimeManager, uint8_t *shader, uint32_t size) {
+VULKAN_RT_EXPORT void setBinaryShader(void *vkRuntimeManager, uint8_t *shader,
+                                      uint32_t size) {
   reinterpret_cast<VulkanRuntimeManager *>(vkRuntimeManager)
       ->setShaderModule(shader, size);
 }
+
 /// Binds the given 1D float memref to the given descriptor set and descriptor
 /// index.
-void bindMemRef1DFloat(void *vkRuntimeManager, DescriptorSetIndex setIndex,
-                       BindingIndex bindIndex,
-                       MemRefDescriptor<float, 1> *ptr) {
+VULKAN_RT_EXPORT void bindMemRef1DFloat(void *vkRuntimeManager,
+                                        DescriptorSetIndex setIndex,
+                                        BindingIndex bindIndex,
+                                        MemRefDescriptor<float, 1> *ptr) {
   VulkanHostMemoryBuffer memBuffer{
       ptr->allocated, static_cast<uint32_t>(ptr->sizes[0] * sizeof(float))};
   reinterpret_cast<VulkanRuntimeManager *>(vkRuntimeManager)
       ->setResourceData(setIndex, bindIndex, memBuffer);
 }
 
-void bindMemRef2DFloat(void *vkRuntimeManager, DescriptorSetIndex setIndex,
-                       BindingIndex bindIndex,
-                       MemRefDescriptor<float, 2> *ptr) {
+VULKAN_RT_EXPORT void bindMemRef2DFloat(void *vkRuntimeManager,
+                                        DescriptorSetIndex setIndex,
+                                        BindingIndex bindIndex,
+                                        MemRefDescriptor<float, 2> *ptr) {
   VulkanHostMemoryBuffer memBuffer{
       ptr->allocated,
       static_cast<uint32_t>(ptr->sizes[0] * ptr->sizes[1] * sizeof(float))};
@@ -206,8 +187,9 @@ void bindMemRef2DFloat(void *vkRuntimeManager, DescriptorSetIndex setIndex,
 }
 
 /// Fills the given 1D float memref with the given float value.
-void _mlir_ciface_fillResource1DFloat(MemRefDescriptor<float, 1> *ptr,
-                                      float value) {
+VULKAN_RT_EXPORT void
+_mlir_ciface_fillResource1DFloat(MemRefDescriptor<float, 1> *ptr, float value) {
   std::fill_n(ptr->allocated, ptr->sizes[0], value);
 }
+
 } // extern "C"

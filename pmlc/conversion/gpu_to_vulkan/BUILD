@@ -1,11 +1,11 @@
-# Copyright 2020 Intel Corporation.
+# Copyright 2020 Intel Corporation
 
 package(default_visibility = ["//visibility:public"])
 
 load("//bzl:plaidml.bzl", "plaidml_cc_library")
 
 plaidml_cc_library(
-    name = "gpu",
+    name = "gpu_to_vulkan",
     srcs = glob(["*.cc"]),
     hdrs = glob(["*.h"]),
     deps = [

@@ -260,12 +260,16 @@ void ConvertGpuLaunchFuncToVulkanLaunchFunc::convertGpuLaunchFunc(
 
   // Serialize `spirv::Module` into binary form.
   std::vector<char> binary;
-  if (failed(createBinaryShader(module, binary)))
+  if (failed(createBinaryShader(module, binary))) {
+    launchOp.emitOpError("Failed to create SPIR-V binary");
     return signalPassFailure();
+  }
 
   // Declare vulkan launch function.
-  if (failed(declareVulkanLaunchFunc(loc, launchOp)))
+  if (failed(declareVulkanLaunchFunc(loc, launchOp))) {
+    launchOp.emitOpError("Failed to declare Vulkan launch functions");
     return signalPassFailure();
+  }
 
   auto operands = SmallVector<Value, 4>(launchOp.getOperands());
 
@@ -275,6 +279,8 @@ void ConvertGpuLaunchFuncToVulkanLaunchFunc::convertGpuLaunchFunc(
       loc, ArrayRef<Type>{},
       builder.getSymbolRefAttr(kVulkanLaunch + std::to_string(lauchFuncIndex)),
       operands);
+
+  IVLOG(1, "binary: " << binary.size());
 
   // Set SPIR-V binary shader data as an attribute.
   vulkanLaunchCallOp.setAttr(

@@ -11,6 +11,7 @@ filegroup(
 filegroup(
     name = "lit_tests",
     srcs = [
+        "//pmlc/conversion/gpu_to_vulkan/tests:all",
         "//pmlc/conversion/stdx_to_llvm/tests:all",
         "//pmlc/conversion/tile_to_pxa/tests:all",
         "//pmlc/dialect/eltwise/tests:all",
@@ -39,7 +40,7 @@ plaidml_cc_library(
     name = "all_passes_and_dialects_no_registration",
     visibility = ["//visibility:public"],
     deps = [
-        "//pmlc/conversion/gpu",
+        "//pmlc/conversion/gpu_to_vulkan",
         "//pmlc/conversion/pxa_to_affine",
         "//pmlc/conversion/stdx_to_llvm",
         "//pmlc/conversion/tile_to_pxa",
@@ -47,6 +48,7 @@ plaidml_cc_library(
         "//pmlc/dialect/pxa",
         "//pmlc/dialect/stdx",
         "//pmlc/dialect/tile",
+        "//pmlc/dialect/vulkan",
         "//pmlc/dialect/xsmm",
         "//pmlc/target/intel_gen",
         "//pmlc/target/x86",

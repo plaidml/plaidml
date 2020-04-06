@@ -22,8 +22,11 @@
 #include "mlir/IR/Function.h"
 #include "mlir/IR/Module.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Support/DebugStringHelper.h"
 
 #include "llvm/ADT/SmallString.h"
+
+#include "pmlc/util/logging.h"
 
 using namespace mlir; // NOLINT[build/namespaces]
 
@@ -173,6 +176,7 @@ void VulkanLaunchFuncToVulkanCallsPass::runOnModule() {
   // Collect SPIR-V attributes such as `spirv_blob` and
   // `spirv_entry_point_name`.
   getModule().walk([this](LLVM::CallOp op) {
+    IVLOG(1, "CallOp: " << mlir::debugString(*op));
     if (isVulkanLaunchCallOp(op))
       collectSPIRVAttributes(op);
   });
@@ -389,7 +393,9 @@ namespace pmlc::conversion::gpu {
 std::unique_ptr<mlir::Pass> createConvertVulkanLaunchFuncToVulkanCallsPass() {
   return std::make_unique<VulkanLaunchFuncToVulkanCallsPass>();
 }
+
 } // namespace pmlc::conversion::gpu
+
 static PassRegistration<VulkanLaunchFuncToVulkanCallsPass>
     pass("pmlc-launch-func-to-vulkan",
          "Convert vulkanLaunch external call to Vulkan runtime external calls");

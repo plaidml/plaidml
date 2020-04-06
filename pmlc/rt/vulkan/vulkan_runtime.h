@@ -244,6 +244,8 @@ private:
   uint32_t memoryTypeIndex{VK_MAX_MEMORY_TYPES};
   VkDeviceSize memorySize{0};
 
+  // See:
+  // https://github.com/KhronosGroup/Vulkan-Docs/wiki/Synchronization-Examples
   std::vector<ActionPtr> schedule;
 
   llvm::SmallVector<VkCommandBuffer, 1> commandBuffers;

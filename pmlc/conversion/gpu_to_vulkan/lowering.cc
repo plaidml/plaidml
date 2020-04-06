@@ -1,6 +1,6 @@
 // Copyright 2020 Intel Corporation
 
-#include "pmlc/conversion/gpu/lowering.h"
+#include "pmlc/conversion/gpu_to_vulkan/lowering.h"
 
 #include <vector>
 

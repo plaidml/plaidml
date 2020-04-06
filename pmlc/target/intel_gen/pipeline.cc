@@ -15,7 +15,7 @@
 #include "mlir/Transforms/Passes.h"
 
 #include "pmlc/compiler/registry.h"
-#include "pmlc/conversion/gpu/lowering.h"
+#include "pmlc/conversion/gpu_to_vulkan/lowering.h"
 #include "pmlc/conversion/pxa_to_affine/pxa_to_affine.h"
 #include "pmlc/conversion/tile_to_pxa/tile_to_pxa.h"
 #include "pmlc/dialect/tile/transforms/passes.h"
@@ -55,7 +55,7 @@ void addToPipeline(OpPassManager &pm) {
   pm.addPass(createLegalizeStdOpsForSPIRVLoweringPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
-  pm.addPass(conversion::gpu::createLegalizeGpuOpForGpuLoweringPass());
+  // pm.addPass(conversion::gpu::createLegalizeGpuOpForGpuLoweringPass());
   pm.addPass(createConvertGPUToSPIRVPass());
   // pm.addPass(std::make_unique<IREEGPUToSPIRVPass>());
 
@@ -66,9 +66,9 @@ void addToPipeline(OpPassManager &pm) {
   pm.addPass(createCSEPass());
 
   // GPU to Vulkan.
-  pm.addPass(conversion::gpu::createConvertGpuLaunchFuncToVulkanCallsPass());
+  // pm.addPass(conversion::gpu::createConvertGpuLaunchFuncToVulkanCallsPass());
   pm.addPass(createLowerToLLVMPass(false, false, true));
-  pm.addPass(conversion::gpu::createConvertVulkanLaunchFuncToVulkanCallsPass());
+  // pm.addPass(conversion::gpu::createConvertVulkanLaunchFuncToVulkanCallsPass());
 }
 
 static PassPipelineRegistration<>
