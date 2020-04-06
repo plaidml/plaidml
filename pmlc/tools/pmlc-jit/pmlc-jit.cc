@@ -9,10 +9,6 @@
 // Main entry point to a command line utility that executes an MLIR file on the
 // CPU by translating MLIR to LLVM IR before JIT-compiling and executing the
 // latter.
-//
-// The implementation also supports specifying an expected runtime_error being
-// thrown and validates with no failure the expected string is correctly
-// thrown.
 //===----------------------------------------------------------------------===//
 
 #include <stdexcept>
@@ -35,8 +31,8 @@ int main(int argc, char **argv) {
 
   try {
     return mlir::JitRunnerMain(argc, argv, nullptr);
-  } catch (const std::runtime_error &e) {
-    llvm::outs() << e.what();
+  } catch (const std::exception &e) {
+    llvm::outs() << "ERROR: " << e.what();
   }
 
   return 0;

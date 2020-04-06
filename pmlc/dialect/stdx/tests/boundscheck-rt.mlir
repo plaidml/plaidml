@@ -7,7 +7,6 @@ module {
   }
   
   func @main() {
-    // Lubo %4 = alloca %"class.std::runtime_error", align 8
     %i = constant 0 : index
     %j = constant 10 : index // out of bounds
     %buf = alloc() : memref<20x10xf32>
@@ -15,5 +14,5 @@ module {
     dealloc %buf : memref<20x10xf32>
     return
   }
-  // CHECK: Out of bounds index for mlir::LoadOp or mlir::StoreOp
+  // CHECK: ERROR: Out of bounds index for mlir::LoadOp or mlir::StoreOp
 }
