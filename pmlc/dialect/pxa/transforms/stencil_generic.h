@@ -60,8 +60,8 @@ private:
   void RecursiveBindIndex(llvm::SmallVector<mlir::BlockArgument, 8> *bound_idxs,
                           const llvm::SmallVector<mlir::Value, 3> &tensors);
   void RecursiveTileIndex(const TensorAndIndexPermutation &perm,
-                          llvm::SmallVector<int64_t, 8> *tile_size,
-                          int64_t curr_idx);
+                          llvm::SmallVector<int64_t, 8> *tileSize,
+                          int64_t currIdx);
 
 protected: // TODO: private backend for some of this?
   virtual llvm::Optional<LoadStoreOps> capture() = 0;
@@ -71,16 +71,16 @@ protected: // TODO: private backend for some of this?
                          ArrayRef<int64_t> tileSize) = 0;
 
   // The number of indexes whose semantics must be considered in the tiling
-  unsigned semantic_idx_count; // TODO: how/where to initialize?
+  unsigned semanticIdxCount; // TODO: how/where to initialize?
 
   // The ParallelOp that is being stenciled.
   mlir::AffineParallelOp op;
 
   // The BlockArguments of `op` (stored as a set for easy lookup)
-  BlockArgumentSet block_args;
+  BlockArgumentSet blockArgs;
 
   // The load and store ops
-  LoadStoreOps loads_and_stores;
+  LoadStoreOps loadsAndStores;
 
   // The range of each index (cached result of op.getConstantRanges())
   llvm::SmallVector<int64_t, 8> ranges;
@@ -94,19 +94,19 @@ protected: // TODO: private backend for some of this?
 
   // For each semantically relevant index, a generator for tile sizes. Ordered
   // to match the index permutation.
-  llvm::SmallVector<TileSizeGenerator, 5> tiling_generators;
+  llvm::SmallVector<TileSizeGenerator, 5> tilingGenerators;
 
-  double best_cost;
-  TensorAndIndexPermutation best_permutation;
+  double bestCost;
+  TensorAndIndexPermutation bestPermutation;
   llvm::SmallVector<int64_t, 8>
-      best_tiling; // only makes sense paired with `best_permutation`
-  std::list<TensorAndIndexPermutation> legal_permutations;
+      bestTiling; // only makes sense paired with `bestPermutation`
+  std::list<TensorAndIndexPermutation> legalPermutations;
 
 public:
   explicit StencilGeneric(mlir::AffineParallelOp op)
-      : op(op), best_cost(std::numeric_limits<double>::infinity()) {
-    for (auto block_arg : op.getBody()->getArguments()) {
-      block_args.insert(block_arg);
+      : op(op), bestCost(std::numeric_limits<double>::infinity()) {
+    for (auto blockArg : op.getBody()->getArguments()) {
+      blockArgs.insert(blockArg);
     }
   }
 

@@ -102,9 +102,9 @@ private:
   }
 
   void transform(TensorAndIndexPermutation perm, ArrayRef<int64_t> tileSize) {
-    IVLOG(2, "Best Perf: " << best_cost);
+    IVLOG(2, "Best Perf: " << bestCost);
     IVLOG(2, "Best Tensor/Index Permutations: TODO: print");
-    IVLOG(2, "Best Tiling: " << best_tiling[0]);
+    IVLOG(2, "Best Tiling: " << bestTiling[0]);
 
     op.setAttr("is_gemm", mlir::UnitAttr::get(op.getContext()));
   }
@@ -113,7 +113,7 @@ public:
   explicit StencilXSMM(mlir::AffineParallelOp op) : StencilGeneric{op} {
     // TODO ctor
     // TODO: Probably want to move these to be params on StencilGeneric ctor...
-    semantic_idx_count = 1; // TODO
+    semanticIdxCount = 1; // TODO
     requirements =
         std::map<std::pair<int64_t, int64_t>,
                  std::function<bool(mlir::Value, mlir::BlockArgument)>>{
@@ -140,12 +140,12 @@ public:
             // {{2, 2}, [](mlir::Value v, mlir::BlockArgument a){ return
             // stride_of(v, a) == 0 }},
         };
-    tiling_generators.push_back(PowerOfTwoGenerator());
+    tilingGenerators.push_back(PowerOfTwoGenerator());
   }
 };
 
 struct XSMMStencilPass : public mlir::FunctionPass<XSMMStencilPass> {
-  // I probably actually need config for requirements & tiling_generators
+  // I probably actually need config for requirements & tilingGenerators
 
   XSMMStencilPass() {}
 

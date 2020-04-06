@@ -36,7 +36,7 @@ class Orderer {
 public:
   Orderer(unsigned ord, V value) : ord_{ord}, value_{std::forward<V>(value)} {}
 
-  void set_ord(unsigned ord) { ord_ = ord; }
+  void setOrd(unsigned ord) { ord_ = ord; }
   unsigned ord() const { return ord_; }
 
   V &operator*() { return value_; }
@@ -61,8 +61,8 @@ std::ostream &operator<<(std::ostream &os, const Orderer<V> &v) {
 template <typename V>
 void swap(Orderer<V> &v1, Orderer<V> &v2) {
   unsigned v1o = v1.ord();
-  v1.set_ord(v2.ord());
-  v2.set_ord(v1o);
+  v1.setOrd(v2.ord());
+  v2.setOrd(v1o);
   std::swap(*v1, *v2);
 }
 
@@ -70,143 +70,140 @@ void swap(Orderer<V> &v1, Orderer<V> &v2) {
 
 void StencilGeneric::BindIndexes(
     const llvm::SmallVector<mlir::Value, 3> &tensors) {
-  llvm::SmallVector<mlir::BlockArgument, 8> empty_bound_idxs_vector;
-  RecursiveBindIndex(&empty_bound_idxs_vector, tensors);
+  llvm::SmallVector<mlir::BlockArgument, 8> emptyBoundIdxsVector;
+  RecursiveBindIndex(&emptyBoundIdxsVector, tensors);
 }
 
-// TODO: Better to maintain bound_idxs as both set & vector, or just vector?
+// TODO: Better to maintain boundIdxs as both set & vector, or just vector?
 //   Or could maintain as map from BlockArg to numeric index (i.e. where it
 //   would have been were it a vector)
 // TODO: Also, should probably at least be a small vector (how small?)
 void StencilGeneric::RecursiveBindIndex(
-    llvm::SmallVector<mlir::BlockArgument, 8> *bound_idxs,
+    llvm::SmallVector<mlir::BlockArgument, 8> *boundIdxs,
     const llvm::SmallVector<mlir::Value, 3> &tensors) {
-  auto curr_idx = bound_idxs->size();
-  if (curr_idx == semantic_idx_count) {
+  auto currIdx = boundIdxs->size();
+  if (currIdx == semanticIdxCount) {
     // This is a legal binding, go find a tiling for it
-    llvm::SmallVector<int64_t, 8> curr_tile_size(semantic_idx_count);
-    RecursiveTileIndex(TensorAndIndexPermutation(tensors, *bound_idxs),
-                       &curr_tile_size, 0);
+    llvm::SmallVector<int64_t, 8> currTileSize(semanticIdxCount);
+    RecursiveTileIndex(TensorAndIndexPermutation(tensors, *boundIdxs),
+                       &currTileSize, 0);
   } else {
-    for (const auto &block_arg : block_args) {
+    for (const auto &blockArg : blockArgs) {
       // Don't bind same index twice
-      if (std::find(bound_idxs->begin(), bound_idxs->end(), block_arg) !=
-          bound_idxs->end()) {
+      if (std::find(boundIdxs->begin(), boundIdxs->end(), blockArg) !=
+          boundIdxs->end()) {
         continue;
       }
 
       // Verify the requirements for this index with each tensor are all met
-      bool reqs_met = true;
+      bool reqsMet = true;
       for (unsigned i = 0; i < tensors.size(); i++) {
         try { // TODO: probably don't keep long term
-          if (!requirements.at(std::make_pair(i, curr_idx))(tensors[i],
-                                                            block_arg)) {
-            reqs_met = false;
+          if (!requirements.at(std::make_pair(i, currIdx))(tensors[i],
+                                                           blockArg)) {
+            reqsMet = false;
             break;
           }
         } catch (const std::out_of_range &e) {
           IVLOG(1, "Error message: " << e.what());
-          IVLOG(1, "Requested key was: " << std::make_pair(i, curr_idx));
+          IVLOG(1, "Requested key was: " << std::make_pair(i, currIdx));
           throw;
         }
       }
-      if (!reqs_met) {
+      if (!reqsMet) {
         continue;
       }
 
       // If we made it to here, this index has appropriate semantics; bind it
       // and recurse
-      bound_idxs->push_back(block_arg);
-      RecursiveBindIndex(bound_idxs, tensors);
-      bound_idxs->pop_back();
+      boundIdxs->push_back(blockArg);
+      RecursiveBindIndex(boundIdxs, tensors);
+      boundIdxs->pop_back();
     }
   }
 }
 
-void StencilGeneric::RecursiveTileIndex(      //
-    const TensorAndIndexPermutation &perm,    //
-    llvm::SmallVector<int64_t, 8> *tile_size, //
-    int64_t curr_idx) {
-  assert(tile_size->size() == semantic_idx_count);
-  if (curr_idx == semantic_idx_count) {
-    auto cost = getCost(perm, *tile_size);
-    if (cost < best_cost) {
-      best_cost = cost;
-      best_permutation = perm;
-      best_tiling = llvm::SmallVector<int64_t, 8>(tile_size->size());
-      for (auto sz : *tile_size) {
-        best_tiling[sz] = (*tile_size)[sz];
+void StencilGeneric::RecursiveTileIndex(     //
+    const TensorAndIndexPermutation &perm,   //
+    llvm::SmallVector<int64_t, 8> *tileSize, //
+    int64_t currIdx) {
+  assert(tileSize->size() == semanticIdxCount);
+  if (currIdx == semanticIdxCount) {
+    auto cost = getCost(perm, *tileSize);
+    if (cost < bestCost) {
+      bestCost = cost;
+      bestPermutation = perm;
+      bestTiling = llvm::SmallVector<int64_t, 8>(tileSize->size());
+      for (auto sz : *tileSize) {
+        bestTiling[sz] = (*tileSize)[sz];
       }
     }
   } else {
     // TODO: Setup cache for the generator
-    for (int64_t curr_idx_tile_size : tiling_generators[curr_idx](
-             ranges[perm.indexes[curr_idx].getArgNumber()])) {
-      (*tile_size)[curr_idx] = curr_idx_tile_size;
-      RecursiveTileIndex(perm, tile_size, curr_idx + 1);
+    for (int64_t currIdxTileSize : tilingGenerators[currIdx](
+             ranges[perm.indexes[currIdx].getArgNumber()])) {
+      (*tileSize)[currIdx] = currIdxTileSize;
+      RecursiveTileIndex(perm, tileSize, currIdx + 1);
     }
   }
 }
 
 void StencilGeneric::DoStenciling() {
   // Initialization
-  auto maybe_ranges = op.getConstantRanges();
-  if (maybe_ranges) {
-    ranges = maybe_ranges.getValue(); // TODO: Is this how to use Optional?
+  auto maybeRanges = op.getConstantRanges();
+  if (maybeRanges) {
+    ranges = maybeRanges.getValue(); // TODO: Is this how to use Optional?
   } else {
     IVLOG(4, "Cannot Stencil: Requires constant ranges");
     return;
   }
 
-  auto maybe_loads_and_stores = capture();
-  if (maybe_loads_and_stores) {
-    loads_and_stores = maybe_loads_and_stores.getValue();
+  auto maybeLoadsAndStores = capture();
+  if (maybeLoadsAndStores) {
+    loadsAndStores = maybeLoadsAndStores.getValue();
   } else {
     IVLOG(4, "Cannot Stencil: Operations fail to pattern-match.");
     return;
   }
 
-  llvm::SmallVector<Orderer<mlir::Value>, 3> order_tracked_tensors;
+  llvm::SmallVector<Orderer<mlir::Value>, 3> orderableTensors;
   unsigned ord = 0;
-  for (auto &load_op : loads_and_stores.loads) {
-    order_tracked_tensors.push_back(
-        Orderer<mlir::Value>(ord++, load_op.getMemRef()));
+  for (auto &loadOp : loadsAndStores.loads) {
+    orderableTensors.push_back(Orderer<mlir::Value>(ord++, loadOp.getMemRef()));
   }
-  size_t first_store_idx = order_tracked_tensors.size();
-  for (auto &store_op : loads_and_stores.stores) {
-    order_tracked_tensors.push_back(
-        Orderer<mlir::Value>(ord++, store_op.out()));
+  size_t firstStoreIdx = orderableTensors.size();
+  for (auto &storeOp : loadsAndStores.stores) {
+    orderableTensors.push_back(Orderer<mlir::Value>(ord++, storeOp.out()));
     // TODO: Probably should handle reduces vs. true stores in a different way
-    // if (auto reduce_op = llvm::dyn_cast_or_null<AffineReduceOp>(store_op)) {
+    // if (auto reduce_op = llvm::dyn_cast_or_null<AffineReduceOp>(storeOp)) {
     //   tensors.push_back(reduce_op.out());
-    // } else if (auto true_store_op =
-    // llvm::dyn_cast_or_null<mlir::AffineStoreOp>(store_op)) {
-    //   tensors.push_back(true_store_op.getMemRef());
+    // } else if (auto trueStoreOp =
+    // llvm::dyn_cast_or_null<mlir::AffineStoreOp>(storeOp)) {
+    //   tensors.push_back(trueStoreOp.getMemRef());
     // } else {
     //   // TODO: throw?
     //   IVLOG(1, "Unexpected failure to load tensors from ops in stenciling");
     //   return;
     // }
   }
-  auto last_load_first_store_it =
-      order_tracked_tensors.begin() + first_store_idx;
-  std::sort(order_tracked_tensors.begin(), last_load_first_store_it);
+  auto lastLoadFirstStoreIt = orderableTensors.begin() + firstStoreIdx;
+  std::sort(orderableTensors.begin(), lastLoadFirstStoreIt);
   do { // Each load tensor permutation
-    std::sort(last_load_first_store_it, order_tracked_tensors.end());
+    std::sort(lastLoadFirstStoreIt, orderableTensors.end());
     do { // Each store tensor permutation
-      // Add all legal permutations to legal_permutations
+      // Add all legal permutations to legalPermutations
       llvm::SmallVector<mlir::Value, 3> tensors;
-      for (const auto &ott : order_tracked_tensors) {
-        tensors.push_back(*ott);
+      for (const auto &tn : orderableTensors) {
+        tensors.push_back(*tn);
       }
       BindIndexes(tensors);
-    } while (std::next_permutation(last_load_first_store_it,
-                                   order_tracked_tensors.end()));
-  } while (std::next_permutation(order_tracked_tensors.begin(),
-                                 last_load_first_store_it));
+    } while (
+        std::next_permutation(lastLoadFirstStoreIt, orderableTensors.end()));
+  } while (
+      std::next_permutation(orderableTensors.begin(), lastLoadFirstStoreIt));
 
-  if (best_cost < std::numeric_limits<double>::infinity()) {
-    transform(best_permutation, best_tiling);
+  if (bestCost < std::numeric_limits<double>::infinity()) {
+    transform(bestPermutation, bestTiling);
   } else {
     IVLOG(3, "No legal tiling found to stencil");
   }
