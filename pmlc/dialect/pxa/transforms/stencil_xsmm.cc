@@ -36,7 +36,7 @@ private:
     if (body->getOperations().size() != kNumValidInstrInGemmRegion) {
       IVLOG(5, "The AffineParallelOp region didn't have the right number of "
                "instructions for a GEMM");
-      return llvm::Optional<LoadStoreOps>(); // i.e. fail to pattern-match
+      return llvm::None;
     }
 
     // Find the Reduce Op
@@ -45,7 +45,7 @@ private:
     if (!reduceOp) {
       IVLOG(5, "The AffineParallelOp region didn't have a reduce as its last "
                "non-terminator");
-      return llvm::Optional<LoadStoreOps>(); // i.e. fail to pattern-match
+      return llvm::None;
     }
     ret.stores.push_back(reduceOp);
     IVLOG(5, "Found ReduceOp");
@@ -53,7 +53,7 @@ private:
     // Now check the reduceOp aggregation.
     if (reduceOp.agg() != AggregationKind::add) {
       IVLOG(5, "the reduce operation is not addition");
-      return llvm::Optional<LoadStoreOps>(); // i.e. fail to pattern-match
+      return llvm::None;
     }
 
     // Get the operand for the reduce op and make sure it is the result of a
@@ -62,7 +62,7 @@ private:
     if (!defOp) {
       IVLOG(5,
             "the source of the reduce operation is not defined in this block");
-      return llvm::Optional<LoadStoreOps>(); // i.e. fail to pattern-match
+      return llvm::None;
     }
 
     mlir::AffineLoadOp lhs;
@@ -79,7 +79,7 @@ private:
           muliOp.rhs().getDefiningOp());
     } else {
       IVLOG(5, "The source of the reduce is not a multiplication operation");
-      return llvm::Optional<LoadStoreOps>(); // i.e. fail to pattern-match
+      return llvm::None;
     }
 
     // Now verify the types of the operands of the mulOp must be affine.load
@@ -87,7 +87,7 @@ private:
     if (!lhs || !rhs) {
       IVLOG(3, "the lhs or rhs of the mul operation are not affine.load "
                "operations.");
-      return llvm::Optional<LoadStoreOps>(); // i.e. fail to pattern-match
+      return llvm::None;
     }
     ret.loads.push_back(lhs);
     ret.loads.push_back(rhs);
