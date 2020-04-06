@@ -11,11 +11,6 @@
 namespace plaidml {
 namespace op {
 
-static const char* const NCX = "ncx";
-static const char* const NXC = "nxc";
-static const char* const KCX = "kcx";
-static const char* const XCK = "xck";
-
 inline void init() {
   plaidml::init();
   plaidml::edsl::init();
@@ -29,6 +24,84 @@ inline edsl::Value op(const std::string& name, const edsl::Value& args) {
 }
 
 }  // namespace details
+
+static const int AUTO_DIM_MATCH = 0;
+static const int AUTO_DIM_FILL = -1;
+
+enum class AutoGroupMode {
+  UNGROUPED,  // Group size explicitly 1
+  EXPLICIT,   // Group size explicitly specified, > 1
+  AUTO,       // Group size determined from shapes of I and F
+  DEPTHWISE,  // for channelized convolutions (i.e. where G = CI)
+  _LAST,
+};
+
+enum class AutoPadMode {
+  NONE,
+  NOTSET = NONE,
+  EXPLICIT = NONE,
+  SAME_LOWER,
+  SAME_UPPER,
+  VALID,
+  _LAST,
+};
+
+enum class ConvDerivMode {
+  NONE,    // Forward Pass
+  DATA,    // Computing derivative of input data (or equivalently a transposed conv)
+  FILTER,  // Computing derivative of filters
+  _LAST,
+};
+
+// For grouped convolutions, in the filters (i.e. weights/kernel) tensor, there
+// are multiple ways of laying out the channels. For a convolution with:
+//  G groups
+//  C input channels
+//  K output channels
+// there must be a total of (C * K) / G channel combinations. This is generally
+// accomplished by having one of the input or output channel dimensions include
+// the group and having the other be the within-group channel; but the group
+// can also be included as a separate dimension. This gives the following total
+// sizes for the channel dimensions:
+//  SEPARATE: G, C/G, K/G
+//  IN_C:     C, K/G
+//  IN_K:     C/G, K
+// SEPARATE is the layout with the group given as a separate dimension. IN_C is
+// the layout with the group included in C, and with the K dim representing the
+// within-group output channel. IN_K is the layout with the group included in K
+// with the C dim representing the within-group input channel.
+// The NONE layout is used for convolutions that aren't grouped.
+enum class GroupLayout {
+  NONE,      // Not grouped
+  SEPARATE,  // Group given as a separate dimension
+  IN_C,      // Group included in the input channels dimension
+  IN_K,      // Group included in the output channels dimensiono
+  _LAST,
+};
+
+enum class InterpolationMode {
+  NEAREST,
+  BILINEAR,
+  _LAST,
+};
+
+enum class PoolMode {
+  AVG,
+  MAX,
+  MIN,
+  SUM,
+  _LAST,
+};
+
+enum class TensorLayout {
+  NXC,
+  NCX,
+  KCX,
+  XCK,
+  GKCX,
+  XGCK,
+  _LAST,
+};
 
 inline edsl::Tensor abs(const edsl::Tensor& I) {
   auto args = edsl::make_tuple(I);
@@ -65,45 +138,126 @@ inline edsl::Tensor concatenate(const std::vector<edsl::Tensor>& tensors, int ax
   return details::op("concatenate", args).as_tensor();
 }
 
-inline edsl::Tensor convolution(             //
-    const edsl::Tensor& I_or_O,              //
-    const edsl::Tensor& F_or_O,              //
-    const std::vector<int>& strides,         //
-    const std::vector<int>& dilations,       //
-    const std::vector<int>& data_dilations,  //
-    const std::vector<int>& filter_shape,    //
-    int groups,                              //
-    const std::string& autopad_mode,         //
-    const std::vector<int>& manual_padding,  //
-    const std::string& input_layout,         //
-    const std::string& filter_layout,        //
-    const std::string& group_layout,         //
-    bool winograd_allowed,                   //
-    const std::string& name,                 //
-    const std::string& autogroup_mode,       //
-    const std::string& deriv_mode,           //
-    const std::vector<int>& result_shape     //
-) {
-  auto args = edsl::make_tuple(          //
-      I_or_O,                            //
-      F_or_O,                            //
-      edsl::make_tuple(strides),         //
-      edsl::make_tuple(dilations),       //
-      edsl::make_tuple(data_dilations),  //
-      edsl::make_tuple(filter_shape),    //
-      groups,                            //
-      autopad_mode,                      //
-      edsl::make_tuple(manual_padding),  //
-      input_layout,                      //
-      filter_layout,                     //
-      group_layout,                      //
-      winograd_allowed,                  //
-      name,                              //
-      autogroup_mode,                    //
-      deriv_mode,                        //
-      edsl::make_tuple(result_shape));
-  return details::op("convolution", args).as_tensor();
-}
+class convolution {
+ public:
+  explicit convolution(edsl::Tensor I, edsl::Tensor F) : I_(I), F_(F) {}
+
+  convolution& strides(const std::vector<int>& strides) {
+    strides_ = strides;
+    return *this;
+  }
+
+  convolution& dilations(const std::vector<int>& dilations) {
+    dilations_ = dilations;
+    return *this;
+  }
+
+  convolution& data_dilations(const std::vector<int>& data_dilations) {
+    data_dilations_ = data_dilations;
+    return *this;
+  }
+
+  convolution& filter_shape(const std::vector<int>& filter_shape) {
+    filter_shape_ = filter_shape;
+    return *this;
+  }
+
+  convolution& groups(int groups) {
+    groups_ = groups;
+    return *this;
+  }
+
+  convolution& manual_padding(const std::vector<int>& manual_padding) {
+    manual_padding_ = manual_padding;
+    return *this;
+  }
+
+  convolution& autopad_mode(AutoPadMode autopad_mode) {
+    autopad_mode_ = autopad_mode;
+    return *this;
+  }
+
+  convolution& input_layout(TensorLayout input_layout) {
+    input_layout_ = input_layout;
+    return *this;
+  }
+
+  convolution& filter_layout(TensorLayout filter_layout) {
+    filter_layout_ = filter_layout;
+    return *this;
+  }
+
+  convolution& group_layout(GroupLayout group_layout) {
+    group_layout_ = group_layout;
+    return *this;
+  }
+
+  convolution& winograd_allowed(bool winograd_allowed) {
+    winograd_allowed_ = winograd_allowed;
+    return *this;
+  }
+
+  convolution& name(const std::string& name) {
+    name_ = name;
+    return *this;
+  }
+
+  convolution& autogroup_mode(AutoGroupMode autogroup_mode) {
+    autogroup_mode_ = autogroup_mode;
+    return *this;
+  }
+
+  convolution& deriv_mode(ConvDerivMode deriv_mode) {
+    deriv_mode_ = deriv_mode;
+    return *this;
+  }
+
+  convolution& result_shape(const std::vector<int>& result_shape) {
+    result_shape_ = result_shape;
+    return *this;
+  }
+
+  operator edsl::Tensor() const {
+    auto args = edsl::make_tuple(           //
+        I_,                                 //
+        F_,                                 //
+        edsl::make_tuple(strides_),         //
+        edsl::make_tuple(dilations_),       //
+        edsl::make_tuple(data_dilations_),  //
+        edsl::make_tuple(filter_shape_),    //
+        groups_,                            //
+        static_cast<int>(autopad_mode_),    //
+        edsl::make_tuple(manual_padding_),  //
+        static_cast<int>(input_layout_),    //
+        static_cast<int>(filter_layout_),   //
+        static_cast<int>(group_layout_),    //
+        winograd_allowed_,                  //
+        name_,                              //
+        static_cast<int>(autogroup_mode_),  //
+        static_cast<int>(deriv_mode_),      //
+        edsl::make_tuple(result_shape_));
+    return details::op("convolution", args).as_tensor();
+  }
+
+ private:
+  edsl::Tensor I_;
+  edsl::Tensor F_;
+  std::vector<int> strides_;
+  std::vector<int> dilations_;
+  std::vector<int> data_dilations_;
+  std::vector<int> filter_shape_;
+  int groups_ = 1;
+  std::vector<int> manual_padding_;
+  AutoPadMode autopad_mode_;
+  TensorLayout input_layout_;
+  TensorLayout filter_layout_;
+  GroupLayout group_layout_ = GroupLayout::NONE;
+  bool winograd_allowed_ = false;
+  std::string name_;
+  AutoGroupMode autogroup_mode_ = AutoGroupMode::UNGROUPED;
+  ConvDerivMode deriv_mode_ = ConvDerivMode::NONE;
+  std::vector<int> result_shape_;
+};
 
 inline edsl::Tensor cumprod(const edsl::Tensor& I, int axis) {
   auto args = edsl::make_tuple(I, axis);
@@ -141,8 +295,8 @@ inline edsl::Tensor hard_sigmoid(const edsl::Tensor& I, double slope) {
 }
 
 inline edsl::Tensor image_resize(const edsl::Tensor& I, const std::vector<int>& factors,
-                                 const std::string& interpolation, const std::string& layout) {
-  auto args = edsl::make_tuple(I, edsl::make_tuple(factors), interpolation, layout);
+                                 InterpolationMode interpolation, TensorLayout layout) {
+  auto args = edsl::make_tuple(I, edsl::make_tuple(factors), static_cast<int>(interpolation), static_cast<int>(layout));
   return details::op("image_resize", args).as_tensor();
 }
 
@@ -175,23 +329,23 @@ inline edsl::Tensor minimum(const edsl::Tensor& X, const edsl::Tensor& Y) {
 
 inline edsl::Tensor pool(                    //
     const edsl::Tensor I,                    //
-    const std::string& pool_mode,            //
+    PoolMode pool_mode,                      //
     const std::vector<int>& pool_size,       //
     const std::vector<int>& strides,         //
-    const std::string& autopad_mode,         //
+    AutoPadMode autopad_mode,                //
     const std::vector<int>& manual_padding,  //
-    const std::string& input_layout,         //
+    TensorLayout input_layout,               //
     bool include_padding_in_avg = false,     //
     bool use_ceil_for_output_shape = false   //
 ) {
   auto args = edsl::make_tuple(          //
       I,                                 //
-      pool_mode,                         //
+      static_cast<int>(pool_mode),       //
       edsl::make_tuple(pool_size),       //
       edsl::make_tuple(strides),         //
-      autopad_mode,                      //
+      static_cast<int>(autopad_mode),    //
       edsl::make_tuple(manual_padding),  //
-      input_layout,                      //
+      static_cast<int>(input_layout),    //
       include_padding_in_avg,            //
       use_ceil_for_output_shape);
   return details::op("pool", args).as_tensor();
@@ -203,35 +357,34 @@ inline edsl::Tensor prod(const edsl::Tensor& I, const edsl::Value& axes = edsl::
 }
 
 class relu {
- protected:
-  edsl::Tensor I_;
-  edsl::Tensor alpha_;
-  edsl::Tensor max_value_;
-  double threshold_ = 0.0;
-
  public:
   explicit relu(const edsl::Tensor& I) : I_(I) {}
 
-  relu alpha(const edsl::Tensor& alpha) {
+  relu& alpha(const edsl::Tensor& alpha) {
     alpha_ = alpha;
     return *this;
   }
 
-  relu max_value(const edsl::Tensor& max_value) {
+  relu& max_value(const edsl::Tensor& max_value) {
     max_value_ = max_value;
     return *this;
   }
 
-  relu threshold(double threshold) {
+  relu& threshold(double threshold) {
     threshold_ = threshold;
     return *this;
   }
 
   operator edsl::Tensor() const {
-    // actually make the relu from the op lib
     auto args = edsl::make_tuple(I_, alpha_, max_value_, threshold_);
     return details::op("relu", args).as_tensor();
   }
+
+ private:
+  edsl::Tensor I_;
+  edsl::Tensor alpha_;
+  edsl::Tensor max_value_;
+  double threshold_ = 0.0;
 };
 
 inline edsl::Tensor repeat(const edsl::Tensor& I, int repeats, int axis) {
@@ -267,8 +420,8 @@ inline edsl::Tensor spatial_padding(  //
     const edsl::Tensor& x,            //
     const std::vector<int>& lo_pads,  //
     const std::vector<int>& hi_pads,  //
-    const std::string& data_layout) {
-  auto args = edsl::make_tuple(x, edsl::make_tuple(lo_pads), edsl::make_tuple(hi_pads), data_layout);
+    TensorLayout data_layout) {
+  auto args = edsl::make_tuple(x, edsl::make_tuple(lo_pads), edsl::make_tuple(hi_pads), static_cast<int>(data_layout));
   return details::op("spatial_padding", edsl::Value(args)).as_tensor();
 }
 
