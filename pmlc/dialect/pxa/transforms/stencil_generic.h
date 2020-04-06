@@ -100,7 +100,6 @@ protected: // TODO: private backend for some of this?
   TensorAndIndexPermutation bestPermutation;
   llvm::SmallVector<int64_t, 8>
       bestTiling; // only makes sense paired with `bestPermutation`
-  std::list<TensorAndIndexPermutation> legalPermutations;
 
 public:
   explicit StencilGeneric(mlir::AffineParallelOp op)

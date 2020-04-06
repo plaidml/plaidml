@@ -191,7 +191,6 @@ void StencilGeneric::DoStenciling() {
   do { // Each load tensor permutation
     std::sort(lastLoadFirstStoreIt, orderableTensors.end());
     do { // Each store tensor permutation
-      // Add all legal permutations to legalPermutations
       llvm::SmallVector<mlir::Value, 3> tensors;
       for (const auto &tn : orderableTensors) {
         tensors.push_back(*tn);
