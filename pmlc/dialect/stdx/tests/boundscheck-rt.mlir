@@ -1,4 +1,4 @@
-// RUN: pmlc-opt -stdx-check-bounds -convert-std-to-llvm %s | pmlc-jit -entry-point-result=void -expected-runtime-exception-string="Out of bounds index for mlir::LoadOp or mlir::StoreOp"
+// RUN: pmlc-opt -stdx-check-bounds -convert-std-to-llvm %s | pmlc-jit -entry-point-result=void | FileCheck %s
 
 module {
   func @simpleLoad(%A: memref<20x10xf32>, %i: index, %j: index) -> (f32) {
@@ -15,4 +15,5 @@ module {
     dealloc %buf : memref<20x10xf32>
     return
   }
+  // CHECK: Out of bounds index for mlir::LoadOp or mlir::StoreOp
 }
