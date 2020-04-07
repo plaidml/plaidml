@@ -46,10 +46,11 @@ py_runtime(
     name = "py3_runtime",
     files = select({
         "@bazel_tools//src/conditions:windows": [
-            "@com_intel_plaidml_conda_windows//:python",
+            "@com_intel_plaidml_conda//:conda",
+            "@com_intel_plaidml_conda//:python",
         ],
         "//conditions:default": [
-            "@com_intel_plaidml_conda_unix//:python",
+            "@com_intel_plaidml_conda//:python",
         ],
     }),
     interpreter = "//tools/conda_run",

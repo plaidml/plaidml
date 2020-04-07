@@ -5,6 +5,7 @@
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/IR/StandardTypes.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/Passes.h"
@@ -38,17 +39,58 @@ namespace pmlc::target::x86 {
 
 namespace {
 
+static LLVM::LLVMType unwrap(Type type) {
+  if (!type)
+    return nullptr;
+  auto *mlirContext = type.getContext();
+  auto wrappedLLVMType = type.dyn_cast<LLVM::LLVMType>();
+  if (!wrappedLLVMType)
+    emitError(UnknownLoc::get(mlirContext),
+              "conversion resulted in a non-LLVM type");
+  return wrappedLLVMType;
+}
+
+/// Convert a MemRef type to a bare pointer to the MemRef element type.
+static Type convertMemRefTypeToBarePtr(LLVMTypeConverter &converter,
+                                       MemRefType type) {
+  int64_t offset;
+  SmallVector<int64_t, 4> strides;
+  if (failed(getStridesAndOffset(type, strides, offset)))
+    return {};
+
+  LLVM::LLVMType elementType =
+      unwrap(converter.convertType(type.getElementType()));
+  if (!elementType)
+    return {};
+  return elementType.getPointerTo(type.getMemorySpace());
+}
+
+/// Callback to convert function argument types. It converts MemRef function
+/// arguments to bare pointers to the MemRef element type.
+LogicalResult mixedPtrFuncArgTypeConverter(LLVMTypeConverter &converter,
+                                           Type type,
+                                           SmallVectorImpl<Type> &result) {
+  if (auto memrefTy = type.dyn_cast<MemRefType>()) {
+    auto llvmTy = convertMemRefTypeToBarePtr(converter, memrefTy);
+    if (!llvmTy)
+      return failure();
+
+    result.push_back(llvmTy);
+    return success();
+  }
+  return structFuncArgTypeConverter(converter, type, result);
+}
+
 struct ConvertToLLVMPass : public ModulePass<ConvertToLLVMPass> {
   void runOnModule() override {
     auto module = getModule();
     auto *context = module.getContext();
 
     LLVMTypeConverterCustomization customs;
-    customs.funcArgConverter = barePtrFuncArgTypeConverter;
+    customs.funcArgConverter = mixedPtrFuncArgTypeConverter;
     LLVMTypeConverter typeConverter(&getContext(), customs);
 
     OwningRewritePatternList patterns;
-    populateXSMMConversionPatterns(patterns, context);
     populateAffineToStdConversionPatterns(patterns, context);
     populateLoopToStdConversionPatterns(patterns, context);
     populateStdToLLVMBarePtrConversionPatterns(typeConverter, patterns);
@@ -78,7 +120,8 @@ void addToPipeline(OpPassManager &pm) {
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
-  // TODO: do optimizations here
+  pm.addPass(pmlc::dialect::pxa::createStencilPass(1, heatmapCost));
+  pm.addPass(createXSMMLoweringPass());
 
   pm.addPass(conversion::pxa_to_affine::createLowerPXAToAffinePass());
   pm.addPass(createCanonicalizerPass());

@@ -10,7 +10,8 @@
 #include "pmlc/dialect/pxa/analysis/strides.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/dialect/pxa/transforms/passes.h"
-#include "pmlc/dialect/tile/ir/ops.h"
+#include "pmlc/dialect/pxa/transforms/tile.h"
+#include "pmlc/dialect/xsmm/ir/ops.h"
 
 #include "pmlc/util/logging.h"
 #include "pmlc/util/util.h"
@@ -63,8 +64,6 @@ private:
   unsigned tensorsOrder[kNumTensors];
   // M, N, K in inner block
   mlir::BlockArgument innerIdxs[kNumIndex];
-  // The matrix_idx for the next search
-  unsigned nextMatrixIdx[kNumIndex] = {2, 3, 1};
   // M, N, K's tiles
   unsigned tiles[kNumIndex];
 
@@ -81,7 +80,7 @@ private:
   // The best index (M, N, K)
   mlir::BlockArgument bestIdxs[kNumIndex];
   // The best tiles for (M, N, K)
-  unsigned bestTiles[kNumIndex];
+  std::array<int64_t, kNumIndex> bestTiles;
 
   // The best performance
   double bestPerf;
@@ -357,7 +356,7 @@ void Stencil::SearchIndex(unsigned matrix_idx) {
     if (ValidateStrideOne(idx, matrix_idx) &&
         ValidateIndexExistance(idx, matrix_idx)) {
       innerIdxs[matrix_idx] = idx;
-      SearchIndex(nextMatrixIdx[matrix_idx]);
+      SearchIndex(matrix_idx + 1);
     }
   }
 }
@@ -410,7 +409,7 @@ double Stencil::Evaluate() {
   // tiles 0, 1, 2 --> m, n, k
   auto cost = costFn(tiles);
   if (cost.throughput == 0) {
-    return std::numeric_limits<double>::max();
+    return std::numeric_limits<double>::infinity();
   }
   double inner_time = tot_inner_loop / cost.throughput;
   IVLOG(3,
@@ -476,7 +475,7 @@ double Stencil::Evaluate() {
 void Stencil::DoStenciling() {
   // Initialization
   tensors.clear();
-  bestPerf = std::numeric_limits<double>::max();
+  bestPerf = std::numeric_limits<double>::infinity();
   if (!TryIdentifyGemmOperation()) {
     IVLOG(3, "Not a Gemm match.");
     return;
@@ -501,16 +500,91 @@ void Stencil::DoStenciling() {
   // Search tensors' order, inner index and their tiles
   SearchTensorsOrder();
 
-  IVLOG(1, "Best Perf: " << bestPerf);
-  IVLOG(1, "Best Tiles: " << bestTiles[0] << ":" << bestTiles[1] << ":"
-                          << bestTiles[2]);
-
-  if (bestPerf == std::numeric_limits<double>::max()) {
+  if (bestPerf == std::numeric_limits<double>::infinity()) {
     IVLOG(1, "No tile plan for stencil.");
     return;
   }
 
-  op.setAttr("is_gemm", mlir::UnitAttr::get(op.getContext()));
+  IVLOG(1, "Best Perf: " << bestPerf);
+  IVLOG(1, "Best Tiles: " << bestTiles[0] << ":" << bestTiles[1] << ":"
+                          << bestTiles[2]);
+  IVLOG(1, "Best idxs: " << bestIdxs[0].getArgNumber() << ":"
+                         << bestIdxs[1].getArgNumber() << ":"
+                         << bestIdxs[2].getArgNumber());
+
+  // Do actual translation into XSMM
+
+  // First, modify step size of all tiled indexes
+  llvm::SmallVector<int64_t, 8> steps;
+  auto oldSteps = op.steps().cast<ArrayAttr>().getValue();
+  for (auto step : oldSteps) {
+    steps.push_back(step.cast<IntegerAttr>().getInt());
+  }
+  for (size_t i = 0; i < ranges->size(); i++) {
+    for (size_t j = 0; j < kNumIndex; j++) {
+      if (bestIdxs[j] == op.getBody()->getArgument(i)) {
+        steps[i] *= bestTiles[j];
+      }
+    }
+  }
+  op.setSteps(steps);
+
+  // Finally generate XSMM call itself
+  Value a = tensors[bestTensorsOrder[0]];
+  Value b = tensors[bestTensorsOrder[1]];
+  Value c = tensors[bestTensorsOrder[2]];
+
+  llvm::SmallVector<Value, 8> mapOperands;
+
+  auto bodyBuilder = op.getBodyBuilder();
+  auto tiles = bodyBuilder.getI64ArrayAttr(bestTiles);
+  auto makeTileMap = [&](AffineMap map, ValueRange ops,
+                         ArrayRef<mlir::BlockArgument> idxs) {
+    llvm::SmallVector<AffineExpr, 8> perOp;
+    for (auto op : ops) {
+      bool found = false;
+      for (size_t i = 0; i < idxs.size(); i++) {
+        if (op == idxs[i]) {
+          perOp.push_back(bodyBuilder.getAffineDimExpr(i));
+          found = true;
+        }
+      }
+      if (!found) {
+        perOp.push_back(bodyBuilder.getAffineConstantExpr(0));
+      }
+    }
+    auto toIdxs = AffineMap::get(idxs.size(), 0, perOp);
+    return map.compose(toIdxs);
+  };
+
+  mlir::AffineLoadOp &opA = (bestTensorsOrder[0] == 0 ? in1Op : in2Op);
+  mlir::AffineLoadOp &opB = (bestTensorsOrder[0] == 0 ? in2Op : in1Op);
+
+  AffineMap cMap = outOp.getAffineMap();
+  AffineMap cTile = makeTileMap(outOp.getAffineMap(), outOp.getMapOperands(),
+                                {bestIdxs[1], bestIdxs[0]});
+  mapOperands.append(outOp.getMapOperands().begin(),
+                     outOp.getMapOperands().end());
+
+  AffineMap aMap = opA.getAffineMap();
+  AffineMap aTile = makeTileMap(opA.getAffineMap(), opA.getMapOperands(),
+                                {bestIdxs[1], bestIdxs[2]});
+  mapOperands.append(opA.getMapOperands().begin(), opA.getMapOperands().end());
+
+  AffineMap bMap = opB.getAffineMap();
+  AffineMap bTile = makeTileMap(opB.getAffineMap(), opB.getMapOperands(),
+                                {bestIdxs[2], bestIdxs[0]});
+  mapOperands.append(opB.getMapOperands().begin(), opB.getMapOperands().end());
+
+  bodyBuilder.create<xsmm::GemmOp>(op.getLoc(), c, cMap, cTile, a, aMap, aTile,
+                                   b, bMap, bTile, tiles, mapOperands);
+
+  // Remove all of the op interior
+  auto xsmm_it = std::prev(op.getBody()->end(), 2);
+  while (op.getBody()->begin() != xsmm_it) {
+    auto prev_it = std::prev(xsmm_it);
+    op.getBody()->getOperations().erase(prev_it);
+  }
 }
 
 struct StencilPass : public mlir::FunctionPass<StencilPass> {

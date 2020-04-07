@@ -62,12 +62,10 @@ build:windows --enable_runfiles
 build:windows --cxxopt=/std:c++17 --cxxopt=/Zc:__cplusplus --cxxopt=/wd4624
 build:windows --define=compiler=msvc
 build:windows --build_tag_filters=-docs,-latex,-linux,-macos,-pytorch,-skip_windows
-build:windows --action_env=CONDA_EXE
 build:windows --action_env=NUMBER_OF_PROCESSORS
 build:windows --action_env=PLAIDML_SETTINGS
 test:windows --enable_runfiles
 test:windows --test_tag_filters=-docs,-latex,-linux,-macos,-pytorch,-skip_windows
-test:windows --test_env=CONDA_EXE
 test:windows --test_env=NUMBER_OF_PROCESSORS
 test:windows --test_env=PATHEXT
 test:windows --test_env=USERPROFILE

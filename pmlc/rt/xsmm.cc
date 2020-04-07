@@ -14,17 +14,15 @@ struct Initializer {
 static Initializer init;
 #endif
 
-extern "C" void plaidml_rt_xsmm_gemm_f32(UnrankedMemRefType a,
-                                         UnrankedMemRefType b,
-                                         UnrankedMemRefType c, int32_t lda,
-                                         int32_t ldb, int32_t ldc, int32_t m,
-                                         int32_t n, int32_t k) {
+extern "C" void plaidml_rt_xsmm_gemm_f32(            //
+    size_t aRank, StridedMemRefType<float, 2> *aRef, //
+    size_t bRank, StridedMemRefType<float, 2> *bRef, //
+    size_t cRank, StridedMemRefType<float, 2> *cRef, //
+    int32_t lda, int32_t ldb, int32_t ldc,           //
+    int32_t m, int32_t n, int32_t k) {
 #ifndef _WIN32
-  auto aRef = static_cast<StridedMemRefType<float, 2> *>(a.descriptor);
   auto aPtr = aRef->data + aRef->offset;
-  auto bRef = static_cast<StridedMemRefType<float, 2> *>(b.descriptor);
   auto bPtr = bRef->data + bRef->offset;
-  auto cRef = static_cast<StridedMemRefType<float, 2> *>(c.descriptor);
   auto cPtr = cRef->data + cRef->offset;
 
   libxsmm_blasint lda_int = lda;
@@ -39,7 +37,7 @@ extern "C" void plaidml_rt_xsmm_gemm_f32(UnrankedMemRefType a,
   libxsmm_blasint n_int = n;
   libxsmm_blasint k_int = k;
   libxsmm_gemm(/*transa=*/nullptr, /*transb=*/nullptr, &m_int, &n_int, &k_int,
-               /*alpha=*/nullptr, aPtr, &lda_int, bPtr, &ldb_int,
+               /*alpha=*/nullptr, bPtr, &ldb_int, aPtr, &lda_int,
                /*beta=*/nullptr, cPtr, &ldc_int);
 #endif
 }
