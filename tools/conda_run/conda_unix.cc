@@ -34,7 +34,7 @@ int main(int argc, char* argv[]) {
     }
 
     // locate assets within runfiles
-    auto python = fs::canonical(runfiles->Rlocation("com_intel_plaidml_conda_unix/env/bin/python"));
+    auto python = fs::canonical(runfiles->Rlocation("com_intel_plaidml_conda/env/bin/python"));
     auto conda_env = python.parent_path().parent_path().string();
 
     // Adjust environment variables to activate conda environment

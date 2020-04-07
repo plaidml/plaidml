@@ -38,8 +38,8 @@ int main(int argc, char* argv[]) {
       pmlc::util::setEnvVar(var.first, var.second);
     }
 
-    auto python_path = fs::canonical(runfiles->Rlocation("com_intel_plaidml_conda_windows/env/python.exe"));
-    auto conda_path = fs::canonical(runfiles->Rlocation("com_intel_plaidml_conda_windows/env/Scripts/conda.exe"));
+    auto python_path = fs::canonical(runfiles->Rlocation("com_intel_plaidml_conda/env/python.exe"));
+    auto conda_path = fs::canonical(runfiles->Rlocation("com_intel_plaidml_conda/env/Scripts/conda.exe"));
 
     auto python = WindowsPath(python_path.string());
     auto conda_env = WindowsPath(python_path.parent_path().string());

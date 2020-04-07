@@ -19,8 +19,10 @@ plaidml_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "//plaidml",
-        "@com_intel_plaidml_conda_unix//:pytorch",
-    ],
+    ] + select({
+        "@bazel_tools//src/conditions:windows": [],
+        "//conditions:default": ["@com_intel_plaidml_conda//:pytorch"],
+    }),
     alwayslink = 1,
 )
 

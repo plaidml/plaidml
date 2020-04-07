@@ -1,23 +1,30 @@
 load("@rules_python//python:defs.bzl", "py_library")
+load("//bzl:python.bzl", "run_python_tool")
 
 def _py_cffi_impl(ctx):
     args = ctx.actions.args()
     args.add_all(ctx.files.srcs, before_each = "--source")
     args.add("--module", ctx.attr.module)
     args.add("--output", ctx.outputs.out)
-    ctx.actions.run(
+
+    run_python_tool(
+        ctx,
+        mnemonic = "PyCffi",
+        python = ctx.file.python,
+        tool = ctx.executable._tool,
+        args = args,
         inputs = ctx.files.srcs,
         outputs = [ctx.outputs.out],
-        arguments = [args],
-        tools = [ctx.executable._tool],
-        executable = ctx.executable._tool,
-        mnemonic = "PyCffi",
-        use_default_shell_env = True,
     )
+
     return [DefaultInfo(files = depset([ctx.outputs.out]))]
 
 py_cffi_rule = rule(
     attrs = {
+        "python": attr.label(
+            default = "@com_intel_plaidml_conda//:python",
+            allow_single_file = True,
+        ),
         "srcs": attr.label_list(
             allow_files = True,
             mandatory = True,

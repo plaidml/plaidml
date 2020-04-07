@@ -1,5 +1,6 @@
 # Copyright 2019 Intel Corporation.
 
+import enum
 import logging
 
 import six
@@ -15,6 +16,61 @@ def __init():
 
 
 ffi.init_once(__init, 'plaidml_op_init')
+
+
+class AutoDimMode(enum.IntEnum):
+    MATCH = 0
+    FILL = -1
+
+
+class AutoGroupMode(enum.IntEnum):
+    UNGROUPED = 0  # Group size explicitly 1
+    EXPLICIT = 1  # Group size explicitly specified, > 1
+    AUTO = 2  # Group size determined from shapes of I and F
+    DEPTHWISE = 3  # for channelized convolutions (i.e. where G = CI)
+
+
+class AutoPadMode(enum.IntEnum):
+    NONE = 0
+    NOTSET = NONE
+    EXPLICIT = NONE
+    SAME_LOWER = 1
+    SAME_UPPER = 2
+    VALID = 3
+
+
+class ConvDerivMode(enum.IntEnum):
+    NONE = 0  # Forward Pass
+    DATA = 1  # Computing derivative of input data (or equivalently a transposed conv)
+    FILTER = 2  # Computing derivative of filters
+
+
+class GroupLayout(enum.IntEnum):
+    NONE = 0  # Not grouped
+    SEPARATE = 1  # Group given as a separate dimension
+    IN_C = 2  # Group included in the input channels dimension
+    IN_K = 3  # Group included in the output channels dimensiono
+
+
+class InterpolationMode(enum.IntEnum):
+    NEAREST = 0
+    BILINEAR = 1
+
+
+class PoolMode(enum.IntEnum):
+    AVG = 0
+    MAX = 1
+    MIN = 2
+    SUM = 3
+
+
+class TensorLayout(enum.IntEnum):
+    NXC = 0
+    NCX = 1
+    KCX = 2
+    XCK = 3
+    GKCX = 4
+    XGCK = 5
 
 
 def op(op_name, args):
