@@ -220,7 +220,10 @@ Executable::Executable(const std::shared_ptr<Program> &program,
 
   auto maybeEngine = ExecutionEngine::create(*program->module, optPipeline,
                                              /*jitCodeGenOptLevel=*/llvm::None,
-                                             sharedLibPaths);
+                                             sharedLibPaths, 
+					     /*enableObjectCache=*/true,
+					     /*enableGDBNotificationListener=*/false
+		  );
   llvm::handleAllErrors(
       maybeEngine.takeError(), [](const llvm::ErrorInfoBase &err) {
         throw std::runtime_error("Failed to create ExecutionEngine: " +

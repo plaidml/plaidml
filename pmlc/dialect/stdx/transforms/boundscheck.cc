@@ -83,4 +83,8 @@ void BoundsCheckPass::runOnFunction() {
   });
 }
 
+std::unique_ptr<mlir::Pass> createBoundsCheckPass() {
+  return std::make_unique<BoundsCheckPass>();
+}
+
 } // namespace pmlc::dialect::stdx
