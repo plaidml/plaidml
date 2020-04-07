@@ -5,6 +5,7 @@
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
@@ -16,9 +17,11 @@
 #include "pmlc/conversion/tile_to_pxa/tile_to_pxa.h"
 #include "pmlc/dialect/pxa/transforms/passes.h"
 #include "pmlc/dialect/tile/transforms/passes.h"
+#include "pmlc/dialect/stdx/transforms/passes.h"
 #include "pmlc/target/x86/heatmap.h"
 #include "pmlc/target/x86/trace_linking.h"
 #include "pmlc/target/x86/xsmm_lowering.h"
+#include "pmlc/util/env.h"
 #include "pmlc/util/logging.h"
 
 using namespace mlir; // NOLINT[build/namespaces]
@@ -81,6 +84,28 @@ LogicalResult mixedPtrFuncArgTypeConverter(LLVMTypeConverter &converter,
   return structFuncArgTypeConverter(converter, type, result);
 }
 
+struct ConvertToStdPass : public ModulePass<ConvertToStdPass> {
+  void runOnModule() override {
+    auto module = getModule();
+    auto *context = module.getContext();
+
+    OwningRewritePatternList patterns;
+    populateAffineToStdConversionPatterns(patterns, context);
+    populateLoopToStdConversionPatterns(patterns, context);
+
+    ConversionTarget target(*context);
+    target.addLegalDialect<StandardOpsDialect>();
+    if (failed(
+            applyPartialConversion(module, target, patterns))) {
+      signalPassFailure();
+    }
+  }
+
+  static std::unique_ptr<OpPassBase<ModuleOp>> create() {
+    return std::make_unique<ConvertToStdPass>();
+  }
+};
+
 struct ConvertToLLVMPass : public ModulePass<ConvertToLLVMPass> {
   void runOnModule() override {
     auto module = getModule();
@@ -91,8 +116,6 @@ struct ConvertToLLVMPass : public ModulePass<ConvertToLLVMPass> {
     LLVMTypeConverter typeConverter(&getContext(), customs);
 
     OwningRewritePatternList patterns;
-    populateAffineToStdConversionPatterns(patterns, context);
-    populateLoopToStdConversionPatterns(patterns, context);
     populateStdToLLVMBarePtrConversionPatterns(typeConverter, patterns);
     conversion::stdx_to_llvm::populateStdXToLLVMConversionPatterns(
         typeConverter, patterns);
@@ -131,6 +154,10 @@ void addToPipeline(OpPassManager &pm) {
   pm.addNestedPass<FuncOp>(createCanonicalizerPass());
   pm.addNestedPass<FuncOp>(createCSEPass());
 
+  pm.addPass(ConvertToStdPass::create());
+  if (pmlc::util::getEnvVar("PLAIDML_BOUNDS_CHECK") == "1") {
+    pm.addPass(pmlc::dialect::stdx::createBoundsCheckPass());
+  }
   pm.addPass(ConvertToLLVMPass::create());
   pm.addPass(createTraceLinkingPass());
 }
