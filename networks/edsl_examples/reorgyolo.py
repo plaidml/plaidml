@@ -11,7 +11,7 @@
 #                   boolean argument
 #                              forward = true -> channel decrease
 #                                        [N,C,H,W] -> [N, C/(s^2), H*s, W*s]
-#                              forward = false ->chennel increase
+#                              forward = false ->channel increase
 #                                        [N,C,H,W] -> [N, C*(s^2), H/s, W/s]
 #    output:
 #            Output Tensor:
@@ -90,34 +90,29 @@ def reorgyolo(I, stride, forward):
     H = dims[2]
     W = dims[3]
 
-    out_c = C // (stride * stride)
-
-    N_out = N
     C_decrease = int(C // (stride * stride))
-    C_increase = int(C * (stride * stride))
     _c1_quotient_range = int(C // (C_decrease))
     _w2_quotient_range = int(_c1_quotient_range // stride)
+
     N_in, C_in, H_in, W_in = edsl.TensorDims(4)
     n1, w1, h1, c2, _w2_quotient, _w2 = edsl.TensorIndexes(6)
     I.bind_dims(N_in, C_in, H_in, W_in)
 
     if forward:
-        O = edsl.TensorOutput(N_out, C_decrease, H * stride, W * stride)
+        O = edsl.TensorOutput(N, C_decrease, H * stride, W * stride)
         O[n1, c2, h1 * stride + _w2_quotient, w1 * stride +
-          _w2] = I[n1, c2 + ((_w2 + _w2_quotient * stride) * out_c), h1, w1]
+          _w2] = I[n1, c2 + ((_w2 + _w2_quotient * stride) * C_decrease), h1, w1]
+        O.add_constraint(c2 < C_decrease)
     else:
-        O = edsl.TensorOutput(N_out, C_increase, int(H / stride), int(W / stride))
+        C_increase = int(C * (stride * stride))
+        O = edsl.TensorOutput(N, C_increase, int(H / stride), int(W / stride))
         O[n1, c2 +
-          ((_w2 + _w2_quotient * stride) * out_c), h1, w1] = I[n1, c2, h1 * stride +
-                                                               _w2_quotient, w1 * stride + _w2]
+          ((_w2 + _w2_quotient * stride) * C), h1, w1] = I[n1, c2, h1 * stride +
+                                                           _w2_quotient, w1 * stride + _w2]
+        O.add_constraint(c2 < C)
 
     O.add_constraint(_w2 < stride)
     O.add_constraint(_w2_quotient < _w2_quotient_range)
-    O.add_constraint(c2 < C_decrease)
-    O.add_constraint(h1 < H)
-    O.add_constraint(w1 < W)
-    O.add_constraint(n1 < N)
-
     return O
 
 
