@@ -1,4 +1,4 @@
-# This example illustrates how to use eDSL to write the reorg layer employed in YOLO-v2
+#   This example illustrates how to use eDSL to write the reorg layer employed in YOLO-v2
 #   --------------------------Op description-----------------------------------
 #   The reorg layer is employed in YOLO-v2 or Darknet to combine midlevel and
 #   high level features. The reorg layer reshapes the output tensor so that
@@ -17,10 +17,10 @@
 #            Output Tensor:
 #                   dimentions [N, C*(s^2), H/s, W/s] OR [N, C/(s^2), H*s, W*s]
 #   -------------------------- Testing method-------------------------------------
-# The reorg function provided here:
+#   The reorg function provided here:
 #   https://gist.github.com/leimao/ece7217b5d07fe4e685c47af5e76744a
-# is currently being used for local testing
-# TODO: iron out issues with channel decrease (forward = false )
+#   is currently being used for local testing
+# TODO: iron out issues with channel increase (forward = false )
 # TODO: write python unittests
 # TODO: write backend_test style test against pytorch implementation
 # TODO: remove test functions and python test code
@@ -39,7 +39,7 @@ def reorgyolo_comparison(arrayIn, batch, C, H, W, stride, forward=False):
     arrayLen = len(arrayIn)
     arrayOut = np.zeros(arrayLen)
     print("C is " + str(C) + "stride is " + str(stride))
-    out_c = C // (stride * stride)  #out_c = 1
+    out_c = C // (stride * stride)
     for b in range(batch):
         for k in range(C):
             for j in range(H):
@@ -101,13 +101,15 @@ def reorgyolo(I, stride, forward):
     n1, w1, h1, c2, _w2_quotient, _w2 = edsl.TensorIndexes(6)
     I.bind_dims(N_in, C_in, H_in, W_in)
 
-    #if forward:
-    O = edsl.TensorOutput(N_out, C_decrease, int(H * stride), int(W * stride))
-    O[n1, c2, h1 * stride + _w2_quotient, w1 * stride +
-      _w2] = I[n1, c2 + ((_w2 + _w2_quotient * stride) * out_c), h1, w1]
-    # else:
-    #     O = edsl.TensorOutput(N_out, C_increase, int(H/stride), int(W/stride))
-    #     O[n1, c2+((_w2 + _w2_quotient*stride)*out_c), h1, w1] = I[n1,c2, h1*stride + _w2_quotient, w1*stride + _w2]
+    if forward:
+        O = edsl.TensorOutput(N_out, C_decrease, H * stride, W * stride)
+        O[n1, c2, h1 * stride + _w2_quotient, w1 * stride +
+          _w2] = I[n1, c2 + ((_w2 + _w2_quotient * stride) * out_c), h1, w1]
+    else:
+        O = edsl.TensorOutput(N_out, C_increase, int(H / stride), int(W / stride))
+        O[n1, c2 +
+          ((_w2 + _w2_quotient * stride) * out_c), h1, w1] = I[n1, c2, h1 * stride +
+                                                               _w2_quotient, w1 * stride + _w2]
 
     O.add_constraint(_w2 < stride)
     O.add_constraint(_w2_quotient < _w2_quotient_range)
@@ -121,11 +123,11 @@ def reorgyolo(I, stride, forward):
 
 def main():
     n_i = 1
-    c_i = 9
-    h_i = 3
-    w_i = 3
-    stride = 3
-    forward = True
+    c_i = 4
+    h_i = 6
+    w_i = 6
+    stride = 2
+    forward = False
 
     I_data_linear = np.array(list(range(n_i * c_i * h_i * w_i))).astype(np.int)
     I_data = np.reshape(I_data_linear, (n_i, c_i, h_i, w_i))
@@ -138,10 +140,14 @@ def main():
 
     I = edsl.Tensor(edsl.LogicalShape(plaidml.DType.FLOAT32, I_data.shape))
     O = reorgyolo(I, stride, forward)
-
-    c_o = c_i // (stride * stride)
-    h_o = h_i * stride
-    w_o = w_i * stride
+    if forward:
+        c_o = c_i // (stride * stride)
+        h_o = h_i * stride
+        w_o = w_i * stride
+    else:
+        c_o = c_i * (stride * stride)
+        h_o = h_i // stride
+        w_o = w_i // stride
 
     program = edsl.Program('reorgyolo', [O])
     binder = plaidml_exec.Binder(program)
