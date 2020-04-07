@@ -20,7 +20,6 @@
 #   The reorg function provided here:
 #   https://gist.github.com/leimao/ece7217b5d07fe4e685c47af5e76744a
 #   is currently being used for local testing
-# TODO: iron out issues with channel increase (forward = false )
 # TODO: write python unittests
 # TODO: write backend_test style test against pytorch implementation
 # TODO: remove test functions and python test code
@@ -90,19 +89,19 @@ def reorgyolo(I, stride, forward):
     H = dims[2]
     W = dims[3]
 
-    C_decrease = int(C // (stride * stride))
-    _c1_quotient_range = int(C // (C_decrease))
-    _w2_quotient_range = int(_c1_quotient_range // stride)
-
     N_in, C_in, H_in, W_in = edsl.TensorDims(4)
     n1, w1, h1, c2, _w2_quotient, _w2 = edsl.TensorIndexes(6)
     I.bind_dims(N_in, C_in, H_in, W_in)
 
     if forward:
+        C_decrease = int(C // (stride * stride))
+        _c1_quotient_range = int(C // (C_decrease))
+        _w2_quotient_range = int(_c1_quotient_range // stride)
         O = edsl.TensorOutput(N, C_decrease, H * stride, W * stride)
         O[n1, c2, h1 * stride + _w2_quotient, w1 * stride +
           _w2] = I[n1, c2 + ((_w2 + _w2_quotient * stride) * C_decrease), h1, w1]
         O.add_constraint(c2 < C_decrease)
+        O.add_constraint(_w2_quotient < _w2_quotient_range)
     else:
         C_increase = int(C * (stride * stride))
         O = edsl.TensorOutput(N, C_increase, int(H / stride), int(W / stride))
@@ -112,7 +111,7 @@ def reorgyolo(I, stride, forward):
         O.add_constraint(c2 < C)
 
     O.add_constraint(_w2 < stride)
-    O.add_constraint(_w2_quotient < _w2_quotient_range)
+
     return O
 
 
@@ -122,7 +121,7 @@ def main():
     h_i = 6
     w_i = 6
     stride = 2
-    forward = False
+    forward = True
 
     I_data_linear = np.array(list(range(n_i * c_i * h_i * w_i))).astype(np.int)
     I_data = np.reshape(I_data_linear, (n_i, c_i, h_i, w_i))
