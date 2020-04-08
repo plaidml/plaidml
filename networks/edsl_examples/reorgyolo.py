@@ -20,6 +20,7 @@
 #   The reorg function provided here:
 #   https://gist.github.com/leimao/ece7217b5d07fe4e685c47af5e76744a
 #   is currently being used for local testing
+# TODO: handle cases where the spatial dims aren't evenly divided by stride
 # TODO: write python unittests
 # TODO: write backend_test style test against pytorch implementation
 # TODO: remove test functions and python test code
@@ -83,28 +84,22 @@ def reorgyolo_comparison_nodivmod(arrayIn, batch, C, H, W, stride, forward=False
 
 
 def reorgyolo(I, stride, forward):
-    dims = I.shape.int_dims
-    N = dims[0]
-    C = dims[1]
-    H = dims[2]
-    W = dims[3]
-
-    N_in, C_in, H_in, W_in = edsl.TensorDims(4)
+    N, C, H, W = edsl.TensorDims(4)
     n1, w1, h1, c2, _w2_quotient, _w2 = edsl.TensorIndexes(6)
-    I.bind_dims(N_in, C_in, H_in, W_in)
+    I.bind_dims(N, C, H, W)
 
     if forward:
-        C_decrease = int(C // (stride * stride))
-        _c1_quotient_range = int(C // (C_decrease))
-        _w2_quotient_range = int(_c1_quotient_range // stride)
+        C_decrease = C // (stride * stride)
+        _c1_quotient_range = C // (C_decrease)
+        _w2_quotient_range = _c1_quotient_range // stride
         O = edsl.TensorOutput(N, C_decrease, H * stride, W * stride)
         O[n1, c2, h1 * stride + _w2_quotient, w1 * stride +
           _w2] = I[n1, c2 + ((_w2 + _w2_quotient * stride) * C_decrease), h1, w1]
         O.add_constraint(c2 < C_decrease)
         O.add_constraint(_w2_quotient < _w2_quotient_range)
     else:
-        C_increase = int(C * (stride * stride))
-        O = edsl.TensorOutput(N, C_increase, int(H / stride), int(W / stride))
+        C_increase = C * (stride * stride)
+        O = edsl.TensorOutput(N, C_increase, H // stride, W // stride)
         O[n1, c2 +
           ((_w2 + _w2_quotient * stride) * C), h1, w1] = I[n1, c2, h1 * stride +
                                                            _w2_quotient, w1 * stride + _w2]
