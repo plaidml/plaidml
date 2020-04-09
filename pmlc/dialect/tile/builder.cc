@@ -784,7 +784,7 @@ TileBuilder::MakeProgram(StringRef name, const ProgramMutations &mutations,
     program->arguments.emplace_back(programArg);
   }
   program->tileIR = mlir::debugString(module);
-  // IVLOG(2, "TileBuilder::MakeProgram>\n" << mlir::debugString(module));
+  IVLOG(2, "TileBuilder::MakeProgram>\n" << mlir::debugString(module));
   return program;
 }
 
