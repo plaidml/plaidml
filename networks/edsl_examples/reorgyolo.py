@@ -97,7 +97,6 @@ def reorgyolo(I, stride, decrease_C):
         O[n, c1, h1, w1] = I[n, c2, h2, w2]
     O.add_constraint(h_jump < stride)
     O.add_constraint(w_jump < stride)
-
     return O
 
 
@@ -140,28 +139,29 @@ def main():
     print("eDSL computed result: \n{}".format(result))
     print("_______________________________________________")
 
-    O_l = reorgyolo_comparison_nodivmod(I_data_linear,
-                                        batch=n_i,
-                                        C=c_i,
-                                        H=h_i,
-                                        W=w_i,
-                                        stride=stride,
-                                        forward=decrease)
-    O_new = np.reshape(O_l, (n_i, c_o, h_o, w_o))
+    if (c_o > c_i):  # leimao edit
+        expected_result_l = reorgyolo_comparison_nodivmod(I_data_linear,
+                                                          batch=n_i,
+                                                          C=c_o,
+                                                          H=h_o,
+                                                          W=w_o,
+                                                          stride=stride,
+                                                          forward=decrease)
+    else:
+        expected_result_l = reorgyolo_comparison_nodivmod(I_data_linear,
+                                                          batch=n_i,
+                                                          C=c_i,
+                                                          H=h_i,
+                                                          W=w_i,
+                                                          stride=stride,
+                                                          forward=decrease)
+    O_new = np.reshape(expected_result_l, (n_i, c_o, h_o, w_o))
 
     print("_______________________________________________")
     print("new result: \n{}".format(O_new))
     print("_______________________________________________")
 
-    O_l = reorgyolo_comparison(I_data_linear,
-                               batch=n_i,
-                               C=c_i,
-                               H=h_i,
-                               W=w_i,
-                               stride=stride,
-                               forward=decrease)
-
-    if (c_o > c_i):
+    if (c_o > c_i):  # leimao edit
         expected_result_l = reorgyolo_comparison(I_data_linear,
                                                  batch=n_i,
                                                  C=c_o,
