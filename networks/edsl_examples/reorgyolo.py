@@ -21,7 +21,8 @@
 #   https://gist.github.com/leimao/ece7217b5d07fe4e685c47af5e76744a
 #   is currently being used for local testing
 # TODO: handle cases where the spatial dims aren't evenly divided by stride
-# TODO: write python unittests
+# TODO: neaten up the reorgyolo c_o>c_in issue in tester function
+# TODO: either figure out how to reference leimao blog code or get rid of it
 # TODO: write backend_test style test against pytorch implementation
 # TODO: remove test functions and python test code
 # TODO: write a note on handling the modulus operator in eDSL
@@ -44,7 +45,7 @@ def reorgyolo_comparison(arrayIn, batch, C, H, W, stride, forward=False):
             for j in range(H):
                 for i in range(W):
                     in_index = i + W * (j + H * (k + C * b))
-                    c2 = k % out_c  #
+                    c2 = k % out_c
                     offset = k // out_c
                     w2 = i * stride + offset % stride
                     h2 = j * stride + offset // stride
@@ -96,6 +97,7 @@ def reorgyolo(I, stride, decrease_C):
         O[n, c1, h1, w1] = I[n, c2, h2, w2]
     O.add_constraint(h_jump < stride)
     O.add_constraint(w_jump < stride)
+
     return O
 
 
@@ -158,8 +160,24 @@ def main():
                                W=w_i,
                                stride=stride,
                                forward=decrease)
-    O_exp = np.reshape(O_l, (n_i, c_o, h_o, w_o))
 
+    if (c_o > c_i):
+        expected_result_l = reorgyolo_comparison(I_data_linear,
+                                                 batch=n_i,
+                                                 C=c_o,
+                                                 H=h_o,
+                                                 W=w_o,
+                                                 stride=stride,
+                                                 forward=decrease)
+    else:
+        expected_result_l = reorgyolo_comparison(I_data_linear,
+                                                 batch=n_i,
+                                                 C=c_i,
+                                                 H=h_i,
+                                                 W=w_i,
+                                                 stride=stride,
+                                                 forward=decrease)
+    O_exp = np.reshape(expected_result_l, (n_i, c_o, h_o, w_o))
     print("_______________________________________________")
     print("expected result: \n{}".format(O_exp))
     print("_______________________________________________")

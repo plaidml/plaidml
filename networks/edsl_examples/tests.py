@@ -1,6 +1,5 @@
 import unittest
 import numpy.testing as npt
-import os
 
 from networks.edsl_examples.reorgyolo import *
 
@@ -30,13 +29,24 @@ def test_reorgyolo(n_i, c_i, h_i, w_i, stride, decrease):
         c_o = c_i * (stride * stride)
         h_o = h_i // stride
         w_o = w_i // stride
-    expected_result_l = reorgyolo_comparison(I_data_linear,
-                                             batch=n_i,
-                                             C=c_i,
-                                             H=h_i,
-                                             W=w_i,
-                                             stride=stride,
-                                             forward=decrease)
+
+    if (c_o > c_i):
+        expected_result_l = reorgyolo_comparison(I_data_linear,
+                                                 batch=n_i,
+                                                 C=c_o,
+                                                 H=h_o,
+                                                 W=w_o,
+                                                 stride=stride,
+                                                 forward=decrease)
+    else:
+        expected_result_l = reorgyolo_comparison(I_data_linear,
+                                                 batch=n_i,
+                                                 C=c_i,
+                                                 H=h_i,
+                                                 W=w_i,
+                                                 stride=stride,
+                                                 forward=decrease)
+
     expected_result = np.reshape(expected_result_l, (n_i, c_o, h_o, w_o))
 
     #check results
@@ -45,7 +55,7 @@ def test_reorgyolo(n_i, c_i, h_i, w_i, stride, decrease):
 
 class EDSLExampleTests(unittest.TestCase):
 
-    @unittest.skip("Fails: incorrect output produced")  #TODO: fix
+    #@unittest.skip("Fails: incorrect output produced")  #TODO: fix
     def tests_reorgyolo_backward(self):
         test_reorgyolo(1, 4, 6, 6, 2, False)
 
