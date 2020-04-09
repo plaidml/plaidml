@@ -33,12 +33,12 @@ using BlockArgumentSet = llvm::SmallPtrSet<mlir::BlockArgument, 8>;
 
 struct TensorAndIndexPermutation {
   // An order of the Tensors and Indexes used in an operation
-  llvm::SmallVector<Value, 3> tensors;
+  llvm::SmallVector<mlir::Operation*, 3> tensors;
   llvm::SmallVector<mlir::BlockArgument, 8> indexes;
 
   TensorAndIndexPermutation() = default;
 
-  TensorAndIndexPermutation(llvm::SmallVector<Value, 3> tensors,
+  TensorAndIndexPermutation(llvm::SmallVector<mlir::Operation*, 3> tensors,
                             llvm::SmallVector<mlir::BlockArgument, 8> indexes)
       : tensors(tensors), indexes(indexes) {}
 };
@@ -56,9 +56,9 @@ using TileSizeGenerator = std::function<std::vector<int64_t>(int64_t)>;
 class StencilGeneric {
   // TODO
 private:
-  void BindIndexes(const llvm::SmallVector<mlir::Value, 3> &tensors);
+  void BindIndexes(const llvm::SmallVector<mlir::Operation*, 3> &tensors);
   void RecursiveBindIndex(llvm::SmallVector<mlir::BlockArgument, 8> *bound_idxs,
-                          const llvm::SmallVector<mlir::Value, 3> &tensors);
+                          const llvm::SmallVector<mlir::Operation*, 3> &tensors);
   void RecursiveTileIndex(const TensorAndIndexPermutation &perm,
                           llvm::SmallVector<int64_t, 8> *tileSize,
                           int64_t currIdx);
@@ -89,7 +89,7 @@ protected: // TODO: private backend for some of this?
   // function to determine if a Value & BlockArg meet the requirements of that
   // pair
   std::map<std::pair<int64_t, int64_t>,
-           std::function<bool(mlir::Value, mlir::BlockArgument)>>
+           std::function<bool(const mlir::Operation*, mlir::BlockArgument)>>
       requirements;
 
   // For each semantically relevant index, a generator for tile sizes. Ordered

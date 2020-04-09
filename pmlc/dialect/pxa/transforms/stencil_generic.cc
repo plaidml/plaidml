@@ -69,7 +69,7 @@ void swap(Orderer<V> &v1, Orderer<V> &v2) {
 } // namespace
 
 void StencilGeneric::BindIndexes(
-    const llvm::SmallVector<mlir::Value, 3> &tensors) {
+    const llvm::SmallVector<mlir::Operation*, 3> &tensors) {
   llvm::SmallVector<mlir::BlockArgument, 8> emptyBoundIdxsVector;
   RecursiveBindIndex(&emptyBoundIdxsVector, tensors);
 }
@@ -80,7 +80,7 @@ void StencilGeneric::BindIndexes(
 // TODO: Also, should probably at least be a small vector (how small?)
 void StencilGeneric::RecursiveBindIndex(
     llvm::SmallVector<mlir::BlockArgument, 8> *boundIdxs,
-    const llvm::SmallVector<mlir::Value, 3> &tensors) {
+    const llvm::SmallVector<mlir::Operation*, 3> &tensors) {
   auto currIdx = boundIdxs->size();
   if (currIdx == semanticIdxCount) {
     // This is a legal binding, go find a tiling for it
@@ -99,6 +99,13 @@ void StencilGeneric::RecursiveBindIndex(
       bool reqsMet = true;
       for (unsigned i = 0; i < tensors.size(); i++) {
         try { // TODO: probably don't keep long term
+          // computeStrideInfo(tensors[i])->print(llvm::errs());
+          // llvm::errs().flush();
+          // std::stringstream msg;
+          // computeStrideInfo(tensors[i])->print(msg);
+          // IVLOG(2, "TODO Stride Info is: " << msg);
+          // throw std::runtime_error("Forced abort");
+
           if (!requirements.at(std::make_pair(i, currIdx))(tensors[i],
                                                            blockArg)) {
             reqsMet = false;
@@ -166,40 +173,58 @@ void StencilGeneric::DoStenciling() {
     return;
   }
 
-  llvm::SmallVector<Orderer<mlir::Value>, 3> orderableTensors;
-  unsigned ord = 0;
-  for (auto &loadOp : loadsAndStores.loads) {
-    orderableTensors.push_back(Orderer<mlir::Value>(ord++, loadOp.getMemRef()));
+  // llvm::SmallVector<Orderer<mlir::Operation*>, 3> orderableTensors;
+  // unsigned ord = 0;
+  // for (auto &loadOp : loadsAndStores.loads) {
+  //   orderableTensors.push_back(Orderer<mlir::Operation*>(ord++, &loadOp));
+  // }
+  // size_t firstStoreIdx = orderableTensors.size();
+  // for (auto &storeOp : loadsAndStores.stores) {
+  //   orderableTensors.push_back(Orderer<mlir::Operation*>(ord++, &storeOp));
+  //   // TODO: Probably should handle reduces vs. true stores in a different way
+  //   // if (auto reduce_op = llvm::dyn_cast_or_null<AffineReduceOp>(storeOp)) {
+  //   //   tensors.push_back(reduce_op.out());
+  //   // } else if (auto trueStoreOp =
+  //   // llvm::dyn_cast_or_null<mlir::AffineStoreOp>(storeOp)) {
+  //   //   tensors.push_back(trueStoreOp.getMemRef());
+  //   // } else {
+  //   //   // TODO: throw?
+  //   //   IVLOG(1, "Unexpected failure to load tensors from ops in stenciling");
+  //   //   return;
+  //   // }
+  // }
+  // auto lastLoadFirstStoreIt = orderableTensors.begin() + firstStoreIdx;
+  // std::sort(orderableTensors.begin(), lastLoadFirstStoreIt);
+  // do { // Each load tensor permutation
+  //   std::sort(lastLoadFirstStoreIt, orderableTensors.end());
+  //   do { // Each store tensor permutation
+  //     llvm::SmallVector<mlir::Operation*, 3> tensors;
+  //     for (const auto &tn : orderableTensors) {
+  //       tensors.push_back(*tn);
+  //     }
+  //     BindIndexes(tensors);
+  //   } while (
+  //       std::next_permutation(lastLoadFirstStoreIt, orderableTensors.end()));
+  // } while (
+  //     std::next_permutation(orderableTensors.begin(), lastLoadFirstStoreIt));
+  llvm::SmallVector<mlir::Operation*, 3> tensors;
+  for (auto& loadOp : loadsAndStores.loads) {
+    tensors.push_back(&loadOp);
   }
-  size_t firstStoreIdx = orderableTensors.size();
-  for (auto &storeOp : loadsAndStores.stores) {
-    orderableTensors.push_back(Orderer<mlir::Value>(ord++, storeOp.out()));
-    // TODO: Probably should handle reduces vs. true stores in a different way
-    // if (auto reduce_op = llvm::dyn_cast_or_null<AffineReduceOp>(storeOp)) {
-    //   tensors.push_back(reduce_op.out());
-    // } else if (auto trueStoreOp =
-    // llvm::dyn_cast_or_null<mlir::AffineStoreOp>(storeOp)) {
-    //   tensors.push_back(trueStoreOp.getMemRef());
-    // } else {
-    //   // TODO: throw?
-    //   IVLOG(1, "Unexpected failure to load tensors from ops in stenciling");
-    //   return;
-    // }
+  size_t firstStoreIdx = tensors.size();
+  for (auto& storeOp : loadsAndStores.stores) {
+    tensors.push_back(&storeOp);
   }
-  auto lastLoadFirstStoreIt = orderableTensors.begin() + firstStoreIdx;
-  std::sort(orderableTensors.begin(), lastLoadFirstStoreIt);
+  auto lastLoadFirstStoreIt = tensors.begin() + firstStoreIdx;
+  std::sort(tensors.begin(), lastLoadFirstStoreIt);
   do { // Each load tensor permutation
-    std::sort(lastLoadFirstStoreIt, orderableTensors.end());
+    std::sort(lastLoadFirstStoreIt, tensors.end());
     do { // Each store tensor permutation
-      llvm::SmallVector<mlir::Value, 3> tensors;
-      for (const auto &tn : orderableTensors) {
-        tensors.push_back(*tn);
-      }
       BindIndexes(tensors);
     } while (
-        std::next_permutation(lastLoadFirstStoreIt, orderableTensors.end()));
+        std::next_permutation(lastLoadFirstStoreIt, tensors.end()));
   } while (
-      std::next_permutation(orderableTensors.begin(), lastLoadFirstStoreIt));
+      std::next_permutation(tensors.begin(), lastLoadFirstStoreIt));
 
   if (bestCost < std::numeric_limits<double>::infinity()) {
     transform(bestPermutation, bestTiling);

@@ -113,13 +113,46 @@ public:
   explicit StencilXSMM(mlir::AffineParallelOp op) : StencilGeneric{op} {
     // TODO ctor
     // TODO: Probably want to move these to be params on StencilGeneric ctor...
-    semanticIdxCount = 1; // TODO
-    requirements =
+    semanticIdxCount = 1; // TODO [i.e., must match generators & requirements]
+    requirements =  // TODO: Make nicer
         std::map<std::pair<int64_t, int64_t>,
-                 std::function<bool(mlir::Value, mlir::BlockArgument)>>{
-            {{0, 0}, [](mlir::Value v, mlir::BlockArgument a) { return true; }},
-            {{1, 0}, [](mlir::Value v, mlir::BlockArgument a) { return true; }},
-            {{2, 0}, [](mlir::Value v, mlir::BlockArgument a) { return true; }},
+                 std::function<bool(const mlir::Operation*, mlir::BlockArgument)>>{
+            {{0, 0}, [](const mlir::Operation* v, mlir::BlockArgument a) {
+              IVLOG(3, "Yep, calling this");
+              // auto op = llvm::dyn_cast_or_null<mlir::AffineLoadOp>(v.getDefiningOp());
+              auto op = llvm::dyn_cast_or_null<pxa::AffineReduceOp>(v.getDefiningOp());
+              IVLOG(3, "A");
+              // if (!op) {
+              //   // Must be a load
+              //   IVLOG(3, "Not a load");
+              //   return false;
+              // } 
+              if (!op) {
+                // Must be a reduce
+                IVLOG(3, "Not a reduce");
+                return false;
+              }
+              IVLOG(3, "B");
+              auto TODOTest3 = computeStrideInfo(op);
+              IVLOG(3, "C");
+              TODOTest3->print(llvm::outs());
+              IVLOG(3, "Should have printed^");
+              // auto TODOTest2 = computeStrideInfo(v.getDefiningOp(), a);
+              // auto TODOTest = computeStrideInfo(v);
+              // IVLOG(3, "Here's the intermediate side");
+              // TODOTest->print(llvm::outs());
+              // IVLOG(3, "Should have printed ^");
+              // throw std::runtime_error("Die now");
+              // if (computeStrideInfo(v)->strides[a] != 0) {
+              //   IVLOG(4, "Cool, got a true");
+              // } else {
+              //   IVLOG(4, "Welp, got a false");
+              // }
+              // IVLOG(5, "and out the other side");
+              return true;
+            }},
+            {{1, 0}, [](const mlir::Operation* v, mlir::BlockArgument a) { return true; }},
+            {{2, 0}, [](const mlir::Operation* v, mlir::BlockArgument a) { return true; }},
             // TODO: Define `stride_of`...
             // {{0, 0}, [](mlir::Value v, mlir::BlockArgument a){ return
             // stride_of(v, a) != 0 }},
