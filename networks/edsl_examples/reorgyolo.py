@@ -38,13 +38,13 @@ import plaidml2.op as plaidml_op
 def reorgyolo_comparison(arrayIn, batch, C, H, W, stride, forward=False):
     arrayLen = len(arrayIn)
     arrayOut = np.zeros(arrayLen)
-    out_c = C // (stride * stride)
+    out_c = C // (stride * stride)  #1
     for b in range(batch):
-        for k in range(C):
-            for j in range(H):
-                for i in range(W):
+        for k in range(C):  #0-4
+            for j in range(H):  #0-6
+                for i in range(W):  #0-6
                     in_index = i + W * (j + H * (k + C * b))
-                    c2 = k % out_c
+                    c2 = k % out_c  #
                     offset = k // out_c
                     w2 = i * stride + offset % stride
                     h2 = j * stride + offset // stride
@@ -60,18 +60,17 @@ def reorgyolo_comparison_nodivmod(arrayIn, batch, C, H, W, stride, forward=False
     arrayLen = len(arrayIn)
     arrayOut = np.zeros(arrayLen)
     out_c = C // (stride * stride)
-    _c1_quotient_range = int(C // (out_c))
     for n1 in range(batch):
         for w1 in range(W):
             for h1 in range(H):
                 for c2 in range(out_c):
-                    for _w2_quotient in range(_c1_quotient_range // stride):
-                        for _w2 in range(stride):
-                            _c1 = _w2 + _w2_quotient * stride
+                    for h_jump in range(stride):
+                        for w_jump in range(stride):
+                            _c1 = w_jump + h_jump * stride
                             c1 = c2 + (_c1 * out_c)
                             in_index = w1 + W * (h1 + H * (c1 + C * n1))
-                            w2 = w1 * stride + _w2
-                            h2 = h1 * stride + _w2_quotient
+                            w2 = w1 * stride + w_jump
+                            h2 = h1 * stride + h_jump
                             out_index = int(w2 + W * stride * (h2 + H * stride *
                                                                (c2 + out_c * n1)))
                             if forward:
@@ -101,12 +100,12 @@ def reorgyolo(I, stride, forward):
 
 
 def main():
-    n_i = 2
+    n_i = 1
     c_i = 4
     h_i = 6
     w_i = 6
     stride = 2
-    forward = True
+    forward = False
 
     I_data_linear = np.array(list(range(n_i * c_i * h_i * w_i))).astype(np.int)
     I_data = np.reshape(I_data_linear, (n_i, c_i, h_i, w_i))
