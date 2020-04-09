@@ -1,13 +1,15 @@
 // RUN: pmlc-vulkan-runner %s --entry-point-result=void | FileCheck %s
 
-// CHECK: [23,  23,  23,  23,  23,  23,  23,  23]
+// CHECK: [23,   23,   23],  
+// CHECK: [23,   23,   23],  
+// CHECK: [23,   23,   23]
+
 
 module attributes {gpu.container_module, spv.target_env = #spv.target_env<#spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]>, {max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
   func @main() {
     %arg0 = alloc() : memref<3x3xf32>
     %arg1 = alloc() : memref<3x3xf32>
     %arg2 = alloc() : memref<3x3xf32>
-    %arg22 = alloc() : memref<3x3xf32>
 
     %c3 = constant 3 : index
     %c1 = constant 1 : index

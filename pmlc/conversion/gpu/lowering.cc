@@ -52,7 +52,7 @@ void LegalizeGpuOpForGpuLoweringPass::runOnModule() {
       // TODO local sizes should be set according to gpu.block_size, waiting for
       // upstream update
       auto entryPointAbiAttr =
-          spirv::getEntryPointABIAttr({3, 1, 1}, func.getContext());
+          spirv::getEntryPointABIAttr({32, 1, 1}, func.getContext());
       func.setAttr(spirv::getEntryPointABIAttrName(), entryPointAbiAttr);
       return;
     }

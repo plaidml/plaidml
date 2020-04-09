@@ -48,9 +48,14 @@ public:
     }
   }
 
-  void createLaunchKernelAction() {
+  void createLaunchKernelAction(uint8_t *shader, uint32_t size,
+                                const char *entryPoint,
+                                NumWorkGroups numWorkGroups) {
     std::lock_guard<std::mutex> lock(mutex);
     vulkanRuntime.createLaunchKernelAction();
+    vulkanRuntime.setShaderModule(shader, size);
+    vulkanRuntime.setEntryPoint(entryPoint);
+    vulkanRuntime.setNumWorkGroups(numWorkGroups);
   }
 
   void createMemoryTransferAction(uint64_t src_index, uint64_t src_binding,
@@ -66,22 +71,7 @@ public:
     vulkanRuntime.setResourceData(setIndex, bindIndex, memBuffer);
   }
 
-  void setEntryPoint(const char *entryPoint) {
-    std::lock_guard<std::mutex> lock(mutex);
-    vulkanRuntime.setEntryPoint(entryPoint);
-  }
-
-  void setNumWorkGroups(NumWorkGroups numWorkGroups) {
-    std::lock_guard<std::mutex> lock(mutex);
-    vulkanRuntime.setNumWorkGroups(numWorkGroups);
-  }
-
-  void setShaderModule(uint8_t *shader, uint32_t size) {
-    std::lock_guard<std::mutex> lock(mutex);
-    vulkanRuntime.setShaderModule(shader, size);
-  }
-
-  void runOnVulkan() {
+  void setLaunchKernelAction() {
     std::lock_guard<std::mutex> lock(mutex);
     if (failed(vulkanRuntime.setLaunchKernelAction())) {
       llvm::errs() << "runOnVulkan failed";
@@ -114,7 +104,9 @@ struct MemRefDescriptor {
 extern "C" {
 VULKAN_RT_EXPORT void *initVulkan();
 VULKAN_RT_EXPORT void deinitVulkan(void *vkRuntimeManager);
-VULKAN_RT_EXPORT void createLaunchKernelAction(void *vkRuntimeManager);
+void createLaunchKernelAction(void *vkRuntimeManager, uint8_t *shader,
+                              uint32_t size, const char *entryPoint, uint32_t x,
+                              uint32_t y, uint32_t z);
 VULKAN_RT_EXPORT void createMemoryTransferAction(void *vkRuntimeManager,
                                                  uint64_t src_index,
                                                  uint64_t src_binding,
@@ -122,12 +114,6 @@ VULKAN_RT_EXPORT void createMemoryTransferAction(void *vkRuntimeManager,
                                                  uint64_t dst_binding);
 VULKAN_RT_EXPORT void runOnVulkan(void *vkRuntimeManager);
 VULKAN_RT_EXPORT void submitCommandBuffers(void *vkRuntimeManager);
-VULKAN_RT_EXPORT void setEntryPoint(void *vkRuntimeManager,
-                                    const char *entryPoint);
-VULKAN_RT_EXPORT void setNumWorkGroups(void *vkRuntimeManager, uint32_t x,
-                                       uint32_t y, uint32_t z);
-VULKAN_RT_EXPORT void setBinaryShader(void *vkRuntimeManager, uint8_t *shader,
-                                      uint32_t size);
 VULKAN_RT_EXPORT void bindMemRef1DFloat(void *vkRuntimeManager,
                                         DescriptorSetIndex setIndex,
                                         BindingIndex bindIndex,
@@ -136,15 +122,18 @@ VULKAN_RT_EXPORT void bindMemRef2DFloat(void *vkRuntimeManager,
                                         DescriptorSetIndex setIndex,
                                         BindingIndex bindIndex,
                                         MemRefDescriptor<float, 2> *ptr);
-VULKAN_RT_EXPORT void
-_mlir_ciface_fillResource1DFloat(MemRefDescriptor<float, 1> *ptr, float value);
 
-/// Initializes `VulkanRuntimeManager` and returns a pointer to it.
 void *initVulkan() { return new VulkanRuntimeManager(); }
 
-void createLaunchKernelAction(void *vkRuntimeManager) {
+void deinitVulkan(void *vkRuntimeManager) {
+  delete reinterpret_cast<VulkanRuntimeManager *>(vkRuntimeManager);
+}
+
+void createLaunchKernelAction(void *vkRuntimeManager, uint8_t *shader,
+                              uint32_t size, const char *entryPoint, uint32_t x,
+                              uint32_t y, uint32_t z) {
   reinterpret_cast<VulkanRuntimeManager *>(vkRuntimeManager)
-      ->createLaunchKernelAction();
+      ->createLaunchKernelAction(shader, size, entryPoint, {x, y, z});
 }
 
 void createMemoryTransferAction(void *vkRuntimeManager, uint64_t src_index,
@@ -155,13 +144,9 @@ void createMemoryTransferAction(void *vkRuntimeManager, uint64_t src_index,
                                    dst_binding);
 }
 
-/// Deinitializes `VulkanRuntimeManager` by the given pointer.
-void deinitVulkan(void *vkRuntimeManager) {
-  delete reinterpret_cast<VulkanRuntimeManager *>(vkRuntimeManager);
-}
-
-void runOnVulkan(void *vkRuntimeManager) {
-  reinterpret_cast<VulkanRuntimeManager *>(vkRuntimeManager)->runOnVulkan();
+void setLaunchKernelAction(void *vkRuntimeManager) {
+  reinterpret_cast<VulkanRuntimeManager *>(vkRuntimeManager)
+      ->setLaunchKernelAction();
 }
 
 void submitCommandBuffers(void *vkRuntimeManager) {
@@ -169,21 +154,6 @@ void submitCommandBuffers(void *vkRuntimeManager) {
       ->submitCommandBuffers();
 }
 
-void setEntryPoint(void *vkRuntimeManager, const char *entryPoint) {
-  reinterpret_cast<VulkanRuntimeManager *>(vkRuntimeManager)
-      ->setEntryPoint(entryPoint);
-}
-
-void setNumWorkGroups(void *vkRuntimeManager, uint32_t x, uint32_t y,
-                      uint32_t z) {
-  reinterpret_cast<VulkanRuntimeManager *>(vkRuntimeManager)
-      ->setNumWorkGroups({x, y, z});
-}
-
-void setBinaryShader(void *vkRuntimeManager, uint8_t *shader, uint32_t size) {
-  reinterpret_cast<VulkanRuntimeManager *>(vkRuntimeManager)
-      ->setShaderModule(shader, size);
-}
 /// Binds the given 1D float memref to the given descriptor set and descriptor
 /// index.
 void bindMemRef1DFloat(void *vkRuntimeManager, DescriptorSetIndex setIndex,
@@ -203,11 +173,5 @@ void bindMemRef2DFloat(void *vkRuntimeManager, DescriptorSetIndex setIndex,
       static_cast<uint32_t>(ptr->sizes[0] * ptr->sizes[1] * sizeof(float))};
   reinterpret_cast<VulkanRuntimeManager *>(vkRuntimeManager)
       ->setResourceData(setIndex, bindIndex, memBuffer);
-}
-
-/// Fills the given 1D float memref with the given float value.
-void _mlir_ciface_fillResource1DFloat(MemRefDescriptor<float, 1> *ptr,
-                                      float value) {
-  std::fill_n(ptr->allocated, ptr->sizes[0], value);
 }
 } // extern "C"

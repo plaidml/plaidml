@@ -1,6 +1,5 @@
 local exports = [
     // vulkan_rt
-    '_mlir_ciface_fillResource1DFloat',
     'bindMemRef1DFloat',
     'bindMemRef2DFloat',
     'deinitVulkan',
@@ -8,10 +7,7 @@ local exports = [
     'submitCommandBuffers',
     'createLaunchKernelAction',
     'createMemoryTransferAction',
-    'runOnVulkan',
-    'setBinaryShader',
-    'setEntryPoint',
-    'setNumWorkGroups',
+    'setLaunchKernelAction',
 
     // rt
     '_mlir_ciface_print_memref_f32',
