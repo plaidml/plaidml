@@ -236,7 +236,7 @@ def cmd_report(args, remainder):
     cmd += ['--annotate']
     cmd += [str(workdir)]
     cmd += remainder
-    util.check_call(cmd, stderr=subprocess.DEVNULL)
+    util.check_call(cmd)
 
 
 def make_cmd_build(parent):
