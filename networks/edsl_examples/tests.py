@@ -5,13 +5,13 @@ import os
 from networks.edsl_examples.reorgyolo import *
 
 
-def test_reorgyolo(n_i, c_i, h_i, w_i, stride, forward):
+def test_reorgyolo(n_i, c_i, h_i, w_i, stride, decrease):
 
     I_data_linear = np.array(list(range(n_i * c_i * h_i * w_i))).astype(np.int)
     I_data = np.reshape(I_data_linear, (n_i, c_i, h_i, w_i))
 
     I = edsl.Tensor(edsl.LogicalShape(plaidml.DType.FLOAT32, I_data.shape))
-    O = reorgyolo(I, stride, forward)
+    O = reorgyolo(I, stride, decrease)
 
     #create eDSL program, compile and run
     program = edsl.Program('reorgyolo', [O])
@@ -22,7 +22,7 @@ def test_reorgyolo(n_i, c_i, h_i, w_i, stride, forward):
     result = binder.output(O).as_ndarray()
 
     #compute expected results without eDSL
-    if forward:
+    if decrease:
         c_o = c_i // (stride * stride)
         h_o = h_i * stride
         w_o = w_i * stride
@@ -36,7 +36,7 @@ def test_reorgyolo(n_i, c_i, h_i, w_i, stride, forward):
                                              H=h_i,
                                              W=w_i,
                                              stride=stride,
-                                             forward=forward)
+                                             forward=decrease)
     expected_result = np.reshape(expected_result_l, (n_i, c_o, h_o, w_o))
 
     #check results
