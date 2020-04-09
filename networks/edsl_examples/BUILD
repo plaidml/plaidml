@@ -14,3 +14,17 @@ py_binary(
         "//plaidml2/op:py",
     ],
 )
+
+py_test(
+    name = "tests",
+    srcs = [
+        "tests.py",
+        "reorgyolo.py",
+    ],
+    deps = [
+        "//plaidml2:py",
+        "//plaidml2/edsl:py",
+        "//plaidml2/exec:py",
+        "//plaidml2/op:py",
+    ],
+)

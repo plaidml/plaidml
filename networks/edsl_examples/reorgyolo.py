@@ -38,7 +38,6 @@ import plaidml2.op as plaidml_op
 def reorgyolo_comparison(arrayIn, batch, C, H, W, stride, forward=False):
     arrayLen = len(arrayIn)
     arrayOut = np.zeros(arrayLen)
-    print("C is " + str(C) + "stride is " + str(stride))
     out_c = C // (stride * stride)
     for b in range(batch):
         for k in range(C):
@@ -60,7 +59,6 @@ def reorgyolo_comparison(arrayIn, batch, C, H, W, stride, forward=False):
 def reorgyolo_comparison_nodivmod(arrayIn, batch, C, H, W, stride, forward=False):
     arrayLen = len(arrayIn)
     arrayOut = np.zeros(arrayLen)
-    print("C is " + str(C) + "stride is " + str(stride))
     out_c = C // (stride * stride)
     _c1_quotient_range = int(C // (out_c))
     for n1 in range(batch):
@@ -85,33 +83,25 @@ def reorgyolo_comparison_nodivmod(arrayIn, batch, C, H, W, stride, forward=False
 
 def reorgyolo(I, stride, forward):
     N, C, H, W = edsl.TensorDims(4)
-    n1, w1, h1, c2, _w2_quotient, _w2 = edsl.TensorIndexes(6)
+    n, w1, h1, c2, h_jump, w_jump = edsl.TensorIndexes(6)
     I.bind_dims(N, C, H, W)
-
+    h2 = h1 * stride + h_jump
+    w2 = w1 * stride + w_jump
     if forward:
-        C_decrease = C // (stride * stride)
-        _c1_quotient_range = C // (C_decrease)
-        _w2_quotient_range = _c1_quotient_range // stride
-        O = edsl.TensorOutput(N, C_decrease, H * stride, W * stride)
-        O[n1, c2, h1 * stride + _w2_quotient, w1 * stride +
-          _w2] = I[n1, c2 + ((_w2 + _w2_quotient * stride) * C_decrease), h1, w1]
-        O.add_constraint(c2 < C_decrease)
-        O.add_constraint(_w2_quotient < _w2_quotient_range)
+        c1 = c2 + ((w_jump + h_jump * stride) * (C // (stride * stride)))
+        O = edsl.TensorOutput(N, C // (stride * stride), H * stride, W * stride)
+        O[n, c2, h2, w2] = I[n, c1, h1, w1]
     else:
-        C_increase = C * (stride * stride)
-        O = edsl.TensorOutput(N, C_increase, H // stride, W // stride)
-        O[n1, c2 +
-          ((_w2 + _w2_quotient * stride) * C), h1, w1] = I[n1, c2, h1 * stride +
-                                                           _w2_quotient, w1 * stride + _w2]
-        O.add_constraint(c2 < C)
-
-    O.add_constraint(_w2 < stride)
-
+        c1 = c2 + ((w_jump + h_jump * stride) * C)
+        O = edsl.TensorOutput(N, C * (stride * stride), H // stride, W // stride)
+        O[n, c1, h1, w1] = I[n, c2, h2, w2]
+    O.add_constraint(h_jump < stride)
+    O.add_constraint(w_jump < stride)
     return O
 
 
 def main():
-    n_i = 1
+    n_i = 2
     c_i = 4
     h_i = 6
     w_i = 6
@@ -141,13 +131,9 @@ def main():
     program = edsl.Program('reorgyolo', [O])
     binder = plaidml_exec.Binder(program)
     executable = binder.compile()
-
-    def run():
-        binder.input(I).copy_from_ndarray(I_data)
-        executable.run()
-        return binder.output(O).as_ndarray()
-
-    result = run()
+    binder.input(I).copy_from_ndarray(I_data)
+    executable.run()
+    result = binder.output(O).as_ndarray()
 
     print("_______________________________________________")
     print("eDSL computed result: \n{}".format(result))
