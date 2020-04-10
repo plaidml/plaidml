@@ -38,6 +38,9 @@ IntersectParallelConstraintPairInner(const RangeConstraint &constraint1,
   // Assumes the RangeConstraints have been validated to have positive ranges,
   // _or_ that for constraint2 specifically it represents a one sided constraint
   // by having an infinite range parameter represented as a range value of -1
+  IVLOG(5, "Entering IntersectParallelConstraintPairInner with:\n"
+               << "constraint1: " << constraint1 << '\n'
+               << "constraint2: " << constraint2);
   Rational ratio = constraint1.poly.tryDivide(constraint2.poly, true);
   if (ratio == 0) {
     throw std::invalid_argument(
@@ -84,6 +87,9 @@ IntersectParallelConstraintPairInner(const RangeConstraint &constraint1,
         "Bound range in IntersectParallelConstraintPair overflows int64.");
   }
   int64_t r = (int64_t)range;
+  IVLOG(5, "Leaving IntersectParallelConstraintPairInner with:\n"
+               << "  constraint1.poly: " << constraint1.poly << "\n  n1: " << n1
+               << "\n  merged_offset: " << merged_offset << "\n  r: " << r);
   Polynomial<Rational> p(constraint1.poly / n1);
   p.setConstant(merged_offset);
   return RangeConstraint(p, r);
@@ -434,11 +440,14 @@ IntersectOpposedSimpleConstraints(const SimpleConstraint &constraint1,
         "Parameters of IntersectOpposedSimpleConstraints must be parallel and "
         "in opposite directions");
   }
-  // We know constraint1.poly <= constraint1.rhs and also constraint2.poly <=
-  // constraint2.rhs Could rewrite as 0 <= -constraint1.poly + constraint1.rhs
-  // and also 0 <= -constraint2.poly + constraint2.rhs Rewrite: constraint1.poly
-  // = p1 + c1 (where p1 has no constant part), constraint1.rhs = rhs1;
-  // similarly for 2 So 0 <= -p1 - c1 + rhs1 and also 0 <= -p2 - c2 + rhs2 and
+  // We know    constraint1.poly <= constraint1.rhs
+  //   and also constraint2.poly <= constraint2.rhs
+  // Could rewrite as 0 <= -constraint1.poly + constraint1.rhs
+  //         and also 0 <= -constraint2.poly + constraint2.rhs
+  // Rewrite: constraint1.poly = p1 + c1 (where p1 has no constant part),
+  //          constraint1.rhs = rhs1;
+  //   similarly for 2.
+  // So 0 <= -p1 - c1 + rhs1 and also 0 <= -p2 - c2 + rhs2 and
   // since a = ratio is negative, and p2 * a = p1, get
   //   0 >= -a * p2 - a * c2 + a * rhs2
   //   0 >= -p1 - a * c2 + a * rhs2
@@ -476,6 +485,77 @@ IntersectOpposedSimpleConstraints(const SimpleConstraint &constraint1,
   //                                << merged_const2 << ")");
   return IntersectParallelConstraintPair(RangeConstraint(merged_poly1, r),
                                          constraint2);
+}
+
+RangeConstraint &RangeConstraint::canonicalize() {
+  // Prefer to have more positive coeffs in the final RangeConstraint; barring
+  // that, larger positive coeffs; barring that, make the lexicographically last
+  // index have a positive coeff
+  int64_t net_pos_count = 0;
+  Rational net_coeff_magnitude = 0;
+  std::string last_idx = "";
+  bool last_idx_positive = true;
+  for (auto [idx, coeff] : poly.getMap()) {
+    if (!idx.empty()) {
+      // Constant term doesn't count
+      if (coeff > 0) {
+        net_pos_count++;
+      } else if (coeff < 0) {
+        net_pos_count--;
+      }
+      net_coeff_magnitude += coeff;
+    }
+    if (last_idx == "" || idx >= last_idx) {
+      // Reverse lexicographic as the constant term should not override anything
+      // else; test with >= rather than strict > because the constant term
+      // _should_ override the _uninitialized_ result
+      last_idx = idx;
+      if (coeff < 0) {
+        last_idx_positive = false;
+      } else {
+        last_idx_positive = true;
+      }
+    }
+  }
+  if (net_pos_count < 0) {
+    IVLOG(5, "RangeConstraint::canonicalize decided to reverse based on pos "
+             "idx count: ");
+    IVLOG(5, "Started with " << *this);
+    reverse();
+    IVLOG(5, "Ended with " << *this);
+  } else if (net_pos_count > 0) {
+    IVLOG(5, "RangeConstraint::canonicalize decided not to reverse based on "
+             "pos idx count: ");
+    IVLOG(5, "Constraint remains " << *this);
+  } else if (net_coeff_magnitude < 0) {
+    IVLOG(5, "RangeConstraint::canonicalize decided to reverse based on coeff "
+             "magnitude: ");
+    IVLOG(5, "Started with " << *this);
+    reverse();
+    IVLOG(5, "Ended with " << *this);
+  } else if (net_coeff_magnitude > 0) {
+    IVLOG(5, "RangeConstraint::canonicalize decided not to reverse based on "
+             "coeff magnitude: ");
+    IVLOG(5, "Constraint remains " << *this);
+  } else if (!last_idx_positive) {
+    IVLOG(5, "RangeConstraint::canonicalize decided to reverse based on sign "
+             "of lexicographically final idx: ");
+    IVLOG(5, "Started with " << *this);
+    reverse();
+    IVLOG(5, "Ended with " << *this);
+  } else {
+    IVLOG(5, "RangeConstraint::canonicalize decided not to reverse based on "
+             "sign of lexicographically final idx: ");
+    IVLOG(5, "Constraint remains " << *this);
+  }
+  return *this;
+}
+
+RangeConstraint &RangeConstraint::reverse() {
+  // Express the same constraint with signs negated. I.e., the same values
+  // satisfy the constraint. For canonicalization.
+  poly = -poly + range - 1;
+  return *this;
 }
 
 } // namespace pmlc::util::math

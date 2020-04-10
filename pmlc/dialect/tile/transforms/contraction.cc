@@ -150,7 +150,7 @@ BoundsAndConstraints Constraints::ComputeBounds() {
 }
 
 static IndexPoly MakePoly(ContractionOp op, AffineExpr expr) {
-  IVLOG(3, "MakePoly: " << mlir::debugString(expr));
+  IVLOG(4, "MakePoly: " << mlir::debugString(expr));
   if (auto dimExpr = expr.dyn_cast<mlir::AffineDimExpr>()) {
     auto idxNames = op.getAttrOfType<ArrayAttr>("idxs");
     if (idxNames) {
@@ -209,6 +209,10 @@ static IndexAccess ConvertAffineMap(ContractionOp op, mlir::AffineMap map) {
 }
 
 Contraction::Contraction(ContractionOp op) {
+  if (VLOG_IS_ON(2)) {
+    auto op_result = op.result();
+    IVLOG(2, "Processing: " << mlir::debugString(op_result));
+  }
   accesses.emplace_back(ConvertAffineMap(op, op.sink()));
   for (auto src : op.srcs()) {
     auto map = src.cast<AffineMapAttr>().getValue();
@@ -221,6 +225,7 @@ Contraction::Contraction(ContractionOp op) {
       // [poly] <= [const] So we use 0 as the constant and negate the constraint
       constraints.emplace_back(MakePoly(op, -cons), 0);
     }
+    IVLOG(4, "Converted to SimpleConstraints: " << constraints);
   }
 }
 
@@ -570,16 +575,21 @@ bool Contraction::NeedReduce() const {
 
 void Contraction::DeduceRangeConstraints() {
   ConstrainIndexVarsToInts();
+  IVLOG(5, "At start of DeduceRangeConstraints, existing range constraints are "
+               << range_constraints.constraints);
   // `unmerged` will track SimpleConstraints that we have yet to merge into a
   // RangeConstraint. Each entry is a collection of unpaired simple constraints,
   // all parallel and pointing in the same direction
   std::list<std::vector<SimpleConstraint>> unmerged;
   for (const auto &cons : constraints) {
+    IVLOG(5, "Trying to merge " << cons << " into RangeConstraints");
     bool has_matched = false;
     // First try to merge with an existing RangeConstraint
     for (auto &r_cons : range_constraints.constraints) {
       if (cons.poly.tryDivide(r_cons.poly, true)) {
+        IVLOG(5, "  " << cons << " matched range constraint " << r_cons);
         r_cons = IntersectParallelConstraintPair(r_cons, cons);
+        IVLOG(5, "  Merged range constraint is " << r_cons);
         has_matched = true;
         break;
       }
@@ -594,6 +604,8 @@ void Contraction::DeduceRangeConstraints() {
       // constraints, see if `cons` is parallel to any of them
       auto ratio = cons.poly.tryDivide(cons_set->begin()->poly, true);
       if (ratio > 0) {
+        IVLOG(5,
+              "  " << cons << " matched SAME dir parallel simple constraint");
         // Parallel in same direction:
         // Group with this set
         cons_set->emplace_back(cons);
@@ -601,6 +613,8 @@ void Contraction::DeduceRangeConstraints() {
         break;
       }
       if (ratio < 0) {
+        IVLOG(5, "  " << cons
+                      << " matched OPPOSITE dir parallel simple constraint");
         // Parallel in opposite direction:
         // Merge with everything in this set to create RangeConstraint that
         // intersects all The first constraint in the set must be merged
@@ -634,6 +648,9 @@ void Contraction::DeduceRangeConstraints() {
                  << constraints << ", unable to match " << unmerged);
     throw std::runtime_error(
         "Unable to pair all constraints in DeduceRangeConstraints");
+  }
+  for (auto &r_cons : range_constraints.constraints) {
+    r_cons.canonicalize();
   }
 }
 
