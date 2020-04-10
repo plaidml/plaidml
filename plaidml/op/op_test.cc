@@ -6,6 +6,7 @@
 #include "llvm/ADT/StringRef.h"
 
 #include "plaidml/op/op.h"
+#include "plaidml/testenv.h"
 #include "pmlc/util/logging.h"
 
 using ::testing::Eq;
@@ -25,7 +26,10 @@ bool operator==(const Program& lhs, const std::string& rhs) {
 namespace plaidml::op {
 namespace {
 
+class OpTest : public TestFixture {};
+
 Program makeProgram(const std::string& name, const std::vector<Tensor>& outputs) {
+  // TODO: remove empty target once all of these are passing.
   return ProgramBuilder(name, outputs).target("").compile();
 }
 
@@ -601,6 +605,75 @@ module {
   }
 }
 )#"));
+}
+
+static std::vector<int64_t> reorgYoloRefImpl(const std::vector<int64_t>& I, unsigned N, unsigned C, unsigned H,
+                                             unsigned W, unsigned stride, bool decrease) {
+  std::vector<int64_t> O(I.size());
+  auto C_out = C / (stride * stride);
+  for (unsigned b = 0; b < N; b++) {
+    for (unsigned k = 0; k < C; k++) {
+      for (unsigned j = 0; j < H; j++) {
+        for (unsigned i = 0; i < W; i++) {
+          auto in_index = i + W * (j + H * (k + C * b));
+          auto c2 = k % C_out;
+          auto offset = k / C_out;
+          auto w2 = i * stride + offset % stride;
+          auto h2 = j * stride + offset / stride;
+          auto out_index = w2 + W * stride * (h2 + H * stride * (c2 + C_out * b));
+          if (decrease) {
+            O[out_index] = I[in_index];
+          } else {
+            O[in_index] = I[out_index];
+          }
+        }
+      }
+    }
+  }
+  return O;
+}
+
+TEST_F(OpTest, ReorgYoloDecrease) {
+  const unsigned N = 1, C = 4, H = 6, W = 6, S = 2;
+  const bool decrease = true;
+
+  auto I = Placeholder(DType::INT64, {N, C, H, W});
+  auto O = op::reorg_yolo(I, S, decrease);
+  auto program = ProgramBuilder("reorg_yolo", {O}).compile();
+  IVLOG(1, "program:\n" << program);
+
+  std::vector<int64_t> I_input(N * C * H * W);
+  for (unsigned i = 0; i < I_input.size(); i++) {
+    I_input[i] = i;
+  }
+  auto O_expected = reorgYoloRefImpl(I_input, N, C, H, W, S, decrease);
+  IVLOG(1, "expected:\n" << O_expected);
+  TensorBuffers inputs{
+      {I, I_input},
+  };
+  TensorBuffers outputs{
+      {O, O_expected},
+  };
+  checkProgram(program, inputs, outputs);
+}
+
+TEST_F(OpTest, ReorgYoloIncrease) {
+  const unsigned N = 1, C = 4, H = 6, W = 6, S = 2;
+  const unsigned C_out = C * (S * S), H_out = H / S, W_out = W / S;
+  const bool decrease = false;
+
+  auto I = Placeholder(DType::INT64, {N, C, H, W});
+  auto O = op::reorg_yolo(I, S, decrease);
+  auto program = ProgramBuilder("reorg_yolo", {O}).compile();
+  IVLOG(1, "program:\n" << program);
+
+  std::vector<int64_t> I_input(N * C * H * W);
+  for (unsigned i = 0; i < I_input.size(); i++) {
+    I_input[i] = i;
+  }
+  auto O_expected = reorgYoloRefImpl(I_input, N, C_out, H_out, W_out, S, decrease);
+  IVLOG(1, "expected:\n" << O_expected);
+  checkProgram(program, {{I, I_input}}, {{O, O_expected}});
 }
 
 TEST(Op, Repeat) {
