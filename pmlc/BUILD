@@ -11,6 +11,7 @@ filegroup(
 filegroup(
     name = "lit_tests",
     srcs = [
+        "//pmlc/conversion/pxa_to_affine/tests:all",
         "//pmlc/conversion/stdx_to_llvm/tests:all",
         "//pmlc/conversion/tile_to_pxa/tests:all",
         "//pmlc/dialect/eltwise/tests:all",
@@ -19,6 +20,7 @@ filegroup(
         "//pmlc/dialect/stdx/tests:all",
         "//pmlc/dialect/tile/tests:all",
         "//pmlc/dialect/xsmm/tests:all",
+        "//pmlc/rt/tests:all",
         "//pmlc/rt/vulkan/tests:all",
         "//pmlc/target/x86/tests:all",
     ],
