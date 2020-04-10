@@ -34,7 +34,6 @@ struct PassInfo {
 struct Program {
   std::string entry;
   std::string tileIR;
-  std::string target;
   mlir::OwningModuleRef module;
   std::vector<ProgramArgument> arguments;
   std::vector<PassInfo> passes;
