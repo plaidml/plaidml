@@ -105,7 +105,7 @@ struct AffineReduceOpConversion : public LoweringBase<pxa::AffineReduceOp> {
                         pxa::AffineReduceOp op, Value source) const {
     switch (op.agg()) {
     case AggregationKind::assign:
-      return source;
+      return op.val();
     case AggregationKind::add: {
       if (source.getType().isa<FloatType>()) {
         return rewriter.create<mlir::AddFOp>(op.getLoc(), source, op.val());
