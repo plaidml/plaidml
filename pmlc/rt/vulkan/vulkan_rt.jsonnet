@@ -1,16 +1,17 @@
 local exports = [
     // vulkan_rt
-    'bindMemRef1DFloat',
-    'bindMemRef2DFloat',
     'deinitVulkan',
     'initVulkan',
     'submitCommandBuffers',
     'createLaunchKernelAction',
+    'configureLaunchKernelAction',
     'createMemoryTransferAction',
     'setLaunchKernelAction',
-
+    'addVulkanLaunchActionToSchedule',
+    'bindBufferFloat32',
+    'bindBufferInt64',
+    
     // rt
-    '_mlir_ciface_print_memref_f32',
     'plaidml_rt_trace',
     'plaidml_rt_xsmm_gemm_f32',
     'print_memref_f32',

@@ -139,7 +139,6 @@ struct LaunchKernelAction : Action {
   ResourceData resourceData;
   ResourceStorageClassBindingMap resourceStorageClassData;
 
-  std::vector<ActionPtr> bufferMoves;
   SmallVector<VkBufferMemoryBarrier, 4> deps;
 };
 
@@ -181,6 +180,8 @@ public:
                                            uint64_t src_binding,
                                            uint64_t dst_index,
                                            uint64_t dst_binding);
+  LogicalResult createMemoryTransferAction(VkBuffer src, VkBuffer dst,
+                                           size_t size);
   LogicalResult setLaunchKernelAction();
   LogicalResult submitCommandBuffers();
   LogicalResult checkResourceData();
@@ -190,6 +191,8 @@ public:
 
   /// Destroys all created vulkan objects and resources.
   LogicalResult destroy();
+
+  void addVulkanLaunchActionToSchedule();
 
 private:
   //===--------------------------------------------------------------------===//
@@ -246,5 +249,6 @@ private:
 
   std::vector<ActionPtr> schedule;
 
+  std::shared_ptr<LaunchKernelAction> currentAction;
   llvm::SmallVector<VkCommandBuffer, 1> commandBuffers;
 };

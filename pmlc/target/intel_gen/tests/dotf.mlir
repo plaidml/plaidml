@@ -15,4 +15,4 @@ module {
   }
 }
 
-// CHECK: llvm.func @vulkanLaunch
+// CHECK: llvm.func @createLaunchKernelAction
