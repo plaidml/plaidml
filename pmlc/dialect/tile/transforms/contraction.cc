@@ -209,10 +209,8 @@ static IndexAccess ConvertAffineMap(ContractionOp op, mlir::AffineMap map) {
 }
 
 Contraction::Contraction(ContractionOp op) {
-  if (VLOG_IS_ON(2)) {
-    auto op_result = op.result();
-    IVLOG(2, "Processing: " << mlir::debugString(op_result));
-  }
+  auto op_result = op.result();
+  IVLOG(2, "Processing: " << mlir::debugString(op_result));
   accesses.emplace_back(ConvertAffineMap(op, op.sink()));
   for (auto src : op.srcs()) {
     auto map = src.cast<AffineMapAttr>().getValue();
