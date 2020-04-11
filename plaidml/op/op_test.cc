@@ -649,13 +649,7 @@ TEST_F(OpTest, ReorgYoloDecrease) {
   }
   auto O_expected = reorgYoloRefImpl(I_input, N, C, H, W, S, decrease);
   IVLOG(1, "expected:\n" << O_expected);
-  TensorBuffers inputs{
-      {I, I_input},
-  };
-  TensorBuffers outputs{
-      {O, O_expected},
-  };
-  checkProgram(program, inputs, outputs);
+  checkProgram(program, {{I, I_input}}, {{O, O_expected}});
 }
 
 TEST_F(OpTest, ReorgYoloIncrease) {
