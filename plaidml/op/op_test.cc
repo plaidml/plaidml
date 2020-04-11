@@ -607,6 +607,7 @@ module {
 )#"));
 }
 
+// See: https://leimao.github.io/blog/Reorg-Layer-Explained/
 static std::vector<int64_t> reorgYoloRefImpl(const std::vector<int64_t>& I, unsigned N, unsigned C, unsigned H,
                                              unsigned W, unsigned stride, bool decrease) {
   std::vector<int64_t> O(I.size());
