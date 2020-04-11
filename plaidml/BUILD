@@ -145,6 +145,7 @@ plaidml_cc_library(
     name = "testenv",
     testonly = 1,
     srcs = ["testenv.cc"],
+    hdrs = ["testenv.h"],
     visibility = ["//visibility:public"],
     deps = [
         ":plaidml",

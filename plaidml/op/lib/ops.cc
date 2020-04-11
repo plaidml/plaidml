@@ -42,6 +42,7 @@ Value minimum(const Value&);
 Value pool(const Value&);
 Value prod(const Value&);
 Value relu(const Value&);
+Value reorg_yolo(const Value&);
 Value repeat(const Value&);
 Value reshape(const Value&);
 Value sigmoid(const Value&);
@@ -1756,6 +1757,48 @@ Value relu(const Value& value) {
   return Value{O};
 }
 
+Value reorg_yolo(const Value& value) {
+  IVLOG(1, "reorg_yolo");
+
+  auto args = value.as_tuple();
+  if (args.size() != 3) {
+    throw std::runtime_error(llvm::formatv("PlaidML reorg_yolo op expects 3 arguments (received {0})", args.size()));
+  }
+  auto I = args[0].as_tensor();
+  auto stride = args[1].as_int();
+  auto decrease = args[2].as_bool();
+
+  auto ndims = I.rank();
+  if (ndims != 4) {
+    throw std::runtime_error(
+        llvm::formatv("PlaidML reorg_yolo op expects I to have 4 dimensions (received {0})", ndims));
+  }
+
+  TensorDim N, C, H, W;
+  I.bind_dims(N, C, H, W);
+
+  TensorIndex b, i, j, k, x, y;
+  auto h = j * stride + y;
+  auto w = i * stride + x;
+
+  Tensor O;
+  if (decrease) {
+    auto C_out = C / (stride * stride);
+    O = TensorOutput(N, C_out, H * stride, W * stride);
+    auto c = k + ((x + y * stride) * C_out);
+    O(b, k, h, w) = I(b, c, j, i);
+  } else {
+    auto C_out = C * (stride * stride);
+    O = TensorOutput(N, C_out, H / stride, W / stride);
+    auto c = k + ((x + y * stride) * C);
+    O(b, c, j, i) = I(b, k, h, w);
+  }
+  O.add_constraint(y < stride);
+  O.add_constraint(x < stride);
+
+  return Value{O};
+}
+
 Value repeat(const Value& value) {
   IVLOG(1, "repeat");
   // This is numpy-style `repeat`; Keras calls it `repeat_elements`
@@ -2579,6 +2622,7 @@ void RegisterOps() {
   registry->Register("pool", pool);
   registry->Register("prod", prod);
   registry->Register("relu", relu);
+  registry->Register("reorg_yolo", reorg_yolo);
   registry->Register("repeat", repeat);
   registry->Register("reshape", reshape);
   registry->Register("scale_gradient", scale_gradient);
