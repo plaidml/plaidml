@@ -17,3 +17,9 @@ func @eltwise_add(
 // CHECK: affine.load
 // CHECK: addf
 // CHECK: affine.store
+
+func @eltwise_add_f32_index(%arg0: tensor<4x1xf32>) -> (tensor<4x1xf32>) {
+  %c7 = tile.constant 7
+  %1 = "eltwise.add"(%arg0, %c7) : (tensor<4x1xf32>, index) -> tensor<4x1xf32>
+  return %1 : tensor<4x1xf32>
+}

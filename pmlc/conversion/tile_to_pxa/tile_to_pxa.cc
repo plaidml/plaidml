@@ -175,6 +175,12 @@ static Value createCastOp(OpBuilder &builder, Location loc, Value from,
       // SIToFPOp: IntegerType -> FloatType
       return builder.create<mlir::SIToFPOp>(loc, from, intoType).getResult();
     }
+    if (auto fromIndexType = fromType.dyn_cast<IndexType>()) {
+      auto i64Type = builder.getIntegerType(64);
+      auto intCastOp = builder.create<mlir::IndexCastOp>(loc, from, i64Type);
+      return builder.create<mlir::SIToFPOp>(loc, intCastOp, intoType)
+          .getResult();
+    }
   }
   if (auto intoIntType = intoType.dyn_cast<IntegerType>()) {
     if (auto fromIntType = fromType.dyn_cast<IntegerType>()) {
