@@ -193,10 +193,35 @@ Executable::Executable(const std::shared_ptr<Program> &program,
     llvmModule->print(llvm::errs(), nullptr);
   }
 
+  std::vector<StringRef> sharedLibPaths;
+  // HACK: this is required because the ORCv2 JIT doesn't want to resolve
+  // symbols from the current process, but only on Linux.
+#ifdef __linux__
+  std::string modulePathHolder;
+  {
+    std::ifstream ifs("/proc/self/maps");
+    if (!ifs.is_open()) {
+      throw std::runtime_error("Could not load /proc/self/maps");
+    }
+    for (std::string line; std::getline(ifs, line);) {
+      auto pos = line.find('/');
+      if (pos == std::string::npos)
+        continue;
+      auto modulePath = line.substr(pos);
+      pos = modulePath.find("libplaidml.so");
+      if (pos != std::string::npos) {
+        IVLOG(1, "module: " << modulePath);
+        modulePathHolder = modulePath;
+        sharedLibPaths.push_back(modulePathHolder);
+        break;
+      }
+    }
+  }
+#endif
+
   auto maybeEngine =
       ExecutionEngine::create(*program->module, optPipeline,
-                              /*jitCodeGenOptLevel=*/llvm::None,
-                              /*sharedLibPaths=*/ArrayRef<StringRef>{},
+                              /*jitCodeGenOptLevel=*/llvm::None, sharedLibPaths,
                               /*enableObjectCache=*/true,
                               /*enableGDBNotificationListener=*/false);
   llvm::handleAllErrors(
