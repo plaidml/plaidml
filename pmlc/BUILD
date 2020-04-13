@@ -22,6 +22,7 @@ filegroup(
         "//pmlc/dialect/xsmm/tests:all",
         "//pmlc/rt/tests:all",
         "//pmlc/rt/vulkan/tests:all",
+        "//pmlc/target/intel_gen/tests:all",
         "//pmlc/target/x86/tests:all",
     ],
     visibility = ["//visibility:public"],
@@ -40,6 +41,7 @@ plaidml_cc_library(
     name = "all_passes_and_dialects_no_registration",
     visibility = ["//visibility:public"],
     deps = [
+        "//pmlc/conversion/gpu",
         "//pmlc/conversion/pxa_to_affine",
         "//pmlc/conversion/stdx_to_llvm",
         "//pmlc/conversion/tile_to_pxa",
@@ -48,6 +50,7 @@ plaidml_cc_library(
         "//pmlc/dialect/stdx",
         "//pmlc/dialect/tile",
         "//pmlc/dialect/xsmm",
+        "//pmlc/target/intel_gen",
         "//pmlc/target/x86",
     ],
 )

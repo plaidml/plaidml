@@ -15,6 +15,18 @@ plaidml_cc_test(
     ],
 )
 
+plaidml_cc_test(
+    name = "cc_test_gpu",
+    srcs = ["edsl_test.cc"],
+    tags = ["manual"],  # the `edsl_test.cc.test` rule will run this test via lit
+    deps = [
+        "//plaidml:testenv",
+        "//plaidml/edsl",
+        "//plaidml/exec",
+        "//pmlc/rt/vulkan:link",
+    ],
+)
+
 py_test(
     name = "py_test",
     srcs = [

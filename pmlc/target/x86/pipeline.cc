@@ -16,8 +16,8 @@
 #include "pmlc/conversion/stdx_to_llvm/stdx_to_llvm.h"
 #include "pmlc/conversion/tile_to_pxa/tile_to_pxa.h"
 #include "pmlc/dialect/pxa/transforms/passes.h"
-#include "pmlc/dialect/tile/transforms/passes.h"
 #include "pmlc/dialect/stdx/transforms/passes.h"
+#include "pmlc/dialect/tile/transforms/passes.h"
 #include "pmlc/target/x86/heatmap.h"
 #include "pmlc/target/x86/trace_linking.h"
 #include "pmlc/target/x86/xsmm_lowering.h"
@@ -95,8 +95,7 @@ struct ConvertToStdPass : public ModulePass<ConvertToStdPass> {
 
     ConversionTarget target(*context);
     target.addLegalDialect<StandardOpsDialect>();
-    if (failed(
-            applyPartialConversion(module, target, patterns))) {
+    if (failed(applyPartialConversion(module, target, patterns))) {
       signalPassFailure();
     }
   }
@@ -136,23 +135,23 @@ struct ConvertToLLVMPass : public ModulePass<ConvertToLLVMPass> {
 void addToPipeline(OpPassManager &pm) {
   pm.addPass(pmlc::dialect::tile::createComputeBoundsPass());
   pm.addPass(pmlc::dialect::tile::createPadPass());
-  pm.addNestedPass<FuncOp>(createCanonicalizerPass());
-  pm.addNestedPass<FuncOp>(createCSEPass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
 
   pm.addPass(pmlc::conversion::tile_to_pxa::createLowerTileToPXAPass());
-  pm.addNestedPass<FuncOp>(createCanonicalizerPass());
-  pm.addNestedPass<FuncOp>(createCSEPass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
 
   pm.addPass(pmlc::dialect::pxa::createStencilPass(1, heatmapCost));
   pm.addPass(createXSMMLoweringPass());
 
   pm.addPass(conversion::pxa_to_affine::createLowerPXAToAffinePass());
-  pm.addNestedPass<FuncOp>(createCanonicalizerPass());
-  pm.addNestedPass<FuncOp>(createCSEPass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
 
   pm.addPass(createLowerAffinePass());
-  pm.addNestedPass<FuncOp>(createCanonicalizerPass());
-  pm.addNestedPass<FuncOp>(createCSEPass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
 
   pm.addPass(ConvertToStdPass::create());
   if (pmlc::util::getEnvVar("PLAIDML_BOUNDS_CHECK") == "1") {

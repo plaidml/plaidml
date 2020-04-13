@@ -1,16 +1,16 @@
 local exports = [
     // vulkan_rt
-    '_mlir_ciface_fillResource1DFloat',
-    'bindMemRef1DFloat',
-    'deinitVulkan',
     'initVulkan',
-    'runOnVulkan',
-    'setBinaryShader',
-    'setEntryPoint',
-    'setNumWorkGroups',
-
+    'deinitVulkan',
+    'createVulkanLaunchKernelAction',
+    'createVulkanMemoryTransferAction',
+    'setVulkanLaunchKernelAction',
+    'addVulkanLaunchActionToSchedule',
+    'submitCommandBuffers',
+    'bindBufferFloat32',
+    'bindBufferInt64',
+    
     // rt
-    '_mlir_ciface_print_memref_f32',
     'plaidml_rt_trace',
     'plaidml_rt_bounds_check',
     'plaidml_rt_xsmm_gemm_f32',
