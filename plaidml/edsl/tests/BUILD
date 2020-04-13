@@ -12,7 +12,18 @@ plaidml_cc_test(
         "//plaidml:testenv",
         "//plaidml/edsl",
         "//plaidml/exec",
-        "//pmlc/rt/vulkan:link", #TODO: move to pmlc/target/intel_gen
+    ],
+)
+
+plaidml_cc_test(
+    name = "cc_test_gpu",
+    srcs = ["edsl_test.cc"],
+    tags = ["manual"],  # the `edsl_test.cc.test` rule will run this test via lit
+    deps = [
+        "//plaidml:testenv",
+        "//plaidml/edsl",
+        "//plaidml/exec",
+        "//pmlc/rt/vulkan:link",
     ],
 )
 

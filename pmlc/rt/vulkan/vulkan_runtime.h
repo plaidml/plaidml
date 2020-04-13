@@ -163,42 +163,32 @@ public:
   VulkanRuntime(const VulkanRuntime &) = delete;
   VulkanRuntime &operator=(const VulkanRuntime &) = delete;
 
+  LogicalResult init();
+  LogicalResult destroy();
+  LogicalResult createLaunchKernelAction();
+  LogicalResult setLaunchKernelAction();
+  void addLaunchActionToSchedule();
+  void setEntryPoint(const char *entryPointName);
+  void setShaderModule(uint8_t *shader, uint32_t size);
+  void setNumWorkGroups(const NumWorkGroups &numberWorkGroups);
+
   /// Sets needed data for Vulkan runtime.
   void setResourceData(const ResourceData &resData);
   void setResourceData(const DescriptorSetIndex desIndex,
                        const BindingIndex bindIndex,
                        const VulkanHostMemoryBuffer &hostMemBuffer);
-  void setShaderModule(uint8_t *shader, uint32_t size);
-  void setNumWorkGroups(const NumWorkGroups &numberWorkGroups);
-  void setResourceStorageClassBindingMap(
-      const ResourceStorageClassBindingMap &stClassData);
-  void setEntryPoint(const char *entryPointName);
-
-  LogicalResult init();
-  LogicalResult createLaunchKernelAction();
   LogicalResult createMemoryTransferAction(uint64_t src_index,
                                            uint64_t src_binding,
                                            uint64_t dst_index,
                                            uint64_t dst_binding);
   LogicalResult createMemoryTransferAction(VkBuffer src, VkBuffer dst,
                                            size_t size);
-  LogicalResult setLaunchKernelAction();
   LogicalResult submitCommandBuffers();
-  LogicalResult checkResourceData();
-
-  /// Updates host memory buffers.
-  LogicalResult updateHostMemoryBuffers();
-
-  /// Destroys all created vulkan objects and resources.
-  LogicalResult destroy();
-
-  void addVulkanLaunchActionToSchedule();
 
 private:
   //===--------------------------------------------------------------------===//
   // Pipeline creation methods.
   //===--------------------------------------------------------------------===//
-
   LogicalResult createInstance();
   LogicalResult createDevice();
   LogicalResult getBestComputeQueue(const VkPhysicalDevice &physicalDevice);
@@ -212,9 +202,12 @@ private:
   LogicalResult allocateDescriptorSets();
   LogicalResult setWriteDescriptors();
   LogicalResult createCommandPool();
-  LogicalResult submitCommandBuffersToQueue();
-
+  LogicalResult checkResourceData();
   LogicalResult createSchedule();
+  LogicalResult submitCommandBuffersToQueue();
+  LogicalResult updateHostMemoryBuffers();
+  void setResourceStorageClassBindingMap(
+      const ResourceStorageClassBindingMap &stClassData);
 
   //===--------------------------------------------------------------------===//
   // Helper methods.
@@ -248,7 +241,6 @@ private:
   VkDeviceSize memorySize{0};
 
   std::vector<ActionPtr> schedule;
-
-  std::shared_ptr<LaunchKernelAction> currentAction;
+  std::shared_ptr<LaunchKernelAction> curr;
   llvm::SmallVector<VkCommandBuffer, 1> commandBuffers;
 };

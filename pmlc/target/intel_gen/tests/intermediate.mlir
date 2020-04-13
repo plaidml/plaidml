@@ -8,4 +8,4 @@ func @eltwise_add(%A: !tensor, %B: !tensor, %C: !tensor) -> !tensor {
   return %1 : !tensor
 }
 
-// CHECK: llvm.func @createLaunchKernelAction
+// CHECK: llvm.call @submitCommandBuffers

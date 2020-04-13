@@ -15,4 +15,4 @@ module {
   }
 }
 
-// CHECK: llvm.func @createLaunchKernelAction
+// CHECK: llvm.call @submitCommandBuffers

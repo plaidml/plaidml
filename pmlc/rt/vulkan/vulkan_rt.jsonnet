@@ -1,13 +1,12 @@
 local exports = [
     // vulkan_rt
-    'deinitVulkan',
     'initVulkan',
-    'submitCommandBuffers',
-    'createLaunchKernelAction',
-    'configureLaunchKernelAction',
-    'createMemoryTransferAction',
-    'setLaunchKernelAction',
+    'deinitVulkan',
+    'createVulkanLaunchKernelAction',
+    'createVulkanMemoryTransferAction',
+    'setVulkanLaunchKernelAction',
     'addVulkanLaunchActionToSchedule',
+    'submitCommandBuffers',
     'bindBufferFloat32',
     'bindBufferInt64',
     

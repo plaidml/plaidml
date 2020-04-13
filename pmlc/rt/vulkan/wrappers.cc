@@ -32,7 +32,6 @@
 #endif // _WIN32
 
 namespace {
-
 class VulkanRuntimeManager {
 public:
   VulkanRuntimeManager() {
@@ -48,15 +47,11 @@ public:
     }
   }
 
-  void createLaunchKernelAction() {
+  void createLaunchKernelAction(uint8_t *shader, uint32_t size,
+                                const char *entryPoint,
+                                NumWorkGroups numWorkGroups) {
     std::lock_guard<std::mutex> lock(mutex);
     vulkanRuntime.createLaunchKernelAction();
-  }
-
-  void configureLaunchKernelAction(uint8_t *shader, uint32_t size,
-                                   const char *entryPoint,
-                                   NumWorkGroups numWorkGroups) {
-    std::lock_guard<std::mutex> lock(mutex);
     vulkanRuntime.setShaderModule(shader, size);
     vulkanRuntime.setEntryPoint(entryPoint);
     vulkanRuntime.setNumWorkGroups(numWorkGroups);
@@ -82,6 +77,11 @@ public:
     }
   }
 
+  void addLaunchActionToSchedule() {
+    std::lock_guard<std::mutex> lock(mutex);
+    vulkanRuntime.addLaunchActionToSchedule();
+  }
+
   void submitCommandBuffers() {
     std::lock_guard<std::mutex> lock(mutex);
     if (failed(vulkanRuntime.submitCommandBuffers())) {
@@ -89,16 +89,10 @@ public:
     }
   }
 
-  void addVulkanLaunchActionToSchedule() {
-    std::lock_guard<std::mutex> lock(mutex);
-    vulkanRuntime.addVulkanLaunchActionToSchedule();
-  }
-
 private:
   VulkanRuntime vulkanRuntime;
   std::mutex mutex;
-}; // namespace
-
+};
 } // namespace
 
 template <typename T, int N>
@@ -125,20 +119,42 @@ void bindBuffer(void *vkRuntimeManager, DescriptorSetIndex setIndex,
 }
 
 extern "C" {
-VULKAN_RT_EXPORT void *initVulkan();
-VULKAN_RT_EXPORT void deinitVulkan(void *vkRuntimeManager);
-VULKAN_RT_EXPORT void createLaunchKernelAction(void *vkRuntimeManager);
-VULKAN_RT_EXPORT void
-configureLaunchKernelAction(void *vkRuntimeManager, uint8_t *shader,
-                            uint32_t size, const char *entryPoint, uint32_t x,
-                            uint32_t y, uint32_t z);
-VULKAN_RT_EXPORT void createMemoryTransferAction(void *vkRuntimeManager,
-                                                 uint64_t src_index,
-                                                 uint64_t src_binding,
-                                                 uint64_t dst_index,
-                                                 uint64_t dst_binding);
-VULKAN_RT_EXPORT void runOnVulkan(void *vkRuntimeManager);
-VULKAN_RT_EXPORT void submitCommandBuffers(void *vkRuntimeManager);
+void *initVulkan() { return new VulkanRuntimeManager(); }
+
+void deinitVulkan(void *vkRuntimeManager) {
+  delete reinterpret_cast<VulkanRuntimeManager *>(vkRuntimeManager);
+}
+
+void createVulkanLaunchKernelAction(void *vkRuntimeManager, uint8_t *shader,
+                                    uint32_t size, const char *entryPoint,
+                                    uint32_t x, uint32_t y, uint32_t z) {
+  reinterpret_cast<VulkanRuntimeManager *>(vkRuntimeManager)
+      ->createLaunchKernelAction(shader, size, entryPoint, {x, y, z});
+}
+
+void createVulkanMemoryTransferAction(void *vkRuntimeManager,
+                                      uint64_t src_index, uint64_t src_binding,
+                                      uint64_t dst_index,
+                                      uint64_t dst_binding) {
+  reinterpret_cast<VulkanRuntimeManager *>(vkRuntimeManager)
+      ->createMemoryTransferAction(src_index, src_binding, dst_index,
+                                   dst_binding);
+}
+
+void setVulkanLaunchKernelAction(void *vkRuntimeManager) {
+  reinterpret_cast<VulkanRuntimeManager *>(vkRuntimeManager)
+      ->setLaunchKernelAction();
+}
+
+void addVulkanLaunchActionToSchedule(void *vkRuntimeManager) {
+  reinterpret_cast<VulkanRuntimeManager *>(vkRuntimeManager)
+      ->addLaunchActionToSchedule();
+}
+
+void submitCommandBuffers(void *vkRuntimeManager) {
+  reinterpret_cast<VulkanRuntimeManager *>(vkRuntimeManager)
+      ->submitCommandBuffers();
+}
 
 void bindBufferFloat32(void *vkRuntimeManager, DescriptorSetIndex setIndex,
                        BindingIndex bindIndex, int64_t rank, void *ptr) {
@@ -172,43 +188,5 @@ void bindBufferInt64(void *vkRuntimeManager, DescriptorSetIndex setIndex,
   default:
     return;
   }
-}
-void *initVulkan() { return new VulkanRuntimeManager(); }
-
-void deinitVulkan(void *vkRuntimeManager) {
-  delete reinterpret_cast<VulkanRuntimeManager *>(vkRuntimeManager);
-}
-
-void createLaunchKernelAction(void *vkRuntimeManager) {
-  reinterpret_cast<VulkanRuntimeManager *>(vkRuntimeManager)
-      ->createLaunchKernelAction();
-}
-void configureLaunchKernelAction(void *vkRuntimeManager, uint8_t *shader,
-                                 uint32_t size, const char *entryPoint,
-                                 uint32_t x, uint32_t y, uint32_t z) {
-  reinterpret_cast<VulkanRuntimeManager *>(vkRuntimeManager)
-      ->configureLaunchKernelAction(shader, size, entryPoint, {x, y, z});
-}
-
-void createMemoryTransferAction(void *vkRuntimeManager, uint64_t src_index,
-                                uint64_t src_binding, uint64_t dst_index,
-                                uint64_t dst_binding) {
-  reinterpret_cast<VulkanRuntimeManager *>(vkRuntimeManager)
-      ->createMemoryTransferAction(src_index, src_binding, dst_index,
-                                   dst_binding);
-}
-
-void setLaunchKernelAction(void *vkRuntimeManager) {
-  reinterpret_cast<VulkanRuntimeManager *>(vkRuntimeManager)
-      ->setLaunchKernelAction();
-}
-
-void addVulkanLaunchActionToSchedule(void *vkRuntimeManager) {
-  reinterpret_cast<VulkanRuntimeManager *>(vkRuntimeManager)
-      ->addVulkanLaunchActionToSchedule();
-}
-void submitCommandBuffers(void *vkRuntimeManager) {
-  reinterpret_cast<VulkanRuntimeManager *>(vkRuntimeManager)
-      ->submitCommandBuffers();
 }
 } // extern "C"

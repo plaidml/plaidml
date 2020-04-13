@@ -1,4 +1,4 @@
-// Copyright 2019, Intel Corporation
+// Copyright 2020, Intel Corporation
 
 #include "mlir/Conversion/GPUToSPIRV/ConvertGPUToSPIRVPass.h"
 #include "mlir/Conversion/GPUToVulkan/ConvertGPUToVulkanPass.h"
@@ -66,8 +66,7 @@ void addToPipeline(OpPassManager &pm) {
 
   // GPU to Vulkan.
   pm.addPass(conversion::gpu::createConvertGpuLaunchFuncToVulkanCallsPass());
-  pm.addPass(createLowerToLLVMPass(false, true, false));
-  pm.addPass(conversion::gpu::createConvertVulkanLaunchFuncToVulkanCallsPass());
+  pm.addPass(conversion::gpu::createLowerToLLVMPass(false, true, false));
 }
 
 static PassPipelineRegistration<>

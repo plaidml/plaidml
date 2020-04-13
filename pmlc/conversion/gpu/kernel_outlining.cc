@@ -1,15 +1,3 @@
-//===- KernelOutlining.cpp - Implementation of GPU kernel outlining -------===//
-//
-// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
-// See https://llvm.org/LICENSE.txt for license information.
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-//
-//===----------------------------------------------------------------------===//
-//
-// This file implements the GPU dialect kernel outlining pass.
-//
-//===----------------------------------------------------------------------===//
-
 #include "mlir/Dialect/GPU/GPUDialect.h"
 #include "mlir/Dialect/GPU/Passes.h"
 #include "mlir/Dialect/GPU/Utils.h"
