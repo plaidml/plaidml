@@ -6,7 +6,8 @@
 
 namespace pmlc::dialect::stdx {
 
-struct BoundsCheckPass : public mlir::FunctionPass<BoundsCheckPass> {
+struct BoundsCheckPass
+    : public mlir::PassWrapper<BoundsCheckPass, mlir::FunctionPass> {
   void runOnFunction() override;
 
 private:

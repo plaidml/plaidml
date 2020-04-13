@@ -41,13 +41,13 @@ public:
   llvm::LLVMContext &getContext() const { return dialect.getLLVMContext(); }
 
   // Get the LLVM module in which the types are constructed.
-  llvm::Module &getModule() const { return dialect.getLLVMModule(); }
+  llvm::Module &getOperation() const { return dialect.getLLVMModule(); }
 
   // Get the MLIR type wrapping the LLVM integer type whose bit width is defined
   // by the pointer size used in the LLVM module.
   LLVM::LLVMType getIndexType() const {
     return LLVM::LLVMType::getIntNTy(
-        &dialect, getModule().getDataLayout().getPointerSizeInBits());
+        &dialect, getOperation().getDataLayout().getPointerSizeInBits());
   }
 
   LLVM::LLVMType getVoidType() const {
@@ -100,10 +100,12 @@ struct FPToUILowering : public LLVMLegalizationPattern<stdx::FPToUIOp> {
 };
 
 /// A pass converting MLIR operations into the LLVM IR dialect.
-struct LLVMLoweringPass : public ModulePass<LLVMLoweringPass> {
+struct LLVMLoweringPass
+    : public mlir::PassWrapper<LLVMLoweringPass,
+                               mlir::OperationPass<mlir::ModuleOp>> {
   // Run the dialect converter on the module.
-  void runOnModule() override {
-    ModuleOp module = getModule();
+  void runOnOperation() override {
+    ModuleOp module = getOperation();
     auto context = module.getContext();
     LLVMTypeConverter typeConverter(context);
 

@@ -864,8 +864,10 @@ struct TraceOpConversion : public OpConversionPattern<TraceOp> {
   }
 };
 
-struct LoweringPass : public mlir::ModulePass<LoweringPass> {
-  void runOnModule() final {
+struct LoweringPass
+    : public mlir::PassWrapper<LoweringPass,
+                               mlir::OperationPass<mlir::ModuleOp>> {
+  void runOnOperation() final {
     // Set up target (i.e. what is legal)
     mlir::ConversionTarget target(getContext());
     target.addLegalDialect<mlir::AffineDialect>();
@@ -992,7 +994,8 @@ struct LoweringPass : public mlir::ModulePass<LoweringPass> {
         EltwiseOpConversion<ew::IdentOp, FirstOperand>>(&getContext());
 
     // Run the conversion
-    if (failed(applyFullConversion(getModule(), target, patterns, nullptr))) {
+    if (failed(
+            applyFullConversion(getOperation(), target, patterns, nullptr))) {
       signalPassFailure();
       return;
     }

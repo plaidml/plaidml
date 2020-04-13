@@ -6,7 +6,6 @@
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/ToolOutputFile.h"
 
-#include "mlir/Analysis/Passes.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/FileUtilities.h"
@@ -44,6 +43,10 @@ static cl::opt<bool>
                  cl::desc("Run the verifier after each transformation pass"),
                  cl::init(true));
 
+static cl::opt<bool> allowUnregisteredDialects(
+    "allow-unregistered-dialect",
+    cl::desc("Allow operation with no registered dialects"), cl::init(false));
+
 int main(int argc, char **argv) {
   auto level_str = pmlc::util::getEnvVar("PLAIDML_VERBOSE");
   if (level_str.size()) {
@@ -70,19 +73,24 @@ int main(int argc, char **argv) {
   std::string errorMessage;
   auto file = openInputFile(inputFilename, &errorMessage);
   if (!file) {
-    errs() << errorMessage << "\n";
+    llvm::errs() << errorMessage << "\n";
     return 1;
   }
 
   auto output = openOutputFile(outputFilename, &errorMessage);
   if (!output) {
-    errs() << errorMessage << "\n";
+    llvm::errs() << errorMessage << "\n";
     exit(1);
   }
 
-  auto ret =
-      failed(MlirOptMain(output->os(), std::move(file), passPipeline,
-                         splitInputFile, verifyDiagnostics, verifyPasses));
-  outs() << "\n";
-  return ret;
+  auto ret = failed(MlirOptMain(output->os(), std::move(file), passPipeline,
+                                splitInputFile, verifyDiagnostics, verifyPasses,
+                                allowUnregisteredDialects));
+  llvm::outs() << "\n";
+  if (ret) {
+    return 1;
+  }
+  // Keep the output file if the invocation of MlirOptMain was successful.
+  output->keep();
+  return 0;
 }

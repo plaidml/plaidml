@@ -44,7 +44,7 @@ plaidml_cc_library(
         ":gen-ops",
         "//pmlc/util",
         "@llvm-project//llvm:support",
-        "@llvm-project//mlir:AffineOps",
+        "@llvm-project//mlir:Affine",
     ],
 )
 
