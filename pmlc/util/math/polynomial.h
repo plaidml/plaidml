@@ -101,6 +101,8 @@ struct RangeConstraint {
 
   SimpleConstraint lowerBound() const;
   SimpleConstraint upperBound() const;
+  RangeConstraint &canonicalize();
+  RangeConstraint &reverse();
 };
 
 inline std::string to_string(const RangeConstraint &c) {

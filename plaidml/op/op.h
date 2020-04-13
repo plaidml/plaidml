@@ -387,6 +387,11 @@ class relu {
   double threshold_ = 0.0;
 };
 
+inline edsl::Tensor reorg_yolo(const edsl::Tensor& I, int stride, bool decrease) {
+  auto args = edsl::make_tuple(I, stride, decrease);
+  return details::op("reorg_yolo", args).as_tensor();
+}
+
 inline edsl::Tensor repeat(const edsl::Tensor& I, int repeats, int axis) {
   auto args = edsl::make_tuple(I, repeats, axis);
   return details::op("repeat", args).as_tensor();
