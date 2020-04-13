@@ -8,6 +8,8 @@
 
 #include "llvm/Support/FormatVariadic.h"
 
+#include "pmlc/util/logging.h" // TODO
+
 namespace mlir {
 
 const char *kBlockAndArgFormat = "^bb{0}:%arg{1}";
