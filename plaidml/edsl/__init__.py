@@ -1,5 +1,6 @@
 # Copyright 2020 Intel Corporation
 
+import enum
 import logging
 from collections import namedtuple
 
@@ -772,6 +773,8 @@ class Value(ForeignObject):
                 value = value.tolist()
         if value is None:
             ffi_obj = ffi_call(lib.plaidml_value_none)
+        elif isinstance(value, enum.IntEnum):
+            ffi_obj = ffi_call(lib.plaidml_value_int, value.value)
         elif isinstance(value, (six.integer_types, bool)):
             ffi_obj = ffi_call(lib.plaidml_value_int, value)
         elif isinstance(value, float):

@@ -1,6 +1,7 @@
 local exports = [
   // rt 
   'plaidml_rt_trace',
+  'plaidml_rt_bounds_check',
   'plaidml_rt_xsmm_gemm_f32',
   'print_memref_f32',
 

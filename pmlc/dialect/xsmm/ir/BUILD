@@ -42,7 +42,7 @@ plaidml_cc_library(
     deps = [
         ":gen-ops",
         "@llvm-project//llvm:support",
-        "@llvm-project//mlir:AffineOps",
+        "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:IR",
     ],
 )

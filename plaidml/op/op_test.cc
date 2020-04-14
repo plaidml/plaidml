@@ -6,6 +6,7 @@
 #include "llvm/ADT/StringRef.h"
 
 #include "plaidml/op/op.h"
+#include "plaidml/testenv.h"
 #include "pmlc/util/logging.h"
 
 using ::testing::Eq;
@@ -25,7 +26,10 @@ bool operator==(const Program& lhs, const std::string& rhs) {
 namespace plaidml::op {
 namespace {
 
+class OpTest : public TestFixture {};
+
 Program makeProgram(const std::string& name, const std::vector<Tensor>& outputs) {
+  // TODO: remove empty target once all of these are passing.
   return ProgramBuilder(name, outputs).target("").compile();
 }
 
@@ -198,24 +202,14 @@ module {
 TEST(Op, Convolution) {
   auto I = Placeholder(DType::FLOAT32, {1, 224, 224, 3}, "I");
   auto K = Placeholder(DType::FLOAT32, {7, 7, 3, 64}, "K");
-  auto O = op::convolution(  //
-      I,                     // I_or_O
-      K,                     // F_or_O
-      {2, 2},                // strides
-      {1, 1},                // dilations
-      {1, 1},                // data_dilations
-      {},                    // filter_shape
-      1,                     // groups
-      "explicit",            // autopad_mode
-      {3, 3},                // manual_padding
-      "nxc",                 // input_layout
-      "xck",                 // filter_layout
-      "none",                // group_layout
-      false,                 // winograd_allowed
-      "",                    // name
-      "ungrouped",           // autogroup_mode
-      "none",                // deriv_mode
-      {});                   // result_shape
+  auto O = op::convolution(I, K)
+               .strides({2, 2})
+               .dilations({1, 1})
+               .data_dilations({1, 1})
+               .autopad_mode(AutoPadMode::EXPLICIT)
+               .manual_padding({3, 3})
+               .input_layout(TensorLayout::NXC)
+               .filter_layout(TensorLayout::XCK);
   auto program = makeProgram("convolution", {O});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"#(
@@ -381,7 +375,7 @@ module {
 
 TEST(Op, ImageResize) {
   auto I = Placeholder(DType::FLOAT32, {1, 224, 224, 3}, "I");
-  auto image_resize = op::image_resize(I, std::vector<int>{5, 4}, "bilinear", "nxc");
+  auto image_resize = op::image_resize(I, std::vector<int>{5, 4}, InterpolationMode::BILINEAR, TensorLayout::NXC);
   auto program = makeProgram("image_resize", {image_resize});
   IVLOG(1, program);
 }
@@ -481,7 +475,8 @@ module {
 
 TEST(Op, Pool) {
   auto I = Placeholder(DType::FLOAT32, {10, 20, 30, 40, 50}, "I");
-  auto program = makeProgram("pool", {op::pool(I, "sum", {1, 2, 3}, {1, 2, 3}, "none", {1, 2}, "nwc", true, true)});
+  auto program = makeProgram("pool", {op::pool(I, PoolMode::SUM, {1, 2, 3}, {1, 2, 3}, AutoPadMode::NONE, {1, 2},
+                                               TensorLayout::NXC, true, true)});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"#(
 #map0 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4)>
@@ -612,6 +607,70 @@ module {
 )#"));
 }
 
+// See: https://leimao.github.io/blog/Reorg-Layer-Explained/
+static std::vector<int64_t> reorgYoloRefImpl(const std::vector<int64_t>& I, unsigned N, unsigned C, unsigned H,
+                                             unsigned W, unsigned stride, bool decrease) {
+  std::vector<int64_t> O(I.size());
+  auto C_out = C / (stride * stride);
+  for (unsigned b = 0; b < N; b++) {
+    for (unsigned k = 0; k < C; k++) {
+      for (unsigned j = 0; j < H; j++) {
+        for (unsigned i = 0; i < W; i++) {
+          auto in_index = i + W * (j + H * (k + C * b));
+          auto c2 = k % C_out;
+          auto offset = k / C_out;
+          auto w2 = i * stride + offset % stride;
+          auto h2 = j * stride + offset / stride;
+          auto out_index = w2 + W * stride * (h2 + H * stride * (c2 + C_out * b));
+          if (decrease) {
+            O[out_index] = I[in_index];
+          } else {
+            O[in_index] = I[out_index];
+          }
+        }
+      }
+    }
+  }
+  return O;
+}
+
+TEST_F(OpTest, ReorgYoloDecrease) {
+  const unsigned N = 1, C = 4, H = 6, W = 6, S = 2;
+  const bool decrease = true;
+
+  auto I = Placeholder(DType::INT64, {N, C, H, W});
+  auto O = op::reorg_yolo(I, S, decrease);
+  auto program = ProgramBuilder("reorg_yolo", {O}).compile();
+  IVLOG(1, "program:\n" << program);
+
+  std::vector<int64_t> I_input(N * C * H * W);
+  for (unsigned i = 0; i < I_input.size(); i++) {
+    I_input[i] = i;
+  }
+  auto O_expected = reorgYoloRefImpl(I_input, N, C, H, W, S, decrease);
+  IVLOG(1, "expected:\n" << O_expected);
+  checkProgram(program, {{I, I_input}}, {{O, O_expected}});
+}
+
+TEST_F(OpTest, ReorgYoloIncrease) {
+  const unsigned N = 1, C = 4, H = 6, W = 6, S = 2;
+  const unsigned C_out = C * (S * S), H_out = H / S, W_out = W / S;
+  const bool decrease = false;
+
+  auto I = Placeholder(DType::INT64, {N, C, H, W});
+  auto O = op::reorg_yolo(I, S, decrease);
+  auto program = ProgramBuilder("reorg_yolo", {O}).compile();
+  IVLOG(1, "program:\n" << program);
+
+  std::vector<int64_t> I_input(N * C * H * W);
+  for (unsigned i = 0; i < I_input.size(); i++) {
+    I_input[i] = i;
+  }
+  auto O_expected = reorgYoloRefImpl(I_input, N, C_out, H_out, W_out, S, decrease);
+  IVLOG(1, "expected:\n" << O_expected);
+  checkProgram(program, {{I, I_input}}, {{O, O_expected}});
+}
+
 TEST(Op, Repeat) {
   auto A = Placeholder(DType::FLOAT32, {32, 1, 4, 1}, "A");
   auto X = op::repeat(  //
@@ -726,7 +785,7 @@ TEST(Op, SpatialPadding) {
       A,                         // tensor to perform spatial padding on
       {1, 3},                    // low pads
       {3, 3},                    // high pads
-      "nchw");                   // data layout
+      TensorLayout::NXC);        // data layout
   auto program = makeProgram("spatial_padding", {X});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"#(

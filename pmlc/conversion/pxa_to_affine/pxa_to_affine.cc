@@ -44,8 +44,10 @@ using util::AggregationKind;
 
 namespace {
 
-struct LoweringPass : public mlir::ModulePass<LoweringPass> {
-  void runOnModule() override;
+struct LoweringPass
+    : public mlir::PassWrapper<LoweringPass,
+                               mlir::OperationPass<mlir::ModuleOp>> {
+  void runOnOperation() override;
 };
 
 template <typename OpType>
@@ -105,7 +107,7 @@ struct AffineReduceOpConversion : public LoweringBase<pxa::AffineReduceOp> {
                         pxa::AffineReduceOp op, Value source) const {
     switch (op.agg()) {
     case AggregationKind::assign:
-      return source;
+      return op.val();
     case AggregationKind::add: {
       if (source.getType().isa<FloatType>()) {
         return rewriter.create<mlir::AddFOp>(op.getLoc(), source, op.val());
@@ -151,7 +153,7 @@ struct AffineReduceOpConversion : public LoweringBase<pxa::AffineReduceOp> {
   }
 };
 
-void LoweringPass::runOnModule() {
+void LoweringPass::runOnOperation() {
   // Set up target (i.e. what is legal)
   mlir::ConversionTarget target(getContext());
   target.addLegalDialect<mlir::AffineDialect>();
@@ -165,8 +167,9 @@ void LoweringPass::runOnModule() {
   patterns.insert<AffineReduceOpConversion>(&getContext());
 
   // Run the conversion
-  if (failed(applyPartialConversion(getModule(), target, patterns, nullptr))) {
-    getModule().dump();
+  if (failed(
+          applyPartialConversion(getOperation(), target, patterns, nullptr))) {
+    getOperation().dump();
     emitError(mlir::UnknownLoc::get(&getContext()),
               "Error lowering pxa -> affine\n");
     signalPassFailure();

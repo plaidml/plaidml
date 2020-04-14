@@ -9,13 +9,15 @@
 // Main entry point to a command line utility that executes an MLIR file on the
 // CPU by translating MLIR to LLVM IR before JIT-compiling and executing the
 // latter.
-//
 //===----------------------------------------------------------------------===//
+
+#include <stdexcept>
 
 #include "mlir/ExecutionEngine/OptUtils.h"
 #include "mlir/Support/JitRunner.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/TargetSelect.h"
+#include "llvm/Support/raw_ostream.h"
 
 #include "pmlc/util/all_dialects.h"
 #include "pmlc/util/all_passes.h"
@@ -26,5 +28,12 @@ int main(int argc, char **argv) {
   llvm::InitializeNativeTarget();
   llvm::InitializeNativeTargetAsmPrinter();
   mlir::initializeLLVMPasses();
-  return mlir::JitRunnerMain(argc, argv, nullptr);
+
+  try {
+    return mlir::JitRunnerMain(argc, argv, nullptr);
+  } catch (const std::exception &e) {
+    llvm::outs() << "ERROR: " << e.what();
+  }
+
+  return 0;
 }

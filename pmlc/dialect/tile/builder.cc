@@ -89,7 +89,7 @@ struct TileBuilder::Impl {
 
   Impl()
       : module(ModuleOp::create(UnknownLoc::get(&context))),
-        builder(module.getBody()), loc(builder.getUnknownLoc()) {
+        builder(module.getBodyRegion()), loc(builder.getUnknownLoc()) {
     builder.setInsertionPointToStart(module.getBody());
   }
 
@@ -621,7 +621,8 @@ private:
   OperationFolder folder;
 };
 
-struct MakeProgramPass : public mlir::FunctionPass<MakeProgramPass> {
+struct MakeProgramPass
+    : public mlir::PassWrapper<MakeProgramPass, mlir::FunctionPass> {
   void runOnFunction() final {
     OwningRewritePatternList patterns;
     auto context = &getContext();
@@ -784,7 +785,7 @@ TileBuilder::MakeProgram(StringRef name, const ProgramMutations &mutations,
     program->arguments.emplace_back(programArg);
   }
   program->tileIR = mlir::debugString(module);
-  // IVLOG(2, "TileBuilder::MakeProgram>\n" << mlir::debugString(module));
+  IVLOG(2, "TileBuilder::MakeProgram>\n" << mlir::debugString(module));
   return program;
 }
 

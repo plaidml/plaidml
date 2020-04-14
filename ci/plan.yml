@@ -185,7 +185,6 @@ SUITES:
           - TestBackendOps.testCategoricalCrossentropyGarbageIn
           - TestBackendOps.testExp
           - TestBackendOps.testLog
-          - TestBackendOps.testTanh
           - TestBackendOps.testDepthwiseConv2d
           - TestBackendOps.testReshapeMatchDim
           - TestBackendOps.testZeros

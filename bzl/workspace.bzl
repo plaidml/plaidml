@@ -19,9 +19,9 @@ def plaidml_workspace():
 
     http_archive(
         name = "boost",
-        url = "https://github.com/plaidml/depot/raw/master/boost_1_66_0.tar.gz",
-        sha256 = "bd0df411efd9a585e5a2212275f8762079fed8842264954675a4fddc46cfcf60",
-        strip_prefix = "boost_1_66_0",
+        url = "https://dl.bintray.com/boostorg/release/1.71.0/source/boost_1_71_0.tar.gz",
+        sha256 = "96b34f7468f26a141f6020efb813f1a2f3dfb9797ecf76a7d7cbd843cc95f5bd",
+        strip_prefix = "boost_1_71_0",
         build_file = clean_dep("//bzl:boost.BUILD"),
     )
 
@@ -50,9 +50,10 @@ def plaidml_workspace():
 
     http_archive(
         name = "easylogging",
-        url = "https://github.com/muflihun/easyloggingpp/releases/download/v9.95.0/easyloggingpp_v9.95.0.tar.gz",
-        sha256 = "4b1aebe19e383349c6e438aac357eccfabb0ce34430e872508ed8ee0d1629e0f",
+        url = "https://github.com/amrayn/easyloggingpp/archive/v9.96.7.tar.gz",
+        sha256 = "237c80072b9b480a9f2942b903b4b0179f65e146e5dcc64864dc91792dedd722",
         build_file = clean_dep("//bzl:easylogging.BUILD"),
+        strip_prefix = "easyloggingpp-9.96.7",
     )
 
     http_archive(
@@ -84,8 +85,8 @@ def plaidml_workspace():
         strip_prefix = "jsonnet-0.13.0",
     )
 
-    LLVM_COMMIT = "c0e1135fb0871206fd4d1c62b9de1e9de861df07"
-    LLVM_SHA256 = "aacabc601e3d249ebbae6a51472aeca54196d1f244c3053d92a837276dc7ffb2"
+    LLVM_COMMIT = "12c9e2f1110a4fc73562214cf5dd0194b31e87cf"
+    LLVM_SHA256 = "10d43c4dbaad90993de20c8a776546f8bcbe164ee2d71ff68cdfa73877e6fd88"
     LLVM_URL = "https://github.com/plaidml/llvm-project/archive/{commit}.tar.gz".format(commit = LLVM_COMMIT)
     http_archive(
         name = "llvm-project",
@@ -156,8 +157,9 @@ def plaidml_workspace():
 
     http_archive(
         name = "zlib",
-        url = "https://github.com/plaidml/depot/raw/master/zlib-1.2.8.tar.gz",
-        sha256 = "36658cb768a54c1d4dec43c3116c27ed893e88b02ecfcb44f2166f9c0b7f2a0d",
+        url = "https://www.zlib.net/zlib-1.2.11.tar.gz",
+        sha256 = "c3e5e9fdd5004dcb542feda5ee4f0ff0744628baf8ed2dd5d66f8ca1197cb1a1",
+        strip_prefix = "zlib-1.2.11",
         build_file = clean_dep("//bzl:zlib.BUILD"),
     )
 

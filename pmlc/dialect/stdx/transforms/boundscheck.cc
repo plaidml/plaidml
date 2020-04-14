@@ -21,14 +21,14 @@ class BoundsCheckGenerator {
   LoadStoreOp op;
   Location loc;
   ModuleOp module;
-  Type i32Type;
+  Type i64Type;
   Type indexType;
 
 private:
   BoundsCheckGenerator(LoadStoreOp op, Builder builder)
       : op(op), loc(op.getLoc()),
         module(op.template getParentOfType<ModuleOp>()),
-        i32Type(builder.getIntegerType(32)), indexType(builder.getIndexType()) {
+        i64Type(builder.getIntegerType(64)), indexType(builder.getIndexType()) {
   }
 
 public:
@@ -44,16 +44,12 @@ public:
       return SymbolRefAttr::get(symbol, context);
     }
     OpBuilder builder(module.getBodyRegion());
-    std::array<Type, 2> inputs{indexType, i32Type};
+    std::array<Type, 2> inputs{indexType, i64Type};
     ArrayRef<Type> results{};
     auto funcType = builder.getFunctionType(inputs, results);
     ArrayRef<NamedAttribute> attrs{};
     builder.create<FuncOp>(loc, symbol, funcType, attrs);
     return SymbolRefAttr::get(symbol, context);
-  }
-
-  Value createConstantIntOp(int64_t value, OpBuilder builder) {
-    return builder.create<ConstantIntOp>(loc, value, i32Type);
   }
 
   void generateBoundsChecks() {
@@ -62,7 +58,8 @@ public:
     auto dimSizes = op.getMemRefType().getShape();
     for (size_t i = 0; i < dimSizes.size(); i++) {
       auto idxVal = op.getIndices()[i];
-      auto rangeVal = createConstantIntOp(dimSizes[i], opBuilder);
+      auto rangeVal =
+          opBuilder.create<ConstantIntOp>(loc, dimSizes[i], i64Type);
       SmallVector<Value, 2> args;
       idxVal.getType().template dyn_cast<mlir::IntegerType>();
       args.push_back(idxVal);
@@ -84,6 +81,10 @@ void BoundsCheckPass::runOnFunction() {
         .Case<StoreOp>(
             [](auto op) { BoundsCheckGenerator<StoreOp>::generate(op); });
   });
+}
+
+std::unique_ptr<mlir::Pass> createBoundsCheckPass() {
+  return std::make_unique<BoundsCheckPass>();
 }
 
 } // namespace pmlc::dialect::stdx

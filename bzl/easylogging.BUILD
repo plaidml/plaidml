@@ -1,13 +1,11 @@
-includes = ["."]
-
 package(default_visibility = ["@//visibility:public"])
 
-exports_files(["LICENCE.txt"])
+exports_files(["LICENSE"])
 
 cc_library(
     name = "easylogging",
-    srcs = ["easylogging++.cc"],
-    hdrs = ["easylogging++.h"],
+    srcs = ["src/easylogging++.cc"],
+    hdrs = ["src/easylogging++.h"],
     copts = [
         "-DELPP_THREAD_SAFE",
         "-DELPP_CUSTOM_COUT=std::cerr",
@@ -19,6 +17,5 @@ cc_library(
         "-DELPP_DISABLE_DEFAULT_CRASH_HANDLING",
         "-DELPP_WINSOCK2",
     ],
-    includes = ["."],
-    visibility = ["//visibility:public"],
+    includes = ["src"],
 )
