@@ -6,7 +6,8 @@
 
 namespace pmlc::dialect::pxa {
 
-struct Autotile10Pass : public mlir::FunctionPass<Autotile10Pass> {
+struct Autotile10Pass
+    : public mlir::PassWrapper<Autotile10Pass, mlir::FunctionPass> {
   void runOnFunction() override {
     auto func = getFunction();
     FixedTileSizeGenerator always10(10);

@@ -140,6 +140,7 @@ void Program::compile(StringRef target, bool collectPasses) {
     os.flush();
     passes.emplace_back(PassInfo{"tile", ir});
     pm.addInstrumentation(std::make_unique<IRCollector>(&passes));
+    pm.disableMultithreading();
   }
 
   if (VLOG_IS_ON(1)) {
@@ -181,7 +182,8 @@ Executable::Executable(const std::shared_ptr<Program> &program,
   }
 
   auto optPipeline = makeOptimizingTransformer(
-      /*optLevel=*/0, /*sizeLevel=*/0,
+      /*optLevel=*/0,
+      /*sizeLevel=*/0,
       /*targetMachine=*/tmOrError->get());
 
   if (VLOG_IS_ON(6)) {
@@ -218,12 +220,11 @@ Executable::Executable(const std::shared_ptr<Program> &program,
   }
 #endif
 
-  auto maybeEngine = ExecutionEngine::create(*program->module, optPipeline,
-                                             /*jitCodeGenOptLevel=*/llvm::None,
-                                             sharedLibPaths, 
-					     /*enableObjectCache=*/true,
-					     /*enableGDBNotificationListener=*/false
-		  );
+  auto maybeEngine =
+      ExecutionEngine::create(*program->module, optPipeline,
+                              /*jitCodeGenOptLevel=*/llvm::None, sharedLibPaths,
+                              /*enableObjectCache=*/true,
+                              /*enableGDBNotificationListener=*/false);
   llvm::handleAllErrors(
       maybeEngine.takeError(), [](const llvm::ErrorInfoBase &err) {
         throw std::runtime_error("Failed to create ExecutionEngine: " +

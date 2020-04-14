@@ -6,7 +6,8 @@
 
 namespace pmlc::dialect::pxa {
 
-struct TestStrideInfoPass : public mlir::OperationPass<TestStrideInfoPass> {
+struct TestStrideInfoPass
+    : public mlir::PassWrapper<TestStrideInfoPass, mlir::OperationPass<void>> {
   void runOnOperation() override;
 };
 

@@ -162,7 +162,7 @@ void populateXSMMConversionPatterns(OwningRewritePatternList &patterns,
 
 namespace {
 
-class LowerXSMMPass : public FunctionPass<LowerXSMMPass> {
+class LowerXSMMPass : public PassWrapper<LowerXSMMPass, mlir::FunctionPass> {
   void runOnFunction() override {
     OwningRewritePatternList patterns;
     populateXSMMConversionPatterns(patterns, &getContext());

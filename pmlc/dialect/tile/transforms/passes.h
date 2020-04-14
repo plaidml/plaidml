@@ -19,7 +19,7 @@ std::unique_ptr<mlir::Pass> createComputeBoundsPass();
 std::unique_ptr<mlir::Pass> createConstantTypesPass(mlir::Type concreteFloat,
                                                     mlir::Type concreteInt);
 
-struct PadPass : public mlir::FunctionPass<PadPass> {
+struct PadPass : public mlir::PassWrapper<PadPass, mlir::FunctionPass> {
   void runOnFunction() final;
 };
 

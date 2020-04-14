@@ -587,7 +587,7 @@ void Stencil::DoStenciling() {
   }
 }
 
-struct StencilPass : public mlir::FunctionPass<StencilPass> {
+struct StencilPass : public mlir::PassWrapper<StencilPass, mlir::FunctionPass> {
   StencilPass() { assert(false && "StencilPass must be configured"); }
 
   StencilPass(const StencilPass &rhs) : costFn(rhs.costFn) {

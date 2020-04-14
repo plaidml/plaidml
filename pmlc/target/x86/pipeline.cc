@@ -16,8 +16,8 @@
 #include "pmlc/conversion/stdx_to_llvm/stdx_to_llvm.h"
 #include "pmlc/conversion/tile_to_pxa/tile_to_pxa.h"
 #include "pmlc/dialect/pxa/transforms/passes.h"
-#include "pmlc/dialect/tile/transforms/passes.h"
 #include "pmlc/dialect/stdx/transforms/passes.h"
+#include "pmlc/dialect/tile/transforms/passes.h"
 #include "pmlc/target/x86/heatmap.h"
 #include "pmlc/target/x86/trace_linking.h"
 #include "pmlc/target/x86/xsmm_lowering.h"
@@ -84,9 +84,11 @@ LogicalResult mixedPtrFuncArgTypeConverter(LLVMTypeConverter &converter,
   return structFuncArgTypeConverter(converter, type, result);
 }
 
-struct ConvertToStdPass : public ModulePass<ConvertToStdPass> {
-  void runOnModule() override {
-    auto module = getModule();
+struct ConvertToStdPass
+    : public mlir::PassWrapper<ConvertToStdPass,
+                               mlir::OperationPass<mlir::ModuleOp>> {
+  void runOnOperation() override {
+    auto module = getOperation();
     auto *context = module.getContext();
 
     OwningRewritePatternList patterns;
@@ -95,20 +97,21 @@ struct ConvertToStdPass : public ModulePass<ConvertToStdPass> {
 
     ConversionTarget target(*context);
     target.addLegalDialect<StandardOpsDialect>();
-    if (failed(
-            applyPartialConversion(module, target, patterns))) {
+    if (failed(applyPartialConversion(module, target, patterns))) {
       signalPassFailure();
     }
   }
 
-  static std::unique_ptr<OpPassBase<ModuleOp>> create() {
+  static std::unique_ptr<OperationPass<ModuleOp>> create() {
     return std::make_unique<ConvertToStdPass>();
   }
 };
 
-struct ConvertToLLVMPass : public ModulePass<ConvertToLLVMPass> {
-  void runOnModule() override {
-    auto module = getModule();
+struct ConvertToLLVMPass
+    : public mlir::PassWrapper<ConvertToLLVMPass,
+                               mlir::OperationPass<mlir::ModuleOp>> {
+  void runOnOperation() override {
+    auto module = getOperation();
     auto *context = module.getContext();
 
     LLVMTypeConverterCustomization customs;
@@ -116,7 +119,8 @@ struct ConvertToLLVMPass : public ModulePass<ConvertToLLVMPass> {
     LLVMTypeConverter typeConverter(&getContext(), customs);
 
     OwningRewritePatternList patterns;
-    populateStdToLLVMBarePtrConversionPatterns(typeConverter, patterns);
+    populateStdToLLVMBarePtrConversionPatterns(typeConverter, patterns,
+                                               /*useAlloca=*/true);
     conversion::stdx_to_llvm::populateStdXToLLVMConversionPatterns(
         typeConverter, patterns);
 
@@ -128,7 +132,7 @@ struct ConvertToLLVMPass : public ModulePass<ConvertToLLVMPass> {
     }
   }
 
-  static std::unique_ptr<OpPassBase<ModuleOp>> create() {
+  static std::unique_ptr<OperationPass<ModuleOp>> create() {
     return std::make_unique<ConvertToLLVMPass>();
   }
 };
