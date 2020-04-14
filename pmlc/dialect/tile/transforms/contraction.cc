@@ -779,10 +779,8 @@ struct ComputeBoundsImpl {
     for (const auto &poly : access) {
       exprs.emplace_back(makeAffineExprFromIntPoly(poly));
     }
-    if (exprs.size()) {
-      return AffineMap::get(/*dimCount=*/idxs.size(), /*symbolCount=*/0, exprs);
-    }
-    return AffineMap::get(op.getContext());
+    return AffineMap::get(/*dimCount=*/idxs.size(), /*symbolCount=*/0, exprs,
+                          op.getContext());
   }
 
   IntegerSet getConstraints() {
