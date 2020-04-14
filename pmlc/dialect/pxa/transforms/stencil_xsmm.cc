@@ -104,9 +104,16 @@ private:
   }
 
   void transform(TensorAndIndexPermutation perm, ArrayRef<int64_t> tileSize) {
+    // TODO: Clean up this logging
     IVLOG(2, "Best Perf: " << bestCost);
     IVLOG(2, "Best Tensor/Index Permutations: TODO: print");
-    IVLOG(2, "Best Tiling: " << bestTiling[0]);
+    std::stringstream bestTilingStr;
+    bestTilingStr << "[ ";
+    for (const auto &tileSize : bestTiling) {
+      bestTilingStr << tileSize << " ";
+    }
+    bestTilingStr << "]";
+    IVLOG(2, "Best Tiling: " << bestTilingStr.str());
 
     op.setAttr("is_gemm", mlir::UnitAttr::get(op.getContext()));
   }
@@ -115,39 +122,110 @@ public:
   explicit StencilXSMM(mlir::AffineParallelOp op) : StencilGeneric{op} {
     // TODO ctor
     // TODO: Probably want to move these to be params on StencilGeneric ctor...
-    semanticIdxCount = 1; // TODO [i.e., must match generators & requirements]
+    semanticIdxCount = 3; // TODO [i.e., must match generators & requirements]
     requirements =        // TODO: Make nicer
         std::map<std::pair<int64_t, int64_t>,
                  std::function<bool(mlir::Operation *, mlir::BlockArgument)>>{
             {{0, 0},
-             [](mlir::Operation *op, mlir::BlockArgument a) {
-               auto loadOp = llvm::dyn_cast<mlir::AffineLoadOp>(*op);
+             [](mlir::Operation *rawOp, mlir::BlockArgument a) {
+               auto loadOp = llvm::dyn_cast<mlir::AffineLoadOp>(*rawOp);
 
                if (!loadOp) {
-                 // Must be a load
-                 IVLOG(3, "Not a load");
+                 //  IVLOG(3, "Not a load");
                  return false;
                }
-               // if (!loadOp) {
-               //   // Must be a reduce
-               //   IVLOG(3, "Not a reduce");
-               //   return false;
-               // }
-               auto loadOpResult = loadOp.getResult(); // TODO
-               IVLOG(3, "The loadOp is " << mlir::debugString(loadOpResult));
+               //  auto loadOpResult = loadOp.getResult(); // TODO
+               //  IVLOG(3, "The loadOp is " <<
+               //  mlir::debugString(loadOpResult));
 
                if (computeStrideInfo(loadOp)->strides[a] != 0) {
-                 IVLOG(4, "Cool, got a true");
+                 //  IVLOG(4, "[0, 0] Cool, got a true (!=0)");
                  return true;
                } else {
-                 IVLOG(4, "Welp, got a false");
+                 //  IVLOG(4, "Welp, got a false (==0)");
                  return false;
                }
              }},
+            {{0, 1},
+             [](mlir::Operation *rawOp, mlir::BlockArgument a) {
+               auto loadOp = llvm::dyn_cast<mlir::AffineLoadOp>(*rawOp);
+               if (!loadOp)
+                 return false;
+               if (computeStrideInfo(loadOp)->strides[a] == 0)
+                 return true;
+               else
+                 return false;
+             }},
+            {{0, 2},
+             [](mlir::Operation *rawOp, mlir::BlockArgument a) {
+               auto loadOp = llvm::dyn_cast<mlir::AffineLoadOp>(*rawOp);
+               if (!loadOp)
+                 return false;
+               if (computeStrideInfo(loadOp)->strides[a] == 1)
+                 return true;
+               else
+                 return false;
+             }},
             {{1, 0},
-             [](mlir::Operation *v, mlir::BlockArgument a) { return true; }},
+             [](mlir::Operation *rawOp, mlir::BlockArgument a) {
+               auto loadOp = llvm::dyn_cast<mlir::AffineLoadOp>(*rawOp);
+               if (!loadOp)
+                 return false;
+               if (computeStrideInfo(loadOp)->strides[a] == 0)
+                 return true;
+               else
+                 return false;
+             }},
+            {{1, 1},
+             [](mlir::Operation *rawOp, mlir::BlockArgument a) {
+               auto loadOp = llvm::dyn_cast<mlir::AffineLoadOp>(*rawOp);
+               if (!loadOp)
+                 return false;
+               if (computeStrideInfo(loadOp)->strides[a] == 1)
+                 return true;
+               else
+                 return false;
+             }},
+            {{1, 2},
+             [](mlir::Operation *rawOp, mlir::BlockArgument a) {
+               auto loadOp = llvm::dyn_cast<mlir::AffineLoadOp>(*rawOp);
+               if (!loadOp)
+                 return false;
+               if (computeStrideInfo(loadOp)->strides[a] != 0)
+                 return true;
+               else
+                 return false;
+             }},
             {{2, 0},
-             [](mlir::Operation *v, mlir::BlockArgument a) { return true; }},
+             [](mlir::Operation *rawOp, mlir::BlockArgument a) {
+               auto reduceOp = llvm::dyn_cast<AffineReduceOp>(*rawOp);
+               if (!reduceOp)
+                 return false;
+               if (computeStrideInfo(reduceOp)->strides[a] != 0)
+                 return true;
+               else
+                 return false;
+             }},
+            {{2, 1},
+             [](mlir::Operation *rawOp, mlir::BlockArgument a) {
+               auto reduceOp = llvm::dyn_cast<AffineReduceOp>(*rawOp);
+               if (!reduceOp)
+                 return false;
+               if (computeStrideInfo(reduceOp)->strides[a] == 1)
+                 return true;
+               else
+                 return false;
+             }},
+            {{2, 2},
+             [](mlir::Operation *rawOp, mlir::BlockArgument a) {
+               auto reduceOp = llvm::dyn_cast<AffineReduceOp>(*rawOp);
+               if (!reduceOp)
+                 return false;
+               if (computeStrideInfo(reduceOp)->strides[a] == 0)
+                 return true;
+               else
+                 return false;
+             }},
             // TODO: Define `stride_of`...
             // {{0, 0}, [](mlir::Value v, mlir::BlockArgument a){ return
             // stride_of(v, a) != 0 }},
@@ -168,6 +246,8 @@ public:
             // {{2, 2}, [](mlir::Value v, mlir::BlockArgument a){ return
             // stride_of(v, a) == 0 }},
         };
+    tilingGenerators.push_back(PowerOfTwoGenerator());
+    tilingGenerators.push_back(PowerOfTwoGenerator());
     tilingGenerators.push_back(PowerOfTwoGenerator());
   }
 };
