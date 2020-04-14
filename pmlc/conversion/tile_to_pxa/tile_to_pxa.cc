@@ -206,6 +206,10 @@ static Value createCastOp(OpBuilder &builder, Location loc, Value from,
         return builder.create<stdx::FPToUIOp>(loc, from, intoType).getResult();
       }
     }
+    if (auto fromIndexType = fromType.dyn_cast<IndexType>()) {
+      auto intType = builder.getIntegerType(intoIntType.getWidth());
+      return builder.create<mlir::IndexCastOp>(loc, from, intType);
+    }
   }
   llvm_unreachable("Unsupported cast op");
 }
