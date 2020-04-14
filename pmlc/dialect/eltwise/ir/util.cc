@@ -121,7 +121,7 @@ bool MergeTypes(Type *into, Type from, Type dtype) {
 // I64EnumAttrCase<"f32",    12>,
 // I64EnumAttrCase<"f64",    13>,
 unsigned typeScore(Type type) {
-  if (!type) {
+  if (!type || type.isIndex()) {
     return 0;
   }
   if (type.isInteger(1)) {
