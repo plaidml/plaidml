@@ -28,13 +28,15 @@ using mlir::LogicalResult;
 using mlir::OperationPass;
 using mlir::OpRewritePattern;
 using mlir::OwningRewritePatternList;
+using mlir::PassWrapper;
 using mlir::PatternRewriter;
 using mlir::success;
 using mlir::Type;
 
 using eltwise::ScalarConstantOp;
 
-struct ConstantTypesPass : public OperationPass<ConstantTypesPass> {
+struct ConstantTypesPass
+    : public PassWrapper<ConstantTypesPass, OperationPass<void>> {
   ConstantTypesPass() {}
 
   ConstantTypesPass(const ConstantTypesPass &rhs) {
@@ -139,7 +141,7 @@ void ConstantTypesPass::runOnOperation() {
   OwningRewritePatternList patterns;
   patterns.insert<ConstantTypesRewriter>(&getContext(), this, *floatType,
                                          *integerType);
-  applyPatternsGreedily(getOperation()->getRegions(), patterns);
+  applyPatternsAndFoldGreedily(getOperation()->getRegions(), patterns);
 }
 
 std::unique_ptr<mlir::Pass> createConstantTypesPass(Type floatType,

@@ -18,9 +18,11 @@ namespace pmlc::target::x86 {
 
 namespace {
 
-struct TraceLinkingPass : public ModulePass<TraceLinkingPass> {
-  void runOnModule() override {
-    getModule().walk([](LLVM::LLVMFuncOp op) {
+struct TraceLinkingPass
+    : public mlir::PassWrapper<TraceLinkingPass,
+                               mlir::OperationPass<mlir::ModuleOp>> {
+  void runOnOperation() override {
+    getOperation().walk([](LLVM::LLVMFuncOp op) {
       if (!op.getAttrOfType<UnitAttr>("trace")) {
         return;
       }

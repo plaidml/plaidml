@@ -12,7 +12,6 @@
 
 #pragma once
 
-#include "mlir/Analysis/Passes.h"
 #include "mlir/Dialect/SPIRV/SPIRVOps.h"
 #include "mlir/Dialect/SPIRV/Serialization.h"
 #include "mlir/IR/Module.h"
