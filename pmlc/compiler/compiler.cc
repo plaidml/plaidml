@@ -140,6 +140,7 @@ void Program::compile(StringRef target, bool collectPasses) {
     os.flush();
     passes.emplace_back(PassInfo{"tile", ir});
     pm.addInstrumentation(std::make_unique<IRCollector>(&passes));
+    pm.disableMultithreading();
   }
 
   if (VLOG_IS_ON(1)) {
