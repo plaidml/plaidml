@@ -25,8 +25,8 @@ void performTiling(AffineParallelOp op, llvm::ArrayRef<int64_t> tileSizes) {
     lbExprs.push_back(outerDim);
     ubExprs.push_back(outerDim + tileSize);
   }
-  auto lbMap = AffineMap::get(dimCount, 0, lbExprs);
-  auto ubMap = AffineMap::get(dimCount, 0, ubExprs);
+  auto lbMap = AffineMap::get(dimCount, 0, lbExprs, op.getContext());
+  auto ubMap = AffineMap::get(dimCount, 0, ubExprs, op.getContext());
   auto outerIdxs = outerBody->getArguments();
   // Make the inner parallel for
   auto inner = builder.create<AffineParallelOp>(op.getLoc(), lbMap, outerIdxs,

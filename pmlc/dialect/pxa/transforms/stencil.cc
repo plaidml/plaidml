@@ -553,7 +553,7 @@ void Stencil::DoStenciling() {
         perOp.push_back(bodyBuilder.getAffineConstantExpr(0));
       }
     }
-    auto toIdxs = AffineMap::get(idxs.size(), 0, perOp);
+    auto toIdxs = AffineMap::get(idxs.size(), 0, perOp, op.getContext());
     return map.compose(toIdxs);
   };
 
