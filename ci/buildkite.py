@@ -37,6 +37,8 @@ def get_emoji(variant):
         return ':darwin:'
     if variant == 'macos_x86_64_dbg':
         return ':darwin::sleuth_or_spy:'
+    if variant == 'linux_x86_64_dbg':
+        return ':linux::sleuth_or_spy:'
     return ':linux:'
 
 
