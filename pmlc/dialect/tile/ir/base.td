@@ -40,12 +40,28 @@ def IndexAttr : Attr<
 def TileDialect : Dialect {
   let name = "tile";
   let cppNamespace = "pmlc::dialect::tile";
+  let hasConstantMaterializer = 1;
+  let extraClassDeclaration = [{
+    static std::string getDialectAttrName(llvm::StringRef name);
+    static std::string getCanonicalOpName(llvm::StringRef name);
+  }];
 }
 
-def AffineMap : Type<CPred<"$_self.isa<AffineMapType>()">, "affine-map">;
-def AffineConstraints : Type<CPred<"$_self.isa<AffineConstraintsType>()">, "affine-constraints">;
-def AffineTensorMap : Type<CPred<"$_self.isa<AffineTensorMapType>()">, "affine-tensor-map">;
-def StrType : Type<CPred<"$_self.isa<StringType>()">, "string">;
+def AffineMap : DialectType<TileDialect,
+  CPred<"$_self.isa<AffineMapType>()">,
+  "affine-map">;
+
+def AffineConstraints : DialectType<TileDialect,
+  CPred<"$_self.isa<AffineConstraintsType>()">,
+  "affine-constraints">;
+
+def AffineTensorMap : DialectType<TileDialect,
+  CPred<"$_self.isa<AffineTensorMapType>()">,
+  "affine-tensor-map">;
+
+def StrType : DialectType<TileDialect,
+  CPred<"$_self.isa<StringType>()">,
+  "string">;
 
 class TileOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
     Op<TileDialect, mnemonic, traits> {}

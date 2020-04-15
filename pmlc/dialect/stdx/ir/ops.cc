@@ -90,4 +90,12 @@ static void buildFPToUIOp(Builder *builder, OperationState &result,
 #define GET_OP_CLASSES
 #include "pmlc/dialect/stdx/ir/ops.cc.inc"
 
+StdXDialect::StdXDialect(mlir::MLIRContext *ctx)
+    : mlir::Dialect(getDialectNamespace(), ctx) {
+  addOperations<
+#define GET_OP_LIST
+#include "pmlc/dialect/stdx/ir/ops.cc.inc" // NOLINT
+      >();
+}
+
 } // namespace pmlc::dialect::stdx

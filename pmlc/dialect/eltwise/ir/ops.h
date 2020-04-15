@@ -5,6 +5,7 @@
 #include "llvm/ADT/SmallVector.h"
 
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/Dialect.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/Interfaces/SideEffects.h"
@@ -57,5 +58,7 @@ namespace SideEffects = mlir::SideEffects;
 
 #define GET_OP_CLASSES
 #include "pmlc/dialect/eltwise/ir/ops.h.inc"
+
+#include "pmlc/dialect/eltwise/ir/dialect.h.inc"
 
 } // namespace pmlc::dialect::eltwise

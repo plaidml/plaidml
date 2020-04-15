@@ -1,7 +1,5 @@
 // Copyright 2019, Intel Corporation
 
-#include "pmlc/dialect/tile/ir/dialect.h"
-
 #include "llvm/Support/FormatVariadic.h"
 
 #include "mlir/IR/Builders.h"
@@ -45,7 +43,7 @@ struct OpAsmInterface : public mlir::OpAsmDialectInterface {
 
 } // namespace
 
-Dialect::Dialect(mlir::MLIRContext *ctx)
+TileDialect::TileDialect(mlir::MLIRContext *ctx)
     : mlir::Dialect(getDialectNamespace(), ctx) {
   addTypes<AffineMapType, AffineConstraintsType, AffineTensorMapType,
            StringType>();
@@ -56,15 +54,15 @@ Dialect::Dialect(mlir::MLIRContext *ctx)
   addInterfaces<OpAsmInterface>();
 }
 
-std::string Dialect::getDialectAttrName(StringRef name) {
+std::string TileDialect::getDialectAttrName(StringRef name) {
   return llvm::formatv("{0}.{1}", getDialectNamespace(), name).str();
 }
 
-std::string Dialect::getCanonicalOpName(StringRef name) {
+std::string TileDialect::getCanonicalOpName(StringRef name) {
   return llvm::formatv("{0}.{1}", getDialectNamespace(), name).str();
 }
 
-void Dialect::printType(Type type, mlir::DialectAsmPrinter &printer) const {
+void TileDialect::printType(Type type, mlir::DialectAsmPrinter &printer) const {
   auto &os = printer.getStream();
   if (type.isa<AffineTensorMapType>()) {
     os << "tmap";
@@ -75,7 +73,7 @@ void Dialect::printType(Type type, mlir::DialectAsmPrinter &printer) const {
   }
 }
 
-Type Dialect::parseType(mlir::DialectAsmParser &parser) const {
+Type TileDialect::parseType(mlir::DialectAsmParser &parser) const {
   auto spec = parser.getFullSymbolSpec();
   auto type = llvm::StringSwitch<Type>(spec)
                   .Case("tmap", AffineTensorMapType::get(getContext()))
@@ -89,10 +87,10 @@ Type Dialect::parseType(mlir::DialectAsmParser &parser) const {
   return type;
 }
 
-Operation *Dialect::materializeConstant(mlir::OpBuilder &builder,
-                                        Attribute value, Type type,
-                                        Location loc) {
-  IVLOG(5, "tile::Dialect::materializeConstant> "
+Operation *TileDialect::materializeConstant(mlir::OpBuilder &builder,
+                                            Attribute value, Type type,
+                                            Location loc) {
+  IVLOG(5, "tile::TileDialect::materializeConstant> "
                << mlir::debugString(value) << " : " << mlir::debugString(type));
   if (auto attr = value.dyn_cast<IntegerAttr>()) {
     auto indexType = builder.getIndexType();

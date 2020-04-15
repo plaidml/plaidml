@@ -19,6 +19,10 @@ include "pmlc/dialect/eltwise/ir/predicates.td"
 def EltwiseDialect : Dialect {
   let name = "eltwise";
   let cppNamespace = "pmlc::dialect::eltwise";
+  let hasConstantMaterializer = 1;
+  let extraClassDeclaration = [{
+    static std::string getCanonicalOpName(llvm::StringRef name);
+  }];
 }
 
 class EltwiseOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :

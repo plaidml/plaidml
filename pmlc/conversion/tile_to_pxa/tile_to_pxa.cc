@@ -11,11 +11,8 @@
 #include "mlir/Transforms/DialectConversion.h"
 
 #include "pmlc/conversion/tile_to_pxa/pass_detail.h"
-#include "pmlc/dialect/eltwise/ir/dialect.h"
 #include "pmlc/dialect/eltwise/ir/ops.h"
-#include "pmlc/dialect/pxa/ir/dialect.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
-#include "pmlc/dialect/stdx/ir/dialect.h"
 #include "pmlc/dialect/stdx/ir/ops.h"
 #include "pmlc/dialect/tile/ir/ops.h"
 #include "pmlc/dialect/tile/transforms/padding.h"
@@ -879,8 +876,8 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
     mlir::ConversionTarget target(getContext());
     target.addLegalDialect<mlir::AffineDialect>();
     target.addLegalDialect<mlir::StandardOpsDialect>();
-    target.addLegalDialect<dialect::pxa::Dialect>();
-    target.addLegalDialect<dialect::stdx::Dialect>();
+    target.addLegalDialect<dialect::pxa::PXADialect>();
+    target.addLegalDialect<dialect::stdx::StdXDialect>();
     target.addLegalOp<mlir::ModuleOp, mlir::ModuleTerminatorOp>();
     target.addDynamicallyLegalOp<FuncOp>([](FuncOp op) {
       auto funcType = op.getType();
