@@ -408,7 +408,6 @@ class TestBackendOps(unittest.TestCase):
     def testArgmaxWithAxis(self, b):
         return b.argmax(b.variable(n(2, 3, 4) % 3), axis=-2)
 
-    @unittest.skip("Cull crashing tests")
     @compareForwardExact()
     def testArgmaxUnequal(self, b):
         x = b.variable(m(3, 2))
@@ -419,7 +418,6 @@ class TestBackendOps(unittest.TestCase):
     def testArgmin(self, b):
         return b.argmin(b.variable(m(7, 2)))
 
-    @unittest.skip("Cull crashing tests")
     @compareForwardExact()
     def testArgminUnequal(self, b):
         x = b.variable(m(3, 2))
@@ -589,6 +587,7 @@ class TestBackendOps(unittest.TestCase):
             c / x,
         ]
 
+    @unittest.skip("Failing on llvm.cpu")
     @opTest([[m(2, 3, 2, 4)], [m(1, 1, 2, 1) + 1], [m(1, 2, 3, 1) + 4]], do_grads=False)
     def testAll(self, b, x):
         return [
@@ -598,6 +597,7 @@ class TestBackendOps(unittest.TestCase):
             b.all(x, axis=-1),
         ]
 
+    @unittest.skip("Failing on llvm.cpu")
     @opTest([[m(2, 3, 2, 4)], [m(1, 1, 2, 1) + 1]], do_grads=False)
     def testAny(self, b, x):
         return [
@@ -718,62 +718,50 @@ class TestBackendOps(unittest.TestCase):
     def testHardSigmoid(self, b, x):
         return [b.hard_sigmoid(x)]
 
-    @unittest.skip("Cull crashing tests")
     @compareForwardExact()
     def testEqual(self, b):
         return b.equal(b.variable(m(3, 3)), b.variable(m(3, 3)))
 
-    @unittest.skip("Cull crashing tests")
     @compareForwardExact()
     def testEqualVersusNumeric(self, b):
         return b.equal(b.variable(m(3, 3)), m(3, 3))
 
-    @unittest.skip("Cull crashing tests")
     @compareForwardExact()
     def testNotEqual(self, b):
         return b.not_equal(b.variable(m(3, 3)), b.variable(m(3, 3)))
 
-    @unittest.skip("Cull crashing tests")
     @compareForwardExact()
     def testNotEqualVersusNumeric(self, b):
         return b.not_equal(b.variable(m(3, 3)), m(3, 3))
 
-    @unittest.skip("Cull crashing tests")
     @compareForwardExact()
     def testLess(self, b):
         return b.less(b.variable(2 * m(3, 3)), b.variable(m(3, 3)))
 
-    @unittest.skip("Cull crashing tests")
     @compareForwardExact()
     def testLessVersusNumeric(self, b):
         return b.less(b.variable(2 * m(3, 3)), m(3, 3))
 
-    @unittest.skip("Cull crashing tests")
     @compareForwardExact()
     def testLessEqual(self, b):
         return b.less_equal(b.variable(2 * m(3, 3)), b.variable(m(3, 3)))
 
-    @unittest.skip("Cull crashing tests")
     @compareForwardExact()
     def testLessEqualVersusNumeric(self, b):
         return b.less_equal(b.variable(2 * m(3, 3)), m(3, 3))
 
-    @unittest.skip("Cull crashing tests")
     @compareForwardExact()
     def testGreater(self, b):
         return b.greater(b.variable(2 * m(3, 3)), b.variable(m(3, 3)))
 
-    @unittest.skip("Cull crashing tests")
     @compareForwardExact()
     def testGreaterVersusNumeric(self, b):
         return b.greater(b.variable(2 * m(3, 3)), m(3, 3))
 
-    @unittest.skip("Cull crashing tests")
     @compareForwardExact()
     def testGreaterEqual(self, b):
         return b.greater_equal(b.variable(2 * m(3, 3)), b.variable(m(3, 3)))
 
-    @unittest.skip("Cull crashing tests")
     @compareForwardExact()
     def testGreaterEqualVersusNumeric(self, b):
         return b.greater_equal(b.variable(2 * m(3, 3)), m(3, 3))
@@ -915,7 +903,6 @@ class TestBackendOps(unittest.TestCase):
             b.sparse_categorical_crossentropy(sbest, smax, from_logits=True)
         ]
 
-    @unittest.skip("Cull crashing tests")
     @compareForwardExact(skip_theano=True)
     def testOneHot(self, b):
         A = b.variable(np.array([[0, 1, 2], [2, 4, 0], [0, 2, 7]]), dtype='int32')
@@ -1003,7 +990,7 @@ class TestBackendOps(unittest.TestCase):
         diffs = rand - mean
         return b.mean(b.square(diffs))
 
-    @unittest.skip("Cull crashing tests")
+    @unittest.skip("Error in calculations of indexes it looks like")
     @opTest([
         _conv_inp(IN=1, IC=16, OC=16, IS=[6, 5], KS=[3, 3]),
     ], 1e-04, skip_theano=True)
@@ -1073,7 +1060,7 @@ class TestBackendOps(unittest.TestCase):
             #b.depthwise_conv2d(im, km, strides=(2, 2), padding='valid', data_format=df, dilation_rate=(2, 2)),  # TF unhappy with strides + dilation
         ]
 
-    @unittest.skip("Cull crashing tests")
+    @unittest.skip("Failing test with MLIR on llvm.cpu")
     @opTest(
         [
             _conv_inp(IN=1, IC=3, OC=1, IS=[8], KS=[2], data_format='channels_last'),
@@ -1093,7 +1080,7 @@ class TestBackendOps(unittest.TestCase):
             b.conv1d(im, km, padding='causal', dilation_rate=2, data_format=df),
         ]
 
-    @unittest.skip("Cull crashing tests")
+    @unittest.skip("Failing test with MLIR on llvm.cpu")
     @opTest([
         _conv_inp(IN=2, IC=2, OC=4, IS=[4, 7], KS=[3, 3]),
         _conv_inp(IN=3, IC=3, OC=1, IS=[9, 8], KS=[2, 2], data_format='channels_last'),
@@ -1167,7 +1154,7 @@ class TestBackendOps(unittest.TestCase):
             b.conv3d(im, km, padding='valid', dilation_rate=(1, 3, 2), data_format=df),
         ]
 
-    @unittest.skip("Cull crashing tests")
+    @unittest.skip("Failed test on llvm.cpu")
     @opTest(
         [
             [

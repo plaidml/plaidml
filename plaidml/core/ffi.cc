@@ -369,7 +369,8 @@ uint64_t plaidml_shape_get_nbytes(  //
         total += (sizes[i] - 1) * strides[i];
       }
     }
-    return (total + 1) * (shape->type.getElementTypeBitWidth() / 8);
+    unsigned elem_bytes = (shape->type.getElementTypeBitWidth() + 7) / 8;
+    return (total + 1) * elem_bytes;
   });
 }
 
