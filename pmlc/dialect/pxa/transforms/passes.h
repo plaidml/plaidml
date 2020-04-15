@@ -13,6 +13,8 @@ class Pass;
 
 namespace pmlc::dialect::pxa {
 
+std::unique_ptr<mlir::Pass> createAutoTileExamplePass();
+
 struct StencilCost {
   double throughput;
   unsigned startupCost;
@@ -23,5 +25,7 @@ using StencilCostFunction =
 
 std::unique_ptr<mlir::Pass> createStencilPass(unsigned numThreads,
                                               StencilCostFunction costFn);
+
+std::unique_ptr<mlir::Pass> createTestStrideInfoPass();
 
 } // namespace pmlc::dialect::pxa

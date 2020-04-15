@@ -11,7 +11,7 @@
 #include "mlir/IR/Matchers.h"
 #include "mlir/Support/DebugStringHelper.h"
 
-#include "pmlc/dialect/tile/transforms/passes.h"
+#include "pmlc/dialect/tile/transforms/pass_detail.h"
 #include "pmlc/util/bilp/ilp_solver.h"
 #include "pmlc/util/logging.h"
 #include "pmlc/util/math/basis.h"
@@ -794,23 +794,25 @@ struct ComputeBoundsImpl {
   }
 };
 
-void ComputeBoundsPass::runOnFunction() {
-  auto func = getFunction();
-  func.walk([this](ContractionOp op) {
-    try {
-      ComputeBoundsImpl impl(op);
-      auto maps = llvm::makeArrayRef(impl.affineMaps);
-      op.setLowerBounds(impl.lowerBounds);
-      op.setUpperBounds(impl.upperBounds);
-      op.setSink(maps.front());
-      op.setSources(maps.drop_front());
-      op.setConstraints(impl.getConstraints());
-    } catch (const std::exception &ex) {
-      op.emitError(ex.what());
-      signalPassFailure();
-    }
-  });
-}
+struct ComputeBoundsPass : public ComputeBoundsBase<ComputeBoundsPass> {
+  void runOnFunction() final {
+    auto func = getFunction();
+    func.walk([this](ContractionOp op) {
+      try {
+        ComputeBoundsImpl impl(op);
+        auto maps = llvm::makeArrayRef(impl.affineMaps);
+        op.setLowerBounds(impl.lowerBounds);
+        op.setUpperBounds(impl.upperBounds);
+        op.setSink(maps.front());
+        op.setSources(maps.drop_front());
+        op.setConstraints(impl.getConstraints());
+      } catch (const std::exception &ex) {
+        op.emitError(ex.what());
+        signalPassFailure();
+      }
+    });
+  }
+};
 
 std::unique_ptr<mlir::Pass> createComputeBoundsPass() {
   return std::make_unique<ComputeBoundsPass>();

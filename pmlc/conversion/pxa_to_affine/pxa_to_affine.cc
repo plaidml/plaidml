@@ -1,7 +1,5 @@
 // Copyright 2020 Intel Corporation
 
-#include "pmlc/conversion/pxa_to_affine/pxa_to_affine.h"
-
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Pass/Pass.h"
@@ -9,6 +7,7 @@
 #include "mlir/Support/DebugStringHelper.h"
 #include "mlir/Transforms/DialectConversion.h"
 
+#include "pmlc/conversion/pxa_to_affine/pass_detail.h"
 #include "pmlc/dialect/pxa/ir/dialect.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/util/logging.h"
@@ -44,10 +43,9 @@ using util::AggregationKind;
 
 namespace {
 
-struct LoweringPass
-    : public mlir::PassWrapper<LoweringPass,
-                               mlir::OperationPass<mlir::ModuleOp>> {
-  void runOnOperation() override;
+struct LowerPXAToAffinePass
+    : public LowerPXAToAffineBase<LowerPXAToAffinePass> {
+  void runOnOperation() final;
 };
 
 template <typename OpType>
@@ -153,7 +151,7 @@ struct AffineReduceOpConversion : public LoweringBase<pxa::AffineReduceOp> {
   }
 };
 
-void LoweringPass::runOnOperation() {
+void LowerPXAToAffinePass::runOnOperation() {
   // Set up target (i.e. what is legal)
   mlir::ConversionTarget target(getContext());
   target.addLegalDialect<mlir::AffineDialect>();
@@ -179,11 +177,7 @@ void LoweringPass::runOnOperation() {
 } // namespace
 
 std::unique_ptr<mlir::Pass> createLowerPXAToAffinePass() {
-  return std::make_unique<LoweringPass>();
+  return std::make_unique<LowerPXAToAffinePass>();
 }
-
-static mlir::PassRegistration<LoweringPass>
-    legalize_pass("convert-pxa-to-affine",
-                  "Convert from PXA dialect to Affine dialect");
 
 } // namespace pmlc::conversion::pxa_to_affine

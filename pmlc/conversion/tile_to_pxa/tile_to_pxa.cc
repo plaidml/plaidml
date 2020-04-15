@@ -1,7 +1,5 @@
 // Copyright 2020, Intel Corporation
 
-#include "pmlc/conversion/tile_to_pxa/tile_to_pxa.h"
-
 #include <utility>
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -12,6 +10,7 @@
 #include "mlir/Support/DebugStringHelper.h"
 #include "mlir/Transforms/DialectConversion.h"
 
+#include "pmlc/conversion/tile_to_pxa/pass_detail.h"
 #include "pmlc/dialect/eltwise/ir/dialect.h"
 #include "pmlc/dialect/eltwise/ir/ops.h"
 #include "pmlc/dialect/pxa/ir/dialect.h"
@@ -874,9 +873,7 @@ struct TraceOpConversion : public OpConversionPattern<TraceOp> {
   }
 };
 
-struct LoweringPass
-    : public mlir::PassWrapper<LoweringPass,
-                               mlir::OperationPass<mlir::ModuleOp>> {
+struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
   void runOnOperation() final {
     // Set up target (i.e. what is legal)
     mlir::ConversionTarget target(getContext());
@@ -1015,10 +1012,7 @@ struct LoweringPass
 } // namespace
 
 std::unique_ptr<mlir::Pass> createLowerTileToPXAPass() {
-  return std::make_unique<LoweringPass>();
+  return std::make_unique<LowerTileToPXAPass>();
 }
-
-static mlir::PassRegistration<LoweringPass>
-    legalize_pass("convert-tile-to-pxa", "Convert Tile dialect to PXA dialect");
 
 } // namespace pmlc::conversion::tile_to_pxa

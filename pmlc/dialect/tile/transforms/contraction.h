@@ -72,9 +72,4 @@ private:
 
 math::Affine Integerize(const IndexPoly &poly, const math::IndexBounds &bounds);
 
-struct ComputeBoundsPass
-    : public mlir::PassWrapper<ComputeBoundsPass, mlir::FunctionPass> {
-  void runOnFunction() final;
-};
-
 } // namespace pmlc::dialect::tile

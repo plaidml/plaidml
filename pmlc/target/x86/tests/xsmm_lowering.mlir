@@ -1,4 +1,4 @@
-// RUN: pmlc-opt -xsmm -split-input-file -canonicalize %s | FileCheck %s
+// RUN: pmlc-opt -x86-xsmm -split-input-file -canonicalize %s | FileCheck %s
 
 #id_map = affine_map<(i, j) -> (i, j)>
 

@@ -1,7 +1,5 @@
 // Copyright 2020, Intel Corporation
 
-#include "pmlc/conversion/stdx_to_llvm/stdx_to_llvm.h"
-
 #include "mlir/ADT/TypeSwitch.h"
 #include "mlir/Conversion/LoopToStandard/ConvertLoopToStandard.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
@@ -11,6 +9,8 @@
 #include "mlir/IR/AffineMap.h"
 #include "mlir/Pass/Pass.h"
 
+#include "pmlc/conversion/stdx_to_llvm/pass_detail.h"
+#include "pmlc/conversion/stdx_to_llvm/passes.h"
 #include "pmlc/dialect/stdx/ir/ops.h"
 
 using namespace mlir; // NOLINT[build/namespaces]
@@ -100,11 +100,9 @@ struct FPToUILowering : public LLVMLegalizationPattern<stdx::FPToUIOp> {
 };
 
 /// A pass converting MLIR operations into the LLVM IR dialect.
-struct LLVMLoweringPass
-    : public mlir::PassWrapper<LLVMLoweringPass,
-                               mlir::OperationPass<mlir::ModuleOp>> {
+struct LowerToLLVMPass : public LowerToLLVMBase<LowerToLLVMPass> {
   // Run the dialect converter on the module.
-  void runOnOperation() override {
+  void runOnOperation() final {
     ModuleOp module = getOperation();
     auto context = module.getContext();
     LLVMTypeConverter typeConverter(context);
@@ -123,9 +121,6 @@ struct LLVMLoweringPass
   }
 };
 
-static PassRegistration<LLVMLoweringPass>
-    pass("convert-stdx-to-llvm", "Convert stdx to the LLVM dialect");
-
 } // namespace
 
 void populateStdXToLLVMConversionPatterns(LLVMTypeConverter &converter,
@@ -135,7 +130,7 @@ void populateStdXToLLVMConversionPatterns(LLVMTypeConverter &converter,
 }
 
 std::unique_ptr<mlir::Pass> createLowerToLLVMPass() {
-  return std::make_unique<LLVMLoweringPass>();
+  return std::make_unique<LowerToLLVMPass>();
 }
 
 } // namespace pmlc::conversion::stdx_to_llvm

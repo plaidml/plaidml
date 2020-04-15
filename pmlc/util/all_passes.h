@@ -29,6 +29,14 @@
 #include "mlir/Transforms/ViewOpGraph.h"
 #include "mlir/Transforms/ViewRegionGraph.h"
 
+#include "pmlc/conversion/pxa_to_affine/passes.h"
+#include "pmlc/conversion/stdx_to_llvm/passes.h"
+#include "pmlc/conversion/tile_to_pxa/passes.h"
+#include "pmlc/dialect/pxa/transforms/passes.h"
+#include "pmlc/dialect/stdx/transforms/passes.h"
+#include "pmlc/dialect/tile/transforms/passes.h"
+#include "pmlc/target/x86/passes.h"
+
 namespace mlir {
 
 // This function may be called to register the MLIR passes with the
@@ -39,6 +47,10 @@ namespace mlir {
 // individual passes.
 // The global registry is interesting to interact with the command-line tools.
 inline void registerAllPasses() {
+  //
+  // MLIR Core
+  //
+
   // Init general passes
 #define GEN_PASS_REGISTRATION
 #include "mlir/Transforms/Passes.h.inc"
@@ -74,6 +86,38 @@ inline void registerAllPasses() {
   // SPIR-V
 #define GEN_PASS_REGISTRATION
 #include "mlir/Dialect/SPIRV/Passes.h.inc"
+
+  //
+  // PMLC
+  //
+
+  // Conversion: pxa_to_affine
+#define GEN_PASS_REGISTRATION
+#include "pmlc/conversion/pxa_to_affine/passes.h.inc"
+
+  // Conversion: stdx_to_llvm
+#define GEN_PASS_REGISTRATION
+#include "pmlc/conversion/stdx_to_llvm/passes.h.inc"
+
+  // Conversion: tile_to_pxa
+#define GEN_PASS_REGISTRATION
+#include "pmlc/conversion/tile_to_pxa/passes.h.inc"
+
+  // Dialect: pxa
+#define GEN_PASS_REGISTRATION
+#include "pmlc/dialect/pxa/transforms/passes.h.inc"
+
+  // Dialect: stdx
+#define GEN_PASS_REGISTRATION
+#include "pmlc/dialect/stdx/transforms/passes.h.inc"
+
+  // Dialect: tile
+#define GEN_PASS_REGISTRATION
+#include "pmlc/dialect/tile/transforms/passes.h.inc"
+
+  // Target: x86
+#define GEN_PASS_REGISTRATION
+#include "pmlc/target/x86/passes.h.inc"
 }
 
 } // namespace mlir

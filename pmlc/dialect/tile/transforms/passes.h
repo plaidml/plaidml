@@ -16,12 +16,10 @@ class ContractionOp;
 
 std::unique_ptr<mlir::Pass> createComputeBoundsPass();
 
+std::unique_ptr<mlir::Pass> createConstantTypesPass();
+
 std::unique_ptr<mlir::Pass> createConstantTypesPass(mlir::Type concreteFloat,
                                                     mlir::Type concreteInt);
-
-struct PadPass : public mlir::PassWrapper<PadPass, mlir::FunctionPass> {
-  void runOnFunction() final;
-};
 
 std::unique_ptr<mlir::Pass> createPadPass();
 
