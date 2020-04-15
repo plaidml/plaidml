@@ -49,8 +49,7 @@ plaidml_cc_library(
         "//pmlc/dialect/tile",
         "//pmlc/dialect/xsmm",
         "//pmlc/target/x86",
-        "@llvm-project//mlir:AVX512",
-        "@llvm-project//mlir:AVX512ToLLVM",
+        "@llvm-project//mlir:AllPassesAndDialectsNoRegistration",
     ],
 )
 
