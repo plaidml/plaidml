@@ -3,13 +3,33 @@
 package(default_visibility = ["//visibility:public"])
 
 load("//bzl:plaidml.bzl", "plaidml_cc_library")
+load("//vendor/mlir:tblgen.bzl", "gentbl")
+
+gentbl(
+    name = "gen-pass",
+    tbl_outs = [
+        (
+            "-gen-pass-decls",
+            "passes.h.inc",
+        ),
+    ],
+    td_file = "passes.td",
+    td_srcs = [
+        "@llvm-project//mlir:PassBaseTdFiles",
+    ],
+)
 
 plaidml_cc_library(
     name = "pxa_to_affine",
-    srcs = glob(["*.cc"]),
-    hdrs = glob(["*.h"]),
+    srcs = [
+        "pass_detail.h",
+        "pxa_to_affine.cc",
+    ],
+    hdrs = [
+        "passes.h",
+    ],
     deps = [
+        ":gen-pass",
         "//pmlc/dialect/pxa/ir",
     ],
-    alwayslink = 1,
 )

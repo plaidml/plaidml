@@ -11,7 +11,7 @@
 
 #include "mlir/IR/StandardTypes.h"
 
-#include "pmlc/compiler/compiler.h"
+#include "pmlc/compiler/program.h"
 #include "pmlc/util/enums.h"
 
 namespace mlir {

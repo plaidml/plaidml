@@ -2,6 +2,8 @@
 
 #include "pmlc/dialect/pxa/transforms/autotile.h"
 
+#include "pmlc/dialect/pxa/transforms/pass_detail.h"
+
 namespace pmlc::dialect::pxa {
 
 std::vector<int64_t> PowerOfTwoGenerator::operator()(int64_t range) {
@@ -24,6 +26,28 @@ std::vector<int64_t> EvenTilingGenerator::operator()(int64_t range) {
     out.push_back(r);
   }
   return out;
+}
+
+struct AutoTileExamplePass : public AutoTileExampleBase<AutoTileExamplePass> {
+  void runOnFunction() final {
+    auto func = getFunction();
+    FixedTileSizeGenerator always10(10);
+    func.walk([&](mlir::AffineParallelOp op) {
+      auto ranges = op.getConstantRanges();
+      if (!ranges) {
+        return;
+      }
+      auto tileSize = findBestTileSize(always10, DummyCostModel, *ranges);
+      if (tileSize.empty()) {
+        return;
+      }
+      performTiling(op, tileSize);
+    });
+  }
+};
+
+std::unique_ptr<mlir::Pass> createAutoTileExamplePass() {
+  return std::make_unique<AutoTileExamplePass>();
 }
 
 } // namespace pmlc::dialect::pxa

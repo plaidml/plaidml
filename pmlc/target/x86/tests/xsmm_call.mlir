@@ -1,14 +1,14 @@
 // RUN: pmlc-opt -convert-linalg-to-loops -convert-pxa-to-affine -lower-affine \
-// RUN:     -convert-loop-to-std -xsmm -convert-std-to-llvm %s | \
+// RUN:     -convert-loop-to-std -x86-xsmm -convert-std-to-llvm %s | \
 // RUN:   pmlc-jit -e baseline -entry-point-result=void | FileCheck %s
 // RUN: pmlc-opt -convert-linalg-to-loops -convert-pxa-to-affine -lower-affine \
-// RUN:     -convert-loop-to-std -xsmm -convert-std-to-llvm %s | \
+// RUN:     -convert-loop-to-std -x86-xsmm -convert-std-to-llvm %s | \
 // RUN:   pmlc-jit -e tiled -entry-point-result=void | FileCheck %s
 // RUN: pmlc-opt -convert-linalg-to-loops -convert-pxa-to-affine -lower-affine \
-// RUN:     -convert-loop-to-std -xsmm -convert-std-to-llvm %s | \
+// RUN:     -convert-loop-to-std -x86-xsmm -convert-std-to-llvm %s | \
 // RUN:   pmlc-jit -e xsmm_call -entry-point-result=void | FileCheck %s
 // RUN: pmlc-opt -convert-linalg-to-loops -convert-pxa-to-affine -lower-affine \
-// RUN:     -convert-loop-to-std -xsmm -convert-std-to-llvm %s | \
+// RUN:     -convert-loop-to-std -x86-xsmm -convert-std-to-llvm %s | \
 // RUN:   pmlc-jit -e xsmm_op -entry-point-result=void | FileCheck %s
 
 !I_memref = type memref<1x6x5x7xf32>

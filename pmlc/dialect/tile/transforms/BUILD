@@ -3,25 +3,19 @@
 package(default_visibility = ["//visibility:public"])
 
 load("//bzl:plaidml.bzl", "plaidml_cc_library")
+load("//vendor/mlir:tblgen.bzl", "gentbl")
 
-plaidml_cc_library(
-    name = "lib",
-    srcs = [
-        "contraction.cc",
-        "padding.cc",
+gentbl(
+    name = "gen-pass",
+    tbl_outs = [
+        (
+            "-gen-pass-decls",
+            "passes.h.inc",
+        ),
     ],
-    hdrs = [
-        "contraction.h",
-        "padding.h",
-        "passes.h",
-    ],
-    deps = [
-        "//pmlc/dialect/tile/ir",
-        "//pmlc/util",
-        "//pmlc/util/bilp",
-        "//pmlc/util/math",
-        "@llvm-project//llvm:support",
-        "@llvm-project//mlir:IR",
+    td_file = "passes.td",
+    td_srcs = [
+        "@llvm-project//mlir:PassBaseTdFiles",
     ],
 )
 
@@ -29,8 +23,22 @@ plaidml_cc_library(
     name = "transforms",
     srcs = [
         "constant_types.cc",
-        "registration.cc",
+        "contraction.cc",
+        "padding.cc",
+        "pass_detail.h",
     ],
-    deps = [":lib"],
-    alwayslink = 1,
+    hdrs = [
+        "contraction.h",
+        "padding.h",
+        "passes.h",
+    ],
+    deps = [
+        ":gen-pass",
+        "//pmlc/dialect/tile/ir",
+        "//pmlc/util",
+        "//pmlc/util/bilp",
+        "//pmlc/util/math",
+        "@llvm-project//llvm:support",
+        "@llvm-project//mlir:IR",
+    ],
 )

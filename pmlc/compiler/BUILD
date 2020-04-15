@@ -10,18 +10,7 @@ plaidml_cc_library(
     hdrs = glob(["*.h"]),
     deps = [
         "//pmlc/util",
-        "@llvm-project//llvm:support",
-        "@llvm-project//mlir:AVX512",
-        "@llvm-project//mlir:AVX512ToLLVM",
-        "@llvm-project//mlir:AffineToStandardTransforms",
         "@llvm-project//mlir:ExecutionEngine",
         "@llvm-project//mlir:ExecutionEngineUtils",
-        "@llvm-project//mlir:GPUToVulkanTransforms",
-        "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:LLVMTransforms",
-        "@llvm-project//mlir:LoopsToGPUPass",
-        "@llvm-project//mlir:MlirOptLib",
-        "@llvm-project//mlir:OpenMPDialect",
-        "@llvm-project//mlir:QuantOps",
     ],
 )

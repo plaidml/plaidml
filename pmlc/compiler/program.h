@@ -11,13 +11,7 @@
 
 #include "pmlc/util/buffer.h"
 
-namespace mlir {
-class ExecutionEngine;
-} // namespace mlir
-
 namespace pmlc::compiler {
-
-class MemRefDescriptor;
 
 struct ProgramArgument {
   bool isInput;
@@ -43,25 +37,6 @@ struct Program {
   explicit Program(mlir::StringRef source);
 
   void compile(mlir::StringRef target, bool collectPasses = false);
-
-  static void initialize();
-};
-
-class Executable {
-public:
-  Executable(const std::shared_ptr<Program> &program,
-             mlir::ArrayRef<void *> bufptrs);
-  ~Executable();
-
-  void invoke();
-
-  static void initialize();
-
-private:
-  std::shared_ptr<Program> program;
-  std::unique_ptr<mlir::ExecutionEngine> engine;
-  std::vector<MemRefDescriptor> descriptors;
-  std::vector<void *> ptrs;
 };
 
 } // namespace pmlc::compiler
