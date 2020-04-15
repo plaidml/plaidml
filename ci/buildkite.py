@@ -90,11 +90,13 @@ def cmd_pipeline(args, remainder):
 
     variants = []
     for variant in plan['VARIANTS'].keys():
-        variants.append(dict(
-            name=variant,
-            python=get_python(variant),
-            emoji=get_emoji(variant),
-        ))
+        variants.append(
+            dict(
+                name=variant,
+                python=get_python(variant),
+                emoji=get_emoji(variant),
+                artifacts='dbg' not in variant,
+            ))
 
     tests = []
     for test in util.iterate_tests(plan, args.pipeline):
@@ -119,7 +121,6 @@ def cmd_pipeline(args, remainder):
                 shard_emoji=shard_emoji,
                 emoji=get_emoji(test.variant),
                 engine=get_engine(test.platform_name),
-                artifacts='dbg' not in variant,
             ))
 
     if args.count:
@@ -191,7 +192,8 @@ def cmd_build(args, remainder):
             if item.name.endswith('.whl'):
                 wheels.append(item)
         tar.extractall('tmp', members=wheels)
-    util.buildkite_upload('*.whl', cwd='tmp')
+    if 'dbg' not in args.variant:
+        util.buildkite_upload('*.whl', cwd='tmp')
 
     variant_dir = os.path.join('tmp', 'build', args.variant)
     os.makedirs(variant_dir)
