@@ -70,6 +70,7 @@ protected: // TODO: private backend for some of this?
                          ArrayRef<int64_t> tileSize) = 0;
   virtual void transform(TensorAndIndexPermutation perm,
                          ArrayRef<int64_t> tileSize) = 0;
+  int64_t getIdxRange(mlir::BlockArgument idx);
 
   // The number of indexes whose semantics must be considered in the tiling
   unsigned semanticIdxCount; // TODO: how/where to initialize?

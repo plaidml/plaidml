@@ -98,9 +98,21 @@ private:
   }
 
   double getCost(TensorAndIndexPermutation perm, ArrayRef<int64_t> tileSize) {
-    // TODO: This is random garbage just to make some sort of test run (and
-    // presumably fail)
-    return 3;
+    // TODO This is a fake cost function.
+    // First, cap total tile size:
+    int64_t totalTileSize = 1;
+    for (auto sz : tileSize) {
+      totalTileSize *= sz;
+    }
+    if (totalTileSize > 1024) {
+      return std::numeric_limits<double>::infinity();
+    }
+    // Next, fewest tiles:
+    int64_t tiles = 1;
+    for (unsigned i = 0; i < semanticIdxCount; i++) {
+      tiles *= ((getIdxRange(perm.indexes[i]) - 1) / tileSize[i]) + 1;
+    }
+    return tiles;
   }
 
   void transform(TensorAndIndexPermutation perm, ArrayRef<int64_t> tileSize) {
@@ -226,25 +238,6 @@ public:
                else
                  return false;
              }},
-            // TODO: Define `stride_of`...
-            // {{0, 0}, [](mlir::Value v, mlir::BlockArgument a){ return
-            // stride_of(v, a) != 0 }},
-            // {{0, 1}, [](mlir::Value v, mlir::BlockArgument a){ return
-            // stride_of(v, a) == 0 }},
-            // {{0, 2}, [](mlir::Value v, mlir::BlockArgument a){ return
-            // stride_of(v, a) == 1 }},
-            // {{1, 0}, [](mlir::Value v, mlir::BlockArgument a){ return
-            // stride_of(v, a) == 0 }},
-            // {{1, 1}, [](mlir::Value v, mlir::BlockArgument a){ return
-            // stride_of(v, a) == 1 }},
-            // {{1, 2}, [](mlir::Value v, mlir::BlockArgument a){ return
-            // stride_of(v, a) != 0 }},
-            // {{2, 0}, [](mlir::Value v, mlir::BlockArgument a){ return
-            // stride_of(v, a) != 0 }},
-            // {{2, 1}, [](mlir::Value v, mlir::BlockArgument a){ return
-            // stride_of(v, a) == 1 }},
-            // {{2, 2}, [](mlir::Value v, mlir::BlockArgument a){ return
-            // stride_of(v, a) == 0 }},
         };
     tilingGenerators.push_back(PowerOfTwoGenerator());
     tilingGenerators.push_back(PowerOfTwoGenerator());
@@ -259,8 +252,8 @@ struct XSMMStencilPass : public mlir::FunctionPass<XSMMStencilPass> {
 
   void runOnFunction() final {
     auto func = getFunction();
-    func.walk([/*this*/](mlir::AffineParallelOp
-                             op) { // TODO: Use `this` once pass has parameters
+    // TODO: Capture `this` once pass has parameters
+    func.walk([/*this*/](mlir::AffineParallelOp op) {
       StencilXSMM stencil(op);
       stencil.DoStenciling();
     });

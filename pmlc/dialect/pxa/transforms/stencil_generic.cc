@@ -68,6 +68,11 @@ void swap(Orderer<V> &v1, Orderer<V> &v2) {
 
 } // namespace
 
+int64_t StencilGeneric::getIdxRange(mlir::BlockArgument idx) {
+  assert(idx.getArgNumber() < ranges.size());
+  return ranges[idx.getArgNumber()];
+}
+
 void StencilGeneric::BindIndexes(
     const llvm::SmallVector<mlir::Operation *, 3> &tensors) {
   llvm::SmallVector<mlir::BlockArgument, 8> emptyBoundIdxsVector;
@@ -203,6 +208,7 @@ void StencilGeneric::DoStenciling() {
   //       std::next_permutation(lastLoadFirstStoreIt, orderableTensors.end()));
   // } while (
   //     std::next_permutation(orderableTensors.begin(), lastLoadFirstStoreIt));
+
   llvm::SmallVector<mlir::Operation *, 3> tensors;
   for (auto &loadOp : loadsAndStores.loads) {
     tensors.push_back(loadOp);
