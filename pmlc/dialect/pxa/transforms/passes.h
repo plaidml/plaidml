@@ -30,4 +30,7 @@ std::unique_ptr<mlir::Pass> createTestStrideInfoPass();
 
 std::unique_ptr<mlir::Pass> createXSMMStencilPass();
 
+// TODO: Merge up
+std::unique_ptr<mlir::Pass> createNewXSMMStencilPass();
+
 } // namespace pmlc::dialect::pxa

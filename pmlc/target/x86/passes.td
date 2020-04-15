@@ -18,4 +18,10 @@ def XSMMStencil : FunctionPass<"x86-affine-stencil-xsmm"> {
   let constructor = "pmlc::target::x86::createXSMMStencilPass()";
 }
 
+// TODO: Merge up when done
+def NewXSMMStencil : FunctionPass<"new-affine-stencil-xsmm"> {
+  let summary = "Find a tiling for extracting 'micro' GEMMs suitable for XSMM";
+  let constructor = "pmlc::target::x86::createNewXSMMStencilPass()";
+}
+
 #endif // __PMLC_TARGET_X86_PASSES__

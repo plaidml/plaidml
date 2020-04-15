@@ -17,7 +17,6 @@
 #include "pmlc/dialect/pxa/analysis/strides.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/dialect/pxa/transforms/passes.h"
-#include "pmlc/dialect/tile/ir/ops.h"
 
 #include "pmlc/util/logging.h"
 #include "pmlc/util/util.h"
@@ -245,7 +244,8 @@ public:
   }
 };
 
-struct XSMMStencilPass : public mlir::FunctionPass<XSMMStencilPass> {
+struct XSMMStencilPass
+    : public mlir::PassWrapper<XSMMStencilPass, mlir::FunctionPass> {
   // I probably actually need config for requirements & tilingGenerators
 
   XSMMStencilPass() {}
@@ -260,7 +260,7 @@ struct XSMMStencilPass : public mlir::FunctionPass<XSMMStencilPass> {
   }
 };
 
-std::unique_ptr<mlir::Pass> createXSMMStencilPass() {
+std::unique_ptr<mlir::Pass> createNewXSMMStencilPass() {
   return std::make_unique<XSMMStencilPass>();
 }
 

@@ -13,7 +13,6 @@
 #include "pmlc/dialect/pxa/analysis/strides.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/dialect/pxa/transforms/passes.h"
-#include "pmlc/dialect/tile/ir/ops.h"
 
 #include "pmlc/util/logging.h"
 #include "pmlc/util/util.h"

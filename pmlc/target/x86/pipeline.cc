@@ -35,7 +35,7 @@ std::unique_ptr<Pass> createXSMMStencilPass() {
 
 // TODO: Merge up when ready
 std::unique_ptr<Pass> createNewXSMMStencilPass() {
-  return pmlc::dialect::pxa::createXSMMStencilPass();
+  return pmlc::dialect::pxa::createNewXSMMStencilPass();
 }
 
 namespace {
