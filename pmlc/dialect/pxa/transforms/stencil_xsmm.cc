@@ -109,7 +109,7 @@ private:
     // Next, fewest tiles:
     int64_t tiles = 1;
     for (unsigned i = 0; i < semanticIdxCount; i++) {
-      tiles *= ((getIdxRange(perm.indexes[i]) - 1) / tileSize[i]) + 1;
+      tiles *= llvm::divideCeil(getIdxRange(perm.indexes[i]), tileSize[i]);
     }
     return tiles;
   }
@@ -138,104 +138,40 @@ public:
         std::map<std::pair<int64_t, int64_t>,
                  std::function<bool(mlir::Operation *, mlir::BlockArgument)>>{
             {{0, 0},
-             [](mlir::Operation *rawOp, mlir::BlockArgument a) {
-               auto loadOp = llvm::dyn_cast<mlir::AffineLoadOp>(*rawOp);
-
-               if (!loadOp) {
-                 //  IVLOG(3, "Not a load");
-                 return false;
-               }
-               //  auto loadOpResult = loadOp.getResult(); // TODO
-               //  IVLOG(3, "The loadOp is " <<
-               //  mlir::debugString(loadOpResult));
-
-               if (computeStrideInfo(loadOp)->strides[a] != 0) {
-                 //  IVLOG(4, "[0, 0] Cool, got a true (!=0)");
-                 return true;
-               } else {
-                 //  IVLOG(4, "Welp, got a false (==0)");
-                 return false;
-               }
+             [this](mlir::Operation *rawOp, mlir::BlockArgument a) {
+               return getStrideInfo(rawOp)->strides[a] != 0;
              }},
             {{0, 1},
-             [](mlir::Operation *rawOp, mlir::BlockArgument a) {
-               auto loadOp = llvm::dyn_cast<mlir::AffineLoadOp>(*rawOp);
-               if (!loadOp)
-                 return false;
-               if (computeStrideInfo(loadOp)->strides[a] == 0)
-                 return true;
-               else
-                 return false;
+             [this](mlir::Operation *rawOp, mlir::BlockArgument a) {
+               return getStrideInfo(rawOp)->strides[a] == 0;
              }},
             {{0, 2},
-             [](mlir::Operation *rawOp, mlir::BlockArgument a) {
-               auto loadOp = llvm::dyn_cast<mlir::AffineLoadOp>(*rawOp);
-               if (!loadOp)
-                 return false;
-               if (computeStrideInfo(loadOp)->strides[a] == 1)
-                 return true;
-               else
-                 return false;
+             [this](mlir::Operation *rawOp, mlir::BlockArgument a) {
+               return getStrideInfo(rawOp)->strides[a] == 1;
              }},
             {{1, 0},
-             [](mlir::Operation *rawOp, mlir::BlockArgument a) {
-               auto loadOp = llvm::dyn_cast<mlir::AffineLoadOp>(*rawOp);
-               if (!loadOp)
-                 return false;
-               if (computeStrideInfo(loadOp)->strides[a] == 0)
-                 return true;
-               else
-                 return false;
+             [this](mlir::Operation *rawOp, mlir::BlockArgument a) {
+               return getStrideInfo(rawOp)->strides[a] == 0;
              }},
             {{1, 1},
-             [](mlir::Operation *rawOp, mlir::BlockArgument a) {
-               auto loadOp = llvm::dyn_cast<mlir::AffineLoadOp>(*rawOp);
-               if (!loadOp)
-                 return false;
-               if (computeStrideInfo(loadOp)->strides[a] == 1)
-                 return true;
-               else
-                 return false;
+             [this](mlir::Operation *rawOp, mlir::BlockArgument a) {
+               return getStrideInfo(rawOp)->strides[a] == 1;
              }},
             {{1, 2},
-             [](mlir::Operation *rawOp, mlir::BlockArgument a) {
-               auto loadOp = llvm::dyn_cast<mlir::AffineLoadOp>(*rawOp);
-               if (!loadOp)
-                 return false;
-               if (computeStrideInfo(loadOp)->strides[a] != 0)
-                 return true;
-               else
-                 return false;
+             [this](mlir::Operation *rawOp, mlir::BlockArgument a) {
+               return getStrideInfo(rawOp)->strides[a] != 0;
              }},
             {{2, 0},
-             [](mlir::Operation *rawOp, mlir::BlockArgument a) {
-               auto reduceOp = llvm::dyn_cast<AffineReduceOp>(*rawOp);
-               if (!reduceOp)
-                 return false;
-               if (computeStrideInfo(reduceOp)->strides[a] != 0)
-                 return true;
-               else
-                 return false;
+             [this](mlir::Operation *rawOp, mlir::BlockArgument a) {
+               return getStrideInfo(rawOp)->strides[a] != 0;
              }},
             {{2, 1},
-             [](mlir::Operation *rawOp, mlir::BlockArgument a) {
-               auto reduceOp = llvm::dyn_cast<AffineReduceOp>(*rawOp);
-               if (!reduceOp)
-                 return false;
-               if (computeStrideInfo(reduceOp)->strides[a] == 1)
-                 return true;
-               else
-                 return false;
+             [this](mlir::Operation *rawOp, mlir::BlockArgument a) {
+               return getStrideInfo(rawOp)->strides[a] == 1;
              }},
             {{2, 2},
-             [](mlir::Operation *rawOp, mlir::BlockArgument a) {
-               auto reduceOp = llvm::dyn_cast<AffineReduceOp>(*rawOp);
-               if (!reduceOp)
-                 return false;
-               if (computeStrideInfo(reduceOp)->strides[a] == 0)
-                 return true;
-               else
-                 return false;
+             [this](mlir::Operation *rawOp, mlir::BlockArgument a) {
+               return getStrideInfo(rawOp)->strides[a] == 0;
              }},
         };
     tilingGenerators.push_back(PowerOfTwoGenerator());

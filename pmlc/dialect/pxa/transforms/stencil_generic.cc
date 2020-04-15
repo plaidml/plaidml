@@ -72,6 +72,36 @@ int64_t StencilGeneric::getIdxRange(mlir::BlockArgument idx) {
   return ranges[idx.getArgNumber()];
 }
 
+mlir::Optional<mlir::StrideInfo>
+StencilGeneric::getStrideInfo(mlir::Operation *op) {
+  auto cached = strideInfoCache.find(op);
+  if (cached != strideInfoCache.end()) {
+    return cached->second;
+  }
+  auto loadOp = llvm::dyn_cast<mlir::AffineLoadOp>(*op);
+  if (loadOp) {
+    auto strideInfo = computeStrideInfo(loadOp);
+    if (strideInfo.hasValue())
+      strideInfoCache.emplace(std::make_pair(op, strideInfo.getValue()));
+    return strideInfo;
+  }
+  auto storeOp = llvm::dyn_cast<mlir::AffineStoreOp>(*op);
+  if (storeOp) {
+    auto strideInfo = computeStrideInfo(storeOp);
+    if (strideInfo.hasValue())
+      strideInfoCache.emplace(std::make_pair(op, strideInfo.getValue()));
+    return strideInfo;
+  }
+  auto reduceOp = llvm::dyn_cast<AffineReduceOp>(*op);
+  if (reduceOp) {
+    auto strideInfo = computeStrideInfo(reduceOp);
+    if (strideInfo.hasValue())
+      strideInfoCache.emplace(std::make_pair(op, strideInfo.getValue()));
+    return strideInfo;
+  }
+  return llvm::None;
+}
+
 void StencilGeneric::BindIndexes(
     const llvm::SmallVector<mlir::Operation *, 3> &tensors) {
   llvm::SmallVector<mlir::BlockArgument, 8> emptyBoundIdxsVector;

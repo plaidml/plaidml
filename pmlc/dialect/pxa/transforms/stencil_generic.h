@@ -70,6 +70,10 @@ protected: // TODO: private backend for some of this?
   virtual void transform(TensorAndIndexPermutation perm,
                          ArrayRef<int64_t> tileSize) = 0;
   int64_t getIdxRange(mlir::BlockArgument idx);
+  mlir::Optional<mlir::StrideInfo> getStrideInfo(mlir::Operation *op);
+
+  // Cache of StrideInfo results
+  std::map<mlir::Operation *, mlir::StrideInfo> strideInfoCache;
 
   // The number of indexes whose semantics must be considered in the tiling
   unsigned semanticIdxCount; // TODO: how/where to initialize?
