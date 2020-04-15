@@ -5,6 +5,7 @@
 #include "mlir/Analysis/AffineStructures.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/IR/AffineExpr.h"
+#include "mlir/IR/Dialect.h"
 
 #include "pmlc/util/enums.h"
 
@@ -55,5 +56,7 @@ namespace OpTrait = mlir::OpTrait;
 
 #define GET_OP_CLASSES
 #include "pmlc/dialect/pxa/ir/ops.h.inc"
+
+#include "pmlc/dialect/pxa/ir/dialect.h.inc"
 
 } // namespace pmlc::dialect::pxa

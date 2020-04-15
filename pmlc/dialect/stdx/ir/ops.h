@@ -3,6 +3,7 @@
 #pragma once
 
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/Dialect.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/Interfaces/SideEffects.h"
@@ -37,5 +38,7 @@ namespace SideEffects = mlir::SideEffects;
 
 #define GET_OP_CLASSES
 #include "pmlc/dialect/stdx/ir/ops.h.inc"
+
+#include "pmlc/dialect/stdx/ir/dialect.h.inc"
 
 } // namespace pmlc::dialect::stdx

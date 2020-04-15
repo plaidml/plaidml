@@ -10,7 +10,6 @@
 #include "mlir/Transforms/DialectConversion.h"
 
 #include "pmlc/dialect/pxa/analysis/strides.h"
-#include "pmlc/dialect/xsmm/ir/dialect.h"
 #include "pmlc/dialect/xsmm/ir/ops.h"
 #include "pmlc/target/x86/pass_detail.h"
 #include "pmlc/util/logging.h"
@@ -158,7 +157,7 @@ class LowerXSMMPass : public XSMMLoweringBase<LowerXSMMPass> {
     patterns.insert<XSMMGemmLowering>(&getContext());
     ConversionTarget target(getContext());
     target.addLegalDialect<AffineDialect, StandardOpsDialect>();
-    target.addIllegalDialect<xsmm::Dialect>();
+    target.addIllegalDialect<xsmm::XSMMDialect>();
     if (failed(applyPartialConversion(getFunction(), target, patterns)))
       signalPassFailure();
   }

@@ -8,7 +8,6 @@
 #include "mlir/Transforms/DialectConversion.h"
 
 #include "pmlc/conversion/pxa_to_affine/pass_detail.h"
-#include "pmlc/dialect/pxa/ir/dialect.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/util/logging.h"
 #include "pmlc/util/util.h"
@@ -156,7 +155,7 @@ void LowerPXAToAffinePass::runOnOperation() {
   mlir::ConversionTarget target(getContext());
   target.addLegalDialect<mlir::AffineDialect>();
   target.addLegalDialect<mlir::StandardOpsDialect>();
-  target.addIllegalDialect<pxa::Dialect>();
+  target.addIllegalDialect<pxa::PXADialect>();
   target.addIllegalOp<AffineParallelOp>();
 
   // Setup rewrite patterns
