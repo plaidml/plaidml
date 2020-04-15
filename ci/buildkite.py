@@ -105,19 +105,22 @@ def cmd_pipeline(args, remainder):
             shard = None
             shard_emoji = ''
         tests.append(
-            dict(suite=test.suite_name,
-                 workload=test.workload_name,
-                 platform=test.platform_name,
-                 batch_size=test.batch_size,
-                 variant=test.variant,
-                 timeout=test.timeout,
-                 retry=test.retry,
-                 soft_fail=test.soft_fail,
-                 python=get_python(test.variant),
-                 shard=shard,
-                 shard_emoji=shard_emoji,
-                 emoji=get_emoji(test.variant),
-                 engine=get_engine(test.platform_name)))
+            dict(
+                suite=test.suite_name,
+                workload=test.workload_name,
+                platform=test.platform_name,
+                batch_size=test.batch_size,
+                variant=test.variant,
+                timeout=test.timeout,
+                retry=test.retry,
+                soft_fail=test.soft_fail,
+                python=get_python(test.variant),
+                shard=shard,
+                shard_emoji=shard_emoji,
+                emoji=get_emoji(test.variant),
+                engine=get_engine(test.platform_name),
+                artifacts='dbg' not in variant,
+            ))
 
     if args.count:
         util.printf('variants: {}'.format(len(variants)))
