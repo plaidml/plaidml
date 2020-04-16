@@ -153,6 +153,8 @@ SUITES:
           - TestBackendOps.testArgmax
           - TestBackendOps.testShape
           - TestBackendOps.testPassthrough
+          - TestBackendOps.testArgmaxUnequal
+          - TestBackendOps.testArgminUnequal
           - TestBackendOps.testArgmaxWithAxis
           - TestBackendOps.testArgmin
           - TestBackendOps.testArange
@@ -222,6 +224,19 @@ SUITES:
           - TestBackendOps.testConcatenateSymbolic
           - TestBackendOps.testCumSum
           - TestBackendOps.testExpandDims
+          - TestBackendOps.testEqual
+          - TestBackendOps.testEqualVersusNumeric
+          - TestBackendOps.testGreater
+          - TestBackendOps.testGreaterEqual
+          - TestBackendOps.testGreaterEqualVersusNumeric
+          - TestBackendOps.testGreaterVersusNumeric
+          - TestBackendOps.testLess
+          - TestBackendOps.testLessEqual
+          - TestBackendOps.testLessEqualVersusNumeric
+          - TestBackendOps.testLessVersusNumeric
+          - TestBackendOps.testNotEqual
+          - TestBackendOps.testNotEqualVersusNumeric
+          - TestBackendOps.testOneHot
           - TestBackendOps.testOnesLike
           - TestBackendOps.testPermuteDimensions
           - TestBackendOps.testRepeat
