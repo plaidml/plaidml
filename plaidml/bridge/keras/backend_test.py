@@ -587,7 +587,6 @@ class TestBackendOps(unittest.TestCase):
             c / x,
         ]
 
-    @unittest.skip("Failing on llvm.cpu")
     @opTest([[m(2, 3, 2, 4)], [m(1, 1, 2, 1) + 1], [m(1, 2, 3, 1) + 4]], do_grads=False)
     def testAll(self, b, x):
         return [
@@ -597,7 +596,6 @@ class TestBackendOps(unittest.TestCase):
             b.all(x, axis=-1),
         ]
 
-    @unittest.skip("Failing on llvm.cpu")
     @opTest([[m(2, 3, 2, 4)], [m(1, 1, 2, 1) + 1]], do_grads=False)
     def testAny(self, b, x):
         return [
@@ -990,7 +988,6 @@ class TestBackendOps(unittest.TestCase):
         diffs = rand - mean
         return b.mean(b.square(diffs))
 
-    @unittest.skip("Error in calculations of indexes it looks like")
     @opTest([
         _conv_inp(IN=1, IC=16, OC=16, IS=[6, 5], KS=[3, 3]),
     ], 1e-04, skip_theano=True)
@@ -1060,7 +1057,6 @@ class TestBackendOps(unittest.TestCase):
             #b.depthwise_conv2d(im, km, strides=(2, 2), padding='valid', data_format=df, dilation_rate=(2, 2)),  # TF unhappy with strides + dilation
         ]
 
-    @unittest.skip("Failing test with MLIR on llvm.cpu")
     @opTest(
         [
             _conv_inp(IN=1, IC=3, OC=1, IS=[8], KS=[2], data_format='channels_last'),
@@ -1080,7 +1076,7 @@ class TestBackendOps(unittest.TestCase):
             b.conv1d(im, km, padding='causal', dilation_rate=2, data_format=df),
         ]
 
-    @unittest.skip("Failing test with MLIR on llvm.cpu")
+    @unittest.skip("Cull crashing tests")
     @opTest([
         _conv_inp(IN=2, IC=2, OC=4, IS=[4, 7], KS=[3, 3]),
         _conv_inp(IN=3, IC=3, OC=1, IS=[9, 8], KS=[2, 2], data_format='channels_last'),
@@ -1154,7 +1150,6 @@ class TestBackendOps(unittest.TestCase):
             b.conv3d(im, km, padding='valid', dilation_rate=(1, 3, 2), data_format=df),
         ]
 
-    @unittest.skip("Failed test on llvm.cpu")
     @opTest(
         [
             [
