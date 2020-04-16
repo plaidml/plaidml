@@ -1,7 +1,5 @@
 // Copyright 2019, Intel Corporation
 
-#include "pmlc/dialect/eltwise/ir/dialect.h"
-
 #include <utility>
 
 #include "llvm/Support/Debug.h"
@@ -46,7 +44,7 @@ struct OpAsmInterface : public mlir::OpAsmDialectInterface {
 
 } // namespace
 
-Dialect::Dialect(mlir::MLIRContext *ctx)
+EltwiseDialect::EltwiseDialect(mlir::MLIRContext *ctx)
     : mlir::Dialect(getDialectNamespace(), ctx) {
   addOperations<
 #define GET_OP_LIST
@@ -55,17 +53,17 @@ Dialect::Dialect(mlir::MLIRContext *ctx)
   addInterfaces<OpAsmInterface>();
 }
 
-std::string Dialect::getCanonicalOpName(llvm::StringRef name) {
+std::string EltwiseDialect::getCanonicalOpName(llvm::StringRef name) {
   if (name == "cond") {
     name = "select";
   }
   return llvm::formatv("{0}.{1}", getDialectNamespace(), name).str();
 }
 
-mlir::Operation *Dialect::materializeConstant(mlir::OpBuilder &builder,
-                                              mlir::Attribute value,
-                                              mlir::Type type,
-                                              mlir::Location loc) {
+mlir::Operation *EltwiseDialect::materializeConstant(mlir::OpBuilder &builder,
+                                                     mlir::Attribute value,
+                                                     mlir::Type type,
+                                                     mlir::Location loc) {
   IVLOG(5,
         "eltwise::Dialect::materializeConstant> " << mlir::debugString(type));
   return builder.create<ScalarConstantOp>(loc, type, value);

@@ -3,7 +3,7 @@
 package(default_visibility = ["//visibility:public"])
 
 load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_test")
-load("//vendor/mlir:tblgen.bzl", "COPTS", "gentbl")
+load("//vendor/mlir:tblgen.bzl", "gentbl")
 
 filegroup(
     name = "td_files",
@@ -24,34 +24,23 @@ gentbl(
             "-gen-op-defs",
             "ops.cc.inc",
         ),
+        (
+            "-gen-dialect-decls",
+            "dialect.h.inc",
+        ),
     ],
     td_file = "ops.td",
     td_srcs = [":td_files"],
 )
 
 plaidml_cc_library(
-    name = "impl",
-    srcs = [
-        "dialect.cc",
-        "ops.cc",
-    ],
-    hdrs = [
-        "dialect.h",
-        "ops.h",
-    ],
-    copts = COPTS,
+    name = "ir",
+    srcs = ["ops.cc"],
+    hdrs = ["ops.h"],
     deps = [
         ":gen-ops",
         "//pmlc/util",
         "@llvm-project//llvm:support",
-        "@llvm-project//mlir:AffineOps",
+        "@llvm-project//mlir:Affine",
     ],
-)
-
-plaidml_cc_library(
-    name = "ir",
-    srcs = ["registration.cc"],
-    copts = COPTS,
-    deps = [":impl"],
-    alwayslink = 1,
 )

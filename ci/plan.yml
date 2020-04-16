@@ -64,6 +64,13 @@ VARIANTS:
     env:
       PLAIDML_DEVICE: llvm_cpu.0
       PLAIDML_TARGET: llvm_cpu
+  linux_x86_64_dbg:
+    bazel_config: dbg
+    arch: manylinux1_x86_64
+    system: Linux
+    env:
+      PLAIDML_DEVICE: llvm_cpu.0
+      PLAIDML_TARGET: llvm_cpu
   macos_x86_64:
     arch: macosx_10_10_x86_64
     system: Darwin
@@ -146,6 +153,8 @@ SUITES:
           - TestBackendOps.testArgmax
           - TestBackendOps.testShape
           - TestBackendOps.testPassthrough
+          - TestBackendOps.testArgmaxUnequal
+          - TestBackendOps.testArgminUnequal
           - TestBackendOps.testArgmaxWithAxis
           - TestBackendOps.testArgmin
           - TestBackendOps.testArange
@@ -175,10 +184,8 @@ SUITES:
           - TestBackendOps.testSoftsign
           - TestBackendOps.testSoftplus
           - TestBackendOps.testSign
-          - TestBackendOps.testCategoricalCrossentropyGarbageIn
           - TestBackendOps.testExp
           - TestBackendOps.testLog
-          - TestBackendOps.testTanh
           - TestBackendOps.testDepthwiseConv2d
           - TestBackendOps.testReshapeMatchDim
           - TestBackendOps.testZeros
@@ -209,6 +216,43 @@ SUITES:
           - TestBackendOps.fc_1000
           - TestBackendOps.bigMatMul
           - TestBackendOps.testDupOutputs
+          - TestBackendOps.testBatchDot
+          - TestBackendOps.testBatchDot3
+          - TestBackendOps.testCategoricalCrossentropyLogits
+          - TestBackendOps.testClearSession
+          - TestBackendOps.testConcatenate
+          - TestBackendOps.testConcatenateSymbolic
+          - TestBackendOps.testCumSum
+          - TestBackendOps.testExpandDims
+          - TestBackendOps.testEqual
+          - TestBackendOps.testEqualVersusNumeric
+          - TestBackendOps.testGreater
+          - TestBackendOps.testGreaterEqual
+          - TestBackendOps.testGreaterEqualVersusNumeric
+          - TestBackendOps.testGreaterVersusNumeric
+          - TestBackendOps.testLess
+          - TestBackendOps.testLessEqual
+          - TestBackendOps.testLessEqualVersusNumeric
+          - TestBackendOps.testLessVersusNumeric
+          - TestBackendOps.testNotEqual
+          - TestBackendOps.testNotEqualVersusNumeric
+          - TestBackendOps.testOneHot
+          - TestBackendOps.testOnesLike
+          - TestBackendOps.testPermuteDimensions
+          - TestBackendOps.testRepeat
+          - TestBackendOps.testRepeatElements
+          - TestBackendOps.testResizeImages
+          - TestBackendOps.testReverse
+          - TestBackendOps.testSeparableConv2d
+          - TestBackendOps.testSliceEllipsis
+          - TestBackendOps.testSliceMessy
+          - TestBackendOps.testSliceShort
+          - TestBackendOps.testSpatial2DPadding
+          - TestBackendOps.testSpatial3DPadding
+          - TestBackendOps.testStack
+          - TestBackendOps.testTemporalPadding
+          - TestBackendOps.testTile
+          - TestBackendOps.testTranspose
         conda_env: ci/conda/keras_backend_test.yml
         precision: untested
       regression:

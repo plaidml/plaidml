@@ -1,7 +1,5 @@
 // Copyright 2020 Intel Corporation
 
-#include "pmlc/target/x86/xsmm_lowering.h"
-
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
@@ -12,8 +10,8 @@
 #include "mlir/Transforms/DialectConversion.h"
 
 #include "pmlc/dialect/pxa/analysis/strides.h"
-#include "pmlc/dialect/xsmm/ir/dialect.h"
 #include "pmlc/dialect/xsmm/ir/ops.h"
+#include "pmlc/target/x86/pass_detail.h"
 #include "pmlc/util/logging.h"
 
 using namespace mlir; // NOLINT
@@ -153,22 +151,13 @@ public:
   };
 };
 
-} // namespace
-
-void populateXSMMConversionPatterns(OwningRewritePatternList &patterns,
-                                    MLIRContext *ctx) {
-  patterns.insert<XSMMGemmLowering>(ctx);
-}
-
-namespace {
-
-class LowerXSMMPass : public FunctionPass<LowerXSMMPass> {
+class LowerXSMMPass : public XSMMLoweringBase<LowerXSMMPass> {
   void runOnFunction() override {
     OwningRewritePatternList patterns;
-    populateXSMMConversionPatterns(patterns, &getContext());
+    patterns.insert<XSMMGemmLowering>(&getContext());
     ConversionTarget target(getContext());
     target.addLegalDialect<AffineDialect, StandardOpsDialect>();
-    target.addIllegalDialect<xsmm::Dialect>();
+    target.addIllegalDialect<xsmm::XSMMDialect>();
     if (failed(applyPartialConversion(getFunction(), target, patterns)))
       signalPassFailure();
   }
@@ -179,8 +168,5 @@ class LowerXSMMPass : public FunctionPass<LowerXSMMPass> {
 std::unique_ptr<mlir::Pass> createXSMMLoweringPass() {
   return std::make_unique<LowerXSMMPass>();
 }
-
-static PassRegistration<LowerXSMMPass> pass("xsmm",
-                                            "XSMM to standard conversion");
 
 } // namespace pmlc::target::x86

@@ -12,7 +12,9 @@ steps:
     agents:
       PLATFORM: '{{name}}'
     artifact_paths:
+      {{#artifacts}}
       - "tmp/build/**/*"
+      {{/artifacts}}
       - "bazel-testlogs/**/test.log"
 {{/variants}}
 

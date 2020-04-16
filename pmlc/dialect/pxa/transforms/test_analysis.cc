@@ -1,7 +1,5 @@
 // Copyright 2020 Intel Corporation
 
-#include "pmlc/dialect/pxa/transforms/test_analysis.h"
-
 #include <map>
 #include <string>
 
@@ -9,6 +7,7 @@
 #include "llvm/Support/FormatVariadic.h"
 
 #include "pmlc/dialect/pxa/analysis/strides.h"
+#include "pmlc/dialect/pxa/transforms/pass_detail.h"
 
 namespace pmlc::dialect::pxa {
 
@@ -29,14 +28,20 @@ static void printStrideInfo(T op) {
   llvm::outs().flush();
 }
 
-void TestStrideInfoPass::runOnOperation() {
-  auto op = getOperation();
-  op->walk([&](Operation *op) {
-    TypeSwitch<Operation *>(op)
-        .Case<AffineLoadOp>([](auto op) { printStrideInfo(op); })
-        .Case<AffineStoreOp>([](auto op) { printStrideInfo(op); })
-        .Case<AffineReduceOp>([](auto op) { printStrideInfo(op); });
-  });
+struct TestStrideInfoPass : public TestStrideInfoBase<TestStrideInfoPass> {
+  void runOnOperation() final {
+    auto op = getOperation();
+    op->walk([&](Operation *op) {
+      TypeSwitch<Operation *>(op)
+          .Case<AffineLoadOp>([](auto op) { printStrideInfo(op); })
+          .Case<AffineStoreOp>([](auto op) { printStrideInfo(op); })
+          .Case<AffineReduceOp>([](auto op) { printStrideInfo(op); });
+    });
+  }
+};
+
+std::unique_ptr<mlir::Pass> createTestStrideInfoPass() {
+  return std::make_unique<TestStrideInfoPass>();
 }
 
 } // namespace pmlc::dialect::pxa

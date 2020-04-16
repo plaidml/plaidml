@@ -1,7 +1,5 @@
 // Copyright 2020 Intel Corporation
 
-#include "pmlc/target/x86/trace_linking.h"
-
 #include "llvm/Support/FormatVariadic.h"
 
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
@@ -10,6 +8,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassRegistry.h"
 
+#include "pmlc/target/x86/pass_detail.h"
 #include "pmlc/util/logging.h"
 
 using namespace mlir; // NOLINT[build/namespaces]
@@ -18,9 +17,9 @@ namespace pmlc::target::x86 {
 
 namespace {
 
-struct TraceLinkingPass : public ModulePass<TraceLinkingPass> {
-  void runOnModule() override {
-    getModule().walk([](LLVM::LLVMFuncOp op) {
+struct TraceLinkingPass : public TraceLinkingBase<TraceLinkingPass> {
+  void runOnOperation() override {
+    getOperation().walk([](LLVM::LLVMFuncOp op) {
       if (!op.getAttrOfType<UnitAttr>("trace")) {
         return;
       }
@@ -92,9 +91,6 @@ struct TraceLinkingPass : public ModulePass<TraceLinkingPass> {
     return SymbolRefAttr::get(symbol, context);
   }
 };
-
-static PassRegistration<TraceLinkingPass>
-    pass("trace-linking", "Link trace ops to runtime functions");
 
 } // namespace
 

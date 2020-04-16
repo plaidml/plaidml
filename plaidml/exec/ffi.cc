@@ -13,7 +13,7 @@
 #include "llvm/Support/FormatVariadic.h"
 
 #include "plaidml/core/internal.h"
-#include "pmlc/compiler/compiler.h"
+#include "pmlc/compiler/executable.h"
 #include "pmlc/util/env.h"
 #include "pmlc/util/logging.h"
 
@@ -80,12 +80,8 @@ struct plaidml_executable {
 
 void plaidml_exec_init(  //
     plaidml_error* err) {
-  static std::once_flag is_initialized;
-  ffi_wrap_void(err, [&] {
-    std::call_once(is_initialized, []() {
-      IVLOG(1, "plaidml_exec_init");
-      Executable::initialize();
-    });
+  ffi_wrap_void(err, [&] {  //
+    IVLOG(1, "plaidml_exec_init");
   });
 }
 

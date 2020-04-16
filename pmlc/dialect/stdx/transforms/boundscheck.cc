@@ -8,7 +8,7 @@
 #include "mlir/Support/DebugStringHelper.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-#include "pmlc/dialect/stdx/transforms/boundscheck.h"
+#include "pmlc/dialect/stdx/transforms/pass_detail.h"
 #include "pmlc/util/logging.h"
 
 using namespace mlir; // NOLINT
@@ -72,16 +72,18 @@ public:
 
 } // namespace
 
-void BoundsCheckPass::runOnFunction() {
-  auto func = getFunction();
-  func.walk([&](Operation *op) {
-    TypeSwitch<Operation *>(op)
-        .Case<LoadOp>(
-            [](auto op) { BoundsCheckGenerator<LoadOp>::generate(op); })
-        .Case<StoreOp>(
-            [](auto op) { BoundsCheckGenerator<StoreOp>::generate(op); });
-  });
-}
+struct BoundsCheckPass : public BoundsCheckBase<BoundsCheckPass> {
+  void runOnFunction() final {
+    auto func = getFunction();
+    func.walk([&](Operation *op) {
+      TypeSwitch<Operation *>(op)
+          .Case<LoadOp>(
+              [](auto op) { BoundsCheckGenerator<LoadOp>::generate(op); })
+          .Case<StoreOp>(
+              [](auto op) { BoundsCheckGenerator<StoreOp>::generate(op); });
+    });
+  }
+};
 
 std::unique_ptr<mlir::Pass> createBoundsCheckPass() {
   return std::make_unique<BoundsCheckPass>();

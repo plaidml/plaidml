@@ -1,7 +1,5 @@
 // Copyright 2020, Intel Corporation
 
-#include "pmlc/conversion/stdx_to_llvm/stdx_to_llvm.h"
-
 #include "mlir/ADT/TypeSwitch.h"
 #include "mlir/Conversion/LoopToStandard/ConvertLoopToStandard.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
@@ -11,6 +9,8 @@
 #include "mlir/IR/AffineMap.h"
 #include "mlir/Pass/Pass.h"
 
+#include "pmlc/conversion/stdx_to_llvm/pass_detail.h"
+#include "pmlc/conversion/stdx_to_llvm/passes.h"
 #include "pmlc/dialect/stdx/ir/ops.h"
 
 using namespace mlir; // NOLINT[build/namespaces]
@@ -41,13 +41,13 @@ public:
   llvm::LLVMContext &getContext() const { return dialect.getLLVMContext(); }
 
   // Get the LLVM module in which the types are constructed.
-  llvm::Module &getModule() const { return dialect.getLLVMModule(); }
+  llvm::Module &getOperation() const { return dialect.getLLVMModule(); }
 
   // Get the MLIR type wrapping the LLVM integer type whose bit width is defined
   // by the pointer size used in the LLVM module.
   LLVM::LLVMType getIndexType() const {
     return LLVM::LLVMType::getIntNTy(
-        &dialect, getModule().getDataLayout().getPointerSizeInBits());
+        &dialect, getOperation().getDataLayout().getPointerSizeInBits());
   }
 
   LLVM::LLVMType getVoidType() const {
@@ -100,10 +100,10 @@ struct FPToUILowering : public LLVMLegalizationPattern<stdx::FPToUIOp> {
 };
 
 /// A pass converting MLIR operations into the LLVM IR dialect.
-struct LLVMLoweringPass : public ModulePass<LLVMLoweringPass> {
+struct LowerToLLVMPass : public LowerToLLVMBase<LowerToLLVMPass> {
   // Run the dialect converter on the module.
-  void runOnModule() override {
-    ModuleOp module = getModule();
+  void runOnOperation() final {
+    ModuleOp module = getOperation();
     auto context = module.getContext();
     LLVMTypeConverter typeConverter(context);
 
@@ -121,9 +121,6 @@ struct LLVMLoweringPass : public ModulePass<LLVMLoweringPass> {
   }
 };
 
-static PassRegistration<LLVMLoweringPass>
-    pass("convert-stdx-to-llvm", "Convert stdx to the LLVM dialect");
-
 } // namespace
 
 void populateStdXToLLVMConversionPatterns(LLVMTypeConverter &converter,
@@ -133,7 +130,7 @@ void populateStdXToLLVMConversionPatterns(LLVMTypeConverter &converter,
 }
 
 std::unique_ptr<mlir::Pass> createLowerToLLVMPass() {
-  return std::make_unique<LLVMLoweringPass>();
+  return std::make_unique<LowerToLLVMPass>();
 }
 
 } // namespace pmlc::conversion::stdx_to_llvm

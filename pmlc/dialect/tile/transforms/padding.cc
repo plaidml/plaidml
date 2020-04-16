@@ -14,7 +14,7 @@
 
 #include "pmlc/dialect/eltwise/ir/ops.h"
 #include "pmlc/dialect/tile/ir/ops.h"
-#include "pmlc/dialect/tile/transforms/passes.h"
+#include "pmlc/dialect/tile/transforms/pass_detail.h"
 
 namespace pmlc::dialect::tile {
 
@@ -129,6 +129,10 @@ static IntegerSet makeConstraintSet(size_t numDims, ArrayRef<AffineExpr> cons) {
   auto allFalse = llvm::SmallVector<bool, 10>(cons.size());
   return IntegerSet::get(numDims, 0, cons, allFalse);
 }
+
+struct PadPass : public PadBase<PadPass> {
+  void runOnFunction() final;
+};
 
 void PadPass::runOnFunction() {
   auto func = getFunction();

@@ -37,6 +37,8 @@ def get_emoji(variant):
         return ':darwin:'
     if variant == 'macos_x86_64_dbg':
         return ':darwin::sleuth_or_spy:'
+    if variant == 'linux_x86_64_dbg':
+        return ':linux::sleuth_or_spy:'
     return ':linux:'
 
 
@@ -88,11 +90,13 @@ def cmd_pipeline(args, remainder):
 
     variants = []
     for variant in plan['VARIANTS'].keys():
-        variants.append(dict(
-            name=variant,
-            python=get_python(variant),
-            emoji=get_emoji(variant),
-        ))
+        variants.append(
+            dict(
+                name=variant,
+                python=get_python(variant),
+                emoji=get_emoji(variant),
+                artifacts='dbg' not in variant,
+            ))
 
     tests = []
     for test in util.iterate_tests(plan, args.pipeline):
@@ -103,19 +107,21 @@ def cmd_pipeline(args, remainder):
             shard = None
             shard_emoji = ''
         tests.append(
-            dict(suite=test.suite_name,
-                 workload=test.workload_name,
-                 platform=test.platform_name,
-                 batch_size=test.batch_size,
-                 variant=test.variant,
-                 timeout=test.timeout,
-                 retry=test.retry,
-                 soft_fail=test.soft_fail,
-                 python=get_python(test.variant),
-                 shard=shard,
-                 shard_emoji=shard_emoji,
-                 emoji=get_emoji(test.variant),
-                 engine=get_engine(test.platform_name)))
+            dict(
+                suite=test.suite_name,
+                workload=test.workload_name,
+                platform=test.platform_name,
+                batch_size=test.batch_size,
+                variant=test.variant,
+                timeout=test.timeout,
+                retry=test.retry,
+                soft_fail=test.soft_fail,
+                python=get_python(test.variant),
+                shard=shard,
+                shard_emoji=shard_emoji,
+                emoji=get_emoji(test.variant),
+                engine=get_engine(test.platform_name),
+            ))
 
     if args.count:
         util.printf('variants: {}'.format(len(variants)))
@@ -186,7 +192,8 @@ def cmd_build(args, remainder):
             if item.name.endswith('.whl'):
                 wheels.append(item)
         tar.extractall('tmp', members=wheels)
-    util.buildkite_upload('*.whl', cwd='tmp')
+    if 'dbg' not in args.variant:
+        util.buildkite_upload('*.whl', cwd='tmp')
 
     variant_dir = os.path.join('tmp', 'build', args.variant)
     os.makedirs(variant_dir)

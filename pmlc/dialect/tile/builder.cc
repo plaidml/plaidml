@@ -31,10 +31,8 @@
 #include "mlir/Transforms/FoldUtils.h"
 #include "mlir/Transforms/Passes.h"
 
-#include "pmlc/dialect/eltwise/ir/dialect.h"
 #include "pmlc/dialect/eltwise/ir/ops.h"
 #include "pmlc/dialect/tile/gradient.h"
-#include "pmlc/dialect/tile/ir/dialect.h"
 #include "pmlc/dialect/tile/ir/ops.h"
 #include "pmlc/dialect/tile/transforms/passes.h"
 #include "pmlc/util/env.h"
@@ -89,7 +87,7 @@ struct TileBuilder::Impl {
 
   Impl()
       : module(ModuleOp::create(UnknownLoc::get(&context))),
-        builder(module.getBody()), loc(builder.getUnknownLoc()) {
+        builder(module.getBodyRegion()), loc(builder.getUnknownLoc()) {
     builder.setInsertionPointToStart(module.getBody());
   }
 
@@ -104,10 +102,10 @@ struct TileBuilder::Impl {
   }
 
   const AbstractOperation *lookupOperation(StringRef op) {
-    auto opName = eltwise::Dialect::getCanonicalOpName(op);
+    auto opName = eltwise::EltwiseDialect::getCanonicalOpName(op);
     auto abstractOp = AbstractOperation::lookup(opName, &context);
     if (!abstractOp) {
-      opName = tile::Dialect::getCanonicalOpName(op);
+      opName = tile::TileDialect::getCanonicalOpName(op);
       abstractOp = AbstractOperation::lookup(opName, &context);
       if (!abstractOp) {
         throw std::runtime_error("Unknown EDSL primitive: " + op.str());
@@ -621,7 +619,8 @@ private:
   OperationFolder folder;
 };
 
-struct MakeProgramPass : public mlir::FunctionPass<MakeProgramPass> {
+struct MakeProgramPass
+    : public mlir::PassWrapper<MakeProgramPass, mlir::FunctionPass> {
   void runOnFunction() final {
     OwningRewritePatternList patterns;
     auto context = &getContext();
@@ -682,7 +681,7 @@ TileBuilder::MakeProgram(StringRef name, const ProgramMutations &mutations,
   funcOp.addEntryBlock();
   OpBuilder builder(funcOp.getBody());
   std::set<std::string> names;
-  auto attrName = Dialect::getDialectAttrName("name");
+  auto attrName = TileDialect::getDialectAttrName("name");
   unsigned argcnt = 0;
   std::map<Operation *, Operation *> opMap;
   BlockAndValueMapping mapper;

@@ -14,7 +14,7 @@
 #include "pmlc/dialect/eltwise/ir/ops.h"
 #include "pmlc/dialect/eltwise/ir/util.h"
 #include "pmlc/dialect/tile/ir/ops.h"
-#include "pmlc/dialect/tile/transforms/passes.h"
+#include "pmlc/dialect/tile/transforms/pass_detail.h"
 #include "pmlc/util/enums.h"
 #include "pmlc/util/logging.h"
 #include "pmlc/util/util.h"
@@ -25,7 +25,6 @@ using mlir::failure;
 using mlir::FloatType;
 using mlir::IntegerType;
 using mlir::LogicalResult;
-using mlir::OperationPass;
 using mlir::OpRewritePattern;
 using mlir::OwningRewritePatternList;
 using mlir::PatternRewriter;
@@ -34,15 +33,8 @@ using mlir::Type;
 
 using eltwise::ScalarConstantOp;
 
-struct ConstantTypesPass : public OperationPass<ConstantTypesPass> {
+struct ConstantTypesPass : public ConstantTypesBase<ConstantTypesPass> {
   ConstantTypesPass() {}
-
-  ConstantTypesPass(const ConstantTypesPass &rhs) {
-    floatType = rhs.floatType;
-    integerType = rhs.integerType;
-    floatKind = rhs.floatKind.getValue();
-    integerKind = rhs.integerKind.getValue();
-  }
 
   ConstantTypesPass(Type floatType, Type integerType)
       : floatType(floatType), integerType(integerType) {}
@@ -53,13 +45,6 @@ struct ConstantTypesPass : public OperationPass<ConstantTypesPass> {
 
   llvm::Optional<Type> floatType;
   llvm::Optional<Type> integerType;
-
-  Option<std::string> floatKind{
-      *this, "floatx", llvm::cl::desc("set floating-point constant precision"),
-      llvm::cl::init("f32")};
-  Option<std::string> integerKind{
-      *this, "intx", llvm::cl::desc("set integer constant precision"),
-      llvm::cl::init("si32")};
 };
 
 struct ConstantTypesRewriter : public OpRewritePattern<ScalarConstantOp> {
@@ -139,15 +124,16 @@ void ConstantTypesPass::runOnOperation() {
   OwningRewritePatternList patterns;
   patterns.insert<ConstantTypesRewriter>(&getContext(), this, *floatType,
                                          *integerType);
-  applyPatternsGreedily(getOperation()->getRegions(), patterns);
+  applyPatternsAndFoldGreedily(getOperation()->getRegions(), patterns);
+}
+
+std::unique_ptr<mlir::Pass> createConstantTypesPass() {
+  return std::make_unique<ConstantTypesPass>();
 }
 
 std::unique_ptr<mlir::Pass> createConstantTypesPass(Type floatType,
                                                     Type integerType) {
   return std::make_unique<ConstantTypesPass>(floatType, integerType);
 }
-
-static mlir::PassRegistration<ConstantTypesPass>
-    pass("tile-constant-types", "Set constant types precision");
 
 } // namespace pmlc::dialect::tile

@@ -1,7 +1,5 @@
 // Copyright 2020, Intel Corporation
 
-#include "pmlc/conversion/tile_to_pxa/tile_to_pxa.h"
-
 #include <utility>
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -12,11 +10,9 @@
 #include "mlir/Support/DebugStringHelper.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-#include "pmlc/dialect/eltwise/ir/dialect.h"
+#include "pmlc/conversion/tile_to_pxa/pass_detail.h"
 #include "pmlc/dialect/eltwise/ir/ops.h"
-#include "pmlc/dialect/pxa/ir/dialect.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
-#include "pmlc/dialect/stdx/ir/dialect.h"
 #include "pmlc/dialect/stdx/ir/ops.h"
 #include "pmlc/dialect/tile/ir/ops.h"
 #include "pmlc/dialect/tile/transforms/padding.h"
@@ -175,6 +171,12 @@ static Value createCastOp(OpBuilder &builder, Location loc, Value from,
       // SIToFPOp: IntegerType -> FloatType
       return builder.create<mlir::SIToFPOp>(loc, from, intoType).getResult();
     }
+    if (auto fromIndexType = fromType.dyn_cast<IndexType>()) {
+      auto i64Type = builder.getIntegerType(64);
+      auto intCastOp = builder.create<mlir::IndexCastOp>(loc, from, i64Type);
+      return builder.create<mlir::SIToFPOp>(loc, intCastOp, intoType)
+          .getResult();
+    }
   }
   if (auto intoIntType = intoType.dyn_cast<IntegerType>()) {
     if (auto fromIntType = fromType.dyn_cast<IntegerType>()) {
@@ -199,6 +201,10 @@ static Value createCastOp(OpBuilder &builder, Location loc, Value from,
         // FPToUIOp: FloatType -> unsigned IntegerType
         return builder.create<stdx::FPToUIOp>(loc, from, intoType).getResult();
       }
+    }
+    if (auto fromIndexType = fromType.dyn_cast<IndexType>()) {
+      auto intType = builder.getIntegerType(intoIntType.getWidth());
+      return builder.create<mlir::IndexCastOp>(loc, from, intType);
     }
   }
   llvm_unreachable("Unsupported cast op");
@@ -864,14 +870,14 @@ struct TraceOpConversion : public OpConversionPattern<TraceOp> {
   }
 };
 
-struct LoweringPass : public mlir::ModulePass<LoweringPass> {
-  void runOnModule() final {
+struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
+  void runOnOperation() final {
     // Set up target (i.e. what is legal)
     mlir::ConversionTarget target(getContext());
     target.addLegalDialect<mlir::AffineDialect>();
     target.addLegalDialect<mlir::StandardOpsDialect>();
-    target.addLegalDialect<dialect::pxa::Dialect>();
-    target.addLegalDialect<dialect::stdx::Dialect>();
+    target.addLegalDialect<dialect::pxa::PXADialect>();
+    target.addLegalDialect<dialect::stdx::StdXDialect>();
     target.addLegalOp<mlir::ModuleOp, mlir::ModuleTerminatorOp>();
     target.addDynamicallyLegalOp<FuncOp>([](FuncOp op) {
       auto funcType = op.getType();
@@ -992,7 +998,8 @@ struct LoweringPass : public mlir::ModulePass<LoweringPass> {
         EltwiseOpConversion<ew::IdentOp, FirstOperand>>(&getContext());
 
     // Run the conversion
-    if (failed(applyFullConversion(getModule(), target, patterns, nullptr))) {
+    if (failed(
+            applyFullConversion(getOperation(), target, patterns, nullptr))) {
       signalPassFailure();
       return;
     }
@@ -1002,10 +1009,7 @@ struct LoweringPass : public mlir::ModulePass<LoweringPass> {
 } // namespace
 
 std::unique_ptr<mlir::Pass> createLowerTileToPXAPass() {
-  return std::make_unique<LoweringPass>();
+  return std::make_unique<LowerTileToPXAPass>();
 }
-
-static mlir::PassRegistration<LoweringPass>
-    legalize_pass("convert-tile-to-pxa", "Convert Tile dialect to PXA dialect");
 
 } // namespace pmlc::conversion::tile_to_pxa

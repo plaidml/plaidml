@@ -1,7 +1,5 @@
 // Copyright 2020 Intel Corporation
 
-#include "pmlc/conversion/pxa_to_affine/pxa_to_affine.h"
-
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Pass/Pass.h"
@@ -9,7 +7,7 @@
 #include "mlir/Support/DebugStringHelper.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-#include "pmlc/dialect/pxa/ir/dialect.h"
+#include "pmlc/conversion/pxa_to_affine/pass_detail.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/util/logging.h"
 #include "pmlc/util/util.h"
@@ -44,8 +42,9 @@ using util::AggregationKind;
 
 namespace {
 
-struct LoweringPass : public mlir::ModulePass<LoweringPass> {
-  void runOnModule() override;
+struct LowerPXAToAffinePass
+    : public LowerPXAToAffineBase<LowerPXAToAffinePass> {
+  void runOnOperation() final;
 };
 
 template <typename OpType>
@@ -151,12 +150,12 @@ struct AffineReduceOpConversion : public LoweringBase<pxa::AffineReduceOp> {
   }
 };
 
-void LoweringPass::runOnModule() {
+void LowerPXAToAffinePass::runOnOperation() {
   // Set up target (i.e. what is legal)
   mlir::ConversionTarget target(getContext());
   target.addLegalDialect<mlir::AffineDialect>();
   target.addLegalDialect<mlir::StandardOpsDialect>();
-  target.addIllegalDialect<pxa::Dialect>();
+  target.addIllegalDialect<pxa::PXADialect>();
   target.addIllegalOp<AffineParallelOp>();
 
   // Setup rewrite patterns
@@ -165,8 +164,9 @@ void LoweringPass::runOnModule() {
   patterns.insert<AffineReduceOpConversion>(&getContext());
 
   // Run the conversion
-  if (failed(applyPartialConversion(getModule(), target, patterns, nullptr))) {
-    getModule().dump();
+  if (failed(
+          applyPartialConversion(getOperation(), target, patterns, nullptr))) {
+    getOperation().dump();
     emitError(mlir::UnknownLoc::get(&getContext()),
               "Error lowering pxa -> affine\n");
     signalPassFailure();
@@ -176,11 +176,7 @@ void LoweringPass::runOnModule() {
 } // namespace
 
 std::unique_ptr<mlir::Pass> createLowerPXAToAffinePass() {
-  return std::make_unique<LoweringPass>();
+  return std::make_unique<LowerPXAToAffinePass>();
 }
-
-static mlir::PassRegistration<LoweringPass>
-    legalize_pass("convert-pxa-to-affine",
-                  "Convert from PXA dialect to Affine dialect");
 
 } // namespace pmlc::conversion::pxa_to_affine

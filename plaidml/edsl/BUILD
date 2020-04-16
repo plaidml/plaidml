@@ -41,6 +41,7 @@ plaidml_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "//plaidml/core",
+        "//pmlc:all_passes_and_dialects_no_registration",
         "//pmlc/dialect/tile",
         "//pmlc/util",
         "@llvm-project//llvm:support",

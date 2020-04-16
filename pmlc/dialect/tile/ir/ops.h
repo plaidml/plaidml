@@ -73,4 +73,6 @@ namespace SideEffects = mlir::SideEffects;
 #define GET_OP_CLASSES
 #include "pmlc/dialect/tile/ir/ops.h.inc"
 
+#include "pmlc/dialect/tile/ir/dialect.h.inc"
+
 } // namespace pmlc::dialect::tile

@@ -10,6 +10,14 @@ using llvm::SmallVector;
 using mlir::failure;
 using mlir::success;
 
+XSMMDialect::XSMMDialect(mlir::MLIRContext *ctx)
+    : mlir::Dialect(getDialectNamespace(), ctx) {
+  addOperations<
+#define GET_OP_LIST
+#include "pmlc/dialect/xsmm/ir/ops.cc.inc"
+      >();
+}
+
 //
 // ---- GemmOp ----
 //
@@ -87,6 +95,6 @@ ParseResult parseGemmOp(OpAsmParser &parser, OperationState &result) {
 LogicalResult verifyGemmOp(GemmOp op) { return success(); }
 
 #define GET_OP_CLASSES
-#include "pmlc/dialect/xsmm/ir/ops.cc.inc"
+#include "pmlc/dialect/xsmm/ir/ops.cc.inc" // NOLINT
 
 } // namespace pmlc::dialect::xsmm

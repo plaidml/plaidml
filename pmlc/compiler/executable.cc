@@ -1,8 +1,9 @@
 // Copyright 2020 Intel Corporation
 
-#include "pmlc/compiler/compiler.h"
+#include "pmlc/compiler/executable.h"
 
 #include <fstream>
+#include <string>
 #include <utility>
 
 #include "llvm/Support/FormatVariadic.h"
@@ -18,63 +19,11 @@
 #include "mlir/Target/LLVMIR.h"
 #include "mlir/Transforms/Passes.h"
 
-#include "pmlc/compiler/registry.h"
-#include "pmlc/util/all_dialects.h"
-#include "pmlc/util/all_passes.h"
 #include "pmlc/util/logging.h"
 
 using namespace mlir; // NOLINT[build/namespaces]
 
 namespace pmlc::compiler {
-
-namespace {
-
-class IRCollector : public PassInstrumentation {
-public:
-  explicit IRCollector(std::vector<PassInfo> *into) : into(into) {}
-
-private:
-  bool isHiddenPass(Pass *pass) {
-    return pass->getName().startswith("detail::");
-  }
-
-  void runAfterPass(Pass *pass, Operation *op) override {
-    if (isHiddenPass(pass))
-      return;
-
-    std::string ir;
-    llvm::raw_string_ostream os(ir);
-
-    // Find the top-level module operation.
-    auto *topLevelOp = op;
-    while (auto *parentOp = topLevelOp->getParentOp()) {
-      topLevelOp = parentOp;
-    }
-
-    // Check to see if the top-level operation is actually a module in the case
-    // of invalid-ir.
-    if (auto module = dyn_cast<ModuleOp>(topLevelOp)) {
-      module.print(os);
-    } else {
-      topLevelOp->print(os);
-    }
-
-    os.flush();
-
-    auto name = pass->getName().str();
-    if (auto passInfo = pass->lookupPassInfo()) {
-      auto passArg = passInfo->getPassArgument();
-      if (!passArg.empty()) {
-        name = passArg.str();
-      }
-    }
-    into->emplace_back(PassInfo{name, ir});
-  }
-
-  std::vector<PassInfo> *into;
-};
-
-} // namespace
 
 class MemRefDescriptor {
 private:
@@ -106,65 +55,17 @@ private:
   std::vector<char> memory;
 };
 
-void Program::initialize() {
-  registerAllDialects();
-  registerAllPasses();
-}
-
-void Executable::initialize() {
-  llvm::InitializeNativeTarget();
-  llvm::InitializeNativeTargetAsmPrinter();
-  initializeLLVMPasses();
-}
-
-Program::Program(mlir::ModuleOp module) : module(module) {}
-
-Program::Program(mlir::StringRef source) {
-  auto inputBuffer = llvm::MemoryBuffer::getMemBuffer(source);
-  llvm::SourceMgr sourceMgr;
-  sourceMgr.AddNewSourceBuffer(std::move(inputBuffer), llvm::SMLoc());
-  module = mlir::parseSourceFile(sourceMgr, &context);
-}
-
-void Program::compile(StringRef target, bool collectPasses) {
-  if (target.empty()) {
-    return;
-  }
-
-  PassManager pm(module->getContext());
-
-  if (collectPasses) {
-    std::string ir;
-    llvm::raw_string_ostream os(ir);
-    module->print(os);
-    os.flush();
-    passes.emplace_back(PassInfo{"tile", ir});
-    pm.addInstrumentation(std::make_unique<IRCollector>(&passes));
-  }
-
-  if (VLOG_IS_ON(1)) {
-    pm.enableStatistics();
-    pm.enableTiming();
-    auto shouldPrintBeforePass = [](auto pass, auto op) { return false; };
-    auto shouldPrintAfterPass = [&](auto pass, auto op) {
-      return VLOG_IS_ON(3);
-    };
-    pm.disableMultithreading();
-    pm.enableIRPrinting(shouldPrintBeforePass, shouldPrintAfterPass, true,
-                        false, llvm::errs());
-  }
-
-  auto pipelineBuilder = resolveTarget(target);
-  pipelineBuilder(pm);
-
-  if (failed(pm.run(*module))) {
-    throw std::runtime_error("conversion to the LLVM IR dialect failed");
-  }
-}
-
 Executable::Executable(const std::shared_ptr<Program> &program,
                        ArrayRef<void *> bufptrs)
     : program(program), ptrs(bufptrs.size()) {
+
+  static std::once_flag is_initialized;
+  std::call_once(is_initialized, []() {
+    llvm::InitializeNativeTarget();
+    llvm::InitializeNativeTargetAsmPrinter();
+    initializeLLVMPasses();
+  });
+
   if (program->arguments.size() != bufptrs.size()) {
     throw std::runtime_error("Program arguments and bufptrs size mismatch");
   }
@@ -181,7 +82,8 @@ Executable::Executable(const std::shared_ptr<Program> &program,
   }
 
   auto optPipeline = makeOptimizingTransformer(
-      /*optLevel=*/0, /*sizeLevel=*/0,
+      /*optLevel=*/0,
+      /*sizeLevel=*/0,
       /*targetMachine=*/tmOrError->get());
 
   if (VLOG_IS_ON(6)) {
@@ -218,12 +120,11 @@ Executable::Executable(const std::shared_ptr<Program> &program,
   }
 #endif
 
-  auto maybeEngine = ExecutionEngine::create(*program->module, optPipeline,
-                                             /*jitCodeGenOptLevel=*/llvm::None,
-                                             sharedLibPaths, 
-					     /*enableObjectCache=*/true,
-					     /*enableGDBNotificationListener=*/false
-		  );
+  auto maybeEngine =
+      ExecutionEngine::create(*program->module, optPipeline,
+                              /*jitCodeGenOptLevel=*/llvm::None, sharedLibPaths,
+                              /*enableObjectCache=*/true,
+                              /*enableGDBNotificationListener=*/false);
   llvm::handleAllErrors(
       maybeEngine.takeError(), [](const llvm::ErrorInfoBase &err) {
         throw std::runtime_error("Failed to create ExecutionEngine: " +

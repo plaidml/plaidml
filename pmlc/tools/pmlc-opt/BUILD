@@ -10,12 +10,8 @@ plaidml_cc_library(
     deps = [
         "//pmlc:all_passes_and_dialects_no_registration",
         "//pmlc/util",
-        "@llvm-project//mlir:EDSC",
-        "@llvm-project//mlir:LoopsToGPUPass",
         "@llvm-project//mlir:MlirOptLib",
-        "@llvm-project//mlir:OpenMPDialect",
         "@llvm-project//mlir:Parser",
-        "@llvm-project//mlir:Transforms",
     ],
     alwayslink = 1,
 )

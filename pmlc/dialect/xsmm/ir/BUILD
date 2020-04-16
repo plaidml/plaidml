@@ -24,32 +24,23 @@ gentbl(
             "-gen-op-defs",
             "ops.cc.inc",
         ),
+        (
+            "-gen-dialect-decls",
+            "dialect.h.inc",
+        ),
     ],
     td_file = "ops.td",
     td_srcs = [":td_files"],
 )
 
 plaidml_cc_library(
-    name = "impl",
-    srcs = [
-        "dialect.cc",
-        "ops.cc",
-    ],
-    hdrs = [
-        "dialect.h",
-        "ops.h",
-    ],
+    name = "ir",
+    srcs = ["ops.cc"],
+    hdrs = ["ops.h"],
     deps = [
         ":gen-ops",
         "@llvm-project//llvm:support",
-        "@llvm-project//mlir:AffineOps",
+        "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:IR",
     ],
-)
-
-plaidml_cc_library(
-    name = "ir",
-    srcs = ["registration.cc"],
-    deps = [":impl"],
-    alwayslink = 1,
 )

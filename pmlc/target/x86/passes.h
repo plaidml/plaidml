@@ -1,5 +1,3 @@
-// Copyright 2020 Intel Corporation
-
 #pragma once
 
 #include <memory>
@@ -11,5 +9,9 @@ class Pass;
 namespace pmlc::target::x86 {
 
 std::unique_ptr<mlir::Pass> createTraceLinkingPass();
+
+std::unique_ptr<mlir::Pass> createXSMMLoweringPass();
+
+std::unique_ptr<mlir::Pass> createXSMMStencilPass();
 
 } // namespace pmlc::target::x86

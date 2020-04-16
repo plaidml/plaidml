@@ -312,10 +312,7 @@ private:
   }
 
   AffineMap makeMap(ArrayRef<AffineExpr> exprs) {
-    if (exprs.size()) {
-      return AffineMap::get(collector.idxs.size(), 0, exprs);
-    }
-    return AffineMap::get(context);
+    return AffineMap::get(collector.idxs.size(), 0, exprs, context);
   }
 
   AffineExpr makeConstraint(Value lhs, Value rhs) {
@@ -481,25 +478,21 @@ AffineMap ContractionOp::getSourceMap(unsigned i) {
 
 void ContractionOp::setLowerBounds(ArrayRef<int64_t> bounds) {
   SmallVector<AffineExpr, 6> exprs;
-  AffineMap map = AffineMap::get(getContext());
-  if (bounds.size() != 0) {
-    for (auto dim : bounds) {
-      exprs.push_back(mlir::getAffineConstantExpr(dim, getContext()));
-    }
-    map = AffineMap::get(/*dimCount=*/0, /*symbolCount=*/0, exprs);
+  for (auto dim : bounds) {
+    exprs.push_back(mlir::getAffineConstantExpr(dim, getContext()));
   }
+  auto map =
+      AffineMap::get(/*dimCount=*/0, /*symbolCount=*/0, exprs, getContext());
   setAttr(getLowerBoundsAttrName(), AffineMapAttr::get(map));
 }
 
 void ContractionOp::setUpperBounds(ArrayRef<int64_t> bounds) {
   SmallVector<AffineExpr, 6> exprs;
-  AffineMap map = AffineMap::get(getContext());
-  if (bounds.size() != 0) {
-    for (auto dim : bounds) {
-      exprs.push_back(mlir::getAffineConstantExpr(dim, getContext()));
-    }
-    map = AffineMap::get(/*dimCount=*/0, /*symbolCount=*/0, exprs);
+  for (auto dim : bounds) {
+    exprs.push_back(mlir::getAffineConstantExpr(dim, getContext()));
   }
+  auto map =
+      AffineMap::get(/*dimCount=*/0, /*symbolCount=*/0, exprs, getContext());
   setAttr(getUpperBoundsAttrName(), AffineMapAttr::get(map));
 }
 

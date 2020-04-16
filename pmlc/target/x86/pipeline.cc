@@ -12,33 +12,26 @@
 #include "mlir/Transforms/Passes.h"
 
 #include "pmlc/compiler/registry.h"
-#include "pmlc/conversion/pxa_to_affine/pxa_to_affine.h"
-#include "pmlc/conversion/stdx_to_llvm/stdx_to_llvm.h"
-#include "pmlc/conversion/tile_to_pxa/tile_to_pxa.h"
+#include "pmlc/conversion/pxa_to_affine/passes.h"
+#include "pmlc/conversion/stdx_to_llvm/passes.h"
+#include "pmlc/conversion/tile_to_pxa/passes.h"
 #include "pmlc/dialect/pxa/transforms/passes.h"
 #include "pmlc/dialect/stdx/transforms/passes.h"
 #include "pmlc/dialect/tile/transforms/passes.h"
 #include "pmlc/target/x86/heatmap.h"
-#include "pmlc/target/x86/trace_linking.h"
-#include "pmlc/target/x86/xsmm_lowering.h"
+#include "pmlc/target/x86/pass_detail.h"
+#include "pmlc/target/x86/passes.h"
 #include "pmlc/util/env.h"
 #include "pmlc/util/logging.h"
 
 using namespace mlir; // NOLINT[build/namespaces]
 
-namespace pmlc::dialect::pxa {
-
-struct StencilPass;
-static mlir::PassRegistration<StencilPass> xsmmStencilPass(
-    "affine-stencil-xsmm",
-    "Find a tiling for extracting 'micro' GEMMs suitable for XSMM.", []() {
-      auto numThreads = std::thread::hardware_concurrency();
-      return createStencilPass(numThreads, target::x86::heatmapCost);
-    });
-
-} // namespace pmlc::dialect::pxa
-
 namespace pmlc::target::x86 {
+
+std::unique_ptr<Pass> createXSMMStencilPass() {
+  auto numThreads = std::thread::hardware_concurrency();
+  return pmlc::dialect::pxa::createStencilPass(numThreads, heatmapCost);
+}
 
 namespace {
 
@@ -84,9 +77,11 @@ LogicalResult mixedPtrFuncArgTypeConverter(LLVMTypeConverter &converter,
   return structFuncArgTypeConverter(converter, type, result);
 }
 
-struct ConvertToStdPass : public ModulePass<ConvertToStdPass> {
-  void runOnModule() override {
-    auto module = getModule();
+struct ConvertToStdPass
+    : public mlir::PassWrapper<ConvertToStdPass,
+                               mlir::OperationPass<mlir::ModuleOp>> {
+  void runOnOperation() override {
+    auto module = getOperation();
     auto *context = module.getContext();
 
     OwningRewritePatternList patterns;
@@ -100,14 +95,16 @@ struct ConvertToStdPass : public ModulePass<ConvertToStdPass> {
     }
   }
 
-  static std::unique_ptr<OpPassBase<ModuleOp>> create() {
+  static std::unique_ptr<OperationPass<ModuleOp>> create() {
     return std::make_unique<ConvertToStdPass>();
   }
 };
 
-struct ConvertToLLVMPass : public ModulePass<ConvertToLLVMPass> {
-  void runOnModule() override {
-    auto module = getModule();
+struct ConvertToLLVMPass
+    : public mlir::PassWrapper<ConvertToLLVMPass,
+                               mlir::OperationPass<mlir::ModuleOp>> {
+  void runOnOperation() override {
+    auto module = getOperation();
     auto *context = module.getContext();
 
     LLVMTypeConverterCustomization customs;
@@ -115,7 +112,8 @@ struct ConvertToLLVMPass : public ModulePass<ConvertToLLVMPass> {
     LLVMTypeConverter typeConverter(&getContext(), customs);
 
     OwningRewritePatternList patterns;
-    populateStdToLLVMBarePtrConversionPatterns(typeConverter, patterns);
+    populateStdToLLVMBarePtrConversionPatterns(typeConverter, patterns,
+                                               /*useAlloca=*/true);
     conversion::stdx_to_llvm::populateStdXToLLVMConversionPatterns(
         typeConverter, patterns);
 
@@ -127,7 +125,7 @@ struct ConvertToLLVMPass : public ModulePass<ConvertToLLVMPass> {
     }
   }
 
-  static std::unique_ptr<OpPassBase<ModuleOp>> create() {
+  static std::unique_ptr<OperationPass<ModuleOp>> create() {
     return std::make_unique<ConvertToLLVMPass>();
   }
 };

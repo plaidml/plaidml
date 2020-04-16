@@ -3,27 +3,36 @@
 package(default_visibility = ["//visibility:public"])
 
 load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_test")
+load("//vendor/mlir:tblgen.bzl", "gentbl")
 
-plaidml_cc_library(
-    name = "lib",
-    srcs = [
-        "boundscheck.h",
-        "boundscheck.cc",
+gentbl(
+    name = "gen-pass",
+    tbl_outs = [
+        (
+            "-gen-pass-decls",
+            "passes.h.inc",
+        ),
     ],
-    hdrs = [
-        "passes.h",
-    ],
-    deps = [
-        "//pmlc/dialect/pxa/analysis",
-        "//pmlc/dialect/pxa/ir",
-        "//pmlc/dialect/tile/ir",
-        "//pmlc/dialect/eltwise/ir",
+    td_file = "passes.td",
+    td_srcs = [
+        "@llvm-project//mlir:PassBaseTdFiles",
     ],
 )
 
 plaidml_cc_library(
     name = "transforms",
-    srcs = ["registration.cc"],
-    deps = [":lib"],
-    alwayslink = 1,
+    srcs = [
+        "boundscheck.cc",
+        "pass_detail.h",
+    ],
+    hdrs = [
+        "passes.h",
+    ],
+    deps = [
+        ":gen-pass",
+        "//pmlc/dialect/eltwise/ir",
+        "//pmlc/dialect/pxa/analysis",
+        "//pmlc/dialect/pxa/ir",
+        "//pmlc/dialect/tile/ir",
+    ],
 )

@@ -553,7 +553,7 @@ void Stencil::DoStenciling() {
         perOp.push_back(bodyBuilder.getAffineConstantExpr(0));
       }
     }
-    auto toIdxs = AffineMap::get(idxs.size(), 0, perOp);
+    auto toIdxs = AffineMap::get(idxs.size(), 0, perOp, op.getContext());
     return map.compose(toIdxs);
   };
 
@@ -587,7 +587,7 @@ void Stencil::DoStenciling() {
   }
 }
 
-struct StencilPass : public mlir::FunctionPass<StencilPass> {
+struct StencilPass : public mlir::PassWrapper<StencilPass, mlir::FunctionPass> {
   StencilPass() { assert(false && "StencilPass must be configured"); }
 
   StencilPass(const StencilPass &rhs) : costFn(rhs.costFn) {
