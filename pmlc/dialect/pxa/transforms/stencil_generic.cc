@@ -102,6 +102,15 @@ StencilGeneric::getStrideInfo(mlir::Operation *op) {
   return llvm::None;
 }
 
+// BlockArgumentSet StencilGeneric::getAccArgs() {
+//   if (accArgs.hasValue())
+//     return accArgs.getValue();
+//   for (auto loadOp : loadsAndStores.loads) {
+
+//   }
+// }
+//   BlockArgumentSet getOutArgs();
+
 void StencilGeneric::BindIndexes(
     const llvm::SmallVector<mlir::Operation *, 3> &tensors) {
   llvm::SmallVector<mlir::BlockArgument, 8> emptyBoundIdxsVector;

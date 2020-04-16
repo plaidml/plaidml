@@ -21,6 +21,8 @@
 #include "pmlc/util/logging.h"
 #include "pmlc/util/util.h"
 
+#include "pmlc/target/x86/heatmap.h"  // TODO: for heatmap
+
 // TODO: includes etc
 
 namespace pmlc::dialect::pxa {
@@ -96,22 +98,127 @@ private:
     return llvm::Optional<LoadStoreOps>(std::move(ret));
   }
 
+  // double getCost(TensorAndIndexPermutation perm, ArrayRef<int64_t> tileSize) {
+  //   // TODO This is a fake cost function.
+  //   // First, cap total tile size:
+  //   int64_t totalTileSize = 1;
+  //   for (auto sz : tileSize) {
+  //     totalTileSize *= sz;
+  //   }
+  //   if (totalTileSize > 1024) {
+  //     return std::numeric_limits<double>::infinity();
+  //   }
+  //   // Next, fewest tiles:
+  //   int64_t tiles = 1;
+  //   for (unsigned i = 0; i < semanticIdxCount; i++) {
+  //     tiles *= llvm::divideCeil(getIdxRange(perm.indexes[i]), tileSize[i]);
+  //   }
+  //   return tiles;
+  // }
+
   double getCost(TensorAndIndexPermutation perm, ArrayRef<int64_t> tileSize) {
-    // TODO This is a fake cost function.
-    // First, cap total tile size:
-    int64_t totalTileSize = 1;
-    for (auto sz : tileSize) {
-      totalTileSize *= sz;
+    unsigned numThreads = 4; // TODO
+
+    unsigned tot_inner_loop = tileSize[0] * tileSize[1] * tileSize[2];
+
+    llvm::SmallVector<unsigned, 3> tileSizeTODO;
+    for (unsigned i = 0; i < 3; ++i) {
+      tileSizeTODO[i] = tileSize[i];
     }
-    if (totalTileSize > 1024) {
+    auto cost = pmlc::target::x86::heatmapCost(tileSizeTODO);
+    if (cost.throughput == 0) {
       return std::numeric_limits<double>::infinity();
     }
-    // Next, fewest tiles:
-    int64_t tiles = 1;
-    for (unsigned i = 0; i < semanticIdxCount; i++) {
-      tiles *= llvm::divideCeil(getIdxRange(perm.indexes[i]), tileSize[i]);
+    double inner_time = tot_inner_loop / cost.throughput;
+    IVLOG(3,
+          "Inner: loop = " << tot_inner_loop << " inner_time = " << inner_time);
+    for (unsigned i = 0; i < semanticIdxCount; ++i) {
+      IVLOG(3, perm.indexes[i] << ": " << tileSize[i]);
     }
-    return tiles;
+
+    // The middle idxs are the accumulation indexes, i.e. those used on loads but not stores
+    llvm::DenseMap<mlir::BlockArgument, unsigned> middle_idxs;
+    for (const auto& kvp : getStrideInfo(perm.tensors[0])->strides) {
+      // TODO: Old version verifies that this is in the parallel op's BlockArgs, but that seems excessive for something that I'd expect to be an assert...
+      middle_idxs.insert(std::make_pair(kvp.first, getIdxRange(kvp.first)));
+    }
+    for (const auto& kvp : getStrideInfo(perm.tensors[1])->strides) {
+      // TODO: Old version verifies that this is in the parallel op's BlockArgs, but that seems excessive for something that I'd expect to be an assert...
+      middle_idxs.insert(std::make_pair(kvp.first, getIdxRange(kvp.first)));
+    }
+    for (const auto& kvp : getStrideInfo(perm.tensors[2])->strides) {
+      auto it = middle_idxs.find(kvp.first);
+      if (it != middle_idxs.end()) {
+        middle_idxs.erase(it);
+      }
+    }
+
+    for (unsigned i = 0; i < semanticIdxCount; ++i) {
+      auto it = middle_idxs.find(perm.indexes[i]);
+      if (it != middle_idxs.end()) {
+        it->second = llvm::divideCeil(it->second, tileSize[i]);
+      }
+    }
+    unsigned tot_middle_loop = 1;
+    for (auto &kvp : middle_idxs) {
+      tot_middle_loop *= kvp.second;
+    }
+
+    IVLOG(3, "Middle: loop = " << tot_middle_loop);
+
+    for (auto &kvp : middle_idxs) {
+      if (kvp.second > 1) {
+        IVLOG(3, kvp.first << ": " << kvp.second);
+      }
+    }
+
+    // ... TODO unclear of port quality
+    llvm::DenseMap<mlir::BlockArgument, unsigned> outer_idxs;
+    for (const auto& kvp : getStrideInfo(loadsAndStores.stores[0])->strides) {
+      outer_idxs.try_emplace(kvp.first, getIdxRange(kvp.first));
+    }
+    for (unsigned i = 0; i < semanticIdxCount; i++) {
+      auto it = outer_idxs.find(perm.indexes[i]);
+      if (it != outer_idxs.end()) {
+        it->second = llvm::divideCeil(it->second, tileSize[i]);
+      }
+    }
+    unsigned tot_outer_loop = 1;
+    for (auto &kvp : outer_idxs) {
+      tot_outer_loop *= kvp.second;
+    }
+
+    IVLOG(3, "Outer: loop = " << tot_outer_loop);
+
+    // llvm::DenseMap<mlir::BlockArgument, unsigned> outer_idxs;
+    // for (auto idx : outIdxs) {
+    //   outer_idxs.try_emplace(idx, idxRange(idx));
+    // }
+    // for (unsigned i = 0; i < semanticIdxCount; ++i) {
+    //   auto it = outer_idxs.find(innerIdxs[i]);
+    //   if (it != outer_idxs.end()) {
+    //     it->second = (it->second - 1) / tileSize[i] + 1;
+    //   }
+    // }
+    // unsigned tot_outer_loop = 1;
+    // for (auto &kvp : outer_idxs) {
+    //   tot_outer_loop *= kvp.second;
+    // }
+
+    // IVLOG(3, "Outer: loop = " << tot_outer_loop);
+
+    for (auto &kvp : outer_idxs) {
+      if (kvp.second > 1) {
+        IVLOG(3, kvp.first << ": " << kvp.second);
+      }
+    }
+
+    unsigned outer_batches = (tot_outer_loop - 1) / numThreads + 1;
+    double perf =
+        outer_batches * tot_middle_loop * (cost.startupCost + inner_time);
+
+    IVLOG(3, "Performance = " << perf);
+    return perf;
   }
 
   void transform(TensorAndIndexPermutation perm, ArrayRef<int64_t> tileSize) {
