@@ -3,7 +3,7 @@
 #include <map>
 #include <string>
 
-#include "mlir/ADT/TypeSwitch.h"
+#include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/FormatVariadic.h"
 
 #include "pmlc/dialect/pxa/analysis/strides.h"
@@ -32,7 +32,7 @@ struct TestStrideInfoPass : public TestStrideInfoBase<TestStrideInfoPass> {
   void runOnOperation() final {
     auto op = getOperation();
     op->walk([&](Operation *op) {
-      TypeSwitch<Operation *>(op)
+      llvm::TypeSwitch<Operation *>(op)
           .Case<AffineLoadOp>([](auto op) { printStrideInfo(op); })
           .Case<AffineStoreOp>([](auto op) { printStrideInfo(op); })
           .Case<AffineReduceOp>([](auto op) { printStrideInfo(op); });
