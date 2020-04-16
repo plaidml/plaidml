@@ -6,7 +6,6 @@
 #include "mlir/IR/AffineExprVisitor.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/DebugStringHelper.h"
-#include "mlir/Support/Functional.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 #include "pmlc/dialect/pxa/analysis/strides.h"

@@ -5,8 +5,8 @@
 #include <vector>
 
 #include "llvm/ADT/SetVector.h"
+#include "llvm/ADT/TypeSwitch.h"
 
-#include "mlir/ADT/TypeSwitch.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Matchers.h"
@@ -25,6 +25,7 @@ using eltwise::m_One;
 using eltwise::m_Zero;
 using llvm::SetVector;
 using llvm::SmallVector;
+using llvm::TypeSwitch;
 using mlir::AffineExpr;
 using mlir::ArrayAttr;
 using mlir::failure;
@@ -36,7 +37,6 @@ using mlir::OpRewritePattern;
 using mlir::PatternRewriter;
 using mlir::StringAttr;
 using mlir::success;
-using mlir::TypeSwitch;
 using mlir::Value;
 
 OpFoldResult ConstantOp::fold(ArrayRef<Attribute> operands) {
