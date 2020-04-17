@@ -332,7 +332,10 @@ LogicalResult VulkanRuntime::submitCommandBuffers() {
 }
 
 LogicalResult VulkanRuntime::createInstance() {
-  RETURN_ON_VULKAN_ERROR(volkInitialize(), "volkInitialize");
+  if (volkInitialized != VK_SUCCESS) {
+    volkInitialized = volkInitialize();
+    RETURN_ON_VULKAN_ERROR(volkInitialized, "volkInitialize");
+  }
 
   VkApplicationInfo applicationInfo = {};
   applicationInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;

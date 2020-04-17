@@ -224,6 +224,8 @@ private:
 
   LogicalResult countDeviceMemorySize();
 
+  VkResult volkInitialized = VK_RESULT_MAX_ENUM;
+
   //===--------------------------------------------------------------------===//
   // Vulkan objects.
   //===--------------------------------------------------------------------===//
