@@ -44,10 +44,7 @@ static LogicalResult runMLIRPasses(ModuleOp module) {
   modulePM.addPass(spirv::createUpdateVersionCapabilityExtensionPass());
   passManager.addPass(
       pmlc::conversion::gpu::createConvertGpuLaunchFuncToVulkanCallsPass());
-  passManager.addPass(
-      pmlc::conversion::gpu::createLowerToLLVMPass(/*useAlloca=*/false,
-                                                   /*useBarePtrCallConv=*/true,
-                                                   /*emitCWrappers=*/false));
+  passManager.addPass(pmlc::conversion::gpu::createLLVMLoweringPass());
   return passManager.run(module);
 }
 

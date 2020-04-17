@@ -6,7 +6,6 @@
 #include "mlir/Conversion/LoopsToGPU/LoopsToGPUPass.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
 #include "mlir/Conversion/StandardToSPIRV/ConvertStandardToSPIRVPass.h"
-
 #include "mlir/Dialect/GPU/Passes.h"
 #include "mlir/Dialect/SPIRV/Passes.h"
 #include "mlir/Dialect/SPIRV/SPIRVOps.h"
@@ -26,7 +25,6 @@ using namespace mlir; // NOLINT[build/namespaces]
 namespace pmlc::target::intel_gen {
 
 namespace {
-
 void addToPipeline(OpPassManager &pm) {
   pm.addPass(dialect::tile::createComputeBoundsPass());
   // pm.addPass(dialect::tile::createPadPass());
@@ -67,7 +65,7 @@ void addToPipeline(OpPassManager &pm) {
 
   // GPU to Vulkan.
   pm.addPass(conversion::gpu::createConvertGpuLaunchFuncToVulkanCallsPass());
-  pm.addPass(conversion::gpu::createLowerToLLVMPass(false, true, false));
+  pm.addPass(conversion::gpu::createLLVMLoweringPass());
 }
 
 static PassPipelineRegistration<>

@@ -1,35 +1,30 @@
-#include <functional>
+// Copyright 2020, Intel Corporation
 
-#include "mlir/ADT/TypeSwitch.h"
+#include "mlir/Conversion/GPUToSPIRV/ConvertGPUToSPIRVPass.h"
+#include "mlir/Conversion/GPUToVulkan/ConvertGPUToVulkanPass.h"
+#include "mlir/Conversion/LoopToStandard/ConvertLoopToStandard.h"
+#include "mlir/Conversion/LoopsToGPU/LoopsToGPUPass.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
+#include "mlir/Conversion/StandardToSPIRV/ConvertStandardToSPIRVPass.h"
+#include "mlir/Dialect/GPU/Passes.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
-#include "mlir/IR/Attributes.h"
-#include "mlir/IR/Builders.h"
-#include "mlir/IR/MLIRContext.h"
-#include "mlir/IR/Module.h"
-#include "mlir/IR/PatternMatch.h"
-#include "mlir/IR/TypeUtilities.h"
+#include "mlir/Dialect/SPIRV/Passes.h"
+#include "mlir/Dialect/SPIRV/SPIRVOps.h"
 #include "mlir/Pass/Pass.h"
-#include "mlir/Support/Functional.h"
-#include "mlir/Support/LogicalResult.h"
-#include "mlir/Transforms/DialectConversion.h"
+#include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/Passes.h"
-#include "mlir/Transforms/Utils.h"
-#include "llvm/IR/DerivedTypes.h"
-#include "llvm/IR/IRBuilder.h"
-#include "llvm/IR/Type.h"
-#include "llvm/Support/CommandLine.h"
-#include "llvm/Support/FormatVariadic.h"
+
+#include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/IR/StandardTypes.h"
+
+#include "pmlc/conversion/gpu/pass_detail.h"
 
 using namespace mlir; // NOLINT[build/namespaces]
 
 namespace pmlc::conversion::gpu {
-#define PASS_NAME "pmlc-convert-std-to-llvm"
 
-namespace {
-// Extract an LLVM IR type from the LLVM IR dialect type.
 static LLVM::LLVMType unwrap(Type type) {
   if (!type)
     return nullptr;
@@ -58,9 +53,9 @@ static Type convertMemRefTypeToBarePtr(LLVMTypeConverter &converter,
 
 /// Callback to convert function argument types. It converts MemRef function
 /// arguments to bare pointers to the MemRef element type.
-LogicalResult barePtrFuncArgTypeConverter(LLVMTypeConverter &converter,
-                                          Type type,
-                                          SmallVectorImpl<Type> &result) {
+LogicalResult mixedPtrFuncArgTypeConverter(LLVMTypeConverter &converter,
+                                           Type type,
+                                           SmallVectorImpl<Type> &result) {
   if (auto memrefTy = type.dyn_cast<MemRefType>()) {
     auto llvmTy = convertMemRefTypeToBarePtr(converter, memrefTy);
     if (!llvmTy)
@@ -69,95 +64,57 @@ LogicalResult barePtrFuncArgTypeConverter(LLVMTypeConverter &converter,
     result.push_back(llvmTy);
     return success();
   }
-
-  if (type.isa<UnrankedMemRefType>()) {
-    mlir::Type llvmInt64Type =
-        LLVM::LLVMType::getInt64Ty(converter.getDialect());
-    mlir::Type llvmPointerType =
-        LLVM::LLVMType::getInt8PtrTy(converter.getDialect());
-    result.append({llvmInt64Type, llvmPointerType});
-    return success();
-  }
-
-  auto llvmTy = converter.convertType(type);
-  if (!llvmTy)
-    return failure();
-
-  result.push_back(llvmTy);
-  return success();
+  return structFuncArgTypeConverter(converter, type, result);
 }
 
-/// A pass converting MLIR operations into the LLVM IR dialect.
-struct LLVMLoweringPass : public ModulePass<LLVMLoweringPass> {
-  /// Creates an LLVM lowering pass.
-  explicit LLVMLoweringPass(bool useAlloca, bool useBarePtrCallConv,
-                            bool emitCWrappers) {
-    this->useAlloca = useAlloca;
-    this->useBarePtrCallConv = useBarePtrCallConv;
-    this->emitCWrappers = emitCWrappers;
-  }
-  LLVMLoweringPass() {}
-  LLVMLoweringPass(const LLVMLoweringPass &pass) {}
+struct ConvertToStdPass
+    : public mlir::PassWrapper<ConvertToStdPass,
+                               mlir::OperationPass<mlir::ModuleOp>> {
+  void runOnOperation() override {
+    auto module = getOperation();
+    auto *context = module.getContext();
 
-  /// Run the dialect converter on the module.
-  void runOnModule() override {
-    if (useBarePtrCallConv && emitCWrappers) {
-      getModule().emitError()
-          << "incompatible conversion options: bare-pointer calling convention "
-             "and C wrapper emission";
+    OwningRewritePatternList patterns;
+    populateAffineToStdConversionPatterns(patterns, context);
+    populateLoopToStdConversionPatterns(patterns, context);
+
+    ConversionTarget target(*context);
+    target.addLegalDialect<StandardOpsDialect>();
+    if (failed(applyPartialConversion(module, target, patterns))) {
       signalPassFailure();
-      return;
     }
+  }
 
-    ModuleOp m = getModule();
+  static std::unique_ptr<OperationPass<ModuleOp>> create() {
+    return std::make_unique<ConvertToStdPass>();
+  }
+};
+
+struct ConvertToLLVMPass
+    : public mlir::PassWrapper<ConvertToLLVMPass,
+                               mlir::OperationPass<mlir::ModuleOp>> {
+  void runOnOperation() override {
+    auto module = getOperation();
+    auto *context = module.getContext();
 
     LLVMTypeConverterCustomization customs;
-    customs.funcArgConverter = useBarePtrCallConv ? barePtrFuncArgTypeConverter
-                                                  : structFuncArgTypeConverter;
+    customs.funcArgConverter = mixedPtrFuncArgTypeConverter;
     LLVMTypeConverter typeConverter(&getContext(), customs);
 
     OwningRewritePatternList patterns;
-    if (useBarePtrCallConv)
-      populateStdToLLVMBarePtrConversionPatterns(typeConverter, patterns,
-                                                 useAlloca);
-    else
-      populateStdToLLVMConversionPatterns(typeConverter, patterns, useAlloca,
-                                          emitCWrappers);
+    populateStdToLLVMBarePtrConversionPatterns(typeConverter, patterns,
+                                               /*useAlloca=*/true);
 
-    LLVMConversionTarget target(getContext());
-    if (failed(applyPartialConversion(m, target, patterns, &typeConverter)))
+    ConversionTarget target(*context);
+    target.addLegalDialect<LLVM::LLVMDialect>();
+    if (failed(
+            applyPartialConversion(module, target, patterns, &typeConverter))) {
       signalPassFailure();
+    }
   }
-
-  /// Use `alloca` instead of `call @malloc` for converting std.alloc.
-  Option<bool> useAlloca{
-      *this, "use-alloca",
-      llvm::cl::desc("Replace emission of malloc/free by alloca"),
-      llvm::cl::init(false)};
-
-  /// Convert memrefs to bare pointers in function signatures.
-  Option<bool> useBarePtrCallConv{
-      *this, "use-bare-ptr-memref-call-conv",
-      llvm::cl::desc("Replace FuncOp's MemRef arguments with "
-                     "bare pointers to the MemRef element types"),
-      llvm::cl::init(false)};
-
-  /// Emit wrappers for C-compatible pointer-to-struct memref descriptors.
-  Option<bool> emitCWrappers{
-      *this, "emit-c-wrappers",
-      llvm::cl::desc("Emit C-compatible wrapper functions"),
-      llvm::cl::init(false)};
 };
-} // end namespace
 
-std::unique_ptr<mlir::Pass> createLowerToLLVMPass(bool useAlloca,
-                                                  bool useBarePtrCallConv,
-                                                  bool emitCWrappers) {
-  return std::make_unique<LLVMLoweringPass>(useAlloca, useBarePtrCallConv,
-                                            emitCWrappers);
+std::unique_ptr<mlir::Pass> createLLVMLoweringPass() {
+  return std::make_unique<ConvertToLLVMPass>();
 }
-
-static PassRegistration<LLVMLoweringPass>
-    pass(PASS_NAME, "Convert scalar and vector operations from the "
-                    "Standard to the LLVM dialect");
 } // namespace pmlc::conversion::gpu

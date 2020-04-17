@@ -274,6 +274,19 @@ LogicalResult VulkanRuntime::createMemoryTransferAction(uint64_t src_index,
   }
 
   createMemoryTransferAction(bufferSrc, bufferDst, bufferSizeDst);
+
+  VkBufferMemoryBarrier bufferMemoryBarrier = {};
+  bufferMemoryBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+  bufferMemoryBarrier.pNext = nullptr;
+  bufferMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+  bufferMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+  bufferMemoryBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+  bufferMemoryBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+  bufferMemoryBarrier.buffer = bufferDst;
+  bufferMemoryBarrier.offset = 0;
+  bufferMemoryBarrier.size = VK_WHOLE_SIZE;
+
+  kernel_dst->deps.push_back(bufferMemoryBarrier);
   return success();
 }
 
@@ -480,7 +493,8 @@ LogicalResult VulkanRuntime::createMemoryBuffers() {
       VulkanDeviceMemoryBuffer memoryBuffer;
       memoryBuffer.bindingIndex = resourceDataBindingPair.first;
       VkDescriptorType descriptorType = {};
-      VkBufferUsageFlagBits bufferUsage = {};
+      VkBufferUsageFlagBits bufferUsageSrc = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+      VkBufferUsageFlagBits bufferUsageDst = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 
       // Check that descriptor set has storage class map.
       const auto resourceStorageClassMapIt =
@@ -507,7 +521,9 @@ LogicalResult VulkanRuntime::createMemoryBuffers() {
       if (failed(mapStorageClassToDescriptorType(resourceStorageClassBinding,
                                                  descriptorType)) ||
           failed(mapStorageClassToBufferUsageFlag(resourceStorageClassBinding,
-                                                  bufferUsage))) {
+                                                  bufferUsageSrc)) ||
+          failed(mapStorageClassToBufferUsageFlag(resourceStorageClassBinding,
+                                                  bufferUsageDst))) {
         llvm::errs() << "storage class for resource with descriptor binding: "
                      << resourceDataBindingPair.first
                      << " in the descriptor set: " << descriptorSetIndex
@@ -545,7 +561,7 @@ LogicalResult VulkanRuntime::createMemoryBuffers() {
       bufferCreateInfo.pNext = nullptr;
       bufferCreateInfo.flags = 0;
       bufferCreateInfo.size = bufferSize;
-      bufferCreateInfo.usage = bufferUsage;
+      bufferCreateInfo.usage = bufferUsageSrc | bufferUsageDst;
       bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
       bufferCreateInfo.queueFamilyIndexCount = 1;
       bufferCreateInfo.pQueueFamilyIndices = &queueFamilyIndex;

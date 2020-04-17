@@ -168,6 +168,15 @@ void bindBufferFloat32(void *vkRuntimeManager, DescriptorSetIndex setIndex,
   case 3:
     bindBuffer<float, 3>(vkRuntimeManager, setIndex, bindIndex, ptr);
     break;
+  case 4:
+    bindBuffer<float, 4>(vkRuntimeManager, setIndex, bindIndex, ptr);
+    break;
+  case 5:
+    bindBuffer<float, 5>(vkRuntimeManager, setIndex, bindIndex, ptr);
+    break;
+  case 6:
+    bindBuffer<float, 6>(vkRuntimeManager, setIndex, bindIndex, ptr);
+    break;
   default:
     return;
   }
@@ -184,6 +193,15 @@ void bindBufferInt64(void *vkRuntimeManager, DescriptorSetIndex setIndex,
     break;
   case 3:
     bindBuffer<int64_t, 3>(vkRuntimeManager, setIndex, bindIndex, ptr);
+    break;
+  case 4:
+    bindBuffer<int64_t, 4>(vkRuntimeManager, setIndex, bindIndex, ptr);
+    break;
+  case 5:
+    bindBuffer<int64_t, 5>(vkRuntimeManager, setIndex, bindIndex, ptr);
+    break;
+  case 6:
+    bindBuffer<int64_t, 6>(vkRuntimeManager, setIndex, bindIndex, ptr);
     break;
   default:
     return;

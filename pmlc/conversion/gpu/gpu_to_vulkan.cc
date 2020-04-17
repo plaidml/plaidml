@@ -12,9 +12,30 @@
 #include "mlir/Pass/Pass.h"
 #include "llvm/ADT/SmallString.h"
 
+#include "pmlc/conversion/gpu/pass_detail.h"
 #include "pmlc/util/logging.h"
 
-using namespace mlir; // NOLINT[build/namespaces]
+namespace pmlc::conversion::gpu {
+namespace gpu = mlir::gpu;
+namespace spirv = mlir::spirv;
+namespace LLVM = mlir::LLVM;
+using mlir::ArrayRef;
+using mlir::CallOp;
+using mlir::failure;
+using mlir::FuncOp;
+using mlir::FunctionType;
+using mlir::Location;
+using mlir::LogicalResult;
+using mlir::MemRefType;
+using mlir::ModuleOp;
+using mlir::OpBuilder;
+using mlir::SmallString;
+using mlir::SmallVector;
+using mlir::StringRef;
+using mlir::success;
+using mlir::Type;
+using mlir::UnrankedMemRefType;
+using mlir::Value;
 
 static constexpr const char *kSPIRVBinary = "SPIRV_BIN";
 static constexpr const char *kPrint_memref_f32 = "print_memref_f32";
@@ -32,15 +53,15 @@ static constexpr const char *kAddVulkanLaunchActionToSchedule =
 static constexpr const char *kBindBufferFloat32 = "bindBufferFloat32";
 static constexpr const char *kBindBufferInt64 = "bindBufferInt64";
 
-namespace {
 /// A pass to convert gpu launch op to vulkan launch call op, by creating a
 /// SPIR-V binary shader from `spirv::ModuleOp` using `spirv::serialize`
 /// function and attaching binary data and entry point name as an attributes to
 /// created vulkan launch call op.
 class ConvertGpuLaunchFuncToVulkanCalls
-    : public ModulePass<ConvertGpuLaunchFuncToVulkanCalls> {
+    : public ConvertGpuLaunchFuncToVulkanCallsBase<
+          ConvertGpuLaunchFuncToVulkanCalls> {
 public:
-  void runOnModule() override;
+  void runOnOperation();
 
 private:
   /// Creates a SPIR-V binary shader from the given `module` using
@@ -76,16 +97,11 @@ private:
     llvmInt32Type = LLVM::LLVMType::getInt32Ty(llvmDialect);
     llvmInt64Type = LLVM::LLVMType::getInt64Ty(llvmDialect);
 
-    OpBuilder builder(getModule());
+    OpBuilder builder(getOperation());
     mlirIndexType = builder.getIndexType();
     mlirInt32Type = builder.getIntegerType(32);
     mlirInt64Type = builder.getIntegerType(64);
     mlirFloat32Type = builder.getF32Type();
-  }
-
-  mlir::Type getDynamicMemRefType(const uint64_t rank, Type &elementType) {
-    SmallVector<int64_t, 4> shape(rank, -1);
-    return MemRefType::get(shape, elementType);
   }
 
   mlir::Type getUnrankedMemRefType(Type &elementType) {
@@ -130,20 +146,19 @@ private:
   mlir::Value vulkanRuntime;
 };
 
-} // anonymous namespace
-
-void ConvertGpuLaunchFuncToVulkanCalls::runOnModule() {
+void ConvertGpuLaunchFuncToVulkanCalls::runOnOperation() {
   getCachedTypes();
-  getModule().walk([this](gpu::LaunchFuncOp op) { numKernel++; });
-  getModule().walk([this](gpu::LaunchFuncOp op) { convertGpuLaunchFunc(op); });
+  getOperation().walk([this](gpu::LaunchFuncOp op) { numKernel++; });
+  getOperation().walk(
+      [this](gpu::LaunchFuncOp op) { convertGpuLaunchFunc(op); });
 
   // Erase `gpu::GPUModuleOp` and `spirv::Module` operations.
   for (auto gpuModule :
-       llvm::make_early_inc_range(getModule().getOps<gpu::GPUModuleOp>()))
+       llvm::make_early_inc_range(getOperation().getOps<gpu::GPUModuleOp>()))
     gpuModule.erase();
 
   for (auto spirvModule :
-       llvm::make_early_inc_range(getModule().getOps<spirv::ModuleOp>()))
+       llvm::make_early_inc_range(getOperation().getOps<spirv::ModuleOp>()))
     spirvModule.erase();
 }
 
@@ -195,12 +210,9 @@ ConvertGpuLaunchFuncToVulkanCalls::bindBuffers(Location loc, OpBuilder &builder,
     Value descriptorBinding = builder.create<LLVM::ConstantOp>(
         loc, getLLVMInt32Type(), builder.getI32IntegerAttr(bindIndex));
     if (auto memRefType = buffer.getType().dyn_cast_or_null<MemRefType>()) {
-      auto rank = memRefType.getRank();
       auto elementType = memRefType.getElementType();
-      auto dynamicBuffer = builder.create<mlir::MemRefCastOp>(
-          loc, buffer, getDynamicMemRefType(rank, elementType));
       Value unrankedBuffer = builder.create<mlir::MemRefCastOp>(
-          loc, dynamicBuffer, getUnrankedMemRefType(elementType));
+          loc, buffer, getUnrankedMemRefType(elementType));
       builder.create<CallOp>(
           loc, ArrayRef<Type>{},
           builder.getSymbolRefAttr(getBufferBindingFunc(elementType)),
@@ -247,13 +259,10 @@ LogicalResult ConvertGpuLaunchFuncToVulkanCalls::printBuffer(Location loc,
                                                              Value &buffer) {
   auto type = buffer.getType();
   if (auto memRefType = type.dyn_cast_or_null<MemRefType>()) {
-    auto rank = memRefType.getRank();
     auto elementType = memRefType.getElementType();
     if (elementType.isF32()) {
-      auto dynamicBuffer = builder.create<mlir::MemRefCastOp>(
-          loc, buffer, getDynamicMemRefType(rank, elementType));
       auto unrankedBuffer = builder.create<mlir::MemRefCastOp>(
-          loc, dynamicBuffer, getUnrankedMemRefType(elementType));
+          loc, buffer, getUnrankedMemRefType(elementType));
       builder.create<CallOp>(loc, ArrayRef<Type>{},
                              builder.getSymbolRefAttr(kPrint_memref_f32),
                              ArrayRef<Value>(unrankedBuffer));
@@ -263,7 +272,7 @@ LogicalResult ConvertGpuLaunchFuncToVulkanCalls::printBuffer(Location loc,
 }
 
 void ConvertGpuLaunchFuncToVulkanCalls::declareVulkanFunctions(Location loc) {
-  ModuleOp module = getModule();
+  ModuleOp module = getOperation();
   OpBuilder builder(module.getBody()->getTerminator());
 
   if (!module.lookupSymbol(kInitVulkan)) {
@@ -361,7 +370,7 @@ void ConvertGpuLaunchFuncToVulkanCalls::declareVulkanFunctions(Location loc) {
 
 void ConvertGpuLaunchFuncToVulkanCalls::convertGpuLaunchFunc(
     gpu::LaunchFuncOp launchOp) {
-  ModuleOp module = getModule();
+  ModuleOp module = getOperation();
   OpBuilder builder(launchOp);
   Location loc = launchOp.getLoc();
 
@@ -453,14 +462,8 @@ void ConvertGpuLaunchFuncToVulkanCalls::convertGpuLaunchFunc(
   lauchFuncIndex++;
 }
 
-namespace pmlc::conversion::gpu {
-
 std::unique_ptr<mlir::Pass> createConvertGpuLaunchFuncToVulkanCallsPass() {
   return std::make_unique<ConvertGpuLaunchFuncToVulkanCalls>();
 }
 
 } // namespace pmlc::conversion::gpu
-
-static PassRegistration<ConvertGpuLaunchFuncToVulkanCalls>
-    pass("pmlc-convert-gpu-to-vulkan",
-         "Convert gpu.launch_func op to Vulkan runtime calls");
