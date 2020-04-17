@@ -139,7 +139,7 @@ TEST_F(CppEdsl, BitAndScalar) {
                                       6, 7, 8};
   checkProgram(program, {{A, A_input}}, {{B, B_output}});
 }
-*/
+
 
 TEST_F(CppEdsl, BitAnd) {
   auto A = Placeholder(DType::UINT64, {3, 3});
@@ -212,7 +212,7 @@ TEST_F(CppEdsl, BitRightTensor) {
                                       7, 8, 9};
   checkProgram(program, {{A, A_input}, {B, B_input}}, {{C, C_output}});
 }
-/*
+
 TEST_F(CppEdsl, BitRightScalar) {
   auto A = Placeholder(DType::UINT64, {3, 3});
   auto B = A >> 9;
@@ -226,7 +226,7 @@ TEST_F(CppEdsl, BitRightScalar) {
                                       7 << 7, 8 << 8, 9 << 9};
   checkProgram(program, {{A, A_input}}, {{B, B_output}});
 }
-*/
+
 TEST_F(CppEdsl, BitXor) {
   auto A = Placeholder(DType::UINT64, {3, 3});
   auto B = Placeholder(DType::UINT64, {3, 3});
@@ -244,7 +244,7 @@ TEST_F(CppEdsl, BitXor) {
                                       7 ^ 16, 8 ^ 17, 9 ^ 18};
   checkProgram(program, {{A, A_input}, {B, B_input}}, {{C, C_output}});
 }
-/*
+
 TEST_F(CppEdsl, BroadcastCmp) {
   auto A = Placeholder(DType::UINT64, {3, 4});
   auto B = Placeholder(DType::UINT64, {3, 1});
@@ -260,7 +260,7 @@ TEST_F(CppEdsl, BroadcastCmp) {
                                          0, 0, 0, 0};
   checkProgram(program, {{A, A_input}, {B, B_input}}, {{C, C_output}});
 }
-*/
+
 TEST_F(CppEdsl, Add) {
   auto A = Placeholder(DType::UINT64, {3, 3});
   auto B = Placeholder(DType::UINT64, {3, 3});
@@ -301,7 +301,7 @@ TEST_F(CppEdsl, Add) {
 
   checkProgram(program, {{A, A_input}, {B, B_input}}, {{C, C_output}});
 }
-
+*/
 TEST_F(CppEdsl, Dot) {
   int64_t M = 8;
   int64_t N = 32;
