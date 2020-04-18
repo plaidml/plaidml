@@ -149,9 +149,9 @@ def plaidml_workspace():
 
     xsmm_repo(
         name = "xsmm",
-        url = "https://github.com/hfp/libxsmm/archive/1.12.1.zip",
-        sha256 = "451ec9d30f0890bf3081aa3d0d264942a6dea8f9d29c17bececc8465a10a832b",
-        strip_prefix = "libxsmm-1.12.1",
+        url = "https://github.com/hfp/libxsmm/archive/dc7523725e0d919d56c739402b28683358b0c95a.zip",
+        sha256 = "70ea9f057c4f11bfe35095815d6b9841e501c2e82931649a953fab389144d648",
+        strip_prefix = "libxsmm-dc7523725e0d919d56c739402b28683358b0c95a",
         build_file = clean_dep("//vendor/xsmm:xsmm.BUILD"),
     )
 
