@@ -6,13 +6,16 @@
 #include <string>
 #include <utility>
 
+#include "llvm/ExecutionEngine/ExecutionEngine.h"
+#include "llvm/ExecutionEngine/GenericValue.h"
+#include "llvm/ExecutionEngine/MCJIT.h"
+#include "llvm/IR/IRBuilder.h"
+#include "llvm/Support/DynamicLibrary.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/TargetSelect.h"
+#include "llvm/Transforms/Utils/Cloning.h"
 
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
-#include "mlir/ExecutionEngine/ExecutionEngine.h"
 #include "mlir/ExecutionEngine/OptUtils.h"
-#include "mlir/Parser.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/DebugStringHelper.h"
@@ -22,6 +25,72 @@
 #include "pmlc/util/logging.h"
 
 using namespace mlir; // NOLINT[build/namespaces]
+
+static std::string makePackedFunctionName(StringRef name) {
+  return "_mlir_" + name.str();
+}
+
+// For each function in the LLVM module, define an interface function that wraps
+// all the arguments of the original function and all its results into an i8**
+// pointer to provide a unified invocation interface.
+static void packFunctionArguments(llvm::Module *module) {
+  auto &ctx = module->getContext();
+  llvm::IRBuilder<> builder(ctx);
+  DenseSet<llvm::Function *> interfaceFunctions;
+  for (auto &func : module->getFunctionList()) {
+    if (func.isDeclaration()) {
+      continue;
+    }
+    if (interfaceFunctions.count(&func)) {
+      continue;
+    }
+
+    // Given a function `foo(<...>)`, define the interface function
+    // `mlir_foo(i8**)`.
+    auto newType = llvm::FunctionType::get(
+        builder.getVoidTy(), builder.getInt8PtrTy()->getPointerTo(),
+        /*isVarArg=*/false);
+    auto newName = makePackedFunctionName(func.getName());
+    auto funcCst = module->getOrInsertFunction(newName, newType);
+    llvm::Function *interfaceFunc = cast<llvm::Function>(funcCst.getCallee());
+    interfaceFunctions.insert(interfaceFunc);
+
+    // Extract the arguments from the type-erased argument list and cast them to
+    // the proper types.
+    auto bb = llvm::BasicBlock::Create(ctx);
+    bb->insertInto(interfaceFunc);
+    builder.SetInsertPoint(bb);
+    llvm::Value *argList = interfaceFunc->arg_begin();
+    SmallVector<llvm::Value *, 8> args;
+    args.reserve(llvm::size(func.args()));
+    for (auto &indexedArg : llvm::enumerate(func.args())) {
+      llvm::Value *argIndex = llvm::Constant::getIntegerValue(
+          builder.getInt64Ty(), APInt(64, indexedArg.index()));
+      llvm::Value *argPtrPtr = builder.CreateGEP(argList, argIndex);
+      llvm::Value *argPtr = builder.CreateLoad(argPtrPtr);
+      argPtr = builder.CreateBitCast(
+          argPtr, indexedArg.value().getType()->getPointerTo());
+      llvm::Value *arg = builder.CreateLoad(argPtr);
+      args.push_back(arg);
+    }
+
+    // Call the implementation function with the extracted arguments.
+    llvm::Value *result = builder.CreateCall(&func, args);
+
+    // Assuming the result is one value, potentially of type `void`.
+    if (!result->getType()->isVoidTy()) {
+      llvm::Value *retIndex = llvm::Constant::getIntegerValue(
+          builder.getInt64Ty(), APInt(64, llvm::size(func.args())));
+      llvm::Value *retPtrPtr = builder.CreateGEP(argList, retIndex);
+      llvm::Value *retPtr = builder.CreateLoad(retPtrPtr);
+      retPtr = builder.CreateBitCast(retPtr, result->getType()->getPointerTo());
+      builder.CreateStore(result, retPtr);
+    }
+
+    // The interface function returns void.
+    builder.CreateRetVoid();
+  }
+}
 
 namespace pmlc::compiler {
 
@@ -70,67 +139,32 @@ Executable::Executable(const std::shared_ptr<Program> &program,
     throw std::runtime_error("Program arguments and bufptrs size mismatch");
   }
 
-  auto tmBuilderOrError = llvm::orc::JITTargetMachineBuilder::detectHost();
-  if (!tmBuilderOrError) {
-    throw std::runtime_error(
-        "Failed to create a JITTargetMachineBuilder for the host");
+  auto llvmModule = translateModuleToLLVMIR(*program->module);
+  if (!llvmModule) {
+    throw std::runtime_error("could not convert to LLVM IR");
   }
 
-  auto tmOrError = tmBuilderOrError->createTargetMachine();
-  if (!tmOrError) {
-    throw std::runtime_error("Failed to create a TargetMachine for the host");
+  packFunctionArguments(llvmModule.get());
+
+  std::string error;
+  engine = std::unique_ptr<llvm::ExecutionEngine>(
+      llvm::EngineBuilder(std::move(llvmModule))
+          .setErrorStr(&error)
+          .setOptLevel(llvm::CodeGenOpt::Aggressive)
+          .setEngineKind(llvm::EngineKind::JIT)
+          .create());
+  if (!engine) {
+    throw std::runtime_error("Failed to create ExecutionEngine: " + error);
   }
 
-  auto optPipeline = makeOptimizingTransformer(
-      /*optLevel=*/0,
-      /*sizeLevel=*/0,
-      /*targetMachine=*/tmOrError->get());
+  engine->finalizeObject();
 
-  if (VLOG_IS_ON(6)) {
-    auto llvmModule = translateModuleToLLVMIR(*program->module);
-    if (!llvmModule) {
-      throw std::runtime_error("could not convert to LLVM IR");
-    }
-    llvmModule->print(llvm::errs(), nullptr);
+  uint64_t addr =
+      engine->getFunctionAddress(makePackedFunctionName(program->entry));
+  if (!addr) {
+    throw std::runtime_error("getFunctionAddress failed");
   }
-
-  std::vector<StringRef> sharedLibPaths;
-  // HACK: this is required because the ORCv2 JIT doesn't want to resolve
-  // symbols from the current process, but only on Linux.
-#ifdef __linux__
-  std::string modulePathHolder;
-  {
-    std::ifstream ifs("/proc/self/maps");
-    if (!ifs.is_open()) {
-      throw std::runtime_error("Could not load /proc/self/maps");
-    }
-    for (std::string line; std::getline(ifs, line);) {
-      auto pos = line.find('/');
-      if (pos == std::string::npos)
-        continue;
-      auto modulePath = line.substr(pos);
-      pos = modulePath.find("libplaidml.so");
-      if (pos != std::string::npos) {
-        IVLOG(1, "module: " << modulePath);
-        modulePathHolder = modulePath;
-        sharedLibPaths.push_back(modulePathHolder);
-        break;
-      }
-    }
-  }
-#endif
-
-  auto maybeEngine =
-      ExecutionEngine::create(*program->module, optPipeline,
-                              /*jitCodeGenOptLevel=*/llvm::None, sharedLibPaths,
-                              /*enableObjectCache=*/true,
-                              /*enableGDBNotificationListener=*/false);
-  llvm::handleAllErrors(
-      maybeEngine.takeError(), [](const llvm::ErrorInfoBase &err) {
-        throw std::runtime_error("Failed to create ExecutionEngine: " +
-                                 err.message());
-      });
-  engine = std::move(*maybeEngine);
+  jitEntry = reinterpret_cast<Function>(addr);
 
   descriptors.reserve(bufptrs.size());
   for (unsigned i = 0; i < bufptrs.size(); i++) {
@@ -141,12 +175,6 @@ Executable::Executable(const std::shared_ptr<Program> &program,
 
 Executable::~Executable() = default;
 
-void Executable::invoke() {
-  auto arrayRef = MutableArrayRef<void *>(ptrs);
-  auto result = engine->invoke(program->entry, arrayRef);
-  if (result) {
-    throw std::runtime_error("JIT invocation failed");
-  }
-}
+void Executable::invoke() { jitEntry(ptrs.data()); }
 
 } // namespace pmlc::compiler

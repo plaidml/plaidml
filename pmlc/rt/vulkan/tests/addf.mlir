@@ -1,4 +1,4 @@
-// RUN: pmlc-vulkan-runner %s --entry-point-result=void | FileCheck %s
+// RUN: pmlc-vulkan-runner %s | FileCheck %s
 
 // CHECK: [3.3,  3.3,  3.3,  3.3,  3.3,  3.3,  3.3,  3.3]
 module attributes {

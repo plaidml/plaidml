@@ -35,6 +35,7 @@ struct Program {
 
   explicit Program(mlir::ModuleOp module);
   explicit Program(mlir::StringRef source);
+  explicit Program(std::unique_ptr<llvm::MemoryBuffer> buffer);
 
   void compile(mlir::StringRef target, bool collectPasses = false);
 };

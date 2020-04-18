@@ -7,9 +7,9 @@
 
 #include "pmlc/compiler/program.h"
 
-namespace mlir {
+namespace llvm {
 class ExecutionEngine;
-} // namespace mlir
+};
 
 namespace pmlc::compiler {
 
@@ -25,9 +25,12 @@ public:
 
 private:
   std::shared_ptr<Program> program;
-  std::unique_ptr<mlir::ExecutionEngine> engine;
+  std::unique_ptr<llvm::ExecutionEngine> engine;
   std::vector<MemRefDescriptor> descriptors;
   std::vector<void *> ptrs;
+
+  using Function = void (*)(void **);
+  Function jitEntry;
 };
 
 } // namespace pmlc::compiler
