@@ -20,7 +20,6 @@ struct Registration {
     using pmlc::compiler::registerSymbol;
 
     // cstdlib functions
-    // registerSymbol("aligned_alloc", reinterpret_cast<void *>(aligned_alloc));
     registerSymbol("expf", reinterpret_cast<void *>(expf));
     registerSymbol("free", reinterpret_cast<void *>(free));
     registerSymbol("malloc", reinterpret_cast<void *>(malloc));
