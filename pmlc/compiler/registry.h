@@ -47,7 +47,7 @@ struct SymbolRegistry {
   void *resolve(llvm::StringRef symbol) {
     auto it = symbols.find(symbol);
     if (it == symbols.end()) {
-      throw std::runtime_error(formatv("Could not find symbol: {0}", symbol));
+      return nullptr;
     }
     return it->second;
   }

@@ -161,6 +161,13 @@ struct MCJITEngineImpl : EngineImpl {
   struct Runtime : public llvm::LegacyJITSymbolResolver {
     llvm::JITSymbol findSymbol(const std::string &symbol) override {
       auto ptr = resolveSymbol(symbol);
+      if (!ptr) {
+        ptr = llvm::sys::DynamicLibrary::SearchForAddressOfSymbol(symbol);
+        if (!ptr) {
+          throw std::runtime_error(
+              llvm::formatv("Could not find symbol: {0}", symbol));
+        }
+      }
       auto addr = llvm::pointerToJITTargetAddress(ptr);
       return llvm::JITEvaluatedSymbol(addr, llvm::JITSymbolFlags::None);
     }

@@ -14,11 +14,7 @@ plaidml_cc_library(
         "//pmlc/compiler",
         "@llvm-project//llvm:support",
         "@llvm-project//mlir:mlir_runner_utils",
-    ] + select({
-        "@bazel_tools//src/conditions:windows": [],
-        "//conditions:default": [
-            "@xsmm",
-        ],
-    }),
+        "@xsmm",
+    ],
     alwayslink = 1,
 )
