@@ -7,12 +7,6 @@
 #include "pmlc/compiler/registry.h"
 #include "pmlc/util/logging.h"
 
-struct Initializer {
-  Initializer() { libxsmm_init(); }
-};
-
-static Initializer init;
-
 extern "C" void plaidml_rt_xsmm_gemm_f32(            //
     size_t aRank, StridedMemRefType<float, 2> *aRef, //
     size_t bRank, StridedMemRefType<float, 2> *bRef, //
@@ -42,6 +36,10 @@ extern "C" void plaidml_rt_xsmm_gemm_f32(            //
 namespace {
 struct Registration {
   Registration() {
+#ifndef _WIN32
+    libxsmm_init();
+#endif
+
     using pmlc::compiler::registerSymbol;
     registerSymbol("plaidml_rt_xsmm_gemm_f32",
                    reinterpret_cast<void *>(plaidml_rt_xsmm_gemm_f32));
