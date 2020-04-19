@@ -20,9 +20,13 @@ struct Registration {
     using pmlc::compiler::registerSymbol;
 
     // cstdlib functions
-    registerSymbol("expf", reinterpret_cast<void *>(expf));
     registerSymbol("free", reinterpret_cast<void *>(free));
     registerSymbol("malloc", reinterpret_cast<void *>(malloc));
+
+    // cmath functions
+    registerSymbol("ceilf", reinterpret_cast<void *>(ceilf));
+    registerSymbol("expf", reinterpret_cast<void *>(expf));
+    registerSymbol("logf", reinterpret_cast<void *>(logf));
 
     // RunnerUtils functions
     registerSymbol("print_memref_f32",
