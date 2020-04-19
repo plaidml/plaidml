@@ -36,9 +36,7 @@ extern "C" void plaidml_rt_xsmm_gemm_f32(            //
 namespace {
 struct Registration {
   Registration() {
-#ifndef _WIN32
     libxsmm_init();
-#endif
 
     using pmlc::compiler::registerSymbol;
     registerSymbol("plaidml_rt_xsmm_gemm_f32",
