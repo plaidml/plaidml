@@ -157,16 +157,23 @@ struct EngineImpl {
                            StringRef entryPoint) = 0;
 };
 
+static void *tryResolveSymbol(StringRef symbol) {
+  if (auto ptr = resolveSymbol(symbol))
+    return ptr;
+  if (symbol[0] == '_') {
+    if (auto ptr = resolveSymbol(symbol.drop_front()))
+      return ptr;
+  }
+  return llvm::sys::DynamicLibrary::SearchForAddressOfSymbol(symbol.str());
+}
+
 struct MCJITEngineImpl : EngineImpl {
   struct Runtime : public llvm::LegacyJITSymbolResolver {
     llvm::JITSymbol findSymbol(const std::string &symbol) override {
-      auto ptr = resolveSymbol(symbol);
+      auto ptr = tryResolveSymbol(symbol);
       if (!ptr) {
-        ptr = llvm::sys::DynamicLibrary::SearchForAddressOfSymbol(symbol);
-        if (!ptr) {
-          throw std::runtime_error(
-              llvm::formatv("Could not find symbol: {0}", symbol));
-        }
+        throw std::runtime_error(
+            llvm::formatv("Could not find symbol: {0}", symbol));
       }
       auto addr = llvm::pointerToJITTargetAddress(ptr);
       return llvm::JITEvaluatedSymbol(addr, llvm::JITSymbolFlags::None);

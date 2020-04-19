@@ -39,7 +39,7 @@ struct SymbolRegistry {
   void registerSymbol(llvm::StringRef symbol, void *ptr) {
     if (symbols.count(symbol)) {
       throw std::runtime_error(
-          formatv("Symbol is already registered: {0}", symbol));
+          llvm::formatv("Symbol is already registered: {0}", symbol));
     }
     symbols[symbol] = ptr;
   }
