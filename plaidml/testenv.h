@@ -57,7 +57,11 @@ class TestFixture : public ::testing::Test {
     }
   }
 
-  void runProgram(const Program& program) { exec::Binder(program).compile()->run(); }
+  void runProgram(const Program& program) {
+#if !defined(_WIN32)
+    exec::Binder(program).compile()->run();
+#endif
+  }
 };
 
 }  // namespace plaidml::edsl

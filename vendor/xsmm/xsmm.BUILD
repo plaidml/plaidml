@@ -16,10 +16,7 @@ cc_library(
         "src/template/*.tpl.c",
     ]),
     defines = [
-        "BLAS=0",
         "__BLAS=0",
-        "LIBXSMM_NO_BLAS=1",
-        "LIBXSMM_BLAS=0",
         "LIBXSMM_DEFAULT_CONFIG",
     ],
     includes = ["include"],
