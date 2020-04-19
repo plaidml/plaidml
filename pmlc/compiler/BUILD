@@ -11,10 +11,11 @@ plaidml_cc_library(
     deps = [
         "//pmlc/util",
         "@llvm-project//llvm:execution_engine",
+        "@llvm-project//llvm:ipo",
         "@llvm-project//llvm:mcjit",
-        "@llvm-project//llvm:target",
+        "@llvm-project//llvm:orc_jit",
+        "@llvm-project//llvm:x86_asm_parser",
         "@llvm-project//llvm:x86_code_gen",
-        "@llvm-project//llvm:x86_disassembler",
         "@llvm-project//mlir:ExecutionEngineUtils",
         "@llvm-project//mlir:TargetLLVMIR",
     ],

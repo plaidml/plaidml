@@ -10,7 +10,8 @@ plaidml_cc_library(
     deps = [
         "//pmlc:all_passes_and_dialects_no_registration",
         "//pmlc/compiler",
-        "//pmlc/rt:link",
+        "//pmlc/rt",
+        "//pmlc/rt/vulkan",
         "//pmlc/util",
         "@llvm-project//mlir:ExecutionEngineUtils",
     ],

@@ -24,8 +24,11 @@
 #include "pmlc/compiler/program.h"
 #include "pmlc/util/all_dialects.h"
 #include "pmlc/util/all_passes.h"
+#include "pmlc/util/env.h"
+#include "pmlc/util/logging.h"
 
 using llvm::Error;
+using pmlc::compiler::EngineKind;
 using pmlc::compiler::Executable;
 using pmlc::compiler::Program;
 
@@ -39,6 +42,8 @@ struct Options {
   llvm::cl::opt<std::string> mainFuncName{
       "e", llvm::cl::desc("The function to be called"),
       llvm::cl::value_desc("<function name>"), llvm::cl::init("main")};
+
+  llvm::cl::opt<bool> optOrc{"orc", llvm::cl::desc("Use OrcJIT")};
 };
 } // namespace
 
@@ -58,13 +63,25 @@ int JitRunnerMain(int argc, char **argv) {
 
   auto program = std::make_shared<Program>(std::move(file));
   program->entry = options.mainFuncName.getValue();
-  Executable executable(program, ArrayRef<void *>{});
+  auto kind = EngineKind::MCJIT;
+  if (options.optOrc.getValue())
+    kind = EngineKind::OrcJIT;
+  Executable executable(program, ArrayRef<void *>{}, kind);
   executable.invoke();
 
   return EXIT_SUCCESS;
 }
 
 int main(int argc, char **argv) {
+  auto level_str = pmlc::util::getEnvVar("PLAIDML_VERBOSE");
+  if (level_str.size()) {
+    auto level = std::atoi(level_str.c_str());
+    if (level) {
+      el::Loggers::setVerboseLevel(level);
+    }
+    IVLOG(level, "PLAIDML_VERBOSE=" << level);
+  }
+
   registerAllDialects();
   llvm::InitLLVM y(argc, argv);
   llvm::InitializeNativeTarget();
@@ -88,15 +105,17 @@ int main(int argc, char **argv) {
     std::exit(EXIT_SUCCESS);
   });
 
+  int exitCode = EXIT_SUCCESS;
   try {
-    return JitRunnerMain(argc, argv);
-  } catch (const std::exception &e) {
-    llvm::outs() << "ERROR: " << e.what() << "\n";
-    llvm::outs().flush();
+    exitCode = JitRunnerMain(argc, argv);
+  } catch (const std::exception &ex) {
+    llvm::outs() << "ERROR: " << ex.what() << "\n";
   } catch (...) {
     llvm::outs() << "ERROR: Unknown exception\n";
-    llvm::outs().flush();
   }
 
-  return EXIT_SUCCESS;
+  llvm::errs().flush();
+  llvm::outs().flush();
+
+  return exitCode;
 }

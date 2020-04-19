@@ -7,30 +7,25 @@
 
 #include "pmlc/compiler/program.h"
 
-namespace llvm {
-class ExecutionEngine;
-};
-
 namespace pmlc::compiler {
 
-class MemRefDescriptor;
+enum class EngineKind {
+  MCJIT,
+  OrcJIT,
+};
 
+struct ExecutableImpl;
 class Executable {
 public:
   Executable(const std::shared_ptr<Program> &program,
-             mlir::ArrayRef<void *> bufptrs);
+             mlir::ArrayRef<void *> bufptrs,
+             EngineKind kind = EngineKind::MCJIT);
   ~Executable();
 
   void invoke();
 
 private:
-  std::shared_ptr<Program> program;
-  std::unique_ptr<llvm::ExecutionEngine> engine;
-  std::vector<MemRefDescriptor> descriptors;
-  std::vector<void *> ptrs;
-
-  using Function = void (*)(void **);
-  Function jitEntry;
+  std::unique_ptr<ExecutableImpl> impl;
 };
 
 } // namespace pmlc::compiler

@@ -8,10 +8,19 @@
 
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
 #include "llvm/ExecutionEngine/GenericValue.h"
+#include "llvm/ExecutionEngine/JITLink/JITLinkMemoryManager.h"
 #include "llvm/ExecutionEngine/MCJIT.h"
+#include "llvm/ExecutionEngine/ObjectCache.h"
+#include "llvm/ExecutionEngine/Orc/ExecutionUtils.h"
+#include "llvm/ExecutionEngine/Orc/LLJIT.h"
+#include "llvm/ExecutionEngine/Orc/ObjectLinkingLayer.h"
+#include "llvm/ExecutionEngine/Orc/RTDyldObjectLinkingLayer.h"
+#include "llvm/ExecutionEngine/SectionMemoryManager.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/Support/DynamicLibrary.h"
 #include "llvm/Support/FormatVariadic.h"
+#include "llvm/Support/Host.h"
+#include "llvm/Support/TargetRegistry.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
@@ -22,9 +31,25 @@
 #include "mlir/Target/LLVMIR.h"
 #include "mlir/Transforms/Passes.h"
 
+#include "pmlc/compiler/registry.h"
 #include "pmlc/util/logging.h"
 
 using namespace mlir; // NOLINT[build/namespaces]
+
+// Setup LLVM target triple from the current machine.
+static void setupTargetTriple(llvm::Module *llvmModule) {
+  // Setup the machine properties from the current architecture.
+  auto targetTriple = llvm::sys::getProcessTriple();
+  std::string errorMessage;
+  auto target = llvm::TargetRegistry::lookupTarget(targetTriple, errorMessage);
+  if (!target) {
+    throw std::runtime_error("NO target: " + errorMessage);
+  }
+  std::unique_ptr<llvm::TargetMachine> machine(
+      target->createTargetMachine(targetTriple, "generic", "", {}, {}));
+  llvmModule->setDataLayout(machine->createDataLayout());
+  llvmModule->setTargetTriple(targetTriple);
+}
 
 static std::string makePackedFunctionName(StringRef name) {
   return "_mlir_" + name.str();
@@ -124,57 +149,218 @@ private:
   std::vector<char> memory;
 };
 
+using Function = void (*)(void **);
+
+struct EngineImpl {
+  virtual ~EngineImpl() = default;
+  virtual Function compile(std::unique_ptr<llvm::Module> module,
+                           StringRef entryPoint) = 0;
+};
+
+struct MCJITEngineImpl : EngineImpl {
+  struct Runtime : public llvm::LegacyJITSymbolResolver {
+    llvm::JITSymbol findSymbol(const std::string &symbol) override {
+      auto ptr = resolveSymbol(symbol);
+      auto addr = llvm::pointerToJITTargetAddress(ptr);
+      return llvm::JITEvaluatedSymbol(addr, llvm::JITSymbolFlags::None);
+    }
+
+    llvm::JITSymbol findSymbolInLogicalDylib(const std::string &) override {
+      return llvm::JITSymbol(nullptr);
+    }
+  };
+
+  Function compile(std::unique_ptr<llvm::Module> module,
+                   StringRef entryPoint) final {
+    std::string error;
+    std::unique_ptr<llvm::LegacyJITSymbolResolver> resolver(new Runtime);
+    engine = std::unique_ptr<llvm::ExecutionEngine>(
+        llvm::EngineBuilder(std::move(module))
+            .setErrorStr(&error)
+            .setOptLevel(llvm::CodeGenOpt::Aggressive)
+            .setEngineKind(llvm::EngineKind::JIT)
+            .setVerifyModules(true)
+            .setSymbolResolver(std::move(resolver))
+            .create());
+    if (!engine) {
+      throw std::runtime_error("Failed to create ExecutionEngine: " + error);
+    }
+
+    engine->finalizeObject();
+
+    uint64_t addr = engine->getFunctionAddress(entryPoint.str());
+    if (!addr) {
+      throw std::runtime_error("getFunctionAddress failed");
+    }
+    return reinterpret_cast<Function>(addr);
+  }
+
+  std::unique_ptr<llvm::ExecutionEngine> engine;
+};
+
+struct OrcJITEngineImpl : EngineImpl {
+  Function compile(std::unique_ptr<llvm::Module> module,
+                   StringRef entryPoint) final {
+    std::unique_ptr<llvm::LLVMContext> ctx(new llvm::LLVMContext);
+    auto dataLayout = module->getDataLayout();
+
+    // Detect the host and set code model to small.
+    auto expectedJTMB = llvm::orc::JITTargetMachineBuilder::detectHost();
+    if (!expectedJTMB) {
+      throw std::runtime_error("Could not detect host");
+    }
+    expectedJTMB->setCodeModel(llvm::CodeModel::Small);
+
+    // Callback to create the object layer with symbol resolution to current
+    // process and dynamically linked libraries.
+    auto objectLinkingLayerCreator = [&](llvm::orc::ExecutionSession &session,
+                                         const llvm::Triple &TT) {
+      return std::make_unique<llvm::orc::ObjectLinkingLayer>(
+          session, std::make_unique<llvm::jitlink::InProcessMemoryManager>());
+      // auto objectLayer =
+      //     std::make_unique<llvm::orc::RTDyldObjectLinkingLayer>(session, []()
+      //     {
+      //       return std::make_unique<llvm::SectionMemoryManager>();
+      //     });
+      // objectLayer->setNotifyLoaded(
+      //     [engine = engine.get()](
+      //         llvm::orc::VModuleKey, const llvm::object::ObjectFile &object,
+      //         const llvm::RuntimeDyld::LoadedObjectInfo &objectInfo) {
+      //       uint64_t key = static_cast<uint64_t>(
+      //           reinterpret_cast<uintptr_t>(object.getData().data()));
+      //       engine->gdbListener->notifyObjectLoaded(key, object, objectInfo);
+      //     });
+
+      // Resolve symbols from shared libraries.
+      // for (auto libPath : sharedLibPaths) {
+      //   auto mb = llvm::MemoryBuffer::getFile(libPath);
+      //   if (!mb) {
+      //     errs() << "Fail to create MemoryBuffer for: " << libPath <<
+      //     "\n"; continue;
+      //   }
+      //   auto &JD = session.createBareJITDylib(std::string(libPath));
+      //   auto loaded = DynamicLibrarySearchGenerator::Load(
+      //       libPath.data(), dataLayout.getGlobalPrefix());
+      //   if (!loaded) {
+      //     errs() << "Could not load " << libPath << ":\n  "
+      //            << loaded.takeError() << "\n";
+      //     continue;
+      //   }
+      //   JD.addGenerator(std::move(*loaded));
+      //   cantFail(objectLayer->add(JD, std::move(mb.get())));
+      // }
+
+      // return objectLayer;
+    };
+
+    jit = llvm::cantFail(
+        llvm::orc::LLJITBuilder()
+            .setJITTargetMachineBuilder(std::move(*expectedJTMB))
+            //  .setCompileFunctionCreator(compileFunctionCreator)
+            .setObjectLinkingLayerCreator(objectLinkingLayerCreator)
+            .create());
+
+    // Add a ThreadSafemodule to the engine and return.
+    llvm::orc::ThreadSafeModule tsm(std::move(module), std::move(ctx));
+    // if (transformer)
+    //   llvm::cantFail(tsm.withModuleDo(
+    //       [&](llvm::Module &module) { return transformer(&module); }));
+    llvm::cantFail(jit->addIRModule(std::move(tsm)));
+
+    // Resolve symbols that are statically linked in the current process.
+    auto &mainJD = jit->getMainJITDylib();
+    mainJD.addGenerator(llvm::cantFail(
+        llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(
+            dataLayout.getGlobalPrefix())));
+
+    // JIT lookup may return an Error referring to strings stored internally by
+    // the JIT. If the Error outlives the ExecutionEngine, it would want have a
+    // dangling reference, which is currently caught by an assertion inside JIT
+    // thanks to hand-rolled reference counting. Rewrap the error message into a
+    // string before returning. Alternatively, ORC JIT should consider copying
+    // the string into the error message.
+    auto expectedSymbol = jit->lookup(entryPoint);
+    if (!expectedSymbol) {
+      std::string errorMessage;
+      llvm::raw_string_ostream os(errorMessage);
+      llvm::handleAllErrors(expectedSymbol.takeError(),
+                            [&os](llvm::ErrorInfoBase &ei) { ei.log(os); });
+      throw std::runtime_error(os.str());
+    }
+
+    auto addr = expectedSymbol->getAddress();
+    return reinterpret_cast<Function>(addr);
+  }
+
+  std::unique_ptr<llvm::orc::LLJIT> jit;
+}; // namespace pmlc::compiler
+
+struct ExecutableImpl {
+  ExecutableImpl(const std::shared_ptr<Program> &program,
+                 ArrayRef<void *> bufptrs, EngineKind kind)
+      : program(program), ptrs(bufptrs.size()) {
+    static std::once_flag is_initialized;
+    std::call_once(is_initialized, []() {
+      llvm::InitializeNativeTarget();
+      llvm::InitializeNativeTargetAsmPrinter();
+      initializeLLVMPasses();
+    });
+
+    switch (kind) {
+    case EngineKind::MCJIT:
+      impl = std::make_unique<MCJITEngineImpl>();
+      break;
+    case EngineKind::OrcJIT:
+      impl = std::make_unique<OrcJITEngineImpl>();
+      break;
+    default:
+      throw std::runtime_error("Invalid EngineKind");
+    }
+
+    if (program->arguments.size() != bufptrs.size()) {
+      throw std::runtime_error("Program arguments and bufptrs size mismatch");
+    }
+
+    auto llvmModule = translateModuleToLLVMIR(*program->module);
+    if (!llvmModule) {
+      throw std::runtime_error("could not convert to LLVM IR");
+    }
+
+    setupTargetTriple(llvmModule.get());
+    packFunctionArguments(llvmModule.get());
+
+    if (VLOG_IS_ON(6)) {
+      llvmModule->print(llvm::errs(), nullptr);
+    }
+
+    jitEntry = impl->compile(std::move(llvmModule),
+                             makePackedFunctionName(program->entry));
+    if (!jitEntry) {
+      throw std::runtime_error("jitEntry function is null");
+    }
+
+    descriptors.reserve(bufptrs.size());
+    for (unsigned i = 0; i < bufptrs.size(); i++) {
+      descriptors.emplace_back(bufptrs[i], program->arguments[i].shape);
+      ptrs[i] = descriptors[i].ptr();
+    }
+  }
+
+  void invoke() { jitEntry(ptrs.data()); }
+
+  std::shared_ptr<Program> program;
+  std::unique_ptr<EngineImpl> impl;
+  std::vector<MemRefDescriptor> descriptors;
+  std::vector<void *> ptrs;
+  Function jitEntry;
+};
+
 Executable::Executable(const std::shared_ptr<Program> &program,
-                       ArrayRef<void *> bufptrs)
-    : program(program), ptrs(bufptrs.size()) {
-
-  static std::once_flag is_initialized;
-  std::call_once(is_initialized, []() {
-    llvm::InitializeNativeTarget();
-    llvm::InitializeNativeTargetAsmPrinter();
-    initializeLLVMPasses();
-  });
-
-  if (program->arguments.size() != bufptrs.size()) {
-    throw std::runtime_error("Program arguments and bufptrs size mismatch");
-  }
-
-  auto llvmModule = translateModuleToLLVMIR(*program->module);
-  if (!llvmModule) {
-    throw std::runtime_error("could not convert to LLVM IR");
-  }
-
-  packFunctionArguments(llvmModule.get());
-
-  std::string error;
-  engine = std::unique_ptr<llvm::ExecutionEngine>(
-      llvm::EngineBuilder(std::move(llvmModule))
-          .setErrorStr(&error)
-          .setOptLevel(llvm::CodeGenOpt::Aggressive)
-          .setEngineKind(llvm::EngineKind::JIT)
-          .create());
-  if (!engine) {
-    throw std::runtime_error("Failed to create ExecutionEngine: " + error);
-  }
-
-  engine->finalizeObject();
-
-  uint64_t addr =
-      engine->getFunctionAddress(makePackedFunctionName(program->entry));
-  if (!addr) {
-    throw std::runtime_error("getFunctionAddress failed");
-  }
-  jitEntry = reinterpret_cast<Function>(addr);
-
-  descriptors.reserve(bufptrs.size());
-  for (unsigned i = 0; i < bufptrs.size(); i++) {
-    descriptors.emplace_back(bufptrs[i], program->arguments[i].shape);
-    ptrs[i] = descriptors[i].ptr();
-  }
-}
+                       ArrayRef<void *> bufptrs, EngineKind kind)
+    : impl(std::make_unique<ExecutableImpl>(program, bufptrs, kind)) {}
 
 Executable::~Executable() = default;
 
-void Executable::invoke() { jitEntry(ptrs.data()); }
+void Executable::invoke() { impl->invoke(); }
 
 } // namespace pmlc::compiler
