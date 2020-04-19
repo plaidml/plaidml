@@ -204,74 +204,22 @@ struct OrcJITEngineImpl : EngineImpl {
     std::unique_ptr<llvm::LLVMContext> ctx(new llvm::LLVMContext);
     auto dataLayout = module->getDataLayout();
 
-    // Detect the host and set code model to small.
-    auto expectedJTMB = llvm::orc::JITTargetMachineBuilder::detectHost();
-    if (!expectedJTMB) {
-      throw std::runtime_error("Could not detect host");
-    }
-    expectedJTMB->setCodeModel(llvm::CodeModel::Small);
-
-    // Callback to create the object layer with symbol resolution to current
-    // process and dynamically linked libraries.
-    auto objectLinkingLayerCreator = [&](llvm::orc::ExecutionSession &session,
-                                         const llvm::Triple &TT) {
-      return std::make_unique<llvm::orc::ObjectLinkingLayer>(
-          session, std::make_unique<llvm::jitlink::InProcessMemoryManager>());
-      // auto objectLayer =
-      //     std::make_unique<llvm::orc::RTDyldObjectLinkingLayer>(session, []()
-      //     {
-      //       return std::make_unique<llvm::SectionMemoryManager>();
-      //     });
-      // objectLayer->setNotifyLoaded(
-      //     [engine = engine.get()](
-      //         llvm::orc::VModuleKey, const llvm::object::ObjectFile &object,
-      //         const llvm::RuntimeDyld::LoadedObjectInfo &objectInfo) {
-      //       uint64_t key = static_cast<uint64_t>(
-      //           reinterpret_cast<uintptr_t>(object.getData().data()));
-      //       engine->gdbListener->notifyObjectLoaded(key, object, objectInfo);
-      //     });
-
-      // Resolve symbols from shared libraries.
-      // for (auto libPath : sharedLibPaths) {
-      //   auto mb = llvm::MemoryBuffer::getFile(libPath);
-      //   if (!mb) {
-      //     errs() << "Fail to create MemoryBuffer for: " << libPath <<
-      //     "\n"; continue;
-      //   }
-      //   auto &JD = session.createBareJITDylib(std::string(libPath));
-      //   auto loaded = DynamicLibrarySearchGenerator::Load(
-      //       libPath.data(), dataLayout.getGlobalPrefix());
-      //   if (!loaded) {
-      //     errs() << "Could not load " << libPath << ":\n  "
-      //            << loaded.takeError() << "\n";
-      //     continue;
-      //   }
-      //   JD.addGenerator(std::move(*loaded));
-      //   cantFail(objectLayer->add(JD, std::move(mb.get())));
-      // }
-
-      // return objectLayer;
-    };
-
-    jit = llvm::cantFail(
-        llvm::orc::LLJITBuilder()
-            .setJITTargetMachineBuilder(std::move(*expectedJTMB))
-            //  .setCompileFunctionCreator(compileFunctionCreator)
-            .setObjectLinkingLayerCreator(objectLinkingLayerCreator)
-            .create());
+    jit = llvm::cantFail(llvm::orc::LLJITBuilder().create());
 
     // Add a ThreadSafemodule to the engine and return.
     llvm::orc::ThreadSafeModule tsm(std::move(module), std::move(ctx));
-    // if (transformer)
-    //   llvm::cantFail(tsm.withModuleDo(
-    //       [&](llvm::Module &module) { return transformer(&module); }));
     llvm::cantFail(jit->addIRModule(std::move(tsm)));
 
-    // Resolve symbols that are statically linked in the current process.
+    llvm::orc::SymbolMap symbols;
+    auto &session = jit->getExecutionSession();
+    for (const auto &kvp : SymbolRegistry::instance()->symbols) {
+      auto addr = llvm::pointerToJITTargetAddress(kvp.second);
+      auto symbol = llvm::JITEvaluatedSymbol(addr, llvm::JITSymbolFlags::None);
+      symbols.insert(std::make_pair(session.intern(kvp.first()), symbol));
+    }
+
     auto &mainJD = jit->getMainJITDylib();
-    mainJD.addGenerator(llvm::cantFail(
-        llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(
-            dataLayout.getGlobalPrefix())));
+    cantFail(mainJD.define(llvm::orc::absoluteSymbols(symbols)));
 
     // JIT lookup may return an Error referring to strings stored internally by
     // the JIT. If the Error outlives the ExecutionEngine, it would want have a
@@ -304,6 +252,7 @@ struct ExecutableImpl {
       llvm::InitializeNativeTarget();
       llvm::InitializeNativeTargetAsmPrinter();
       initializeLLVMPasses();
+      llvm::sys::DynamicLibrary::LoadLibraryPermanently(nullptr);
     });
 
     switch (kind) {

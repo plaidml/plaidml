@@ -19,6 +19,7 @@
 
 using plaidml::core::ffi_wrap;
 using plaidml::core::ffi_wrap_void;
+using pmlc::compiler::EngineKind;
 using pmlc::compiler::Executable;
 using pmlc::compiler::ProgramArgument;
 using pmlc::util::Buffer;
@@ -114,7 +115,14 @@ plaidml_executable* plaidml_jit(  //
       auto view = args[i].buffer->MapCurrent();
       bufptrs[i] = view->data();
     }
-    exec->exec = std::make_unique<Executable>(program->program, bufptrs);
+    EngineKind kind = EngineKind::MCJIT;
+    auto jit = pmlc::util::getEnvVar("LLVM_JIT");
+    if (jit == "ORC") {
+      kind = EngineKind::OrcJIT;
+    } else if (jit == "MCJIT") {
+      kind = EngineKind::MCJIT;
+    }
+    exec->exec = std::make_unique<Executable>(program->program, bufptrs, kind);
     return exec.release();
   });
 }

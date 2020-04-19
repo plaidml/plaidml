@@ -4,7 +4,6 @@
 
 #include <string>
 
-#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/Support/FormatVariadic.h"
 
@@ -49,33 +48,6 @@ private:
   StringMap<TargetRegistryFunction> registry;
 };
 
-class SymbolRegistry {
-public:
-  static SymbolRegistry *instance() {
-    static SymbolRegistry registry;
-    return &registry;
-  }
-
-  void registerSymbol(StringRef symbol, void *ptr) {
-    if (registry.count(symbol)) {
-      throw std::runtime_error(
-          formatv("Symbol is already registered: {0}", symbol));
-    }
-    registry[symbol] = ptr;
-  }
-
-  void *resolve(StringRef symbol) {
-    auto it = registry.find(symbol);
-    if (it == registry.end()) {
-      throw std::runtime_error(formatv("Could not find symbol: {0}", symbol));
-    }
-    return it->second;
-  }
-
-private:
-  StringMap<void *> registry;
-};
-
 } // namespace
 
 void registerTarget(StringRef name, const TargetRegistryFunction &function) {
@@ -88,14 +60,6 @@ TargetRegistryFunction resolveTarget(StringRef name) {
 
 std::vector<StringRef> listTargets() {
   return TargetRegistry::instance()->list();
-}
-
-void registerSymbol(llvm::StringRef symbol, void *ptr) {
-  SymbolRegistry::instance()->registerSymbol(symbol, ptr);
-}
-
-void *resolveSymbol(llvm::StringRef symbol) {
-  return SymbolRegistry::instance()->resolve(symbol);
 }
 
 } // namespace pmlc::compiler

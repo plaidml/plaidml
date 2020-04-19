@@ -19,8 +19,9 @@ extern "C" void plaidml_rt_bounds_check(intptr_t index, int64_t range) {
 namespace {
 struct Registration {
   Registration() {
-    pmlc::compiler::registerSymbol("plaidml_rt_bounds_check",
-                                   plaidml_rt_bounds_check);
+    using pmlc::compiler::registerSymbol;
+    registerSymbol("plaidml_rt_bounds_check",
+                   reinterpret_cast<void *>(plaidml_rt_bounds_check));
   }
 };
 static Registration reg;

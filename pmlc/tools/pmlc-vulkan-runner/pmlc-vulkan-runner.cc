@@ -30,6 +30,8 @@
 #include "pmlc/compiler/program.h"
 #include "pmlc/util/all_dialects.h"
 #include "pmlc/util/all_passes.h"
+#include "pmlc/util/env.h"
+#include "pmlc/util/logging.h"
 
 using namespace mlir; // NOLINT[build/namespaces]
 using pmlc::compiler::Executable;
@@ -94,6 +96,15 @@ int JitRunnerMain(int argc, char **argv) {
 }
 
 int main(int argc, char **argv) {
+  auto level_str = pmlc::util::getEnvVar("PLAIDML_VERBOSE");
+  if (level_str.size()) {
+    auto level = std::atoi(level_str.c_str());
+    if (level) {
+      el::Loggers::setVerboseLevel(level);
+    }
+    IVLOG(level, "PLAIDML_VERBOSE=" << level);
+  }
+
   llvm::llvm_shutdown_obj x;
   registerPassManagerCLOptions();
 

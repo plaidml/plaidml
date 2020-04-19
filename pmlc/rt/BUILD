@@ -1,13 +1,11 @@
 # Copyright 2020 Intel Corporation
 
-load("@io_bazel_rules_jsonnet//jsonnet:jsonnet.bzl", "jsonnet_to_json")
-load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_shlib")
+load("//bzl:plaidml.bzl", "plaidml_cc_library")
 
 plaidml_cc_library(
     name = "rt",
     srcs = [
         "boundscheck.cc",
-        "memref.h",
         "runtime.cc",
         "xsmm.cc",
     ],

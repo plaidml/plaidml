@@ -1,9 +1,13 @@
 // Copyright 2020 Intel Corporation
 
+#include <cmath>
+#include <cstdlib>
+
 #include "llvm/Support/raw_ostream.h"
 
+#include "mlir/ExecutionEngine/RunnerUtils.h"
+
 #include "pmlc/compiler/registry.h"
-#include "pmlc/rt/memref.h"
 
 extern "C" void plaidml_rt_trace(const char *msg) {
   llvm::outs() << msg << "\n";
@@ -13,7 +17,20 @@ extern "C" void plaidml_rt_trace(const char *msg) {
 namespace {
 struct Registration {
   Registration() {
-    pmlc::compiler::registerSymbol("plaidml_rt_trace", plaidml_rt_trace);
+    using pmlc::compiler::registerSymbol;
+
+    // cstdlib functions
+    registerSymbol("aligned_alloc", reinterpret_cast<void *>(aligned_alloc));
+    registerSymbol("expf", reinterpret_cast<void *>(expf));
+    registerSymbol("free", reinterpret_cast<void *>(free));
+    registerSymbol("malloc", reinterpret_cast<void *>(malloc));
+
+    // RunnerUtils functions
+    registerSymbol("print_memref_f32",
+                   reinterpret_cast<void *>(print_memref_f32));
+
+    registerSymbol("plaidml_rt_trace",
+                   reinterpret_cast<void *>(plaidml_rt_trace));
   }
 };
 static Registration reg;

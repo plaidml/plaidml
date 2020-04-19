@@ -1,11 +1,12 @@
 // Copyright 2020 Intel Corporation
 
+#include "mlir/ExecutionEngine/RunnerUtils.h"
+
 #ifndef _WIN32
 #include "libxsmm_source.h" // NOLINT [build/include_subdir]
 #endif
 
 #include "pmlc/compiler/registry.h"
-#include "pmlc/rt/memref.h"
 
 #ifndef _WIN32
 struct Initializer {
@@ -46,8 +47,9 @@ extern "C" void plaidml_rt_xsmm_gemm_f32(            //
 namespace {
 struct Registration {
   Registration() {
-    pmlc::compiler::registerSymbol("plaidml_rt_xsmm_gemm_f32",
-                                   plaidml_rt_xsmm_gemm_f32);
+    using pmlc::compiler::registerSymbol;
+    registerSymbol("plaidml_rt_xsmm_gemm_f32",
+                   reinterpret_cast<void *>(plaidml_rt_xsmm_gemm_f32));
   }
 };
 static Registration reg;

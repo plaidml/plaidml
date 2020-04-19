@@ -43,6 +43,7 @@ struct Options {
       "e", llvm::cl::desc("The function to be called"),
       llvm::cl::value_desc("<function name>"), llvm::cl::init("main")};
 
+  llvm::cl::opt<bool> optMCJIT{"mcjit", llvm::cl::desc("Use MCJIT")};
   llvm::cl::opt<bool> optOrc{"orc", llvm::cl::desc("Use OrcJIT")};
 };
 } // namespace
@@ -66,6 +67,8 @@ int JitRunnerMain(int argc, char **argv) {
   auto kind = EngineKind::MCJIT;
   if (options.optOrc.getValue())
     kind = EngineKind::OrcJIT;
+  if (options.optMCJIT.getValue())
+    kind = EngineKind::MCJIT;
   Executable executable(program, ArrayRef<void *>{}, kind);
   executable.invoke();
 
