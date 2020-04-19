@@ -45,6 +45,7 @@ class TestFixture : public ::testing::Test {
       const Program& program,       //
       const TensorBuffers& inputs,  //
       const TensorBuffers& expected) {
+#if !defined(_WIN32)
     auto binder = exec::Binder(program);
     auto executable = binder.compile();
     for (const auto& kvp : inputs) {
@@ -55,6 +56,7 @@ class TestFixture : public ::testing::Test {
       auto view = binder.output(kvp.first).mmap_current();
       std::visit([&](auto&& vec) { compareBuffers(view, vec); }, kvp.second);
     }
+#endif
   }
 
   void runProgram(const Program& program) {
