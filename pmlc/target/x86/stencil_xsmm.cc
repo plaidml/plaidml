@@ -301,9 +301,9 @@ public:
                return getStrideInfo(rawOp)->strides[a] == 0;
              }},
         };
-    tilingGenerators.push_back(PowerOfTwoGenerator());
-    tilingGenerators.push_back(PowerOfTwoGenerator());
-    tilingGenerators.push_back(PowerOfTwoGenerator());
+    tilingGenerators.push_back(EvenTilingGenerator());
+    tilingGenerators.push_back(EvenTilingGenerator());
+    tilingGenerators.push_back(EvenTilingGenerator());
   }
 };
 
