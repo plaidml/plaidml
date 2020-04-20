@@ -69,6 +69,15 @@ void swap(Orderer<V> &v1, Orderer<V> &v2) {
 
 int64_t StencilGeneric::getIdxRange(mlir::BlockArgument idx) {
   assert(idx.getArgNumber() < ranges.size());
+  assert(idx.getArgNumber() >= 0 && "TODO scrap");
+  assert(idx.getArgNumber() <= 2 && "TODO scrap");
+  IVLOG(5, "inside getIdxRange");
+  IVLOG(3, "arg number: " << idx.getArgNumber());  // Intermittent crashes on this log
+  IVLOG(3, "ranges: ");
+  for (auto r : ranges) {
+    IVLOG(3, "  " << r);
+  }
+  IVLOG(3, "requested range: " << ranges[idx.getArgNumber()]);
   return ranges[idx.getArgNumber()];
 }
 

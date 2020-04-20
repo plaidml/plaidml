@@ -131,19 +131,27 @@ private:
       return std::numeric_limits<double>::infinity();
     }
     double inner_time = tot_inner_loop / cost.throughput;
-    IVLOG(3,
+    IVLOG(6,
           "Inner: loop = " << tot_inner_loop << " inner_time = " << inner_time);
     for (unsigned i = 0; i < semanticIdxCount; ++i) {
-      IVLOG(3, perm.indexes[i] << ": " << tileSize[i]);
+      IVLOG(6, perm.indexes[i] << ": " << tileSize[i]);
     }
+    // return 3; // TODO cheap hack  !!!!! Works on all verbosities if I return here
 
     // The middle idxs are the accumulation indexes, i.e. those used on loads but not stores
     // llvm::DenseMap<mlir::BlockArgument, unsigned> middle_idxs;
     std::map<mlir::BlockArgument, unsigned> middle_idxs;  // TODO: Why does this matter?
     for (const auto& kvp : getStrideInfo(perm.tensors[0])->strides) {
       // TODO: Old version verifies that this is in the parallel op's BlockArgs, but that seems excessive for something that I'd expect to be an assert...
-      middle_idxs.insert(std::make_pair(kvp.first, getIdxRange(kvp.first)));
+      if (blockArgs.find(kvp.first) == blockArgs.end()) {
+        IVLOG(1, "Hey this isn't a real block arg!: " << kvp.first);
+        // throw std::runtime_error("TODO Guess we do need to check!");
+      } else {
+        middle_idxs.insert(std::make_pair(kvp.first, getIdxRange(kvp.first)));
+      }
+      // return 3; // TODO: cheap hack...  !!!!!!!! Returning here gives intermittent verbosity 3 errors
     }
+    // return 3;  // TODO: cheap hack  !!!!!!!!!!!! Breaks on verbosity 3+ if I return here
     for (const auto& kvp : getStrideInfo(perm.tensors[1])->strides) {
       // TODO: Old version verifies that this is in the parallel op's BlockArgs, but that seems excessive for something that I'd expect to be an assert...
       middle_idxs.insert(std::make_pair(kvp.first, getIdxRange(kvp.first)));
@@ -154,6 +162,7 @@ private:
         middle_idxs.erase(it);
       }
     }
+    // return 3;  // TODO: cheap hack
 
     for (unsigned i = 0; i < semanticIdxCount; ++i) {
       auto it = middle_idxs.find(perm.indexes[i]);
@@ -165,21 +174,29 @@ private:
     for (auto &kvp : middle_idxs) {
       tot_middle_loop *= kvp.second;
     }
+    // return 3;  // TODO: cheap hack !!!! INTERMITTENTLY breaks on verbosity 2 if I return here
 
-    IVLOG(3, "Middle: loop = " << tot_middle_loop);
+    IVLOG(4, "Middle: loop = " << tot_middle_loop);
 
     for (auto &kvp : middle_idxs) {
       if (kvp.second > 1) {
-        IVLOG(3, kvp.first << ": " << kvp.second);
+        IVLOG(4, kvp.first << ": " << kvp.second);
       }
     }
+    // return 3; // TODO: less cheap hack
 
     // ... TODO unclear of port quality
     // llvm::DenseMap<mlir::BlockArgument, unsigned> outer_idxs;
     std::map<mlir::BlockArgument, unsigned> outer_idxs;  // TODO why does this matter...
     for (const auto& kvp : getStrideInfo(loadsAndStores.stores[0])->strides) {
+      IVLOG(4, "First: " << kvp.first);
+      IVLOG(5, "Second: " << kvp.second);
+      IVLOG(5, "IdxRange: " << getIdxRange(kvp.first));
       outer_idxs.try_emplace(kvp.first, getIdxRange(kvp.first));
+      IVLOG(4, "And now emplaced");
     }
+    IVLOG(4, "Left loop...");
+    // return 3; // TODO: less cheap hack
     for (unsigned i = 0; i < semanticIdxCount; i++) {
       auto it = outer_idxs.find(perm.indexes[i]);
       if (it != outer_idxs.end()) {
@@ -191,7 +208,7 @@ private:
       tot_outer_loop *= kvp.second;
     }
 
-    IVLOG(3, "Outer: loop = " << tot_outer_loop);
+    IVLOG(4, "Outer: loop = " << tot_outer_loop);
 
     // llvm::DenseMap<mlir::BlockArgument, unsigned> outer_idxs;
     // for (auto idx : outIdxs) {
@@ -212,7 +229,7 @@ private:
 
     for (auto &kvp : outer_idxs) {
       if (kvp.second > 1) {
-        IVLOG(3, kvp.first << ": " << kvp.second);
+        IVLOG(4, kvp.first << ": " << kvp.second);
       }
     }
 
@@ -220,7 +237,7 @@ private:
     double perf =
         outer_batches * tot_middle_loop * (cost.startupCost + inner_time);
 
-    IVLOG(3, "Performance = " << perf);
+    IVLOG(4, "Performance = " << perf);
     return perf;
   }
 
