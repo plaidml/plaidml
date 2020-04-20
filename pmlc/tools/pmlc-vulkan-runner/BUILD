@@ -9,7 +9,7 @@ plaidml_cc_library(
     srcs = ["pmlc-vulkan-runner.cc"],
     deps = [
         "//pmlc:all_passes_and_dialects_no_registration",
-        "//pmlc/rt/vulkan:link",
+        "//pmlc/rt/vulkan",
         "@llvm-project//mlir:MlirJitRunner",
     ],
 )

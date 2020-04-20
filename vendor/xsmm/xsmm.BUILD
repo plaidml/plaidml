@@ -4,12 +4,20 @@ exports_files(["LICENSE.md"])
 
 cc_library(
     name = "xsmm",
-    srcs = ["include/libxsmm_source.h"],
+    srcs = glob(
+        [
+            "src/*.c",
+            "src/*.h",
+        ],
+        exclude = ["src/libxsmm_generator_gemm_driver.c"],
+    ),
     hdrs = glob([
-        "src/**/*.c",
-        "src/**/*.h",
         "include/*",
+        "src/template/*.tpl.c",
     ]),
-    defines = ["LIBXSMM_NO_BLAS"],
+    defines = [
+        "__BLAS=0",
+        "LIBXSMM_DEFAULT_CONFIG",
+    ],
     includes = ["include"],
 )

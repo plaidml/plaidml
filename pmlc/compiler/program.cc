@@ -6,7 +6,6 @@
 
 #include "llvm/Support/FormatVariadic.h"
 
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Parser.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
@@ -71,10 +70,12 @@ private:
 
 Program::Program(mlir::ModuleOp module) : module(module) {}
 
-Program::Program(mlir::StringRef source) {
-  auto inputBuffer = llvm::MemoryBuffer::getMemBuffer(source);
+Program::Program(mlir::StringRef source)
+    : Program(llvm::MemoryBuffer::getMemBuffer(source)) {}
+
+Program::Program(std::unique_ptr<llvm::MemoryBuffer> buffer) {
   llvm::SourceMgr sourceMgr;
-  sourceMgr.AddNewSourceBuffer(std::move(inputBuffer), llvm::SMLoc());
+  sourceMgr.AddNewSourceBuffer(std::move(buffer), llvm::SMLoc());
   module = mlir::parseSourceFile(sourceMgr, &context);
 }
 

@@ -1,18 +1,11 @@
 // Copyright 2020 Intel Corporation
 
-#ifndef _WIN32
-#include "libxsmm_source.h" // NOLINT [build/include_subdir]
-#endif
+#include "mlir/ExecutionEngine/RunnerUtils.h"
 
-#include "pmlc/rt/memref.h"
+#include "libxsmm.h" // NOLINT [build/include_subdir]
 
-#ifndef _WIN32
-struct Initializer {
-  Initializer() { libxsmm_init(); }
-};
-
-static Initializer init;
-#endif
+#include "pmlc/compiler/registry.h"
+#include "pmlc/util/logging.h"
 
 extern "C" void plaidml_rt_xsmm_gemm_f32(            //
     size_t aRank, StridedMemRefType<float, 2> *aRef, //
@@ -20,7 +13,6 @@ extern "C" void plaidml_rt_xsmm_gemm_f32(            //
     size_t cRank, StridedMemRefType<float, 2> *cRef, //
     int32_t lda, int32_t ldb, int32_t ldc,           //
     int32_t m, int32_t n, int32_t k) {
-#ifndef _WIN32
   auto aPtr = aRef->data + aRef->offset;
   auto bPtr = bRef->data + bRef->offset;
   auto cPtr = cRef->data + cRef->offset;
@@ -39,5 +31,17 @@ extern "C" void plaidml_rt_xsmm_gemm_f32(            //
   libxsmm_gemm(/*transa=*/nullptr, /*transb=*/nullptr, &m_int, &n_int, &k_int,
                /*alpha=*/nullptr, bPtr, &ldb_int, aPtr, &lda_int,
                /*beta=*/nullptr, cPtr, &ldc_int);
-#endif
 }
+
+namespace {
+struct Registration {
+  Registration() {
+    libxsmm_init();
+
+    using pmlc::compiler::registerSymbol;
+    registerSymbol("plaidml_rt_xsmm_gemm_f32",
+                   reinterpret_cast<void *>(plaidml_rt_xsmm_gemm_f32));
+  }
+};
+static Registration reg;
+} // namespace

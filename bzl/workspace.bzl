@@ -3,7 +3,6 @@
 load("//vendor/bazel:repo.bzl", "http_archive")
 load("//vendor/conda:repo.bzl", "conda_repo")
 load("//vendor/openvino:repo.bzl", "openvino_workspace")
-load("//vendor/xsmm:repo.bzl", "xsmm_repo")
 
 # Sanitize a dependency so that it works correctly from code that includes it as a submodule.
 def clean_dep(dep):
@@ -147,7 +146,7 @@ def plaidml_workspace():
         build_file = clean_dep("//vendor/vulkan_headers:vulkan_headers.BUILD"),
     )
 
-    xsmm_repo(
+    http_archive(
         name = "xsmm",
         url = "https://github.com/hfp/libxsmm/archive/dc7523725e0d919d56c739402b28683358b0c95a.zip",
         sha256 = "70ea9f057c4f11bfe35095815d6b9841e501c2e82931649a953fab389144d648",
