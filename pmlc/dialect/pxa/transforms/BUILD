@@ -26,7 +26,6 @@ plaidml_cc_library(
         "pass_detail.h",
         "stencil.cc",
         "stencil_generic.cc",
-        "stencil_xsmm.cc",
         "test_analysis.cc",
         "tile.cc",
     ],
@@ -42,6 +41,5 @@ plaidml_cc_library(
         "//pmlc/dialect/pxa/analysis",
         "//pmlc/dialect/pxa/ir",
         "//pmlc/dialect/xsmm/ir",
-        "//pmlc/target/x86",  # TODO for heatmap
     ],
 )

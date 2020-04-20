@@ -21,7 +21,7 @@
 #include "pmlc/util/logging.h"
 #include "pmlc/util/util.h"
 
-#include "pmlc/target/x86/heatmap.h"  // TODO: for heatmap
+#include "pmlc/target/x86/heatmap.h" // TODO: for heatmap
 
 // TODO: includes etc
 
@@ -98,7 +98,8 @@ private:
     return llvm::Optional<LoadStoreOps>(std::move(ret));
   }
 
-  // double getCost(TensorAndIndexPermutation perm, ArrayRef<int64_t> tileSize) {
+  // double getCost(TensorAndIndexPermutation perm, ArrayRef<int64_t> tileSize)
+  // {
   //   // TODO This is a fake cost function.
   //   // First, cap total tile size:
   //   int64_t totalTileSize = 1;
@@ -123,7 +124,7 @@ private:
 
     llvm::SmallVector<unsigned, 3> tileSizeTODO;
     for (unsigned i = 0; i < 3; ++i) {
-      tileSizeTODO[i] = tileSize[i];
+      tileSizeTODO.push_back(tileSize[i]);
     }
     auto cost = pmlc::target::x86::heatmapCost(tileSizeTODO);
     if (cost.throughput == 0) {
@@ -137,7 +138,8 @@ private:
     }
 
     // The middle idxs are the accumulation indexes, i.e. those used on loads but not stores
-    llvm::DenseMap<mlir::BlockArgument, unsigned> middle_idxs;
+    // llvm::DenseMap<mlir::BlockArgument, unsigned> middle_idxs;
+    std::map<mlir::BlockArgument, unsigned> middle_idxs;  // TODO: Why does this matter?
     for (const auto& kvp : getStrideInfo(perm.tensors[0])->strides) {
       // TODO: Old version verifies that this is in the parallel op's BlockArgs, but that seems excessive for something that I'd expect to be an assert...
       middle_idxs.insert(std::make_pair(kvp.first, getIdxRange(kvp.first)));
@@ -146,7 +148,7 @@ private:
       // TODO: Old version verifies that this is in the parallel op's BlockArgs, but that seems excessive for something that I'd expect to be an assert...
       middle_idxs.insert(std::make_pair(kvp.first, getIdxRange(kvp.first)));
     }
-    for (const auto& kvp : getStrideInfo(perm.tensors[2])->strides) {
+    for (const auto &kvp : getStrideInfo(perm.tensors[2])->strides) {
       auto it = middle_idxs.find(kvp.first);
       if (it != middle_idxs.end()) {
         middle_idxs.erase(it);
@@ -173,7 +175,8 @@ private:
     }
 
     // ... TODO unclear of port quality
-    llvm::DenseMap<mlir::BlockArgument, unsigned> outer_idxs;
+    // llvm::DenseMap<mlir::BlockArgument, unsigned> outer_idxs;
+    std::map<mlir::BlockArgument, unsigned> outer_idxs;  // TODO why does this matter...
     for (const auto& kvp : getStrideInfo(loadsAndStores.stores[0])->strides) {
       outer_idxs.try_emplace(kvp.first, getIdxRange(kvp.first));
     }
@@ -287,11 +290,11 @@ public:
   }
 };
 
-struct XSMMStencilPass
-    : public mlir::PassWrapper<XSMMStencilPass, mlir::FunctionPass> {
+struct NewXSMMStencilPass
+    : public mlir::PassWrapper<NewXSMMStencilPass, mlir::FunctionPass> {
   // I probably actually need config for requirements & tilingGenerators
 
-  XSMMStencilPass() {}
+  NewXSMMStencilPass() {}
 
   void runOnFunction() final {
     auto func = getFunction();
@@ -304,7 +307,7 @@ struct XSMMStencilPass
 };
 
 std::unique_ptr<mlir::Pass> createNewXSMMStencilPass() {
-  return std::make_unique<XSMMStencilPass>();
+  return std::make_unique<NewXSMMStencilPass>();
 }
 
 } // namespace pmlc::dialect::pxa
