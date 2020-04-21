@@ -886,14 +886,14 @@ TEST_F(CppEdsl, DupOut) {
   auto program = makeProgram("dup_out", {R, R, R});
   runProgram(program);
 }
-/*
+
 TEST_F(CppEdsl, Select) {
   auto I = Placeholder(DType::FLOAT32, {10, 20});
   auto O = select(I == 0, Tensor{0}, Tensor{1});
   auto program = makeProgram("select", {O});
   runProgram(program);
 }
-*/
+
 TEST_F(CppEdsl, Shape) {
   auto I = Placeholder(DType::FLOAT32, {10, 20});
   auto O = shape(I);

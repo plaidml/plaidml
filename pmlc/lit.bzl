@@ -104,6 +104,10 @@ def glob_lit_tests(
     # failure.
     for curr_test in tests:
         # Instantiate this test with updated parameters.
+        print("(DBG) glob_lit_tests")
+        print(curr_test)
+        print(data + per_test_extra_data.pop(curr_test, []) + local_cfg)
+        print("(DBG) --------------")
         lit_test(
             name = curr_test,
             data = data + per_test_extra_data.pop(curr_test, []) + local_cfg,

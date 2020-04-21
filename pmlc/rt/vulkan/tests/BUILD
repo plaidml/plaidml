@@ -22,6 +22,10 @@ plaidml_cc_test(
 )
 
 lit_test(
-    name = "edsl_test_gpu.cc",
-    data = [":cc_test_gpu"],
+	name="edsl_test_gpu.cc",
+    data = [
+    	":cc_test_gpu",
+    	"lit.local.cfg",
+    	"//pmlc/rt/vulkan:vkprobe",
+    ],
 )
