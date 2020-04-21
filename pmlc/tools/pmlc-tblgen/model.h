@@ -8,7 +8,6 @@
 #include <map>
 #include <vector>
 
-#include "mlir/Support/STLExtras.h"
 #include "mlir/TableGen/Attribute.h"
 #include "mlir/TableGen/Operator.h"
 #include "llvm/ADT/MapVector.h"

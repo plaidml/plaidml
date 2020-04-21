@@ -113,7 +113,7 @@ struct ConvertToLLVMPass
 
     OwningRewritePatternList patterns;
     populateStdToLLVMBarePtrConversionPatterns(typeConverter, patterns,
-                                               /*useAlloca=*/true);
+                                               /*useAlignedAlloc=*/false);
     conversion::stdx_to_llvm::populateStdXToLLVMConversionPatterns(
         typeConverter, patterns);
 

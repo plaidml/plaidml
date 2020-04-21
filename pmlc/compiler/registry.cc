@@ -4,7 +4,6 @@
 
 #include <string>
 
-#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/Support/FormatVariadic.h"
 
@@ -19,7 +18,7 @@ namespace {
 
 class TargetRegistry {
 public:
-  static TargetRegistry *Instance() {
+  static TargetRegistry *instance() {
     static TargetRegistry registry;
     return &registry;
   }
@@ -52,15 +51,15 @@ private:
 } // namespace
 
 void registerTarget(StringRef name, const TargetRegistryFunction &function) {
-  TargetRegistry::Instance()->registerTarget(name, function);
+  TargetRegistry::instance()->registerTarget(name, function);
 }
 
 TargetRegistryFunction resolveTarget(StringRef name) {
-  return TargetRegistry::Instance()->resolve(name);
+  return TargetRegistry::instance()->resolve(name);
 }
 
 std::vector<StringRef> listTargets() {
-  return TargetRegistry::Instance()->list();
+  return TargetRegistry::instance()->list();
 }
 
 } // namespace pmlc::compiler

@@ -15,21 +15,10 @@
 
 #include "llvm/Support/raw_ostream.h"
 
-#include "pmlc/rt/vulkan/vulkan_runtime.h"
+#include "mlir/ExecutionEngine/RunnerUtils.h"
 
-#ifdef _WIN32
-#ifndef VULKAN_RT_EXPORT
-#ifdef VULKAN_RT_BUILD
-/* We are building this library */
-#define VULKAN_RT_EXPORT __declspec(dllexport)
-#else
-/* We are using this library */
-#define VULKAN_RT_EXPORT __declspec(dllimport)
-#endif // VULKAN_RT_BUILD
-#endif // VULKAN_RT_EXPORT
-#else
-#define VULKAN_RT_EXPORT
-#endif // _WIN32
+#include "pmlc/compiler/registry.h"
+#include "pmlc/rt/vulkan/vulkan_runtime.h"
 
 namespace {
 class VulkanRuntimeManager {
@@ -207,4 +196,43 @@ void bindBufferInt64(void *vkRuntimeManager, DescriptorSetIndex setIndex,
     return;
   }
 }
+
+/// Fills the given 1D float memref with the given float value.
+void _mlir_ciface_fillResource1DFloat(StridedMemRefType<float, 1> *ptr,
+                                      float value) {
+  std::fill_n(ptr->data, ptr->sizes[0], value);
+}
 } // extern "C"
+
+namespace {
+struct Registration {
+  Registration() {
+    using pmlc::compiler::registerSymbol;
+
+    // RunnerUtils functions
+    registerSymbol("_mlir_ciface_print_memref_f32",
+                   reinterpret_cast<void *>(_mlir_ciface_print_memref_f32));
+
+    // Vulkan Runtime functions
+    registerSymbol("initVulkan", reinterpret_cast<void *>(initVulkan));
+    registerSymbol("deinitVulkan", reinterpret_cast<void *>(deinitVulkan));
+    registerSymbol("createVulkanLaunchKernelAction",
+                   reinterpret_cast<void *>(createVulkanLaunchKernelAction));
+    registerSymbol("createVulkanMemoryTransferAction",
+                   reinterpret_cast<void *>(createVulkanMemoryTransferAction));
+    registerSymbol("setVulkanLaunchKernelAction",
+                   reinterpret_cast<void *>(setVulkanLaunchKernelAction));
+    registerSymbol("addVulkanLaunchActionToSchedule",
+                   reinterpret_cast<void *>(addVulkanLaunchActionToSchedule));
+    registerSymbol("submitCommandBuffers",
+                   reinterpret_cast<void *>(submitCommandBuffers));
+    registerSymbol("bindBufferFloat32",
+                   reinterpret_cast<void *>(bindBufferFloat32));
+    registerSymbol("bindBufferInt64",
+                   reinterpret_cast<void *>(bindBufferInt64));
+    registerSymbol("_mlir_ciface_fillResource1DFloat",
+                   reinterpret_cast<void *>(_mlir_ciface_fillResource1DFloat));
+  }
+};
+static Registration reg;
+} // namespace

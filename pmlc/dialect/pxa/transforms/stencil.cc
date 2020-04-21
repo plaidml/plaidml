@@ -1,6 +1,5 @@
 // Copyright 2020 Intel Corporation
 
-#include "mlir/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Pass/Pass.h"

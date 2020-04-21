@@ -3,7 +3,6 @@
 load("//vendor/bazel:repo.bzl", "http_archive")
 load("//vendor/conda:repo.bzl", "conda_repo")
 load("//vendor/openvino:repo.bzl", "openvino_workspace")
-load("//vendor/xsmm:repo.bzl", "xsmm_repo")
 
 # Sanitize a dependency so that it works correctly from code that includes it as a submodule.
 def clean_dep(dep):
@@ -85,8 +84,8 @@ def plaidml_workspace():
         strip_prefix = "jsonnet-0.13.0",
     )
 
-    LLVM_COMMIT = "2dec9e1ad4a53dda64ae1853143dd35801e362b4"
-    LLVM_SHA256 = "a190f9f8d66481ba98588e521bd9b2f47bd6911f38087df39c829924cc3da57e"
+    LLVM_COMMIT = "9f3ab92ec86953e310d0814a95d9c0213bfe05d4"
+    LLVM_SHA256 = "b2355d5de2f411a201efef0b70241dd767cc87c657b184c18eec797aae53fade"
     LLVM_URL = "https://github.com/plaidml/llvm-project/archive/{commit}.tar.gz".format(commit = LLVM_COMMIT)
     http_archive(
         name = "llvm-project",
@@ -147,11 +146,11 @@ def plaidml_workspace():
         build_file = clean_dep("//vendor/vulkan_headers:vulkan_headers.BUILD"),
     )
 
-    xsmm_repo(
+    http_archive(
         name = "xsmm",
-        url = "https://github.com/hfp/libxsmm/archive/1.12.1.zip",
-        sha256 = "451ec9d30f0890bf3081aa3d0d264942a6dea8f9d29c17bececc8465a10a832b",
-        strip_prefix = "libxsmm-1.12.1",
+        url = "https://github.com/hfp/libxsmm/archive/dc7523725e0d919d56c739402b28683358b0c95a.zip",
+        sha256 = "70ea9f057c4f11bfe35095815d6b9841e501c2e82931649a953fab389144d648",
+        strip_prefix = "libxsmm-dc7523725e0d919d56c739402b28683358b0c95a",
         build_file = clean_dep("//vendor/xsmm:xsmm.BUILD"),
     )
 

@@ -110,15 +110,17 @@ TEST_F(CppEdsl, Cast) {
 }
 
 TEST_F(CppEdsl, BitAndScalar) {
+  const uint64_t ONE = 1;
+
   auto A = Placeholder(DType::UINT64, {3, 3});
   std::uint64_t mask = UINT32_MAX;
   auto B = A & mask;
   auto program = ProgramBuilder("bit_and", {B}).intx(DType::UINT64).compile();
   std::cout << program << std::endl;
 
-  std::vector<std::uint64_t> A_input{(1UL << 32),     (1UL << 33) + 1, (1UL << 34) + 2,  //
-                                     (1UL << 35) + 3, (1UL << 36) + 4, (1UL << 37) + 5,  //
-                                     (1UL << 38) + 6, (1UL << 39) + 7, (1UL << 40) + 8};
+  std::vector<std::uint64_t> A_input{(ONE << 32),     (ONE << 33) + 1, (ONE << 34) + 2,  //
+                                     (ONE << 35) + 3, (ONE << 36) + 4, (ONE << 37) + 5,  //
+                                     (ONE << 38) + 6, (ONE << 39) + 7, (ONE << 40) + 8};
   std::vector<std::uint64_t> B_output{0, 1, 2,  //
                                       3, 4, 5,  //
                                       6, 7, 8};

@@ -8,7 +8,7 @@
 
 #include <map>
 
-#include "mlir/Support/STLExtras.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringExtras.h"
 
 using mlir::StringRef;
