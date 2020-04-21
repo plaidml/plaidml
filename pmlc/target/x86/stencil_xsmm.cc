@@ -136,58 +136,70 @@ private:
     for (unsigned i = 0; i < semanticIdxCount; ++i) {
       IVLOG(6, perm.indexes[i] << ": " << tileSize[i]);
     }
-    // return 3; // TODO cheap hack  !!!!! Works on all verbosities if I return here
+    // return 3; // TODO a hack  !!!! Works on all verbosities if I return here
 
-    // The middle idxs are the accumulation indexes, i.e. those used on loads but not stores
+    // The middle idxs are the accumulation indexes, i.e. those used on loads
+    // but not stores
     // llvm::DenseMap<mlir::BlockArgument, unsigned> middle_idxs;
-    std::map<mlir::BlockArgument, unsigned> middle_idxs;  // TODO: Why does this matter?
+    std::map<unsigned, unsigned> middle_idxs; // TODO: Why does this matter?
     unsigned TODO_loop_count = 0;
-    for (const auto& kvp : getStrideInfo(perm.tensors[0])->strides) {
-      // TODO: Old version verifies that this is in the parallel op's BlockArgs, but that seems excessive for something that I'd expect to be an assert...
+    for (const auto &kvp : getStrideInfo(perm.tensors[0])->strides) {
+      // TODO: Old version verifies that this is in the parallel op's BlockArgs,
+      // but that seems excessive for something that I'd expect to be an
+      // assert...
       if (blockArgs.find(kvp.first) == blockArgs.end()) {
         IVLOG(1, "Hey this isn't a real block arg!: " << kvp.first);
-        // throw std::runtime_error("TODO Guess we do need to check!");
+        throw std::runtime_error("TODO Guess we do need to check!");
       } else {
-        IVLOG(1, "[loop " << TODO_loop_count << "] Based on first tensor, inserting middle index " << kvp.first << ":" << kvp.first.getArgNumber());
-        middle_idxs.insert(std::make_pair(kvp.first, getIdxRange(kvp.first)));
+        IVLOG(5, "[loop " << TODO_loop_count
+                          << "] Based on first tensor, inserting middle index "
+                          << kvp.first << ":" << kvp.first.getArgNumber());
+        middle_idxs.insert(
+            std::make_pair(kvp.first.getArgNumber(), getIdxRange(kvp.first)));
       }
       TODO_loop_count++;
-      // return 3; // TODO: cheap hack...  !!!!!!!! Returning here gives intermittent verbosity 3 errors
+      // return 3; // TODO: cheap hack...  !!!!!!!! Returning here gives
+      // intermittent verbosity 3 errors
     }
-    IVLOG(1, "Current size of middle_idxs = " << middle_idxs.size());
-    // return 3;  // TODO: cheap hack  !!!!!!!!!!!! Breaks on verbosity 3+ if I return here
-    for (const auto& kvp : getStrideInfo(perm.tensors[1])->strides) {
-      // TODO: Old version verifies that this is in the parallel op's BlockArgs, but that seems excessive for something that I'd expect to be an assert...
+    IVLOG(5, "Current size of middle_idxs = " << middle_idxs.size());
+    // return 3;  // TODO: cheap hack  !!!!!!!!!!!! Breaks on verbosity 3+ if I
+    // return here
+    for (const auto &kvp : getStrideInfo(perm.tensors[1])->strides) {
+      // TODO: Old version verifies that this is in the parallel op's BlockArgs,
+      // but that seems excessive for something that I'd expect to be an
+      // assert...
       if (blockArgs.find(kvp.first) == blockArgs.end()) {
         IVLOG(1, "Hey this isn't a real block arg! (v2): " << kvp.first);
-        // throw std::runtime_error("TODO Guess we do need to check!");
+        throw std::runtime_error("TODO Guess we do need to check!");
       } else {
-        IVLOG(1, "Based on second tensor, inserting middle index " << kvp.first);
-        middle_idxs.insert(std::make_pair(kvp.first, getIdxRange(kvp.first)));
+        IVLOG(5,
+              "Based on second tensor, inserting middle index " << kvp.first);
+        middle_idxs.insert(
+            std::make_pair(kvp.first.getArgNumber(), getIdxRange(kvp.first)));
       }
     }
+    IVLOG(5, "Current size of middle_idxs = " << middle_idxs.size());
     for (const auto &kvp : getStrideInfo(perm.tensors[2])->strides) {
-      auto it = middle_idxs.find(kvp.first);
+      auto it = middle_idxs.find(kvp.first.getArgNumber());
       if (it != middle_idxs.end()) {
-        IVLOG(1, "Based on output tensor, erasing middle index " << it->first);
+        IVLOG(5, "Based on output tensor, erasing middle index " << it->first);
         middle_idxs.erase(it);
       }
     }
     // return 3;  // TODO: cheap hack
 
     for (unsigned i = 0; i < semanticIdxCount; ++i) {
-      auto it = middle_idxs.find(perm.indexes[i]);
+      auto it = middle_idxs.find(perm.indexes[i].getArgNumber());
       if (it != middle_idxs.end()) {
         it->second = llvm::divideCeil(it->second, tileSize[i]);
       }
     }
     unsigned tot_middle_loop = 1;
     for (auto &kvp : middle_idxs) {
-      throw std::runtime_error("Hey, we got here!!!");
-      IVLOG(3, "Multiplying middle loop count by " << kvp.second);
       tot_middle_loop *= kvp.second;
     }
-    // return 3;  // TODO: cheap hack !!!! INTERMITTENTLY breaks on verbosity 2 if I return here
+    // return 3;  // TODO: cheap hack !!!! INTERMITTENTLY breaks on verbosity 2
+    // if I return here
 
     IVLOG(4, "Middle: loop = " << tot_middle_loop);
 
@@ -198,20 +210,19 @@ private:
     }
     // return 3; // TODO: less cheap hack
 
-    // ... TODO unclear of port quality
     // llvm::DenseMap<mlir::BlockArgument, unsigned> outer_idxs;
-    std::map<mlir::BlockArgument, unsigned> outer_idxs;  // TODO why does this matter...
-    for (const auto& kvp : getStrideInfo(loadsAndStores.stores[0])->strides) {
+    std::map<unsigned, unsigned> outer_idxs; // TODO why does this matter...
+    for (const auto &kvp : getStrideInfo(loadsAndStores.stores[0])->strides) {
       IVLOG(4, "First: " << kvp.first);
       IVLOG(5, "Second: " << kvp.second);
       IVLOG(5, "IdxRange: " << getIdxRange(kvp.first));
-      outer_idxs.try_emplace(kvp.first, getIdxRange(kvp.first));
+      outer_idxs.try_emplace(kvp.first.getArgNumber(), getIdxRange(kvp.first));
       IVLOG(4, "And now emplaced");
     }
     IVLOG(4, "Left loop...");
     // return 3; // TODO: less cheap hack
     for (unsigned i = 0; i < semanticIdxCount; i++) {
-      auto it = outer_idxs.find(perm.indexes[i]);
+      auto it = outer_idxs.find(perm.indexes[i].getArgNumber());
       if (it != outer_idxs.end()) {
         it->second = llvm::divideCeil(it->second, tileSize[i]);
       }
@@ -250,35 +261,43 @@ private:
     double perf =
         outer_batches * tot_middle_loop * (cost.startupCost + inner_time);
 
-    IVLOG(3, "Performance = " << perf << "(outer count: " << outer_batches << ", middle count: " << tot_middle_loop << ", startup cost: " << cost.startupCost << ", inner time: " << inner_time << ")");
+    IVLOG(3, "Performance = " << perf << "(outer count: " << outer_batches
+                              << ", middle count: " << tot_middle_loop
+                              << ", startup cost: " << cost.startupCost
+                              << ", inner time: " << inner_time << ")");
     return perf;
   }
 
   void transform(TensorAndIndexPermutation perm, ArrayRef<int64_t> tileSize) {
     // TODO: Clean up this logging
     if (VLOG_IS_ON(2)) {
-      IVLOG(2, "Best Perf: " << bestCost);
+      std::stringstream bestReport;
+      bestReport << "Stencil Selection Report:\n";
+      bestReport << "    Best Perf: " << bestCost << "\n";
       std::stringstream tensorPermStr;
       tensorPermStr << "[\n";
       for (auto t : perm.tensors) {
-        tensorPermStr << "  " << mlir::debugString(*t) << "\n";
+        tensorPermStr << "        " << mlir::debugString(*t) << "\n";
       }
-      tensorPermStr << "]";
-      IVLOG(2, "Best Tensor Permutation: " << tensorPermStr.str());
+      tensorPermStr << "    ]";
+      bestReport << "    Best Tensor Permutation: " << tensorPermStr.str()
+                 << "\n";
       std::stringstream indexPermStr;
       indexPermStr << "[ ";
       for (auto ind : perm.indexes) {
         indexPermStr << ind.getArgNumber() << " ";
       }
       indexPermStr << "]";
-      IVLOG(2, "Best Index Permutation: " << indexPermStr.str());
+      bestReport << "    Best Index Permutation: " << indexPermStr.str()
+                 << "\n";
       std::stringstream bestTilingStr;
       bestTilingStr << "[ ";
       for (const auto &tileSize : bestTiling) {
         bestTilingStr << tileSize << " ";
       }
       bestTilingStr << "]";
-      IVLOG(2, "Best Tiling: " << bestTilingStr.str());
+      bestReport << "    Best Tiling: " << bestTilingStr.str();
+      IVLOG(2, bestReport.str());
     }
 
     op.setAttr("is_gemm", mlir::UnitAttr::get(op.getContext()));
