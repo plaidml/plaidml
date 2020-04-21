@@ -21,13 +21,35 @@
 #include "pmlc/rt/vulkan/vulkan_runtime.h"
 
 namespace {
-
 class VulkanRuntimeManager {
 public:
-  VulkanRuntimeManager() = default;
+  VulkanRuntimeManager() {
+    if (failed(vulkanRuntime.init())) {
+      llvm::errs() << "vulkanRuntime.init() failed";
+    }
+  }
   VulkanRuntimeManager(const VulkanRuntimeManager &) = delete;
   VulkanRuntimeManager operator=(const VulkanRuntimeManager &) = delete;
-  ~VulkanRuntimeManager() = default;
+  ~VulkanRuntimeManager() {
+    if (failed(vulkanRuntime.destroy())) {
+      llvm::errs() << "vulkanRuntime.destroy() failed";
+    }
+  }
+
+  void createLaunchKernelAction(uint8_t *shader, uint32_t size,
+                                const char *entryPoint,
+                                NumWorkGroups numWorkGroups) {
+    std::lock_guard<std::mutex> lock(mutex);
+    vulkanRuntime.createLaunchKernelAction(shader, size, entryPoint,
+                                           numWorkGroups);
+  }
+
+  void createMemoryTransferAction(uint64_t src_index, uint64_t src_binding,
+                                  uint64_t dst_index, uint64_t dst_binding) {
+    std::lock_guard<std::mutex> lock(mutex);
+    vulkanRuntime.createMemoryTransferAction(src_index, src_binding, dst_index,
+                                             dst_binding);
+  }
 
   void setResourceData(DescriptorSetIndex setIndex, BindingIndex bindIndex,
                        const VulkanHostMemoryBuffer &memBuffer) {
@@ -35,27 +57,21 @@ public:
     vulkanRuntime.setResourceData(setIndex, bindIndex, memBuffer);
   }
 
-  void setEntryPoint(const char *entryPoint) {
+  void setLaunchKernelAction() {
     std::lock_guard<std::mutex> lock(mutex);
-    vulkanRuntime.setEntryPoint(entryPoint);
-  }
-
-  void setNumWorkGroups(NumWorkGroups numWorkGroups) {
-    std::lock_guard<std::mutex> lock(mutex);
-    vulkanRuntime.setNumWorkGroups(numWorkGroups);
-  }
-
-  void setShaderModule(uint8_t *shader, uint32_t size) {
-    std::lock_guard<std::mutex> lock(mutex);
-    vulkanRuntime.setShaderModule(shader, size);
-  }
-
-  void runOnVulkan() {
-    std::lock_guard<std::mutex> lock(mutex);
-    if (failed(vulkanRuntime.initRuntime()) || failed(vulkanRuntime.run()) ||
-        failed(vulkanRuntime.updateHostMemoryBuffers()) ||
-        failed(vulkanRuntime.destroy())) {
+    if (failed(vulkanRuntime.setLaunchKernelAction())) {
       llvm::errs() << "runOnVulkan failed";
+    }
+  }
+
+  void addLaunchActionToSchedule() {
+    vulkanRuntime.addLaunchActionToSchedule();
+  }
+
+  void submitCommandBuffers() {
+    std::lock_guard<std::mutex> lock(mutex);
+    if (failed(vulkanRuntime.submitCommandBuffers())) {
+      llvm::errs() << "vulkanRuntime.submitBuffer() failed";
     }
   }
 
@@ -63,69 +79,146 @@ private:
   VulkanRuntime vulkanRuntime;
   std::mutex mutex;
 };
-
 } // namespace
 
-extern "C" {
-
-void *initVulkan();
-void deinitVulkan(void *vkRuntimeManager);
-void runOnVulkan(void *vkRuntimeManager);
-void setEntryPoint(void *vkRuntimeManager, const char *entryPoint);
-void setNumWorkGroups(void *vkRuntimeManager, uint32_t x, uint32_t y,
-                      uint32_t z);
-void setBinaryShader(void *vkRuntimeManager, uint8_t *shader, uint32_t size);
-void bindMemRef1DFloat(void *vkRuntimeManager, DescriptorSetIndex setIndex,
-                       BindingIndex bindIndex,
-                       StridedMemRefType<float, 1> *ptr);
-void _mlir_ciface_fillResource1DFloat(StridedMemRefType<float, 1> *ptr,
-                                      float value);
-
-/// Initializes `VulkanRuntimeManager` and returns a pointer to it.
-void *initVulkan() { return new VulkanRuntimeManager(); }
-
-/// Deinitializes `VulkanRuntimeManager` by the given pointer.
-void deinitVulkan(void *vkRuntimeManager) {
-  delete reinterpret_cast<VulkanRuntimeManager *>(vkRuntimeManager);
-}
-
-void runOnVulkan(void *vkRuntimeManager) {
-  reinterpret_cast<VulkanRuntimeManager *>(vkRuntimeManager)->runOnVulkan();
-}
-
-void setEntryPoint(void *vkRuntimeManager, const char *entryPoint) {
-  reinterpret_cast<VulkanRuntimeManager *>(vkRuntimeManager)
-      ->setEntryPoint(entryPoint);
-}
-
-void setNumWorkGroups(void *vkRuntimeManager, uint32_t x, uint32_t y,
-                      uint32_t z) {
-  reinterpret_cast<VulkanRuntimeManager *>(vkRuntimeManager)
-      ->setNumWorkGroups({x, y, z});
-}
-
-void setBinaryShader(void *vkRuntimeManager, uint8_t *shader, uint32_t size) {
-  reinterpret_cast<VulkanRuntimeManager *>(vkRuntimeManager)
-      ->setShaderModule(shader, size);
-}
-
-/// Binds the given 1D float memref to the given descriptor set and descriptor
-/// index.
-void bindMemRef1DFloat(void *vkRuntimeManager, DescriptorSetIndex setIndex,
-                       BindingIndex bindIndex,
-                       StridedMemRefType<float, 1> *ptr) {
-  VulkanHostMemoryBuffer memBuffer{
-      ptr->data, static_cast<uint32_t>(ptr->sizes[0] * sizeof(float))};
+template <typename T, int N>
+void bindBuffer(void *vkRuntimeManager, DescriptorSetIndex setIndex,
+                BindingIndex bindIndex, void *ptr) {
+  auto descriptor = reinterpret_cast<StridedMemRefType<T, N> *>(ptr);
+  int64_t size = 1;
+  for (int i = 0; i < N; i++) {
+    size *= descriptor->sizes[i];
+  }
+  VulkanHostMemoryBuffer memBuffer{descriptor->data,
+                                   static_cast<uint32_t>(size * sizeof(T))};
   reinterpret_cast<VulkanRuntimeManager *>(vkRuntimeManager)
       ->setResourceData(setIndex, bindIndex, memBuffer);
 }
 
-/// Fills the given 1D float memref with the given float value.
-void _mlir_ciface_fillResource1DFloat(StridedMemRefType<float, 1> *ptr,
-                                      float value) {
-  std::fill_n(ptr->data, ptr->sizes[0], value);
+template <typename T, int N>
+void fillResource(void *ptr, float value) {
+  auto descriptor = reinterpret_cast<StridedMemRefType<T, N> *>(ptr);
+  int64_t size = 1;
+  for (int i = 0; i < N; i++) {
+    size *= descriptor->sizes[i];
+  }
+  std::fill_n(descriptor->data, size, value);
 }
 
+extern "C" {
+void *initVulkan() { return new VulkanRuntimeManager(); }
+
+void deinitVulkan(void *vkRuntimeManager) {
+  delete reinterpret_cast<VulkanRuntimeManager *>(vkRuntimeManager);
+}
+
+void createVulkanLaunchKernelAction(void *vkRuntimeManager, uint8_t *shader,
+                                    uint32_t size, const char *entryPoint,
+                                    uint32_t x, uint32_t y, uint32_t z) {
+  reinterpret_cast<VulkanRuntimeManager *>(vkRuntimeManager)
+      ->createLaunchKernelAction(shader, size, entryPoint, {x, y, z});
+}
+
+void createVulkanMemoryTransferAction(void *vkRuntimeManager,
+                                      uint64_t src_index, uint64_t src_binding,
+                                      uint64_t dst_index,
+                                      uint64_t dst_binding) {
+  reinterpret_cast<VulkanRuntimeManager *>(vkRuntimeManager)
+      ->createMemoryTransferAction(src_index, src_binding, dst_index,
+                                   dst_binding);
+}
+
+void setVulkanLaunchKernelAction(void *vkRuntimeManager) {
+  reinterpret_cast<VulkanRuntimeManager *>(vkRuntimeManager)
+      ->setLaunchKernelAction();
+}
+
+void addVulkanLaunchActionToSchedule(void *vkRuntimeManager) {
+  reinterpret_cast<VulkanRuntimeManager *>(vkRuntimeManager)
+      ->addLaunchActionToSchedule();
+}
+
+void submitCommandBuffers(void *vkRuntimeManager) {
+  reinterpret_cast<VulkanRuntimeManager *>(vkRuntimeManager)
+      ->submitCommandBuffers();
+}
+
+void bindBufferFloat32(void *vkRuntimeManager, DescriptorSetIndex setIndex,
+                       BindingIndex bindIndex, int64_t rank, void *ptr) {
+  switch (rank) {
+  case 1:
+    bindBuffer<float, 1>(vkRuntimeManager, setIndex, bindIndex, ptr);
+    break;
+  case 2:
+    bindBuffer<float, 2>(vkRuntimeManager, setIndex, bindIndex, ptr);
+    break;
+  case 3:
+    bindBuffer<float, 3>(vkRuntimeManager, setIndex, bindIndex, ptr);
+    break;
+  case 4:
+    bindBuffer<float, 4>(vkRuntimeManager, setIndex, bindIndex, ptr);
+    break;
+  case 5:
+    bindBuffer<float, 5>(vkRuntimeManager, setIndex, bindIndex, ptr);
+    break;
+  case 6:
+    bindBuffer<float, 6>(vkRuntimeManager, setIndex, bindIndex, ptr);
+    break;
+  default:
+    return;
+  }
+}
+
+void bindBufferInt64(void *vkRuntimeManager, DescriptorSetIndex setIndex,
+                     BindingIndex bindIndex, int64_t rank, void *ptr) {
+  switch (rank) {
+  case 1:
+    bindBuffer<int64_t, 1>(vkRuntimeManager, setIndex, bindIndex, ptr);
+    break;
+  case 2:
+    bindBuffer<int64_t, 2>(vkRuntimeManager, setIndex, bindIndex, ptr);
+    break;
+  case 3:
+    bindBuffer<int64_t, 3>(vkRuntimeManager, setIndex, bindIndex, ptr);
+    break;
+  case 4:
+    bindBuffer<int64_t, 4>(vkRuntimeManager, setIndex, bindIndex, ptr);
+    break;
+  case 5:
+    bindBuffer<int64_t, 5>(vkRuntimeManager, setIndex, bindIndex, ptr);
+    break;
+  case 6:
+    bindBuffer<int64_t, 6>(vkRuntimeManager, setIndex, bindIndex, ptr);
+    break;
+  default:
+    return;
+  }
+}
+
+void fillResourceFloat32(int64_t rank, void *ptr, float value) {
+  switch (rank) {
+  case 1:
+    fillResource<float, 1>(ptr, value);
+    break;
+  case 2:
+    fillResource<float, 2>(ptr, value);
+    break;
+  case 3:
+    fillResource<float, 3>(ptr, value);
+    break;
+  case 4:
+    fillResource<float, 4>(ptr, value);
+    break;
+  case 5:
+    fillResource<float, 5>(ptr, value);
+    break;
+  case 6:
+    fillResource<float, 6>(ptr, value);
+    break;
+  default:
+    return;
+  }
+}
 } // extern "C"
 
 namespace {
@@ -140,16 +233,22 @@ struct Registration {
     // Vulkan Runtime functions
     registerSymbol("initVulkan", reinterpret_cast<void *>(initVulkan));
     registerSymbol("deinitVulkan", reinterpret_cast<void *>(deinitVulkan));
-    registerSymbol("runOnVulkan", reinterpret_cast<void *>(runOnVulkan));
-    registerSymbol("setEntryPoint", reinterpret_cast<void *>(setEntryPoint));
-    registerSymbol("setNumWorkGroups",
-                   reinterpret_cast<void *>(setNumWorkGroups));
-    registerSymbol("setBinaryShader",
-                   reinterpret_cast<void *>(setBinaryShader));
-    registerSymbol("bindMemRef1DFloat",
-                   reinterpret_cast<void *>(bindMemRef1DFloat));
-    registerSymbol("_mlir_ciface_fillResource1DFloat",
-                   reinterpret_cast<void *>(_mlir_ciface_fillResource1DFloat));
+    registerSymbol("createVulkanLaunchKernelAction",
+                   reinterpret_cast<void *>(createVulkanLaunchKernelAction));
+    registerSymbol("createVulkanMemoryTransferAction",
+                   reinterpret_cast<void *>(createVulkanMemoryTransferAction));
+    registerSymbol("setVulkanLaunchKernelAction",
+                   reinterpret_cast<void *>(setVulkanLaunchKernelAction));
+    registerSymbol("addVulkanLaunchActionToSchedule",
+                   reinterpret_cast<void *>(addVulkanLaunchActionToSchedule));
+    registerSymbol("submitCommandBuffers",
+                   reinterpret_cast<void *>(submitCommandBuffers));
+    registerSymbol("bindBufferFloat32",
+                   reinterpret_cast<void *>(bindBufferFloat32));
+    registerSymbol("bindBufferInt64",
+                   reinterpret_cast<void *>(bindBufferInt64));
+    registerSymbol("fillResourceFloat32",
+                   reinterpret_cast<void *>(fillResourceFloat32));
   }
 };
 static Registration reg;

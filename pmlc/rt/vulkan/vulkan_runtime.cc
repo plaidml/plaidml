@@ -13,36 +13,38 @@
 
 #include "pmlc/rt/vulkan/vulkan_runtime.h"
 
-using namespace mlir; // NOLINT[build/namespaces]
+#include <memory>
+#include <vector>
 
-void VulkanRuntime::setNumWorkGroups(const NumWorkGroups &numberWorkGroups) {
-  numWorkGroups = numberWorkGroups;
-}
+using namespace mlir; // NOLINT[build/namespaces]
 
 void VulkanRuntime::setResourceStorageClassBindingMap(
     const ResourceStorageClassBindingMap &stClassData) {
-  resourceStorageClassData = stClassData;
+  if (!curr) {
+    llvm::errs() << "setResourceStorageClassBindingMap: curr is nullptr!";
+    return;
+  }
+  curr->resourceStorageClassData = stClassData;
 }
 
 void VulkanRuntime::setResourceData(
     const DescriptorSetIndex desIndex, const BindingIndex bindIndex,
     const VulkanHostMemoryBuffer &hostMemBuffer) {
-  resourceData[desIndex][bindIndex] = hostMemBuffer;
-  resourceStorageClassData[desIndex][bindIndex] =
+  if (!curr) {
+    llvm::errs() << "setResourceData: curr is nullptr!";
+    return;
+  }
+  curr->resourceData[desIndex][bindIndex] = hostMemBuffer;
+  curr->resourceStorageClassData[desIndex][bindIndex] =
       spirv::StorageClass::StorageBuffer;
 }
 
-void VulkanRuntime::setEntryPoint(const char *entryPointName) {
-  entryPoint = entryPointName;
-}
-
 void VulkanRuntime::setResourceData(const ResourceData &resData) {
-  resourceData = resData;
-}
-
-void VulkanRuntime::setShaderModule(uint8_t *shader, uint32_t size) {
-  binary = shader;
-  binarySize = size;
+  if (!curr) {
+    llvm::errs() << "setResourceData: curr is nullptr!";
+    return;
+  }
+  curr->resourceData = resData;
 }
 
 LogicalResult VulkanRuntime::mapStorageClassToDescriptorType(
@@ -78,7 +80,12 @@ LogicalResult VulkanRuntime::mapStorageClassToBufferUsageFlag(
 }
 
 LogicalResult VulkanRuntime::countDeviceMemorySize() {
-  for (const auto &resourceDataMapPair : resourceData) {
+  if (!curr) {
+    llvm::errs() << "countDeviceMemorySize: curr is nullptr!";
+    return failure();
+  }
+
+  for (const auto &resourceDataMapPair : curr->resourceData) {
     const auto &resourceDataMap = resourceDataMapPair.second;
     for (const auto &resourceDataBindingPair : resourceDataMap) {
       if (resourceDataBindingPair.second.size) {
@@ -93,12 +100,16 @@ LogicalResult VulkanRuntime::countDeviceMemorySize() {
   return success();
 }
 
-LogicalResult VulkanRuntime::initRuntime() {
-  if (!resourceData.size()) {
+LogicalResult VulkanRuntime::checkResourceData() {
+  if (!curr) {
+    llvm::errs() << "checkResourceData: curr is nullptr!";
+    return failure();
+  }
+  if (!curr->resourceData.size()) {
     llvm::errs() << "Vulkan runtime needs at least one resource";
     return failure();
   }
-  if (!binarySize || !binary) {
+  if (!curr->binarySize || !curr->binary) {
     llvm::errs() << "binary shader size must be greater than zero";
     return failure();
   }
@@ -121,35 +132,151 @@ LogicalResult VulkanRuntime::destroy() {
   vkFreeCommandBuffers(device, commandPool, commandBuffers.size(),
                        commandBuffers.data());
   vkDestroyCommandPool(device, commandPool, nullptr);
-  vkFreeDescriptorSets(device, descriptorPool, descriptorSets.size(),
-                       descriptorSets.data());
-  vkDestroyDescriptorPool(device, descriptorPool, nullptr);
-  vkDestroyPipeline(device, pipeline, nullptr);
-  vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
-  for (auto &descriptorSetLayout : descriptorSetLayouts) {
-    vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
-  }
-  vkDestroyShaderModule(device, shaderModule, nullptr);
+  for (const auto &action : schedule) {
+    if (auto kernel = std::dynamic_pointer_cast<LaunchKernelAction>(action)) {
+      vkFreeDescriptorSets(device, kernel->descriptorPool,
+                           kernel->descriptorSets.size(),
+                           kernel->descriptorSets.data());
+      vkDestroyDescriptorPool(device, kernel->descriptorPool, nullptr);
+      vkDestroyPipeline(device, kernel->pipeline, nullptr);
+      vkDestroyPipelineLayout(device, kernel->pipelineLayout, nullptr);
+      for (auto &descriptorSetLayout : kernel->descriptorSetLayouts) {
+        vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
+      }
+      vkDestroyShaderModule(device, kernel->shaderModule, nullptr);
 
-  // For each descriptor set.
-  for (auto &deviceMemoryBufferMapPair : deviceMemoryBufferMap) {
-    auto &deviceMemoryBuffers = deviceMemoryBufferMapPair.second;
-    // For each descirptor binding.
-    for (auto &memoryBuffer : deviceMemoryBuffers) {
-      vkFreeMemory(device, memoryBuffer.deviceMemory, nullptr);
-      vkDestroyBuffer(device, memoryBuffer.buffer, nullptr);
+      // For each descriptor set.
+      for (auto &deviceMemoryBufferMapPair : kernel->deviceMemoryBufferMap) {
+        auto &deviceMemoryBuffers = deviceMemoryBufferMapPair.second;
+        // For each descirptor binding.
+        for (auto &memoryBuffer : deviceMemoryBuffers) {
+          vkFreeMemory(device, memoryBuffer.deviceMemory, nullptr);
+          vkDestroyBuffer(device, memoryBuffer.buffer, nullptr);
+        }
+      }
     }
   }
-
   vkDestroyDevice(device, nullptr);
   vkDestroyInstance(instance, nullptr);
   return success();
 }
 
-LogicalResult VulkanRuntime::run() {
-  // Create logical device, shader module and memory buffers.
+LogicalResult VulkanRuntime::init() {
   if (failed(createInstance()) || failed(createDevice()) ||
-      failed(createMemoryBuffers()) || failed(createShaderModule())) {
+      failed(createCommandPool())) {
+    return failure();
+  }
+  // Get working queue.
+  vkGetDeviceQueue(device, queueFamilyIndex, 0, &queue);
+  return success();
+}
+
+LogicalResult
+VulkanRuntime::createLaunchKernelAction(uint8_t *shader, uint32_t size,
+                                        const char *entryPoint,
+                                        NumWorkGroups numWorkGroups) {
+  curr = std::make_shared<LaunchKernelAction>();
+
+  curr->binary = shader;
+  curr->binarySize = size;
+  curr->entryPoint = entryPoint;
+  curr->workGroups = numWorkGroups;
+  return success();
+}
+
+LogicalResult VulkanRuntime::createMemoryTransferAction(VkBuffer src,
+                                                        VkBuffer dst,
+                                                        size_t size) {
+  auto transferAction = std::make_shared<MemoryTransferAction>();
+  transferAction->src = src;
+  transferAction->dst = dst;
+  const VkBufferCopy copy = {0, 0, size};
+  transferAction->regions.push_back(copy);
+
+  schedule.push_back(transferAction);
+  return success();
+}
+
+LogicalResult VulkanRuntime::createMemoryTransferAction(uint64_t src_index,
+                                                        uint64_t src_binding,
+                                                        uint64_t dst_index,
+                                                        uint64_t dst_binding) {
+  std::shared_ptr<LaunchKernelAction> kernel_src;
+  std::shared_ptr<LaunchKernelAction> kernel_dst;
+  uint64_t kernel_index = 0;
+  for (auto action : schedule) {
+    if (auto kernel = std::dynamic_pointer_cast<LaunchKernelAction>(action)) {
+      if (src_index == kernel_index) {
+        kernel_src = kernel;
+      }
+      if (dst_index == kernel_index) {
+        kernel_dst = kernel;
+      }
+      kernel_index++;
+    }
+  }
+
+  if (kernel_index == dst_index) {
+    kernel_dst = curr;
+  }
+  if (kernel_index == src_index) {
+    kernel_src = curr;
+  }
+
+  if ((!kernel_src) || (!kernel_dst)) {
+    llvm::errs() << "createMemoryTransferAction: invalid kernel index";
+    return failure();
+  }
+
+  auto descriptorSetIndex = 0;
+  auto memoryBuffersSrc = kernel_src->deviceMemoryBufferMap[descriptorSetIndex];
+  auto memoryBuffersDst = kernel_dst->deviceMemoryBufferMap[descriptorSetIndex];
+
+  VkBuffer bufferSrc{VK_NULL_HANDLE};
+  VkBuffer bufferDst{VK_NULL_HANDLE};
+  size_t bufferSizeSrc = 0;
+  size_t bufferSizeDst = 0;
+
+  for (auto memoryBuffer : memoryBuffersSrc) {
+    if (memoryBuffer.bindingIndex == src_binding) {
+      bufferSrc = memoryBuffer.buffer;
+      bufferSizeSrc = memoryBuffer.bufferSize;
+    }
+  }
+
+  for (auto memoryBuffer : memoryBuffersDst) {
+    if (memoryBuffer.bindingIndex == dst_binding) {
+      bufferDst = memoryBuffer.buffer;
+      bufferSizeDst = memoryBuffer.bufferSize;
+    }
+  }
+
+  if (bufferSizeSrc != bufferSizeDst) {
+    llvm::errs() << "createMemoryTransferAction: different buffer sizes!";
+    return failure();
+  }
+
+  createMemoryTransferAction(bufferSrc, bufferDst, bufferSizeDst);
+
+  VkBufferMemoryBarrier bufferMemoryBarrier = {};
+  bufferMemoryBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+  bufferMemoryBarrier.pNext = nullptr;
+  bufferMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+  bufferMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+  bufferMemoryBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+  bufferMemoryBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+  bufferMemoryBarrier.buffer = bufferDst;
+  bufferMemoryBarrier.offset = 0;
+  bufferMemoryBarrier.size = VK_WHOLE_SIZE;
+
+  kernel_dst->deps.push_back(bufferMemoryBarrier);
+  return success();
+}
+
+LogicalResult VulkanRuntime::setLaunchKernelAction() {
+  // Create logical device, shader module and memory buffers.
+  if (failed(checkResourceData()) || failed(createMemoryBuffers()) ||
+      failed(createShaderModule())) {
     return failure();
   }
 
@@ -160,25 +287,38 @@ LogicalResult VulkanRuntime::run() {
   if (failed(createDescriptorSetLayout()) || failed(createPipelineLayout()) ||
       // Each descriptor set must be allocated from a descriptor pool.
       failed(createComputePipeline()) || failed(createDescriptorPool()) ||
-      failed(allocateDescriptorSets()) || failed(setWriteDescriptors()) ||
-      // Create command buffer.
-      failed(createCommandPool()) || failed(createComputeCommandBuffer())) {
+      failed(allocateDescriptorSets()) || failed(setWriteDescriptors())) {
     return failure();
   }
 
-  // Get working queue.
-  vkGetDeviceQueue(device, queueFamilyIndex, 0, &queue);
+  return success();
+}
 
-  // Submit command buffer into the queue.
-  if (failed(submitCommandBuffersToQueue()))
+void VulkanRuntime::addLaunchActionToSchedule() {
+  schedule.push_back(curr);
+  curr = nullptr;
+}
+
+LogicalResult VulkanRuntime::submitCommandBuffers() {
+  if (failed(createSchedule())) {
     return failure();
+  }
+  // Submit command buffer into the queue.
+  if (failed(submitCommandBuffersToQueue())) {
+    return failure();
+  }
 
   RETURN_ON_VULKAN_ERROR(vkQueueWaitIdle(queue), "vkQueueWaitIdle");
+
+  updateHostMemoryBuffers();
   return success();
 }
 
 LogicalResult VulkanRuntime::createInstance() {
-  RETURN_ON_VULKAN_ERROR(volkInitialize(), "volkInitialize");
+  if (volkInitialized != VK_SUCCESS) {
+    volkInitialized = volkInitialize();
+    RETURN_ON_VULKAN_ERROR(volkInitialized, "volkInitialize");
+  }
 
   VkApplicationInfo applicationInfo = {};
   applicationInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
@@ -213,7 +353,7 @@ LogicalResult VulkanRuntime::createDevice() {
       vkEnumeratePhysicalDevices(instance, &physicalDeviceCount, 0),
       "vkEnumeratePhysicalDevices");
 
-  llvm::SmallVector<VkPhysicalDevice, 1> physicalDevices(physicalDeviceCount);
+  SmallVector<VkPhysicalDevice, 1> physicalDevices(physicalDeviceCount);
   RETURN_ON_VULKAN_ERROR(vkEnumeratePhysicalDevices(instance,
                                                     &physicalDeviceCount,
                                                     physicalDevices.data()),
@@ -322,8 +462,13 @@ VulkanRuntime::getBestComputeQueue(const VkPhysicalDevice &physicalDevice) {
 }
 
 LogicalResult VulkanRuntime::createMemoryBuffers() {
+  if (!curr) {
+    llvm::errs() << "createMemoryBuffers: curr is nullptr!";
+    return failure();
+  }
+
   // For each descriptor set.
-  for (const auto &resourceDataMapPair : resourceData) {
+  for (const auto &resourceDataMapPair : curr->resourceData) {
     llvm::SmallVector<VulkanDeviceMemoryBuffer, 1> deviceMemoryBuffers;
     const auto descriptorSetIndex = resourceDataMapPair.first;
     const auto &resourceDataMap = resourceDataMapPair.second;
@@ -334,12 +479,13 @@ LogicalResult VulkanRuntime::createMemoryBuffers() {
       VulkanDeviceMemoryBuffer memoryBuffer;
       memoryBuffer.bindingIndex = resourceDataBindingPair.first;
       VkDescriptorType descriptorType = {};
-      VkBufferUsageFlagBits bufferUsage = {};
+      VkBufferUsageFlagBits bufferUsageSrc = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+      VkBufferUsageFlagBits bufferUsageDst = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 
       // Check that descriptor set has storage class map.
       const auto resourceStorageClassMapIt =
-          resourceStorageClassData.find(descriptorSetIndex);
-      if (resourceStorageClassMapIt == resourceStorageClassData.end()) {
+          curr->resourceStorageClassData.find(descriptorSetIndex);
+      if (resourceStorageClassMapIt == curr->resourceStorageClassData.end()) {
         llvm::errs()
             << "cannot find storge class for resource in descriptor set: "
             << descriptorSetIndex;
@@ -351,9 +497,9 @@ LogicalResult VulkanRuntime::createMemoryBuffers() {
       const auto resourceStorageClassIt =
           resourceStorageClassMap.find(resourceDataBindingPair.first);
       if (resourceStorageClassIt == resourceStorageClassMap.end()) {
-        llvm::errs()
-            << "cannot find storage class for resource with descriptor index: "
-            << resourceDataBindingPair.first;
+        llvm::errs() << "cannot find storage class for resource with "
+                        "descriptor index: "
+                     << resourceDataBindingPair.first;
         return failure();
       }
 
@@ -361,7 +507,9 @@ LogicalResult VulkanRuntime::createMemoryBuffers() {
       if (failed(mapStorageClassToDescriptorType(resourceStorageClassBinding,
                                                  descriptorType)) ||
           failed(mapStorageClassToBufferUsageFlag(resourceStorageClassBinding,
-                                                  bufferUsage))) {
+                                                  bufferUsageSrc)) ||
+          failed(mapStorageClassToBufferUsageFlag(resourceStorageClassBinding,
+                                                  bufferUsageDst))) {
         llvm::errs() << "storage class for resource with descriptor binding: "
                      << resourceDataBindingPair.first
                      << " in the descriptor set: " << descriptorSetIndex
@@ -399,7 +547,7 @@ LogicalResult VulkanRuntime::createMemoryBuffers() {
       bufferCreateInfo.pNext = nullptr;
       bufferCreateInfo.flags = 0;
       bufferCreateInfo.size = bufferSize;
-      bufferCreateInfo.usage = bufferUsage;
+      bufferCreateInfo.usage = bufferUsageSrc | bufferUsageDst;
       bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
       bufferCreateInfo.queueFamilyIndexCount = 1;
       bufferCreateInfo.pQueueFamilyIndices = &queueFamilyIndex;
@@ -412,6 +560,8 @@ LogicalResult VulkanRuntime::createMemoryBuffers() {
                                                 memoryBuffer.deviceMemory, 0),
                              "vkBindBufferMemory");
 
+      memoryBuffer.bufferSize = bufferSize;
+
       // Update buffer info.
       memoryBuffer.bufferInfo.buffer = memoryBuffer.buffer;
       memoryBuffer.bufferInfo.offset = 0;
@@ -420,28 +570,38 @@ LogicalResult VulkanRuntime::createMemoryBuffers() {
     }
 
     // Associate device memory buffers with a descriptor set.
-    deviceMemoryBufferMap[descriptorSetIndex] = deviceMemoryBuffers;
+    curr->deviceMemoryBufferMap[descriptorSetIndex] = deviceMemoryBuffers;
   }
   return success();
 }
 
 LogicalResult VulkanRuntime::createShaderModule() {
+  if (!curr) {
+    llvm::errs() << "createShaderModule : curr is nullptr!";
+    return failure();
+  }
+
   VkShaderModuleCreateInfo shaderModuleCreateInfo = {};
   shaderModuleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
   shaderModuleCreateInfo.pNext = nullptr;
   shaderModuleCreateInfo.flags = 0;
   // Set size in bytes.
-  shaderModuleCreateInfo.codeSize = binarySize;
+  shaderModuleCreateInfo.codeSize = curr->binarySize;
   // Set pointer to the binary shader.
-  shaderModuleCreateInfo.pCode = reinterpret_cast<uint32_t *>(binary);
-  RETURN_ON_VULKAN_ERROR(
-      vkCreateShaderModule(device, &shaderModuleCreateInfo, 0, &shaderModule),
-      "vkCreateShaderModule");
+  shaderModuleCreateInfo.pCode = reinterpret_cast<uint32_t *>(curr->binary);
+  RETURN_ON_VULKAN_ERROR(vkCreateShaderModule(device, &shaderModuleCreateInfo,
+                                              0, &curr->shaderModule),
+                         "vkCreateShaderModule");
   return success();
 }
 
 void VulkanRuntime::initDescriptorSetLayoutBindingMap() {
-  for (const auto &deviceMemoryBufferMapPair : deviceMemoryBufferMap) {
+  if (!curr) {
+    llvm::errs() << "initDescriptorSetLayoutBindingMap: curr is nullptr!";
+    return;
+  }
+
+  for (const auto &deviceMemoryBufferMapPair : curr->deviceMemoryBufferMap) {
     SmallVector<VkDescriptorSetLayoutBinding, 1> descriptorSetLayoutBindings;
     const auto &deviceMemoryBuffers = deviceMemoryBufferMapPair.second;
     const auto descriptorSetIndex = deviceMemoryBufferMapPair.first;
@@ -456,13 +616,18 @@ void VulkanRuntime::initDescriptorSetLayoutBindingMap() {
       descriptorSetLayoutBinding.pImmutableSamplers = 0;
       descriptorSetLayoutBindings.push_back(descriptorSetLayoutBinding);
     }
-    descriptorSetLayoutBindingMap[descriptorSetIndex] =
+    curr->descriptorSetLayoutBindingMap[descriptorSetIndex] =
         descriptorSetLayoutBindings;
   }
 }
 
 LogicalResult VulkanRuntime::createDescriptorSetLayout() {
-  for (const auto &deviceMemoryBufferMapPair : deviceMemoryBufferMap) {
+  if (!curr) {
+    llvm::errs() << "createDescriptorSetLayout: curr is nullptr!";
+    return failure();
+  }
+
+  for (const auto &deviceMemoryBufferMapPair : curr->deviceMemoryBufferMap) {
     const auto descriptorSetIndex = deviceMemoryBufferMapPair.first;
     const auto &deviceMemoryBuffers = deviceMemoryBufferMapPair.second;
     // Each descriptor in a descriptor set must be the same type.
@@ -470,9 +635,10 @@ LogicalResult VulkanRuntime::createDescriptorSetLayout() {
         deviceMemoryBuffers.front().descriptorType;
     const uint32_t descriptorSize = deviceMemoryBuffers.size();
     const auto descriptorSetLayoutBindingIt =
-        descriptorSetLayoutBindingMap.find(descriptorSetIndex);
+        curr->descriptorSetLayoutBindingMap.find(descriptorSetIndex);
 
-    if (descriptorSetLayoutBindingIt == descriptorSetLayoutBindingMap.end()) {
+    if (descriptorSetLayoutBindingIt ==
+        curr->descriptorSetLayoutBindingMap.end()) {
       llvm::errs() << "cannot find layout bindings for the set with number: "
                    << descriptorSetIndex;
       return failure();
@@ -498,40 +664,50 @@ LogicalResult VulkanRuntime::createDescriptorSetLayout() {
                                     &descriptorSetLayout),
         "vkCreateDescriptorSetLayout");
 
-    descriptorSetLayouts.push_back(descriptorSetLayout);
-    descriptorSetInfoPool.push_back(
+    curr->descriptorSetLayouts.push_back(descriptorSetLayout);
+    curr->descriptorSetInfoPool.push_back(
         {descriptorSetIndex, descriptorSize, descriptorType});
   }
   return success();
 }
 
 LogicalResult VulkanRuntime::createPipelineLayout() {
+  if (!curr) {
+    llvm::errs() << "createPipelineLayout: curr is nullptr!";
+    return failure();
+  }
+
   // Associate descriptor sets with a pipeline layout.
   VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {};
   pipelineLayoutCreateInfo.sType =
       VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
   pipelineLayoutCreateInfo.pNext = nullptr;
   pipelineLayoutCreateInfo.flags = 0;
-  pipelineLayoutCreateInfo.setLayoutCount = descriptorSetLayouts.size();
-  pipelineLayoutCreateInfo.pSetLayouts = descriptorSetLayouts.data();
+  pipelineLayoutCreateInfo.setLayoutCount = curr->descriptorSetLayouts.size();
+  pipelineLayoutCreateInfo.pSetLayouts = curr->descriptorSetLayouts.data();
   pipelineLayoutCreateInfo.pushConstantRangeCount = 0;
   pipelineLayoutCreateInfo.pPushConstantRanges = 0;
   RETURN_ON_VULKAN_ERROR(vkCreatePipelineLayout(device,
                                                 &pipelineLayoutCreateInfo, 0,
-                                                &pipelineLayout),
+                                                &curr->pipelineLayout),
                          "vkCreatePipelineLayout");
   return success();
 }
 
 LogicalResult VulkanRuntime::createComputePipeline() {
+  if (!curr) {
+    llvm::errs() << "createComputePipeline: curr is nullptr!";
+    return failure();
+  }
+
   VkPipelineShaderStageCreateInfo stageInfo = {};
   stageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
   stageInfo.pNext = nullptr;
   stageInfo.flags = 0;
   stageInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-  stageInfo.module = shaderModule;
+  stageInfo.module = curr->shaderModule;
   // Set entry point.
-  stageInfo.pName = entryPoint;
+  stageInfo.pName = curr->entryPoint;
   stageInfo.pSpecializationInfo = 0;
 
   VkComputePipelineCreateInfo computePipelineCreateInfo = {};
@@ -540,19 +716,24 @@ LogicalResult VulkanRuntime::createComputePipeline() {
   computePipelineCreateInfo.pNext = nullptr;
   computePipelineCreateInfo.flags = 0;
   computePipelineCreateInfo.stage = stageInfo;
-  computePipelineCreateInfo.layout = pipelineLayout;
+  computePipelineCreateInfo.layout = curr->pipelineLayout;
   computePipelineCreateInfo.basePipelineHandle = 0;
   computePipelineCreateInfo.basePipelineIndex = 0;
   RETURN_ON_VULKAN_ERROR(vkCreateComputePipelines(device, 0, 1,
                                                   &computePipelineCreateInfo, 0,
-                                                  &pipeline),
+                                                  &curr->pipeline),
                          "vkCreateComputePipelines");
   return success();
 }
 
 LogicalResult VulkanRuntime::createDescriptorPool() {
-  llvm::SmallVector<VkDescriptorPoolSize, 1> descriptorPoolSizes;
-  for (const auto &descriptorSetInfo : descriptorSetInfoPool) {
+  if (!curr) {
+    llvm::errs() << "createDescriptorPool: curr is nullptr!";
+    return failure();
+  }
+
+  SmallVector<VkDescriptorPoolSize, 1> descriptorPoolSizes;
+  for (const auto &descriptorSetInfo : curr->descriptorSetInfoPool) {
     // For each descriptor set populate descriptor pool size.
     VkDescriptorPoolSize descriptorPoolSize = {};
     descriptorPoolSize.type = descriptorSetInfo.descriptorType;
@@ -570,40 +751,51 @@ LogicalResult VulkanRuntime::createDescriptorPool() {
   descriptorPoolCreateInfo.pPoolSizes = descriptorPoolSizes.data();
   RETURN_ON_VULKAN_ERROR(vkCreateDescriptorPool(device,
                                                 &descriptorPoolCreateInfo, 0,
-                                                &descriptorPool),
+                                                &curr->descriptorPool),
                          "vkCreateDescriptorPool");
   return success();
 }
 
 LogicalResult VulkanRuntime::allocateDescriptorSets() {
+  if (!curr) {
+    llvm::errs() << "allocateDescriptorSets: curr is nullptr!";
+    return failure();
+  }
+
   VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = {};
   // Size of desciptor sets and descriptor layout sets is the same.
-  descriptorSets.resize(descriptorSetLayouts.size());
+  curr->descriptorSets.resize(curr->descriptorSetLayouts.size());
   descriptorSetAllocateInfo.sType =
       VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
   descriptorSetAllocateInfo.pNext = nullptr;
-  descriptorSetAllocateInfo.descriptorPool = descriptorPool;
-  descriptorSetAllocateInfo.descriptorSetCount = descriptorSetLayouts.size();
-  descriptorSetAllocateInfo.pSetLayouts = descriptorSetLayouts.data();
+  descriptorSetAllocateInfo.descriptorPool = curr->descriptorPool;
+  descriptorSetAllocateInfo.descriptorSetCount =
+      curr->descriptorSetLayouts.size();
+  descriptorSetAllocateInfo.pSetLayouts = curr->descriptorSetLayouts.data();
   RETURN_ON_VULKAN_ERROR(vkAllocateDescriptorSets(device,
                                                   &descriptorSetAllocateInfo,
-                                                  descriptorSets.data()),
+                                                  curr->descriptorSets.data()),
                          "vkAllocateDescriptorSets");
   return success();
 }
 
 LogicalResult VulkanRuntime::setWriteDescriptors() {
-  if (descriptorSets.size() != descriptorSetInfoPool.size()) {
+  if (!curr) {
+    llvm::errs() << "setWriteDescriptors: curr is nullptr!";
+    return failure();
+  }
+
+  if (curr->descriptorSets.size() != curr->descriptorSetInfoPool.size()) {
     llvm::errs() << "Each descriptor set must have descriptor set information";
     return failure();
   }
   // For each descriptor set.
-  auto descriptorSetIt = descriptorSets.begin();
+  auto descriptorSetIt = curr->descriptorSets.begin();
   // Each descriptor set is associated with descriptor set info.
-  for (const auto &descriptorSetInfo : descriptorSetInfoPool) {
+  for (const auto &descriptorSetInfo : curr->descriptorSetInfoPool) {
     // For each device memory buffer in the descriptor set.
     const auto &deviceMemoryBuffers =
-        deviceMemoryBufferMap[descriptorSetInfo.descriptorSet];
+        curr->deviceMemoryBufferMap[descriptorSetInfo.descriptorSet];
     for (const auto &memoryBuffer : deviceMemoryBuffers) {
       // Structure describing descriptor sets to write to.
       VkWriteDescriptorSet wSet = {};
@@ -638,47 +830,6 @@ LogicalResult VulkanRuntime::createCommandPool() {
   return success();
 }
 
-LogicalResult VulkanRuntime::createComputeCommandBuffer() {
-  VkCommandBufferAllocateInfo commandBufferAllocateInfo = {};
-  VkCommandBuffer commandBuffer;
-  commandBufferAllocateInfo.sType =
-      VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-  commandBufferAllocateInfo.pNext = nullptr;
-  commandBufferAllocateInfo.commandPool = commandPool;
-  commandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-  commandBufferAllocateInfo.commandBufferCount = 1;
-  RETURN_ON_VULKAN_ERROR(vkAllocateCommandBuffers(device,
-                                                  &commandBufferAllocateInfo,
-                                                  &commandBuffer),
-                         "vkAllocateCommandBuffers");
-
-  VkCommandBufferBeginInfo commandBufferBeginInfo = {};
-  commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-  commandBufferBeginInfo.pNext = nullptr;
-  commandBufferBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-  commandBufferBeginInfo.pInheritanceInfo = nullptr;
-
-  // Commands begin.
-  RETURN_ON_VULKAN_ERROR(
-      vkBeginCommandBuffer(commandBuffer, &commandBufferBeginInfo),
-      "vkBeginCommandBuffer");
-
-  // Commands.
-  vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
-  vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
-                          pipelineLayout, 0, descriptorSets.size(),
-                          descriptorSets.data(), 0, 0);
-  vkCmdDispatch(commandBuffer, numWorkGroups.x, numWorkGroups.y,
-                numWorkGroups.z);
-
-  // Commands end.
-  RETURN_ON_VULKAN_ERROR(vkEndCommandBuffer(commandBuffer),
-                         "vkEndCommandBuffer");
-
-  commandBuffers.push_back(commandBuffer);
-  return success();
-}
-
 LogicalResult VulkanRuntime::submitCommandBuffersToQueue() {
   VkSubmitInfo submitInfo = {};
   submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -696,26 +847,102 @@ LogicalResult VulkanRuntime::submitCommandBuffersToQueue() {
 }
 
 LogicalResult VulkanRuntime::updateHostMemoryBuffers() {
-  // For each descriptor set.
-  for (auto &resourceDataMapPair : resourceData) {
-    auto &resourceDataMap = resourceDataMapPair.second;
-    auto &deviceMemoryBuffers =
-        deviceMemoryBufferMap[resourceDataMapPair.first];
-    // For each device memory buffer in the set.
-    for (auto &deviceMemoryBuffer : deviceMemoryBuffers) {
-      if (resourceDataMap.count(deviceMemoryBuffer.bindingIndex)) {
-        void *payload;
-        auto &hostMemoryBuffer =
-            resourceDataMap[deviceMemoryBuffer.bindingIndex];
-        RETURN_ON_VULKAN_ERROR(vkMapMemory(device,
-                                           deviceMemoryBuffer.deviceMemory, 0,
-                                           hostMemoryBuffer.size, 0,
-                                           reinterpret_cast<void **>(&payload)),
-                               "vkMapMemory");
-        std::memcpy(hostMemoryBuffer.ptr, payload, hostMemoryBuffer.size);
-        vkUnmapMemory(device, deviceMemoryBuffer.deviceMemory);
+  for (const auto &action : schedule) {
+    if (auto kernel = std::dynamic_pointer_cast<LaunchKernelAction>(action)) {
+      // For each descriptor set.
+      for (auto &resourceDataMapPair : kernel->resourceData) {
+        auto &resourceDataMap = resourceDataMapPair.second;
+        auto &deviceMemoryBuffers =
+            kernel->deviceMemoryBufferMap[resourceDataMapPair.first];
+        // For each device memory buffer in the set.
+        for (auto &deviceMemoryBuffer : deviceMemoryBuffers) {
+          if (resourceDataMap.count(deviceMemoryBuffer.bindingIndex)) {
+            void *payload;
+            auto &hostMemoryBuffer =
+                resourceDataMap[deviceMemoryBuffer.bindingIndex];
+            RETURN_ON_VULKAN_ERROR(
+                vkMapMemory(device, deviceMemoryBuffer.deviceMemory, 0,
+                            hostMemoryBuffer.size, 0,
+                            reinterpret_cast<void **>(&payload)),
+                "vkMapMemory");
+            std::memcpy(hostMemoryBuffer.ptr, payload, hostMemoryBuffer.size);
+            vkUnmapMemory(device, deviceMemoryBuffer.deviceMemory);
+          }
+        }
       }
     }
   }
+  return success();
+}
+
+LogicalResult VulkanRuntime::createSchedule() {
+  VkCommandBufferAllocateInfo allocInfo = {};
+  allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+  allocInfo.pNext = nullptr;
+  allocInfo.commandPool = commandPool;
+  allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+  allocInfo.commandBufferCount = 1;
+
+  VkCommandBuffer commandBuffer;
+  RETURN_ON_VULKAN_ERROR(
+      vkAllocateCommandBuffers(device, &allocInfo, &commandBuffer),
+      "vkAllocateCommandBuffers");
+
+  VkCommandBufferBeginInfo beginInfo = {};
+  beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+  beginInfo.pNext = nullptr;
+  beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+  beginInfo.pInheritanceInfo = nullptr;
+
+  RETURN_ON_VULKAN_ERROR(vkBeginCommandBuffer(commandBuffer, &beginInfo),
+                         "vkBeginCommandBuffer");
+
+  for (const auto &action : schedule) {
+    if (auto kernel = std::dynamic_pointer_cast<LaunchKernelAction>(action)) {
+      if (kernel->deps.size()) {
+        vkCmdPipelineBarrier(
+            commandBuffer,
+            /*srcStageMask=*/VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            /*dstStageMask=*/VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            /*dependencyFlags=*/0, /*memoryBarrierCount=*/0,
+            /*pMemoryBarriers=*/nullptr,
+            /*bufferMemoryBarrierCount=*/kernel->deps.size(),
+            /*pBufferMemoryBarriers=*/kernel->deps.data(),
+            /*imageMemoryBarrierCount=*/0,
+            /*pImageMemoryBarriers=*/nullptr);
+      }
+
+      vkCmdBindPipeline(commandBuffer,
+                        /*pipelineBindPoint=*/VK_PIPELINE_BIND_POINT_COMPUTE,
+                        kernel->pipeline);
+
+      vkCmdBindDescriptorSets(
+          commandBuffer,
+          /*pipelineBindPoint=*/VK_PIPELINE_BIND_POINT_COMPUTE,
+          /*layout=*/kernel->pipelineLayout,
+          /*firstSet=*/0,
+          /*descriptorSetCount=*/kernel->descriptorSets.size(),
+          /*pDescriptorSets=*/kernel->descriptorSets.data(),
+          /*dynamicOffsetCount=*/0,
+          /*pDynamicOffsets=*/0);
+
+      vkCmdDispatch(commandBuffer,
+                    /*groupCountX=*/kernel->workGroups.x,
+                    /*groupCountY=*/kernel->workGroups.y,
+                    /*groupCountZ=*/kernel->workGroups.z);
+    }
+    if (auto xfer = std::dynamic_pointer_cast<MemoryTransferAction>(action)) {
+      vkCmdCopyBuffer(commandBuffer,
+                      /*srcBuffer=*/xfer->src,
+                      /*dstBuffer=*/xfer->dst,
+                      /*regionCount=*/xfer->regions.size(),
+                      /*pRegions=*/xfer->regions.data());
+    }
+  }
+
+  RETURN_ON_VULKAN_ERROR(vkEndCommandBuffer(commandBuffer),
+                         "vkEndCommandBuffer");
+
+  commandBuffers.push_back(commandBuffer);
   return success();
 }

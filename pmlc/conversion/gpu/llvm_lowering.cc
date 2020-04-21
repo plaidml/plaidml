@@ -1,39 +1,29 @@
-// Copyright 2020 Intel Corporation
+// Copyright 2020, Intel Corporation
 
-#include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
+#include "mlir/Conversion/GPUToSPIRV/ConvertGPUToSPIRVPass.h"
+#include "mlir/Conversion/GPUToVulkan/ConvertGPUToVulkanPass.h"
 #include "mlir/Conversion/LoopToStandard/ConvertLoopToStandard.h"
+#include "mlir/Conversion/LoopsToGPU/LoopsToGPUPass.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
+#include "mlir/Conversion/StandardToSPIRV/ConvertStandardToSPIRVPass.h"
+#include "mlir/Dialect/GPU/Passes.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
-#include "mlir/IR/StandardTypes.h"
+#include "mlir/Dialect/SPIRV/Passes.h"
+#include "mlir/Dialect/SPIRV/SPIRVOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/Passes.h"
 
-#include "pmlc/compiler/registry.h"
-#include "pmlc/conversion/pxa_to_affine/passes.h"
-#include "pmlc/conversion/stdx_to_llvm/passes.h"
-#include "pmlc/conversion/tile_to_pxa/passes.h"
-#include "pmlc/dialect/pxa/transforms/passes.h"
-#include "pmlc/dialect/stdx/transforms/passes.h"
-#include "pmlc/dialect/tile/transforms/passes.h"
-#include "pmlc/target/x86/heatmap.h"
-#include "pmlc/target/x86/pass_detail.h"
-#include "pmlc/target/x86/passes.h"
-#include "pmlc/util/env.h"
-#include "pmlc/util/logging.h"
+#include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/IR/StandardTypes.h"
+
+#include "pmlc/conversion/gpu/pass_detail.h"
 
 using namespace mlir; // NOLINT[build/namespaces]
 
-namespace pmlc::target::x86 {
-
-std::unique_ptr<Pass> createXSMMStencilPass() {
-  auto numThreads = std::thread::hardware_concurrency();
-  return pmlc::dialect::pxa::createStencilPass(numThreads, heatmapCost);
-}
-
-namespace {
+namespace pmlc::conversion::gpu {
 
 static LLVM::LLVMType unwrap(Type type) {
   if (!type)
@@ -113,9 +103,7 @@ struct ConvertToLLVMPass
 
     OwningRewritePatternList patterns;
     populateStdToLLVMBarePtrConversionPatterns(typeConverter, patterns,
-                                               /*useAlignedAlloc=*/false);
-    conversion::stdx_to_llvm::populateStdXToLLVMConversionPatterns(
-        typeConverter, patterns);
+                                               /*useAlloca=*/true);
 
     ConversionTarget target(*context);
     target.addLegalDialect<LLVM::LLVMDialect>();
@@ -124,45 +112,9 @@ struct ConvertToLLVMPass
       signalPassFailure();
     }
   }
-
-  static std::unique_ptr<OperationPass<ModuleOp>> create() {
-    return std::make_unique<ConvertToLLVMPass>();
-  }
 };
 
-void addToPipeline(OpPassManager &pm) {
-  pm.addPass(pmlc::dialect::tile::createComputeBoundsPass());
-  pm.addPass(pmlc::dialect::tile::createPadPass());
-  pm.addPass(createCanonicalizerPass());
-  pm.addPass(createCSEPass());
-
-  pm.addPass(pmlc::conversion::tile_to_pxa::createLowerTileToPXAPass());
-  pm.addPass(createCanonicalizerPass());
-  pm.addPass(createCSEPass());
-
-  pm.addPass(pmlc::dialect::pxa::createStencilPass(1, heatmapCost));
-  pm.addPass(createXSMMLoweringPass());
-
-  pm.addPass(conversion::pxa_to_affine::createLowerPXAToAffinePass());
-  pm.addPass(createCanonicalizerPass());
-  pm.addPass(createCSEPass());
-
-  pm.addPass(createLowerAffinePass());
-  pm.addPass(createCanonicalizerPass());
-  pm.addPass(createCSEPass());
-
-  pm.addPass(ConvertToStdPass::create());
-  if (pmlc::util::getEnvVar("PLAIDML_BOUNDS_CHECK") == "1") {
-    pm.addPass(pmlc::dialect::stdx::createBoundsCheckPass());
-  }
-  pm.addPass(ConvertToLLVMPass::create());
-  pm.addPass(createTraceLinkingPass());
+std::unique_ptr<mlir::Pass> createLLVMLoweringPass() {
+  return std::make_unique<ConvertToLLVMPass>();
 }
-
-static PassPipelineRegistration<>
-    passPipelineReg("target-cpu", "Target pipeline for CPU", addToPipeline);
-static compiler::TargetRegistration targetReg("llvm_cpu", addToPipeline);
-
-} // namespace
-
-} // namespace pmlc::target::x86
+} // namespace pmlc::conversion::gpu
