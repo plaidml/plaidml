@@ -141,24 +141,35 @@ private:
     // The middle idxs are the accumulation indexes, i.e. those used on loads but not stores
     // llvm::DenseMap<mlir::BlockArgument, unsigned> middle_idxs;
     std::map<mlir::BlockArgument, unsigned> middle_idxs;  // TODO: Why does this matter?
+    unsigned TODO_loop_count = 0;
     for (const auto& kvp : getStrideInfo(perm.tensors[0])->strides) {
       // TODO: Old version verifies that this is in the parallel op's BlockArgs, but that seems excessive for something that I'd expect to be an assert...
       if (blockArgs.find(kvp.first) == blockArgs.end()) {
         IVLOG(1, "Hey this isn't a real block arg!: " << kvp.first);
         // throw std::runtime_error("TODO Guess we do need to check!");
       } else {
+        IVLOG(1, "[loop " << TODO_loop_count << "] Based on first tensor, inserting middle index " << kvp.first << ":" << kvp.first.getArgNumber());
         middle_idxs.insert(std::make_pair(kvp.first, getIdxRange(kvp.first)));
       }
+      TODO_loop_count++;
       // return 3; // TODO: cheap hack...  !!!!!!!! Returning here gives intermittent verbosity 3 errors
     }
+    IVLOG(1, "Current size of middle_idxs = " << middle_idxs.size());
     // return 3;  // TODO: cheap hack  !!!!!!!!!!!! Breaks on verbosity 3+ if I return here
     for (const auto& kvp : getStrideInfo(perm.tensors[1])->strides) {
       // TODO: Old version verifies that this is in the parallel op's BlockArgs, but that seems excessive for something that I'd expect to be an assert...
-      middle_idxs.insert(std::make_pair(kvp.first, getIdxRange(kvp.first)));
+      if (blockArgs.find(kvp.first) == blockArgs.end()) {
+        IVLOG(1, "Hey this isn't a real block arg! (v2): " << kvp.first);
+        // throw std::runtime_error("TODO Guess we do need to check!");
+      } else {
+        IVLOG(1, "Based on second tensor, inserting middle index " << kvp.first);
+        middle_idxs.insert(std::make_pair(kvp.first, getIdxRange(kvp.first)));
+      }
     }
     for (const auto &kvp : getStrideInfo(perm.tensors[2])->strides) {
       auto it = middle_idxs.find(kvp.first);
       if (it != middle_idxs.end()) {
+        IVLOG(1, "Based on output tensor, erasing middle index " << it->first);
         middle_idxs.erase(it);
       }
     }
@@ -172,6 +183,8 @@ private:
     }
     unsigned tot_middle_loop = 1;
     for (auto &kvp : middle_idxs) {
+      throw std::runtime_error("Hey, we got here!!!");
+      IVLOG(3, "Multiplying middle loop count by " << kvp.second);
       tot_middle_loop *= kvp.second;
     }
     // return 3;  // TODO: cheap hack !!!! INTERMITTENTLY breaks on verbosity 2 if I return here
@@ -237,21 +250,36 @@ private:
     double perf =
         outer_batches * tot_middle_loop * (cost.startupCost + inner_time);
 
-    IVLOG(4, "Performance = " << perf);
+    IVLOG(3, "Performance = " << perf << "(outer count: " << outer_batches << ", middle count: " << tot_middle_loop << ", startup cost: " << cost.startupCost << ", inner time: " << inner_time << ")");
     return perf;
   }
 
   void transform(TensorAndIndexPermutation perm, ArrayRef<int64_t> tileSize) {
     // TODO: Clean up this logging
-    IVLOG(2, "Best Perf: " << bestCost);
-    IVLOG(2, "Best Tensor/Index Permutations: TODO: print");
-    std::stringstream bestTilingStr;
-    bestTilingStr << "[ ";
-    for (const auto &tileSize : bestTiling) {
-      bestTilingStr << tileSize << " ";
+    if (VLOG_IS_ON(2)) {
+      IVLOG(2, "Best Perf: " << bestCost);
+      std::stringstream tensorPermStr;
+      tensorPermStr << "[\n";
+      for (auto t : perm.tensors) {
+        tensorPermStr << "  " << mlir::debugString(*t) << "\n";
+      }
+      tensorPermStr << "]";
+      IVLOG(2, "Best Tensor Permutation: " << tensorPermStr.str());
+      std::stringstream indexPermStr;
+      indexPermStr << "[ ";
+      for (auto ind : perm.indexes) {
+        indexPermStr << ind.getArgNumber() << " ";
+      }
+      indexPermStr << "]";
+      IVLOG(2, "Best Index Permutation: " << indexPermStr.str());
+      std::stringstream bestTilingStr;
+      bestTilingStr << "[ ";
+      for (const auto &tileSize : bestTiling) {
+        bestTilingStr << tileSize << " ";
+      }
+      bestTilingStr << "]";
+      IVLOG(2, "Best Tiling: " << bestTilingStr.str());
     }
-    bestTilingStr << "]";
-    IVLOG(2, "Best Tiling: " << bestTilingStr.str());
 
     op.setAttr("is_gemm", mlir::UnitAttr::get(op.getContext()));
   }

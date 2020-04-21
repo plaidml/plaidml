@@ -72,12 +72,12 @@ int64_t StencilGeneric::getIdxRange(mlir::BlockArgument idx) {
   assert(idx.getArgNumber() >= 0 && "TODO scrap");
   assert(idx.getArgNumber() <= 2 && "TODO scrap");
   IVLOG(5, "inside getIdxRange");
-  IVLOG(3, "arg number: " << idx.getArgNumber());  // Intermittent crashes on this log
-  IVLOG(3, "ranges: ");
+  IVLOG(4, "arg number: " << idx.getArgNumber());  // Intermittent crashes on this log
+  IVLOG(4, "ranges: ");
   for (auto r : ranges) {
-    IVLOG(3, "  " << r);
+    IVLOG(4, "  " << r);
   }
-  IVLOG(3, "requested range: " << ranges[idx.getArgNumber()]);
+  IVLOG(4, "requested range: " << ranges[idx.getArgNumber()]);
   return ranges[idx.getArgNumber()];
 }
 
@@ -182,6 +182,15 @@ void StencilGeneric::RecursiveTileIndex(     //
   assert(tileSize->size() == semanticIdxCount);
   if (currIdx == semanticIdxCount) {
     auto cost = getCost(perm, *tileSize);
+    if (VLOG_IS_ON(3)) {
+      std::stringstream currTilingStr;
+      currTilingStr << "[ ";
+      for (const auto &sz : *tileSize) {
+        currTilingStr << sz << " ";
+      }
+      currTilingStr << "]";
+      IVLOG(3, "Considering Tiling " << currTilingStr.str() << ", which would have cost " << cost);
+    }
     if (cost < bestCost) {
       bestCost = cost;
       bestPermutation = perm;
