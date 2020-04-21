@@ -17,8 +17,9 @@ plaidml_cc_test(
         "//plaidml:testenv",
         "//plaidml/edsl",
         "//plaidml/exec",
-        "//pmlc/rt/vulkan:link",
+        "//pmlc/rt/vulkan",
     ],
+    linkstatic = 1,
 )
 
 lit_test(

@@ -1,4 +1,4 @@
-// RUN: pmlc-vulkan-runner %s --entry-point-result=void | FileCheck %s
+// RUN: pmlc-vulkan-runner %s | FileCheck %s
 
 // CHECK: [23,   23,   23],  
 // CHECK: [23,   23,   23],  

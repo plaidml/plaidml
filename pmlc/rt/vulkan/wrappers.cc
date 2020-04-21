@@ -196,12 +196,6 @@ void bindBufferInt64(void *vkRuntimeManager, DescriptorSetIndex setIndex,
     return;
   }
 }
-
-/// Fills the given 1D float memref with the given float value.
-void _mlir_ciface_fillResource1DFloat(StridedMemRefType<float, 1> *ptr,
-                                      float value) {
-  std::fill_n(ptr->data, ptr->sizes[0], value);
-}
 } // extern "C"
 
 namespace {
@@ -230,8 +224,6 @@ struct Registration {
                    reinterpret_cast<void *>(bindBufferFloat32));
     registerSymbol("bindBufferInt64",
                    reinterpret_cast<void *>(bindBufferInt64));
-    registerSymbol("_mlir_ciface_fillResource1DFloat",
-                   reinterpret_cast<void *>(_mlir_ciface_fillResource1DFloat));
   }
 };
 static Registration reg;
