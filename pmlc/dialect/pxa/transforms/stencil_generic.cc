@@ -72,7 +72,7 @@ int64_t StencilGeneric::getIdxRange(mlir::BlockArgument idx) {
   assert(idx.getArgNumber() >= 0 && "TODO scrap");
   assert(idx.getArgNumber() <= 2 && "TODO scrap");
   IVLOG(5, "inside getIdxRange");
-  IVLOG(4, "arg number: " << idx.getArgNumber());  // Intermittent crashes on this log
+  IVLOG(4, "arg number: " << idx.getArgNumber()); // Intermittent crashes here
   IVLOG(4, "ranges: ");
   for (auto r : ranges) {
     IVLOG(4, "  " << r);
@@ -150,16 +150,10 @@ void StencilGeneric::RecursiveBindIndex(
       // Verify the requirements for this index with each tensor are all met
       bool reqsMet = true;
       for (unsigned i = 0; i < tensors.size(); i++) {
-        try { // TODO: probably don't keep long term
-          if (!requirements.at(std::make_pair(i, currIdx))(tensors[i],
-                                                           blockArg)) {
-            reqsMet = false;
-            break;
-          }
-        } catch (const std::out_of_range &e) {
-          IVLOG(1, "Error message: " << e.what());
-          IVLOG(1, "Requested key was: " << std::make_pair(i, currIdx));
-          throw;
+        auto it = requirements.find(std::make_pair(i, currIdx));
+        if (it != requirements.end() && !it->second(tensors[i], blockArg)) {
+          reqsMet = false;
+          break;
         }
       }
       if (!reqsMet) {
@@ -189,7 +183,8 @@ void StencilGeneric::RecursiveTileIndex(     //
         currTilingStr << sz << " ";
       }
       currTilingStr << "]";
-      IVLOG(3, "Considering Tiling " << currTilingStr.str() << ", which would have cost " << cost);
+      IVLOG(3, "Considering Tiling " << currTilingStr.str()
+                                     << ", which would have cost " << cost);
     }
     if (cost < bestCost) {
       bestCost = cost;
