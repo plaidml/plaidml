@@ -18,14 +18,6 @@
 
 using namespace mlir; // NOLINT[build/namespaces]
 
-void VulkanRuntime::setNumWorkGroups(const NumWorkGroups &numberWorkGroups) {
-  if (!curr) {
-    llvm::errs() << "setNumWorkGroups: curr is nullptr!";
-    return;
-  }
-  curr->workGroups = numberWorkGroups;
-}
-
 void VulkanRuntime::setResourceStorageClassBindingMap(
     const ResourceStorageClassBindingMap &stClassData) {
   if (!curr) {
@@ -47,29 +39,12 @@ void VulkanRuntime::setResourceData(
       spirv::StorageClass::StorageBuffer;
 }
 
-void VulkanRuntime::setEntryPoint(const char *entryPointName) {
-  if (!curr) {
-    llvm::errs() << "setEntryPoint: curr is nullptr!";
-    return;
-  }
-  curr->entryPoint = entryPointName;
-}
-
 void VulkanRuntime::setResourceData(const ResourceData &resData) {
   if (!curr) {
     llvm::errs() << "setResourceData: curr is nullptr!";
     return;
   }
   curr->resourceData = resData;
-}
-
-void VulkanRuntime::setShaderModule(uint8_t *shader, uint32_t size) {
-  if (!curr) {
-    llvm::errs() << "setShaderModule: curr is nullptr!";
-    return;
-  }
-  curr->binary = shader;
-  curr->binarySize = size;
 }
 
 LogicalResult VulkanRuntime::mapStorageClassToDescriptorType(
@@ -196,8 +171,16 @@ LogicalResult VulkanRuntime::init() {
   return success();
 }
 
-LogicalResult VulkanRuntime::createLaunchKernelAction() {
+LogicalResult
+VulkanRuntime::createLaunchKernelAction(uint8_t *shader, uint32_t size,
+                                        const char *entryPoint,
+                                        NumWorkGroups numWorkGroups) {
   curr = std::make_shared<LaunchKernelAction>();
+
+  curr->binary = shader;
+  curr->binarySize = size;
+  curr->entryPoint = entryPoint;
+  curr->workGroups = numWorkGroups;
   return success();
 }
 

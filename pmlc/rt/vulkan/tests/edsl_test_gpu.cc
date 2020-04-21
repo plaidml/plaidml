@@ -12,7 +12,7 @@
 #include "plaidml/edsl/edsl.h"
 #include "plaidml/exec/exec.h"
 #include "plaidml/op/op.h"
-#include "plaidml/testenv.h"
+#include "pmlc/rt/vulkan/tests/testenv.h"
 #include "pmlc/util/env.h"
 #include "pmlc/util/logging.h"
 
@@ -27,15 +27,8 @@ class CppEdsl : public TestFixture {};
 
 Program makeProgram(const std::string &name,
                     const std::vector<Tensor> &outputs) {
-  auto device = plaidml::Settings::get("PLAIDML_DEVICE");
-  auto target = plaidml::Settings::get("PLAIDML_TARGET");
-
-  plaidml::Settings::set("PLAIDML_DEVICE", "intel_gen");
-  plaidml::Settings::set("PLAIDML_TARGET", "intel_gen");
   auto program = ProgramBuilder(name, outputs).compile();
   std::cout << program << std::endl;
-  plaidml::Settings::set("PLAIDML_DEVICE", device);
-  plaidml::Settings::set("PLAIDML_TARGET", target);
   return program;
 }
 
@@ -48,7 +41,7 @@ Tensor Dot(const Tensor &X, const Tensor &Y) {
   R(i, j) += X(i, k) * Y(k, j);
   return R;
 }
-/*
+
 Tensor Relu(const Tensor &I) { return select(I < 0.0, Tensor{0.0}, I); }
 
 Tensor Softmax(const Tensor &X) {
@@ -75,46 +68,9 @@ TEST_F(CppEdsl, HigherPrecisionInvalidNegative) {
   });
 }
 
-TEST_F(CppEdsl, HigherPrecisionConstants) {
-  auto A = Placeholder(DType::FLOAT32, {3, 3});
-  auto C = A + 1 + 2.0;
-
-  auto program = ProgramBuilder("higher_precision_constants",
-{C}).floatx(DType::FLOAT64).intx(DType::UINT64).compile(); std::cout << program
-<< std::endl;
-
-  std::vector<float> A_input{1, 2, 3, 4, 5, 6, 7, 8, 9};
-  std::vector<double> C_output{4, 5, 6, 7, 8, 9, 10, 11, 12};
-  checkProgram(program, {{A, A_input}}, {{C, C_output}});
-}
-
-TEST_F(CppEdsl, Cast) {
-  auto A = Placeholder(DType::UINT64, {3, 3});
-  auto B = cast(A, DType::UINT32);
-  auto program = makeProgram("cast", {B});
-
-  std::vector<std::uint64_t> A_input{1,
-                                     2,
-                                     3,
-                                     4,
-                                     5,
-                                     6 + (1UL << 12),
-                                     7 + (1UL << 24),
-                                     8 + (1UL << 31),  //
-                                     (1ULL << 32) - 1};
-  std::vector<std::uint32_t> B_output{1,
-                                      2,
-                                      3,
-                                      4,
-                                      5,
-                                      6 + (1UL << 12),
-                                      7 + (1UL << 24),
-                                      8 + (1UL << 31),  //
-                                      (1ULL << 32) - 1};
-  checkProgram(program, {{A, A_input}}, {{B, B_output}});
-}
-
 TEST_F(CppEdsl, BitAndScalar) {
+  const uint64_t ONE = 1;
+
   auto A = Placeholder(DType::UINT64, {3, 3});
   std::uint64_t mask = UINT32_MAX;
   auto B = A & mask;
@@ -122,15 +78,14 @@ TEST_F(CppEdsl, BitAndScalar) {
   std::cout << program << std::endl;
 
   std::vector<std::uint64_t> A_input{
-      (1UL << 32),     (1UL << 33) + 1, (1UL << 34) + 2, //
-      (1UL << 35) + 3, (1UL << 36) + 4, (1UL << 37) + 5, //
-      (1UL << 38) + 6, (1UL << 39) + 7, (1UL << 40) + 8};
+      (ONE << 32),     (ONE << 33) + 1, (ONE << 34) + 2, //
+      (ONE << 35) + 3, (ONE << 36) + 4, (ONE << 37) + 5, //
+      (ONE << 38) + 6, (ONE << 39) + 7, (ONE << 40) + 8};
   std::vector<std::uint64_t> B_output{0, 1, 2, //
                                       3, 4, 5, //
                                       6, 7, 8};
   checkProgram(program, {{A, A_input}}, {{B, B_output}});
 }
-
 
 TEST_F(CppEdsl, BitAnd) {
   auto A = Placeholder(DType::UINT64, {3, 3});
@@ -204,20 +159,6 @@ TEST_F(CppEdsl, BitRightTensor) {
   checkProgram(program, {{A, A_input}, {B, B_input}}, {{C, C_output}});
 }
 
-TEST_F(CppEdsl, BitRightScalar) {
-  auto A = Placeholder(DType::UINT64, {3, 3});
-  auto B = A >> 9;
-  auto program = makeProgram("bit_right_scalar", {B});
-
-  std::vector<std::uint64_t> A_input{1 << 10, 2 << 11, 3 << 12,  //
-                                     4 << 13, 5 << 14, 6 << 15,  //
-                                     7 << 16, 8 << 17, 9 << 18};
-  std::vector<std::uint64_t> B_output{1 << 1, 2 << 2, 3 << 3,  //
-                                      4 << 4, 5 << 5, 6 << 6,  //
-                                      7 << 7, 8 << 8, 9 << 9};
-  checkProgram(program, {{A, A_input}}, {{B, B_output}});
-}
-
 TEST_F(CppEdsl, BitXor) {
   auto A = Placeholder(DType::UINT64, {3, 3});
   auto B = Placeholder(DType::UINT64, {3, 3});
@@ -233,22 +174,6 @@ TEST_F(CppEdsl, BitXor) {
   std::vector<std::uint64_t> C_output{1 ^ 10, 2 ^ 11, 3 ^ 12, //
                                       4 ^ 13, 5 ^ 14, 6 ^ 15, //
                                       7 ^ 16, 8 ^ 17, 9 ^ 18};
-  checkProgram(program, {{A, A_input}, {B, B_input}}, {{C, C_output}});
-}
-
-TEST_F(CppEdsl, BroadcastCmp) {
-  auto A = Placeholder(DType::UINT64, {3, 4});
-  auto B = Placeholder(DType::UINT64, {3, 1});
-  auto C = cast(A >= B, DType::UINT64);
-  auto program = makeProgram("broadcast_cmp", {C});
-
-  std::vector<std::uint64_t> A_input = {0, 1, 2,  3,  //
-                                        4, 5, 6,  7,  //
-                                        8, 9, 10, 11};
-  std::vector<std::uint64_t> B_input = {0, 6, 12};
-  std::vector<std::uint64_t> C_output = {1, 1, 1, 1,  //
-                                         0, 0, 1, 1,  //
-                                         0, 0, 0, 0};
   checkProgram(program, {{A, A_input}, {B, B_input}}, {{C, C_output}});
 }
 
@@ -292,7 +217,7 @@ TEST_F(CppEdsl, Add) {
 
   checkProgram(program, {{A, A_input}, {B, B_input}}, {{C, C_output}});
 }
-*/
+
 TEST_F(CppEdsl, Dot) {
   int64_t M = 8;
   int64_t N = 32;
@@ -347,24 +272,7 @@ TEST_F(CppEdsl, DoubleDot) {
   // clang-format on
   runProgram(program);
 }
-/*
-TEST_F(CppEdsl, Max) {
-  auto A = Placeholder(DType::FLOAT32, {3, 3});
-  TensorDim I, J, K;
-  TensorIndex i("i"), j("j");
-  A.bind_dims(I, K);
-  auto R = TensorOutput(I);
-  R(i) >= A(i, j);
-  auto program = makeProgram("max", {R});
-  std::vector<float> input = {
-      -5.0f, -6.0f, -7.0f,  //
-      4.0f,  5.0f,  6.0f,   //
-      7.0f,  8.0f,  9.0f,   //
-  };
-  std::vector<float> expected = {-5.0, 6.0, 9.0};
-  checkProgram(program, {{A, input}}, {{R, expected}});
-}
-*/
+
 TEST_F(CppEdsl, EltwiseAdd) {
   auto A = Placeholder(DType::FLOAT32, {10, 20});
   auto B = Placeholder(DType::FLOAT32, {10, 20});
@@ -378,31 +286,7 @@ TEST_F(CppEdsl, EltwiseAdd) {
   // clang-format on
   runProgram(program);
 }
-/*
-TEST_F(CppEdsl, Relu) {
-  auto A = Placeholder(DType::FLOAT32, {10, 20});
-  auto program = makeProgram("relu", {Relu(A)});
-  runProgram(program);
-}
 
-TEST_F(CppEdsl, MnistMlp) {
-  // model.add(Dense(512, activation='relu', input_shape=(784,)))
-  auto input = Placeholder(DType::FLOAT32, {1, 784});
-  auto kernel1 = Placeholder(DType::FLOAT32, {784, 512});
-  auto bias1 = Placeholder(DType::FLOAT32, {512});
-  auto dense1 = Relu(Dot(input, kernel1) + bias1);
-  // model.add(Dense(512, activation='relu'))
-  auto kernel2 = Placeholder(DType::FLOAT32, {512, 512});
-  auto bias2 = Placeholder(DType::FLOAT32, {512});
-  auto dense2 = Relu(Dot(dense1, kernel2) + bias2);
-  // model.add(Dense(10, activation='softmax'))
-  auto kernel3 = Placeholder(DType::FLOAT32, {512, 10});
-  auto bias3 = Placeholder(DType::FLOAT32, {10});
-  auto dense3 = Softmax(Dot(dense2, kernel3) + bias3);
-  auto program = makeProgram("mnist_mlp", {dense3});
-  runProgram(program);
-}
-*/
 Tensor Convolution2(const Tensor &I, const Tensor &K) {
   TensorDim CI, CO, K0, K1, N, X0, X1;
   TensorIndex n, x0, x1, co, ci, k0, k1;
@@ -427,7 +311,7 @@ TEST_F(CppEdsl, Convolution) {
   // clang-format on
   runProgram(program);
 }
-/*
+
 Tensor MaxPooling2(const Tensor &I) {
   TensorDim N, X0, X1, C;
   TensorIndex n, x0, x1, i, j, c;
@@ -450,7 +334,6 @@ Tensor Flatten(const Tensor &X) {
   }
   return reshape(X, {TensorDim{1}, product});
 }
-
 
 TEST_F(CppEdsl, MnistCnn) {
   // model.add(Conv2D(32, kernel_size=(3, 3), activation='relu',
@@ -480,10 +363,40 @@ TEST_F(CppEdsl, MnistCnn) {
   auto dense2 = Softmax(Dot(dense1, kernel4) + bias4);
   auto program = ProgramBuilder("mnist_cnn", {dense2}).target("").compile();
   std::cout << program << std::endl;
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.MnistCnn
+  // CHECK: func @mnist_cnn
+  // CHECK-DAG: %[[c12544:.*]] = tile.constant 12544
+  // CHECK-DAG: %[[cst:.*]] = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> tensor<f32>
+  // CHECK-DAG: %[[c1:.*]] = tile.constant 1
+  // CHECK-DAG: %[[cst_0:.*]] = "eltwise.sconst"() {value = 0xFFF0000000000000 : f64} : () -> tensor<f32>
+  // CHECK: %{{.*}} = tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : tensor<f32>, tensor<1x224x224x1xf32>, tensor<3x3x1x32xf32> -> tensor<1x224x224x32xf32>
+  // CHECK: %{{.*}} = "eltwise.add"(%{{.*}}, %{{.*}}) : (tensor<1x224x224x32xf32>, tensor<32xf32>) -> tensor<1x224x224x32xf32>
+  // CHECK: %{{.*}} = "eltwise.cmp_lt"(%{{.*}}, %[[cst]]) : (tensor<1x224x224x32xf32>, tensor<f32>) -> tensor<1x224x224x32xi1>
+  // CHECK: %{{.*}} = "eltwise.select"(%{{.*}}, %[[cst]], %{{.*}}) : (tensor<1x224x224x32xi1>, tensor<f32>, tensor<1x224x224x32xf32>) -> tensor<1x224x224x32xf32>
+  // CHECK: %{{.*}} = tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : tensor<f32>, tensor<1x224x224x32xf32>, tensor<3x3x32x64xf32> -> tensor<1x224x224x64xf32>
+  // CHECK: %{{.*}} = "eltwise.add"(%{{.*}}, %{{.*}}) : (tensor<1x224x224x64xf32>, tensor<64xf32>) -> tensor<1x224x224x64xf32>
+  // CHECK: %{{.*}} = "eltwise.cmp_lt"(%{{.*}}, %[[cst]]) : (tensor<1x224x224x64xf32>, tensor<f32>) -> tensor<1x224x224x64xi1>
+  // CHECK: %{{.*}} = "eltwise.select"(%{{.*}}, %[[cst]], %{{.*}}) : (tensor<1x224x224x64xi1>, tensor<f32>, tensor<1x224x224x64xf32>) -> tensor<1x224x224x64xf32>
+  // CHECK: %{{.*}} = tile.contract max, none, %[[cst_0]], %{{.*}} {cons = #set{{[0-9]+}}, sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}]} : tensor<f32>, tensor<1x224x224x64xf32> -> tensor<1x112x112x64xf32>
+  // CHECK: %{{.*}} = "tile.reshape"(%{{.*}}, %[[c1]], %[[c12544]]) : (tensor<1x112x112x64xf32>, index, index) -> tensor<1x12544xf32>
+  // CHECK: %{{.*}} = tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {idxs = ["i", "j", "k"], sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : tensor<f32>, tensor<1x12544xf32>, tensor<12544x128xf32> -> tensor<1x128xf32>
+  // CHECK: %{{.*}} = "eltwise.add"(%{{.*}}, %{{.*}}) : (tensor<1x128xf32>, tensor<128xf32>) -> tensor<1x128xf32>
+  // CHECK: %{{.*}} = "eltwise.cmp_lt"(%{{.*}}, %[[cst]]) : (tensor<1x128xf32>, tensor<f32>) -> tensor<1x128xi1>
+  // CHECK: %{{.*}} = "eltwise.select"(%{{.*}}, %[[cst]], %{{.*}}) : (tensor<1x128xi1>, tensor<f32>, tensor<1x128xf32>) -> tensor<1x128xf32>
+  // CHECK: %{{.*}} = tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {idxs = ["i", "j", "k"], sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : tensor<f32>, tensor<1x128xf32>, tensor<128x100xf32> -> tensor<1x100xf32>
+  // CHECK: %{{.*}} = "eltwise.add"(%{{.*}}, %{{.*}}) : (tensor<1x100xf32>, tensor<100xf32>) -> tensor<1x100xf32>
+  // CHECK: %{{.*}} = tile.contract max, none,  %[[cst_0]], %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}]} : tensor<f32>, tensor<1x100xf32> -> tensor<1x1xf32>
+  // CHECK: %{{.*}} = "eltwise.sub"(%{{.*}}, %{{.*}}) : (tensor<1x100xf32>, tensor<1x1xf32>) -> tensor<1x100xf32>
+  // CHECK: %{{.*}} = "eltwise.exp"(%{{.*}}) : (tensor<1x100xf32>) -> tensor<1x100xf32>
+  // CHECK: %{{.*}} = tile.contract add, none, %[[cst]], %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}]} : tensor<f32>, tensor<1x100xf32> -> tensor<1x1xf32>
+  // CHECK: %{{.*}} = "eltwise.div"(%{{.*}}, %{{.*}}) : (tensor<1x100xf32>, tensor<1x1xf32>) -> tensor<1x100xf32>
+  // CHECK: return %{{.*}} : tensor<1x100xf32>
+  // clang-format on
   // TODO: error: failed to legalize operation 'tile.reshape'
   // runProgram(program);
 }
-*/
+
 Tensor Normalize(const Tensor &X) {
   auto XSqr = X * X;
   auto X_MS = TensorOutput();
@@ -584,30 +497,7 @@ TEST_F(CppEdsl, UseDefault) {
   // clang-format on
   runProgram(program);
 }
-/*
-Tensor ArgMax(const Tensor& I) {
-  TensorDim X0, X1, X2;
-  TensorIndex x0, x1, x2;
-  I.bind_dims(X0, X1, X2);
-  auto Max = TensorOutput(X0, X2);
-  Max(x0, x2) >= I(x0, x1, x2);
-  Tensor One{1};
-  auto T = TensorOutput(X1);
-  T(x1) = One();
-  Tensor IX = index(T, 0);
-  auto O = TensorOutput(X0, X2);
-  O(x0, x2) >= cond(I(x0, x1, x2), Max(x0, x2), IX(x1));
-  return cast(O, DType::UINT32);
-}
 
-TEST_F(CppEdsl, ArgMax) {
-  auto I = Placeholder(DType::FLOAT32, {1, 10, 10});
-  auto X = ArgMax(I);
-  auto program = makeProgram("arg_max", {X});
-  EXPECT_THAT(X.compute_shape(), Eq(LogicalShape(DType::UINT32, {1, 10})));
-  runProgram(program);
-}
-*/
 Tensor Winograd(const Tensor &I, const Tensor &K, const Tensor &A,
                 const Tensor &B, const Tensor &G) {
   TensorDim N, S, X, Y, CI, CO, BI, BO;
@@ -653,16 +543,6 @@ TEST_F(CppEdsl, Winograd) {
   auto program = makeProgram("winograd", {W});
   runProgram(program);
 }
-/*
-TEST_F(CppEdsl, UniqueNames) {
-  LogicalShape shape(DType::FLOAT32, {1});
-  auto A = Placeholder(shape, "A");
-  auto B = Placeholder(shape, "B");
-  auto C0 = Placeholder(shape, "C");
-  auto C1 = Placeholder(shape, "C");
-  auto program = makeProgram("unique_names", {A + B + C0 + C1});
-  runProgram(program);
-}
 
 TEST_F(CppEdsl, GlobalMin) {
   auto I = Placeholder(DType::FLOAT32, {10, 10, 10}, "I");
@@ -672,21 +552,18 @@ TEST_F(CppEdsl, GlobalMin) {
   O_Neg() >= Neg(i, j, k);
   auto O = -O_Neg;
   auto program = makeProgram("global_min", {O});
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.GlobalMin
+  // CHECK: func @global_min
+  // CHECK: %[[cst:.*]] = "eltwise.sconst"() {value = 0xFFF0000000000000 : f64} : () -> tensor<f32>
+  // CHECK: %{{.*}} = "eltwise.neg"(%{{.*}}) : (tensor<10x10x10xf32>) -> tensor<10x10x10xf32>
+  // CHECK: %{{.*}} = tile.contract max, none, %[[cst]], %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}]} : tensor<f32>, tensor<10x10x10xf32> -> tensor<f32>
+  // CHECK: %{{.*}} = "eltwise.neg"(%{{.*}}) : (tensor<f32>) -> tensor<f32>
+  // CHECK: return %{{.*}} : tensor<f32>
+  // clang-format on
   runProgram(program);
 }
 
-TEST_F(CppEdsl, CumSum) {
-  auto I = Placeholder(DType::FLOAT32, {10}, "I");
-  TensorDim N;
-  TensorIndex i, k;
-  I.bind_dims(N);
-  auto O = TensorOutput(N);
-  O(i) += I(k);
-  O.add_constraint(i - k < N);
-  auto program = makeProgram("cumsum", {O});
-  runProgram(program);
-}
-*/
 Tensor ComplexConv2d(             //
     const Tensor &I,              //
     const Tensor &K,              //
@@ -740,113 +617,60 @@ TEST_F(CppEdsl, ComplexConv2d) {
   // clang-format on
   runProgram(program);
 }
-/*
-TEST_F(CppEdsl, Reciprocal) {
-  auto A = Placeholder(DType::FLOAT32, {6}, "A");
-  auto R = 1.0 / A;
-  auto program = makeProgram("reciprocal", {R});
-  std::vector<float> input = {1, 2, 4, 5, 8, 10};
-  std::vector<float> expected = {1.0, 0.5, 0.25, 0.2, 0.125, 0.1};
-  checkProgram(program, {{A, input}}, {{R, expected}});
+
+TEST_F(CppEdsl, GradientDot) {
+  auto A = Placeholder(DType::FLOAT32, {100, 100}, "A");
+  auto B = Placeholder(DType::FLOAT32, {100, 100}, "B");
+  auto O = Dot(A, B);
+  auto grads = Gradient({A, B}, O);
+  auto program = makeProgram("gradient_dot", {grads});
+  //clang-format off
+  //  EXPECT_THAT(program, Eq(R"(function (
+  //   A[A_0, A_1],
+  //   B[B_0, B_1]
+  // ) -> (
+  //   _X3,
+  //   _X2
+  // ) {
+  //   _X0 = 1.000000;
+  //   _X1[x0, x1 : 100, 100] = +(_X0[]);
+  //   _X2[k, j : 100, 100] = +(A[i, k] * _X1[i, j]);
+  //   _X3[i, k : 100, 100] = +(_X1[i, j] * B[k, j]);
+  // }
+  // )"));
+  // clang-format on
+  runProgram(program);
 }
-*/
 
-// TEST_F(CppEdsl, GradientDot) {
-//   auto A = Placeholder(DType::FLOAT32, {100, 100}, "A");
-//   auto B = Placeholder(DType::FLOAT32, {100, 100}, "B");
-//   auto O = Dot(A, B);
-//   auto grads = Gradient({A, B}, O);
-//   auto program = makeProgram("gradient_dot", {grads});
-// clang-format off
-//   EXPECT_THAT(program, Eq(R"(function (
-//   A[A_0, A_1],
-//   B[B_0, B_1]
-// ) -> (
-//   _X3,
-//   _X2
-// ) {
-//   _X0 = 1.000000;
-//   _X1[x0, x1 : 100, 100] = +(_X0[]);
-//   _X2[k, j : 100, 100] = +(A[i, k] * _X1[i, j]);
-//   _X3[i, k : 100, 100] = +(_X1[i, j] * B[k, j]);
-// }
-// )"));
-// clang-format on
-//   runProgram(program);
-// }
-
-// Tensor Max2Da0(const Tensor& A) {
-//   TensorDim M, N;
-//   A.bind_dims(M, N);
-//   TensorIndex m("m"), n("n");
-//   auto O = NamedTensorOutput("O", N);
-//   O(n) >= A(m, n);
-//   // O(n) += A(m, n);
-//   return O;
-// }
-
-// TEST_F(CppEdsl, GradientMultiDot) {
-//   auto A = Placeholder(DType::FLOAT32, {100, 100}, "A");
-//   auto B = Placeholder(DType::FLOAT32, {100, 100}, "B");
-//   auto C = Dot(A, B);
-//   auto D = Dot(A, C);
-//   auto O = Max2Da0(D);
-//   auto grads = Gradient({A, B}, O);
-//   auto program = makeProgram("gradient_dot", {grads});
-// clang-format off
-//   EXPECT_THAT(program, Eq(R"(function (
-//   A[A_0, A_1],
-//   B[B_0, B_1]
-// ) -> (
-//   _X9,
-//   _X6
-// ) {
-//   _X0[i, j : 100, 100] = +(A[i, k] * B[k, j]);
-//   _X1[i, j : 100, 100] = +(A[i, k] * _X0[k, j]);
-//   O[n : 100] = >(_X1[m, n]);
-//   _X2 = 1.000000;
-//   _X3[x0 : 100] = +(_X2[]);
-//   _X4[m, n : 100, 100] = +(_X1[m, n] == O[n] ? _X3[n]);
-//   _X5[k, j : 100, 100] = +(A[i, k] * _X4[i, j]);
-//   _X6[k, j : 100, 100] = +(A[i, k] * _X5[i, j]);
-//   _X7[i, k : 100, 100] = +(_X4[i, j] * _X0[k, j]);
-//   _X8[i, k : 100, 100] = +(_X5[i, j] * B[k, j]);
-//   _X9 = add(_X7, _X8);
-// }
-// )"));
-// clang-format on
-//   runProgram(program);
-// }
-
-// TEST_F(CppEdsl, GradientDotSqrt) {
-//   auto A = Placeholder(DType::FLOAT32, {100, 100}, "A");
-//   auto B = Placeholder(DType::FLOAT32, {100, 100}, "B");
-//   auto C = Dot(A, B);
-//   auto O = sqrt(C);
-//   auto grads = Gradient({A, B}, O);
-//   auto program = makeProgram("gradient_dot", {grads});
-// clang-format off
-//   EXPECT_THAT(program, Eq(R"(function (
-//   A[A_0, A_1],
-//   B[B_0, B_1]
-// ) -> (
-//   _X8,
-//   _X7
-// ) {
-//   _X0 = 1.000000;
-//   _X1[x0, x1 : 100, 100] = +(_X0[]);
-//   _X2 = 2;
-//   _X3[i, j : 100, 100] = +(A[i, k] * B[k, j]);
-//   _X4 = sqrt(_X3);
-//   _X5 = mul(_X2, _X4);
-//   _X6 = div(_X1, _X5);
-//   _X7[k, j : 100, 100] = +(A[i, k] * _X6[i, j]);
-//   _X8[i, k : 100, 100] = +(_X6[i, j] * B[k, j]);
-// }
-// )"));
-// clang-format on
-//   runProgram(program);
-// }
+TEST_F(CppEdsl, GradientDotSqrt) {
+  auto A = Placeholder(DType::FLOAT32, {100, 100}, "A");
+  auto B = Placeholder(DType::FLOAT32, {100, 100}, "B");
+  auto C = Dot(A, B);
+  auto O = sqrt(C);
+  auto grads = Gradient({A, B}, O);
+  auto program = makeProgram("gradient_dot", {grads});
+  // clang-format off
+  //   EXPECT_THAT(program, Eq(R"(function (
+  //   A[A_0, A_1],
+  //   B[B_0, B_1]
+  // ) -> (
+  //   _X8,
+  //   _X7
+  // ) {
+  //   _X0 = 1.000000;
+  //   _X1[x0, x1 : 100, 100] = +(_X0[]);
+  //   _X2 = 2;
+  //   _X3[i, j : 100, 100] = +(A[i, k] * B[k, j]);
+  //   _X4 = sqrt(_X3);
+  //   _X5 = mul(_X2, _X4);
+  //   _X6 = div(_X1, _X5);
+  //   _X7[k, j : 100, 100] = +(A[i, k] * _X6[i, j]);
+  //   _X8[i, k : 100, 100] = +(_X6[i, j] * B[k, j]);
+  // }
+  // )"));
+  // clang-format on
+  runProgram(program);
+}
 
 TEST_F(CppEdsl, DefractLong) {
   std::vector<int64_t> input_shape{1, 3, 3, 1};
@@ -877,15 +701,6 @@ TEST_F(CppEdsl, DupOut) {
   auto program = makeProgram("dup_out", {R, R, R});
   runProgram(program);
 }
-
-/*
-TEST_F(CppEdsl, Select) {
-  auto I = Placeholder(DType::FLOAT32, {10, 20});
-  auto O = select(I == 0, Tensor{0}, Tensor{1});
-  auto program = makeProgram("select", {O});
-  runProgram(program);
-}
-*/
 
 TEST_F(CppEdsl, Shape) {
   auto I = Placeholder(DType::FLOAT32, {10, 20});
@@ -925,13 +740,5 @@ TEST_F(CppEdsl, Prng) {
   // TODO: lowering for PrngOp
   // runProgram(program);
 }
-/*
-TEST_F(CppEdsl, ConvI8) {
-  auto I = Placeholder(DType::INT8, {1, 224, 224, 3});
-  auto K = Placeholder(DType::INT8, {3, 3, 1, 32});
-  auto program = makeProgram("convolution", {Convolution2(I, K)});
-  runProgram(program);
-}
-*/
 } // namespace
 } // namespace plaidml::edsl

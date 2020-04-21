@@ -40,10 +40,8 @@ public:
                                 const char *entryPoint,
                                 NumWorkGroups numWorkGroups) {
     std::lock_guard<std::mutex> lock(mutex);
-    vulkanRuntime.createLaunchKernelAction();
-    vulkanRuntime.setShaderModule(shader, size);
-    vulkanRuntime.setEntryPoint(entryPoint);
-    vulkanRuntime.setNumWorkGroups(numWorkGroups);
+    vulkanRuntime.createLaunchKernelAction(shader, size, entryPoint,
+                                           numWorkGroups);
   }
 
   void createMemoryTransferAction(uint64_t src_index, uint64_t src_binding,
@@ -67,7 +65,6 @@ public:
   }
 
   void addLaunchActionToSchedule() {
-    std::lock_guard<std::mutex> lock(mutex);
     vulkanRuntime.addLaunchActionToSchedule();
   }
 

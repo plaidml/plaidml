@@ -164,18 +164,11 @@ public:
 
   LogicalResult init();
   LogicalResult destroy();
-  LogicalResult createLaunchKernelAction();
+  LogicalResult createLaunchKernelAction(uint8_t *shader, uint32_t size,
+                                         const char *entryPoint,
+                                         NumWorkGroups numWorkGroups);
   LogicalResult setLaunchKernelAction();
   void addLaunchActionToSchedule();
-  void setEntryPoint(const char *entryPointName);
-  void setShaderModule(uint8_t *shader, uint32_t size);
-  void setNumWorkGroups(const NumWorkGroups &numberWorkGroups);
-
-  /// Sets needed data for Vulkan runtime.
-  void setResourceData(const ResourceData &resData);
-  void setResourceData(const DescriptorSetIndex desIndex,
-                       const BindingIndex bindIndex,
-                       const VulkanHostMemoryBuffer &hostMemBuffer);
   LogicalResult createMemoryTransferAction(uint64_t src_index,
                                            uint64_t src_binding,
                                            uint64_t dst_index,
@@ -183,6 +176,11 @@ public:
   LogicalResult createMemoryTransferAction(VkBuffer src, VkBuffer dst,
                                            size_t size);
   LogicalResult submitCommandBuffers();
+  /// Sets needed data for Vulkan runtime.
+  void setResourceData(const ResourceData &resData);
+  void setResourceData(const DescriptorSetIndex desIndex,
+                       const BindingIndex bindIndex,
+                       const VulkanHostMemoryBuffer &hostMemBuffer);
 
 private:
   //===--------------------------------------------------------------------===//
