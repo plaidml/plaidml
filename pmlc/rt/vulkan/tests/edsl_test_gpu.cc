@@ -23,28 +23,19 @@ using ::testing::Eq;
 namespace plaidml::edsl {
 namespace {
 
-class EnvironmentGPU : public ::testing::Environment {
-  void SetUp() override {
-    plaidml::init();
-    plaidml::edsl::init();
-    plaidml::op::init();
-    plaidml::exec::init();
-    plaidml::Settings::set("PLAIDML_DEVICE", "intel_gen");
-    plaidml::Settings::set("PLAIDML_TARGET", "intel_gen");
-  }
-};
-
-[[gnu::unused]] auto init = []() {
-  ::testing::AddGlobalTestEnvironment(new EnvironmentGPU);
-  return 0;
-}();
-
 class CppEdsl : public TestFixture {};
 
 Program makeProgram(const std::string &name,
                     const std::vector<Tensor> &outputs) {
+  auto device = plaidml::Settings::get("PLAIDML_DEVICE");
+  auto target = plaidml::Settings::get("PLAIDML_TARGET");
+
+  plaidml::Settings::set("PLAIDML_DEVICE", "intel_gen");
+  plaidml::Settings::set("PLAIDML_TARGET", "intel_gen");
   auto program = ProgramBuilder(name, outputs).compile();
   std::cout << program << std::endl;
+  plaidml::Settings::set("PLAIDML_DEVICE", device);
+  plaidml::Settings::set("PLAIDML_TARGET", target);
   return program;
 }
 
@@ -887,12 +878,14 @@ TEST_F(CppEdsl, DupOut) {
   runProgram(program);
 }
 
+/*
 TEST_F(CppEdsl, Select) {
   auto I = Placeholder(DType::FLOAT32, {10, 20});
   auto O = select(I == 0, Tensor{0}, Tensor{1});
   auto program = makeProgram("select", {O});
   runProgram(program);
 }
+*/
 
 TEST_F(CppEdsl, Shape) {
   auto I = Placeholder(DType::FLOAT32, {10, 20});

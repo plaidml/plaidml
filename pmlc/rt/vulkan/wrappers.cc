@@ -85,26 +85,27 @@ private:
 } // namespace
 
 template <typename T, int N>
-struct MemRefDescriptor {
-  T *allocated;
-  T *aligned;
-  int64_t offset;
-  int64_t sizes[N];
-  int64_t strides[N];
-};
-
-template <typename T, int N>
 void bindBuffer(void *vkRuntimeManager, DescriptorSetIndex setIndex,
                 BindingIndex bindIndex, void *ptr) {
-  auto descriptor = reinterpret_cast<MemRefDescriptor<T, N> *>(ptr);
+  auto descriptor = reinterpret_cast<StridedMemRefType<T, N> *>(ptr);
   int64_t size = 1;
   for (int i = 0; i < N; i++) {
     size *= descriptor->sizes[i];
   }
-  VulkanHostMemoryBuffer memBuffer{descriptor->allocated,
+  VulkanHostMemoryBuffer memBuffer{descriptor->data,
                                    static_cast<uint32_t>(size * sizeof(T))};
   reinterpret_cast<VulkanRuntimeManager *>(vkRuntimeManager)
       ->setResourceData(setIndex, bindIndex, memBuffer);
+}
+
+template <typename T, int N>
+void fillResource(void *ptr, float value) {
+  auto descriptor = reinterpret_cast<StridedMemRefType<T, N> *>(ptr);
+  int64_t size = 1;
+  for (int i = 0; i < N; i++) {
+    size *= descriptor->sizes[i];
+  }
+  std::fill_n(descriptor->data, size, value);
 }
 
 extern "C" {
@@ -196,6 +197,31 @@ void bindBufferInt64(void *vkRuntimeManager, DescriptorSetIndex setIndex,
     return;
   }
 }
+
+void fillResourceFloat32(int64_t rank, void *ptr, float value) {
+  switch (rank) {
+  case 1:
+    fillResource<float, 1>(ptr, value);
+    break;
+  case 2:
+    fillResource<float, 2>(ptr, value);
+    break;
+  case 3:
+    fillResource<float, 3>(ptr, value);
+    break;
+  case 4:
+    fillResource<float, 4>(ptr, value);
+    break;
+  case 5:
+    fillResource<float, 5>(ptr, value);
+    break;
+  case 6:
+    fillResource<float, 6>(ptr, value);
+    break;
+  default:
+    return;
+  }
+}
 } // extern "C"
 
 namespace {
@@ -224,6 +250,8 @@ struct Registration {
                    reinterpret_cast<void *>(bindBufferFloat32));
     registerSymbol("bindBufferInt64",
                    reinterpret_cast<void *>(bindBufferInt64));
+    registerSymbol("fillResourceFloat32",
+                   reinterpret_cast<void *>(fillResourceFloat32));
   }
 };
 static Registration reg;

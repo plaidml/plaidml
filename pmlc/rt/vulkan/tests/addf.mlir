@@ -1,5 +1,6 @@
-// RUN: pmlc-vulkan-runner %s 
-
+// RUN: pmlc-vulkan-runner %s | FileCheck %s
+ 
+// CHECK: [3.3,  3.3,  3.3,  3.3,  3.3,  3.3,  3.3,  3.3]
 module attributes {
   gpu.container_module,
   spv.target_env = #spv.target_env<
@@ -33,6 +34,10 @@ module attributes {
     %arg4 = memref_cast %arg1 : memref<8xf32> to memref<*xf32>
     %arg5 = memref_cast %arg2 : memref<8xf32> to memref<*xf32>
 
+    call @fillResourceFloat32(%arg3, %value1) : (memref<*xf32>, f32) -> ()
+    call @fillResourceFloat32(%arg4, %value2) : (memref<*xf32>, f32) -> ()
+    call @fillResourceFloat32(%arg5, %value0) : (memref<*xf32>, f32) -> ()
+
     %cst1 = constant 1 : index
     %cst8 = constant 8 : index
     "gpu.launch_func"(%cst8, %cst1, %cst1, %cst1, %cst1, %cst1, %arg0, %arg1, %arg2) { kernel = "kernel_add", kernel_module = @kernels }
@@ -40,6 +45,6 @@ module attributes {
     call @print_memref_f32(%arg5) : (memref<*xf32>) -> ()
     return
   }
-  func @fillResource1DFloat(%0 : memref<?xf32>, %1 : f32)
+  func @fillResourceFloat32(%0 : memref<*xf32>, %1 : f32)
   func @print_memref_f32(%ptr : memref<*xf32>)
 }
