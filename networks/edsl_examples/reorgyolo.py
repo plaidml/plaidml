@@ -62,10 +62,10 @@ import plaidml2.edsl as edsl
 import plaidml2.exec as plaidml_exec
 import plaidml2.op as plaidml_op
 
+
 #---------------------------------------------------------------------------------
 #    Python Implementation of reorgyolo: Our starting point.
-
-
+#    Original function @:
 #    Title: reorg_simulation
 #    Author: Mao, Lei
 #    Date: 2020
