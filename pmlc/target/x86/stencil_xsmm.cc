@@ -416,18 +416,16 @@ public:
   }
 };
 
-struct NewXSMMStencilPass
-    : public mlir::PassWrapper<NewXSMMStencilPass, mlir::FunctionPass> {
+struct XSMMStencilPass
+    : public mlir::PassWrapper<XSMMStencilPass, mlir::FunctionPass> {
   // TODO: (?) probably actually need config for requirements & tilingGenerators
-  NewXSMMStencilPass() {
-    assert(false && "NewXSMMStencilPass must be configured");
-  }
+  XSMMStencilPass() { assert(false && "XSMMStencilPass must be configured"); }
 
-  NewXSMMStencilPass(const NewXSMMStencilPass &rhs) {
+  XSMMStencilPass(const XSMMStencilPass &rhs) {
     numThreads = rhs.numThreads.getValue();
   }
 
-  explict NewXSMMStencilPass(unsigned numThreads_) { numThreads = numThreads_; }
+  explicit XSMMStencilPass(unsigned numThreads_) { numThreads = numThreads_; }
 
   void runOnFunction() final {
     auto func = getFunction();
@@ -442,8 +440,8 @@ struct NewXSMMStencilPass
       llvm::cl::desc("Specifies number of threads for the stencil pass")};
 };
 
-std::unique_ptr<mlir::Pass> createNewXSMMStencilPass(unsigned numThreads) {
-  return std::make_unique<NewXSMMStencilPass>(numThreads);
+std::unique_ptr<mlir::Pass> createXSMMStencilPass(unsigned numThreads) {
+  return std::make_unique<XSMMStencilPass>(numThreads);
 }
 
 } // namespace pmlc::dialect::pxa

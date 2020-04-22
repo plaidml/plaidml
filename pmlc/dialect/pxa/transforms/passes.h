@@ -20,15 +20,13 @@ struct StencilCost {
   unsigned startupCost;
 };
 
-using StencilCostFunction =
-    std::function<StencilCost(llvm::ArrayRef<unsigned>)>;
+// TODO: Maybe include StencilCostFunction as parameter
 
-std::unique_ptr<mlir::Pass> createStencilPass(unsigned numThreads,
-                                              StencilCostFunction costFn);
+// using StencilCostFunction =
+//     std::function<StencilCost(llvm::ArrayRef<unsigned>)>;
 
 std::unique_ptr<mlir::Pass> createTestStrideInfoPass();
 
-// TODO: Merge up
-std::unique_ptr<mlir::Pass> createNewXSMMStencilPass(unsigned numThreads);
+std::unique_ptr<mlir::Pass> createXSMMStencilPass(unsigned numThreads);
 
 } // namespace pmlc::dialect::pxa

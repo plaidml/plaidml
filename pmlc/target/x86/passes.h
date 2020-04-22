@@ -14,7 +14,4 @@ std::unique_ptr<mlir::Pass> createXSMMLoweringPass();
 
 std::unique_ptr<mlir::Pass> createXSMMStencilPass();
 
-// TODO: Merge up
-std::unique_ptr<mlir::Pass> createNewXSMMStencilPass();
-
 } // namespace pmlc::target::x86
