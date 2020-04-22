@@ -49,11 +49,9 @@ struct LoadStoreOps {
       stores; // TODO: Might be either store or reduce
 };
 
-// TODO: size_t or int64_t?
 using TileSizeGenerator = std::function<std::vector<int64_t>(int64_t)>;
 
 class StencilGeneric {
-  // TODO
 private:
   void BindIndexes(const llvm::SmallVector<mlir::Operation *, 3> &tensors);
   void RecursiveBindIndex(

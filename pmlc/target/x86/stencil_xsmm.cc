@@ -17,6 +17,7 @@
 #include "pmlc/dialect/pxa/analysis/strides.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/dialect/pxa/transforms/passes.h"
+#include "pmlc/dialect/xsmm/ir/ops.h"
 
 #include "pmlc/util/logging.h"
 #include "pmlc/util/util.h"
@@ -97,25 +98,6 @@ private:
 
     return llvm::Optional<LoadStoreOps>(std::move(ret));
   }
-
-  // double getCost(TensorAndIndexPermutation perm, ArrayRef<int64_t> tileSize)
-  // {
-  //   // TODO This is a fake cost function.
-  //   // First, cap total tile size:
-  //   int64_t totalTileSize = 1;
-  //   for (auto sz : tileSize) {
-  //     totalTileSize *= sz;
-  //   }
-  //   if (totalTileSize > 1024) {
-  //     return std::numeric_limits<double>::infinity();
-  //   }
-  //   // Next, fewest tiles:
-  //   int64_t tiles = 1;
-  //   for (unsigned i = 0; i < semanticIdxCount; i++) {
-  //     tiles *= llvm::divideCeil(getIdxRange(perm.indexes[i]), tileSize[i]);
-  //   }
-  //   return tiles;
-  // }
 
   double getCost(TensorAndIndexPermutation perm, ArrayRef<int64_t> tileSize) {
     unsigned numThreads = 4; // TODO
@@ -212,7 +194,7 @@ private:
 
     // llvm::DenseMap<mlir::BlockArgument, unsigned> outer_idxs;
     std::map<unsigned, unsigned> outer_idxs; // TODO why does this matter...
-    for (const auto &kvp : getStrideInfo(loadsAndStores.stores[0])->strides) {
+    for (const auto &kvp : getStrideInfo(perm.tensors[2])->strides) {
       IVLOG(4, "First: " << kvp.first);
       IVLOG(5, "Second: " << kvp.second);
       IVLOG(5, "IdxRange: " << getIdxRange(kvp.first));
@@ -292,20 +274,99 @@ private:
                  << "\n";
       std::stringstream bestTilingStr;
       bestTilingStr << "[ ";
-      for (const auto &tileSize : bestTiling) {
-        bestTilingStr << tileSize << " ";
+      for (const auto &sz : tileSize) {
+        bestTilingStr << sz << " ";
       }
       bestTilingStr << "]";
       bestReport << "    Best Tiling: " << bestTilingStr.str();
       IVLOG(2, bestReport.str());
     }
 
-    op.setAttr("is_gemm", mlir::UnitAttr::get(op.getContext()));
+    // First, modify step size of all tiled indexes
+    llvm::SmallVector<int64_t, 8> steps;
+    auto oldSteps = op.steps().cast<ArrayAttr>().getValue();
+    for (auto step : oldSteps) {
+      steps.push_back(step.cast<IntegerAttr>().getInt());
+    }
+    for (size_t i = 0; i < ranges.size(); i++) {
+      for (size_t j = 0; j < semanticIdxCount; j++) {
+        if (perm.indexes[j] == op.getBody()->getArgument(i)) {
+          steps[i] *= tileSize[j];
+        }
+      }
+    }
+    op.setSteps(steps);
+
+    // Generate the XSMM call; first select inputs based on permutation order
+    // TODO: 0 then 1 seems better...
+    auto opA = llvm::dyn_cast<mlir::AffineLoadOp>(*perm.tensors[1]);
+    auto opB = llvm::dyn_cast<mlir::AffineLoadOp>(*perm.tensors[0]);
+    auto opC = llvm::dyn_cast<AffineReduceOp>(*perm.tensors[2]);
+
+    // Get the current memrefs
+    Value aVal = opA.getMemRef();
+    Value bVal = opB.getMemRef();
+    Value cVal = opC.out();
+
+    // Initialize helpers
+    llvm::SmallVector<Value, 8> mapOperands;
+    auto bodyBuilder = op.getBodyBuilder();
+    auto makeTileMap = [&](AffineMap map, ValueRange ops,
+                           ArrayRef<mlir::BlockArgument> idxs) {
+      llvm::SmallVector<AffineExpr, 8> perOp;
+      for (auto op : ops) {
+        bool found = false;
+        for (size_t i = 0; i < idxs.size(); i++) {
+          if (op == idxs[i]) {
+            perOp.push_back(bodyBuilder.getAffineDimExpr(i));
+            found = true;
+          }
+        }
+        if (!found) {
+          perOp.push_back(bodyBuilder.getAffineConstantExpr(0));
+        }
+      }
+      auto toIdxs = AffineMap::get(idxs.size(), 0, perOp, op.getContext());
+      return map.compose(toIdxs);
+    };
+
+    // Set the tile size
+    auto tiles = bodyBuilder.getI64ArrayAttr(tileSize);
+
+    // Set up the maps
+    AffineMap cMap = opC.getAffineMap();
+    AffineMap cTile = makeTileMap(opC.getAffineMap(), opC.getMapOperands(),
+                                  {perm.indexes[1], perm.indexes[0]});
+    mapOperands.append(opC.getMapOperands().begin(),
+                       opC.getMapOperands().end());
+
+    AffineMap aMap = opA.getAffineMap();
+    AffineMap aTile = makeTileMap(opA.getAffineMap(), opA.getMapOperands(),
+                                  {perm.indexes[1], perm.indexes[2]});
+    mapOperands.append(opA.getMapOperands().begin(),
+                       opA.getMapOperands().end());
+
+    AffineMap bMap = opB.getAffineMap();
+    AffineMap bTile = makeTileMap(opB.getAffineMap(), opB.getMapOperands(),
+                                  {perm.indexes[2], perm.indexes[0]});
+    mapOperands.append(opB.getMapOperands().begin(),
+                       opB.getMapOperands().end());
+
+    // Make the XSMM op
+    bodyBuilder.create<xsmm::GemmOp>(op.getLoc(), cVal, cMap, cTile, aVal, aMap,
+                                     aTile, bVal, bMap, bTile, tiles,
+                                     mapOperands);
+
+    // Remove all other ops from the op interior
+    auto xsmm_it = std::prev(op.getBody()->end(), 2);
+    while (op.getBody()->begin() != xsmm_it) {
+      auto prev_it = std::prev(xsmm_it);
+      op.getBody()->getOperations().erase(prev_it);
+    }
   }
 
 public:
   explicit StencilXSMM(mlir::AffineParallelOp op) : StencilGeneric{op} {
-    // TODO ctor
     // TODO: Probably want to move these to be params on StencilGeneric ctor...
     semanticIdxCount = 3; // TODO [i.e., must match generators & requirements]
     requirements =        // TODO: Make nicer
