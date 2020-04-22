@@ -30,6 +30,8 @@ namespace pmlc::dialect::pxa {
 
 class StencilXSMM : public StencilGeneric {
 private:
+  unsigned numThreads;
+
   llvm::Optional<LoadStoreOps> capture() {
     // Looking for load..load..mul..reduce..terminator
     LoadStoreOps ret;
@@ -100,8 +102,6 @@ private:
   }
 
   double getCost(TensorAndIndexPermutation perm, ArrayRef<int64_t> tileSize) {
-    unsigned numThreads = 4; // TODO
-
     unsigned tot_inner_loop = tileSize[0] * tileSize[1] * tileSize[2];
 
     llvm::SmallVector<unsigned, 3> tileSizeTODO;
@@ -366,7 +366,8 @@ private:
   }
 
 public:
-  explicit StencilXSMM(mlir::AffineParallelOp op) : StencilGeneric{op} {
+  explicit StencilXSMM(mlir::AffineParallelOp op, unsigned numThreads)
+      : StencilGeneric{op}, numThreads{numThreads} {
     // TODO: Probably want to move these to be params on StencilGeneric ctor...
     semanticIdxCount = 3; // TODO [i.e., must match generators & requirements]
     requirements =        // TODO: Make nicer
@@ -417,22 +418,32 @@ public:
 
 struct NewXSMMStencilPass
     : public mlir::PassWrapper<NewXSMMStencilPass, mlir::FunctionPass> {
-  // I probably actually need config for requirements & tilingGenerators
+  // TODO: (?) probably actually need config for requirements & tilingGenerators
+  NewXSMMStencilPass() {
+    assert(false && "NewXSMMStencilPass must be configured");
+  }
 
-  NewXSMMStencilPass() {}
+  NewXSMMStencilPass(const NewXSMMStencilPass &rhs) {
+    numThreads = rhs.numThreads.getValue();
+  }
+
+  explict NewXSMMStencilPass(unsigned numThreads_) { numThreads = numThreads_; }
 
   void runOnFunction() final {
     auto func = getFunction();
-    // TODO: Capture `this` once pass has parameters
-    func.walk([/*this*/](mlir::AffineParallelOp op) {
-      StencilXSMM stencil(op);
+    func.walk([this](mlir::AffineParallelOp op) {
+      StencilXSMM stencil(op, numThreads.getValue());
       stencil.DoStenciling();
     });
   }
+
+  Option<unsigned> numThreads{
+      *this, "threads",
+      llvm::cl::desc("Specifies number of threads for the stencil pass")};
 };
 
-std::unique_ptr<mlir::Pass> createNewXSMMStencilPass() {
-  return std::make_unique<NewXSMMStencilPass>();
+std::unique_ptr<mlir::Pass> createNewXSMMStencilPass(unsigned numThreads) {
+  return std::make_unique<NewXSMMStencilPass>(numThreads);
 }
 
 } // namespace pmlc::dialect::pxa

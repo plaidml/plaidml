@@ -35,7 +35,8 @@ std::unique_ptr<Pass> createXSMMStencilPass() {
 
 // TODO: Merge up when ready
 std::unique_ptr<Pass> createNewXSMMStencilPass() {
-  return pmlc::dialect::pxa::createNewXSMMStencilPass();
+  auto numThreads = std::thread::hardware_concurrency();
+  return pmlc::dialect::pxa::createNewXSMMStencilPass(numThreads);
 }
 
 namespace {
