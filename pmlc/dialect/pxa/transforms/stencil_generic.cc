@@ -3,7 +3,6 @@
 #include "pmlc/dialect/pxa/transforms/stencil_generic.h"
 
 // TODO: Just seeing if the stencil.cc includes work
-#include "mlir/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Pass/Pass.h"

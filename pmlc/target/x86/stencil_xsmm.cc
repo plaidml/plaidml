@@ -7,7 +7,6 @@
 #include "mlir/Support/DebugStringHelper.h" // TODO: sort
 
 // TODO: Just seeing if the stencil.cc includes work
-#include "mlir/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Pass/Pass.h"
