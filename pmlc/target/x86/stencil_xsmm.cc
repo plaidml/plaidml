@@ -217,23 +217,6 @@ private:
 
     IVLOG(4, "Outer: loop = " << tot_outer_loop);
 
-    // llvm::DenseMap<mlir::BlockArgument, unsigned> outer_idxs;
-    // for (auto idx : outIdxs) {
-    //   outer_idxs.try_emplace(idx, idxRange(idx));
-    // }
-    // for (unsigned i = 0; i < semanticIdxCount; ++i) {
-    //   auto it = outer_idxs.find(innerIdxs[i]);
-    //   if (it != outer_idxs.end()) {
-    //     it->second = (it->second - 1) / tileSize[i] + 1;
-    //   }
-    // }
-    // unsigned tot_outer_loop = 1;
-    // for (auto &kvp : outer_idxs) {
-    //   tot_outer_loop *= kvp.second;
-    // }
-
-    // IVLOG(3, "Outer: loop = " << tot_outer_loop);
-
     for (auto &kvp : outer_idxs) {
       if (kvp.second > 1) {
         IVLOG(4, kvp.first << ": " << kvp.second);

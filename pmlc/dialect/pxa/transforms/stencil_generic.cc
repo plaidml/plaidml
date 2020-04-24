@@ -215,7 +215,8 @@ void StencilGeneric::DoStenciling() {
 
   auto maybeLoadsAndStores = capture();
   if (maybeLoadsAndStores) {
-    loadsAndStores = maybeLoadsAndStores.getValue();
+    loadsAndStores =
+        maybeLoadsAndStores.getValue(); // TODO: Is this how to use Optional?
   } else {
     IVLOG(4, "Cannot Stencil: Operations fail to pattern-match.");
     return;
