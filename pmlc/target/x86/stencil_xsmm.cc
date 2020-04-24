@@ -103,10 +103,12 @@ private:
   double getCost(TensorAndIndexPermutation perm, ArrayRef<int64_t> tileSize) {
     unsigned tot_inner_loop = tileSize[0] * tileSize[1] * tileSize[2];
 
+    // TODO: Just put these in the order heatmap expects? Flip heatmap? Also
+    // int64_t vs. unsigned?
     llvm::SmallVector<unsigned, 3> tileSizeTODO;
-    for (unsigned i = 0; i < 3; ++i) {
-      tileSizeTODO.push_back(tileSize[i]);
-    }
+    tileSizeTODO.push_back(tileSize[1]);
+    tileSizeTODO.push_back(tileSize[0]);
+    tileSizeTODO.push_back(tileSize[2]);
     auto cost = pmlc::target::x86::heatmapCost(tileSizeTODO);
     if (cost.throughput == 0) {
       return std::numeric_limits<double>::infinity();
@@ -328,8 +330,13 @@ private:
       return map.compose(toIdxs);
     };
 
-    // Set the tile size
-    auto tiles = bodyBuilder.getI64ArrayAttr(tileSize);
+    // Set the tile size. Note XSMM wants n, m, k order and we have m, n, k
+    // TODO: Or maybe we should change everything to match XSMM order?
+    llvm::SmallVector<int64_t, 3> xsmmTileSize;
+    xsmmTileSize.push_back(tileSize[1]);
+    xsmmTileSize.push_back(tileSize[0]);
+    xsmmTileSize.push_back(tileSize[2]);
+    auto tiles = bodyBuilder.getI64ArrayAttr(xsmmTileSize);
 
     // Set up the maps
     AffineMap cMap = opC.getAffineMap();
