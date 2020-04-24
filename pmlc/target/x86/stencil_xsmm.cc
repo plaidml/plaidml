@@ -297,9 +297,8 @@ private:
     op.setSteps(steps);
 
     // Generate the XSMM call; first select inputs based on permutation order
-    // TODO: 0 then 1 seems better...
-    auto opA = llvm::dyn_cast<mlir::AffineLoadOp>(*perm.tensors[1]);
-    auto opB = llvm::dyn_cast<mlir::AffineLoadOp>(*perm.tensors[0]);
+    auto opA = llvm::dyn_cast<mlir::AffineLoadOp>(*perm.tensors[0]);
+    auto opB = llvm::dyn_cast<mlir::AffineLoadOp>(*perm.tensors[1]);
     auto opC = llvm::dyn_cast<AffineReduceOp>(*perm.tensors[2]);
 
     // Get the current memrefs
@@ -335,19 +334,19 @@ private:
     // Set up the maps
     AffineMap cMap = opC.getAffineMap();
     AffineMap cTile = makeTileMap(opC.getAffineMap(), opC.getMapOperands(),
-                                  {perm.indexes[1], perm.indexes[0]});
+                                  {perm.indexes[0], perm.indexes[1]});
     mapOperands.append(opC.getMapOperands().begin(),
                        opC.getMapOperands().end());
 
     AffineMap aMap = opA.getAffineMap();
     AffineMap aTile = makeTileMap(opA.getAffineMap(), opA.getMapOperands(),
-                                  {perm.indexes[1], perm.indexes[2]});
+                                  {perm.indexes[0], perm.indexes[2]});
     mapOperands.append(opA.getMapOperands().begin(),
                        opA.getMapOperands().end());
 
     AffineMap bMap = opB.getAffineMap();
     AffineMap bTile = makeTileMap(opB.getAffineMap(), opB.getMapOperands(),
-                                  {perm.indexes[2], perm.indexes[0]});
+                                  {perm.indexes[2], perm.indexes[1]});
     mapOperands.append(opB.getMapOperands().begin(),
                        opB.getMapOperands().end());
 
