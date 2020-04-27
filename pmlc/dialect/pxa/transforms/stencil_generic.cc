@@ -23,49 +23,6 @@
 
 namespace pmlc::dialect::pxa {
 
-namespace {
-
-// A simple wrapper to provide an ordering to object vectors that
-// we're going to be processing with std::next_permutation() --
-// e.g. if we used pointers as comparison values, our order of
-// iteration could vary run-to-run, creating non-determinism.
-template <typename V>
-class Orderer {
-public:
-  Orderer(unsigned ord, V value) : ord_{ord}, value_{std::forward<V>(value)} {}
-
-  void setOrd(unsigned ord) { ord_ = ord; }
-  unsigned ord() const { return ord_; }
-
-  V &operator*() { return value_; }
-  const V &operator*() const { return value_; }
-
-  V &operator->() { return value_; }
-  const V &operator->() const { return value_; }
-
-  bool operator<(const Orderer<V> &other) const { return ord() < other.ord(); }
-
-private:
-  unsigned ord_;
-  V value_;
-};
-
-template <typename V>
-std::ostream &operator<<(std::ostream &os, const Orderer<V> &v) {
-  os << *v << ":" << v.ord();
-  return os;
-}
-
-template <typename V>
-void swap(Orderer<V> &v1, Orderer<V> &v2) {
-  unsigned v1o = v1.ord();
-  v1.setOrd(v2.ord());
-  v2.setOrd(v1o);
-  std::swap(*v1, *v2);
-}
-
-} // namespace
-
 int64_t StencilGeneric::getIdxRange(mlir::BlockArgument idx) {
   assert(idx.getArgNumber() < ranges.size());
   assert(idx.getArgNumber() >= 0 && "TODO scrap");
@@ -81,33 +38,21 @@ int64_t StencilGeneric::getIdxRange(mlir::BlockArgument idx) {
 }
 
 mlir::Optional<mlir::StrideInfo>
-StencilGeneric::getStrideInfo(mlir::Operation *op) {
-  auto cached = strideInfoCache.find(op);
+StencilGeneric::getStrideInfo(unsigned tensorID) {
+  auto cached = strideInfoCache.find(tensorID);
   if (cached != strideInfoCache.end()) {
     return cached->second;
   }
-  auto loadOp = llvm::dyn_cast<mlir::AffineLoadOp>(*op);
-  if (loadOp) {
-    auto strideInfo = computeStrideInfo(loadOp);
-    if (strideInfo.hasValue())
-      strideInfoCache.emplace(std::make_pair(op, strideInfo.getValue()));
-    return strideInfo;
+  mlir::Optional<mlir::StrideInfo> strideInfo;
+  if (tensorID < loadsAndStores.loads.size()) {
+    strideInfo = computeStrideInfo(loadsAndStores.loads[tensorID]);
+  } else {
+    strideInfo = computeStrideInfo(
+        loadsAndStores.stores[tensorID - loadsAndStores.loads.size()]);
   }
-  auto storeOp = llvm::dyn_cast<mlir::AffineStoreOp>(*op);
-  if (storeOp) {
-    auto strideInfo = computeStrideInfo(storeOp);
-    if (strideInfo.hasValue())
-      strideInfoCache.emplace(std::make_pair(op, strideInfo.getValue()));
-    return strideInfo;
-  }
-  auto reduceOp = llvm::dyn_cast<AffineReduceOp>(*op);
-  if (reduceOp) {
-    auto strideInfo = computeStrideInfo(reduceOp);
-    if (strideInfo.hasValue())
-      strideInfoCache.emplace(std::make_pair(op, strideInfo.getValue()));
-    return strideInfo;
-  }
-  return llvm::None;
+  if (strideInfo.hasValue())
+    strideInfoCache.emplace(std::make_pair(tensorID, strideInfo.getValue()));
+  return strideInfo;
 }
 
 // BlockArgumentSet StencilGeneric::getAccArgs() {
@@ -120,9 +65,9 @@ StencilGeneric::getStrideInfo(mlir::Operation *op) {
 //   BlockArgumentSet getOutArgs();
 
 void StencilGeneric::BindIndexes(
-    const llvm::SmallVector<mlir::Operation *, 3> &tensors) {
+    const llvm::SmallVector<unsigned, 3> &tensorIDs) {
   llvm::SmallVector<mlir::BlockArgument, 8> emptyBoundIdxsVector;
-  RecursiveBindIndex(&emptyBoundIdxsVector, tensors);
+  RecursiveBindIndex(&emptyBoundIdxsVector, tensorIDs);
 }
 
 // TODO: Better to maintain boundIdxs as both set & vector, or just vector?
@@ -131,12 +76,12 @@ void StencilGeneric::BindIndexes(
 // TODO: Also, should probably at least be a small vector (how small?)
 void StencilGeneric::RecursiveBindIndex(
     llvm::SmallVector<mlir::BlockArgument, 8> *boundIdxs,
-    const llvm::SmallVector<mlir::Operation *, 3> &tensors) {
+    const llvm::SmallVector<unsigned, 3> &tensorIDs) {
   auto currIdx = boundIdxs->size();
   if (currIdx == semanticIdxCount) {
     // This is a legal binding, go find a tiling for it
     llvm::SmallVector<int64_t, 8> currTileSize(semanticIdxCount);
-    RecursiveTileIndex(TensorAndIndexPermutation(tensors, *boundIdxs),
+    RecursiveTileIndex(TensorAndIndexPermutation(tensorIDs, *boundIdxs),
                        &currTileSize, 0);
   } else {
     for (const auto &blockArg : blockArgs) {
@@ -148,9 +93,9 @@ void StencilGeneric::RecursiveBindIndex(
 
       // Verify the requirements for this index with each tensor are all met
       bool reqsMet = true;
-      for (unsigned i = 0; i < tensors.size(); i++) {
+      for (unsigned i = 0; i < tensorIDs.size(); i++) {
         auto it = requirements.find(std::make_pair(i, currIdx));
-        if (it != requirements.end() && !it->second(tensors[i], blockArg)) {
+        if (it != requirements.end() && !it->second(tensorIDs[i], blockArg)) {
           reqsMet = false;
           break;
         }
@@ -162,7 +107,7 @@ void StencilGeneric::RecursiveBindIndex(
       // If we made it to here, this index has appropriate semantics; bind it
       // and recurse
       boundIdxs->push_back(blockArg);
-      RecursiveBindIndex(boundIdxs, tensors);
+      RecursiveBindIndex(boundIdxs, tensorIDs);
       boundIdxs->pop_back();
     }
   }
@@ -222,60 +167,23 @@ void StencilGeneric::DoStenciling() {
     return;
   }
 
-  // llvm::SmallVector<Orderer<mlir::Operation*>, 3> orderableTensors;
-  // unsigned ord = 0;
-  // for (auto &loadOp : loadsAndStores.loads) {
-  //   orderableTensors.push_back(Orderer<mlir::Operation*>(ord++, &loadOp));
-  // }
-  // size_t firstStoreIdx = orderableTensors.size();
-  // for (auto &storeOp : loadsAndStores.stores) {
-  //   orderableTensors.push_back(Orderer<mlir::Operation*>(ord++, &storeOp));
-  //   // TODO: Probably should handle reduces vs. true stores in a different
-  //   // way
-  //   // if (auto reduce_op = llvm::dyn_cast_or_null<AffineReduceOp>(storeOp))
-  //   // {
-  //   //   tensors.push_back(reduce_op.out());
-  //   // } else if (auto trueStoreOp =
-  //   // llvm::dyn_cast_or_null<mlir::AffineStoreOp>(storeOp)) {
-  //   //   tensors.push_back(trueStoreOp.getMemRef());
-  //   // } else {
-  //   //   // TODO: throw?
-  //   //   IVLOG(1, "Unexpected failure to load tensors from ops in
-  //   // stenciling");
-  //   //   return;
-  //   // }
-  // }
-  // auto lastLoadFirstStoreIt = orderableTensors.begin() + firstStoreIdx;
-  // std::sort(orderableTensors.begin(), lastLoadFirstStoreIt);
-  // do { // Each load tensor permutation
-  //   std::sort(lastLoadFirstStoreIt, orderableTensors.end());
-  //   do { // Each store tensor permutation
-  //     llvm::SmallVector<mlir::Operation*, 3> tensors;
-  //     for (const auto &tn : orderableTensors) {
-  //       tensors.push_back(*tn);
-  //     }
-  //     BindIndexes(tensors);
-  //   } while (
-  //       std::next_permutation(lastLoadFirstStoreIt, orderableTensors.end()));
-  // } while (
-  //     std::next_permutation(orderableTensors.begin(), lastLoadFirstStoreIt));
-
-  llvm::SmallVector<mlir::Operation *, 3> tensors;
-  for (auto &loadOp : loadsAndStores.loads) {
-    tensors.push_back(loadOp);
+  llvm::SmallVector<unsigned, 3> tensorIDs;
+  for (unsigned i = 0; i < loadsAndStores.loads.size(); i++) {
+    tensorIDs.push_back(i);
   }
-  size_t firstStoreIdx = tensors.size();
-  for (auto &storeOp : loadsAndStores.stores) {
-    tensors.push_back(storeOp);
+  unsigned firstStoreIdx = tensorIDs.size();
+  for (unsigned i = 0; i < loadsAndStores.stores.size(); i++) {
+    tensorIDs.push_back(firstStoreIdx + i);
   }
-  auto lastLoadFirstStoreIt = tensors.begin() + firstStoreIdx;
-  std::sort(tensors.begin(), lastLoadFirstStoreIt);
+  auto lastLoadFirstStoreIt = tensorIDs.begin() + firstStoreIdx;
+  // Sorting is redundant here, but cheap so including for algorithmic clarity
+  std::sort(tensorIDs.begin(), lastLoadFirstStoreIt);
   do { // Each load tensor permutation
-    std::sort(lastLoadFirstStoreIt, tensors.end());
+    std::sort(lastLoadFirstStoreIt, tensorIDs.end());
     do { // Each store tensor permutation
-      BindIndexes(tensors);
-    } while (std::next_permutation(lastLoadFirstStoreIt, tensors.end()));
-  } while (std::next_permutation(tensors.begin(), lastLoadFirstStoreIt));
+      BindIndexes(tensorIDs);
+    } while (std::next_permutation(lastLoadFirstStoreIt, tensorIDs.end()));
+  } while (std::next_permutation(tensorIDs.begin(), lastLoadFirstStoreIt));
 
   if (bestCost < std::numeric_limits<double>::infinity()) {
     transform(bestPermutation, bestTiling);

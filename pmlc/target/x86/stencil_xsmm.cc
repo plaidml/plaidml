@@ -52,7 +52,7 @@ private:
                "non-terminator");
       return llvm::None;
     }
-    ret.stores.push_back(&*it);
+    ret.stores.push_back(reduceOp);
     IVLOG(5, "Found ReduceOp");
 
     // Now check the reduceOp aggregation.
@@ -70,30 +70,18 @@ private:
       return llvm::None;
     }
 
-    mlir::Operation *lhs;
-    mlir::Operation *rhs;
+    mlir::AffineLoadOp lhs;
+    mlir::AffineLoadOp rhs;
     if (auto mulfOp = llvm::dyn_cast_or_null<mlir::MulFOp>(defOp)) {
-      lhs = mulfOp.lhs().getDefiningOp();
-      if (!llvm::dyn_cast_or_null<mlir::AffineLoadOp>(lhs)) {
-        IVLOG(3, "The LHS of the mul op is not affine.load.");
-        return llvm::None;
-      }
-      rhs = mulfOp.rhs().getDefiningOp();
-      if (!llvm::dyn_cast_or_null<mlir::AffineLoadOp>(rhs)) {
-        IVLOG(3, "The RHS of the mul op is not affine.load.");
-        return llvm::None;
-      }
+      lhs = llvm::dyn_cast_or_null<mlir::AffineLoadOp>(
+          mulfOp.lhs().getDefiningOp());
+      rhs = llvm::dyn_cast_or_null<mlir::AffineLoadOp>(
+          mulfOp.rhs().getDefiningOp());
     } else if (auto muliOp = llvm::dyn_cast_or_null<mlir::MulIOp>(defOp)) {
-      lhs = mulfOp.lhs().getDefiningOp();
-      if (!llvm::dyn_cast_or_null<mlir::AffineLoadOp>(lhs)) {
-        IVLOG(3, "The LHS of the mul op is not affine.load.");
-        return llvm::None;
-      }
-      rhs = mulfOp.rhs().getDefiningOp();
-      if (!llvm::dyn_cast_or_null<mlir::AffineLoadOp>(rhs)) {
-        IVLOG(3, "The RHS of the mul op is not affine.load.");
-        return llvm::None;
-      }
+      lhs = llvm::dyn_cast_or_null<mlir::AffineLoadOp>(
+          muliOp.lhs().getDefiningOp());
+      rhs = llvm::dyn_cast_or_null<mlir::AffineLoadOp>(
+          muliOp.rhs().getDefiningOp());
     } else {
       IVLOG(5, "The source of the reduce is not a multiplication operation");
       return llvm::None;
@@ -101,6 +89,10 @@ private:
 
     // Now verify the types of the operands of the mulOp must be affine.load
     // operations.
+    if (!lhs || !rhs) {
+      IVLOG(3, "The LHS or RHS of the mul op is not an affine.load.");
+      return llvm::None;
+    }
     ret.loads.push_back(lhs);
     ret.loads.push_back(rhs);
 
@@ -133,7 +125,7 @@ private:
     // llvm::DenseMap<mlir::BlockArgument, unsigned> middle_idxs;
     std::map<unsigned, unsigned> middle_idxs; // TODO: Why does this matter?
     unsigned TODO_loop_count = 0;
-    for (const auto &kvp : getStrideInfo(perm.tensors[0])->strides) {
+    for (const auto &kvp : getStrideInfo(perm.tensorIDs[0])->strides) {
       // TODO: Old version verifies that this is in the parallel op's BlockArgs,
       // but that seems excessive for something that I'd expect to be an
       // assert...
@@ -154,7 +146,7 @@ private:
     IVLOG(5, "Current size of middle_idxs = " << middle_idxs.size());
     // return 3;  // TODO: cheap hack  !!!!!!!!!!!! Breaks on verbosity 3+ if I
     // return here
-    for (const auto &kvp : getStrideInfo(perm.tensors[1])->strides) {
+    for (const auto &kvp : getStrideInfo(perm.tensorIDs[1])->strides) {
       // TODO: Old version verifies that this is in the parallel op's BlockArgs,
       // but that seems excessive for something that I'd expect to be an
       // assert...
@@ -169,7 +161,7 @@ private:
       }
     }
     IVLOG(5, "Current size of middle_idxs = " << middle_idxs.size());
-    for (const auto &kvp : getStrideInfo(perm.tensors[2])->strides) {
+    for (const auto &kvp : getStrideInfo(perm.tensorIDs[2])->strides) {
       auto it = middle_idxs.find(kvp.first.getArgNumber());
       if (it != middle_idxs.end()) {
         IVLOG(5, "Based on output tensor, erasing middle index " << it->first);
@@ -202,7 +194,7 @@ private:
 
     // llvm::DenseMap<mlir::BlockArgument, unsigned> outer_idxs;
     std::map<unsigned, unsigned> outer_idxs; // TODO why does this matter...
-    for (const auto &kvp : getStrideInfo(perm.tensors[2])->strides) {
+    for (const auto &kvp : getStrideInfo(perm.tensorIDs[2])->strides) {
       IVLOG(4, "First: " << kvp.first);
       IVLOG(5, "Second: " << kvp.second);
       IVLOG(5, "IdxRange: " << getIdxRange(kvp.first));
@@ -249,8 +241,19 @@ private:
       bestReport << "    Best Perf: " << bestCost << "\n";
       std::stringstream tensorPermStr;
       tensorPermStr << "[\n";
-      for (auto t : perm.tensors) {
-        tensorPermStr << "        " << mlir::debugString(*t) << "\n";
+      for (auto tID : perm.tensorIDs) {
+        tensorPermStr << "        " << tID << ": ";
+        if (tID < loadsAndStores.loads.size()) {
+          auto t = loadsAndStores.loads[tID];
+          auto str = mlir::debugString(*t);
+          tensorPermStr << str;
+        } else {
+          // TODO: Handle reduces/stores both
+          auto t = loadsAndStores.stores[tID - loadsAndStores.loads.size()];
+          auto str = mlir::debugString(*t);
+          tensorPermStr << str;
+        }
+        tensorPermStr << "\n";
       }
       tensorPermStr << "    ]";
       bestReport << "    Best Tensor Permutation: " << tensorPermStr.str()
@@ -289,9 +292,10 @@ private:
     op.setSteps(steps);
 
     // Generate the XSMM call; first select inputs based on permutation order
-    auto opA = llvm::dyn_cast<mlir::AffineLoadOp>(*perm.tensors[0]);
-    auto opB = llvm::dyn_cast<mlir::AffineLoadOp>(*perm.tensors[1]);
-    auto opC = llvm::dyn_cast<AffineReduceOp>(*perm.tensors[2]);
+    auto opA = loadsAndStores.loads[perm.tensorIDs[0]];
+    auto opB = loadsAndStores.loads[perm.tensorIDs[1]];
+    assert(loadsAndStores.loads.size() == 2);
+    auto opC = loadsAndStores.stores[perm.tensorIDs[2] - 2];
 
     // Get the current memrefs
     Value aVal = opA.getMemRef();
@@ -367,42 +371,42 @@ public:
     semanticIdxCount = 3; // TODO [i.e., must match generators & requirements]
     requirements =        // TODO: Make nicer
         std::map<std::pair<int64_t, int64_t>,
-                 std::function<bool(mlir::Operation *, mlir::BlockArgument)>>{
+                 std::function<bool(unsigned, mlir::BlockArgument)>>{
             {{0, 0},
-             [this](mlir::Operation *rawOp, mlir::BlockArgument a) {
-               return getStrideInfo(rawOp)->strides[a] != 0;
+             [this](unsigned tensorID, mlir::BlockArgument a) {
+               return getStrideInfo(tensorID)->strides[a] != 0;
              }},
             {{0, 1},
-             [this](mlir::Operation *rawOp, mlir::BlockArgument a) {
-               return getStrideInfo(rawOp)->strides[a] == 0;
+             [this](unsigned tensorID, mlir::BlockArgument a) {
+               return getStrideInfo(tensorID)->strides[a] == 0;
              }},
             {{0, 2},
-             [this](mlir::Operation *rawOp, mlir::BlockArgument a) {
-               return getStrideInfo(rawOp)->strides[a] == 1;
+             [this](unsigned tensorID, mlir::BlockArgument a) {
+               return getStrideInfo(tensorID)->strides[a] == 1;
              }},
             {{1, 0},
-             [this](mlir::Operation *rawOp, mlir::BlockArgument a) {
-               return getStrideInfo(rawOp)->strides[a] == 0;
+             [this](unsigned tensorID, mlir::BlockArgument a) {
+               return getStrideInfo(tensorID)->strides[a] == 0;
              }},
             {{1, 1},
-             [this](mlir::Operation *rawOp, mlir::BlockArgument a) {
-               return getStrideInfo(rawOp)->strides[a] == 1;
+             [this](unsigned tensorID, mlir::BlockArgument a) {
+               return getStrideInfo(tensorID)->strides[a] == 1;
              }},
             {{1, 2},
-             [this](mlir::Operation *rawOp, mlir::BlockArgument a) {
-               return getStrideInfo(rawOp)->strides[a] != 0;
+             [this](unsigned tensorID, mlir::BlockArgument a) {
+               return getStrideInfo(tensorID)->strides[a] != 0;
              }},
             {{2, 0},
-             [this](mlir::Operation *rawOp, mlir::BlockArgument a) {
-               return getStrideInfo(rawOp)->strides[a] != 0;
+             [this](unsigned tensorID, mlir::BlockArgument a) {
+               return getStrideInfo(tensorID)->strides[a] != 0;
              }},
             {{2, 1},
-             [this](mlir::Operation *rawOp, mlir::BlockArgument a) {
-               return getStrideInfo(rawOp)->strides[a] == 1;
+             [this](unsigned tensorID, mlir::BlockArgument a) {
+               return getStrideInfo(tensorID)->strides[a] == 1;
              }},
             {{2, 2},
-             [this](mlir::Operation *rawOp, mlir::BlockArgument a) {
-               return getStrideInfo(rawOp)->strides[a] == 0;
+             [this](unsigned tensorID, mlir::BlockArgument a) {
+               return getStrideInfo(tensorID)->strides[a] == 0;
              }},
         };
     tilingGenerators.push_back(EvenTilingGenerator());
