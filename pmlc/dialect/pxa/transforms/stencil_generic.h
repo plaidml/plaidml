@@ -43,9 +43,8 @@ struct TensorAndIndexPermutation {
 
 struct LoadStoreOps {
   // The load and store ops of an AffineParallel
-  llvm::SmallVector<mlir::AffineLoadOp, 2> loads;
-  llvm::SmallVector<AffineReduceOp, 1>
-      stores; // TODO: Might be either store or reduce
+  llvm::SmallVector<mlir::Operation *, 2> loads;
+  llvm::SmallVector<mlir::Operation *, 1> stores;
 };
 
 using TileSizeGenerator = std::function<std::vector<int64_t>(int64_t)>;

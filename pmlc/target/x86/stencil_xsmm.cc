@@ -52,7 +52,7 @@ private:
                "non-terminator");
       return llvm::None;
     }
-    ret.stores.push_back(reduceOp);
+    ret.stores.push_back(&*it);
     IVLOG(5, "Found ReduceOp");
 
     // Now check the reduceOp aggregation.
@@ -70,18 +70,30 @@ private:
       return llvm::None;
     }
 
-    mlir::AffineLoadOp lhs;
-    mlir::AffineLoadOp rhs;
+    mlir::Operation *lhs;
+    mlir::Operation *rhs;
     if (auto mulfOp = llvm::dyn_cast_or_null<mlir::MulFOp>(defOp)) {
-      lhs = llvm::dyn_cast_or_null<mlir::AffineLoadOp>(
-          mulfOp.lhs().getDefiningOp());
-      rhs = llvm::dyn_cast_or_null<mlir::AffineLoadOp>(
-          mulfOp.rhs().getDefiningOp());
+      lhs = mulfOp.lhs().getDefiningOp();
+      if (!llvm::dyn_cast_or_null<mlir::AffineLoadOp>(lhs)) {
+        IVLOG(3, "The LHS of the mul op is not affine.load.");
+        return llvm::None;
+      }
+      rhs = mulfOp.rhs().getDefiningOp();
+      if (!llvm::dyn_cast_or_null<mlir::AffineLoadOp>(rhs)) {
+        IVLOG(3, "The RHS of the mul op is not affine.load.");
+        return llvm::None;
+      }
     } else if (auto muliOp = llvm::dyn_cast_or_null<mlir::MulIOp>(defOp)) {
-      lhs = llvm::dyn_cast_or_null<mlir::AffineLoadOp>(
-          muliOp.lhs().getDefiningOp());
-      rhs = llvm::dyn_cast_or_null<mlir::AffineLoadOp>(
-          muliOp.rhs().getDefiningOp());
+      lhs = mulfOp.lhs().getDefiningOp();
+      if (!llvm::dyn_cast_or_null<mlir::AffineLoadOp>(lhs)) {
+        IVLOG(3, "The LHS of the mul op is not affine.load.");
+        return llvm::None;
+      }
+      rhs = mulfOp.rhs().getDefiningOp();
+      if (!llvm::dyn_cast_or_null<mlir::AffineLoadOp>(rhs)) {
+        IVLOG(3, "The RHS of the mul op is not affine.load.");
+        return llvm::None;
+      }
     } else {
       IVLOG(5, "The source of the reduce is not a multiplication operation");
       return llvm::None;
@@ -89,11 +101,6 @@ private:
 
     // Now verify the types of the operands of the mulOp must be affine.load
     // operations.
-    if (!lhs || !rhs) {
-      IVLOG(3, "the lhs or rhs of the mul operation are not affine.load "
-               "operations.");
-      return llvm::None;
-    }
     ret.loads.push_back(lhs);
     ret.loads.push_back(rhs);
 
