@@ -131,7 +131,7 @@ private:
       // assert...
       if (blockArgs.find(kvp.first) == blockArgs.end()) {
         IVLOG(1, "Hey this isn't a real block arg!: " << kvp.first);
-        throw std::runtime_error("TODO Guess we do need to check!");
+        // TODO: Figure out if we want to add additional handling here
       } else {
         IVLOG(5, "[loop " << TODO_loop_count
                           << "] Based on first tensor, inserting middle index "
@@ -152,7 +152,7 @@ private:
       // assert...
       if (blockArgs.find(kvp.first) == blockArgs.end()) {
         IVLOG(1, "Hey this isn't a real block arg! (v2): " << kvp.first);
-        throw std::runtime_error("TODO Guess we do need to check!");
+        // TODO: Figure out if we want to add additional handling here
       } else {
         IVLOG(5,
               "Based on second tensor, inserting middle index " << kvp.first);

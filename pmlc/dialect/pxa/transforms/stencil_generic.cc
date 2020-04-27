@@ -24,6 +24,8 @@
 namespace pmlc::dialect::pxa {
 
 int64_t StencilGeneric::getIdxRange(mlir::BlockArgument idx) {
+  assert(blockArgs.find(idx) != blockArgs.end() &&
+         "getIdxRange should have block arg in block");
   assert(idx.getArgNumber() < ranges.size());
   assert(idx.getArgNumber() >= 0 && "TODO scrap");
   assert(idx.getArgNumber() <= 2 && "TODO scrap");
