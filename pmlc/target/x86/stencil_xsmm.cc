@@ -118,7 +118,6 @@ private:
     for (unsigned i = 0; i < semanticIdxCount; ++i) {
       IVLOG(6, perm.indexes[i] << ": " << tileSize[i]);
     }
-    // return 3; // TODO a hack  !!!! Works on all verbosities if I return here
 
     // The middle idxs are the accumulation indexes, i.e. those used on loads
     // but not stores
@@ -140,12 +139,8 @@ private:
             std::make_pair(kvp.first.getArgNumber(), getIdxRange(kvp.first)));
       }
       TODO_loop_count++;
-      // return 3; // TODO: cheap hack...  !!!!!!!! Returning here gives
-      // intermittent verbosity 3 errors
     }
     IVLOG(5, "Current size of middle_idxs = " << middle_idxs.size());
-    // return 3;  // TODO: cheap hack  !!!!!!!!!!!! Breaks on verbosity 3+ if I
-    // return here
     for (const auto &kvp : getStrideInfo(perm.tensorIDs[1])->strides) {
       // TODO: Old version verifies that this is in the parallel op's BlockArgs,
       // but that seems excessive for something that I'd expect to be an
@@ -168,7 +163,6 @@ private:
         middle_idxs.erase(it);
       }
     }
-    // return 3;  // TODO: cheap hack
 
     for (unsigned i = 0; i < semanticIdxCount; ++i) {
       auto it = middle_idxs.find(perm.indexes[i].getArgNumber());
@@ -180,8 +174,6 @@ private:
     for (auto &kvp : middle_idxs) {
       tot_middle_loop *= kvp.second;
     }
-    // return 3;  // TODO: cheap hack !!!! INTERMITTENTLY breaks on verbosity 2
-    // if I return here
 
     IVLOG(4, "Middle: loop = " << tot_middle_loop);
 
@@ -190,7 +182,6 @@ private:
         IVLOG(4, kvp.first << ": " << kvp.second);
       }
     }
-    // return 3; // TODO: less cheap hack
 
     // llvm::DenseMap<mlir::BlockArgument, unsigned> outer_idxs;
     std::map<unsigned, unsigned> outer_idxs; // TODO why does this matter...
@@ -202,7 +193,6 @@ private:
       IVLOG(4, "And now emplaced");
     }
     IVLOG(4, "Left loop...");
-    // return 3; // TODO: less cheap hack
     for (unsigned i = 0; i < semanticIdxCount; i++) {
       auto it = outer_idxs.find(perm.indexes[i].getArgNumber());
       if (it != outer_idxs.end()) {
