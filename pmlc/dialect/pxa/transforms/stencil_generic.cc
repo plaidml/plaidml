@@ -135,10 +135,7 @@ void StencilGeneric::RecursiveTileIndex(     //
     if (cost < bestCost) {
       bestCost = cost;
       bestPermutation = perm;
-      bestTiling = llvm::SmallVector<int64_t, 8>(tileSize->size());
-      for (size_t i = 0; i < tileSize->size(); i++) {
-        bestTiling[i] = (*tileSize)[i];
-      }
+      bestTiling = *tileSize;
     }
   } else {
     // TODO: Setup cache for the generator
