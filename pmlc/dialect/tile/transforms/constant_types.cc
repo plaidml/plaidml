@@ -33,13 +33,34 @@ using mlir::Type;
 
 using eltwise::ScalarConstantOp;
 
+class SimpleConstantRewriter : public PatternRewriter {
+public:
+  SimpleConstantRewriter(MLIRContext *ctx,
+                         const OwningRewritePatternList &patterns)
+      : PatternRewriter(ctx), matcher(patterns) {}
+  void run(mlir::FuncOp funcOp) {
+    funcOp.walk([&](Operation *op) {
+      // Set the insertion point.
+      setInsertionPoint(op);
+      // Match and rewrite.
+      matcher.matchAndRewrite(op, *this);
+    });
+  }
+
+protected:
+  Operation *insert(Operation *op) final { return OpBuilder::insert(op); }
+
+private:
+  mlir::RewritePatternMatcher matcher;
+};
+
 struct ConstantTypesPass : public ConstantTypesBase<ConstantTypesPass> {
   ConstantTypesPass() {}
 
   ConstantTypesPass(Type floatType, Type integerType)
       : floatType(floatType), integerType(integerType) {}
 
-  void runOnOperation() final;
+  void runOnFunction() final;
 
   void notifyPassFailure() { signalPassFailure(); }
 
@@ -94,7 +115,7 @@ struct ConstantTypesRewriter : public OpRewritePattern<ScalarConstantOp> {
   Type integerType;
 };
 
-void ConstantTypesPass::runOnOperation() {
+void ConstantTypesPass::runOnFunction() {
   auto *context = &getContext();
 
   if (!floatType) {
@@ -124,7 +145,8 @@ void ConstantTypesPass::runOnOperation() {
   OwningRewritePatternList patterns;
   patterns.insert<ConstantTypesRewriter>(&getContext(), this, *floatType,
                                          *integerType);
-  applyPatternsAndFoldGreedily(getOperation()->getRegions(), patterns);
+  SimpleConstantRewriter simpleRewriter(context, patterns);
+  simpleRewriter.run(getFunction());
 }
 
 std::unique_ptr<mlir::Pass> createConstantTypesPass() {
