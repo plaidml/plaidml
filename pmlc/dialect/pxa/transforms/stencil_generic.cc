@@ -49,6 +49,8 @@ StencilGeneric::getStrideInfo(unsigned tensorID) {
   if (tensorID < loadsAndStores.loads.size()) {
     strideInfo = computeStrideInfo(loadsAndStores.loads[tensorID]);
   } else {
+    assert(tensorID - loadsAndStores.loads.size() <
+           loadsAndStores.stores.size());
     strideInfo = computeStrideInfo(
         loadsAndStores.stores[tensorID - loadsAndStores.loads.size()]);
   }
@@ -130,6 +132,8 @@ void StencilGeneric::RecursiveTileIndex(     //
     }
   } else {
     // TODO: Setup cache for the generator
+    assert(blockArgs.count(perm.indexes[currIdx]) &&
+           "BlockArg for current index must be valid");
     for (int64_t currIdxTileSize : tilingGenerators[currIdx](
              ranges[perm.indexes[currIdx].getArgNumber()])) {
       (*tileSize)[currIdx] = currIdxTileSize;
