@@ -129,8 +129,8 @@ private:
       // but that seems excessive for something that I'd expect to be an
       // assert...
       if (blockArgs.find(kvp.first) == blockArgs.end()) {
-        IVLOG(1, "Hey this isn't a real block arg!: " << kvp.first);
-        // TODO: Figure out if we want to add additional handling here
+        IVLOG(5, "Index found from outside current loop on left input: "
+                     << kvp.first);
       } else {
         IVLOG(5, "[loop " << TODO_loop_count
                           << "] Based on first tensor, inserting middle index "
@@ -146,8 +146,8 @@ private:
       // but that seems excessive for something that I'd expect to be an
       // assert...
       if (blockArgs.find(kvp.first) == blockArgs.end()) {
-        IVLOG(1, "Hey this isn't a real block arg! (v2): " << kvp.first);
-        // TODO: Figure out if we want to add additional handling here
+        IVLOG(5, "Index found from outside current loop on right input: "
+                     << kvp.first);
       } else {
         IVLOG(5,
               "Based on second tensor, inserting middle index " << kvp.first);
@@ -157,14 +157,22 @@ private:
     }
     IVLOG(5, "Current size of middle_idxs = " << middle_idxs.size());
     for (const auto &kvp : getStrideInfo(perm.tensorIDs[2])->strides) {
-      auto it = middle_idxs.find(kvp.first.getArgNumber());
-      if (it != middle_idxs.end()) {
-        IVLOG(5, "Based on output tensor, erasing middle index " << it->first);
-        middle_idxs.erase(it);
+      if (!blockArgs.count(kvp.first)) {
+        IVLOG(5,
+              "Index found from outside current loop on output: " << kvp.first);
+      } else {
+        auto it = middle_idxs.find(kvp.first.getArgNumber());
+        if (it != middle_idxs.end()) {
+          IVLOG(5,
+                "Based on output tensor, erasing middle index " << it->first);
+          middle_idxs.erase(it);
+        }
       }
     }
 
     for (unsigned i = 0; i < semanticIdxCount; ++i) {
+      assert(blockArgs.count(perm.indexes[i]) &&
+             "All tiled indexes must be introduced in current loop");
       auto it = middle_idxs.find(perm.indexes[i].getArgNumber());
       if (it != middle_idxs.end()) {
         it->second = llvm::divideCeil(it->second, tileSize[i]);
@@ -186,14 +194,22 @@ private:
     // llvm::DenseMap<mlir::BlockArgument, unsigned> outer_idxs;
     std::map<unsigned, unsigned> outer_idxs; // TODO why does this matter...
     for (const auto &kvp : getStrideInfo(perm.tensorIDs[2])->strides) {
-      IVLOG(4, "First: " << kvp.first);
-      IVLOG(5, "Second: " << kvp.second);
-      IVLOG(5, "IdxRange: " << getIdxRange(kvp.first));
-      outer_idxs.try_emplace(kvp.first.getArgNumber(), getIdxRange(kvp.first));
-      IVLOG(4, "And now emplaced");
+      if (!blockArgs.count(kvp.first)) {
+        IVLOG(5, "Index found from outside current loop on output (2nd pass): "
+                     << kvp.first);
+      } else {
+        IVLOG(4, "First: " << kvp.first);
+        IVLOG(5, "Second: " << kvp.second);
+        IVLOG(5, "IdxRange: " << getIdxRange(kvp.first));
+        outer_idxs.try_emplace(kvp.first.getArgNumber(),
+                               getIdxRange(kvp.first));
+        IVLOG(4, "And now emplaced");
+      }
     }
     IVLOG(4, "Left loop...");
     for (unsigned i = 0; i < semanticIdxCount; i++) {
+      assert(blockArgs.count(perm.indexes[i]) &&
+             "All tiled indexes must be introduced in current loop");
       auto it = outer_idxs.find(perm.indexes[i].getArgNumber());
       if (it != outer_idxs.end()) {
         it->second = llvm::divideCeil(it->second, tileSize[i]);
@@ -251,6 +267,8 @@ private:
       std::stringstream indexPermStr;
       indexPermStr << "[ ";
       for (auto ind : perm.indexes) {
+        assert(blockArgs.count(ind) &&
+               "All tiled indexes must be introduced in current loop");
         indexPermStr << ind.getArgNumber() << " ";
       }
       indexPermStr << "]";
