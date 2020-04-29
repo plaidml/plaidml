@@ -27,16 +27,6 @@ def IntegerSetAttr : Attr<
   let constBuilderCall = "IntegerSetAttr::get($0)";
 }
 
-// TODO: this should be defined upstream
-def IndexAttr : Attr<
-      And<[CPred<"$_self.isa<IntegerAttr>()">,
-           CPred<"$_self.cast<IntegerAttr>().getType().isIndex()">]>,
-      "index attribute"> {
-  let constBuilderCall = "$_builder.getIntegerAttr($_builder.getIndexType(), $0)";
-  let storageType = "IntegerAttr";
-  let returnType = [{ APInt }];
-}
-
 def TileDialect : Dialect {
   let name = "tile";
   let cppNamespace = "pmlc::dialect::tile";
