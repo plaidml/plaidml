@@ -57,15 +57,6 @@ StencilGeneric::getStrideInfo(unsigned tensorID) {
   return strideInfo;
 }
 
-// BlockArgumentSet StencilGeneric::getAccArgs() {
-//   if (accArgs.hasValue())
-//     return accArgs.getValue();
-//   for (auto loadOp : loadsAndStores.loads) {
-
-//   }
-// }
-//   BlockArgumentSet getOutArgs();
-
 void StencilGeneric::BindIndexes(
     const llvm::SmallVector<unsigned, 3> &tensorIDs) {
   llvm::SmallVector<mlir::BlockArgument, 8> emptyBoundIdxsVector;

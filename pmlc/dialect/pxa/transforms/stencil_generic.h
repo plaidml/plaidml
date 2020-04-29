@@ -67,8 +67,6 @@ protected: // TODO: private backend for some of this?
                          ArrayRef<int64_t> tileSize) = 0;
   int64_t getIdxRange(mlir::BlockArgument idx);
   mlir::Optional<mlir::StrideInfo> getStrideInfo(unsigned tensorID);
-  BlockArgumentSet getAccArgs();
-  BlockArgumentSet getOutArgs();
 
   // Cache of StrideInfo results
   std::map<unsigned, mlir::StrideInfo> strideInfoCache;
@@ -81,12 +79,6 @@ protected: // TODO: private backend for some of this?
 
   // The BlockArguments of `op` (stored as a set for easy lookup)
   BlockArgumentSet blockArgs;
-
-  // // Cache of BlockArgs used on loads but not stores
-  // mlir::Optional<BlockArgumentSet> accArgs;
-
-  // // Cache of BlockArgs used on stores
-  // mlir::Optional<BlockArgumentSet> outArgs;
 
   // The load and store ops
   LoadStoreOps loadsAndStores;
