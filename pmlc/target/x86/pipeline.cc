@@ -132,7 +132,7 @@ struct ConvertToLLVMPass
 
 void addToPipeline(OpPassManager &pm) {
   pm.addPass(pmlc::dialect::tile::createComputeBoundsPass());
-  pm.addPass(pmlc::dialect::tile::createPadPass());
+  // pm.addPass(pmlc::dialect::tile::createPadPass());
   pm.addNestedPass<FuncOp>(createCanonicalizerPass());
   pm.addNestedPass<FuncOp>(createCSEPass());
 
@@ -140,8 +140,8 @@ void addToPipeline(OpPassManager &pm) {
   pm.addNestedPass<FuncOp>(createCanonicalizerPass());
   pm.addNestedPass<FuncOp>(createCSEPass());
 
-  pm.addPass(pmlc::dialect::pxa::createStencilPass(1, heatmapCost));
-  pm.addPass(createXSMMLoweringPass());
+  // pm.addPass(pmlc::dialect::pxa::createStencilPass(1, heatmapCost));
+  // pm.addPass(createXSMMLoweringPass());
 
   pm.addPass(conversion::pxa_to_affine::createLowerPXAToAffinePass());
   pm.addNestedPass<FuncOp>(createCanonicalizerPass());

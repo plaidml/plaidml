@@ -92,10 +92,10 @@ struct AffineReduceOpConversion : public LoweringBase<pxa::AffineReduceOp> {
 
   void rewrite(pxa::AffineReduceOp op, ArrayRef<Value> operands,
                ConversionPatternRewriter &rewriter) const override {
-    auto source = rewriter.create<AffineLoadOp>(op.getLoc(), op.out(), op.map(),
+    auto source = rewriter.create<AffineLoadOp>(op.getLoc(), op.mem(), op.map(),
                                                 op.idxs());
     auto reduce = createReduction(rewriter, op, source.getResult());
-    rewriter.create<AffineStoreOp>(op.getLoc(), reduce, op.out(), op.map(),
+    rewriter.create<AffineStoreOp>(op.getLoc(), reduce, op.mem(), op.map(),
                                    op.idxs());
     rewriter.eraseOp(op);
   }

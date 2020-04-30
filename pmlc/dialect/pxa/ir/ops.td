@@ -11,6 +11,8 @@ include "mlir/Dialect/Affine/IR/AffineOpsBase.td"
 include "pmlc/util/enums.td"
 #endif
 
+include "mlir/Interfaces/SideEffects.td"
+
 def PXA_Dialect : Dialect {
   let name = "pxa";
   let cppNamespace = "pmlc::dialect::pxa";
@@ -27,20 +29,30 @@ class PXA_OpWithPP<string mnemonic, list<OpTrait> traits = []> :
 
 def AnyStdScalar : AnyTypeOf<[AnyFloat, AnySignlessInteger]> {}
 
-def AffineReduceOp : PXA_OpWithPP<"reduce"> {
+// TODO: Add NoSideEffect
+def AffineReduceOp : PXA_OpWithPP<"reduce", []> {
   let summary = "affine reduction operation";
   let arguments = (ins
     AggregationKind:$agg,
     AnyStdScalar:$val,
-    AnyMemRef:$out,
+    AnyMemRef:$mem,
     AffineMapAttr:$map,
     Variadic<Index>:$idxs
   );
+  let results = (outs AnyMemRef:$result);
 
   let hasCanonicalizer = 1;
   let hasFolder = 1;
 
+  let builders = [OpBuilder<
+    "Builder* builder, OperationState& result, AggregationKind agg, Value val, Value mem, AffineMap map, ValueRange idxs", [{
+      build(builder, result, mem.getType(), agg, val, mem, map, idxs);
+    }]
+  >];
+
   let extraClassDeclaration = [{
+    Value getMemRef() { return mem(); }
+    MemRefType getMemRefType() { return mem().getType().cast<MemRefType>(); }
     AffineMap getAffineMap() { return map(); }
     operand_range getMapOperands() { return idxs(); }
   }];

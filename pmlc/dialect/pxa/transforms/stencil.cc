@@ -213,7 +213,7 @@ bool Stencil::CollectTensors() {
 
   tensors.push_back(in1Op.getMemRef());
   tensors.push_back(in2Op.getMemRef());
-  tensors.push_back(outOp.out());
+  tensors.push_back(outOp.getMemRef());
 
   return tensors.size() == kNumTensors;
 }

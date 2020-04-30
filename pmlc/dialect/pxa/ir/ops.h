@@ -6,6 +6,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/Dialect.h"
+#include "mlir/Interfaces/SideEffects.h"
 
 #include "pmlc/util/enums.h"
 
@@ -29,6 +30,7 @@ using mlir::IntegerType;
 using mlir::Location;
 using mlir::LogicalResult;
 using mlir::LoopLikeOpInterface;
+using mlir::MemoryEffectOpInterface;
 using mlir::MemRefType;
 using mlir::MLIRContext;
 using mlir::NamedAttribute;
@@ -52,7 +54,9 @@ using mlir::Value;
 using mlir::ValueRange;
 using util::AggregationKind;
 
+namespace MemoryEffects = mlir::MemoryEffects;
 namespace OpTrait = mlir::OpTrait;
+namespace SideEffects = mlir::SideEffects;
 
 #define GET_OP_CLASSES
 #include "pmlc/dialect/pxa/ir/ops.h.inc"
