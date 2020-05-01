@@ -640,12 +640,12 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
 
     auto ubMap = AffineMap::get(0, 0, {ubExprs}, op.getContext());
     // Make the outer loops
-    auto forOp = rewriter.create<AffineParallelOp>(
-        loc,
-        /*lbMap=*/op.lowerBounds().getValue(),
-        /*lbArgs=*/llvm::SmallVector<Value, 0>{},
-        /*ubMap=*/ubMap,
-        /*ubArgs=*/llvm::ArrayRef<Value>{});
+    auto forOp =
+        rewriter.create<AffineParallelOp>(loc,
+                                          /*lbMap=*/op.lowerBounds().getValue(),
+                                          /*lbArgs=*/llvm::ArrayRef<Value>{},
+                                          /*ubMap=*/ubMap,
+                                          /*ubArgs=*/llvm::ArrayRef<Value>{});
 
     auto body = forOp.getBody();
     rewriter.setInsertionPointToStart(body);
