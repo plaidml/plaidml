@@ -4,6 +4,7 @@
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/Dialect/StandardOps/EDSC/Intrinsics.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/Pass/Pass.h"
@@ -17,6 +18,7 @@ using namespace mlir; // NOLINT[build/namespaces]
 namespace pmlc::conversion::stdx_to_llvm {
 
 namespace stdx = dialect::stdx;
+namespace edsc = mlir::edsc;
 
 namespace {
 
@@ -98,6 +100,77 @@ struct FPToUILowering : public LLVMLegalizationPattern<stdx::FPToUIOp> {
   }
 };
 
+class BaseViewConversionHelper {
+public:
+  explicit BaseViewConversionHelper(Type type)
+      : d(MemRefDescriptor::undef(rewriter(), loc(), type)) {}
+
+  explicit BaseViewConversionHelper(Value v) : d(v) {}
+
+  /// Wrappers around MemRefDescriptor that use EDSC builder and location.
+  Value allocatedPtr() { return d.allocatedPtr(rewriter(), loc()); }
+  void setAllocatedPtr(Value v) { d.setAllocatedPtr(rewriter(), loc(), v); }
+  Value alignedPtr() { return d.alignedPtr(rewriter(), loc()); }
+  void setAlignedPtr(Value v) { d.setAlignedPtr(rewriter(), loc(), v); }
+  Value offset() { return d.offset(rewriter(), loc()); }
+  void setOffset(Value v) { d.setOffset(rewriter(), loc(), v); }
+  Value size(unsigned i) { return d.size(rewriter(), loc(), i); }
+  void setSize(unsigned i, Value v) { d.setSize(rewriter(), loc(), i, v); }
+  void setConstantSize(unsigned i, int64_t v) {
+    d.setConstantSize(rewriter(), loc(), i, v);
+  }
+  Value stride(unsigned i) { return d.stride(rewriter(), loc(), i); }
+  void setStride(unsigned i, Value v) { d.setStride(rewriter(), loc(), i, v); }
+  void setConstantStride(unsigned i, int64_t v) {
+    d.setConstantStride(rewriter(), loc(), i, v);
+  }
+
+  operator Value() { return d; }
+
+private:
+  OpBuilder &rewriter() { return edsc::ScopedContext::getBuilder(); }
+  Location loc() { return edsc::ScopedContext::getLocation(); }
+
+  MemRefDescriptor d;
+};
+
+struct ReshapeLowering : public LLVMLegalizationPattern<stdx::ReshapeOp> {
+  using LLVMLegalizationPattern<stdx::ReshapeOp>::LLVMLegalizationPattern;
+  using Base = LLVMLegalizationPattern<stdx::ReshapeOp>;
+
+  LogicalResult
+  matchAndRewrite(Operation *op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto reshapeOp = cast<stdx::ReshapeOp>(op);
+    MemRefType dstType = reshapeOp.getResult().getType().cast<MemRefType>();
+
+    if (!dstType.hasStaticShape())
+      return failure();
+
+    int64_t offset;
+    SmallVector<int64_t, 4> strides;
+    auto res = getStridesAndOffset(dstType, strides, offset);
+    if (failed(res) || llvm::any_of(strides, [](int64_t val) {
+          return ShapedType::isDynamicStrideOrOffset(val);
+        }))
+      return failure();
+
+    edsc::ScopedContext context(rewriter, op->getLoc());
+    stdx::ReshapeOpOperandAdaptor adaptor(operands);
+    BaseViewConversionHelper baseDesc(adaptor.tensor());
+    BaseViewConversionHelper desc(typeConverter.convertType(dstType));
+    desc.setAllocatedPtr(baseDesc.allocatedPtr());
+    desc.setAlignedPtr(baseDesc.alignedPtr());
+    desc.setOffset(baseDesc.offset());
+    for (auto en : llvm::enumerate(dstType.getShape()))
+      desc.setConstantSize(en.index(), en.value());
+    for (auto en : llvm::enumerate(strides))
+      desc.setConstantStride(en.index(), en.value());
+    rewriter.replaceOp(op, {desc});
+    return success();
+  }
+};
+
 /// A pass converting MLIR operations into the LLVM IR dialect.
 struct LowerToLLVMPass : public LowerToLLVMBase<LowerToLLVMPass> {
   // Run the dialect converter on the module.
@@ -124,8 +197,8 @@ struct LowerToLLVMPass : public LowerToLLVMBase<LowerToLLVMPass> {
 
 void populateStdXToLLVMConversionPatterns(LLVMTypeConverter &converter,
                                           OwningRewritePatternList &patterns) {
-  patterns.insert<FPToSILowering, FPToUILowering>(*converter.getDialect(),
-                                                  converter);
+  patterns.insert<FPToSILowering, FPToUILowering, ReshapeLowering>(
+      *converter.getDialect(), converter);
 }
 
 std::unique_ptr<mlir::Pass> createLowerToLLVMPass() {

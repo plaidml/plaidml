@@ -85,6 +85,29 @@ static void buildFPToUIOp(Builder *builder, OperationState &result,
   result.addTypes(destType);
 }
 
+// ---- ReshapeOp ----
+
+void printReshapeOp(OpAsmPrinter &p, ReshapeOp op) {
+  p << op.getOperation()->getName() << " (" << op.getOperand(0) << ", "
+    << op.getOperand(1) << ") : (" << op.getOperand(0).getType() << ", "
+    << op.getOperand(1).getType() << ") -> "
+    << op.getOperation()->getResult(0).getType();
+}
+
+ParseResult parseReshapeOp(OpAsmParser &parser, OperationState &result) {
+  return failure();
+}
+
+LogicalResult verifyReshapeOp(ReshapeOp op) { return success(); }
+
+static void buildReshapeOp(Builder *builder, OperationState &result,
+                           Value tensor, ArrayRef<Value> dims,
+                           MemRefType destType) {
+  result.addOperands(tensor);
+  result.addOperands(dims);
+  result.addTypes(destType);
+}
+
 } // namespace
 
 #define GET_OP_CLASSES
