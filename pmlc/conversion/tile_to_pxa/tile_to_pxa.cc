@@ -627,23 +627,25 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
                alloc.rankedTensorType.getShape());
 
     // Determine lower and upper bounds.
-    SmallVector<AffineExpr, 8> ubExpr;
+    SmallVector<AffineExpr, 8> ubExprs;
     auto lowerBounds = op.lowerBounds().getValue();
     auto upperBounds = op.upperBounds().getValue();
     assert(lowerBounds.getNumResults() == upperBounds.getNumResults() &&
            "mismatched dims for lower and upper bounds");
     for (unsigned i = 0; i < lowerBounds.getNumResults(); i++) {
-      auto uExpr = upperBounds.getResult(i) + 1;
-      auto upper = uExpr.cast<AffineConstantExpr>().getValue();
-      ubExpr.push_back(rewriter.getAffineConstantExpr(upper));
+      auto ubExpr = upperBounds.getResult(i) + 1;
+      auto upper = ubExpr.cast<AffineConstantExpr>().getValue();
+      ubExprs.push_back(rewriter.getAffineConstantExpr(upper));
     }
 
-    auto ubMap =
-        AffineMap::get(0, 0, (ArrayRef<AffineExpr>)ubExpr, op.getContext());
+    auto ubMap = AffineMap::get(0, 0, {ubExprs}, op.getContext());
     // Make the outer loops
     auto forOp = rewriter.create<AffineParallelOp>(
-        loc, op.lowerBounds().getValue(), llvm::SmallVector<Value, 0>{}, ubMap,
-        llvm::SmallVector<Value, 0>{});
+        loc,
+        /*lbMap=*/op.lowerBounds().getValue(),
+        /*lbArgs=*/llvm::SmallVector<Value, 0>{},
+        /*ubMap=*/ubMap,
+        /*ubArgs=*/llvm::ArrayRef<Value>{});
 
     auto body = forOp.getBody();
     rewriter.setInsertionPointToStart(body);
