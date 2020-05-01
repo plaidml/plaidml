@@ -194,7 +194,7 @@ def compareMultiple(arguments):
 def opTest(in_data,
            tol=DEFAULT_TOL,
            atol=DEFAULT_ATOL,
-           do_grads=True,
+           do_grads=False,
            skip_theano=True,
            skip_tensorflow=False,
            verbose=False,
@@ -1093,7 +1093,6 @@ class TestBackendOps(unittest.TestCase):
             b.conv2d(im, km, padding='same', dilation_rate=(2, 2), data_format=df),
         ]
 
-    @unittest.skip("Cull crashing tests")
     @opTest(
         [[m(1, 1, 3, 1),
           m(1, 4, 1, 1), (1, 1, 9, 1), (1, 4), 'same', 'channels_last', (1, 1)],
