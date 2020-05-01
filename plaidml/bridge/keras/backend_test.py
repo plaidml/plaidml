@@ -194,7 +194,7 @@ def compareMultiple(arguments):
 def opTest(in_data,
            tol=DEFAULT_TOL,
            atol=DEFAULT_ATOL,
-           do_grads=True,
+           do_grads=False,
            skip_theano=True,
            skip_tensorflow=False,
            verbose=False,
@@ -279,14 +279,15 @@ def opTest(in_data,
                             atol=atol,
                             err_msg='ERR: datum={}, test={}, x=plaidml, y=theano'.format(
                                 didx, idx))
-                        for x in range(0, len(pmlr[1])):
-                            npt.assert_allclose(
-                                pmlr[1][x],
-                                thr[1][x],
-                                rtol=tol,
-                                atol=atol,
-                                err_msg='ERR: datum={}, test={}, grad, x=plaidml, y=theano'.format(
-                                    didx, idx))
+                        if do_grads:
+                            for x in range(0, len(pmlr[1])):
+                                npt.assert_allclose(
+                                    pmlr[1][x],
+                                    thr[1][x],
+                                    rtol=tol,
+                                    atol=atol,
+                                    err_msg='ERR: datum={}, test={}, grad, x=plaidml, y=theano'.
+                                    format(didx, idx))
                 if not skip_tensorflow:
                     for idx, (pmlr, tfr) in enumerate(zip(plaidml_results, tensorflow_results)):
                         idx = idx + 1
@@ -1093,7 +1094,6 @@ class TestBackendOps(unittest.TestCase):
             b.conv2d(im, km, padding='same', dilation_rate=(2, 2), data_format=df),
         ]
 
-    @unittest.skip("Cull crashing tests")
     @opTest(
         [[m(1, 1, 3, 1),
           m(1, 4, 1, 1), (1, 1, 9, 1), (1, 4), 'same', 'channels_last', (1, 1)],
