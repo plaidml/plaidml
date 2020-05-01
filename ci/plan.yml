@@ -203,7 +203,12 @@ SUITES:
           - TestBackendOps.testSelfMult
           - TestBackendOps.testL2Normalize
           - TestBackendOps.testZerosLike
+          - TestBackendOps.testConv1d
+          - TestBackendOps.testConv2d
+          - TestBackendOps.testConv2dTranspose
           - TestBackendOps.testConv2dSpecial
+          - TestBackendOps.testConv3d
+          - TestBackendOps.testConv3dTranspose
           - TestBackendOps.testConvParameterRankExceptions
           - TestBackendOps.testCastToInt
           - TestBackendOps.testCastToFloat
