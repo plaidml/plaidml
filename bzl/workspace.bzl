@@ -71,6 +71,14 @@ def plaidml_workspace():
     )
 
     http_archive(
+        name = "half",
+        url = "https://github.com/plaidml/depot/raw/master/half-1.11.0.zip",
+        sha256 = "9e5ddb4b43abeafe190e780b5b606b081acb511e6edd4ef6fbe5de863a4affaf",
+        strip_prefix = "half-1.11.0",
+        build_file = clean_dep("//bzl:half.BUILD"),
+    )
+
+    http_archive(
         name = "io_bazel_rules_jsonnet",
         sha256 = "d05d719c4738e8aac5f13b32f745ff4832b9638ecc89ddcb6e36c379a1ada025",
         strip_prefix = "rules_jsonnet-0.1.0",
