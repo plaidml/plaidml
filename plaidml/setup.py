@@ -79,6 +79,7 @@ def main():
             ('share/plaidml/boost', ['boost/LICENSE_1_0.txt']),
             ('share/plaidml/easylogging', ['easylogging/LICENSE']),
             ('share/plaidml/gmock', ['gmock/googlemock/LICENSE']),
+            ('share/plaidml/half', ['half/LICENSE.txt']),
             ('share/plaidml/llvm', ['llvm-project/llvm/LICENSE.TXT']),
             ('share/plaidml/mlir', ['llvm-project/mlir/LICENSE.TXT']),
             ('share/plaidml/xsmm', ['xsmm/LICENSE.md']),
