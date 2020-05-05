@@ -28,10 +28,9 @@ using namespace mlir; // NOLINT[build/namespaces]
 
 namespace pmlc::target::x86 {
 
-// TODO: Pass in heatmapCost?
 std::unique_ptr<Pass> createXSMMStencilPass() {
   auto numThreads = std::thread::hardware_concurrency();
-  return pmlc::dialect::pxa::createXSMMStencilPass(numThreads);
+  return pmlc::dialect::pxa::createXSMMStencilPass(numThreads, heatmapCost);
 }
 
 namespace {
@@ -141,8 +140,7 @@ void addToPipeline(OpPassManager &pm) {
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
-  pm.addPass(
-      pmlc::dialect::pxa::createXSMMStencilPass(1)); // TODO: Pass heatmapCost?
+  pm.addPass(pmlc::dialect::pxa::createXSMMStencilPass(1, heatmapCost));
   pm.addPass(createXSMMLoweringPass());
 
   pm.addPass(conversion::pxa_to_affine::createLowerPXAToAffinePass());

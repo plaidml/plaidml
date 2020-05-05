@@ -21,8 +21,6 @@
 #include "pmlc/util/logging.h"
 #include "pmlc/util/util.h"
 
-#include "pmlc/target/x86/heatmap.h" // TODO: for heatmap
-
 // TODO: includes etc
 
 namespace pmlc::dialect::pxa {
@@ -30,6 +28,7 @@ namespace pmlc::dialect::pxa {
 class StencilXSMM : public StencilGeneric {
 private:
   unsigned numThreads;
+  StencilCostFunction stencilCostFn;
 
   llvm::Optional<LoadStoreOps> capture() {
     // Looking for load..load..mul..reduce..terminator
@@ -113,7 +112,7 @@ private:
     tileSizeTODO.push_back(tileSize[1]);
     tileSizeTODO.push_back(tileSize[0]);
     tileSizeTODO.push_back(tileSize[2]);
-    auto cost = pmlc::target::x86::heatmapCost(tileSizeTODO);
+    auto cost = stencilCostFn(tileSizeTODO);
     if (cost.throughput == 0) {
       return std::numeric_limits<double>::infinity();
     }
@@ -371,8 +370,9 @@ private:
   }
 
 public:
-  explicit StencilXSMM(mlir::AffineParallelOp op, unsigned numThreads)
-      : StencilGeneric{op}, numThreads{numThreads} {
+  StencilXSMM(mlir::AffineParallelOp op, unsigned numThreads,
+              StencilCostFunction costFn)
+      : StencilGeneric{op}, numThreads{numThreads}, stencilCostFn(costFn) {
     // TODO: Probably want to move these to be params on StencilGeneric ctor...
     semanticIdxCount = 3; // TODO [i.e., must match generators & requirements]
     requirements =        // TODO: Make nicer
@@ -426,27 +426,33 @@ struct XSMMStencilPass
   // TODO: (?) probably actually need config for requirements & tilingGenerators
   XSMMStencilPass() { assert(false && "XSMMStencilPass must be configured"); }
 
-  XSMMStencilPass(const XSMMStencilPass &rhs) {
+  XSMMStencilPass(const XSMMStencilPass &rhs) : costFn(rhs.costFn) {
     numThreads = rhs.numThreads.getValue();
   }
 
-  explicit XSMMStencilPass(unsigned numThreads_) { numThreads = numThreads_; }
+  XSMMStencilPass(unsigned numThreads_, StencilCostFunction costFn)
+      : costFn(costFn) {
+    numThreads = numThreads_;
+  }
 
   void runOnFunction() final {
     auto func = getFunction();
     func.walk([this](mlir::AffineParallelOp op) {
-      StencilXSMM stencil(op, numThreads.getValue());
+      StencilXSMM stencil(op, numThreads.getValue(), costFn);
       stencil.DoStenciling();
     });
   }
+
+  StencilCostFunction costFn;
 
   Option<unsigned> numThreads{
       *this, "threads",
       llvm::cl::desc("Specifies number of threads for the stencil pass")};
 };
 
-std::unique_ptr<mlir::Pass> createXSMMStencilPass(unsigned numThreads) {
-  return std::make_unique<XSMMStencilPass>(numThreads);
+std::unique_ptr<mlir::Pass> createXSMMStencilPass(unsigned numThreads,
+                                                  StencilCostFunction costFn) {
+  return std::make_unique<XSMMStencilPass>(numThreads, costFn);
 }
 
 } // namespace pmlc::dialect::pxa
