@@ -124,7 +124,8 @@ private:
     // llvm::DenseMap<mlir::BlockArgument, unsigned> middle_idxs;
     std::map<unsigned, unsigned> middle_idxs; // TODO: Why does this matter?
     unsigned TODO_loop_count = 0;
-    for (const auto &kvp : getStrideInfo(perm.tensorIDs[0])->strides) {
+    auto in0StrideInfo = getStrideInfo(perm.tensorIDs[0]);
+    for (const auto &kvp : in0StrideInfo->strides) {
       // TODO: Old version verifies that this is in the parallel op's BlockArgs,
       // but that seems excessive for something that I'd expect to be an
       // assert...
@@ -141,7 +142,9 @@ private:
       TODO_loop_count++;
     }
     IVLOG(5, "Current size of middle_idxs = " << middle_idxs.size());
-    for (const auto &kvp : getStrideInfo(perm.tensorIDs[1])->strides) {
+
+    auto in1StrideInfo = getStrideInfo(perm.tensorIDs[1]);
+    for (const auto &kvp : in1StrideInfo->strides) {
       // TODO: Old version verifies that this is in the parallel op's BlockArgs,
       // but that seems excessive for something that I'd expect to be an
       // assert...
@@ -156,7 +159,8 @@ private:
       }
     }
     IVLOG(5, "Current size of middle_idxs = " << middle_idxs.size());
-    for (const auto &kvp : getStrideInfo(perm.tensorIDs[2])->strides) {
+    auto outStrideInfo = getStrideInfo(perm.tensorIDs[2]);
+    for (const auto &kvp : outStrideInfo->strides) {
       if (!blockArgs.count(kvp.first)) {
         IVLOG(5,
               "Index found from outside current loop on output: " << kvp.first);
@@ -193,7 +197,7 @@ private:
 
     // llvm::DenseMap<mlir::BlockArgument, unsigned> outer_idxs;
     std::map<unsigned, unsigned> outer_idxs; // TODO why does this matter...
-    for (const auto &kvp : getStrideInfo(perm.tensorIDs[2])->strides) {
+    for (const auto &kvp : outStrideInfo->strides) {
       if (!blockArgs.count(kvp.first)) {
         IVLOG(5, "Index found from outside current loop on output (2nd pass): "
                      << kvp.first);
