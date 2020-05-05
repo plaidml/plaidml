@@ -1,27 +1,21 @@
 // Copyright 2020 Intel Corporation
 
-#include "pmlc/dialect/pxa/transforms/stencil_generic.h"
-
-#include "pmlc/dialect/pxa/transforms/autotile.h" // TODO: for PowerOfTwoGenerator
-
-#include "mlir/Support/DebugStringHelper.h" // TODO: sort
-
-// TODO: Just seeing if the stencil.cc includes work
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassOptions.h"
+#include "mlir/Support/DebugStringHelper.h"
 
-#include "pmlc/dialect/eltwise/ir/ops.h"
+// TODO: Including autotile.h for PowerOfTwoGenerator, but maybe instead both
+// should include a third file with the tile size generators
 #include "pmlc/dialect/pxa/analysis/strides.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
+#include "pmlc/dialect/pxa/transforms/autotile.h"
 #include "pmlc/dialect/pxa/transforms/passes.h"
+#include "pmlc/dialect/pxa/transforms/stencil_generic.h"
 #include "pmlc/dialect/xsmm/ir/ops.h"
 
 #include "pmlc/util/logging.h"
-#include "pmlc/util/util.h"
-
-// TODO: includes etc
 
 namespace pmlc::dialect::pxa {
 

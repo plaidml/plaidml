@@ -2,24 +2,11 @@
 
 #include "pmlc/dialect/pxa/transforms/stencil_generic.h"
 
-// TODO: Just seeing if the stencil.cc includes work
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
-#include "mlir/Pass/Pass.h"
-#include "mlir/Pass/PassOptions.h"
 
-#include "pmlc/dialect/eltwise/ir/ops.h"
 #include "pmlc/dialect/pxa/analysis/strides.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
-#include "pmlc/dialect/pxa/transforms/passes.h"
-
 #include "pmlc/util/logging.h"
-#include "pmlc/util/util.h"
-
-// // TODO: includes etc
-// #include "mlir/Dialect/Affine/IR/AffineOps.h"
-
-// #include "pmlc/util/logging.h"
 
 namespace pmlc::dialect::pxa {
 
