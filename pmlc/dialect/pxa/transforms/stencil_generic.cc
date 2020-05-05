@@ -11,17 +11,9 @@
 namespace pmlc::dialect::pxa {
 
 int64_t StencilGeneric::getIdxRange(mlir::BlockArgument idx) {
-  assert(blockArgs.count(idx) && "getIdxRange should have block arg in block");
+  assert(blockArgs.count(idx) &&
+         "getIdxRange only valid on indexes of current op");
   assert(idx.getArgNumber() < ranges.size());
-  assert(idx.getArgNumber() >= 0 && "TODO scrap");
-  assert(idx.getArgNumber() <= 2 && "TODO scrap");
-  IVLOG(5, "inside getIdxRange");
-  IVLOG(4, "arg number: " << idx.getArgNumber()); // Intermittent crashes here
-  IVLOG(4, "ranges: ");
-  for (auto r : ranges) {
-    IVLOG(4, "  " << r);
-  }
-  IVLOG(4, "requested range: " << ranges[idx.getArgNumber()]);
   return ranges[idx.getArgNumber()];
 }
 
@@ -61,10 +53,6 @@ void StencilGeneric::BindIndexes(
   RecursiveBindIndex(&emptyBoundIdxsVector, ioOps);
 }
 
-// TODO: Better to maintain boundIdxs as both set & vector, or just vector?
-//   Or could maintain as map from BlockArg to numeric index (i.e. where it
-//   would have been were it a vector)
-// TODO: Also, should probably at least be a small vector (how small?)
 void StencilGeneric::RecursiveBindIndex(
     llvm::SmallVector<mlir::BlockArgument, 8> *boundIdxs,
     const llvm::SmallVector<mlir::Operation *, 3> &ioOps) {
@@ -77,6 +65,9 @@ void StencilGeneric::RecursiveBindIndex(
   } else {
     for (const auto &blockArg : blockArgs) {
       // Don't bind same index twice
+      // Note: While it's awkward to be repeatedly searching a vector, I think
+      // boundIdxs is small enough that it would not be efficient to maintain a
+      // parallel map
       if (std::find(boundIdxs->begin(), boundIdxs->end(), blockArg) !=
           boundIdxs->end()) {
         continue;
@@ -156,7 +147,6 @@ void StencilGeneric::DoStenciling() {
     return;
   }
 
-  // TODO: Rework this section to mlir::Operation *ioOps
   // TODO: Deal with nondeterminisitic order
   llvm::SmallVector<mlir::Operation *, 3> ioOps;
   for (auto &loadOp : loadsAndStores.loads) {
