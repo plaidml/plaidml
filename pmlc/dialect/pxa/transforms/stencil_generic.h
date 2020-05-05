@@ -31,30 +31,34 @@ using BlockArgumentSet = llvm::SmallPtrSet<mlir::BlockArgument, 8>;
 
 struct TensorAndIndexPermutation {
   // An order of the Tensors and Indexes used in an operation
-  llvm::SmallVector<unsigned, 3> tensorIDs;
+  // Note: Tensors are tracked by their load/store/reduce ops, not values,
+  // because we need to get stride information, which means we need the op,
+  // and for stores/reduces getting to the op from the value is nontrivial
+  llvm::SmallVector<mlir::Operation *, 3> ioOps;
   llvm::SmallVector<mlir::BlockArgument, 8> indexes;
 
   TensorAndIndexPermutation() = default;
 
-  TensorAndIndexPermutation(llvm::SmallVector<unsigned, 3> tensorIDs,
+  TensorAndIndexPermutation(llvm::SmallVector<mlir::Operation *, 3> ioOps,
                             llvm::SmallVector<mlir::BlockArgument, 8> indexes)
-      : tensorIDs(tensorIDs), indexes(indexes) {}
+      : ioOps(ioOps), indexes(indexes) {}
 };
 
 struct LoadStoreOps {
   // The load and store ops of an AffineParallel
-  llvm::SmallVector<mlir::AffineLoadOp, 2> loads;
+  llvm::SmallVector<mlir::Operation *, 2> loads;
   // TODO: Set up to enable either store or reduce
-  llvm::SmallVector<AffineReduceOp, 1> stores;
+  // TODO: Or if this works, indicate that can be store or reduce or mix
+  llvm::SmallVector<mlir::Operation *, 1> stores;
 };
 
 using TileSizeGenerator = std::function<std::vector<int64_t>(int64_t)>;
 
 class StencilGeneric {
 private:
-  void BindIndexes(const llvm::SmallVector<unsigned, 3> &tensorIDs);
+  void BindIndexes(const llvm::SmallVector<mlir::Operation *, 3> &ioOps);
   void RecursiveBindIndex(llvm::SmallVector<mlir::BlockArgument, 8> *bound_idxs,
-                          const llvm::SmallVector<unsigned, 3> &tensorIDs);
+                          const llvm::SmallVector<mlir::Operation *, 3> &ioOps);
   void RecursiveTileIndex(const TensorAndIndexPermutation &perm,
                           llvm::SmallVector<int64_t, 8> *tileSize,
                           int64_t currIdx);
@@ -66,10 +70,10 @@ protected: // TODO: private backend for some of this?
   virtual void transform(TensorAndIndexPermutation perm,
                          ArrayRef<int64_t> tileSize) = 0;
   int64_t getIdxRange(mlir::BlockArgument idx);
-  mlir::Optional<mlir::StrideInfo> getStrideInfo(unsigned tensorID);
+  mlir::Optional<mlir::StrideInfo> getStrideInfo(mlir::Operation *ioOp);
 
   // Cache of StrideInfo results
-  std::map<unsigned, mlir::StrideInfo> strideInfoCache;
+  std::map<mlir::Operation *, mlir::StrideInfo> strideInfoCache;
 
   // The number of indexes whose semantics must be considered in the tiling
   unsigned semanticIdxCount; // TODO: how/where to initialize?
@@ -90,7 +94,7 @@ protected: // TODO: private backend for some of this?
   // function to determine if a Value & BlockArg meet the requirements of that
   // pair
   std::map<std::pair<int64_t, int64_t>,
-           std::function<bool(unsigned, mlir::BlockArgument)>>
+           std::function<bool(mlir::Operation *, mlir::BlockArgument)>>
       requirements;
 
   // For each semantically relevant index, a generator for tile sizes. Ordered

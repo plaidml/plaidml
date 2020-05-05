@@ -39,29 +39,39 @@ int64_t StencilGeneric::getIdxRange(mlir::BlockArgument idx) {
 }
 
 mlir::Optional<mlir::StrideInfo>
-StencilGeneric::getStrideInfo(unsigned tensorID) {
-  auto cached = strideInfoCache.find(tensorID);
+StencilGeneric::getStrideInfo(mlir::Operation *op) {
+  auto cached = strideInfoCache.find(op);
   if (cached != strideInfoCache.end()) {
     return cached->second;
   }
-  mlir::Optional<mlir::StrideInfo> strideInfo;
-  if (tensorID < loadsAndStores.loads.size()) {
-    strideInfo = computeStrideInfo(loadsAndStores.loads[tensorID]);
-  } else {
-    assert(tensorID - loadsAndStores.loads.size() <
-           loadsAndStores.stores.size());
-    strideInfo = computeStrideInfo(
-        loadsAndStores.stores[tensorID - loadsAndStores.loads.size()]);
+  auto loadOp = llvm::dyn_cast<mlir::AffineLoadOp>(*op);
+  if (loadOp) {
+    auto strideInfo = computeStrideInfo(loadOp);
+    if (strideInfo.hasValue())
+      strideInfoCache.emplace(std::make_pair(op, strideInfo.getValue()));
+    return strideInfo;
   }
-  if (strideInfo.hasValue())
-    strideInfoCache.emplace(std::make_pair(tensorID, strideInfo.getValue()));
-  return strideInfo;
+  auto storeOp = llvm::dyn_cast<mlir::AffineStoreOp>(*op);
+  if (storeOp) {
+    auto strideInfo = computeStrideInfo(storeOp);
+    if (strideInfo.hasValue())
+      strideInfoCache.emplace(std::make_pair(op, strideInfo.getValue()));
+    return strideInfo;
+  }
+  auto reduceOp = llvm::dyn_cast<AffineReduceOp>(*op);
+  if (reduceOp) {
+    auto strideInfo = computeStrideInfo(reduceOp);
+    if (strideInfo.hasValue())
+      strideInfoCache.emplace(std::make_pair(op, strideInfo.getValue()));
+    return strideInfo;
+  }
+  return llvm::None;
 }
 
 void StencilGeneric::BindIndexes(
-    const llvm::SmallVector<unsigned, 3> &tensorIDs) {
+    const llvm::SmallVector<mlir::Operation *, 3> &ioOps) {
   llvm::SmallVector<mlir::BlockArgument, 8> emptyBoundIdxsVector;
-  RecursiveBindIndex(&emptyBoundIdxsVector, tensorIDs);
+  RecursiveBindIndex(&emptyBoundIdxsVector, ioOps);
 }
 
 // TODO: Better to maintain boundIdxs as both set & vector, or just vector?
@@ -70,12 +80,12 @@ void StencilGeneric::BindIndexes(
 // TODO: Also, should probably at least be a small vector (how small?)
 void StencilGeneric::RecursiveBindIndex(
     llvm::SmallVector<mlir::BlockArgument, 8> *boundIdxs,
-    const llvm::SmallVector<unsigned, 3> &tensorIDs) {
+    const llvm::SmallVector<mlir::Operation *, 3> &ioOps) {
   auto currIdx = boundIdxs->size();
   if (currIdx == semanticIdxCount) {
     // This is a legal binding, go find a tiling for it
     llvm::SmallVector<int64_t, 8> currTileSize(semanticIdxCount);
-    RecursiveTileIndex(TensorAndIndexPermutation(tensorIDs, *boundIdxs),
+    RecursiveTileIndex(TensorAndIndexPermutation(ioOps, *boundIdxs),
                        &currTileSize, 0);
   } else {
     for (const auto &blockArg : blockArgs) {
@@ -87,9 +97,9 @@ void StencilGeneric::RecursiveBindIndex(
 
       // Verify the requirements for this index with each tensor are all met
       bool reqsMet = true;
-      for (unsigned i = 0; i < tensorIDs.size(); i++) {
+      for (unsigned i = 0; i < ioOps.size(); i++) {
         auto it = requirements.find(std::make_pair(i, currIdx));
-        if (it != requirements.end() && !it->second(tensorIDs[i], blockArg)) {
+        if (it != requirements.end() && !it->second(ioOps[i], blockArg)) {
           reqsMet = false;
           break;
         }
@@ -101,7 +111,7 @@ void StencilGeneric::RecursiveBindIndex(
       // If we made it to here, this index has appropriate semantics; bind it
       // and recurse
       boundIdxs->push_back(blockArg);
-      RecursiveBindIndex(boundIdxs, tensorIDs);
+      RecursiveBindIndex(boundIdxs, ioOps);
       boundIdxs->pop_back();
     }
   }
@@ -145,7 +155,7 @@ void StencilGeneric::DoStenciling() {
   // Initialization
   auto maybeRanges = op.getConstantRanges();
   if (maybeRanges) {
-    ranges = maybeRanges.getValue(); // TODO: Is this how to use Optional?
+    ranges = *maybeRanges;
   } else {
     IVLOG(4, "Cannot Stencil: Requires constant ranges");
     return;
@@ -153,30 +163,30 @@ void StencilGeneric::DoStenciling() {
 
   auto maybeLoadsAndStores = capture();
   if (maybeLoadsAndStores) {
-    loadsAndStores =
-        maybeLoadsAndStores.getValue(); // TODO: Is this how to use Optional?
+    loadsAndStores = *maybeLoadsAndStores;
   } else {
     IVLOG(4, "Cannot Stencil: Operations fail to pattern-match.");
     return;
   }
 
-  llvm::SmallVector<unsigned, 3> tensorIDs;
-  for (unsigned i = 0; i < loadsAndStores.loads.size(); i++) {
-    tensorIDs.push_back(i);
+  // TODO: Rework this section to mlir::Operation *ioOps
+  // TODO: Deal with nondeterminisitic order
+  llvm::SmallVector<mlir::Operation *, 3> ioOps;
+  for (auto &loadOp : loadsAndStores.loads) {
+    ioOps.push_back(loadOp);
   }
-  unsigned firstStoreIdx = tensorIDs.size();
-  for (unsigned i = 0; i < loadsAndStores.stores.size(); i++) {
-    tensorIDs.push_back(firstStoreIdx + i);
+  unsigned firstStoreIdx = ioOps.size();
+  for (auto &storeOp : loadsAndStores.stores) {
+    ioOps.push_back(storeOp);
   }
-  auto lastLoadFirstStoreIt = tensorIDs.begin() + firstStoreIdx;
-  // Sorting is redundant here, but cheap so including for algorithmic clarity
-  std::sort(tensorIDs.begin(), lastLoadFirstStoreIt);
+  auto lastLoadFirstStoreIt = ioOps.begin() + firstStoreIdx;
+  std::sort(ioOps.begin(), lastLoadFirstStoreIt);
   do { // Each load tensor permutation
-    std::sort(lastLoadFirstStoreIt, tensorIDs.end());
+    std::sort(lastLoadFirstStoreIt, ioOps.end());
     do { // Each store tensor permutation
-      BindIndexes(tensorIDs);
-    } while (std::next_permutation(lastLoadFirstStoreIt, tensorIDs.end()));
-  } while (std::next_permutation(tensorIDs.begin(), lastLoadFirstStoreIt));
+      BindIndexes(ioOps);
+    } while (std::next_permutation(lastLoadFirstStoreIt, ioOps.end()));
+  } while (std::next_permutation(ioOps.begin(), lastLoadFirstStoreIt));
 
   if (bestCost < std::numeric_limits<double>::infinity()) {
     transform(bestPermutation, bestTiling);

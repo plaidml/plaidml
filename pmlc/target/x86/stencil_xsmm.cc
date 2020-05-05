@@ -52,7 +52,7 @@ private:
                "non-terminator");
       return llvm::None;
     }
-    ret.stores.push_back(reduceOp);
+    ret.stores.push_back(&*it);
     IVLOG(5, "Found ReduceOp");
 
     // Now check the reduceOp aggregation.
@@ -70,27 +70,32 @@ private:
       return llvm::None;
     }
 
-    mlir::AffineLoadOp lhs;
-    mlir::AffineLoadOp rhs;
+    mlir::Operation *lhs;
+    mlir::Operation *rhs;
     if (auto mulfOp = llvm::dyn_cast_or_null<mlir::MulFOp>(defOp)) {
-      lhs = llvm::dyn_cast_or_null<mlir::AffineLoadOp>(
-          mulfOp.lhs().getDefiningOp());
-      rhs = llvm::dyn_cast_or_null<mlir::AffineLoadOp>(
-          mulfOp.rhs().getDefiningOp());
+      lhs = mulfOp.lhs().getDefiningOp();
+      if (!llvm::dyn_cast_or_null<mlir::AffineLoadOp>(lhs)) {
+        IVLOG(3, "The LHS of the mul op is not affine.load.");
+        return llvm::None;
+      }
+      rhs = mulfOp.rhs().getDefiningOp();
+      if (!llvm::dyn_cast_or_null<mlir::AffineLoadOp>(rhs)) {
+        IVLOG(3, "The RHS of the mul op is not affine.load.");
+        return llvm::None;
+      }
     } else if (auto muliOp = llvm::dyn_cast_or_null<mlir::MulIOp>(defOp)) {
-      lhs = llvm::dyn_cast_or_null<mlir::AffineLoadOp>(
-          muliOp.lhs().getDefiningOp());
-      rhs = llvm::dyn_cast_or_null<mlir::AffineLoadOp>(
-          muliOp.rhs().getDefiningOp());
+      lhs = muliOp.lhs().getDefiningOp();
+      if (!llvm::dyn_cast_or_null<mlir::AffineLoadOp>(lhs)) {
+        IVLOG(3, "The LHS of the mul op is not affine.load.");
+        return llvm::None;
+      }
+      rhs = muliOp.rhs().getDefiningOp();
+      if (!llvm::dyn_cast_or_null<mlir::AffineLoadOp>(rhs)) {
+        IVLOG(3, "The RHS of the mul op is not affine.load.");
+        return llvm::None;
+      }
     } else {
       IVLOG(5, "The source of the reduce is not a multiplication operation");
-      return llvm::None;
-    }
-
-    // Now verify the types of the operands of the mulOp must be affine.load
-    // operations.
-    if (!lhs || !rhs) {
-      IVLOG(3, "The LHS or RHS of the mul op is not an affine.load.");
       return llvm::None;
     }
     ret.loads.push_back(lhs);
@@ -124,7 +129,7 @@ private:
     // llvm::DenseMap<mlir::BlockArgument, unsigned> middle_idxs;
     std::map<unsigned, unsigned> middle_idxs; // TODO: Why does this matter?
     unsigned TODO_loop_count = 0;
-    auto in0StrideInfo = getStrideInfo(perm.tensorIDs[0]);
+    auto in0StrideInfo = getStrideInfo(perm.ioOps[0]);
     for (const auto &kvp : in0StrideInfo->strides) {
       // TODO: Old version verifies that this is in the parallel op's BlockArgs,
       // but that seems excessive for something that I'd expect to be an
@@ -143,7 +148,7 @@ private:
     }
     IVLOG(5, "Current size of middle_idxs = " << middle_idxs.size());
 
-    auto in1StrideInfo = getStrideInfo(perm.tensorIDs[1]);
+    auto in1StrideInfo = getStrideInfo(perm.ioOps[1]);
     for (const auto &kvp : in1StrideInfo->strides) {
       // TODO: Old version verifies that this is in the parallel op's BlockArgs,
       // but that seems excessive for something that I'd expect to be an
@@ -159,7 +164,7 @@ private:
       }
     }
     IVLOG(5, "Current size of middle_idxs = " << middle_idxs.size());
-    auto outStrideInfo = getStrideInfo(perm.tensorIDs[2]);
+    auto outStrideInfo = getStrideInfo(perm.ioOps[2]);
     for (const auto &kvp : outStrideInfo->strides) {
       if (!blockArgs.count(kvp.first)) {
         IVLOG(5,
@@ -251,19 +256,8 @@ private:
       bestReport << "    Best Perf: " << bestCost << "\n";
       std::stringstream tensorPermStr;
       tensorPermStr << "[\n";
-      for (auto tID : perm.tensorIDs) {
-        tensorPermStr << "        " << tID << ": ";
-        if (tID < loadsAndStores.loads.size()) {
-          auto t = loadsAndStores.loads[tID];
-          auto str = mlir::debugString(*t);
-          tensorPermStr << str;
-        } else {
-          // TODO: Handle reduces/stores both
-          auto t = loadsAndStores.stores[tID - loadsAndStores.loads.size()];
-          auto str = mlir::debugString(*t);
-          tensorPermStr << str;
-        }
-        tensorPermStr << "\n";
+      for (auto ioOp : perm.ioOps) {
+        tensorPermStr << "        " << mlir::debugString(*ioOp) << "\n";
       }
       tensorPermStr << "    ]";
       bestReport << "    Best Tensor Permutation: " << tensorPermStr.str()
@@ -304,10 +298,10 @@ private:
     op.setSteps(steps);
 
     // Generate the XSMM call; first select inputs based on permutation order
-    auto opA = loadsAndStores.loads[perm.tensorIDs[0]];
-    auto opB = loadsAndStores.loads[perm.tensorIDs[1]];
-    assert(loadsAndStores.loads.size() == 2);
-    auto opC = loadsAndStores.stores[perm.tensorIDs[2] - 2];
+    auto opA = llvm::dyn_cast<mlir::AffineLoadOp>(*perm.ioOps[0]);
+    auto opB = llvm::dyn_cast<mlir::AffineLoadOp>(*perm.ioOps[1]);
+    auto opC = llvm::dyn_cast<AffineReduceOp>(*perm.ioOps[2]);
+    // TODO: Assert casts worked right?
 
     // Get the current memrefs
     Value aVal = opA.getMemRef();
@@ -383,42 +377,42 @@ public:
     semanticIdxCount = 3; // TODO [i.e., must match generators & requirements]
     requirements =        // TODO: Make nicer
         std::map<std::pair<int64_t, int64_t>,
-                 std::function<bool(unsigned, mlir::BlockArgument)>>{
+                 std::function<bool(mlir::Operation *, mlir::BlockArgument)>>{
             {{0, 0},
-             [this](unsigned tensorID, mlir::BlockArgument a) {
-               return getStrideInfo(tensorID)->strides[a] != 0;
+             [this](mlir::Operation *ioOp, mlir::BlockArgument a) {
+               return getStrideInfo(ioOp)->strides[a] != 0;
              }},
             {{0, 1},
-             [this](unsigned tensorID, mlir::BlockArgument a) {
-               return getStrideInfo(tensorID)->strides[a] == 0;
+             [this](mlir::Operation *ioOp, mlir::BlockArgument a) {
+               return getStrideInfo(ioOp)->strides[a] == 0;
              }},
             {{0, 2},
-             [this](unsigned tensorID, mlir::BlockArgument a) {
-               return getStrideInfo(tensorID)->strides[a] == 1;
+             [this](mlir::Operation *ioOp, mlir::BlockArgument a) {
+               return getStrideInfo(ioOp)->strides[a] == 1;
              }},
             {{1, 0},
-             [this](unsigned tensorID, mlir::BlockArgument a) {
-               return getStrideInfo(tensorID)->strides[a] == 0;
+             [this](mlir::Operation *ioOp, mlir::BlockArgument a) {
+               return getStrideInfo(ioOp)->strides[a] == 0;
              }},
             {{1, 1},
-             [this](unsigned tensorID, mlir::BlockArgument a) {
-               return getStrideInfo(tensorID)->strides[a] == 1;
+             [this](mlir::Operation *ioOp, mlir::BlockArgument a) {
+               return getStrideInfo(ioOp)->strides[a] == 1;
              }},
             {{1, 2},
-             [this](unsigned tensorID, mlir::BlockArgument a) {
-               return getStrideInfo(tensorID)->strides[a] != 0;
+             [this](mlir::Operation *ioOp, mlir::BlockArgument a) {
+               return getStrideInfo(ioOp)->strides[a] != 0;
              }},
             {{2, 0},
-             [this](unsigned tensorID, mlir::BlockArgument a) {
-               return getStrideInfo(tensorID)->strides[a] != 0;
+             [this](mlir::Operation *ioOp, mlir::BlockArgument a) {
+               return getStrideInfo(ioOp)->strides[a] != 0;
              }},
             {{2, 1},
-             [this](unsigned tensorID, mlir::BlockArgument a) {
-               return getStrideInfo(tensorID)->strides[a] == 1;
+             [this](mlir::Operation *ioOp, mlir::BlockArgument a) {
+               return getStrideInfo(ioOp)->strides[a] == 1;
              }},
             {{2, 2},
-             [this](unsigned tensorID, mlir::BlockArgument a) {
-               return getStrideInfo(tensorID)->strides[a] == 0;
+             [this](mlir::Operation *ioOp, mlir::BlockArgument a) {
+               return getStrideInfo(ioOp)->strides[a] == 0;
              }},
         };
     tilingGenerators.push_back(EvenTilingGenerator());
