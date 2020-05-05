@@ -129,7 +129,7 @@ private:
       // TODO: Old version verifies that this is in the parallel op's BlockArgs,
       // but that seems excessive for something that I'd expect to be an
       // assert...
-      if (blockArgs.find(kvp.first) == blockArgs.end()) {
+      if (!blockArgs.count(kvp.first)) {
         IVLOG(5, "Index found from outside current loop on left input: "
                      << kvp.first);
       } else {
@@ -148,7 +148,7 @@ private:
       // TODO: Old version verifies that this is in the parallel op's BlockArgs,
       // but that seems excessive for something that I'd expect to be an
       // assert...
-      if (blockArgs.find(kvp.first) == blockArgs.end()) {
+      if (!blockArgs.count(kvp.first)) {
         IVLOG(5, "Index found from outside current loop on right input: "
                      << kvp.first);
       } else {
