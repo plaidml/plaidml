@@ -67,9 +67,6 @@ protected: // TODO: private backend for some of this?
   // Cache of StrideInfo results
   llvm::DenseMap<mlir::Operation *, mlir::StrideInfo> strideInfoCache;
 
-  // The number of indexes whose semantics must be considered in the tiling
-  unsigned semanticIdxCount; // TODO: how/where to initialize?
-
   // The ParallelOp that is being stenciled.
   mlir::AffineParallelOp op;
 
@@ -82,16 +79,19 @@ protected: // TODO: private backend for some of this?
   // The range of each index (cached result of op.getConstantRanges())
   llvm::SmallVector<int64_t, 8> ranges;
 
-  // For each tensor/index semantic pair (given as a pair of size_ts), a
-  // function to determine if a Value & BlockArg meet the requirements of that
-  // pair
+  // The number of indexes whose semantics must be considered in the tiling
+  unsigned tiledIdxCount;
+
+  // For each tiled index, a generator for tile sizes. Ordered to match the
+  // index permutation.
+  llvm::SmallVector<TileSizeGenerator, 5> tilingGenerators;
+
+  // For each tensor/index semantic pair (given as a pair of `int64_t`s), a
+  // function to determine if the load or store op of a tensor and the BlockArg
+  // of an index meet the requirements of that pair.
   llvm::DenseMap<std::pair<int64_t, int64_t>,
                  std::function<bool(mlir::Operation *, mlir::BlockArgument)>>
       requirements;
-
-  // For each semantically relevant index, a generator for tile sizes. Ordered
-  // to match the index permutation.
-  llvm::SmallVector<TileSizeGenerator, 5> tilingGenerators;
 
   double bestCost;
   TensorAndIndexPermutation bestPermutation;
@@ -99,8 +99,24 @@ protected: // TODO: private backend for some of this?
       bestTiling; // only makes sense paired with `bestPermutation`
 
 public:
-  explicit StencilGeneric(mlir::AffineParallelOp op)
-      : op(op), bestCost(std::numeric_limits<double>::infinity()) {
+  explicit StencilGeneric(
+      mlir::AffineParallelOp op, unsigned tiledIdxCount,
+      llvm::SmallVector<TileSizeGenerator, 5> tilingGenerators,
+      llvm::DenseMap<
+          std::pair<int64_t, int64_t>,
+          std::function<bool(mlir::Operation *, mlir::BlockArgument)>>
+          requirements)
+      : op(op), tiledIdxCount(tiledIdxCount),
+        tilingGenerators(tilingGenerators), requirements(requirements),
+        bestCost(std::numeric_limits<double>::infinity()) {
+    assert(tilingGenerators.size() == tiledIdxCount &&
+           "Stencil pass requires one tiling generator per tiled index");
+    for (const auto &kvp : requirements) {
+      assert(kvp.first.second >= 0 &&
+             "Only nonnegative indexes are valid in requirements");
+      assert(kvp.first.second < tiledIdxCount &&
+             "Only tiled indexes are valid in requirements");
+    }
     for (auto blockArg : op.getBody()->getArguments()) {
       blockArgs.insert(blockArg);
     }

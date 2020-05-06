@@ -59,9 +59,9 @@ void StencilGeneric::RecursiveBindIndex(
     llvm::SmallVector<mlir::BlockArgument, 8> *boundIdxs,
     const llvm::SmallVector<mlir::Operation *, 3> &ioOps) {
   auto currIdx = boundIdxs->size();
-  if (currIdx == semanticIdxCount) {
+  if (currIdx == tiledIdxCount) {
     // This is a legal binding, go find a tiling for it
-    llvm::SmallVector<int64_t, 8> currTileSize(semanticIdxCount);
+    llvm::SmallVector<int64_t, 8> currTileSize(tiledIdxCount);
     RecursiveTileIndex(TensorAndIndexPermutation(ioOps, *boundIdxs),
                        &currTileSize, 0);
   } else {
@@ -101,8 +101,8 @@ void StencilGeneric::RecursiveTileIndex(     //
     const TensorAndIndexPermutation &perm,   //
     llvm::SmallVector<int64_t, 8> *tileSize, //
     int64_t currIdx) {
-  assert(tileSize->size() == semanticIdxCount);
-  if (currIdx == semanticIdxCount) {
+  assert(tileSize->size() == tiledIdxCount);
+  if (currIdx == tiledIdxCount) {
     auto cost = getCost(perm, *tileSize);
     if (VLOG_IS_ON(3)) {
       std::stringstream currTilingStr;

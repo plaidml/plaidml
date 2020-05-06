@@ -113,7 +113,7 @@ private:
     double inner_time = tot_inner_loop / cost.throughput;
     IVLOG(6,
           "Inner: loop = " << tot_inner_loop << " inner_time = " << inner_time);
-    for (unsigned i = 0; i < semanticIdxCount; ++i) {
+    for (unsigned i = 0; i < tiledIdxCount; ++i) {
       IVLOG(6, perm.indexes[i] << ": " << tileSize[i]);
     }
 
@@ -160,7 +160,7 @@ private:
       }
     }
 
-    for (unsigned i = 0; i < semanticIdxCount; ++i) {
+    for (unsigned i = 0; i < tiledIdxCount; ++i) {
       assert(blockArgs.count(perm.indexes[i]) &&
              "All tiled indexes must be introduced in current loop");
       auto it = middle_idxs.find(perm.indexes[i]);
@@ -194,7 +194,7 @@ private:
       // for `else` branch here
     }
     IVLOG(4, "Left loop...");
-    for (unsigned i = 0; i < semanticIdxCount; i++) {
+    for (unsigned i = 0; i < tiledIdxCount; i++) {
       assert(blockArgs.count(perm.indexes[i]) &&
              "All tiled indexes must be introduced in current loop");
       auto it = outer_idxs.find(perm.indexes[i]);
@@ -267,7 +267,7 @@ private:
       steps.push_back(step.cast<IntegerAttr>().getInt());
     }
     for (size_t i = 0; i < ranges.size(); i++) {
-      for (size_t j = 0; j < semanticIdxCount; j++) {
+      for (size_t j = 0; j < tiledIdxCount; j++) {
         if (perm.indexes[j] == op.getBody()->getArgument(i)) {
           steps[i] *= tileSize[j];
         }
@@ -350,54 +350,60 @@ private:
 public:
   StencilXSMM(mlir::AffineParallelOp op, unsigned numThreads,
               StencilCostFunction costFn)
-      : StencilGeneric{op}, numThreads{numThreads}, stencilCostFn(costFn) {
-    // TODO: Probably want to move these to be params on StencilGeneric ctor...
-    semanticIdxCount = 3; // TODO [i.e., must match generators & requirements]
-    requirements =        // TODO: Make nicer
-        llvm::DenseMap<
-            std::pair<int64_t, int64_t>,
-            std::function<bool(mlir::Operation *, mlir::BlockArgument)>>{
-            {{0, 0},
-             [this](mlir::Operation *ioOp, mlir::BlockArgument a) {
-               return getStrideInfo(ioOp)->strides[a] != 0;
-             }},
-            {{0, 1},
-             [this](mlir::Operation *ioOp, mlir::BlockArgument a) {
-               return getStrideInfo(ioOp)->strides[a] == 0;
-             }},
-            {{0, 2},
-             [this](mlir::Operation *ioOp, mlir::BlockArgument a) {
-               return getStrideInfo(ioOp)->strides[a] == 1;
-             }},
-            {{1, 0},
-             [this](mlir::Operation *ioOp, mlir::BlockArgument a) {
-               return getStrideInfo(ioOp)->strides[a] == 0;
-             }},
-            {{1, 1},
-             [this](mlir::Operation *ioOp, mlir::BlockArgument a) {
-               return getStrideInfo(ioOp)->strides[a] == 1;
-             }},
-            {{1, 2},
-             [this](mlir::Operation *ioOp, mlir::BlockArgument a) {
-               return getStrideInfo(ioOp)->strides[a] != 0;
-             }},
-            {{2, 0},
-             [this](mlir::Operation *ioOp, mlir::BlockArgument a) {
-               return getStrideInfo(ioOp)->strides[a] != 0;
-             }},
-            {{2, 1},
-             [this](mlir::Operation *ioOp, mlir::BlockArgument a) {
-               return getStrideInfo(ioOp)->strides[a] == 1;
-             }},
-            {{2, 2},
-             [this](mlir::Operation *ioOp, mlir::BlockArgument a) {
-               return getStrideInfo(ioOp)->strides[a] == 0;
-             }},
-        };
-    tilingGenerators.push_back(EvenTilingGenerator());
-    tilingGenerators.push_back(EvenTilingGenerator());
-    tilingGenerators.push_back(EvenTilingGenerator());
-  }
+      : StencilGeneric{op,
+                       3,
+                       {EvenTilingGenerator(), EvenTilingGenerator(),
+                        EvenTilingGenerator()},
+                       llvm::DenseMap<std::pair<int64_t, int64_t>,
+                                      std::function<bool(mlir::Operation *,
+                                                         mlir::BlockArgument)>>{
+                           {{0, 0},
+                            [this](mlir::Operation *ioOp,
+                                   mlir::BlockArgument a) {
+                              return getStrideInfo(ioOp)->strides[a] != 0;
+                            }},
+                           {{0, 1},
+                            [this](mlir::Operation *ioOp,
+                                   mlir::BlockArgument a) {
+                              return getStrideInfo(ioOp)->strides[a] == 0;
+                            }},
+                           {{0, 2},
+                            [this](mlir::Operation *ioOp,
+                                   mlir::BlockArgument a) {
+                              return getStrideInfo(ioOp)->strides[a] == 1;
+                            }},
+                           {{1, 0},
+                            [this](mlir::Operation *ioOp,
+                                   mlir::BlockArgument a) {
+                              return getStrideInfo(ioOp)->strides[a] == 0;
+                            }},
+                           {{1, 1},
+                            [this](mlir::Operation *ioOp,
+                                   mlir::BlockArgument a) {
+                              return getStrideInfo(ioOp)->strides[a] == 1;
+                            }},
+                           {{1, 2},
+                            [this](mlir::Operation *ioOp,
+                                   mlir::BlockArgument a) {
+                              return getStrideInfo(ioOp)->strides[a] != 0;
+                            }},
+                           {{2, 0},
+                            [this](mlir::Operation *ioOp,
+                                   mlir::BlockArgument a) {
+                              return getStrideInfo(ioOp)->strides[a] != 0;
+                            }},
+                           {{2, 1},
+                            [this](mlir::Operation *ioOp,
+                                   mlir::BlockArgument a) {
+                              return getStrideInfo(ioOp)->strides[a] == 1;
+                            }},
+                           {{2, 2},
+                            [this](mlir::Operation *ioOp,
+                                   mlir::BlockArgument a) {
+                              return getStrideInfo(ioOp)->strides[a] == 0;
+                            }},
+                       }},
+        numThreads{numThreads}, stencilCostFn(costFn) {}
 };
 
 struct XSMMStencilPass
