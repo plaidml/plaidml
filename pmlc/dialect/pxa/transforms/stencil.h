@@ -156,6 +156,7 @@ protected: // TODO: private backend for some of this?
                          ArrayRef<int64_t> tileSize) = 0;
   int64_t getIdxRange(mlir::BlockArgument idx);
   mlir::Optional<mlir::StrideInfo> getStrideInfo(mlir::Operation *ioOp);
+  void reportBestStencil(unsigned logLevel);
 
   // Cache of StrideInfo results
   llvm::DenseMap<mlir::Operation *, mlir::StrideInfo> strideInfoCache;

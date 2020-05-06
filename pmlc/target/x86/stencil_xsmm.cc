@@ -227,39 +227,6 @@ private:
   }
 
   void transform(TensorAndIndexPermutation perm, ArrayRef<int64_t> tileSize) {
-    // TODO: Clean up this logging
-    if (VLOG_IS_ON(2)) {
-      std::stringstream bestReport;
-      bestReport << "Stencil Selection Report:\n";
-      bestReport << "    Best Perf: " << bestCost << "\n";
-      std::stringstream tensorPermStr;
-      tensorPermStr << "[\n";
-      for (auto ioOp : perm.ioOps) {
-        tensorPermStr << "        " << mlir::debugString(*ioOp) << "\n";
-      }
-      tensorPermStr << "    ]";
-      bestReport << "    Best Tensor Permutation: " << tensorPermStr.str()
-                 << "\n";
-      std::stringstream indexPermStr;
-      indexPermStr << "[ ";
-      for (auto ind : perm.indexes) {
-        assert(blockArgs.count(ind) &&
-               "All tiled indexes must be introduced in current loop");
-        indexPermStr << ind.getArgNumber() << " ";
-      }
-      indexPermStr << "]";
-      bestReport << "    Best Index Permutation: " << indexPermStr.str()
-                 << "\n";
-      std::stringstream bestTilingStr;
-      bestTilingStr << "[ ";
-      for (const auto &sz : tileSize) {
-        bestTilingStr << sz << " ";
-      }
-      bestTilingStr << "]";
-      bestReport << "    Best Tiling: " << bestTilingStr.str();
-      IVLOG(2, bestReport.str());
-    }
-
     // First, modify step size of all tiled indexes
     llvm::SmallVector<int64_t, 8> steps;
     auto oldSteps = op.steps().cast<ArrayAttr>().getValue();

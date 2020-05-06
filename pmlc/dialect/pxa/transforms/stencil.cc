@@ -3,12 +3,46 @@
 #include "pmlc/dialect/pxa/transforms/stencil.h"
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Support/DebugStringHelper.h"
 
 #include "pmlc/dialect/pxa/analysis/strides.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/util/logging.h"
 
 namespace pmlc::dialect::pxa {
+
+void StencilBase::reportBestStencil(unsigned logLevel) {
+  if (VLOG_IS_ON(logLevel)) {
+    std::stringstream bestReport;
+    bestReport << "Stencil Selection Report:\n";
+    bestReport << "    Best Perf: " << bestCost << "\n";
+    std::stringstream tensorPermStr;
+    tensorPermStr << "[\n";
+    for (auto ioOp : bestPermutation.ioOps) {
+      tensorPermStr << "        " << mlir::debugString(*ioOp) << "\n";
+    }
+    tensorPermStr << "    ]";
+    bestReport << "    Best Tensor Permutation: " << tensorPermStr.str()
+               << "\n";
+    std::stringstream indexPermStr;
+    indexPermStr << "[ ";
+    for (auto ind : bestPermutation.indexes) {
+      assert(blockArgs.count(ind) &&
+             "All tiled indexes must be introduced in current loop");
+      indexPermStr << ind.getArgNumber() << " ";
+    }
+    indexPermStr << "]";
+    bestReport << "    Best Index Permutation: " << indexPermStr.str() << "\n";
+    std::stringstream bestTilingStr;
+    bestTilingStr << "[ ";
+    for (const auto &sz : bestTiling) {
+      bestTilingStr << sz << " ";
+    }
+    bestTilingStr << "]";
+    bestReport << "    Best Tiling: " << bestTilingStr.str();
+    IVLOG(logLevel, bestReport.str());
+  }
+}
 
 int64_t StencilBase::getIdxRange(mlir::BlockArgument idx) {
   assert(blockArgs.count(idx) &&
@@ -168,6 +202,7 @@ void StencilBase::DoStenciling() {
   } while (std::next_permutation(ioOps.begin(), lastLoadFirstStoreIt));
 
   if (bestCost < std::numeric_limits<double>::infinity()) {
+    reportBestStencil(2);
     transform(bestPermutation, bestTiling);
   } else {
     IVLOG(3, "No legal tiling found to stencil");
