@@ -2,6 +2,99 @@
 
 #pragma once
 
+//
+// Provides a base class `StencilBase` for building stencil passes.
+//
+// If you would like to look at an example stencil pass to supplement this
+// documentation, one can be found at `pmlc/target/x86/stencil_xsmm.cc`.
+//
+// To create a derived stencil pass from `StencilBase`, you will need to pass
+// appropriate parameters for the `StencilBase` constructor and to overload the
+// virtual functions `capture`, `getCost`, and `transform`.
+//
+// The main function is `DoStenciling`, and is what the pass should call to
+// perform the stenciling.
+//
+// `DoStenciling` Overview
+// -----------------------
+//  `DoStenciling` will first find appropriate IO ops (i.e., loads
+//  (`mlir::AffineLoadOp`) and stores (`mlir::AffineStoreOp` or
+//  `pxa::AffineReduceOp`)) using the `capture` function.
+//
+//  It will then iterate through all permutations of the IO ops that have all
+//  loads precede all stores, and all permutations of `op`'s `BlockArgument`s as
+//  tiled indexes. (Strictly speaking, since there may be more block args than
+//  tiled indexes, it will iterate over all subsets of block args of size
+//  `tiledIdxCount` and all permutations of each subset). For each such
+//  permutation, `DoStenciling` will verify that each tensor-index requirement
+//  specified in `requirements` is met. This logic includes shortcutting to skip
+//  iterating through permutations that are already known to fail.
+//
+//  For tensor & index permutations that meet all requirements, `DoStenciling`
+//  will use the `tilingGenerators` to generate potential tile sizes for each
+//  index. These will be evaluated using the `getCost` function.
+//
+//  If any tilings with finite cost have been generated, `DoStenciling` will use
+//  whichever is cheapest in the `transform` function to rewrite `op`.
+//
+// Constructor Parameters
+// ----------------------
+//  * `op`:
+//    This `mlir::AffineParallelOp` is the op that the current instance will
+//    stencil.
+//  * `tiledIdxCount`:
+//    How many indexes will be considered for tiling.
+//  * `tilingGenerators`:
+//    A `TileSizeGenerator` for each tileable index, used to generate proposed
+//    tile sizes for that index.
+//  * `requirements`:
+//    Pairwise tensor-index requirements.
+//
+//    Maps integer pairs representing IO op order and index order to a function
+//    that determines if a given IO op and BlockArg pair are valid if used in
+//    that order. As an example, consider the trying to match the matmul
+//        C[i, j] += A[i, k] * B[k, j]
+//    To build requirements, decide on an order of the tensors and indexes
+//    (these orders are arbitrary except that all stores must follow all loads).
+//    Here let's choose {A, B, C} and {i, j, k} as our order. Then to express
+//    the requirement "`j` must be a stride one index of `C`", for the key
+//    (2, 1) we set the value to be a function that returns `true` if and only
+//    if the passed BlockArg is a stride one index of the passed Operation*.
+//
+//  The `op` parameter will be different for each instance of the pass -- it is
+//  the operation that MLIR is trying to stencil. The other constructor
+//  parameters will commonly be fixed amongst all instances of a derived class,
+//  although they can be configurable if that is useful to the derived class.
+//
+// Virtual Functions to Overload
+// -----------------------------
+//  * `capture`:
+//    Search the body of `op` for IO ops, and verify that `op` has a structure
+//    amenable to this stenciling. Returns a `llvm::Optional<LoadStoreOps>`,
+//    which is to be `None` if `op` cannot be stenciled by this pass and
+//    otherwise contains the IO ops, with load ops in `loads` and store or
+//    reduce ops in `stores`. The order of `loads` and `stores` does not matter,
+//    as `DoStencil` will attempt all permutations.
+//  * `getCost`:
+//    Determine the cost of a proposed tiling. The tiling is provided as
+//    parameters to `getCost` (same as for `transform`):
+//     * `perm`: A `TensorAndIndexPermutation` which gives the IO ops and the
+//       indexes in semantic order.
+//     * `tileSizes`: An `ArrayRef<int64_t>` which gives the size of each index
+//       in the selected tiling. Uses the same order of indexes as in `perm`.
+//    Returns the cost as a double. If the proposed tiling is illegal, the cost
+//    `std::numeric_limits<double>::infinity()` should be returned.
+//  * `transform`:
+//    Transform `op` based on the already-determined optimal tiling. The tiling
+//    is provided as paramters to `transform` (same as for `getCost`):
+//     * `perm`: A `TensorAndIndexPermutation` which gives the IO ops and the
+//       indexes in semantic order.
+//     * `tileSizes`: An `ArrayRef<int64_t>` which gives the size of each index
+//       in the selected tiling. Uses the same order of indexes as in `perm`.
+//    The `transform` function will also need to access the member variable
+//    `op`, as this is the operation it is transforming.
+//
+
 #include <algorithm>
 #include <functional>
 #include <limits>

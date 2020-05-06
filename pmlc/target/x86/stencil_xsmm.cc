@@ -94,7 +94,7 @@ private:
     ret.loads.push_back(lhs);
     ret.loads.push_back(rhs);
 
-    return llvm::Optional<LoadStoreOps>(std::move(ret));
+    return llvm::Optional<LoadStoreOps>(std::move(ret)); // TODO: std::move?
   }
 
   double getCost(TensorAndIndexPermutation perm, ArrayRef<int64_t> tileSize) {
@@ -161,6 +161,7 @@ private:
     }
 
     for (unsigned i = 0; i < tiledIdxCount; ++i) {
+      // TODO: This should have been verified earlier. Confirm that's true
       assert(blockArgs.count(perm.indexes[i]) &&
              "All tiled indexes must be introduced in current loop");
       auto it = middle_idxs.find(perm.indexes[i]);
@@ -193,7 +194,6 @@ private:
       // If the index is from outside `op` this has already been logged, no need
       // for `else` branch here
     }
-    IVLOG(4, "Left loop...");
     for (unsigned i = 0; i < tiledIdxCount; i++) {
       assert(blockArgs.count(perm.indexes[i]) &&
              "All tiled indexes must be introduced in current loop");
