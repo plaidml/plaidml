@@ -1,6 +1,6 @@
 // Copyright 2020 Intel Corporation
 
-#include "pmlc/dialect/pxa/transforms/stencil_generic.h"
+#include "pmlc/dialect/pxa/transforms/stencil.h"
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 
@@ -10,7 +10,7 @@
 
 namespace pmlc::dialect::pxa {
 
-int64_t StencilGeneric::getIdxRange(mlir::BlockArgument idx) {
+int64_t StencilBase::getIdxRange(mlir::BlockArgument idx) {
   assert(blockArgs.count(idx) &&
          "getIdxRange only valid on indexes of current op");
   assert(idx.getArgNumber() < ranges.size());
@@ -18,7 +18,7 @@ int64_t StencilGeneric::getIdxRange(mlir::BlockArgument idx) {
 }
 
 mlir::Optional<mlir::StrideInfo>
-StencilGeneric::getStrideInfo(mlir::Operation *op) {
+StencilBase::getStrideInfo(mlir::Operation *op) {
   // TODO: As written, this doesn't cache `None` returns; I think that's what we
   // want?
   auto cached = strideInfoCache.find(op);
@@ -49,13 +49,13 @@ StencilGeneric::getStrideInfo(mlir::Operation *op) {
   return llvm::None;
 }
 
-void StencilGeneric::BindIndexes(
+void StencilBase::BindIndexes(
     const llvm::SmallVector<mlir::Operation *, 3> &ioOps) {
   llvm::SmallVector<mlir::BlockArgument, 8> emptyBoundIdxsVector;
   RecursiveBindIndex(&emptyBoundIdxsVector, ioOps);
 }
 
-void StencilGeneric::RecursiveBindIndex(
+void StencilBase::RecursiveBindIndex(
     llvm::SmallVector<mlir::BlockArgument, 8> *boundIdxs,
     const llvm::SmallVector<mlir::Operation *, 3> &ioOps) {
   auto currIdx = boundIdxs->size();
@@ -97,7 +97,7 @@ void StencilGeneric::RecursiveBindIndex(
   }
 }
 
-void StencilGeneric::RecursiveTileIndex(     //
+void StencilBase::RecursiveTileIndex(        //
     const TensorAndIndexPermutation &perm,   //
     llvm::SmallVector<int64_t, 8> *tileSize, //
     int64_t currIdx) {
@@ -131,7 +131,7 @@ void StencilGeneric::RecursiveTileIndex(     //
   }
 }
 
-void StencilGeneric::DoStenciling() {
+void StencilBase::DoStenciling() {
   // Initialization
   auto maybeRanges = op.getConstantRanges();
   if (maybeRanges) {

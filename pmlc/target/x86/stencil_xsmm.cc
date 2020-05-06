@@ -12,14 +12,14 @@
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/dialect/pxa/transforms/autotile.h"
 #include "pmlc/dialect/pxa/transforms/passes.h"
-#include "pmlc/dialect/pxa/transforms/stencil_generic.h"
+#include "pmlc/dialect/pxa/transforms/stencil.h"
 #include "pmlc/dialect/xsmm/ir/ops.h"
 
 #include "pmlc/util/logging.h"
 
 namespace pmlc::dialect::pxa {
 
-class StencilXSMM : public StencilGeneric {
+class StencilXSMM : public StencilBase {
 private:
   unsigned numThreads;
   StencilCostFunction stencilCostFn;
@@ -350,65 +350,56 @@ private:
 public:
   StencilXSMM(mlir::AffineParallelOp op, unsigned numThreads,
               StencilCostFunction costFn)
-      : StencilGeneric{op,
-                       3,
-                       {EvenTilingGenerator(), EvenTilingGenerator(),
-                        EvenTilingGenerator()},
-                       llvm::DenseMap<std::pair<int64_t, int64_t>,
-                                      std::function<bool(mlir::Operation *,
-                                                         mlir::BlockArgument)>>{
-                           {{0, 0},
-                            [this](mlir::Operation *ioOp,
-                                   mlir::BlockArgument a) {
-                              return getStrideInfo(ioOp)->strides[a] != 0;
-                            }},
-                           {{0, 1},
-                            [this](mlir::Operation *ioOp,
-                                   mlir::BlockArgument a) {
-                              return getStrideInfo(ioOp)->strides[a] == 0;
-                            }},
-                           {{0, 2},
-                            [this](mlir::Operation *ioOp,
-                                   mlir::BlockArgument a) {
-                              return getStrideInfo(ioOp)->strides[a] == 1;
-                            }},
-                           {{1, 0},
-                            [this](mlir::Operation *ioOp,
-                                   mlir::BlockArgument a) {
-                              return getStrideInfo(ioOp)->strides[a] == 0;
-                            }},
-                           {{1, 1},
-                            [this](mlir::Operation *ioOp,
-                                   mlir::BlockArgument a) {
-                              return getStrideInfo(ioOp)->strides[a] == 1;
-                            }},
-                           {{1, 2},
-                            [this](mlir::Operation *ioOp,
-                                   mlir::BlockArgument a) {
-                              return getStrideInfo(ioOp)->strides[a] != 0;
-                            }},
-                           {{2, 0},
-                            [this](mlir::Operation *ioOp,
-                                   mlir::BlockArgument a) {
-                              return getStrideInfo(ioOp)->strides[a] != 0;
-                            }},
-                           {{2, 1},
-                            [this](mlir::Operation *ioOp,
-                                   mlir::BlockArgument a) {
-                              return getStrideInfo(ioOp)->strides[a] == 1;
-                            }},
-                           {{2, 2},
-                            [this](mlir::Operation *ioOp,
-                                   mlir::BlockArgument a) {
-                              return getStrideInfo(ioOp)->strides[a] == 0;
-                            }},
-                       }},
+      : StencilBase{op,
+                    3, // Three tileable indexes
+                    {EvenTilingGenerator(), EvenTilingGenerator(),
+                     EvenTilingGenerator()},
+                    llvm::DenseMap<std::pair<int64_t, int64_t>,
+                                   std::function<bool(mlir::Operation *,
+                                                      mlir::BlockArgument)>>{
+                        {{0, 0},
+                         [this](mlir::Operation *ioOp, mlir::BlockArgument a) {
+                           return getStrideInfo(ioOp)->strides[a] != 0;
+                         }},
+                        {{0, 1},
+                         [this](mlir::Operation *ioOp, mlir::BlockArgument a) {
+                           return getStrideInfo(ioOp)->strides[a] == 0;
+                         }},
+                        {{0, 2},
+                         [this](mlir::Operation *ioOp, mlir::BlockArgument a) {
+                           return getStrideInfo(ioOp)->strides[a] == 1;
+                         }},
+                        {{1, 0},
+                         [this](mlir::Operation *ioOp, mlir::BlockArgument a) {
+                           return getStrideInfo(ioOp)->strides[a] == 0;
+                         }},
+                        {{1, 1},
+                         [this](mlir::Operation *ioOp, mlir::BlockArgument a) {
+                           return getStrideInfo(ioOp)->strides[a] == 1;
+                         }},
+                        {{1, 2},
+                         [this](mlir::Operation *ioOp, mlir::BlockArgument a) {
+                           return getStrideInfo(ioOp)->strides[a] != 0;
+                         }},
+                        {{2, 0},
+                         [this](mlir::Operation *ioOp, mlir::BlockArgument a) {
+                           return getStrideInfo(ioOp)->strides[a] != 0;
+                         }},
+                        {{2, 1},
+                         [this](mlir::Operation *ioOp, mlir::BlockArgument a) {
+                           return getStrideInfo(ioOp)->strides[a] == 1;
+                         }},
+                        {{2, 2},
+                         [this](mlir::Operation *ioOp, mlir::BlockArgument a) {
+                           return getStrideInfo(ioOp)->strides[a] == 0;
+                         }},
+                    }},
         numThreads{numThreads}, stencilCostFn(costFn) {}
 };
 
 struct XSMMStencilPass
     : public mlir::PassWrapper<XSMMStencilPass, mlir::FunctionPass> {
-  // TODO: (?) probably actually need config for requirements & tilingGenerators
+  // TODO: Do I want config for requirements & tilingGenerators?
   XSMMStencilPass() { assert(false && "XSMMStencilPass must be configured"); }
 
   XSMMStencilPass(const XSMMStencilPass &rhs) : costFn(rhs.costFn) {

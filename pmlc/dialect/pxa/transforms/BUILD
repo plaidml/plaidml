@@ -24,7 +24,7 @@ plaidml_cc_library(
     srcs = [
         "autotile.cc",
         "pass_detail.h",
-        "stencil_generic.cc",
+        "stencil.cc",
         "test_analysis.cc",
         "tile.cc",
     ],
@@ -32,7 +32,7 @@ plaidml_cc_library(
         "autotile.h",
         "passes.h",
         "tile.h",
-        "stencil_generic.h",
+        "stencil.h",
     ],
     deps = [
         ":gen-pass",

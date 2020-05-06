@@ -46,7 +46,7 @@ struct LoadStoreOps {
 
 using TileSizeGenerator = std::function<std::vector<int64_t>(int64_t)>;
 
-class StencilGeneric {
+class StencilBase {
 private:
   void BindIndexes(const llvm::SmallVector<mlir::Operation *, 3> &ioOps);
   void RecursiveBindIndex(llvm::SmallVector<mlir::BlockArgument, 8> *bound_idxs,
@@ -99,7 +99,7 @@ protected: // TODO: private backend for some of this?
       bestTiling; // only makes sense paired with `bestPermutation`
 
 public:
-  explicit StencilGeneric(
+  explicit StencilBase(
       mlir::AffineParallelOp op, unsigned tiledIdxCount,
       llvm::SmallVector<TileSizeGenerator, 5> tilingGenerators,
       llvm::DenseMap<
