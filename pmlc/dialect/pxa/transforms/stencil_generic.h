@@ -62,7 +62,7 @@ protected: // TODO: private backend for some of this?
   mlir::Optional<mlir::StrideInfo> getStrideInfo(mlir::Operation *ioOp);
 
   // Cache of StrideInfo results
-  std::map<mlir::Operation *, mlir::StrideInfo> strideInfoCache;
+  llvm::DenseMap<mlir::Operation *, mlir::StrideInfo> strideInfoCache;
 
   // The number of indexes whose semantics must be considered in the tiling
   unsigned semanticIdxCount; // TODO: how/where to initialize?
@@ -82,8 +82,8 @@ protected: // TODO: private backend for some of this?
   // For each tensor/index semantic pair (given as a pair of size_ts), a
   // function to determine if a Value & BlockArg meet the requirements of that
   // pair
-  std::map<std::pair<int64_t, int64_t>,
-           std::function<bool(mlir::Operation *, mlir::BlockArgument)>>
+  llvm::DenseMap<std::pair<int64_t, int64_t>,
+                 std::function<bool(mlir::Operation *, mlir::BlockArgument)>>
       requirements;
 
   // For each semantically relevant index, a generator for tile sizes. Ordered

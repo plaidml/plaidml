@@ -100,13 +100,13 @@ private:
   double getCost(TensorAndIndexPermutation perm, ArrayRef<int64_t> tileSize) {
     unsigned tot_inner_loop = tileSize[0] * tileSize[1] * tileSize[2];
 
-    // TODO: Just put these in the order heatmap expects? Flip heatmap? Also
-    // int64_t vs. unsigned?
-    llvm::SmallVector<unsigned, 3> tileSizeTODO;
-    tileSizeTODO.push_back(tileSize[1]);
-    tileSizeTODO.push_back(tileSize[0]);
-    tileSizeTODO.push_back(tileSize[2]);
-    auto cost = stencilCostFn(tileSizeTODO);
+    // Note: XSMM and its cost function heatmap use the reverse index order from
+    // the rest of this code, hence the flip below
+    llvm::SmallVector<unsigned, 3> xsmmTileSize;
+    xsmmTileSize.push_back(tileSize[1]);
+    xsmmTileSize.push_back(tileSize[0]);
+    xsmmTileSize.push_back(tileSize[2]);
+    auto cost = stencilCostFn(xsmmTileSize);
     if (cost.throughput == 0) {
       return std::numeric_limits<double>::infinity();
     }
@@ -119,14 +119,10 @@ private:
 
     // The middle idxs are the accumulation indexes, i.e. those used on loads
     // but not stores
-    // llvm::DenseMap<mlir::BlockArgument, unsigned> middle_idxs;
-    std::map<unsigned, unsigned> middle_idxs; // TODO: Why does this matter?
+    llvm::DenseMap<mlir::BlockArgument, unsigned> middle_idxs;
     unsigned TODO_loop_count = 0;
     auto in0StrideInfo = getStrideInfo(perm.ioOps[0]);
     for (const auto &kvp : in0StrideInfo->strides) {
-      // TODO: Old version verifies that this is in the parallel op's BlockArgs,
-      // but that seems excessive for something that I'd expect to be an
-      // assert...
       if (!blockArgs.count(kvp.first)) {
         IVLOG(5, "Index found from outside current loop on left input: "
                      << kvp.first);
@@ -134,8 +130,7 @@ private:
         IVLOG(5, "[loop " << TODO_loop_count
                           << "] Based on first tensor, inserting middle index "
                           << kvp.first << ":" << kvp.first.getArgNumber());
-        middle_idxs.insert(
-            std::make_pair(kvp.first.getArgNumber(), getIdxRange(kvp.first)));
+        middle_idxs.insert(std::make_pair(kvp.first, getIdxRange(kvp.first)));
       }
       TODO_loop_count++;
     }
@@ -143,17 +138,13 @@ private:
 
     auto in1StrideInfo = getStrideInfo(perm.ioOps[1]);
     for (const auto &kvp : in1StrideInfo->strides) {
-      // TODO: Old version verifies that this is in the parallel op's BlockArgs,
-      // but that seems excessive for something that I'd expect to be an
-      // assert...
       if (!blockArgs.count(kvp.first)) {
         IVLOG(5, "Index found from outside current loop on right input: "
                      << kvp.first);
       } else {
         IVLOG(5,
               "Based on second tensor, inserting middle index " << kvp.first);
-        middle_idxs.insert(
-            std::make_pair(kvp.first.getArgNumber(), getIdxRange(kvp.first)));
+        middle_idxs.insert(std::make_pair(kvp.first, getIdxRange(kvp.first)));
       }
     }
     IVLOG(5, "Current size of middle_idxs = " << middle_idxs.size());
@@ -163,7 +154,7 @@ private:
         IVLOG(5,
               "Index found from outside current loop on output: " << kvp.first);
       } else {
-        auto it = middle_idxs.find(kvp.first.getArgNumber());
+        auto it = middle_idxs.find(kvp.first);
         if (it != middle_idxs.end()) {
           IVLOG(5,
                 "Based on output tensor, erasing middle index " << it->first);
@@ -175,7 +166,7 @@ private:
     for (unsigned i = 0; i < semanticIdxCount; ++i) {
       assert(blockArgs.count(perm.indexes[i]) &&
              "All tiled indexes must be introduced in current loop");
-      auto it = middle_idxs.find(perm.indexes[i].getArgNumber());
+      auto it = middle_idxs.find(perm.indexes[i]);
       if (it != middle_idxs.end()) {
         it->second = llvm::divideCeil(it->second, tileSize[i]);
       }
@@ -193,8 +184,7 @@ private:
       }
     }
 
-    // llvm::DenseMap<mlir::BlockArgument, unsigned> outer_idxs;
-    std::map<unsigned, unsigned> outer_idxs; // TODO why does this matter...
+    llvm::DenseMap<mlir::BlockArgument, unsigned> outer_idxs;
     for (const auto &kvp : outStrideInfo->strides) {
       if (!blockArgs.count(kvp.first)) {
         IVLOG(5, "Index found from outside current loop on output (2nd pass): "
@@ -203,8 +193,7 @@ private:
         IVLOG(4, "First: " << kvp.first);
         IVLOG(5, "Second: " << kvp.second);
         IVLOG(5, "IdxRange: " << getIdxRange(kvp.first));
-        outer_idxs.try_emplace(kvp.first.getArgNumber(),
-                               getIdxRange(kvp.first));
+        outer_idxs.try_emplace(kvp.first, getIdxRange(kvp.first));
         IVLOG(4, "And now emplaced");
       }
     }
@@ -212,7 +201,7 @@ private:
     for (unsigned i = 0; i < semanticIdxCount; i++) {
       assert(blockArgs.count(perm.indexes[i]) &&
              "All tiled indexes must be introduced in current loop");
-      auto it = outer_idxs.find(perm.indexes[i].getArgNumber());
+      auto it = outer_idxs.find(perm.indexes[i]);
       if (it != outer_idxs.end()) {
         it->second = llvm::divideCeil(it->second, tileSize[i]);
       }
@@ -324,7 +313,6 @@ private:
     };
 
     // Set the tile size. Note XSMM wants n, m, k order and we have m, n, k
-    // TODO: Or maybe we should change everything to match XSMM order?
     llvm::SmallVector<int64_t, 3> xsmmTileSize;
     xsmmTileSize.push_back(tileSize[1]);
     xsmmTileSize.push_back(tileSize[0]);
@@ -370,8 +358,9 @@ public:
     // TODO: Probably want to move these to be params on StencilGeneric ctor...
     semanticIdxCount = 3; // TODO [i.e., must match generators & requirements]
     requirements =        // TODO: Make nicer
-        std::map<std::pair<int64_t, int64_t>,
-                 std::function<bool(mlir::Operation *, mlir::BlockArgument)>>{
+        llvm::DenseMap<
+            std::pair<int64_t, int64_t>,
+            std::function<bool(mlir::Operation *, mlir::BlockArgument)>>{
             {{0, 0},
              [this](mlir::Operation *ioOp, mlir::BlockArgument a) {
                return getStrideInfo(ioOp)->strides[a] != 0;

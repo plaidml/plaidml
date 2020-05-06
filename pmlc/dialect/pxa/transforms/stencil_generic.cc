@@ -19,6 +19,8 @@ int64_t StencilGeneric::getIdxRange(mlir::BlockArgument idx) {
 
 mlir::Optional<mlir::StrideInfo>
 StencilGeneric::getStrideInfo(mlir::Operation *op) {
+  // TODO: As written, this doesn't cache `None` returns; I think that's what we
+  // want?
   auto cached = strideInfoCache.find(op);
   if (cached != strideInfoCache.end()) {
     return cached->second;
@@ -27,21 +29,21 @@ StencilGeneric::getStrideInfo(mlir::Operation *op) {
   if (loadOp) {
     auto strideInfo = computeStrideInfo(loadOp);
     if (strideInfo.hasValue())
-      strideInfoCache.emplace(std::make_pair(op, strideInfo.getValue()));
+      strideInfoCache.insert(std::make_pair(op, strideInfo.getValue()));
     return strideInfo;
   }
   auto storeOp = llvm::dyn_cast<mlir::AffineStoreOp>(*op);
   if (storeOp) {
     auto strideInfo = computeStrideInfo(storeOp);
     if (strideInfo.hasValue())
-      strideInfoCache.emplace(std::make_pair(op, strideInfo.getValue()));
+      strideInfoCache.insert(std::make_pair(op, strideInfo.getValue()));
     return strideInfo;
   }
   auto reduceOp = llvm::dyn_cast<AffineReduceOp>(*op);
   if (reduceOp) {
     auto strideInfo = computeStrideInfo(reduceOp);
     if (strideInfo.hasValue())
-      strideInfoCache.emplace(std::make_pair(op, strideInfo.getValue()));
+      strideInfoCache.insert(std::make_pair(op, strideInfo.getValue()));
     return strideInfo;
   }
   return llvm::None;
