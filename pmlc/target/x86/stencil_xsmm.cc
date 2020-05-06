@@ -120,46 +120,43 @@ private:
     // The middle idxs are the accumulation indexes, i.e. those used on loads
     // but not stores
     llvm::DenseMap<mlir::BlockArgument, unsigned> middle_idxs;
-    unsigned TODO_loop_count = 0;
     auto in0StrideInfo = getStrideInfo(perm.ioOps[0]);
     for (const auto &kvp : in0StrideInfo->strides) {
-      if (!blockArgs.count(kvp.first)) {
+      if (blockArgs.count(kvp.first)) {
+        IVLOG(6, "Based on first tensor, inserting middle index "
+                     << kvp.first.getArgNumber());
+        middle_idxs.insert(std::make_pair(kvp.first, getIdxRange(kvp.first)));
+      } else {
         IVLOG(5, "Index found from outside current loop on left input: "
                      << kvp.first);
-      } else {
-        IVLOG(5, "[loop " << TODO_loop_count
-                          << "] Based on first tensor, inserting middle index "
-                          << kvp.first << ":" << kvp.first.getArgNumber());
-        middle_idxs.insert(std::make_pair(kvp.first, getIdxRange(kvp.first)));
       }
-      TODO_loop_count++;
     }
     IVLOG(5, "Current size of middle_idxs = " << middle_idxs.size());
 
     auto in1StrideInfo = getStrideInfo(perm.ioOps[1]);
     for (const auto &kvp : in1StrideInfo->strides) {
-      if (!blockArgs.count(kvp.first)) {
+      if (blockArgs.count(kvp.first)) {
+        IVLOG(6, "Based on second tensor, inserting middle index "
+                     << kvp.first.getArgNumber());
+        middle_idxs.insert(std::make_pair(kvp.first, getIdxRange(kvp.first)));
+      } else {
         IVLOG(5, "Index found from outside current loop on right input: "
                      << kvp.first);
-      } else {
-        IVLOG(5,
-              "Based on second tensor, inserting middle index " << kvp.first);
-        middle_idxs.insert(std::make_pair(kvp.first, getIdxRange(kvp.first)));
       }
     }
     IVLOG(5, "Current size of middle_idxs = " << middle_idxs.size());
     auto outStrideInfo = getStrideInfo(perm.ioOps[2]);
     for (const auto &kvp : outStrideInfo->strides) {
-      if (!blockArgs.count(kvp.first)) {
-        IVLOG(5,
-              "Index found from outside current loop on output: " << kvp.first);
-      } else {
+      if (blockArgs.count(kvp.first)) {
         auto it = middle_idxs.find(kvp.first);
         if (it != middle_idxs.end()) {
-          IVLOG(5,
-                "Based on output tensor, erasing middle index " << it->first);
+          IVLOG(6, "Based on output tensor, erasing middle index "
+                       << it->first.getArgNumber());
           middle_idxs.erase(it);
         }
+      } else {
+        IVLOG(5,
+              "Index found from outside current loop on output: " << kvp.first);
       }
     }
 
@@ -186,16 +183,15 @@ private:
 
     llvm::DenseMap<mlir::BlockArgument, unsigned> outer_idxs;
     for (const auto &kvp : outStrideInfo->strides) {
-      if (!blockArgs.count(kvp.first)) {
-        IVLOG(5, "Index found from outside current loop on output (2nd pass): "
-                     << kvp.first);
-      } else {
+      if (blockArgs.count(kvp.first)) {
         IVLOG(4, "First: " << kvp.first);
         IVLOG(5, "Second: " << kvp.second);
         IVLOG(5, "IdxRange: " << getIdxRange(kvp.first));
         outer_idxs.try_emplace(kvp.first, getIdxRange(kvp.first));
         IVLOG(4, "And now emplaced");
       }
+      // If the index is from outside `op` this has already been logged, no need
+      // for `else` branch here
     }
     IVLOG(4, "Left loop...");
     for (unsigned i = 0; i < semanticIdxCount; i++) {

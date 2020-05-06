@@ -35,9 +35,12 @@ struct TensorAndIndexPermutation {
 
 struct LoadStoreOps {
   // The load and store ops of an AffineParallel
+  // Loads and stores are expected to be distinguished within a single op, so
+  // are stored separately. Stores and Reduces are not expected to be
+  // distinguished within a single op (`capture` may only allow one or the other
+  // (or both), but almost no cases will have both a store and a reduce within a
+  // single op). Thus, `stores` might have either store or reduce ops.
   llvm::SmallVector<mlir::Operation *, 2> loads;
-  // TODO: Set up to enable either store or reduce
-  // TODO: Or if this works, indicate that can be store or reduce or mix
   llvm::SmallVector<mlir::Operation *, 1> stores;
 };
 
