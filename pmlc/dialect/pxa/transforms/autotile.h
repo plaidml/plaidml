@@ -70,11 +70,15 @@ private:
   Single single;
 };
 
+// Empty target info. Subclasses for different targets.
+class TargetInfo {
+};
+
 // A tile cost model is a functor from an array of tile sizes (i.e.
 // ArrayRef<int64_t>) to a double, which is 'inf' for infeasible tilings.  For
 // example:
 
-inline double DummyCostModel(mlir::AffineParallelOp op, ArrayRef<int64_t> tile, void* args) {
+inline double DummyCostModel(mlir::AffineParallelOp op, ArrayRef<int64_t> tile, const TargetInfo& info) {
   return 1.0;
 }
 
@@ -84,8 +88,8 @@ template <typename Generator, typename CostModel>
 llvm::SmallVector<int64_t, 8> findBestTileSize(mlir::AffineParallelOp op,
                                                const Generator &generator,
                                                const CostModel &costModel,
-                                               ArrayRef<int64_t> ranges,
-                                               void *args) {
+					       const TargetInfo &targetInfo,
+                                               ArrayRef<int64_t> ranges) {
   // Build a list of potential tile sizes for each dimension.
   // Basically, we are caching the output of the generator in case it is
   // expensive.
@@ -100,7 +104,7 @@ llvm::SmallVector<int64_t, 8> findBestTileSize(mlir::AffineParallelOp op,
   // Build a recursive lambda to walk over the options (thanks c++14!)
   auto recurse = [&](auto &self, size_t idx) -> void {
     if (idx == allowedTileSizes.size()) {
-      double newCost = costModel(op, curTileSize, args);
+      double newCost = costModel(op, curTileSize, targetInfo);
       if (newCost < bestCost) {
         bestCost = newCost;
         bestTileSize = curTileSize;
