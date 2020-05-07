@@ -245,7 +245,7 @@ private:
     auto opA = llvm::dyn_cast<mlir::AffineLoadOp>(*perm.ioOps[0]);
     auto opB = llvm::dyn_cast<mlir::AffineLoadOp>(*perm.ioOps[1]);
     auto opC = llvm::dyn_cast<AffineReduceOp>(*perm.ioOps[2]);
-    // TODO: Assert casts worked right?
+    assert(opA && opB && opC);
 
     // Get the current memrefs
     Value aVal = opA.getMemRef();
