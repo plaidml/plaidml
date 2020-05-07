@@ -78,7 +78,7 @@ class TargetInfo {
 // ArrayRef<int64_t>) to a double, which is 'inf' for infeasible tilings.  For
 // example:
 
-inline double DummyCostModel(mlir::AffineParallelOp op, ArrayRef<int64_t> tile, const TargetInfo& info) {
+inline double DummyCostModel(mlir::AffineParallelOp op, ArrayRef<int64_t> tile) {
   return 1.0;
 }
 
@@ -88,7 +88,6 @@ template <typename Generator, typename CostModel>
 llvm::SmallVector<int64_t, 8> findBestTileSize(mlir::AffineParallelOp op,
                                                const Generator &generator,
                                                const CostModel &costModel,
-                                               const TargetInfo &targetInfo,
                                                ArrayRef<int64_t> ranges) {
   // Build a list of potential tile sizes for each dimension.
   // Basically, we are caching the output of the generator in case it is
@@ -104,7 +103,7 @@ llvm::SmallVector<int64_t, 8> findBestTileSize(mlir::AffineParallelOp op,
   // Build a recursive lambda to walk over the options (thanks c++14!)
   auto recurse = [&](auto &self, size_t idx) -> void {
     if (idx == allowedTileSizes.size()) {
-      double newCost = costModel(op, curTileSize, targetInfo);
+      double newCost = costModel(op, curTileSize);
       if (newCost < bestCost) {
         bestCost = newCost;
         bestTileSize = curTileSize;

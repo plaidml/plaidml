@@ -37,7 +37,7 @@ struct AutoTileExamplePass : public AutoTileExampleBase<AutoTileExamplePass> {
       if (!ranges) {
         return;
       }
-      auto tileSize = findBestTileSize(op, always10, DummyCostModel, TargetInfo(), *ranges);
+      auto tileSize = findBestTileSize(op, always10, DummyCostModel, *ranges);
       if (tileSize.empty()) {
         return;
       }
