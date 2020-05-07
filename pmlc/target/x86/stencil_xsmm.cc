@@ -94,7 +94,7 @@ private:
     ret.loads.push_back(lhs);
     ret.loads.push_back(rhs);
 
-    return llvm::Optional<LoadStoreOps>(std::move(ret)); // TODO: std::move?
+    return llvm::Optional<LoadStoreOps>(ret);
   }
 
   double getCost(TensorAndIndexPermutation perm, ArrayRef<int64_t> tileSize) {
