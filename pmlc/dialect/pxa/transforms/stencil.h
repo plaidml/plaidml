@@ -121,9 +121,10 @@ struct TensorAndIndexPermutation {
 
   TensorAndIndexPermutation() = default;
 
-  TensorAndIndexPermutation(llvm::SmallVector<mlir::Operation *, 3> ioOps,
-                            llvm::SmallVector<mlir::BlockArgument, 8> indexes)
-      : ioOps(ioOps), indexes(indexes) {}
+  TensorAndIndexPermutation(llvm::ArrayRef<mlir::Operation *> ioOps,
+                            llvm::ArrayRef<mlir::BlockArgument> indexes)
+      : ioOps(ioOps.begin(), ioOps.end()),
+        indexes(indexes.begin(), indexes.end()) {}
 };
 
 struct LoadStoreOps {
@@ -143,13 +144,14 @@ class StencilBase {
 public:
   explicit StencilBase(
       mlir::AffineParallelOp op, unsigned tiledIdxCount,
-      llvm::SmallVector<TileSizeGenerator, 5> tilingGenerators,
+      llvm::ArrayRef<TileSizeGenerator> tilingGenerators,
       llvm::DenseMap<
           std::pair<int64_t, int64_t>,
           std::function<bool(mlir::Operation *, mlir::BlockArgument)>>
           requirements)
       : op(op), tiledIdxCount(tiledIdxCount),
-        tilingGenerators(tilingGenerators), requirements(requirements),
+        tilingGenerators(tilingGenerators.begin(), tilingGenerators.end()),
+        requirements(requirements),
         bestCost(std::numeric_limits<double>::infinity()) {
     assert(tilingGenerators.size() == tiledIdxCount &&
            "Stencil pass requires one tiling generator per tiled index");
@@ -198,11 +200,11 @@ protected:
   mlir::AffineParallelOp op;
 
 private:
-  void BindIndexes(const llvm::SmallVector<mlir::Operation *, 3> &ioOps);
-  void RecursiveBindIndex(llvm::SmallVector<mlir::BlockArgument, 8> *bound_idxs,
-                          const llvm::SmallVector<mlir::Operation *, 3> &ioOps);
+  void BindIndexes(llvm::ArrayRef<mlir::Operation *> ioOps);
+  void RecursiveBindIndex(llvm::SmallVector<mlir::BlockArgument, 8> &bound_idxs,
+                          llvm::ArrayRef<mlir::Operation *> ioOps);
   void RecursiveTileIndex(const TensorAndIndexPermutation &perm,
-                          llvm::SmallVector<int64_t, 8> *tileSize,
+                          llvm::MutableArrayRef<int64_t> tileSize,
                           int64_t currIdx);
 
   // Cached call of the `idx`th tilingGenerator on parameter `range`

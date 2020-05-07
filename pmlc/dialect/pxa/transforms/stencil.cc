@@ -137,29 +137,28 @@ StencilBase::getStrideInfo(mlir::Operation *op) {
   return llvm::None;
 }
 
-void StencilBase::BindIndexes(
-    const llvm::SmallVector<mlir::Operation *, 3> &ioOps) {
+void StencilBase::BindIndexes(llvm::ArrayRef<mlir::Operation *> ioOps) {
   llvm::SmallVector<mlir::BlockArgument, 8> emptyBoundIdxsVector;
-  RecursiveBindIndex(&emptyBoundIdxsVector, ioOps);
+  RecursiveBindIndex(emptyBoundIdxsVector, ioOps);
 }
 
 void StencilBase::RecursiveBindIndex(
-    llvm::SmallVector<mlir::BlockArgument, 8> *boundIdxs,
-    const llvm::SmallVector<mlir::Operation *, 3> &ioOps) {
-  auto currIdx = boundIdxs->size();
+    llvm::SmallVector<mlir::BlockArgument, 8> &boundIdxs,
+    llvm::ArrayRef<mlir::Operation *> ioOps) {
+  auto currIdx = boundIdxs.size();
   if (currIdx == tiledIdxCount) {
     // This is a legal binding, go find a tiling for it
     llvm::SmallVector<int64_t, 8> currTileSize(tiledIdxCount);
-    RecursiveTileIndex(TensorAndIndexPermutation(ioOps, *boundIdxs),
-                       &currTileSize, 0);
+    RecursiveTileIndex(TensorAndIndexPermutation(ioOps, boundIdxs),
+                       currTileSize, 0);
   } else {
     for (const auto &blockArg : getBlockArgsAsSet()) {
       // Don't bind same index twice
       // Note: While it's awkward to be repeatedly searching a vector, I think
       // boundIdxs is small enough that it would not be efficient to maintain a
       // parallel map
-      if (std::find(boundIdxs->begin(), boundIdxs->end(), blockArg) !=
-          boundIdxs->end()) {
+      if (std::find(boundIdxs.begin(), boundIdxs.end(), blockArg) !=
+          boundIdxs.end()) {
         continue;
       }
 
@@ -178,24 +177,24 @@ void StencilBase::RecursiveBindIndex(
 
       // If we made it to here, this index has appropriate semantics; bind it
       // and recurse
-      boundIdxs->push_back(blockArg);
+      boundIdxs.push_back(blockArg);
       RecursiveBindIndex(boundIdxs, ioOps);
-      boundIdxs->pop_back();
+      boundIdxs.pop_back();
     }
   }
 }
 
 void StencilBase::RecursiveTileIndex(        //
     const TensorAndIndexPermutation &perm,   //
-    llvm::SmallVector<int64_t, 8> *tileSize, //
+    llvm::MutableArrayRef<int64_t> tileSize, //
     int64_t currIdx) {
-  assert(tileSize->size() == tiledIdxCount);
+  assert(tileSize.size() == tiledIdxCount);
   if (currIdx == tiledIdxCount) {
-    auto cost = getCost(perm, *tileSize);
+    auto cost = getCost(perm, tileSize);
     if (VLOG_IS_ON(3)) {
       std::stringstream currTilingStr;
       currTilingStr << "[ ";
-      for (const auto &sz : *tileSize) {
+      for (const auto &sz : tileSize) {
         currTilingStr << sz << " ";
       }
       currTilingStr << "]";
@@ -205,14 +204,14 @@ void StencilBase::RecursiveTileIndex(        //
     if (cost < bestCost) {
       bestCost = cost;
       bestPermutation = perm;
-      bestTiling = *tileSize;
+      bestTiling.assign(tileSize.begin(), tileSize.end());
     }
   } else {
     assert(getBlockArgsAsSet().count(perm.indexes[currIdx]) &&
            "BlockArg for current index must be valid");
     for (int64_t currIdxTileSize : generateTilings(
              currIdx, ranges[perm.indexes[currIdx].getArgNumber()])) {
-      (*tileSize)[currIdx] = currIdxTileSize;
+      tileSize[currIdx] = currIdxTileSize;
       RecursiveTileIndex(perm, tileSize, currIdx + 1);
     }
   }
