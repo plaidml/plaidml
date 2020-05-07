@@ -222,7 +222,8 @@ private:
   llvm::SmallVector<int64_t, 8> ranges;
 
   // Cache of StrideInfo results
-  llvm::DenseMap<mlir::Operation *, mlir::StrideInfo> strideInfoCache;
+  llvm::DenseMap<mlir::Operation *, mlir::Optional<mlir::StrideInfo>>
+      strideInfoCache;
 
   // The load and store ops
   LoadStoreOps loadsAndStores;
