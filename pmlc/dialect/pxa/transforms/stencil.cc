@@ -27,7 +27,7 @@ void StencilBase::reportBestStencil(unsigned logLevel) {
     std::stringstream indexPermStr;
     indexPermStr << "[ ";
     for (auto ind : bestPermutation.indexes) {
-      assert(blockArgs.count(ind) &&
+      assert(getBlockArgsAsSet().count(ind) &&
              "All tiled indexes must be introduced in current loop");
       indexPermStr << ind.getArgNumber() << " ";
     }
@@ -45,7 +45,7 @@ void StencilBase::reportBestStencil(unsigned logLevel) {
 }
 
 int64_t StencilBase::getIdxRange(mlir::BlockArgument idx) {
-  assert(blockArgs.count(idx) &&
+  assert(getBlockArgsAsSet().count(idx) &&
          "getIdxRange only valid on indexes of current op");
   assert(idx.getArgNumber() < ranges.size());
   return ranges[idx.getArgNumber()];
@@ -99,7 +99,7 @@ void StencilBase::RecursiveBindIndex(
     RecursiveTileIndex(TensorAndIndexPermutation(ioOps, *boundIdxs),
                        &currTileSize, 0);
   } else {
-    for (const auto &blockArg : blockArgs) {
+    for (const auto &blockArg : getBlockArgsAsSet()) {
       // Don't bind same index twice
       // Note: While it's awkward to be repeatedly searching a vector, I think
       // boundIdxs is small enough that it would not be efficient to maintain a
@@ -155,7 +155,7 @@ void StencilBase::RecursiveTileIndex(        //
     }
   } else {
     // TODO: Setup cache for the generator
-    assert(blockArgs.count(perm.indexes[currIdx]) &&
+    assert(getBlockArgsAsSet().count(perm.indexes[currIdx]) &&
            "BlockArg for current index must be valid");
     for (int64_t currIdxTileSize : tilingGenerators[currIdx](
              ranges[perm.indexes[currIdx].getArgNumber()])) {
@@ -174,6 +174,7 @@ void StencilBase::DoStenciling() {
     IVLOG(4, "Cannot Stencil: Requires constant ranges");
     return;
   }
+  assert(ranges.size() == getBlockArgsAsSet().size());
 
   auto maybeLoadsAndStores = capture();
   if (maybeLoadsAndStores) {

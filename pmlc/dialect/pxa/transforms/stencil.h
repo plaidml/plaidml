@@ -140,58 +140,6 @@ struct LoadStoreOps {
 using TileSizeGenerator = std::function<std::vector<int64_t>(int64_t)>;
 
 class StencilBase {
-private:
-  void BindIndexes(const llvm::SmallVector<mlir::Operation *, 3> &ioOps);
-  void RecursiveBindIndex(llvm::SmallVector<mlir::BlockArgument, 8> *bound_idxs,
-                          const llvm::SmallVector<mlir::Operation *, 3> &ioOps);
-  void RecursiveTileIndex(const TensorAndIndexPermutation &perm,
-                          llvm::SmallVector<int64_t, 8> *tileSize,
-                          int64_t currIdx);
-
-protected: // TODO: private backend for some of this?
-  virtual llvm::Optional<LoadStoreOps> capture() = 0;
-  virtual double getCost(TensorAndIndexPermutation perm,
-                         ArrayRef<int64_t> tileSize) = 0;
-  virtual void transform(TensorAndIndexPermutation perm,
-                         ArrayRef<int64_t> tileSize) = 0;
-  int64_t getIdxRange(mlir::BlockArgument idx);
-  mlir::Optional<mlir::StrideInfo> getStrideInfo(mlir::Operation *ioOp);
-  void reportBestStencil(unsigned logLevel);
-
-  // Cache of StrideInfo results
-  llvm::DenseMap<mlir::Operation *, mlir::StrideInfo> strideInfoCache;
-
-  // The ParallelOp that is being stenciled.
-  mlir::AffineParallelOp op;
-
-  // The BlockArguments of `op` (stored as a set for easy lookup)
-  BlockArgumentSet blockArgs;
-
-  // The load and store ops
-  LoadStoreOps loadsAndStores;
-
-  // The range of each index (cached result of op.getConstantRanges())
-  llvm::SmallVector<int64_t, 8> ranges;
-
-  // The number of indexes whose semantics must be considered in the tiling
-  unsigned tiledIdxCount;
-
-  // For each tiled index, a generator for tile sizes. Ordered to match the
-  // index permutation.
-  llvm::SmallVector<TileSizeGenerator, 5> tilingGenerators;
-
-  // For each tensor/index semantic pair (given as a pair of `int64_t`s), a
-  // function to determine if the load or store op of a tensor and the BlockArg
-  // of an index meet the requirements of that pair.
-  llvm::DenseMap<std::pair<int64_t, int64_t>,
-                 std::function<bool(mlir::Operation *, mlir::BlockArgument)>>
-      requirements;
-
-  double bestCost;
-  TensorAndIndexPermutation bestPermutation;
-  llvm::SmallVector<int64_t, 8>
-      bestTiling; // only makes sense paired with `bestPermutation`
-
 public:
   explicit StencilBase(
       mlir::AffineParallelOp op, unsigned tiledIdxCount,
@@ -218,6 +166,73 @@ public:
 
   // Main function
   void DoStenciling();
+
+protected:
+  // Determine if `op` is eligible for stenciling and capture the IO ops if so
+  virtual llvm::Optional<LoadStoreOps> capture() = 0;
+  // Determine the cost of the specified stencil
+  virtual double getCost(TensorAndIndexPermutation perm,
+                         ArrayRef<int64_t> tileSize) = 0;
+  // Rewrite `op` by applying the specified stencil
+  virtual void transform(TensorAndIndexPermutation perm,
+                         ArrayRef<int64_t> tileSize) = 0;
+
+  // Get the range of the `idx`th BlockArg
+  int64_t getIdxRange(mlir::BlockArgument idx);
+
+  // Call `computeStrideInfo` with caching and automatic conversion to whichever
+  // of AffineLoadOp, AffineStoreOp, or AffineReduceOp is correct
+  mlir::Optional<mlir::StrideInfo> getStrideInfo(mlir::Operation *ioOp);
+
+  // Print a log of the best stencil (reporting on cost, permutation, and
+  // tiling) provided verbosity is at least `logLevel`
+  void reportBestStencil(unsigned logLevel);
+
+  // The number of indexes whose semantics must be considered in the tiling
+  unsigned getTiledIdxCount() const { return tiledIdxCount; }
+
+  // The BlockArguments of `op` (stored as a set for easy lookup)
+  BlockArgumentSet getBlockArgsAsSet() const { return blockArgs; }
+
+  // The ParallelOp that is being stenciled.
+  mlir::AffineParallelOp op;
+
+private:
+  void BindIndexes(const llvm::SmallVector<mlir::Operation *, 3> &ioOps);
+  void RecursiveBindIndex(llvm::SmallVector<mlir::BlockArgument, 8> *bound_idxs,
+                          const llvm::SmallVector<mlir::Operation *, 3> &ioOps);
+  void RecursiveTileIndex(const TensorAndIndexPermutation &perm,
+                          llvm::SmallVector<int64_t, 8> *tileSize,
+                          int64_t currIdx);
+
+  unsigned tiledIdxCount;
+  BlockArgumentSet blockArgs;
+
+  // The range of each index (cached result of op.getConstantRanges())
+  llvm::SmallVector<int64_t, 8> ranges;
+
+  // Cache of StrideInfo results
+  llvm::DenseMap<mlir::Operation *, mlir::StrideInfo> strideInfoCache;
+
+  // The load and store ops
+  LoadStoreOps loadsAndStores;
+
+  // For each tiled index, a generator for tile sizes. Ordered to match the
+  // index permutation.
+  llvm::SmallVector<TileSizeGenerator, 5> tilingGenerators;
+
+  // For each tensor/index semantic pair (given as a pair of `int64_t`s), a
+  // function to determine if the load or store op of a tensor and the BlockArg
+  // of an index meet the requirements of that pair.
+  llvm::DenseMap<std::pair<int64_t, int64_t>,
+                 std::function<bool(mlir::Operation *, mlir::BlockArgument)>>
+      requirements;
+
+  // Note: The bestCost, bestPermutation, and bestTiling all must refer to the
+  // same permutation & tiling choices and should only be modified together
+  double bestCost;
+  TensorAndIndexPermutation bestPermutation;
+  llvm::SmallVector<int64_t, 8> bestTiling;
 };
 
 } // namespace pmlc::dialect::pxa

@@ -113,7 +113,7 @@ private:
     double inner_time = tot_inner_loop / cost.throughput;
     IVLOG(6,
           "Inner: loop = " << tot_inner_loop << " inner_time = " << inner_time);
-    for (unsigned i = 0; i < tiledIdxCount; ++i) {
+    for (unsigned i = 0; i < getTiledIdxCount(); ++i) {
       IVLOG(6, perm.indexes[i] << ": " << tileSize[i]);
     }
 
@@ -122,7 +122,7 @@ private:
     llvm::DenseMap<mlir::BlockArgument, unsigned> middle_idxs;
     auto in0StrideInfo = getStrideInfo(perm.ioOps[0]);
     for (const auto &kvp : in0StrideInfo->strides) {
-      if (blockArgs.count(kvp.first)) {
+      if (getBlockArgsAsSet().count(kvp.first)) {
         IVLOG(6, "Based on first tensor, inserting middle index "
                      << kvp.first.getArgNumber());
         middle_idxs.insert(std::make_pair(kvp.first, getIdxRange(kvp.first)));
@@ -135,7 +135,7 @@ private:
 
     auto in1StrideInfo = getStrideInfo(perm.ioOps[1]);
     for (const auto &kvp : in1StrideInfo->strides) {
-      if (blockArgs.count(kvp.first)) {
+      if (getBlockArgsAsSet().count(kvp.first)) {
         IVLOG(6, "Based on second tensor, inserting middle index "
                      << kvp.first.getArgNumber());
         middle_idxs.insert(std::make_pair(kvp.first, getIdxRange(kvp.first)));
@@ -147,7 +147,7 @@ private:
     IVLOG(5, "Current size of middle_idxs = " << middle_idxs.size());
     auto outStrideInfo = getStrideInfo(perm.ioOps[2]);
     for (const auto &kvp : outStrideInfo->strides) {
-      if (blockArgs.count(kvp.first)) {
+      if (getBlockArgsAsSet().count(kvp.first)) {
         auto it = middle_idxs.find(kvp.first);
         if (it != middle_idxs.end()) {
           IVLOG(6, "Based on output tensor, erasing middle index "
@@ -160,9 +160,9 @@ private:
       }
     }
 
-    for (unsigned i = 0; i < tiledIdxCount; ++i) {
+    for (unsigned i = 0; i < getTiledIdxCount(); ++i) {
       // TODO: This should have been verified earlier. Confirm that's true
-      assert(blockArgs.count(perm.indexes[i]) &&
+      assert(getBlockArgsAsSet().count(perm.indexes[i]) &&
              "All tiled indexes must be introduced in current loop");
       auto it = middle_idxs.find(perm.indexes[i]);
       if (it != middle_idxs.end()) {
@@ -184,7 +184,7 @@ private:
 
     llvm::DenseMap<mlir::BlockArgument, unsigned> outer_idxs;
     for (const auto &kvp : outStrideInfo->strides) {
-      if (blockArgs.count(kvp.first)) {
+      if (getBlockArgsAsSet().count(kvp.first)) {
         IVLOG(4, "First: " << kvp.first);
         IVLOG(5, "Second: " << kvp.second);
         IVLOG(5, "IdxRange: " << getIdxRange(kvp.first));
@@ -194,8 +194,8 @@ private:
       // If the index is from outside `op` this has already been logged, no need
       // for `else` branch here
     }
-    for (unsigned i = 0; i < tiledIdxCount; i++) {
-      assert(blockArgs.count(perm.indexes[i]) &&
+    for (unsigned i = 0; i < getTiledIdxCount(); i++) {
+      assert(getBlockArgsAsSet().count(perm.indexes[i]) &&
              "All tiled indexes must be introduced in current loop");
       auto it = outer_idxs.find(perm.indexes[i]);
       if (it != outer_idxs.end()) {
@@ -233,8 +233,8 @@ private:
     for (auto step : oldSteps) {
       steps.push_back(step.cast<IntegerAttr>().getInt());
     }
-    for (size_t i = 0; i < ranges.size(); i++) {
-      for (size_t j = 0; j < tiledIdxCount; j++) {
+    for (size_t i = 0; i < getBlockArgsAsSet().size(); i++) {
+      for (size_t j = 0; j < getTiledIdxCount(); j++) {
         if (perm.indexes[j] == op.getBody()->getArgument(i)) {
           steps[i] *= tileSize[j];
         }
