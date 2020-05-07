@@ -88,7 +88,7 @@ template <typename Generator, typename CostModel>
 llvm::SmallVector<int64_t, 8> findBestTileSize(mlir::AffineParallelOp op,
                                                const Generator &generator,
                                                const CostModel &costModel,
-					       const TargetInfo &targetInfo,
+																							 const TargetInfo &targetInfo,
                                                ArrayRef<int64_t> ranges) {
   // Build a list of potential tile sizes for each dimension.
   // Basically, we are caching the output of the generator in case it is
