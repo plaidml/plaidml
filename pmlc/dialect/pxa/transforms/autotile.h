@@ -82,10 +82,10 @@ inline double DummyCostModel(mlir::AffineParallelOp op, ArrayRef<int64_t> tile, 
 // tiling when all tiles are infeasible
 template <typename Generator, typename CostModel>
 llvm::SmallVector<int64_t, 8> findBestTileSize(mlir::AffineParallelOp op,
-		                               const Generator &generator,
+                                               const Generator &generator,
                                                const CostModel &costModel,
                                                ArrayRef<int64_t> ranges,
-					       void *args) {
+                                               void *args) {
   // Build a list of potential tile sizes for each dimension.
   // Basically, we are caching the output of the generator in case it is
   // expensive.
