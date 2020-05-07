@@ -1,7 +1,7 @@
 // Copyright 2020 Intel Corporation
 
-#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/IR/IntegerSet.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/DebugStringHelper.h"
@@ -15,6 +15,7 @@
 namespace pmlc::conversion::pxa_to_affine {
 namespace pxa = dialect::pxa;
 
+using mlir::AffineIfOp;
 using mlir::AffineLoadOp;
 using mlir::AffineParallelOp;
 using mlir::AffineStoreOp;
@@ -82,7 +83,41 @@ struct AffineParallelOpConversion : public LoweringBase<AffineParallelOp> {
     for (auto arg : op.region().front().getArguments()) {
       arg.replaceAllUsesWith(ivs[idx++]);
     }
+    // Replace outputs with values from yield
+    auto termIt = std::prev(stripeBodyOps.end());
+    for (size_t i = 0; i < op.getNumResults(); i++) {
+      op.getResult(i).replaceAllUsesWith(termIt->getOperand(i));
+    }
     // We are done. Remove original op.
+    rewriter.eraseOp(op);
+  }
+};
+
+struct AffineIfOpConversion : public LoweringBase<AffineIfOp> {
+  explicit AffineIfOpConversion(MLIRContext *ctx) : LoweringBase(ctx) {}
+
+  void rewrite(AffineIfOp op, ArrayRef<Value> operands,
+               ConversionPatternRewriter &rewriter) const override {
+    IVLOG(1, "W0001");
+    // Make a new if value
+    auto newIf = rewriter.create<mlir::AffineIfOp>(
+        op.getLoc(), op.getIntegerSet(), op.getOperands(), op.hasElse());
+    // Move 'then' operations over, ignoring terminator
+    auto &newThenOps = newIf.getThenBlock()->getOperations();
+    auto &oldThenOps = op.getThenBlock()->getOperations();
+    newThenOps.splice(std::prev(newThenOps.end()), oldThenOps,
+                      oldThenOps.begin(), std::prev(oldThenOps.end()));
+    // Replace outputs with values from yield (based on the then clause)
+    auto termIt = std::prev(oldThenOps.end());
+    for (size_t i = 0; i < op.getNumResults(); i++) {
+      op.getResult(i).replaceAllUsesWith(termIt->getOperand(i));
+    }
+    // Move 'else' operations over, ignoring terminator
+    auto &newElseOps = newIf.getElseBlock()->getOperations();
+    auto &oldElseOps = op.getElseBlock()->getOperations();
+    newElseOps.splice(std::prev(newElseOps.end()), oldElseOps,
+                      oldElseOps.begin(), std::prev(oldElseOps.end()));
+    // Erase original
     rewriter.eraseOp(op);
   }
 };
@@ -97,6 +132,7 @@ struct AffineReduceOpConversion : public LoweringBase<pxa::AffineReduceOp> {
     auto reduce = createReduction(rewriter, op, source.getResult());
     rewriter.create<AffineStoreOp>(op.getLoc(), reduce, op.mem(), op.map(),
                                    op.idxs());
+    op.replaceAllUsesWith(op.mem());
     rewriter.eraseOp(op);
   }
 
@@ -150,6 +186,60 @@ struct AffineReduceOpConversion : public LoweringBase<pxa::AffineReduceOp> {
   }
 };
 
+struct FuncOpConversion : public OpConversionPattern<FuncOp> {
+  using OpConversionPattern<FuncOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(FuncOp op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const final {
+    FunctionType type = op.getType();
+    IVLOG(2, "FuncOpConversion::rewrite> " << mlir::debugString(type));
+
+    // Convert the function signature
+    mlir::TypeConverter::SignatureConversion result(type.getNumInputs() +
+                                                    type.getNumResults());
+    for (unsigned i = 0; i < type.getNumInputs(); ++i) {
+      result.addInputs(i, {type.getInput(i)});
+    }
+    for (unsigned i = 0; i < type.getNumResults(); ++i) {
+      result.addInputs({type.getResult(i)});
+    }
+
+    // Create a new function with an updated signature.
+    auto newOp = rewriter.cloneWithoutRegions(op);
+    rewriter.inlineRegionBefore(op.getBody(), newOp.getBody(), newOp.end());
+    newOp.setType(FunctionType::get(result.getConvertedTypes(), llvm::None,
+                                    op.getContext()));
+
+    // Tell the rewriter to convert the region signature.
+    rewriter.applySignatureConversion(&newOp.getBody(), result);
+
+    // Finally cause the old func op to be erased
+    rewriter.eraseOp(op);
+
+    return mlir::success();
+  }
+};
+
+struct ReturnOpConversion : public OpConversionPattern<ReturnOp> {
+  using OpConversionPattern<ReturnOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(ReturnOp op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const final {
+    IVLOG(2, "ReturnOpConversion::matchAndRewrite>");
+    auto &block = op.getParentRegion()->front();
+    auto funcOp = op.getParentOfType<FuncOp>();
+    auto blockArg = funcOp.getType().getNumInputs() - op.getNumOperands();
+    for (auto operand : operands) {
+      // Find very initial allocation of memref
+      operand.replaceAllUsesWith(block.getArgument(blockArg++));
+    }
+    rewriter.replaceOpWithNewOp<ReturnOp>(op);
+    return mlir::success();
+  }
+};
+
 void LowerPXAToAffinePass::runOnOperation() {
   // Set up target (i.e. what is legal)
   mlir::ConversionTarget target(getContext());
@@ -157,11 +247,20 @@ void LowerPXAToAffinePass::runOnOperation() {
   target.addLegalDialect<mlir::StandardOpsDialect>();
   target.addIllegalDialect<pxa::PXADialect>();
   target.addIllegalOp<AffineParallelOp>();
+  target.addDynamicallyLegalOp<AffineIfOp>(
+      [](AffineIfOp op) { return op.getNumResults() == 0; });
+  target.addDynamicallyLegalOp<FuncOp>(
+      [](FuncOp op) { return op.getType().getNumResults() == 0; });
+  target.addDynamicallyLegalOp<ReturnOp>(
+      [](ReturnOp op) { return op.getNumOperands() == 0; });
 
   // Setup rewrite patterns
   mlir::OwningRewritePatternList patterns;
   patterns.insert<AffineParallelOpConversion>(&getContext());
+  patterns.insert<AffineIfOpConversion>(&getContext());
   patterns.insert<AffineReduceOpConversion>(&getContext());
+  patterns.insert<FuncOpConversion>(&getContext());
+  patterns.insert<ReturnOpConversion>(&getContext());
 
   // Run the conversion
   if (failed(

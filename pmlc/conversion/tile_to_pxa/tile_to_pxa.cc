@@ -45,6 +45,7 @@ struct TypeConverter : public mlir::TypeConverter {
     addConversion([](FunctionType type) { return type; });
     addConversion([](FloatType type) { return type; });
     addConversion([](IntegerType type) { return ew::toSignlessType(type); });
+    addConversion([](MemRefType type) { return type; });
     addConversion([this](RankedTensorType type) {
       auto elementType = type.getElementType();
       auto newType = convertType(elementType);
@@ -83,14 +84,15 @@ struct FuncOpConversion : public OpConversionPattern<FuncOp> {
 
     // Convert the function signature
     TypeConverter typeConverter;
-    mlir::TypeConverter::SignatureConversion result(type.getNumInputs() +
-                                                    type.getNumResults());
+    mlir::TypeConverter::SignatureConversion result(type.getNumInputs());
     for (unsigned i = 0; i < type.getNumInputs(); ++i) {
       result.addInputs(i, {typeConverter.convertType(type.getInput(i))});
     }
+    /*
     for (unsigned i = 0; i < type.getNumResults(); ++i) {
       result.addInputs({typeConverter.convertType(type.getResult(i))});
     }
+    */
 
     // Create a new function with an updated signature.
     auto newOp = rewriter.cloneWithoutRegions(op);
@@ -491,7 +493,7 @@ static AffineParallelOp fillBuffer(OpBuilder &builder, Location loc,
   auto parallelBuilder = parallel.getBodyBuilder();
   auto load = buildBroadcastLoad(parallelBuilder, loc, value, shape.size());
   auto stored = buildSimpleStore(parallelBuilder, loc, load, memref);
-  parallelBuilder.create<AffineYieldOp>(loc, ValueRange({stored}));
+  parallelBuilder.create<AffineTerminatorOp>(loc, ValueRange({stored}));
   return parallel;
 }
 
@@ -525,7 +527,7 @@ struct BufferAllocator {
       auto initValue = createInit(builder, loc, elementType, maybePadding->agg);
       auto newBuf = fillBuffer(builder, loc, initValue, resultMemRef, shape);
       newBuf.setAttr("origin", builder.getI64ArrayAttr(maybePadding->lower));
-      resultMemRef = newBuf.getResults()[0];
+      resultMemRef = newBuf.getResult(0);
     }
   }
 };
@@ -571,10 +573,10 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
 
     // Create the store
     auto stored = buildSimpleStore(rewriter, loc, result, alloc.resultMemRef);
-    rewriter.create<AffineYieldOp>(loc, ValueRange({stored}));
+    rewriter.create<AffineTerminatorOp>(loc, ValueRange({stored}));
 
     // Replace output with the newly allocated buffer
-    rewriter.replaceOp(op, alloc.resultMemRef);
+    rewriter.replaceOp(op, forOp.getResult(0));
   }
 };
 
@@ -619,8 +621,10 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
     BufferAllocator alloc(rewriter, op.getOperation(), op.result().getType());
 
     // Do initialization
-    fillBuffer(rewriter, loc, cionAdaptor.init(), alloc.resultMemRef,
-               alloc.rankedTensorType.getShape());
+    auto filled =
+        fillBuffer(rewriter, loc, cionAdaptor.init(), alloc.resultMemRef,
+                   alloc.rankedTensorType.getShape())
+            .getResult(0);
 
     // Determine ranges
     SmallVector<int64_t, 8> ranges;
@@ -646,9 +650,10 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
       auto cons = op.cons().getValue();
       auto ifOp = rewriter.create<AffineIfOp>(
           loc, TypeRange({alloc.memRefType}), cons, idxs, true);
-      rewriter.create<AffineYieldOp>(loc, ifOp.getOperation()->getResults());
+      rewriter.create<AffineTerminatorOp>(loc,
+                                          ifOp.getOperation()->getResults());
       rewriter.setInsertionPointToStart(&ifOp.elseRegion().front());
-      rewriter.create<AffineYieldOp>(loc, alloc.resultMemRef);
+      rewriter.create<AffineTerminatorOp>(loc, alloc.resultMemRef);
       rewriter.setInsertionPointToStart(&ifOp.thenRegion().front());
     }
 
@@ -683,15 +688,15 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
     if (resultMap.isEmpty()) {
       SmallVector<Value, 0> emptyIdxs;
       reduceOp = rewriter.create<pxa::AffineReduceOp>(
-          loc, op.agg(), combined, alloc.resultMemRef, resultMap, emptyIdxs);
+          loc, op.agg(), combined, filled, resultMap, emptyIdxs);
     } else {
-      reduceOp = rewriter.create<pxa::AffineReduceOp>(
-          loc, op.agg(), combined, alloc.resultMemRef, resultMap, idxs);
+      reduceOp = rewriter.create<pxa::AffineReduceOp>(loc, op.agg(), combined,
+                                                      filled, resultMap, idxs);
     }
-    rewriter.create<AffineYieldOp>(loc, ValueRange({reduceOp}));
+    rewriter.create<AffineTerminatorOp>(loc, ValueRange({reduceOp}));
 
     // Replace the op
-    rewriter.replaceOp(op, forOp.getODSResults(0));
+    rewriter.replaceOp(op, forOp.getResult(0));
   }
 };
 
@@ -728,10 +733,11 @@ struct IndexOpConversion : public OpConversionPattern<IndexOp> {
     // Create the store
     auto cast = rewriter.create<mlir::IndexCastOp>(loc, apply,
                                                    rewriter.getIntegerType(32));
-    rewriter.create<AffineStoreOp>(loc, cast, resultMemRef, idxs);
+    auto stored = buildSimpleStore(rewriter, loc, cast, resultMemRef);
+    rewriter.create<AffineTerminatorOp>(loc, ValueRange({stored}));
 
     // Replace the op
-    rewriter.replaceOp(op, resultMemRef);
+    rewriter.replaceOp(op, forOp.getResult(0));
 
     return success();
   }
@@ -817,15 +823,28 @@ struct CastOpConversion : public OpConversionPattern<ew::CastOp> {
                                resultType.getElementType(), resultIsSigned);
 
     // Create the store
-    rewriter.create<AffineStoreOp>(loc, result, resultMemRef, idxs);
+    auto stored = buildSimpleStore(rewriter, loc, result, resultMemRef);
+    rewriter.create<AffineTerminatorOp>(loc, ValueRange({stored}));
 
     // Replace the op
-    rewriter.replaceOp(op, resultMemRef);
+    rewriter.replaceOp(op, forOp.getResult(0));
 
     IVLOG(2, "CastOpConversion::matchAndRewrite returns success");
     return success();
   }
 };
+
+/*
+static Value findAllocation(Value in) {
+  auto inOp = in..getDefiningOp();
+  assert(inOp);
+  if (llvm::dyn_cast<AllocateOp>(inOp)) {
+    return in;
+  }
+  if (auto redOp = llvm::dyn_cast<ReduceOp>(inOp)) {
+
+          in..getDefiningOp()
+*/
 
 struct ReturnOpConversion : public OpConversionPattern<ReturnOp> {
   using OpConversionPattern<ReturnOp>::OpConversionPattern;
@@ -838,6 +857,7 @@ struct ReturnOpConversion : public OpConversionPattern<ReturnOp> {
     auto funcOp = op.getParentOfType<FuncOp>();
     auto blockArg = funcOp.getType().getNumInputs() - op.getNumOperands();
     for (auto operand : operands) {
+      // Find very initial allocation of memref
       operand.replaceAllUsesWith(block.getArgument(blockArg++));
     }
     rewriter.replaceOpWithNewOp<ReturnOp>(op);
@@ -879,17 +899,21 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
   void runOnOperation() final {
     // Set up target (i.e. what is legal)
     mlir::ConversionTarget target(getContext());
+    TypeConverter converter;
     target.addLegalDialect<mlir::AffineDialect>();
     target.addLegalDialect<mlir::StandardOpsDialect>();
     target.addLegalDialect<dialect::pxa::PXADialect>();
     target.addLegalDialect<dialect::stdx::StdXDialect>();
-    target.addLegalOp<mlir::ModuleOp, mlir::ModuleTerminatorOp>();
-    target.addDynamicallyLegalOp<FuncOp>([](FuncOp op) {
-      auto funcType = op.getType();
-      return funcType.getNumResults() == 0;
+    target.addLegalOp<mlir::ModuleOp, mlir::ModuleTerminatorOp, ReturnOp>();
+    target.addDynamicallyLegalOp<FuncOp>([&](FuncOp op) {
+      return converter.isSignatureLegal(op.getType());
+      // auto funcType = op.getType();
+      // return funcType.getNumResults() == 0;
     });
+    /*
     target.addDynamicallyLegalOp<ReturnOp>(
         [](ReturnOp op) { return op.getNumOperands() == 0; });
+    */
 
     // Setup rewrite patterns
     using CmpIntLtOp =
@@ -901,9 +925,10 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
     using CmpIntGeOp =
         CmpIntInequalityOp<CmpIPredicate::sge, CmpIPredicate::uge>;
     OwningRewritePatternList patterns;
+    populateFuncOpTypeConversionPattern(patterns, &getContext(), converter);
     patterns.insert<
-        TileConstantOpConversion, CastOpConversion, FuncOpConversion,
-        IndexOpConversion, ReturnOpConversion, ScalarConstantOpConversion,
+        TileConstantOpConversion, CastOpConversion, /*FuncOpConversion,*/
+        IndexOpConversion, /*ReturnOpConversion,*/ ScalarConstantOpConversion,
         ShapeOpConversion, TraceOpConversion,
         // TODO: PrngOpConversion
         // TODO: SpecialOpConversion (GatherOp, ReshapeOp,
