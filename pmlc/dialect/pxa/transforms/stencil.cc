@@ -11,6 +11,49 @@
 
 namespace pmlc::dialect::pxa {
 
+namespace {
+
+// A simple wrapper to provide an ordering to object vectors that
+// we're going to be processing with std::next_permutation() --
+// e.g. if we used pointers as comparison values, our order of
+// iteration could vary run-to-run, creating non-determinism.
+template <typename V>
+class Orderer {
+public:
+  Orderer(unsigned ord, V value) : ord_{ord}, value_{std::forward<V>(value)} {}
+
+  void setOrd(unsigned ord) { ord_ = ord; }
+  unsigned ord() const { return ord_; }
+
+  V &operator*() { return value_; }
+  const V &operator*() const { return value_; }
+
+  V &operator->() { return value_; }
+  const V &operator->() const { return value_; }
+
+  bool operator<(const Orderer<V> &other) const { return ord() < other.ord(); }
+
+private:
+  unsigned ord_;
+  V value_;
+};
+
+template <typename V>
+std::ostream &operator<<(std::ostream &os, const Orderer<V> &v) {
+  os << *v << ":" << v.ord();
+  return os;
+}
+
+template <typename V>
+void swap(Orderer<V> &v1, Orderer<V> &v2) {
+  unsigned v1o = v1.ord();
+  v1.setOrd(v2.ord());
+  v2.setOrd(v1o);
+  std::swap(*v1, *v2);
+}
+
+} // namespace
+
 void StencilBase::reportBestStencil(unsigned logLevel) {
   if (VLOG_IS_ON(logLevel)) {
     std::stringstream bestReport;
@@ -194,23 +237,31 @@ void StencilBase::DoStenciling() {
     return;
   }
 
-  // TODO: Deal with nondeterminisitic order
-  llvm::SmallVector<mlir::Operation *, 3> ioOps;
+  // We wrap loads & stores with `Orderer` to make the order the permutations
+  // are iterated through deterministic (the "sorted" order of the IO ops is the
+  // order they were returned by `capture`) -- without this, the sorted order
+  // would be however the pointers were ordered in memory.
+  llvm::SmallVector<Orderer<mlir::Operation *>, 3> ioOpsOrdered;
+  unsigned ord = 0;
   for (auto &loadOp : loadsAndStores.loads) {
-    ioOps.push_back(loadOp);
+    ioOpsOrdered.push_back(Orderer<mlir::Operation *>(ord++, loadOp));
   }
-  unsigned firstStoreIdx = ioOps.size();
+  size_t firstStoreIdx = ioOpsOrdered.size();
   for (auto &storeOp : loadsAndStores.stores) {
-    ioOps.push_back(storeOp);
+    ioOpsOrdered.push_back(Orderer<mlir::Operation *>(ord++, storeOp));
   }
-  auto lastLoadFirstStoreIt = ioOps.begin() + firstStoreIdx;
-  std::sort(ioOps.begin(), lastLoadFirstStoreIt);
+  auto lastLoadFirstStoreIt = ioOpsOrdered.begin() + firstStoreIdx;
+  std::sort(ioOpsOrdered.begin(), lastLoadFirstStoreIt);
   do { // Each load tensor permutation
-    std::sort(lastLoadFirstStoreIt, ioOps.end());
+    std::sort(lastLoadFirstStoreIt, ioOpsOrdered.end());
     do { // Each store tensor permutation
+      llvm::SmallVector<mlir::Operation *, 3> ioOps;
+      for (const auto &ioOp : ioOpsOrdered) {
+        ioOps.push_back(*ioOp);
+      }
       BindIndexes(ioOps);
-    } while (std::next_permutation(lastLoadFirstStoreIt, ioOps.end()));
-  } while (std::next_permutation(ioOps.begin(), lastLoadFirstStoreIt));
+    } while (std::next_permutation(lastLoadFirstStoreIt, ioOpsOrdered.end()));
+  } while (std::next_permutation(ioOpsOrdered.begin(), lastLoadFirstStoreIt));
 
   if (bestCost < std::numeric_limits<double>::infinity()) {
     reportBestStencil(2);
