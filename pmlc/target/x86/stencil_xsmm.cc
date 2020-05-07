@@ -161,7 +161,6 @@ private:
     }
 
     for (unsigned i = 0; i < getTiledIdxCount(); ++i) {
-      // TODO: This should have been verified earlier. Confirm that's true
       assert(getBlockArgsAsSet().count(perm.indexes[i]) &&
              "All tiled indexes must be introduced in current loop");
       auto it = middle_idxs.find(perm.indexes[i]);
