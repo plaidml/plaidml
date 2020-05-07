@@ -44,6 +44,17 @@ void StencilBase::reportBestStencil(unsigned logLevel) {
   }
 }
 
+std::vector<int64_t> StencilBase::generateTilings(int64_t idx, int64_t range) {
+  std::pair<int64_t, int64_t> idxRangePair(idx, range);
+  auto cached = tilingsCache.find(idxRangePair);
+  if (cached != tilingsCache.end()) {
+    return cached->second;
+  }
+  auto result = tilingGenerators[idx](range);
+  tilingsCache.insert(std::make_pair(idxRangePair, result));
+  return result;
+}
+
 int64_t StencilBase::getIdxRange(mlir::BlockArgument idx) {
   assert(getBlockArgsAsSet().count(idx) &&
          "getIdxRange only valid on indexes of current op");
@@ -154,11 +165,10 @@ void StencilBase::RecursiveTileIndex(        //
       bestTiling = *tileSize;
     }
   } else {
-    // TODO: Setup cache for the generator
     assert(getBlockArgsAsSet().count(perm.indexes[currIdx]) &&
            "BlockArg for current index must be valid");
-    for (int64_t currIdxTileSize : tilingGenerators[currIdx](
-             ranges[perm.indexes[currIdx].getArgNumber()])) {
+    for (int64_t currIdxTileSize : generateTilings(
+             currIdx, ranges[perm.indexes[currIdx].getArgNumber()])) {
       (*tileSize)[currIdx] = currIdxTileSize;
       RecursiveTileIndex(perm, tileSize, currIdx + 1);
     }

@@ -205,8 +205,16 @@ private:
                           llvm::SmallVector<int64_t, 8> *tileSize,
                           int64_t currIdx);
 
+  // Cached call of the `idx`th tilingGenerator on parameter `range`
+  std::vector<int64_t> generateTilings(int64_t idx, int64_t range);
+
   unsigned tiledIdxCount;
   BlockArgumentSet blockArgs;
+
+  // Cache of results of tilingGenerators calls: First value of the key is which
+  // generator was called, second value of the key is range it was called with
+  llvm::DenseMap<std::pair<int64_t, int64_t>, std::vector<int64_t>>
+      tilingsCache;
 
   // The range of each index (cached result of op.getConstantRanges())
   llvm::SmallVector<int64_t, 8> ranges;
