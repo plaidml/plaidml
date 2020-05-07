@@ -155,12 +155,14 @@ public:
         bestCost(std::numeric_limits<double>::infinity()) {
     assert(tilingGenerators.size() == tiledIdxCount &&
            "Stencil pass requires one tiling generator per tiled index");
+#ifdef DEBUG
     for (const auto &kvp : requirements) {
       assert(kvp.first.second >= 0 &&
              "Only nonnegative indexes are valid in requirements");
       assert(kvp.first.second < tiledIdxCount &&
              "Only tiled indexes are valid in requirements");
     }
+#endif
     for (auto blockArg : op.getBody()->getArguments()) {
       blockArgs.insert(blockArg);
     }
