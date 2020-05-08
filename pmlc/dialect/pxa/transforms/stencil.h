@@ -249,10 +249,11 @@ private:
   // index permutation.
   llvm::SmallVector<TileSizeGenerator, 5> tilingGenerators;
 
-  // TODO: The documentation of `requirements` is outdated:
-  // For each tensor/index semantic pair (given as a pair of `int64_t`s), a
-  // function to determine if the load or store op of a tensor and the BlockArg
-  // of an index meet the requirements of that pair.
+  // For each index, a IdxStrideReqs, which provides the functions needed to
+  // verify that each store or load op uses this index with the appropriate
+  // striding (e.g., stride 0 if the index is unused for that store/load). See
+  // the `requirements` section of the documentation at the top of this file for
+  // more details
   llvm::SmallVector<IdxStrideReqs, 8> requirements;
 
   // Note: The bestCost, bestPermutation, and bestTiling all must refer to the
