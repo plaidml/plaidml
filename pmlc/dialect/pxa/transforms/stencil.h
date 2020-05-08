@@ -22,11 +22,11 @@
 //  `pxa::AffineReduceOp`)) using the `capture` function.
 //
 //  It will then iterate through all permutations of the IO ops that have all
-//  loads precede all stores, and all permutations of `op`'s `BlockArgument`s as
+//  stores precede all loads, and all permutations of `op`'s `BlockArgument`s as
 //  tiled indexes. (Strictly speaking, since there may be more block args than
 //  tiled indexes, it will iterate over all subsets of block args of size
 //  `tiledIdxCount` and all permutations of each subset). For each such
-//  permutation, `DoStenciling` will verify that each tensor-index requirement
+//  permutation, `DoStenciling` will verify that each stride requirement
 //  specified in `requirements` is met. This logic includes shortcutting to skip
 //  iterating through permutations that are already known to fail.
 //
@@ -45,21 +45,39 @@
 //  * `tiledIdxCount`:
 //    How many indexes will be considered for tiling.
 //  * `tilingGenerators`:
-//    A `TileSizeGenerator` for each tileable index, used to generate proposed
+//    A `TileSizeGenerator` for each tileable index, used to generate candidate
 //    tile sizes for that index.
 //  * `requirements`:
-//    Pairwise tensor-index requirements. TODO: `requirements` docs outdated...
+//    Stride requirements
 //
-//    Maps integer pairs representing IO op order and index order to a function
-//    that determines if a given IO op and BlockArg pair are valid if used in
-//    that order. As an example, consider the trying to match the matmul
+//    A `llvm::SmallVector<IdxStrideReqs, 8>` which has an `IdxStrideReqs` for
+//    each tileable index. These have a function for each I/O Op indicating
+//    which strides are legal for the access of this op by this index. For
+//    instance, if the op shouldn't use this index, the function should be
+//        return stride == 0;
+//
+//    To build requirements, decide on an order of the tensors and indexes.
+//    Importantly, all stores MUST PRECEDE all loads. These orders are otherwise
+//    arbitrary. As an example, consider trying to stencil the matmul
 //        C[i, j] += A[i, k] * B[k, j]
-//    To build requirements, decide on an order of the tensors and indexes
-//    (these orders are arbitrary except that all stores must follow all loads).
-//    Here let's choose {A, B, C} and {i, j, k} as our order. Then to express
-//    the requirement "`j` must be a stride one index of `C`", for the key
-//    (2, 1) we set the value to be a function that returns `true` if and only
-//    if the passed BlockArg is a stride one index of the passed Operation*.
+//    Since the AffineReductionOp writing C is the only store, we make sure it
+//    is first in our tensor order and choose {C, A, B} to order our I/O ops and
+//    choose {i, j, k} to order our indexes. Then the first element of
+//    `requirements` will be the stride requirements for `i`. Looking at the
+//    formula above, we see that both `C` and `A` use `i` in the their access,
+//    but neither needs `i` to be stride 1 specifically as neither uses `i` for
+//    their stride 1 (final) dimension. So their stride verification functions
+//    must validate that the stride is non-zero. For `B`, `i` is not used, and
+//    so its function must validate that the stride is exactly zero. The order
+//    we chose above was C then A then B, so the first element of `requirements`
+//    for this example will be
+//        IdxStrideReqs{
+//          [](int64_t stride) { return stride != 0; }, // C
+//          [](int64_t stride) { return stride != 0; }, // A
+//          [](int64_t stride) { return stride == 0; }, // B
+//        }
+//    A similar technique is used to construct the second IdxStrideReqs (for j)
+//    and the final IdxStrideReqs (for k).
 //
 //  The `op` parameter will be different for each instance of the pass -- it is
 //  the operation that MLIR is trying to stencil. The other constructor
@@ -72,25 +90,29 @@
 //    Search the body of `op` for IO ops, and verify that `op` has a structure
 //    amenable to this stenciling. Returns a `llvm::Optional<LoadStoreOps>`,
 //    which is to be `None` if `op` cannot be stenciled by this pass and
-//    otherwise contains the IO ops, with load ops in `loads` and store or
-//    reduce ops in `stores`. The order of `loads` and `stores` does not matter,
-//    as `DoStencil` will attempt all permutations.
+//    otherwise contains the IO ops, with store or reduce ops in `stores` and
+//    load ops in `loads`. The order of `loads` and `stores` does not matter, as
+//    `DoStencil` will attempt all permutations.
 //  * `getCost`:
 //    Determine the cost of a proposed tiling. The tiling is provided as
 //    parameters to `getCost` (same as for `transform`):
 //     * `perm`: A `TensorAndIndexPermutation` which gives the IO ops and the
-//       indexes in semantic order.
+//       indexes in the same order as `requirements` uses. In particular, this
+//       means all store ops will precede all load ops.
 //     * `tileSizes`: An `ArrayRef<int64_t>` which gives the size of each index
-//       in the selected tiling. Uses the same order of indexes as in `perm`.
+//       in the selected tiling. Uses the same order of indexes as in `perm` and
+//       `requirements`.
 //    Returns the cost as a double. If the proposed tiling is illegal, the cost
 //    `std::numeric_limits<double>::infinity()` should be returned.
 //  * `transform`:
 //    Transform `op` based on the already-determined optimal tiling. The tiling
 //    is provided as paramters to `transform` (same as for `getCost`):
 //     * `perm`: A `TensorAndIndexPermutation` which gives the IO ops and the
-//       indexes in semantic order.
+//       indexes in the same order `requirements` uses. In particular, this
+//       means all store ops will precede all load ops.
 //     * `tileSizes`: An `ArrayRef<int64_t>` which gives the size of each index
-//       in the selected tiling. Uses the same order of indexes as in `perm`.
+//       in the selected tiling. Uses the same order of indexes as in `perm` and
+//       `requirements`.
 //    The `transform` function will also need to access the member variable
 //    `op`, as this is the operation it is transforming.
 //
