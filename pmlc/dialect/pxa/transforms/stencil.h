@@ -48,7 +48,7 @@
 //    A `TileSizeGenerator` for each tileable index, used to generate proposed
 //    tile sizes for that index.
 //  * `requirements`:
-//    Pairwise tensor-index requirements.
+//    Pairwise tensor-index requirements. TODO: `requirements` docs outdated...
 //
 //    Maps integer pairs representing IO op order and index order to a function
 //    that determines if a given IO op and BlockArg pair are valid if used in
@@ -111,6 +111,9 @@ namespace pmlc::dialect::pxa {
 
 using BlockArgumentSet = llvm::SmallPtrSet<mlir::BlockArgument, 8>;
 
+// For an index, verifiers for each tensor that the index's strides match it
+using IdxStrideReqs = llvm::SmallVector<std::function<bool(int64_t)>, 3>;
+
 struct TensorAndIndexPermutation {
   // An order of the Tensors and Indexes used in an operation
   // Note: Tensors are tracked by their load/store/reduce ops, not values,
@@ -142,27 +145,17 @@ using TileSizeGenerator = std::function<std::vector<int64_t>(int64_t)>;
 
 class StencilBase {
 public:
-  explicit StencilBase(
-      mlir::AffineParallelOp op, unsigned tiledIdxCount,
-      llvm::ArrayRef<TileSizeGenerator> tilingGenerators,
-      llvm::DenseMap<
-          std::pair<int64_t, int64_t>,
-          std::function<bool(mlir::Operation *, mlir::BlockArgument)>>
-          requirements)
+  explicit StencilBase(mlir::AffineParallelOp op, unsigned tiledIdxCount,
+                       llvm::ArrayRef<TileSizeGenerator> tilingGenerators,
+                       llvm::ArrayRef<IdxStrideReqs> requirements)
       : op(op), tiledIdxCount(tiledIdxCount),
         tilingGenerators(tilingGenerators.begin(), tilingGenerators.end()),
-        requirements(requirements),
+        requirements(requirements.begin(), requirements.end()),
         bestCost(std::numeric_limits<double>::infinity()) {
     assert(tilingGenerators.size() == tiledIdxCount &&
            "Stencil pass requires one tiling generator per tiled index");
-#ifdef DEBUG
-    for (const auto &kvp : requirements) {
-      assert(kvp.first.second >= 0 &&
-             "Only nonnegative indexes are valid in requirements");
-      assert(kvp.first.second < tiledIdxCount &&
-             "Only tiled indexes are valid in requirements");
-    }
-#endif
+    assert(requirements.size() == tiledIdxCount &&
+           "Stencil pass requires one requirements vector per tiled index");
     for (auto blockArg : op.getBody()->getArguments()) {
       blockArgs.insert(blockArg);
     }
@@ -234,12 +227,11 @@ private:
   // index permutation.
   llvm::SmallVector<TileSizeGenerator, 5> tilingGenerators;
 
+  // TODO: The documentation of `requirements` is outdated:
   // For each tensor/index semantic pair (given as a pair of `int64_t`s), a
   // function to determine if the load or store op of a tensor and the BlockArg
   // of an index meet the requirements of that pair.
-  llvm::DenseMap<std::pair<int64_t, int64_t>,
-                 std::function<bool(mlir::Operation *, mlir::BlockArgument)>>
-      requirements;
+  llvm::SmallVector<IdxStrideReqs, 8> requirements;
 
   // Note: The bestCost, bestPermutation, and bestTiling all must refer to the
   // same permutation & tiling choices and should only be modified together

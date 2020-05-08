@@ -320,46 +320,21 @@ public:
                     3, // Three tileable indexes
                     {EvenTilingGenerator(), EvenTilingGenerator(),
                      EvenTilingGenerator()},
-                    llvm::DenseMap<std::pair<int64_t, int64_t>,
-                                   std::function<bool(mlir::Operation *,
-                                                      mlir::BlockArgument)>>{
-                        {{0, 0},
-                         [this](mlir::Operation *ioOp, mlir::BlockArgument a) {
-                           return getStrideInfo(ioOp)->strides[a] != 0;
-                         }},
-                        {{0, 1},
-                         [this](mlir::Operation *ioOp, mlir::BlockArgument a) {
-                           return getStrideInfo(ioOp)->strides[a] == 0;
-                         }},
-                        {{0, 2},
-                         [this](mlir::Operation *ioOp, mlir::BlockArgument a) {
-                           return getStrideInfo(ioOp)->strides[a] == 1;
-                         }},
-                        {{1, 0},
-                         [this](mlir::Operation *ioOp, mlir::BlockArgument a) {
-                           return getStrideInfo(ioOp)->strides[a] == 0;
-                         }},
-                        {{1, 1},
-                         [this](mlir::Operation *ioOp, mlir::BlockArgument a) {
-                           return getStrideInfo(ioOp)->strides[a] == 1;
-                         }},
-                        {{1, 2},
-                         [this](mlir::Operation *ioOp, mlir::BlockArgument a) {
-                           return getStrideInfo(ioOp)->strides[a] != 0;
-                         }},
-                        {{2, 0},
-                         [this](mlir::Operation *ioOp, mlir::BlockArgument a) {
-                           return getStrideInfo(ioOp)->strides[a] != 0;
-                         }},
-                        {{2, 1},
-                         [this](mlir::Operation *ioOp, mlir::BlockArgument a) {
-                           return getStrideInfo(ioOp)->strides[a] == 1;
-                         }},
-                        {{2, 2},
-                         [this](mlir::Operation *ioOp, mlir::BlockArgument a) {
-                           return getStrideInfo(ioOp)->strides[a] == 0;
-                         }},
-                    }},
+                    {IdxStrideReqs{
+                         [](int64_t strides) { return strides != 0; }, // input0
+                         [](int64_t strides) { return strides == 0; }, // input1
+                         [](int64_t strides) { return strides != 0; }, // output
+                     },
+                     IdxStrideReqs{
+                         [](int64_t strides) { return strides == 0; }, // input0
+                         [](int64_t strides) { return strides == 1; }, // input1
+                         [](int64_t strides) { return strides == 1; }, // output
+                     },
+                     IdxStrideReqs{
+                         [](int64_t strides) { return strides == 1; }, // input0
+                         [](int64_t strides) { return strides != 0; }, // input1
+                         [](int64_t strides) { return strides == 0; }, // output
+                     }}},
         numThreads{numThreads}, stencilCostFn(costFn) {}
 };
 

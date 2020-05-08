@@ -161,9 +161,12 @@ void StencilBase::RecursiveBindIndex(
 
       // Verify the requirements for this index with each tensor are all met
       bool reqsMet = true;
+      assert(requirements[currIdx].size == ioOps.size() &&
+             "Each requirements entry must have one function per I/O op");
       for (unsigned i = 0; i < ioOps.size(); i++) {
-        auto it = requirements.find(std::make_pair(i, currIdx));
-        if (it != requirements.end() && !it->second(ioOps[i], blockArg)) {
+        auto strideInfo = getStrideInfo(ioOps[i]);
+        auto stride = strideInfo->strides[blockArg];
+        if (!requirements[currIdx][i](stride)) {
           reqsMet = false;
           break;
         }
