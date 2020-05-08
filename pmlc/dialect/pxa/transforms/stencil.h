@@ -135,10 +135,10 @@ struct LoadStoreOps {
   // Loads and stores are expected to be distinguished within a single op, so
   // are stored separately. Stores and Reduces are not expected to be
   // distinguished within a single op (`capture` may only allow one or the other
-  // (or both), but almost no cases will have both a store and a reduce within a
-  // single op). Thus, `stores` might have either store or reduce ops.
-  llvm::SmallVector<mlir::Operation *, 2> loads;
+  // (or both), but may not distinguish between store and reduce within a single
+  // op). Thus, `stores` might have either store or reduce ops.
   llvm::SmallVector<mlir::Operation *, 1> stores;
+  llvm::SmallVector<mlir::Operation *, 2> loads;
 };
 
 using TileSizeGenerator = std::function<std::vector<int64_t>(int64_t)>;

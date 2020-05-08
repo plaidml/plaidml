@@ -161,7 +161,7 @@ void StencilBase::RecursiveBindIndex(
 
       // Verify the requirements for this index with each tensor are all met
       bool reqsMet = true;
-      assert(requirements[currIdx].size == ioOps.size() &&
+      assert(requirements[currIdx].size() == ioOps.size() &&
              "Each requirements entry must have one function per I/O op");
       for (unsigned i = 0; i < ioOps.size(); i++) {
         auto strideInfo = getStrideInfo(ioOps[i]);
@@ -242,25 +242,25 @@ void StencilBase::DoStenciling() {
   // would be however the pointers were ordered in memory.
   llvm::SmallVector<Orderer<mlir::Operation *>, 3> ioOpsOrdered;
   unsigned ord = 0;
-  for (auto &loadOp : loadsAndStores.loads) {
-    ioOpsOrdered.push_back(Orderer<mlir::Operation *>(ord++, loadOp));
-  }
-  size_t firstStoreIdx = ioOpsOrdered.size();
   for (auto &storeOp : loadsAndStores.stores) {
     ioOpsOrdered.push_back(Orderer<mlir::Operation *>(ord++, storeOp));
   }
-  auto lastLoadFirstStoreIt = ioOpsOrdered.begin() + firstStoreIdx;
-  std::sort(ioOpsOrdered.begin(), lastLoadFirstStoreIt);
-  do { // Each load tensor permutation
-    std::sort(lastLoadFirstStoreIt, ioOpsOrdered.end());
-    do { // Each store tensor permutation
+  size_t firstLoadIdx = ioOpsOrdered.size();
+  for (auto &loadOp : loadsAndStores.loads) {
+    ioOpsOrdered.push_back(Orderer<mlir::Operation *>(ord++, loadOp));
+  }
+  auto lastStoreFirstLoadIt = ioOpsOrdered.begin() + firstLoadIdx;
+  std::sort(ioOpsOrdered.begin(), lastStoreFirstLoadIt);
+  do { // Each store tensor permutation
+    std::sort(lastStoreFirstLoadIt, ioOpsOrdered.end());
+    do { // Each load tensor permutation
       llvm::SmallVector<mlir::Operation *, 3> ioOps;
       for (const auto &ioOp : ioOpsOrdered) {
         ioOps.push_back(*ioOp);
       }
       BindIndexes(ioOps);
-    } while (std::next_permutation(lastLoadFirstStoreIt, ioOpsOrdered.end()));
-  } while (std::next_permutation(ioOpsOrdered.begin(), lastLoadFirstStoreIt));
+    } while (std::next_permutation(lastStoreFirstLoadIt, ioOpsOrdered.end()));
+  } while (std::next_permutation(ioOpsOrdered.begin(), lastStoreFirstLoadIt));
 
   if (bestCost < std::numeric_limits<double>::infinity()) {
     reportBestStencil(2);

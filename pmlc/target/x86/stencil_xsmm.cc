@@ -120,7 +120,7 @@ private:
     // The middle idxs are the accumulation indexes, i.e. those used on loads
     // but not stores
     llvm::DenseMap<mlir::BlockArgument, unsigned> middle_idxs;
-    auto in0StrideInfo = getStrideInfo(perm.ioOps[0]);
+    auto in0StrideInfo = getStrideInfo(perm.ioOps[1]);
     for (const auto &kvp : in0StrideInfo->strides) {
       if (getBlockArgsAsSet().count(kvp.first)) {
         IVLOG(6, "Based on first tensor, inserting middle index "
@@ -133,7 +133,7 @@ private:
     }
     IVLOG(5, "Current size of middle_idxs = " << middle_idxs.size());
 
-    auto in1StrideInfo = getStrideInfo(perm.ioOps[1]);
+    auto in1StrideInfo = getStrideInfo(perm.ioOps[2]);
     for (const auto &kvp : in1StrideInfo->strides) {
       if (getBlockArgsAsSet().count(kvp.first)) {
         IVLOG(6, "Based on second tensor, inserting middle index "
@@ -145,7 +145,7 @@ private:
       }
     }
     IVLOG(5, "Current size of middle_idxs = " << middle_idxs.size());
-    auto outStrideInfo = getStrideInfo(perm.ioOps[2]);
+    auto outStrideInfo = getStrideInfo(perm.ioOps[0]);
     for (const auto &kvp : outStrideInfo->strides) {
       if (getBlockArgsAsSet().count(kvp.first)) {
         auto it = middle_idxs.find(kvp.first);
@@ -242,9 +242,9 @@ private:
     op.setSteps(steps);
 
     // Generate the XSMM call; first select inputs based on permutation order
-    auto opA = llvm::dyn_cast<mlir::AffineLoadOp>(*perm.ioOps[0]);
-    auto opB = llvm::dyn_cast<mlir::AffineLoadOp>(*perm.ioOps[1]);
-    auto opC = llvm::dyn_cast<AffineReduceOp>(*perm.ioOps[2]);
+    auto opC = llvm::dyn_cast<AffineReduceOp>(*perm.ioOps[0]);
+    auto opA = llvm::dyn_cast<mlir::AffineLoadOp>(*perm.ioOps[1]);
+    auto opB = llvm::dyn_cast<mlir::AffineLoadOp>(*perm.ioOps[2]);
     assert(opA && opB && opC);
 
     // Get the current memrefs
@@ -321,19 +321,19 @@ public:
                     {EvenTilingGenerator(), EvenTilingGenerator(),
                      EvenTilingGenerator()},
                     {IdxStrideReqs{
+                         [](int64_t stride) { return stride != 0; }, // output
                          [](int64_t stride) { return stride != 0; }, // input0
                          [](int64_t stride) { return stride == 0; }, // input1
-                         [](int64_t stride) { return stride != 0; }, // output
                      },
                      IdxStrideReqs{
+                         [](int64_t stride) { return stride == 1; }, // output
                          [](int64_t stride) { return stride == 0; }, // input0
                          [](int64_t stride) { return stride == 1; }, // input1
-                         [](int64_t stride) { return stride == 1; }, // output
                      },
                      IdxStrideReqs{
+                         [](int64_t stride) { return stride == 0; }, // output
                          [](int64_t stride) { return stride == 1; }, // input0
                          [](int64_t stride) { return stride != 0; }, // input1
-                         [](int64_t stride) { return stride == 0; }, // output
                      }}},
         numThreads{numThreads}, stencilCostFn(costFn) {}
 };
