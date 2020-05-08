@@ -321,19 +321,19 @@ public:
                     {EvenTilingGenerator(), EvenTilingGenerator(),
                      EvenTilingGenerator()},
                     {IdxStrideReqs{
-                         [](int64_t strides) { return strides != 0; }, // input0
-                         [](int64_t strides) { return strides == 0; }, // input1
-                         [](int64_t strides) { return strides != 0; }, // output
+                         [](int64_t stride) { return stride != 0; }, // input0
+                         [](int64_t stride) { return stride == 0; }, // input1
+                         [](int64_t stride) { return stride != 0; }, // output
                      },
                      IdxStrideReqs{
-                         [](int64_t strides) { return strides == 0; }, // input0
-                         [](int64_t strides) { return strides == 1; }, // input1
-                         [](int64_t strides) { return strides == 1; }, // output
+                         [](int64_t stride) { return stride == 0; }, // input0
+                         [](int64_t stride) { return stride == 1; }, // input1
+                         [](int64_t stride) { return stride == 1; }, // output
                      },
                      IdxStrideReqs{
-                         [](int64_t strides) { return strides == 1; }, // input0
-                         [](int64_t strides) { return strides != 0; }, // input1
-                         [](int64_t strides) { return strides == 0; }, // output
+                         [](int64_t stride) { return stride == 1; }, // input0
+                         [](int64_t stride) { return stride != 0; }, // input1
+                         [](int64_t stride) { return stride == 0; }, // output
                      }}},
         numThreads{numThreads}, stencilCostFn(costFn) {}
 };
