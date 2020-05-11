@@ -1206,7 +1206,7 @@ def pool2d(x, pool_size, strides=(1, 1), padding='valid', data_format=None, pool
                 strides=strides,
                 padding=padding,
                 data_format=data_format,
-                pool_mode=_normalize_pool_mode(pool_mode))
+                pool_mode=pool_mode)
 
 
 @_log_call
@@ -1216,7 +1216,7 @@ def pool3d(x, pool_size, strides=(1, 1, 1), padding='valid', data_format=None, p
                 strides=strides,
                 padding=padding,
                 data_format=data_format,
-                pool_mode=_normalize_pool_mode(pool_mode))
+                pool_mode=pool_mode)
 
 
 @_log_call
