@@ -1008,7 +1008,7 @@ TEST_F(CppEdsl, Shape) {
 TEST_F(CppEdsl, Prng) {
   auto S = Placeholder(DType::UINT32, {3, 2048});
   auto O = prng(S, {2, 3, 4, 5});
-  auto program = ProgramBuilder("prng", {O}).target("").compile();
+  auto program = makeProgram("prng", {O});
   std::cout << program << std::endl;
   // clang-format off
   // CHECK-LABEL: CppEdsl.Prng
@@ -1020,8 +1020,7 @@ TEST_F(CppEdsl, Prng) {
   // CHECK: %result, %new_state = "tile.prng"(%{{.*}}, %[[c2]], %[[c3]], %[[c4]], %[[c5]]) : (tensor<3x2048xui32>, tensor<si32>, tensor<si32>, tensor<si32>, tensor<si32>) -> (tensor<2x3x4x5xf32>, tensor<3x2048xui32>)
   // CHECK: return %result, %new_state : tensor<2x3x4x5xf32>, tensor<3x2048xui32>
   // clang-format on
-  // TODO: lowering for PrngOp
-  // runProgram(program);
+  runProgram(program);
 }
 
 TEST_F(CppEdsl, ConvI8) {
