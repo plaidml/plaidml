@@ -32,6 +32,7 @@ plaidml_cc_library(
         "autotile.h",
         "passes.h",
         "tile.h",
+        "stencil.h",
     ],
     deps = [
         ":gen-pass",
