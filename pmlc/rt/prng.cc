@@ -4,24 +4,25 @@
 #include "pmlc/util/logging.h"
 
 extern "C" void
-plaidml_rt_prng(size_t stateRank, UnrankedMemRefType<float> *state,
-                size_t resultRank, UnrankedMemRefType<float> *result,
-                size_t newStateRank, UnrankedMemRefType<float> *newState) {
-  if (resultRank <= 0) {
-    // Nothing to do or a bad parameter.
+plaidml_rt_prng(unsigned stateRank, UnrankedMemRefType<float> *state,
+                unsigned resultRank, UnrankedMemRefType<float> *result,
+                unsigned newStateRank, UnrankedMemRefType<float> *newState) {
+  if (resultRank == 0) {
+    // Nothing to do.
     return;
   }
 
   // From the StridedMemRef types below we use only the sizes[]. Their offset is
   // independent of the value of the second type parameter.
-  StridedMemRefType<int, 1> *stateStrided = (StridedMemRefType<int, 1> *)state;
+  StridedMemRefType<int32_t, 1> *stateStrided =
+      reinterpret_cast<StridedMemRefType<int32_t, 1> *>(state);
   StridedMemRefType<float, 1> *resultStrided =
-      (StridedMemRefType<float, 1> *)result;
-  StridedMemRefType<int, 1> *newStateStrided =
-      (StridedMemRefType<int, 1> *)newState;
+      reinterpret_cast<StridedMemRefType<float, 1> *>(result);
+  StridedMemRefType<int32_t, 1> *newStateStrided =
+      reinterpret_cast<StridedMemRefType<int32_t, 1> *>(newState);
 
-  int count = resultStrided->sizes[0];
-  for (size_t i = 1; i < resultRank; i++) {
+  unsigned count = resultStrided->sizes[0];
+  for (unsigned i = 1; i < resultRank; i++) {
     count *= resultStrided->sizes[i];
   }
 
@@ -34,7 +35,7 @@ plaidml_rt_prng(size_t stateRank, UnrankedMemRefType<float> *state,
   // s1_{n+1} = (((s1_n & 4294967294) <<12) ^ (((s1_n <<13) ^ s1_n) >>19))
   // s2_{n+1} = (((s2_n & 4294967288) << 4) ^ (((s2_n << 2) ^ s2_n) >>25))
   // s3_{n+1} = (((s3_n & 4294967280) <<17) ^ (((s3_n << 3) ^ s3_n) >>11))
-  for (size_t i = 0; i < count; ++i) {
+  for (unsigned i = 0; i < count; ++i) {
     buf[i] = (in_state[0] ^ in_state[1] ^ in_state[2]) / 4294967296.0;
     out_state[0] = (((in_state[0] & 4294967294) << 12) ^
                     (((in_state[0] << 13) ^ in_state[0]) >> 19));
