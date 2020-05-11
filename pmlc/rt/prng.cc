@@ -3,32 +3,25 @@
 #include "pmlc/compiler/registry.h"
 #include "pmlc/util/logging.h"
 
-extern "C" void
-plaidml_rt_prng(unsigned stateRank, UnrankedMemRefType<float> *state,
-                unsigned resultRank, UnrankedMemRefType<float> *result,
-                unsigned newStateRank, UnrankedMemRefType<float> *newState) {
+extern "C" void plaidml_rt_prng(unsigned stateRank,
+                                StridedMemRefType<int32_t, 1> *state,
+                                unsigned resultRank,
+                                StridedMemRefType<float, 1> *result,
+                                unsigned newStateRank,
+                                StridedMemRefType<int32_t, 1> *newState) {
   if (resultRank == 0) {
     // Nothing to do.
     return;
   }
 
-  // From the StridedMemRef types below we use only the sizes[]. Their offset is
-  // independent of the value of the second type parameter.
-  StridedMemRefType<int32_t, 1> *stateStrided =
-      reinterpret_cast<StridedMemRefType<int32_t, 1> *>(state);
-  StridedMemRefType<float, 1> *resultStrided =
-      reinterpret_cast<StridedMemRefType<float, 1> *>(result);
-  StridedMemRefType<int32_t, 1> *newStateStrided =
-      reinterpret_cast<StridedMemRefType<int32_t, 1> *>(newState);
-
-  unsigned count = resultStrided->sizes[0];
+  unsigned count = result->sizes[0];
   for (unsigned i = 1; i < resultRank; i++) {
-    count *= resultStrided->sizes[i];
+    count *= result->sizes[i];
   }
 
-  int *in_state = stateStrided->data + stateStrided->offset;
-  float *buf = resultStrided->data + resultStrided->offset;
-  int *out_state = newStateStrided->data + newStateStrided->offset;
+  int *in_state = state->data + state->offset;
+  float *buf = result->data + result->offset;
+  int *out_state = newState->data + newState->offset;
 
   // A reimplementation of the PRNG from tile/lang/gen_special.cc.
   // x_n = (s1_n ^ s2_n ^ s3_n)
