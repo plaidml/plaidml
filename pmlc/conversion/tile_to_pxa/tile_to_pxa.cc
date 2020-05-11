@@ -537,7 +537,7 @@ struct BufferAllocator {
   }
 };
 
-struct TilePrngOpConversion : public OpConversionPattern<PrngOp> {
+struct PrngOpConversion : public OpConversionPattern<PrngOp> {
   using OpConversionPattern<PrngOp>::OpConversionPattern;
 
   LogicalResult
@@ -968,8 +968,7 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
     patterns.insert<
         TileConstantOpConversion, CastOpConversion, FuncOpConversion,
         IndexOpConversion, ReturnOpConversion, ScalarConstantOpConversion,
-        ShapeOpConversion, TraceOpConversion, TilePrngOpConversion,
-        // TODO: PrngOpConversion
+        ShapeOpConversion, TraceOpConversion, PrngOpConversion,
         // TODO: SpecialOpConversion (GatherOp, ReshapeOp,
         // ScatterOp, ZeroOp)
         ContractionOpConversion<CombinationKind::none, FirstOperand>,
