@@ -28,15 +28,18 @@ extern "C" void plaidml_rt_prng(unsigned stateRank,
   // s1_{n+1} = (((s1_n & 4294967294) <<12) ^ (((s1_n <<13) ^ s1_n) >>19))
   // s2_{n+1} = (((s2_n & 4294967288) << 4) ^ (((s2_n << 2) ^ s2_n) >>25))
   // s3_{n+1} = (((s3_n & 4294967280) <<17) ^ (((s3_n << 3) ^ s3_n) >>11))
+  int32_t in0 = in_state[0];
+  int32_t in1 = in_state[1];
+  int32_t in2 = in_state[2];
   for (unsigned i = 0; i < count; ++i) {
-    buf[i] = (in_state[0] ^ in_state[1] ^ in_state[2]) / 4294967296.0;
-    out_state[0] = (((in_state[0] & 4294967294) << 12) ^
-                    (((in_state[0] << 13) ^ in_state[0]) >> 19));
-    out_state[1] = (((in_state[1] & 4294967288) << 4) ^
-                    (((in_state[1] << 2) ^ in_state[1]) >> 25));
-    out_state[2] = (((in_state[2] & 4294967280) << 17) ^
-                    (((in_state[2] << 3) ^ in_state[2]) >> 11));
-    in_state = out_state;
+    buf[i] = (in0 ^ in1 ^ in2) / 4294967296.0;
+    int32_t out0 = (((in0 & 4294967294) << 12) ^ (((in0 << 13) ^ in0) >> 19));
+    int32_t out1 = (((in1 & 4294967288) << 4) ^ (((in1 << 2) ^ in1) >> 25));
+    int32_t out2 = (((in2 & 4294967280) << 17) ^ (((in2 << 3) ^ in2) >> 11));
+
+    in_state[0] = out_state[0] = out0;
+    in_state[1] = out_state[1] = out1;
+    in_state[2] = out_state[2] = out2;
   }
 }
 
