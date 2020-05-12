@@ -74,10 +74,18 @@ struct AffineParallelOpConversion : public LoweringBase<AffineParallelOp> {
       ivs.push_back(af.getInductionVar());
     }
     // Move ParallelOp's operations (single block) to Affine innermost loop.
+    // (But when `op` has no indexes, there are no Affine loops and we need to
+    // instead put `op`'s body where `op` is.)
     auto &innerLoopOps = rewriter.getInsertionBlock()->getOperations();
     auto &stripeBodyOps = op.region().front().getOperations();
-    innerLoopOps.splice(std::prev(innerLoopOps.end()), stripeBodyOps,
-                        stripeBodyOps.begin(), std::prev(stripeBodyOps.end()));
+    mlir::Block::iterator insertion_loc;
+    if (op.lowerBoundsMap().getNumResults() > 0) {
+      insertion_loc = std::prev(innerLoopOps.end());
+    } else {
+      insertion_loc = mlir::Block::iterator(op);
+    }
+    innerLoopOps.splice(insertion_loc, stripeBodyOps, stripeBodyOps.begin(),
+                        std::prev(stripeBodyOps.end()));
     // Replace all uses of old values
     size_t idx = 0;
     for (auto arg : op.region().front().getArguments()) {
