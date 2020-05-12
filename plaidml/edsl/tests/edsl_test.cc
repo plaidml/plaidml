@@ -1035,10 +1035,10 @@ TEST_F(CppEdsl, PrngResultNotNegative) {
   // CHECK-LABEL: CppEdsl.PrngResultNotNegative
   // clang-format on
 
-  std::vector<int> input = {
-      -5, -6, -7,  //
-      4,  5,  6,   //
-      7,  8,  9,   //
+  std::vector<uint32_t> input = {
+      5, 6, 7,  //
+      4, 5, 6,  //
+      7, 8, 9,  //
   };
 
   auto binder = exec::Binder(program);
