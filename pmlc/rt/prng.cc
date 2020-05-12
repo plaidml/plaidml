@@ -28,16 +28,19 @@ extern "C" void plaidml_rt_prng(unsigned stateRank,
   // s1_{n+1} = (((s1_n & 4294967294) <<12) ^ (((s1_n <<13) ^ s1_n) >>19))
   // s2_{n+1} = (((s2_n & 4294967288) << 4) ^ (((s2_n << 2) ^ s2_n) >>25))
   // s3_{n+1} = (((s3_n & 4294967280) <<17) ^ (((s3_n << 3) ^ s3_n) >>11))
+  int32_t s0 = in_state[0];
+  int32_t s1 = in_state[1];
+  int32_t s2 = in_state[2];
   for (unsigned i = 0; i < count; ++i) {
-    buf[i] = (in_state[0] ^ in_state[1] ^ in_state[2]) / 4294967296.0;
-    out_state[0] = (((in_state[0] & 4294967294) << 12) ^
-                    (((in_state[0] << 13) ^ in_state[0]) >> 19));
-    out_state[1] = (((in_state[1] & 4294967288) << 4) ^
-                    (((in_state[1] << 2) ^ in_state[1]) >> 25));
-    out_state[2] = (((in_state[2] & 4294967280) << 17) ^
-                    (((in_state[2] << 3) ^ in_state[2]) >> 11));
-    in_state = out_state;
+    buf[i] = (s0 ^ s1 ^ s2) / 4294967296.0;
+    s0 = (((s0 & 4294967294) << 12) ^ (((s0 << 13) ^ s0) >> 19));
+    s1 = (((s1 & 4294967288) << 4) ^ (((s1 << 2) ^ s1) >> 25));
+    s2 = (((s2 & 4294967280) << 17) ^ (((s2 << 3) ^ s2) >> 11));
   }
+
+  out_state[0] = s0;
+  out_state[1] = s1;
+  out_state[2] = s2;
 }
 
 namespace {
