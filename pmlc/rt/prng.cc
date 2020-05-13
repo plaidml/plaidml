@@ -3,18 +3,17 @@
 #include "pmlc/compiler/registry.h"
 #include "pmlc/util/logging.h"
 
-extern "C" void plaidml_rt_prng(unsigned stateRank,
-                                StridedMemRefType<uint32_t, 1> *state,
-                                unsigned resultRank,
-                                StridedMemRefType<float, 1> *result,
-                                unsigned newStateRank,
-                                StridedMemRefType<uint32_t, 1> *newState) {
+extern "C" void
+plaidml_rt_prng(unsigned stateRank, StridedMemRefType<uint32_t, 100> *state,
+                unsigned resultRank, StridedMemRefType<float, 100> *result,
+                unsigned newStateRank,
+                StridedMemRefType<uint32_t, 100 : wq> *newState) {
   if (resultRank == 0) {
     // Nothing to do.
     return;
   }
 
-  unsigned count = result->sizes[0];
+  uint64_t count = result->sizes[0];
   for (unsigned i = 1; i < resultRank; i++) {
     count *= result->sizes[i];
   }
@@ -31,7 +30,7 @@ extern "C" void plaidml_rt_prng(unsigned stateRank,
   uint32_t s0 = in_state[0];
   uint32_t s1 = in_state[1];
   uint32_t s2 = in_state[2];
-  for (unsigned i = 0; i < count; ++i) {
+  for (uint64_t i = 0; i < count; ++i) {
     buf[i] = (s0 ^ s1 ^ s2) / 4294967296.0;
     s0 = (((s0 & 4294967294) << 12) ^ (((s0 << 13) ^ s0) >> 19));
     s1 = (((s1 & 4294967288) << 4) ^ (((s1 << 2) ^ s1) >> 25));
