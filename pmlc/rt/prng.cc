@@ -3,11 +3,12 @@
 #include "pmlc/compiler/registry.h"
 #include "pmlc/util/logging.h"
 
-extern "C" void
-plaidml_rt_prng(unsigned stateRank, StridedMemRefType<uint32_t, 100> *state,
-                unsigned resultRank, StridedMemRefType<float, 100> *result,
-                unsigned newStateRank,
-                StridedMemRefType<uint32_t, 100 : wq> *newState) {
+extern "C" void plaidml_rt_prng(unsigned stateRank,
+                                StridedMemRefType<uint32_t, 100> *state,
+                                unsigned resultRank,
+                                StridedMemRefType<float, 100> *result,
+                                unsigned newStateRank,
+                                StridedMemRefType<uint32_t, 100> *newState) {
   if (resultRank == 0) {
     // Nothing to do.
     return;
