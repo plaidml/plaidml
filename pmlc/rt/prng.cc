@@ -4,18 +4,13 @@
 #include "pmlc/util/logging.h"
 
 extern "C" void plaidml_rt_prng(unsigned stateRank,
-                                StridedMemRefType<uint32_t, 10> *state,
+                                StridedMemRefType<uint32_t, 2> *state,
                                 unsigned resultRank,
                                 StridedMemRefType<float, 20> *result,
                                 unsigned newStateRank,
-                                StridedMemRefType<uint32_t, 20> *newState) {
-  if (resultRank == 0) {
-    // Nothing to do.
-    return;
-  }
-
-  unsigned count = result->sizes[0];
-  for (unsigned i = 1; i < resultRank; i++) {
+                                StridedMemRefType<uint32_t, 2> *newState) {
+  unsigned count = 1;
+  for (unsigned i = 0; i < resultRank; i++) {
     count *= result->sizes[i];
   }
 
