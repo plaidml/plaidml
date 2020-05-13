@@ -6,6 +6,7 @@ dependencies:
   - doxygen
   - jupyter
   - nbformat=4.4.0 # Latest version of nbformat breaks the analysis notebook
+  - libopencv=4.2.0
   - pip=19
   - python=3.7.4
   - scikit-image
