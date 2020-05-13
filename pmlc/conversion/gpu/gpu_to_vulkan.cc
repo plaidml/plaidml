@@ -50,8 +50,27 @@ static constexpr const char *kCreateVulkanMemoryTransferAction =
     "createVulkanMemoryTransferAction";
 static constexpr const char *kAddVulkanLaunchActionToSchedule =
     "addVulkanLaunchActionToSchedule";
+
+static constexpr const char *kBindBufferBFloat16 = "bindBufferBFloat16";
+static constexpr const char *kBindBufferFloat16 = "bindBufferFloat16";
 static constexpr const char *kBindBufferFloat32 = "bindBufferFloat32";
-static constexpr const char *kBindBufferInt64 = "bindBufferInt64";
+static constexpr const char *kBindBufferFloat64 = "bindBufferFloat64";
+
+// These functions are signless, meaning they apply to both signed and unsigned
+// integers
+static constexpr const char *kBindBufferInteger8 = "bindBufferInteger8";
+static constexpr const char *kBindBufferInteger16 = "bindBufferInteger16";
+static constexpr const char *kBindBufferInteger32 = "bindBufferInteger32";
+static constexpr const char *kBindBufferInteger64 = "bindBufferInteger64";
+
+static constexpr const int byteBits = 8;
+static constexpr const int intMinBytes = 1;
+static constexpr const int intMaxBytes = 8;
+
+static constexpr const int bFloat16Bytes = 2;
+static constexpr const int float16Bytes = 2;
+static constexpr const int float32Bytes = 4;
+static constexpr const int float64Bytes = 8;
 
 /// A pass to convert gpu launch op to vulkan launch call op, by creating a
 /// SPIR-V binary shader from `spirv::ModuleOp` using `spirv::serialize`
@@ -99,8 +118,6 @@ private:
 
     OpBuilder builder(getOperation());
     mlirIndexType = builder.getIndexType();
-    mlirInt32Type = builder.getIntegerType(32);
-    mlirInt64Type = builder.getIntegerType(64);
     mlirFloat32Type = builder.getF32Type();
   }
 
@@ -109,13 +126,59 @@ private:
   }
 
   const char *getBufferBindingFunc(Type &elementType) {
+    if (elementType.isInteger(8)) {
+      return kBindBufferInteger8;
+    }
+    if (elementType.isInteger(16)) {
+      return kBindBufferInteger16;
+    }
+    if (elementType.isInteger(32)) {
+      return kBindBufferInteger32;
+    }
     if (elementType.isInteger(64)) {
-      return kBindBufferInt64;
+      return kBindBufferInteger64;
+    }
+    if (elementType.isBF16()) {
+      return kBindBufferBFloat16;
+    }
+    if (elementType.isF16()) {
+      return kBindBufferFloat16;
     }
     if (elementType.isF32()) {
       return kBindBufferFloat32;
     }
+    if (elementType.isF64()) {
+      return kBindBufferFloat64;
+    }
     return nullptr;
+  }
+
+  void getElementTypeSize(Type &elementType, uint32_t &size) {
+    for (int i = intMinBytes; i <= intMaxBytes; i *= 2) {
+      if (elementType.isInteger(i * byteBits)) {
+        size = i;
+        return;
+      }
+    }
+    if (elementType.isBF16()) {
+      size = bFloat16Bytes;
+      return;
+    }
+    if (elementType.isF16()) {
+      size = float16Bytes;
+      return;
+    }
+    if (elementType.isF32()) {
+      size = float32Bytes;
+      return;
+    }
+    if (elementType.isF64()) {
+      size = float64Bytes;
+      return;
+    }
+    emitError(mlir::UnknownLoc::get(&getContext()))
+        << elementType << "unsupported to run on Vulkan\n";
+    return signalPassFailure();
   }
 
   LLVM::LLVMDialect *getLLVMDialect() { return llvmDialect; }
@@ -126,8 +189,6 @@ private:
 
   mlir::Type &getMLIRFloat32Type() { return mlirFloat32Type; }
   mlir::Type &getMLIRIndexType() { return mlirIndexType; }
-  mlir::Type &getMLIRInt32Type() { return mlirInt32Type; }
-  mlir::Type &getMLIRInt64Type() { return mlirInt64Type; }
 
   LLVM::LLVMDialect *llvmDialect;
   LLVM::LLVMType llvmVoidType;
@@ -135,15 +196,14 @@ private:
   LLVM::LLVMType llvmInt32Type;
   LLVM::LLVMType llvmInt64Type;
 
-  mlir::Type mlirInt32Type;
-  mlir::Type mlirInt64Type;
   mlir::Type mlirFloat32Type;
   mlir::Type mlirIndexType;
 
   uint64_t numKernel = 0;
   uint64_t lauchFuncIndex = 0;
-  llvm::DenseMap<Value, llvm::SmallVector<uint64_t, 2>> bufferMap;
   mlir::Value vulkanRuntime;
+  llvm::DenseMap<Value, llvm::SmallVector<uint64_t, 2>> bufferMap;
+  llvm::SmallVector<mlir::Type, 4> bufferElementTypes;
 };
 
 void ConvertGpuLaunchFuncToVulkanCalls::runOnOperation() {
@@ -210,14 +270,28 @@ ConvertGpuLaunchFuncToVulkanCalls::bindBuffers(Location loc, OpBuilder &builder,
     Value descriptorBinding = builder.create<LLVM::ConstantOp>(
         loc, getLLVMInt32Type(), builder.getI32IntegerAttr(bindIndex));
     if (auto memRefType = buffer.getType().dyn_cast_or_null<MemRefType>()) {
+      auto shape = memRefType.getShape();
+      uint32_t numElement = 1;
+      for (auto dim : shape) {
+        numElement *= dim;
+      }
+
       auto elementType = memRefType.getElementType();
+      bufferElementTypes.push_back(elementType);
+      uint32_t elementTypeSize = 0;
+      getElementTypeSize(elementType, elementTypeSize);
+
+      Value bufferByteSize = builder.create<LLVM::ConstantOp>(
+          loc, getLLVMInt32Type(),
+          builder.getI32IntegerAttr(numElement * elementTypeSize));
       Value unrankedBuffer = builder.create<mlir::MemRefCastOp>(
           loc, buffer, getUnrankedMemRefType(elementType));
+
       builder.create<CallOp>(
           loc, ArrayRef<Type>{},
           builder.getSymbolRefAttr(getBufferBindingFunc(elementType)),
           ArrayRef<Value>{vulkanRuntime, descriptorSet, descriptorBinding,
-                          unrankedBuffer});
+                          bufferByteSize, unrankedBuffer});
     } else {
       return failure();
     }
@@ -343,33 +417,25 @@ void ConvertGpuLaunchFuncToVulkanCalls::declareVulkanFunctions(Location loc) {
         ArrayRef<std::pair<mlir::Identifier, mlir::Attribute>>());
   }
 
-  if (!module.lookupSymbol(kBindBufferFloat32)) {
-    auto &ctx = getContext();
-    builder.create<FuncOp>(
-        loc, kBindBufferFloat32,
-        FunctionType::get(
-            {ArrayRef<Type>{getLLVMPointerType(), getLLVMInt32Type(),
-                            getLLVMInt32Type(),
-                            getUnrankedMemRefType(getMLIRFloat32Type())}},
-            {}, &ctx),
-        ArrayRef<std::pair<mlir::Identifier, mlir::Attribute>>());
-  }
-
-  if (!module.lookupSymbol(kBindBufferInt64)) {
-    auto &ctx = getContext();
-    builder.create<FuncOp>(
-        loc, kBindBufferInt64,
-        FunctionType::get(
-            {ArrayRef<Type>{getLLVMPointerType(), getLLVMInt32Type(),
-                            getLLVMInt32Type(),
-                            getUnrankedMemRefType(getMLIRInt64Type())}},
-            {}, &ctx),
-        ArrayRef<std::pair<mlir::Identifier, mlir::Attribute>>());
+  for (auto bufferElementType : bufferElementTypes) {
+    auto func = getBufferBindingFunc(bufferElementType);
+    if (!module.lookupSymbol(func)) {
+      auto &ctx = getContext();
+      builder.create<FuncOp>(
+          loc, func,
+          FunctionType::get(
+              {ArrayRef<Type>{getLLVMPointerType(), getLLVMInt32Type(),
+                              getLLVMInt32Type(), getLLVMInt32Type(),
+                              getUnrankedMemRefType(bufferElementType)}},
+              {}, &ctx),
+          ArrayRef<std::pair<mlir::Identifier, mlir::Attribute>>());
+    }
   }
 }
 
 void ConvertGpuLaunchFuncToVulkanCalls::convertGpuLaunchFunc(
     gpu::LaunchFuncOp launchOp) {
+
   ModuleOp module = getOperation();
   OpBuilder builder(launchOp);
   Location loc = launchOp.getLoc();
