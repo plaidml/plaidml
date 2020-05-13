@@ -78,13 +78,13 @@ struct AffineParallelOpConversion : public LoweringBase<AffineParallelOp> {
     // instead put `op`'s body where `op` is.)
     auto &innerLoopOps = rewriter.getInsertionBlock()->getOperations();
     auto &stripeBodyOps = op.region().front().getOperations();
-    mlir::Block::iterator insertion_loc;
+    mlir::Block::iterator insertionLoc;
     if (op.lowerBoundsMap().getNumResults() > 0) {
-      insertion_loc = std::prev(innerLoopOps.end());
+      insertionLoc = std::prev(innerLoopOps.end());
     } else {
-      insertion_loc = mlir::Block::iterator(op);
+      insertionLoc = mlir::Block::iterator(op);
     }
-    innerLoopOps.splice(insertion_loc, stripeBodyOps, stripeBodyOps.begin(),
+    innerLoopOps.splice(insertionLoc, stripeBodyOps, stripeBodyOps.begin(),
                         std::prev(stripeBodyOps.end()));
     // Replace all uses of old values
     size_t idx = 0;
