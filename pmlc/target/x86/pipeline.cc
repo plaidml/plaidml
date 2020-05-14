@@ -140,8 +140,8 @@ void addToPipeline(OpPassManager &pm) {
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
-  // pm.addPass(pmlc::dialect::pxa::createStencilPass(1, heatmapCost));
-  // pm.addPass(createXSMMLoweringPass());
+  pm.addPass(pmlc::dialect::pxa::createXSMMStencilPass(1, heatmapCost));
+  pm.addPass(createXSMMLoweringPass());
 
   pm.addPass(conversion::pxa_to_affine::createLowerPXAToAffinePass());
   pm.addPass(createCanonicalizerPass());
