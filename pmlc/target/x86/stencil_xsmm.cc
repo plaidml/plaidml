@@ -250,7 +250,7 @@ private:
     // Get the current memrefs
     Value aVal = opA.getMemRef();
     Value bVal = opB.getMemRef();
-    Value cVal = opC.out();
+    Value cVal = opC.getMemRef();
 
     // Initialize helpers
     llvm::SmallVector<Value, 8> mapOperands;
