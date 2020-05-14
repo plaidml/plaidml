@@ -570,10 +570,8 @@ struct PrngOpConversion : public OpConversionPattern<PrngOp> {
         loc, symbol, ArrayRef<Type>{},
         ArrayRef<Value>{stateCast, resultCast, newStateCast});
 
-    op.result().replaceAllUsesWith(allocResult.resultMemRef);
-    op.new_state().replaceAllUsesWith(allocState.resultMemRef);
-
-    rewriter.eraseOp(op);
+    rewriter.replaceOp(
+        op, ValueRange({allocResult.resultMemRef, allocState.resultMemRef}));
     return success();
   }
 
