@@ -1,5 +1,6 @@
 // Copyright 2020, Intel Corporation
 
+#include <limits>
 #include <utility>
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -412,6 +413,16 @@ static Value createInit(OpBuilder &builder, Location loc, Type type,
       auto value = convertFloatUsingType(llvm::APFloat(1.0), floatType);
       return builder.create<mlir::ConstantFloatOp>(loc, value, floatType);
     }
+    case AggregationKind::min: {
+      auto value = convertFloatUsingType(
+          llvm::APFloat(std::numeric_limits<float>::max()), floatType);
+      return builder.create<mlir::ConstantFloatOp>(loc, value, floatType);
+    }
+    case AggregationKind::max: {
+      auto value = convertFloatUsingType(
+          llvm::APFloat(std::numeric_limits<float>::min()), floatType);
+      return builder.create<mlir::ConstantFloatOp>(loc, value, floatType);
+    }
     default:
       llvm_unreachable("Unsupported aggregation for createInit");
     }
@@ -421,6 +432,12 @@ static Value createInit(OpBuilder &builder, Location loc, Type type,
       return builder.create<mlir::ConstantIntOp>(loc, 0, intType);
     case AggregationKind::mul:
       return builder.create<mlir::ConstantIntOp>(loc, 1, intType);
+    case AggregationKind::min:
+      return builder.create<mlir::ConstantIntOp>(
+          loc, std::numeric_limits<int>::max(), intType);
+    case AggregationKind::max:
+      return builder.create<mlir::ConstantIntOp>(
+          loc, std::numeric_limits<int>::min(), intType);
     default:
       llvm_unreachable("Unsupported aggregation for createInit");
     }
