@@ -27,6 +27,7 @@ dependencies:
     - networkx
     - pandas
     - pcpp==1.20.1
+    - pybuildkite==0.0.6
     - pygments
     - pystache
     - pyyaml
