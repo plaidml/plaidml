@@ -46,13 +46,11 @@ def FPToUIOp :
 
 def ReshapeOp : StdX_Op<"reshape"> {
   let summary = "tensor reshape operation";
-  let arguments = (ins
-    AnyMemRef:$tensor,
-    Variadic<Index>:$dims);
+  let arguments = (ins AnyMemRef:$tensor);
   let results = (outs AnyMemRef:$result);
   let builders = [OpBuilder<
-    "Builder *builder, OperationState &result, Value tensor, ArrayRef<Value> dims, MemRefType destType", [{
-        buildReshapeOp(builder, result, tensor, dims, destType);
+    "Builder *builder, OperationState &result, Value tensor, MemRefType destType", [{
+        buildReshapeOp(builder, result, tensor, destType);
   }]>];
 }
 

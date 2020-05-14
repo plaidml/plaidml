@@ -35,7 +35,10 @@ using dialect::tile::ContractionOp;
 using dialect::tile::ContractionOpOperandAdaptor;
 using dialect::tile::getPaddingInfo;
 using dialect::tile::IndexOp;
+<<<<<<< HEAD
 using dialect::tile::PaddingInfo;
+=======
+>>>>>>> simplify stdx reshape op: dims params are redundant with type of result
 using dialect::tile::PrngOp;
 using dialect::tile::ReshapeOp;
 using dialect::tile::ReshapeOpOperandAdaptor;
@@ -866,13 +869,12 @@ struct ReshapeOpConversion : public OpConversionPattern<ReshapeOp> {
     ReshapeOpOperandAdaptor adaptor(operands);
 
     auto tensor = adaptor.tensor();
-    auto dims = adaptor.dims();
 
     TypeConverter typeConverter;
     auto resultType =
         typeConverter.convertType(op.result().getType()).cast<MemRefType>();
 
-    rewriter.replaceOpWithNewOp<stdx::ReshapeOp>(op, tensor, dims, resultType);
+    rewriter.replaceOpWithNewOp<stdx::ReshapeOp>(op, tensor, resultType);
     return success();
   }
 };
