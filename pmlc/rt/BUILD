@@ -8,6 +8,7 @@ plaidml_cc_library(
         "boundscheck.cc",
         "runtime.cc",
         "xsmm.cc",
+        "prng.cc",
     ],
     visibility = ["//visibility:public"],
     deps = [

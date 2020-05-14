@@ -30,7 +30,7 @@ namespace pmlc::target::x86 {
 
 std::unique_ptr<Pass> createXSMMStencilPass() {
   auto numThreads = std::thread::hardware_concurrency();
-  return pmlc::dialect::pxa::createStencilPass(numThreads, heatmapCost);
+  return pmlc::dialect::pxa::createXSMMStencilPass(numThreads, heatmapCost);
 }
 
 namespace {

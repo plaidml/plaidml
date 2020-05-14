@@ -35,6 +35,7 @@ using dialect::tile::ContractionOpOperandAdaptor;
 using dialect::tile::getPaddingInfo;
 using dialect::tile::IndexOp;
 using dialect::tile::PaddingInfo;
+using dialect::tile::PrngOp;
 using dialect::tile::ShapeOp;
 using dialect::tile::ShapeOpOperandAdaptor;
 using dialect::tile::TraceOp;
@@ -546,6 +547,67 @@ struct BufferAllocator {
   }
 };
 
+struct PrngOpConversion : public OpConversionPattern<PrngOp> {
+  using OpConversionPattern<PrngOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(dialect::tile::PrngOp op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const final {
+    ModuleOp module = op.getParentOfType<ModuleOp>();
+    auto loc = op.getLoc();
+    BufferAllocator allocResult(rewriter, op.getOperation(),
+                                op.result().getType());
+    BufferAllocator allocState(rewriter, op.getOperation(),
+                               op.state().getType());
+
+    UnrankedMemRefType resultUnrankedType =
+        UnrankedMemRefType::get(rewriter.getF32Type(), /*memorySpace=*/0);
+    UnrankedMemRefType stateUnrankedType =
+        UnrankedMemRefType::get(rewriter.getIntegerType(32), /*memorySpace=*/0);
+
+    auto symbol = getOrInsertFunc(module, rewriter.getF32Type(), op.getLoc(),
+                                  resultUnrankedType, stateUnrankedType);
+
+    auto stateCast =
+        rewriter.create<MemRefCastOp>(loc, operands[0], stateUnrankedType);
+    auto resultCast = rewriter.create<MemRefCastOp>(
+        loc, allocResult.resultMemRef, resultUnrankedType);
+    auto newStateCast = rewriter.create<MemRefCastOp>(
+        loc, allocState.resultMemRef, stateUnrankedType);
+
+    OpBuilder opBuilder(op);
+    opBuilder.create<CallOp>(
+        loc, symbol, ArrayRef<Type>{},
+        ArrayRef<Value>{stateCast, resultCast, newStateCast});
+
+    op.result().replaceAllUsesWith(allocResult.resultMemRef);
+    op.new_state().replaceAllUsesWith(allocState.resultMemRef);
+
+    rewriter.eraseOp(op);
+    return success();
+  }
+
+private:
+  FlatSymbolRefAttr
+  getOrInsertFunc(ModuleOp module, Type elementType, Location loc,
+                  UnrankedMemRefType resultUnrankedType,
+                  UnrankedMemRefType stateUnrankedType) const {
+    const char *symbol = "plaidml_rt_prng";
+    auto context = module.getContext();
+    if (module.lookupSymbol(symbol)) {
+      return SymbolRefAttr::get(symbol, context);
+    }
+    OpBuilder builder(module.getBodyRegion());
+    std::array<Type, 3> inputs{stateUnrankedType, resultUnrankedType,
+                               stateUnrankedType};
+    ArrayRef<Type> results{};
+    auto funcType = builder.getFunctionType(inputs, results);
+    ArrayRef<NamedAttribute> attrs{};
+    builder.create<FuncOp>(loc, symbol, funcType, attrs);
+    return SymbolRefAttr::get(symbol, context);
+  }
+};
+
 template <typename FromOpType, typename IntoOpBuilder,
           typename Matcher = AlwaysTrue>
 struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
@@ -968,10 +1030,9 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
     OwningRewritePatternList patterns;
     populateFuncOpTypeConversionPattern(patterns, &getContext(), converter);
     patterns.insert<
-        TileConstantOpConversion, CastOpConversion, /*FuncOpConversion,*/
-        IndexOpConversion, /*ReturnOpConversion,*/ ScalarConstantOpConversion,
-        ShapeOpConversion, TraceOpConversion,
-        // TODO: PrngOpConversion
+        TileConstantOpConversion, CastOpConversion, IndexOpConversion,
+        ScalarConstantOpConversion, ShapeOpConversion, TraceOpConversion,
+        PrngOpConversion,
         // TODO: SpecialOpConversion (GatherOp, ReshapeOp,
         // ScatterOp, ZeroOp)
         ContractionOpConversion<CombinationKind::none, FirstOperand>,
@@ -1067,7 +1128,6 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
                             FirstOperandIs<EltwiseUnsigned>>,
         EltwiseOpConversion<ew::SelectOp, SelectOp>,
         EltwiseOpConversion<ew::IdentOp, FirstOperand>>(&getContext());
-
     // Run the conversion
     if (failed(
             applyFullConversion(getOperation(), target, patterns, nullptr))) {
@@ -1076,7 +1136,6 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
     }
   }
 };
-
 } // namespace
 
 std::unique_ptr<mlir::Pass> createLowerTileToPXAPass() {

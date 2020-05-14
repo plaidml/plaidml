@@ -12,7 +12,7 @@ def openvino_workspace():
         sha256 = "6660e1b66bd3d8005026155571a057765ace9b0fdd9899aaa5823eca12847896",
         url = "https://github.com/opencv/ade/archive/cbe2db61a659c2cc304c3837406f95c39dfa938e.zip",
         strip_prefix = "ade-cbe2db61a659c2cc304c3837406f95c39dfa938e",
-        build_file = clean_dep("//vendor/openvino:ade.BUILD")
+        build_file = clean_dep("//vendor/openvino:ade.BUILD"),
     )
 
     http_archive(
@@ -32,8 +32,8 @@ def openvino_workspace():
 
     http_archive(
         name = "openvino",
-        sha256 = "7b416d45765aea2cdd42edcdfc4e6ab4d7c4d37587530bf51a43b4c261e24a16",
-        strip_prefix = "dldt-2020.1",
+        sha256 = "0d641b158fff868ae7a969c02bf73462e335c15c40b42e3fe65ac6ea7cffea66",
+        strip_prefix = "openvino-2020.1",
         url = "https://github.com/opencv/dldt/archive/2020.1.zip",
         build_file = clean_dep("//vendor/openvino:openvino.BUILD"),
     )
