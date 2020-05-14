@@ -28,6 +28,7 @@
 
 #include "pmlc/compiler/executable.h"
 #include "pmlc/compiler/program.h"
+#include "pmlc/conversion/gpu/lowering.h"
 #include "pmlc/util/all_dialects.h"
 #include "pmlc/util/all_passes.h"
 #include "pmlc/util/env.h"
@@ -47,13 +48,9 @@ static LogicalResult runMLIRPasses(ModuleOp module) {
   OpPassManager &modulePM = passManager.nest<spirv::ModuleOp>();
   modulePM.addPass(spirv::createLowerABIAttributesPass());
   modulePM.addPass(spirv::createUpdateVersionCapabilityExtensionPass());
-  passManager.addPass(createConvertGpuLaunchFuncToVulkanLaunchFuncPass());
-  LowerToLLVMOptions llvmOptions = {
-      /*useBarePtrCallConv=*/false,
-      /*emitCWrappers=*/true,
-      /*indexBitwidth=*/kDeriveIndexBitwidthFromDataLayout};
-  passManager.addPass(createLowerToLLVMPass(llvmOptions));
-  passManager.addPass(createConvertVulkanLaunchFuncToVulkanCallsPass());
+  passManager.addPass(
+      pmlc::conversion::gpu::createConvertGpuLaunchFuncToVulkanCallsPass());
+  passManager.addPass(pmlc::conversion::gpu::createLLVMLoweringPass());
   return passManager.run(module);
 }
 

@@ -8,7 +8,7 @@ def ComputeBounds : FunctionPass<"tile-compute-bounds"> {
   let constructor = "pmlc::dialect::tile::createComputeBoundsPass()";
 }
 
-def ConstantTypes : Pass<"tile-constant-types"> {
+def ConstantTypes : FunctionPass<"tile-constant-types"> {
   let summary = "Set constant types precision";
   let constructor = "pmlc::dialect::tile::createConstantTypesPass()";
   let options = [

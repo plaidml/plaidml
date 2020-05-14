@@ -12,6 +12,7 @@ plaidml_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pmlc/compiler",
+        "@half",
         "@llvm-project//llvm:support",
         "@llvm-project//mlir:mlir_runner_utils",
         "@xsmm",

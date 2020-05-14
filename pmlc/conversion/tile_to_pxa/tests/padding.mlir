@@ -52,7 +52,7 @@ func @pad_contraction(%A: tensor<10xf32>, %B: tensor<1xf32>, %C: tensor<3xf32>) 
 // CHECK: affine.parallel (%{{.*}}) = (0) to (10)
 // CHECK:   affine.store %{{.*}}, %[[SUBVIEW]][%{{.*}}] : memref<10xf32, #[[LAYOUT]]>
 // 1st contraction
-// CHECK: affine.parallel (%{{.*}}, %{{.*}}) = (0, 0) to (9, 1)
+// CHECK: affine.parallel (%{{.*}}, %{{.*}}) = (1, 0) to (10, 1)
 // CHECK:   pxa.reduce add %{{.*}}, %[[SUBVIEW]][%{{.*}}] : memref<10xf32, #[[LAYOUT]]>
 // 2nd contraction
 // CHECK: affine.parallel (%{{.*}}, %{{.*}}) = (0, 0) to (10, 3)

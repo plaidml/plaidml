@@ -194,7 +194,7 @@ def compareMultiple(arguments):
 def opTest(in_data,
            tol=DEFAULT_TOL,
            atol=DEFAULT_ATOL,
-           do_grads=True,
+           do_grads=False,
            skip_theano=True,
            skip_tensorflow=False,
            verbose=False,
@@ -279,14 +279,15 @@ def opTest(in_data,
                             atol=atol,
                             err_msg='ERR: datum={}, test={}, x=plaidml, y=theano'.format(
                                 didx, idx))
-                        for x in range(0, len(pmlr[1])):
-                            npt.assert_allclose(
-                                pmlr[1][x],
-                                thr[1][x],
-                                rtol=tol,
-                                atol=atol,
-                                err_msg='ERR: datum={}, test={}, grad, x=plaidml, y=theano'.format(
-                                    didx, idx))
+                        if do_grads:
+                            for x in range(0, len(pmlr[1])):
+                                npt.assert_allclose(
+                                    pmlr[1][x],
+                                    thr[1][x],
+                                    rtol=tol,
+                                    atol=atol,
+                                    err_msg='ERR: datum={}, test={}, grad, x=plaidml, y=theano'.
+                                    format(didx, idx))
                 if not skip_tensorflow:
                     for idx, (pmlr, tfr) in enumerate(zip(plaidml_results, tensorflow_results)):
                         idx = idx + 1
@@ -1076,7 +1077,6 @@ class TestBackendOps(unittest.TestCase):
             b.conv1d(im, km, padding='causal', dilation_rate=2, data_format=df),
         ]
 
-    @unittest.skip("Cull crashing tests")
     @opTest([
         _conv_inp(IN=2, IC=2, OC=4, IS=[4, 7], KS=[3, 3]),
         _conv_inp(IN=3, IC=3, OC=1, IS=[9, 8], KS=[2, 2], data_format='channels_last'),
@@ -1094,7 +1094,6 @@ class TestBackendOps(unittest.TestCase):
             b.conv2d(im, km, padding='same', dilation_rate=(2, 2), data_format=df),
         ]
 
-    @unittest.skip("Cull crashing tests")
     @opTest(
         [[m(1, 1, 3, 1),
           m(1, 4, 1, 1), (1, 1, 9, 1), (1, 4), 'same', 'channels_last', (1, 1)],
@@ -1124,7 +1123,6 @@ class TestBackendOps(unittest.TestCase):
             b.conv2d_transpose(x, k, os, strides=st, padding=pd, data_format=df, dilation_rate=dr)
         ]
 
-    @unittest.skip("Cull crashing tests")
     @opTest([_conv_inp(IN=1, IC=1, OC=1, IS=[1, 6], KS=[1, 1], data_format='channels_last')],
             1e-04,
             skip_theano=True)
@@ -1134,7 +1132,6 @@ class TestBackendOps(unittest.TestCase):
         If we're not concerned with Keras 2.0.8 we probably don't need to retain this.'''
         return [b.conv2d(im, km, padding='same', strides=(2, 3), data_format=df)]
 
-    @unittest.skip("Cull crashing tests")
     @opTest([
         _conv_inp(IN=3, IC=1, OC=3, IS=[4, 7, 5], KS=[3, 3, 3]),
         _conv_inp(IN=3, IC=4, OC=2, IS=[3, 6, 3], KS=[2, 1, 2], data_format='channels_last'),
@@ -1558,7 +1555,6 @@ class TestBackendOps(unittest.TestCase):
     def testResizeImages(self, b, x, h, w, df):
         return [b.resize_images(x, h, w, df)]
 
-    @unittest.skip("Cull crashing tests")
     @opTest([
         [m(3, 2, 5, 11), 3, 1, 'channels_last'],
         [m(1, 3, 7, 5), 2, 3, 'channels_first'],

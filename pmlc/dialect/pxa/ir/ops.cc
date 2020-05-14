@@ -147,7 +147,7 @@ ParseResult parseAffineReduceOp(OpAsmParser &parser, OperationState &result) {
       parser.parseOperand(out) ||
       parser.parseAffineMapOfSSAIds(idxs, mapAttr, "map", result.attributes) ||
       parser.parseOptionalAttrDict(result.attributes) ||
-      parser.parseColonType(type) ||
+      parser.parseColonType(type) || parser.addTypeToList(type, result.types) ||
       parser.resolveOperand(val, type.getElementType(), result.operands) ||
       parser.resolveOperand(out, type, result.operands) ||
       parser.resolveOperands(idxs, indexTy, result.operands));
