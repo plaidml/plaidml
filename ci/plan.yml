@@ -173,6 +173,7 @@ SUITES:
           - TestBackendOps.testProdAxisNumpy
           - TestBackendOps.testProdNegAxis
           - TestBackendOps.testMaximum
+          - TestBackendOps.testMaxPool
           - TestBackendOps.testMinimum
           - TestBackendOps.testClip
           - TestBackendOps.testElu
