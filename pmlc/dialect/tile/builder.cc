@@ -142,9 +142,8 @@ struct TileBuilder::Impl {
     auto state = args.front();
     auto dims = args.drop_front();
     auto resultType = PrngOp::getResultType(args);
-    auto elementType = builder.getIntegerType(32, false);
-    auto stateType = RankedTensorType::get({3, 2048}, elementType);
-    auto op = builder.create<PrngOp>(loc, resultType, stateType, state, dims);
+    auto op =
+        builder.create<PrngOp>(loc, resultType, state.getType(), state, dims);
     implicitUpdates.insert(std::make_pair(op.new_state(), op.state()));
     return op.result();
   }
