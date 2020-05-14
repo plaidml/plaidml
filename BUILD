@@ -1,11 +1,11 @@
-# Copyright 2019 Intel Corporation
+# Copyright 2020 Intel Corporation
 #
 # For build instructions, see <docs/building.md>.
 
-package(default_visibility = ["//visibility:public"])
-
 load("@rules_pkg//:pkg.bzl", "pkg_tar")
-load("@rules_python//python:defs.bzl", "py_runtime_pair")
+load("@rules_python//python:defs.bzl", "py_runtime", "py_runtime_pair")
+
+package(default_visibility = ["//visibility:public"])
 
 exports_files([
     "LICENSE",
