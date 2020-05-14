@@ -33,10 +33,13 @@ module attributes {
     %arg3 = memref_cast %arg0 : memref<8xf32> to memref<*xf32>
     %arg4 = memref_cast %arg1 : memref<8xf32> to memref<*xf32>
     %arg5 = memref_cast %arg2 : memref<8xf32> to memref<*xf32>
-
-    call @fillResourceFloat32(%arg3, %value1) : (memref<*xf32>, f32) -> ()
-    call @fillResourceFloat32(%arg4, %value2) : (memref<*xf32>, f32) -> ()
-    call @fillResourceFloat32(%arg5, %value0) : (memref<*xf32>, f32) -> ()
+    %size3 = constant 8 : i32
+    %size4 = constant 8 : i32
+    %size5 = constant 8 : i32
+    
+    call @fillResourceFloat32(%arg3, %size3, %value1) : (memref<*xf32>, i32, f32) -> ()
+    call @fillResourceFloat32(%arg4, %size4, %value2) : (memref<*xf32>, i32, f32) -> ()
+    call @fillResourceFloat32(%arg5, %size5, %value0) : (memref<*xf32>, i32, f32) -> ()
 
     %cst1 = constant 1 : index
     %cst8 = constant 8 : index
@@ -45,6 +48,6 @@ module attributes {
     call @print_memref_f32(%arg5) : (memref<*xf32>) -> ()
     return
   }
-  func @fillResourceFloat32(%0 : memref<*xf32>, %1 : f32)
+  func @fillResourceFloat32(%0 : memref<*xf32>, %1:i32, %2 : f32)
   func @print_memref_f32(%ptr : memref<*xf32>)
 }
