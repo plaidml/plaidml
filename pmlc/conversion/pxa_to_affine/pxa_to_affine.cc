@@ -98,7 +98,6 @@ struct AffineIfOpConversion : public LoweringBase<AffineIfOp> {
 
   void rewrite(AffineIfOp op, ArrayRef<Value> operands,
                ConversionPatternRewriter &rewriter) const override {
-    IVLOG(1, "W0001");
     // Make a new if value
     auto newIf = rewriter.create<mlir::AffineIfOp>(
         op.getLoc(), op.getIntegerSet(), op.getOperands(), op.hasElse());
@@ -256,11 +255,10 @@ void LowerPXAToAffinePass::runOnOperation() {
 
   // Setup rewrite patterns
   mlir::OwningRewritePatternList patterns;
-  patterns.insert<AffineParallelOpConversion>(&getContext());
-  patterns.insert<AffineIfOpConversion>(&getContext());
-  patterns.insert<AffineReduceOpConversion>(&getContext());
-  patterns.insert<FuncOpConversion>(&getContext());
-  patterns.insert<ReturnOpConversion>(&getContext());
+  patterns
+      .insert<AffineParallelOpConversion, AffineIfOpConversion,
+              AffineReduceOpConversion, FuncOpConversion, ReturnOpConversion>(
+          &getContext());
 
   // Run the conversion
   if (failed(

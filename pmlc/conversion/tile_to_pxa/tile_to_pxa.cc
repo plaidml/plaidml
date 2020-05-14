@@ -90,11 +90,6 @@ struct FuncOpConversion : public OpConversionPattern<FuncOp> {
     for (unsigned i = 0; i < type.getNumInputs(); ++i) {
       result.addInputs(i, {typeConverter.convertType(type.getInput(i))});
     }
-    /*
-    for (unsigned i = 0; i < type.getNumResults(); ++i) {
-      result.addInputs({typeConverter.convertType(type.getResult(i))});
-    }
-    */
 
     // Create a new function with an updated signature.
     auto newOp = rewriter.cloneWithoutRegions(op);
@@ -541,7 +536,7 @@ struct BufferAllocator {
                                      shape.size(), llvm::None);
       auto stored = buildSimpleStore(parallelBuilder, loc, load, resultMemRef,
                                      llvm::None);
-      parallelBuilder.create<AffineYieldOp>(loc, ValueRange({stored}));
+      parallelBuilder.create<AffineYieldOp>(loc, ValueRange{stored});
       resultMemRef = parallel.getResult(0);
     }
   }
@@ -728,7 +723,7 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
     // Make the outer loops
     auto forOp = rewriter.create<AffineParallelOp>(
         loc,
-        /*resultTypes=*/ArrayRef<Type>({alloc.memRefType}),
+        /*resultTypes=*/ArrayRef<Type>{alloc.memRefType},
         /*lbMap=*/op.lowerBounds().getValue(),
         /*lbArgs=*/llvm::ArrayRef<Value>{},
         /*ubMap=*/ubMap,
@@ -908,7 +903,7 @@ struct CastOpConversion : public OpConversionPattern<ew::CastOp> {
 
     // Make a parallel for loop to fill the result
     auto forOp = rewriter.create<AffineParallelOp>(
-        loc, ArrayRef<Type>({resultType}), resultType.getShape());
+        loc, ArrayRef<Type>{resultType}, resultType.getShape());
     auto body = forOp.getBody();
     rewriter.setInsertionPointToStart(body);
     auto idxs = body->getArguments();
@@ -924,7 +919,7 @@ struct CastOpConversion : public OpConversionPattern<ew::CastOp> {
     // Create the store
     auto stored = buildSimpleStore(rewriter, loc, result, resultMemRef,
                                    getPaddingInfo(op));
-    rewriter.create<AffineYieldOp>(loc, ValueRange({stored}));
+    rewriter.create<AffineYieldOp>(loc, ValueRange{stored});
 
     // Replace the op
     rewriter.replaceOp(op, forOp.getResult(0));
@@ -933,18 +928,6 @@ struct CastOpConversion : public OpConversionPattern<ew::CastOp> {
     return success();
   }
 };
-
-/*
-static Value findAllocation(Value in) {
-  auto inOp = in..getDefiningOp();
-  assert(inOp);
-  if (llvm::dyn_cast<AllocateOp>(inOp)) {
-    return in;
-  }
-  if (auto redOp = llvm::dyn_cast<ReduceOp>(inOp)) {
-
-          in..getDefiningOp()
-*/
 
 struct ReturnOpConversion : public OpConversionPattern<ReturnOp> {
   using OpConversionPattern<ReturnOp>::OpConversionPattern;
@@ -1005,15 +988,8 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
     target.addLegalDialect<dialect::pxa::PXADialect>();
     target.addLegalDialect<dialect::stdx::StdXDialect>();
     target.addLegalOp<mlir::ModuleOp, mlir::ModuleTerminatorOp, ReturnOp>();
-    target.addDynamicallyLegalOp<FuncOp>([&](FuncOp op) {
-      return converter.isSignatureLegal(op.getType());
-      // auto funcType = op.getType();
-      // return funcType.getNumResults() == 0;
-    });
-    /*
-    target.addDynamicallyLegalOp<ReturnOp>(
-        [](ReturnOp op) { return op.getNumOperands() == 0; });
-    */
+    target.addDynamicallyLegalOp<FuncOp>(
+        [&](FuncOp op) { return converter.isSignatureLegal(op.getType()); });
 
     // Setup rewrite patterns
     using CmpIntLtOp =
