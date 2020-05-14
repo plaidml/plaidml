@@ -63,7 +63,7 @@ static constexpr const char *kBindBufferInteger16 = "bindBufferInteger16";
 static constexpr const char *kBindBufferInteger32 = "bindBufferInteger32";
 static constexpr const char *kBindBufferInteger64 = "bindBufferInteger64";
 
-static constexpr const int byteBits = 8;
+static constexpr const int kByteBits = 8;
 
 /// A pass to convert gpu launch op to vulkan launch call op, by creating a
 /// SPIR-V binary shader from `spirv::ModuleOp` using `spirv::serialize`
@@ -243,14 +243,14 @@ ConvertGpuLaunchFuncToVulkanCalls::bindBuffers(Location loc, OpBuilder &builder,
 
       auto elementType = memRefType.getElementType();
       bufferElementTypes.push_back(elementType);
-      uint32_t elementTypeSize = elementType.getIntOrFloatBitWidth() / byteBits;
+      uint32_t elementTypeSize =
+          llvm::divideCeil(elementType.getIntOrFloatBitWidth(), kByteBits);
 
       Value bufferByteSize = builder.create<LLVM::ConstantOp>(
           loc, getLLVMInt32Type(),
           builder.getI32IntegerAttr(numElement * elementTypeSize));
       Value unrankedBuffer = builder.create<mlir::MemRefCastOp>(
           loc, buffer, getUnrankedMemRefType(elementType));
-
       builder.create<CallOp>(
           loc, ArrayRef<Type>{},
           builder.getSymbolRefAttr(getBufferBindingFunc(elementType)),
@@ -399,7 +399,6 @@ void ConvertGpuLaunchFuncToVulkanCalls::declareVulkanFunctions(Location loc) {
 
 void ConvertGpuLaunchFuncToVulkanCalls::convertGpuLaunchFunc(
     gpu::LaunchFuncOp launchOp) {
-
   ModuleOp module = getOperation();
   OpBuilder builder(launchOp);
   Location loc = launchOp.getLoc();
