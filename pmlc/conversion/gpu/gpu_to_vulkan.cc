@@ -64,13 +64,6 @@ static constexpr const char *kBindBufferInteger32 = "bindBufferInteger32";
 static constexpr const char *kBindBufferInteger64 = "bindBufferInteger64";
 
 static constexpr const int byteBits = 8;
-static constexpr const int intMinBytes = 1;
-static constexpr const int intMaxBytes = 8;
-
-static constexpr const int bFloat16Bytes = 2;
-static constexpr const int float16Bytes = 2;
-static constexpr const int float32Bytes = 4;
-static constexpr const int float64Bytes = 8;
 
 /// A pass to convert gpu launch op to vulkan launch call op, by creating a
 /// SPIR-V binary shader from `spirv::ModuleOp` using `spirv::serialize`
@@ -121,11 +114,11 @@ private:
     mlirFloat32Type = builder.getF32Type();
   }
 
-  mlir::Type getUnrankedMemRefType(Type &elementType) {
+  mlir::Type getUnrankedMemRefType(Type elementType) {
     return UnrankedMemRefType::get(elementType, /*memorySpace=*/0);
   }
 
-  const char *getBufferBindingFunc(Type &elementType) {
+  const char *getBufferBindingFunc(Type elementType) {
     if (elementType.isInteger(8)) {
       return kBindBufferInteger8;
     }
@@ -153,42 +146,14 @@ private:
     return nullptr;
   }
 
-  void getElementTypeSize(Type &elementType, uint32_t &size) {
-    for (int i = intMinBytes; i <= intMaxBytes; i *= 2) {
-      if (elementType.isInteger(i * byteBits)) {
-        size = i;
-        return;
-      }
-    }
-    if (elementType.isBF16()) {
-      size = bFloat16Bytes;
-      return;
-    }
-    if (elementType.isF16()) {
-      size = float16Bytes;
-      return;
-    }
-    if (elementType.isF32()) {
-      size = float32Bytes;
-      return;
-    }
-    if (elementType.isF64()) {
-      size = float64Bytes;
-      return;
-    }
-    emitError(mlir::UnknownLoc::get(&getContext()))
-        << elementType << "unsupported to run on Vulkan\n";
-    return signalPassFailure();
-  }
-
   LLVM::LLVMDialect *getLLVMDialect() { return llvmDialect; }
-  LLVM::LLVMType &getLLVMVoidType() { return llvmVoidType; }
-  LLVM::LLVMType &getLLVMPointerType() { return llvmPointerType; }
-  LLVM::LLVMType &getLLVMInt32Type() { return llvmInt32Type; }
-  LLVM::LLVMType &getLLVMInt64Type() { return llvmInt64Type; }
+  LLVM::LLVMType getLLVMVoidType() { return llvmVoidType; }
+  LLVM::LLVMType getLLVMPointerType() { return llvmPointerType; }
+  LLVM::LLVMType getLLVMInt32Type() { return llvmInt32Type; }
+  LLVM::LLVMType getLLVMInt64Type() { return llvmInt64Type; }
 
-  mlir::Type &getMLIRFloat32Type() { return mlirFloat32Type; }
-  mlir::Type &getMLIRIndexType() { return mlirIndexType; }
+  mlir::Type getMLIRFloat32Type() { return mlirFloat32Type; }
+  mlir::Type getMLIRIndexType() { return mlirIndexType; }
 
   LLVM::LLVMDialect *llvmDialect;
   LLVM::LLVMType llvmVoidType;
@@ -278,8 +243,7 @@ ConvertGpuLaunchFuncToVulkanCalls::bindBuffers(Location loc, OpBuilder &builder,
 
       auto elementType = memRefType.getElementType();
       bufferElementTypes.push_back(elementType);
-      uint32_t elementTypeSize = 0;
-      getElementTypeSize(elementType, elementTypeSize);
+      uint32_t elementTypeSize = elementType.getIntOrFloatBitWidth() / byteBits;
 
       Value bufferByteSize = builder.create<LLVM::ConstantOp>(
           loc, getLLVMInt32Type(),
