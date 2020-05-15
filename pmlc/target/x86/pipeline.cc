@@ -30,7 +30,7 @@ namespace pmlc::target::x86 {
 
 std::unique_ptr<Pass> createXSMMStencilPass() {
   auto numThreads = std::thread::hardware_concurrency();
-  return pmlc::dialect::pxa::createStencilPass(numThreads, heatmapCost);
+  return pmlc::dialect::pxa::createXSMMStencilPass(numThreads, heatmapCost);
 }
 
 namespace {
@@ -113,7 +113,7 @@ struct ConvertToLLVMPass
 
     OwningRewritePatternList patterns;
     populateStdToLLVMBarePtrConversionPatterns(typeConverter, patterns,
-                                               /*useAlloca=*/true);
+                                               /*useAlignedAlloc=*/false);
     conversion::stdx_to_llvm::populateStdXToLLVMConversionPatterns(
         typeConverter, patterns);
 
@@ -133,23 +133,23 @@ struct ConvertToLLVMPass
 void addToPipeline(OpPassManager &pm) {
   pm.addPass(pmlc::dialect::tile::createComputeBoundsPass());
   pm.addPass(pmlc::dialect::tile::createPadPass());
-  pm.addNestedPass<FuncOp>(createCanonicalizerPass());
-  pm.addNestedPass<FuncOp>(createCSEPass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
 
   pm.addPass(pmlc::conversion::tile_to_pxa::createLowerTileToPXAPass());
-  pm.addNestedPass<FuncOp>(createCanonicalizerPass());
-  pm.addNestedPass<FuncOp>(createCSEPass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
 
-  pm.addPass(pmlc::dialect::pxa::createStencilPass(1, heatmapCost));
+  pm.addPass(pmlc::dialect::pxa::createXSMMStencilPass(1, heatmapCost));
   pm.addPass(createXSMMLoweringPass());
 
   pm.addPass(conversion::pxa_to_affine::createLowerPXAToAffinePass());
-  pm.addNestedPass<FuncOp>(createCanonicalizerPass());
-  pm.addNestedPass<FuncOp>(createCSEPass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
 
   pm.addPass(createLowerAffinePass());
-  pm.addNestedPass<FuncOp>(createCanonicalizerPass());
-  pm.addNestedPass<FuncOp>(createCSEPass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
 
   pm.addPass(ConvertToStdPass::create());
   if (pmlc::util::getEnvVar("PLAIDML_BOUNDS_CHECK") == "1") {

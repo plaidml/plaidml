@@ -12,6 +12,9 @@
 
 #pragma once
 
+#include <memory>
+#include <vector>
+
 #include "mlir/Dialect/SPIRV/SPIRVOps.h"
 #include "mlir/Dialect/SPIRV/Serialization.h"
 #include "mlir/IR/Module.h"
@@ -34,6 +37,7 @@ struct VulkanDeviceMemoryBuffer {
   VkDescriptorBufferInfo bufferInfo{};
   VkBuffer buffer{VK_NULL_HANDLE};
   VkDeviceMemory deviceMemory{VK_NULL_HANDLE};
+  size_t bufferSize{0};
 };
 
 /// Struct containing information regarding to a host memory buffer.
@@ -83,89 +87,13 @@ inline void emitVulkanError(const llvm::Twine &message, VkResult error) {
     return failure();                                                          \
   }
 
-/// Vulkan runtime.
-/// The purpose of this class is to run SPIR-V compute shader on Vulkan
-/// device.
-/// Before the run, user must provide and set resource data with descriptors,
-/// SPIR-V shader, number of work groups and entry point. After the creation of
-/// VulkanRuntime, special methods must be called in the following
-/// sequence: initRuntime(), run(), updateHostMemoryBuffers(), destroy();
-/// each method in the sequence returns succes or failure depends on the Vulkan
-/// result code.
-class VulkanRuntime {
-public:
-  VulkanRuntime() = default;
-  VulkanRuntime(const VulkanRuntime &) = delete;
-  VulkanRuntime &operator=(const VulkanRuntime &) = delete;
+struct Action {
+  virtual ~Action() {}
+};
 
-  /// Sets needed data for Vulkan runtime.
-  void setResourceData(const ResourceData &resData);
-  void setResourceData(const DescriptorSetIndex desIndex,
-                       const BindingIndex bindIndex,
-                       const VulkanHostMemoryBuffer &hostMemBuffer);
-  void setShaderModule(uint8_t *shader, uint32_t size);
-  void setNumWorkGroups(const NumWorkGroups &numberWorkGroups);
-  void setResourceStorageClassBindingMap(
-      const ResourceStorageClassBindingMap &stClassData);
-  void setEntryPoint(const char *entryPointName);
+using ActionPtr = std::shared_ptr<Action>;
 
-  /// Runtime initialization.
-  LogicalResult initRuntime();
-
-  /// Runs runtime.
-  LogicalResult run();
-
-  /// Updates host memory buffers.
-  LogicalResult updateHostMemoryBuffers();
-
-  /// Destroys all created vulkan objects and resources.
-  LogicalResult destroy();
-
-private:
-  //===--------------------------------------------------------------------===//
-  // Pipeline creation methods.
-  //===--------------------------------------------------------------------===//
-
-  LogicalResult createInstance();
-  LogicalResult createDevice();
-  LogicalResult getBestComputeQueue(const VkPhysicalDevice &physicalDevice);
-  LogicalResult createMemoryBuffers();
-  LogicalResult createShaderModule();
-  void initDescriptorSetLayoutBindingMap();
-  LogicalResult createDescriptorSetLayout();
-  LogicalResult createPipelineLayout();
-  LogicalResult createComputePipeline();
-  LogicalResult createDescriptorPool();
-  LogicalResult allocateDescriptorSets();
-  LogicalResult setWriteDescriptors();
-  LogicalResult createCommandPool();
-  LogicalResult createComputeCommandBuffer();
-  LogicalResult submitCommandBuffersToQueue();
-
-  //===--------------------------------------------------------------------===//
-  // Helper methods.
-  //===--------------------------------------------------------------------===//
-
-  /// Maps storage class to a descriptor type.
-  LogicalResult
-  mapStorageClassToDescriptorType(spirv::StorageClass storageClass,
-                                  VkDescriptorType &descriptorType);
-
-  /// Maps storage class to buffer usage flags.
-  LogicalResult
-  mapStorageClassToBufferUsageFlag(spirv::StorageClass storageClass,
-                                   VkBufferUsageFlagBits &bufferUsage);
-
-  LogicalResult countDeviceMemorySize();
-
-  //===--------------------------------------------------------------------===//
-  // Vulkan objects.
-  //===--------------------------------------------------------------------===//
-
-  VkInstance instance;
-  VkDevice device;
-  VkQueue queue;
-
+struct LaunchKernelAction : Action {
   /// Specifies VulkanDeviceMemoryBuffers divided into sets.
   llvm::DenseMap<DescriptorSetIndex,
                  llvm::SmallVector<VulkanDeviceMemoryBuffer, 1>>
@@ -193,22 +121,12 @@ private:
 
   /// Computation pipeline.
   VkPipeline pipeline;
-  VkCommandPool commandPool;
-  llvm::SmallVector<VkCommandBuffer, 1> commandBuffers;
-
-  //===--------------------------------------------------------------------===//
-  // Vulkan memory context.
-  //===--------------------------------------------------------------------===//
-
-  uint32_t queueFamilyIndex{0};
-  uint32_t memoryTypeIndex{VK_MAX_MEMORY_TYPES};
-  VkDeviceSize memorySize{0};
 
   //===--------------------------------------------------------------------===//
   // Vulkan execution context.
   //===--------------------------------------------------------------------===//
 
-  NumWorkGroups numWorkGroups;
+  NumWorkGroups workGroups;
   const char *entryPoint{nullptr};
   uint8_t *binary{nullptr};
   uint32_t binarySize{0};
@@ -219,4 +137,109 @@ private:
 
   ResourceData resourceData;
   ResourceStorageClassBindingMap resourceStorageClassData;
+
+  SmallVector<VkBufferMemoryBarrier, 4> deps;
+};
+
+struct MemoryTransferAction : Action {
+  VkBuffer src;
+  VkBuffer dst;
+  SmallVector<VkBufferCopy, 1> regions;
+};
+
+/// Vulkan runtime.
+/// The purpose of this class is to run SPIR-V compute shader on Vulkan
+/// device.
+/// Before the run, user must provide and set resource data with descriptors,
+/// SPIR-V shader, number of work groups and entry point. After the creation of
+/// VulkanRuntime, special methods must be called in the following
+/// sequence: initRuntime(), run(), updateHostMemoryBuffers(), destroy();
+/// each method in the sequence returns succes or failure depends on the Vulkan
+/// result code.
+class VulkanRuntime {
+public:
+  VulkanRuntime() = default;
+  VulkanRuntime(const VulkanRuntime &) = delete;
+  VulkanRuntime &operator=(const VulkanRuntime &) = delete;
+
+  LogicalResult init();
+  LogicalResult destroy();
+  LogicalResult createLaunchKernelAction(uint8_t *shader, uint32_t size,
+                                         const char *entryPoint,
+                                         NumWorkGroups numWorkGroups);
+  LogicalResult setLaunchKernelAction();
+  void addLaunchActionToSchedule();
+  LogicalResult createMemoryTransferAction(uint64_t src_index,
+                                           uint64_t src_binding,
+                                           uint64_t dst_index,
+                                           uint64_t dst_binding);
+  LogicalResult createMemoryTransferAction(VkBuffer src, VkBuffer dst,
+                                           size_t size);
+  LogicalResult submitCommandBuffers();
+  /// Sets needed data for Vulkan runtime.
+  void setResourceData(const ResourceData &resData);
+  void setResourceData(const DescriptorSetIndex desIndex,
+                       const BindingIndex bindIndex,
+                       const VulkanHostMemoryBuffer &hostMemBuffer);
+
+private:
+  //===--------------------------------------------------------------------===//
+  // Pipeline creation methods.
+  //===--------------------------------------------------------------------===//
+  LogicalResult createInstance();
+  LogicalResult createDevice();
+  LogicalResult getBestComputeQueue(const VkPhysicalDevice &physicalDevice);
+  LogicalResult createMemoryBuffers();
+  LogicalResult createShaderModule();
+  void initDescriptorSetLayoutBindingMap();
+  LogicalResult createDescriptorSetLayout();
+  LogicalResult createPipelineLayout();
+  LogicalResult createComputePipeline();
+  LogicalResult createDescriptorPool();
+  LogicalResult allocateDescriptorSets();
+  LogicalResult setWriteDescriptors();
+  LogicalResult createCommandPool();
+  LogicalResult checkResourceData();
+  LogicalResult createSchedule();
+  LogicalResult submitCommandBuffersToQueue();
+  LogicalResult updateHostMemoryBuffers();
+  void setResourceStorageClassBindingMap(
+      const ResourceStorageClassBindingMap &stClassData);
+
+  //===--------------------------------------------------------------------===//
+  // Helper methods.
+  //===--------------------------------------------------------------------===//
+
+  /// Maps storage class to a descriptor type.
+  LogicalResult
+  mapStorageClassToDescriptorType(spirv::StorageClass storageClass,
+                                  VkDescriptorType &descriptorType);
+
+  /// Maps storage class to buffer usage flags.
+  LogicalResult
+  mapStorageClassToBufferUsageFlag(spirv::StorageClass storageClass,
+                                   VkBufferUsageFlagBits &bufferUsage);
+
+  LogicalResult countDeviceMemorySize();
+
+  VkResult volkInitialized = VK_RESULT_MAX_ENUM;
+
+  //===--------------------------------------------------------------------===//
+  // Vulkan objects.
+  //===--------------------------------------------------------------------===//
+  VkInstance instance;
+  VkDevice device;
+  VkQueue queue;
+  VkCommandPool commandPool;
+
+  //===--------------------------------------------------------------------===//
+  // Vulkan memory context.
+  //===--------------------------------------------------------------------===//
+  uint32_t queueFamilyIndex{0};
+  uint32_t memoryTypeIndex{VK_MAX_MEMORY_TYPES};
+  VkDeviceSize memorySize{0};
+
+  std::vector<ActionPtr> schedule;
+  std::shared_ptr<LaunchKernelAction> curr;
+  llvm::SmallVector<VkCommandBuffer, 1> commandBuffers;
 };

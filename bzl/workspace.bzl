@@ -3,7 +3,6 @@
 load("//vendor/bazel:repo.bzl", "http_archive")
 load("//vendor/conda:repo.bzl", "conda_repo")
 load("//vendor/openvino:repo.bzl", "openvino_workspace")
-load("//vendor/xsmm:repo.bzl", "xsmm_repo")
 
 # Sanitize a dependency so that it works correctly from code that includes it as a submodule.
 def clean_dep(dep):
@@ -72,6 +71,14 @@ def plaidml_workspace():
     )
 
     http_archive(
+        name = "half",
+        url = "https://github.com/plaidml/depot/raw/master/half-1.11.0.zip",
+        sha256 = "9e5ddb4b43abeafe190e780b5b606b081acb511e6edd4ef6fbe5de863a4affaf",
+        strip_prefix = "half-1.11.0",
+        build_file = clean_dep("//bzl:half.BUILD"),
+    )
+
+    http_archive(
         name = "io_bazel_rules_jsonnet",
         sha256 = "d05d719c4738e8aac5f13b32f745ff4832b9638ecc89ddcb6e36c379a1ada025",
         strip_prefix = "rules_jsonnet-0.1.0",
@@ -85,8 +92,8 @@ def plaidml_workspace():
         strip_prefix = "jsonnet-0.13.0",
     )
 
-    LLVM_COMMIT = "9f3ab92ec86953e310d0814a95d9c0213bfe05d4"
-    LLVM_SHA256 = "b2355d5de2f411a201efef0b70241dd767cc87c657b184c18eec797aae53fade"
+    LLVM_COMMIT = "296e416498f9edcefc2c4a68382d82044f0271f1"
+    LLVM_SHA256 = "91d19ed4d5a010bb2582c505b511ac2b9979ec04c9e9463e9a37ff3d301cd96e"
     LLVM_URL = "https://github.com/plaidml/llvm-project/archive/{commit}.tar.gz".format(commit = LLVM_COMMIT)
     http_archive(
         name = "llvm-project",
@@ -147,7 +154,7 @@ def plaidml_workspace():
         build_file = clean_dep("//vendor/vulkan_headers:vulkan_headers.BUILD"),
     )
 
-    xsmm_repo(
+    http_archive(
         name = "xsmm",
         url = "https://github.com/hfp/libxsmm/archive/dc7523725e0d919d56c739402b28683358b0c95a.zip",
         sha256 = "70ea9f057c4f11bfe35095815d6b9841e501c2e82931649a953fab389144d648",

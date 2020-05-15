@@ -1206,7 +1206,7 @@ def pool2d(x, pool_size, strides=(1, 1), padding='valid', data_format=None, pool
                 strides=strides,
                 padding=padding,
                 data_format=data_format,
-                pool_mode=_normalize_pool_mode(pool_mode))
+                pool_mode=pool_mode)
 
 
 @_log_call
@@ -1216,7 +1216,7 @@ def pool3d(x, pool_size, strides=(1, 1, 1), padding='valid', data_format=None, p
                 strides=strides,
                 padding=padding,
                 data_format=data_format,
-                pool_mode=_normalize_pool_mode(pool_mode))
+                pool_mode=pool_mode)
 
 
 @_log_call
@@ -1353,11 +1353,11 @@ def resize_images(x, height_factor, width_factor, data_format, interpolation='ne
 @_log_call
 def resize_volumes(x, depth_factor, height_factor, width_factor, data_format):
     data_format = _normalize_data_format(data_format)
-    if data_format == 'ncx':
+    if data_format == plaidml_op.TensorLayout.NCX:
         ret = repeat_elements(x, depth_factor, axis=2)
         ret = repeat_elements(ret, height_factor, axis=3)
         ret = repeat_elements(ret, width_factor, axis=4)
-    elif data_format == 'nxc':
+    elif data_format == plaidml_op.TensorLayout.NXC:
         ret = repeat_elements(x, depth_factor, axis=1)
         ret = repeat_elements(ret, height_factor, axis=2)
         ret = repeat_elements(ret, width_factor, axis=3)

@@ -217,8 +217,8 @@ Optional<StrideInfo> computeStrideInfo(AffineStoreOp op) {
 }
 
 Optional<StrideInfo> computeStrideInfo(pmlc::dialect::pxa::AffineReduceOp op) {
-  return computeStrideInfo(op.out().getType().cast<MemRefType>(), op.map(),
-                           op.idxs());
+  return computeStrideInfo(op.getMemRefType(), op.getAffineMap(),
+                           op.getMapOperands());
 }
 
 StrideArray::StrideArray(unsigned numDims, int64_t offset)

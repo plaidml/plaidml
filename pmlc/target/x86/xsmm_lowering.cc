@@ -56,7 +56,8 @@ public:
     for (auto i : impl.tile) {
       args.push_back(impl.createConstantIntOp(i));
     }
-    rewriter.replaceOpWithNewOp<CallOp>(op, symbol, ArrayRef<Type>{}, args);
+    rewriter.create<CallOp>(op.getLoc(), symbol, ArrayRef<Type>{}, args);
+    rewriter.replaceOp(op, op.c());
     return success();
   }
 

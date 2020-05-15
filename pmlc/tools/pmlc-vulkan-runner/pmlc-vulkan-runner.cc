@@ -22,14 +22,21 @@
 #include "mlir/ExecutionEngine/OptUtils.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
-#include "mlir/Support/JitRunner.h"
+#include "mlir/Support/FileUtilities.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/TargetSelect.h"
 
+#include "pmlc/compiler/executable.h"
+#include "pmlc/compiler/program.h"
+#include "pmlc/conversion/gpu/lowering.h"
 #include "pmlc/util/all_dialects.h"
 #include "pmlc/util/all_passes.h"
+#include "pmlc/util/env.h"
+#include "pmlc/util/logging.h"
 
 using namespace mlir; // NOLINT[build/namespaces]
+using pmlc::compiler::Executable;
+using pmlc::compiler::Program;
 
 static LogicalResult runMLIRPasses(ModuleOp module) {
   PassManager passManager(module.getContext());
@@ -41,17 +48,60 @@ static LogicalResult runMLIRPasses(ModuleOp module) {
   OpPassManager &modulePM = passManager.nest<spirv::ModuleOp>();
   modulePM.addPass(spirv::createLowerABIAttributesPass());
   modulePM.addPass(spirv::createUpdateVersionCapabilityExtensionPass());
-  passManager.addPass(createConvertGpuLaunchFuncToVulkanLaunchFuncPass());
-  LowerToLLVMOptions llvmOptions = {
-      /*useBarePtrCallConv=*/false,
-      /*emitCWrappers=*/true,
-      /*indexBitwidth=*/kDeriveIndexBitwidthFromDataLayout};
-  passManager.addPass(createLowerToLLVMPass(llvmOptions));
-  passManager.addPass(createConvertVulkanLaunchFuncToVulkanCallsPass());
+  passManager.addPass(
+      pmlc::conversion::gpu::createConvertGpuLaunchFuncToVulkanCallsPass());
+  passManager.addPass(pmlc::conversion::gpu::createLLVMLoweringPass());
   return passManager.run(module);
 }
 
+namespace {
+/// This options struct prevents the need for global static initializers, and
+/// is only initialized if the JITRunner is invoked.
+struct Options {
+  llvm::cl::opt<std::string> inputFilename{llvm::cl::Positional,
+                                           llvm::cl::desc("<input file>"),
+                                           llvm::cl::init("-")};
+  llvm::cl::opt<std::string> mainFuncName{
+      "e", llvm::cl::desc("The function to be called"),
+      llvm::cl::value_desc("<function name>"), llvm::cl::init("main")};
+};
+} // namespace
+
+int JitRunnerMain(int argc, char **argv) {
+  // Create the options struct containing the command line options for the
+  // runner. This must come before the command line options are parsed.
+  Options options;
+  llvm::cl::ParseCommandLineOptions(argc, argv, "pmlc execution driver\n");
+
+  // Set up the input file.
+  std::string errorMessage;
+  auto file = openInputFile(options.inputFilename, &errorMessage);
+  if (!file) {
+    llvm::errs() << errorMessage << "\n";
+    return EXIT_FAILURE;
+  }
+
+  auto program = std::make_shared<Program>(std::move(file));
+  program->entry = options.mainFuncName.getValue();
+
+  runMLIRPasses(*program->module);
+
+  Executable executable(program, ArrayRef<void *>{});
+  executable.invoke();
+
+  return EXIT_SUCCESS;
+}
+
 int main(int argc, char **argv) {
+  auto level_str = pmlc::util::getEnvVar("PLAIDML_VERBOSE");
+  if (level_str.size()) {
+    auto level = std::atoi(level_str.c_str());
+    if (level) {
+      el::Loggers::setVerboseLevel(level);
+    }
+    IVLOG(level, "PLAIDML_VERBOSE=" << level);
+  }
+
   llvm::llvm_shutdown_obj x;
   registerPassManagerCLOptions();
 
@@ -61,5 +111,5 @@ int main(int argc, char **argv) {
   llvm::InitializeNativeTargetAsmPrinter();
   mlir::initializeLLVMPasses();
 
-  return mlir::JitRunnerMain(argc, argv, &runMLIRPasses);
+  return JitRunnerMain(argc, argv);
 }

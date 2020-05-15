@@ -110,15 +110,17 @@ TEST_F(CppEdsl, Cast) {
 }
 
 TEST_F(CppEdsl, BitAndScalar) {
+  const uint64_t ONE = 1;
+
   auto A = Placeholder(DType::UINT64, {3, 3});
   std::uint64_t mask = UINT32_MAX;
   auto B = A & mask;
   auto program = ProgramBuilder("bit_and", {B}).intx(DType::UINT64).compile();
   std::cout << program << std::endl;
 
-  std::vector<std::uint64_t> A_input{(1UL << 32),     (1UL << 33) + 1, (1UL << 34) + 2,  //
-                                     (1UL << 35) + 3, (1UL << 36) + 4, (1UL << 37) + 5,  //
-                                     (1UL << 38) + 6, (1UL << 39) + 7, (1UL << 40) + 8};
+  std::vector<std::uint64_t> A_input{(ONE << 32),     (ONE << 33) + 1, (ONE << 34) + 2,  //
+                                     (ONE << 35) + 3, (ONE << 36) + 4, (ONE << 37) + 5,  //
+                                     (ONE << 38) + 6, (ONE << 39) + 7, (ONE << 40) + 8};
   std::vector<std::uint64_t> B_output{0, 1, 2,  //
                                       3, 4, 5,  //
                                       6, 7, 8};
@@ -1006,7 +1008,7 @@ TEST_F(CppEdsl, Shape) {
 TEST_F(CppEdsl, Prng) {
   auto S = Placeholder(DType::UINT32, {3, 2048});
   auto O = prng(S, {2, 3, 4, 5});
-  auto program = ProgramBuilder("prng", {O}).target("").compile();
+  auto program = makeProgram("prng", {O});
   std::cout << program << std::endl;
   // clang-format off
   // CHECK-LABEL: CppEdsl.Prng
@@ -1018,8 +1020,40 @@ TEST_F(CppEdsl, Prng) {
   // CHECK: %result, %new_state = "tile.prng"(%{{.*}}, %[[c2]], %[[c3]], %[[c4]], %[[c5]]) : (tensor<3x2048xui32>, tensor<si32>, tensor<si32>, tensor<si32>, tensor<si32>) -> (tensor<2x3x4x5xf32>, tensor<3x2048xui32>)
   // CHECK: return %result, %new_state : tensor<2x3x4x5xf32>, tensor<3x2048xui32>
   // clang-format on
-  // TODO: lowering for PrngOp
-  // runProgram(program);
+  runProgram(program);
+}
+
+TEST_F(CppEdsl, PrngResultNotNegative) {
+  auto S = Placeholder(DType::UINT32, {3, 3});
+  TensorDim I, J;
+  TensorIndex i("i"), j("j");
+  S.bind_dims(I, J);
+  auto O = prng(S, {2, 3, 4, 5});
+  auto program = makeProgram("prng", {O});
+  std::cout << program << std::endl;
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.PrngResultNotNegative
+  // clang-format on
+
+  std::vector<uint32_t> input = {
+      5, 6, 7,  //
+      4, 5, 6,  //
+      7, 8, 9,  //
+  };
+
+  auto binder = exec::Binder(program);
+  auto executable = binder.compile();
+  binder.input(S).copy_from(input.data());
+  executable->run();
+
+  auto view = binder.output(O).mmap_current();
+  float* results = reinterpret_cast<float*>(view.data());
+  for (int i = 0; i < 120; i++) {
+    float res = results[i];
+    if (res <= 0 || res > 1) {
+      throw std::runtime_error("Bad PRNG!");
+    }
+  }
 }
 
 TEST_F(CppEdsl, ConvI8) {

@@ -5,7 +5,9 @@
 #include <functional>
 #include <vector>
 
+#include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/FormatVariadic.h"
 
 namespace mlir {
 class OpPassManager;
@@ -17,7 +19,9 @@ using TargetRegistryFunction = std::function<void(mlir::OpPassManager &)>;
 
 void registerTarget(llvm::StringRef name,
                     const TargetRegistryFunction &function);
+
 TargetRegistryFunction resolveTarget(llvm::StringRef name);
+
 std::vector<llvm::StringRef> listTargets();
 
 struct TargetRegistration {
@@ -25,5 +29,38 @@ struct TargetRegistration {
     registerTarget(name, builder);
   }
 };
+
+struct SymbolRegistry {
+  static SymbolRegistry *instance() {
+    static SymbolRegistry registry;
+    return &registry;
+  }
+
+  void registerSymbol(llvm::StringRef symbol, void *ptr) {
+    if (symbols.count(symbol)) {
+      throw std::runtime_error(
+          llvm::formatv("Symbol is already registered: {0}", symbol));
+    }
+    symbols[symbol] = ptr;
+  }
+
+  void *resolve(llvm::StringRef symbol) {
+    auto it = symbols.find(symbol);
+    if (it == symbols.end()) {
+      return nullptr;
+    }
+    return it->second;
+  }
+
+  llvm::StringMap<void *> symbols;
+};
+
+inline void registerSymbol(llvm::StringRef symbol, void *ptr) {
+  SymbolRegistry::instance()->registerSymbol(symbol, ptr);
+}
+
+inline void *resolveSymbol(llvm::StringRef symbol) {
+  return SymbolRegistry::instance()->resolve(symbol);
+}
 
 } // namespace pmlc::compiler

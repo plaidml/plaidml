@@ -1,4 +1,4 @@
-// RUN: pmlc-opt -stdx-check-bounds -convert-std-to-llvm %s | pmlc-jit -entry-point-result=void | FileCheck %s
+// RUN: pmlc-opt -stdx-check-bounds -convert-std-to-llvm %s | pmlc-jit | FileCheck %s
 
 module {
   func @simpleLoad(%A: memref<20x10xf32>, %i: index, %j: index) -> (f32) {
