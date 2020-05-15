@@ -305,6 +305,14 @@ TEST_F(CppEdsl, Add) {
 TEST_F(CppEdsl, ConstAdd) {
   auto O = ConstAdd();
   auto program = makeProgram("const_add", {O});
+
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.ConstAdd
+  // CHECK: func @const_add
+  // CHECK: %{{.*}} = "eltwise.add"(%{{.*}}, %{{.*}}) : (tensor<4xsi32>, tensor<4xsi32>) -> tensor<4xsi32>
+  // CHECK: return %{{.*}} : tensor<4xsi32>
+  // clang-format on
+
   exec::Binder binder(program);
   binder.compile()->run();
   IVLOG(1, "output: " << O.as_ptr());
