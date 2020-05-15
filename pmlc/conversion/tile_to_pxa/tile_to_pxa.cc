@@ -417,12 +417,12 @@ static Value createInit(OpBuilder &builder, Location loc, Type type,
     }
     case AggregationKind::min: {
       auto value = convertFloatUsingType(
-          llvm::APFloat(std::numeric_limits<double>::infinity()), floatType);
+          llvm::APFloat::getInf(llvm::APFloat::IEEEdouble(), false), floatType);
       return builder.create<mlir::ConstantFloatOp>(loc, value, floatType);
     }
     case AggregationKind::max: {
       auto value = convertFloatUsingType(
-          llvm::APFloat(-std::numeric_limits<double>::infinity()), floatType);
+          llvm::APFloat::getInf(llvm::APFloat::IEEEdouble(), true), floatType);
       return builder.create<mlir::ConstantFloatOp>(loc, value, floatType);
     }
     default:
