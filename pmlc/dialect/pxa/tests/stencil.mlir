@@ -40,7 +40,7 @@ module {
       %3 = addf %0, %1 :f32
       %2 = mulf %0, %3 : f32
       pxa.reduce add %2, %arg2[%i, %j] : memref<100x100xf32>
-      "affine.terminator"() : () -> ()
+      "affine.yield"() : () -> ()
     }
     return
   }
@@ -55,7 +55,7 @@ module {
       %3 = addf %0, %1 :f32
       %2 = mulf %0, %3 : f32
       pxa.reduce add %2, %arg2[%i, %j] : memref<100x100xf32>
-      "affine.terminator"() : () -> ()
+      "affine.yield"() : () -> ()
     }
     return
   }
@@ -70,7 +70,7 @@ module {
       %3 = addf %0, %1 :f32
       %2 = mulf %0, %3 : f32
       pxa.reduce add %2, %arg2[%i, %j] : memref<100x100xf32>
-      "affine.terminator"() : () -> ()
+      "affine.yield"() : () -> ()
     }
     return
   }

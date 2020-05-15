@@ -10,7 +10,7 @@ func @dot(%A: memref<8x8xf32>, %B: memref<8x8xf32>, %C: memref<8x8xf32>) -> () {
     // CHECK: xsmm.gemm %{{.*}}[%{{.*}}, %{{.*}}]:#{{.*}} =
     // CHECK-SAME: %{{.*}}[%{{.*}}, %{{.*}}]:#{{.*}}, %{{.*}}[%{{.*}}, %{{.*}}]:#{{.*}}, [2, 2, 2]
     // CHECK-SAME: memref<8x8xf32>, memref<8x8xf32>, memref<8x8xf32>
-    xsmm.gemm %C[%i, %j]:#C_tile = %A[%i, %k]:#A_tile, %B[%k, %j]:#B_tile, [2, 2, 2]
+    %0 = xsmm.gemm %C[%i, %j]:#C_tile = %A[%i, %k]:#A_tile, %B[%k, %j]:#B_tile, [2, 2, 2]
       : memref<8x8xf32>, memref<8x8xf32>, memref<8x8xf32>
   }
   return
@@ -23,7 +23,7 @@ func @dot(%A: memref<8x8xf32>, %B: memref<8x8xf32>, %C: memref<8x8xf32>) -> () {
 func @res2a_branch2a(%I: memref<1x56x56x64xf32>, %K: memref<1x1x64x64xf32>, %O: memref<1x56x56x64xf32>) -> () {
   %c0 = constant 0 : index
   affine.parallel (%x, %y) = (0, 0) to (56, 56) step (14, 1) {
-    xsmm.gemm %O[%c0, 14 * %x, %y, %c0]:#O_tile
+    %0 = xsmm.gemm %O[%c0, 14 * %x, %y, %c0]:#O_tile
       = %K[%c0, %c0, %c0, %c0]:#K_tile, %I[%c0, 14 * %x, %y, %c0]:#I_tile, [64, 14, 64]
       : memref<1x56x56x64xf32>, memref<1x1x64x64xf32>, memref<1x56x56x64xf32>
   }
@@ -40,7 +40,7 @@ func @res2a_branch2b(%I: memref<1x56x56x64xf32>, %K: memref<3x3x64x64xf32>, %O: 
     affine.store %0, %T[%c0, %x + 1, %y + 1, %k] : memref<1x58x58x64xf32>
   }
   affine.parallel (%x, %y, %kx, %ky) = (0, 0, 0, 0) to (56, 56, 3, 3) step (14, 1, 1, 1) {
-    xsmm.gemm %O[%c0, 14 * %x, %y, %c0]:#O_tile
+    %0 = xsmm.gemm %O[%c0, 14 * %x, %y, %c0]:#O_tile
       = %K[%kx, %ky, %c0, %c0]:#K_tile
       , %T[%c0, 14 * %x + %kx, %y + %ky, %c0]:#I_tile
       , [64, 14, 64]

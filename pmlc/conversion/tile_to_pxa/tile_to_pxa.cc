@@ -1,5 +1,6 @@
 // Copyright 2020, Intel Corporation
 
+#include <limits>
 #include <utility>
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -34,6 +35,7 @@ using dialect::tile::ContractionOp;
 using dialect::tile::ContractionOpOperandAdaptor;
 using dialect::tile::getPaddingInfo;
 using dialect::tile::IndexOp;
+using dialect::tile::PaddingInfo;
 using dialect::tile::PrngOp;
 using dialect::tile::ShapeOp;
 using dialect::tile::ShapeOpOperandAdaptor;
@@ -46,6 +48,7 @@ struct TypeConverter : public mlir::TypeConverter {
     addConversion([](FunctionType type) { return type; });
     addConversion([](FloatType type) { return type; });
     addConversion([](IntegerType type) { return ew::toSignlessType(type); });
+    addConversion([](MemRefType type) { return type; });
     addConversion([this](RankedTensorType type) {
       auto elementType = type.getElementType();
       auto newType = convertType(elementType);
@@ -84,13 +87,9 @@ struct FuncOpConversion : public OpConversionPattern<FuncOp> {
 
     // Convert the function signature
     TypeConverter typeConverter;
-    mlir::TypeConverter::SignatureConversion result(type.getNumInputs() +
-                                                    type.getNumResults());
+    mlir::TypeConverter::SignatureConversion result(type.getNumInputs());
     for (unsigned i = 0; i < type.getNumInputs(); ++i) {
       result.addInputs(i, {typeConverter.convertType(type.getInput(i))});
-    }
-    for (unsigned i = 0; i < type.getNumResults(); ++i) {
-      result.addInputs({typeConverter.convertType(type.getResult(i))});
     }
 
     // Create a new function with an updated signature.
@@ -414,6 +413,14 @@ static Value createInit(OpBuilder &builder, Location loc, Type type,
       auto value = convertFloatUsingType(llvm::APFloat(1.0), floatType);
       return builder.create<mlir::ConstantFloatOp>(loc, value, floatType);
     }
+    case AggregationKind::min: {
+      auto value = llvm::APFloat::getInf(floatType.getFloatSemantics(), false);
+      return builder.create<mlir::ConstantFloatOp>(loc, value, floatType);
+    }
+    case AggregationKind::max: {
+      auto value = llvm::APFloat::getInf(floatType.getFloatSemantics(), true);
+      return builder.create<mlir::ConstantFloatOp>(loc, value, floatType);
+    }
     default:
       llvm_unreachable("Unsupported aggregation for createInit");
     }
@@ -423,6 +430,12 @@ static Value createInit(OpBuilder &builder, Location loc, Type type,
       return builder.create<mlir::ConstantIntOp>(loc, 0, intType);
     case AggregationKind::mul:
       return builder.create<mlir::ConstantIntOp>(loc, 1, intType);
+    case AggregationKind::min:
+      return builder.create<mlir::ConstantIntOp>(
+          loc, std::numeric_limits<int>::max(), intType);
+    case AggregationKind::max:
+      return builder.create<mlir::ConstantIntOp>(
+          loc, std::numeric_limits<int>::min(), intType);
     default:
       llvm_unreachable("Unsupported aggregation for createInit");
     }
@@ -444,8 +457,20 @@ struct CondOp {
   }
 };
 
+static void updateAffineMap(Operation *in, const PaddingInfo &padding) {
+  auto accMap = in->getAttr("map").cast<AffineMapAttr>().getValue();
+  assert(padding.lower.size() == accMap.getNumResults());
+  SmallVector<AffineExpr, 4> newExprs;
+  for (unsigned j = 0; j < accMap.getNumResults(); j++) {
+    newExprs.push_back(accMap.getResult(j) + padding.lower[j]);
+  }
+  accMap = AffineMap::get(accMap.getNumDims(), 0, newExprs, in->getContext());
+  in->setAttr("map", AffineMapAttr::get(accMap));
+}
+
 static Value buildBroadcastLoad(OpBuilder &builder, Location loc, Value operand,
-                                unsigned outRank) {
+                                unsigned outRank,
+                                llvm::Optional<PaddingInfo> maybePadding) {
   auto body = builder.getBlock();
   auto defOp = operand.getDefiningOp();
   Attribute attr;
@@ -467,26 +492,28 @@ static Value buildBroadcastLoad(OpBuilder &builder, Location loc, Value operand,
       operandIdxs[k] = body->getArgument(j);
     }
   }
-  return builder.create<AffineLoadOp>(loc, operand, operandIdxs);
+  auto loadOp = builder.create<AffineLoadOp>(loc, operand, operandIdxs);
+  if (maybePadding)
+    updateAffineMap(loadOp, *maybePadding);
+  return loadOp;
 }
 
-static void buildSimpleStore(OpBuilder &builder, Location loc, Value scalar,
-                             Value memRef) {
+static Value buildSimpleStore(OpBuilder &builder, Location loc, Value scalar,
+                              Value memRef,
+                              llvm::Optional<PaddingInfo> maybePadding) {
   auto body = builder.getBlock();
   auto memRefType = memRef.getType().cast<MemRefType>();
   auto elementType = memRefType.getElementType();
   if (elementType != scalar.getType()) {
     scalar = createCastOp(builder, loc, scalar, false, elementType, false);
   }
-  builder.create<AffineStoreOp>(loc, scalar, memRef, body->getArguments());
-}
-
-static void fillBuffer(OpBuilder &builder, Location loc, Value value,
-                       Value memref, ArrayRef<int64_t> shape) {
-  auto parallel = builder.create<AffineParallelOp>(loc, shape);
-  auto parallelBuilder = parallel.getBodyBuilder();
-  auto load = buildBroadcastLoad(parallelBuilder, loc, value, shape.size());
-  buildSimpleStore(parallelBuilder, loc, load, memref);
+  auto aggOp = AggregationKind::assign;
+  auto idMap = builder.getMultiDimIdentityMap(memRefType.getRank());
+  auto storeOp = builder.create<pxa::AffineReduceOp>(
+      loc, aggOp, scalar, memRef, idMap, body->getArguments());
+  if (maybePadding)
+    updateAffineMap(storeOp, *maybePadding);
+  return storeOp;
 }
 
 struct BufferAllocator {
@@ -514,25 +541,18 @@ struct BufferAllocator {
 
     // Make an allocation for the output
     memRefType = MemRefType::get(shape, elementType);
-    resultMemRef = builder.create<AllocOp>(loc, memRefType).getResult();
-
+    resultMemRef = builder.create<AllocOp>(loc, memRefType);
     if (maybePadding) {
-      // Initialize the entire buffer, including the halo.
       auto initValue = createInit(builder, loc, elementType, maybePadding->agg);
-      fillBuffer(builder, loc, initValue, resultMemRef, shape);
-      // Construct a subview of the interior.
-      auto one = builder.create<mlir::ConstantIndexOp>(loc, 1);
-      SmallVector<Value, 4> offsets;
-      SmallVector<Value, 4> sizes;
-      SmallVector<Value, 4> strides(shape.size(), one);
-      for (unsigned i = 0, e = shape.size(); i < e; ++i) {
-        auto offset = maybePadding->lower[i];
-        auto size = originalShape[i];
-        offsets.push_back(builder.create<mlir::ConstantIndexOp>(loc, offset));
-        sizes.push_back(builder.create<mlir::ConstantIndexOp>(loc, size));
-      }
-      resultMemRef =
-          builder.create<SubViewOp>(loc, resultMemRef, offsets, sizes, strides);
+      auto parallel = builder.create<AffineParallelOp>(
+          loc, ArrayRef<Type>({memRefType}), shape);
+      auto parallelBuilder = parallel.getBodyBuilder();
+      auto load = buildBroadcastLoad(parallelBuilder, loc, initValue,
+                                     shape.size(), llvm::None);
+      auto stored = buildSimpleStore(parallelBuilder, loc, load, resultMemRef,
+                                     llvm::None);
+      parallelBuilder.create<AffineYieldOp>(loc, ValueRange{stored});
+      resultMemRef = parallel.getResult(0);
     }
   }
 };
@@ -570,10 +590,7 @@ struct PrngOpConversion : public OpConversionPattern<PrngOp> {
         loc, symbol, ArrayRef<Type>{},
         ArrayRef<Value>{stateCast, resultCast, newStateCast});
 
-    op.result().replaceAllUsesWith(allocResult.resultMemRef);
-    op.new_state().replaceAllUsesWith(allocState.resultMemRef);
-
-    rewriter.eraseOp(op);
+    rewriter.replaceOp(op, {allocResult.resultMemRef, allocState.resultMemRef});
     return success();
   }
 
@@ -616,15 +633,19 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
 
     // Make a parallel for loop to fill the result
     auto forOp = rewriter.create<AffineParallelOp>(
-        loc, alloc.rankedTensorType.getShape());
+        loc, ArrayRef<Type>({alloc.memRefType}),
+        alloc.rankedTensorType.getShape());
     auto body = forOp.getBody();
     rewriter.setInsertionPointToStart(body);
 
     // Create the loads
     SmallVector<Value, 4> scalars;
     for (size_t i = 0; i < operands.size(); i++) {
+      auto maybePadding =
+          getPaddingInfo(op.getOperation()->getOperand(i).getDefiningOp());
       scalars.push_back(buildBroadcastLoad(rewriter, loc, operands[i],
-                                           alloc.memRefType.getRank()));
+                                           alloc.memRefType.getRank(),
+                                           maybePadding));
     }
 
     // Create the standard op
@@ -637,10 +658,12 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
                                        scalars, operandTypes);
 
     // Create the store
-    buildSimpleStore(rewriter, loc, result, alloc.resultMemRef);
+    auto stored = buildSimpleStore(rewriter, loc, result, alloc.resultMemRef,
+                                   getPaddingInfo(op));
+    rewriter.create<AffineYieldOp>(loc, ValueRange({stored}));
 
     // Replace output with the newly allocated buffer
-    rewriter.replaceOp(op, alloc.resultMemRef);
+    rewriter.replaceOp(op, forOp.getResult(0));
   }
 };
 
@@ -685,8 +708,19 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
     BufferAllocator alloc(rewriter, op.getOperation(), op.result().getType());
 
     // Do initialization
-    fillBuffer(rewriter, loc, cionAdaptor.init(), alloc.resultMemRef,
-               alloc.rankedTensorType.getShape());
+    auto shape = alloc.rankedTensorType.getShape();
+    auto parallel = rewriter.create<AffineParallelOp>(
+        loc, ArrayRef<Type>({alloc.memRefType}), shape);
+    auto parallelBuilder = parallel.getBodyBuilder();
+    auto maybePadding = getPaddingInfo(op.init().getDefiningOp());
+    auto load = buildBroadcastLoad(parallelBuilder, loc, cionAdaptor.init(),
+                                   shape.size(), maybePadding);
+    auto store = buildSimpleStore(parallelBuilder, loc, load,
+                                  alloc.resultMemRef, getPaddingInfo(op));
+    if (maybePadding)
+      updateAffineMap(store.getDefiningOp(), *maybePadding);
+    parallelBuilder.create<AffineYieldOp>(loc, ValueRange({store}));
+    auto filled = parallel.getResult(0);
 
     // Determine lower and upper bounds.
     SmallVector<AffineExpr, 8> ubExprs;
@@ -702,12 +736,13 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
 
     auto ubMap = AffineMap::get(0, 0, {ubExprs}, op.getContext());
     // Make the outer loops
-    auto forOp =
-        rewriter.create<AffineParallelOp>(loc,
-                                          /*lbMap=*/op.lowerBounds().getValue(),
-                                          /*lbArgs=*/llvm::ArrayRef<Value>{},
-                                          /*ubMap=*/ubMap,
-                                          /*ubArgs=*/llvm::ArrayRef<Value>{});
+    auto forOp = rewriter.create<AffineParallelOp>(
+        loc,
+        /*resultTypes=*/ArrayRef<Type>{alloc.memRefType},
+        /*lbMap=*/op.lowerBounds().getValue(),
+        /*lbArgs=*/llvm::ArrayRef<Value>{},
+        /*ubMap=*/ubMap,
+        /*ubArgs=*/llvm::ArrayRef<Value>{});
 
     auto body = forOp.getBody();
     rewriter.setInsertionPointToStart(body);
@@ -716,7 +751,11 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
     // add constraints
     if (op.cons()) {
       auto cons = op.cons().getValue();
-      auto ifOp = rewriter.create<AffineIfOp>(loc, cons, idxs, false);
+      auto ifOp = rewriter.create<AffineIfOp>(
+          loc, TypeRange({alloc.memRefType}), cons, idxs, true);
+      rewriter.create<AffineYieldOp>(loc, ifOp.getOperation()->getResults());
+      rewriter.setInsertionPointToStart(&ifOp.elseRegion().front());
+      rewriter.create<AffineYieldOp>(loc, alloc.resultMemRef);
       rewriter.setInsertionPointToStart(&ifOp.thenRegion().front());
     }
 
@@ -731,8 +770,11 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
         scalars.push_back(operand);
       } else {
         auto map = srcs[i].cast<AffineMapAttr>().getValue();
-        scalars.push_back(
-            rewriter.create<AffineLoadOp>(loc, operand, map, idxs));
+        auto loadOp = rewriter.create<AffineLoadOp>(loc, operand, map, idxs);
+        auto maybePadding = getPaddingInfo(op.operands()[i].getDefiningOp());
+        if (maybePadding)
+          updateAffineMap(loadOp, *maybePadding);
+        scalars.push_back(loadOp);
       }
     }
 
@@ -747,17 +789,22 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
 
     // Create the store
     auto resultMap = op.sink();
+    pxa::AffineReduceOp reduceOp;
     if (resultMap.isEmpty()) {
       SmallVector<Value, 0> emptyIdxs;
-      rewriter.create<pxa::AffineReduceOp>(
-          loc, op.agg(), combined, alloc.resultMemRef, resultMap, emptyIdxs);
+      reduceOp = rewriter.create<pxa::AffineReduceOp>(
+          loc, op.agg(), combined, filled, resultMap, emptyIdxs);
     } else {
-      rewriter.create<pxa::AffineReduceOp>(loc, op.agg(), combined,
-                                           alloc.resultMemRef, resultMap, idxs);
+      reduceOp = rewriter.create<pxa::AffineReduceOp>(loc, op.agg(), combined,
+                                                      filled, resultMap, idxs);
     }
+    maybePadding = getPaddingInfo(op);
+    if (maybePadding)
+      updateAffineMap(reduceOp, *maybePadding);
+    rewriter.create<AffineYieldOp>(loc, ValueRange({reduceOp}));
 
     // Replace the op
-    rewriter.replaceOp(op, alloc.resultMemRef);
+    rewriter.replaceOp(op, forOp.getResult(0));
   }
 };
 
@@ -779,7 +826,8 @@ struct IndexOpConversion : public OpConversionPattern<IndexOp> {
     auto resultMemRef = rewriter.create<AllocOp>(loc, resultType).getResult();
 
     // Make a parallel for loop to fill the result
-    auto forOp = rewriter.create<AffineParallelOp>(loc, resultType.getShape());
+    auto forOp = rewriter.create<AffineParallelOp>(
+        loc, ArrayRef<Type>({resultType}), resultType.getShape());
     auto body = forOp.getBody();
     rewriter.setInsertionPointToStart(body);
     auto idxs = body->getArguments();
@@ -793,10 +841,12 @@ struct IndexOpConversion : public OpConversionPattern<IndexOp> {
     // Create the store
     auto cast = rewriter.create<mlir::IndexCastOp>(loc, apply,
                                                    rewriter.getIntegerType(32));
-    rewriter.create<AffineStoreOp>(loc, cast, resultMemRef, idxs);
+    auto stored =
+        buildSimpleStore(rewriter, loc, cast, resultMemRef, getPaddingInfo(op));
+    rewriter.create<AffineYieldOp>(loc, ValueRange({stored}));
 
     // Replace the op
-    rewriter.replaceOp(op, resultMemRef);
+    rewriter.replaceOp(op, forOp.getResult(0));
 
     return success();
   }
@@ -867,7 +917,8 @@ struct CastOpConversion : public OpConversionPattern<ew::CastOp> {
     auto resultMemRef = rewriter.create<AllocOp>(loc, resultType).getResult();
 
     // Make a parallel for loop to fill the result
-    auto forOp = rewriter.create<AffineParallelOp>(loc, resultType.getShape());
+    auto forOp = rewriter.create<AffineParallelOp>(
+        loc, ArrayRef<Type>{resultType}, resultType.getShape());
     auto body = forOp.getBody();
     rewriter.setInsertionPointToStart(body);
     auto idxs = body->getArguments();
@@ -881,10 +932,12 @@ struct CastOpConversion : public OpConversionPattern<ew::CastOp> {
                                resultType.getElementType(), resultIsSigned);
 
     // Create the store
-    rewriter.create<AffineStoreOp>(loc, result, resultMemRef, idxs);
+    auto stored = buildSimpleStore(rewriter, loc, result, resultMemRef,
+                                   getPaddingInfo(op));
+    rewriter.create<AffineYieldOp>(loc, ValueRange{stored});
 
     // Replace the op
-    rewriter.replaceOp(op, resultMemRef);
+    rewriter.replaceOp(op, forOp.getResult(0));
 
     IVLOG(2, "CastOpConversion::matchAndRewrite returns success");
     return success();
@@ -902,6 +955,7 @@ struct ReturnOpConversion : public OpConversionPattern<ReturnOp> {
     auto funcOp = op.getParentOfType<FuncOp>();
     auto blockArg = funcOp.getType().getNumInputs() - op.getNumOperands();
     for (auto operand : operands) {
+      // Find very initial allocation of memref
       operand.replaceAllUsesWith(block.getArgument(blockArg++));
     }
     rewriter.replaceOpWithNewOp<ReturnOp>(op);
@@ -943,17 +997,14 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
   void runOnOperation() final {
     // Set up target (i.e. what is legal)
     mlir::ConversionTarget target(getContext());
+    TypeConverter converter;
     target.addLegalDialect<mlir::AffineDialect>();
     target.addLegalDialect<mlir::StandardOpsDialect>();
     target.addLegalDialect<dialect::pxa::PXADialect>();
     target.addLegalDialect<dialect::stdx::StdXDialect>();
-    target.addLegalOp<mlir::ModuleOp, mlir::ModuleTerminatorOp>();
-    target.addDynamicallyLegalOp<FuncOp>([](FuncOp op) {
-      auto funcType = op.getType();
-      return funcType.getNumResults() == 0;
-    });
-    target.addDynamicallyLegalOp<ReturnOp>(
-        [](ReturnOp op) { return op.getNumOperands() == 0; });
+    target.addLegalOp<mlir::ModuleOp, mlir::ModuleTerminatorOp, ReturnOp>();
+    target.addDynamicallyLegalOp<FuncOp>(
+        [&](FuncOp op) { return converter.isSignatureLegal(op.getType()); });
 
     // Setup rewrite patterns
     using CmpIntLtOp =
@@ -965,10 +1016,11 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
     using CmpIntGeOp =
         CmpIntInequalityOp<CmpIPredicate::sge, CmpIPredicate::uge>;
     OwningRewritePatternList patterns;
+    populateFuncOpTypeConversionPattern(patterns, &getContext(), converter);
     patterns.insert<
-        TileConstantOpConversion, CastOpConversion, FuncOpConversion,
-        IndexOpConversion, ReturnOpConversion, ScalarConstantOpConversion,
-        ShapeOpConversion, TraceOpConversion, PrngOpConversion,
+        TileConstantOpConversion, CastOpConversion, IndexOpConversion,
+        ScalarConstantOpConversion, ShapeOpConversion, TraceOpConversion,
+        PrngOpConversion,
         // TODO: SpecialOpConversion (GatherOp, ReshapeOp,
         // ScatterOp, ZeroOp)
         ContractionOpConversion<CombinationKind::none, FirstOperand>,

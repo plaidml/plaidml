@@ -84,6 +84,7 @@ ParseResult parseGemmOp(OpAsmParser &parser, OperationState &result) {
       parser.parseComma() ||
       parser.parseAttribute(tileAttr, i64Type, "tile", result.attributes) ||
       parser.parseColonTypeList(operandTypes) ||
+      parser.addTypeToList(operandTypes[0], result.types) ||
       parser.resolveOperand(c, operandTypes[0], result.operands) ||
       parser.resolveOperand(a, operandTypes[1], result.operands) ||
       parser.resolveOperand(b, operandTypes[2], result.operands) ||

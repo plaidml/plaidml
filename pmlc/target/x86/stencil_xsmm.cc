@@ -250,7 +250,7 @@ private:
     // Get the current memrefs
     Value aVal = opA.getMemRef();
     Value bVal = opB.getMemRef();
-    Value cVal = opC.out();
+    Value cVal = opC.getMemRef();
 
     // Initialize helpers
     llvm::SmallVector<Value, 8> mapOperands;
@@ -301,9 +301,10 @@ private:
                        opB.getMapOperands().end());
 
     // Make the XSMM op
-    bodyBuilder.create<xsmm::GemmOp>(op.getLoc(), cVal, cMap, cTile, aVal, aMap,
-                                     aTile, bVal, bMap, bTile, tiles,
-                                     mapOperands);
+    auto gemm = bodyBuilder.create<xsmm::GemmOp>(
+        op.getLoc(), cVal.getType(), cVal, cMap, cTile, aVal, aMap, aTile, bVal,
+        bMap, bTile, tiles, mapOperands);
+    opC.result().replaceAllUsesWith(gemm);
 
     // Remove all other ops from the op interior
     auto xsmm_it = std::prev(op.getBody()->end(), 2);

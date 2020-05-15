@@ -1173,7 +1173,7 @@ class TestBackendOps(unittest.TestCase):
         ]
 
     @opTest([
-        [m(1, 4, 4, 1)],
+        [m(1, 4, 4, 1) - 33.],
         [m(1, 9, 9, 1)],
         [m(1, 8, 10, 1)],
         [m(2, 9, 11, 3)],

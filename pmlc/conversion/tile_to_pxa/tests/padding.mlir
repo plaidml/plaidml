@@ -11,19 +11,17 @@ func @pad_input(%arg0: tensor<10xf32>) -> tensor<10xf32> {
   return %0 : tensor<10xf32>
 }
 
-// CHECK: #[[LAYOUT:.*]] = affine_map<(d0) -> (d0 + 1)>
 // CHECK-LABEL: func @pad_input
 // CHECK: %[[TMP:.*]] = alloc() : memref<12xf32>
-// CHECK: affine.parallel (%{{.*}}) = (0) to (12)
-// CHECK:   affine.store %{{.*}}, %[[TMP]][%{{.*}}] : memref<12xf32>
-// CHECK: %[[SUBVIEW:.*]] = subview %[[TMP]][] [] [] : memref<12xf32> to memref<10xf32, #[[LAYOUT]]>
-// CHECK: affine.parallel (%{{.*}}) = (0) to (10)
+// CHECK: %[[CLEAR:.*]] = affine.parallel (%{{.*}}) = (0) to (12)
+// CHECK:   pxa.reduce assign %{{.*}}, %[[TMP]][%{{.*}}] : memref<12xf32>
+// CHECK: %[[COPY:.*]] = affine.parallel (%{{.*}}) = (0) to (10)
 // CHECK:   %[[X0:.*]] = affine.load %{{.*}}[%{{.*}}] : memref<10xf32>
-// CHECK:   affine.store %[[X0]], %[[SUBVIEW]][%{{.*}}] : memref<10xf32, #[[LAYOUT]]>
+// CHECK:   pxa.reduce assign %[[X0]], %[[CLEAR]][%{{.*}} + 1] : memref<12xf32>
 // CHECK: affine.parallel (%{{.*}}) = (0) to (10)
-// CHECK:   affine.store %{{.*}}, %{{.*}}[%{{.*}}] : memref<10xf32>
+// CHECK:   pxa.reduce assign %{{.*}}, %{{.*}}[%{{.*}}] : memref<10xf32>
 // CHECK: affine.parallel (%{{.*}}, %{{.*}}) = (0, 0) to (10, 3)
-// CHECK:   %[[X1:.*]] = affine.load %[[SUBVIEW]][%{{.*}} + %{{.*}} - 1] : memref<10xf32, #[[LAYOUT]]>
+// CHECK:   %[[X1:.*]] = affine.load %[[COPY]][%{{.*}} + %{{.*}}] : memref<12xf32>
 // CHECK:   pxa.reduce add %[[X1]], %{{.*}}[%{{.*}}] : memref<10xf32>
 
 // -----
@@ -41,20 +39,18 @@ func @pad_contraction(%A: tensor<10xf32>, %B: tensor<1xf32>, %C: tensor<3xf32>) 
   return %1 : tensor<10xf32>
 }
 
-// CHECK: #[[LAYOUT:.*]] = affine_map<(d0) -> (d0 + 1)>
 // CHECK-LABEL: func @pad_contraction
 // CHECK: %[[TMP:.*]] = alloc() : memref<12xf32>
 // fill exterior
-// CHECK: affine.parallel (%{{.*}}) = (0) to (12)
-// CHECK:   affine.store %{{.*}}, %[[TMP]][%{{.*}}] : memref<12xf32>
-// CHECK: %[[SUBVIEW:.*]] = subview %[[TMP]][] [] [] : memref<12xf32> to memref<10xf32, #[[LAYOUT]]>
+// CHECK: %[[CLEAR:.*]] = affine.parallel (%{{.*}}) = (0) to (12)
+// CHECK:   pxa.reduce assign %{{.*}}, %[[TMP]][%{{.*}}] : memref<12xf32>
 // fill interior
-// CHECK: affine.parallel (%{{.*}}) = (0) to (10)
-// CHECK:   affine.store %{{.*}}, %[[SUBVIEW]][%{{.*}}] : memref<10xf32, #[[LAYOUT]]>
+// CHECK: %[[INITED:.*]] = affine.parallel (%{{.*}}) = (0) to (10)
+// CHECK:   pxa.reduce assign %{{.*}}, %[[CLEAR]][%{{.*}} + 1] : memref<12xf32>
 // 1st contraction
-// CHECK: affine.parallel (%{{.*}}, %{{.*}}) = (1, 0) to (10, 1)
-// CHECK:   pxa.reduce add %{{.*}}, %[[SUBVIEW]][%{{.*}}] : memref<10xf32, #[[LAYOUT]]>
+// CHECK: %[[FINAL:.*]] = affine.parallel (%{{.*}}, %{{.*}}) = (1, 0) to (10, 1)
+// CHECK:   pxa.reduce add %{{.*}}, %[[INITED]][%{{.*}} + 1] : memref<12xf32>
 // 2nd contraction
 // CHECK: affine.parallel (%{{.*}}, %{{.*}}) = (0, 0) to (10, 3)
-// CHECK:   affine.load %[[SUBVIEW]][%{{.*}} + %{{.*}} - 1] : memref<10xf32, #[[LAYOUT]]>
+// CHECK:   affine.load %[[FINAL]][%{{.*}} + %{{.*}}] : memref<12xf32>
 // CHECK:   pxa.reduce add %{{.*}}, %{{.*}}[%{{.*}}] : memref<10xf32>
