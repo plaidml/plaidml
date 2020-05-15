@@ -290,7 +290,7 @@ func @conv2_xsmm_op(%I: !I_memref, %K: !K_memref, %O: !O_memref) {
   %CO = dim %O, 3 : !O_memref
   %c0 = constant 0 : index
   affine.parallel (%x, %y) = (0, 0) to (%X, %Y) step (2, 1) {
-    xsmm.gemm %O[%c0, %x, %y, %c0]:#O_tile = %I[%c0, %x, %y, %c0]:#I_tile, %K[%c0, %c0, %c0, %c0]:#K_tile, [11, 2, 7]
+    xsmm.gemm %O[%c0, %x, %y, %c0]:#O_tile = %I[%c0, %x, %y, %c0]:#I_tile, %K[%c0, %c0, %c0, %c0]:#K_tile, [2, 11, 7]
       : !O_memref, !I_memref, !K_memref
   }
   return
@@ -303,8 +303,8 @@ func @conv2_xsmm_call(%I: !I_memref, %K: !K_memref, %O: !O_memref) {
   %c0 = constant 0 : index
   %X = dim %I, 1 : !I_memref
   %Y = dim %I, 2 : !I_memref
-  %m = constant 11 : i32
-  %n = constant 2 : i32
+  %m = constant 2 : i32
+  %n = constant 11 : i32
   %k = constant 7 : i32
   %lda = constant 35 : i32
   %ldb = constant 11 : i32
