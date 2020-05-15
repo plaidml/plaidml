@@ -92,8 +92,8 @@ template <>
 void SimplifyAffineOp<AffineReduceOp>::replaceAffineOp(
     PatternRewriter &rewriter, AffineReduceOp op, AffineMap map,
     ArrayRef<Value> mapOperands) const {
-  rewriter.replaceOpWithNewOp<AffineReduceOp>(op, op.agg(), op.val(), op.out(),
-                                              map, mapOperands);
+  rewriter.replaceOpWithNewOp<AffineReduceOp>(
+      op, op.getMemRefType(), op.agg(), op.val(), op.mem(), map, mapOperands);
 }
 
 /// This is a common class used for patterns of the form
@@ -119,13 +119,13 @@ void printAffineReduceOp(OpAsmPrinter &p, AffineReduceOp op) {
   p << op.getOperation()->getName() << ' ';
   p << util::stringifyAggregationKind(op.agg()) << ' ';
   p << op.val() << ", ";
-  p << op.out() << '[';
+  p << op.mem() << '[';
   auto mapAttr = op.getAttrOfType<AffineMapAttr>("map");
   p.printAffineMapOfSSAIds(mapAttr, op.idxs());
   p << ']';
   p.printOptionalAttrDict(op.getAttrs(), {"agg", "map"});
   p << " : ";
-  p.printType(op.out().getType());
+  p.printType(op.mem().getType());
 }
 
 // <operation> ::= `pxa.reduce` keyword ssa-use `,` ssa-use `[` ssa-use-list `]`
@@ -147,7 +147,7 @@ ParseResult parseAffineReduceOp(OpAsmParser &parser, OperationState &result) {
       parser.parseOperand(out) ||
       parser.parseAffineMapOfSSAIds(idxs, mapAttr, "map", result.attributes) ||
       parser.parseOptionalAttrDict(result.attributes) ||
-      parser.parseColonType(type) ||
+      parser.parseColonType(type) || parser.addTypeToList(type, result.types) ||
       parser.resolveOperand(val, type.getElementType(), result.operands) ||
       parser.resolveOperand(out, type, result.operands) ||
       parser.resolveOperands(idxs, indexTy, result.operands));
@@ -158,10 +158,10 @@ void AffineReduceOp::getCanonicalizationPatterns(
   results.insert<SimplifyAffineOp<AffineReduceOp>>(context);
 }
 
-LogicalResult AffineReduceOp::fold(ArrayRef<Attribute> cstOperands,
-                                   SmallVectorImpl<OpFoldResult> &results) {
+OpFoldResult AffineReduceOp::fold(ArrayRef<Attribute> cstOperands) {
   /// reduce(memrefcast) -> reduce
-  return foldMemRefCast(*this);
+  foldMemRefCast(*this);
+  return OpFoldResult();
 }
 
 #define GET_OP_CLASSES

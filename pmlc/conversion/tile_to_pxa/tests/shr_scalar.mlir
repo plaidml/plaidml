@@ -12,4 +12,4 @@ module {
 // CHECK: affine.parallel
 // CHECK: affine.load
 // CHECK: shift_right_unsigned
-// CHECK: affine.store
+// CHECK: pxa.reduce assign

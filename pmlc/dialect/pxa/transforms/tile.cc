@@ -9,7 +9,7 @@ namespace pmlc::dialect::pxa {
 using mlir::AffineParallelOp;
 
 void performTiling(AffineParallelOp op, llvm::ArrayRef<int64_t> tileSizes) {
-  auto builder = op.getBodyBuilder();
+  mlir::OpBuilder builder(op.getBody(), op.getBody()->begin());
   mlir::Block *outerBody = op.getBody();
   // Verify sizes match
   size_t dimCount = tileSizes.size();
@@ -28,14 +28,17 @@ void performTiling(AffineParallelOp op, llvm::ArrayRef<int64_t> tileSizes) {
   auto lbMap = AffineMap::get(dimCount, 0, lbExprs, op.getContext());
   auto ubMap = AffineMap::get(dimCount, 0, ubExprs, op.getContext());
   auto outerIdxs = outerBody->getArguments();
-  // Make the inner parallel for
-  auto inner = builder.create<AffineParallelOp>(op.getLoc(), lbMap, outerIdxs,
-                                                ubMap, outerIdxs);
+  // Make the inner parallel for (abve all other code);
+  auto inner = builder.create<AffineParallelOp>(
+      op.getLoc(), op.getResultTypes(), lbMap, outerIdxs, ubMap, outerIdxs);
   // Splice instructions into the interior
   auto &innerLoopOps = inner.getBody()->getOperations();
   auto &outerLoopOps = outerBody->getOperations();
   innerLoopOps.splice(std::prev(innerLoopOps.end()), outerLoopOps,
-                      outerLoopOps.begin(), std::prev(outerLoopOps.end(), 2));
+                      std::next(outerLoopOps.begin(), 1), outerLoopOps.end());
+  // Add a return of the values of the inner to the outer
+  builder.setInsertionPointToEnd(op.getBody());
+  builder.create<AffineYieldOp>(op.getLoc(), inner.getResults());
   // Update outer step size
   llvm::SmallVector<int64_t, 8> newSteps;
   auto oldSteps = op.steps().cast<ArrayAttr>().getValue();

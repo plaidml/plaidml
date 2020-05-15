@@ -43,6 +43,7 @@ def XSMM_GemmOp : XSMM_Op<"gemm"> {
     AnyMemRef:$b, AffineMapAttr:$bAccessMap, AffineMapAttr:$bTileMap,
     I64ArrayAttr:$tile,
     Variadic<Index>:$mapOperands);
+  let results = (outs AnyMemRef:$cout);
 
   let extraClassDeclaration = [{
     operand_range getOperandsForA();
