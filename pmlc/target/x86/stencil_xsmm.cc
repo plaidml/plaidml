@@ -274,10 +274,11 @@ private:
       return map.compose(toIdxs);
     };
 
-    // Set the tile size. Note XSMM wants n, m, k order and we have m, n, k
+    // Set the tile size. Note XSMM wants col-major order and we fix this later
+    // inside the libxsmm call.
     llvm::SmallVector<int64_t, 3> xsmmTileSize;
-    xsmmTileSize.push_back(tileSize[1]);
     xsmmTileSize.push_back(tileSize[0]);
+    xsmmTileSize.push_back(tileSize[1]);
     xsmmTileSize.push_back(tileSize[2]);
     auto tiles = bodyBuilder.getI64ArrayAttr(xsmmTileSize);
 

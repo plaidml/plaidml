@@ -20,17 +20,15 @@ extern "C" void plaidml_rt_xsmm_gemm_f32(            //
   libxsmm_blasint lda_int = lda;
   libxsmm_blasint ldb_int = ldb;
   libxsmm_blasint ldc_int = ldc;
-  // auto sgemm = libxsmm_smmdispatch(m, n, k, &lda_int, &ldb_int, &ldc_int,
-  //                                  /*alpha=*/nullptr,
-  //                                  /*beta=*/nullptr, /*flags=*/nullptr,
-  //                                  /*prefetch=*/nullptr);
-  // sgemm(aPtr, bPtr, cPtr);
   libxsmm_blasint m_int = m;
   libxsmm_blasint n_int = n;
   libxsmm_blasint k_int = k;
-  libxsmm_gemm(/*transa=*/nullptr, /*transb=*/nullptr, &m_int, &n_int, &k_int,
-               /*alpha=*/nullptr, bPtr, &ldb_int, aPtr, &lda_int,
-               /*beta=*/nullptr, cPtr, &ldc_int);
+
+  auto sgemm =
+      libxsmm_smmdispatch(n_int, m_int, k_int, &ldb_int, &lda_int, &ldc_int,
+                          /*alpha=*/nullptr, /*beta=*/nullptr,
+                          /*flags=*/nullptr, /*prefetch=*/nullptr);
+  sgemm(bPtr, aPtr, cPtr);
 }
 
 namespace {
