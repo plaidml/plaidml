@@ -55,6 +55,20 @@ Tensor Softmax(const Tensor& X) {
   return E / N;
 }
 
+Tensor ConstAdd() {
+  std::string DEFAULT_DEVICE = "llvm_cpu.0";
+  std::vector<int64_t> shape = {4};
+  std::vector<int> a = {4,3,2,1};
+  std::vector<int> b = {1,2,3,4};
+  auto Buffer_A = Buffer(DEFAULT_DEVICE, TensorShape(DType::INT32, shape));
+  auto Buffer_B = Buffer(DEFAULT_DEVICE, TensorShape(DType::INT32, shape));
+  Buffer_A.copy_from(a.data());
+  Buffer_B.copy_from(b.data());
+  auto A = Constant(LogicalShape(DType::INT32, shape), Buffer_A, "A");
+  auto B = Constant(LogicalShape(DType::INT32, shape), Buffer_B, "B");
+  return A + B;
+}
+
 TEST_F(CppEdsl, HigherPrecisionInvalidNegative) {
   auto A = Placeholder(DType::FLOAT32, {3, 3});
   auto C = A * (-2);
@@ -286,6 +300,21 @@ TEST_F(CppEdsl, Add) {
                                          18 + (1ULL << 40)};
 
   checkProgram(program, {{A, A_input}, {B, B_input}}, {{C, C_output}});
+}
+
+TEST_F(CppEdsl, ConstAdd) {
+  auto O = ConstAdd();
+  auto program = makeProgram("const_add", {O});
+  exec::Binder binder(program);
+  binder.compile()->run();
+  IVLOG(1, "output: " << O.as_ptr());
+  auto view = binder.output(O).mmap_current();
+  auto data = reinterpret_cast<const int32_t*>(view.data());
+  ASSERT_THAT(view.size(), sizeof(int32_t) * 4);
+  EXPECT_THAT(data[0], 5);
+  EXPECT_THAT(data[1], 5);
+  EXPECT_THAT(data[2], 5);
+  EXPECT_THAT(data[3], 5);
 }
 
 TEST_F(CppEdsl, Dot) {

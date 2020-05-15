@@ -816,6 +816,26 @@ def TensorIndexes(count):
     """Creates multiple ``TensorIndex`` objects based on ``count``."""
     return [TensorIndex() for i in range(count)]
 
+def Constant(dtype_or_shape, buffer, dims=[], name=''):
+    """Creates a tensor with constant values.
+
+    Args:
+        dtype_or_shape (DType | LogicalShape): A data type or a shape can be
+            specified. If a shape is specified, the `dims` parameter is ignored.
+        dims (list, optional): Specifies the dimensions of the ``Constant``.
+        name (string, optional): A name to be assigned to the ``Tensor``.
+
+    Returns:
+        Tensor: The constant ``Tensor``.
+    """
+    if isinstance(dtype_or_shape, LogicalShape):
+        shape = dtype_or_shape
+    elif isinstance(dtype_or_shape, DType):
+        shape = LogicalShape(dtype=dtype_or_shape, dims=dims)
+    else:
+        raise TypeError('Unsupported type {} for dtype_or_shape={}'.format(
+            type(dtype_or_shape), dtype_or_shape))
+    return Tensor(shape=shape, name=name, buffer=buffer)
 
 def Placeholder(dtype_or_shape, dims=[], name=''):
     """Creates a placeholder tensor.
