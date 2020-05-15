@@ -822,6 +822,7 @@ def Constant(dtype_or_shape, buffer, dims=[], name=''):
     Args:
         dtype_or_shape (DType | LogicalShape): A data type or a shape can be
             specified. If a shape is specified, the `dims` parameter is ignored.
+        buffer (Buffer): A Buffer that stores the values of the ``Constant``.
         dims (list, optional): Specifies the dimensions of the ``Constant``.
         name (string, optional): A name to be assigned to the ``Tensor``.
 
