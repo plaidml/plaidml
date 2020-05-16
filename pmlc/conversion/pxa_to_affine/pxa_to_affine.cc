@@ -57,6 +57,38 @@ struct LoweringBase : public OpConversionPattern<OpType> {
   LogicalResult match(Operation *op) const override { return mlir::success(); }
 };
 
+// This pattern removes affine.parallel ops with no induction variables
+struct AffineParallelRank0Remover
+    : public mlir::OpRewritePattern<AffineParallelOp> {
+  using mlir::OpRewritePattern<AffineParallelOp>::OpRewritePattern;
+
+  // Default benefit of 2 since this generally needs to run before
+  // AffineParallelOp conversion
+  explicit AffineParallelRank0Remover(MLIRContext *ctx,
+                                      mlir::PatternBenefit benefit = 2)
+      : OpRewritePattern(ctx, benefit) {}
+
+  LogicalResult
+  matchAndRewrite(AffineParallelOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    // Check that there are no induction variables
+    if (op.lowerBoundsMap().getNumResults() != 0)
+      return mlir::failure();
+    // Remove the affine.parallel wrapper, retain the body in the same location
+    auto &parentOps = rewriter.getInsertionBlock()->getOperations();
+    auto &parallelBodyOps = op.region().front().getOperations();
+    parentOps.splice(mlir::Block::iterator(op), parallelBodyOps,
+                     parallelBodyOps.begin(), std::prev(parallelBodyOps.end()));
+    // Replace outputs with values from yield
+    auto termIt = std::prev(parallelBodyOps.end());
+    for (size_t i = 0; i < op.getNumResults(); i++) {
+      op.getResult(i).replaceAllUsesWith(termIt->getOperand(i));
+    }
+    rewriter.eraseOp(op);
+    return mlir::success();
+  }
+};
+
 struct AffineParallelOpConversion : public LoweringBase<AffineParallelOp> {
   explicit AffineParallelOpConversion(MLIRContext *ctx) : LoweringBase(ctx) {}
 
@@ -74,19 +106,11 @@ struct AffineParallelOpConversion : public LoweringBase<AffineParallelOp> {
       ivs.push_back(af.getInductionVar());
     }
     // Move ParallelOp's operations (single block) to Affine innermost loop.
-    // (But when `op` has no indexes, there are no Affine loops and we need to
-    // instead put `op`'s body where `op` is.)
     auto &innerLoopOps = rewriter.getInsertionBlock()->getOperations();
     auto &parallelBodyOps = op.region().front().getOperations();
-    if (op.lowerBoundsMap().getNumResults() > 0) {
-      innerLoopOps.splice(std::prev(innerLoopOps.end()), parallelBodyOps,
-                          parallelBodyOps.begin(),
-                          std::prev(parallelBodyOps.end()));
-    } else {
-      innerLoopOps.splice(mlir::Block::iterator(op), parallelBodyOps,
-                          parallelBodyOps.begin(),
-                          std::prev(parallelBodyOps.end()));
-    }
+    innerLoopOps.splice(std::prev(innerLoopOps.end()), parallelBodyOps,
+                        parallelBodyOps.begin(),
+                        std::prev(parallelBodyOps.end()));
     // Replace all uses of old values
     size_t idx = 0;
     for (auto arg : op.region().front().getArguments()) {
@@ -264,10 +288,9 @@ void LowerPXAToAffinePass::runOnOperation() {
 
   // Setup rewrite patterns
   mlir::OwningRewritePatternList patterns;
-  patterns
-      .insert<AffineParallelOpConversion, AffineIfOpConversion,
-              AffineReduceOpConversion, FuncOpConversion, ReturnOpConversion>(
-          &getContext());
+  patterns.insert<AffineParallelRank0Remover, AffineParallelOpConversion,
+                  AffineIfOpConversion, AffineReduceOpConversion,
+                  FuncOpConversion, ReturnOpConversion>(&getContext());
 
   // Run the conversion
   if (failed(
