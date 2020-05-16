@@ -93,7 +93,7 @@ struct AffineParallelOpConversion : public LoweringBase<AffineParallelOp> {
       arg.replaceAllUsesWith(ivs[idx++]);
     }
     // Replace outputs with values from yield
-    auto termIt = std::prev(stripeBodyOps.end());
+    auto termIt = std::prev(parallelBodyOps.end());
     for (size_t i = 0; i < op.getNumResults(); i++) {
       op.getResult(i).replaceAllUsesWith(termIt->getOperand(i));
     }
