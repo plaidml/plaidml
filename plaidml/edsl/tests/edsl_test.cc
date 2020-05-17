@@ -56,12 +56,12 @@ Tensor Softmax(const Tensor& X) {
 }
 
 Tensor ConstAdd() {
-  std::string DEFAULT_DEVICE = "llvm_cpu.0";
   std::vector<int64_t> shape = {4};
-  std::vector<int> a = {4,3,2,1};
-  std::vector<int> b = {1,2,3,4};
-  auto Buffer_A = Buffer(DEFAULT_DEVICE, TensorShape(DType::INT32, shape));
-  auto Buffer_B = Buffer(DEFAULT_DEVICE, TensorShape(DType::INT32, shape));
+  std::vector<int> a = {4, 3, 2, 1};
+  std::vector<int> b = {1, 2, 3, 4};
+  std::string current_device = plaidml::Settings::get("PLAIDML_DEVICE");
+  auto Buffer_A = Buffer(current_device, TensorShape(DType::INT32, shape));
+  auto Buffer_B = Buffer(current_device, TensorShape(DType::INT32, shape));
   Buffer_A.copy_from(a.data());
   Buffer_B.copy_from(b.data());
   auto A = Constant(LogicalShape(DType::INT32, shape), Buffer_A, "A");
