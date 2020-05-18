@@ -392,22 +392,17 @@ struct SymbolicContractionCanonicalizer
       }
       // Can't rewrite to a non-symbolic contraction, but we can at least update
       // the result type
+      auto nameAttr = rewriter.getStringAttr(op.name().getValueOr(""));
+      auto reduceAttr =
+          op.no_reduce().hasValue() ? rewriter.getUnitAttr() : UnitAttr{};
       auto newOp = rewriter.create<SymbolicContractionOp>(
           op.getLoc(), resultType, op.init(), op.cons(), op.size(), op.sink(),
-          op.srcs(), op.agg(), op.combo(), rewriter.getUnitAttr(),
-          rewriter.getStringAttr(op.name().getValueOr("")));
-      // TODO: This seems like not the right way to handle no_reduce
-      if (op.no_reduce().hasValue()) {
-        newOp.setAttr("no_reduce", rewriter.getUnitAttr());
-      } else {
-        newOp.removeAttr("no_reduce");
-      }
-      rewriter.replaceOp(op, newOp.result());
+          op.srcs(), op.agg(), op.combo(), reduceAttr, nameAttr);
+      rewriter.replaceOp(op, {newOp});
       util::UpdateFuncOpType(newOp.getOperation());
       return success();
     }
 
-    // TODO: Do I need to verify foldability first?
     IsFoldableVisitor foldable_checker;
     if (!foldable_checker.is_foldable(op)) {
       return failure();
