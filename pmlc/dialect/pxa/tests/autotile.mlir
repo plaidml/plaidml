@@ -1,6 +1,5 @@
 // RUN: pmlc-opt -canonicalize -autotile-10 %s | FileCheck %s
 
-// CHECK-LABEL: @dot
 func @dot(%arg0: memref<100x100xf32>, %arg1: memref<100x100xf32>) -> memref<100x100xf32> {
   %obuf = alloc() : memref<100x100xf32>
   %out = affine.parallel (%i, %j, %k) = (0, 0, 0) to (100, 100, 100) : memref<100x100xf32> {
@@ -13,6 +12,8 @@ func @dot(%arg0: memref<100x100xf32>, %arg1: memref<100x100xf32>) -> memref<100x
   return %out : memref<100x100xf32>
 }
 
+// CHECK-LABEL: func @dot
+// CHECK-SAME: (%arg0: memref<100x100xf32>, %arg1: memref<100x100xf32>) -> memref<100x100xf32>
 // CHECK: %1 = affine.parallel (%arg2, %arg3, %arg4) = (0, 0, 0) to (100, 100, 100) step (10, 10, 10) {
 // CHECK:   %2 = affine.parallel (%arg5, %arg6, %arg7) = (%arg2, %arg3, %arg4) to (%arg2 + 10, %arg3 + 10, %arg4 + 10) {
 // CHECK:     %3 = affine.load %arg1[%arg5, %arg7] : memref<100x100xf32>
