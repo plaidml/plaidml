@@ -88,14 +88,15 @@ struct AffineParallelRank0Remover
 
 struct AffineParallelOpConversion
     : public OpConversionPattern<AffineParallelOp> {
-  MLIRContext *ctx;
 
   explicit AffineParallelOpConversion(MLIRContext *ctx)
-      : OpConversionPattern<AffineParallelOp>(ctx), ctx(ctx) {}
+      : OpConversionPattern<AffineParallelOp>(ctx) {}
 
   LogicalResult
   matchAndRewrite(AffineParallelOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
+    // This conversion doesn't work in the rank 0 case; that case will be
+    // covered by AffineParallelRank0Remover
     if (op.lowerBoundsMap().getNumResults() == 0)
       return mlir::failure();
     // Create an affine loop nest, capture induction variables
