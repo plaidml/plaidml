@@ -103,35 +103,37 @@ struct FPToUILowering : public LLVMLegalizationPattern<stdx::FPToUIOp> {
 class BaseViewConversionHelper {
 public:
   explicit BaseViewConversionHelper(Type type)
-      : d(MemRefDescriptor::undef(rewriter(), loc(), type)) {}
+      : desc(MemRefDescriptor::undef(rewriter(), loc(), type)) {}
 
-  explicit BaseViewConversionHelper(Value v) : d(v) {}
+  explicit BaseViewConversionHelper(Value v) : desc(v) {}
 
   /// Wrappers around MemRefDescriptor that use EDSC builder and location.
-  Value allocatedPtr() { return d.allocatedPtr(rewriter(), loc()); }
-  void setAllocatedPtr(Value v) { d.setAllocatedPtr(rewriter(), loc(), v); }
-  Value alignedPtr() { return d.alignedPtr(rewriter(), loc()); }
-  void setAlignedPtr(Value v) { d.setAlignedPtr(rewriter(), loc(), v); }
-  Value offset() { return d.offset(rewriter(), loc()); }
-  void setOffset(Value v) { d.setOffset(rewriter(), loc(), v); }
-  Value size(unsigned i) { return d.size(rewriter(), loc(), i); }
-  void setSize(unsigned i, Value v) { d.setSize(rewriter(), loc(), i, v); }
+  Value allocatedPtr() { return desc.allocatedPtr(rewriter(), loc()); }
+  void setAllocatedPtr(Value v) { desc.setAllocatedPtr(rewriter(), loc(), v); }
+  Value alignedPtr() { return desc.alignedPtr(rewriter(), loc()); }
+  void setAlignedPtr(Value v) { desc.setAlignedPtr(rewriter(), loc(), v); }
+  Value offset() { return desc.offset(rewriter(), loc()); }
+  void setOffset(Value v) { desc.setOffset(rewriter(), loc(), v); }
+  Value size(unsigned i) { return desc.size(rewriter(), loc(), i); }
+  void setSize(unsigned i, Value v) { desc.setSize(rewriter(), loc(), i, v); }
   void setConstantSize(unsigned i, int64_t v) {
-    d.setConstantSize(rewriter(), loc(), i, v);
+    desc.setConstantSize(rewriter(), loc(), i, v);
   }
-  Value stride(unsigned i) { return d.stride(rewriter(), loc(), i); }
-  void setStride(unsigned i, Value v) { d.setStride(rewriter(), loc(), i, v); }
+  Value stride(unsigned i) { return desc.stride(rewriter(), loc(), i); }
+  void setStride(unsigned i, Value v) {
+    desc.setStride(rewriter(), loc(), i, v);
+  }
   void setConstantStride(unsigned i, int64_t v) {
-    d.setConstantStride(rewriter(), loc(), i, v);
+    desc.setConstantStride(rewriter(), loc(), i, v);
   }
 
-  operator Value() { return d; }
+  operator Value() { return desc; }
 
 private:
   OpBuilder &rewriter() { return edsc::ScopedContext::getBuilder(); }
   Location loc() { return edsc::ScopedContext::getLocation(); }
 
-  MemRefDescriptor d;
+  MemRefDescriptor desc;
 };
 
 struct ReshapeLowering : public LLVMLegalizationPattern<stdx::ReshapeOp> {

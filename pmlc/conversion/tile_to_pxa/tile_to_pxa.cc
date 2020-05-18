@@ -868,8 +868,7 @@ struct ReshapeOpConversion : public OpConversionPattern<ReshapeOp> {
     auto tensor = adaptor.tensor();
 
     TypeConverter typeConverter;
-    auto resultType =
-        typeConverter.convertType(op.result().getType()).cast<MemRefType>();
+    auto resultType = typeConverter.convertType(op.result().getType());
 
     rewriter.replaceOpWithNewOp<stdx::ReshapeOp>(op, resultType, tensor);
     return success();
