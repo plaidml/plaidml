@@ -313,16 +313,8 @@ TEST_F(CppEdsl, ConstAdd) {
   // CHECK: return %{{.*}} : tensor<4xsi32>
   // clang-format on
 
-  exec::Binder binder(program);
-  binder.compile()->run();
-  IVLOG(1, "output: " << O.as_ptr());
-  auto view = binder.output(O).mmap_current();
-  auto data = reinterpret_cast<const int32_t*>(view.data());
-  ASSERT_THAT(view.size(), sizeof(int32_t) * 4);
-  EXPECT_THAT(data[0], 5);
-  EXPECT_THAT(data[1], 5);
-  EXPECT_THAT(data[2], 5);
-  EXPECT_THAT(data[3], 5);
+  std::vector<int32_t> expected = {5, 5, 5, 5};
+  checkProgram(program, {}, {{O, expected}});
 }
 
 TEST_F(CppEdsl, Dot) {
