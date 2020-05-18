@@ -44,14 +44,17 @@ def FPToUIOp :
   }]>];
 }
 
-def ReshapeOp : StdX_Op<"reshape"> {
+class StdX_Plain_Op<string mnemonic, list<OpTrait> traits = []> :
+    Op<StdX_Dialect, mnemonic, traits> {
+}
+
+def ReshapeOp : StdX_Plain_Op<"reshape"> {
   let summary = "tensor reshape operation";
   let arguments = (ins AnyMemRef:$tensor);
   let results = (outs AnyMemRef:$result);
-  let builders = [OpBuilder<
-    "Builder *builder, OperationState &result, Value tensor, MemRefType destType", [{
-        buildReshapeOp(builder, result, tensor, destType);
-  }]>];
+  let assemblyFormat = [{
+    `(` $tensor `)` attr-dict `:` functional-type($tensor, results)
+  }];
 }
 
 #endif // __PML_STDX_OPS__

@@ -7,6 +7,7 @@
 namespace pmlc::dialect::stdx {
 
 using mlir::failure;
+using mlir::FunctionType;
 using mlir::success;
 
 namespace {
@@ -82,26 +83,6 @@ LogicalResult verifyFPToUIOp(FPToUIOp op) {
 static void buildFPToUIOp(Builder *builder, OperationState &result,
                           Value source, Type destType) {
   result.addOperands(source);
-  result.addTypes(destType);
-}
-
-// ---- ReshapeOp ----
-
-void printReshapeOp(OpAsmPrinter &p, ReshapeOp op) {
-  p << op.getOperation()->getName() << " (" << op.getOperand() << ") : ("
-    << op.getOperand().getType() << ") -> "
-    << op.getOperation()->getResult(0).getType();
-}
-
-ParseResult parseReshapeOp(OpAsmParser &parser, OperationState &result) {
-  return failure();
-}
-
-LogicalResult verifyReshapeOp(ReshapeOp op) { return success(); }
-
-static void buildReshapeOp(Builder *builder, OperationState &result,
-                           Value tensor, MemRefType destType) {
-  result.addOperands(tensor);
   result.addTypes(destType);
 }
 

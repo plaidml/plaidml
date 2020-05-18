@@ -1,21 +1,21 @@
 // RUN: pmlc-opt -convert-tile-to-pxa -canonicalize -cse %s | FileCheck %s
 
 module {
-  func @reshaper(%arg0: tensor<1x1x60xf32>) -> tensor<60xf32> {
+  func @reshaper0(%arg0: tensor<1x1x60xf32>) -> tensor<60xf32> {
     %c60 = tile.constant 60
     %0 = "tile.reshape"(%arg0, %c60) : (tensor<1x1x60xf32>, index) -> tensor<60xf32>
     return %0 : tensor<60xf32>
   }
 }
 
-// CHECK-LABEL: func @reshaper
+// CHECK-LABEL: func @reshaper0
 // CHECK: stdx.reshape
 // CHECK: memref<60xf32>
 
 // -----
 
 module {
-  func @reshaper(%arg0: tensor<2x4x5xf32>) -> tensor<2x20xf32> {
+  func @reshaper1(%arg0: tensor<2x4x5xf32>) -> tensor<2x20xf32> {
     %c2 = tile.constant 2
     %c20 = tile.constant 20
     %0 = "tile.reshape"(%arg0, %c2, %c20) : (tensor<2x4x5xf32>, index, index) -> tensor<2x20xf32>
@@ -23,14 +23,14 @@ module {
   }
 }
 
-// CHECK-LABEL: func @reshaper
+// CHECK-LABEL: func @reshaper1
 // CHECK: stdx.reshape
 // CHECK: memref<2x20xf32>
 
 // -----
 
 module {
-  func @reshaper(%arg0: tensor<5x6xf32>, %arg1: tensor<5x2x3xf32>) -> tensor<5x6xf32> {
+  func @reshaper2(%arg1: tensor<5x2x3xf32>) -> tensor<5x6xf32> {
     %c5 = tile.constant 5
     %c6 = tile.constant 6
     %0 = "tile.reshape"(%arg1, %c5, %c6) : (tensor<5x2x3xf32>, index, index) -> tensor<5x6xf32>
@@ -38,7 +38,7 @@ module {
   }
 }
 
-// CHECK-LABEL: func @reshaper
+// CHECK-LABEL: func @reshaper2
 // CHECK: stdx.reshape
 // CHECK: memref<5x6xf32>
 
