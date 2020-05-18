@@ -387,7 +387,20 @@ struct SymbolicContractionCanonicalizer
     auto sourceType = op.result().getType().cast<RankedTensorType>();
     auto resultType = RankedTensorType::get(shape, sourceType.getElementType());
     if (!resultType.hasStaticShape()) {
-      return failure();
+      if (resultType == sourceType) {
+        return failure();
+      }
+      // Can't rewrite to a non-symbolic contraction, but we can at least update
+      // the result type
+      auto nameAttr = rewriter.getStringAttr(op.name().getValueOr(""));
+      auto reduceAttr =
+          op.no_reduce().hasValue() ? rewriter.getUnitAttr() : UnitAttr{};
+      auto newOp = rewriter.create<SymbolicContractionOp>(
+          op.getLoc(), resultType, op.init(), op.cons(), op.size(), op.sink(),
+          op.srcs(), op.agg(), op.combo(), reduceAttr, nameAttr);
+      rewriter.replaceOp(op, {newOp});
+      util::UpdateFuncOpType(newOp.getOperation());
+      return success();
     }
 
     IsFoldableVisitor foldable_checker;
