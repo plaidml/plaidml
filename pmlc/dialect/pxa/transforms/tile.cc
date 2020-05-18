@@ -9,6 +9,22 @@ namespace pmlc::dialect::pxa {
 
 using mlir::AffineParallelOp;
 
+void replaceAllUses(Operation* op, mlir::BlockAndValueMapping& mapper) {
+  for (auto& operand : op->getOpOperands()) {
+    auto to = mapper.lookupOrNull(operand.get());
+    if (to) {
+      operand.set(to);
+    }
+  }
+  for (auto& region: op->getRegions()) {
+    for (auto& block: region) {
+      for (auto& innerOp: block) {
+        replaceAllUses(&innerOp, mapper);
+      }
+    }
+  }
+}
+
 void performTiling(AffineParallelOp op, llvm::ArrayRef<int64_t> tileSizes) {
   mlir::OpBuilder builder(op.getBody(), op.getBody()->begin());
   mlir::Block *outerBody = op.getBody();
@@ -37,11 +53,15 @@ void performTiling(AffineParallelOp op, llvm::ArrayRef<int64_t> tileSizes) {
   auto &outerLoopOps = outerBody->getOperations();
   innerLoopOps.splice(std::prev(innerLoopOps.end()), outerLoopOps,
                       std::next(outerLoopOps.begin(), 1), outerLoopOps.end());
+  // Map from old indices to new indices
   auto innerIdxs = inner.getBody()->getArguments();
+  mlir::BlockAndValueMapping mapper;
+  for (unsigned i = 0; i < outerIdxs.size(); ++i) {
+    mapper.map(outerIdxs[i], innerIdxs[i]);
+  }
+  // Replace all old indices with new indices
   for (auto& innerOp : innerLoopOps) {
-    for (unsigned i = 0; i < outerIdxs.size(); ++i) {
-      innerOp.replaceUsesOfWith(outerIdxs[i], innerIdxs[i]);
-    }
+    replaceAllUses(&innerOp, mapper);
   }
   // Add a return of the values of the inner to the outer
   builder.setInsertionPointToEnd(op.getBody());
