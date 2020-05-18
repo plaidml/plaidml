@@ -32,23 +32,17 @@ void performTiling(AffineParallelOp op, llvm::ArrayRef<int64_t> tileSizes) {
   // Make the inner parallel for (abve all other code);
   auto inner = builder.create<AffineParallelOp>(
       op.getLoc(), op.getResultTypes(), lbMap, outerIdxs, ubMap, outerIdxs);
-  // Build a map from old indices to new indices
-  mlir::BlockAndValueMapping mapper;
-  auto innerIdxs = inner.getBody()->getArguments();
-  for (unsigned i = 0; i < outerIdxs.size(); ++i) {
-    mapper.map(outerIdxs[i], innerIdxs[i]);
-  }
-  // Clone new instructions into the interior
+  // Splice instructions into the interior
   auto &innerLoopOps = inner.getBody()->getOperations();
   auto &outerLoopOps = outerBody->getOperations();
-  for (auto& origOp : outerLoopOps) {
-    if (&origOp == inner.getOperation()) {
-      continue;
+  innerLoopOps.splice(std::prev(innerLoopOps.end()), outerLoopOps,
+                      std::next(outerLoopOps.begin(), 1), outerLoopOps.end());
+  auto innerIdxs = inner.getBody()->getArguments();
+  for (auto& innerOp : innerLoopOps) {
+    for (unsigned i = 0; i < outerIdxs.size(); ++i) {
+      innerOp.replaceUsesOfWith(outerIdxs[i], innerIdxs[i]);
     }
-    Operation* newOp = origOp.clone(mapper);
-    innerLoopOps.push_back(newOp);
   }
-  outerLoopOps.erase(std::next(outerLoopOps.begin(), 1), outerLoopOps.end());
   // Add a return of the values of the inner to the outer
   builder.setInsertionPointToEnd(op.getBody());
   builder.create<AffineYieldOp>(op.getLoc(), inner.getResults());
