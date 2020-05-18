@@ -31,6 +31,14 @@ Program makeProgram(const std::string& name, const std::vector<Tensor>& outputs)
   return program;
 }
 
+template <typename T>
+Buffer makeBuffer(const TensorShape& shape, const std::vector<T>& data) {
+  const auto& curDevice = plaidml::Settings::get("PLAIDML_DEVICE");
+  Buffer buffer(curDevice, shape);
+  buffer.copy_from(data.data());
+  return buffer;
+}
+
 Tensor Dot(const Tensor& X, const Tensor& Y) {
   TensorDim I, J, K;
   TensorIndex i("i"), j("j"), k("k");
@@ -55,17 +63,12 @@ Tensor Softmax(const Tensor& X) {
   return E / N;
 }
 
-Tensor ConstAdd() {
+Tensor ConstAdd(const std::vector<int32_t>& a, const std::vector<int32_t>& b) {
   std::vector<int64_t> shape = {4};
-  std::vector<int> a = {4, 3, 2, 1};
-  std::vector<int> b = {1, 2, 3, 4};
-  std::string current_device = plaidml::Settings::get("PLAIDML_DEVICE");
-  auto Buffer_A = Buffer(current_device, TensorShape(DType::INT32, shape));
-  auto Buffer_B = Buffer(current_device, TensorShape(DType::INT32, shape));
-  Buffer_A.copy_from(a.data());
-  Buffer_B.copy_from(b.data());
-  auto A = Constant(LogicalShape(DType::INT32, shape), Buffer_A, "A");
-  auto B = Constant(LogicalShape(DType::INT32, shape), Buffer_B, "B");
+  auto bufferA = makeBuffer(TensorShape(DType::INT32, shape), a);
+  auto bufferB = makeBuffer(TensorShape(DType::INT32, shape), b);
+  auto A = Constant(LogicalShape(DType::INT32, shape), bufferA, "A");
+  auto B = Constant(LogicalShape(DType::INT32, shape), bufferB, "B");
   return A + B;
 }
 
@@ -303,7 +306,9 @@ TEST_F(CppEdsl, Add) {
 }
 
 TEST_F(CppEdsl, ConstAdd) {
-  auto O = ConstAdd();
+  std::vector<int> a = {4, 3, 2, 1};
+  std::vector<int> b = {1, 2, 3, 4};
+  auto O = ConstAdd(a, b);
   auto program = makeProgram("const_add", {O});
 
   // clang-format off
