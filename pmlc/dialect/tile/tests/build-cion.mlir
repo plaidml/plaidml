@@ -51,6 +51,26 @@ func @dot_partial_size(%arg0: tensor<?x2xf32>, %arg1: tensor<2x3xf32>) -> tensor
 
 // -----
 
+func @max_axis_partial_size(%arg0: tensor<?x3x4xf32>) -> tensor<?x?xf32> {
+  %c0 = "eltwise.sconst"() {value = 0.0 : f32} : () -> tensor<f32>
+  %0 = tile.idx 0
+  %1 = tile.idx 1
+  %2 = tile.idx 2
+  %3 = tile.dim %arg0[0] : tensor<?x3x4xf32>
+  %4 = tile.dim %arg0[1] : tensor<?x3x4xf32>
+  %5 = tile.dim %arg0[2] : tensor<?x3x4xf32>
+  %6 = tile.tmap %arg0[%0, %1, %2] : tensor<?x3x4xf32>
+  %7 = tile.map %3, %4
+  %8 = tile.map %0, %1
+  %9 = tile.cons ()
+  %10 = tile.sym_contract max, none, %c0, %9, %7, %8, %6 : tensor<f32> -> tensor<?x?xf32>
+  return %10 : tensor<?x?xf32>
+}
+
+// CHECK: func @max_axis_partial_size(%arg0: tensor<?x3x4xf32>) -> tensor<?x3xf32> {
+// CHECK:   %{{.*}} = tile.sym_contract max, none, %{{.*}}, %{{.*}}, %{{.*}}, %{{.*}}, %{{.*}} : tensor<f32> -> tensor<?x3xf32>
+
+// -----
 func @cumsum(%arg0: tensor<10xf32>) -> tensor<?xf32> {
   %c0 = "eltwise.sconst"() {value = 0.0 : f32} : () -> f32
   %0 = tile.idx 0
