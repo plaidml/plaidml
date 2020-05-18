@@ -134,9 +134,7 @@ class TensorShape {
   ///
   /// The default constructor for a TensorShape.
   ///
-  TensorShape()
-      : ptr_(details::make_ptr(
-            ffi::call<plaidml_shape*>(plaidml_shape_alloc, PLAIDML_DATA_INVALID, 0, nullptr, nullptr))) {}
+  TensorShape() {}
 
   ///
   /// TensorShape constructor

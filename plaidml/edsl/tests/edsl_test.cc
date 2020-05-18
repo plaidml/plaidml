@@ -31,6 +31,14 @@ Program makeProgram(const std::string& name, const std::vector<Tensor>& outputs)
   return program;
 }
 
+template <typename T>
+Buffer makeBuffer(const TensorShape& shape, const std::vector<T>& data) {
+  const auto& curDevice = plaidml::Settings::get("PLAIDML_DEVICE");
+  Buffer buffer(curDevice, shape);
+  buffer.copy_from(data.data());
+  return buffer;
+}
+
 Tensor Dot(const Tensor& X, const Tensor& Y) {
   TensorDim I, J, K;
   TensorIndex i("i"), j("j"), k("k");
@@ -53,6 +61,15 @@ Tensor Softmax(const Tensor& X) {
   auto N = TensorOutput(I, 1);
   N(i, 0) += E(i, j);
   return E / N;
+}
+
+Tensor ConstAdd(const std::vector<int32_t>& a, const std::vector<int32_t>& b) {
+  std::vector<int64_t> shape = {4};
+  auto bufferA = makeBuffer(TensorShape(DType::INT32, shape), a);
+  auto bufferB = makeBuffer(TensorShape(DType::INT32, shape), b);
+  auto A = Constant(LogicalShape(DType::INT32, shape), bufferA, "A");
+  auto B = Constant(LogicalShape(DType::INT32, shape), bufferB, "B");
+  return A + B;
 }
 
 TEST_F(CppEdsl, HigherPrecisionInvalidNegative) {
@@ -286,6 +303,23 @@ TEST_F(CppEdsl, Add) {
                                          18 + (1ULL << 40)};
 
   checkProgram(program, {{A, A_input}, {B, B_input}}, {{C, C_output}});
+}
+
+TEST_F(CppEdsl, ConstAdd) {
+  std::vector<int> a = {4, 3, 2, 1};
+  std::vector<int> b = {1, 2, 3, 4};
+  auto O = ConstAdd(a, b);
+  auto program = makeProgram("const_add", {O});
+
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.ConstAdd
+  // CHECK: func @const_add
+  // CHECK: %{{.*}} = "eltwise.add"(%{{.*}}, %{{.*}}) : (tensor<4xsi32>, tensor<4xsi32>) -> tensor<4xsi32>
+  // CHECK: return %{{.*}} : tensor<4xsi32>
+  // clang-format on
+
+  std::vector<int32_t> expected = {5, 5, 5, 5};
+  checkProgram(program, {}, {{O, expected}});
 }
 
 TEST_F(CppEdsl, Dot) {
