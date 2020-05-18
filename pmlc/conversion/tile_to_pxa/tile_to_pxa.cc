@@ -35,10 +35,7 @@ using dialect::tile::ContractionOp;
 using dialect::tile::ContractionOpOperandAdaptor;
 using dialect::tile::getPaddingInfo;
 using dialect::tile::IndexOp;
-<<<<<<< HEAD
 using dialect::tile::PaddingInfo;
-=======
->>>>>>> simplify stdx reshape op: dims params are redundant with type of result
 using dialect::tile::PrngOp;
 using dialect::tile::ReshapeOp;
 using dialect::tile::ReshapeOpOperandAdaptor;
