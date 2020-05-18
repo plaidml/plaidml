@@ -62,11 +62,8 @@ struct AffineParallelRank0Remover
     : public mlir::OpRewritePattern<AffineParallelOp> {
   using mlir::OpRewritePattern<AffineParallelOp>::OpRewritePattern;
 
-  // Default benefit of 2 since this generally needs to run before
-  // AffineParallelOp conversion
-  explicit AffineParallelRank0Remover(MLIRContext *ctx,
-                                      mlir::PatternBenefit benefit = 2)
-      : OpRewritePattern(ctx, benefit) {}
+  explicit AffineParallelRank0Remover(MLIRContext *ctx)
+      : OpRewritePattern(ctx) {}
 
   LogicalResult
   matchAndRewrite(AffineParallelOp op,
@@ -89,11 +86,18 @@ struct AffineParallelRank0Remover
   }
 };
 
-struct AffineParallelOpConversion : public LoweringBase<AffineParallelOp> {
-  explicit AffineParallelOpConversion(MLIRContext *ctx) : LoweringBase(ctx) {}
+struct AffineParallelOpConversion
+    : public OpConversionPattern<AffineParallelOp> {
+  MLIRContext *ctx;
 
-  void rewrite(AffineParallelOp op, ArrayRef<Value> operands,
-               ConversionPatternRewriter &rewriter) const override {
+  explicit AffineParallelOpConversion(MLIRContext *ctx)
+      : OpConversionPattern<AffineParallelOp>(ctx), ctx(ctx) {}
+
+  LogicalResult
+  matchAndRewrite(AffineParallelOp op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override {
+    if (op.lowerBoundsMap().getNumResults() == 0)
+      return mlir::failure();
     // Create an affine loop nest, capture induction variables
     llvm::SmallVector<Value, 8> ivs;
     for (unsigned int i = 0; i < op.lowerBoundsMap().getNumResults(); i++) {
@@ -123,6 +127,7 @@ struct AffineParallelOpConversion : public LoweringBase<AffineParallelOp> {
     }
     // We are done. Remove original op.
     rewriter.eraseOp(op);
+    return mlir::success();
   }
 };
 
