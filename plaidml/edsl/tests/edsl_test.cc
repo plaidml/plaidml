@@ -1090,6 +1090,30 @@ TEST_F(CppEdsl, PrngResultNotNegative) {
   }
 }
 
+TEST_F(CppEdsl, Cos) {
+  auto S = Placeholder(DType::FLOAT32, {3, 3});
+  TensorDim I, J;
+  TensorIndex i("i"), j("j");
+  S.bind_dims(I, J);
+  auto O = cos(S);
+  auto program = makeProgram("cos", {O});
+  std::cout << program << std::endl;
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.Cos
+  // clang-format on
+
+  std::vector<float> input = {
+      5.0, 6.0, 7.0,  //
+      4.0, 5.0, 6.0,  //
+      7.0, 8.0, 9.0,  //
+  };
+
+  auto binder = exec::Binder(program);
+  auto executable = binder.compile();
+  binder.input(S).copy_from(input.data());
+  executable->run();
+}
+
 TEST_F(CppEdsl, ConvI8) {
   auto I = Placeholder(DType::INT8, {1, 224, 224, 3});
   auto K = Placeholder(DType::INT8, {3, 3, 1, 32});
