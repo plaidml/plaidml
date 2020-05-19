@@ -158,7 +158,7 @@ def _create_var(name, value):
     tensor_shape = plaidml.TensorShape(dtype, value.shape)
     buffer = plaidml.Buffer(tensor_shape, device=_device)
     buffer.copy_from_ndarray(value)
-    return edsl.Tensor(shape=shape, name=name, buffer=buffer)
+    return edsl.Constant(shape, buffer, name=name)
 
 
 class _KerasNode(object):
