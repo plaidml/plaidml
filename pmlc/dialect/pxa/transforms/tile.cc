@@ -2,9 +2,6 @@
 
 #include <iostream>
 
-#include "llvm/ADT/SmallPtrSet.h"
-#include "mlir/include/mlir/IR/BlockAndValueMapping.h"
-#include "mlir/include/mlir/IR/UseDefLists.h"
 #include "pmlc/dialect/pxa/transforms/tile.h"
 
 namespace pmlc::dialect::pxa {
