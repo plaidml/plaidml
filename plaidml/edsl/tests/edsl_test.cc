@@ -1102,16 +1102,15 @@ TEST_F(CppEdsl, Cos) {
   // CHECK-LABEL: CppEdsl.Cos
   // clang-format on
 
-  std::vector<float> input = {
+  std::vector<float> A_input = {
       5.0, 6.0, 7.0,  //
       4.0, 5.0, 6.0,  //
       7.0, 8.0, 9.0,  //
   };
 
-  auto binder = exec::Binder(program);
-  auto executable = binder.compile();
-  binder.input(S).copy_from(input.data());
-  executable->run();
+  std::vector<float> C_output = {0.283662, 0.96017,  0.753902, -0.653644, 0.283662,
+                                 0.96017,  0.753902, -0.1455,  -0.91113};
+  checkProgram(program, {{S, A_input}}, {{O, C_output}});
 }
 
 TEST_F(CppEdsl, ConvI8) {

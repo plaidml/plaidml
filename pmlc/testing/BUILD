@@ -1,4 +1,4 @@
-# Copyright 2019 Intel Corporation.
+# Copyright 2020 Intel Corporation.
 
 load("//bzl:plaidml.bzl", "plaidml_cc_library")
 
