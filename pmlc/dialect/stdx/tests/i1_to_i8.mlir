@@ -1,31 +1,23 @@
 // RUN: pmlc-opt -stdx-i1-storage-to-i8 %s | FileCheck %s
 
-module {
-  func @i1_to_i8_test(%arg0: memref<10x20xf32>, %arg1: memref<10x20xf32>) {
-    %cst = constant 0.000000e+00 : f32
-    %0 = alloc() : memref<10x20xi1>
-    // CHECK: %{{.*}} = alloc() : memref<10x20xi8>
-    %c0 = constant 0 : index
-    %c10 = constant 10 : index
-    %c1 = constant 1 : index
-    loop.for %arg2 = %c0 to %c10 step %c1 {
-      %c0_3 = constant 0 : index
-      %c20 = constant 20 : index
-      %c1_4 = constant 1 : index
-      loop.for %arg3 = %c0_3 to %c20 step %c1_4 {
-        %1 = load %arg0[%arg2, %arg3] : memref<10x20xf32>
-        %2 = cmpf "olt", %1, %cst : f32
-        // CHECK: %{{.*}} = zexti %{{.*}} : i1 to i8
-        store %2, %0[%arg2, %arg3] : memref<10x20xi1>
-        // CHECK: store %{{.*}}, %{{.*}}[%arg2, %arg3] : memref<10x20xi8>
-        %3 = load %0[%arg2, %arg3] : memref<10x20xi1>
-        // CHECK: %{{.*}} = load %{{.*}}[%arg2, %arg3] : memref<10x20xi8>
-        // CHECK: %{{.*}} = trunci %{{.*}} : i8 to i1
-        // CHECK: %{{.*}} = zexti %{{.*}} : i1 to i8
-        store %3, %0[%arg2, %arg3] : memref<10x20xi1>
-        // CHECK: store %{{.*}}, %{{.*}}[%arg2, %arg3] : memref<10x20xi8>
-      }
-    }
-    return
-  }
+func @simpleStore(%i: index, %j: index) {
+  %0 = alloc() : memref<20x10xi1>
+  // alloc() : memref<20x10xi8>
+  %c0 = constant 1 : i1
+  // CHECK: %1 = zexti %true : i1 to i8
+  store %c0, %0[%i, %j] : memref<20x10xi1>
+  // CHECK: store %1, %0[%arg0, %arg1] : memref<20x10xi8>
+  return
+}
+
+func @simpleLoadStore(%i: index, %j: index) {
+  %0 = alloc() : memref<20x10xi1>
+  // alloc() : memref<20x10xi8>
+  %1 = load %0[%i, %j] : memref<20x10xi1>
+  // CHECK: load %0[%arg0, %arg1] : memref<20x10xi8>
+  // CHECK: %2 = trunci %1 : i8 to i1
+  // CHECK: %3 = zexti %2 : i1 to i8
+  store %1, %0[%i, %j] : memref<20x10xi1>
+  // CHECK: store %3, %0[%arg0, %arg1] : memref<20x10xi8>
+  return
 }
