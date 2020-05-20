@@ -2653,6 +2653,7 @@ cc_library(
         "include/mlir/ExecutionEngine/CRunnerUtils.h",
     ],
     includes = ["include"],
+    local_defines = ["mlir_c_runner_utils_EXPORTS"],
 )
 
 cc_library(
@@ -2664,6 +2665,7 @@ cc_library(
         "include/mlir/ExecutionEngine/RunnerUtils.h",
     ],
     includes = ["include"],
+    local_defines = ["mlir_runner_utils_EXPORTS"],
     deps = [
         ":mlir_c_runner_utils",
     ],
