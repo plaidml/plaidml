@@ -18,14 +18,14 @@ def GenericBuilderInterface : OpInterface<"GenericBuilder"> {
       /*retTy=*/"Operation*",
       /*methodName=*/"create",
       /*args=*/(ins
-        "OpBuilder*":$builder,
+        "OpBuilder &":$builder,
         "Location":$loc,
         "ArrayRef<Value>":$operands),
       /*methodBody=*/[{
         OperationState state(loc, ConcreteOp::getOperationName());
         state.addOperands(operands);
         state.addTypes(getResultType(operands));
-        return builder->createOperation(state);
+        return builder.createOperation(state);
       }]
     >,
   ];

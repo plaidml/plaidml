@@ -192,7 +192,7 @@ void PadPass::runOnFunction() {
     }
   });
 
-  Builder builder(&getContext());
+  OpBuilder builder(&getContext());
   for (const auto &kvp : toPad) {
     // Get the value which we want to pad.
     Value def = kvp.first;

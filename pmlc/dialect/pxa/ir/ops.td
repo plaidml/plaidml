@@ -11,7 +11,7 @@ include "mlir/Dialect/Affine/IR/AffineOpsBase.td"
 include "pmlc/util/enums.td"
 #endif
 
-include "mlir/Interfaces/SideEffects.td"
+include "mlir/Interfaces/SideEffectInterfaces.td"
 
 def PXA_Dialect : Dialect {
   let name = "pxa";
@@ -45,7 +45,8 @@ def AffineReduceOp : PXA_OpWithPP<"reduce", []> {
   let hasFolder = 1;
 
   let builders = [OpBuilder<
-    "Builder* builder, OperationState& result, AggregationKind agg, Value val, Value mem, AffineMap map, ValueRange idxs", [{
+    "OpBuilder& builder, OperationState& result, AggregationKind agg,"
+    "Value val, Value mem, AffineMap map, ValueRange idxs", [{
       build(builder, result, mem.getType(), agg, val, mem, map, idxs);
     }]
   >];
