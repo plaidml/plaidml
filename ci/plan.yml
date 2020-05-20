@@ -184,6 +184,8 @@ SUITES:
           - TestBackendOps.testSqrt
           - TestBackendOps.testSoftsign
           - TestBackendOps.testSoftplus
+          - TestBackendOps.testSoftCat
+          - TestBackendOps.testSoftmax
           - TestBackendOps.testSign
           - TestBackendOps.testExp
           - TestBackendOps.testLog
@@ -260,6 +262,12 @@ SUITES:
           - TestBackendOps.testTemporalPadding
           - TestBackendOps.testTile
           - TestBackendOps.testTranspose
+          - TestBackendOps.testRandomNormalDev
+          - TestBackendOps.testRandomUniformMean
+          - TestBackendOps.testRandomUniformDev
+          - TestBackendOps.testRandomUniformVariableMean
+          - TestBackendOps.testRandomUniformVariableDev
+          - TestBackendOps.testRandomNormalMean
         conda_env: ci/conda/keras_backend_test.yml
         precision: untested
       regression:
