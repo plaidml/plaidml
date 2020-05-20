@@ -18,8 +18,8 @@
 #include <ie_metric_helpers.hpp>
 
 #include <memory>
-#include <vector>
 #include <string>
+#include <vector>
 
 #include <cpp_interfaces/impl/ie_executable_network_thread_safe_default.hpp>
 
@@ -28,34 +28,33 @@
 namespace PlaidMLPlugin {
 
 class PlaidMLExecutableNetwork : public InferenceEngine::ExecutableNetworkThreadSafeDefault {
-public:
-    using Ptr = std::shared_ptr<PlaidMLExecutableNetwork>;
+ public:
+  using Ptr = std::shared_ptr<PlaidMLExecutableNetwork>;
 
-    PlaidMLExecutableNetwork(InferenceEngine::ICNNNetwork &network, const std::string& configuration_type);
-    virtual ~PlaidMLExecutableNetwork() = default;
+  PlaidMLExecutableNetwork(InferenceEngine::ICNNNetwork& network, const std::string& configuration_type);
+  virtual ~PlaidMLExecutableNetwork() = default;
 
-    InferenceEngine::InferRequestInternal::Ptr
-    CreateInferRequestImpl(InferenceEngine::InputsDataMap  networkInputs,
-                           InferenceEngine::OutputsDataMap networkOutputs) override;
+  InferenceEngine::InferRequestInternal::Ptr CreateInferRequestImpl(
+      InferenceEngine::InputsDataMap networkInputs, InferenceEngine::OutputsDataMap networkOutputs) override;
 
-    void GetMetric(const std::string &name, Parameter &result, ResponseDesc *resp) const override {
-        if (name == METRIC_KEY(SUPPORTED_METRICS)) {
-            std::vector<std::string> metrics;
-            metrics.push_back(METRIC_KEY(SUPPORTED_METRICS));
-            metrics.push_back(METRIC_KEY(OPTIMAL_NUMBER_OF_INFER_REQUESTS));
-            result = IE_SET_METRIC(SUPPORTED_METRICS, metrics);
-        } else if (name == METRIC_KEY(OPTIMAL_NUMBER_OF_INFER_REQUESTS)) {
-            result = IE_SET_METRIC(OPTIMAL_NUMBER_OF_INFER_REQUESTS, 1);
-        } else {
-            THROW_IE_EXCEPTION << "Unsupported ExecutableNetwork metric: " << name;
-        }
+  void GetMetric(const std::string& name, Parameter& result, ResponseDesc* resp) const override {
+    if (name == METRIC_KEY(SUPPORTED_METRICS)) {
+      std::vector<std::string> metrics;
+      metrics.push_back(METRIC_KEY(SUPPORTED_METRICS));
+      metrics.push_back(METRIC_KEY(OPTIMAL_NUMBER_OF_INFER_REQUESTS));
+      result = IE_SET_METRIC(SUPPORTED_METRICS, metrics);
+    } else if (name == METRIC_KEY(OPTIMAL_NUMBER_OF_INFER_REQUESTS)) {
+      result = IE_SET_METRIC(OPTIMAL_NUMBER_OF_INFER_REQUESTS, 1);
+    } else {
+      THROW_IE_EXCEPTION << "Unsupported ExecutableNetwork metric: " << name;
     }
+  }
 
-private:
-    void InitInputs(InferenceEngine::ICNNNetwork &network);
+ private:
+  void InitInputs(InferenceEngine::ICNNNetwork& network);
 
-    // This is a global state that is shared between all infer requests
-    std::shared_ptr<State> state_;
+  // This is a global state that is shared between all infer requests
+  std::shared_ptr<State> state_;
 };
 
 }  // namespace PlaidMLPlugin
