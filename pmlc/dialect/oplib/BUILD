@@ -1,9 +1,8 @@
 # Copyright 2019 Intel Corporation.
 
-package(default_visibility = ["//visibility:public"])
+load("//vendor/mlir:tblgen.bzl", "gentbl")
 
-load("//vendor/mlir:tblgen.bzl", "COPTS", "gentbl")
-load("//bzl:plaidml.bzl", "plaidml_cc_binary", "plaidml_cc_library")
+package(default_visibility = ["//visibility:public"])
 
 gentbl(
     name = "gen",

@@ -107,11 +107,7 @@ public:
 
     PreparedOperand prepareOperand(Value operand, AffineMap accessMap,
                                    ValueRange mapOperands, AffineMap tileMap,
-                                   ArrayRef<unsigned int> sizes) {
-      ArrayRef<Value> empty{};
-      auto offsets = expandAffineMap(rewriter, loc, accessMap, mapOperands);
-      auto memRefType = operand.getType().cast<MemRefType>();
-
+                                   ArrayRef<int64_t> sizes) {
       SmallVector<int64_t, 8> shape;
       auto flat = getFlattenedTileDimMapping(tileMap);
       for (auto dim : flat) {
@@ -123,16 +119,22 @@ public:
 
       int64_t outerOffset;
       SmallVector<int64_t, 4> outerStrides;
+      auto memRefType = operand.getType().cast<MemRefType>();
       getStridesAndOffset(memRefType, outerStrides, outerOffset);
 
-      auto subviewMap = makeStridedLinearLayoutMap(
-          outerStrides, MemRefType::getDynamicStrideOrOffset(),
-          module.getContext());
-
-      auto resultType = MemRefType::get(shape, elementType, subviewMap);
-      auto subview =
-          rewriter.create<SubViewOp>(loc, operand, *offsets, /*sizes=*/empty,
-                                     /*strides=*/empty, resultType);
+      ArrayRef<Value> emptyValues{};
+      SmallVector<int64_t, 4> staticOffsets(
+          memRefType.getRank(), MemRefType::getDynamicStrideOrOffset());
+      SmallVector<int64_t, 4> staticStrides(memRefType.getRank(), 1);
+      auto offsets = expandAffineMap(rewriter, loc, accessMap, mapOperands);
+      auto subview = rewriter.create<SubViewOp>(loc,
+                                                /*source=*/operand,
+                                                /*staticOffsets=*/staticOffsets,
+                                                /*staticSizes=*/shape,
+                                                /*staticStrides=*/staticStrides,
+                                                /*offsets=*/*offsets,
+                                                /*sizes=*/emptyValues,
+                                                /*strides=*/emptyValues);
       auto cast = rewriter.create<MemRefCastOp>(loc, subview, unrankedType);
 
       auto layoutMap = makeStridedLinearLayoutMap(outerStrides, outerOffset,

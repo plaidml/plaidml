@@ -6,9 +6,9 @@
 #include "mlir/Dialect/GPU/GPUDialect.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
-#include "mlir/Dialect/LoopOps/LoopOps.h"
 #include "mlir/Dialect/OpenMP/OpenMPDialect.h"
 #include "mlir/Dialect/Quant/QuantOps.h"
+#include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/SPIRV/SPIRVDialect.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
@@ -31,9 +31,9 @@ inline void registerAllDialects() {
     registerDialect<gpu::GPUDialect>();
     registerDialect<LLVM::LLVMDialect>();
     registerDialect<linalg::LinalgDialect>();
-    registerDialect<loop::LoopOpsDialect>();
     registerDialect<omp::OpenMPDialect>();
     registerDialect<quant::QuantizationDialect>();
+    registerDialect<scf::SCFDialect>();
     registerDialect<spirv::SPIRVDialect>();
     registerDialect<StandardOpsDialect>();
     registerDialect<vector::VectorDialect>();

@@ -2,7 +2,7 @@
 #ifndef __PML_ELTWISE_OPS__
 #define __PML_ELTWISE_OPS__
 
-include "mlir/Interfaces/SideEffects.td"
+include "mlir/Interfaces/SideEffectInterfaces.td"
 
 #ifndef __PML_UTIL_INTERFACES__
 include "pmlc/util/interfaces.td"
@@ -39,17 +39,17 @@ def ScalarConstantOp :
   let results = (outs EltwiseAny:$result);
 
   let builders = [OpBuilder<
-    "Builder* builder, OperationState& result, Type type, double value", [{
-      result.addAttribute("value", builder->getF64FloatAttr(value));
+    "OpBuilder &builder, OperationState& result, Type type, double value", [{
+      result.addAttribute("value", builder.getF64FloatAttr(value));
       result.addTypes(RankedTensorType::get({}, type));
     }]
   >, OpBuilder<
-    "Builder* builder, OperationState& result, Type type, int64_t value", [{
-      result.addAttribute("value", builder->getI64IntegerAttr(value));
+    "OpBuilder &builder, OperationState& result, Type type, int64_t value", [{
+      result.addAttribute("value", builder.getI64IntegerAttr(value));
       result.addTypes(RankedTensorType::get({}, type));
     }]>, OpBuilder<
-    "Builder* builder, OperationState& result, Type type, uint64_t value", [{
-      result.addAttribute("value", builder->getI64IntegerAttr(value));
+    "OpBuilder &builder, OperationState& result, Type type, uint64_t value", [{
+      result.addAttribute("value", builder.getI64IntegerAttr(value));
       result.addTypes(RankedTensorType::get({}, type));
     }]
   >];
@@ -68,7 +68,7 @@ class EW_UnaryOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
   let results = (outs EltwiseAny:$result);
 
   let builders = [OpBuilder<
-    "Builder* builder, OperationState& result, ValueRange operands", [{
+    "OpBuilder &builder, OperationState& result, ValueRange operands", [{
       result.addOperands(operands);
       result.addTypes(getResultType(operands));
     }]
@@ -88,7 +88,7 @@ class EW_BinaryOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
   let results = (outs EltwiseAny:$result);
 
   let builders = [OpBuilder<
-    "Builder* builder, OperationState& result, ValueRange operands", [{
+    "OpBuilder &builder, OperationState& result, ValueRange operands", [{
       result.addOperands(operands);
       result.addTypes(getResultType(operands));
     }]
@@ -115,7 +115,7 @@ class EW_CompareOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
   let results = (outs EltwiseBool:$result);
 
   let builders = [OpBuilder<
-    "Builder* builder, OperationState& result, ValueRange operands", [{
+    "OpBuilder &builder, OperationState& result, ValueRange operands", [{
       result.addOperands(operands);
       result.addTypes(getResultType(operands));
     }]
@@ -196,7 +196,7 @@ def EW_SelectOp : EltwiseOp<"select">, HasCanonicalizer {
   let results = (outs EltwiseAny:$result);
 
   let builders = [OpBuilder<
-    "Builder* builder, OperationState& result, ValueRange operands", [{
+    "OpBuilder &builder, OperationState& result, ValueRange operands", [{
       result.addOperands(operands);
       result.addTypes(getResultType(operands));
     }]

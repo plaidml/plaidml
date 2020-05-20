@@ -2,8 +2,8 @@
 
 #include "mlir/Conversion/GPUToSPIRV/ConvertGPUToSPIRVPass.h"
 #include "mlir/Conversion/GPUToVulkan/ConvertGPUToVulkanPass.h"
-#include "mlir/Conversion/LoopToStandard/ConvertLoopToStandard.h"
-#include "mlir/Conversion/LoopsToGPU/LoopsToGPUPass.h"
+#include "mlir/Conversion/SCFToGPU/SCFToGPUPass.h"
+#include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
 #include "mlir/Conversion/StandardToSPIRV/ConvertStandardToSPIRVPass.h"
 #include "mlir/Dialect/GPU/Passes.h"
@@ -45,8 +45,8 @@ void addToPipeline(OpPassManager &pm) {
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
-  // pm.addPass(std::make_unique<LoopsToGPUPass>());
-  pm.addPass(createSimpleLoopsToGPUPass(1, 1));
+  // pm.addPass(std::make_unique<SCFToGPUPass>());
+  pm.addPass(createSimpleSCFToGPUPass(1, 1));
   pm.addPass(createCanonicalizerPass());
   pm.addPass(conversion::gpu::createGpuKernelOutliningPass());
 

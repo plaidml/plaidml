@@ -12,9 +12,9 @@ def ConstantOp : TileOpWithPPV<"constant", [ConstantLike, NoSideEffect]>, HasFol
   let results = (outs Index:$result);
 
   let builders = [OpBuilder<
-    "Builder* builder, OperationState& result, int64_t value", [{
-      auto indexType = builder->getIndexType();
-      result.addAttribute("value", builder->getIntegerAttr(indexType, value));
+    "OpBuilder &builder, OperationState& result, int64_t value", [{
+      auto indexType = builder.getIndexType();
+      result.addAttribute("value", builder.getIntegerAttr(indexType, value));
       result.addTypes(indexType);
     }]
   >];
@@ -42,7 +42,7 @@ def ContractionOp : TileOpWithPPV<"contract", [NoSideEffect]> {
   let results = (outs RankedTensorOf<[AnyScalar]>:$result);
 
   let builders = [OpBuilder<
-    "Builder* builder, "
+    "OpBuilder &builder, "
     "OperationState& result, "
     "Type resultType, "
     "Value init, "
@@ -146,10 +146,10 @@ def TraceOp : Op<TileDialect, "trace", []>, HasCanonicalizer {
   let results = (outs AnyType:$out);
 
   let builders = [OpBuilder<
-    "Builder* builder, OperationState& result, Value tensor, StringRef msg", [{
+    "OpBuilder &builder, OperationState& result, Value tensor, StringRef msg", [{
       result.addTypes(tensor.getType());
       result.addOperands(tensor);
-      result.addAttribute("msg", builder->getStringAttr(msg));
+      result.addAttribute("msg", builder.getStringAttr(msg));
     }]
   >];
 }

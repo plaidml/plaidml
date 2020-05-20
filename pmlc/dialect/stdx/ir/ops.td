@@ -7,7 +7,7 @@
 include "mlir/IR/OpBase.td"
 #endif
 
-include "mlir/Interfaces/SideEffects.td"
+include "mlir/Interfaces/SideEffectInterfaces.td"
 
 def StdX_Dialect : Dialect {
   let name = "stdx";
@@ -27,9 +27,9 @@ def FPToSIOp :
   let arguments = (ins AnyType:$result);
   let results = (outs AnyType);
   let builders = [OpBuilder<
-    "Builder *builder, OperationState &result, Value source, Type destType", [{
-       buildFPToSIOp(builder, result, source, destType);
-  }]>];
+    "OpBuilder &builder, OperationState &result, Value source, Type destType",
+    [{ buildFPToSIOp(builder, result, source, destType); }]
+  >];
 }
 
 def FPToUIOp :
@@ -38,9 +38,9 @@ def FPToUIOp :
   let arguments = (ins AnyType:$result);
   let results = (outs AnyType);
   let builders = [OpBuilder<
-    "Builder *builder, OperationState &result, Value source, Type destType", [{
-       buildFPToUIOp(builder, result, source, destType);
-  }]>];
+    "OpBuilder &builder, OperationState &result, Value source, Type destType",
+    [{ buildFPToUIOp(builder, result, source, destType); }]
+  >];
 }
 
 #endif // __PML_STDX_OPS__
