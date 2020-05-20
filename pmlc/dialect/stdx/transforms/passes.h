@@ -12,6 +12,6 @@ class Pass;
 namespace pmlc::dialect::stdx {
 
 std::unique_ptr<mlir::Pass> createBoundsCheckPass();
-std::unique_ptr<mlir::Pass> createi1StorageToi8Pass();
+std::unique_ptr<mlir::Pass> createI1StorageToI8Pass();
 
 } // namespace pmlc::dialect::stdx

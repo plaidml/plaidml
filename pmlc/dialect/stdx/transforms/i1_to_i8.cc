@@ -4,6 +4,7 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/Pass/Pass.h"
+#include "pmlc/dialect/stdx/transforms/pass_detail.h"
 
 using namespace mlir; // NOLINT[build/namespaces]
 
@@ -12,7 +13,7 @@ namespace pmlc::dialect::stdx {
 namespace {
 
 /// Changes loadOp from i1 memref to loadOp i8 followed by trunci i8->i1
-class LoadOpi1Toi8 final : public OpRewritePattern<LoadOp> {
+class LoadOpI1ToI8 final : public OpRewritePattern<LoadOp> {
 public:
   using OpRewritePattern<LoadOp>::OpRewritePattern;
 
@@ -21,7 +22,7 @@ public:
 };
 
 /// Changes storeOp to i1 memref to zexti i1->i8 followed by storeOp to i8
-class StoreOpi1Toi8 final : public OpRewritePattern<StoreOp> {
+class StoreOpI1ToI8 final : public OpRewritePattern<StoreOp> {
 public:
   using OpRewritePattern<StoreOp>::OpRewritePattern;
 
@@ -31,11 +32,11 @@ public:
 } // namespace
 
 /// Changes loadOp from i1 memref to loadOp i8 followed by trunci i8->i1
-LogicalResult LoadOpi1Toi8::matchAndRewrite(LoadOp loadOp,
+LogicalResult LoadOpI1ToI8::matchAndRewrite(LoadOp loadOp,
                                             PatternRewriter &rewriter) const {
   auto elementType = loadOp.result().getType();
   if (!elementType.isInteger(1)) {
-    return success();
+    return failure();
   }
 
   auto destType = rewriter.getIntegerType(8);
@@ -44,9 +45,9 @@ LogicalResult LoadOpi1Toi8::matchAndRewrite(LoadOp loadOp,
   loadOp.getMemRef().setType(
       MemRefType::get(loadOp.getMemRefType().getShape(), destType));
 
-  auto loadOp_new =
+  auto newLoadOp =
       rewriter.create<LoadOp>(loc, loadOp.memref(), loadOp.indices());
-  auto truncOp = rewriter.create<TruncateIOp>(loc, loadOp_new.getResult(),
+  auto truncOp = rewriter.create<TruncateIOp>(loc, newLoadOp.getResult(),
                                               rewriter.getIntegerType(1));
 
   rewriter.replaceOp(loadOp, {truncOp});
@@ -54,11 +55,11 @@ LogicalResult LoadOpi1Toi8::matchAndRewrite(LoadOp loadOp,
 }
 
 /// Changes storeOp to i1 memref to zexti i1->i8 followed by storeOp to i8
-LogicalResult StoreOpi1Toi8::matchAndRewrite(StoreOp storeOp,
+LogicalResult StoreOpI1ToI8::matchAndRewrite(StoreOp storeOp,
                                              PatternRewriter &rewriter) const {
   auto elementType = storeOp.value().getType();
   if (!elementType.isInteger(1)) {
-    return success();
+    return failure();
   }
 
   auto destType = rewriter.getIntegerType(8);
@@ -75,24 +76,23 @@ LogicalResult StoreOpi1Toi8::matchAndRewrite(StoreOp storeOp,
 }
 
 /// Hook for adding patterns.
-void populatei1StorageToi8(MLIRContext *context,
+void populateI1StorageToI8(MLIRContext *context,
                            OwningRewritePatternList &patterns) {
-  patterns.insert<LoadOpi1Toi8, StoreOpi1Toi8>(context);
+  patterns.insert<LoadOpI1ToI8, StoreOpI1ToI8>(context);
 }
 
-struct i1StorageToi8Pass
-    : public mlir::PassWrapper<i1StorageToi8Pass, mlir::FunctionPass> {
+struct I1StorageToI8Pass : public I1StorageToI8Base<I1StorageToI8Pass> {
   void runOnFunction() final {
     OwningRewritePatternList patterns;
     auto *context = &getContext();
 
-    populatei1StorageToi8(context, patterns);
+    populateI1StorageToI8(context, patterns);
     applyPatternsAndFoldGreedily(getOperation(), patterns);
   }
 };
 
-std::unique_ptr<mlir::Pass> createi1StorageToi8Pass() {
-  return std::make_unique<i1StorageToi8Pass>();
+std::unique_ptr<mlir::Pass> createI1StorageToI8Pass() {
+  return std::make_unique<I1StorageToI8Pass>();
 }
 
 } // namespace pmlc::dialect::stdx

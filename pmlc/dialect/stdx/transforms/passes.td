@@ -8,9 +8,9 @@ def BoundsCheck : FunctionPass<"stdx-check-bounds"> {
   let constructor = "pmlc::dialect::stdx::createBoundsCheckPass()";
 }
 
-def i8StorageToi8 : FunctionPass<"stdx-i1-storage-to-i8"> {
+def I1StorageToI8 : FunctionPass<"stdx-i1-storage-to-i8"> {
   let summary = "Convert i1 storage type to i8";
-  let constructor = "pmlc::dialect::stdx::createi1StorageToi8Pass()";
+  let constructor = "pmlc::dialect::stdx::createI1StorageToI8Pass()";
 }
 
 #endif // __PMLC_DIALECT_STDX_PASSES__
