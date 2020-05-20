@@ -66,7 +66,7 @@ OpFoldResult PolyDivOp::fold(ArrayRef<Attribute> operands) {
   }
   // div(0, x) -> 0
   if (matchPattern(lhs(), m_Zero())) {
-    Builder builder(getContext());
+    OpBuilder builder(getContext());
     return builder.getZeroAttr(builder.getIntegerType(64));
   }
   return constFoldBinaryOp(operands, [](double a, double b) { return a / b; });
@@ -109,7 +109,7 @@ OpFoldResult PolySubOp::fold(ArrayRef<Attribute> operands) {
   // sub(x, x) -> 0
   if (lhs() == rhs()) {
     IVLOG(5, "sub(x, x) -> 0");
-    Builder builder(getContext());
+    OpBuilder builder(getContext());
     return builder.getZeroAttr(builder.getIntegerType(64));
   }
   /// sub(x, 0) -> x
@@ -459,7 +459,7 @@ unsigned ContractionOp::getNumTensors(CombinationKind combo) {
   }
 }
 
-void ContractionOp::build(Builder *builder, OperationState &result,
+void ContractionOp::build(OpBuilder &builder, OperationState &result,
                           Type resultType, Value init, ArrayRef<Value> tensors,
                           AggregationKind agg, CombinationKind combo,
                           AffineMap sink, ArrayRef<AffineMap> srcs,
@@ -468,20 +468,20 @@ void ContractionOp::build(Builder *builder, OperationState &result,
   result.addOperands(tensors);
   result.addTypes(resultType);
   result.addAttribute("agg",
-                      builder->getI64IntegerAttr(static_cast<int64_t>(agg)));
+                      builder.getI64IntegerAttr(static_cast<int64_t>(agg)));
   result.addAttribute("combo",
-                      builder->getI64IntegerAttr(static_cast<int64_t>(combo)));
+                      builder.getI64IntegerAttr(static_cast<int64_t>(combo)));
   result.addAttribute(getSinkAttrName(), AffineMapAttr::get(sink));
   result.addAttribute(getSourcesAttrName(),
-                      builder->getAffineMapArrayAttr(srcs));
+                      builder.getAffineMapArrayAttr(srcs));
   if (!cons.isEmptyIntegerSet()) {
     result.addAttribute(getConstraintsAttrName(), IntegerSetAttr::get(cons));
   }
   if (no_reduce) {
-    result.addAttribute("no_reduce", builder->getUnitAttr());
+    result.addAttribute("no_reduce", builder.getUnitAttr());
   }
   if (name.size()) {
-    result.addAttribute("name", builder->getStringAttr(name));
+    result.addAttribute("name", builder.getStringAttr(name));
   }
 }
 

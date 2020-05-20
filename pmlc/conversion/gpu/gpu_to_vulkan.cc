@@ -429,7 +429,7 @@ void ConvertGpuLaunchFuncToVulkanCalls::convertGpuLaunchFunc(
 
   // Create LLVM global with entry point name.
   Value entryPointName = createEntryPointNameConstant(
-      launchOp.kernel(), lauchFuncIndex, loc, builder);
+      launchOp.getKernelName(), lauchFuncIndex, loc, builder);
 
   auto gridSize = launchOp.getGridSizeOperandValues();
 
