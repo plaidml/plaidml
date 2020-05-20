@@ -157,7 +157,9 @@ SUITES:
           - TestBackendOps.testArgminUnequal
           - TestBackendOps.testArgmaxWithAxis
           - TestBackendOps.testArgmin
+          - TestBackendOps.testDropoutManual
           - TestBackendOps.testArange
+          - TestBackendOps.testAvgPool
           - TestBackendOps.testDot
           - TestBackendOps.testEye
           - TestBackendOps.testAddElements
@@ -168,27 +170,40 @@ SUITES:
           - TestBackendOps.testMulElements
           - TestBackendOps.testMulConstant
           - TestBackendOps.testDivElements
+          - TestBackendOps.testDivConstant
           - TestBackendOps.testProdKeepdims
           - TestBackendOps.testProdAxis
           - TestBackendOps.testProdAxisNumpy
           - TestBackendOps.testProdNegAxis
+          - TestBackendOps.testProdOfShape
+          - TestBackendOps.testProd
+          - TestBackendOps.testMax
           - TestBackendOps.testMaximum
           - TestBackendOps.testMaxPool
+          - TestBackendOps.testMean
+          - TestBackendOps.testMin
           - TestBackendOps.testMinimum
           - TestBackendOps.testClip
           - TestBackendOps.testElu
+          - TestBackendOps.testPool3D
           - TestBackendOps.testRelu
           - TestBackendOps.testHardSigmoid
           - TestBackendOps.testAbs
+          - TestBackendOps.testAll
+          - TestBackendOps.testAny
+          - TestBackendOps.testReshapeMatchDim
+          - TestBackendOps.testSum
           - TestBackendOps.testSquare
           - TestBackendOps.testSqrt
           - TestBackendOps.testSoftsign
           - TestBackendOps.testSoftplus
           - TestBackendOps.testSoftCat
           - TestBackendOps.testSoftmax
+          - TestBackendOps.testSigmoid
           - TestBackendOps.testSign
           - TestBackendOps.testExp
           - TestBackendOps.testLog
+          - TestBackendOps.testLogSumExp
           - TestBackendOps.testDepthwiseConv2d
           - TestBackendOps.testReshapeMatchDim
           - TestBackendOps.testZeros
@@ -203,6 +218,12 @@ SUITES:
           - TestBackendOps.testBatchNormalizationOneElement
           - TestBackendOps.testBatchNormalizationNoBeta
           - TestBackendOps.testBatchNormalizationNoGamma
+          - TestBackendOps.testBigRollup
+          - TestBackendOps.testBinaryCrossentropy
+          - TestBackendOps.testBranchWithSoftmax
+          - TestBackendOps.testCategoricalCrossentropy
+          - TestBackendOps.testCategoricalCrossentropyGarbageIn
+          - TestBackendOps.testCategoricalCrossentropyLogits
           - TestBackendOps.testSelfMult
           - TestBackendOps.testL2Normalize
           - TestBackendOps.testZerosLike
@@ -220,8 +241,9 @@ SUITES:
           - TestBackendOps.testCumProd
           - TestBackendOps.resnetLayer1
           - TestBackendOps.resnetLayer2
-          - TestBackendOps.res3a_branch2a
+          - TestBackendOps.res2a_branch2a
           - TestBackendOps.res2a_branch2b
+          - TestBackendOps.res3a_branch2a
           - TestBackendOps.fc_1000
           - TestBackendOps.bigMatMul
           - TestBackendOps.testDupOutputs
@@ -251,6 +273,8 @@ SUITES:
           - TestBackendOps.testRepeat
           - TestBackendOps.testRepeatElements
           - TestBackendOps.testResizeImages
+          - TestBackendOps.testResizeImagesBilinear
+          - TestBackendOps.testResizeVolumes
           - TestBackendOps.testReverse
           - TestBackendOps.testSeparableConv2d
           - TestBackendOps.testSliceEllipsis
@@ -259,15 +283,20 @@ SUITES:
           - TestBackendOps.testSpatial2DPadding
           - TestBackendOps.testSpatial3DPadding
           - TestBackendOps.testStack
+          - TestBackendOps.testStd
           - TestBackendOps.testTemporalPadding
           - TestBackendOps.testTile
           - TestBackendOps.testTranspose
+          - TestBackendOps.testTruncatedNormalMean
+          - TestBackendOps.testTruncatedNormalDev
           - TestBackendOps.testRandomNormalDev
           - TestBackendOps.testRandomUniformMean
           - TestBackendOps.testRandomUniformDev
           - TestBackendOps.testRandomUniformVariableMean
           - TestBackendOps.testRandomUniformVariableDev
           - TestBackendOps.testRandomNormalMean
+          - TestBackendOps.testVarSimple
+          - TestBackendOps.testWinograd
         conda_env: ci/conda/keras_backend_test.yml
         precision: untested
       regression:
