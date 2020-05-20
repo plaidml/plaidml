@@ -877,6 +877,17 @@ TEST_F(CppEdsl, Reciprocal) {
   checkProgram(program, {{A, input}}, {{R, expected}});
 }
 
+TEST_F(CppEdsl, ReshapeFold) {
+  auto A = Placeholder(DType::INT32, {3, 3});
+  auto R = reshape(A, {3, 3});
+  auto program = makeProgram("reshape_fold", {R});
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.ReshapeFold
+  // CHECK: func @reshape_fold(%arg0: tensor<3x3xsi32>) -> tensor<3x3xsi32> {
+  // CHECK: return %arg0 : tensor<3x3xsi32>
+  // clang-format on
+}
+
 // TEST_F(CppEdsl, GradientDot) {
 //   auto A = Placeholder(DType::FLOAT32, {100, 100}, "A");
 //   auto B = Placeholder(DType::FLOAT32, {100, 100}, "B");

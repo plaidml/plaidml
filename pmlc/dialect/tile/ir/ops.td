@@ -117,7 +117,7 @@ def PrngOp : SpecialOp<"prng", []>, HasCanonicalizer {
     RankedTensorOf<[UI32]>:$new_state);
 }
 
-def ReshapeOp : SpecialOp<"reshape">, HasCanonicalizer {
+def ReshapeOp : SpecialOp<"reshape">, HasCanonicalizer, HasFolder {
   let summary = "tensor reshape operation";
   let arguments = (ins
     RankedTensorOf<[AnyScalar]>:$tensor,
