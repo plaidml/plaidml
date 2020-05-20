@@ -5,8 +5,11 @@
 #include <string>
 #include <vector>
 
+#include "llvm/Support/FormatVariadic.h"
+
 #include "plaidml/edsl/edsl.h"
 #include "plaidml/op/ffi.h"
+#include "pmlc/util/logging.h"
 
 namespace plaidml {
 namespace op {
@@ -218,23 +221,64 @@ class convolution {
   }
 
   operator edsl::Tensor() const {
-    auto args = edsl::make_tuple(           //
-        I_,                                 //
-        F_,                                 //
-        edsl::make_tuple(strides_),         //
-        edsl::make_tuple(dilations_),       //
-        edsl::make_tuple(data_dilations_),  //
-        edsl::make_tuple(filter_shape_),    //
-        groups_,                            //
-        static_cast<int>(autopad_mode_),    //
-        edsl::make_tuple(manual_padding_),  //
-        static_cast<int>(input_layout_),    //
-        static_cast<int>(filter_layout_),   //
-        static_cast<int>(group_layout_),    //
-        winograd_allowed_,                  //
-        name_,                              //
-        static_cast<int>(autogroup_mode_),  //
-        static_cast<int>(deriv_mode_),      //
+    // Infer spatial rank, enabling validation and rank-dependent default values
+    int rank = F_.rank() - 2;
+    // If you add more valid `input_layout_`s, ensure the spatial rank inference logic above remains correct
+    if (input_layout_ != TensorLayout::NCX && input_layout_ != TensorLayout::NXC) {
+      IVLOG(1, "TODO: bad conv request details");
+      throw std::runtime_error(llvm::formatv("Invalid input layout"));
+    }
+    if (rank < 0) {
+      IVLOG(1, "TODO: bad conv request details");
+      throw std::runtime_error(
+          llvm::formatv("Cannot build convolution of spatial rank {0} (rank must be nonnegative)", rank));
+    }
+    // TODO: Verify this definition of rank matches everything else
+    // If strides is empty, default a vector of 1s
+    std::vector<int> strides_with_default;
+    if (strides_.size() == 0) {
+      for (size_t i = 0; i < rank; i++) {
+        strides_with_default.push_back(1);
+      }
+    } else {
+      strides_with_default = strides_;
+    }
+    // If dilations is empty, default a vector of 1s
+    std::vector<int> dilations_with_default;
+    if (dilations_.size() == 0) {
+      for (size_t i = 0; i < rank; i++) {
+        dilations_with_default.push_back(1);
+      }
+    } else {
+      dilations_with_default = dilations_;
+    }
+    // If data_dilations is empty, default a vector of 1s
+    std::vector<int> data_dilations_with_default;
+    if (data_dilations_.size() == 0) {
+      for (size_t i = 0; i < rank; i++) {
+        data_dilations_with_default.push_back(1);
+      }
+    } else {
+      data_dilations_with_default = data_dilations_;
+    }
+
+    auto args = edsl::make_tuple(                       //
+        I_,                                             //
+        F_,                                             //
+        edsl::make_tuple(strides_with_default),         //
+        edsl::make_tuple(dilations_with_default),       //
+        edsl::make_tuple(data_dilations_with_default),  //
+        edsl::make_tuple(filter_shape_),                //
+        groups_,                                        //
+        static_cast<int>(autopad_mode_),                //
+        edsl::make_tuple(manual_padding_),              //
+        static_cast<int>(input_layout_),                //
+        static_cast<int>(filter_layout_),               //
+        static_cast<int>(group_layout_),                //
+        winograd_allowed_,                              //
+        name_,                                          //
+        static_cast<int>(autogroup_mode_),              //
+        static_cast<int>(deriv_mode_),                  //
         edsl::make_tuple(result_shape_));
     return details::op("convolution", args).as_tensor();
   }
@@ -242,21 +286,21 @@ class convolution {
  private:
   edsl::Tensor I_;
   edsl::Tensor F_;
-  std::vector<int> strides_;
-  std::vector<int> dilations_;
-  std::vector<int> data_dilations_;
-  std::vector<int> filter_shape_;
+  std::vector<int> strides_;         // Default built inside operator()
+  std::vector<int> dilations_;       // Default built inside operator()
+  std::vector<int> data_dilations_;  // Default built inside operator()
+  std::vector<int> filter_shape_;    // Default: empty (i.e. no filter dim check)
   int groups_ = 1;
-  std::vector<int> manual_padding_;
-  AutoPadMode autopad_mode_;
-  TensorLayout input_layout_;
-  TensorLayout filter_layout_;
+  std::vector<int> manual_padding_;  // Default: empty (i.e. no manual padding)
+  AutoPadMode autopad_mode_ = AutoPadMode::SAME_UPPER;
+  TensorLayout input_layout_ = TensorLayout::NXC;
+  TensorLayout filter_layout_ = TensorLayout::XCK;
   GroupLayout group_layout_ = GroupLayout::NONE;
   bool winograd_allowed_ = false;
-  std::string name_;
+  std::string name_;  // Default: empty (oplib currently renames "" to "conv")
   AutoGroupMode autogroup_mode_ = AutoGroupMode::UNGROUPED;
   ConvDerivMode deriv_mode_ = ConvDerivMode::NONE;
-  std::vector<int> result_shape_;
+  std::vector<int> result_shape_;  // Default: empty (i.e. unspecified)
 };
 
 inline edsl::Tensor cumprod(const edsl::Tensor& I, int axis) {
