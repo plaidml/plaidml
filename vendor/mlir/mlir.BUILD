@@ -2669,6 +2669,7 @@ cc_library(
     deps = [
         ":mlir_c_runner_utils",
     ],
+    alwayslink = 1,
 )
 
 cc_binary(
