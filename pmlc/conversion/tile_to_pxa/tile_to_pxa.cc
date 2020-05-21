@@ -37,6 +37,8 @@ using dialect::tile::getPaddingInfo;
 using dialect::tile::IndexOp;
 using dialect::tile::PaddingInfo;
 using dialect::tile::PrngOp;
+using dialect::tile::ReshapeOp;
+using dialect::tile::ReshapeOpOperandAdaptor;
 using dialect::tile::ShapeOp;
 using dialect::tile::ShapeOpOperandAdaptor;
 using dialect::tile::TraceOp;
@@ -196,7 +198,7 @@ static Value createCastOp(OpBuilder &builder, Location loc, Value from,
     if (auto fromFloatType = fromType.dyn_cast<FloatType>()) {
       if (intoSigned) {
         // FPToSIOp: FloatType -> signed IntegerType
-        return builder.create<stdx::FPToSIOp>(loc, from, intoType).getResult();
+        return builder.create<mlir::FPToSIOp>(loc, from, intoType).getResult();
       } else {
         // FPToUIOp: FloatType -> unsigned IntegerType
         return builder.create<stdx::FPToUIOp>(loc, from, intoType).getResult();
@@ -852,6 +854,27 @@ struct IndexOpConversion : public OpConversionPattern<IndexOp> {
   }
 };
 
+struct ReshapeOpConversion : public OpConversionPattern<ReshapeOp> {
+  using OpConversionPattern<ReshapeOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(ReshapeOp op, llvm::ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override {
+    IVLOG(2, "ReshapeOpConversion::matchAndRewrite>");
+
+    // Create an adaptor, to interpret the operands
+    ReshapeOpOperandAdaptor adaptor(operands);
+
+    auto tensor = adaptor.tensor();
+
+    TypeConverter typeConverter;
+    auto resultType = typeConverter.convertType(op.result().getType());
+
+    rewriter.replaceOpWithNewOp<stdx::ReshapeOp>(op, resultType, tensor);
+    return success();
+  }
+};
+
 struct ShapeOpConversion : public OpConversionPattern<ShapeOp> {
   using OpConversionPattern<ShapeOp>::OpConversionPattern;
 
@@ -1020,9 +1043,8 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
     patterns.insert<
         TileConstantOpConversion, CastOpConversion, IndexOpConversion,
         ScalarConstantOpConversion, ShapeOpConversion, TraceOpConversion,
-        PrngOpConversion,
-        // TODO: SpecialOpConversion (GatherOp, ReshapeOp,
-        // ScatterOp, ZeroOp)
+        PrngOpConversion, ReshapeOpConversion,
+        // TODO: SpecialOpConversion (GatherOp, ScatterOp, ZeroOp)
         ContractionOpConversion<CombinationKind::none, FirstOperand>,
         ContractionOpConversion<CombinationKind::add, StdOp<mlir::AddFOp>,
                                 ResultIs<EltwiseFloat>>,

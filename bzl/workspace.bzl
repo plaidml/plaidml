@@ -2,7 +2,7 @@
 
 load("//vendor/bazel:repo.bzl", "http_archive")
 load("//vendor/conda:repo.bzl", "conda_repo")
-load("//vendor/openvino:repo.bzl", "openvino_workspace")
+load("//vendor/openvino:workspace.bzl", "openvino_workspace")
 
 # Sanitize a dependency so that it works correctly from code that includes it as a submodule.
 def clean_dep(dep):

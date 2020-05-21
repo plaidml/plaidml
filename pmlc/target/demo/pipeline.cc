@@ -35,11 +35,12 @@ void addToPipeline(OpPassManager &pm) {
   pm.addNestedPass<FuncOp>(createCSEPass());
 }
 
-static PassPipelineRegistration<>
-    passPipelineReg("target-demo", "Target pipeline for demonstrations",
-                    addToPipeline);
-static compiler::TargetRegistration targetReg("demo", addToPipeline);
-
 } // namespace
+
+void registerPassPipeline() {
+  static PassPipelineRegistration<> passPipelineReg(
+      "target-demo", "Target pipeline for demonstrations", addToPipeline);
+  static compiler::TargetRegistration targetReg("demo", addToPipeline);
+}
 
 } // namespace pmlc::target::demo
