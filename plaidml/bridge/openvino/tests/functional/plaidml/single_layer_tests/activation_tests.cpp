@@ -196,27 +196,28 @@ std::string getTestCaseName(testing::TestParamInfo<activation_test_params> obj) 
 
 activation_test_params test_cases[] = {
     activation_test_params(case_1, "relu", {0.0f}),  // n_slope
-    activation_test_params(case_2, "relu", {0.1f}), activation_test_params(case_3, "relu", {0.1f}),
-    activation_test_params(case_4, "relu", {0.1f}), activation_test_params(case_5, "relu", {0.1f}),
+    activation_test_params(case_2, "relu", {0.1f}),  //
+    activation_test_params(case_3, "relu", {0.1f}),  //
+    activation_test_params(case_4, "relu", {0.1f}),  //
+    activation_test_params(case_5, "relu", {0.1f}),
 
-    // activation_test_params(case_1, "sigmoid"),
-    // activation_test_params(case_2, "sigmoid"),
-    // activation_test_params(case_3, "sigmoid"),
-    // activation_test_params(case_4, "sigmoid"),
-    // activation_test_params(case_5, "sigmoid"),
+    // activation_test_params(case_1, "sigmoid"),  //
+    // activation_test_params(case_2, "sigmoid"),  //
+    // activation_test_params(case_3, "sigmoid"),  //
+    // activation_test_params(case_4, "sigmoid"),  //
+    // activation_test_params(case_5, "sigmoid"),  //
 
-    // activation_test_params(case_1, "power",
-    //                        {1.0f, 0.0f, 1.0f}), // power offset scale
+    // activation_test_params(case_1, "power", {1.0f, 0.0f, 1.0f}),  // power offset scale
     // activation_test_params(case_2, "power", {2.0f, 3.0f, 5.0f}),
     // activation_test_params(case_3, "power", {4.0f, 1.0f, 7.0f}),
 
-    // activation_test_params(case_1, "clamp", {0.0f, 1.0f}), // min max
-    // activation_test_params(case_2, "clamp", {0.0f, 6.0f}),
-    // activation_test_params(case_3, "clamp", {0.0f, 3.0f}),
+    // activation_test_params(case_1, "clamp", {0.0f, 1.0f}),  // min max
+    // activation_test_params(case_2, "clamp", {0.0f, 6.0f}),  //
+    // activation_test_params(case_3, "clamp", {0.0f, 3.0f}),  //
 
     // FIXME doesn't support exp and not activation now
-    // activation_test_params( case_1, "exp"),
-    // activation_test_params( case_1, "not"),
+    // activation_test_params(case_1, "exp"),
+    // activation_test_params(case_1, "not"),
 };
 
 INSTANTIATE_TEST_CASE_P(TestsActivationFunctions, ActivationTest, ::testing::ValuesIn(test_cases), getTestCaseName);
