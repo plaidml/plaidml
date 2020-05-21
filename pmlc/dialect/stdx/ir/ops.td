@@ -21,17 +21,6 @@ class StdX_Op<string mnemonic, list<OpTrait> traits = []> :
   let verifier = [{ return verify$cppClass(*this); }];
 }
 
-def FPToSIOp :
-    StdX_Op<"fptosi", [NoSideEffect]> {
-  let summary = "cast from floating-point to signed integer type";
-  let arguments = (ins AnyType:$result);
-  let results = (outs AnyType);
-  let builders = [OpBuilder<
-    "OpBuilder &builder, OperationState &result, Value source, Type destType",
-    [{ buildFPToSIOp(builder, result, source, destType); }]
-  >];
-}
-
 def FPToUIOp :
     StdX_Op<"fptoui", [NoSideEffect]> {
   let summary = "cast from floating-point to unsigned integer type";
