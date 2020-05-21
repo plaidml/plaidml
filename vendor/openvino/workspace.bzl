@@ -23,13 +23,6 @@ def openvino_workspace():
         url = "https://github.com/NervanaSystems/ngraph/archive/edc65ca0111f86a7e63a98f62cb17d153cc2535c.zip",
     )
 
-    # http_archive(
-    #     name = "nlo_json",
-    #     url = "https://github.com/nlohmann/json/releases/download/v3.7.3/include.zip",
-    #     sha256 = "87b5884741427220d3a33df1363ae0e8b898099fbc59f1c451113f6732891014",
-    #     build_file = clean_dep("//vendor/openvino:nlohmann_json.BUILD"),
-    # )
-
     http_archive(
         name = "openvino",
         sha256 = "40652941587e579d45a190731960008827221d11575f7f2e6162285b6625b940",
