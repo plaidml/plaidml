@@ -9,6 +9,7 @@ include "mlir/IR/OpBase.td"
 
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
+
 def StdX_Dialect : Dialect {
   let name = "stdx";
   let cppNamespace = "pmlc::dialect::stdx";
@@ -30,6 +31,19 @@ def FPToUIOp :
     "OpBuilder &builder, OperationState &result, Value source, Type destType",
     [{ buildFPToUIOp(builder, result, source, destType); }]
   >];
+}
+
+class StdX_Plain_Op<string mnemonic, list<OpTrait> traits = []> :
+    Op<StdX_Dialect, mnemonic, traits> {
+}
+
+def ReshapeOp : StdX_Plain_Op<"reshape"> {
+  let summary = "tensor reshape operation";
+  let arguments = (ins AnyMemRef:$tensor);
+  let results = (outs AnyMemRef:$result);
+  let assemblyFormat = [{
+    `(` $tensor `)` attr-dict `:` functional-type($tensor, results)
+  }];
 }
 
 #endif // __PML_STDX_OPS__
