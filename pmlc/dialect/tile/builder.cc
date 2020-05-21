@@ -770,7 +770,7 @@ TileBuilder::MakeProgram(StringRef name, const ProgramMutations &mutations,
     auto userValue = outputs[i];
     auto finalValue = returnOp.getOperand(i);
     // Wrap outputs that directly refer to inputs
-    if (!finalValue.getDefiningOp() || outputs.count(userValue) > 1) {
+    if (!finalValue.getDefiningOp()) {
       IVLOG(2, "Reached condition: output that refers directly to input");
       OpBuilder identBuilder(returnOp);
       auto ident = identBuilder.create<eltwise::IdentOp>(loc, finalValue);
