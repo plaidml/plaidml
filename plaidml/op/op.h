@@ -5,11 +5,8 @@
 #include <string>
 #include <vector>
 
-#include "llvm/Support/FormatVariadic.h"
-
 #include "plaidml/edsl/edsl.h"
 #include "plaidml/op/ffi.h"
-#include "pmlc/util/logging.h"
 
 namespace plaidml {
 namespace op {
