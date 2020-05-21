@@ -3,7 +3,7 @@
 // CHECK-LABEL: func @cast_f32_i16
 func @cast_f32_i16(%arg0: tensor<f32>) -> tensor<si16> {
   %0 = "eltwise.cast"(%arg0) : (tensor<f32>) -> tensor<si16>
-  // CHECK: stdx.fptosi
+  // CHECK: fptosi
   return %0 : tensor<si16>
 }
 

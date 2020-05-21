@@ -70,21 +70,6 @@ protected:
   LLVM::LLVMDialect &dialect;
 };
 
-struct FPToSILowering : public LLVMLegalizationPattern<stdx::FPToSIOp> {
-  using LLVMLegalizationPattern<stdx::FPToSIOp>::LLVMLegalizationPattern;
-  using Base = LLVMLegalizationPattern<stdx::FPToSIOp>;
-
-  LogicalResult
-  matchAndRewrite(Operation *op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const override {
-    auto value = op->getOperand(0);
-    auto stdxType = op->getResult(0).getType();
-    auto llvmType = typeConverter.convertType(stdxType);
-    rewriter.replaceOpWithNewOp<LLVM::FPToSIOp>(op, llvmType, value);
-    return success();
-  }
-};
-
 struct FPToUILowering : public LLVMLegalizationPattern<stdx::FPToUIOp> {
   using LLVMLegalizationPattern<stdx::FPToUIOp>::LLVMLegalizationPattern;
   using Base = LLVMLegalizationPattern<stdx::FPToUIOp>;
@@ -199,8 +184,7 @@ struct LowerToLLVMPass : public LowerToLLVMBase<LowerToLLVMPass> {
 
 void populateStdXToLLVMConversionPatterns(LLVMTypeConverter &converter,
                                           OwningRewritePatternList &patterns) {
-  patterns.insert<FPToSILowering, FPToUILowering, ReshapeLowering>(
-      *converter.getDialect(), converter);
+  patterns.insert<FPToUILowering, ReshapeLowering>(*converter.getDialect(), converter);
 }
 
 std::unique_ptr<mlir::Pass> createLowerToLLVMPass() {
