@@ -7,6 +7,7 @@
 namespace pmlc::dialect::stdx {
 
 using mlir::failure;
+using mlir::FunctionType;
 using mlir::success;
 
 namespace {
