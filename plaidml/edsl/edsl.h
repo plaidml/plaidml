@@ -635,6 +635,13 @@ class Tensor {
   Tensor(const Tensor& rhs) { *this = rhs; }
 
   ///
+  /// Assigns a buffer to an existing Tensor
+  ///
+  void set_param_value(const Buffer& buf) {
+    ffi::call_void(plaidml_expr_param_reset, as_ptr(), buf.as_ptr());
+  }
+
+  ///
   /// Represents an operator overload for `=` for a `Tensor`
   ///
   Tensor& operator=(const Tensor& rhs) {
@@ -864,6 +871,27 @@ inline Tensor TensorOutput(const std::vector<TensorDim>& dims) {  //
 
 inline Tensor TensorOutput(const std::vector<int64_t>& dims) {  //
   return Tensor(dims);
+}
+
+inline Tensor Constant(                 //
+    const LogicalShape& shape,          //
+    const Buffer& buf,                  //
+    const std::string& name = "") {
+  auto ptr = ffi::call<plaidml_expr*>(  //
+      plaidml_expr_placeholder,         //
+      shape.as_ptr(),                   //
+      buf.as_ptr(),                     //
+      name.c_str());
+  return Tensor(ptr);
+}
+
+inline Tensor Constant(                //
+    DType dtype,                       //
+    const Buffer& buf,                 //
+    const std::vector<int64_t>& dims,  //
+    const std::string& name = "") {
+  LogicalShape shape(dtype, dims);
+  return Constant(shape, buf, name);
 }
 
 inline Tensor Placeholder(      //

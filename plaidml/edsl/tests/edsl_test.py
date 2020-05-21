@@ -9,6 +9,7 @@ import unittest
 import plaidml
 import plaidml.exec
 from plaidml.edsl import *
+import numpy as np
 
 DEFAULT_DEVICE = 'llvm_cpu.0'
 DEFAULT_TARGET = 'llvm_cpu'
@@ -287,6 +288,16 @@ def csum(I):
     O.add_constraint(i - k < N)
     return O
 
+def constant_add():
+    a = np.array([4,3,2,1])
+    b = np.array([1,2,3,4])
+    Buffer_A = plaidml.Buffer(plaidml.TensorShape(plaidml.DType.INT32, [4]), device = DEFAULT_DEVICE)
+    Buffer_B = plaidml.Buffer(plaidml.TensorShape(plaidml.DType.INT32, [4]), device = DEFAULT_DEVICE)
+    Buffer_A.copy_from_ndarray(a)
+    Buffer_B.copy_from_ndarray(b)
+    A = Constant(LogicalShape(plaidml.DType.INT32, [4]), Buffer_A, name="A")
+    B = Constant(LogicalShape(plaidml.DType.INT32, [4]), Buffer_B, name="B")
+    return A + B
 
 class TestEdsl(unittest.TestCase):
     maxDiff = None
@@ -1120,6 +1131,26 @@ module {
         self.assertEqual(str(I1.compute_shape()), "tensor<1x1xsi32>")
         self.assertEqual(str(I2.compute_shape()), "tensor<1x1xsi32>")
         self.assertMultiLineEqual(str(program1), str(program2))
+
+    def test_constant_add(self):
+        constants = np.array([[1,2,3,4], [4,3,2,1]])
+        I = constant_add()
+        program = Program('const_add', [I])
+        self.assertEqual(len(program.args), 3)
+        self.assertEqual(len(program.inputs), 2)
+        # check inputs to known values
+        for i in range(2):
+            this_arg = program.inputs[i]
+            self.assertEqual(this_arg.buffer.as_ndarray().tolist(), constants[i].tolist())
+        expected = '''
+
+module {
+  func @const_add(%arg0: tensor<4xsi32> {tile.name = "B"}, %arg1: tensor<4xsi32> {tile.name = "A"}) -> tensor<4xsi32> {
+    %0 = "eltwise.add"(%arg1, %arg0) : (tensor<4xsi32>, tensor<4xsi32>) -> tensor<4xsi32>
+    return %0 : tensor<4xsi32>
+  }
+}'''
+        self.assertEqual(str(program), expected)
 
     def test_collect_passes(self):
         A = Placeholder(plaidml.DType.FLOAT32, [10, 10])

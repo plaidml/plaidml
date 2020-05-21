@@ -6,7 +6,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/Dialect.h"
-#include "mlir/Interfaces/SideEffects.h"
+#include "mlir/Interfaces/SideEffectInterfaces.h"
 
 #include "pmlc/util/enums.h"
 
@@ -22,7 +22,6 @@ using mlir::ArrayAttr;
 using mlir::ArrayRef;
 using mlir::Attribute;
 using mlir::BoolAttr;
-using mlir::Builder;
 using mlir::FloatType;
 using mlir::IndexType;
 using mlir::IntegerAttr;
@@ -37,6 +36,7 @@ using mlir::NamedAttribute;
 using mlir::Op;
 using mlir::OpAsmParser;
 using mlir::OpAsmPrinter;
+using mlir::OpBuilder;
 using mlir::Operation;
 using mlir::OperationState;
 using mlir::OpFoldResult;

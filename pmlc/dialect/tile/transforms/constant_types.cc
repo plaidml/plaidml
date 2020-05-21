@@ -47,9 +47,6 @@ public:
     });
   }
 
-protected:
-  Operation *insert(Operation *op) final { return OpBuilder::insert(op); }
-
 private:
   mlir::RewritePatternMatcher matcher;
 };

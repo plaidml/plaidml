@@ -3,7 +3,7 @@
 #ifndef __PML_TILE_BASE__
 #define __PML_TILE_BASE__
 
-include "mlir/Interfaces/SideEffects.td"
+include "mlir/Interfaces/SideEffectInterfaces.td"
 
 #ifndef AFFINE_OPS_BASE
 include "mlir/Dialect/Affine/IR/AffineOpsBase.td"
@@ -25,16 +25,6 @@ def IntegerSetAttr : Attr<
   let storageType = [{ IntegerSetAttr }];
   let returnType = [{ IntegerSet }];
   let constBuilderCall = "IntegerSetAttr::get($0)";
-}
-
-// TODO: this should be defined upstream
-def IndexAttr : Attr<
-      And<[CPred<"$_self.isa<IntegerAttr>()">,
-           CPred<"$_self.cast<IntegerAttr>().getType().isIndex()">]>,
-      "index attribute"> {
-  let constBuilderCall = "$_builder.getIntegerAttr($_builder.getIndexType(), $0)";
-  let storageType = "IntegerAttr";
-  let returnType = [{ APInt }];
 }
 
 def TileDialect : Dialect {

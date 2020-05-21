@@ -36,6 +36,16 @@ void performTiling(AffineParallelOp op, llvm::ArrayRef<int64_t> tileSizes) {
   auto &outerLoopOps = outerBody->getOperations();
   innerLoopOps.splice(std::prev(innerLoopOps.end()), outerLoopOps,
                       std::next(outerLoopOps.begin(), 1), outerLoopOps.end());
+  // Replace old indices with new indices
+  auto innerIdxs = inner.getBody()->getArguments();
+  for (unsigned i = 0; i < outerIdxs.size(); ++i) {
+    outerIdxs[i].replaceAllUsesWith(innerIdxs[i]);
+  }
+  unsigned numIdxs = inner.lowerBoundsMap().getNumInputs();
+  for (unsigned i = 0; i < numIdxs; ++i) {
+    inner.setOperand(i, outerIdxs[i]);
+    inner.setOperand(i + numIdxs, outerIdxs[i]);
+  }
   // Add a return of the values of the inner to the outer
   builder.setInsertionPointToEnd(op.getBody());
   builder.create<AffineYieldOp>(op.getLoc(), inner.getResults());

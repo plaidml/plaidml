@@ -19,7 +19,7 @@ plaidml_cc_library(
         "@llvm-project//mlir:GPUToVulkanTransforms",
         "@llvm-project//mlir:GPUTransforms",
         "@llvm-project//mlir:LLVMTransforms",
-        "@llvm-project//mlir:LoopsToGPUPass",
+        "@llvm-project//mlir:SCFToGPUPass",
     ],
     alwayslink = 1,
 )

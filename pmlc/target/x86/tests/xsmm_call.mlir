@@ -1,14 +1,14 @@
 // RUN: pmlc-opt -convert-linalg-to-loops -convert-pxa-to-affine -lower-affine \
-// RUN:     -convert-loop-to-std -x86-xsmm -convert-std-to-llvm %s | \
+// RUN:     -convert-scf-to-std -x86-xsmm -convert-std-to-llvm %s | \
 // RUN:   pmlc-jit -e baseline | FileCheck %s
 // RUN: pmlc-opt -convert-linalg-to-loops -convert-pxa-to-affine -lower-affine \
-// RUN:     -convert-loop-to-std -x86-xsmm -convert-std-to-llvm %s | \
+// RUN:     -convert-scf-to-std -x86-xsmm -convert-std-to-llvm %s | \
 // RUN:   pmlc-jit -e tiled | FileCheck %s
 // RUN: pmlc-opt -convert-linalg-to-loops -convert-pxa-to-affine -lower-affine \
-// RUN:     -convert-loop-to-std -x86-xsmm -convert-std-to-llvm %s | \
+// RUN:     -convert-scf-to-std -x86-xsmm -convert-std-to-llvm %s | \
 // RUN:   pmlc-jit -e xsmm_call | FileCheck %s
 // RUN: pmlc-opt -convert-linalg-to-loops -convert-pxa-to-affine -lower-affine \
-// RUN:     -convert-loop-to-std -x86-xsmm -convert-std-to-llvm %s | \
+// RUN:     -convert-scf-to-std -x86-xsmm -convert-std-to-llvm %s | \
 // RUN:   pmlc-jit -e xsmm_op | FileCheck %s
 
 !I_memref = type memref<1x6x5x7xf32>
@@ -168,6 +168,7 @@ func @dot_tiled(%A: memref<?x?xf32>, %B: memref<?x?xf32>, %C: memref<?x?xf32>) {
 
 func @dot_xsmm_call(%A: memref<?x?xf32>, %B: memref<?x?xf32>, %C: memref<?x?xf32>) {
   %c0 = constant 0 : index
+  %c1 = constant 1 : index
   %c2 = constant 2 : index
   %tile_m = constant 2 : i32
   %tile_n = constant 2 : i32
@@ -179,12 +180,15 @@ func @dot_xsmm_call(%A: memref<?x?xf32>, %B: memref<?x?xf32>, %C: memref<?x?xf32
   %N = dim %C, 1 : memref<?x?xf32>
   %K = dim %A, 1 : memref<?x?xf32>
   affine.parallel (%i, %j, %k) = (0, 0, 0) to (%M, %N, %K) step (2, 2, 2) {
-    %a_view = subview %A[%i, %k][][] : memref<?x?xf32> to memref<2x2xf32, offset: ?, strides: [?, ?]>
-    %b_view = subview %B[%k, %j][][] : memref<?x?xf32> to memref<2x2xf32, offset: ?, strides: [?, ?]>
-    %c_view = subview %C[%i, %j][][] : memref<?x?xf32> to memref<2x2xf32, offset: ?, strides: [?, ?]>
-    %a_ref = memref_cast %a_view : memref<2x2xf32, offset: ?, strides: [?, ?]> to memref<*xf32>
-    %b_ref = memref_cast %b_view : memref<2x2xf32, offset: ?, strides: [?, ?]> to memref<*xf32>
-    %c_ref = memref_cast %c_view : memref<2x2xf32, offset: ?, strides: [?, ?]> to memref<*xf32>
+    %a_view = subview %A[%i, %k][2, 2][1, 1] :
+      memref<?x?xf32> to memref<2x2xf32, offset: ?, strides: [?, 1]>
+    %b_view = subview %B[%k, %j][2, 2][1, 1] :
+      memref<?x?xf32> to memref<2x2xf32, offset: ?, strides: [?, 1]>
+    %c_view = subview %C[%i, %j][2, 2][1, 1] :
+      memref<?x?xf32> to memref<2x2xf32, offset: ?, strides: [?, 1]>
+    %a_ref = memref_cast %a_view : memref<2x2xf32, offset: ?, strides: [?, 1]> to memref<*xf32>
+    %b_ref = memref_cast %b_view : memref<2x2xf32, offset: ?, strides: [?, 1]> to memref<*xf32>
+    %c_ref = memref_cast %c_view : memref<2x2xf32, offset: ?, strides: [?, 1]> to memref<*xf32>
     call @plaidml_rt_xsmm_gemm_f32(%a_ref, %b_ref, %c_ref, %lda, %ldb, %ldc, %tile_m, %tile_n, %tile_k)
       : (memref<*xf32>, memref<*xf32>, memref<*xf32>, i32, i32, i32, i32, i32, i32) -> ()
   }
@@ -290,7 +294,7 @@ func @conv2_xsmm_op(%I: !I_memref, %K: !K_memref, %O: !O_memref) {
   %CO = dim %O, 3 : !O_memref
   %c0 = constant 0 : index
   affine.parallel (%x, %y) = (0, 0) to (%X, %Y) step (2, 1) {
-    xsmm.gemm %O[%c0, %x, %y, %c0]:#O_tile = %I[%c0, %x, %y, %c0]:#I_tile, %K[%c0, %c0, %c0, %c0]:#K_tile, [11, 2, 7]
+    xsmm.gemm %O[%c0, %x, %y, %c0]:#O_tile = %I[%c0, %x, %y, %c0]:#I_tile, %K[%c0, %c0, %c0, %c0]:#K_tile, [2, 11, 7]
       : !O_memref, !I_memref, !K_memref
   }
   return
@@ -303,20 +307,23 @@ func @conv2_xsmm_call(%I: !I_memref, %K: !K_memref, %O: !O_memref) {
   %c0 = constant 0 : index
   %X = dim %I, 1 : !I_memref
   %Y = dim %I, 2 : !I_memref
-  %m = constant 11 : i32
-  %n = constant 2 : i32
+  %m = constant 2 : i32
+  %n = constant 11 : i32
   %k = constant 7 : i32
   %lda = constant 35 : i32
   %ldb = constant 11 : i32
   %ldc = constant 55 : i32
   affine.parallel (%x, %y) = (0, 0) to (%X, %Y) step (2, 1) {
     // xsmm.gemm %O[%c0, %x, %y, %c0] = %K[%c0, %c0, %c0, %c0], %I[%c0, %x, %y, %c0], [co:11, x:2, ci:7]
-    %I_view = subview %I[%c0,  %x,  %y, %c0][][] : !I_memref to memref<1x2x1x7xf32, offset: ?, strides: [?, ?, ?, ?]>
-    %K_view = subview %K[%c0, %c0, %c0, %c0][][] : !K_memref to memref<1x1x7x11xf32, offset: ?, strides: [?, ?, ?, ?]>
-    %O_view = subview %O[%c0,  %x,  %y, %c0][][] : !O_memref to memref<1x2x1x11xf32, offset: ?, strides: [?, ?, ?, ?]>
-    %I_ref = memref_cast %I_view : memref<1x2x1x7xf32, offset: ?, strides: [?, ?, ?, ?]> to memref<*xf32>
-    %K_ref = memref_cast %K_view : memref<1x1x7x11xf32, offset: ?, strides: [?, ?, ?, ?]> to memref<*xf32>
-    %O_ref = memref_cast %O_view : memref<1x2x1x11xf32, offset: ?, strides: [?, ?, ?, ?]> to memref<*xf32>
+    %I_view = subview %I[%c0,  %x,  %y, %c0][1, 2, 1, 7][1, 1, 1, 1] :
+      !I_memref to memref<1x2x1x7xf32, offset: ?, strides: [210, 35, 7, 1]>
+    %K_view = subview %K[%c0, %c0, %c0, %c0][1, 1, 7, 11][1, 1, 1, 1] :
+      !K_memref to memref<1x1x7x11xf32, offset: ?, strides: [77, 77, 11, 1]>
+    %O_view = subview %O[%c0,  %x,  %y, %c0][1, 2, 1, 11][1, 1, 1, 1] :
+      !O_memref to memref<1x2x1x11xf32, offset: ?, strides: [330, 55, 11, 1]>
+    %I_ref = memref_cast %I_view : memref<1x2x1x7xf32, offset: ?, strides: [210, 35, 7, 1]> to memref<*xf32>
+    %K_ref = memref_cast %K_view : memref<1x1x7x11xf32, offset: ?, strides: [77, 77, 11, 1]> to memref<*xf32>
+    %O_ref = memref_cast %O_view : memref<1x2x1x11xf32, offset: ?, strides: [330, 55, 11, 1]> to memref<*xf32>
     call @plaidml_rt_xsmm_gemm_f32(%I_ref, %K_ref, %O_ref, %lda, %ldb, %ldc, %m, %n, %k)
       : (memref<*xf32>, memref<*xf32>, memref<*xf32>, i32, i32, i32, i32, i32, i32) -> ()
   }

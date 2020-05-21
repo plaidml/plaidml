@@ -43,7 +43,7 @@ LogicalResult verifyFPToSIOp(FPToSIOp op) {
                                        << resType << " are cast incompatible";
 }
 
-static void buildFPToSIOp(Builder *builder, OperationState &result,
+static void buildFPToSIOp(OpBuilder &builder, OperationState &result,
                           Value source, Type destType) {
   result.addOperands(source);
   result.addTypes(destType);
@@ -80,7 +80,7 @@ LogicalResult verifyFPToUIOp(FPToUIOp op) {
                                        << resType << " are cast incompatible";
 }
 
-static void buildFPToUIOp(Builder *builder, OperationState &result,
+static void buildFPToUIOp(OpBuilder &builder, OperationState &result,
                           Value source, Type destType) {
   result.addOperands(source);
   result.addTypes(destType);
