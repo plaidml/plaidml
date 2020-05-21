@@ -130,7 +130,7 @@ public:
   operator Value() { return desc; }
 
 private:
-  OpBuilder &rewriter() { return edsc::ScopedContext::getBuilder(); }
+  OpBuilder &rewriter() { return edsc::ScopedContext::getBuilderRef(); }
   Location loc() { return edsc::ScopedContext::getLocation(); }
 
   MemRefDescriptor desc;
