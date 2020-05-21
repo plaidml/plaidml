@@ -1,9 +1,9 @@
-# Copyright 2019 Intel Corporation.
-
-package(default_visibility = ["//visibility:public"])
+# Copyright 2020 Intel Corporation
 
 load("//vendor/mlir:tblgen.bzl", "COPTS", "gentbl")
 load("//bzl:plaidml.bzl", "plaidml_cc_library")
+
+package(default_visibility = ["//visibility:public"])
 
 filegroup(
     name = "enums-td",
@@ -64,7 +64,6 @@ plaidml_cc_library(
         ":enums-gen",
         ":interfaces-gen",
         "@easylogging",
-        "@gflags",
         "@llvm-project//llvm:support",
         "@llvm-project//mlir:IR",
     ],
@@ -74,4 +73,11 @@ plaidml_cc_library(
     name = "env",
     srcs = ["env.cc"],
     hdrs = ["env.h"],
+)
+
+plaidml_cc_library(
+    name = "logging",
+    srcs = ["logging.cc"],
+    hdrs = ["logging.h"],
+    deps = ["@easylogging"],
 )

@@ -1,14 +1,11 @@
-#include <gflags/gflags.h>
-#include <gtest/gtest.h>
-
 #include <cstdlib>
 
-#include "pmlc/util/logging.h"
+#include "gflags/gflags.h"
+#include "gtest/gtest.h"
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
   gflags::SetUsageMessage(argv[0]);
   testing::InitGoogleTest(&argc, argv);
-  START_EASYLOGGINGPP(argc, argv);
 
   gflags::ParseCommandLineFlags(&argc, &argv, true);
 
@@ -19,7 +16,7 @@ int main(int argc, char *argv[]) {
 
   try {
     return RUN_ALL_TESTS();
-  } catch (const std::exception &ex) {
+  } catch (const std::exception& ex) {
     std::cerr << "Caught unhandled exception: " << ex.what() << std::endl;
     return EXIT_FAILURE;
   } catch (...) {

@@ -1,10 +1,9 @@
-# Copyright 2019 Intel Corporation.
+# Copyright 2020 Intel Corporation
 
-load("@rules_pkg//:pkg.bzl", "pkg_tar")
+load("@rules_python//python:defs.bzl", "py_library", "py_test")
 load(
     "//bzl:plaidml.bzl",
     "plaidml_cc_library",
-    "plaidml_cc_test",
     "plaidml_cc_version",
     "plaidml_py_version",
 )
@@ -78,5 +77,6 @@ py_test(
     deps = [
         ":py",
         "//plaidml:py",
+        "//plaidml/edsl:py",
     ],
 )
