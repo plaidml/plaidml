@@ -15,7 +15,7 @@ IE_SUPPRESS_DEPRECATED_START
 
 static OpRegistration reg("relu", [](const Context& ctx) {
   auto* layer = dynamic_cast<ReLULayer*>(ctx.layer);
-  assert(ctx.operands.size() == 1);
+  IE_ASSERT(ctx.operands.size() == 1);
   auto I = ctx.operands.at(0);
   edsl::Tensor alpha(layer->negative_slope);
   return edsl::make_tuple(op::relu(I).alpha(alpha));

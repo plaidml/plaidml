@@ -45,7 +45,7 @@ PlaidMLExecutableNetwork::PlaidMLExecutableNetwork(const ICNNNetwork& network, c
     IVLOG(1, "  " << layer->type << ": " << layer->name);
     if (layer->type == "Input") {
       auto it = inputMap.find(layer->name);
-      assert(it != inputMap.end() && "Missing info for Input layer");
+      IE_ASSERT(it != inputMap.end());
       const auto& desc = it->second->getTensorDesc();
       auto tensor = edsl::Placeholder(to_plaidml(desc));
       tensorMap_[layer->name] = tensor;
