@@ -1,11 +1,12 @@
 // RUN: pmlc-opt -canonicalize %s | FileCheck %s
 
 // CHECK-LABEL: @basic
+// CHECK-SAME: %[[arg0:.*]]: tensor<4x4xsi32>
+// CHECK-NEXT: return %[[arg0]]
 func @basic(%arg0: tensor<4x4xsi32>) -> tensor<4x4xsi32> {
   %c4 = tile.constant 4
   %0 = "tile.reshape"(%arg0, %c4, %c4) : (tensor<4x4xsi32>, index, index) -> tensor<4x4xsi32>
   return %0 : tensor<4x4xsi32>
-  // CHECK-NEXT: return %arg0
 }
 
 // CHECK-LABEL: @no_folding

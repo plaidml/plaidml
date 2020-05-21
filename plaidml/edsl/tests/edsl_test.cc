@@ -884,7 +884,8 @@ TEST_F(CppEdsl, ReshapeFold) {
   // clang-format off
   // CHECK-LABEL: CppEdsl.ReshapeFold
   // CHECK: func @reshape_fold(%arg0: tensor<3x3xsi32>) -> tensor<3x3xsi32> {
-  // CHECK: return %arg0 : tensor<3x3xsi32>
+  // CHECK-SAME: %[[arg0:.*]]: tensor<4x4xsi32>
+  // CHECK-NEXT: return %[[arg0]]
   // clang-format on
   std::vector<int32_t> input = {
       1, 2, 3,  //

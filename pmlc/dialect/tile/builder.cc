@@ -769,6 +769,10 @@ TileBuilder::MakeProgram(StringRef name, const ProgramMutations &mutations,
   for (unsigned i = 0; i < returnOp.getNumOperands(); i++) {
     auto userValue = outputs[i];
     auto finalValue = returnOp.getOperand(i);
+    if (!finalValue.getDefiningOp()) {
+      IVLOG(2, "reached condition where return operand has no defining op");
+      userValue = MakePrimitiveOp("ident", {outputs[i]});
+    }
     auto itUpdate = impl->implicitUpdates.find(outputs[i]);
     if (itUpdate != impl->implicitUpdates.end()) {
       userValue = itUpdate->second;

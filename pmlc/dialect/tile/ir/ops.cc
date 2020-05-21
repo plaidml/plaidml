@@ -685,7 +685,7 @@ OpFoldResult ReshapeOp::fold(ArrayRef<Attribute> operands) {
   IVLOG(5, "ReshapeOp::fold");
   // reshape(x, x.shape) -> x
   if (tensor().getType() == getType()) {
-    return getOperand(0);
+    return tensor();
   }
   return {};
 }
