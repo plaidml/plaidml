@@ -196,7 +196,7 @@ static Value createCastOp(OpBuilder &builder, Location loc, Value from,
     if (auto fromFloatType = fromType.dyn_cast<FloatType>()) {
       if (intoSigned) {
         // FPToSIOp: FloatType -> signed IntegerType
-        return builder.create<stdx::FPToSIOp>(loc, from, intoType).getResult();
+        return builder.create<mlir::FPToSIOp>(loc, from, intoType).getResult();
       } else {
         // FPToUIOp: FloatType -> unsigned IntegerType
         return builder.create<stdx::FPToUIOp>(loc, from, intoType).getResult();
