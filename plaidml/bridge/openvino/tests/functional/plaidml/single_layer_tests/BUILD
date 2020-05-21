@@ -1,4 +1,5 @@
 load("@rules_cc//cc:defs.bzl", "cc_test")
+load("//bzl:plaidml.bzl", "PLAIDML_LINKOPTS")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -12,9 +13,10 @@ cc_test(
     srcs = glob(["*.cpp"]),
     copts = ["-Wno-deprecated-declarations"],
     data = [
+        "//plaidml/bridge/openvino:libplaidml-plugin.so",
         "//plaidml/bridge/openvino:plugins",
-        "//plaidml/bridge/openvino:shlib",
     ],
+    linkopts = PLAIDML_LINKOPTS,
     tags = TAGS,
     deps = [
         "//pmlc/util:logging",

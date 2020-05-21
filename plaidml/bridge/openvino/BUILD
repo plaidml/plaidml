@@ -1,7 +1,13 @@
 load("@bazel_skylib//rules:write_file.bzl", "write_file")
-load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_shlib")
+load("@rules_cc//cc:defs.bzl", "cc_binary")
+load("//bzl:plaidml.bzl", "PLAIDML_LINKOPTS", "plaidml_cc_library")
 
 package(default_visibility = ["//visibility:public"])
+
+TAGS = [
+    "skip_macos",
+    "skip_windows",
+]
 
 plaidml_cc_library(
     name = "lib",
@@ -12,6 +18,7 @@ plaidml_cc_library(
     hdrs = glob(["include/plaidml/*.hpp"]),
     copts = ["-Wno-pessimizing-move"],
     includes = ["src/plaidml_plugin"],
+    tags = TAGS,
     deps = [
         "//plaidml",
         "@openvino//:inference_engine",
@@ -19,9 +26,11 @@ plaidml_cc_library(
     alwayslink = 1,
 )
 
-plaidml_cc_shlib(
-    name = "shlib",
-    shlib_name = "plaidml-plugin",
+cc_binary(
+    name = "libplaidml-plugin.so",
+    linkopts = PLAIDML_LINKOPTS,
+    linkshared = 1,
+    tags = TAGS,
     deps = [":lib"],
 )
 

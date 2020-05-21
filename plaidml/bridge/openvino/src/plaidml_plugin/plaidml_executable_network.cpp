@@ -66,7 +66,7 @@ PlaidMLExecutableNetwork::PlaidMLExecutableNetwork(const ICNNNetwork& network, c
     }
     auto value = op(ctx);
     auto tuple = value.as_tuple();
-    assert(tuple.size() == layer->outData.size() && "Op results count mismatch");
+    IE_ASSERT(tuple.size() == layer->outData.size());
     for (unsigned i = 0; i < tuple.size(); i++) {
       auto tensor = tuple.at(i).as_tensor();
       const auto& name = layer->outData.at(i)->getName();
