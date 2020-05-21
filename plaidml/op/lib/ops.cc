@@ -125,34 +125,82 @@ T validate(int raw) {
   return static_cast<T>(raw);
 }
 
-std::string to_string(AutoPadMode m) {
-  switch (m) {
-    case AutoPadMode::NONE:
-      return "none";
-    case AutoPadMode::SAME_LOWER:
-      return "same_lower";
-    case AutoPadMode::SAME_UPPER:
-      return "same_upper";
-    case AutoPadMode::VALID:
-      return "valid";
+std::string to_string(AutoGroupMode mode) {
+  switch (mode) {
+    case AutoGroupMode::UNGROUPED:
+      return "AutoGroupMode::UNGROUPED";
+    case AutoGroupMode::EXPLICIT:
+      return "AutoGroupMode::EXPLICIT";
+    case AutoGroupMode::AUTO:
+      return "AutoGroupMode::AUTO";
+    case AutoGroupMode::DEPTHWISE:
+      return "AutoGroupMode::DEPTHWISE";
     default:
-      throw std::runtime_error("Unable to convert autopadding mode to string due to unrecognized mode");
+      return "<<UNRECOGNIZED AutoGroupMode>>";
   }
 }
 
-std::string to_string(GroupLayout l) {
-  switch (l) {
-    case GroupLayout::IN_C:
-      return "in_C";
-    case GroupLayout::IN_K:
-      return "in_K";
-    case GroupLayout::NONE:
-      return "none";
-    case GroupLayout::SEPARATE:
-      return "separate";
+std::ostream& operator<<(std::ostream& os, const AutoGroupMode& mode) {
+  os << to_string(mode);
+  return os;
+}
+
+std::string to_string(AutoPadMode mode) {
+  switch (mode) {
+    case AutoPadMode::NONE:
+      return "AutoPadMode::NONE (a.k.a. EXPLICIT)";
+    case AutoPadMode::SAME_LOWER:
+      return "AutoPadMode::SAME_LOWER";
+    case AutoPadMode::SAME_UPPER:
+      return "AutoPadMode::SAME_UPPER";
+    case AutoPadMode::VALID:
+      return "AutoPadMode::VALID";
     default:
-      throw std::runtime_error("Unable to convert group layout to string due to unrecognized layout");
+      return "<<UNRECOGNIZED AutoPadMode>>";
   }
+}
+
+std::ostream& operator<<(std::ostream& os, const AutoPadMode& mode) {
+  os << to_string(mode);
+  return os;
+}
+
+std::string to_string(ConvDerivMode mode) {
+  switch (mode) {
+    case ConvDerivMode::NONE:
+      return "ConvDerivMode::NONE";
+    case ConvDerivMode::DATA:
+      return "ConvDerivMode::DATA";
+    case ConvDerivMode::FILTER:
+      return "ConvDerivMode::FILTER";
+    default:
+      return "<<UNRECOGNIZED ConvDerivMode>>";
+  }
+}
+
+std::ostream& operator<<(std::ostream& os, const ConvDerivMode& mode) {
+  os << to_string(mode);
+  return os;
+}
+
+std::string to_string(GroupLayout mode) {
+  switch (mode) {
+    case GroupLayout::NONE:
+      return "GroupLayout::NONE";
+    case GroupLayout::SEPARATE:
+      return "GroupLayout::SEPARATE";
+    case GroupLayout::IN_C:
+      return "GroupLayout::IN_C";
+    case GroupLayout::IN_K:
+      return "GroupLayout::IN_K";
+    default:
+      return "<<UNRECOGNIZED GroupLayout>>";
+  }
+}
+
+std::ostream& operator<<(std::ostream& os, const GroupLayout& mode) {
+  os << to_string(mode);
+  return os;
 }
 
 // TODO: Enable when needed
@@ -185,23 +233,28 @@ size_t nonspatial_dims(TensorLayout layout) {
   }
 }
 
-std::string to_string(TensorLayout m) {
-  switch (m) {
+std::string to_string(TensorLayout mode) {
+  switch (mode) {
     case TensorLayout::NXC:
-      return "NXC";
+      return "TensorLayout::NXC";
     case TensorLayout::NCX:
-      return "NCX";
+      return "TensorLayout::NCX";
     case TensorLayout::KCX:
-      return "KCX";
+      return "TensorLayout::KCX";
     case TensorLayout::XCK:
-      return "XCK";
+      return "TensorLayout::XCK";
     case TensorLayout::GKCX:
-      return "GKCX";
+      return "TensorLayout::GKCX";
     case TensorLayout::XGCK:
-      return "XGCK";
+      return "TensorLayout::XGCK";
     default:
-      throw std::runtime_error("Unable to convert tensor layout to string due to unrecognized layout");
+      return "<<UNRECOGNIZED TensorLayout>>";
   }
+}
+
+std::ostream& operator<<(std::ostream& os, const TensorLayout& mode) {
+  os << to_string(mode);
+  return os;
 }
 
 bool is_input_layout(TensorLayout layout) {  //
@@ -215,69 +268,6 @@ bool is_filter_layout(TensorLayout layout) {
 
 bool is_filter_layout_with_separate_groups(TensorLayout layout) {
   return (layout == TensorLayout::GKCX || layout == TensorLayout::XGCK);
-}
-
-void normalize_grouping_strategy(int64_t* groups, AutoGroupMode* autogroup_mode, GroupLayout* group_layout) {
-  // This normalization enforces:
-  //  * If group_layout is NONE:
-  //      - autogroup_mode is UNGROUPED
-  //        (AUTO is converted to UNGROUPED, as is EXPLICIT if groups == 1)
-  //        (DEPTHWISE throws, as does EXPLICIT if groups != 1)
-  //      - groups is 1
-  //        (If non-1, it is converted after autogroup_mode conversion succeeds)
-  //  * If autogroup_mode is UNGROUPED:
-  //      - groups is 1
-  //        (If non-1, it throws)
-  //      - group_layout allowed to vary
-  //  * If autogroup_mode is EXPLICIT:
-  //      - groups is > 1
-  //        (If < 1, throw; if == 1, autogroup_mode is converted to UNGROUPED)
-  //      - group_layout is allowed to vary, but may not be NONE
-  //        (If group_layout is NONE and groups != 1, this throws (see above))
-  //        (If group_layout is NONE and groupd == 1, autogroup_mode is converted to UNGROUPED (see above))
-  //  * If autogroup_mode is AUTO:
-  //      - groups is to be ignored
-  //      - group_layout is SEPARATE or IN_K
-  //        (throws if group_layout is IN_C)
-  //        (if group_layout is NONE, autogroup_mode is converted to UNGROUPED (see above))
-  //  * If autogroup_mode is DEPTHWISE:
-  //      - groups is to be ignored
-  //      - group_layout is not NONE
-  switch (*autogroup_mode) {
-    case AutoGroupMode::UNGROUPED:
-      if (*groups != 1) {
-        throw std::runtime_error("Convolution AutoGroupMode::UNGROUPED requires groups == 1");
-      }
-      break;
-    case AutoGroupMode::AUTO:
-      if (*group_layout == GroupLayout::NONE) {
-        *groups = 1;
-        *autogroup_mode = AutoGroupMode::UNGROUPED;
-      }
-      if (*group_layout == GroupLayout::IN_C) {
-        // TODO: This and related cases may depend on the deriv_mode; take that into account
-        throw std::runtime_error("Cannot automatically detect group size of convolution with IN_C GroupLayout");
-      }
-      break;
-    case AutoGroupMode::EXPLICIT:
-      if (*groups < 1) {
-        throw std::runtime_error("Requested grouped convolution with fewer than 1 groups");
-      }
-      if (*groups == 1) {
-        *autogroup_mode = AutoGroupMode::UNGROUPED;
-      }
-      if (*group_layout == GroupLayout::NONE && *groups != 1) {
-        throw std::runtime_error("GroupLayout not specified for grouped convolution");
-      }
-      break;
-    case AutoGroupMode::DEPTHWISE:
-      if (*group_layout == GroupLayout::NONE) {
-        throw std::runtime_error("Convolution GroupLayout must be specified to use DEPTHWISE AutoGroupMode");
-      }
-      break;
-    default:
-      throw std::runtime_error("Unrecognized AutoGroupMode");
-  }
 }
 
 size_t normalize_axis(int64_t axis, size_t ndims, std::string op_name = "") {
@@ -562,6 +552,212 @@ Value concatenate(const Value& value) {
   return Value{final_result};
 }
 
+namespace {
+// Convolution helper functions
+
+size_t compute_conv_rank_validating_strides(std::vector<int64_t>* strides, const Tensor& I_or_O,
+                                            TensorLayout input_layout) {
+  // As a side effect of computing the spatial_rank, this fills in the default 1s to strides if it's empty
+  size_t spatial_rank = strides->size();
+  if (spatial_rank == 0) {
+    // We are probably* being asked to infer a default strides value using the spatial rank from the tensors. So examine
+    // the `I_or_O` tensor rank and reconstruct `strides`.
+    // (*: It's also possible that we're dealing with a rank 0 conv, but the inferred strides will be unchanged in that
+    // case anyway, so this is safe.)
+    // If we ever extend possible layouts so that I and O may have different layouts, we will need to do this check in
+    // different ways depending on whether deriv_mode is DATA or not
+
+    // Infer spatial rank from input/output tensor rank
+    spatial_rank = I_or_O.rank() - nonspatial_dims(input_layout);
+    for (size_t i = 0; i < spatial_rank; i++) {
+      strides->push_back(1);
+    }
+  }
+  return spatial_rank;
+}
+
+void validate_conv_padding(const std::vector<int64_t>& manual_padding, AutoPadMode autopad_mode,
+                           std::stringstream& args_log) {
+  if (!manual_padding.empty() && autopad_mode != AutoPadMode::NONE) {
+    IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+    throw std::runtime_error("Autopadding and manual padding both requested for single conv operation");
+  }
+}
+
+void validate_conv_dilations_rank(size_t spatial_rank, std::vector<int64_t>* dilations, std::stringstream& args_log) {
+  // Verifies dilations rank and loads default value (all 1s) if dilations empty
+  if (dilations->empty()) {
+    // We're being asked to infer a default value for dilations
+    for (size_t i = 0; i < spatial_rank; i++) {
+      dilations->push_back(1);
+    }
+  } else if (dilations->size() != spatial_rank) {
+    IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+    throw std::runtime_error(
+        llvm::formatv("Inconsistent spatial rank in conv op (expecting rank {0}, received {1}D dilations)",
+                      spatial_rank, dilations->size()));
+  }
+}
+
+void validate_conv_data_dilations_rank(size_t spatial_rank, std::vector<int64_t>* data_dilations,
+                                       std::stringstream& args_log) {
+  if (data_dilations->empty()) {
+    // We're being asked to infer a default value for data_dilations
+    for (size_t i = 0; i < spatial_rank; i++) {
+      data_dilations->push_back(1);
+    }
+  } else if (data_dilations->size() != spatial_rank) {
+    IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+    throw std::runtime_error(
+        llvm::formatv("Inconsistent spatial rank in conv op (expecting rank {0}, received {1}D data_dilations)",
+                      spatial_rank, data_dilations->size()));
+  }
+}
+
+void validate_conv_input_layout(TensorLayout input_layout, std::stringstream& args_log) {
+  if (!is_input_layout(input_layout)) {
+    IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+    throw std::runtime_error("Input tensor layout requested in conv op does not apply to convolution input tensors");
+  }
+}
+
+void validate_conv_filter_layout(TensorLayout filter_layout, std::stringstream& args_log) {
+  if (!is_filter_layout(filter_layout)) {
+    IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+    throw std::runtime_error("Filter tensor layout requested in conv op does not apply to convolution filter tensors");
+  }
+}
+
+void validate_conv_input_rank(size_t const spatial_rank, const Tensor& I, TensorLayout input_layout,
+                              ConvDerivMode deriv_mode, std::stringstream& args_log) {
+  if (deriv_mode != ConvDerivMode::DATA && I.rank() - spatial_rank != nonspatial_dims(input_layout)) {
+    // If we ever extend possible layouts so that I and O may have different layouts, we will
+    // need to do this check in different ways depending on whether deriv_mode is DATA or not
+    IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+    throw std::runtime_error(llvm::formatv(
+        "Inconsistent spatial rank in conv op (expected spatial rank {0} but input tensor has {1} dimensions, and thus "
+        "{2} spatial dims). (This error can also occur if the layout of I is incorrectly specified or interpreted.)",
+        spatial_rank, I.rank(), (I.rank() - nonspatial_dims(input_layout))));
+  }
+}
+
+void validate_conv_filter_rank(size_t spatial_rank, const Tensor& F, TensorLayout filter_layout,
+                               ConvDerivMode deriv_mode, std::stringstream& args_log) {
+  if (deriv_mode != ConvDerivMode::FILTER && F.rank() - spatial_rank != nonspatial_dims(filter_layout)) {
+    IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+    throw std::runtime_error(
+        llvm::formatv("Inconsistent spatial rank in conv op (expected spatial rank {0} but filter tensor has {1} "
+                      "dimensions, and thus {2} spatial dims). (This error can also occur if the layout of F is "
+                      "incorrectly specified or interpreted.)",
+                      spatial_rank, F.rank(), (F.rank() - nonspatial_dims(filter_layout))));
+  }
+}
+
+void validate_conv_filter_shape_rank(size_t spatial_rank, std::vector<int64_t> filter_shape,
+                                     std::stringstream& args_log) {
+  if (filter_shape.size() && (filter_shape.size() != spatial_rank)) {
+    IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+    throw std::runtime_error(
+        llvm::formatv("Filter shape manually specified with inconsistent rank (expected spatial rank {0} but "
+                      "filter_shape has {1} dimensions)",
+                      spatial_rank, filter_shape.size()));
+  }
+}
+
+void validate_conv_group_layout(TensorLayout filter_layout, GroupLayout group_layout, std::stringstream& args_log) {
+  if (is_filter_layout_with_separate_groups(filter_layout) && group_layout != GroupLayout::SEPARATE) {
+    IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+    throw std::runtime_error("Filter_layout specifies separate groups but group_layout isn't SEPARATE");
+  }
+  if (!is_filter_layout_with_separate_groups(filter_layout) && group_layout == GroupLayout::SEPARATE) {
+    IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+    throw std::runtime_error("Filter_layout lacks separate groups but group_layout is SEPARATE");
+  }
+}
+
+void validate_conv_result_shape(size_t spatial_rank, const std::vector<int64_t>& result_shape, ConvDerivMode deriv_mode,
+                                std::stringstream& args_log) {
+  if (result_shape.empty()) {
+    if (deriv_mode != ConvDerivMode::NONE) {
+      IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+      throw std::runtime_error("Transposed/gradient convolutions require specifying the result_shape");
+    }
+  } else {
+    if (result_shape.size() != spatial_rank) {
+      IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+      throw std::runtime_error(
+          llvm::formatv("Inconsistent spatial rank in conv op (received {0} spatial dimensions based on strides "
+                        "but result shape has {1} spatial dims).",
+                        spatial_rank, result_shape.size()));
+    }
+  }
+}
+
+void normalize_grouping_strategy(int64_t* groups, AutoGroupMode* autogroup_mode, GroupLayout* group_layout) {
+  // This normalization enforces:
+  //  * If group_layout is NONE:
+  //      - autogroup_mode is UNGROUPED
+  //        (AUTO is converted to UNGROUPED, as is EXPLICIT if groups == 1)
+  //        (DEPTHWISE throws, as does EXPLICIT if groups != 1)
+  //      - groups is 1
+  //        (If non-1, it is converted after autogroup_mode conversion succeeds)
+  //  * If autogroup_mode is UNGROUPED:
+  //      - groups is 1
+  //        (If non-1, it throws)
+  //      - group_layout allowed to vary
+  //  * If autogroup_mode is EXPLICIT:
+  //      - groups is > 1
+  //        (If < 1, throw; if == 1, autogroup_mode is converted to UNGROUPED)
+  //      - group_layout is allowed to vary, but may not be NONE
+  //        (If group_layout is NONE and groups != 1, this throws (see above))
+  //        (If group_layout is NONE and groupd == 1, autogroup_mode is converted to UNGROUPED (see above))
+  //  * If autogroup_mode is AUTO:
+  //      - groups is to be ignored
+  //      - group_layout is SEPARATE or IN_K
+  //        (throws if group_layout is IN_C)
+  //        (if group_layout is NONE, autogroup_mode is converted to UNGROUPED (see above))
+  //  * If autogroup_mode is DEPTHWISE:
+  //      - groups is to be ignored
+  //      - group_layout is not NONE
+  switch (*autogroup_mode) {
+    case AutoGroupMode::UNGROUPED:
+      if (*groups != 1) {
+        throw std::runtime_error("Convolution AutoGroupMode::UNGROUPED requires groups == 1");
+      }
+      break;
+    case AutoGroupMode::AUTO:
+      if (*group_layout == GroupLayout::NONE) {
+        *groups = 1;
+        *autogroup_mode = AutoGroupMode::UNGROUPED;
+      }
+      if (*group_layout == GroupLayout::IN_C) {
+        // TODO: This and related cases may depend on the deriv_mode; take that into account
+        throw std::runtime_error("Cannot automatically detect group size of convolution with IN_C GroupLayout");
+      }
+      break;
+    case AutoGroupMode::EXPLICIT:
+      if (*groups < 1) {
+        throw std::runtime_error("Requested grouped convolution with fewer than 1 groups");
+      }
+      if (*groups == 1) {
+        *autogroup_mode = AutoGroupMode::UNGROUPED;
+      }
+      if (*group_layout == GroupLayout::NONE && *groups != 1) {
+        throw std::runtime_error("GroupLayout not specified for grouped convolution");
+      }
+      break;
+    case AutoGroupMode::DEPTHWISE:
+      if (*group_layout == GroupLayout::NONE) {
+        throw std::runtime_error("Convolution GroupLayout must be specified to use DEPTHWISE AutoGroupMode");
+      }
+      break;
+    default:
+      throw std::runtime_error("Unrecognized AutoGroupMode");
+  }
+}
+
+}  // namespace
+
 Value convolution(const Value& value) {
   IVLOG(1, "convolution");
   // Parameters:
@@ -601,16 +797,38 @@ Value convolution(const Value& value) {
   auto input_layout = validate<TensorLayout>(args[9].as_int());
   auto filter_layout = validate<TensorLayout>(args[10].as_int());
   auto group_layout = validate<GroupLayout>(args[11].as_int());
-  // auto winograd_allowed = args[12].as_bool();  // TODO: Implement Winograd
+  auto winograd_allowed = args[12].as_bool();  // TODO: Implement Winograd
   auto name = args[13].as_str();
   auto autogroup_mode = validate<AutoGroupMode>(args[14].as_int());
   auto deriv_mode = validate<ConvDerivMode>(args[15].as_int());
   auto result_shape = args[16].as_int_tuple();
 
-  Tensor I;       // Inputs (i.e. Data) tensor
-  Tensor F;       // Filters (i.e. Weights i.e. Kernel) tensor
-  Tensor O;       // Output (i.e. of a forward pass) tensor
-  Tensor Result;  // The tensor that is actually returned, depends on deriv_mode
+  // Construct a string to log the arguments if something throws
+  std::stringstream args_log;
+  if (VLOG_IS_ON(1)) {
+    args_log << "  Input Tensor: " << I_or_O << "\n";
+    args_log << "  Filter Tensor: " << F_or_O << "\n";
+    args_log << "  Strides: " << std::to_string(strides) << "\n";
+    args_log << "  Dilations: " << std::to_string(dilations) << "\n";
+    args_log << "  Data Dilations: " << std::to_string(data_dilations) << "\n";
+    args_log << "  Filter Shape (optional): " << std::to_string(filter_shape) << "\n";
+    args_log << "  Number of Groups (1 if not grouped): " << groups << "\n";
+    args_log << "  Autopadding Mode: " << autopad_mode << "\n";
+    args_log << "  Manual Padding (if used): " << std::to_string(manual_padding) << "\n";
+    args_log << "  Input Layout: " << input_layout << "\n";
+    args_log << "  Filter Layout: " << filter_layout << "\n";
+    args_log << "  Group Layout: " << group_layout << "\n";
+    args_log << "  Winograd Permitted?: " << winograd_allowed << "\n";
+    args_log << "  Name: " << name << "\n";
+    args_log << "  Autogroup Mode: " << autogroup_mode << "\n";
+    args_log << "  Derivative Mode: " << deriv_mode << "\n";
+    args_log << "  Result Shape (for transposed/differentiated convs): " << std::to_string(result_shape);
+  }
+  IVLOG(3, "Requesting convolution with args:\n" << args_log.str());
+
+  Tensor I;  // Inputs (i.e. Data) tensor
+  Tensor F;  // Filters (i.e. Weights i.e. Kernel) tensor
+  Tensor O;  // Output (i.e. of a forward pass) tensor
 
   // Connect the inputs to the right names
   switch (deriv_mode) {
@@ -627,74 +845,24 @@ Value convolution(const Value& value) {
       O = F_or_O;
       break;
     default:
+      IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
       throw std::runtime_error("Invalid ConvDerivMode");
   }
 
-  // Initialize useful values
-  auto spatial_rank = strides.size();
+  // Determine the number of spatial dimensions
+  auto spatial_rank = compute_conv_rank_validating_strides(&strides, I_or_O, input_layout);
 
-  // Verify inputs are consistent
-  if (manual_padding.size() && autopad_mode != AutoPadMode::NONE) {
-    throw std::runtime_error("Autopadding and manual padding both requested for single conv operation");
-  }
-  if (dilations.size() != spatial_rank) {
-    throw std::runtime_error(
-        llvm::formatv("Inconsistent spatial rank in conv op (received {0}D strides and {1}D dilations)", strides.size(),
-                      dilations.size()));
-  }
-  if (data_dilations.size() != spatial_rank) {
-    throw std::runtime_error(
-        llvm::formatv("Inconsistent spatial rank in conv op (received {0}D strides and {1}D data_dilations)",
-                      strides.size(), data_dilations.size()));
-  }
-  if (!is_input_layout(input_layout)) {
-    throw std::runtime_error("Input tensor layout requested in conv op does not apply to convolution input tensors");
-  }
-  if (!is_filter_layout(filter_layout)) {
-    throw std::runtime_error("Filter tensor layout requested in conv op does not apply to convolution filter tensors");
-  }
-  if (deriv_mode != ConvDerivMode::DATA && I.rank() - spatial_rank != nonspatial_dims(input_layout)) {
-    // If we ever extend possible layouts so that I and O may have different layouts, we will
-    // need to do this check in different ways depending on whether deriv_mode is DATA or not
-    throw std::runtime_error(
-        llvm::formatv("Inconsistent spatial rank in conv op (received {0} spatial dimensions based on strides but "
-                      "input tensor has {1} dimensions, and thus {2} spatial dims). (This error can also occur if "
-                      "the layout of I is incorrectly specified or interpreted.)",
-                      spatial_rank, I.rank(), (I.rank() - nonspatial_dims(input_layout))));
-  }
-  if (deriv_mode != ConvDerivMode::FILTER && F.rank() - spatial_rank != nonspatial_dims(filter_layout)) {
-    throw std::runtime_error(
-        llvm::formatv("Inconsistent spatial rank in conv op (received {0} spatial dimensions based on strides "
-                      "but filter tensor has {1} dimensions, and thus {2} spatial dims). (This error can also occur "
-                      "if the layout of F is incorrectly specified or interpreted.)",
-                      spatial_rank, F.rank(), (F.rank() - nonspatial_dims(filter_layout))));
-  }
-  if (filter_shape.size() && (filter_shape.size() != spatial_rank)) {
-    throw std::runtime_error(
-        llvm::formatv("Filter shape manually specified with inconsistent rank (received {0} spatial dimensions "
-                      "based on strides but filter_shape has {1} dimensions)",
-                      spatial_rank, filter_shape.size()));
-  }
-  if (is_filter_layout_with_separate_groups(filter_layout) && group_layout != GroupLayout::SEPARATE) {
-    throw std::runtime_error("Filter_layout specifies separate groups but group_layout isn't SEPARATE");
-  }
-  if (!is_filter_layout_with_separate_groups(filter_layout) && group_layout == GroupLayout::SEPARATE) {
-    throw std::runtime_error("Filter_layout lacks separate groups but group_layout is SEPARATE");
-  }
-  if (result_shape.size() == 0) {
-    if (deriv_mode != ConvDerivMode::NONE) {
-      throw std::runtime_error("Transposed/gradient convolutions require specifying the result_shape");
-    }
-  } else {
-    if (result_shape.size() != spatial_rank) {
-      throw std::runtime_error(
-          llvm::formatv("Inconsistent spatial rank in conv op (received {0} spatial dimensions based on strides "
-                        "but result shape has {1} spatial dims).",
-                        spatial_rank, result_shape.size()));
-    }
-  }
-
-  // Fill in defaults & normalize inputs
+  // Verify inputs are consistent & generate default arguments if needed
+  validate_conv_padding(manual_padding, autopad_mode, args_log);
+  validate_conv_dilations_rank(spatial_rank, &dilations, args_log);
+  validate_conv_data_dilations_rank(spatial_rank, &data_dilations, args_log);
+  validate_conv_input_layout(input_layout, args_log);
+  validate_conv_filter_layout(filter_layout, args_log);
+  validate_conv_input_rank(spatial_rank, I, input_layout, deriv_mode, args_log);
+  validate_conv_filter_rank(spatial_rank, F, filter_layout, deriv_mode, args_log);
+  validate_conv_filter_shape_rank(spatial_rank, filter_shape, args_log);
+  validate_conv_group_layout(filter_layout, group_layout, args_log);
+  validate_conv_result_shape(spatial_rank, result_shape, deriv_mode, args_log);
   extend_manual_padding(&manual_padding, spatial_rank);
   if (name.empty()) {
     name = "conv";
@@ -747,6 +915,7 @@ Value convolution(const Value& value) {
       } else if (group_layout == GroupLayout::IN_C) {
         // Everything can be inferred, do nothing  // nolint(whitespace/empty_if_body)
       } else {
+        IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
         throw std::runtime_error(llvm::formatv("Unsupported group layout '{0}' used with autogroup mode DEPTHWISE",
                                                to_string(group_layout)));
       }
@@ -755,11 +924,13 @@ Value convolution(const Value& value) {
       if (group_layout == GroupLayout::SEPARATE || group_layout == GroupLayout::IN_K) {
         // just let G be inferred; i.e. do nothing  // nolint(whitespace/empty_if_body)
       } else {
+        IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
         throw std::runtime_error(
             llvm::formatv("Unsupported group layout '{0}' used with autogroup mode AUTO", to_string(group_layout)));
       }
       break;
     default:
+      IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
       throw std::runtime_error("Unrecognized AutoGroupMode");
   }
 
@@ -786,6 +957,7 @@ Value convolution(const Value& value) {
       // Later: F_CI = CI / G;
       break;
     default:
+      IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
       throw std::runtime_error("Invalid group_layout");
   }
 
@@ -807,6 +979,7 @@ Value convolution(const Value& value) {
         I_dims.push_back(CI);
         break;
       default:
+        IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
         throw std::runtime_error("Invalid input_layout");
     }
     I.bind_dims(I_dims);
@@ -849,6 +1022,7 @@ Value convolution(const Value& value) {
         F_explicit_dims.push_back(F_CO);
         break;
       default:
+        IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
         throw std::runtime_error("Invalid filter_layout");
     }
     F.bind_dims(F_dims);
@@ -877,6 +1051,7 @@ Value convolution(const Value& value) {
         O_dims.push_back(CO);
         break;
       default:
+        IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
         throw std::runtime_error("Invalid input_layout");
     }
     O.bind_dims(O_dims);
@@ -897,6 +1072,7 @@ Value convolution(const Value& value) {
       CI = F_CI * G;
       break;
     default:
+      IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
       throw std::runtime_error("Invalid group_layout");
   }
 
@@ -936,6 +1112,7 @@ Value convolution(const Value& value) {
           O_dims.push_back(CO);
           break;
         default:
+          IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
           throw std::runtime_error("Invalid input_layout");
       }
       O = Tensor{name, O_dims};
@@ -958,6 +1135,7 @@ Value convolution(const Value& value) {
           I_dims.push_back(CI);
           break;
         default:
+          IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
           throw std::runtime_error("Invalid input_layout");
       }
       I = Tensor{name, I_dims};
@@ -988,12 +1166,14 @@ Value convolution(const Value& value) {
           F_dims.push_back(F_CO);
           break;
         default:
+          IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
           throw std::runtime_error("Invalid filter_layout");
       }
       F = Tensor{name, F_dims};
       // F = NamedTensorOutput(name, F_dims);  // TODO: Re-enable when ready
       break;
     default:
+      IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
       throw std::runtime_error("Invalid deriv_mode");
   }
 
@@ -1023,6 +1203,7 @@ Value convolution(const Value& value) {
       }
       break;
     default:
+      IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
       throw std::runtime_error("Invalid input_layout");
   }
 
@@ -1047,6 +1228,7 @@ Value convolution(const Value& value) {
       constraints.push_back(co < CO / G);
       break;
     default:
+      IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
       throw std::runtime_error("Unrecognized group layout");
   }
   switch (filter_layout) {
@@ -1072,6 +1254,7 @@ Value convolution(const Value& value) {
       F_idxs.push_back(f_co);
       break;
     default:
+      IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
       throw std::runtime_error("Invalid filter_layout");
   }
 
@@ -1102,6 +1285,7 @@ Value convolution(const Value& value) {
       }
       break;
     default:
+      IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
       throw std::runtime_error("Invalid input_layout");
   }
 
@@ -1120,6 +1304,7 @@ Value convolution(const Value& value) {
       F.add_constraints(constraints);
       return Value{F};
     default:
+      IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
       throw std::runtime_error("Unrecognized deriv_mode");
   }
 }
