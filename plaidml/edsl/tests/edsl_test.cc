@@ -883,9 +883,9 @@ TEST_F(CppEdsl, ReshapeFold) {
   auto program = makeProgram("reshape_fold", {R});
   // clang-format off
   // CHECK-LABEL: CppEdsl.ReshapeFold
-  // CHECK: func @reshape_fold(%arg0: tensor<3x3xsi32>) -> tensor<3x3xsi32> {
-  // CHECK-SAME: %[[arg0:.*]]: tensor<4x4xsi32>
-  // CHECK-NEXT: return %[[arg0]]
+  // CHECK: func @reshape_fold
+  // CHECK-NEXT: %[[ident0:.*]] = "eltwise.ident"(%{{.*}}) : (tensor<3x3xsi32>) -> tensor<3x3xsi32>
+  // CHECK-NEXT: return %[[ident0]]
   // clang-format on
   std::vector<int32_t> input = {
       1, 2, 3,  //
@@ -1018,6 +1018,15 @@ TEST_F(CppEdsl, DupOut) {
   auto C = Placeholder(DType::FLOAT32, {30, 40});
   auto R = Dot(Dot(A, B), C);
   auto program = makeProgram("dup_out", {R, R, R});
+  // clang-format off
+  // CHECK: func @dup_out
+  // CHECK:  %[[cst:.*]] = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> tensor<f32>
+  // CHECK:  %{{.*}} = tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {idxs = ["{{.*}}", "{{.*}}", "{{.*}}"], sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : tensor<f32>, tensor<10x20xf32>, tensor<20x30xf32> -> tensor<10x30xf32>
+  // CHECK:  %[[out:.*]] = tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {idxs = ["{{.*}}", "{{.*}}", "{{.*}}"], sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : tensor<f32>, tensor<10x30xf32>, tensor<30x40xf32> -> tensor<10x40xf32>
+  // CHECK:  %{{.*}} = "eltwise.ident"(%[[out]]) : (tensor<10x40xf32>) -> tensor<10x40xf32>
+  // CHECL:  %{{.*}} = "eltwise.ident"(%[[out]]) : (tensor<10x40xf32>) -> tensor<10x40xf32>
+  // CHECK:  return %{{.*}}, %{{.*}}, %{{.*}} : tensor<10x40xf32>, tensor<10x40xf32>, tensor<10x40xf32>
+  // clang-format on
   runProgram(program);
 }
 

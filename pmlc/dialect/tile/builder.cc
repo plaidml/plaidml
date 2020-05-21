@@ -644,11 +644,14 @@ TileBuilder::MakeProgram(StringRef name, const ProgramMutations &mutations,
   }
   IVLOG(1, "TileBuilder::MakeProgram> " << name.str());
   IVLOG(6, "\n" << mlir::debugString(impl->module));
-  // Wrap duplicate outputs and outputs that directly refer to inputs
   SetVector<Value> outputs;
   for (auto output : mutations.outputs) {
     if (!output) {
       throw std::runtime_error("Invalid output");
+    }
+    // Wrap duplicate outputs
+    if (outputs.count(output)) {
+      outputs.insert(MakePrimitiveOp("ident", {output}));
     } else {
       outputs.insert(output);
     }
@@ -762,11 +765,13 @@ TileBuilder::MakeProgram(StringRef name, const ProgramMutations &mutations,
     IVLOG(1, "\n" << mlir::debugString(module));
     throw std::runtime_error("Optimization passes failure");
   }
+  IVLOG(2, "\n" << returnOp.getNumOperands());
   for (unsigned i = 0; i < returnOp.getNumOperands(); i++) {
     auto userValue = outputs[i];
     auto finalValue = returnOp.getOperand(i);
-    if (!finalValue.getDefiningOp()) {
-      IVLOG(2, "reached condition where return operand has no defining op");
+    // Wrap outputs that directly refer to inputs
+    if (!finalValue.getDefiningOp() || outputs.count(userValue) > 1) {
+      IVLOG(2, "Reached condition: output that refers directly to input");
       OpBuilder identBuilder(returnOp);
       auto ident = identBuilder.create<eltwise::IdentOp>(loc, finalValue);
       returnOp.setOperand(i, ident.result());
