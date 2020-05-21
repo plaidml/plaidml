@@ -649,10 +649,6 @@ TileBuilder::MakeProgram(StringRef name, const ProgramMutations &mutations,
   for (auto output : mutations.outputs) {
     if (!output) {
       throw std::runtime_error("Invalid output");
-    }
-    if (outputs.count(output) ||
-        llvm::isa<PlaceholderOp>(output.getDefiningOp())) {
-      outputs.insert(MakePrimitiveOp("ident", {output}));
     } else {
       outputs.insert(output);
     }
@@ -771,7 +767,9 @@ TileBuilder::MakeProgram(StringRef name, const ProgramMutations &mutations,
     auto finalValue = returnOp.getOperand(i);
     if (!finalValue.getDefiningOp()) {
       IVLOG(2, "reached condition where return operand has no defining op");
-      userValue = MakePrimitiveOp("ident", {outputs[i]});
+      OpBuilder identBuilder(returnOp);
+      auto ident = identBuilder.create<eltwise::IdentOp>(loc, finalValue);
+      returnOp.setOperand(i, ident.result());
     }
     auto itUpdate = impl->implicitUpdates.find(outputs[i]);
     if (itUpdate != impl->implicitUpdates.end()) {
