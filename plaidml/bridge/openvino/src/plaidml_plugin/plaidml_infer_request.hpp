@@ -9,8 +9,10 @@
 #include <string>
 #include <unordered_map>
 
-#include "plaidml_executable_network.hpp"
-#include "plaidml_state.hpp"
+#include "cpp_interfaces/impl/ie_infer_request_internal.hpp"
+
+#include "plaidml/edsl/edsl.h"
+#include "plaidml/exec/exec.h"
 
 namespace PlaidMLPlugin {
 
@@ -18,8 +20,10 @@ class PlaidMLInferRequest : public InferenceEngine::InferRequestInternal {
  public:
   using Ptr = std::shared_ptr<PlaidMLInferRequest>;
 
-  explicit PlaidMLInferRequest(InferenceEngine::InputsDataMap networkInputs,
-                               InferenceEngine::OutputsDataMap networkOutputs, const std::shared_ptr<State>& state);
+  explicit PlaidMLInferRequest(const InferenceEngine::InputsDataMap& networkInputs,
+                               const InferenceEngine::OutputsDataMap& networkOutputs,
+                               const plaidml::edsl::Program& program,
+                               const std::unordered_map<std::string, plaidml::edsl::Tensor>& tensorMap);
 
   void InferImpl() override;
 
@@ -32,9 +36,9 @@ class PlaidMLInferRequest : public InferenceEngine::InferRequestInternal {
   void SyncOutput();
 
  private:
-  std::unique_ptr<plaidml::exec::Binder> binder_;
+  std::unordered_map<std::string, plaidml::edsl::Tensor> tensorMap_;
+  plaidml::exec::Binder binder_;
   std::shared_ptr<plaidml::exec::Executable> exec_;
-  std::shared_ptr<State> state_;
 };
 
 }  // namespace PlaidMLPlugin

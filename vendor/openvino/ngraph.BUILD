@@ -1,28 +1,26 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])  # BSD/MIT-like license
-
 cc_library(
-    name = "core",
+    name = "ngraph",
     srcs = glob(
         [
-            "src/ngraph/*pp",
-            "src/ngraph/autodiff/*pp",
-            "src/ngraph/builder/*pp",
-            "src/ngraph/descriptor/*pp",
-            "src/ngraph/descriptor/**/*pp",
-            "src/ngraph/op/*pp",
-            "src/ngraph/op/**/*pp",
-            "src/ngraph/opsets/**/*pp",
-            "src/ngraph/pass/*pp",
-            "src/ngraph/pattern/*pp",
-            "src/ngraph/pattern/**/*pp",
-            "src/ngraph/runtime/*pp",
-            "src/ngraph/runtime/dynamic/*pp",
-            "src/ngraph/type/*pp",
+            "src/ngraph/*.cpp",
+            "src/ngraph/*.hpp",
+            "src/ngraph/autodiff/*.cpp",
+            "src/ngraph/builder/*.cpp",
+            "src/ngraph/descriptor/**/*.cpp",
+            "src/ngraph/distributed/*.cpp",
+            "src/ngraph/op/**/*.cpp",
+            "src/ngraph/opsets/*.cpp",
+            "src/ngraph/pass/*.cpp",
+            "src/ngraph/pattern/**/*.cpp",
+            "src/ngraph/runtime/*.cpp",
+            "src/ngraph/runtime/dynamic/*.cpp",
+            "src/ngraph/type/*.cpp",
         ],
         exclude = [
-            "src/ngraph/plaidml/*",
             "src/ngraph/serializer.cpp",
         ],
     ),
@@ -30,28 +28,28 @@ cc_library(
         "src/ngraph/*.hpp",
         "src/ngraph/autodiff/*.hpp",
         "src/ngraph/builder/*.hpp",
-        "src/ngraph/descriptor/*.hpp",
         "src/ngraph/descriptor/**/*.hpp",
+        "src/ngraph/distributed/*.hpp",
         "src/ngraph/op/*.hpp",
         "src/ngraph/op/**/*.hpp",
+        "src/ngraph/opsets/*.hpp",
         "src/ngraph/pass/*.hpp",
         "src/ngraph/pattern/*.hpp",
-        "src/ngraph/runtime/*.hpp",
         "src/ngraph/runtime/**/*.hpp",
         "src/ngraph/pattern/**/*.hpp",
         "src/ngraph/type/*.hpp",
     ]),
     defines = [
+        "NGRAPH_JSON_DISABLE",
         "NGRAPH_VERSION=\\\"0.21.0\\\"",
+    ],
+    includes = [
+        "src",
+        "src/ngraph",
+    ],
+    local_defines = [
         "PROJECT_ROOT_DIR=\\\"./\\\"",
         "SHARED_LIB_PREFIX=\\\"\\\"",
         "SHARED_LIB_SUFFIX=\\\"\\\"",
-    ],
-    includes = [
-        "src/",
-        "src/ngraph",
-    ],
-    deps = [
-        "@nlo_json//:json",
     ],
 )

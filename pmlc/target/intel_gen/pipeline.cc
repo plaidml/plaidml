@@ -68,11 +68,12 @@ void addToPipeline(OpPassManager &pm) {
   pm.addPass(conversion::gpu::createLLVMLoweringPass());
 }
 
-static PassPipelineRegistration<>
-    passPipelineReg("target-intel_gen", "Target pipeline for Intel GEN iGPUs",
-                    addToPipeline);
-static compiler::TargetRegistration targetReg("intel_gen", addToPipeline);
-
 } // namespace
+
+void registerPassPipeline() {
+  static PassPipelineRegistration<> passPipelineReg(
+      "target-intel_gen", "Target pipeline for Intel GEN iGPUs", addToPipeline);
+  static compiler::TargetRegistration targetReg("intel_gen", addToPipeline);
+}
 
 } // namespace pmlc::target::intel_gen
