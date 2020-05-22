@@ -1023,9 +1023,9 @@ TEST_F(CppEdsl, DupOut) {
   // CHECK:  %[[cst:.*]] = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> tensor<f32>
   // CHECK:  %{{.*}} = tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {idxs = ["{{.*}}", "{{.*}}", "{{.*}}"], sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : tensor<f32>, tensor<10x20xf32>, tensor<20x30xf32> -> tensor<10x30xf32>
   // CHECK:  %[[out:.*]] = tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {idxs = ["{{.*}}", "{{.*}}", "{{.*}}"], sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : tensor<f32>, tensor<10x30xf32>, tensor<30x40xf32> -> tensor<10x40xf32>
-  // CHECK:  %{{.*}} = "eltwise.ident"(%[[out]]) : (tensor<10x40xf32>) -> tensor<10x40xf32>
-  // CHECL:  %{{.*}} = "eltwise.ident"(%[[out]]) : (tensor<10x40xf32>) -> tensor<10x40xf32>
-  // CHECK:  return %{{.*}}, %{{.*}}, %{{.*}} : tensor<10x40xf32>, tensor<10x40xf32>, tensor<10x40xf32>
+  // CHECK:  %[[i2:.*]] = "eltwise.ident"(%[[out]]) : (tensor<10x40xf32>) -> tensor<10x40xf32>
+  // CHECK:  %[[i3:.*]] = "eltwise.ident"(%[[out]]) : (tensor<10x40xf32>) -> tensor<10x40xf32>
+  // CHECK:  return %[[out]], %[[i2]], %[[i3]] : tensor<10x40xf32>, tensor<10x40xf32>, tensor<10x40xf32>
   // clang-format on
   runProgram(program);
 }
