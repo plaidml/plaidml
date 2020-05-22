@@ -164,7 +164,19 @@ static void *tryResolveSymbol(StringRef symbol) {
     if (auto ptr = resolveSymbol(symbol.drop_front()))
       return ptr;
   }
-  return llvm::sys::DynamicLibrary::SearchForAddressOfSymbol(symbol.str());
+
+  auto ptr = llvm::sys::DynamicLibrary::SearchForAddressOfSymbol(symbol.str());
+  if (ptr)
+    return ptr;
+
+  if (symbol[0] == '_') {
+    if (auto ptr = llvm::sys::DynamicLibrary::SearchForAddressOfSymbol(
+            symbol.drop_front().str())) {
+      return ptr;
+    }
+  }
+
+  return nullptr;
 }
 
 struct MCJITEngineImpl : EngineImpl {

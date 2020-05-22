@@ -7,7 +7,7 @@
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/StandardTypes.h"
-#include "mlir/Interfaces/SideEffects.h"
+#include "mlir/Interfaces/SideEffectInterfaces.h"
 
 #include "pmlc/dialect/eltwise/ir/ops.h"
 #include "pmlc/dialect/tile/ir/types.h"
@@ -23,7 +23,6 @@ using mlir::ArrayAttr;
 using mlir::ArrayRef;
 using mlir::Attribute;
 using mlir::BoolAttr;
-using mlir::Builder;
 using mlir::FloatType;
 using mlir::IndexType;
 using mlir::IntegerAttr;

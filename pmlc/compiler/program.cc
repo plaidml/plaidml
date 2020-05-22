@@ -93,7 +93,7 @@ void Program::compile(StringRef target, bool collectPasses) {
     os.flush();
     passes.emplace_back(PassInfo{"tile", ir});
     pm.addInstrumentation(std::make_unique<IRCollector>(&passes));
-    pm.disableMultithreading();
+    pm.getContext()->disableMultithreading();
   }
 
   if (VLOG_IS_ON(1)) {
@@ -103,7 +103,7 @@ void Program::compile(StringRef target, bool collectPasses) {
     auto shouldPrintAfterPass = [&](auto pass, auto op) {
       return VLOG_IS_ON(3);
     };
-    pm.disableMultithreading();
+    pm.getContext()->disableMultithreading();
     pm.enableIRPrinting(shouldPrintBeforePass, shouldPrintAfterPass, true,
                         false, llvm::errs());
   }

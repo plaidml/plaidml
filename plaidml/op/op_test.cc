@@ -202,14 +202,7 @@ module {
 TEST(Op, Convolution) {
   auto I = Placeholder(DType::FLOAT32, {1, 224, 224, 3}, "I");
   auto K = Placeholder(DType::FLOAT32, {7, 7, 3, 64}, "K");
-  auto O = op::convolution(I, K)
-               .strides({2, 2})
-               .dilations({1, 1})
-               .data_dilations({1, 1})
-               .autopad_mode(AutoPadMode::EXPLICIT)
-               .manual_padding({3, 3})
-               .input_layout(TensorLayout::NXC)
-               .filter_layout(TensorLayout::XCK);
+  auto O = op::convolution(I, K).strides({2, 2}).autopad_mode(AutoPadMode::EXPLICIT).manual_padding({3, 3});
   auto program = makeProgram("convolution", {O});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"#(

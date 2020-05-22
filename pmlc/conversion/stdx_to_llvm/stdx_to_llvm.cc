@@ -1,9 +1,10 @@
 // Copyright 2020, Intel Corporation
 
-#include "mlir/Conversion/LoopToStandard/ConvertLoopToStandard.h"
+#include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/Dialect/StandardOps/EDSC/Intrinsics.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/Pass/Pass.h"
@@ -17,6 +18,7 @@ using namespace mlir; // NOLINT[build/namespaces]
 namespace pmlc::conversion::stdx_to_llvm {
 
 namespace stdx = dialect::stdx;
+namespace edsc = mlir::edsc;
 
 namespace {
 
@@ -68,21 +70,6 @@ protected:
   LLVM::LLVMDialect &dialect;
 };
 
-struct FPToSILowering : public LLVMLegalizationPattern<stdx::FPToSIOp> {
-  using LLVMLegalizationPattern<stdx::FPToSIOp>::LLVMLegalizationPattern;
-  using Base = LLVMLegalizationPattern<stdx::FPToSIOp>;
-
-  LogicalResult
-  matchAndRewrite(Operation *op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const override {
-    auto value = op->getOperand(0);
-    auto stdxType = op->getResult(0).getType();
-    auto llvmType = typeConverter.convertType(stdxType);
-    rewriter.replaceOpWithNewOp<LLVM::FPToSIOp>(op, llvmType, value);
-    return success();
-  }
-};
-
 struct FPToUILowering : public LLVMLegalizationPattern<stdx::FPToUIOp> {
   using LLVMLegalizationPattern<stdx::FPToUIOp>::LLVMLegalizationPattern;
   using Base = LLVMLegalizationPattern<stdx::FPToUIOp>;
@@ -94,6 +81,79 @@ struct FPToUILowering : public LLVMLegalizationPattern<stdx::FPToUIOp> {
     auto stdxType = op->getResult(0).getType();
     auto llvmType = typeConverter.convertType(stdxType);
     rewriter.replaceOpWithNewOp<LLVM::FPToUIOp>(op, llvmType, value);
+    return success();
+  }
+};
+
+class BaseViewConversionHelper {
+public:
+  explicit BaseViewConversionHelper(Type type)
+      : desc(MemRefDescriptor::undef(rewriter(), loc(), type)) {}
+
+  explicit BaseViewConversionHelper(Value v) : desc(v) {}
+
+  /// Wrappers around MemRefDescriptor that use EDSC builder and location.
+  Value allocatedPtr() { return desc.allocatedPtr(rewriter(), loc()); }
+  void setAllocatedPtr(Value v) { desc.setAllocatedPtr(rewriter(), loc(), v); }
+  Value alignedPtr() { return desc.alignedPtr(rewriter(), loc()); }
+  void setAlignedPtr(Value v) { desc.setAlignedPtr(rewriter(), loc(), v); }
+  Value offset() { return desc.offset(rewriter(), loc()); }
+  void setOffset(Value v) { desc.setOffset(rewriter(), loc(), v); }
+  Value size(unsigned i) { return desc.size(rewriter(), loc(), i); }
+  void setSize(unsigned i, Value v) { desc.setSize(rewriter(), loc(), i, v); }
+  void setConstantSize(unsigned i, int64_t v) {
+    desc.setConstantSize(rewriter(), loc(), i, v);
+  }
+  Value stride(unsigned i) { return desc.stride(rewriter(), loc(), i); }
+  void setStride(unsigned i, Value v) {
+    desc.setStride(rewriter(), loc(), i, v);
+  }
+  void setConstantStride(unsigned i, int64_t v) {
+    desc.setConstantStride(rewriter(), loc(), i, v);
+  }
+
+  operator Value() { return desc; }
+
+private:
+  OpBuilder &rewriter() { return edsc::ScopedContext::getBuilderRef(); }
+  Location loc() { return edsc::ScopedContext::getLocation(); }
+
+  MemRefDescriptor desc;
+};
+
+struct ReshapeLowering : public LLVMLegalizationPattern<stdx::ReshapeOp> {
+  using LLVMLegalizationPattern<stdx::ReshapeOp>::LLVMLegalizationPattern;
+  using Base = LLVMLegalizationPattern<stdx::ReshapeOp>;
+
+  LogicalResult
+  matchAndRewrite(Operation *op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto reshapeOp = cast<stdx::ReshapeOp>(op);
+    MemRefType dstType = reshapeOp.getResult().getType().cast<MemRefType>();
+
+    if (!dstType.hasStaticShape())
+      return failure();
+
+    int64_t offset;
+    SmallVector<int64_t, 4> strides;
+    auto res = getStridesAndOffset(dstType, strides, offset);
+    if (failed(res) || llvm::any_of(strides, [](int64_t val) {
+          return ShapedType::isDynamicStrideOrOffset(val);
+        }))
+      return failure();
+
+    edsc::ScopedContext context(rewriter, op->getLoc());
+    stdx::ReshapeOpOperandAdaptor adaptor(operands);
+    BaseViewConversionHelper baseDesc(adaptor.tensor());
+    BaseViewConversionHelper desc(typeConverter.convertType(dstType));
+    desc.setAllocatedPtr(baseDesc.allocatedPtr());
+    desc.setAlignedPtr(baseDesc.alignedPtr());
+    desc.setOffset(baseDesc.offset());
+    for (auto en : llvm::enumerate(dstType.getShape()))
+      desc.setConstantSize(en.index(), en.value());
+    for (auto en : llvm::enumerate(strides))
+      desc.setConstantStride(en.index(), en.value());
+    rewriter.replaceOp(op, {desc});
     return success();
   }
 };
@@ -124,8 +184,7 @@ struct LowerToLLVMPass : public LowerToLLVMBase<LowerToLLVMPass> {
 
 void populateStdXToLLVMConversionPatterns(LLVMTypeConverter &converter,
                                           OwningRewritePatternList &patterns) {
-  patterns.insert<FPToSILowering, FPToUILowering>(*converter.getDialect(),
-                                                  converter);
+  patterns.insert<FPToUILowering, ReshapeLowering>(*converter.getDialect(), converter);
 }
 
 std::unique_ptr<mlir::Pass> createLowerToLLVMPass() {

@@ -1,7 +1,7 @@
 // Copyright 2020 Intel Corporation
 
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
-#include "mlir/Conversion/LoopToStandard/ConvertLoopToStandard.h"
+#include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
@@ -159,10 +159,12 @@ void addToPipeline(OpPassManager &pm) {
   pm.addPass(createTraceLinkingPass());
 }
 
-static PassPipelineRegistration<>
-    passPipelineReg("target-cpu", "Target pipeline for CPU", addToPipeline);
-static compiler::TargetRegistration targetReg("llvm_cpu", addToPipeline);
-
 } // namespace
+
+void registerPassPipeline() {
+  static PassPipelineRegistration<> passPipelineReg(
+      "target-cpu", "Target pipeline for CPU", addToPipeline);
+  static compiler::TargetRegistration targetReg("llvm_cpu", addToPipeline);
+}
 
 } // namespace pmlc::target::x86

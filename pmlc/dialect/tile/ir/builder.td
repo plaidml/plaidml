@@ -32,10 +32,10 @@ def DimOp : TileOpWithPPV<"dim", [NoSideEffect]>, HasFolder {
   let results = (outs Index:$result);
 
   let builders = [OpBuilder<
-    "Builder* builder, OperationState& result, Value tensor, int64_t value", [{
-      auto indexType = builder->getIndexType();
+    "OpBuilder &builder, OperationState& result, Value tensor, int64_t value", [{
+      auto indexType = builder.getIndexType();
       result.addOperands(tensor);
-      result.addAttribute("dim", builder->getIntegerAttr(indexType, value));
+      result.addAttribute("dim", builder.getIntegerAttr(indexType, value));
       result.addTypes(indexType);
     }]
   >];
@@ -51,11 +51,11 @@ def PolyIndexOp : TileOpWithPPV<"idx", [NoSideEffect]> {
   let results = (outs Index:$result);
 
   let builders = [OpBuilder<
-    "Builder* builder, OperationState& result, int64_t id, StringRef name", [{
-      result.addTypes(builder->getIndexType());
-      result.addAttribute("id", builder->getI64IntegerAttr(id));
+    "OpBuilder &builder, OperationState& result, int64_t id, StringRef name", [{
+      result.addTypes(builder.getIndexType());
+      result.addAttribute("id", builder.getI64IntegerAttr(id));
       if (name.size()) {
-        result.addAttribute("name", builder->getStringAttr(name));
+        result.addAttribute("name", builder.getStringAttr(name));
       }
     }]
   >];
@@ -67,9 +67,9 @@ class PolyOp<string mnemonic, list<OpTrait> traits = []> :
   let results = (outs Index:$result);
 
   let builders = [OpBuilder<
-    "Builder* builder, OperationState& result, ArrayRef<Value> operands", [{
+    "OpBuilder &builder, OperationState& result, ArrayRef<Value> operands", [{
       result.addOperands(operands);
-      result.addTypes(builder->getIndexType());
+      result.addTypes(builder.getIndexType());
     }]
   >];
 }
@@ -121,10 +121,10 @@ def AffineTensorMapOp : TileOpWithPPV<"tmap", [NoSideEffect]> {
   let results = (outs AffineTensorMap:$result);
 
   let builders = [OpBuilder<
-    "Builder* builder, OperationState& result, Value tensor, ArrayRef<Value> dims", [{
+    "OpBuilder &builder, OperationState& result, Value tensor, ArrayRef<Value> dims", [{
       result.addOperands(tensor);
       result.addOperands(dims);
-      result.addTypes(builder->getType<AffineTensorMapType>());
+      result.addTypes(builder.getType<AffineTensorMapType>());
     }]
   >];
 }
@@ -135,9 +135,9 @@ def AffineMapOp : TileOpWithPPV<"map", [NoSideEffect]> {
   let results = (outs AffineMap:$result);
 
   let builders = [OpBuilder<
-    "Builder* builder, OperationState& result, ArrayRef<Value> dims", [{
+    "OpBuilder &builder, OperationState& result, ArrayRef<Value> dims", [{
       result.addOperands(dims);
-      result.addTypes(builder->getType<AffineMapType>());
+      result.addTypes(builder.getType<AffineMapType>());
     }]
   >];
 }
@@ -148,9 +148,8 @@ def AffineConstraintsOp : TileOpWithPPV<"cons", [NoSideEffect]> {
   let results = (outs AffineConstraints:$result);
 
   let builders = [OpBuilder<
-    "Builder* builder, OperationState& result", [{
-      result.setOperandListToResizable();
-      result.addTypes(builder->getType<AffineConstraintsType>());
+    "OpBuilder &builder, OperationState& result", [{
+      result.addTypes(builder.getType<AffineConstraintsType>());
     }]
   >];
 }

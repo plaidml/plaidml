@@ -15,7 +15,6 @@
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/FormatVariadic.h"
 
-#include "mlir/Analysis/Verifier.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
@@ -331,7 +330,7 @@ Value TileBuilder::MakePrimitiveOp(StringRef fn, ArrayRef<Value> args) {
             if (!genericBuilder) {
               throw std::runtime_error("Unknown intrinsic: " + fn.str());
             }
-            auto op = genericBuilder->create(&impl->builder, impl->loc, args);
+            auto op = genericBuilder->create(impl->builder, impl->loc, args);
             return op->getResult(0);
           });
   return builder();
@@ -610,9 +609,6 @@ public:
     });
   }
 
-protected:
-  Operation *insert(Operation *op) final { return OpBuilder::insert(op); }
-
 private:
   RewritePatternMatcher matcher;
   OperationFolder folder;
@@ -751,7 +747,7 @@ TileBuilder::MakeProgram(StringRef name, const ProgramMutations &mutations,
   // Attach the function to the module
   module.push_back(funcOp);
   IVLOG(5, "\n" << mlir::debugString(module));
-  if (failed(mlir::verify(module))) {
+  if (failed(module.verify())) {
     throw std::runtime_error("Module verification error");
   }
   // Do some optimization passes
