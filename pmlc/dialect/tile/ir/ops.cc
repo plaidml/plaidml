@@ -681,6 +681,15 @@ Type PrngOp::getResultType(ArrayRef<Value> operands) {
 
 // ---- ReshapeOp ----
 
+OpFoldResult ReshapeOp::fold(ArrayRef<Attribute> operands) {
+  IVLOG(5, "ReshapeOp::fold");
+  // reshape(x, x.shape) -> x
+  if (tensor().getType() == getType()) {
+    return tensor();
+  }
+  return {};
+}
+
 struct ReshapeCanonicalizer : public OpRewritePattern<ReshapeOp> {
   using OpRewritePattern<ReshapeOp>::OpRewritePattern;
 
