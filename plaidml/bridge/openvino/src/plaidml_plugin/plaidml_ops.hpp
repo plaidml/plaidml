@@ -10,20 +10,24 @@
 
 #include "ie_layers.h"  // NOLINT[build/include_subdir]
 
+// TODO: Clean & order nGraph includes
+#include "ngraph/opsets/opset.hpp"
+#include "ngraph/opsets/opset1.hpp"
+
 #include "details/caseless.hpp"
 
 #include "plaidml/edsl/edsl.h"
 
 namespace PlaidMLPlugin {
 
-IE_SUPPRESS_DEPRECATED_START
+// IE_SUPPRESS_DEPRECATED_START
 
 struct Context {
-  InferenceEngine::CNNLayer* layer;
+  ngraph::Function* layer;
   std::vector<plaidml::edsl::Tensor> operands;
 };
 
-IE_SUPPRESS_DEPRECATED_END
+// IE_SUPPRESS_DEPRECATED_END
 
 using Op = std::function<plaidml::edsl::Value(const Context& ctx)>;
 

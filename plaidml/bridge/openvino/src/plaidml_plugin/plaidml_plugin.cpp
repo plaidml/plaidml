@@ -57,7 +57,7 @@ void Engine::QueryNetwork(const ICNNNetwork& network, const std::map<std::string
   // }
 }
 
-IE_SUPPRESS_DEPRECATED_START
+// IE_SUPPRESS_DEPRECATED_START
 
 INFERENCE_PLUGIN_API(StatusCode)
 CreatePluginEngine(IInferencePlugin*& plugin, ResponseDesc* resp) noexcept {
@@ -98,6 +98,6 @@ Parameter Engine::GetMetric(const std::string& name, const std::map<std::string,
   throw std::logic_error("Unsupported metric: " + name);
 }
 
-IE_SUPPRESS_DEPRECATED_END
+// IE_SUPPRESS_DEPRECATED_END
 
 }  // namespace PlaidMLPlugin
