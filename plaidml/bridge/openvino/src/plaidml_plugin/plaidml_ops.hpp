@@ -23,7 +23,7 @@ namespace PlaidMLPlugin {
 // IE_SUPPRESS_DEPRECATED_START
 
 struct Context {
-  ngraph::Function* layer;
+  ngraph::Node* layer;
   std::vector<plaidml::edsl::Tensor> operands;
 };
 

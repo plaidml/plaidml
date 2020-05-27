@@ -9,6 +9,8 @@
 
 #include <vector>
 
+#include <network_serializer.h>  // TODO: Sort/clean includes
+
 #include "details/ie_cnn_network_tools.h"
 
 #include "plaidml/op/op.h"
@@ -37,39 +39,41 @@ InferRequestInternal::Ptr PlaidMLExecutableNetwork::CreateInferRequestImpl(Input
 
 PlaidMLExecutableNetwork::PlaidMLExecutableNetwork(const ICNNNetwork& network, const std::string& device) {
   InputsDataMap inputMap;
-  network.getInputsInfo(inputMap);
+  auto fcn = network.getFunction();
+  // network.getInputsInfo(inputMap);
 
-  auto layers = CNNNetSortTopologically(network);
   IVLOG(1, "Layers:");
-  for (auto& layer : layers) {
-    IVLOG(1, "  " << layer->type << ": " << layer->name);
-    if (layer->type == "Input") {
-      auto it = inputMap.find(layer->name);
-      IE_ASSERT(it != inputMap.end());
-      const auto& desc = it->second->getTensorDesc();
-      auto tensor = edsl::Placeholder(to_plaidml(desc));
-      tensorMap_[layer->name] = tensor;
+  for (auto& node : fcn->get_ordered_ops()) {
+    IVLOG(1, "  " << node->description() << ": " << node->get_name());
+    if (node->is_parameter()) {  // TODO: Verify this IDs inputs
+      std::vector<int64_t> dims {node->get_shape().begin(), node->get_shape().end()};
+      auto type = to_plaidml(node->get_element_type());
+      auto tensor = edsl::Placeholder(edsl::LogicalShape(type, dims));
+      tensorMap_[node->get_name()] = tensor;
       continue;
+    } else if (node->is_constant()) { // TODO: Flip order with is_parameter
+      // TODO
     }
 
-    auto op = OpsRegistry::instance()->resolve(layer->type);
+    auto op = OpsRegistry::instance()->resolve(node->description());
     if (!op) {
-      THROW_IE_EXCEPTION << "Unsupported operation: " << layer->type;
+      THROW_IE_EXCEPTION << "Unsupported operation: " << node->description();
     }
 
-    Context ctx{layer.get()};
-    for (const auto& input : layer->insData) {
-      const auto& name = input.lock()->getName();
+    Context ctx{node.get()};
+    for (const auto& input : node->inputs()) {
+      // TODO: n.b. each `input` is an instance of Input<Node>
+      const auto& name = input.get_node()->get_name();  // TODO: Correct name?
       IVLOG(1, "    input: " << name);
       auto tensor = tensorMap_.at(name);
       ctx.operands.push_back(tensor);
     }
     auto value = op(ctx);
     auto tuple = value.as_tuple();
-    IE_ASSERT(tuple.size() == layer->outData.size());
+    IE_ASSERT(tuple.size() == node->get_output_size());
     for (unsigned i = 0; i < tuple.size(); i++) {
       auto tensor = tuple.at(i).as_tensor();
-      const auto& name = layer->outData.at(i)->getName();
+      const auto& name = node->output(i).get_node()->get_name();  // TODO: Correct name?
       IVLOG(1, "    output: " << name);
       tensorMap_[name] = tensor;
     }
