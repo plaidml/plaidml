@@ -219,9 +219,11 @@ SUITES:
           - TestBackendOps.testIsPlaceholder
           - TestBackendOps.testUpdate
           - TestBackendOps.testMovingAverageUpdate
+          - TestBackendOps.testBatchNormAndUpdate
           - TestBackendOps.testNormalizeBatchInTrainingSimple
           - TestBackendOps.testNormalizeBatchInTrainingWeirdAxis
           - TestBackendOps.testNormalizeBatchInTrainingWeirdMultiAxis
+          - TestBackendOps.testNormalizeBatchInTrainingMultiAxis
           - TestBackendOps.testBatchNormalization
           - TestBackendOps.testBatchNormalizationVar
           - TestBackendOps.testBatchNormalizationMean
