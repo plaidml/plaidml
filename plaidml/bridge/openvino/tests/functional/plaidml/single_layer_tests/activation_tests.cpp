@@ -60,7 +60,7 @@ void ref_activation(const TBlob<data_t>& src, TBlob<data_t>& dst, activation_tes
         } else if (prm.activationType == "sigmoid") {
           dst_data[oidx] = 1 / (1 + exp(-src_data[oidx]));
         } else if (prm.activationType == "relu") {
-          dst_data[oidx] = src_data[oidx] >= 0.0 ? src_data[oidx] : src_data[oidx] * prm.activationParams[0];
+          dst_data[oidx] = src_data[oidx] >= 0.0 ? src_data[oidx] : 0.0;
         } else if (prm.activationType == "power") {
           dst_data[oidx] =
               std::pow(prm.activationParams[2] * src_data[oidx] + prm.activationParams[1], prm.activationParams[0]);
@@ -215,8 +215,6 @@ class ActivationTest : public TestsCommon, public WithParamInterface<activation_
       REPLACE_WITH_STR(model, "_ACTIVATION_TYPE_", "Sigmoid");
     } else if (p.activationType == "relu") {
       REPLACE_WITH_STR(model, "_ACTIVATION_TYPE_", "ReLU");
-      activation_info = R"(<data negative_slope="_N_SLOPE_"/>)";
-      REPLACE_WITH_NUM(activation_info, "_N_SLOPE_", p.activationParams[0]);
     } else if (p.activationType == "power") {
       REPLACE_WITH_STR(model, "_ACTIVATION_TYPE_", "Power");
       activation_info = R"(<data power="_POWER_" scale="_SCALE_" shift="_OFFSET_"/>)";
@@ -299,11 +297,14 @@ std::string getTestCaseName(testing::TestParamInfo<activation_test_params> obj) 
 }
 
 activation_test_params test_cases[] = {
-    activation_test_params(case_1, "relu", {0.0f}),  // n_slope
-    activation_test_params(case_2, "relu", {0.1f}),  //
-    activation_test_params(case_3, "relu", {0.1f}),  //
-    activation_test_params(case_4, "relu", {0.1f}),  //
-    activation_test_params(case_5, "relu", {0.1f}),
+    activation_test_params(case_1, "relu"),
+
+    // There used to be non-zero negative slope tests (i.e. for LeakyReLU), but with an nGraph-based opset those show up
+    // as a fused PReLU; re-enable once we have PReLU support
+    // activation_test_params(case_2, "relu", {0.1f}),  // n_slope
+    // activation_test_params(case_3, "relu", {0.1f}),  //
+    // activation_test_params(case_4, "relu", {0.1f}),  //
+    // activation_test_params(case_5, "relu", {0.1f}),
 
     // activation_test_params(case_1, "sigmoid"),  //
     // activation_test_params(case_2, "sigmoid"),  //
