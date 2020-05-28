@@ -20,14 +20,14 @@
 
 namespace PlaidMLPlugin {
 
-// IE_SUPPRESS_DEPRECATED_START
+IE_SUPPRESS_DEPRECATED_START
 
 struct Context {
   ngraph::Node* layer;
   std::vector<plaidml::edsl::Tensor> operands;
 };
 
-// IE_SUPPRESS_DEPRECATED_END
+IE_SUPPRESS_DEPRECATED_END
 
 using Op = std::function<plaidml::edsl::Value(const Context& ctx)>;
 

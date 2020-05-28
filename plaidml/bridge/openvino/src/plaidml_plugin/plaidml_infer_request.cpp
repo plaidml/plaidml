@@ -51,6 +51,7 @@ PlaidMLInferRequest::PlaidMLInferRequest(const InputsDataMap& networkInputs, con
 
 void PlaidMLInferRequest::InferImpl() {
   IVLOG(1, "PlaidMLInferRequest::InferImpl>");
+  IVLOG(1, "  _inputs: " << _inputs);
   execDataPreprocessing(_inputs);
 
   SyncInput();

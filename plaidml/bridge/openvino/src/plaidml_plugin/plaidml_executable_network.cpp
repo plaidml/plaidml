@@ -29,6 +29,8 @@ InferRequestInternal::Ptr PlaidMLExecutableNetwork::CreateInferRequestImpl(Input
                                                                            OutputsDataMap networkOutputs) {
   IVLOG(1, "PlaidMLExecutableNetwork::CreateInferRequestImpl>");
   std::vector<plaidml::edsl::Tensor> outputs;
+    IVLOG(1, "networkOutputs: " << networkOutputs);
+    IVLOG(1, "tensorMap_: " << tensorMap_);
   for (const auto& kvp : networkOutputs) {
     IVLOG(1, "output: " << kvp.first);
     outputs.push_back(tensorMap_.at(kvp.first));
@@ -40,19 +42,31 @@ InferRequestInternal::Ptr PlaidMLExecutableNetwork::CreateInferRequestImpl(Input
 PlaidMLExecutableNetwork::PlaidMLExecutableNetwork(const ICNNNetwork& network, const std::string& device) {
   InputsDataMap inputMap;
   auto fcn = network.getFunction();
-  // network.getInputsInfo(inputMap);
-
+  IE_ASSERT(fcn);  // PlaidML requires that the nGraph-based API be used
   IVLOG(1, "Layers:");
   for (auto& node : fcn->get_ordered_ops()) {
-    IVLOG(1, "  " << node->description() << ": " << node->get_name());
+    IVLOG(1, "  " << node->description() << ": " << node->get_name() << "... " << node->get_friendly_name());
     if (node->is_parameter()) {  // TODO: Verify this IDs inputs
+      IE_ASSERT(node->get_output_size() == 1);
       std::vector<int64_t> dims {node->get_shape().begin(), node->get_shape().end()};
       auto type = to_plaidml(node->get_element_type());
       auto tensor = edsl::Placeholder(edsl::LogicalShape(type, dims));
-      tensorMap_[node->get_name()] = tensor;
+      IVLOG(1, "    Adding placeholder named '" << node->get_output_tensor_name(0) << "'");
+      tensorMap_[node->get_output_tensor_name(0)] = tensor;
+      // TODO: OpenVINO seems to want to look up inputs by the friendly name of the receiving Node. Which seems troublesomely non-unique, insofar as there's no uniqueness requirement on friendly names. But for now, add an alias under the friendly name.
+      IVLOG(1, "    Also, aliasing " << node->get_output_tensor_name(0) << " as " << node->get_friendly_name());
+      tensorMap_[node->get_friendly_name()] = tensor;
       continue;
     } else if (node->is_constant()) { // TODO: Flip order with is_parameter
       // TODO
+    } else if (node->is_output()) {
+      // TODO: OpenVINO seems to want to look up outputs by the friendly name of the generating Node. Which seems troublesomely non-unique, insofar as nodes may have multiple outputs and there's no uniqueness requirement on friendly names. But for now, add an alias under the friendly name.
+      const auto& src_output = node->get_inputs()[0].get_output();
+      const auto& friendly_name = src_output.get_node()->get_friendly_name();
+      const auto& original_name = src_output.get_node()->get_output_tensor_name(src_output.get_index());
+      IVLOG(1, "At an output node, aliasing " << original_name << " as " << friendly_name);
+      tensorMap_[friendly_name] = tensorMap_.at(original_name);
+      continue;
     }
 
     auto op = OpsRegistry::instance()->resolve(node->description());
@@ -61,9 +75,10 @@ PlaidMLExecutableNetwork::PlaidMLExecutableNetwork(const ICNNNetwork& network, c
     }
 
     Context ctx{node.get()};
-    for (const auto& input : node->inputs()) {
+    for (const auto& input : node->get_inputs()) {
       // TODO: n.b. each `input` is an instance of Input<Node>
-      const auto& name = input.get_node()->get_name();  // TODO: Correct name?
+      const auto& src_output = input.get_output();
+      const auto& name = src_output.get_node()->get_output_tensor_name(src_output.get_index());
       IVLOG(1, "    input: " << name);
       auto tensor = tensorMap_.at(name);
       ctx.operands.push_back(tensor);
@@ -73,7 +88,7 @@ PlaidMLExecutableNetwork::PlaidMLExecutableNetwork(const ICNNNetwork& network, c
     IE_ASSERT(tuple.size() == node->get_output_size());
     for (unsigned i = 0; i < tuple.size(); i++) {
       auto tensor = tuple.at(i).as_tensor();
-      const auto& name = node->output(i).get_node()->get_name();  // TODO: Correct name?
+      const auto& name = node->get_output_tensor_name(i);
       IVLOG(1, "    output: " << name);
       tensorMap_[name] = tensor;
     }
