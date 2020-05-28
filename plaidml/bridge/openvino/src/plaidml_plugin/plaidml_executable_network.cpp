@@ -9,8 +9,6 @@
 
 #include <vector>
 
-#include <network_serializer.h>  // TODO: Sort/clean includes
-
 #include "details/ie_cnn_network_tools.h"
 
 #include "plaidml/op/op.h"

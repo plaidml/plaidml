@@ -10,11 +10,10 @@
 
 #include "ie_layers.h"  // NOLINT[build/include_subdir]
 
-// TODO: Clean & order nGraph includes
+#include "details/caseless.hpp"
+
 #include "ngraph/opsets/opset.hpp"
 #include "ngraph/opsets/opset1.hpp"
-
-#include "details/caseless.hpp"
 
 #include "plaidml/edsl/edsl.h"
 
