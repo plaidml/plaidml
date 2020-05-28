@@ -4,8 +4,6 @@
 
 #include "plaidml_ops.hpp"
 
-// TODO: Include ordering
-
 #include "ngraph/opsets/opset.hpp"
 #include "ngraph/opsets/opset1.hpp"
 
@@ -16,8 +14,6 @@ using namespace InferenceEngine; // NOLINT[build/namespaces]
 
 namespace PlaidMLPlugin {
 
-// IE_SUPPRESS_DEPRECATED_START
-
 static OpRegistration reg("clamp", [](const Context& ctx) {
   auto* layer = dynamic_cast<ngraph::opset1::Clamp*>(ctx.layer);
   IE_ASSERT(ctx.operands.size() == 1);
@@ -26,7 +22,5 @@ static OpRegistration reg("clamp", [](const Context& ctx) {
   edsl::Tensor max(layer->get_max());
   return edsl::make_tuple(op::clip(I, min, max));
 });
-
-// IE_SUPPRESS_DEPRECATED_END
 
 }  // namespace PlaidMLPlugin

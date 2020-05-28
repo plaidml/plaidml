@@ -29,14 +29,14 @@ InferRequestInternal::Ptr PlaidMLExecutableNetwork::CreateInferRequestImpl(Input
                                                                            OutputsDataMap networkOutputs) {
   IVLOG(1, "PlaidMLExecutableNetwork::CreateInferRequestImpl>");
   std::vector<plaidml::edsl::Tensor> outputs;
-    IVLOG(1, "networkOutputs: " << networkOutputs);
-    IVLOG(1, "tensorMap_: " << tensorMap_);
+    IVLOG(2, "networkOutputs: " << networkOutputs);
+    IVLOG(3, "tensorIOMap_: " << tensorIOMap_);
   for (const auto& kvp : networkOutputs) {
-    IVLOG(1, "output: " << kvp.first);
-    outputs.push_back(tensorMap_.at(kvp.first));
+    IVLOG(2, "output: " << kvp.first);
+    outputs.push_back(tensorIOMap_.at(kvp.first));
   }
   auto program = edsl::ProgramBuilder("ie", outputs).compile();
-  return std::make_shared<PlaidMLInferRequest>(networkInputs, networkOutputs, program, tensorMap_);
+  return std::make_shared<PlaidMLInferRequest>(networkInputs, networkOutputs, program, tensorIOMap_);
 }
 
 PlaidMLExecutableNetwork::PlaidMLExecutableNetwork(const ICNNNetwork& network, const std::string& device) {
@@ -46,26 +46,24 @@ PlaidMLExecutableNetwork::PlaidMLExecutableNetwork(const ICNNNetwork& network, c
   IVLOG(1, "Layers:");
   for (auto& node : fcn->get_ordered_ops()) {
     IVLOG(1, "  " << node->description() << ": " << node->get_name() << "... " << node->get_friendly_name());
-    if (node->is_parameter()) {  // TODO: Verify this IDs inputs
+    if (node->is_parameter()) {
       IE_ASSERT(node->get_output_size() == 1);
       std::vector<int64_t> dims {node->get_shape().begin(), node->get_shape().end()};
       auto type = to_plaidml(node->get_element_type());
       auto tensor = edsl::Placeholder(edsl::LogicalShape(type, dims));
       IVLOG(1, "    Adding placeholder named '" << node->get_output_tensor_name(0) << "'");
       tensorMap_[node->get_output_tensor_name(0)] = tensor;
-      // TODO: OpenVINO seems to want to look up inputs by the friendly name of the receiving Node. Which seems troublesomely non-unique, insofar as there's no uniqueness requirement on friendly names. But for now, add an alias under the friendly name.
       IVLOG(1, "    Also, aliasing " << node->get_output_tensor_name(0) << " as " << node->get_friendly_name());
-      tensorMap_[node->get_friendly_name()] = tensor;
+      tensorIOMap_[node->get_friendly_name()] = tensor;
       continue;
-    } else if (node->is_constant()) { // TODO: Flip order with is_parameter
+    } else if (node->is_constant()) {  // TODO: Flip order with is_parameter
       // TODO
     } else if (node->is_output()) {
-      // TODO: OpenVINO seems to want to look up outputs by the friendly name of the generating Node. Which seems troublesomely non-unique, insofar as nodes may have multiple outputs and there's no uniqueness requirement on friendly names. But for now, add an alias under the friendly name.
       const auto& src_output = node->get_inputs()[0].get_output();
       const auto& friendly_name = src_output.get_node()->get_friendly_name();
       const auto& original_name = src_output.get_node()->get_output_tensor_name(src_output.get_index());
       IVLOG(1, "At an output node, aliasing " << original_name << " as " << friendly_name);
-      tensorMap_[friendly_name] = tensorMap_.at(original_name);
+      tensorIOMap_[friendly_name] = tensorMap_.at(original_name);
       continue;
     }
 

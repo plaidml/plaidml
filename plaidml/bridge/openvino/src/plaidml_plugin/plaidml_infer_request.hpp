@@ -36,7 +36,7 @@ class PlaidMLInferRequest : public InferenceEngine::InferRequestInternal {
   void SyncOutput();
 
  private:
-  std::unordered_map<std::string, plaidml::edsl::Tensor> tensorMap_;
+  std::unordered_map<std::string, plaidml::edsl::Tensor> tensorIOMap_;
   plaidml::exec::Binder binder_;
   std::shared_ptr<plaidml::exec::Executable> exec_;
 };

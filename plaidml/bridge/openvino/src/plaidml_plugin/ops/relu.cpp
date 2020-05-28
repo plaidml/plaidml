@@ -4,8 +4,6 @@
 
 #include "plaidml_ops.hpp"
 
-// TODO: Include ordering
-
 #include "ngraph/opsets/opset.hpp"
 #include "ngraph/opsets/opset1.hpp"
 
@@ -16,8 +14,6 @@ using namespace InferenceEngine;  // NOLINT[build/namespaces]
 
 namespace PlaidMLPlugin {
 
-// IE_SUPPRESS_DEPRECATED_START
-
 static OpRegistration reg("relu", [](const Context& ctx) {
   // auto* layer = dynamic_cast<ngraph::opset1::Relu*>(ctx.layer);  // TODO: Will need to recover layer to get alpha
   IE_ASSERT(ctx.operands.size() == 1);
@@ -26,7 +22,5 @@ static OpRegistration reg("relu", [](const Context& ctx) {
   // return edsl::make_tuple(op::relu(I).alpha(alpha));
   return edsl::make_tuple(op::relu(I));
 });
-
-// IE_SUPPRESS_DEPRECATED_END
 
 }  // namespace PlaidMLPlugin
