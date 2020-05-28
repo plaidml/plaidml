@@ -44,7 +44,10 @@ PlaidMLExecutableNetwork::PlaidMLExecutableNetwork(const ICNNNetwork& network, c
   IVLOG(1, "Layers:");
   for (auto& node : fcn->get_ordered_ops()) {
     IVLOG(1, "  " << node->description() << ": " << node->get_name() << "... " << node->get_friendly_name());
-    if (node->is_parameter()) {
+    if (node->is_constant()) {
+      // TODO
+      THROW_IE_EXCEPTION << "PlaidML OpenVINO constants not yet implemented";
+    } else if (node->is_parameter()) {
       IE_ASSERT(node->get_output_size() == 1);
       std::vector<int64_t> dims {node->get_shape().begin(), node->get_shape().end()};
       auto type = to_plaidml(node->get_element_type());
@@ -54,8 +57,6 @@ PlaidMLExecutableNetwork::PlaidMLExecutableNetwork(const ICNNNetwork& network, c
       IVLOG(1, "    Also, aliasing " << node->get_output_tensor_name(0) << " as " << node->get_friendly_name());
       tensorIOMap_[node->get_friendly_name()] = tensor;
       continue;
-    } else if (node->is_constant()) {  // TODO: Flip order with is_parameter
-      // TODO
     } else if (node->is_output()) {
       const auto& src_output = node->get_inputs()[0].get_output();
       const auto& friendly_name = src_output.get_node()->get_friendly_name();
@@ -72,7 +73,6 @@ PlaidMLExecutableNetwork::PlaidMLExecutableNetwork(const ICNNNetwork& network, c
 
     Context ctx{node.get()};
     for (const auto& input : node->get_inputs()) {
-      // TODO: n.b. each `input` is an instance of Input<Node>
       const auto& src_output = input.get_output();
       const auto& name = src_output.get_node()->get_output_tensor_name(src_output.get_index());
       IVLOG(1, "    input: " << name);
