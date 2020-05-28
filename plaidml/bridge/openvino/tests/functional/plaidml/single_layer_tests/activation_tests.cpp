@@ -315,9 +315,9 @@ activation_test_params test_cases[] = {
     // activation_test_params(case_2, "power", {2.0f, 3.0f, 5.0f}),
     // activation_test_params(case_3, "power", {4.0f, 1.0f, 7.0f}),
 
-    // activation_test_params(case_1, "clamp", {0.0f, 1.0f}),  // min max
-    // activation_test_params(case_2, "clamp", {0.0f, 6.0f}),  //
-    // activation_test_params(case_3, "clamp", {0.0f, 3.0f}),  //
+    activation_test_params(case_1, "clamp", {0.0f, 1.0f}),  // min max
+    activation_test_params(case_2, "clamp", {0.0f, 6.0f}),  //
+    activation_test_params(case_3, "clamp", {0.0f, 3.0f}),  //
 
     // FIXME doesn't support exp and not activation now
     // activation_test_params(case_1, "exp"),
