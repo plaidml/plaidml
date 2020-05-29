@@ -12,6 +12,9 @@
 
 #include "details/caseless.hpp"
 
+#include "ngraph/opsets/opset.hpp"
+#include "ngraph/opsets/opset1.hpp"
+
 #include "plaidml/edsl/edsl.h"
 
 namespace PlaidMLPlugin {
@@ -19,7 +22,7 @@ namespace PlaidMLPlugin {
 IE_SUPPRESS_DEPRECATED_START
 
 struct Context {
-  InferenceEngine::CNNLayer* layer;
+  ngraph::Node* layer;
   std::vector<plaidml::edsl::Tensor> operands;
 };
 

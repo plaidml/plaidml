@@ -4,6 +4,9 @@
 
 #include "plaidml_ops.hpp"
 
+#include "ngraph/opsets/opset.hpp"
+#include "ngraph/opsets/opset1.hpp"
+
 #include "plaidml/op/op.h"
 
 using namespace plaidml;          // NOLINT[build/namespaces]
@@ -11,16 +14,11 @@ using namespace InferenceEngine;  // NOLINT[build/namespaces]
 
 namespace PlaidMLPlugin {
 
-IE_SUPPRESS_DEPRECATED_START
-
 static OpRegistration reg("relu", [](const Context& ctx) {
-  auto* layer = dynamic_cast<ReLULayer*>(ctx.layer);
+  // Note that nGraph ReLU does not include an alpha parameter
   IE_ASSERT(ctx.operands.size() == 1);
   auto I = ctx.operands.at(0);
-  edsl::Tensor alpha(layer->negative_slope);
-  return edsl::make_tuple(op::relu(I).alpha(alpha));
+  return edsl::make_tuple(op::relu(I));
 });
-
-IE_SUPPRESS_DEPRECATED_END
 
 }  // namespace PlaidMLPlugin
