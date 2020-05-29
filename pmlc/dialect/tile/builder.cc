@@ -765,9 +765,16 @@ TileBuilder::MakeProgram(StringRef name, const ProgramMutations &mutations,
   for (unsigned i = 0; i < returnOp.getNumOperands(); i++) {
     auto userValue = outputs[i];
     auto finalValue = returnOp.getOperand(i);
-    // Wrap outputs that directly refer to inputs
-    if (!finalValue.getDefiningOp()) {
+    // Determine whether an elementwise copy is required
+    bool mustCopy = false;
+    if (auto defOp = finalValue.getDefiningOp()) {
+      // Output is the result of a reshape (view)
+      mustCopy = mlir::dyn_cast<ReshapeOp>(defOp);
+    } else {
       IVLOG(2, "Reached condition: output that refers directly to input");
+      mustCopy = true;
+    }
+    if (mustCopy) {
       OpBuilder identBuilder(returnOp);
       auto ident = identBuilder.create<eltwise::IdentOp>(loc, finalValue);
       returnOp.setOperand(i, ident.result());

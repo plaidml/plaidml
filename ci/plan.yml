@@ -161,6 +161,8 @@ SUITES:
           - TestBackendOps.testArange
           - TestBackendOps.testAvgPool
           - TestBackendOps.testDot
+          - TestBackendOps.testBatchFlatten
+          - TestBackendOps.testFlatten
           - TestBackendOps.testEye
           - TestBackendOps.testAddElements
           - TestBackendOps.testAddElementsRepeated
@@ -176,6 +178,7 @@ SUITES:
           - TestBackendOps.testProdAxisNumpy
           - TestBackendOps.testProdNegAxis
           - TestBackendOps.testProdOfShape
+          - TestBackendOps.testReshapeShape
           - TestBackendOps.testProd
           - TestBackendOps.testMax
           - TestBackendOps.testMaximum
@@ -186,12 +189,16 @@ SUITES:
           - TestBackendOps.testClip
           - TestBackendOps.testElu
           - TestBackendOps.testPool3D
+          - TestBackendOps.testReshape
           - TestBackendOps.testRelu
           - TestBackendOps.testHardSigmoid
           - TestBackendOps.testAbs
           - TestBackendOps.testAll
           - TestBackendOps.testAny
           - TestBackendOps.testReshapeMatchDim
+          - TestBackendOps.testReshapeSymbolic
+          - TestBackendOps.testTransposeReshape
+          - TestBackendOps.testSqueeze
           - TestBackendOps.testSum
           - TestBackendOps.testSquare
           - TestBackendOps.testSqrt
@@ -212,6 +219,11 @@ SUITES:
           - TestBackendOps.testIsPlaceholder
           - TestBackendOps.testUpdate
           - TestBackendOps.testMovingAverageUpdate
+          - TestBackendOps.testBatchNormAndUpdate
+          - TestBackendOps.testNormalizeBatchInTrainingSimple
+          - TestBackendOps.testNormalizeBatchInTrainingWeirdAxis
+          - TestBackendOps.testNormalizeBatchInTrainingWeirdMultiAxis
+          - TestBackendOps.testNormalizeBatchInTrainingMultiAxis
           - TestBackendOps.testBatchNormalization
           - TestBackendOps.testBatchNormalizationVar
           - TestBackendOps.testBatchNormalizationMean
