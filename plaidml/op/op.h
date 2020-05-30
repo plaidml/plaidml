@@ -140,7 +140,17 @@ inline edsl::Tensor concatenate(const std::vector<edsl::Tensor>& tensors, int ax
 
 class convolution {
  public:
-  explicit convolution(edsl::Tensor I, edsl::Tensor F) : I_(I), F_(F) {}
+  explicit convolution(edsl::Tensor I, edsl::Tensor F)
+      : I_(I),
+        F_(F),
+        groups_(1),
+        autopad_mode_(AutoPadMode::SAME_UPPER),
+        input_layout_(TensorLayout::NXC),
+        filter_layout_(TensorLayout::XCK),
+        group_layout_(GroupLayout::NONE),
+        winograd_allowed_(false),
+        autogroup_mode_(AutoGroupMode::UNGROUPED),
+        deriv_mode_(ConvDerivMode::NONE) {}
 
   convolution& strides(const std::vector<int>& strides) {
     strides_ = strides;
@@ -248,15 +258,15 @@ class convolution {
   std::vector<int> filter_shape_;    // Default: empty (i.e. no filter dim check)
   int groups_ = 1;
   std::vector<int> manual_padding_;  // Default: empty (i.e. no manual padding)
-  AutoPadMode autopad_mode_ = AutoPadMode::SAME_UPPER;
-  TensorLayout input_layout_ = TensorLayout::NXC;
-  TensorLayout filter_layout_ = TensorLayout::XCK;
-  GroupLayout group_layout_ = GroupLayout::NONE;
-  bool winograd_allowed_ = false;
-  std::string name_;  // Default: empty (oplib currently renames "" to "conv")
-  AutoGroupMode autogroup_mode_ = AutoGroupMode::UNGROUPED;
-  ConvDerivMode deriv_mode_ = ConvDerivMode::NONE;
-  std::vector<int> result_shape_;  // Default: empty (i.e. unspecified)
+  AutoPadMode autopad_mode_;         // Default: AutoPadMode::SAME_UPPER
+  TensorLayout input_layout_;        // Default: TensorLayout::NXC
+  TensorLayout filter_layout_;       // Default: TensorLayout::XCK
+  GroupLayout group_layout_;         // Default: GroupLayout::NONE
+  bool winograd_allowed_;            // Default: false
+  std::string name_;                 // Default: empty (oplib currently renames "" to "conv")
+  AutoGroupMode autogroup_mode_;     // Default: AutoGroupMode::UNGROUPED
+  ConvDerivMode deriv_mode_;         // Default: ConvDerivMode::NONE
+  std::vector<int> result_shape_;    // Default: empty (i.e. unspecified)
 };
 
 inline edsl::Tensor cumprod(const edsl::Tensor& I, int axis) {
