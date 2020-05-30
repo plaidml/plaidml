@@ -256,7 +256,7 @@ class convolution {
   std::vector<int> dilations_;       // Default: empty (builds vector of 1s in oplib)
   std::vector<int> data_dilations_;  // Default: empty (builds vector of 1s in oplib)
   std::vector<int> filter_shape_;    // Default: empty (i.e. no filter dim check)
-  int groups_ = 1;
+  int groups_;                       // Default: 1
   std::vector<int> manual_padding_;  // Default: empty (i.e. no manual padding)
   AutoPadMode autopad_mode_;         // Default: AutoPadMode::SAME_UPPER
   TensorLayout input_layout_;        // Default: TensorLayout::NXC
