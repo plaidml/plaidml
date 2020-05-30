@@ -719,20 +719,12 @@ void ReshapeOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
 
 Type ReshapeOp::getResultType(ArrayRef<Value> operands) {
   IVLOG(5, "ReshapeOp::getResultType>")
-  if (!operands.size()) {
+  if (operands.empty()) {
     throw std::runtime_error("ReshapeOp requires at least 1 operand");
   }
   auto tensor = operands.front();
-  auto tensorType = eltwise::getRankedTensorType(tensor.getType());
-  // In the case of scalars, return the original type
-  if (!tensorType.getRank()) {
-    return tensorType;
-  }
   auto dims = operands.drop_front();
-  if (!dims.size()) {
-    throw std::runtime_error(
-        "ReshapeOp with Tensor of rank > 0 requires dims to be set");
-  }
+  auto tensorType = eltwise::getRankedTensorType(tensor.getType());
   auto elementType = tensorType.getElementType();
   auto shape = eltwise::ComputeShape(dims);
   return RankedTensorType::get(shape, elementType);
