@@ -15,13 +15,70 @@ cc_library(
         "inference-engine/include/**/*.hpp",
     ]),
     defines = [
-        'CI_BUILD_NUMBER=\\"0\\"',
-        'IE_BUILD_POSTFIX=\\"\\"',
+        "CI_BUILD_NUMBER=\\\"0\\\"",
+        "IE_BUILD_POSTFIX=\\\"\\\"",
     ],
     includes = [
         "inference-engine/include",
     ],
     tags = TAGS,
+)
+
+cc_library(
+    name = "shared_plugin_tests",
+    #    srcs = glob(
+    #        ["inference-engine/tests/functional/plugin/shared/src/single_layer_tests/*.cpp"],
+    #        exclude = [
+    #            # TODO
+    #            "inference-engine/tests/functional/plugin/shared/src/single_layer_tests/lrn.cpp",
+    #        ],
+    #    ),
+    #    hdrs = glob(
+    #        ["inference-engine/tests/functional/plugin/shared/include/single_layer_tests/*.hpp"],
+    #        exclude = [
+    #            # TODO
+    #            "inference-engine/tests/functional/plugin/shared/include/single_layer_tests/lrn.hpp",
+    #        ],
+    #    ),
+    srcs = glob(["inference-engine/tests/functional/plugin/shared/src/single_layer_tests/activation.cpp"]),
+    hdrs = glob(["inference-engine/tests/functional/plugin/shared/include/single_layer_tests/activation.hpp"]),
+    # copts = ["-w"],
+    includes = ["inference-engine/tests/functional/plugin/shared/include"],
+    deps = [
+        ":functional_test_utils",
+        ":inference_engine",
+        ":ngraph_function_tests",
+        "@gmock//:gtest",
+    ],
+)
+
+cc_library(
+    name = "functional_test_utils",
+    srcs = glob(["inference-engine/tests/ie_test_utils/functional_test_utils/*.cpp"]),
+    hdrs = glob(["inference-engine/tests/ie_test_utils/functional_test_utils/*.hpp"]),
+    # copts = ["-w"],
+    includes = ["inference-engine/tests/ie_test_utils"],
+    deps = [
+        ":inference_engine",
+        "@gmock//:gtest",
+    ],
+)
+
+cc_library(
+    name = "ngraph_function_tests",
+    srcs = glob([
+        "inference-engine/tests/ngraph_functions/src/*.cpp",
+        "inference-engine/tests/ngraph_functions/src/utils/*.cpp",
+    ]),
+    hdrs = glob([
+        "inference-engine/tests/ngraph_functions/include/ngraph_functions/*.hpp",
+        "inference-engine/tests/ngraph_functions/include/ngraph_functions/utils/*.hpp",
+    ]),
+    # copts = ["-w"],
+    includes = ["inference-engine/tests/ngraph_functions/include/"],
+    deps = [
+        ":inference_engine",
+    ],
 )
 
 cc_library(
