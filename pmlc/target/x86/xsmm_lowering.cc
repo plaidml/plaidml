@@ -44,6 +44,11 @@ public:
     Impl impl(op, rewriter);
     auto &tile = impl.tile;
 
+    SmallVector<int64_t, 1> memshape{1};
+    MemRefType newMemRefType = MemRefType::Builder(memshape,rewriter.getIntegerType(64));
+    auto funcaddr = rewriter.create<AllocaOp>(op.getLoc(), newMemRefType );
+    auto funcaddr2 = rewriter.create<MemRefCastOp>(op.getLoc(), funcaddr, UnrankedMemRefType::get(rewriter.getIntegerType(64), /*memorySpace=*/0) );
+
     auto symbola = impl.getOrInsertDispatchFunc();
     auto symbolb = impl.getOrInsertExecFunc();
     auto a = impl.prepareOperand(op.a(), op.aAccessMap(), op.getOperandsForA(),
@@ -59,10 +64,6 @@ public:
     for (auto i : impl.tile) {
       argsa.push_back(impl.createConstantIntOp(i));
     }
-    SmallVector<int64_t, 1> memshape{1};
-    MemRefType newMemRefType = MemRefType::Builder(memshape,rewriter.getIntegerType(64));
-    auto funcaddr = rewriter.create<AllocaOp>(op.getLoc(), newMemRefType );
-    auto funcaddr2 = rewriter.create<MemRefCastOp>(op.getLoc(), funcaddr, UnrankedMemRefType::get(rewriter.getIntegerType(64), /*memorySpace=*/0) );
     argsa.push_back(funcaddr2);
     argsb.push_back(funcaddr2);
     rewriter.create<CallOp>(op.getLoc(), symbola, ArrayRef<Type>{}, argsa );
