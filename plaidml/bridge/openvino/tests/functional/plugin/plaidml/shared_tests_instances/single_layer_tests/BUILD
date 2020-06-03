@@ -10,7 +10,20 @@ TAGS = [
 
 cc_test(
     name = "single_layer_tests",
-    srcs = glob(["*.cpp"]),
+    srcs = glob(
+        ["*.cpp"],
+        exclude = [
+            "convolution_backprop_data.cpp",
+            "cum_sum.cpp",
+            "extract_image_patches.cpp",
+            "fake_quantize.cpp",
+            "group_convolution.cpp",
+            "group_convolution_backprop_data.cpp",
+            "mvn.cpp",
+            "select.cpp",
+            "space_to_batch.cpp",
+        ],
+    ),
     copts = ["-Wno-deprecated-declarations"],
     data = [
         "//plaidml/bridge/openvino:libplaidml-plugin.so",
