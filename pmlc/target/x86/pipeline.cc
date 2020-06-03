@@ -152,6 +152,7 @@ void addToPipeline(OpPassManager &pm) {
   pm.addPass(createLowerAffinePass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
+  pm.addPass(createLoopInvariantCodeMotionPass());
 
   pm.addPass(ConvertToStdPass::create());
   if (pmlc::util::getEnvVar("PLAIDML_BOUNDS_CHECK") == "1") {
