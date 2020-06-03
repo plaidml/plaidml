@@ -18,8 +18,8 @@ cc_library(
             "src/ngraph/pattern/**/*.cpp",
             "src/ngraph/runtime/*.cpp",
             "src/ngraph/runtime/dynamic/*.cpp",
-            "src/ngraph/runtime/interpreter/*.cpp",  # TODO
-            "src/ngraph/state/*.cpp",  # TODO
+            "src/ngraph/runtime/interpreter/*.cpp",
+            "src/ngraph/state/*.cpp",
             "src/ngraph/type/*.cpp",
         ],
         exclude = [
@@ -38,8 +38,7 @@ cc_library(
         "src/ngraph/pass/*.hpp",
         "src/ngraph/pattern/*.hpp",
         "src/ngraph/runtime/**/*.hpp",
-        "src/ngraph/runtime/interpreter/*.hpp",  # TODO
-        "src/ngraph/state/*.hpp",  # TODO
+        "src/ngraph/state/*.hpp",
         "src/ngraph/pattern/**/*.hpp",
         "src/ngraph/type/*.hpp",
     ]),

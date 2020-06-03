@@ -26,23 +26,11 @@ cc_library(
 
 cc_library(
     name = "shared_plugin_tests",
-    #    srcs = glob(
-    #        ["inference-engine/tests/functional/plugin/shared/src/single_layer_tests/*.cpp"],
-    #        exclude = [
-    #            # TODO
-    #            "inference-engine/tests/functional/plugin/shared/src/single_layer_tests/lrn.cpp",
-    #        ],
-    #    ),
-    #    hdrs = glob(
-    #        ["inference-engine/tests/functional/plugin/shared/include/single_layer_tests/*.hpp"],
-    #        exclude = [
-    #            # TODO
-    #            "inference-engine/tests/functional/plugin/shared/include/single_layer_tests/lrn.hpp",
-    #        ],
-    #    ),
+    # TODO: Switch to * srcs & hdrs once all are working (perhaps with `exclude` if needed)
+    #    srcs = glob(["inference-engine/tests/functional/plugin/shared/src/single_layer_tests/*.cpp"]),
+    #    hdrs = glob(["inference-engine/tests/functional/plugin/shared/include/single_layer_tests/*.hpp"]),
     srcs = glob(["inference-engine/tests/functional/plugin/shared/src/single_layer_tests/activation.cpp"]),
     hdrs = glob(["inference-engine/tests/functional/plugin/shared/include/single_layer_tests/activation.hpp"]),
-    # copts = ["-w"],
     includes = ["inference-engine/tests/functional/plugin/shared/include"],
     deps = [
         ":functional_test_utils",
@@ -56,7 +44,6 @@ cc_library(
     name = "functional_test_utils",
     srcs = glob(["inference-engine/tests/ie_test_utils/functional_test_utils/*.cpp"]),
     hdrs = glob(["inference-engine/tests/ie_test_utils/functional_test_utils/*.hpp"]),
-    # copts = ["-w"],
     includes = ["inference-engine/tests/ie_test_utils"],
     deps = [
         ":inference_engine",
@@ -74,7 +61,6 @@ cc_library(
         "inference-engine/tests/ngraph_functions/include/ngraph_functions/*.hpp",
         "inference-engine/tests/ngraph_functions/include/ngraph_functions/utils/*.hpp",
     ]),
-    # copts = ["-w"],
     includes = ["inference-engine/tests/ngraph_functions/include/"],
     deps = [
         ":inference_engine",
