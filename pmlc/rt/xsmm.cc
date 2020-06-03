@@ -35,25 +35,20 @@ extern "C" void plaidml_rt_xsmm_exec_gemm_f32(       //
     size_t aRank, StridedMemRefType<float, 2> *aRef, //
     size_t bRank, StridedMemRefType<float, 2> *bRef, //
     size_t cRank, StridedMemRefType<float, 2> *cRef, //
-    //size_t funcRank, unsigned long long* func_addr ) {
-    size_t funcRank, StridedMemRefType<unsigned long long, 2> *fRef ) {
+    unsigned long long func_addr ) {
   auto aPtr = aRef->data + aRef->offset;
   auto bPtr = bRef->data + bRef->offset;
   auto cPtr = cRef->data + cRef->offset;
-  auto func_addr_ptr = fRef->data + fRef->offset;
   libxsmm_xmmfunction sgemm;
-  unsigned long long func_addr = *func_addr_ptr;
   void* func_ptr = (void*)func_addr;
   sgemm.xmm = (void (*)(const void*, const void*, void*, ...))func_ptr; 
 
   sgemm.smm(bPtr, aPtr, cPtr);
 }
 
-extern "C" void plaidml_rt_xsmm_dispatch_gemm_f32(  //
+extern "C" unsigned long long plaidml_rt_xsmm_dispatch_gemm_f32(  //
     int32_t lda, int32_t ldb, int32_t ldc,           //
-    int32_t m, int32_t n, int32_t k,
-    //size_t funcRank, unsigned long long* func_addr ) {
-    size_t funcRank, StridedMemRefType<unsigned long long, 2> *fRef ) {
+    int32_t m, int32_t n, int32_t k ) {
 
   libxsmm_blasint lda_int = lda;
   libxsmm_blasint ldb_int = ldb;
@@ -61,14 +56,13 @@ extern "C" void plaidml_rt_xsmm_dispatch_gemm_f32(  //
   libxsmm_blasint m_int = m;
   libxsmm_blasint n_int = n;
   libxsmm_blasint k_int = k;
-  auto func_addr = fRef->data + fRef->offset;
 
   auto sgemm =
       libxsmm_smmdispatch(n_int, m_int, k_int, &ldb_int, &lda_int, &ldc_int,
                           /*alpha=*/nullptr, /*beta=*/nullptr,
                           /*flags=*/nullptr, /*prefetch=*/nullptr);
 
-  *func_addr = (unsigned long long)sgemm;
+  return (unsigned long long)sgemm;
 }
 
 namespace {

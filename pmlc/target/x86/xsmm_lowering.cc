@@ -44,11 +44,6 @@ public:
     Impl impl(op, rewriter);
     auto &tile = impl.tile;
 
-    SmallVector<int64_t, 1> memshape{1};
-    MemRefType newMemRefType = MemRefType::Builder(memshape,rewriter.getIntegerType(64));
-    auto funcaddr = rewriter.create<AllocaOp>(op.getLoc(), newMemRefType );
-    auto funcaddr2 = rewriter.create<MemRefCastOp>(op.getLoc(), funcaddr, UnrankedMemRefType::get(rewriter.getIntegerType(64), /*memorySpace=*/0) );
-
     auto symbola = impl.getOrInsertDispatchFunc();
     auto symbolb = impl.getOrInsertExecFunc();
     auto a = impl.prepareOperand(op.a(), op.aAccessMap(), op.getOperandsForA(),
@@ -64,9 +59,9 @@ public:
     for (auto i : impl.tile) {
       argsa.push_back(impl.createConstantIntOp(i));
     }
-    argsa.push_back(funcaddr2);
-    argsb.push_back(funcaddr2);
-    rewriter.create<CallOp>(op.getLoc(), symbola, ArrayRef<Type>{}, argsa );
+
+    auto xsmmdis = rewriter.create<CallOp>(op.getLoc(), symbola, rewriter.getIntegerType(64), argsa );
+    argsb.push_back(xsmmdis.getResult(0)); 
     rewriter.create<CallOp>(op.getLoc(), symbolb, ArrayRef<Type>{}, argsb );
     rewriter.replaceOp(op, op.c());
     return success();
@@ -125,11 +120,9 @@ public:
         return SymbolRefAttr::get(symbol, context);
       }
       OpBuilder builder(module.getBodyRegion());
-      UnrankedMemRefType newMemRefType = UnrankedMemRefType::get(i64Type, /*memorySpace=*/0);
-      std::array<Type, 7> inputs{i32Type,      i32Type,      i32Type,
-                                 i32Type,      i32Type,      i32Type, newMemRefType};
-      ArrayRef<Type> results{};
-      auto funcType = builder.getFunctionType(inputs, results);
+      std::array<Type, 6> inputs{i32Type,      i32Type,      i32Type,
+                                 i32Type,      i32Type,      i32Type};
+      auto funcType = builder.getFunctionType(inputs, i64Type);
       ArrayRef<NamedAttribute> attrs{};
       builder.create<FuncOp>(loc, symbol, funcType, attrs);
       return SymbolRefAttr::get(symbol, context);
@@ -142,8 +135,7 @@ public:
         return SymbolRefAttr::get(symbol, context);
       }
       OpBuilder builder(module.getBodyRegion());
-      UnrankedMemRefType newMemRefType = UnrankedMemRefType::get(i64Type, /*memorySpace=*/0);
-      std::array<Type, 4> inputs{unrankedType, unrankedType, unrankedType, newMemRefType};
+      std::array<Type, 4> inputs{unrankedType, unrankedType, unrankedType, i64Type};
       ArrayRef<Type> results{};
       auto funcType = builder.getFunctionType(inputs, results);
       ArrayRef<NamedAttribute> attrs{};
