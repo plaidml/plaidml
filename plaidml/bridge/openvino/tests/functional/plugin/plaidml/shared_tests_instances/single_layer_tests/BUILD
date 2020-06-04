@@ -21,6 +21,7 @@ cc_test(
     deps = [
         "//pmlc/util:logging",
         "@gflags",
+        "@gmock//:gtest_main",
         "@openvino//:helpers",
         "@openvino//:inference_engine",
         "@openvino//:common_test_utils",
