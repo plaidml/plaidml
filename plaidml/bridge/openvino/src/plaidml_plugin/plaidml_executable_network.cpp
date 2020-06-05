@@ -45,7 +45,6 @@ PlaidMLExecutableNetwork::PlaidMLExecutableNetwork(const ICNNNetwork& network, c
   for (auto& node : fcn->get_ordered_ops()) {
     IVLOG(2, "  " << node->description() << ": " << node->get_name() << "... " << node->get_friendly_name());
     if (node->is_constant()) {
-      // TODO: Possible we could move this into the general purpose op registry
       IE_ASSERT(node->get_output_size() == 1);
       IE_ASSERT(node->description() == "Constant");
       auto type = to_plaidml(node->get_element_type());
@@ -59,9 +58,6 @@ PlaidMLExecutableNetwork::PlaidMLExecutableNetwork(const ICNNNetwork& network, c
       auto tensor = edsl::Constant(type, buffer, dims, node->get_friendly_name());
       IVLOG(3, "    Adding constant named '" << node->get_output_tensor_name(0) << "'");
       tensorMap_[node->get_output_tensor_name(0)] = tensor;
-      // TODO: Unclear that this needs to be in the IO tensor map
-      IVLOG(3, "    Also, aliasing " << node->get_output_tensor_name(0) << " as " << node->get_friendly_name());
-      tensorIOMap_[node->get_friendly_name()] = tensor;
       continue;
     } else if (node->is_parameter()) {
       IE_ASSERT(node->get_output_size() == 1);
