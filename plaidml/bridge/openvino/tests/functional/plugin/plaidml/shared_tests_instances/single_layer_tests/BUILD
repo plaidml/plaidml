@@ -3,21 +3,33 @@ load("//bzl:plaidml.bzl", "PLAIDML_LINKOPTS")
 
 package(default_visibility = ["//visibility:public"])
 
-TAGS = [
-    "skip_macos",
-    "skip_windows",
-]
-
 cc_test(
     name = "single_layer_tests",
-    srcs = glob(["*.cpp"]),
+    srcs = glob(
+        ["*.cpp"],
+        exclude = [
+            "convolution_backprop_data.cpp",
+            "cum_sum.cpp",
+            "extract_image_patches.cpp",
+            "fake_quantize.cpp",
+            "group_convolution.cpp",
+            "group_convolution_backprop_data.cpp",
+            "mvn.cpp",
+            "select.cpp",
+            "space_to_batch.cpp",
+        ],
+    ),
     copts = ["-Wno-deprecated-declarations"],
     data = [
         "//plaidml/bridge/openvino:libplaidml-plugin.so",
         "//plaidml/bridge/openvino:plugins",
     ],
     linkopts = PLAIDML_LINKOPTS,
-    tags = TAGS,
+    tags = [
+        "manual",
+        "skip_macos",
+        "skip_windows",
+    ],
     deps = [
         "//pmlc/util:logging",
         "@gflags",

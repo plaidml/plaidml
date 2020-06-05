@@ -7,8 +7,14 @@
 #include <vector>
 
 using LayerTestsDefinitions::ActivationLayerTest;
+using ngraph::helpers::Abs;
 using ngraph::helpers::ActivationTypes;
+using ngraph::helpers::Exp;
+using ngraph::helpers::Log;
 using ngraph::helpers::Relu;
+using ngraph::helpers::Sigmoid;
+using ngraph::helpers::Sign;
+using ngraph::helpers::Tanh;
 
 namespace {
 // Common params
@@ -21,13 +27,13 @@ const std::vector<InferenceEngine::Precision> netPrecisions = {
 };
 
 const std::vector<ActivationTypes> activationTypes = {
-    // Sigmoid,
-    // Tanh,
-    Relu,
-    // Exp,
-    // Log,
-    // Sign,
-    // Abs,
+    Sigmoid,  //
+    Tanh,     //
+    Relu,     //
+    Exp,      //
+    Log,      //
+    Sign,     //
+    Abs,
     // Gelu
 };
 
