@@ -20,10 +20,10 @@ std::vector<std::vector<std::vector<size_t>>> inShapes = {{{2}},
 
 std::vector<InferenceEngine::Precision> netPrecisions = {
     InferenceEngine::Precision::FP32,
-    InferenceEngine::Precision::FP16,
+    // InferenceEngine::Precision::FP16,  // TODO: Not yet supported
 };
 
-INSTANTIATE_TEST_CASE_P(multilpy, MultiplyLayerTest,
+INSTANTIATE_TEST_CASE_P(multiply, MultiplyLayerTest,
                         ::testing::Combine(                                       //
                             ::testing::ValuesIn(inShapes),                        //
                             ::testing::ValuesIn(netPrecisions),                   //
