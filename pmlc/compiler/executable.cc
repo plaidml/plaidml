@@ -36,6 +36,8 @@
 
 using namespace mlir; // NOLINT[build/namespaces]
 
+void *g_stack_base = nullptr;
+
 // Setup LLVM target triple from the current machine.
 static void setupTargetTriple(llvm::Module *llvmModule) {
   // Setup the machine properties from the current architecture.
@@ -321,7 +323,17 @@ struct ExecutableImpl {
     }
   }
 
-  void invoke() { jitEntry(ptrs.data()); }
+  void invoke() {
+    void *cur = alloca(8);
+    unsigned usage = reinterpret_cast<uint64_t>(g_stack_base) -
+                     reinterpret_cast<uint64_t>(cur);
+
+    IVLOG(1, "Base: " << g_stack_base);
+    IVLOG(1, "Cur : " << cur);
+    IVLOG(1, "Usage: " << usage);
+
+    jitEntry(ptrs.data());
+  }
 
   std::shared_ptr<Program> program;
   std::unique_ptr<EngineImpl> impl;
