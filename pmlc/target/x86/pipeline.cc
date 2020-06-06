@@ -6,6 +6,7 @@
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Affine/Passes.h"
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
@@ -146,6 +147,7 @@ void addToPipeline(OpPassManager &pm) {
   pm.addPass(conversion::pxa_to_affine::createLowerPXAToAffinePass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
+  pm.addPass(createAffineLoopInvariantCodeMotionPass());
 
   pm.addPass(createLowerAffinePass());
   pm.addPass(createCanonicalizerPass());

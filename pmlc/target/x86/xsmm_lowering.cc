@@ -43,20 +43,26 @@ public:
                                 PatternRewriter &rewriter) const override {
     Impl impl(op, rewriter);
     auto &tile = impl.tile;
-    auto symbol = impl.getOrInsertFunc();
+
+    auto symbola = impl.getOrInsertDispatchFunc();
+    auto symbolb = impl.getOrInsertExecFunc();
     auto a = impl.prepareOperand(op.a(), op.aAccessMap(), op.getOperandsForA(),
                                  op.aTileMap(), {tile[0], tile[2]});
     auto b = impl.prepareOperand(op.b(), op.bAccessMap(), op.getOperandsForB(),
                                  op.bTileMap(), {tile[2], tile[1]});
     auto c = impl.prepareOperand(op.c(), op.cAccessMap(), op.getOperandsForC(),
                                  op.cTileMap(), {tile[0], tile[1]});
-    SmallVector<Value, 9> args{a.memref,           b.memref,
-                               c.memref,           a.leadingDimStride,
-                               b.leadingDimStride, c.leadingDimStride};
+    SmallVector<Value, 3> argsa{a.leadingDimStride,
+                                b.leadingDimStride, c.leadingDimStride};
+    SmallVector<Value, 6> argsb{a.memref,           b.memref,
+                                c.memref           };
     for (auto i : impl.tile) {
-      args.push_back(impl.createConstantIntOp(i));
+      argsa.push_back(impl.createConstantIntOp(i));
     }
-    rewriter.create<CallOp>(op.getLoc(), symbol, ArrayRef<Type>{}, args);
+
+    auto xsmmdis = rewriter.create<CallOp>(op.getLoc(), symbola, rewriter.getIntegerType(64), argsa );
+    argsb.push_back(xsmmdis.getResult(0)); 
+    rewriter.create<CallOp>(op.getLoc(), symbolb, ArrayRef<Type>{}, argsb );
     rewriter.replaceOp(op, op.c());
     return success();
   }
@@ -67,6 +73,7 @@ public:
     Location loc;
     ModuleOp module;
     Type i32Type;
+    Type i64Type;
     Type elementType;
     UnrankedMemRefType unrankedType;
     SmallVector<unsigned, 3> tile;
@@ -80,6 +87,7 @@ public:
         : op(op), rewriter(rewriter), loc(op.getLoc()),
           module(op.getParentOfType<ModuleOp>()),
           i32Type(rewriter.getIntegerType(32)),
+          i64Type(rewriter.getIntegerType(64)),
           elementType(rewriter.getF32Type()),
           unrankedType(
               UnrankedMemRefType::get(elementType, /*memorySpace=*/0)) {
@@ -98,6 +106,36 @@ public:
       std::array<Type, 9> inputs{unrankedType, unrankedType, unrankedType,
                                  i32Type,      i32Type,      i32Type,
                                  i32Type,      i32Type,      i32Type};
+      ArrayRef<Type> results{};
+      auto funcType = builder.getFunctionType(inputs, results);
+      ArrayRef<NamedAttribute> attrs{};
+      builder.create<FuncOp>(loc, symbol, funcType, attrs);
+      return SymbolRefAttr::get(symbol, context);
+    }
+
+    FlatSymbolRefAttr getOrInsertDispatchFunc() {
+      const char *symbol = "plaidml_rt_xsmm_dispatch_gemm_f32";
+      auto context = module.getContext();
+      if (module.lookupSymbol(symbol)) {
+        return SymbolRefAttr::get(symbol, context);
+      }
+      OpBuilder builder(module.getBodyRegion());
+      std::array<Type, 6> inputs{i32Type,      i32Type,      i32Type,
+                                 i32Type,      i32Type,      i32Type};
+      auto funcType = builder.getFunctionType(inputs, i64Type);
+      ArrayRef<NamedAttribute> attrs{};
+      builder.create<FuncOp>(loc, symbol, funcType, attrs);
+      return SymbolRefAttr::get(symbol, context);
+    }
+
+    FlatSymbolRefAttr getOrInsertExecFunc() {
+      const char *symbol = "plaidml_rt_xsmm_exec_gemm_f32";
+      auto context = module.getContext();
+      if (module.lookupSymbol(symbol)) {
+        return SymbolRefAttr::get(symbol, context);
+      }
+      OpBuilder builder(module.getBodyRegion());
+      std::array<Type, 4> inputs{unrankedType, unrankedType, unrankedType, i64Type};
       ArrayRef<Type> results{};
       auto funcType = builder.getFunctionType(inputs, results);
       ArrayRef<NamedAttribute> attrs{};

@@ -16,9 +16,10 @@ func @dot(%A: memref<4x8xf32>, %B: memref<8x6xf32>, %C: memref<4x6xf32>) -> () {
     // CHECK: memref_cast
     // CHECK: subview %{{.*}}[{{.*}}] [2, 2] [1, 1] : memref<4x6xf32> to memref<2x2xf32, #{{.*}}>
     // CHECK: memref_cast
-    // CHECK: call @plaidml_rt_xsmm_gemm_f32
-    // CHECK-SAME: (%{{.*}}, %{{.*}}, %{{.*}}, %[[c8]], %[[c6]], %[[c6]], %[[c2]], %[[c2]], %[[c2]])
-    // CHECK-SAME: (memref<*xf32>, memref<*xf32>, memref<*xf32>, i32, i32, i32, i32, i32, i32) -> ()
+    // CHECK: call @plaidml_rt_xsmm_dispatch_gemm_f32
+    // CHECK-SAME: (%[[c8]], %[[c6]], %[[c6]], %[[c2]], %[[c2]], %[[c2]]) : (i32, i32, i32, i32, i32, i32) -> i64
+    // CHECK: call @plaidml_rt_xsmm_exec_gemm_f32
+    // CHECK-SAME: (%{{.*}}, %{{.*}}, %{{.*}}, %{{.*}}) : (memref<*xf32>, memref<*xf32>, memref<*xf32>, i64) -> ()
   }
   return
 }
@@ -44,9 +45,10 @@ func @res2a_branch2a(%I: memref<1x56x56x64xf32>, %K: memref<1x1x64x64xf32>, %O: 
     // CHECK: memref_cast
     // CHECK: subview %{{.*}}[{{.*}}] [1, 14, 1, 64] [1, 1, 1, 1] : memref<1x56x56x64xf32> to memref<1x14x1x64xf32, #{{.*}}>
     // CHECK: memref_cast
-    // CHECK: call @plaidml_rt_xsmm_gemm_f32
-    // CHECK-SAME: (%{{.*}}, %{{.*}}, %{{.*}}, %[[c3584]], %[[c64]], %[[c3584]], %[[c14]], %[[c64]], %[[c64]])
-    // CHECK-SAME: (memref<*xf32>, memref<*xf32>, memref<*xf32>, i32, i32, i32, i32, i32, i32) -> ()
+    // CHECK: call @plaidml_rt_xsmm_dispatch_gemm_f32
+    // CHECK-SAME: (%[[c3584]], %[[c64]], %[[c3584]], %[[c14]], %[[c64]], %[[c64]]) : (i32, i32, i32, i32, i32, i32) -> i64
+    // CHECK: call @plaidml_rt_xsmm_exec_gemm_f32
+    // CHECK-SAME: (%{{.*}}, %{{.*}}, %{{.*}}, %{{.*}}) : (memref<*xf32>, memref<*xf32>, memref<*xf32>, i64) -> ()
   }
   return
 }

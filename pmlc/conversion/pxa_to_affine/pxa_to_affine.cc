@@ -231,6 +231,10 @@ struct FuncOpConversion : public OpConversionPattern<FuncOp> {
   matchAndRewrite(FuncOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
     FunctionType type = op.getType();
+    /* do not rewrite xsmm dispatch functions */
+    if (op.getName().str() == "plaidml_rt_xsmm_dispatch_gemm_f32") {
+      return mlir::success();
+    }
     IVLOG(2, "FuncOpConversion::rewrite> " << mlir::debugString(type));
 
     // Convert the function signature
@@ -254,7 +258,6 @@ struct FuncOpConversion : public OpConversionPattern<FuncOp> {
 
     // Finally cause the old func op to be erased
     rewriter.eraseOp(op);
-
     return mlir::success();
   }
 };
