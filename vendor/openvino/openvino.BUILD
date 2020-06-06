@@ -15,13 +15,95 @@ cc_library(
         "inference-engine/include/**/*.hpp",
     ]),
     defines = [
-        'CI_BUILD_NUMBER=\\"0\\"',
-        'IE_BUILD_POSTFIX=\\"\\"',
+        "CI_BUILD_NUMBER=\\\"0\\\"",
+        "IE_BUILD_POSTFIX=\\\"\\\"",
     ],
     includes = [
         "inference-engine/include",
     ],
     tags = TAGS,
+)
+
+cc_library(
+    name = "shared_plugin_tests",
+    srcs = glob(
+        ["inference-engine/tests/functional/plugin/shared/src/single_layer_tests/*.cpp"],
+        exclude = [
+            "inference-engine/tests/functional/plugin/shared/src/single_layer_tests/convolution_backprop_data.cpp",
+            "inference-engine/tests/functional/plugin/shared/src/single_layer_tests/ctc_greedy_decoder.cpp",
+            "inference-engine/tests/functional/plugin/shared/src/single_layer_tests/cum_sum.cpp",
+            "inference-engine/tests/functional/plugin/shared/src/single_layer_tests/equal.cpp",
+            "inference-engine/tests/functional/plugin/shared/src/single_layer_tests/extract_image_patches.cpp",
+            "inference-engine/tests/functional/plugin/shared/src/single_layer_tests/fake_quantize.cpp",
+            "inference-engine/tests/functional/plugin/shared/src/single_layer_tests/greater.cpp",
+            "inference-engine/tests/functional/plugin/shared/src/single_layer_tests/grn.cpp",
+            "inference-engine/tests/functional/plugin/shared/src/single_layer_tests/group_convolution.cpp",
+            "inference-engine/tests/functional/plugin/shared/src/single_layer_tests/group_convolution_backprop_data.cpp",
+            "inference-engine/tests/functional/plugin/shared/src/single_layer_tests/maximum.cpp",
+            "inference-engine/tests/functional/plugin/shared/src/single_layer_tests/mvn.cpp",
+            "inference-engine/tests/functional/plugin/shared/src/single_layer_tests/nonzero.cpp",
+            "inference-engine/tests/functional/plugin/shared/src/single_layer_tests/prior_box_clustered.cpp",
+            "inference-engine/tests/functional/plugin/shared/src/single_layer_tests/proposal.cpp",
+            "inference-engine/tests/functional/plugin/shared/src/single_layer_tests/select.cpp",
+            "inference-engine/tests/functional/plugin/shared/src/single_layer_tests/strided_slice.cpp",
+        ],
+    ),
+    hdrs = glob(
+        ["inference-engine/tests/functional/plugin/shared/include/single_layer_tests/*.hpp"],
+        exclude = [
+            "inference-engine/tests/functional/plugin/shared/include/single_layer_tests/convolution_backprop_data.hpp",
+            "inference-engine/tests/functional/plugin/shared/include/single_layer_tests/ctc_greedy_decoder.hpp",
+            "inference-engine/tests/functional/plugin/shared/include/single_layer_tests/cum_sum.hpp",
+            "inference-engine/tests/functional/plugin/shared/include/single_layer_tests/equal.hpp",
+            "inference-engine/tests/functional/plugin/shared/include/single_layer_tests/extract_image_patches.hpp",
+            "inference-engine/tests/functional/plugin/shared/include/single_layer_tests/fake_quantize.hpp",
+            "inference-engine/tests/functional/plugin/shared/include/single_layer_tests/greater.hpp",
+            "inference-engine/tests/functional/plugin/shared/include/single_layer_tests/grn.hpp",
+            "inference-engine/tests/functional/plugin/shared/include/single_layer_tests/group_convolution.hpp",
+            "inference-engine/tests/functional/plugin/shared/include/single_layer_tests/group_convolution_backprop_data.hpp",
+            "inference-engine/tests/functional/plugin/shared/include/single_layer_tests/maximum.hpp",
+            "inference-engine/tests/functional/plugin/shared/include/single_layer_tests/mvn.hpp",
+            "inference-engine/tests/functional/plugin/shared/include/single_layer_tests/nonzero.hpp",
+            "inference-engine/tests/functional/plugin/shared/include/single_layer_tests/prior_box_clustered.hpp",
+            "inference-engine/tests/functional/plugin/shared/include/single_layer_tests/proposal.hpp",
+            "inference-engine/tests/functional/plugin/shared/include/single_layer_tests/select.hpp",
+            "inference-engine/tests/functional/plugin/shared/include/single_layer_tests/strided_slice.hpp",
+        ],
+    ),
+    includes = ["inference-engine/tests/functional/plugin/shared/include"],
+    deps = [
+        ":functional_test_utils",
+        ":inference_engine",
+        ":ngraph_function_tests",
+        "@gmock//:gtest",
+    ],
+)
+
+cc_library(
+    name = "functional_test_utils",
+    srcs = glob(["inference-engine/tests/ie_test_utils/functional_test_utils/*.cpp"]),
+    hdrs = glob(["inference-engine/tests/ie_test_utils/functional_test_utils/*.hpp"]),
+    includes = ["inference-engine/tests/ie_test_utils"],
+    deps = [
+        ":inference_engine",
+        "@gmock//:gtest",
+    ],
+)
+
+cc_library(
+    name = "ngraph_function_tests",
+    srcs = glob([
+        "inference-engine/tests/ngraph_functions/src/*.cpp",
+        "inference-engine/tests/ngraph_functions/src/utils/*.cpp",
+    ]),
+    hdrs = glob([
+        "inference-engine/tests/ngraph_functions/include/ngraph_functions/*.hpp",
+        "inference-engine/tests/ngraph_functions/include/ngraph_functions/utils/*.hpp",
+    ]),
+    includes = ["inference-engine/tests/ngraph_functions/include/"],
+    deps = [
+        ":inference_engine",
+    ],
 )
 
 cc_library(
