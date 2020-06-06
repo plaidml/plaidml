@@ -884,8 +884,8 @@ TEST_F(CppEdsl, ReshapeFold) {
   // clang-format off
   // CHECK-LABEL: CppEdsl.ReshapeFold
   // CHECK: func @reshape_fold
-  // CHECK-NEXT: %[[ident0:.*]] = "eltwise.ident"(%{{.*}}) : (tensor<3x3xsi32>) -> tensor<3x3xsi32>
-  // CHECK-NEXT: return %[[ident0]]
+  // CHECK-NEXT: %[[X0:.*]] = "eltwise.ident"(%{{.*}}) : (tensor<3x3xsi32>) -> tensor<3x3xsi32>
+  // CHECK-NEXT: return %[[X0]]
   // clang-format on
   std::vector<int32_t> input = {
       1, 2, 3,  //
@@ -893,6 +893,54 @@ TEST_F(CppEdsl, ReshapeFold) {
       7, 8, 9,  //
   };
   checkProgram(program, {{A, input}}, {{R, input}});
+}
+
+TEST_F(CppEdsl, ReshapeScalar) {
+  auto A = Placeholder(DType::INT32, {}, "A");
+  std::vector<std::int64_t> shape = {};
+  auto R = reshape(A, shape);
+  auto program = makeProgram("reshape_scalar", {R});
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.ReshapeScalar
+  // CHECK: func @reshape_scalar
+  // CHECK-NEXT: %[[X0:.*]] = "eltwise.ident"(%{{.*}}) : (tensor<si32>) -> tensor<si32>
+  // CHECK-NEXT: return %[[X0]] : tensor<si32>
+  // clang-format on
+  std::vector<int32_t> data = {2};
+  checkProgram(program, {{A, data}}, {{R, data}});
+}
+
+TEST_F(CppEdsl, ReshapeIntoScalar) {
+  auto A = Placeholder(DType::INT32, {1, 1, 1}, "A");
+  std::vector<std::int64_t> shape = {};
+  auto R = reshape(A, shape);
+  auto program = makeProgram("reshape_into_scalar", {R});
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.ReshapeIntoScalar
+  // CHECK: func @reshape_into_scalar
+  // CHECK-NEXT: %[[X0:.*]] = "tile.reshape"(%{{.*}}) : (tensor<1x1x1xsi32>) -> tensor<si32>
+  // CHECK-NEXT: %[[X1:.*]] = "eltwise.ident"(%[[X0]]) : (tensor<si32>) -> tensor<si32>
+  // CHECK-NEXT: return %[[X1]] : tensor<si32>
+  // clang-format on
+  std::vector<int32_t> data = {2};
+  checkProgram(program, {{A, data}}, {{R, data}});
+}
+
+TEST_F(CppEdsl, ReshapeFromScalar) {
+  auto A = Placeholder(DType::INT32, {}, "A");
+  std::vector<std::int64_t> shape = {1, 1, 1};
+  auto R = reshape(A, shape);
+  auto program = makeProgram("reshape_from_scalar", {R});
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.ReshapeFromScalar
+  // CHECK: func @reshape_from_scalar
+  // CHECK-NEXT: %[[c1:.*]] = "eltwise.sconst"() {value = 1 : i64} : () -> tensor<si32>
+  // CHECK-NEXT: %[[X0:.*]] = "tile.reshape"(%{{.*}}, %[[c1]], %[[c1]], %[[c1]]) : (tensor<si32>, tensor<si32>, tensor<si32>, tensor<si32>) -> tensor<1x1x1xsi32>
+  // CHECK-NEXT: %[[X1:.*]] = "eltwise.ident"(%[[X0]]) : (tensor<1x1x1xsi32>) -> tensor<1x1x1xsi32>
+  // CHECK-NEXT: return %[[X1]] : tensor<1x1x1xsi32>
+  // clang-format on
+  std::vector<int32_t> data = {2};
+  checkProgram(program, {{A, data}}, {{R, data}});
 }
 
 // TEST_F(CppEdsl, GradientDot) {

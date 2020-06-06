@@ -719,8 +719,8 @@ void ReshapeOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
 
 Type ReshapeOp::getResultType(ArrayRef<Value> operands) {
   IVLOG(5, "ReshapeOp::getResultType>")
-  if (operands.size() < 2) {
-    throw std::runtime_error("ReshapeOp requires at least 2 operands");
+  if (operands.empty()) {
+    throw std::runtime_error("ReshapeOp requires at least 1 operand");
   }
   auto tensor = operands.front();
   auto dims = operands.drop_front();
