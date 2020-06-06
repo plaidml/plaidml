@@ -27,8 +27,8 @@ InferRequestInternal::Ptr PlaidMLExecutableNetwork::CreateInferRequestImpl(Input
                                                                            OutputsDataMap networkOutputs) {
   IVLOG(1, "PlaidMLExecutableNetwork::CreateInferRequestImpl>");
   std::vector<plaidml::edsl::Tensor> outputs;
-    IVLOG(2, "networkOutputs: " << networkOutputs);
-    IVLOG(3, "tensorIOMap_: " << tensorIOMap_);
+  IVLOG(2, "networkOutputs: " << networkOutputs);
+  IVLOG(3, "tensorIOMap_: " << tensorIOMap_);
   for (const auto& kvp : networkOutputs) {
     IVLOG(2, "output: " << kvp.first);
     outputs.push_back(tensorIOMap_.at(kvp.first));
@@ -41,27 +41,39 @@ PlaidMLExecutableNetwork::PlaidMLExecutableNetwork(const ICNNNetwork& network, c
   InputsDataMap inputMap;
   auto fcn = network.getFunction();
   IE_ASSERT(fcn);  // PlaidML requires that the nGraph-based API be used
-  IVLOG(1, "Layers:");
+  IVLOG(2, "Layers:");
   for (auto& node : fcn->get_ordered_ops()) {
-    IVLOG(1, "  " << node->description() << ": " << node->get_name() << "... " << node->get_friendly_name());
+    IVLOG(2, "  " << node->description() << ": " << node->get_name() << "... " << node->get_friendly_name());
     if (node->is_constant()) {
-      // TODO
-      THROW_IE_EXCEPTION << "PlaidML OpenVINO constants not yet implemented";
+      IE_ASSERT(node->get_output_size() == 1);
+      IE_ASSERT(node->description() == "Constant");
+      auto type = to_plaidml(node->get_element_type());
+      std::vector<int64_t> dims{node->get_shape().begin(), node->get_shape().end()};
+      TensorShape ts(type, dims);
+      Buffer buffer(device, ts);
+      // Specially resolve the constant-creating op
+      Context ctx{node.get()};
+      auto* layer = dynamic_cast<ngraph::opset1::Constant*>(ctx.layer);
+      buffer.copy_from(layer->get_data_ptr());
+      auto tensor = edsl::Constant(type, buffer, dims, node->get_friendly_name());
+      IVLOG(3, "    Adding constant named '" << node->get_output_tensor_name(0) << "'");
+      tensorMap_[node->get_output_tensor_name(0)] = tensor;
+      continue;
     } else if (node->is_parameter()) {
       IE_ASSERT(node->get_output_size() == 1);
-      std::vector<int64_t> dims {node->get_shape().begin(), node->get_shape().end()};
+      std::vector<int64_t> dims{node->get_shape().begin(), node->get_shape().end()};
       auto type = to_plaidml(node->get_element_type());
-      auto tensor = edsl::Placeholder(edsl::LogicalShape(type, dims));
-      IVLOG(1, "    Adding placeholder named '" << node->get_output_tensor_name(0) << "'");
+      auto tensor = edsl::Placeholder(edsl::LogicalShape(type, dims), node->get_friendly_name());
+      IVLOG(3, "    Adding placeholder named '" << node->get_output_tensor_name(0) << "'");
       tensorMap_[node->get_output_tensor_name(0)] = tensor;
-      IVLOG(1, "    Also, aliasing " << node->get_output_tensor_name(0) << " as " << node->get_friendly_name());
+      IVLOG(3, "    Also, aliasing " << node->get_output_tensor_name(0) << " as " << node->get_friendly_name());
       tensorIOMap_[node->get_friendly_name()] = tensor;
       continue;
     } else if (node->is_output()) {
       const auto& src_output = node->get_inputs()[0].get_output();
       const auto& friendly_name = src_output.get_node()->get_friendly_name();
       const auto& original_name = src_output.get_node()->get_output_tensor_name(src_output.get_index());
-      IVLOG(1, "At an output node, aliasing " << original_name << " as " << friendly_name);
+      IVLOG(3, "At an output node, aliasing " << original_name << " as " << friendly_name);
       tensorIOMap_[friendly_name] = tensorMap_.at(original_name);
       continue;
     }
