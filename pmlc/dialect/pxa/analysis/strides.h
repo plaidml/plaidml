@@ -34,6 +34,10 @@ Optional<StrideInfo> computeStrideInfo(Value expr);
 // Compute stride info but for an affine expression over some set of values
 Optional<StrideInfo> computeStrideInfo(AffineExpr expr, ValueRange args);
 
+// Compute 'dimensionalized' strides for a given affine map and arguments
+Optional<llvm::SmallVector<StrideInfo, 4>> computeStrideInfo(AffineMap map,
+                                                             ValueRange args);
+
 // Compute stride info as additionaly applied to a memRef.
 Optional<StrideInfo> computeStrideInfo(MemRefType memRef, AffineMap map,
                                        ValueRange values);
