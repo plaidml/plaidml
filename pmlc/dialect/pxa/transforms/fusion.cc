@@ -330,7 +330,7 @@ struct FusionInfo {
           apOp.getBody()->eraseArgument(curArgNum);
         } else {
           newLowerBounds.push_back(apOp.lowerBoundsMap().getResult(i));
-          newUpperBounds.push_back(apOp.lowerBoundsMap().getResult(i));
+          newUpperBounds.push_back(apOp.upperBoundsMap().getResult(i));
           newSteps.push_back(
               apOp.steps()[i].template cast<IntegerAttr>().getInt());
           curArgNum++;
@@ -349,11 +349,11 @@ struct FusionInfo {
     };
     fixupLoops(apA, aToNew);
     fixupLoops(apB, bToNew);
-    return apC;
     // PRINT!
     // mlir::OpPrintingFlags flags;
     // flags.printGenericOpForm();
     // apC.getOperation()->print(llvm::errs(), flags);
+    return apC;
   }
 };
 
