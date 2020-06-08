@@ -14,11 +14,11 @@ using namespace InferenceEngine;  // NOLINT[build/namespaces]
 
 namespace PlaidMLPlugin {
 
-static OpRegistration reg("relu", [](const Context& ctx) {
-  // Note that nGraph ReLU does not include an alpha parameter
-  IE_ASSERT(ctx.operands.size() == 1);
-  auto I = ctx.operands.at(0);
-  return edsl::make_tuple(op::relu(I));
+static OpRegistration reg("multiply", [](const Context& ctx) {
+  IE_ASSERT(ctx.operands.size() == 2);
+  auto A = ctx.operands.at(0);
+  auto B = ctx.operands.at(1);
+  return edsl::make_tuple(A * B);
 });
 
 }  // namespace PlaidMLPlugin

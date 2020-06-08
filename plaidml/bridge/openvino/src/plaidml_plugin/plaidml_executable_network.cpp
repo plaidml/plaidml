@@ -27,49 +27,76 @@ InferRequestInternal::Ptr PlaidMLExecutableNetwork::CreateInferRequestImpl(Input
                                                                            OutputsDataMap networkOutputs) {
   IVLOG(1, "PlaidMLExecutableNetwork::CreateInferRequestImpl>");
   std::vector<plaidml::edsl::Tensor> outputs;
+  IVLOG(2, "networkOutputs: " << networkOutputs);
+  IVLOG(3, "tensorIOMap_: " << tensorIOMap_);
   for (const auto& kvp : networkOutputs) {
-    IVLOG(1, "output: " << kvp.first);
-    outputs.push_back(tensorMap_.at(kvp.first));
+    IVLOG(2, "output: " << kvp.first);
+    outputs.push_back(tensorIOMap_.at(kvp.first));
   }
   auto program = edsl::ProgramBuilder("ie", outputs).compile();
-  return std::make_shared<PlaidMLInferRequest>(networkInputs, networkOutputs, program, tensorMap_);
+  return std::make_shared<PlaidMLInferRequest>(networkInputs, networkOutputs, program, tensorIOMap_);
 }
 
 PlaidMLExecutableNetwork::PlaidMLExecutableNetwork(const ICNNNetwork& network, const std::string& device) {
   InputsDataMap inputMap;
-  network.getInputsInfo(inputMap);
-
-  auto layers = CNNNetSortTopologically(network);
-  IVLOG(1, "Layers:");
-  for (auto& layer : layers) {
-    IVLOG(1, "  " << layer->type << ": " << layer->name);
-    if (layer->type == "Input") {
-      auto it = inputMap.find(layer->name);
-      IE_ASSERT(it != inputMap.end());
-      const auto& desc = it->second->getTensorDesc();
-      auto tensor = edsl::Placeholder(to_plaidml(desc));
-      tensorMap_[layer->name] = tensor;
+  auto fcn = network.getFunction();
+  IE_ASSERT(fcn);  // PlaidML requires that the nGraph-based API be used
+  IVLOG(2, "Layers:");
+  for (auto& node : fcn->get_ordered_ops()) {
+    IVLOG(2, "  " << node->description() << ": " << node->get_name() << "... " << node->get_friendly_name());
+    if (node->is_constant()) {
+      IE_ASSERT(node->get_output_size() == 1);
+      IE_ASSERT(node->description() == "Constant");
+      auto type = to_plaidml(node->get_element_type());
+      std::vector<int64_t> dims{node->get_shape().begin(), node->get_shape().end()};
+      TensorShape ts(type, dims);
+      Buffer buffer(device, ts);
+      // Specially resolve the constant-creating op
+      Context ctx{node.get()};
+      auto* layer = dynamic_cast<ngraph::opset1::Constant*>(ctx.layer);
+      buffer.copy_from(layer->get_data_ptr());
+      auto tensor = edsl::Constant(type, buffer, dims, node->get_friendly_name());
+      IVLOG(3, "    Adding constant named '" << node->get_output_tensor_name(0) << "'");
+      tensorMap_[node->get_output_tensor_name(0)] = tensor;
+      continue;
+    } else if (node->is_parameter()) {
+      IE_ASSERT(node->get_output_size() == 1);
+      std::vector<int64_t> dims{node->get_shape().begin(), node->get_shape().end()};
+      auto type = to_plaidml(node->get_element_type());
+      auto tensor = edsl::Placeholder(edsl::LogicalShape(type, dims), node->get_friendly_name());
+      IVLOG(3, "    Adding placeholder named '" << node->get_output_tensor_name(0) << "'");
+      tensorMap_[node->get_output_tensor_name(0)] = tensor;
+      IVLOG(3, "    Also, aliasing " << node->get_output_tensor_name(0) << " as " << node->get_friendly_name());
+      tensorIOMap_[node->get_friendly_name()] = tensor;
+      continue;
+    } else if (node->is_output()) {
+      const auto& src_output = node->get_inputs()[0].get_output();
+      const auto& friendly_name = src_output.get_node()->get_friendly_name();
+      const auto& original_name = src_output.get_node()->get_output_tensor_name(src_output.get_index());
+      IVLOG(3, "At an output node, aliasing " << original_name << " as " << friendly_name);
+      tensorIOMap_[friendly_name] = tensorMap_.at(original_name);
       continue;
     }
 
-    auto op = OpsRegistry::instance()->resolve(layer->type);
+    auto op = OpsRegistry::instance()->resolve(node->description());
     if (!op) {
-      THROW_IE_EXCEPTION << "Unsupported operation: " << layer->type;
+      THROW_IE_EXCEPTION << "Unsupported operation: " << node->description();
     }
 
-    Context ctx{layer.get()};
-    for (const auto& input : layer->insData) {
-      const auto& name = input.lock()->getName();
+    Context ctx{node.get()};
+    for (const auto& input : node->get_inputs()) {
+      const auto& src_output = input.get_output();
+      const auto& name = src_output.get_node()->get_output_tensor_name(src_output.get_index());
       IVLOG(1, "    input: " << name);
       auto tensor = tensorMap_.at(name);
       ctx.operands.push_back(tensor);
     }
     auto value = op(ctx);
     auto tuple = value.as_tuple();
-    IE_ASSERT(tuple.size() == layer->outData.size());
+    IE_ASSERT(tuple.size() == node->get_output_size());
     for (unsigned i = 0; i < tuple.size(); i++) {
       auto tensor = tuple.at(i).as_tensor();
-      const auto& name = layer->outData.at(i)->getName();
+      const auto& name = node->get_output_tensor_name(i);
       IVLOG(1, "    output: " << name);
       tensorMap_[name] = tensor;
     }

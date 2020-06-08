@@ -60,7 +60,7 @@ void ref_activation(const TBlob<data_t>& src, TBlob<data_t>& dst, activation_tes
         } else if (prm.activationType == "sigmoid") {
           dst_data[oidx] = 1 / (1 + exp(-src_data[oidx]));
         } else if (prm.activationType == "relu") {
-          dst_data[oidx] = src_data[oidx] >= 0.0 ? src_data[oidx] : src_data[oidx] * prm.activationParams[0];
+          dst_data[oidx] = src_data[oidx] >= 0.0 ? src_data[oidx] : 0.0;
         } else if (prm.activationType == "power") {
           dst_data[oidx] =
               std::pow(prm.activationParams[2] * src_data[oidx] + prm.activationParams[1], prm.activationParams[0]);
@@ -76,10 +76,10 @@ void ref_activation(const TBlob<data_t>& src, TBlob<data_t>& dst, activation_tes
 
 class ActivationTest : public TestsCommon, public WithParamInterface<activation_test_params> {
   std::string layers_t = R"(
-        <layer name="_ACTIVATION_TYPE_" id="1" type="_ACTIVATION_TYPE_" precision="FP32">
+        <layer id="1" name="_ACTIVATION_TYPE_" type="_ACTIVATION_TYPE_" version="opset1">
             _DATA_
             <input>
-                <port id="0">
+                <port id="0" precision="FP32">
                     <dim>_IN_</dim>
                     <dim>_IC_</dim>
                     <dim>_IH_</dim>
@@ -87,7 +87,7 @@ class ActivationTest : public TestsCommon, public WithParamInterface<activation_
                 </port>
             </input>
             <output>
-                <port id="1">
+                <port id="1" precision="FP32">
                     <dim>_IN_</dim>
                     <dim>_IC_</dim>
                     <dim>_IH_</dim>
@@ -99,7 +99,110 @@ class ActivationTest : public TestsCommon, public WithParamInterface<activation_
 
   std::string edges_t = R"(
         <edge from-layer="0" from-port="0" to-layer="1" to-port="0"/>
+        <edge from-layer="1" from-port="1" to-layer="2" to-port="0"/>
 )";
+
+  // TODO: This is a hack replacement for getIRTemplate which isn't working quite right...
+  std::string getCustomIRTemplate(const std::string& name,
+      const std::vector<size_t>& input_shape,
+      const std::string& precision,
+      const std::string& layers,
+      const std::string& edges,
+      const unsigned ir_version,
+      const std::string& metadata = "") {
+    const std::vector< std::vector<size_t>> input_shape_vector = { input_shape };
+    return getCustomIRTemplate(name, input_shape_vector, precision, layers, edges, ir_version, metadata);
+  }
+
+  // TODO: This is a hack replacement for getIRTemplate which isn't working quite right...
+  std::string getCustomIRTemplate(const std::string& name,
+      const std::vector<std::vector<size_t>>& input_shape,
+      const std::string& precision,
+      const std::string& layers,
+      const std::string& edges,
+      const unsigned ir_version,
+      const std::string& metadata = "") {
+    // TODO: Be consistent in whether I'm loading precision or just using fp32
+
+    std::string model_input_t = R"V0G0N(
+                <layer id="_ID_" name="_input_name_" type="Parameter" version="opset1">
+                    <data element_type="f32" shape="__SRC_DIMS_COMMAS__"/>
+                    <output>
+                        <port id="0" precision="_PR_">__SRC_DIMS__
+                        </port>
+                    </output>
+                </layer>
+        )V0G0N";
+
+    std::string model_output_t = R"V0G0N(
+                <layer name="_output_name_" type="Result" id="_ID_" version="opset1">
+                    <input>
+                        <port id="0" precision="_PR_">__SRC_DIMS__
+                        </port>
+                    </input>
+                </layer>
+        )V0G0N";
+
+    std::string model_t = R"V0G0N(
+        <net name="_NAME_" version="_IRv_">
+            <layers>
+                __INPUT_LAYERS_
+                _LAYERS_
+                __OUTPUT_LAYER__
+            </layers>
+            <edges>
+                _EDGES_
+            </edges>
+            <meta_data>
+                _META_DATA_
+            </meta_data>
+        </net>
+        )V0G0N";
+
+    std::string model = model_t;
+    REPLACE_WITH_STR(model, "_NAME_", name);
+    REPLACE_WITH_NUM(model, "_IRv_", ir_version);
+    std::string input_layers;
+    std::string output_layer;
+    for (size_t input_idx = 0; input_idx < input_shape.size(); input_idx++) {
+        std::string model_input = model_input_t;
+        std::string s_dims;
+        std::string s_dims_commas;
+        bool first_iter = true;
+        for (auto& dim : input_shape[0]) {
+            if (first_iter) {
+              first_iter = false;
+            } else {
+              s_dims_commas += ",";
+            }
+            s_dims_commas += std::to_string(dim);
+            s_dims += "\n\t                    <dim>";
+            s_dims += std::to_string(dim) + "</dim>";
+        }
+        REPLACE_WITH_STR(model_input, "_ID_", std::to_string(input_idx));
+        std::string input_name = "in" + std::to_string(input_idx + 1);
+        REPLACE_WITH_STR(model_input, "_input_name_", input_name);
+        REPLACE_WITH_STR(model_input, "__SRC_DIMS__", s_dims);
+        REPLACE_WITH_STR(model_input, "__SRC_DIMS_COMMAS__", s_dims_commas);
+        input_layers += model_input;
+        if (input_idx == 0) {
+          // The output follows the first input's shape, so build at same time
+          std::string model_output = model_output_t;
+          REPLACE_WITH_STR(model_output, "_ID_", "2");
+          REPLACE_WITH_STR(model_output, "_output_name_", "out");
+          REPLACE_WITH_STR(model_input, "__SRC_DIMS__", s_dims);
+          output_layer += model_output;
+        }
+    }
+    REPLACE_WITH_STR(model, "__INPUT_LAYERS_", input_layers);
+    REPLACE_WITH_STR(model, "__OUTPUT_LAYER__", output_layer);
+    REPLACE_WITH_STR(model, "_PR_", precision);
+    REPLACE_WITH_STR(model, "_LAYERS_", layers);
+    REPLACE_WITH_STR(model, "_EDGES_", edges);
+    REPLACE_WITH_STR(model, "_META_DATA_", metadata);
+
+    return model;
+  }
 
   std::string getModel(activation_test_params p) {
     std::string model = layers_t;
@@ -112,8 +215,6 @@ class ActivationTest : public TestsCommon, public WithParamInterface<activation_
       REPLACE_WITH_STR(model, "_ACTIVATION_TYPE_", "Sigmoid");
     } else if (p.activationType == "relu") {
       REPLACE_WITH_STR(model, "_ACTIVATION_TYPE_", "ReLU");
-      activation_info = R"(<data negative_slope="_N_SLOPE_"/>)";
-      REPLACE_WITH_NUM(activation_info, "_N_SLOPE_", p.activationParams[0]);
     } else if (p.activationType == "power") {
       REPLACE_WITH_STR(model, "_ACTIVATION_TYPE_", "Power");
       activation_info = R"(<data power="_POWER_" scale="_SCALE_" shift="_OFFSET_"/>)";
@@ -133,9 +234,10 @@ class ActivationTest : public TestsCommon, public WithParamInterface<activation_
     REPLACE_WITH_NUM(model, "_IH_", p.in.h);
     REPLACE_WITH_NUM(model, "_IC_", p.in.c);
 
-    model = IRTemplateGenerator::getIRTemplate(p.activationType + "_Only", {1lu, p.in.c, p.in.h, p.in.w}, "FP32", model,
-                                               edges_t);
+    model = getCustomIRTemplate(p.activationType + "_Only", {1lu, p.in.c, p.in.h, p.in.w}, "FP32", model,
+                                               edges_t, 10);
 
+    IVLOG(1, "Requesting testing of IR: " << model);
     return model;
   }
 
@@ -145,8 +247,6 @@ class ActivationTest : public TestsCommon, public WithParamInterface<activation_
     std::string model = getModel(p);
 
     // TODO: can we use the newer API instead of using this legacy one?
-    CNNNetReader net_reader;
-    net_reader.ReadNetwork(model.data(), model.length());
 
     SizeVector dims_src = {p.in.w, p.in.h, p.in.c};
     TBlob<float>::Ptr src = make_shared_blob<float>(TensorDesc(Precision::FP32, dims_src, CHW));
@@ -164,13 +264,15 @@ class ActivationTest : public TestsCommon, public WithParamInterface<activation_
     Core ie("plaidml/bridge/openvino/plugins.xml");
     auto devices = ie.GetAvailableDevices();
     IVLOG(1, "devices: " << devices);
-    auto exeNetwork = ie.LoadNetwork(net_reader.getNetwork(), kDeviceName);
+    auto network = ie.ReadNetwork(model, Blob::Ptr());  // TODO: Weights??
+    auto exeNetwork = ie.LoadNetwork(network, kDeviceName);
     InferRequest request = exeNetwork.CreateInferRequest();
     OutputsDataMap outInfo;
-    outInfo = net_reader.getNetwork().getOutputsInfo();
+    outInfo = network.getOutputsInfo();
+    IVLOG(1, "Just added outInfo as " << outInfo);
     Blob::Ptr srcPtr = std::shared_ptr<Blob>(src);
     Blob::Ptr dstPtr = std::shared_ptr<Blob>(dst);
-    request.SetBlob(net_reader.getNetwork().getInputsInfo().begin()->first, srcPtr);
+    request.SetBlob(network.getInputsInfo().begin()->first, srcPtr);
     request.SetBlob(outInfo.begin()->first, dstPtr);
 
     request.Infer();
@@ -195,11 +297,14 @@ std::string getTestCaseName(testing::TestParamInfo<activation_test_params> obj) 
 }
 
 activation_test_params test_cases[] = {
-    activation_test_params(case_1, "relu", {0.0f}),  // n_slope
-    activation_test_params(case_2, "relu", {0.1f}),  //
-    activation_test_params(case_3, "relu", {0.1f}),  //
-    activation_test_params(case_4, "relu", {0.1f}),  //
-    activation_test_params(case_5, "relu", {0.1f}),
+    activation_test_params(case_1, "relu"),
+
+    // There used to be non-zero negative slope tests (i.e. for LeakyReLU), but with an nGraph-based opset those show up
+    // as a fused PReLU; re-enable once we have PReLU support
+    // activation_test_params(case_2, "relu", {0.1f}),  // n_slope
+    // activation_test_params(case_3, "relu", {0.1f}),  //
+    // activation_test_params(case_4, "relu", {0.1f}),  //
+    // activation_test_params(case_5, "relu", {0.1f}),
 
     // activation_test_params(case_1, "sigmoid"),  //
     // activation_test_params(case_2, "sigmoid"),  //
@@ -211,9 +316,9 @@ activation_test_params test_cases[] = {
     // activation_test_params(case_2, "power", {2.0f, 3.0f, 5.0f}),
     // activation_test_params(case_3, "power", {4.0f, 1.0f, 7.0f}),
 
-    // activation_test_params(case_1, "clamp", {0.0f, 1.0f}),  // min max
-    // activation_test_params(case_2, "clamp", {0.0f, 6.0f}),  //
-    // activation_test_params(case_3, "clamp", {0.0f, 3.0f}),  //
+    activation_test_params(case_1, "clamp", {0.0f, 1.0f}),  // min max
+    activation_test_params(case_2, "clamp", {0.0f, 6.0f}),  //
+    activation_test_params(case_3, "clamp", {0.0f, 3.0f}),  //
 
     // FIXME doesn't support exp and not activation now
     // activation_test_params(case_1, "exp"),
