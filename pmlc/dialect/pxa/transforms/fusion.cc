@@ -98,7 +98,9 @@ struct FusionInfo {
     if (!getStrides(stridesB, opB, apB))
       return false;
 
-    assert(stridesA.size() == stridesB.size());
+    assert(stridesA.size() == stridesB.size() &&
+           "Fusion ops should read/write the same memref and thus have the "
+           "same rank");
     // Try to relate the block arguments
     for (size_t i = 0; i < stridesA.size(); i++) {
       const auto &sa = stridesA[i];
@@ -340,10 +342,7 @@ struct FusionInfo {
     };
     fixupLoops(apA, aToNew);
     fixupLoops(apB, bToNew);
-    // PRINT!
-    // mlir::OpPrintingFlags flags;
-    // flags.printGenericOpForm();
-    // apC.getOperation()->print(llvm::errs(), flags);
+
     return apC;
   }
 };
