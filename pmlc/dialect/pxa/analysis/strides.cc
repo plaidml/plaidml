@@ -1,10 +1,12 @@
 // Copyright 2020 Intel Corporation
 
+#include "pmlc/dialect/pxa/analysis/strides.h"
+
 #include <map>
 #include <string>
 #include <vector>
 
-#include "pmlc/dialect/pxa/analysis/strides.h"
+#include "mlir/Support/DebugStringHelper.h"
 #include "pmlc/util/logging.h"
 #include "llvm/Support/FormatVariadic.h"
 
@@ -119,8 +121,7 @@ Optional<StrideInfo> computeStrideInfo(Value expr) {
     return computeStrideInfo(op.getAffineMap().getResult(0),
                              op.getMapOperands());
 
-  IVLOG(1, "Failed stride info: op = "
-               << expr.getDefiningOp()->getName().getStringRef().str());
+  IVLOG(1, "Failed stride info: op = " << mlir::debugString(expr));
 
   return None;
 }

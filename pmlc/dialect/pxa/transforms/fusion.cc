@@ -29,8 +29,8 @@ struct FusionInfo {
   llvm::SmallVector<int64_t, 4> sizesA;
   llvm::SmallVector<int64_t, 4> sizesB;
   // The load and store ops
-  llvm::SmallVector<WriteRead, 4> writeReads;
-  llvm::SmallVector<WriteWrite, 4> writeWrites;
+  llvm::SmallVector<WriteRead, 4> readAfterWrites;
+  llvm::SmallVector<WriteWrite, 4> writeAfterWrites;
   // Current state (whether we have a plan or not)
   bool hasPlan;
   // Tiling's for A + B (pre-fusion)
@@ -61,12 +61,10 @@ struct FusionInfo {
   // Helper method to remove elements from a stride info that are not part of
   // a specific block's arguments.
   static void cleanStrideInfo(Block *block, StrideInfo &si) {
-    for (auto it = si.strides.begin(); it != si.strides.end();) {
-      auto next = std::next(it);
-      if (it->first.getOwner() != block) {
-        si.strides.erase(it);
+    for (auto &pair : llvm::make_early_inc_range(si.strides)) {
+      if (pair.first.getOwner() != block) {
+        si.strides.erase(pair.first);
       }
-      it = next;
     }
   }
 
@@ -112,13 +110,6 @@ struct FusionInfo {
       }
       // If both are empty, nothing to do
       if (sa.strides.size() == 0 && sb.strides.size() == 0)
-        continue;
-      // TODO: Thses should be fixed by canonicalization
-      if (sa.strides.size() == 0 && sb.strides.size() == 1 &&
-          sizesB[sb.strides.begin()->first.getArgNumber()] == 1)
-        continue;
-      if (sb.strides.size() == 0 && sa.strides.size() == 1 &&
-          sizesA[sa.strides.begin()->first.getArgNumber()] == 1)
         continue;
       // If there are multiple indexes, give up
       if (sa.strides.size() != 1 || sb.strides.size() != 1) {
@@ -222,11 +213,11 @@ struct FusionInfo {
         if (auto read = mlir::dyn_cast<AffineLoadOp>(user)) {
           if (!considerPlan(write, read))
             return false;
-          writeReads.emplace_back(write, read);
+          readAfterWrites.emplace_back(write, read);
         } else if (auto write2 = mlir::dyn_cast<AffineReduceOp>(user)) {
           if (!considerPlan(write, write2))
             return false;
-          writeWrites.emplace_back(write, write2);
+          writeAfterWrites.emplace_back(write, write2);
         } else {
           user->emitRemark("Op is not a load or reduce");
           return false;
@@ -366,8 +357,8 @@ struct FusionPass : public FusionBase<FusionPass> {
     if (!r) {
       return AffineParallelOp();
     }
-    IVLOG(1, "Found " << fi.writeReads.size() << " write/reads");
-    IVLOG(1, "Found " << fi.writeWrites.size() << " write/writes");
+    IVLOG(1, "Found " << fi.readAfterWrites.size() << " read after writes");
+    IVLOG(1, "Found " << fi.writeAfterWrites.size() << " write after writes");
     return fi.applyFusion();
   }
 
