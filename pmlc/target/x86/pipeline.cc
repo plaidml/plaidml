@@ -6,6 +6,7 @@
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/StandardOps/Transforms/Passes.h"
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
@@ -155,6 +156,9 @@ void addToPipeline(OpPassManager &pm) {
   if (pmlc::util::getEnvVar("PLAIDML_BOUNDS_CHECK") == "1") {
     pm.addPass(pmlc::dialect::stdx::createBoundsCheckPass());
   }
+
+  pm.addPass(createTanhLowerPass());
+
   pm.addPass(ConvertToLLVMPass::create());
   pm.addPass(createTraceLinkingPass());
 }

@@ -208,6 +208,7 @@ SUITES:
           - TestBackendOps.testSoftmax
           - TestBackendOps.testSigmoid
           - TestBackendOps.testSign
+          - TestBackendOps.testTanh
           - TestBackendOps.testExp
           - TestBackendOps.testLog
           - TestBackendOps.testLogSumExp
