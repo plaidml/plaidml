@@ -232,7 +232,7 @@ struct FuncOpConversion : public OpConversionPattern<FuncOp> {
                   ConversionPatternRewriter &rewriter) const final {
     FunctionType type = op.getType();
     /* do not rewrite xsmm dispatch functions */
-    if (op.getName().str() == "plaidml_rt_xsmm_dispatch_gemm_f32") {
+    if (op.isExternal()) {
       return mlir::success();
     }
     IVLOG(2, "FuncOpConversion::rewrite> " << mlir::debugString(type));
@@ -290,8 +290,9 @@ void LowerPXAToAffinePass::runOnOperation() {
   target.addIllegalOp<AffineParallelOp>();
   target.addDynamicallyLegalOp<AffineIfOp>(
       [](AffineIfOp op) { return op.getNumResults() == 0; });
-  target.addDynamicallyLegalOp<FuncOp>(
-      [](FuncOp op) { return op.getType().getNumResults() == 0; });
+  target.addDynamicallyLegalOp<FuncOp>([](FuncOp op) {
+    return op.isExternal() || op.getType().getNumResults() == 0;
+  });
   target.addDynamicallyLegalOp<ReturnOp>(
       [](ReturnOp op) { return op.getNumOperands() == 0; });
 
