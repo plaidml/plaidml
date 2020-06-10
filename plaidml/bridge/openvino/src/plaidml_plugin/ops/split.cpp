@@ -3,6 +3,7 @@
 //
 
 #include "plaidml_ops.hpp"
+#include "plaidml_util.hpp"
 
 #include "ngraph/opsets/opset.hpp"
 #include "ngraph/opsets/opset1.hpp"
@@ -20,13 +21,7 @@ static OpRegistration reg("split", [](const Context& ctx) {
   auto I = ctx.operands.at(0);
   // operands.at(1) is unused, just read the Constant instead
   auto splits = layer->get_num_splits();
-  ngraph::AxisSet axes;
-  auto axis_ngraph_op = std::dynamic_pointer_cast<ngraph::op::Constant>(layer->input_value(1).get_node_shared_ptr());
-  if (axis_ngraph_op) {
-    axes = axis_ngraph_op->get_axis_set_val();
-  } else {
-    THROW_IE_EXCEPTION << "Dynamic axis not currently supported by PlaidML plugin";
-  }
+  auto axes = get_axes_from_constant_operand(1, ctx.layer);
   IE_ASSERT(axes.size() == 1);
   auto axis = axes.to_vector()[0];
 
