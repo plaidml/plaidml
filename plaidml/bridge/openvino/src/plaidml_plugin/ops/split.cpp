@@ -41,7 +41,7 @@ static OpRegistration reg("split", [](const Context& ctx) {
   for (size_t i = 0; i < splits; i++) {
     auto thisO = edsl::TensorOutput(O_dims);
     auto O_idxs = I_idxs;
-    O_idxs[axis] = I_idxs[axis] + i * split_size;
+    O_idxs[axis] = I_idxs[axis] - i * split_size;
     thisO(O_idxs) = I(I_idxs);
     Os.push_back(thisO);
   }
