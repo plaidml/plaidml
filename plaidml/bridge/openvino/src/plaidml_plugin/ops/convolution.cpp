@@ -1,10 +1,14 @@
 // Copyright (C) 2020 Intel Corporation
 // SPDX-License-Identifier: Apache-2.0
 //
+
+#include "plaidml_ops.hpp"
+#include "plaidml_util.hpp"
+
 #include "ngraph/opsets/opset.hpp"
 #include "ngraph/opsets/opset1.hpp"
+
 #include "plaidml/op/op.h"
-#include "plaidml_ops.hpp"
 
 using namespace plaidml;          // NOLINT[build/namespaces]
 using namespace InferenceEngine;  // NOLINT[build/namespaces]
@@ -24,9 +28,24 @@ static OpRegistration reg("convolution", [](const Context& ctx) {
   for (auto dilation : layer->get_dilations()) {
     dilations.push_back(dilation);
   }
-  // TODO : padding
-  // TODO: auto padding
-  return edsl::make_tuple(op::convolution(I, F).strides(strides).dilations(dilations));
+  auto autopad_mode = to_plaidml(layer->get_auto_pad());
+  auto result = op::convolution(I, F)
+                    .strides(strides)
+                    .dilations(dilations)
+                    .autopad_mode(autopad_mode)
+                    .input_layout(plaidml::op::TensorLayout::NCX)
+                    .filter_layout(plaidml::op::TensorLayout::KCX);
+  if (autopad_mode == plaidml::op::AutoPadMode::EXPLICIT) {
+    std::vector<int> padding;
+    for (auto pad : layer->get_pads_begin()) {
+      padding.push_back(pad);
+    }
+    for (auto pad : layer->get_pads_end()) {
+      padding.push_back(pad);
+    }
+    result = result.manual_padding(padding);
+  }
+  return edsl::make_tuple(result);
 });
 
 }  // namespace PlaidMLPlugin
