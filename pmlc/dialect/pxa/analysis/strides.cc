@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 
+#include "mlir/Support/DebugStringHelper.h"
+#include "pmlc/util/logging.h"
 #include "llvm/Support/FormatVariadic.h"
 
 namespace mlir {
@@ -115,9 +117,11 @@ Optional<StrideInfo> computeStrideInfo(Value expr) {
   }
 
   // Try for the affine apply case
-  if (auto op = dyn_cast<AffineApplyOp>(expr.getDefiningOp()))
+  if (auto op = dyn_cast_or_null<AffineApplyOp>(expr.getDefiningOp()))
     return computeStrideInfo(op.getAffineMap().getResult(0),
                              op.getMapOperands());
+
+  IVLOG(1, "Failed stride info: op = " << mlir::debugString(expr));
 
   return None;
 }
@@ -166,6 +170,19 @@ Optional<StrideInfo> computeStrideInfo(AffineExpr expr, ValueRange args) {
 
   // Fail for all other cases.
   return None;
+}
+
+Optional<llvm::SmallVector<StrideInfo, 4>> computeStrideInfo(AffineMap map,
+                                                             ValueRange args) {
+  llvm::SmallVector<StrideInfo, 4> results;
+  for (auto expr : map.getResults()) {
+    auto dimStride = computeStrideInfo(expr, args);
+    if (!dimStride) {
+      return None;
+    }
+    results.push_back(*dimStride);
+  }
+  return results;
 }
 
 Optional<StrideInfo> computeStrideInfo(MemRefType memRefType, AffineMap map,
