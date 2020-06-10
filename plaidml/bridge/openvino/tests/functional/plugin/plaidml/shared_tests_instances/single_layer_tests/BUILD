@@ -6,7 +6,7 @@ package(default_visibility = ["//visibility:public"])
 cc_test(
     name = "single_layer_tests",
     srcs = glob(
-        ["*.cpp"],
+        ["unsqueeze.cpp"],
         exclude = [
             "convolution_backprop_data.cpp",
             "cum_sum.cpp",
