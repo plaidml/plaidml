@@ -157,7 +157,7 @@ void addToPipeline(OpPassManager &pm) {
     pm.addPass(pmlc::dialect::stdx::createBoundsCheckPass());
   }
 
-  pm.addPass(createTanhLowerPass());
+  pm.addPass(createTanhLoweringPass());
 
   pm.addPass(ConvertToLLVMPass::create());
   pm.addPass(createTraceLinkingPass());

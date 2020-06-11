@@ -3,17 +3,17 @@
 
 include "mlir/Pass/PassBase.td"
 
-def AutoTileExample : FunctionPass<"autotile-10"> {
+def AutoTileExample : FunctionPass<"pxa-autotile-example"> {
   let summary = "Tile all dimensions by 10";
   let constructor = "pmlc::dialect::pxa::createAutoTileExamplePass()";
 }
 
-def Fusion : FunctionPass<"fusion"> {
+def Fusion : FunctionPass<"pxa-fusion"> {
   let summary = "Fuse blocks that are compatible";
   let constructor = "pmlc::dialect::pxa::createFusionPass()";
 }
 
-def TestStrideInfo : Pass<"test-stride-info"> {
+def TestStrideInfo : Pass<"pxa-stride-info"> {
   let summary = "Report stride data for all loads/stores for unit tests";
   let constructor = "pmlc::dialect::pxa::createTestStrideInfoPass()";
 }

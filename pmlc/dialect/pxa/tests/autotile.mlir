@@ -1,4 +1,4 @@
-// RUN: pmlc-opt -canonicalize -autotile-10 %s | FileCheck %s
+// RUN: pmlc-opt -canonicalize -pxa-autotile-example %s | FileCheck %s
 
 // CHECK-LABEL: @dot0
 func @dot0(%arg0: memref<100x100xf32>, %arg1: memref<100x100xf32>) -> memref<100x100xf32> {
