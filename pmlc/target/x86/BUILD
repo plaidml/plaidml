@@ -56,6 +56,7 @@ plaidml_cc_library(
         "//pmlc/rt",
         "@llvm-project//mlir:AffineToStandardTransforms",
         "@llvm-project//mlir:LLVMTransforms",
+        "@llvm-project//mlir:StandardOpsTransforms",
     ],
     alwayslink = 1,
 )
