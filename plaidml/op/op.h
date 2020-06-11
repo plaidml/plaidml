@@ -467,18 +467,17 @@ class mvn {
 
   mvn& axes(const std::vector<int64_t>& axes) {
     // negative axes interpreted as in numpy
+    if (!across_channels_ || layout_ != "NHWC") {
+      throw std::runtime_error("When using layout and across_channels, axes may not be specified");
+    }
     axes_ = edsl::make_tuple(axes);
     return *this;
   }
 
-  mvn& remove_axes_parameter() {
-    // Restores axes to the default of being unused (meaning use `across_channels` & `layout` instead)
-    axes_ = edsl::None();
-    return *this;
-  }
-
   mvn& across_channels(bool flag) {
-    // only used if `axes` is `None`
+    if (!axes_.is_none()) {
+      throw std::runtime_error("May not specify both axes and across_channels for MVN");
+    }
     across_channels_ = flag;
     return *this;
   }
@@ -494,7 +493,9 @@ class mvn {
   }
 
   mvn& layout(const std::string& value) {
-    // only used if `axes` is `None`
+    if (!axes_.is_none()) {
+      throw std::runtime_error("May not specify both axes and layout for MVN");
+    }
     layout_ = value;
     return *this;
   }
