@@ -18,7 +18,7 @@ func @simple_fusion(%A: memref<2x3xf32>, %B: memref<2x3xf32>, %C: memref<2x3xf32
     affine.yield %3 : memref<2x3xf32>
   }
   return
-  // CHECK: affine.parallel (%[[i:.*]], %[[j:.*]]) = (0, 0) to (2, 3)
+  // CHECK: affine.parallel (%{{.*}}, %{{.*}}) = (0, 0) to (2, 3)
   // CHECK: affine.load
   // CHECK: affine.load
   // CHECK: addf
