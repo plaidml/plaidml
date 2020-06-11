@@ -43,7 +43,7 @@ static OpRegistration reg("convolution", [](const Context& ctx) {
     for (auto pad : layer->get_pads_end()) {
       padding.push_back(pad);
     }
-    result = result.manual_padding(padding);
+    result.manual_padding(padding);
   }
   return edsl::make_tuple(result);
 });
