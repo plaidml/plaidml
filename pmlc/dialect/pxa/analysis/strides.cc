@@ -42,7 +42,7 @@ StrideInfo &StrideInfo::operator+=(const StrideInfo &rhs) {
   return *this;
 }
 
-void StrideInfo::print(raw_ostream &os, Block *relative) {
+void StrideInfo::print(raw_ostream &os, Block *relative) const {
   std::map<std::string, unsigned> ordered;
   std::map<Block *, unsigned> blockIds;
   for (auto kvp : strides) {
