@@ -40,6 +40,7 @@ Value maximum(const Value&);
 Value mean(const Value&);
 Value min(const Value&);
 Value minimum(const Value&);
+Value mvn(const Value&);
 Value l2norm(const Value&);
 Value pool(const Value&);
 Value prod(const Value&);
@@ -1971,6 +1972,39 @@ Value minimum(const Value& value) {
   return Value{O};
 }
 
+Value mvn(const Value& value) {
+  IVLOG(1, "mvn");
+  auto args = value.as_tuple();
+  if (args.size() != 6) {
+    throw std::runtime_error("mvn expects 6 arguments");
+  }
+  auto I_raw = args[0];
+  auto I = args[0].as_tensor();
+  auto axes = args[1];
+  auto normalize_variance = args[2].as_bool();
+  auto epsilon = args[3].as_float();
+  auto across_channels = args[4].as_bool();
+  auto layout = args[5].as_str();
+  if (axes.is_none()) {
+    std::vector<int64_t> raw_axes;
+    for (size_t i = 0; i < layout.size(); i++) {
+      auto dim = layout[i];
+      if (dim == 'N') continue;
+      if (dim == 'C' && !across_channels) continue;
+      raw_axes.push_back(i);
+    }
+    axes = edsl::make_tuple(raw_axes);
+  }
+  auto R = I - mean(edsl::make_tuple(I_raw, axes, /*keepdims=*/true)).as_tensor();
+
+  if (normalize_variance) {
+    auto stdev = edsl::sqrt(variance(edsl::make_tuple(I_raw, axes, /*keepdims=*/true)).as_tensor());
+    R = R / maximum(edsl::make_tuple(stdev, Tensor(epsilon))).as_tensor();
+  }
+
+  return Value{R};
+}
+
 Value l2norm(const Value& value) {
   IVLOG(1, "l2norm");
   auto args = value.as_tuple();
@@ -3115,6 +3149,7 @@ void RegisterOps() {
   registry->Register("mean", mean);
   registry->Register("min", min);
   registry->Register("minimum", minimum);
+  registry->Register("mvn", mvn);
   registry->Register("l2norm", l2norm);
   registry->Register("pool", pool);
   registry->Register("prod", prod);

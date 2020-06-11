@@ -455,6 +455,64 @@ inline edsl::Tensor minimum(const edsl::Tensor& X, const edsl::Tensor& Y) {
   return details::op("minimum", args).as_tensor();
 }
 
+class mvn {
+ public:
+  explicit mvn(const plaidml::edsl::Tensor& I)
+      : I_(I),
+        axes_(edsl::None()),
+        normalize_variance_(true),
+        epsilon_(1e-9),
+        across_channels_(true),
+        layout_("NHWC") {}
+
+  mvn& axes(const std::vector<int64_t>& axes) {
+    // negative axes interpreted as in numpy
+    axes_ = edsl::make_tuple(axes);
+    return *this;
+  }
+
+  mvn& remove_axes_parameter() {
+    // Restores axes to the default of being unused (meaning use `across_channels` & `layout` instead)
+    axes_ = edsl::None();
+    return *this;
+  }
+
+  mvn& across_channels(bool flag) {
+    // only used if `axes` is `None`
+    across_channels_ = flag;
+    return *this;
+  }
+
+  mvn& normalize_variance(bool flag) {
+    normalize_variance_ = flag;
+    return *this;
+  }
+
+  mvn& epsilon(double value) {
+    epsilon_ = value;
+    return *this;
+  }
+
+  mvn& layout(const std::string& value) {
+    // only used if `axes` is `None`
+    layout_ = value;
+    return *this;
+  }
+
+  operator plaidml::edsl::Tensor() const {
+    auto args = edsl::make_tuple(I_, axes_, normalize_variance_, epsilon_, across_channels_, layout_);
+    return details::op("mvn", args).as_tensor();
+  }
+
+ private:
+  plaidml::edsl::Tensor I_;
+  edsl::Value axes_;
+  bool normalize_variance_;
+  double epsilon_;
+  bool across_channels_;
+  std::string layout_;
+};
+
 class l2norm {
  public:
   explicit l2norm(const edsl::Tensor& I, const std::vector<int64_t> axes)
