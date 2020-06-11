@@ -13,6 +13,11 @@ def Fusion : FunctionPass<"pxa-fusion"> {
   let constructor = "pmlc::dialect::pxa::createFusionPass()";
 }
 
+def Localize : FunctionPass<"pxa-localize"> {
+  let summary = "Localize buffers to nearest scope";
+  let constructor = "pmlc::dialect::pxa::createLocalizePass()";
+}
+
 def TestStrideInfo : Pass<"pxa-stride-info"> {
   let summary = "Report stride data for all loads/stores for unit tests";
   let constructor = "pmlc::dialect::pxa::createTestStrideInfoPass()";
