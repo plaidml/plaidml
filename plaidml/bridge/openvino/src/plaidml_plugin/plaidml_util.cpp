@@ -46,4 +46,19 @@ plaidml::DType to_plaidml(const ngraph::element::Type& ng_type) {
   }
 }
 
+plaidml::op::AutoPadMode to_plaidml(const ngraph::op::PadType& ng_type) {
+  switch (ng_type) {
+    case ngraph::op::PadType::EXPLICIT:
+      return plaidml::op::AutoPadMode::EXPLICIT;
+    case ngraph::op::PadType::SAME_LOWER:
+      return plaidml::op::AutoPadMode::SAME_LOWER;
+    case ngraph::op::PadType::SAME_UPPER:
+      return plaidml::op::AutoPadMode::SAME_UPPER;
+    case ngraph::op::PadType::VALID:
+      return plaidml::op::AutoPadMode::VALID;
+    default:
+      THROW_IE_EXCEPTION << "Unsupported autopad type";
+  }
+}
+
 }  // namespace PlaidMLPlugin
