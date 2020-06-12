@@ -409,6 +409,31 @@ TEST_F(CppEdsl, EltwiseAdd) {
   runProgram(program);
 }
 
+TEST_F(CppEdsl, EltwiseMod) {
+  auto A = Placeholder(DType::INT32, {3, 3});
+  auto B = Placeholder(DType::INT32, {3, 3});
+  auto C = A % B;
+  auto program = makeProgram("mod", {C});
+
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.EltwiseMod
+  // CHECK: func @mod
+  // CHECK: %{{.*}} = "eltwise.mod"(%{{.*}}, %{{.*}}) : (tensor<3x3xsi32>, tensor<3x3xsi32>) -> tensor<3x3xsi32>
+  // CHECK: return %{{.*}} : tensor<3x3xsi32>
+  // clang-format on
+
+  std::vector<std::int32_t> A_input{2, 4, 8,  //
+                                     16, 32, 64,  //
+                                     128, 256, 512};
+  std::vector<std::int32_t> B_input{1, 2, 3,  //
+                                     4, 5, 6,  //
+                                     7, 8, 9};
+  std::vector<std::int32_t> C_output{2 % 1, 4 % 2, 8 % 3,  //
+                                      16 % 4, 32 % 5, 64 % 6,  //
+                                      128 % 7, 256 % 8, 512 % 9};
+  checkProgram(program, {{A, A_input}, {B, B_input}}, {{C, C_output}});
+}
+
 TEST_F(CppEdsl, Relu) {
   auto A = Placeholder(DType::FLOAT32, {10, 20});
   auto program = makeProgram("relu", {Relu(A)});
