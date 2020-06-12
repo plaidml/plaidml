@@ -422,15 +422,15 @@ TEST_F(CppEdsl, EltwiseMod) {
   // CHECK: return %{{.*}} : tensor<3x3xsi32>
   // clang-format on
 
-  std::vector<std::int32_t> A_input{2, 4, 8,  //
-                                     16, 32, 64,  //
-                                     128, 256, 512};
+  std::vector<std::int32_t> A_input{2,   4,   8,   //
+                                    16,  32,  64,  //
+                                    128, 256, 512};
   std::vector<std::int32_t> B_input{1, 2, 3,  //
-                                     4, 5, 6,  //
-                                     7, 8, 9};
-  std::vector<std::int32_t> C_output{2 % 1, 4 % 2, 8 % 3,  //
-                                      16 % 4, 32 % 5, 64 % 6,  //
-                                      128 % 7, 256 % 8, 512 % 9};
+                                    4, 5, 6,  //
+                                    7, 8, 9};
+  std::vector<std::int32_t> C_output{2 % 1,   4 % 2,   8 % 3,   //
+                                     16 % 4,  32 % 5,  64 % 6,  //
+                                     128 % 7, 256 % 8, 512 % 9};
   checkProgram(program, {{A, A_input}, {B, B_input}}, {{C, C_output}});
 }
 
