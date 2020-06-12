@@ -458,16 +458,11 @@ inline edsl::Tensor minimum(const edsl::Tensor& X, const edsl::Tensor& Y) {
 class mvn {
  public:
   explicit mvn(const plaidml::edsl::Tensor& I)
-      : I_(I),
-        axes_(edsl::None()),
-        normalize_variance_(true),
-        epsilon_(1e-9),
-        across_channels_(true),
-        layout_("NHWC") {}
+      : I_(I), axes_(edsl::None()), normalize_variance_(true), epsilon_(1e-9), across_channels_(true), layout_("") {}
 
   mvn& axes(const std::vector<int64_t>& axes) {
     // negative axes interpreted as in numpy
-    if (!across_channels_ || layout_ != "NHWC") {
+    if (!across_channels_ || !layout_.empty()) {
       throw std::runtime_error("When using layout and across_channels, axes may not be specified");
     }
     axes_ = edsl::make_tuple(axes);
