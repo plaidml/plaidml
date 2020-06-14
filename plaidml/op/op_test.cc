@@ -157,6 +157,28 @@ module {
 )#"));
 }
 
+TEST(Op, Broadcast) {
+  auto I = Placeholder(DType::FLOAT32, {1, 224, 224}, "I");
+  std::vector<int> result_shape = {1, 224, 224, 3};
+  std::vector<int> bcast_axes = {0, 1, 2};
+  auto program = makeProgram("broadcast", {op::broadcast(I, result_shape, bcast_axes)});
+  IVLOG(1, program);
+  EXPECT_THAT(program, Eq(R"#(
+
+#map0 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+#map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+
+
+module {
+  func @broadcast(%arg0: tensor<1x224x224xf32> {tile.name = "I"}) -> tensor<1x224x224x3xf32> {
+    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> tensor<f32>
+    %0 = tile.contract assign, none, %cst, %arg0 {idxs = ["x0", "x1", "x2", "x3"], sink = #map0, srcs = [#map1]} : tensor<f32>, tensor<1x224x224xf32> -> tensor<1x224x224x3xf32>
+    return %0 : tensor<1x224x224x3xf32>
+  }
+}
+)#"));
+}
+
 TEST(Op, Clip) {
   auto I = Placeholder(DType::FLOAT32, {7, 7, 3, 64}, "I");
   auto raw_min = Placeholder(DType::FLOAT32, {7, 7, 3, 64}, "raw_min");

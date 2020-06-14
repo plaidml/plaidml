@@ -23,6 +23,7 @@ Value all(const Value&);
 Value any(const Value&);
 Value argmax(const Value&);
 Value binary_crossentropy(const Value&);
+Value broadcast(const Value&);
 Value clip(const Value&);
 Value concatenate(const Value&);
 Value convolution(const Value&);
@@ -464,6 +465,39 @@ Value binary_crossentropy(const Value& value) {
   };
   // Safe to use P without copy since it is built internally to this function
   return Value{OverrideGrads(deriv, std::vector<Tensor>{T, P}, O)};
+}
+
+Value broadcast(const Value& value) {
+  IVLOG(1, "broadcast");
+  auto args = value.as_tuple();
+  if (args.size() != 3) {
+    throw std::runtime_error(llvm::formatv("PlaidML broadcast op expects 3 arguments (received {0})", args.size()));
+  }
+
+  auto I = args[0].as_tensor();
+  auto target_shape = args[1].as_int_tuple();
+  auto broadcast_axes = args[2].as_int_tuple();
+
+  std::vector<TensorDim> O_dims;
+  std::vector<TensorDim> I_dims(I.rank());
+  I.bind_dims(I_dims);
+
+  std::vector<TensorIndex> I_idxs;
+  std::vector<TensorIndex> O_idxs;
+
+  // Define broadcast indices
+  for (int i = 0; i < target_shape.size(); i++) {
+    O_dims.emplace_back(TensorDim{target_shape[i]});
+    auto tidx = TensorIndex(llvm::formatv("x{0}", i));
+    if (std::find(broadcast_axes.begin(), broadcast_axes.end(), i) != broadcast_axes.end()) {
+      I_idxs.emplace_back(tidx);
+    }
+    O_idxs.emplace_back(TensorIndex(tidx));
+  }
+  auto O = TensorOutput(O_dims);
+  O(O_idxs) = I(I_idxs);
+
+  return Value{O};
 }
 
 Value clip(const Value& value) {
@@ -2788,6 +2822,7 @@ void RegisterOps() {
   registry->Register("any", any);
   registry->Register("argmax", argmax);
   registry->Register("binary_crossentropy", binary_crossentropy);
+  registry->Register("broadcast", broadcast);
   registry->Register("clip", clip);
   registry->Register("concatenate", concatenate);
   registry->Register("convolution", convolution);
