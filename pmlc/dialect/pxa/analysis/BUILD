@@ -11,6 +11,7 @@ plaidml_cc_library(
     ],
     hdrs = [
         "strides.h",
+        "uses.h",
     ],
     deps = [
         "//pmlc/dialect/pxa/ir",

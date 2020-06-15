@@ -24,6 +24,7 @@ plaidml_cc_library(
     srcs = [
         "autotile.cc",
         "fusion.cc",
+        "resize_tmps.cc",
         "pass_detail.h",
         "stencil.cc",
         "test_analysis.cc",

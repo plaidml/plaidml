@@ -2,10 +2,14 @@
 
 #include "pmlc/dialect/pxa/analysis/strides.h"
 
+#include <algorithm>
 #include <map>
+#include <numeric>
 #include <string>
+#include <utility>
 #include <vector>
 
+#include "mlir/Dialect/Affine/IR/AffineValueMap.h"
 #include "mlir/Support/DebugStringHelper.h"
 #include "pmlc/util/logging.h"
 #include "llvm/Support/FormatVariadic.h"
@@ -24,6 +28,56 @@ static std::string getUniqueName(Block *ref, BlockArgument arg) {
       .str();
 }
 
+StrideRange::StrideRange(BlockArgument arg)
+    : valid(false), minVal(0), maxVal(0), stride(0) {
+  if (auto ap =
+          mlir::dyn_cast<AffineParallelOp>(arg.getOwner()->getParentOp())) {
+    auto low_expr = ap.getLowerBoundsValueMap().getResult(arg.getArgNumber());
+    auto high_expr = ap.getUpperBoundsValueMap().getResult(arg.getArgNumber());
+    auto low_cst = low_expr.dyn_cast<AffineConstantExpr>();
+    auto high_cst = high_expr.dyn_cast<AffineConstantExpr>();
+    if (!low_cst || !high_cst) {
+      return;
+    }
+    int64_t step = ap.steps()[arg.getArgNumber()].cast<IntegerAttr>().getInt();
+    if (step == 0 || ((maxVal - minVal) % step) != 0) {
+      return;
+    }
+    stride = step;
+    minVal = low_cst.getValue();
+    maxVal = high_cst.getValue();
+    valid = true;
+    if (stride < 0) {
+      std::swap(minVal, maxVal);
+    }
+  }
+}
+
+StrideRange &StrideRange::operator*=(int64_t factor) {
+  minVal *= factor;
+  maxVal *= factor;
+  stride *= factor;
+  if (factor < 0) {
+    std::swap(minVal, maxVal);
+  }
+  return *this;
+}
+
+StrideRange &StrideRange::operator+=(const StrideRange &rhs) {
+  valid = valid && rhs.valid;
+  minVal += rhs.minVal;
+  maxVal += rhs.maxVal;
+  stride = std::gcd(stride, rhs.stride);
+  return *this;
+}
+
+void StrideRange::unionEquals(const StrideRange &rhs) {
+  valid = valid && rhs.valid;
+  minVal = std::min(minVal, rhs.minVal);
+  maxVal = std::max(maxVal, rhs.maxVal);
+  stride = std::gcd(stride, rhs.stride);
+}
+
 // Multiply the offset and all strides by a constant.
 StrideInfo &StrideInfo::operator*=(int64_t factor) {
   offset *= factor;
@@ -40,6 +94,50 @@ StrideInfo &StrideInfo::operator+=(const StrideInfo &rhs) {
     strides[kvp.first] += kvp.second;
   }
   return *this;
+}
+
+static bool blockAncestor(Block *x, Block *y) {
+  while (x != y) {
+    Operation *upOp = y->getParentOp();
+    if (!upOp) {
+      return false;
+    }
+    y = upOp->getBlock();
+    if (!y) {
+      return false;
+    }
+  }
+  return true;
+}
+
+StrideInfo StrideInfo::outer(Block *block) {
+  StrideInfo r;
+  r.offset = offset;
+  for (const auto &kvp : strides) {
+    if (blockAncestor(kvp.first.getOwner(), block)) {
+      r.strides.insert(kvp);
+    }
+  }
+  return r;
+}
+
+StrideInfo StrideInfo::inner(Block *block) {
+  StrideInfo r;
+  r.offset = 0;
+  for (const auto &kvp : strides) {
+    if (!blockAncestor(kvp.first.getOwner(), block)) {
+      r.strides.insert(kvp);
+    }
+  }
+  return r;
+}
+
+StrideRange StrideInfo::range() const {
+  StrideRange out = offset;
+  for (const auto &kvp : strides) {
+    out += StrideRange(kvp.first) * kvp.second;
+  }
+  return out;
 }
 
 void StrideInfo::print(raw_ostream &os, Block *relative) const {

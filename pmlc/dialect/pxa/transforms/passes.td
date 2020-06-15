@@ -13,6 +13,11 @@ def Fusion : FunctionPass<"pxa-fusion"> {
   let constructor = "pmlc::dialect::pxa::createFusionPass()";
 }
 
+def ResizeTmps : FunctionPass<"pxa-resize-tmps"> {
+  let summary = "Resize temporary buffers to minimal sizes";
+  let constructor = "pmlc::dialect::pxa::createResizeTmpsPass()";
+}
+
 def TestStrideInfo : Pass<"pxa-stride-info"> {
   let summary = "Report stride data for all loads/stores for unit tests";
   let constructor = "pmlc::dialect::pxa::createTestStrideInfoPass()";
