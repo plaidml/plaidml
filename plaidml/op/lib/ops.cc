@@ -1986,6 +1986,9 @@ Value mvn(const Value& value) {
   auto across_channels = args[4].as_bool();
   auto layout = args[5].as_str();
   if (axes.is_none()) {
+    if (layout.empty()) {
+      throw std::runtime_error("Either axes or layout must be specified for MVN");
+    }
     std::vector<int64_t> raw_axes;
     for (size_t i = 0; i < layout.size(); i++) {
       auto dim = layout[i];
