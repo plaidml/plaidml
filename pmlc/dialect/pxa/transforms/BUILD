@@ -1,9 +1,9 @@
 # Copyright 2020 Intel Corporation
 
-package(default_visibility = ["//visibility:public"])
-
-load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_test")
+load("//bzl:plaidml.bzl", "plaidml_cc_library")
 load("//vendor/mlir:tblgen.bzl", "gentbl")
+
+package(default_visibility = ["//visibility:public"])
 
 gentbl(
     name = "gen-pass",
@@ -23,6 +23,7 @@ plaidml_cc_library(
     name = "transforms",
     srcs = [
         "autotile.cc",
+        "dataflow_opt.cc",
         "fusion.cc",
         "pass_detail.h",
         "stencil.cc",
@@ -32,8 +33,8 @@ plaidml_cc_library(
     hdrs = [
         "autotile.h",
         "passes.h",
-        "tile.h",
         "stencil.h",
+        "tile.h",
     ],
     deps = [
         ":gen-pass",

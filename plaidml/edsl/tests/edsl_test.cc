@@ -499,15 +499,15 @@ Tensor Convolution2(const Tensor& I, const Tensor& K) {
 }
 
 TEST_F(CppEdsl, Convolution) {
-  auto I = Placeholder(DType::FLOAT32, {1, 224, 224, 3});
-  auto K = Placeholder(DType::FLOAT32, {3, 3, 1, 32});
+  auto I = Placeholder(DType::FLOAT32, {1, 56, 56, 64});
+  auto K = Placeholder(DType::FLOAT32, {3, 3, 64, 64});
   auto program = makeProgram("convolution", {Convolution2(I, K)});
   // clang-format off
   // CHECK-LABEL: CppEdsl.Convolution
   // CHECK: func @convolution
   // CHECK: %[[cst:.*]] = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> tensor<f32>
-  // CHECK: %{{.*}} = tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : tensor<f32>, tensor<1x224x224x3xf32>, tensor<3x3x1x32xf32> -> tensor<1x224x224x32xf32>
-  // CHECK: return %{{.*}} : tensor<1x224x224x32xf32>
+  // CHECK: %{{.*}} = tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : tensor<f32>, tensor<1x56x56x64xf32>, tensor<3x3x64x64xf32> -> tensor<1x56x56x64xf32>
+  // CHECK: return %{{.*}} : tensor<1x56x56x64xf32>
   // clang-format on
   runProgram(program);
 }

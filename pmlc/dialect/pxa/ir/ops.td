@@ -35,7 +35,7 @@ def AffineReduceOp : PXA_OpWithPP<"reduce", []> {
   let arguments = (ins
     AggregationKind:$agg,
     AnyStdScalar:$val,
-    AnyMemRef:$mem,
+    Arg<AnyMemRef, "the memref to reduce", [MemRead, MemWrite]>:$mem,
     AffineMapAttr:$map,
     Variadic<Index>:$idxs
   );
@@ -56,6 +56,7 @@ def AffineReduceOp : PXA_OpWithPP<"reduce", []> {
     MemRefType getMemRefType() { return mem().getType().cast<MemRefType>(); }
     AffineMap getAffineMap() { return map(); }
     operand_range getMapOperands() { return idxs(); }
+    Value getValueToStore() { return val(); }
   }];
 }
 
