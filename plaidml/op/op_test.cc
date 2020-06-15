@@ -29,7 +29,6 @@ namespace {
 class OpTest : public TestFixture {};
 
 Program makeProgram(const std::string& name, const std::vector<Tensor>& outputs) {
-  // TODO: remove empty target once all of these are passing.
   return ProgramBuilder(name, outputs).compile();
 }
 
@@ -169,26 +168,56 @@ TEST_F(OpTest, BroadcastNoOp) {
 }
 
 TEST_F(OpTest, BroadcastNumpy) {
-  auto A = Placeholder(DType::FLOAT32, {1, 10, 10});
-  std::vector<int> rshape = {1, 7, 10, 10};
+  auto A = Placeholder(DType::FLOAT32, {1, 3, 3});
+  std::vector<int> rshape = {1, 4, 3, 3};
   std::vector<int> bdims = {0, 2, 3};
   auto C = broadcast(A, rshape, bdims);
   auto program = makeProgram("broadcast_numpy", {C});
-  runProgram(program);
+
+  std::vector<float> A_input = {0, 1, 2,  //
+                                0, 1, 2,  //
+                                0, 1, 2};
+  std::vector<float> C_output = {0, 1, 2,  //
+                                 0, 1, 2,  //
+                                 0, 1, 2,  //
+                                 0, 1, 2,  //
+                                 0, 1, 2,  //
+                                 0, 1, 2,  //
+                                 0, 1, 2,  //
+                                 0, 1, 2,  //
+                                 0, 1, 2,  //
+                                 0, 1, 2,  //
+                                 0, 1, 2,  //
+                                 0, 1, 2};
+}
+
+TEST_F(OpTest, BroadcastNumpy2) {
+  auto A = Placeholder(DType::FLOAT32, {3, 1});
+  std::vector<int> rshape = {3, 4};
+  std::vector<int> bdims = {0, 1};
+  auto C = broadcast(A, rshape, bdims);
+  auto program = makeProgram("broadcast_numpy_2", {C});
+
+  std::vector<float> A_input = {0, 1, 2};
+  std::vector<float> C_output = {0, 1, 2,  //
+                                 0, 1, 2,  //
+                                 0, 1, 2,  //
+                                 0, 1, 2};
+  checkProgram(program, {{A, A_input}}, {{C, C_output}});
 }
 
 TEST_F(OpTest, BroadcastNonNumpy) {
-  auto A = Placeholder(DType::UINT64, {3});
+  auto A = Placeholder(DType::FLOAT32, {3});
   std::vector<int> rshape = {3, 4};
   std::vector<int> bdims = {0};
   auto C = broadcast(A, rshape, bdims);
   auto program = makeProgram("broadcast_non_numpy", {C});
 
-  std::vector<uint64_t> A_input = {0, 1, 2};
-  std::vector<uint64_t> C_output = {0, 1, 2,  //
-                                    0, 1, 2,  //
-                                    0, 1, 2,  //
-                                    0, 1, 2};
+  std::vector<float> A_input = {0, 1, 2};
+  std::vector<float> C_output = {0, 1, 2,  //
+                                 0, 1, 2,  //
+                                 0, 1, 2,  //
+                                 0, 1, 2};
   checkProgram(program, {{A, A_input}}, {{C, C_output}});
 }
 
