@@ -23,8 +23,8 @@ plaidml_cc_library(
     name = "transforms",
     srcs = [
         "autotile.cc",
+        "dataflow_opt.cc",
         "fusion.cc",
-        "localize.cc",
         "pass_detail.h",
         "stencil.cc",
         "test_analysis.cc",

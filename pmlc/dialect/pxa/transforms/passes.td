@@ -13,9 +13,9 @@ def Fusion : FunctionPass<"pxa-fusion"> {
   let constructor = "pmlc::dialect::pxa::createFusionPass()";
 }
 
-def Localize : FunctionPass<"pxa-localize"> {
-  let summary = "Localize buffers to nearest scope";
-  let constructor = "pmlc::dialect::pxa::createLocalizePass()";
+def MemRefDataFlowOpt : FunctionPass<"pxa-dataflow-opt"> {
+  let summary = "Perform reduce/load forwarding for memrefs";
+  let constructor = "pmlc::dialect::pxa::createMemRefDataFlowOptPass()";
 }
 
 def TestStrideInfo : Pass<"pxa-stride-info"> {
