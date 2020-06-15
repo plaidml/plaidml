@@ -47,14 +47,8 @@ struct MemRefAccess {
 struct MemRefDataFlowOptPass
     : public MemRefDataFlowOptBase<MemRefDataFlowOptPass> {
   void runOnFunction() final {
-    // Only supports single block functions at the moment.
-    FuncOp f = getFunction();
-    if (f.getBlocks().size() != 1) {
-      markAllAnalysesPreserved();
-      return;
-    }
-
     // Walk all load's and perform reduce to load forwarding.
+    FuncOp f = getFunction();
     f.walk([&](AffineLoadOp loadOp) {
       auto defOp = loadOp.getMemRef().getDefiningOp();
       if (!defOp) {
