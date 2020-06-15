@@ -703,12 +703,11 @@ TEST_F(CppEdsl, BroadcastNonOpLib) {
   I.bind_dims(B, N1, N2);
   auto O = TensorOutput(B, 7, N1, N2);
   O(b, j, i1, i2) = I(b, i1, i2);
-  // O.use_default(P);
   auto program = makeProgram("broadcast", {O});
   // clang-format off
-  // CHECK-LABEL: CppEdsl.UseDefault
+  // CHECK-LABEL: CppEdsl.BroadcastNonOpLib
   // CHECK: func @broadcast
-  // CHECK: %{{.*}} = tile.contract assign, none, %{{.*}}, %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}]} : tensor<1x7x10x10xf32>, tensor<1x10x10xf32> -> tensor<1x7x10x10xf32>
+  // CHECK: %{{.*}} = tile.contract assign, none, %{{.*}}, %{{.*}} {sink = #{{.*}}, srcs = [#{{.*}}]} : tensor<f32>, tensor<1x10x10xf32> -> tensor<1x7x10x10xf32>
   // CHECK: return %{{.*}} : tensor<1x7x10x10xf32>
   // clang-format on
   runProgram(program);

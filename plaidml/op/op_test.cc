@@ -30,7 +30,7 @@ class OpTest : public TestFixture {};
 
 Program makeProgram(const std::string& name, const std::vector<Tensor>& outputs) {
   // TODO: remove empty target once all of these are passing.
-  return ProgramBuilder(name, outputs).target("").compile();
+  return ProgramBuilder(name, outputs).compile();
 }
 
 TEST(Op, Abs) {
@@ -164,7 +164,7 @@ TEST_F(OpTest, BroadcastNoOp) {
   auto C = broadcast(A, rshape, bdims);
   auto program = makeProgram("broadcast_nop", {C});
 
-  std::vector<std::uint64_t> A_input = {0, 1, 2};
+  std::vector<float> A_input = {0, 1, 2};
   checkProgram(program, {{A, A_input}}, {{C, A_input}});
 }
 
@@ -184,11 +184,11 @@ TEST_F(OpTest, BroadcastNonNumpy) {
   auto C = broadcast(A, rshape, bdims);
   auto program = makeProgram("broadcast_non_numpy", {C});
 
-  std::vector<std::uint64_t> A_input = {0, 1, 2};
-  std::vector<std::uint64_t> C_output = {0, 1, 2,  //
-                                         0, 1, 2,  //
-                                         0, 1, 2,  //
-                                         0, 1, 2};
+  std::vector<uint64_t> A_input = {0, 1, 2};
+  std::vector<uint64_t> C_output = {0, 1, 2,  //
+                                    0, 1, 2,  //
+                                    0, 1, 2,  //
+                                    0, 1, 2};
   checkProgram(program, {{A, A_input}}, {{C, C_output}});
 }
 
