@@ -458,7 +458,7 @@ inline edsl::Tensor minimum(const edsl::Tensor& X, const edsl::Tensor& Y) {
 class mvn {
  public:
   explicit mvn(const plaidml::edsl::Tensor& I)
-      : I_(I), axes_(edsl::None()), normalize_variance_(true), epsilon_(1e-9), across_channels_(true), layout_("") {}
+      : I_(I), axes_(edsl::None()), normalize_variance_(true), epsilon_(1e-9), across_channels_(true) {}
 
   mvn& axes(const std::vector<int64_t>& axes) {
     // negative axes interpreted as in numpy
