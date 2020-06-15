@@ -157,6 +157,41 @@ module {
 )#"));
 }
 
+TEST_F(OpTest, BroadcastNoOp) {
+  auto A = Placeholder(DType::FLOAT32, {3});
+  std::vector<int> rshape = {3};
+  std::vector<int> bdims = {0};
+  auto C = broadcast(A, rshape, bdims);
+  auto program = makeProgram("broadcast_nop", {C});
+
+  std::vector<std::uint64_t> A_input = {0, 1, 2};
+  checkProgram(program, {{A, A_input}}, {{C, A_input}});
+}
+
+TEST_F(OpTest, BroadcastNumpy) {
+  auto A = Placeholder(DType::FLOAT32, {1, 10, 10});
+  std::vector<int> rshape = {1, 7, 10, 10};
+  std::vector<int> bdims = {0, 2, 3};
+  auto C = broadcast(A, rshape, bdims);
+  auto program = makeProgram("broadcast_numpy", {C});
+  runProgram(program);
+}
+
+TEST_F(OpTest, BroadcastNonNumpy) {
+  auto A = Placeholder(DType::UINT64, {3});
+  std::vector<int> rshape = {3, 4};
+  std::vector<int> bdims = {0};
+  auto C = broadcast(A, rshape, bdims);
+  auto program = makeProgram("broadcast_non_numpy", {C});
+
+  std::vector<std::uint64_t> A_input = {0, 1, 2};
+  std::vector<std::uint64_t> C_output = {0, 1, 2,  //
+                                         0, 1, 2,  //
+                                         0, 1, 2,  //
+                                         0, 1, 2};
+  checkProgram(program, {{A, A_input}}, {{C, C_output}});
+}
+
 TEST(Op, Broadcast) {
   auto I = Placeholder(DType::FLOAT32, {1, 224, 224}, "I");
   std::vector<int> result_shape = {1, 224, 224, 3};
