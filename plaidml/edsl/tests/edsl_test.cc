@@ -695,24 +695,6 @@ TEST_F(CppEdsl, UseDefault) {
   runProgram(program);
 }
 
-TEST_F(CppEdsl, BroadcastNonOpLib) {
-  auto P = Placeholder(DType::FLOAT32, {1, 7, 10, 10});
-  auto I = Placeholder(DType::FLOAT32, {1, 10, 10});
-  TensorDim B, N1, N2;
-  TensorIndex b, i1, i2, j;
-  I.bind_dims(B, N1, N2);
-  auto O = TensorOutput(B, 7, N1, N2);
-  O(b, j, i1, i2) = I(b, i1, i2);
-  auto program = makeProgram("broadcast", {O});
-  // clang-format off
-  // CHECK-LABEL: CppEdsl.BroadcastNonOpLib
-  // CHECK: func @broadcast
-  // CHECK: %{{.*}} = tile.contract assign, none, %{{.*}}, %{{.*}} {sink = #{{.*}}, srcs = [#{{.*}}]} : tensor<f32>, tensor<1x10x10xf32> -> tensor<1x7x10x10xf32>
-  // CHECK: return %{{.*}} : tensor<1x7x10x10xf32>
-  // clang-format on
-  runProgram(program);
-}
-
 Tensor ArgMax(const Tensor& I) {
   TensorDim X0, X1, X2;
   TensorIndex x0, x1, x2;
