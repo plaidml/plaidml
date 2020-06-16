@@ -45,10 +45,13 @@ StrideRange::StrideRange(BlockArgument arg)
     }
     stride = step;
     minVal = low_cst.getValue();
-    maxVal = high_cst.getValue();
+    maxVal = high_cst.getValue() - stride;
     valid = true;
     if (stride < 0) {
       std::swap(minVal, maxVal);
+    }
+    if (minVal == maxVal) {
+      stride = 0;
     }
   }
 }
@@ -133,7 +136,7 @@ StrideInfo StrideInfo::inner(Block *block) {
 }
 
 StrideRange StrideInfo::range() const {
-  StrideRange out = offset;
+  StrideRange out(offset);
   for (const auto &kvp : strides) {
     out += StrideRange(kvp.first) * kvp.second;
   }

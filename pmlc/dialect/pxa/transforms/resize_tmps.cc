@@ -15,66 +15,116 @@ namespace pmlc::dialect::pxa {
 namespace {
 
 struct ResizeTmpsPass : public ResizeTmpsBase<ResizeTmpsPass> {
+  void runOnAlloc(mlir::AllocOp op) {
+    using namespace mlir; // NOLINT
+    Block *opBlock = op.getOperation()->getBlock();
+    IVLOG(2, "Considering: " << debugString(*op.getOperation()));
+
+    llvm::SmallVector<StrideInfo, 4> outer;
+    llvm::SmallVector<StrideRange, 4> inner;
+    for (auto &use : AccessIndirectUses(op)) {
+      IVLOG(2, "Found use: " << debugString(*use.getOwner()));
+      Optional<llvm::SmallVector<StrideInfo, 4>> maybeStrides;
+      if (auto lop = dyn_cast<AffineLoadOp>(use.getOwner())) {
+        maybeStrides =
+            computeStrideInfo(lop.getAffineMap(), lop.getMapOperands());
+      } else if (auto rop = dyn_cast<AffineReduceOp>(use.getOwner())) {
+        maybeStrides =
+            computeStrideInfo(rop.getAffineMap(), rop.getMapOperands());
+      }
+      if (!maybeStrides) {
+        use.getOwner()->emitRemark("Unable to compute strides for access");
+        return;
+      }
+
+      llvm::SmallVector<StrideInfo, 4> curOuter;
+      llvm::SmallVector<StrideRange, 4> curInner;
+      for (size_t i = 0; i < maybeStrides->size(); i++) {
+        auto dimStride = (*maybeStrides)[i];
+        auto dimStrideOuter = dimStride.outer(opBlock);
+        auto dimStrideInner = dimStride.inner(opBlock);
+        curOuter.push_back(dimStrideOuter);
+        curInner.push_back(dimStrideInner.range());
+        if (!curInner.back().valid) {
+          use.getOwner()->emitRemark("Invalid inner range");
+          return;
+        }
+      }
+      // If we have set outer strides, make sure we match them
+      if (outer.size()) {
+        assert(curOuter.size() == outer.size() &&
+               "All accesses should have the same rank");
+        assert(curInner.size() == inner.size() &&
+               "All accesses should have the same rank");
+        if (outer != curOuter) {
+          use.getOwner()->emitRemark("Mismatched out access");
+          return;
+        }
+        for (size_t i = 0; i < inner.size(); i++) {
+          inner[i].unionEquals(curInner[i]);
+        }
+      } else {
+        // Otherwise, define new outer strides
+        outer = curOuter;
+        inner = curInner;
+      }
+    }
+    assert(outer.size() == inner.size() &&
+           "All accesses should have the same rank");
+    // Check for lots of kinds of failures and compute new size
+    bool sizeChanged = false;
+    llvm::SmallVector<int64_t, 4> newShape;
+    auto oldShape = op.getType().getShape();
+    for (size_t i = 0; i < outer.size(); i++) {
+      auto outerRange = outer[i].range();
+      auto innerRange = inner[i];
+      if (!outerRange.valid) {
+        op.emitRemark("Invalid outer range");
+        return;
+      }
+      if (innerRange.minVal != 0) {
+        op.emitRemark("Inner range has non-trivial lower bound");
+        return;
+      }
+      if (innerRange.stride < 0) {
+        op.emitRemark("Negative strides not handled");
+        return;
+      }
+      if (outerRange.stride && innerRange.maxVal + 1 > outerRange.stride) {
+        op.emitRemark("Inner and outer ranges overlap");
+        return;
+      }
+      newShape.push_back(innerRange.maxVal + 1);
+      IVLOG(2, "Computed size:" << newShape.back());
+      if (newShape[i] != oldShape[i]) {
+        sizeChanged = true;
+      }
+    }
+    // If it's already sized right, don't bother
+    if (!sizeChanged) {
+      op.emitRemark("Alloc is already correctly sized");
+      return;
+    }
+    // Compute new memref type
+    auto newType = MemRefType::get(newShape, op.getType().getElementType());
+    op.getResult().setType(newType);
+    // Update everywhere
+    for (auto &use : IndirectUses(op.getResult())) {
+      // A bit of overkill here
+      use.get().setType(newType);
+      if (auto rop = mlir::dyn_cast<AffineReduceOp>(use.getOwner())) {
+        // TODO: Update affine map to remove outer strides
+      }
+      if (auto lop = mlir::dyn_cast<AffineLoadOp>(use.getOwner())) {
+        // TODO: Update affine map to remove outer strides
+      }
+    }
+  }
+
   void runOnFunction() final {
     using namespace mlir; // NOLINT
     auto func = getFunction();
-    func.walk([&](AllocOp op) {
-      Block *opBlock = op.getOperation()->getBlock();
-      IVLOG(1, "Considering: " << debugString(*op.getOperation()));
-      bool valid = true;
-      llvm::SmallVector<StrideInfo, 4> outer;
-      llvm::SmallVector<StrideRange, 4> inner;
-      for (auto &use : AccessIndirectUses(op)) {
-        IVLOG(1, "Found use: " << debugString(*use.getOwner()));
-        Optional<llvm::SmallVector<StrideInfo, 4>> maybeStrides;
-        if (auto lop = dyn_cast<AffineLoadOp>(use.getOwner())) {
-          maybeStrides =
-              computeStrideInfo(lop.getAffineMap(), lop.getMapOperands());
-        } else if (auto rop = dyn_cast<AffineReduceOp>(use.getOwner())) {
-          maybeStrides =
-              computeStrideInfo(rop.getAffineMap(), rop.getMapOperands());
-        }
-        if (!maybeStrides) {
-          IVLOG(1, "Failed since one access cannot compute strides");
-          valid = false;
-          break;
-        }
-        llvm::SmallVector<StrideInfo, 4> curOuter;
-        llvm::SmallVector<StrideRange, 4> curInner;
-        for (size_t i = 0; i < maybeStrides->size(); i++) {
-          auto dimStride = (*maybeStrides)[i];
-          auto dimStrideOuter = dimStride.outer(opBlock);
-          auto dimStrideInner = dimStride.inner(opBlock);
-          curOuter.push_back(dimStrideOuter);
-          curInner.push_back(dimStrideInner.range());
-        }
-        // If we have set outer strides, make sure we match them
-        if (outer.size()) {
-          assert(curOuter.size() == outer.size() &&
-                 "All accesses should have the same rank");
-          assert(curInner.size() == inner.size() &&
-                 "All accesses should have the same rank");
-          if (outer != curOuter) {
-            IVLOG(1, "Different outer access, cannot resize");
-            valid = false;
-            break;
-          }
-          for (size_t i = 0; i < inner.size(); i++) {
-            inner[i].unionEquals(curInner[i]);
-          }
-        } else {
-          // Otherwise, define new outer strides
-          outer = curOuter;
-          inner = curInner;
-        }
-      }
-      IVLOG(1, "valid = " << valid);
-      for (size_t i = 0; i < inner.size(); i++) {
-        IVLOG(1, "Inner " << i << ": min = " << inner[i].minVal << ", max = "
-                          << inner[i].maxVal << ", stride = " << inner[i].stride
-                          << ", valid = " << inner[i].valid);
-      }
-    });
+    func.walk([&](AllocOp op) { runOnAlloc(op); });
   }
 };
 
