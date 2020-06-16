@@ -487,7 +487,7 @@ Value broadcast(const Value& value) {
   std::vector<TensorIndex> O_idxs;
 
   // Define broadcast indices
-  for (int i = 0; i < target_shape.size(); i++) {
+  for (size_t i = 0; i < target_shape.size(); i++) {
     O_dims.emplace_back(TensorDim{target_shape[i]});
     auto tidx = TensorIndex(llvm::formatv("x{0}", i));
     if (input_shape[i] == 1) {
