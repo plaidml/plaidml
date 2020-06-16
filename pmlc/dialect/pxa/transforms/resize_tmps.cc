@@ -4,6 +4,7 @@
 #include "mlir/Dialect/Affine/IR/AffineValueMap.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Support/DebugStringHelper.h"
+
 #include "pmlc/dialect/pxa/analysis/strides.h"
 #include "pmlc/dialect/pxa/analysis/uses.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
@@ -17,9 +18,14 @@ namespace pmlc::dialect::pxa {
 namespace {
 
 struct ResizeTmpsPass : public ResizeTmpsBase<ResizeTmpsPass> {
+  void runOnFunction() final {
+    auto func = getFunction();
+    func.walk([&](AllocOp op) { runOnAlloc(op); });
+  }
+
   AffineMap computeInnerMap(AffineMap orig, ValueRange operands, Block *block) {
     auto strides = computeStrideInfo(orig, operands);
-    assert(strides);
+    assert(strides && "Could not compute stride info");
     llvm::SmallVector<AffineExpr, 4> newExprs;
     for (size_t i = 0; i < strides->size(); i++) {
       auto innerStrides = (*strides)[i].inner(block);
@@ -27,6 +33,7 @@ struct ResizeTmpsPass : public ResizeTmpsBase<ResizeTmpsPass> {
     }
     return AffineMap::get(operands.size(), 0, newExprs, orig.getContext());
   }
+
   void runOnAlloc(mlir::AllocOp op) {
     Block *opBlock = op.getOperation()->getBlock();
     IVLOG(2, "Considering: " << debugString(*op.getOperation()));
@@ -135,11 +142,6 @@ struct ResizeTmpsPass : public ResizeTmpsBase<ResizeTmpsPass> {
         lop.setAttr(AffineLoadOp::getMapAttrName(), AffineMapAttr::get(map));
       }
     }
-  }
-
-  void runOnFunction() final {
-    auto func = getFunction();
-    func.walk([&](AllocOp op) { runOnAlloc(op); });
   }
 };
 
