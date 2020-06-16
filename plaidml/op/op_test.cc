@@ -29,8 +29,7 @@ namespace {
 class OpTest : public TestFixture {};
 
 Program makeProgram(const std::string& name, const std::vector<Tensor>& outputs) {
-  // TODO: remove empty target once all of these are passing.
-  return ProgramBuilder(name, outputs).target("").compile();
+  return ProgramBuilder(name, outputs).compile();
 }
 
 TEST(Op, Abs) {
