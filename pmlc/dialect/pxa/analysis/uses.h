@@ -10,14 +10,17 @@ class IndirectUsesIterator
           IndirectUsesIterator, std::forward_iterator_tag, mlir::OpOperand> {
 public:
   IndirectUsesIterator() : curValue(nullptr), curIt(), next(nullptr) {}
+
   explicit IndirectUsesIterator(Value value)
       : curValue(value), curIt(value.use_begin()), next(nullptr) {
     skipNonRead();
   }
+
   IndirectUsesIterator &operator=(const IndirectUsesIterator &other) = default;
   bool operator==(const IndirectUsesIterator &rhs) const {
     return curValue == rhs.curValue && curIt == rhs.curIt && next == rhs.next;
   }
+
   const mlir::OpOperand &operator*() const {
     return curIt == curValue.use_end() ? *next : *curIt;
   }
@@ -27,7 +30,7 @@ public:
   }
 
   IndirectUsesIterator &operator++() {
-    assert(curValue);
+    assert(curValue && "Invalid curValue");
     if (curIt != curValue.use_end()) {
       // Walking over a read use
       curIt++;
@@ -36,7 +39,7 @@ public:
     // We've finished the readers
     if (curIt == curValue.use_end()) {
       // Maybe we are all done?
-      if (next == nullptr || mlir::isa<mlir::ReturnOp>(next->getOwner())) {
+      if (!next || mlir::isa<mlir::ReturnOp>(next->getOwner())) {
         curValue = nullptr;
         curIt = Value::use_iterator();
         next = nullptr;
@@ -63,8 +66,7 @@ private:
   void skipNonRead() {
     while (curIt != curValue.use_end() &&
            !mlir::isa<mlir::AffineLoadOp>(curIt->getOwner())) {
-      assert(next == nullptr &&
-             "PXA memref-states should have only one non-read user");
+      assert(!next && "PXA memref-states should have only one non-read user");
       next = &*curIt;
       curIt++;
     }
@@ -84,16 +86,22 @@ class AccessIndirectUsesIterator
                                         mlir::OpOperand> {
 public:
   AccessIndirectUsesIterator() {}
+
   explicit AccessIndirectUsesIterator(Value value) : inner(value) {
     skipNonAccess();
   }
+
   AccessIndirectUsesIterator &
   operator=(const AccessIndirectUsesIterator &other) = default;
+
   bool operator==(const AccessIndirectUsesIterator &rhs) const {
     return inner == rhs.inner;
   }
+
   const mlir::OpOperand &operator*() const { return *inner; }
+
   mlir::OpOperand &operator*() { return *inner; }
+
   AccessIndirectUsesIterator &operator++() {
     ++inner;
     skipNonAccess();
@@ -126,9 +134,11 @@ private:
 class AccessIndirectUses {
 public:
   explicit AccessIndirectUses(Value value) : value(value) {}
+
   AccessIndirectUsesIterator begin() {
     return AccessIndirectUsesIterator(value);
   }
+
   AccessIndirectUsesIterator end() { return AccessIndirectUsesIterator(); }
 
 private:

@@ -44,5 +44,3 @@ func @inner_indexes(%I: memref<100x100xf32>) -> (memref<100x100xf32>) {
   }
   return %O4 : memref<100x100xf32>
 }
-
-

@@ -18,19 +18,23 @@ struct StrideRange {
 
   explicit StrideRange(int64_t val)
       : valid(true), minVal(val), maxVal(val), stride(0) {}
+
   explicit StrideRange(BlockArgument arg);
+
   StrideRange &operator*=(int64_t factor);
   StrideRange operator*(int64_t factor) const {
-    StrideRange r = *this;
-    r *= factor;
-    return r;
+    StrideRange ret = *this;
+    ret *= factor;
+    return ret;
   }
+
   StrideRange &operator+=(const StrideRange &rhs);
   StrideRange operator+(const StrideRange &rhs) const {
-    StrideRange r = *this;
-    r += rhs;
-    return r;
+    StrideRange ret = *this;
+    ret += rhs;
+    return ret;
   }
+
   void unionEquals(const StrideRange &rhs);
 };
 

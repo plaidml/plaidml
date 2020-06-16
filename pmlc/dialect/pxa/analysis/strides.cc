@@ -99,13 +99,13 @@ StrideInfo &StrideInfo::operator+=(const StrideInfo &rhs) {
   return *this;
 }
 
-static bool blockAncestor(Block *x, Block *y) {
+static bool isBlockAncestor(Block *x, Block *y) {
   while (x != y) {
-    Operation *upOp = y->getParentOp();
-    if (!upOp) {
+    Operation *parentOp = y->getParentOp();
+    if (!parentOp) {
       return false;
     }
-    y = upOp->getBlock();
+    y = parentOp->getBlock();
     if (!y) {
       return false;
     }
@@ -114,33 +114,33 @@ static bool blockAncestor(Block *x, Block *y) {
 }
 
 StrideInfo StrideInfo::outer(Block *block) {
-  StrideInfo r;
-  r.offset = offset;
+  StrideInfo ret;
+  ret.offset = offset;
   for (const auto &kvp : strides) {
-    if (blockAncestor(kvp.first.getOwner(), block)) {
-      r.strides.insert(kvp);
+    if (isBlockAncestor(kvp.first.getOwner(), block)) {
+      ret.strides.insert(kvp);
     }
   }
-  return r;
+  return ret;
 }
 
 StrideInfo StrideInfo::inner(Block *block) {
-  StrideInfo r;
-  r.offset = 0;
+  StrideInfo ret;
+  ret.offset = 0;
   for (const auto &kvp : strides) {
-    if (!blockAncestor(kvp.first.getOwner(), block)) {
-      r.strides.insert(kvp);
+    if (!isBlockAncestor(kvp.first.getOwner(), block)) {
+      ret.strides.insert(kvp);
     }
   }
-  return r;
+  return ret;
 }
 
 StrideRange StrideInfo::range() const {
-  StrideRange out(offset);
+  StrideRange ret(offset);
   for (const auto &kvp : strides) {
-    out += StrideRange(kvp.first) * kvp.second;
+    ret += StrideRange(kvp.first) * kvp.second;
   }
-  return out;
+  return ret;
 }
 
 AffineExpr StrideInfo::toExpr(MLIRContext *ctx, ValueRange operands) const {
@@ -148,15 +148,15 @@ AffineExpr StrideInfo::toExpr(MLIRContext *ctx, ValueRange operands) const {
   for (unsigned i = 0; i < operands.size(); i++) {
     opIdx[operands[i]] = i;
   }
-  AffineExpr r = getAffineConstantExpr(offset, ctx);
+  AffineExpr ret = getAffineConstantExpr(offset, ctx);
   for (const auto &kvp : strides) {
     auto it = opIdx.find(kvp.first);
     assert(it != opIdx.end() &&
            "toMap requires all values needed to be passed in as operands");
-    r = r + getAffineDimExpr(it->second, ctx) *
-                getAffineConstantExpr(kvp.second, ctx);
+    ret = ret + getAffineDimExpr(it->second, ctx) *
+                    getAffineConstantExpr(kvp.second, ctx);
   }
-  return r;
+  return ret;
 }
 
 void StrideInfo::print(raw_ostream &os, Block *relative) const {
