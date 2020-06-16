@@ -40,16 +40,16 @@ StrideRange::StrideRange(BlockArgument arg)
       return;
     }
     int64_t step = ap.steps()[arg.getArgNumber()].cast<IntegerAttr>().getInt();
-    if (step == 0 || ((maxVal - minVal) % step) != 0) {
+    if (step <= 0 || ((maxVal - minVal) % step) != 0) {
       return;
     }
-    stride = step;
+    stride = 1;
     minVal = low_cst.getValue();
-    maxVal = high_cst.getValue() - stride;
+    // This is a correction to deal with the fact that strides are measured
+    // relative to loop iterations not indexes.
+    maxVal = low_cst.getValue() +
+             (high_cst.getValue() - low_cst.getValue()) / step - 1;
     valid = true;
-    if (stride < 0) {
-      std::swap(minVal, maxVal);
-    }
     if (minVal == maxVal) {
       stride = 0;
     }
