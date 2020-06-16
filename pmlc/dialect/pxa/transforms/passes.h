@@ -19,6 +19,8 @@ std::unique_ptr<mlir::Pass> createFusionPass();
 
 std::unique_ptr<mlir::Pass> createResizeTmpsPass();
 
+std::unique_ptr<mlir::Pass> createMemRefDataFlowOptPass();
+
 struct StencilCost {
   double throughput;
   unsigned startupCost;

@@ -111,6 +111,21 @@ static LogicalResult foldMemRefCast(Operation *op) {
   return success(folded);
 }
 
+/// Fold reduce operations with no uses. Reduce has side effects on the heap,
+/// but can still be deleted if it has zero uses.
+struct SimplifyDeadReduce : public OpRewritePattern<AffineReduceOp> {
+  using OpRewritePattern<AffineReduceOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(AffineReduceOp reduce,
+                                PatternRewriter &rewriter) const override {
+    if (reduce.use_empty()) {
+      rewriter.eraseOp(reduce);
+      return success();
+    }
+    return failure();
+  }
+};
+
 } // namespace
 
 // ---- AffineReduceOp ----
@@ -155,7 +170,7 @@ ParseResult parseAffineReduceOp(OpAsmParser &parser, OperationState &result) {
 
 void AffineReduceOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
-  results.insert<SimplifyAffineOp<AffineReduceOp>>(context);
+  results.insert<SimplifyAffineOp<AffineReduceOp>, SimplifyDeadReduce>(context);
 }
 
 OpFoldResult AffineReduceOp::fold(ArrayRef<Attribute> cstOperands) {
