@@ -174,10 +174,9 @@ TEST_F(OpTest, BroadcastNoOpLarge) {
   auto C = broadcast(A, rshape, bdims);
   auto program = makeProgram("broadcast_nop_large", {C});
 
-  std::vector<float> A_input = {0, 1, 2,  //
-                                0, 1, 2,  //
-                                0, 1, 2,  //
-                                0, 1, 2};
+  std::vector<float> A_input = {0, 1, 2, 3,  //
+                                0, 1, 2, 3,  //
+                                0, 1, 2, 3};
   checkProgram(program, {{A, A_input}}, {{C, A_input}});
 }
 
