@@ -13,6 +13,11 @@ def Fusion : FunctionPass<"pxa-fusion"> {
   let constructor = "pmlc::dialect::pxa::createFusionPass()";
 }
 
+def MemRefDataFlowOpt : FunctionPass<"pxa-dataflow-opt"> {
+  let summary = "Perform reduce/load forwarding for memrefs";
+  let constructor = "pmlc::dialect::pxa::createMemRefDataFlowOptPass()";
+}
+
 def TestStrideInfo : Pass<"pxa-stride-info"> {
   let summary = "Report stride data for all loads/stores for unit tests";
   let constructor = "pmlc::dialect::pxa::createTestStrideInfoPass()";

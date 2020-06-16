@@ -1,7 +1,5 @@
 // Copyright 2020 Intel Corporation
 
-#include <iostream>
-
 #include "pmlc/dialect/pxa/transforms/tile.h"
 
 namespace pmlc::dialect::pxa {
