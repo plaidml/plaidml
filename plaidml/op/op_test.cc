@@ -226,7 +226,10 @@ TEST_F(OpTest, BroadcastNumpy3) {
   auto program = makeProgram("broadcast_numpy_3", {C});
 
   std::vector<float> A_input = {0, 1, 2};
-  std::vector<float> C_output = {0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2};
+  std::vector<float> C_output = {0, 1, 2,  //
+                                 0, 1, 2,  //
+                                 0, 1, 2,  //
+                                 0, 1, 2};
   checkProgram(program, {{A, A_input}}, {{C, C_output}});
 }
 
@@ -238,7 +241,9 @@ TEST_F(OpTest, BroadcastNonNumpy) {
   auto program = makeProgram("broadcast_non_numpy", {C});
 
   std::vector<float> A_input = {0, 1, 2};
-  std::vector<float> C_output = {0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2};
+  std::vector<float> C_output = {0, 0, 0, 0,  //
+                                 1, 1, 1, 1,  //
+                                 2, 2, 2, 2};
   checkProgram(program, {{A, A_input}}, {{C, C_output}});
 }
 
