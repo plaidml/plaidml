@@ -10,6 +10,34 @@
 
 namespace mlir {
 
+struct StrideRange {
+  bool valid;
+  int64_t minVal;
+  int64_t maxVal;
+  int64_t stride;
+
+  explicit StrideRange(int64_t val)
+      : valid(true), minVal(val), maxVal(val), stride(0) {}
+
+  explicit StrideRange(BlockArgument arg);
+
+  StrideRange &operator*=(int64_t factor);
+  StrideRange operator*(int64_t factor) const {
+    StrideRange ret = *this;
+    ret *= factor;
+    return ret;
+  }
+
+  StrideRange &operator+=(const StrideRange &rhs);
+  StrideRange operator+(const StrideRange &rhs) const {
+    StrideRange ret = *this;
+    ret += rhs;
+    return ret;
+  }
+
+  void unionEquals(const StrideRange &rhs);
+};
+
 // StrideInfo provides a simple 'stride' multiplier for each affine induction
 // variable (from an affine.for or affine.parallel).  Basically, each step of
 // the loop moves a pure affine expression by a fixed distance, 'strides' holds
@@ -20,8 +48,21 @@ struct StrideInfo {
 
   explicit StrideInfo(int64_t offset = 0) : offset(offset) {}
 
+  bool operator==(const StrideInfo &rhs) const {
+    return offset == rhs.offset && strides == rhs.strides;
+  }
   StrideInfo &operator*=(int64_t factor);
   StrideInfo &operator+=(const StrideInfo &rhs);
+
+  // Compute the outer and inner portion of stride info with respect to a given
+  // block.
+  StrideInfo outer(Block *block);
+  StrideInfo inner(Block *block);
+
+  // Return the range of a given stride info if it's computable
+  StrideRange range() const;
+
+  AffineExpr toExpr(MLIRContext *ctx, ValueRange operands) const;
 
   void print(raw_ostream &os, Block *relative = nullptr) const;
 };

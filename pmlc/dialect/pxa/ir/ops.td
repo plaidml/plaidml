@@ -58,6 +58,7 @@ def AffineReduceOp : PXA_OpWithPP<"reduce", []> {
     MemRefType getMemRefType() { return mem().getType().cast<MemRefType>(); }
     AffineMap getAffineMap() { return map(); }
     operand_range getMapOperands() { return idxs(); }
+    static StringRef getMapAttrName() { return "map"; }
     Value getValueToStore() { return val(); }
   }];
 }

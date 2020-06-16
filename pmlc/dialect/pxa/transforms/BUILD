@@ -25,6 +25,7 @@ plaidml_cc_library(
         "autotile.cc",
         "dataflow_opt.cc",
         "fusion.cc",
+        "resize_tmps.cc",
         "pass_detail.h",
         "stencil.cc",
         "test_analysis.cc",
