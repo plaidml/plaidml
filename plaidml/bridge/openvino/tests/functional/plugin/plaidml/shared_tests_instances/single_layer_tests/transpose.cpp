@@ -15,7 +15,7 @@ const std::vector<InferenceEngine::Precision> netPrecisions = {
     InferenceEngine::Precision::FP32,
 };
 
-INSTANTIATE_TEST_CASE_P(UnsqueezeCheck, TransposeLayerTest,
+INSTANTIATE_TEST_CASE_P(TransposeCheck, TransposeLayerTest,
                         ::testing::Combine(::testing::Values(std::vector<int64_t>({2, 0, 1}),
                                                              std::vector<int64_t>({0, 1, 2})),   //
                                            ::testing::ValuesIn(netPrecisions),                   //
