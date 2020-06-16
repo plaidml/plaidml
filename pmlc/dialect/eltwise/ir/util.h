@@ -10,6 +10,7 @@
 namespace pmlc::dialect::eltwise {
 
 mlir::Type promoteTypes(mlir::Type lhs, mlir::Type rhs);
+mlir::Type inferElementType(mlir::ArrayRef<mlir::Type> types);
 
 llvm::SmallVector<int64_t, 4>
 ComputeShape(llvm::ArrayRef<mlir::Value> operands);
