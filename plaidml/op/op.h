@@ -128,6 +128,12 @@ inline edsl::Tensor binary_crossentropy(const edsl::Tensor& I, const edsl::Tenso
   return details::op("binary_crossentropy", args).as_tensor();
 }
 
+inline edsl::Tensor broadcast(const edsl::Tensor& I, const std::vector<int>& result_shape,
+                              const std::vector<int>& bcast_axes) {
+  auto args = edsl::make_tuple(I, edsl::make_tuple(result_shape), edsl::make_tuple(bcast_axes));
+  return details::op("broadcast", args).as_tensor();
+}
+
 inline edsl::Tensor clip(const edsl::Tensor& I, const edsl::Tensor& min, const edsl::Tensor& max) {
   auto args = edsl::make_tuple(I, min, max);
   return details::op("clip", args).as_tensor();
