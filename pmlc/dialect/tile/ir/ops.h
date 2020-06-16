@@ -74,4 +74,7 @@ namespace SideEffects = mlir::SideEffects;
 
 #include "pmlc/dialect/tile/ir/dialect.h.inc"
 
+Type inferElementType(MLIRContext *context, CombinationKind combo,
+                      ValueRange srcs);
+
 } // namespace pmlc::dialect::tile
