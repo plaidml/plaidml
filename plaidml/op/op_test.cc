@@ -167,6 +167,20 @@ TEST_F(OpTest, BroadcastNoOp) {
   checkProgram(program, {{A, A_input}}, {{C, A_input}});
 }
 
+TEST_F(OpTest, BroadcastNoOpLarge) {
+  auto A = Placeholder(DType::FLOAT32, {3, 4});
+  std::vector<int> rshape = {3, 4};
+  std::vector<int> bdims = {0, 1};
+  auto C = broadcast(A, rshape, bdims);
+  auto program = makeProgram("broadcast_nop_large", {C});
+
+  std::vector<float> A_input = {0, 1, 2,  //
+                                0, 1, 2,  //
+                                0, 1, 2,  //
+                                0, 1, 2};
+  checkProgram(program, {{A, A_input}}, {{C, A_input}});
+}
+
 TEST_F(OpTest, BroadcastNumpy) {
   auto A = Placeholder(DType::FLOAT32, {1, 3, 3});
   std::vector<int> rshape = {1, 4, 3, 3};
@@ -203,6 +217,34 @@ TEST_F(OpTest, BroadcastNumpy2) {
                                  0, 1, 2,  //
                                  0, 1, 2,  //
                                  0, 1, 2};
+  checkProgram(program, {{A, A_input}}, {{C, C_output}});
+}
+
+TEST_F(OpTest, BroadcastNumpy3) {
+  auto A = Placeholder(DType::FLOAT32, {3});
+  std::vector<int> rshape = {4, 3};
+  std::vector<int> bdims = {1};
+  auto C = broadcast(A, rshape, bdims);
+  auto program = makeProgram("broadcast_numpy_3", {C});
+
+  std::vector<float> A_input = {0, 1, 2};
+  std::vector<float> C_output = {0, 0, 0, 0,  //
+                                 1, 1, 1, 1,  //
+                                 2, 2, 2, 2};
+  checkProgram(program, {{A, A_input}}, {{C, C_output}});
+}
+
+TEST_F(OpTest, BroadcastNumpy3WeirdParam) {
+  auto A = Placeholder(DType::FLOAT32, {3});
+  std::vector<int> rshape = {4, 3};
+  std::vector<int> bdims = {0};
+  auto C = broadcast(A, rshape, bdims);
+  auto program = makeProgram("broadcast_numpy_3", {C});
+
+  std::vector<float> A_input = {0, 1, 2};
+  std::vector<float> C_output = {0, 0, 0, 0,  //
+                                 1, 1, 1, 1,  //
+                                 2, 2, 2, 2};
   checkProgram(program, {{A, A_input}}, {{C, C_output}});
 }
 

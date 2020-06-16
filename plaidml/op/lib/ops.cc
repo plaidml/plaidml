@@ -475,6 +475,7 @@ Value broadcast(const Value& value) {
   }
 
   auto I = args[0].as_tensor();
+  auto input_shape = I.compute_shape().sizes();
   auto target_shape = args[1].as_int_tuple();
   auto broadcast_axes = args[2].as_int_tuple();
 
@@ -489,7 +490,9 @@ Value broadcast(const Value& value) {
   for (int i = 0; i < target_shape.size(); i++) {
     O_dims.emplace_back(TensorDim{target_shape[i]});
     auto tidx = TensorIndex(llvm::formatv("x{0}", i));
-    if (std::find(broadcast_axes.begin(), broadcast_axes.end(), i) != broadcast_axes.end()) {
+    if (input_shape[i] == 1) {
+      I_idxs.emplace_back(TensorIndex(0));
+    } else if (std::find(broadcast_axes.begin(), broadcast_axes.end(), i) != broadcast_axes.end()) {
       I_idxs.emplace_back(tidx);
     }
     O_idxs.emplace_back(tidx);
