@@ -58,6 +58,8 @@ struct StrideInfo {
   // Return the range of a given stride info if it's computable
   StrideRange range() const;
 
+  AffineExpr toExpr(MLIRContext *ctx, ValueRange operands) const;
+
   void print(raw_ostream &os, Block *relative = nullptr) const;
 };
 

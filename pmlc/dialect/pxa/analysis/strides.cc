@@ -143,6 +143,22 @@ StrideRange StrideInfo::range() const {
   return out;
 }
 
+AffineExpr StrideInfo::toExpr(MLIRContext *ctx, ValueRange operands) const {
+  DenseMap<Value, unsigned> opIdx;
+  for (unsigned i = 0; i < operands.size(); i++) {
+    opIdx[operands[i]] = i;
+  }
+  AffineExpr r = getAffineConstantExpr(offset, ctx);
+  for (const auto &kvp : strides) {
+    auto it = opIdx.find(kvp.first);
+    assert(it != opIdx.end() &&
+           "toMap requires all values needed to be passed in as operands");
+    r = r + getAffineDimExpr(it->second, ctx) *
+                getAffineConstantExpr(kvp.second, ctx);
+  }
+  return r;
+}
+
 void StrideInfo::print(raw_ostream &os, Block *relative) const {
   std::map<std::string, unsigned> ordered;
   std::map<Block *, unsigned> blockIds;

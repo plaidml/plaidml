@@ -10,13 +10,24 @@
 #include "pmlc/dialect/pxa/transforms/pass_detail.h"
 #include "pmlc/util/logging.h"
 
+using namespace mlir; // NOLINT
+
 namespace pmlc::dialect::pxa {
 
 namespace {
 
 struct ResizeTmpsPass : public ResizeTmpsBase<ResizeTmpsPass> {
+  AffineMap computeInnerMap(AffineMap orig, ValueRange operands, Block *block) {
+    auto strides = computeStrideInfo(orig, operands);
+    assert(strides);
+    llvm::SmallVector<AffineExpr, 4> newExprs;
+    for (size_t i = 0; i < strides->size(); i++) {
+      auto innerStrides = (*strides)[i].inner(block);
+      newExprs.push_back(innerStrides.toExpr(orig.getContext(), operands));
+    }
+    return AffineMap::get(operands.size(), 0, newExprs, orig.getContext());
+  }
   void runOnAlloc(mlir::AllocOp op) {
-    using namespace mlir; // NOLINT
     Block *opBlock = op.getOperation()->getBlock();
     IVLOG(2, "Considering: " << debugString(*op.getOperation()));
 
@@ -60,6 +71,7 @@ struct ResizeTmpsPass : public ResizeTmpsBase<ResizeTmpsPass> {
           use.getOwner()->emitRemark("Mismatched out access");
           return;
         }
+
         for (size_t i = 0; i < inner.size(); i++) {
           inner[i].unionEquals(curInner[i]);
         }
@@ -113,16 +125,19 @@ struct ResizeTmpsPass : public ResizeTmpsBase<ResizeTmpsPass> {
       // A bit of overkill here
       use.get().setType(newType);
       if (auto rop = mlir::dyn_cast<AffineReduceOp>(use.getOwner())) {
-        // TODO: Update affine map to remove outer strides
+        auto map =
+            computeInnerMap(rop.getAffineMap(), rop.getMapOperands(), opBlock);
+        rop.setAttr(AffineReduceOp::getMapAttrName(), AffineMapAttr::get(map));
       }
       if (auto lop = mlir::dyn_cast<AffineLoadOp>(use.getOwner())) {
-        // TODO: Update affine map to remove outer strides
+        auto map =
+            computeInnerMap(lop.getAffineMap(), lop.getMapOperands(), opBlock);
+        lop.setAttr(AffineLoadOp::getMapAttrName(), AffineMapAttr::get(map));
       }
     }
   }
 
   void runOnFunction() final {
-    using namespace mlir; // NOLINT
     auto func = getFunction();
     func.walk([&](AllocOp op) { runOnAlloc(op); });
   }
