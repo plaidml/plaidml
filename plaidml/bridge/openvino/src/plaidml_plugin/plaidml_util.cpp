@@ -13,7 +13,7 @@ using namespace InferenceEngine;  // NOLINT[build/namespaces]
 
 namespace PlaidMLPlugin {
 
-ngraph::AxisSet get_axes_set_from_constant_operand(size_t operand_idx, ngraph::Node* layer) {
+ngraph::AxisSet get_axis_set_from_constant_operand(size_t operand_idx, ngraph::Node* layer) {
   auto axis_ngraph_op =
       std::dynamic_pointer_cast<ngraph::op::Constant>(layer->input_value(operand_idx).get_node_shared_ptr());
   if (axis_ngraph_op) {
@@ -23,7 +23,7 @@ ngraph::AxisSet get_axes_set_from_constant_operand(size_t operand_idx, ngraph::N
   }
 }
 
-ngraph::AxisVector get_axes_vector_from_constant_operand(size_t operand_idx, ngraph::Node* layer) {
+ngraph::AxisVector get_axis_vector_from_constant_operand(size_t operand_idx, ngraph::Node* layer) {
   auto axis_ngraph_op =
       std::dynamic_pointer_cast<ngraph::op::Constant>(layer->input_value(operand_idx).get_node_shared_ptr());
   if (axis_ngraph_op) {
