@@ -10,7 +10,7 @@ TAGS = [
 
 cc_test(
     name = "single_layer_tests",
-    srcs = glob(["transpose.cpp"]),
+    srcs = glob(["*.cpp"]),
     copts = ["-Wno-deprecated-declarations"],
     data = [
         "//plaidml/bridge/openvino:libplaidml-plugin.so",
