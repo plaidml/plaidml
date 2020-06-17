@@ -1,4 +1,4 @@
-/ Copyright(C) 2020 Intel Corporation
+// Copyright(C) 2020 Intel Corporation
 // SPDX-License-Identifier: Apache-2.0
 //
 
@@ -9,13 +9,12 @@
 
 #include "plaidml/op/op.h"
 
-    using namespace plaidml;      // NOLINT[build/namespaces]
+using namespace plaidml;          // NOLINT[build/namespaces]
 using namespace InferenceEngine;  // NOLINT[build/namespaces]
 
 namespace PlaidMLPlugin {
 
 static OpRegistration reg("sigmoid", [](const Context& ctx) {
-  auto* layer = dynamic_cast<ngraph::opset1::Sigmoid*>(ctx.layer);
   IE_ASSERT(ctx.operands.size() == 1);
   auto I = ctx.operands.at(0);
   return edsl::make_tuple(op::sigmoid(I));
