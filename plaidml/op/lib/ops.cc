@@ -475,9 +475,15 @@ Value broadcast(const Value& value) {
   }
 
   auto I = args[0].as_tensor();
+  auto broadcast_axes = args[2].as_int_tuple();
+  if (I.rank() != broadcast_axes.size()) {
+    throw std::runtime_error(
+        llvm::formatv("Mismatched broadcast axes (received {0} broadcast axes for input tensor of rank {1})",
+                      broadcast_axes.size(), I.rank()));
+  }
+
   auto input_shape = I.compute_shape().sizes();
   auto target_shape = args[1].as_int_tuple();
-  auto broadcast_axes = args[2].as_int_tuple();
 
   std::vector<TensorDim> O_dims;
   std::vector<TensorDim> I_dims(I.rank());
@@ -486,17 +492,21 @@ Value broadcast(const Value& value) {
   std::vector<TensorIndex> I_idxs;
   std::vector<TensorIndex> O_idxs;
 
-  // Define broadcast indices
+  // Define output dims and indexes
   for (size_t i = 0; i < target_shape.size(); i++) {
     O_dims.emplace_back(TensorDim{target_shape[i]});
-    auto tidx = TensorIndex(llvm::formatv("x{0}", i));
+    O_idxs.emplace_back(TensorIndex(llvm::formatv("x{0}", i)));
+  }
+
+  // Define input dims and indexes
+  for (size_t i = 0; i < broadcast_axes.size(); i++) {
     if (input_shape[i] == 1) {
       I_idxs.emplace_back(TensorIndex(0));
-    } else if (std::find(broadcast_axes.begin(), broadcast_axes.end(), i) != broadcast_axes.end()) {
-      I_idxs.emplace_back(tidx);
+    } else {
+      I_idxs.emplace_back(O_idxs.at(broadcast_axes[i]));
     }
-    O_idxs.emplace_back(tidx);
   }
+
   auto O = TensorOutput(O_dims);
   O(O_idxs) = I(I_idxs);
 
