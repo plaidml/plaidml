@@ -167,6 +167,20 @@ TEST_F(OpTest, BroadcastNoOp) {
   checkProgram(program, {{A, A_input}}, {{C, A_input}});
 }
 
+TEST_F(OpTest, BroadcastScalar) {
+  auto A = Placeholder(DType::FLOAT32, {});
+  std::vector<int> rshape = {3, 4};
+  std::vector<int> bdims = {};
+  auto C = broadcast(A, rshape, bdims);
+  auto program = makeProgram("broadcast_scalar", {C});
+
+  std::vector<float> A_input = {3};
+  std::vector<float> C_output = {3, 3, 3, 3,  //
+                                 3, 3, 3, 3,  //
+                                 3, 3, 3, 3};
+  checkProgram(program, {{A, A_input}}, {{C, C_output}});
+}
+
 TEST_F(OpTest, BroadcastNoOpLarge) {
   auto A = Placeholder(DType::FLOAT32, {3, 4});
   std::vector<int> rshape = {3, 4};
