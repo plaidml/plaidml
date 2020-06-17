@@ -33,7 +33,7 @@ InferRequestInternal::Ptr PlaidMLExecutableNetwork::CreateInferRequestImpl(Input
     IVLOG(2, "output: " << kvp.first);
     outputs.push_back(tensorIOMap_.at(kvp.first));
   }
-  auto program = edsl::ProgramBuilder("ie", outputs).compile();
+  auto program = edsl::ProgramBuilder("ie", outputs).target("llvm_cpu").compile();
   return std::make_shared<PlaidMLInferRequest>(networkInputs, networkOutputs, program, tensorIOMap_);
 }
 
