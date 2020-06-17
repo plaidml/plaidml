@@ -501,7 +501,7 @@ Value broadcast(const Value& value) {
   // Define input dims and indexes
   for (size_t i = 0; i < broadcast_axes.size(); i++) {
     if (input_shape[i] == 1) {
-      I_idxs.emplace_back(TensorIndex(0));
+      I_idxs.emplace_back(0);
     } else {
       I_idxs.emplace_back(O_idxs.at(broadcast_axes[i]));
     }
