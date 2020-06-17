@@ -485,18 +485,12 @@ Value broadcast(const Value& value) {
   auto input_shape = I.compute_shape().sizes();
   auto target_shape = args[1].as_int_tuple();
 
-  std::vector<TensorDim> O_dims;
+  std::vector<TensorDim> O_dims(target_shape.begin(), target_shape.end());
   std::vector<TensorDim> I_dims(I.rank());
   I.bind_dims(I_dims);
 
   std::vector<TensorIndex> I_idxs;
-  std::vector<TensorIndex> O_idxs;
-
-  // Define output dims and indexes
-  for (size_t i = 0; i < target_shape.size(); i++) {
-    O_dims.emplace_back(TensorDim{target_shape[i]});
-    O_idxs.emplace_back(TensorIndex(llvm::formatv("x{0}", i)));
-  }
+  std::vector<TensorIndex> O_idxs(target_shape.size());
 
   // Define input dims and indexes
   for (size_t i = 0; i < broadcast_axes.size(); i++) {
