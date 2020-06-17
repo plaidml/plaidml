@@ -34,7 +34,7 @@ struct ResizeTmpsPass : public ResizeTmpsBase<ResizeTmpsPass> {
     return AffineMap::get(operands.size(), 0, newExprs, orig.getContext());
   }
 
-  void runOnAlloc(mlir::AllocOp op) {
+  void runOnAlloc(AllocOp op) {
     Block *opBlock = op.getOperation()->getBlock();
     IVLOG(2, "Considering: " << debugString(*op.getOperation()));
 
@@ -131,12 +131,12 @@ struct ResizeTmpsPass : public ResizeTmpsBase<ResizeTmpsPass> {
     for (auto &use : IndirectUses(op.getResult())) {
       // A bit of overkill here
       use.get().setType(newType);
-      if (auto rop = mlir::dyn_cast<AffineReduceOp>(use.getOwner())) {
+      if (auto rop = dyn_cast<AffineReduceOp>(use.getOwner())) {
         auto map =
             computeInnerMap(rop.getAffineMap(), rop.getMapOperands(), opBlock);
         rop.setAttr(AffineReduceOp::getMapAttrName(), AffineMapAttr::get(map));
       }
-      if (auto lop = mlir::dyn_cast<AffineLoadOp>(use.getOwner())) {
+      if (auto lop = dyn_cast<AffineLoadOp>(use.getOwner())) {
         auto map =
             computeInnerMap(lop.getAffineMap(), lop.getMapOperands(), opBlock);
         lop.setAttr(AffineLoadOp::getMapAttrName(), AffineMapAttr::get(map));
@@ -147,7 +147,7 @@ struct ResizeTmpsPass : public ResizeTmpsBase<ResizeTmpsPass> {
 
 } // namespace
 
-std::unique_ptr<mlir::Pass> createResizeTmpsPass() {
+std::unique_ptr<Pass> createResizeTmpsPass() {
   return std::make_unique<ResizeTmpsPass>();
 }
 
