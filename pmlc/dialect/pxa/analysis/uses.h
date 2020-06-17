@@ -9,14 +9,15 @@ class IndirectUsesIterator
     : public llvm::iterator_facade_base<
           IndirectUsesIterator, std::forward_iterator_tag, mlir::OpOperand> {
 public:
-  IndirectUsesIterator() : curValue(nullptr), curIt(), next(nullptr) {}
+  IndirectUsesIterator() {}
 
   explicit IndirectUsesIterator(Value value)
-      : curValue(value), curIt(value.use_begin()), next(nullptr) {
+      : curValue(value), curIt(value.use_begin()) {
     skipNonRead();
   }
 
   IndirectUsesIterator &operator=(const IndirectUsesIterator &other) = default;
+
   bool operator==(const IndirectUsesIterator &rhs) const {
     return curValue == rhs.curValue && curIt == rhs.curIt && next == rhs.next;
   }
@@ -29,54 +30,17 @@ public:
     return curIt == curValue.use_end() ? *next : *curIt;
   }
 
-  IndirectUsesIterator &operator++() {
-    assert(curValue && "Invalid curValue");
-    if (curIt != curValue.use_end()) {
-      // Walking over a read use
-      curIt++;
-      skipNonRead();
-    }
-    // We've finished the readers
-    if (curIt == curValue.use_end()) {
-      // Maybe we are all done?
-      if (!next || mlir::isa<mlir::ReturnOp>(next->getOwner())) {
-        curValue = nullptr;
-        curIt = Value::use_iterator();
-        next = nullptr;
-        return *this;
-      }
-      // Otherwise, move to next value + reset it + next
-      if (auto yieldOp = mlir::dyn_cast<AffineYieldOp>(next->getOwner())) {
-        curValue = yieldOp.getParentOp()->getResult(next->getOperandNumber());
-      } else if (auto reduceOp =
-                     mlir::dyn_cast<AffineReduceOp>(next->getOwner())) {
-        curValue = reduceOp.result();
-      } else {
-        llvm_unreachable("All uses of pxa mem-ref state should be reads, "
-                         "yields, or reduces or returns");
-      }
-      curIt = curValue.use_begin();
-      next = nullptr;
-      skipNonRead();
-    }
-    return *this;
-  }
+  IndirectUsesIterator &operator++();
 
 private:
-  void skipNonRead() {
-    while (curIt != curValue.use_end() &&
-           !mlir::isa<mlir::AffineLoadOp>(curIt->getOwner())) {
-      assert(!next && "PXA memref-states should have only one non-read user");
-      next = &*curIt;
-      curIt++;
-    }
-  }
+  void skipNonRead();
+
   // The current value being walked
   Value curValue;
   // The position in the walk
   Value::use_iterator curIt;
   // The next operation to follow once we finish with all read uses
-  mlir::OpOperand *next;
+  mlir::OpOperand *next = nullptr;
 };
 
 // Subsets all uses to only acceses (skipping yield/return)

@@ -13,14 +13,19 @@ def Fusion : FunctionPass<"pxa-fusion"> {
   let constructor = "pmlc::dialect::pxa::createFusionPass()";
 }
 
-def ResizeTmps : FunctionPass<"pxa-resize-tmps"> {
-  let summary = "Resize temporary buffers to minimal sizes";
-  let constructor = "pmlc::dialect::pxa::createResizeTmpsPass()";
+def Localize : FunctionPass<"pxa-localize"> {
+  let summary = "Push memref allocs to innermost scope";
+  let constructor = "pmlc::dialect::pxa::createLocalizePass()";
 }
 
 def MemRefDataFlowOpt : FunctionPass<"pxa-dataflow-opt"> {
   let summary = "Perform reduce/load forwarding for memrefs";
   let constructor = "pmlc::dialect::pxa::createMemRefDataFlowOptPass()";
+}
+
+def ResizeTmps : FunctionPass<"pxa-resize-tmps"> {
+  let summary = "Resize temporary buffers to minimal sizes";
+  let constructor = "pmlc::dialect::pxa::createResizeTmpsPass()";
 }
 
 def TestStrideInfo : Pass<"pxa-stride-info"> {
