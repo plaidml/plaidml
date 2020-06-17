@@ -17,7 +17,7 @@ namespace PlaidMLPlugin {
 static OpRegistration reg("tanh", [](const Context& ctx) {
   IE_ASSERT(ctx.operands.size() == 1);
   auto I = ctx.operands.at(0);
-  return edsl::make_tuple(op::tanh(I));
+  return edsl::make_tuple(tanh(I));
 });
 
 }  // namespace PlaidMLPlugin
