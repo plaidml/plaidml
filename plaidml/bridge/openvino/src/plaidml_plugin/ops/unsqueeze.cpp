@@ -19,7 +19,7 @@ namespace PlaidMLPlugin {
 static OpRegistration reg("unsqueeze", [](const Context& ctx) {
   IE_ASSERT(ctx.operands.size() == 2);
   auto I = ctx.operands.at(0);
-  auto axes = get_axes_from_constant_operand(1, ctx.layer);
+  auto axes = get_axes_set_from_constant_operand(1, ctx.layer);
   std::vector<edsl::TensorDim> I_dims(I.rank());
   size_t new_rank = I.rank() + axes.size();
   I.bind_dims(I_dims);
