@@ -14,7 +14,7 @@ using namespace InferenceEngine;  // NOLINT[build/namespaces]
 
 namespace PlaidMLPlugin {
 
-static OpRegistration reg("less_eq", [](const Context& ctx) {
+static OpRegistration reg("lessequal", [](const Context& ctx) {
   IE_ASSERT(ctx.operands.size() == 2);
   auto A = ctx.operands.at(0);
   auto B = ctx.operands.at(1);

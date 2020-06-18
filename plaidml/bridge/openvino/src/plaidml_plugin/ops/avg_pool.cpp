@@ -15,7 +15,7 @@ using namespace InferenceEngine;  // NOLINT[build/namespaces]
 
 namespace PlaidMLPlugin {
 
-static OpRegistration reg("avg_pool", [](const Context& ctx) {
+static OpRegistration reg("avgpool", [](const Context& ctx) {
   auto* layer = dynamic_cast<ngraph::opset1::AvgPool*>(ctx.layer);
   IE_ASSERT(ctx.operands.size() == 1);
   auto I = ctx.operands.at(0);

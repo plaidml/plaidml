@@ -14,7 +14,7 @@ using namespace InferenceEngine;  // NOLINT[build/namespaces]
 
 namespace PlaidMLPlugin {
 
-static OpRegistration reg("not_equal", [](const Context& ctx) {
+static OpRegistration reg("notequal", [](const Context& ctx) {
   IE_ASSERT(ctx.operands.size() == 2);
   auto A = ctx.operands.at(0);
   auto B = ctx.operands.at(1);
