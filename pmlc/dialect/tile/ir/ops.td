@@ -80,7 +80,7 @@ def ContractionOp : TileOpWithPPV<"contract", [NoSideEffect]> {
 
 def IndexOp : TileOp<"index", [NoSideEffect]>, HasCanonicalizer {
   let summary = "tensor index lookup operation";
-  let arguments = (ins EltwiseAny:$tensor, APIntAttr:$dim);
+  let arguments = (ins APIntAttr:$axis, Variadic<EltwiseIndex>:$dims);
   let results = (outs EltwiseIndex:$result);
 
   let extraClassDeclaration = [{

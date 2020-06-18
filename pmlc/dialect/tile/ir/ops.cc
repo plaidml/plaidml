@@ -625,14 +625,13 @@ struct IndexCanonicalizer : public OpRewritePattern<IndexOp> {
     IVLOG(5, "IndexCanonicalizer::matchAndRewrite> "
                  << mlir::debugString(indexOp));
     auto op = indexOp.getOperation();
-    SmallVector<Value, 2> operands(op->getOperands());
+    SmallVector<Value, 4> operands(op->getOperands());
     auto resultType = IndexOp::getResultType(operands);
     if (resultType == indexOp.result().getType()) {
       return failure();
     }
-    auto dim = indexOp.getAttrOfType<IntegerAttr>("dim");
     auto newOp = rewriter.create<IndexOp>(op->getLoc(), resultType,
-                                          indexOp.tensor(), dim);
+                                          indexOp.axisAttr(), indexOp.dims());
     rewriter.replaceOp(op, {newOp});
     util::UpdateFuncOpType(newOp.getOperation());
     return success();
@@ -645,21 +644,14 @@ void IndexOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
 }
 
 Type IndexOp::getResultType(ArrayRef<Value> operands) {
-  IVLOG(5, "IndexOp::getResultType>")
-  for (auto operand : operands) {
-    IVLOG(6, "  operand: " << mlir::debugString(operand));
+  if (operands.size() < 1) {
+    throw std::runtime_error("IndexOp requires at least one operand");
   }
-  if (operands.size() != 1) {
-    throw std::runtime_error("IndexOp requires 1 operand");
-  }
-  auto tensor = operands.front();
-  auto tensorType = eltwise::getRankedTensorType(tensor.getType());
-  auto elementType =
-      IntegerType::get(32, IntegerType::Signed, tensor.getContext());
-  IVLOG(6, "  elementType: " << mlir::debugString(elementType));
-  auto resultType = RankedTensorType::get(tensorType.getShape(), elementType);
-  IVLOG(6, "  resultType: " << mlir::debugString(resultType));
-  return resultType;
+
+  auto *context = operands.front().getContext();
+  auto elementType = IntegerType::get(32, IntegerType::Signed, context);
+  auto shape = eltwise::ComputeShape(operands);
+  return RankedTensorType::get(shape, elementType);
 }
 
 // ---- PrngOp ----

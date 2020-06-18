@@ -420,10 +420,7 @@ Value argmax(const Value& value) {
   I.bind_dims(agg.src_dims);
   auto M = TensorOutput(agg.dst_dims);
   M(agg.dst_idxs) >= I(agg.src_idxs);
-  Tensor One(1);
-  auto T = TensorOutput(agg.reduce_dims);
-  T(agg.reduce_idxs) = One();
-  auto IX = index(T, 0);
+  auto IX = index(agg.reduce_dims, 0);
   auto AM = TensorOutput(agg.dst_dims);
   AM(agg.dst_idxs) >= cond(I(agg.src_idxs), M(agg.dst_idxs), IX(agg.reduce_idxs));
   auto O = cast(AM, DType::UINT32);
