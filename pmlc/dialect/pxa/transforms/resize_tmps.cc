@@ -127,10 +127,12 @@ struct ResizeTmpsPass : public ResizeTmpsBase<ResizeTmpsPass> {
     // Compute new memref type
     auto newType = MemRefType::get(newShape, op.getType().getElementType());
     op.getResult().setType(newType);
-    // Update everywhere
-    for (auto &use : IndirectUses(op.getResult())) {
-      // A bit of overkill here
-      use.get().setType(newType);
+    // Update type on all definitions
+    for (auto &def : IndirectDefs(op.getResult())) {
+      def.setType(newType);
+    }
+    // Update all of the access maps
+    for (auto &use : AccessIndirectUses(op.getResult())) {
       if (auto rop = dyn_cast<AffineReduceOp>(use.getOwner())) {
         auto map =
             computeInnerMap(rop.getAffineMap(), rop.getMapOperands(), opBlock);
