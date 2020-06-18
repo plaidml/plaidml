@@ -39,6 +39,23 @@ using mlir::StringAttr;
 using mlir::success;
 using mlir::Value;
 
+Type inferElementType(MLIRContext *context, CombinationKind combo,
+                      ValueRange srcs) {
+  SmallVector<Type, 3> types;
+  for (auto src : srcs) {
+    auto mapOp = llvm::cast<AffineTensorMapOp>(src.getDefiningOp());
+    types.push_back(mapOp.tensor().getType());
+  }
+  if (combo == CombinationKind::eq) {
+    return IntegerType::get(1, context);
+  }
+  if (combo == CombinationKind::cond) {
+    auto rankedTensorType = eltwise::getRankedTensorType(types[2]);
+    return rankedTensorType.getElementType();
+  }
+  return eltwise::inferElementType(types);
+}
+
 OpFoldResult ConstantOp::fold(ArrayRef<Attribute> operands) {
   // IVLOG(5, "ConstantOp::fold> " << mlir::debugString(*getOperation()));
   assert(operands.empty() && "constant has no operands");
@@ -385,7 +402,8 @@ struct SymbolicContractionCanonicalizer
     SmallVector<Value, 4> sizeDims(sizeMapOp.dims());
     auto shape = eltwise::ComputeShape(sizeDims);
     auto sourceType = op.result().getType().cast<RankedTensorType>();
-    auto resultType = RankedTensorType::get(shape, sourceType.getElementType());
+    auto elementType = inferElementType(op.getContext(), op.combo(), op.srcs());
+    auto resultType = RankedTensorType::get(shape, elementType);
     if (!resultType.hasStaticShape()) {
       if (resultType == sourceType) {
         return failure();
@@ -409,11 +427,18 @@ struct SymbolicContractionCanonicalizer
     }
 
     ContractionBuilder builder(op);
-    auto newOp = rewriter.create<ContractionOp>(
-        op.getLoc(), resultType, op.init(), builder.getTensors(), op.agg(),
-        op.combo(), builder.getSink(), builder.getSources(),
-        builder.getConstraints(), op.no_reduce().hasValue(),
-        op.name().getValueOr(""));
+    auto newOp =
+        rewriter.create<ContractionOp>(op.getLoc(),
+                                       /*resultType=*/resultType,
+                                       /*init=*/op.init(),
+                                       /*tensors=*/builder.getTensors(),
+                                       /*agg=*/op.agg(),
+                                       /*combo=*/op.combo(),
+                                       /*sink=*/builder.getSink(),
+                                       /*srcs=*/builder.getSources(),
+                                       /*cons=*/builder.getConstraints(),
+                                       /*no_reduce=*/op.no_reduce().hasValue(),
+                                       /*name=*/op.name().getValueOr(""));
     bool hasNames = false;
     auto idxs = builder.getIndexes();
     SmallVector<Attribute, 8> idxNames;
@@ -600,14 +625,13 @@ struct IndexCanonicalizer : public OpRewritePattern<IndexOp> {
     IVLOG(5, "IndexCanonicalizer::matchAndRewrite> "
                  << mlir::debugString(indexOp));
     auto op = indexOp.getOperation();
-    SmallVector<Value, 2> operands(op->getOperands());
+    SmallVector<Value, 4> operands(op->getOperands());
     auto resultType = IndexOp::getResultType(operands);
     if (resultType == indexOp.result().getType()) {
       return failure();
     }
-    auto dim = indexOp.getAttrOfType<IntegerAttr>("dim");
     auto newOp = rewriter.create<IndexOp>(op->getLoc(), resultType,
-                                          indexOp.tensor(), dim);
+                                          indexOp.axisAttr(), indexOp.dims());
     rewriter.replaceOp(op, {newOp});
     util::UpdateFuncOpType(newOp.getOperation());
     return success();
@@ -620,21 +644,14 @@ void IndexOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
 }
 
 Type IndexOp::getResultType(ArrayRef<Value> operands) {
-  IVLOG(5, "IndexOp::getResultType>")
-  for (auto operand : operands) {
-    IVLOG(6, "  operand: " << mlir::debugString(operand));
+  if (operands.size() < 1) {
+    throw std::runtime_error("IndexOp requires at least one operand");
   }
-  if (operands.size() != 1) {
-    throw std::runtime_error("IndexOp requires 1 operand");
-  }
-  auto tensor = operands.front();
-  auto tensorType = eltwise::getRankedTensorType(tensor.getType());
-  auto elementType =
-      IntegerType::get(32, IntegerType::Signed, tensor.getContext());
-  IVLOG(6, "  elementType: " << mlir::debugString(elementType));
-  auto resultType = RankedTensorType::get(tensorType.getShape(), elementType);
-  IVLOG(6, "  resultType: " << mlir::debugString(resultType));
-  return resultType;
+
+  auto *context = operands.front().getContext();
+  auto elementType = IntegerType::get(32, IntegerType::Signed, context);
+  auto shape = eltwise::ComputeShape(operands);
+  return RankedTensorType::get(shape, elementType);
 }
 
 // ---- PrngOp ----

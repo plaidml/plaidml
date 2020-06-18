@@ -1,4 +1,4 @@
-// RUN: pmlc-opt -convert-tile-to-pxa -canonicalize -cse %s | FileCheck %s
+// RUN: pmlc-opt -convert-tile-to-pxa %s | FileCheck %s
 
 !f32 = type tensor<f32>
 !i1 = type tensor<i1>

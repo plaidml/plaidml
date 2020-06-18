@@ -1,4 +1,4 @@
-// RUN: pmlc-opt -tile-compute-bounds -convert-tile-to-pxa -canonicalize -cse %s | FileCheck %s
+// RUN: pmlc-opt -tile-compute-bounds -convert-tile-to-pxa %s | FileCheck %s
 
 #map0 = affine_map<(i, j, k) -> (j, k)>
 #map1 = affine_map<(i, j, k) -> (j, i)>

@@ -23,6 +23,7 @@ Value all(const Value&);
 Value any(const Value&);
 Value argmax(const Value&);
 Value binary_crossentropy(const Value&);
+Value broadcast(const Value&);
 Value clip(const Value&);
 Value concatenate(const Value&);
 Value convolution(const Value&);
@@ -419,10 +420,7 @@ Value argmax(const Value& value) {
   I.bind_dims(agg.src_dims);
   auto M = TensorOutput(agg.dst_dims);
   M(agg.dst_idxs) >= I(agg.src_idxs);
-  Tensor One(1);
-  auto T = TensorOutput(agg.reduce_dims);
-  T(agg.reduce_idxs) = One();
-  auto IX = index(T, 0);
+  auto IX = index(agg.reduce_dims, 0);
   auto AM = TensorOutput(agg.dst_dims);
   AM(agg.dst_idxs) >= cond(I(agg.src_idxs), M(agg.dst_idxs), IX(agg.reduce_idxs));
   auto O = cast(AM, DType::UINT32);
@@ -464,6 +462,46 @@ Value binary_crossentropy(const Value& value) {
   };
   // Safe to use P without copy since it is built internally to this function
   return Value{OverrideGrads(deriv, std::vector<Tensor>{T, P}, O)};
+}
+
+Value broadcast(const Value& value) {
+  IVLOG(1, "broadcast");
+  auto args = value.as_tuple();
+  if (args.size() != 3) {
+    throw std::runtime_error(llvm::formatv("PlaidML broadcast op expects 3 arguments (received {0})", args.size()));
+  }
+
+  auto I = args[0].as_tensor();
+  auto broadcast_axes = args[2].as_int_tuple();
+  if (I.rank() != broadcast_axes.size()) {
+    throw std::runtime_error(
+        llvm::formatv("Mismatched broadcast axes (received {0} broadcast axes for input tensor of rank {1})",
+                      broadcast_axes.size(), I.rank()));
+  }
+
+  auto input_shape = I.compute_shape().sizes();
+  auto target_shape = args[1].as_int_tuple();
+
+  std::vector<TensorDim> O_dims(target_shape.begin(), target_shape.end());
+  std::vector<TensorDim> I_dims(I.rank());
+  I.bind_dims(I_dims);
+
+  std::vector<TensorIndex> I_idxs;
+  std::vector<TensorIndex> O_idxs(target_shape.size());
+
+  // Define input dims and indexes
+  for (size_t i = 0; i < broadcast_axes.size(); i++) {
+    if (input_shape[i] == 1) {
+      I_idxs.emplace_back(0);
+    } else {
+      I_idxs.emplace_back(O_idxs.at(broadcast_axes[i]));
+    }
+  }
+
+  auto O = TensorOutput(O_dims);
+  O(O_idxs) = I(I_idxs);
+
+  return Value{O};
 }
 
 Value clip(const Value& value) {
@@ -2788,6 +2826,7 @@ void RegisterOps() {
   registry->Register("any", any);
   registry->Register("argmax", argmax);
   registry->Register("binary_crossentropy", binary_crossentropy);
+  registry->Register("broadcast", broadcast);
   registry->Register("clip", clip);
   registry->Register("concatenate", concatenate);
   registry->Register("convolution", convolution);

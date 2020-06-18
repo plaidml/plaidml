@@ -2,10 +2,16 @@
 
 #include "pmlc/dialect/pxa/analysis/strides.h"
 
+#include <algorithm>
 #include <map>
+#include <numeric>
 #include <string>
+#include <utility>
 #include <vector>
 
+#include "mlir/Dialect/Affine/IR/AffineValueMap.h"
+#include "mlir/Support/DebugStringHelper.h"
+#include "pmlc/util/logging.h"
 #include "llvm/Support/FormatVariadic.h"
 
 namespace mlir {
@@ -20,6 +26,59 @@ static std::string getUniqueName(Block *ref, BlockArgument arg) {
   }
   return llvm::formatv(kBlockAndArgFormat, reverseDepth, arg.getArgNumber())
       .str();
+}
+
+StrideRange::StrideRange(BlockArgument arg)
+    : valid(false), minVal(0), maxVal(0), stride(0) {
+  if (auto ap =
+          mlir::dyn_cast<AffineParallelOp>(arg.getOwner()->getParentOp())) {
+    auto low_expr = ap.getLowerBoundsValueMap().getResult(arg.getArgNumber());
+    auto high_expr = ap.getUpperBoundsValueMap().getResult(arg.getArgNumber());
+    auto low_cst = low_expr.dyn_cast<AffineConstantExpr>();
+    auto high_cst = high_expr.dyn_cast<AffineConstantExpr>();
+    if (!low_cst || !high_cst) {
+      return;
+    }
+    int64_t step = ap.steps()[arg.getArgNumber()].cast<IntegerAttr>().getInt();
+    if (step <= 0 || ((maxVal - minVal) % step) != 0) {
+      return;
+    }
+    stride = 1;
+    minVal = low_cst.getValue();
+    // This is a correction to deal with the fact that strides are measured
+    // relative to loop iterations not indexes.
+    maxVal = low_cst.getValue() +
+             (high_cst.getValue() - low_cst.getValue()) / step - 1;
+    valid = true;
+    if (minVal == maxVal) {
+      stride = 0;
+    }
+  }
+}
+
+StrideRange &StrideRange::operator*=(int64_t factor) {
+  minVal *= factor;
+  maxVal *= factor;
+  stride *= factor;
+  if (factor < 0) {
+    std::swap(minVal, maxVal);
+  }
+  return *this;
+}
+
+StrideRange &StrideRange::operator+=(const StrideRange &rhs) {
+  valid = valid && rhs.valid;
+  minVal += rhs.minVal;
+  maxVal += rhs.maxVal;
+  stride = std::gcd(stride, rhs.stride);
+  return *this;
+}
+
+void StrideRange::unionEquals(const StrideRange &rhs) {
+  valid = valid && rhs.valid;
+  minVal = std::min(minVal, rhs.minVal);
+  maxVal = std::max(maxVal, rhs.maxVal);
+  stride = std::gcd(stride, rhs.stride);
 }
 
 // Multiply the offset and all strides by a constant.
@@ -40,7 +99,67 @@ StrideInfo &StrideInfo::operator+=(const StrideInfo &rhs) {
   return *this;
 }
 
-void StrideInfo::print(raw_ostream &os, Block *relative) {
+static bool isBlockAncestor(Block *x, Block *y) {
+  while (x != y) {
+    Operation *parentOp = y->getParentOp();
+    if (!parentOp) {
+      return false;
+    }
+    y = parentOp->getBlock();
+    if (!y) {
+      return false;
+    }
+  }
+  return true;
+}
+
+StrideInfo StrideInfo::outer(Block *block) {
+  StrideInfo ret;
+  ret.offset = offset;
+  for (const auto &kvp : strides) {
+    if (isBlockAncestor(kvp.first.getOwner(), block)) {
+      ret.strides.insert(kvp);
+    }
+  }
+  return ret;
+}
+
+StrideInfo StrideInfo::inner(Block *block) {
+  StrideInfo ret;
+  ret.offset = 0;
+  for (const auto &kvp : strides) {
+    if (!isBlockAncestor(kvp.first.getOwner(), block)) {
+      ret.strides.insert(kvp);
+    }
+  }
+  return ret;
+}
+
+StrideRange StrideInfo::range() const {
+  StrideRange ret(offset);
+  for (const auto &kvp : strides) {
+    ret += StrideRange(kvp.first) * kvp.second;
+  }
+  return ret;
+}
+
+AffineExpr StrideInfo::toExpr(MLIRContext *ctx, ValueRange operands) const {
+  DenseMap<Value, unsigned> opIdx;
+  for (unsigned i = 0; i < operands.size(); i++) {
+    opIdx[operands[i]] = i;
+  }
+  AffineExpr ret = getAffineConstantExpr(offset, ctx);
+  for (const auto &kvp : strides) {
+    auto it = opIdx.find(kvp.first);
+    assert(it != opIdx.end() &&
+           "toMap requires all values needed to be passed in as operands");
+    ret = ret + getAffineDimExpr(it->second, ctx) *
+                    getAffineConstantExpr(kvp.second, ctx);
+  }
+  return ret;
+}
+
+void StrideInfo::print(raw_ostream &os, Block *relative) const {
   std::map<std::string, unsigned> ordered;
   std::map<Block *, unsigned> blockIds;
   for (auto kvp : strides) {
@@ -115,9 +234,11 @@ Optional<StrideInfo> computeStrideInfo(Value expr) {
   }
 
   // Try for the affine apply case
-  if (auto op = dyn_cast<AffineApplyOp>(expr.getDefiningOp()))
+  if (auto op = dyn_cast_or_null<AffineApplyOp>(expr.getDefiningOp()))
     return computeStrideInfo(op.getAffineMap().getResult(0),
                              op.getMapOperands());
+
+  IVLOG(1, "Failed stride info: op = " << mlir::debugString(expr));
 
   return None;
 }
@@ -166,6 +287,19 @@ Optional<StrideInfo> computeStrideInfo(AffineExpr expr, ValueRange args) {
 
   // Fail for all other cases.
   return None;
+}
+
+Optional<llvm::SmallVector<StrideInfo, 4>> computeStrideInfo(AffineMap map,
+                                                             ValueRange args) {
+  llvm::SmallVector<StrideInfo, 4> results;
+  for (auto expr : map.getResults()) {
+    auto dimStride = computeStrideInfo(expr, args);
+    if (!dimStride) {
+      return None;
+    }
+    results.push_back(*dimStride);
+  }
+  return results;
 }
 
 Optional<StrideInfo> computeStrideInfo(MemRefType memRefType, AffineMap map,

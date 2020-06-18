@@ -1,16 +1,18 @@
 # Copyright 2020 Intel Corporation
 
-package(default_visibility = ["//visibility:public"])
+load("//bzl:plaidml.bzl", "plaidml_cc_library")
 
-load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_test")
+package(default_visibility = ["//visibility:public"])
 
 plaidml_cc_library(
     name = "analysis",
     srcs = [
         "strides.cc",
+        "uses.cc",
     ],
     hdrs = [
         "strides.h",
+        "uses.h",
     ],
     deps = [
         "//pmlc/dialect/pxa/ir",

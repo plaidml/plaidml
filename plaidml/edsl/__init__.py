@@ -816,6 +816,7 @@ def TensorIndexes(count):
     """Creates multiple ``TensorIndex`` objects based on ``count``."""
     return [TensorIndex() for i in range(count)]
 
+
 def Constant(dtype_or_shape, buffer, dims=[], name=''):
     """Creates a tensor with constant values.
 
@@ -837,6 +838,7 @@ def Constant(dtype_or_shape, buffer, dims=[], name=''):
         raise TypeError('Unsupported type {} for dtype_or_shape={}'.format(
             type(dtype_or_shape), dtype_or_shape))
     return Tensor(shape=shape, name=name, buffer=buffer)
+
 
 def Placeholder(dtype_or_shape, dims=[], name=''):
     """Creates a placeholder tensor.
@@ -1083,17 +1085,17 @@ def ident(x):
     return call('ident', x)
 
 
-def index(x, axis):
-    """Returns the index of ``x`` at the specified ``axis``.
+def index(dims, axis):
+    """Returns a tensor populated with the index value of the shape and axis specified.
 
     Args:
-        x (Tensor): The Tensor to index.
+        dims (list): The shape of the tensor to base indexing on.
         axis (Tensor): The axis used for indexing.
 
     Returns:
-        Tensor: The indexed tensor.
+        Tensor: The resultant tensor.
     """
-    return call('index', x, axis)
+    return call('index', axis, *dims)
 
 
 def log(x):

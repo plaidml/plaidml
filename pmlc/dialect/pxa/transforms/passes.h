@@ -15,6 +15,14 @@ namespace pmlc::dialect::pxa {
 
 std::unique_ptr<mlir::Pass> createAutoTileExamplePass();
 
+std::unique_ptr<mlir::Pass> createFusionPass();
+
+std::unique_ptr<mlir::Pass> createLocalizePass();
+
+std::unique_ptr<mlir::Pass> createMemRefDataFlowOptPass();
+
+std::unique_ptr<mlir::Pass> createResizeTmpsPass();
+
 struct StencilCost {
   double throughput;
   unsigned startupCost;

@@ -21,6 +21,11 @@ def ConstantTypes : FunctionPass<"tile-constant-types"> {
   ];
 }
 
+def MakeProgram : FunctionPass<"tile-make-program"> {
+  let summary = "Forward-only canonicalization pass";
+  let constructor = "pmlc::dialect::tile::createMakeProgramPass()";
+}
+
 def Pad : FunctionPass<"tile-pad"> {
   let summary = "Pad outputs to remove constraints on inputs";
   let constructor = "pmlc::dialect::tile::createPadPass()";
