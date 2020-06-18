@@ -107,18 +107,19 @@ struct TileBuilder::Impl {
   }
 
   Value makeIndexOp(ArrayRef<Value> args) {
-    if (args.size() != 2) {
-      throw std::runtime_error("'index' primitive expects 2 operands");
-    }
-    auto tensor = args[0];
-    auto dim = args[1];
-    auto resultType = IndexOp::getResultType(args.take_front());
-    IntegerAttr dimAttr;
-    if (!m_Constant(&dimAttr).match(dim.getDefiningOp())) {
+    if (args.size() < 1) {
       throw std::runtime_error(
-          "'index' primitive expect argument 2 to be a constant integer");
+          "'index' primitive expects at least one operand");
     }
-    auto op = builder.create<IndexOp>(loc, resultType, tensor, dimAttr);
+    auto axis = args.front();
+    IntegerAttr axisAttr;
+    if (!m_Constant(&axisAttr).match(axis.getDefiningOp())) {
+      throw std::runtime_error(
+          "'index' primitive expects argument 1 to be a constant integer");
+    }
+    auto dims = args.drop_front();
+    auto resultType = IndexOp::getResultType(dims);
+    auto op = builder.create<IndexOp>(loc, resultType, axisAttr, dims);
     return op.result();
   }
 

@@ -102,28 +102,11 @@ module {
 )#"));
 }
 
-TEST(Op, Argmax) {
+TEST_F(OpTest, Argmax) {
   auto I = Placeholder(DType::FLOAT32, {1, 224, 224, 3}, "I");
   auto program = makeProgram("argmax", {op::argmax(I)});
-  IVLOG(1, program);
-  EXPECT_THAT(program, Eq(R"#(
-#map0 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
-#map1 = affine_map<() -> ()>
-
-
-module {
-  func @argmax(%arg0: tensor<1x224x224x3xf32> {tile.name = "I"}) -> ui32 {
-    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> f32
-    %c1 = "eltwise.sconst"() {value = 1 : i64} : () -> si32
-    %0 = tile.contract assign, none, %cst, %c1 {sink = #map0, srcs = [#map1]} : f32, si32 -> tensor<1x224x224x3xsi32>
-    %1 = "tile.index"(%0) {dim = 0 : i64} : (tensor<1x224x224x3xsi32>) -> tensor<1x224x224x3xsi32>
-    %2 = tile.contract max, none, %cst, %arg0 {sink = #map1, srcs = [#map0]} : f32, tensor<1x224x224x3xf32> -> f32
-    %3 = tile.contract max, cond, %cst, %arg0, %2, %1 {sink = #map1, srcs = [#map0, #map1, #map0]} : f32, tensor<1x224x224x3xf32>, f32, tensor<1x224x224x3xsi32> -> si32
-    %4 = "eltwise.cast"(%3) : (si32) -> ui32
-    return %4 : ui32
-  }
-}
-)#"));
+  IVLOG(1, "\n" << program);
+  runProgram(program);
 }
 
 TEST(Op, BinaryCrossentropy) {

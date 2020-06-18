@@ -637,9 +637,7 @@ class Tensor {
   ///
   /// Assigns a buffer to an existing Tensor
   ///
-  void set_param_value(const Buffer& buf) {
-    ffi::call_void(plaidml_expr_param_reset, as_ptr(), buf.as_ptr());
-  }
+  void set_param_value(const Buffer& buf) { ffi::call_void(plaidml_expr_param_reset, as_ptr(), buf.as_ptr()); }
 
   ///
   /// Represents an operator overload for `=` for a `Tensor`
@@ -873,9 +871,9 @@ inline Tensor TensorOutput(const std::vector<int64_t>& dims) {  //
   return Tensor(dims);
 }
 
-inline Tensor Constant(                 //
-    const LogicalShape& shape,          //
-    const Buffer& buf,                  //
+inline Tensor Constant(         //
+    const LogicalShape& shape,  //
+    const Buffer& buf,          //
     const std::string& name = "") {
   auto ptr = ffi::call<plaidml_expr*>(  //
       plaidml_expr_placeholder,         //
@@ -1032,12 +1030,18 @@ inline Tensor gather(const Tensor& x, const Tensor& y) { return Call("gather", x
 inline Tensor ident(const Tensor& x) { return Call("ident", x); }
 
 ///
-/// Returns the index of `x` at the specified `axis`.
-/// \param x Tensor
+/// Returns a tensor populated with the index value of the shape and axis specified.
+/// \param dims std::vector<TensorDim>
 /// \param axis size_t
 /// \return Tensor
 ///
-inline Tensor index(const Tensor& x, size_t axis) { return Call("index", x, static_cast<int64_t>(axis)); }
+inline Tensor index(const std::vector<TensorDim>& dims, size_t axis) {
+  std::vector<Tensor> args = {Tensor{static_cast<int64_t>(axis)}};
+  for (const auto& dim : dims) {
+    args.emplace_back(dim);
+  }
+  return Call("index", args);
+}
 
 ///
 /// Computes the elementwise natural logarithm of `x`: _ln_(`x`).

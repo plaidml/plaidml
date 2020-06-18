@@ -195,10 +195,7 @@ def arg_max(I):
     I.bind_dims(X0, X1, X2)
     Max = TensorOutput(X0, X2)
     Max[x0, x2] >= I[x0, x1, x2]
-    One = Placeholder(plaidml.DType.FLOAT32)
-    T = TensorOutput(X1)
-    T[x1] = One[()]
-    IX = index(T, 0)
+    IX = index([X1], 0)
     O = TensorOutput(X0, X2)
     O[x0, x2] >= cond(I[x0, x1, x2], Max[x0, x2], IX[x1])
     return cast(O, DType.UINT32)
@@ -288,16 +285,18 @@ def csum(I):
     O.add_constraint(i - k < N)
     return O
 
+
 def constant_add():
-    a = np.array([4,3,2,1])
-    b = np.array([1,2,3,4])
-    Buffer_A = plaidml.Buffer(plaidml.TensorShape(plaidml.DType.INT32, [4]), device = DEFAULT_DEVICE)
-    Buffer_B = plaidml.Buffer(plaidml.TensorShape(plaidml.DType.INT32, [4]), device = DEFAULT_DEVICE)
+    a = np.array([4, 3, 2, 1])
+    b = np.array([1, 2, 3, 4])
+    Buffer_A = plaidml.Buffer(plaidml.TensorShape(plaidml.DType.INT32, [4]), device=DEFAULT_DEVICE)
+    Buffer_B = plaidml.Buffer(plaidml.TensorShape(plaidml.DType.INT32, [4]), device=DEFAULT_DEVICE)
     Buffer_A.copy_from_ndarray(a)
     Buffer_B.copy_from_ndarray(b)
     A = Constant(LogicalShape(plaidml.DType.INT32, [4]), Buffer_A, name="A")
     B = Constant(LogicalShape(plaidml.DType.INT32, [4]), Buffer_B, name="B")
     return A + B
+
 
 class TestEdsl(unittest.TestCase):
     maxDiff = None
@@ -1133,7 +1132,7 @@ module {
         self.assertMultiLineEqual(str(program1), str(program2))
 
     def test_constant_add(self):
-        constants = np.array([[1,2,3,4], [4,3,2,1]])
+        constants = np.array([[1, 2, 3, 4], [4, 3, 2, 1]])
         I = constant_add()
         program = Program('const_add', [I])
         self.assertEqual(len(program.args), 3)

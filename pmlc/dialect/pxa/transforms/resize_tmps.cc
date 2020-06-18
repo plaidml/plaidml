@@ -26,7 +26,7 @@ struct ResizeTmpsPass : public ResizeTmpsBase<ResizeTmpsPass> {
   AffineMap computeInnerMap(AffineMap orig, ValueRange operands, Block *block) {
     auto strides = computeStrideInfo(orig, operands);
     assert(strides && "Could not compute stride info");
-    llvm::SmallVector<AffineExpr, 4> newExprs;
+    SmallVector<AffineExpr, 4> newExprs;
     for (size_t i = 0; i < strides->size(); i++) {
       auto innerStrides = (*strides)[i].inner(block);
       newExprs.push_back(innerStrides.toExpr(orig.getContext(), operands));
@@ -38,11 +38,11 @@ struct ResizeTmpsPass : public ResizeTmpsBase<ResizeTmpsPass> {
     Block *opBlock = op.getOperation()->getBlock();
     IVLOG(2, "Considering: " << debugString(*op.getOperation()));
 
-    llvm::SmallVector<StrideInfo, 4> outer;
-    llvm::SmallVector<StrideRange, 4> inner;
+    SmallVector<StrideInfo, 4> outer;
+    SmallVector<StrideRange, 4> inner;
     for (auto &use : AccessIndirectUses(op)) {
       IVLOG(2, "Found use: " << debugString(*use.getOwner()));
-      Optional<llvm::SmallVector<StrideInfo, 4>> maybeStrides;
+      Optional<SmallVector<StrideInfo, 4>> maybeStrides;
       if (auto lop = dyn_cast<AffineLoadOp>(use.getOwner())) {
         maybeStrides =
             computeStrideInfo(lop.getAffineMap(), lop.getMapOperands());
@@ -55,8 +55,8 @@ struct ResizeTmpsPass : public ResizeTmpsBase<ResizeTmpsPass> {
         return;
       }
 
-      llvm::SmallVector<StrideInfo, 4> curOuter;
-      llvm::SmallVector<StrideRange, 4> curInner;
+      SmallVector<StrideInfo, 4> curOuter;
+      SmallVector<StrideRange, 4> curInner;
       for (size_t i = 0; i < maybeStrides->size(); i++) {
         auto dimStride = (*maybeStrides)[i];
         auto dimStrideOuter = dimStride.outer(opBlock);
@@ -92,7 +92,7 @@ struct ResizeTmpsPass : public ResizeTmpsBase<ResizeTmpsPass> {
            "All accesses should have the same rank");
     // Check for lots of kinds of failures and compute new size
     bool sizeChanged = false;
-    llvm::SmallVector<int64_t, 4> newShape;
+    SmallVector<int64_t, 4> newShape;
     auto oldShape = op.getType().getShape();
     for (size_t i = 0; i < outer.size(); i++) {
       auto outerRange = outer[i].range();
