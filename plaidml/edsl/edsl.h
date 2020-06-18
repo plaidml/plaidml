@@ -1036,7 +1036,7 @@ inline Tensor ident(const Tensor& x) { return Call("ident", x); }
 /// \return Tensor
 ///
 inline Tensor index(const std::vector<TensorDim>& dims, size_t axis) {
-  std::vector<Tensor> args = {Tensor{axis}};
+  std::vector<Tensor> args = {Tensor{static_cast<int64_t>(axis)}};
   for (const auto& dim : dims) {
     args.emplace_back(dim);
   }
