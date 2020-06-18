@@ -5,6 +5,28 @@
 
 namespace pmlc::dialect::pxa {
 
+class IndirectDefsIterator
+    : public llvm::iterator_facade_base<
+          IndirectDefsIterator, std::forward_iterator_tag, mlir::Value> {
+public:
+  IndirectDefsIterator() {}
+
+  explicit IndirectDefsIterator(Value value) : curValue(value) {}
+
+  IndirectDefsIterator &operator=(const IndirectDefsIterator &other) = default;
+  bool operator==(const IndirectDefsIterator &rhs) const {
+    return curValue == rhs.curValue;
+  }
+  const mlir::Value &operator*() const { return curValue; }
+  mlir::Value &operator*() { return curValue; }
+
+  IndirectDefsIterator &operator++();
+
+private:
+  // The current def being considered
+  Value curValue;
+};
+
 class IndirectUsesIterator
     : public llvm::iterator_facade_base<
           IndirectUsesIterator, std::forward_iterator_tag, mlir::OpOperand> {
@@ -83,6 +105,16 @@ private:
     }
   }
   IndirectUsesIterator inner;
+};
+
+class IndirectDefs {
+public:
+  explicit IndirectDefs(Value value) : value(value) {}
+  IndirectDefsIterator begin() { return IndirectDefsIterator(value); }
+  IndirectDefsIterator end() { return IndirectDefsIterator(); }
+
+private:
+  Value value;
 };
 
 class IndirectUses {

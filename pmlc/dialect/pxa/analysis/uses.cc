@@ -8,6 +8,35 @@ using namespace mlir; // NOLINT
 
 namespace pmlc::dialect::pxa {
 
+IndirectDefsIterator &IndirectDefsIterator::operator++() {
+  assert(curValue && "Should not do ++ on end");
+  // Walk all uses and find the unique non-read user
+  unsigned nextOperand = 0;
+  Operation *nextOp = nullptr;
+  for (auto &use : curValue.getUses()) {
+    if (isa<AffineLoadOp>(use.getOwner())) {
+      continue;
+    }
+    assert(!nextOp && "PXA memref-states should have only one non-read user");
+    nextOp = use.getOwner();
+    nextOperand = use.getOperandNumber();
+  }
+  // If no next op, set to done
+  if (!nextOp) {
+    curValue = Value();
+    return *this;
+  }
+  if (auto yieldOp = dyn_cast<AffineYieldOp>(nextOp)) {
+    curValue = yieldOp.getParentOp()->getResult(nextOperand);
+  } else if (auto reduceOp = dyn_cast<AffineReduceOp>(nextOp)) {
+    curValue = reduceOp.result();
+  } else {
+    llvm_unreachable("All uses of pxa mem-ref state should be reads, "
+                     "yields, reduces, or returns");
+  }
+  return *this;
+}
+
 IndirectUsesIterator &IndirectUsesIterator::operator++() {
   assert(curValue && "Invalid curValue");
   if (curIt != curValue.use_end()) {
@@ -35,7 +64,11 @@ IndirectUsesIterator &IndirectUsesIterator::operator++() {
     }
     curIt = curValue.use_begin();
     next = nullptr;
-    skipNonRead();
+    if (curIt == curValue.use_end()) {
+      curValue = nullptr;
+    } else {
+      skipNonRead();
+    }
   }
   return *this;
 }
