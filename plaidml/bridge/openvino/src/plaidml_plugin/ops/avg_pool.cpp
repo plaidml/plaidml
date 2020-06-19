@@ -28,13 +28,12 @@ static OpRegistration reg("avgpool", [](const Context& ctx) {
     kernel.push_back(k);
   }
   auto pool_type = plaidml::op::PoolMode::AVG;
-  plaidml::op::TensorLayout input_layout = plaidml::op::TensorLayout::NCX;
+  auto input_layout = plaidml::op::TensorLayout::NCX;
   auto autopad_mode = to_plaidml(layer->get_auto_pad());
   bool include_padding_in_avg = false;
   bool use_ceil_for_output_shape = false;
   std::vector<int> padding;
-  auto result = op::pool(I, pool_type, kernel, strides, autopad_mode, padding, input_layout, include_padding_in_avg,
-                         use_ceil_for_output_shape);
+  plaidml::edsl::Tensor result;
   if (autopad_mode == plaidml::op::AutoPadMode::EXPLICIT) {
     for (auto pad : layer->get_pads_begin()) {
       padding.push_back(pad);
@@ -42,9 +41,13 @@ static OpRegistration reg("avgpool", [](const Context& ctx) {
     for (auto pad : layer->get_pads_end()) {
       padding.push_back(pad);
     }
-    auto result = op::pool(I, pool_type, kernel, strides, autopad_mode, padding, input_layout, include_padding_in_avg,
-                           use_ceil_for_output_shape);
+    result = op::pool(I, pool_type, kernel, strides, autopad_mode, padding, input_layout, include_padding_in_avg,
+                      use_ceil_for_output_shape);
+  } else {
+    result = op::pool(I, pool_type, kernel, strides, autopad_mode, padding, input_layout, include_padding_in_avg,
+                      use_ceil_for_output_shape);
   }
+
   return edsl::make_tuple(result);
 });
 
