@@ -95,6 +95,106 @@ ParseResult parseGemmOp(OpAsmParser &parser, OperationState &result) {
 
 LogicalResult verifyGemmOp(GemmOp op) { return success(); }
 
+//
+// ---- DispatchGemmOp ----
+//
+
+void printDispatchGemmOp(OpAsmPrinter &p, DispatchGemmOp op) {
+  p << op.getOperation()->getName() << ' ';
+  p << op.tile() << ", " << op.tileld();
+}
+
+ParseResult parseDispatchGemmOp(OpAsmParser &parser, OperationState &result) {
+  auto &builder = parser.getBuilder();
+  auto i64Type = builder.getIntegerType(64);
+  ArrayAttr tileAttr;
+  ArrayAttr tileldAttr;
+  return failure(
+      parser.parseAttribute(tileAttr, i64Type, "tile", result.attributes) ||
+      parser.parseComma() ||
+      parser.parseAttribute(tileAttr, i64Type, "tileld", result.attributes));
+}
+
+LogicalResult verifyDispatchGemmOp(DispatchGemmOp op) { return success(); }
+
+//
+// ---- InvokeGemmOp ----
+//
+
+InvokeGemmOp::operand_range InvokeGemmOp::getOperandsForA() {
+  return getOperands().slice(3 + cAccessMap().getNumInputs(),
+                             aAccessMap().getNumInputs());
+}
+
+InvokeGemmOp::operand_range InvokeGemmOp::getOperandsForB() {
+  return getOperands().slice(3 + cAccessMap().getNumInputs() +
+                                 aAccessMap().getNumInputs(),
+                             bAccessMap().getNumInputs());
+}
+
+InvokeGemmOp::operand_range InvokeGemmOp::getOperandsForC() {
+  return getOperands().slice(3, cAccessMap().getNumInputs());
+}
+
+void printInvokeGemmOp(OpAsmPrinter &p, InvokeGemmOp op) {
+  p << op.getOperation()->getName() << ' ';
+  p << op.ptr() << " : "; 
+  p << op.c() << '[';
+  p.printAffineMapOfSSAIds(op.cAccessMapAttr(), op.getOperandsForC());
+  p << "]:";
+  p.printAttribute(op.cTileMapAttr());
+  p << " = " << op.a() << '[';
+  p.printAffineMapOfSSAIds(op.aAccessMapAttr(), op.getOperandsForA());
+  p << "]:";
+  p.printAttribute(op.aTileMapAttr());
+  p << ", " << op.b() << '[';
+  p.printAffineMapOfSSAIds(op.bAccessMapAttr(), op.getOperandsForB());
+  p << "]:";
+  p.printAttribute(op.bTileMapAttr());
+  p << ", : " << op.ptr().getType() << ", " << op.c().getType() << ", "
+    << op.a().getType() << ", " << op.b().getType();
+}
+
+ParseResult parseInvokeGemmOp(OpAsmParser &parser, OperationState &result) {
+  auto &builder = parser.getBuilder();
+  auto indexType = builder.getIndexType();
+  SmallVector<Type, 4> operandTypes;
+  OpAsmParser::OperandType ptr, a, b, c;
+  AffineMapAttr aAccessMapAttr, bAccessMapAttr, cAccessMapAttr;
+  AffineMapAttr aTileMapAttr, bTileMapAttr, cTileMapAttr;
+  SmallVector<OpAsmParser::OperandType, 4> aOperands, bOperands, cOperands;
+  return failure(
+      parser.parseOperand(ptr) ||
+      parser.parseColon() ||
+      parser.parseOperand(c) ||
+      parser.parseAffineMapOfSSAIds(cOperands, cAccessMapAttr, "cAccessMap",
+                                    result.attributes) ||
+      parser.parseColon() ||
+      parser.parseAttribute(cTileMapAttr, "cTileMap", result.attributes) ||
+      parser.parseEqual() || parser.parseOperand(a) ||
+      parser.parseAffineMapOfSSAIds(aOperands, aAccessMapAttr, "aAccessMap",
+                                    result.attributes) ||
+      parser.parseColon() ||
+      parser.parseAttribute(aTileMapAttr, "aTileMap", result.attributes) ||
+      parser.parseComma() || parser.parseOperand(b) ||
+      parser.parseAffineMapOfSSAIds(bOperands, bAccessMapAttr, "bAccessMap",
+                                    result.attributes) ||
+      parser.parseColon() ||
+      parser.parseAttribute(bTileMapAttr, "bTileMap", result.attributes) ||
+      parser.parseComma() ||
+      parser.parseColonTypeList(operandTypes) ||
+      parser.addTypeToList(operandTypes[1], result.types) ||
+      parser.resolveOperand(ptr, operandTypes[0], result.operands) ||
+      parser.resolveOperand(c, operandTypes[1], result.operands) ||
+      parser.resolveOperand(a, operandTypes[2], result.operands) ||
+      parser.resolveOperand(b, operandTypes[3], result.operands) ||
+      parser.resolveOperands(cOperands, indexType, result.operands) ||
+      parser.resolveOperands(aOperands, indexType, result.operands) ||
+      parser.resolveOperands(bOperands, indexType, result.operands));
+}
+
+LogicalResult verifyInvokeGemmOp(InvokeGemmOp op) { return success(); }
+
 #define GET_OP_CLASSES
 #include "pmlc/dialect/xsmm/ir/ops.cc.inc" // NOLINT
 
