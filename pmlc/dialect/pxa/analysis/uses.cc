@@ -39,11 +39,9 @@ IndirectDefsIterator &IndirectDefsIterator::operator++() {
 }
 
 void IndirectUsesIterator::enqueueNext(Value value) {
-  if (!value.use_empty()) {
-    if (!visited.count(value)) {
-      visited.insert(value);
-      workQueue.push(value.use_begin());
-    }
+  if (!value.use_empty() && !visited.count(value)) {
+    visited.insert(value);
+    workQueue.push(value.use_begin());
   }
 }
 
@@ -52,8 +50,7 @@ IndirectUsesIterator &IndirectUsesIterator::operator++() {
     auto value = yieldOp.getParentOp()->getResult(curIt->getOperandNumber());
     enqueueNext(value);
   } else if (auto reduceOp = dyn_cast<AffineReduceOp>(curIt->getOwner())) {
-    auto value = reduceOp.result();
-    enqueueNext(value);
+    enqueueNext(reduceOp.result());
   }
   curIt++;
   if (curIt == Value::use_iterator() && !workQueue.empty()) {
