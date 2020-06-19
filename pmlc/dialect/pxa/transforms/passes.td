@@ -33,4 +33,9 @@ def TestStrideInfo : Pass<"pxa-stride-info"> {
   let constructor = "pmlc::dialect::pxa::createTestStrideInfoPass()";
 }
 
+def TestUsesIterator : Pass<"pxa-uses-iterator"> {
+  let summary = "Trace the use iterator for unit tests";
+  let constructor = "pmlc::dialect::pxa::createTestUsesIteratorPass()";
+}
+
 #endif // __PMLC_DIALECT_PXA_PASSES__

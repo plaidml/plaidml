@@ -33,6 +33,8 @@ using StencilCostFunction =
 
 std::unique_ptr<mlir::Pass> createTestStrideInfoPass();
 
+std::unique_ptr<mlir::Pass> createTestUsesIteratorPass();
+
 std::unique_ptr<mlir::Pass> createXSMMStencilPass(unsigned numThreads,
                                                   StencilCostFunction costFn);
 

@@ -1,7 +1,12 @@
 #pragma once
 
-#include "pmlc/dialect/pxa/ir/ops.h"
+#include <queue>
+#include <set>
+
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/iterator.h"
+
+#include "pmlc/dialect/pxa/ir/ops.h"
 
 namespace pmlc::dialect::pxa {
 
@@ -10,13 +15,14 @@ class IndirectDefsIterator
           IndirectDefsIterator, std::forward_iterator_tag, mlir::Value> {
 public:
   IndirectDefsIterator() {}
-
   explicit IndirectDefsIterator(Value value) : curValue(value) {}
 
   IndirectDefsIterator &operator=(const IndirectDefsIterator &other) = default;
+
   bool operator==(const IndirectDefsIterator &rhs) const {
     return curValue == rhs.curValue;
   }
+
   const mlir::Value &operator*() const { return curValue; }
   mlir::Value &operator*() { return curValue; }
 
@@ -32,37 +38,29 @@ class IndirectUsesIterator
           IndirectUsesIterator, std::forward_iterator_tag, mlir::OpOperand> {
 public:
   IndirectUsesIterator() {}
-
-  explicit IndirectUsesIterator(Value value)
-      : curValue(value), curIt(value.use_begin()) {
-    skipNonRead();
-  }
+  explicit IndirectUsesIterator(Value value) : curIt(value.use_begin()) {}
 
   IndirectUsesIterator &operator=(const IndirectUsesIterator &other) = default;
 
   bool operator==(const IndirectUsesIterator &rhs) const {
-    return curValue == rhs.curValue && curIt == rhs.curIt && next == rhs.next;
+    return curIt == rhs.curIt;
   }
 
-  const mlir::OpOperand &operator*() const {
-    return curIt == curValue.use_end() ? *next : *curIt;
-  }
-
-  mlir::OpOperand &operator*() {
-    return curIt == curValue.use_end() ? *next : *curIt;
-  }
+  const mlir::OpOperand &operator*() const { return *curIt; }
+  mlir::OpOperand &operator*() { return *curIt; }
 
   IndirectUsesIterator &operator++();
 
 private:
-  void skipNonRead();
+  void enqueueNext(Value value);
 
-  // The current value being walked
-  Value curValue;
+private:
   // The position in the walk
   Value::use_iterator curIt;
-  // The next operation to follow once we finish with all read uses
-  mlir::OpOperand *next = nullptr;
+  // The next iterators to follow once we finish with the current iterator.
+  std::queue<Value::use_iterator> workQueue;
+  // Avoid duplicate visitations.
+  llvm::DenseSet<Value> visited;
 };
 
 // Subsets all uses to only acceses (skipping yield/return)
@@ -85,25 +83,13 @@ public:
   }
 
   const mlir::OpOperand &operator*() const { return *inner; }
-
   mlir::OpOperand &operator*() { return *inner; }
 
-  AccessIndirectUsesIterator &operator++() {
-    ++inner;
-    skipNonAccess();
-    return *this;
-  }
+  AccessIndirectUsesIterator &operator++();
 
 private:
-  void skipNonAccess() {
-    while (inner != IndirectUsesIterator()) {
-      if (mlir::isa<mlir::AffineLoadOp>(inner->getOwner()) ||
-          mlir::isa<AffineReduceOp>(inner->getOwner())) {
-        break;
-      }
-      ++inner;
-    }
-  }
+  void skipNonAccess();
+
   IndirectUsesIterator inner;
 };
 
@@ -141,4 +127,4 @@ private:
   Value value;
 };
 
-} // End namespace pmlc::dialect::pxa
+} // namespace pmlc::dialect::pxa

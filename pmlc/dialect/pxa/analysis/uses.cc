@@ -3,6 +3,7 @@
 #include "pmlc/dialect/pxa/analysis/uses.h"
 
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Support/DebugStringHelper.h"
 
 using namespace mlir; // NOLINT
 
@@ -37,47 +38,44 @@ IndirectDefsIterator &IndirectDefsIterator::operator++() {
   return *this;
 }
 
-IndirectUsesIterator &IndirectUsesIterator::operator++() {
-  assert(curValue && "Invalid curValue");
-  if (curIt != curValue.use_end()) {
-    // Walking over a read use
-    curIt++;
-    skipNonRead();
+void IndirectUsesIterator::enqueueNext(Value value) {
+  if (!value.use_empty()) {
+    if (!visited.count(value)) {
+      visited.insert(value);
+      workQueue.push(value.use_begin());
+    }
   }
-  // We've finished the readers
-  if (curIt == curValue.use_end()) {
-    // Maybe we are all done?
-    if (!next || isa<ReturnOp>(next->getOwner())) {
-      curValue = nullptr;
-      curIt = Value::use_iterator();
-      next = nullptr;
-      return *this;
-    }
-    // Otherwise, move to next value + reset it + next
-    if (auto yieldOp = dyn_cast<AffineYieldOp>(next->getOwner())) {
-      curValue = yieldOp.getParentOp()->getResult(next->getOperandNumber());
-    } else if (auto reduceOp = dyn_cast<AffineReduceOp>(next->getOwner())) {
-      curValue = reduceOp.result();
-    } else {
-      llvm_unreachable("All uses of pxa mem-ref state should be reads, "
-                       "yields, reduces, or returns");
-    }
-    curIt = curValue.use_begin();
-    next = nullptr;
-    if (curIt == curValue.use_end()) {
-      curValue = nullptr;
-    } else {
-      skipNonRead();
-    }
+}
+
+IndirectUsesIterator &IndirectUsesIterator::operator++() {
+  if (auto yieldOp = dyn_cast<AffineYieldOp>(curIt->getOwner())) {
+    auto value = yieldOp.getParentOp()->getResult(curIt->getOperandNumber());
+    enqueueNext(value);
+  } else if (auto reduceOp = dyn_cast<AffineReduceOp>(curIt->getOwner())) {
+    auto value = reduceOp.result();
+    enqueueNext(value);
+  }
+  curIt++;
+  if (curIt == Value::use_iterator() && !workQueue.empty()) {
+    curIt = workQueue.front();
+    workQueue.pop();
   }
   return *this;
 }
 
-void IndirectUsesIterator::skipNonRead() {
-  while (curIt != curValue.use_end() && !isa<AffineLoadOp>(curIt->getOwner())) {
-    assert(!next && "PXA memref-states should have only one non-read user");
-    next = &*curIt;
-    curIt++;
+AccessIndirectUsesIterator &AccessIndirectUsesIterator::operator++() {
+  ++inner;
+  skipNonAccess();
+  return *this;
+}
+
+void AccessIndirectUsesIterator::skipNonAccess() {
+  while (inner != IndirectUsesIterator()) {
+    if (isa<AffineLoadOp>(inner->getOwner()) ||
+        isa<AffineReduceOp>(inner->getOwner())) {
+      break;
+    }
+    ++inner;
   }
 }
 
