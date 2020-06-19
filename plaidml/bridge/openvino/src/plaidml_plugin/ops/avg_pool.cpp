@@ -33,7 +33,6 @@ static OpRegistration reg("avgpool", [](const Context& ctx) {
   bool include_padding_in_avg = false;
   bool use_ceil_for_output_shape = false;
   std::vector<int> padding;
-  plaidml::edsl::Tensor result;
   if (autopad_mode == plaidml::op::AutoPadMode::EXPLICIT) {
     for (auto pad : layer->get_pads_begin()) {
       padding.push_back(pad);
@@ -41,14 +40,9 @@ static OpRegistration reg("avgpool", [](const Context& ctx) {
     for (auto pad : layer->get_pads_end()) {
       padding.push_back(pad);
     }
-    result = op::pool(I, pool_type, kernel, strides, autopad_mode, padding, input_layout, include_padding_in_avg,
-                      use_ceil_for_output_shape);
-  } else {
-    result = op::pool(I, pool_type, kernel, strides, autopad_mode, padding, input_layout, include_padding_in_avg,
-                      use_ceil_for_output_shape);
   }
-
-  return edsl::make_tuple(result);
+  return edsl::make_tuple(op::pool(I, pool_type, kernel, strides, autopad_mode, padding, input_layout,
+                                   include_padding_in_avg, use_ceil_for_output_shape));
 });
 
 }  // namespace PlaidMLPlugin
