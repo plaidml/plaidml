@@ -166,8 +166,20 @@ class convolution {
   }
 
   template <typename T, typename std::enable_if<std::is_integral<T>::value>::type* = nullptr>
+  convolution& strides(const std::initializer_list<T>& strides) {
+    strides_ = edsl::make_tuple(std::vector<T>(strides));
+    return *this;
+  }
+
+  template <typename T, typename std::enable_if<std::is_integral<T>::value>::type* = nullptr>
   convolution& dilations(const std::vector<T>& dilations) {
     dilations_ = edsl::make_tuple(dilations);
+    return *this;
+  }
+
+  template <typename T, typename std::enable_if<std::is_integral<T>::value>::type* = nullptr>
+  convolution& dilations(const std::initializer_list<T>& dilations) {
+    dilations_ = edsl::make_tuple(std::vector<T>(dilations));
     return *this;
   }
 
@@ -178,8 +190,20 @@ class convolution {
   }
 
   template <typename T, typename std::enable_if<std::is_integral<T>::value>::type* = nullptr>
+  convolution& data_dilations(const std::initializer_list<T>& data_dilations) {
+    data_dilations_ = edsl::make_tuple(std::vector<T>(data_dilations));
+    return *this;
+  }
+
+  template <typename T, typename std::enable_if<std::is_integral<T>::value>::type* = nullptr>
   convolution& filter_shape(const std::vector<T>& filter_shape) {
     filter_shape_ = edsl::make_tuple(filter_shape);
+    return *this;
+  }
+
+  template <typename T, typename std::enable_if<std::is_integral<T>::value>::type* = nullptr>
+  convolution& filter_shape(const std::initializer_list<T>& filter_shape) {
+    filter_shape_ = edsl::make_tuple(std::vector<T>(filter_shape));
     return *this;
   }
 
@@ -191,6 +215,12 @@ class convolution {
   template <typename T, typename std::enable_if<std::is_integral<T>::value>::type* = nullptr>
   convolution& manual_padding(const std::vector<T>& manual_padding) {
     manual_padding_ = edsl::make_tuple(manual_padding);
+    return *this;
+  }
+
+  template <typename T, typename std::enable_if<std::is_integral<T>::value>::type* = nullptr>
+  convolution& manual_padding(const std::initializer_list<T>& manual_padding) {
+    manual_padding_ = edsl::make_tuple(std::vector<T>(manual_padding));
     return *this;
   }
 
@@ -237,6 +267,12 @@ class convolution {
   template <typename T, typename std::enable_if<std::is_integral<T>::value>::type* = nullptr>
   convolution& result_shape(const std::vector<T>& result_shape) {
     result_shape_ = edsl::make_tuple(result_shape);
+    return *this;
+  }
+
+  template <typename T, typename std::enable_if<std::is_integral<T>::value>::type* = nullptr>
+  convolution& result_shape(const std::initializer_list<T>& result_shape) {
+    result_shape_ = edsl::make_tuple(std::vector<T>(result_shape));
     return *this;
   }
 
