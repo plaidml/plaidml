@@ -92,8 +92,8 @@ def plaidml_workspace():
         strip_prefix = "jsonnet-0.13.0",
     )
 
-    LLVM_COMMIT = "d26bfee56b315043e03627ad179fe6eb6ebfe7e9"
-    LLVM_SHA256 = "5a758eaff559d8bc4341d74de6260334c071280294ff084d5aa091a0964507bf"
+    LLVM_COMMIT = "0eefc2173fae726a8eec02dfc8ebd2738d359d52"
+    LLVM_SHA256 = "2b7eac0da73fa0f8b3c8cf2df9c7bb7b1c006d619ec9f147642a65716698598c"
     LLVM_URL = "https://github.com/plaidml/llvm-project/archive/{commit}.tar.gz".format(commit = LLVM_COMMIT)
     http_archive(
         name = "llvm-project",

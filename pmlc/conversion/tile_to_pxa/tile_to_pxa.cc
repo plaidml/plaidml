@@ -753,11 +753,11 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
     // add constraints
     if (op.cons()) {
       auto cons = op.cons().getValue();
-      auto ifOp = rewriter.create<AffineIfOp>(
-          loc, TypeRange({alloc.memRefType}), cons, idxs, true);
+      auto ifOp = rewriter.create<AffineIfOp>(loc, TypeRange{alloc.memRefType},
+                                              cons, idxs, true);
       rewriter.create<AffineYieldOp>(loc, ifOp.getOperation()->getResults());
       rewriter.setInsertionPointToStart(&ifOp.elseRegion().front());
-      rewriter.create<AffineYieldOp>(loc, alloc.resultMemRef);
+      rewriter.create<AffineYieldOp>(loc, filled);
       rewriter.setInsertionPointToStart(&ifOp.thenRegion().front());
     }
 
