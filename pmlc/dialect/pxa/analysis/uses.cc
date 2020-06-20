@@ -5,68 +5,73 @@
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Support/DebugStringHelper.h"
 
+#include "pmlc/util/logging.h"
+
 using namespace mlir; // NOLINT
 
 namespace pmlc::dialect::pxa {
 
-IndirectDefsIterator &IndirectDefsIterator::operator++() {
-  assert(curValue && "Should not do ++ on end");
-  // Walk all uses and find the unique non-read user
-  unsigned nextOperand = 0;
-  Operation *nextOp = nullptr;
+IndirectValuesIterator &IndirectValuesIterator::operator++() {
   for (auto &use : curValue.getUses()) {
-    if (isa<AffineLoadOp>(use.getOwner())) {
-      continue;
+    if (auto yieldOp = dyn_cast<AffineYieldOp>(use.getOwner())) {
+      auto value = yieldOp.getParentOp()->getResult(use.getOperandNumber());
+      enqueueNext(value);
+    } else if (auto reduceOp = dyn_cast<AffineReduceOp>(use.getOwner())) {
+      enqueueNext(reduceOp.result());
     }
-    assert(!nextOp && "PXA memref-states should have only one non-read user");
-    nextOp = use.getOwner();
-    nextOperand = use.getOperandNumber();
   }
-  // If no next op, set to done
-  if (!nextOp) {
-    curValue = Value();
-    return *this;
-  }
-  if (auto yieldOp = dyn_cast<AffineYieldOp>(nextOp)) {
-    curValue = yieldOp.getParentOp()->getResult(nextOperand);
-  } else if (auto reduceOp = dyn_cast<AffineReduceOp>(nextOp)) {
-    curValue = reduceOp.result();
+  if (workQueue.empty()) {
+    curValue = nullptr;
   } else {
-    llvm_unreachable("All uses of pxa mem-ref state should be reads, "
-                     "yields, reduces, or returns");
-  }
-  return *this;
-}
-
-void IndirectUsesIterator::enqueueNext(Value value) {
-  if (!value.use_empty() && !visited.count(value)) {
-    visited.insert(value);
-    workQueue.push(value.use_begin());
-  }
-}
-
-IndirectUsesIterator &IndirectUsesIterator::operator++() {
-  if (auto yieldOp = dyn_cast<AffineYieldOp>(curIt->getOwner())) {
-    auto value = yieldOp.getParentOp()->getResult(curIt->getOperandNumber());
-    enqueueNext(value);
-  } else if (auto reduceOp = dyn_cast<AffineReduceOp>(curIt->getOwner())) {
-    enqueueNext(reduceOp.result());
-  }
-  curIt++;
-  if (curIt == Value::use_iterator() && !workQueue.empty()) {
-    curIt = workQueue.front();
+    curValue = workQueue.front();
     workQueue.pop();
   }
   return *this;
 }
 
-AccessIndirectUsesIterator &AccessIndirectUsesIterator::operator++() {
+void IndirectValuesIterator::enqueueNext(Value value) {
+  if (!visited.count(value)) {
+    visited.insert(value);
+    workQueue.push(value);
+  }
+}
+
+IndirectValuesRange getIndirectValues(Value value) {
+  return {IndirectValuesIterator(value), IndirectValuesIterator()};
+}
+
+IndirectUsesIterator::IndirectUsesIterator(Value value)
+    : inner(value), curIt(value.use_begin()) {
+  nextValue();
+}
+
+IndirectUsesIterator &IndirectUsesIterator::operator++() {
+  ++curIt;
+  nextValue();
+  return *this;
+}
+
+void IndirectUsesIterator::nextValue() {
+  while (curIt == Value::use_iterator()) {
+    ++inner;
+    if (inner == IndirectValuesIterator()) {
+      return;
+    }
+    curIt = inner.getValue().use_begin();
+  }
+}
+
+IndirectUsesRange getIndirectUses(Value value) {
+  return {IndirectUsesIterator(value), IndirectUsesIterator()};
+}
+
+IndirectAccessUsesIterator &IndirectAccessUsesIterator::operator++() {
   ++inner;
   skipNonAccess();
   return *this;
 }
 
-void AccessIndirectUsesIterator::skipNonAccess() {
+void IndirectAccessUsesIterator::skipNonAccess() {
   while (inner != IndirectUsesIterator()) {
     if (isa<AffineLoadOp>(inner->getOwner()) ||
         isa<AffineReduceOp>(inner->getOwner())) {
@@ -74,6 +79,10 @@ void AccessIndirectUsesIterator::skipNonAccess() {
     }
     ++inner;
   }
+}
+
+IndirectAccessUsesRange getIndirectAccessUses(Value value) {
+  return {IndirectAccessUsesIterator(value), IndirectAccessUsesIterator()};
 }
 
 } // namespace pmlc::dialect::pxa

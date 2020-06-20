@@ -28,14 +28,19 @@ def ResizeTmps : FunctionPass<"pxa-resize-tmps"> {
   let constructor = "pmlc::dialect::pxa::createResizeTmpsPass()";
 }
 
+def TestIndirectUsesIterator : Pass<"pxa-test-indirect-uses-iterator"> {
+  let summary = "Trace the IndirectUsesIterator";
+  let constructor = "pmlc::dialect::pxa::createTestIndirectUsesIteratorPass()";
+}
+
+def TestIndirectValuesIterator : Pass<"pxa-test-indirect-values-iterator"> {
+  let summary = "Trace the IndirectValuesIterator for unit tests";
+  let constructor = "pmlc::dialect::pxa::createTestIndirectValuesIteratorPass()";
+}
+
 def TestStrideInfo : Pass<"pxa-stride-info"> {
   let summary = "Report stride data for all loads/stores for unit tests";
   let constructor = "pmlc::dialect::pxa::createTestStrideInfoPass()";
-}
-
-def TestUsesIterator : Pass<"pxa-uses-iterator"> {
-  let summary = "Trace the use iterator for unit tests";
-  let constructor = "pmlc::dialect::pxa::createTestUsesIteratorPass()";
 }
 
 #endif // __PMLC_DIALECT_PXA_PASSES__

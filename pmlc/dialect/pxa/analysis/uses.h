@@ -1,7 +1,6 @@
 #pragma once
 
 #include <queue>
-#include <set>
 
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/iterator.h"
@@ -10,40 +9,51 @@
 
 namespace pmlc::dialect::pxa {
 
-class IndirectDefsIterator
+class IndirectValuesIterator
     : public llvm::iterator_facade_base<
-          IndirectDefsIterator, std::forward_iterator_tag, mlir::Value> {
+          IndirectValuesIterator, std::forward_iterator_tag, mlir::Value> {
 public:
-  IndirectDefsIterator() {}
-  explicit IndirectDefsIterator(Value value) : curValue(value) {}
+  IndirectValuesIterator() {}
+  explicit IndirectValuesIterator(Value value) : curValue(value) {}
 
-  IndirectDefsIterator &operator=(const IndirectDefsIterator &other) = default;
+  IndirectValuesIterator &
+  operator=(const IndirectValuesIterator &other) = default;
 
-  bool operator==(const IndirectDefsIterator &rhs) const {
+  bool operator==(const IndirectValuesIterator &rhs) const {
     return curValue == rhs.curValue;
   }
 
-  const mlir::Value &operator*() const { return curValue; }
-  mlir::Value &operator*() { return curValue; }
+  mlir::Value getValue() const { return curValue; }
+  mlir::Value operator*() const { return curValue; }
 
-  IndirectDefsIterator &operator++();
+  IndirectValuesIterator &operator++();
 
 private:
-  // The current def being considered
+  void enqueueNext(Value value);
+
+private:
+  // The current value.
   Value curValue;
+  // The next values to process.
+  std::queue<Value> workQueue;
+  // Avoid duplicate visitations.
+  llvm::DenseSet<Value> visited;
 };
+
+using IndirectValuesRange = llvm::iterator_range<IndirectValuesIterator>;
+IndirectValuesRange getIndirectValues(Value value);
 
 class IndirectUsesIterator
     : public llvm::iterator_facade_base<
           IndirectUsesIterator, std::forward_iterator_tag, mlir::OpOperand> {
 public:
   IndirectUsesIterator() {}
-  explicit IndirectUsesIterator(Value value) : curIt(value.use_begin()) {}
+  explicit IndirectUsesIterator(Value value);
 
   IndirectUsesIterator &operator=(const IndirectUsesIterator &other) = default;
 
   bool operator==(const IndirectUsesIterator &rhs) const {
-    return curIt == rhs.curIt;
+    return std::tie(inner, curIt) == std::tie(rhs.inner, rhs.curIt);
   }
 
   const mlir::OpOperand &operator*() const { return *curIt; }
@@ -52,40 +62,41 @@ public:
   IndirectUsesIterator &operator++();
 
 private:
-  void enqueueNext(Value value);
+  void nextValue();
 
 private:
-  // The position in the walk
+  // The current value iterator.
+  IndirectValuesIterator inner;
+  // The use iterator.
   Value::use_iterator curIt;
-  // The next iterators to follow once we finish with the current iterator.
-  std::queue<Value::use_iterator> workQueue;
-  // Avoid duplicate visitations.
-  llvm::DenseSet<Value> visited;
 };
 
+using IndirectUsesRange = llvm::iterator_range<IndirectUsesIterator>;
+IndirectUsesRange getIndirectUses(Value value);
+
 // Subsets all uses to only acceses (skipping yield/return)
-class AccessIndirectUsesIterator
-    : public llvm::iterator_facade_base<AccessIndirectUsesIterator,
+class IndirectAccessUsesIterator
+    : public llvm::iterator_facade_base<IndirectAccessUsesIterator,
                                         std::forward_iterator_tag,
                                         mlir::OpOperand> {
 public:
-  AccessIndirectUsesIterator() {}
+  IndirectAccessUsesIterator() {}
 
-  explicit AccessIndirectUsesIterator(Value value) : inner(value) {
+  explicit IndirectAccessUsesIterator(Value value) : inner(value) {
     skipNonAccess();
   }
 
-  AccessIndirectUsesIterator &
-  operator=(const AccessIndirectUsesIterator &other) = default;
+  IndirectAccessUsesIterator &
+  operator=(const IndirectAccessUsesIterator &other) = default;
 
-  bool operator==(const AccessIndirectUsesIterator &rhs) const {
+  bool operator==(const IndirectAccessUsesIterator &rhs) const {
     return inner == rhs.inner;
   }
 
   const mlir::OpOperand &operator*() const { return *inner; }
   mlir::OpOperand &operator*() { return *inner; }
 
-  AccessIndirectUsesIterator &operator++();
+  IndirectAccessUsesIterator &operator++();
 
 private:
   void skipNonAccess();
@@ -93,38 +104,8 @@ private:
   IndirectUsesIterator inner;
 };
 
-class IndirectDefs {
-public:
-  explicit IndirectDefs(Value value) : value(value) {}
-  IndirectDefsIterator begin() { return IndirectDefsIterator(value); }
-  IndirectDefsIterator end() { return IndirectDefsIterator(); }
-
-private:
-  Value value;
-};
-
-class IndirectUses {
-public:
-  explicit IndirectUses(Value value) : value(value) {}
-  IndirectUsesIterator begin() { return IndirectUsesIterator(value); }
-  IndirectUsesIterator end() { return IndirectUsesIterator(); }
-
-private:
-  Value value;
-};
-
-class AccessIndirectUses {
-public:
-  explicit AccessIndirectUses(Value value) : value(value) {}
-
-  AccessIndirectUsesIterator begin() {
-    return AccessIndirectUsesIterator(value);
-  }
-
-  AccessIndirectUsesIterator end() { return AccessIndirectUsesIterator(); }
-
-private:
-  Value value;
-};
+using IndirectAccessUsesRange =
+    llvm::iterator_range<IndirectAccessUsesIterator>;
+IndirectAccessUsesRange getIndirectAccessUses(Value value);
 
 } // namespace pmlc::dialect::pxa

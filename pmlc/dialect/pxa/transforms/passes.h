@@ -33,7 +33,9 @@ using StencilCostFunction =
 
 std::unique_ptr<mlir::Pass> createTestStrideInfoPass();
 
-std::unique_ptr<mlir::Pass> createTestUsesIteratorPass();
+std::unique_ptr<mlir::Pass> createTestIndirectUsesIteratorPass();
+
+std::unique_ptr<mlir::Pass> createTestIndirectValuesIteratorPass();
 
 std::unique_ptr<mlir::Pass> createXSMMStencilPass(unsigned numThreads,
                                                   StencilCostFunction costFn);

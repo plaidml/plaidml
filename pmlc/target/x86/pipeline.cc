@@ -144,6 +144,16 @@ void addToPipeline(OpPassManager &pm) {
   pm.addPass(pmlc::dialect::pxa::createXSMMStencilPass(1, heatmapCost));
   pm.addPass(createXSMMLoweringPass());
 
+  pm.addPass(pmlc::dialect::pxa::createFusionPass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(pmlc::dialect::pxa::createMemRefDataFlowOptPass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(pmlc::dialect::pxa::createLocalizePass());
+  // FIXME: this pass currently breaks on CppEdsl.Winograd
+  // pm.addPass(pmlc::dialect::pxa::createResizeTmpsPass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
+
   pm.addPass(conversion::pxa_to_affine::createLowerPXAToAffinePass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
