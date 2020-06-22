@@ -43,7 +43,7 @@ struct LocalizePass : public LocalizeBase<LocalizePass> {
     f.walk([&](AllocOp allocOp) {
       // Collect all the indirect users of the alloc op.
       SmallVector<Operation *, 4> opGroup;
-      for (auto &use : IndirectUses(allocOp)) {
+      for (auto &use : getIndirectUses(allocOp)) {
         opGroup.push_back(use.getOwner());
       }
 

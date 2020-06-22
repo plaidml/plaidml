@@ -54,7 +54,7 @@ plaidml_cc_library(
         "//pmlc/compiler",
         "//pmlc/dialect/tile",
         "//pmlc/util",
-        "@llvm-project//llvm:support",
+        "@llvm-project//llvm:Support",
     ],
     alwayslink = 1,
 )

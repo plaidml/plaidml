@@ -39,7 +39,7 @@ plaidml_cc_library(
         "//pmlc/util",
         "//pmlc/util/bilp",
         "//pmlc/util/math",
-        "@llvm-project//llvm:support",
+        "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
     ],
 )
