@@ -15,6 +15,7 @@
 
 #include "pmlc/compiler/registry.h"
 
+#include "pmlc/conversion/SCFToGPU/SCFToGPUPass.h"
 #include "pmlc/conversion/gpu/lowering.h"
 #include "pmlc/conversion/pxa_to_affine/passes.h"
 #include "pmlc/conversion/tile_to_pxa/passes.h"
@@ -42,12 +43,11 @@ void addToPipeline(OpPassManager &pm) {
   // pm.addPass(std::make_unique<IREETileLinalgPass>());
   // pm.addPass(createConvertLinalgToLoopsPass());
   pm.addPass(conversion::pxa_to_affine::createLowerPXAToAffinePass());
-  // pm.addPass(createLowerAffinePass());
-  // pm.addPass(createCanonicalizerPass());
-  // pm.addPass(createCSEPass());
+  pm.addPass(createLowerAffinePass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
 
-  // pm.addPass(std::make_unique<SCFToGPUPass>());
-  pm.addPass(createAffineForToGPUPass(1, 1));
+  pm.addPass(pmlc::conversion::scf_to_gpu::createSimpleSCFToGPUPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(conversion::gpu::createGpuKernelOutliningPass());
 
