@@ -78,29 +78,6 @@ LogicalResult mixedPtrFuncArgTypeConverter(LLVMTypeConverter &converter,
   return structFuncArgTypeConverter(converter, type, result);
 }
 
-struct ConvertToStdPass
-    : public mlir::PassWrapper<ConvertToStdPass,
-                               mlir::OperationPass<mlir::ModuleOp>> {
-  void runOnOperation() override {
-    auto module = getOperation();
-    auto *context = module.getContext();
-
-    OwningRewritePatternList patterns;
-    populateAffineToStdConversionPatterns(patterns, context);
-    populateLoopToStdConversionPatterns(patterns, context);
-
-    ConversionTarget target(*context);
-    target.addLegalDialect<StandardOpsDialect>();
-    if (failed(applyPartialConversion(module, target, patterns))) {
-      signalPassFailure();
-    }
-  }
-
-  static std::unique_ptr<OperationPass<ModuleOp>> create() {
-    return std::make_unique<ConvertToStdPass>();
-  }
-};
-
 struct ConvertToLLVMPass
     : public mlir::PassWrapper<ConvertToLLVMPass,
                                mlir::OperationPass<mlir::ModuleOp>> {
@@ -120,8 +97,7 @@ struct ConvertToLLVMPass
 
     ConversionTarget target(*context);
     target.addLegalDialect<LLVM::LLVMDialect>();
-    if (failed(
-            applyPartialConversion(module, target, patterns, &typeConverter))) {
+    if (failed(applyPartialConversion(module, target, patterns))) {
       signalPassFailure();
     }
   }
@@ -144,6 +120,16 @@ void addToPipeline(OpPassManager &pm) {
   pm.addPass(pmlc::dialect::pxa::createXSMMStencilPass(1, heatmapCost));
   pm.addPass(createXSMMLoweringPass());
 
+  // FIXME: these passes cause test failures (correctness or otherwise)
+  // pm.addPass(pmlc::dialect::pxa::createFusionPass());
+  // pm.addPass(createCanonicalizerPass());
+  // pm.addPass(pmlc::dialect::pxa::createMemRefDataFlowOptPass());
+  // pm.addPass(createCanonicalizerPass());
+  // pm.addPass(pmlc::dialect::pxa::createLocalizePass());
+  // pm.addPass(pmlc::dialect::pxa::createResizeTmpsPass());
+  // pm.addPass(createCanonicalizerPass());
+  // pm.addPass(createCSEPass());
+
   pm.addPass(conversion::pxa_to_affine::createLowerPXAToAffinePass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
@@ -152,7 +138,7 @@ void addToPipeline(OpPassManager &pm) {
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
-  pm.addPass(ConvertToStdPass::create());
+  pm.addPass(createLowerToCFGPass());
   if (pmlc::util::getEnvVar("PLAIDML_BOUNDS_CHECK") == "1") {
     pm.addPass(pmlc::dialect::stdx::createBoundsCheckPass());
   }

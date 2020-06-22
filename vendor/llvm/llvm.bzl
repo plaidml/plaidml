@@ -61,7 +61,8 @@ def gentbl(name, tblgen, td_file, td_srcs, tbl_outs, library = True, **kwargs):
             message = "Generating code from table: %s" % td_file,
             cmd = (("$(location %s) " + "-I external/llvm-project/llvm/include " +
                     "-I external/llvm-project/clang/include " +
-                    "-I $$(dirname $(location %s)) " + "%s $(location %s) --long-string-literals=0 -o $@") % (
+                    "-I $$(dirname $(location %s)) " + ("%s $(location %s) --long-string-literals=0 " +
+                                                        "-o $@")) % (
                 tblgen,
                 td_file,
                 opts,
@@ -102,7 +103,7 @@ def _quote(s):
       command.
     """
     return ('"' +
-            s.replace("\\", "\\\\").replace("$", "\\$").replace('"', '\\"') +
+            s.replace("\\", "\\\\").replace("$", "\\$").replace('"', "\\\"") +
             '"')
 
 def cmake_var_string(cmake_vars):
@@ -330,11 +331,7 @@ llvm_all_cmake_vars = select({
 
 llvm_linkopts = select({
     "@bazel_tools//src/conditions:windows": [],
-    "//conditions:default": [
-        "-ldl",
-        "-lm",
-        "-lpthread",
-    ],
+    "//conditions:default": ["-ldl", "-lm", "-lpthread"],
 })
 
 llvm_defines = select({

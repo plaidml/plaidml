@@ -16,6 +16,6 @@ plaidml_cc_library(
         "//plaidml/edsl",
         "//plaidml/op:headers",
         "//pmlc/util",
-        "@llvm-project//llvm:support",
+        "@llvm-project//llvm:Support",
     ],
 )

@@ -39,7 +39,7 @@ plaidml_cc_library(
     hdrs = ["ops.h"],
     deps = [
         ":gen-ops",
-        "@llvm-project//llvm:support",
+        "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:IR",
     ],
