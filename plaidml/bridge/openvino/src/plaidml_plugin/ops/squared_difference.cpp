@@ -19,7 +19,6 @@ static OpRegistration reg("squareddifference", [](const Context& ctx) {
   auto A = ctx.operands.at(0);
   auto B = ctx.operands.at(1);
   return edsl::make_tuple(op::square(A - B));
-  // return edsl::make_tuple(1);
 });
 
 }  // namespace PlaidMLPlugin
