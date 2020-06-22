@@ -224,7 +224,7 @@ Type ComputeResultType(ValueRange operands, Type override) {
   return ret;
 }
 
-SmallVector<int64_t, 4> ComputeShape(ArrayRef<Value> operands) {
+SmallVector<int64_t, 4> getShapeFromOperands(ArrayRef<Value> operands) {
   SmallVector<int64_t, 4> shape;
   for (auto operand : operands) {
     auto op = operand.getDefiningOp();

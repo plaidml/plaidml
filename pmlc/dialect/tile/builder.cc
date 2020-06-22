@@ -548,8 +548,7 @@ Value TileBuilder::MakeContractionOp(AggregationKind agg, CombinationKind combo,
   auto elementType = inferElementType(&impl->context, combo, srcs);
   auto sizeMapOp = llvm::cast<AffineMapOp>(sizes.getDefiningOp());
   SmallVector<Value, 4> sizeDims(sizeMapOp.dims());
-  auto shape = eltwise::ComputeShape(sizeDims);
-
+  auto shape = eltwise::getShapeFromOperands(sizeDims);
   StringAttr nameAttr;
   if (name.size()) {
     nameAttr = impl->builder.getStringAttr(name);
@@ -699,6 +698,7 @@ TileBuilder::MakeProgram(StringRef name, const ProgramMutations &mutations,
   pm.addPass(createMakeProgramPass());
   pm.addPass(mlir::createCanonicalizerPass());
   pm.addPass(mlir::createCSEPass());
+  IVLOG(2, "Running tile builder passes");
   auto result = pm.run(module);
   if (failed(result)) {
     IVLOG(1, "\n" << mlir::debugString(module));

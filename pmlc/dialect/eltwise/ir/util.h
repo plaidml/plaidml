@@ -13,7 +13,7 @@ mlir::Type promoteTypes(mlir::Type lhs, mlir::Type rhs);
 mlir::Type inferElementType(mlir::ArrayRef<mlir::Type> types);
 
 llvm::SmallVector<int64_t, 4>
-ComputeShape(llvm::ArrayRef<mlir::Value> operands);
+getShapeFromOperands(llvm::ArrayRef<mlir::Value> operands);
 
 mlir::Type ComputeResultType(mlir::ValueRange operands,
                              mlir::Type override = mlir::Type());
