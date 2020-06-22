@@ -32,15 +32,15 @@ using dialect::tile::AggregationKind;
 using dialect::tile::CombinationKind;
 using dialect::tile::ConstantOp;
 using dialect::tile::ContractionOp;
-using dialect::tile::ContractionOpOperandAdaptor;
+using dialect::tile::ContractionOpAdaptor;
 using dialect::tile::getPaddingInfo;
 using dialect::tile::IndexOp;
 using dialect::tile::PaddingInfo;
 using dialect::tile::PrngOp;
 using dialect::tile::ReshapeOp;
-using dialect::tile::ReshapeOpOperandAdaptor;
+using dialect::tile::ReshapeOpAdaptor;
 using dialect::tile::ShapeOp;
-using dialect::tile::ShapeOpOperandAdaptor;
+using dialect::tile::ShapeOpAdaptor;
 using dialect::tile::TraceOp;
 
 namespace {
@@ -270,7 +270,7 @@ template <typename InnerPredicate>
 struct AnyComparandIs : Matcher {
   bool match(Operation *op) const final {
     SmallVector<Value, 4> allOperands(op->getOperands());
-    ContractionOpOperandAdaptor adaptor(allOperands);
+    ContractionOpAdaptor adaptor(allOperands);
     auto operands = adaptor.operands();
     InnerPredicate pred;
     return pred.match(operands[0].getType()) ||
@@ -703,7 +703,7 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
   void tryRewrite(ContractionOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const {
     // Create an adaptor
-    ContractionOpOperandAdaptor cionAdaptor(operands);
+    ContractionOpAdaptor cionAdaptor(operands);
     auto cionOperands = cionAdaptor.operands();
 
     auto loc = op.getLoc();
@@ -863,7 +863,7 @@ struct ReshapeOpConversion : public OpConversionPattern<ReshapeOp> {
     IVLOG(2, "ReshapeOpConversion::matchAndRewrite>");
 
     // Create an adaptor, to interpret the operands
-    ReshapeOpOperandAdaptor adaptor(operands);
+    ReshapeOpAdaptor adaptor(operands);
 
     auto tensor = adaptor.tensor();
 
@@ -884,7 +884,7 @@ struct ShapeOpConversion : public OpConversionPattern<ShapeOp> {
     IVLOG(2, "ShapeOpConversion::matchAndRewrite>");
 
     // Create an adaptor
-    ShapeOpOperandAdaptor adaptor(operands);
+    ShapeOpAdaptor adaptor(operands);
 
     // Gather some basic info
     auto loc = op.getLoc();
@@ -1141,8 +1141,7 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
         EltwiseOpConversion<ew::SelectOp, SelectOp>,
         EltwiseOpConversion<ew::IdentOp, FirstOperand>>(&getContext());
     // Run the conversion
-    if (failed(
-            applyFullConversion(getOperation(), target, patterns, nullptr))) {
+    if (failed(applyFullConversion(getOperation(), target, patterns))) {
       signalPassFailure();
       return;
     }

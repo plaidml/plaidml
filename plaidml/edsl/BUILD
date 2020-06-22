@@ -44,7 +44,7 @@ plaidml_cc_library(
         "//pmlc:all_passes_and_dialects_no_registration",
         "//pmlc/dialect/tile",
         "//pmlc/util",
-        "@llvm-project//llvm:support",
+        "@llvm-project//llvm:Support",
     ],
     alwayslink = 1,
 )
