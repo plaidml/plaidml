@@ -2130,6 +2130,10 @@ Value slice(const Value& value) {
 
   // Useful values and correctness checks
   auto ndims = I.rank();
+  // First, handle the case of a scalar
+  if (ndims == 0) {
+    return Value{I};
+  }
   if (slices.size() != ndims) {
     throw std::runtime_error(
         llvm::formatv("{0} slice axes provided to slice {1}-dimensional tensor", slices.size(), ndims));

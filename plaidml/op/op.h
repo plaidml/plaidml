@@ -422,6 +422,11 @@ inline edsl::Tensor slice(const edsl::Tensor& I, const std::vector<int>& slices)
   return details::op("slice", args).as_tensor();
 }
 
+inline edsl::Tensor slice(const edsl::Tensor& I, const std::vector<edsl::Value>& slices) {
+  auto args = edsl::make_tuple(I, edsl::make_tuple(slices));
+  return details::op("slice", args).as_tensor();
+}
+
 inline edsl::Tensor softmax(const edsl::Tensor& I, int axis) {
   auto args = edsl::make_tuple(I, axis);
   return details::op("softmax", args).as_tensor();
