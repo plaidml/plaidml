@@ -11,7 +11,14 @@ using LayerTestsDefinitions::SqrtLayerTest;
 namespace {
 
 std::vector<std::vector<size_t>> inShapes = {
-    {2}, {1, 1, 1, 3}, {1, 2, 4}, {1, 4, 4}, {1, 4, 4, 1}, {1, 1, 1, 1, 1, 1, 3}, {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}};
+    {2},                                  //
+    {1, 1, 1, 3},                         //
+    {1, 2, 4},                            //
+    {1, 4, 4},                            //
+    {1, 4, 4, 1},                         //
+    {1, 1, 1, 1, 1, 1, 3},                //
+    {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}  //
+};
 
 std::vector<InferenceEngine::Precision> netPrecisions = {
     InferenceEngine::Precision::FP32,
