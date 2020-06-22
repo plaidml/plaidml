@@ -11,7 +11,6 @@ cc_test(
             "cum_sum.cpp",
             "extract_image_patches.cpp",
             "fake_quantize.cpp",
-            "group_convolution.cpp",
             "group_convolution_backprop_data.cpp",
             "mvn.cpp",
             "select.cpp",
