@@ -60,9 +60,10 @@ func @xsmm_op() {
 
 func @fill_2d(%buf : memref<?x?xf32>, %alt : i1) {
   %c0 = constant 0 : index
+  %c1 = constant 1 : index
   %c5 = constant 5 : index
-  %X = dim %buf, 0 : memref<?x?xf32>
-  %Y = dim %buf, 1 : memref<?x?xf32>
+  %X = dim %buf, %c0 : memref<?x?xf32>
+  %Y = dim %buf, %c1 : memref<?x?xf32>
   affine.parallel (%x, %y) = (0, 0) to (%X, %Y) {
     // i = linear offset
     %i = affine.apply affine_map<(x, y)[Y] -> (x * Y + y)>(%x, %y)[%Y]
@@ -81,11 +82,14 @@ func @fill_2d(%buf : memref<?x?xf32>, %alt : i1) {
 
 func @fill_4d(%buf : memref<?x?x?x?xf32>, %alt : i1) {
   %c0 = constant 0 : index
+  %c1 = constant 1 : index
+  %c2 = constant 2 : index
+  %c3 = constant 3 : index
   %c5 = constant 5 : index
-  %X = dim %buf, 0 : memref<?x?x?x?xf32>
-  %Y = dim %buf, 1 : memref<?x?x?x?xf32>
-  %Z = dim %buf, 2 : memref<?x?x?x?xf32>
-  %W = dim %buf, 3 : memref<?x?x?x?xf32>
+  %X = dim %buf, %c0 : memref<?x?x?x?xf32>
+  %Y = dim %buf, %c1 : memref<?x?x?x?xf32>
+  %Z = dim %buf, %c2 : memref<?x?x?x?xf32>
+  %W = dim %buf, %c3 : memref<?x?x?x?xf32>
   affine.parallel (%x, %y, %z, %w) = (0, 0, 0, 0) to (%X, %Y, %Z, %W) {
     // i = linear offset
     %i = affine.apply affine_map<(x, y, z, w)[Y, Z, W] -> (x * Y + y * W + z * W + w)>(%x, %y, %z, %w)[%Y, %Z, %W]
@@ -139,9 +143,11 @@ func @test_dot(%impl : (memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>) -> ()
 }
 
 func @dot(%A: memref<?x?xf32>, %B: memref<?x?xf32>, %C: memref<?x?xf32>) {
-  %M = dim %C, 0 : memref<?x?xf32>
-  %N = dim %C, 1 : memref<?x?xf32>
-  %K = dim %A, 1 : memref<?x?xf32>
+  %c0 = constant 0 : index
+  %c1 = constant 1 : index
+  %M = dim %C, %c0 : memref<?x?xf32>
+  %N = dim %C, %c1 : memref<?x?xf32>
+  %K = dim %A, %c1 : memref<?x?xf32>
   affine.parallel (%i, %j, %k) = (0, 0, 0) to (%M, %N, %K) {
     %0 = affine.load %A[%i, %k] : memref<?x?xf32>
     %1 = affine.load %B[%k, %j] : memref<?x?xf32>
@@ -152,9 +158,11 @@ func @dot(%A: memref<?x?xf32>, %B: memref<?x?xf32>, %C: memref<?x?xf32>) {
 }
 
 func @dot_tiled(%A: memref<?x?xf32>, %B: memref<?x?xf32>, %C: memref<?x?xf32>) {
-  %M = dim %C, 0 : memref<?x?xf32>
-  %N = dim %C, 1 : memref<?x?xf32>
-  %K = dim %A, 1 : memref<?x?xf32>
+  %c0 = constant 1 : index
+  %c1 = constant 1 : index
+  %M = dim %C, %c0 : memref<?x?xf32>
+  %N = dim %C, %c1 : memref<?x?xf32>
+  %K = dim %A, %c1 : memref<?x?xf32>
   affine.parallel (%i0, %j0, %k0) = (0, 0, 0) to (%M, %N, %K) step (2, 2, 2) {
     affine.parallel (%i1, %j1, %k1) = (%i0, %j0, %k0) to (%i0 + 2, %j0 + 2, %k0 + 2) {
       %0 = affine.load %A[%i1, %k1] : memref<?x?xf32>
@@ -176,9 +184,9 @@ func @dot_xsmm_call(%A: memref<?x?xf32>, %B: memref<?x?xf32>, %C: memref<?x?xf32
   %lda = constant 8 : i32
   %ldb = constant 8 : i32
   %ldc = constant 8 : i32
-  %M = dim %C, 0 : memref<?x?xf32>
-  %N = dim %C, 1 : memref<?x?xf32>
-  %K = dim %A, 1 : memref<?x?xf32>
+  %M = dim %C, %c0 : memref<?x?xf32>
+  %N = dim %C, %c1 : memref<?x?xf32>
+  %K = dim %A, %c1 : memref<?x?xf32>
   affine.parallel (%i, %j, %k) = (0, 0, 0) to (%M, %N, %K) step (2, 2, 2) {
     %a_view = subview %A[%i, %k][2, 2][1, 1] :
       memref<?x?xf32> to memref<2x2xf32, offset: ?, strides: [?, 1]>
@@ -254,10 +262,13 @@ func @test_conv2(%impl : (!I_memref, !K_memref, !O_memref) -> ()) {
 }
 
 func @conv2(%I: !I_memref, %K: !K_memref, %O: !O_memref) {
-  %X = dim %I, 1 : !I_memref
-  %Y = dim %I, 2 : !I_memref
-  %CI = dim %I, 3 : !I_memref
-  %CO = dim %O, 3 : !O_memref
+  %c1 = constant 1 : index
+  %c2 = constant 2 : index
+  %c3 = constant 3 : index
+  %X = dim %I, %c1 : !I_memref
+  %Y = dim %I, %c2 : !I_memref
+  %CI = dim %I, %c3 : !I_memref
+  %CO = dim %O, %c3 : !O_memref
   affine.parallel (%x, %y, %ci, %co) = (0, 0, 0, 0) to (%X, %Y, %CI, %CO) {
     %0 = affine.load %I[0, %x, %y, %ci] : !I_memref
     %1 = affine.load %K[0, 0, %ci, %co] : !K_memref
@@ -268,10 +279,13 @@ func @conv2(%I: !I_memref, %K: !K_memref, %O: !O_memref) {
 }
 
 func @conv2_tiled(%I: !I_memref, %K: !K_memref, %O: !O_memref) {
-  %X = dim %I, 1 : !I_memref
-  %Y = dim %I, 2 : !I_memref
-  %CI = dim %I, 3 : !I_memref
-  %CO = dim %O, 3 : !O_memref
+  %c1 = constant 1 : index
+  %c2 = constant 2 : index
+  %c3 = constant 3 : index
+  %X = dim %I, %c1 : !I_memref
+  %Y = dim %I, %c2 : !I_memref
+  %CI = dim %I, %c3 : !I_memref
+  %CO = dim %O, %c3 : !O_memref
   affine.parallel (%x0, %y) = (0, 0) to (%X, %Y) step (2, 1) {
     affine.parallel (%x1, %ci, %co) = (%x0, 0, 0) to (%x0 + 2, %CI, %CO) {
       %0 = affine.load %I[0, %x1, %y, %ci] : !I_memref
@@ -288,11 +302,14 @@ func @conv2_tiled(%I: !I_memref, %K: !K_memref, %O: !O_memref) {
 #K_tile = affine_map<(k, n) -> (0, 0, k, n)>
 
 func @conv2_xsmm_op(%I: !I_memref, %K: !K_memref, %O: !O_memref) {
-  %X = dim %I, 1 : !I_memref
-  %Y = dim %I, 2 : !I_memref
-  %CI = dim %I, 3 : !I_memref
-  %CO = dim %O, 3 : !O_memref
   %c0 = constant 0 : index
+  %c1 = constant 1 : index
+  %c2 = constant 2 : index
+  %c3 = constant 3 : index
+  %X = dim %I, %c1 : !I_memref
+  %Y = dim %I, %c2 : !I_memref
+  %CI = dim %I, %c3 : !I_memref
+  %CO = dim %O, %c3 : !O_memref
   affine.parallel (%x, %y) = (0, 0) to (%X, %Y) step (2, 1) {
     xsmm.gemm %O[%c0, %x, %y, %c0]:#O_tile = %I[%c0, %x, %y, %c0]:#I_tile, %K[%c0, %c0, %c0, %c0]:#K_tile, [2, 11, 7]
       : !O_memref, !I_memref, !K_memref
@@ -305,8 +322,10 @@ func @conv2_xsmm_op(%I: !I_memref, %K: !K_memref, %O: !O_memref) {
 // O: 1x6x5x11xf32
 func @conv2_xsmm_call(%I: !I_memref, %K: !K_memref, %O: !O_memref) {
   %c0 = constant 0 : index
-  %X = dim %I, 1 : !I_memref
-  %Y = dim %I, 2 : !I_memref
+  %c1 = constant 1 : index
+  %c2 = constant 2 : index
+  %X = dim %I, %c1 : !I_memref
+  %Y = dim %I, %c2 : !I_memref
   %m = constant 2 : i32
   %n = constant 11 : i32
   %k = constant 7 : i32

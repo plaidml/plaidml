@@ -205,7 +205,6 @@ void plaidml_expr_free(  //
     plaidml_error* err,  //
     plaidml_expr* expr) {
   ffi_wrap_void(err, [&] {
-    IVLOG(3, "plaidml_expr_free> " << expr->value);
     IVLOG(3, "plaidml_expr_free> " << mlir::debugString(expr->value));
     GlobalContext::get()->Destroy(expr->value);
     delete expr;
@@ -279,7 +278,8 @@ void plaidml_expr_bind_dims(  //
     IVLOG(3, "plaidml_expr_bind_dims> " << mlir::debugString(expr->value));
     llvm::SmallVector<mlir::Value*, 6> into;
     for (size_t i = 0; i < rank; i++) {
-      IVLOG(3, "bind_dims> i: " << i << ", from: " << expr->value << ", into: " << dims[i]->value);
+      IVLOG(3, "bind_dims> i: " << i << ", from: " << mlir::debugString(expr->value)
+                                << ", into: " << mlir::debugString(dims[i]->value));
       into.emplace_back(&dims[i]->value);
     }
     GlobalContext::get()->BindTensorDims(expr->value, into);

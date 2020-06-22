@@ -68,7 +68,7 @@ plaidml_cc_library(
         ":gen-ops",
         "//pmlc/dialect/eltwise/ir",
         "//pmlc/util",
-        "@llvm-project//llvm:support",
+        "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
     ],
 )

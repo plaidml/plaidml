@@ -120,8 +120,7 @@ struct ConvertToLLVMPass
 
     ConversionTarget target(*context);
     target.addLegalDialect<LLVM::LLVMDialect>();
-    if (failed(
-            applyPartialConversion(module, target, patterns, &typeConverter))) {
+    if (failed(applyPartialConversion(module, target, patterns))) {
       signalPassFailure();
     }
   }

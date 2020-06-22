@@ -25,6 +25,7 @@ using namespace mlir; // NOLINT[build/namespaces]
 namespace pmlc::target::intel_gen {
 
 namespace {
+
 void addToPipeline(OpPassManager &pm) {
   pm.addPass(dialect::tile::createComputeBoundsPass());
   // pm.addPass(dialect::tile::createPadPass());
@@ -41,12 +42,12 @@ void addToPipeline(OpPassManager &pm) {
   // pm.addPass(std::make_unique<IREETileLinalgPass>());
   // pm.addPass(createConvertLinalgToLoopsPass());
   pm.addPass(conversion::pxa_to_affine::createLowerPXAToAffinePass());
-  pm.addPass(createLowerAffinePass());
-  pm.addPass(createCanonicalizerPass());
-  pm.addPass(createCSEPass());
+  // pm.addPass(createLowerAffinePass());
+  // pm.addPass(createCanonicalizerPass());
+  // pm.addPass(createCSEPass());
 
   // pm.addPass(std::make_unique<SCFToGPUPass>());
-  pm.addPass(createSimpleSCFToGPUPass(1, 1));
+  pm.addPass(createAffineForToGPUPass(1, 1));
   pm.addPass(createCanonicalizerPass());
   pm.addPass(conversion::gpu::createGpuKernelOutliningPass());
 
