@@ -847,8 +847,8 @@ TEST_F(OpTest, Slice) {
 TEST_F(OpTest, Slice2) {
   auto A = Placeholder(DType::FLOAT32, {10, 20}, "A");
   auto X = op::slice(A)  //
-               .add_dim(0, 2)
-               .add_dim(2, 8, 2);
+               .add_dim(/*start=*/0, /*stop=*/2)
+               .add_dim(/*start=*/2, /*stop=*/8, /*step=*/2);
   auto program = makeProgram("slice", {X});
   IVLOG(1, program);
   runProgram(program);
