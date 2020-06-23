@@ -15,7 +15,7 @@ using namespace InferenceEngine;  // NOLINT[build/namespaces]
 
 namespace PlaidMLPlugin {
 
-static OpRegistration reg("one_hot", [](const Context& ctx) {
+static OpRegistration reg("OneHot", [](const Context& ctx) {
   IE_ASSERT(ctx.operands.size() == 4);
   auto indices = ctx.operands.at(0);
   // auto depth = ctx.operands.at(1);
@@ -37,7 +37,7 @@ static OpRegistration reg("one_hot", [](const Context& ctx) {
   size_t j = 0;
   for (size_t i = 0; i < O_dims.size(); i++) {
     if (i == axis) {
-      O_dims[i] = edsl::TensorDim(5);  // depth
+      O_dims[i] = edsl::TensorDim(10);  // depth
     } else {
       O_dims[i] = I_dims[j];
       j++;
