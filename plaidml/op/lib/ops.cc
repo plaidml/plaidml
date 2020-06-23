@@ -864,15 +864,15 @@ Value convolution(const Value& value) {
   }
   auto I_or_O = args[0].as_tensor();  // O if deriv_mode is DATA, else I
   auto F_or_O = args[1].as_tensor();  // O if deriv_mode is FILTER, else F
-  auto strides = args[2].is_none() ? std::vector<int64_t>{} : args[2].as_int_tuple();
-  auto dilations = args[3].is_none() ? std::vector<int64_t>{} : args[3].as_int_tuple();
-  auto data_dilations = args[4].is_none() ? std::vector<int64_t>{} : args[4].as_int_tuple();
+  auto strides = args[2].as_int_tuple_or_empty();
+  auto dilations = args[3].as_int_tuple_or_empty();
+  auto data_dilations = args[4].as_int_tuple_or_empty();
   // TODO: Perhaps could upgrade use of filter_shape?
   // This is the shape of the _spatial_ filter dims _only_
-  auto filter_shape = args[5].is_none() ? std::vector<int64_t>{} : args[5].as_int_tuple();
+  auto filter_shape = args[5].as_int_tuple_or_empty();
   auto groups = args[6].as_int();  // will be 1 for non-grouped convolutions
   auto autopad_mode = validate<AutoPadMode>(args[7].as_int());
-  auto manual_padding = args[8].is_none() ? std::vector<int64_t>{} : args[8].as_int_tuple();
+  auto manual_padding = args[8].as_int_tuple_or_empty();
   auto input_layout = validate<TensorLayout>(args[9].as_int());
   auto filter_layout = validate<TensorLayout>(args[10].as_int());
   auto group_layout = validate<GroupLayout>(args[11].as_int());
@@ -880,7 +880,7 @@ Value convolution(const Value& value) {
   auto name = args[13].as_str();
   auto autogroup_mode = validate<AutoGroupMode>(args[14].as_int());
   auto deriv_mode = validate<ConvDerivMode>(args[15].as_int());
-  auto result_shape = args[16].is_none() ? std::vector<int64_t>{} : args[16].as_int_tuple();
+  auto result_shape = args[16].as_int_tuple_or_empty();
   auto infer_result_shape = args[17].as_bool();
 
   // Construct a string to log the arguments if something throws
