@@ -83,4 +83,24 @@ plaidml::op::AutoPadMode to_plaidml(const ngraph::op::PadType& ng_type) {
   }
 }
 
+ngraph::Shape get_shape_from_constant_operand(size_t operand_idx, ngraph::Node* layer) {
+  auto shape_ngraph_op =
+      std::dynamic_pointer_cast<ngraph::op::Constant>(layer->input_value(operand_idx).get_node_shared_ptr());
+  if (shape_ngraph_op) {
+    return shape_ngraph_op->get_shape_val();
+  } else {
+    THROW_IE_EXCEPTION << "Dynamic shapes not currently supported by PlaidML plugin";
+  }
+}
+
+ngraph::Coordinate get_coords_from_constant_operand(size_t operand_idx, ngraph::Node* layer) {
+  auto coord_ngraph_op =
+      std::dynamic_pointer_cast<ngraph::op::Constant>(layer->input_value(operand_idx).get_node_shared_ptr());
+  if (coord_ngraph_op) {
+    return coord_ngraph_op->get_coordinate_val();
+  } else {
+    THROW_IE_EXCEPTION << "Dynamic coordinates not currently supported by PlaidML plugin";
+  }
+}
+
 }  // namespace PlaidMLPlugin
