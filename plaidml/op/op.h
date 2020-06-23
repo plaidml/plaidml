@@ -473,10 +473,36 @@ inline edsl::Tensor sigmoid(const edsl::Tensor& I) {
   return details::op("sigmoid", args).as_tensor();
 }
 
-inline edsl::Tensor slice(const edsl::Tensor& I, const std::vector<int>& slices) {
-  auto args = edsl::make_tuple(I, edsl::make_tuple(slices));
-  return details::op("slice", args).as_tensor();
-}
+class slice {
+ public:
+  explicit slice(const edsl::Tensor& I) : I_(I) {}
+
+  slice& add_dims(const std::vector<int>& dims) {
+    for (auto dim : dims) {
+      dims_.emplace_back(dim);
+    }
+    return *this;
+  }
+
+  slice& add_dim(int dim) {
+    dims_.emplace_back(dim);
+    return *this;
+  }
+
+  slice& add_dim(int start, int stop, int step = 1) {
+    dims_.emplace_back(edsl::make_tuple(start, stop, step));
+    return *this;
+  }
+
+  operator edsl::Tensor() const {
+    auto args = edsl::make_tuple(I_, dims_);
+    return details::op("slice", args).as_tensor();
+  }
+
+ private:
+  edsl::Tensor I_;
+  std::vector<edsl::Value> dims_;
+};
 
 inline edsl::Tensor softmax(const edsl::Tensor& I, int axis) {
   auto args = edsl::make_tuple(I, axis);
