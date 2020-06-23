@@ -17,8 +17,8 @@ namespace PlaidMLPlugin {
 static OpRegistration reg("sign", [](const Context& ctx) {
   IE_ASSERT(ctx.operands.size() == 1);
   auto I = ctx.operands.at(0);
-  auto Z = edsl::Tensor(0.0) * I;
-  auto O = Z + 1;
+  auto Z = edsl::Tensor(0.0);
+  auto O = edsl::Tensor(1.0);
   return edsl::make_tuple(edsl::select(I > 0, O, Z) + edsl::select(I < 0, -1 * O, Z));
 });
 
