@@ -16,13 +16,17 @@ const std::vector<InferenceEngine::Precision> netPrecisions = {
                                        // InferenceEngine::Precision::FP16   //
 };
 
+const int64_t axis = 1;
+const size_t depth = 10;
+const float on_value = 3;
+const float off_value = 1;
 INSTANTIATE_TEST_CASE_P(NumSplitsCheck, OneHotLayerTest,
-                        ::testing::Combine(::testing::Values(1),                                      // axis
-                                           ::testing::Values(30),                                     // depth
-                                           ::testing::Values(0.0),                                    // on_value
-                                           ::testing::Values(4.0),                                    // off_value
-                                           ::testing::ValuesIn(netPrecisions),                        //
-                                           ::testing::Values(std::vector<size_t>({30, 30, 30, 30})),  //
-                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),       //
+                        ::testing::Combine(::testing::Values(axis),                              //
+                                           ::testing::Values(depth),                             //
+                                           ::testing::Values(on_value),                          //
+                                           ::testing::Values(off_value),                         //
+                                           ::testing::ValuesIn(netPrecisions),                   //
+                                           ::testing::Values(std::vector<size_t>({2, 2})),       //
+                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
                         OneHotLayerTest::getTestCaseName);
 }  // namespace

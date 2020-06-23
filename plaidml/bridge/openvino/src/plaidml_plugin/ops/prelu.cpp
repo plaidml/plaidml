@@ -18,7 +18,7 @@ static OpRegistration reg("prelu", [](const Context& ctx) {
   IE_ASSERT(ctx.operands.size() == 2);
   auto I = ctx.operands.at(0);
   auto slope = ctx.operands.at(1);
-  auto O = select(I < 0.0, slope * I, I);  // https://arxiv.org/pdf/1502.01852.pdf section 2.1
+  auto O = select(I < 0.0, slope * I, I);
   return edsl::make_tuple(O);
 });
 
