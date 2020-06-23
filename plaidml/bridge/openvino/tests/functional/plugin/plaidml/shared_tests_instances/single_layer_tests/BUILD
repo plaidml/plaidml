@@ -8,7 +8,6 @@ cc_test(
     srcs = glob(
         ["*.cpp"],
         exclude = [
-            "convolution_backprop_data.cpp",
             "cum_sum.cpp",
             "extract_image_patches.cpp",
             "fake_quantize.cpp",
