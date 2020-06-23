@@ -25,7 +25,7 @@ static OpRegistration reg("depthtospace", [](const Context& ctx) {
   IE_ASSERT(I.rank() >= 3);
 
   auto block_size = layer->get_block_size();
-  bool batch_first = layer->get_mode() == ngraph::opset1::DepthToSpace::DepthToSpaceMode::BLOCKS_FIRST;
+  bool blocks_first = layer->get_mode() == ngraph::opset1::DepthToSpace::DepthToSpaceMode::BLOCKS_FIRST;
 
   std::vector<edsl::TensorDim> I_dims(I.rank());
   std::vector<edsl::TensorIndex> I_idxs(I.rank());
@@ -44,8 +44,8 @@ static OpRegistration reg("depthtospace", [](const Context& ctx) {
   O_dims.push_back(I_dims[1] / total_block_size);
   O_idxs.push_back(I_idxs[0]);
   O_idxs.push_back(I_idxs[1]);
-  auto I_channel_stride = batch_first ? I_dims[1] / total_block_size : edsl::TensorDim(1);
-  if (!batch_first) {
+  auto I_channel_stride = blocks_first ? I_dims[1] / total_block_size : edsl::TensorDim(1);
+  if (!blocks_first) {
     I_idxs[1] = total_block_size * I_idxs[1];
   }
   for (size_t i = 2; i < I.rank(); i++) {
