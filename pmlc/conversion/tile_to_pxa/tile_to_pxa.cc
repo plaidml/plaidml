@@ -32,15 +32,15 @@ using dialect::tile::AggregationKind;
 using dialect::tile::CombinationKind;
 using dialect::tile::ConstantOp;
 using dialect::tile::ContractionOp;
-using dialect::tile::ContractionOpOperandAdaptor;
+using dialect::tile::ContractionOpAdaptor;
 using dialect::tile::getPaddingInfo;
 using dialect::tile::IndexOp;
 using dialect::tile::PaddingInfo;
 using dialect::tile::PrngOp;
 using dialect::tile::ReshapeOp;
-using dialect::tile::ReshapeOpOperandAdaptor;
+using dialect::tile::ReshapeOpAdaptor;
 using dialect::tile::ShapeOp;
-using dialect::tile::ShapeOpOperandAdaptor;
+using dialect::tile::ShapeOpAdaptor;
 using dialect::tile::TraceOp;
 
 namespace {
@@ -270,7 +270,7 @@ template <typename InnerPredicate>
 struct AnyComparandIs : Matcher {
   bool match(Operation *op) const final {
     SmallVector<Value, 4> allOperands(op->getOperands());
-    ContractionOpOperandAdaptor adaptor(allOperands);
+    ContractionOpAdaptor adaptor(allOperands);
     auto operands = adaptor.operands();
     InnerPredicate pred;
     return pred.match(operands[0].getType()) ||
@@ -316,7 +316,7 @@ struct FirstOperand {
 
 static Type promoteTypes(ConversionPatternRewriter &rewriter, Location loc,
                          ArrayRef<Value> operands, ArrayRef<Type> types,
-                         llvm::SmallVectorImpl<Value> *into) {
+                         SmallVectorImpl<Value> *into) {
   // First, determine the 'final' type that wins the promotion
   Type bestType;
   for (auto type : types) {
@@ -472,7 +472,7 @@ static void updateAffineMap(Operation *in, const PaddingInfo &padding) {
 
 static Value buildBroadcastLoad(OpBuilder &builder, Location loc, Value operand,
                                 unsigned outRank,
-                                llvm::Optional<PaddingInfo> maybePadding) {
+                                Optional<PaddingInfo> maybePadding) {
   auto body = builder.getBlock();
   auto defOp = operand.getDefiningOp();
   Attribute attr;
@@ -502,7 +502,7 @@ static Value buildBroadcastLoad(OpBuilder &builder, Location loc, Value operand,
 
 static Value buildSimpleStore(OpBuilder &builder, Location loc, Value scalar,
                               Value memRef,
-                              llvm::Optional<PaddingInfo> maybePadding) {
+                              Optional<PaddingInfo> maybePadding) {
   auto body = builder.getBlock();
   auto memRefType = memRef.getType().cast<MemRefType>();
   auto elementType = memRefType.getElementType();
@@ -676,7 +676,7 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
 
   LogicalResult match(Operation *op) const final {
     IVLOG(2, "ContractionOpConversion::match>");
-    if (auto cionOp = llvm::dyn_cast<ContractionOp>(op)) {
+    if (auto cionOp = dyn_cast<ContractionOp>(op)) {
       if (cionOp.combo() != comboKind) {
         return failure();
       }
@@ -703,7 +703,7 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
   void tryRewrite(ContractionOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const {
     // Create an adaptor
-    ContractionOpOperandAdaptor cionAdaptor(operands);
+    ContractionOpAdaptor cionAdaptor(operands);
     auto cionOperands = cionAdaptor.operands();
 
     auto loc = op.getLoc();
@@ -742,9 +742,9 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
         loc,
         /*resultTypes=*/ArrayRef<Type>{alloc.memRefType},
         /*lbMap=*/op.lowerBounds().getValue(),
-        /*lbArgs=*/llvm::ArrayRef<Value>{},
+        /*lbArgs=*/ArrayRef<Value>{},
         /*ubMap=*/ubMap,
-        /*ubArgs=*/llvm::ArrayRef<Value>{});
+        /*ubArgs=*/ArrayRef<Value>{});
 
     auto body = forOp.getBody();
     rewriter.setInsertionPointToStart(body);
@@ -753,11 +753,11 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
     // add constraints
     if (op.cons()) {
       auto cons = op.cons().getValue();
-      auto ifOp = rewriter.create<AffineIfOp>(
-          loc, TypeRange({alloc.memRefType}), cons, idxs, true);
+      auto ifOp = rewriter.create<AffineIfOp>(loc, TypeRange{alloc.memRefType},
+                                              cons, idxs, true);
       rewriter.create<AffineYieldOp>(loc, ifOp.getOperation()->getResults());
       rewriter.setInsertionPointToStart(&ifOp.elseRegion().front());
-      rewriter.create<AffineYieldOp>(loc, alloc.resultMemRef);
+      rewriter.create<AffineYieldOp>(loc, filled);
       rewriter.setInsertionPointToStart(&ifOp.thenRegion().front());
     }
 
@@ -814,7 +814,7 @@ struct IndexOpConversion : public OpConversionPattern<IndexOp> {
   using OpConversionPattern<IndexOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(IndexOp op, llvm::ArrayRef<Value> operands,
+  matchAndRewrite(IndexOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
     IVLOG(2, "IndexOpConversion::matchAndRewrite>");
 
@@ -829,16 +829,16 @@ struct IndexOpConversion : public OpConversionPattern<IndexOp> {
 
     // Make a parallel for loop to fill the result
     auto forOp = rewriter.create<AffineParallelOp>(
-        loc, ArrayRef<Type>({resultType}), resultType.getShape());
+        loc, ArrayRef<Type>{resultType}, resultType.getShape());
     auto body = forOp.getBody();
     rewriter.setInsertionPointToStart(body);
     auto idxs = body->getArguments();
 
     // Load the index value
-    // TODO: add check that dim is within range in verifier
-    auto dim = op.dim().getZExtValue();
+    // TODO: add check that axis is within range in verifier
+    auto axis = op.axis().getZExtValue();
     auto map = AffineMap::get(1, 0, {rewriter.getAffineDimExpr(0)});
-    auto apply = rewriter.create<mlir::AffineApplyOp>(loc, map, idxs[dim]);
+    auto apply = rewriter.create<mlir::AffineApplyOp>(loc, map, idxs[axis]);
 
     // Create the store
     auto cast = rewriter.create<mlir::IndexCastOp>(loc, apply,
@@ -858,12 +858,12 @@ struct ReshapeOpConversion : public OpConversionPattern<ReshapeOp> {
   using OpConversionPattern<ReshapeOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(ReshapeOp op, llvm::ArrayRef<Value> operands,
+  matchAndRewrite(ReshapeOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
     IVLOG(2, "ReshapeOpConversion::matchAndRewrite>");
 
     // Create an adaptor, to interpret the operands
-    ReshapeOpOperandAdaptor adaptor(operands);
+    ReshapeOpAdaptor adaptor(operands);
 
     auto tensor = adaptor.tensor();
 
@@ -879,12 +879,12 @@ struct ShapeOpConversion : public OpConversionPattern<ShapeOp> {
   using OpConversionPattern<ShapeOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(ShapeOp op, llvm::ArrayRef<Value> operands,
+  matchAndRewrite(ShapeOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
     IVLOG(2, "ShapeOpConversion::matchAndRewrite>");
 
     // Create an adaptor
-    ShapeOpOperandAdaptor adaptor(operands);
+    ShapeOpAdaptor adaptor(operands);
 
     // Gather some basic info
     auto loc = op.getLoc();
@@ -917,7 +917,7 @@ struct CastOpConversion : public OpConversionPattern<ew::CastOp> {
   using OpConversionPattern<ew::CastOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(ew::CastOp op, llvm::ArrayRef<Value> operands,
+  matchAndRewrite(ew::CastOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
     IVLOG(2, "CastOpConversion::matchAndRewrite>");
 
@@ -1141,8 +1141,7 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
         EltwiseOpConversion<ew::SelectOp, SelectOp>,
         EltwiseOpConversion<ew::IdentOp, FirstOperand>>(&getContext());
     // Run the conversion
-    if (failed(
-            applyFullConversion(getOperation(), target, patterns, nullptr))) {
+    if (failed(applyFullConversion(getOperation(), target, patterns))) {
       signalPassFailure();
       return;
     }

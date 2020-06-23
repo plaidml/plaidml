@@ -27,7 +27,6 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/DebugStringHelper.h"
-#include "mlir/Transforms/FoldUtils.h"
 #include "mlir/Transforms/Passes.h"
 
 #include "pmlc/dialect/eltwise/ir/ops.h"
@@ -58,10 +57,8 @@ using mlir::MemRefType;
 using mlir::MLIRContext;
 using mlir::ModuleOp;
 using mlir::OpBuilder;
-using mlir::OperationFolder;
 using mlir::PatternRewriter;
 using mlir::RankedTensorType;
-using mlir::RewritePatternMatcher;
 using mlir::Type;
 using mlir::UnknownLoc;
 using mlir::Value;
@@ -90,16 +87,6 @@ struct TileBuilder::Impl {
     builder.setInsertionPointToStart(module.getBody());
   }
 
-  Type inferElementType(ArrayRef<Type> types) {
-    Type ret;
-    for (auto type : types) {
-      auto rankedTensorType = eltwise::getRankedTensorType(type);
-      auto dtype = rankedTensorType.getElementType();
-      ret = eltwise::promoteTypes(ret, dtype);
-    }
-    return ret;
-  }
-
   const AbstractOperation *lookupOperation(StringRef op) {
     auto opName = eltwise::EltwiseDialect::getCanonicalOpName(op);
     auto abstractOp = AbstractOperation::lookup(opName, &context);
@@ -119,18 +106,19 @@ struct TileBuilder::Impl {
   }
 
   Value makeIndexOp(ArrayRef<Value> args) {
-    if (args.size() != 2) {
-      throw std::runtime_error("'index' primitive expects 2 operands");
-    }
-    auto tensor = args[0];
-    auto dim = args[1];
-    auto resultType = IndexOp::getResultType(args.take_front());
-    IntegerAttr dimAttr;
-    if (!m_Constant(&dimAttr).match(dim.getDefiningOp())) {
+    if (args.size() < 1) {
       throw std::runtime_error(
-          "'index' primitive expect argument 2 to be a constant integer");
+          "'index' primitive expects at least one operand");
     }
-    auto op = builder.create<IndexOp>(loc, resultType, tensor, dimAttr);
+    auto axis = args.front();
+    IntegerAttr axisAttr;
+    if (!m_Constant(&axisAttr).match(axis.getDefiningOp())) {
+      throw std::runtime_error(
+          "'index' primitive expects argument 1 to be a constant integer");
+    }
+    auto dims = args.drop_front();
+    auto resultType = IndexOp::getResultType(dims);
+    auto op = builder.create<IndexOp>(loc, resultType, axisAttr, dims);
     return op.result();
   }
 
@@ -557,24 +545,10 @@ Value TileBuilder::MakeContractionOp(AggregationKind agg, CombinationKind combo,
   IVLOG(5, "\n" << mlir::debugString(impl->module));
   // TODO: handle names (and idx_names)
   // Compute the sink shape of the contraction
-  SmallVector<Type, 3> types;
-  for (auto src : srcs) {
-    auto mapOp = llvm::cast<AffineTensorMapOp>(src.getDefiningOp());
-    types.push_back(mapOp.tensor().getType());
-  }
-  Type elementType;
-  if (combo == CombinationKind::eq) {
-    elementType = IntegerType::get(1, &impl->context);
-  } else if (combo == CombinationKind::cond) {
-    auto rankedTensorType = eltwise::getRankedTensorType(types[2]);
-    elementType = rankedTensorType.getElementType();
-  } else {
-    elementType = impl->inferElementType(types);
-  }
+  auto elementType = inferElementType(&impl->context, combo, srcs);
   auto sizeMapOp = llvm::cast<AffineMapOp>(sizes.getDefiningOp());
   SmallVector<Value, 4> sizeDims(sizeMapOp.dims());
-  auto shape = eltwise::ComputeShape(sizeDims);
-
+  auto shape = eltwise::getShapeFromOperands(sizeDims);
   StringAttr nameAttr;
   if (name.size()) {
     nameAttr = impl->builder.getStringAttr(name);
@@ -588,49 +562,6 @@ Value TileBuilder::MakeContractionOp(AggregationKind agg, CombinationKind combo,
       nameAttr);
   return op.result();
 }
-
-class MakeProgramDriver : public PatternRewriter {
-public:
-  MakeProgramDriver(MLIRContext *ctx, const OwningRewritePatternList &patterns)
-      : PatternRewriter(ctx), matcher(patterns), folder(ctx) {}
-
-  void run(FuncOp funcOp) {
-    funcOp.walk([&](Operation *op) {
-      // Try to fold this op.
-      if (succeeded(folder.tryToFold(op))) {
-        return;
-      }
-
-      // Make sure that any new operations are inserted at this point.
-      setInsertionPoint(op);
-
-      // Try to match one of the patterns.
-      matcher.matchAndRewrite(op, *this);
-    });
-  }
-
-private:
-  RewritePatternMatcher matcher;
-  OperationFolder folder;
-};
-
-struct MakeProgramPass
-    : public mlir::PassWrapper<MakeProgramPass, mlir::FunctionPass> {
-  void runOnFunction() final {
-    OwningRewritePatternList patterns;
-    auto context = &getContext();
-    for (auto op : context->getRegisteredOperations()) {
-      op->getCanonicalizationPatterns(patterns, context);
-    }
-
-    MakeProgramDriver driver(context, patterns);
-    driver.run(getFunction());
-  }
-
-  static std::unique_ptr<mlir::Pass> create() {
-    return std::make_unique<MakeProgramPass>();
-  }
-};
 
 std::shared_ptr<compiler::Program>
 TileBuilder::MakeProgram(StringRef name, const ProgramMutations &mutations,
@@ -691,7 +622,8 @@ TileBuilder::MakeProgram(StringRef name, const ProgramMutations &mutations,
           auto uniqueAttr = builder.getStringAttr(uniqueName);
           funcOp.setArgAttr(blockArg.getArgNumber(), attrName, uniqueAttr);
         }
-        IVLOG(5, "BlockArgument mapping: " << value << " -> " << blockArg);
+        IVLOG(5, "BlockArgument mapping: " << mlir::debugString(value) << " -> "
+                                           << blockArg.getArgNumber());
         mapper.map(value, blockArg);
         compiler::ProgramArgument programArg{
             true, value, value.getType().cast<RankedTensorType>()};
@@ -713,7 +645,6 @@ TileBuilder::MakeProgram(StringRef name, const ProgramMutations &mutations,
           auto oldResult = op->getResult(i);
           auto newResult = newOp->getResult(i);
           if (oldResult == value) {
-            IVLOG(5, "mapping: " << value << " -> " << newResult);
             IVLOG(6, "value: " << mlir::debugString(value));
             IVLOG(6, "newResult: " << mlir::debugString(newResult));
             mapper.map(value, newResult);
@@ -752,10 +683,22 @@ TileBuilder::MakeProgram(StringRef name, const ProgramMutations &mutations,
   }
   // Do some optimization passes
   mlir::PassManager pm(&impl->context);
+  if (VLOG_IS_ON(1)) {
+    pm.enableStatistics();
+    pm.enableTiming();
+    auto shouldPrintBeforePass = [](auto pass, auto op) { return false; };
+    auto shouldPrintAfterPass = [&](auto pass, auto op) {
+      return VLOG_IS_ON(3);
+    };
+    pm.getContext()->disableMultithreading();
+    pm.enableIRPrinting(shouldPrintBeforePass, shouldPrintAfterPass, true,
+                        false, llvm::errs());
+  }
   pm.addPass(createConstantTypesPass(concreteFloat, concreteInt));
-  pm.addPass(MakeProgramPass::create());
+  pm.addPass(createMakeProgramPass());
   pm.addPass(mlir::createCanonicalizerPass());
   pm.addPass(mlir::createCSEPass());
+  IVLOG(2, "Running tile builder passes");
   auto result = pm.run(module);
   if (failed(result)) {
     IVLOG(1, "\n" << mlir::debugString(module));

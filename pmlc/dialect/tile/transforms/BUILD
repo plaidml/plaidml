@@ -1,9 +1,9 @@
 # Copyright 2020 Intel Corporation.
 
-package(default_visibility = ["//visibility:public"])
-
 load("//bzl:plaidml.bzl", "plaidml_cc_library")
 load("//vendor/mlir:tblgen.bzl", "gentbl")
+
+package(default_visibility = ["//visibility:public"])
 
 gentbl(
     name = "gen-pass",
@@ -24,6 +24,7 @@ plaidml_cc_library(
     srcs = [
         "constant_types.cc",
         "contraction.cc",
+        "make_program.cc",
         "padding.cc",
         "pass_detail.h",
     ],
@@ -38,7 +39,7 @@ plaidml_cc_library(
         "//pmlc/util",
         "//pmlc/util/bilp",
         "//pmlc/util/math",
-        "@llvm-project//llvm:support",
+        "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
     ],
 )

@@ -29,8 +29,7 @@ namespace {
 class OpTest : public TestFixture {};
 
 Program makeProgram(const std::string& name, const std::vector<Tensor>& outputs) {
-  // TODO: remove empty target once all of these are passing.
-  return ProgramBuilder(name, outputs).target("").compile();
+  return ProgramBuilder(name, outputs).compile();
 }
 
 TEST(Op, Abs) {
@@ -103,28 +102,11 @@ module {
 )#"));
 }
 
-TEST(Op, Argmax) {
+TEST_F(OpTest, Argmax) {
   auto I = Placeholder(DType::FLOAT32, {1, 224, 224, 3}, "I");
   auto program = makeProgram("argmax", {op::argmax(I)});
-  IVLOG(1, program);
-  EXPECT_THAT(program, Eq(R"#(
-#map0 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
-#map1 = affine_map<() -> ()>
-
-
-module {
-  func @argmax(%arg0: tensor<1x224x224x3xf32> {tile.name = "I"}) -> ui32 {
-    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> f32
-    %c1 = "eltwise.sconst"() {value = 1 : i64} : () -> si32
-    %0 = tile.contract assign, none, %cst, %c1 {sink = #map0, srcs = [#map1]} : f32, si32 -> tensor<1x224x224x3xsi32>
-    %1 = "tile.index"(%0) {dim = 0 : i64} : (tensor<1x224x224x3xsi32>) -> tensor<1x224x224x3xsi32>
-    %2 = tile.contract max, none, %cst, %arg0 {sink = #map1, srcs = [#map0]} : f32, tensor<1x224x224x3xf32> -> f32
-    %3 = tile.contract max, cond, %cst, %arg0, %2, %1 {sink = #map1, srcs = [#map0, #map1, #map0]} : f32, tensor<1x224x224x3xf32>, f32, tensor<1x224x224x3xsi32> -> si32
-    %4 = "eltwise.cast"(%3) : (si32) -> ui32
-    return %4 : ui32
-  }
-}
-)#"));
+  IVLOG(1, "\n" << program);
+  runProgram(program);
 }
 
 TEST(Op, BinaryCrossentropy) {
@@ -152,6 +134,133 @@ module {
     %11 = "eltwise.mul"(%10, %9) : (tensor<7x7x3x64xf32>, tensor<7x7x3x64xf32>) -> tensor<7x7x3x64xf32>
     %12 = "eltwise.sub"(%11, %8) : (tensor<7x7x3x64xf32>, tensor<7x7x3x64xf32>) -> tensor<7x7x3x64xf32>
     return %12 : tensor<7x7x3x64xf32>
+  }
+}
+)#"));
+}
+
+TEST_F(OpTest, BroadcastNoOp) {
+  auto A = Placeholder(DType::FLOAT32, {3});
+  std::vector<int> rshape = {3};
+  std::vector<int> bdims = {0};
+  auto C = broadcast(A, rshape, bdims);
+  auto program = makeProgram("broadcast_nop", {C});
+
+  std::vector<float> A_input = {0, 1, 2};
+  checkProgram(program, {{A, A_input}}, {{C, A_input}});
+}
+
+TEST_F(OpTest, BroadcastScalar) {
+  auto A = Placeholder(DType::FLOAT32, {});
+  std::vector<int> rshape = {3, 4};
+  std::vector<int> bdims = {};
+  auto C = broadcast(A, rshape, bdims);
+  auto program = makeProgram("broadcast_scalar", {C});
+
+  std::vector<float> A_input = {3};
+  std::vector<float> C_output = {3, 3, 3, 3,  //
+                                 3, 3, 3, 3,  //
+                                 3, 3, 3, 3};
+  checkProgram(program, {{A, A_input}}, {{C, C_output}});
+}
+
+TEST_F(OpTest, BroadcastNoOpLarge) {
+  auto A = Placeholder(DType::FLOAT32, {3, 4});
+  std::vector<int> rshape = {3, 4};
+  std::vector<int> bdims = {0, 1};
+  auto C = broadcast(A, rshape, bdims);
+  auto program = makeProgram("broadcast_nop_large", {C});
+
+  std::vector<float> A_input = {0, 1, 2, 3,  //
+                                0, 1, 2, 3,  //
+                                0, 1, 2, 3};
+  checkProgram(program, {{A, A_input}}, {{C, A_input}});
+}
+
+TEST_F(OpTest, BroadcastNumpy) {
+  auto A = Placeholder(DType::FLOAT32, {1, 3, 3});
+  std::vector<int> rshape = {1, 4, 3, 3};
+  std::vector<int> bdims = {0, 2, 3};
+  auto C = broadcast(A, rshape, bdims);
+  auto program = makeProgram("broadcast_numpy", {C});
+
+  std::vector<float> A_input = {0, 1, 2,  //
+                                0, 1, 2,  //
+                                0, 1, 2};
+  std::vector<float> C_output = {0, 1, 2,  //
+                                 0, 1, 2,  //
+                                 0, 1, 2,  //
+                                 0, 1, 2,  //
+                                 0, 1, 2,  //
+                                 0, 1, 2,  //
+                                 0, 1, 2,  //
+                                 0, 1, 2,  //
+                                 0, 1, 2,  //
+                                 0, 1, 2,  //
+                                 0, 1, 2,  //
+                                 0, 1, 2};
+}
+
+TEST_F(OpTest, BroadcastNumpy2) {
+  auto A = Placeholder(DType::FLOAT32, {3, 1});
+  std::vector<int> rshape = {3, 4};
+  std::vector<int> bdims = {0, 1};
+  auto C = broadcast(A, rshape, bdims);
+  auto program = makeProgram("broadcast_numpy_2", {C});
+
+  std::vector<float> A_input = {0, 1, 2};
+  std::vector<float> C_output = {0, 0, 0, 0,  //
+                                 1, 1, 1, 1,  //
+                                 2, 2, 2, 2};
+  checkProgram(program, {{A, A_input}}, {{C, C_output}});
+}
+
+TEST_F(OpTest, BroadcastNumpy3) {
+  auto A = Placeholder(DType::FLOAT32, {3});
+  std::vector<int> rshape = {4, 3};
+  std::vector<int> bdims = {1};
+  auto C = broadcast(A, rshape, bdims);
+  auto program = makeProgram("broadcast_numpy_3", {C});
+
+  std::vector<float> A_input = {0, 1, 2};
+  std::vector<float> C_output = {0, 1, 2,  //
+                                 0, 1, 2,  //
+                                 0, 1, 2,  //
+                                 0, 1, 2};
+  checkProgram(program, {{A, A_input}}, {{C, C_output}});
+}
+
+TEST_F(OpTest, BroadcastNonNumpy) {
+  auto A = Placeholder(DType::FLOAT32, {3});
+  std::vector<int> rshape = {3, 4};
+  std::vector<int> bdims = {0};
+  auto C = broadcast(A, rshape, bdims);
+  auto program = makeProgram("broadcast_non_numpy", {C});
+
+  std::vector<float> A_input = {0, 1, 2};
+  std::vector<float> C_output = {0, 0, 0, 0,  //
+                                 1, 1, 1, 1,  //
+                                 2, 2, 2, 2};
+  checkProgram(program, {{A, A_input}}, {{C, C_output}});
+}
+
+TEST(Op, Broadcast) {
+  auto I = Placeholder(DType::FLOAT32, {1, 224, 224}, "I");
+  std::vector<int> result_shape = {1, 224, 224, 3};
+  std::vector<int> bcast_axes = {0, 1, 2};
+  auto program = makeProgram("broadcast", {op::broadcast(I, result_shape, bcast_axes)});
+  IVLOG(1, program);
+  EXPECT_THAT(program, Eq(R"#(
+
+#map0 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+#map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+
+
+module {
+  func @broadcast(%arg0: tensor<1x224x224xf32> {tile.name = "I"}) -> tensor<1x224x224x3xf32> {
+    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> tensor<f32>
+    %0 = tile.contract assign, none, %cst, %arg0 {idxs = ["x0", "x1", "x2", "x3"], sink = #map0, srcs = [#map1]} : tensor<f32>, tensor<1x224x224xf32> -> tensor<1x224x224x3xf32>
+    return %0 : tensor<1x224x224x3xf32>
   }
 }
 )#"));

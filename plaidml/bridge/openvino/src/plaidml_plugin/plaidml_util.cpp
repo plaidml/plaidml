@@ -4,12 +4,34 @@
 
 #include "plaidml_util.hpp"
 
+#include "ngraph/op/constant.hpp"
+
 #include "plaidml/edsl/edsl.h"
 
 using plaidml::edsl::LogicalShape;
 using namespace InferenceEngine;  // NOLINT[build/namespaces]
 
 namespace PlaidMLPlugin {
+
+ngraph::AxisSet get_axis_set_from_constant_operand(size_t operand_idx, ngraph::Node* layer) {
+  auto axis_ngraph_op =
+      std::dynamic_pointer_cast<ngraph::op::Constant>(layer->input_value(operand_idx).get_node_shared_ptr());
+  if (axis_ngraph_op) {
+    return axis_ngraph_op->get_axis_set_val();
+  } else {
+    THROW_IE_EXCEPTION << "Dynamic axis not currently supported by PlaidML plugin";
+  }
+}
+
+ngraph::AxisVector get_axis_vector_from_constant_operand(size_t operand_idx, ngraph::Node* layer) {
+  auto axis_ngraph_op =
+      std::dynamic_pointer_cast<ngraph::op::Constant>(layer->input_value(operand_idx).get_node_shared_ptr());
+  if (axis_ngraph_op) {
+    return axis_ngraph_op->get_axis_vector_val();
+  } else {
+    THROW_IE_EXCEPTION << "Dynamic axis not currently supported by PlaidML plugin";
+  }
+}
 
 plaidml::DType to_plaidml(const ngraph::element::Type& ng_type) {
   switch (ng_type) {
@@ -58,6 +80,26 @@ plaidml::op::AutoPadMode to_plaidml(const ngraph::op::PadType& ng_type) {
       return plaidml::op::AutoPadMode::VALID;
     default:
       THROW_IE_EXCEPTION << "Unsupported autopad type";
+  }
+}
+
+ngraph::Shape get_shape_from_constant_operand(size_t operand_idx, ngraph::Node* layer) {
+  auto shape_ngraph_op =
+      std::dynamic_pointer_cast<ngraph::op::Constant>(layer->input_value(operand_idx).get_node_shared_ptr());
+  if (shape_ngraph_op) {
+    return shape_ngraph_op->get_shape_val();
+  } else {
+    THROW_IE_EXCEPTION << "Dynamic shapes not currently supported by PlaidML plugin";
+  }
+}
+
+ngraph::Coordinate get_coords_from_constant_operand(size_t operand_idx, ngraph::Node* layer) {
+  auto coord_ngraph_op =
+      std::dynamic_pointer_cast<ngraph::op::Constant>(layer->input_value(operand_idx).get_node_shared_ptr());
+  if (coord_ngraph_op) {
+    return coord_ngraph_op->get_coordinate_val();
+  } else {
+    THROW_IE_EXCEPTION << "Dynamic coordinates not currently supported by PlaidML plugin";
   }
 }
 

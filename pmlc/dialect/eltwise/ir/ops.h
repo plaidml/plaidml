@@ -20,6 +20,7 @@ using mlir::AbstractOperation;
 using mlir::APInt;
 using mlir::ArrayRef;
 using mlir::Attribute;
+using mlir::DictionaryAttr;
 using mlir::FloatAttr;
 using mlir::FloatType;
 using mlir::IndexType;

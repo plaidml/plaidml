@@ -171,6 +171,16 @@ Type promoteTypes(Type lhs, Type rhs) {
   return typeScore(lhs) > typeScore(rhs) ? lhs : rhs;
 }
 
+Type inferElementType(ArrayRef<Type> types) {
+  Type ret;
+  for (auto type : types) {
+    auto rankedTensorType = getRankedTensorType(type);
+    auto dtype = rankedTensorType.getElementType();
+    ret = promoteTypes(ret, dtype);
+  }
+  return ret;
+}
+
 RankedTensorType getRankedTensorType(Type type) {
   if (auto rankedType = type.dyn_cast<RankedTensorType>()) {
     return rankedType;
@@ -214,7 +224,7 @@ Type ComputeResultType(ValueRange operands, Type override) {
   return ret;
 }
 
-SmallVector<int64_t, 4> ComputeShape(ArrayRef<Value> operands) {
+SmallVector<int64_t, 4> getShapeFromOperands(ArrayRef<Value> operands) {
   SmallVector<int64_t, 4> shape;
   for (auto operand : operands) {
     auto op = operand.getDefiningOp();

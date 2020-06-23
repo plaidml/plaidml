@@ -13,9 +13,29 @@ def Fusion : FunctionPass<"pxa-fusion"> {
   let constructor = "pmlc::dialect::pxa::createFusionPass()";
 }
 
+def Localize : FunctionPass<"pxa-localize"> {
+  let summary = "Push memref allocs to innermost scope";
+  let constructor = "pmlc::dialect::pxa::createLocalizePass()";
+}
+
 def MemRefDataFlowOpt : FunctionPass<"pxa-dataflow-opt"> {
   let summary = "Perform reduce/load forwarding for memrefs";
   let constructor = "pmlc::dialect::pxa::createMemRefDataFlowOptPass()";
+}
+
+def ResizeTmps : FunctionPass<"pxa-resize-tmps"> {
+  let summary = "Resize temporary buffers to minimal sizes";
+  let constructor = "pmlc::dialect::pxa::createResizeTmpsPass()";
+}
+
+def TestIndirectUsesIterator : Pass<"pxa-test-indirect-uses-iterator"> {
+  let summary = "Trace the IndirectUsesIterator";
+  let constructor = "pmlc::dialect::pxa::createTestIndirectUsesIteratorPass()";
+}
+
+def TestIndirectValuesIterator : Pass<"pxa-test-indirect-values-iterator"> {
+  let summary = "Trace the IndirectValuesIterator for unit tests";
+  let constructor = "pmlc::dialect::pxa::createTestIndirectValuesIteratorPass()";
 }
 
 def TestStrideInfo : Pass<"pxa-stride-info"> {

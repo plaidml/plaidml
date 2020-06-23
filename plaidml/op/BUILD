@@ -43,7 +43,7 @@ plaidml_cc_library(
         "//plaidml/edsl",
         "//plaidml/op/lib",
         "//pmlc/util",
-        "@llvm-project//llvm:support",
+        "@llvm-project//llvm:Support",
     ],
     alwayslink = 1,
 )

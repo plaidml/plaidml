@@ -4,9 +4,6 @@
 
 #include "llvm/Support/FormatVariadic.h"
 
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
-#include "mlir/IR/Builders.h"
-#include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/DebugStringHelper.h"
@@ -19,38 +16,13 @@
 #include "pmlc/util/logging.h"
 #include "pmlc/util/util.h"
 
-namespace pmlc::dialect::tile {
+using namespace mlir; // NOLINT
 
-using mlir::failure;
-using mlir::FloatType;
-using mlir::IntegerType;
-using mlir::LogicalResult;
-using mlir::OpRewritePattern;
-using mlir::OwningRewritePatternList;
-using mlir::PatternRewriter;
-using mlir::success;
-using mlir::Type;
+namespace pmlc::dialect::tile {
 
 using eltwise::ScalarConstantOp;
 
-class SimpleConstantRewriter : public PatternRewriter {
-public:
-  SimpleConstantRewriter(MLIRContext *ctx,
-                         const OwningRewritePatternList &patterns)
-      : PatternRewriter(ctx), matcher(patterns) {}
-  void run(mlir::FuncOp funcOp) {
-    funcOp.walk([&](Operation *op) {
-      // Set the insertion point.
-      setInsertionPoint(op);
-      // Match and rewrite.
-      matcher.matchAndRewrite(op, *this);
-    });
-  }
-
-private:
-  mlir::RewritePatternMatcher matcher;
-};
-
+namespace {
 struct ConstantTypesPass : public ConstantTypesBase<ConstantTypesPass> {
   ConstantTypesPass() {}
 
@@ -61,8 +33,8 @@ struct ConstantTypesPass : public ConstantTypesBase<ConstantTypesPass> {
 
   void notifyPassFailure() { signalPassFailure(); }
 
-  llvm::Optional<Type> floatType;
-  llvm::Optional<Type> integerType;
+  Type floatType;
+  Type integerType;
 };
 
 struct ConstantTypesRewriter : public OpRewritePattern<ScalarConstantOp> {
@@ -113,6 +85,7 @@ struct ConstantTypesRewriter : public OpRewritePattern<ScalarConstantOp> {
 };
 
 void ConstantTypesPass::runOnFunction() {
+  auto func = getFunction();
   auto *context = &getContext();
 
   if (!floatType) {
@@ -121,7 +94,7 @@ void ConstantTypesPass::runOnFunction() {
                     .Case("f16", FloatType::getF16(context))
                     .Case("f32", FloatType::getF32(context))
                     .Case("f64", FloatType::getF64(context));
-    IVLOG(1, "floatType: " << mlir::debugString(*floatType));
+    IVLOG(1, "floatType: " << debugString(floatType));
   }
 
   if (!integerType) {
@@ -136,22 +109,22 @@ void ConstantTypesPass::runOnFunction() {
             .Case("ui32", IntegerType::get(32, IntegerType::Unsigned, context))
             .Case("si64", IntegerType::get(64, IntegerType::Signed, context))
             .Case("ui64", IntegerType::get(64, IntegerType::Unsigned, context));
-    IVLOG(1, "integerType: " << mlir::debugString(*integerType));
+    IVLOG(1, "integerType: " << debugString(integerType));
   }
 
   OwningRewritePatternList patterns;
-  patterns.insert<ConstantTypesRewriter>(&getContext(), this, *floatType,
-                                         *integerType);
-  SimpleConstantRewriter simpleRewriter(context, patterns);
-  simpleRewriter.run(getFunction());
+  patterns.insert<ConstantTypesRewriter>(context, this, floatType, integerType);
+  applyPatternsAndFoldGreedily(func, patterns);
 }
 
-std::unique_ptr<mlir::Pass> createConstantTypesPass() {
+} // namespace
+
+std::unique_ptr<Pass> createConstantTypesPass() {
   return std::make_unique<ConstantTypesPass>();
 }
 
-std::unique_ptr<mlir::Pass> createConstantTypesPass(Type floatType,
-                                                    Type integerType) {
+std::unique_ptr<Pass> createConstantTypesPass(Type floatType,
+                                              Type integerType) {
   return std::make_unique<ConstantTypesPass>(floatType, integerType);
 }
 

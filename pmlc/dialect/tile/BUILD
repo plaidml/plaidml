@@ -1,8 +1,8 @@
 # Copyright 2019 Intel Corporation.
 
-package(default_visibility = ["//visibility:public"])
+load("//bzl:plaidml.bzl", "plaidml_cc_library")
 
-load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_test")
+package(default_visibility = ["//visibility:public"])
 
 plaidml_cc_library(
     name = "tile",
@@ -20,7 +20,7 @@ plaidml_cc_library(
         "//pmlc/dialect/tile/ir",
         "//pmlc/dialect/tile/transforms",
         "//pmlc/util",
-        "@llvm-project//llvm:support",
+        "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Analysis",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Transforms",

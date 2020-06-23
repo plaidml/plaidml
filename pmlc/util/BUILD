@@ -64,7 +64,7 @@ plaidml_cc_library(
         ":enums-gen",
         ":interfaces-gen",
         "@easylogging",
-        "@llvm-project//llvm:support",
+        "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
     ],
 )

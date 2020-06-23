@@ -23,6 +23,7 @@ using mlir::ArrayAttr;
 using mlir::ArrayRef;
 using mlir::Attribute;
 using mlir::BoolAttr;
+using mlir::DictionaryAttr;
 using mlir::FloatType;
 using mlir::IndexType;
 using mlir::IntegerAttr;
@@ -73,5 +74,8 @@ namespace SideEffects = mlir::SideEffects;
 #include "pmlc/dialect/tile/ir/ops.h.inc"
 
 #include "pmlc/dialect/tile/ir/dialect.h.inc"
+
+Type inferElementType(MLIRContext *context, CombinationKind combo,
+                      ValueRange srcs);
 
 } // namespace pmlc::dialect::tile

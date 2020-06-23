@@ -695,43 +695,6 @@ TEST_F(CppEdsl, UseDefault) {
   runProgram(program);
 }
 
-Tensor ArgMax(const Tensor& I) {
-  TensorDim X0, X1, X2;
-  TensorIndex x0, x1, x2;
-  I.bind_dims(X0, X1, X2);
-  auto Max = TensorOutput(X0, X2);
-  Max(x0, x2) >= I(x0, x1, x2);
-  Tensor One{1};
-  auto T = TensorOutput(X1);
-  T(x1) = One();
-  Tensor IX = index(T, 0);
-  auto O = TensorOutput(X0, X2);
-  O(x0, x2) >= cond(I(x0, x1, x2), Max(x0, x2), IX(x1));
-  return cast(O, DType::UINT32);
-}
-
-TEST_F(CppEdsl, ArgMax) {
-  auto I = Placeholder(DType::FLOAT32, {1, 10, 10});
-  auto X = ArgMax(I);
-  auto program = makeProgram("arg_max", {X});
-  EXPECT_THAT(X.compute_shape(), Eq(LogicalShape(DType::UINT32, {1, 10})));
-  // clang-format off
-  // CHECK-LABEL: CppEdsl.ArgMax
-  // CHECK: func @arg_max
-  // CHECK-DAG: %[[i64_min:.*]] = "eltwise.sconst"() {value = -9223372036854775808 : i64} : () -> tensor<si32>
-  // CHECK-DAG: %[[cst:.*]] = "eltwise.sconst"() {value = 0xFFF0000000000000 : f64} : () -> tensor<f32>
-  // CHECK-DAG: %[[c0:.*]] = "eltwise.sconst"() {value = 0 : i64} : () -> tensor<si32>
-  // CHECK-DAG: %[[c1:.*]] = "eltwise.sconst"() {value = 1 : i64} : () -> tensor<si32>
-  // CHECK: %{{.*}} = tile.contract assign, none, %[[c0]], %[[c1]] {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}]} : tensor<si32>, tensor<si32> -> tensor<10xsi32>
-  // CHECK: %{{.*}} = "tile.index"(%{{.*}}) {dim = 0 : i64} : (tensor<10xsi32>) -> tensor<10xsi32>
-  // CHECK: %{{.*}} = tile.contract max, none, %[[cst]], %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}]} : tensor<f32>, tensor<1x10x10xf32> -> tensor<1x10xf32>
-  // CHECK: %{{.*}} = tile.contract max, cond, %[[i64_min]], %{{.*}}, %{{.*}}, %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}, #map{{[0-9]+}}]} : tensor<si32>, tensor<1x10x10xf32>, tensor<1x10xf32>, tensor<10xsi32> -> tensor<1x10xsi32>
-  // CHECK: %{{.*}} = "eltwise.cast"(%{{.*}}) : (tensor<1x10xsi32>) -> tensor<1x10xui32>
-  // CHECK: return %{{.*}} : tensor<1x10xui32>
-  // clang-format on
-  runProgram(program);
-}
-
 Tensor Winograd(const Tensor& I, const Tensor& K, const Tensor& A, const Tensor& B, const Tensor& G) {
   TensorDim N, S, X, Y, CI, CO, BI, BO;
   I.bind_dims(N, X, Y, CI);
@@ -1110,7 +1073,7 @@ TEST_F(CppEdsl, Select) {
   // clang-format off
   // CHECK-LABEL: CppEdsl.Select
   // CHECK: func @select
-  // CHECK-DAG: %[[c0.*]] = "eltwise.sconst"() {value = 0 : i64} : () -> tensor<si32>
+  // CHECK-DAG: %[[c0:.*]] = "eltwise.sconst"() {value = 0 : i64} : () -> tensor<si32>
   // CHECK-DAG: %[[c1:.*]] = "eltwise.sconst"() {value = 1 : i64} : () -> tensor<si32>
   // CHECK: %{{.*}} = "eltwise.cmp_eq"(%{{.*}}, %[[c0]]) : (tensor<10x20xf32>, tensor<si32>) -> tensor<10x20xi1>
   // CHECK: %{{.*}} = "eltwise.select"(%{{.*}}, %[[c0]], %[[c1]]) : (tensor<10x20xi1>, tensor<si32>, tensor<si32>) -> tensor<10x20xsi32>

@@ -40,6 +40,6 @@ plaidml_cc_library(
     deps = [
         ":gen-ops",
         "//pmlc/util",
-        "@llvm-project//llvm:support",
+        "@llvm-project//llvm:Support",
     ],
 )

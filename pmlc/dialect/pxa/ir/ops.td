@@ -53,11 +53,12 @@ def AffineReduceOp : PXA_OpWithPP<"reduce", []> {
 
   let extraClassDeclaration = [{
     Value getMemRef() { return mem(); }
-    unsigned getMemRefOperandIndex() { return 2; }
+    unsigned getMemRefOperandIndex() { return 1; }
     void setMemRef(Value value) { setOperand(getMemRefOperandIndex(), value); }
     MemRefType getMemRefType() { return mem().getType().cast<MemRefType>(); }
     AffineMap getAffineMap() { return map(); }
     operand_range getMapOperands() { return idxs(); }
+    static StringRef getMapAttrName() { return "map"; }
     Value getValueToStore() { return val(); }
   }];
 }
