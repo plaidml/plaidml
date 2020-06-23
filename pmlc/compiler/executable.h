@@ -10,6 +10,7 @@
 namespace pmlc::compiler {
 
 enum class EngineKind {
+  Interpreter,
   MCJIT,
   OrcJIT,
 };

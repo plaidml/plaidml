@@ -8,6 +8,7 @@
 
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
 #include "llvm/ExecutionEngine/GenericValue.h"
+#include "llvm/ExecutionEngine/Interpreter.h"
 #include "llvm/ExecutionEngine/JITLink/JITLinkMemoryManager.h"
 #include "llvm/ExecutionEngine/MCJIT.h"
 #include "llvm/ExecutionEngine/ObjectCache.h"
@@ -153,8 +154,9 @@ using Function = void (*)(void **);
 
 struct EngineImpl {
   virtual ~EngineImpl() = default;
-  virtual Function compile(std::unique_ptr<llvm::Module> module,
-                           StringRef entryPoint) = 0;
+  virtual void compile(std::unique_ptr<llvm::Module> module,
+                       StringRef entryPoint) = 0;
+  virtual void invoke(ArrayRef<void *> args) = 0;
 };
 
 static void *tryResolveSymbol(StringRef symbol) {
@@ -179,25 +181,25 @@ static void *tryResolveSymbol(StringRef symbol) {
   return nullptr;
 }
 
+struct Runtime : public llvm::LegacyJITSymbolResolver {
+  llvm::JITSymbol findSymbol(const std::string &symbol) override {
+    auto ptr = tryResolveSymbol(symbol);
+    if (!ptr) {
+      throw std::runtime_error(
+          llvm::formatv("Could not find symbol: {0}", symbol));
+    }
+    auto addr = llvm::pointerToJITTargetAddress(ptr);
+    return llvm::JITEvaluatedSymbol(addr, llvm::JITSymbolFlags::None);
+  }
+
+  llvm::JITSymbol findSymbolInLogicalDylib(const std::string &) override {
+    return llvm::JITSymbol(nullptr);
+  }
+};
+
 struct MCJITEngineImpl : EngineImpl {
-  struct Runtime : public llvm::LegacyJITSymbolResolver {
-    llvm::JITSymbol findSymbol(const std::string &symbol) override {
-      auto ptr = tryResolveSymbol(symbol);
-      if (!ptr) {
-        throw std::runtime_error(
-            llvm::formatv("Could not find symbol: {0}", symbol));
-      }
-      auto addr = llvm::pointerToJITTargetAddress(ptr);
-      return llvm::JITEvaluatedSymbol(addr, llvm::JITSymbolFlags::None);
-    }
-
-    llvm::JITSymbol findSymbolInLogicalDylib(const std::string &) override {
-      return llvm::JITSymbol(nullptr);
-    }
-  };
-
-  Function compile(std::unique_ptr<llvm::Module> module,
-                   StringRef entryPoint) final {
+  void compile(std::unique_ptr<llvm::Module> module,
+               StringRef entryPoint) final {
     std::string error;
     std::unique_ptr<llvm::LegacyJITSymbolResolver> resolver(new Runtime);
     engine = std::unique_ptr<llvm::ExecutionEngine>(
@@ -218,15 +220,58 @@ struct MCJITEngineImpl : EngineImpl {
     if (!addr) {
       throw std::runtime_error("getFunctionAddress failed");
     }
-    return reinterpret_cast<Function>(addr);
+    jitEntry = reinterpret_cast<Function>(addr);
+  }
+
+  void invoke(ArrayRef<void *> args) final {
+    jitEntry(const_cast<void **>(args.data()));
   }
 
   std::unique_ptr<llvm::ExecutionEngine> engine;
+  Function jitEntry;
+};
+
+struct InterpreterEngineImpl : EngineImpl {
+  void compile(std::unique_ptr<llvm::Module> owner,
+               StringRef entryPoint) final {
+    llvm::DebugFlag = true;
+    std::string error;
+    auto *module = owner.get();
+    std::unique_ptr<llvm::LegacyJITSymbolResolver> resolver(new Runtime);
+    engine = std::unique_ptr<llvm::ExecutionEngine>(
+        llvm::EngineBuilder(std::move(owner))
+            .setErrorStr(&error)
+            // .setOptLevel(llvm::CodeGenOpt::Aggressive)
+            .setEngineKind(llvm::EngineKind::Interpreter)
+            .setVerifyModules(true)
+            .setSymbolResolver(std::move(resolver))
+            .create());
+    if (!engine) {
+      throw std::runtime_error("Failed to create ExecutionEngine: " + error);
+    }
+
+    entryFn = module->getFunction(entryPoint.str());
+    if (!entryFn) {
+      throw std::runtime_error(
+          llvm::formatv("'{0}' function not found in module.", entryPoint));
+    }
+  }
+
+  void invoke(ArrayRef<void *> args) final {
+    std::vector<llvm::GenericValue> values(args.size());
+    for (unsigned i = 0; i < args.size(); i++) {
+      values[i] = llvm::GenericValue{args[i]};
+    }
+    engine->runFunction(entryFn, values);
+  }
+
+  std::unique_ptr<llvm::ExecutionEngine> engine;
+  llvm::Function *entryFn;
 };
 
 struct OrcJITEngineImpl : EngineImpl {
-  Function compile(std::unique_ptr<llvm::Module> module,
-                   StringRef entryPoint) final {
+  void compile(std::unique_ptr<llvm::Module> module,
+               StringRef entryPoint) final {
     std::unique_ptr<llvm::LLVMContext> ctx(new llvm::LLVMContext);
     auto dataLayout = module->getDataLayout();
 
@@ -263,11 +308,16 @@ struct OrcJITEngineImpl : EngineImpl {
     }
 
     auto addr = expectedSymbol->getAddress();
-    return reinterpret_cast<Function>(addr);
+    jitEntry = reinterpret_cast<Function>(addr);
+  }
+
+  void invoke(ArrayRef<void *> args) final {
+    jitEntry(const_cast<void **>(args.data()));
   }
 
   std::unique_ptr<llvm::orc::LLJIT> jit;
-}; // namespace pmlc::compiler
+  Function jitEntry;
+};
 
 struct ExecutableImpl {
   ExecutableImpl(const std::shared_ptr<Program> &program,
@@ -279,9 +329,13 @@ struct ExecutableImpl {
       llvm::InitializeNativeTargetAsmPrinter();
       initializeLLVMPasses();
       llvm::sys::DynamicLibrary::LoadLibraryPermanently(nullptr);
+      LLVMLinkInInterpreter();
     });
 
     switch (kind) {
+    case EngineKind::Interpreter:
+      impl = std::make_unique<InterpreterEngineImpl>();
+      break;
     case EngineKind::MCJIT:
       impl = std::make_unique<MCJITEngineImpl>();
       break;
@@ -308,11 +362,8 @@ struct ExecutableImpl {
       llvmModule->print(llvm::errs(), nullptr);
     }
 
-    jitEntry = impl->compile(std::move(llvmModule),
-                             makePackedFunctionName(program->entry));
-    if (!jitEntry) {
-      throw std::runtime_error("jitEntry function is null");
-    }
+    impl->compile(std::move(llvmModule),
+                  makePackedFunctionName(program->entry));
 
     descriptors.reserve(bufptrs.size());
     for (unsigned i = 0; i < bufptrs.size(); i++) {
@@ -321,13 +372,12 @@ struct ExecutableImpl {
     }
   }
 
-  void invoke() { jitEntry(ptrs.data()); }
+  void invoke() { impl->invoke(ptrs); }
 
   std::shared_ptr<Program> program;
   std::unique_ptr<EngineImpl> impl;
   std::vector<MemRefDescriptor> descriptors;
   std::vector<void *> ptrs;
-  Function jitEntry;
 };
 
 Executable::Executable(const std::shared_ptr<Program> &program,

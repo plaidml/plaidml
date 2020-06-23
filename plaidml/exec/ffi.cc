@@ -121,6 +121,8 @@ plaidml_executable* plaidml_jit(  //
       kind = EngineKind::OrcJIT;
     } else if (jit == "MCJIT") {
       kind = EngineKind::MCJIT;
+    } else if (jit == "Interpreter") {
+      kind = EngineKind::Interpreter;
     }
     exec->exec = std::make_unique<Executable>(program->program, bufptrs, kind);
     return exec.release();

@@ -30,7 +30,7 @@ using namespace mlir; // NOLINT[build/namespaces]
 namespace pmlc::target::x86 {
 
 std::unique_ptr<Pass> createXSMMStencilPass() {
-  auto numThreads = std::thread::hardware_concurrency();
+  auto numThreads = 1; // std::thread::hardware_concurrency();
   return pmlc::dialect::pxa::createXSMMStencilPass(numThreads, heatmapCost);
 }
 
@@ -91,7 +91,7 @@ struct ConvertToLLVMPass
 
     OwningRewritePatternList patterns;
     populateStdToLLVMBarePtrConversionPatterns(typeConverter, patterns,
-                                               /*useAlignedAlloc=*/false);
+                                               /*useAlignedAlloc=*/true);
     conversion::stdx_to_llvm::populateStdXToLLVMConversionPatterns(
         typeConverter, patterns);
 
@@ -109,7 +109,7 @@ struct ConvertToLLVMPass
 
 void addToPipeline(OpPassManager &pm) {
   pm.addPass(pmlc::dialect::tile::createComputeBoundsPass());
-  pm.addPass(pmlc::dialect::tile::createPadPass());
+  // pm.addPass(pmlc::dialect::tile::createPadPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
@@ -117,8 +117,8 @@ void addToPipeline(OpPassManager &pm) {
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
-  pm.addPass(pmlc::dialect::pxa::createXSMMStencilPass(1, heatmapCost));
-  pm.addPass(createXSMMLoweringPass());
+  // pm.addPass(pmlc::dialect::pxa::createXSMMStencilPass(1, heatmapCost));
+  // pm.addPass(createXSMMLoweringPass());
 
   // FIXME: these passes cause test failures (correctness or otherwise)
   // pm.addPass(pmlc::dialect::pxa::createFusionPass());

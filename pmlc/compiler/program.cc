@@ -99,8 +99,15 @@ void Program::compile(StringRef target, bool collectPasses) {
   if (VLOG_IS_ON(1)) {
     pm.enableStatistics();
     pm.enableTiming();
-    auto shouldPrintBeforePass = [](auto pass, auto op) { return false; };
-    auto shouldPrintAfterPass = [&](auto pass, auto op) {
+    auto shouldPrintBeforePass = [](Pass *pass, Operation *op) {
+      return false;
+    };
+    auto shouldPrintAfterPass = [&](Pass *pass, Operation *op) {
+      if (auto funcOp = dyn_cast<FuncOp>(op)) {
+        if (funcOp.isExternal()) {
+          return false;
+        }
+      }
       return VLOG_IS_ON(3);
     };
     pm.getContext()->disableMultithreading();

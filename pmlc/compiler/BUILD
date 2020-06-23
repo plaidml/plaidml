@@ -1,8 +1,8 @@
 # Copyright 2020 Intel Corporation
 
-package(default_visibility = ["//visibility:public"])
-
 load("//bzl:plaidml.bzl", "plaidml_cc_library")
+
+package(default_visibility = ["//visibility:public"])
 
 plaidml_cc_library(
     name = "compiler",
@@ -12,6 +12,7 @@ plaidml_cc_library(
         "//pmlc/util",
         "@llvm-project//llvm:ExecutionEngine",
         "@llvm-project//llvm:IPO",
+        "@llvm-project//llvm:Interpreter",
         "@llvm-project//llvm:MCJIT",
         "@llvm-project//llvm:OrcJIT",
         "@llvm-project//llvm:X86AsmParser",
