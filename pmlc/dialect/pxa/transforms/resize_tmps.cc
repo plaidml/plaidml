@@ -40,7 +40,7 @@ struct ResizeTmpsPass : public ResizeTmpsBase<ResizeTmpsPass> {
 
     SmallVector<StrideInfo, 4> outer;
     SmallVector<StrideRange, 4> inner;
-    for (auto &use : AccessIndirectUses(op)) {
+    for (auto &use : getIndirectAccessUses(op)) {
       IVLOG(2, "Found use: " << debugString(*use.getOwner()));
       Optional<SmallVector<StrideInfo, 4>> maybeStrides;
       if (auto lop = dyn_cast<AffineLoadOp>(use.getOwner())) {
@@ -128,11 +128,11 @@ struct ResizeTmpsPass : public ResizeTmpsBase<ResizeTmpsPass> {
     auto newType = MemRefType::get(newShape, op.getType().getElementType());
     op.getResult().setType(newType);
     // Update type on all definitions
-    for (auto &def : IndirectDefs(op.getResult())) {
-      def.setType(newType);
+    for (auto value : getIndirectValues(op.getResult())) {
+      value.setType(newType);
     }
     // Update all of the access maps
-    for (auto &use : AccessIndirectUses(op.getResult())) {
+    for (auto &use : getIndirectAccessUses(op.getResult())) {
       if (auto rop = dyn_cast<AffineReduceOp>(use.getOwner())) {
         auto map =
             computeInnerMap(rop.getAffineMap(), rop.getMapOperands(), opBlock);

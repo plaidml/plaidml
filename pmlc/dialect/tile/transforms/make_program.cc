@@ -15,7 +15,9 @@ namespace {
 class MakeProgramDriver : public PatternRewriter {
 public:
   MakeProgramDriver(MLIRContext *ctx, const OwningRewritePatternList &patterns)
-      : PatternRewriter(ctx), matcher(patterns), folder(ctx) {}
+      : PatternRewriter(ctx), matcher(patterns), folder(ctx) {
+    matcher.applyDefaultCostModel();
+  }
 
   void run(FuncOp funcOp) {
     funcOp.walk([&](Operation *op) {
@@ -33,7 +35,7 @@ public:
   }
 
 private:
-  RewritePatternMatcher matcher;
+  PatternApplicator matcher;
   OperationFolder folder;
 };
 

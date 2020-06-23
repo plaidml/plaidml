@@ -143,7 +143,7 @@ struct ReshapeLowering : public LLVMLegalizationPattern<stdx::ReshapeOp> {
       return failure();
 
     edsc::ScopedContext context(rewriter, op->getLoc());
-    stdx::ReshapeOpOperandAdaptor adaptor(operands);
+    stdx::ReshapeOpAdaptor adaptor(operands);
     BaseViewConversionHelper baseDesc(adaptor.tensor());
     BaseViewConversionHelper desc(typeConverter.convertType(dstType));
     desc.setAllocatedPtr(baseDesc.allocatedPtr());
@@ -173,8 +173,7 @@ struct LowerToLLVMPass : public LowerToLLVMBase<LowerToLLVMPass> {
 
     ConversionTarget target(*context);
     target.addLegalDialect<LLVM::LLVMDialect>();
-    if (failed(
-            applyPartialConversion(module, target, patterns, &typeConverter))) {
+    if (failed(applyPartialConversion(module, target, patterns))) {
       signalPassFailure();
     }
   }
@@ -184,7 +183,8 @@ struct LowerToLLVMPass : public LowerToLLVMBase<LowerToLLVMPass> {
 
 void populateStdXToLLVMConversionPatterns(LLVMTypeConverter &converter,
                                           OwningRewritePatternList &patterns) {
-  patterns.insert<FPToUILowering, ReshapeLowering>(*converter.getDialect(), converter);
+  patterns.insert<FPToUILowering, ReshapeLowering>(*converter.getDialect(),
+                                                   converter);
 }
 
 std::unique_ptr<mlir::Pass> createLowerToLLVMPass() {

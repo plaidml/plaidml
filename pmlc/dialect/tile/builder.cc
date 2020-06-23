@@ -59,7 +59,6 @@ using mlir::ModuleOp;
 using mlir::OpBuilder;
 using mlir::PatternRewriter;
 using mlir::RankedTensorType;
-using mlir::RewritePatternMatcher;
 using mlir::Type;
 using mlir::UnknownLoc;
 using mlir::Value;
@@ -549,8 +548,7 @@ Value TileBuilder::MakeContractionOp(AggregationKind agg, CombinationKind combo,
   auto elementType = inferElementType(&impl->context, combo, srcs);
   auto sizeMapOp = llvm::cast<AffineMapOp>(sizes.getDefiningOp());
   SmallVector<Value, 4> sizeDims(sizeMapOp.dims());
-  auto shape = eltwise::ComputeShape(sizeDims);
-
+  auto shape = eltwise::getShapeFromOperands(sizeDims);
   StringAttr nameAttr;
   if (name.size()) {
     nameAttr = impl->builder.getStringAttr(name);
@@ -624,7 +622,8 @@ TileBuilder::MakeProgram(StringRef name, const ProgramMutations &mutations,
           auto uniqueAttr = builder.getStringAttr(uniqueName);
           funcOp.setArgAttr(blockArg.getArgNumber(), attrName, uniqueAttr);
         }
-        IVLOG(5, "BlockArgument mapping: " << value << " -> " << blockArg);
+        IVLOG(5, "BlockArgument mapping: " << mlir::debugString(value) << " -> "
+                                           << blockArg.getArgNumber());
         mapper.map(value, blockArg);
         compiler::ProgramArgument programArg{
             true, value, value.getType().cast<RankedTensorType>()};
@@ -646,7 +645,6 @@ TileBuilder::MakeProgram(StringRef name, const ProgramMutations &mutations,
           auto oldResult = op->getResult(i);
           auto newResult = newOp->getResult(i);
           if (oldResult == value) {
-            IVLOG(5, "mapping: " << value << " -> " << newResult);
             IVLOG(6, "value: " << mlir::debugString(value));
             IVLOG(6, "newResult: " << mlir::debugString(newResult));
             mapper.map(value, newResult);
@@ -700,6 +698,7 @@ TileBuilder::MakeProgram(StringRef name, const ProgramMutations &mutations,
   pm.addPass(createMakeProgramPass());
   pm.addPass(mlir::createCanonicalizerPass());
   pm.addPass(mlir::createCSEPass());
+  IVLOG(2, "Running tile builder passes");
   auto result = pm.run(module);
   if (failed(result)) {
     IVLOG(1, "\n" << mlir::debugString(module));
