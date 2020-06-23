@@ -835,26 +835,23 @@ module {
 )#"));
 }
 
-TEST(Op, Slice) {
+TEST_F(OpTest, Slice) {
   auto A = Placeholder(DType::FLOAT32, {10, 20}, "A");
-  auto X = op::slice(  //
-      A,               // tensor to perform spatial padding on
-      {2, 10});        // slices
+  auto X = op::slice(A)  //
+               .add_dims({2, 10});
   auto program = makeProgram("slice", {X});
   IVLOG(1, program);
-  EXPECT_THAT(program, Eq(R"#(
-#map0 = affine_map<() -> ()>
-#map1 = affine_map<() -> (2, 10)>
-
-
-module {
-  func @slice(%arg0: tensor<10x20xf32> {tile.name = "A"}) -> f32 {
-    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> f32
-    %0 = tile.contract assign, none, %cst, %arg0 {sink = #map0, srcs = [#map1]} : f32, tensor<10x20xf32> -> f32
-    return %0 : f32
-  }
+  runProgram(program);
 }
-)#"));
+
+TEST_F(OpTest, Slice2) {
+  auto A = Placeholder(DType::FLOAT32, {10, 20}, "A");
+  auto X = op::slice(A)  //
+               .add_dim(0, 2)
+               .add_dim(2, 8, 2);
+  auto program = makeProgram("slice", {X});
+  IVLOG(1, program);
+  runProgram(program);
 }
 
 TEST(Op, Softmax) {
