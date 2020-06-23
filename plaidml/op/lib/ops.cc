@@ -325,6 +325,42 @@ std::pair<TensorDim, TensorDim> compute_padding_and_output_size(  //
   throw std::runtime_error(llvm::formatv("Unexpected autopadding mode: {0}", to_string(autopad_mode)));
 }
 
+std::pair<TensorDim, TensorDim> compute_padding_and_input_size(  //
+    const TensorDim& output_size,                                //
+    const TensorDim& filter_size,                                //
+    int64_t stride,                                              //
+    AutoPadMode autopad_mode,                                    //
+    int64_t pad_lo,                                              //
+    int64_t pad_hi,                                              //
+    int64_t dilation,                                            //
+    int64_t data_dilation) {
+  // Note that this computes the smallest input_size that would produce the given output_size
+
+  if (data_dilation != 1) {
+    throw std::runtime_error("Cannot infer input data size for transposed convolution with data dilation");
+  }
+
+  auto O_eff = output_size;
+  auto F_eff = (dilation * (filter_size - 1)) + 1;  // Effective Filter Size
+  if (autopad_mode == AutoPadMode::NONE) {
+    TensorDim pad_before(pad_lo);
+    TensorDim input_size(O_eff * stride - pad_lo - pad_hi + F_eff - stride);
+    return std::pair<TensorDim, TensorDim>(pad_before, input_size);
+  }
+  if (autopad_mode == AutoPadMode::VALID) {
+    TensorDim pad_before(0);
+    TensorDim input_size(O_eff * stride + F_eff - stride);
+    return std::pair<TensorDim, TensorDim>(pad_before, input_size);
+  }
+  if (autopad_mode == AutoPadMode::SAME_LOWER || autopad_mode == AutoPadMode::SAME_UPPER) {
+    TensorDim input_size(O_eff * stride - stride + 1);
+    int64_t lower_term = (autopad_mode == AutoPadMode::SAME_LOWER) ? 1 : 0;
+    TensorDim pad_before((max(0, (O_eff - 1) * stride + F_eff - input_size) + lower_term) / 2);
+    return std::pair<TensorDim, TensorDim>(pad_before, output_size);
+  }
+  throw std::runtime_error(llvm::formatv("Unexpected autopadding mode: {0}", to_string(autopad_mode)));
+}
+
 std::vector<int64_t>* extend_manual_padding(std::vector<int64_t>* pads, size_t rank) {
   // TODO: Perhaps we should throw for sizes != 0, rank, 2*rank?
   if (pads->size() > 2 * rank) {
@@ -714,11 +750,14 @@ void validate_conv_group_layout(TensorLayout filter_layout, GroupLayout group_la
 }
 
 void validate_conv_result_shape(size_t spatial_rank, const std::vector<int64_t>& result_shape, ConvDerivMode deriv_mode,
-                                std::stringstream& args_log) {
+                                bool infer_result_shape, std::stringstream& args_log) {
   if (result_shape.empty()) {
-    if (deriv_mode != ConvDerivMode::NONE) {
+    if (deriv_mode != ConvDerivMode::NONE && !infer_result_shape) {
       IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
-      throw std::runtime_error("Transposed/gradient convolutions require specifying the result_shape");
+      throw std::runtime_error(
+          "Transposed/gradient convolutions require specifying the result_shape. This can be bypassed by setting "
+          "infer_result_shape = true, but be warned that infered result shapes do not necessarily match the input "
+          "shape used in the forward convolution, as multiple input shapes produce the same output shape.");
     }
   } else {
     if (result_shape.size() != spatial_rank) {
@@ -816,22 +855,24 @@ Value convolution(const Value& value) {
   // 14. Autogrouping (? Unclear if we really need this)
   // 15. Deriv Mode (DATA is equivalent to transposed conv)
   // 16. Result Shape (a.k.a. output shape, used for transposed/derivative convs)
+  // 17. Infer Result Shape (is it legal to omit result shape for transposed convs)
 
   // Read Arguments
   auto args = value.as_tuple();
-  if (args.size() != 17) {
-    throw std::runtime_error("Convolution op expects 17 arguments");
+  if (args.size() != 18) {
+    throw std::runtime_error("Convolution op expects 18 arguments");
   }
   auto I_or_O = args[0].as_tensor();  // O if deriv_mode is DATA, else I
   auto F_or_O = args[1].as_tensor();  // O if deriv_mode is FILTER, else F
-  auto strides = args[2].as_int_tuple();
-  auto dilations = args[3].as_int_tuple();
-  auto data_dilations = args[4].as_int_tuple();
+  auto strides = args[2].as_int_tuple_or_empty();
+  auto dilations = args[3].as_int_tuple_or_empty();
+  auto data_dilations = args[4].as_int_tuple_or_empty();
   // TODO: Perhaps could upgrade use of filter_shape?
-  auto filter_shape = args[5].as_int_tuple();  // This is the shape of the _spatial_ filter dims _only_
-  auto groups = args[6].as_int();              // will be 1 for non-grouped convolutions
+  // This is the shape of the _spatial_ filter dims _only_
+  auto filter_shape = args[5].as_int_tuple_or_empty();
+  auto groups = args[6].as_int();  // will be 1 for non-grouped convolutions
   auto autopad_mode = validate<AutoPadMode>(args[7].as_int());
-  auto manual_padding = args[8].as_int_tuple();
+  auto manual_padding = args[8].as_int_tuple_or_empty();
   auto input_layout = validate<TensorLayout>(args[9].as_int());
   auto filter_layout = validate<TensorLayout>(args[10].as_int());
   auto group_layout = validate<GroupLayout>(args[11].as_int());
@@ -839,7 +880,8 @@ Value convolution(const Value& value) {
   auto name = args[13].as_str();
   auto autogroup_mode = validate<AutoGroupMode>(args[14].as_int());
   auto deriv_mode = validate<ConvDerivMode>(args[15].as_int());
-  auto result_shape = args[16].as_int_tuple();
+  auto result_shape = args[16].as_int_tuple_or_empty();
+  auto infer_result_shape = args[17].as_bool();
 
   // Construct a string to log the arguments if something throws
   std::stringstream args_log;
@@ -900,7 +942,7 @@ Value convolution(const Value& value) {
   validate_conv_filter_rank(spatial_rank, F, filter_layout, deriv_mode, args_log);
   validate_conv_filter_shape_rank(spatial_rank, filter_shape, args_log);
   validate_conv_group_layout(filter_layout, group_layout, args_log);
-  validate_conv_result_shape(spatial_rank, result_shape, deriv_mode, args_log);
+  validate_conv_result_shape(spatial_rank, result_shape, deriv_mode, infer_result_shape, args_log);
   extend_manual_padding(&manual_padding, spatial_rank);
   if (name.empty()) {
     name = "conv";
@@ -916,16 +958,16 @@ Value convolution(const Value& value) {
   TensorIndex co("co");
   TensorIndex g("g");
   // The spatial dimensions of I
-  std::vector<TensorDim> X(spatial_rank);
+  std::vector<TensorDim> I_spatial_dims(spatial_rank);
   // The spatial indexes of I
   std::vector<TensorIndex> x;
   for (size_t i = 0; i < spatial_rank; ++i) {
     x.emplace_back(TensorIndex(llvm::formatv("x{0}", i)));
   }
   // The spatial dimensions of O; nearly unused
-  std::vector<TensorDim> Y(spatial_rank);
+  std::vector<TensorDim> O_spatial_dims(spatial_rank);
   // The spatial dimensions of F
-  std::vector<TensorDim> K(spatial_rank);
+  std::vector<TensorDim> F_spatial_dims(spatial_rank);
   // The spatial indexs of F
   std::vector<TensorIndex> k;
   for (size_t i = 0; i < spatial_rank; ++i) {
@@ -1006,13 +1048,13 @@ Value convolution(const Value& value) {
         I_dims.push_back(N);
         I_dims.push_back(CI);
         for (size_t i = 0; i < spatial_rank; ++i) {
-          I_dims.push_back(X[i]);
+          I_dims.push_back(I_spatial_dims[i]);
         }
         break;
       case TensorLayout::NXC:
         I_dims.push_back(N);
         for (size_t i = 0; i < spatial_rank; ++i) {
-          I_dims.push_back(X[i]);
+          I_dims.push_back(I_spatial_dims[i]);
         }
         I_dims.push_back(CI);
         break;
@@ -1036,7 +1078,7 @@ Value convolution(const Value& value) {
         F_dims.push_back(F_CI);
         F_explicit_dims.push_back(F_CI);
         for (size_t i = 0; i < spatial_rank; ++i) {
-          F_dims.push_back(K[i]);
+          F_dims.push_back(F_spatial_dims[i]);
           if (filter_shape.size()) {
             F_explicit_dims.push_back(TensorDim(filter_shape[i]));
           }
@@ -1045,7 +1087,7 @@ Value convolution(const Value& value) {
       case TensorLayout::XCK:
       case TensorLayout::XGCK:
         for (size_t i = 0; i < spatial_rank; ++i) {
-          F_dims.push_back(K[i]);
+          F_dims.push_back(F_spatial_dims[i]);
           if (filter_shape.size()) {
             F_explicit_dims.push_back(TensorDim(filter_shape[i]));
           }
@@ -1078,13 +1120,13 @@ Value convolution(const Value& value) {
         O_dims.push_back(N);
         O_dims.push_back(CO);
         for (size_t i = 0; i < spatial_rank; ++i) {
-          O_dims.push_back(Y[i]);
+          O_dims.push_back(O_spatial_dims[i]);
         }
         break;
       case TensorLayout::NXC:
         O_dims.push_back(N);
         for (size_t i = 0; i < spatial_rank; ++i) {
-          O_dims.push_back(Y[i]);
+          O_dims.push_back(O_spatial_dims[i]);
         }
         O_dims.push_back(CO);
         break;
@@ -1115,18 +1157,58 @@ Value convolution(const Value& value) {
   }
 
   // Determine the padding and the shape of the result tensor
+  // Note that this is a different shape computed in a different way depending on the DerivMode. In most cases with DATA
+  // and FILTER, `result_shape` will be set, in which case we use the NONE mode logic for the fully determined padding
+  // amounts it enables. If we need to we can infer result_shape for these cases (currently only implemented for DATA),
+  // but we have to make the assumption that the size is the minimal possible, so we avoid this path where possible.
   std::vector<TensorDim> pad_before;
-  std::vector<TensorDim> O_spatial_dims;
+  // Replace the unset defaults
+  switch (deriv_mode) {
+    case ConvDerivMode::NONE:
+      O_spatial_dims.clear();
+      break;
+    case ConvDerivMode::DATA:
+      I_spatial_dims.clear();
+      break;
+    default:
+      break;
+  }
   for (size_t i = 0; i < spatial_rank; ++i) {
     TensorDim local_pad_before;
     TensorDim local_output_size;
-    TensorDim local_input_size = (deriv_mode == ConvDerivMode::DATA) ? TensorDim(result_shape[i]) : X[i];
-    TensorDim local_filter_size = (deriv_mode == ConvDerivMode::FILTER) ? TensorDim(result_shape[i]) : K[i];
-    std::tie(local_pad_before, local_output_size) = compute_padding_and_output_size(
-        local_input_size, local_filter_size, strides[i], autopad_mode, manual_padding[i],
-        manual_padding[i + spatial_rank], dilations[i], data_dilations[i], false);
-    pad_before.emplace_back(local_pad_before);
-    O_spatial_dims.emplace_back(local_output_size);
+    TensorDim local_input_size;
+    TensorDim local_filter_size;
+    if (deriv_mode == ConvDerivMode::DATA && result_shape.empty()) {
+      TensorDim local_output_size = O_spatial_dims[i];
+      TensorDim local_filter_size = F_spatial_dims[i];
+      std::tie(local_pad_before, local_input_size) = compute_padding_and_input_size(
+          local_output_size, local_filter_size, strides[i], autopad_mode, manual_padding[i],
+          manual_padding[i + spatial_rank], dilations[i], data_dilations[i]);
+      pad_before.push_back(local_pad_before);
+      I_spatial_dims.push_back(local_input_size);
+    } else {
+      if (deriv_mode == ConvDerivMode::FILTER && result_shape.empty()) {
+        IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+        throw std::runtime_error(
+            "Result shape inference not yet supported for filter transposed/derivative convolutions");
+      }
+      local_input_size = (deriv_mode == ConvDerivMode::DATA) ? TensorDim(result_shape[i]) : I_spatial_dims[i];
+      local_filter_size = (deriv_mode == ConvDerivMode::FILTER) ? TensorDim(result_shape[i]) : F_spatial_dims[i];
+      std::tie(local_pad_before, local_output_size) = compute_padding_and_output_size(
+          local_input_size, local_filter_size, strides[i], autopad_mode, manual_padding[i],
+          manual_padding[i + spatial_rank], dilations[i], data_dilations[i], false);
+      pad_before.push_back(local_pad_before);
+      switch (deriv_mode) {
+        case ConvDerivMode::NONE:
+          O_spatial_dims.push_back(local_output_size);
+          break;
+        case ConvDerivMode::DATA:
+          I_spatial_dims.push_back(TensorDim(result_shape[i]));
+          break;
+        default:
+          break;
+      }
+    }
   }
 
   // Now set up the dimensions of the result to be returned
@@ -1162,13 +1244,13 @@ Value convolution(const Value& value) {
           I_dims.push_back(N);
           I_dims.push_back(CI);
           for (size_t i = 0; i < spatial_rank; ++i) {
-            I_dims.push_back(TensorDim(result_shape[i]));
+            I_dims.push_back(I_spatial_dims[i]);
           }
           break;
         case TensorLayout::NXC:
           I_dims.push_back(N);
           for (size_t i = 0; i < spatial_rank; ++i) {
-            I_dims.push_back(TensorDim(result_shape[i]));
+            I_dims.push_back(I_spatial_dims[i]);
           }
           I_dims.push_back(CI);
           break;
@@ -2168,6 +2250,10 @@ Value slice(const Value& value) {
 
   // Useful values and correctness checks
   auto ndims = I.rank();
+  // First, handle the case of a scalar
+  if (ndims == 0) {
+    return Value{I};
+  }
   if (slices.size() != ndims) {
     throw std::runtime_error(
         llvm::formatv("{0} slice axes provided to slice {1}-dimensional tensor", slices.size(), ndims));

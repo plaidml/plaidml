@@ -33,7 +33,7 @@ edsl::Tensor block(             //
   // as their existence depends on use_shortcut_conv
   auto conv_2a = op::convolution(I, W[0])
                      .name(base_name.str() + "_branch2a")
-                     .strides(strides)
+                     .strides(strides.vec())
                      .autopad_mode(op::AutoPadMode::VALID);
   auto relu_2a = op::relu(conv_2a + B[0]);
   auto conv_2b = op::convolution(relu_2a, W[1])  //
@@ -45,7 +45,7 @@ edsl::Tensor block(             //
   if (use_shortcut_conv) {
     auto conv_1 = op::convolution(I, W[3])
                       .name(base_name.str() + "_branch1")
-                      .strides(strides)
+                      .strides(strides.vec())
                       .autopad_mode(op::AutoPadMode::VALID);
     return op::relu(conv_2c + B[2] + conv_1 + B[3]);
   } else {
