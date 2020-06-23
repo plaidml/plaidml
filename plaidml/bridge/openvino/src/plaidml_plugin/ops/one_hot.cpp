@@ -15,29 +15,24 @@ using namespace InferenceEngine;  // NOLINT[build/namespaces]
 
 namespace PlaidMLPlugin {
 
-static OpRegistration reg("OneHot", [](const Context& ctx) {
+static OpRegistration reg("onehot", [](const Context& ctx) {
   IE_ASSERT(ctx.operands.size() == 4);
   auto indices = ctx.operands.at(0);
-  // auto depth = ctx.operands.at(1);
+  auto depth = get_shape_from_constant_operand(1, ctx.layer);  // ctx.operands.at(1);
   auto on_value = ctx.operands.at(2);
   auto off_value = ctx.operands.at(3);
   auto* layer = dynamic_cast<ngraph::opset1::OneHot*>(ctx.layer);
   auto axis = size_t(layer->get_axis());
 
-  // create an output tensor with Rank = input Rank + 1
-  // get shape of indices
-  // add dim at axis of size = depth
-
   std::vector<edsl::TensorDim> I_dims(indices.rank());
   indices.bind_dims(I_dims);
   std::vector<edsl::TensorDim> O_dims(indices.rank() + 1);
 
-  // TODO: figure out how to get depth value
   if (axis < 0) axis = indices.rank() + axis;
   size_t j = 0;
   for (size_t i = 0; i < O_dims.size(); i++) {
     if (i == axis) {
-      O_dims[i] = edsl::TensorDim(10);  // depth
+      O_dims[i] = edsl::TensorDim(depth[0]);
     } else {
       O_dims[i] = I_dims[j];
       j++;
@@ -46,7 +41,6 @@ static OpRegistration reg("OneHot", [](const Context& ctx) {
 
   // create output tensor of new shape
   edsl::Tensor O = edsl::TensorOutput(O_dims);
-  // fill axis dimention with on_value and off_value depending on
 
   // corresponding value in indices tensor
 
