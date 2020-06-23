@@ -1,4 +1,4 @@
-// RUN: pmlc-tblgen -gen-cpp-wrappers -I llvm-project/mlir/include %s | FileCheck --dump-input-on-failure %s
+// RUN: pmlc-tblgen -gen-cpp-wrappers -I llvm-project/mlir/include %s | FileCheck %s
 
 include "mlir/IR/OpBase.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"

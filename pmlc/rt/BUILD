@@ -14,7 +14,7 @@ plaidml_cc_library(
     deps = [
         "//pmlc/compiler",
         "@half",
-        "@llvm-project//llvm:support",
+        "@llvm-project//llvm:Support",
         "@llvm-project//mlir:mlir_runner_utils",
         "@xsmm",
     ],

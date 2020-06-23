@@ -83,8 +83,7 @@ OpFoldResult PolyDivOp::fold(ArrayRef<Attribute> operands) {
   }
   // div(0, x) -> 0
   if (matchPattern(lhs(), m_Zero())) {
-    OpBuilder builder(getContext());
-    return builder.getZeroAttr(builder.getIntegerType(64));
+    return lhs();
   }
   return constFoldBinaryOp(operands, [](double a, double b) { return a / b; });
 }
@@ -93,12 +92,10 @@ OpFoldResult PolyMulOp::fold(ArrayRef<Attribute> operands) {
   IVLOG(5, "PolyMulOp::fold");
   // mul(x, 0) -> 0
   if (matchPattern(rhs(), m_Zero())) {
-    IVLOG(5, "mul(x, 0) -> 0");
     return rhs();
   }
   // mul(x, 1) -> x
   if (matchPattern(rhs(), m_One())) {
-    IVLOG(5, "mul(x, 1) -> x");
     return lhs();
   }
   return constFoldBinaryOp(operands, [](double a, double b) { return a * b; });
@@ -125,13 +122,10 @@ OpFoldResult PolySubOp::fold(ArrayRef<Attribute> operands) {
   IVLOG(5, "PolySubOp::fold");
   // sub(x, x) -> 0
   if (lhs() == rhs()) {
-    IVLOG(5, "sub(x, x) -> 0");
-    OpBuilder builder(getContext());
-    return builder.getZeroAttr(builder.getIntegerType(64));
+    return OpBuilder(getContext()).getIndexAttr(0);
   }
   /// sub(x, 0) -> x
   if (matchPattern(rhs(), m_Zero())) {
-    IVLOG(5, "sub(x, 0) -> x");
     return lhs();
   }
   return constFoldBinaryOp(operands, [](double a, double b) { return a - b; });
@@ -212,10 +206,12 @@ struct AffineIndexCollector : public PolyVisitor<AffineIndexCollector> {
 
 struct IsFoldableVisitor : public PolyVisitor<IsFoldableVisitor> {
   bool foldable = true;
+
   void visitMaxOp(PolyMaxOp op) { foldable = false; }
+
   void visitMinOp(PolyMinOp op) { foldable = false; }
 
-  bool is_foldable(SymbolicContractionOp op) {
+  bool isFoldable(SymbolicContractionOp op) {
     foldable = true;
     auto sinkMapOp = llvm::cast<AffineMapOp>(op.sink().getDefiningOp());
     for (auto dim : sinkMapOp.dims()) {
@@ -398,9 +394,10 @@ struct SymbolicContractionCanonicalizer
 
   LogicalResult matchAndRewrite(SymbolicContractionOp op,
                                 PatternRewriter &rewriter) const override {
+    IVLOG(5, "SymbolicContractionCanonicalizer::matchAndRewrite>");
     auto sizeMapOp = llvm::cast<AffineMapOp>(op.size().getDefiningOp());
     SmallVector<Value, 4> sizeDims(sizeMapOp.dims());
-    auto shape = eltwise::ComputeShape(sizeDims);
+    auto shape = eltwise::getShapeFromOperands(sizeDims);
     auto sourceType = op.result().getType().cast<RankedTensorType>();
     auto elementType = inferElementType(op.getContext(), op.combo(), op.srcs());
     auto resultType = RankedTensorType::get(shape, elementType);
@@ -421,8 +418,8 @@ struct SymbolicContractionCanonicalizer
       return success();
     }
 
-    IsFoldableVisitor foldable_checker;
-    if (!foldable_checker.is_foldable(op)) {
+    IsFoldableVisitor foldableCheck;
+    if (!foldableCheck.isFoldable(op)) {
       return failure();
     }
 
@@ -650,7 +647,7 @@ Type IndexOp::getResultType(ArrayRef<Value> operands) {
 
   auto *context = operands.front().getContext();
   auto elementType = IntegerType::get(32, IntegerType::Signed, context);
-  auto shape = eltwise::ComputeShape(operands);
+  auto shape = eltwise::getShapeFromOperands(operands);
   return RankedTensorType::get(shape, elementType);
 }
 
@@ -691,7 +688,7 @@ Type PrngOp::getResultType(ArrayRef<Value> operands) {
   }
   auto state = operands.front();
   auto dims = operands.drop_front();
-  auto shape = eltwise::ComputeShape(dims);
+  auto shape = eltwise::getShapeFromOperands(dims);
   auto elementType = FloatType::getF32(state.getContext());
   return RankedTensorType::get(shape, elementType);
 }
@@ -743,7 +740,7 @@ Type ReshapeOp::getResultType(ArrayRef<Value> operands) {
   auto dims = operands.drop_front();
   auto tensorType = eltwise::getRankedTensorType(tensor.getType());
   auto elementType = tensorType.getElementType();
-  auto shape = eltwise::ComputeShape(dims);
+  auto shape = eltwise::getShapeFromOperands(dims);
   return RankedTensorType::get(shape, elementType);
 }
 

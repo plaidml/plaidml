@@ -15,6 +15,7 @@
 
 #include "pmlc/compiler/registry.h"
 
+#include "pmlc/conversion/SCFToGPU/SCFToGPUPass.h"
 #include "pmlc/conversion/gpu/lowering.h"
 #include "pmlc/conversion/pxa_to_affine/passes.h"
 #include "pmlc/conversion/tile_to_pxa/passes.h"
@@ -25,6 +26,7 @@ using namespace mlir; // NOLINT[build/namespaces]
 namespace pmlc::target::intel_gen {
 
 namespace {
+
 void addToPipeline(OpPassManager &pm) {
   pm.addPass(dialect::tile::createComputeBoundsPass());
   // pm.addPass(dialect::tile::createPadPass());
@@ -45,8 +47,7 @@ void addToPipeline(OpPassManager &pm) {
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
-  // pm.addPass(std::make_unique<SCFToGPUPass>());
-  pm.addPass(createSimpleSCFToGPUPass(1, 1));
+  pm.addPass(pmlc::conversion::scf_to_gpu::createSimpleSCFToGPUPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(conversion::gpu::createGpuKernelOutliningPass());
 

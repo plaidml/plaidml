@@ -22,6 +22,7 @@ using mlir::ArrayAttr;
 using mlir::ArrayRef;
 using mlir::Attribute;
 using mlir::BoolAttr;
+using mlir::DictionaryAttr;
 using mlir::FloatType;
 using mlir::IndexType;
 using mlir::IntegerAttr;

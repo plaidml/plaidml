@@ -10,6 +10,7 @@ plaidml_cc_library(
     hdrs = glob(["*.h"]),
     deps = [
         "//pmlc/compiler",
+        "//pmlc/conversion/SCFToGPU",
         "//pmlc/conversion/gpu",
         "//pmlc/conversion/pxa_to_affine",
         "//pmlc/conversion/tile_to_pxa",

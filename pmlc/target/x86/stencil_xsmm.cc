@@ -114,7 +114,7 @@ private:
     IVLOG(6,
           "Inner: loop = " << tot_inner_loop << " inner_time = " << inner_time);
     for (unsigned i = 0; i < getTiledIdxCount(); ++i) {
-      IVLOG(6, perm.indexes[i] << ": " << tileSize[i]);
+      IVLOG(6, mlir::debugString(perm.indexes[i]) << ": " << tileSize[i]);
     }
 
     // The middle idxs are the accumulation indexes, i.e. those used on loads
@@ -128,7 +128,7 @@ private:
         middle_idxs.insert(std::make_pair(kvp.first, getIdxRange(kvp.first)));
       } else {
         IVLOG(5, "Index found from outside current loop on left input: "
-                     << kvp.first);
+                     << kvp.first.getArgNumber());
       }
     }
     IVLOG(5, "Current size of middle_idxs = " << middle_idxs.size());
@@ -141,7 +141,7 @@ private:
         middle_idxs.insert(std::make_pair(kvp.first, getIdxRange(kvp.first)));
       } else {
         IVLOG(5, "Index found from outside current loop on right input: "
-                     << kvp.first);
+                     << kvp.first.getArgNumber());
       }
     }
     IVLOG(5, "Current size of middle_idxs = " << middle_idxs.size());
@@ -155,8 +155,8 @@ private:
           middle_idxs.erase(it);
         }
       } else {
-        IVLOG(5,
-              "Index found from outside current loop on output: " << kvp.first);
+        IVLOG(5, "Index found from outside current loop on output: "
+                     << kvp.first.getArgNumber());
       }
     }
 
@@ -175,16 +175,18 @@ private:
 
     IVLOG(4, "Middle: loop = " << tot_middle_loop);
 
-    for (auto &kvp : middle_idxs) {
-      if (kvp.second > 1) {
-        IVLOG(4, kvp.first << ": " << kvp.second);
+    if (VLOG_IS_ON(4)) {
+      for (auto &kvp : middle_idxs) {
+        if (kvp.second > 1) {
+          IVLOG(4, kvp.first.getArgNumber() << ": " << kvp.second);
+        }
       }
     }
 
     llvm::DenseMap<mlir::BlockArgument, unsigned> outer_idxs;
     for (const auto &kvp : outStrideInfo->strides) {
       if (getBlockArgsAsSet().count(kvp.first)) {
-        IVLOG(4, "First: " << kvp.first);
+        IVLOG(4, "First: " << kvp.first.getArgNumber());
         IVLOG(5, "Second: " << kvp.second);
         IVLOG(5, "IdxRange: " << getIdxRange(kvp.first));
         outer_idxs.try_emplace(kvp.first, getIdxRange(kvp.first));
@@ -208,9 +210,11 @@ private:
 
     IVLOG(4, "Outer: loop = " << tot_outer_loop);
 
-    for (auto &kvp : outer_idxs) {
-      if (kvp.second > 1) {
-        IVLOG(4, kvp.first << ": " << kvp.second);
+    if (VLOG_IS_ON(4)) {
+      for (auto &kvp : outer_idxs) {
+        if (kvp.second > 1) {
+          IVLOG(4, kvp.first.getArgNumber() << ": " << kvp.second);
+        }
       }
     }
 
