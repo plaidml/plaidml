@@ -17,7 +17,7 @@ namespace PlaidMLPlugin {
 static OpRegistration reg("negative", [](const Context& ctx) {
   IE_ASSERT(ctx.operands.size() == 1);
   auto I = ctx.operands.at(0);
-  return edsl::make_tuple(-1 * I);
+  return edsl::make_tuple(-I);
 });
 
 }  // namespace PlaidMLPlugin
