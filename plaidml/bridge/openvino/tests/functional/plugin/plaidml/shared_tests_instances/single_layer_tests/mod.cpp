@@ -16,12 +16,16 @@ const std::vector<InferenceEngine::Precision> netPrecisions = {
     InferenceEngine::Precision::FP32,
 };
 
-const std::vector<std::vector<std::size_t>> inputShapes = {
-    {std::vector<std::size_t>({1, 30}), std::vector<std::size_t>({1, 30})}};
+const std::vector<std::vector<std::vector<std::size_t>>> inputShapes = {
+    {{1, 30}, {1, 30}},       //
+    {{3, 5, 10}, {1, 5, 1}},  //
+};
 
 INSTANTIATE_TEST_CASE_P(CompareWithRefs, ModLayerTest,
-                        ::testing::Combine(::testing::ValuesIn(netPrecisions), ::testing::Values(inputShapes),
-                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),
+                        ::testing::Combine(                                       //
+                            ::testing::ValuesIn(netPrecisions),                   //
+                            ::testing::ValuesIn(inputShapes),                     //
+                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
                         ModLayerTest::getTestCaseName);
 
 }  // namespace
