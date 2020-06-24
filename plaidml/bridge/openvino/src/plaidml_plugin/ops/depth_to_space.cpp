@@ -11,7 +11,6 @@
 #include "ngraph/opsets/opset2.hpp"
 
 #include "plaidml/op/op.h"
-#include "pmlc/util/logging.h"
 
 using namespace plaidml;          // NOLINT[build/namespaces]
 using namespace InferenceEngine;  // NOLINT[build/namespaces]

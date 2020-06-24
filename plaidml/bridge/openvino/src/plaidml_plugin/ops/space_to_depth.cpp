@@ -11,14 +11,12 @@
 #include "ngraph/opsets/opset2.hpp"
 
 #include "plaidml/op/op.h"
-#include "pmlc/util/logging.h"
 
 using namespace plaidml;          // NOLINT[build/namespaces]
 using namespace InferenceEngine;  // NOLINT[build/namespaces]
 
 namespace PlaidMLPlugin {
 
-// TODO
 static OpRegistration reg("spacetodepth", [](const Context& ctx) {
   auto* layer = dynamic_cast<ngraph::opset1::SpaceToDepth*>(ctx.layer);
   IE_ASSERT(ctx.operands.size() == 1);
