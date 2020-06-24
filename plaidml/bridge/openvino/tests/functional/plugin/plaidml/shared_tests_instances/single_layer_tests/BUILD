@@ -10,7 +10,6 @@ cc_test(
         exclude = [
             "cum_sum.cpp",
             "extract_image_patches.cpp",
-            "fake_quantize.cpp",
             "space_to_batch.cpp",
         ],
     ),
