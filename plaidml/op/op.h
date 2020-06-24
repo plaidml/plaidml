@@ -156,25 +156,54 @@ class convolution {
         group_layout_(GroupLayout::NONE),
         winograd_allowed_(false),
         autogroup_mode_(AutoGroupMode::UNGROUPED),
-        deriv_mode_(ConvDerivMode::NONE) {}
+        deriv_mode_(ConvDerivMode::NONE),
+        infer_result_shape_(false) {}
 
-  convolution& strides(const std::vector<int>& strides) {
-    strides_ = strides;
+  template <typename T, typename std::enable_if<std::is_integral<T>::value>::type* = nullptr>
+  convolution& strides(const std::vector<T>& strides) {
+    strides_ = edsl::make_tuple(strides);
     return *this;
   }
 
-  convolution& dilations(const std::vector<int>& dilations) {
-    dilations_ = dilations;
+  template <typename T, typename std::enable_if<std::is_integral<T>::value>::type* = nullptr>
+  convolution& strides(const std::initializer_list<T>& strides) {
+    strides_ = edsl::make_tuple(std::vector<T>(strides));
     return *this;
   }
 
-  convolution& data_dilations(const std::vector<int>& data_dilations) {
-    data_dilations_ = data_dilations;
+  template <typename T, typename std::enable_if<std::is_integral<T>::value>::type* = nullptr>
+  convolution& dilations(const std::vector<T>& dilations) {
+    dilations_ = edsl::make_tuple(dilations);
     return *this;
   }
 
-  convolution& filter_shape(const std::vector<int>& filter_shape) {
-    filter_shape_ = filter_shape;
+  template <typename T, typename std::enable_if<std::is_integral<T>::value>::type* = nullptr>
+  convolution& dilations(const std::initializer_list<T>& dilations) {
+    dilations_ = edsl::make_tuple(std::vector<T>(dilations));
+    return *this;
+  }
+
+  template <typename T, typename std::enable_if<std::is_integral<T>::value>::type* = nullptr>
+  convolution& data_dilations(const std::vector<T>& data_dilations) {
+    data_dilations_ = edsl::make_tuple(data_dilations);
+    return *this;
+  }
+
+  template <typename T, typename std::enable_if<std::is_integral<T>::value>::type* = nullptr>
+  convolution& data_dilations(const std::initializer_list<T>& data_dilations) {
+    data_dilations_ = edsl::make_tuple(std::vector<T>(data_dilations));
+    return *this;
+  }
+
+  template <typename T, typename std::enable_if<std::is_integral<T>::value>::type* = nullptr>
+  convolution& filter_shape(const std::vector<T>& filter_shape) {
+    filter_shape_ = edsl::make_tuple(filter_shape);
+    return *this;
+  }
+
+  template <typename T, typename std::enable_if<std::is_integral<T>::value>::type* = nullptr>
+  convolution& filter_shape(const std::initializer_list<T>& filter_shape) {
+    filter_shape_ = edsl::make_tuple(std::vector<T>(filter_shape));
     return *this;
   }
 
@@ -183,8 +212,15 @@ class convolution {
     return *this;
   }
 
-  convolution& manual_padding(const std::vector<int>& manual_padding) {
-    manual_padding_ = manual_padding;
+  template <typename T, typename std::enable_if<std::is_integral<T>::value>::type* = nullptr>
+  convolution& manual_padding(const std::vector<T>& manual_padding) {
+    manual_padding_ = edsl::make_tuple(manual_padding);
+    return *this;
+  }
+
+  template <typename T, typename std::enable_if<std::is_integral<T>::value>::type* = nullptr>
+  convolution& manual_padding(const std::initializer_list<T>& manual_padding) {
+    manual_padding_ = edsl::make_tuple(std::vector<T>(manual_padding));
     return *this;
   }
 
@@ -228,8 +264,20 @@ class convolution {
     return *this;
   }
 
-  convolution& result_shape(const std::vector<int>& result_shape) {
-    result_shape_ = result_shape;
+  template <typename T, typename std::enable_if<std::is_integral<T>::value>::type* = nullptr>
+  convolution& result_shape(const std::vector<T>& result_shape) {
+    result_shape_ = edsl::make_tuple(result_shape);
+    return *this;
+  }
+
+  template <typename T, typename std::enable_if<std::is_integral<T>::value>::type* = nullptr>
+  convolution& result_shape(const std::initializer_list<T>& result_shape) {
+    result_shape_ = edsl::make_tuple(std::vector<T>(result_shape));
+    return *this;
+  }
+
+  convolution& infer_result_shape(bool infer_result_shape) {
+    infer_result_shape_ = infer_result_shape;
     return *this;
   }
 
@@ -237,13 +285,13 @@ class convolution {
     auto args = edsl::make_tuple(           //
         I_,                                 //
         F_,                                 //
-        edsl::make_tuple(strides_),         //
-        edsl::make_tuple(dilations_),       //
-        edsl::make_tuple(data_dilations_),  //
-        edsl::make_tuple(filter_shape_),    //
+        strides_,                           //
+        dilations_,                         //
+        data_dilations_,                    //
+        filter_shape_,                      //
         groups_,                            //
         static_cast<int>(autopad_mode_),    //
-        edsl::make_tuple(manual_padding_),  //
+        manual_padding_,                    //
         static_cast<int>(input_layout_),    //
         static_cast<int>(filter_layout_),   //
         static_cast<int>(group_layout_),    //
@@ -251,28 +299,30 @@ class convolution {
         name_,                              //
         static_cast<int>(autogroup_mode_),  //
         static_cast<int>(deriv_mode_),      //
-        edsl::make_tuple(result_shape_));
+        result_shape_,                      //
+        infer_result_shape_);
     return details::op("convolution", args).as_tensor();
   }
 
  private:
   edsl::Tensor I_;
   edsl::Tensor F_;
-  std::vector<int> strides_;         // Default: empty (builds vector of 1s in oplib)
-  std::vector<int> dilations_;       // Default: empty (builds vector of 1s in oplib)
-  std::vector<int> data_dilations_;  // Default: empty (builds vector of 1s in oplib)
-  std::vector<int> filter_shape_;    // Default: empty (i.e. no filter dim check)
-  int groups_;                       // Default: 1
-  std::vector<int> manual_padding_;  // Default: empty (i.e. no manual padding)
-  AutoPadMode autopad_mode_;         // Default: AutoPadMode::SAME_UPPER
-  TensorLayout input_layout_;        // Default: TensorLayout::NXC
-  TensorLayout filter_layout_;       // Default: TensorLayout::XCK
-  GroupLayout group_layout_;         // Default: GroupLayout::NONE
-  bool winograd_allowed_;            // Default: false
-  std::string name_;                 // Default: empty (oplib currently renames "" to "conv")
-  AutoGroupMode autogroup_mode_;     // Default: AutoGroupMode::UNGROUPED
-  ConvDerivMode deriv_mode_;         // Default: ConvDerivMode::NONE
-  std::vector<int> result_shape_;    // Default: empty (i.e. unspecified)
+  edsl::Value strides_;           // Default: empty (builds vector of 1s in oplib)
+  edsl::Value dilations_;         // Default: empty (builds vector of 1s in oplib)
+  edsl::Value data_dilations_;    // Default: empty (builds vector of 1s in oplib)
+  edsl::Value filter_shape_;      // Default: empty (i.e. no filter dim check)
+  int groups_;                    // Default: 1
+  edsl::Value manual_padding_;    // Default: empty (i.e. no manual padding)
+  AutoPadMode autopad_mode_;      // Default: AutoPadMode::SAME_UPPER
+  TensorLayout input_layout_;     // Default: TensorLayout::NXC
+  TensorLayout filter_layout_;    // Default: TensorLayout::XCK
+  GroupLayout group_layout_;      // Default: GroupLayout::NONE
+  bool winograd_allowed_;         // Default: false
+  std::string name_;              // Default: empty (oplib currently renames "" to "conv")
+  AutoGroupMode autogroup_mode_;  // Default: AutoGroupMode::UNGROUPED
+  ConvDerivMode deriv_mode_;      // Default: ConvDerivMode::NONE
+  edsl::Value result_shape_;      // Default: empty (i.e. unspecified)
+  bool infer_result_shape_;       // Default: false
 };
 
 inline edsl::Tensor cumprod(const edsl::Tensor& I, int axis) {
