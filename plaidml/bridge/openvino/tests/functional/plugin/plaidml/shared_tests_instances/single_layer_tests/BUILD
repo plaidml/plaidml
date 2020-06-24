@@ -6,7 +6,7 @@ package(default_visibility = ["//visibility:public"])
 cc_test(
     name = "single_layer_tests",
     srcs = glob(
-        ["*.cpp"],
+        ["tile.cpp"],
         exclude = [
             "cum_sum.cpp",
             "extract_image_patches.cpp",
