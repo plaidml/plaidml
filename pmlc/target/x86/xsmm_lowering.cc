@@ -191,10 +191,188 @@ public:
   };
 };
 
+class XSMMDispatchGemmLowering : public OpRewritePattern<xsmm::DispatchGemmOp> {
+public:
+  using OpRewritePattern<xsmm::DispatchGemmOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(xsmm::DispatchGemmOp op,
+                                PatternRewriter &rewriter) const override {
+    Impl impl(op, rewriter);
+    auto symbol = impl.getOrInsertDispatchFunc();
+    SmallVector<Value, 0> args;
+
+    for (auto i : impl.tileld) {
+      args.push_back(impl.createConstantIntOp(i));
+    }
+    for (auto i : impl.tile) {
+      args.push_back(impl.createConstantIntOp(i));
+    }
+
+    auto dispatch = rewriter.create<CallOp>(op.getLoc(), symbol, rewriter.getIntegerType(64), args );
+    rewriter.replaceOp(op, dispatch.getResult(0));
+    return success();
+  }
+
+  struct Impl {
+    xsmm::DispatchGemmOp op;
+    PatternRewriter &rewriter;
+    Location loc;
+    ModuleOp module;
+    Type i32Type;
+    Type i64Type;
+    SmallVector<unsigned, 3> tile;
+    SmallVector<unsigned, 3> tileld;
+
+    Impl(xsmm::DispatchGemmOp op, PatternRewriter &rewriter)
+        : op(op), rewriter(rewriter), loc(op.getLoc()),
+          module(op.getParentOfType<ModuleOp>()),
+          i32Type(rewriter.getIntegerType(32)),
+          i64Type(rewriter.getIntegerType(64)) {
+      for (auto attr : op.tile().getValue()) {
+        tile.push_back(attr.cast<IntegerAttr>().getInt());
+      }
+      for (auto attr : op.tileld().getValue()) {
+        tileld.push_back(attr.cast<IntegerAttr>().getInt());
+      }
+    }
+
+    FlatSymbolRefAttr getOrInsertDispatchFunc() {
+      const char *symbol = "plaidml_rt_xsmm_dispatch_gemm_f32";
+      auto context = module.getContext();
+      if (module.lookupSymbol(symbol)) {
+        return SymbolRefAttr::get(symbol, context);
+      }
+      OpBuilder builder(module.getBodyRegion());
+      std::array<Type, 6> inputs{i32Type,      i32Type,      i32Type,
+                                 i32Type,      i32Type,      i32Type};
+      auto funcType = builder.getFunctionType(inputs, i64Type);
+      ArrayRef<NamedAttribute> attrs{};
+      builder.create<FuncOp>(loc, symbol, funcType, attrs);
+      return SymbolRefAttr::get(symbol, context);
+    }
+
+    Value createConstantIntOp(int64_t value) {
+      return rewriter.create<ConstantIntOp>(loc, value, i32Type);
+    }
+  };
+};
+
+class XSMMInvokeGemmLowering : public OpRewritePattern<xsmm::InvokeGemmOp> {
+public:
+  using OpRewritePattern<xsmm::InvokeGemmOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(xsmm::InvokeGemmOp op,
+                                PatternRewriter &rewriter) const override {
+    Impl impl(op, rewriter);
+    auto &tile = impl.tile;
+
+    auto symbol = impl.getOrInsertInvokeFunc();
+    auto a = impl.prepareOperand(op.a(), op.aAccessMap(), op.getOperandsForA(),
+                                 op.aTileMap(), {tile[0], tile[2]});
+    auto b = impl.prepareOperand(op.b(), op.bAccessMap(), op.getOperandsForB(),
+                                 op.bTileMap(), {tile[2], tile[1]});
+    auto c = impl.prepareOperand(op.c(), op.cAccessMap(), op.getOperandsForC(),
+                                 op.cTileMap(), {tile[0], tile[1]});
+    SmallVector<Value, 6> args{a.memref,           b.memref,
+                               c.memref           };
+    args.push_back(op.ptr());
+
+    rewriter.create<CallOp>(op.getLoc(), symbol, ArrayRef<Type>{}, args );
+    rewriter.replaceOp(op, op.c());
+    return success();
+  }
+
+  struct Impl {
+    xsmm::InvokeGemmOp op;
+    PatternRewriter &rewriter;
+    Location loc;
+    ModuleOp module;
+    Type i64Type;
+    Type elementType;
+    UnrankedMemRefType unrankedType;
+    SmallVector<unsigned, 3> tile;
+
+    struct PreparedOperand {
+      Value memref;
+    };
+
+    Impl(xsmm::InvokeGemmOp op, PatternRewriter &rewriter)
+        : op(op), rewriter(rewriter), loc(op.getLoc()),
+          module(op.getParentOfType<ModuleOp>()),
+          i64Type(rewriter.getIntegerType(64)),
+          elementType(rewriter.getF32Type()),
+          unrankedType(
+              UnrankedMemRefType::get(elementType, /*memorySpace=*/0)) {
+      for (auto attr : op.tile().getValue()) {
+        tile.push_back(attr.cast<IntegerAttr>().getInt());
+      }
+    }
+
+    FlatSymbolRefAttr getOrInsertInvokeFunc() {
+      const char *symbol = "plaidml_rt_xsmm_exec_gemm_f32";
+      auto context = module.getContext();
+      if (module.lookupSymbol(symbol)) {
+        return SymbolRefAttr::get(symbol, context);
+      }
+      OpBuilder builder(module.getBodyRegion());
+      std::array<Type, 4> inputs{unrankedType, unrankedType, unrankedType, i64Type};
+      ArrayRef<Type> results{};
+      auto funcType = builder.getFunctionType(inputs, results);
+      ArrayRef<NamedAttribute> attrs{};
+      builder.create<FuncOp>(loc, symbol, funcType, attrs);
+      return SymbolRefAttr::get(symbol, context);
+    }
+
+    PreparedOperand prepareOperand(Value operand, AffineMap accessMap,
+                                   ValueRange mapOperands, AffineMap tileMap,
+                                   ArrayRef<int64_t> sizes) {
+      SmallVector<int64_t, 8> shape;
+      auto flat = getFlattenedTileDimMapping(tileMap);
+      for (auto dim : flat) {
+        if (dim == kUnusedDimension)
+          shape.push_back(1);
+        else
+          shape.push_back(sizes[dim]);
+      }
+
+      int64_t outerOffset;
+      SmallVector<int64_t, 4> outerStrides;
+      auto memRefType = operand.getType().cast<MemRefType>();
+      getStridesAndOffset(memRefType, outerStrides, outerOffset);
+
+      ArrayRef<Value> emptyValues{};
+      SmallVector<int64_t, 4> staticOffsets(
+          memRefType.getRank(), MemRefType::getDynamicStrideOrOffset());
+      SmallVector<int64_t, 4> staticStrides(memRefType.getRank(), 1);
+      auto offsets = expandAffineMap(rewriter, loc, accessMap, mapOperands);
+      auto subview = rewriter.create<SubViewOp>(loc,
+                                                /*source=*/operand,
+                                                /*staticOffsets=*/staticOffsets,
+                                                /*staticSizes=*/shape,
+                                                /*staticStrides=*/staticStrides,
+                                                /*offsets=*/*offsets,
+                                                /*sizes=*/emptyValues,
+                                                /*strides=*/emptyValues);
+      auto cast = rewriter.create<MemRefCastOp>(loc, subview, unrankedType);
+
+      auto layoutMap = makeStridedLinearLayoutMap(outerStrides, outerOffset,
+                                                  module.getContext());
+      auto stridesArray = computeStrideArray(layoutMap.compose(tileMap));
+      assert(stridesArray.hasValue() && "computeStrideArray must succeed");
+
+      //int64_t leadingDimStride = stridesArray->strides[0];
+      //auto leadingDimValue = createConstantIntOp(leadingDimStride);
+      return {cast};
+    }
+  };
+};
+
 class LowerXSMMPass : public XSMMLoweringBase<LowerXSMMPass> {
   void runOnFunction() override {
     OwningRewritePatternList patterns;
     patterns.insert<XSMMGemmLowering>(&getContext());
+    patterns.insert<XSMMInvokeGemmLowering>(&getContext());
+    patterns.insert<XSMMDispatchGemmLowering>(&getContext());
     ConversionTarget target(getContext());
     target.addLegalDialect<AffineDialect, StandardOpsDialect>();
     target.addIllegalDialect<xsmm::XSMMDialect>();

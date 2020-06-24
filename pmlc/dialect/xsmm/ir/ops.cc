@@ -138,7 +138,7 @@ InvokeGemmOp::operand_range InvokeGemmOp::getOperandsForC() {
 
 void printInvokeGemmOp(OpAsmPrinter &p, InvokeGemmOp op) {
   p << op.getOperation()->getName() << ' ';
-  p << op.ptr() << " : "; 
+  p << op.ptr() << ", "; 
   p << op.c() << '[';
   p.printAffineMapOfSSAIds(op.cAccessMapAttr(), op.getOperandsForC());
   p << "]:";
@@ -151,18 +151,20 @@ void printInvokeGemmOp(OpAsmPrinter &p, InvokeGemmOp op) {
   p.printAffineMapOfSSAIds(op.bAccessMapAttr(), op.getOperandsForB());
   p << "]:";
   p.printAttribute(op.bTileMapAttr());
-  p << ", : " << op.ptr().getType() << ", " << op.c().getType() << ", "
+  p << ", " << op.tile() << " : " << op.ptr().getType() << ", " << op.c().getType() << ", "
     << op.a().getType() << ", " << op.b().getType();
 }
 
 ParseResult parseInvokeGemmOp(OpAsmParser &parser, OperationState &result) {
   auto &builder = parser.getBuilder();
   auto indexType = builder.getIndexType();
+  auto i64Type = builder.getIntegerType(64);
   SmallVector<Type, 4> operandTypes;
   OpAsmParser::OperandType ptr, a, b, c;
   AffineMapAttr aAccessMapAttr, bAccessMapAttr, cAccessMapAttr;
   AffineMapAttr aTileMapAttr, bTileMapAttr, cTileMapAttr;
   SmallVector<OpAsmParser::OperandType, 4> aOperands, bOperands, cOperands;
+  ArrayAttr tileAttr;
   return failure(
       parser.parseOperand(ptr) ||
       parser.parseColon() ||
@@ -182,6 +184,7 @@ ParseResult parseInvokeGemmOp(OpAsmParser &parser, OperationState &result) {
       parser.parseColon() ||
       parser.parseAttribute(bTileMapAttr, "bTileMap", result.attributes) ||
       parser.parseComma() ||
+      parser.parseAttribute(tileAttr, i64Type, "tile", result.attributes) ||
       parser.parseColonTypeList(operandTypes) ||
       parser.addTypeToList(operandTypes[1], result.types) ||
       parser.resolveOperand(ptr, operandTypes[0], result.operands) ||

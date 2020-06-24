@@ -306,9 +306,11 @@ private:
                        opB.getMapOperands().end());
 
     // Make the XSMM op
+#if 1
     auto gemm = bodyBuilder.create<xsmm::GemmOp>(
         op.getLoc(), cVal.getType(), cVal, cMap, cTile, aVal, aMap, aTile, bVal,
         bMap, bTile, tiles, mapOperands);
+    
     opC.result().replaceAllUsesWith(gemm);
 
     // Remove all other ops from the op interior
@@ -317,6 +319,57 @@ private:
       auto prev_it = std::prev(xsmm_it);
       op.getBody()->getOperations().erase(prev_it);
     }
+#else
+    // create pointer storage as i64
+    int64_t outerOffsetA;
+    llvm::SmallVector<int64_t, 4> outerStridesA;
+    auto memRefTypeA = aVal.getType().cast<MemRefType>();
+    getStridesAndOffset(memRefTypeA, outerStridesA, outerOffsetA);
+    auto layoutMapA = makeStridedLinearLayoutMap(outerStridesA, outerOffsetA,
+                                                  op.getContext());
+    auto stridesArrayA = computeStrideArray(layoutMapA.compose(aTile));
+    assert(stridesArrayA.hasValue() && "computeStrideArray must succeed");
+
+    int64_t outerOffsetB;
+    llvm::SmallVector<int64_t, 4> outerStridesB;
+    auto memRefTypeB = bVal.getType().cast<MemRefType>();
+    getStridesAndOffset(memRefTypeB, outerStridesB, outerOffsetB);
+    auto layoutMapB = makeStridedLinearLayoutMap(outerStridesB, outerOffsetB,
+                                                  op.getContext());
+    auto stridesArrayB = computeStrideArray(layoutMapB.compose(bTile));
+    assert(stridesArrayB.hasValue() && "computeStrideArray must succeed");
+
+    int64_t outerOffsetC;
+    llvm::SmallVector<int64_t, 4> outerStridesC;
+    auto memRefTypeC = cVal.getType().cast<MemRefType>();
+    getStridesAndOffset(memRefTypeC, outerStridesC, outerOffsetC);
+    auto layoutMapC = makeStridedLinearLayoutMap(outerStridesC, outerOffsetC,
+                                                  op.getContext());
+    auto stridesArrayC = computeStrideArray(layoutMapC.compose(cTile));
+    assert(stridesArrayC.hasValue() && "computeStrideArray must succeed");
+
+    llvm::SmallVector<int64_t, 3> xsmmLDs;
+    xsmmLDs.push_back(stridesArrayA->strides[0]);
+    xsmmLDs.push_back(stridesArrayB->strides[0]);
+    xsmmLDs.push_back(stridesArrayC->strides[0]);
+    auto lddims = bodyBuilder.getI64ArrayAttr(xsmmLDs);
+
+    auto dispatchgemm = bodyBuilder.create<xsmm::DispatchGemmOp>( 
+      op.getLoc(), bodyBuilder.getI64Type(), tiles, lddims );
+    
+    auto invokegemm = bodyBuilder.create<xsmm::InvokeGemmOp>(
+      op.getLoc(), cVal.getType(), dispatchgemm.getResult(), cVal, cMap, cTile,
+      aVal, aMap, aTile, bVal, bMap, bTile, tiles, mapOperands);
+    
+    opC.result().replaceAllUsesWith(invokegemm);
+
+    // Remove all other ops from the op interior
+    auto xsmm_it = std::prev(op.getBody()->end(), 3);
+    while (op.getBody()->begin() != xsmm_it) {
+      auto prev_it = std::prev(xsmm_it);
+      op.getBody()->getOperations().erase(prev_it);
+    }
+#endif
   }
 
 public:

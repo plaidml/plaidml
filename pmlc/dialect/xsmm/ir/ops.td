@@ -69,7 +69,9 @@ def XSMM_InvokeGemmOp : XSMM_Op<"invokegemm"> {
   let arguments = (ins I64:$ptr,
     AnyMemRef:$c, AffineMapAttr:$cAccessMap, AffineMapAttr:$cTileMap,
     AnyMemRef:$a, AffineMapAttr:$aAccessMap, AffineMapAttr:$aTileMap,
-    AnyMemRef:$b, AffineMapAttr:$bAccessMap, AffineMapAttr:$bTileMap);
+    AnyMemRef:$b, AffineMapAttr:$bAccessMap, AffineMapAttr:$bTileMap,
+    I64ArrayAttr:$tile,
+    Variadic<Index>:$mapOperands);
   let results = (outs AnyMemRef:$cout);
 
   let extraClassDeclaration = [{
