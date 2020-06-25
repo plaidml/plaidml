@@ -124,6 +124,7 @@ def convolution(
         autogroup_mode,
         deriv_mode,
         result_shape,
+        infer_result_shape=False,
 ):
     return op("convolution", [
         inputs,
@@ -143,6 +144,7 @@ def convolution(
         autogroup_mode,
         deriv_mode,
         result_shape,
+        infer_result_shape,
     ]).as_tensor()
 
 
