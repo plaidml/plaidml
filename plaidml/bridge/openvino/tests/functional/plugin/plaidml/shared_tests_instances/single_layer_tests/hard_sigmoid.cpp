@@ -10,8 +10,8 @@ using LayerTestsDefinitions::HardSigmoidLayerTest;
 
 namespace {
 
-std::vector<float> alphas = {1, 2};
-std::vector<float> betas = {2, 1};
+std::vector<float> alphas = {1.1, 2.2};
+std::vector<float> betas = {2.1, 1.2};
 
 std::vector<std::vector<size_t>> inShapes = {{2},                    //
                                              {1, 1, 1, 3},           //
