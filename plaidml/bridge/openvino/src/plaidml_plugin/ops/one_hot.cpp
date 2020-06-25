@@ -39,18 +39,12 @@ static OpRegistration reg("onehot", [](const Context& ctx) {
     }
   }
 
-  // create output tensor of new shape
   edsl::Tensor O = edsl::TensorOutput(O_dims);
-
-  // corresponding value in indices tensor
-
-  // auto i_axis = edsl::TensorIndex(5);//TODO:needs to be depth
   std::vector<edsl::TensorIndex> O_idxs(indices.rank() + 1);
   std::vector<edsl::TensorIndex> I_idxs(indices.rank());
   edsl::Tensor count = edsl::index(O_dims, axis);
   edsl::TensorIndex c;
   O(O_idxs) = indices(I_idxs) == count(c);
-  // O[O_idxs] = indices[I_idxs] == count[c]
   O = select(O, on_value, off_value);
   return edsl::make_tuple(O);
 });

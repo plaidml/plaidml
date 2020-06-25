@@ -19,7 +19,8 @@ const int64_t axis = 1;
 const size_t depth = 10;
 const float on_value = 3;
 const float off_value = 1;
-INSTANTIATE_TEST_CASE_P(NumSplitsCheck, OneHotLayerTest,
+
+INSTANTIATE_TEST_CASE_P(OneHotCheck, OneHotLayerTest,
                         ::testing::Combine(::testing::Values(axis),                              //
                                            ::testing::Values(depth),                             //
                                            ::testing::Values(on_value),                          //
