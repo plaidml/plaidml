@@ -144,6 +144,12 @@ class EW_BinaryIntOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
     Arguments<(ins EltwiseInteger:$lhs, EltwiseInteger:$rhs)>,
     Results<(outs EltwiseInteger:$result)>;
 
+class EW_BinaryBoolOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
+    EW_BinaryOp<mnemonic, traits>,
+    Arguments<(ins EltwiseBool:$lhs, EltwiseBool:$rhs)>,
+    Results<(outs EltwiseBool:$result)>;
+
+
 def EW_AbsOp : EW_UnaryOp<"abs">;
 def EW_ACosOp : EW_UnaryFloatOp<"acos">;
 def EW_AddOp : EW_BinaryOp<"add", [Commutative, NoSideEffect]>, HasFolder;
@@ -189,6 +195,10 @@ def EW_BitXorOp : EW_BinaryIntOp<"bit_xor", [Commutative, NoSideEffect]>;
 def EW_BitShlOp : EW_BinaryIntOp<"bit_shl">;
 def EW_BitShrOp : EW_BinaryIntOp<"bit_shr">;
 
+// logical operations
+def EW_LogicalAndOp : EW_BinaryOp<"logical_and", [Commutative, NoSideEffect]>;
+def EW_LogicalOrOp : EW_BinaryOp<"logical_or", [Commutative, NoSideEffect]>;
+def EW_LogicalXorOp : EW_BinaryOp<"logical_xor", [Commutative, NoSideEffect]>;
 
 def EW_SelectOp : EltwiseOp<"select">, HasCanonicalizer {
   let summary = "conditional selection";
