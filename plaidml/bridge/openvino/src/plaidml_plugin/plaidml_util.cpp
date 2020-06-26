@@ -57,8 +57,9 @@ plaidml::DType to_plaidml(const ngraph::element::Type& ng_type) {
       return plaidml::DType::UINT32;
     case ngraph::element::Type_t::u64:
       return plaidml::DType::UINT64;
-    case ngraph::element::Type_t::u1:
     case ngraph::element::Type_t::boolean:
+      return plaidml::DType::BOOLEAN;
+    case ngraph::element::Type_t::u1:
     case ngraph::element::Type_t::bf16:
     case ngraph::element::Type_t::undefined:
     case ngraph::element::Type_t::dynamic:
