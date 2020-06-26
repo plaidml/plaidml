@@ -31,7 +31,7 @@ static OpRegistration reg("maxpool", [](const Context& ctx) {
   auto input_layout = plaidml::op::TensorLayout::NCX;
   auto autopad_mode = to_plaidml(layer->get_auto_pad());
   bool include_padding_in_avg = false;
-  auto use_ceil_for_output_shape = to_plaidml(layer->get_rounding_type());
+  auto use_ceil_for_output_shape = layer->get_rounding_type() == ngraph::op::RoundingType::CEIL;
   std::vector<int> padding;
   if (autopad_mode == plaidml::op::AutoPadMode::EXPLICIT) {
     for (auto pad : layer->get_pads_begin()) {
