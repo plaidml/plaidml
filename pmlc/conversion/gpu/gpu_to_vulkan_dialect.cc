@@ -45,8 +45,6 @@ using mlir::Type;
 using mlir::UnrankedMemRefType;
 using mlir::Value;
 
-static constexpr const char *kSPIRVBinary = "SPIRV_BIN";
-static constexpr const char *kPrint_memref_f32 = "print_memref_f32";
 static constexpr const char *kInitVulkan = "initVulkan";
 static constexpr const char *kDeinitVulkan = "deinitVulkan";
 static constexpr const char *kSubmitCommandBuffers = "submitCommandBuffers";
@@ -241,26 +239,9 @@ Value ConvertGpuLaunchFuncToVulkanDialect::createEntryPointNameConstant(
 LogicalResult ConvertGpuLaunchFuncToVulkanDialect::bindBuffers(
     Location loc, OpBuilder &builder, gpu::LaunchFuncOp launchOp) {
   auto buffers = launchOp.operands();
-  // Create LLVM constant for the descriptor set index.
-  // Bind all memrefs to the `0` descriptor set, the same way as `GPUToSPIRV`
-  // pass does.
-  // Value descriptorSet = builder.create<LLVM::ConstantOp>(
-  //    loc, getLLVMInt32Type(), builder.getI32IntegerAttr(0));
-
   for (uint32_t bindIndex = 0; bindIndex < buffers.size(); bindIndex++) {
     auto buffer = buffers[bindIndex];
-    // Create LLVM constant for the descriptor binding index.
-    // Value descriptorBinding = builder.create<LLVM::ConstantOp>(
-    //    loc, getLLVMInt32Type(), builder.getI32IntegerAttr(bindIndex));
     if (auto memRefType = buffer.getType().dyn_cast_or_null<MemRefType>()) {
-      /*auto elementType = memRefType.getElementType();
-      Value unrankedBuffer = builder.create<mlir::MemRefCastOp>(
-          loc, buffer, getUnrankedMemRefType(elementType));
-      builder.create<CallOp>(
-          loc, ArrayRef<Type>{},
-          builder.getSymbolRefAttr(getBufferBindingFunc(elementType)),
-          ArrayRef<Value>{vulkanRuntime, descriptorSet, descriptorBinding,
-                          unrankedBuffer});*/
       builder.create<pmlc::dialect::vulkan::Alloc>(
           loc, builder.getType<pmlc::dialect::vulkan::BufferType>());
     } else {
@@ -295,22 +276,6 @@ LogicalResult ConvertGpuLaunchFuncToVulkanDialect::transferBuffers(
     llvm::SmallVector<uint64_t, 2> second;
     second.append({lauchFuncIndex, i});
     bufferMap[buffers[i]] = second;
-  }
-  return success();
-}
-
-LogicalResult ConvertGpuLaunchFuncToVulkanDialect::printBuffer(
-    Location loc, OpBuilder &builder, Value &buffer) {
-  auto type = buffer.getType();
-  if (auto memRefType = type.dyn_cast_or_null<MemRefType>()) {
-    auto elementType = memRefType.getElementType();
-    if (elementType.isF32()) {
-      auto unrankedBuffer = builder.create<mlir::MemRefCastOp>(
-          loc, buffer, getUnrankedMemRefType(elementType));
-      builder.create<CallOp>(loc, ArrayRef<Type>{},
-                             builder.getSymbolRefAttr(kPrint_memref_f32),
-                             ArrayRef<Value>(unrankedBuffer));
-    }
   }
   return success();
 }
@@ -377,16 +342,6 @@ void ConvertGpuLaunchFuncToVulkanDialect::declareVulkanFunctions(Location loc) {
                                       /*isVarArg=*/false));
   }
 
-  if (!module.lookupSymbol(kPrint_memref_f32)) {
-    auto &ctx = getContext();
-    builder.create<FuncOp>(
-        loc, kPrint_memref_f32,
-        FunctionType::get(
-            {ArrayRef<Type>{getUnrankedMemRefType(getMLIRFloat32Type())}}, {},
-            &ctx),
-        ArrayRef<std::pair<mlir::Identifier, mlir::Attribute>>());
-  }
-
   if (!module.lookupSymbol(kBindBufferFloat32)) {
     auto &ctx = getContext();
     builder.create<FuncOp>(
@@ -417,13 +372,6 @@ void ConvertGpuLaunchFuncToVulkanDialect::convertGpuLaunchFunc(
   ModuleOp module = getOperation();
   OpBuilder builder(launchOp);
   Location loc = launchOp.getLoc();
-  /*
-  if (lauchFuncIndex == 0) {
-    auto initVulkanCall = builder.create<LLVM::CallOp>(
-        loc, ArrayRef<Type>{getLLVMPointerType()},
-        builder.getSymbolRefAttr(kInitVulkan), ArrayRef<Value>{});
-    vulkanRuntime = initVulkanCall.getResult(0);
-  }*/
 
   if (lauchFuncIndex == 0) {
     auto initVulkanCall = builder.create<pmlc::dialect::vulkan::InitVulkanCall>(
@@ -436,15 +384,6 @@ void ConvertGpuLaunchFuncToVulkanDialect::convertGpuLaunchFunc(
   std::vector<char> binary;
   if (failed(createBinaryShader(module, binary)))
     return signalPassFailure();
-
-  /*
-  // Create LLVM global with SPIR-V binary data, so we can pass a pointer with
-  // that data to runtime call.
-  Value ptrToSPIRVBinary = LLVM::createGlobalString(
-      loc, builder, kSPIRVBinary + std::to_string(lauchFuncIndex),
-      {binary.data(), binary.size()}, LLVM::Linkage::Internal,
-      getLLVMDialect());
-  */
 
   auto shaderModule =
       builder.create<pmlc::dialect::vulkan::CreateShaderModuleOp>(
@@ -472,50 +411,18 @@ void ConvertGpuLaunchFuncToVulkanDialect::convertGpuLaunchFunc(
     return signalPassFailure();
   }
 
-  /*
-  // Create call to `setLaunchKernelAction` runtime function.
-  builder.create<LLVM::CallOp>(
-      loc, ArrayRef<Type>{},
-      builder.getSymbolRefAttr(kSetVulkanLaunchKernelAction),
-      ArrayRef<Value>{vulkanRuntime});
-  */
   builder.create<pmlc::dialect::vulkan::SetLaunchKernelAction>(
       loc, builder.getSymbolRefAttr(kSetVulkanLaunchKernelAction),
       ArrayRef<Value>{vulkanRuntime});
-
-  /*
-  builder.create<pmlc::dialect::vulkan::Dispatch>(
-      loc, shaderModule, launchOp.kernel(), gridSize.x, gridSize.y, gridSize.z);
-  */
 
   // Check and transfer VkBuffers when necessary.
   if (failed(transferBuffers(loc, builder, launchOp))) {
     return signalPassFailure();
   }
 
-  /*
-  // Create call to `AddVulkanLaunchActionToSchedule` runtime function.
-  builder.create<LLVM::CallOp>(
-      loc, ArrayRef<Type>{},
-      builder.getSymbolRefAttr(kAddVulkanLaunchActionToSchedule),
-      ArrayRef<Value>{vulkanRuntime});
-  */
   builder.create<pmlc::dialect::vulkan::AddVulkanLaunchActionToSchedule>(
       loc, builder.getSymbolRefAttr(kAddVulkanLaunchActionToSchedule),
       ArrayRef<Value>{vulkanRuntime});
-
-  /*
-  // Create call to 'submitCommandBuffers' and 'deinitVulkan' runtime function
-  // after the last GpuLauchFunc.
-  if (lauchFuncIndex == numKernel - 1) {
-    builder.create<LLVM::CallOp>(
-        loc, ArrayRef<Type>{}, builder.getSymbolRefAttr(kSubmitCommandBuffers),
-        ArrayRef<Value>{vulkanRuntime});
-    builder.create<LLVM::CallOp>(loc, ArrayRef<Type>{},
-                                 builder.getSymbolRefAttr(kDeinitVulkan),
-                                 ArrayRef<Value>{vulkanRuntime});
-  }
-  */
 
   if (lauchFuncIndex == numKernel - 1) {
     builder.create<pmlc::dialect::vulkan::SubmitCommandBuffers>(
@@ -527,19 +434,6 @@ void ConvertGpuLaunchFuncToVulkanDialect::convertGpuLaunchFunc(
         ArrayRef<Value>{vulkanRuntime});
   }
 
-  /*
-  // Print buffers
-  if (VLOG_IS_ON(4)) {
-    auto buffers = launchOp.operands();
-    for (auto buffer : buffers) {
-      if (failed(printBuffer(loc, builder, buffer))) {
-        return signalPassFailure();
-      }
-    }
-  }
-  // Declare runtime functions.
-  declareVulkanFunctions(loc);
-  */
   launchOp.erase();
   lauchFuncIndex++;
 }
