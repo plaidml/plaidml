@@ -38,6 +38,7 @@
 #include "pmlc/conversion/pxa_to_affine/passes.h"
 #include "pmlc/conversion/stdx_to_llvm/passes.h"
 #include "pmlc/conversion/tile_to_pxa/passes.h"
+#include "pmlc/conversion/gpu/lowering.h"
 #include "pmlc/dialect/pxa/transforms/passes.h"
 #include "pmlc/dialect/stdx/transforms/passes.h"
 #include "pmlc/dialect/tile/transforms/passes.h"
@@ -125,6 +126,10 @@ inline void registerAllPasses() {
   // Target: x86
 #define GEN_PASS_REGISTRATION
 #include "pmlc/target/x86/passes.h.inc"
+
+  // Target: gpu_to_vulkan
+#define GEN_PASS_REGISTRATION
+#include "pmlc/conversion/gpu/passes.h.inc"
 
   // Pass pipelines
   pmlc::target::intel_gen::registerPassPipeline();

@@ -18,6 +18,7 @@
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/dialect/stdx/ir/ops.h"
 #include "pmlc/dialect/tile/ir/ops.h"
+#include "pmlc/dialect/vulkan/ir/ops.h"
 #include "pmlc/dialect/xsmm/ir/ops.h"
 
 using namespace mlir; // NOLINT [build/namespaces]
@@ -43,6 +44,7 @@ inline void registerAllDialects() {
     registerDialect<pmlc::dialect::stdx::StdXDialect>();
     registerDialect<pmlc::dialect::tile::TileDialect>();
     registerDialect<pmlc::dialect::xsmm::XSMMDialect>();
+    registerDialect<pmlc::dialect::vulkan::VkDialect>();
     return true;
   }();
   (void)init_once;
