@@ -144,11 +144,6 @@ class EW_BinaryIntOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
     Arguments<(ins EltwiseInteger:$lhs, EltwiseInteger:$rhs)>,
     Results<(outs EltwiseInteger:$result)>;
 
-class EW_BinaryBoolOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
-    EW_BinaryOp<mnemonic, traits>,
-    Arguments<(ins EltwiseBool:$lhs, EltwiseBool:$rhs)>,
-    Results<(outs EltwiseBool:$result)>;
-
 class EW_BinaryLogicOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
     EW_BinaryOp<mnemonic, traits>,
     Arguments<(ins EltwiseAny:$lhs, EltwiseAny:$rhs)>,
