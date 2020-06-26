@@ -14,6 +14,7 @@ namespace plaidml::edsl {
 using MultiBuffer = std::variant<  //
     std::vector<float>,            //
     std::vector<double>,           //
+    std::vector<int8_t>,           //
     std::vector<int32_t>,          //
     std::vector<int64_t>,          //
     std::vector<uint32_t>,         //
