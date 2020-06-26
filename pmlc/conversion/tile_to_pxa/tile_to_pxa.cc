@@ -336,6 +336,27 @@ static Type promoteTypes(ConversionPatternRewriter &rewriter, Location loc,
   return bestType;
 }
 
+struct NegIOp {
+  Value create(ConversionPatternRewriter &rewriter, Location loc,
+               Type resultType, ArrayRef<Value> operands,
+               ArrayRef<Type> types) {
+    auto zero = rewriter.create<mlir::ConstantIntOp>(loc, 0, resultType);
+    auto neg = rewriter.create<mlir::SubIOp>(loc, zero, operands[0]);
+    return neg.getResult();
+  }
+};
+
+struct NotOp {
+  Value create(ConversionPatternRewriter &rewriter, Location loc,
+               Type resultType, ArrayRef<Value> operands,
+               ArrayRef<Type> types) {
+    // -(x + 1) = -1 - x
+    auto negOne = rewriter.create<mlir::ConstantIntOp>(loc, -1, resultType);
+    auto sub = rewriter.create<mlir::SubIOp>(loc, negOne, operands[0]);
+    return sub.getResult();
+  }
+};
+
 template <typename OpType>
 struct StdOp {
   Value create(ConversionPatternRewriter &rewriter, Location loc,
@@ -1077,6 +1098,7 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
                             ResultIs<EltwiseFloat>>,
         EltwiseOpConversion<ew::NegOp, StdOp<mlir::NegFOp>,
                             ResultIs<EltwiseFloat>>,
+        EltwiseOpConversion<ew::NegOp, NegIOp, ResultIs<EltwiseInteger>>,
         EltwiseOpConversion<ew::AddOp, StdOp<mlir::AddFOp>,
                             ResultIs<EltwiseFloat>>,
         EltwiseOpConversion<ew::AddOp, StdOp<mlir::AddIOp>,
@@ -1130,6 +1152,7 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
                             OperandsAre<EltwiseInteger>>,
         EltwiseOpConversion<ew::BitOrOp, StdOp<mlir::OrOp>,
                             OperandsAre<EltwiseInteger>>,
+        EltwiseOpConversion<ew::BitNotOp, NotOp>,
         EltwiseOpConversion<ew::BitXorOp, StdOp<mlir::XOrOp>,
                             OperandsAre<EltwiseInteger>>,
         EltwiseOpConversion<ew::BitShlOp, StdOp<mlir::ShiftLeftOp>,
