@@ -190,6 +190,7 @@ def EW_CmpNeOp : EW_CompareOp<"cmp_ne", [Commutative, NoSideEffect]>;
 def EW_CosHOp : EW_UnaryFloatOp<"cosh">;
 def EW_CosOp : EW_UnaryFloatOp<"cos">;
 def EW_DivOp : EW_BinaryOp<"div">, HasFolder;
+def EW_ErfOp : EW_UnaryFloatOp<"erf">;
 def EW_ExpOp : EW_UnaryFloatOp<"exp">;
 def EW_FloorOp : EW_UnaryOp<"floor">;
 // Prevent CSE from dropping 'ident' by avoiding the NoSideEffect trait

@@ -1026,6 +1026,13 @@ inline Tensor cos(const Tensor& x) { return Call("cos", x); }
 inline Tensor cosh(const Tensor& x) { return Call("cosh", x); }
 
 ///
+/// Computes the elementwise Gauss error function of `x`
+/// \param x Tensor
+/// \return Tensor
+///
+inline Tensor erf(const Tensor& x) { return Call("erf", x); }
+
+///
 /// Computes the elementwise natural exponential function of `x`: _e_<sup>x</sup>.
 /// \param x Tensor
 /// \return Tensor
