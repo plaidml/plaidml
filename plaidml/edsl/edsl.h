@@ -1504,6 +1504,10 @@ class Value {
     return ret;
   }
 
+  std::vector<int64_t> as_int_tuple_or_empty() const {  //
+    return is_none() ? std::vector<int64_t>{} : as_int_tuple();
+  }
+
   plaidml_value* as_ptr() const { return ptr_.get(); }
 
  private:
