@@ -149,6 +149,19 @@ class EW_BinaryBoolOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
     Arguments<(ins EltwiseBool:$lhs, EltwiseBool:$rhs)>,
     Results<(outs EltwiseBool:$result)>;
 
+class EW_BinaryLogicOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
+    EW_BinaryOp<mnemonic, traits>,
+    Arguments<(ins EltwiseAny:$lhs, EltwiseAny:$rhs)>,
+    Results<(outs EltwiseBool:$result)> {
+
+  let extraClassDeclaration = [{
+    static Type getResultType(ValueRange operands) {
+      return ComputeResultType(operands,
+        IntegerType::get(1, operands[0].getContext()));
+    }
+  }];
+}
+
 
 def EW_AbsOp : EW_UnaryOp<"abs">;
 def EW_ACosOp : EW_UnaryFloatOp<"acos">;
@@ -196,9 +209,9 @@ def EW_BitShlOp : EW_BinaryIntOp<"bit_shl">;
 def EW_BitShrOp : EW_BinaryIntOp<"bit_shr">;
 
 // logical operations
-def EW_LogicalAndOp : EW_BinaryOp<"logical_and", [Commutative, NoSideEffect]>;
-def EW_LogicalOrOp : EW_BinaryOp<"logical_or", [Commutative, NoSideEffect]>;
-def EW_LogicalXorOp : EW_BinaryOp<"logical_xor", [Commutative, NoSideEffect]>;
+def EW_LogicalAndOp : EW_BinaryLogicOp<"logical_and", [Commutative, NoSideEffect]>;
+def EW_LogicalOrOp : EW_BinaryLogicOp<"logical_or", [Commutative, NoSideEffect]>;
+def EW_LogicalXorOp : EW_BinaryLogicOp<"logical_xor", [Commutative, NoSideEffect]>;
 
 def EW_SelectOp : EltwiseOp<"select">, HasCanonicalizer {
   let summary = "conditional selection";

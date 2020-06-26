@@ -1202,9 +1202,9 @@ TEST_F(CppEdsl, LogicalAnd_uint64) {
   std::vector<std::uint64_t> B_input{10, 11, 12,  //
                                      13, 14, 15,  //
                                      16, 17, 18};
-  std::vector<std::uint64_t> C_output{1, 1, 1,  //
-                                      1, 0, 1,  //
-                                      1, 0, 1};
+  std::vector<std::int8_t> C_output{1, 1, 1,  //
+                                    1, 0, 1,  //
+                                    1, 0, 1};
   checkProgram(program, {{A, A_input}, {B, B_input}}, {{C, C_output}});
 }
 
@@ -1220,9 +1220,9 @@ TEST_F(CppEdsl, LogicalAnd_mixed) {
   std::vector<float> B_input{10.0, 11.0, 12.0,  //
                              13.0, 14.0, 15.0,  //
                              16.0, 17.0, 18.0};
-  std::vector<float> C_output{-1, -1, -1,  //
-                              -1, 0,  -1,  //
-                              -1, 0,  -1};
+  std::vector<std::int8_t> C_output{1, 1, 1,  //
+                                    1, 0, 1,  //
+                                    1, 0, 1};
   checkProgram(program, {{A, A_input}, {B, B_input}}, {{C, C_output}});
 }
 
@@ -1238,9 +1238,9 @@ TEST_F(CppEdsl, LogicalOr_uint64) {
   std::vector<std::uint64_t> B_input{10, 11, 12,  //
                                      0,  0,  0,   //
                                      16, 17, 18};
-  std::vector<std::uint64_t> C_output{1, 1, 1,  //
-                                      1, 0, 1,  //
-                                      1, 1, 1};
+  std::vector<std::int8_t> C_output{1, 1, 1,  //
+                                    1, 0, 1,  //
+                                    1, 1, 1};
   checkProgram(program, {{A, A_input}, {B, B_input}}, {{C, C_output}});
 }
 
@@ -1256,9 +1256,9 @@ TEST_F(CppEdsl, LogicalOr_float) {
   std::vector<float> B_input{10.0, 11.0, 12.0,  //
                              0.0,  0.0,  0.0,   //
                              16.0, 17.0, 18.0};
-  std::vector<float> C_output{-1.0, -1.0, -1.0,  //
-                              -1.0, 0.0,  -1.0,  //
-                              -1.0, -1.0, -1.0};
+  std::vector<std::int8_t> C_output{1, 1, 1,  //
+                                    1, 0, 1,  //
+                                    1, 1, 1};
   checkProgram(program, {{A, A_input}, {B, B_input}}, {{C, C_output}});
 }
 
@@ -1274,9 +1274,9 @@ TEST_F(CppEdsl, LogicalOr_int32) {
   std::vector<std::int32_t> B_input{10, 11, 12,  //
                                     0,  0,  0,   //
                                     16, 17, 18};
-  std::vector<std::int32_t> C_output{1, 1, 1,  //
-                                     1, 0, 1,  //
-                                     1, 1, 1};
+  std::vector<std::int8_t> C_output{1, 1, 1,  //
+                                    1, 0, 1,  //
+                                    1, 1, 1};
   checkProgram(program, {{A, A_input}, {B, B_input}}, {{C, C_output}});
 }
 
