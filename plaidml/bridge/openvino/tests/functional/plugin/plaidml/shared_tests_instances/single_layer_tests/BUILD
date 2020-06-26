@@ -12,6 +12,7 @@ cc_test(
             "extract_image_patches.cpp",
             "fake_quantize.cpp",
             "mvn.cpp",
+            "power.cpp",
             "select.cpp",
             "space_to_batch.cpp",
         ],
