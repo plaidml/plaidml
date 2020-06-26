@@ -273,8 +273,7 @@ public:
                                  op.bTileMap(), {tile[2], tile[1]});
     auto c = impl.prepareOperand(op.c(), op.cAccessMap(), op.getOperandsForC(),
                                  op.cTileMap(), {tile[0], tile[1]});
-    SmallVector<Value, 6> args{a.memref,           b.memref,
-                               c.memref           };
+    SmallVector<Value, 6> args{a, b, c};
     args.push_back(op.ptr());
 
     rewriter.create<CallOp>(op.getLoc(), symbol, ArrayRef<Type>{}, args );
@@ -291,10 +290,6 @@ public:
     Type elementType;
     UnrankedMemRefType unrankedType;
     SmallVector<unsigned, 3> tile;
-
-    struct PreparedOperand {
-      Value memref;
-    };
 
     Impl(xsmm::InvokeGemmOp op, PatternRewriter &rewriter)
         : op(op), rewriter(rewriter), loc(op.getLoc()),
@@ -323,7 +318,7 @@ public:
       return SymbolRefAttr::get(symbol, context);
     }
 
-    PreparedOperand prepareOperand(Value operand, AffineMap accessMap,
+    Value prepareOperand(Value operand, AffineMap accessMap,
                                    ValueRange mapOperands, AffineMap tileMap,
                                    ArrayRef<int64_t> sizes) {
       SmallVector<int64_t, 8> shape;
@@ -355,14 +350,7 @@ public:
                                                 /*strides=*/emptyValues);
       auto cast = rewriter.create<MemRefCastOp>(loc, subview, unrankedType);
 
-      auto layoutMap = makeStridedLinearLayoutMap(outerStrides, outerOffset,
-                                                  module.getContext());
-      auto stridesArray = computeStrideArray(layoutMap.compose(tileMap));
-      assert(stridesArray.hasValue() && "computeStrideArray must succeed");
-
-      //int64_t leadingDimStride = stridesArray->strides[0];
-      //auto leadingDimValue = createConstantIntOp(leadingDimStride);
-      return {cast};
+      return cast;
     }
   };
 };
