@@ -15,10 +15,9 @@ using namespace InferenceEngine;  // NOLINT[build/namespaces]
 namespace PlaidMLPlugin {
 
 static OpRegistration reg("minimum", [](const Context& ctx) {
-  // Note that nGraph ReLU does not include an alpha parameter
   IE_ASSERT(ctx.operands.size() == 2);
   auto A = ctx.operands.at(0);
-  auto B = ctx.operands.at(0);
+  auto B = ctx.operands.at(1);
   return edsl::make_tuple(op::minimum(A, B));
 });
 
