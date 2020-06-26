@@ -1324,6 +1324,8 @@ PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(>>, "bit_shr");
 PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(&, "bit_and");
 PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(|, "bit_or");
 PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(^, "bit_xor");
+PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(&&, "logical_and");
+PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(||, "logical_or");
 
 inline void IndexedTensor::Impl::MakeContraction(plaidml_agg_op agg_op, const IndexedTensor& rhs) {
   plaidml_combo_op combo_op;

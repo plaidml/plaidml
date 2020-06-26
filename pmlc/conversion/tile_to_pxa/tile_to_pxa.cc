@@ -424,6 +424,40 @@ struct CmpIntInequalityOp {
   }
 };
 
+template <typename OpType>
+struct LogicalOp {
+  Value create(ConversionPatternRewriter &rewriter, Location loc,
+               Type resultType, ArrayRef<Value> operands,
+               ArrayRef<Type> types) {
+    SmallVector<Value, 2> promoted;
+    for (unsigned i = 0; i < operands.size(); ++i) {
+      auto &operand = operands[i];
+      auto fromType = operand.getType();
+      if (auto floatType = fromType.dyn_cast<FloatType>()) {
+        auto value = convertFloatUsingType(llvm::APFloat(0.0), floatType);
+        auto zero =
+            rewriter.create<mlir::ConstantFloatOp>(loc, value, floatType);
+        promoted.push_back(
+            rewriter
+                .create<mlir::CmpFOp>(loc, CmpFPredicate::ONE, operand, zero)
+                .getResult());
+      } else if (auto intType = fromType.dyn_cast<IntegerType>()) {
+        auto zero = rewriter.create<mlir::ConstantIntOp>(loc, 0, intType);
+        promoted.push_back(
+            rewriter.create<mlir::CmpIOp>(loc, CmpIPredicate::ne, operand, zero)
+                .getResult());
+      } else {
+        llvm_unreachable("Unknown type for LogicalOp");
+      }
+    }
+    auto attrs = ArrayRef<NamedAttribute>{};
+    Type boolType = IntegerType::get(1, rewriter.getContext());
+    auto resultTypes = llvm::makeArrayRef(boolType);
+    auto op = rewriter.create<OpType>(loc, resultTypes, promoted, attrs);
+    return op.getOperation()->getResult(0);
+  }
+};
+
 static Value createInit(OpBuilder &builder, Location loc, Type type,
                         AggregationKind agg) {
   if (auto floatType = type.dyn_cast<FloatType>()) {
@@ -1161,6 +1195,9 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
                             FirstOperandIs<EltwiseSigned>>,
         EltwiseOpConversion<ew::BitShrOp, StdOp<mlir::UnsignedShiftRightOp>,
                             FirstOperandIs<EltwiseUnsigned>>,
+        EltwiseOpConversion<ew::LogicalAndOp, LogicalOp<mlir::AndOp>>,
+        EltwiseOpConversion<ew::LogicalOrOp, LogicalOp<mlir::OrOp>>,
+        EltwiseOpConversion<ew::LogicalXorOp, LogicalOp<mlir::XOrOp>>,
         EltwiseOpConversion<ew::SelectOp, SelectOp>,
         EltwiseOpConversion<ew::IdentOp, FirstOperand>>(&getContext());
     // Run the conversion

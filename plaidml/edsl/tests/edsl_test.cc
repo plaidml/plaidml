@@ -1204,5 +1204,95 @@ TEST_F(CppEdsl, ConvI8) {
   runProgram(program);
 }
 
+TEST_F(CppEdsl, LogicalAnd_uint64) {
+  auto A = Placeholder(DType::UINT64, {3, 3});
+  auto B = Placeholder(DType::UINT64, {3, 3});
+  auto C = A && B;
+  auto program = makeProgram("logical_and", {C});
+
+  std::vector<uint64_t> A_input{1, 2, 3,  //
+                                4, 0, 6,  //
+                                7, 0, 9};
+  std::vector<uint64_t> B_input{10, 11, 12,  //
+                                13, 14, 15,  //
+                                16, 17, 18};
+  std::vector<int8_t> C_output{1, 1, 1,  //
+                               1, 0, 1,  //
+                               1, 0, 1};
+  checkProgram(program, {{A, A_input}, {B, B_input}}, {{C, C_output}});
+}
+
+TEST_F(CppEdsl, LogicalAnd_mixed) {
+  auto A = Placeholder(DType::UINT64, {3, 3});
+  auto B = Placeholder(DType::FLOAT32, {3, 3});
+  auto C = A && B;
+  auto program = makeProgram("logical_and", {C});
+
+  std::vector<uint64_t> A_input{1, 2, 3,  //
+                                4, 0, 6,  //
+                                7, 0, 9};
+  std::vector<float> B_input{10.0, 11.0, 12.0,  //
+                             13.0, 14.0, 15.0,  //
+                             16.0, 17.0, 18.0};
+  std::vector<int8_t> C_output{1, 1, 1,  //
+                               1, 0, 1,  //
+                               1, 0, 1};
+  checkProgram(program, {{A, A_input}, {B, B_input}}, {{C, C_output}});
+}
+
+TEST_F(CppEdsl, LogicalOr_uint64) {
+  auto A = Placeholder(DType::UINT64, {3, 3});
+  auto B = Placeholder(DType::UINT64, {3, 3});
+  auto C = A || B;
+  auto program = makeProgram("logical_or", {C});
+
+  std::vector<uint64_t> A_input{1, 2, 3,  //
+                                4, 0, 6,  //
+                                7, 0, 9};
+  std::vector<uint64_t> B_input{10, 11, 12,  //
+                                0,  0,  0,   //
+                                16, 17, 18};
+  std::vector<int8_t> C_output{1, 1, 1,  //
+                               1, 0, 1,  //
+                               1, 1, 1};
+  checkProgram(program, {{A, A_input}, {B, B_input}}, {{C, C_output}});
+}
+
+TEST_F(CppEdsl, LogicalOr_float) {
+  auto A = Placeholder(DType::FLOAT32, {3, 3});
+  auto B = Placeholder(DType::FLOAT32, {3, 3});
+  auto C = A || B;
+  auto program = makeProgram("logical_or", {C});
+
+  std::vector<float> A_input{1.0, 2.0, 3.0,  //
+                             4.0, 0.0, 6.0,  //
+                             7.0, 0.0, 9.0};
+  std::vector<float> B_input{10.0, 11.0, 12.0,  //
+                             0.0,  0.0,  0.0,   //
+                             16.0, 17.0, 18.0};
+  std::vector<int8_t> C_output{1, 1, 1,  //
+                               1, 0, 1,  //
+                               1, 1, 1};
+  checkProgram(program, {{A, A_input}, {B, B_input}}, {{C, C_output}});
+}
+
+TEST_F(CppEdsl, LogicalOr_int32) {
+  auto A = Placeholder(DType::INT32, {3, 3});
+  auto B = Placeholder(DType::INT32, {3, 3});
+  auto C = A || B;
+  auto program = makeProgram("logical_or", {C});
+
+  std::vector<int32_t> A_input{1, 2, 3,  //
+                               4, 0, 6,  //
+                               7, 0, 9};
+  std::vector<int32_t> B_input{10, 11, 12,  //
+                               0,  0,  0,   //
+                               16, 17, 18};
+  std::vector<int8_t> C_output{1, 1, 1,  //
+                               1, 0, 1,  //
+                               1, 1, 1};
+  checkProgram(program, {{A, A_input}, {B, B_input}}, {{C, C_output}});
+}
+
 }  // namespace
 }  // namespace plaidml::edsl
