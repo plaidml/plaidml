@@ -20,7 +20,7 @@ filegroup(
         "//pmlc/dialect/stdx/tests:all",
         "//pmlc/dialect/tile/tests:all",
         "//pmlc/dialect/xsmm/tests:all",
-	"//pmlc/dialect/vulkan/tests:all",
+        "//pmlc/dialect/vulkan/tests:all",
         "//pmlc/rt/tests:all",
         "//pmlc/rt/vulkan/tests:all",
         "//pmlc/target/intel_gen/tests:all",
