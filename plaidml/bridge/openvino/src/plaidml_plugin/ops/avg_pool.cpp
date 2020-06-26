@@ -30,8 +30,8 @@ static OpRegistration reg("avgpool", [](const Context& ctx) {
   auto pool_type = plaidml::op::PoolMode::AVG;
   auto input_layout = plaidml::op::TensorLayout::NCX;
   auto autopad_mode = to_plaidml(layer->get_auto_pad());
-  bool include_padding_in_avg = false;
-  bool use_ceil_for_output_shape = false;
+  auto include_padding_in_avg = to_plaidml(layer->get_exclude_pad();
+  auto use_ceil_for_output_shape = to_plaidml(layer->get_rounding_type());
   std::vector<int> padding;
   if (autopad_mode == plaidml::op::AutoPadMode::EXPLICIT) {
     for (auto pad : layer->get_pads_begin()) {
