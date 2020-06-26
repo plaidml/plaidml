@@ -16,7 +16,7 @@ using namespace InferenceEngine;  // NOLINT[build/namespaces]
 namespace PlaidMLPlugin {
 
 static OpRegistration reg("maxpool", [](const Context& ctx) {
-  auto* layer = dynamic_cast<ngraph::opset1::AvgPool*>(ctx.layer);
+  auto* layer = dynamic_cast<ngraph::opset1::MaxPool*>(ctx.layer);
   IE_ASSERT(ctx.operands.size() == 1);
   auto I = ctx.operands.at(0);
   std::vector<int> strides;
@@ -31,7 +31,7 @@ static OpRegistration reg("maxpool", [](const Context& ctx) {
   auto input_layout = plaidml::op::TensorLayout::NCX;
   auto autopad_mode = to_plaidml(layer->get_auto_pad());
   bool include_padding_in_avg = false;
-  bool use_ceil_for_output_shape = false;
+  auto use_ceil_for_output_shape = layer->get_rounding_type() == ngraph::op::RoundingType::CEIL;
   std::vector<int> padding;
   if (autopad_mode == plaidml::op::AutoPadMode::EXPLICIT) {
     for (auto pad : layer->get_pads_begin()) {
