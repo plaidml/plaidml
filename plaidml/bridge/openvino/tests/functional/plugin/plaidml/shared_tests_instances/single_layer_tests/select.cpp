@@ -7,14 +7,16 @@
 #include "common_test_utils/test_constants.hpp"
 #include "single_layer_tests/select.hpp"
 
-using namespace LayerTestsDefinitions;
+using LayerTestsDefinitions : SelectLayerTest;
+
+namespace {
 
 const std::vector<InferenceEngine::Precision> inputPrecision = {
-    InferenceEngine::Precision::I8,    //
-    InferenceEngine::Precision::I16,   //
-    InferenceEngine::Precision::I32,   //
+    // InferenceEngine::Precision::I8,    //
+    // InferenceEngine::Precision::I16,   //
+    // InferenceEngine::Precision::I32,   //
     InferenceEngine::Precision::FP32,  //
-    InferenceEngine::Precision::I64    //
+                                       // InferenceEngine::Precision::I64    //
 };
 
 const std::vector<std::vector<std::vector<size_t>>> noneShapes = {
@@ -29,7 +31,7 @@ const std::vector<std::vector<std::vector<size_t>>> noneShapes = {
 const auto noneCases = ::testing::Combine(::testing::ValuesIn(noneShapes),                         //
                                           ::testing::ValuesIn(inputPrecision),                     //
                                           ::testing::Values(ngraph::op::AutoBroadcastSpec::NONE),  //
-                                          ::testing::Values(CommonTestUtils::DEVICE_CPU)           //
+                                          ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)       //
 );
 
 const std::vector<std::vector<std::vector<size_t>>> numpyShapes = {
@@ -73,7 +75,7 @@ const std::vector<std::vector<std::vector<size_t>>> numpyShapes = {
 };
 
 const auto numpyCases = ::testing::Combine(::testing::ValuesIn(numpyShapes),                         //
-                                           ::testing::ValuesIn(inputPrecision),                      //
+                                           ::testing::ValuesIn(netPrecision),                        //
                                            ::testing::Values(ngraph::op::AutoBroadcastSpec::NUMPY),  //
                                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)        //
 );
@@ -81,3 +83,5 @@ const auto numpyCases = ::testing::Combine(::testing::ValuesIn(numpyShapes),    
 INSTANTIATE_TEST_CASE_P(smoke_MKLDNN_TestsSelect_none, SelectLayerTest, noneCases, SelectLayerTest::getTestCaseName);
 
 INSTANTIATE_TEST_CASE_P(smoke_MKLDNN_TestsSelect_numpy, SelectLayerTest, numpyCases, SelectLayerTest::getTestCaseName);
+
+}  // namespace

@@ -16,10 +16,18 @@ const std::vector<InferenceEngine::Precision> netPrecisions = {
     InferenceEngine::Precision::FP32,
 };
 
-const auto cases =
-    ::testing::Combine(::testing::Values(std::vector<size_t>({1, 50}), std::vector<size_t>({1, 128})),  //
-                       ::testing::ValuesIn(netPrecisions),                                              //
-                       ::testing::Values(CommonTestUtils::DEVICE_PLAIDML));
+std::vector<std::vector<std::vector<size_t>>> inputShapes = {
+    {{1}, {1}},                         //
+    {{8}, {8}},                         //
+    {{4, 5}, {4, 5}},                   //
+    {{3, 4, 5}, {3, 4, 5}},             //
+    {{2, 3, 4, 5}, {2, 3, 4, 5}},       //
+    {{2, 3, 4, 5, 6}, {2, 3, 4, 5, 6}}  //
+};
+
+const auto cases = ::testing::Combine(::testing::ValuesIn(inputShapes),    //
+                                      ::testing::ValuesIn(netPrecisions),  //
+                                      ::testing::Values(CommonTestUtils::DEVICE_PLAIDML));
 
 INSTANTIATE_TEST_CASE_P(CompareWithRefs, EqualLayerTest, cases, EqualLayerTest::getTestCaseName);
 }  // namespace
