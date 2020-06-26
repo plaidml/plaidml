@@ -107,24 +107,24 @@ TEST_F(CppEdsl, Cast) {
   auto B = cast(A, DType::UINT32);
   auto program = makeProgram("cast", {B});
 
-  std::vector<std::uint64_t> A_input{1,
-                                     2,
-                                     3,
-                                     4,
-                                     5,
-                                     6 + (1UL << 12),
-                                     7 + (1UL << 24),
-                                     8 + (1UL << 31),  //
-                                     (1ULL << 32) - 1};
-  std::vector<std::uint32_t> B_output{1,
-                                      2,
-                                      3,
-                                      4,
-                                      5,
-                                      6 + (1UL << 12),
-                                      7 + (1UL << 24),
-                                      8 + (1UL << 31),  //
-                                      (1ULL << 32) - 1};
+  std::vector<uint64_t> A_input{1,
+                                2,
+                                3,
+                                4,
+                                5,
+                                6 + (1UL << 12),
+                                7 + (1UL << 24),
+                                8 + (1UL << 31),  //
+                                (1ULL << 32) - 1};
+  std::vector<uint32_t> B_output{1,
+                                 2,
+                                 3,
+                                 4,
+                                 5,
+                                 6 + (1UL << 12),
+                                 7 + (1UL << 24),
+                                 8 + (1UL << 31),  //
+                                 (1ULL << 32) - 1};
   checkProgram(program, {{A, A_input}}, {{B, B_output}});
 }
 
@@ -132,17 +132,17 @@ TEST_F(CppEdsl, BitAndScalar) {
   const uint64_t ONE = 1;
 
   auto A = Placeholder(DType::UINT64, {3, 3});
-  std::uint64_t mask = UINT32_MAX;
+  uint64_t mask = UINT32_MAX;
   auto B = A & mask;
   auto program = ProgramBuilder("bit_and", {B}).intx(DType::UINT64).compile();
   std::cout << program << std::endl;
 
-  std::vector<std::uint64_t> A_input{(ONE << 32),     (ONE << 33) + 1, (ONE << 34) + 2,  //
-                                     (ONE << 35) + 3, (ONE << 36) + 4, (ONE << 37) + 5,  //
-                                     (ONE << 38) + 6, (ONE << 39) + 7, (ONE << 40) + 8};
-  std::vector<std::uint64_t> B_output{0, 1, 2,  //
-                                      3, 4, 5,  //
-                                      6, 7, 8};
+  std::vector<uint64_t> A_input{(ONE << 32),     (ONE << 33) + 1, (ONE << 34) + 2,  //
+                                (ONE << 35) + 3, (ONE << 36) + 4, (ONE << 37) + 5,  //
+                                (ONE << 38) + 6, (ONE << 39) + 7, (ONE << 40) + 8};
+  std::vector<uint64_t> B_output{0, 1, 2,  //
+                                 3, 4, 5,  //
+                                 6, 7, 8};
   checkProgram(program, {{A, A_input}}, {{B, B_output}});
 }
 
@@ -152,15 +152,15 @@ TEST_F(CppEdsl, BitAnd) {
   auto C = A & B;
   auto program = makeProgram("bit_and", {C});
 
-  std::vector<std::uint64_t> A_input{1, 2, 3,  //
-                                     4, 5, 6,  //
-                                     7, 8, 9};
-  std::vector<std::uint64_t> B_input{10, 11, 12,  //
-                                     13, 14, 15,  //
-                                     16, 17, 18};
-  std::vector<std::uint64_t> C_output{1 & 10, 2 & 11, 3 & 12,  //
-                                      4 & 13, 5 & 14, 6 & 15,  //
-                                      7 & 16, 8 & 17, 9 & 18};
+  std::vector<uint64_t> A_input{1, 2, 3,  //
+                                4, 5, 6,  //
+                                7, 8, 9};
+  std::vector<uint64_t> B_input{10, 11, 12,  //
+                                13, 14, 15,  //
+                                16, 17, 18};
+  std::vector<uint64_t> C_output{1 & 10, 2 & 11, 3 & 12,  //
+                                 4 & 13, 5 & 14, 6 & 15,  //
+                                 7 & 16, 8 & 17, 9 & 18};
   checkProgram(program, {{A, A_input}, {B, B_input}}, {{C, C_output}});
 }
 
@@ -170,15 +170,15 @@ TEST_F(CppEdsl, BitOr) {
   auto C = A | B;
   auto program = makeProgram("bit_or", {C});
 
-  std::vector<std::uint64_t> A_input{1, 2, 3,  //
-                                     4, 5, 6,  //
-                                     7, 8, 9};
-  std::vector<std::uint64_t> B_input{10, 11, 12,  //
-                                     13, 14, 15,  //
-                                     16, 17, 18};
-  std::vector<std::uint64_t> C_output{1 | 10, 2 | 11, 3 | 12,  //
-                                      4 | 13, 5 | 14, 6 | 15,  //
-                                      7 | 16, 8 | 17, 9 | 18};
+  std::vector<uint64_t> A_input{1, 2, 3,  //
+                                4, 5, 6,  //
+                                7, 8, 9};
+  std::vector<uint64_t> B_input{10, 11, 12,  //
+                                13, 14, 15,  //
+                                16, 17, 18};
+  std::vector<uint64_t> C_output{1 | 10, 2 | 11, 3 | 12,  //
+                                 4 | 13, 5 | 14, 6 | 15,  //
+                                 7 | 16, 8 | 17, 9 | 18};
   checkProgram(program, {{A, A_input}, {B, B_input}}, {{C, C_output}});
 }
 
@@ -188,15 +188,15 @@ TEST_F(CppEdsl, BitLeft) {
   auto C = A << B;
   auto program = makeProgram("bit_left", {C});
 
-  std::vector<std::uint64_t> A_input{1, 2, 3,  //
-                                     4, 5, 6,  //
-                                     7, 8, 9};
-  std::vector<std::uint64_t> B_input{10, 11, 12,  //
-                                     13, 14, 15,  //
-                                     16, 17, 18};
-  std::vector<std::uint64_t> C_output{1 << 10, 2 << 11, 3 << 12,  //
-                                      4 << 13, 5 << 14, 6 << 15,  //
-                                      7 << 16, 8 << 17, 9 << 18};
+  std::vector<uint64_t> A_input{1, 2, 3,  //
+                                4, 5, 6,  //
+                                7, 8, 9};
+  std::vector<uint64_t> B_input{10, 11, 12,  //
+                                13, 14, 15,  //
+                                16, 17, 18};
+  std::vector<uint64_t> C_output{1 << 10, 2 << 11, 3 << 12,  //
+                                 4 << 13, 5 << 14, 6 << 15,  //
+                                 7 << 16, 8 << 17, 9 << 18};
   checkProgram(program, {{A, A_input}, {B, B_input}}, {{C, C_output}});
 }
 
@@ -206,15 +206,15 @@ TEST_F(CppEdsl, BitRightTensor) {
   auto C = A >> B;
   auto program = makeProgram("bit_right_tensor", {C});
 
-  std::vector<std::uint64_t> A_input{1 << 10, 2 << 11, 3 << 12,  //
-                                     4 << 13, 5 << 14, 6 << 15,  //
-                                     7 << 16, 8 << 17, 9 << 18};
-  std::vector<std::uint64_t> B_input{10, 11, 12,  //
-                                     13, 14, 15,  //
-                                     16, 17, 18};
-  std::vector<std::uint64_t> C_output{1, 2, 3,  //
-                                      4, 5, 6,  //
-                                      7, 8, 9};
+  std::vector<uint64_t> A_input{1 << 10, 2 << 11, 3 << 12,  //
+                                4 << 13, 5 << 14, 6 << 15,  //
+                                7 << 16, 8 << 17, 9 << 18};
+  std::vector<uint64_t> B_input{10, 11, 12,  //
+                                13, 14, 15,  //
+                                16, 17, 18};
+  std::vector<uint64_t> C_output{1, 2, 3,  //
+                                 4, 5, 6,  //
+                                 7, 8, 9};
   checkProgram(program, {{A, A_input}, {B, B_input}}, {{C, C_output}});
 }
 
@@ -223,12 +223,26 @@ TEST_F(CppEdsl, BitRightScalar) {
   auto B = A >> 9;
   auto program = makeProgram("bit_right_scalar", {B});
 
-  std::vector<std::uint64_t> A_input{1 << 10, 2 << 11, 3 << 12,  //
-                                     4 << 13, 5 << 14, 6 << 15,  //
-                                     7 << 16, 8 << 17, 9 << 18};
-  std::vector<std::uint64_t> B_output{1 << 1, 2 << 2, 3 << 3,  //
-                                      4 << 4, 5 << 5, 6 << 6,  //
-                                      7 << 7, 8 << 8, 9 << 9};
+  std::vector<uint64_t> A_input{1 << 10, 2 << 11, 3 << 12,  //
+                                4 << 13, 5 << 14, 6 << 15,  //
+                                7 << 16, 8 << 17, 9 << 18};
+  std::vector<uint64_t> B_output{1 << 1, 2 << 2, 3 << 3,  //
+                                 4 << 4, 5 << 5, 6 << 6,  //
+                                 7 << 7, 8 << 8, 9 << 9};
+  checkProgram(program, {{A, A_input}}, {{B, B_output}});
+}
+
+TEST_F(CppEdsl, BitNot) {
+  auto A = Placeholder(DType::UINT8, {3, 3});
+  auto B = ~A;
+  auto program = makeProgram("bit_not", {B});
+
+  std::vector<uint8_t> A_input{0x00, 0x01, 0x02,  //
+                               0x10, 0x11, 0x22,  //
+                               0xF0, 0x0F, 0xFF};
+  std::vector<uint8_t> B_output{0xFF, 0xFE, 0xFD,  //
+                                0xEF, 0xEE, 0xDD,  //
+                                0x0F, 0xF0, 0x00};
   checkProgram(program, {{A, A_input}}, {{B, B_output}});
 }
 
@@ -238,15 +252,15 @@ TEST_F(CppEdsl, BitXor) {
   auto C = A ^ B;
   auto program = makeProgram("bit_xor", {C});
 
-  std::vector<std::uint64_t> A_input{1, 2, 3,  //
-                                     4, 5, 6,  //
-                                     7, 8, 9};
-  std::vector<std::uint64_t> B_input{10, 11, 12,  //
-                                     13, 14, 15,  //
-                                     16, 17, 18};
-  std::vector<std::uint64_t> C_output{1 ^ 10, 2 ^ 11, 3 ^ 12,  //
-                                      4 ^ 13, 5 ^ 14, 6 ^ 15,  //
-                                      7 ^ 16, 8 ^ 17, 9 ^ 18};
+  std::vector<uint64_t> A_input{1, 2, 3,  //
+                                4, 5, 6,  //
+                                7, 8, 9};
+  std::vector<uint64_t> B_input{10, 11, 12,  //
+                                13, 14, 15,  //
+                                16, 17, 18};
+  std::vector<uint64_t> C_output{1 ^ 10, 2 ^ 11, 3 ^ 12,  //
+                                 4 ^ 13, 5 ^ 14, 6 ^ 15,  //
+                                 7 ^ 16, 8 ^ 17, 9 ^ 18};
   checkProgram(program, {{A, A_input}, {B, B_input}}, {{C, C_output}});
 }
 
@@ -256,13 +270,13 @@ TEST_F(CppEdsl, BroadcastCmp) {
   auto C = cast(A >= B, DType::UINT64);
   auto program = makeProgram("broadcast_cmp", {C});
 
-  std::vector<std::uint64_t> A_input = {0, 1, 2,  3,  //
-                                        4, 5, 6,  7,  //
-                                        8, 9, 10, 11};
-  std::vector<std::uint64_t> B_input = {0, 6, 12};
-  std::vector<std::uint64_t> C_output = {1, 1, 1, 1,  //
-                                         0, 0, 1, 1,  //
-                                         0, 0, 0, 0};
+  std::vector<uint64_t> A_input = {0, 1, 2,  3,  //
+                                   4, 5, 6,  7,  //
+                                   8, 9, 10, 11};
+  std::vector<uint64_t> B_input = {0, 6, 12};
+  std::vector<uint64_t> C_output = {1, 1, 1, 1,  //
+                                    0, 0, 1, 1,  //
+                                    0, 0, 0, 0};
   checkProgram(program, {{A, A_input}, {B, B_input}}, {{C, C_output}});
 }
 
@@ -272,7 +286,7 @@ TEST_F(CppEdsl, Add) {
   auto C = A + B;
   auto program = makeProgram("add", {C});
 
-  std::vector<std::uint64_t> A_input = {
+  std::vector<uint64_t> A_input = {
       1,
       2,
       3,
@@ -284,25 +298,25 @@ TEST_F(CppEdsl, Add) {
       9 + (1ULL << 40)  //
   };
 
-  std::vector<std::uint64_t> B_input = {1,
-                                        2 + (1UL << 12),
-                                        3,
-                                        4 + (1UL << 24),
-                                        5,
-                                        6 + (1ULL << 32),
-                                        7,
-                                        8 + (1ULL << 40),  //
-                                        9};
+  std::vector<uint64_t> B_input = {1,
+                                   2 + (1UL << 12),
+                                   3,
+                                   4 + (1UL << 24),
+                                   5,
+                                   6 + (1ULL << 32),
+                                   7,
+                                   8 + (1ULL << 40),  //
+                                   9};
 
-  std::vector<std::uint64_t> C_output = {2,
-                                         4 + (1UL << 12),
-                                         6,
-                                         8 + (1UL << 24),
-                                         10,
-                                         12 + (1UL << 12) + (1ULL << 32),
-                                         14 + (1UL << 24),
-                                         16 + (1ULL << 32) + (1ULL << 40),
-                                         18 + (1ULL << 40)};
+  std::vector<uint64_t> C_output = {2,
+                                    4 + (1UL << 12),
+                                    6,
+                                    8 + (1UL << 24),
+                                    10,
+                                    12 + (1UL << 12) + (1ULL << 32),
+                                    14 + (1UL << 24),
+                                    16 + (1ULL << 32) + (1ULL << 40),
+                                    18 + (1ULL << 40)};
 
   checkProgram(program, {{A, A_input}, {B, B_input}}, {{C, C_output}});
 }
@@ -438,15 +452,15 @@ TEST_F(CppEdsl, EltwiseMod) {
   // CHECK: return %{{.*}} : tensor<3x3xsi32>
   // clang-format on
 
-  std::vector<std::int32_t> A_input{2,   4,   8,   //
-                                    16,  32,  64,  //
-                                    128, 256, 512};
-  std::vector<std::int32_t> B_input{1, 2, 3,  //
-                                    4, 5, 6,  //
-                                    7, 8, 9};
-  std::vector<std::int32_t> C_output{2 % 1,   4 % 2,   8 % 3,   //
-                                     16 % 4,  32 % 5,  64 % 6,  //
-                                     128 % 7, 256 % 8, 512 % 9};
+  std::vector<int32_t> A_input{2,   4,   8,   //
+                               16,  32,  64,  //
+                               128, 256, 512};
+  std::vector<int32_t> B_input{1, 2, 3,  //
+                               4, 5, 6,  //
+                               7, 8, 9};
+  std::vector<int32_t> C_output{2 % 1,   4 % 2,   8 % 3,   //
+                                16 % 4,  32 % 5,  64 % 6,  //
+                                128 % 7, 256 % 8, 512 % 9};
   checkProgram(program, {{A, A_input}, {B, B_input}}, {{C, C_output}});
 }
 
@@ -570,7 +584,7 @@ TEST_F(CppEdsl, MnistCnn) {
   auto kernel3 = Placeholder(DType::FLOAT32, {12544, 128});
   auto bias3 = Placeholder(DType::FLOAT32, {128});
   auto dense1 = Relu(Dot(flat, kernel3) + bias3);
-  const std::int64_t kNumClasses = 100;
+  const int64_t kNumClasses = 100;
   // model.add(Dense(num_classes, activation='softmax'))
   auto kernel4 = Placeholder(DType::FLOAT32, {128, kNumClasses});
   auto bias4 = Placeholder(DType::FLOAT32, {kNumClasses});
@@ -744,7 +758,7 @@ Tensor Winograd(const Tensor& I, const Tensor& K, const Tensor& A, const Tensor&
 }
 
 TEST_F(CppEdsl, Winograd) {
-  const std::int64_t N = 1, X = 224, Y = 224, CI = 3, S = 3, CO = 32, BI = 32, BO = BI - CI + 1;
+  const int64_t N = 1, X = 224, Y = 224, CI = 3, S = 3, CO = 32, BI = 32, BO = BI - CI + 1;
   auto I = Placeholder(DType::FLOAT32, {N, X, Y, CI});
   auto K = Placeholder(DType::FLOAT32, {S, S, CI, CO});
   auto A = Placeholder(DType::FLOAT32, {BI, BO});
@@ -901,7 +915,7 @@ TEST_F(CppEdsl, ReshapeFold) {
 
 TEST_F(CppEdsl, ReshapeScalar) {
   auto A = Placeholder(DType::INT32, {}, "A");
-  std::vector<std::int64_t> shape = {};
+  std::vector<int64_t> shape = {};
   auto R = reshape(A, shape);
   auto program = makeProgram("reshape_scalar", {R});
   // clang-format off
@@ -916,7 +930,7 @@ TEST_F(CppEdsl, ReshapeScalar) {
 
 TEST_F(CppEdsl, ReshapeIntoScalar) {
   auto A = Placeholder(DType::INT32, {1, 1, 1}, "A");
-  std::vector<std::int64_t> shape = {};
+  std::vector<int64_t> shape = {};
   auto R = reshape(A, shape);
   auto program = makeProgram("reshape_into_scalar", {R});
   // clang-format off
@@ -932,7 +946,7 @@ TEST_F(CppEdsl, ReshapeIntoScalar) {
 
 TEST_F(CppEdsl, ReshapeFromScalar) {
   auto A = Placeholder(DType::INT32, {}, "A");
-  std::vector<std::int64_t> shape = {1, 1, 1};
+  std::vector<int64_t> shape = {1, 1, 1};
   auto R = reshape(A, shape);
   auto program = makeProgram("reshape_from_scalar", {R});
   // clang-format off
@@ -1204,6 +1218,96 @@ TEST_F(CppEdsl, ConvI8) {
   // CHECK: return %{{.*}} : tensor<1x224x224x32xsi8>
   // clang-format on
   runProgram(program);
+}
+
+TEST_F(CppEdsl, LogicalAnd_uint64) {
+  auto A = Placeholder(DType::UINT64, {3, 3});
+  auto B = Placeholder(DType::UINT64, {3, 3});
+  auto C = A && B;
+  auto program = makeProgram("logical_and", {C});
+
+  std::vector<uint64_t> A_input{1, 2, 3,  //
+                                4, 0, 6,  //
+                                7, 0, 9};
+  std::vector<uint64_t> B_input{10, 11, 12,  //
+                                13, 14, 15,  //
+                                16, 17, 18};
+  std::vector<int8_t> C_output{1, 1, 1,  //
+                               1, 0, 1,  //
+                               1, 0, 1};
+  checkProgram(program, {{A, A_input}, {B, B_input}}, {{C, C_output}});
+}
+
+TEST_F(CppEdsl, LogicalAnd_mixed) {
+  auto A = Placeholder(DType::UINT64, {3, 3});
+  auto B = Placeholder(DType::FLOAT32, {3, 3});
+  auto C = A && B;
+  auto program = makeProgram("logical_and", {C});
+
+  std::vector<uint64_t> A_input{1, 2, 3,  //
+                                4, 0, 6,  //
+                                7, 0, 9};
+  std::vector<float> B_input{10.0, 11.0, 12.0,  //
+                             13.0, 14.0, 15.0,  //
+                             16.0, 17.0, 18.0};
+  std::vector<int8_t> C_output{1, 1, 1,  //
+                               1, 0, 1,  //
+                               1, 0, 1};
+  checkProgram(program, {{A, A_input}, {B, B_input}}, {{C, C_output}});
+}
+
+TEST_F(CppEdsl, LogicalOr_uint64) {
+  auto A = Placeholder(DType::UINT64, {3, 3});
+  auto B = Placeholder(DType::UINT64, {3, 3});
+  auto C = A || B;
+  auto program = makeProgram("logical_or", {C});
+
+  std::vector<uint64_t> A_input{1, 2, 3,  //
+                                4, 0, 6,  //
+                                7, 0, 9};
+  std::vector<uint64_t> B_input{10, 11, 12,  //
+                                0,  0,  0,   //
+                                16, 17, 18};
+  std::vector<int8_t> C_output{1, 1, 1,  //
+                               1, 0, 1,  //
+                               1, 1, 1};
+  checkProgram(program, {{A, A_input}, {B, B_input}}, {{C, C_output}});
+}
+
+TEST_F(CppEdsl, LogicalOr_float) {
+  auto A = Placeholder(DType::FLOAT32, {3, 3});
+  auto B = Placeholder(DType::FLOAT32, {3, 3});
+  auto C = A || B;
+  auto program = makeProgram("logical_or", {C});
+
+  std::vector<float> A_input{1.0, 2.0, 3.0,  //
+                             4.0, 0.0, 6.0,  //
+                             7.0, 0.0, 9.0};
+  std::vector<float> B_input{10.0, 11.0, 12.0,  //
+                             0.0,  0.0,  0.0,   //
+                             16.0, 17.0, 18.0};
+  std::vector<int8_t> C_output{1, 1, 1,  //
+                               1, 0, 1,  //
+                               1, 1, 1};
+  checkProgram(program, {{A, A_input}, {B, B_input}}, {{C, C_output}});
+}
+
+TEST_F(CppEdsl, LogicalOr_int32) {
+  auto A = Placeholder(DType::INT32, {3, 3});
+  auto B = Placeholder(DType::INT32, {3, 3});
+  auto C = A || B;
+  auto program = makeProgram("logical_or", {C});
+
+  std::vector<int32_t> A_input{1, 2, 3,  //
+                               4, 0, 6,  //
+                               7, 0, 9};
+  std::vector<int32_t> B_input{10, 11, 12,  //
+                               0,  0,  0,   //
+                               16, 17, 18};
+  std::vector<int8_t> C_output{1, 1, 1,  //
+                               1, 0, 1,  //
+                               1, 1, 1};
+  checkProgram(program, {{A, A_input}, {B, B_input}}, {{C, C_output}});
 }
 
 }  // namespace
