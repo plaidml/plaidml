@@ -7,6 +7,7 @@
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/StandardTypes.h"
+#include "mlir/Interfaces/SideEffectInterfaces.h"
 
 namespace pmlc::dialect::xsmm {
 
@@ -24,8 +25,10 @@ using mlir::IndexType;
 using mlir::IntegerAttr;
 using mlir::Location;
 using mlir::LogicalResult;
+using mlir::MemoryEffectOpInterface;
 using mlir::MemRefType;
 using mlir::NamedAttribute;
+using mlir::NoneType;
 using mlir::Op;
 using mlir::OpAsmParser;
 using mlir::OpAsmPrinter;
@@ -34,11 +37,14 @@ using mlir::Operation;
 using mlir::OperationState;
 using mlir::ParseResult;
 using mlir::Region;
+using mlir::SmallVectorImpl;
 using mlir::Type;
 using mlir::Value;
 using mlir::ValueRange;
 
+namespace MemoryEffects = mlir::MemoryEffects;
 namespace OpTrait = mlir::OpTrait;
+namespace SideEffects = mlir::SideEffects;
 
 #define GET_OP_CLASSES
 #include "pmlc/dialect/xsmm/ir/ops.h.inc"
