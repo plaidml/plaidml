@@ -19,8 +19,6 @@ using llvm::StringRef;
 using ::testing::ContainerEq;
 using ::testing::Eq;
 
-extern void* g_stack_base;
-
 namespace plaidml::edsl {
 
 namespace {
@@ -374,20 +372,6 @@ TEST_F(CppEdsl, Dot) {
     }
   }
   checkProgram(program, {{A, in1}, {B, in2}}, {{C, expected}});
-}
-
-TEST_F(CppEdsl, BigDot) {
-  int64_t M = 2048;
-  int64_t N = 2048;
-  int64_t K = 2048;
-  auto A = Placeholder(DType::FLOAT32, {M, K});
-  auto B = Placeholder(DType::FLOAT32, {K, N});
-  auto C = Dot(A, B);
-  auto program = makeProgram("dot", {C});
-
-  g_stack_base = alloca(8);
-
-  runProgram(program);
 }
 
 TEST_F(CppEdsl, DoubleDot) {

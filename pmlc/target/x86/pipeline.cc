@@ -120,6 +120,7 @@ void addToPipeline(OpPassManager &pm) {
 
   pm.addPass(
       pmlc::dialect::pxa::createXSMMStencilPass(/*numThreads=*/1, heatmapCost));
+  pm.addPass(createAffineLoopInvariantCodeMotionPass());
   pm.addPass(createXSMMLoweringPass());
 
   // FIXME: these passes cause test failures (correctness or otherwise)
@@ -135,7 +136,6 @@ void addToPipeline(OpPassManager &pm) {
   pm.addPass(conversion::pxa_to_affine::createLowerPXAToAffinePass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
-  pm.addPass(createAffineLoopInvariantCodeMotionPass());
 
   pm.addPass(createLowerAffinePass());
   pm.addPass(createCanonicalizerPass());

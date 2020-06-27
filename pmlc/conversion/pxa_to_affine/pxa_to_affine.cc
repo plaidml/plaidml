@@ -231,7 +231,6 @@ struct FuncOpConversion : public OpConversionPattern<FuncOp> {
   matchAndRewrite(FuncOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
     FunctionType type = op.getType();
-    /* do not rewrite xsmm dispatch functions */
     if (op.isExternal()) {
       return mlir::success();
     }

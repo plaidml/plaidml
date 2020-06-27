@@ -310,9 +310,10 @@ func @conv2_xsmm_op(%I: !I_memref, %K: !K_memref, %O: !O_memref) {
   %Y = dim %I, %c2 : !I_memref
   %CI = dim %I, %c3 : !I_memref
   %CO = dim %O, %c3 : !O_memref
+  %ptr = xsmm.gemm.dispatch [2, 11, 7], [35, 11, 55]
   affine.parallel (%x, %y) = (0, 0) to (%X, %Y) step (2, 1) {
-    xsmm.gemm %O[%c0, %x, %y, %c0]:#O_tile = %I[%c0, %x, %y, %c0]:#I_tile, %K[%c0, %c0, %c0, %c0]:#K_tile, [2, 11, 7]
-      : !O_memref, !I_memref, !K_memref
+    xsmm.gemm.invoke %ptr, %O[%c0, %x, %y, %c0]:#O_tile = %I[%c0, %x, %y, %c0]:#I_tile, %K[%c0, %c0, %c0, %c0]:#K_tile, [2, 11, 7]
+      : (!I_memref, !K_memref) -> !O_memref
   }
   return
 }
