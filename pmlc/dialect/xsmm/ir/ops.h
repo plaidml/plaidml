@@ -28,6 +28,7 @@ using mlir::LogicalResult;
 using mlir::MemoryEffectOpInterface;
 using mlir::MemRefType;
 using mlir::NamedAttribute;
+using mlir::NoneType;
 using mlir::Op;
 using mlir::OpAsmParser;
 using mlir::OpAsmPrinter;

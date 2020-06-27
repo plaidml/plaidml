@@ -22,29 +22,6 @@ XSMMDialect::XSMMDialect(mlir::MLIRContext *ctx)
 }
 
 //
-// ---- GemmDispatchOp ----
-//
-
-void printGemmDispatchOp(OpAsmPrinter &p, GemmDispatchOp op) {
-  p << op.getOperation()->getName() << ' ';
-  p << op.tile() << ", " << op.tileld();
-}
-
-ParseResult parseGemmDispatchOp(OpAsmParser &parser, OperationState &result) {
-  auto &builder = parser.getBuilder();
-  auto i64Type = builder.getIntegerType(64);
-  ArrayAttr tileAttr;
-  ArrayAttr tileldAttr;
-  result.addTypes(i64Type);
-  return failure(
-      parser.parseAttribute(tileAttr, i64Type, "tile", result.attributes) ||
-      parser.parseComma() ||
-      parser.parseAttribute(tileAttr, i64Type, "tileld", result.attributes));
-}
-
-LogicalResult verifyGemmDispatchOp(GemmDispatchOp op) { return success(); }
-
-//
 // ---- GemmInvokeOp ----
 //
 
@@ -83,7 +60,7 @@ void printGemmInvokeOp(OpAsmPrinter &p, GemmInvokeOp op) {
   p << ", " << op.tile() << " : " << funcType;
 }
 
-struct GemmOperand {
+struct GemmOperandParser {
   OpAsmParser::OperandType operand;
   SmallVector<OpAsmParser::OperandType, 4> accessOperands;
   AffineMapAttr accessMapAttr;
@@ -91,7 +68,7 @@ struct GemmOperand {
   std::string accessMapAttrName;
   std::string tileMapAttrName;
 
-  explicit GemmOperand(StringRef name)
+  explicit GemmOperandParser(StringRef name)
       : accessMapAttrName(name.str() + "AccessMap"),
         tileMapAttrName(name.str() + "TileMap") {}
 
@@ -109,7 +86,7 @@ ParseResult parseGemmInvokeOp(OpAsmParser &parser, OperationState &result) {
   auto &builder = parser.getBuilder();
   auto indexType = builder.getIndexType();
   auto i64Type = builder.getIntegerType(64);
-  GemmOperand a("a"), b("b"), c("c");
+  GemmOperandParser a("a"), b("b"), c("c");
   OpAsmParser::OperandType ptr;
   ArrayAttr tileAttr;
   FunctionType funcType;
@@ -134,8 +111,6 @@ ParseResult parseGemmInvokeOp(OpAsmParser &parser, OperationState &result) {
       parser.resolveOperands(a.accessOperands, indexType, result.operands) ||
       parser.resolveOperands(b.accessOperands, indexType, result.operands));
 }
-
-LogicalResult verifyGemmInvokeOp(GemmInvokeOp op) { return success(); }
 
 #define GET_OP_CLASSES
 #include "pmlc/dialect/xsmm/ir/ops.cc.inc" // NOLINT
