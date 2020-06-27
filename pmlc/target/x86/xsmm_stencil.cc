@@ -22,12 +22,13 @@ using namespace mlir; // NOLINT
 namespace pmlc::dialect::pxa {
 
 static AffineMap makeTileMap(MLIRContext *context, AffineMap map,
-                             ValueRange ops, ArrayRef<BlockArgument> idxs) {
+                             ValueRange operands,
+                             ArrayRef<BlockArgument> idxs) {
   SmallVector<AffineExpr, 8> exprs;
-  for (auto op : ops) {
+  for (auto value : operands) {
     bool found = false;
     for (size_t i = 0; i < idxs.size(); i++) {
-      if (op == idxs[i]) {
+      if (value == idxs[i]) {
         exprs.push_back(getAffineDimExpr(i, context));
         found = true;
       }
@@ -291,21 +292,21 @@ private:
     op.setSteps(steps);
 
     // Generate the XSMM call; first select inputs based on permutation order
+    auto opC = cast<AffineReduceOp>(*perm.ioOps[0]);
     auto opA = cast<AffineLoadOp>(*perm.ioOps[1]);
     auto opB = cast<AffineLoadOp>(*perm.ioOps[2]);
-    auto opC = cast<AffineReduceOp>(*perm.ioOps[0]);
 
     // Initialize helpers
-    SmallVector<Value, 8> mapOperands;
     auto bodyBuilder = op.getBodyBuilder();
 
     // Set the tile size. Note XSMM wants col-major order and we fix this later
     // inside the libxsmm call.
     auto tileAttr = bodyBuilder.getI64ArrayAttr(tileSize);
 
+    SmallVector<Value, 8> mapOperands;
+    GemmOperand c(opC, {perm.indexes[0], perm.indexes[1]}, mapOperands);
     GemmOperand a(opA, {perm.indexes[0], perm.indexes[2]}, mapOperands);
     GemmOperand b(opB, {perm.indexes[2], perm.indexes[1]}, mapOperands);
-    GemmOperand c(opC, {perm.indexes[0], perm.indexes[1]}, mapOperands);
 
     auto leadingDimsAttr = bodyBuilder.getI64ArrayAttr(ArrayRef<int64_t>{
         a.stridesArray->strides[0],

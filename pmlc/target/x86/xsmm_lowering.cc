@@ -25,18 +25,6 @@ static constexpr int64_t kUnusedDimension = -1;
 const char *kGemmInvokeF32 = "plaidml_rt_xsmm_gemm_invoke_f32";
 const char *kGemmDispatchF32 = "plaidml_rt_xsmm_gemm_dispatch_f32";
 
-static SmallVector<int64_t, 8> getFlattenedTileDimMapping(AffineMap map) {
-  SmallVector<int64_t, 8> ret;
-  for (const auto &expr : map.getResults()) {
-    if (auto dimExpr = expr.dyn_cast<AffineDimExpr>()) {
-      ret.push_back(dimExpr.getPosition());
-    } else {
-      ret.push_back(kUnusedDimension);
-    }
-  }
-  return ret;
-}
-
 class XSMMGemmDispatchLowering : public OpRewritePattern<xsmm::GemmDispatchOp> {
 public:
   using OpRewritePattern<xsmm::GemmDispatchOp>::OpRewritePattern;
@@ -46,14 +34,14 @@ public:
     Impl impl(op, rewriter);
     auto symbol = impl.getOrInsertDispatchFunc();
     SmallVector<Value, 6> args;
-    for (auto i : impl.tileld) {
-      args.push_back(impl.createConstantIntOp(i));
+    for (auto value : impl.tileld) {
+      args.push_back(impl.createConstantIntOp(value));
     }
-    for (auto i : impl.tile) {
-      args.push_back(impl.createConstantIntOp(i));
+    for (auto value : impl.tile) {
+      args.push_back(impl.createConstantIntOp(value));
     }
-    auto dispatch = rewriter.create<CallOp>(op.getLoc(), symbol,
-                                            rewriter.getIntegerType(64), args);
+    auto dispatch =
+        rewriter.create<CallOp>(op.getLoc(), symbol, impl.i64Type, args);
     rewriter.replaceOp(op, dispatch.getResult(0));
     return success();
   }
@@ -117,10 +105,9 @@ public:
                                  op.bTileMap(), {tile[2], tile[1]});
     auto c = impl.prepareOperand(op.c(), op.cAccessMap(), op.getOperandsForC(),
                                  op.cTileMap(), {tile[0], tile[1]});
-    SmallVector<Value, 6> args{a, b, c};
-    args.push_back(op.ptr());
 
-    rewriter.create<CallOp>(op.getLoc(), symbol, ArrayRef<Type>{}, args);
+    rewriter.create<CallOp>(op.getLoc(), symbol, ArrayRef<Type>{},
+                            ArrayRef<Value>{a, b, c, op.ptr()});
     rewriter.replaceOp(op, op.c());
     return success();
   }
@@ -166,20 +153,17 @@ public:
                          ValueRange mapOperands, AffineMap tileMap,
                          ArrayRef<int64_t> sizes) {
       SmallVector<int64_t, 8> shape;
-      auto flat = getFlattenedTileDimMapping(tileMap);
-      for (auto dim : flat) {
-        if (dim == kUnusedDimension)
-          shape.push_back(1);
-        else
+      for (const auto &expr : tileMap.getResults()) {
+        if (auto dimExpr = expr.dyn_cast<AffineDimExpr>()) {
+          auto dim = dimExpr.getPosition();
           shape.push_back(sizes[dim]);
+        } else {
+          shape.push_back(1);
+        }
       }
 
-      int64_t outerOffset;
-      SmallVector<int64_t, 4> outerStrides;
-      auto memRefType = operand.getType().cast<MemRefType>();
-      getStridesAndOffset(memRefType, outerStrides, outerOffset);
-
       ArrayRef<Value> emptyValues{};
+      auto memRefType = operand.getType().cast<MemRefType>();
       SmallVector<int64_t, 4> staticOffsets(
           memRefType.getRank(), MemRefType::getDynamicStrideOrOffset());
       SmallVector<int64_t, 4> staticStrides(memRefType.getRank(), 1);
