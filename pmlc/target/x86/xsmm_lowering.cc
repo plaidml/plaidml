@@ -21,7 +21,6 @@ namespace xsmm = dialect::xsmm;
 
 namespace {
 
-static constexpr int64_t kUnusedDimension = -1;
 const char *kGemmInvokeF32 = "plaidml_rt_xsmm_gemm_invoke_f32";
 const char *kGemmDispatchF32 = "plaidml_rt_xsmm_gemm_dispatch_f32";
 
