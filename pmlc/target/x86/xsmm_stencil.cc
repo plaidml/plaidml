@@ -307,11 +307,11 @@ private:
     GemmOperand b(opB, {perm.indexes[2], perm.indexes[1]}, mapOperands);
     GemmOperand c(opC, {perm.indexes[0], perm.indexes[1]}, mapOperands);
 
-    SmallVector<int64_t, 3> leadingDims;
-    leadingDims.push_back(a.stridesArray->strides[0]);
-    leadingDims.push_back(b.stridesArray->strides[0]);
-    leadingDims.push_back(c.stridesArray->strides[0]);
-    auto leadingDimsAttr = bodyBuilder.getI64ArrayAttr(leadingDims);
+    auto leadingDimsAttr = bodyBuilder.getI64ArrayAttr(ArrayRef<int64_t>{
+        a.stridesArray->strides[0],
+        b.stridesArray->strides[0],
+        c.stridesArray->strides[0],
+    });
 
     // Make the XSMM ops
     auto dispatch = bodyBuilder.create<xsmm::GemmDispatchOp>(

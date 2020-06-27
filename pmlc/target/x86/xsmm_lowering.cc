@@ -22,6 +22,8 @@ namespace xsmm = dialect::xsmm;
 namespace {
 
 static constexpr int64_t kUnusedDimension = -1;
+const char *kGemmInvokeF32 = "plaidml_rt_xsmm_gemm_invoke_f32";
+const char *kGemmDispatchF32 = "plaidml_rt_xsmm_gemm_dispatch_f32";
 
 static SmallVector<int64_t, 8> getFlattenedTileDimMapping(AffineMap map) {
   SmallVector<int64_t, 8> ret;
@@ -80,18 +82,17 @@ public:
     }
 
     FlatSymbolRefAttr getOrInsertDispatchFunc() {
-      const char *symbol = "plaidml_rt_xsmm_dispatch_gemm_f32";
       auto context = module.getContext();
-      if (module.lookupSymbol(symbol)) {
-        return SymbolRefAttr::get(symbol, context);
+      if (module.lookupSymbol(kGemmDispatchF32)) {
+        return SymbolRefAttr::get(kGemmDispatchF32, context);
       }
       OpBuilder builder(module.getBodyRegion());
       SmallVector<Type, 6> inputs{i32Type, i32Type, i32Type,
                                   i32Type, i32Type, i32Type};
       auto funcType = builder.getFunctionType(inputs, i64Type);
       ArrayRef<NamedAttribute> attrs{};
-      builder.create<FuncOp>(loc, symbol, funcType, attrs);
-      return SymbolRefAttr::get(symbol, context);
+      builder.create<FuncOp>(loc, kGemmDispatchF32, funcType, attrs);
+      return SymbolRefAttr::get(kGemmDispatchF32, context);
     }
 
     Value createConstantIntOp(int64_t value) {
@@ -147,19 +148,18 @@ public:
     }
 
     FlatSymbolRefAttr getOrInsertInvokeFunc() {
-      const char *symbol = "plaidml_rt_xsmm_exec_gemm_f32";
       auto context = module.getContext();
-      if (module.lookupSymbol(symbol)) {
-        return SymbolRefAttr::get(symbol, context);
+      if (module.lookupSymbol(kGemmInvokeF32)) {
+        return SymbolRefAttr::get(kGemmInvokeF32, context);
       }
       OpBuilder builder(module.getBodyRegion());
       SmallVector<Type, 4> inputs{unrankedType, unrankedType, unrankedType,
                                   i64Type};
       ArrayRef<Type> results{};
-      auto funcType = builder.getFunctionType(inputs, results);
       ArrayRef<NamedAttribute> attrs{};
-      builder.create<FuncOp>(loc, symbol, funcType, attrs);
-      return SymbolRefAttr::get(symbol, context);
+      auto funcType = builder.getFunctionType(inputs, results);
+      builder.create<FuncOp>(loc, kGemmInvokeF32, funcType, attrs);
+      return SymbolRefAttr::get(kGemmInvokeF32, context);
     }
 
     Value prepareOperand(Value operand, AffineMap accessMap,
