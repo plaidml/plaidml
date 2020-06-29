@@ -17,7 +17,7 @@ const std::vector<InferenceEngine::Precision> netPrecisions = {
 };
 
 const std::vector<std::vector<std::size_t>> inputShapes = {
-    {std::vector<std::size_t>({1, 30}), std::vector<std::size_t>({1, 30})}};
+    {std::vector<std::size_t>({40, 30}), std::vector<std::size_t>({1, 30})}};
 
 INSTANTIATE_TEST_CASE_P(CompareWithRefs, LessEqualLayerTest,
                         ::testing::Combine(::testing::ValuesIn(netPrecisions), ::testing::Values(inputShapes),
