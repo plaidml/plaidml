@@ -13,7 +13,6 @@ cc_test(
             "fake_quantize.cpp",
             "mvn.cpp",
             "power.cpp",
-            "select.cpp",
             "space_to_batch.cpp",
         ],
     ),
