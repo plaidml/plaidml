@@ -494,6 +494,11 @@ class slice {
     return *this;
   }
 
+  slice& add_dim(edsl::Value start, edsl::Value stop, edsl::Value step = edsl::Value(1)) {
+    dims_.emplace_back(edsl::make_tuple(start, stop, step));
+    return *this;
+  }
+
   operator edsl::Tensor() const {
     auto args = edsl::make_tuple(I_, dims_);
     return details::op("slice", args).as_tensor();

@@ -37,7 +37,6 @@ cc_library(
             "inference-engine/tests/functional/plugin/shared/src/single_layer_tests/nonzero.cpp",
             "inference-engine/tests/functional/plugin/shared/src/single_layer_tests/prior_box_clustered.cpp",
             "inference-engine/tests/functional/plugin/shared/src/single_layer_tests/proposal.cpp",
-            "inference-engine/tests/functional/plugin/shared/src/single_layer_tests/strided_slice.cpp",
         ],
     ),
     hdrs = glob(
@@ -51,7 +50,6 @@ cc_library(
             "inference-engine/tests/functional/plugin/shared/include/single_layer_tests/nonzero.hpp",
             "inference-engine/tests/functional/plugin/shared/include/single_layer_tests/prior_box_clustered.hpp",
             "inference-engine/tests/functional/plugin/shared/include/single_layer_tests/proposal.hpp",
-            "inference-engine/tests/functional/plugin/shared/include/single_layer_tests/strided_slice.hpp",
         ],
     ),
     includes = ["inference-engine/tests/functional/plugin/shared/include"],
