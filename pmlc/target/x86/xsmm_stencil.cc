@@ -17,14 +17,60 @@
 
 #include "pmlc/util/logging.h"
 
+using namespace mlir; // NOLINT
+
 namespace pmlc::dialect::pxa {
+
+static AffineMap makeTileMap(MLIRContext *context, AffineMap map,
+                             ValueRange operands,
+                             ArrayRef<BlockArgument> idxs) {
+  SmallVector<AffineExpr, 8> exprs;
+  for (auto value : operands) {
+    bool found = false;
+    for (size_t i = 0; i < idxs.size(); i++) {
+      if (value == idxs[i]) {
+        exprs.push_back(getAffineDimExpr(i, context));
+        found = true;
+      }
+    }
+    if (!found) {
+      exprs.push_back(getAffineConstantExpr(0, context));
+    }
+  }
+  auto toIdxs = AffineMap::get(idxs.size(), 0, exprs, context);
+  return map.compose(toIdxs);
+}
+
+struct GemmOperand {
+  Value memref;
+  AffineMap accessMap;
+  AffineMap tileMap;
+  Optional<StrideArray> stridesArray;
+
+  template <typename TOp>
+  GemmOperand(TOp op, ArrayRef<BlockArgument> idxs,
+              SmallVectorImpl<Value> &mapOperands)
+      : memref(op.getMemRef()), accessMap(op.getAffineMap()),
+        tileMap(makeTileMap(op.getContext(), op.getAffineMap(),
+                            op.getMapOperands(), idxs)) {
+    mapOperands.append(op.getMapOperands().begin(), op.getMapOperands().end());
+    int64_t offset;
+    SmallVector<int64_t, 4> strides;
+    auto memrefType = memref.getType().cast<MemRefType>();
+    getStridesAndOffset(memrefType, strides, offset);
+    auto layoutMap =
+        makeStridedLinearLayoutMap(strides, offset, op.getContext());
+    stridesArray = computeStrideArray(layoutMap.compose(tileMap));
+    assert(stridesArray.hasValue() && "computeStrideArray must succeed");
+  }
+};
 
 class StencilXSMM : public StencilBase {
 private:
   unsigned numThreads;
   StencilCostFunction stencilCostFn;
 
-  llvm::Optional<LoadStoreOps> capture() {
+  Optional<LoadStoreOps> capture() {
     // Looking for load..load..mul..reduce..terminator
     LoadStoreOps ret;
     const unsigned kNumValidInstrInGemmRegion = 5;
@@ -39,7 +85,7 @@ private:
 
     // Find the Reduce Op
     auto it = std::prev(body->end(), 2);
-    auto reduceOp = llvm::dyn_cast<AffineReduceOp>(*it);
+    auto reduceOp = dyn_cast<AffineReduceOp>(*it);
     if (!reduceOp) {
       IVLOG(5, "The AffineParallelOp region didn't have a reduce as its last "
                "non-terminator");
@@ -63,27 +109,27 @@ private:
       return llvm::None;
     }
 
-    mlir::Operation *lhs;
-    mlir::Operation *rhs;
-    if (auto mulfOp = llvm::dyn_cast_or_null<mlir::MulFOp>(defOp)) {
+    Operation *lhs;
+    Operation *rhs;
+    if (auto mulfOp = dyn_cast_or_null<MulFOp>(defOp)) {
       lhs = mulfOp.lhs().getDefiningOp();
-      if (!llvm::dyn_cast_or_null<mlir::AffineLoadOp>(lhs)) {
+      if (!dyn_cast_or_null<AffineLoadOp>(lhs)) {
         IVLOG(3, "The LHS of the mul op is not affine.load.");
         return llvm::None;
       }
       rhs = mulfOp.rhs().getDefiningOp();
-      if (!llvm::dyn_cast_or_null<mlir::AffineLoadOp>(rhs)) {
+      if (!dyn_cast_or_null<AffineLoadOp>(rhs)) {
         IVLOG(3, "The RHS of the mul op is not affine.load.");
         return llvm::None;
       }
-    } else if (auto muliOp = llvm::dyn_cast_or_null<mlir::MulIOp>(defOp)) {
+    } else if (auto muliOp = dyn_cast_or_null<MulIOp>(defOp)) {
       lhs = muliOp.lhs().getDefiningOp();
-      if (!llvm::dyn_cast_or_null<mlir::AffineLoadOp>(lhs)) {
+      if (!dyn_cast_or_null<AffineLoadOp>(lhs)) {
         IVLOG(3, "The LHS of the mul op is not affine.load.");
         return llvm::None;
       }
       rhs = muliOp.rhs().getDefiningOp();
-      if (!llvm::dyn_cast_or_null<mlir::AffineLoadOp>(rhs)) {
+      if (!dyn_cast_or_null<AffineLoadOp>(rhs)) {
         IVLOG(3, "The RHS of the mul op is not affine.load.");
         return llvm::None;
       }
@@ -94,7 +140,7 @@ private:
     ret.loads.push_back(lhs);
     ret.loads.push_back(rhs);
 
-    return llvm::Optional<LoadStoreOps>(ret);
+    return Optional<LoadStoreOps>(ret);
   }
 
   double getCost(TensorAndIndexPermutation perm, ArrayRef<int64_t> tileSize) {
@@ -102,7 +148,7 @@ private:
 
     // Note: XSMM and its cost function heatmap use the reverse index order from
     // the rest of this code, hence the flip below
-    llvm::SmallVector<unsigned, 3> xsmmTileSize;
+    SmallVector<unsigned, 3> xsmmTileSize;
     xsmmTileSize.push_back(tileSize[1]);
     xsmmTileSize.push_back(tileSize[0]);
     xsmmTileSize.push_back(tileSize[2]);
@@ -114,12 +160,12 @@ private:
     IVLOG(6,
           "Inner: loop = " << tot_inner_loop << " inner_time = " << inner_time);
     for (unsigned i = 0; i < getTiledIdxCount(); ++i) {
-      IVLOG(6, mlir::debugString(perm.indexes[i]) << ": " << tileSize[i]);
+      IVLOG(6, debugString(perm.indexes[i]) << ": " << tileSize[i]);
     }
 
     // The middle idxs are the accumulation indexes, i.e. those used on loads
     // but not stores
-    llvm::DenseMap<mlir::BlockArgument, unsigned> middle_idxs;
+    DenseMap<BlockArgument, unsigned> middle_idxs;
     auto in0StrideInfo = getStrideInfo(perm.ioOps[1]);
     for (const auto &kvp : in0StrideInfo->strides) {
       if (getBlockArgsAsSet().count(kvp.first)) {
@@ -183,7 +229,7 @@ private:
       }
     }
 
-    llvm::DenseMap<mlir::BlockArgument, unsigned> outer_idxs;
+    DenseMap<BlockArgument, unsigned> outer_idxs;
     for (const auto &kvp : outStrideInfo->strides) {
       if (getBlockArgsAsSet().count(kvp.first)) {
         IVLOG(4, "First: " << kvp.first.getArgNumber());
@@ -231,7 +277,7 @@ private:
 
   void transform(TensorAndIndexPermutation perm, ArrayRef<int64_t> tileSize) {
     // First, modify step size of all tiled indexes
-    llvm::SmallVector<int64_t, 8> steps;
+    SmallVector<int64_t, 8> steps;
     auto oldSteps = op.steps().cast<ArrayAttr>().getValue();
     for (auto step : oldSteps) {
       steps.push_back(step.cast<IntegerAttr>().getInt());
@@ -246,73 +292,43 @@ private:
     op.setSteps(steps);
 
     // Generate the XSMM call; first select inputs based on permutation order
-    auto opC = llvm::dyn_cast<AffineReduceOp>(*perm.ioOps[0]);
-    auto opA = llvm::dyn_cast<mlir::AffineLoadOp>(*perm.ioOps[1]);
-    auto opB = llvm::dyn_cast<mlir::AffineLoadOp>(*perm.ioOps[2]);
-    assert(opA && opB && opC);
-
-    // Get the current memrefs
-    Value aVal = opA.getMemRef();
-    Value bVal = opB.getMemRef();
-    Value cVal = opC.getMemRef();
+    auto opC = cast<AffineReduceOp>(*perm.ioOps[0]);
+    auto opA = cast<AffineLoadOp>(*perm.ioOps[1]);
+    auto opB = cast<AffineLoadOp>(*perm.ioOps[2]);
 
     // Initialize helpers
-    llvm::SmallVector<Value, 8> mapOperands;
     auto bodyBuilder = op.getBodyBuilder();
-    auto makeTileMap = [&](AffineMap map, ValueRange ops,
-                           ArrayRef<mlir::BlockArgument> idxs) {
-      llvm::SmallVector<AffineExpr, 8> perOp;
-      for (auto op : ops) {
-        bool found = false;
-        for (size_t i = 0; i < idxs.size(); i++) {
-          if (op == idxs[i]) {
-            perOp.push_back(bodyBuilder.getAffineDimExpr(i));
-            found = true;
-          }
-        }
-        if (!found) {
-          perOp.push_back(bodyBuilder.getAffineConstantExpr(0));
-        }
-      }
-      auto toIdxs = AffineMap::get(idxs.size(), 0, perOp, op.getContext());
-      return map.compose(toIdxs);
-    };
 
     // Set the tile size. Note XSMM wants col-major order and we fix this later
     // inside the libxsmm call.
-    llvm::SmallVector<int64_t, 3> xsmmTileSize;
-    xsmmTileSize.push_back(tileSize[0]);
-    xsmmTileSize.push_back(tileSize[1]);
-    xsmmTileSize.push_back(tileSize[2]);
-    auto tiles = bodyBuilder.getI64ArrayAttr(xsmmTileSize);
+    auto tileAttr = bodyBuilder.getI64ArrayAttr(tileSize);
 
-    // Set up the maps
-    AffineMap cMap = opC.getAffineMap();
-    AffineMap cTile = makeTileMap(opC.getAffineMap(), opC.getMapOperands(),
-                                  {perm.indexes[0], perm.indexes[1]});
-    mapOperands.append(opC.getMapOperands().begin(),
-                       opC.getMapOperands().end());
+    SmallVector<Value, 8> mapOperands;
+    GemmOperand c(opC, {perm.indexes[0], perm.indexes[1]}, mapOperands);
+    GemmOperand a(opA, {perm.indexes[0], perm.indexes[2]}, mapOperands);
+    GemmOperand b(opB, {perm.indexes[2], perm.indexes[1]}, mapOperands);
 
-    AffineMap aMap = opA.getAffineMap();
-    AffineMap aTile = makeTileMap(opA.getAffineMap(), opA.getMapOperands(),
-                                  {perm.indexes[0], perm.indexes[2]});
-    mapOperands.append(opA.getMapOperands().begin(),
-                       opA.getMapOperands().end());
+    auto leadingDimsAttr = bodyBuilder.getI64ArrayAttr(ArrayRef<int64_t>{
+        a.stridesArray->strides[0],
+        b.stridesArray->strides[0],
+        c.stridesArray->strides[0],
+    });
 
-    AffineMap bMap = opB.getAffineMap();
-    AffineMap bTile = makeTileMap(opB.getAffineMap(), opB.getMapOperands(),
-                                  {perm.indexes[2], perm.indexes[1]});
-    mapOperands.append(opB.getMapOperands().begin(),
-                       opB.getMapOperands().end());
+    // Make the XSMM ops
+    auto dispatch = bodyBuilder.create<xsmm::GemmDispatchOp>(
+        op.getLoc(), bodyBuilder.getI64Type(), tileAttr, leadingDimsAttr);
 
-    // Make the XSMM op
-    auto gemm = bodyBuilder.create<xsmm::GemmOp>(
-        op.getLoc(), cVal.getType(), cVal, cMap, cTile, aVal, aMap, aTile, bVal,
-        bMap, bTile, tiles, mapOperands);
-    opC.result().replaceAllUsesWith(gemm);
+    auto invoke = bodyBuilder.create<xsmm::GemmInvokeOp>(
+        op.getLoc(), c.memref.getType(), dispatch.getResult(), //
+        c.memref, c.accessMap, c.tileMap,                      //
+        a.memref, a.accessMap, a.tileMap,                      //
+        b.memref, b.accessMap, b.tileMap,                      //
+        tileAttr, mapOperands);
+
+    opC.result().replaceAllUsesWith(invoke);
 
     // Remove all other ops from the op interior
-    auto xsmm_it = std::prev(op.getBody()->end(), 2);
+    auto xsmm_it = std::prev(op.getBody()->end(), 3);
     while (op.getBody()->begin() != xsmm_it) {
       auto prev_it = std::prev(xsmm_it);
       op.getBody()->getOperations().erase(prev_it);
@@ -320,7 +336,7 @@ private:
   }
 
 public:
-  StencilXSMM(mlir::AffineParallelOp op, unsigned numThreads,
+  StencilXSMM(AffineParallelOp op, unsigned numThreads,
               StencilCostFunction costFn)
       : StencilBase{op,
                     3, // Three tileable indexes
@@ -344,8 +360,7 @@ public:
         numThreads{numThreads}, stencilCostFn(costFn) {}
 };
 
-struct XSMMStencilPass
-    : public mlir::PassWrapper<XSMMStencilPass, mlir::FunctionPass> {
+struct XSMMStencilPass : public PassWrapper<XSMMStencilPass, FunctionPass> {
   // TODO: Do I want config for requirements & tilingGenerators?
   XSMMStencilPass() { assert(false && "XSMMStencilPass must be configured"); }
 
@@ -360,7 +375,7 @@ struct XSMMStencilPass
 
   void runOnFunction() final {
     auto func = getFunction();
-    func.walk([this](mlir::AffineParallelOp op) {
+    func.walk([this](AffineParallelOp op) {
       StencilXSMM stencil(op, numThreads.getValue(), costFn);
       stencil.DoStenciling();
     });
@@ -373,8 +388,8 @@ struct XSMMStencilPass
       llvm::cl::desc("Specifies number of threads for the stencil pass")};
 };
 
-std::unique_ptr<mlir::Pass> createXSMMStencilPass(unsigned numThreads,
-                                                  StencilCostFunction costFn) {
+std::unique_ptr<Pass> createXSMMStencilPass(unsigned numThreads,
+                                            StencilCostFunction costFn) {
   return std::make_unique<XSMMStencilPass>(numThreads, costFn);
 }
 
