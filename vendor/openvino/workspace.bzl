@@ -25,8 +25,8 @@ def openvino_workspace():
 
     http_archive(
         name = "openvino",
-        sha256 = "081b367cd710a10c040a333683a08ccbe81888053b93e2d629170d08a1a8f8d6",
-        strip_prefix = "openvino-ca8bc0f914a2cddb4e24a86cfba701990dc56667",
-        url = "https://github.com/PlaidML/openvino/archive/ca8bc0f914a2cddb4e24a86cfba701990dc56667.zip",
+        sha256 = "493a989ebdcd0b90d606261555ef9762a51086a9608973a14dc1dc005576b657",
+        strip_prefix = "openvino-e178fec7701ecf563378a951a5af6e303dc1f8e3",
+        url = "https://github.com/PlaidML/openvino/archive/e178fec7701ecf563378a951a5af6e303dc1f8e3.zip",
         build_file = clean_dep("//vendor/openvino:openvino.BUILD"),
     )
