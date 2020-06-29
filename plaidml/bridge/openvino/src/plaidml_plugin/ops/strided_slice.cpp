@@ -9,7 +9,6 @@
 #include "ngraph/opsets/opset1.hpp"
 
 #include "plaidml/op/op.h"
-#include "pmlc/util/logging.h"
 
 using namespace plaidml;          // NOLINT[build/namespaces]
 using namespace InferenceEngine;  // NOLINT[build/namespaces]
@@ -80,7 +79,6 @@ static OpRegistration reg("stridedslice", [](const Context& ctx) {
     shrink_axis_mask.push_back(0);
   }
 
-  IVLOG(1, "Starts: " << starts << ", stops: " << stops << ", steps: " << steps);
   for (size_t i = 0; i < I.rank(); i++) {
     if (i >= starts.size()) {
       result.add_dim(edsl::None(), edsl::None(), edsl::None());
