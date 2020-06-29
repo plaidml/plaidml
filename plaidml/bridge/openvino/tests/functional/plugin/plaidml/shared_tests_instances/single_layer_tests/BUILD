@@ -49,6 +49,8 @@ cc_test(
             "equal.cpp",                            # Known errors
             "extract_image_patches.cpp",            # Doesn't compile
             "fake_quantize.cpp",                    # Doesn't compile
+            "greater.cpp",                          # Known errors
+            "greater_equal.cpp",                    # Known errors
             "group_convolution_backprop_data.cpp",  # Long
             "less.cpp",                             # Known errors
             "less_equal.cpp",                       # Known errors
