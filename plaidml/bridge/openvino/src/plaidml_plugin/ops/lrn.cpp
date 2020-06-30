@@ -16,9 +16,8 @@ namespace PlaidMLPlugin {
 
 static OpRegistration reg("lrn", [](const Context& ctx) {
   auto* layer = dynamic_cast<ngraph::opset1::LRN*>(ctx.layer);
-  // IE_ASSERT(ctx.operands.size() == 1);
   auto I = ctx.operands.at(0);
-  return edsl::make_tuple(op::lrn(I, {static_cast<int64_t>(layer->get_nsize())}));  // TODO
+  return edsl::make_tuple(op::lrn(I, {static_cast<int64_t>(layer->get_nsize())}));
 });
 
 }  // namespace PlaidMLPlugin
