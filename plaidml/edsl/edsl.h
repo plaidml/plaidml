@@ -973,6 +973,13 @@ Tensor Call(const std::string& fn, Ts... args) {
 inline Tensor abs(const Tensor& x) { return Call("abs", x); }
 
 ///
+/// Computes the elementwise arcsine of `x`.
+/// \param x Tensor
+/// \return Tensor
+///
+inline Tensor asin(const Tensor& x) { return Call("asin", x); }
+
+///
 /// Casts the element type of a tensor `x` to the type specified by `dtype`.
 /// \param x Tensor
 /// \param dtype DType

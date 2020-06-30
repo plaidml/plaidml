@@ -70,6 +70,18 @@ protected:
   LLVM::LLVMDialect &dialect;
 };
 
+LLVM::LLVMFuncOp appendOrGetFuncOp(StringRef funcName, LLVM::LLVMType funcType,
+                                   Operation *op) {
+  using LLVM::LLVMFuncOp;
+
+  Operation *funcOp = SymbolTable::lookupNearestSymbolFrom(op, funcName);
+  if (funcOp)
+    return cast<LLVMFuncOp>(*funcOp);
+
+  mlir::OpBuilder b(op->getParentOfType<LLVMFuncOp>());
+  return b.create<LLVMFuncOp>(op->getLoc(), funcName, funcType);
+}
+
 struct FPToUILowering : public LLVMLegalizationPattern<stdx::FPToUIOp> {
   using LLVMLegalizationPattern<stdx::FPToUIOp>::LLVMLegalizationPattern;
   using Base = LLVMLegalizationPattern<stdx::FPToUIOp>;
@@ -81,6 +93,25 @@ struct FPToUILowering : public LLVMLegalizationPattern<stdx::FPToUIOp> {
     auto stdxType = op->getResult(0).getType();
     auto llvmType = typeConverter.convertType(stdxType);
     rewriter.replaceOpWithNewOp<LLVM::FPToUIOp>(op, llvmType, value);
+    return success();
+  }
+};
+
+struct ASinLowering : public LLVMLegalizationPattern<stdx::ASinOp> {
+  using LLVMLegalizationPattern<stdx::ASinOp>::LLVMLegalizationPattern;
+  using Base = LLVMLegalizationPattern<stdx::ASinOp>;
+
+  LogicalResult
+  matchAndRewrite(Operation *op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto value = op->getOperand(0);
+    auto f32Type = LLVM::LLVMType::getFloatTy(&dialect);
+    auto funcType = LLVM::LLVMType::getFunctionTy(f32Type, {f32Type}, false);
+    auto sym = appendOrGetFuncOp("asinf", funcType, op);
+
+    rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, ArrayRef<Type>{f32Type},
+                                              rewriter.getSymbolRefAttr(sym),
+                                              ArrayRef<Value>{value});
     return success();
   }
 };
@@ -183,8 +214,8 @@ struct LowerToLLVMPass : public LowerToLLVMBase<LowerToLLVMPass> {
 
 void populateStdXToLLVMConversionPatterns(LLVMTypeConverter &converter,
                                           OwningRewritePatternList &patterns) {
-  patterns.insert<FPToUILowering, ReshapeLowering>(*converter.getDialect(),
-                                                   converter);
+  patterns.insert<FPToUILowering, ReshapeLowering, ASinLowering>(
+      *converter.getDialect(), converter);
 }
 
 std::unique_ptr<mlir::Pass> createLowerToLLVMPass() {
