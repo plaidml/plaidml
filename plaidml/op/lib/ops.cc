@@ -57,6 +57,8 @@ Value tile(const Value&);
 Value transpose(const Value&);
 Value variance(const Value&);
 
+namespace {
+
 struct AggregationAxes {
   std::vector<TensorIndex> src_idxs;
   std::vector<TensorIndex> dst_idxs;
@@ -115,8 +117,38 @@ struct AggregationAxes {
   }
 };
 
-namespace {
-// TODO: I haven't decided whether to make these helper functions visible to the outside world
+struct LRNAxes {
+  std::vector<TensorIndex> src_idxs;
+  std::vector<TensorIndex> dst_idxs;
+  std::vector<Constraint> constraints;
+  std::set<int64_t> axes;
+  std::vector<int64_t> widths;
+
+  LRNAxes(size_t ndims, const std::vector<int64_t>& in_axes, const std::vector<int64_t>& widths) : src_idxs(ndims) {
+    IVLOG(5, "Received agg axes request with\n\tndims = " << ndims << "\n\tin_axes = " << in_axes
+                                                          << "\n\twidths = " << widths);
+    dst_idxs = src_idxs;
+    for (int64_t axis : in_axes) {
+      if (axis < 0) {
+        axis += ndims;
+      }
+      if (axis < 0 || ndims < static_cast<size_t>(axis)) {
+        throw std::out_of_range(llvm::formatv("axis out of range: {0}", axis));
+      }
+      axes.insert(axis);
+    }
+    if (axes.size() != widths.size()) {
+      throw std::runtime_error(llvm::formatv("Inconsistent axis count and window width count in LRN ({0} vs {1})",
+                                             axes.size(), widths.size()));
+    }
+    std::vector<TensorIndex> window_idxs(widths.size());
+    size_t i = 0;  // to iterate through window_idxs and widths in tandem with axes
+    for (auto ax_it = axes.begin(); ax_it != axes.end(); ax_it++, i++) {
+      constraints.push_back(window_idxs[i] < widths[i]);
+      src_idxs[*ax_it] = src_idxs[*ax_it] + window_idxs[i] - widths[i] / 2;
+    }
+  }
+};
 
 template <typename T>
 T validate(int raw) {
@@ -1769,6 +1801,30 @@ Value image_resize(const Value& value) {
   return Value{O};
 }
 
+Value lrn(const Value& value) {
+  IVLOG(1, "lrn");
+  auto args = value.as_tuple();
+  if (args.size() != 6) {
+    throw std::runtime_error("lrn expects 6 arguments");
+  }
+  auto I = args[0].as_tensor();
+  auto window_size = args[1].as_int_tuple();
+  auto axes = args[2].as_int_tuple();
+  auto alpha = args[3].as_float();
+  auto beta = args[4].as_float();
+  auto epsilon = args[5].as_float();
+
+  LRNAxes agg(I.rank(), axes, window_size);
+  std::vector<TensorDim> dims(I.rank());
+  I.bind_dims(dims);
+
+  auto I_sqr = I * I;
+  auto local_sum_sqr = TensorOutput(dims);
+  local_sum_sqr(agg.dst_idxs) = I_sqr(agg.src_idxs);
+  local_sum_sqr.add_constraints(agg.constraints);
+  return Value{I / edsl::pow(alpha * local_sum_sqr + epsilon, Tensor(beta))};
+}
+
 Value max(const Value& value) {
   IVLOG(1, "max");
   auto args = value.as_tuple();
@@ -2924,6 +2980,7 @@ void RegisterOps() {
   registry->Register("flip", flip);
   registry->Register("hard_sigmoid", hard_sigmoid);
   registry->Register("image_resize", image_resize);
+  registry->Register("lrn", lrn);
   registry->Register("max", max);
   registry->Register("maximum", maximum);
   registry->Register("mean", mean);

@@ -973,11 +973,25 @@ Tensor Call(const std::string& fn, Ts... args) {
 inline Tensor abs(const Tensor& x) { return Call("abs", x); }
 
 ///
+/// Computes the elementwise arccosine of `x`.
+/// \param x Tensor
+/// \return Tensor
+///
+inline Tensor acos(const Tensor& x) { return Call("acos", x); }
+
+///
 /// Computes the elementwise arcsine of `x`.
 /// \param x Tensor
 /// \return Tensor
 ///
 inline Tensor asin(const Tensor& x) { return Call("asin", x); }
+
+///
+/// Computes the elementwise arctangent of `x`.
+/// \param x Tensor
+/// \return Tensor
+///
+inline Tensor atan(const Tensor& x) { return Call("atan", x); }
 
 ///
 /// Casts the element type of a tensor `x` to the type specified by `dtype`.
@@ -1010,6 +1024,13 @@ inline Tensor cos(const Tensor& x) { return Call("cos", x); }
 /// \return Tensor
 ///
 inline Tensor cosh(const Tensor& x) { return Call("cosh", x); }
+
+///
+/// Computes the elementwise Gauss error function of `x`
+/// \param x Tensor
+/// \return Tensor
+///
+inline Tensor erf(const Tensor& x) { return Call("erf", x); }
 
 ///
 /// Computes the elementwise natural exponential function of `x`: _e_<sup>x</sup>.
