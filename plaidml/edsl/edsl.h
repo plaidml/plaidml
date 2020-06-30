@@ -698,6 +698,11 @@ class Tensor {
   Tensor operator~() const;
 
   ///
+  /// Elementwise logical not
+  ///
+  Tensor operator!() const;
+
+  ///
   /// TODO
   ///
   std::string str() const {  //
@@ -1296,6 +1301,7 @@ PLAIDML_EDSL_DEFINE_TENSOR_DIM_BINARY_FN(min, PLAIDML_INT_OP_MIN);
 
 inline Tensor Tensor::operator-() const { return Call("neg", {*this}); }
 inline Tensor Tensor::operator~() const { return Call("bit_not", {*this}); }
+inline Tensor Tensor::operator!() const { return Call("logical_not", {*this}); }
 
 #define PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(_op_, _fn_)                                               \
   inline Tensor operator _op_(const Tensor& lhs, const Tensor& rhs) { return Call(_fn_, lhs, rhs); }    \

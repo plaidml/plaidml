@@ -157,6 +157,22 @@ class EW_BinaryLogicOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
   }];
 }
 
+class EW_UnaryLogicOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
+    EW_UnaryOp<mnemonic, traits>,
+    Arguments<(ins EltwiseAny:$operand)>,
+    Results<(outs EltwiseBool:$result)> {
+
+  let extraClassDeclaration = [{
+    static Type getResultType(ValueRange operands) {
+      Value operand = operands[0];
+      auto opType = getRankedTensorType(operand.getType());
+      auto resultShape = opType.getShape();
+      Type dtype = IntegerType::get(1, operand.getContext());
+      return RankedTensorType::get(resultShape, dtype);
+    }
+  }];
+}
+
 
 def EW_AbsOp : EW_UnaryOp<"abs">;
 def EW_ACosOp : EW_UnaryFloatOp<"acos">;
@@ -205,6 +221,7 @@ def EW_BitShrOp : EW_BinaryIntOp<"bit_shr">;
 
 // logical operations
 def EW_LogicalAndOp : EW_BinaryLogicOp<"logical_and", [Commutative, NoSideEffect]>;
+def EW_LogicalNotOp : EW_UnaryLogicOp<"logical_not">;
 def EW_LogicalOrOp : EW_BinaryLogicOp<"logical_or", [Commutative, NoSideEffect]>;
 def EW_LogicalXorOp : EW_BinaryLogicOp<"logical_xor", [Commutative, NoSideEffect]>;
 

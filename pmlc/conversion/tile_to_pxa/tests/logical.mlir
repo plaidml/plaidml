@@ -60,4 +60,34 @@ func @eltwise_xor_mixed(
 // CHECK: xor
 // CHECK: pxa.reduce assign
 
+func @eltwise_not_si32(
+  %arg0: tensor<3x3xsi32>
+) -> tensor<3x3xi1> {
+  %0 = "eltwise.logical_not"(%arg0) : (
+    tensor<3x3xsi32>
+  ) -> tensor<3x3xi1>
+  return %0 : tensor<3x3xi1>
+}
 
+// CHECK-LABEL: func @eltwise_not_si32
+// CHECK: constant 0
+// CHECK: affine.parallel
+// CHECK: affine.load
+// CHECK: cmpi "eq"
+// CHECK: pxa.reduce assign
+
+func @eltwise_not_f32(
+  %arg0: tensor<3x3xf32>
+) -> tensor<3x3xi1> {
+  %0 = "eltwise.logical_not"(%arg0) : (
+    tensor<3x3xf32>
+  ) -> tensor<3x3xi1>
+  return %0 : tensor<3x3xi1>
+}
+
+// CHECK-LABEL: func @eltwise_not_f32
+// CHECK: constant 0 : f32
+// CHECK: affine.parallel
+// CHECK: affine.load
+// CHECK: cmpf "oeq"
+// CHECK: pxa.reduce assign

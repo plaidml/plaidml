@@ -1294,5 +1294,33 @@ TEST_F(CppEdsl, LogicalOr_int32) {
   checkProgram(program, {{A, A_input}, {B, B_input}}, {{C, C_output}});
 }
 
+TEST_F(CppEdsl, LogicalNot_int32) {
+  auto A = Placeholder(DType::INT32, {3, 3});
+  auto R = !A;
+  auto program = makeProgram("logical_not", {R});
+
+  std::vector<int32_t> input{1, 2, 3,  //
+                             4, 0, 6,  //
+                             7, 0, 9};
+  std::vector<int8_t> expected{0, 0, 0,  //
+                               0, 1, 0,  //
+                               0, 1, 0};
+  checkProgram(program, {{A, input}}, {{R, expected}});
+}
+
+TEST_F(CppEdsl, LogicalNot_float) {
+  auto A = Placeholder(DType::FLOAT32, {3, 3});
+  auto R = !A;
+  auto program = makeProgram("logical_not", {R});
+
+  std::vector<float> input{1.0, 2.0, 3.0,  //
+                           4.0, 0,   6.5,  //
+                           7.7, 0,   0.9};
+  std::vector<int8_t> expected{0, 0, 0,  //
+                               0, 1, 0,  //
+                               0, 1, 0};
+  checkProgram(program, {{A, input}}, {{R, expected}});
+}
+
 }  // namespace
 }  // namespace plaidml::edsl
