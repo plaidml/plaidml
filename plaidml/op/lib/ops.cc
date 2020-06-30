@@ -124,7 +124,6 @@ struct LRNAxes {
   std::set<int64_t> axes;
   std::vector<int64_t> widths;
 
-  // LRNAxes(size_t ndims, const Value& in_axes, const Value& size) : src_idxs(ndims) {
   LRNAxes(size_t ndims, const std::vector<int64_t>& in_axes, const std::vector<int64_t>& widths) : src_idxs(ndims) {
     IVLOG(5, "Received agg axes request with\n\tndims = " << ndims << "\n\tin_axes = " << in_axes
                                                           << "\n\twidths = " << widths);
@@ -142,7 +141,6 @@ struct LRNAxes {
       throw std::runtime_error(llvm::formatv("Inconsistent axis count and window width count in LRN ({0} vs {1})",
                                              axes.size(), widths.size()));
     }
-    // TODO: Assert axes.size() == widths.size()
     std::vector<TensorIndex> window_idxs(widths.size());
     size_t i = 0;  // to iterate through window_idxs and widths in tandem with axes
     for (auto ax_it = axes.begin(); ax_it != axes.end(); ax_it++, i++) {
