@@ -27,10 +27,9 @@ static OpRegistration reg("fakequantize", [](const Context& ctx) {
     THROW_IE_EXCEPTION << "FakeQuantize requires at least 2 levels";
   }
   auto lvl_diff = levels - 1;
-  auto clamped =
-      edsl::select(X <= op::minimum(in_lo, in_hi), out_lo, edsl::select(X > op::maximum(in_lo, in_hi), out_hi, X));
-  return edsl::make_tuple(
-      edsl::round(round((X - in_lo) / (in_hi - in_lo) * (lvl_diff)) / (lvl_diff) * (out_hi - out_lo) + out_lo));
+  auto main_result = edsl::round((X - in_lo) / (in_hi - in_lo) * (lvl_diff)) / (lvl_diff) * (out_hi - out_lo) + out_lo;
+  return edsl::make_tuple(edsl::select(X <= op::minimum(in_lo, in_hi), out_lo,
+                                       edsl::select(X > op::maximum(in_lo, in_hi), out_hi, main_result)));
 });
 
 }  // namespace PlaidMLPlugin
