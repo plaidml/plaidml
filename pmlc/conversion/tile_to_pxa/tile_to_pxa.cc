@@ -462,7 +462,7 @@ struct LogicalNotOp {
   Value create(ConversionPatternRewriter &rewriter, Location loc,
                Type resultType, ArrayRef<Value> operands,
                ArrayRef<Type> types) {
-    auto &input = operands[0];
+    auto input = operands[0];
     auto fromType = input.getType();
     if (auto floatType = fromType.dyn_cast<FloatType>()) {
       auto value = convertFloatUsingType(llvm::APFloat(0.0), floatType);
