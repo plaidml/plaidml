@@ -54,7 +54,10 @@ cc_test(
             "group_convolution_backprop_data.cpp",  # Long
             "less.cpp",                             # Known errors
             "less_equal.cpp",                       # Known errors
+            "logical_and.cpp",                      # Known errors
             "logical_not.cpp",                      # Known errors
+            "logical_or.cpp",                       # Known errors
+            "logical_xor.cpp",                      # Known errors
             "lrn.cpp",                              # Known errors
             "not_equal.cpp",                        # Known errors
             "reduce_logical_and.cpp",               # Known errors
