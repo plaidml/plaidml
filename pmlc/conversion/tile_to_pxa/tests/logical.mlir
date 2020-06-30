@@ -86,7 +86,7 @@ func @eltwise_not_f32(
 }
 
 // CHECK-LABEL: func @eltwise_not_f32
-// CHECK: constant 0 : f32
+// CHECK: constant 0{{.*}} : f32
 // CHECK: affine.parallel
 // CHECK: affine.load
 // CHECK: cmpf "oeq"
