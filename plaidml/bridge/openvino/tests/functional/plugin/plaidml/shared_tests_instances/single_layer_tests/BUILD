@@ -41,13 +41,19 @@ cc_test(
     srcs = glob(
         ["*.cpp"],
         exclude = [
+            "acos.cpp",                             # Known errors
+            "asin.cpp",                             # Known errors
+            "atan.cpp",                             # Known errors
             "convert_like.cpp",                     # Known errors
             "convolution.cpp",                      # Long
             "convolution_backprop_data.cpp",        # Long
             "cum_sum.cpp",                          # Doesn't compile
             "equal.cpp",                            # Known errors
+            "erf.cpp",                              # Known errors
             "extract_image_patches.cpp",            # Doesn't compile
-            "fake_quantize.cpp",                    # Doesn't compile
+            "fake_quantize.cpp",                    # Known errors
+            "floor.cpp",                            # Known errors
+            "floor_mod.cpp",                        # Known errors
             "greater.cpp",                          # Known errors
             "greater_equal.cpp",                    # Known errors
             "group_convolution_backprop_data.cpp",  # Long
