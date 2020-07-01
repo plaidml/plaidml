@@ -1340,5 +1340,173 @@ TEST_F(CppEdsl, Asin) {
   checkProgram(program, {{S, input}}, {{O, expected}});
 }
 
+TEST_F(CppEdsl, Acos) {
+  auto S = Placeholder(DType::FLOAT32, {3, 3});
+  auto O = acos(S);
+  auto program = makeProgram("acos", {O});
+
+  std::vector<float> input = {
+      0.1, 0.2, 0.3,   //
+      0.4, 0.5, 0.6,   //
+      1.0, 0.0, -0.6,  //
+  };
+  std::vector<float> expected = {
+      1.47063, 1.36944, 1.2661,    //
+      1.15928, 1.0472,  0.927295,  //
+      0.0,     1.5708,  2.2143     //
+  };
+  checkProgram(program, {{S, input}}, {{O, expected}});
+}
+
+TEST_F(CppEdsl, Atan) {
+  auto S = Placeholder(DType::FLOAT32, {3, 3});
+  auto O = atan(S);
+  auto program = makeProgram("atan", {O});
+
+  std::vector<float> input = {
+      0.1, 0.2, 0.3,   //
+      0.4, 0.5, 0.6,   //
+      1.0, 0.0, -0.6,  //
+  };
+  std::vector<float> expected = {
+      0.0996687, 0.197396, 0.291457,  //
+      0.380506,  0.463648, 0.54042,   //
+      0.785398,  0,        -0.54042   //
+  };
+  checkProgram(program, {{S, input}}, {{O, expected}});
+}
+
+TEST_F(CppEdsl, CosH) {
+  auto S = Placeholder(DType::FLOAT32, {3, 3});
+  auto O = cosh(S);
+  auto program = makeProgram("cosh", {O});
+
+  std::vector<float> input = {
+      0.1, 0.2, 0.3,   //
+      0.4, 0.5, 0.6,   //
+      1.0, 0.0, -0.6,  //
+  };
+  std::vector<float> expected = {
+      1.005,   1.02007, 1.04534,  //
+      1.08107, 1.12763, 1.18547,  //
+      1.54308, 1,       1.18547   //
+  };
+  checkProgram(program, {{S, input}}, {{O, expected}});
+}
+
+TEST_F(CppEdsl, Erf) {
+  auto S = Placeholder(DType::FLOAT32, {3, 3});
+  auto O = erf(S);
+  auto program = makeProgram("erf", {O});
+
+  std::vector<float> input = {
+      0.1, 0.2, 0.3,   //
+      0.4, 0.5, 0.6,   //
+      1.0, 0.0, -0.6,  //
+  };
+  std::vector<float> expected = {
+      0.112463, 0.222703, 0.328627,  //
+      0.428392, 0.5205,   0.603856,  //
+      0.842701, 0,        -0.603856  //
+  };
+  checkProgram(program, {{S, input}}, {{O, expected}});
+}
+
+TEST_F(CppEdsl, Floor) {
+  auto S = Placeholder(DType::FLOAT32, {3, 3});
+  auto O = floor(S);
+  auto program = makeProgram("floor", {O});
+
+  std::vector<float> input = {
+      1.1,  9.21, 3.0,   //
+      -0.4, -7.0, 0.6,   //
+      1.0,  0.0,  -6.6,  //
+  };
+  std::vector<float> expected = {
+      1,  9,  3,  //
+      -1, -7, 0,  //
+      1,  0,  -7  //
+  };
+  checkProgram(program, {{S, input}}, {{O, expected}});
+}
+
+TEST_F(CppEdsl, Pow) {
+  auto A = Placeholder(DType::FLOAT32, {3, 3});
+  auto B = Placeholder(DType::FLOAT32, {3, 3});
+  auto O = pow(A, B);
+  auto program = makeProgram("pow", {O});
+
+  std::vector<float> A_input = {
+      0.5, 1.5, 2.5,  //
+      0.5, 1.5, 2.5,  //
+      0.5, 1.5, 2.5,  //
+  };
+  std::vector<float> B_input = {
+      0.5, 0.5, 0.5,  //
+      1.5, 1.5, 1.5,  //
+      2.5, 2.5, 2.5,  //
+  };
+  std::vector<float> expected = {
+      0.707107, 1.22474, 1.58114,  //
+      0.353553, 1.83712, 3.95285,  //
+      0.176777, 2.75568, 9.88212   //
+  };
+  checkProgram(program, {{A, A_input}, {B, B_input}}, {{O, expected}});
+}
+
+TEST_F(CppEdsl, Round) {
+  auto S = Placeholder(DType::FLOAT32, {3, 3});
+  auto O = round(S);
+  auto program = makeProgram("round", {O});
+
+  std::vector<float> input = {
+      1.1,  9.21, 3.0,   //
+      -0.4, -7.0, 0.6,   //
+      1.0,  0.0,  -6.6,  //
+  };
+  std::vector<float> expected = {
+      1,  9,  3,  //
+      -0, -7, 1,  //
+      1,  0,  -7  //
+  };
+  checkProgram(program, {{S, input}}, {{O, expected}});
+}
+
+TEST_F(CppEdsl, SinH) {
+  auto S = Placeholder(DType::FLOAT32, {3, 3});
+  auto O = sinh(S);
+  auto program = makeProgram("sinh", {O});
+
+  std::vector<float> input = {
+      -2.0, -1.5, 0.0,  //
+      -1.0, 0.1,  0.2,  //
+      1.0,  1.5,  5.0,  //
+  };
+  std::vector<float> expected = {
+      -3.62686, -2.12928, 0,         //
+      -1.1752,  0.100167, 0.201336,  //
+      1.1752,   2.12928,  74.2032    //
+  };
+  checkProgram(program, {{S, input}}, {{O, expected}});
+}
+
+TEST_F(CppEdsl, Tan) {
+  auto S = Placeholder(DType::FLOAT32, {3, 3});
+  auto O = tan(S);
+  auto program = makeProgram("tan", {O});
+
+  std::vector<float> input = {
+      0.1, 0.2, 0.3,   //
+      0.4, 0.5, 0.6,   //
+      1.0, 0.0, -0.6,  //
+  };
+  std::vector<float> expected = {
+      0.100335, 0.20271,  0.309336,  //
+      0.422793, 0.546302, 0.684137,  //
+      1.55741,  0,        -0.684137  //
+  };
+  checkProgram(program, {{S, input}}, {{O, expected}});
+}
+
 }  // namespace
 }  // namespace plaidml::edsl
