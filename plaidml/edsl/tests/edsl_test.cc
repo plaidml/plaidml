@@ -1324,28 +1324,20 @@ TEST_F(CppEdsl, LogicalNot_float) {
 
 TEST_F(CppEdsl, Asin) {
   auto S = Placeholder(DType::FLOAT32, {3, 3});
-  TensorDim I, J;
-  TensorIndex i("i"), j("j");
-  S.bind_dims(I, J);
   auto O = asin(S);
   auto program = makeProgram("asin", {O});
-  std::cout << program << std::endl;
-  // clang-format off
-  // CHECK-LABEL: CppEdsl.Asin
-  // clang-format on
 
-  std::vector<float> A_input = {
+  std::vector<float> input = {
       0.1, 0.2, 0.3,   //
       0.4, 0.5, 0.6,   //
       1.0, 0.0, -0.6,  //
   };
-
-  std::vector<float> C_output = {
+  std::vector<float> expected = {
       0.100167, 0.201358, 0.304693,  //
       0.411517, 0.523599, 0.643501,  //
       1.5708,   0.0,      -0.643501  //
   };
-  checkProgram(program, {{S, A_input}}, {{O, C_output}});
+  checkProgram(program, {{S, input}}, {{O, expected}});
 }
 
 }  // namespace

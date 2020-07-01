@@ -70,7 +70,7 @@ protected:
   LLVM::LLVMDialect &dialect;
 };
 
-LLVM::LLVMFuncOp appendOrGetFuncOp(StringRef funcName, LLVM::LLVMType funcType,
+LLVM::LLVMFuncOp getOrInsertFuncOp(StringRef funcName, LLVM::LLVMType funcType,
                                    Operation *op) {
   using LLVM::LLVMFuncOp;
 
@@ -78,8 +78,8 @@ LLVM::LLVMFuncOp appendOrGetFuncOp(StringRef funcName, LLVM::LLVMType funcType,
   if (funcOp)
     return cast<LLVMFuncOp>(*funcOp);
 
-  mlir::OpBuilder b(op->getParentOfType<LLVMFuncOp>());
-  return b.create<LLVMFuncOp>(op->getLoc(), funcName, funcType);
+  mlir::OpBuilder builder(op->getParentOfType<LLVMFuncOp>());
+  return builder.create<LLVMFuncOp>(op->getLoc(), funcName, funcType);
 }
 
 struct FPToUILowering : public LLVMLegalizationPattern<stdx::FPToUIOp> {
@@ -104,14 +104,12 @@ struct ASinLowering : public LLVMLegalizationPattern<stdx::ASinOp> {
   LogicalResult
   matchAndRewrite(Operation *op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
-    auto value = op->getOperand(0);
     auto f32Type = LLVM::LLVMType::getFloatTy(&dialect);
     auto funcType = LLVM::LLVMType::getFunctionTy(f32Type, {f32Type}, false);
-    auto sym = appendOrGetFuncOp("asinf", funcType, op);
+    auto sym = getOrInsertFuncOp("asinf", funcType, op);
 
-    rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, ArrayRef<Type>{f32Type},
-                                              rewriter.getSymbolRefAttr(sym),
-                                              ArrayRef<Value>{value});
+    rewriter.replaceOpWithNewOp<LLVM::CallOp>(
+        op, ArrayRef<Type>{f32Type}, rewriter.getSymbolRefAttr(sym), operands);
     return success();
   }
 };
