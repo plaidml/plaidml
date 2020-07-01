@@ -1157,6 +1157,8 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
                             OperandsAre<EltwiseFloat>>,
         EltwiseOpConversion<ew::CosHOp, StdOp<stdx::CosHOp>,
                             OperandsAre<EltwiseFloat>>,
+        EltwiseOpConversion<ew::SinOp, StdOp<mlir::SinOp>,
+                            ResultIs<EltwiseFloat>>,
         EltwiseOpConversion<ew::TanHOp, StdOp<mlir::TanhOp>,
                             ResultIs<EltwiseFloat>>,
         EltwiseOpConversion<ew::ASinOp, StdOp<stdx::ASinOp>,

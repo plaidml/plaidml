@@ -1169,16 +1169,8 @@ TEST_F(CppEdsl, PrngResultNotNegative) {
 
 TEST_F(CppEdsl, Cos) {
   auto S = Placeholder(DType::FLOAT32, {3, 3});
-  TensorDim I, J;
-  TensorIndex i("i"), j("j");
-  S.bind_dims(I, J);
   auto O = cos(S);
   auto program = makeProgram("cos", {O});
-  std::cout << program << std::endl;
-  // clang-format off
-  // CHECK-LABEL: CppEdsl.Cos
-  // clang-format on
-
   std::vector<float> A_input = {
       5.0, 6.0, 7.0,  //
       4.0, 5.0, 6.0,  //
@@ -1187,6 +1179,24 @@ TEST_F(CppEdsl, Cos) {
 
   std::vector<float> C_output = {0.283662, 0.96017,  0.753902, -0.653644, 0.283662,
                                  0.96017,  0.753902, -0.1455,  -0.91113};
+  checkProgram(program, {{S, A_input}}, {{O, C_output}});
+}
+
+TEST_F(CppEdsl, Sin) {
+  auto S = Placeholder(DType::FLOAT32, {3, 3});
+  auto O = sin(S);
+  auto program = makeProgram("sin", {O});
+  std::vector<float> A_input = {
+      5.0, 6.0,  7.0,  //
+      4.0, -5.0, 1.1,  //
+      7.0, 8.0,  9.0,  //
+  };
+
+  std::vector<float> C_output = {
+      -0.958924, -0.279415, 0.656987,  //
+      -0.756802, 0.958924,  0.891207,  //
+      0.656987,  0.989358,  0.412118   //
+  };
   checkProgram(program, {{S, A_input}}, {{O, C_output}});
 }
 
