@@ -1348,31 +1348,5 @@ TEST_F(CppEdsl, Asin) {
   checkProgram(program, {{S, A_input}}, {{O, C_output}});
 }
 
-TEST_F(CppEdsl, Asin64) {
-  auto S = Placeholder(DType::FLOAT64, {3, 3});
-  TensorDim I, J;
-  TensorIndex i("i"), j("j");
-  S.bind_dims(I, J);
-  auto O = asin(S);
-  auto program = makeProgram("asin", {O});
-  std::cout << program << std::endl;
-  // clang-format off
-  // CHECK-LABEL: CppEdsl.Asin
-  // clang-format on
-
-  std::vector<double> A_input = {
-      0.1, 0.2, 0.3,   //
-      0.4, 0.5, 0.6,   //
-      1.0, 0.0, -0.6,  //
-  };
-
-  std::vector<double> C_output = {
-      0.100167, 0.201358, 0.304693,  //
-      0.411517, 0.523599, 0.643501,  //
-      1.5708,   0.0,      -0.643501  //
-  };
-  checkProgram(program, {{S, A_input}}, {{O, C_output}});
-}
-
 }  // namespace
 }  // namespace plaidml::edsl
