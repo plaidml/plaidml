@@ -1,4 +1,5 @@
 // Copyright 2019 Intel Corporation.
+// RUN: cc_test | FileCheck %s
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -32,48 +33,42 @@ Program makeProgram(const std::string& name, const std::vector<Tensor>& outputs)
   return ProgramBuilder(name, outputs).compile();
 }
 
-TEST(Op, Abs) {
-  auto I = Placeholder(DType::FLOAT32, {1, 224, 224, 3}, "I");
-  auto abs = op::abs(I);
-  auto program = makeProgram("abs", {abs});
-  IVLOG(1, program);
+TEST_F(OpTest, Abs) {
+  auto A = Placeholder(DType::FLOAT32, {10, 20});
+  auto program = makeProgram("abs", {op::abs(A)});
+  std::cout << program << std::endl;
 
-  EXPECT_THAT(program, Eq(R"#(
+  // clang-format off
+  // CHECK-LABEL: OpTest.Abs
+  // CHECK: func @abs
+  // CHECK: %[[cst:.*]] = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> tensor<f32>
+  // CHECK: %{{.*}} = "eltwise.neg"(%{{.*}}) : (tensor<10x20xf32>) -> tensor<10x20xf32>
+  // CHECK: %{{.*}} = "eltwise.cmp_lt"(%{{.*}}, %[[cst]]) : (tensor<10x20xf32>, tensor<f32>) -> tensor<10x20xi1>
+  // CHECK: %{{.*}} = "eltwise.select"(%{{.*}}, %{{.*}}, %{{.*}}) : (tensor<10x20xi1>, tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
+  // CHECK: return %{{.*}} : tensor<10x20xf32>
+  // clang-format on
 
-module {
-  func @abs(%arg0: tensor<1x224x224x3xf32> {tile.name = "I"}) -> tensor<1x224x224x3xf32> {
-    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> f32
-    %0 = "eltwise.neg"(%arg0) : (tensor<1x224x224x3xf32>) -> tensor<1x224x224x3xf32>
-    %1 = "eltwise.cmp_lt"(%arg0, %cst) : (tensor<1x224x224x3xf32>, f32) -> tensor<1x224x224x3xi1>
-    %2 = "eltwise.select"(%1, %0, %arg0) : (tensor<1x224x224x3xi1>, tensor<1x224x224x3xf32>, tensor<1x224x224x3xf32>) -> tensor<1x224x224x3xf32>
-    return %2 : tensor<1x224x224x3xf32>
-  }
-}
-)#"));
+  runProgram(program);
 }
 
-TEST(Op, All) {
+TEST_F(OpTest, All) {
   auto I = Placeholder(DType::FLOAT32, {1, 224, 224, 3}, "I");
   auto program = makeProgram("all", {op::all(I)});
-  IVLOG(1, program);
-  EXPECT_THAT(program, Eq(R"#(
-#map0 = affine_map<() -> ()>
-#map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+  std::cout << program << std::endl;
 
+  // clang-format off
+  // CHECK-LABEL: OpTest.All
+  // CHECK: func @all
+  // CHECK: %[[cst1:.*]] = "eltwise.sconst"() {value = 1 : i64} : () -> tensor<si32>
+  // CHECK: %[[cst0:.*]] = "eltwise.sconst"() {value = 0 : i64} : () -> tensor<si32>
+  // CHECK: %{{.*}} = "eltwise.cmp_eq"(%{{.*}}, %[[cst0]]) : (tensor<1x224x224x3xf32>, tensor<si32>) -> tensor<1x224x224x3xi1>
+  // CHECK: %{{.*}} = "eltwise.select"(%{{.*}}, %[[cst0]], %[[cst1]]) : (tensor<1x224x224x3xi1>, tensor<si32>, tensor<si32>) -> tensor<1x224x224x3xsi32>
+  // CHECK: %{{.*}} = tile.contract mul, none, %[[cst1]], %{{.*}} {sink = #map0, srcs = [#map1]} : tensor<si32>, tensor<1x224x224x3xsi32> -> tensor<si32>
+  // CHECK: %{{.*}} = "eltwise.cast"(%{{.*}}) : (tensor<si32>) -> tensor<ui8>
+  // CHECK: return %{{.*}} : tensor<ui8>
+  // clang-format on
 
-module {
-  func @all(%arg0: tensor<1x224x224x3xf32> {tile.name = "I"}) -> ui8 {
-    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> f32
-    %c0 = "eltwise.sconst"() {value = 0 : i64} : () -> si32
-    %c1 = "eltwise.sconst"() {value = 1 : i64} : () -> si32
-    %0 = "eltwise.cmp_eq"(%arg0, %c0) : (tensor<1x224x224x3xf32>, si32) -> tensor<1x224x224x3xi1>
-    %1 = "eltwise.select"(%0, %c0, %c1) : (tensor<1x224x224x3xi1>, si32, si32) -> tensor<1x224x224x3xsi32>
-    %2 = tile.contract mul, none, %cst, %1 {sink = #map0, srcs = [#map1]} : f32, tensor<1x224x224x3xsi32> -> si32
-    %3 = "eltwise.cast"(%2) : (si32) -> ui8
-    return %3 : ui8
-  }
-}
-)#"));
+  runProgram(program);
 }
 
 TEST(Op, Any) {
@@ -615,26 +610,19 @@ module {
 )#"));
 }
 
-TEST(Op, Relu) {
-  auto I = Placeholder(DType::FLOAT32, {10, 20}, "I");
-  auto A = Placeholder(DType::FLOAT32, {10, 20}, "A");
-  auto M = Placeholder(DType::FLOAT32, {10, 20}, "M");
-  auto program = makeProgram("relu", {op::relu(I).alpha(A).max_value(M).threshold(0.05)});
-  EXPECT_THAT(program, Eq(R"#(
-
-module {
-  func @relu(%arg0: tensor<10x20xf32> {tile.name = "M"}, %arg1: tensor<10x20xf32> {tile.name = "I"}, %arg2: tensor<10x20xf32> {tile.name = "A"}) -> tensor<10x20xf32> {
-    %cst = "eltwise.sconst"() {value = 5.000000e-02 : f64} : () -> f32
-    %0 = "eltwise.sub"(%arg1, %cst) : (tensor<10x20xf32>, f32) -> tensor<10x20xf32>
-    %1 = "eltwise.mul"(%arg2, %0) : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
-    %2 = "eltwise.cmp_lt"(%arg1, %cst) : (tensor<10x20xf32>, f32) -> tensor<10x20xi1>
-    %3 = "eltwise.select"(%2, %1, %arg1) : (tensor<10x20xi1>, tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
-    %4 = "eltwise.cmp_lt"(%3, %arg0) : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xi1>
-    %5 = "eltwise.select"(%4, %3, %arg0) : (tensor<10x20xi1>, tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
-    return %5 : tensor<10x20xf32>
-  }
-}
-)#"));
+TEST_F(OpTest, Relu) {
+  auto A = Placeholder(DType::FLOAT32, {10, 20});
+  auto program = makeProgram("relu", {op::relu(A)});
+  std::cout << program << std::endl;
+  // clang-format off
+  // CHECK-LABEL: OpTest.Relu
+  // CHECK: func @relu
+  // CHECK: %[[cst:.*]] = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> tensor<f32>
+  // CHECK: %{{.*}} = "eltwise.cmp_lt"(%{{.*}}, %[[cst]]) : (tensor<10x20xf32>, tensor<f32>) -> tensor<10x20xi1>
+  // CHECK: %{{.*}} = "eltwise.select"(%{{.*}}, %[[cst]], %{{.*}}) : (tensor<10x20xi1>, tensor<f32>, tensor<10x20xf32>) -> tensor<10x20xf32>
+  // CHECK: return %{{.*}} : tensor<10x20xf32>
+  // clang-format on
+  runProgram(program);
 }
 
 TEST(Op, ReluNoAlpha) {

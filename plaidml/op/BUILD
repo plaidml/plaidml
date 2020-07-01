@@ -3,6 +3,7 @@
 load("@rules_python//python:defs.bzl", "py_test")
 load("@rules_pkg//:pkg.bzl", "pkg_tar")
 load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_test")
+load("//pmlc:lit.bzl", "lit_test")
 
 SDK_HDRS = [
     "ffi.h",
@@ -63,8 +64,15 @@ py_library(
 plaidml_cc_test(
     name = "cc_test",
     srcs = ["op_test.cc"],
+    tags = ["manual"],  # the `edsl_test.cc.test` rule will run this test via lit
     deps = [
-        ":op",
         "//plaidml:testenv",
+        "//plaidml/edsl",
+        "//plaidml/exec",
     ],
+)
+
+lit_test(
+    name = "op_test.cc",
+    data = [":cc_test"],
 )

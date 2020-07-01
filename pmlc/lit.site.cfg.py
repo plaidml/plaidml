@@ -29,6 +29,7 @@ mlir_pmlc_tools_dirs = [
     'pmlc/tools/pmlc-vulkan-runner',
     'pmlc/rt/vulkan/tests',
     'plaidml/edsl/tests',
+    'plaidml/op',
 ]
 config.mlir_pmlc_tools_dirs = [
     os.path.join(os.environ['TEST_SRCDIR'], os.environ['TEST_WORKSPACE'], s)
