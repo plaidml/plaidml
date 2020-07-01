@@ -1190,6 +1190,32 @@ TEST_F(CppEdsl, Cos) {
   checkProgram(program, {{S, A_input}}, {{O, C_output}});
 }
 
+TEST_F(CppEdsl, Sin) {
+  auto S = Placeholder(DType::FLOAT32, {3, 3});
+  TensorDim I, J;
+  TensorIndex i("i"), j("j");
+  S.bind_dims(I, J);
+  auto O = sin(S);
+  auto program = makeProgram("sin", {O});
+  std::cout << program << std::endl;
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.Sin
+  // clang-format on
+
+  std::vector<float> A_input = {
+      5.0, 6.0,  7.0,  //
+      4.0, -5.0, 1.1,  //
+      7.0, 8.0,  9.0,  //
+  };
+
+  std::vector<float> C_output = {
+      -0.958924, -0.279415, 0.656987,  //
+      -0.756802, 0.958924,  0.891207,  //
+      0.656987,  0.989358,  0.412118   //
+  };
+  checkProgram(program, {{S, A_input}}, {{O, C_output}});
+}
+
 TEST_F(CppEdsl, ConvI8) {
   auto I = Placeholder(DType::INT8, {1, 224, 224, 3});
   auto K = Placeholder(DType::INT8, {3, 3, 1, 32});
