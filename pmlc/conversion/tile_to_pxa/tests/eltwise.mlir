@@ -26,7 +26,7 @@ func @neg_i32(%arg0: tensor<10x20xsi32>) -> tensor<10x20xsi32> {
 func @asin_f32(%arg0: tensor<8x9xf32>) -> tensor<8x9xf32> {
   // CHECK: affine.parallel
   // CHECK: affine.load
-  // CHECK: stdx.asin (f32) -> f32
+  // CHECK: stdx.asin({{.*}}) : (f32) -> f32
   // CHECK: pxa.reduce assign
   %0 = "eltwise.asin"(%arg0) : (tensor<8x9xf32>) -> tensor<8x9xf32>
   return %0 : tensor<8x9xf32>
