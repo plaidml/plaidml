@@ -72,7 +72,7 @@ def CosHOp : StdX_UnaryFuncOp<"cosh"> {
 }
 
 def ErfOp : StdX_UnaryFuncOp<"erf"> {
-  let summary = "error function";
+  let summary = "Gauss error function";
 }
 
 def FloorOp : StdX_UnaryFuncOp<"floor"> {
