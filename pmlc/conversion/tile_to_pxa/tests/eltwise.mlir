@@ -119,6 +119,8 @@ func @tan_f32(%arg0: tensor<8x9xf32>) -> tensor<8x9xf32> {
   // CHECK: stdx.tan({{.*}}) : (f32) -> f32
   // CHECK: pxa.reduce assign
   %0 = "eltwise.tan"(%arg0) : (tensor<8x9xf32>) -> tensor<8x9xf32>
+  return %0 : tensor<8x9xf32>
+}
 
 // CHECK-LABEL: func @sin
 func @sin(%arg0: tensor<8x9xf32>) -> tensor<8x9xf32> {
