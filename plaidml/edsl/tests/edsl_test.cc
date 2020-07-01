@@ -1294,5 +1294,59 @@ TEST_F(CppEdsl, LogicalOr_int32) {
   checkProgram(program, {{A, A_input}, {B, B_input}}, {{C, C_output}});
 }
 
+TEST_F(CppEdsl, LogicalNot_int32) {
+  auto A = Placeholder(DType::INT32, {3, 3});
+  auto R = !A;
+  auto program = makeProgram("logical_not", {R});
+
+  std::vector<int32_t> input{1, 2, 3,  //
+                             4, 0, 6,  //
+                             7, 0, 9};
+  std::vector<int8_t> expected{0, 0, 0,  //
+                               0, 1, 0,  //
+                               0, 1, 0};
+  checkProgram(program, {{A, input}}, {{R, expected}});
+}
+
+TEST_F(CppEdsl, LogicalNot_float) {
+  auto A = Placeholder(DType::FLOAT32, {3, 3});
+  auto R = !A;
+  auto program = makeProgram("logical_not", {R});
+
+  std::vector<float> input{1.0, 2.0, 3.0,  //
+                           4.0, 0,   6.5,  //
+                           7.7, 0,   0.9};
+  std::vector<int8_t> expected{0, 0, 0,  //
+                               0, 1, 0,  //
+                               0, 1, 0};
+  checkProgram(program, {{A, input}}, {{R, expected}});
+}
+
+TEST_F(CppEdsl, Asin) {
+  auto S = Placeholder(DType::FLOAT32, {3, 3});
+  TensorDim I, J;
+  TensorIndex i("i"), j("j");
+  S.bind_dims(I, J);
+  auto O = asin(S);
+  auto program = makeProgram("asin", {O});
+  std::cout << program << std::endl;
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.Asin
+  // clang-format on
+
+  std::vector<float> A_input = {
+      0.1, 0.2, 0.3,   //
+      0.4, 0.5, 0.6,   //
+      1.0, 0.0, -0.6,  //
+  };
+
+  std::vector<float> C_output = {
+      0.100167, 0.201358, 0.304693,  //
+      0.411517, 0.523599, 0.643501,  //
+      1.5708,   0.0,      -0.643501  //
+  };
+  checkProgram(program, {{S, A_input}}, {{O, C_output}});
+}
+
 }  // namespace
 }  // namespace plaidml::edsl

@@ -46,4 +46,13 @@ def ReshapeOp : StdX_Plain_Op<"reshape"> {
   }];
 }
 
+def ASinOp : StdX_Plain_Op<"asin", [NoSideEffect]> {
+  let summary = "elementwise arcsine";
+  let arguments = (ins AnyType:$tensor);
+  let results = (outs AnyType);
+  let assemblyFormat = [{
+    `(` $tensor `)` attr-dict `:` functional-type(operands, results)
+  }];
+}
+
 #endif // __PML_STDX_OPS__

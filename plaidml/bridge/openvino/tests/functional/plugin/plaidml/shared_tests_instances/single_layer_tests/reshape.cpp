@@ -10,8 +10,7 @@
 using LayerTestsDefinitions::ReshapeLayerTest;
 
 namespace {
-const std::vector<InferenceEngine::Precision> netPrecisions = {InferenceEngine::Precision::FP32,
-                                                               InferenceEngine::Precision::FP16};
+const std::vector<InferenceEngine::Precision> netPrecisions = {InferenceEngine::Precision::FP32};
 
 INSTANTIATE_TEST_CASE_P(ReshapeCheckDynBatch, ReshapeLayerTest,
                         ::testing::Combine(::testing::Values(true),                                   //

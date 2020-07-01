@@ -38,6 +38,7 @@ struct Registration {
     registerSymbol("malloc", reinterpret_cast<void *>(malloc));
 
     // cmath functions
+    registerSymbol("asinf", reinterpret_cast<void *>(asinf));
     registerSymbol("ceilf", reinterpret_cast<void *>(ceilf));
     registerSymbol("expf", reinterpret_cast<void *>(expf));
     registerSymbol("logf", reinterpret_cast<void *>(logf));
