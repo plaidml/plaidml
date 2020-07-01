@@ -41,9 +41,6 @@ cc_test(
     srcs = glob(
         ["*.cpp"],
         exclude = [
-            "acos.cpp",                             # Known errors
-            "asin.cpp",                             # Known errors
-            "atan.cpp",                             # Known errors
             "convert_like.cpp",                     # Known errors
             "convolution.cpp",                      # Long
             "convolution_backprop_data.cpp",        # Long
