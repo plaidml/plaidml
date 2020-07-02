@@ -17,7 +17,7 @@ namespace PlaidMLPlugin {
 static OpRegistration reg("floormod", [](const Context& ctx) {
   IE_ASSERT(ctx.operands.size() == 2);
   auto N = ctx.operands.at(0);
-  auto D = ctx.operands.at(0);
+  auto D = ctx.operands.at(1);
   return edsl::make_tuple(N - D * edsl::floor(N / D));
 });
 

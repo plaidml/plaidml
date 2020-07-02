@@ -11,7 +11,7 @@ using LayerTestsDefinitions::FloorModLayerTest;
 namespace {
 
 const std::vector<std::vector<std::size_t>> inputShapes = {
-    {std::vector<std::size_t>({1, 30}), std::vector<std::size_t>({1, 30})}};
+    {std::vector<std::size_t>({10, 30}), std::vector<std::size_t>({1, 30})}};
 
 const std::vector<InferenceEngine::Precision> netPrecisions = {
     InferenceEngine::Precision::FP32,
