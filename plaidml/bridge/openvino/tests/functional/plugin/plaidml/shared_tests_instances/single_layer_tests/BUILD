@@ -46,10 +46,8 @@ cc_test(
             "convolution_backprop_data.cpp",        # Long
             "cum_sum.cpp",                          # Doesn't compile
             "equal.cpp",                            # Known errors
-            "erf.cpp",                              # Known errors
             "extract_image_patches.cpp",            # Doesn't compile
-            "fake_quantize.cpp",                    # Known errors
-            "floor.cpp",                            # Known errors
+            "fake_quantize.cpp",                    # Known errors (intermittent)
             "floor_mod.cpp",                        # Known errors
             "greater.cpp",                          # Known errors
             "greater_equal.cpp",                    # Known errors
@@ -60,13 +58,11 @@ cc_test(
             "logical_not.cpp",                      # Known errors
             "logical_or.cpp",                       # Known errors
             "logical_xor.cpp",                      # Known errors
-            "lrn.cpp",                              # Known errors
             "not_equal.cpp",                        # Known errors
             "reduce_logical_and.cpp",               # Known errors
             "reduce_logical_or.cpp",                # Known errors
             "mvn.cpp",                              # Known errors
             "pooling.cpp",                          # Long, known errors
-            "power.cpp",                            # Known errors
             "select.cpp",                           # Known errors
             "sin.cpp",                              # Known errors
             "split.cpp",                            # Known errors

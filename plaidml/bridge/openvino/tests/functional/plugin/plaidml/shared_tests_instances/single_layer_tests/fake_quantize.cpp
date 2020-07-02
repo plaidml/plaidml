@@ -7,12 +7,11 @@
 #include "common_test_utils/test_constants.hpp"
 #include "single_layer_tests/fake_quantize.hpp"
 
-using namespace LayerTestsDefinitions;  // TODO: Lint once enabled
+using LayerTestsDefinitions::FakeQuantizeLayerTest;
 
 namespace {
 
-const std::vector<InferenceEngine::Precision> netPrecisions = {InferenceEngine::Precision::FP32,
-                                                               InferenceEngine::Precision::FP16};
+const std::vector<InferenceEngine::Precision> netPrecisions = {InferenceEngine::Precision::FP32};
 
 const std::vector<std::vector<size_t>> inputShapes = {{1, 1, 1, 1}, {3, 10, 5, 6}};
 const std::vector<std::vector<size_t>> constShapes = {{1}};
