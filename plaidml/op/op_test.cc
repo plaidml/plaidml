@@ -125,7 +125,7 @@ TEST_F(OpTest, BroadcastNumpy) {
                                  0, 1, 2,  //
                                  0, 1, 2,  //
                                  0, 1, 2};
-  checkProgram(program, {{A, A_input}}, {{C, A_input}});
+  checkProgram(program, {{A, A_input}}, {{C, C_output}});
 }
 
 TEST_F(OpTest, BroadcastNumpy2) {
