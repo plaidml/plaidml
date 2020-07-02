@@ -47,6 +47,7 @@ cc_test(
             "cum_sum.cpp",                          # Doesn't compile
             "equal.cpp",                            # Known errors
             "extract_image_patches.cpp",            # Doesn't compile
+            "fake_quantize.cpp",                    # Known errors (intermittent)
             "floor_mod.cpp",                        # Known errors
             "greater.cpp",                          # Known errors
             "greater_equal.cpp",                    # Known errors
