@@ -58,7 +58,6 @@ cc_test(
             "logical_not.cpp",                      # Known errors
             "logical_or.cpp",                       # Known errors
             "logical_xor.cpp",                      # Known errors
-            "lrn.cpp",                              # Known errors
             "not_equal.cpp",                        # Known errors
             "reduce_logical_and.cpp",               # Known errors
             "reduce_logical_or.cpp",                # Known errors
