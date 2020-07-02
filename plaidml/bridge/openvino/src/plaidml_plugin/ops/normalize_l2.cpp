@@ -24,20 +24,19 @@ static OpRegistration reg("normalizel2", [](const Context& ctx) {
   auto eps_mode = layer->get_eps_mode();
 
   if (axes.empty()) {
-    auto norm = I + eps;
-    return edsl::make_tuple(I / norm);
+    auto N = I + eps;
+    return edsl::make_tuple(I / N);
   }
-
   int axis = axes[0];
-  auto X = op::sum((I * I), edsl::make_tuple(axis), 1);
+  edsl::Tensor N;
   if (eps_mode == ngraph::op::EpsMode::ADD) {
-    X = X + eps;
+    N = op::norm(I, axis, eps, plaidml::op::EpsMode::ADD);
   } else if (eps_mode == ngraph::op::EpsMode::MAX) {
-    X = edsl::select(X < eps, edsl::Tensor{eps}, X);
+    N = op::norm(I, axis, eps, plaidml::op::EpsMode::MAX);
+  } else {
+    THROW_IE_EXCEPTION << "Invalid eps_mode";
   }
-  auto norm = edsl::sqrt(X);
-  auto O = I / norm;
-  return edsl::make_tuple(O);
+  return edsl::make_tuple(I / N);
 });
 
 }  // namespace PlaidMLPlugin

@@ -23,10 +23,8 @@ static OpRegistration reg("grn", [](const Context& ctx) {
   }
   auto* layer = dynamic_cast<ngraph::opset1::GRN*>(ctx.layer);
   auto bias = layer->get_bias();
-  auto X = op::sum((I * I), edsl::make_tuple(1), 1);
-  auto norm = edsl::sqrt(X + bias);
-  auto O = I / norm;
-  return edsl::make_tuple(O);
+  auto N = op::norm(I, 1, bias, plaidml::op::EpsMode::ADD);
+  return edsl::make_tuple(I / N);
 });
 
 }  // namespace PlaidMLPlugin

@@ -53,6 +53,12 @@ enum class ConvDerivMode {
   _LAST,
 };
 
+enum class EpsMode {
+  ADD,
+  MAX,
+  _LAST,
+};
+
 // For grouped convolutions, in the filters (i.e. weights/kernel) tensor, there
 // are multiple ways of laying out the channels. For a convolution with:
 //  G groups
@@ -435,6 +441,11 @@ inline edsl::Tensor min(const edsl::Tensor& I, const edsl::Value& axes = edsl::N
 inline edsl::Tensor minimum(const edsl::Tensor& X, const edsl::Tensor& Y) {
   auto args = edsl::make_tuple(X, Y);
   return details::op("minimum", args).as_tensor();
+}
+
+inline edsl::Tensor norm(const edsl::Tensor& I, int axis, float eps, EpsMode eps_mode) {
+  auto args = edsl::make_tuple(I, axis, eps, static_cast<int>(eps_mode));
+  return details::op("norm", args).as_tensor();
 }
 
 inline edsl::Tensor pool(                    //

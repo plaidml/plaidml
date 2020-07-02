@@ -40,6 +40,7 @@ Value maximum(const Value&);
 Value mean(const Value&);
 Value min(const Value&);
 Value minimum(const Value&);
+Value norm(const Value&);
 Value pool(const Value&);
 Value prod(const Value&);
 Value relu(const Value&);
@@ -1917,6 +1918,28 @@ Value minimum(const Value& value) {
   return Value{O};
 }
 
+Value norm(const Value& value) {
+  IVLOG(1, "norm");
+  auto args = value.as_tuple();
+  if (args.size() != 4) {
+    throw std::runtime_error("norm expects 4 arguments");
+  }
+
+  auto I = args[0].as_tensor();
+  auto axis = args[1].as_int();
+  auto eps = args[2].as_float();
+  auto eps_mode = validate<EpsMode>(args[3].as_int());
+
+  auto X = op::sum((I * I), edsl::make_tuple(axis), 1);
+  if (eps_mode == EpsMode::ADD) {
+    X = X + eps;
+  } else if (eps_mode == EpsMode::MAX) {
+    X = edsl::select(X < eps, edsl::Tensor{eps}, X);
+  }
+  auto N = edsl::sqrt(X);
+  return Value(N);
+}
+
 Value prod(const Value& value) {
   IVLOG(1, "prod");
   auto args = value.as_tuple();
@@ -2986,6 +3009,7 @@ void RegisterOps() {
   registry->Register("mean", mean);
   registry->Register("min", min);
   registry->Register("minimum", minimum);
+  registry->Register("norm", norm);
   registry->Register("pool", pool);
   registry->Register("prod", prod);
   registry->Register("relu", relu);
