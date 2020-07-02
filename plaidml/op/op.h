@@ -443,10 +443,36 @@ inline edsl::Tensor minimum(const edsl::Tensor& X, const edsl::Tensor& Y) {
   return details::op("minimum", args).as_tensor();
 }
 
-inline edsl::Tensor norm(const edsl::Tensor& I, int axis, float eps, EpsMode eps_mode) {
-  auto args = edsl::make_tuple(I, axis, eps, static_cast<int>(eps_mode));
-  return details::op("norm", args).as_tensor();
-}
+class l2norm {
+ public:
+  explicit l2norm(const edsl::Tensor& I) : I_(I), axis_(0), epsilon_(1e-8), eps_mode_(EpsMode::ADD) {}
+
+  l2norm& axis(int axis) {
+    axis_ = axis;
+    return *this;
+  }
+
+  l2norm& epsilon(float epsilon) {
+    epsilon_ = epsilon;
+    return *this;
+  }
+
+  l2norm& eps_mode(EpsMode eps_mode) {
+    eps_mode_ = eps_mode;
+    return *this;
+  }
+
+  operator edsl::Tensor() const {
+    auto args = edsl::make_tuple(I_, axis_, epsilon_, static_cast<int>(eps_mode_));
+    return details::op("l2norm", args).as_tensor();
+  }
+
+ private:
+  edsl::Tensor I_;
+  int axis_;
+  float epsilon_;
+  EpsMode eps_mode_;
+};
 
 inline edsl::Tensor pool(                    //
     const edsl::Tensor I,                    //

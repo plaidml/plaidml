@@ -28,14 +28,16 @@ static OpRegistration reg("normalizel2", [](const Context& ctx) {
     return edsl::make_tuple(I / N);
   }
   int axis = axes[0];
-  edsl::Tensor N;
+  plaidml::op::EpsMode edsl_eps_mode;
+  // edsl::Tensor N;
   if (eps_mode == ngraph::op::EpsMode::ADD) {
-    N = op::norm(I, axis, eps, plaidml::op::EpsMode::ADD);
+    edsl_eps_mode = plaidml::op::EpsMode::ADD;
   } else if (eps_mode == ngraph::op::EpsMode::MAX) {
-    N = op::norm(I, axis, eps, plaidml::op::EpsMode::MAX);
+    edsl_eps_mode = plaidml::op::EpsMode::MAX;
   } else {
     THROW_IE_EXCEPTION << "Invalid eps_mode";
   }
+  auto N = op::l2norm(I).axis(axis).epsilon(eps).eps_mode(edsl_eps_mode);
   return edsl::make_tuple(I / N);
 });
 

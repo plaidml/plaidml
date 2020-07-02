@@ -23,7 +23,8 @@ static OpRegistration reg("grn", [](const Context& ctx) {
   }
   auto* layer = dynamic_cast<ngraph::opset1::GRN*>(ctx.layer);
   auto bias = layer->get_bias();
-  auto N = op::norm(I, 1, bias, plaidml::op::EpsMode::ADD);
+  // auto N = op::l2norm(I, 1, bias, plaidml::op::EpsMode::ADD);
+  auto N = op::l2norm(I).axis(1).epsilon(bias);
   return edsl::make_tuple(I / N);
 });
 

@@ -575,9 +575,9 @@ module {
 )#"));
 }
 
-TEST(Op, Norm) {
+TEST(Op, L2Norm) {
   auto I = Placeholder(DType::FLOAT32, {10, 20}, "I");
-  auto program = makeProgram("norm", {op::norm(I, 1, 0.01, EpsMode::ADD)});
+  auto program = makeProgram("l2norm", {op::l2norm(I).axis(1).epsilon(0.01).eps_mode(EpsMode::ADD)});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"#(
 #map0 = affine_map<(d0, d1, d2) -> (d0, d1)>
@@ -585,7 +585,7 @@ TEST(Op, Norm) {
 
 
 module {
-  func @norm(%arg0: tensor<10x20xf32> {tile.name = "I"}) -> tensor<10x1xf32> {
+  func @l2norm(%arg0: tensor<10x20xf32> {tile.name = "I"}) -> tensor<10x1xf32> {
     %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> tensor<f32>
     %cst_0 = "eltwise.sconst"() {value = 0.0099999997764825821 : f64} : () -> tensor<f32>
     %0 = "eltwise.mul"(%arg0, %arg0) : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
