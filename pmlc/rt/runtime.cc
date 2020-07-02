@@ -38,10 +38,19 @@ struct Registration {
     registerSymbol("malloc", reinterpret_cast<void *>(malloc));
 
     // cmath functions
+    registerSymbol("acosf", reinterpret_cast<void *>(acosf));
     registerSymbol("asinf", reinterpret_cast<void *>(asinf));
+    registerSymbol("atanf", reinterpret_cast<void *>(atanf));
     registerSymbol("ceilf", reinterpret_cast<void *>(ceilf));
+    registerSymbol("coshf", reinterpret_cast<void *>(coshf));
+    registerSymbol("erff", reinterpret_cast<void *>(erff));
     registerSymbol("expf", reinterpret_cast<void *>(expf));
+    registerSymbol("floorf", reinterpret_cast<void *>(floorf));
     registerSymbol("logf", reinterpret_cast<void *>(logf));
+    registerSymbol("powf", reinterpret_cast<void *>(powf));
+    registerSymbol("roundf", reinterpret_cast<void *>(roundf));
+    registerSymbol("sinhf", reinterpret_cast<void *>(sinhf));
+    registerSymbol("tanf", reinterpret_cast<void *>(tanf));
 
     // RunnerUtils functions
     registerSymbol("print_memref_f32",
