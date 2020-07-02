@@ -591,6 +591,11 @@ inline edsl::Tensor transpose(const edsl::Tensor& I, const edsl::Value& axes = e
   return details::op("transpose", args).as_tensor();
 }
 
+inline edsl::Tensor unsqueeze(const edsl::Tensor& I, const std::vector<int>& axes) {
+  auto args = edsl::make_tuple(I, edsl::make_tuple(axes));
+  return details::op("unsqueeze", args).as_tensor();
+}
+
 inline edsl::Tensor variance(const edsl::Tensor& I, const edsl::Value& axes = edsl::None(), bool keepdims = false) {
   auto args = edsl::make_tuple(I, axes, keepdims);
   return details::op("variance", args).as_tensor();
