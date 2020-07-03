@@ -518,6 +518,36 @@ module {
 }
 '''
 
+    def test_cast_scalar(self):
+        I = Placeholder(plaidml.DType.INT32, {})
+        O = cast(I, plaidml.DType.FLOAT32)
+        program = Program('cast', [O])
+        # CHECK-LABEL: test_cast_scalar
+        expected = '''
+module {
+  func @cast() {
+  }
+}
+'''
+        self.checkProgram(program, [
+            (I, np.array([(3)])),
+        ], [3.0])
+
+    def test_cast_folder(self):
+        I = Placeholder(plaidml.DType.INT32, {3})
+        O = cast(I, plaidml.DType.INT32)
+        program = Program('cast', [O])
+        # CHECK-LABEL: test_cast_folder
+        expected = '''
+module {
+  func @cast() {
+  }
+}
+'''
+        self.checkProgram(program, [
+            (I, np.array([(1, 2, 3)])),
+        ], [[1, 2, 3]])
+
     def test_conv_1d(self):
         I = Placeholder(plaidml.DType.FLOAT32, [1, 224, 3])
         K = Placeholder(plaidml.DType.FLOAT32, [3, 3, 1])

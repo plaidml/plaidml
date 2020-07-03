@@ -102,7 +102,7 @@ class EW_BinaryOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
 }
 
 def EW_CastOp : Op<EltwiseDialect, "cast", [EltwiseOpInterface, NoSideEffect]>,
-    HasCanonicalizer {
+    HasCanonicalizer, HasFolder {
   let summary = "cast operation";
   let arguments = (ins EltwiseAny:$tensor);
   let results = (outs EltwiseAny:$result);
