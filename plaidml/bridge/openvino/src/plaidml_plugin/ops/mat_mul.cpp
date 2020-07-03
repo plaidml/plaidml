@@ -14,7 +14,7 @@ using namespace InferenceEngine;  // NOLINT[build/namespaces]
 
 namespace PlaidMLPlugin {
 
-static OpRegistration reg("mat_mul", [](const Context& ctx) {
+static OpRegistration reg("matmul", [](const Context& ctx) {
   auto* layer = dynamic_cast<ngraph::opset1::MatMul*>(ctx.layer);
   IE_ASSERT(ctx.operands.size() == 2);
   auto A = ctx.operands.at(0);

@@ -366,6 +366,50 @@ inline edsl::Tensor image_resize(const edsl::Tensor& I, const std::vector<int>& 
   return details::op("image_resize", args).as_tensor();
 }
 
+class lrn {
+ public:
+  explicit lrn(const edsl::Tensor& I, const std::vector<int64_t>& window_size)
+      : I_(I), window_size_(window_size), axes_({-1}), alpha_(1.), beta_(1.), epsilon_(1.e-5) {}
+
+  lrn& alpha(double alpha) {
+    alpha_ = alpha;
+    return *this;
+  }
+
+  lrn& beta(double beta) {
+    beta_ = beta;
+    return *this;
+  }
+
+  lrn& epsilon(double epsilon) {
+    epsilon_ = epsilon;
+    return *this;
+  }
+
+  lrn& window_size(const std::vector<int64_t>& window_size) {
+    window_size_ = window_size;
+    return *this;
+  }
+
+  lrn& axes(const std::vector<int64_t>& axes) {
+    axes_ = axes;
+    return *this;
+  }
+
+  operator edsl::Tensor() const {
+    auto args = edsl::make_tuple(I_, edsl::make_tuple(window_size_), edsl::make_tuple(axes_), alpha_, beta_, epsilon_);
+    return details::op("lrn", args).as_tensor();
+  }
+
+ private:
+  edsl::Tensor I_;
+  std::vector<int64_t> window_size_;
+  std::vector<int64_t> axes_;
+  double alpha_;
+  double beta_;
+  double epsilon_;
+};
+
 inline edsl::Tensor max(const edsl::Tensor& I,  // NOLINT(build/include_what_you_use)
                         const edsl::Value& axes = edsl::None(), bool keepdims = false) {
   auto args = edsl::make_tuple(I, axes, keepdims);
@@ -490,6 +534,11 @@ class slice {
   }
 
   slice& add_dim(int start, int stop, int step = 1) {
+    dims_.emplace_back(edsl::make_tuple(start, stop, step));
+    return *this;
+  }
+
+  slice& add_dim(edsl::Value start, edsl::Value stop, edsl::Value step = edsl::Value(1)) {
     dims_.emplace_back(edsl::make_tuple(start, stop, step));
     return *this;
   }

@@ -46,4 +46,58 @@ def ReshapeOp : StdX_Plain_Op<"reshape"> {
   }];
 }
 
+class StdX_UnaryFuncOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
+    Op<StdX_Dialect, mnemonic, traits> {
+  let arguments = (ins AnyType:$value);
+  let results = (outs AnyType);
+  let assemblyFormat = [{
+    `(` $value `)` attr-dict `:` functional-type(operands, results)
+  }];
+}
+
+def ACosOp : StdX_UnaryFuncOp<"acos"> {
+  let summary = "arccosine";
+}
+
+def ASinOp : StdX_UnaryFuncOp<"asin"> {
+  let summary = "arcsine";
+}
+
+def ATanOp : StdX_UnaryFuncOp<"atan"> {
+  let summary = "arctangent";
+}
+
+def CosHOp : StdX_UnaryFuncOp<"cosh"> {
+  let summary = "hyperbolic cosine";
+}
+
+def ErfOp : StdX_UnaryFuncOp<"erf"> {
+  let summary = "Gauss error function";
+}
+
+def FloorOp : StdX_UnaryFuncOp<"floor"> {
+  let summary = "integer floor";
+}
+
+def PowOp : StdX_Plain_Op<"pow"> {
+  let summary = "raise to power";
+  let arguments = (ins AnyType:$base, AnyType:$exponent);
+  let results = (outs AnyType);
+  let assemblyFormat = [{
+    `(` $base `,` $exponent `)` attr-dict `:` functional-type(operands, results)
+  }];
+}
+
+def RoundOp : StdX_UnaryFuncOp<"round"> {
+  let summary = "round to nearest integer";
+}
+
+def SinHOp : StdX_UnaryFuncOp<"sinh"> {
+  let summary = "hyperbolic sine";
+}
+
+def TanOp : StdX_UnaryFuncOp<"tan"> {
+  let summary = "tangent";
+}
+
 #endif // __PML_STDX_OPS__

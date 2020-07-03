@@ -2,12 +2,15 @@
 
 #include "pmlc/dialect/xsmm/ir/ops.h"
 
+#include <string>
+
 #include "mlir/IR/OpImplementation.h"
 
 namespace pmlc::dialect::xsmm {
 
 using llvm::SmallVector;
 using mlir::failure;
+using mlir::FunctionType;
 using mlir::success;
 
 XSMMDialect::XSMMDialect(mlir::MLIRContext *ctx)
@@ -19,26 +22,29 @@ XSMMDialect::XSMMDialect(mlir::MLIRContext *ctx)
 }
 
 //
-// ---- GemmOp ----
+// ---- GemmInvokeOp ----
 //
 
-GemmOp::operand_range GemmOp::getOperandsForA() {
-  return getOperands().slice(3 + cAccessMap().getNumInputs(),
+GemmInvokeOp::operand_range GemmInvokeOp::getOperandsForA() {
+  return getOperands().slice(4 + cAccessMap().getNumInputs(),
                              aAccessMap().getNumInputs());
 }
 
-GemmOp::operand_range GemmOp::getOperandsForB() {
-  return getOperands().slice(3 + cAccessMap().getNumInputs() +
+GemmInvokeOp::operand_range GemmInvokeOp::getOperandsForB() {
+  return getOperands().slice(4 + cAccessMap().getNumInputs() +
                                  aAccessMap().getNumInputs(),
                              bAccessMap().getNumInputs());
 }
 
-GemmOp::operand_range GemmOp::getOperandsForC() {
-  return getOperands().slice(3, cAccessMap().getNumInputs());
+GemmInvokeOp::operand_range GemmInvokeOp::getOperandsForC() {
+  return getOperands().slice(4, cAccessMap().getNumInputs());
 }
 
-void printGemmOp(OpAsmPrinter &p, GemmOp op) {
+void printGemmInvokeOp(OpAsmPrinter &p, GemmInvokeOp op) {
+  auto funcType = FunctionType::get({op.a().getType(), op.b().getType()},
+                                    {op.c().getType()}, op.getContext());
   p << op.getOperation()->getName() << ' ';
+  p << op.ptr() << ", ";
   p << op.c() << '[';
   p.printAffineMapOfSSAIds(op.cAccessMapAttr(), op.getOperandsForC());
   p << "]:";
@@ -51,49 +57,60 @@ void printGemmOp(OpAsmPrinter &p, GemmOp op) {
   p.printAffineMapOfSSAIds(op.bAccessMapAttr(), op.getOperandsForB());
   p << "]:";
   p.printAttribute(op.bTileMapAttr());
-  p << ", " << op.tile() << " : " << op.c().getType() << ", "
-    << op.a().getType() << ", " << op.b().getType();
+  p << ", " << op.tile() << " : " << funcType;
 }
 
-ParseResult parseGemmOp(OpAsmParser &parser, OperationState &result) {
+struct GemmOperandParser {
+  OpAsmParser::OperandType operand;
+  SmallVector<OpAsmParser::OperandType, 4> accessOperands;
+  AffineMapAttr accessMapAttr;
+  AffineMapAttr tileMapAttr;
+  std::string accessMapAttrName;
+  std::string tileMapAttrName;
+
+  explicit GemmOperandParser(StringRef name)
+      : accessMapAttrName(name.str() + "AccessMap"),
+        tileMapAttrName(name.str() + "TileMap") {}
+
+  ParseResult parse(OpAsmParser &parser, OperationState &result) {
+    return failure(
+        parser.parseOperand(operand) ||
+        parser.parseAffineMapOfSSAIds(accessOperands, accessMapAttr,
+                                      accessMapAttrName, result.attributes) ||
+        parser.parseColon() ||
+        parser.parseAttribute(tileMapAttr, tileMapAttrName, result.attributes));
+  }
+};
+
+ParseResult parseGemmInvokeOp(OpAsmParser &parser, OperationState &result) {
   auto &builder = parser.getBuilder();
   auto indexType = builder.getIndexType();
   auto i64Type = builder.getIntegerType(64);
-  SmallVector<Type, 3> operandTypes;
-  OpAsmParser::OperandType a, b, c;
-  AffineMapAttr aAccessMapAttr, bAccessMapAttr, cAccessMapAttr;
-  AffineMapAttr aTileMapAttr, bTileMapAttr, cTileMapAttr;
-  SmallVector<OpAsmParser::OperandType, 4> aOperands, bOperands, cOperands;
+  GemmOperandParser a("a"), b("b"), c("c");
+  OpAsmParser::OperandType ptr;
   ArrayAttr tileAttr;
+  FunctionType funcType;
   return failure(
-      parser.parseOperand(c) ||
-      parser.parseAffineMapOfSSAIds(cOperands, cAccessMapAttr, "cAccessMap",
-                                    result.attributes) ||
-      parser.parseColon() ||
-      parser.parseAttribute(cTileMapAttr, "cTileMap", result.attributes) ||
-      parser.parseEqual() || parser.parseOperand(a) ||
-      parser.parseAffineMapOfSSAIds(aOperands, aAccessMapAttr, "aAccessMap",
-                                    result.attributes) ||
-      parser.parseColon() ||
-      parser.parseAttribute(aTileMapAttr, "aTileMap", result.attributes) ||
-      parser.parseComma() || parser.parseOperand(b) ||
-      parser.parseAffineMapOfSSAIds(bOperands, bAccessMapAttr, "bAccessMap",
-                                    result.attributes) ||
-      parser.parseColon() ||
-      parser.parseAttribute(bTileMapAttr, "bTileMap", result.attributes) ||
+      parser.parseOperand(ptr) || //
+      parser.parseComma() ||      //
+      c.parse(parser, result) ||  //
+      parser.parseEqual() ||      //
+      a.parse(parser, result) ||  //
+      parser.parseComma() ||      //
+      b.parse(parser, result) ||  //
       parser.parseComma() ||
       parser.parseAttribute(tileAttr, i64Type, "tile", result.attributes) ||
-      parser.parseColonTypeList(operandTypes) ||
-      parser.addTypeToList(operandTypes[0], result.types) ||
-      parser.resolveOperand(c, operandTypes[0], result.operands) ||
-      parser.resolveOperand(a, operandTypes[1], result.operands) ||
-      parser.resolveOperand(b, operandTypes[2], result.operands) ||
-      parser.resolveOperands(cOperands, indexType, result.operands) ||
-      parser.resolveOperands(aOperands, indexType, result.operands) ||
-      parser.resolveOperands(bOperands, indexType, result.operands));
+      parser.parseColonType(funcType) ||
+      parser.addTypesToList(funcType.getResults(), result.types) ||
+      parser.resolveOperand(ptr, i64Type, result.operands) ||
+      parser.resolveOperand(c.operand, funcType.getResult(0),
+                            result.operands) ||
+      parser.resolveOperand(a.operand, funcType.getInput(0), result.operands) ||
+      parser.resolveOperand(b.operand, funcType.getInput(1), result.operands) ||
+      parser.resolveOperands(c.accessOperands, indexType, result.operands) ||
+      parser.resolveOperands(a.accessOperands, indexType, result.operands) ||
+      parser.resolveOperands(b.accessOperands, indexType, result.operands));
 }
-
-LogicalResult verifyGemmOp(GemmOp op) { return success(); }
 
 #define GET_OP_CLASSES
 #include "pmlc/dialect/xsmm/ir/ops.cc.inc" // NOLINT

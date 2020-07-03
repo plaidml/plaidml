@@ -231,6 +231,9 @@ struct FuncOpConversion : public OpConversionPattern<FuncOp> {
   matchAndRewrite(FuncOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
     FunctionType type = op.getType();
+    if (op.isExternal()) {
+      return mlir::success();
+    }
     IVLOG(2, "FuncOpConversion::rewrite> " << mlir::debugString(type));
 
     // Convert the function signature
@@ -254,7 +257,6 @@ struct FuncOpConversion : public OpConversionPattern<FuncOp> {
 
     // Finally cause the old func op to be erased
     rewriter.eraseOp(op);
-
     return mlir::success();
   }
 };
@@ -287,8 +289,9 @@ void LowerPXAToAffinePass::runOnOperation() {
   target.addIllegalOp<AffineParallelOp>();
   target.addDynamicallyLegalOp<AffineIfOp>(
       [](AffineIfOp op) { return op.getNumResults() == 0; });
-  target.addDynamicallyLegalOp<FuncOp>(
-      [](FuncOp op) { return op.getType().getNumResults() == 0; });
+  target.addDynamicallyLegalOp<FuncOp>([](FuncOp op) {
+    return op.isExternal() || op.getType().getNumResults() == 0;
+  });
   target.addDynamicallyLegalOp<ReturnOp>(
       [](ReturnOp op) { return op.getNumOperands() == 0; });
 
