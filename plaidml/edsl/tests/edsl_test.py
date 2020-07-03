@@ -524,13 +524,13 @@ module {
         program = Program('cast', [O])
         # CHECK-LABEL: test_cast_scalar
         expected = '''
-
 module {
   func @cast(%arg0: tensor<si32>) -> tensor<f32> {
     %0 = "eltwise.cast"(%arg0) : (tensor<si32>) -> tensor<f32>
     return %0 : tensor<f32>
   }
-}'''
+}
+'''
         self.checkProgram(program, [
             (I, np.array([(3)])),
         ], [3.0])
@@ -541,13 +541,13 @@ module {
         program = Program('cast', [O])
         # CHECK-LABEL: test_cast_folder
         expected = '''
-
 module {
   func @cast(%arg0: tensor<3xsi32>) -> tensor<3xsi32> {
     %0 = "eltwise.ident"(%arg0) : (tensor<3xsi32>) -> tensor<3xsi32>
     return %0 : tensor<3xsi32>
   }
-}'''
+}
+'''
         self.checkProgram(program, [
             (I, np.array([(1, 2, 3)])),
         ], [[1, 2, 3]])

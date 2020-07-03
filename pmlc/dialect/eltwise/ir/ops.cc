@@ -149,7 +149,7 @@ OpFoldResult CastOp::fold(ArrayRef<Attribute> operands) {
   if (oldType == newType) {
     return tensor();
   }
-  return constFoldBinaryOp(operands, [](double a, double b) { return a + b; });
+  return constFoldBinaryOp(operands, [](double a, double b) {});
 }
 
 OpFoldResult AddOp::fold(ArrayRef<Attribute> operands) {
