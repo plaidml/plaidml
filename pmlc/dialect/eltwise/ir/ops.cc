@@ -145,7 +145,7 @@ DEFINE_CANONICALIZER(SelectOp);
 OpFoldResult CastOp::fold(ArrayRef<Attribute> operands) {
   auto oldType = getRankedTensorType(tensor().getType());
   auto newType = getRankedTensorType(result().getType());
-  /// cast(x, x.type) -> x
+  /// cast(x).type == type -> x
   if (oldType == newType) {
     return tensor();
   }
