@@ -218,7 +218,6 @@ func @fold_div_f32_0(%arg0: f32) -> f32 {
 func @fold_cast_si32(%arg0: tensor<3xsi32>) -> tensor<3xsi32> {
   %0 = "eltwise.cast"(%arg0) : (tensor<3xsi32>) -> tensor<3xsi32>
   return %0 : tensor<3xsi32>
-  // CHECK-NEXT: %0 = "eltwise.ident"(%arg0) : (tensor<3xsi32>) -> tensor<3xsi32>
   // CHECK-NEXT: return %0 : tensor<3xsi32>
 }
 
@@ -227,7 +226,6 @@ func @fold_cast_si32(%arg0: tensor<3xsi32>) -> tensor<3xsi32> {
 func @fold_cast_f32(%arg0: tensor<3xf32>) -> tensor<3xf32> {
   %0 = "eltwise.cast"(%arg0) : (tensor<3xf32>) -> tensor<3xf32>
   return %0 : tensor<3xf32>
-  // CHECK-NEXT: %0 = "eltwise.ident"(%arg0) : (tensor<3xf32>) -> tensor<3xf32>
   // CHECK-NEXT: return %0 : tensor<3xf32>
 }
 
