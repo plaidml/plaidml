@@ -200,7 +200,7 @@ TEST_F(OpTest, Concatenate) {
 TEST_F(OpTest, Convolution) {
   auto I = Placeholder(DType::FLOAT32, {1, 224, 224, 3}, "I");
   auto K = Placeholder(DType::FLOAT32, {7, 7, 3, 64}, "K");
-  auto O = op::convolution(I, K).strides({2, 2}).autopad_mode(AutoPadMode::EXPLICIT).manual_padding({3, 3});
+  auto O = op::convolution(I, K).strides({2, 2}).autopad_mode(AutoPadMode::EXPLICIT).manual_padding({2, 2});
   auto program = makeProgram("convolution", {O});
   IVLOG(1, program);
   runProgram(program);
