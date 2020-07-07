@@ -445,12 +445,8 @@ inline edsl::Tensor minimum(const edsl::Tensor& X, const edsl::Tensor& Y) {
 
 class l2norm {
  public:
-  explicit l2norm(const edsl::Tensor& I) : I_(I), axis_(0), epsilon_(1e-8), eps_mode_(EpsMode::ADD) {}
-
-  l2norm& axis(int axis) {
-    axis_ = axis;
-    return *this;
-  }
+  explicit l2norm(const edsl::Tensor& I, const std::vector<int64_t> axes)
+      : I_(I), axes_(axes), epsilon_(0), eps_mode_(EpsMode::ADD) {}
 
   l2norm& epsilon(float epsilon) {
     epsilon_ = epsilon;
@@ -463,13 +459,13 @@ class l2norm {
   }
 
   operator edsl::Tensor() const {
-    auto args = edsl::make_tuple(I_, axis_, epsilon_, static_cast<int>(eps_mode_));
+    auto args = edsl::make_tuple(I_, edsl::make_tuple(axes_), epsilon_, static_cast<int>(eps_mode_));
     return details::op("l2norm", args).as_tensor();
   }
 
  private:
   edsl::Tensor I_;
-  int axis_;
+  std::vector<int64_t> axes_;
   float epsilon_;
   EpsMode eps_mode_;
 };

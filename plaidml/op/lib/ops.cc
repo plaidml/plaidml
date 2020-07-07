@@ -1926,17 +1926,17 @@ Value l2norm(const Value& value) {
   }
 
   auto I = args[0].as_tensor();
-  auto axis = args[1].as_int();
+  auto axes = args[1].as_int_tuple();
   auto epsilon = args[2].as_float();
   auto eps_mode = validate<EpsMode>(args[3].as_int());
 
-  auto X = op::sum((I * I), edsl::make_tuple(axis), 1);
+  auto X = op::sum((I * I), edsl::make_tuple(axes), 1);
   switch (eps_mode) {
     case EpsMode::ADD:
       X = X + epsilon;
       break;
     case EpsMode::MAX:
-      X = edsl::select(X < epsilon, edsl::Tensor{epsilon}, X);
+      X = op::maximum(X, edsl::Tensor{epsilon});
       break;
     default:
       throw std::runtime_error("Unrecognized eps_mode in l2norm op");

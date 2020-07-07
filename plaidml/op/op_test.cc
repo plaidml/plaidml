@@ -577,7 +577,7 @@ module {
 
 TEST(Op, L2Norm) {
   auto I = Placeholder(DType::FLOAT32, {10, 20}, "I");
-  auto program = makeProgram("l2norm", {op::l2norm(I).axis(1).epsilon(0.01).eps_mode(EpsMode::ADD)});
+  auto program = makeProgram("l2norm", {op::l2norm(I, {1}).epsilon(0.01).eps_mode(EpsMode::ADD)});
   IVLOG(1, program);
   EXPECT_THAT(program, Eq(R"#(
 #map0 = affine_map<(d0, d1, d2) -> (d0, d1)>
