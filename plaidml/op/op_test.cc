@@ -575,6 +575,29 @@ module {
 )#"));
 }
 
+TEST(Op, L2Norm) {
+  auto I = Placeholder(DType::FLOAT32, {10, 20}, "I");
+  auto program = makeProgram("l2norm", {op::l2norm(I, {1}).epsilon(0.01).eps_mode(EpsMode::ADD)});
+  IVLOG(1, program);
+  EXPECT_THAT(program, Eq(R"#(
+#map0 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#map1 = affine_map<(d0, d1, d2) -> (d0, d2)>
+
+
+module {
+  func @l2norm(%arg0: tensor<10x20xf32> {tile.name = "I"}) -> tensor<10x1xf32> {
+    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> tensor<f32>
+    %cst_0 = "eltwise.sconst"() {value = 0.0099999997764825821 : f64} : () -> tensor<f32>
+    %0 = "eltwise.mul"(%arg0, %arg0) : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
+    %1 = tile.contract add, none, %cst, %0 {sink = #map0, srcs = [#map1]} : tensor<f32>, tensor<10x20xf32> -> tensor<10x1xf32>
+    %2 = "eltwise.add"(%1, %cst_0) : (tensor<10x1xf32>, tensor<f32>) -> tensor<10x1xf32>
+    %3 = "eltwise.sqrt"(%2) : (tensor<10x1xf32>) -> tensor<10x1xf32>
+    return %3 : tensor<10x1xf32>
+  }
+}
+)#"));
+}
+
 TEST(Op, Pool) {
   auto I = Placeholder(DType::FLOAT32, {10, 20, 30, 40, 50}, "I");
   auto program = makeProgram("pool", {op::pool(I, PoolMode::SUM, {1, 2, 3}, {1, 2, 3}, AutoPadMode::NONE, {1, 2},
