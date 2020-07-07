@@ -57,7 +57,7 @@ static OpRegistration reg("stridedslice", [](const Context& ctx) {
 
   for (size_t i = 0; i < new_axis_mask.size(); i++) {
     if (new_axis_mask[i]) {
-      I = op::expand_dims(I, i);
+      I = op::unsqueeze(I, {static_cast<int64_t>(i)});
     }
   }
   auto result = op::slice(I);

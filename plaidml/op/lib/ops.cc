@@ -31,7 +31,6 @@ Value cumprod(const Value&);
 Value cumsum(const Value&);
 Value dot(const Value&);
 Value elu(const Value&);
-Value expand_dims(const Value&);
 Value flip(const Value&);
 Value hard_sigmoid(const Value&);
 Value image_resize(const Value&);
@@ -1582,45 +1581,6 @@ Value elu(const Value& value) {
   throw std::runtime_error("Unexpected type for alpha in elu");
 }
 
-Value expand_dims(const Value& value) {
-  IVLOG(1, "expand_dims");
-
-  // Read arguments
-  auto args = value.as_tuple();
-  if (args.size() != 2) {
-    throw std::runtime_error(llvm::formatv("PlaidML expand_dims op expects 2 arguments (received {0})", args.size()));
-  }
-  auto I = args[0].as_tensor();
-  auto raw_axis = args[1].as_int();
-
-  // Initialize useful values
-  auto ndims = I.rank();
-  // Axis is relative to _output_ tensor, which has one more dim than I
-  size_t axis = normalize_axis(raw_axis, ndims + 1, "expand_dims");
-  std::vector<TensorDim> I_dims(ndims);
-  std::vector<TensorIndex> I_idxs;
-  std::vector<TensorDim> O_dims;
-  std::vector<TensorIndex> O_idxs;
-  I.bind_dims(I_dims);
-  for (size_t i = 0; i < ndims; ++i) {
-    I_idxs.emplace_back(llvm::formatv("n{0}", i));
-    if (i == axis) {
-      O_dims.emplace_back(1);
-      O_idxs.emplace_back("a");
-    }
-    O_dims.push_back(I_dims[i]);
-    O_idxs.push_back(I_idxs[i]);
-  }
-  if (axis == ndims) {
-    // This one case won't be caught in the main loop, so handle specially
-    O_dims.emplace_back(1);
-    O_idxs.emplace_back("a");
-  }
-  auto O = TensorOutput(O_dims);
-  O(O_idxs) = I(I_idxs);
-  return Value{O};
-}
-
 Value flip(const Value& value) {
   IVLOG(1, "flip");
   // This is numpy-style `flip`; Keras calls it `repeat`
@@ -2931,9 +2891,10 @@ Value unsqueeze(const Value& value) {
   } else {
     raw_axes = args[1].as_int_tuple();
   }
+
   std::set<size_t> axes;
   for (auto& raw_axis : raw_axes) {
-    axes.insert(normalize_axis(raw_axis, ndims + 1, "unsqueeze"));
+    axes.insert(normalize_axis(raw_axis, ndims + raw_axes.size(), "unsqueeze"));
   }
 
   std::vector<TensorDim> I_dims(ndims);
@@ -2946,7 +2907,7 @@ Value unsqueeze(const Value& value) {
   for (size_t i = 0; i < new_rank; i++) {
     if (axes.count(i)) {
       O_dims.push_back(edsl::TensorDim(1));
-      O_idxs.emplace_back("a");
+      O_idxs.emplace_back(llvm::formatv("a{0}", i));
     } else {
       I_idxs.emplace_back(llvm::formatv("n{0}", i));
       O_dims.push_back(I_dims[src_loc]);
@@ -3024,7 +2985,6 @@ void RegisterOps() {
   registry->Register("cumsum", cumsum);
   registry->Register("dot", dot);
   registry->Register("elu", elu);
-  registry->Register("expand_dims", expand_dims);
   registry->Register("flip", flip);
   registry->Register("hard_sigmoid", hard_sigmoid);
   registry->Register("image_resize", image_resize);

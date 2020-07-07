@@ -235,13 +235,6 @@ TEST_F(OpTest, Elu) {
   runProgram(program);
 }
 
-TEST_F(OpTest, ExpandDims) {
-  auto I = Placeholder(DType::FLOAT32, {7, 7, 3, 64}, "I");
-  auto program = makeProgram("expand_dims", {op::expand_dims(I, 2)});
-  IVLOG(1, program);
-  runProgram(program);
-}
-
 TEST_F(OpTest, Flip) {
   auto I = Placeholder(DType::FLOAT32, {7, 7, 3, 64}, "I");
   auto program = makeProgram("flip", {op::flip(I, 2)});
@@ -504,10 +497,7 @@ TEST_F(OpTest, Squeeze) {
   std::vector<uint64_t> A_input = {0, 1, 2,  3,  //
                                    4, 5, 6,  7,  //
                                    8, 9, 10, 11};
-  std::vector<uint64_t> C_output = {0, 1, 2,  3,  //
-                                    4, 5, 6,  7,  //
-                                    8, 9, 10, 11};
-  checkProgram(program, {{A, A_input}}, {{C, C_output}});
+  checkProgram(program, {{A, A_input}}, {{C, A_input}});
 }
 
 TEST_F(OpTest, Tile) {
@@ -538,10 +528,7 @@ TEST_F(OpTest, Unsqueeze) {
   std::vector<uint64_t> A_input = {0, 1, 2,  3,  //
                                    4, 5, 6,  7,  //
                                    8, 9, 10, 11};
-  std::vector<uint64_t> C_output = {0, 1, 2,  3,  //
-                                    4, 5, 6,  7,  //
-                                    8, 9, 10, 11};
-  checkProgram(program, {{A, A_input}}, {{C, C_output}});
+  checkProgram(program, {{A, A_input}}, {{C, A_input}});
 }
 
 TEST_F(OpTest, Variance) {
