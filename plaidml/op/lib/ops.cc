@@ -1821,7 +1821,7 @@ Value lrn(const Value& value) {
 
   auto I_sqr = I * I;
   auto local_sum_sqr = TensorOutput(dims);
-  local_sum_sqr(agg.dst_idxs) = I_sqr(agg.src_idxs);
+  local_sum_sqr(agg.dst_idxs) += I_sqr(agg.src_idxs);
   local_sum_sqr.add_constraints(agg.constraints);
   return Value{I / edsl::pow(alpha * local_sum_sqr + epsilon, Tensor(beta))};
 }
