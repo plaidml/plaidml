@@ -35,10 +35,10 @@ static OpRegistration reg("batchnorminference", [](const Context& ctx) {
   // Position the gamma/beta/mean/var data at dimension 1 of the input tensor
   // TODO: Simplify with an oplib-level unsqueeze
   while (gamma.rank() < I.rank() - 1) {
-    gamma = op::expand_dims(gamma, 1);
-    beta = op::expand_dims(beta, 1);
-    mean = op::expand_dims(mean, 1);
-    variance = op::expand_dims(variance, 1);
+    gamma = op::unsqueeze(gamma, {1});
+    beta = op::unsqueeze(beta, {1});
+    mean = op::unsqueeze(mean, {1});
+    variance = op::unsqueeze(variance, {1});
   }
   return edsl::make_tuple(gamma * ((I - mean) / edsl::sqrt(variance + layer->get_eps_value())) + beta);
 });

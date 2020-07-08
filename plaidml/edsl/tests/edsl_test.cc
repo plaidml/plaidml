@@ -25,12 +25,6 @@ namespace {
 
 class CppEdsl : public TestFixture {};
 
-Program makeProgram(const std::string& name, const std::vector<Tensor>& outputs) {
-  auto program = ProgramBuilder(name, outputs).compile();
-  std::cout << program << std::endl;
-  return program;
-}
-
 template <typename T>
 Buffer makeBuffer(const TensorShape& shape, const std::vector<T>& data) {
   const auto& curDevice = plaidml::Settings::get("PLAIDML_DEVICE");

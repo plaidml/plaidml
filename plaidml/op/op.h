@@ -351,11 +351,6 @@ inline edsl::Tensor elu(const edsl::Tensor& I, double alpha) {
   return details::op("elu", args).as_tensor();
 }
 
-inline edsl::Tensor expand_dims(const edsl::Tensor& I, int axis) {
-  auto args = edsl::make_tuple(I, axis);
-  return details::op("expand_dims", args).as_tensor();
-}
-
 inline edsl::Tensor flip(const edsl::Tensor& I, int axis) {
   auto args = edsl::make_tuple(I, axis);
   return details::op("flip", args).as_tensor();
@@ -622,6 +617,11 @@ inline edsl::Tensor tile(const edsl::Tensor& I, const std::vector<int>& tiling_f
 inline edsl::Tensor transpose(const edsl::Tensor& I, const edsl::Value& axes = edsl::None()) {
   auto args = edsl::make_tuple(I, axes);
   return details::op("transpose", args).as_tensor();
+}
+
+inline edsl::Tensor unsqueeze(const edsl::Tensor& I, const std::vector<int64_t>& axes) {
+  auto args = edsl::make_tuple(I, edsl::make_tuple(axes));
+  return details::op("unsqueeze", args).as_tensor();
 }
 
 inline edsl::Tensor variance(const edsl::Tensor& I, const edsl::Value& axes = edsl::None(), bool keepdims = false) {
