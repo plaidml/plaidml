@@ -294,7 +294,14 @@ TEST_F(OpTest, Minimum) {
   runProgram(program);
 }
 
-TEST_F(OpTest, Pool) {
+TEST(Op, L2Norm) {
+  auto I = Placeholder(DType::FLOAT32, {10, 20}, "I");
+  auto program = makeProgram("l2norm", {op::l2norm(I, {1}).epsilon(0.01).eps_mode(EpsMode::ADD)});
+  IVLOG(1, program);
+  runProgram(program);
+}
+
+TEST(Op, Pool) {
   auto I = Placeholder(DType::FLOAT32, {10, 20, 30, 40, 50}, "I");
   auto program = makeProgram("pool", {op::pool(I, PoolMode::SUM, {1, 2, 3}, {1, 2, 3}, AutoPadMode::NONE, {1, 2},
                                                TensorLayout::NXC, true, true)});

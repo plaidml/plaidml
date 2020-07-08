@@ -142,6 +142,16 @@ DEFINE_CANONICALIZER(TanHOp);
 DEFINE_CANONICALIZER(TanOp);
 DEFINE_CANONICALIZER(SelectOp);
 
+OpFoldResult CastOp::fold(ArrayRef<Attribute> operands) {
+  auto oldType = getRankedTensorType(tensor().getType());
+  auto newType = getRankedTensorType(result().getType());
+  /// cast(x).type == type -> x
+  if (oldType == newType) {
+    return tensor();
+  }
+  return {};
+}
+
 OpFoldResult AddOp::fold(ArrayRef<Attribute> operands) {
   /// add(x, 0) -> x
   if (matchPattern(rhs(), m_Zero())) {

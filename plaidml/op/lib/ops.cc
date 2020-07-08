@@ -39,6 +39,7 @@ Value maximum(const Value&);
 Value mean(const Value&);
 Value min(const Value&);
 Value minimum(const Value&);
+Value l2norm(const Value&);
 Value pool(const Value&);
 Value prod(const Value&);
 Value relu(const Value&);
@@ -1878,6 +1879,33 @@ Value minimum(const Value& value) {
   return Value{O};
 }
 
+Value l2norm(const Value& value) {
+  IVLOG(1, "l2norm");
+  auto args = value.as_tuple();
+  if (args.size() != 4) {
+    throw std::runtime_error("norm expects 4 arguments");
+  }
+
+  auto I = args[0].as_tensor();
+  auto axes = args[1].as_int_tuple();
+  auto epsilon = args[2].as_float();
+  auto eps_mode = validate<EpsMode>(args[3].as_int());
+
+  auto X = op::sum((I * I), edsl::make_tuple(axes), 1);
+  switch (eps_mode) {
+    case EpsMode::ADD:
+      X = X + epsilon;
+      break;
+    case EpsMode::MAX:
+      X = op::maximum(X, edsl::Tensor{epsilon});
+      break;
+    default:
+      throw std::runtime_error("Unrecognized eps_mode in l2norm op");
+  }
+  auto N = edsl::sqrt(X);
+  return Value(N);
+}
+
 Value prod(const Value& value) {
   IVLOG(1, "prod");
   auto args = value.as_tuple();
@@ -2994,6 +3022,7 @@ void RegisterOps() {
   registry->Register("mean", mean);
   registry->Register("min", min);
   registry->Register("minimum", minimum);
+  registry->Register("l2norm", l2norm);
   registry->Register("pool", pool);
   registry->Register("prod", prod);
   registry->Register("relu", relu);
