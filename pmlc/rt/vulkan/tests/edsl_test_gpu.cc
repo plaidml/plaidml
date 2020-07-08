@@ -56,6 +56,32 @@ Tensor Softmax(const Tensor &X) {
   return E / N;
 }
 
+TEST_F(CppEdsl, Cast) {
+  auto A = Placeholder(DType::UINT64, {3, 3});
+  auto B = cast(A, DType::UINT32);
+  auto program = makeProgram("cast", {B});
+
+  std::vector<uint64_t> A_input{1,
+                                2,
+                                3,
+                                4,
+                                5,
+                                6 + (1UL << 12),
+                                7 + (1UL << 24),
+                                8 + (1UL << 31), //
+                                (1ULL << 32) - 1};
+  std::vector<uint32_t> B_output{1,
+                                 2,
+                                 3,
+                                 4,
+                                 5,
+                                 6 + (1UL << 12),
+                                 7 + (1UL << 24),
+                                 8 + (1UL << 31), //
+                                 (1ULL << 32) - 1};
+  checkProgram(program, {{A, A_input}}, {{B, B_output}});
+}
+
 TEST_F(CppEdsl, Dot) {
   int64_t M = 8;
   int64_t N = 32;
@@ -120,6 +146,20 @@ TEST_F(CppEdsl, EltwiseAdd) {
   // CHECK-LABEL: CppEdsl.EltwiseAdd
   // CHECK: func @eltwise_add
   // CHECK: %{{.*}} = "eltwise.add"(%{{.*}}, %{{.*}}) : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
+  // CHECK: return %{{.*}} : tensor<10x20xf32>
+  // clang-format on
+  runProgram(program);
+}
+
+TEST_F(CppEdsl, Relu) {
+  auto A = Placeholder(DType::FLOAT32, {10, 20});
+  auto program = makeProgram("relu", {Relu(A)});
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.Relu
+  // CHECK: func @relu
+  // CHECK: %[[cst:.*]] = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> tensor<f32>
+  // CHECK: %{{.*}} = "eltwise.cmp_lt"(%{{.*}}, %[[cst]]) : (tensor<10x20xf32>, tensor<f32>) -> tensor<10x20xi1>
+  // CHECK: %{{.*}} = "eltwise.select"(%{{.*}}, %[[cst]], %{{.*}}) : (tensor<10x20xi1>, tensor<f32>, tensor<10x20xf32>) -> tensor<10x20xf32>
   // CHECK: return %{{.*}} : tensor<10x20xf32>
   // clang-format on
   runProgram(program);
@@ -407,7 +447,7 @@ Tensor ComplexConv2d(             //
     const Tensor &K,              //
     const std::vector<size_t> &s, // stride coeffs
     const std::vector<size_t> &d  // dilation coeffs
-) {
+    ) {
   // "same-lower" autopadding will be applied
   TensorDim N, G, GCI, GCO;
   std::vector<TensorDim> X(2);
@@ -462,7 +502,7 @@ TEST_F(CppEdsl, GradientDot) {
   auto O = Dot(A, B);
   auto grads = Gradient({A, B}, O);
   auto program = makeProgram("gradient_dot", {grads});
-  //clang-format off
+  // clang-format off
   //  EXPECT_THAT(program, Eq(R"(function (
   //   A[A_0, A_1],
   //   B[B_0, B_1]
