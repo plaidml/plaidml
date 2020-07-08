@@ -23,6 +23,7 @@ plaidml_cc_library(
     name = "transforms",
     srcs = [
         "boundscheck.cc",
+        "i1_to_i32.cc",
         "pass_detail.h",
     ],
     hdrs = [
