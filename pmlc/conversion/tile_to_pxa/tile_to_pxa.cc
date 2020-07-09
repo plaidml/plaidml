@@ -458,6 +458,27 @@ struct LogicalOp {
   }
 };
 
+struct LogicalNotOp {
+  Value create(ConversionPatternRewriter &rewriter, Location loc,
+               Type resultType, ArrayRef<Value> operands,
+               ArrayRef<Type> types) {
+    auto input = operands[0];
+    auto fromType = input.getType();
+    if (auto floatType = fromType.dyn_cast<FloatType>()) {
+      auto value = convertFloatUsingType(llvm::APFloat(0.0), floatType);
+      auto zero = rewriter.create<mlir::ConstantFloatOp>(loc, value, floatType);
+      return rewriter.create<mlir::CmpFOp>(loc, CmpFPredicate::OEQ, input, zero)
+          .getResult();
+    } else if (auto intType = fromType.dyn_cast<IntegerType>()) {
+      auto zero = rewriter.create<mlir::ConstantIntOp>(loc, 0, intType);
+      return rewriter.create<mlir::CmpIOp>(loc, CmpIPredicate::eq, input, zero)
+          .getResult();
+    } else {
+      llvm_unreachable("Unknown type for LogicalNotOp");
+    }
+  }
+};
+
 static Value createInit(OpBuilder &builder, Location loc, Type type,
                         AggregationKind agg) {
   if (auto floatType = type.dyn_cast<FloatType>()) {
@@ -1124,12 +1145,34 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
         EltwiseOpConversion<ew::ExpOp, StdOp<mlir::ExpOp>>,
         EltwiseOpConversion<ew::LogOp, StdOp<mlir::LogOp>,
                             ResultIs<EltwiseFloat>>,
+        EltwiseOpConversion<ew::PowOp, StdOp<stdx::PowOp>,
+                            OperandsAre<EltwiseFloat>>,
+        EltwiseOpConversion<ew::ErfOp, StdOp<stdx::ErfOp>,
+                            OperandsAre<EltwiseFloat>>,
         EltwiseOpConversion<ew::CosOp, StdOp<mlir::CosOp>,
+                            ResultIs<EltwiseFloat>>,
+        EltwiseOpConversion<ew::TanOp, StdOp<stdx::TanOp>,
+                            OperandsAre<EltwiseFloat>>,
+        EltwiseOpConversion<ew::SinHOp, StdOp<stdx::SinHOp>,
+                            OperandsAre<EltwiseFloat>>,
+        EltwiseOpConversion<ew::CosHOp, StdOp<stdx::CosHOp>,
+                            OperandsAre<EltwiseFloat>>,
+        EltwiseOpConversion<ew::SinOp, StdOp<mlir::SinOp>,
                             ResultIs<EltwiseFloat>>,
         EltwiseOpConversion<ew::TanHOp, StdOp<mlir::TanhOp>,
                             ResultIs<EltwiseFloat>>,
+        EltwiseOpConversion<ew::ASinOp, StdOp<stdx::ASinOp>,
+                            OperandsAre<EltwiseFloat>>,
+        EltwiseOpConversion<ew::ACosOp, StdOp<stdx::ACosOp>,
+                            OperandsAre<EltwiseFloat>>,
+        EltwiseOpConversion<ew::ATanOp, StdOp<stdx::ATanOp>,
+                            OperandsAre<EltwiseFloat>>,
         EltwiseOpConversion<ew::CeilOp, StdOp<mlir::CeilFOp>,
                             ResultIs<EltwiseFloat>>,
+        EltwiseOpConversion<ew::FloorOp, StdOp<stdx::FloorOp>,
+                            OperandsAre<EltwiseFloat>>,
+        EltwiseOpConversion<ew::RoundOp, StdOp<stdx::RoundOp>,
+                            OperandsAre<EltwiseFloat>>,
         EltwiseOpConversion<ew::NegOp, StdOp<mlir::NegFOp>,
                             ResultIs<EltwiseFloat>>,
         EltwiseOpConversion<ew::NegOp, NegIOp, ResultIs<EltwiseInteger>>,
@@ -1196,6 +1239,7 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
         EltwiseOpConversion<ew::BitShrOp, StdOp<mlir::UnsignedShiftRightOp>,
                             FirstOperandIs<EltwiseUnsigned>>,
         EltwiseOpConversion<ew::LogicalAndOp, LogicalOp<mlir::AndOp>>,
+        EltwiseOpConversion<ew::LogicalNotOp, LogicalNotOp>,
         EltwiseOpConversion<ew::LogicalOrOp, LogicalOp<mlir::OrOp>>,
         EltwiseOpConversion<ew::LogicalXorOp, LogicalOp<mlir::XOrOp>>,
         EltwiseOpConversion<ew::SelectOp, SelectOp>,

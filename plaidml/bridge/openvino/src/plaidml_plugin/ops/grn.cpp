@@ -15,12 +15,16 @@ using namespace InferenceEngine;  // NOLINT[build/namespaces]
 
 namespace PlaidMLPlugin {
 
-static OpRegistration reg("reducelogicalor", [](const Context& ctx) {
-  IE_ASSERT(ctx.operands.size() == 2);
+static OpRegistration reg("grn", [](const Context& ctx) {
+  IE_ASSERT(ctx.operands.size() == 1);
   auto I = ctx.operands.at(0);
-  std::vector<size_t> axes = get_axis_vector_from_constant_operand(1, ctx.layer);
-  auto* layer = dynamic_cast<ngraph::opset1::ReduceLogicalOr*>(ctx.layer);
-  return edsl::make_tuple(op::any(I, edsl::make_tuple(axes), layer->get_keep_dims()));
+  if (I.rank() > 4 || I.rank() < 2) {
+    THROW_IE_EXCEPTION << "input tensor must be 2 <= rank <= 4 ";
+  }
+  auto* layer = dynamic_cast<ngraph::opset1::GRN*>(ctx.layer);
+  auto bias = layer->get_bias();
+  auto N = op::l2norm(I, {1}).epsilon(bias);
+  return edsl::make_tuple(I / N);
 });
 
 }  // namespace PlaidMLPlugin

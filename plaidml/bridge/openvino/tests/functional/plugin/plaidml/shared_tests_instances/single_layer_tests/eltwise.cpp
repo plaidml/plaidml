@@ -27,8 +27,7 @@ using EltwiseTestNamespace::ParameterInputIdx;
 std::vector<EltwiseOpType> operations = {EltwiseOpType::ADD, EltwiseOpType::SUBSTRACT, EltwiseOpType::MULTIPLY};
 std::vector<ParameterInputIdx> primary_input_idx = {0, 1};
 std::vector<InputLayerType> secondary_input_types = {InputLayerType::CONSTANT, InputLayerType::PARAMETER};
-std::vector<InferenceEngine::Precision> net_precisions = {InferenceEngine::Precision::FP32,
-                                                          InferenceEngine::Precision::FP16};
+std::vector<InferenceEngine::Precision> net_precisions = {InferenceEngine::Precision::FP32};
 std::vector<InferenceEngine::SizeVector> flat_shapes = {{1, 200}, {1, 2000}, {1, 20000}};
 std::vector<InferenceEngine::SizeVector> non_flat_shapes = {{2, 200}, {10, 200}, {1, 10, 100}, {4, 4, 16}};
 std::map<std::string, std::string> additional_config = {};

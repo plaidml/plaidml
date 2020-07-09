@@ -14,7 +14,7 @@ using namespace InferenceEngine;  // NOLINT[build/namespaces]
 
 namespace PlaidMLPlugin {
 
-static OpRegistration reg("mat_mul", [](const Context& ctx) {
+static OpRegistration reg("matmul", [](const Context& ctx) {
   auto* layer = dynamic_cast<ngraph::opset1::MatMul*>(ctx.layer);
   IE_ASSERT(ctx.operands.size() == 2);
   auto A = ctx.operands.at(0);
@@ -24,11 +24,11 @@ static OpRegistration reg("mat_mul", [](const Context& ctx) {
   auto ndimsB = B.rank();
 
   if (ndimsA < 2) {
-    A = op::expand_dims(A, 0);
+    A = op::unsqueeze(A, {0});
     ndimsA++;
   }
   if (ndimsB < 2) {
-    B = op::expand_dims(B, 0);
+    B = op::unsqueeze(B, {0});
     ndimsB++;
   }
   if (layer->get_transpose_a()) {
@@ -50,10 +50,10 @@ static OpRegistration reg("mat_mul", [](const Context& ctx) {
     B = op::transpose(B, edsl::make_tuple(pattern));
   }
   while (A.rank() < B.rank()) {
-    A = op::expand_dims(A, 0);
+    A = op::unsqueeze(A, {0});
   }
   while (B.rank() < A.rank()) {
-    B = op::expand_dims(B, 0);
+    B = op::unsqueeze(B, {0});
   }
 
   return edsl::make_tuple(op::dot(A, B));

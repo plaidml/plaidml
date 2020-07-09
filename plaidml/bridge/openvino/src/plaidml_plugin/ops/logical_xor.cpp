@@ -3,7 +3,6 @@
 //
 
 #include "plaidml_ops.hpp"
-#include "plaidml_util.hpp"
 
 #include "ngraph/opsets/opset.hpp"
 #include "ngraph/opsets/opset1.hpp"
@@ -15,12 +14,11 @@ using namespace InferenceEngine;  // NOLINT[build/namespaces]
 
 namespace PlaidMLPlugin {
 
-static OpRegistration reg("reducelogicalor", [](const Context& ctx) {
+static OpRegistration reg("xor", [](const Context& ctx) {
   IE_ASSERT(ctx.operands.size() == 2);
-  auto I = ctx.operands.at(0);
-  std::vector<size_t> axes = get_axis_vector_from_constant_operand(1, ctx.layer);
-  auto* layer = dynamic_cast<ngraph::opset1::ReduceLogicalOr*>(ctx.layer);
-  return edsl::make_tuple(op::any(I, edsl::make_tuple(axes), layer->get_keep_dims()));
+  auto A = edsl::cast(ctx.operands.at(0), plaidml::DType::BOOLEAN);  // cast to bool and use bitwise xor for now
+  auto B = edsl::cast(ctx.operands.at(1), plaidml::DType::BOOLEAN);
+  return edsl::make_tuple(A ^ B);
 });
 
 }  // namespace PlaidMLPlugin
