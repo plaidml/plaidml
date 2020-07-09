@@ -60,6 +60,10 @@ public:
     return LLVM::LLVMType::getInt8PtrTy(&dialect);
   }
 
+  LLVM::LLVMType getFloatType() const {
+    return LLVM::LLVMType::getFloatTy(&dialect);
+  }
+
   // Create an LLVM IR pseudo-operation defining the given index constant.
   Value createIndexConstant(ConversionPatternRewriter &builder, Location loc,
                             uint64_t value) const {
@@ -69,6 +73,18 @@ public:
 protected:
   LLVM::LLVMDialect &dialect;
 };
+
+LLVM::LLVMFuncOp getOrInsertFuncOp(StringRef funcName, LLVM::LLVMType funcType,
+                                   Operation *op) {
+  using LLVM::LLVMFuncOp;
+
+  Operation *funcOp = SymbolTable::lookupNearestSymbolFrom(op, funcName);
+  if (funcOp)
+    return cast<LLVMFuncOp>(*funcOp);
+
+  mlir::OpBuilder builder(op->getParentOfType<LLVMFuncOp>());
+  return builder.create<LLVMFuncOp>(op->getLoc(), funcName, funcType);
+}
 
 struct FPToUILowering : public LLVMLegalizationPattern<stdx::FPToUIOp> {
   using LLVMLegalizationPattern<stdx::FPToUIOp>::LLVMLegalizationPattern;
@@ -83,6 +99,80 @@ struct FPToUILowering : public LLVMLegalizationPattern<stdx::FPToUIOp> {
     rewriter.replaceOpWithNewOp<LLVM::FPToUIOp>(op, llvmType, value);
     return success();
   }
+};
+
+template <typename T>
+struct LibMCallLowering : public LLVMLegalizationPattern<T> {
+  using LLVMLegalizationPattern<T>::LLVMLegalizationPattern;
+  using Base = LLVMLegalizationPattern<T>;
+
+  LogicalResult
+  matchAndRewrite(Operation *op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto f32Type = Base::getFloatType();
+    SmallVector<LLVM::LLVMType, 2> argTypes(getArity(), f32Type);
+    auto funcType = LLVM::LLVMType::getFunctionTy(f32Type, argTypes, false);
+    auto sym = getOrInsertFuncOp(getFuncName(), funcType, op);
+
+    rewriter.replaceOpWithNewOp<LLVM::CallOp>(
+        op, ArrayRef<Type>{f32Type}, rewriter.getSymbolRefAttr(sym), operands);
+    return success();
+  }
+
+protected:
+  virtual std::string getFuncName() const = 0;
+  virtual size_t getArity() const { return 1; }
+};
+
+struct ACosLowering : public LibMCallLowering<stdx::ACosOp> {
+  using LibMCallLowering<stdx::ACosOp>::LibMCallLowering;
+  std::string getFuncName() const override { return "acosf"; }
+};
+
+struct ASinLowering : public LibMCallLowering<stdx::ASinOp> {
+  using LibMCallLowering<stdx::ASinOp>::LibMCallLowering;
+  std::string getFuncName() const override { return "asinf"; }
+};
+
+struct ATanLowering : public LibMCallLowering<stdx::ATanOp> {
+  using LibMCallLowering<stdx::ATanOp>::LibMCallLowering;
+  std::string getFuncName() const override { return "atanf"; }
+};
+
+struct CosHLowering : public LibMCallLowering<stdx::CosHOp> {
+  using LibMCallLowering<stdx::CosHOp>::LibMCallLowering;
+  std::string getFuncName() const override { return "coshf"; }
+};
+
+struct ErfLowering : public LibMCallLowering<stdx::ErfOp> {
+  using LibMCallLowering<stdx::ErfOp>::LibMCallLowering;
+  std::string getFuncName() const override { return "erff"; }
+};
+
+struct FloorLowering : public LibMCallLowering<stdx::FloorOp> {
+  using LibMCallLowering<stdx::FloorOp>::LibMCallLowering;
+  std::string getFuncName() const override { return "floorf"; }
+};
+
+struct PowLowering : public LibMCallLowering<stdx::PowOp> {
+  using LibMCallLowering<stdx::PowOp>::LibMCallLowering;
+  std::string getFuncName() const override { return "powf"; }
+  size_t getArity() const override { return 2; }
+};
+
+struct RoundLowering : public LibMCallLowering<stdx::RoundOp> {
+  using LibMCallLowering<stdx::RoundOp>::LibMCallLowering;
+  std::string getFuncName() const override { return "roundf"; }
+};
+
+struct SinHLowering : public LibMCallLowering<stdx::SinHOp> {
+  using LibMCallLowering<stdx::SinHOp>::LibMCallLowering;
+  std::string getFuncName() const override { return "sinhf"; }
+};
+
+struct TanLowering : public LibMCallLowering<stdx::TanOp> {
+  using LibMCallLowering<stdx::TanOp>::LibMCallLowering;
+  std::string getFuncName() const override { return "tanf"; }
 };
 
 class BaseViewConversionHelper {
@@ -183,8 +273,10 @@ struct LowerToLLVMPass : public LowerToLLVMBase<LowerToLLVMPass> {
 
 void populateStdXToLLVMConversionPatterns(LLVMTypeConverter &converter,
                                           OwningRewritePatternList &patterns) {
-  patterns.insert<FPToUILowering, ReshapeLowering>(*converter.getDialect(),
-                                                   converter);
+  patterns.insert<FPToUILowering, ReshapeLowering, ACosLowering, ASinLowering,
+                  ATanLowering, CosHLowering, ErfLowering, FloorLowering,
+                  PowLowering, RoundLowering, SinHLowering, TanLowering>(
+      *converter.getDialect(), converter);
 }
 
 std::unique_ptr<mlir::Pass> createLowerToLLVMPass() {

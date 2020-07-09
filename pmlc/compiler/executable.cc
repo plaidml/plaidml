@@ -218,7 +218,8 @@ struct MCJITEngineImpl : EngineImpl {
 
     uint64_t addr = engine->getFunctionAddress(entryPoint.str());
     if (!addr) {
-      throw std::runtime_error("getFunctionAddress failed");
+      throw std::runtime_error(
+          llvm::formatv("Entry point not found: {0}", entryPoint.str()));
     }
     jitEntry = reinterpret_cast<Function>(addr);
   }

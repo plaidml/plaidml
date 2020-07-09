@@ -698,6 +698,11 @@ class Tensor {
   Tensor operator~() const;
 
   ///
+  /// Elementwise logical not
+  ///
+  Tensor operator!() const;
+
+  ///
   /// TODO
   ///
   std::string str() const {  //
@@ -968,6 +973,27 @@ Tensor Call(const std::string& fn, Ts... args) {
 inline Tensor abs(const Tensor& x) { return Call("abs", x); }
 
 ///
+/// Computes the elementwise arccosine of `x`.
+/// \param x Tensor
+/// \return Tensor
+///
+inline Tensor acos(const Tensor& x) { return Call("acos", x); }
+
+///
+/// Computes the elementwise arcsine of `x`.
+/// \param x Tensor
+/// \return Tensor
+///
+inline Tensor asin(const Tensor& x) { return Call("asin", x); }
+
+///
+/// Computes the elementwise arctangent of `x`.
+/// \param x Tensor
+/// \return Tensor
+///
+inline Tensor atan(const Tensor& x) { return Call("atan", x); }
+
+///
 /// Casts the element type of a tensor `x` to the type specified by `dtype`.
 /// \param x Tensor
 /// \param dtype DType
@@ -998,6 +1024,13 @@ inline Tensor cos(const Tensor& x) { return Call("cos", x); }
 /// \return Tensor
 ///
 inline Tensor cosh(const Tensor& x) { return Call("cosh", x); }
+
+///
+/// Computes the elementwise Gauss error function of `x`
+/// \param x Tensor
+/// \return Tensor
+///
+inline Tensor erf(const Tensor& x) { return Call("erf", x); }
 
 ///
 /// Computes the elementwise natural exponential function of `x`: _e_<sup>x</sup>.
@@ -1296,6 +1329,7 @@ PLAIDML_EDSL_DEFINE_TENSOR_DIM_BINARY_FN(min, PLAIDML_INT_OP_MIN);
 
 inline Tensor Tensor::operator-() const { return Call("neg", {*this}); }
 inline Tensor Tensor::operator~() const { return Call("bit_not", {*this}); }
+inline Tensor Tensor::operator!() const { return Call("logical_not", {*this}); }
 
 #define PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(_op_, _fn_)                                               \
   inline Tensor operator _op_(const Tensor& lhs, const Tensor& rhs) { return Call(_fn_, lhs, rhs); }    \
@@ -1324,6 +1358,8 @@ PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(>>, "bit_shr");
 PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(&, "bit_and");
 PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(|, "bit_or");
 PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(^, "bit_xor");
+PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(&&, "logical_and");
+PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(||, "logical_or");
 
 inline void IndexedTensor::Impl::MakeContraction(plaidml_agg_op agg_op, const IndexedTensor& rhs) {
   plaidml_combo_op combo_op;

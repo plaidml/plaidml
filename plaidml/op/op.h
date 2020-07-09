@@ -53,6 +53,12 @@ enum class ConvDerivMode {
   _LAST,
 };
 
+enum class EpsMode {
+  ADD,
+  MAX,
+  _LAST,
+};
+
 // For grouped convolutions, in the filters (i.e. weights/kernel) tensor, there
 // are multiple ways of laying out the channels. For a convolution with:
 //  G groups
@@ -345,11 +351,6 @@ inline edsl::Tensor elu(const edsl::Tensor& I, double alpha) {
   return details::op("elu", args).as_tensor();
 }
 
-inline edsl::Tensor expand_dims(const edsl::Tensor& I, int axis) {
-  auto args = edsl::make_tuple(I, axis);
-  return details::op("expand_dims", args).as_tensor();
-}
-
 inline edsl::Tensor flip(const edsl::Tensor& I, int axis) {
   auto args = edsl::make_tuple(I, axis);
   return details::op("flip", args).as_tensor();
@@ -365,6 +366,50 @@ inline edsl::Tensor image_resize(const edsl::Tensor& I, const std::vector<int>& 
   auto args = edsl::make_tuple(I, edsl::make_tuple(factors), static_cast<int>(interpolation), static_cast<int>(layout));
   return details::op("image_resize", args).as_tensor();
 }
+
+class lrn {
+ public:
+  explicit lrn(const edsl::Tensor& I, const std::vector<int64_t>& window_size)
+      : I_(I), window_size_(window_size), axes_({-1}), alpha_(1.), beta_(1.), epsilon_(1.e-5) {}
+
+  lrn& alpha(double alpha) {
+    alpha_ = alpha;
+    return *this;
+  }
+
+  lrn& beta(double beta) {
+    beta_ = beta;
+    return *this;
+  }
+
+  lrn& epsilon(double epsilon) {
+    epsilon_ = epsilon;
+    return *this;
+  }
+
+  lrn& window_size(const std::vector<int64_t>& window_size) {
+    window_size_ = window_size;
+    return *this;
+  }
+
+  lrn& axes(const std::vector<int64_t>& axes) {
+    axes_ = axes;
+    return *this;
+  }
+
+  operator edsl::Tensor() const {
+    auto args = edsl::make_tuple(I_, edsl::make_tuple(window_size_), edsl::make_tuple(axes_), alpha_, beta_, epsilon_);
+    return details::op("lrn", args).as_tensor();
+  }
+
+ private:
+  edsl::Tensor I_;
+  std::vector<int64_t> window_size_;
+  std::vector<int64_t> axes_;
+  double alpha_;
+  double beta_;
+  double epsilon_;
+};
 
 inline edsl::Tensor max(const edsl::Tensor& I,  // NOLINT(build/include_what_you_use)
                         const edsl::Value& axes = edsl::None(), bool keepdims = false) {
@@ -392,6 +437,33 @@ inline edsl::Tensor minimum(const edsl::Tensor& X, const edsl::Tensor& Y) {
   auto args = edsl::make_tuple(X, Y);
   return details::op("minimum", args).as_tensor();
 }
+
+class l2norm {
+ public:
+  explicit l2norm(const edsl::Tensor& I, const std::vector<int64_t> axes)
+      : I_(I), axes_(axes), epsilon_(0), eps_mode_(EpsMode::ADD) {}
+
+  l2norm& epsilon(float epsilon) {
+    epsilon_ = epsilon;
+    return *this;
+  }
+
+  l2norm& eps_mode(EpsMode eps_mode) {
+    eps_mode_ = eps_mode;
+    return *this;
+  }
+
+  operator edsl::Tensor() const {
+    auto args = edsl::make_tuple(I_, edsl::make_tuple(axes_), epsilon_, static_cast<int>(eps_mode_));
+    return details::op("l2norm", args).as_tensor();
+  }
+
+ private:
+  edsl::Tensor I_;
+  std::vector<int64_t> axes_;
+  float epsilon_;
+  EpsMode eps_mode_;
+};
 
 inline edsl::Tensor pool(                    //
     const edsl::Tensor I,                    //
@@ -494,6 +566,11 @@ class slice {
     return *this;
   }
 
+  slice& add_dim(edsl::Value start, edsl::Value stop, edsl::Value step = edsl::Value(1)) {
+    dims_.emplace_back(edsl::make_tuple(start, stop, step));
+    return *this;
+  }
+
   operator edsl::Tensor() const {
     auto args = edsl::make_tuple(I_, dims_);
     return details::op("slice", args).as_tensor();
@@ -540,6 +617,11 @@ inline edsl::Tensor tile(const edsl::Tensor& I, const std::vector<int>& tiling_f
 inline edsl::Tensor transpose(const edsl::Tensor& I, const edsl::Value& axes = edsl::None()) {
   auto args = edsl::make_tuple(I, axes);
   return details::op("transpose", args).as_tensor();
+}
+
+inline edsl::Tensor unsqueeze(const edsl::Tensor& I, const std::vector<int64_t>& axes) {
+  auto args = edsl::make_tuple(I, edsl::make_tuple(axes));
+  return details::op("unsqueeze", args).as_tensor();
 }
 
 inline edsl::Tensor variance(const edsl::Tensor& I, const edsl::Value& axes = edsl::None(), bool keepdims = false) {

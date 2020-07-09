@@ -13,14 +13,8 @@ using LayerTestsDefinitions::poolSpecificParams;
 
 namespace {
 // Common params
-const std::vector<InferenceEngine::Precision> inputPrecisions = {
-    InferenceEngine::Precision::FP32,
-    //         InferenceEngine::Precision::FP16, // "[NOT_IMPLEMENTED] Input image format FP16 is not supported yet...
-    InferenceEngine::Precision::U8,
-    //         InferenceEngine::Precision::I8 // Too much cases
-};
 
-const std::vector<InferenceEngine::Precision> netPrecisions = {InferenceEngine::Precision::FP16};
+const std::vector<InferenceEngine::Precision> netPrecisions = {InferenceEngine::Precision::FP32};
 
 const std::vector<std::vector<size_t>> kernels = {{3, 3}, {3, 5}};
 const std::vector<std::vector<size_t>> strides = {{1, 1}, {1, 2}};
@@ -40,7 +34,7 @@ const auto maxPool_ExplicitPad_FloorRounding_Params =
                        ::testing::Values(ngraph::op::PadType::EXPLICIT),       //
                        ::testing::Values(false));  // placeholder value - exclude pad not applicable for max pooling
 
-INSTANTIATE_TEST_CASE_P(MaxPool_ExplicitPad_FloorRpunding, PoolingLayerTest,
+INSTANTIATE_TEST_CASE_P(MaxPool_ExplicitPad_FloorRounding, PoolingLayerTest,
                         ::testing::Combine(maxPool_ExplicitPad_FloorRounding_Params,                //
                                            ::testing::ValuesIn(netPrecisions),                      //
                                            ::testing::Values(std::vector<size_t>({1, 3, 30, 30})),  //

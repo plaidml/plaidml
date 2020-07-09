@@ -14,12 +14,11 @@ using LayerTestsDefinitions::LrnLayerTest;
 namespace {
 // Common params
 
-const std::vector<InferenceEngine::Precision> netPrecisions = {InferenceEngine::Precision::FP32,
-                                                               InferenceEngine::Precision::FP16};
+const std::vector<InferenceEngine::Precision> netPrecisions = {InferenceEngine::Precision::FP32};
 
 const double alpha = 9.9e-05;
-const size_t beta = 2;
-const size_t bias = 1.0f;
+const double beta = 2.0;
+const double bias = 1.0;
 const size_t size = 5;
 
 INSTANTIATE_TEST_CASE_P(LrnCheck, LrnLayerTest,

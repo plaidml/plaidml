@@ -26,6 +26,7 @@ static Blob::Ptr make_shared_blob(const TensorDesc& desc) {
     CASE(Precision::U8);
     CASE(Precision::I8);
     CASE(Precision::BOOL);
+    CASE(Precision::I16);
     CASE(Precision::I32);
     CASE(Precision::I64);
     CASE(Precision::BIN);

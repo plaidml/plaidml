@@ -3,6 +3,7 @@
 #include <gmock/gmock.h>
 
 #include <map>
+#include <string>
 #include <variant>
 #include <vector>
 
@@ -14,8 +15,12 @@ namespace plaidml::edsl {
 using MultiBuffer = std::variant<  //
     std::vector<float>,            //
     std::vector<double>,           //
+    std::vector<int8_t>,           //
+    std::vector<int16_t>,          //
     std::vector<int32_t>,          //
     std::vector<int64_t>,          //
+    std::vector<uint8_t>,          //
+    std::vector<uint16_t>,         //
     std::vector<uint32_t>,         //
     std::vector<uint64_t>>;
 
@@ -59,6 +64,12 @@ class TestFixture : public ::testing::Test {
       std::visit([&](auto&& vec) { compareBuffers(view, vec); }, kvp.second);
     }
 #endif
+  }
+
+  Program makeProgram(const std::string& name, const std::vector<Tensor>& outputs) {
+    auto program = ProgramBuilder(name, outputs).compile();
+    std::cout << program << std::endl;
+    return program;
   }
 
   void runProgram(const Program& program) {

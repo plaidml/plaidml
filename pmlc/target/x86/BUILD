@@ -34,9 +34,9 @@ plaidml_cc_library(
         "heatmap_impl.cc",
         "pass_detail.h",
         "pipeline.cc",
-        "stencil_xsmm.cc",
         "trace_linking.cc",
         "xsmm_lowering.cc",
+        "xsmm_stencil.cc",
         ":heatmap",
     ],
     hdrs = [

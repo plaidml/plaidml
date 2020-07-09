@@ -102,7 +102,7 @@ class EW_BinaryOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
 }
 
 def EW_CastOp : Op<EltwiseDialect, "cast", [EltwiseOpInterface, NoSideEffect]>,
-    HasCanonicalizer {
+    HasCanonicalizer, HasFolder {
   let summary = "cast operation";
   let arguments = (ins EltwiseAny:$tensor);
   let results = (outs EltwiseAny:$result);
@@ -144,6 +144,36 @@ class EW_BinaryIntOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
     Arguments<(ins EltwiseInteger:$lhs, EltwiseInteger:$rhs)>,
     Results<(outs EltwiseInteger:$result)>;
 
+class EW_BinaryLogicOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
+    EW_BinaryOp<mnemonic, traits>,
+    Arguments<(ins EltwiseAny:$lhs, EltwiseAny:$rhs)>,
+    Results<(outs EltwiseBool:$result)> {
+
+  let extraClassDeclaration = [{
+    static Type getResultType(ValueRange operands) {
+      return ComputeResultType(operands,
+        IntegerType::get(1, operands[0].getContext()));
+    }
+  }];
+}
+
+class EW_UnaryLogicOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
+    EW_UnaryOp<mnemonic, traits>,
+    Arguments<(ins EltwiseAny:$operand)>,
+    Results<(outs EltwiseBool:$result)> {
+
+  let extraClassDeclaration = [{
+    static Type getResultType(ValueRange operands) {
+      Value operand = operands[0];
+      auto opType = getRankedTensorType(operand.getType());
+      auto resultShape = opType.getShape();
+      Type dtype = IntegerType::get(1, operand.getContext());
+      return RankedTensorType::get(resultShape, dtype);
+    }
+  }];
+}
+
+
 def EW_AbsOp : EW_UnaryOp<"abs">;
 def EW_ACosOp : EW_UnaryFloatOp<"acos">;
 def EW_AddOp : EW_BinaryOp<"add", [Commutative, NoSideEffect]>, HasFolder;
@@ -160,6 +190,7 @@ def EW_CmpNeOp : EW_CompareOp<"cmp_ne", [Commutative, NoSideEffect]>;
 def EW_CosHOp : EW_UnaryFloatOp<"cosh">;
 def EW_CosOp : EW_UnaryFloatOp<"cos">;
 def EW_DivOp : EW_BinaryOp<"div">, HasFolder;
+def EW_ErfOp : EW_UnaryFloatOp<"erf">;
 def EW_ExpOp : EW_UnaryFloatOp<"exp">;
 def EW_FloorOp : EW_UnaryOp<"floor">;
 // Prevent CSE from dropping 'ident' by avoiding the NoSideEffect trait
@@ -189,6 +220,11 @@ def EW_BitXorOp : EW_BinaryIntOp<"bit_xor", [Commutative, NoSideEffect]>;
 def EW_BitShlOp : EW_BinaryIntOp<"bit_shl">;
 def EW_BitShrOp : EW_BinaryIntOp<"bit_shr">;
 
+// logical operations
+def EW_LogicalAndOp : EW_BinaryLogicOp<"logical_and", [Commutative, NoSideEffect]>;
+def EW_LogicalNotOp : EW_UnaryLogicOp<"logical_not">;
+def EW_LogicalOrOp : EW_BinaryLogicOp<"logical_or", [Commutative, NoSideEffect]>;
+def EW_LogicalXorOp : EW_BinaryLogicOp<"logical_xor", [Commutative, NoSideEffect]>;
 
 def EW_SelectOp : EltwiseOp<"select">, HasCanonicalizer {
   let summary = "conditional selection";
