@@ -156,12 +156,18 @@ struct ScalarConstantOpConversion
 
 static Value createCastOp(OpBuilder &builder, Location loc, Value from,
                           bool fromSigned, Type intoType, bool intoSigned) {
+  IVLOG(2, "createCastOp begin");
   auto fromType = from.getType();
   if (fromType == intoType) {
     return from;
   }
+  IVLOG(2, "Attempt to cast intoType into float");
   if (auto intoFloatType = intoType.dyn_cast<FloatType>()) {
+    IVLOG(2, "Cast intoType into float successful");
+    IVLOG(2, "Attempt to cast fromType into float");
     if (auto fromFloatType = fromType.dyn_cast<FloatType>()) {
+      IVLOG(2, "Cast fromType into float successful");
+      IVLOG(2, "Checking widths of fromType and IntoType");
       if (fromFloatType.getWidth() < intoFloatType.getWidth()) {
         // FPExtOp: FloatType -> wider FloatType
         return builder.create<mlir::FPExtOp>(loc, from, intoType).getResult();
@@ -169,10 +175,12 @@ static Value createCastOp(OpBuilder &builder, Location loc, Value from,
       // FPTruncOp: FloatType -> narrower FloatType
       return builder.create<mlir::FPTruncOp>(loc, from, intoType).getResult();
     }
+    IVLOG(2, "Attempt to cast fromType into integer");
     if (auto fromIntType = fromType.dyn_cast<IntegerType>()) {
       // SIToFPOp: IntegerType -> FloatType
       return builder.create<mlir::SIToFPOp>(loc, from, intoType).getResult();
     }
+    IVLOG(2, "Attempt to cast fromType into index");
     if (auto fromIndexType = fromType.dyn_cast<IndexType>()) {
       auto i64Type = builder.getIntegerType(64);
       auto intCastOp = builder.create<mlir::IndexCastOp>(loc, from, i64Type);
@@ -180,6 +188,7 @@ static Value createCastOp(OpBuilder &builder, Location loc, Value from,
           .getResult();
     }
   }
+  IVLOG(2, "Attempt to cast intoType into integer");
   if (auto intoIntType = intoType.dyn_cast<IntegerType>()) {
     if (auto fromIntType = fromType.dyn_cast<IntegerType>()) {
       if (fromIntType.getWidth() < intoIntType.getWidth()) {
@@ -1001,21 +1010,29 @@ struct CastOpConversion : public OpConversionPattern<ew::CastOp> {
     auto loc = op.getLoc();
     TypeConverter typeConverter;
 
+    IVLOG(2, "Getting resultType");
     auto oldResultType = op.result().getType();
+    IVLOG(2, "Getting resultType as memref");
     auto resultType =
         typeConverter.convertType(oldResultType).cast<MemRefType>();
     auto operand = operands[0];
+    IVLOG(2, "Getting operandType");
     auto operandType = operand.getType().cast<MemRefType>();
+    IVLOG(2, "Checking operandType vs. resultType");
     if (resultType == operandType) {
+      IVLOG(2, "folding");
       rewriter.replaceOp(op, operand);
       return success();
     }
+    IVLOG(2, "Checking if result is signed integer");
     bool resultIsSigned = getElementType(oldResultType).isSignedInteger();
 
     // Make an allocation for the output
+    IVLOG(2, "Allocating memref for result");
     auto resultMemRef = rewriter.create<AllocOp>(loc, resultType).getResult();
 
     // Make a parallel for loop to fill the result
+    IVLOG(2, "Creating parallel for");
     auto forOp = rewriter.create<AffineParallelOp>(
         loc, ArrayRef<Type>{resultType}, resultType.getShape());
     auto body = forOp.getBody();
@@ -1023,19 +1040,23 @@ struct CastOpConversion : public OpConversionPattern<ew::CastOp> {
     auto idxs = body->getArguments();
 
     // Create the load
+    IVLOG(2, "Creating affine load");
     auto scalar = rewriter.create<AffineLoadOp>(loc, operand, idxs);
 
     // Create the standard cast op
+    IVLOG(2, "Creating cast op");
     auto dtype = getElementType(op.tensor());
     auto result = createCastOp(rewriter, loc, scalar, dtype.isSignedInteger(),
                                resultType.getElementType(), resultIsSigned);
 
     // Create the store
+    IVLOG(2, "Creating affine store");
     auto stored = buildSimpleStore(rewriter, loc, result, resultMemRef,
                                    getPaddingInfo(op));
     rewriter.create<AffineYieldOp>(loc, ValueRange{stored});
 
     // Replace the op
+    IVLOG(2, "Replacing cast op");
     rewriter.replaceOp(op, forOp.getResult(0));
 
     IVLOG(2, "CastOpConversion::matchAndRewrite returns success");
