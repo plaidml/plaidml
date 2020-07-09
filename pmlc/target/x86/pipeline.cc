@@ -31,7 +31,7 @@ using namespace mlir; // NOLINT[build/namespaces]
 namespace pmlc::target::x86 {
 
 std::unique_ptr<Pass> createXSMMStencilPass() {
-  auto numThreads = 1; // std::thread::hardware_concurrency();
+  auto numThreads = std::thread::hardware_concurrency();
   return pmlc::dialect::pxa::createXSMMStencilPass(numThreads, heatmapCost);
 }
 
@@ -110,7 +110,7 @@ struct ConvertToLLVMPass
 
 void addToPipeline(OpPassManager &pm) {
   pm.addPass(pmlc::dialect::tile::createComputeBoundsPass());
-  // pm.addPass(pmlc::dialect::tile::createPadPass());
+  pm.addPass(pmlc::dialect::tile::createPadPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
