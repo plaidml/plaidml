@@ -18,26 +18,31 @@ namespace PlaidMLPlugin {
 static OpRegistration reg("normalizel2", [](const Context& ctx) {
   IE_ASSERT(ctx.operands.size() == 2);
   auto I = ctx.operands.at(0);
-  std::vector<size_t> axes = get_axis_vector_from_constant_operand(1, ctx.layer);
+  auto axes = get_axis_vector_from_constant_operand(1, ctx.layer);
   auto* layer = dynamic_cast<ngraph::opset1::NormalizeL2*>(ctx.layer);
   auto eps = layer->get_eps();
   auto eps_mode = layer->get_eps_mode();
 
   if (axes.empty()) {
-    auto norm = I + eps;
-    return edsl::make_tuple(I / norm);
+    auto N = I + eps;
+    return edsl::make_tuple(I / N);
   }
 
-  int axis = axes[0];
-  auto X = op::sum((I * I), edsl::make_tuple(axis), 1);
-  if (eps_mode == ngraph::op::EpsMode::ADD) {
-    X = X + eps;
-  } else if (eps_mode == ngraph::op::EpsMode::MAX) {
-    X = edsl::select(X < eps, edsl::Tensor{eps}, X);
+  plaidml::op::EpsMode edsl_eps_mode;
+  switch (eps_mode) {
+    case ngraph::op::EpsMode::ADD:
+      edsl_eps_mode = plaidml::op::EpsMode::ADD;
+      break;
+    case ngraph::op::EpsMode::MAX:
+      edsl_eps_mode = plaidml::op::EpsMode::MAX;
+      break;
+    default:
+      THROW_IE_EXCEPTION << "Invalid eps_mode";
   }
-  auto norm = edsl::sqrt(X);
-  auto O = I / norm;
-  return edsl::make_tuple(O);
+  std::vector<int64_t> axes_l2norm;
+  axes_l2norm.assign(axes.begin(), axes.end());
+  auto N = op::l2norm(I, axes_l2norm).epsilon(eps).eps_mode(edsl_eps_mode);
+  return edsl::make_tuple(I / N);
 });
 
 }  // namespace PlaidMLPlugin

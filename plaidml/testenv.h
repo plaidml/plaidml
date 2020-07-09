@@ -3,6 +3,7 @@
 #include <gmock/gmock.h>
 
 #include <map>
+#include <string>
 #include <variant>
 #include <vector>
 
@@ -63,6 +64,12 @@ class TestFixture : public ::testing::Test {
       std::visit([&](auto&& vec) { compareBuffers(view, vec); }, kvp.second);
     }
 #endif
+  }
+
+  Program makeProgram(const std::string& name, const std::vector<Tensor>& outputs) {
+    auto program = ProgramBuilder(name, outputs).compile();
+    std::cout << program << std::endl;
+    return program;
   }
 
   void runProgram(const Program& program) {

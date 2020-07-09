@@ -31,7 +31,6 @@ Value cumprod(const Value&);
 Value cumsum(const Value&);
 Value dot(const Value&);
 Value elu(const Value&);
-Value expand_dims(const Value&);
 Value flip(const Value&);
 Value hard_sigmoid(const Value&);
 Value image_resize(const Value&);
@@ -40,6 +39,7 @@ Value maximum(const Value&);
 Value mean(const Value&);
 Value min(const Value&);
 Value minimum(const Value&);
+Value l2norm(const Value&);
 Value pool(const Value&);
 Value prod(const Value&);
 Value relu(const Value&);
@@ -55,6 +55,7 @@ Value squeeze(const Value&);
 Value sum(const Value&);
 Value tile(const Value&);
 Value transpose(const Value&);
+Value unsqueeze(const Value&);
 Value variance(const Value&);
 
 namespace {
@@ -1581,45 +1582,6 @@ Value elu(const Value& value) {
   throw std::runtime_error("Unexpected type for alpha in elu");
 }
 
-Value expand_dims(const Value& value) {
-  IVLOG(1, "expand_dims");
-
-  // Read arguments
-  auto args = value.as_tuple();
-  if (args.size() != 2) {
-    throw std::runtime_error(llvm::formatv("PlaidML expand_dims op expects 2 arguments (received {0})", args.size()));
-  }
-  auto I = args[0].as_tensor();
-  auto raw_axis = args[1].as_int();
-
-  // Initialize useful values
-  auto ndims = I.rank();
-  // Axis is relative to _output_ tensor, which has one more dim than I
-  size_t axis = normalize_axis(raw_axis, ndims + 1, "expand_dims");
-  std::vector<TensorDim> I_dims(ndims);
-  std::vector<TensorIndex> I_idxs;
-  std::vector<TensorDim> O_dims;
-  std::vector<TensorIndex> O_idxs;
-  I.bind_dims(I_dims);
-  for (size_t i = 0; i < ndims; ++i) {
-    I_idxs.emplace_back(llvm::formatv("n{0}", i));
-    if (i == axis) {
-      O_dims.emplace_back(1);
-      O_idxs.emplace_back("a");
-    }
-    O_dims.push_back(I_dims[i]);
-    O_idxs.push_back(I_idxs[i]);
-  }
-  if (axis == ndims) {
-    // This one case won't be caught in the main loop, so handle specially
-    O_dims.emplace_back(1);
-    O_idxs.emplace_back("a");
-  }
-  auto O = TensorOutput(O_dims);
-  O(O_idxs) = I(I_idxs);
-  return Value{O};
-}
-
 Value flip(const Value& value) {
   IVLOG(1, "flip");
   // This is numpy-style `flip`; Keras calls it `repeat`
@@ -1915,6 +1877,33 @@ Value minimum(const Value& value) {
   auto Y = args[1].as_tensor();
   auto O = select(X < Y, X, Y);
   return Value{O};
+}
+
+Value l2norm(const Value& value) {
+  IVLOG(1, "l2norm");
+  auto args = value.as_tuple();
+  if (args.size() != 4) {
+    throw std::runtime_error("norm expects 4 arguments");
+  }
+
+  auto I = args[0].as_tensor();
+  auto axes = args[1].as_int_tuple();
+  auto epsilon = args[2].as_float();
+  auto eps_mode = validate<EpsMode>(args[3].as_int());
+
+  auto X = op::sum((I * I), edsl::make_tuple(axes), 1);
+  switch (eps_mode) {
+    case EpsMode::ADD:
+      X = X + epsilon;
+      break;
+    case EpsMode::MAX:
+      X = op::maximum(X, edsl::Tensor{epsilon});
+      break;
+    default:
+      throw std::runtime_error("Unrecognized eps_mode in l2norm op");
+  }
+  auto N = edsl::sqrt(X);
+  return Value(N);
 }
 
 Value prod(const Value& value) {
@@ -2914,6 +2903,54 @@ Value transpose(const Value& value) {
   return Value{O};
 }
 
+Value unsqueeze(const Value& value) {
+  // Read arguments
+  auto args = value.as_tuple();
+  if (args.size() != 2) {
+    throw std::runtime_error(llvm::formatv("PlaidML unsqueeze op expects 2 arguments (received {0})", args.size()));
+  }
+
+  auto I = args[0].as_tensor();
+  auto ndims = I.rank();
+
+  std::vector<int64_t> raw_axes;
+  if (args[1].is_int()) {
+    raw_axes.push_back(args[1].as_int());
+  } else {
+    raw_axes = args[1].as_int_tuple();
+  }
+
+  std::set<size_t> axes;
+  for (auto& raw_axis : raw_axes) {
+    axes.insert(normalize_axis(raw_axis, ndims + raw_axes.size(), "unsqueeze"));
+  }
+
+  std::vector<TensorDim> I_dims(ndims);
+  std::vector<TensorIndex> I_idxs;
+  std::vector<TensorDim> O_dims;
+  std::vector<TensorIndex> O_idxs;
+  I.bind_dims(I_dims);
+  size_t src_loc = 0;
+  size_t new_rank = ndims + axes.size();
+  for (size_t i = 0; i < new_rank; i++) {
+    if (axes.count(i)) {
+      O_dims.push_back(edsl::TensorDim(1));
+      O_idxs.emplace_back(llvm::formatv("a{0}", i));
+    } else {
+      I_idxs.emplace_back(llvm::formatv("n{0}", i));
+      O_dims.push_back(I_dims[src_loc]);
+      O_idxs.push_back(I_idxs[src_loc]);
+      src_loc++;
+    }
+  }
+  if (src_loc != I.rank()) {
+    throw std::runtime_error(llvm::formatv("Unsqueeze did not replicate entirety of input into output"));
+  }
+  auto O = TensorOutput(O_dims);
+  O(O_idxs) = I(I_idxs);
+  return Value{O};
+}
+
 Value variance(const Value& value) {
   // This computes the *uncorrected* sample variance (i.e. denominator = n
   // rather than = n-1) to match tensorflow
@@ -2976,7 +3013,6 @@ void RegisterOps() {
   registry->Register("cumsum", cumsum);
   registry->Register("dot", dot);
   registry->Register("elu", elu);
-  registry->Register("expand_dims", expand_dims);
   registry->Register("flip", flip);
   registry->Register("hard_sigmoid", hard_sigmoid);
   registry->Register("image_resize", image_resize);
@@ -2986,6 +3022,7 @@ void RegisterOps() {
   registry->Register("mean", mean);
   registry->Register("min", min);
   registry->Register("minimum", minimum);
+  registry->Register("l2norm", l2norm);
   registry->Register("pool", pool);
   registry->Register("prod", prod);
   registry->Register("relu", relu);
@@ -3002,6 +3039,7 @@ void RegisterOps() {
   registry->Register("sum", sum);
   registry->Register("tile", tile);
   registry->Register("transpose", transpose);
+  registry->Register("unsqueeze", unsqueeze);
   registry->Register("variance", variance);
 }
 
