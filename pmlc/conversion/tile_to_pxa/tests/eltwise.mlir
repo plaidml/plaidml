@@ -11,13 +11,6 @@ func @bit_not(%arg0: tensor<10x20xsi32>) -> tensor<10x20xsi32> {
   return %0 : tensor<10x20xsi32>
 }
 
-// CHECK-LABEL: func @cast_f32
-func @cast_f32() -> tensor<f32> {
-  %c3 = "eltwise.sconst"() {value = 3 : i64} : () -> tensor<si32>
-  %1 = "eltwise.cast"(%c3) : (tensor<si32>) -> tensor<f32>
-  return %1 : tensor<f32>
-}
-
 // CHECK-LABEL: func @neg_i32
 func @neg_i32(%arg0: tensor<10x20xsi32>) -> tensor<10x20xsi32> {
   // CHECK: %[[c0:.*]] = constant 0 : i32

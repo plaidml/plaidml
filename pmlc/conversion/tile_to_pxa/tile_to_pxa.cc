@@ -156,18 +156,12 @@ struct ScalarConstantOpConversion
 
 static Value createCastOp(OpBuilder &builder, Location loc, Value from,
                           bool fromSigned, Type intoType, bool intoSigned) {
-  IVLOG(2, "createCastOp begin");
   auto fromType = from.getType();
   if (fromType == intoType) {
     return from;
   }
-  IVLOG(2, "Attempt to cast intoType into float");
   if (auto intoFloatType = intoType.dyn_cast<FloatType>()) {
-    IVLOG(2, "Cast intoType into float successful");
-    IVLOG(2, "Attempt to cast fromType into float");
     if (auto fromFloatType = fromType.dyn_cast<FloatType>()) {
-      IVLOG(2, "Cast fromType into float successful");
-      IVLOG(2, "Checking widths of fromType and IntoType");
       if (fromFloatType.getWidth() < intoFloatType.getWidth()) {
         // FPExtOp: FloatType -> wider FloatType
         return builder.create<mlir::FPExtOp>(loc, from, intoType).getResult();
@@ -175,12 +169,10 @@ static Value createCastOp(OpBuilder &builder, Location loc, Value from,
       // FPTruncOp: FloatType -> narrower FloatType
       return builder.create<mlir::FPTruncOp>(loc, from, intoType).getResult();
     }
-    IVLOG(2, "Attempt to cast fromType into integer");
     if (auto fromIntType = fromType.dyn_cast<IntegerType>()) {
       // SIToFPOp: IntegerType -> FloatType
       return builder.create<mlir::SIToFPOp>(loc, from, intoType).getResult();
     }
-    IVLOG(2, "Attempt to cast fromType into index");
     if (auto fromIndexType = fromType.dyn_cast<IndexType>()) {
       auto i64Type = builder.getIntegerType(64);
       auto intCastOp = builder.create<mlir::IndexCastOp>(loc, from, i64Type);
@@ -188,7 +180,6 @@ static Value createCastOp(OpBuilder &builder, Location loc, Value from,
           .getResult();
     }
   }
-  IVLOG(2, "Attempt to cast intoType into integer");
   if (auto intoIntType = intoType.dyn_cast<IntegerType>()) {
     if (auto fromIntType = fromType.dyn_cast<IntegerType>()) {
       if (fromIntType.getWidth() < intoIntType.getWidth()) {
@@ -555,9 +546,10 @@ static void updateAffineMap(Operation *in, const PaddingInfo &padding) {
   in->setAttr("map", AffineMapAttr::get(accMap));
 }
 
-static Value buildBroadcastLoad(OpBuilder &builder, Location loc, Value operand,
-                                unsigned outRank,
-                                Optional<PaddingInfo> maybePadding) {
+static Value
+buildBroadcastLoad(OpBuilder &builder, Location loc, Value operand,
+                   unsigned outRank,
+                   Optional<PaddingInfo> maybePadding = llvm::None) {
   auto body = builder.getBlock();
   auto defOp = operand.getDefiningOp();
   Attribute attr;
@@ -568,12 +560,12 @@ static Value buildBroadcastLoad(OpBuilder &builder, Location loc, Value operand,
   // handle broadcasts
   auto operandType = operand.getType().cast<MemRefType>();
   assert(operandType.getRank() <= outRank && "result rank < operand rank");
-  auto op_shape = operandType.getShape();
+  auto shape = operandType.getShape();
   SmallVector<Value, 8> operandIdxs(operandType.getRank());
   for (unsigned i = 0; i < operandType.getRank(); i++) {
     unsigned j = outRank - i - 1;
     unsigned k = operandType.getRank() - i - 1;
-    if (op_shape[k] == 1) {
+    if (shape[k] == 1) {
       operandIdxs[k] = builder.create<mlir::ConstantIndexOp>(loc, 0);
     } else {
       operandIdxs[k] = body->getArgument(j);
@@ -634,8 +626,8 @@ struct BufferAllocator {
       auto parallel = builder.create<AffineParallelOp>(
           loc, ArrayRef<Type>({memRefType}), shape);
       auto parallelBuilder = parallel.getBodyBuilder();
-      auto load = buildBroadcastLoad(parallelBuilder, loc, initValue,
-                                     shape.size(), llvm::None);
+      auto load =
+          buildBroadcastLoad(parallelBuilder, loc, initValue, shape.size());
       auto stored = buildSimpleStore(parallelBuilder, loc, load, resultMemRef,
                                      llvm::None);
       parallelBuilder.create<AffineYieldOp>(loc, ValueRange{stored});
@@ -1006,60 +998,44 @@ struct CastOpConversion : public OpConversionPattern<ew::CastOp> {
                   ConversionPatternRewriter &rewriter) const override {
     IVLOG(2, "CastOpConversion::matchAndRewrite>");
 
-    // Gather some basic info
     auto loc = op.getLoc();
     TypeConverter typeConverter;
-
-    IVLOG(2, "Getting resultType");
     auto oldResultType = op.result().getType();
-    IVLOG(2, "Getting resultType as memref");
     auto resultType =
         typeConverter.convertType(oldResultType).cast<MemRefType>();
     auto operand = operands[0];
-    IVLOG(2, "Getting operandType");
-    auto operandType = operand.getType().cast<MemRefType>();
-    IVLOG(2, "Checking operandType vs. resultType");
-    if (resultType == operandType) {
-      IVLOG(2, "folding");
+    if (resultType == operand.getType()) {
       rewriter.replaceOp(op, operand);
       return success();
     }
-    IVLOG(2, "Checking if result is signed integer");
-    bool resultIsSigned = getElementType(oldResultType).isSignedInteger();
 
     // Make an allocation for the output
-    IVLOG(2, "Allocating memref for result");
     auto resultMemRef = rewriter.create<AllocOp>(loc, resultType).getResult();
 
     // Make a parallel for loop to fill the result
-    IVLOG(2, "Creating parallel for");
     auto forOp = rewriter.create<AffineParallelOp>(
         loc, ArrayRef<Type>{resultType}, resultType.getShape());
     auto body = forOp.getBody();
     rewriter.setInsertionPointToStart(body);
-    auto idxs = body->getArguments();
 
     // Create the load
-    IVLOG(2, "Creating affine load");
-    auto scalar = rewriter.create<AffineLoadOp>(loc, operand, idxs);
+    auto scalar =
+        buildBroadcastLoad(rewriter, loc, operand, resultType.getRank());
 
     // Create the standard cast op
-    IVLOG(2, "Creating cast op");
     auto dtype = getElementType(op.tensor());
+    bool resultIsSigned = getElementType(oldResultType).isSignedInteger();
     auto result = createCastOp(rewriter, loc, scalar, dtype.isSignedInteger(),
                                resultType.getElementType(), resultIsSigned);
 
     // Create the store
-    IVLOG(2, "Creating affine store");
     auto stored = buildSimpleStore(rewriter, loc, result, resultMemRef,
                                    getPaddingInfo(op));
     rewriter.create<AffineYieldOp>(loc, ValueRange{stored});
 
     // Replace the op
-    IVLOG(2, "Replacing cast op");
     rewriter.replaceOp(op, forOp.getResult(0));
 
-    IVLOG(2, "CastOpConversion::matchAndRewrite returns success");
     return success();
   }
 };
