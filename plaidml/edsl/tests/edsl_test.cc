@@ -330,6 +330,13 @@ TEST_F(CppEdsl, ConstAdd) {
   checkProgram(program, {}, {{O, expected}});
 }
 
+TEST_F(CppEdsl, ConstCast) {
+  auto O = cast(Tensor{3}, DType::FLOAT32);
+  auto program = makeProgram("const_cast", {O});
+  std::vector<float> expected = {3.0};
+  checkProgram(program, {}, {{O, expected}});
+}
+
 TEST_F(CppEdsl, Dot) {
   int64_t M = 8;
   int64_t N = 32;
