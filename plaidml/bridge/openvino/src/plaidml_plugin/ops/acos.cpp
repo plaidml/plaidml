@@ -2,8 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include <math.h>
-
 #include "plaidml_ops.hpp"
 
 #include "ngraph/opsets/opset.hpp"
@@ -19,8 +17,7 @@ namespace PlaidMLPlugin {
 static OpRegistration reg("acos", [](const Context& ctx) {
   IE_ASSERT(ctx.operands.size() == 1);
   auto I = ctx.operands.at(0);
-  auto partial = edsl::asin(edsl::sqrt(1 - I * I));
-  return edsl::make_tuple(edsl::select(I > 0, partial, M_PI - partial));
+  return edsl::make_tuple(edsl::acos(I));
 });
 
 }  // namespace PlaidMLPlugin
