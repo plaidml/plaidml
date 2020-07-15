@@ -2,8 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include <math.h>
-
 #include "plaidml_ops.hpp"
 
 #include "ngraph/opsets/opset.hpp"
@@ -19,7 +17,7 @@ namespace PlaidMLPlugin {
 static OpRegistration reg("tan", [](const Context& ctx) {
   IE_ASSERT(ctx.operands.size() == 1);
   auto I = ctx.operands.at(0);
-  return edsl::make_tuple(cos(I - M_PI / 2) / cos(I));  // workaround till lowering for sin is available
+  return edsl::make_tuple(tan(I));
 });
 
 }  // namespace PlaidMLPlugin

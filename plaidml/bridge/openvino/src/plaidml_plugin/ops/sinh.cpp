@@ -17,7 +17,7 @@ namespace PlaidMLPlugin {
 static OpRegistration reg("sinh", [](const Context& ctx) {
   IE_ASSERT(ctx.operands.size() == 1);
   auto I = ctx.operands.at(0);
-  return edsl::make_tuple((edsl::exp(I) - edsl::exp(-I)) / 2);
+  return edsl::make_tuple(edsl::sinh(I));
 });
 
 }  // namespace PlaidMLPlugin
