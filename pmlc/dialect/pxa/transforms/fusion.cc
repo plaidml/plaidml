@@ -284,9 +284,15 @@ struct FusionInfo {
                                  lowerExprsC, aInfo.op.getContext());
     auto upperC = AffineMap::get(aInfo.op.upperBoundsMap().getNumDims(), 0,
                                  upperExprsC, aInfo.op.getContext());
+    SmallVector<AtomicRMWKind, 8> reductions(typesC.size(),
+                                             AtomicRMWKind::assign);
     auto apC = builder.create<AffineParallelOp>(
-        aInfo.op.getLoc(), typesC, lowerC, aInfo.op.getLowerBoundsOperands(),
-        upperC, aInfo.op.getUpperBoundsOperands(), stepsC);
+        aInfo.op.getLoc(),
+        /*resultTypes=*/typesC,
+        /*reductions=*/reductions,
+        /*lbMap=*/lowerC, /*lbArgs=*/aInfo.op.getLowerBoundsOperands(),
+        /*ubMap=*/upperC, /*ubArgs=*/aInfo.op.getUpperBoundsOperands(),
+        /*steps=*/stepsC);
 
     // Move the two parallel for's inside the new op
     aInfo.op.getOperation()->moveBefore(apC.getBody(), apC.getBody()->end());

@@ -1,14 +1,14 @@
 // RUN: pmlc-opt -convert-linalg-to-loops -convert-pxa-to-affine -lower-affine \
-// RUN:     -convert-scf-to-std -x86-xsmm -convert-std-to-llvm %s | \
+// RUN:     -convert-scf-to-std -x86-xsmm -convert-std-to-llvm='emit-c-wrappers=1' %s | \
 // RUN:   pmlc-jit -e baseline | FileCheck %s
 // RUN: pmlc-opt -convert-linalg-to-loops -convert-pxa-to-affine -lower-affine \
-// RUN:     -convert-scf-to-std -x86-xsmm -convert-std-to-llvm %s | \
+// RUN:     -convert-scf-to-std -x86-xsmm -convert-std-to-llvm='emit-c-wrappers=1' %s | \
 // RUN:   pmlc-jit -e tiled | FileCheck %s
 // RUN: pmlc-opt -convert-linalg-to-loops -convert-pxa-to-affine -lower-affine \
-// RUN:     -convert-scf-to-std -x86-xsmm -convert-std-to-llvm %s | \
+// RUN:     -convert-scf-to-std -x86-xsmm -convert-std-to-llvm='emit-c-wrappers=1' %s | \
 // RUN:   pmlc-jit -e xsmm_call | FileCheck %s
 // RUN: pmlc-opt -convert-linalg-to-loops -convert-pxa-to-affine -lower-affine \
-// RUN:     -convert-scf-to-std -x86-xsmm -convert-std-to-llvm %s | \
+// RUN:     -convert-scf-to-std -x86-xsmm -convert-std-to-llvm='emit-c-wrappers=1' %s | \
 // RUN:   pmlc-jit -e xsmm_op | FileCheck %s
 
 !I_memref = type memref<1x6x5x7xf32>

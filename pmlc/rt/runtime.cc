@@ -38,23 +38,24 @@ struct Registration {
     registerSymbol("malloc", reinterpret_cast<void *>(malloc));
 
     // cmath functions
-    registerSymbol("acosf", reinterpret_cast<void *>(acosf));
-    registerSymbol("asinf", reinterpret_cast<void *>(asinf));
-    registerSymbol("atanf", reinterpret_cast<void *>(atanf));
-    registerSymbol("ceilf", reinterpret_cast<void *>(ceilf));
-    registerSymbol("coshf", reinterpret_cast<void *>(coshf));
-    registerSymbol("erff", reinterpret_cast<void *>(erff));
-    registerSymbol("expf", reinterpret_cast<void *>(expf));
-    registerSymbol("floorf", reinterpret_cast<void *>(floorf));
-    registerSymbol("logf", reinterpret_cast<void *>(logf));
-    registerSymbol("powf", reinterpret_cast<void *>(powf));
-    registerSymbol("roundf", reinterpret_cast<void *>(roundf));
-    registerSymbol("sinhf", reinterpret_cast<void *>(sinhf));
-    registerSymbol("tanf", reinterpret_cast<void *>(tanf));
+    registerSymbol("_mlir_ciface_acosf", reinterpret_cast<void *>(acosf));
+    registerSymbol("_mlir_ciface_asinf", reinterpret_cast<void *>(asinf));
+    registerSymbol("_mlir_ciface_atanf", reinterpret_cast<void *>(atanf));
+    registerSymbol("_mlir_ciface_ceilf", reinterpret_cast<void *>(ceilf));
+    registerSymbol("_mlir_ciface_coshf", reinterpret_cast<void *>(coshf));
+    registerSymbol("_mlir_ciface_erff", reinterpret_cast<void *>(erff));
+    registerSymbol("_mlir_ciface_expf", reinterpret_cast<void *>(expf));
+    registerSymbol("_mlir_ciface_floorf", reinterpret_cast<void *>(floorf));
+    registerSymbol("_mlir_ciface_logf", reinterpret_cast<void *>(logf));
+    registerSymbol("_mlir_ciface_powf", reinterpret_cast<void *>(powf));
+    registerSymbol("_mlir_ciface_roundf", reinterpret_cast<void *>(roundf));
+    registerSymbol("_mlir_ciface_sinhf", reinterpret_cast<void *>(sinhf));
+    registerSymbol("_mlir_ciface_tanf", reinterpret_cast<void *>(tanf));
+    registerSymbol("_mlir_ciface_tanhf", reinterpret_cast<void *>(tanhf));
 
     // RunnerUtils functions
-    registerSymbol("print_memref_f32",
-                   reinterpret_cast<void *>(print_memref_f32));
+    registerSymbol("_mlir_ciface_print_memref_f32",
+                   reinterpret_cast<void *>(_mlir_ciface_print_memref_f32));
 
     registerSymbol("plaidml_rt_trace",
                    reinterpret_cast<void *>(plaidml_rt_trace));

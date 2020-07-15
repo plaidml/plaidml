@@ -624,7 +624,10 @@ struct BufferAllocator {
     if (maybePadding) {
       auto initValue = createInit(builder, loc, elementType, maybePadding->agg);
       auto parallel = builder.create<AffineParallelOp>(
-          loc, ArrayRef<Type>({memRefType}), shape);
+          loc,
+          /*resultTypes=*/ArrayRef<Type>{memRefType},
+          /*reductions=*/ArrayRef<AtomicRMWKind>{AtomicRMWKind::assign},
+          /*ranges=*/shape);
       auto parallelBuilder = parallel.getBodyBuilder();
       auto load =
           buildBroadcastLoad(parallelBuilder, loc, initValue, shape.size());
@@ -712,8 +715,10 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
 
     // Make a parallel for loop to fill the result
     auto forOp = rewriter.create<AffineParallelOp>(
-        loc, ArrayRef<Type>({alloc.memRefType}),
-        alloc.rankedTensorType.getShape());
+        loc,
+        /*resultTypes=*/ArrayRef<Type>{alloc.memRefType},
+        /*reductions=*/ArrayRef<AtomicRMWKind>{AtomicRMWKind::assign},
+        /*ranges=*/alloc.rankedTensorType.getShape());
     auto body = forOp.getBody();
     rewriter.setInsertionPointToStart(body);
 
@@ -789,7 +794,10 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
     // Do initialization
     auto shape = alloc.rankedTensorType.getShape();
     auto parallel = rewriter.create<AffineParallelOp>(
-        loc, ArrayRef<Type>({alloc.memRefType}), shape);
+        loc,
+        /*resultTypes=*/ArrayRef<Type>{alloc.memRefType},
+        /*reductions=*/ArrayRef<AtomicRMWKind>{AtomicRMWKind::assign},
+        /*ranges=*/shape);
     auto parallelBuilder = parallel.getBodyBuilder();
     auto maybePadding = getPaddingInfo(op.init().getDefiningOp());
     auto load = buildBroadcastLoad(parallelBuilder, loc, cionAdaptor.init(),
@@ -818,6 +826,7 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
     auto forOp = rewriter.create<AffineParallelOp>(
         loc,
         /*resultTypes=*/ArrayRef<Type>{alloc.memRefType},
+        /*reductions=*/ArrayRef<AtomicRMWKind>{AtomicRMWKind::assign},
         /*lbMap=*/op.lowerBounds().getValue(),
         /*lbArgs=*/ArrayRef<Value>{},
         /*ubMap=*/ubMap,
@@ -906,7 +915,10 @@ struct IndexOpConversion : public OpConversionPattern<IndexOp> {
 
     // Make a parallel for loop to fill the result
     auto forOp = rewriter.create<AffineParallelOp>(
-        loc, ArrayRef<Type>{resultType}, resultType.getShape());
+        loc,
+        /*resultTypes=*/ArrayRef<Type>{resultType},
+        /*reductions=*/ArrayRef<AtomicRMWKind>{AtomicRMWKind::assign},
+        /*ranges=*/resultType.getShape());
     auto body = forOp.getBody();
     rewriter.setInsertionPointToStart(body);
     auto idxs = body->getArguments();
@@ -1014,7 +1026,10 @@ struct CastOpConversion : public OpConversionPattern<ew::CastOp> {
 
     // Make a parallel for loop to fill the result
     auto forOp = rewriter.create<AffineParallelOp>(
-        loc, ArrayRef<Type>{resultType}, resultType.getShape());
+        loc,
+        /*resultTypes=*/ArrayRef<Type>{resultType},
+        /*reductions=*/ArrayRef<AtomicRMWKind>{AtomicRMWKind::assign},
+        /*ranges=*/resultType.getShape());
     auto body = forOp.getBody();
     rewriter.setInsertionPointToStart(body);
 

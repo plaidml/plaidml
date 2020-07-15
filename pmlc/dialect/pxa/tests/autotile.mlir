@@ -7,7 +7,7 @@ func @dot0(%arg0: memref<100x100xf32>, %arg1: memref<100x100xf32>) -> memref<100
   // CHECK: %[[obuf:.*]] = alloc() : memref<100x100xf32>
   // CHECK: affine.parallel (%[[arg2:.*]], %[[arg3:.*]], %[[arg4:.*]]) = (0, 0, 0) to (100, 100, 100) step (10, 10, 10)
   // CHECK: affine.parallel (%[[arg5:.*]], %[[arg6:.*]], %[[arg7:.*]]) = (%[[arg2]], %[[arg3]], %[[arg4]]) to (%[[arg2]] + 10, %[[arg3]] + 10, %[[arg4]] + 10)
-  %out = affine.parallel (%i, %j, %k) = (0, 0, 0) to (100, 100, 100) : memref<100x100xf32> {
+  %out = affine.parallel (%i, %j, %k) = (0, 0, 0) to (100, 100, 100) reduce ("assign") -> (memref<100x100xf32>) {
     // CHECK: %[[arg1]][%[[arg5]], %[[arg7]]]
     %0 = affine.load %arg1[%i, %k] : memref<100x100xf32>
     // CHECK: %[[arg0]][%[[arg7]], %[[arg6]]]
@@ -26,10 +26,10 @@ func @dot1(%arg0: memref<100x100xf32>, %arg1: memref<100x100xf32>) -> memref<100
   %obuf = alloc() : memref<100x100xf32>
   // CHECK: %[[obuf:.*]] = alloc() : memref<100x100xf32>
   // CHECK: affine.parallel (%[[arg2:.*]], %[[arg3:.*]], %[[arg4:.*]]) = (0, 0, 0) to (200, 200, 200) step (50, 50, 50)
-  %out = affine.parallel (%arg2, %arg3, %arg4) = (0, 0, 0) to (200, 200, 200) step (5, 5, 5) : memref<100x100xf32> {
+  %out = affine.parallel (%arg2, %arg3, %arg4) = (0, 0, 0) to (200, 200, 200) step (5, 5, 5) reduce ("assign") -> (memref<100x100xf32>) {
     // CHECK: affine.parallel (%[[arg5:.*]], %[[arg6:.*]], %[[arg7:.*]]) = (%[[arg2]], %[[arg3]], %[[arg4]]) to (%[[arg2]] + 10, %[[arg3]] + 10, %[[arg4]] + 10) 
     // CHECK: affine.parallel (%[[arg8:.*]], %[[arg9:.*]], %[[arg10:.*]]) = (%[[arg5]], %[[arg6]], %[[arg7]]) to (%[[arg5]] + 5, %[[arg6]] + 5, %[[arg7]] + 5)
-    %0 = affine.parallel (%arg5, %arg6, %arg7) = (%arg2, %arg3, %arg4) to (%arg2 + 5, %arg3 + 5, %arg4 + 5) : memref<100x100xf32> {
+    %0 = affine.parallel (%arg5, %arg6, %arg7) = (%arg2, %arg3, %arg4) to (%arg2 + 5, %arg3 + 5, %arg4 + 5) reduce ("assign") -> (memref<100x100xf32>) {
       // CHECK: %[[arg1]][%[[arg8]], %[[arg10]]]
       %1 = affine.load %arg1[%arg5, %arg7] : memref<100x100xf32>
       // CHECK: %[[arg0]][%[[arg10]], %[[arg9]]]

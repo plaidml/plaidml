@@ -16,7 +16,8 @@ enum Kind {
 }
 
 class AffineTensorMapType
-    : public mlir::Type::TypeBase<AffineTensorMapType, mlir::Type> {
+    : public mlir::Type::TypeBase<AffineTensorMapType, mlir::Type,
+                                  mlir::TypeStorage> {
 public:
   using Base::Base;
   static AffineTensorMapType get(mlir::MLIRContext *context);
@@ -25,7 +26,8 @@ public:
   }
 };
 
-class AffineMapType : public mlir::Type::TypeBase<AffineMapType, mlir::Type> {
+class AffineMapType : public mlir::Type::TypeBase<AffineMapType, mlir::Type,
+                                                  mlir::TypeStorage> {
 public:
   using Base::Base;
   static AffineMapType get(mlir::MLIRContext *context);
@@ -33,7 +35,8 @@ public:
 };
 
 class AffineConstraintsType
-    : public mlir::Type::TypeBase<AffineConstraintsType, mlir::Type> {
+    : public mlir::Type::TypeBase<AffineConstraintsType, mlir::Type,
+                                  mlir::TypeStorage> {
 public:
   using Base::Base;
   static AffineConstraintsType get(mlir::MLIRContext *context);
@@ -42,7 +45,8 @@ public:
   }
 };
 
-class StringType : public mlir::Type::TypeBase<StringType, mlir::Type> {
+class StringType
+    : public mlir::Type::TypeBase<StringType, mlir::Type, mlir::TypeStorage> {
 public:
   using Base::Base;
   static StringType get(mlir::MLIRContext *context);
