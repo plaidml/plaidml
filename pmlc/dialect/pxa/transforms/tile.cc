@@ -27,8 +27,14 @@ void performTiling(AffineParallelOp op, llvm::ArrayRef<int64_t> tileSizes) {
   auto ubMap = AffineMap::get(dimCount, 0, ubExprs, op.getContext());
   auto outerIdxs = outerBody->getArguments();
   // Make the inner parallel for (abve all other code);
+  llvm::SmallVector<mlir::AtomicRMWKind, 8> reductions;
+  for (Attribute attr : op.reductions()) {
+    auto intAttr = attr.dyn_cast<IntegerAttr>();
+    reductions.push_back(*mlir::symbolizeAtomicRMWKind(intAttr.getInt()));
+  }
   auto inner = builder.create<AffineParallelOp>(
-      op.getLoc(), op.getResultTypes(), lbMap, outerIdxs, ubMap, outerIdxs);
+      op.getLoc(), op.getResultTypes(), reductions, lbMap, outerIdxs, ubMap,
+      outerIdxs);
   // Splice instructions into the interior
   auto &innerLoopOps = inner.getBody()->getOperations();
   auto &outerLoopOps = outerBody->getOperations();

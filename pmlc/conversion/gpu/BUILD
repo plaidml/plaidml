@@ -1,9 +1,9 @@
 # Copyright 2020 Intel Corporation
 
-package(default_visibility = ["//visibility:public"])
-
 load("//bzl:plaidml.bzl", "plaidml_cc_library")
 load("//vendor/mlir:tblgen.bzl", "gentbl")
+
+package(default_visibility = ["//visibility:public"])
 
 gentbl(
     name = "gen-pass",
@@ -22,10 +22,9 @@ gentbl(
 plaidml_cc_library(
     name = "gpu",
     srcs = [
-        "pass_detail.h",
         "gpu_to_vulkan.cc",
         "kernel_outlining.cc",
-        "llvm_lowering.cc",
+        "pass_detail.h",
     ],
     hdrs = [
         "lowering.h",

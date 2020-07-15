@@ -48,6 +48,6 @@ module attributes {
     call @print_memref_f32(%arg5) : (memref<*xf32>) -> ()
     return
   }
-  func @fillResourceFloat32(%0 : memref<*xf32>, %1:i32, %2 : f32)
+  func @fillResourceFloat32(%0 : memref<*xf32>, %1 : i32, %2 : f32)
   func @print_memref_f32(%ptr : memref<*xf32>)
 }

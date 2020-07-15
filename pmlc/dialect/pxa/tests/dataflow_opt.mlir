@@ -6,7 +6,7 @@ func @simple(%out : memref<2xf32>) {
   %zero = constant 0.0 : f32
   %buf = alloc() : memref<2xf32>
   // CHECK-NEXT: affine.parallel
-  %0 = affine.parallel (%i) = (0) to (2) : memref<2xf32> {
+  %0 = affine.parallel (%i) = (0) to (2) reduce ("assign") -> (memref<2xf32>) {
     %1 = pxa.reduce assign %zero, %buf[%i] : memref<2xf32>
     %2 = affine.load %1[%i] : memref<2xf32>
     // CHECK-NEXT: pxa.reduce add
@@ -34,11 +34,11 @@ func @grn(%arg0: memref<1x4x4x3xf16>) -> memref<1x4x4x3xf16> {
   %5 = alloc() : memref<1x4x4x1xf16>
   %6 = alloc() : memref<1x4x4x3xf16>
   // CHECK-NEXT: affine.parallel
-  %7 = affine.parallel (%arg1, %arg2) = (0, 0) to (4, 4) : memref<1x4x4x3xf16> {
+  %7 = affine.parallel (%arg1, %arg2) = (0, 0) to (4, 4) reduce ("assign") -> (memref<1x4x4x3xf16>) {
     // CHECK-NEXT: pxa.reduce assign
     %8 = pxa.reduce assign %cst_0, %1[0, %arg1, %arg2, 0] : memref<1x4x4x1xf16>
     // CHECK-NEXT: affine.parallel
-    %9 = affine.parallel (%arg3) = (0) to (3) : memref<1x4x4x1xf16> {
+    %9 = affine.parallel (%arg3) = (0) to (3) reduce ("assign") -> (memref<1x4x4x1xf16>) {
       // CHECK-NEXT: affine.load
       %24 = affine.load %arg0[0, %arg1, %arg2, %arg3] : memref<1x4x4x3xf16>
       // CHECK-NEXT: affine.load
@@ -70,7 +70,7 @@ func @grn(%arg0: memref<1x4x4x3xf16>) -> memref<1x4x4x3xf16> {
     %21 = select %19, %cst, %20 : f16
     %22 = pxa.reduce assign %21, %5[0, %arg1, %arg2, 0] : memref<1x4x4x1xf16>
     // CHECK-NEXT: affine.parallel
-    %23 = affine.parallel (%arg3) = (0) to (3) : memref<1x4x4x3xf16> {
+    %23 = affine.parallel (%arg3) = (0) to (3) reduce ("assign") -> (memref<1x4x4x3xf16>) {
       // CHECK-NEXT: affine.load
       %24 = affine.load %arg0[0, %arg1, %arg2, %arg3] : memref<1x4x4x3xf16>
       %25 = affine.load %22[0, %arg1, %arg2, 0] : memref<1x4x4x1xf16>
