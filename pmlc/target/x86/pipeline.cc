@@ -37,48 +37,6 @@ std::unique_ptr<Pass> createXSMMStencilPass() {
 
 namespace {
 
-static LLVM::LLVMType unwrap(Type type) {
-  if (!type)
-    return nullptr;
-  auto *mlirContext = type.getContext();
-  auto wrappedLLVMType = type.dyn_cast<LLVM::LLVMType>();
-  if (!wrappedLLVMType)
-    emitError(UnknownLoc::get(mlirContext),
-              "conversion resulted in a non-LLVM type");
-  return wrappedLLVMType;
-}
-
-/// Convert a MemRef type to a bare pointer to the MemRef element type.
-static Type convertMemRefTypeToBarePtr(LLVMTypeConverter &converter,
-                                       MemRefType type) {
-  int64_t offset;
-  SmallVector<int64_t, 4> strides;
-  if (failed(getStridesAndOffset(type, strides, offset)))
-    return {};
-
-  LLVM::LLVMType elementType =
-      unwrap(converter.convertType(type.getElementType()));
-  if (!elementType)
-    return {};
-  return elementType.getPointerTo(type.getMemorySpace());
-}
-
-/// Callback to convert function argument types. It converts MemRef function
-/// arguments to bare pointers to the MemRef element type.
-LogicalResult mixedPtrFuncArgTypeConverter(LLVMTypeConverter &converter,
-                                           Type type,
-                                           SmallVectorImpl<Type> &result) {
-  if (auto memrefTy = type.dyn_cast<MemRefType>()) {
-    auto llvmTy = convertMemRefTypeToBarePtr(converter, memrefTy);
-    if (!llvmTy)
-      return failure();
-
-    result.push_back(llvmTy);
-    return success();
-  }
-  return structFuncArgTypeConverter(converter, type, result);
-}
-
 struct ConvertToLLVMPass
     : public mlir::PassWrapper<ConvertToLLVMPass,
                                mlir::OperationPass<mlir::ModuleOp>> {
@@ -86,13 +44,16 @@ struct ConvertToLLVMPass
     auto module = getOperation();
     auto *context = module.getContext();
 
-    LLVMTypeConverterCustomization customs;
-    customs.funcArgConverter = mixedPtrFuncArgTypeConverter;
-    LLVMTypeConverter typeConverter(&getContext(), customs);
+    LowerToLLVMOptions options = {
+        /*useBarePtrCallConv=*/false,
+        /*emitCWrappers=*/true,
+        /*indexBitwidth=*/kDeriveIndexBitwidthFromDataLayout,
+        /*useAlignedAlloc=*/false,
+    };
+    LLVMTypeConverter typeConverter(context, options);
 
     OwningRewritePatternList patterns;
-    populateStdToLLVMBarePtrConversionPatterns(typeConverter, patterns,
-                                               /*useAlignedAlloc=*/true);
+    populateStdToLLVMConversionPatterns(typeConverter, patterns, options);
     conversion::stdx_to_llvm::populateStdXToLLVMConversionPatterns(
         typeConverter, patterns);
 

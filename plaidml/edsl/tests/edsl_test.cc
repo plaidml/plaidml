@@ -1118,54 +1118,28 @@ TEST_F(CppEdsl, Shape) {
 }
 
 TEST_F(CppEdsl, Prng) {
-  auto S = Placeholder(DType::UINT32, {3, 2048});
-  auto O = prng(S, {2, 3, 4, 5});
+  auto S = Placeholder(DType::UINT32, {1, 3});
+  auto O = prng(S, {2, 3});
   auto program = makeProgram("prng", {O});
-  std::cout << program << std::endl;
   // clang-format off
   // CHECK-LABEL: CppEdsl.Prng
   // CHECK: func @prng
   // CHECK-DAG: %[[c2:.*]] = "eltwise.sconst"() {value = 2 : i64} : () -> tensor<si32>
   // CHECK-DAG: %[[c3:.*]] = "eltwise.sconst"() {value = 3 : i64} : () -> tensor<si32>
-  // CHECK-DAG: %[[c4:.*]] = "eltwise.sconst"() {value = 4 : i64} : () -> tensor<si32>
-  // CHECK-DAG: %[[c5:.*]] = "eltwise.sconst"() {value = 5 : i64} : () -> tensor<si32>
-  // CHECK: %result, %new_state = "tile.prng"(%{{.*}}, %[[c2]], %[[c3]], %[[c4]], %[[c5]]) : (tensor<3x2048xui32>, tensor<si32>, tensor<si32>, tensor<si32>, tensor<si32>) -> (tensor<2x3x4x5xf32>, tensor<3x2048xui32>)
-  // CHECK: return %result, %new_state : tensor<2x3x4x5xf32>, tensor<3x2048xui32>
-  // clang-format on
-  runProgram(program);
-}
-
-TEST_F(CppEdsl, PrngResultNotNegative) {
-  auto S = Placeholder(DType::UINT32, {3, 3});
-  TensorDim I, J;
-  TensorIndex i("i"), j("j");
-  S.bind_dims(I, J);
-  auto O = prng(S, {2, 3, 4, 5});
-  auto program = makeProgram("prng", {O});
-  std::cout << program << std::endl;
-  // clang-format off
-  // CHECK-LABEL: CppEdsl.PrngResultNotNegative
+  // CHECK: %result, %new_state = "tile.prng"(%{{.*}}, %[[c2]], %[[c3]]) : (tensor<1x3xui32>, tensor<si32>, tensor<si32>) -> (tensor<2x3xf32>, tensor<1x3xui32>)
+  // CHECK: return %result, %new_state : tensor<2x3xf32>, tensor<1x3xui32>
   // clang-format on
 
-  std::vector<uint32_t> input = {
+  std::vector<uint32_t> state = {
       5, 6, 7,  //
-      4, 5, 6,  //
-      7, 8, 9,  //
   };
 
-  auto binder = exec::Binder(program);
-  auto executable = binder.compile();
-  binder.input(S).copy_from(input.data());
-  executable->run();
+  std::vector<float> result = {
+      9.31323e-10, 3.8147e-06,  0.0156251,  //
+      0.000244171, 0.000125885, 0.515625,   //
+  };
 
-  auto view = binder.output(O).mmap_current();
-  float* results = reinterpret_cast<float*>(view.data());
-  for (int i = 0; i < 120; i++) {
-    float res = results[i];
-    if (res <= 0 || res > 1) {
-      throw std::runtime_error("Bad PRNG!");
-    }
-  }
+  checkProgram(program, {{S, state}}, {{O, result}});
 }
 
 TEST_F(CppEdsl, Cos) {

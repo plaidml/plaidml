@@ -142,9 +142,17 @@ public:
       SmallVector<Type, 4> inputs{unrankedType, unrankedType, unrankedType,
                                   i64Type};
       ArrayRef<Type> results{};
-      ArrayRef<NamedAttribute> attrs{};
+      // Insert a function attribute that will trigger the emission of the
+      // corresponding `_mlir_ciface_xxx` interface so that external libraries
+      // see a normalized ABI. This interface is added during std to llvm
+      // conversion.
+      ArrayRef<NamedAttribute> attrs{
+          // builder.getNamedAttr("llvm.emit_c_interface",
+          // builder.getUnitAttr()),
+      };
       auto funcType = builder.getFunctionType(inputs, results);
       builder.create<FuncOp>(loc, kGemmInvokeF32, funcType, attrs);
+
       return SymbolRefAttr::get(kGemmInvokeF32, context);
     }
 

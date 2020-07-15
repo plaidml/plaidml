@@ -25,8 +25,6 @@
 
 #include "volk.h" // NOLINT[build/include_subdir]
 
-using namespace mlir; // NOLINT[build/namespaces]
-
 using DescriptorSetIndex = uint32_t;
 using BindingIndex = uint32_t;
 
@@ -138,13 +136,13 @@ struct LaunchKernelAction : Action {
   ResourceData resourceData;
   ResourceStorageClassBindingMap resourceStorageClassData;
 
-  SmallVector<VkBufferMemoryBarrier, 4> deps;
+  llvm::SmallVector<VkBufferMemoryBarrier, 4> deps;
 };
 
 struct MemoryTransferAction : Action {
   VkBuffer src;
   VkBuffer dst;
-  SmallVector<VkBufferCopy, 1> regions;
+  llvm::SmallVector<VkBufferCopy, 1> regions;
 };
 
 /// Vulkan runtime.
@@ -162,20 +160,20 @@ public:
   VulkanRuntime(const VulkanRuntime &) = delete;
   VulkanRuntime &operator=(const VulkanRuntime &) = delete;
 
-  LogicalResult init();
-  LogicalResult destroy();
-  LogicalResult createLaunchKernelAction(uint8_t *shader, uint32_t size,
-                                         const char *entryPoint,
-                                         NumWorkGroups numWorkGroups);
-  LogicalResult setLaunchKernelAction();
+  mlir::LogicalResult init();
+  mlir::LogicalResult destroy();
+  mlir::LogicalResult createLaunchKernelAction(uint8_t *shader, uint32_t size,
+                                               const char *entryPoint,
+                                               NumWorkGroups numWorkGroups);
+  mlir::LogicalResult setLaunchKernelAction();
   void addLaunchActionToSchedule();
-  LogicalResult createMemoryTransferAction(uint64_t src_index,
-                                           uint64_t src_binding,
-                                           uint64_t dst_index,
-                                           uint64_t dst_binding);
-  LogicalResult createMemoryTransferAction(VkBuffer src, VkBuffer dst,
-                                           size_t size);
-  LogicalResult submitCommandBuffers();
+  mlir::LogicalResult createMemoryTransferAction(uint64_t src_index,
+                                                 uint64_t src_binding,
+                                                 uint64_t dst_index,
+                                                 uint64_t dst_binding);
+  mlir::LogicalResult createMemoryTransferAction(VkBuffer src, VkBuffer dst,
+                                                 size_t size);
+  mlir::LogicalResult submitCommandBuffers();
   /// Sets needed data for Vulkan runtime.
   void setResourceData(const ResourceData &resData);
   void setResourceData(const DescriptorSetIndex desIndex,
@@ -186,23 +184,24 @@ private:
   //===--------------------------------------------------------------------===//
   // Pipeline creation methods.
   //===--------------------------------------------------------------------===//
-  LogicalResult createInstance();
-  LogicalResult createDevice();
-  LogicalResult getBestComputeQueue(const VkPhysicalDevice &physicalDevice);
-  LogicalResult createMemoryBuffers();
-  LogicalResult createShaderModule();
+  mlir::LogicalResult createInstance();
+  mlir::LogicalResult createDevice();
+  mlir::LogicalResult
+  getBestComputeQueue(const VkPhysicalDevice &physicalDevice);
+  mlir::LogicalResult createMemoryBuffers();
+  mlir::LogicalResult createShaderModule();
   void initDescriptorSetLayoutBindingMap();
-  LogicalResult createDescriptorSetLayout();
-  LogicalResult createPipelineLayout();
-  LogicalResult createComputePipeline();
-  LogicalResult createDescriptorPool();
-  LogicalResult allocateDescriptorSets();
-  LogicalResult setWriteDescriptors();
-  LogicalResult createCommandPool();
-  LogicalResult checkResourceData();
-  LogicalResult createSchedule();
-  LogicalResult submitCommandBuffersToQueue();
-  LogicalResult updateHostMemoryBuffers();
+  mlir::LogicalResult createDescriptorSetLayout();
+  mlir::LogicalResult createPipelineLayout();
+  mlir::LogicalResult createComputePipeline();
+  mlir::LogicalResult createDescriptorPool();
+  mlir::LogicalResult allocateDescriptorSets();
+  mlir::LogicalResult setWriteDescriptors();
+  mlir::LogicalResult createCommandPool();
+  mlir::LogicalResult checkResourceData();
+  mlir::LogicalResult createSchedule();
+  mlir::LogicalResult submitCommandBuffersToQueue();
+  mlir::LogicalResult updateHostMemoryBuffers();
   void setResourceStorageClassBindingMap(
       const ResourceStorageClassBindingMap &stClassData);
 
@@ -211,16 +210,16 @@ private:
   //===--------------------------------------------------------------------===//
 
   /// Maps storage class to a descriptor type.
-  LogicalResult
-  mapStorageClassToDescriptorType(spirv::StorageClass storageClass,
+  mlir::LogicalResult
+  mapStorageClassToDescriptorType(mlir::spirv::StorageClass storageClass,
                                   VkDescriptorType &descriptorType);
 
   /// Maps storage class to buffer usage flags.
-  LogicalResult
-  mapStorageClassToBufferUsageFlag(spirv::StorageClass storageClass,
+  mlir::LogicalResult
+  mapStorageClassToBufferUsageFlag(mlir::spirv::StorageClass storageClass,
                                    VkBufferUsageFlagBits &bufferUsage);
 
-  LogicalResult countDeviceMemorySize();
+  mlir::LogicalResult countDeviceMemorySize();
 
   VkResult volkInitialized = VK_RESULT_MAX_ENUM;
 

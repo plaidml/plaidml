@@ -83,6 +83,27 @@ gentbl(
     test = True,
 )
 
+gentbl(
+    name = "TestInterfacesIncGen",
+    strip_include_prefix = "lib/Dialect/Test",
+    tbl_outs = [
+        (
+            "-gen-type-interface-decls",
+            "lib/Dialect/Test/TestTypeInterfaces.h.inc",
+        ),
+        (
+            "-gen-type-interface-defs",
+            "lib/Dialect/Test/TestTypeInterfaces.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "lib/Dialect/Test/TestInterfaces.td",
+    td_srcs = [
+        "@llvm-project//mlir:OpBaseTdFiles",
+    ],
+    test = True,
+)
+
 cc_library(
     name = "TestDialect",
     srcs = [
@@ -91,12 +112,14 @@ cc_library(
     ],
     hdrs = [
         "lib/Dialect/Test/TestDialect.h",
+        "lib/Dialect/Test/TestTypes.h",
     ],
     includes = [
         "lib/DeclarativeTransforms",
         "lib/Dialect/Test",
     ],
     deps = [
+        ":TestInterfacesIncGen",
         ":TestOpsIncGen",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ControlFlowInterfaces",
@@ -117,6 +140,7 @@ cc_library(
     name = "TestIR",
     srcs = [
         "lib/IR/TestFunc.cpp",
+        "lib/IR/TestInterfaces.cpp",
         "lib/IR/TestMatchers.cpp",
         "lib/IR/TestSideEffects.cpp",
         "lib/IR/TestSymbolUses.cpp",
@@ -146,9 +170,7 @@ cc_library(
 
 cc_library(
     name = "TestTransforms",
-    srcs = glob([
-        "lib/Transforms/*.cpp",
-    ]),
+    srcs = glob(["lib/Transforms/*.cpp"]),
     defines = ["MLIR_CUDA_CONVERSIONS_ENABLED"],
     includes = ["lib/Dialect/Test"],
     deps = [

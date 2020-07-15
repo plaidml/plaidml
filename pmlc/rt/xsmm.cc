@@ -7,25 +7,25 @@
 #include "pmlc/compiler/registry.h"
 #include "pmlc/util/logging.h"
 
-extern "C" void plaidml_rt_xsmm_gemm_invoke_f32(     //
-    size_t aRank, StridedMemRefType<float, 2> *aRef, //
-    size_t bRank, StridedMemRefType<float, 2> *bRef, //
-    size_t cRank, StridedMemRefType<float, 2> *cRef, //
-    uint64_t func_addr) {
-  auto aPtr = aRef->data + aRef->offset;
-  auto bPtr = bRef->data + bRef->offset;
-  auto cPtr = cRef->data + cRef->offset;
-  using FunctionPtr = void (*)(const void *, const void *, void *, ...);
-  auto *func_ptr = reinterpret_cast<FunctionPtr>(func_addr);
-  libxsmm_xmmfunction sgemm;
-  sgemm.xmm = func_ptr;
+using FunctionPtr = void (*)(const void *, const void *, void *, ...);
 
+extern "C" void _mlir_ciface_plaidml_rt_xsmm_gemm_invoke_f32(
+    UnrankedMemRefType<float> *a, UnrankedMemRefType<float> *b,
+    UnrankedMemRefType<float> *c, uint64_t funcAddr) {
+  DynamicMemRefType<float> aRef(*a);
+  DynamicMemRefType<float> bRef(*b);
+  DynamicMemRefType<float> cRef(*c);
+  float *aPtr = aRef.data + aRef.offset;
+  float *bPtr = bRef.data + bRef.offset;
+  float *cPtr = cRef.data + cRef.offset;
+
+  libxsmm_xmmfunction sgemm;
+  sgemm.xmm = reinterpret_cast<FunctionPtr>(funcAddr);
   sgemm.smm(bPtr, aPtr, cPtr);
 }
 
-extern "C" uint64_t plaidml_rt_xsmm_gemm_dispatch_f32(int32_t lda, int32_t ldb,
-                                                      int32_t ldc, int32_t m,
-                                                      int32_t n, int32_t k) {
+extern "C" uint64_t _mlir_ciface_plaidml_rt_xsmm_gemm_dispatch_f32(
+    int32_t lda, int32_t ldb, int32_t ldc, int32_t m, int32_t n, int32_t k) {
   libxsmm_blasint lda_int = lda;
   libxsmm_blasint ldb_int = ldb;
   libxsmm_blasint ldc_int = ldc;
@@ -47,10 +47,14 @@ struct Registration {
     libxsmm_init();
 
     using pmlc::compiler::registerSymbol;
-    registerSymbol("plaidml_rt_xsmm_gemm_invoke_f32",
-                   reinterpret_cast<void *>(plaidml_rt_xsmm_gemm_invoke_f32));
-    registerSymbol("plaidml_rt_xsmm_gemm_dispatch_f32",
-                   reinterpret_cast<void *>(plaidml_rt_xsmm_gemm_dispatch_f32));
+
+    registerSymbol(
+        "_mlir_ciface_plaidml_rt_xsmm_gemm_invoke_f32",
+        reinterpret_cast<void *>(_mlir_ciface_plaidml_rt_xsmm_gemm_invoke_f32));
+
+    registerSymbol("_mlir_ciface_plaidml_rt_xsmm_gemm_dispatch_f32",
+                   reinterpret_cast<void *>(
+                       _mlir_ciface_plaidml_rt_xsmm_gemm_dispatch_f32));
   }
 };
 static Registration reg;

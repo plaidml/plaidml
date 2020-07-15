@@ -23,6 +23,9 @@ struct TraceLinkingPass : public TraceLinkingBase<TraceLinkingPass> {
       if (!op.getAttrOfType<UnitAttr>("trace")) {
         return;
       }
+      if (!op.empty()) {
+        return;
+      }
       auto loc = op.getLoc();
       auto context = op.getContext();
       OpBuilder builder(context);
