@@ -13,9 +13,12 @@ namespace plaidml::edsl {
 using MultiBuffer = std::variant< //
     std::vector<float>,           //
     std::vector<double>,          //
-    std::vector<int>,             //
+    std::vector<int8_t>,          //
+    std::vector<int16_t>,         //
     std::vector<int32_t>,         //
     std::vector<int64_t>,         //
+    std::vector<uint8_t>,         //
+    std::vector<uint16_t>,        //
     std::vector<uint32_t>,        //
     std::vector<uint64_t>>;
 
@@ -23,10 +26,7 @@ using TensorBuffers = std::map<TensorRef, MultiBuffer>;
 
 class TestFixture : public ::testing::Test {
 protected:
-  template <typename T>
-  void compareElements(T a, T b) {
-    EXPECT_EQ(a, b);
-  }
+  template <typename T> void compareElements(T a, T b) { EXPECT_EQ(a, b); }
 
   void compareElements(float a, float b) {
     EXPECT_NEAR(a, b, (fabs(a) + fabs(b)) / 10000.0);
