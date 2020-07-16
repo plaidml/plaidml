@@ -48,10 +48,9 @@ void addToPipeline(OpPassManager &pm) {
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
-  pm.addPass(dialect::stdx::createI1StorageToI32Pass());
-
   pm.addPass(pmlc::conversion::scf_to_gpu::createSimpleSCFToGPUPass());
   pm.addPass(createCanonicalizerPass());
+  pm.addPass(dialect::stdx::createI1StorageToI32Pass());
   pm.addPass(conversion::gpu::createGpuKernelOutliningPass());
 
   // GPU to SPIR-V.
@@ -69,6 +68,14 @@ void addToPipeline(OpPassManager &pm) {
 
   // GPU to Vulkan.
   pm.addPass(conversion::gpu::createConvertGpuLaunchFuncToVulkanCallsPass());
+
+  pm.addPass(createLowerAffinePass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
+  pm.addPass(createLowerToCFGPass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
+
   pm.addPass(conversion::gpu::createLLVMLoweringPass());
 }
 
