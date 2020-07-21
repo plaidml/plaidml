@@ -1,6 +1,8 @@
 // Copyright 2020 Intel Corporation
 
-#include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/GPU/GPUDialect.h"
+#include "mlir/Dialect/SCF/SCF.h"
+#include "mlir/Dialect/StandardOps/EDSC/Builders.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/StandardTypes.h"
@@ -33,6 +35,15 @@ public:
   LogicalResult matchAndRewrite(StoreOp storeOp,
                                 PatternRewriter &rewriter) const override;
 };
+
+// Change new added SCF to standards and avoid influence on gpu::LaunchOp
+// content
+struct ForLowering : public OpRewritePattern<mlir::scf::ForOp> {
+  using OpRewritePattern<mlir::scf::ForOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(mlir::scf::ForOp forOp,
+                                PatternRewriter &rewriter) const override;
+};
 } // namespace
 
 /// Changes loadOp from i1 memref to loadOp i32 followed by creting constant
@@ -40,6 +51,11 @@ public:
 /// be produced
 LogicalResult LoadOpI1ToI32::matchAndRewrite(LoadOp loadOp,
                                              PatternRewriter &rewriter) const {
+  // Not convert function argument as we alloc i32 buffer for it.
+  if (!loadOp.getMemRef().getDefiningOp()) {
+    return failure();
+  }
+
   auto elementType = loadOp.result().getType();
   if (!elementType.isInteger(1)) {
     return failure();
@@ -67,6 +83,11 @@ LogicalResult LoadOpI1ToI32::matchAndRewrite(LoadOp loadOp,
 /// i32
 LogicalResult StoreOpI1ToI32::matchAndRewrite(StoreOp storeOp,
                                               PatternRewriter &rewriter) const {
+  // Not convert function argument as we alloc i32 buffer for it.
+  if (!storeOp.getMemRef().getDefiningOp()) {
+    return failure();
+  }
+
   auto elementType = storeOp.value().getType();
   if (!elementType.isInteger(1)) {
     return failure();
@@ -91,10 +112,86 @@ LogicalResult StoreOpI1ToI32::matchAndRewrite(StoreOp storeOp,
   return success();
 }
 
+// From LowerToCFGPass, avoid conversion in gpu::LaunchOp contents.
+LogicalResult ForLowering::matchAndRewrite(scf::ForOp forOp,
+                                           PatternRewriter &rewriter) const {
+  auto parentOp = forOp.getParentOp();
+  if (isa<gpu::LaunchOp>(*parentOp)) {
+    // Avoid conversion in gpu::LaunchOp region
+    return failure();
+  } else if (isa<scf::ForOp>(*parentOp)) {
+    // Avoid conversion jump into nested scf loops
+    return failure();
+  }
+
+  Location loc = forOp.getLoc();
+
+  // Start by splitting the block containing the 'scf.for' into two parts.
+  // The part before will get the init code, the part after will be the end
+  // point.
+  auto *initBlock = rewriter.getInsertionBlock();
+  auto initPosition = rewriter.getInsertionPoint();
+  auto *endBlock = rewriter.splitBlock(initBlock, initPosition);
+
+  // Use the first block of the loop body as the condition block since it is the
+  // block that has the induction variable and loop-carried values as arguments.
+  // Split out all operations from the first block into a new block. Move all
+  // body blocks from the loop body region to the region containing the loop.
+  auto *conditionBlock = &forOp.region().front();
+  auto *firstBodyBlock =
+      rewriter.splitBlock(conditionBlock, conditionBlock->begin());
+  auto *lastBodyBlock = &forOp.region().back();
+  rewriter.inlineRegionBefore(forOp.region(), endBlock);
+  auto iv = conditionBlock->getArgument(0);
+
+  // Append the induction variable stepping logic to the last body block and
+  // branch back to the condition block. Loop-carried values are taken from
+  // operands of the loop terminator.
+  Operation *terminator = lastBodyBlock->getTerminator();
+  rewriter.setInsertionPointToEnd(lastBodyBlock);
+  auto step = forOp.step();
+  auto stepped = rewriter.create<AddIOp>(loc, iv, step).getResult();
+  if (!stepped)
+    return failure();
+
+  SmallVector<Value, 8> loopCarried;
+  loopCarried.push_back(stepped);
+  loopCarried.append(terminator->operand_begin(), terminator->operand_end());
+  rewriter.create<BranchOp>(loc, conditionBlock, loopCarried);
+  rewriter.eraseOp(terminator);
+
+  // Compute loop bounds before branching to the condition.
+  rewriter.setInsertionPointToEnd(initBlock);
+  Value lowerBound = forOp.lowerBound();
+  Value upperBound = forOp.upperBound();
+  if (!lowerBound || !upperBound)
+    return failure();
+
+  // The initial values of loop-carried values is obtained from the operands
+  // of the loop operation.
+  SmallVector<Value, 8> destOperands;
+  destOperands.push_back(lowerBound);
+  auto iterOperands = forOp.getIterOperands();
+  destOperands.append(iterOperands.begin(), iterOperands.end());
+  rewriter.create<BranchOp>(loc, conditionBlock, destOperands);
+
+  // With the body block done, we can fill in the condition block.
+  rewriter.setInsertionPointToEnd(conditionBlock);
+  auto comparison =
+      rewriter.create<CmpIOp>(loc, CmpIPredicate::slt, iv, upperBound);
+
+  rewriter.create<CondBranchOp>(loc, comparison, firstBodyBlock,
+                                ArrayRef<Value>(), endBlock, ArrayRef<Value>());
+  // The result of the loop operation is the values of the condition block
+  // arguments except the induction variable on the last iteration.
+  rewriter.replaceOp(forOp, conditionBlock->getArguments().drop_front());
+  return success();
+}
+
 /// Hook for adding patterns.
 void populateI1StorageToI32(MLIRContext *context,
                             OwningRewritePatternList &patterns) {
-  patterns.insert<LoadOpI1ToI32, StoreOpI1ToI32>(context);
+  patterns.insert<LoadOpI1ToI32, StoreOpI1ToI32, ForLowering>(context);
 }
 
 struct I1StorageToI32Pass : public I1StorageToI32Base<I1StorageToI32Pass> {
@@ -127,6 +224,7 @@ struct I1StorageToI32Pass : public I1StorageToI32Base<I1StorageToI32Pass> {
           argument.replaceUsesWithIf(alloc,
                                      [&](OpOperand &operand) { return true; });
 
+          Block &endBlock = function.back();
           auto const0 =
               builder
                   .create<ConstantOp>(loc, builder.getIntegerAttr(intType, 0))
@@ -135,37 +233,52 @@ struct I1StorageToI32Pass : public I1StorageToI32Base<I1StorageToI32Pass> {
               builder
                   .create<ConstantOp>(loc, builder.getIntegerAttr(intType, 1))
                   .getResult();
-          SmallVector<int64_t, 4> lowerBounds(memRefType.getRank(),
-                                              /*Value=*/0);
-          SmallVector<int64_t, 4> steps(memRefType.getRank(), /*Value=*/1);
 
-          // Copy data from memref<i1> to memref<i32>
-          buildAffineLoopNest(
-              builder, loc, lowerBounds, memRefType.getShape(), steps,
-              [&](OpBuilder &nestedBuilder, Location loc, ValueRange ivs) {
-                auto valueToStore =
-                    nestedBuilder.create<AffineLoadOp>(loc, argument, ivs);
-                auto selOp = nestedBuilder.create<SelectOp>(loc, valueToStore,
-                                                            const1, const0);
-                nestedBuilder.create<AffineStoreOp>(loc, selOp.getResult(),
-                                                    alloc, ivs);
-              });
+          // Use EDSC in ScopedContext
+          {
+            mlir::edsc::ScopedContext context(builder, loc);
+            mlir::edsc::MemRefBoundsCapture mBoundsCapture(argument);
 
-          // Make sure to allocate at the end of the block.
-          // Copy data from memref<i32> to memref<i1>
-          builder.setInsertionPoint(entryBlock.getTerminator());
-          buildAffineLoopNest(
-              builder, loc, lowerBounds, memRefType.getShape(), steps,
-              [&](OpBuilder &nestedBuilder, Location loc, ValueRange ivs) {
-                auto valueToStore =
-                    nestedBuilder.create<AffineLoadOp>(loc, alloc, ivs);
-                auto cmpOp = nestedBuilder.create<CmpIOp>(
-                    loc, CmpIPredicate::ne, valueToStore, const0);
-                nestedBuilder.create<AffineStoreOp>(loc, cmpOp.getResult(),
-                                                    argument, ivs);
-              });
+            SmallVector<Value, 8> steps;
+            int count = memRefType.getRank();
+            steps.reserve(count);
+            auto index1 =
+                builder.create<ConstantOp>(loc, builder.getIndexAttr(1));
+            for (; count > 0; count--)
+              steps.push_back(index1);
+
+            // Build the scf loop to copy form i1 memref to i32 memref
+            mlir::scf::buildLoopNest(
+                builder, loc, mBoundsCapture.getLbs(), mBoundsCapture.getUbs(),
+                steps,
+                [&](OpBuilder &nestedBuilder, Location loc, ValueRange ivs) {
+                  auto valueToStore =
+                      nestedBuilder.create<LoadOp>(loc, argument, ivs);
+                  auto selOp = nestedBuilder.create<SelectOp>(loc, valueToStore,
+                                                              const1, const0);
+                  nestedBuilder.create<StoreOp>(loc, selOp.getResult(), alloc,
+                                                ivs);
+                });
+
+            // Make sure to copy in reverse at the end of the block
+            builder.setInsertionPoint(endBlock.getTerminator());
+
+            // Build the scf loop to copy form i32 memref to i1 memref
+            mlir::scf::buildLoopNest(
+                builder, loc, mBoundsCapture.getLbs(), mBoundsCapture.getUbs(),
+                steps,
+                [&](OpBuilder &nestedBuilder, Location loc, ValueRange ivs) {
+                  auto valueToStore =
+                      nestedBuilder.create<LoadOp>(loc, alloc, ivs);
+                  auto cmpOp = nestedBuilder.create<CmpIOp>(
+                      loc, CmpIPredicate::ne, valueToStore, const0);
+                  nestedBuilder.create<StoreOp>(loc, cmpOp.getResult(),
+                                                argument, ivs);
+                });
+          }
 
           // Make sure to deallocate this alloc at the end of the block.
+          builder.setInsertionPoint(endBlock.getTerminator());
           builder.create<DeallocOp>(loc, alloc);
         }
       }
