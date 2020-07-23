@@ -226,6 +226,15 @@ ConvolutionParams convParams[] = {
 
 INSTANTIATE_TEST_CASE_P(Suite, ConvolutionTest, ::testing::ValuesIn(convParams));
 
+TEST_F(OpTest, Convolution_Padding3) {
+  auto I = Placeholder(DType::FLOAT32, {1, 224, 224, 3}, "I");
+  auto K = Placeholder(DType::FLOAT32, {7, 7, 3, 64}, "K");
+  auto O = op::convolution(I, K).strides({2, 2}).autopad_mode(AutoPadMode::EXPLICIT).manual_padding({3, 3});
+  auto program = makeProgram("convolution", {O});
+  IVLOG(1, program);
+  runProgram(program);
+}
+
 TEST_F(OpTest, CumProd) {
   auto I = Placeholder(DType::FLOAT32, {7, 7, 3, 64}, "I");
   auto program = makeProgram("cumprod", {op::cumprod(I, 2)});

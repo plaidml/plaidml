@@ -101,15 +101,15 @@ class Executable {
     std::vector<plaidml_binding> inputs_storage(inputs.size());
     std::vector<plaidml_binding*> raw_inputs(inputs.size());
     for (size_t i = 0; i < inputs.size(); i++) {
-      inputs_storage[i].expr = inputs[i].tensor.as_ptr();
-      inputs_storage[i].buffer = inputs[i].buffer.as_ptr();
+      inputs_storage[i].expr = ffi::call<plaidml_expr*>(plaidml_expr_clone, inputs[i].tensor.as_ptr());
+      inputs_storage[i].buffer = ffi::call<plaidml_buffer*>(plaidml_buffer_clone, inputs[i].buffer.as_ptr());
       raw_inputs[i] = &inputs_storage[i];
     }
     std::vector<plaidml_binding> outputs_storage(outputs.size());
     std::vector<plaidml_binding*> raw_outputs(outputs.size());
     for (size_t i = 0; i < raw_outputs.size(); i++) {
-      outputs_storage[i].expr = outputs[i].tensor.as_ptr();
-      outputs_storage[i].buffer = outputs[i].buffer.as_ptr();
+      outputs_storage[i].expr = ffi::call<plaidml_expr*>(plaidml_expr_clone, outputs[i].tensor.as_ptr());
+      outputs_storage[i].buffer = ffi::call<plaidml_buffer*>(plaidml_buffer_clone, outputs[i].buffer.as_ptr());
       raw_outputs[i] = &outputs_storage[i];
     }
     ptr_ = details::make_ptr(            //
