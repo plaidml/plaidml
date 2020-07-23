@@ -48,9 +48,10 @@ void addToPipeline(OpPassManager &pm) {
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
+  pm.addPass(dialect::stdx::createI1StorageToI32Pass());
+
   pm.addPass(pmlc::conversion::scf_to_gpu::createSimpleSCFToGPUPass());
   pm.addPass(createCanonicalizerPass());
-  pm.addPass(dialect::stdx::createI1StorageToI32Pass());
   pm.addPass(conversion::gpu::createGpuKernelOutliningPass());
 
   // GPU to SPIR-V.

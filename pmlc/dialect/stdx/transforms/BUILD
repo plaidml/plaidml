@@ -35,8 +35,5 @@ plaidml_cc_library(
         "//pmlc/dialect/pxa/analysis",
         "//pmlc/dialect/pxa/ir",
         "//pmlc/dialect/tile/ir",
-        "//pmlc/util",
-        "@llvm-project//mlir:SCFDialect",
-        "@llvm-project//mlir:GPUDialect",
     ],
 )

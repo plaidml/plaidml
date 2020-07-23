@@ -1,7 +1,5 @@
 // Copyright 2020 Intel Corporation
 
-#include "mlir/Dialect/GPU/GPUDialect.h"
-#include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/StandardOps/EDSC/Builders.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/PatternMatch.h"
@@ -33,15 +31,6 @@ public:
   using OpRewritePattern<StoreOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(StoreOp storeOp,
-                                PatternRewriter &rewriter) const override;
-};
-
-// Change new added SCF to standards and avoid influence on gpu::LaunchOp
-// content
-struct ForLowering : public OpRewritePattern<mlir::scf::ForOp> {
-  using OpRewritePattern<mlir::scf::ForOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(mlir::scf::ForOp forOp,
                                 PatternRewriter &rewriter) const override;
 };
 } // namespace
@@ -112,86 +101,69 @@ LogicalResult StoreOpI1ToI32::matchAndRewrite(StoreOp storeOp,
   return success();
 }
 
-// From LowerToCFGPass, avoid conversion in gpu::LaunchOp contents.
-LogicalResult ForLowering::matchAndRewrite(scf::ForOp forOp,
-                                           PatternRewriter &rewriter) const {
-  auto parentOp = forOp.getParentOp();
-  if (isa<gpu::LaunchOp>(*parentOp)) {
-    // Avoid conversion in gpu::LaunchOp region
-    return failure();
-  } else if (isa<scf::ForOp>(*parentOp)) {
-    // Avoid conversion jump into nested scf loops
-    return failure();
-  }
-
-  Location loc = forOp.getLoc();
-
-  // Start by splitting the block containing the 'scf.for' into two parts.
-  // The part before will get the init code, the part after will be the end
-  // point.
-  auto *initBlock = rewriter.getInsertionBlock();
-  auto initPosition = rewriter.getInsertionPoint();
-  auto *endBlock = rewriter.splitBlock(initBlock, initPosition);
-
-  // Use the first block of the loop body as the condition block since it is the
-  // block that has the induction variable and loop-carried values as arguments.
-  // Split out all operations from the first block into a new block. Move all
-  // body blocks from the loop body region to the region containing the loop.
-  auto *conditionBlock = &forOp.region().front();
-  auto *firstBodyBlock =
-      rewriter.splitBlock(conditionBlock, conditionBlock->begin());
-  auto *lastBodyBlock = &forOp.region().back();
-  rewriter.inlineRegionBefore(forOp.region(), endBlock);
-  auto iv = conditionBlock->getArgument(0);
-
-  // Append the induction variable stepping logic to the last body block and
-  // branch back to the condition block. Loop-carried values are taken from
-  // operands of the loop terminator.
-  Operation *terminator = lastBodyBlock->getTerminator();
-  rewriter.setInsertionPointToEnd(lastBodyBlock);
-  auto step = forOp.step();
-  auto stepped = rewriter.create<AddIOp>(loc, iv, step).getResult();
-  if (!stepped)
-    return failure();
-
-  SmallVector<Value, 8> loopCarried;
-  loopCarried.push_back(stepped);
-  loopCarried.append(terminator->operand_begin(), terminator->operand_end());
-  rewriter.create<BranchOp>(loc, conditionBlock, loopCarried);
-  rewriter.eraseOp(terminator);
-
-  // Compute loop bounds before branching to the condition.
-  rewriter.setInsertionPointToEnd(initBlock);
-  Value lowerBound = forOp.lowerBound();
-  Value upperBound = forOp.upperBound();
-  if (!lowerBound || !upperBound)
-    return failure();
-
-  // The initial values of loop-carried values is obtained from the operands
-  // of the loop operation.
-  SmallVector<Value, 8> destOperands;
-  destOperands.push_back(lowerBound);
-  auto iterOperands = forOp.getIterOperands();
-  destOperands.append(iterOperands.begin(), iterOperands.end());
-  rewriter.create<BranchOp>(loc, conditionBlock, destOperands);
-
-  // With the body block done, we can fill in the condition block.
-  rewriter.setInsertionPointToEnd(conditionBlock);
-  auto comparison =
-      rewriter.create<CmpIOp>(loc, CmpIPredicate::slt, iv, upperBound);
-
-  rewriter.create<CondBranchOp>(loc, comparison, firstBodyBlock,
-                                ArrayRef<Value>(), endBlock, ArrayRef<Value>());
-  // The result of the loop operation is the values of the condition block
-  // arguments except the induction variable on the last iteration.
-  rewriter.replaceOp(forOp, conditionBlock->getArguments().drop_front());
-  return success();
-}
-
 /// Hook for adding patterns.
 void populateI1StorageToI32(MLIRContext *context,
                             OwningRewritePatternList &patterns) {
-  patterns.insert<LoadOpI1ToI32, StoreOpI1ToI32, ForLowering>(context);
+  patterns.insert<LoadOpI1ToI32, StoreOpI1ToI32>(context);
+}
+
+// Adaptor for building loop nests for the specific memRef shape
+void buildLoopForMemRef(
+    OpBuilder &builder, Location loc, Value memRef,
+    function_ref<void(OpBuilder &, Location, ValueRange)> bodyBuilder) {
+  auto memRefType = memRef.getType().dyn_cast_or_null<MemRefType>();
+  if (!memRefType)
+    return;
+
+  mlir::edsc::ScopedContext context(builder, loc);
+  mlir::edsc::MemRefBoundsCapture mBoundsCapture(memRef);
+
+  auto indexConst1 = builder.create<ConstantOp>(loc, builder.getIndexAttr(1));
+  SmallVector<Value, 8> steps, ivs;
+  int rank = memRefType.getRank();
+  steps.reserve(rank);
+  for (int i = 0; i < rank; i++)
+    steps.push_back(indexConst1);
+
+  Block *currentBlock = builder.getInsertionBlock();
+  Block *ifBlock, *thenBlock, *continueBlock;
+
+  for (int i = 0; i < rank; i++) {
+    // Create blocks
+    auto currentPoint = builder.getInsertionPoint();
+    ifBlock = currentBlock->splitBlock(currentPoint);
+    thenBlock = ifBlock->splitBlock(ifBlock->begin());
+    continueBlock = thenBlock->splitBlock(thenBlock->begin());
+
+    // Create loop entry
+    builder.setInsertionPointToEnd(currentBlock);
+    builder.create<BranchOp>(loc, ifBlock, mBoundsCapture.lb(i));
+
+    // Check up bound
+    builder.setInsertionPointToStart(ifBlock);
+    ifBlock->addArgument(mBoundsCapture.lb(i).getType());
+    auto comparsion = builder.create<CmpIOp>(
+        loc, CmpIPredicate::slt, ifBlock->getArgument(0), mBoundsCapture.ub(i));
+    builder.create<CondBranchOp>(loc, comparsion, thenBlock, ArrayRef<Value>(),
+                                 continueBlock, ArrayRef<Value>());
+
+    // Update index with step
+    builder.setInsertionPointToStart(thenBlock);
+    auto stepped =
+        builder.create<AddIOp>(loc, ifBlock->getArgument(0), steps[i])
+            .getResult();
+    builder.create<BranchOp>(loc, ifBlock, stepped);
+
+    // Ready for next dimension
+    builder.setInsertionPointToStart(thenBlock);
+    currentBlock = thenBlock;
+    ivs.push_back(ifBlock->getArgument(0));
+  }
+
+  // Create loop body
+  if (thenBlock && bodyBuilder) {
+    bodyBuilder(builder, loc, ivs);
+  }
 }
 
 struct I1StorageToI32Pass : public I1StorageToI32Base<I1StorageToI32Pass> {
@@ -206,7 +178,7 @@ struct I1StorageToI32Pass : public I1StorageToI32Base<I1StorageToI32Pass> {
                                 .getType()
                                 .dyn_cast_or_null<MemRefType>()) {
         if (memRefType.getElementType().isInteger(1)) {
-          // shall convert this type to int32
+          // shall convert this memref to int32
           auto argument = entryBlock.getArgument(i);
           auto intType = IntegerType::get(32, context);
           auto newMemRefType = MemRefType::get(memRefType.getShape(), intType);
@@ -224,7 +196,6 @@ struct I1StorageToI32Pass : public I1StorageToI32Base<I1StorageToI32Pass> {
           argument.replaceUsesWithIf(alloc,
                                      [&](OpOperand &operand) { return true; });
 
-          Block &endBlock = function.back();
           auto const0 =
               builder
                   .create<ConstantOp>(loc, builder.getIntegerAttr(intType, 0))
@@ -234,52 +205,31 @@ struct I1StorageToI32Pass : public I1StorageToI32Base<I1StorageToI32Pass> {
                   .create<ConstantOp>(loc, builder.getIntegerAttr(intType, 1))
                   .getResult();
 
-          // Use EDSC in ScopedContext
-          {
-            mlir::edsc::ScopedContext context(builder, loc);
-            mlir::edsc::MemRefBoundsCapture mBoundsCapture(argument);
-
-            SmallVector<Value, 8> steps;
-            int count = memRefType.getRank();
-            steps.reserve(count);
-            auto index1 =
-                builder.create<ConstantOp>(loc, builder.getIndexAttr(1));
-            for (; count > 0; count--)
-              steps.push_back(index1);
-
-            // Build the scf loop to copy form i1 memref to i32 memref
-            mlir::scf::buildLoopNest(
-                builder, loc, mBoundsCapture.getLbs(), mBoundsCapture.getUbs(),
-                steps,
-                [&](OpBuilder &nestedBuilder, Location loc, ValueRange ivs) {
-                  auto valueToStore =
-                      nestedBuilder.create<LoadOp>(loc, argument, ivs);
-                  auto selOp = nestedBuilder.create<SelectOp>(loc, valueToStore,
-                                                              const1, const0);
-                  nestedBuilder.create<StoreOp>(loc, selOp.getResult(), alloc,
-                                                ivs);
-                });
-
-            // Make sure to copy in reverse at the end of the block
-            builder.setInsertionPoint(endBlock.getTerminator());
-
-            // Build the scf loop to copy form i32 memref to i1 memref
-            mlir::scf::buildLoopNest(
-                builder, loc, mBoundsCapture.getLbs(), mBoundsCapture.getUbs(),
-                steps,
-                [&](OpBuilder &nestedBuilder, Location loc, ValueRange ivs) {
-                  auto valueToStore =
-                      nestedBuilder.create<LoadOp>(loc, alloc, ivs);
-                  auto cmpOp = nestedBuilder.create<CmpIOp>(
-                      loc, CmpIPredicate::ne, valueToStore, const0);
-                  nestedBuilder.create<StoreOp>(loc, cmpOp.getResult(),
-                                                argument, ivs);
-                });
-          }
+          // create mem copy from i1 buffer to i32 buffer
+          buildLoopForMemRef(
+              builder, loc, argument,
+              [&](OpBuilder &builder, Location loc, ValueRange ivs) {
+                auto valueToStore = builder.create<LoadOp>(loc, argument, ivs);
+                auto selOp =
+                    builder.create<SelectOp>(loc, valueToStore, const1, const0);
+                builder.create<StoreOp>(loc, selOp.getResult(), alloc, ivs);
+              });
 
           // Make sure to deallocate this alloc at the end of the block.
+          Block &endBlock = function.back();
           builder.setInsertionPoint(endBlock.getTerminator());
-          builder.create<DeallocOp>(loc, alloc);
+          auto dealloc = builder.create<DeallocOp>(loc, alloc);
+
+          // create mem copy from i32 buffer to i1 buffer
+          builder.setInsertionPoint(dealloc);
+          buildLoopForMemRef(
+              builder, loc, argument,
+              [&](OpBuilder &builder, Location loc, ValueRange ivs) {
+                auto valueToStore = builder.create<LoadOp>(loc, alloc, ivs);
+                auto cmpOp = builder.create<CmpIOp>(loc, CmpIPredicate::ne,
+                                                    valueToStore, const0);
+                builder.create<StoreOp>(loc, cmpOp.getResult(), argument, ivs);
+              });
         }
       }
 
