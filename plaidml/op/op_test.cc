@@ -310,7 +310,7 @@ TEST_F(OpTest, L2Norm) {
 
 TEST_F(OpTest, Pool) {
   auto I = Placeholder(DType::FLOAT32, {10, 20, 30, 40, 50}, "I");
-  auto program = makeProgram("pool", {op::pool(I, op::PoolMode::SUM, {1, 2, 3}, {1, 2, 3}, op::AutoPadMode::NONE,
+  auto program = makeProgram("pool", {op::pool(I, op::PoolMode::SUM, {1, 2, 3}, {1, 2, 3}, op::AutoPadMode::EXPLICIT,
                                                {1, 2}, op::TensorLayout::NXC, true, true)});
   runProgram(program);
 }
