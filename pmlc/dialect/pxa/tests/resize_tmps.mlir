@@ -44,3 +44,36 @@ func @inner_indexes(%I: memref<100x100xf32>) -> (memref<100x100xf32>) {
   }
   return %O4 : memref<100x100xf32>
 }
+
+func @no_resize_return() -> memref<10x10xf32> {
+// CHECK-LABEL: func @no_resize_return
+  %cst = constant 0.000000e+00 : f32
+  %0 = alloc() : memref<10x10xf32>
+  // CHECK: alloc() : memref<10x10xf32>
+  %1 = affine.parallel (%arg0, %arg1) = (0, 0) to (5, 5) reduce ("assign") -> (memref<10x10xf32>) {
+    %2 = pxa.reduce assign %cst, %0[%arg0, %arg1] : memref<10x10xf32>
+    affine.yield %2 : memref<10x10xf32>
+  }
+  return %1 : memref<10x10xf32>
+}
+
+#set0 = affine_set<(d0, d1, d2, d3) : (d0 * -30 - d1 + 221 >= 0, d2 * -30 - d3 + 221 >= 0)>
+func @no_resize_expand(%arg0: memref<32x30xf32>) {
+// CHECK-LABEL: func @no_resize_expand
+  %0 = alloc() : memref<1x30x32x8x8x32xf32>
+  %1 = alloc() : memref<1x222x222x32xf32>
+  // CHECK: alloc() : memref<1x222x222x32xf32>
+  %2 = affine.parallel (%arg1, %arg2, %arg3, %arg4, %arg5, %arg6) = (0, 0, 0, 0, 0, 0) to (8, 30, 8, 30, 32, 32) reduce ("assign") -> (memref<1x222x222x32xf32>) {
+    %4 = affine.if #set0(%arg1, %arg2, %arg3, %arg4) -> memref<1x222x222x32xf32> {
+      %5 = affine.load %0[0, %arg2, %arg6, %arg1, %arg3, %arg5] : memref<1x30x32x8x8x32xf32>
+      %6 = affine.load %arg0[%arg6, %arg4] : memref<32x30xf32>
+      %7 = mulf %5, %6 : f32
+      %8 = pxa.reduce add %7, %1[0, %arg1 * 30 + %arg2, %arg3 * 30 + %arg4, %arg5] : memref<1x222x222x32xf32>
+      affine.yield %8 : memref<1x222x222x32xf32>
+    } else {
+      affine.yield %1 : memref<1x222x222x32xf32>
+    }
+    affine.yield %4 : memref<1x222x222x32xf32>
+  }
+  return
+}
