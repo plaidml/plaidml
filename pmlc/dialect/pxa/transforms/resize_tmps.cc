@@ -39,7 +39,7 @@ struct ResizeTmpsPass : public ResizeTmpsBase<ResizeTmpsPass> {
     IVLOG(2, "Considering: " << debugString(*op.getOperation()));
 
     for (auto &use : getIndirectUses(op)) {
-      IVLOG(2, "Found indicrect use: " << debugString(*use.getOwner()));
+      IVLOG(2, "Found indirect use: " << debugString(*use.getOwner()));
       if (isa<ReturnOp>(use.getOwner())) {
         IVLOG(2, "Found ReturnOp user, cannot resize allocation");
         return;
