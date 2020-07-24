@@ -96,9 +96,9 @@ SUITES:
         pipelines: [nightly, plaidml]
     params:
       plaidml:
-        batch_sizes: [0]
+        batch_sizes: [1]
       ci:
-        batch_sizes: [0]
+        batch_sizes: [1]
     wheels:
       # NOTE: this list must be in least to most dependent order.
       - plaidml-{version}-py2.py3-none-{arch}.whl
@@ -110,13 +110,11 @@ SUITES:
     eventlog: yes
     runner: plaidbench
     args:
-      - --results
-      - "{results}"
+      - --results="{results}"
       - --no-kernel-timing
       - --print-stacktraces
       - --no-warmup
-      - --examples
-      - 1
+      - --examples=1
       - keras
       - "{workload}"
     workloads:
@@ -183,10 +181,8 @@ SUITES:
     conda_env: ci/conda/tensorflow.yml
     runner: plaidbench
     args:
-      - --results
-      - "{results}"
-      - --batch-size
-      - "{batch_size}"
+      - --results="{results}"
+      - --batch-size="{batch_size}"
       - --no-kernel-timing
       - --print-stacktraces
       - keras
@@ -204,11 +200,11 @@ SUITES:
           keras-tf-dnnl-cpu:
             conda_env: ci/conda/tensorflow-dnnl.yml
             keras-stripe-ocl-gfx804:
-            prepend_args: [--examples, 64]
+            prepend_args: [--examples=64]
           keras-stripe-ocl-neo:
-            prepend_args: [--examples, 512]
+            prepend_args: [--examples=512]
           keras-stripe-mtl-uhd630:
-            prepend_args: [--examples, 256]
+            prepend_args: [--examples=256]
       mobilenet:
         precision: high
         platform_overrides:
@@ -223,24 +219,24 @@ SUITES:
         precision: high
         platform_overrides:
           keras-stripe-llvm-cpu:
-            prepend_args: [--examples, 128]
+            prepend_args: [--examples=128]
           keras-stripe-ocl-gfx804:
-            prepend_args: [--examples, 128]
+            prepend_args: [--examples=128]
           keras-stripe-mtl-uhd630:
-            prepend_args: [--examples, 256]
+            prepend_args: [--examples=256]
           keras-tf-dnnl-cpu:
             conda_env: ci/conda/tensorflow-dnnl.yml
       vgg19:
         precision: high
         platform_overrides:
           keras-stripe-llvm-cpu:
-            prepend_args: [--examples, 64]
+            prepend_args: [--examples=64]
           keras-stripe-ocl-gfx804:
-            prepend_args: [--examples, 64]
+            prepend_args: [--examples=64]
           keras-stripe-ocl-neo:
-            prepend_args: [--examples, 256]
+            prepend_args: [--examples=256]
           keras-stripe-mtl-uhd630:
-            prepend_args: [--examples, 256]
+            prepend_args: [--examples=256]
           keras-tf-dnnl-cpu:
             conda_env: ci/conda/tensorflow-dnnl.yml
         skip_platforms:
@@ -250,16 +246,16 @@ SUITES:
         precision: high
         platform_overrides:
           keras-stripe-llvm-cpu:
-            prepend_args: [--examples, 64]
+            prepend_args: [--examples=64]
           keras-stripe-ocl-gfx804:
-            prepend_args: [--examples, 64]
+            prepend_args: [--examples=64]
           keras-stripe-ocl-gv100gl:
-            prepend_args: [--examples, 512]
+            prepend_args: [--examples=512]
           keras-stripe-ocl-neo:
-            prepend_args: [--examples, 256]
+            prepend_args: [--examples=256]
             perf_threshold: 0.7
           keras-stripe-mtl-uhd630:
-            prepend_args: [--examples, 64]
+            prepend_args: [--examples=64]
             soft_fail: true
           keras-tf-dnnl-cpu:
             conda_env: ci/conda/tensorflow-dnnl.yml
@@ -295,8 +291,7 @@ SUITES:
           - inception_v3
           - --train
           - --print-stacktraces
-          - --batch-size
-          - "{batch_size}"
+          - --batch-size="{batch_size}"
       resnet50_train:
         precision: low
         args:
@@ -304,8 +299,7 @@ SUITES:
           - resnet50
           - --train
           - --print-stacktraces
-          - --batch-size
-          - "{batch_size}"
+          - --batch-size="{batch_size}"
       vgg19_train:
         precision: low
         args:
@@ -313,8 +307,7 @@ SUITES:
           - vgg19
           - --train
           - --print-stacktraces
-          - --batch-size
-          - "{batch_size}"
+          - --batch-size="{batch_size}"
       xception_train:
         precision: low
         args:
@@ -322,8 +315,7 @@ SUITES:
           - xception
           - --train
           - --print-stacktraces
-          - --batch-size
-          - "{batch_size}"
+          - --batch-size="{batch_size}"
       mobilenet_train:
         precision: low
         args:
@@ -331,5 +323,4 @@ SUITES:
           - mobilenet
           - --train
           - --print-stacktraces
-          - --batch-size
-          - "{batch_size}"
+          - --batch-size="{batch_size}"
