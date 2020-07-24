@@ -181,8 +181,8 @@ std::ostream& operator<<(std::ostream& os, const AutoGroupMode& mode) {
 
 std::string to_string(AutoPadMode mode) {
   switch (mode) {
-    case AutoPadMode::NONE:
-      return "AutoPadMode::NONE (a.k.a. EXPLICIT)";
+    case AutoPadMode::EXPLICIT:
+      return "AutoPadMode::EXPLICIT";
     case AutoPadMode::SAME_LOWER:
       return "AutoPadMode::SAME_LOWER";
     case AutoPadMode::SAME_UPPER:
@@ -339,7 +339,7 @@ std::pair<TensorDim, TensorDim> compute_padding_and_output_size(  //
   auto F_eff = (dilation * (filter_size - 1)) + 1;      // Effective Filter Size
   int64_t ceil_term =
       use_ceil_for_output_shape ? stride - 1 : 0;  // TODO: Will need to confirm that this is the intended behavior
-  if (autopad_mode == AutoPadMode::NONE) {
+  if (autopad_mode == AutoPadMode::EXPLICIT) {
     TensorDim pad_before(pad_lo);
     TensorDim output_size((I_eff + pad_lo + pad_hi - F_eff + stride + ceil_term) / stride);
     return std::pair<TensorDim, TensorDim>(pad_before, output_size);
@@ -375,7 +375,7 @@ std::pair<TensorDim, TensorDim> compute_padding_and_input_size(  //
 
   auto O_eff = output_size;
   auto F_eff = (dilation * (filter_size - 1)) + 1;  // Effective Filter Size
-  if (autopad_mode == AutoPadMode::NONE) {
+  if (autopad_mode == AutoPadMode::EXPLICIT) {
     TensorDim pad_before(pad_lo);
     TensorDim input_size(O_eff * stride - pad_lo - pad_hi + F_eff - stride);
     return std::pair<TensorDim, TensorDim>(pad_before, input_size);
@@ -685,7 +685,7 @@ size_t compute_conv_rank_validating_strides(std::vector<int64_t>* strides, const
 
 void validate_conv_padding(const std::vector<int64_t>& manual_padding, AutoPadMode autopad_mode,
                            std::stringstream& args_log) {
-  if (!manual_padding.empty() && autopad_mode != AutoPadMode::NONE) {
+  if (!manual_padding.empty() && autopad_mode != AutoPadMode::EXPLICIT) {
     IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
     throw std::runtime_error("Autopadding and manual padding both requested for single conv operation");
   }
@@ -1977,7 +1977,7 @@ Value pool(const Value& value) {
   auto I_channel_dims = I.rank() - spatial_rank - 1;
 
   // Verify inputs are consistent
-  if (manual_padding.size() && autopad_mode != AutoPadMode::NONE) {
+  if (manual_padding.size() && autopad_mode != AutoPadMode::EXPLICIT) {
     throw std::runtime_error("Autopadding and manual padding both requested for single pool operation");
   }
   if (strides.size() != spatial_rank) {
