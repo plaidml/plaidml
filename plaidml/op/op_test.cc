@@ -179,7 +179,7 @@ TEST_F(OpTest, Concatenate) {
 TEST_F(OpTest, 3dConvolution) {
   auto I = Placeholder(DType::FLOAT32, {1, 32, 224, 224, 3}, "I");
   auto K = Placeholder(DType::FLOAT32, {7, 7, 7, 3, 64}, "K");
-  edsl::TensorRef O = edsl::Tensor(op::convolution(I, K).strides({2, 2, 2}).autopad_mode(AutoPadMode::EXPLICIT).manual_padding({2, 3, 2, 3, 2, 3}));
+  edsl::TensorRef O = edsl::Tensor(op::convolution(I, K).strides({2, 2, 2}).autopad_mode(op::AutoPadMode::EXPLICIT).manual_padding({2, 3, 2, 3, 2, 3}));
   auto program = makeProgram("convolution", {O});
   IVLOG(1, program);
   std::vector<float> I_input(1*32*224*224*3, 0.0);
@@ -193,7 +193,7 @@ TEST_F(OpTest, 3dConvolution) {
 TEST_F(OpTest, 3dConvolution2) {
   auto I = Placeholder(DType::FLOAT32, {1, 3, 1, 1, 1024}, "I");
   auto K = Placeholder(DType::FLOAT32, {1, 1, 1, 1024, 400}, "K");
-  edsl::TensorRef O = edsl::Tensor(op::convolution(I, K).strides({1, 1, 1}).autopad_mode(AutoPadMode::EXPLICIT).manual_padding({0, 0, 0, 0, 0, 0}));
+  edsl::TensorRef O = edsl::Tensor(op::convolution(I, K).strides({1, 1, 1}).autopad_mode(op::AutoPadMode::EXPLICIT).manual_padding({0, 0, 0, 0, 0, 0}));
   auto program = makeProgram("convolution", {O});
   IVLOG(1, program);
   std::vector<float> I_input(1*3*1*1*1024, 0.0);
@@ -207,7 +207,7 @@ TEST_F(OpTest, 3dConvolution2) {
 TEST_F(OpTest, 3dConvolution3) {
   auto I = Placeholder(DType::FLOAT32, {1, 16, 56, 56, 64}, "I");
   auto K = Placeholder(DType::FLOAT32, {1, 1, 1, 64, 64}, "K");
-  edsl::TensorRef O = edsl::Tensor(op::convolution(I, K).strides({1, 1, 1}).autopad_mode(AutoPadMode::EXPLICIT).manual_padding({0, 0, 0, 0, 0, 0}));
+  edsl::TensorRef O = edsl::Tensor(op::convolution(I, K).strides({1, 1, 1}).autopad_mode(op::AutoPadMode::EXPLICIT).manual_padding({0, 0, 0, 0, 0, 0}));
   auto program = makeProgram("convolution", {O});
   IVLOG(1, program);
   std::vector<float> I_input(1*16*56*56*64, 0.0);
@@ -221,7 +221,7 @@ TEST_F(OpTest, 3dConvolution3) {
 TEST_F(OpTest, 3dConvolution4) {
   auto I = Placeholder(DType::FLOAT32, {1, 16, 56, 56, 64}, "I");
   auto K = Placeholder(DType::FLOAT32, {3, 3, 3, 64, 192}, "K");
-  edsl::TensorRef O = edsl::Tensor(op::convolution(I, K).strides({1, 1, 1}).autopad_mode(AutoPadMode::EXPLICIT).manual_padding({1, 1, 1, 1, 1, 1}));
+  edsl::TensorRef O = edsl::Tensor(op::convolution(I, K).strides({1, 1, 1}).autopad_mode(op::AutoPadMode::EXPLICIT).manual_padding({1, 1, 1, 1, 1, 1}));
   auto program = makeProgram("convolution", {O});
   IVLOG(1, program);
   std::vector<float> I_input(1*16*56*56*64, 0.0);
@@ -235,7 +235,7 @@ TEST_F(OpTest, 3dConvolution4) {
 TEST_F(OpTest, Convolution_Padding3) {
   auto I = Placeholder(DType::FLOAT32, {1, 224, 224, 3}, "I");
   auto K = Placeholder(DType::FLOAT32, {7, 7, 3, 64}, "K");
-  auto O = op::convolution(I, K).strides({2, 2}).autopad_mode(AutoPadMode::EXPLICIT).manual_padding({3, 3});
+  auto O = op::convolution(I, K).strides({2, 2}).autopad_mode(op::AutoPadMode::EXPLICIT).manual_padding({3, 3});
   auto program = makeProgram("convolution", {O});
   IVLOG(1, program);
   runProgram(program);
