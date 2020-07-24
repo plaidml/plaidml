@@ -163,6 +163,36 @@ private:
       IVLOG(6, debugString(perm.indexes[i]) << ": " << tileSize[i]);
     }
 
+    auto verifyStride = [&](auto op) -> bool {
+      auto si = computeStrideInfo(op.getAffineMap(), op.getMapOperands());
+      if (!si)
+        return false;
+      for (size_t i = 0; i < getTiledIdxCount(); ++i) {
+        for (size_t j = 0; j < si->size(); j++) {
+          if ((*si)[j].strides.count(perm.indexes[i]) == 0) {
+            continue;
+          }
+          if ((*si)[j].strides[perm.indexes[i]] != 1) {
+            IVLOG(3, "Bad stride = " << (*si)[j].strides[perm.indexes[i]]);
+            return false;
+          }
+        }
+      }
+      return true;
+    };
+    for (auto op : perm.ioOps) {
+      bool good = false;
+      if (auto loadOp = mlir::dyn_cast<AffineLoadOp>(op)) {
+        good = verifyStride(loadOp);
+      } else if (auto reduceOp = mlir::dyn_cast<AffineReduceOp>(op)) {
+        good = verifyStride(reduceOp);
+      }
+      if (!good) {
+        IVLOG(3, "Non-simple dimensionalized strides, forget it!");
+        return std::numeric_limits<double>::infinity();
+      }
+    }
+
     // The middle idxs are the accumulation indexes, i.e. those used on loads
     // but not stores
     DenseMap<BlockArgument, unsigned> middle_idxs;
