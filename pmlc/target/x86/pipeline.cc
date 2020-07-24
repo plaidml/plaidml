@@ -89,8 +89,8 @@ void addToPipeline(OpPassManager &pm) {
   // pm.addPass(createCanonicalizerPass());
   // pm.addPass(pmlc::dialect::pxa::createMemRefDataFlowOptPass());
   // pm.addPass(createCanonicalizerPass());
-  // pm.addPass(pmlc::dialect::pxa::createLocalizePass());
-  // pm.addPass(pmlc::dialect::pxa::createResizeTmpsPass());
+  pm.addPass(pmlc::dialect::pxa::createLocalizePass());
+  pm.addPass(pmlc::dialect::pxa::createResizeTmpsPass());
   // pm.addPass(createCanonicalizerPass());
   // pm.addPass(createCSEPass());
 

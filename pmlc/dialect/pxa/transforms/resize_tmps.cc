@@ -38,6 +38,14 @@ struct ResizeTmpsPass : public ResizeTmpsBase<ResizeTmpsPass> {
     Block *opBlock = op.getOperation()->getBlock();
     IVLOG(2, "Considering: " << debugString(*op.getOperation()));
 
+    for (auto &use : getIndirectUses(op)) {
+      IVLOG(2, "Found indicrect use: " << debugString(*use.getOwner()));
+      if (isa<ReturnOp>(use.getOwner())) {
+        IVLOG(2, "Found ReturnOp user, cannot resize allocation");
+        return;
+      }
+    }
+
     SmallVector<StrideInfo, 4> outer;
     SmallVector<StrideRange, 4> inner;
     for (auto &use : getIndirectAccessUses(op)) {
@@ -114,7 +122,16 @@ struct ResizeTmpsPass : public ResizeTmpsBase<ResizeTmpsPass> {
         return;
       }
       newShape.push_back(innerRange.maxVal + 1);
-      IVLOG(2, "Computed size:" << newShape.back());
+      IVLOG(2, "Original size:" << oldShape[i]);
+      IVLOG(2, "Computed size:" << newShape[i]);
+
+      // if you assume that incoming IR is sane
+      // then there is no need to expand
+      if (newShape[i] > oldShape[i]) {
+        IVLOG(2, "Expansion not allowed, resetting to original size");
+        newShape[i] = oldShape[i];
+      }
+
       if (newShape[i] != oldShape[i]) {
         sizeChanged = true;
       }
