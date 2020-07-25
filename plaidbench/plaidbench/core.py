@@ -18,6 +18,7 @@ import enum
 import errno
 import json
 import os
+import pprint
 import time
 from abc import ABCMeta, abstractmethod, abstractproperty
 from collections import namedtuple
@@ -172,6 +173,7 @@ class ExplicitReporter(object):
             if ex.errno != errno.EEXIST:
                 click.echo(ex)
                 return
+        pprint.pprint(results)
         with open(os.path.join(self.result_dir, 'result.json'), 'w') as out:
             json.dump(results, out)
         if isinstance(output, np.ndarray):

@@ -110,7 +110,7 @@ SUITES:
     eventlog: yes
     runner: plaidbench
     args:
-      - --results="{results}"
+      - --results={results}
       - --no-kernel-timing
       - --print-stacktraces
       - --no-warmup
@@ -181,8 +181,8 @@ SUITES:
     conda_env: ci/conda/tensorflow.yml
     runner: plaidbench
     args:
-      - --results="{results}"
-      - --batch-size="{batch_size}"
+      - --results={results}
+      - --batch-size={batch_size}
       - --no-kernel-timing
       - --print-stacktraces
       - keras
@@ -291,7 +291,7 @@ SUITES:
           - inception_v3
           - --train
           - --print-stacktraces
-          - --batch-size="{batch_size}"
+          - --batch-size={batch_size}
       resnet50_train:
         precision: low
         args:
@@ -299,7 +299,7 @@ SUITES:
           - resnet50
           - --train
           - --print-stacktraces
-          - --batch-size="{batch_size}"
+          - --batch-size={batch_size}
       vgg19_train:
         precision: low
         args:
@@ -307,7 +307,7 @@ SUITES:
           - vgg19
           - --train
           - --print-stacktraces
-          - --batch-size="{batch_size}"
+          - --batch-size={batch_size}
       xception_train:
         precision: low
         args:
@@ -315,7 +315,7 @@ SUITES:
           - xception
           - --train
           - --print-stacktraces
-          - --batch-size="{batch_size}"
+          - --batch-size={batch_size}
       mobilenet_train:
         precision: low
         args:
@@ -323,4 +323,4 @@ SUITES:
           - mobilenet
           - --train
           - --print-stacktraces
-          - --batch-size="{batch_size}"
+          - --batch-size={batch_size}
