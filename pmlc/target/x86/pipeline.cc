@@ -30,11 +30,6 @@ using namespace mlir; // NOLINT[build/namespaces]
 
 namespace pmlc::target::x86 {
 
-std::unique_ptr<Pass> createXSMMStencilPass() {
-  auto numThreads = std::thread::hardware_concurrency();
-  return pmlc::dialect::pxa::createXSMMStencilPass(numThreads, heatmapCost);
-}
-
 namespace {
 
 struct ConvertToLLVMPass
@@ -53,6 +48,7 @@ struct ConvertToLLVMPass
     LLVMTypeConverter typeConverter(context, options);
 
     OwningRewritePatternList patterns;
+    populateXSMMToLLVMConversionPatterns(typeConverter, patterns, options);
     populateStdToLLVMConversionPatterns(typeConverter, patterns, options);
     conversion::stdx_to_llvm::populateStdXToLLVMConversionPatterns(
         typeConverter, patterns);
@@ -63,13 +59,20 @@ struct ConvertToLLVMPass
       signalPassFailure();
     }
   }
-
-  static std::unique_ptr<OperationPass<ModuleOp>> create() {
-    return std::make_unique<ConvertToLLVMPass>();
-  }
 };
 
-void addToPipeline(OpPassManager &pm) {
+} // namespace
+
+std::unique_ptr<Pass> createXSMMStencilPass() {
+  auto numThreads = std::thread::hardware_concurrency();
+  return pmlc::dialect::pxa::createXSMMStencilPass(numThreads, heatmapCost);
+}
+
+std::unique_ptr<Pass> createLowerToLLVMPass() {
+  return std::make_unique<ConvertToLLVMPass>();
+}
+
+static void addToPipeline(OpPassManager &pm) {
   pm.addPass(pmlc::dialect::tile::createComputeBoundsPass());
   pm.addPass(pmlc::dialect::tile::createPadPass());
   pm.addPass(createCanonicalizerPass());
@@ -82,7 +85,6 @@ void addToPipeline(OpPassManager &pm) {
   pm.addPass(
       pmlc::dialect::pxa::createXSMMStencilPass(/*numThreads=*/1, heatmapCost));
   pm.addPass(createLoopInvariantCodeMotionPass());
-  pm.addPass(createXSMMLoweringPass());
 
   // FIXME: these passes cause test failures (correctness or otherwise)
   // pm.addPass(pmlc::dialect::pxa::createFusionPass());
@@ -94,6 +96,8 @@ void addToPipeline(OpPassManager &pm) {
   // pm.addPass(createCanonicalizerPass());
   // pm.addPass(createCSEPass());
 
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
   pm.addPass(conversion::pxa_to_affine::createLowerPXAToAffinePass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
@@ -109,11 +113,9 @@ void addToPipeline(OpPassManager &pm) {
 
   pm.addPass(createTanhLoweringPass());
 
-  pm.addPass(ConvertToLLVMPass::create());
+  pm.addPass(createLowerToLLVMPass());
   pm.addPass(createTraceLinkingPass());
 }
-
-} // namespace
 
 void registerPassPipeline() {
   static PassPipelineRegistration<> passPipelineReg(

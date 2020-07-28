@@ -349,11 +349,8 @@ private:
         op.getLoc(), bodyBuilder.getI64Type(), tileAttr, leadingDimsAttr);
 
     auto invoke = bodyBuilder.create<xsmm::GemmInvokeOp>(
-        op.getLoc(), c.memref.getType(), dispatch.getResult(), //
-        c.memref, c.accessMap, c.tileMap,                      //
-        a.memref, a.accessMap, a.tileMap,                      //
-        b.memref, b.accessMap, b.tileMap,                      //
-        tileAttr, mapOperands);
+        op.getLoc(), c.memref.getType(), dispatch.getResult(), c.memref,
+        c.accessMap, a.memref, a.accessMap, b.memref, b.accessMap, mapOperands);
 
     opC.result().replaceAllUsesWith(invoke);
 

@@ -34,14 +34,13 @@ def XSMM_GemmDispatchOp : XSMM_Op<"gemm.dispatch", [NoSideEffect]> {
 }
 
 def XSMM_GemmInvokeOp : XSMM_Op<"gemm.invoke"> {
-  let summary = "invoke a preivously queried LIBXSMM kernel";
+  let summary = "invoke a previously queried LIBXSMM kernel";
   let arguments = (ins I64:$ptr,
-    AnyMemRef:$c, AffineMapAttr:$cAccessMap, AffineMapAttr:$cTileMap,
-    AnyMemRef:$a, AffineMapAttr:$aAccessMap, AffineMapAttr:$aTileMap,
-    AnyMemRef:$b, AffineMapAttr:$bAccessMap, AffineMapAttr:$bTileMap,
-    I64ArrayAttr:$tile,
+    AnyMemRef:$c, AffineMapAttr:$cAccessMap,
+    AnyMemRef:$a, AffineMapAttr:$aAccessMap,
+    AnyMemRef:$b, AffineMapAttr:$bAccessMap,
     Variadic<Index>:$mapOperands);
-  let results = (outs AnyMemRef:$cout);
+  let results = (outs AnyMemRef:$c_out);
 
   let extraClassDeclaration = [{
     operand_range getOperandsForA();

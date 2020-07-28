@@ -57,35 +57,6 @@ struct LoweringBase : public OpConversionPattern<OpType> {
   LogicalResult match(Operation *op) const override { return mlir::success(); }
 };
 
-// This pattern removes affine.parallel ops with no induction variables
-struct AffineParallelRank0Remover
-    : public mlir::OpRewritePattern<AffineParallelOp> {
-  using mlir::OpRewritePattern<AffineParallelOp>::OpRewritePattern;
-
-  explicit AffineParallelRank0Remover(MLIRContext *ctx)
-      : OpRewritePattern(ctx) {}
-
-  LogicalResult
-  matchAndRewrite(AffineParallelOp op,
-                  mlir::PatternRewriter &rewriter) const override {
-    // Check that there are no induction variables
-    if (op.lowerBoundsMap().getNumResults() != 0)
-      return mlir::failure();
-    // Remove the affine.parallel wrapper, retain the body in the same location
-    auto &parentOps = rewriter.getInsertionBlock()->getOperations();
-    auto &parallelBodyOps = op.region().front().getOperations();
-    parentOps.splice(mlir::Block::iterator(op), parallelBodyOps,
-                     parallelBodyOps.begin(), std::prev(parallelBodyOps.end()));
-    // Replace outputs with values from yield
-    auto termIt = std::prev(parallelBodyOps.end());
-    for (size_t i = 0; i < op.getNumResults(); i++) {
-      op.getResult(i).replaceAllUsesWith(termIt->getOperand(i));
-    }
-    rewriter.eraseOp(op);
-    return mlir::success();
-  }
-};
-
 struct AffineParallelOpConversion
     : public OpConversionPattern<AffineParallelOp> {
 
@@ -96,7 +67,7 @@ struct AffineParallelOpConversion
   matchAndRewrite(AffineParallelOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
     // This conversion doesn't work in the rank 0 case; that case will be
-    // covered by AffineParallelRank0Remover
+    // covered by canonicalization.
     if (op.lowerBoundsMap().getNumResults() == 0)
       return mlir::failure();
     // Create an affine loop nest, capture induction variables
@@ -297,9 +268,10 @@ void LowerPXAToAffinePass::runOnOperation() {
 
   // Setup rewrite patterns
   mlir::OwningRewritePatternList patterns;
-  patterns.insert<AffineParallelRank0Remover, AffineParallelOpConversion,
-                  AffineIfOpConversion, AffineReduceOpConversion,
-                  FuncOpConversion, ReturnOpConversion>(&getContext());
+  patterns
+      .insert<AffineParallelOpConversion, AffineIfOpConversion,
+              AffineReduceOpConversion, FuncOpConversion, ReturnOpConversion>(
+          &getContext());
 
   // Run the conversion
   if (failed(

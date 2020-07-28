@@ -47,38 +47,27 @@ void printGemmInvokeOp(OpAsmPrinter &p, GemmInvokeOp op) {
   p << op.ptr() << ", ";
   p << op.c() << '[';
   p.printAffineMapOfSSAIds(op.cAccessMapAttr(), op.getOperandsForC());
-  p << "]:";
-  p.printAttribute(op.cTileMapAttr());
-  p << " = " << op.a() << '[';
+  p << "] = " << op.a() << '[';
   p.printAffineMapOfSSAIds(op.aAccessMapAttr(), op.getOperandsForA());
-  p << "]:";
-  p.printAttribute(op.aTileMapAttr());
-  p << ", " << op.b() << '[';
+  p << "], " << op.b() << '[';
   p.printAffineMapOfSSAIds(op.bAccessMapAttr(), op.getOperandsForB());
-  p << "]:";
-  p.printAttribute(op.bTileMapAttr());
-  p << ", " << op.tile() << " : " << funcType;
+  p << "] : " << funcType;
 }
 
 struct GemmOperandParser {
   OpAsmParser::OperandType operand;
   SmallVector<OpAsmParser::OperandType, 4> accessOperands;
   AffineMapAttr accessMapAttr;
-  AffineMapAttr tileMapAttr;
   std::string accessMapAttrName;
-  std::string tileMapAttrName;
 
   explicit GemmOperandParser(StringRef name)
-      : accessMapAttrName(name.str() + "AccessMap"),
-        tileMapAttrName(name.str() + "TileMap") {}
+      : accessMapAttrName(name.str() + "AccessMap") {}
 
   ParseResult parse(OpAsmParser &parser, OperationState &result) {
-    return failure(
-        parser.parseOperand(operand) ||
-        parser.parseAffineMapOfSSAIds(accessOperands, accessMapAttr,
-                                      accessMapAttrName, result.attributes) ||
-        parser.parseColon() ||
-        parser.parseAttribute(tileMapAttr, tileMapAttrName, result.attributes));
+    return failure(parser.parseOperand(operand) ||
+                   parser.parseAffineMapOfSSAIds(accessOperands, accessMapAttr,
+                                                 accessMapAttrName,
+                                                 result.attributes));
   }
 };
 
@@ -88,7 +77,6 @@ ParseResult parseGemmInvokeOp(OpAsmParser &parser, OperationState &result) {
   auto i64Type = builder.getIntegerType(64);
   GemmOperandParser a("a"), b("b"), c("c");
   OpAsmParser::OperandType ptr;
-  ArrayAttr tileAttr;
   FunctionType funcType;
   return failure(
       parser.parseOperand(ptr) || //
@@ -98,8 +86,6 @@ ParseResult parseGemmInvokeOp(OpAsmParser &parser, OperationState &result) {
       a.parse(parser, result) ||  //
       parser.parseComma() ||      //
       b.parse(parser, result) ||  //
-      parser.parseComma() ||
-      parser.parseAttribute(tileAttr, i64Type, "tile", result.attributes) ||
       parser.parseColonType(funcType) ||
       parser.addTypesToList(funcType.getResults(), result.types) ||
       parser.resolveOperand(ptr, i64Type, result.operands) ||
