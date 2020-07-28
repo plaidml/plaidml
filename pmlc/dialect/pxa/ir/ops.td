@@ -29,7 +29,7 @@ class PXA_OpWithPP<string mnemonic, list<OpTrait> traits = []> :
 
 def AnyStdScalar : AnyTypeOf<[AnyFloat, AnySignlessInteger]> {}
 
-def AffineReduceOp : PXA_OpWithPP<"reduce", [NoSideEffect]> {
+def AffineReduceOp : PXA_OpWithPP<"reduce", []> {
   let summary = "affine reduction operation";
   let arguments = (ins
     AggregationKind:$agg,
@@ -62,7 +62,7 @@ def AffineReduceOp : PXA_OpWithPP<"reduce", [NoSideEffect]> {
   }];
 }
 
-def AffineVectorReduceOp : PXA_OpWithPP<"vector_reduce", [NoSideEffect]> {
+def AffineVectorReduceOp : PXA_OpWithPP<"vector_reduce", []> {
   let summary = "affine vector reduction operation";
   let arguments = (ins
     AggregationKind:$agg,
