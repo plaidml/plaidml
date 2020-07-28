@@ -19,6 +19,8 @@ using mlir::AffineIfOp;
 using mlir::AffineLoadOp;
 using mlir::AffineParallelOp;
 using mlir::AffineStoreOp;
+using mlir::AffineVectorLoadOp;
+using mlir::AffineVectorStoreOp;
 using mlir::AllocOp;
 using mlir::ArrayRef;
 using mlir::ConversionPattern;
@@ -38,6 +40,7 @@ using mlir::RankedTensorType;
 using mlir::ReturnOp;
 using mlir::Type;
 using mlir::Value;
+using mlir::VectorType;
 
 using util::AggregationKind;
 
@@ -224,6 +227,88 @@ struct AffineReduceOpConversion : public LoweringBase<pxa::AffineReduceOp> {
   }
 };
 
+struct AffineVectorReduceOpConversion
+    : public LoweringBase<pxa::AffineVectorReduceOp> {
+  explicit AffineVectorReduceOpConversion(MLIRContext *ctx)
+      : LoweringBase(ctx) {}
+
+  void rewrite(pxa::AffineVectorReduceOp op, ArrayRef<Value> operands,
+               ConversionPatternRewriter &rewriter) const override {
+    auto source = rewriter.create<AffineVectorLoadOp>(
+        op.getLoc(), op.getVectorType(), op.mem(), op.idxs());
+    auto reduce = createVectorReduction(rewriter, op, source.getResult());
+    rewriter.create<AffineVectorStoreOp>(op.getLoc(), ArrayRef<Type>{}, reduce,
+                                         op.mem(), op.idxs());
+    op.replaceAllUsesWith(op.mem());
+    rewriter.eraseOp(op);
+  }
+
+  Value createVectorReduction(ConversionPatternRewriter &rewriter,
+                              pxa::AffineVectorReduceOp op,
+                              Value source) const {
+    // Must be a VectorType
+    assert(source.getType().isa<VectorType>());
+
+    switch (op.agg()) {
+    case AggregationKind::assign:
+      return op.vector();
+    case AggregationKind::add: {
+      if (source.getType().isa<VectorType>() && source.getType()
+                                                    .cast<VectorType>()
+                                                    .getElementType()
+                                                    .isa<FloatType>()) {
+        return rewriter.create<mlir::AddFOp>(op.getLoc(), source, op.vector());
+      }
+      return rewriter.create<mlir::AddIOp>(op.getLoc(), source, op.vector());
+    }
+    case AggregationKind::max: {
+      if (source.getType().isa<VectorType>() && source.getType()
+                                                    .cast<VectorType>()
+                                                    .getElementType()
+                                                    .isa<FloatType>()) {
+        auto cmp = rewriter.create<mlir::CmpFOp>(
+            op.getLoc(), mlir::CmpFPredicate::OGT, op.vector(), source);
+        return rewriter.create<mlir::SelectOp>(op.getLoc(), cmp, op.vector(),
+                                               source);
+      }
+      // TODO: determine whether to use signed or unsigned compare
+      auto cmp = rewriter.create<mlir::CmpIOp>(
+          op.getLoc(), mlir::CmpIPredicate::sgt, op.vector(), source);
+      return rewriter.create<mlir::SelectOp>(op.getLoc(), cmp, op.vector(),
+                                             source);
+    }
+    case AggregationKind::min: {
+      if (source.getType().isa<VectorType>() && source.getType()
+                                                    .cast<VectorType>()
+                                                    .getElementType()
+                                                    .isa<FloatType>()) {
+        auto cmp = rewriter.create<mlir::CmpFOp>(
+            op.getLoc(), mlir::CmpFPredicate::OLT, op.vector(), source);
+        return rewriter.create<mlir::SelectOp>(op.getLoc(), cmp, op.vector(),
+                                               source);
+      }
+      // TODO: determine whether to use signed or unsigned compare
+      auto cmp = rewriter.create<mlir::CmpIOp>(
+          op.getLoc(), mlir::CmpIPredicate::slt, op.vector(), source);
+      return rewriter.create<mlir::SelectOp>(op.getLoc(), cmp, op.vector(),
+                                             source);
+    }
+    case AggregationKind::mul: {
+      if (source.getType().isa<VectorType>() && source.getType()
+                                                    .cast<VectorType>()
+                                                    .getElementType()
+                                                    .isa<FloatType>()) {
+        return rewriter.create<mlir::MulFOp>(op.getLoc(), source, op.vector());
+      }
+      return rewriter.create<mlir::MulIOp>(op.getLoc(), source, op.vector());
+    }
+    default:
+      llvm_unreachable("Unsupported aggregation for "
+                       "AffineVectorReduceOpConversion::createVectorReduction");
+    }
+  }
+};
+
 struct FuncOpConversion : public OpConversionPattern<FuncOp> {
   using OpConversionPattern<FuncOp>::OpConversionPattern;
 
@@ -299,7 +384,8 @@ void LowerPXAToAffinePass::runOnOperation() {
   mlir::OwningRewritePatternList patterns;
   patterns.insert<AffineParallelRank0Remover, AffineParallelOpConversion,
                   AffineIfOpConversion, AffineReduceOpConversion,
-                  FuncOpConversion, ReturnOpConversion>(&getContext());
+                  AffineVectorReduceOpConversion, FuncOpConversion,
+                  ReturnOpConversion>(&getContext());
 
   // Run the conversion
   if (failed(
