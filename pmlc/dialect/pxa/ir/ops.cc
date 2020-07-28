@@ -123,10 +123,11 @@ static LogicalResult foldMemRefCast(Operation *op) {
 
 /// Fold reduce operations with no uses. Reduce has side effects on the heap,
 /// but can still be deleted if it has zero uses.
-struct SimplifyDeadReduce : public OpRewritePattern<AffineReduceOp> {
-  using OpRewritePattern<AffineReduceOp>::OpRewritePattern;
+template <typename ReduceOp>
+struct SimplifyDeadReduce : public OpRewritePattern<ReduceOp> {
+  using OpRewritePattern<ReduceOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(AffineReduceOp reduce,
+  LogicalResult matchAndRewrite(ReduceOp reduce,
                                 PatternRewriter &rewriter) const override {
     if (reduce.use_empty()) {
       rewriter.eraseOp(reduce);
@@ -135,23 +136,6 @@ struct SimplifyDeadReduce : public OpRewritePattern<AffineReduceOp> {
     return failure();
   }
 };
-
-/// Fold vector_reduce operations with no uses. Vector_reduce has side effects
-/// on the heap, but can still be deleted if it has zero uses.
-struct SimplifyDeadVectorReduce
-    : public OpRewritePattern<AffineVectorReduceOp> {
-  using OpRewritePattern<AffineVectorReduceOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(AffineVectorReduceOp reduce,
-                                PatternRewriter &rewriter) const override {
-    if (reduce.use_empty()) {
-      rewriter.eraseOp(reduce);
-      return success();
-    }
-    return failure();
-  }
-};
-
 } // namespace
 
 // ---- AffineReduceOp ----
@@ -213,7 +197,10 @@ ParseResult parseAffineReduceOp(OpAsmParser &parser, OperationState &result) {
 
 void AffineReduceOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
-  results.insert<SimplifyAffineOp<AffineReduceOp>, SimplifyDeadReduce>(context);
+  results.insert<SimplifyAffineOp<AffineReduceOp>,
+                 SimplifyAffineOp<AffineVectorReduceOp>,
+                 SimplifyDeadReduce<AffineReduceOp>,
+                 SimplifyDeadReduce<AffineVectorReduceOp>>(context);
 }
 
 OpFoldResult AffineReduceOp::fold(ArrayRef<Attribute> cstOperands) {
@@ -254,8 +241,10 @@ ParseResult parseAffineVectorReduceOp(OpAsmParser &parser,
 
 void AffineVectorReduceOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
-  results.insert<SimplifyAffineOp<AffineVectorReduceOp>, SimplifyDeadReduce>(
-      context);
+  results.insert<SimplifyAffineOp<AffineReduceOp>,
+                 SimplifyAffineOp<AffineVectorReduceOp>,
+                 SimplifyDeadReduce<AffineReduceOp>,
+                 SimplifyDeadReduce<AffineVectorReduceOp>>(context);
 }
 
 OpFoldResult AffineVectorReduceOp::fold(ArrayRef<Attribute> cstOperands) {
