@@ -1,6 +1,7 @@
 # Copyright 2020 Intel Corporation
 
 load("//vendor/bazel:repo.bzl", "http_archive")
+load("@bazel_tools//tools/build_defs/repo:git.bzl", "new_git_repository")
 
 # Sanitize a dependency so that it works correctly from code that includes it as a submodule.
 def clean_dep(dep):
@@ -23,10 +24,10 @@ def openvino_workspace():
         build_file = clean_dep("//vendor/openvino:ngraph.BUILD"),
     )
 
-    http_archive(
+    new_git_repository(
         name = "openvino",
-        url = "https://github.com/PlaidML/openvino/archive/fa832406b3c0d053aab4042ff53ac7f6dccde16b.zip",
-        strip_prefix = "openvino-fa832406b3c0d053aab4042ff53ac7f6dccde16b",
-        sha256 = "1c308163a4ef381c49ea203f6dda1820a233b64e2b22a8aa1750fc46d61256d0",
+        # sha256 = "40652941587e579d45a190731960008827221d11575f7f2e6162285b6625b940",
+        remote = "file:///home/tim/openvino/.git",
+        commit = "fc3f9af923a1bd8ee2c232f227144f941f1f4015",
         build_file = clean_dep("//vendor/openvino:openvino.BUILD"),
     )

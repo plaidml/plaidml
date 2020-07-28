@@ -96,19 +96,19 @@ cc_library(
     ],
 )
 
-template_rule(
-    name = "test_model_repo",
-    src = "inference-engine/tests_deprecated/helpers/test_model_repo.hpp.in",
-    out = "inference-engine/tests_deprecated/helpers/test_model_repo.hpp",
-    substitutions = {
-        "@MODELS_LST@": "",
-    },
-)
+# template_rule(
+#     name = "test_model_repo",
+#     src = "inference-engine/tests_deprecated/helpers/test_model_repo.hpp.in",
+#     out = "inference-engine/tests_deprecated/helpers/test_model_repo.hpp",
+#     substitutions = {
+#         "@MODELS_LST@": "",
+#     },
+# )
 
 cc_library(
     name = "helpers",
     srcs = glob(["inference-engine/tests_deprecated/helpers/*.cpp"]),
-    hdrs = glob(["inference-engine/tests_deprecated/helpers/*.hpp"]) + [":test_model_repo"],
+    hdrs = glob(["inference-engine/tests_deprecated/helpers/*.hpp"]),  # + [":test_model_repo"],
     copts = ["-w"],
     defines = ["DATA_PATH=NULL"],
     includes = ["inference-engine/tests_deprecated/helpers"],
@@ -124,6 +124,7 @@ cc_library(
         "inference-engine/src/legacy_api/src/**/*.cpp",
         "inference-engine/src/legacy_api/src/**/*.hpp",
         "inference-engine/src/legacy_api/src/**/*.h",
+        "inference-engine/src/inference_engine/cnn_network_ngraph_impl.hpp",  # TODO: Ok?
     ]),
     hdrs = glob([
         "inference-engine/src/legacy_api/include/**/*.hpp",
@@ -133,14 +134,15 @@ cc_library(
         "-isystem external/openvino/inference-engine/src/legacy_api/src",
     ],
     includes = [
+        "inference-engine/src/inference_engine/cnn_network_ngraph_impl.hpp",  # TODO: Ok?
         "inference-engine/src/legacy_api/include",
     ],
     tags = TAGS,
     deps = [
         ":inc",
+        ":ngraph",
         ":plugin_api",
         ":pugixml",
-        "@ngraph",
         "@tbb",
     ],
 )
@@ -189,7 +191,7 @@ cc_library(
     tags = TAGS,
     deps = [
         ":inc",
-        "@ngraph",
+        ":ngraph",
     ],
 )
 
@@ -219,11 +221,11 @@ cc_library(
         ":inc",
         ":legacy_api",
         ":low_precision_transformations",
+        ":ngraph",
         ":plugin_api",
         ":preprocessing",
         ":pugixml",
         ":transformations",
-        "@ngraph",
         "@tbb",
     ],
     alwayslink = 1,
@@ -268,4 +270,59 @@ cc_library(
         "inference-engine/thirdparty/pugixml/src",
     ],
     strip_include_prefix = "inference-engine/thirdparty/pugixml/src",
+)
+
+cc_library(
+    name = "ngraph",
+    srcs = glob(
+        [
+            "ngraph/src/ngraph/*.cpp",
+            "ngraph/src/ngraph/*.hpp",
+            "ngraph/src/ngraph/autodiff/*.cpp",
+            "ngraph/src/ngraph/builder/*.cpp",
+            "ngraph/src/ngraph/descriptor/**/*.cpp",
+            "ngraph/src/ngraph/distributed/*.cpp",
+            "ngraph/src/ngraph/op/**/*.cpp",
+            "ngraph/src/ngraph/opsets/*.cpp",
+            "ngraph/src/ngraph/pass/*.cpp",
+            "ngraph/src/ngraph/pattern/**/*.cpp",
+            "ngraph/src/ngraph/runtime/*.cpp",
+            "ngraph/src/ngraph/runtime/dynamic/*.cpp",
+            "ngraph/src/ngraph/runtime/interpreter/*.cpp",
+            "ngraph/src/ngraph/state/*.cpp",
+            "ngraph/src/ngraph/type/*.cpp",
+        ],
+        exclude = [
+            "ngraph/src/ngraph/serializer.cpp",
+        ],
+    ),
+    hdrs = glob([
+        "ngraph/src/ngraph/*.hpp",
+        "ngraph/src/ngraph/autodiff/*.hpp",
+        "ngraph/src/ngraph/builder/*.hpp",
+        "ngraph/src/ngraph/descriptor/**/*.hpp",
+        "ngraph/src/ngraph/distributed/*.hpp",
+        "ngraph/src/ngraph/op/*.hpp",
+        "ngraph/src/ngraph/op/**/*.hpp",
+        "ngraph/src/ngraph/opsets/*.hpp",
+        "ngraph/src/ngraph/pass/*.hpp",
+        "ngraph/src/ngraph/pattern/*.hpp",
+        "ngraph/src/ngraph/runtime/**/*.hpp",
+        "ngraph/src/ngraph/state/*.hpp",
+        "ngraph/src/ngraph/pattern/**/*.hpp",
+        "ngraph/src/ngraph/type/*.hpp",
+    ]),
+    defines = [
+        "NGRAPH_JSON_DISABLE",
+        "NGRAPH_VERSION=\\\"0.21.0\\\"",
+    ],
+    includes = [
+        "ngraph/src",
+        "ngraph/src/ngraph",
+    ],
+    local_defines = [
+        "PROJECT_ROOT_DIR=\\\"./\\\"",
+        "SHARED_LIB_PREFIX=\\\"\\\"",
+        "SHARED_LIB_SUFFIX=\\\"\\\"",
+    ],
 )
