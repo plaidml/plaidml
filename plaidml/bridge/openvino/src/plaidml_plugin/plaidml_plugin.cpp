@@ -26,7 +26,7 @@ namespace PlaidMLPlugin {
 
 void Engine::GetVersion(const Version*& versionInfo) noexcept {}
 
-ExecutableNetworkInternal::Ptr Engine::LoadExeNetworkImpl(const ICore* core, const ICNNNetwork& network,
+ExecutableNetworkInternal::Ptr Engine::LoadExeNetworkImpl(const ICNNNetwork& network,
                                                           const std::map<std::string, std::string>& config) {
   IVLOG(1, "Engine::LoadExeNetworkImpl> config: " << config);
   auto it = config.find("device");

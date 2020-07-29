@@ -28,6 +28,71 @@ cc_library(
     srcs = glob(
         ["*.cpp"],
         exclude = [
+            # New Excludes (TODO)
+            "acos.cpp",
+            "activation.cpp",   # TODO: Broken not missing
+            "add.cpp",
+            "asin.cpp",
+            "atan.cpp",
+            "batch_norm_inference.cpp",
+            "broadcast.cpp",
+            "ceiling.cpp",
+            "convert.cpp",   # TODO: Broken not missing
+            "convert_like.cpp",   # TODO: Broken not missing
+            "cos.cpp",
+            "cosh.cpp",
+            "depth_to_space.cpp",   # TODO: Broken not missing
+            "divide.cpp",
+            "eltwise.cpp",   # TODO: Broken not missing
+            "elu.cpp",
+            "equal.cpp",   # TODO: Broken not missing
+            "erf.cpp",
+            "floor.cpp",
+            "floor_mod.cpp",
+            "greater.cpp",   # TODO: Broken not missing
+            "greater_equal.cpp",
+            "hard_sigmoid.cpp",
+            "less.cpp",
+            "less_equal.cpp",
+            "logical_and.cpp",
+            "logical_not.cpp",
+            "logical_or.cpp",
+            "logical_xor.cpp",
+            "lrn.cpp",   # TODO: Broken not missing
+            "mat_mul.cpp",  # TODO : Broken not missing
+            "maximum.cpp",
+            "minimum.cpp",
+            "mod.cpp",
+            "multiply.cpp",
+            "mvn.cpp",  # TODO: Broken not missing
+            "negative.cpp",
+            "normalize_l2.cpp",
+            "not_equal.cpp",
+            "power.cpp",
+            "prelu.cpp",
+            "reduce_logical_and.cpp",
+            "reduce_logical_or.cpp",
+            "reduce_max.cpp",
+            "reduce_mean.cpp",
+            "reduce_min.cpp",
+            "reduce_prod.cpp",
+            "reduce_sum.cpp",
+            "reshape.cpp",  # TODO: Broken not missing
+            "selu.cpp",
+            "sin.cpp",
+            "sinh.cpp",
+            "softmax.cpp",  # TODO: Broken not missing
+            "space_to_depth.cpp",  # TODO: Broken not missing
+            "sqrt.cpp",
+            "squared_difference.cpp",
+            "squeeze.cpp",
+            "strided_slice.cpp",  # TODO: Broken not missing
+            "subtract.cpp",
+            "tan.cpp",
+            "tile.cpp",
+            "transpose.cpp",   # TODO: Broken not missing
+            "unsqueeze.cpp",
+            # Original Excludes
             "cum_sum.cpp",
             "extract_image_patches.cpp",
             "space_to_batch.cpp",
@@ -43,6 +108,71 @@ cc_library(
     srcs = glob(
         ["*.cpp"],
         exclude = [
+            # New Excludes (TODO)
+            "acos.cpp",
+            "activation.cpp",   # TODO: Broken not missing
+            "add.cpp",
+            "asin.cpp",
+            "atan.cpp",
+            "batch_norm_inference.cpp",
+            "broadcast.cpp",
+            "ceiling.cpp",
+            "convert.cpp",   # TODO: Broken not missing
+            "convert_like.cpp",   # TODO: Broken not missing
+            "cos.cpp",
+            "cosh.cpp",
+            "depth_to_space.cpp",   # TODO: Broken not missing
+            "divide.cpp",
+            "eltwise.cpp",   # TODO: Broken not missing
+            "elu.cpp",
+            "equal.cpp",   # TODO: Broken not missing
+            "erf.cpp",
+            "floor.cpp",
+            "floor_mod.cpp",
+            "greater.cpp",   # TODO: Broken not missing
+            "greater_equal.cpp",
+            "hard_sigmoid.cpp",
+            "less.cpp",
+            "less_equal.cpp",
+            "logical_and.cpp",
+            "logical_not.cpp",
+            "logical_or.cpp",
+            "logical_xor.cpp",
+            "lrn.cpp",   # TODO: Broken not missing
+            "mat_mul.cpp",  # TODO : Broken not missing
+            "maximum.cpp",
+            "minimum.cpp",
+            "mod.cpp",
+            "multiply.cpp",
+            "mvn.cpp",  # TODO: Broken not missing
+            "negative.cpp",
+            "normalize_l2.cpp",
+            "not_equal.cpp",
+            "power.cpp",
+            "prelu.cpp",
+            "reduce_logical_and.cpp",
+            "reduce_logical_or.cpp",
+            "reduce_max.cpp",
+            "reduce_mean.cpp",
+            "reduce_min.cpp",
+            "reduce_prod.cpp",
+            "reduce_sum.cpp",
+            "reshape.cpp",  # TODO: Broken not missing
+            "selu.cpp",
+            "sin.cpp",
+            "sinh.cpp",
+            "softmax.cpp",  # TODO: Broken not missing
+            "space_to_depth.cpp",  # TODO: Broken not missing
+            "sqrt.cpp",
+            "squared_difference.cpp",
+            "squeeze.cpp",
+            "strided_slice.cpp",  # TODO: Broken not missing
+            "subtract.cpp",
+            "tan.cpp",
+            "tile.cpp",
+            "transpose.cpp",   # TODO: Broken not missing
+            "unsqueeze",
+            # Original Excludes
             "convert_like.cpp",  # Known errors
             "convolution.cpp",  # Long
             "convolution_backprop_data.cpp",  # Long

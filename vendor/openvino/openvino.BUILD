@@ -63,6 +63,7 @@ cc_library(
     hdrs = glob(["inference-engine/tests/ie_test_utils/functional_test_utils/*.hpp"]),
     includes = ["inference-engine/tests/ie_test_utils"],
     deps = [
+        "ngraph_function_tests",  # TODO: Ok?
         ":inference_engine",
         "@gmock//:gtest",
     ],
@@ -73,12 +74,17 @@ cc_library(
     srcs = glob([
         "inference-engine/tests/ngraph_functions/src/*.cpp",
         "inference-engine/tests/ngraph_functions/src/utils/*.cpp",
+        "ngraph/test/runtime/*.cpp",  # TODO: Ok?
     ]),
     hdrs = glob([
         "inference-engine/tests/ngraph_functions/include/ngraph_functions/*.hpp",
         "inference-engine/tests/ngraph_functions/include/ngraph_functions/utils/*.hpp",
+        "ngraph/test/runtime/*.hpp",  # TODO: Ok?
     ]),
-    includes = ["inference-engine/tests/ngraph_functions/include/"],
+    includes = [
+        "inference-engine/tests/ngraph_functions/include/",
+        "ngraph/test/runtime",  # TODO: Ok?
+    ],
     deps = [
         ":inference_engine",
     ],
@@ -125,17 +131,23 @@ cc_library(
         "inference-engine/src/legacy_api/src/**/*.hpp",
         "inference-engine/src/legacy_api/src/**/*.h",
         "inference-engine/src/inference_engine/cnn_network_ngraph_impl.hpp",  # TODO: Ok?
+        "inference-engine/src/transformations/include/ngraph_ops/crop_ie.hpp",  # TODO: Ok?
+        "inference-engine/src/transformations/include/ngraph_ops/convolution_ie.hpp",  # TODO: Ok?
     ]),
     hdrs = glob([
         "inference-engine/src/legacy_api/include/**/*.hpp",
+        "inference-engine/src/inference_engine/*.hpp",  # TODO: Ok?
+        "inference-engine/src/transformations/include/**/*.hpp",  # TODO: Ok?
+        # Or: "inference-engine/src/transformations/include/ngraph_ops/*.hpp",
     ]),
     copts = [
         "-w",
         "-isystem external/openvino/inference-engine/src/legacy_api/src",
     ],
     includes = [
-        "inference-engine/src/inference_engine/cnn_network_ngraph_impl.hpp",  # TODO: Ok?
+        "inference-engine/src/inference_engine",  # TODO: Ok?
         "inference-engine/src/legacy_api/include",
+        "inference-engine/src/transformations/include",  # TODO: Ok?
     ],
     tags = TAGS,
     deps = [
@@ -209,9 +221,14 @@ cc_library(
             "inference-engine/src/inference_engine/os/lin/*.cpp",
         ]),
     }),
+    hdrs = glob([
+        "inference-engine/src/readers/ir_reader/ie_ir_version.hpp",  # TODO: Ok?
+    ]),
     copts = ["-w"],
     includes = [
         "inference-engine/src/inference_engine",
+        "inference-engine/src/readers/ir_reader",  # TODO: Sufficient?
+        "inference-engine/src/readers/reader_api",  # TODO: Sufficient?
     ],
     local_defines = [
         "ENABLE_IR_READER",
