@@ -74,16 +74,13 @@ cc_library(
     srcs = glob([
         "inference-engine/tests/ngraph_functions/src/*.cpp",
         "inference-engine/tests/ngraph_functions/src/utils/*.cpp",
-        "ngraph/test/runtime/*.cpp",  # TODO: Ok?
     ]),
     hdrs = glob([
         "inference-engine/tests/ngraph_functions/include/ngraph_functions/*.hpp",
         "inference-engine/tests/ngraph_functions/include/ngraph_functions/utils/*.hpp",
-        "ngraph/test/runtime/*.hpp",  # TODO: Ok?
     ]),
     includes = [
         "inference-engine/tests/ngraph_functions/include/",
-        "ngraph/test/runtime",  # TODO: Ok?
     ],
     deps = [
         ":inference_engine",
@@ -308,6 +305,7 @@ cc_library(
             "ngraph/src/ngraph/runtime/interpreter/*.cpp",
             "ngraph/src/ngraph/state/*.cpp",
             "ngraph/src/ngraph/type/*.cpp",
+            "ngraph/test/runtime/*.cpp",  # TODO: Ok?
         ],
         exclude = [
             "ngraph/src/ngraph/serializer.cpp",
@@ -328,6 +326,7 @@ cc_library(
         "ngraph/src/ngraph/state/*.hpp",
         "ngraph/src/ngraph/pattern/**/*.hpp",
         "ngraph/src/ngraph/type/*.hpp",
+        "ngraph/test/runtime/*.hpp",  # TODO: Ok?
     ]),
     defines = [
         "NGRAPH_JSON_DISABLE",
@@ -336,6 +335,7 @@ cc_library(
     includes = [
         "ngraph/src",
         "ngraph/src/ngraph",
+        "ngraph/test/runtime",  # TODO: Ok?
     ],
     local_defines = [
         "PROJECT_ROOT_DIR=\\\"./\\\"",
