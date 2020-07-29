@@ -17,6 +17,7 @@ namespace pxa = dialect::pxa;
 
 using mlir::AffineIfOp;
 using mlir::AffineLoadOp;
+using mlir::AffineMapAttr;
 using mlir::AffineParallelOp;
 using mlir::AffineStoreOp;
 using mlir::AffineVectorLoadOp;
@@ -236,9 +237,16 @@ struct AffineVectorReduceOpConversion
                ConversionPatternRewriter &rewriter) const override {
     auto source = rewriter.create<AffineVectorLoadOp>(
         op.getLoc(), op.getVectorType(), op.mem(), op.idxs());
+    // Get an attribute form of the map
+    auto srcMapAttr = AffineMapAttr::get(op.map());
+    // Set the nap attribute
+    source.setAttr(AffineVectorLoadOp::getMapAttrName(), srcMapAttr);
     auto reduce = createVectorReduction(rewriter, op, source.getResult());
-    rewriter.create<AffineVectorStoreOp>(op.getLoc(), ArrayRef<Type>{}, reduce,
-                                         op.mem(), op.idxs());
+    auto dest = rewriter.create<AffineVectorStoreOp>(
+        op.getLoc(), ArrayRef<Type>{}, reduce, op.mem(), op.idxs());
+    // Set the nap attribute
+    auto destMapAttr = AffineMapAttr::get(op.map());
+    dest.setAttr(AffineVectorLoadOp::getMapAttrName(), destMapAttr);
     op.replaceAllUsesWith(op.mem());
     rewriter.eraseOp(op);
   }
