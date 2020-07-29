@@ -238,15 +238,14 @@ struct AffineVectorReduceOpConversion
     auto source = rewriter.create<AffineVectorLoadOp>(
         op.getLoc(), op.getVectorType(), op.mem(), op.idxs());
     // Get an attribute form of the map
-    auto srcMapAttr = AffineMapAttr::get(op.map());
-    // Set the nap attribute
-    source.setAttr(AffineVectorLoadOp::getMapAttrName(), srcMapAttr);
+    auto mapAttr = AffineMapAttr::get(op.map());
+    // Set the map attribute
+    source.setAttr(AffineVectorLoadOp::getMapAttrName(), mapAttr);
     auto reduce = createVectorReduction(rewriter, op, source.getResult());
     auto dest = rewriter.create<AffineVectorStoreOp>(
         op.getLoc(), ArrayRef<Type>{}, reduce, op.mem(), op.idxs());
-    // Set the nap attribute
-    auto destMapAttr = AffineMapAttr::get(op.map());
-    dest.setAttr(AffineVectorLoadOp::getMapAttrName(), destMapAttr);
+    // Set the map attribute
+    dest.setAttr(AffineVectorLoadOp::getMapAttrName(), mapAttr);
     op.replaceAllUsesWith(op.mem());
     rewriter.eraseOp(op);
   }
