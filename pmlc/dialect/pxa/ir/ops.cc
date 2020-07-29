@@ -70,7 +70,8 @@ struct SimplifyAffineOp : public OpRewritePattern<AffineOpTy> {
         // std::is_same<AffineOpTy, AffinePrefetchOp>::value ||
         // std::is_same<AffineOpTy, AffineStoreOp>::value ||
         std::is_same<AffineOpTy, AffineApplyOp>::value ||
-            std::is_same<AffineOpTy, AffineReduceOp>::value,
+            std::is_same<AffineOpTy, AffineReduceOp>::value ||
+            std::is_same<AffineOpTy, AffineVectorReduceOp>::value,
         "affine load/store/apply/reduce op expected");
     auto map = affineOp.getAffineMap();
     AffineMap oldMap = map;
@@ -87,13 +88,22 @@ struct SimplifyAffineOp : public OpRewritePattern<AffineOpTy> {
 };
 
 // Specialize the template to account for the different build signatures for
-// affine load, store, reduce, and apply ops.
+// affine load, store, reduce, vector_reduce, and apply ops.
 template <>
 void SimplifyAffineOp<AffineReduceOp>::replaceAffineOp(
     PatternRewriter &rewriter, AffineReduceOp op, AffineMap map,
     ArrayRef<Value> mapOperands) const {
   rewriter.replaceOpWithNewOp<AffineReduceOp>(
       op, op.getMemRefType(), op.agg(), op.val(), op.mem(), map, mapOperands);
+}
+
+template <>
+void SimplifyAffineOp<AffineVectorReduceOp>::replaceAffineOp(
+    PatternRewriter &rewriter, AffineVectorReduceOp op, AffineMap map,
+    ArrayRef<Value> mapOperands) const {
+  rewriter.replaceOpWithNewOp<AffineVectorReduceOp>(op, op.getMemRefType(),
+                                                    op.agg(), op.vector(),
+                                                    op.mem(), map, mapOperands);
 }
 
 /// This is a common class used for patterns of the form
@@ -113,10 +123,11 @@ static LogicalResult foldMemRefCast(Operation *op) {
 
 /// Fold reduce operations with no uses. Reduce has side effects on the heap,
 /// but can still be deleted if it has zero uses.
-struct SimplifyDeadReduce : public OpRewritePattern<AffineReduceOp> {
-  using OpRewritePattern<AffineReduceOp>::OpRewritePattern;
+template <typename ReduceOp>
+struct SimplifyDeadReduce : public OpRewritePattern<ReduceOp> {
+  using OpRewritePattern<ReduceOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(AffineReduceOp reduce,
+  LogicalResult matchAndRewrite(ReduceOp reduce,
                                 PatternRewriter &rewriter) const override {
     if (reduce.use_empty()) {
       rewriter.eraseOp(reduce);
@@ -125,7 +136,6 @@ struct SimplifyDeadReduce : public OpRewritePattern<AffineReduceOp> {
     return failure();
   }
 };
-
 } // namespace
 
 // ---- AffineReduceOp ----
@@ -141,6 +151,23 @@ void printAffineReduceOp(OpAsmPrinter &p, AffineReduceOp op) {
   p.printOptionalAttrDict(op.getAttrs(), {"agg", "map"});
   p << " : ";
   p.printType(op.mem().getType());
+}
+
+// ---- AffineVectorReduceOp ----
+
+void printAffineVectorReduceOp(OpAsmPrinter &p, AffineVectorReduceOp op) {
+  p << op.getOperation()->getName() << ' ';
+  p << util::stringifyAggregationKind(op.agg()) << ' ';
+  p << op.vector() << ", ";
+  p << op.mem() << '[';
+  auto mapAttr = op.getAttrOfType<AffineMapAttr>("map");
+  p.printAffineMapOfSSAIds(mapAttr, op.idxs());
+  p << ']';
+  p.printOptionalAttrDict(op.getAttrs(), {"agg", "map"});
+  p << " : ";
+  p.printType(op.mem().getType());
+  p << ", ";
+  p.printType(op.vector().getType());
 }
 
 // <operation> ::= `pxa.reduce` keyword ssa-use `,` ssa-use `[` ssa-use-list `]`
@@ -170,11 +197,58 @@ ParseResult parseAffineReduceOp(OpAsmParser &parser, OperationState &result) {
 
 void AffineReduceOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
-  results.insert<SimplifyAffineOp<AffineReduceOp>, SimplifyDeadReduce>(context);
+  results.insert<SimplifyAffineOp<AffineReduceOp>,
+                 SimplifyAffineOp<AffineVectorReduceOp>,
+                 SimplifyDeadReduce<AffineReduceOp>,
+                 SimplifyDeadReduce<AffineVectorReduceOp>>(context);
 }
 
 OpFoldResult AffineReduceOp::fold(ArrayRef<Attribute> cstOperands) {
   /// reduce(memrefcast) -> reduce
+  foldMemRefCast(*this);
+  return OpFoldResult();
+}
+
+// <operation> ::= `pxa.vector_reduce` keyword ssa-use `,` ssa-use `[`
+// ssa-use-list `]`
+//                 attribute-dict? `:` type
+ParseResult parseAffineVectorReduceOp(OpAsmParser &parser,
+                                      OperationState &result) {
+  auto indexTy = parser.getBuilder().getIndexType();
+  auto i64Ty = parser.getBuilder().getIntegerType(64);
+  MemRefType memrefType;
+  VectorType vectorType;
+  AffineMapAttr mapAttr;
+  OpAsmParser::OperandType val, out;
+  SmallVector<OpAsmParser::OperandType, 4> idxs;
+  auto symbolizeAggregationKind = [](StringRef str) {
+    return util::symbolizeAggregationKind(str);
+  };
+  return failure(
+      parseKeywordIntoEnumAttr(parser, result, "agg", i64Ty,
+                               symbolizeAggregationKind) ||
+      parser.parseOperand(val) || parser.parseComma() ||
+      parser.parseOperand(out) ||
+      parser.parseAffineMapOfSSAIds(idxs, mapAttr, "map", result.attributes) ||
+      parser.parseOptionalAttrDict(result.attributes) ||
+      parser.parseColonType(memrefType) ||
+      parser.addTypeToList(memrefType, result.types) || parser.parseComma() ||
+      parser.parseType(vectorType) ||
+      parser.resolveOperand(val, vectorType, result.operands) ||
+      parser.resolveOperand(out, memrefType, result.operands) ||
+      parser.resolveOperands(idxs, indexTy, result.operands));
+}
+
+void AffineVectorReduceOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<SimplifyAffineOp<AffineReduceOp>,
+                 SimplifyAffineOp<AffineVectorReduceOp>,
+                 SimplifyDeadReduce<AffineReduceOp>,
+                 SimplifyDeadReduce<AffineVectorReduceOp>>(context);
+}
+
+OpFoldResult AffineVectorReduceOp::fold(ArrayRef<Attribute> cstOperands) {
+  /// vectorReduce(memrefcast) -> vectorReduce
   foldMemRefCast(*this);
   return OpFoldResult();
 }
