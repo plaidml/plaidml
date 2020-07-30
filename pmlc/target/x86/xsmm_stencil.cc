@@ -13,7 +13,6 @@
 #include "pmlc/dialect/pxa/transforms/autotile.h"
 #include "pmlc/dialect/pxa/transforms/passes.h"
 #include "pmlc/dialect/pxa/transforms/stencil.h"
-#include "pmlc/dialect/xsmm/ir/ops.h"
 
 #include "pmlc/util/logging.h"
 
@@ -45,7 +44,6 @@ struct GemmOperand {
   Value memref;
   AffineMap accessMap;
   AffineMap tileMap;
-  Optional<StrideArray> stridesArray;
 
   template <typename TOp>
   GemmOperand(TOp op, ArrayRef<BlockArgument> idxs,
@@ -54,14 +52,6 @@ struct GemmOperand {
         tileMap(makeTileMap(op.getContext(), op.getAffineMap(),
                             op.getMapOperands(), idxs)) {
     mapOperands.append(op.getMapOperands().begin(), op.getMapOperands().end());
-    int64_t offset;
-    SmallVector<int64_t, 4> strides;
-    auto memrefType = memref.getType().cast<MemRefType>();
-    getStridesAndOffset(memrefType, strides, offset);
-    auto layoutMap =
-        makeStridedLinearLayoutMap(strides, offset, op.getContext());
-    stridesArray = computeStrideArray(layoutMap.compose(tileMap));
-    assert(stridesArray.hasValue() && "computeStrideArray must succeed");
   }
 };
 
@@ -338,28 +328,15 @@ private:
     GemmOperand a(opA, {perm.indexes[0], perm.indexes[2]}, mapOperands);
     GemmOperand b(opB, {perm.indexes[2], perm.indexes[1]}, mapOperands);
 
-    auto leadingDimsAttr = bodyBuilder.getI64ArrayAttr(ArrayRef<int64_t>{
-        a.stridesArray->strides[0],
-        b.stridesArray->strides[0],
-        c.stridesArray->strides[0],
-    });
-
     // Make the XSMM ops
-    auto dispatch = bodyBuilder.create<xsmm::GemmDispatchOp>(
-        op.getLoc(), bodyBuilder.getI64Type(), tileAttr, leadingDimsAttr);
+    auto gemm = bodyBuilder.create<pxa::AffineGemmOp>(
+        op.getLoc(), c.memref.getType(),  //
+        c.memref, c.accessMap, c.tileMap, //
+        a.memref, a.accessMap, a.tileMap, //
+        b.memref, b.accessMap, b.tileMap, //
+        tileAttr, mapOperands);
 
-    auto invoke = bodyBuilder.create<xsmm::GemmInvokeOp>(
-        op.getLoc(), c.memref.getType(), dispatch.getResult(), c.memref,
-        c.accessMap, a.memref, a.accessMap, b.memref, b.accessMap, mapOperands);
-
-    opC.result().replaceAllUsesWith(invoke);
-
-    // Remove all other ops from the op interior
-    auto xsmm_it = std::prev(op.getBody()->end(), 3);
-    while (op.getBody()->begin() != xsmm_it) {
-      auto prev_it = std::prev(xsmm_it);
-      op.getBody()->getOperations().erase(prev_it);
-    }
+    opC.result().replaceAllUsesWith(gemm);
   }
 
 public:

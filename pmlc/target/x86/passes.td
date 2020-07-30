@@ -3,8 +3,13 @@
 
 include "mlir/Pass/PassBase.td"
 
-def ConvertStandardToLLVM : Pass<"convert-x86-to-llvm", "mlir::ModuleOp"> {
-  let summary = "Convert from the StandardX + XSMM dialects to the LLVM dialect";
+def ConvertPXAToAffine : Pass<"x86-convert-pxa-to-affine", "mlir::ModuleOp"> {
+  let summary = "Convert PXA dialect to Affine dialect";
+  let constructor = "pmlc::target::x86::createLowerPXAToAffinePass()";
+}
+
+def ConvertStandardToLLVM : Pass<"x86-convert-std-to-llvm", "mlir::ModuleOp"> {
+  let summary = "Convert StandardX + XSMM dialects to LLVM dialect";
   let constructor = "pmlc::target::x86::createLowerToLLVMPass()";
 }
 

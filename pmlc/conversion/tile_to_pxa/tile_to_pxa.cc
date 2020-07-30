@@ -744,7 +744,7 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
     // Create the store
     auto stored = buildSimpleStore(rewriter, loc, result, alloc.resultMemRef,
                                    getPaddingInfo(op));
-    rewriter.create<AffineYieldOp>(loc, ValueRange({stored}));
+    rewriter.create<AffineYieldOp>(loc, ValueRange{stored});
 
     // Replace output with the newly allocated buffer
     rewriter.replaceOp(op, forOp.getResult(0));
@@ -806,7 +806,7 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
                                   alloc.resultMemRef, getPaddingInfo(op));
     if (maybePadding)
       updateAffineMap(store.getDefiningOp(), *maybePadding);
-    parallelBuilder.create<AffineYieldOp>(loc, ValueRange({store}));
+    parallelBuilder.create<AffineYieldOp>(loc, ValueRange{store});
     auto filled = parallel.getResult(0);
 
     // Determine lower and upper bounds.
@@ -889,7 +889,7 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
     maybePadding = getPaddingInfo(op);
     if (maybePadding)
       updateAffineMap(reduceOp, *maybePadding);
-    rewriter.create<AffineYieldOp>(loc, ValueRange({reduceOp}));
+    rewriter.create<AffineYieldOp>(loc, ValueRange{reduceOp});
 
     // Replace the op
     rewriter.replaceOp(op, forOp.getResult(0));
@@ -934,7 +934,7 @@ struct IndexOpConversion : public OpConversionPattern<IndexOp> {
                                                    rewriter.getIntegerType(32));
     auto stored =
         buildSimpleStore(rewriter, loc, cast, resultMemRef, getPaddingInfo(op));
-    rewriter.create<AffineYieldOp>(loc, ValueRange({stored}));
+    rewriter.create<AffineYieldOp>(loc, ValueRange{stored});
 
     // Replace the op
     rewriter.replaceOp(op, forOp.getResult(0));

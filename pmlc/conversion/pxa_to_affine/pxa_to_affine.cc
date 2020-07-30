@@ -8,6 +8,7 @@
 #include "mlir/Transforms/DialectConversion.h"
 
 #include "pmlc/conversion/pxa_to_affine/pass_detail.h"
+#include "pmlc/conversion/pxa_to_affine/passes.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/util/logging.h"
 #include "pmlc/util/util.h"
@@ -43,29 +44,13 @@ using util::AggregationKind;
 
 namespace {
 
-struct LowerPXAToAffinePass
-    : public LowerPXAToAffineBase<LowerPXAToAffinePass> {
-  void runOnOperation() final;
-};
-
-template <typename OpType>
-struct LoweringBase : public OpConversionPattern<OpType> {
-  MLIRContext *ctx;
-
-  explicit LoweringBase(MLIRContext *ctx)
-      : OpConversionPattern<OpType>(ctx), ctx(ctx) {}
-  LogicalResult match(Operation *op) const override { return mlir::success(); }
-};
-
 struct AffineParallelOpConversion
     : public OpConversionPattern<AffineParallelOp> {
-
-  explicit AffineParallelOpConversion(MLIRContext *ctx)
-      : OpConversionPattern<AffineParallelOp>(ctx) {}
+  using OpConversionPattern<AffineParallelOp>::OpConversionPattern;
 
   LogicalResult
   matchAndRewrite(AffineParallelOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const override {
+                  ConversionPatternRewriter &rewriter) const final {
     // This conversion doesn't work in the rank 0 case; that case will be
     // covered by canonicalization.
     if (op.lowerBoundsMap().getNumResults() == 0)
@@ -74,12 +59,12 @@ struct AffineParallelOpConversion
     llvm::SmallVector<Value, 8> ivs;
     for (unsigned int i = 0; i < op.lowerBoundsMap().getNumResults(); i++) {
       auto step = op.steps().getValue()[i].cast<IntegerAttr>().getInt();
-      auto af = rewriter.create<mlir::AffineForOp>(
+      auto forOp = rewriter.create<mlir::AffineForOp>(
           op.getLoc(), op.getLowerBoundsOperands(),
           op.lowerBoundsMap().getSubMap({i}), op.getUpperBoundsOperands(),
           op.upperBoundsMap().getSubMap({i}), step);
-      rewriter.setInsertionPointToStart(&af.region().front());
-      ivs.push_back(af.getInductionVar());
+      rewriter.setInsertionPointToStart(&forOp.region().front());
+      ivs.push_back(forOp.getInductionVar());
     }
     // Move ParallelOp's operations (single block) to Affine innermost loop.
     auto &innerLoopOps = rewriter.getInsertionBlock()->getOperations();
@@ -103,11 +88,12 @@ struct AffineParallelOpConversion
   }
 };
 
-struct AffineIfOpConversion : public LoweringBase<AffineIfOp> {
-  explicit AffineIfOpConversion(MLIRContext *ctx) : LoweringBase(ctx) {}
+struct AffineIfOpConversion : public OpConversionPattern<AffineIfOp> {
+  using OpConversionPattern<AffineIfOp>::OpConversionPattern;
 
-  void rewrite(AffineIfOp op, ArrayRef<Value> operands,
-               ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(AffineIfOp op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const final {
     // Make a new if value
     auto newIf = rewriter.create<mlir::AffineIfOp>(
         op.getLoc(), op.getIntegerSet(), op.getOperands(), op.hasElse());
@@ -128,14 +114,18 @@ struct AffineIfOpConversion : public LoweringBase<AffineIfOp> {
                       oldElseOps.begin(), std::prev(oldElseOps.end()));
     // Erase original
     rewriter.eraseOp(op);
+    return mlir::success();
   }
 };
 
-struct AffineReduceOpConversion : public LoweringBase<pxa::AffineReduceOp> {
-  explicit AffineReduceOpConversion(MLIRContext *ctx) : LoweringBase(ctx) {}
+struct AffineReduceOpConversion
+    : public OpConversionPattern<pxa::AffineReduceOp> {
+  using OpConversionPattern<pxa::AffineReduceOp>::OpConversionPattern;
 
-  void rewrite(pxa::AffineReduceOp op, ArrayRef<Value> operands,
-               ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(pxa::AffineReduceOp op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const final {
+    IVLOG(1, "HERE");
     auto source = rewriter.create<AffineLoadOp>(op.getLoc(), op.mem(), op.map(),
                                                 op.idxs());
     auto reduce = createReduction(rewriter, op, source.getResult());
@@ -143,6 +133,7 @@ struct AffineReduceOpConversion : public LoweringBase<pxa::AffineReduceOp> {
                                    op.idxs());
     op.replaceAllUsesWith(op.mem());
     rewriter.eraseOp(op);
+    return mlir::success();
   }
 
   Value createReduction(ConversionPatternRewriter &rewriter,
@@ -251,39 +242,50 @@ struct ReturnOpConversion : public OpConversionPattern<ReturnOp> {
   }
 };
 
-void LowerPXAToAffinePass::runOnOperation() {
-  // Set up target (i.e. what is legal)
-  mlir::ConversionTarget target(getContext());
-  target.addLegalDialect<mlir::AffineDialect>();
-  target.addLegalDialect<mlir::StandardOpsDialect>();
-  target.addIllegalDialect<pxa::PXADialect>();
-  target.addIllegalOp<AffineParallelOp>();
-  target.addDynamicallyLegalOp<AffineIfOp>(
-      [](AffineIfOp op) { return op.getNumResults() == 0; });
-  target.addDynamicallyLegalOp<FuncOp>([](FuncOp op) {
-    return op.isExternal() || op.getType().getNumResults() == 0;
-  });
-  target.addDynamicallyLegalOp<ReturnOp>(
-      [](ReturnOp op) { return op.getNumOperands() == 0; });
+struct LowerPXAToAffinePass
+    : public LowerPXAToAffineBase<LowerPXAToAffinePass> {
+  void runOnOperation() final {
+    auto &ctx = getContext();
+    PXAToAffineConversionTarget target(ctx);
 
-  // Setup rewrite patterns
-  mlir::OwningRewritePatternList patterns;
-  patterns
-      .insert<AffineParallelOpConversion, AffineIfOpConversion,
-              AffineReduceOpConversion, FuncOpConversion, ReturnOpConversion>(
-          &getContext());
+    mlir::OwningRewritePatternList patterns;
+    populatePXAToAffineConversionPatterns(patterns, &ctx);
 
-  // Run the conversion
-  if (failed(
-          applyPartialConversion(getOperation(), target, patterns, nullptr))) {
-    getOperation().dump();
-    emitError(mlir::UnknownLoc::get(&getContext()),
-              "Error lowering pxa -> affine\n");
-    signalPassFailure();
+    if (failed(applyPartialConversion(getOperation(), target, patterns,
+                                      nullptr))) {
+      getOperation().dump();
+      emitError(mlir::UnknownLoc::get(&ctx), "Error lowering pxa -> affine\n");
+      signalPassFailure();
+    }
   }
-}
+};
 
 } // namespace
+
+PXAToAffineConversionTarget::PXAToAffineConversionTarget(MLIRContext &ctx)
+    : ConversionTarget(ctx) {
+  addLegalDialect<mlir::AffineDialect>();
+  addLegalDialect<mlir::StandardOpsDialect>();
+  addIllegalDialect<pxa::PXADialect>();
+  addIllegalOp<AffineParallelOp>();
+  addDynamicallyLegalOp<AffineIfOp>(
+      [](AffineIfOp op) { return op.getNumResults() == 0; });
+  addDynamicallyLegalOp<FuncOp>([](FuncOp op) {
+    return op.isExternal() || op.getType().getNumResults() == 0;
+  });
+  addDynamicallyLegalOp<ReturnOp>(
+      [](ReturnOp op) { return op.getNumOperands() == 0; });
+}
+
+void populatePXAToAffineConversionPatterns(
+    mlir::OwningRewritePatternList &patterns, MLIRContext *ctx) {
+  patterns.insert<                //
+      AffineParallelOpConversion, //
+      AffineIfOpConversion,       //
+      AffineReduceOpConversion,   //
+      FuncOpConversion,           //
+      ReturnOpConversion>(ctx);
+}
 
 std::unique_ptr<mlir::Pass> createLowerPXAToAffinePass() {
   return std::make_unique<LowerPXAToAffinePass>();

@@ -2,6 +2,8 @@
 
 #include "pmlc/dialect/pxa/ir/ops.h"
 
+#include <string>
+
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/PatternMatch.h"
@@ -65,13 +67,8 @@ struct SimplifyAffineOp : public OpRewritePattern<AffineOpTy> {
 
   LogicalResult matchAndRewrite(AffineOpTy affineOp,
                                 PatternRewriter &rewriter) const override {
-    static_assert(
-        // std::is_same<AffineOpTy, AffineLoadOp>::value ||
-        // std::is_same<AffineOpTy, AffinePrefetchOp>::value ||
-        // std::is_same<AffineOpTy, AffineStoreOp>::value ||
-        std::is_same<AffineOpTy, AffineApplyOp>::value ||
-            std::is_same<AffineOpTy, AffineReduceOp>::value,
-        "affine load/store/apply/reduce op expected");
+    static_assert(std::is_same<AffineOpTy, AffineReduceOp>::value,
+                  "affine reduce op expected");
     auto map = affineOp.getAffineMap();
     AffineMap oldMap = map;
     auto oldOperands = affineOp.getMapOperands();
@@ -86,8 +83,6 @@ struct SimplifyAffineOp : public OpRewritePattern<AffineOpTy> {
   }
 };
 
-// Specialize the template to account for the different build signatures for
-// affine load, store, reduce, and apply ops.
 template <>
 void SimplifyAffineOp<AffineReduceOp>::replaceAffineOp(
     PatternRewriter &rewriter, AffineReduceOp op, AffineMap map,
@@ -123,6 +118,43 @@ struct SimplifyDeadReduce : public OpRewritePattern<AffineReduceOp> {
       return success();
     }
     return failure();
+  }
+};
+
+struct SimplifyAffineGemmOp : public OpRewritePattern<AffineGemmOp> {
+  using OpRewritePattern<AffineGemmOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(AffineGemmOp op,
+                                PatternRewriter &rewriter) const override {
+    auto aAccessMap = op.aAccessMap();
+    auto bAccessMap = op.bAccessMap();
+    auto cAccessMap = op.cAccessMap();
+
+    SmallVector<Value, 8> aOperands(op.getOperandsForA());
+    composeAffineMapAndOperands(&aAccessMap, &aOperands);
+    SmallVector<Value, 8> bOperands(op.getOperandsForB());
+    composeAffineMapAndOperands(&bAccessMap, &bOperands);
+    SmallVector<Value, 8> cOperands(op.getOperandsForC());
+    composeAffineMapAndOperands(&cAccessMap, &cOperands);
+
+    SmallVector<Value, 8> mapOperands;
+    mapOperands.append(cOperands.begin(), cOperands.end());
+    mapOperands.append(aOperands.begin(), aOperands.end());
+    mapOperands.append(bOperands.begin(), bOperands.end());
+
+    if (aAccessMap == op.aAccessMap() && bAccessMap == op.bAccessMap() &&
+        cAccessMap == op.cAccessMap() &&
+        std::equal(mapOperands.begin(), mapOperands.end(),
+                   op.mapOperands().begin()))
+      return failure();
+
+    rewriter.replaceOpWithNewOp<pxa::AffineGemmOp>(
+        op, op.c().getType(),              //
+        op.c(), cAccessMap, op.cTileMap(), //
+        op.a(), aAccessMap, op.aTileMap(), //
+        op.b(), bAccessMap, op.bTileMap(), //
+        op.tile(), mapOperands);
+    return success();
   }
 };
 
@@ -170,13 +202,101 @@ ParseResult parseAffineReduceOp(OpAsmParser &parser, OperationState &result) {
 
 void AffineReduceOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
-  results.insert<SimplifyAffineOp<AffineReduceOp>, SimplifyDeadReduce>(context);
+  results.insert<SimplifyAffineGemmOp>(context);
 }
 
 OpFoldResult AffineReduceOp::fold(ArrayRef<Attribute> cstOperands) {
   /// reduce(memrefcast) -> reduce
   foldMemRefCast(*this);
   return OpFoldResult();
+}
+
+//
+// ---- AffineGemmOp ----
+//
+
+AffineGemmOp::operand_range AffineGemmOp::getOperandsForA() {
+  return getOperands().slice(3 + cAccessMap().getNumInputs(),
+                             aAccessMap().getNumInputs());
+}
+
+AffineGemmOp::operand_range AffineGemmOp::getOperandsForB() {
+  return getOperands().slice(3 + cAccessMap().getNumInputs() +
+                                 aAccessMap().getNumInputs(),
+                             bAccessMap().getNumInputs());
+}
+
+AffineGemmOp::operand_range AffineGemmOp::getOperandsForC() {
+  return getOperands().slice(3, cAccessMap().getNumInputs());
+}
+
+void AffineGemmOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<SimplifyAffineOp<AffineReduceOp>, SimplifyDeadReduce>(context);
+}
+
+void printAffineGemmOp(OpAsmPrinter &p, AffineGemmOp op) {
+  auto funcType = FunctionType::get({op.a().getType(), op.b().getType()},
+                                    {op.c().getType()}, op.getContext());
+  p << op.getOperation()->getName() << ' ';
+  p << op.c() << '[';
+  p.printAffineMapOfSSAIds(op.cAccessMapAttr(), op.getOperandsForC());
+  p << "]:";
+  p.printAttribute(op.cTileMapAttr());
+  p << " = " << op.a() << '[';
+  p.printAffineMapOfSSAIds(op.aAccessMapAttr(), op.getOperandsForA());
+  p << "]:";
+  p.printAttribute(op.aTileMapAttr());
+  p << ", " << op.b() << '[';
+  p.printAffineMapOfSSAIds(op.bAccessMapAttr(), op.getOperandsForB());
+  p << "]:";
+  p.printAttribute(op.bTileMapAttr());
+  p << ", " << op.tile() << " : " << funcType;
+}
+
+struct GemmOperandParser {
+  OpAsmParser::OperandType operand;
+  SmallVector<OpAsmParser::OperandType, 4> accessOperands;
+  AffineMapAttr accessMapAttr;
+  AffineMapAttr tileMapAttr;
+  std::string accessMapAttrName;
+  std::string tileMapAttrName;
+
+  explicit GemmOperandParser(StringRef name)
+      : accessMapAttrName(name.str() + "AccessMap"),
+        tileMapAttrName(name.str() + "TileMap") {}
+
+  ParseResult parse(OpAsmParser &parser, OperationState &result) {
+    return failure(
+        parser.parseOperand(operand) ||
+        parser.parseAffineMapOfSSAIds(accessOperands, accessMapAttr,
+                                      accessMapAttrName, result.attributes) ||
+        parser.parseColon() ||
+        parser.parseAttribute(tileMapAttr, tileMapAttrName, result.attributes));
+  }
+};
+
+ParseResult parseAffineGemmOp(OpAsmParser &parser, OperationState &result) {
+  auto &builder = parser.getBuilder();
+  auto indexType = builder.getIndexType();
+  auto i64Type = builder.getIntegerType(64);
+  GemmOperandParser a("a"), b("b"), c("c");
+  ArrayAttr tileAttr;
+  FunctionType funcType;
+  return failure(
+      c.parse(parser, result) || parser.parseEqual() ||
+      a.parse(parser, result) || parser.parseComma() ||
+      b.parse(parser, result) || parser.parseComma() ||
+      parser.parseAttribute(tileAttr, i64Type, "tile", result.attributes) ||
+      parser.parseColonType(funcType) ||
+      parser.addTypesToList(funcType.getResults(), result.types) ||
+      parser.resolveOperand(c.operand, funcType.getResult(0),
+                            result.operands) ||
+      parser.resolveOperand(a.operand, funcType.getInput(0), result.operands) ||
+      parser.resolveOperand(b.operand, funcType.getInput(1), result.operands) ||
+      parser.resolveOperands(c.accessOperands, indexType, result.operands) ||
+      parser.resolveOperands(a.accessOperands, indexType, result.operands) ||
+      parser.resolveOperands(b.accessOperands, indexType, result.operands));
 }
 
 #define GET_OP_CLASSES

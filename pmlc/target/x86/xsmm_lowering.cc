@@ -6,15 +6,81 @@
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/IR/Module.h"
 
+#include "pmlc/dialect/pxa/analysis/strides.h"
+#include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/dialect/xsmm/ir/ops.h"
 
 using namespace mlir; // NOLINT[build/namespaces]
 
 namespace pmlc::target::x86 {
 
+namespace pxa = dialect::pxa;
 namespace xsmm = dialect::xsmm;
 
 namespace {
+
+StrideArray getStrideArray(Value operand, AffineMap tileMap) {
+  int64_t offset;
+  SmallVector<int64_t, 4> strides;
+  auto type = operand.getType().cast<MemRefType>();
+  getStridesAndOffset(type, strides, offset);
+  auto layoutMap =
+      makeStridedLinearLayoutMap(strides, offset, operand.getContext());
+  auto info = computeStrideArray(layoutMap.compose(tileMap));
+  assert(info.hasValue() && "computeStrideArray must succeed");
+  return *info;
+}
+
+struct AffineGemmOpConversion : public OpConversionPattern<pxa::AffineGemmOp> {
+  using OpConversionPattern<pxa::AffineGemmOp>::OpConversionPattern;
+
+  bool getIndices(pxa::AffineGemmOp op, ConversionPatternRewriter &rewriter,
+                  pxa::AffineGemmOp::Adaptor &adaptor, AffineMap accessMap,
+                  unsigned start, unsigned count,
+                  SmallVectorImpl<Value> &into) const {
+    auto operands = adaptor.mapOperands().slice(start, count);
+    auto indices = expandAffineMap(rewriter, op.getLoc(), accessMap, operands);
+    if (!indices)
+      return false;
+    into.append(indices->begin(), indices->end());
+    return true;
+  }
+
+  LogicalResult
+  matchAndRewrite(pxa::AffineGemmOp op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override {
+    pxa::AffineGemmOp::Adaptor transformed(operands);
+    SmallVector<Value, 8> indices;
+    auto aNumInputs = op.aAccessMap().getNumInputs();
+    auto bNumInputs = op.bAccessMap().getNumInputs();
+    auto cNumInputs = op.cAccessMap().getNumInputs();
+    if (!getIndices(op, rewriter, transformed, op.cAccessMap(), 0, cNumInputs,
+                    indices) ||
+        !getIndices(op, rewriter, transformed, op.aAccessMap(), cNumInputs,
+                    aNumInputs, indices) ||
+        !getIndices(op, rewriter, transformed, op.bAccessMap(),
+                    cNumInputs + aNumInputs, bNumInputs, indices))
+      return failure();
+
+    auto aInfo = getStrideArray(transformed.a(), op.aTileMap());
+    auto bInfo = getStrideArray(transformed.b(), op.bTileMap());
+    auto cInfo = getStrideArray(transformed.c(), op.cTileMap());
+    auto leadingDimsAttr = rewriter.getI64ArrayAttr(ArrayRef<int64_t>{
+        aInfo.strides[0], bInfo.strides[0], cInfo.strides[0]});
+
+    auto dispatch = rewriter.create<xsmm::GemmDispatchOp>(
+        op.getLoc(), rewriter.getI64Type(), op.tile(), leadingDimsAttr);
+
+    rewriter.create<xsmm::GemmInvokeOp>(op.getLoc(), ArrayRef<Type>(), dispatch,
+                                        transformed.c(), transformed.a(),
+                                        transformed.b(), indices);
+
+    op.replaceAllUsesWith(transformed.c());
+    rewriter.eraseOp(op);
+
+    return success();
+  }
+};
 
 struct XSMMGemmDispatchLowering
     : public ConvertOpToLLVMPattern<xsmm::GemmDispatchOp> {
@@ -78,40 +144,31 @@ struct XSMMGemmInvokeLowering
   LogicalResult
   matchAndRewrite(Operation *op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
+    auto &module = getModule();
     auto invokeOp = cast<xsmm::GemmInvokeOp>(op);
     xsmm::GemmInvokeOp::Adaptor transformed(operands);
+    auto aType = invokeOp.a().getType().cast<MemRefType>();
+    auto bType = invokeOp.b().getType().cast<MemRefType>();
+    auto cType = invokeOp.c().getType().cast<MemRefType>();
 
     auto aIndices =
-        transformed.mapOperands().slice(invokeOp.cAccessMap().getNumInputs(),
-                                        invokeOp.aAccessMap().getNumInputs());
-    auto aPtr = getOperandPtr(invokeOp, rewriter, invokeOp.a().getType(),
-                              transformed.a(), invokeOp.aAccessMap(), aIndices);
-    if (!aPtr)
-      return failure();
+        transformed.indices().slice(cType.getRank(), aType.getRank());
+    auto aPtr = getDataPtr(op->getLoc(), aType, transformed.a(), aIndices,
+                           rewriter, module);
 
-    auto bIndices = transformed.mapOperands().slice(
-        invokeOp.cAccessMap().getNumInputs() +
-            invokeOp.aAccessMap().getNumInputs(),
-        invokeOp.bAccessMap().getNumInputs());
-    auto bPtr = getOperandPtr(invokeOp, rewriter, invokeOp.b().getType(),
-                              transformed.b(), invokeOp.bAccessMap(), bIndices);
-    if (!bPtr)
-      return failure();
+    auto bIndices = transformed.indices().slice(
+        cType.getRank() + aType.getRank(), bType.getRank());
+    auto bPtr = getDataPtr(op->getLoc(), bType, transformed.b(), bIndices,
+                           rewriter, module);
 
-    auto cIndices = transformed.mapOperands().slice(
-        0, invokeOp.cAccessMap().getNumInputs());
-    auto cPtr = getOperandPtr(invokeOp, rewriter, invokeOp.c().getType(),
-                              transformed.c(), invokeOp.cAccessMap(), cIndices);
-    if (!cPtr)
-      return failure();
+    auto cIndices = transformed.indices().slice(0, cType.getRank());
+    auto cPtr = getDataPtr(op->getLoc(), cType, transformed.c(), cIndices,
+                           rewriter, module);
 
     auto func = getOrInsertFunc(op, rewriter);
-    rewriter.create<LLVM::CallOp>(op->getLoc(), ArrayRef<Type>(),
-                                  rewriter.getSymbolRefAttr(func),
-                                  ArrayRef<Value>{transformed.ptr(), // funcPtr
-                                                  *aPtr,             // a
-                                                  *bPtr,             // b
-                                                  *cPtr});           // c
+    rewriter.create<LLVM::CallOp>(
+        op->getLoc(), ArrayRef<Type>(), rewriter.getSymbolRefAttr(func),
+        ArrayRef<Value>{transformed.ptr(), aPtr, bPtr, cPtr});
     rewriter.eraseOp(op);
 
     return success();
@@ -154,6 +211,11 @@ struct XSMMGemmInvokeLowering
 };
 
 } // namespace
+
+void populatePXAToAffineConversionPatterns(OwningRewritePatternList &patterns,
+                                           MLIRContext *ctx) {
+  patterns.insert<AffineGemmOpConversion>(ctx);
+}
 
 void populateXSMMToLLVMConversionPatterns(LLVMTypeConverter &converter,
                                           OwningRewritePatternList &patterns,

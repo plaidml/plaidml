@@ -8,7 +8,7 @@ func @dot(%A: memref<8x8xf32>, %B: memref<8x8xf32>, %C: memref<8x8xf32>) -> () {
     // CHECK: xsmm.gemm.invoke %{{.*}}, %{{.*}}[%{{.*}}, %{{.*}}] =
     // CHECK-SAME: %{{.*}}[%{{.*}}, %{{.*}}], %{{.*}}[%{{.*}}, %{{.*}}]
     // CHECK-SAME: (memref<8x8xf32>, memref<8x8xf32>) -> memref<8x8xf32>
-    %2 = xsmm.gemm.invoke %1, %C[%i, %j] = %A[%i, %k], %B[%k, %j]
+    xsmm.gemm.invoke %1, %C[%i, %j] = %A[%i, %k], %B[%k, %j]
       : (memref<8x8xf32>, memref<8x8xf32>) -> memref<8x8xf32>
   }
   return
