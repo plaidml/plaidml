@@ -22,8 +22,8 @@ std::vector<T> cast_constant_operand(size_t operand_idx, ngraph::Node* layer) {
   if (ngraph_const) {
     return ngraph_const->cast_vector<T>();
   } else {
-    THROW_IE_EXCEPTION << "Dynamic slicing not currently supported by PlaidML plugin; all of begin, end, and stride "
-                          "must be Constants.";
+    THROW_IE_EXCEPTION << "Dynamic padding not currently supported by PlaidML plugin; all of pads_begin, pads_end, "
+                          "and pads_value must be Constants";
   }
 }
 
