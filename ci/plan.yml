@@ -40,7 +40,7 @@ PLATFORMS:
     variant: linux_x86_64
   keras-pml-mtl-uhd630:
     variant: macos_x86_64
-  keras-pml-cpu:
+    keras-pml-llvm-cpu:
     variant: linux_x86_64
   keras-tf-cuda-gp100gl:
     variant: linux_x86_64
@@ -92,7 +92,7 @@ VARIANTS:
 SUITES:
   smoke:
     platforms:
-      keras-pml-cpu:
+      keras-pml-llvm-cpu:
         pipelines: [nightly, plaidml]
     params:
       plaidml:
@@ -123,7 +123,7 @@ SUITES:
 
   base:
     platforms:
-      keras-pml-cpu:
+      keras-pml-llvm-cpu:
         pipelines: [nightly, plaidml, ci]
 
     params:
@@ -162,7 +162,7 @@ SUITES:
 
   infer:
     platforms:
-      keras-pml-cpu:
+      keras-pml-llvm-cpu:
         pipelines: [nightly, plaidml, ci]
 
     params:
@@ -191,7 +191,7 @@ SUITES:
       imdb_lstm:
         precision: high
         skip_platforms:
-          - keras-pml-cpu
+          - keras-pml-llvm-cpu
           - keras-tf-dnnl-cpu
         perf_threshold: 0.7
       inception_v3:
@@ -218,7 +218,7 @@ SUITES:
       resnet50:
         precision: high
         platform_overrides:
-          keras-pml-cpu:
+          keras-pml-llvm-cpu:
             prepend_args: [--examples=128]
           keras-pml-ocl-gfx804:
             prepend_args: [--examples=128]
@@ -229,7 +229,7 @@ SUITES:
       vgg19:
         precision: high
         platform_overrides:
-          keras-pml-cpu:
+          keras-pml-llvm-cpu:
             prepend_args: [--examples=64]
           keras-pml-ocl-gfx804:
             prepend_args: [--examples=64]
@@ -245,7 +245,7 @@ SUITES:
       xception:
         precision: high
         platform_overrides:
-          keras-pml-cpu:
+          keras-pml-llvm-cpu:
             prepend_args: [--examples=64]
           keras-pml-ocl-gfx804:
             prepend_args: [--examples=64]
