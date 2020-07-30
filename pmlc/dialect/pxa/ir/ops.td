@@ -64,9 +64,15 @@ def AffineReduceOp : PXA_OpWithPP<"reduce"> {
 
 def AffineGemmOp : PXA_OpWithPP<"gemm"> {
   let arguments = (ins
-    AnyMemRef:$c, AffineMapAttr:$cAccessMap, AffineMapAttr:$cTileMap,
-    AnyMemRef:$a, AffineMapAttr:$aAccessMap, AffineMapAttr:$aTileMap,
-    AnyMemRef:$b, AffineMapAttr:$bAccessMap, AffineMapAttr:$bTileMap,
+    Arg<AnyMemRef, "the C memref to store to", [MemWrite]>:$c,
+    AffineMapAttr:$cAccessMap,
+    AffineMapAttr:$cTileMap,
+    Arg<AnyMemRef, "the A memref to load from", [MemRead]>:$a,
+    AffineMapAttr:$aAccessMap,
+    AffineMapAttr:$aTileMap,
+    Arg<AnyMemRef, "the B memref to load from", [MemRead]>:$b,
+    AffineMapAttr:$bAccessMap,
+    AffineMapAttr:$bTileMap,
     I64ArrayAttr:$tile,
     Variadic<Index>:$mapOperands);
   let results = (outs AnyMemRef:$out);
