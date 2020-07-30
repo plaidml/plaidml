@@ -13,6 +13,22 @@
 using namespace plaidml;          // NOLINT[build/namespaces]
 using namespace InferenceEngine;  // NOLINT[build/namespaces]
 
+namespace {
+
+template <typename T>
+std::vector<T> cast_constant_operand(size_t operand_idx, ngraph::Node* layer) {
+  auto ngraph_const =
+      std::dynamic_pointer_cast<ngraph::op::Constant>(layer->input_value(operand_idx).get_node_shared_ptr());
+  if (ngraph_const) {
+    return ngraph_const->cast_vector<T>();
+  } else {
+    THROW_IE_EXCEPTION << "Dynamic slicing not currently supported by PlaidML plugin; all of begin, end, and stride "
+                          "must be Constants.";
+  }
+}
+
+}  // namespace
+
 namespace PlaidMLPlugin {
 
 static OpRegistration reg("pad", [](const Context& ctx) {
@@ -20,20 +36,13 @@ static OpRegistration reg("pad", [](const Context& ctx) {
   IE_ASSERT((ctx.operands.size() == 3) || (ctx.operands.size() == 4));
 
   auto I = ctx.operands.at(0);
-  std::vector<int> lo_pads;
-  auto lopadset = get_axis_vector_from_constant_operand(1, ctx.layer);
-  for (auto p : lopadset) {
-    lo_pads.push_back(p);
-  }
-  std::vector<int> hi_pads;
-  auto hipadset = get_axis_vector_from_constant_operand(2, ctx.layer);
-  for (auto p : hipadset) {
-    hi_pads.push_back(p);
-  }
-  float padval = 0.;  // OV tests currently only use default constant pad of 0
+  auto lo_pads = cast_constant_operand<int>(1, layer);
+  auto hi_pads = cast_constant_operand<int>(2, layer);
+
+  double padval = 0.;  // OV tests currently only use default constant pad of 0
   if (ctx.operands.size() == 4) {
-    auto padvalset = get_axis_set_from_constant_operand(3, ctx.layer);
-    padval = *padvalset.begin();
+    auto padvalvec = cast_constant_operand<double>(3, layer);
+    padval = padvalvec[0];
   }
 
   auto autopad_mode = to_plaidml(layer->get_pad_mode());
