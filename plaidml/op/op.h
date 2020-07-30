@@ -333,7 +333,7 @@ inline edsl::Tensor explicit_padding(  //
     const std::vector<int>& lo_pads,   //
     const std::vector<int>& hi_pads,   //
     PadMode mode,                      //
-    const double& padval) {
+    double padval) {
   auto args = edsl::make_tuple(x, edsl::make_tuple(lo_pads), edsl::make_tuple(hi_pads), static_cast<int>(mode), padval);
   return details::op("explicit_padding", edsl::Value(args)).as_tensor();
 }
