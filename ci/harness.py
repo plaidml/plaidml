@@ -101,15 +101,9 @@ def run(args, remainder):
         whl_path = input / whl_filename
         conda_env.install(whl_path)
 
-    if 'stripe' in args.platform:
-        env['PLAIDML_USE_STRIPE'] = '1'
-    else:
-        env['PLAIDML_USE_STRIPE'] = '0'
     if 'cuda' in args.platform:
         env['CUDA_DEVICE_ORDER'] = buildkite_metadata('CUDA_CUDA_DEVICE_ORDER', 'PCI_BUS_ID')
         env['CUDA_VISIBLE_DEVICES'] = buildkite_metadata('CUDA_VISIBLE_DEVICES', '0')
-    env['PLAIDML_DEVICE_IDS'] = buildkite_metadata('PLAIDML_DEVICE_IDS')
-    env['PLAIDML_EXPERIMENTAL'] = buildkite_metadata('PLAIDML_EXPERIMENTAL', '0')
     device = buildkite_metadata('PLAIDML_DEVICE')
     target = buildkite_metadata('PLAIDML_TARGET')
     if device != None:
