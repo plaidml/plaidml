@@ -31,6 +31,7 @@ Value cumprod(const Value&);
 Value cumsum(const Value&);
 Value dot(const Value&);
 Value elu(const Value&);
+Value explicit_padding(const Value&);
 Value flip(const Value&);
 Value hard_sigmoid(const Value&);
 Value image_resize(const Value&);
@@ -189,6 +190,21 @@ std::string to_string(AutoPadMode mode) {
       return "AutoPadMode::SAME_UPPER";
     case AutoPadMode::VALID:
       return "AutoPadMode::VALID";
+    default:
+      return "<<UNRECOGNIZED AutoPadMode>>";
+  }
+}
+
+std::string to_string(PadMode mode) {
+  switch (mode) {
+    case PadMode::CONSTANT:
+      return "PadMode::CONSTANT";
+    case PadMode::EDGE:
+      return "PadMode::EDGE";
+    case PadMode::REFLECT:
+      return "PadMode::REFLECT";
+    case PadMode::SYMMETRIC:
+      return "PadMode::SYMMETRIC";
     default:
       return "<<UNRECOGNIZED AutoPadMode>>";
   }
@@ -1582,6 +1598,82 @@ Value elu(const Value& value) {
   throw std::runtime_error("Unexpected type for alpha in elu");
 }
 
+Value explicit_padding(const Value& value) {
+  IVLOG(1, "explicit_padding");
+  auto args = value.as_tuple();
+  if (args.size() < 5) {
+    throw std::runtime_error("explicit_padding expects 5 arguments");
+  }
+
+  auto I = args[0].as_tensor();
+  auto lo_pads = args[1].as_int_tuple();
+  auto hi_pads = args[2].as_int_tuple();
+  auto mode = validate<PadMode>(args[3].as_int());
+
+  // validate inputs
+
+  if (lo_pads.size() != I.rank()) {
+    IVLOG(1, lo_pads.size())
+    IVLOG(1, I.rank())
+    IVLOG(1, lo_pads[0])
+    throw std::runtime_error(
+        llvm::formatv("Inconsistent shapes in explicit_padding op (received an input tensor with {0} dims, "
+                      "but received lower padding for {1} dims.)",
+                      I.rank(), lo_pads.size()));
+  }
+  if (hi_pads.size() != I.rank()) {
+    throw std::runtime_error(
+        llvm::formatv("Inconsistent shapes in explicit_padding op (received an input tensor with {0} dims, "
+                      "but received higher padding for {1} dims.)",
+                      I.rank(), hi_pads.size()));
+  }
+
+  std::vector<TensorDim> I_dims;
+  std::vector<TensorDim> O_dims;
+  std::vector<TensorIndex> I_idxs;
+  std::vector<TensorIndex> O_idxs;
+
+  // Assign dimensions & indices
+  std::vector<TensorDim> X(I.rank());
+  std::vector<TensorIndex> x;
+  for (size_t i = 0; i < I.rank(); ++i) {
+    x.emplace_back(llvm::formatv("x{0}", i));
+  }
+
+  for (size_t i = 0; i < I.rank(); ++i) {
+    I_dims.push_back(X[i]);
+    I_idxs.push_back(x[i]);
+  }
+  I.bind_dims(I_dims);
+
+  for (size_t i = 0; i < I.rank(); ++i) {
+    O_dims.push_back(X[i] + lo_pads[i] + hi_pads[i]);
+    O_idxs.push_back(x[i] + lo_pads[i]);
+  }
+
+  auto O = TensorOutput(O_dims);
+
+  switch (mode) {
+    case PadMode::CONSTANT: {
+      IVLOG(1, "Constant padding requested");
+
+      auto padval = args[4].as_float();
+      I = I - padval;
+      O(O_idxs) = I(I_idxs);
+      O = O + padval;
+    } break;
+    case PadMode::EDGE:
+    case PadMode::SYMMETRIC:
+    case PadMode::REFLECT: {
+      throw std::runtime_error(llvm::formatv("Unimplemented padding mode: {0}", to_string(mode)));
+    } break;
+    default:
+      throw std::runtime_error(llvm::formatv("Unrecognized padding mode: {0}", to_string(mode)));
+  }
+
+  return Value{O};
+}
+
 Value flip(const Value& value) {
   IVLOG(1, "flip");
   // This is numpy-style `flip`; Keras calls it `repeat`
@@ -2504,21 +2596,21 @@ Value spatial_padding(const Value& value) {
   if (spatial_rank < 1) {
     throw std::runtime_error(llvm::formatv(
         "Insufficient spatial rank in spatial_padding op (At least 1 spatial dim required; received {0} spatial "
-        "dims based on an input tensor with {1} dims with a specified layout with {2} nonspatial dims.",
+        "dims based on an input tensor with {1} dims with a specified layout with {2} nonspatial dims.)",
         spatial_rank, I.rank(), nonspatial_ndims));
   }
   if (lo_pads.size() != spatial_rank) {
     throw std::runtime_error(
         llvm::formatv("Inconsistent spatial rank in spatial_padding op (received {0} spatial dim(s) based on an "
                       "input tensor with {1} dims with a specified layout with {2} nonspatial dims, but received "
-                      "lower padding for {3} spatial dims.",
+                      "lower padding for {3} spatial dims.)",
                       spatial_rank, I.rank(), nonspatial_ndims, lo_pads.size()));
   }
   if (hi_pads.size() != spatial_rank) {
     throw std::runtime_error(
         llvm::formatv("Inconsistent spatial rank in spatial_padding op (received {0} spatial dim(s) based on an "
                       "input tensor with {1} dims with a specified layout with {2} nonspatial dims, but received "
-                      "upper padding for {3} spatial dims.",
+                      "upper padding for {3} spatial dims.)",
                       spatial_rank, I.rank(), nonspatial_ndims, hi_pads.size()));
   }
 
@@ -3013,6 +3105,7 @@ void RegisterOps() {
   registry->Register("cumsum", cumsum);
   registry->Register("dot", dot);
   registry->Register("elu", elu);
+  registry->Register("explicit_padding", explicit_padding);
   registry->Register("flip", flip);
   registry->Register("hard_sigmoid", hard_sigmoid);
   registry->Register("image_resize", image_resize);
