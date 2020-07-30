@@ -29,7 +29,7 @@ class PXA_OpWithPP<string mnemonic, list<OpTrait> traits = []> :
 
 def AnyStdScalar : AnyTypeOf<[AnyFloat, AnySignlessInteger]> {}
 
-def AffineReduceOp : PXA_OpWithPP<"reduce", []> {
+def AffineReduceOp : PXA_OpWithPP<"reduce"> {
   let summary = "affine reduction operation";
   let arguments = (ins
     AggregationKind:$agg,
@@ -59,6 +59,24 @@ def AffineReduceOp : PXA_OpWithPP<"reduce", []> {
     operand_range getMapOperands() { return idxs(); }
     static StringRef getMapAttrName() { return "map"; }
     Value getValueToStore() { return val(); }
+  }];
+}
+
+def AffineGemmOp : PXA_OpWithPP<"gemm"> {
+  let arguments = (ins
+    AnyMemRef:$c, AffineMapAttr:$cAccessMap, AffineMapAttr:$cTileMap,
+    AnyMemRef:$a, AffineMapAttr:$aAccessMap, AffineMapAttr:$aTileMap,
+    AnyMemRef:$b, AffineMapAttr:$bAccessMap, AffineMapAttr:$bTileMap,
+    I64ArrayAttr:$tile,
+    Variadic<Index>:$mapOperands);
+  let results = (outs AnyMemRef:$out);
+
+  let hasCanonicalizer = 1;
+
+  let extraClassDeclaration = [{
+    operand_range getOperandsForA();
+    operand_range getOperandsForB();
+    operand_range getOperandsForC();
   }];
 }
 

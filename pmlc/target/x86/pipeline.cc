@@ -20,6 +20,7 @@
 #include "pmlc/dialect/pxa/transforms/passes.h"
 #include "pmlc/dialect/stdx/transforms/passes.h"
 #include "pmlc/dialect/tile/transforms/passes.h"
+#include "pmlc/dialect/xsmm/ir/ops.h"
 #include "pmlc/target/x86/heatmap.h"
 #include "pmlc/target/x86/pass_detail.h"
 #include "pmlc/target/x86/passes.h"
@@ -30,16 +31,33 @@ using namespace mlir; // NOLINT[build/namespaces]
 
 namespace pmlc::target::x86 {
 
-std::unique_ptr<Pass> createXSMMStencilPass() {
-  auto numThreads = std::thread::hardware_concurrency();
-  return pmlc::dialect::pxa::createXSMMStencilPass(numThreads, heatmapCost);
-}
+namespace xsmm = dialect::xsmm;
 
 namespace {
 
+struct LowerPXAToAffinePass
+    : public ConvertPXAToAffineBase<LowerPXAToAffinePass> {
+  void runOnOperation() final {
+    auto &ctx = getContext();
+    conversion::pxa_to_affine::PXAToAffineConversionTarget target(ctx);
+    target.addLegalDialect<xsmm::XSMMDialect>();
+
+    OwningRewritePatternList patterns;
+    populatePXAToAffineConversionPatterns(patterns, &ctx);
+    conversion::pxa_to_affine::populatePXAToAffineConversionPatterns(patterns,
+                                                                     &ctx);
+
+    if (failed(applyPartialConversion(getOperation(), target, patterns,
+                                      nullptr))) {
+      getOperation().dump();
+      emitError(UnknownLoc::get(&ctx), "Error lowering pxa -> affine\n");
+      signalPassFailure();
+    }
+  }
+};
+
 struct ConvertToLLVMPass
-    : public mlir::PassWrapper<ConvertToLLVMPass,
-                               mlir::OperationPass<mlir::ModuleOp>> {
+    : public PassWrapper<ConvertToLLVMPass, OperationPass<ModuleOp>> {
   void runOnOperation() override {
     auto module = getOperation();
     auto *context = module.getContext();
@@ -53,23 +71,34 @@ struct ConvertToLLVMPass
     LLVMTypeConverter typeConverter(context, options);
 
     OwningRewritePatternList patterns;
+    populateXSMMToLLVMConversionPatterns(typeConverter, patterns, options);
     populateStdToLLVMConversionPatterns(typeConverter, patterns, options);
     conversion::stdx_to_llvm::populateStdXToLLVMConversionPatterns(
         typeConverter, patterns);
 
-    ConversionTarget target(*context);
-    target.addLegalDialect<LLVM::LLVMDialect>();
+    LLVMConversionTarget target(*context);
     if (failed(applyPartialConversion(module, target, patterns))) {
       signalPassFailure();
     }
   }
-
-  static std::unique_ptr<OperationPass<ModuleOp>> create() {
-    return std::make_unique<ConvertToLLVMPass>();
-  }
 };
 
-void addToPipeline(OpPassManager &pm) {
+} // namespace
+
+std::unique_ptr<Pass> createXSMMStencilPass() {
+  auto numThreads = std::thread::hardware_concurrency();
+  return pmlc::dialect::pxa::createXSMMStencilPass(numThreads, heatmapCost);
+}
+
+std::unique_ptr<Pass> createLowerPXAToAffinePass() {
+  return std::make_unique<LowerPXAToAffinePass>();
+}
+
+std::unique_ptr<Pass> createLowerToLLVMPass() {
+  return std::make_unique<ConvertToLLVMPass>();
+}
+
+static void addToPipeline(OpPassManager &pm) {
   pm.addPass(pmlc::dialect::tile::createComputeBoundsPass());
   pm.addPass(pmlc::dialect::tile::createPadPass());
   pm.addPass(createCanonicalizerPass());
@@ -81,8 +110,6 @@ void addToPipeline(OpPassManager &pm) {
 
   pm.addPass(
       pmlc::dialect::pxa::createXSMMStencilPass(/*numThreads=*/1, heatmapCost));
-  pm.addPass(createLoopInvariantCodeMotionPass());
-  pm.addPass(createXSMMLoweringPass());
 
   // FIXME: these passes cause test failures (correctness or otherwise)
   // pm.addPass(pmlc::dialect::pxa::createFusionPass());
@@ -94,7 +121,10 @@ void addToPipeline(OpPassManager &pm) {
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
-  pm.addPass(conversion::pxa_to_affine::createLowerPXAToAffinePass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
+  pm.addPass(createLowerPXAToAffinePass());
+  pm.addPass(createLoopInvariantCodeMotionPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
@@ -109,11 +139,9 @@ void addToPipeline(OpPassManager &pm) {
 
   pm.addPass(createTanhLoweringPass());
 
-  pm.addPass(ConvertToLLVMPass::create());
+  pm.addPass(createLowerToLLVMPass());
   pm.addPass(createTraceLinkingPass());
 }
-
-} // namespace
 
 void registerPassPipeline() {
   static PassPipelineRegistration<> passPipelineReg(
