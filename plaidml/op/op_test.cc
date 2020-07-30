@@ -251,6 +251,22 @@ TEST_F(OpTest, Elu) {
   runProgram(program);
 }
 
+TEST_F(OpTest, ExplicitPadding) {
+  auto I = Placeholder(DType::FLOAT32, {2, 3}, "A");
+  auto O = op::explicit_padding(I, {2, 1}, {2, 1}, op::PadMode::CONSTANT, -1.0);
+  auto program = makeProgram("explicit_padding", {O});
+
+  std::vector<float> I_input = {1, 2, 3,  //
+                                4, 5, 6};
+  std::vector<float> O_output = {-1, -1, -1, -1, -1,  //
+                                 -1, -1, -1, -1, -1,  //
+                                 -1, 1,  2,  3,  -1,  //
+                                 -1, 4,  5,  6,  -1,  //
+                                 -1, -1, -1, -1, -1,  //
+                                 -1, -1, -1, -1, -1};
+  checkProgram(program, {{I, I_input}}, {{O, O_output}});
+}
+
 TEST_F(OpTest, Flip) {
   auto I = Placeholder(DType::FLOAT32, {7, 7, 3, 64}, "I");
   auto program = makeProgram("flip", {op::flip(I, 2)});

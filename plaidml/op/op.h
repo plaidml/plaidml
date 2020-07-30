@@ -107,6 +107,14 @@ enum class TensorLayout {
   _LAST,
 };
 
+enum class PadMode {
+  CONSTANT,
+  EDGE,
+  REFLECT,
+  SYMMETRIC,
+  _LAST,
+};
+
 struct int_list {
   int_list(const std::vector<int>& elts)  // NOLINT[runtime/explicit]
       : value(edsl::make_tuple(elts)) {}
@@ -318,6 +326,16 @@ inline edsl::Tensor dot(const edsl::Tensor& I, const edsl::Tensor& K) {
 inline edsl::Tensor elu(const edsl::Tensor& I, double alpha) {
   auto args = edsl::make_tuple(I, alpha);
   return details::op("elu", args).as_tensor();
+}
+
+inline edsl::Tensor explicit_padding(  //
+    const edsl::Tensor& x,             //
+    const std::vector<int>& lo_pads,   //
+    const std::vector<int>& hi_pads,   //
+    PadMode mode,                      //
+    const float& padval) {
+  auto args = edsl::make_tuple(x, edsl::make_tuple(lo_pads), edsl::make_tuple(hi_pads), static_cast<int>(mode), padval);
+  return details::op("explicit_padding", edsl::Value(args)).as_tensor();
 }
 
 inline edsl::Tensor flip(const edsl::Tensor& I, int axis) {
