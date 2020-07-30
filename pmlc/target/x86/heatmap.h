@@ -11,6 +11,6 @@
 
 namespace pmlc::target::x86 {
 
-dialect::pxa::StencilCost heatmapCost(llvm::ArrayRef<unsigned> tile);
+dialect::pxa::StencilCost heatmapCost(llvm::ArrayRef<int64_t> tile);
 
 } // namespace pmlc::target::x86

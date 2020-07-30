@@ -31,6 +31,7 @@ using namespace mlir; // NOLINT[build/namespaces]
 
 namespace pmlc::target::x86 {
 
+namespace pxa = dialect::pxa;
 namespace xsmm = dialect::xsmm;
 
 namespace {
@@ -85,9 +86,15 @@ struct ConvertToLLVMPass
 
 } // namespace
 
+// NOTE: the stencil pass uses row-major ordering, the heatmap is
+// specified in column-major ordering.
+static pxa::StencilCost heatmapCostTransposed(ArrayRef<int64_t> tile) {
+  return heatmapCost(ArrayRef<int64_t>{tile[1], tile[0], tile[2]});
+}
+
 std::unique_ptr<Pass> createXSMMStencilPass() {
   auto numThreads = std::thread::hardware_concurrency();
-  return pmlc::dialect::pxa::createXSMMStencilPass(numThreads, heatmapCost);
+  return pxa::createStencilGEMMPass(numThreads, heatmapCostTransposed);
 }
 
 std::unique_ptr<Pass> createLowerPXAToAffinePass() {
@@ -109,15 +116,15 @@ static void addToPipeline(OpPassManager &pm) {
   pm.addPass(createCSEPass());
 
   pm.addPass(
-      pmlc::dialect::pxa::createXSMMStencilPass(/*numThreads=*/1, heatmapCost));
+      pxa::createStencilGEMMPass(/*numThreads=*/1, heatmapCostTransposed));
 
   // FIXME: these passes cause test failures (correctness or otherwise)
-  // pm.addPass(pmlc::dialect::pxa::createFusionPass());
+  // pm.addPass(pxa::createFusionPass());
   // pm.addPass(createCanonicalizerPass());
-  // pm.addPass(pmlc::dialect::pxa::createMemRefDataFlowOptPass());
+  // pm.addPass(pxa::createMemRefDataFlowOptPass());
   // pm.addPass(createCanonicalizerPass());
-  pm.addPass(pmlc::dialect::pxa::createLocalizePass());
-  pm.addPass(pmlc::dialect::pxa::createResizeTmpsPass());
+  pm.addPass(pxa::createLocalizePass());
+  pm.addPass(pxa::createResizeTmpsPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
