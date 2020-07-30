@@ -174,17 +174,6 @@ struct XSMMGemmInvokeLowering
     return success();
   }
 
-  Optional<Value> getOperandPtr(xsmm::GemmInvokeOp op,
-                                ConversionPatternRewriter &rewriter, Type type,
-                                Value memref, AffineMap accessMap,
-                                ValueRange indices) const {
-    auto operands = expandAffineMap(rewriter, op.getLoc(), accessMap, indices);
-    if (!operands)
-      return llvm::None;
-    return getDataPtr(op.getLoc(), type.cast<MemRefType>(), memref, *operands,
-                      rewriter, getModule());
-  }
-
   LLVM::LLVMFuncOp getOrInsertFunc(Operation *op,
                                    ConversionPatternRewriter &rewriter) const {
     const char *kGemmInvokeF32 = "plaidml_rt_xsmm_gemm_invoke_f32";
