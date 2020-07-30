@@ -40,7 +40,7 @@ PLATFORMS:
     variant: linux_x86_64
   keras-pml-mtl-uhd630:
     variant: macos_x86_64
-    keras-pml-llvm-cpu:
+  keras-pml-llvm-cpu:
     variant: linux_x86_64
   keras-tf-cuda-gp100gl:
     variant: linux_x86_64
