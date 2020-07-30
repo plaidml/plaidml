@@ -29,7 +29,6 @@ class PXA_OpWithPP<string mnemonic, list<OpTrait> traits = []> :
 
 def AnyStdScalar : AnyTypeOf<[AnyFloat, AnySignlessInteger]> {}
 
-// TODO: Add NoSideEffect
 def AffineReduceOp : PXA_OpWithPP<"reduce"> {
   let summary = "affine reduction operation";
   let arguments = (ins
@@ -78,6 +77,42 @@ def AffineGemmOp : PXA_OpWithPP<"gemm"> {
     operand_range getOperandsForA();
     operand_range getOperandsForB();
     operand_range getOperandsForC();
+  }];
+}
+
+def AffineVectorReduceOp : PXA_OpWithPP<"vector_reduce", []> {
+  let summary = "affine vector reduction operation";
+  let arguments = (ins
+    AggregationKind:$agg,
+    AnyVector:$vector,
+    Arg<AnyMemRef, "the memref to reduce", [MemRead, MemWrite]>:$mem,
+    AffineMapAttr:$map,
+    Variadic<Index>:$idxs
+  );
+  let results = (outs AnyMemRef:$result);
+
+  let hasCanonicalizer = 1;
+  let hasFolder = 1;
+
+  let builders = [OpBuilder<
+    "OpBuilder& builder, OperationState& result, AggregationKind agg,"
+    "Value vector, Value mem, AffineMap map, ValueRange idxs", [{
+      build(builder, result, mem.getType(), agg, vector, mem, map, idxs);
+    }]
+  >];
+
+  let extraClassDeclaration = [{
+    Value getMemRef() { return mem(); }
+    unsigned getMemRefOperandIndex() { return 1; }
+    void setMemRef(Value value) { setOperand(getMemRefOperandIndex(), value); }
+    MemRefType getMemRefType() { return mem().getType().cast<MemRefType>(); }
+    AffineMap getAffineMap() { return map(); }
+    operand_range getMapOperands() { return idxs(); }
+    static StringRef getMapAttrName() { return "map"; }
+    Value getValueToStore() { return vector(); }
+    mlir::VectorType getVectorType() {
+      return vector().getType().cast<mlir::VectorType>();
+    }
   }];
 }
 
