@@ -15,6 +15,7 @@ cc_test(
     data = [
         "//plaidml/bridge/openvino:libplaidml-plugin.so",
         "//plaidml/bridge/openvino:plugins",
+        "//:ov_plugins_xml",  # TODO
     ],
     linkopts = PLAIDML_LINKOPTS,
     tags = TAGS,

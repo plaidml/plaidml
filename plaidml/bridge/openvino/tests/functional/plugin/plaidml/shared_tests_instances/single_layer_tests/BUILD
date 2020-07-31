@@ -11,6 +11,7 @@ TAGS = [
 DATA = [
     "//plaidml/bridge/openvino:libplaidml-plugin.so",
     "//plaidml/bridge/openvino:plugins",
+    "//:ov_plugins_xml",  # TODO
 ]
 
 DEPS = [
@@ -101,12 +102,8 @@ cc_library(
     copts = ["-Wno-deprecated-declarations"],
     tags = TAGS,
     deps = DEPS + [ "//plaidml/bridge/openvino/tests/functional/plugin/plaidml/shared_tests_instances" ],  # TODO: need addon?
-    # TODO: `data` needed?
-    data = [
-        "//plaidml/bridge/openvino:libplaidml-plugin.so",
-        "//plaidml/bridge/openvino:plugins",
-    ],
-    linkopts = PLAIDML_LINKOPTS,  # TODO: Needed?
+    # data = DATA,  # TODO: Needed?
+    # linkopts = PLAIDML_LINKOPTS,  # TODO: Needed?
 )
 
 cc_library(

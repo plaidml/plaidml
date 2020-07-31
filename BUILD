@@ -2,6 +2,7 @@
 #
 # For build instructions, see <docs/building.md>.
 
+load("@bazel_skylib//rules:write_file.bzl", "write_file")
 load("@rules_pkg//:pkg.bzl", "pkg_tar")
 load("@rules_python//python:defs.bzl", "py_runtime", "py_runtime_pair")
 
@@ -66,4 +67,18 @@ toolchain(
     name = "py_toolchain",
     toolchain = ":py_runtime_pair",
     toolchain_type = "@rules_python//python:toolchain_type",
+)
+
+# TODO
+write_file(
+    name = "ov_plugins_xml",
+    out = "_solib_linux_x86_64/plugins.xml",
+    content = [
+        "<ie>",
+        "   <plugins>",
+        "       <plugin name='PlaidML' location='plaidml/bridge/openvino/libplaidml-plugin.so'/>",
+        "   </plugins>",
+        "</ie>",
+        "",
+    ],
 )

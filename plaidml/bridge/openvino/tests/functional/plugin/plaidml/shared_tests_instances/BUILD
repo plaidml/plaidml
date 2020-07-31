@@ -9,6 +9,7 @@ plaidml_cc_library(
     data = [  # TODO
         "//plaidml/bridge/openvino:libplaidml-plugin.so",
         "//plaidml/bridge/openvino:plugins",
+        "//:ov_plugins_xml",  # TODO
     ],
     linkopts = PLAIDML_LINKOPTS,  # TODO
     deps = [  # TODO
