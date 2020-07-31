@@ -291,7 +291,7 @@ TEST_F(OpTest, Elu) {
 
 TEST_F(OpTest, ExplicitPadding) {
   auto I = Placeholder(DType::FLOAT32, {2, 3}, "A");
-  auto O = static_cast<Tensor>(op::explicit_padding(I, {2, 1}, {2, 1}).padval(edsl::Value(-1.0)));
+  auto O = static_cast<Tensor>(op::explicit_padding(I, {2, 1}, {2, 1}).padval(-1.0));
   auto program = makeProgram("explicit_padding", {O});
 
   std::vector<float> I_input = {1, 2, 3,  //
