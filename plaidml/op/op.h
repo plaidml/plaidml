@@ -328,15 +328,44 @@ inline edsl::Tensor elu(const edsl::Tensor& I, double alpha) {
   return details::op("elu", args).as_tensor();
 }
 
-inline edsl::Tensor explicit_padding(  //
-    const edsl::Tensor& x,             //
-    const std::vector<int>& lo_pads,   //
-    const std::vector<int>& hi_pads,   //
-    PadMode mode,                      //
-    double padval) {
-  auto args = edsl::make_tuple(x, edsl::make_tuple(lo_pads), edsl::make_tuple(hi_pads), static_cast<int>(mode), padval);
-  return details::op("explicit_padding", edsl::Value(args)).as_tensor();
-}
+class explicit_padding {
+ public:
+  explicit explicit_padding(const edsl::Tensor& I, const std::vector<int>& lo_pads, const std::vector<int>& hi_pads)
+      : I_(I), lo_pads_(lo_pads), hi_pads_(hi_pads), mode_(PadMode::CONSTANT), padval_(edsl::Value(0)) {}
+
+  explicit_padding& lo_pads(const std::vector<int>& lo_pads) {
+    lo_pads_ = lo_pads;
+    return *this;
+  }
+
+  explicit_padding& hi_pads(const std::vector<int>& hi_pads) {
+    hi_pads_ = hi_pads;
+    return *this;
+  }
+
+  explicit_padding& mode(PadMode mode) {
+    mode_ = mode;
+    return *this;
+  }
+
+  explicit_padding& padval(const edsl::Value& padval) {
+    padval_ = padval;
+    return *this;
+  }
+
+  operator edsl::Tensor() const {
+    auto args =
+        edsl::make_tuple(I_, edsl::make_tuple(lo_pads_), edsl::make_tuple(hi_pads_), static_cast<int>(mode_), padval_);
+    return details::op("explicit_padding", args).as_tensor();
+  }
+
+ private:
+  edsl::Tensor I_;
+  std::vector<int> lo_pads_;
+  std::vector<int> hi_pads_;
+  PadMode mode_;
+  edsl::Value padval_;
+};
 
 inline edsl::Tensor flip(const edsl::Tensor& I, int axis) {
   auto args = edsl::make_tuple(I, axis);

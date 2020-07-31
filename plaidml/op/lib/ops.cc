@@ -1657,7 +1657,7 @@ Value explicit_padding(const Value& value) {
     case PadMode::CONSTANT: {
       IVLOG(1, "Constant padding requested");
 
-      auto padval = args[4].as_float();
+      auto padval = args[4].as_tensor();
       I = I - padval;
       O(O_idxs) = I(I_idxs);
       O = O + padval;
