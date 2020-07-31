@@ -18,21 +18,6 @@ cc_library(
 )
 
 gentbl(
-    name = "TestVectorTransformPatternsIncGen",
-    tbl_outs = [
-        (
-            "-gen-rewriters",
-            "lib/DeclarativeTransforms/TestVectorTransformPatterns.h.inc",
-        ),
-    ],
-    tblgen = "@llvm-project//mlir:mlir-tblgen",
-    td_file = "lib/DeclarativeTransforms/TestVectorTransformPatterns.td",
-    td_srcs = [
-        "@llvm-project//mlir:VectorTransformPatternsTdFiles",
-    ],
-)
-
-gentbl(
     name = "TestOpsIncGen",
     strip_include_prefix = "lib/Dialect/Test",
     tbl_outs = [
@@ -74,6 +59,7 @@ gentbl(
     td_srcs = [
         "@llvm-project//mlir:OpBaseTdFiles",
         "@llvm-project//mlir:include/mlir/IR/OpAsmInterface.td",
+        "@llvm-project//mlir:include/mlir/IR/RegionKindInterface.td",
         "@llvm-project//mlir:include/mlir/IR/SymbolInterfaces.td",
         "@llvm-project//mlir:include/mlir/Interfaces/CallInterfaces.td",
         "@llvm-project//mlir:include/mlir/Interfaces/ControlFlowInterfaces.td",
@@ -115,7 +101,6 @@ cc_library(
         "lib/Dialect/Test/TestTypes.h",
     ],
     includes = [
-        "lib/DeclarativeTransforms",
         "lib/Dialect/Test",
     ],
     deps = [
@@ -144,6 +129,7 @@ cc_library(
         "lib/IR/TestMatchers.cpp",
         "lib/IR/TestSideEffects.cpp",
         "lib/IR/TestSymbolUses.cpp",
+        "lib/IR/TestTypes.cpp",
     ],
     deps = [
         ":TestDialect",
@@ -169,13 +155,24 @@ cc_library(
 )
 
 cc_library(
+    name = "TestReducer",
+    srcs = [
+        "lib/Reducer/MLIRTestReducer.cpp",
+    ],
+    deps = [
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:Support",
+    ],
+)
+
+cc_library(
     name = "TestTransforms",
     srcs = glob(["lib/Transforms/*.cpp"]),
     defines = ["MLIR_CUDA_CONVERSIONS_ENABLED"],
     includes = ["lib/Dialect/Test"],
     deps = [
         ":TestDialect",
-        ":TestVectorTransformPatternsIncGen",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:Analysis",
@@ -226,6 +223,7 @@ cc_library(
         "lib/Dialect/SPIRV/*.cpp",
     ]),
     deps = [
+        "@llvm-project//mlir:GPUDialect",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:SPIRVDialect",
