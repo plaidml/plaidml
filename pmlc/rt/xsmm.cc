@@ -9,16 +9,16 @@
 
 using FunctionPtr = void (*)(const void *, const void *, void *, ...);
 
-extern "C" void plaidml_rt_xsmm_gemm_invoke_f32(void *funcPtr, float *a,
+extern "C" void plaidml_rt_xsmm_gemm_invoke_f32(int64_t funcAddr, float *a,
                                                 float *b, float *c) {
   libxsmm_xmmfunction sgemm;
-  sgemm.xmm = reinterpret_cast<FunctionPtr>(funcPtr);
+  sgemm.xmm = reinterpret_cast<FunctionPtr>(funcAddr);
   sgemm.smm(b, a, c);
 }
 
-extern "C" void *plaidml_rt_xsmm_gemm_dispatch_f32(int32_t lda, int32_t ldb,
-                                                   int32_t ldc, int32_t m,
-                                                   int32_t n, int32_t k) {
+extern "C" int64_t plaidml_rt_xsmm_gemm_dispatch_f32(int32_t lda, int32_t ldb,
+                                                     int32_t ldc, int32_t m,
+                                                     int32_t n, int32_t k) {
   libxsmm_blasint lda_int = lda;
   libxsmm_blasint ldb_int = ldb;
   libxsmm_blasint ldc_int = ldc;
@@ -31,7 +31,7 @@ extern "C" void *plaidml_rt_xsmm_gemm_dispatch_f32(int32_t lda, int32_t ldb,
                           /*alpha=*/nullptr, /*beta=*/nullptr,
                           /*flags=*/nullptr, /*prefetch=*/nullptr);
 
-  return reinterpret_cast<void *>(sgemm);
+  return reinterpret_cast<int64_t>(sgemm);
 }
 
 namespace {

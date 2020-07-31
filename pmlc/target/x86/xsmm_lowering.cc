@@ -93,6 +93,7 @@ struct XSMMGemmDispatchLowering
     auto func = getOrInsertFunc(op, rewriter);
 
     auto int32Type = LLVM::LLVMType::getInt32Ty(&getDialect());
+    auto int64Type = LLVM::LLVMType::getInt64Ty(&getDialect());
     SmallVector<Value, 6> callOperands;
 
     // lda, ldb, ldc
@@ -108,7 +109,7 @@ struct XSMMGemmDispatchLowering
     }
 
     rewriter.replaceOpWithNewOp<LLVM::CallOp>(
-        op, getVoidPtrType(), rewriter.getSymbolRefAttr(func), callOperands);
+        op, int64Type, rewriter.getSymbolRefAttr(func), callOperands);
     return success();
   }
 
@@ -124,9 +125,10 @@ struct XSMMGemmDispatchLowering
     OpBuilder::InsertionGuard guard(rewriter);
     rewriter.setInsertionPointToStart(module.getBody());
     auto int32Type = LLVM::LLVMType::getInt32Ty(&getDialect());
+    auto int64Type = LLVM::LLVMType::getInt64Ty(&getDialect());
     return rewriter.create<LLVM::LLVMFuncOp>(
         rewriter.getUnknownLoc(), kGemmDispatchF32,
-        LLVM::LLVMType::getFunctionTy(getVoidPtrType(),
+        LLVM::LLVMType::getFunctionTy(int64Type,
                                       ArrayRef<LLVM::LLVMType>{int32Type, // lda
                                                                int32Type, // ldb
                                                                int32Type, // ldc
@@ -186,15 +188,16 @@ struct XSMMGemmInvokeLowering
     OpBuilder::InsertionGuard guard(rewriter);
     rewriter.setInsertionPointToStart(module.getBody());
     auto floatType = LLVM::LLVMType::getFloatTy(&getDialect());
+    auto int64Type = LLVM::LLVMType::getInt64Ty(&getDialect());
     auto floatPtrType = floatType.getPointerTo();
     return rewriter.create<LLVM::LLVMFuncOp>(
         rewriter.getUnknownLoc(), kGemmInvokeF32,
         LLVM::LLVMType::getFunctionTy(
             getVoidType(),
-            ArrayRef<LLVM::LLVMType>{getVoidPtrType(), // funcPtr
-                                     floatPtrType,     // a
-                                     floatPtrType,     // b
-                                     floatPtrType},    // c
+            ArrayRef<LLVM::LLVMType>{int64Type,     // funcPtr
+                                     floatPtrType,  // a
+                                     floatPtrType,  // b
+                                     floatPtrType}, // c
             /*isVarArg=*/false));
   }
 };
@@ -207,10 +210,8 @@ void populatePXAToAffineConversionPatterns(OwningRewritePatternList &patterns,
 }
 
 void populateXSMMToLLVMConversionPatterns(LLVMTypeConverter &converter,
-                                          OwningRewritePatternList &patterns,
-                                          const LowerToLLVMOptions &options) {
-  patterns.insert<XSMMGemmDispatchLowering, XSMMGemmInvokeLowering>(converter,
-                                                                    options);
+                                          OwningRewritePatternList &patterns) {
+  patterns.insert<XSMMGemmDispatchLowering, XSMMGemmInvokeLowering>(converter);
 }
 
 } // namespace pmlc::target::x86
