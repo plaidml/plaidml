@@ -340,6 +340,7 @@ cc_library(
     ]),
     defines = [
         "NGRAPH_JSON_DISABLE",
+        "NGRAPH_INTERPRETER_ENABLE",
         "NGRAPH_VERSION=\\\"0.21.0\\\"",
     ],
     includes = [
