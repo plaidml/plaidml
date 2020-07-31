@@ -60,7 +60,10 @@ cc_library(
 cc_library(
     name = "functional_test_utils",
     srcs = glob(["inference-engine/tests/ie_test_utils/functional_test_utils/*.cpp"]),
-    hdrs = glob(["inference-engine/tests/ie_test_utils/functional_test_utils/*.hpp"]),
+    hdrs = glob(
+        ["inference-engine/tests/ie_test_utils/functional_test_utils/*.hpp"],
+        # exclude = ["inference-engine/tests/ie_test_utils/functional_test_utils/skip_tests_config.hpp"],  # TODO
+    ),
     includes = ["inference-engine/tests/ie_test_utils"],
     deps = [
         "ngraph_function_tests",  # TODO: Ok?
@@ -108,6 +111,7 @@ cc_library(
 #     },
 # )
 
+# TODO: Might be broken
 cc_library(
     name = "helpers",
     srcs = glob(["inference-engine/tests_deprecated/helpers/*.cpp"]),
@@ -296,6 +300,7 @@ cc_library(
             "ngraph/src/ngraph/builder/*.cpp",
             "ngraph/src/ngraph/descriptor/**/*.cpp",
             "ngraph/src/ngraph/distributed/*.cpp",
+            "ngraph/src/ngraph/op/*.cpp",  # TODO: Needed?
             "ngraph/src/ngraph/op/**/*.cpp",
             "ngraph/src/ngraph/opsets/*.cpp",
             "ngraph/src/ngraph/pass/*.cpp",
@@ -303,12 +308,15 @@ cc_library(
             "ngraph/src/ngraph/runtime/*.cpp",
             "ngraph/src/ngraph/runtime/dynamic/*.cpp",
             "ngraph/src/ngraph/runtime/interpreter/*.cpp",
+            "ngraph/src/ngraph/runtime/reference/*.cpp",  # TODO: Ok?
             "ngraph/src/ngraph/state/*.cpp",
             "ngraph/src/ngraph/type/*.cpp",
             "ngraph/test/runtime/*.cpp",  # TODO: Ok?
+            "ngraph/test/runtime/**/*.cpp",  # TODO: Ok?
         ],
         exclude = [
             "ngraph/src/ngraph/serializer.cpp",
+            "ngraph/test/runtime/ie/*.cpp",  # TODO: Ok?
         ],
     ),
     hdrs = glob([
@@ -327,6 +335,8 @@ cc_library(
         "ngraph/src/ngraph/pattern/**/*.hpp",
         "ngraph/src/ngraph/type/*.hpp",
         "ngraph/test/runtime/*.hpp",  # TODO: Ok?
+        "ngraph/test/runtime/**/*.hpp",  # TODO: Ok?
+        "ngraph/test/runtime/ie/*.hpp",  # TODO: Ok?
     ]),
     defines = [
         "NGRAPH_JSON_DISABLE",

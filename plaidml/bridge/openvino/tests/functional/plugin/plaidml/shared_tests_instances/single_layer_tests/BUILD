@@ -18,7 +18,7 @@ DEPS = [
     "@gflags",
     "@gmock//:gtest_main",
     "@openvino//:common_test_utils",
-    "@openvino//:helpers",
+    # "@openvino//:helpers",  # TODO
     "@openvino//:inference_engine",
     "@openvino//:shared_plugin_tests",
 ]
@@ -100,7 +100,13 @@ cc_library(
     ),
     copts = ["-Wno-deprecated-declarations"],
     tags = TAGS,
-    deps = DEPS,
+    deps = DEPS + [ "//plaidml/bridge/openvino/tests/functional/plugin/plaidml/shared_tests_instances" ],  # TODO: need addon?
+    # TODO: `data` needed?
+    data = [
+        "//plaidml/bridge/openvino:libplaidml-plugin.so",
+        "//plaidml/bridge/openvino:plugins",
+    ],
+    linkopts = PLAIDML_LINKOPTS,  # TODO: Needed?
 )
 
 cc_library(
