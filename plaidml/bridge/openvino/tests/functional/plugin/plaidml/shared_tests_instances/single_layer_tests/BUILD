@@ -100,7 +100,7 @@ cc_library(
         ],
     ),
     copts = ["-Wno-deprecated-declarations"],
-    tags = TAGS,
+    tags = TAGS,  # TODO
     deps = DEPS + [ "//plaidml/bridge/openvino/tests/functional/plugin/plaidml/shared_tests_instances" ],  # TODO: need addon?
     # data = DATA,  # TODO: Needed?
     # linkopts = PLAIDML_LINKOPTS,  # TODO: Needed?
@@ -174,7 +174,7 @@ cc_library(
             "tan.cpp",
             "tile.cpp",
             "transpose.cpp",   # TODO: Broken not missing
-            "unsqueeze",
+            "unsqueeze.cpp",
             # Original Excludes
             "convert_like.cpp",  # Known errors
             "convolution.cpp",  # Long
@@ -204,8 +204,8 @@ cc_library(
         ],
     ),
     copts = ["-Wno-deprecated-declarations"],
-    tags = TAGS,
-    deps = DEPS,
+    tags = TAGS,  # TODO
+    deps = DEPS,  # TODO
 )
 
 cc_test(
