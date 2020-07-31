@@ -61,7 +61,6 @@ cc_test(
             "not_equal.cpp",                        # Known errors
             "reduce_logical_and.cpp",               # Known errors
             "reduce_logical_or.cpp",                # Known errors
-            "mvn.cpp",                              # Known errors
             "pooling.cpp",                          # Long, known errors
             "select.cpp",                           # Known errors
             "split.cpp",                            # Known errors
