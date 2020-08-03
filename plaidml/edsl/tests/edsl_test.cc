@@ -393,6 +393,18 @@ TEST_F(CppEdsl, DoubleDot) {
   runProgram(program);
 }
 
+TEST_F(CppEdsl, BigDot) {
+  int64_t M = 2048;
+  int64_t N = 2048;
+  int64_t K = 2048;
+  auto A = Placeholder(DType::FLOAT32, {M, K});
+  auto B = Placeholder(DType::FLOAT32, {K, N});
+  auto C = Dot(A, B);
+  auto program = makeProgram("dot", {C});
+
+  runProgram(program);
+}
+
 TEST_F(CppEdsl, Max) {
   auto A = Placeholder(DType::FLOAT32, {3, 3});
   TensorDim I, J, K;
