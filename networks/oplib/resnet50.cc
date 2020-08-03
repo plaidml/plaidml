@@ -28,7 +28,8 @@ edsl::Tensor block(             //
     bool use_shortcut_conv,     //
     StringRef base_name) {
   // Add a tracepoint for diagnostics
-  auto I = edsl::trace(I_raw, base_name.str());
+  // auto I = edsl::trace(I_raw, base_name.str());
+  auto I = I_raw;
   // Note: The branch1 weights/biases are at the _end_ of the input vectors,
   // as their existence depends on use_shortcut_conv
   auto conv_2a = op::convolution(I, W[0])
@@ -331,8 +332,10 @@ edsl::Program build(int64_t batch_size, const edsl::Tensor& I, ArrayRef<edsl::Te
   auto W_dense = W[53];
   auto B_dense = B[53];
   auto dense = op::dot(global_mean, W_dense) + B_dense;
-  auto softmax = op::softmax(dense, 1);
-  return edsl::ProgramBuilder("resnet50", {edsl::trace(softmax, "done")}).compile();
+  // op::softmax(dense, 1);
+  // return edsl::ProgramBuilder("resnet50", {edsl::trace(softmax, "done")}).compile();
+  auto softmax = dense;
+  return edsl::ProgramBuilder("resnet50", {softmax}).compile();
 }
 
 }  // namespace
