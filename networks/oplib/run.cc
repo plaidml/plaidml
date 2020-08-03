@@ -15,7 +15,8 @@ int main(int argc, char** argv) {
     plaidml::exec::init();
     auto program = networks::oplib::buildResnet50();
     // std::cout << program.str() << std::endl;
-    auto executable = plaidml::exec::Binder(program).compile();
+    auto binder = plaidml::exec::Binder(program);
+    auto executable = binder.compile();
     std::cout << "Running..." << std::endl;
     executable->run();
     return EXIT_SUCCESS;
