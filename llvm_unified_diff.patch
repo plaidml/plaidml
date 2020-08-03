@@ -1,0 +1,205 @@
+--- llvm\include\llvm\ADT\StringMap.h	2020-06-22 13:29:03.000000000 +0200
++++ llvm\include\llvm\ADT\StringMap.h	2020-07-10 01:37:22.000000000 +0200
+@@ -463,13 +463,18 @@
+ 
+   StringRef &operator*() {
+     Key = this->wrapped()->getKey();
+     return Key;
+   }
+ 
++  StringRef &operator*() const {
++    Key = this->wrapped()->getKey();
++    return Key;
++  }
++
+ private:
+   StringRef Key;
+ };
+ 
+ } // end namespace llvm
+ 
+ #endif // LLVM_ADT_STRINGMAP_H
+--- mlir\lib\Conversion\GPUToSPIRV\ConvertGPUToSPIRV.cpp	2020-06-22 13:29:03.000000000 +0200
++++ mlir\lib\Conversion\GPUToSPIRV\ConvertGPUToSPIRV.cpp	2020-07-13 01:10:30.000000000 +0200
+@@ -12,12 +12,13 @@
+ #include "mlir/Conversion/GPUToSPIRV/ConvertGPUToSPIRV.h"
+ #include "mlir/Dialect/GPU/GPUDialect.h"
+ #include "mlir/Dialect/SCF/SCF.h"
+ #include "mlir/Dialect/SPIRV/SPIRVDialect.h"
+ #include "mlir/Dialect/SPIRV/SPIRVLowering.h"
+ #include "mlir/Dialect/SPIRV/SPIRVOps.h"
++#include "mlir/Dialect/SPIRV/TargetAndABI.h"
+ #include "mlir/IR/Module.h"
+ 
+ using namespace mlir;
+ 
+ namespace {
+ 
+@@ -433,15 +434,23 @@
+ // ModuleOp with gpu.module.
+ //===----------------------------------------------------------------------===//
+ 
+ LogicalResult GPUModuleConversion::matchAndRewrite(
+     gpu::GPUModuleOp moduleOp, ArrayRef<Value> operands,
+     ConversionPatternRewriter &rewriter) const {
++  auto addressingModel = spirv::AddressingModel::Logical;
++  auto memoryModel = spirv::MemoryModel::GLSL450;
++  auto targetEnv = spirv::lookupTargetEnvOrDefault(moduleOp);
++  for (auto cap : targetEnv.getCapabilities()) {
++    if (cap == spirv::Capability::Addresses)
++      addressingModel = spirv::AddressingModel::Physical64;
++    if (cap == spirv::Capability::Kernel)
++      memoryModel = spirv::MemoryModel::OpenCL;
++  }
+   auto spvModule = rewriter.create<spirv::ModuleOp>(
+-      moduleOp.getLoc(), spirv::AddressingModel::Logical,
+-      spirv::MemoryModel::GLSL450);
++      moduleOp.getLoc(), addressingModel, memoryModel);
+ 
+   // Move the region from the module op into the SPIR-V module.
+   Region &spvModuleRegion = spvModule.body();
+   rewriter.inlineRegionBefore(moduleOp.body(), spvModuleRegion,
+                               spvModuleRegion.begin());
+   // The spv.module build method adds a block with a terminator. Remove that
+--- mlir\lib\Dialect\LLVMIR\IR\LLVMDialect.cpp	2020-06-22 13:29:03.000000000 +0200
++++ mlir\lib\Dialect\LLVMIR\IR\LLVMDialect.cpp	2020-07-11 09:08:17.000000000 +0200
+@@ -934,12 +934,14 @@
+ // Verifier for LLVM::DialectCastOp.
+ //===----------------------------------------------------------------------===//
+ 
+ static LogicalResult verify(DialectCastOp op) {
+   auto verifyMLIRCastType = [&op](Type type) -> LogicalResult {
+     if (auto llvmType = type.dyn_cast<LLVM::LLVMType>()) {
++      if (llvmType.isStructTy())
++        return success();
+       if (llvmType.isVectorTy())
+         llvmType = llvmType.getVectorElementType();
+       if (llvmType.isIntegerTy() || llvmType.isBFloatTy() ||
+           llvmType.isHalfTy() || llvmType.isFloatTy() ||
+           llvmType.isDoubleTy()) {
+         return success();
+@@ -948,12 +950,15 @@
+                             "types, or vector of mentioned types.");
+     }
+     if (auto vectorType = type.dyn_cast<VectorType>()) {
+       if (vectorType.getShape().size() > 1)
+         return op.emitOpError("only 1-d vector is allowed");
+       type = vectorType.getElementType();
++    }
++    if (auto memRefType = type.dyn_cast<MemRefType>()) {
++      type = memRefType.getElementType();
+     }
+     if (type.isSignlessIntOrFloat())
+       return success();
+     // Note that memrefs are not supported. We currently don't have a use case
+     // for it, but even if we do, there are challenges:
+     // * if we allow memrefs to cast from/to memref descriptors, then the
+--- mlir\lib\Dialect\SPIRV\Transforms\LowerABIAttributesPass.cpp	2020-06-22 13:29:03.000000000 +0200
++++ mlir\lib\Dialect\SPIRV\Transforms\LowerABIAttributesPass.cpp	2020-07-13 02:39:02.000000000 +0200
+@@ -116,14 +116,20 @@
+   // Adds the spv.EntryPointOp after collecting all the interface variables
+   // needed.
+   SmallVector<Attribute, 1> interfaceVars;
+   if (failed(getInterfaceVariables(funcOp, interfaceVars))) {
+     return failure();
+   }
++
++  spirv::TargetEnv targetEnv(spirv::lookupTargetEnv(funcOp));
++  auto executionModel = spirv::ExecutionModel::GLCompute;
++  if (targetEnv.allows(spirv::Capability::Kernel))
++    executionModel = spirv::ExecutionModel::Kernel;
++
+   builder.create<spirv::EntryPointOp>(
+-      funcOp.getLoc(), spirv::ExecutionModel::GLCompute, funcOp, interfaceVars);
++      funcOp.getLoc(), executionModel, funcOp, interfaceVars);
+   // Specifies the spv.ExecutionModeOp.
+   auto localSizeAttr = entryPointAttr.local_size();
+   SmallVector<int32_t, 3> localSize(localSizeAttr.getValues<int32_t>());
+   builder.create<spirv::ExecutionModeOp>(
+       funcOp.getLoc(), funcOp, spirv::ExecutionMode::LocalSize, localSize);
+   funcOp.removeAttr(entryPointAttrName);
+@@ -136,12 +142,25 @@
+ ///
+ /// Specifically, this pattern creates global variables according to interface
+ /// variable ABI attributes attached to function arguments and converts all
+ /// function argument uses to those global variables. This is necessary because
+ /// Vulkan requires all shader entry points to be of void(void) type.
+ class ProcessInterfaceVarABI final : public SPIRVOpLowering<spirv::FuncOp> {
++public:
++  using SPIRVOpLowering<spirv::FuncOp>::SPIRVOpLowering;
++  LogicalResult
++  matchAndRewrite(spirv::FuncOp funcOp, ArrayRef<Value> operands,
++                  ConversionPatternRewriter &rewriter) const override;
++};
++
++/// A pattern to convert function signature according to interface variable ABI
++/// attributes for OpenCL contract.
++///
++/// Currently it only strips ABI attributes to make function legal,
++/// since OpenCL expects entry point functions to have normal arguments.
++class ProcessInterfaceVarABIForOpenCL final : public SPIRVOpLowering<spirv::FuncOp> {
+ public:
+   using SPIRVOpLowering<spirv::FuncOp>::SPIRVOpLowering;
+   LogicalResult
+   matchAndRewrite(spirv::FuncOp funcOp, ArrayRef<Value> operands,
+                   ConversionPatternRewriter &rewriter) const override;
+ };
+@@ -210,32 +229,52 @@
+     funcOp.setType(rewriter.getFunctionType(
+         signatureConverter.getConvertedTypes(), llvm::None));
+   });
+   return success();
+ }
+ 
++LogicalResult ProcessInterfaceVarABIForOpenCL::matchAndRewrite(
++    spirv::FuncOp funcOp, ArrayRef<Value> operands,
++    ConversionPatternRewriter &rewriter) const {
++  rewriter.startRootUpdate(funcOp);
++  auto context = funcOp.getContext();
++  auto attrName = spirv::getInterfaceVarABIAttrName();
++  auto attrId = Identifier::get(attrName, context);
++  for (auto argType : llvm::enumerate(funcOp.getType().getInputs())) {
++    // Remove ABI attributes
++    funcOp.removeArgAttr(argType.index(), attrId);
++  }
++  rewriter.finalizeRootUpdate(funcOp);
++  return success();
++}
++
+ void LowerABIAttributesPass::runOnOperation() {
+   // Uses the signature conversion methodology of the dialect conversion
+   // framework to implement the conversion.
+   spirv::ModuleOp module = getOperation();
+   MLIRContext *context = &getContext();
+ 
+   spirv::TargetEnv targetEnv(spirv::lookupTargetEnv(module));
+ 
+   SPIRVTypeConverter typeConverter(targetEnv);
+   OwningRewritePatternList patterns;
+-  patterns.insert<ProcessInterfaceVarABI>(context, typeConverter);
++  if (targetEnv.allows(spirv::Capability::Kernel)) {
++    // TODO Should it be the pattern that rejects/accepts depending on capabilities?
++    patterns.insert<ProcessInterfaceVarABIForOpenCL>(context, typeConverter);
++  } else {
++    patterns.insert<ProcessInterfaceVarABI>(context, typeConverter);
++  }
+ 
+   ConversionTarget target(*context);
+   // "Legal" function ops should have no interface variable ABI attributes.
+   target.addDynamicallyLegalOp<spirv::FuncOp>([&](spirv::FuncOp op) {
+-    StringRef attrName = spirv::getInterfaceVarABIAttrName();
+-    for (unsigned i = 0, e = op.getNumArguments(); i < e; ++i)
+-      if (op.getArgAttr(i, attrName))
+-        return false;
+-    return true;
++   StringRef attrName = spirv::getInterfaceVarABIAttrName();
++   for (unsigned i = 0, e = op.getNumArguments(); i < e; ++i)
++     if (op.getArgAttr(i, attrName))
++       return false;
++   return true;
+   });
+   // All other SPIR-V ops are legal.
+   target.markUnknownOpDynamicallyLegal([](Operation *op) {
+     return op->getDialect()->getNamespace() ==
+            spirv::SPIRVDialect::getDialectNamespace();
+   });
