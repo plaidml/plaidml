@@ -35,6 +35,7 @@ plaidml_cc_library(
         "//pmlc/compiler",
         "//pmlc/target/demo",
         "//pmlc/target/intel_gen",
+        "//pmlc/target/intel_gen_ocl_spirv",
         "//pmlc/target/x86",
         "//pmlc/util",
     ],
