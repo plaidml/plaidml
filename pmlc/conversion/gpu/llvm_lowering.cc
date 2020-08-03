@@ -103,10 +103,11 @@ struct ConvertToLLVMPass
 
     OwningRewritePatternList patterns;
     populateStdToLLVMBarePtrConversionPatterns(typeConverter, patterns,
-                                               /*useAlloca=*/true);
+                                               /*useAlloca=*/false);
 
     ConversionTarget target(*context);
     target.addLegalDialect<LLVM::LLVMDialect>();
+    target.addIllegalOp<LLVM::DialectCastOp>();
     if (failed(applyPartialConversion(module, target, patterns))) {
       signalPassFailure();
     }

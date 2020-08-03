@@ -151,18 +151,32 @@ public:
     auto target_env = getOperation().getAttrOfType<spirv::TargetEnvAttr>(
         spirv::getTargetEnvAttrName());
     if (!target_env) {
-      auto triple = spirv::VerCapExtAttr::get(
-          spirv::Version::V_1_0,
-          {spirv::Capability::Shader, spirv::Capability::Int64,
-           spirv::Capability::Int16, spirv::Capability::Int8,
-           spirv::Capability::Float64, spirv::Capability::Float16},
-          ArrayRef<spirv::Extension>(
-              spirv::Extension::SPV_KHR_storage_buffer_storage_class),
-          &getContext());
-      getOperation().setAttr(
-          spirv::getTargetEnvAttrName(),
-          spirv::TargetEnvAttr::get(
-              triple, spirv::getDefaultResourceLimits(&getContext())));
+      if (!oclCapabilities.getValue()) {
+        auto triple = spirv::VerCapExtAttr::get(
+            spirv::Version::V_1_0,
+            {spirv::Capability::Shader, spirv::Capability::Int64,
+             spirv::Capability::Int16, spirv::Capability::Int8,
+             spirv::Capability::Float64, spirv::Capability::Float16},
+            ArrayRef<spirv::Extension>(
+                spirv::Extension::SPV_KHR_storage_buffer_storage_class),
+            &getContext());
+        getOperation().setAttr(
+            spirv::getTargetEnvAttrName(),
+            spirv::TargetEnvAttr::get(
+                triple, spirv::getDefaultResourceLimits(&getContext())));
+      } else {
+        auto triple = spirv::VerCapExtAttr::get(
+            spirv::Version::V_1_0,
+            {spirv::Capability::Kernel, spirv::Capability::Int64,
+             spirv::Capability::Int16, spirv::Capability::Int8,
+             spirv::Capability::Float64, spirv::Capability::Float16,
+             spirv::Capability::Addresses},
+            ArrayRef<spirv::Extension>(), &getContext());
+        getOperation().setAttr(
+            spirv::getTargetEnvAttrName(),
+            spirv::TargetEnvAttr::get(
+                triple, spirv::getDefaultResourceLimits(&getContext())));
+      }
     }
 
     SymbolTable symbolTable(getOperation());

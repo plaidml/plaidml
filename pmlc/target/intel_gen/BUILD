@@ -21,6 +21,7 @@ plaidml_cc_library(
         "@llvm-project//mlir:GPUTransforms",
         "@llvm-project//mlir:LLVMTransforms",
         "@llvm-project//mlir:SCFToGPUPass",
+        "//pmlc/rt/vulkan"
     ],
     alwayslink = 1,
 )

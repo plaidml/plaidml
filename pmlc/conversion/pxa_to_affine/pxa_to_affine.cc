@@ -110,6 +110,10 @@ struct AffineParallelOpConversion
       rewriter.setInsertionPointToStart(&af.region().front());
       ivs.push_back(af.getInductionVar());
     }
+    for (unsigned i = op.lowerBoundsMap().getNumResults(); i < 2; ++i) {
+      auto af = rewriter.create<mlir::AffineForOp>(op.getLoc(), 0, 1, 1);
+      rewriter.setInsertionPointToStart(&af.region().front());
+    }
     // Move ParallelOp's operations (single block) to Affine innermost loop.
     auto &innerLoopOps = rewriter.getInsertionBlock()->getOperations();
     auto &parallelBodyOps = op.region().front().getOperations();
