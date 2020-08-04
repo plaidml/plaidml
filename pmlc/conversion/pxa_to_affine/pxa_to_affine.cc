@@ -129,7 +129,6 @@ struct AffineReduceOpConversion
   LogicalResult
   matchAndRewrite(pxa::AffineReduceOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
-    IVLOG(1, "HERE");
     auto source = rewriter.create<AffineLoadOp>(op.getLoc(), op.mem(), op.map(),
                                                 op.idxs());
     auto reduce = createReduction(rewriter, op, source.getResult());
