@@ -11,8 +11,9 @@
 
 namespace mlir {
 
-// Generally useful helper function
-int64_t GetIVStep(BlockArgument arg);
+// Get the step for a block argument as an IV of an affine.for or
+// affine.parallel
+int64_t getIVStep(BlockArgument arg);
 
 struct StrideRange {
   bool valid;

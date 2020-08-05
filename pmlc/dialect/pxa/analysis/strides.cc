@@ -30,7 +30,7 @@ static std::string getUniqueName(Block *ref, BlockArgument arg) {
 }
 
 // Generally useful helper function
-int64_t GetIVStep(BlockArgument arg) {
+int64_t getIVStep(BlockArgument arg) {
   // Check the kind of loop we are part of, and dispatch.
   Operation *baseOp = arg.getOwner()->getParentOp();
 
@@ -186,7 +186,7 @@ AffineValueExpr StrideInfo::toValueExpr(MLIRContext *ctx) const {
     } else {
       llvm_unreachable("Invalid op type in toValueMap");
     }
-    int64_t step = GetIVStep(kvp.first);
+    int64_t step = getIVStep(kvp.first);
     assert(kvp.second % step == 0 && "Stride not divisible by step");
     tot = tot + idx * (kvp.second / step);
   }
