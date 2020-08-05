@@ -41,7 +41,7 @@ AffineValueExpr AffineValueExpr::operator-(const AffineValueExpr &rhs) const {
 }
 
 AffineValueExpr AffineValueExpr::operator-(int64_t rhs) const {
-  return *this - rhs;
+  return *this - AffineValueExpr(expr.getContext(), rhs);
 }
 
 AffineExpr AffineValueExpr::getExpr() const { return expr; }
