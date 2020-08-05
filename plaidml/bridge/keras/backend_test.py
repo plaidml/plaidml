@@ -1702,7 +1702,6 @@ class TestBackendOps(unittest.TestCase):
         [m(3, 2, 4), n(3, 2, 4), 0],
         [m(2, 3), n(2, 3), 1],
     ])
-    @unittest.skip("'eltwise.select' op operand #0 must be eltwise-bool, but got 'tensor<f32>'")
     def testSwitch(self, b, e, t, c):
         c_tensor = b.variable(c)
         return [
