@@ -59,6 +59,6 @@ namespace SideEffects = mlir::SideEffects;
 #define GET_OP_CLASSES
 #include "pmlc/dialect/eltwise/ir/ops.h.inc"
 
-#include "pmlc/dialect/eltwise/ir/interfacesDialect.h.inc"
+#include "pmlc/dialect/eltwise/ir/dialect.h.inc"
 
 } // namespace pmlc::dialect::eltwise
