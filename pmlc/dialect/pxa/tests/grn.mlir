@@ -8,6 +8,7 @@
 // RUN:   -canonicalize \
 // RUN:   -pxa-localize \
 // RUN:   -pxa-resize-tmps \
+// RUN:   --canonicalize \
 // RUN:   %s | FileCheck %s
 
 #map0 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>

@@ -6,9 +6,14 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Optional.h"
 
+#include "pmlc/dialect/pxa/analysis/affine_expr.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
 
 namespace mlir {
+
+// Get the step for a block argument as an IV of an affine.for or
+// affine.parallel
+int64_t getIVStep(BlockArgument arg);
 
 struct StrideRange {
   bool valid;
@@ -35,6 +40,16 @@ struct StrideRange {
     return ret;
   }
 
+  int64_t count() {
+    if (!valid) {
+      return 0;
+    }
+    if (stride == 0) {
+      return 1;
+    }
+    return (maxVal - minVal) / stride + 1;
+  }
+
   void unionEquals(const StrideRange &rhs);
 };
 
@@ -46,6 +61,7 @@ struct StrideInfo {
   int64_t offset;
   DenseMap<BlockArgument, int64_t> strides;
 
+  explicit StrideInfo(BlockArgument arg) : offset(0), strides({{arg, 1}}) {}
   explicit StrideInfo(int64_t offset = 0) : offset(offset) {}
 
   bool operator==(const StrideInfo &rhs) const {
@@ -53,6 +69,11 @@ struct StrideInfo {
   }
   StrideInfo &operator*=(int64_t factor);
   StrideInfo &operator+=(const StrideInfo &rhs);
+  StrideInfo operator+(const StrideInfo &rhs) {
+    StrideInfo r = *this;
+    r += rhs;
+    return r;
+  }
 
   // Compute the outer and inner portion of stride info with respect to a given
   // block.
@@ -62,10 +83,14 @@ struct StrideInfo {
   // Return the range of a given stride info if it's computable
   StrideRange range() const;
 
-  AffineExpr toExpr(MLIRContext *ctx, ValueRange operands) const;
+  // Convert a StrideInfo back into an affine expression
+  AffineValueExpr toValueExpr(MLIRContext *ctx) const;
 
   void print(raw_ostream &os, Block *relative = nullptr) const;
 };
+
+// Convert a vector of StrideInfo's into a value map
+AffineValueMap StridesToValueMap(MLIRContext *ctx, ArrayRef<StrideInfo> dims);
 
 // Compute stride info for a given affine value (such an an induction variable
 // or the result of an affine.apply). Return None if the expression is not a
