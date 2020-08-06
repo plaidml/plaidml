@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <unordered_map>
+#include <vector>
 
 #include "llvm/ADT/TypeSwitch.h"
 
@@ -25,6 +26,7 @@ using mlir::MulFOp;
 using mlir::MulIOp;
 using mlir::SubFOp;
 using mlir::SubIOp;
+using mlir::VectorType;
 using mlir::VectorUnrollOpInterface;
 
 using pmlc::dialect::pxa::AffineReduceOp;
@@ -52,6 +54,8 @@ private:
   unsigned vectorSize;
   unsigned minElemWidth;
   std::unordered_map<Operation *, OpVectState> vectorizableOps;
+  unsigned numElementsInRegister;
+  VectorType vecType;
 
   bool tryVectorizeOperation(Operation *op) {
     bool ret = true;
@@ -133,16 +137,36 @@ private:
         width = std::max(w, width);
       }
     }
+    IVLOG(1, "Lubo31:" << width);
+
     return width;
+  }
+
+  // Get the element type.
+  Type getElementType(AffineParallelOp forOp) {
+    for (auto &op : forOp.getLoopBody().front()) {
+      if (auto load = mlir::dyn_cast<AffineLoadOp>(op)) {
+        return load.getResult().getType();
+      }
+    }
+    llvm_unreachable("Vectorize: Nlo load operation to get element type");
   }
 
 public:
   Impl(AffineParallelOp op, BlockArgument index, unsigned vectorSize,
        unsigned minElemWidth)
       : op(op), index(index), vectorSize(vectorSize),
-        minElemWidth(minElemWidth) {}
+        minElemWidth(minElemWidth), numElementsInRegister(0) {}
 
-  void fixupSteps(AffineParallelOp op, unsigned argNum) {
+  void fixupSteps(AffineParallelOp op, AffineParallelOp newOp, unsigned argNum,
+                  OpBuilder builder) {
+    std::vector<int64_t> newSteps;
+    for (unsigned int i = 0; i < op.getIVs().size(); i++) {
+      newSteps.push_back(op.steps().getValue()[i].cast<IntegerAttr>().getInt() *
+                         (i == argNum ? numElementsInRegister : 1));
+    }
+    newOp.setAttr(AffineParallelOp::getStepsAttrName(),
+                  builder.getI64ArrayAttr(newSteps));
     // TODO: Fix up steps.
   }
 
@@ -171,6 +195,8 @@ public:
                   /*reductions=*/
                   ArrayRef<mlir::AtomicRMWKind>{mlir::AtomicRMWKind::assign},
                   /*ranges=*/ArrayRef<int64_t>({64, 64, 64})); // TODO:
+
+          fixupSteps(op, newAffineParallelOp, argNum, builder);
 
           IVLOG(1, "Lubo8: " << mlir::debugString(
                        *newAffineParallelOp.getOperation()));
@@ -261,7 +287,13 @@ public:
       return false;
     }
 
-    unsigned numElementsInRegister = vectorSize / elementWidth;
+    numElementsInRegister = vectorSize / elementWidth;
+
+    IVLOG(1, "Lubo30:" << numElementsInRegister << ":" << vectorSize << ":"
+                       << elementWidth);
+
+    vecType = VectorType::get(ArrayRef<int64_t>{numElementsInRegister},
+                              getElementType(op)); // TODO: Use shape...
 
     auto argNum = index.getArgNumber();
     if (((*ranges)[argNum] % numElementsInRegister) > 0) {
