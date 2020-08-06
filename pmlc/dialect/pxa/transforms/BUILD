@@ -32,12 +32,16 @@ plaidml_cc_library(
         "stencil_gemm.cc",
         "test_analysis.cc",
         "tile.cc",
+        "vectorize.cc",
+        "vectorizepass.cc",
     ],
     hdrs = [
         "autotile.h",
         "passes.h",
         "stencil.h",
         "tile.h",
+        "vectorize.h",
+
     ],
     deps = [
         ":gen-pass",
