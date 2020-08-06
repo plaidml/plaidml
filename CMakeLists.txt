@@ -19,7 +19,6 @@ project(PlaidML LANGUAGES CXX C)
 
 include(FetchContent)
 
-set(CMAKE_CXX_STANDARD 17 CACHE STRING "C++ standard to conform to")
 
 SET(LLVM_COMMIT f00f71b2a279449c04796e28b3b7bb0e06c945bf)
 #-------------------------------------------------------------------------------
@@ -50,22 +49,41 @@ if(NOT llvm_project_POPULATED)
   #find_package(MLIR PATHS ${CMAKE_BINARY_DIR}/lib/cmake/mlir/)
   add_subdirectory(${llvm_project_SOURCE_DIR}/llvm ${llvm_project_BINARY_DIR} EXCLUDE_FROM_ALL)
 endif()
-list(APPEND CMAKE_MODULE_PATH "${llvm_project_SOURCE_DIR}/llvm/cmake/modules")
 
-#set(LLVM_RUNTIME_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/bin)
-#set(LLVM_LIBRARY_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/lib)
-#set(MLIR_BINARY_DIR ${CMAKE_BINARY_DIR})
 list(APPEND LLVM_INCLUDE_DIRS ${llvm_project_SOURCE_DIR}/llvm/include ${llvm_project_BINARY_DIR}/include)
 list(APPEND MLIR_INCLUDE_DIRS ${llvm_project_SOURCE_DIR}/mlir/include ${llvm_project_BINARY_DIR}/tools/mlir/include)
-
 
 include_directories(${LLVM_INCLUDE_DIRS})
 include_directories(${MLIR_INCLUDE_DIRS})
 include_directories(${PROJECT_SOURCE_DIR}/include)
 include_directories(${PROJECT_BINARY_DIR}/include)
 
-# link_directories(${LLVM_BUILD_LIBRARY_DIR})
-# add_definitions(${LLVM_DEFINITIONS})
+#####
+# Easylogging
+####
+FetchContent_Declare(
+  easyloggingpp
+  FETCHCONTENT_QUIET OFF
+  URL https://github.com/amrayn/easyloggingpp/archive/v9.96.7.tar.gz
+  URL_HASH SHA256=237c80072b9b480a9f2942b903b4b0179f65e146e5dcc64864dc91792dedd722
+)
+FetchContent_GetProperties(easloggingpp)
+if(NOT easyloggingpp_POPULATED)
+  FetchContent_Populate(easyloggingpp)
+  #find_package(MLIR PATHS ${CMAKE_BINARY_DIR}/lib/cmake/mlir/)
+  add_subdirectory(${easyloggingpp_SOURCE_DIR} ${easyloggingpp_BINARY_DIR}EXCLUDE_FROM_ALL)
+endif()
+include_directories(${easyloggingpp_SOURCE_DIR}/src)
+
+#####
+# Plaidml
+#####
+
+# C++
+set(CMAKE_CXX_STANDARD 17 CACHE STRING "C++ standard to conform to")
+list(APPEND ${PMLC_DEFAULT_COPTS} -Wno-c++17-extensions)
+# Obviously too broad, can be addressed later
 include_directories(./)
 include_directories(${CMAKE_BINARY_DIR})
+
 add_subdirectory(pmlc)

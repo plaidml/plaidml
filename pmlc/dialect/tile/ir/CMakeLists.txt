@@ -11,13 +11,15 @@ add_mlir_dialect_library(PMLCEltwise
         ADDITIONAL_HEADER_DIRS
 
         DEPENDS
-          MLIROpAsmInterfaceIncGen
-          PMLCeltwiseDialectGen
-          PMLCeltwiseInterfacesGen
-          PMLCutilInterfacesGen
+                MLIROpAsmInterfaceIncGen
+                PMLCeltwiseDialectGen
+                PMLCeltwiseInterfacesGen
+                PMLCutilInterfacesGen
         LINK_LIBS 
-          PUBLIC 
-          MLIRIR
-          MLIRSideEffectInterfaces
-          MLIRStandardOps
-  )
+                PUBLIC 
+                MLIRIR
+                MLIRSideEffectInterfaces
+                MLIRStandardOps
+ )
+target_compile_options(PMLCEltwise PUBLIC ${PMLC_DEFAULT_COPTS})
+
