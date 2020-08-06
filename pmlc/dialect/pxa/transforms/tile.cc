@@ -7,6 +7,13 @@ namespace pmlc::dialect::pxa {
 using mlir::AffineParallelOp;
 
 void performTiling(AffineParallelOp op, llvm::ArrayRef<int64_t> tileSizes) {
+  // Extract steps (TODO: this should be a utility on affine.parallel)
+  auto oldStepsArray = op.steps().cast<ArrayAttr>().getValue();
+  llvm::SmallVector<int64_t, 6> oldSteps;
+  for (auto ia : oldStepsArray) {
+    oldSteps.push_back(ia.cast<IntegerAttr>().getInt());
+  }
+  // Make builder
   mlir::OpBuilder builder(op.getBody(), op.getBody()->begin());
   mlir::Block *outerBody = op.getBody();
   // Verify sizes match
@@ -14,6 +21,10 @@ void performTiling(AffineParallelOp op, llvm::ArrayRef<int64_t> tileSizes) {
   assert(op.lowerBoundsMap().getNumResults() == dimCount);
   // Fail on no dimensions (TODO: should we handle this case anyway?)
   assert(dimCount > 0);
+  // Check that tile sizes is a multiple of original steps
+  for (size_t i = 0; i < dimCount; i++) {
+    assert(tileSizes[i] % oldSteps[i] == 0);
+  }
   // Make the maps for the inner parallel
   llvm::SmallVector<mlir::AffineExpr, 8> lbExprs;
   llvm::SmallVector<mlir::AffineExpr, 8> ubExprs;
@@ -55,11 +66,8 @@ void performTiling(AffineParallelOp op, llvm::ArrayRef<int64_t> tileSizes) {
   builder.create<AffineYieldOp>(op.getLoc(), inner.getResults());
   // Update outer step size
   llvm::SmallVector<int64_t, 8> newSteps;
-  auto oldSteps = op.steps().cast<ArrayAttr>().getValue();
-  for (size_t i = 0; i < dimCount; i++) {
-    newSteps.push_back(oldSteps[i].cast<IntegerAttr>().getInt() * tileSizes[i]);
-  }
-  op.setSteps(newSteps);
+  inner.setSteps(oldSteps);
+  op.setSteps(tileSizes);
 }
 
 } // namespace pmlc::dialect::pxa
