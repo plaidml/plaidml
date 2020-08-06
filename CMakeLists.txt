@@ -55,7 +55,7 @@ list(APPEND CMAKE_MODULE_PATH "${llvm_project_SOURCE_DIR}/llvm/cmake/modules")
 #set(LLVM_RUNTIME_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/bin)
 #set(LLVM_LIBRARY_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/lib)
 #set(MLIR_BINARY_DIR ${CMAKE_BINARY_DIR})
-list(APPEND LLVM_INCLUDE_DIRS ${llvm_project_SOURCE_DIR}/llvm/include)
+list(APPEND LLVM_INCLUDE_DIRS ${llvm_project_SOURCE_DIR}/llvm/include ${llvm_project_BINARY_DIR}/include)
 list(APPEND MLIR_INCLUDE_DIRS ${llvm_project_SOURCE_DIR}/mlir/include ${llvm_project_BINARY_DIR}/tools/mlir/include)
 
 
