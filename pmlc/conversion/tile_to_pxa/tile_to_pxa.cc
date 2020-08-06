@@ -170,8 +170,17 @@ static Value createCastOp(OpBuilder &builder, Location loc, Value from,
       return builder.create<mlir::FPTruncOp>(loc, from, intoType).getResult();
     }
     if (auto fromIntType = fromType.dyn_cast<IntegerType>()) {
-      // SIToFPOp: IntegerType -> FloatType
-      return builder.create<mlir::SIToFPOp>(loc, from, intoType).getResult();
+      if (fromIntType.getWidth() == 1) {
+        // If UIToFPOp existed, we would use it, but it currently does not.
+        // Converting i1 as signed gives us [0,-1] rather than [0,1].
+        // We can hack our way around this by negating the result.
+        auto raw =
+            builder.create<mlir::SIToFPOp>(loc, from, intoType).getResult();
+        return builder.create<mlir::NegFOp>(loc, raw);
+      } else {
+        // SIToFPOp: IntegerType -> FloatType
+        return builder.create<mlir::SIToFPOp>(loc, from, intoType).getResult();
+      }
     }
     if (auto fromIndexType = fromType.dyn_cast<IndexType>()) {
       auto i64Type = builder.getIntegerType(64);
@@ -274,6 +283,18 @@ struct AnyComparandIs : Matcher {
     auto operands = adaptor.operands();
     InnerPredicate pred;
     return pred.match(operands[0].getType()) ||
+           pred.match(operands[1].getType());
+  }
+};
+
+template <typename InnerPredicate>
+struct ComparandsAre : Matcher {
+  bool match(Operation *op) const final {
+    SmallVector<Value, 4> allOperands(op->getOperands());
+    ContractionOpAdaptor adaptor(allOperands);
+    auto operands = adaptor.operands();
+    InnerPredicate pred;
+    return pred.match(operands[0].getType()) &&
            pred.match(operands[1].getType());
   }
 };
@@ -1144,10 +1165,10 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
                                 ResultIs<EltwiseInteger>>,
         ContractionOpConversion<CombinationKind::eq,
                                 CmpFloatOp<CmpFPredicate::OEQ>,
-                                ResultIs<EltwiseFloat>>,
+                                AnyComparandIs<EltwiseFloat>>,
         ContractionOpConversion<CombinationKind::eq,
                                 CmpIntOp<CmpIPredicate::eq>,
-                                ResultIs<EltwiseInteger>>,
+                                ComparandsAre<EltwiseInteger>>,
         ContractionOpConversion<CombinationKind::cond,
                                 CondOp<CmpFloatOp<CmpFPredicate::OEQ>>,
                                 AnyComparandIs<EltwiseFloat>>,
