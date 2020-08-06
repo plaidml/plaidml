@@ -28,18 +28,6 @@ public:
   const char *data() const { return data_; }
   size_t size() const { return size_; }
 
-  // Helper accessors
-  char &operator[](size_t pos) { return data_[pos]; }
-  const char &operator[](size_t pos) const { return data_[pos]; }
-  char *begin() { return data_; }
-  const char *begin() const { return data_; }
-  const char *cbegin() const { return data_; }
-  char *end() { return data_ + size_; }
-  const char *end() const { return data_ + size_; }
-  const char *cend() const { return data_ + size_; }
-
-  std::string str() const { return std::string(cbegin(), cend()); }
-
 protected:
   View() {}
   View(char *data, size_t size) : data_{data}, size_{size} {}
