@@ -1,0 +1,11 @@
+# Declare a dialect in the include directory
+function(pmlc_add_mlir_dialect dialect dialect_namespace)
+  set(LLVM_TARGET_DEFINITIONS ${dialect}.td)
+  mlir_tablegen(${dialect}.h.inc -gen-op-decls)
+  mlir_tablegen(${dialect}.cpp.inc -gen-op-defs)
+  mlir_tablegen(${dialect}Dialect.h.inc -gen-dialect-decls -dialect=${dialect_namespace})
+  add_public_tablegen_target(PMLC-${dialect_namespace}-${dialect}IncGen)
+  add_dependencies(mlir-headers PMLC-${dialect_namespace}-${dialect}IncGen)
+endfunction()
+add_subdirectory(util)
+add_subdirectory(dialect)
