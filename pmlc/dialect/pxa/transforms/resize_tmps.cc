@@ -32,7 +32,7 @@ struct ResizeTmpsPass : public ResizeTmpsBase<ResizeTmpsPass> {
       auto innerStride = (*strides)[i].inner(block);
       inner.push_back(innerStride);
     }
-    return StridesToValueMap(orig.getContext(), inner);
+    return convertToValueMap(orig.getContext(), inner);
   }
 
   void runOnAlloc(AllocOp op) {

@@ -97,7 +97,7 @@ struct StrideInfo {
 };
 
 // Convert a vector of StrideInfo's into a value map
-AffineValueMap StridesToValueMap(MLIRContext *ctx, ArrayRef<StrideInfo> dims);
+AffineValueMap convertToValueMap(MLIRContext *ctx, ArrayRef<StrideInfo> dims);
 
 // Compute stride info for a given affine value (such an an induction variable
 // or the result of an affine.apply). Return None if the expression is not a

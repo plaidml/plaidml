@@ -216,7 +216,7 @@ void StrideInfo::print(raw_ostream &os, Block *relative) const {
   os << ']';
 }
 
-AffineValueMap StridesToValueMap(MLIRContext *ctx, ArrayRef<StrideInfo> dims) {
+AffineValueMap convertToValueMap(MLIRContext *ctx, ArrayRef<StrideInfo> dims) {
   SmallVector<AffineValueExpr, 4> exprs;
   for (const auto &si : dims) {
     exprs.push_back(si.toValueExpr(ctx));
