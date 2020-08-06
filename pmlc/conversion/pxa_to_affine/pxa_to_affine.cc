@@ -180,8 +180,8 @@ struct AffineReduceOpConversion
                   ConversionPatternRewriter &rewriter) const final {
     auto source = rewriter.create<AffineLoadOp>(op.getLoc(), op.mem(), op.map(),
                                                 op.idxs());
-    auto reduce = createReduction(rewriter, op.getLoc(), op.agg(), op.val(),
-                                  source.getResult());
+    auto reduce = createReduction(rewriter, op.getLoc(), op.agg(),
+                                  source.getResult(), op.val());
     rewriter.create<AffineStoreOp>(op.getLoc(), reduce, op.mem(), op.map(),
                                    op.idxs());
     op.replaceAllUsesWith(op.mem());
@@ -203,8 +203,8 @@ struct AffineVectorReduceOpConversion
     auto mapAttr = AffineMapAttr::get(op.map());
     // Set the map attribute
     source.setAttr(AffineVectorLoadOp::getMapAttrName(), mapAttr);
-    auto reduce = createReduction(rewriter, op.getLoc(), op.agg(), op.vector(),
-                                  source.getResult());
+    auto reduce = createReduction(rewriter, op.getLoc(), op.agg(),
+                                  source.getResult(), op.vector());
     auto dest = rewriter.create<AffineVectorStoreOp>(
         op.getLoc(), ArrayRef<Type>{}, reduce, op.mem(), op.idxs());
     // Set the map attribute
