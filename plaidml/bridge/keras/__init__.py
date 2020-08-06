@@ -1644,8 +1644,9 @@ def sum(x, axis=None, keepdims=False):
 
 @_log_call
 def switch(condition, then_expression, else_expression):
+    bool_condition = cast(condition, dtype='bool')
     return _KerasNode('switch',
-                      tensor=edsl.select(condition.tensor, then_expression.tensor,
+                      tensor=edsl.select(bool_condition.tensor, then_expression.tensor,
                                          else_expression.tensor))
 
 
