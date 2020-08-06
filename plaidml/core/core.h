@@ -351,6 +351,16 @@ struct Settings {
   static void set(const std::string& key, const std::string& value) {
     ffi::call_void(plaidml_settings_set, key.c_str(), value.c_str());
   }
+
+  ///
+  /// Sets the setting specified by `key` to the `value` specified, iff that
+  /// setting has not already been set.
+  /// \param key string
+  /// \param value string
+  ///
+  static void setDefault(const std::string& key, const std::string& value) {
+    ffi::call_void(plaidml_settings_set_default, key.c_str(), value.c_str());
+  }
 };
 
 inline std::ostream& operator<<(std::ostream& os, const TensorShape& x) {

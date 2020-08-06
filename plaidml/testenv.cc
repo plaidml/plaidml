@@ -14,8 +14,8 @@ class Environment : public ::testing::Environment {
     plaidml::edsl::init();
     plaidml::op::init();
     plaidml::exec::init();
-    plaidml::Settings::set("PLAIDML_DEVICE", "llvm_cpu.0");
-    plaidml::Settings::set("PLAIDML_TARGET", "llvm_cpu");
+    plaidml::Settings::setDefault("PLAIDML_DEVICE", "llvm_cpu.0");
+    plaidml::Settings::setDefault("PLAIDML_TARGET", "llvm_cpu");
   }
 };
 

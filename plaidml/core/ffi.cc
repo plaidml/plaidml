@@ -201,6 +201,15 @@ void plaidml_settings_set(  //
   });
 }
 
+void plaidml_settings_set_default(  //
+    plaidml_error* err,             //
+    const char* key,                //
+    const char* value) {
+  ffi_wrap_void(err, [&] {  //
+    Settings::Instance()->setDefault(key, value);
+  });
+}
+
 const char* plaidml_string_ptr(plaidml_string* str) {  //
   return str->str.c_str();
 }

@@ -52,6 +52,18 @@ void Settings::set(const std::string& key, const std::string& value) {
   pmlc::util::setEnvVar(key, value);
 }
 
+void Settings::setDefault(const std::string& key, const std::string& value) {
+  auto [it, inserted] = settings_.emplace(key, value);
+  if (inserted) {
+    auto env_var = pmlc::util::getEnvVar(key);
+    if (env_var.size()) {
+      it->second = env_var;
+    } else {
+      pmlc::util::setEnvVar(key, value);
+    }
+  }
+}
+
 void Settings::load() {
   auto settings_path = get("PLAIDML_SETTINGS");
   if (!fs::exists(settings_path)) {

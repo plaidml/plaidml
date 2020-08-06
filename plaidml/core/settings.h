@@ -16,6 +16,7 @@ class Settings {
   const std::map<std::string, std::string>& all() const;
   std::string get(const std::string& key) const;
   void set(const std::string& key, const std::string& value);
+  void setDefault(const std::string& key, const std::string& value);
 
   void load();
   void save();

@@ -123,6 +123,11 @@ void plaidml_settings_set(  //
     const char* key,        //
     const char* value);
 
+void plaidml_settings_set_default(  //
+    plaidml_error* err,             //
+    const char* key,                //
+    const char* value);
+
 void plaidml_settings_load(  //
     plaidml_error* err);
 
