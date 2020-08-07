@@ -170,16 +170,12 @@ static Value createCastOp(OpBuilder &builder, Location loc, Value from,
       return builder.create<mlir::FPTruncOp>(loc, from, intoType).getResult();
     }
     if (auto fromIntType = fromType.dyn_cast<IntegerType>()) {
-      if (fromIntType.getWidth() == 1) {
-        // If UIToFPOp existed, we would use it, but it currently does not.
-        // Converting i1 as signed gives us [0,-1] rather than [0,1].
-        // We can hack our way around this by negating the result.
-        auto raw =
-            builder.create<mlir::SIToFPOp>(loc, from, intoType).getResult();
-        return builder.create<mlir::NegFOp>(loc, raw);
-      } else {
+      if (fromSigned) {
         // SIToFPOp: IntegerType -> FloatType
         return builder.create<mlir::SIToFPOp>(loc, from, intoType).getResult();
+      } else {
+        // UIToFPOp: IntegerType -> FloatType
+        return builder.create<stdx::UIToFPOp>(loc, intoType, from).getResult();
       }
     }
     if (auto fromIndexType = fromType.dyn_cast<IndexType>()) {
