@@ -131,7 +131,7 @@ LogicalResult cacheReduce(AffineParallelOp par, AffineReduceOp reduce) {
   if (!out.hasOneUse()) {
     return failure();
   }
-  auto &final_use = *out.use_begin();
+  auto &finalUse = *out.use_begin();
   // Prep for generation
   auto loc = reduce.getLoc();
   auto builder = OpBuilder::atBlockBegin(par.getBody());
@@ -162,10 +162,10 @@ LogicalResult cacheReduce(AffineParallelOp par, AffineReduceOp reduce) {
   // Implement the copy loop
   builder.setInsertionPoint(par.getBody(), std::prev(par.getBody()->end()));
   SmallVector<StrideInfo, 4> zeroOffset(rap.innerCount.size());
-  auto copy_loop =
+  auto copyLoop =
       createCopyLoop(builder, loc, rap.innerCount, out, reduce.getMemRef(),
                      zeroOffset, rap.outer, reduce.agg());
-  final_use.set(copy_loop);
+  finalUse.set(copyLoop);
   reduce.erase();
   return success();
 }

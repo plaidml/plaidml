@@ -8,16 +8,16 @@ namespace mlir {
 
 static Attribute typedFloat(double num, Type type) {
   auto value = llvm::APFloat(num);
-  auto ftype = type.cast<FloatType>();
+  auto floatType = type.cast<FloatType>();
   bool losesInfo = false;
-  value.convert(ftype.getFloatSemantics(), APFloat::rmNearestTiesToEven,
+  value.convert(floatType.getFloatSemantics(), APFloat::rmNearestTiesToEven,
                 &losesInfo);
   return FloatAttr::get(type, value);
 }
 
 static Attribute typedInf(Type type, bool neg) {
-  auto ftype = type.cast<FloatType>();
-  auto value = llvm::APFloat::getInf(ftype.getFloatSemantics(), neg);
+  auto floatType = type.cast<FloatType>();
+  auto value = llvm::APFloat::getInf(floatType.getFloatSemantics(), neg);
   return FloatAttr::get(type, value);
 }
 
@@ -36,17 +36,17 @@ static Attribute getAggAttr(AtomicRMWKind agg, Type type) {
   case AtomicRMWKind::addf:
     return typedFloat(0.0, type);
   case AtomicRMWKind::addi:
-    return IntegerAttr::get(type, int64_t(0));
+    return IntegerAttr::get(type, static_cast<int64_t>(0));
   case AtomicRMWKind::mulf:
     return typedFloat(1.0, type);
   case AtomicRMWKind::muli:
-    return IntegerAttr::get(type, int64_t(1));
+    return IntegerAttr::get(type, static_cast<int64_t>(1));
   case AtomicRMWKind::maxf:
     return typedInf(type, true);
   case AtomicRMWKind::maxs:
     return IntegerAttr::get(type, std::numeric_limits<int64_t>::min());
   case AtomicRMWKind::maxu:
-    return IntegerAttr::get(type, int64_t(0));
+    return IntegerAttr::get(type, static_cast<int64_t>(0));
   case AtomicRMWKind::minf:
     return typedInf(type, false);
   case AtomicRMWKind::mins:

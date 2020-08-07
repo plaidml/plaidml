@@ -23,7 +23,7 @@ plaidml_cc_library(
     name = "transforms",
     srcs = [
         "autotile.cc",
-	"cache.cc",
+        "cache.cc",
         "dataflow_opt.cc",
         "fusion.cc",
         "localize.cc",
@@ -36,7 +36,7 @@ plaidml_cc_library(
     ],
     hdrs = [
         "autotile.h",
-	"cache.h",
+        "cache.h",
         "passes.h",
         "stencil.h",
         "tile.h",
