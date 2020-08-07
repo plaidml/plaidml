@@ -913,7 +913,6 @@ class TestBackendOps(unittest.TestCase):
         return [b.exp(x)]
 
     @opTest([[m(20)], [m(2, 2, 2)]])
-    @unittest.skip("failed to legalize operation 'eltwise.pow'")
     def testPow(self, b, x):
         return [b.pow(x, 5)]
 
