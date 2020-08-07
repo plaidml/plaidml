@@ -1,5 +1,7 @@
 # Copyright 2020 Intel Corporation.
 
+load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
+
 PLAIDML_COPTS = select({
     "@com_intel_plaidml//:msvc": [
         "/std:c++17",  # This MUST match all other compilation units
@@ -121,3 +123,21 @@ def plaidml_cc_shlib(
         srcs = select(names),
         visibility = visibility,
     )
+
+
+def _plaidml_settings_impl(ctx):
+    return [
+        platform_common.TemplateVariableInfo({
+            "plaidml_device": ctx.attr._device[BuildSettingInfo].value,
+            "plaidml_target": ctx.attr._target[BuildSettingInfo].value,
+        }),
+    ]
+
+
+plaidml_settings = rule(
+    attrs = {
+        "_device": attr.label(default="//plaidml:device"),
+        "_target": attr.label(default="//plaidml:target"),
+    },
+    implementation = _plaidml_settings_impl,
+)
