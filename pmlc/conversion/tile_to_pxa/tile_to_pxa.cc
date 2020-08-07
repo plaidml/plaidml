@@ -170,8 +170,13 @@ static Value createCastOp(OpBuilder &builder, Location loc, Value from,
       return builder.create<mlir::FPTruncOp>(loc, from, intoType).getResult();
     }
     if (auto fromIntType = fromType.dyn_cast<IntegerType>()) {
-      // SIToFPOp: IntegerType -> FloatType
-      return builder.create<mlir::SIToFPOp>(loc, from, intoType).getResult();
+      if (fromSigned) {
+        // SIToFPOp: IntegerType -> FloatType
+        return builder.create<mlir::SIToFPOp>(loc, from, intoType).getResult();
+      } else {
+        // UIToFPOp: IntegerType -> FloatType
+        return builder.create<stdx::UIToFPOp>(loc, intoType, from).getResult();
+      }
     }
     if (auto fromIndexType = fromType.dyn_cast<IndexType>()) {
       auto i64Type = builder.getIntegerType(64);
@@ -274,6 +279,18 @@ struct AnyComparandIs : Matcher {
     auto operands = adaptor.operands();
     InnerPredicate pred;
     return pred.match(operands[0].getType()) ||
+           pred.match(operands[1].getType());
+  }
+};
+
+template <typename InnerPredicate>
+struct ComparandsAre : Matcher {
+  bool match(Operation *op) const final {
+    SmallVector<Value, 4> allOperands(op->getOperands());
+    ContractionOpAdaptor adaptor(allOperands);
+    auto operands = adaptor.operands();
+    InnerPredicate pred;
+    return pred.match(operands[0].getType()) &&
            pred.match(operands[1].getType());
   }
 };
@@ -1181,10 +1198,10 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
                                 ResultIs<EltwiseInteger>>,
         ContractionOpConversion<CombinationKind::eq,
                                 CmpFloatOp<CmpFPredicate::OEQ>,
-                                ResultIs<EltwiseFloat>>,
+                                AnyComparandIs<EltwiseFloat>>,
         ContractionOpConversion<CombinationKind::eq,
                                 CmpIntOp<CmpIPredicate::eq>,
-                                ResultIs<EltwiseInteger>>,
+                                ComparandsAre<EltwiseInteger>>,
         ContractionOpConversion<CombinationKind::cond,
                                 CondOp<CmpFloatOp<CmpFPredicate::OEQ>>,
                                 AnyComparandIs<EltwiseFloat>>,
@@ -1195,7 +1212,7 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
         EltwiseOpConversion<ew::LogOp, StdOp<mlir::LogOp>,
                             ResultIs<EltwiseFloat>>,
         EltwiseOpConversion<ew::PowOp, StdOp<stdx::PowOp>,
-                            OperandsAre<EltwiseFloat>>,
+                            ResultIs<EltwiseFloat>>,
         EltwiseOpConversion<ew::ErfOp, StdOp<stdx::ErfOp>,
                             OperandsAre<EltwiseFloat>>,
         EltwiseOpConversion<ew::CosOp, StdOp<mlir::CosOp>,

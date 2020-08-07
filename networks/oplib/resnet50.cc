@@ -34,38 +34,19 @@ edsl::Tensor block(             //
   auto conv_2a = op::convolution(I, W[0])
                      .name(base_name.str() + "_branch2a")
                      .strides(strides.vec())
-                     .dilations({1, 1})
-                     .data_dilations({1, 1})
-                     .autopad_mode(op::AutoPadMode::VALID)
-                     .input_layout(op::TensorLayout::NXC)
-                     .filter_layout(op::TensorLayout::XCK);
+                     .autopad_mode(op::AutoPadMode::VALID);
   auto relu_2a = op::relu(conv_2a + B[0]);
-  auto conv_2b = op::convolution(relu_2a, W[1])
-                     .name(base_name.str() + "_branch2b")
-                     .strides({1, 1})
-                     .dilations({1, 1})
-                     .data_dilations({1, 1})
-                     .autopad_mode(op::AutoPadMode::SAME_UPPER)
-                     .input_layout(op::TensorLayout::NXC)
-                     .filter_layout(op::TensorLayout::XCK);
+  auto conv_2b = op::convolution(relu_2a, W[1])  //
+                     .name(base_name.str() + "_branch2b");
   auto relu_2b = op::relu(conv_2b + B[1]);
-  auto conv_2c = op::convolution(relu_2b, W[2])
+  auto conv_2c = op::convolution(relu_2b, W[2])  //
                      .name(base_name.str() + "_branch2b")
-                     .strides({1, 1})
-                     .dilations({1, 1})
-                     .data_dilations({1, 1})
-                     .autopad_mode(op::AutoPadMode::VALID)
-                     .input_layout(op::TensorLayout::NXC)
-                     .filter_layout(op::TensorLayout::XCK);
+                     .autopad_mode(op::AutoPadMode::VALID);
   if (use_shortcut_conv) {
     auto conv_1 = op::convolution(I, W[3])
                       .name(base_name.str() + "_branch1")
                       .strides(strides.vec())
-                      .dilations({1, 1})
-                      .data_dilations({1, 1})
-                      .autopad_mode(op::AutoPadMode::VALID)
-                      .input_layout(op::TensorLayout::NXC)
-                      .filter_layout(op::TensorLayout::XCK);
+                      .autopad_mode(op::AutoPadMode::VALID);
     return op::relu(conv_2c + B[2] + conv_1 + B[3]);
   } else {
     return op::relu(conv_2c + B[2] + I);
@@ -242,12 +223,8 @@ edsl::Program build(int64_t batch_size, const edsl::Tensor& I, ArrayRef<edsl::Te
   auto conv1 = op::convolution(I, W_conv1)
                    .name("conv1")
                    .strides({2, 2})
-                   .dilations({1, 1})
-                   .data_dilations({1, 1})
                    .autopad_mode(op::AutoPadMode::EXPLICIT)
-                   .manual_padding({3, 3})
-                   .input_layout(op::TensorLayout::NXC)
-                   .filter_layout(op::TensorLayout::XCK);
+                   .manual_padding({3, 3});
   auto relu1 = op::relu(conv1 + B_conv1);
   auto pool1 = op::pool(          //
       relu1,                      // input
