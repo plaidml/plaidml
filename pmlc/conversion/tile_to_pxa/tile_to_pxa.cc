@@ -594,6 +594,42 @@ buildBroadcastLoad(OpBuilder &builder, Location loc, Value operand,
   return loadOp;
 }
 
+static AtomicRMWKind convertAgg(AggregationKind agg, Type type) {
+  switch (agg) {
+  case AggregationKind::assign:
+    return AtomicRMWKind::assign;
+  case AggregationKind::add:
+    if (type.isa<FloatType>()) {
+      return AtomicRMWKind::addf;
+    } else {
+      return AtomicRMWKind::addi;
+    }
+  case AggregationKind::mul:
+    if (type.isa<FloatType>()) {
+      return AtomicRMWKind::mulf;
+    } else {
+      return AtomicRMWKind::muli;
+    }
+  case AggregationKind::min:
+    if (type.isa<FloatType>()) {
+      return AtomicRMWKind::minf;
+    } else if (type.isSignedInteger()) {
+      return AtomicRMWKind::mins;
+    } else {
+      return AtomicRMWKind::minu;
+    }
+  case AggregationKind::max:
+    if (type.isa<FloatType>()) {
+      return AtomicRMWKind::maxf;
+    } else if (type.isSignedInteger()) {
+      return AtomicRMWKind::maxs;
+    } else {
+      return AtomicRMWKind::maxu;
+    }
+  }
+  llvm_unreachable("Invalid agg type in convertAgg");
+}
+
 static Value buildSimpleStore(OpBuilder &builder, Location loc, Value scalar,
                               Value memRef,
                               Optional<PaddingInfo> maybePadding) {
@@ -603,7 +639,7 @@ static Value buildSimpleStore(OpBuilder &builder, Location loc, Value scalar,
   if (elementType != scalar.getType()) {
     scalar = createCastOp(builder, loc, scalar, false, elementType, false);
   }
-  auto aggOp = AggregationKind::assign;
+  auto aggOp = AtomicRMWKind::assign;
   auto idMap = builder.getMultiDimIdentityMap(memRefType.getRank());
   auto storeOp = builder.create<pxa::AffineReduceOp>(
       loc, aggOp, scalar, memRef, idMap, body->getArguments());
@@ -895,12 +931,13 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
     // Create the store
     auto resultMap = op.sink();
     pxa::AffineReduceOp reduceOp;
+    auto agg = convertAgg(op.agg(), alloc.elementType);
     if (resultMap.isEmpty()) {
       SmallVector<Value, 0> emptyIdxs;
       reduceOp = rewriter.create<pxa::AffineReduceOp>(
-          loc, op.agg(), combined, filled, resultMap, emptyIdxs);
+          loc, agg, combined, filled, resultMap, emptyIdxs);
     } else {
-      reduceOp = rewriter.create<pxa::AffineReduceOp>(loc, op.agg(), combined,
+      reduceOp = rewriter.create<pxa::AffineReduceOp>(loc, agg, combined,
                                                       filled, resultMap, idxs);
     }
     maybePadding = getPaddingInfo(op);

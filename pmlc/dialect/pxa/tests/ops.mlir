@@ -39,7 +39,7 @@ func @pxa_reduce_add(%arg0: memref<100x100xf32>, %arg1: memref<100x100xf32>) -> 
     %0 = affine.load %arg1[%i, %k] : memref<100x100xf32>
     %1 = affine.load %arg0[%k, %j] : memref<100x100xf32>
     %2 = mulf %0, %1 : f32
-    %red = pxa.reduce add %2, %a[%i, %j] :  memref<100x100xf32>
+    %red = pxa.reduce addf %2, %a[%i, %j] :  memref<100x100xf32>
     // CHECK: %[[MUL:.*]] = mulf %{{.*}}, %{{.*}} : f32
     // CHECK: %[[LOAD:.*]] = affine.load %[[ARG2:.*]][%[[ARG3:.*]], %[[ARG4:.*]]] : memref<100x100xf32>
     // CHECK: %[[AGG:.*]] = addf %[[LOAD]], %[[MUL:.*]] : f32
@@ -56,7 +56,7 @@ func @pxa_vector_reduce_add(%arg0: memref<100x100xf32>, %arg1: memref<100x100xf3
     %0 = affine.vector_load %arg1[%i, %k] : memref<100x100xf32>, vector<4xf32>
     %1 = affine.vector_load %arg0[%k, %j] : memref<100x100xf32>, vector<4xf32>
     %2 = mulf %0, %1 : vector <4xf32>
-    %red = pxa.vector_reduce add %2, %a[%i, %j] :  memref<100x100xf32>, vector<4xf32>
+    %red = pxa.vector_reduce addf %2, %a[%i, %j] :  memref<100x100xf32>, vector<4xf32>
     // CHECK: %[[MUL:.*]] = mulf %{{.*}}, %{{.*}} : vector<4xf32>
     // CHECK: %[[LOAD:.*]] = affine.vector_load %[[ARG2:.*]][%[[ARG3:.*]], %[[ARG4:.*]]] : memref<100x100xf32>, vector<4xf32>
     // CHECK: %[[AGG:.*]] = addf %[[LOAD]], %[[MUL]] : vector<4xf32>
@@ -73,7 +73,7 @@ func @pxa_reduce_mul(%arg0: memref<100x100xf32>, %arg1: memref<100x100xf32>) -> 
     %0 = affine.load %arg1[%i, %k] : memref<100x100xf32>
     %1 = affine.load %arg0[%k, %j] : memref<100x100xf32>
     %2 = mulf %0, %1 : f32
-    %red = pxa.reduce mul %2, %a[%i, %j] :  memref<100x100xf32>
+    %red = pxa.reduce mulf %2, %a[%i, %j] :  memref<100x100xf32>
     // CHECK: %[[MUL:.*]] = mulf %{{.*}}, %{{.*}} : f32
     // CHECK: %[[LOAD:.*]] = affine.load %[[ARG2:.*]][%[[ARG3:.*]], %[[ARG4:.*]]] : memref<100x100xf32>
     // CHECK: %[[AGG:.*]] = mulf %[[LOAD]], %[[MUL]] : f32
@@ -90,7 +90,7 @@ func @pxa_vector_reduce_mul(%arg0: memref<100x100xf32>, %arg1: memref<100x100xf3
     %0 = affine.vector_load %arg1[%i, %k] : memref<100x100xf32>, vector<4xf32>
     %1 = affine.vector_load %arg0[%k, %j] : memref<100x100xf32>, vector<4xf32>
     %2 = mulf %0, %1 : vector <4xf32>
-    %red = pxa.vector_reduce mul %2, %a[%i, %j] :  memref<100x100xf32>, vector<4xf32>
+    %red = pxa.vector_reduce mulf %2, %a[%i, %j] :  memref<100x100xf32>, vector<4xf32>
     // CHECK: %[[MUL:.*]] = mulf %{{.*}}, %{{.*}} : vector<4xf32>
     // CHECK: %[[LOAD:.*]] = affine.vector_load %[[ARG2:.*]][%[[ARG3:.*]], %[[ARG4:.*]]] : memref<100x100xf32>, vector<4xf32>
     // CHECK: %[[AGG:.*]] = mulf %[[LOAD]], %[[MUL]] : vector<4xf32>
@@ -107,7 +107,7 @@ func @pxa_reduce_max(%arg0: memref<100x100xf32>, %arg1: memref<100x100xf32>) -> 
     %0 = affine.load %arg1[%i, %k] : memref<100x100xf32>
     %1 = affine.load %arg0[%k, %j] : memref<100x100xf32>
     %2 = mulf %0, %1 : f32
-    %red = pxa.reduce max %2, %a[%i, %j] :  memref<100x100xf32>
+    %red = pxa.reduce maxf %2, %a[%i, %j] :  memref<100x100xf32>
     // CHECK: %[[MUL:.*]] = mulf %{{.*}}, %{{.*}} : f32
     // CHECK: %[[LOAD:.*]] = affine.load %[[ARG2:.*]][%[[ARG3:.*]], %[[ARG4:.*]]] : memref<100x100xf32>
     // CHECK: %[[AGG:.*]] = cmpf "ogt", %[[MUL]], %[[LOAD]] : f32
@@ -125,7 +125,7 @@ func @pxa_vector_reduce_max(%arg0: memref<100x100xf32>, %arg1: memref<100x100xf3
     %0 = affine.vector_load %arg1[%i, %k] : memref<100x100xf32>, vector<4xf32>
     %1 = affine.vector_load %arg0[%k, %j] : memref<100x100xf32>, vector<4xf32>
     %2 = mulf %0, %1 : vector <4xf32>
-    %red = pxa.vector_reduce max %2, %a[%i, %j] :  memref<100x100xf32>, vector<4xf32>
+    %red = pxa.vector_reduce maxf %2, %a[%i, %j] :  memref<100x100xf32>, vector<4xf32>
     // CHECK: %[[MUL:.*]] = mulf %{{.*}}, %{{.*}} : vector<4xf32>
     // CHECK: %[[LOAD:.*]] = affine.vector_load %[[ARG2:.*]][%[[ARG3:.*]], %[[ARG4:.*]]] : memref<100x100xf32>, vector<4xf32>
     // CHECK: %[[AGG:.*]] = cmpf "ogt", %[[MUL]], %[[LOAD]] : vector<4xf32>
@@ -143,7 +143,7 @@ func @pxa_reduce_min(%arg0: memref<100x100xf32>, %arg1: memref<100x100xf32>) -> 
     %0 = affine.load %arg1[%i, %k] : memref<100x100xf32>
     %1 = affine.load %arg0[%k, %j] : memref<100x100xf32>
     %2 = mulf %0, %1 : f32
-    %red = pxa.reduce min %2, %a[%i, %j] :  memref<100x100xf32>
+    %red = pxa.reduce minf %2, %a[%i, %j] :  memref<100x100xf32>
     // CHECK: %[[MUL:.*]] = mulf %{{.*}}, %{{.*}} : f32
     // CHECK: %[[LOAD:.*]] = affine.load %[[ARG2:.*]][%[[ARG3:.*]], %[[ARG4:.*]]] : memref<100x100xf32>
     // CHECK: %[[AGG:.*]] = cmpf "olt", %[[MUL]], %[[LOAD]] : f32
@@ -161,7 +161,7 @@ func @pxa_vector_reduce_min(%arg0: memref<100x100xf32>, %arg1: memref<100x100xf3
     %0 = affine.vector_load %arg1[%i, %k] : memref<100x100xf32>, vector<4xf32>
     %1 = affine.vector_load %arg0[%k, %j] : memref<100x100xf32>, vector<4xf32>
     %2 = mulf %0, %1 : vector <4xf32>
-    %red = pxa.vector_reduce min %2, %a[%i, %j] :  memref<100x100xf32>, vector<4xf32>
+    %red = pxa.vector_reduce minf %2, %a[%i, %j] :  memref<100x100xf32>, vector<4xf32>
     // CHECK: %[[MUL:.*]] = mulf %{{.*}}, %{{.*}} : vector<4xf32>
     // CHECK: %[[LOAD:.*]] = affine.vector_load %[[ARG2:.*]][%[[ARG3:.*]], %[[ARG4:.*]]] : memref<100x100xf32>, vector<4xf32>
     // CHECK: %[[AGG:.*]] = cmpf "olt", %[[MUL]], %[[LOAD]] : vector<4xf32>

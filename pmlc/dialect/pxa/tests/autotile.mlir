@@ -14,7 +14,7 @@ func @dot0(%arg0: memref<100x100xf32>, %arg1: memref<100x100xf32>) -> memref<100
     %1 = affine.load %arg0[%k, %j] : memref<100x100xf32>
     %2 = mulf %0, %1 : f32
     // CHECK: %[[obuf]][%[[arg5]], %[[arg6]]]
-    %3 = pxa.reduce add %2, %obuf[%i, %j] : memref<100x100xf32>
+    %3 = pxa.reduce addf %2, %obuf[%i, %j] : memref<100x100xf32>
     affine.yield %3 : memref<100x100xf32>
   }
   return %out : memref<100x100xf32>
@@ -36,7 +36,7 @@ func @dot1(%arg0: memref<100x100xf32>, %arg1: memref<100x100xf32>) -> memref<100
       %2 = affine.load %arg0[%arg7, %arg6] : memref<100x100xf32>
       %3 = mulf %1, %2 : f32
       // CHECK: %[[obuf]][%[[arg8]], %[[arg9]]]
-      %4 = pxa.reduce add %3, %obuf[%arg5, %arg6] : memref<100x100xf32>
+      %4 = pxa.reduce addf %3, %obuf[%arg5, %arg6] : memref<100x100xf32>
       affine.yield %4 : memref<100x100xf32>
     }
     affine.yield %0 : memref<100x100xf32>

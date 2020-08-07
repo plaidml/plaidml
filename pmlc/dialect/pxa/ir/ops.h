@@ -4,6 +4,7 @@
 
 #include "mlir/Analysis/AffineStructures.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
@@ -20,6 +21,7 @@ using mlir::AffineValueMap;
 using mlir::AffineYieldOp;
 using mlir::ArrayAttr;
 using mlir::ArrayRef;
+using mlir::AtomicRMWKind;
 using mlir::Attribute;
 using mlir::BoolAttr;
 using mlir::DictionaryAttr;
@@ -53,7 +55,6 @@ using mlir::Type;
 using mlir::TypeAttr;
 using mlir::Value;
 using mlir::ValueRange;
-using util::AggregationKind;
 
 namespace MemoryEffects = mlir::MemoryEffects;
 namespace OpTrait = mlir::OpTrait;

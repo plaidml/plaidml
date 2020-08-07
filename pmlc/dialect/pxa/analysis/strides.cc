@@ -13,6 +13,7 @@
 #include "mlir/Support/DebugStringHelper.h"
 #include "pmlc/dialect/pxa/analysis/affine_expr.h"
 #include "pmlc/util/logging.h"
+#include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/FormatVariadic.h"
 
 namespace mlir {
@@ -215,7 +216,7 @@ void StrideInfo::print(raw_ostream &os, Block *relative) const {
   os << ']';
 }
 
-AffineValueMap StridesToValueMap(MLIRContext *ctx, ArrayRef<StrideInfo> dims) {
+AffineValueMap convertToValueMap(MLIRContext *ctx, ArrayRef<StrideInfo> dims) {
   SmallVector<AffineValueExpr, 4> exprs;
   for (const auto &si : dims) {
     exprs.push_back(si.toValueExpr(ctx));
@@ -395,6 +396,59 @@ Optional<StrideInfo> computeStrideInfo(AffineStoreOp op) {
 Optional<StrideInfo> computeStrideInfo(pmlc::dialect::pxa::AffineReduceOp op) {
   return computeStrideInfo(op.getMemRefType(), op.getAffineMap(),
                            op.getMapOperands());
+}
+
+Optional<RelativeAccessPattern> computeRelativeAccess(Block *block,
+                                                      Operation *op) {
+  ArrayRef<int64_t> vecSize = {};
+  Optional<llvm::SmallVector<StrideInfo, 4>> maybeStrides;
+  TypeSwitch<Operation *>(op)
+      .Case<AffineLoadOp>([&](auto op) {
+        maybeStrides =
+            computeStrideInfo(op.getAffineMap(), op.getMapOperands());
+      })
+      .Case<pmlc::dialect::pxa::AffineReduceOp>([&](auto op) {
+        maybeStrides =
+            computeStrideInfo(op.getAffineMap(), op.getMapOperands());
+      })
+      .Case<AffineVectorLoadOp>([&](auto op) {
+        maybeStrides =
+            computeStrideInfo(op.getAffineMap(), op.getMapOperands());
+        vecSize = op.getVectorType().getShape();
+      })
+      .Case<pmlc::dialect::pxa::AffineVectorReduceOp>([&](auto op) {
+        maybeStrides =
+            computeStrideInfo(op.getAffineMap(), op.getMapOperands());
+        vecSize = op.getVectorType().getShape();
+      });
+  if (!maybeStrides) {
+    return llvm::None;
+  }
+  auto &strides = *maybeStrides;
+  RelativeAccessPattern ret;
+  for (size_t i = 0; i < strides.size(); i++) {
+    ret.outer.push_back(strides[i].outer(block));
+    auto inner = strides[i].inner(block);
+    ret.inner.push_back(inner);
+    StrideRange range = inner.range();
+    if (i + vecSize.size() >= strides.size()) {
+      int64_t vecVal = vecSize[i + vecSize.size() - strides.size()];
+      if (vecVal > 1) {
+        StrideRange vecRange(0, vecVal - 1, 1);
+        range += vecRange;
+      }
+    }
+    if (!range.valid || range.minVal != 0) {
+      return llvm::None;
+    }
+    ret.innerCount.push_back(range.count());
+    int64_t stride = range.stride;
+    if (stride == 0) {
+      stride = 1;
+    }
+    ret.innerStride.push_back(stride);
+  }
+  return ret;
 }
 
 StrideArray::StrideArray(unsigned numDims, int64_t offset)

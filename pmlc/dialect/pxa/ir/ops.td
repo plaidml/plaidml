@@ -3,13 +3,9 @@
 #ifndef __PML_PXA_OPS__
 #define __PML_PXA_OPS__
 
-#ifndef AFFINE_OPS_BASE
+include "mlir/Dialect/StandardOps/IR/StandardOpsBase.td"
 include "mlir/Dialect/Affine/IR/AffineOpsBase.td"
-#endif
-
-#ifndef __PML_UTIL_ENUMS__
 include "pmlc/util/enums.td"
-#endif
 
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
@@ -32,7 +28,7 @@ def AnyStdScalar : AnyTypeOf<[AnyFloat, AnySignlessInteger]> {}
 def AffineReduceOp : PXA_OpWithPP<"reduce"> {
   let summary = "affine reduction operation";
   let arguments = (ins
-    AggregationKind:$agg,
+    AtomicRMWKindAttr:$agg,
     AnyStdScalar:$val,
     Arg<AnyMemRef, "the memref to reduce", [MemRead, MemWrite]>:$mem,
     AffineMapAttr:$map,
@@ -44,7 +40,7 @@ def AffineReduceOp : PXA_OpWithPP<"reduce"> {
   let hasFolder = 1;
 
   let builders = [OpBuilder<
-    "OpBuilder& builder, OperationState& result, AggregationKind agg,"
+    "OpBuilder& builder, OperationState& result, AtomicRMWKind agg,"
     "Value val, Value mem, AffineMap map, ValueRange idxs", [{
       build(builder, result, mem.getType(), agg, val, mem, map, idxs);
     }]
@@ -89,7 +85,7 @@ def AffineGemmOp : PXA_OpWithPP<"gemm"> {
 def AffineVectorReduceOp : PXA_OpWithPP<"vector_reduce", []> {
   let summary = "affine vector reduction operation";
   let arguments = (ins
-    AggregationKind:$agg,
+    AtomicRMWKindAttr:$agg,
     AnyVector:$vector,
     Arg<AnyMemRef, "the memref to reduce", [MemRead, MemWrite]>:$mem,
     AffineMapAttr:$map,
@@ -101,7 +97,7 @@ def AffineVectorReduceOp : PXA_OpWithPP<"vector_reduce", []> {
   let hasFolder = 1;
 
   let builders = [OpBuilder<
-    "OpBuilder& builder, OperationState& result, AggregationKind agg,"
+    "OpBuilder& builder, OperationState& result, AtomicRMWKind agg,"
     "Value vector, Value mem, AffineMap map, ValueRange idxs", [{
       build(builder, result, mem.getType(), agg, vector, mem, map, idxs);
     }]

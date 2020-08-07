@@ -25,6 +25,7 @@ using mlir::AffineVectorLoadOp;
 using mlir::AffineVectorStoreOp;
 using mlir::AllocOp;
 using mlir::ArrayRef;
+using mlir::AtomicRMWKind;
 using mlir::ConversionPattern;
 using mlir::ConversionPatternRewriter;
 using mlir::FloatAttr;
@@ -43,8 +44,6 @@ using mlir::ReturnOp;
 using mlir::Type;
 using mlir::Value;
 using mlir::VectorType;
-
-using util::AggregationKind;
 
 namespace {
 
@@ -122,6 +121,56 @@ struct AffineIfOpConversion : public OpConversionPattern<AffineIfOp> {
   }
 };
 
+static Value createReduction(ConversionPatternRewriter &rewriter,
+                             mlir::Location loc, AtomicRMWKind agg,
+                             Value source, Value val) {
+  switch (agg) {
+  case AtomicRMWKind::assign:
+    return val;
+  case AtomicRMWKind::addf:
+    return rewriter.create<mlir::AddFOp>(loc, source, val);
+  case AtomicRMWKind::addi:
+    return rewriter.create<mlir::AddIOp>(loc, source, val);
+  case AtomicRMWKind::maxf: {
+    auto cmp = rewriter.create<mlir::CmpFOp>(loc, mlir::CmpFPredicate::OGT, val,
+                                             source);
+    return rewriter.create<mlir::SelectOp>(loc, cmp, val, source);
+  }
+  case AtomicRMWKind::maxu: {
+    auto cmp = rewriter.create<mlir::CmpIOp>(loc, mlir::CmpIPredicate::ugt, val,
+                                             source);
+    return rewriter.create<mlir::SelectOp>(loc, cmp, val, source);
+  }
+  case AtomicRMWKind::maxs: {
+    auto cmp = rewriter.create<mlir::CmpIOp>(loc, mlir::CmpIPredicate::sgt, val,
+                                             source);
+    return rewriter.create<mlir::SelectOp>(loc, cmp, val, source);
+  }
+  case AtomicRMWKind::minf: {
+    auto cmp = rewriter.create<mlir::CmpFOp>(loc, mlir::CmpFPredicate::OLT, val,
+                                             source);
+    return rewriter.create<mlir::SelectOp>(loc, cmp, val, source);
+  }
+  case AtomicRMWKind::minu: {
+    auto cmp = rewriter.create<mlir::CmpIOp>(loc, mlir::CmpIPredicate::ult, val,
+                                             source);
+    return rewriter.create<mlir::SelectOp>(loc, cmp, val, source);
+  }
+  case AtomicRMWKind::mins: {
+    auto cmp = rewriter.create<mlir::CmpIOp>(loc, mlir::CmpIPredicate::slt, val,
+                                             source);
+    return rewriter.create<mlir::SelectOp>(loc, cmp, val, source);
+  }
+  case AtomicRMWKind::mulf:
+    return rewriter.create<mlir::MulFOp>(loc, source, val);
+  case AtomicRMWKind::muli:
+    return rewriter.create<mlir::MulIOp>(loc, source, val);
+  default:
+    llvm_unreachable("Unsupported aggregation for "
+                     "AffineReduceOpConversion::createReduction");
+  }
+}
+
 struct AffineReduceOpConversion
     : public OpConversionPattern<pxa::AffineReduceOp> {
   using OpConversionPattern<pxa::AffineReduceOp>::OpConversionPattern;
@@ -131,62 +180,13 @@ struct AffineReduceOpConversion
                   ConversionPatternRewriter &rewriter) const final {
     auto source = rewriter.create<AffineLoadOp>(op.getLoc(), op.mem(), op.map(),
                                                 op.idxs());
-    auto reduce = createReduction(rewriter, op, source.getResult());
+    auto reduce = createReduction(rewriter, op.getLoc(), op.agg(),
+                                  source.getResult(), op.val());
     rewriter.create<AffineStoreOp>(op.getLoc(), reduce, op.mem(), op.map(),
                                    op.idxs());
     op.replaceAllUsesWith(op.mem());
     rewriter.eraseOp(op);
     return mlir::success();
-  }
-
-  Value createReduction(ConversionPatternRewriter &rewriter,
-                        pxa::AffineReduceOp op, Value source) const {
-    auto type = source.getType();
-    switch (op.agg()) {
-    case AggregationKind::assign:
-      return op.val();
-    case AggregationKind::add: {
-      if (type.isa<FloatType>()) {
-        return rewriter.create<mlir::AddFOp>(op.getLoc(), source, op.val());
-      }
-      return rewriter.create<mlir::AddIOp>(op.getLoc(), source, op.val());
-    }
-    case AggregationKind::max: {
-      if (type.isa<FloatType>()) {
-        auto cmp = rewriter.create<mlir::CmpFOp>(
-            op.getLoc(), mlir::CmpFPredicate::OGT, op.val(), source);
-        return rewriter.create<mlir::SelectOp>(op.getLoc(), cmp, op.val(),
-                                               source);
-      }
-      // TODO: determine whether to use signed or unsigned compare
-      auto cmp = rewriter.create<mlir::CmpIOp>(
-          op.getLoc(), mlir::CmpIPredicate::sgt, op.val(), source);
-      return rewriter.create<mlir::SelectOp>(op.getLoc(), cmp, op.val(),
-                                             source);
-    }
-    case AggregationKind::min: {
-      if (type.isa<FloatType>()) {
-        auto cmp = rewriter.create<mlir::CmpFOp>(
-            op.getLoc(), mlir::CmpFPredicate::OLT, op.val(), source);
-        return rewriter.create<mlir::SelectOp>(op.getLoc(), cmp, op.val(),
-                                               source);
-      }
-      // TODO: determine whether to use signed or unsigned compare
-      auto cmp = rewriter.create<mlir::CmpIOp>(
-          op.getLoc(), mlir::CmpIPredicate::slt, op.val(), source);
-      return rewriter.create<mlir::SelectOp>(op.getLoc(), cmp, op.val(),
-                                             source);
-    }
-    case AggregationKind::mul: {
-      if (type.isa<FloatType>()) {
-        return rewriter.create<mlir::MulFOp>(op.getLoc(), source, op.val());
-      }
-      return rewriter.create<mlir::MulIOp>(op.getLoc(), source, op.val());
-    }
-    default:
-      llvm_unreachable("Unsupported aggregation for "
-                       "AffineReduceOpConversion::createReduction");
-    }
   }
 };
 
@@ -203,7 +203,8 @@ struct AffineVectorReduceOpConversion
     auto mapAttr = AffineMapAttr::get(op.map());
     // Set the map attribute
     source.setAttr(AffineVectorLoadOp::getMapAttrName(), mapAttr);
-    auto reduce = createVectorReduction(rewriter, op, source.getResult());
+    auto reduce = createReduction(rewriter, op.getLoc(), op.agg(),
+                                  source.getResult(), op.vector());
     auto dest = rewriter.create<AffineVectorStoreOp>(
         op.getLoc(), ArrayRef<Type>{}, reduce, op.mem(), op.idxs());
     // Set the map attribute
@@ -211,57 +212,6 @@ struct AffineVectorReduceOpConversion
     op.replaceAllUsesWith(op.mem());
     rewriter.eraseOp(op);
     return mlir::success();
-  }
-
-  Value createVectorReduction(ConversionPatternRewriter &rewriter,
-                              pxa::AffineVectorReduceOp op,
-                              Value source) const {
-    auto vectorType = op.getVectorType();
-    switch (op.agg()) {
-    case AggregationKind::assign:
-      return op.vector();
-    case AggregationKind::add: {
-      if (vectorType.getElementType().isa<FloatType>()) {
-        return rewriter.create<mlir::AddFOp>(op.getLoc(), source, op.vector());
-      }
-      return rewriter.create<mlir::AddIOp>(op.getLoc(), source, op.vector());
-    }
-    case AggregationKind::max: {
-      if (vectorType.getElementType().isa<FloatType>()) {
-        auto cmp = rewriter.create<mlir::CmpFOp>(
-            op.getLoc(), mlir::CmpFPredicate::OGT, op.vector(), source);
-        return rewriter.create<mlir::SelectOp>(op.getLoc(), cmp, op.vector(),
-                                               source);
-      }
-      // TODO: determine whether to use signed or unsigned compare
-      auto cmp = rewriter.create<mlir::CmpIOp>(
-          op.getLoc(), mlir::CmpIPredicate::sgt, op.vector(), source);
-      return rewriter.create<mlir::SelectOp>(op.getLoc(), cmp, op.vector(),
-                                             source);
-    }
-    case AggregationKind::min: {
-      if (vectorType.getElementType().isa<FloatType>()) {
-        auto cmp = rewriter.create<mlir::CmpFOp>(
-            op.getLoc(), mlir::CmpFPredicate::OLT, op.vector(), source);
-        return rewriter.create<mlir::SelectOp>(op.getLoc(), cmp, op.vector(),
-                                               source);
-      }
-      // TODO: determine whether to use signed or unsigned compare
-      auto cmp = rewriter.create<mlir::CmpIOp>(
-          op.getLoc(), mlir::CmpIPredicate::slt, op.vector(), source);
-      return rewriter.create<mlir::SelectOp>(op.getLoc(), cmp, op.vector(),
-                                             source);
-    }
-    case AggregationKind::mul: {
-      if (vectorType.getElementType().isa<FloatType>()) {
-        return rewriter.create<mlir::MulFOp>(op.getLoc(), source, op.vector());
-      }
-      return rewriter.create<mlir::MulIOp>(op.getLoc(), source, op.vector());
-    }
-    default:
-      llvm_unreachable("Unsupported aggregation for "
-                       "AffineVectorReduceOpConversion::createVectorReduction");
-    }
   }
 };
 

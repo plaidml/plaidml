@@ -140,7 +140,7 @@ func @dot(%A: memref<?x?xf32>, %B: memref<?x?xf32>, %C: memref<?x?xf32>) {
     %0 = affine.load %A[%i, %k] : memref<?x?xf32>
     %1 = affine.load %B[%k, %j] : memref<?x?xf32>
     %2 = mulf %0, %1 : f32
-    pxa.reduce add %2, %C[%i, %j] : memref<?x?xf32>
+    pxa.reduce addf %2, %C[%i, %j] : memref<?x?xf32>
   }
   return
 }
@@ -156,7 +156,7 @@ func @dot_tiled(%A: memref<?x?xf32>, %B: memref<?x?xf32>, %C: memref<?x?xf32>) {
       %0 = affine.load %A[%i1, %k1] : memref<?x?xf32>
       %1 = affine.load %B[%k1, %j1] : memref<?x?xf32>
       %2 = mulf %0, %1 : f32
-      pxa.reduce add %2, %C[%i1, %j1] : memref<?x?xf32>
+      pxa.reduce addf %2, %C[%i1, %j1] : memref<?x?xf32>
     }
   }
   return
@@ -232,7 +232,7 @@ func @conv2(%I: !I_memref, %K: !K_memref, %O: !O_memref) {
     %0 = affine.load %I[0, %x, %y, %ci] : !I_memref
     %1 = affine.load %K[0, 0, %ci, %co] : !K_memref
     %2 = mulf %0, %1 : f32
-    pxa.reduce add %2, %O[0, %x, %y, %co] : !O_memref
+    pxa.reduce addf %2, %O[0, %x, %y, %co] : !O_memref
   }
   return
 }
@@ -250,7 +250,7 @@ func @conv2_tiled(%I: !I_memref, %K: !K_memref, %O: !O_memref) {
       %0 = affine.load %I[0, %x1, %y, %ci] : !I_memref
       %1 = affine.load %K[0, 0, %ci, %co] : !K_memref
       %2 = mulf %0, %1 : f32
-      pxa.reduce add %2, %O[0, %x1, %y, %co] : !O_memref
+      pxa.reduce addf %2, %O[0, %x1, %y, %co] : !O_memref
     }
   }
   return
