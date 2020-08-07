@@ -2,9 +2,10 @@
 
 load("//tools/py_cffi:build_defs.bzl", "py_cffi")
 load("//tools/py_setup:build_defs.bzl", "py_setup")
+load("@bazel_skylib//rules:common_settings.bzl", "string_flag")
 load("@rules_python//python:defs.bzl", "py_binary")
 load("@io_bazel_rules_jsonnet//jsonnet:jsonnet.bzl", "jsonnet_to_json")
-load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_shlib")
+load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_shlib", "plaidml_settings")
 
 plaidml_cc_library(
     name = "plaidml",
@@ -150,6 +151,7 @@ plaidml_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":plaidml",
+        "@gflags",
         "@gmock//:gtest",
     ],
     alwayslink = 1,
@@ -165,4 +167,20 @@ py_binary(
         "//plaidml/exec:py",
         "//plaidml/op:py",
     ],
+)
+
+string_flag(
+    name = "device",
+    build_setting_default = "llvm_cpu.0",
+)
+
+string_flag(
+    name = "target",
+    values = ["llvm_cpu", "foo"],
+    build_setting_default = "llvm_cpu",
+)
+
+plaidml_settings(
+    name = "settings",
+    visibility = ["//visibility:public"],
 )
