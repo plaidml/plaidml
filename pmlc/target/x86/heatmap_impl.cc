@@ -36,7 +36,7 @@ struct Heatmap {
 
 static Heatmap heatmap;
 
-StencilCost heatmapCost(llvm::ArrayRef<unsigned> ranges) {
+StencilCost heatmapCost(llvm::ArrayRef<int64_t> ranges) {
   assert(ranges.size() == 3 && "heatmapCost expects a 3D tile");
 
   auto tile = Tile{ranges[0], ranges[1], ranges[2]};

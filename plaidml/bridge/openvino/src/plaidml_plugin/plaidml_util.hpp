@@ -27,6 +27,8 @@ ngraph::AxisVector get_axis_vector_from_constant_operand(size_t operand_idx, ngr
 plaidml::DType to_plaidml(const ngraph::element::Type& ng_type);
 plaidml::op::AutoPadMode to_plaidml(const ngraph::op::PadType& ng_type);
 
+plaidml::op::PadMode to_plaidml(const ngraph::op::PadMode& ng_type);
+
 ngraph::Shape get_shape_from_constant_operand(size_t operand_idx, ngraph::Node* layer);
 ngraph::Coordinate get_coords_from_constant_operand(size_t operand_idx, ngraph::Node* layer);
 

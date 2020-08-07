@@ -13,7 +13,6 @@
 #include "pmlc/dialect/pxa/transforms/autotile.h"
 #include "pmlc/dialect/pxa/transforms/passes.h"
 #include "pmlc/dialect/pxa/transforms/stencil.h"
-#include "pmlc/dialect/xsmm/ir/ops.h"
 
 #include "pmlc/util/logging.h"
 
@@ -45,7 +44,6 @@ struct GemmOperand {
   Value memref;
   AffineMap accessMap;
   AffineMap tileMap;
-  Optional<StrideArray> stridesArray;
 
   template <typename TOp>
   GemmOperand(TOp op, ArrayRef<BlockArgument> idxs,
@@ -54,18 +52,10 @@ struct GemmOperand {
         tileMap(makeTileMap(op.getContext(), op.getAffineMap(),
                             op.getMapOperands(), idxs)) {
     mapOperands.append(op.getMapOperands().begin(), op.getMapOperands().end());
-    int64_t offset;
-    SmallVector<int64_t, 4> strides;
-    auto memrefType = memref.getType().cast<MemRefType>();
-    getStridesAndOffset(memrefType, strides, offset);
-    auto layoutMap =
-        makeStridedLinearLayoutMap(strides, offset, op.getContext());
-    stridesArray = computeStrideArray(layoutMap.compose(tileMap));
-    assert(stridesArray.hasValue() && "computeStrideArray must succeed");
   }
 };
 
-class StencilXSMM : public StencilBase {
+class StencilGEMM : public StencilBase {
 private:
   unsigned numThreads;
   StencilCostFunction stencilCostFn;
@@ -146,13 +136,7 @@ private:
   double getCost(TensorAndIndexPermutation perm, ArrayRef<int64_t> tileSize) {
     unsigned tot_inner_loop = tileSize[0] * tileSize[1] * tileSize[2];
 
-    // Note: XSMM and its cost function heatmap use the reverse index order from
-    // the rest of this code, hence the flip below
-    SmallVector<unsigned, 3> xsmmTileSize;
-    xsmmTileSize.push_back(tileSize[1]);
-    xsmmTileSize.push_back(tileSize[0]);
-    xsmmTileSize.push_back(tileSize[2]);
-    auto cost = stencilCostFn(xsmmTileSize);
+    auto cost = stencilCostFn(tileSize);
     if (cost.throughput == 0) {
       return std::numeric_limits<double>::infinity();
     }
@@ -291,16 +275,13 @@ private:
     }
     op.setSteps(steps);
 
-    // Generate the XSMM call; first select inputs based on permutation order
+    // Generate the GEMM op; select inputs based on permutation order
     auto opC = cast<AffineReduceOp>(*perm.ioOps[0]);
     auto opA = cast<AffineLoadOp>(*perm.ioOps[1]);
     auto opB = cast<AffineLoadOp>(*perm.ioOps[2]);
 
-    // Initialize helpers
     auto bodyBuilder = op.getBodyBuilder();
 
-    // Set the tile size. Note XSMM wants col-major order and we fix this later
-    // inside the libxsmm call.
     auto tileAttr = bodyBuilder.getI64ArrayAttr(tileSize);
 
     SmallVector<Value, 8> mapOperands;
@@ -308,35 +289,18 @@ private:
     GemmOperand a(opA, {perm.indexes[0], perm.indexes[2]}, mapOperands);
     GemmOperand b(opB, {perm.indexes[2], perm.indexes[1]}, mapOperands);
 
-    auto leadingDimsAttr = bodyBuilder.getI64ArrayAttr(ArrayRef<int64_t>{
-        a.stridesArray->strides[0],
-        b.stridesArray->strides[0],
-        c.stridesArray->strides[0],
-    });
-
-    // Make the XSMM ops
-    auto dispatch = bodyBuilder.create<xsmm::GemmDispatchOp>(
-        op.getLoc(), bodyBuilder.getI64Type(), tileAttr, leadingDimsAttr);
-
-    auto invoke = bodyBuilder.create<xsmm::GemmInvokeOp>(
-        op.getLoc(), c.memref.getType(), dispatch.getResult(), //
-        c.memref, c.accessMap, c.tileMap,                      //
-        a.memref, a.accessMap, a.tileMap,                      //
-        b.memref, b.accessMap, b.tileMap,                      //
+    auto gemm = bodyBuilder.create<pxa::AffineGemmOp>(
+        op.getLoc(), c.memref.getType(),  //
+        c.memref, c.accessMap, c.tileMap, //
+        a.memref, a.accessMap, a.tileMap, //
+        b.memref, b.accessMap, b.tileMap, //
         tileAttr, mapOperands);
 
-    opC.result().replaceAllUsesWith(invoke);
-
-    // Remove all other ops from the op interior
-    auto xsmm_it = std::prev(op.getBody()->end(), 3);
-    while (op.getBody()->begin() != xsmm_it) {
-      auto prev_it = std::prev(xsmm_it);
-      op.getBody()->getOperations().erase(prev_it);
-    }
+    opC.result().replaceAllUsesWith(gemm);
   }
 
 public:
-  StencilXSMM(AffineParallelOp op, unsigned numThreads,
+  StencilGEMM(AffineParallelOp op, unsigned numThreads,
               StencilCostFunction costFn)
       : StencilBase{op,
                     3, // Three tileable indexes
@@ -360,15 +324,14 @@ public:
         numThreads{numThreads}, stencilCostFn(costFn) {}
 };
 
-struct XSMMStencilPass : public PassWrapper<XSMMStencilPass, FunctionPass> {
-  // TODO: Do I want config for requirements & tilingGenerators?
-  XSMMStencilPass() { assert(false && "XSMMStencilPass must be configured"); }
+struct StencilGEMMPass : public PassWrapper<StencilGEMMPass, FunctionPass> {
+  StencilGEMMPass() { assert(false && "StencilGEMMPass must be configured"); }
 
-  XSMMStencilPass(const XSMMStencilPass &rhs) : costFn(rhs.costFn) {
+  StencilGEMMPass(const StencilGEMMPass &rhs) : costFn(rhs.costFn) {
     numThreads = rhs.numThreads.getValue();
   }
 
-  XSMMStencilPass(unsigned numThreads_, StencilCostFunction costFn)
+  StencilGEMMPass(unsigned numThreads_, StencilCostFunction costFn)
       : costFn(costFn) {
     numThreads = numThreads_;
   }
@@ -376,7 +339,7 @@ struct XSMMStencilPass : public PassWrapper<XSMMStencilPass, FunctionPass> {
   void runOnFunction() final {
     auto func = getFunction();
     func.walk([this](AffineParallelOp op) {
-      StencilXSMM stencil(op, numThreads.getValue(), costFn);
+      StencilGEMM stencil(op, numThreads.getValue(), costFn);
       stencil.DoStenciling();
     });
   }
@@ -388,9 +351,9 @@ struct XSMMStencilPass : public PassWrapper<XSMMStencilPass, FunctionPass> {
       llvm::cl::desc("Specifies number of threads for the stencil pass")};
 };
 
-std::unique_ptr<Pass> createXSMMStencilPass(unsigned numThreads,
+std::unique_ptr<Pass> createStencilGEMMPass(unsigned numThreads,
                                             StencilCostFunction costFn) {
-  return std::make_unique<XSMMStencilPass>(numThreads, costFn);
+  return std::make_unique<StencilGEMMPass>(numThreads, costFn);
 }
 
 } // namespace pmlc::dialect::pxa

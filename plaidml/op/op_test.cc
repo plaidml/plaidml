@@ -210,7 +210,7 @@ ConvolutionParams convParams[] = {
         {1, 224, 224, 3},
         {7, 7, 3, 64},
         [](op::convolution& conv) {
-          conv.name("conv1").strides({2, 2}).autopad_mode(op::AutoPadMode::NONE).manual_padding({3, 3});
+          conv.name("conv1").strides({2, 2}).autopad_mode(op::AutoPadMode::EXPLICIT).manual_padding({3, 3});
         },
     },
     {
@@ -220,6 +220,42 @@ ConvolutionParams convParams[] = {
         {1, 1, 64, 256},
         [](op::convolution& conv) {
           conv.name("res2a_branch1").strides({1, 1}).autopad_mode(op::AutoPadMode::VALID);
+        },
+    },
+    {
+        // 3D convolution
+        DType::FLOAT32,
+        {1, 32, 224, 224, 3},
+        {7, 7, 7, 3, 64},
+        [](op::convolution& conv) {
+          conv.strides({2, 2, 2}).autopad_mode(op::AutoPadMode::EXPLICIT).manual_padding({2, 3, 2, 3, 2, 3});
+        },
+    },
+    {
+        // 3D convolution
+        DType::FLOAT32,
+        {1, 3, 1, 1, 1024},
+        {1, 1, 1, 1024, 400},
+        [](op::convolution& conv) {
+          conv.strides({1, 1, 1}).autopad_mode(op::AutoPadMode::EXPLICIT).manual_padding({0, 0, 0, 0, 0, 0});
+        },
+    },
+    {
+        // 3D convolution
+        DType::FLOAT32,
+        {1, 16, 56, 56, 64},
+        {1, 1, 1, 64, 64},
+        [](op::convolution& conv) {
+          conv.strides({1, 1, 1}).autopad_mode(op::AutoPadMode::EXPLICIT).manual_padding({0, 0, 0, 0, 0, 0});
+        },
+    },
+    {
+        // 3D convolution
+        DType::FLOAT32,
+        {1, 16, 56, 56, 64},
+        {3, 3, 3, 64, 192},
+        [](op::convolution& conv) {
+          conv.strides({1, 1, 1}).autopad_mode(op::AutoPadMode::EXPLICIT).manual_padding({1, 1, 1, 1, 1, 1});
         },
     },
 };
@@ -249,6 +285,23 @@ TEST_F(OpTest, Elu) {
   auto I = Placeholder(DType::FLOAT32, {7, 7, 3, 64}, "I");
   auto program = makeProgram("elu", {op::elu(I, 0.1)});
   runProgram(program);
+}
+
+TEST_F(OpTest, ExplicitPadding) {
+  auto I = Placeholder(DType::FLOAT32, {2, 3}, "A");
+  auto O = static_cast<Tensor>(op::explicit_padding(I, {2, 1}, {2, 1}).padval(-1.0));
+  auto program = makeProgram("explicit_padding", {O});
+
+  std::vector<float> I_input = {1, 2, 3,  //
+                                4, 5, 6};
+  std::vector<float> O_output = {-1, -1, -1, -1, -1,  //
+                                 -1, -1, -1, -1, -1,  //
+                                 -1, 1,  2,  3,  -1,  //
+                                 -1, 4,  5,  6,  -1,  //
+                                 -1, -1, -1, -1, -1,  //
+                                 -1, -1, -1, -1, -1};
+
+  checkProgram(program, {{I, I_input}}, {{O, O_output}});
 }
 
 TEST_F(OpTest, Flip) {
@@ -310,7 +363,7 @@ TEST_F(OpTest, L2Norm) {
 
 TEST_F(OpTest, Pool) {
   auto I = Placeholder(DType::FLOAT32, {10, 20, 30, 40, 50}, "I");
-  auto program = makeProgram("pool", {op::pool(I, op::PoolMode::SUM, {1, 2, 3}, {1, 2, 3}, op::AutoPadMode::NONE,
+  auto program = makeProgram("pool", {op::pool(I, op::PoolMode::SUM, {1, 2, 3}, {1, 2, 3}, op::AutoPadMode::EXPLICIT,
                                                {1, 2}, op::TensorLayout::NXC, true, true)});
   runProgram(program);
 }

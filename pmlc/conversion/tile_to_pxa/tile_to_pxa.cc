@@ -170,8 +170,17 @@ static Value createCastOp(OpBuilder &builder, Location loc, Value from,
       return builder.create<mlir::FPTruncOp>(loc, from, intoType).getResult();
     }
     if (auto fromIntType = fromType.dyn_cast<IntegerType>()) {
-      // SIToFPOp: IntegerType -> FloatType
-      return builder.create<mlir::SIToFPOp>(loc, from, intoType).getResult();
+      if (fromIntType.getWidth() == 1) {
+        // If UIToFPOp existed, we would use it, but it currently does not.
+        // Converting i1 as signed gives us [0,-1] rather than [0,1].
+        // We can hack our way around this by negating the result.
+        auto raw =
+            builder.create<mlir::SIToFPOp>(loc, from, intoType).getResult();
+        return builder.create<mlir::NegFOp>(loc, raw);
+      } else {
+        // SIToFPOp: IntegerType -> FloatType
+        return builder.create<mlir::SIToFPOp>(loc, from, intoType).getResult();
+      }
     }
     if (auto fromIndexType = fromType.dyn_cast<IndexType>()) {
       auto i64Type = builder.getIntegerType(64);
@@ -274,6 +283,18 @@ struct AnyComparandIs : Matcher {
     auto operands = adaptor.operands();
     InnerPredicate pred;
     return pred.match(operands[0].getType()) ||
+           pred.match(operands[1].getType());
+  }
+};
+
+template <typename InnerPredicate>
+struct ComparandsAre : Matcher {
+  bool match(Operation *op) const final {
+    SmallVector<Value, 4> allOperands(op->getOperands());
+    ContractionOpAdaptor adaptor(allOperands);
+    auto operands = adaptor.operands();
+    InnerPredicate pred;
+    return pred.match(operands[0].getType()) &&
            pred.match(operands[1].getType());
   }
 };
@@ -744,7 +765,7 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
     // Create the store
     auto stored = buildSimpleStore(rewriter, loc, result, alloc.resultMemRef,
                                    getPaddingInfo(op));
-    rewriter.create<AffineYieldOp>(loc, ValueRange({stored}));
+    rewriter.create<AffineYieldOp>(loc, ValueRange{stored});
 
     // Replace output with the newly allocated buffer
     rewriter.replaceOp(op, forOp.getResult(0));
@@ -806,7 +827,7 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
                                   alloc.resultMemRef, getPaddingInfo(op));
     if (maybePadding)
       updateAffineMap(store.getDefiningOp(), *maybePadding);
-    parallelBuilder.create<AffineYieldOp>(loc, ValueRange({store}));
+    parallelBuilder.create<AffineYieldOp>(loc, ValueRange{store});
     auto filled = parallel.getResult(0);
 
     // Determine lower and upper bounds.
@@ -889,7 +910,7 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
     maybePadding = getPaddingInfo(op);
     if (maybePadding)
       updateAffineMap(reduceOp, *maybePadding);
-    rewriter.create<AffineYieldOp>(loc, ValueRange({reduceOp}));
+    rewriter.create<AffineYieldOp>(loc, ValueRange{reduceOp});
 
     // Replace the op
     rewriter.replaceOp(op, forOp.getResult(0));
@@ -934,7 +955,7 @@ struct IndexOpConversion : public OpConversionPattern<IndexOp> {
                                                    rewriter.getIntegerType(32));
     auto stored =
         buildSimpleStore(rewriter, loc, cast, resultMemRef, getPaddingInfo(op));
-    rewriter.create<AffineYieldOp>(loc, ValueRange({stored}));
+    rewriter.create<AffineYieldOp>(loc, ValueRange{stored});
 
     // Replace the op
     rewriter.replaceOp(op, forOp.getResult(0));
@@ -1144,10 +1165,10 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
                                 ResultIs<EltwiseInteger>>,
         ContractionOpConversion<CombinationKind::eq,
                                 CmpFloatOp<CmpFPredicate::OEQ>,
-                                ResultIs<EltwiseFloat>>,
+                                AnyComparandIs<EltwiseFloat>>,
         ContractionOpConversion<CombinationKind::eq,
                                 CmpIntOp<CmpIPredicate::eq>,
-                                ResultIs<EltwiseInteger>>,
+                                ComparandsAre<EltwiseInteger>>,
         ContractionOpConversion<CombinationKind::cond,
                                 CondOp<CmpFloatOp<CmpFPredicate::OEQ>>,
                                 AnyComparandIs<EltwiseFloat>>,

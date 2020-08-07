@@ -84,6 +84,21 @@ plaidml::op::AutoPadMode to_plaidml(const ngraph::op::PadType& ng_type) {
   }
 }
 
+plaidml::op::PadMode to_plaidml(const ngraph::op::PadMode& ng_type) {
+  switch (ng_type) {
+    case ngraph::op::PadMode::CONSTANT:
+      return plaidml::op::PadMode::CONSTANT;
+    case ngraph::op::PadMode::EDGE:
+      return plaidml::op::PadMode::EDGE;
+    case ngraph::op::PadMode::REFLECT:
+      return plaidml::op::PadMode::REFLECT;
+    case ngraph::op::PadMode::SYMMETRIC:
+      return plaidml::op::PadMode::SYMMETRIC;
+    default:
+      THROW_IE_EXCEPTION << "Unsupported autopad type";
+  }
+}
+
 ngraph::Shape get_shape_from_constant_operand(size_t operand_idx, ngraph::Node* layer) {
   auto shape_ngraph_op =
       std::dynamic_pointer_cast<ngraph::op::Constant>(layer->input_value(operand_idx).get_node_shared_ptr());

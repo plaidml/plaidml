@@ -29,6 +29,7 @@ plaidml_cc_library(
         "pass_detail.h",
         "resize_tmps.cc",
         "stencil.cc",
+        "stencil_gemm.cc",
         "test_analysis.cc",
         "tile.cc",
     ],

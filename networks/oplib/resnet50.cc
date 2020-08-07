@@ -220,22 +220,21 @@ std::vector<edsl::Tensor> bias_placeholders() {
 edsl::Program build(int64_t batch_size, const edsl::Tensor& I, ArrayRef<edsl::Tensor> W, ArrayRef<edsl::Tensor> B) {
   auto W_conv1 = W[0];
   auto B_conv1 = B[0];
-  auto start = edsl::trace(I, "start");
-  auto conv1 = edsl::trace(op::convolution(start, W_conv1)
+  auto conv1 = edsl::trace(op::convolution(I, W_conv1)
                                .name("conv1")
                                .strides({2, 2})
-                               .autopad_mode(op::AutoPadMode::NONE)
+                               .autopad_mode(op::AutoPadMode::EXPLICIT)
                                .manual_padding({3, 3}),
                            "conv1");
   auto relu1 = op::relu(conv1 + B_conv1);
-  auto pool1 = op::pool(       //
-      relu1,                   // input
-      op::PoolMode::MAX,       // pool mode
-      {3, 3},                  // pool shape
-      {2, 2},                  // strides
-      op::AutoPadMode::NONE,   // autopadding
-      {1, 1},                  // manual padding
-      op::TensorLayout::NXC);  // input layout
+  auto pool1 = op::pool(          //
+      relu1,                      // input
+      op::PoolMode::MAX,          // pool mode
+      {3, 3},                     // pool shape
+      {2, 2},                     // strides
+      op::AutoPadMode::EXPLICIT,  // autopadding
+      {1, 1},                     // manual padding
+      op::TensorLayout::NXC);     // input layout
 
   // 2
   SmallVector<edsl::Tensor, 4> W_block2a = {W[1], W[2], W[3], W[4]};

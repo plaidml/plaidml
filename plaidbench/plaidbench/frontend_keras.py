@@ -198,9 +198,9 @@ class Model(core.Model):
             eval(code, mod)
         self.x = mod['scale_dataset'](self.x)
         self.model = mod['build_model'](**build_model_kwargs)
-        if self.enable_bn_folding:
-            click.echo('Model loaded, folding in batch_norm')
-            self.model = self.fold_batch_norm(self.model)
+        # if self.enable_bn_folding:
+        #     click.echo('Model loaded, folding in batch_norm')
+        #     self.model = self.fold_batch_norm(self.model)
 
     def compile(self):
         if self.params.network_name[:3] == 'vgg':
