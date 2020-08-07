@@ -13,22 +13,9 @@
 #include "pmlc/dialect/pxa/transforms/vectorize.h"
 #include "pmlc/util/logging.h"
 
-namespace pmlc::dialect::pxa {
-using mlir::AddFOp;
-using mlir::AddIOp;
-using mlir::AffineLoadOp;
-using mlir::AffineParallelOp;
-using mlir::BlockArgument;
-using mlir::CmpFOp;
-using mlir::CmpIOp;
-using mlir::DivFOp;
-using mlir::MulFOp;
-using mlir::MulIOp;
-using mlir::SubFOp;
-using mlir::SubIOp;
-using mlir::VectorType;
-using mlir::VectorUnrollOpInterface;
+using namespace mlir; // NOLINT[build/namespaces]
 
+namespace pmlc::dialect::pxa {
 using pmlc::dialect::pxa::AffineReduceOp;
 
 class Impl {
@@ -137,8 +124,6 @@ private:
         width = std::max(w, width);
       }
     }
-    IVLOG(1, "Lubo31:" << width);
-
     return width;
   }
 
@@ -158,20 +143,22 @@ public:
       : op(op), index(index), vectorSize(vectorSize),
         minElemWidth(minElemWidth), numElementsInRegister(0) {}
 
-  void fixupSteps(AffineParallelOp op, AffineParallelOp newOp, unsigned argNum,
-                  OpBuilder builder) {
-    std::vector<int64_t> newSteps;
-    for (unsigned int i = 0; i < op.getIVs().size(); i++) {
-      newSteps.push_back(op.steps().getValue()[i].cast<IntegerAttr>().getInt() *
-                         (i == argNum ? numElementsInRegister : 1));
-    }
-    newOp.setAttr(AffineParallelOp::getStepsAttrName(),
-                  builder.getI64ArrayAttr(newSteps));
-    // TODO: Fix up steps.
-  }
-
   Operation *vectorizeOperation(OpBuilder &builder, Operation &loopOperation) {
-    // TODO: Lubo
+    auto pair = vectorizableOps.find(&loopOperation);
+    if (pair != vectorizableOps.end()) {
+      OpVectState opVectState = pair->second;
+      IVLOG(1, "Lubo: Found operation:" << opVectState.opType << ":"
+                                        << opVectState.stride);
+
+      // TODO: transform
+
+      if (opVectState.opType == OpType::SCALAR) {
+        Operation *ret = builder.clone(loopOperation);
+        // TODO: ret->setType(vecType);
+        return ret;
+      }
+    }
+
     return builder.clone(loopOperation);
   }
 
@@ -180,6 +167,22 @@ public:
     // mlir::OpBuilder builder(op); // Lubo , op.getBody()->begin());
     IVLOG(1, "Lubo10: " << mlir::debugString(*op.getParentOp()->getParentOp()));
     // Lubo Operation* luboOp = op.getParentOp()->getParentOp();
+    mlir::OpBuilder builder(op);
+    // Fix up the steps
+    std::vector<int64_t> newSteps;
+    for (unsigned int i = 0; i < op.getIVs().size(); i++) {
+      newSteps.push_back(op.steps().getValue()[i].cast<IntegerAttr>().getInt() *
+                         (i == argNum ? numElementsInRegister : 1));
+    }
+    SmallVector<AtomicRMWKind, 8> reductions(op.getResultTypes().size(),
+                                             AtomicRMWKind::assign);
+    AffineParallelOp newAffineParallelOp = builder.create<AffineParallelOp>(
+        op.getLoc(), op.getResultTypes(), reductions,
+        op.getLowerBoundsValueMap().getAffineMap(), op.getLowerBoundsOperands(),
+        op.getUpperBoundsValueMap().getAffineMap(), op.getUpperBoundsOperands(),
+        newSteps);
+    IVLOG(1,
+          "Lubo8: " << mlir::debugString(*newAffineParallelOp.getOperation()));
     for (auto it = block->begin(); it != block->end(); it++) {
       // Operation* blockOp = &*it;
       IVLOG(1, "Lubo4: " << mlir::debugString(*it));
@@ -187,20 +190,6 @@ public:
         Value operand = (*it).getOperand(i);
         if (operand.getDefiningOp() == op) {
           IVLOG(1, "Lubo5: " << i);
-          mlir::OpBuilder builder(op);
-          AffineParallelOp newAffineParallelOp =
-              builder.create<AffineParallelOp>(
-                  op.getLoc(),
-                  /*resultTypes=*/op.getResultTypes(),
-                  /*reductions=*/
-                  ArrayRef<mlir::AtomicRMWKind>{mlir::AtomicRMWKind::assign},
-                  /*ranges=*/ArrayRef<int64_t>({64, 64, 64})); // TODO:
-
-          fixupSteps(op, newAffineParallelOp, argNum, builder);
-
-          IVLOG(1, "Lubo8: " << mlir::debugString(
-                       *newAffineParallelOp.getOperation()));
-
           // builder.insert(newAffineParallelOp);
           (*it).setOperand(i, newAffineParallelOp.getResult(0));
 
@@ -233,8 +222,9 @@ public:
             loopOp.erase();
           }
           // IVLOG(1, "Lubo9: " <<
-          // mlir::debugString(*newAffineParallelOp.getOperation())); IVLOG(1,
-          // "Lubo12: " << mlir::debugString(*op.getOperation()));
+          // mlir::debugString(*newAffineParallelOp.getOperation()));
+
+          IVLOG(1, "Lubo12: " << mlir::debugString(*op.getOperation()));
         }
       }
     }
