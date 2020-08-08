@@ -1,5 +1,5 @@
 // Copyright 2020 Intel Corporation
-// RUN: cc_test | FileCheck %s
+// RUN: cc_test --plaidml_device=%plaidml_device --plaidml_target=%plaidml_target | FileCheck %s
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -390,6 +390,18 @@ TEST_F(CppEdsl, DoubleDot) {
   // CHECK: %{{.*}} = tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {idxs = ["i", "j", "k"], sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : tensor<f32>, tensor<10x30xf32>, tensor<30x40xf32> -> tensor<10x40xf32>
   // CHECK: return %{{.*}} : tensor<10x40xf32>
   // clang-format on
+  runProgram(program);
+}
+
+TEST_F(CppEdsl, BigDot) {
+  int64_t M = 2048;
+  int64_t N = 2048;
+  int64_t K = 2048;
+  auto A = Placeholder(DType::FLOAT32, {M, K});
+  auto B = Placeholder(DType::FLOAT32, {K, N});
+  auto C = Dot(A, B);
+  auto program = makeProgram("dot", {C});
+
   runProgram(program);
 }
 

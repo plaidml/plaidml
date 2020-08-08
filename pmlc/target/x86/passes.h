@@ -27,8 +27,7 @@ void populatePXAToAffineConversionPatterns(
 
 void populateXSMMToLLVMConversionPatterns(
     mlir::LLVMTypeConverter &converter,
-    mlir::OwningRewritePatternList &patterns,
-    const mlir::LowerToLLVMOptions &options);
+    mlir::OwningRewritePatternList &patterns);
 
 void registerPassPipeline();
 

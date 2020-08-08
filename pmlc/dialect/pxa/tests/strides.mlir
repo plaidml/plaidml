@@ -11,7 +11,7 @@ func @simple(%arg0: memref<100x100xf32>, %arg1: memref<100x100xf32>, %arg2: memr
     %1 = affine.load %arg0[%k, %j] : memref<100x100xf32>
     // CHECK: strides: 0:[^bb0:%arg1=1, ^bb0:%arg2=100]
     %2 = mulf %0, %1 : f32
-    pxa.reduce add %2, %arg2[%i, %j] : memref<100x100xf32>
+    pxa.reduce addf %2, %arg2[%i, %j] : memref<100x100xf32>
     // CHECK: strides: 0:[^bb0:%arg0=100, ^bb0:%arg1=1]
   }
   return
@@ -87,7 +87,7 @@ func @dot_tiled(%A: memref<8x8xf32>, %B: memref<8x8xf32>, %C: memref<8x8xf32>) {
       %1 = affine.load %B[%k1, %j1] : memref<8x8xf32>
       // CHECK: strides: 0:[^bb0:%arg1=1, ^bb0:%arg2=8, ^bb1:%arg1=2, ^bb1:%arg2=16]
       %2 = mulf %0, %1 : f32
-      pxa.reduce add %2, %C[%i1, %j1] : memref<8x8xf32>
+      pxa.reduce addf %2, %C[%i1, %j1] : memref<8x8xf32>
       // CHECK: strides: 0:[^bb0:%arg0=8, ^bb0:%arg1=1, ^bb1:%arg0=16, ^bb1:%arg1=2]        
     }
   }
@@ -102,7 +102,7 @@ func @conv2_tiled(%I: memref<1x6x5x7xf32>, %K: memref<1x1x7x11xf32>, %O: memref<
       %1 = affine.load %K[0, 0, %ci, %co] : memref<1x1x7x11xf32>
       // CHECK: strides: 0:[^bb0:%arg1=11, ^bb0:%arg2=1]
       %2 = mulf %0, %1 : f32
-      pxa.reduce add %2, %O[0, %x1, %y, %co] : memref<1x6x5x11xf32>
+      pxa.reduce addf %2, %O[0, %x1, %y, %co] : memref<1x6x5x11xf32>
       // CHECK: strides: 0:[^bb0:%arg0=55, ^bb0:%arg2=1, ^bb1:%arg0=110, ^bb1:%arg1=11]
     }
   }

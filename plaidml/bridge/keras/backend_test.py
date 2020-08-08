@@ -855,7 +855,6 @@ class TestBackendOps(unittest.TestCase):
         return [b.categorical_crossentropy(x, y, from_logits=True)]
 
     @opTest([[m(3, 3, 10)]], skip_theano=True, tol=0.01)
-    @unittest.skip("'std.cmpi' op operand #0 must be signless-integer-like, but got 'f32'")
     def testSparseCategoricalCrossentropy(self, b, x):
         smax = b.softmax(x)
         sbest = b.variable(np.array([[7, 8, 5], [9, 3, 8], [0, 7, 6]]))
@@ -865,7 +864,6 @@ class TestBackendOps(unittest.TestCase):
         ]
 
     @opTest([[m(1, 3, 10)]], skip_theano=True, tol=0.01)
-    @unittest.skip("'std.cmpi' op operand #0 must be signless-integer-like, but got 'f32'")
     def testSparseCategoricalCrossentropyUnbalanced(self, b, x):
         smax = b.softmax(x)
         sbest = b.variable(np.array([[7, 8, 5]]))
@@ -875,7 +873,6 @@ class TestBackendOps(unittest.TestCase):
         ]
 
     @opTest([[m(3, 10)]], skip_theano=True, tol=0.001)
-    @unittest.skip("'std.cmpi' op operand #0 must be signless-integer-like, but got 'f32'")
     def testSparseCategoricalCrossentropyShort(self, b, x):
         smax = b.softmax(x)
         sbest = b.variable(np.array([7, 8, 5]))
@@ -885,7 +882,6 @@ class TestBackendOps(unittest.TestCase):
         ]
 
     @opTest([[m(3, 3, 2, 10)]], skip_theano=True, tol=0.01)
-    @unittest.skip("'std.cmpi' op operand #0 must be signless-integer-like, but got 'f32'")
     def testSparseCategoricalCrossentropyLong(self, b, x):
         smax = b.softmax(x)
         sbest = b.variable(
@@ -897,7 +893,6 @@ class TestBackendOps(unittest.TestCase):
         ]
 
     @opTest([[m(3, 3, 2, 1, 10)]], skip_theano=True, tol=0.01)
-    @unittest.skip("'std.cmpi' op operand #0 must be signless-integer-like, but got 'f32'")
     def testSparseCategoricalCrossentropyXLong(self, b, x):
         smax = b.softmax(x)
         sbest = b.variable(
@@ -918,7 +913,6 @@ class TestBackendOps(unittest.TestCase):
         return [b.exp(x)]
 
     @opTest([[m(20)], [m(2, 2, 2)]])
-    @unittest.skip("failed to legalize operation 'eltwise.pow'")
     def testPow(self, b, x):
         return [b.pow(x, 5)]
 
@@ -1702,7 +1696,6 @@ class TestBackendOps(unittest.TestCase):
         [m(3, 2, 4), n(3, 2, 4), 0],
         [m(2, 3), n(2, 3), 1],
     ])
-    @unittest.skip("'eltwise.select' op operand #0 must be eltwise-bool, but got 'tensor<f32>'")
     def testSwitch(self, b, e, t, c):
         c_tensor = b.variable(c)
         return [

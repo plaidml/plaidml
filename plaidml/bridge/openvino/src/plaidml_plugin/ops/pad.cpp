@@ -39,15 +39,15 @@ static OpRegistration reg("pad", [](const Context& ctx) {
   auto lo_pads = cast_constant_operand<int>(1, layer);
   auto hi_pads = cast_constant_operand<int>(2, layer);
 
-  double padval = 0.;  // OV tests currently only use default constant pad of 0
-  if (ctx.operands.size() == 4) {
-    auto padvalvec = cast_constant_operand<double>(3, layer);
-    padval = padvalvec[0];
-  }
-
   auto autopad_mode = to_plaidml(layer->get_pad_mode());
 
-  return edsl::make_tuple(op::explicit_padding(I, lo_pads, hi_pads, autopad_mode, padval));
+  auto op = op::explicit_padding(I, lo_pads, hi_pads).mode(autopad_mode);
+
+  if (ctx.operands.size() == 4) {
+    op.padval(edsl::Value(ctx.operands.at(0)));
+  }
+
+  return edsl::make_tuple(op);
 });
 
 }  // namespace PlaidMLPlugin

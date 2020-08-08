@@ -72,8 +72,9 @@ struct ConvertToLLVMPass
     LLVMTypeConverter typeConverter(context, options);
 
     OwningRewritePatternList patterns;
-    populateXSMMToLLVMConversionPatterns(typeConverter, patterns, options);
-    populateStdToLLVMConversionPatterns(typeConverter, patterns, options);
+    populateExpandTanhPattern(patterns, context);
+    populateXSMMToLLVMConversionPatterns(typeConverter, patterns);
+    populateStdToLLVMConversionPatterns(typeConverter, patterns);
     conversion::stdx_to_llvm::populateStdXToLLVMConversionPatterns(
         typeConverter, patterns);
 
@@ -143,8 +144,6 @@ static void addToPipeline(OpPassManager &pm) {
   if (pmlc::util::getEnvVar("PLAIDML_BOUNDS_CHECK") == "1") {
     pm.addPass(pmlc::dialect::stdx::createBoundsCheckPass());
   }
-
-  pm.addPass(createTanhLoweringPass());
 
   pm.addPass(createLowerToLLVMPass());
   pm.addPass(createTraceLinkingPass());

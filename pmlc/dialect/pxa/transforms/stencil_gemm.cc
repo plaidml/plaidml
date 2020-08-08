@@ -85,7 +85,7 @@ private:
     IVLOG(5, "Found ReduceOp");
 
     // Now check the reduceOp aggregation.
-    if (reduceOp.agg() != AggregationKind::add) {
+    if (reduceOp.agg() != AtomicRMWKind::addf) {
       IVLOG(5, "the reduce operation is not addition");
       return llvm::None;
     }

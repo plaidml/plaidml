@@ -175,7 +175,7 @@ struct SimplifyAffineGemmOp : public OpRewritePattern<AffineGemmOp> {
 
 void printAffineReduceOp(OpAsmPrinter &p, AffineReduceOp op) {
   p << op.getOperation()->getName() << ' ';
-  p << util::stringifyAggregationKind(op.agg()) << ' ';
+  p << stringifyAtomicRMWKind(op.agg()) << ' ';
   p << op.val() << ", ";
   p << op.mem() << '[';
   auto mapAttr = op.getAttrOfType<AffineMapAttr>("map");
@@ -195,12 +195,12 @@ ParseResult parseAffineReduceOp(OpAsmParser &parser, OperationState &result) {
   AffineMapAttr mapAttr;
   OpAsmParser::OperandType val, out;
   SmallVector<OpAsmParser::OperandType, 4> idxs;
-  auto symbolizeAggregationKind = [](StringRef str) {
-    return util::symbolizeAggregationKind(str);
+  auto symbolizeAtomicRMWKindWrap = [](StringRef str) {
+    return symbolizeAtomicRMWKind(str);
   };
   return failure(
       parseKeywordIntoEnumAttr(parser, result, "agg", i64Ty,
-                               symbolizeAggregationKind) ||
+                               symbolizeAtomicRMWKindWrap) ||
       parser.parseOperand(val) || parser.parseComma() ||
       parser.parseOperand(out) ||
       parser.parseAffineMapOfSSAIds(idxs, mapAttr, "map", result.attributes) ||
@@ -318,7 +318,7 @@ ParseResult parseAffineGemmOp(OpAsmParser &parser, OperationState &result) {
 
 void printAffineVectorReduceOp(OpAsmPrinter &p, AffineVectorReduceOp op) {
   p << op.getOperation()->getName() << ' ';
-  p << util::stringifyAggregationKind(op.agg()) << ' ';
+  p << stringifyAtomicRMWKind(op.agg()) << ' ';
   p << op.vector() << ", ";
   p << op.mem() << '[';
   auto mapAttr = op.getAttrOfType<AffineMapAttr>("map");
@@ -343,12 +343,12 @@ ParseResult parseAffineVectorReduceOp(OpAsmParser &parser,
   AffineMapAttr mapAttr;
   OpAsmParser::OperandType val, out;
   SmallVector<OpAsmParser::OperandType, 4> idxs;
-  auto symbolizeAggregationKind = [](StringRef str) {
-    return util::symbolizeAggregationKind(str);
+  auto symbolizeAtomicRMWKindWrap = [](StringRef str) {
+    return symbolizeAtomicRMWKind(str);
   };
   return failure(
       parseKeywordIntoEnumAttr(parser, result, "agg", i64Ty,
-                               symbolizeAggregationKind) ||
+                               symbolizeAtomicRMWKindWrap) ||
       parser.parseOperand(val) || parser.parseComma() ||
       parser.parseOperand(out) ||
       parser.parseAffineMapOfSSAIds(idxs, mapAttr, "map", result.attributes) ||
