@@ -41,6 +41,7 @@ private:
   unsigned vectorSize;
   unsigned minElemWidth;
   std::unordered_map<Operation *, OpVectState> vectorizableOps;
+  llvm::DenseMap<Value, Value> clonedOpsResultsMap;
   unsigned numElementsInRegister;
   VectorType vecType;
 
@@ -143,8 +144,77 @@ public:
       : op(op), index(index), vectorSize(vectorSize),
         minElemWidth(minElemWidth), numElementsInRegister(0) {}
 
-  Operation *vectorizeOperation(OpBuilder &builder, Operation &loopOperation) {
-    auto pair = vectorizableOps.find(&loopOperation);
+  void mapResults(const Operation &orig, const Operation *const clone) {
+    ResultRange origResults = const_cast<Operation &>(orig).getResults();
+    ResultRange clonedResults = const_cast<Operation *>(clone)->getResults();
+    if (origResults.size() != clonedResults.size()) {
+      llvm_unreachable(
+          "Vectorize: original and cloned op result's size is not equal");
+    }
+    for (unsigned i = 0; i < origResults.size(); i++) {
+      clonedOpsResultsMap[origResults[i]] = clonedResults[i];
+    }
+    IVLOG(1, "Lubo: Mapped operation results: " << clonedOpsResultsMap.size());
+  }
+
+  // Get the new value according to the original value
+  // vecType is null if the new value is not required to be vector
+  Value mappedValue(Value orig) {
+    Value newValue = clonedOpsResultsMap[orig];
+    if (newValue) {
+      return newValue;
+    }
+    return orig;
+  }
+
+  template <class T>
+  Operation *createCmpOp(T op, OpBuilder &builder) {
+    Value lhs = mappedValue(op.getOperand(0));
+    Value rhs = mappedValue(op.getOperand(1));
+    return builder.create<T>(op.getLoc(), vecType, op.getPredicate(), lhs, rhs);
+  }
+
+  template <class T>
+  Operation *createScalarOp(T op, OpBuilder &builder) {
+    Value lhs = mappedValue(op.getOperand(0));
+    Value rhs = mappedValue(op.getOperand(1));
+    Operation *ret = builder.create<T>(op.getLoc(), vecType, lhs, rhs);
+    IVLOG(1, "Lubo: New SCALAR op:" << mlir::debugString(vecType) << ":"
+                                    << mlir::debugString(*ret));
+    return op;
+  }
+
+  Operation *vectorizeScalarOp(Operation *op, OpBuilder &builder) {
+    Operation *ret;
+    TypeSwitch<Operation *>(op)
+        .Case<AddFOp>(
+            [&](auto op) { ret = createScalarOp<AddFOp>(op, builder); })
+        .Case<AddIOp>(
+            [&](auto op) { ret = createScalarOp<AddIOp>(op, builder); })
+        .Case<SubFOp>(
+            [&](auto op) { ret = createScalarOp<SubFOp>(op, builder); })
+        .Case<SubIOp>(
+            [&](auto op) { ret = createScalarOp<SubIOp>(op, builder); })
+        .Case<MulFOp>(
+            [&](auto op) { ret = createScalarOp<MulFOp>(op, builder); })
+        .Case<MulIOp>(
+            [&](auto op) { ret = createScalarOp<MulIOp>(op, builder); })
+        .Case<DivFOp>(
+            [&](auto op) { ret = createScalarOp<DivFOp>(op, builder); })
+        .Case<CmpFOp>([&](auto op) { ret = createCmpOp<CmpFOp>(op, builder); })
+        .Case<CmpIOp>([&](auto op) { ret = createCmpOp<CmpIOp>(op, builder); })
+        .Default([&](Operation *op) { ret = builder.clone(*op); });
+    return ret;
+  }
+
+  Operation *vectorizeOperation(OpBuilder &builder,
+                                const Operation &loopOperation) {
+    auto pair = vectorizableOps.find(&const_cast<Operation &>(loopOperation));
+    IVLOG(1,
+          "Lubo: Processing loop operation:"
+              << const_cast<Operation &>(loopOperation).getResultTypes().size()
+              << ":"
+              << mlir::debugString(const_cast<Operation &>(loopOperation)));
     if (pair != vectorizableOps.end()) {
       OpVectState opVectState = pair->second;
       IVLOG(1, "Lubo: Found operation:" << opVectState.opType << ":"
@@ -153,13 +223,39 @@ public:
       // TODO: transform
 
       if (opVectState.opType == OpType::SCALAR) {
-        Operation *ret = builder.clone(loopOperation);
-        // TODO: ret->setType(vecType);
+        Operation *ret =
+            vectorizeScalarOp(const_cast<Operation *>(&loopOperation), builder);
+        mapResults(loopOperation, ret);
+        Type tp = ret->getResultTypes()[0]; // Lubo
+        IVLOG(1, "Lubo: Transformed operation SCALAR:"
+                     << ret->getResultTypes().size() << ":"
+                     << mlir::debugString(tp) << ":"
+                     << mlir::debugString(*ret));
         return ret;
+      } else if (opVectState.opType == OpType::LOAD) {
+        Operation *ret = builder.clone(const_cast<Operation &>(loopOperation));
+        mapResults(loopOperation, ret);
+        IVLOG(1, "Lubo: Transformed operation LOAD:"
+                     << ret->getResultTypes().size() << ":"
+                     << mlir::debugString(*ret));
+        return ret;
+      } else if (opVectState.opType == OpType::REDUCE) {
+        Operation *ret = builder.clone(const_cast<Operation &>(loopOperation));
+        mapResults(loopOperation, ret);
+        IVLOG(1, "Lubo: Transformed operation REDUCE:"
+                     << ret->getResultTypes().size() << ":"
+                     << mlir::debugString(*ret));
+        return ret;
+      } else {
+        llvm_unreachable("Vectorize: Unexpected vectorizable operation type");
       }
     }
 
-    return builder.clone(loopOperation);
+    Operation *ret = builder.clone(const_cast<Operation &>(loopOperation));
+    mapResults(loopOperation, ret);
+    IVLOG(1, "Lubo: Cloned operation:" << ret->getResultTypes().size() << ":"
+                                       << mlir::debugString(*ret));
+    return ret;
   }
 
   void createAndPopulateNewLoop(AffineParallelOp op, unsigned argNum) {
@@ -284,6 +380,8 @@ public:
 
     vecType = VectorType::get(ArrayRef<int64_t>{numElementsInRegister},
                               getElementType(op)); // TODO: Use shape...
+
+    IVLOG(1, "Lubo vecType: " << mlir::debugString(vecType));
 
     auto argNum = index.getArgNumber();
     if (((*ranges)[argNum] % numElementsInRegister) > 0) {
