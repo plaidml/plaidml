@@ -49,5 +49,6 @@ plaidml_cc_library(
         "//pmlc/dialect/pxa/analysis",
         "//pmlc/dialect/pxa/ir",
         "//pmlc/dialect/xsmm/ir",
+        "@llvm-project//mlir:VectorOps",
     ],
 )

@@ -6,6 +6,7 @@
 
 #include "llvm/ADT/TypeSwitch.h"
 
+#include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/Interfaces/VectorInterfaces.h"
 #include "mlir/Support/DebugStringHelper.h" // Lubo
 
@@ -41,7 +42,6 @@ private:
   unsigned vectorSize;
   unsigned minElemWidth;
   std::unordered_map<Operation *, OpVectState> vectorizableOps;
-  llvm::DenseMap<Value, Value> clonedOpsResultsMap;
   unsigned numElementsInRegister;
   VectorType vecType;
 
@@ -144,44 +144,29 @@ public:
       : op(op), index(index), vectorSize(vectorSize),
         minElemWidth(minElemWidth), numElementsInRegister(0) {}
 
-  void mapResults(const Operation &orig, const Operation *const clone) {
-    ResultRange origResults = const_cast<Operation &>(orig).getResults();
-    ResultRange clonedResults = const_cast<Operation *>(clone)->getResults();
-    if (origResults.size() != clonedResults.size()) {
-      llvm_unreachable(
-          "Vectorize: original and cloned op result's size is not equal");
-    }
-    for (unsigned i = 0; i < origResults.size(); i++) {
-      clonedOpsResultsMap[origResults[i]] = clonedResults[i];
-    }
-    IVLOG(1, "Lubo: Mapped operation results: " << clonedOpsResultsMap.size());
-  }
-
-  // Get the new value according to the original value
-  // vecType is null if the new value is not required to be vector
-  Value mappedValue(Value orig) {
-    Value newValue = clonedOpsResultsMap[orig];
-    if (newValue) {
-      return newValue;
-    }
-    return orig;
+  void mapResults(Operation &orig, Operation *newOp) {
+    IVLOG(1, "Lubo: Mapped operation results1: " << &orig << ":" << newOp);
+    IVLOG(1, "Lubo: Mapped operation results1: " << mlir::debugString(orig)
+                                                 << ":"
+                                                 << mlir::debugString(*newOp));
+    orig.replaceAllUsesWith(newOp);
   }
 
   template <class T>
   Operation *createCmpOp(T op, OpBuilder &builder) {
-    Value lhs = mappedValue(op.getOperand(0));
-    Value rhs = mappedValue(op.getOperand(1));
+    Value lhs = op.getOperand(0);
+    Value rhs = op.getOperand(1);
     return builder.create<T>(op.getLoc(), vecType, op.getPredicate(), lhs, rhs);
   }
 
   template <class T>
   Operation *createScalarOp(T op, OpBuilder &builder) {
-    Value lhs = mappedValue(op.getOperand(0));
-    Value rhs = mappedValue(op.getOperand(1));
+    Value lhs = op.getOperand(0);
+    Value rhs = op.getOperand(1);
     Operation *ret = builder.create<T>(op.getLoc(), vecType, lhs, rhs);
     IVLOG(1, "Lubo: New SCALAR op:" << mlir::debugString(vecType) << ":"
                                     << mlir::debugString(*ret));
-    return op;
+    return ret;
   }
 
   Operation *vectorizeScalarOp(Operation *op, OpBuilder &builder) {
@@ -207,14 +192,68 @@ public:
     return ret;
   }
 
-  Operation *vectorizeOperation(OpBuilder &builder,
-                                const Operation &loopOperation) {
-    auto pair = vectorizableOps.find(&const_cast<Operation &>(loopOperation));
-    IVLOG(1,
-          "Lubo: Processing loop operation:"
-              << const_cast<Operation &>(loopOperation).getResultTypes().size()
-              << ":"
-              << mlir::debugString(const_cast<Operation &>(loopOperation)));
+  Operation *vectorizeLoadOp(Operation *op, OpVectState &opVectState,
+                             OpBuilder &builder) {
+    IVLOG(1, "Lubo: New LOAD op111:" << mlir::debugString(vecType) << ":"
+                                     << mlir::debugString(*op));
+    AffineLoadOp loadOp = dyn_cast_or_null<AffineLoadOp>(op);
+    if (!loadOp) {
+      llvm_unreachable("Vectorize: Invalid state for AffineLoadOp");
+    }
+
+    Value operand = loadOp.getMemRef();
+    Type tp = operand.getType(); // Lubo
+    IVLOG(1, "Lubo: New LOAD op222:" << mlir::debugString(tp));
+
+    Operation *ret = nullptr;
+    if (opVectState.stride == 0) {
+      Operation *cloned = builder.clone(*op);
+      ret = builder.create<vector::BroadcastOp>(op->getLoc(), vecType,
+                                                cloned->getResults()[0]);
+    } else if (opVectState.stride == 1) {
+      ret = builder.create<AffineVectorLoadOp>(
+          loadOp.getLoc(), ArrayRef<Type>{vecType}, operand, loadOp.indices());
+      auto mapAttr = AffineMapAttr::get(loadOp.getAffineMap());
+      // Set the map attribute
+      ret->setAttr(AffineVectorLoadOp::getMapAttrName(), mapAttr);
+      IVLOG(1, "Lubo: New LOAD op:" << mlir::debugString(vecType) << ":"
+                                    << mlir::debugString(*ret));
+    } else {
+      llvm_unreachable("Vectorize: Invalid stride for AffineLoadOp");
+    }
+    return ret;
+  }
+
+  Operation *vectorizeReduceOp(Operation *op, OpBuilder &builder) {
+    IVLOG(1, "Lubo: New REDUCE op111:" << mlir::debugString(vecType) << ":"
+                                       << mlir::debugString(*op));
+    AffineReduceOp reduceOp = dyn_cast_or_null<AffineReduceOp>(op);
+    if (!reduceOp) {
+      llvm_unreachable("Vectorize: Invalid state for AffineReduceOp");
+    }
+
+    Value mem = reduceOp.mem();    // Lubo mappedValue(reduceOp.mem());
+    Value vector = reduceOp.val(); // Lubo mappedValue(reduceOp.val());
+    Type tp = vector.getType();    // Lubo
+    IVLOG(1, "Lubo: New REDUCE op222:" << mlir::debugString(tp));
+    Type tp1 = mem.getType(); // Lubo
+    IVLOG(1, "Lubo: New REDUCE op333:" << mlir::debugString(tp1));
+    Operation *ret = builder.create<AffineVectorReduceOp>(
+        reduceOp.getLoc(), ArrayRef<Type>{mem.getType()}, reduceOp.agg(),
+        vector, mem, reduceOp.map(), reduceOp.idxs());
+    Type tttp = ret->getResults()[0].getType();
+    IVLOG(1, "Lubo: New REDUCE op:" << mlir::debugString(vecType) << ":"
+                                    << mlir::debugString(*ret) << ":"
+                                    << ret->getResults().size() << ":"
+                                    << mlir::debugString(tttp));
+    return ret;
+  }
+
+  Operation *vectorizeOperation(OpBuilder &builder, Operation &loopOperation) {
+    auto pair = vectorizableOps.find(&loopOperation);
+    IVLOG(1, "Lubo: Processing loop operation:"
+                 << loopOperation.getResultTypes().size() << ":"
+                 << mlir::debugString(loopOperation));
     if (pair != vectorizableOps.end()) {
       OpVectState opVectState = pair->second;
       IVLOG(1, "Lubo: Found operation:" << opVectState.opType << ":"
@@ -223,8 +262,7 @@ public:
       // TODO: transform
 
       if (opVectState.opType == OpType::SCALAR) {
-        Operation *ret =
-            vectorizeScalarOp(const_cast<Operation *>(&loopOperation), builder);
+        Operation *ret = vectorizeScalarOp(&loopOperation, builder);
         mapResults(loopOperation, ret);
         Type tp = ret->getResultTypes()[0]; // Lubo
         IVLOG(1, "Lubo: Transformed operation SCALAR:"
@@ -233,14 +271,14 @@ public:
                      << mlir::debugString(*ret));
         return ret;
       } else if (opVectState.opType == OpType::LOAD) {
-        Operation *ret = builder.clone(const_cast<Operation &>(loopOperation));
+        Operation *ret = vectorizeLoadOp(&loopOperation, opVectState, builder);
         mapResults(loopOperation, ret);
         IVLOG(1, "Lubo: Transformed operation LOAD:"
                      << ret->getResultTypes().size() << ":"
                      << mlir::debugString(*ret));
         return ret;
       } else if (opVectState.opType == OpType::REDUCE) {
-        Operation *ret = builder.clone(const_cast<Operation &>(loopOperation));
+        Operation *ret = vectorizeReduceOp(&loopOperation, builder);
         mapResults(loopOperation, ret);
         IVLOG(1, "Lubo: Transformed operation REDUCE:"
                      << ret->getResultTypes().size() << ":"
@@ -251,7 +289,7 @@ public:
       }
     }
 
-    Operation *ret = builder.clone(const_cast<Operation &>(loopOperation));
+    Operation *ret = builder.clone(loopOperation);
     mapResults(loopOperation, ret);
     IVLOG(1, "Lubo: Cloned operation:" << ret->getResultTypes().size() << ":"
                                        << mlir::debugString(*ret));
@@ -259,7 +297,7 @@ public:
   }
 
   void createAndPopulateNewLoop(AffineParallelOp op, unsigned argNum) {
-    mlir::Block *block = op.getOperation()->getBlock();
+    // Lubo mlir::Block *block = op.getOperation()->getBlock();
     // mlir::OpBuilder builder(op); // Lubo , op.getBody()->begin());
     IVLOG(1, "Lubo10: " << mlir::debugString(*op.getParentOp()->getParentOp()));
     // Lubo Operation* luboOp = op.getParentOp()->getParentOp();
@@ -279,51 +317,50 @@ public:
         newSteps);
     IVLOG(1,
           "Lubo8: " << mlir::debugString(*newAffineParallelOp.getOperation()));
-    for (auto it = block->begin(); it != block->end(); it++) {
-      // Operation* blockOp = &*it;
-      IVLOG(1, "Lubo4: " << mlir::debugString(*it));
-      for (unsigned i = 0; i < (*it).getNumOperands(); i++) {
-        Value operand = (*it).getOperand(i);
-        if (operand.getDefiningOp() == op) {
-          IVLOG(1, "Lubo5: " << i);
-          // builder.insert(newAffineParallelOp);
-          (*it).setOperand(i, newAffineParallelOp.getResult(0));
+    // Lubo for (auto it = block->begin(); it != block->end(); it++) {
+    IVLOG(1, "Lubo4: " << mlir::debugString(*op.getOperation()));
+    // Now transfer the body
+    mlir::Block *newLoopBlock = newAffineParallelOp.getBody();
+    // Lubo OpBuilder newBlockBuilder = OpBuilder(&newLoopBlock);
+    builder.setInsertionPointToStart(newLoopBlock);
 
-          // Now transfer the body
-          mlir::Block *newLoopBlock = newAffineParallelOp.getBody();
-          // Lubo OpBuilder newBlockBuilder = OpBuilder(&newLoopBlock);
-          builder.setInsertionPointToStart(newLoopBlock);
-
-          // Walk over the statements in order.
-          for (auto &loopOp : llvm::make_early_inc_range(*op.getBody())) {
-            // IVLOG(1, "Lubo6:" << mlir::debugString(loopOp));
-            /* The prtinting is broken with the latest project-llvm sources
-             * Operation* clonedOp =*/
-            vectorizeOperation(builder, loopOp);
-            /*Operation clonedOp = builder.clone(loopOp); */
-            // IVLOG(1, "Lubo7:" << mlir::debugString(*clonedOp));
-            // IVLOG(1, "Lubo17:" << mlir::debugString(loopOp));
-            // loopOp.dropAllUses();
-            // loopOp.erase();
-          }
-
-          // Now erase the instructions
-          for (auto &loopOp : llvm::make_early_inc_range(*op.getBody())) {
-            // IVLOG(1, "Lubo6:" << mlir::debugString(loopOp));
-            // / * Operation* clonedOp =* / builder.clone(loopOp);
-            // IVLOG(1, "Lubo7:" << mlir::debugString(*clonedOp));
-            // IVLOG(1, "Lubo17:" << mlir::debugString(loopOp));
-            loopOp.dropAllUses();
-            loopOp.dropAllReferences();
-            loopOp.erase();
-          }
-          // IVLOG(1, "Lubo9: " <<
-          // mlir::debugString(*newAffineParallelOp.getOperation()));
-
-          IVLOG(1, "Lubo12: " << mlir::debugString(*op.getOperation()));
-        }
-      }
+    // Walk over the statements in order.
+    for (auto &loopOp : llvm::make_early_inc_range(*op.getBody())) {
+      // IVLOG(1, "Lubo6:" << mlir::debugString(loopOp));
+      /* The prtinting is broken with the latest project-llvm sources
+       * Operation* clonedOp =*/
+      vectorizeOperation(builder, loopOp);
+      /*Operation clonedOp = builder.clone(loopOp); */
+      // IVLOG(1, "Lubo7:" << mlir::debugString(*clonedOp));
+      // IVLOG(1, "Lubo17:" << mlir::debugString(loopOp));
+      // loopOp.dropAllUses();
+      // loopOp.erase();
     }
+
+    // Now erase the instructions
+    for (auto &loopOp : llvm::make_early_inc_range(*op.getBody())) {
+      // IVLOG(1, "Lubo6:" << mlir::debugString(loopOp));
+      // / * Operation* clonedOp =* / builder.clone(loopOp);
+      // IVLOG(1, "Lubo7:" << mlir::debugString(*clonedOp));
+      // IVLOG(1, "Lubo17:" << mlir::debugString(loopOp));
+      loopOp.dropAllUses();
+      loopOp.dropAllReferences();
+      loopOp.erase();
+    }
+    // IVLOG(1, "Lubo9: " <<
+    // mlir::debugString(*newAffineParallelOp.getOperation()));
+
+    IVLOG(1, "Lubo12: " << mlir::debugString(*op.getOperation()));
+    // Lubo }
+    // Lubo}
+    op.replaceAllUsesWith(newAffineParallelOp);
+    // Lubo
+    mlir::Block *block = op.getOperation()->getBlock();
+    for (auto it = block->begin(); it != block->end(); it++) {
+      IVLOG(1, "Lubo40: " << mlir::debugString(*it));
+    }
+
+    // Lubo end
 
     IVLOG(1, "Lubo10.2: ");
     // IVLOG(1, "Lubo10.1: " <<
@@ -335,7 +372,7 @@ public:
       llvm_unreachable("AffineParallelOp with no parent region.");
     }
 
-    // IVLOG(1, "Lubo14: " << mlir::debugString(*luboOp));
+    // Lubo IVLOG(1, "Lubo14: " << mlir::debugString(*luboOp));
 
     auto &opList = parentRegion->getBlocks().front().getOperations();
     for (auto elt = opList.begin(); elt != opList.end(); ++elt) {
@@ -354,7 +391,7 @@ public:
         break;
       }
     }
-    // IVLOG(1, "Lubo11: " << mlir::debugString(*luboOp));
+    // Lubo IVLOG(1, "Lubo11: " << mlir::debugString(*luboOp));
   }
 
   bool vectorize() {
@@ -420,29 +457,6 @@ public:
                  << vectorizableOps.size() << " for index " << argNum);
 
     createAndPopulateNewLoop(op, argNum);
-    // Create a new
-    // Lubo getParentOp()->erase();
-
-    // for (OpVectState vectState : vectorizableOps) {
-    //   switch (vectState.opType) {
-    //     case OpType::LOAD: {
-    //       mlir::OpBuilder builder(vectState.op);
-    //         if (vectState.stride == 0) {
-
-    //         } else if (vectState.stride == 1) {
-
-    //         }
-    //       }
-    //       break;
-    //     case OpType::REDUCE:
-    //       break;
-    //     case OpType::SCALAR:
-    //       break;
-    //     default:
-    //       llvm_unreachable("Invalid Op-Type for vectorization");
-    //   }
-    // }
-
     return true;
   }
 };
