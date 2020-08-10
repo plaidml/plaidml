@@ -300,21 +300,32 @@ public:
     // Lubo mlir::Block *block = op.getOperation()->getBlock();
     // mlir::OpBuilder builder(op); // Lubo , op.getBody()->begin());
     IVLOG(1, "Lubo10: " << mlir::debugString(*op.getParentOp()->getParentOp()));
+
     // Lubo Operation* luboOp = op.getParentOp()->getParentOp();
     mlir::OpBuilder builder(op);
     // Fix up the steps
-    std::vector<int64_t> newSteps;
+    std::vector<Attribute> newSteps;
     for (unsigned int i = 0; i < op.getIVs().size(); i++) {
-      newSteps.push_back(op.steps().getValue()[i].cast<IntegerAttr>().getInt() *
-                         (i == argNum ? numElementsInRegister : 1));
+      int64_t val = op.steps().getValue()[i].cast<IntegerAttr>().getInt() *
+                    (i == argNum ? numElementsInRegister : 1);
+      newSteps.push_back(builder.getI64IntegerAttr(val));
     }
     SmallVector<AtomicRMWKind, 8> reductions(op.getResultTypes().size(),
                                              AtomicRMWKind::assign);
+
+    SmallVector<Attribute, 8> reductionAttrs;
+    for (AtomicRMWKind reduction : reductions)
+      reductionAttrs.push_back(
+          builder.getI64IntegerAttr(static_cast<int64_t>(reduction)));
+
     AffineParallelOp newAffineParallelOp = builder.create<AffineParallelOp>(
-        op.getLoc(), op.getResultTypes(), reductions,
-        op.getLowerBoundsValueMap().getAffineMap(), op.getLowerBoundsOperands(),
-        op.getUpperBoundsValueMap().getAffineMap(), op.getUpperBoundsOperands(),
-        newSteps);
+        op.getLoc(), op.getResultTypes(),
+        ArrayAttr::get(reductionAttrs, op.getContext()),
+        op.getLowerBoundsValueMap()
+            .getAffineMap(), // Lubo op.getLowerBoundsOperands(),
+        op.getUpperBoundsValueMap()
+            .getAffineMap(), // Lubo op.getUpperBoundsOperands(),
+        builder.getArrayAttr(newSteps), op.mapOperands());
     IVLOG(1,
           "Lubo8: " << mlir::debugString(*newAffineParallelOp.getOperation()));
     // Lubo for (auto it = block->begin(); it != block->end(); it++) {
@@ -373,7 +384,15 @@ public:
     }
 
     // Lubo IVLOG(1, "Lubo14: " << mlir::debugString(*luboOp));
+    auto ivss = op.getIVs(); // Lubo
+    for (unsigned int i = 0; i < ivss.size(); i++) {
+      ivss[i].getOwner()->dropAllReferences();
+      ivss[i].getOwner()->dropAllDefinedValueUses();
+      // ivss[i].getOwner()->erase();
+      IVLOG(1, "Lubo10.1: " << ivss[i].getOwner());
+    }
 
+    op.erase();
     auto &opList = parentRegion->getBlocks().front().getOperations();
     for (auto elt = opList.begin(); elt != opList.end(); ++elt) {
       if (&(*elt) == op.getOperation()) {
@@ -391,7 +410,11 @@ public:
         break;
       }
     }
-    // Lubo IVLOG(1, "Lubo11: " << mlir::debugString(*luboOp));
+
+    for (auto it = block->begin(); it != block->end(); it++) {
+      IVLOG(1, "Lubo41: " << mlir::debugString(*it));
+    }
+    IVLOG(1, "Lubo11: "); // Lubo  << mlir::debugString(*luboOp));
   }
 
   bool vectorize() {
