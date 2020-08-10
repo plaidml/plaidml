@@ -153,8 +153,7 @@ public:
   void vectorizeReduceOp(AffineReduceOp op) {
     Value mem = op.mem();
     Value vector = op.val();
-    Type vecType = vector.getType();
-    assert(vecType.isa<VectorType>());
+    assert(vecType.getType().isa<VectorType>());
     OpBuilder builder(op);
     auto vecOp = builder.create<AffineVectorReduceOp>(
         op.getLoc(), ArrayRef<Type>{mem.getType()}, op.agg(), vector, mem,
