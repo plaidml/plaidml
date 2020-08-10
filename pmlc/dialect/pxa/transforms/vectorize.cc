@@ -202,8 +202,9 @@ public:
     }
 
     bool vectorizable = true;
-    body->walk(
-        [&](Operation *op) { vectorizable &= tryVectorizeOperation(op); });
+    for (auto &op : body->getOperations()) {
+      vectorizable &= tryVectorizeOperation(&op);
+    }
     if (!vectorizable) {
       return failure();
     }
@@ -218,9 +219,11 @@ public:
     for (auto &op : llvm::make_early_inc_range(body->getOperations())) {
       vectorizeOperation(&op);
     }
+    // TODO: We should upstream a utility like getSteps since this code is
+    // duplicated in multiple places
     llvm::SmallVector<int64_t, 6> steps;
-    for (auto ia : loop.steps().cast<ArrayAttr>().getValue()) {
-      steps.push_back(ia.cast<IntegerAttr>().getInt());
+    for (auto stepAttr : loop.steps().cast<ArrayAttr>().getValue()) {
+      steps.push_back(stepAttr.cast<IntegerAttr>().getInt());
     }
     steps[argNum] *= vectorSize;
     loop.setSteps(steps);
@@ -238,7 +241,7 @@ struct VectorizeExample : public VectorizeExampleBase<VectorizeExample> {
   void runOnFunction() final {
     static constexpr unsigned vectorWidth = 8;
     auto func = getFunction();
-    // Autotile only the outermost loops
+    // Vectorize only the outermost loops
     for (auto &op : func.getBody().front()) {
       auto loop = mlir::dyn_cast<mlir::AffineParallelOp>(op);
       if (!loop) {
