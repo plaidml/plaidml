@@ -28,35 +28,35 @@ private:
   DenseSet<Value> vectorizedValues;
   DenseSet<Operation *> vectorizedOps;
 
-  bool tryVectorizeOperation(Operation *op) {
-    return llvm::TypeSwitch<Operation *, bool>(op)
+  LogicalResult tryVectorizeOperation(Operation *op) {
+    return llvm::TypeSwitch<Operation *, LogicalResult>(op)
         .Case<AffineLoadOp>([&](auto op) {
           auto strideInfo = computeStrideInfo(op);
           if (!strideInfo) {
             IVLOG(3, "Vectorize: Failed, non-affine strides");
-            return false;
+            return failure();
           }
 
           auto it = strideInfo->strides.find(index);
           if (it == strideInfo->strides.end()) {
             // Stride 0, safe to leave unvectorized
-            return true;
+            return success();
           }
 
           // Stride is non-zero, must vectorize
           if (it->second != 1) {
             IVLOG(3, "Vectorize: Failed, AffineLoadOp stride != 1");
-            return false;
+            return failure();
           }
           vectorizedOps.insert(op);
           vectorizedValues.insert(op.getResult());
-          return true;
+          return success();
         })
         .Case<AffineReduceOp>([&](auto op) {
           auto strideInfo = computeStrideInfo(op);
           if (!strideInfo) {
             IVLOG(3, "Vectorize: Failed, non-affine strides");
-            return false;
+            return failure();
           }
 
           auto it = strideInfo->strides.find(index);
@@ -65,20 +65,20 @@ private:
             // TODO: If input is a vector, call vector.reduce and then scalar
             // pxa.reduce. Right now, we say things are cool if out input isn't
             // vectorized
-            return !vectorizedValues.count(op.val());
+            return failure(vectorizedValues.count(op.val()));
           }
           if (it->second != 1) {
             IVLOG(3, "Vectorize: Failed, AffineReduceOp stride != 1");
-            return false;
+            return failure();
           }
 
           vectorizedOps.insert(op);
-          return true;
+          return success();
         })
         .Default([&](Operation *op) {
           if (op->getNumRegions() != 0) {
             IVLOG(3, "Vectorize: Failed, interior loops");
-            return false;
+            return failure();
           }
           if (!mlir::isa<VectorUnrollOpInterface>(op)) {
             // Probably not a vectorizable op.  Verify it doesn't use an
@@ -87,11 +87,11 @@ private:
               if (vectorizedValues.count(operand)) {
                 IVLOG(3,
                       "Vectorize: Failed, unknown op used vectorized result");
-                return false;
+                return failure();
               }
             }
             // Otherwise, safe and ignorable.
-            return true;
+            return success();
           }
           // Only vectorize if at least one operand is vectorized
           bool anyVec = false;
@@ -102,16 +102,16 @@ private:
           }
           if (!anyVec) {
             // No need to vectorize, all is good
-            return true;
+            return success();
           }
           // We also don't handle ops with multiple results
           if (op->getNumResults() != 1) {
             IVLOG(3, "Vectorize: Failed, multi-result scalar op");
-            return false;
+            return failure();
           }
           vectorizedOps.insert(op);
           vectorizedValues.insert(op->getResult(0));
-          return true;
+          return success();
         });
   }
 
@@ -203,7 +203,7 @@ public:
 
     bool vectorizable = true;
     for (auto &op : body->getOperations()) {
-      vectorizable &= tryVectorizeOperation(&op);
+      vectorizable &= succeeded(tryVectorizeOperation(&op));
     }
     if (!vectorizable) {
       return failure();
