@@ -33,6 +33,17 @@ def FPToUIOp :
   >];
 }
 
+def UIToFPOp :
+    StdX_Op<"uitofp", [NoSideEffect]> {
+  let summary = "cast from unsigned integer to floating-point type";
+  let arguments = (ins AnyType:$result);
+  let results = (outs AnyType);
+  let builders = [OpBuilder<
+    "OpBuilder &builder, OperationState &result, Value source, Type destType",
+    [{ buildUIToFPOp(builder, result, source, destType); }]
+  >];
+}
+
 class StdX_Plain_Op<string mnemonic, list<OpTrait> traits = []> :
     Op<StdX_Dialect, mnemonic, traits> {
 }

@@ -24,6 +24,13 @@ struct StrideRange {
   explicit StrideRange(int64_t val)
       : valid(true), minVal(val), maxVal(val), stride(0) {}
 
+  explicit StrideRange(int64_t min, int64_t max, int64_t stride)
+      : valid(true), minVal(min), maxVal(max), stride(stride) {
+    if (min == max) {
+      stride = 0;
+    }
+  }
+
   explicit StrideRange(BlockArgument arg);
 
   StrideRange &operator*=(int64_t factor);
@@ -69,7 +76,7 @@ struct StrideInfo {
   }
   StrideInfo &operator*=(int64_t factor);
   StrideInfo &operator+=(const StrideInfo &rhs);
-  StrideInfo operator+(const StrideInfo &rhs) {
+  StrideInfo operator+(const StrideInfo &rhs) const {
     StrideInfo r = *this;
     r += rhs;
     return r;
@@ -90,7 +97,7 @@ struct StrideInfo {
 };
 
 // Convert a vector of StrideInfo's into a value map
-AffineValueMap StridesToValueMap(MLIRContext *ctx, ArrayRef<StrideInfo> dims);
+AffineValueMap convertToValueMap(MLIRContext *ctx, ArrayRef<StrideInfo> dims);
 
 // Compute stride info for a given affine value (such an an induction variable
 // or the result of an affine.apply). Return None if the expression is not a
@@ -112,6 +119,29 @@ Optional<StrideInfo> computeStrideInfo(MemRefType memRef, AffineMap map,
 Optional<StrideInfo> computeStrideInfo(AffineLoadOp op);
 Optional<StrideInfo> computeStrideInfo(AffineStoreOp op);
 Optional<StrideInfo> computeStrideInfo(pmlc::dialect::pxa::AffineReduceOp op);
+
+// For a given block + memory access:
+// 1) What is the effect of all block args outside and including the
+// block on the memory access, in terms of strides.
+// 2) For all interior blocks/load width/etc, what is the range of elements
+// accessed.
+
+struct RelativeAccessPattern {
+  // For each dimension on the access, what are it's strides relative to various
+  // block args
+  SmallVector<StrideInfo, 4> outer;
+  // For each dimension the offset inside the block
+  SmallVector<StrideInfo, 4> inner;
+  // For each dimension what is the number of accesses
+  SmallVector<int64_t, 4> innerCount;
+  // For each dimension what is the minimal stride of the access.  Note:
+  // dimensions with a count of 1 have a stride of 1 automatically
+  SmallVector<int64_t, 4> innerStride;
+};
+
+// Compute relative access, fail if non-strided (or operation not supported)
+Optional<RelativeAccessPattern> computeRelativeAccess(Block *block,
+                                                      Operation *op);
 
 // A StrideArray contains a set of constant factors and a constant offset.
 struct StrideArray {

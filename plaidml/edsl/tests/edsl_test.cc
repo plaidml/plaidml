@@ -1,5 +1,5 @@
 // Copyright 2020 Intel Corporation
-// RUN: cc_test | FileCheck %s
+// RUN: cc_test --plaidml_device=%plaidml_device --plaidml_target=%plaidml_target | FileCheck %s
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>

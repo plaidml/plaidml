@@ -101,6 +101,21 @@ struct FPToUILowering : public LLVMLegalizationPattern<stdx::FPToUIOp> {
   }
 };
 
+struct UIToFPLowering : public LLVMLegalizationPattern<stdx::UIToFPOp> {
+  using LLVMLegalizationPattern<stdx::UIToFPOp>::LLVMLegalizationPattern;
+  using Base = LLVMLegalizationPattern<stdx::UIToFPOp>;
+
+  LogicalResult
+  matchAndRewrite(Operation *op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto value = op->getOperand(0);
+    auto stdxType = op->getResult(0).getType();
+    auto llvmType = typeConverter.convertType(stdxType);
+    rewriter.replaceOpWithNewOp<LLVM::UIToFPOp>(op, llvmType, value);
+    return success();
+  }
+};
+
 template <typename T>
 struct LibMCallLowering : public LLVMLegalizationPattern<T> {
   using LLVMLegalizationPattern<T>::LLVMLegalizationPattern;
@@ -273,10 +288,10 @@ struct LowerToLLVMPass : public LowerToLLVMBase<LowerToLLVMPass> {
 
 void populateStdXToLLVMConversionPatterns(LLVMTypeConverter &converter,
                                           OwningRewritePatternList &patterns) {
-  patterns.insert<FPToUILowering, ReshapeLowering, ACosLowering, ASinLowering,
-                  ATanLowering, CosHLowering, ErfLowering, FloorLowering,
-                  PowLowering, RoundLowering, SinHLowering, TanLowering>(
-      *converter.getDialect(), converter);
+  patterns.insert<FPToUILowering, UIToFPLowering, ReshapeLowering, ACosLowering,
+                  ASinLowering, ATanLowering, CosHLowering, ErfLowering,
+                  FloorLowering, PowLowering, RoundLowering, SinHLowering,
+                  TanLowering>(*converter.getDialect(), converter);
 }
 
 std::unique_ptr<mlir::Pass> createLowerToLLVMPass() {

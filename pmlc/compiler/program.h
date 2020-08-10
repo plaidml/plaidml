@@ -37,7 +37,8 @@ struct Program {
   explicit Program(mlir::StringRef source);
   explicit Program(std::unique_ptr<llvm::MemoryBuffer> buffer);
 
-  void compile(mlir::StringRef target, bool collectPasses = false);
+  void compile(mlir::StringRef target, bool collectPasses = false,
+               mlir::StringRef dumpDir = "");
 };
 
 } // namespace pmlc::compiler

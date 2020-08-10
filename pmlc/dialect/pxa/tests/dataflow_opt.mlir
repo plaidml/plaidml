@@ -9,8 +9,8 @@ func @simple(%out : memref<2xf32>) {
   %0 = affine.parallel (%i) = (0) to (2) reduce ("assign") -> (memref<2xf32>) {
     %1 = pxa.reduce assign %zero, %buf[%i] : memref<2xf32>
     %2 = affine.load %1[%i] : memref<2xf32>
-    // CHECK-NEXT: pxa.reduce add
-    %3 = pxa.reduce add %2, %out[%i] : memref<2xf32>
+    // CHECK-NEXT: pxa.reduce addf
+    %3 = pxa.reduce addf %2, %out[%i] : memref<2xf32>
     affine.yield %3 : memref<2xf32>
   }
   return
@@ -47,8 +47,8 @@ func @grn(%arg0: memref<1x4x4x3xf16>) -> memref<1x4x4x3xf16> {
       %26 = mulf %24, %25 : f16
       %27 = pxa.reduce assign %26, %0[0, %arg1, %arg2, %arg3] : memref<1x4x4x3xf16>
       %28 = affine.load %27[0, %arg1, %arg2, %arg3] : memref<1x4x4x3xf16>
-      // CHECK-NEXT: pxa.reduce add
-      %29 = pxa.reduce add %28, %8[0, %arg1, %arg2, 0] : memref<1x4x4x1xf16>
+      // CHECK-NEXT: pxa.reduce addf
+      %29 = pxa.reduce addf %28, %8[0, %arg1, %arg2, 0] : memref<1x4x4x1xf16>
       affine.yield %29 : memref<1x4x4x1xf16>
     }
     // CHECK: affine.load
