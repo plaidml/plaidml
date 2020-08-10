@@ -6,7 +6,8 @@
 
 namespace pmlc::dialect::pxa {
 
-bool performVectorization(mlir::AffineParallelOp op, mlir::BlockArgument index,
-                          unsigned vectorSize);
+LogicalResult performVectorization(mlir::AffineParallelOp op,
+                                   mlir::BlockArgument index,
+                                   unsigned vectorSize);
 
 } // namespace pmlc::dialect::pxa

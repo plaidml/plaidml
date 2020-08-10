@@ -34,7 +34,6 @@ plaidml_cc_library(
         "test_analysis.cc",
         "tile.cc",
         "vectorize.cc",
-        "vectorizepass.cc",
     ],
     hdrs = [
         "autotile.h",

@@ -1,6 +1,7 @@
 // Copyright 2020 Intel Corporation
 
 #include <algorithm>
+#include <memory>
 #include <unordered_map>
 #include <vector>
 
@@ -8,9 +9,9 @@
 
 #include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/Interfaces/VectorInterfaces.h"
-#include "mlir/Support/DebugStringHelper.h" // Lubo
 
 #include "pmlc/dialect/pxa/analysis/strides.h"
+#include "pmlc/dialect/pxa/transforms/pass_detail.h"
 #include "pmlc/dialect/pxa/transforms/vectorize.h"
 #include "pmlc/util/logging.h"
 
@@ -32,20 +33,19 @@ private:
         .Case<AffineLoadOp>([&](auto op) {
           auto strideInfo = computeStrideInfo(op);
           if (!strideInfo) {
-            IVLOG(1, "Vectorize: Failed, non-affine strides");
+            IVLOG(3, "Vectorize: Failed, non-affine strides");
             return false;
           }
 
-          auto pair = strideInfo->strides.find(index);
-          if (pair == strideInfo->strides.end()) {
-            IVLOG(1, "Vectorize: AffineLoadOp stride of 0 for index");
+          auto it = strideInfo->strides.find(index);
+          if (it == strideInfo->strides.end()) {
+            // Stride 0, safe to leave unvectorized
             return true;
           }
 
-          if (pair->second != 1) {
-            IVLOG(1, "Vectorize: Failed, AffineLoadOp stride different "
-                     "than 0 and 1 for index:"
-                         << pair->second);
+          // Stride is non-zero, must vectorize
+          if (it->second != 1) {
+            IVLOG(3, "Vectorize: Failed, AffineLoadOp stride != 1");
             return false;
           }
           vectorizedOps.insert(op);
@@ -55,15 +55,20 @@ private:
         .Case<AffineReduceOp>([&](auto op) {
           auto strideInfo = computeStrideInfo(op);
           if (!strideInfo) {
-            IVLOG(1, "Vectorize: Failed, non-affine strides");
+            IVLOG(3, "Vectorize: Failed, non-affine strides");
             return false;
           }
 
-          // TODO: Deal with reductions of stride 0.
-          // TODO: Call vector_reduce and then scalar pxa.reduce.
-          auto pair = strideInfo->strides.find(index);
-          if (pair == strideInfo->strides.end() || pair->second != 1) {
-            IVLOG(1, "Vectorize: Failed, AffineReduceOp stride != 1 for index");
+          auto it = strideInfo->strides.find(index);
+          if (it == strideInfo->strides.end()) {
+            // Deal with reductions of stride 0.
+            // TODO: If input is a vector, call vector.reduce and then scalar
+            // pxa.reduce. Right now, we say things are cool if out input isn't
+            // vectorized
+            return !vectorizedValues.count(op.val());
+          }
+          if (it->second != 1) {
+            IVLOG(3, "Vectorize: Failed, AffineReduceOp stride != 1");
             return false;
           }
 
@@ -72,7 +77,7 @@ private:
         })
         .Default([&](Operation *op) {
           if (op->getNumRegions() != 0) {
-            IVLOG(1, "Vectorize: Failed, interior loops");
+            IVLOG(3, "Vectorize: Failed, interior loops");
             return false;
           }
           if (!mlir::isa<VectorUnrollOpInterface>(op)) {
@@ -80,7 +85,7 @@ private:
             // vectorized results.
             for (auto operand : op->getOperands()) {
               if (vectorizedValues.count(operand)) {
-                IVLOG(1,
+                IVLOG(3,
                       "Vectorize: Failed, unknown op used vectorized result");
                 return false;
               }
@@ -101,7 +106,7 @@ private:
           }
           // We also don't handle ops with multiple results
           if (op->getNumResults() != 1) {
-            IVLOG(1, "Vectorize: Failed, multi-result scalar op");
+            IVLOG(3, "Vectorize: Failed, multi-result scalar op");
             return false;
           }
           vectorizedOps.insert(op);
@@ -171,37 +176,43 @@ public:
     }
   }
 
-  bool vectorize() {
+  LogicalResult vectorize() {
     mlir::Block *body = loop.getBody();
-    IVLOG(1, "Vectorize: Attempting Vectorizing for BlockArgument: "
+    IVLOG(3, "Vectorize: Attempting Vectorizing for BlockArgument: "
                  << index.getArgNumber());
 
     auto ranges = loop.getConstantRanges();
     if (!ranges) {
-      IVLOG(1, "Cannot Vectorize: Requires constant ranges");
-      return false;
+      IVLOG(3, " Vectorize: Failed, Requires constant ranges");
+      return failure();
     }
 
     auto argNum = index.getArgNumber();
     if ((*ranges)[argNum] % vectorSize != 0) {
-      IVLOG(1, "Cannot Vectorize: The dimension being vectorized not multiple "
+      IVLOG(3, "Vectorize: Failed, the dimension being vectorized not multiple "
                "of the number of elements in a register");
-      return false;
+      return failure();
     }
 
     auto step = loop.steps().getValue()[argNum].cast<IntegerAttr>().getInt();
     if (step != 1) {
-      IVLOG(1, "Cannot Vectorize: The steps for the dimension being vectorized "
-               "is not 1");
-      return false;
+      IVLOG(3,
+            "Vectorize: Failed, the steps for the dimension being vectorized "
+            "is not 1");
+      return failure();
     }
 
     bool vectorizable = true;
     body->walk(
         [&](Operation *op) { vectorizable &= tryVectorizeOperation(op); });
     if (!vectorizable) {
-      IVLOG(1, "Found an unvectorizable op");
-      return false;
+      return failure();
+    }
+    if (vectorizedOps.empty()) {
+      // TODO: should we actually fail in this case?  Currently we need to since
+      // we have no cost model
+      IVLOG(3, "Vectorize: Failed, no point in vectorization");
+      return failure();
     }
 
     // Preflight complete, do the transform
@@ -214,13 +225,39 @@ public:
     }
     steps[argNum] *= vectorSize;
     loop.setSteps(steps);
-    return true;
+    return success();
   }
 };
 
-bool performVectorization(AffineParallelOp op, BlockArgument index,
-                          unsigned vectorSize) {
+LogicalResult performVectorization(AffineParallelOp op, BlockArgument index,
+                                   unsigned vectorSize) {
   Impl impl(op, index, vectorSize);
   return impl.vectorize();
 }
+
+struct VectorizeExample : public VectorizeExampleBase<VectorizeExample> {
+  void runOnFunction() final {
+    static constexpr unsigned vectorWidth = 8;
+    auto func = getFunction();
+    // Autotile only the outermost loops
+    for (auto &op : func.getBody().front()) {
+      auto loop = mlir::dyn_cast<mlir::AffineParallelOp>(op);
+      if (!loop) {
+        continue;
+      }
+      // Try IV's until we succeed
+      for (unsigned int i = 0; i < loop.getIVs().size(); i++) {
+        auto blockArg = loop.getIVs()[i];
+        if (succeeded(performVectorization(loop, blockArg, vectorWidth))) {
+          break;
+        }
+      }
+    }
+  }
+};
+
+std::unique_ptr<mlir::Pass> createVectorizeExamplePass() {
+  return std::make_unique<VectorizeExample>();
+}
+
 } // namespace pmlc::dialect::pxa
