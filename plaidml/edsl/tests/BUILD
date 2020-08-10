@@ -13,6 +13,11 @@ plaidml_cc_test(
         "//plaidml/edsl",
         "//plaidml/exec",
     ],
+    args = [
+        "--plaidml_device=$(plaidml_device)",
+        "--plaidml_target=$(plaidml_target)",
+    ],
+    toolchains = ["//plaidml:settings"],
 )
 
 py_test(
