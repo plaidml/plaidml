@@ -31,9 +31,9 @@ std::vector<int64_t> EvenTilingGenerator::operator()(int64_t range) {
 struct AutoTileExamplePass : public AutoTileExampleBase<AutoTileExamplePass> {
   void runOnFunction() final {
     auto func = getFunction();
-    FixedTileSizeGenerator always10(10);
+    FixedTileSizeGenerator always10(1);
     // Autotile only the outermost loops
-    for (auto& op : func.getBody().front()) {
+    for (auto &op : func.getBody().front()) {
       auto loop = mlir::dyn_cast<mlir::AffineParallelOp>(op);
       if (!loop) {
         continue;
@@ -47,7 +47,7 @@ struct AutoTileExamplePass : public AutoTileExampleBase<AutoTileExamplePass> {
         return;
       }
       performTiling(loop, tileSize);
-    };
+    }
   }
 };
 

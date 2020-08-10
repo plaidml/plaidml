@@ -8,6 +8,11 @@ def AutoTileExample : FunctionPass<"pxa-autotile-example"> {
   let constructor = "pmlc::dialect::pxa::createAutoTileExamplePass()";
 }
 
+def TileAccumulate : FunctionPass<"pxa-tile-accumulate"> {
+  let summary = "Tile all dimensions by 10";
+  let constructor = "pmlc::dialect::pxa::createTileAccumulatePass()";
+}
+
 def Fusion : FunctionPass<"pxa-fusion"> {
   let summary = "Fuse blocks that are compatible";
   let constructor = "pmlc::dialect::pxa::createFusionPass()";

@@ -32,6 +32,14 @@ Program makeProgram(const std::string &name,
   return program;
 }
 
+template <typename T>
+Buffer makeBuffer(const TensorShape &shape, const std::vector<T> &data) {
+  const auto &curDevice = plaidml::Settings::get("PLAIDML_DEVICE");
+  Buffer buffer(curDevice, shape);
+  buffer.copy_from(data.data());
+  return buffer;
+}
+
 Tensor Dot(const Tensor &X, const Tensor &Y) {
   TensorDim I, J, K;
   TensorIndex i("i"), j("j"), k("k");
@@ -54,6 +62,32 @@ Tensor Softmax(const Tensor &X) {
   auto N = TensorOutput(I, 1);
   N(i, 0) += E(i, j);
   return E / N;
+}
+
+Tensor ConstAdd(const std::vector<int32_t> &a, const std::vector<int32_t> &b) {
+  std::vector<int64_t> shape = {4};
+  auto bufferA = makeBuffer(TensorShape(DType::INT32, shape), a);
+  auto bufferB = makeBuffer(TensorShape(DType::INT32, shape), b);
+  auto A = Constant(LogicalShape(DType::INT32, shape), bufferA, "A");
+  auto B = Constant(LogicalShape(DType::INT32, shape), bufferB, "B");
+  return A + B;
+}
+
+TEST_F(CppEdsl, ConstAdd) {
+  std::vector<int> a = {4, 3, 2, 1};
+  std::vector<int> b = {1, 2, 3, 4};
+  auto O = ConstAdd(a, b);
+  auto program = makeProgram("const_add", {O});
+
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.ConstAdd
+  // CHECK: func @const_add
+  // CHECK: %{{.*}} = "eltwise.add"(%{{.*}}, %{{.*}}) : (tensor<4xsi32>, tensor<4xsi32>) -> tensor<4xsi32>
+  // CHECK: return %{{.*}} : tensor<4xsi32>
+  // clang-format on
+
+  std::vector<int32_t> expected = {5, 5, 5, 5};
+  checkProgram(program, {}, {{O, expected}});
 }
 
 TEST_F(CppEdsl, Dot) {
@@ -111,6 +145,23 @@ TEST_F(CppEdsl, DoubleDot) {
   runProgram(program);
 }
 
+TEST_F(CppEdsl, Max) {
+  auto A = Placeholder(DType::FLOAT32, {3, 3});
+  TensorDim I, J, K;
+  TensorIndex i("i"), j("j");
+  A.bind_dims(I, K);
+  auto R = TensorOutput(I);
+  R(i) >= A(i, j);
+  auto program = makeProgram("max", {R});
+  std::vector<float> input = {
+      5.0f, -7.0f, 6.0f, //
+      6.0f, 5.0f,  4.0f, //
+      7.0f, 8.0f,  9.0f, //
+  };
+  std::vector<float> expected = {6.0, 6.0, 9.0};
+  checkProgram(program, {{A, input}}, {{R, expected}});
+}
+
 TEST_F(CppEdsl, EltwiseAdd) {
   auto A = Placeholder(DType::FLOAT32, {10, 20});
   auto B = Placeholder(DType::FLOAT32, {10, 20});
@@ -124,6 +175,71 @@ TEST_F(CppEdsl, EltwiseAdd) {
   // clang-format on
   runProgram(program);
 }
+
+/*TEST_F(CppEdsl, MnistMlp) {
+  // model.add(Dense(512, activation='relu', input_shape=(784,)))
+  auto input = Placeholder(DType::FLOAT32, {1, 784});
+  auto kernel1 = Placeholder(DType::FLOAT32, {784, 512});
+  auto bias1 = Placeholder(DType::FLOAT32, {512});
+  auto dense1 = Relu(Dot(input, kernel1) + bias1);
+  // model.add(Dense(512, activation='relu'))
+  auto kernel2 = Placeholder(DType::FLOAT32, {512, 512});
+  auto bias2 = Placeholder(DType::FLOAT32, {512});
+  auto dense2 = Relu(Dot(dense1, kernel2) + bias2);
+  // model.add(Dense(10, activation='softmax'))
+  auto kernel3 = Placeholder(DType::FLOAT32, {512, 10});
+  auto bias3 = Placeholder(DType::FLOAT32, {10});
+  auto dense3 = Softmax(Dot(dense2, kernel3) + bias3);
+  auto program = makeProgram("mnist_mlp", {dense3});
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.MnistMlp
+  // CHECK: func @mnist_mlp
+  // CHECK-DAG: %[[cst:.*]] = "eltwise.sconst"() {value = 0.000000e+00 : f64} :
+() -> tensor<f32>
+  // CHECK-DAG: %[[cst0:.*]] = "eltwise.sconst"() {value = 0xFFF0000000000000 :
+f64} : () -> tensor<f32>
+  // CHECK: %[[X0:.*]] = tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}}
+{idxs = ["i", "j", "k"], sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}},
+#map{{[0-9]+}}]} : tensor<f32>, tensor<1x784xf32>, tensor<784x512xf32> ->
+tensor<1x512xf32>
+  // CHECK: %[[X1:.*]] = "eltwise.add"(%{{.*}}, %{{.*}}) : (tensor<1x512xf32>,
+tensor<512xf32>) -> tensor<1x512xf32>
+  // CHECK: %[[X2:.*]] = "eltwise.cmp_lt"(%{{.*}}, %[[cst]]) :
+(tensor<1x512xf32>, tensor<f32>) -> tensor<1x512xi1>
+  // CHECK: %[[X3:.*]] = "eltwise.select"(%{{.*}}, %[[cst]], %{{.*}}) :
+(tensor<1x512xi1>, tensor<f32>, tensor<1x512xf32>) -> tensor<1x512xf32>
+  // CHECK: %[[X4:.*]] = tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}}
+{idxs = ["i", "j", "k"], sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}},
+#map{{[0-9]+}}]} : tensor<f32>, tensor<1x512xf32>, tensor<512x512xf32> ->
+tensor<1x512xf32>
+  // CHECK: %[[X5:.*]] = "eltwise.add"(%{{.*}}, %{{.*}}) : (tensor<1x512xf32>,
+tensor<512xf32>) -> tensor<1x512xf32>
+  // CHECK: %[[X6:.*]] = "eltwise.cmp_lt"(%{{.*}}, %[[cst]]) :
+(tensor<1x512xf32>, tensor<f32>) -> tensor<1x512xi1>
+  // CHECK: %[[X7:.*]] = "eltwise.select"(%{{.*}}, %[[cst]], %{{.*}}) :
+(tensor<1x512xi1>, tensor<f32>, tensor<1x512xf32>) -> tensor<1x512xf32>
+  // CHECK: %[[X8:.*]] = tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}}
+{idxs = ["i", "j", "k"], sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}},
+#map{{[0-9]+}}]} : tensor<f32>, tensor<1x512xf32>, tensor<512x10xf32> ->
+tensor<1x10xf32>
+  // CHECK: %[[X9:.*]] = "eltwise.add"(%{{.*}}, %{{.*}}) : (tensor<1x10xf32>,
+tensor<10xf32>) -> tensor<1x10xf32>
+  // CHECK: %[[X10:.*]] = tile.contract max, none, %[[cst0]], %{{.*}} {sink =
+#map{{[0-9]+}}, srcs = [#map{{[0-9]+}}]} : tensor<f32>, tensor<1x10xf32> ->
+tensor<1x1xf32>
+  // CHECK: %[[X11:.*]] = "eltwise.sub"(%{{.*}}, %{{.*}}) : (tensor<1x10xf32>,
+tensor<1x1xf32>) -> tensor<1x10xf32>
+  // CHECK: %[[X12:.*]] = "eltwise.exp"(%{{.*}}) : (tensor<1x10xf32>) ->
+tensor<1x10xf32>
+  // CHECK: %[[X13:.*]] = tile.contract add, none, %[[cst]], %{{.*}} {sink =
+#map{{[0-9]+}}, srcs = [#map{{[0-9]+}}]} : tensor<f32>, tensor<1x10xf32> ->
+tensor<1x1xf32>
+  // CHECK: %[[X14:.*]] = "eltwise.div"(%{{.*}}, %{{.*}}) : (tensor<1x10xf32>,
+tensor<1x1xf32>) -> tensor<1x10xf32>
+  // CHECK: return %{{.*}} : tensor<1x10xf32>
+  // clang-format on
+  runProgram(program);
+}*/
 
 Tensor Convolution2(const Tensor &I, const Tensor &K) {
   TensorDim CI, CO, K0, K1, N, X0, X1;
@@ -402,6 +518,25 @@ TEST_F(CppEdsl, GlobalMin) {
   runProgram(program);
 }
 
+TEST_F(CppEdsl, CumSum) {
+  auto I = Placeholder(DType::FLOAT32, {10}, "I");
+  TensorDim N;
+  TensorIndex i, k;
+  I.bind_dims(N);
+  auto O = TensorOutput(N);
+  O(i) += I(k);
+  O.add_constraint(i - k < N);
+  auto program = makeProgram("cumsum", {O});
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.CumSum
+  // CHECK: func @cumsum
+  // CHECK: %[[cst:.*]] = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> tensor<f32>
+  // CHECK: %{{.*}} = tile.contract add, none, %[[cst]], %{{.*}} {cons = #set{{[0-9]+}}, sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}]} : tensor<f32>, tensor<10xf32> -> tensor<10xf32>
+  // CHECK: return %{{.*}} : tensor<10xf32>
+  // clang-format on
+  runProgram(program);
+}
+
 Tensor ComplexConv2d(             //
     const Tensor &I,              //
     const Tensor &K,              //
@@ -456,13 +591,29 @@ TEST_F(CppEdsl, ComplexConv2d) {
   runProgram(program);
 }
 
+TEST_F(CppEdsl, Reciprocal) {
+  auto A = Placeholder(DType::FLOAT32, {6}, "A");
+  auto R = 1.0 / A;
+  auto program = makeProgram("reciprocal", {R});
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.Reciprocal
+  // CHECK: func @reciprocal
+  // CHECK: %[[cst:.*]] = "eltwise.sconst"() {value = 1.000000e+00 : f64} : () -> tensor<f32>
+  // CHECK: %{{.*}} = "eltwise.div"(%[[cst]], %{{.*}}) : (tensor<f32>, tensor<6xf32>) -> tensor<6xf32>
+  // CHECK: return %{{.*}} : tensor<6xf32>
+  // clang-format on
+  std::vector<float> input = {1, 2, 4, 5, 8, 10};
+  std::vector<float> expected = {1.0, 0.5, 0.25, 0.2, 0.125, 0.1};
+  checkProgram(program, {{A, input}}, {{R, expected}});
+}
+
 TEST_F(CppEdsl, GradientDot) {
   auto A = Placeholder(DType::FLOAT32, {100, 100}, "A");
   auto B = Placeholder(DType::FLOAT32, {100, 100}, "B");
   auto O = Dot(A, B);
   auto grads = Gradient({A, B}, O);
   auto program = makeProgram("gradient_dot", {grads});
-  //clang-format off
+  // clang-format off
   //  EXPECT_THAT(program, Eq(R"(function (
   //   A[A_0, A_1],
   //   B[B_0, B_1]

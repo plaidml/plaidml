@@ -15,6 +15,8 @@ namespace pmlc::dialect::pxa {
 
 std::unique_ptr<mlir::Pass> createAutoTileExamplePass();
 
+std::unique_ptr<mlir::Pass> createTileAccumulatePass();
+
 std::unique_ptr<mlir::Pass> createFusionPass();
 
 std::unique_ptr<mlir::Pass> createLocalizePass();
