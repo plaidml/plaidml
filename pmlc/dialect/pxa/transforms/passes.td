@@ -9,7 +9,7 @@ def AutoTileExample : FunctionPass<"pxa-autotile-example"> {
 }
 
 def VectorizeExample : FunctionPass<"pxa-vectorize-example"> {
-  let summary = "Vectorizes woith vector register of 8 elements";
+  let summary = "Vectorizes with vector register of 8 elements";
   let constructor = "pmlc::dialect::pxa::createVectorizeExamplePass()";
 }
 
