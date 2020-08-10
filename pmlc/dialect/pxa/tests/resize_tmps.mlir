@@ -68,7 +68,7 @@ func @no_resize_expand(%arg0: memref<32x30xf32>) {
       %5 = affine.load %0[0, %arg2, %arg6, %arg1, %arg3, %arg5] : memref<1x30x32x8x8x32xf32>
       %6 = affine.load %arg0[%arg6, %arg4] : memref<32x30xf32>
       %7 = mulf %5, %6 : f32
-      %8 = pxa.reduce add %7, %1[0, %arg1 * 30 + %arg2, %arg3 * 30 + %arg4, %arg5] : memref<1x222x222x32xf32>
+      %8 = pxa.reduce addf %7, %1[0, %arg1 * 30 + %arg2, %arg3 * 30 + %arg4, %arg5] : memref<1x222x222x32xf32>
       affine.yield %8 : memref<1x222x222x32xf32>
     } else {
       affine.yield %1 : memref<1x222x222x32xf32>

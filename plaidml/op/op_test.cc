@@ -222,16 +222,15 @@ ConvolutionParams convParams[] = {
           conv.name("res2a_branch1").strides({1, 1}).autopad_mode(op::AutoPadMode::VALID);
         },
     },
-    // FIXME: this one takes a very long time to run.
-    // {
-    //     // 3D convolution
-    //     DType::FLOAT32,
-    //     {1, 32, 224, 224, 3},
-    //     {7, 7, 7, 3, 64},
-    //     [](op::convolution& conv) {
-    //       conv.strides({2, 2, 2}).autopad_mode(op::AutoPadMode::EXPLICIT).manual_padding({2, 3, 2, 3, 2, 3});
-    //     },
-    // },
+    {
+        // 3D convolution
+        DType::FLOAT32,
+        {1, 32, 224, 224, 3},
+        {7, 7, 7, 3, 64},
+        [](op::convolution& conv) {
+          conv.strides({2, 2, 2}).autopad_mode(op::AutoPadMode::EXPLICIT).manual_padding({2, 3, 2, 3, 2, 3});
+        },
+    },
     {
         // 3D convolution
         DType::FLOAT32,
@@ -250,16 +249,15 @@ ConvolutionParams convParams[] = {
           conv.strides({1, 1, 1}).autopad_mode(op::AutoPadMode::EXPLICIT).manual_padding({0, 0, 0, 0, 0, 0});
         },
     },
-    // FIXME: this one segfaults (sometimes)
-    // {
-    //     // 3D convolution
-    //     DType::FLOAT32,
-    //     {1, 16, 56, 56, 64},
-    //     {3, 3, 3, 64, 192},
-    //     [](op::convolution& conv) {
-    //       conv.strides({1, 1, 1}).autopad_mode(op::AutoPadMode::EXPLICIT).manual_padding({1, 1, 1, 1, 1, 1});
-    //     },
-    // },
+    {
+        // 3D convolution
+        DType::FLOAT32,
+        {1, 16, 56, 56, 64},
+        {3, 3, 3, 64, 192},
+        [](op::convolution& conv) {
+          conv.strides({1, 1, 1}).autopad_mode(op::AutoPadMode::EXPLICIT).manual_padding({1, 1, 1, 1, 1, 1});
+        },
+    },
 };
 
 INSTANTIATE_TEST_CASE_P(Suite, ConvolutionTest, ::testing::ValuesIn(convParams));

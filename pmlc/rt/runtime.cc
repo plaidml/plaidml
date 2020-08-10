@@ -1,9 +1,11 @@
 // Copyright 2020 Intel Corporation
 
+#include <chrono>
 #include <cmath>
 #include <cstdlib>
 
 #include "half.hpp"
+#include "llvm/Support/Format.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include "mlir/ExecutionEngine/RunnerUtils.h"
@@ -11,7 +13,21 @@
 #include "pmlc/compiler/registry.h"
 
 extern "C" void plaidml_rt_trace(const char *msg) {
-  llvm::outs() << msg << "\n";
+  using clock = std::chrono::high_resolution_clock;
+  static bool isFirst = true;
+  static std::chrono::time_point<clock> lastTime = clock::now();
+  auto now = clock::now();
+  auto delta = now - lastTime;
+  lastTime = now;
+  auto deltaSecs =
+      std::chrono::duration_cast<std::chrono::duration<double>>(delta).count();
+  if (isFirst) {
+    isFirst = false;
+  } else {
+    llvm::outs() << llvm::format(": %7.6f\n", deltaSecs);
+    llvm::outs().flush();
+  }
+  llvm::outs() << msg;
   llvm::outs().flush();
 }
 
