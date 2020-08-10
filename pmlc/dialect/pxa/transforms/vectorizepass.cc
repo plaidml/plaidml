@@ -6,8 +6,7 @@
 
 #include "pmlc/util/logging.h"
 
-#define PXA_EXAMPLE_VECTOR_WIDTH_IN_BYTES 32
-#define PXA_EXAMPLE_ELEM_MIN_WIDTH 1
+#define PXA_EXAMPLE_VECTOR_WIDTH_IN_ELEMENTS 8
 
 namespace pmlc::dialect::pxa {
 
@@ -20,19 +19,14 @@ struct VectorizeExample : public VectorizeExampleBase<VectorizeExample> {
       if (!loop) {
         continue;
       }
-      //   auto ranges = loop.getConstantRanges();
-      //   if (!ranges) {
-      //     return;
-      //   }
 
       bool vectorized = false;
       for (unsigned int i = 0; i < loop.getIVs().size(); i++) {
         auto blockArg = loop.getIVs()[i];
         IVLOG(1, "Lubo3 VectorizePass!!!" << vectorized << ":"
                                           << blockArg.getArgNumber());
-        vectorized |= performVectorization(loop, blockArg,
-                                           PXA_EXAMPLE_VECTOR_WIDTH_IN_BYTES,
-                                           PXA_EXAMPLE_ELEM_MIN_WIDTH);
+        vectorized |= performVectorization(
+            loop, blockArg, PXA_EXAMPLE_VECTOR_WIDTH_IN_ELEMENTS);
         // IVLOG(1, "Lubo VectorizePass!!!" << vectorized << ":" <<
         // blockArg.getArgNumber());
         if (vectorized) {
