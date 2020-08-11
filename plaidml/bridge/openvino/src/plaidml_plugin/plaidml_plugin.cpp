@@ -15,6 +15,8 @@
 #include "ie_plugin_config.hpp"
 #include "inference_engine.hpp"
 
+#include "ngraph/test/runtime/interpreter/int_backend.cpp"  // TODO: Shouldn't have this
+
 #include "plaidml/exec/exec.h"
 #include "plaidml/op/op.h"
 #include "plaidml_executable_network.hpp"
@@ -64,6 +66,7 @@ CreatePluginEngine(IInferencePlugin*& plugin, ResponseDesc* resp) noexcept {
   try {
     plaidml::op::init();
     plaidml::exec::init();
+    ngraph_register_interpreter_backend();  // TODO: Really shouldn't be here
     IVLOG(1, "CreatePluginEngine>");
     plugin = make_ie_compatible_plugin({{1, 6}, CI_BUILD_NUMBER, "PlaidMLPlugin"}, std::make_shared<Engine>());
     return OK;
