@@ -9,7 +9,7 @@ def AutoTileExample : FunctionPass<"pxa-autotile-example"> {
 }
 
 def TileAccumulate : FunctionPass<"pxa-tile-accumulate"> {
-  let summary = "Tile all dimensions by 10";
+  let summary = "Tile accumulate";
   let constructor = "pmlc::dialect::pxa::createTileAccumulatePass()";
 }
 
