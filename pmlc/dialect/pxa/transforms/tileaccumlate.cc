@@ -47,34 +47,55 @@ Operation *GetOriginalDef(Value val) {
       defop->walk([&](AffineReduceOp op) {
         opRes = op.getResult().cast<mlir::OpResult>();
       });
-    } else {
     }
   }
   return opRes.getOwner();
 }
 
-void TileAccumulationstest(AffineParallelOp op) {
+void accelerate() {}
+
+bool isAggregation(AffineParallelOp op) {
+  bool AggTag = false;
+  auto argRange = op.getIVs();
+  auto parallelLoopNum = argRange.size() < 2 ? argRange.size() : 2;
+  op.walk([&](AffineReduceOp reduce) {
+    auto range = reduce.idxs();
+    for (size_t i = 0; i < parallelLoopNum; i++) {
+      auto firstArg = std::find(range.begin(), range.end(), argRange[i]);
+      AggTag = firstArg == range.end() || AggTag;
+    }
+  });
+  IVLOG(1, "the aggtag is " << AggTag);
+  return AggTag;
+}
+
+void TileAccumulations(AffineParallelOp op) {
   // Find the originating reduce
   assert(op.getNumResults() == 1);
-  auto srcDef = GetOriginalDef(op.getResult(0));
-  auto red = mlir::dyn_cast<AffineReduceOp>(srcDef);
-  // Get strides for output
-  auto si = *computeStrideInfo(red);
-  // Find all the accumulation indexes (stride 0 with respect to output) and
-  // tile them into an inner block
-  auto ranges = *op.getConstantRanges();
-  SmallVector<int64_t, 6> accumTile;
-  auto steps = op.steps().cast<ArrayAttr>().getValue();
-  for (size_t i = 0; i < ranges.size(); i++) {
-    auto arg = op.getIVs()[i];
-    if (si.strides.count(arg)) {
-      accumTile.push_back(steps[i].cast<IntegerAttr>().getInt());
-    } else {
-      accumTile.push_back(ranges[i]);
+  if (isAggregation(op)) {
+    auto srcDef = GetOriginalDef(op.getResult(0));
+    auto red = mlir::dyn_cast<AffineReduceOp>(srcDef);
+    // Get strides for output
+    auto si = *computeStrideInfo(red);
+    // Find all the accumulation indexes (stride 0 with respect to output) and
+    // tile them into an inner block
+    auto ranges = *op.getConstantRanges();
+    SmallVector<int64_t, 6> accumTile;
+    auto steps = op.steps().cast<ArrayAttr>().getValue();
+    for (size_t i = 0; i < ranges.size(); i++) {
+      auto arg = op.getIVs()[i];
+      if (si.strides.count(arg)) {
+        accumTile.push_back(steps[i].cast<IntegerAttr>().getInt());
+      } else {
+        accumTile.push_back(ranges[i]);
+      }
+      IVLOG(1, "accumTile[" << i << "] = " << accumTile[i]);
     }
-    IVLOG(1, "accumTile[" << i << "] = " << accumTile[i]);
+    performTiling(op, accumTile);
+  } else {
+    // TODO maybe accelerate the loop in one kernel.
+    accelerate();
   }
-  performTiling(op, accumTile);
 }
 
 struct TileAccumulatePass : public TileAccumulateBase<TileAccumulatePass> {
@@ -90,7 +111,7 @@ struct TileAccumulatePass : public TileAccumulateBase<TileAccumulatePass> {
       if (!ranges) {
         return;
       }
-      TileAccumulationstest(loop);
+      TileAccumulations(loop);
     }
   }
 };
