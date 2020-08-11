@@ -33,6 +33,7 @@ plaidml_cc_library(
         "stencil_gemm.cc",
         "test_analysis.cc",
         "tile.cc",
+        "vectorize.cc",
     ],
     hdrs = [
         "autotile.h",
@@ -40,6 +41,8 @@ plaidml_cc_library(
         "passes.h",
         "stencil.h",
         "tile.h",
+        "vectorize.h",
+
     ],
     deps = [
         ":gen-pass",
@@ -47,5 +50,6 @@ plaidml_cc_library(
         "//pmlc/dialect/pxa/analysis",
         "//pmlc/dialect/pxa/ir",
         "//pmlc/dialect/xsmm/ir",
+        "@llvm-project//mlir:VectorOps",
     ],
 )

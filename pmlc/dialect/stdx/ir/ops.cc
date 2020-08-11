@@ -88,6 +88,10 @@ static void buildUIToFPOp(OpBuilder &builder, OperationState &result,
 
 } // namespace
 
+// ---- ReshapeOp ----
+
+Value ReshapeOp::getViewSource() { return tensor(); }
+
 #define GET_OP_CLASSES
 #include "pmlc/dialect/stdx/ir/ops.cc.inc"
 
