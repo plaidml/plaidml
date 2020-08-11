@@ -32,7 +32,7 @@ set(LLVM_APPEND_VC_REV OFF CACHE BOOL "" FORCE)
 set(LLVM_ENABLE_IDE ON CACHE BOOL "" FORCE)
 set(LLVM_ENABLE_RTTI ON CACHE BOOL "" FORCE)
 set(LLVM_TARGETS_TO_BUILD "WebAssembly;X86;ARM;AArch64" CACHE STRING "" FORCE)
-set(LLVM_ENABLE_PROJECTS "mlir" CACHE STRING "" FORCE)
+set(LLVM_ENABLE_PROJECTS "mlir;" CACHE STRING "" FORCE)
 set(LLVM_ENABLE_BINDINGS OFF CACHE BOOL "" FORCE)
 
 set(MLIR_TABLEGEN_EXE mlir-tblgen)
@@ -67,7 +67,7 @@ FetchContent_Declare(
   URL https://github.com/amrayn/easyloggingpp/archive/v9.96.7.tar.gz
   URL_HASH SHA256=237c80072b9b480a9f2942b903b4b0179f65e146e5dcc64864dc91792dedd722
 )
-FetchContent_GetProperties(easloggingpp)
+FetchContent_GetProperties(easyloggingpp)
 if(NOT easyloggingpp_POPULATED)
   FetchContent_Populate(easyloggingpp)
   #find_package(MLIR PATHS ${CMAKE_BINARY_DIR}/lib/cmake/mlir/)
@@ -80,8 +80,7 @@ include_directories(${easyloggingpp_SOURCE_DIR}/src)
 #####
 
 # C++
-set(CMAKE_CXX_STANDARD 17 CACHE STRING "C++ standard to conform to")
-list(APPEND ${PMLC_DEFAULT_COPTS} -Wno-c++17-extensions)
+list(APPEND PMLC_DEFAULT_COPTS -Wno-c++17-extensions)
 # Obviously too broad, can be addressed later
 include_directories(./)
 include_directories(${CMAKE_BINARY_DIR})

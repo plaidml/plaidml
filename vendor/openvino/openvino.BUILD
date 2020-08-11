@@ -1,7 +1,7 @@
-LOAD("@RULES_CC//CC:DEFS.BZL", "CC_LIBRARY")
-LOAD("@COM_INTEL_PLAIDML//BZL:TEMPLATE.BZL", "TEMPLATE_RULE")
+load("@rules_cc//cc:defs.bzl", "cc_library")
+load("@com_intel_plaidml//bzl:template.bzl", "template_rule")
 
-PACKAGE(DEFAULT_VISIBILITY = ["//VISIBILITY:PUBLIC"])
+package(default_visibility = ["//visibility:public"])
 
 TAGS = [
     "skip_macos",

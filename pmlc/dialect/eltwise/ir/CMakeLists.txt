@@ -1,6 +1,5 @@
-# In order to include source and headers we have to do it this way.
-pmlc_add_mlir_dialect(eltwise)
-pmlc_add_mlir_interfaces(eltwise)
+pmlc_add_mlir_dialect(Eltwise)
+pmlc_add_mlir_interfaces(Eltwise)
 add_mlir_doc(interfaces -gen-dialect-doc EltwiseInterfaces Eltwise/)
 add_mlir_doc(ops -gen-op-doc EltwiseOps Eltwise/)
 
@@ -12,9 +11,9 @@ add_mlir_dialect_library(PMLCEltwise
 
         DEPENDS
                 MLIROpAsmInterfaceIncGen
-                PMLCeltwiseDialectGen
-                PMLCeltwiseInterfacesGen
-                PMLCutilInterfacesGen
+                PMLCEltwiseDialectGen
+                PMLCEltwiseInterfacesGen
+                PMLCUtilInterfacesGen
         LINK_LIBS 
                 PUBLIC 
                 MLIRIR
