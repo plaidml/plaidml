@@ -13,6 +13,11 @@ def TileAccumulate : FunctionPass<"pxa-tile-accumulate"> {
   let constructor = "pmlc::dialect::pxa::createTileAccumulatePass()";
 }
 
+def VectorizeExample : FunctionPass<"pxa-vectorize-example"> {
+  let summary = "Vectorizes with vector register of 8 elements";
+  let constructor = "pmlc::dialect::pxa::createVectorizeExamplePass()";
+}
+
 def Fusion : FunctionPass<"pxa-fusion"> {
   let summary = "Fuse blocks that are compatible";
   let constructor = "pmlc::dialect::pxa::createFusionPass()";

@@ -12,7 +12,7 @@ func @simple(%arg0: memref<3x4xf16>) -> memref<3x4xf16> {
     // CHECK-NEXT: affine.parallel
     %3 = affine.parallel (%j) = (0) to (4) reduce ("assign") -> (memref<3x4xf16>) {
       %5 = pxa.reduce assign %cst, %0[%i, %j] : memref<3x4xf16>
-      %6 = pxa.reduce add %cst, %5[%i, %j] : memref<3x4xf16>
+      %6 = pxa.reduce addf %cst, %5[%i, %j] : memref<3x4xf16>
       affine.yield %6 : memref<3x4xf16>
     }
     %4 = affine.parallel (%j) = (0) to (4) reduce ("assign") -> (memref<3x4xf16>) {

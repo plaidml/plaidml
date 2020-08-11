@@ -7,7 +7,7 @@
 #include "common_test_utils/test_constants.hpp"
 #include "single_layer_tests/mvn.hpp"
 
-using namespace LayerTestsDefinitions;
+using LayerTestsDefinitions::MvnLayerTest;
 
 const std::vector<std::vector<size_t>> inputShapes = {
     {1, 32, 17},        //
@@ -41,7 +41,7 @@ const auto MvnCases = ::testing::Combine(::testing::ValuesIn(inputShapes),      
                                          ::testing::ValuesIn(acrossChannels),                  //
                                          ::testing::ValuesIn(normalizeVariance),               //
                                          ::testing::ValuesIn(epsilon),                         //
-                                         ::testing::Values(CommonTestUtils::DEVICE_CPU)        //
+                                         ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)    //
 );
 
 INSTANTIATE_TEST_CASE_P(smoke_MKLDNN_TestsMVN, MvnLayerTest, MvnCases, MvnLayerTest::getTestCaseName);
