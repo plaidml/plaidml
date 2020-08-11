@@ -1,6 +1,5 @@
-//
-// Created by cxh on 8/6/20.
-//
+// Copyright 2020 Intel Corporation
+
 #include <limits>
 #include <memory>
 #include <utility>
@@ -52,8 +51,6 @@ Operation *GetOriginalDef(Value val) {
   return opRes.getOwner();
 }
 
-void accelerate() {}
-
 bool isAggregation(AffineParallelOp op) {
   bool AggTag = false;
   auto argRange = op.getIVs();
@@ -92,9 +89,6 @@ void TileAccumulations(AffineParallelOp op) {
       IVLOG(1, "accumTile[" << i << "] = " << accumTile[i]);
     }
     performTiling(op, accumTile);
-  } else {
-    // TODO maybe accelerate the loop in one kernel.
-    accelerate();
   }
 }
 
