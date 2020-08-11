@@ -152,11 +152,16 @@ public:
 
   void vectorizeReduceOp(AffineReduceOp op) {
     Value mem = op.mem();
-    Value vector = op.val();
-    assert(vector.getType().isa<VectorType>());
+    Value val = op.val();
     OpBuilder builder(op);
+    if (!val.getType().isa<VectorType>()) {
+      auto vecType = VectorType::get({vectorSize}, val.getType());
+      auto bcast =
+          builder.create<vector::BroadcastOp>(op.getLoc(), vecType, val);
+      val = bcast.getResult();
+    }
     auto vecOp = builder.create<AffineVectorReduceOp>(
-        op.getLoc(), ArrayRef<Type>{mem.getType()}, op.agg(), vector, mem,
+        op.getLoc(), ArrayRef<Type>{mem.getType()}, op.agg(), val, mem,
         op.map(), op.idxs());
     op.replaceAllUsesWith(vecOp.getResult());
     op.erase();

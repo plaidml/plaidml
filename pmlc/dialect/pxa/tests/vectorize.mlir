@@ -38,3 +38,17 @@ func @vectorize_gemm(%arg0: memref<64x64xf32>, %arg1: memref<64x64xf32>) -> (mem
   return %r1, %r2 : memref<64x64xf32>, memref<64xf32>
 }
 
+// CHECK-LABEL: func @vector_set
+func @vector_set(%val: f32) -> (memref<64xf32>) {
+  %a = alloc() : memref<64xf32>
+  %o = affine.parallel (%i) = (0) to (64) reduce ("assign") -> (memref<64xf32>) {
+  // CHECK: affine.parallel (%{{.*}}) = (0) to (64) step (8) reduce ("assign") -> (memref<64xf32>)
+    %0 = pxa.reduce assign %val, %a[%i] : memref<64xf32>
+    /// The reduce should get vectorized, including a broadcast of the scalar 
+    // %[[.*:vec]] = vector.broadcast %{{.*}} : f32 to vector<8xf32>
+    // pxa.vector_reduce assign %[[vec]], %{{.*}} : memref<64xf32>, vector<8xf32>
+    affine.yield %0 : memref<64xf32>
+  }
+  return %o : memref<64xf32>
+}
+
