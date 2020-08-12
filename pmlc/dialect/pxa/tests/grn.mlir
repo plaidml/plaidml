@@ -8,6 +8,7 @@
 // RUN:   -canonicalize \
 // RUN:   -pxa-localize \
 // RUN:   -pxa-resize-tmps \
+// RUN:   --canonicalize \
 // RUN:   %s | FileCheck %s
 
 #map0 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>
@@ -39,7 +40,7 @@ func @grn(%arg0: tensor<1x4x4x3xf16>) -> tensor<1x4x4x3xf16> {
 // CHECK:       %[[X0:.*]] = pxa.load %[[in]][0, %[[i]], %[[j]], %[[k]]] : memref<1x4x4x3xf16>
 // CHECK:       %[[X1:.*]] = pxa.load %[[in]][0, %[[i]], %[[j]], %[[k]]] : memref<1x4x4x3xf16>
 // CHECK:       %[[X2:.*]] = mulf %[[X0]], %[[X1]] : f16
-// CHECK:       %[[X3:.*]] = pxa.reduce add %[[X2]], %[[T1]][0, 0, 0, 0] : memref<1x1x1x1xf16>
+// CHECK:       %[[X3:.*]] = pxa.reduce addf %[[X2]], %[[T1]][0, 0, 0, 0] : memref<1x1x1x1xf16>
 // CHECK:       affine.yield %[[X3]] : memref<1x1x1x1xf16>
 // CHECK:     %[[X5:.*]] = pxa.load %[[P1]][0, 0, 0, 0] : memref<1x1x1x1xf16>
 // CHECK:     %[[X6:.*]] = addf %[[X5]], %[[one]] : f16

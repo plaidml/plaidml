@@ -66,6 +66,7 @@ plaidml_cc_library(
         "@easylogging",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:StandardOps",
     ],
 )
 

@@ -33,3 +33,27 @@ func @cast_f32_u16(%arg0: tensor<f32>) -> tensor<ui16> {
   // CHECK: pxa.reduce assign
   return %0 : tensor<ui16>
 }
+
+// -----
+
+// CHECK-LABEL: func @cast_i16_f32
+func @cast_i16_f32(%arg0: tensor<si16>) -> tensor<f32> {
+  %0 = "eltwise.cast"(%arg0) : (tensor<si16>) -> tensor<f32>
+  // CHECK: alloc
+  // CHECK: pxa.load
+  // CHECK: sitofp
+  // CHECK: pxa.reduce assign
+  return %0 : tensor<f32>
+}
+
+// -----
+
+// CHECK-LABEL: func @cast_u16_f32
+func @cast_u16_f32(%arg0: tensor<ui16>) -> tensor<f32> {
+  %0 = "eltwise.cast"(%arg0) : (tensor<ui16>) -> tensor<f32>
+  // CHECK: alloc
+  // CHECK: pxa.load
+  // CHECK: stdx.uitofp
+  // CHECK: pxa.reduce assign
+  return %0 : tensor<f32>
+}

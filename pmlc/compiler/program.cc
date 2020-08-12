@@ -4,12 +4,16 @@
 
 #include <utility>
 
+#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FormatVariadic.h"
+#include "llvm/Support/Path.h"
+#include "llvm/Support/ToolOutputFile.h"
 
 #include "mlir/Parser.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/DebugStringHelper.h"
+#include "mlir/Support/FileUtilities.h"
 #include "mlir/Transforms/Passes.h"
 
 #include "pmlc/compiler/registry.h"
@@ -21,17 +25,25 @@ namespace pmlc::compiler {
 
 namespace {
 
+static bool isHiddenPass(Pass *pass, Operation *op) {
+  if (pass->getName().startswith("mlir::detail::")) {
+    return true;
+  }
+  if (auto funcOp = dyn_cast<FuncOp>(op)) {
+    if (funcOp.isExternal()) {
+      return true;
+    }
+  }
+  return false;
+}
+
 class IRCollector : public PassInstrumentation {
 public:
   explicit IRCollector(std::vector<PassInfo> *into) : into(into) {}
 
 private:
-  bool isHiddenPass(Pass *pass) {
-    return pass->getName().startswith("detail::");
-  }
-
   void runAfterPass(Pass *pass, Operation *op) override {
-    if (isHiddenPass(pass))
+    if (isHiddenPass(pass, op))
       return;
 
     std::string ir;
@@ -79,19 +91,18 @@ Program::Program(std::unique_ptr<llvm::MemoryBuffer> buffer) {
   module = mlir::parseSourceFile(sourceMgr, &context);
 }
 
-void Program::compile(StringRef target, bool collectPasses) {
+void Program::compile(StringRef target, bool collectPasses, StringRef dumpDir) {
   if (target.empty()) {
     return;
   }
 
   PassManager pm(module->getContext());
 
-  if (collectPasses) {
+  if (collectPasses || dumpDir.size()) {
     std::string ir;
     llvm::raw_string_ostream os(ir);
     module->print(os);
-    os.flush();
-    passes.emplace_back(PassInfo{"tile", ir});
+    passes.emplace_back(PassInfo{"tile", os.str()});
     pm.addInstrumentation(std::make_unique<IRCollector>(&passes));
     pm.getContext()->disableMultithreading();
   }
@@ -99,13 +110,18 @@ void Program::compile(StringRef target, bool collectPasses) {
   if (VLOG_IS_ON(1)) {
     pm.enableStatistics();
     pm.enableTiming();
-    auto shouldPrintBeforePass = [](auto pass, auto op) { return false; };
-    auto shouldPrintAfterPass = [&](auto pass, auto op) {
+    auto shouldPrintBeforePass = [](auto *pass, auto *op) { return false; };
+    auto shouldPrintAfterPass = [&](auto *pass, auto *op) {
+      if (isHiddenPass(pass, op)) {
+        return false;
+      }
       return VLOG_IS_ON(3);
     };
     pm.getContext()->disableMultithreading();
-    pm.enableIRPrinting(shouldPrintBeforePass, shouldPrintAfterPass, true,
-                        false, llvm::errs());
+    pm.enableIRPrinting(shouldPrintBeforePass, shouldPrintAfterPass,
+                        /*printModuleScope=*/true,
+                        /*printAfterOnlyOnChange=*/false,
+                        /*out=*/llvm::errs());
   }
 
   auto pipelineBuilder = resolveTarget(target);
@@ -113,6 +129,27 @@ void Program::compile(StringRef target, bool collectPasses) {
 
   if (failed(pm.run(*module))) {
     throw std::runtime_error("conversion to the LLVM IR dialect failed");
+  }
+
+  if (dumpDir.size()) {
+    std::string err;
+    auto errCode = llvm::sys::fs::create_directories(dumpDir);
+    if (errCode) {
+      throw std::runtime_error("Could not create dumpDir: " +
+                               errCode.message());
+    }
+    for (auto pass : llvm::enumerate(passes)) {
+      const auto &info = pass.value();
+      SmallString<128> path(dumpDir);
+      llvm::sys::path::append(
+          path, llvm::formatv("{0,0+2}_{1}.mlir", pass.index(), info.name));
+      auto file = mlir::openOutputFile(path, &err);
+      if (!err.empty()) {
+        throw std::runtime_error("Failed to dump pass: " + err);
+      }
+      file->os() << info.ir;
+      file->keep();
+    }
   }
 }
 

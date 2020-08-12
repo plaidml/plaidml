@@ -23,6 +23,7 @@ plaidml_cc_library(
     name = "transforms",
     srcs = [
         "autotile.cc",
+        "cache.cc",
         "dataflow_opt.cc",
         "fusion.cc",
         "localize.cc",
@@ -32,12 +33,16 @@ plaidml_cc_library(
         "stencil_gemm.cc",
         "test_analysis.cc",
         "tile.cc",
+        "vectorize.cc",
     ],
     hdrs = [
         "autotile.h",
+        "cache.h",
         "passes.h",
         "stencil.h",
         "tile.h",
+        "vectorize.h",
+
     ],
     deps = [
         ":gen-pass",
@@ -45,5 +50,6 @@ plaidml_cc_library(
         "//pmlc/dialect/pxa/analysis",
         "//pmlc/dialect/pxa/ir",
         "//pmlc/dialect/xsmm/ir",
+        "@llvm-project//mlir:VectorOps",
     ],
 )

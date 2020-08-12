@@ -8,6 +8,11 @@ def AutoTileExample : FunctionPass<"pxa-autotile-example"> {
   let constructor = "pmlc::dialect::pxa::createAutoTileExamplePass()";
 }
 
+def VectorizeExample : FunctionPass<"pxa-vectorize-example"> {
+  let summary = "Vectorizes with vector register of 8 elements";
+  let constructor = "pmlc::dialect::pxa::createVectorizeExamplePass()";
+}
+
 def Fusion : FunctionPass<"pxa-fusion"> {
   let summary = "Fuse blocks that are compatible";
   let constructor = "pmlc::dialect::pxa::createFusionPass()";

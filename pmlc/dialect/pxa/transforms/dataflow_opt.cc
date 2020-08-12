@@ -56,7 +56,7 @@ struct MemRefDataFlowOptPass
       }
 
       auto reduceOp = dyn_cast_or_null<AffineReduceOp>(defOp);
-      if (!reduceOp || reduceOp.agg() != AggregationKind::assign) {
+      if (!reduceOp || reduceOp.agg() != AtomicRMWKind::assign) {
         return;
       }
 

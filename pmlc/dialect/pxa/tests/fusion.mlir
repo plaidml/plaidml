@@ -50,7 +50,7 @@ func @grn(%arg0: memref<1x4x4x3xf16>) -> memref<1x4x4x3xf16> {
   }
   %4 = affine.parallel (%arg1, %arg2, %arg3, %arg4, %arg5) = (0, 0, 0, 0, 0) to (1, 4, 4, 1, 3) reduce ("assign") -> (memref<1x4x4x1xf16>) {
     %15 = pxa.load %1[%arg1, %arg2, %arg3, %arg5] : memref<1x4x4x3xf16>
-    %16 = pxa.reduce add %15, %3[%arg1, %arg2, %arg3, %arg4] : memref<1x4x4x1xf16>
+    %16 = pxa.reduce addf %15, %3[%arg1, %arg2, %arg3, %arg4] : memref<1x4x4x1xf16>
     affine.yield %16 : memref<1x4x4x1xf16>
   }
   %5 = alloc() : memref<1x4x4x1xf16>
@@ -100,7 +100,7 @@ func @grn(%arg0: memref<1x4x4x3xf16>) -> memref<1x4x4x3xf16> {
   // CHECK:     mulf
   // CHECK:     pxa.reduce assign
   // CHECK:     pxa.load
-  // CHECK:     pxa.reduce add
+  // CHECK:     pxa.reduce addf
   // CHECK:     affine.yield
   // CHECK:   pxa.load
   // CHECK:   addf

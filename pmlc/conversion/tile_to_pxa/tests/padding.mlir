@@ -22,7 +22,7 @@ func @pad_input(%arg0: tensor<10xf32>) -> tensor<10xf32> {
 // CHECK:   pxa.reduce assign %{{.*}}, %{{.*}}[%{{.*}}] : memref<10xf32>
 // CHECK: affine.parallel (%{{.*}}, %{{.*}}) = (0, 0) to (10, 3)
 // CHECK:   %[[X1:.*]] = pxa.load %[[COPY]][%{{.*}} + %{{.*}}] : memref<12xf32>
-// CHECK:   pxa.reduce add %[[X1]], %{{.*}}[%{{.*}}] : memref<10xf32>
+// CHECK:   pxa.reduce addf %[[X1]], %{{.*}}[%{{.*}}] : memref<10xf32>
 
 // -----
 
@@ -49,8 +49,8 @@ func @pad_contraction(%A: tensor<10xf32>, %B: tensor<1xf32>, %C: tensor<3xf32>) 
 // CHECK:   pxa.reduce assign %{{.*}}, %[[CLEAR]][%{{.*}} + 1] : memref<12xf32>
 // 1st contraction
 // CHECK: %[[FINAL:.*]] = affine.parallel (%{{.*}}, %{{.*}}) = (1, 0) to (10, 1)
-// CHECK:   pxa.reduce add %{{.*}}, %[[INITED]][%{{.*}} + 1] : memref<12xf32>
+// CHECK:   pxa.reduce addf %{{.*}}, %[[INITED]][%{{.*}} + 1] : memref<12xf32>
 // 2nd contraction
 // CHECK: affine.parallel (%{{.*}}, %{{.*}}) = (0, 0) to (10, 3)
 // CHECK:   pxa.load %[[FINAL]][%{{.*}} + %{{.*}}] : memref<12xf32>
-// CHECK:   pxa.reduce add %{{.*}}, %{{.*}}[%{{.*}}] : memref<10xf32>
+// CHECK:   pxa.reduce addf %{{.*}}, %{{.*}}[%{{.*}}] : memref<10xf32>
