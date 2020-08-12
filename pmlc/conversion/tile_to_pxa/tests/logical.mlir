@@ -13,8 +13,8 @@ func @eltwise_and_f32(
 
 // CHECK-LABEL: func @eltwise_and_f32
 // CHECK: affine.parallel
-// CHECK: affine.load
-// CHECK: affine.load
+// CHECK: pxa.load
+// CHECK: pxa.load
 // CHECK: cmpf "one"
 // CHECK: cmpf "one"
 // CHECK: and
@@ -33,8 +33,8 @@ func @eltwise_or_si32(
 
 // CHECK-LABEL: func @eltwise_or_si32
 // CHECK: affine.parallel
-// CHECK: affine.load
-// CHECK: affine.load
+// CHECK: pxa.load
+// CHECK: pxa.load
 // CHECK: cmpi "ne"
 // CHECK: cmpi "ne"
 // CHECK: or
@@ -53,8 +53,8 @@ func @eltwise_xor_mixed(
 
 // CHECK-LABEL: func @eltwise_xor_mixed
 // CHECK: affine.parallel
-// CHECK: affine.load
-// CHECK: affine.load
+// CHECK: pxa.load
+// CHECK: pxa.load
 // CHECK: cmpf "one"
 // CHECK: cmpi "ne"
 // CHECK: xor
@@ -72,7 +72,7 @@ func @eltwise_not_si32(
 // CHECK-LABEL: func @eltwise_not_si32
 // CHECK: constant 0
 // CHECK: affine.parallel
-// CHECK: affine.load
+// CHECK: pxa.load
 // CHECK: cmpi "eq"
 // CHECK: pxa.reduce assign
 
@@ -88,6 +88,6 @@ func @eltwise_not_f32(
 // CHECK-LABEL: func @eltwise_not_f32
 // CHECK: constant 0{{.*}} : f32
 // CHECK: affine.parallel
-// CHECK: affine.load
+// CHECK: pxa.load
 // CHECK: cmpf "oeq"
 // CHECK: pxa.reduce assign

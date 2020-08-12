@@ -588,7 +588,7 @@ buildBroadcastLoad(OpBuilder &builder, Location loc, Value operand,
       operandIdxs[k] = body->getArgument(j);
     }
   }
-  auto loadOp = builder.create<AffineLoadOp>(loc, operand, operandIdxs);
+  auto loadOp = builder.create<pxa::AffineLoadOp>(loc, operand, operandIdxs);
   if (maybePadding)
     updateAffineMap(loadOp, *maybePadding);
   return loadOp;
@@ -911,7 +911,8 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
         scalars.push_back(operand);
       } else {
         auto map = srcs[i].cast<AffineMapAttr>().getValue();
-        auto loadOp = rewriter.create<AffineLoadOp>(loc, operand, map, idxs);
+        auto loadOp =
+            rewriter.create<pxa::AffineLoadOp>(loc, operand, map, idxs);
         auto maybePadding = getPaddingInfo(op.operands()[i].getDefiningOp());
         if (maybePadding)
           updateAffineMap(loadOp, *maybePadding);

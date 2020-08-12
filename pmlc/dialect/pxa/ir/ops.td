@@ -7,6 +7,7 @@ include "mlir/Dialect/StandardOps/IR/StandardOpsBase.td"
 include "mlir/Dialect/Affine/IR/AffineOpsBase.td"
 include "pmlc/util/enums.td"
 
+include "mlir/Dialect/Affine/IR/AffineMemoryOpInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
 def PXA_Dialect : Dialect {
@@ -116,6 +117,71 @@ def AffineVectorReduceOp : PXA_OpWithPP<"vector_reduce", []> {
       return vector().getType().cast<mlir::VectorType>();
     }
   }];
+}
+
+class AffineLoadOpBase<string mnemonic, list<OpTrait> traits = []> :
+    PXA_OpWithPP<mnemonic, !listconcat(traits,
+        [DeclareOpInterfaceMethods<AffineReadOpInterface>])> {
+  let arguments = (ins Arg<AnyMemRef, "the reference to load from",
+      [MemRead]>:$memref,
+      Variadic<Index>:$indices);
+
+  code extraClassDeclarationBase = [{
+    /// Returns the operand index of the memref.
+    unsigned getMemRefOperandIndex() { return 0; }
+
+    void setMemRef(Value value) { setOperand(getMemRefOperandIndex(), value); }
+
+    /// Returns the affine map used to index the memref for this operation.
+    AffineMapAttr getAffineMapAttr() {
+      return getAttr(getMapAttrName()).cast<AffineMapAttr>();
+    }
+
+    static StringRef getMapAttrName() { return "map"; }
+  }];
+}
+
+def AffineLoadOp : AffineLoadOpBase<"load"> {
+  let summary = "affine load operation";
+  let description = [{
+    The "affine.load" op reads an element from a memref, where the index
+    for each memref dimension is an affine expression of loop induction
+    variables and symbols. The output of 'affine.load' is a new value with the
+    same type as the elements of the memref. An affine expression of loop IVs
+    and symbols must be specified for each dimension of the memref. The keyword
+    'symbol' can be used to indicate SSA identifiers which are symbolic.
+
+    Example 1:
+
+    ```mlir
+    %1 = affine.load %0[%i0 + 3, %i1 + 7] : memref<100x100xf32>
+    ```
+
+    Example 2: Uses 'symbol' keyword for symbols '%n' and '%m'.
+
+    ```mlir
+    %1 = affine.load %0[%i0 + symbol(%n), %i1 + symbol(%m)] : memref<100x100xf32>
+    ```
+  }];
+
+  let results = (outs AnyType:$result);
+
+  let builders = [
+    /// Builds an affine load op with the specified map and operands.
+    OpBuilder<"OpBuilder &builder, OperationState &result, AffineMap map, "
+                      "ValueRange operands">,
+    /// Builds an affine load op with an identity map and operands.
+    OpBuilder<"OpBuilder &builder, OperationState &result, Value memref, "
+                      "ValueRange indices = {}">,
+    /// Builds an affine load op with the specified map and its operands.
+    OpBuilder<"OpBuilder &builder, OperationState &result, Value memref, "
+                      "AffineMap map, ValueRange mapOperands">
+  ];
+
+  let extraClassDeclaration = extraClassDeclarationBase;
+
+  let hasCanonicalizer = 1;
+  let hasFolder = 1;
 }
 
 #endif // __PML_PXA_OPS__

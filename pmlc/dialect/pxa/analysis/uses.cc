@@ -73,7 +73,7 @@ IndirectAccessUsesIterator &IndirectAccessUsesIterator::operator++() {
 
 void IndirectAccessUsesIterator::skipNonAccess() {
   while (inner != IndirectUsesIterator()) {
-    if (isa<AffineLoadOp>(inner->getOwner()) ||
+    if (isa<pxa::AffineLoadOp>(inner->getOwner()) ||
         isa<AffineReduceOp>(inner->getOwner())) {
       break;
     }

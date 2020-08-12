@@ -17,7 +17,6 @@ namespace pmlc::conversion::pxa_to_affine {
 namespace pxa = dialect::pxa;
 
 using mlir::AffineIfOp;
-using mlir::AffineLoadOp;
 using mlir::AffineMapAttr;
 using mlir::AffineParallelOp;
 using mlir::AffineStoreOp;
@@ -121,6 +120,18 @@ struct AffineIfOpConversion : public OpConversionPattern<AffineIfOp> {
   }
 };
 
+struct AffineLoadOpConversion : public OpConversionPattern<pxa::AffineLoadOp> {
+  using OpConversionPattern<pxa::AffineLoadOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(pxa::AffineLoadOp op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const final {
+    rewriter.replaceOpWithNewOp<mlir::AffineLoadOp>(
+        op, op.memref(), op.getAffineMap(), op.indices());
+    return mlir::success();
+  }
+};
+
 static Value createReduction(ConversionPatternRewriter &rewriter,
                              mlir::Location loc, AtomicRMWKind agg,
                              Value source, Value val) {
@@ -178,8 +189,8 @@ struct AffineReduceOpConversion
   LogicalResult
   matchAndRewrite(pxa::AffineReduceOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
-    auto source = rewriter.create<AffineLoadOp>(op.getLoc(), op.mem(), op.map(),
-                                                op.idxs());
+    auto source = rewriter.create<mlir::AffineLoadOp>(op.getLoc(), op.mem(),
+                                                      op.map(), op.idxs());
     auto reduce = createReduction(rewriter, op.getLoc(), op.agg(),
                                   source.getResult(), op.val());
     rewriter.create<AffineStoreOp>(op.getLoc(), reduce, op.mem(), op.map(),
@@ -311,6 +322,7 @@ void populatePXAToAffineConversionPatterns(
   patterns.insert<                    //
       AffineParallelOpConversion,     //
       AffineIfOpConversion,           //
+      AffineLoadOpConversion,         //
       AffineReduceOpConversion,       //
       AffineVectorReduceOpConversion, //
       FuncOpConversion,               //
