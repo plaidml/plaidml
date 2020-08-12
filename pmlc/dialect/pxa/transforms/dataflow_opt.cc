@@ -18,7 +18,7 @@ namespace {
 struct MemRefAccess {
   AffineValueMap accessMap;
 
-  explicit MemRefAccess(AffineLoadOp op) {
+  explicit MemRefAccess(pxa::AffineLoadOp op) {
     getAccessMap(op.getAffineMap(), op.getMapOperands(), &accessMap);
   }
 
@@ -49,7 +49,7 @@ struct MemRefDataFlowOptPass
   void runOnFunction() final {
     // Walk all load's and perform reduce to load forwarding.
     FuncOp f = getFunction();
-    f.walk([&](AffineLoadOp loadOp) {
+    f.walk([&](pxa::AffineLoadOp loadOp) {
       auto defOp = loadOp.getMemRef().getDefiningOp();
       if (!defOp) {
         return;

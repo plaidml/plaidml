@@ -10,6 +10,6 @@ module {
 
 // CHECK-LABEL: func @bit_right_scalar
 // CHECK: affine.parallel
-// CHECK: affine.load
+// CHECK: pxa.load
 // CHECK: shift_right_unsigned
 // CHECK: pxa.reduce assign

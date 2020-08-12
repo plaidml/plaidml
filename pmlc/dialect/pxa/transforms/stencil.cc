@@ -112,7 +112,7 @@ StencilBase::getStrideInfo(mlir::Operation *op) {
   if (cached != strideInfoCache.end()) {
     return cached->second;
   }
-  auto loadOp = llvm::dyn_cast<mlir::AffineLoadOp>(*op);
+  auto loadOp = llvm::dyn_cast<pxa::AffineLoadOp>(*op);
   if (loadOp) {
     auto strideInfo = computeStrideInfo(loadOp);
     strideInfoCache.insert(std::make_pair(op, strideInfo));

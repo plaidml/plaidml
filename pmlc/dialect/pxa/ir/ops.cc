@@ -68,8 +68,9 @@ struct SimplifyAffineOp : public OpRewritePattern<AffineOpTy> {
   LogicalResult matchAndRewrite(AffineOpTy affineOp,
                                 PatternRewriter &rewriter) const override {
     static_assert(std::is_same<AffineOpTy, AffineReduceOp>::value ||
-                      std::is_same<AffineOpTy, AffineVectorReduceOp>::value,
-                  "affine reduce/vector_reduce op expected");
+                      std::is_same<AffineOpTy, AffineVectorReduceOp>::value ||
+                      std::is_same<AffineOpTy, pxa::AffineLoadOp>::value,
+                  "affine reduce/vector_reduce or load op expected");
     auto map = affineOp.getAffineMap();
     AffineMap oldMap = map;
     auto oldOperands = affineOp.getMapOperands();
@@ -83,6 +84,14 @@ struct SimplifyAffineOp : public OpRewritePattern<AffineOpTy> {
     return success();
   }
 };
+
+template <>
+void SimplifyAffineOp<AffineLoadOp>::replaceAffineOp(
+    PatternRewriter &rewriter, AffineLoadOp load, AffineMap map,
+    ArrayRef<Value> mapOperands) const {
+  rewriter.replaceOpWithNewOp<AffineLoadOp>(load, load.getMemRef(), map,
+                                            mapOperands);
+}
 
 template <>
 void SimplifyAffineOp<AffineReduceOp>::replaceAffineOp(
@@ -170,6 +179,82 @@ struct SimplifyAffineGemmOp : public OpRewritePattern<AffineGemmOp> {
 };
 
 } // namespace
+
+// ---- AffineLoadOp ----
+
+void AffineLoadOp::build(OpBuilder &builder, OperationState &result,
+                         AffineMap map, ValueRange operands) {
+  assert(operands.size() == 1 + map.getNumInputs() && "inconsistent operands");
+  result.addOperands(operands);
+  if (map)
+    result.addAttribute(getMapAttrName(), AffineMapAttr::get(map));
+  auto memrefType = operands[0].getType().cast<MemRefType>();
+  result.types.push_back(memrefType.getElementType());
+}
+
+void AffineLoadOp::build(OpBuilder &builder, OperationState &result,
+                         Value memref, AffineMap map, ValueRange mapOperands) {
+  assert(map.getNumInputs() == mapOperands.size() && "inconsistent index info");
+  result.addOperands(memref);
+  result.addOperands(mapOperands);
+  auto memrefType = memref.getType().cast<MemRefType>();
+  result.addAttribute(getMapAttrName(), AffineMapAttr::get(map));
+  result.types.push_back(memrefType.getElementType());
+}
+
+void AffineLoadOp::build(OpBuilder &builder, OperationState &result,
+                         Value memref, ValueRange indices) {
+  auto memrefType = memref.getType().cast<MemRefType>();
+  auto rank = memrefType.getRank();
+  // Create identity map for memrefs with at least one dimension or () -> ()
+  // for zero-dimensional memrefs.
+  auto map =
+      rank ? builder.getMultiDimIdentityMap(rank) : builder.getEmptyAffineMap();
+  build(builder, result, memref, map, indices);
+}
+
+void printAffineLoadOp(OpAsmPrinter &p, AffineLoadOp op) {
+  p << "pxa.load " << op.getMemRef() << '[';
+  if (AffineMapAttr mapAttr =
+          op.getAttrOfType<AffineMapAttr>(op.getMapAttrName()))
+    p.printAffineMapOfSSAIds(mapAttr, op.getMapOperands());
+  p << ']';
+  p.printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{op.getMapAttrName()});
+  p << " : " << op.getMemRefType();
+}
+
+static ParseResult parseAffineLoadOp(OpAsmParser &parser,
+                                     OperationState &result) {
+  auto &builder = parser.getBuilder();
+  auto indexTy = builder.getIndexType();
+
+  MemRefType type;
+  OpAsmParser::OperandType memrefInfo;
+  AffineMapAttr mapAttr;
+  SmallVector<OpAsmParser::OperandType, 1> mapOperands;
+  return failure(
+      parser.parseOperand(memrefInfo) ||
+      parser.parseAffineMapOfSSAIds(mapOperands, mapAttr,
+                                    AffineLoadOp::getMapAttrName(),
+                                    result.attributes) ||
+      parser.parseOptionalAttrDict(result.attributes) ||
+      parser.parseColonType(type) ||
+      parser.resolveOperand(memrefInfo, type, result.operands) ||
+      parser.resolveOperands(mapOperands, indexTy, result.operands) ||
+      parser.addTypeToList(type.getElementType(), result.types));
+}
+
+void AffineLoadOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<SimplifyAffineOp<AffineLoadOp>>(context);
+}
+
+OpFoldResult AffineLoadOp::fold(ArrayRef<Attribute> cstOperands) {
+  /// load(memrefcast) -> load
+  if (succeeded(foldMemRefCast(*this)))
+    return getResult();
+  return OpFoldResult();
+}
 
 // ---- AffineReduceOp ----
 
