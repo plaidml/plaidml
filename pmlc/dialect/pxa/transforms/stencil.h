@@ -18,7 +18,7 @@
 // `DoStenciling` Overview
 // -----------------------
 //  `DoStenciling` will first find appropriate IO ops (i.e., loads
-//  (`mlir::AffineLoadOp`) and stores (`mlir::AffineStoreOp` or
+//  (`pxa::AffineLoadOp`) and stores (`mlir::AffineStoreOp` or
 //  `pxa::AffineReduceOp`)) using the `capture` function.
 //
 //  It will then iterate through all permutations of the IO ops that have all

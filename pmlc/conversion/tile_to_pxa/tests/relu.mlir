@@ -10,11 +10,11 @@ func @relu(%arg0: tensor<10x20xf32>) -> tensor<10x20xf32> {
 // CHECK-LABEL: func @relu
 // CHECK: alloc
 // CHECK: affine.parallel
-// CHECK: affine.load
+// CHECK: pxa.load
 // CHECK: cmpf "olt"
 // CHECK: pxa.reduce assign
 // CHECK: affine.parallel
-// CHECK: affine.load
-// CHECK: affine.load
+// CHECK: pxa.load
+// CHECK: pxa.load
 // CHECK: select
 // CHECK: pxa.reduce assign

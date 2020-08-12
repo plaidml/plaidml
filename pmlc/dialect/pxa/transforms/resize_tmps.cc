@@ -50,7 +50,7 @@ struct ResizeTmpsPass : public ResizeTmpsBase<ResizeTmpsPass> {
     for (auto &use : getIndirectAccessUses(op)) {
       IVLOG(2, "Found use: " << debugString(*use.getOwner()));
       Optional<SmallVector<StrideInfo, 4>> maybeStrides;
-      if (auto lop = dyn_cast<AffineLoadOp>(use.getOwner())) {
+      if (auto lop = dyn_cast<pxa::AffineLoadOp>(use.getOwner())) {
         maybeStrides =
             computeStrideInfo(lop.getAffineMap(), lop.getMapOperands());
       } else if (auto rop = dyn_cast<AffineReduceOp>(use.getOwner())) {
@@ -154,10 +154,11 @@ struct ResizeTmpsPass : public ResizeTmpsBase<ResizeTmpsPass> {
             computeInnerMap(rop.getAffineMap(), rop.getMapOperands(), opBlock);
         rop.setAttr(AffineReduceOp::getMapAttrName(), AffineMapAttr::get(map));
       }
-      if (auto lop = dyn_cast<AffineLoadOp>(use.getOwner())) {
+      if (auto lop = dyn_cast<pxa::AffineLoadOp>(use.getOwner())) {
         auto map =
             computeInnerMap(lop.getAffineMap(), lop.getMapOperands(), opBlock);
-        lop.setAttr(AffineLoadOp::getMapAttrName(), AffineMapAttr::get(map));
+        lop.setAttr(pxa::AffineLoadOp::getMapAttrName(),
+                    AffineMapAttr::get(map));
       }
     }
   }
