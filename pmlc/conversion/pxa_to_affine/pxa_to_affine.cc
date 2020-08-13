@@ -20,7 +20,6 @@ using mlir::AffineIfOp;
 using mlir::AffineMapAttr;
 using mlir::AffineParallelOp;
 using mlir::AffineStoreOp;
-using mlir::AffineVectorLoadOp;
 using mlir::AffineVectorStoreOp;
 using mlir::AllocOp;
 using mlir::ArrayRef;
@@ -132,6 +131,25 @@ struct AffineLoadOpConversion : public OpConversionPattern<pxa::AffineLoadOp> {
   }
 };
 
+struct AffineVectorLoadOpConversion
+    : public OpConversionPattern<pxa::AffineVectorLoadOp> {
+  using OpConversionPattern<pxa::AffineVectorLoadOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(pxa::AffineVectorLoadOp op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const final {
+    rewriter.replaceOpWithNewOp<mlir::AffineVectorLoadOp>(
+        op, op.getVectorType(), op.memref(), op.indices());
+
+    // Get an attribute form of the map
+    auto mapAttr = AffineMapAttr::get(op.getAffineMap());
+    // Set the map attribute
+    op.setAttr(mlir::AffineVectorLoadOp::getMapAttrName(), mapAttr);
+
+    return mlir::success();
+  }
+};
+
 static Value createReduction(ConversionPatternRewriter &rewriter,
                              mlir::Location loc, AtomicRMWKind agg,
                              Value source, Value val) {
@@ -208,18 +226,18 @@ struct AffineVectorReduceOpConversion
   LogicalResult
   matchAndRewrite(pxa::AffineVectorReduceOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
-    auto source = rewriter.create<AffineVectorLoadOp>(
+    auto source = rewriter.create<mlir::AffineVectorLoadOp>(
         op.getLoc(), op.getVectorType(), op.mem(), op.idxs());
     // Get an attribute form of the map
     auto mapAttr = AffineMapAttr::get(op.map());
     // Set the map attribute
-    source.setAttr(AffineVectorLoadOp::getMapAttrName(), mapAttr);
+    source.setAttr(mlir::AffineVectorLoadOp::getMapAttrName(), mapAttr);
     auto reduce = createReduction(rewriter, op.getLoc(), op.agg(),
                                   source.getResult(), op.vector());
     auto dest = rewriter.create<AffineVectorStoreOp>(
         op.getLoc(), ArrayRef<Type>{}, reduce, op.mem(), op.idxs());
     // Set the map attribute
-    dest.setAttr(AffineVectorLoadOp::getMapAttrName(), mapAttr);
+    dest.setAttr(mlir::AffineVectorLoadOp::getMapAttrName(), mapAttr);
     op.replaceAllUsesWith(op.mem());
     rewriter.eraseOp(op);
     return mlir::success();
@@ -324,6 +342,7 @@ void populatePXAToAffineConversionPatterns(
       AffineIfOpConversion,           //
       AffineLoadOpConversion,         //
       AffineReduceOpConversion,       //
+      AffineVectorLoadOpConversion,   //
       AffineVectorReduceOpConversion, //
       FuncOpConversion,               //
       ReturnOpConversion>(ctx);
