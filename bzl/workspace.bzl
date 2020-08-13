@@ -2,7 +2,6 @@
 
 load("//vendor/bazel:repo.bzl", "http_archive")
 load("//vendor/conda:repo.bzl", "conda_repo")
-load("//vendor/openvino:workspace.bzl", "openvino_workspace")
 
 # Sanitize a dependency so that it works correctly from code that includes it as a submodule.
 def clean_dep(dep):
@@ -169,5 +168,3 @@ def plaidml_workspace():
         strip_prefix = "zlib-1.2.11",
         build_file = clean_dep("//bzl:zlib.BUILD"),
     )
-
-    openvino_workspace()
