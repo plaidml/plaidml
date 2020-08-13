@@ -26,7 +26,7 @@ class PXA_OpWithPP<string mnemonic, list<OpTrait> traits = []> :
 
 def AnyStdScalar : AnyTypeOf<[AnyFloat, AnySignlessInteger]> {}
 
-def AffineReduceOp : PXA_OpWithPP<"reduce"> {
+def PxaReduceOp : PXA_OpWithPP<"reduce"> {
   let summary = "affine reduction operation";
   let arguments = (ins
     AtomicRMWKindAttr:$agg,
@@ -83,7 +83,7 @@ def AffineGemmOp : PXA_OpWithPP<"gemm"> {
   }];
 }
 
-def AffineVectorReduceOp : PXA_OpWithPP<"vector_reduce", []> {
+def PxaVectorReduceOp : PXA_OpWithPP<"vector_reduce", []> {
   let summary = "affine vector reduction operation";
   let arguments = (ins
     AtomicRMWKindAttr:$agg,
@@ -119,7 +119,7 @@ def AffineVectorReduceOp : PXA_OpWithPP<"vector_reduce", []> {
   }];
 }
 
-class AffineLoadOpBase<string mnemonic, list<OpTrait> traits = []> :
+class PxaLoadOpBase<string mnemonic, list<OpTrait> traits = []> :
     PXA_OpWithPP<mnemonic, !listconcat(traits,
         [DeclareOpInterfaceMethods<AffineReadOpInterface>])> {
   let arguments = (ins Arg<AnyMemRef, "the reference to load from",
@@ -141,7 +141,7 @@ class AffineLoadOpBase<string mnemonic, list<OpTrait> traits = []> :
   }];
 }
 
-def AffineLoadOp : AffineLoadOpBase<"load"> {
+def PxaLoadOp : PxaLoadOpBase<"load"> {
   let summary = "affine load operation";
   let description = [{
     The "affine.load" op reads an element from a memref, where the index
@@ -184,7 +184,7 @@ def AffineLoadOp : AffineLoadOpBase<"load"> {
   let hasFolder = 1;
 }
 
-def AffineVectorLoadOp : AffineLoadOpBase<"vector_load"> {
+def PxaVectorLoadOp : PxaLoadOpBase<"vector_load"> {
   let summary = "affine vector load operation";
   let description = [{
     The "affine.vector_load" is the vector counterpart of

@@ -119,11 +119,11 @@ struct AffineIfOpConversion : public OpConversionPattern<AffineIfOp> {
   }
 };
 
-struct AffineLoadOpConversion : public OpConversionPattern<pxa::AffineLoadOp> {
-  using OpConversionPattern<pxa::AffineLoadOp>::OpConversionPattern;
+struct AffineLoadOpConversion : public OpConversionPattern<pxa::PxaLoadOp> {
+  using OpConversionPattern<pxa::PxaLoadOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(pxa::AffineLoadOp op, ArrayRef<Value> operands,
+  matchAndRewrite(pxa::PxaLoadOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
     rewriter.replaceOpWithNewOp<mlir::AffineLoadOp>(
         op, op.memref(), op.getAffineMap(), op.indices());
@@ -132,11 +132,11 @@ struct AffineLoadOpConversion : public OpConversionPattern<pxa::AffineLoadOp> {
 };
 
 struct AffineVectorLoadOpConversion
-    : public OpConversionPattern<pxa::AffineVectorLoadOp> {
-  using OpConversionPattern<pxa::AffineVectorLoadOp>::OpConversionPattern;
+    : public OpConversionPattern<pxa::PxaVectorLoadOp> {
+  using OpConversionPattern<pxa::PxaVectorLoadOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(pxa::AffineVectorLoadOp op, ArrayRef<Value> operands,
+  matchAndRewrite(pxa::PxaVectorLoadOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
     rewriter.replaceOpWithNewOp<mlir::AffineVectorLoadOp>(
         op, op.getVectorType(), op.memref(), op.indices());
@@ -196,16 +196,15 @@ static Value createReduction(ConversionPatternRewriter &rewriter,
     return rewriter.create<mlir::MulIOp>(loc, source, val);
   default:
     llvm_unreachable("Unsupported aggregation for "
-                     "AffineReduceOpConversion::createReduction");
+                     "PxaReduceOpConversion::createReduction");
   }
 }
 
-struct AffineReduceOpConversion
-    : public OpConversionPattern<pxa::AffineReduceOp> {
-  using OpConversionPattern<pxa::AffineReduceOp>::OpConversionPattern;
+struct PxaReduceOpConversion : public OpConversionPattern<pxa::PxaReduceOp> {
+  using OpConversionPattern<pxa::PxaReduceOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(pxa::AffineReduceOp op, ArrayRef<Value> operands,
+  matchAndRewrite(pxa::PxaReduceOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
     auto source = rewriter.create<mlir::AffineLoadOp>(op.getLoc(), op.mem(),
                                                       op.map(), op.idxs());
@@ -219,12 +218,12 @@ struct AffineReduceOpConversion
   }
 };
 
-struct AffineVectorReduceOpConversion
-    : public OpConversionPattern<pxa::AffineVectorReduceOp> {
-  using OpConversionPattern<pxa::AffineVectorReduceOp>::OpConversionPattern;
+struct PxaVectorReduceOpConversion
+    : public OpConversionPattern<pxa::PxaVectorReduceOp> {
+  using OpConversionPattern<pxa::PxaVectorReduceOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(pxa::AffineVectorReduceOp op, ArrayRef<Value> operands,
+  matchAndRewrite(pxa::PxaVectorReduceOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
     auto source = rewriter.create<mlir::AffineVectorLoadOp>(
         op.getLoc(), op.getVectorType(), op.mem(), op.idxs());
@@ -337,14 +336,14 @@ PXAToAffineConversionTarget::PXAToAffineConversionTarget(MLIRContext &ctx)
 
 void populatePXAToAffineConversionPatterns(
     mlir::OwningRewritePatternList &patterns, MLIRContext *ctx) {
-  patterns.insert<                    //
-      AffineParallelOpConversion,     //
-      AffineIfOpConversion,           //
-      AffineLoadOpConversion,         //
-      AffineReduceOpConversion,       //
-      AffineVectorLoadOpConversion,   //
-      AffineVectorReduceOpConversion, //
-      FuncOpConversion,               //
+  patterns.insert<                  //
+      AffineParallelOpConversion,   //
+      AffineIfOpConversion,         //
+      AffineLoadOpConversion,       //
+      PxaReduceOpConversion,        //
+      AffineVectorLoadOpConversion, //
+      PxaVectorReduceOpConversion,  //
+      FuncOpConversion,             //
       ReturnOpConversion>(ctx);
 }
 
