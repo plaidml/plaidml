@@ -6,7 +6,8 @@
 
 namespace pmlc::dialect::pxa {
 
-void performTiling(mlir::AffineParallelOp op,
-                   llvm::ArrayRef<int64_t> tileSizes);
+// Tiles op in place, and returns the inner AffineParallelOp
+mlir::AffineParallelOp performTiling(mlir::AffineParallelOp op,
+                                     llvm::ArrayRef<int64_t> tileSizes);
 
 } // namespace pmlc::dialect::pxa

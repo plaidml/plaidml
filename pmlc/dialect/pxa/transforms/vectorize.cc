@@ -11,6 +11,7 @@
 #include "mlir/Interfaces/VectorInterfaces.h"
 
 #include "pmlc/dialect/pxa/analysis/strides.h"
+#include "pmlc/dialect/pxa/analysis/uses.h"
 #include "pmlc/dialect/pxa/transforms/pass_detail.h"
 #include "pmlc/dialect/pxa/transforms/vectorize.h"
 #include "pmlc/util/logging.h"
@@ -30,7 +31,7 @@ private:
 
   LogicalResult tryVectorizeOperation(Operation *op) {
     return llvm::TypeSwitch<Operation *, LogicalResult>(op)
-        .Case<AffineLoadOp>([&](auto op) {
+        .Case<pxa::AffineLoadOp>([&](auto op) {
           auto strideInfo = computeStrideInfo(op);
           if (!strideInfo) {
             IVLOG(3, "Vectorize: Failed, non-affine strides");
@@ -136,16 +137,13 @@ public:
     result.setType(vecType);
   }
 
-  void vectorizeLoadOp(AffineLoadOp op) {
+  void vectorizeLoadOp(pxa::AffineLoadOp op) {
     Value operand = op.getMemRef();
     auto eltType = op.getMemRefType().getElementType();
     auto vecType = VectorType::get(vectorSize, eltType);
     OpBuilder builder(op);
     auto vecOp = builder.create<pxa::AffineVectorLoadOp>(
-        op.getLoc(), ArrayRef<Type>{vecType}, operand, op.indices());
-    // TODO: Add support for direct construction with map to VectorLoadOp
-    auto mapAttr = AffineMapAttr::get(op.getAffineMap());
-    vecOp.setAttr(pxa::AffineVectorLoadOp::getMapAttrName(), mapAttr);
+        op.getLoc(), vecType, operand, op.getAffineMap(), op.getMapOperands());
     op.replaceAllUsesWith(vecOp.getResult());
     op.erase();
   }
@@ -171,7 +169,7 @@ public:
     if (!vectorizedOps.count(op)) {
       return;
     }
-    if (auto loadOp = dyn_cast<AffineLoadOp>(op)) {
+    if (auto loadOp = dyn_cast<pxa::AffineLoadOp>(op)) {
       vectorizeLoadOp(loadOp);
     } else if (auto reduceOp = dyn_cast<AffineReduceOp>(op)) {
       vectorizeReduceOp(reduceOp);
@@ -240,6 +238,30 @@ LogicalResult performVectorization(AffineParallelOp op, BlockArgument index,
                                    unsigned vectorSize) {
   Impl impl(op, index, vectorSize);
   return impl.vectorize();
+}
+
+LogicalResult simpleVectorize(AffineParallelOp op, unsigned vecSize) {
+  if (op.getNumResults() != 1) {
+    return failure();
+  }
+  auto red = mlir::dyn_cast<AffineReduceOp>(getOriginalDef(op.getResult(0)));
+  if (!red) {
+    return failure();
+  }
+  auto maybeSI = computeStrideInfo(red);
+  if (!maybeSI) {
+    return failure();
+  }
+  SmallVector<BlockArgument, 4> options;
+  for (auto ba : op.getIVs()) {
+    if (maybeSI->strides.count(ba) && maybeSI->strides[ba] == 1) {
+      options.push_back(ba);
+    }
+  }
+  if (options.size() != 1) {
+    return failure();
+  }
+  return performVectorization(op, options[0], vecSize);
 }
 
 struct VectorizeExample : public VectorizeExampleBase<VectorizeExample> {

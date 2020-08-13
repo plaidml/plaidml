@@ -53,7 +53,7 @@ static Value createCopyLoop(OpBuilder &builder,               //
   auto loadMap = convertToValueMap(ctx, srcAccess);
   auto reduceMap = convertToValueMap(ctx, dstAccess);
   auto txBuilder = loop.getBodyBuilder();
-  auto loaded = txBuilder.create<AffineLoadOp>(
+  auto loaded = txBuilder.create<pxa::AffineLoadOp>(
       loc, srcMemRef, loadMap.getAffineMap(), loadMap.getOperands());
   auto stored = txBuilder.create<AffineReduceOp>(loc, agg, loaded, dstMemRef,
                                                  reduceMap.getAffineMap(),
@@ -62,7 +62,7 @@ static Value createCopyLoop(OpBuilder &builder,               //
   return loop.getResult(0);
 }
 
-LogicalResult cacheLoad(AffineParallelOp par, AffineLoadOp load) {
+LogicalResult cacheLoad(AffineParallelOp par, pxa::AffineLoadOp load) {
   // Get the striding information for the load op, fail if unsuccessful
   auto maybeRap = computeRelativeAccess(par.getBody(), load);
   if (!maybeRap) {
@@ -91,7 +91,7 @@ LogicalResult cacheLoad(AffineParallelOp par, AffineLoadOp load) {
   // Make a new load and remove the old one
   auto innerMap = convertToValueMap(par.getContext(), rap.inner);
   OpBuilder newLoadBuilder(load);
-  auto newLoad = newLoadBuilder.create<AffineLoadOp>(
+  auto newLoad = newLoadBuilder.create<pxa::AffineLoadOp>(
       loc, copy, innerMap.getAffineMap(), innerMap.getOperands());
   load.replaceAllUsesWith(newLoad.result());
   load.erase();

@@ -6,7 +6,8 @@ namespace pmlc::dialect::pxa {
 
 using mlir::AffineParallelOp;
 
-void performTiling(AffineParallelOp op, llvm::ArrayRef<int64_t> tileSizes) {
+AffineParallelOp performTiling(AffineParallelOp op,
+                               llvm::ArrayRef<int64_t> tileSizes) {
   // Extract steps (TODO: this should be a utility on affine.parallel)
   auto oldStepsArray = op.steps().cast<ArrayAttr>().getValue();
   llvm::SmallVector<int64_t, 6> oldSteps;
@@ -68,6 +69,7 @@ void performTiling(AffineParallelOp op, llvm::ArrayRef<int64_t> tileSizes) {
   llvm::SmallVector<int64_t, 8> newSteps;
   inner.setSteps(oldSteps);
   op.setSteps(tileSizes);
+  return inner;
 }
 
 } // namespace pmlc::dialect::pxa

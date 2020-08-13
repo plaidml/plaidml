@@ -69,7 +69,8 @@ struct SimplifyAffineOp : public OpRewritePattern<AffineOpTy> {
                                 PatternRewriter &rewriter) const override {
     static_assert(std::is_same<AffineOpTy, AffineReduceOp>::value ||
                       std::is_same<AffineOpTy, AffineVectorReduceOp>::value ||
-                      std::is_same<AffineOpTy, pxa::AffineLoadOp>::value,
+                      std::is_same<AffineOpTy, pxa::AffineLoadOp>::value ||
+                      std::is_same<AffineOpTy, pxa::AffineVectorLoadOp>::value,
                   "affine reduce/vector_reduce or load op expected");
     auto map = affineOp.getAffineMap();
     AffineMap oldMap = map;
@@ -101,6 +102,13 @@ void SimplifyAffineOp<AffineReduceOp>::replaceAffineOp(
       op, op.getMemRefType(), op.agg(), op.val(), op.mem(), map, mapOperands);
 }
 
+template <>
+void SimplifyAffineOp<AffineVectorLoadOp>::replaceAffineOp(
+    PatternRewriter &rewriter, AffineVectorLoadOp op, AffineMap map,
+    ArrayRef<Value> mapOperands) const {
+  rewriter.replaceOpWithNewOp<AffineVectorLoadOp>(
+      op, op.getVectorType(), op.getMemRef(), map, mapOperands);
+}
 template <>
 void SimplifyAffineOp<AffineVectorReduceOp>::replaceAffineOp(
     PatternRewriter &rewriter, AffineVectorReduceOp op, AffineMap map,
@@ -258,6 +266,16 @@ OpFoldResult AffineLoadOp::fold(ArrayRef<Attribute> cstOperands) {
 
 // ---- AffineVectorLoadOp ----
 
+void AffineVectorLoadOp::build(OpBuilder &builder, OperationState &result,
+                               VectorType type, Value memref, AffineMap map,
+                               ValueRange mapOperands) {
+  assert(map.getNumInputs() == mapOperands.size() && "inconsistent index info");
+  result.addOperands(memref);
+  result.addOperands(mapOperands);
+  result.addAttribute(getMapAttrName(), AffineMapAttr::get(map));
+  result.types.push_back(type);
+}
+
 static void printAffineVectorLoadOp(OpAsmPrinter &p, AffineVectorLoadOp op) {
   p << "pxa.vector_load " << op.getMemRef() << '[';
   if (AffineMapAttr mapAttr =
@@ -289,6 +307,17 @@ static ParseResult parseAffineVectorLoadOp(OpAsmParser &parser,
       parser.resolveOperand(memrefInfo, memrefType, result.operands) ||
       parser.resolveOperands(mapOperands, indexTy, result.operands) ||
       parser.addTypeToList(resultType, result.types));
+}
+
+void AffineVectorLoadOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<SimplifyAffineOp<AffineVectorLoadOp>>(context);
+}
+
+OpFoldResult AffineVectorLoadOp::fold(ArrayRef<Attribute> cstOperands) {
+  /// reduce(memrefcast) -> reduce
+  foldMemRefCast(*this);
+  return OpFoldResult();
 }
 
 // ---- AffineReduceOp ----
@@ -333,11 +362,9 @@ ParseResult parseAffineReduceOp(OpAsmParser &parser, OperationState &result) {
 
 void AffineReduceOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
-  results.insert<                             //
-      SimplifyAffineOp<AffineReduceOp>,       //
-      SimplifyAffineOp<AffineVectorReduceOp>, //
-      SimplifyDeadReduce<AffineReduceOp>,     //
-      SimplifyDeadReduce<AffineVectorReduceOp>>(context);
+  results.insert<                       //
+      SimplifyAffineOp<AffineReduceOp>, //
+      SimplifyDeadReduce<AffineReduceOp>>(context);
 }
 
 OpFoldResult AffineReduceOp::fold(ArrayRef<Attribute> cstOperands) {
@@ -483,9 +510,7 @@ ParseResult parseAffineVectorReduceOp(OpAsmParser &parser,
 
 void AffineVectorReduceOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
-  results.insert<SimplifyAffineOp<AffineReduceOp>,
-                 SimplifyAffineOp<AffineVectorReduceOp>,
-                 SimplifyDeadReduce<AffineReduceOp>,
+  results.insert<SimplifyAffineOp<AffineVectorReduceOp>,
                  SimplifyDeadReduce<AffineVectorReduceOp>>(context);
 }
 

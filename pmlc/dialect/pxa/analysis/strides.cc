@@ -18,6 +18,7 @@
 
 namespace mlir {
 
+namespace pxa = pmlc::dialect::pxa;
 const char *kBlockAndArgFormat = "^bb{0}:%arg{1}";
 
 static std::string getUniqueName(Block *ref, BlockArgument arg) {
@@ -383,7 +384,7 @@ Optional<StrideInfo> computeStrideInfo(MemRefType memRefType, AffineMap map,
   return out;
 }
 
-Optional<StrideInfo> computeStrideInfo(pmlc::dialect::pxa::AffineLoadOp op) {
+Optional<StrideInfo> computeStrideInfo(pxa::AffineLoadOp op) {
   return computeStrideInfo(op.getMemRefType(), op.getAffineMap(),
                            op.getMapOperands());
 }
@@ -393,7 +394,7 @@ Optional<StrideInfo> computeStrideInfo(AffineStoreOp op) {
                            op.getMapOperands());
 }
 
-Optional<StrideInfo> computeStrideInfo(pmlc::dialect::pxa::AffineReduceOp op) {
+Optional<StrideInfo> computeStrideInfo(pxa::AffineReduceOp op) {
   return computeStrideInfo(op.getMemRefType(), op.getAffineMap(),
                            op.getMapOperands());
 }
@@ -403,20 +404,20 @@ Optional<RelativeAccessPattern> computeRelativeAccess(Block *block,
   ArrayRef<int64_t> vecSize = {};
   Optional<llvm::SmallVector<StrideInfo, 4>> maybeStrides;
   TypeSwitch<Operation *>(op)
-      .Case<pmlc::dialect::pxa::AffineLoadOp>([&](auto op) {
+      .Case<pxa::AffineLoadOp>([&](auto op) {
         maybeStrides =
             computeStrideInfo(op.getAffineMap(), op.getMapOperands());
       })
-      .Case<pmlc::dialect::pxa::AffineReduceOp>([&](auto op) {
+      .Case<pxa::AffineReduceOp>([&](auto op) {
         maybeStrides =
             computeStrideInfo(op.getAffineMap(), op.getMapOperands());
       })
-      .Case<pmlc::dialect::pxa::AffineVectorLoadOp>([&](auto op) {
+      .Case<pxa::AffineVectorLoadOp>([&](auto op) {
         maybeStrides =
             computeStrideInfo(op.getAffineMap(), op.getMapOperands());
         vecSize = op.getVectorType().getShape();
       })
-      .Case<pmlc::dialect::pxa::AffineVectorReduceOp>([&](auto op) {
+      .Case<pxa::AffineVectorReduceOp>([&](auto op) {
         maybeStrides =
             computeStrideInfo(op.getAffineMap(), op.getMapOperands());
         vecSize = op.getVectorType().getShape();

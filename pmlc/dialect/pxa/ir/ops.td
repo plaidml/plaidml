@@ -226,11 +226,19 @@ def AffineVectorLoadOp : AffineLoadOpBase<"vector_load"> {
 
   let results = (outs AnyVector:$result);
 
+  let builders = [OpBuilder<
+    "OpBuilder &builder, OperationState &result, VectorType type,"
+    "Value memref, AffineMap map, ValueRange mapOperands">
+  ];
+
   let extraClassDeclaration = extraClassDeclarationBase # [{
     VectorType getVectorType() {
       return result().getType().cast<VectorType>();
     }
   }];
+
+  let hasCanonicalizer = 1;
+  let hasFolder = 1;
 }
 
 #endif // __PML_PXA_OPS__
