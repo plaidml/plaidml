@@ -33,8 +33,6 @@ func @cumsum(%arg0: memref<10xf32> {tile.name = "I"}) -> memref<10xf32> {
 return %2 : memref<10xf32>
 }
 
-
-
 // CHECK-LABEL: func @mixed
 func @mixed() {
   // CHECK: alloc()

@@ -129,14 +129,9 @@ struct TileAccumulatePass : public TileAccumulateBase<TileAccumulatePass> {
     // Autotile only the outermost loops
     for (auto &op : func.getBody().front()) {
       auto loop = mlir::dyn_cast<mlir::AffineParallelOp>(op);
-      if (!loop) {
-        continue;
+      if (loop && loop.getConstantRanges()) {
+        TileAccumulations(loop);
       }
-      auto ranges = loop.getConstantRanges();
-      if (!ranges) {
-        return;
-      }
-      TileAccumulations(loop);
     }
   }
 };
