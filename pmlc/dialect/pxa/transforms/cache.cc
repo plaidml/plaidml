@@ -99,6 +99,57 @@ LogicalResult cacheLoad(AffineParallelOp par, PxaLoadOp load) {
   return success();
 }
 
+LogicalResult cacheLoadAsVector(AffineParallelOp par, PxaLoadOp load) {
+  // Get the striding information for the load op, fail if unsuccessful
+  auto maybeRap = computeRelativeAccess(par.getBody(), load);
+  if (!maybeRap) {
+    IVLOG(1, "Failed due to a bad rap");
+    return failure();
+  }
+  const auto &rap = *maybeRap;
+  // Require all sizes to be 1 except the final one, which is the vector size
+  // and must be stride 1.
+  if (rap.innerCount.size() < 1) {
+    IVLOG(1, "Failed due to tiny size");
+    return failure();
+  }
+  for (unsigned i = 0; i < rap.inner.size() - 1; i++) {
+    if (rap.innerCount[i] != 1) {
+      IVLOG(1, "Failed due to lame count: " << rap.innerCount[i]);
+      return failure();
+    }
+  }
+  unsigned last = rap.inner.size() - 1;
+  if (rap.innerStride[last] != 1) {
+    IVLOG(1, "Failed due to lame stride: " << rap.innerStride[last]);
+    return failure();
+  }
+  int64_t vectorSize = rap.innerCount[last];
+  auto eltType = load.getMemRefType().getElementType();
+  auto vecType = VectorType::get({vectorSize}, eltType);
+  // Prep for generation
+  auto loc = load.getLoc();
+  auto builder = OpBuilder::atBlockBegin(par.getBody());
+  // Load as a vector
+  auto loadMap = convertToValueMap(load.getContext(), rap.outer);
+  IVLOG(1, "Making vector load");
+  auto loadVec = builder.create<PxaVectorLoadOp>(loc, vecType, load.getMemRef(),
+                                                 loadMap.getAffineMap(),
+                                                 loadMap.getOperands());
+  // Make a new load and remove the old one
+  OpBuilder newLoadBuilder(load);
+  // Do an affine apply to get the index
+  auto innerMap = convertToValueMap(par.getContext(), rap.inner);
+  // Extrace the right element of the vector
+  Value idx = newLoadBuilder.create<AffineApplyOp>(
+      loc, innerMap.getAffineMap().getSubMap({last}), innerMap.getOperands());
+  auto newLoad = newLoadBuilder.create<ExtractElementOp>(
+      loc, eltType, loadVec.getResult(), idx);
+  load.replaceAllUsesWith(newLoad.result());
+  load.erase();
+  return success();
+}
+
 LogicalResult cacheReduce(AffineParallelOp par, PxaReduceOp reduce) {
   // Get the striding information for the load op, fail if unsuccessful
   auto maybeRap = computeRelativeAccess(par.getBody(), reduce);

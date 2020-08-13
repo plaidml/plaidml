@@ -89,9 +89,9 @@ IndirectAccessUsesIterator &IndirectAccessUsesIterator::operator++() {
 void IndirectAccessUsesIterator::skipNonAccess() {
   while (inner != IndirectUsesIterator()) {
     if (isa<PxaLoadOp>(inner->getOwner()) ||
-        isa<pxa::PxaReduceOp>(inner->getOwner()) ||
+        isa<PxaReduceOp>(inner->getOwner()) ||
         isa<PxaVectorLoadOp>(inner->getOwner()) ||
-        isa<pxa::PxaVectorReduceOp>(inner->getOwner())) {
+        isa<PxaVectorReduceOp>(inner->getOwner())) {
       break;
     }
     ++inner;

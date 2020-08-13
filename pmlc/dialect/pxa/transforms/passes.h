@@ -25,6 +25,8 @@ std::unique_ptr<mlir::Pass> createMemRefDataFlowOptPass();
 
 std::unique_ptr<mlir::Pass> createResizeTmpsPass();
 
+std::unique_ptr<mlir::Pass> createSubgroupsPass();
+
 struct StencilCost {
   double throughput;
   unsigned startupCost;
