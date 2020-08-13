@@ -143,10 +143,7 @@ public:
     auto vecType = VectorType::get(vectorSize, eltType);
     OpBuilder builder(op);
     auto vecOp = builder.create<pxa::AffineVectorLoadOp>(
-        op.getLoc(), ArrayRef<Type>{vecType}, operand, op.indices());
-    // TODO: Add support for direct construction with map to VectorLoadOp
-    auto mapAttr = AffineMapAttr::get(op.getAffineMap());
-    vecOp.setAttr(pxa::AffineVectorLoadOp::getMapAttrName(), mapAttr);
+        op.getLoc(), vecType, operand, op.getAffineMap(), op.getMapOperands());
     op.replaceAllUsesWith(vecOp.getResult());
     op.erase();
   }
