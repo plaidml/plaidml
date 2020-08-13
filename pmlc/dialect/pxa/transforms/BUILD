@@ -33,7 +33,7 @@ plaidml_cc_library(
         "stencil_gemm.cc",
         "test_analysis.cc",
         "tile.cc",
-        "tileaccumlate.cc",
+        "tile_accumulate.cc",
         "vectorize.cc",
     ],
     hdrs = [
