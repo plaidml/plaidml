@@ -14,7 +14,7 @@ namespace pmlc::dialect::pxa {
 
 namespace {
 
-using WriteRead = std::pair<AffineReduceOp, AffineLoadOp>;
+using WriteRead = std::pair<AffineReduceOp, pxa::AffineLoadOp>;
 using WriteWrite = std::pair<AffineReduceOp, AffineReduceOp>;
 
 struct FusionInfo {
@@ -215,7 +215,7 @@ struct FusionInfo {
           continue;
         // Now we make sure it's a read or a write, if not, we can't do fusion,
         // bail.
-        if (auto read = dyn_cast<AffineLoadOp>(user)) {
+        if (auto read = dyn_cast<pxa::AffineLoadOp>(user)) {
           if (!considerPlan(write, read))
             return false;
           readAfterWrites.emplace_back(write, read);

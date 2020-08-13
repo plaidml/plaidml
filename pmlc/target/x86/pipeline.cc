@@ -141,6 +141,7 @@ static void addToPipeline(OpPassManager &pm) {
   pm.addPass(createCSEPass());
 
   pm.addPass(createLowerToCFGPass());
+  pm.addPass(createBufferPlacementPass());
   if (pmlc::util::getEnvVar("PLAIDML_BOUNDS_CHECK") == "1") {
     pm.addPass(pmlc::dialect::stdx::createBoundsCheckPass());
   }

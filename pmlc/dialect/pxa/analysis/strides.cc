@@ -383,7 +383,7 @@ Optional<StrideInfo> computeStrideInfo(MemRefType memRefType, AffineMap map,
   return out;
 }
 
-Optional<StrideInfo> computeStrideInfo(AffineLoadOp op) {
+Optional<StrideInfo> computeStrideInfo(pmlc::dialect::pxa::AffineLoadOp op) {
   return computeStrideInfo(op.getMemRefType(), op.getAffineMap(),
                            op.getMapOperands());
 }

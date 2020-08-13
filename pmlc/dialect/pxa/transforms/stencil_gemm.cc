@@ -103,23 +103,23 @@ private:
     Operation *rhs;
     if (auto mulfOp = dyn_cast_or_null<MulFOp>(defOp)) {
       lhs = mulfOp.lhs().getDefiningOp();
-      if (!dyn_cast_or_null<AffineLoadOp>(lhs)) {
+      if (!dyn_cast_or_null<pxa::AffineLoadOp>(lhs)) {
         IVLOG(3, "The LHS of the mul op is not affine.load.");
         return llvm::None;
       }
       rhs = mulfOp.rhs().getDefiningOp();
-      if (!dyn_cast_or_null<AffineLoadOp>(rhs)) {
+      if (!dyn_cast_or_null<pxa::AffineLoadOp>(rhs)) {
         IVLOG(3, "The RHS of the mul op is not affine.load.");
         return llvm::None;
       }
     } else if (auto muliOp = dyn_cast_or_null<MulIOp>(defOp)) {
       lhs = muliOp.lhs().getDefiningOp();
-      if (!dyn_cast_or_null<AffineLoadOp>(lhs)) {
+      if (!dyn_cast_or_null<pxa::AffineLoadOp>(lhs)) {
         IVLOG(3, "The LHS of the mul op is not affine.load.");
         return llvm::None;
       }
       rhs = muliOp.rhs().getDefiningOp();
-      if (!dyn_cast_or_null<AffineLoadOp>(rhs)) {
+      if (!dyn_cast_or_null<pxa::AffineLoadOp>(rhs)) {
         IVLOG(3, "The RHS of the mul op is not affine.load.");
         return llvm::None;
       }
@@ -277,8 +277,8 @@ private:
 
     // Generate the GEMM op; select inputs based on permutation order
     auto opC = cast<AffineReduceOp>(*perm.ioOps[0]);
-    auto opA = cast<AffineLoadOp>(*perm.ioOps[1]);
-    auto opB = cast<AffineLoadOp>(*perm.ioOps[2]);
+    auto opA = cast<pxa::AffineLoadOp>(*perm.ioOps[1]);
+    auto opB = cast<pxa::AffineLoadOp>(*perm.ioOps[2]);
 
     auto bodyBuilder = op.getBodyBuilder();
 

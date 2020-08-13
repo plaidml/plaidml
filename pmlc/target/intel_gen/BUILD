@@ -16,6 +16,7 @@ plaidml_cc_library(
         "//pmlc/conversion/tile_to_pxa",
         "//pmlc/dialect/pxa/transforms",
         "//pmlc/dialect/tile/transforms",
+        "//pmlc/dialect/stdx/transforms",
         "@llvm-project//mlir:AffineToStandardTransforms",
         "@llvm-project//mlir:GPUToSPIRVTransforms",
         "@llvm-project//mlir:GPUToVulkanTransforms",
