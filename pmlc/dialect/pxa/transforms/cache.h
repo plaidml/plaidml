@@ -8,6 +8,6 @@
 namespace pmlc::dialect::pxa {
 
 LogicalResult cacheLoad(mlir::AffineParallelOp par, mlir::AffineLoadOp load);
-LogicalResult cacheReduce(mlir::AffineParallelOp par, AffineReduceOp reduce);
+LogicalResult cacheReduce(mlir::AffineParallelOp par, PxaReduceOp reduce);
 
 } // namespace pmlc::dialect::pxa

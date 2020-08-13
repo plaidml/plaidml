@@ -588,7 +588,7 @@ buildBroadcastLoad(OpBuilder &builder, Location loc, Value operand,
       operandIdxs[k] = body->getArgument(j);
     }
   }
-  auto loadOp = builder.create<pxa::AffineLoadOp>(loc, operand, operandIdxs);
+  auto loadOp = builder.create<pxa::PxaLoadOp>(loc, operand, operandIdxs);
   if (maybePadding)
     updateAffineMap(loadOp, *maybePadding);
   return loadOp;
@@ -641,8 +641,8 @@ static Value buildSimpleStore(OpBuilder &builder, Location loc, Value scalar,
   }
   auto aggOp = AtomicRMWKind::assign;
   auto idMap = builder.getMultiDimIdentityMap(memRefType.getRank());
-  auto storeOp = builder.create<pxa::AffineReduceOp>(
-      loc, aggOp, scalar, memRef, idMap, body->getArguments());
+  auto storeOp = builder.create<pxa::PxaReduceOp>(loc, aggOp, scalar, memRef,
+                                                  idMap, body->getArguments());
   if (maybePadding)
     updateAffineMap(storeOp, *maybePadding);
   return storeOp;
@@ -911,8 +911,7 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
         scalars.push_back(operand);
       } else {
         auto map = srcs[i].cast<AffineMapAttr>().getValue();
-        auto loadOp =
-            rewriter.create<pxa::AffineLoadOp>(loc, operand, map, idxs);
+        auto loadOp = rewriter.create<pxa::PxaLoadOp>(loc, operand, map, idxs);
         auto maybePadding = getPaddingInfo(op.operands()[i].getDefiningOp());
         if (maybePadding)
           updateAffineMap(loadOp, *maybePadding);
@@ -931,15 +930,15 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
 
     // Create the store
     auto resultMap = op.sink();
-    pxa::AffineReduceOp reduceOp;
+    pxa::PxaReduceOp reduceOp;
     auto agg = convertAgg(op.agg(), alloc.elementType);
     if (resultMap.isEmpty()) {
       SmallVector<Value, 0> emptyIdxs;
-      reduceOp = rewriter.create<pxa::AffineReduceOp>(
-          loc, agg, combined, filled, resultMap, emptyIdxs);
+      reduceOp = rewriter.create<pxa::PxaReduceOp>(loc, agg, combined, filled,
+                                                   resultMap, emptyIdxs);
     } else {
-      reduceOp = rewriter.create<pxa::AffineReduceOp>(loc, agg, combined,
-                                                      filled, resultMap, idxs);
+      reduceOp = rewriter.create<pxa::PxaReduceOp>(loc, agg, combined, filled,
+                                                   resultMap, idxs);
     }
     maybePadding = getPaddingInfo(op);
     if (maybePadding)
