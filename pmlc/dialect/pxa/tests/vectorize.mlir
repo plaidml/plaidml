@@ -13,7 +13,7 @@ func @vectorize_gemm(%arg0: memref<64x64xf32>, %arg1: memref<64x64xf32>) -> (mem
     
     %1 = pxa.load %arg0[%k, %j] : memref<64x64xf32>
     // This load *does* vectorize (stride 1 on j)
-    // CHECK: affine.vector_load %{{.*}} : memref<64x64xf32>, vector<8xf32>
+    // CHECK: pxa.vector_load %{{.*}} : memref<64x64xf32>, vector<8xf32>
 
     %2 = mulf %0, %1 : f32
     // Since this mulf uses one vector (%1) and one scalar (%0) we need to add

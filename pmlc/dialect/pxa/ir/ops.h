@@ -8,6 +8,7 @@
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/Dialect.h"
+#include "mlir/IR/StandardTypes.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 
 #include "pmlc/util/enums.h"
@@ -57,6 +58,7 @@ using mlir::Type;
 using mlir::TypeAttr;
 using mlir::Value;
 using mlir::ValueRange;
+using mlir::VectorType;
 
 namespace MemoryEffects = mlir::MemoryEffects;
 namespace OpTrait = mlir::OpTrait;

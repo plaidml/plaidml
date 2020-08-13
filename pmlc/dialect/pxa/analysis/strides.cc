@@ -403,7 +403,7 @@ Optional<RelativeAccessPattern> computeRelativeAccess(Block *block,
   ArrayRef<int64_t> vecSize = {};
   Optional<llvm::SmallVector<StrideInfo, 4>> maybeStrides;
   TypeSwitch<Operation *>(op)
-      .Case<AffineLoadOp>([&](auto op) {
+      .Case<pmlc::dialect::pxa::AffineLoadOp>([&](auto op) {
         maybeStrides =
             computeStrideInfo(op.getAffineMap(), op.getMapOperands());
       })
@@ -411,7 +411,7 @@ Optional<RelativeAccessPattern> computeRelativeAccess(Block *block,
         maybeStrides =
             computeStrideInfo(op.getAffineMap(), op.getMapOperands());
       })
-      .Case<AffineVectorLoadOp>([&](auto op) {
+      .Case<pmlc::dialect::pxa::AffineVectorLoadOp>([&](auto op) {
         maybeStrides =
             computeStrideInfo(op.getAffineMap(), op.getMapOperands());
         vecSize = op.getVectorType().getShape();
