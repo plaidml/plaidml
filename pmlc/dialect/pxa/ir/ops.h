@@ -42,6 +42,7 @@ using mlir::NamedAttribute;
 using mlir::Op;
 using mlir::OpAsmParser;
 using mlir::OpAsmPrinter;
+using mlir::OpAsmSetValueNameFn;
 using mlir::OpBuilder;
 using mlir::Operation;
 using mlir::OperationState;

@@ -44,7 +44,8 @@ struct LowerPXAToAffinePass
     target.addLegalDialect<xsmm::XSMMDialect>();
 
     OwningRewritePatternList patterns;
-    populatePXAToAffineConversionPatterns(patterns, &ctx);
+    populatePXAGemmToXSMMConversionPatterns(patterns, &ctx);
+    populatePXAPrngToAffineConversionPatterns(patterns, &ctx);
     conversion::pxa_to_affine::populatePXAToAffineConversionPatterns(patterns,
                                                                      &ctx);
 
@@ -122,15 +123,14 @@ static void addToPipeline(OpPassManager &pm) {
   // FIXME: these passes cause test failures (correctness or otherwise)
   // pm.addPass(pxa::createFusionPass());
   // pm.addPass(createCanonicalizerPass());
-  // pm.addPass(pxa::createMemRefDataFlowOptPass());
-  // pm.addPass(createCanonicalizerPass());
+  pm.addPass(pxa::createMemRefDataFlowOptPass());
+  pm.addPass(createCanonicalizerPass());
   pm.addPass(pxa::createLocalizePass());
   pm.addPass(pxa::createResizeTmpsPass());
+  pm.addPass(pxa::createBufferPlacementPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
-  pm.addPass(createCanonicalizerPass());
-  pm.addPass(createCSEPass());
   pm.addPass(createLowerPXAToAffinePass());
   pm.addPass(createLoopInvariantCodeMotionPass());
   pm.addPass(createCanonicalizerPass());
@@ -141,7 +141,6 @@ static void addToPipeline(OpPassManager &pm) {
   pm.addPass(createCSEPass());
 
   pm.addPass(createLowerToCFGPass());
-  pm.addPass(createBufferPlacementPass());
   if (pmlc::util::getEnvVar("PLAIDML_BOUNDS_CHECK") == "1") {
     pm.addPass(pmlc::dialect::stdx::createBoundsCheckPass());
   }

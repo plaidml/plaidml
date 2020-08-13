@@ -22,7 +22,10 @@ std::unique_ptr<mlir::Pass> createXSMMLoweringPass();
 
 std::unique_ptr<mlir::Pass> createXSMMStencilPass();
 
-void populatePXAToAffineConversionPatterns(
+void populatePXAGemmToXSMMConversionPatterns(
+    mlir::OwningRewritePatternList &patterns, mlir::MLIRContext *ctx);
+
+void populatePXAPrngToAffineConversionPatterns(
     mlir::OwningRewritePatternList &patterns, mlir::MLIRContext *ctx);
 
 void populateXSMMToLLVMConversionPatterns(

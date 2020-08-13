@@ -586,8 +586,7 @@ TEST_F(CppEdsl, MnistCnn) {
   auto kernel4 = Placeholder(DType::FLOAT32, {128, kNumClasses});
   auto bias4 = Placeholder(DType::FLOAT32, {kNumClasses});
   auto dense2 = Softmax(Dot(dense1, kernel4) + bias4);
-  auto program = ProgramBuilder("mnist_cnn", {dense2}).target("").compile();
-  std::cout << program << std::endl;
+  auto program = makeProgram("mnist_cnn", {dense2});
   // clang-format off
   // CHECK-LABEL: CppEdsl.MnistCnn
   // CHECK: func @mnist_cnn
@@ -618,8 +617,7 @@ TEST_F(CppEdsl, MnistCnn) {
   // CHECK: %{{.*}} = "eltwise.div"(%{{.*}}, %{{.*}}) : (tensor<1x100xf32>, tensor<1x1xf32>) -> tensor<1x100xf32>
   // CHECK: return %{{.*}} : tensor<1x100xf32>
   // clang-format on
-  // TODO: error: failed to legalize operation 'tile.reshape'
-  // runProgram(program);
+  runProgram(program);
 }
 
 Tensor Normalize(const Tensor& X) {
@@ -1071,8 +1069,7 @@ TEST_F(CppEdsl, DefractLong) {
   // CHECK: %{{.*}} = tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : tensor<f32>, tensor<1x3x3x1xf32>, tensor<1x3x3x1xf32> -> tensor<1x5x5x1xf32>
   // CHECK: return %{{.*}} : tensor<1x5x5x1xf32>
   // clang-format on
-  // TODO: This causes out of bounds access!
-  // runProgram(program);
+  runProgram(program);
 }
 
 TEST_F(CppEdsl, DupOut) {

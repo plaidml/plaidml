@@ -13,6 +13,11 @@ def VectorizeExample : FunctionPass<"pxa-vectorize-example"> {
   let constructor = "pmlc::dialect::pxa::createVectorizeExamplePass()";
 }
 
+def BufferPlacement : FunctionPass<"pxa-buffer-placement"> {
+  let summary = "Optimizes placement of alloc and dealloc operations";
+  let constructor = "pmlc::dialect::pxa::createBufferPlacementPass()";
+}
+
 def Fusion : FunctionPass<"pxa-fusion"> {
   let summary = "Fuse blocks that are compatible";
   let constructor = "pmlc::dialect::pxa::createFusionPass()";
