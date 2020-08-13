@@ -51,7 +51,7 @@ Operation *GetOriginalDef(Value val) {
   return opRes.getOwner();
 }
 
-bool isAggregation(AffineParallelOp op) {
+bool isAccumulation(AffineParallelOp op) {
   bool AggTag = false;
   auto argRange = op.getIVs();
   auto parallelLoopNum = argRange.size() < 2 ? argRange.size() : 2;
@@ -66,12 +66,41 @@ bool isAggregation(AffineParallelOp op) {
   return AggTag;
 }
 
+bool isSingLoop(AffineParallelOp op) {
+  auto beginOp = &op.getBody()->front();
+  auto isMulLoop = isa<AffineParallelOp>(beginOp);
+  if (!isMulLoop) {
+    isMulLoop = op.getIVs().size() > 1 ? true : false;
+  }
+  return !isMulLoop;
+}
+
+void buildNestLoop(AffineParallelOp op) {
+  OpBuilder builder(op.getBody(), op.getBody()->begin());
+  Block *outerBody = op.getBody();
+  llvm::SmallVector<mlir::AtomicRMWKind, 8> reductions;
+  for (Attribute attr : op.reductions()) {
+    auto intAttr = attr.dyn_cast<IntegerAttr>();
+    reductions.push_back(*mlir::symbolizeAtomicRMWKind(intAttr.getInt()));
+  }
+  auto inner = builder.create<AffineParallelOp>(
+      op.getLoc(), op.getResultTypes(), reductions, ArrayRef<int64_t>{1});
+  // Splice instructions into the interior
+  auto &innerLoopOps = inner.getBody()->getOperations();
+  auto &outerLoopOps = outerBody->getOperations();
+  innerLoopOps.splice(std::prev(innerLoopOps.end()), outerLoopOps,
+                      std::next(outerLoopOps.begin(), 1), outerLoopOps.end());
+  // Add a return of the values of the inner to the outer
+  builder.setInsertionPointToEnd(op.getBody());
+  builder.create<AffineYieldOp>(op.getLoc(), inner.getResults());
+}
+
 void TileAccumulations(AffineParallelOp op) {
   // Find the originating reduce
   assert(op.getNumResults() == 1);
-  if (isAggregation(op)) {
+  if (isAccumulation(op)) {
     auto srcDef = GetOriginalDef(op.getResult(0));
-    auto red = mlir::dyn_cast<AffineReduceOp>(srcDef);
+    auto red = dyn_cast<AffineReduceOp>(srcDef);
     // Get strides for output
     auto si = *computeStrideInfo(red);
     // Find all the accumulation indexes (stride 0 with respect to output) and
@@ -89,6 +118,8 @@ void TileAccumulations(AffineParallelOp op) {
       IVLOG(1, "accumTile[" << i << "] = " << accumTile[i]);
     }
     performTiling(op, accumTile);
+  } else if (isSingLoop(op)) {
+    buildNestLoop(op);
   }
 }
 
