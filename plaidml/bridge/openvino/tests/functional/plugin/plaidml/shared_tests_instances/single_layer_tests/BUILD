@@ -30,14 +30,12 @@ cc_library(
         ["*.cpp"],
         exclude = [
             # New Excludes (TODO)
-            "add.cpp",
             "batch_norm_inference.cpp",
             "broadcast.cpp",
             "convert.cpp",   # TODO: Broken not missing
             "convert_like.cpp",   # TODO: Broken not missing
             "depth_to_space.cpp",   # TODO: Broken not missing
             "divide.cpp",
-            "eltwise.cpp",   # TODO: Broken not missing
             "equal.cpp",   # TODO: Broken not missing
             "floor_mod.cpp",
             "greater.cpp",   # TODO: Broken not missing
@@ -53,7 +51,6 @@ cc_library(
             "maximum.cpp",
             "minimum.cpp",
             "mod.cpp",
-            "multiply.cpp",
             "mvn.cpp",  # TODO: Broken not missing
             "normalize_l2.cpp",
             "not_equal.cpp",
@@ -72,7 +69,6 @@ cc_library(
             "squared_difference.cpp",
             "squeeze.cpp",
             "strided_slice.cpp",  # TODO: Broken not missing
-            "subtract.cpp",
             "tile.cpp",
             "transpose.cpp",   # TODO: Broken not missing
             "unsqueeze.cpp",
@@ -95,14 +91,12 @@ cc_library(
         ["*.cpp"],
         exclude = [
             # New Excludes (TODO)
-            "add.cpp",
             "batch_norm_inference.cpp",
             "broadcast.cpp",
             "convert.cpp",   # TODO: Broken not missing
             "convert_like.cpp",   # TODO: Broken not missing
             "depth_to_space.cpp",   # TODO: Broken not missing
             "divide.cpp",
-            "eltwise.cpp",   # TODO: Broken not missing
             "equal.cpp",   # TODO: Broken not missing
             "floor_mod.cpp",
             "greater.cpp",   # TODO: Broken not missing
@@ -118,7 +112,6 @@ cc_library(
             "maximum.cpp",
             "minimum.cpp",
             "mod.cpp",
-            "multiply.cpp",
             "mvn.cpp",  # TODO: Broken not missing
             "normalize_l2.cpp",
             "not_equal.cpp",
@@ -137,7 +130,6 @@ cc_library(
             "squared_difference.cpp",
             "squeeze.cpp",
             "strided_slice.cpp",  # TODO: Broken not missing
-            "subtract.cpp",
             "tile.cpp",
             "transpose.cpp",   # TODO: Broken not missing
             "unsqueeze.cpp",
