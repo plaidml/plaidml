@@ -34,7 +34,6 @@ cc_library(
             "broadcast.cpp",
             "convert_like.cpp",   # TODO: Broken not missing
             "divide.cpp",
-            "equal.cpp",   # TODO: Broken not missing
             "floor_mod.cpp",
             "greater.cpp",   # TODO: Broken not missing
             "greater_equal.cpp",
@@ -93,7 +92,6 @@ cc_library(
             "broadcast.cpp",
             "convert_like.cpp",   # TODO: Broken not missing
             "divide.cpp",
-            "equal.cpp",   # TODO: Broken not missing
             "floor_mod.cpp",
             "greater.cpp",   # TODO: Broken not missing
             "greater_equal.cpp",
