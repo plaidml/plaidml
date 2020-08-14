@@ -320,6 +320,7 @@ cc_library(
         ],
     ),
     hdrs = glob([
+        "ngraph/core/include/ngraph/*.hpp",  # TODO: Ok? rd 2
         "ngraph/src/ngraph/*.hpp",
         "ngraph/src/ngraph/autodiff/*.hpp",
         "ngraph/src/ngraph/builder/*.hpp",
@@ -344,6 +345,7 @@ cc_library(
         "NGRAPH_VERSION=\\\"0.21.0\\\"",
     ],
     includes = [
+        "ngraph/core/include",  # TODO: Ok? rd 2
         "ngraph/src",
         "ngraph/src/ngraph",
         "ngraph/test/runtime",  # TODO: Ok?
