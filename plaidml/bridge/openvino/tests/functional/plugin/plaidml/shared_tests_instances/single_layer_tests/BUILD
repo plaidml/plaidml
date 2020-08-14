@@ -35,7 +35,6 @@ cc_library(
             "convert_like.cpp",   # TODO: Broken not missing
             "divide.cpp",
             "floor_mod.cpp",
-            "greater.cpp",   # TODO: Broken not missing
             "greater_equal.cpp",
             "less.cpp",
             "less_equal.cpp",
@@ -93,7 +92,6 @@ cc_library(
             "convert_like.cpp",   # TODO: Broken not missing
             "divide.cpp",
             "floor_mod.cpp",
-            "greater.cpp",   # TODO: Broken not missing
             "greater_equal.cpp",
             "less.cpp",
             "less_equal.cpp",
