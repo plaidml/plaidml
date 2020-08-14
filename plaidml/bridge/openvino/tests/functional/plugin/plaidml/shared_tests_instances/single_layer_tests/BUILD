@@ -42,7 +42,6 @@ cc_library(
             "logical_not.cpp",
             "logical_or.cpp",
             "logical_xor.cpp",
-            "lrn.cpp",   # TODO: Broken not missing
             "mat_mul.cpp",  # TODO : Broken not missing
             "maximum.cpp",
             "minimum.cpp",
@@ -99,7 +98,6 @@ cc_library(
             "logical_not.cpp",
             "logical_or.cpp",
             "logical_xor.cpp",
-            "lrn.cpp",   # TODO: Broken not missing
             "mat_mul.cpp",  # TODO : Broken not missing
             "maximum.cpp",
             "minimum.cpp",
