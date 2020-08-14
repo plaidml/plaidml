@@ -32,9 +32,7 @@ cc_library(
             # New Excludes (TODO)
             "batch_norm_inference.cpp",
             "broadcast.cpp",
-            "convert.cpp",   # TODO: Broken not missing
             "convert_like.cpp",   # TODO: Broken not missing
-            "depth_to_space.cpp",   # TODO: Broken not missing
             "divide.cpp",
             "equal.cpp",   # TODO: Broken not missing
             "floor_mod.cpp",
@@ -93,9 +91,7 @@ cc_library(
             # New Excludes (TODO)
             "batch_norm_inference.cpp",
             "broadcast.cpp",
-            "convert.cpp",   # TODO: Broken not missing
             "convert_like.cpp",   # TODO: Broken not missing
-            "depth_to_space.cpp",   # TODO: Broken not missing
             "divide.cpp",
             "equal.cpp",   # TODO: Broken not missing
             "floor_mod.cpp",
@@ -133,6 +129,9 @@ cc_library(
             "tile.cpp",
             "transpose.cpp",   # TODO: Broken not missing
             "unsqueeze.cpp",
+            # Exclusions from update
+            "convert.cpp",                          # Known errors
+            "depth_to_space.cpp",                   # Long  TODO: Make smoke test version
             # Original Excludes
             "convert_like.cpp",  # Known errors
             "convolution.cpp",  # Long
