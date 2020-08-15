@@ -1,5 +1,6 @@
 #pragma once
 
+#include <gflags/gflags.h>
 #include <gmock/gmock.h>
 
 #include <map>
@@ -9,6 +10,8 @@
 
 #include "plaidml/exec/exec.h"
 #include "pmlc/util/logging.h"
+
+DECLARE_bool(generate_filecheck_input);
 
 namespace plaidml::edsl {
 
@@ -67,11 +70,15 @@ class TestFixture : public ::testing::Test {
   }
 
   Program makeProgram(const std::string& name, const std::vector<Tensor>& outputs) {
-    ProgramBuilder builder(name, outputs);
-    shimTarget(builder);
-    auto program = builder.compile();
-    std::cout << program << std::endl;
+    auto program = ProgramBuilder(name, outputs).compile();
+    writeForFileCheck(program);
     return program;
+  }
+
+  void writeForFileCheck(const Program& program) {
+    if (FLAGS_generate_filecheck_input) {
+      std::cout << program << std::endl;
+    }
   }
 
   void runProgram(const Program& program) {
@@ -79,57 +86,6 @@ class TestFixture : public ::testing::Test {
     exec::Binder(program).compile()->run();
 #endif
   }
-
-  // Sets a skip if the current target is the specified target,
-  // returning true iff the current test should be skipped.
-  //
-  // N.B. The test itself continues to execute, and should use
-  //      IsSkipped() or the result of this method to exit when
-  //      necessary.  This is useful for tests whose output will be
-  //      processed by LLVM FileCheck.
-  //
-  // For example, if the test's output is being checked against its
-  // source by FileCheck, one might want to use:
-  //
-  //     setIsSkipped("some_target");
-  //
-  //     // Code that emits some program, often via makeProgram()
-  //
-  //     // CHECK-LABEL: MyTest
-  //
-  //     if (IsSkipped()) {
-  //       return;
-  //     }
-  //
-  //     // Code to run the program and check its output.
-  //
-  // On the other hand, if the test's output isn't being checked
-  // against its source by FileCheck, one can simply use:
-  //
-  //    if (setIsSkipped("some_target")) {
-  //      return;
-  //    }
-  //
-  bool setSkipOnTarget(const char* target) {
-    if (Settings::get("PLAIDML_TARGET") == target) {
-      [target]() -> void {
-        GTEST_SKIP() << "Test skipped on " << target;
-      }();
-      skipTarget_ = target;
-      return true;
-    }
-    return false;
-  }
-
-  // Sets the target to llvm_cpu if the current actual PlaidML target is being skipped.
-  void shimTarget(ProgramBuilder& pb) {
-    if (skipTarget_.size()) {
-      pb.target("llvm_cpu");
-    }
-  }
-
- private:
-  std::string skipTarget_;
 };
 
 }  // namespace plaidml::edsl

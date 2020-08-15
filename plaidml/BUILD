@@ -199,6 +199,20 @@ string_flag(
     build_setting_default = "llvm_cpu",
 )
 
+config_setting(
+    name = "llvm_cpu",
+    flag_values = {
+        ":target": "llvm_cpu",
+    }
+)
+
+config_setting(
+    name = "intel_gen",
+    flag_values = {
+        ":target": "intel_gen",
+    }
+)
+
 plaidml_settings(
     name = "settings",
     visibility = ["//visibility:public"],

@@ -9,6 +9,7 @@
 
 DEFINE_string(plaidml_device, "llvm_cpu.0", "The device to run tests on");
 DEFINE_string(plaidml_target, "llvm_cpu", "The compilation target");
+DEFINE_bool(generate_filecheck_input, false, "Write test programs as MLIR for FileCheck");
 
 namespace {
 

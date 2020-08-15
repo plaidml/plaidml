@@ -1,10 +1,10 @@
 # Copyright 2020 Intel Corporation
 
 load("@rules_python//python:defs.bzl", "py_test")
-load("//bzl:plaidml.bzl", "plaidml_cc_binary")
+load("//bzl:plaidml.bzl", "plaidml_cc_test")
 load("//pmlc:lit.bzl", "lit_test")
 
-plaidml_cc_binary(
+plaidml_cc_test(
     name = "cc_test",
     srcs = ["edsl_test.cc"],
     deps = [
@@ -12,14 +12,20 @@ plaidml_cc_binary(
         "//plaidml/edsl",
         "//plaidml/exec",
         "//pmlc/rt/vulkan",
-        "//pmlc/testing:gtest_main",
     ],
     args = [
         "--plaidml_device=$(plaidml_device)",
         "--plaidml_target=$(plaidml_target)",
-    ],
+    ] + select({
+        "//plaidml:intel_gen": ["--skip_test_file=$(location edsl_test-skip.intel_gen.txt)"],
+        "//conditions:default": [],
+    }),
+    data = select({
+        "//plaidml:intel_gen": [":edsl_test-skip.intel_gen.txt"],
+        "//conditions:default": [],
+    }),
     toolchains = ["//plaidml:settings"],
-    testonly = True,
+    linkstatic = True,
 )
 
 py_test(

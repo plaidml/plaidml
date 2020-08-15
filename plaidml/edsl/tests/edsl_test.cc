@@ -1,5 +1,7 @@
 // Copyright 2020 Intel Corporation
-// RUN: cc_test --plaidml_device=%plaidml_device --plaidml_target=%plaidml_target | FileCheck %s
+//
+// N.B. When running via lit, we always use the llvm_cpu device.
+// RUN: cc_test --plaidml_device=llvm_cpu.0 --plaidml_target=llvm_cpu --generate_filecheck_input | FileCheck %s
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -75,15 +77,11 @@ TEST_F(CppEdsl, HigherPrecisionInvalidNegative) {
 }
 
 TEST_F(CppEdsl, HigherPrecisionConstants) {
-  setSkipOnTarget("intel_gen");
-
   auto A = Placeholder(DType::FLOAT32, {3, 3});
   auto C = A + 1 + 2.0;
 
-  ProgramBuilder builder("higher_precision_constants", {C});
-  shimTarget(builder);
-  auto program = builder.floatx(DType::FLOAT64).intx(DType::UINT64).compile();
-  std::cout << program << std::endl;
+  auto program = ProgramBuilder("higher_precision_constants", {C}).floatx(DType::FLOAT64).intx(DType::UINT64).compile();
+  writeForFileCheck(program);
 
   // CHECK-LABEL: CppEdsl.HigherPrecisionConstants
   // CHECK: func @higher_precision_constants
@@ -92,10 +90,6 @@ TEST_F(CppEdsl, HigherPrecisionConstants) {
   // CHECK: %[[A:.*]] = "eltwise.add"(%{{.*}}, %[[c1]]) : (tensor<3x3xf32>, tensor<ui64>) -> tensor<3x3xf32>
   // CHECK: %[[B:.*]] = "eltwise.add"(%[[A]], %[[cst]]) : (tensor<3x3xf32>, tensor<f64>) -> tensor<3x3xf64>
   // CHECK: return %[[B]] : tensor<3x3xf64>
-
-  if (IsSkipped()) {
-    return;
-  }
 
   std::vector<float> A_input{1, 2, 3, 4, 5, 6, 7, 8, 9};
   std::vector<double> C_output{4, 5, 6, 7, 8, 9, 10, 11, 12};
@@ -135,7 +129,7 @@ TEST_F(CppEdsl, BitAndScalar) {
   uint64_t mask = UINT32_MAX;
   auto B = A & mask;
   auto program = ProgramBuilder("bit_and", {B}).intx(DType::UINT64).compile();
-  std::cout << program << std::endl;
+  writeForFileCheck(program);
 
   std::vector<uint64_t> A_input{(ONE << 32),     (ONE << 33) + 1, (ONE << 34) + 2,  //
                                 (ONE << 35) + 3, (ONE << 36) + 4, (ONE << 37) + 5,  //
@@ -219,10 +213,6 @@ TEST_F(CppEdsl, BitRightTensor) {
 }
 
 TEST_F(CppEdsl, BitRightScalar) {
-  if (setSkipOnTarget("intel_gen")) {
-    return;
-  }
-
   auto A = Placeholder(DType::UINT64, {3, 3});
   auto B = A >> 9;
   auto program = makeProgram("bit_right_scalar", {B});
@@ -237,10 +227,6 @@ TEST_F(CppEdsl, BitRightScalar) {
 }
 
 TEST_F(CppEdsl, BitNot) {
-  if (setSkipOnTarget("intel_gen")) {
-    return;
-  }
-
   auto A = Placeholder(DType::UINT8, {3, 3});
   auto B = ~A;
   auto program = makeProgram("bit_not", {B});
@@ -273,10 +259,6 @@ TEST_F(CppEdsl, BitXor) {
 }
 
 TEST_F(CppEdsl, BroadcastCmp) {
-  if (setSkipOnTarget("intel_gen")) {
-    return;
-  }
-
   auto A = Placeholder(DType::UINT64, {3, 4});
   auto B = Placeholder(DType::UINT64, {3, 1});
   auto C = cast(A >= B, DType::UINT64);
@@ -334,8 +316,6 @@ TEST_F(CppEdsl, Add) {
 }
 
 TEST_F(CppEdsl, ConstAdd) {
-  setSkipOnTarget("intel_gen");
-
   std::vector<int> a = {4, 3, 2, 1};
   std::vector<int> b = {1, 2, 3, 4};
   auto O = ConstAdd(a, b);
@@ -347,10 +327,6 @@ TEST_F(CppEdsl, ConstAdd) {
   // CHECK: %{{.*}} = "eltwise.add"(%{{.*}}, %{{.*}}) : (tensor<4xsi32>, tensor<4xsi32>) -> tensor<4xsi32>
   // CHECK: return %{{.*}} : tensor<4xsi32>
   // clang-format on
-
-  if (IsSkipped()) {
-    return;
-  }
 
   std::vector<int32_t> expected = {5, 5, 5, 5};
   checkProgram(program, {}, {{O, expected}});
@@ -432,10 +408,6 @@ TEST_F(CppEdsl, BigDot) {
 }
 
 TEST_F(CppEdsl, Max) {
-  if (setSkipOnTarget("intel_gen")) {
-    return;
-  }
-
   auto A = Placeholder(DType::FLOAT32, {3, 3});
   TensorDim I, J, K;
   TensorIndex i("i"), j("j");
@@ -492,8 +464,6 @@ TEST_F(CppEdsl, EltwiseMod) {
 }
 
 TEST_F(CppEdsl, Relu) {
-  setSkipOnTarget("intel_gen");
-
   auto A = Placeholder(DType::FLOAT32, {10, 20});
   auto program = makeProgram("relu", {Relu(A)});
   // clang-format off
@@ -504,17 +474,10 @@ TEST_F(CppEdsl, Relu) {
   // CHECK: %{{.*}} = "eltwise.select"(%{{.*}}, %[[cst]], %{{.*}}) : (tensor<10x20xi1>, tensor<f32>, tensor<10x20xf32>) -> tensor<10x20xf32>
   // CHECK: return %{{.*}} : tensor<10x20xf32>
   // clang-format on
-
-  if (IsSkipped()) {
-    return;
-  }
-
   runProgram(program);
 }
 
 TEST_F(CppEdsl, MnistMlp) {
-  setSkipOnTarget("intel_gen");
-
   // model.add(Dense(512, activation='relu', input_shape=(784,)))
   auto input = Placeholder(DType::FLOAT32, {1, 784});
   auto kernel1 = Placeholder(DType::FLOAT32, {784, 512});
@@ -551,11 +514,6 @@ TEST_F(CppEdsl, MnistMlp) {
   // CHECK: %[[X14:.*]] = "eltwise.div"(%{{.*}}, %{{.*}}) : (tensor<1x10xf32>, tensor<1x1xf32>) -> tensor<1x10xf32>
   // CHECK: return %{{.*}} : tensor<1x10xf32>
   // clang-format on
-
-  if (IsSkipped()) {
-    return;
-  }
-
   runProgram(program);
 }
 
@@ -631,7 +589,8 @@ TEST_F(CppEdsl, MnistCnn) {
   auto bias4 = Placeholder(DType::FLOAT32, {kNumClasses});
   auto dense2 = Softmax(Dot(dense1, kernel4) + bias4);
   auto program = ProgramBuilder("mnist_cnn", {dense2}).target("").compile();
-  std::cout << program << std::endl;
+  writeForFileCheck(program);
+
   // clang-format off
   // CHECK-LABEL: CppEdsl.MnistCnn
   // CHECK: func @mnist_cnn
@@ -849,8 +808,6 @@ TEST_F(CppEdsl, GlobalMin) {
 }
 
 TEST_F(CppEdsl, CumSum) {
-  setSkipOnTarget("intel_gen");
-
   auto I = Placeholder(DType::FLOAT32, {10}, "I");
   TensorDim N;
   TensorIndex i, k;
@@ -866,11 +823,6 @@ TEST_F(CppEdsl, CumSum) {
   // CHECK: %{{.*}} = tile.contract add, none, %[[cst]], %{{.*}} {cons = #set{{[0-9]+}}, sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}]} : tensor<f32>, tensor<10xf32> -> tensor<10xf32>
   // CHECK: return %{{.*}} : tensor<10xf32>
   // clang-format on
-
-  if (IsSkipped()) {
-    return;
-  }
-
   runProgram(program);
 }
 
@@ -928,8 +880,6 @@ TEST_F(CppEdsl, ComplexConv2d) {
 }
 
 TEST_F(CppEdsl, Reciprocal) {
-  setSkipOnTarget("intel_gen");
-
   auto A = Placeholder(DType::FLOAT32, {6}, "A");
   auto R = 1.0 / A;
   auto program = makeProgram("reciprocal", {R});
@@ -940,11 +890,6 @@ TEST_F(CppEdsl, Reciprocal) {
   // CHECK: %{{.*}} = "eltwise.div"(%[[cst]], %{{.*}}) : (tensor<f32>, tensor<6xf32>) -> tensor<6xf32>
   // CHECK: return %{{.*}} : tensor<6xf32>
   // clang-format on
-
-  if (IsSkipped()) {
-    return;
-  }
-
   std::vector<float> input = {1, 2, 4, 5, 8, 10};
   std::vector<float> expected = {1.0, 0.5, 0.25, 0.2, 0.125, 0.1};
   checkProgram(program, {{A, input}}, {{R, expected}});
@@ -984,8 +929,6 @@ TEST_F(CppEdsl, ReshapeScalar) {
 }
 
 TEST_F(CppEdsl, ReshapeIntoScalar) {
-  setSkipOnTarget("intel_gen");
-
   auto A = Placeholder(DType::INT32, {1, 1, 1}, "A");
   std::vector<int64_t> shape = {};
   auto R = reshape(A, shape);
@@ -998,17 +941,11 @@ TEST_F(CppEdsl, ReshapeIntoScalar) {
   // CHECK-NEXT: return %[[X1]] : tensor<si32>
   // clang-format on
 
-  if (IsSkipped()) {
-    return;
-  }
-
   std::vector<int32_t> data = {2};
   checkProgram(program, {{A, data}}, {{R, data}});
 }
 
 TEST_F(CppEdsl, ReshapeFromScalar) {
-  setSkipOnTarget("intel_gen");
-
   auto A = Placeholder(DType::INT32, {}, "A");
   std::vector<int64_t> shape = {1, 1, 1};
   auto R = reshape(A, shape);
@@ -1021,11 +958,6 @@ TEST_F(CppEdsl, ReshapeFromScalar) {
   // CHECK-NEXT: %[[X1:.*]] = "eltwise.ident"(%[[X0]]) : (tensor<1x1x1xsi32>) -> tensor<1x1x1xsi32>
   // CHECK-NEXT: return %[[X1]] : tensor<1x1x1xsi32>
   // clang-format on
-
-  if (IsSkipped()) {
-    return;
-  }
-
   std::vector<int32_t> data = {2};
   checkProgram(program, {{A, data}}, {{R, data}});
 }
@@ -1166,8 +1098,6 @@ TEST_F(CppEdsl, DupOut) {
 }
 
 TEST_F(CppEdsl, Select) {
-  setSkipOnTarget("intel_gen");
-
   auto I = Placeholder(DType::FLOAT32, {10, 20});
   auto O = select(I == 0, Tensor{0}, Tensor{1});
   auto program = makeProgram("select", {O});
@@ -1180,11 +1110,6 @@ TEST_F(CppEdsl, Select) {
   // CHECK: %{{.*}} = "eltwise.select"(%{{.*}}, %[[c0]], %[[c1]]) : (tensor<10x20xi1>, tensor<si32>, tensor<si32>) -> tensor<10x20xsi32>
   // CHECK: return %{{.*}} : tensor<10x20xsi32>
   // clang-format on
-
-  if (IsSkipped()) {
-    return;
-  }
-
   runProgram(program);
 }
 
@@ -1267,8 +1192,6 @@ TEST_F(CppEdsl, Sin) {
 }
 
 TEST_F(CppEdsl, ConvI8) {
-  setSkipOnTarget("intel_gen");
-
   auto I = Placeholder(DType::INT8, {1, 224, 224, 3});
   auto K = Placeholder(DType::INT8, {3, 3, 1, 32});
   auto program = makeProgram("convolution", {Convolution2(I, K)});
@@ -1279,19 +1202,10 @@ TEST_F(CppEdsl, ConvI8) {
   // CHECK: %{{.*}} = tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : tensor<si32>, tensor<1x224x224x3xsi8>, tensor<3x3x1x32xsi8> -> tensor<1x224x224x32xsi8>
   // CHECK: return %{{.*}} : tensor<1x224x224x32xsi8>
   // clang-format on
-
-  if (IsSkipped()) {
-    return;
-  }
-
   runProgram(program);
 }
 
 TEST_F(CppEdsl, LogicalAnd_uint64) {
-  if (setSkipOnTarget("intel_gen")) {
-    return;
-  }
-
   auto A = Placeholder(DType::UINT64, {3, 3});
   auto B = Placeholder(DType::UINT64, {3, 3});
   auto C = A && B;
@@ -1310,10 +1224,6 @@ TEST_F(CppEdsl, LogicalAnd_uint64) {
 }
 
 TEST_F(CppEdsl, LogicalAnd_mixed) {
-  if (setSkipOnTarget("intel_gen")) {
-    return;
-  }
-
   auto A = Placeholder(DType::UINT64, {3, 3});
   auto B = Placeholder(DType::FLOAT32, {3, 3});
   auto C = A && B;
@@ -1332,10 +1242,6 @@ TEST_F(CppEdsl, LogicalAnd_mixed) {
 }
 
 TEST_F(CppEdsl, LogicalOr_uint64) {
-  if (setSkipOnTarget("intel_gen")) {
-    return;
-  }
-
   auto A = Placeholder(DType::UINT64, {3, 3});
   auto B = Placeholder(DType::UINT64, {3, 3});
   auto C = A || B;
@@ -1354,10 +1260,6 @@ TEST_F(CppEdsl, LogicalOr_uint64) {
 }
 
 TEST_F(CppEdsl, LogicalOr_float) {
-  if (setSkipOnTarget("intel_gen")) {
-    return;
-  }
-
   auto A = Placeholder(DType::FLOAT32, {3, 3});
   auto B = Placeholder(DType::FLOAT32, {3, 3});
   auto C = A || B;
@@ -1376,10 +1278,6 @@ TEST_F(CppEdsl, LogicalOr_float) {
 }
 
 TEST_F(CppEdsl, LogicalOr_int32) {
-  if (setSkipOnTarget("intel_gen")) {
-    return;
-  }
-
   auto A = Placeholder(DType::INT32, {3, 3});
   auto B = Placeholder(DType::INT32, {3, 3});
   auto C = A || B;
@@ -1398,10 +1296,6 @@ TEST_F(CppEdsl, LogicalOr_int32) {
 }
 
 TEST_F(CppEdsl, LogicalNot_int32) {
-  if (setSkipOnTarget("intel_gen")) {
-    return;
-  }
-
   auto A = Placeholder(DType::INT32, {3, 3});
   auto R = !A;
   auto program = makeProgram("logical_not", {R});
@@ -1416,10 +1310,6 @@ TEST_F(CppEdsl, LogicalNot_int32) {
 }
 
 TEST_F(CppEdsl, LogicalNot_float) {
-  if (setSkipOnTarget("intel_gen")) {
-    return;
-  }
-
   auto A = Placeholder(DType::FLOAT32, {3, 3});
   auto R = !A;
   auto program = makeProgram("logical_not", {R});
@@ -1434,10 +1324,6 @@ TEST_F(CppEdsl, LogicalNot_float) {
 }
 
 TEST_F(CppEdsl, Asin) {
-  if (setSkipOnTarget("intel_gen")) {
-    return;
-  }
-
   auto S = Placeholder(DType::FLOAT32, {3, 3});
   auto O = asin(S);
   auto program = makeProgram("asin", {O});
@@ -1456,10 +1342,6 @@ TEST_F(CppEdsl, Asin) {
 }
 
 TEST_F(CppEdsl, Acos) {
-  if (setSkipOnTarget("intel_gen")) {
-    return;
-  }
-
   auto S = Placeholder(DType::FLOAT32, {3, 3});
   auto O = acos(S);
   auto program = makeProgram("acos", {O});
@@ -1478,10 +1360,6 @@ TEST_F(CppEdsl, Acos) {
 }
 
 TEST_F(CppEdsl, Atan) {
-  if (setSkipOnTarget("intel_gen")) {
-    return;
-  }
-
   auto S = Placeholder(DType::FLOAT32, {3, 3});
   auto O = atan(S);
   auto program = makeProgram("atan", {O});
@@ -1500,10 +1378,6 @@ TEST_F(CppEdsl, Atan) {
 }
 
 TEST_F(CppEdsl, CosH) {
-  if (setSkipOnTarget("intel_gen")) {
-    return;
-  }
-
   auto S = Placeholder(DType::FLOAT32, {3, 3});
   auto O = cosh(S);
   auto program = makeProgram("cosh", {O});
@@ -1522,10 +1396,6 @@ TEST_F(CppEdsl, CosH) {
 }
 
 TEST_F(CppEdsl, Erf) {
-  if (setSkipOnTarget("intel_gen")) {
-    return;
-  }
-
   auto S = Placeholder(DType::FLOAT32, {3, 3});
   auto O = erf(S);
   auto program = makeProgram("erf", {O});
@@ -1544,10 +1414,6 @@ TEST_F(CppEdsl, Erf) {
 }
 
 TEST_F(CppEdsl, Floor) {
-  if (setSkipOnTarget("intel_gen")) {
-    return;
-  }
-
   auto S = Placeholder(DType::FLOAT32, {3, 3});
   auto O = floor(S);
   auto program = makeProgram("floor", {O});
@@ -1566,10 +1432,6 @@ TEST_F(CppEdsl, Floor) {
 }
 
 TEST_F(CppEdsl, Pow) {
-  if (setSkipOnTarget("intel_gen")) {
-    return;
-  }
-
   auto A = Placeholder(DType::FLOAT32, {3, 3});
   auto B = Placeholder(DType::FLOAT32, {3, 3});
   auto O = pow(A, B);
@@ -1594,10 +1456,6 @@ TEST_F(CppEdsl, Pow) {
 }
 
 TEST_F(CppEdsl, Round) {
-  if (setSkipOnTarget("intel_gen")) {
-    return;
-  }
-
   auto S = Placeholder(DType::FLOAT32, {3, 3});
   auto O = round(S);
   auto program = makeProgram("round", {O});
@@ -1616,10 +1474,6 @@ TEST_F(CppEdsl, Round) {
 }
 
 TEST_F(CppEdsl, SinH) {
-  if (setSkipOnTarget("intel_gen")) {
-    return;
-  }
-
   auto S = Placeholder(DType::FLOAT32, {3, 3});
   auto O = sinh(S);
   auto program = makeProgram("sinh", {O});
@@ -1638,10 +1492,6 @@ TEST_F(CppEdsl, SinH) {
 }
 
 TEST_F(CppEdsl, Tan) {
-  if (setSkipOnTarget("intel_gen")) {
-    return;
-  }
-
   auto S = Placeholder(DType::FLOAT32, {3, 3});
   auto O = tan(S);
   auto program = makeProgram("tan", {O});
