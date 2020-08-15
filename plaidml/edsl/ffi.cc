@@ -20,8 +20,6 @@
 #include "pmlc/compiler/registry.h"
 #include "pmlc/dialect/tile/gradient.h"
 #include "pmlc/dialect/tile/ir/ops.h"
-#include "pmlc/util/all_dialects.h"
-#include "pmlc/util/all_passes.h"
 #include "pmlc/util/enums.h"
 #include "pmlc/util/env.h"
 
@@ -114,8 +112,6 @@ void plaidml_edsl_init(  //
   ffi_wrap_void(err, [&] {
     std::call_once(is_initialized, []() {
       IVLOG(1, "plaidml_edsl_init");
-      registerAllDialects();
-      registerAllPasses();
       plaidml::edsl::RegisterDerivs();
     });
   });

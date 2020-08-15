@@ -1,8 +1,7 @@
 # Copyright 2020 Intel Corporation
 
-load("@rules_python//python:defs.bzl", "py_test")
+load("@rules_python//python:defs.bzl", "py_library", "py_test")
 load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_test")
-load("//pmlc:lit.bzl", "lit_test")
 
 SDK_HDRS = [
     "autodiff.h",
@@ -41,12 +40,10 @@ plaidml_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "//plaidml/core",
-        "//pmlc:all_passes_and_dialects_no_registration",
         "//pmlc/dialect/tile",
         "//pmlc/util",
         "@llvm-project//llvm:Support",
     ],
-    alwayslink = 1,
 )
 
 py_library(

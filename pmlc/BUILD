@@ -38,7 +38,9 @@ plaidml_cc_test(
 )
 
 plaidml_cc_library(
-    name = "all_passes_and_dialects_no_registration",
+    name = "all_passes_and_dialects",
+    srcs = ["all_dialects.cc"],
+    hdrs = ["all_passes.h"],
     visibility = ["//visibility:public"],
     deps = [
         "//pmlc/conversion/gpu",
@@ -50,16 +52,11 @@ plaidml_cc_library(
         "//pmlc/dialect/stdx",
         "//pmlc/dialect/tile",
         "//pmlc/dialect/xsmm",
+        "//pmlc/target/demo",
         "//pmlc/target/intel_gen",
         "//pmlc/target/x86",
         "@llvm-project//mlir:AllPassesAndDialectsNoRegistration",
     ],
-)
-
-plaidml_cc_library(
-    name = "all_passes_and_dialects",
-    visibility = ["//visibility:public"],
-    deps = [":all_passes_and_dialects_no_registration"],
     alwayslink = 1,
 )
 
