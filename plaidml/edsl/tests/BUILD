@@ -11,8 +11,10 @@ plaidml_cc_test(
         "//plaidml:testenv",
         "//plaidml/edsl",
         "//plaidml/exec",
-        "//pmlc/rt/vulkan",
-    ],
+    ] + select({
+        "//plaidml:gpu_target": ["//pmlc/rt/vulkan"],
+        "//conditions:default": [],
+    }),
     args = [
         "--plaidml_device=$(plaidml_device)",
         "--plaidml_target=$(plaidml_target)",
