@@ -11,8 +11,7 @@
 #include "mlir/Support/FileUtilities.h"
 #include "mlir/Support/MlirOptMain.h"
 
-#include "pmlc/util/all_dialects.h"
-#include "pmlc/util/all_passes.h"
+#include "pmlc/all_passes.h"
 #include "pmlc/util/env.h"
 #include "pmlc/util/logging.h"
 
@@ -57,7 +56,6 @@ int main(int argc, char **argv) {
     IVLOG(level, "PLAIDML_VERBOSE=" << level);
   }
 
-  registerAllDialects();
   registerAllPasses();
   // registerTestPasses();
   InitLLVM y(argc, argv);
