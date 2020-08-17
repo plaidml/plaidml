@@ -59,7 +59,6 @@ cc_library(
             "reduce_sum.cpp",
             "squared_difference.cpp",
             "squeeze.cpp",
-            "strided_slice.cpp",  # TODO: Broken not missing
             "tile.cpp",
             "transpose.cpp",   # TODO: Broken not missing
             "unsqueeze.cpp",
@@ -111,7 +110,6 @@ cc_library(
             "reduce_sum.cpp",
             "squared_difference.cpp",
             "squeeze.cpp",
-            "strided_slice.cpp",  # TODO: Broken not missing
             "tile.cpp",
             "transpose.cpp",   # TODO: Broken not missing
             "unsqueeze.cpp",
