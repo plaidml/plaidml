@@ -1,37 +1,35 @@
 ---
-
 CONST:
   efficiency_baseline: keras-tf-cuda-gp100gl
 
   gpu_flops:
-
     # nvidia
-    gt650m:       605.77
-    gtx780:      3819.42
-    gtx1050:     1733.15
-    gtx1070:     7282.69
-    gtx1080:     9380.39
-    gtx1080ti:  12571.25
-    gp100gl:    10736.02
-    gv100gl:    14757.70
+    gt650m: 605.77
+    gtx780: 3819.42
+    gtx1050: 1733.15
+    gtx1070: 7282.69
+    gtx1080: 9380.39
+    gtx1080ti: 12571.25
+    gp100gl: 10736.02
+    gv100gl: 14757.70
     # amd
-    r560:        1815.01
-    rx480:       5950.39
-    r9nano:      8077.04
-    vega:       12697.10
-    gfx900:     11300.84
-    gfx803:      3573.79
-    gfx906:     13379.70
-    vega56:      4342.63
+    r560: 1815.01
+    rx480: 5950.39
+    r9nano: 8077.04
+    vega: 12697.10
+    gfx900: 11300.84
+    gfx803: 3573.79
+    gfx906: 13379.70
+    vega56: 4342.63
     # mali
-    t628:          34.05
+    t628: 34.05
     # intel
-    hd4000:       247.14
-    hd505:        213.80
-    hd630:        417.22 
-    uhd630:       454.72
-    iris655:      757.84
-    neo:         1084.50
+    hd4000: 247.14
+    hd505: 213.80
+    hd630: 417.22
+    uhd630: 454.72
+    iris655: 757.84
+    neo: 1084.50
 
 PLATFORMS:
   keras-tf-cuda-gtx780:
@@ -95,12 +93,12 @@ SUITES:
   smoke:
     platforms:
       keras-stripe-llvm-cpu:
-        pipelines: [nightly]
+        pipelines: [nightly, plaidml]
     params:
       plaidml:
-        batch_sizes: [0]
+        batch_sizes: [1]
       ci:
-        batch_sizes: [0]
+        batch_sizes: [1]
     wheels:
       # NOTE: this list must be in least to most dependent order.
       - plaidml-{version}-py2.py3-none-{arch}.whl
@@ -111,18 +109,16 @@ SUITES:
     compare: no
     eventlog: yes
     runner: plaidbench
-    args: 
-      - --results
-      - '{results}'
+    args:
+      - --results={results}
       - --no-kernel-timing
       - --print-stacktraces
       - --no-warmup
-      - --examples
-      - 1
+      - --examples=1
       - keras
-      - '{workload}'
+      - "{workload}"
     workloads:
-      mobilenet:
+      resnet50:
         precision: untested
 
   base:
@@ -148,168 +144,7 @@ SUITES:
     runner: python
     workloads:
       backend:
-        args:
-          - backend_test.py
-          - TestBackendOps.testArgmax
-          - TestBackendOps.testShape
-          - TestBackendOps.testPassthrough
-          - TestBackendOps.testArgmaxUnequal
-          - TestBackendOps.testArgminUnequal
-          - TestBackendOps.testArgmaxWithAxis
-          - TestBackendOps.testArgmin
-          - TestBackendOps.testDropoutManual
-          - TestBackendOps.testArange
-          - TestBackendOps.testAvgPool
-          - TestBackendOps.testDot
-          - TestBackendOps.testBatchFlatten
-          - TestBackendOps.testFlatten
-          - TestBackendOps.testEye
-          - TestBackendOps.testAddElements
-          - TestBackendOps.testAddElementsRepeated
-          - TestBackendOps.testAddConstant
-          - TestBackendOps.testSubConstant
-          - TestBackendOps.testSubElements
-          - TestBackendOps.testMulElements
-          - TestBackendOps.testMulConstant
-          - TestBackendOps.testDivElements
-          - TestBackendOps.testDivConstant
-          - TestBackendOps.testProdKeepdims
-          - TestBackendOps.testProdAxis
-          - TestBackendOps.testProdAxisNumpy
-          - TestBackendOps.testProdNegAxis
-          - TestBackendOps.testProdOfShape
-          - TestBackendOps.testReshapeShape
-          - TestBackendOps.testProd
-          - TestBackendOps.testMax
-          - TestBackendOps.testMaximum
-          - TestBackendOps.testMaxPool
-          - TestBackendOps.testMean
-          - TestBackendOps.testMin
-          - TestBackendOps.testMinimum
-          - TestBackendOps.testClip
-          - TestBackendOps.testElu
-          - TestBackendOps.testPool3D
-          - TestBackendOps.testReshape
-          - TestBackendOps.testRelu
-          - TestBackendOps.testHardSigmoid
-          - TestBackendOps.testAbs
-          - TestBackendOps.testAll
-          - TestBackendOps.testAny
-          - TestBackendOps.testReshapeMatchDim
-          - TestBackendOps.testReshapeSymbolic
-          - TestBackendOps.testTransposeReshape
-          - TestBackendOps.testSqueeze
-          - TestBackendOps.testSum
-          - TestBackendOps.testSquare
-          - TestBackendOps.testSqrt
-          - TestBackendOps.testSoftsign
-          - TestBackendOps.testSoftplus
-          - TestBackendOps.testSoftCat
-          - TestBackendOps.testSoftmax
-          - TestBackendOps.testSigmoid
-          - TestBackendOps.testSign
-          - TestBackendOps.testTanh
-          - TestBackendOps.testExp
-          - TestBackendOps.testLog
-          - TestBackendOps.testLogSumExp
-          - TestBackendOps.testDepthwiseConv2d
-          - TestBackendOps.testReshapeMatchDim
-          - TestBackendOps.testZeros
-          - TestBackendOps.testOnes
-          - TestBackendOps.testConstant
-          - TestBackendOps.testIsPlaceholder
-          - TestBackendOps.testUpdate
-          - TestBackendOps.testMovingAverageUpdate
-          - TestBackendOps.testBatchNormAndUpdate
-          - TestBackendOps.testNormalizeBatchInTrainingSimple
-          - TestBackendOps.testNormalizeBatchInTrainingWeirdAxis
-          - TestBackendOps.testNormalizeBatchInTrainingWeirdMultiAxis
-          - TestBackendOps.testNormalizeBatchInTrainingMultiAxis
-          - TestBackendOps.testBatchNormalization
-          - TestBackendOps.testBatchNormalizationVar
-          - TestBackendOps.testBatchNormalizationMean
-          - TestBackendOps.testBatchNormalizationOneElement
-          - TestBackendOps.testBatchNormalizationNoBeta
-          - TestBackendOps.testBatchNormalizationNoGamma
-          - TestBackendOps.testBigRollup
-          - TestBackendOps.testBinaryCrossentropy
-          - TestBackendOps.testBranchWithSoftmax
-          - TestBackendOps.testCategoricalCrossentropy
-          - TestBackendOps.testCategoricalCrossentropyGarbageIn
-          - TestBackendOps.testCategoricalCrossentropyLogits
-          - TestBackendOps.testSelfMult
-          - TestBackendOps.testL2Normalize
-          - TestBackendOps.testZerosLike
-          - TestBackendOps.testConv1d
-          - TestBackendOps.testConv2d
-          - TestBackendOps.testConv2dTranspose
-          - TestBackendOps.testConv2dSpecial
-          - TestBackendOps.testConv3d
-          - TestBackendOps.testConv3dTranspose
-          - TestBackendOps.testConvParameterRankExceptions
-          - TestBackendOps.testCastToInt
-          - TestBackendOps.testCastToFloat
-          - TestBackendOps.testCastToUInt
-          - TestBackendOps.testCeil
-          - TestBackendOps.testCumProd
-          - TestBackendOps.resnetLayer1
-          - TestBackendOps.resnetLayer2
-          - TestBackendOps.res2a_branch2a
-          - TestBackendOps.res2a_branch2b
-          - TestBackendOps.res3a_branch2a
-          - TestBackendOps.fc_1000
-          - TestBackendOps.bigMatMul
-          - TestBackendOps.testDupOutputs
-          - TestBackendOps.testBatchDot
-          - TestBackendOps.testBatchDot3
-          - TestBackendOps.testCategoricalCrossentropyLogits
-          - TestBackendOps.testClearSession
-          - TestBackendOps.testConcatenate
-          - TestBackendOps.testConcatenateSymbolic
-          - TestBackendOps.testCumSum
-          - TestBackendOps.testExpandDims
-          - TestBackendOps.testEqual
-          - TestBackendOps.testEqualVersusNumeric
-          - TestBackendOps.testGreater
-          - TestBackendOps.testGreaterEqual
-          - TestBackendOps.testGreaterEqualVersusNumeric
-          - TestBackendOps.testGreaterVersusNumeric
-          - TestBackendOps.testLess
-          - TestBackendOps.testLessEqual
-          - TestBackendOps.testLessEqualVersusNumeric
-          - TestBackendOps.testLessVersusNumeric
-          - TestBackendOps.testNotEqual
-          - TestBackendOps.testNotEqualVersusNumeric
-          - TestBackendOps.testOneHot
-          - TestBackendOps.testOnesLike
-          - TestBackendOps.testPermuteDimensions
-          - TestBackendOps.testRepeat
-          - TestBackendOps.testRepeatElements
-          - TestBackendOps.testResizeImages
-          - TestBackendOps.testResizeImagesBilinear
-          - TestBackendOps.testResizeVolumes
-          - TestBackendOps.testReverse
-          - TestBackendOps.testSeparableConv2d
-          - TestBackendOps.testSliceEllipsis
-          - TestBackendOps.testSliceMessy
-          - TestBackendOps.testSliceShort
-          - TestBackendOps.testSpatial2DPadding
-          - TestBackendOps.testSpatial3DPadding
-          - TestBackendOps.testStack
-          - TestBackendOps.testStd
-          - TestBackendOps.testTemporalPadding
-          - TestBackendOps.testTile
-          - TestBackendOps.testTranspose
-          - TestBackendOps.testTruncatedNormalMean
-          - TestBackendOps.testTruncatedNormalDev
-          - TestBackendOps.testRandomNormalDev
-          - TestBackendOps.testRandomUniformMean
-          - TestBackendOps.testRandomUniformDev
-          - TestBackendOps.testRandomUniformVariableMean
-          - TestBackendOps.testRandomUniformVariableDev
-          - TestBackendOps.testRandomNormalMean
-          - TestBackendOps.testVarSimple
-          - TestBackendOps.testWinograd
+        args: [backend_test.py]
         conda_env: ci/conda/keras_backend_test.yml
         precision: untested
       regression:
@@ -345,15 +180,13 @@ SUITES:
     timeout: 10
     conda_env: ci/conda/tensorflow.yml
     runner: plaidbench
-    args: 
-      - --results
-      - '{results}'
-      - --batch-size
-      - '{batch_size}'
+    args:
+      - --results={results}
+      - --batch-size={batch_size}
       - --no-kernel-timing
       - --print-stacktraces
       - keras
-      - '{workload}'
+      - "{workload}"
     workloads:
       imdb_lstm:
         precision: high
@@ -367,11 +200,11 @@ SUITES:
           keras-tf-dnnl-cpu:
             conda_env: ci/conda/tensorflow-dnnl.yml
             keras-stripe-ocl-gfx804:
-            prepend_args: [--examples, 64]
+            prepend_args: [--examples=64]
           keras-stripe-ocl-neo:
-            prepend_args: [--examples, 512]
+            prepend_args: [--examples=512]
           keras-stripe-mtl-uhd630:
-            prepend_args: [--examples, 256]
+            prepend_args: [--examples=256]
       mobilenet:
         precision: high
         platform_overrides:
@@ -386,43 +219,43 @@ SUITES:
         precision: high
         platform_overrides:
           keras-stripe-llvm-cpu:
-            prepend_args: [--examples, 128]
+            prepend_args: [--examples=128]
           keras-stripe-ocl-gfx804:
-            prepend_args: [--examples, 128]
+            prepend_args: [--examples=128]
           keras-stripe-mtl-uhd630:
-            prepend_args: [--examples, 256]
+            prepend_args: [--examples=256]
           keras-tf-dnnl-cpu:
             conda_env: ci/conda/tensorflow-dnnl.yml
       vgg19:
         precision: high
         platform_overrides:
           keras-stripe-llvm-cpu:
-            prepend_args: [--examples, 64]
+            prepend_args: [--examples=64]
           keras-stripe-ocl-gfx804:
-            prepend_args: [--examples, 64]
+            prepend_args: [--examples=64]
           keras-stripe-ocl-neo:
-            prepend_args: [--examples, 256]
+            prepend_args: [--examples=256]
           keras-stripe-mtl-uhd630:
-            prepend_args: [--examples, 256]
+            prepend_args: [--examples=256]
           keras-tf-dnnl-cpu:
             conda_env: ci/conda/tensorflow-dnnl.yml
-        skip_platforms: 
+        skip_platforms:
           - keras-stripe-mtl-uhd630
 
       xception:
         precision: high
         platform_overrides:
           keras-stripe-llvm-cpu:
-            prepend_args: [--examples, 64]
+            prepend_args: [--examples=64]
           keras-stripe-ocl-gfx804:
-            prepend_args: [--examples, 64]
+            prepend_args: [--examples=64]
           keras-stripe-ocl-gv100gl:
-            prepend_args: [--examples, 512]
+            prepend_args: [--examples=512]
           keras-stripe-ocl-neo:
-            prepend_args: [--examples, 256]
+            prepend_args: [--examples=256]
             perf_threshold: 0.7
           keras-stripe-mtl-uhd630:
-            prepend_args: [--examples, 64]
+            prepend_args: [--examples=64]
             soft_fail: true
           keras-tf-dnnl-cpu:
             conda_env: ci/conda/tensorflow-dnnl.yml
@@ -453,17 +286,41 @@ SUITES:
         # passing versions will pass; and non-memory errors will still error
         expected: "CL_MEM_OBJECT_ALLOCATION_FAILURE"
         precision: low
-        args: [plaidbench.py, inception_v3, --train, --print-stacktraces, --batch-size, '{batch_size}']
+        args:
+          - plaidbench.py
+          - inception_v3
+          - --train
+          - --print-stacktraces
+          - --batch-size={batch_size}
       resnet50_train:
         precision: low
-        args: [plaidbench.py, resnet50, --train, --print-stacktraces, --batch-size, '{batch_size}']
+        args:
+          - plaidbench.py
+          - resnet50
+          - --train
+          - --print-stacktraces
+          - --batch-size={batch_size}
       vgg19_train:
         precision: low
-        args: [plaidbench.py, vgg19, --train, --print-stacktraces, --batch-size, '{batch_size}']
+        args:
+          - plaidbench.py
+          - vgg19
+          - --train
+          - --print-stacktraces
+          - --batch-size={batch_size}
       xception_train:
         precision: low
-        args: [plaidbench.py, xception, --train, --print-stacktraces, --batch-size, '{batch_size}']
+        args:
+          - plaidbench.py
+          - xception
+          - --train
+          - --print-stacktraces
+          - --batch-size={batch_size}
       mobilenet_train:
         precision: low
-        args: [plaidbench.py, mobilenet, --train, --print-stacktraces, --batch-size, '{batch_size}']
-
+        args:
+          - plaidbench.py
+          - mobilenet
+          - --train
+          - --print-stacktraces
+          - --batch-size={batch_size}

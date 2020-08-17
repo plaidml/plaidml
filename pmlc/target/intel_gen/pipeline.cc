@@ -69,7 +69,13 @@ void addToPipeline(OpPassManager &pm) {
 
   // GPU to Vulkan.
   pm.addPass(conversion::gpu::createConvertGpuLaunchFuncToVulkanCallsPass());
-  pm.addPass(conversion::gpu::createLLVMLoweringPass());
+  // pm.addPass(conversion::gpu::createLLVMLoweringPass());
+  pm.addPass(createLowerToLLVMPass(LowerToLLVMOptions{
+      /*useBarePtrCallConv=*/false,
+      /*emitCWrappers=*/true,
+      /*indexBitwidth=*/kDeriveIndexBitwidthFromDataLayout,
+      /*useAlignedAlloc=*/false,
+  }));
 }
 
 } // namespace

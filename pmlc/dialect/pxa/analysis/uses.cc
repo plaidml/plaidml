@@ -11,13 +11,28 @@ using namespace mlir; // NOLINT
 
 namespace pmlc::dialect::pxa {
 
+Operation *getOriginalDef(Value val) {
+  auto opRes = val.cast<mlir::OpResult>();
+  while (true) {
+    auto ap = mlir::dyn_cast<AffineParallelOp>(opRes.getOwner());
+    if (!ap)
+      break;
+    auto ret = mlir::cast<AffineYieldOp>(ap.getBody()->getTerminator());
+    auto src = ret.getOperand(opRes.getResultNumber());
+    opRes = src.cast<mlir::OpResult>();
+  }
+  return opRes.getOwner();
+}
+
 IndirectValuesIterator &IndirectValuesIterator::operator++() {
   for (auto &use : curValue.getUses()) {
     if (auto yieldOp = dyn_cast<AffineYieldOp>(use.getOwner())) {
       auto value = yieldOp.getParentOp()->getResult(use.getOperandNumber());
       enqueueNext(value);
-    } else if (auto reduceOp = dyn_cast<AffineReduceOp>(use.getOwner())) {
+    } else if (auto reduceOp = dyn_cast<PxaReduceOp>(use.getOwner())) {
       enqueueNext(reduceOp.result());
+    } else if (auto vecReduceOp = dyn_cast<PxaVectorReduceOp>(use.getOwner())) {
+      enqueueNext(vecReduceOp.result());
     }
   }
   if (workQueue.empty()) {
@@ -73,8 +88,10 @@ IndirectAccessUsesIterator &IndirectAccessUsesIterator::operator++() {
 
 void IndirectAccessUsesIterator::skipNonAccess() {
   while (inner != IndirectUsesIterator()) {
-    if (isa<AffineLoadOp>(inner->getOwner()) ||
-        isa<AffineReduceOp>(inner->getOwner())) {
+    if (isa<PxaLoadOp>(inner->getOwner()) ||
+        isa<pxa::PxaReduceOp>(inner->getOwner()) ||
+        isa<PxaVectorLoadOp>(inner->getOwner()) ||
+        isa<pxa::PxaVectorReduceOp>(inner->getOwner())) {
       break;
     }
     ++inner;

@@ -23,30 +23,38 @@ struct ResizeTmpsPass : public ResizeTmpsBase<ResizeTmpsPass> {
     func.walk([&](AllocOp op) { runOnAlloc(op); });
   }
 
-  AffineMap computeInnerMap(AffineMap orig, ValueRange operands, Block *block) {
+  AffineValueMap computeInnerValueMap(AffineMap orig, ValueRange operands,
+                                      Block *block) {
     auto strides = computeStrideInfo(orig, operands);
     assert(strides && "Could not compute stride info");
-    SmallVector<AffineExpr, 4> newExprs;
+    SmallVector<StrideInfo, 4> inner;
     for (size_t i = 0; i < strides->size(); i++) {
-      auto innerStrides = (*strides)[i].inner(block);
-      newExprs.push_back(innerStrides.toExpr(orig.getContext(), operands));
+      auto innerStride = (*strides)[i].inner(block);
+      inner.push_back(innerStride);
     }
-    return AffineMap::get(operands.size(), 0, newExprs, orig.getContext());
+    return convertToValueMap(orig.getContext(), inner);
   }
 
   void runOnAlloc(AllocOp op) {
     Block *opBlock = op.getOperation()->getBlock();
     IVLOG(2, "Considering: " << debugString(*op.getOperation()));
 
+    for (auto &use : getIndirectUses(op)) {
+      if (isa<ReturnOp>(use.getOwner())) {
+        IVLOG(2, "Found ReturnOp user, cannot resize allocation");
+        return;
+      }
+    }
+
     SmallVector<StrideInfo, 4> outer;
     SmallVector<StrideRange, 4> inner;
     for (auto &use : getIndirectAccessUses(op)) {
       IVLOG(2, "Found use: " << debugString(*use.getOwner()));
       Optional<SmallVector<StrideInfo, 4>> maybeStrides;
-      if (auto lop = dyn_cast<AffineLoadOp>(use.getOwner())) {
+      if (auto lop = dyn_cast<PxaLoadOp>(use.getOwner())) {
         maybeStrides =
             computeStrideInfo(lop.getAffineMap(), lop.getMapOperands());
-      } else if (auto rop = dyn_cast<AffineReduceOp>(use.getOwner())) {
+      } else if (auto rop = dyn_cast<PxaReduceOp>(use.getOwner())) {
         maybeStrides =
             computeStrideInfo(rop.getAffineMap(), rop.getMapOperands());
       }
@@ -114,7 +122,16 @@ struct ResizeTmpsPass : public ResizeTmpsBase<ResizeTmpsPass> {
         return;
       }
       newShape.push_back(innerRange.maxVal + 1);
-      IVLOG(2, "Computed size:" << newShape.back());
+      IVLOG(2, "Original size:" << oldShape[i]);
+      IVLOG(2, "Computed size:" << newShape[i]);
+
+      // if you assume that incoming IR is sane
+      // then there is no need to expand
+      if (newShape[i] > oldShape[i]) {
+        IVLOG(2, "Expansion not allowed, resetting to original size");
+        newShape[i] = oldShape[i];
+      }
+
       if (newShape[i] != oldShape[i]) {
         sizeChanged = true;
       }
@@ -132,16 +149,33 @@ struct ResizeTmpsPass : public ResizeTmpsBase<ResizeTmpsPass> {
       value.setType(newType);
     }
     // Update all of the access maps
+    // Get ops first and then replace since we modify use-def chain during
+    // mutation.
+    SmallVector<Operation *, 4> ops;
     for (auto &use : getIndirectAccessUses(op.getResult())) {
-      if (auto rop = dyn_cast<AffineReduceOp>(use.getOwner())) {
-        auto map =
-            computeInnerMap(rop.getAffineMap(), rop.getMapOperands(), opBlock);
-        rop.setAttr(AffineReduceOp::getMapAttrName(), AffineMapAttr::get(map));
+      ops.push_back(use.getOwner());
+    }
+    // Now do the actual changes.  Note, we don't bother erasing the original
+    // instructions, but they get cleaned up via canonicalization
+    for (Operation *op : ops) {
+      if (auto rop = dyn_cast<PxaReduceOp>(op)) {
+        // TODO: This probably should move into some sort of utility transform,
+        // but I need another example or two to generalize from
+        auto vm = computeInnerValueMap(rop.getAffineMap(), rop.getMapOperands(),
+                                       opBlock);
+        OpBuilder replace(rop);
+        auto nrop = replace.create<PxaReduceOp>(
+            rop.getLoc(), rop.agg(), rop.val(), rop.getMemRef(),
+            vm.getAffineMap(), vm.getOperands());
+        rop.replaceAllUsesWith(nrop.result());
       }
-      if (auto lop = dyn_cast<AffineLoadOp>(use.getOwner())) {
-        auto map =
-            computeInnerMap(lop.getAffineMap(), lop.getMapOperands(), opBlock);
-        lop.setAttr(AffineLoadOp::getMapAttrName(), AffineMapAttr::get(map));
+      if (auto lop = dyn_cast<PxaLoadOp>(op)) {
+        auto vm = computeInnerValueMap(lop.getAffineMap(), lop.getMapOperands(),
+                                       opBlock);
+        OpBuilder replace(lop);
+        auto nlop = replace.create<PxaLoadOp>(
+            lop.getLoc(), lop.getMemRef(), vm.getAffineMap(), vm.getOperands());
+        lop.replaceAllUsesWith(nlop.result());
       }
     }
   }

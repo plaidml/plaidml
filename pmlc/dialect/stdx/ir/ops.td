@@ -8,6 +8,7 @@ include "mlir/IR/OpBase.td"
 #endif
 
 include "mlir/Interfaces/SideEffectInterfaces.td"
+include "mlir/Interfaces/ViewLikeInterface.td"
 
 
 def StdX_Dialect : Dialect {
@@ -22,8 +23,7 @@ class StdX_Op<string mnemonic, list<OpTrait> traits = []> :
   let verifier = [{ return verify$cppClass(*this); }];
 }
 
-def FPToUIOp :
-    StdX_Op<"fptoui", [NoSideEffect]> {
+def FPToUIOp : StdX_Op<"fptoui", [NoSideEffect]> {
   let summary = "cast from floating-point to unsigned integer type";
   let arguments = (ins AnyType:$result);
   let results = (outs AnyType);
@@ -33,17 +33,25 @@ def FPToUIOp :
   >];
 }
 
-class StdX_Plain_Op<string mnemonic, list<OpTrait> traits = []> :
-    Op<StdX_Dialect, mnemonic, traits> {
+def UIToFPOp : StdX_Op<"uitofp", [NoSideEffect]> {
+  let summary = "cast from unsigned integer to floating-point type";
+  let arguments = (ins AnyType:$result);
+  let results = (outs AnyType);
+  let builders = [OpBuilder<
+    "OpBuilder &builder, OperationState &result, Value source, Type destType",
+    [{ buildUIToFPOp(builder, result, source, destType); }]
+  >];
 }
 
-def ReshapeOp : StdX_Plain_Op<"reshape"> {
+def ReshapeOp : StdX_Op<"reshape",
+  [DeclareOpInterfaceMethods<ViewLikeOpInterface>]> {
   let summary = "tensor reshape operation";
   let arguments = (ins AnyMemRef:$tensor);
   let results = (outs AnyMemRef:$result);
   let assemblyFormat = [{
     `(` $tensor `)` attr-dict `:` functional-type($tensor, results)
   }];
+  let verifier = ?;
 }
 
 class StdX_UnaryFuncOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
@@ -53,6 +61,7 @@ class StdX_UnaryFuncOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
   let assemblyFormat = [{
     `(` $value `)` attr-dict `:` functional-type(operands, results)
   }];
+  let verifier = ?;
 }
 
 def ACosOp : StdX_UnaryFuncOp<"acos"> {
@@ -79,13 +88,14 @@ def FloorOp : StdX_UnaryFuncOp<"floor"> {
   let summary = "integer floor";
 }
 
-def PowOp : StdX_Plain_Op<"pow"> {
+def PowOp : StdX_Op<"pow"> {
   let summary = "raise to power";
   let arguments = (ins AnyType:$base, AnyType:$exponent);
   let results = (outs AnyType);
   let assemblyFormat = [{
     `(` $base `,` $exponent `)` attr-dict `:` functional-type(operands, results)
   }];
+  let verifier = ?;
 }
 
 def RoundOp : StdX_UnaryFuncOp<"round"> {

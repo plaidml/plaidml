@@ -2,7 +2,6 @@
 
 load("//vendor/bazel:repo.bzl", "http_archive")
 load("//vendor/conda:repo.bzl", "conda_repo")
-load("//vendor/openvino:workspace.bzl", "openvino_workspace")
 
 # Sanitize a dependency so that it works correctly from code that includes it as a submodule.
 def clean_dep(dep):
@@ -92,8 +91,8 @@ def plaidml_workspace():
         strip_prefix = "jsonnet-0.13.0",
     )
 
-    LLVM_COMMIT = "3149709e7f809405a861f4460c7c2aaf98ba350c"
-    LLVM_SHA256 = "7c9ae29375d3bc2e84f890b035197cab417a8393b28fdf561713108e30703e95"
+    LLVM_COMMIT = "ae1b53a07c63e03deafdcd4152a03c625161adcb"
+    LLVM_SHA256 = "eca41b349e99db0cde1e510cd28ea48b6ac09d4257dc7f9d7668342f0d46ddf0"
     LLVM_URL = "https://github.com/plaidml/llvm-project/archive/{commit}.tar.gz".format(commit = LLVM_COMMIT)
     http_archive(
         name = "llvm-project",
@@ -169,5 +168,3 @@ def plaidml_workspace():
         strip_prefix = "zlib-1.2.11",
         build_file = clean_dep("//bzl:zlib.BUILD"),
     )
-
-    openvino_workspace()

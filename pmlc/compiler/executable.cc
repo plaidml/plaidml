@@ -55,66 +55,54 @@ static std::string makePackedFunctionName(StringRef name) {
   return "_mlir_" + name.str();
 }
 
-// For each function in the LLVM module, define an interface function that wraps
-// all the arguments of the original function and all its results into an i8**
-// pointer to provide a unified invocation interface.
-static void packFunctionArguments(llvm::Module *module) {
+std::string makeCWrapperFunctionName(StringRef name) {
+  return "_mlir_ciface_" + name.str();
+}
+
+// Define an interface function that wraps all the arguments of the original
+// function and all its results into an i8** pointer to provide a unified
+// invocation interface.
+static std::string packFunctionArguments(llvm::Module *module,
+                                         StringRef entry) {
   auto &ctx = module->getContext();
   llvm::IRBuilder<> builder(ctx);
-  DenseSet<llvm::Function *> interfaceFunctions;
-  for (auto &func : module->getFunctionList()) {
-    if (func.isDeclaration()) {
-      continue;
-    }
-    if (interfaceFunctions.count(&func)) {
-      continue;
-    }
+  auto funcName = makeCWrapperFunctionName(entry);
+  auto *func = module->getFunction(funcName);
 
-    // Given a function `foo(<...>)`, define the interface function
-    // `mlir_foo(i8**)`.
-    auto newType = llvm::FunctionType::get(
-        builder.getVoidTy(), builder.getInt8PtrTy()->getPointerTo(),
-        /*isVarArg=*/false);
-    auto newName = makePackedFunctionName(func.getName());
-    auto funcCst = module->getOrInsertFunction(newName, newType);
-    llvm::Function *interfaceFunc = cast<llvm::Function>(funcCst.getCallee());
-    interfaceFunctions.insert(interfaceFunc);
+  // Given a function `foo(<...>)`, define the interface function
+  // `mlir_foo(i8**)`.
+  auto newType = llvm::FunctionType::get(builder.getVoidTy(),
+                                         builder.getInt8PtrTy()->getPointerTo(),
+                                         /*isVarArg=*/false);
+  auto newName = makePackedFunctionName(entry);
+  auto funcCst = module->getOrInsertFunction(newName, newType);
+  llvm::Function *interfaceFunc = cast<llvm::Function>(funcCst.getCallee());
 
-    // Extract the arguments from the type-erased argument list and cast them to
-    // the proper types.
-    auto bb = llvm::BasicBlock::Create(ctx);
-    bb->insertInto(interfaceFunc);
-    builder.SetInsertPoint(bb);
-    llvm::Value *argList = interfaceFunc->arg_begin();
-    SmallVector<llvm::Value *, 8> args;
-    args.reserve(llvm::size(func.args()));
-    for (auto &indexedArg : llvm::enumerate(func.args())) {
-      llvm::Value *argIndex = llvm::Constant::getIntegerValue(
-          builder.getInt64Ty(), APInt(64, indexedArg.index()));
-      llvm::Value *argPtrPtr = builder.CreateGEP(argList, argIndex);
-      llvm::Value *argPtr = builder.CreateLoad(argPtrPtr);
-      argPtr = builder.CreateBitCast(
-          argPtr, indexedArg.value().getType()->getPointerTo());
-      llvm::Value *arg = builder.CreateLoad(argPtr);
-      args.push_back(arg);
-    }
-
-    // Call the implementation function with the extracted arguments.
-    llvm::Value *result = builder.CreateCall(&func, args);
-
-    // Assuming the result is one value, potentially of type `void`.
-    if (!result->getType()->isVoidTy()) {
-      llvm::Value *retIndex = llvm::Constant::getIntegerValue(
-          builder.getInt64Ty(), APInt(64, llvm::size(func.args())));
-      llvm::Value *retPtrPtr = builder.CreateGEP(argList, retIndex);
-      llvm::Value *retPtr = builder.CreateLoad(retPtrPtr);
-      retPtr = builder.CreateBitCast(retPtr, result->getType()->getPointerTo());
-      builder.CreateStore(result, retPtr);
-    }
-
-    // The interface function returns void.
-    builder.CreateRetVoid();
+  // Extract the arguments from the type-erased argument list and cast them to
+  // the proper types.
+  auto bb = llvm::BasicBlock::Create(ctx);
+  bb->insertInto(interfaceFunc);
+  builder.SetInsertPoint(bb);
+  llvm::Value *argList = interfaceFunc->arg_begin();
+  SmallVector<llvm::Value *, 8> args;
+  args.reserve(llvm::size(func->args()));
+  for (auto &indexedArg : llvm::enumerate(func->args())) {
+    llvm::Value *argIndex = llvm::Constant::getIntegerValue(
+        builder.getInt64Ty(), APInt(64, indexedArg.index()));
+    llvm::Value *argPtrPtr = builder.CreateGEP(argList, argIndex);
+    llvm::Value *argPtr = builder.CreateLoad(argPtrPtr);
+    llvm::Value *arg =
+        builder.CreateBitCast(argPtr, indexedArg.value().getType());
+    args.push_back(arg);
   }
+
+  // Call the implementation function with the extracted arguments.
+  builder.CreateCall(func, args);
+
+  // The interface function returns void.
+  builder.CreateRetVoid();
+
+  return newName;
 }
 
 namespace pmlc::compiler {
@@ -125,6 +113,7 @@ private:
     void *basePtr;
     void *data;
     int64_t offset;
+    int64_t sizesAndStrides[];
   };
 
 public:
@@ -133,6 +122,15 @@ public:
     auto base = reinterpret_cast<Base *>(memory.data());
     base->basePtr = data;
     base->data = data;
+    auto rank = type.getRank();
+    auto shape = type.getShape();
+    auto memRefType = MemRefType::get(shape, type.getElementType());
+    SmallVector<int64_t, 8> strides;
+    getStridesAndOffset(memRefType, strides, base->offset);
+    for (unsigned i = 0; i < rank; i++) {
+      base->sizesAndStrides[i] = shape[i];
+      base->sizesAndStrides[i + rank] = strides[i];
+    }
   }
 
   void *ptr() { return memory.data(); }
@@ -303,14 +301,13 @@ struct ExecutableImpl {
     }
 
     setupTargetTriple(llvmModule.get());
-    packFunctionArguments(llvmModule.get());
+    auto entryPoint = packFunctionArguments(llvmModule.get(), program->entry);
 
     if (VLOG_IS_ON(6)) {
       llvmModule->print(llvm::errs(), nullptr);
     }
 
-    jitEntry = impl->compile(std::move(llvmModule),
-                             makePackedFunctionName(program->entry));
+    jitEntry = impl->compile(std::move(llvmModule), entryPoint);
     if (!jitEntry) {
       throw std::runtime_error("jitEntry function is null");
     }

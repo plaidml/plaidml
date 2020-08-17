@@ -37,9 +37,8 @@ struct TestStrideInfoPass : public TestStrideInfoBase<TestStrideInfoPass> {
     auto op = getOperation();
     op->walk([&](Operation *op) {
       llvm::TypeSwitch<Operation *>(op)
-          .Case<AffineLoadOp>([](auto op) { printStrideInfo(op); })
-          .Case<AffineStoreOp>([](auto op) { printStrideInfo(op); })
-          .Case<AffineReduceOp>([](auto op) { printStrideInfo(op); });
+          .Case<PxaLoadOp>([](auto op) { printStrideInfo(op); })
+          .Case<PxaReduceOp>([](auto op) { printStrideInfo(op); });
     });
   }
 };

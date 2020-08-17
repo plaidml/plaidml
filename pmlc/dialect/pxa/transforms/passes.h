@@ -15,6 +15,8 @@ namespace pmlc::dialect::pxa {
 
 std::unique_ptr<mlir::Pass> createAutoTileExamplePass();
 
+std::unique_ptr<mlir::Pass> createVectorizeExamplePass();
+
 std::unique_ptr<mlir::Pass> createFusionPass();
 
 std::unique_ptr<mlir::Pass> createLocalizePass();
@@ -28,8 +30,7 @@ struct StencilCost {
   unsigned startupCost;
 };
 
-using StencilCostFunction =
-    std::function<StencilCost(llvm::ArrayRef<unsigned>)>;
+using StencilCostFunction = std::function<StencilCost(llvm::ArrayRef<int64_t>)>;
 
 std::unique_ptr<mlir::Pass> createTestStrideInfoPass();
 
@@ -37,7 +38,7 @@ std::unique_ptr<mlir::Pass> createTestIndirectUsesIteratorPass();
 
 std::unique_ptr<mlir::Pass> createTestIndirectValuesIteratorPass();
 
-std::unique_ptr<mlir::Pass> createXSMMStencilPass(unsigned numThreads,
+std::unique_ptr<mlir::Pass> createStencilGEMMPass(unsigned numThreads,
                                                   StencilCostFunction costFn);
 
 } // namespace pmlc::dialect::pxa

@@ -16,6 +16,7 @@ plaidml_cc_library(
     local_defines = ["VULKAN_RT_BUILD"],
     deps = [
         "//pmlc/compiler",
+        "@half",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:SPIRVLowering",
         "@llvm-project//mlir:mlir_runner_utils",

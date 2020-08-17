@@ -14,8 +14,8 @@ namespace pmlc::dialect::pxa {
 
 namespace {
 
-using WriteRead = std::pair<AffineReduceOp, AffineLoadOp>;
-using WriteWrite = std::pair<AffineReduceOp, AffineReduceOp>;
+using WriteRead = std::pair<PxaReduceOp, PxaLoadOp>;
+using WriteWrite = std::pair<PxaReduceOp, PxaReduceOp>;
 
 struct FusionInfo {
   struct AffineParallelInfo {
@@ -43,9 +43,9 @@ struct FusionInfo {
       : aInfo{apA}, bInfo{apB}, hasPlan(false) {}
 
   // Helper method to find the original source write of a state update.
-  static AffineReduceOp findSourceWrite(Value val) {
+  static PxaReduceOp findSourceWrite(Value val) {
     auto opRes = val.dyn_cast<OpResult>();
-    if (auto op = dyn_cast_or_null<AffineReduceOp>(opRes.getOwner())) {
+    if (auto op = dyn_cast_or_null<PxaReduceOp>(opRes.getOwner())) {
       return op;
     }
     if (auto op = dyn_cast<AffineParallelOp>(opRes.getOwner())) {
@@ -215,11 +215,11 @@ struct FusionInfo {
           continue;
         // Now we make sure it's a read or a write, if not, we can't do fusion,
         // bail.
-        if (auto read = dyn_cast<AffineLoadOp>(user)) {
+        if (auto read = dyn_cast<PxaLoadOp>(user)) {
           if (!considerPlan(write, read))
             return false;
           readAfterWrites.emplace_back(write, read);
-        } else if (auto write2 = dyn_cast<AffineReduceOp>(user)) {
+        } else if (auto write2 = dyn_cast<PxaReduceOp>(user)) {
           if (!considerPlan(write, write2))
             return false;
           writeAfterWrites.emplace_back(write, write2);
@@ -284,9 +284,15 @@ struct FusionInfo {
                                  lowerExprsC, aInfo.op.getContext());
     auto upperC = AffineMap::get(aInfo.op.upperBoundsMap().getNumDims(), 0,
                                  upperExprsC, aInfo.op.getContext());
+    SmallVector<AtomicRMWKind, 8> reductions(typesC.size(),
+                                             AtomicRMWKind::assign);
     auto apC = builder.create<AffineParallelOp>(
-        aInfo.op.getLoc(), typesC, lowerC, aInfo.op.getLowerBoundsOperands(),
-        upperC, aInfo.op.getUpperBoundsOperands(), stepsC);
+        aInfo.op.getLoc(),
+        /*resultTypes=*/typesC,
+        /*reductions=*/reductions,
+        /*lbMap=*/lowerC, /*lbArgs=*/aInfo.op.getLowerBoundsOperands(),
+        /*ubMap=*/upperC, /*ubArgs=*/aInfo.op.getUpperBoundsOperands(),
+        /*steps=*/stepsC);
 
     // Move the two parallel for's inside the new op
     aInfo.op.getOperation()->moveBefore(apC.getBody(), apC.getBody()->end());

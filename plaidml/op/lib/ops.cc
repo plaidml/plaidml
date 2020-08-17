@@ -31,7 +31,7 @@ Value cumprod(const Value&);
 Value cumsum(const Value&);
 Value dot(const Value&);
 Value elu(const Value&);
-Value expand_dims(const Value&);
+Value explicit_padding(const Value&);
 Value flip(const Value&);
 Value hard_sigmoid(const Value&);
 Value image_resize(const Value&);
@@ -40,6 +40,7 @@ Value maximum(const Value&);
 Value mean(const Value&);
 Value min(const Value&);
 Value minimum(const Value&);
+Value mvn(const Value&);
 Value l2norm(const Value&);
 Value pool(const Value&);
 Value prod(const Value&);
@@ -56,6 +57,7 @@ Value squeeze(const Value&);
 Value sum(const Value&);
 Value tile(const Value&);
 Value transpose(const Value&);
+Value unsqueeze(const Value&);
 Value variance(const Value&);
 
 namespace {
@@ -181,14 +183,29 @@ std::ostream& operator<<(std::ostream& os, const AutoGroupMode& mode) {
 
 std::string to_string(AutoPadMode mode) {
   switch (mode) {
-    case AutoPadMode::NONE:
-      return "AutoPadMode::NONE (a.k.a. EXPLICIT)";
+    case AutoPadMode::EXPLICIT:
+      return "AutoPadMode::EXPLICIT";
     case AutoPadMode::SAME_LOWER:
       return "AutoPadMode::SAME_LOWER";
     case AutoPadMode::SAME_UPPER:
       return "AutoPadMode::SAME_UPPER";
     case AutoPadMode::VALID:
       return "AutoPadMode::VALID";
+    default:
+      return "<<UNRECOGNIZED AutoPadMode>>";
+  }
+}
+
+std::string to_string(PadMode mode) {
+  switch (mode) {
+    case PadMode::CONSTANT:
+      return "PadMode::CONSTANT";
+    case PadMode::EDGE:
+      return "PadMode::EDGE";
+    case PadMode::REFLECT:
+      return "PadMode::REFLECT";
+    case PadMode::SYMMETRIC:
+      return "PadMode::SYMMETRIC";
     default:
       return "<<UNRECOGNIZED AutoPadMode>>";
   }
@@ -339,7 +356,7 @@ std::pair<TensorDim, TensorDim> compute_padding_and_output_size(  //
   auto F_eff = (dilation * (filter_size - 1)) + 1;      // Effective Filter Size
   int64_t ceil_term =
       use_ceil_for_output_shape ? stride - 1 : 0;  // TODO: Will need to confirm that this is the intended behavior
-  if (autopad_mode == AutoPadMode::NONE) {
+  if (autopad_mode == AutoPadMode::EXPLICIT) {
     TensorDim pad_before(pad_lo);
     TensorDim output_size((I_eff + pad_lo + pad_hi - F_eff + stride + ceil_term) / stride);
     return std::pair<TensorDim, TensorDim>(pad_before, output_size);
@@ -375,7 +392,7 @@ std::pair<TensorDim, TensorDim> compute_padding_and_input_size(  //
 
   auto O_eff = output_size;
   auto F_eff = (dilation * (filter_size - 1)) + 1;  // Effective Filter Size
-  if (autopad_mode == AutoPadMode::NONE) {
+  if (autopad_mode == AutoPadMode::EXPLICIT) {
     TensorDim pad_before(pad_lo);
     TensorDim input_size(O_eff * stride - pad_lo - pad_hi + F_eff - stride);
     return std::pair<TensorDim, TensorDim>(pad_before, input_size);
@@ -685,7 +702,7 @@ size_t compute_conv_rank_validating_strides(std::vector<int64_t>* strides, const
 
 void validate_conv_padding(const std::vector<int64_t>& manual_padding, AutoPadMode autopad_mode,
                            std::stringstream& args_log) {
-  if (!manual_padding.empty() && autopad_mode != AutoPadMode::NONE) {
+  if (!manual_padding.empty() && autopad_mode != AutoPadMode::EXPLICIT) {
     IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
     throw std::runtime_error("Autopadding and manual padding both requested for single conv operation");
   }
@@ -1582,42 +1599,79 @@ Value elu(const Value& value) {
   throw std::runtime_error("Unexpected type for alpha in elu");
 }
 
-Value expand_dims(const Value& value) {
-  IVLOG(1, "expand_dims");
-
-  // Read arguments
+Value explicit_padding(const Value& value) {
+  IVLOG(1, "explicit_padding");
   auto args = value.as_tuple();
-  if (args.size() != 2) {
-    throw std::runtime_error(llvm::formatv("PlaidML expand_dims op expects 2 arguments (received {0})", args.size()));
+  if (args.size() < 5) {
+    throw std::runtime_error("explicit_padding expects 5 arguments");
   }
-  auto I = args[0].as_tensor();
-  auto raw_axis = args[1].as_int();
 
-  // Initialize useful values
-  auto ndims = I.rank();
-  // Axis is relative to _output_ tensor, which has one more dim than I
-  size_t axis = normalize_axis(raw_axis, ndims + 1, "expand_dims");
-  std::vector<TensorDim> I_dims(ndims);
-  std::vector<TensorIndex> I_idxs;
+  auto I = args[0].as_tensor();
+  auto lo_pads = args[1].as_int_tuple();
+  auto hi_pads = args[2].as_int_tuple();
+  auto mode = validate<PadMode>(args[3].as_int());
+
+  // validate inputs
+
+  if (lo_pads.size() != I.rank()) {
+    IVLOG(1, lo_pads.size())
+    IVLOG(1, I.rank())
+    IVLOG(1, lo_pads[0])
+    throw std::runtime_error(
+        llvm::formatv("Inconsistent shapes in explicit_padding op (received an input tensor with {0} dims, "
+                      "but received lower padding for {1} dims.)",
+                      I.rank(), lo_pads.size()));
+  }
+  if (hi_pads.size() != I.rank()) {
+    throw std::runtime_error(
+        llvm::formatv("Inconsistent shapes in explicit_padding op (received an input tensor with {0} dims, "
+                      "but received higher padding for {1} dims.)",
+                      I.rank(), hi_pads.size()));
+  }
+
+  std::vector<TensorDim> I_dims;
   std::vector<TensorDim> O_dims;
+  std::vector<TensorIndex> I_idxs;
   std::vector<TensorIndex> O_idxs;
+
+  // Assign dimensions & indices
+  std::vector<TensorDim> X(I.rank());
+  std::vector<TensorIndex> x;
+  for (size_t i = 0; i < I.rank(); ++i) {
+    x.emplace_back(llvm::formatv("x{0}", i));
+  }
+
+  for (size_t i = 0; i < I.rank(); ++i) {
+    I_dims.push_back(X[i]);
+    I_idxs.push_back(x[i]);
+  }
   I.bind_dims(I_dims);
-  for (size_t i = 0; i < ndims; ++i) {
-    I_idxs.emplace_back(llvm::formatv("n{0}", i));
-    if (i == axis) {
-      O_dims.emplace_back(1);
-      O_idxs.emplace_back("a");
-    }
-    O_dims.push_back(I_dims[i]);
-    O_idxs.push_back(I_idxs[i]);
+
+  for (size_t i = 0; i < I.rank(); ++i) {
+    O_dims.push_back(X[i] + lo_pads[i] + hi_pads[i]);
+    O_idxs.push_back(x[i] + lo_pads[i]);
   }
-  if (axis == ndims) {
-    // This one case won't be caught in the main loop, so handle specially
-    O_dims.emplace_back(1);
-    O_idxs.emplace_back("a");
-  }
+
   auto O = TensorOutput(O_dims);
-  O(O_idxs) = I(I_idxs);
+
+  switch (mode) {
+    case PadMode::CONSTANT: {
+      IVLOG(1, "Constant padding requested");
+
+      auto padval = args[4].as_tensor();
+      I = I - padval;
+      O(O_idxs) = I(I_idxs);
+      O = O + padval;
+    } break;
+    case PadMode::EDGE:
+    case PadMode::SYMMETRIC:
+    case PadMode::REFLECT: {
+      throw std::runtime_error(llvm::formatv("Unimplemented padding mode: {0}", to_string(mode)));
+    } break;
+    default:
+      throw std::runtime_error(llvm::formatv("Unrecognized padding mode: {0}", to_string(mode)));
+  }
+
   return Value{O};
 }
 
@@ -1918,6 +1972,42 @@ Value minimum(const Value& value) {
   return Value{O};
 }
 
+Value mvn(const Value& value) {
+  IVLOG(1, "mvn");
+  auto args = value.as_tuple();
+  if (args.size() != 6) {
+    throw std::runtime_error("mvn expects 6 arguments");
+  }
+  auto I_raw = args[0];
+  auto I = args[0].as_tensor();
+  auto axes = args[1];
+  auto normalize_variance = args[2].as_bool();
+  auto epsilon = args[3].as_float();
+  auto across_channels = args[4].as_bool();
+  auto layout = args[5].as_str();
+  if (axes.is_none()) {
+    if (layout.empty()) {
+      throw std::runtime_error("Either axes or layout must be specified for MVN");
+    }
+    std::vector<int64_t> raw_axes;
+    for (size_t i = 0; i < layout.size(); i++) {
+      auto dim = layout[i];
+      if (dim == 'N') continue;
+      if (dim == 'C' && !across_channels) continue;
+      raw_axes.push_back(i);
+    }
+    axes = edsl::make_tuple(raw_axes);
+  }
+  auto R = I - mean(edsl::make_tuple(I_raw, axes, /*keepdims=*/true)).as_tensor();
+
+  if (normalize_variance) {
+    auto stdev = edsl::sqrt(variance(edsl::make_tuple(I_raw, axes, /*keepdims=*/true)).as_tensor());
+    R = R / maximum(edsl::make_tuple(stdev, Tensor(epsilon))).as_tensor();
+  }
+
+  return Value{R};
+}
+
 Value l2norm(const Value& value) {
   IVLOG(1, "l2norm");
   auto args = value.as_tuple();
@@ -2016,7 +2106,7 @@ Value pool(const Value& value) {
   auto I_channel_dims = I.rank() - spatial_rank - 1;
 
   // Verify inputs are consistent
-  if (manual_padding.size() && autopad_mode != AutoPadMode::NONE) {
+  if (manual_padding.size() && autopad_mode != AutoPadMode::EXPLICIT) {
     throw std::runtime_error("Autopadding and manual padding both requested for single pool operation");
   }
   if (strides.size() != spatial_rank) {
@@ -2543,21 +2633,21 @@ Value spatial_padding(const Value& value) {
   if (spatial_rank < 1) {
     throw std::runtime_error(llvm::formatv(
         "Insufficient spatial rank in spatial_padding op (At least 1 spatial dim required; received {0} spatial "
-        "dims based on an input tensor with {1} dims with a specified layout with {2} nonspatial dims.",
+        "dims based on an input tensor with {1} dims with a specified layout with {2} nonspatial dims.)",
         spatial_rank, I.rank(), nonspatial_ndims));
   }
   if (lo_pads.size() != spatial_rank) {
     throw std::runtime_error(
         llvm::formatv("Inconsistent spatial rank in spatial_padding op (received {0} spatial dim(s) based on an "
                       "input tensor with {1} dims with a specified layout with {2} nonspatial dims, but received "
-                      "lower padding for {3} spatial dims.",
+                      "lower padding for {3} spatial dims.)",
                       spatial_rank, I.rank(), nonspatial_ndims, lo_pads.size()));
   }
   if (hi_pads.size() != spatial_rank) {
     throw std::runtime_error(
         llvm::formatv("Inconsistent spatial rank in spatial_padding op (received {0} spatial dim(s) based on an "
                       "input tensor with {1} dims with a specified layout with {2} nonspatial dims, but received "
-                      "upper padding for {3} spatial dims.",
+                      "upper padding for {3} spatial dims.)",
                       spatial_rank, I.rank(), nonspatial_ndims, hi_pads.size()));
   }
 
@@ -2942,6 +3032,54 @@ Value transpose(const Value& value) {
   return Value{O};
 }
 
+Value unsqueeze(const Value& value) {
+  // Read arguments
+  auto args = value.as_tuple();
+  if (args.size() != 2) {
+    throw std::runtime_error(llvm::formatv("PlaidML unsqueeze op expects 2 arguments (received {0})", args.size()));
+  }
+
+  auto I = args[0].as_tensor();
+  auto ndims = I.rank();
+
+  std::vector<int64_t> raw_axes;
+  if (args[1].is_int()) {
+    raw_axes.push_back(args[1].as_int());
+  } else {
+    raw_axes = args[1].as_int_tuple();
+  }
+
+  std::set<size_t> axes;
+  for (auto& raw_axis : raw_axes) {
+    axes.insert(normalize_axis(raw_axis, ndims + raw_axes.size(), "unsqueeze"));
+  }
+
+  std::vector<TensorDim> I_dims(ndims);
+  std::vector<TensorIndex> I_idxs;
+  std::vector<TensorDim> O_dims;
+  std::vector<TensorIndex> O_idxs;
+  I.bind_dims(I_dims);
+  size_t src_loc = 0;
+  size_t new_rank = ndims + axes.size();
+  for (size_t i = 0; i < new_rank; i++) {
+    if (axes.count(i)) {
+      O_dims.push_back(edsl::TensorDim(1));
+      O_idxs.emplace_back(llvm::formatv("a{0}", i));
+    } else {
+      I_idxs.emplace_back(llvm::formatv("n{0}", i));
+      O_dims.push_back(I_dims[src_loc]);
+      O_idxs.push_back(I_idxs[src_loc]);
+      src_loc++;
+    }
+  }
+  if (src_loc != I.rank()) {
+    throw std::runtime_error(llvm::formatv("Unsqueeze did not replicate entirety of input into output"));
+  }
+  auto O = TensorOutput(O_dims);
+  O(O_idxs) = I(I_idxs);
+  return Value{O};
+}
+
 Value variance(const Value& value) {
   // This computes the *uncorrected* sample variance (i.e. denominator = n
   // rather than = n-1) to match tensorflow
@@ -3004,7 +3142,7 @@ void RegisterOps() {
   registry->Register("cumsum", cumsum);
   registry->Register("dot", dot);
   registry->Register("elu", elu);
-  registry->Register("expand_dims", expand_dims);
+  registry->Register("explicit_padding", explicit_padding);
   registry->Register("flip", flip);
   registry->Register("hard_sigmoid", hard_sigmoid);
   registry->Register("image_resize", image_resize);
@@ -3014,6 +3152,7 @@ void RegisterOps() {
   registry->Register("mean", mean);
   registry->Register("min", min);
   registry->Register("minimum", minimum);
+  registry->Register("mvn", mvn);
   registry->Register("l2norm", l2norm);
   registry->Register("pool", pool);
   registry->Register("prod", prod);
@@ -3031,6 +3170,7 @@ void RegisterOps() {
   registry->Register("sum", sum);
   registry->Register("tile", tile);
   registry->Register("transpose", transpose);
+  registry->Register("unsqueeze", unsqueeze);
   registry->Register("variance", variance);
 }
 

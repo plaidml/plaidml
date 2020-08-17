@@ -52,3 +52,6 @@ tool_names = [
 ]
 tools = [ToolSubst(s, unresolved='ignore') for s in tool_names]
 llvm_config.add_tool_substitutions(tools, tool_dirs)
+
+config.substitutions.append(('%plaidml_device', lit_config.params.get('plaidml_device', 'llvm_cpu.0')))
+config.substitutions.append(('%plaidml_target', lit_config.params.get('plaidml_target', 'llvm_cpu')))

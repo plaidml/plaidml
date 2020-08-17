@@ -170,8 +170,13 @@ static Value createCastOp(OpBuilder &builder, Location loc, Value from,
       return builder.create<mlir::FPTruncOp>(loc, from, intoType).getResult();
     }
     if (auto fromIntType = fromType.dyn_cast<IntegerType>()) {
-      // SIToFPOp: IntegerType -> FloatType
-      return builder.create<mlir::SIToFPOp>(loc, from, intoType).getResult();
+      if (fromSigned) {
+        // SIToFPOp: IntegerType -> FloatType
+        return builder.create<mlir::SIToFPOp>(loc, from, intoType).getResult();
+      } else {
+        // UIToFPOp: IntegerType -> FloatType
+        return builder.create<stdx::UIToFPOp>(loc, intoType, from).getResult();
+      }
     }
     if (auto fromIndexType = fromType.dyn_cast<IndexType>()) {
       auto i64Type = builder.getIntegerType(64);
@@ -274,6 +279,18 @@ struct AnyComparandIs : Matcher {
     auto operands = adaptor.operands();
     InnerPredicate pred;
     return pred.match(operands[0].getType()) ||
+           pred.match(operands[1].getType());
+  }
+};
+
+template <typename InnerPredicate>
+struct ComparandsAre : Matcher {
+  bool match(Operation *op) const final {
+    SmallVector<Value, 4> allOperands(op->getOperands());
+    ContractionOpAdaptor adaptor(allOperands);
+    auto operands = adaptor.operands();
+    InnerPredicate pred;
+    return pred.match(operands[0].getType()) &&
            pred.match(operands[1].getType());
   }
 };
@@ -546,9 +563,10 @@ static void updateAffineMap(Operation *in, const PaddingInfo &padding) {
   in->setAttr("map", AffineMapAttr::get(accMap));
 }
 
-static Value buildBroadcastLoad(OpBuilder &builder, Location loc, Value operand,
-                                unsigned outRank,
-                                Optional<PaddingInfo> maybePadding) {
+static Value
+buildBroadcastLoad(OpBuilder &builder, Location loc, Value operand,
+                   unsigned outRank,
+                   Optional<PaddingInfo> maybePadding = llvm::None) {
   auto body = builder.getBlock();
   auto defOp = operand.getDefiningOp();
   Attribute attr;
@@ -559,21 +577,57 @@ static Value buildBroadcastLoad(OpBuilder &builder, Location loc, Value operand,
   // handle broadcasts
   auto operandType = operand.getType().cast<MemRefType>();
   assert(operandType.getRank() <= outRank && "result rank < operand rank");
-  auto op_shape = operandType.getShape();
+  auto shape = operandType.getShape();
   SmallVector<Value, 8> operandIdxs(operandType.getRank());
   for (unsigned i = 0; i < operandType.getRank(); i++) {
     unsigned j = outRank - i - 1;
     unsigned k = operandType.getRank() - i - 1;
-    if (op_shape[k] == 1) {
+    if (shape[k] == 1) {
       operandIdxs[k] = builder.create<mlir::ConstantIndexOp>(loc, 0);
     } else {
       operandIdxs[k] = body->getArgument(j);
     }
   }
-  auto loadOp = builder.create<AffineLoadOp>(loc, operand, operandIdxs);
+  auto loadOp = builder.create<pxa::PxaLoadOp>(loc, operand, operandIdxs);
   if (maybePadding)
     updateAffineMap(loadOp, *maybePadding);
   return loadOp;
+}
+
+static AtomicRMWKind convertAgg(AggregationKind agg, Type type) {
+  switch (agg) {
+  case AggregationKind::assign:
+    return AtomicRMWKind::assign;
+  case AggregationKind::add:
+    if (type.isa<FloatType>()) {
+      return AtomicRMWKind::addf;
+    } else {
+      return AtomicRMWKind::addi;
+    }
+  case AggregationKind::mul:
+    if (type.isa<FloatType>()) {
+      return AtomicRMWKind::mulf;
+    } else {
+      return AtomicRMWKind::muli;
+    }
+  case AggregationKind::min:
+    if (type.isa<FloatType>()) {
+      return AtomicRMWKind::minf;
+    } else if (type.isSignedInteger()) {
+      return AtomicRMWKind::mins;
+    } else {
+      return AtomicRMWKind::minu;
+    }
+  case AggregationKind::max:
+    if (type.isa<FloatType>()) {
+      return AtomicRMWKind::maxf;
+    } else if (type.isSignedInteger()) {
+      return AtomicRMWKind::maxs;
+    } else {
+      return AtomicRMWKind::maxu;
+    }
+  }
+  llvm_unreachable("Invalid agg type in convertAgg");
 }
 
 static Value buildSimpleStore(OpBuilder &builder, Location loc, Value scalar,
@@ -585,10 +639,10 @@ static Value buildSimpleStore(OpBuilder &builder, Location loc, Value scalar,
   if (elementType != scalar.getType()) {
     scalar = createCastOp(builder, loc, scalar, false, elementType, false);
   }
-  auto aggOp = AggregationKind::assign;
+  auto aggOp = AtomicRMWKind::assign;
   auto idMap = builder.getMultiDimIdentityMap(memRefType.getRank());
-  auto storeOp = builder.create<pxa::AffineReduceOp>(
-      loc, aggOp, scalar, memRef, idMap, body->getArguments());
+  auto storeOp = builder.create<pxa::PxaReduceOp>(loc, aggOp, scalar, memRef,
+                                                  idMap, body->getArguments());
   if (maybePadding)
     updateAffineMap(storeOp, *maybePadding);
   return storeOp;
@@ -623,10 +677,13 @@ struct BufferAllocator {
     if (maybePadding) {
       auto initValue = createInit(builder, loc, elementType, maybePadding->agg);
       auto parallel = builder.create<AffineParallelOp>(
-          loc, ArrayRef<Type>({memRefType}), shape);
+          loc,
+          /*resultTypes=*/ArrayRef<Type>{memRefType},
+          /*reductions=*/ArrayRef<AtomicRMWKind>{AtomicRMWKind::assign},
+          /*ranges=*/shape);
       auto parallelBuilder = parallel.getBodyBuilder();
-      auto load = buildBroadcastLoad(parallelBuilder, loc, initValue,
-                                     shape.size(), llvm::None);
+      auto load =
+          buildBroadcastLoad(parallelBuilder, loc, initValue, shape.size());
       auto stored = buildSimpleStore(parallelBuilder, loc, load, resultMemRef,
                                      llvm::None);
       parallelBuilder.create<AffineYieldOp>(loc, ValueRange{stored});
@@ -711,8 +768,10 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
 
     // Make a parallel for loop to fill the result
     auto forOp = rewriter.create<AffineParallelOp>(
-        loc, ArrayRef<Type>({alloc.memRefType}),
-        alloc.rankedTensorType.getShape());
+        loc,
+        /*resultTypes=*/ArrayRef<Type>{alloc.memRefType},
+        /*reductions=*/ArrayRef<AtomicRMWKind>{AtomicRMWKind::assign},
+        /*ranges=*/alloc.rankedTensorType.getShape());
     auto body = forOp.getBody();
     rewriter.setInsertionPointToStart(body);
 
@@ -738,7 +797,7 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
     // Create the store
     auto stored = buildSimpleStore(rewriter, loc, result, alloc.resultMemRef,
                                    getPaddingInfo(op));
-    rewriter.create<AffineYieldOp>(loc, ValueRange({stored}));
+    rewriter.create<AffineYieldOp>(loc, ValueRange{stored});
 
     // Replace output with the newly allocated buffer
     rewriter.replaceOp(op, forOp.getResult(0));
@@ -788,7 +847,10 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
     // Do initialization
     auto shape = alloc.rankedTensorType.getShape();
     auto parallel = rewriter.create<AffineParallelOp>(
-        loc, ArrayRef<Type>({alloc.memRefType}), shape);
+        loc,
+        /*resultTypes=*/ArrayRef<Type>{alloc.memRefType},
+        /*reductions=*/ArrayRef<AtomicRMWKind>{AtomicRMWKind::assign},
+        /*ranges=*/shape);
     auto parallelBuilder = parallel.getBodyBuilder();
     auto maybePadding = getPaddingInfo(op.init().getDefiningOp());
     auto load = buildBroadcastLoad(parallelBuilder, loc, cionAdaptor.init(),
@@ -797,7 +859,7 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
                                   alloc.resultMemRef, getPaddingInfo(op));
     if (maybePadding)
       updateAffineMap(store.getDefiningOp(), *maybePadding);
-    parallelBuilder.create<AffineYieldOp>(loc, ValueRange({store}));
+    parallelBuilder.create<AffineYieldOp>(loc, ValueRange{store});
     auto filled = parallel.getResult(0);
 
     // Determine lower and upper bounds.
@@ -817,6 +879,7 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
     auto forOp = rewriter.create<AffineParallelOp>(
         loc,
         /*resultTypes=*/ArrayRef<Type>{alloc.memRefType},
+        /*reductions=*/ArrayRef<AtomicRMWKind>{AtomicRMWKind::assign},
         /*lbMap=*/op.lowerBounds().getValue(),
         /*lbArgs=*/ArrayRef<Value>{},
         /*ubMap=*/ubMap,
@@ -848,7 +911,7 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
         scalars.push_back(operand);
       } else {
         auto map = srcs[i].cast<AffineMapAttr>().getValue();
-        auto loadOp = rewriter.create<AffineLoadOp>(loc, operand, map, idxs);
+        auto loadOp = rewriter.create<pxa::PxaLoadOp>(loc, operand, map, idxs);
         auto maybePadding = getPaddingInfo(op.operands()[i].getDefiningOp());
         if (maybePadding)
           updateAffineMap(loadOp, *maybePadding);
@@ -867,19 +930,20 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
 
     // Create the store
     auto resultMap = op.sink();
-    pxa::AffineReduceOp reduceOp;
+    pxa::PxaReduceOp reduceOp;
+    auto agg = convertAgg(op.agg(), alloc.elementType);
     if (resultMap.isEmpty()) {
       SmallVector<Value, 0> emptyIdxs;
-      reduceOp = rewriter.create<pxa::AffineReduceOp>(
-          loc, op.agg(), combined, filled, resultMap, emptyIdxs);
+      reduceOp = rewriter.create<pxa::PxaReduceOp>(loc, agg, combined, filled,
+                                                   resultMap, emptyIdxs);
     } else {
-      reduceOp = rewriter.create<pxa::AffineReduceOp>(loc, op.agg(), combined,
-                                                      filled, resultMap, idxs);
+      reduceOp = rewriter.create<pxa::PxaReduceOp>(loc, agg, combined, filled,
+                                                   resultMap, idxs);
     }
     maybePadding = getPaddingInfo(op);
     if (maybePadding)
       updateAffineMap(reduceOp, *maybePadding);
-    rewriter.create<AffineYieldOp>(loc, ValueRange({reduceOp}));
+    rewriter.create<AffineYieldOp>(loc, ValueRange{reduceOp});
 
     // Replace the op
     rewriter.replaceOp(op, forOp.getResult(0));
@@ -905,7 +969,10 @@ struct IndexOpConversion : public OpConversionPattern<IndexOp> {
 
     // Make a parallel for loop to fill the result
     auto forOp = rewriter.create<AffineParallelOp>(
-        loc, ArrayRef<Type>{resultType}, resultType.getShape());
+        loc,
+        /*resultTypes=*/ArrayRef<Type>{resultType},
+        /*reductions=*/ArrayRef<AtomicRMWKind>{AtomicRMWKind::assign},
+        /*ranges=*/resultType.getShape());
     auto body = forOp.getBody();
     rewriter.setInsertionPointToStart(body);
     auto idxs = body->getArguments();
@@ -921,7 +988,7 @@ struct IndexOpConversion : public OpConversionPattern<IndexOp> {
                                                    rewriter.getIntegerType(32));
     auto stored =
         buildSimpleStore(rewriter, loc, cast, resultMemRef, getPaddingInfo(op));
-    rewriter.create<AffineYieldOp>(loc, ValueRange({stored}));
+    rewriter.create<AffineYieldOp>(loc, ValueRange{stored});
 
     // Replace the op
     rewriter.replaceOp(op, forOp.getResult(0));
@@ -997,36 +1064,36 @@ struct CastOpConversion : public OpConversionPattern<ew::CastOp> {
                   ConversionPatternRewriter &rewriter) const override {
     IVLOG(2, "CastOpConversion::matchAndRewrite>");
 
-    // Gather some basic info
     auto loc = op.getLoc();
     TypeConverter typeConverter;
-
     auto oldResultType = op.result().getType();
     auto resultType =
         typeConverter.convertType(oldResultType).cast<MemRefType>();
     auto operand = operands[0];
-    auto operandType = operand.getType().cast<MemRefType>();
-    if (resultType == operandType) {
+    if (resultType == operand.getType()) {
       rewriter.replaceOp(op, operand);
       return success();
     }
-    bool resultIsSigned = getElementType(oldResultType).isSignedInteger();
 
     // Make an allocation for the output
     auto resultMemRef = rewriter.create<AllocOp>(loc, resultType).getResult();
 
     // Make a parallel for loop to fill the result
     auto forOp = rewriter.create<AffineParallelOp>(
-        loc, ArrayRef<Type>{resultType}, resultType.getShape());
+        loc,
+        /*resultTypes=*/ArrayRef<Type>{resultType},
+        /*reductions=*/ArrayRef<AtomicRMWKind>{AtomicRMWKind::assign},
+        /*ranges=*/resultType.getShape());
     auto body = forOp.getBody();
     rewriter.setInsertionPointToStart(body);
-    auto idxs = body->getArguments();
 
     // Create the load
-    auto scalar = rewriter.create<AffineLoadOp>(loc, operand, idxs);
+    auto scalar =
+        buildBroadcastLoad(rewriter, loc, operand, resultType.getRank());
 
     // Create the standard cast op
     auto dtype = getElementType(op.tensor());
+    bool resultIsSigned = getElementType(oldResultType).isSignedInteger();
     auto result = createCastOp(rewriter, loc, scalar, dtype.isSignedInteger(),
                                resultType.getElementType(), resultIsSigned);
 
@@ -1038,7 +1105,6 @@ struct CastOpConversion : public OpConversionPattern<ew::CastOp> {
     // Replace the op
     rewriter.replaceOp(op, forOp.getResult(0));
 
-    IVLOG(2, "CastOpConversion::matchAndRewrite returns success");
     return success();
   }
 };
@@ -1132,10 +1198,10 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
                                 ResultIs<EltwiseInteger>>,
         ContractionOpConversion<CombinationKind::eq,
                                 CmpFloatOp<CmpFPredicate::OEQ>,
-                                ResultIs<EltwiseFloat>>,
+                                AnyComparandIs<EltwiseFloat>>,
         ContractionOpConversion<CombinationKind::eq,
                                 CmpIntOp<CmpIPredicate::eq>,
-                                ResultIs<EltwiseInteger>>,
+                                ComparandsAre<EltwiseInteger>>,
         ContractionOpConversion<CombinationKind::cond,
                                 CondOp<CmpFloatOp<CmpFPredicate::OEQ>>,
                                 AnyComparandIs<EltwiseFloat>>,
@@ -1146,7 +1212,7 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
         EltwiseOpConversion<ew::LogOp, StdOp<mlir::LogOp>,
                             ResultIs<EltwiseFloat>>,
         EltwiseOpConversion<ew::PowOp, StdOp<stdx::PowOp>,
-                            OperandsAre<EltwiseFloat>>,
+                            ResultIs<EltwiseFloat>>,
         EltwiseOpConversion<ew::ErfOp, StdOp<stdx::ErfOp>,
                             OperandsAre<EltwiseFloat>>,
         EltwiseOpConversion<ew::CosOp, StdOp<mlir::CosOp>,

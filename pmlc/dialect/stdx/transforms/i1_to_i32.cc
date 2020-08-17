@@ -13,7 +13,7 @@ namespace pmlc::dialect::stdx {
 
 namespace {
 
-/// Changes loadOp from i1 memref to loadOp i32 followed by creting constant
+/// Changes loadOp from i1 memref to loadOp i32 followed by creating constant
 /// value 0 of i32 type and doing cmpi afterwards, next this bool-like type will
 /// be produced
 class LoadOpI1ToI32 final : public OpRewritePattern<LoadOp> {
@@ -35,7 +35,7 @@ public:
 };
 } // namespace
 
-/// Changes loadOp from i1 memref to loadOp i32 followed by creting constant
+/// Changes loadOp from i1 memref to loadOp i32 followed by creating constant
 /// value 0 of i32 type and doing cmpi afterwards, next this bool-like type will
 /// be produced
 LogicalResult LoadOpI1ToI32::matchAndRewrite(LoadOp loadOp,

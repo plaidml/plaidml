@@ -18,11 +18,11 @@ namespace {
 struct MemRefAccess {
   AffineValueMap accessMap;
 
-  explicit MemRefAccess(AffineLoadOp op) {
+  explicit MemRefAccess(PxaLoadOp op) {
     getAccessMap(op.getAffineMap(), op.getMapOperands(), &accessMap);
   }
 
-  explicit MemRefAccess(AffineReduceOp op) {
+  explicit MemRefAccess(PxaReduceOp op) {
     getAccessMap(op.getAffineMap(), op.getMapOperands(), &accessMap);
   }
 
@@ -49,14 +49,14 @@ struct MemRefDataFlowOptPass
   void runOnFunction() final {
     // Walk all load's and perform reduce to load forwarding.
     FuncOp f = getFunction();
-    f.walk([&](AffineLoadOp loadOp) {
+    f.walk([&](PxaLoadOp loadOp) {
       auto defOp = loadOp.getMemRef().getDefiningOp();
       if (!defOp) {
         return;
       }
 
-      auto reduceOp = dyn_cast_or_null<AffineReduceOp>(defOp);
-      if (!reduceOp || reduceOp.agg() != AggregationKind::assign) {
+      auto reduceOp = dyn_cast_or_null<PxaReduceOp>(defOp);
+      if (!reduceOp || reduceOp.agg() != AtomicRMWKind::assign) {
         return;
       }
 

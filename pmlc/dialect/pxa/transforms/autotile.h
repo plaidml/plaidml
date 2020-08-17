@@ -74,7 +74,7 @@ private:
 // ArrayRef<int64_t>) to a double, which is 'inf' for infeasible tilings.  For
 // example:
 
-inline double DummyCostModel(ArrayRef<int64_t> tile) { return 1.0; }
+inline double DummyCostModel(ArrayRef<int64_t> tile, double bestCost) { return 1.0; }
 
 // Given a generator and cost model, find the best tile size, return empty
 // tiling when all tiles are infeasible
@@ -96,7 +96,7 @@ llvm::SmallVector<int64_t, 8> findBestTileSize(const Generator &generator,
   // Build a recursive lambda to walk over the options (thanks c++14!)
   auto recurse = [&](auto &self, size_t idx) -> void {
     if (idx == allowedTileSizes.size()) {
-      double newCost = costModel(curTileSize);
+      double newCost = costModel(curTileSize, bestCost);
       if (newCost < bestCost) {
         bestCost = newCost;
         bestTileSize = curTileSize;

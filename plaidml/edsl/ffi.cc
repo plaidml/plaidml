@@ -23,6 +23,7 @@
 #include "pmlc/util/all_dialects.h"
 #include "pmlc/util/all_passes.h"
 #include "pmlc/util/enums.h"
+#include "pmlc/util/env.h"
 
 using plaidml::core::convertFromDataType;
 using plaidml::core::convertIntoDataType;
@@ -990,7 +991,8 @@ plaidml_program* plaidml_compile(  //
       }
     }
     *raw_args = new plaidml_program_args{nargs, args};
-    program->compile(target, debug);
+    auto dumpDir = pmlc::util::getEnvVar("PLAIDML_DUMP");
+    program->compile(target, /*collectPasses=*/debug, /*dumpDir=*/dumpDir);
     return ret;
   });
 }

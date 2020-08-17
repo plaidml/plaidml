@@ -18,8 +18,7 @@
 // `DoStenciling` Overview
 // -----------------------
 //  `DoStenciling` will first find appropriate IO ops (i.e., loads
-//  (`mlir::AffineLoadOp`) and stores (`mlir::AffineStoreOp` or
-//  `pxa::AffineReduceOp`)) using the `capture` function.
+//  (`PxaLoadOp`) and stores (pxa::PxaReduceOp`)) using the `capture` function.
 //
 //  It will then iterate through all permutations of the IO ops that have all
 //  stores precede all loads, and all permutations of `op`'s `BlockArgument`s as
@@ -155,7 +154,7 @@ struct TensorAndIndexPermutation {
 struct LoadStoreOps {
   // The load and store ops of an AffineParallel
   // Loads and stores are expected to be distinguished within a single op, so
-  // are stored separately. Stores and Reduces are not expected to be
+  // are stored separately. Reduces are not expected to be
   // distinguished within a single op (`capture` may only allow one or the other
   // (or both), but may not distinguish between store and reduce within a single
   // op). Thus, `stores` might have either store or reduce ops.
@@ -200,7 +199,7 @@ protected:
   int64_t getIdxRange(mlir::BlockArgument idx);
 
   // Call `computeStrideInfo` with caching and automatic conversion to whichever
-  // of AffineLoadOp, AffineStoreOp, or AffineReduceOp is correct
+  // of PxaLoadOp, or PxaReduceOp is correct
   mlir::Optional<mlir::StrideInfo> getStrideInfo(mlir::Operation *ioOp);
 
   // Print a log of the best stencil (reporting on cost, permutation, and

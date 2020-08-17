@@ -164,10 +164,6 @@ def elu(x, alpha=1.0):
     return op('elu', [x, alpha]).as_tensor()
 
 
-def expand_dims(x, axis=-1):
-    return op('expand_dims', [x, axis]).as_tensor()
-
-
 def flip(x, axis=None):
     return op('flip', [x, axis]).as_tensor()
 
@@ -288,6 +284,10 @@ def tile(x, n):
 
 def transpose(x, pattern=None):
     return op('transpose', [x, pattern]).as_tensor()
+
+
+def unsqueeze(x, axes):
+    return op('unsqueeze', [x, axes]).as_tensor()
 
 
 def variance(x, axis=None, keepdims=False):

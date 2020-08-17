@@ -387,7 +387,7 @@ def batch_dot(x, y, axes=None, name=None):
         O = edsl.TensorOutput(*odims)
         O[oidxs] += X[xidxs] * Y[yidxs]
     if len(odims) == 1:
-        O = plaidml_op.expand_dims(O, 1)
+        O = plaidml_op.unsqueeze(O, [1])
     return _KerasNode('batch_dot', tensor=O)
 
 
@@ -806,7 +806,7 @@ def eval(x):
 
 @_log_call
 def expand_dims(x, axis=-1, name=None):
-    return _KerasNode('expand_dims', name=name, tensor=plaidml_op.expand_dims(x.tensor, axis))
+    return _KerasNode('expand_dims', name=name, tensor=plaidml_op.unsqueeze(x.tensor, [axis]))
 
 
 @_log_call
@@ -1644,8 +1644,9 @@ def sum(x, axis=None, keepdims=False):
 
 @_log_call
 def switch(condition, then_expression, else_expression):
+    bool_condition = cast(condition, dtype='bool')
     return _KerasNode('switch',
-                      tensor=edsl.select(condition.tensor, then_expression.tensor,
+                      tensor=edsl.select(bool_condition.tensor, then_expression.tensor,
                                          else_expression.tensor))
 
 

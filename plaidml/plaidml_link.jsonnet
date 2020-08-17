@@ -1,11 +1,4 @@
 local exports = [
-  // rt 
-  'plaidml_rt_trace',
-  'plaidml_rt_bounds_check',
-  'plaidml_rt_xsmm_gemm_dispatch_f32',
-  'plaidml_rt_xsmm_gemm_invoke_f32',
-  'print_memref_f32',
-
   // core/ffi.h
   'plaidml_string_ptr',
   'plaidml_string_free',

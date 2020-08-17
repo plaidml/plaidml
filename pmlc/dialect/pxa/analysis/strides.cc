@@ -11,11 +11,14 @@
 
 #include "mlir/Dialect/Affine/IR/AffineValueMap.h"
 #include "mlir/Support/DebugStringHelper.h"
+#include "pmlc/dialect/pxa/analysis/affine_expr.h"
 #include "pmlc/util/logging.h"
+#include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/FormatVariadic.h"
 
 namespace mlir {
 
+namespace pxa = pmlc::dialect::pxa;
 const char *kBlockAndArgFormat = "^bb{0}:%arg{1}";
 
 static std::string getUniqueName(Block *ref, BlockArgument arg) {
@@ -28,27 +31,44 @@ static std::string getUniqueName(Block *ref, BlockArgument arg) {
       .str();
 }
 
+// Generally useful helper function
+int64_t getIVStep(BlockArgument arg) {
+  // Check the kind of loop we are part of, and dispatch.
+  Operation *baseOp = arg.getOwner()->getParentOp();
+
+  size_t idx = arg.getArgNumber();
+  if (auto op = dyn_cast<AffineParallelOp>(baseOp)) {
+    auto stepAttr = op.steps().getValue()[idx];
+    return stepAttr.cast<IntegerAttr>().getInt();
+  }
+  if (auto op = dyn_cast<AffineForOp>(baseOp)) {
+    return op.getStep();
+  }
+  llvm_unreachable("Get IV Step on non-IV");
+}
+
 StrideRange::StrideRange(BlockArgument arg)
     : valid(false), minVal(0), maxVal(0), stride(0) {
   if (auto ap =
           mlir::dyn_cast<AffineParallelOp>(arg.getOwner()->getParentOp())) {
-    auto low_expr = ap.getLowerBoundsValueMap().getResult(arg.getArgNumber());
-    auto high_expr = ap.getUpperBoundsValueMap().getResult(arg.getArgNumber());
-    auto low_cst = low_expr.dyn_cast<AffineConstantExpr>();
-    auto high_cst = high_expr.dyn_cast<AffineConstantExpr>();
-    if (!low_cst || !high_cst) {
+    auto range_expr = ap.getRangesValueMap().getResult(arg.getArgNumber());
+    auto range_cst = range_expr.dyn_cast<AffineConstantExpr>();
+    if (!range_cst) {
+      return;
+    }
+    int64_t range = range_cst.getValue();
+    if (range < 1) {
       return;
     }
     int64_t step = ap.steps()[arg.getArgNumber()].cast<IntegerAttr>().getInt();
-    if (step <= 0 || ((maxVal - minVal) % step) != 0) {
+    if (step <= 0) {
       return;
     }
     stride = 1;
-    minVal = low_cst.getValue();
+    minVal = 0;
     // This is a correction to deal with the fact that strides are measured
     // relative to loop iterations not indexes.
-    maxVal = low_cst.getValue() +
-             (high_cst.getValue() - low_cst.getValue()) / step - 1;
+    maxVal = (range - 1) / step;
     valid = true;
     if (minVal == maxVal) {
       stride = 0;
@@ -84,8 +104,12 @@ void StrideRange::unionEquals(const StrideRange &rhs) {
 // Multiply the offset and all strides by a constant.
 StrideInfo &StrideInfo::operator*=(int64_t factor) {
   offset *= factor;
-  for (auto &kvp : strides) {
-    kvp.second *= factor;
+  if (factor == 0) {
+    strides.clear();
+  } else {
+    for (auto &kvp : strides) {
+      kvp.second *= factor;
+    }
   }
   return *this;
 }
@@ -95,6 +119,13 @@ StrideInfo &StrideInfo::operator+=(const StrideInfo &rhs) {
   offset += rhs.offset;
   for (const auto &kvp : rhs.strides) {
     strides[kvp.first] += kvp.second;
+  }
+  // Remove entries with 0 for stride
+  for (auto &kvp : llvm::make_early_inc_range(strides)) {
+    if (kvp.second == 0) {
+      // DenseMap never resizes during erase, so iterators stay valid.
+      strides.erase(kvp.first);
+    }
   }
   return *this;
 }
@@ -143,20 +174,25 @@ StrideRange StrideInfo::range() const {
   return ret;
 }
 
-AffineExpr StrideInfo::toExpr(MLIRContext *ctx, ValueRange operands) const {
-  DenseMap<Value, unsigned> opIdx;
-  for (unsigned i = 0; i < operands.size(); i++) {
-    opIdx[operands[i]] = i;
-  }
-  AffineExpr ret = getAffineConstantExpr(offset, ctx);
+AffineValueExpr StrideInfo::toValueExpr(MLIRContext *ctx) const {
+  auto tot = AffineValueExpr(ctx, offset);
   for (const auto &kvp : strides) {
-    auto it = opIdx.find(kvp.first);
-    assert(it != opIdx.end() &&
-           "toMap requires all values needed to be passed in as operands");
-    ret = ret + getAffineDimExpr(it->second, ctx) *
-                    getAffineConstantExpr(kvp.second, ctx);
+    Operation *baseOp = kvp.first.getOwner()->getParentOp();
+    AffineValueExpr idx(kvp.first);
+    if (auto op = dyn_cast<AffineParallelOp>(baseOp)) {
+      idx = idx - AffineValueExpr(op.getLowerBoundsValueMap(),
+                                  kvp.first.getArgNumber());
+    } else if (auto op = dyn_cast<AffineForOp>(baseOp)) {
+      auto map = op.getLowerBoundMap();
+      idx = idx - AffineValueExpr(map.getResult(0), op.getLowerBoundOperands());
+    } else {
+      llvm_unreachable("Invalid op type in toValueMap");
+    }
+    int64_t step = getIVStep(kvp.first);
+    assert(kvp.second % step == 0 && "Stride not divisible by step");
+    tot = tot + idx * (kvp.second / step);
   }
-  return ret;
+  return tot;
 }
 
 void StrideInfo::print(raw_ostream &os, Block *relative) const {
@@ -179,6 +215,14 @@ void StrideInfo::print(raw_ostream &os, Block *relative) const {
     os << item.value().first << "=" << item.value().second;
   }
   os << ']';
+}
+
+AffineValueMap convertToValueMap(MLIRContext *ctx, ArrayRef<StrideInfo> dims) {
+  SmallVector<AffineValueExpr, 4> exprs;
+  for (const auto &si : dims) {
+    exprs.push_back(si.toValueExpr(ctx));
+  }
+  return jointValueMap(ctx, exprs);
 }
 
 static Optional<StrideInfo> computeStrideInfo(AffineParallelOp op,
@@ -340,19 +384,77 @@ Optional<StrideInfo> computeStrideInfo(MemRefType memRefType, AffineMap map,
   return out;
 }
 
-Optional<StrideInfo> computeStrideInfo(AffineLoadOp op) {
+Optional<StrideInfo> computeStrideInfo(pxa::PxaLoadOp op) {
   return computeStrideInfo(op.getMemRefType(), op.getAffineMap(),
                            op.getMapOperands());
 }
 
-Optional<StrideInfo> computeStrideInfo(AffineStoreOp op) {
+Optional<StrideInfo> computeStrideInfo(pxa::PxaReduceOp op) {
   return computeStrideInfo(op.getMemRefType(), op.getAffineMap(),
                            op.getMapOperands());
 }
 
-Optional<StrideInfo> computeStrideInfo(pmlc::dialect::pxa::AffineReduceOp op) {
+Optional<StrideInfo> computeStrideInfo(pxa::PxaVectorLoadOp op) {
   return computeStrideInfo(op.getMemRefType(), op.getAffineMap(),
                            op.getMapOperands());
+}
+
+Optional<StrideInfo> computeStrideInfo(pxa::PxaVectorReduceOp op) {
+  return computeStrideInfo(op.getMemRefType(), op.getAffineMap(),
+                           op.getMapOperands());
+}
+
+Optional<RelativeAccessPattern> computeRelativeAccess(Block *block,
+                                                      Operation *op) {
+  ArrayRef<int64_t> vecSize = {};
+  Optional<llvm::SmallVector<StrideInfo, 4>> maybeStrides;
+  TypeSwitch<Operation *>(op)
+      .Case<pxa::PxaLoadOp>([&](auto op) {
+        maybeStrides =
+            computeStrideInfo(op.getAffineMap(), op.getMapOperands());
+      })
+      .Case<pxa::PxaReduceOp>([&](auto op) {
+        maybeStrides =
+            computeStrideInfo(op.getAffineMap(), op.getMapOperands());
+      })
+      .Case<pxa::PxaVectorLoadOp>([&](auto op) {
+        maybeStrides =
+            computeStrideInfo(op.getAffineMap(), op.getMapOperands());
+        vecSize = op.getVectorType().getShape();
+      })
+      .Case<pxa::PxaVectorReduceOp>([&](auto op) {
+        maybeStrides =
+            computeStrideInfo(op.getAffineMap(), op.getMapOperands());
+        vecSize = op.getVectorType().getShape();
+      });
+  if (!maybeStrides) {
+    return llvm::None;
+  }
+  auto &strides = *maybeStrides;
+  RelativeAccessPattern ret;
+  for (size_t i = 0; i < strides.size(); i++) {
+    ret.outer.push_back(strides[i].outer(block));
+    auto inner = strides[i].inner(block);
+    ret.inner.push_back(inner);
+    StrideRange range = inner.range();
+    if (i + vecSize.size() >= strides.size()) {
+      int64_t vecVal = vecSize[i + vecSize.size() - strides.size()];
+      if (vecVal > 1) {
+        StrideRange vecRange(0, vecVal - 1, 1);
+        range += vecRange;
+      }
+    }
+    if (!range.valid || range.minVal != 0) {
+      return llvm::None;
+    }
+    ret.innerCount.push_back(range.count());
+    int64_t stride = range.stride;
+    if (stride == 0) {
+      stride = 1;
+    }
+    ret.innerStride.push_back(stride);
+  }
+  return ret;
 }
 
 StrideArray::StrideArray(unsigned numDims, int64_t offset)
