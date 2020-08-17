@@ -57,7 +57,6 @@ cc_library(
             "reduce_min.cpp",
             "reduce_prod.cpp",
             "reduce_sum.cpp",
-            "softmax.cpp",  # TODO: Broken not missing
             "space_to_depth.cpp",  # TODO: Broken not missing
             "squared_difference.cpp",
             "squeeze.cpp",
@@ -111,7 +110,6 @@ cc_library(
             "reduce_min.cpp",
             "reduce_prod.cpp",
             "reduce_sum.cpp",
-            "softmax.cpp",  # TODO: Broken not missing
             "space_to_depth.cpp",  # TODO: Broken not missing
             "squared_difference.cpp",
             "squeeze.cpp",
