@@ -1,5 +1,6 @@
 #pragma once
 
+#include <gflags/gflags.h>
 #include <gmock/gmock.h>
 
 #include <map>
@@ -9,6 +10,8 @@
 
 #include "plaidml/exec/exec.h"
 #include "pmlc/util/logging.h"
+
+DECLARE_bool(generate_filecheck_input);
 
 namespace plaidml::edsl {
 
@@ -68,8 +71,14 @@ class TestFixture : public ::testing::Test {
 
   Program makeProgram(const std::string& name, const std::vector<Tensor>& outputs) {
     auto program = ProgramBuilder(name, outputs).compile();
-    std::cout << program << std::endl;
+    writeForFileCheck(program);
     return program;
+  }
+
+  void writeForFileCheck(const Program& program) {
+    if (FLAGS_generate_filecheck_input) {
+      std::cout << program << std::endl;
+    }
   }
 
   void runProgram(const Program& program) {

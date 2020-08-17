@@ -3,6 +3,7 @@
 load("//tools/py_cffi:build_defs.bzl", "py_cffi")
 load("//tools/py_setup:build_defs.bzl", "py_setup")
 load("@bazel_skylib//rules:common_settings.bzl", "string_flag")
+load("@bazel_skylib//lib:selects.bzl", "selects")
 load("@rules_python//python:defs.bzl", "py_binary", "py_library")
 load("@io_bazel_rules_jsonnet//jsonnet:jsonnet.bzl", "jsonnet_to_json")
 load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_shlib", "plaidml_settings")
@@ -197,6 +198,25 @@ string_flag(
 string_flag(
     name = "target",
     build_setting_default = "llvm_cpu",
+)
+
+config_setting(
+    name = "llvm_cpu",
+    flag_values = {
+        ":target": "llvm_cpu",
+    }
+)
+
+config_setting(
+    name = "intel_gen",
+    flag_values = {
+        ":target": "intel_gen",
+    }
+)
+
+selects.config_setting_group(
+    name = "gpu_target",
+    match_any = [":intel_gen"],
 )
 
 plaidml_settings(
