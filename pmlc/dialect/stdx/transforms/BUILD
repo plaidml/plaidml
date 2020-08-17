@@ -24,6 +24,7 @@ plaidml_cc_library(
     srcs = [
         "boundscheck.cc",
         "i1_to_i32.cc",
+        "subgroup_broadcast.cc",
         "pass_detail.h",
     ],
     hdrs = [
@@ -31,6 +32,11 @@ plaidml_cc_library(
     ],
     deps = [
         ":gen-pass",
+        "@llvm-project//mlir:SCFDialect",
+        "@llvm-project//mlir:GPUDialect",
+        "@llvm-project//mlir:GPUTransforms",
+        "@llvm-project//mlir:VectorOps",
+        "//pmlc/dialect/stdx/ir",
         "//pmlc/dialect/eltwise/ir",
         "//pmlc/dialect/pxa/analysis",
         "//pmlc/dialect/pxa/ir",

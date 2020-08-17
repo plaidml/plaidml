@@ -13,5 +13,6 @@ namespace pmlc::dialect::stdx {
 
 std::unique_ptr<mlir::Pass> createBoundsCheckPass();
 std::unique_ptr<mlir::Pass> createI1StorageToI32Pass();
+std::unique_ptr<mlir::Pass> createSubgroupBroadcastPass();
 
 } // namespace pmlc::dialect::stdx

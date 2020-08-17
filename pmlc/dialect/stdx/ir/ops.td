@@ -110,4 +110,14 @@ def TanOp : StdX_UnaryFuncOp<"tan"> {
   let summary = "tangent";
 }
 
+def SubgroupBroadcastOp : StdX_Op<"subgroup_broadcast", [NoSideEffect, AllTypesMatch<["value", "result"]>]> {
+  let summary = "broadcast to all elements in subgroup";
+  let arguments = (ins AnyType:$value, AnyType:$localid);
+  let results = (outs AnyType:$result);
+  let assemblyFormat = [{
+    `(` $value `,` $localid `)` attr-dict `:` type($value) `,` type($localid)
+  }];
+  let verifier = ?;
+}
+
 #endif // __PML_STDX_OPS__
