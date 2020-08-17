@@ -16,17 +16,17 @@
 
 #include "mlir/ExecutionEngine/OptUtils.h"
 #include "mlir/Support/FileUtilities.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include "pmlc/compiler/executable.h"
 #include "pmlc/compiler/program.h"
-#include "pmlc/util/all_dialects.h"
-#include "pmlc/util/all_passes.h"
 #include "pmlc/util/env.h"
 #include "pmlc/util/logging.h"
 
+using namespace mlir; // NOLINT
 using llvm::Error;
 using pmlc::compiler::EngineKind;
 using pmlc::compiler::Executable;
@@ -85,7 +85,6 @@ int main(int argc, char **argv) {
     IVLOG(level, "PLAIDML_VERBOSE=" << level);
   }
 
-  registerAllDialects();
   llvm::InitLLVM y(argc, argv);
   llvm::InitializeNativeTarget();
   llvm::InitializeNativeTargetAsmPrinter();

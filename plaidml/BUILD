@@ -3,18 +3,38 @@
 load("//tools/py_cffi:build_defs.bzl", "py_cffi")
 load("//tools/py_setup:build_defs.bzl", "py_setup")
 load("@bazel_skylib//rules:common_settings.bzl", "string_flag")
-load("@rules_python//python:defs.bzl", "py_binary")
+load("@rules_python//python:defs.bzl", "py_binary", "py_library")
 load("@io_bazel_rules_jsonnet//jsonnet:jsonnet.bzl", "jsonnet_to_json")
 load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_shlib", "plaidml_settings")
 
 plaidml_cc_library(
-    name = "plaidml",
+    name = "api",
     visibility = ["//visibility:public"],
     deps = [
         "//plaidml/core",
         "//plaidml/edsl",
         "//plaidml/exec",
         "//plaidml/op",
+    ],
+)
+
+plaidml_cc_library(
+    name = "plaidml",
+    visibility = ["//visibility:public"],
+    deps = [
+        ":api",
+        ":targets",
+    ],
+)
+
+plaidml_cc_library(
+    name = "targets",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//pmlc:all_passes_and_dialects",
+        "//pmlc/target/demo",
+        "//pmlc/target/intel_gen",
+        "//pmlc/target/x86",
     ],
 )
 
@@ -176,7 +196,6 @@ string_flag(
 
 string_flag(
     name = "target",
-    values = ["llvm_cpu", "foo"],
     build_setting_default = "llvm_cpu",
 )
 
