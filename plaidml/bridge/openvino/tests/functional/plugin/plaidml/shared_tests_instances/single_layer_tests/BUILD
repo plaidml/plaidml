@@ -60,7 +60,6 @@ cc_library(
             "squared_difference.cpp",
             "squeeze.cpp",
             "tile.cpp",
-            "transpose.cpp",   # TODO: Broken not missing
             "unsqueeze.cpp",
             # Original Excludes
             "cum_sum.cpp",
@@ -111,7 +110,6 @@ cc_library(
             "squared_difference.cpp",
             "squeeze.cpp",
             "tile.cpp",
-            "transpose.cpp",   # TODO: Broken not missing
             "unsqueeze.cpp",
             # Exclusions from update
             "convert.cpp",                          # Known errors

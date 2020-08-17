@@ -28,6 +28,6 @@ def openvino_workspace():
         name = "openvino",
         # sha256 = "40652941587e579d45a190731960008827221d11575f7f2e6162285b6625b940",
         remote = "file:///home/tim/openvino/.git",
-        commit = "9d3aa7751150541c0469bdc2771b261cdabf23ee",
+        commit = "87e82c6cbc829d39ef2ed6ee739d71503668a5a8",
         build_file = clean_dep("//vendor/openvino:openvino.BUILD"),
     )
