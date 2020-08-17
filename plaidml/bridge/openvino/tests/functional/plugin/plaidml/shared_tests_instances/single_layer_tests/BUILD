@@ -46,7 +46,6 @@ cc_library(
             "maximum.cpp",
             "minimum.cpp",
             "mod.cpp",
-            "mvn.cpp",  # TODO: Broken not missing
             "normalize_l2.cpp",
             "not_equal.cpp",
             "pad.cpp",
@@ -102,7 +101,6 @@ cc_library(
             "maximum.cpp",
             "minimum.cpp",
             "mod.cpp",
-            "mvn.cpp",  # TODO: Broken not missing
             "normalize_l2.cpp",
             "not_equal.cpp",
             "pad.cpp",
