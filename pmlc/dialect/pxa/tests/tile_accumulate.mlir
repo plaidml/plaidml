@@ -60,3 +60,20 @@ func @mixed() {
   }
   return
 }
+
+
+// CHECK-LABEL: func @const_add
+func @const_add(%arg0: memref<4xi32> {tile.name = "B"}, %arg1: memref<4xi32> {tile.name = "A"}) -> memref<4xi32> {
+  // CHECK: alloc()
+  %0 = alloc() : memref<4xi32>
+  // CHECK-NEXT: affine.parallel
+  // CHECK-NEXT: affine.parallel
+  %1 = affine.parallel (%arg2) = (0) to (4) reduce ("assign") -> (memref<4xi32>) {
+    %2 = pxa.load %arg1[%arg2] : memref<4xi32>
+    %3 = pxa.load %arg0[%arg2] : memref<4xi32>
+    %4 = addi %2, %3 : i32
+    %5 = pxa.reduce assign %4, %0[%arg2] : memref<4xi32>
+    affine.yield %5 : memref<4xi32>
+  }
+  return %1 : memref<4xi32>
+}
