@@ -13,6 +13,7 @@
 #include "mlir/Transforms/Passes.h"
 
 #include "pmlc/conversion/SCFToGPU/Passes.h"
+#include "pmlc/conversion/gpu_to_spirv/passes.h"
 #include "pmlc/conversion/pxa_to_affine/passes.h"
 #include "pmlc/conversion/stdx_to_llvm/passes.h"
 #include "pmlc/conversion/tile_to_pxa/passes.h"
