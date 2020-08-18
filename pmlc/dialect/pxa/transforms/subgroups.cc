@@ -68,6 +68,8 @@ void SubgroupApply(AffineParallelOp op, SubgroupPlan plan) {
       [&](AffineParallelOp par) { simpleVectorize(par, plan.subgroup_size); });
   // Try to 'vector cache' any remaining innermost loads
   subgroup.walk([&](PxaLoadOp load) { cacheLoadAsVector(inner, load); });
+  // Convert local allocations to vector types
+  op.walk([&](AllocOp alloc) { vectorizeBuffer(alloc); });
 }
 
 struct SubgroupsPass : public SubgroupsBase<SubgroupsPass> {
