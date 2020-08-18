@@ -19,6 +19,7 @@
 #include "pmlc/conversion/gpu/lowering.h"
 #include "pmlc/conversion/pxa_to_affine/passes.h"
 #include "pmlc/conversion/tile_to_pxa/passes.h"
+#include "pmlc/dialect/pxa//transforms/passes.h"
 #include "pmlc/dialect/stdx/transforms/passes.h"
 #include "pmlc/dialect/tile/transforms/passes.h"
 
@@ -37,6 +38,7 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(conversion::tile_to_pxa::createLowerTileToPXAPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
+  pm.addPass(pmlc::dialect::pxa::createTileAccumulatePass());
 
   // TODO: do optimizations here
 

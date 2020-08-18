@@ -14,6 +14,7 @@ plaidml_cc_library(
         "//pmlc/conversion/gpu",
         "//pmlc/conversion/pxa_to_affine",
         "//pmlc/conversion/tile_to_pxa",
+        "//pmlc/dialect/pxa/transforms",
         "//pmlc/dialect/tile/transforms",
         "//pmlc/dialect/stdx/transforms",
         "@llvm-project//mlir:AffineToStandardTransforms",
