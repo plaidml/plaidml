@@ -23,6 +23,7 @@ plaidml_cc_library(
     name = "transforms",
     srcs = [
         "autotile.cc",
+        "buffer_placement.cc",
         "cache.cc",
         "dataflow_opt.cc",
         "fusion.cc",
@@ -45,7 +46,6 @@ plaidml_cc_library(
         "tile.h",
         "tile_accumulate.h",
         "vectorize.h",
-
     ],
     deps = [
         ":gen-pass",

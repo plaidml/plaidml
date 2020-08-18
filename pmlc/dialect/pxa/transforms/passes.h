@@ -19,6 +19,8 @@ std::unique_ptr<mlir::Pass> createTileAccumulatePass();
 
 std::unique_ptr<mlir::Pass> createVectorizeExamplePass();
 
+std::unique_ptr<mlir::Pass> createBufferPlacementPass();
+
 std::unique_ptr<mlir::Pass> createFusionPass();
 
 std::unique_ptr<mlir::Pass> createLocalizePass();

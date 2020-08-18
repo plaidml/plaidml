@@ -204,8 +204,8 @@ struct XSMMGemmInvokeLowering
 
 } // namespace
 
-void populatePXAToAffineConversionPatterns(OwningRewritePatternList &patterns,
-                                           MLIRContext *ctx) {
+void populatePXAGemmToXSMMConversionPatterns(OwningRewritePatternList &patterns,
+                                             MLIRContext *ctx) {
   patterns.insert<AffineGemmOpConversion>(ctx);
 }
 

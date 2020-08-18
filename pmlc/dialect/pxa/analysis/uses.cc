@@ -1,9 +1,9 @@
 // Copyright 2020 Intel Corporation
 
 #include "pmlc/dialect/pxa/analysis/uses.h"
-
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Support/DebugStringHelper.h"
+#include "pmlc/dialect/stdx/ir/ops.h"
 
 #include "pmlc/util/logging.h"
 
@@ -38,6 +38,20 @@ IndirectValuesIterator &IndirectValuesIterator::operator++() {
       enqueueNext(reduceOp.result());
     } else if (auto vecReduceOp = dyn_cast<PxaVectorReduceOp>(use.getOwner())) {
       enqueueNext(vecReduceOp.result());
+    } else if (auto gemmOp = dyn_cast<AffineGemmOp>(use.getOwner())) {
+      if (gemmOp.getOperand(use.getOperandNumber()) == gemmOp.c()) {
+        enqueueNext(gemmOp.out());
+      }
+    } else if (auto prngOp = dyn_cast<PrngOp>(use.getOwner())) {
+      if (prngOp.getOperand(use.getOperandNumber()) == prngOp.tensor()) {
+        enqueueNext(prngOp.result_tensor());
+      } else if (prngOp.getOperand(use.getOperandNumber()) ==
+                 prngOp.new_state()) {
+        enqueueNext(prngOp.result_state());
+      }
+    } else if (auto reshapeOp =
+                   dyn_cast<pmlc::dialect::stdx::ReshapeOp>(use.getOwner())) {
+      enqueueNext(reshapeOp.result());
     }
   }
   if (workQueue.empty()) {
