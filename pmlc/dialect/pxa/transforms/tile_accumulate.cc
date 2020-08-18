@@ -1,5 +1,7 @@
 // Copyright 2020 Intel Corporation
 
+#include "pmlc/dialect/pxa/transforms/tile_accumulate.h"
+
 #include <limits>
 #include <memory>
 #include <utility>
@@ -21,7 +23,6 @@
 #include "pmlc/util/logging.h"
 
 using namespace mlir; // NOLINT
-using mlir::AffineParallelOp;
 
 namespace pmlc::dialect::pxa {
 
@@ -30,26 +31,6 @@ using llvm::DenseMap;
 using llvm::DenseSet;
 using llvm::SmallVector;
 using mlir::BlockArgument;
-
-Operation *GetOriginalDef(Value val) {
-  auto opRes = val.cast<mlir::OpResult>();
-  while (true) {
-    auto ap = mlir::dyn_cast<AffineParallelOp>(opRes.getOwner());
-    if (!ap)
-      break;
-    auto ret = mlir::cast<AffineYieldOp>(ap.getBody()->getTerminator());
-    auto src = ret.getOperand(opRes.getResultNumber());
-    auto defop = src.getDefiningOp();
-    if (dyn_cast<PxaReduceOp>(defop)) {
-      opRes = src.cast<mlir::OpResult>();
-    } else if (dyn_cast<AffineIfOp>(defop)) {
-      defop->walk([&](PxaReduceOp op) {
-        opRes = op.getResult().cast<mlir::OpResult>();
-      });
-    }
-  }
-  return opRes.getOwner();
-}
 
 bool isAccumulation(AffineParallelOp op) {
   bool tag = false;
@@ -66,71 +47,44 @@ bool isAccumulation(AffineParallelOp op) {
   return tag;
 }
 
-bool isSingLoop(AffineParallelOp op) {
-  auto beginOp = &op.getBody()->front();
-  auto isMulLoop = isa<AffineParallelOp>(beginOp);
-  if (!isMulLoop) {
-    isMulLoop = op.getIVs().size() > 1 ? true : false;
-  }
-  return !isMulLoop;
-}
-
-void buildNestLoop(AffineParallelOp op) {
-  OpBuilder builder(op.getBody(), op.getBody()->begin());
-  Block *outerBody = op.getBody();
-  llvm::SmallVector<mlir::AtomicRMWKind, 8> reductions;
-  for (Attribute attr : op.reductions()) {
-    auto intAttr = attr.dyn_cast<IntegerAttr>();
-    reductions.push_back(*mlir::symbolizeAtomicRMWKind(intAttr.getInt()));
-  }
-  auto inner = builder.create<AffineParallelOp>(
-      op.getLoc(), op.getResultTypes(), reductions, ArrayRef<int64_t>{1});
-  // Splice instructions into the interior
-  auto &innerLoopOps = inner.getBody()->getOperations();
-  auto &outerLoopOps = outerBody->getOperations();
-  innerLoopOps.splice(std::prev(innerLoopOps.end()), outerLoopOps,
-                      std::next(outerLoopOps.begin(), 1), outerLoopOps.end());
-  // Add a return of the values of the inner to the outer
-  builder.setInsertionPointToEnd(op.getBody());
-  builder.create<AffineYieldOp>(op.getLoc(), inner.getResults());
-}
-
-void TileAccumulations(AffineParallelOp op) {
+AffineParallelOp tileAccumulations(AffineParallelOp op, bool skipTrivial) {
   // Find the originating reduce
   assert(op.getNumResults() == 1);
-  if (isAccumulation(op)) {
-    auto srcDef = GetOriginalDef(op.getResult(0));
-    auto red = dyn_cast<PxaReduceOp>(srcDef);
-    // Get strides for output
-    auto si = *computeStrideInfo(red);
-    // Find all the accumulation indexes (stride 0 with respect to output) and
-    // tile them into an inner block
-    auto ranges = *op.getConstantRanges();
-    SmallVector<int64_t, 6> accumTile;
-    auto steps = op.steps().cast<ArrayAttr>().getValue();
-    for (size_t i = 0; i < ranges.size(); i++) {
-      auto arg = op.getIVs()[i];
-      if (si.strides.count(arg)) {
-        accumTile.push_back(steps[i].cast<IntegerAttr>().getInt());
-      } else {
-        accumTile.push_back(ranges[i]);
-      }
-      IVLOG(1, "accumTile[" << i << "] = " << accumTile[i]);
+  auto srcDef = getOriginalDef(op.getResult(0));
+  auto red = mlir::cast<PxaReduceOp>(srcDef);
+  // Get strides for output
+  auto si = *computeStrideInfo(red);
+  // Find all the accumulation indexes (stride 0 with respect to output) and
+  // tile them into an inner block
+  auto ranges = *op.getConstantRanges();
+  SmallVector<int64_t, 6> accumTile;
+  auto steps = op.steps().cast<ArrayAttr>().getValue();
+  bool anyAccum = false;
+  bool anyNonAccum = false;
+  for (size_t i = 0; i < ranges.size(); i++) {
+    auto arg = op.getIVs()[i];
+    if (si.strides.count(arg)) {
+      anyNonAccum = true;
+      accumTile.push_back(steps[i].cast<IntegerAttr>().getInt());
+    } else {
+      anyAccum = true;
+      accumTile.push_back(ranges[i]);
     }
-    performTiling(op, accumTile);
-  } else if (isSingLoop(op)) {
-    buildNestLoop(op);
   }
+  bool nonTrivial = anyAccum && anyNonAccum;
+  if (nonTrival || !skipTrivial) {
+    op = performTiling(op, accumTile);
+  }
+  return op;
 }
 
 struct TileAccumulatePass : public TileAccumulateBase<TileAccumulatePass> {
   void runOnFunction() final {
     auto func = getFunction();
-    // Autotile only the outermost loops
-    for (auto &op : func.getBody().front()) {
-      auto loop = mlir::dyn_cast<mlir::AffineParallelOp>(op);
-      if (loop && loop.getConstantRanges()) {
-        TileAccumulations(loop);
+    // TIle only the outermost loops
+    for (auto op : func.getBody().getOps<AffineParallelOp>()) {
+      if (op.getNumResults() == 1) {
+        tileAccumulations(op, true);
       }
     }
   }
