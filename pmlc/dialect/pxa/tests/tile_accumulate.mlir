@@ -95,3 +95,34 @@ func @const_add(%arg0: memref<4xi32> {tile.name = "B"}, %arg1: memref<4xi32> {ti
   }
   return %1 : memref<4xi32>
 }
+
+
+// CHECK-LABEL: func @axis_max
+// CHECK-SAME: (%[[arg0:.*]]: memref<3x3x3xf32>) -> memref<3x3xf32>
+func @axis_max(%arg0: memref<3x3x3xf32>) -> memref<3x3xf32> {
+  %cst = constant 0xFF800000 : f32
+  %0 = alloc() : memref<3x3xf32>
+  %1 = affine.parallel (%arg1, %arg2) = (0, 0) to (3, 3) reduce ("assign") -> (memref<3x3xf32>) {
+    %3 = pxa.reduce assign %cst, %0[%arg1, %arg2] : memref<3x3xf32>
+    affine.yield %3 : memref<3x3xf32>
+  }
+  %2 = affine.parallel (%arg1, %arg2, %arg3) = (0, 0, 0) to (3, 3, 3) reduce ("assign") -> (memref<3x3xf32>) {
+    %3 = pxa.load %arg0[%arg1, %arg2, %arg3] : memref<3x3x3xf32>
+    %4 = pxa.reduce maxf %3, %1[%arg2, %arg3] : memref<3x3xf32>
+    affine.yield %4 : memref<3x3xf32>
+  }
+  return %2 : memref<3x3xf32>
+}
+
+// CHECK: constant 0xFF800000 : f32
+// CHECK: alloc() : memref<3x3xf32>
+// CHECK: affine.parallel (%[[arg1:.*]], %[[arg2:.*]]) = (0, 0) to (3, 3) reduce ("assign") -> (memref<3x3xf32>)
+// CHECK:   pxa.reduce assign %cst, %{{.*}}[%[[arg1]], %[[arg2]]] : memref<3x3xf32>
+// CHECK:   affine.yield %{{.*}} : memref<3x3xf32>
+// CHECK: affine.parallel (%[[arg1:.*]], %[[arg2:.*]], %[[arg3:.*]]) = (0, 0, 0) to (3, 3, 3) step (3, 1, 1) reduce ("assign") -> (memref<3x3xf32>)
+// CHECK:   affine.parallel (%[[arg4:.*]], %[[arg5:.*]], %[[arg6:.*]]) = (%[[arg1]], %[[arg2]], %[[arg3]]) to (%[[arg1]] + 3, %[[arg2]] + 1, %[[arg3]] + 1) reduce ("assign") -> (memref<3x3xf32>)
+// CHECK:     pxa.load %[[arg0]][%[[arg4]], %[[arg5]], %[[arg6]]] : memref<3x3x3xf32>
+// CHECK:     pxa.reduce maxf %{{.*}}, %{{.*}}[%[[arg5]], %[[arg6]]] : memref<3x3xf32>
+// CHECK:     affine.yield %{{.*}} : memref<3x3xf32>
+// CHECK:   affine.yield %{{.*}} : memref<3x3xf32>
+// CHECK: return %{{.*}} : memref<3x3xf32>
