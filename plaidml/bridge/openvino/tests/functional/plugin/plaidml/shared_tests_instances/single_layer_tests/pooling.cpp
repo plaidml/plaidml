@@ -52,7 +52,7 @@ const auto maxPool_ExplicitPad_CeilRounding_Params =
                        ::testing::Values(ngraph::op::PadType::EXPLICIT),       //
                        ::testing::Values(false));  // placeholder value - exclude pad not applicable for max pooling
 
-INSTANTIATE_TEST_CASE_P(MaxPool_ExplicitPad_CeilRpunding, PoolingLayerTest,
+INSTANTIATE_TEST_CASE_P(MaxPool_ExplicitPad_CeilRounding, PoolingLayerTest,
                         ::testing::Combine(maxPool_ExplicitPad_CeilRounding_Params,                 //
                                            ::testing::ValuesIn(netPrecisions),                      //
                                            ::testing::Values(std::vector<size_t>({1, 3, 30, 30})),  //

@@ -79,15 +79,15 @@ const auto testCasesAxis_4 =
                        ::testing::ValuesIn(reverse),                                                             //
                        ::testing::Values(CommonTestUtils::DEVICE_PLAIDML));                                      //
 
-INSTANTIATE_TEST_CASE_P(smoke_MKLDNN_TestsCumSum_negative_axis, CumSumLayerTest, testCasesNegativeAxis,
+INSTANTIATE_TEST_CASE_P(smoke_PlaidML_TestsCumSum_negative_axis, CumSumLayerTest, testCasesNegativeAxis,
                         CumSumLayerTest::getTestCaseName);
-INSTANTIATE_TEST_CASE_P(smoke_MKLDNN_TestsCumSum_axis_0, CumSumLayerTest, testCasesAxis_0,
+INSTANTIATE_TEST_CASE_P(smoke_PlaidML_TestsCumSum_axis_0, CumSumLayerTest, testCasesAxis_0,
                         CumSumLayerTest::getTestCaseName);
-INSTANTIATE_TEST_CASE_P(smoke_MKLDNN_TestsCumSum_axis_1, CumSumLayerTest, testCasesAxis_1,
+INSTANTIATE_TEST_CASE_P(smoke_PlaidML_TestsCumSum_axis_1, CumSumLayerTest, testCasesAxis_1,
                         CumSumLayerTest::getTestCaseName);
-INSTANTIATE_TEST_CASE_P(smoke_MKLDNN_TestsCumSum_axis_2, CumSumLayerTest, testCasesAxis_2,
+INSTANTIATE_TEST_CASE_P(smoke_PlaidML_TestsCumSum_axis_2, CumSumLayerTest, testCasesAxis_2,
                         CumSumLayerTest::getTestCaseName);
-INSTANTIATE_TEST_CASE_P(smoke_MKLDNN_TestsCumSum_axis_3, CumSumLayerTest, testCasesAxis_3,
+INSTANTIATE_TEST_CASE_P(smoke_PlaidML_TestsCumSum_axis_3, CumSumLayerTest, testCasesAxis_3,
                         CumSumLayerTest::getTestCaseName);
-INSTANTIATE_TEST_CASE_P(smoke_MKLDNN_TestsCumSum_axis_4, CumSumLayerTest, testCasesAxis_4,
+INSTANTIATE_TEST_CASE_P(smoke_PlaidML_TestsCumSum_axis_4, CumSumLayerTest, testCasesAxis_4,
                         CumSumLayerTest::getTestCaseName);
