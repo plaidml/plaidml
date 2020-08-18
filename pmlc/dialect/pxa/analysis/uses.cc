@@ -14,12 +14,17 @@ namespace pmlc::dialect::pxa {
 Operation *getOriginalDef(Value val) {
   auto opRes = val.cast<mlir::OpResult>();
   while (true) {
-    auto ap = mlir::dyn_cast<AffineParallelOp>(opRes.getOwner());
-    if (!ap)
+    if (auto ap = mlir::dyn_cast<AffineParallelOp>(opRes.getOwner())) {
+      auto ret = mlir::cast<AffineYieldOp>(ap.getBody()->getTerminator());
+      auto src = ret.getOperand(opRes.getResultNumber());
+      opRes = src.cast<mlir::OpResult>();
+    } else if (auto iop = dyn_cast<AffineIfOp>(opRes.getOwner())) {
+      auto ret = mlir::cast<AffineYieldOp>(iop.getThenBlock()->getTerminator());
+      auto src = ret.getOperand(opRes.getResultNumber());
+      opRes = src.cast<mlir::OpResult>();
+    } else {
       break;
-    auto ret = mlir::cast<AffineYieldOp>(ap.getBody()->getTerminator());
-    auto src = ret.getOperand(opRes.getResultNumber());
-    opRes = src.cast<mlir::OpResult>();
+    }
   }
   return opRes.getOwner();
 }
