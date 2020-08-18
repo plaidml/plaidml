@@ -1,4 +1,4 @@
-// RUN: pmlc-opt -pxa-tile-accumulate %s | FileCheck %s
+// RUN: pmlc-opt -pxa-tile-accumulate -pxa-nest-loops %s | FileCheck %s
 
 // CHECK-LABEL: func @cumsum
 #map0 = affine_map<(d0) -> (d0)>

@@ -18,7 +18,8 @@ def NestLoops : FunctionPass<"pxa-nest-loops"> {
   let constructor = "pmlc::dialect::pxa::createNestLoopsPass()";
   let options = [
     Option<"minLoopIVs", "ivs", "unsigned", /*default=*/"2",
-           "Set minimum required IV's">,
+           "Set minimum required IV's">
+  ];
 }
 
 def VectorizeExample : FunctionPass<"pxa-vectorize-example"> {

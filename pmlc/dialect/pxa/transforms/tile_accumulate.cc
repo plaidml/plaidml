@@ -32,21 +32,6 @@ using llvm::DenseSet;
 using llvm::SmallVector;
 using mlir::BlockArgument;
 
-bool isAccumulation(AffineParallelOp op) {
-  bool tag = false;
-  auto argRange = op.getIVs();
-  auto parallelLoopNum = argRange.size() < 2 ? argRange.size() : 2;
-  op.walk([&](PxaReduceOp reduce) {
-    auto range = reduce.idxs();
-    for (size_t i = 0; i < parallelLoopNum; i++) {
-      auto firstArg = std::find(range.begin(), range.end(), argRange[i]);
-      tag = firstArg == range.end() || tag;
-    }
-  });
-  IVLOG(1, "the accumutation tag is " << tag);
-  return tag;
-}
-
 AffineParallelOp tileAccumulations(AffineParallelOp op, bool skipTrivial) {
   // Find the originating reduce
   assert(op.getNumResults() == 1);
@@ -59,20 +44,25 @@ AffineParallelOp tileAccumulations(AffineParallelOp op, bool skipTrivial) {
   auto ranges = *op.getConstantRanges();
   SmallVector<int64_t, 6> accumTile;
   auto steps = op.steps().cast<ArrayAttr>().getValue();
+  // Track if both inner + outer loops would bee used
   bool anyAccum = false;
   bool anyNonAccum = false;
   for (size_t i = 0; i < ranges.size(); i++) {
     auto arg = op.getIVs()[i];
     if (si.strides.count(arg)) {
+      // Output non-stationary, outer loop
       anyNonAccum = true;
       accumTile.push_back(steps[i].cast<IntegerAttr>().getInt());
     } else {
+      // Output stationary, accumulate in inner loop
       anyAccum = true;
       accumTile.push_back(ranges[i]);
     }
   }
+  // Check if both loops were used
   bool nonTrivial = anyAccum && anyNonAccum;
-  if (nonTrival || !skipTrivial) {
+  // Tile if needed or if we always want fixed depth
+  if (nonTrivial || !skipTrivial) {
     op = performTiling(op, accumTile);
   }
   return op;
@@ -81,7 +71,7 @@ AffineParallelOp tileAccumulations(AffineParallelOp op, bool skipTrivial) {
 struct TileAccumulatePass : public TileAccumulateBase<TileAccumulatePass> {
   void runOnFunction() final {
     auto func = getFunction();
-    // TIle only the outermost loops
+    // Tile only the outermost loops
     for (auto op : func.getBody().getOps<AffineParallelOp>()) {
       if (op.getNumResults() == 1) {
         tileAccumulations(op, true);

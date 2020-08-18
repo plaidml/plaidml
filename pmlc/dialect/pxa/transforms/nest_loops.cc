@@ -61,24 +61,24 @@ void buildNestLoop(AffineParallelOp op) {
 
 struct NestLoopsPass : public NestLoopsBase<NestLoopsPass> {
   NestLoopsPass() = default;
-  explicit NestLoopsPass(unsigned minLoopIVs) : minLoopIVs(minLoopIVs) {}
+  explicit NestLoopsPass(unsigned minLoopIVs) { this->minLoopIVs = minLoopIVs; }
   void runOnFunction() final {
     auto func = getFunction();
     // Nest output loops
     for (auto op : func.getBody().getOps<AffineParallelOp>()) {
-      while (getNestedIVCount(op) < minDepth) {
+      while (getNestedIVCount(op) < minLoopIVs) {
         buildNestLoop(op);
       }
     }
   }
 };
+
 } // namespace
 
-std::unique_ptr<mlir::Pass> createNestLoopPass() {
+std::unique_ptr<mlir::Pass> createNestLoopsPass() {
   return std::make_unique<NestLoopsPass>();
 }
-
-std::unique_ptr<mlir::Pass> createNestLoopPass(unsigned minLoopIVs) {
+std::unique_ptr<mlir::Pass> createNestLoopsPass(unsigned minLoopIVs) {
   return std::make_unique<NestLoopsPass>(minLoopIVs);
 }
 

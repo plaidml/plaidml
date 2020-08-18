@@ -7,7 +7,7 @@
 
 namespace pmlc::dialect::pxa {
 
-AffineParallelOp tileAccumulations(AffineParallelOp op,
-                                   bool skipTrivial = true);
+mlir::AffineParallelOp tileAccumulations(mlir::AffineParallelOp op,
+                                         bool skipTrivial = true);
 
 } // namespace pmlc::dialect::pxa
