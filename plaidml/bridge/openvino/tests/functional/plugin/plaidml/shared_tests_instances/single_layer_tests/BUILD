@@ -15,6 +15,7 @@ DATA = [
 ]
 
 DEPS = [
+    "//plaidml/bridge/openvino/tests/functional/plugin/plaidml/shared_tests_instances",
     "//pmlc/util:logging",
     "@gflags",
     "@gmock//:gtest_main",
@@ -68,10 +69,7 @@ cc_library(
         ],
     ),
     copts = ["-Wno-deprecated-declarations"],
-    tags = TAGS,  # TODO
-    deps = DEPS + [ "//plaidml/bridge/openvino/tests/functional/plugin/plaidml/shared_tests_instances" ],  # TODO: need addon?
-    # data = DATA,  # TODO: Needed?
-    # linkopts = PLAIDML_LINKOPTS,  # TODO: Needed?
+    deps = DEPS,
 )
 
 cc_library(
@@ -143,8 +141,7 @@ cc_library(
         ],
     ),
     copts = ["-Wno-deprecated-declarations"],
-    tags = TAGS,  # TODO
-    deps = DEPS,  # TODO
+    deps = DEPS,
 )
 
 cc_test(
