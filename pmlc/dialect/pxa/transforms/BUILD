@@ -27,7 +27,7 @@ plaidml_cc_library(
         "dataflow_opt.cc",
         "fusion.cc",
         "localize.cc",
-	"nest_loops.cc",
+        "nest_loops.cc",
         "pass_detail.h",
         "resize_tmps.cc",
         "stencil.cc",
