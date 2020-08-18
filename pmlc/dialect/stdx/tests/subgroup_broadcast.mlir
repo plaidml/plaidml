@@ -10,11 +10,8 @@ func @subgroup_test(%arg0: memref<64xf32>, %arg1: memref<64xf32>) {
   // CHECK: scf.parallel (%[[I:.*]], %[[SID:.*]]) = (%{{.*}}, %{{.*}}) to (%{{.*}}, %{{.*}}) step (%{{.*}}, %{{.*}}) {
   // CHECK-NEXT:   %[[IDX:.*]] = addi %[[I]], %[[SID]] : index
   // CHECK-NEXT:   %[[LOAD:.*]] = load %{{.*}}[%[[IDX]]] : memref<64xf32>
-  // CHECK-NEXT:   %[[BROADCAST:.*]] = stdx.subgroup_broadcast %[[LOAD]], %{{.*}} : f32
+  // CHECK-NEXT:   %[[BROADCAST:.*]] = stdx.subgroup_broadcast(%[[LOAD]], %{{.*}}) : f32, i32
   // CHECK-NEXT:   store %[[BROADCAST]], %{{.*}}[%[[IDX]]] : memref<64xf32>
-  // CHECK-NEXT: } { mapping = [
-  // CHECK-NEXT:   {processor = 1, map = affine_map<(d0) -> (d0)>, bound = affine_map<(d0) -> (d0)>}, 
-  // CHECK-NEXT:   {processor = 0, map = affine_map<(d0) -> (d0)>, bound = affine_map<(d0) -> (d0)>}] }
   scf.parallel (%i) = (%c0) to (%c64) step (%c8) {
     %0 = vector.transfer_read %arg0[%i], %cst : memref<64xf32>, vector<8xf32>
     %1 = vector.extractelement %0[%c1_i32 : i32] : vector<8xf32>

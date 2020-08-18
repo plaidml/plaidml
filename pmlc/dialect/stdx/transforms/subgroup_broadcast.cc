@@ -50,12 +50,6 @@ namespace {
 ///    %1 = stdx.subgroup_broadcast %0, %c1_i32 : f32
 ///    store %1, %arg1[%idx] : memref<64xf32>
 ///    scf.yield
-///  } { mapping = [
-///    {processor = 1, map = affine_map<(d0) -> (d0)>, bound = affine_map<(d0)
-///    -> (d0)>}, {processor = 0, map = affine_map<(d0) -> (d0)>, bound =
-///    affine_map<(d0) -> (d0)>}] }
-///
-/// This pass requires --convert-parallel-loops-to-gpu afterwards
 
 void runOnParallel(scf::ParallelOp loopOp) {
   // First, find the matching pattern that needs to have minimum 4 ops within
@@ -139,19 +133,6 @@ void runOnParallel(scf::ParallelOp loopOp) {
   newIVs[0].replaceAllUsesExcept(
       Idx, SmallPtrSet<Operation *, 1>{Idx.getOperation()});
 
-  // Add parallel loop mapping attribute, please see example
-  // TODO: make this more generic as we hardcode on BlockY and BlockX per
-  // example now
-  SmallVector<gpu::ParallelLoopDimMapping, 4> attrs;
-  attrs.reserve(newLoop.getNumLoops());
-  attrs.push_back(getParallelLoopDimMappingAttr(gpu::Processor::BlockY,
-                                                builder.getDimIdentityMap(),
-                                                builder.getDimIdentityMap()));
-  attrs.push_back(getParallelLoopDimMappingAttr(gpu::Processor::BlockX,
-                                                builder.getDimIdentityMap(),
-                                                builder.getDimIdentityMap()));
-  setMappingAttr(newLoop, attrs);
-
   // Capture the new loop's ops, we already verified ops types before so there
   // is no need to check is the dynamic cast succeeded
   // TODO: again, make sure that transfer_write as the last place will be always
@@ -190,11 +171,35 @@ void runOnParallel(scf::ParallelOp loopOp) {
   newExtractElementOp.erase();
 }
 
+/// Returns true if no other scf.parallel ops are nested within.
+static bool isInnermostParallelOp(scf::ParallelOp parallelOp) {
+  // Only for the innermost scf.parallel op's.
+  bool isInnermost = true;
+  parallelOp.walk([&](scf::ParallelOp thisparallelOp) {
+    // Since this is a post order walk, we are able to conclude here.
+    isInnermost = (thisparallelOp == parallelOp);
+    return WalkResult::interrupt();
+  });
+  return isInnermost;
+}
+
+/// Gathers loops that have no scf.parallel nested within.
+static void gatherInnermostLoops(FuncOp f,
+                                 SmallVectorImpl<scf::ParallelOp> &loops) {
+  f.walk([&](scf::ParallelOp parallelOp) {
+    if (isInnermostParallelOp(parallelOp))
+      loops.push_back(parallelOp);
+  });
+}
+
 struct SubgroupBroadcastPass
     : public SubgroupBroadcastBase<SubgroupBroadcastPass> {
   void runOnFunction() final {
     auto func = getFunction();
-    func.walk([&](scf::ParallelOp op) { runOnParallel(op); });
+    SmallVector<scf::ParallelOp, 4> loops;
+    gatherInnermostLoops(func, loops);
+    for (auto parallelOp : loops)
+      runOnParallel(parallelOp);
   }
 };
 
