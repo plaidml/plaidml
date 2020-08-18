@@ -29,10 +29,9 @@ IndirectValuesIterator &IndirectValuesIterator::operator++() {
     if (auto yieldOp = dyn_cast<AffineYieldOp>(use.getOwner())) {
       auto value = yieldOp.getParentOp()->getResult(use.getOperandNumber());
       enqueueNext(value);
-    } else if (auto reduceOp = dyn_cast<AffineReduceOp>(use.getOwner())) {
+    } else if (auto reduceOp = dyn_cast<PxaReduceOp>(use.getOwner())) {
       enqueueNext(reduceOp.result());
-    } else if (auto vecReduceOp =
-                   dyn_cast<AffineVectorReduceOp>(use.getOwner())) {
+    } else if (auto vecReduceOp = dyn_cast<PxaVectorReduceOp>(use.getOwner())) {
       enqueueNext(vecReduceOp.result());
     } else if (auto gemmOp = dyn_cast<AffineGemmOp>(use.getOwner())) {
       if (gemmOp.getOperand(use.getOperandNumber()) == gemmOp.c()) {
@@ -103,10 +102,10 @@ IndirectAccessUsesIterator &IndirectAccessUsesIterator::operator++() {
 
 void IndirectAccessUsesIterator::skipNonAccess() {
   while (inner != IndirectUsesIterator()) {
-    if (isa<pxa::AffineLoadOp>(inner->getOwner()) ||
-        isa<pxa::AffineReduceOp>(inner->getOwner()) ||
-        isa<pxa::AffineVectorLoadOp>(inner->getOwner()) ||
-        isa<pxa::AffineVectorReduceOp>(inner->getOwner())) {
+    if (isa<PxaLoadOp>(inner->getOwner()) ||
+        isa<pxa::PxaReduceOp>(inner->getOwner()) ||
+        isa<PxaVectorLoadOp>(inner->getOwner()) ||
+        isa<pxa::PxaVectorReduceOp>(inner->getOwner())) {
       break;
     }
     ++inner;

@@ -6,6 +6,7 @@ namespace mlir {
 class LLVMTypeConverter;
 class LowerToLLVMOptions;
 class MLIRContext;
+class OpPassManager;
 class OwningRewritePatternList;
 class Pass;
 } // namespace mlir
@@ -32,6 +33,6 @@ void populateXSMMToLLVMConversionPatterns(
     mlir::LLVMTypeConverter &converter,
     mlir::OwningRewritePatternList &patterns);
 
-void registerPassPipeline();
+void pipelineBuilder(mlir::OpPassManager &pm);
 
 } // namespace pmlc::target::x86

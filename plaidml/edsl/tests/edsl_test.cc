@@ -1,5 +1,7 @@
 // Copyright 2020 Intel Corporation
-// RUN: cc_test --plaidml_device=%plaidml_device --plaidml_target=%plaidml_target | FileCheck %s
+//
+// N.B. When running via lit, we always use the llvm_cpu device.
+// RUN: cc_test --plaidml_device=llvm_cpu.0 --plaidml_target=llvm_cpu --generate_filecheck_input | FileCheck %s
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -79,7 +81,7 @@ TEST_F(CppEdsl, HigherPrecisionConstants) {
   auto C = A + 1 + 2.0;
 
   auto program = ProgramBuilder("higher_precision_constants", {C}).floatx(DType::FLOAT64).intx(DType::UINT64).compile();
-  std::cout << program << std::endl;
+  writeForFileCheck(program);
 
   // CHECK-LABEL: CppEdsl.HigherPrecisionConstants
   // CHECK: func @higher_precision_constants
@@ -127,7 +129,7 @@ TEST_F(CppEdsl, BitAndScalar) {
   uint64_t mask = UINT32_MAX;
   auto B = A & mask;
   auto program = ProgramBuilder("bit_and", {B}).intx(DType::UINT64).compile();
-  std::cout << program << std::endl;
+  writeForFileCheck(program);
 
   std::vector<uint64_t> A_input{(ONE << 32),     (ONE << 33) + 1, (ONE << 34) + 2,  //
                                 (ONE << 35) + 3, (ONE << 36) + 4, (ONE << 37) + 5,  //
@@ -935,6 +937,7 @@ TEST_F(CppEdsl, ReshapeIntoScalar) {
   // CHECK-NEXT: %[[X1:.*]] = "eltwise.ident"(%[[X0]]) : (tensor<si32>) -> tensor<si32>
   // CHECK-NEXT: return %[[X1]] : tensor<si32>
   // clang-format on
+
   std::vector<int32_t> data = {2};
   checkProgram(program, {{A, data}}, {{R, data}});
 }

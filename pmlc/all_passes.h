@@ -125,10 +125,6 @@ inline void registerAllPasses() {
   // Target: x86
 #define GEN_PASS_REGISTRATION
 #include "pmlc/target/x86/passes.h.inc"
-
-  // Pass pipelines
-  pmlc::target::intel_gen::registerPassPipeline();
-  pmlc::target::x86::registerPassPipeline();
 }
 
 } // namespace mlir

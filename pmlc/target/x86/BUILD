@@ -28,7 +28,7 @@ gentbl(
 )
 
 plaidml_cc_library(
-    name = "x86",
+    name = "lib",
     srcs = [
         "heatmap.h",
         "heatmap_impl.cc",
@@ -56,7 +56,14 @@ plaidml_cc_library(
         "//pmlc/rt",
         "@llvm-project//mlir:AffineToStandardTransforms",
         "@llvm-project//mlir:LLVMTransforms",
+        "@llvm-project//mlir:SCFToStandard",
         "@llvm-project//mlir:StandardOpsTransforms",
     ],
+)
+
+plaidml_cc_library(
+    name = "x86",
+    srcs = ["register.cc"],
+    deps = [":lib"],
     alwayslink = 1,
 )
