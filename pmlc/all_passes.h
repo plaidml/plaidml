@@ -35,6 +35,7 @@
 #include "mlir/Transforms/ViewOpGraph.h"
 #include "mlir/Transforms/ViewRegionGraph.h"
 
+#include "pmlc/conversion/gpu_to_spirv/passes.h"
 #include "pmlc/conversion/pxa_to_affine/passes.h"
 #include "pmlc/conversion/stdx_to_llvm/passes.h"
 #include "pmlc/conversion/tile_to_pxa/passes.h"
@@ -109,6 +110,10 @@ inline void registerAllPasses() {
   // Conversion: tile_to_pxa
 #define GEN_PASS_REGISTRATION
 #include "pmlc/conversion/tile_to_pxa/passes.h.inc"
+
+  // Conversion: gpu_to_spirv
+#define GEN_PASS_REGISTRATION
+#include "pmlc/conversion/gpu_to_spirv/passes.h.inc"
 
   // Dialect: pxa
 #define GEN_PASS_REGISTRATION
