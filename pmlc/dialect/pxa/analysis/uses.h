@@ -9,6 +9,10 @@
 
 namespace pmlc::dialect::pxa {
 
+// Trace through any parallel fors to find the original defining operation for a
+// given value.
+Operation *getOriginalDef(Value val);
+
 class IndirectValuesIterator
     : public llvm::iterator_facade_base<
           IndirectValuesIterator, std::forward_iterator_tag, mlir::Value> {

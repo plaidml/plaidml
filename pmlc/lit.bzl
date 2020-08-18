@@ -48,8 +48,6 @@ def _run_lit_test(name, data, size, tags, features):
         args = [
             "pmlc",
             "-v",
-            "-Dplaidml_device=$(plaidml_device)",
-            "-Dplaidml_target=$(plaidml_target)",
         ] + features,
         data = data + [
             "//pmlc/tools/pmlc-jit",
@@ -63,7 +61,6 @@ def _run_lit_test(name, data, size, tags, features):
         ],
         size = size,
         main = "lit.py",
-        toolchains = ["//plaidml:settings"],
     )
 
 def glob_lit_tests(

@@ -1,9 +1,9 @@
 # Copyright 2020 Intel Corporation
 
-package(default_visibility = ["//visibility:public"])
-
 load("//pmlc:lit.bzl", "glob_lit_tests", "lit_test")
-load("//bzl:plaidml.bzl", "plaidml_cc_test","plaidml_cc_library")
+load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_test")
+
+package(default_visibility = ["//visibility:public"])
 
 glob_lit_tests(
     data = ["//pmlc/rt/vulkan:vkprobe"],
@@ -25,6 +25,7 @@ plaidml_cc_library(
 plaidml_cc_test(
     name = "cc_test_gpu",
     srcs = ["edsl_test_gpu.cc"],
+    linkstatic = 1,
     tags = ["manual"],  # the `edsl_test.cc.test` rule will run this test via lit
     deps = [
         ":testenv",
@@ -32,14 +33,13 @@ plaidml_cc_test(
         "//plaidml/exec",
         "//pmlc/rt/vulkan",
     ],
-    linkstatic = 1,
 )
 
 lit_test(
-	name="edsl_test_gpu.cc",
+    name = "edsl_test_gpu.cc",
     data = [
-    	":cc_test_gpu",
-    	"lit.local.cfg",
-    	"//pmlc/rt/vulkan:vkprobe",
+        "lit.local.cfg",
+        ":cc_test_gpu",
+        "//pmlc/rt/vulkan:vkprobe",
     ],
 )

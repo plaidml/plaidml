@@ -26,7 +26,7 @@ class PXA_OpWithPP<string mnemonic, list<OpTrait> traits = []> :
 
 def AnyStdScalar : AnyTypeOf<[AnyFloat, AnySignlessInteger]> {}
 
-def AffineReduceOp : PXA_OpWithPP<"reduce"> {
+def PxaReduceOp : PXA_OpWithPP<"reduce"> {
   let summary = "affine reduction operation";
   let arguments = (ins
     AtomicRMWKindAttr:$agg,
@@ -83,7 +83,7 @@ def AffineGemmOp : PXA_OpWithPP<"gemm"> {
   }];
 }
 
-def AffineVectorReduceOp : PXA_OpWithPP<"vector_reduce", []> {
+def PxaVectorReduceOp : PXA_OpWithPP<"vector_reduce", []> {
   let summary = "affine vector reduction operation";
   let arguments = (ins
     AtomicRMWKindAttr:$agg,
@@ -119,7 +119,7 @@ def AffineVectorReduceOp : PXA_OpWithPP<"vector_reduce", []> {
   }];
 }
 
-class AffineLoadOpBase<string mnemonic, list<OpTrait> traits = []> :
+class PxaLoadOpBase<string mnemonic, list<OpTrait> traits = []> :
     PXA_OpWithPP<mnemonic, !listconcat(traits,
         [DeclareOpInterfaceMethods<AffineReadOpInterface>])> {
   let arguments = (ins Arg<AnyMemRef, "the reference to load from",
@@ -141,7 +141,7 @@ class AffineLoadOpBase<string mnemonic, list<OpTrait> traits = []> :
   }];
 }
 
-def AffineLoadOp : AffineLoadOpBase<"load"> {
+def PxaLoadOp : PxaLoadOpBase<"load"> {
   let summary = "affine load operation";
   let description = [{
     The "affine.load" op reads an element from a memref, where the index
@@ -179,6 +179,63 @@ def AffineLoadOp : AffineLoadOpBase<"load"> {
   ];
 
   let extraClassDeclaration = extraClassDeclarationBase;
+
+  let hasCanonicalizer = 1;
+  let hasFolder = 1;
+}
+
+def PxaVectorLoadOp : PxaLoadOpBase<"vector_load"> {
+  let summary = "affine vector load operation";
+  let description = [{
+    The "affine.vector_load" is the vector counterpart of
+    [affine.load](#affineload-operation). It reads a slice from a
+    [MemRef](../LangRef.md#memref-type), supplied as its first operand,
+    into a [vector](../LangRef.md#vector-type) of the same base elemental type.
+    The index for each memref dimension is an affine expression of loop induction
+    variables and symbols. These indices determine the start position of the read
+    within the memref. The shape of the return vector type determines the shape of
+    the slice read from the memref. This slice is contiguous along the respective
+    dimensions of the shape. Strided vector loads will be supported in the future.
+    An affine expression of loop IVs and symbols must be specified for each
+    dimension of the memref. The keyword 'symbol' can be used to indicate SSA
+    identifiers which are symbolic.
+
+    Example 1: 8-wide f32 vector load.
+
+    ```mlir
+    %1 = affine.vector_load %0[%i0 + 3, %i1 + 7] : memref<100x100xf32>, vector<8xf32>
+    ```
+
+    Example 2: 4-wide f32 vector load. Uses 'symbol' keyword for symbols '%n' and '%m'.
+
+    ```mlir
+    %1 = affine.vector_load %0[%i0 + symbol(%n), %i1 + symbol(%m)] : memref<100x100xf32>, vector<4xf32>
+    ```
+
+    Example 3: 2-dim f32 vector load.
+
+    ```mlir
+    %1 = affine.vector_load %0[%i0, %i1] : memref<100x100xf32>, vector<2x8xf32>
+    ```
+
+    TODOs:
+    * Add support for strided vector loads.
+    * Consider adding a permutation map to permute the slice that is read from memory
+    (see [vector.transfer_read](../Vector/#vectortransfer_read-vectortransferreadop)).
+  }];
+
+  let results = (outs AnyVector:$result);
+
+  let builders = [OpBuilder<
+    "OpBuilder &builder, OperationState &result, VectorType type,"
+    "Value memref, AffineMap map, ValueRange mapOperands">
+  ];
+
+  let extraClassDeclaration = extraClassDeclarationBase # [{
+    VectorType getVectorType() {
+      return result().getType().cast<VectorType>();
+    }
+  }];
 
   let hasCanonicalizer = 1;
   let hasFolder = 1;

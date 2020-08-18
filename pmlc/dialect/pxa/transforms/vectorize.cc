@@ -11,6 +11,7 @@
 #include "mlir/Interfaces/VectorInterfaces.h"
 
 #include "pmlc/dialect/pxa/analysis/strides.h"
+#include "pmlc/dialect/pxa/analysis/uses.h"
 #include "pmlc/dialect/pxa/transforms/pass_detail.h"
 #include "pmlc/dialect/pxa/transforms/vectorize.h"
 #include "pmlc/util/logging.h"
@@ -18,7 +19,7 @@
 using namespace mlir; // NOLINT[build/namespaces]
 
 namespace pmlc::dialect::pxa {
-using pmlc::dialect::pxa::AffineReduceOp;
+using pmlc::dialect::pxa::PxaReduceOp;
 
 class Impl {
 private:
@@ -30,7 +31,7 @@ private:
 
   LogicalResult tryVectorizeOperation(Operation *op) {
     return llvm::TypeSwitch<Operation *, LogicalResult>(op)
-        .Case<AffineLoadOp>([&](auto op) {
+        .Case<PxaLoadOp>([&](auto op) {
           auto strideInfo = computeStrideInfo(op);
           if (!strideInfo) {
             IVLOG(3, "Vectorize: Failed, non-affine strides");
@@ -52,7 +53,7 @@ private:
           vectorizedValues.insert(op.getResult());
           return success();
         })
-        .Case<AffineReduceOp>([&](auto op) {
+        .Case<PxaReduceOp>([&](auto op) {
           auto strideInfo = computeStrideInfo(op);
           if (!strideInfo) {
             IVLOG(3, "Vectorize: Failed, non-affine strides");
@@ -68,7 +69,7 @@ private:
             return failure(vectorizedValues.count(op.val()));
           }
           if (it->second != 1) {
-            IVLOG(3, "Vectorize: Failed, AffineReduceOp stride != 1");
+            IVLOG(3, "Vectorize: Failed, PxaReduceOp stride != 1");
             return failure();
           }
 
@@ -136,21 +137,18 @@ public:
     result.setType(vecType);
   }
 
-  void vectorizeLoadOp(AffineLoadOp op) {
+  void vectorizeLoadOp(PxaLoadOp op) {
     Value operand = op.getMemRef();
     auto eltType = op.getMemRefType().getElementType();
     auto vecType = VectorType::get(vectorSize, eltType);
     OpBuilder builder(op);
-    auto vecOp = builder.create<AffineVectorLoadOp>(
-        op.getLoc(), ArrayRef<Type>{vecType}, operand, op.indices());
-    // TODO: Add support for direct construction with map to VectorLoadOp
-    auto mapAttr = AffineMapAttr::get(op.getAffineMap());
-    vecOp.setAttr(AffineVectorLoadOp::getMapAttrName(), mapAttr);
+    auto vecOp = builder.create<PxaVectorLoadOp>(
+        op.getLoc(), vecType, operand, op.getAffineMap(), op.getMapOperands());
     op.replaceAllUsesWith(vecOp.getResult());
     op.erase();
   }
 
-  void vectorizeReduceOp(AffineReduceOp op) {
+  void vectorizeReduceOp(PxaReduceOp op) {
     Value mem = op.mem();
     Value val = op.val();
     OpBuilder builder(op);
@@ -160,7 +158,7 @@ public:
           builder.create<vector::BroadcastOp>(op.getLoc(), vecType, val);
       val = bcast.getResult();
     }
-    auto vecOp = builder.create<AffineVectorReduceOp>(
+    auto vecOp = builder.create<PxaVectorReduceOp>(
         op.getLoc(), ArrayRef<Type>{mem.getType()}, op.agg(), val, mem,
         op.map(), op.idxs());
     op.replaceAllUsesWith(vecOp.getResult());
@@ -171,9 +169,9 @@ public:
     if (!vectorizedOps.count(op)) {
       return;
     }
-    if (auto loadOp = dyn_cast<AffineLoadOp>(op)) {
+    if (auto loadOp = dyn_cast<PxaLoadOp>(op)) {
       vectorizeLoadOp(loadOp);
-    } else if (auto reduceOp = dyn_cast<AffineReduceOp>(op)) {
+    } else if (auto reduceOp = dyn_cast<PxaReduceOp>(op)) {
       vectorizeReduceOp(reduceOp);
     } else {
       vectorizeScalarOp(op);
@@ -240,6 +238,30 @@ LogicalResult performVectorization(AffineParallelOp op, BlockArgument index,
                                    unsigned vectorSize) {
   Impl impl(op, index, vectorSize);
   return impl.vectorize();
+}
+
+LogicalResult simpleVectorize(AffineParallelOp op, unsigned vecSize) {
+  if (op.getNumResults() != 1) {
+    return failure();
+  }
+  auto red = mlir::dyn_cast<PxaReduceOp>(getOriginalDef(op.getResult(0)));
+  if (!red) {
+    return failure();
+  }
+  auto maybeSI = computeStrideInfo(red);
+  if (!maybeSI) {
+    return failure();
+  }
+  SmallVector<BlockArgument, 4> options;
+  for (auto ba : op.getIVs()) {
+    if (maybeSI->strides.count(ba) && maybeSI->strides[ba] == 1) {
+      options.push_back(ba);
+    }
+  }
+  if (options.size() != 1) {
+    return failure();
+  }
+  return performVectorization(op, options[0], vecSize);
 }
 
 struct VectorizeExample : public VectorizeExampleBase<VectorizeExample> {

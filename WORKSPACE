@@ -56,3 +56,7 @@ llvm_toolchain(
 load("@llvm_toolchain//:toolchains.bzl", "llvm_register_toolchains")
 
 llvm_register_toolchains()
+
+load("//vendor/openvino:workspace.bzl", "openvino_workspace")
+
+openvino_workspace()

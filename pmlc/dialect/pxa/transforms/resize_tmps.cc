@@ -51,10 +51,10 @@ struct ResizeTmpsPass : public ResizeTmpsBase<ResizeTmpsPass> {
     for (auto &use : getIndirectAccessUses(op)) {
       IVLOG(2, "Found use: " << debugString(*use.getOwner()));
       Optional<SmallVector<StrideInfo, 4>> maybeStrides;
-      if (auto lop = dyn_cast<pxa::AffineLoadOp>(use.getOwner())) {
+      if (auto lop = dyn_cast<PxaLoadOp>(use.getOwner())) {
         maybeStrides =
             computeStrideInfo(lop.getAffineMap(), lop.getMapOperands());
-      } else if (auto rop = dyn_cast<AffineReduceOp>(use.getOwner())) {
+      } else if (auto rop = dyn_cast<PxaReduceOp>(use.getOwner())) {
         maybeStrides =
             computeStrideInfo(rop.getAffineMap(), rop.getMapOperands());
       }
@@ -158,22 +158,22 @@ struct ResizeTmpsPass : public ResizeTmpsBase<ResizeTmpsPass> {
     // Now do the actual changes.  Note, we don't bother erasing the original
     // instructions, but they get cleaned up via canonicalization
     for (Operation *op : ops) {
-      if (auto rop = dyn_cast<AffineReduceOp>(op)) {
+      if (auto rop = dyn_cast<PxaReduceOp>(op)) {
         // TODO: This probably should move into some sort of utility transform,
         // but I need another example or two to generalize from
         auto vm = computeInnerValueMap(rop.getAffineMap(), rop.getMapOperands(),
                                        opBlock);
         OpBuilder replace(rop);
-        auto nrop = replace.create<AffineReduceOp>(
+        auto nrop = replace.create<PxaReduceOp>(
             rop.getLoc(), rop.agg(), rop.val(), rop.getMemRef(),
             vm.getAffineMap(), vm.getOperands());
         rop.replaceAllUsesWith(nrop.result());
       }
-      if (auto lop = dyn_cast<pxa::AffineLoadOp>(op)) {
+      if (auto lop = dyn_cast<PxaLoadOp>(op)) {
         auto vm = computeInnerValueMap(lop.getAffineMap(), lop.getMapOperands(),
                                        opBlock);
         OpBuilder replace(lop);
-        auto nlop = replace.create<pxa::AffineLoadOp>(
+        auto nlop = replace.create<PxaLoadOp>(
             lop.getLoc(), lop.getMemRef(), vm.getAffineMap(), vm.getOperands());
         lop.replaceAllUsesWith(nlop.result());
       }

@@ -75,7 +75,7 @@ private:
 
     // Find the Reduce Op
     auto it = std::prev(body->end(), 2);
-    auto reduceOp = dyn_cast<AffineReduceOp>(*it);
+    auto reduceOp = dyn_cast<PxaReduceOp>(*it);
     if (!reduceOp) {
       IVLOG(5, "The AffineParallelOp region didn't have a reduce as its last "
                "non-terminator");
@@ -103,23 +103,23 @@ private:
     Operation *rhs;
     if (auto mulfOp = dyn_cast_or_null<MulFOp>(defOp)) {
       lhs = mulfOp.lhs().getDefiningOp();
-      if (!dyn_cast_or_null<pxa::AffineLoadOp>(lhs)) {
+      if (!dyn_cast_or_null<PxaLoadOp>(lhs)) {
         IVLOG(3, "The LHS of the mul op is not affine.load.");
         return llvm::None;
       }
       rhs = mulfOp.rhs().getDefiningOp();
-      if (!dyn_cast_or_null<pxa::AffineLoadOp>(rhs)) {
+      if (!dyn_cast_or_null<PxaLoadOp>(rhs)) {
         IVLOG(3, "The RHS of the mul op is not affine.load.");
         return llvm::None;
       }
     } else if (auto muliOp = dyn_cast_or_null<MulIOp>(defOp)) {
       lhs = muliOp.lhs().getDefiningOp();
-      if (!dyn_cast_or_null<pxa::AffineLoadOp>(lhs)) {
+      if (!dyn_cast_or_null<PxaLoadOp>(lhs)) {
         IVLOG(3, "The LHS of the mul op is not affine.load.");
         return llvm::None;
       }
       rhs = muliOp.rhs().getDefiningOp();
-      if (!dyn_cast_or_null<pxa::AffineLoadOp>(rhs)) {
+      if (!dyn_cast_or_null<PxaLoadOp>(rhs)) {
         IVLOG(3, "The RHS of the mul op is not affine.load.");
         return llvm::None;
       }
@@ -276,9 +276,9 @@ private:
     op.setSteps(steps);
 
     // Generate the GEMM op; select inputs based on permutation order
-    auto opC = cast<AffineReduceOp>(*perm.ioOps[0]);
-    auto opA = cast<pxa::AffineLoadOp>(*perm.ioOps[1]);
-    auto opB = cast<pxa::AffineLoadOp>(*perm.ioOps[2]);
+    auto opC = cast<PxaReduceOp>(*perm.ioOps[0]);
+    auto opA = cast<PxaLoadOp>(*perm.ioOps[1]);
+    auto opB = cast<PxaLoadOp>(*perm.ioOps[2]);
 
     auto bodyBuilder = op.getBodyBuilder();
 

@@ -53,9 +53,7 @@ static void composeAffineMapAndOperands(AffineMap *map,
   assert(*map);
 }
 
-/// Simplify AffineApply, AffineLoad, and AffineStore operations by composing
-/// maps that supply results into them.
-///
+/// Simplify operations by composing maps that supply results into them.
 template <typename AffineOpTy>
 struct SimplifyAffineOp : public OpRewritePattern<AffineOpTy> {
   using OpRewritePattern<AffineOpTy>::OpRewritePattern;
@@ -67,9 +65,10 @@ struct SimplifyAffineOp : public OpRewritePattern<AffineOpTy> {
 
   LogicalResult matchAndRewrite(AffineOpTy affineOp,
                                 PatternRewriter &rewriter) const override {
-    static_assert(std::is_same<AffineOpTy, AffineReduceOp>::value ||
-                      std::is_same<AffineOpTy, AffineVectorReduceOp>::value ||
-                      std::is_same<AffineOpTy, pxa::AffineLoadOp>::value,
+    static_assert(std::is_same<AffineOpTy, PxaReduceOp>::value ||
+                      std::is_same<AffineOpTy, PxaVectorReduceOp>::value ||
+                      std::is_same<AffineOpTy, PxaLoadOp>::value ||
+                      std::is_same<AffineOpTy, PxaVectorLoadOp>::value,
                   "affine reduce/vector_reduce or load op expected");
     auto map = affineOp.getAffineMap();
     AffineMap oldMap = map;
@@ -86,28 +85,35 @@ struct SimplifyAffineOp : public OpRewritePattern<AffineOpTy> {
 };
 
 template <>
-void SimplifyAffineOp<AffineLoadOp>::replaceAffineOp(
-    PatternRewriter &rewriter, AffineLoadOp load, AffineMap map,
+void SimplifyAffineOp<PxaLoadOp>::replaceAffineOp(
+    PatternRewriter &rewriter, PxaLoadOp load, AffineMap map,
     ArrayRef<Value> mapOperands) const {
-  rewriter.replaceOpWithNewOp<AffineLoadOp>(load, load.getMemRef(), map,
-                                            mapOperands);
+  rewriter.replaceOpWithNewOp<PxaLoadOp>(load, load.getMemRef(), map,
+                                         mapOperands);
 }
 
 template <>
-void SimplifyAffineOp<AffineReduceOp>::replaceAffineOp(
-    PatternRewriter &rewriter, AffineReduceOp op, AffineMap map,
+void SimplifyAffineOp<PxaReduceOp>::replaceAffineOp(
+    PatternRewriter &rewriter, PxaReduceOp op, AffineMap map,
     ArrayRef<Value> mapOperands) const {
-  rewriter.replaceOpWithNewOp<AffineReduceOp>(
+  rewriter.replaceOpWithNewOp<PxaReduceOp>(
       op, op.getMemRefType(), op.agg(), op.val(), op.mem(), map, mapOperands);
 }
 
 template <>
-void SimplifyAffineOp<AffineVectorReduceOp>::replaceAffineOp(
-    PatternRewriter &rewriter, AffineVectorReduceOp op, AffineMap map,
+void SimplifyAffineOp<PxaVectorLoadOp>::replaceAffineOp(
+    PatternRewriter &rewriter, PxaVectorLoadOp op, AffineMap map,
     ArrayRef<Value> mapOperands) const {
-  rewriter.replaceOpWithNewOp<AffineVectorReduceOp>(op, op.getMemRefType(),
-                                                    op.agg(), op.vector(),
-                                                    op.mem(), map, mapOperands);
+  rewriter.replaceOpWithNewOp<PxaVectorLoadOp>(
+      op, op.getVectorType(), op.getMemRef(), map, mapOperands);
+}
+template <>
+void SimplifyAffineOp<PxaVectorReduceOp>::replaceAffineOp(
+    PatternRewriter &rewriter, PxaVectorReduceOp op, AffineMap map,
+    ArrayRef<Value> mapOperands) const {
+  rewriter.replaceOpWithNewOp<PxaVectorReduceOp>(op, op.getMemRefType(),
+                                                 op.agg(), op.vector(),
+                                                 op.mem(), map, mapOperands);
 }
 
 /// This is a common class used for patterns of the form
@@ -180,10 +186,10 @@ struct SimplifyAffineGemmOp : public OpRewritePattern<AffineGemmOp> {
 
 } // namespace
 
-// ---- AffineLoadOp ----
+// ---- PxaLoadOp ----
 
-void AffineLoadOp::build(OpBuilder &builder, OperationState &result,
-                         AffineMap map, ValueRange operands) {
+void PxaLoadOp::build(OpBuilder &builder, OperationState &result, AffineMap map,
+                      ValueRange operands) {
   assert(operands.size() == 1 + map.getNumInputs() && "inconsistent operands");
   result.addOperands(operands);
   if (map)
@@ -192,8 +198,8 @@ void AffineLoadOp::build(OpBuilder &builder, OperationState &result,
   result.types.push_back(memrefType.getElementType());
 }
 
-void AffineLoadOp::build(OpBuilder &builder, OperationState &result,
-                         Value memref, AffineMap map, ValueRange mapOperands) {
+void PxaLoadOp::build(OpBuilder &builder, OperationState &result, Value memref,
+                      AffineMap map, ValueRange mapOperands) {
   assert(map.getNumInputs() == mapOperands.size() && "inconsistent index info");
   result.addOperands(memref);
   result.addOperands(mapOperands);
@@ -202,8 +208,8 @@ void AffineLoadOp::build(OpBuilder &builder, OperationState &result,
   result.types.push_back(memrefType.getElementType());
 }
 
-void AffineLoadOp::build(OpBuilder &builder, OperationState &result,
-                         Value memref, ValueRange indices) {
+void PxaLoadOp::build(OpBuilder &builder, OperationState &result, Value memref,
+                      ValueRange indices) {
   auto memrefType = memref.getType().cast<MemRefType>();
   auto rank = memrefType.getRank();
   // Create identity map for memrefs with at least one dimension or () -> ()
@@ -213,7 +219,7 @@ void AffineLoadOp::build(OpBuilder &builder, OperationState &result,
   build(builder, result, memref, map, indices);
 }
 
-void printAffineLoadOp(OpAsmPrinter &p, AffineLoadOp op) {
+static void printPxaLoadOp(OpAsmPrinter &p, PxaLoadOp op) {
   p << "pxa.load " << op.getMemRef() << '[';
   if (AffineMapAttr mapAttr =
           op.getAttrOfType<AffineMapAttr>(op.getMapAttrName()))
@@ -223,8 +229,7 @@ void printAffineLoadOp(OpAsmPrinter &p, AffineLoadOp op) {
   p << " : " << op.getMemRefType();
 }
 
-static ParseResult parseAffineLoadOp(OpAsmParser &parser,
-                                     OperationState &result) {
+static ParseResult parsePxaLoadOp(OpAsmParser &parser, OperationState &result) {
   auto &builder = parser.getBuilder();
   auto indexTy = builder.getIndexType();
 
@@ -235,7 +240,7 @@ static ParseResult parseAffineLoadOp(OpAsmParser &parser,
   return failure(
       parser.parseOperand(memrefInfo) ||
       parser.parseAffineMapOfSSAIds(mapOperands, mapAttr,
-                                    AffineLoadOp::getMapAttrName(),
+                                    PxaLoadOp::getMapAttrName(),
                                     result.attributes) ||
       parser.parseOptionalAttrDict(result.attributes) ||
       parser.parseColonType(type) ||
@@ -244,21 +249,77 @@ static ParseResult parseAffineLoadOp(OpAsmParser &parser,
       parser.addTypeToList(type.getElementType(), result.types));
 }
 
-void AffineLoadOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
-  results.insert<SimplifyAffineOp<AffineLoadOp>>(context);
+void PxaLoadOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+                                            MLIRContext *context) {
+  results.insert<SimplifyAffineOp<PxaLoadOp>>(context);
 }
 
-OpFoldResult AffineLoadOp::fold(ArrayRef<Attribute> cstOperands) {
+OpFoldResult PxaLoadOp::fold(ArrayRef<Attribute> cstOperands) {
   /// load(memrefcast) -> load
   if (succeeded(foldMemRefCast(*this)))
     return getResult();
   return OpFoldResult();
 }
 
-// ---- AffineReduceOp ----
+// ---- PxaVectorLoadOp ----
 
-void printAffineReduceOp(OpAsmPrinter &p, AffineReduceOp op) {
+void PxaVectorLoadOp::build(OpBuilder &builder, OperationState &result,
+                            VectorType type, Value memref, AffineMap map,
+                            ValueRange mapOperands) {
+  assert(map.getNumInputs() == mapOperands.size() && "inconsistent index info");
+  result.addOperands(memref);
+  result.addOperands(mapOperands);
+  result.addAttribute(getMapAttrName(), AffineMapAttr::get(map));
+  result.types.push_back(type);
+}
+
+static void printPxaVectorLoadOp(OpAsmPrinter &p, PxaVectorLoadOp op) {
+  p << "pxa.vector_load " << op.getMemRef() << '[';
+  if (AffineMapAttr mapAttr =
+          op.getAttrOfType<AffineMapAttr>(op.getMapAttrName()))
+    p.printAffineMapOfSSAIds(mapAttr, op.getMapOperands());
+  p << ']';
+  p.printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{op.getMapAttrName()});
+  p << " : " << op.getMemRefType() << ", " << op.getType();
+}
+
+static ParseResult parsePxaVectorLoadOp(OpAsmParser &parser,
+                                        OperationState &result) {
+  auto &builder = parser.getBuilder();
+  auto indexTy = builder.getIndexType();
+
+  MemRefType memrefType;
+  VectorType resultType;
+  OpAsmParser::OperandType memrefInfo;
+  AffineMapAttr mapAttr;
+  SmallVector<OpAsmParser::OperandType, 1> mapOperands;
+  return failure(
+      parser.parseOperand(memrefInfo) ||
+      parser.parseAffineMapOfSSAIds(mapOperands, mapAttr,
+                                    PxaVectorLoadOp::getMapAttrName(),
+                                    result.attributes) ||
+      parser.parseOptionalAttrDict(result.attributes) ||
+      parser.parseColonType(memrefType) || parser.parseComma() ||
+      parser.parseType(resultType) ||
+      parser.resolveOperand(memrefInfo, memrefType, result.operands) ||
+      parser.resolveOperands(mapOperands, indexTy, result.operands) ||
+      parser.addTypeToList(resultType, result.types));
+}
+
+void PxaVectorLoadOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<SimplifyAffineOp<PxaVectorLoadOp>>(context);
+}
+
+OpFoldResult PxaVectorLoadOp::fold(ArrayRef<Attribute> cstOperands) {
+  /// reduce(memrefcast) -> reduce
+  foldMemRefCast(*this);
+  return OpFoldResult();
+}
+
+// ---- PxaReduceOp ----
+
+void printPxaReduceOp(OpAsmPrinter &p, PxaReduceOp op) {
   p << op.getOperation()->getName() << ' ';
   p << stringifyAtomicRMWKind(op.agg()) << ' ';
   p << op.val() << ", ";
@@ -273,7 +334,7 @@ void printAffineReduceOp(OpAsmPrinter &p, AffineReduceOp op) {
 
 // <operation> ::= `pxa.reduce` keyword ssa-use `,` ssa-use `[` ssa-use-list `]`
 //                 attribute-dict? `:` type
-ParseResult parseAffineReduceOp(OpAsmParser &parser, OperationState &result) {
+ParseResult parsePxaReduceOp(OpAsmParser &parser, OperationState &result) {
   auto indexTy = parser.getBuilder().getIndexType();
   auto i64Ty = parser.getBuilder().getIntegerType(64);
   MemRefType type;
@@ -296,16 +357,14 @@ ParseResult parseAffineReduceOp(OpAsmParser &parser, OperationState &result) {
       parser.resolveOperands(idxs, indexTy, result.operands));
 }
 
-void AffineReduceOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
-  results.insert<                             //
-      SimplifyAffineOp<AffineReduceOp>,       //
-      SimplifyAffineOp<AffineVectorReduceOp>, //
-      SimplifyDeadReduce<AffineReduceOp>,     //
-      SimplifyDeadReduce<AffineVectorReduceOp>>(context);
+void PxaReduceOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+                                              MLIRContext *context) {
+  results.insert<                    //
+      SimplifyAffineOp<PxaReduceOp>, //
+      SimplifyDeadReduce<PxaReduceOp>>(context);
 }
 
-OpFoldResult AffineReduceOp::fold(ArrayRef<Attribute> cstOperands) {
+OpFoldResult PxaReduceOp::fold(ArrayRef<Attribute> cstOperands) {
   /// reduce(memrefcast) -> reduce
   foldMemRefCast(*this);
   return OpFoldResult();
@@ -399,9 +458,9 @@ ParseResult parseAffineGemmOp(OpAsmParser &parser, OperationState &result) {
       parser.resolveOperands(b.accessOperands, indexType, result.operands));
 }
 
-// ---- AffineVectorReduceOp ----
+// ---- PxaVectorReduceOp ----
 
-void printAffineVectorReduceOp(OpAsmPrinter &p, AffineVectorReduceOp op) {
+void printPxaVectorReduceOp(OpAsmPrinter &p, PxaVectorReduceOp op) {
   p << op.getOperation()->getName() << ' ';
   p << stringifyAtomicRMWKind(op.agg()) << ' ';
   p << op.vector() << ", ";
@@ -419,8 +478,8 @@ void printAffineVectorReduceOp(OpAsmPrinter &p, AffineVectorReduceOp op) {
 // <operation> ::= `pxa.vector_reduce` keyword ssa-use `,` ssa-use `[`
 // ssa-use-list `]`
 //                 attribute-dict? `:` type
-ParseResult parseAffineVectorReduceOp(OpAsmParser &parser,
-                                      OperationState &result) {
+ParseResult parsePxaVectorReduceOp(OpAsmParser &parser,
+                                   OperationState &result) {
   auto indexTy = parser.getBuilder().getIndexType();
   auto i64Ty = parser.getBuilder().getIntegerType(64);
   MemRefType memrefType;
@@ -446,15 +505,13 @@ ParseResult parseAffineVectorReduceOp(OpAsmParser &parser,
       parser.resolveOperands(idxs, indexTy, result.operands));
 }
 
-void AffineVectorReduceOp::getCanonicalizationPatterns(
+void PxaVectorReduceOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
-  results.insert<SimplifyAffineOp<AffineReduceOp>,
-                 SimplifyAffineOp<AffineVectorReduceOp>,
-                 SimplifyDeadReduce<AffineReduceOp>,
-                 SimplifyDeadReduce<AffineVectorReduceOp>>(context);
+  results.insert<SimplifyAffineOp<PxaVectorReduceOp>,
+                 SimplifyDeadReduce<PxaVectorReduceOp>>(context);
 }
 
-OpFoldResult AffineVectorReduceOp::fold(ArrayRef<Attribute> cstOperands) {
+OpFoldResult PxaVectorReduceOp::fold(ArrayRef<Attribute> cstOperands) {
   /// vectorReduce(memrefcast) -> vectorReduce
   foldMemRefCast(*this);
   return OpFoldResult();

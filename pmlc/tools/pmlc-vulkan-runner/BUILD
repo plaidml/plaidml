@@ -8,7 +8,7 @@ plaidml_cc_library(
     name = "lib",
     srcs = ["pmlc-vulkan-runner.cc"],
     deps = [
-        "//pmlc:all_passes_and_dialects_no_registration",
+        "//pmlc:all_passes_and_dialects",
         "//pmlc/rt/vulkan",
         "@llvm-project//mlir:MlirJitRunner",
     ],
