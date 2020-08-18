@@ -21,25 +21,23 @@ struct BufferPlacementPass : public BufferPlacementBase<BufferPlacementPass> {
       Operation *lastOp = alloc;
       Block *allocBlock = alloc.getOperation()->getBlock();
       for (auto &itUse : getIndirectUses(alloc)) {
-        Operation *use = itUse.getOwner();
+        auto use = itUse.getOwner();
         IVLOG(3, "  use: " << debugString(*use));
 
-        while (use->getBlock() != allocBlock) {
-          use = use->getParentOp();
-          assert(use && "use does not have a common ancestor");
-          IVLOG(3, "  parent: " << debugString(*use));
-        }
+        auto ancestor = allocBlock->findAncestorOpInBlock(*use);
+        assert(ancestor && "use and alloc do not have a common ancestor");
+        IVLOG(3, "  ancestor: " << debugString(*use));
 
-        if (isa<ReturnOp>(use)) {
+        if (isa<ReturnOp>(ancestor)) {
           IVLOG(3, "  return");
           return;
         }
 
-        if (!use->isBeforeInBlock(lastOp)) {
-          lastOp = use;
+        if (!ancestor->isBeforeInBlock(lastOp)) {
+          lastOp = ancestor;
         }
       }
-      IVLOG(3, "  last: " << debugString(*lastOp));
+      IVLOG(3, "  last ancestor: " << debugString(*lastOp));
 
       Operation *nextOp = lastOp->getNextNode();
       if (!nextOp) {
@@ -47,7 +45,7 @@ struct BufferPlacementPass : public BufferPlacementBase<BufferPlacementPass> {
         return;
       }
 
-      IVLOG(3, "  nextOp: " << debugString(*nextOp));
+      IVLOG(3, "  next operation: " << debugString(*nextOp));
       OpBuilder builder(nextOp);
       builder.create<DeallocOp>(alloc.getLoc(), alloc);
     });
