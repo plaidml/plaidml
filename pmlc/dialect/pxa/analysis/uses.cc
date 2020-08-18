@@ -1,9 +1,9 @@
 // Copyright 2020 Intel Corporation
 
 #include "pmlc/dialect/pxa/analysis/uses.h"
-
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Support/DebugStringHelper.h"
+#include "pmlc/dialect/stdx/ir/ops.h"
 
 #include "pmlc/util/logging.h"
 
@@ -45,6 +45,9 @@ IndirectValuesIterator &IndirectValuesIterator::operator++() {
                  prngOp.new_state()) {
         enqueueNext(prngOp.result_state());
       }
+    } else if (auto reshapeOp =
+                   dyn_cast<pmlc::dialect::stdx::ReshapeOp>(use.getOwner())) {
+      enqueueNext(reshapeOp.result());
     }
   }
   if (workQueue.empty()) {

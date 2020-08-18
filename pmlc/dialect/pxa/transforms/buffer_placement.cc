@@ -29,20 +29,32 @@ struct BufferPlacementPass : public BufferPlacementBase<BufferPlacementPass> {
     auto fn = getFunction();
     fn.walk([&](AllocOp alloc) {
       IVLOG(1, "alloc: " << debugString(*alloc));
-      auto itLast = getLast<IndirectUsesIterator>(getIndirectUses(alloc));
-      Operation *lastOp = itLast->getOwner();
+
+      Operation *lastOp = alloc;
+      auto uses = getIndirectUses(alloc);
+      auto itUse = uses.begin();
+      while (itUse != uses.end()) {
+        Operation *use = itUse->getOwner();
+        IVLOG(1, "  use: " << debugString(*use));
+
+        Block *allocBlock = alloc.getOperation()->getBlock();
+        while (use->getBlock() != allocBlock) {
+          use = use->getParentOp();
+          assert(use && "use does not have a common ancestor");
+          IVLOG(1, "  up, use: " << debugString(*use));
+        }
+
+        if (!use->isBeforeInBlock(lastOp)) {
+          lastOp = use;
+        }
+
+        ++itUse;
+      }
       IVLOG(1, "  last: " << debugString(*lastOp));
 
       if (isa<ReturnOp>(lastOp)) {
         IVLOG(1, "  return");
         return;
-      }
-
-      Block *allocBlock = alloc.getOperation()->getBlock();
-      while (lastOp->getBlock() != allocBlock) {
-        lastOp = lastOp->getParentOp();
-        assert(lastOp && "last op does not have a common ancestor");
-        IVLOG(1, "  up, last: " << debugString(*lastOp));
       }
 
       Operation *nextOp = lastOp->getNextNode();
