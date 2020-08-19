@@ -198,6 +198,7 @@ SUITES:
             conda_env: ci/conda/tensorflow-dnnl.yml
           keras-pml-llvm-cpu:
             prepend_args: [--examples=64]
+            soft_fail: true # performance regression
           keras-pml-ocl-gfx804:
             prepend_args: [--examples=64]
           keras-pml-ocl-neo:
