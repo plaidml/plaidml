@@ -9,6 +9,7 @@ namespace pmlc::dialect::pxa {
 
 LogicalResult cacheLoad(mlir::AffineParallelOp par, PxaLoadOp load);
 LogicalResult cacheReduce(mlir::AffineParallelOp par, PxaReduceOp reduce);
-LogicalResult cacheLoadAsVector(mlir::AffineParallelOp par, PxaLoadOp load);
+LogicalResult cacheLoadAsVector(mlir::AffineParallelOp par, PxaLoadOp load,
+                                int64_t reqVecSize = 0);
 
 } // namespace pmlc::dialect::pxa

@@ -99,7 +99,8 @@ LogicalResult cacheLoad(AffineParallelOp par, PxaLoadOp load) {
   return success();
 }
 
-LogicalResult cacheLoadAsVector(AffineParallelOp par, PxaLoadOp load) {
+LogicalResult cacheLoadAsVector(AffineParallelOp par, PxaLoadOp load,
+                                int64_t reqVecSize) {
   // Get the striding information for the load op, fail if unsuccessful
   auto maybeRap = computeRelativeAccess(par.getBody(), load);
   if (!maybeRap) {
@@ -125,6 +126,14 @@ LogicalResult cacheLoadAsVector(AffineParallelOp par, PxaLoadOp load) {
     return failure();
   }
   int64_t vectorSize = rap.innerCount[last];
+  if (vectorSize == 1) {
+    IVLOG(1, "Failed since stuff is scalar");
+    return failure();
+  }
+  if (reqVecSize && vectorSize != reqVecSize) {
+    IVLOG(1, "Failed due to mismatch of required size");
+    return failure();
+  }
   auto eltType = load.getMemRefType().getElementType();
   auto vecType = VectorType::get({vectorSize}, eltType);
   // Prep for generation
@@ -190,10 +199,12 @@ LogicalResult cacheReduce(AffineParallelOp par, PxaReduceOp reduce) {
   auto eltType = reduce.getMemRefType().getElementType();
   auto type = MemRefType::get(rap.innerCount, eltType);
   auto localBuf = builder.create<AllocOp>(loc, type);
-  // Clear it to the reduction identity
-  auto ident = createIdentity(builder, loc, reduce.agg(), eltType);
-  auto initBuf = createInitLoop(builder, loc, localBuf, ident);
-
+  // If it's not an assign, clear it to the reduction dentity
+  Value initBuf = localBuf;
+  if (reduce.agg() != AtomicRMWKind::assign) {
+    auto ident = createIdentity(builder, loc, reduce.agg(), eltType);
+    initBuf = createInitLoop(builder, loc, localBuf, ident);
+  }
   // Make a new load and remove the old one
   auto innerMap = convertToValueMap(par.getContext(), rap.inner);
   OpBuilder newReduceBuilder(reduce);
