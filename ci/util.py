@@ -41,10 +41,10 @@ def buildkite_upload(pattern, **kwargs):
 
 def buildkite_download(pattern, destination, check=True, **kwargs):
     cmd = ['buildkite-agent', 'artifact', 'download', pattern, destination]
-    if ignore_errors:
-        call(cmd, **kwargs)
-    else:
+    if check:
         check_call(cmd, **kwargs)
+    else:
+        call(cmd, **kwargs)
 
 
 class CondaEnv(object):
