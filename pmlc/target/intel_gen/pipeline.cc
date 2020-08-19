@@ -50,6 +50,7 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
+  pm.addPass(dialect::stdx::createI1StorageToI32Pass());
   pm.addPass(pmlc::conversion::scf_to_gpu::createSimpleSCFToGPUPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(conversion::gpu::createGpuKernelOutliningPass());
