@@ -206,6 +206,7 @@ SUITES:
             prepend_args: [--examples=256]
       mobilenet:
         expected: "could not broadcast input array from shape (3,2048) into shape (1,2048)"
+        soft_fail: true
         precision: high
         platform_overrides:
           keras-tf-dnnl-cpu:
@@ -245,7 +246,8 @@ SUITES:
         skip_platforms:
           - keras-pml-mtl-uhd630
       xception:
-        expected: "ValueError: Unrecognized data_format"
+        expected: "Unrecognized data_format"
+        soft_fail: true
         precision: high
         platform_overrides:
           keras-pml-llvm-cpu:
