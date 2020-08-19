@@ -39,8 +39,12 @@ def buildkite_upload(pattern, **kwargs):
     check_call(['buildkite-agent', 'artifact', 'upload', pattern], **kwargs)
 
 
-def buildkite_download(pattern, destination, **kwargs):
-    check_call(['buildkite-agent', 'artifact', 'download', pattern, destination], **kwargs)
+def buildkite_download(pattern, destination, check=True, **kwargs):
+    cmd = ['buildkite-agent', 'artifact', 'download', pattern, destination]
+    if check:
+        check_call(cmd, **kwargs)
+    else:
+        call(cmd, **kwargs)
 
 
 class CondaEnv(object):

@@ -85,7 +85,7 @@ def ratio_plot(path, labels, values, title):
     fig.set_size_inches(10, len(values) / 4)
 
     # Vertical lines with major at 1.0
-    ax.xaxis.grid(True, color='666666')
+    ax.xaxis.grid(True, color='#666666')
     ax.axvline(1.0, color='gray')
 
     # Horizontal bar chart, labeled on y axis with test config
@@ -133,44 +133,6 @@ def generate_efficiency_chart(results, report_dir):
     if len(values):
         filename = report_dir / 'efficiency.png'
         ratio_plot(filename, labels, values, 'Efficiency relative to TF/GP100')
-        return Image(filename)
-    return None
-
-
-def generate_engines_chart(results, report_dir, filename, compare, caption):
-    printf(caption)
-
-    def get_by_engine(items, engine):
-        for item in items:
-            if engine in item.engine:
-                return item
-        raise KeyError
-
-    def compare_durations(group):
-        plaid = get_by_engine(group, 'plaid')
-        stripe = get_by_engine(group, 'stripe')
-        printf('{:25} {:25} {:25}'.format(group.key, plaid.dur, stripe.dur))
-        return new(label=group.key, value=plaid.dur / stripe.dur)
-
-    data = query(results) \
-        .where(lambda x: x['compare']) \
-        .where(lambda x: x[compare]) \
-        .select(lambda x: new( \
-            key=x['info'].label(inc_engine=False), \
-            label=x['info'].label(), \
-            engine=x['info'].platform.engine, \
-            dur=x[compare], \
-        )) \
-        .group_by(lambda x: x.key) \
-        .where(lambda x: len(x) > 1) \
-        .select(lambda x: compare_durations(x)) \
-        .order_by(lambda x: x.label) \
-        .to_list()
-    labels = query(data).select(lambda x: x.label).to_list()
-    values = query(data).select(lambda x: x.value).to_list()
-    if len(values):
-        filename = report_dir / filename
-        ratio_plot(filename, labels, values, caption)
         return Image(filename)
     return None
 
@@ -385,26 +347,6 @@ def main():
         'suites': make_html_suites(results),
         'summary': summary,
     }
-
-    engines_execution_png = generate_engines_chart(
-        results,
-        report_dir,
-        'engines_execution.png',
-        'cur.execution_duration',
-        'plaid vs stripe (execution)',
-    )
-    if engines_execution_png:
-        context['engines_execution_png'] = engines_execution_png.data_url()
-
-    engines_compile_png = generate_engines_chart(
-        results,
-        report_dir,
-        'engines_compile.png',
-        'compile_duration',
-        'plaid vs stripe (compilation)',
-    )
-    if engines_compile_png:
-        context['engines_compile_png'] = engines_compile_png.data_url()
 
     ratio_png = generate_ratio_chart(results, report_dir)
     if ratio_png:
