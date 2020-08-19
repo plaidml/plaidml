@@ -11,6 +11,7 @@
 #include "pmlc/dialect/pxa/transforms/cache.h"
 #include "pmlc/dialect/pxa/transforms/pass_detail.h"
 #include "pmlc/dialect/pxa/transforms/tile.h"
+#include "pmlc/dialect/pxa/transforms/tile_accumulate.h"
 #include "pmlc/dialect/pxa/transforms/vectorize.h"
 #include "pmlc/util/logging.h"
 
@@ -195,36 +196,13 @@ struct SubgroupCostModel {
   SmallVector<StrideInfo, 4> ioStrides;
 };
 
-AffineParallelOp tileAccumulations(AffineParallelOp op) {
-  // Find the originating reduce
-  assert(op.getNumResults() == 1);
-  auto srcDef = getOriginalDef(op.getResult(0));
-  auto red = mlir::cast<PxaReduceOp>(srcDef);
-  // Get strides for output
-  auto si = *computeStrideInfo(red);
-  // Find all the accumulation indexes (stride 0 with respect to output) and
-  // tile them into an inner block
-  auto ranges = *op.getConstantRanges();
-  SmallVector<int64_t, 6> accumTile;
-  auto steps = op.steps().cast<ArrayAttr>().getValue();
-  for (unsigned i = 0; i < ranges.size(); i++) {
-    auto arg = op.getIVs()[i];
-    if (si.strides.count(arg)) {
-      accumTile.push_back(steps[i].cast<IntegerAttr>().getInt());
-    } else {
-      accumTile.push_back(ranges[i]);
-    }
-  }
-  return performTiling(op, accumTile);
-}
-
 void SubgroupApply(AffineParallelOp op, SubgroupPlan plan) {
   // Perform the primary innermost tiling
   auto inner = performTiling(op, plan.innerTile);
   // Perform the deep inner tiling
   auto subgroup = performTiling(inner, plan.subgroupTile);
   // Tile over accumulations
-  auto accum = tileAccumulations(op);
+  auto accum = tileAccumulations(op, false);
   // Cache innermost loads at accum level
   subgroup.walk([&](PxaLoadOp load) { cacheLoad(accum, load); });
   // Cache innermost reduces at op level
