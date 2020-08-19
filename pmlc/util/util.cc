@@ -40,7 +40,7 @@ uint64_t getByteSize(MemRefType type) {
     throw std::runtime_error("Could not retrieve strides");
   }
   auto sizes = type.getShape();
-  unsigned total = 0;
+  uint64_t total = 0;
   for (unsigned i = 0; i < type.getRank(); i++) {
     if (!sizes[i]) {
       return 0;
