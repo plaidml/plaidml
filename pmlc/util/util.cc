@@ -6,6 +6,7 @@
 
 using mlir::FuncOp;
 using mlir::FunctionType;
+using mlir::MemRefType;
 using mlir::Operation;
 using mlir::OperationName;
 using mlir::SmallVector;
@@ -30,6 +31,26 @@ void UpdateFuncOpType(Operation *op) {
       }
     }
   }
+}
+
+uint64_t getByteSize(MemRefType type) {
+  int64_t offset;
+  llvm::SmallVector<int64_t, 8> strides;
+  if (failed(mlir::getStridesAndOffset(type, strides, offset))) {
+    throw std::runtime_error("Could not retrieve strides");
+  }
+  auto sizes = type.getShape();
+  uint64_t total = 0;
+  for (unsigned i = 0; i < type.getRank(); i++) {
+    if (!sizes[i]) {
+      return 0;
+    }
+    if (strides[i] > 0) {
+      total += (sizes[i] - 1) * strides[i];
+    }
+  }
+  unsigned elem_bytes = llvm::divideCeil(type.getElementTypeBitWidth(), 8);
+  return (total + 1) * elem_bytes;
 }
 
 } // namespace pmlc::util
