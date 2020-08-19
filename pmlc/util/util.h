@@ -50,4 +50,6 @@ std::string getUniqueName(Set *names, llvm::StringRef name) {
   return next;
 }
 
+uint64_t getByteSize(mlir::MemRefType type);
+
 } // namespace pmlc::util
