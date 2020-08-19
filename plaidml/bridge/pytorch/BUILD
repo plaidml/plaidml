@@ -1,6 +1,6 @@
 # Copyright 2019, Intel Corporation.
 
-load("@rules_python//python:defs.bzl", "py_test")
+load("@rules_python//python:defs.bzl", "py_library", "py_test")
 load("//bzl:plaidml.bzl", "plaidml_cc_binary", "plaidml_cc_library")
 
 # NOTE: We can't statically link against anything unless it was built with _GLIBCXX_USE_CXX11_ABI=0.

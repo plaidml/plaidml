@@ -20,7 +20,7 @@ plaidml_cc_library(
     includes = ["src/plaidml_plugin"],
     tags = TAGS,
     deps = [
-        "//plaidml",
+        "//plaidml:api",
         "@openvino//:inference_engine",
     ],
     alwayslink = 1,
@@ -31,7 +31,10 @@ cc_binary(
     linkopts = PLAIDML_LINKOPTS,
     linkshared = 1,
     tags = TAGS,
-    deps = [":lib"],
+    deps = [
+        ":lib",
+        "//plaidml:targets",
+    ],
 )
 
 write_file(

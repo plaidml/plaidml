@@ -18,6 +18,7 @@
 
 namespace mlir {
 
+namespace pxa = pmlc::dialect::pxa;
 const char *kBlockAndArgFormat = "^bb{0}:%arg{1}";
 
 static std::string getUniqueName(Block *ref, BlockArgument arg) {
@@ -383,17 +384,22 @@ Optional<StrideInfo> computeStrideInfo(MemRefType memRefType, AffineMap map,
   return out;
 }
 
-Optional<StrideInfo> computeStrideInfo(AffineLoadOp op) {
+Optional<StrideInfo> computeStrideInfo(pxa::PxaLoadOp op) {
   return computeStrideInfo(op.getMemRefType(), op.getAffineMap(),
                            op.getMapOperands());
 }
 
-Optional<StrideInfo> computeStrideInfo(AffineStoreOp op) {
+Optional<StrideInfo> computeStrideInfo(pxa::PxaReduceOp op) {
   return computeStrideInfo(op.getMemRefType(), op.getAffineMap(),
                            op.getMapOperands());
 }
 
-Optional<StrideInfo> computeStrideInfo(pmlc::dialect::pxa::AffineReduceOp op) {
+Optional<StrideInfo> computeStrideInfo(pxa::PxaVectorLoadOp op) {
+  return computeStrideInfo(op.getMemRefType(), op.getAffineMap(),
+                           op.getMapOperands());
+}
+
+Optional<StrideInfo> computeStrideInfo(pxa::PxaVectorReduceOp op) {
   return computeStrideInfo(op.getMemRefType(), op.getAffineMap(),
                            op.getMapOperands());
 }
@@ -403,20 +409,20 @@ Optional<RelativeAccessPattern> computeRelativeAccess(Block *block,
   ArrayRef<int64_t> vecSize = {};
   Optional<llvm::SmallVector<StrideInfo, 4>> maybeStrides;
   TypeSwitch<Operation *>(op)
-      .Case<AffineLoadOp>([&](auto op) {
+      .Case<pxa::PxaLoadOp>([&](auto op) {
         maybeStrides =
             computeStrideInfo(op.getAffineMap(), op.getMapOperands());
       })
-      .Case<pmlc::dialect::pxa::AffineReduceOp>([&](auto op) {
+      .Case<pxa::PxaReduceOp>([&](auto op) {
         maybeStrides =
             computeStrideInfo(op.getAffineMap(), op.getMapOperands());
       })
-      .Case<AffineVectorLoadOp>([&](auto op) {
+      .Case<pxa::PxaVectorLoadOp>([&](auto op) {
         maybeStrides =
             computeStrideInfo(op.getAffineMap(), op.getMapOperands());
         vecSize = op.getVectorType().getShape();
       })
-      .Case<pmlc::dialect::pxa::AffineVectorReduceOp>([&](auto op) {
+      .Case<pxa::PxaVectorReduceOp>([&](auto op) {
         maybeStrides =
             computeStrideInfo(op.getAffineMap(), op.getMapOperands());
         vecSize = op.getVectorType().getShape();

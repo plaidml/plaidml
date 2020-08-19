@@ -24,7 +24,7 @@ static Value createInitLoop(OpBuilder &builder, Location loc, Value memref,
   auto initBuilder = loop.getBodyBuilder();
   auto idMap =
       AffineMap::getMultiDimIdentityMap(size.size(), builder.getContext());
-  auto stored = initBuilder.create<AffineReduceOp>(
+  auto stored = initBuilder.create<PxaReduceOp>(
       loc, AtomicRMWKind::assign, initVal, memref, idMap, loop.getIVs());
   initBuilder.create<AffineYieldOp>(loc, ArrayRef<Value>{stored});
   return loop.getResult(0);
@@ -53,16 +53,16 @@ static Value createCopyLoop(OpBuilder &builder,               //
   auto loadMap = convertToValueMap(ctx, srcAccess);
   auto reduceMap = convertToValueMap(ctx, dstAccess);
   auto txBuilder = loop.getBodyBuilder();
-  auto loaded = txBuilder.create<AffineLoadOp>(
+  auto loaded = txBuilder.create<PxaLoadOp>(
       loc, srcMemRef, loadMap.getAffineMap(), loadMap.getOperands());
-  auto stored = txBuilder.create<AffineReduceOp>(loc, agg, loaded, dstMemRef,
-                                                 reduceMap.getAffineMap(),
-                                                 reduceMap.getOperands());
+  auto stored = txBuilder.create<PxaReduceOp>(loc, agg, loaded, dstMemRef,
+                                              reduceMap.getAffineMap(),
+                                              reduceMap.getOperands());
   txBuilder.create<AffineYieldOp>(loc, ArrayRef<Value>{stored});
   return loop.getResult(0);
 }
 
-LogicalResult cacheLoad(AffineParallelOp par, AffineLoadOp load) {
+LogicalResult cacheLoad(AffineParallelOp par, PxaLoadOp load) {
   // Get the striding information for the load op, fail if unsuccessful
   auto maybeRap = computeRelativeAccess(par.getBody(), load);
   if (!maybeRap) {
@@ -91,7 +91,7 @@ LogicalResult cacheLoad(AffineParallelOp par, AffineLoadOp load) {
   // Make a new load and remove the old one
   auto innerMap = convertToValueMap(par.getContext(), rap.inner);
   OpBuilder newLoadBuilder(load);
-  auto newLoad = newLoadBuilder.create<AffineLoadOp>(
+  auto newLoad = newLoadBuilder.create<PxaLoadOp>(
       loc, copy, innerMap.getAffineMap(), innerMap.getOperands());
   load.replaceAllUsesWith(newLoad.result());
   load.erase();
@@ -99,7 +99,7 @@ LogicalResult cacheLoad(AffineParallelOp par, AffineLoadOp load) {
   return success();
 }
 
-LogicalResult cacheReduce(AffineParallelOp par, AffineReduceOp reduce) {
+LogicalResult cacheReduce(AffineParallelOp par, PxaReduceOp reduce) {
   // Get the striding information for the load op, fail if unsuccessful
   auto maybeRap = computeRelativeAccess(par.getBody(), reduce);
   if (!maybeRap) {
@@ -146,7 +146,7 @@ LogicalResult cacheReduce(AffineParallelOp par, AffineReduceOp reduce) {
   // Make a new load and remove the old one
   auto innerMap = convertToValueMap(par.getContext(), rap.inner);
   OpBuilder newReduceBuilder(reduce);
-  auto newReduce = newReduceBuilder.create<AffineReduceOp>(
+  auto newReduce = newReduceBuilder.create<PxaReduceOp>(
       loc, reduce.agg(), reduce.val(), initBuf, innerMap.getAffineMap(),
       innerMap.getOperands());
   reduce.replaceAllUsesWith(newReduce.result());

@@ -588,7 +588,7 @@ buildBroadcastLoad(OpBuilder &builder, Location loc, Value operand,
       operandIdxs[k] = body->getArgument(j);
     }
   }
-  auto loadOp = builder.create<AffineLoadOp>(loc, operand, operandIdxs);
+  auto loadOp = builder.create<pxa::PxaLoadOp>(loc, operand, operandIdxs);
   if (maybePadding)
     updateAffineMap(loadOp, *maybePadding);
   return loadOp;
@@ -641,8 +641,8 @@ static Value buildSimpleStore(OpBuilder &builder, Location loc, Value scalar,
   }
   auto aggOp = AtomicRMWKind::assign;
   auto idMap = builder.getMultiDimIdentityMap(memRefType.getRank());
-  auto storeOp = builder.create<pxa::AffineReduceOp>(
-      loc, aggOp, scalar, memRef, idMap, body->getArguments());
+  auto storeOp = builder.create<pxa::PxaReduceOp>(loc, aggOp, scalar, memRef,
+                                                  idMap, body->getArguments());
   if (maybePadding)
     updateAffineMap(storeOp, *maybePadding);
   return storeOp;
@@ -698,55 +698,15 @@ struct PrngOpConversion : public OpConversionPattern<PrngOp> {
   LogicalResult
   matchAndRewrite(dialect::tile::PrngOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
-    ModuleOp module = op.getParentOfType<ModuleOp>();
-    auto loc = op.getLoc();
+    PrngOp::Adaptor transformed(operands);
     BufferAllocator allocResult(rewriter, op.getOperation(),
                                 op.result().getType());
-    BufferAllocator allocState(rewriter, op.getOperation(),
-                               op.state().getType());
-
-    UnrankedMemRefType resultUnrankedType =
-        UnrankedMemRefType::get(rewriter.getF32Type(), /*memorySpace=*/0);
-    UnrankedMemRefType stateUnrankedType =
-        UnrankedMemRefType::get(rewriter.getIntegerType(32), /*memorySpace=*/0);
-
-    auto symbol = getOrInsertFunc(module, rewriter.getF32Type(), op.getLoc(),
-                                  resultUnrankedType, stateUnrankedType);
-
-    auto stateCast =
-        rewriter.create<MemRefCastOp>(loc, operands[0], stateUnrankedType);
-    auto resultCast = rewriter.create<MemRefCastOp>(
-        loc, allocResult.resultMemRef, resultUnrankedType);
-    auto newStateCast = rewriter.create<MemRefCastOp>(
-        loc, allocState.resultMemRef, stateUnrankedType);
-
-    OpBuilder opBuilder(op);
-    opBuilder.create<CallOp>(
-        loc, symbol, ArrayRef<Type>{},
-        ArrayRef<Value>{stateCast, resultCast, newStateCast});
-
-    rewriter.replaceOp(op, {allocResult.resultMemRef, allocState.resultMemRef});
+    BufferAllocator stateResult(rewriter, op.getOperation(),
+                                op.state().getType());
+    rewriter.replaceOpWithNewOp<pxa::PrngOp>(
+        op, allocResult.memRefType, stateResult.memRefType, transformed.state(),
+        allocResult.resultMemRef, stateResult.resultMemRef);
     return success();
-  }
-
-private:
-  FlatSymbolRefAttr
-  getOrInsertFunc(ModuleOp module, Type elementType, Location loc,
-                  UnrankedMemRefType resultUnrankedType,
-                  UnrankedMemRefType stateUnrankedType) const {
-    const char *symbol = "plaidml_rt_prng";
-    auto context = module.getContext();
-    if (module.lookupSymbol(symbol)) {
-      return SymbolRefAttr::get(symbol, context);
-    }
-    OpBuilder builder(module.getBodyRegion());
-    std::array<Type, 3> inputs{stateUnrankedType, resultUnrankedType,
-                               stateUnrankedType};
-    ArrayRef<Type> results{};
-    auto funcType = builder.getFunctionType(inputs, results);
-    ArrayRef<NamedAttribute> attrs{};
-    builder.create<FuncOp>(loc, symbol, funcType, attrs);
-    return SymbolRefAttr::get(symbol, context);
   }
 };
 
@@ -911,7 +871,7 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
         scalars.push_back(operand);
       } else {
         auto map = srcs[i].cast<AffineMapAttr>().getValue();
-        auto loadOp = rewriter.create<AffineLoadOp>(loc, operand, map, idxs);
+        auto loadOp = rewriter.create<pxa::PxaLoadOp>(loc, operand, map, idxs);
         auto maybePadding = getPaddingInfo(op.operands()[i].getDefiningOp());
         if (maybePadding)
           updateAffineMap(loadOp, *maybePadding);
@@ -930,15 +890,15 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
 
     // Create the store
     auto resultMap = op.sink();
-    pxa::AffineReduceOp reduceOp;
+    pxa::PxaReduceOp reduceOp;
     auto agg = convertAgg(op.agg(), alloc.elementType);
     if (resultMap.isEmpty()) {
       SmallVector<Value, 0> emptyIdxs;
-      reduceOp = rewriter.create<pxa::AffineReduceOp>(
-          loc, agg, combined, filled, resultMap, emptyIdxs);
+      reduceOp = rewriter.create<pxa::PxaReduceOp>(loc, agg, combined, filled,
+                                                   resultMap, emptyIdxs);
     } else {
-      reduceOp = rewriter.create<pxa::AffineReduceOp>(loc, agg, combined,
-                                                      filled, resultMap, idxs);
+      reduceOp = rewriter.create<pxa::PxaReduceOp>(loc, agg, combined, filled,
+                                                   resultMap, idxs);
     }
     maybePadding = getPaddingInfo(op);
     if (maybePadding)
@@ -1036,21 +996,22 @@ struct ShapeOpConversion : public OpConversionPattern<ShapeOp> {
         typeConverter.convertType(op.result().getType()).cast<MemRefType>();
 
     // Make an allocation for the output
-    auto resultMemRef = rewriter.create<AllocOp>(loc, resultType).getResult();
+    auto memRef = rewriter.create<AllocOp>(loc, resultType).getResult();
 
     // Populate the buffer with the shape dims
     auto operandType = adaptor.tensor().getType().cast<MemRefType>();
+    auto aggOp = AtomicRMWKind::assign;
     for (unsigned i = 0; i < operandType.getRank(); i++) {
-      auto idx = rewriter.create<mlir::ConstantIndexOp>(loc, i);
       auto dim = rewriter.create<mlir::DimOp>(loc, adaptor.tensor(), i);
       auto cast = rewriter.create<mlir::IndexCastOp>(
           loc, dim, rewriter.getIntegerType(32));
-      SmallVector<Value, 1> idxs = {idx};
-      rewriter.create<mlir::StoreOp>(loc, cast, resultMemRef, idxs);
+      auto map = rewriter.getConstantAffineMap(i);
+      memRef = rewriter.create<pxa::PxaReduceOp>(loc, aggOp, cast, memRef, map,
+                                                 ArrayRef<Value>{});
     }
 
     // Replace the op
-    rewriter.replaceOp(op, resultMemRef);
+    rewriter.replaceOp(op, memRef);
 
     return success();
   }

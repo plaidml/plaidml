@@ -6,6 +6,7 @@ namespace mlir {
 class LLVMTypeConverter;
 class LowerToLLVMOptions;
 class MLIRContext;
+class OpPassManager;
 class OwningRewritePatternList;
 class Pass;
 } // namespace mlir
@@ -22,13 +23,16 @@ std::unique_ptr<mlir::Pass> createXSMMLoweringPass();
 
 std::unique_ptr<mlir::Pass> createXSMMStencilPass();
 
-void populatePXAToAffineConversionPatterns(
+void populatePXAGemmToXSMMConversionPatterns(
+    mlir::OwningRewritePatternList &patterns, mlir::MLIRContext *ctx);
+
+void populatePXAPrngToAffineConversionPatterns(
     mlir::OwningRewritePatternList &patterns, mlir::MLIRContext *ctx);
 
 void populateXSMMToLLVMConversionPatterns(
     mlir::LLVMTypeConverter &converter,
     mlir::OwningRewritePatternList &patterns);
 
-void registerPassPipeline();
+void pipelineBuilder(mlir::OpPassManager &pm);
 
 } // namespace pmlc::target::x86

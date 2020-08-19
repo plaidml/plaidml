@@ -1,7 +1,6 @@
 # Copyright 2019 Intel Corporation.
 
-load("@rules_python//python:defs.bzl", "py_test")
-load("@rules_pkg//:pkg.bzl", "pkg_tar")
+load("@rules_python//python:defs.bzl", "py_library")
 load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_test")
 
 SDK_HDRS = [

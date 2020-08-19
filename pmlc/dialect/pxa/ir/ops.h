@@ -3,10 +3,12 @@
 #pragma once
 
 #include "mlir/Analysis/AffineStructures.h"
+#include "mlir/Dialect/Affine/IR/AffineMemoryOpInterfaces.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/Dialect.h"
+#include "mlir/IR/StandardTypes.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 
 #include "pmlc/util/enums.h"
@@ -17,6 +19,7 @@ using llvm::SmallVectorImpl;
 using mlir::AffineExpr;
 using mlir::AffineMap;
 using mlir::AffineMapAttr;
+using mlir::AffineReadOpInterface;
 using mlir::AffineValueMap;
 using mlir::AffineYieldOp;
 using mlir::ArrayAttr;
@@ -39,6 +42,7 @@ using mlir::NamedAttribute;
 using mlir::Op;
 using mlir::OpAsmParser;
 using mlir::OpAsmPrinter;
+using mlir::OpAsmSetValueNameFn;
 using mlir::OpBuilder;
 using mlir::Operation;
 using mlir::OperationState;
@@ -55,6 +59,7 @@ using mlir::Type;
 using mlir::TypeAttr;
 using mlir::Value;
 using mlir::ValueRange;
+using mlir::VectorType;
 
 namespace MemoryEffects = mlir::MemoryEffects;
 namespace OpTrait = mlir::OpTrait;

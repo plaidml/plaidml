@@ -5,8 +5,6 @@
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
 #include "mlir/Dialect/Affine/Passes.h"
-#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/StandardOps/Transforms/Passes.h"
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/Pass/Pass.h"
@@ -44,7 +42,8 @@ struct LowerPXAToAffinePass
     target.addLegalDialect<xsmm::XSMMDialect>();
 
     OwningRewritePatternList patterns;
-    populatePXAToAffineConversionPatterns(patterns, &ctx);
+    populatePXAGemmToXSMMConversionPatterns(patterns, &ctx);
+    populatePXAPrngToAffineConversionPatterns(patterns, &ctx);
     conversion::pxa_to_affine::populatePXAToAffineConversionPatterns(patterns,
                                                                      &ctx);
 
@@ -106,7 +105,7 @@ std::unique_ptr<Pass> createLowerToLLVMPass() {
   return std::make_unique<ConvertToLLVMPass>();
 }
 
-static void addToPipeline(OpPassManager &pm) {
+void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(pmlc::dialect::tile::createComputeBoundsPass());
   pm.addPass(pmlc::dialect::tile::createPadPass());
   pm.addPass(createCanonicalizerPass());
@@ -122,15 +121,14 @@ static void addToPipeline(OpPassManager &pm) {
   // FIXME: these passes cause test failures (correctness or otherwise)
   // pm.addPass(pxa::createFusionPass());
   // pm.addPass(createCanonicalizerPass());
-  // pm.addPass(pxa::createMemRefDataFlowOptPass());
-  // pm.addPass(createCanonicalizerPass());
+  pm.addPass(pxa::createMemRefDataFlowOptPass());
+  pm.addPass(createCanonicalizerPass());
   pm.addPass(pxa::createLocalizePass());
-  pm.addPass(pxa::createResizeTmpsPass());
+  // pm.addPass(pxa::createResizeTmpsPass());
+  pm.addPass(pxa::createBufferPlacementPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
-  pm.addPass(createCanonicalizerPass());
-  pm.addPass(createCSEPass());
   pm.addPass(createLowerPXAToAffinePass());
   pm.addPass(createLoopInvariantCodeMotionPass());
   pm.addPass(createCanonicalizerPass());
@@ -141,19 +139,12 @@ static void addToPipeline(OpPassManager &pm) {
   pm.addPass(createCSEPass());
 
   pm.addPass(createLowerToCFGPass());
-  pm.addPass(createBufferPlacementPass());
   if (pmlc::util::getEnvVar("PLAIDML_BOUNDS_CHECK") == "1") {
     pm.addPass(pmlc::dialect::stdx::createBoundsCheckPass());
   }
 
   pm.addPass(createLowerToLLVMPass());
   pm.addPass(createTraceLinkingPass());
-}
-
-void registerPassPipeline() {
-  static PassPipelineRegistration<> passPipelineReg(
-      "target-cpu", "Target pipeline for CPU", addToPipeline);
-  static compiler::TargetRegistration targetReg("llvm_cpu", addToPipeline);
 }
 
 } // namespace pmlc::target::x86

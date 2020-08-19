@@ -116,9 +116,11 @@ Optional<StrideInfo> computeStrideInfo(MemRefType memRef, AffineMap map,
                                        ValueRange values);
 
 // Helper that works on a affine load / store, etc.
-Optional<StrideInfo> computeStrideInfo(AffineLoadOp op);
-Optional<StrideInfo> computeStrideInfo(AffineStoreOp op);
-Optional<StrideInfo> computeStrideInfo(pmlc::dialect::pxa::AffineReduceOp op);
+Optional<StrideInfo> computeStrideInfo(pmlc::dialect::pxa::PxaLoadOp op);
+Optional<StrideInfo> computeStrideInfo(pmlc::dialect::pxa::PxaReduceOp op);
+Optional<StrideInfo> computeStrideInfo(pmlc::dialect::pxa::PxaVectorLoadOp op);
+Optional<StrideInfo>
+computeStrideInfo(pmlc::dialect::pxa::PxaVectorReduceOp op);
 
 // For a given block + memory access:
 // 1) What is the effect of all block args outside and including the

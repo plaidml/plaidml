@@ -15,7 +15,11 @@ namespace pmlc::dialect::pxa {
 
 std::unique_ptr<mlir::Pass> createAutoTileExamplePass();
 
+std::unique_ptr<mlir::Pass> createTileAccumulatePass();
+
 std::unique_ptr<mlir::Pass> createVectorizeExamplePass();
+
+std::unique_ptr<mlir::Pass> createBufferPlacementPass();
 
 std::unique_ptr<mlir::Pass> createFusionPass();
 
@@ -40,5 +44,8 @@ std::unique_ptr<mlir::Pass> createTestIndirectValuesIteratorPass();
 
 std::unique_ptr<mlir::Pass> createStencilGEMMPass(unsigned numThreads,
                                                   StencilCostFunction costFn);
+
+std::unique_ptr<mlir::Pass> createNestLoopsPass();
+std::unique_ptr<mlir::Pass> createNestLoopsPass(unsigned minLoopIVs);
 
 } // namespace pmlc::dialect::pxa

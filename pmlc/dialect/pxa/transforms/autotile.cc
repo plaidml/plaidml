@@ -33,7 +33,7 @@ struct AutoTileExamplePass : public AutoTileExampleBase<AutoTileExamplePass> {
     auto func = getFunction();
     FixedTileSizeGenerator always10(10);
     // Autotile only the outermost loops
-    for (auto& op : func.getBody().front()) {
+    for (auto &op : func.getBody().front()) {
       auto loop = mlir::dyn_cast<mlir::AffineParallelOp>(op);
       if (!loop) {
         continue;
@@ -47,7 +47,7 @@ struct AutoTileExamplePass : public AutoTileExampleBase<AutoTileExamplePass> {
         return;
       }
       performTiling(loop, tileSize);
-    };
+    }
   }
 };
 

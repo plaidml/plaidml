@@ -7,7 +7,7 @@
 
 namespace pmlc::dialect::pxa {
 
-LogicalResult cacheLoad(mlir::AffineParallelOp par, mlir::AffineLoadOp load);
-LogicalResult cacheReduce(mlir::AffineParallelOp par, PxaReduceOp reduce);
+mlir::AffineParallelOp tileAccumulations(mlir::AffineParallelOp op,
+                                         bool skipTrivial = true);
 
 } // namespace pmlc::dialect::pxa

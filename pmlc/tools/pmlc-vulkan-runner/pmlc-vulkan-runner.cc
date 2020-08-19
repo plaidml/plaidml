@@ -29,8 +29,6 @@
 #include "pmlc/compiler/executable.h"
 #include "pmlc/compiler/program.h"
 #include "pmlc/conversion/gpu/lowering.h"
-#include "pmlc/util/all_dialects.h"
-#include "pmlc/util/all_passes.h"
 #include "pmlc/util/env.h"
 #include "pmlc/util/logging.h"
 
@@ -110,7 +108,6 @@ int main(int argc, char **argv) {
   llvm::llvm_shutdown_obj x;
   registerPassManagerCLOptions();
 
-  registerAllDialects();
   llvm::InitLLVM y(argc, argv);
   llvm::InitializeNativeTarget();
   llvm::InitializeNativeTargetAsmPrinter();

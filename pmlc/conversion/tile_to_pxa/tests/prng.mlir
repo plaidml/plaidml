@@ -12,7 +12,4 @@ module {
 }
 
 // CHECK-LABEL: func @prng
-// CHECK: %{{.*}} = memref_cast %{{.*}}: memref<3x2048xi32> to memref<*xi32>
-// CHECK-NEXT %{{.*}} = memref_cast %{{.*}} : memref<2x3x4x5xf32> to memref<*xf32>
-// CHECK-NEXT %{{.*}} = memref_cast %{{.*}} : memref<3x2048xi32> to memref<*xi32>
-// CHECK-NEXT call @plaidml_rt_prng(%{{.*}}, %{{.*}}, %{{.*}}) : (memref<*xi32>, memref<*xf32>, memref<*xi32>) -> ()
+// CHECK "pxa.prng"(%{{.*}}, %{{.*}}, %{{.*}})

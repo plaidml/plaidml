@@ -1,5 +1,7 @@
 // Copyright 2020 Intel Corporation
-// RUN: cc_test --plaidml_device=%plaidml_device --plaidml_target=%plaidml_target | FileCheck %s
+//
+// N.B. When running via lit, we always use the llvm_cpu device.
+// RUN: cc_test --plaidml_device=llvm_cpu.0 --plaidml_target=llvm_cpu --generate_filecheck_input | FileCheck %s
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -79,7 +81,7 @@ TEST_F(CppEdsl, HigherPrecisionConstants) {
   auto C = A + 1 + 2.0;
 
   auto program = ProgramBuilder("higher_precision_constants", {C}).floatx(DType::FLOAT64).intx(DType::UINT64).compile();
-  std::cout << program << std::endl;
+  writeForFileCheck(program);
 
   // CHECK-LABEL: CppEdsl.HigherPrecisionConstants
   // CHECK: func @higher_precision_constants
@@ -127,7 +129,7 @@ TEST_F(CppEdsl, BitAndScalar) {
   uint64_t mask = UINT32_MAX;
   auto B = A & mask;
   auto program = ProgramBuilder("bit_and", {B}).intx(DType::UINT64).compile();
-  std::cout << program << std::endl;
+  writeForFileCheck(program);
 
   std::vector<uint64_t> A_input{(ONE << 32),     (ONE << 33) + 1, (ONE << 34) + 2,  //
                                 (ONE << 35) + 3, (ONE << 36) + 4, (ONE << 37) + 5,  //
@@ -586,8 +588,7 @@ TEST_F(CppEdsl, MnistCnn) {
   auto kernel4 = Placeholder(DType::FLOAT32, {128, kNumClasses});
   auto bias4 = Placeholder(DType::FLOAT32, {kNumClasses});
   auto dense2 = Softmax(Dot(dense1, kernel4) + bias4);
-  auto program = ProgramBuilder("mnist_cnn", {dense2}).target("").compile();
-  std::cout << program << std::endl;
+  auto program = makeProgram("mnist_cnn", {dense2});
   // clang-format off
   // CHECK-LABEL: CppEdsl.MnistCnn
   // CHECK: func @mnist_cnn
@@ -618,8 +619,7 @@ TEST_F(CppEdsl, MnistCnn) {
   // CHECK: %{{.*}} = "eltwise.div"(%{{.*}}, %{{.*}}) : (tensor<1x100xf32>, tensor<1x1xf32>) -> tensor<1x100xf32>
   // CHECK: return %{{.*}} : tensor<1x100xf32>
   // clang-format on
-  // TODO: error: failed to legalize operation 'tile.reshape'
-  // runProgram(program);
+  runProgram(program);
 }
 
 Tensor Normalize(const Tensor& X) {
@@ -937,6 +937,7 @@ TEST_F(CppEdsl, ReshapeIntoScalar) {
   // CHECK-NEXT: %[[X1:.*]] = "eltwise.ident"(%[[X0]]) : (tensor<si32>) -> tensor<si32>
   // CHECK-NEXT: return %[[X1]] : tensor<si32>
   // clang-format on
+
   std::vector<int32_t> data = {2};
   checkProgram(program, {{A, data}}, {{R, data}});
 }
@@ -1071,8 +1072,7 @@ TEST_F(CppEdsl, DefractLong) {
   // CHECK: %{{.*}} = tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : tensor<f32>, tensor<1x3x3x1xf32>, tensor<1x3x3x1xf32> -> tensor<1x5x5x1xf32>
   // CHECK: return %{{.*}} : tensor<1x5x5x1xf32>
   // clang-format on
-  // TODO: This causes out of bounds access!
-  // runProgram(program);
+  runProgram(program);
 }
 
 TEST_F(CppEdsl, DupOut) {
