@@ -8,7 +8,6 @@ plaidml_cc_library(
     copts = ["-Wno-deprecated-declarations"],
     data = [  # TODO
         "//plaidml/bridge/openvino:libplaidml-plugin.so",
-        "//plaidml/bridge/openvino:plugins",
         "//:ov_plugins_xml",  # TODO
     ],
     linkopts = PLAIDML_LINKOPTS,  # TODO
@@ -16,7 +15,6 @@ plaidml_cc_library(
         "//pmlc/util:logging",
         "@gflags",
         "@gmock//:gtest_main",
-        # "@openvino//:helpers",  # TODO
         "@openvino//:inference_engine",
         "@openvino//:common_test_utils",
         "@openvino//:shared_plugin_tests",

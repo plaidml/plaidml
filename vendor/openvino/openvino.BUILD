@@ -102,29 +102,6 @@ cc_library(
     ],
 )
 
-# template_rule(
-#     name = "test_model_repo",
-#     src = "inference-engine/tests_deprecated/helpers/test_model_repo.hpp.in",
-#     out = "inference-engine/tests_deprecated/helpers/test_model_repo.hpp",
-#     substitutions = {
-#         "@MODELS_LST@": "",
-#     },
-# )
-
-# TODO: Might be broken
-cc_library(
-    name = "helpers",
-    srcs = glob(["inference-engine/tests_deprecated/helpers/*.cpp"]),
-    hdrs = glob(["inference-engine/tests_deprecated/helpers/*.hpp"]),  # + [":test_model_repo"],
-    copts = ["-w"],
-    defines = ["DATA_PATH=NULL"],
-    includes = ["inference-engine/tests_deprecated/helpers"],
-    deps = [
-        ":common_test_utils",
-        ":inference_engine",
-    ],
-)
-
 cc_library(
     name = "legacy_api",
     srcs = glob([

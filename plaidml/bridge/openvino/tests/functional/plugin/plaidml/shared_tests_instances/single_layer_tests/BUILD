@@ -10,8 +10,6 @@ TAGS = [
 
 DATA = [
     "//plaidml/bridge/openvino:libplaidml-plugin.so",
-    "//plaidml/bridge/openvino:plugins",
-    "//:ov_plugins_xml",  # TODO
 ]
 
 DEPS = [
@@ -20,7 +18,6 @@ DEPS = [
     "@gflags",
     "@gmock//:gtest_main",
     "@openvino//:common_test_utils",
-    # "@openvino//:helpers",  # TODO
     "@openvino//:inference_engine",
     "@openvino//:shared_plugin_tests",
 ]
