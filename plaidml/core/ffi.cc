@@ -14,6 +14,7 @@
 #include "plaidml/core/settings.h"
 #include "pmlc/util/env.h"
 #include "pmlc/util/logging.h"
+#include "pmlc/util/util.h"
 
 using mlir::FloatType;
 using mlir::IntegerType;
@@ -354,23 +355,7 @@ uint64_t plaidml_shape_get_nbytes(  //
     plaidml_error* err,             //
     plaidml_shape* shape) {
   return ffi_wrap<uint64_t>(err, 0, [&]() -> uint64_t {  //
-    int64_t offset;
-    llvm::SmallVector<int64_t, 8> strides;
-    if (failed(mlir::getStridesAndOffset(shape->type, strides, offset))) {
-      throw std::runtime_error("Could not retrieve strides");
-    }
-    auto sizes = shape->type.getShape();
-    unsigned total = 0;
-    for (unsigned i = 0; i < shape->type.getRank(); i++) {
-      if (!sizes[i]) {
-        return 0;
-      }
-      if (strides[i] > 0) {
-        total += (sizes[i] - 1) * strides[i];
-      }
-    }
-    unsigned elem_bytes = llvm::divideCeil(shape->type.getElementTypeBitWidth(), 8);
-    return (total + 1) * elem_bytes;
+    return pmlc::util::getByteSize(shape->type);
   });
 }
 
