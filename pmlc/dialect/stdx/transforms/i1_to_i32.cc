@@ -59,8 +59,7 @@ LogicalResult LoadOpI1ToI32::matchAndRewrite(LoadOp loadOp,
   auto newLoadOp =
       rewriter.create<LoadOp>(loc, loadOp.memref(), loadOp.indices());
 
-  auto const0 =
-      rewriter.create<ConstantOp>(loc, rewriter.getIntegerAttr(destType, 0));
+  auto const0 = rewriter.create<ConstantIntOp>(loc, 0, destType);
   auto cmpOp = rewriter.create<CmpIOp>(
       loc, CmpIPredicate::ne, newLoadOp.getResult(), const0.getResult());
 
@@ -85,10 +84,8 @@ LogicalResult StoreOpI1ToI32::matchAndRewrite(StoreOp storeOp,
   auto destType = rewriter.getIntegerType(32);
   auto loc = storeOp.getLoc();
 
-  auto const0 =
-      rewriter.create<ConstantOp>(loc, rewriter.getIntegerAttr(destType, 0));
-  auto const1 =
-      rewriter.create<ConstantOp>(loc, rewriter.getIntegerAttr(destType, 1));
+  auto const0 = rewriter.create<ConstantIntOp>(loc, 0, destType);
+  auto const1 = rewriter.create<ConstantIntOp>(loc, 1, destType);
   auto selOp = rewriter.create<SelectOp>(
       loc, storeOp.value(), const1.getResult(), const0.getResult());
 
@@ -242,4 +239,4 @@ std::unique_ptr<mlir::Pass> createI1StorageToI32Pass() {
   return std::make_unique<I1StorageToI32Pass>();
 }
 
-} // namespace pmlc::dialect::stdx
+} // namespace pmlc::dialect::stdx 
