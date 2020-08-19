@@ -21,7 +21,7 @@ func @simpleLoadStore(%i: index, %j: index) {
   return
 }
 
-// CHECK-LABLE: func @simpleI1Param
+// CHECK-LABEL: func @simpleI1Param
 func @simpleI1Param(%i: index, %j: index, %k: memref<3x3xi1>) {
   %c0 = constant 0 : i32
   %c1 = constant 1 : i32

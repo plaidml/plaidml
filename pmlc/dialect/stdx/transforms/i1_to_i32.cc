@@ -194,13 +194,9 @@ struct I1StorageToI32Pass : public I1StorageToI32Base<I1StorageToI32Pass> {
                                      [&](OpOperand &operand) { return true; });
 
           auto const0 =
-              builder
-                  .create<ConstantOp>(loc, builder.getIntegerAttr(intType, 0))
-                  .getResult();
+              builder.create<ConstantIntOp>(loc, 0, intType).getResult();
           auto const1 =
-              builder
-                  .create<ConstantOp>(loc, builder.getIntegerAttr(intType, 1))
-                  .getResult();
+              builder.create<ConstantIntOp>(loc, 1, intType).getResult();
 
           // create mem copy from i1 buffer to i32 buffer
           buildLoopForMemRef(
@@ -239,4 +235,4 @@ std::unique_ptr<mlir::Pass> createI1StorageToI32Pass() {
   return std::make_unique<I1StorageToI32Pass>();
 }
 
-} // namespace pmlc::dialect::stdx 
+} // namespace pmlc::dialect::stdx
