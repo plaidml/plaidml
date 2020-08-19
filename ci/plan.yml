@@ -38,21 +38,21 @@ PLATFORMS:
     variant: linux_x86_64
   keras-tf-dnnl-cpu:
     variant: linux_x86_64
-  keras-stripe-mtl-uhd630:
+  keras-pml-mtl-uhd630:
     variant: macos_x86_64
-  keras-stripe-llvm-cpu:
+  keras-pml-llvm-cpu:
     variant: linux_x86_64
   keras-tf-cuda-gp100gl:
     variant: linux_x86_64
-  keras-stripe-ocl-gfx900:
+  keras-pml-ocl-gfx900:
     variant: linux_x86_64
-  keras-stripe-ocl-gp100gl:
+  keras-pml-ocl-gp100gl:
     variant: linux_x86_64
-  keras-stripe-ocl-gv100gl:
+  keras-pml-ocl-gv100gl:
     variant: linux_x86_64
-  keras-stripe-ocl-neo:
+  keras-pml-ocl-neo:
     variant: linux_x86_64
-  keras-stripe-ocl-gfx804:
+  keras-pml-ocl-gfx804:
     variant: windows_x86_64
 
 VARIANTS:
@@ -92,7 +92,7 @@ VARIANTS:
 SUITES:
   smoke:
     platforms:
-      keras-stripe-llvm-cpu:
+      keras-pml-llvm-cpu:
         pipelines: [nightly, plaidml]
     params:
       plaidml:
@@ -123,9 +123,8 @@ SUITES:
 
   base:
     platforms:
-      keras-stripe-llvm-cpu:
+      keras-pml-llvm-cpu:
         pipelines: [nightly, plaidml, ci]
-
     params:
       ci:
         batch_sizes: [0]
@@ -154,7 +153,6 @@ SUITES:
       trivial_model:
         args: [trivial_model_test.py]
         precision: untested
-        soft_fail: true
       mnist_mlp:
         args: [mnist_mlp_test.py]
         precision: untested
@@ -162,9 +160,8 @@ SUITES:
 
   infer:
     platforms:
-      keras-stripe-llvm-cpu:
-        pipelines: [nightly]
-
+      keras-pml-llvm-cpu:
+        pipelines: [nightly, plaidml, ci]
     params:
       ci:
         batch_sizes: [1]
@@ -191,7 +188,7 @@ SUITES:
       imdb_lstm:
         precision: high
         skip_platforms:
-          - keras-stripe-llvm-cpu
+          - keras-pml-llvm-cpu
           - keras-tf-dnnl-cpu
         perf_threshold: 0.7
       inception_v3:
@@ -199,13 +196,18 @@ SUITES:
         platform_overrides:
           keras-tf-dnnl-cpu:
             conda_env: ci/conda/tensorflow-dnnl.yml
-            keras-stripe-ocl-gfx804:
+          keras-pml-llvm-cpu:
             prepend_args: [--examples=64]
-          keras-stripe-ocl-neo:
+            soft_fail: true # performance regression
+          keras-pml-ocl-gfx804:
+            prepend_args: [--examples=64]
+          keras-pml-ocl-neo:
             prepend_args: [--examples=512]
-          keras-stripe-mtl-uhd630:
+          keras-pml-mtl-uhd630:
             prepend_args: [--examples=256]
       mobilenet:
+        expected: "could not broadcast input array from shape (3,2048) into shape (1,2048)"
+        soft_fail: true
         precision: high
         platform_overrides:
           keras-tf-dnnl-cpu:
@@ -213,48 +215,52 @@ SUITES:
       mobilenet_v2:
         precision: high
         platform_overrides:
+          keras-pml-llvm-cpu:
+            soft_fail: true # performance regression
           keras-tf-dnnl-cpu:
             conda_env: ci/conda/tensorflow-dnnl.yml
       resnet50:
         precision: high
         platform_overrides:
-          keras-stripe-llvm-cpu:
+          keras-pml-llvm-cpu:
             prepend_args: [--examples=128]
-          keras-stripe-ocl-gfx804:
+          keras-pml-ocl-gfx804:
             prepend_args: [--examples=128]
-          keras-stripe-mtl-uhd630:
+          keras-pml-mtl-uhd630:
             prepend_args: [--examples=256]
           keras-tf-dnnl-cpu:
             conda_env: ci/conda/tensorflow-dnnl.yml
       vgg19:
         precision: high
         platform_overrides:
-          keras-stripe-llvm-cpu:
+          keras-pml-llvm-cpu:
             prepend_args: [--examples=64]
-          keras-stripe-ocl-gfx804:
+            soft_fail: true # performance regression
+          keras-pml-ocl-gfx804:
             prepend_args: [--examples=64]
-          keras-stripe-ocl-neo:
+          keras-pml-ocl-neo:
             prepend_args: [--examples=256]
-          keras-stripe-mtl-uhd630:
+          keras-pml-mtl-uhd630:
             prepend_args: [--examples=256]
           keras-tf-dnnl-cpu:
             conda_env: ci/conda/tensorflow-dnnl.yml
         skip_platforms:
-          - keras-stripe-mtl-uhd630
-
+          - keras-pml-mtl-uhd630
       xception:
+        expected: "Unrecognized data_format"
+        soft_fail: true
         precision: high
         platform_overrides:
-          keras-stripe-llvm-cpu:
+          keras-pml-llvm-cpu:
             prepend_args: [--examples=64]
-          keras-stripe-ocl-gfx804:
+          keras-pml-ocl-gfx804:
             prepend_args: [--examples=64]
-          keras-stripe-ocl-gv100gl:
+          keras-pml-ocl-gv100gl:
             prepend_args: [--examples=512]
-          keras-stripe-ocl-neo:
+          keras-pml-ocl-neo:
             prepend_args: [--examples=256]
             perf_threshold: 0.7
-          keras-stripe-mtl-uhd630:
+          keras-pml-mtl-uhd630:
             prepend_args: [--examples=64]
             soft_fail: true
           keras-tf-dnnl-cpu:
@@ -274,7 +280,6 @@ SUITES:
       - plaidml-{version}-py2.py3-none-{arch}.whl
       - plaidml_keras-{version}-py2.py3-none-any.whl
       - plaidbench-{version}-py2.py3-none-any.whl
-
     timeout: 5
     conda_env: ci/conda/ml_gpu.yml
     cwd: plaidbench

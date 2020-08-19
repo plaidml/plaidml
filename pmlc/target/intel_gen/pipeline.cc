@@ -19,6 +19,7 @@
 #include "pmlc/conversion/gpu/lowering.h"
 #include "pmlc/conversion/pxa_to_affine/passes.h"
 #include "pmlc/conversion/tile_to_pxa/passes.h"
+#include "pmlc/dialect/pxa//transforms/passes.h"
 #include "pmlc/dialect/stdx/transforms/passes.h"
 #include "pmlc/dialect/tile/transforms/passes.h"
 
@@ -28,7 +29,7 @@ namespace pmlc::target::intel_gen {
 
 namespace {
 
-void addToPipeline(OpPassManager &pm) {
+void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(dialect::tile::createComputeBoundsPass());
   // pm.addPass(dialect::tile::createPadPass());
   pm.addPass(createCanonicalizerPass());
@@ -37,6 +38,7 @@ void addToPipeline(OpPassManager &pm) {
   pm.addPass(conversion::tile_to_pxa::createLowerTileToPXAPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
+  pm.addPass(pmlc::dialect::pxa::createTileAccumulatePass());
 
   // TODO: do optimizations here
 
@@ -78,10 +80,9 @@ void addToPipeline(OpPassManager &pm) {
 
 } // namespace
 
-void registerPassPipeline() {
-  static PassPipelineRegistration<> passPipelineReg(
-      "target-intel_gen", "Target pipeline for Intel GEN iGPUs", addToPipeline);
-  static compiler::TargetRegistration targetReg("intel_gen", addToPipeline);
-}
+static PassPipelineRegistration<>
+    passPipelineReg("target-intel_gen", "Target pipeline for Intel GEN iGPUs",
+                    pipelineBuilder);
+static compiler::TargetRegistration targetReg("intel_gen", pipelineBuilder);
 
 } // namespace pmlc::target::intel_gen

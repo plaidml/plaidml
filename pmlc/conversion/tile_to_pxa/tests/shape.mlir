@@ -6,9 +6,8 @@ func @shape(%arg0: tensor<10x20xf32>) -> tensor<2xsi32> {
 }
 
 // CHECK-LABEL: func @shape
-// CHECK-DAG: %[[c0:.*]] = constant 0 : index
 // CHECK-DAG: %[[c10:.*]] = constant 10 : i32
-// CHECK-DAG: %[[c1:.*]] = constant 1 : index
 // CHECK-DAG: %[[c20:.*]] = constant 20 : i32
-// CHECK: store %[[c10]], %{{.*}}[%[[c0]]] : memref<2xi32>
-// CHECK: store %[[c20]], %{{.*}}[%[[c1]]] : memref<2xi32>
+// CHECK: %[[r0:.*]] = pxa.reduce assign %[[c10]], %{{.*}}[0] : memref<2xi32>
+// CHECK: %[[r1:.*]] = pxa.reduce assign %[[c20]], %[[r0]][1] : memref<2xi32>
+// CHECK: return %[[r1]] : memref<2xi32>

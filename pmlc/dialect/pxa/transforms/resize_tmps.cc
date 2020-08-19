@@ -9,6 +9,7 @@
 #include "pmlc/dialect/pxa/analysis/uses.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/dialect/pxa/transforms/pass_detail.h"
+#include "pmlc/dialect/stdx/ir/ops.h"
 #include "pmlc/util/logging.h"
 
 using namespace mlir; // NOLINT
@@ -42,6 +43,9 @@ struct ResizeTmpsPass : public ResizeTmpsBase<ResizeTmpsPass> {
     for (auto &use : getIndirectUses(op)) {
       if (isa<ReturnOp>(use.getOwner())) {
         IVLOG(2, "Found ReturnOp user, cannot resize allocation");
+        return;
+      } else if (isa<pmlc::dialect::stdx::ReshapeOp>(use.getOwner())) {
+        IVLOG(2, "Found ReshapeOp user, cannot resize allocation");
         return;
       }
     }

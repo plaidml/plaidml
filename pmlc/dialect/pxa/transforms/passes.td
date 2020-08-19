@@ -8,9 +8,28 @@ def AutoTileExample : FunctionPass<"pxa-autotile-example"> {
   let constructor = "pmlc::dialect::pxa::createAutoTileExamplePass()";
 }
 
+def TileAccumulate : FunctionPass<"pxa-tile-accumulate"> {
+  let summary = "Tile accumulation indexes into an inner block to avoid possible race conditions";
+  let constructor = "pmlc::dialect::pxa::createTileAccumulatePass()";
+}
+
+def NestLoops : FunctionPass<"pxa-nest-loops"> {
+  let summary = "Nests outermost loops to a minimum IV count";
+  let constructor = "pmlc::dialect::pxa::createNestLoopsPass()";
+  let options = [
+    Option<"minLoopIVs", "ivs", "unsigned", /*default=*/"2",
+           "Set minimum required IV's">
+  ];
+}
+
 def VectorizeExample : FunctionPass<"pxa-vectorize-example"> {
   let summary = "Vectorizes with vector register of 8 elements";
   let constructor = "pmlc::dialect::pxa::createVectorizeExamplePass()";
+}
+
+def BufferPlacement : FunctionPass<"pxa-buffer-placement"> {
+  let summary = "Optimizes placement of alloc and dealloc operations";
+  let constructor = "pmlc::dialect::pxa::createBufferPlacementPass()";
 }
 
 def Fusion : FunctionPass<"pxa-fusion"> {

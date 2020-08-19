@@ -225,8 +225,8 @@ def make_all_wheels(workdir):
 
 
 def download_test_artifacts(pattern):
-    util.buildkite_download(pattern, '.')
-    util.buildkite_download(pattern.replace('/', '\\'), '.')
+    util.buildkite_download(pattern, '.', check=False)
+    util.buildkite_download(pattern.replace('/', '\\'), '.', check=False)
     for path in glob.glob(pattern):
         src = Path(path)
         tgt = Path(path.replace('\\', '/'))

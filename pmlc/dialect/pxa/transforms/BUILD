@@ -23,10 +23,12 @@ plaidml_cc_library(
     name = "transforms",
     srcs = [
         "autotile.cc",
+        "buffer_placement.cc",
         "cache.cc",
         "dataflow_opt.cc",
         "fusion.cc",
         "localize.cc",
+        "nest_loops.cc",
         "pass_detail.h",
         "resize_tmps.cc",
         "stencil.cc",
@@ -34,6 +36,7 @@ plaidml_cc_library(
 	"subgroups.cc",
         "test_analysis.cc",
         "tile.cc",
+        "tile_accumulate.cc",
         "vectorize.cc",
     ],
     hdrs = [
@@ -42,8 +45,8 @@ plaidml_cc_library(
         "passes.h",
         "stencil.h",
         "tile.h",
+        "tile_accumulate.h",
         "vectorize.h",
-
     ],
     deps = [
         ":gen-pass",

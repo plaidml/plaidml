@@ -18,5 +18,6 @@ plaidml_cc_library(
     ],
     deps = [
         "//pmlc/dialect/pxa/ir",
+        "//pmlc/dialect/stdx/ir",
     ],
 )

@@ -56,7 +56,6 @@ plaidml_cc_library(
         "//pmlc/util",
         "@llvm-project//llvm:Support",
     ],
-    alwayslink = 1,
 )
 
 py_library(
