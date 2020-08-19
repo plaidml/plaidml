@@ -28,6 +28,7 @@ plaidml_cc_test(
     }),
     toolchains = ["//plaidml:settings"],
     linkstatic = True,
+    visibility = ["//visibility:public"],
 )
 
 py_test(

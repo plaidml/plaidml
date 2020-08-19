@@ -4,6 +4,7 @@ package(default_visibility = ["//visibility:public"])
 
 exports_files([
     "conda_wrapper.py",
+    "device_test_builder.tpl.py",
     "googlemock.LICENSE",
     "version.tpl.cc",
     "version.tpl.py",
