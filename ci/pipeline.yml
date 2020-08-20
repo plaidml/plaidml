@@ -48,10 +48,10 @@ steps:
 
 # report phase
 
-  # - label: ':bar_chart:'
-  #   command: python3 ci/buildkite.py report
-  #   agents:
-  #     PLATFORM: linux_x86_64
-  #   retry:
-  #     manual:
-  #       permit_on_passed: true
+  - label: ':bar_chart:'
+    command: python3 ci/buildkite.py report
+    agents:
+      PLATFORM: linux_x86_64
+    retry:
+      manual:
+        permit_on_passed: true

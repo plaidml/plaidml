@@ -131,7 +131,7 @@ def run(args, remainder):
         workload=args.workload,
     )
     cmd_args = [str(x).format(**ctx) for x in cmd_args]
-    if 'stripe' in args.platform:
+    if 'pml' in args.platform:
         try:
             cmd_args.remove('--no-kernel-timing')
         except ValueError:
