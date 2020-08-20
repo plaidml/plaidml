@@ -102,7 +102,7 @@ LogicalResult cacheLoad(AffineParallelOp par, PxaLoadOp load) {
 LogicalResult cacheLoadAsVector(AffineParallelOp par, PxaLoadOp load,
                                 int64_t reqVecSize) {
   // Get the striding information for the load op, fail if unsuccessful
-  auto maybeRap = computeRelativeAccess(par.getBody(), load);
+  auto maybeRap = computeRelativeAccess(load, par.getBody());
   if (!maybeRap) {
     IVLOG(3, "cacheLoadAsVector: Failed due to a non-strided access");
     return failure();
