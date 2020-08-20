@@ -62,12 +62,11 @@ cc_library(
     srcs = glob(["inference-engine/tests/ie_test_utils/functional_test_utils/*.cpp"]),
     hdrs = glob(
         ["inference-engine/tests/ie_test_utils/functional_test_utils/*.hpp"],
-        # exclude = ["inference-engine/tests/ie_test_utils/functional_test_utils/skip_tests_config.hpp"],  # TODO
     ),
     includes = ["inference-engine/tests/ie_test_utils"],
     deps = [
-        "ngraph_function_tests",  # TODO: Ok?
         ":inference_engine",
+        ":ngraph_function_tests",
         "@gmock//:gtest",
     ],
 )
@@ -108,9 +107,9 @@ cc_library(
         "inference-engine/src/legacy_api/src/**/*.cpp",
         "inference-engine/src/legacy_api/src/**/*.hpp",
         "inference-engine/src/legacy_api/src/**/*.h",
-        "inference-engine/src/inference_engine/cnn_network_ngraph_impl.hpp",  # TODO: Ok?
-        "inference-engine/src/transformations/include/ngraph_ops/crop_ie.hpp",  # TODO: Ok?
-        "inference-engine/src/transformations/include/ngraph_ops/convolution_ie.hpp",  # TODO: Ok?
+        # "inference-engine/src/inference_engine/cnn_network_ngraph_impl.hpp",  # TODO: Ok?
+        # "inference-engine/src/transformations/include/ngraph_ops/crop_ie.hpp",  # TODO: Ok?
+        # "inference-engine/src/transformations/include/ngraph_ops/convolution_ie.hpp",  # TODO: Ok?
     ]),
     hdrs = glob([
         "inference-engine/src/legacy_api/include/**/*.hpp",
