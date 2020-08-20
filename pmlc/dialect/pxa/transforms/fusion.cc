@@ -93,9 +93,12 @@ struct FusionInfo {
     if (hasPlan)
       return true;
 
-    IVLOG(1, "considerPlan>");
-    IVLOG(1, "  A: " << debugString(*opA));
-    IVLOG(1, "  B: " << debugString(*opB));
+    IVLOG(3, "considerPlan>");
+    IVLOG(3, "  A: " << debugString(*opA));
+    IVLOG(3, "  B: " << debugString(*opB));
+
+    aToB.clear();
+    bToA.clear();
 
     // Extract the per-dimension strides for the two ops
     SmallVector<StrideInfo, 4> stridesA;
@@ -108,8 +111,6 @@ struct FusionInfo {
     assert(stridesA.size() == stridesB.size() &&
            "Fusion ops should read/write the same memref and thus have the "
            "same rank");
-    DenseSet<BlockArgument> newAs;
-    DenseSet<BlockArgument> newBs;
     // Try to relate the block arguments
     for (size_t i = 0; i < stridesA.size(); i++) {
       const auto &sa = stridesA[i];
@@ -123,8 +124,8 @@ struct FusionInfo {
       if (sa.strides.size() == 0 && sb.strides.size() == 0)
         continue;
       // If there are multiple indexes, give up
-      IVLOG(1, "sa: " << debugString(sa));
-      IVLOG(1, "sb: " << debugString(sb));
+      IVLOG(3, "sa: " << debugString(sa));
+      IVLOG(3, "sb: " << debugString(sb));
       if (sa.strides.size() != 1 || sb.strides.size() != 1) {
         opB.emitRemark("Failed to fuse with def due to multiple indexes, i = ")
             << i;
@@ -169,19 +170,17 @@ struct FusionInfo {
         return false;
       }
 
-      IVLOG(1, "Mapping arg " << argA.getArgNumber() << " to "
+      IVLOG(3, "Mapping arg " << argA.getArgNumber() << " to "
                               << argB.getArgNumber());
       if (aToB.count(argA) || bToA.count(argB)) {
-        IVLOG(1, "Failed, aToB.count(" << argA.getArgNumber()
+        IVLOG(3, "Failed, aToB.count(" << argA.getArgNumber()
                                        << ") = " << aToB.count(argA));
-        IVLOG(1, "Failed, bToA.count(" << argB.getArgNumber()
+        IVLOG(3, "Failed, bToA.count(" << argB.getArgNumber()
                                        << ") = " << bToA.count(argB));
         bInfo.op.emitRemark("Mapping is not 1 to 1");
         return false;
       }
-      newAs.insert(argA);
       aToB[argA] = argB;
-      newBs.insert(argB);
       bToA[argB] = argA;
     }
 
@@ -199,12 +198,6 @@ struct FusionInfo {
     if (memoryActivityThreshold) {
       auto memoryActivity = computeMemoryActivity();
       if (memoryActivity > memoryActivityThreshold) {
-        // If the current fusion is going to fail, we need to rollback the new
-        // mappings that were just inserted.
-        for (auto arg : newAs)
-          aToB.erase(arg);
-        for (auto arg : newBs)
-          bToA.erase(arg);
         return false;
       }
     }
@@ -224,21 +217,21 @@ struct FusionInfo {
     auto computeMemoryActivityForOp = [&](Operation *op) {
       if (auto allocOp = dyn_cast<AllocOp>(op)) {
         auto bytes = util::getByteSize(allocOp.getType());
-        IVLOG(1, "op: " << debugString(*op) << ", bytes: " << bytes);
+        IVLOG(3, "op: " << debugString(*op) << ", bytes: " << bytes);
         sum += bytes;
       }
       auto relAccess = computeRelativeAccess(op, boundaryFn);
       if (!relAccess)
         return;
       auto bytes = relAccess->totalInnerBytes();
-      IVLOG(1, "op: " << debugString(*op) << ", bytes: " << bytes);
+      IVLOG(3, "op: " << debugString(*op) << ", bytes: " << bytes);
       sum += bytes;
     };
 
     aInfo.op.walk(computeMemoryActivityForOp);
     bInfo.op.walk(computeMemoryActivityForOp);
 
-    IVLOG(1, "memoryActivity: " << sum);
+    IVLOG(3, "memoryActivity: " << sum);
     return sum;
   }
 
@@ -258,7 +251,7 @@ struct FusionInfo {
     std::swap(bInfo.sizes, *rangesB);
     // First, we find all the write/read and write/write pairs, where block A
     // writes to a value that block B reads from or writes into.
-    IVLOG(1, "Collecting read/write information");
+    IVLOG(3, "Collecting read/write information");
     // For each output from loop
     for (auto res : aInfo.op.results()) {
       // Find the source write
@@ -439,9 +432,9 @@ struct FusionPass : public FusionBase<FusionPass> {
     if (!canFuse) {
       return nullptr;
     }
-    IVLOG(1, "Found " << fusionInfo.readAfterWrites.size()
+    IVLOG(3, "Found " << fusionInfo.readAfterWrites.size()
                       << " read after writes");
-    IVLOG(1, "Found " << fusionInfo.writeAfterWrites.size()
+    IVLOG(3, "Found " << fusionInfo.writeAfterWrites.size()
                       << " write after writes");
     return fusionInfo.applyFusion();
   }
