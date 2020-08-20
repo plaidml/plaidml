@@ -27,7 +27,6 @@ mlir_pmlc_tools_dirs = [
     'pmlc/tools/pmlc-tblgen',
     'pmlc/tools/pmlc-translate',
     'pmlc/tools/pmlc-vulkan-runner',
-    'pmlc/rt/vulkan/tests',
     'plaidml/edsl/tests',
 ]
 config.mlir_pmlc_tools_dirs = [
