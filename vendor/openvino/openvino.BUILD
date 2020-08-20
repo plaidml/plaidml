@@ -270,17 +270,17 @@ cc_library(
             "ngraph/src/ngraph/builder/*.cpp",
             "ngraph/src/ngraph/descriptor/**/*.cpp",
             "ngraph/src/ngraph/distributed/*.cpp",
-            "ngraph/src/ngraph/op/*.cpp",  # TODO: Needed?
+            "ngraph/src/ngraph/op/*.cpp",
             "ngraph/src/ngraph/op/**/*.cpp",
             "ngraph/src/ngraph/opsets/*.cpp",
             "ngraph/src/ngraph/pass/*.cpp",
             "ngraph/src/ngraph/pattern/**/*.cpp",
             "ngraph/src/ngraph/runtime/*.cpp",
-            "ngraph/src/ngraph/runtime/reference/*.cpp",  # TODO: Ok?
+            "ngraph/src/ngraph/runtime/reference/*.cpp",
             "ngraph/src/ngraph/state/*.cpp",
             "ngraph/src/ngraph/type/*.cpp",
-            "ngraph/test/runtime/*.cpp",  # TODO: Ok?
-            "ngraph/test/runtime/**/*.cpp",  # TODO: Ok?
+            "ngraph/test/runtime/*.cpp",
+            "ngraph/test/runtime/**/*.cpp",
         ],
         exclude = [
             "ngraph/src/ngraph/serializer.cpp",
@@ -289,7 +289,7 @@ cc_library(
     ),
     hdrs = glob(
         [
-            "ngraph/core/include/ngraph/*.hpp",  # TODO: Ok? rd 2
+            "ngraph/core/include/ngraph/*.hpp",
             "ngraph/src/ngraph/*.hpp",
             "ngraph/src/ngraph/builder/*.hpp",
             "ngraph/src/ngraph/descriptor/**/*.hpp",
@@ -303,8 +303,8 @@ cc_library(
             "ngraph/src/ngraph/state/*.hpp",
             "ngraph/src/ngraph/pattern/**/*.hpp",
             "ngraph/src/ngraph/type/*.hpp",
-            "ngraph/test/runtime/*.hpp",  # TODO: Ok?
-            "ngraph/test/runtime/**/*.hpp",  # TODO: Ok?
+            "ngraph/test/runtime/*.hpp",
+            "ngraph/test/runtime/**/*.hpp",
         ],
         exclude = [
             "ngraph/test/runtime/ie/*.hpp",
@@ -316,10 +316,10 @@ cc_library(
         "NGRAPH_VERSION=\\\"0.21.0\\\"",
     ],
     includes = [
-        "ngraph/core/include",  # TODO: Ok? rd 2
+        "ngraph/core/include",
         "ngraph/src",
         "ngraph/src/ngraph",
-        "ngraph/test/runtime",  # TODO: Ok?
+        "ngraph/test/runtime",
     ],
     local_defines = [
         "PROJECT_ROOT_DIR=\\\"./\\\"",
