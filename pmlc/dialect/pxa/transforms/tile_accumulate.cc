@@ -26,12 +26,6 @@ using namespace mlir; // NOLINT
 
 namespace pmlc::dialect::pxa {
 
-namespace {
-using llvm::DenseMap;
-using llvm::DenseSet;
-using llvm::SmallVector;
-using mlir::BlockArgument;
-
 AffineParallelOp tileAccumulations(AffineParallelOp op, bool skipTrivial) {
   // Find the originating reduce
   assert(op.getNumResults() == 1);
@@ -67,6 +61,12 @@ AffineParallelOp tileAccumulations(AffineParallelOp op, bool skipTrivial) {
   }
   return op;
 }
+
+namespace {
+using llvm::DenseMap;
+using llvm::DenseSet;
+using llvm::SmallVector;
+using mlir::BlockArgument;
 
 struct TileAccumulatePass : public TileAccumulateBase<TileAccumulatePass> {
   void runOnFunction() final {
