@@ -22,15 +22,17 @@ DEPS = [
     "@openvino//:shared_plugin_tests",
 ]
 
+# TODO: Pull forward the PlaidML-OpenVINO tests from the 2020.2 OV version to remove exclusions
+
 cc_library(
     name = "lib",
     srcs = glob(
         ["*.cpp"],
         exclude = [
-            # New Excludes (TODO)
+            # Exclusions for files lost in update to OV `master`
             "batch_norm_inference.cpp",
             "broadcast.cpp",
-            "convert_like.cpp",   # TODO: Broken not missing
+            "convert_like.cpp",   # Note: Broken not missing
             "divide.cpp",
             "floor_mod.cpp",
             "greater_equal.cpp",
@@ -40,7 +42,7 @@ cc_library(
             "logical_not.cpp",
             "logical_or.cpp",
             "logical_xor.cpp",
-            "mat_mul.cpp",  # TODO : Broken not missing
+            "mat_mul.cpp",  # Note : Broken not missing
             "maximum.cpp",
             "minimum.cpp",
             "mod.cpp",
@@ -74,10 +76,10 @@ cc_library(
     srcs = glob(
         ["*.cpp"],
         exclude = [
-            # New Excludes (TODO)
+            # Exclusions for files lost in update to OV `master`
             "batch_norm_inference.cpp",
             "broadcast.cpp",
-            "convert_like.cpp",   # TODO: Broken not missing
+            "convert_like.cpp",   # Note: Broken not missing
             "divide.cpp",
             "floor_mod.cpp",
             "greater_equal.cpp",
@@ -87,7 +89,7 @@ cc_library(
             "logical_not.cpp",
             "logical_or.cpp",
             "logical_xor.cpp",
-            "mat_mul.cpp",  # TODO : Broken not missing
+            "mat_mul.cpp",  # Note : Broken not missing
             "maximum.cpp",
             "minimum.cpp",
             "mod.cpp",
@@ -107,8 +109,8 @@ cc_library(
             "tile.cpp",
             "unsqueeze.cpp",
             # Exclusions from update
-            "convert.cpp",                          # Known errors
-            "depth_to_space.cpp",                   # Long  TODO: Make smoke test version
+            "convert.cpp",  # Known errors
+            "depth_to_space.cpp",  # Long
             # Original Excludes
             "convert_like.cpp",  # Known errors
             "convolution.cpp",  # Long
