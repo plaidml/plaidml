@@ -65,10 +65,10 @@ enum class BoundaryRegion {
   Exterior,
 };
 
-// A boundary function takes a BlockArgument it is considered to be 'interior'
-// or false otherwise (i.e. 'exterior'). The definition of 'interior' and
-// 'exterior' are up to the caller, and is useful for computing access relative
-// to some user-defined boundary.
+// A boundary function takes a BlockArgument and decides whether it is
+// 'interior' or 'exterior'. The definition of 'interior' and 'exterior' are up
+// to the caller, and is useful for computing access relative to some
+// user-defined boundary.
 //
 // For example, this boundary could be defined as whether the owner (Block) of
 // an argument is an ancestor of another reference block.
