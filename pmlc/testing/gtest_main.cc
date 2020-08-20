@@ -50,7 +50,7 @@ int main(int argc, char *argv[]) {
       sep = ':';
     }
 
-    testing::FLAGS_gtest_filter = ss.str();
+    testing::FLAGS_gtest_filter += ss.str();
   }
 
   try {
