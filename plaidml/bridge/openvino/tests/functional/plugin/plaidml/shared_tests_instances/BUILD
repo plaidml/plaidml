@@ -6,12 +6,11 @@ plaidml_cc_library(
     name = "shared_tests_instances",
     srcs = glob(["*.cpp"]),
     copts = ["-Wno-deprecated-declarations"],
-    data = [  # TODO
+    data = [
         "//plaidml/bridge/openvino:libplaidml-plugin.so",
-        "//:ov_plugins_xml",  # TODO
+        "//:ov_plugins_xml",
     ],
-    linkopts = PLAIDML_LINKOPTS,  # TODO
-    deps = [  # TODO
+    deps = [
         "//pmlc/util:logging",
         "@gflags",
         "@gmock//:gtest_main",

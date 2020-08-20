@@ -14,12 +14,12 @@ DATA = [
 
 DEPS = [
     "//plaidml/bridge/openvino/tests/functional/plugin/plaidml/shared_tests_instances",
-    "//pmlc/util:logging",
-    "@gflags",
-    "@gmock//:gtest_main",
-    "@openvino//:common_test_utils",
-    "@openvino//:inference_engine",
-    "@openvino//:shared_plugin_tests",
+    # "//pmlc/util:logging",
+    # "@gflags",
+    # "@gmock//:gtest_main",
+    # "@openvino//:common_test_utils",
+    # "@openvino//:inference_engine",
+    # "@openvino//:shared_plugin_tests",
 ]
 
 # TODO: Pull forward the PlaidML-OpenVINO tests from the 2020.2 OV version to remove exclusions
