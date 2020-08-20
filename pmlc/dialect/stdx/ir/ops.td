@@ -10,6 +10,8 @@ include "mlir/IR/OpBase.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/ViewLikeInterface.td"
 
+include "mlir/Dialect/StandardOps/IR/StandardOpsBase.td"
+
 
 def StdX_Dialect : Dialect {
   let name = "stdx";
@@ -108,6 +110,18 @@ def SinHOp : StdX_UnaryFuncOp<"sinh"> {
 
 def TanOp : StdX_UnaryFuncOp<"tan"> {
   let summary = "tangent";
+}
+
+def AnyStdScalar : AnyTypeOf<[AnyFloat, AnySignlessInteger]> {} 
+
+def SubgroupBroadcastOp : StdX_Op<"subgroup_broadcast", [NoSideEffect, AllTypesMatch<["value", "result"]>]> {
+  let summary = "broadcast to all elements in subgroup";
+  let arguments = (ins AnyStdScalar:$value, AnySignlessInteger:$localid);
+  let results = (outs AnyStdScalar:$result);
+  let assemblyFormat = [{
+    `(` $value `,` $localid `)` attr-dict `:` type($value) `,` type($localid)
+  }];
+  let verifier = ?;
 }
 
 #endif // __PML_STDX_OPS__
