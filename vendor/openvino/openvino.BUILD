@@ -108,14 +108,9 @@ cc_library(
         "inference-engine/src/legacy_api/src/**/*.hpp",
         "inference-engine/src/legacy_api/src/**/*.h",
         # "inference-engine/src/inference_engine/cnn_network_ngraph_impl.hpp",  # TODO: Ok?
-        # "inference-engine/src/transformations/include/ngraph_ops/crop_ie.hpp",  # TODO: Ok?
-        # "inference-engine/src/transformations/include/ngraph_ops/convolution_ie.hpp",  # TODO: Ok?
     ]),
     hdrs = glob([
         "inference-engine/src/legacy_api/include/**/*.hpp",
-        # "inference-engine/src/inference_engine/*.hpp",  # TODO: Ok?
-        # "inference-engine/src/transformations/include/**/*.hpp",  # TODO: Ok?
-        # Or: "inference-engine/src/transformations/include/ngraph_ops/*.hpp",
     ]),
     copts = [
         "-w",
@@ -124,7 +119,6 @@ cc_library(
     includes = [
         "inference-engine/src/inference_engine",  # TODO: Why does this work?
         "inference-engine/src/legacy_api/include",
-        # "inference-engine/src/transformations/include",  # TODO: Ok?
     ],
     tags = TAGS,
     deps = [
@@ -200,13 +194,13 @@ cc_library(
         ]),
     }),
     hdrs = glob([
-        "inference-engine/src/readers/ir_reader/ie_ir_version.hpp",  # TODO: Ok?
+        # "inference-engine/src/readers/ir_reader/ie_ir_version.hpp",  # TODO: Ok to remove?
     ]),
     copts = ["-w"],
     includes = [
         "inference-engine/src/inference_engine",
-        "inference-engine/src/readers/ir_reader",  # TODO: Sufficient?
-        "inference-engine/src/readers/reader_api",  # TODO: Sufficient?
+        "inference-engine/src/readers/ir_reader",  # TODO: Why does this work?
+        "inference-engine/src/readers/reader_api",  # TODO: Why does this work?
     ],
     local_defines = [
         "ENABLE_IR_READER",
@@ -273,7 +267,6 @@ cc_library(
         [
             "ngraph/src/ngraph/*.cpp",
             "ngraph/src/ngraph/*.hpp",
-            "ngraph/src/ngraph/autodiff/*.cpp",
             "ngraph/src/ngraph/builder/*.cpp",
             "ngraph/src/ngraph/descriptor/**/*.cpp",
             "ngraph/src/ngraph/distributed/*.cpp",
@@ -283,8 +276,6 @@ cc_library(
             "ngraph/src/ngraph/pass/*.cpp",
             "ngraph/src/ngraph/pattern/**/*.cpp",
             "ngraph/src/ngraph/runtime/*.cpp",
-            "ngraph/src/ngraph/runtime/dynamic/*.cpp",
-            "ngraph/src/ngraph/runtime/interpreter/*.cpp",
             "ngraph/src/ngraph/runtime/reference/*.cpp",  # TODO: Ok?
             "ngraph/src/ngraph/state/*.cpp",
             "ngraph/src/ngraph/type/*.cpp",
@@ -293,29 +284,32 @@ cc_library(
         ],
         exclude = [
             "ngraph/src/ngraph/serializer.cpp",
-            "ngraph/test/runtime/ie/*.cpp",  # TODO: Ok?
+            "ngraph/test/runtime/ie/*.cpp",
         ],
     ),
-    hdrs = glob([
-        "ngraph/core/include/ngraph/*.hpp",  # TODO: Ok? rd 2
-        "ngraph/src/ngraph/*.hpp",
-        "ngraph/src/ngraph/autodiff/*.hpp",
-        "ngraph/src/ngraph/builder/*.hpp",
-        "ngraph/src/ngraph/descriptor/**/*.hpp",
-        "ngraph/src/ngraph/distributed/*.hpp",
-        "ngraph/src/ngraph/op/*.hpp",
-        "ngraph/src/ngraph/op/**/*.hpp",
-        "ngraph/src/ngraph/opsets/*.hpp",
-        "ngraph/src/ngraph/pass/*.hpp",
-        "ngraph/src/ngraph/pattern/*.hpp",
-        "ngraph/src/ngraph/runtime/**/*.hpp",
-        "ngraph/src/ngraph/state/*.hpp",
-        "ngraph/src/ngraph/pattern/**/*.hpp",
-        "ngraph/src/ngraph/type/*.hpp",
-        "ngraph/test/runtime/*.hpp",  # TODO: Ok?
-        "ngraph/test/runtime/**/*.hpp",  # TODO: Ok?
-        "ngraph/test/runtime/ie/*.hpp",  # TODO: Ok?
-    ]),
+    hdrs = glob(
+        [
+            "ngraph/core/include/ngraph/*.hpp",  # TODO: Ok? rd 2
+            "ngraph/src/ngraph/*.hpp",
+            "ngraph/src/ngraph/builder/*.hpp",
+            "ngraph/src/ngraph/descriptor/**/*.hpp",
+            "ngraph/src/ngraph/distributed/*.hpp",
+            "ngraph/src/ngraph/op/*.hpp",
+            "ngraph/src/ngraph/op/**/*.hpp",
+            "ngraph/src/ngraph/opsets/*.hpp",
+            "ngraph/src/ngraph/pass/*.hpp",
+            "ngraph/src/ngraph/pattern/*.hpp",
+            "ngraph/src/ngraph/runtime/**/*.hpp",
+            "ngraph/src/ngraph/state/*.hpp",
+            "ngraph/src/ngraph/pattern/**/*.hpp",
+            "ngraph/src/ngraph/type/*.hpp",
+            "ngraph/test/runtime/*.hpp",  # TODO: Ok?
+            "ngraph/test/runtime/**/*.hpp",  # TODO: Ok?
+        ],
+        exclude = [
+            "ngraph/test/runtime/ie/*.hpp",
+        ],
+    ),
     defines = [
         "NGRAPH_JSON_DISABLE",
         "NGRAPH_INTERPRETER_ENABLE",
