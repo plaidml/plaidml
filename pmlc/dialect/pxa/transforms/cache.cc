@@ -143,7 +143,7 @@ LogicalResult cacheLoadAsVector(AffineParallelOp par, PxaLoadOp load,
   auto builder = OpBuilder::atBlockBegin(par.getBody());
   // Load as a vector
   auto loadMap = convertToValueMap(load.getContext(), rap.outer);
-  IVLOG(2 :, "Making vector load");
+  IVLOG(2, "Making vector load");
   auto loadVec = builder.create<PxaVectorLoadOp>(loc, vecType, load.getMemRef(),
                                                  loadMap.getAffineMap(),
                                                  loadMap.getOperands());
