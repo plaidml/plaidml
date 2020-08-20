@@ -64,7 +64,7 @@ static Value createCopyLoop(OpBuilder &builder,               //
 
 LogicalResult cacheLoad(AffineParallelOp par, PxaLoadOp load) {
   // Get the striding information for the load op, fail if unsuccessful
-  auto maybeRap = computeRelativeAccess(par.getBody(), load);
+  auto maybeRap = computeRelativeAccess(load, par.getBody());
   if (!maybeRap) {
     return failure();
   }
@@ -101,7 +101,7 @@ LogicalResult cacheLoad(AffineParallelOp par, PxaLoadOp load) {
 
 LogicalResult cacheReduce(AffineParallelOp par, PxaReduceOp reduce) {
   // Get the striding information for the load op, fail if unsuccessful
-  auto maybeRap = computeRelativeAccess(par.getBody(), reduce);
+  auto maybeRap = computeRelativeAccess(reduce, par.getBody());
   if (!maybeRap) {
     return failure();
   }

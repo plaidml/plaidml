@@ -21,7 +21,8 @@ std::unique_ptr<mlir::Pass> createVectorizeExamplePass();
 
 std::unique_ptr<mlir::Pass> createBufferPlacementPass();
 
-std::unique_ptr<mlir::Pass> createFusionPass();
+std::unique_ptr<mlir::Pass>
+createFusionPass(int64_t memoryActivityThreshold = 0);
 
 std::unique_ptr<mlir::Pass> createLocalizePass();
 

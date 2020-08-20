@@ -3,10 +3,12 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/IR/AffineValueMap.h"
 #include "mlir/Support/DebugStringHelper.h"
+
 #include "pmlc/dialect/pxa/analysis/strides.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/dialect/pxa/transforms/pass_detail.h"
 #include "pmlc/util/logging.h"
+#include "pmlc/util/util.h"
 
 using namespace mlir; // NOLINT[build/namespaces]
 
@@ -38,9 +40,13 @@ struct FusionInfo {
   // tiling)
   DenseMap<BlockArgument, BlockArgument> aToB;
   DenseMap<BlockArgument, BlockArgument> bToA;
+  // Over-fusion prevention parameter
+  int64_t memoryActivityThreshold;
 
-  FusionInfo(AffineParallelOp apA, AffineParallelOp apB)
-      : aInfo{apA}, bInfo{apB}, hasPlan(false) {}
+  FusionInfo(AffineParallelOp apA, AffineParallelOp apB,
+             int64_t memoryActivityThreshold)
+      : aInfo{apA}, bInfo{apB}, hasPlan(false),
+        memoryActivityThreshold(memoryActivityThreshold) {}
 
   // Helper method to find the original source write of a state update.
   static PxaReduceOp findSourceWrite(Value val) {
@@ -102,6 +108,8 @@ struct FusionInfo {
     assert(stridesA.size() == stridesB.size() &&
            "Fusion ops should read/write the same memref and thus have the "
            "same rank");
+    DenseSet<BlockArgument> newAs;
+    DenseSet<BlockArgument> newBs;
     // Try to relate the block arguments
     for (size_t i = 0; i < stridesA.size(); i++) {
       const auto &sa = stridesA[i];
@@ -171,15 +179,67 @@ struct FusionInfo {
         bInfo.op.emitRemark("Mapping is not 1 to 1");
         return false;
       }
+      newAs.insert(argA);
       aToB[argA] = argB;
+      newBs.insert(argB);
       bToA[argB] = argA;
     }
+
     if (aToB.size() == 0) {
       bInfo.op.emitRemark("No index matches");
       return false;
     }
+
+    // Over-fusion prevention:
+    // Compute the amount of memory activity, defined as the amount of memory
+    // allocated, read, and written during the course of the two affine.parallel
+    // ops to be merged.
+    // Prevent fusion when the amount of memory activity exceeds a user-defined
+    // threshold.
+    if (memoryActivityThreshold) {
+      auto memoryActivity = computeMemoryActivity();
+      if (memoryActivity > memoryActivityThreshold) {
+        // If the current fusion is going to fail, we need to rollback the new
+        // mappings that were just inserted.
+        for (auto arg : newAs)
+          aToB.erase(arg);
+        for (auto arg : newBs)
+          bToA.erase(arg);
+        return false;
+      }
+    }
+
     hasPlan = true;
     return true;
+  }
+
+  int64_t computeMemoryActivity() {
+    int64_t sum = 0;
+
+    auto boundaryFn = [&](BlockArgument arg) {
+      return (aToB.count(arg) || bToA.count(arg)) ? BoundaryRegion::Exterior
+                                                  : BoundaryRegion::Interior;
+    };
+
+    auto computeMemoryActivityForOp = [&](Operation *op) {
+      if (auto allocOp = dyn_cast<AllocOp>(op)) {
+        auto bytes = util::getByteSize(allocOp.getType());
+        IVLOG(1, "op: " << debugString(*op) << ", bytes: " << bytes);
+        sum += bytes;
+      }
+      auto relAccess = computeRelativeAccess(op, boundaryFn);
+      if (!relAccess)
+        return;
+      auto bytes = relAccess->totalInnerBytes();
+      IVLOG(1, "op: " << debugString(*op) << ", bytes: " << bytes);
+      sum += bytes;
+    };
+
+    aInfo.op.walk(computeMemoryActivityForOp);
+    bInfo.op.walk(computeMemoryActivityForOp);
+
+    IVLOG(1, "memoryActivity: " << sum);
+    return sum;
   }
 
   bool computeFusion() {
@@ -198,7 +258,7 @@ struct FusionInfo {
     std::swap(bInfo.sizes, *rangesB);
     // First, we find all the write/read and write/write pairs, where block A
     // writes to a value that block B reads from or writes into.
-    IVLOG(1, "Collectiong read/write information");
+    IVLOG(1, "Collecting read/write information");
     // For each output from loop
     for (auto res : aInfo.op.results()) {
       // Find the source write
@@ -365,17 +425,25 @@ struct FusionInfo {
 };
 
 struct FusionPass : public FusionBase<FusionPass> {
+  FusionPass() = default;
+
+  explicit FusionPass(int64_t memoryActivityThreshold) {
+    this->memoryActivityThreshold = memoryActivityThreshold;
+  }
+
   // Attempts to fuse two ops if they look good.  Returns the new fused loop
   // (which may be a nullptr if fusion failed).
   AffineParallelOp attemptFusion(AffineParallelOp apA, AffineParallelOp apB) {
-    FusionInfo fi(apA, apB);
-    bool r = fi.computeFusion();
-    if (!r) {
-      return AffineParallelOp();
+    FusionInfo fusionInfo(apA, apB, memoryActivityThreshold.getValue());
+    bool canFuse = fusionInfo.computeFusion();
+    if (!canFuse) {
+      return nullptr;
     }
-    IVLOG(1, "Found " << fi.readAfterWrites.size() << " read after writes");
-    IVLOG(1, "Found " << fi.writeAfterWrites.size() << " write after writes");
-    return fi.applyFusion();
+    IVLOG(1, "Found " << fusionInfo.readAfterWrites.size()
+                      << " read after writes");
+    IVLOG(1, "Found " << fusionInfo.writeAfterWrites.size()
+                      << " write after writes");
+    return fusionInfo.applyFusion();
   }
 
   void runOnFunction() final {
@@ -432,8 +500,8 @@ struct FusionPass : public FusionBase<FusionPass> {
 
 } // namespace
 
-std::unique_ptr<Pass> createFusionPass() {
-  return std::make_unique<FusionPass>();
+std::unique_ptr<Pass> createFusionPass(int64_t memoryActivityThreshold) {
+  return std::make_unique<FusionPass>(memoryActivityThreshold);
 }
 
 } // namespace pmlc::dialect::pxa
