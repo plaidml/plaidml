@@ -58,7 +58,7 @@ struct SubgroupCostModel {
   SubgroupCostModel(const SubgroupParams &params, AffineParallelOp op)
       : params(params), op(op) {
     bestCost = std::numeric_limits<double>::infinity();
-    // Tile accumulations only works on parallel loops with a singe result
+    // Tile accumulations only works on parallel loops with a single result
     if (op.getNumResults() != 1) {
       return;
     }
