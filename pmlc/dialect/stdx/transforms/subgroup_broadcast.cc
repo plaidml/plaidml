@@ -151,9 +151,9 @@ void runOnParallel(scf::ParallelOp loopOp) {
   auto newBroadcast = builder.create<stdx::SubgroupBroadcastOp>(
       loc, newLoadOp.result().getType(), newLoadOp.result(),
       newExtractElementOp.position());
-  auto newStoreOp = builder.create<StoreOp>(loc, newBroadcast.getResult(),
-                                            newTransferWriteOp.memref(),
-                                            newTransferWriteOp.indices());
+  builder.create<StoreOp>(loc, newBroadcast.getResult(),
+                          newTransferWriteOp.memref(),
+                          newTransferWriteOp.indices());
 
   // Remove old loop and redundant ops from the new loop, replace usages where
   // appropriate
