@@ -52,6 +52,11 @@ def ResizeTmps : FunctionPass<"pxa-resize-tmps"> {
   let constructor = "pmlc::dialect::pxa::createResizeTmpsPass()";
 }
 
+def Subgroups : FunctionPass<"pxa-subgroups"> {
+  let summary = "TODO: text";
+  let constructor = "pmlc::dialect::pxa::createSubgroupsPass()";
+}
+
 def TestIndirectUsesIterator : Pass<"pxa-test-indirect-uses-iterator"> {
   let summary = "Trace the IndirectUsesIterator";
   let constructor = "pmlc::dialect::pxa::createTestIndirectUsesIteratorPass()";

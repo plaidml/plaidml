@@ -14,4 +14,7 @@ LogicalResult performVectorization(mlir::AffineParallelOp op,
 // Attempt to vectorize a loop on the stride 1 index of it's output
 LogicalResult simpleVectorize(mlir::AffineParallelOp op, unsigned vecSize);
 
+// Attempt to vectorize a buffer (given it's allocation)
+LogicalResult vectorizeBuffer(mlir::AllocOp op);
+
 } // namespace pmlc::dialect::pxa
