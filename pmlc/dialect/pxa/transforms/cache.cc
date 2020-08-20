@@ -104,34 +104,36 @@ LogicalResult cacheLoadAsVector(AffineParallelOp par, PxaLoadOp load,
   // Get the striding information for the load op, fail if unsuccessful
   auto maybeRap = computeRelativeAccess(par.getBody(), load);
   if (!maybeRap) {
-    IVLOG(1, "Failed due to a bad rap");
+    IVLOG(3, "cacheLoadAsVector: Failed due to a non-strided access");
     return failure();
   }
   const auto &rap = *maybeRap;
   // Require all sizes to be 1 except the final one, which is the vector size
   // and must be stride 1.
   if (rap.innerCount.size() < 1) {
-    IVLOG(1, "Failed due to tiny size");
+    IVLOG(3, "cacheLoadAsVector: Failed due to 0-dim memref");
     return failure();
   }
   for (unsigned i = 0; i < rap.inner.size() - 1; i++) {
     if (rap.innerCount[i] != 1) {
-      IVLOG(1, "Failed due to lame count: " << rap.innerCount[i]);
+      IVLOG(3, "cacheLoadAsVector: Failed due to invalid non-final count: "
+                   << rap.innerCount[i]);
       return failure();
     }
   }
   unsigned last = rap.inner.size() - 1;
   if (rap.innerStride[last] != 1) {
-    IVLOG(1, "Failed due to lame stride: " << rap.innerStride[last]);
+    IVLOG(3, "cacheLoadAsVector: Failed due to invalid stride: "
+                 << rap.innerStride[last]);
     return failure();
   }
   int64_t vectorSize = rap.innerCount[last];
   if (vectorSize == 1) {
-    IVLOG(1, "Failed since stuff is scalar");
+    IVLOG(3, "cacheLoadAsVector: Failed due to size 1 vector width");
     return failure();
   }
   if (reqVecSize && vectorSize != reqVecSize) {
-    IVLOG(1, "Failed due to mismatch of required size");
+    IVLOG(3, "cacheLoadAsVector: Failed due to mismatch of required size");
     return failure();
   }
   auto eltType = load.getMemRefType().getElementType();
@@ -141,7 +143,7 @@ LogicalResult cacheLoadAsVector(AffineParallelOp par, PxaLoadOp load,
   auto builder = OpBuilder::atBlockBegin(par.getBody());
   // Load as a vector
   auto loadMap = convertToValueMap(load.getContext(), rap.outer);
-  IVLOG(1, "Making vector load");
+  IVLOG(2 :, "Making vector load");
   auto loadVec = builder.create<PxaVectorLoadOp>(loc, vecType, load.getMemRef(),
                                                  loadMap.getAffineMap(),
                                                  loadMap.getOperands());

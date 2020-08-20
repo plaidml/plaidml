@@ -33,7 +33,7 @@ plaidml_cc_library(
         "resize_tmps.cc",
         "stencil.cc",
         "stencil_gemm.cc",
-	"subgroups.cc",
+        "subgroups.cc",
         "test_analysis.cc",
         "tile.cc",
         "tile_accumulate.cc",
