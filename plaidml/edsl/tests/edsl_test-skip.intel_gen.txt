@@ -12,13 +12,6 @@ CppEdsl.ReshapeIntoScalar
 CppEdsl.ReshapeFromScalar
 CppEdsl.Select
 CppEdsl.ConvI8
-CppEdsl.LogicalAnd_uint64
-CppEdsl.LogicalAnd_mixed
-CppEdsl.LogicalOr_uint64
-CppEdsl.LogicalOr_float
-CppEdsl.LogicalOr_int32
-CppEdsl.LogicalNot_int32
-CppEdsl.LogicalNot_float
 CppEdsl.Asin
 CppEdsl.Acos
 CppEdsl.Atan
