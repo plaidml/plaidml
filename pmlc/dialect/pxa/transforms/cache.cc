@@ -151,7 +151,7 @@ LogicalResult cacheLoadAsVector(AffineParallelOp par, PxaLoadOp load,
   OpBuilder newLoadBuilder(load);
   // Do an affine apply to get the index
   auto innerMap = convertToValueMap(par.getContext(), rap.inner);
-  // Extrace the right element of the vector
+  // Extract the right element of the vector
   Value idx = newLoadBuilder.create<AffineApplyOp>(
       loc, innerMap.getAffineMap().getSubMap({last}), innerMap.getOperands());
   auto newLoad = newLoadBuilder.create<ExtractElementOp>(
@@ -201,7 +201,7 @@ LogicalResult cacheReduce(AffineParallelOp par, PxaReduceOp reduce) {
   auto eltType = reduce.getMemRefType().getElementType();
   auto type = MemRefType::get(rap.innerCount, eltType);
   auto localBuf = builder.create<AllocOp>(loc, type);
-  // If it's not an assign, clear it to the reduction dentity
+  // If it's not an assign, clear it to the reduction identity
   Value initBuf = localBuf;
   if (reduce.agg() != AtomicRMWKind::assign) {
     auto ident = createIdentity(builder, loc, reduce.agg(), eltType);

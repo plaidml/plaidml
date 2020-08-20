@@ -369,20 +369,20 @@ LogicalResult vectorizeBuffer(AllocOp op) {
   // Replace the alloc
   auto newOp = replaceOp<AllocOp>(op, newType);
   // Walk over the uses and update them all
-  auto cur_use = IndirectUsesIterator(newOp);
-  while (cur_use != IndirectUsesIterator()) {
-    cur_use->get().setType(newType);
-    if (auto vecOp = dyn_cast<PxaVectorLoadOp>(cur_use->getOwner())) {
+  auto curUse = IndirectUsesIterator(newOp);
+  while (curUse != IndirectUsesIterator()) {
+    curUse->get().setType(newType);
+    if (auto vecOp = dyn_cast<PxaVectorLoadOp>(curUse->getOwner())) {
       replaceOp<PxaLoadOp>(vecOp, vecOp.getMemRef(), vecOp.getAffineMap(),
                            vecOp.getMapOperands());
-      cur_use++;
-    } else if (auto vecOp = dyn_cast<PxaVectorReduceOp>(cur_use->getOwner())) {
+      curUse++;
+    } else if (auto vecOp = dyn_cast<PxaVectorReduceOp>(curUse->getOwner())) {
       auto newVecOp = replaceOp<PxaReduceOp>(
           vecOp, vecOp.agg(), vecOp.getValueToStore(), vecOp.getMemRef(),
           vecOp.getAffineMap(), vecOp.getMapOperands());
-      cur_use = IndirectUsesIterator(newVecOp);
+      curUse = IndirectUsesIterator(newVecOp);
     } else {
-      cur_use++;
+      curUse++;
     }
   }
   return success();
