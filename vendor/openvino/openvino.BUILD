@@ -113,8 +113,8 @@ cc_library(
     ]),
     hdrs = glob([
         "inference-engine/src/legacy_api/include/**/*.hpp",
-        "inference-engine/src/inference_engine/*.hpp",  # TODO: Ok?
-        "inference-engine/src/transformations/include/**/*.hpp",  # TODO: Ok?
+        # "inference-engine/src/inference_engine/*.hpp",  # TODO: Ok?
+        # "inference-engine/src/transformations/include/**/*.hpp",  # TODO: Ok?
         # Or: "inference-engine/src/transformations/include/ngraph_ops/*.hpp",
     ]),
     copts = [
@@ -122,9 +122,9 @@ cc_library(
         "-isystem external/openvino/inference-engine/src/legacy_api/src",
     ],
     includes = [
-        "inference-engine/src/inference_engine",  # TODO: Ok?
+        "inference-engine/src/inference_engine",  # TODO: Why does this work?
         "inference-engine/src/legacy_api/include",
-        "inference-engine/src/transformations/include",  # TODO: Ok?
+        # "inference-engine/src/transformations/include",  # TODO: Ok?
     ],
     tags = TAGS,
     deps = [
@@ -132,6 +132,7 @@ cc_library(
         ":ngraph",
         ":plugin_api",
         ":pugixml",
+        ":transformations",
         "@tbb",
     ],
 )
