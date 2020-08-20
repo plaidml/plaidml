@@ -13,6 +13,7 @@ plaidml_cc_library(
         "//pmlc/conversion/SCFToGPU",
         "//pmlc/conversion/gpu",
         "//pmlc/conversion/pxa_to_affine",
+        "//pmlc/conversion/stdx_to_llvm",
         "//pmlc/conversion/tile_to_pxa",
         "//pmlc/dialect/pxa/transforms",
         "//pmlc/dialect/tile/transforms",
