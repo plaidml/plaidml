@@ -8,18 +8,17 @@
 #include <vector>
 
 #include "mlir/Analysis/AffineStructures.h"
-#include "mlir/Pass/Pass.h"
-#include "pmlc/dialect/pxa/ir/ops.h"
-#include "pmlc/dialect/pxa/transforms/pass_detail.h"
-
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/IR/AffineValueMap.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
-#include "pmlc/dialect/pxa/transforms/tile.h"
-
+#include "mlir/Pass/Pass.h"
 #include "mlir/Support/DebugStringHelper.h"
+
 #include "pmlc/dialect/pxa/analysis/strides.h"
 #include "pmlc/dialect/pxa/analysis/uses.h"
+#include "pmlc/dialect/pxa/ir/ops.h"
+#include "pmlc/dialect/pxa/transforms/pass_detail.h"
+#include "pmlc/dialect/pxa/transforms/tile.h"
 #include "pmlc/util/logging.h"
 
 using namespace mlir; // NOLINT

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/Pass/Pass.h"
 
 namespace pmlc::dialect::pxa {

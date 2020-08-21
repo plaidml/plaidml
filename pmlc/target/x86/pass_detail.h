@@ -1,6 +1,10 @@
 #pragma once
 
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Pass/Pass.h"
+
+#include "pmlc/dialect/xsmm/ir/ops.h"
 
 namespace pmlc::target::x86 {
 

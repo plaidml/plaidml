@@ -175,7 +175,7 @@ static Value createCastOp(OpBuilder &builder, Location loc, Value from,
         return builder.create<mlir::SIToFPOp>(loc, from, intoType).getResult();
       } else {
         // UIToFPOp: IntegerType -> FloatType
-        return builder.create<stdx::UIToFPOp>(loc, intoType, from).getResult();
+        return builder.create<mlir::UIToFPOp>(loc, intoType, from).getResult();
       }
     }
     if (auto fromIndexType = fromType.dyn_cast<IndexType>()) {
@@ -206,7 +206,7 @@ static Value createCastOp(OpBuilder &builder, Location loc, Value from,
         return builder.create<mlir::FPToSIOp>(loc, from, intoType).getResult();
       } else {
         // FPToUIOp: FloatType -> unsigned IntegerType
-        return builder.create<stdx::FPToUIOp>(loc, from, intoType).getResult();
+        return builder.create<mlir::FPToUIOp>(loc, from, intoType).getResult();
       }
     }
     if (auto fromIndexType = fromType.dyn_cast<IndexType>()) {

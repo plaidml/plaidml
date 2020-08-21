@@ -22,116 +22,33 @@ namespace edsc = mlir::edsc;
 
 namespace {
 
-// Base class for Standard to LLVM IR op conversions.  Matches the Op type
-// provided as template argument.  Carries a reference to the LLVM dialect in
-// case it is necessary for rewriters.
-template <typename SourceOp>
-class LLVMLegalizationPattern : public ConvertToLLVMPattern {
-public:
-  // Construct a conversion pattern.
-  explicit LLVMLegalizationPattern(LLVM::LLVMDialect &dialect_,
-                                   LLVMTypeConverter &typeConverter_)
-      : ConvertToLLVMPattern(SourceOp::getOperationName(),
-                             dialect_.getContext(), typeConverter_),
-        dialect(dialect_) {}
-
-  // Get the LLVM IR dialect.
-  LLVM::LLVMDialect &getDialect() const { return dialect; }
-
-  // Get the LLVM context.
-  llvm::LLVMContext &getContext() const { return dialect.getLLVMContext(); }
-
-  // Get the LLVM module in which the types are constructed.
-  llvm::Module &getOperation() const { return dialect.getLLVMModule(); }
-
-  // Get the MLIR type wrapping the LLVM integer type whose bit width is defined
-  // by the pointer size used in the LLVM module.
-  LLVM::LLVMType getIndexType() const {
-    return LLVM::LLVMType::getIntNTy(
-        &dialect, getOperation().getDataLayout().getPointerSizeInBits());
-  }
-
-  LLVM::LLVMType getVoidType() const {
-    return LLVM::LLVMType::getVoidTy(&dialect);
-  }
-
-  // Get the MLIR type wrapping the LLVM i8* type.
-  LLVM::LLVMType getVoidPtrType() const {
-    return LLVM::LLVMType::getInt8PtrTy(&dialect);
-  }
-
-  LLVM::LLVMType getFloatType() const {
-    return LLVM::LLVMType::getFloatTy(&dialect);
-  }
-
-  // Create an LLVM IR pseudo-operation defining the given index constant.
-  Value createIndexConstant(ConversionPatternRewriter &builder, Location loc,
-                            uint64_t value) const {
-    return createIndexAttrConstant(builder, loc, getIndexType(), value);
-  }
-
-protected:
-  LLVM::LLVMDialect &dialect;
-};
-
-LLVM::LLVMFuncOp getOrInsertFuncOp(StringRef funcName, LLVM::LLVMType funcType,
-                                   Operation *op) {
-  using LLVM::LLVMFuncOp;
-
-  Operation *funcOp = SymbolTable::lookupNearestSymbolFrom(op, funcName);
-  if (funcOp)
-    return cast<LLVMFuncOp>(*funcOp);
-
-  mlir::OpBuilder builder(op->getParentOfType<LLVMFuncOp>());
-  return builder.create<LLVMFuncOp>(op->getLoc(), funcName, funcType);
-}
-
-struct FPToUILowering : public LLVMLegalizationPattern<stdx::FPToUIOp> {
-  using LLVMLegalizationPattern<stdx::FPToUIOp>::LLVMLegalizationPattern;
-  using Base = LLVMLegalizationPattern<stdx::FPToUIOp>;
-
-  LogicalResult
-  matchAndRewrite(Operation *op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const override {
-    auto value = op->getOperand(0);
-    auto stdxType = op->getResult(0).getType();
-    auto llvmType = typeConverter.convertType(stdxType);
-    rewriter.replaceOpWithNewOp<LLVM::FPToUIOp>(op, llvmType, value);
-    return success();
-  }
-};
-
-struct UIToFPLowering : public LLVMLegalizationPattern<stdx::UIToFPOp> {
-  using LLVMLegalizationPattern<stdx::UIToFPOp>::LLVMLegalizationPattern;
-  using Base = LLVMLegalizationPattern<stdx::UIToFPOp>;
-
-  LogicalResult
-  matchAndRewrite(Operation *op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const override {
-    auto value = op->getOperand(0);
-    auto stdxType = op->getResult(0).getType();
-    auto llvmType = typeConverter.convertType(stdxType);
-    rewriter.replaceOpWithNewOp<LLVM::UIToFPOp>(op, llvmType, value);
-    return success();
-  }
-};
-
 template <typename T>
-struct LibMCallLowering : public LLVMLegalizationPattern<T> {
-  using LLVMLegalizationPattern<T>::LLVMLegalizationPattern;
-  using Base = LLVMLegalizationPattern<T>;
+struct LibMCallLowering : public ConvertOpToLLVMPattern<T> {
+  using ConvertOpToLLVMPattern<T>::ConvertOpToLLVMPattern;
 
   LogicalResult
   matchAndRewrite(Operation *op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
-    auto f32Type = Base::getFloatType();
+    auto f32Type = LLVM::LLVMType::getFloatTy(rewriter.getContext());
     SmallVector<LLVM::LLVMType, 2> argTypes(getArity(), f32Type);
     auto funcType = LLVM::LLVMType::getFunctionTy(f32Type, argTypes, false);
     auto sym = getOrInsertFuncOp(getFuncName(), funcType, op);
-
     rewriter.replaceOpWithNewOp<LLVM::CallOp>(
         op, ArrayRef<Type>{f32Type}, rewriter.getSymbolRefAttr(sym), operands);
     return success();
+  }
+
+  LLVM::LLVMFuncOp getOrInsertFuncOp(StringRef funcName,
+                                     LLVM::LLVMType funcType,
+                                     Operation *op) const {
+    using LLVM::LLVMFuncOp;
+
+    Operation *funcOp = SymbolTable::lookupNearestSymbolFrom(op, funcName);
+    if (funcOp)
+      return cast<LLVMFuncOp>(*funcOp);
+
+    mlir::OpBuilder builder(op->getParentOfType<LLVMFuncOp>());
+    return builder.create<LLVMFuncOp>(op->getLoc(), funcName, funcType);
   }
 
 protected:
@@ -226,9 +143,8 @@ private:
   MemRefDescriptor desc;
 };
 
-struct ReshapeLowering : public LLVMLegalizationPattern<stdx::ReshapeOp> {
-  using LLVMLegalizationPattern<stdx::ReshapeOp>::LLVMLegalizationPattern;
-  using Base = LLVMLegalizationPattern<stdx::ReshapeOp>;
+struct ReshapeLowering : public ConvertOpToLLVMPattern<stdx::ReshapeOp> {
+  using ConvertOpToLLVMPattern<stdx::ReshapeOp>::ConvertOpToLLVMPattern;
 
   LogicalResult
   matchAndRewrite(Operation *op, ArrayRef<Value> operands,
@@ -288,10 +204,17 @@ struct LowerToLLVMPass : public LowerToLLVMBase<LowerToLLVMPass> {
 
 void populateStdXToLLVMConversionPatterns(LLVMTypeConverter &converter,
                                           OwningRewritePatternList &patterns) {
-  patterns.insert<FPToUILowering, UIToFPLowering, ReshapeLowering, ACosLowering,
-                  ASinLowering, ATanLowering, CosHLowering, ErfLowering,
-                  FloorLowering, PowLowering, RoundLowering, SinHLowering,
-                  TanLowering>(*converter.getDialect(), converter);
+  patterns.insert<ACosLowering,    //
+                  ASinLowering,    //
+                  ATanLowering,    //
+                  CosHLowering,    //
+                  ErfLowering,     //
+                  FloorLowering,   //
+                  PowLowering,     //
+                  ReshapeLowering, //
+                  RoundLowering,   //
+                  SinHLowering,    //
+                  TanLowering>(converter);
 }
 
 std::unique_ptr<mlir::Pass> createLowerToLLVMPass() {

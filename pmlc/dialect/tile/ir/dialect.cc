@@ -43,8 +43,7 @@ struct OpAsmInterface : public mlir::OpAsmDialectInterface {
 
 } // namespace
 
-TileDialect::TileDialect(mlir::MLIRContext *ctx)
-    : mlir::Dialect(getDialectNamespace(), ctx) {
+void TileDialect::initialize() {
   addTypes<AffineMapType, AffineConstraintsType, AffineTensorMapType,
            StringType>();
   addOperations<

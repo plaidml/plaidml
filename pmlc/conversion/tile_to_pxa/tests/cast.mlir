@@ -29,7 +29,7 @@ func @cast_f32_u16(%arg0: tensor<f32>) -> tensor<ui16> {
   %0 = "eltwise.cast"(%arg0) : (tensor<f32>) -> tensor<ui16>
   // CHECK: alloc
   // CHECK: pxa.load
-  // CHECK: stdx.fptoui
+  // CHECK: fptoui
   // CHECK: pxa.reduce assign
   return %0 : tensor<ui16>
 }
@@ -53,7 +53,7 @@ func @cast_u16_f32(%arg0: tensor<ui16>) -> tensor<f32> {
   %0 = "eltwise.cast"(%arg0) : (tensor<ui16>) -> tensor<f32>
   // CHECK: alloc
   // CHECK: pxa.load
-  // CHECK: stdx.uitofp
+  // CHECK: uitofp
   // CHECK: pxa.reduce assign
   return %0 : tensor<f32>
 }

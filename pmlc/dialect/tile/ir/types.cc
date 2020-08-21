@@ -5,19 +5,19 @@
 namespace pmlc::dialect::tile {
 
 AffineMapType AffineMapType::get(mlir::MLIRContext *context) {
-  return Base::get(context, TypeKinds::AffineMap);
+  return Base::get(context);
 }
 
 AffineTensorMapType AffineTensorMapType::get(mlir::MLIRContext *context) {
-  return Base::get(context, TypeKinds::AffineTensorMap);
+  return Base::get(context);
 }
 
 AffineConstraintsType AffineConstraintsType::get(mlir::MLIRContext *context) {
-  return Base::get(context, TypeKinds::AffineConstraints);
+  return Base::get(context);
 }
 
 StringType StringType::get(mlir::MLIRContext *context) {
-  return Base::get(context, TypeKinds::String);
+  return Base::get(context);
 }
 
 } // namespace pmlc::dialect::tile

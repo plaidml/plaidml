@@ -970,7 +970,6 @@ class TestBackendOps(unittest.TestCase):
         diffs = rand - mean
         return b.mean(b.square(diffs))
 
-    @unittest.expectedFailure
     @compareMultiple([
         [[100, 100], 5, 2],
         [[50, 50], 5, 2, 'float16'],

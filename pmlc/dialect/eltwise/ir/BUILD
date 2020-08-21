@@ -1,9 +1,9 @@
 # Copyright 2019 Intel Corporation.
 
-package(default_visibility = ["//visibility:public"])
-
-load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_test")
+load("//bzl:plaidml.bzl", "plaidml_cc_library")
 load("//vendor/mlir:tblgen.bzl", "gentbl")
+
+package(default_visibility = ["//visibility:public"])
 
 filegroup(
     name = "td_files",
@@ -27,6 +27,7 @@ gentbl(
             "interfaces.cc.inc",
         ),
     ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "interfaces.td",
     td_srcs = [":td_files"],
 )
@@ -47,6 +48,7 @@ gentbl(
             "dialect.h.inc",
         ),
     ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "ops.td",
     td_srcs = [":td_files"],
 )

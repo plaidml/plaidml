@@ -3,29 +3,14 @@
 
 include "mlir/Pass/PassBase.td"
 
+def AffineNormalize : FunctionPass<"pxa-normalize"> {
+  let summary = "Normalize affine ops";
+  let constructor = "pmlc::dialect::pxa::createAffineNormalizePass()";
+}
+
 def AutoTileExample : FunctionPass<"pxa-autotile-example"> {
   let summary = "Tile all dimensions by 10";
   let constructor = "pmlc::dialect::pxa::createAutoTileExamplePass()";
-}
-
-def TileAccumulate : FunctionPass<"pxa-tile-accumulate"> {
-  let summary = "Tile accumulation indexes into an inner block to avoid "
-    "possible race conditions";
-  let constructor = "pmlc::dialect::pxa::createTileAccumulatePass()";
-}
-
-def NestLoops : FunctionPass<"pxa-nest-loops"> {
-  let summary = "Nests outermost loops to a minimum IV count";
-  let constructor = "pmlc::dialect::pxa::createNestLoopsPass()";
-  let options = [
-    Option<"minLoopIVs", "ivs", "unsigned", /*default=*/"2",
-           "Set minimum required IV's">
-  ];
-}
-
-def VectorizeExample : FunctionPass<"pxa-vectorize-example"> {
-  let summary = "Vectorizes with vector register of 8 elements";
-  let constructor = "pmlc::dialect::pxa::createVectorizeExamplePass()";
 }
 
 def BufferPlacement : FunctionPass<"pxa-buffer-placement"> {
@@ -54,6 +39,15 @@ def MemRefDataFlowOpt : FunctionPass<"pxa-dataflow-opt"> {
   let constructor = "pmlc::dialect::pxa::createMemRefDataFlowOptPass()";
 }
 
+def NestLoops : FunctionPass<"pxa-nest-loops"> {
+  let summary = "Nests outermost loops to a minimum IV count";
+  let constructor = "pmlc::dialect::pxa::createNestLoopsPass()";
+  let options = [
+    Option<"minLoopIVs", "ivs", "unsigned", /*default=*/"2",
+           "Set minimum required IV's">
+  ];
+}
+
 def ResizeTmps : FunctionPass<"pxa-resize-tmps"> {
   let summary = "Resize temporary buffers to minimal sizes";
   let constructor = "pmlc::dialect::pxa::createResizeTmpsPass()";
@@ -77,6 +71,18 @@ def TestIndirectValuesIterator : Pass<"pxa-test-indirect-values-iterator"> {
 def TestStrideInfo : Pass<"pxa-stride-info"> {
   let summary = "Report stride data for all loads/stores for unit tests";
   let constructor = "pmlc::dialect::pxa::createTestStrideInfoPass()";
+}
+
+def TileAccumulate : FunctionPass<"pxa-tile-accumulate"> {
+  let summary = "Tile accumulation indexes into an inner block to avoid "
+    "possible race conditions";
+  let constructor = "pmlc::dialect::pxa::createTileAccumulatePass()";
+}
+
+def VectorizeExample : FunctionPass<"pxa-vectorize-example"> {
+  let summary = "Vectorizes with vector register of 8 elements";
+  let constructor = "pmlc::dialect::pxa::createVectorizeExamplePass()";
+  let dependentDialects = ["mlir::vector::VectorDialect"];
 }
 
 #endif // __PMLC_DIALECT_PXA_PASSES__

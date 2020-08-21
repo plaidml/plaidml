@@ -27,19 +27,18 @@ struct TraceLinkingPass : public TraceLinkingBase<TraceLinkingPass> {
         return;
       }
       auto loc = op.getLoc();
-      auto context = op.getContext();
+      auto *context = op.getContext();
       OpBuilder builder(context);
-      auto llvmDialect = context->getRegisteredDialect<LLVM::LLVMDialect>();
       auto module = op.getParentOfType<ModuleOp>();
-      auto traceRef = getOrInsertTrace(loc, builder, module, llvmDialect);
+      auto traceRef = getOrInsertTrace(loc, builder, module);
       auto block = op.addEntryBlock();
       builder.setInsertionPointToStart(block);
       auto id = op.getAttrOfType<IntegerAttr>("id").getValue().getZExtValue();
       auto msgStr = op.getAttrOfType<StringAttr>("msg").getValue().str();
       auto msg = StringRef(msgStr.c_str(), msgStr.size() + 1);
       auto msgSymbol = llvm::formatv("__trace_msg_{0}", id).str();
-      auto msgValue = getOrCreateGlobalString(loc, builder, msgSymbol, msg,
-                                              module, llvmDialect);
+      auto msgValue =
+          getOrCreateGlobalString(loc, builder, msgSymbol, msg, module);
       builder.create<LLVM::CallOp>(loc, ArrayRef<Type>{}, traceRef,
                                    ArrayRef<Value>{msgValue});
       builder.create<LLVM::ReturnOp>(loc, ArrayRef<Value>{});
@@ -53,15 +52,14 @@ struct TraceLinkingPass : public TraceLinkingBase<TraceLinkingPass> {
   /// name, creating the string if necessary.
   static Value getOrCreateGlobalString(Location loc, OpBuilder &builder,
                                        StringRef name, StringRef value,
-                                       ModuleOp module,
-                                       LLVM::LLVMDialect *llvmDialect) {
+                                       ModuleOp module) {
     // Create the global at the entry of the module.
     LLVM::GlobalOp global;
     if (!(global = module.lookupSymbol<LLVM::GlobalOp>(name))) {
       OpBuilder::InsertionGuard insertGuard(builder);
       builder.setInsertionPointToStart(module.getBody());
       auto type = LLVM::LLVMType::getArrayTy(
-          LLVM::LLVMType::getInt8Ty(llvmDialect), value.size());
+          LLVM::LLVMType::getInt8Ty(builder.getContext()), value.size());
       global = builder.create<LLVM::GlobalOp>(loc, type, /*isConstant=*/true,
                                               LLVM::Linkage::Internal, name,
                                               builder.getStringAttr(value));
@@ -70,25 +68,24 @@ struct TraceLinkingPass : public TraceLinkingBase<TraceLinkingPass> {
     // Get the pointer to the first character in the global string.
     Value globalPtr = builder.create<LLVM::AddressOfOp>(loc, global);
     Value cst0 = builder.create<LLVM::ConstantOp>(
-        loc, LLVM::LLVMType::getInt64Ty(llvmDialect),
+        loc, LLVM::LLVMType::getInt64Ty(builder.getContext()),
         builder.getIntegerAttr(builder.getIndexType(), 0));
     return builder.create<LLVM::GEPOp>(
-        loc, LLVM::LLVMType::getInt8PtrTy(llvmDialect), globalPtr,
+        loc, LLVM::LLVMType::getInt8PtrTy(builder.getContext()), globalPtr,
         ArrayRef<Value>({cst0, cst0}));
   }
 
   static FlatSymbolRefAttr getOrInsertTrace(Location loc, OpBuilder &builder,
-                                            ModuleOp module,
-                                            LLVM::LLVMDialect *llvmDialect) {
+                                            ModuleOp module) {
     const char *symbol = "plaidml_rt_trace";
-    auto context = module.getContext();
+    auto *context = module.getContext();
     if (module.lookupSymbol(symbol)) {
       return SymbolRefAttr::get(symbol, context);
     }
     OpBuilder::InsertionGuard insertGuard(builder);
     builder.setInsertionPointToStart(module.getBody());
-    auto voidTy = LLVM::LLVMType::getVoidTy(llvmDialect);
-    auto msgTy = LLVM::LLVMType::getInt8PtrTy(llvmDialect);
+    auto voidTy = LLVM::LLVMType::getVoidTy(context);
+    auto msgTy = LLVM::LLVMType::getInt8PtrTy(context);
     auto funcType = LLVM::LLVMType::getFunctionTy(voidTy, {msgTy}, false);
     builder.create<LLVM::LLVMFuncOp>(loc, symbol, funcType);
     return SymbolRefAttr::get(symbol, context);
