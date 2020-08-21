@@ -39,14 +39,23 @@ using namespace mlir; // NOLINT[build/namespaces]
 // Setup LLVM target triple from the current machine.
 static void setupTargetTriple(llvm::Module *llvmModule) {
   // Setup the machine properties from the current architecture.
-  auto targetTriple = llvm::sys::getProcessTriple();
+  auto targetTriple = llvm::sys::getDefaultTargetTriple();
   std::string errorMessage;
   auto target = llvm::TargetRegistry::lookupTarget(targetTriple, errorMessage);
   if (!target) {
     throw std::runtime_error("NO target: " + errorMessage);
   }
-  std::unique_ptr<llvm::TargetMachine> machine(
-      target->createTargetMachine(targetTriple, "generic", "", {}, {}));
+
+  std::string cpu(llvm::sys::getHostCPUName());
+  llvm::SubtargetFeatures features;
+  llvm::StringMap<bool> hostFeatures;
+
+  if (llvm::sys::getHostCPUFeatures(hostFeatures))
+    for (auto &f : hostFeatures)
+      features.AddFeature(f.first(), f.second);
+
+  std::unique_ptr<llvm::TargetMachine> machine(target->createTargetMachine(
+      targetTriple, cpu, features.getString(), {}, {}));
   llvmModule->setDataLayout(machine->createDataLayout());
   llvmModule->setTargetTriple(targetTriple);
 }
@@ -152,6 +161,7 @@ using Function = void (*)(void **);
 struct EngineImpl {
   virtual ~EngineImpl() = default;
   virtual Function compile(std::unique_ptr<llvm::Module> module,
+                           std::unique_ptr<llvm::LLVMContext> ctx,
                            StringRef entryPoint) = 0;
 };
 
@@ -195,6 +205,7 @@ struct MCJITEngineImpl : EngineImpl {
   };
 
   Function compile(std::unique_ptr<llvm::Module> module,
+                   std::unique_ptr<llvm::LLVMContext> ctx,
                    StringRef entryPoint) final {
     std::string error;
     std::unique_ptr<llvm::LegacyJITSymbolResolver> resolver(new Runtime);
@@ -225,17 +236,22 @@ struct MCJITEngineImpl : EngineImpl {
 
 struct OrcJITEngineImpl : EngineImpl {
   Function compile(std::unique_ptr<llvm::Module> module,
+                   std::unique_ptr<llvm::LLVMContext> ctx,
                    StringRef entryPoint) final {
-    std::unique_ptr<llvm::LLVMContext> ctx(new llvm::LLVMContext);
+    using llvm::orc::DynamicLibrarySearchGenerator;
+    using llvm::orc::MangleAndInterner;
+    using llvm::orc::SymbolMap;
+    using llvm::orc::ThreadSafeModule;
+
     auto dataLayout = module->getDataLayout();
 
     jit = llvm::cantFail(llvm::orc::LLJITBuilder().create());
 
-    // Add a ThreadSafemodule to the engine and return.
-    llvm::orc::ThreadSafeModule tsm(std::move(module), std::move(ctx));
+    // Add a ThreadSafeModule to the engine and return.
+    ThreadSafeModule tsm(std::move(module), std::move(ctx));
     llvm::cantFail(jit->addIRModule(std::move(tsm)));
 
-    llvm::orc::SymbolMap symbols;
+    SymbolMap symbols;
     auto &session = jit->getExecutionSession();
     for (const auto &kvp : SymbolRegistry::instance()->symbols) {
       auto addr = llvm::pointerToJITTargetAddress(kvp.second);
@@ -243,8 +259,11 @@ struct OrcJITEngineImpl : EngineImpl {
       symbols.insert(std::make_pair(session.intern(kvp.first()), symbol));
     }
 
-    auto &mainJD = jit->getMainJITDylib();
-    cantFail(mainJD.define(llvm::orc::absoluteSymbols(symbols)));
+    auto &mainJitDylib = jit->getMainJITDylib();
+    cantFail(mainJitDylib.define(absoluteSymbols(symbols)));
+    mainJitDylib.addGenerator(
+        cantFail(DynamicLibrarySearchGenerator::GetForCurrentProcess(
+            dataLayout.getGlobalPrefix())));
 
     // JIT lookup may return an Error referring to strings stored internally by
     // the JIT. If the Error outlives the ExecutionEngine, it would want have a
@@ -295,7 +314,8 @@ struct ExecutableImpl {
       throw std::runtime_error("Program arguments and bufptrs size mismatch");
     }
 
-    auto llvmModule = translateModuleToLLVMIR(*program->module);
+    auto ctx = std::make_unique<llvm::LLVMContext>();
+    auto llvmModule = translateModuleToLLVMIR(*program->module, *ctx);
     if (!llvmModule) {
       throw std::runtime_error("could not convert to LLVM IR");
     }
@@ -307,7 +327,7 @@ struct ExecutableImpl {
       llvmModule->print(llvm::errs(), nullptr);
     }
 
-    jitEntry = impl->compile(std::move(llvmModule), entryPoint);
+    jitEntry = impl->compile(std::move(llvmModule), std::move(ctx), entryPoint);
     if (!jitEntry) {
       throw std::runtime_error("jitEntry function is null");
     }

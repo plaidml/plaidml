@@ -115,7 +115,7 @@ plaidml_executable* plaidml_jit(  //
       auto view = args[i].buffer->MapCurrent();
       bufptrs[i] = view->data();
     }
-    EngineKind kind = EngineKind::MCJIT;
+    EngineKind kind = EngineKind::OrcJIT;
     auto jit = pmlc::util::getEnvVar("LLVM_JIT");
     if (jit == "ORC") {
       kind = EngineKind::OrcJIT;

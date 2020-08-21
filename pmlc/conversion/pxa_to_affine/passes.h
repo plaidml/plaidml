@@ -22,4 +22,8 @@ void populatePXAToAffineConversionPatterns(
 
 std::unique_ptr<mlir::Pass> createLowerPXAToAffinePass();
 
+/// Generate the code for registering conversion passes.
+#define GEN_PASS_REGISTRATION
+#include "pmlc/conversion/pxa_to_affine/passes.h.inc"
+
 } // namespace pmlc::conversion::pxa_to_affine

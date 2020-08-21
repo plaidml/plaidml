@@ -38,11 +38,20 @@ plaidml_cc_test(
 )
 
 plaidml_cc_library(
+    name = "hdrs",
+    hdrs = [
+        "all_dialects.h",
+        "all_passes.h",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+plaidml_cc_library(
     name = "all_passes_and_dialects",
     srcs = ["all_dialects.cc"],
-    hdrs = ["all_passes.h"],
     visibility = ["//visibility:public"],
     deps = [
+        ":hdrs",
         "//pmlc/conversion/gpu",
         "//pmlc/conversion/pxa_to_affine",
         "//pmlc/conversion/stdx_to_llvm",
@@ -57,7 +66,6 @@ plaidml_cc_library(
         "//pmlc/target/x86",
         "@llvm-project//mlir:AllPassesAndDialectsNoRegistration",
     ],
-    alwayslink = 1,
 )
 
 # The following rules are helpers to make it quicker and easier to launch the

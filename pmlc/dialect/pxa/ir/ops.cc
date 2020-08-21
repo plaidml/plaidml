@@ -520,8 +520,7 @@ OpFoldResult PxaVectorReduceOp::fold(ArrayRef<Attribute> cstOperands) {
 #define GET_OP_CLASSES
 #include "pmlc/dialect/pxa/ir/ops.cc.inc"
 
-PXADialect::PXADialect(mlir::MLIRContext *ctx)
-    : mlir::Dialect(getDialectNamespace(), ctx) {
+void PXADialect::initialize() {
   addOperations<
 #define GET_OP_LIST
 #include "pmlc/dialect/pxa/ir/ops.cc.inc" // NOLINT

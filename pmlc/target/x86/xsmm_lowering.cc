@@ -92,8 +92,8 @@ struct XSMMGemmDispatchLowering
     auto dispatchOp = cast<xsmm::GemmDispatchOp>(op);
     auto func = getOrInsertFunc(op, rewriter);
 
-    auto int32Type = LLVM::LLVMType::getInt32Ty(&getDialect());
-    auto int64Type = LLVM::LLVMType::getInt64Ty(&getDialect());
+    auto int32Type = LLVM::LLVMType::getInt32Ty(op->getContext());
+    auto int64Type = LLVM::LLVMType::getInt64Ty(op->getContext());
     SmallVector<Value, 6> callOperands;
 
     // lda, ldb, ldc
@@ -124,8 +124,8 @@ struct XSMMGemmDispatchLowering
 
     OpBuilder::InsertionGuard guard(rewriter);
     rewriter.setInsertionPointToStart(module.getBody());
-    auto int32Type = LLVM::LLVMType::getInt32Ty(&getDialect());
-    auto int64Type = LLVM::LLVMType::getInt64Ty(&getDialect());
+    auto int32Type = LLVM::LLVMType::getInt32Ty(op->getContext());
+    auto int64Type = LLVM::LLVMType::getInt64Ty(op->getContext());
     return rewriter.create<LLVM::LLVMFuncOp>(
         rewriter.getUnknownLoc(), kGemmDispatchF32,
         LLVM::LLVMType::getFunctionTy(int64Type,
@@ -146,7 +146,6 @@ struct XSMMGemmInvokeLowering
   LogicalResult
   matchAndRewrite(Operation *op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
-    auto &module = getModule();
     auto invokeOp = cast<xsmm::GemmInvokeOp>(op);
     xsmm::GemmInvokeOp::Adaptor transformed(operands);
     auto aType = invokeOp.a().getType().cast<MemRefType>();
@@ -155,17 +154,17 @@ struct XSMMGemmInvokeLowering
 
     auto aIndices =
         transformed.indices().slice(cType.getRank(), aType.getRank());
-    auto aPtr = getDataPtr(op->getLoc(), aType, transformed.a(), aIndices,
-                           rewriter, module);
+    auto aPtr =
+        getDataPtr(op->getLoc(), aType, transformed.a(), aIndices, rewriter);
 
     auto bIndices = transformed.indices().slice(
         cType.getRank() + aType.getRank(), bType.getRank());
-    auto bPtr = getDataPtr(op->getLoc(), bType, transformed.b(), bIndices,
-                           rewriter, module);
+    auto bPtr =
+        getDataPtr(op->getLoc(), bType, transformed.b(), bIndices, rewriter);
 
     auto cIndices = transformed.indices().slice(0, cType.getRank());
-    auto cPtr = getDataPtr(op->getLoc(), cType, transformed.c(), cIndices,
-                           rewriter, module);
+    auto cPtr =
+        getDataPtr(op->getLoc(), cType, transformed.c(), cIndices, rewriter);
 
     auto func = getOrInsertFunc(op, rewriter);
     rewriter.create<LLVM::CallOp>(
@@ -187,8 +186,8 @@ struct XSMMGemmInvokeLowering
 
     OpBuilder::InsertionGuard guard(rewriter);
     rewriter.setInsertionPointToStart(module.getBody());
-    auto floatType = LLVM::LLVMType::getFloatTy(&getDialect());
-    auto int64Type = LLVM::LLVMType::getInt64Ty(&getDialect());
+    auto floatType = LLVM::LLVMType::getFloatTy(op->getContext());
+    auto int64Type = LLVM::LLVMType::getInt64Ty(op->getContext());
     auto floatPtrType = floatType.getPointerTo();
     return rewriter.create<LLVM::LLVMFuncOp>(
         rewriter.getUnknownLoc(), kGemmInvokeF32,

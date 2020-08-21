@@ -103,11 +103,10 @@ private:
   void declareVulkanFunctions(Location loc);
 
   void getCachedTypes() {
-    llvmDialect = getContext().getRegisteredDialect<LLVM::LLVMDialect>();
-    llvmVoidType = LLVM::LLVMType::getVoidTy(llvmDialect);
-    llvmPointerType = LLVM::LLVMType::getInt8PtrTy(llvmDialect);
-    llvmInt32Type = LLVM::LLVMType::getInt32Ty(llvmDialect);
-    llvmInt64Type = LLVM::LLVMType::getInt64Ty(llvmDialect);
+    llvmVoidType = LLVM::LLVMType::getVoidTy(&getContext());
+    llvmPointerType = LLVM::LLVMType::getInt8PtrTy(&getContext());
+    llvmInt32Type = LLVM::LLVMType::getInt32Ty(&getContext());
+    llvmInt64Type = LLVM::LLVMType::getInt64Ty(&getContext());
 
     OpBuilder builder(getOperation());
     mlirIndexType = builder.getIndexType();
@@ -146,7 +145,6 @@ private:
     return nullptr;
   }
 
-  LLVM::LLVMDialect *getLLVMDialect() { return llvmDialect; }
   LLVM::LLVMType getLLVMVoidType() { return llvmVoidType; }
   LLVM::LLVMType getLLVMPointerType() { return llvmPointerType; }
   LLVM::LLVMType getLLVMInt32Type() { return llvmInt32Type; }
@@ -155,7 +153,6 @@ private:
   mlir::Type getMLIRFloat32Type() { return mlirFloat32Type; }
   mlir::Type getMLIRIndexType() { return mlirIndexType; }
 
-  LLVM::LLVMDialect *llvmDialect;
   LLVM::LLVMType llvmVoidType;
   LLVM::LLVMType llvmPointerType;
   LLVM::LLVMType llvmInt32Type;
@@ -215,8 +212,7 @@ Value ConvertGpuLaunchFuncToVulkanCalls::createEntryPointNameConstant(
   std::string entryPointGlobalName =
       (name + "_spv_entry_point_name" + std::to_string(lauchFuncIndex)).str();
   return LLVM::createGlobalString(loc, builder, entryPointGlobalName,
-                                  shaderName, LLVM::Linkage::Internal,
-                                  getLLVMDialect());
+                                  shaderName, LLVM::Linkage::Internal);
 }
 
 LogicalResult
@@ -420,8 +416,7 @@ void ConvertGpuLaunchFuncToVulkanCalls::convertGpuLaunchFunc(
   // that data to runtime call.
   Value ptrToSPIRVBinary = LLVM::createGlobalString(
       loc, builder, kSPIRVBinary + std::to_string(lauchFuncIndex),
-      {binary.data(), binary.size()}, LLVM::Linkage::Internal,
-      getLLVMDialect());
+      {binary.data(), binary.size()}, LLVM::Linkage::Internal);
 
   // Create LLVM constant for the size of SPIR-V binary shader.
   Value binarySize = builder.create<LLVM::ConstantOp>(

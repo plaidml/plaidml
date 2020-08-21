@@ -21,6 +21,7 @@ gentbl(
             "passes.h.inc",
         ),
     ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "passes.td",
     td_srcs = [
         "@llvm-project//mlir:PassBaseTdFiles",
@@ -55,6 +56,7 @@ plaidml_cc_library(
         "//pmlc/dialect/xsmm",
         "//pmlc/rt",
         "@llvm-project//mlir:AffineToStandardTransforms",
+        "@llvm-project//mlir:AffineTransforms",
         "@llvm-project//mlir:LLVMTransforms",
         "@llvm-project//mlir:SCFToStandard",
         "@llvm-project//mlir:StandardOpsTransforms",

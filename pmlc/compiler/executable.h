@@ -19,7 +19,7 @@ class Executable {
 public:
   Executable(const std::shared_ptr<Program> &program,
              mlir::ArrayRef<void *> bufptrs,
-             EngineKind kind = EngineKind::MCJIT);
+             EngineKind kind = EngineKind::OrcJIT);
   ~Executable();
 
   void invoke();

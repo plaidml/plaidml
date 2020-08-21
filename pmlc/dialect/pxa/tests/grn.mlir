@@ -1,14 +1,16 @@
 // RUN: pmlc-opt \
 // RUN:   -tile-compute-bounds \
 // RUN:   -convert-tile-to-pxa \
+// RUN:   -pxa-normalize \
 // RUN:   -canonicalize \
 // RUN:   -pxa-fusion \
+// RUN:   -pxa-normalize \
 // RUN:   -canonicalize \
 // RUN:   -pxa-dataflow-opt \
 // RUN:   -canonicalize \
 // RUN:   -pxa-localize \
 // RUN:   -pxa-resize-tmps \
-// RUN:   --canonicalize \
+// RUN:   -canonicalize \
 // RUN:   %s | FileCheck %s
 
 #map0 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>
