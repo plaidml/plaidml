@@ -65,7 +65,7 @@ private:
         // For each Vector operation check if vector is single ranked and of
         // size of parallel's loop step on last dimension (vectorSize)
         .Case<vector::TransferReadOp>([&](auto op) {
-          auto vecType = op.vector().getType().cast<VectorType>();
+          auto vecType = op.vector().getType().template cast<VectorType>();
           if ((vecType.getRank() != 1) ||
               (vecType.getDimSize(0) != vectorSize)) {
             IVLOG(3, "Devectorize: Failed, TransferReadOp vector size does not "
@@ -77,7 +77,7 @@ private:
           return success();
         })
         .Case<vector::TransferWriteOp>([&](auto op) {
-          auto vecType = op.vector().getType().cast<VectorType>();
+          auto vecType = op.vector().getType().template cast<VectorType>();
           if ((vecType.getRank() != 1) ||
               (vecType.getDimSize(0) != vectorSize)) {
             IVLOG(3, "Devectorize: Failed, TransferReadOp vector size does not "
@@ -88,7 +88,7 @@ private:
           return success();
         })
         .Case<vector::BroadcastOp>([&](auto op) {
-          auto vecType = op.vector().getType().cast<VectorType>();
+          auto vecType = op.vector().getType().template cast<VectorType>();
           if ((vecType.getRank() != 1) ||
               (vecType.getDimSize(0) != vectorSize)) {
             IVLOG(3, "Devectorize: Failed, BroadcastOp vector size does not "
@@ -151,10 +151,10 @@ public:
 
     // Update the result type if it is a vector, operands types should have
     // already been updated before
-    for (auto &result : op->getResults()) {
+    for (auto result : op->getResults()) {
       auto resultType = result.getType();
       if (resultType.isa<VectorType>())
-        result.setType(resultType.cast<VectorType>().getElementType());
+        result.setType(resultType.template cast<VectorType>().getElementType());
     }
   }
 
@@ -219,7 +219,7 @@ public:
       return failure();
     }
 
-    vectorSize = vectorSizeOp.value().cast<IntegerAttr>().getInt();
+    vectorSize = vectorSizeOp.value().template cast<IntegerAttr>().getInt();
     if (vectorSize == 1) {
       // Step on last dimension is 1, no need to devectorize then
       return failure();
