@@ -9,7 +9,8 @@ def AutoTileExample : FunctionPass<"pxa-autotile-example"> {
 }
 
 def TileAccumulate : FunctionPass<"pxa-tile-accumulate"> {
-  let summary = "Tile accumulation indexes into an inner block to avoid possible race conditions";
+  let summary = "Tile accumulation indexes into an inner block to avoid "
+    "possible race conditions";
   let constructor = "pmlc::dialect::pxa::createTileAccumulatePass()";
 }
 
@@ -35,6 +36,12 @@ def BufferPlacement : FunctionPass<"pxa-buffer-placement"> {
 def Fusion : FunctionPass<"pxa-fusion"> {
   let summary = "Fuse blocks that are compatible";
   let constructor = "pmlc::dialect::pxa::createFusionPass()";
+  let options = [
+    Option<"memoryActivityThreshold", "mem-threshold", "int64_t",
+           /*default=*/"0",
+           "Prevent over-fusion by specifying the maximum memory activity "
+           "(alloc, read, write) allowed">
+  ];
 }
 
 def Localize : FunctionPass<"pxa-localize"> {
@@ -50,6 +57,11 @@ def MemRefDataFlowOpt : FunctionPass<"pxa-dataflow-opt"> {
 def ResizeTmps : FunctionPass<"pxa-resize-tmps"> {
   let summary = "Resize temporary buffers to minimal sizes";
   let constructor = "pmlc::dialect::pxa::createResizeTmpsPass()";
+}
+
+def Subgroups : FunctionPass<"pxa-subgroups"> {
+  let summary = "TODO: text";
+  let constructor = "pmlc::dialect::pxa::createSubgroupsPass()";
 }
 
 def TestIndirectUsesIterator : Pass<"pxa-test-indirect-uses-iterator"> {

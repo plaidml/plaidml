@@ -11,10 +11,11 @@
 
 #include "mlir/Dialect/Affine/IR/AffineValueMap.h"
 #include "mlir/Support/DebugStringHelper.h"
-#include "pmlc/dialect/pxa/analysis/affine_expr.h"
-#include "pmlc/util/logging.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/FormatVariadic.h"
+
+#include "pmlc/dialect/pxa/analysis/affine_expr.h"
+#include "pmlc/util/logging.h"
 
 namespace mlir {
 
@@ -47,10 +48,18 @@ int64_t getIVStep(BlockArgument arg) {
   llvm_unreachable("Get IV Step on non-IV");
 }
 
+int64_t RelativeAccessPattern::totalInnerBytes() const {
+  int64_t ret = 1;
+  for (auto dim : innerCount) {
+    ret *= dim;
+  }
+  auto eltSize = llvm::divideCeil(memRefType.getElementTypeBitWidth(), 8);
+  return ret * eltSize;
+}
+
 StrideRange::StrideRange(BlockArgument arg)
     : valid(false), minVal(0), maxVal(0), stride(0) {
-  if (auto ap =
-          mlir::dyn_cast<AffineParallelOp>(arg.getOwner()->getParentOp())) {
+  if (auto ap = dyn_cast<AffineParallelOp>(arg.getOwner()->getParentOp())) {
     auto range_expr = ap.getRangesValueMap().getResult(arg.getArgNumber());
     auto range_cst = range_expr.dyn_cast<AffineConstantExpr>();
     if (!range_cst) {
@@ -130,40 +139,52 @@ StrideInfo &StrideInfo::operator+=(const StrideInfo &rhs) {
   return *this;
 }
 
-static bool isBlockAncestor(Block *x, Block *y) {
+static BoundaryRegion getBoundaryRegion(Block *x, Block *y) {
   while (x != y) {
     Operation *parentOp = y->getParentOp();
     if (!parentOp) {
-      return false;
+      return BoundaryRegion::Interior;
     }
     y = parentOp->getBlock();
     if (!y) {
-      return false;
+      return BoundaryRegion::Interior;
     }
   }
-  return true;
+  return BoundaryRegion::Exterior;
 }
 
-StrideInfo StrideInfo::outer(Block *block) {
+StrideInfo StrideInfo::outer(BlockArgumentBoundaryFn fn) {
   StrideInfo ret;
   ret.offset = offset;
   for (const auto &kvp : strides) {
-    if (isBlockAncestor(kvp.first.getOwner(), block)) {
+    if (fn(kvp.first) == BoundaryRegion::Exterior) {
       ret.strides.insert(kvp);
     }
   }
   return ret;
 }
 
-StrideInfo StrideInfo::inner(Block *block) {
+StrideInfo StrideInfo::inner(BlockArgumentBoundaryFn fn) {
   StrideInfo ret;
   ret.offset = 0;
   for (const auto &kvp : strides) {
-    if (!isBlockAncestor(kvp.first.getOwner(), block)) {
+    if (fn(kvp.first) == BoundaryRegion::Interior) {
       ret.strides.insert(kvp);
     }
   }
   return ret;
+}
+
+StrideInfo StrideInfo::outer(Block *block) {
+  return outer([block](BlockArgument arg) {
+    return getBoundaryRegion(arg.getOwner(), block);
+  });
+}
+
+StrideInfo StrideInfo::inner(Block *block) {
+  return inner([block](BlockArgument arg) {
+    return getBoundaryRegion(arg.getOwner(), block);
+  });
 }
 
 StrideRange StrideInfo::range() const {
@@ -282,7 +303,7 @@ Optional<StrideInfo> computeStrideInfo(Value expr) {
     return computeStrideInfo(op.getAffineMap().getResult(0),
                              op.getMapOperands());
 
-  IVLOG(1, "Failed stride info: op = " << mlir::debugString(expr));
+  IVLOG(1, "Failed stride info: op = " << debugString(expr));
 
   return None;
 }
@@ -404,37 +425,40 @@ Optional<StrideInfo> computeStrideInfo(pxa::PxaVectorReduceOp op) {
                            op.getMapOperands());
 }
 
-Optional<RelativeAccessPattern> computeRelativeAccess(Block *block,
-                                                      Operation *op) {
-  ArrayRef<int64_t> vecSize = {};
-  Optional<llvm::SmallVector<StrideInfo, 4>> maybeStrides;
-  TypeSwitch<Operation *>(op)
-      .Case<pxa::PxaLoadOp>([&](auto op) {
-        maybeStrides =
-            computeStrideInfo(op.getAffineMap(), op.getMapOperands());
-      })
-      .Case<pxa::PxaReduceOp>([&](auto op) {
-        maybeStrides =
-            computeStrideInfo(op.getAffineMap(), op.getMapOperands());
-      })
-      .Case<pxa::PxaVectorLoadOp>([&](auto op) {
-        maybeStrides =
-            computeStrideInfo(op.getAffineMap(), op.getMapOperands());
-        vecSize = op.getVectorType().getShape();
-      })
-      .Case<pxa::PxaVectorReduceOp>([&](auto op) {
-        maybeStrides =
-            computeStrideInfo(op.getAffineMap(), op.getMapOperands());
-        vecSize = op.getVectorType().getShape();
-      });
+Optional<RelativeAccessPattern>
+computeRelativeAccess(Operation *op, BlockArgumentBoundaryFn fn) {
+  ArrayRef<int64_t> vecSize;
+  MemRefType memRefType;
+  using MaybeStrides = Optional<llvm::SmallVector<StrideInfo, 4>>;
+  auto maybeStrides =
+      TypeSwitch<Operation *, MaybeStrides>(op)
+          .Case<pxa::PxaLoadOp>([&](auto op) {
+            memRefType = op.getMemRefType();
+            return computeStrideInfo(op.getAffineMap(), op.getMapOperands());
+          })
+          .Case<pxa::PxaReduceOp>([&](auto op) {
+            memRefType = op.getMemRefType();
+            return computeStrideInfo(op.getAffineMap(), op.getMapOperands());
+          })
+          .Case<pxa::PxaVectorLoadOp>([&](auto op) {
+            memRefType = op.getMemRefType();
+            vecSize = op.getVectorType().getShape();
+            return computeStrideInfo(op.getAffineMap(), op.getMapOperands());
+          })
+          .Case<pxa::PxaVectorReduceOp>([&](auto op) {
+            memRefType = op.getMemRefType();
+            vecSize = op.getVectorType().getShape();
+            return computeStrideInfo(op.getAffineMap(), op.getMapOperands());
+          })
+          .Default([](auto op) { return llvm::None; });
   if (!maybeStrides) {
     return llvm::None;
   }
   auto &strides = *maybeStrides;
-  RelativeAccessPattern ret;
+  RelativeAccessPattern ret(memRefType);
   for (size_t i = 0; i < strides.size(); i++) {
-    ret.outer.push_back(strides[i].outer(block));
-    auto inner = strides[i].inner(block);
+    ret.outer.push_back(strides[i].outer(fn));
+    auto inner = strides[i].inner(fn);
     ret.inner.push_back(inner);
     StrideRange range = inner.range();
     if (i + vecSize.size() >= strides.size()) {
@@ -455,6 +479,13 @@ Optional<RelativeAccessPattern> computeRelativeAccess(Block *block,
     ret.innerStride.push_back(stride);
   }
   return ret;
+}
+
+Optional<RelativeAccessPattern> computeRelativeAccess(Operation *op,
+                                                      Block *block) {
+  return computeRelativeAccess(op, [block](BlockArgument arg) {
+    return getBoundaryRegion(arg.getOwner(), block);
+  });
 }
 
 StrideArray::StrideArray(unsigned numDims, int64_t offset)

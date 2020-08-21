@@ -21,13 +21,16 @@ std::unique_ptr<mlir::Pass> createVectorizeExamplePass();
 
 std::unique_ptr<mlir::Pass> createBufferPlacementPass();
 
-std::unique_ptr<mlir::Pass> createFusionPass();
+std::unique_ptr<mlir::Pass>
+createFusionPass(int64_t memoryActivityThreshold = 0);
 
 std::unique_ptr<mlir::Pass> createLocalizePass();
 
 std::unique_ptr<mlir::Pass> createMemRefDataFlowOptPass();
 
 std::unique_ptr<mlir::Pass> createResizeTmpsPass();
+
+std::unique_ptr<mlir::Pass> createSubgroupsPass();
 
 struct StencilCost {
   double throughput;

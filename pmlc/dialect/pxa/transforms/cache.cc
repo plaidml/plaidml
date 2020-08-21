@@ -64,7 +64,7 @@ static Value createCopyLoop(OpBuilder &builder,               //
 
 LogicalResult cacheLoad(AffineParallelOp par, PxaLoadOp load) {
   // Get the striding information for the load op, fail if unsuccessful
-  auto maybeRap = computeRelativeAccess(par.getBody(), load);
+  auto maybeRap = computeRelativeAccess(load, par.getBody());
   if (!maybeRap) {
     return failure();
   }
@@ -99,9 +99,71 @@ LogicalResult cacheLoad(AffineParallelOp par, PxaLoadOp load) {
   return success();
 }
 
+LogicalResult cacheLoadAsVector(AffineParallelOp par, PxaLoadOp load,
+                                int64_t reqVecSize) {
+  // Get the striding information for the load op, fail if unsuccessful
+  auto maybeRap = computeRelativeAccess(load, par.getBody());
+  if (!maybeRap) {
+    IVLOG(3, "cacheLoadAsVector: Failed due to a non-strided access");
+    return failure();
+  }
+  const auto &rap = *maybeRap;
+  // Require all sizes to be 1 except the final one, which is the vector size
+  // and must be stride 1.
+  if (rap.innerCount.size() < 1) {
+    IVLOG(3, "cacheLoadAsVector: Failed due to 0-dim memref");
+    return failure();
+  }
+  for (unsigned i = 0; i < rap.inner.size() - 1; i++) {
+    if (rap.innerCount[i] != 1) {
+      IVLOG(3, "cacheLoadAsVector: Failed due to invalid non-final count: "
+                   << rap.innerCount[i]);
+      return failure();
+    }
+  }
+  unsigned last = rap.inner.size() - 1;
+  if (rap.innerStride[last] != 1) {
+    IVLOG(3, "cacheLoadAsVector: Failed due to invalid stride: "
+                 << rap.innerStride[last]);
+    return failure();
+  }
+  int64_t vectorSize = rap.innerCount[last];
+  if (vectorSize == 1) {
+    IVLOG(3, "cacheLoadAsVector: Failed due to size 1 vector width");
+    return failure();
+  }
+  if (reqVecSize && vectorSize != reqVecSize) {
+    IVLOG(3, "cacheLoadAsVector: Failed due to mismatch of required size");
+    return failure();
+  }
+  auto eltType = load.getMemRefType().getElementType();
+  auto vecType = VectorType::get({vectorSize}, eltType);
+  // Prep for generation
+  auto loc = load.getLoc();
+  auto builder = OpBuilder::atBlockBegin(par.getBody());
+  // Load as a vector
+  auto loadMap = convertToValueMap(load.getContext(), rap.outer);
+  IVLOG(2, "Making vector load");
+  auto loadVec = builder.create<PxaVectorLoadOp>(loc, vecType, load.getMemRef(),
+                                                 loadMap.getAffineMap(),
+                                                 loadMap.getOperands());
+  // Make a new load and remove the old one
+  OpBuilder newLoadBuilder(load);
+  // Do an affine apply to get the index
+  auto innerMap = convertToValueMap(par.getContext(), rap.inner);
+  // Extract the right element of the vector
+  Value idx = newLoadBuilder.create<AffineApplyOp>(
+      loc, innerMap.getAffineMap().getSubMap({last}), innerMap.getOperands());
+  auto newLoad = newLoadBuilder.create<ExtractElementOp>(
+      loc, eltType, loadVec.getResult(), idx);
+  load.replaceAllUsesWith(newLoad.result());
+  load.erase();
+  return success();
+}
+
 LogicalResult cacheReduce(AffineParallelOp par, PxaReduceOp reduce) {
   // Get the striding information for the load op, fail if unsuccessful
-  auto maybeRap = computeRelativeAccess(par.getBody(), reduce);
+  auto maybeRap = computeRelativeAccess(reduce, par.getBody());
   if (!maybeRap) {
     return failure();
   }
@@ -139,10 +201,12 @@ LogicalResult cacheReduce(AffineParallelOp par, PxaReduceOp reduce) {
   auto eltType = reduce.getMemRefType().getElementType();
   auto type = MemRefType::get(rap.innerCount, eltType);
   auto localBuf = builder.create<AllocOp>(loc, type);
-  // Clear it to the reduction identity
-  auto ident = createIdentity(builder, loc, reduce.agg(), eltType);
-  auto initBuf = createInitLoop(builder, loc, localBuf, ident);
-
+  // If it's not an assign, clear it to the reduction identity
+  Value initBuf = localBuf;
+  if (reduce.agg() != AtomicRMWKind::assign) {
+    auto ident = createIdentity(builder, loc, reduce.agg(), eltType);
+    initBuf = createInitLoop(builder, loc, localBuf, ident);
+  }
   // Make a new load and remove the old one
   auto innerMap = convertToValueMap(par.getContext(), rap.inner);
   OpBuilder newReduceBuilder(reduce);
