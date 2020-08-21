@@ -26,8 +26,8 @@ def openvino_workspace():
     # TODO: Update the commit once the OV-repo PR lands
     http_archive(
         name = "openvino",
-        url = "https://github.com/PlaidML/openvino/archive/c6fbeb1ce3ae61c2ff8a91cd9904b002a1ef4059.zip",
-        strip_prefix = "openvino-c6fbeb1ce3ae61c2ff8a91cd9904b002a1ef4059",
-        sha256 = "e6e54f16ae88ba5444be73edfa8e45b2d442a733993df2808a88a6b604c692e1",
+        url = "https://github.com/PlaidML/openvino/archive/93f610ed0afa111e1ca21e93ad4d60bdb1ac4c03.zip",
+        strip_prefix = "openvino-93f610ed0afa111e1ca21e93ad4d60bdb1ac4c03",
+        sha256 = "138998910127a0104beabd06967d3be486fe8d6dd2539bc5175b08f969079932",
         build_file = clean_dep("//vendor/openvino:openvino.BUILD"),
     )
