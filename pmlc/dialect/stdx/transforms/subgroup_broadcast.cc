@@ -1,10 +1,13 @@
 // Copyright 2020 Intel Corporation
 
+#include "llvm/ADT/TypeSwitch.h"
+
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/StandardTypes.h"
+#include "mlir/Interfaces/VectorInterfaces.h"
 #include "mlir/Pass/Pass.h"
 
 #include "pmlc/dialect/stdx/ir/ops.h"
@@ -17,8 +20,9 @@ namespace pmlc::dialect::stdx {
 
 namespace {
 
-/// Finds proper sequence of vector operations, performs unvectorization and
-/// adds stdx.subgroup_broadcast
+/// Performs unvectorization and finds the sequence of
+/// vector.extractelement->vector.broadcast and replaces with
+/// stdx.subgroup_broadcast
 ///
 /// Sample code:
 ///
@@ -49,125 +53,237 @@ namespace {
 ///    store %1, %arg1[%idx] : memref<64xf32>
 ///    scf.yield
 
-void runOnParallel(scf::ParallelOp loopOp) {
-  // First, find the matching pattern that needs to have minimum 4 ops within
-  // scf.parallel and the following vector ops:
-  // transfer_read -> elementextract -> broadcast -> transfer_write
-  const unsigned kMinNumValidSubgroupsBroadcastRegion = 4;
-  auto *body = loopOp.getBody();
-  if (body->getOperations().size() < kMinNumValidSubgroupsBroadcastRegion) {
-    IVLOG(5, "The scf.parallel region didn't have the right number of "
-             "instructions for a Subgroups broadcast transformation");
-    return;
+class DevectorizeImpl {
+private:
+  scf::ParallelOp loop;
+  unsigned vectorSize;
+  DenseSet<Value> vectorizedValues;
+  DenseSet<Operation *> vectorizedOps;
+
+  LogicalResult tryDevectorizeOperation(Operation *op) {
+    return llvm::TypeSwitch<Operation *, LogicalResult>(op)
+        // For each Vector operation check if vector is single ranked and of
+        // size of parallel's loop step on last dimension (vectorSize)
+        .Case<vector::TransferReadOp>([&](auto op) {
+          auto vecType = op.vector().getType().template cast<VectorType>();
+          if ((vecType.getRank() != 1) ||
+              (vecType.getDimSize(0) != vectorSize)) {
+            IVLOG(3, "Devectorize: Failed, TransferReadOp vector size does not "
+                     "match last dimension step of the loop");
+            return failure();
+          }
+          vectorizedOps.insert(op);
+          vectorizedValues.insert(op.getResult());
+          return success();
+        })
+        .Case<vector::TransferWriteOp>([&](auto op) {
+          auto vecType = op.vector().getType().template cast<VectorType>();
+          if ((vecType.getRank() != 1) ||
+              (vecType.getDimSize(0) != vectorSize)) {
+            IVLOG(3, "Devectorize: Failed, TransferReadOp vector size does not "
+                     "match last dimension step of the loop");
+            return failure();
+          }
+          vectorizedOps.insert(op);
+          return success();
+        })
+        .Case<vector::BroadcastOp>([&](auto op) {
+          auto vecType = op.vector().getType().template cast<VectorType>();
+          if ((vecType.getRank() != 1) ||
+              (vecType.getDimSize(0) != vectorSize)) {
+            IVLOG(3, "Devectorize: Failed, BroadcastOp vector size does not "
+                     "match last dimension step of the loop");
+            return failure();
+          }
+          vectorizedOps.insert(op);
+          vectorizedValues.insert(op.getResult());
+          return success();
+        })
+        .Default([&](Operation *op) {
+          // Check if the operation is vectorizable to consider it at all with
+          // transformation
+          if (!mlir::isa<VectorUnrollOpInterface>(op)) {
+            // Create exception for vector.extractelement followed by
+            // vector.broadcast that will be taken care of later.
+            auto extractElementOp =
+                dyn_cast_or_null<vector::ExtractElementOp>(op);
+            if (extractElementOp) {
+              for (auto user : extractElementOp.result().getUsers()) {
+                if (dyn_cast_or_null<vector::BroadcastOp>(user))
+                  return success();
+                else
+                  break;
+              }
+            }
+            return success();
+          }
+          // Devectorize if at least one operand will be devectorized
+          bool anyDevec = false;
+          for (auto operand : op->getOperands()) {
+            if (vectorizedValues.count(operand)) {
+              anyDevec = true;
+            }
+          }
+          if (!anyDevec) {
+            // No need to devectorize, all is good
+            return success();
+          }
+          // Don't handle ops with multiple results
+          if (op->getNumResults() != 1) {
+            IVLOG(3, "Devectorize: Failed, multi-result vector op");
+            return failure();
+          }
+          vectorizedOps.insert(op);
+          vectorizedValues.insert(op->getResult(0));
+          return success();
+        });
   }
 
-  // TODO: Verify if that is the only case
-  if (loopOp.lowerBound().size() != 1) {
-    IVLOG(3, "scf.parralel needs to have single dimension");
-    return;
+public:
+  explicit DevectorizeImpl(scf::ParallelOp loop) : loop(loop) {}
+
+  void devectorizeVectorOp(Operation *op) {
+    OpBuilder builder(op);
+    // Skip on vector.extractelement as it will be removed with broadcast op
+    // transformation
+    if (dyn_cast_or_null<vector::ExtractElementOp>(op))
+      return;
+
+    // Update the result type if it is a vector, operands types should have
+    // already been updated before
+    for (auto result : op->getResults()) {
+      auto resultType = result.getType();
+      if (resultType.isa<VectorType>())
+        result.setType(resultType.template cast<VectorType>().getElementType());
+    }
   }
 
-  // TODO: transfer_write needs to be in the last place. Verify if this is the
-  // only case
-  auto it = std::prev(body->end(), 2);
-  auto transferWriteOp = dyn_cast<vector::TransferWriteOp>(*it);
-
-  if (!transferWriteOp) {
-    IVLOG(3, "The scf.parallel region didn't have a vector.transfer_write as "
-             "its last "
-             "non-terminator");
-    return;
+  void devectorizeTransferRead(vector::TransferReadOp op) {
+    // Simple replace with loadOp, the indices were already updated before
+    OpBuilder builder(op);
+    auto newLoadOp =
+        builder.create<LoadOp>(op.getLoc(), op.memref(), op.indices());
+    op.replaceAllUsesWith(newLoadOp.getResult());
+    op.erase();
   }
 
-  auto broadcastOp = dyn_cast_or_null<vector::BroadcastOp>(
-      transferWriteOp.vector().getDefiningOp());
-  if (!broadcastOp) {
-    IVLOG(3, "vector() of the vector.transfer_write operation is not from "
-             "vector.broadcast");
-    return;
+  void devectorizeTransferWrite(vector::TransferWriteOp op) {
+    // Simple replace with storeOp, the indices were already updated before
+    OpBuilder builder(op);
+    builder.create<StoreOp>(op.getLoc(), op.vector(), op.memref(),
+                            op.indices());
+    op.erase();
   }
 
-  auto extractElementOp = dyn_cast_or_null<vector::ExtractElementOp>(
-      broadcastOp.source().getDefiningOp());
-  if (!extractElementOp) {
-    IVLOG(3, "The source of the vector.broadcast is not vector.extractelement");
-    return;
+  void devectorizeBroadcast(vector::BroadcastOp op) {
+    // If broadcast's result comes from extractelement then replace it with
+    // stdx.subgroup_broadcast, otherwise it is removed
+    auto extractElementOp =
+        dyn_cast_or_null<vector::ExtractElementOp>(op.source().getDefiningOp());
+    if (extractElementOp) {
+      OpBuilder builder(op);
+      auto newBroadcast = builder.create<stdx::SubgroupBroadcastOp>(
+          op.getLoc(), extractElementOp.vector().getType(),
+          extractElementOp.vector(), extractElementOp.position());
+      op.replaceAllUsesWith(newBroadcast.getResult());
+      extractElementOp.replaceAllUsesWith(newBroadcast.getResult());
+      extractElementOp.erase();
+      op.erase();
+    } else {
+      op.replaceAllUsesWith(op.source());
+      op.erase();
+    }
   }
 
-  auto transferReadOp = dyn_cast_or_null<vector::TransferReadOp>(
-      extractElementOp.vector().getDefiningOp());
-  if (!transferReadOp) {
-    IVLOG(3, "vector() of the vector.extractelement operation is not from "
-             "vector.transfer_read");
-    return;
+  void devectorizeOperation(Operation *op) {
+    if (auto vecReadOp = dyn_cast<vector::TransferReadOp>(op)) {
+      devectorizeTransferRead(vecReadOp);
+    } else if (auto vecWriteOp = dyn_cast<vector::TransferWriteOp>(op)) {
+      devectorizeTransferWrite(vecWriteOp);
+    } else if (auto vecBroadcastOp = dyn_cast<vector::BroadcastOp>(op)) {
+      devectorizeBroadcast(vecBroadcastOp);
+    } else {
+      devectorizeVectorOp(op);
+    }
   }
 
-  mlir::OpBuilder builder(loopOp);
-  // Create proper lower,upper bounds and steps for the updated scf.parallel op
-  // and create it
-  SmallVector<Value, 2> newLowerBounds = loopOp.lowerBound();
-  SmallVector<Value, 2> newUpperBounds = loopOp.upperBound();
-  SmallVector<Value, 2> newStepsBounds = loopOp.step();
-  newLowerBounds.push_back(newLowerBounds[0]);
-  newUpperBounds.push_back(newStepsBounds[0]);
-  newStepsBounds.push_back(builder.create<ConstantIndexOp>(loopOp.getLoc(), 1));
+  LogicalResult devectorize() {
+    mlir::Block *body = loop.getBody();
 
-  auto newLoop = builder.create<scf::ParallelOp>(
-      loopOp.getLoc(), newLowerBounds, newUpperBounds, newStepsBounds);
+    // TODO: Check if setting vector size by the step of the last dimension
+    // will be ok for our implementation
+    auto vectorSizeOp =
+        dyn_cast_or_null<ConstantOp>(loop.step().back().getDefiningOp());
+    if (!vectorSizeOp) {
+      IVLOG(3, "Devectorize: Failed to get step size");
+      return failure();
+    }
 
-  // Rewrite the new loops body with the proper indices mappings
-  BlockAndValueMapping indicesMappings;
-  indicesMappings.map(loopOp.getBody()->getArguments(),
-                      newLoop.getBody()->getArguments());
-  builder.setInsertionPointToStart(newLoop.getBody());
-  for (auto &op : loopOp.getBody()->without_terminator())
-    builder.clone(op, indicesMappings);
+    vectorSize = vectorSizeOp.value().template cast<IntegerAttr>().getInt();
+    if (vectorSize == 1) {
+      // Step on last dimension is 1, no need to devectorize then
+      return failure();
+    }
 
-  // Update IVs with newly created index variable
-  auto newIVs = newLoop.getInductionVars();
-  builder.setInsertionPointToStart(newLoop.getBody());
-  auto loc = newLoop.getLoc();
-  auto Idx = builder.create<AddIOp>(loc, newIVs[0], newIVs[1]);
-  newIVs[0].replaceAllUsesExcept(
-      Idx, SmallPtrSet<Operation *, 1>{Idx.getOperation()});
+    bool devectorizable = true;
+    for (auto &op : body->getOperations()) {
+      devectorizable &= succeeded(tryDevectorizeOperation(&op));
+    }
+    if (!devectorizable) {
+      return failure();
+    }
 
-  // Capture the new loop's ops, we already verified ops types before so there
-  // is no need to check is the dynamic cast succeeded
-  // TODO: again, make sure that transfer_write as the last place will be always
-  // the case
-  auto *newBody = newLoop.getBody();
-  auto newIterator = std::prev(newBody->end(), 2);
-  auto newTransferWriteOp = dyn_cast<vector::TransferWriteOp>(*newIterator);
-  auto newVecBroadcastOp = dyn_cast_or_null<vector::BroadcastOp>(
-      newTransferWriteOp.vector().getDefiningOp());
-  auto newExtractElementOp = dyn_cast_or_null<vector::ExtractElementOp>(
-      newVecBroadcastOp.source().getDefiningOp());
-  auto newTransferReadOp = dyn_cast_or_null<vector::TransferReadOp>(
-      newExtractElementOp.vector().getDefiningOp());
+    if (vectorizedOps.empty()) {
+      // No valid vector ops used, nothing to do
+      return success();
+    }
 
-  // Create new ops with stdx.subgroup_broadcast
-  auto newLoadOp = builder.create<LoadOp>(loc, newTransferReadOp.memref(),
-                                          newTransferReadOp.indices());
-  auto newBroadcast = builder.create<stdx::SubgroupBroadcastOp>(
-      loc, newLoadOp.result().getType(), newLoadOp.result(),
-      newExtractElementOp.position());
-  builder.create<StoreOp>(loc, newBroadcast.getResult(),
-                          newTransferWriteOp.memref(),
-                          newTransferWriteOp.indices());
+    // Rewrite the loop with new dimension added
+    mlir::OpBuilder builder(loop);
 
-  // Remove old loop and redundant ops from the new loop, replace usages where
-  // appropriate
-  for (unsigned int i = 0; i < loopOp.getResults().size(); i++)
-    loopOp.getResult(i).replaceAllUsesWith(newLoop.getResult(i));
-  loopOp.erase();
+    // Create proper lower, upper bounds and steps for the updated
+    // scf.parallel op and create the actual op
+    SmallVector<Value, 4> newLowerBounds = loop.lowerBound();
+    SmallVector<Value, 4> newUpperBounds = loop.upperBound();
+    SmallVector<Value, 4> newStepsBounds = loop.step();
+    newLowerBounds.push_back(newLowerBounds.back());
+    newUpperBounds.push_back(newStepsBounds.back());
+    newStepsBounds.push_back(builder.create<ConstantIndexOp>(loop.getLoc(), 1));
 
-  newTransferReadOp.vector().replaceAllUsesWith(newLoadOp.result());
-  newTransferReadOp.erase();
-  newVecBroadcastOp.vector().replaceAllUsesWith(newBroadcast.result());
-  newVecBroadcastOp.erase();
-  newTransferWriteOp.erase();
-  newExtractElementOp.erase();
-}
+    auto newLoop = builder.create<scf::ParallelOp>(
+        loop.getLoc(), newLowerBounds, newUpperBounds, newStepsBounds);
+
+    // Rewrite the new loops body with the proper indices mappings
+    BlockAndValueMapping indicesMappings;
+    indicesMappings.map(loop.getBody()->getArguments(),
+                        newLoop.getBody()->getArguments());
+    builder.setInsertionPointToStart(newLoop.getBody());
+    for (auto &op : loop.getBody()->without_terminator())
+      builder.clone(op, indicesMappings);
+
+    // Update IVs with newly created index variable
+    auto newIVs = newLoop.getInductionVars();
+    builder.setInsertionPointToStart(newLoop.getBody());
+    auto loc = newLoop.getLoc();
+    auto idx =
+        builder.create<AddIOp>(loc, newIVs[newIVs.size() - 2], newIVs.back());
+    newIVs[newIVs.size() - 2].replaceAllUsesExcept(
+        idx, SmallPtrSet<Operation *, 1>{idx.getOperation()});
+
+    // Remove old loop and redundant ops from the new loop, replace usages
+    // where appropriate
+    for (unsigned int i = 0; i < loop.getResults().size(); i++)
+      loop.getResult(i).replaceAllUsesWith(newLoop.getResult(i));
+    loop.erase();
+
+    mlir::Block *newBody = newLoop.getBody();
+    // Do the Ops transform
+    for (auto &op : llvm::make_early_inc_range(newBody->getOperations())) {
+      devectorizeOperation(&op);
+    }
+    return success();
+  }
+};
 
 /// Returns true if no other scf.parallel ops are nested within.
 static bool isInnermostParallelOp(scf::ParallelOp parallelOp) {
@@ -196,8 +312,10 @@ struct SubgroupBroadcastPass
     auto func = getFunction();
     SmallVector<scf::ParallelOp, 4> loops;
     gatherInnermostLoops(func, loops);
-    for (auto parallelOp : loops)
-      runOnParallel(parallelOp);
+    for (auto parallelOp : loops) {
+      DevectorizeImpl impl(parallelOp);
+      impl.devectorize();
+    }
   }
 };
 
