@@ -126,6 +126,7 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(pxa::createLocalizePass());
   pm.addPass(pxa::createResizeTmpsPass());
   pm.addPass(pxa::createBufferPlacementPass());
+  pm.addPass(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 

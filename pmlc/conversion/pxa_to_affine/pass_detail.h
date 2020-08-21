@@ -1,5 +1,6 @@
 #pragma once
 
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Pass/Pass.h"
 
 namespace pmlc::conversion::pxa_to_affine {

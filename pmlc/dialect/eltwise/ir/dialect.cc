@@ -44,8 +44,7 @@ struct OpAsmInterface : public mlir::OpAsmDialectInterface {
 
 } // namespace
 
-EltwiseDialect::EltwiseDialect(mlir::MLIRContext *ctx)
-    : mlir::Dialect(getDialectNamespace(), ctx) {
+void EltwiseDialect::initialize() {
   addOperations<
 #define GET_OP_LIST
 #include "pmlc/dialect/eltwise/ir/ops.cc.inc"

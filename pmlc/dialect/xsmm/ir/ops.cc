@@ -13,8 +13,7 @@ using mlir::failure;
 using mlir::FunctionType;
 using mlir::success;
 
-XSMMDialect::XSMMDialect(mlir::MLIRContext *ctx)
-    : mlir::Dialect(getDialectNamespace(), ctx) {
+void XSMMDialect::initialize() {
   addOperations<
 #define GET_OP_LIST
 #include "pmlc/dialect/xsmm/ir/ops.cc.inc"

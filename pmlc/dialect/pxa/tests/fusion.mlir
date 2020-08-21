@@ -1,4 +1,4 @@
-// RUN: pmlc-opt -canonicalize -pxa-fusion -canonicalize %s | FileCheck %s
+// RUN: pmlc-opt -pxa-normalize -canonicalize -pxa-fusion -pxa-normalize -canonicalize %s | FileCheck %s
 
 // CHECK-LABEL: func @simple_fusion
 func @simple_fusion(%A: memref<2x3xf32>, %B: memref<2x3xf32>, %C: memref<2x3xf32>, %D: memref<2x3xf32>) {

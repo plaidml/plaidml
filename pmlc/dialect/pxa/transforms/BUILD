@@ -13,6 +13,7 @@ gentbl(
             "passes.h.inc",
         ),
     ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "passes.td",
     td_srcs = [
         "@llvm-project//mlir:PassBaseTdFiles",
@@ -29,6 +30,7 @@ plaidml_cc_library(
         "fusion.cc",
         "localize.cc",
         "nest_loops.cc",
+        "normalize.cc",
         "pass_detail.h",
         "resize_tmps.cc",
         "stencil.cc",

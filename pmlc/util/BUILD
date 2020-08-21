@@ -35,6 +35,7 @@ gentbl(
             "interfaces.cc.inc",
         ),
     ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "interfaces.td",
     td_srcs = ["@llvm-project//mlir:OpBaseTdFiles"],
 )
@@ -51,6 +52,7 @@ gentbl(
             "enums.cc.inc",
         ),
     ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "enums.td",
     td_srcs = ["@llvm-project//mlir:OpBaseTdFiles"],
 )

@@ -1,5 +1,7 @@
 // Copyright 2020 Intel Corporation
 
+#include "pmlc/all_dialects.h"
+
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/GPU/GPUDialect.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
@@ -20,31 +22,28 @@
 
 using namespace mlir; // NOLINT [build/namespaces]
 
-namespace {
+// Add all the MLIR dialects to the provided registry.
+void registerAllDialects(DialectRegistry &registry) {
+  registry.insert<AffineDialect,                          //
+                  gpu::GPUDialect,                        //
+                  LLVM::LLVMDialect,                      //
+                  linalg::LinalgDialect,                  //
+                  scf::SCFDialect,                        //
+                  omp::OpenMPDialect,                     //
+                  spirv::SPIRVDialect,                    //
+                  StandardOpsDialect,                     //
+                  vector::VectorDialect,                  //
+                  pmlc::dialect::eltwise::EltwiseDialect, //
+                  pmlc::dialect::pxa::PXADialect,         //
+                  pmlc::dialect::stdx::StdXDialect,       //
+                  pmlc::dialect::tile::TileDialect,       //
+                  pmlc::dialect::xsmm::XSMMDialect>();
+}
 
-struct DialectRegistration {
-  DialectRegistration() {
-    // MLIR core
-    registerDialect<AffineDialect>();
-    registerDialect<gpu::GPUDialect>();
-    registerDialect<LLVM::LLVMDialect>();
-    registerDialect<linalg::LinalgDialect>();
-    registerDialect<omp::OpenMPDialect>();
-    registerDialect<quant::QuantizationDialect>();
-    registerDialect<scf::SCFDialect>();
-    registerDialect<spirv::SPIRVDialect>();
-    registerDialect<StandardOpsDialect>();
-    registerDialect<vector::VectorDialect>();
-
-    // PMLC
-    registerDialect<pmlc::dialect::eltwise::EltwiseDialect>();
-    registerDialect<pmlc::dialect::pxa::PXADialect>();
-    registerDialect<pmlc::dialect::stdx::StdXDialect>();
-    registerDialect<pmlc::dialect::tile::TileDialect>();
-    registerDialect<pmlc::dialect::xsmm::XSMMDialect>();
-  }
-};
-
-static DialectRegistration allDialects;
-
-} // namespace
+// This function should be called before creating any MLIRContext if one expect
+// all the possible dialects to be made available to the context automatically.
+void registerAllDialects() {
+  static bool initOnce =
+      ([]() { registerAllDialects(getGlobalDialectRegistry()); }(), true);
+  (void)initOnce;
+}

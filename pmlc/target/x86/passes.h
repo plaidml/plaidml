@@ -2,13 +2,14 @@
 
 #include <memory>
 
+#include "mlir/Pass/Pass.h"
+
 namespace mlir {
 class LLVMTypeConverter;
 class LowerToLLVMOptions;
 class MLIRContext;
 class OpPassManager;
 class OwningRewritePatternList;
-class Pass;
 } // namespace mlir
 
 namespace pmlc::target::x86 {
@@ -34,5 +35,9 @@ void populateXSMMToLLVMConversionPatterns(
     mlir::OwningRewritePatternList &patterns);
 
 void pipelineBuilder(mlir::OpPassManager &pm);
+
+/// Generate the code for registering passes.
+#define GEN_PASS_REGISTRATION
+#include "pmlc/target/x86/passes.h.inc"
 
 } // namespace pmlc::target::x86

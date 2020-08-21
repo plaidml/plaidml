@@ -18,12 +18,13 @@
 #include "mlir/Support/FileUtilities.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/InitLLVM.h"
+#include "llvm/Support/Process.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include "pmlc/all_dialects.h"
 #include "pmlc/compiler/executable.h"
 #include "pmlc/compiler/program.h"
-#include "pmlc/util/env.h"
 #include "pmlc/util/logging.h"
 
 using namespace mlir; // NOLINT
@@ -64,7 +65,7 @@ int JitRunnerMain(int argc, char **argv) {
 
   auto program = std::make_shared<Program>(std::move(file));
   program->entry = options.mainFuncName.getValue();
-  auto kind = EngineKind::MCJIT;
+  auto kind = EngineKind::OrcJIT;
   if (options.optOrc.getValue())
     kind = EngineKind::OrcJIT;
   if (options.optMCJIT.getValue())
@@ -76,15 +77,16 @@ int JitRunnerMain(int argc, char **argv) {
 }
 
 int main(int argc, char **argv) {
-  auto level_str = pmlc::util::getEnvVar("PLAIDML_VERBOSE");
-  if (level_str.size()) {
-    auto level = std::atoi(level_str.c_str());
+  auto verboseEnv = llvm::sys::Process::GetEnv("PLAIDML_VERBOSE");
+  if (verboseEnv) {
+    auto level = std::atoi(verboseEnv->c_str());
     if (level) {
       el::Loggers::setVerboseLevel(level);
     }
     IVLOG(level, "PLAIDML_VERBOSE=" << level);
   }
 
+  registerAllDialects();
   llvm::InitLLVM y(argc, argv);
   llvm::InitializeNativeTarget();
   llvm::InitializeNativeTargetAsmPrinter();

@@ -40,11 +40,6 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(createCSEPass());
   pm.addPass(pmlc::dialect::pxa::createTileAccumulatePass());
 
-  // TODO: do optimizations here
-
-  // pm.addPass(std::make_unique<UpdateWorkGroupSizePass>(workGroupSize));
-  // pm.addPass(std::make_unique<IREETileLinalgPass>());
-  // pm.addPass(createConvertLinalgToLoopsPass());
   pm.addPass(conversion::pxa_to_affine::createLowerPXAToAffinePass());
   pm.addPass(createLowerAffinePass());
   pm.addPass(createCanonicalizerPass());
@@ -59,7 +54,6 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
   pm.addPass(createConvertGPUToSPIRVPass());
-  // pm.addPass(std::make_unique<IREEGPUToSPIRVPass>());
 
   // SPIR-V passes for lowering attributes.
   pm.addPass(spirv::createLowerABIAttributesPass());

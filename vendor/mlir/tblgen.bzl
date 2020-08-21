@@ -7,15 +7,7 @@ COPTS = select({
     "//conditions:default": [],
 })
 
-def gentbl(
-        name,
-        td_file,
-        tbl_outs,
-        td_srcs = [],
-        td_includes = [],
-        strip_include_prefix = None,
-        test = False,
-        tblgen = "@llvm-project//mlir:mlir-tblgen"):
+def gentbl(name, tblgen, td_file, tbl_outs, td_srcs = [], td_includes = [], td_relative_includes = [], strip_include_prefix = None, test = False):
     """gentbl() generates tabular code from a table definition file.
 
     Args:
@@ -26,7 +18,8 @@ def gentbl(
         options passed to tblgen, and the out is the corresponding output file
         produced.
       td_srcs: A list of table definition files included transitively.
-      td_includes: A list of include paths for relative includes.
+      td_includes: A list of include paths for relative includes, provided as build targets.
+      td_relative_includes: A list of include paths for relative includes, provided as relative path.
       strip_include_prefix: attribute to pass through to cc_library.
       test: whether to create a test to invoke the tool too.
     """
@@ -41,7 +34,16 @@ def gentbl(
         "-I external/com_intel_plaidml",
     ]
     for td_include in td_includes:
-        td_includes_cmd += ["-I%s" % td_include]
+        td_includes_cmd += [
+            "-I%s" % td_include,
+            "-I$(GENDIR)/%s" % td_include,
+        ]
+    for td_include in td_relative_includes:
+        td_includes_cmd += [
+            "-I%s/%s -Iexternal/com_intel_plaidml/%s/%s" % (native.package_name(), td_include, native.package_name(), td_include),
+            "-I$(GENDIR)/%s/%s" % (native.package_name(), td_include),
+        ]
+
     local_inc = "-I $$(dirname $(location %s))" % td_file
 
     if test:
@@ -63,7 +65,8 @@ def gentbl(
             "$(location %s)" % td_file,
             "-I$(GENDIR)",
         ] + td_includes_cmd
-        rule_suffix = "_".join(opts.replace("-", "_").replace("=", "_").split(" "))
+        first_opt = opts.split(" ", 1)[0]
+        rule_suffix = "_{}_{}".format(first_opt.replace("-", "_").replace("=", "_"), str(hash(opts)))
 
         # Rule to generate code using generated shell script.
         native.genrule(
@@ -76,12 +79,15 @@ def gentbl(
         )
 
         # Optionally generate rule to test tblgen invocation.
+        # Disable these on windows, because $(location ...) does not seem to
+        # work as expected on windows.
         if test:
             native.sh_test(
                 name = "%s_%s_genrule_test" % (name, rule_suffix),
                 srcs = ["%s.gen.sh" % name],
                 args = base_args,
                 data = srcs + [tblgen],
+                tags = ["no_windows"],
             )
 
     # List of opts that do not generate cc files.

@@ -17,7 +17,8 @@ include "mlir/Pass/PassBase.td"
 
 def ConvertSimpleSCFToGPU : FunctionPass<"convert-scf-to-gpu"> {
   let summary = "Convert top-level loops to GPU kernels";
-  let constructor = "mlir::createSimpleSCFToGPUPass()";
+  let constructor = "createSimpleSCFToGPUPass()";
+  let dependentDialects = ["mlir::gpu::GPUDialect"];
   let options = [
     Option<"numBlockDims", "gpu-block-dims", "unsigned", /*default=*/"1u",
            "Number of GPU block dimensions for mapping">,

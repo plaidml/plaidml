@@ -18,4 +18,8 @@ void populateStdXToLLVMConversionPatterns(
 
 std::unique_ptr<mlir::Pass> createLowerToLLVMPass();
 
+/// Generate the code for registering conversion passes.
+#define GEN_PASS_REGISTRATION
+#include "pmlc/conversion/stdx_to_llvm/passes.h.inc"
+
 } // namespace pmlc::conversion::stdx_to_llvm

@@ -13,8 +13,8 @@
 !O_memref = type memref<1x6x5x11xf32>
 
 func @print_memref_f32(memref<*xf32>)
-llvm.func @plaidml_rt_xsmm_gemm_invoke_f32(!llvm<"i8*">, !llvm<"float*">, !llvm<"float*">, !llvm<"float*">)
-llvm.func @plaidml_rt_xsmm_gemm_dispatch_f32(!llvm.i32, !llvm.i32, !llvm.i32, !llvm.i32, !llvm.i32, !llvm.i32) -> !llvm<"i8*">
+llvm.func @plaidml_rt_xsmm_gemm_invoke_f32(!llvm.ptr<i8>, !llvm.ptr<float>, !llvm.ptr<float>, !llvm.ptr<float>)
+llvm.func @plaidml_rt_xsmm_gemm_dispatch_f32(!llvm.i32, !llvm.i32, !llvm.i32, !llvm.i32, !llvm.i32, !llvm.i32) -> !llvm.ptr<i8>
 
 func @baseline() {
   %dot = constant @dot : (memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>) -> ()

@@ -8,7 +8,7 @@ func @main() {
 }
 
 // CHECK-DAG:  llvm.mlir.global internal constant @__trace_msg{{.*}}("msg\00")
-// CHECK-DAG:  llvm.func @plaidml_rt_trace(!llvm<"i8*">)
+// CHECK-DAG:  llvm.func @plaidml_rt_trace(!llvm.ptr<i8>)
 // CHECK:      llvm.func @__trace{{.*}}()
 // CHECK:        llvm.mlir.addressof @{{.*}}
 // CHECK:        llvm.mlir.constant

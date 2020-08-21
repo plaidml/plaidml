@@ -1,5 +1,6 @@
 #pragma once
 
+#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Pass/Pass.h"
 
 namespace pmlc::conversion::stdx_to_llvm {

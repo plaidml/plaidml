@@ -18,6 +18,7 @@
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/Dialect.h"
 #include "mlir/IR/Function.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/Module.h"
@@ -71,7 +72,7 @@ struct DomainInfo {
 };
 
 struct TileBuilder::Impl {
-  MLIRContext context;
+  std::unique_ptr<MLIRContext> context;
   ModuleOp module;
   OpBuilder builder;
   llvm::DenseMap<Value, Value> implicitUpdates;
@@ -82,17 +83,25 @@ struct TileBuilder::Impl {
   unsigned idxCounter = 0;
 
   Impl()
-      : module(ModuleOp::create(UnknownLoc::get(&context))),
+      : context(createContext()),
+        module(ModuleOp::create(UnknownLoc::get(context.get()))),
         builder(module.getBodyRegion()), loc(builder.getUnknownLoc()) {
     builder.setInsertionPointToStart(module.getBody());
   }
 
+  std::unique_ptr<MLIRContext> createContext() {
+    mlir::registerDialect<TileDialect>();
+    mlir::registerDialect<eltwise::EltwiseDialect>();
+    mlir::registerDialect<mlir::StandardOpsDialect>();
+    return std::make_unique<MLIRContext>();
+  }
+
   const AbstractOperation *lookupOperation(StringRef op) {
     auto opName = eltwise::EltwiseDialect::getCanonicalOpName(op);
-    auto abstractOp = AbstractOperation::lookup(opName, &context);
+    auto abstractOp = AbstractOperation::lookup(opName, context.get());
     if (!abstractOp) {
       opName = tile::TileDialect::getCanonicalOpName(op);
-      abstractOp = AbstractOperation::lookup(opName, &context);
+      abstractOp = AbstractOperation::lookup(opName, context.get());
       if (!abstractOp) {
         throw std::runtime_error("Unknown EDSL primitive: " + op.str());
       }
@@ -198,12 +207,12 @@ void TileBuilder::Destroy(Value value) {
   // }
 }
 
-MLIRContext *TileBuilder::getContext() { return &impl->context; }
+MLIRContext *TileBuilder::getContext() { return impl->context.get(); }
 
 MemRefType TileBuilder::MakeMemRefType(Type dtype, ArrayRef<int64_t> sizes,
                                        ArrayRef<int64_t> strides) {
   auto elementType = eltwise::toSignlessType(dtype);
-  auto map = mlir::makeStridedLinearLayoutMap(strides, 0, &impl->context);
+  auto map = mlir::makeStridedLinearLayoutMap(strides, 0, getContext());
   return MemRefType::get(sizes, elementType, map);
 }
 
@@ -340,7 +349,7 @@ Value TileBuilder::MakeNoneOp() {
 
 Value TileBuilder::MakeStringOp(StringRef value) {
   IVLOG(5, "TileBuilder::MakeStringOp> " << value.str());
-  auto type = StringType::get(&impl->context);
+  auto type = StringType::get(getContext());
   auto attr = impl->builder.getStringAttr(value);
   return impl->builder.create<StringOp>(impl->loc, type, attr).result();
 }
@@ -545,7 +554,7 @@ Value TileBuilder::MakeContractionOp(AggregationKind agg, CombinationKind combo,
   IVLOG(5, "\n" << mlir::debugString(impl->module));
   // TODO: handle names (and idx_names)
   // Compute the sink shape of the contraction
-  auto elementType = inferElementType(&impl->context, combo, srcs);
+  auto elementType = inferElementType(getContext(), combo, srcs);
   auto sizeMapOp = llvm::cast<AffineMapOp>(sizes.getDefiningOp());
   SmallVector<Value, 4> sizeDims(sizeMapOp.dims());
   auto shape = eltwise::getShapeFromOperands(sizeDims);
@@ -596,12 +605,12 @@ TileBuilder::MakeProgram(StringRef name, const ProgramMutations &mutations,
     }
   }
   // Construct a module
-  auto loc = UnknownLoc::get(&impl->context);
+  auto loc = UnknownLoc::get(getContext());
   auto module = ModuleOp::create(loc);
   auto program = std::make_shared<compiler::Program>(module);
   program->entry = name;
   // Construct a function to represent the entire program
-  auto initialFuncType = FunctionType::get(inputTypes, {}, &impl->context);
+  auto initialFuncType = FunctionType::get(inputTypes, {}, getContext());
   auto funcOp = FuncOp::create(loc, name, initialFuncType, {});
   funcOp.addEntryBlock();
   OpBuilder builder(funcOp.getBody());
@@ -672,8 +681,7 @@ TileBuilder::MakeProgram(StringRef name, const ProgramMutations &mutations,
   }
   auto returnOp = builder.create<mlir::ReturnOp>(loc, returnOperands);
   // compute final function type
-  auto finalFuncType =
-      FunctionType::get(inputTypes, resultTypes, &impl->context);
+  auto finalFuncType = FunctionType::get(inputTypes, resultTypes, getContext());
   funcOp.setType(finalFuncType);
   // Attach the function to the module
   module.push_back(funcOp);
@@ -682,7 +690,7 @@ TileBuilder::MakeProgram(StringRef name, const ProgramMutations &mutations,
     throw std::runtime_error("Module verification error");
   }
   // Do some optimization passes
-  mlir::PassManager pm(&impl->context);
+  mlir::PassManager pm(getContext());
   if (VLOG_IS_ON(1)) {
     pm.enableStatistics();
     pm.enableTiming();
