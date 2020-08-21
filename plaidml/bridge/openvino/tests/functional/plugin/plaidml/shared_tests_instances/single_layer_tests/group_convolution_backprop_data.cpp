@@ -7,7 +7,7 @@
 #include "common_test_utils/test_constants.hpp"
 #include "single_layer_tests/group_convolution_backprop_data.hpp"
 
-using namespace LayerTestsDefinitions;
+using LayerTestsDefinitions::GroupConvBackpropDataLayerTest;
 
 namespace {
 
@@ -43,19 +43,19 @@ const auto groupConvBackpropData2DParams_AutoPadValid =
                        ::testing::ValuesIn(numGroups),                     //
                        ::testing::Values(ngraph::op::PadType::VALID));     //
 
-INSTANTIATE_TEST_CASE_P(GroupConvBackpropData2D_ExplicitPadding, GroupConvBackpropDataLayerTest,
-                        ::testing::Combine(groupConvBackpropData2DParams_ExplicitPadding,        //
-                                           ::testing::ValuesIn(netPrecisions),                   //
-                                           ::testing::ValuesIn(inputShapes2D),                   //
-                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
-                        GroupConvBackpropDataLayerTest::getTestCaseName);
+INSTANTIATE_TEST_SUITE_P(GroupConvBackpropData2D_ExplicitPadding, GroupConvBackpropDataLayerTest,
+                         ::testing::Combine(groupConvBackpropData2DParams_ExplicitPadding,        //
+                                            ::testing::ValuesIn(netPrecisions),                   //
+                                            ::testing::ValuesIn(inputShapes2D),                   //
+                                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
+                         GroupConvBackpropDataLayerTest::getTestCaseName);
 
-INSTANTIATE_TEST_CASE_P(GroupConvBackpropData2D_AutoPadValid, GroupConvBackpropDataLayerTest,
-                        ::testing::Combine(groupConvBackpropData2DParams_AutoPadValid,           //
-                                           ::testing::ValuesIn(netPrecisions),                   //
-                                           ::testing::ValuesIn(inputShapes2D),                   //
-                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
-                        GroupConvBackpropDataLayerTest::getTestCaseName);
+INSTANTIATE_TEST_SUITE_P(GroupConvBackpropData2D_AutoPadValid, GroupConvBackpropDataLayerTest,
+                         ::testing::Combine(groupConvBackpropData2DParams_AutoPadValid,           //
+                                            ::testing::ValuesIn(netPrecisions),                   //
+                                            ::testing::ValuesIn(inputShapes2D),                   //
+                                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
+                         GroupConvBackpropDataLayerTest::getTestCaseName);
 
 /* ============= 3D GroupConvolution ============= */
 const std::vector<std::vector<size_t>> inputShapes3D = {{1, 16, 5, 5, 5}, {1, 32, 5, 5, 5}};
@@ -84,18 +84,18 @@ const auto groupConvBackpropData3DParams_AutoPadValid =
                        ::testing::ValuesIn(numGroups),                        //
                        ::testing::Values(ngraph::op::PadType::VALID));        //
 
-INSTANTIATE_TEST_CASE_P(GroupConvBackpropData3D_ExplicitPadding, GroupConvBackpropDataLayerTest,
-                        ::testing::Combine(groupConvBackpropData3DParams_ExplicitPadding,        //
-                                           ::testing::ValuesIn(netPrecisions),                   //
-                                           ::testing::ValuesIn(inputShapes3D),                   //
-                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
-                        GroupConvBackpropDataLayerTest::getTestCaseName);
+INSTANTIATE_TEST_SUITE_P(GroupConvBackpropData3D_ExplicitPadding, GroupConvBackpropDataLayerTest,
+                         ::testing::Combine(groupConvBackpropData3DParams_ExplicitPadding,        //
+                                            ::testing::ValuesIn(netPrecisions),                   //
+                                            ::testing::ValuesIn(inputShapes3D),                   //
+                                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
+                         GroupConvBackpropDataLayerTest::getTestCaseName);
 
-INSTANTIATE_TEST_CASE_P(GroupConvBackpropData3D_AutoPadValid, GroupConvBackpropDataLayerTest,
-                        ::testing::Combine(groupConvBackpropData3DParams_AutoPadValid,           //
-                                           ::testing::ValuesIn(netPrecisions),                   //
-                                           ::testing::ValuesIn(inputShapes3D),                   //
-                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
-                        GroupConvBackpropDataLayerTest::getTestCaseName);
+INSTANTIATE_TEST_SUITE_P(GroupConvBackpropData3D_AutoPadValid, GroupConvBackpropDataLayerTest,
+                         ::testing::Combine(groupConvBackpropData3DParams_AutoPadValid,           //
+                                            ::testing::ValuesIn(netPrecisions),                   //
+                                            ::testing::ValuesIn(inputShapes3D),                   //
+                                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
+                         GroupConvBackpropDataLayerTest::getTestCaseName);
 
 }  // namespace

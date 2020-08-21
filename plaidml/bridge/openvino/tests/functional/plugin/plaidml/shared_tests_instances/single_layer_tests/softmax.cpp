@@ -35,10 +35,10 @@ const auto params2D = testing::Combine(testing::ValuesIn(netPrecisions),        
                                        testing::Values(std::map<std::string, std::string>())  //
 );
 
-INSTANTIATE_TEST_CASE_P(SoftMax2D,                         //
-                        SoftMaxLayerTest,                  //
-                        params2D,                          //
-                        SoftMaxLayerTest::getTestCaseName  //
+INSTANTIATE_TEST_SUITE_P(SoftMax2D,                         //
+                         SoftMaxLayerTest,                  //
+                         params2D,                          //
+                         SoftMaxLayerTest::getTestCaseName  //
 );
 
 const std::vector<InferenceEngine::SizeVector> inputShapes4D = {
@@ -57,10 +57,10 @@ const auto params4D = testing::Combine(testing::ValuesIn(netPrecisions),        
                                        testing::Values(std::map<std::string, std::string>())  //
 );
 
-INSTANTIATE_TEST_CASE_P(SoftMax4D,                         //
-                        SoftMaxLayerTest,                  //
-                        params4D,                          //
-                        SoftMaxLayerTest::getTestCaseName  //
+INSTANTIATE_TEST_SUITE_P(SoftMax4D,                         //
+                         SoftMaxLayerTest,                  //
+                         params4D,                          //
+                         SoftMaxLayerTest::getTestCaseName  //
 );
 
 }  // namespace

@@ -29,6 +29,6 @@ const auto cases = ::testing::Combine(::testing::Values(inputShapes),      //
                                       ::testing::ValuesIn(outPrecisions),  //
                                       ::testing::Values(CommonTestUtils::DEVICE_PLAIDML));
 
-INSTANTIATE_TEST_CASE_P(CompareWithRefs, GreaterLayerTest, cases, GreaterLayerTest::getTestCaseName);
+INSTANTIATE_TEST_SUITE_P(CompareWithRefs, GreaterLayerTest, cases, GreaterLayerTest::getTestCaseName);
 
 }  // namespace

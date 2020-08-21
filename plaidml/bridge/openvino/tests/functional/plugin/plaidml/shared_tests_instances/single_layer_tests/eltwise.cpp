@@ -52,5 +52,5 @@ const auto multiply_params = ::testing::Combine(::testing::ValuesIn(inShapes),  
                                                 ::testing::Values(CommonTestUtils::DEVICE_PLAIDML),  //
                                                 ::testing::Values(additional_config));
 
-INSTANTIATE_TEST_CASE_P(CompareWithRefs, EltwiseLayerTest, multiply_params, EltwiseLayerTest::getTestCaseName);
+INSTANTIATE_TEST_SUITE_P(CompareWithRefs, EltwiseLayerTest, multiply_params, EltwiseLayerTest::getTestCaseName);
 }  // namespace

@@ -32,11 +32,11 @@ std::vector<InferenceEngine::Precision> targetPrecisions = {
     // InferenceEngine::Precision::BOOL,
 };
 
-INSTANTIATE_TEST_CASE_P(ConvertLike, ConvertLikeLayerTest,
-                        ::testing::Combine(                                       //
-                            ::testing::ValuesIn(targetPrecisions),                //
-                            ::testing::ValuesIn(netPrecisions),                   //
-                            ::testing::ValuesIn(inShapes),                        //
-                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
-                        ConvertLikeLayerTest::getTestCaseName);
+INSTANTIATE_TEST_SUITE_P(ConvertLike, ConvertLikeLayerTest,
+                         ::testing::Combine(                                       //
+                             ::testing::ValuesIn(targetPrecisions),                //
+                             ::testing::ValuesIn(netPrecisions),                   //
+                             ::testing::ValuesIn(inShapes),                        //
+                             ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
+                         ConvertLikeLayerTest::getTestCaseName);
 }  // namespace

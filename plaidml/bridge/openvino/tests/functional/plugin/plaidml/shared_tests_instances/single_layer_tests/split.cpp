@@ -16,11 +16,11 @@ const std::vector<InferenceEngine::Precision> netPrecisions = {
     InferenceEngine::Precision::FP16   //
 };
 
-INSTANTIATE_TEST_CASE_P(NumSplitsCheck, SplitLayerTest,
-                        ::testing::Combine(::testing::Values(1),                                      //
-                                           ::testing::Values(0, 1, 2, 3),                             //
-                                           ::testing::ValuesIn(netPrecisions),                        //
-                                           ::testing::Values(std::vector<size_t>({30, 30, 30, 30})),  //
-                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),       //
-                        SplitLayerTest::getTestCaseName);
+INSTANTIATE_TEST_SUITE_P(NumSplitsCheck, SplitLayerTest,
+                         ::testing::Combine(::testing::Values(1),                                      //
+                                            ::testing::Values(0, 1, 2, 3),                             //
+                                            ::testing::ValuesIn(netPrecisions),                        //
+                                            ::testing::Values(std::vector<size_t>({30, 30, 30, 30})),  //
+                                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),       //
+                         SplitLayerTest::getTestCaseName);
 }  // namespace

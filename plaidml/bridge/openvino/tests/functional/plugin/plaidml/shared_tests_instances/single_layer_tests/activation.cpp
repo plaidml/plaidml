@@ -88,6 +88,6 @@ const auto basicCases = ::testing::Combine(::testing::ValuesIn(activationTypes),
                                            ::testing::ValuesIn(CommonTestUtils::combineShapes<size_t>(basic)),  //
                                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML));
 
-INSTANTIATE_TEST_CASE_P(Activation_Basic, ActivationLayerTest, basicCases, ActivationLayerTest::getTestCaseName);
+INSTANTIATE_TEST_SUITE_P(Activation_Basic, ActivationLayerTest, basicCases, ActivationLayerTest::getTestCaseName);
 
 }  // namespace

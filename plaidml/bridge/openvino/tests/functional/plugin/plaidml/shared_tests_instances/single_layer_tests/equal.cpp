@@ -35,5 +35,5 @@ const auto cases = ::testing::Combine(::testing::ValuesIn(inputShapes),    //
                                       ::testing::ValuesIn(outPrecisions),  //
                                       ::testing::Values(CommonTestUtils::DEVICE_PLAIDML));
 
-INSTANTIATE_TEST_CASE_P(CompareWithRefs, EqualLayerTest, cases, EqualLayerTest::getTestCaseName);
+INSTANTIATE_TEST_SUITE_P(CompareWithRefs, EqualLayerTest, cases, EqualLayerTest::getTestCaseName);
 }  // namespace

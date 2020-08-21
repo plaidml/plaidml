@@ -46,4 +46,4 @@ const auto MvnCases =
                        ::testing::Values(CommonTestUtils::DEVICE_PLAIDML),                           //
                        ::testing::ValuesIn(Configs));
 
-INSTANTIATE_TEST_CASE_P(smoke_PlaidML_TestsMVN, MvnLayerTest, MvnCases, MvnLayerTest::getTestCaseName);
+INSTANTIATE_TEST_SUITE_P(smoke_PlaidML_TestsMVN, MvnLayerTest, MvnCases, MvnLayerTest::getTestCaseName);

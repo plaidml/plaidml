@@ -22,9 +22,9 @@ std::vector<InferenceEngine::Precision> netPrecisions = {
     InferenceEngine::Precision::FP32,
 };
 
-INSTANTIATE_TEST_CASE_P(logicalnot, LogicalNotLayerTest,
-                        ::testing::Combine(::testing::ValuesIn(netPrecisions),                   //
-                                           ::testing::ValuesIn(inShapes),                        //
-                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
-                        LogicalNotLayerTest::getTestCaseName);
+INSTANTIATE_TEST_SUITE_P(logicalnot, LogicalNotLayerTest,
+                         ::testing::Combine(::testing::ValuesIn(netPrecisions),                   //
+                                            ::testing::ValuesIn(inShapes),                        //
+                                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
+                         LogicalNotLayerTest::getTestCaseName);
 }  // namespace

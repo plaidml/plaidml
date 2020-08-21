@@ -31,6 +31,7 @@ const auto DepthToSpace = ::testing::Combine(::testing::ValuesIn(inputShapes),  
                                              ::testing::Values(3),                  //
                                              ::testing::Values(CommonTestUtils::DEVICE_PLAIDML));
 
-INSTANTIATE_TEST_CASE_P(DepthToSpaceSmoke, DepthToSpaceLayerTest, DepthToSpace, DepthToSpaceLayerTest::getTestCaseName);
+INSTANTIATE_TEST_SUITE_P(DepthToSpaceSmoke, DepthToSpaceLayerTest, DepthToSpace,
+                         DepthToSpaceLayerTest::getTestCaseName);
 
 }  // namespace

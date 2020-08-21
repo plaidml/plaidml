@@ -44,19 +44,19 @@ const auto conv2DParams_AutoPadValid = ::testing::Combine(::testing::ValuesIn(ke
                                                           ::testing::Values(ngraph::op::PadType::VALID)       //
 );
 
-INSTANTIATE_TEST_CASE_P(Convolution_Smoke_2D_ExplicitPadding, ConvolutionLayerTest,
-                        ::testing::Combine(conv2DParams_ExplicitPadding,                            //
-                                           ::testing::ValuesIn(netPrecisions),                      //
-                                           ::testing::Values(std::vector<size_t>({1, 3, 30, 30})),  //
-                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),     //
-                        ConvolutionLayerTest::getTestCaseName);
+INSTANTIATE_TEST_SUITE_P(Convolution_Smoke_2D_ExplicitPadding, ConvolutionLayerTest,
+                         ::testing::Combine(conv2DParams_ExplicitPadding,                            //
+                                            ::testing::ValuesIn(netPrecisions),                      //
+                                            ::testing::Values(std::vector<size_t>({1, 3, 30, 30})),  //
+                                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),     //
+                         ConvolutionLayerTest::getTestCaseName);
 
-INSTANTIATE_TEST_CASE_P(Convolution_Smoke_2D_AutoPadValid, ConvolutionLayerTest,
-                        ::testing::Combine(conv2DParams_AutoPadValid,  //
-                                           ::testing::ValuesIn(netPrecisions),
-                                           ::testing::Values(std::vector<size_t>({1, 3, 30, 30})),  //
-                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),     //
-                        ConvolutionLayerTest::getTestCaseName);
+INSTANTIATE_TEST_SUITE_P(Convolution_Smoke_2D_AutoPadValid, ConvolutionLayerTest,
+                         ::testing::Combine(conv2DParams_AutoPadValid,  //
+                                            ::testing::ValuesIn(netPrecisions),
+                                            ::testing::Values(std::vector<size_t>({1, 3, 30, 30})),  //
+                                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),     //
+                         ConvolutionLayerTest::getTestCaseName);
 /* ============= 3D Convolution ============= */
 const std::vector<std::vector<size_t>> kernels3d = {{3, 5, 3}};
 const std::vector<std::vector<ptrdiff_t>> paddings3d = {{0, 2, 0}};
@@ -81,19 +81,19 @@ const auto conv3DParams_AutoPadValid = ::testing::Combine(::testing::ValuesIn(ke
                                                           ::testing::Values(ngraph::op::PadType::VALID)          //
 );
 
-INSTANTIATE_TEST_CASE_P(Convolution_Smoke_3D_ExplicitPadding, ConvolutionLayerTest,
-                        ::testing::Combine(conv3DParams_ExplicitPadding,                                //
-                                           ::testing::ValuesIn(netPrecisions),                          //
-                                           ::testing::Values(std::vector<size_t>({1, 3, 10, 10, 10})),  //
-                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),         //
-                        ConvolutionLayerTest::getTestCaseName);
+INSTANTIATE_TEST_SUITE_P(Convolution_Smoke_3D_ExplicitPadding, ConvolutionLayerTest,
+                         ::testing::Combine(conv3DParams_ExplicitPadding,                                //
+                                            ::testing::ValuesIn(netPrecisions),                          //
+                                            ::testing::Values(std::vector<size_t>({1, 3, 10, 10, 10})),  //
+                                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),         //
+                         ConvolutionLayerTest::getTestCaseName);
 
-INSTANTIATE_TEST_CASE_P(Convolution_Smoke_3D_AutoPadValid, ConvolutionLayerTest,
-                        ::testing::Combine(conv3DParams_AutoPadValid,                                   //
-                                           ::testing::ValuesIn(netPrecisions),                          //
-                                           ::testing::Values(std::vector<size_t>({1, 3, 10, 10, 10})),  //
-                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),         //
-                        ConvolutionLayerTest::getTestCaseName);
+INSTANTIATE_TEST_SUITE_P(Convolution_Smoke_3D_AutoPadValid, ConvolutionLayerTest,
+                         ::testing::Combine(conv3DParams_AutoPadValid,                                   //
+                                            ::testing::ValuesIn(netPrecisions),                          //
+                                            ::testing::Values(std::vector<size_t>({1, 3, 10, 10, 10})),  //
+                                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),         //
+                         ConvolutionLayerTest::getTestCaseName);
 
 /* ============= 2D ConvolutionBackpropData ============= */
 const std::vector<std::vector<size_t>> inputShapes2D = {{1, 3, 30, 30}};
@@ -118,19 +118,19 @@ const auto convbprop2DParams_AutoPadValid = ::testing::Combine(::testing::Values
                                                                ::testing::ValuesIn(numOutChannels),                //
                                                                ::testing::Values(ngraph::op::PadType::VALID));
 
-INSTANTIATE_TEST_CASE_P(ConvolutionBackpropData_Smoke_2D_ExplicitPadding, ConvolutionBackpropDataLayerTest,
-                        ::testing::Combine(convbprop2DParams_ExplicitPadding,   //
-                                           ::testing::ValuesIn(netPrecisions),  //
-                                           ::testing::ValuesIn(inputShapes2D),  //
-                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),
-                        ConvolutionBackpropDataLayerTest::getTestCaseName);
+INSTANTIATE_TEST_SUITE_P(ConvolutionBackpropData_Smoke_2D_ExplicitPadding, ConvolutionBackpropDataLayerTest,
+                         ::testing::Combine(convbprop2DParams_ExplicitPadding,   //
+                                            ::testing::ValuesIn(netPrecisions),  //
+                                            ::testing::ValuesIn(inputShapes2D),  //
+                                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),
+                         ConvolutionBackpropDataLayerTest::getTestCaseName);
 
-INSTANTIATE_TEST_CASE_P(ConvolutionBackpropData_Smoke_2D_AutoPadValid, ConvolutionBackpropDataLayerTest,
-                        ::testing::Combine(convbprop2DParams_AutoPadValid,      //
-                                           ::testing::ValuesIn(netPrecisions),  //
-                                           ::testing::ValuesIn(inputShapes2D),  //
-                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),
-                        ConvolutionBackpropDataLayerTest::getTestCaseName);
+INSTANTIATE_TEST_SUITE_P(ConvolutionBackpropData_Smoke_2D_AutoPadValid, ConvolutionBackpropDataLayerTest,
+                         ::testing::Combine(convbprop2DParams_AutoPadValid,      //
+                                            ::testing::ValuesIn(netPrecisions),  //
+                                            ::testing::ValuesIn(inputShapes2D),  //
+                                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),
+                         ConvolutionBackpropDataLayerTest::getTestCaseName);
 
 /* ============= 3D ConvolutionBackpropData ============= */
 const std::vector<std::vector<size_t>> inputShapes3D = {{1, 16, 5, 5, 5}};
@@ -155,19 +155,19 @@ const auto convbrop3DParams_AutoPadValid = ::testing::Combine(::testing::ValuesI
                                                               ::testing::ValuesIn(numOutChannels),                   //
                                                               ::testing::Values(ngraph::op::PadType::VALID));
 
-INSTANTIATE_TEST_CASE_P(ConvolutionBackpropData_Smoke_3D_ExplicitPadding, ConvolutionBackpropDataLayerTest,
-                        ::testing::Combine(convbprop3DParams_ExplicitPadding,   //
-                                           ::testing::ValuesIn(netPrecisions),  //
-                                           ::testing::ValuesIn(inputShapes3D),  //
-                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),
-                        ConvolutionBackpropDataLayerTest::getTestCaseName);
+INSTANTIATE_TEST_SUITE_P(ConvolutionBackpropData_Smoke_3D_ExplicitPadding, ConvolutionBackpropDataLayerTest,
+                         ::testing::Combine(convbprop3DParams_ExplicitPadding,   //
+                                            ::testing::ValuesIn(netPrecisions),  //
+                                            ::testing::ValuesIn(inputShapes3D),  //
+                                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),
+                         ConvolutionBackpropDataLayerTest::getTestCaseName);
 
-INSTANTIATE_TEST_CASE_P(ConvolutionBackpropData_Smoke_3D_AutoPadValid, ConvolutionBackpropDataLayerTest,
-                        ::testing::Combine(convbrop3DParams_AutoPadValid,       //
-                                           ::testing::ValuesIn(netPrecisions),  //
-                                           ::testing::ValuesIn(inputShapes3D),  //
-                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),
-                        ConvolutionBackpropDataLayerTest::getTestCaseName);
+INSTANTIATE_TEST_SUITE_P(ConvolutionBackpropData_Smoke_3D_AutoPadValid, ConvolutionBackpropDataLayerTest,
+                         ::testing::Combine(convbrop3DParams_AutoPadValid,       //
+                                            ::testing::ValuesIn(netPrecisions),  //
+                                            ::testing::ValuesIn(inputShapes3D),  //
+                                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),
+                         ConvolutionBackpropDataLayerTest::getTestCaseName);
 
 const std::vector<size_t> groupNumOutChannels = {16};
 const std::vector<size_t> numGroups = {8};
@@ -194,19 +194,19 @@ const auto groupConvBackpropData2DParams_AutoPadValid =
                        ::testing::ValuesIn(numGroups),                     //
                        ::testing::Values(ngraph::op::PadType::VALID));     //
 
-INSTANTIATE_TEST_CASE_P(GroupConvBackpropData_Smoke_2D_ExplicitPadding, GroupConvBackpropDataLayerTest,
-                        ::testing::Combine(groupConvBackpropData2DParams_ExplicitPadding,        //
-                                           ::testing::ValuesIn(netPrecisions),                   //
-                                           ::testing::ValuesIn(groupInputShapes2D),              //
-                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
-                        GroupConvBackpropDataLayerTest::getTestCaseName);
+INSTANTIATE_TEST_SUITE_P(GroupConvBackpropData_Smoke_2D_ExplicitPadding, GroupConvBackpropDataLayerTest,
+                         ::testing::Combine(groupConvBackpropData2DParams_ExplicitPadding,        //
+                                            ::testing::ValuesIn(netPrecisions),                   //
+                                            ::testing::ValuesIn(groupInputShapes2D),              //
+                                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
+                         GroupConvBackpropDataLayerTest::getTestCaseName);
 
-INSTANTIATE_TEST_CASE_P(GroupConvBackpropData_Smoke_2D_AutoPadValid, GroupConvBackpropDataLayerTest,
-                        ::testing::Combine(groupConvBackpropData2DParams_AutoPadValid,           //
-                                           ::testing::ValuesIn(netPrecisions),                   //
-                                           ::testing::ValuesIn(groupInputShapes2D),              //
-                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
-                        GroupConvBackpropDataLayerTest::getTestCaseName);
+INSTANTIATE_TEST_SUITE_P(GroupConvBackpropData_Smoke_2D_AutoPadValid, GroupConvBackpropDataLayerTest,
+                         ::testing::Combine(groupConvBackpropData2DParams_AutoPadValid,           //
+                                            ::testing::ValuesIn(netPrecisions),                   //
+                                            ::testing::ValuesIn(groupInputShapes2D),              //
+                                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
+                         GroupConvBackpropDataLayerTest::getTestCaseName);
 
 /* ============= 3D GroupConvolution ============= */
 
@@ -229,18 +229,18 @@ const auto groupConvBackpropData3DParams_AutoPadValid =
                        ::testing::ValuesIn(numGroups),                        //
                        ::testing::Values(ngraph::op::PadType::VALID));        //
 
-INSTANTIATE_TEST_CASE_P(GroupConvBackpropData_Smoke_3D_ExplicitPadding, GroupConvBackpropDataLayerTest,
-                        ::testing::Combine(groupConvBackpropData3DParams_ExplicitPadding,        //
-                                           ::testing::ValuesIn(netPrecisions),                   //
-                                           ::testing::ValuesIn(inputShapes3D),                   //
-                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
-                        GroupConvBackpropDataLayerTest::getTestCaseName);
+INSTANTIATE_TEST_SUITE_P(GroupConvBackpropData_Smoke_3D_ExplicitPadding, GroupConvBackpropDataLayerTest,
+                         ::testing::Combine(groupConvBackpropData3DParams_ExplicitPadding,        //
+                                            ::testing::ValuesIn(netPrecisions),                   //
+                                            ::testing::ValuesIn(inputShapes3D),                   //
+                                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
+                         GroupConvBackpropDataLayerTest::getTestCaseName);
 
-INSTANTIATE_TEST_CASE_P(GroupConvBackpropData_Smoke_3D_AutoPadValid, GroupConvBackpropDataLayerTest,
-                        ::testing::Combine(groupConvBackpropData3DParams_AutoPadValid,           //
-                                           ::testing::ValuesIn(netPrecisions),                   //
-                                           ::testing::ValuesIn(inputShapes3D),                   //
-                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
-                        GroupConvBackpropDataLayerTest::getTestCaseName);
+INSTANTIATE_TEST_SUITE_P(GroupConvBackpropData_Smoke_3D_AutoPadValid, GroupConvBackpropDataLayerTest,
+                         ::testing::Combine(groupConvBackpropData3DParams_AutoPadValid,           //
+                                            ::testing::ValuesIn(netPrecisions),                   //
+                                            ::testing::ValuesIn(inputShapes3D),                   //
+                                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
+                         GroupConvBackpropDataLayerTest::getTestCaseName);
 
 }  // namespace

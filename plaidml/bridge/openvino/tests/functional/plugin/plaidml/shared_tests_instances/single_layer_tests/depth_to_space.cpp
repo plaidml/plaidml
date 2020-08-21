@@ -38,8 +38,8 @@ const auto DepthToSpaceBS2 = ::testing::Combine(::testing::ValuesIn(inputShapesB
                                                 ::testing::Values(2),                  //
                                                 ::testing::Values(CommonTestUtils::DEVICE_PLAIDML));
 
-INSTANTIATE_TEST_CASE_P(DepthToSpaceBS2, DepthToSpaceLayerTest, DepthToSpaceBS2,
-                        DepthToSpaceLayerTest::getTestCaseName);
+INSTANTIATE_TEST_SUITE_P(DepthToSpaceBS2, DepthToSpaceLayerTest, DepthToSpaceBS2,
+                         DepthToSpaceLayerTest::getTestCaseName);
 
 const std::vector<std::vector<size_t>> inputShapesBS3 = {{1, 9, 1, 1},       //
                                                          {1, 9, 2, 2},       //
@@ -58,7 +58,7 @@ const auto DepthToSpaceBS3 = ::testing::Combine(::testing::ValuesIn(inputShapesB
                                                 ::testing::Values(3),                  //
                                                 ::testing::Values(CommonTestUtils::DEVICE_PLAIDML));
 
-INSTANTIATE_TEST_CASE_P(DepthToSpaceBS3, DepthToSpaceLayerTest, DepthToSpaceBS3,
-                        DepthToSpaceLayerTest::getTestCaseName);
+INSTANTIATE_TEST_SUITE_P(DepthToSpaceBS3, DepthToSpaceLayerTest, DepthToSpaceBS3,
+                         DepthToSpaceLayerTest::getTestCaseName);
 
 }  // namespace
