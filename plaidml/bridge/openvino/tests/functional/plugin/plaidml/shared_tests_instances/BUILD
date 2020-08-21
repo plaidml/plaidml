@@ -5,7 +5,10 @@ package(default_visibility = ["//visibility:public"])
 plaidml_cc_library(
     name = "shared_tests_instances",
     srcs = glob(["*.cpp"]),
-    copts = ["-Wno-deprecated-declarations"],
+    copts = select({
+        "@bazel_tools//src/conditions:windows": [],
+        "//conditions:default": ["-Wno-deprecated-declarations"],
+    }),
     data = [
         "//plaidml/bridge/openvino:libplaidml-plugin.so",
         "//:ov_plugins_xml",

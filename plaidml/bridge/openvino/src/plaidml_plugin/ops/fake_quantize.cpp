@@ -22,7 +22,7 @@ static OpRegistration reg("fakequantize", [](const Context& ctx) {
   auto in_hi = ctx.operands.at(2);
   auto out_lo = ctx.operands.at(3);
   auto out_hi = ctx.operands.at(4);
-  auto levels = layer->get_levels();
+  uint64_t levels = layer->get_levels();
   if (levels <= 1) {
     THROW_IE_EXCEPTION << "FakeQuantize requires at least 2 levels";
   }

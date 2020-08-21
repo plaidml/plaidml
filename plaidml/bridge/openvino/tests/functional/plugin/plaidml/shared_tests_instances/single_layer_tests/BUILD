@@ -14,13 +14,12 @@ DATA = [
 
 DEPS = [
     "//plaidml/bridge/openvino/tests/functional/plugin/plaidml/shared_tests_instances",
-    # "//pmlc/util:logging",
-    # "@gflags",
-    # "@gmock//:gtest_main",
-    # "@openvino//:common_test_utils",
-    # "@openvino//:inference_engine",
-    # "@openvino//:shared_plugin_tests",
 ]
+
+COPTS = select({
+    "@bazel_tools//src/conditions:windows": [],
+    "//conditions:default": ["-Wno-deprecated-declarations"],
+})
 
 # TODO: Pull forward the PlaidML-OpenVINO tests from the 2020.2 OV version to remove exclusions
 
@@ -67,7 +66,7 @@ cc_library(
             "space_to_batch.cpp",
         ],
     ),
-    copts = ["-Wno-deprecated-declarations"],
+    copts = COPTS,
     deps = DEPS,
 )
 
@@ -139,7 +138,7 @@ cc_library(
             "tile.cpp",  # Known errors
         ],
     ),
-    copts = ["-Wno-deprecated-declarations"],
+    copts = COPTS,
     deps = DEPS,
 )
 
