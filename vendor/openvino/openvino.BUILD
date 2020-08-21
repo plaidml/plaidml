@@ -325,4 +325,5 @@ cc_library(
         "SHARED_LIB_PREFIX=\\\"\\\"",
         "SHARED_LIB_SUFFIX=\\\"\\\"",
     ],
+    tags = TAGS,
 )
