@@ -67,6 +67,7 @@ cc_library(
         ],
     ),
     copts = COPTS,
+    tags = TAGS,
     deps = DEPS,
 )
 
@@ -139,6 +140,7 @@ cc_library(
         ],
     ),
     copts = COPTS,
+    tags = TAGS,
     deps = DEPS,
 )
 
