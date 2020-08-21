@@ -170,8 +170,8 @@ public:
   void devectorizeTransferWrite(vector::TransferWriteOp op) {
     // Simple replace with storeOp, the indices were already updated before
     OpBuilder builder(op);
-    auto newStoreOp = builder.create<StoreOp>(op.getLoc(), op.vector(),
-                                              op.memref(), op.indices());
+    builder.create<StoreOp>(op.getLoc(), op.vector(), op.memref(),
+                            op.indices());
     op.erase();
   }
 
