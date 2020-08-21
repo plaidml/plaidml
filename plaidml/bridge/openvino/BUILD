@@ -37,6 +37,19 @@ cc_binary(
     ],
 )
 
+plaidml_cc_library(
+    name = "testenv",
+    testonly = 1,
+    srcs = ["testenv.cpp"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "@openvino//:shared_plugin_tests",
+        "@gflags",
+        "@gmock//:gtest",
+    ],
+    alwayslink = 1,
+)
+
 write_file(
     name = "plugins",
     out = "plugins.xml",

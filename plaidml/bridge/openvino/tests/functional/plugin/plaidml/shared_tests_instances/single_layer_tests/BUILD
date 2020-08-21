@@ -149,7 +149,10 @@ cc_test(
     data = DATA,
     linkopts = PLAIDML_LINKOPTS,
     tags = TAGS + ["manual"],
-    deps = [":lib"],
+    deps = [
+        ":lib",
+        "//plaidml/bridge/openvino:testenv",
+    ],
 )
 
 # Tests suitable for CI, skips flakey, broken, and long tests
@@ -158,5 +161,8 @@ cc_test(
     data = DATA,
     linkopts = PLAIDML_LINKOPTS,
     tags = TAGS,
-    deps = [":smoke_lib"],
+    deps = [
+        ":smoke_lib",
+        "//plaidml/bridge/openvino:testenv",
+    ],
 )

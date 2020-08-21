@@ -15,10 +15,6 @@
 #include "ie_plugin_config.hpp"
 #include "inference_engine.hpp"
 
-// TODO: The awkward include of a *.cpp is to get `ngraph_register_interpreter_backend`. See below where it's used for
-// more info.
-#include "ngraph/test/runtime/interpreter/int_backend.cpp"  // NOLINT[build/include]
-
 #include "plaidml/exec/exec.h"
 #include "plaidml/op/op.h"
 #include "plaidml_executable_network.hpp"
@@ -68,11 +64,6 @@ CreatePluginEngine(IInferencePlugin*& plugin, ResponseDesc* resp) noexcept {
   try {
     plaidml::op::init();
     plaidml::exec::init();
-
-    // TODO: This seems like this should be handled by the testing infrastructure, but as far as I can tell it isn't. It
-    // is testing-specific, so if we need to keep this in our code in the long term we should find a different place for
-    // it.
-    ngraph_register_interpreter_backend();
 
     IVLOG(1, "CreatePluginEngine>");
     plugin = make_ie_compatible_plugin({{1, 6}, CI_BUILD_NUMBER, "PlaidMLPlugin"}, std::make_shared<Engine>());
