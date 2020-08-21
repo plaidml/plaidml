@@ -47,7 +47,6 @@ tool_names = [
     'pmlc-translate',
     'pmlc-vulkan-runner',
     'cc_test',
-    'cc_test_gpu',
     'py_test',
 ]
 tools = [ToolSubst(s, unresolved='ignore') for s in tool_names]
