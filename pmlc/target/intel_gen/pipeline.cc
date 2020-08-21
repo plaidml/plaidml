@@ -8,6 +8,7 @@
 #include "mlir/Conversion/StandardToSPIRV/ConvertStandardToSPIRVPass.h"
 #include "mlir/Dialect/GPU/Passes.h"
 #include "mlir/Dialect/SPIRV/Passes.h"
+#include "mlir/Dialect/SPIRV/SPIRVDialect.h"
 #include "mlir/Dialect/SPIRV/SPIRVOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
@@ -30,6 +31,8 @@ namespace pmlc::target::intel_gen {
 namespace {
 
 void pipelineBuilder(OpPassManager &pm) {
+  pm.getContext()->getOrLoadDialect<spirv::SPIRVDialect>();
+
   pm.addPass(dialect::tile::createComputeBoundsPass());
   // pm.addPass(dialect::tile::createPadPass());
   pm.addPass(createCanonicalizerPass());
@@ -58,12 +61,9 @@ void pipelineBuilder(OpPassManager &pm) {
   // SPIR-V passes for lowering attributes.
   pm.addPass(spirv::createLowerABIAttributesPass());
   pm.addPass(spirv::createUpdateVersionCapabilityExtensionPass());
-  pm.addPass(createCanonicalizerPass());
-  pm.addPass(createCSEPass());
 
   // GPU to Vulkan.
   pm.addPass(conversion::gpu::createConvertGpuLaunchFuncToVulkanCallsPass());
-  // pm.addPass(conversion::gpu::createLLVMLoweringPass());
   pm.addPass(createLowerToLLVMPass(LowerToLLVMOptions{
       /*useBarePtrCallConv=*/false,
       /*emitCWrappers=*/true,

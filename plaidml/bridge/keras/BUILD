@@ -1,8 +1,6 @@
 # Copyright 2018 Intel Corporation.
 
-licenses(["by_exception_only"])
-
-load("@rules_python//python:defs.bzl", "py_test")
+load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
 load("//tools/py_setup:build_defs.bzl", "py_setup")
 
 package(default_visibility = ["//visibility:public"])
