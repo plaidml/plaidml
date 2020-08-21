@@ -107,18 +107,17 @@ cc_library(
         "inference-engine/src/legacy_api/src/**/*.cpp",
         "inference-engine/src/legacy_api/src/**/*.hpp",
         "inference-engine/src/legacy_api/src/**/*.h",
-        # "inference-engine/src/inference_engine/cnn_network_ngraph_impl.hpp",  # TODO: Ok?
     ]),
     hdrs = glob([
         "inference-engine/src/legacy_api/include/**/*.hpp",
     ]),
     copts = [
         "-w",
-        "-isystem external/openvino/inference-engine/src/legacy_api/src",
     ],
     includes = [
         "inference-engine/src/inference_engine",  # TODO: Why does this work?
         "inference-engine/src/legacy_api/include",
+        "inference-engine/src/legacy_api/src",
     ],
     tags = TAGS,
     deps = [
