@@ -55,7 +55,6 @@ class TestFixture : public ::testing::Test {
       const Program& program,       //
       const TensorBuffers& inputs,  //
       const TensorBuffers& expected) {
-#if !defined(_WIN32)
     auto binder = exec::Binder(program);
     auto executable = binder.compile();
     for (const auto& kvp : inputs) {
@@ -66,7 +65,6 @@ class TestFixture : public ::testing::Test {
       auto view = binder.output(kvp.first).mmap_current();
       std::visit([&](auto&& vec) { compareBuffers(view, vec); }, kvp.second);
     }
-#endif
   }
 
   Program makeProgram(const std::string& name, const std::vector<Tensor>& outputs) {
@@ -81,11 +79,7 @@ class TestFixture : public ::testing::Test {
     }
   }
 
-  void runProgram(const Program& program) {
-#if !defined(_WIN32)
-    exec::Binder(program).compile()->run();
-#endif
-  }
+  void runProgram(const Program& program) { exec::Binder(program).compile()->run(); }
 };
 
 }  // namespace plaidml::edsl
