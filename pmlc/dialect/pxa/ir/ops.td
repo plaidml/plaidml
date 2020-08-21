@@ -30,7 +30,7 @@ def PxaReduceOp : PXA_OpWithPP<"reduce"> {
   let summary = "affine reduction operation";
   let arguments = (ins
     AtomicRMWKindAttr:$agg,
-    AnyStdScalar:$val,
+    AnyType:$val,
     Arg<AnyMemRef, "the memref to reduce", [MemRead, MemWrite]>:$mem,
     AffineMapAttr:$map,
     Variadic<Index>:$idxs

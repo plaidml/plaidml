@@ -31,6 +31,11 @@ public:
   mlir::Value operator*() const { return curValue; }
 
   IndirectValuesIterator &operator++();
+  IndirectValuesIterator operator++(int) {
+    IndirectValuesIterator cur = *this;
+    ++(*this);
+    return cur;
+  }
 
 private:
   void enqueueNext(Value value);
@@ -64,6 +69,11 @@ public:
   mlir::OpOperand &operator*() { return *curIt; }
 
   IndirectUsesIterator &operator++();
+  IndirectUsesIterator operator++(int) {
+    IndirectUsesIterator cur = *this;
+    ++(*this);
+    return cur;
+  }
 
 private:
   void nextValue();
@@ -101,6 +111,11 @@ public:
   mlir::OpOperand &operator*() { return *inner; }
 
   IndirectAccessUsesIterator &operator++();
+  IndirectAccessUsesIterator operator++(int) {
+    IndirectAccessUsesIterator cur = *this;
+    ++(*this);
+    return cur;
+  }
 
 private:
   void skipNonAccess();

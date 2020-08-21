@@ -13,4 +13,9 @@ def I1StorageToI32 : FunctionPass<"stdx-i1-storage-to-i32"> {
   let constructor = "pmlc::dialect::stdx::createI1StorageToI32Pass()";
 }
 
+def SubgroupBroadcast : FunctionPass<"stdx-subgroup-broadcast"> {
+  let summary = "Perform unvectorization for subgroups broadcast usage";
+  let constructor = "pmlc::dialect::stdx::createSubgroupBroadcastPass()";
+}
+
 #endif // __PMLC_DIALECT_STDX_PASSES__

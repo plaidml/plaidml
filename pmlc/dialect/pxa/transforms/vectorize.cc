@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <memory>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "llvm/ADT/TypeSwitch.h"
@@ -287,6 +288,104 @@ struct VectorizeExample : public VectorizeExampleBase<VectorizeExample> {
 
 std::unique_ptr<mlir::Pass> createVectorizeExamplePass() {
   return std::make_unique<VectorizeExample>();
+}
+
+// TODO: Maybe move this to a generic utility somewhere
+template <typename OpTy, typename... Args>
+static OpTy replaceOp(Operation *op, Args &&... args) {
+  OpBuilder builder(op);
+  auto newOp = builder.create<OpTy>(op->getLoc(), std::forward<Args>(args)...);
+  op->getResult(0).replaceAllUsesWith(newOp.getResult());
+  op->erase();
+  return newOp;
+}
+
+LogicalResult vectorizeBuffer(AllocOp op) {
+  // Verify that all uses are vector load/stores of the same width and with
+  // valid minimum strides
+  int64_t vecSize = 0;
+  // Make generic lambda to verify/capture vector size
+  auto validAccess = [&](auto vecOp) -> LogicalResult {
+    auto shape = vecOp.getVectorType().getShape();
+    if (shape.size() != 1) {
+      return failure(); // Only support 1-d vectors
+    }
+    int64_t newSize = shape[0];
+    if (vecSize && vecSize != newSize) {
+      return failure(); // All vectors must have the same width
+    }
+    vecSize = newSize;
+    assert(vecSize != 0 && "Vector shape should never be zero elements");
+    auto maybeStride = computeStrideInfo(vecOp);
+    if (!maybeStride) {
+      return failure(); // Non strided access
+    }
+    auto range = maybeStride->range();
+    if (range.stride % vecSize != 0) {
+      return failure(); // Vector op not aligned
+    }
+    return success();
+  };
+  // Call the lambda on all uses + verify all are are valid vector ops
+  for (auto &use : getIndirectAccessUses(op)) {
+    if (auto vecOp = dyn_cast<PxaVectorLoadOp>(use.getOwner())) {
+      if (failed(validAccess(vecOp))) {
+        return failure();
+      }
+    } else if (auto vecOp = dyn_cast<PxaVectorReduceOp>(use.getOwner())) {
+      if (failed(validAccess(vecOp))) {
+        return failure();
+      }
+    } else {
+      return failure(); // Non vector access detected
+    }
+  }
+  // Exit early if no accesses
+  if (!vecSize) {
+    return failure();
+  }
+  // Compute new memref shape
+  auto mtype = op.getType();
+  auto mshape = mtype.getShape();
+  if (mshape.size() < 1) {
+    return failure(); // Can't perform transform on a scalar
+  }
+  SmallVector<int64_t, 4> newShape;
+  for (size_t i = 0; i < mshape.size(); i++) {
+    if (i == mshape.size() - 1) {
+      // Last index, verify it's divisible vector size + reduce
+      if (mshape[i] % vecSize != 0) {
+        return failure();
+      }
+      newShape.push_back(mshape[i] / vecSize);
+    } else {
+      // Leave non-final indexes alone
+      newShape.push_back(mshape[i]);
+    }
+  }
+  // Make the new type
+  auto newType = MemRefType::get(
+      newShape, VectorType::get({vecSize}, mtype.getElementType()));
+  // Replace the alloc
+  auto newOp = replaceOp<AllocOp>(op, newType);
+  // Walk over the uses and update them all
+  auto curUse = IndirectUsesIterator(newOp);
+  while (curUse != IndirectUsesIterator()) {
+    curUse->get().setType(newType);
+    if (auto vecOp = dyn_cast<PxaVectorLoadOp>(curUse->getOwner())) {
+      replaceOp<PxaLoadOp>(vecOp, vecOp.getMemRef(), vecOp.getAffineMap(),
+                           vecOp.getMapOperands());
+      curUse++;
+    } else if (auto vecOp = dyn_cast<PxaVectorReduceOp>(curUse->getOwner())) {
+      auto newVecOp = replaceOp<PxaReduceOp>(
+          vecOp, vecOp.agg(), vecOp.getValueToStore(), vecOp.getMemRef(),
+          vecOp.getAffineMap(), vecOp.getMapOperands());
+      curUse = IndirectUsesIterator(newVecOp);
+    } else {
+      curUse++;
+    }
+  }
+  return success();
 }
 
 } // namespace pmlc::dialect::pxa

@@ -60,6 +60,21 @@ struct StrideRange {
   void unionEquals(const StrideRange &rhs);
 };
 
+enum class BoundaryRegion {
+  Interior,
+  Exterior,
+};
+
+// A boundary function takes a BlockArgument and decides whether it is
+// 'interior' or 'exterior'. The definition of 'interior' and 'exterior' are up
+// to the caller, and is useful for computing access relative to some
+// user-defined boundary.
+//
+// For example, this boundary could be defined as whether the owner (Block) of
+// an argument is an ancestor of another reference block.
+using BlockArgumentBoundaryFn =
+    std::function<BoundaryRegion(BlockArgument arg)>;
+
 // StrideInfo provides a simple 'stride' multiplier for each affine induction
 // variable (from an affine.for or affine.parallel).  Basically, each step of
 // the loop moves a pure affine expression by a fixed distance, 'strides' holds
@@ -86,6 +101,11 @@ struct StrideInfo {
   // block.
   StrideInfo outer(Block *block);
   StrideInfo inner(Block *block);
+
+  // Compute the outer and inner portion of stride info with respect to a given
+  // boundary function.
+  StrideInfo outer(BlockArgumentBoundaryFn fn);
+  StrideInfo inner(BlockArgumentBoundaryFn fn);
 
   // Return the range of a given stride info if it's computable
   StrideRange range() const;
@@ -129,6 +149,11 @@ computeStrideInfo(pmlc::dialect::pxa::PxaVectorReduceOp op);
 // accessed.
 
 struct RelativeAccessPattern {
+  explicit RelativeAccessPattern(MemRefType memRefType)
+      : memRefType(memRefType) {}
+
+  // The memref type of the access.
+  MemRefType memRefType;
   // For each dimension on the access, what are it's strides relative to various
   // block args
   SmallVector<StrideInfo, 4> outer;
@@ -139,11 +164,17 @@ struct RelativeAccessPattern {
   // For each dimension what is the minimal stride of the access.  Note:
   // dimensions with a count of 1 have a stride of 1 automatically
   SmallVector<int64_t, 4> innerStride;
+
+  // Return the total bytes for all inner accesses.
+  int64_t totalInnerBytes() const;
 };
 
 // Compute relative access, fail if non-strided (or operation not supported)
-Optional<RelativeAccessPattern> computeRelativeAccess(Block *block,
-                                                      Operation *op);
+Optional<RelativeAccessPattern>
+computeRelativeAccess(Operation *op, BlockArgumentBoundaryFn fn);
+
+Optional<RelativeAccessPattern> computeRelativeAccess(Operation *op,
+                                                      Block *block);
 
 // A StrideArray contains a set of constant factors and a constant offset.
 struct StrideArray {
