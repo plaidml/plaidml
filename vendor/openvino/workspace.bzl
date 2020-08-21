@@ -16,15 +16,6 @@ def openvino_workspace():
     )
 
     http_archive(
-        name = "ngraph",
-        url = "https://github.com/NervanaSystems/ngraph/archive/edc65ca0111f86a7e63a98f62cb17d153cc2535c.zip",
-        strip_prefix = "ngraph-edc65ca0111f86a7e63a98f62cb17d153cc2535c",
-        sha256 = "34c0c0ec372514b79105db8896381826595565ff0c4cd76a2d2a5f1e7eb82c19",
-        build_file = clean_dep("//vendor/openvino:ngraph.BUILD"),
-    )
-
-    # TODO: Update the commit once the OV-repo PR lands
-    http_archive(
         name = "openvino",
         url = "https://github.com/PlaidML/openvino/archive/60bd0feb01b3abea217a1fb62bfbd3b80d2cc4e7.zip",
         strip_prefix = "openvino-60bd0feb01b3abea217a1fb62bfbd3b80d2cc4e7",
