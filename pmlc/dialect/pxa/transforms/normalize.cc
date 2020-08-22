@@ -1,5 +1,7 @@
 // Copyright 2020 Intel Corporation
 
+#include "llvm/ADT/StringSet.h"
+
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/IR/AffineValueMap.h"
 #include "mlir/Dialect/Affine/Utils.h"
@@ -21,6 +23,23 @@ void promoteIfEmptyIVs(AffineParallelOp op) {
   // Nothing to do when there are induction variables.
   if (op.getNumDims())
     return;
+
+  // Only remove ops that don't have any custom attributes (i.e. those not
+  // defined by the op itself). This is needed to ensure that we don't drop
+  // ops that are structural in nature. One case is for kernel outlining; it's
+  // possible to have an outermost loop with a single iteration which would
+  // represent a single kernel launch. In this case, we don't want this
+  // canonicalization to drop it.
+  // TODO: This feels like a hack; should we create a new op with a region for
+  // this case? Or perhaps we can have a standard attribute that is used for
+  // controlling canoncializations?
+  StringSet<> opAttrs{AffineParallelOp::getReductionsAttrName(),
+                      AffineParallelOp::getLowerBoundsMapAttrName(),
+                      AffineParallelOp::getUpperBoundsMapAttrName(),
+                      AffineParallelOp::getStepsAttrName()};
+  for (NamedAttribute attr : op.getAttrs())
+    if (!opAttrs.count(attr.first.strref()))
+      return;
 
   // Replace yielded loop results.
   auto *body = op.getBody();
