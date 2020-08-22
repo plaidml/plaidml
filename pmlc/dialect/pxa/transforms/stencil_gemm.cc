@@ -289,12 +289,12 @@ private:
     GemmOperand a(opA, {perm.indexes[0], perm.indexes[2]}, mapOperands);
     GemmOperand b(opB, {perm.indexes[2], perm.indexes[1]}, mapOperands);
 
-    auto gemm = bodyBuilder.create<pxa::AffineGemmOp>(
-        op.getLoc(), c.memref.getType(),  //
-        c.memref, c.accessMap, c.tileMap, //
-        a.memref, a.accessMap, a.tileMap, //
-        b.memref, b.accessMap, b.tileMap, //
-        tileAttr, mapOperands);
+    auto gemm =
+        bodyBuilder.create<pxa::PxaGemmOp>(op.getLoc(), c.memref.getType(),  //
+                                           c.memref, c.accessMap, c.tileMap, //
+                                           a.memref, a.accessMap, a.tileMap, //
+                                           b.memref, b.accessMap, b.tileMap, //
+                                           tileAttr, mapOperands);
 
     opC.result().replaceAllUsesWith(gemm);
   }
