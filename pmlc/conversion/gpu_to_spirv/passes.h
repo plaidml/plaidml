@@ -19,4 +19,8 @@ void populateStdxToSPIRVPatterns(mlir::MLIRContext *context,
 
 std::unique_ptr<mlir::Pass> createGPUToSPIRVCustomPass();
 
+/// Generate the code for registering conversion passes.
+#define GEN_PASS_REGISTRATION
+#include "pmlc/conversion/gpu_to_spirv/passes.h.inc"
+
 } // namespace pmlc::conversion::gpu_to_spirv

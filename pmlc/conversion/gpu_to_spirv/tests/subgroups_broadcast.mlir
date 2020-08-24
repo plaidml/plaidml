@@ -1,4 +1,4 @@
-// RUN: pmlc-opt gpu-to-spirv-custom %s -o - | FileCheck %s
+// RUN: pmlc-opt -gpu-to-spirv-custom %s | FileCheck %s
 
 module attributes {gpu.container_module, spv.target_env = #spv.target_env<#spv.vce<v1.0, [Shader, Groups], [SPV_KHR_storage_buffer_storage_class]>, {max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
   func @main() {

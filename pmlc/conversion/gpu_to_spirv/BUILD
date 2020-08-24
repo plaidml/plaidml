@@ -13,6 +13,7 @@ gentbl(
             "passes.h.inc",
         ),
     ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "passes.td",
     td_srcs = [
         "@llvm-project//mlir:PassBaseTdFiles",

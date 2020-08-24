@@ -58,6 +58,7 @@ inline void registerAllPasses() {
   pmlc::conversion::scf_to_gpu::registerPasses();
   pmlc::conversion::stdx_to_llvm::registerPasses();
   pmlc::conversion::tile_to_pxa::registerPasses();
+  pmlc::conversion::gpu_to_spirv::registerPasses();
 
   // Dialect passes
   pmlc::dialect::pxa::registerPasses();
