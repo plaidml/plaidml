@@ -127,6 +127,7 @@ py_binary(
     data = [
         "plaidml-config.cmake",
         ":setup",
+        "//bzl:googlemock.LICENSE",
         "//:LICENSE",
         "//plaidml/core:sdk",
         "//plaidml/edsl:sdk",
@@ -134,7 +135,6 @@ py_binary(
         "//plaidml/op:sdk",
         "@boost//:LICENSE_1_0.txt",
         "@easylogging//:LICENSE",
-        "@gmock//:googlemock/LICENSE",
         "@half//:LICENSE.txt",
         "@llvm-project//llvm:LICENSE.TXT",
         "@llvm-project//mlir:LICENSE.TXT",

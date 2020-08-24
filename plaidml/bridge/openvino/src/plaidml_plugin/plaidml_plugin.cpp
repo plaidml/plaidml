@@ -26,7 +26,7 @@ namespace PlaidMLPlugin {
 
 void Engine::GetVersion(const Version*& versionInfo) noexcept {}
 
-ExecutableNetworkInternal::Ptr Engine::LoadExeNetworkImpl(const ICore* core, const ICNNNetwork& network,
+ExecutableNetworkInternal::Ptr Engine::LoadExeNetworkImpl(const ICNNNetwork& network,
                                                           const std::map<std::string, std::string>& config) {
   IVLOG(1, "Engine::LoadExeNetworkImpl> config: " << config);
   auto it = config.find("device");
@@ -64,6 +64,7 @@ CreatePluginEngine(IInferencePlugin*& plugin, ResponseDesc* resp) noexcept {
   try {
     plaidml::op::init();
     plaidml::exec::init();
+
     IVLOG(1, "CreatePluginEngine>");
     plugin = make_ie_compatible_plugin({{1, 6}, CI_BUILD_NUMBER, "PlaidMLPlugin"}, std::make_shared<Engine>());
     return OK;

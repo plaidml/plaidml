@@ -29,5 +29,5 @@ const auto cases = ::testing::Combine(::testing::ValuesIn(inputShapes),    //
                                       ::testing::ValuesIn(netPrecisions),  //
                                       ::testing::Values(CommonTestUtils::DEVICE_PLAIDML));
 
-INSTANTIATE_TEST_CASE_P(CompareWithRefs, NotEqualLayerTest, cases, NotEqualLayerTest::getTestCaseName);
+INSTANTIATE_TEST_SUITE_P(CompareWithRefs, NotEqualLayerTest, cases, NotEqualLayerTest::getTestCaseName);
 }  // namespace

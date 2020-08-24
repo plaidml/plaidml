@@ -7,7 +7,7 @@
 #include "common_test_utils/test_constants.hpp"
 #include "single_layer_tests/select.hpp"
 
-using namespace LayerTestsDefinitions;
+using LayerTestsDefinitions::SelectLayerTest;
 
 const std::vector<InferenceEngine::Precision> inputPrecision = {
     InferenceEngine::Precision::I8,    //
@@ -78,6 +78,7 @@ const auto numpyCases = ::testing::Combine(::testing::ValuesIn(numpyShapes),    
                                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)        //
 );
 
-INSTANTIATE_TEST_CASE_P(smoke_MKLDNN_TestsSelect_none, SelectLayerTest, noneCases, SelectLayerTest::getTestCaseName);
+INSTANTIATE_TEST_SUITE_P(smoke_PlaidML_TestsSelect_none, SelectLayerTest, noneCases, SelectLayerTest::getTestCaseName);
 
-INSTANTIATE_TEST_CASE_P(smoke_MKLDNN_TestsSelect_numpy, SelectLayerTest, numpyCases, SelectLayerTest::getTestCaseName);
+INSTANTIATE_TEST_SUITE_P(smoke_PlaidML_TestsSelect_numpy, SelectLayerTest, numpyCases,
+                         SelectLayerTest::getTestCaseName);

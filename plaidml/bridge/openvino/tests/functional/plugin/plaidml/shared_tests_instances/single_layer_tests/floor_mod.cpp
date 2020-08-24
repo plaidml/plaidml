@@ -17,10 +17,10 @@ const std::vector<InferenceEngine::Precision> netPrecisions = {
     InferenceEngine::Precision::FP32,
 };
 
-INSTANTIATE_TEST_CASE_P(FloorMod, FloorModLayerTest,
-                        ::testing::Combine(                                       //
-                            ::testing::ValuesIn(netPrecisions),                   //
-                            ::testing::Values(inputShapes),                       //
-                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
-                        FloorModLayerTest::getTestCaseName);
+INSTANTIATE_TEST_SUITE_P(FloorMod, FloorModLayerTest,
+                         ::testing::Combine(                                       //
+                             ::testing::ValuesIn(netPrecisions),                   //
+                             ::testing::Values(inputShapes),                       //
+                             ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
+                         FloorModLayerTest::getTestCaseName);
 }  // namespace

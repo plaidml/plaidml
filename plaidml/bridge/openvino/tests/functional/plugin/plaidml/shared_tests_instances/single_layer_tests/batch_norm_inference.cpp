@@ -30,10 +30,10 @@ const auto params = testing::Combine(testing::ValuesIn(epsilon),                
                                      testing::Values(inputShapes),                       //
                                      testing::Values(CommonTestUtils::DEVICE_PLAIDML));  //
 
-INSTANTIATE_TEST_CASE_P(BatchNorm,                                    //
-                        BatchNormInferenceLayerTest,                  //
-                        params,                                       //
-                        BatchNormInferenceLayerTest::getTestCaseName  //
+INSTANTIATE_TEST_SUITE_P(BatchNorm,                                    //
+                         BatchNormInferenceLayerTest,                  //
+                         params,                                       //
+                         BatchNormInferenceLayerTest::getTestCaseName  //
 );
 
 }  // namespace

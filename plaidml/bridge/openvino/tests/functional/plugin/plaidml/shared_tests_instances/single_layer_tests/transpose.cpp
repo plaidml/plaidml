@@ -15,11 +15,21 @@ const std::vector<InferenceEngine::Precision> netPrecisions = {
     InferenceEngine::Precision::FP32,
 };
 
-INSTANTIATE_TEST_CASE_P(TransposeCheck, TransposeLayerTest,
-                        ::testing::Combine(::testing::Values(std::vector<int64_t>({2, 0, 1}),
-                                                             std::vector<int64_t>({0, 1, 2})),   //
-                                           ::testing::ValuesIn(netPrecisions),                   //
-                                           ::testing::Values(std::vector<size_t>({2, 3, 4})),    //
-                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
-                        TransposeLayerTest::getTestCaseName);
+const std::vector<std::vector<size_t>> inputShapes = {
+    std::vector<size_t>{1, 3, 100, 100},
+};
+
+const std::vector<std::vector<size_t>> inputOrder = {
+    std::vector<size_t>{0, 3, 2, 1},
+    // std::vector<size_t>{},  // This is failing; does not appear to be a PlaidML-side failure
+};
+
+const auto params = testing::Combine(testing::ValuesIn(inputOrder),                    //
+                                     testing::ValuesIn(netPrecisions),                 //
+                                     testing::ValuesIn(inputShapes),                   //
+                                     testing::Values(CommonTestUtils::DEVICE_PLAIDML)  //
+);
+
+INSTANTIATE_TEST_SUITE_P(Transpose, TransposeLayerTest, params, TransposeLayerTest::getTestCaseName);
+
 }  // namespace

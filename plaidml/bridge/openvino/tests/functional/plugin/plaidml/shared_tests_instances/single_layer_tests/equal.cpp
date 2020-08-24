@@ -12,8 +12,13 @@
 using LayerTestsDefinitions::EqualLayerTest;
 
 namespace {
-const std::vector<InferenceEngine::Precision> netPrecisions = {
+
+const std::vector<InferenceEngine::Precision> inPrecisions = {
     InferenceEngine::Precision::FP32,
+};
+
+const std::vector<InferenceEngine::Precision> outPrecisions = {
+    InferenceEngine::Precision::BOOL,
 };
 
 std::vector<std::vector<std::vector<size_t>>> inputShapes = {
@@ -26,8 +31,9 @@ std::vector<std::vector<std::vector<size_t>>> inputShapes = {
 };
 
 const auto cases = ::testing::Combine(::testing::ValuesIn(inputShapes),    //
-                                      ::testing::ValuesIn(netPrecisions),  //
+                                      ::testing::ValuesIn(inPrecisions),   //
+                                      ::testing::ValuesIn(outPrecisions),  //
                                       ::testing::Values(CommonTestUtils::DEVICE_PLAIDML));
 
-INSTANTIATE_TEST_CASE_P(CompareWithRefs, EqualLayerTest, cases, EqualLayerTest::getTestCaseName);
+INSTANTIATE_TEST_SUITE_P(CompareWithRefs, EqualLayerTest, cases, EqualLayerTest::getTestCaseName);
 }  // namespace

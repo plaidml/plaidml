@@ -260,7 +260,7 @@ ConvolutionParams convParams[] = {
     },
 };
 
-INSTANTIATE_TEST_CASE_P(Suite, ConvolutionTest, ::testing::ValuesIn(convParams));
+INSTANTIATE_TEST_SUITE_P(Suite, ConvolutionTest, ::testing::ValuesIn(convParams));
 
 TEST_F(OpTest, CumProd) {
   auto I = Placeholder(DType::FLOAT32, {7, 7, 3, 64}, "I");

@@ -36,12 +36,14 @@ const std::vector<bool> normalizeVariance = {
 
 const std::vector<double> epsilon = {0.000000001};
 
-const auto MvnCases = ::testing::Combine(::testing::ValuesIn(inputShapes),                     //
-                                         ::testing::Values(InferenceEngine::Precision::FP32),  //
-                                         ::testing::ValuesIn(acrossChannels),                  //
-                                         ::testing::ValuesIn(normalizeVariance),               //
-                                         ::testing::ValuesIn(epsilon),                         //
-                                         ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)    //
-);
+const std::vector<std::map<std::string, std::string>> Configs = {{}};
 
-INSTANTIATE_TEST_CASE_P(smoke_MKLDNN_TestsMVN, MvnLayerTest, MvnCases, MvnLayerTest::getTestCaseName);
+const auto MvnCases =
+    ::testing::Combine(::testing::ValuesIn(inputShapes),                                             //
+                       ::testing::Values(InferenceEngine::Precision::FP32),                          //
+                       ::testing::ValuesIn(acrossChannels), ::testing::ValuesIn(normalizeVariance),  //
+                       ::testing::ValuesIn(epsilon),                                                 //
+                       ::testing::Values(CommonTestUtils::DEVICE_PLAIDML),                           //
+                       ::testing::ValuesIn(Configs));
+
+INSTANTIATE_TEST_SUITE_P(smoke_PlaidML_TestsMVN, MvnLayerTest, MvnCases, MvnLayerTest::getTestCaseName);

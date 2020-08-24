@@ -15,10 +15,10 @@ const std::vector<InferenceEngine::Precision> netPrecisions = {
     InferenceEngine::Precision::FP32,
 };
 
-INSTANTIATE_TEST_CASE_P(SqueezeCheck, SqueezeLayerTest,
-                        ::testing::Combine(::testing::Values(std::vector<int64_t>({1})),         //
-                                           ::testing::ValuesIn(netPrecisions),                   //
-                                           ::testing::Values(std::vector<size_t>({2, 1, 4})),    //
-                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
-                        SqueezeLayerTest::getTestCaseName);
+INSTANTIATE_TEST_SUITE_P(SqueezeCheck, SqueezeLayerTest,
+                         ::testing::Combine(::testing::Values(std::vector<int64_t>({1})),         //
+                                            ::testing::ValuesIn(netPrecisions),                   //
+                                            ::testing::Values(std::vector<size_t>({2, 1, 4})),    //
+                                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
+                         SqueezeLayerTest::getTestCaseName);
 }  // namespace
