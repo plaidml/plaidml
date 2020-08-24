@@ -47,6 +47,10 @@ plaidml_cc_library(
         "@gflags",
         "@gmock//:gtest",
     ],
+    tags = [
+        "skip_macos",
+        "skip_windows",
+    ],
     alwayslink = 1,
 )
 
