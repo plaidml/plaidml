@@ -59,7 +59,7 @@ def PxaReduceOp : PXA_OpWithPP<"reduce"> {
   }];
 }
 
-def AffineGemmOp : PXA_OpWithPP<"gemm"> {
+def PxaGemmOp : PXA_OpWithPP<"gemm"> {
   let arguments = (ins
     Arg<AnyMemRef, "the C memref to store to", [MemWrite]>:$c,
     AffineMapAttr:$cAccessMap,

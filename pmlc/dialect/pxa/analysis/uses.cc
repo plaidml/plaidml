@@ -38,7 +38,7 @@ IndirectValuesIterator &IndirectValuesIterator::operator++() {
       enqueueNext(reduceOp.result());
     } else if (auto vecReduceOp = dyn_cast<PxaVectorReduceOp>(use.getOwner())) {
       enqueueNext(vecReduceOp.result());
-    } else if (auto gemmOp = dyn_cast<AffineGemmOp>(use.getOwner())) {
+    } else if (auto gemmOp = dyn_cast<PxaGemmOp>(use.getOwner())) {
       if (gemmOp.getOperand(use.getOperandNumber()) == gemmOp.c()) {
         enqueueNext(gemmOp.out());
       }

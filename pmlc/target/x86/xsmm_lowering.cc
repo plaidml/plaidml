@@ -31,11 +31,11 @@ StrideArray getStrideArray(Value operand, AffineMap tileMap) {
   return *info;
 }
 
-struct AffineGemmOpConversion : public OpConversionPattern<pxa::AffineGemmOp> {
-  using OpConversionPattern<pxa::AffineGemmOp>::OpConversionPattern;
+struct PxaGemmOpConversion : public OpConversionPattern<pxa::PxaGemmOp> {
+  using OpConversionPattern<pxa::PxaGemmOp>::OpConversionPattern;
 
-  bool getIndices(pxa::AffineGemmOp op, ConversionPatternRewriter &rewriter,
-                  pxa::AffineGemmOp::Adaptor &adaptor, AffineMap accessMap,
+  bool getIndices(pxa::PxaGemmOp op, ConversionPatternRewriter &rewriter,
+                  pxa::PxaGemmOp::Adaptor &adaptor, AffineMap accessMap,
                   unsigned start, unsigned count,
                   SmallVectorImpl<Value> &into) const {
     auto operands = adaptor.mapOperands().slice(start, count);
@@ -47,9 +47,9 @@ struct AffineGemmOpConversion : public OpConversionPattern<pxa::AffineGemmOp> {
   }
 
   LogicalResult
-  matchAndRewrite(pxa::AffineGemmOp op, ArrayRef<Value> operands,
+  matchAndRewrite(pxa::PxaGemmOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
-    pxa::AffineGemmOp::Adaptor transformed(operands);
+    pxa::PxaGemmOp::Adaptor transformed(operands);
     SmallVector<Value, 8> indices;
     auto aNumInputs = op.aAccessMap().getNumInputs();
     auto bNumInputs = op.bAccessMap().getNumInputs();
@@ -205,7 +205,7 @@ struct XSMMGemmInvokeLowering
 
 void populatePXAGemmToXSMMConversionPatterns(OwningRewritePatternList &patterns,
                                              MLIRContext *ctx) {
-  patterns.insert<AffineGemmOpConversion>(ctx);
+  patterns.insert<PxaGemmOpConversion>(ctx);
 }
 
 void populateXSMMToLLVMConversionPatterns(LLVMTypeConverter &converter,
