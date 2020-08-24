@@ -35,6 +35,11 @@ namespace {
 // Lower stdx and std dialect to llvm dialect
 struct LowerStdxAndStdToLLVMPass
     : public PassWrapper<LowerStdxAndStdToLLVMPass, OperationPass<ModuleOp>> {
+
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<LLVM::LLVMDialect>();
+  }
+
   void runOnOperation() override {
     auto module = getOperation();
     auto *context = module.getContext();
