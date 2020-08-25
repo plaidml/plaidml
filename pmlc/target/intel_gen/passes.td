@@ -17,5 +17,12 @@ def ConvertStandardToLLVM : Pass<"intel-gen-convert-std-to-llvm", "mlir::ModuleO
   let dependentDialects = ["mlir::LLVM::LLVMDialect"];
 }
 
+def ConvertParallelLoopToGpu : Pass<"intel-gen-convert-parallel-loops-to-gpu"> {
+  let summary = "Convert mapped scf.parallel ops to gpu launch operations";
+  let constructor = "pmlc::target::createParallelLoopToGpuPass()";
+  let dependentDialects = ["mlir::AffineDialect", "mlir::gpu::GPUDialect"];
+}
+
+
 #endif
 

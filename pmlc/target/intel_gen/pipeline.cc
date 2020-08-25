@@ -1,6 +1,7 @@
 // Copyright 2020, Intel Corporation
 
 #include "mlir/Conversion/GPUToVulkan/ConvertGPUToVulkanPass.h"
+#include "mlir/Conversion/SCFToGPU/SCFToGPU.h"
 #include "mlir/Conversion/SCFToGPU/SCFToGPUPass.h"
 #include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
@@ -24,6 +25,7 @@
 #include "pmlc/conversion/stdx_to_llvm/passes.h"
 #include "pmlc/conversion/tile_to_pxa/passes.h"
 #include "pmlc/dialect/pxa/transforms/passes.h"
+#include "pmlc/dialect/stdx/ir/ops.h"
 #include "pmlc/dialect/stdx/transforms/passes.h"
 #include "pmlc/dialect/tile/transforms/passes.h"
 #include "pmlc/target/intel_gen/pass_detail.h"
@@ -62,10 +64,31 @@ struct ConvertStandardToLLVMPass
   }
 };
 
+struct ParallelLoopToGpuPass
+    : public ConvertParallelLoopToGpuBase<ParallelLoopToGpuPass> {
+  void runOnOperation() override {
+    OwningRewritePatternList patterns;
+    populateParallelLoopToGPUPatterns(patterns, &getContext());
+    ConversionTarget target(getContext());
+    target.addLegalDialect<StandardOpsDialect>();
+    target.addLegalDialect<pmlc::dialect::stdx::StdXDialect>();
+    target.addLegalDialect<AffineDialect>();
+    target.addLegalDialect<gpu::GPUDialect>();
+    target.addLegalDialect<scf::SCFDialect>();
+    target.addIllegalOp<scf::ParallelOp>();
+    if (failed(applyPartialConversion(getOperation(), target, patterns)))
+      signalPassFailure();
+  }
+};
+
 } // namespace
 
 std::unique_ptr<Pass> createConvertStandardToLLVM() {
   return std::make_unique<ConvertStandardToLLVMPass>();
+}
+
+std::unique_ptr<Pass> createParallelLoopToGpuPass() {
+  return std::make_unique<ParallelLoopToGpuPass>();
 }
 
 void pipelineBuilder(OpPassManager &pm) {
@@ -108,7 +131,7 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(dialect::stdx::createI1StorageToI32Pass());
 
   // Lower mapped scf.parallel's to GPU
-  pm.addPass(mlir::createParallelLoopToGpuPass());
+  pm.addPass(createParallelLoopToGpuPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
