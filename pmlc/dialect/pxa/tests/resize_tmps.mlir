@@ -58,7 +58,7 @@ func @no_resize_return() -> memref<10x10xf32> {
 }
 
 #set0 = affine_set<(d0, d1, d2, d3) : (d0 * -30 - d1 + 221 >= 0, d2 * -30 - d3 + 221 >= 0)>
-func @no_resize_expand(%arg0: memref<32x30xf32>) {
+func @no_resize_expand(%arg0: memref<32x30xf32>) -> memref<1x222x222x32xf32> {
 // CHECK-LABEL: func @no_resize_expand
   %0 = alloc() : memref<1x30x32x8x8x32xf32>
   %1 = alloc() : memref<1x222x222x32xf32>
@@ -75,5 +75,5 @@ func @no_resize_expand(%arg0: memref<32x30xf32>) {
     }
     affine.yield %4 : memref<1x222x222x32xf32>
   }
-  return
+  return %2 : memref<1x222x222x32xf32>
 }

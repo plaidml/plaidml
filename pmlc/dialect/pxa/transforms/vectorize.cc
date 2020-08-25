@@ -150,7 +150,6 @@ public:
   }
 
   void vectorizeReduceOp(PxaReduceOp op) {
-    Value mem = op.mem();
     Value val = op.val();
     OpBuilder builder(op);
     if (!val.getType().isa<VectorType>()) {
@@ -160,8 +159,8 @@ public:
       val = bcast.getResult();
     }
     auto vecOp = builder.create<PxaVectorReduceOp>(
-        op.getLoc(), ArrayRef<Type>{mem.getType()}, op.agg(), val, mem,
-        op.map(), op.idxs());
+        op.getLoc(), ArrayRef<Type>{op.getMemRefType()}, op.agg(), val,
+        op.memref(), op.map(), op.idxs());
     op.replaceAllUsesWith(vecOp.getResult());
     op.erase();
   }
