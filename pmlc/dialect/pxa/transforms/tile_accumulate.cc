@@ -36,8 +36,8 @@ AffineParallelOp tileAccumulations(AffineParallelOp op, bool skipTrivial) {
   // tile them into an inner block
   auto ranges = *op.getConstantRanges();
   SmallVector<int64_t, 6> accumTile;
-  auto steps = op.steps().cast<ArrayAttr>().getValue();
-  // Track if both inner + outer loops would bee used
+  auto steps = op.getSteps();
+  // Track if both inner + outer loops would be used
   bool anyAccum = false;
   bool anyNonAccum = false;
   for (size_t i = 0; i < ranges.size(); i++) {
@@ -45,7 +45,7 @@ AffineParallelOp tileAccumulations(AffineParallelOp op, bool skipTrivial) {
     if (si.strides.count(arg)) {
       // Output non-stationary, outer loop
       anyNonAccum = true;
-      accumTile.push_back(steps[i].cast<IntegerAttr>().getInt());
+      accumTile.push_back(steps[i]);
     } else {
       // Output stationary, accumulate in inner loop
       anyAccum = true;
