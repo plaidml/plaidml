@@ -195,7 +195,7 @@ _plaidml_args = rule(
 )
 
 
-def _plaidml_device_test_builder_impl(ctx):
+def _plaidml_target_test_builder_impl(ctx):
     ctx.actions.expand_template(
         template = ctx.file._tpl,
         output = ctx.outputs.executable,
@@ -210,20 +210,20 @@ def _plaidml_device_test_builder_impl(ctx):
     return [DefaultInfo(runfiles = runfiles, executable = ctx.outputs.executable)]
 
 
-# A rule to create a device-specific test builder script, used as a
-# tool for packaging device-specific tests for use outside of the
+# A rule to create a target-specific test builder script, used as a
+# tool for packaging target-specific tests for use outside of the
 # Bazel environment.
 #
-# Note that the device-specific tests are built using a transition to
+# Note that the target-specific tests are built using a transition to
 # an explicit //plaidml:target configuration; the command-line and
 # default //plaidml:target setting are *not* used.  This makes it
-# possible to build multiple device-specific tests via a single bazel
+# possible to build multiple target-specific tests via a single bazel
 # invocation.
-_plaidml_device_test_builder = rule(
+_plaidml_target_test_builder = rule(
     attrs = {
         "plaidml_target": attr.string(mandatory = True),
         "tests": attr.label_list(allow_empty = False, cfg = plaidml_target),
-        "_tpl": attr.label(default = "//bzl:device_test_builder.tpl.py", allow_single_file = True),
+        "_tpl": attr.label(default = "//bzl:target_test_builder.tpl.py", allow_single_file = True),
 
         # Allow this rule to use transitions (which bazel is fairly
         # careful about, since transitions have the potential to
@@ -238,11 +238,11 @@ _plaidml_device_test_builder = rule(
     outputs = {
         "executable": "%{name}.py",
     },
-    implementation = _plaidml_device_test_builder_impl
+    implementation = _plaidml_target_test_builder_impl
 )
 
 
-def _plaidml_device_test_runner_impl(ctx):
+def _plaidml_target_test_runner_impl(ctx):
     # Build the test runner.
     script = [
         "#!/usr/bin/env python",
@@ -270,15 +270,15 @@ def _plaidml_device_test_runner_impl(ctx):
     return [DefaultInfo(executable = ctx.outputs.executable)]
 
 
-# A rule to create a device-specific test runner script, which is
-# packaged into an out-of-bazel device-specific unit testing package.
+# A rule to create a target-specific test runner script, which is
+# packaged into an out-of-bazel target-specific unit testing package.
 #
-# Note that the device-specific tests are built using a transition to
+# Note that the target-specific tests are built using a transition to
 # an explicit //plaidml:target configuration; the command-line and
 # default //plaidml:target setting are *not* used.  This makes it
-# possible to build multiple device-specific tests via a single bazel
+# possible to build multiple target-specific tests via a single bazel
 # invocation.
-_plaidml_device_test_runner = rule(
+_plaidml_target_test_runner = rule(
     attrs = {
         "plaidml_target": attr.string(mandatory = True),
         "tests": attr.label_list(allow_empty = False, cfg = plaidml_target),
@@ -297,11 +297,11 @@ _plaidml_device_test_runner = rule(
     outputs = {
         "executable": "%{name}.py",
     },
-    implementation = _plaidml_device_test_runner_impl
+    implementation = _plaidml_target_test_runner_impl
 )
 
 
-def _plaidml_device_test_package_impl(ctx):
+def _plaidml_target_test_package_impl(ctx):
     # Package it all up.
     ctx.actions.run(
         outputs = [ctx.outputs.archive],
@@ -316,9 +316,9 @@ def _plaidml_device_test_package_impl(ctx):
     )
 
 
-# A rule to actually package up an out-of-bazel device-specific unit
+# A rule to actually package up an out-of-bazel target-specific unit
 # testing package, using the supplied builder and runner.
-_plaidml_device_test_package = rule(
+_plaidml_target_test_package = rule(
     attrs = {
         "builder": attr.label(
             executable = True,
@@ -332,11 +332,11 @@ _plaidml_device_test_package = rule(
     outputs = {
         "archive": "%{name}.tar.gz",
     },
-    implementation = _plaidml_device_test_package_impl
+    implementation = _plaidml_target_test_package_impl
 )
 
 
-def plaidml_device_test_package(name, plaidml_target, tests, tags=[]):
+def plaidml_target_test_package(name, plaidml_target, tests, tags=[]):
     # To build an out-of-bazel test package:
     #
     # 1) We create a builder executable whose runfiles is the union
@@ -349,14 +349,14 @@ def plaidml_device_test_package(name, plaidml_target, tests, tags=[]):
     # When the builder is used as a tool, bazel does the work of
     # constructing a runfiles directory for it; the tool then packages
     # the contents of its own runfiles directory.
-    _plaidml_device_test_builder(
+    _plaidml_target_test_builder(
         name = name + "_builder",
         testonly = True,
         plaidml_target = plaidml_target,
         tests = tests,
         tags = tags
     )
-    _plaidml_device_test_runner(
+    _plaidml_target_test_runner(
         name = name + "_runner",
         testonly = True,
         plaidml_target = plaidml_target,
@@ -364,7 +364,7 @@ def plaidml_device_test_package(name, plaidml_target, tests, tags=[]):
         args = [test + "_args" for test in tests],
         tags = tags
     )
-    _plaidml_device_test_package(
+    _plaidml_target_test_package(
         name = name,
         testonly = True,
         builder = name + "_builder",

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# This script is used to run device-specific bazel tests outside of bazel.
+# This script is used to run target-specific bazel tests outside of bazel.
 
 import os
 import sys

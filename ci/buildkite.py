@@ -197,7 +197,7 @@ def cmd_build(args, remainder):
     if 'dbg' not in args.variant:
         util.buildkite_upload('*.whl', cwd='tmp')
 
-    actions = util.check_output(['bazelisk'] + startup_args + ['aquery', 'kind(_plaidml_device_test_package, //plaidml/...)'])
+    actions = util.check_output(['bazelisk'] + startup_args + ['aquery', 'kind(_plaidml_target_test_package, //plaidml/...)'])
     for output in re.findall(r'^ *Outputs: \[(.*)\] *$', actions.decode('utf-8'), re.MULTILINE):
         util.buildkite_upload(output)
 
