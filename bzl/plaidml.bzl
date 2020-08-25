@@ -160,6 +160,15 @@ def _plaidml_target(settings, attr):
     return {"//plaidml:target": attr.plaidml_target}
 
 
+# Defines a configuration transition to a new //plaidml:target.
+#
+# When used as a transition in the Bazel action graph, this causes
+# rules to be built with a different //plaidml:target configuration
+# (reusing build products that do not depend on //plaidml:target).
+#
+# See
+# https://docs.bazel.build/versions/master/skylark/config.html#user-defined-transitions
+# for more details on how this works.
 plaidml_target = transition(
     implementation = _plaidml_target,
     inputs = [],
@@ -201,11 +210,27 @@ def _plaidml_device_test_builder_impl(ctx):
     return [DefaultInfo(runfiles = runfiles, executable = ctx.outputs.executable)]
 
 
+# A rule to create a device-specific test builder script, used as a
+# tool for packaging device-specific tests for use outside of the
+# Bazel environment.
+#
+# Note that the device-specific tests are built using a transition to
+# an explicit //plaidml:target configuration; the command-line and
+# default //plaidml:target setting are *not* used.  This makes it
+# possible to build multiple device-specific tests via a single bazel
+# invocation.
 _plaidml_device_test_builder = rule(
     attrs = {
         "plaidml_target": attr.string(mandatory = True),
         "tests": attr.label_list(allow_empty = False, cfg = plaidml_target),
         "_tpl": attr.label(default = "//bzl:device_test_builder.tpl.py", allow_single_file = True),
+
+        # Allow this rule to use transitions (which bazel is fairly
+        # careful about, since transitions have the potential to
+        # explode the build graph).
+        #
+        # TODO: This has been renamed from "whitelist" to "allowlist"
+        # in more recent versions of bazel.
         "_whitelist_function_transition": attr.label(
             default = "@bazel_tools//tools/whitelists/function_transition_whitelist"
         ),
@@ -245,11 +270,26 @@ def _plaidml_device_test_runner_impl(ctx):
     return [DefaultInfo(executable = ctx.outputs.executable)]
 
 
+# A rule to create a device-specific test runner script, which is
+# packaged into an out-of-bazel device-specific unit testing package.
+#
+# Note that the device-specific tests are built using a transition to
+# an explicit //plaidml:target configuration; the command-line and
+# default //plaidml:target setting are *not* used.  This makes it
+# possible to build multiple device-specific tests via a single bazel
+# invocation.
 _plaidml_device_test_runner = rule(
     attrs = {
         "plaidml_target": attr.string(mandatory = True),
         "tests": attr.label_list(allow_empty = False, cfg = plaidml_target),
         "args": attr.label_list(allow_empty = False, cfg = plaidml_target, providers = [_ArgInfo]),
+
+        # Allow this rule to use transitions (which bazel is fairly
+        # careful about, since transitions have the potential to
+        # explode the build graph).
+        #
+        # TODO: This has been renamed from "whitelist" to "allowlist"
+        # in more recent versions of bazel.
         "_whitelist_function_transition": attr.label(
             default = "@bazel_tools//tools/whitelists/function_transition_whitelist"
         ),
@@ -276,6 +316,8 @@ def _plaidml_device_test_package_impl(ctx):
     )
 
 
+# A rule to actually package up an out-of-bazel device-specific unit
+# testing package, using the supplied builder and runner.
 _plaidml_device_test_package = rule(
     attrs = {
         "builder": attr.label(
