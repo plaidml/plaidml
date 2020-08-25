@@ -9,7 +9,6 @@ CppEdsl.MnistMlp
 CppEdsl.CumSum
 CppEdsl.Reciprocal
 CppEdsl.ReshapeIntoScalar
-CppEdsl.ReshapeFromScalar
 CppEdsl.Select
 CppEdsl.ConvI8
 CppEdsl.LogicalAnd_uint64
