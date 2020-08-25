@@ -5,7 +5,7 @@ import shutil
 import subprocess
 import sys
 
-verbose = False  # pylint: disable=invalid-name
+verbose = True  # pylint: disable=invalid-name
 
 
 def printf(*args, **kwargs):

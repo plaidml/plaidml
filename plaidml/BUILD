@@ -6,7 +6,7 @@ load("@bazel_skylib//rules:common_settings.bzl", "string_flag")
 load("@bazel_skylib//lib:selects.bzl", "selects")
 load("@rules_python//python:defs.bzl", "py_binary", "py_library")
 load("@io_bazel_rules_jsonnet//jsonnet:jsonnet.bzl", "jsonnet_to_json")
-load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_shlib", "plaidml_settings")
+load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_shlib", "plaidml_settings", "plaidml_target_test_package")
 
 plaidml_cc_library(
     name = "api",
@@ -222,4 +222,13 @@ selects.config_setting_group(
 plaidml_settings(
     name = "settings",
     visibility = ["//visibility:public"],
+)
+
+plaidml_target_test_package(
+    name = "intel_gen_test",
+    plaidml_target = "intel_gen",
+    tests = [
+        "//plaidml/edsl/tests:cc_test",
+    ],
+    tags = ["skip_windows"],
 )
