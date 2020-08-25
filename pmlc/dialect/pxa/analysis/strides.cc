@@ -53,7 +53,7 @@ static Optional<StrideInfo> flatten(MemRefType memRefType,
                                     ArrayRef<StrideInfo> dimensional) {
   assert(memRefType.getRank() == static_cast<int64_t>(dimensional.size()) &&
          "memRef and dimensional rank mismatch");
-  // Get the memRef strides/offsets, and fail early if there is an isssue.
+  // Get the memRef strides/offsets, and fail early if there is an issue.
   int64_t offset;
   SmallVector<int64_t, 4> strides;
   if (failed(getStridesAndOffset(memRefType, strides, offset)))
