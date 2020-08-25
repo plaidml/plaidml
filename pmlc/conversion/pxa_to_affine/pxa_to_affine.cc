@@ -34,8 +34,9 @@ struct AffineParallelOpConversion
       return failure();
     // Create an affine loop nest, capture induction variables
     llvm::SmallVector<Value, 8> ivs;
+    auto steps = op.getSteps();
     for (unsigned int i = 0; i < op.lowerBoundsMap().getNumResults(); i++) {
-      auto step = op.steps().getValue()[i].cast<IntegerAttr>().getInt();
+      auto step = steps[i];
       auto forOp = rewriter.create<AffineForOp>(
           op.getLoc(), op.getLowerBoundsOperands(),
           op.lowerBoundsMap().getSubMap({i}), op.getUpperBoundsOperands(),
