@@ -44,6 +44,7 @@ plaidml_cc_library(
     hdrs = [
         "autotile.h",
         "cache.h",
+        "normalize.h",
         "passes.h",
         "stencil.h",
         "tile.h",

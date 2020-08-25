@@ -1,5 +1,9 @@
 // Copyright 2020 Intel Corporation
 
+#include "pmlc/dialect/pxa/transforms/normalize.h"
+
+#include <memory>
+
 #include "llvm/ADT/StringSet.h"
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
