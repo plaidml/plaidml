@@ -46,25 +46,25 @@ const std::vector<std::vector<std::vector<std::size_t>>> inputShapesBTrans = {
     {{5, 2}, {5, 2}},  //
 };
 
-INSTANTIATE_TEST_CASE_P(MatMul_NoTranspose, MatMulLayerTest,
-                        ::testing::Combine(params_NoTranspose,                                   //
-                                           ::testing::ValuesIn(netPrecisions),                   //
-                                           ::testing::ValuesIn(inputShapes),                     //
-                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
-                        MatMulLayerTest::getTestCaseName);
+INSTANTIATE_TEST_SUITE_P(MatMul_NoTranspose, MatMulLayerTest,
+                         ::testing::Combine(params_NoTranspose,                                   //
+                                            ::testing::ValuesIn(netPrecisions),                   //
+                                            ::testing::ValuesIn(inputShapes),                     //
+                                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
+                         MatMulLayerTest::getTestCaseName);
 
-INSTANTIATE_TEST_CASE_P(MatMul_ATranspose, MatMulLayerTest,
-                        ::testing::Combine(params_ATranspose,                                    //
-                                           ::testing::ValuesIn(netPrecisions),                   //
-                                           ::testing::ValuesIn(inputShapesATrans),               //
-                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
-                        MatMulLayerTest::getTestCaseName);
+INSTANTIATE_TEST_SUITE_P(MatMul_ATranspose, MatMulLayerTest,
+                         ::testing::Combine(params_ATranspose,                                    //
+                                            ::testing::ValuesIn(netPrecisions),                   //
+                                            ::testing::ValuesIn(inputShapesATrans),               //
+                                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
+                         MatMulLayerTest::getTestCaseName);
 
-INSTANTIATE_TEST_CASE_P(MatMul_BTranspose, MatMulLayerTest,
-                        ::testing::Combine(params_BTranspose,                                    //
-                                           ::testing::ValuesIn(netPrecisions),                   //
-                                           ::testing::ValuesIn(inputShapesBTrans),               //
-                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
-                        MatMulLayerTest::getTestCaseName);
+INSTANTIATE_TEST_SUITE_P(MatMul_BTranspose, MatMulLayerTest,
+                         ::testing::Combine(params_BTranspose,                                    //
+                                            ::testing::ValuesIn(netPrecisions),                   //
+                                            ::testing::ValuesIn(inputShapesBTrans),               //
+                                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
+                         MatMulLayerTest::getTestCaseName);
 
 }  // namespace

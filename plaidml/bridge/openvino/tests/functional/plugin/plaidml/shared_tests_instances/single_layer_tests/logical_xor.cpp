@@ -19,9 +19,9 @@ const std::vector<InferenceEngine::Precision> netPrecisions = {
 const std::vector<std::vector<std::size_t>> inputShapes = {
     {std::vector<std::size_t>({1, 1}), std::vector<std::size_t>({1, 1})}};
 
-INSTANTIATE_TEST_CASE_P(CompareWithRefs, LogicalXorLayerTest,
-                        ::testing::Combine(::testing::ValuesIn(netPrecisions), ::testing::Values(inputShapes),
-                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),
-                        LogicalXorLayerTest::getTestCaseName);
+INSTANTIATE_TEST_SUITE_P(CompareWithRefs, LogicalXorLayerTest,
+                         ::testing::Combine(::testing::ValuesIn(netPrecisions), ::testing::Values(inputShapes),
+                                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),
+                         LogicalXorLayerTest::getTestCaseName);
 
 }  // namespace

@@ -7,7 +7,7 @@
 #include "common_test_utils/test_constants.hpp"
 #include "single_layer_tests/group_convolution.hpp"
 
-using namespace LayerTestsDefinitions;  // TODO: Lint once enabled
+using LayerTestsDefinitions::GroupConvolutionLayerTest;
 
 namespace {
 
@@ -41,19 +41,19 @@ const auto groupConv2DParams_AutoPadValid = ::testing::Combine(::testing::Values
                                                                ::testing::Values(ngraph::op::PadType::VALID)       //
 );
 
-INSTANTIATE_TEST_CASE_P(GroupConvolution2D_ExplicitPadding, GroupConvolutionLayerTest,
-                        ::testing::Combine(groupConv2DParams_ExplicitPadding,                        //
-                                           ::testing::ValuesIn(netPrecisions),                       //
-                                           ::testing::Values(std::vector<size_t>({1, 16, 30, 30})),  //
-                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),      //
-                        GroupConvolutionLayerTest::getTestCaseName);
+INSTANTIATE_TEST_SUITE_P(GroupConvolution2D_ExplicitPadding, GroupConvolutionLayerTest,
+                         ::testing::Combine(groupConv2DParams_ExplicitPadding,                        //
+                                            ::testing::ValuesIn(netPrecisions),                       //
+                                            ::testing::Values(std::vector<size_t>({1, 16, 30, 30})),  //
+                                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),      //
+                         GroupConvolutionLayerTest::getTestCaseName);
 
-INSTANTIATE_TEST_CASE_P(GroupConvolution2D_AutoPadValid, GroupConvolutionLayerTest,
-                        ::testing::Combine(groupConv2DParams_AutoPadValid,                           //
-                                           ::testing::ValuesIn(netPrecisions),                       //
-                                           ::testing::Values(std::vector<size_t>({1, 16, 30, 30})),  //
-                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),      //
-                        GroupConvolutionLayerTest::getTestCaseName);
+INSTANTIATE_TEST_SUITE_P(GroupConvolution2D_AutoPadValid, GroupConvolutionLayerTest,
+                         ::testing::Combine(groupConv2DParams_AutoPadValid,                           //
+                                            ::testing::ValuesIn(netPrecisions),                       //
+                                            ::testing::Values(std::vector<size_t>({1, 16, 30, 30})),  //
+                                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),      //
+                         GroupConvolutionLayerTest::getTestCaseName);
 
 /* ============= 3D GroupConvolution ============= */
 const std::vector<std::vector<size_t>> kernels3d = {{3, 3, 3}};
@@ -81,18 +81,18 @@ const auto groupConv3DParams_AutoPadValid = ::testing::Combine(::testing::Values
                                                                ::testing::Values(ngraph::op::PadType::VALID)          //
 );
 
-INSTANTIATE_TEST_CASE_P(GroupConvolution3D_ExplicitPadding, GroupConvolutionLayerTest,
-                        ::testing::Combine(groupConv3DParams_ExplicitPadding,                           //
-                                           ::testing::ValuesIn(netPrecisions),                          //
-                                           ::testing::Values(std::vector<size_t>({1, 4, 10, 10, 10})),  //
-                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),         //
-                        GroupConvolutionLayerTest::getTestCaseName);
+INSTANTIATE_TEST_SUITE_P(GroupConvolution3D_ExplicitPadding, GroupConvolutionLayerTest,
+                         ::testing::Combine(groupConv3DParams_ExplicitPadding,                           //
+                                            ::testing::ValuesIn(netPrecisions),                          //
+                                            ::testing::Values(std::vector<size_t>({1, 4, 10, 10, 10})),  //
+                                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),         //
+                         GroupConvolutionLayerTest::getTestCaseName);
 
-INSTANTIATE_TEST_CASE_P(GroupConvolution3D_AutoPadValid, GroupConvolutionLayerTest,
-                        ::testing::Combine(groupConv3DParams_AutoPadValid,                              //
-                                           ::testing::ValuesIn(netPrecisions),                          //
-                                           ::testing::Values(std::vector<size_t>({1, 4, 10, 10, 10})),  //
-                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),         //
-                        GroupConvolutionLayerTest::getTestCaseName);
+INSTANTIATE_TEST_SUITE_P(GroupConvolution3D_AutoPadValid, GroupConvolutionLayerTest,
+                         ::testing::Combine(groupConv3DParams_AutoPadValid,                              //
+                                            ::testing::ValuesIn(netPrecisions),                          //
+                                            ::testing::Values(std::vector<size_t>({1, 4, 10, 10, 10})),  //
+                                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),         //
+                         GroupConvolutionLayerTest::getTestCaseName);
 
 }  // namespace

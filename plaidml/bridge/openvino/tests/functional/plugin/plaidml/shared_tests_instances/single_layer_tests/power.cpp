@@ -19,9 +19,9 @@ const std::vector<InferenceEngine::Precision> inputPrecisions = {
 const std::vector<std::vector<std::size_t>> inputShapes = {
     {std::vector<std::size_t>({1, 30}), std::vector<std::size_t>({1, 30})}};
 
-INSTANTIATE_TEST_CASE_P(PowerCheck, PowerLayerTest,
-                        ::testing::Combine(::testing::ValuesIn(inputPrecisions), ::testing::Values(inputShapes),
-                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),
-                        PowerLayerTest::getTestCaseName);
+INSTANTIATE_TEST_SUITE_P(PowerCheck, PowerLayerTest,
+                         ::testing::Combine(::testing::ValuesIn(inputPrecisions), ::testing::Values(inputShapes),
+                                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),
+                         PowerLayerTest::getTestCaseName);
 
 }  // namespace

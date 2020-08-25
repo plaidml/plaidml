@@ -20,8 +20,7 @@ class Engine : public InferenceEngine::InferencePluginInternal {
   void GetVersion(const InferenceEngine::Version*& versionInfo) noexcept;
 
   InferenceEngine::ExecutableNetworkInternal::Ptr LoadExeNetworkImpl(
-      const InferenceEngine::ICore* core, const InferenceEngine::ICNNNetwork& network,
-      const std::map<std::string, std::string>& config) override;
+      const InferenceEngine::ICNNNetwork& network, const std::map<std::string, std::string>& config) override;
 
   void QueryNetwork(const InferenceEngine::ICNNNetwork& network, const std::map<std::string, std::string>& config,
                     InferenceEngine::QueryNetworkResult& res) const override;

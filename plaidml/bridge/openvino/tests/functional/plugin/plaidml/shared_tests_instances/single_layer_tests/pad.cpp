@@ -27,13 +27,13 @@ const std::vector<std::vector<std::size_t>> hiPads = {
 
 const std::vector<ngraph::op::PadMode> padModes = {{ngraph::op::PadMode::CONSTANT}};
 
-INSTANTIATE_TEST_CASE_P(CompareWithRefs, PadLayerTest,
-                        ::testing::Combine(::testing::ValuesIn(loPads),         //
-                                           ::testing::ValuesIn(hiPads),         //
-                                           ::testing::ValuesIn(padModes),       //
-                                           ::testing::ValuesIn(netPrecisions),  //
-                                           ::testing::ValuesIn(inputShapes),    //
-                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),
-                        PadLayerTest::getTestCaseName);
+INSTANTIATE_TEST_SUITE_P(CompareWithRefs, PadLayerTest,
+                         ::testing::Combine(::testing::ValuesIn(loPads),         //
+                                            ::testing::ValuesIn(hiPads),         //
+                                            ::testing::ValuesIn(padModes),       //
+                                            ::testing::ValuesIn(netPrecisions),  //
+                                            ::testing::ValuesIn(inputShapes),    //
+                                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),
+                         PadLayerTest::getTestCaseName);
 
 }  // namespace

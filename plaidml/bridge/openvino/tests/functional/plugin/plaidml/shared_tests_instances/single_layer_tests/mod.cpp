@@ -21,11 +21,11 @@ const std::vector<std::vector<std::vector<std::size_t>>> inputShapes = {
     {{3, 5, 10}, {1, 5, 1}},  //
 };
 
-INSTANTIATE_TEST_CASE_P(CompareWithRefs, ModLayerTest,
-                        ::testing::Combine(                                       //
-                            ::testing::ValuesIn(netPrecisions),                   //
-                            ::testing::ValuesIn(inputShapes),                     //
-                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
-                        ModLayerTest::getTestCaseName);
+INSTANTIATE_TEST_SUITE_P(CompareWithRefs, ModLayerTest,
+                         ::testing::Combine(                                       //
+                             ::testing::ValuesIn(netPrecisions),                   //
+                             ::testing::ValuesIn(inputShapes),                     //
+                             ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
+                         ModLayerTest::getTestCaseName);
 
 }  // namespace
