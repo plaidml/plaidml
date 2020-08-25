@@ -32,9 +32,9 @@ using namespace mlir; // NOLINT[build/namespaces]
 namespace pmlc::target::intel_gen {
 
 namespace {
-// Lower stdx and std dialect to llvm dialect
-struct LowerStdxAndStdToLLVMPass
-    : public PassWrapper<LowerStdxAndStdToLLVMPass, OperationPass<ModuleOp>> {
+// Lower std and stdx ops to llvm dialect on gpu host function
+struct LowerStdAndStdxToLLVMPass
+    : public PassWrapper<LowerStdAndStdxToLLVMPass, OperationPass<ModuleOp>> {
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<LLVM::LLVMDialect>();
@@ -64,8 +64,8 @@ struct LowerStdxAndStdToLLVMPass
   }
 };
 
-std::unique_ptr<Pass> createLowerStdxAndStdToLLVMPass() {
-  return std::make_unique<LowerStdxAndStdToLLVMPass>();
+std::unique_ptr<Pass> createLowerStdAndStdxToLLVMPass() {
+  return std::make_unique<LowerStdAndStdxToLLVMPass>();
 }
 
 void pipelineBuilder(OpPassManager &pm) {
@@ -102,7 +102,7 @@ void pipelineBuilder(OpPassManager &pm) {
 
   // GPU to Vulkan.
   pm.addPass(conversion::gpu::createConvertGpuLaunchFuncToVulkanCallsPass());
-  pm.addPass(createLowerStdxAndStdToLLVMPass());
+  pm.addPass(createLowerStdAndStdxToLLVMPass());
 }
 
 } // namespace
