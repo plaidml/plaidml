@@ -5,7 +5,6 @@ CppEdsl.BitNot
 CppEdsl.BitLeft
 CppEdsl.BitRightScalar
 CppEdsl.BitRightTensor
-CppEdsl.BroadcastCmp
 CppEdsl.ComplexConv2d
 CppEdsl.ConvI8
 CppEdsl.CosH
@@ -16,8 +15,6 @@ CppEdsl.MnistCnn
 CppEdsl.Pow
 CppEdsl.Prng
 CppEdsl.Reciprocal
-CppEdsl.ReshapeFromScalar
-CppEdsl.ReshapeIntoScalar
 CppEdsl.Round
 CppEdsl.SinH
 CppEdsl.Tan

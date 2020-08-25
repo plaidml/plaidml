@@ -30,6 +30,7 @@ plaidml_cc_library(
         "//pmlc/conversion/gpu",
         "//pmlc/conversion/gpu_to_spirv",
         "//pmlc/conversion/pxa_to_affine",
+        "//pmlc/conversion/stdx_to_llvm",
         "//pmlc/conversion/tile_to_pxa",
         "//pmlc/dialect/pxa/transforms",
         "//pmlc/dialect/tile/transforms",
@@ -40,6 +41,7 @@ plaidml_cc_library(
         "@llvm-project//mlir:GPUTransforms",
         "@llvm-project//mlir:LLVMTransforms",
         "@llvm-project//mlir:SCFToGPUPass",
+        "@llvm-project//mlir:StandardOpsTransforms",
     ],
     alwayslink = 1,
 )
