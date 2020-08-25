@@ -59,35 +59,20 @@ VARIANTS:
   linux_x86_64:
     arch: manylinux1_x86_64
     system: Linux
-    env:
-      PLAIDML_DEVICE: llvm_cpu.0
-      PLAIDML_TARGET: llvm_cpu
   linux_x86_64_dbg:
     bazel_config: dbg
     arch: manylinux1_x86_64
     system: Linux
-    env:
-      PLAIDML_DEVICE: llvm_cpu.0
-      PLAIDML_TARGET: llvm_cpu
   macos_x86_64:
     arch: macosx_10_10_x86_64
     system: Darwin
-    env:
-      PLAIDML_DEVICE: llvm_cpu.0
-      PLAIDML_TARGET: llvm_cpu
   macos_x86_64_dbg:
     bazel_config: dbg
     arch: macosx_10_10_x86_64
     system: Darwin
-    env:
-      PLAIDML_DEVICE: llvm_cpu.0
-      PLAIDML_TARGET: llvm_cpu
   windows_x86_64:
     arch: win_amd64
     system: Windows
-    env:
-      PLAIDML_DEVICE: llvm_cpu.0
-      PLAIDML_TARGET: llvm_cpu
 
 SUITES:
   smoke:

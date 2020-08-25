@@ -16,10 +16,22 @@ steps:
       - "tmp/build/**/*"
       {{/artifacts}}
       - "bazel-testlogs/**/test.log"
+    env:
+      PLAIDML_DEVICE: llvm_cpu.0
+      PLAIDML_TARGET: llvm_cpu
 {{/variants}}
 
 
 # test phase
+
+  - label: ':linux:unit_tests/intel_gen'
+    agents:
+      PLAIDML_TARGET: intel_gen
+    command: |
+      python3 ci/buildkite.py unit linux_x86_64-opt intel_gen
+    env:
+      PLAIDML_TARGET: intel_gen
+    depends_on: linux_x86_64
 
 {{#tests}}
   - label: '{{emoji}}{{engine}}{{shard_emoji}}{{suite}}/{{workload}}/{{platform}} BATCH_SIZE={{batch_size}}'

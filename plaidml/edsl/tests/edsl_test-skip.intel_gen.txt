@@ -1,13 +1,21 @@
 CppEdsl.HigherPrecisionConstants
+CppEdsl.BitLeft
+CppEdsl.BitRightTensor
 CppEdsl.BitRightScalar
 CppEdsl.BitNot
 CppEdsl.BroadcastCmp
 CppEdsl.ConstAdd
+CppEdsl.ConstCast
 CppEdsl.Max
 CppEdsl.Relu
+CppEdsl.MnistCnn
 CppEdsl.MnistMlp
 CppEdsl.CumSum
 CppEdsl.Reciprocal
+CppEdsl.LarsMomentum4d
+CppEdsl.UniqueNames
+CppEdsl.GlobalMin
+CppEdsl.ReshapeScalar
 CppEdsl.ReshapeIntoScalar
 CppEdsl.ReshapeFromScalar
 CppEdsl.Select
@@ -29,4 +37,4 @@ CppEdsl.Pow
 CppEdsl.Round
 CppEdsl.SinH
 CppEdsl.Tan
-
+CppEdsl.Prng

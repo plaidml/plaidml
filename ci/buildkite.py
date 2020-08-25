@@ -4,6 +4,7 @@ import argparse
 import glob
 import os
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -150,8 +151,9 @@ def cmd_build(args, remainder):
 
     env = os.environ.copy()
     variant = plan['VARIANTS'][args.variant]
-    for key, value in variant['env'].items():
-        env[key] = str(value)
+    if 'env' in variant:
+        for key, value in variant['env'].items():
+            env[key] = str(value)
 
     explain_log = 'explain.log'
     profile_json = 'profile.json.gz'
@@ -195,9 +197,37 @@ def cmd_build(args, remainder):
     if 'dbg' not in args.variant:
         util.buildkite_upload('*.whl', cwd='tmp')
 
+    actions = util.check_output(['bazelisk'] + startup_args + ['aquery', 'kind(_plaidml_target_test_package, //plaidml/...)'])
+    for output in re.findall(r'^ *Outputs: \[(.*)\] *$', actions.decode('utf-8'), re.MULTILINE):
+        util.buildkite_upload(output)
+
     variant_dir = os.path.join('tmp', 'build', args.variant)
     os.makedirs(variant_dir)
     shutil.copy(tarball, variant_dir)
+
+
+def cmd_unit(args, remainder):
+    util.printf('--- Cleaning workdir')
+    workdir = Path('tmp').resolve()
+    shutil.rmtree(workdir, ignore_errors=True)
+    workdir.mkdir(parents=True, exist_ok=False)
+    downloaddir = workdir / "downloads"
+    downloaddir.mkdir()
+    testdir = workdir / "tests"
+    testdir.mkdir()
+    util.printf('--- Downloading unit tests')
+    util.buildkite_download('*/{}/*/{}_test.tar.gz'.format(args.platform, args.target), str(downloaddir), cwd=downloaddir)
+    for root, dirs, files in os.walk(downloaddir):
+        for f in files:
+            with tarfile.open(os.path.join(root, f), 'r:gz') as tar:
+                tar.extractall(testdir)
+    util.printf('--- Running unit tests')
+    for root, dirs, files in os.walk(testdir):
+        for f in files:
+            if f == 'run_tests.py':
+                test = os.path.join(root, f)
+                util.printf('--- Running {}'.format(test))
+                util.check_call(test)
 
 
 def cmd_test(args, remainder):
@@ -254,6 +284,13 @@ def make_cmd_build(parent):
     parser.set_defaults(func=cmd_build)
 
 
+def make_cmd_unit(parent):
+    parser = parent.add_parser('unit')
+    parser.add_argument('platform')
+    parser.add_argument('target')
+    parser.set_defaults(func=cmd_unit)
+
+
 def make_cmd_test(parent):
     parser = parent.add_parser('test')
     parser.add_argument('platform')
@@ -295,6 +332,7 @@ def main():
 
     make_cmd_pipeline(sub_parsers)
     make_cmd_build(sub_parsers)
+    make_cmd_unit(sub_parsers)
     make_cmd_test(sub_parsers)
     make_cmd_report(sub_parsers)
 
