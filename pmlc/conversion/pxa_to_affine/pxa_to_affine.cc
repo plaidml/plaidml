@@ -28,35 +28,48 @@ struct AffineParallelOpConversion
   LogicalResult
   matchAndRewrite(AffineParallelOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
-    // This conversion doesn't work in the rank 0 case; that case will be
-    // covered by canonicalization.
-    if (op.lowerBoundsMap().getNumResults() == 0)
-      return failure();
-    // Create an affine loop nest, capture induction variables
+    // Make a map for induction variable
     llvm::SmallVector<Value, 8> ivs;
+    auto hardware = op.getAttr("hardware");
     auto steps = op.getSteps();
-    for (unsigned int i = 0; i < op.lowerBoundsMap().getNumResults(); i++) {
-      auto step = steps[i];
-      auto forOp = rewriter.create<AffineForOp>(
-          op.getLoc(), op.getLowerBoundsOperands(),
-          op.lowerBoundsMap().getSubMap({i}), op.getUpperBoundsOperands(),
-          op.upperBoundsMap().getSubMap({i}), step);
-      rewriter.setInsertionPointToStart(&forOp.region().front());
-      ivs.push_back(forOp.getInductionVar());
+    // If it's a hardware parallel loop, leave as parallel
+    if (hardware) {
+      // Make a new affine parallel with no return values
+      auto newOp = rewriter.create<AffineParallelOp>(
+          op.getLoc(),                                      //
+          ArrayRef<Type>{}, ArrayRef<AtomicRMWKind>{},      //
+          op.lowerBoundsMap(), op.getLowerBoundsOperands(), //
+          op.upperBoundsMap(), op.getUpperBoundsOperands(), //
+          steps);
+      for (Value iv : newOp.getIVs()) {
+        ivs.push_back(iv);
+      }
+      newOp.setAttr("hardware", hardware);
+      rewriter.setInsertionPointToStart(newOp.getBody());
+    } else {
+      // Otherwise unroll into serial loops
+      for (unsigned int i = 0; i < op.lowerBoundsMap().getNumResults(); i++) {
+        auto forOp = rewriter.create<AffineForOp>(
+            op.getLoc(), op.getLowerBoundsOperands(),
+            op.lowerBoundsMap().getSubMap({i}), op.getUpperBoundsOperands(),
+            op.upperBoundsMap().getSubMap({i}), steps[i]);
+        rewriter.setInsertionPointToStart(forOp.getBody());
+        ivs.push_back(forOp.getInductionVar());
+      }
     }
-    // Move ParallelOp's operations (single block) to Affine innermost loop.
-    auto &innerLoopOps = rewriter.getInsertionBlock()->getOperations();
-    auto &parallelBodyOps = op.region().front().getOperations();
-    innerLoopOps.splice(std::prev(innerLoopOps.end()), parallelBodyOps,
-                        parallelBodyOps.begin(),
-                        std::prev(parallelBodyOps.end()));
+
+    // Move ParallelOp's operations across to the new op
+    auto &oldBodyOps = op.getBody()->getOperations();
+    auto &newBodyOps = rewriter.getInsertionBlock()->getOperations();
+    newBodyOps.splice(std::prev(newBodyOps.end()), oldBodyOps,
+                      oldBodyOps.begin(), std::prev(oldBodyOps.end()));
     // Replace all uses of old values
     size_t idx = 0;
-    for (auto arg : op.region().front().getArguments()) {
+    for (auto arg : op.getBody()->getArguments()) {
       arg.replaceAllUsesWith(ivs[idx++]);
     }
     // Replace outputs with values from yield
-    auto termIt = std::prev(parallelBodyOps.end());
+    auto termIt = std::prev(oldBodyOps.end());
     for (size_t i = 0; i < op.getNumResults(); i++) {
       op.getResult(i).replaceAllUsesWith(termIt->getOperand(i));
     }
@@ -283,7 +296,9 @@ PXAToAffineConversionTarget::PXAToAffineConversionTarget(MLIRContext &ctx)
   addLegalDialect<AffineDialect>();
   addLegalDialect<StandardOpsDialect>();
   addIllegalDialect<pxa::PXADialect>();
-  addIllegalOp<AffineParallelOp>();
+  addDynamicallyLegalOp<AffineParallelOp>([](AffineParallelOp op) {
+    return op.getNumResults() == 0 && op.getAttr("hardware");
+  });
   addDynamicallyLegalOp<AffineIfOp>(
       [](AffineIfOp op) { return op.getNumResults() == 0; });
   addDynamicallyLegalOp<FuncOp>([](FuncOp op) {

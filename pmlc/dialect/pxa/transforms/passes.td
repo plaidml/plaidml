@@ -6,6 +6,11 @@ include "mlir/Pass/PassBase.td"
 def AffineNormalize : FunctionPass<"pxa-normalize"> {
   let summary = "Normalize affine ops";
   let constructor = "pmlc::dialect::pxa::createAffineNormalizePass()";
+  let options = [
+    Option<"promote", "promote", "bool",
+           /*default=*/"true",
+           "Promote the body of 1 trip loops">
+  ];
 }
 
 def AutoTileExample : FunctionPass<"pxa-autotile-example"> {
@@ -26,6 +31,15 @@ def Fusion : FunctionPass<"pxa-fusion"> {
            /*default=*/"0",
            "Prevent over-fusion by specifying the maximum memory activity "
            "(alloc, read, write) allowed">
+  ];
+}
+
+def GPUThread : FunctionPass<"pxa-gpu-thread"> {
+  let summary = "Tile outmost loops for GPU threading";
+  let constructor = "pmlc::dialect::pxa::createGPUThreadPass()";
+  let options = [
+    Option<"maxThreads", "max-threads", "unsigned", /*default=*/"64",
+           "Set maximum/goal inner threads">
   ];
 }
 
@@ -54,7 +68,7 @@ def ResizeTmps : FunctionPass<"pxa-resize-tmps"> {
 }
 
 def Subgroups : FunctionPass<"pxa-subgroups"> {
-  let summary = "TODO: text";
+  let summary = "Regorganize top level block to maximum use of subgroups on gen9";
   let constructor = "pmlc::dialect::pxa::createSubgroupsPass()";
 }
 

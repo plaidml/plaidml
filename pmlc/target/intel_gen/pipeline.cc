@@ -1,6 +1,5 @@
 // Copyright 2020, Intel Corporation
 
-#include "mlir/Conversion/GPUToSPIRV/ConvertGPUToSPIRVPass.h"
 #include "mlir/Conversion/GPUToVulkan/ConvertGPUToVulkanPass.h"
 #include "mlir/Conversion/SCFToGPU/SCFToGPUPass.h"
 #include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
@@ -16,13 +15,14 @@
 
 #include "pmlc/compiler/registry.h"
 
-#include "pmlc/conversion/SCFToGPU/SCFToGPUPass.h"
 #include "pmlc/conversion/gpu/lowering.h"
+#include "pmlc/conversion/gpu_to_spirv/passes.h"
 #include "pmlc/conversion/pxa_to_affine/passes.h"
 #include "pmlc/conversion/tile_to_pxa/passes.h"
-#include "pmlc/dialect/pxa//transforms/passes.h"
+#include "pmlc/dialect/pxa/transforms/passes.h"
 #include "pmlc/dialect/stdx/transforms/passes.h"
 #include "pmlc/dialect/tile/transforms/passes.h"
+#include "pmlc/target/intel_gen/passes.h"
 
 using namespace mlir; // NOLINT[build/namespaces]
 
@@ -30,33 +30,55 @@ namespace pmlc::target::intel_gen {
 
 namespace {
 
-void pipelineBuilder(OpPassManager &pm) {
+void intelGenPipeline(OpPassManager &pm) {
   pm.getContext()->getOrLoadDialect<spirv::SPIRVDialect>();
 
+  // Bound + pad initial tile code
   pm.addPass(dialect::tile::createComputeBoundsPass());
-  // pm.addPass(dialect::tile::createPadPass());
+  pm.addPass(dialect::tile::createPadPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
+  // Lower to PXA
   pm.addPass(conversion::tile_to_pxa::createLowerTileToPXAPass());
+  pm.addPass(pmlc::dialect::pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
+
+  // Move accumulation indexes into an inner loop
   pm.addPass(pmlc::dialect::pxa::createTileAccumulatePass());
-
-  pm.addPass(conversion::pxa_to_affine::createLowerPXAToAffinePass());
-  pm.addPass(createLowerAffinePass());
+  pm.addPass(
+      pmlc::dialect::pxa::createAffineNormalizePass(/*normalize=*/false));
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
-  pm.addPass(pmlc::conversion::scf_to_gpu::createSimpleSCFToGPUPass());
+  // Assign GPU blocks + threads to outermost loop
+  pm.addPass(pmlc::dialect::pxa::createGPUThreadPass(/*maxThreads=*/128));
+  pm.addPass(pmlc::dialect::pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
+
+  // Lower out of PXA memory semantics
+  pm.addPass(conversion::pxa_to_affine::createLowerPXAToAffinePass());
+
+  // Do a custom version of lower-affine which also set GPU mappings
+  pm.addPass(createIntelGenLowerAffinePass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
+
+  // Lower mapped scf.parallel's to GPU
+  pm.addPass(mlir::createParallelLoopToGpuPass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
+
+  // Do kernel outlining
   pm.addPass(conversion::gpu::createGpuKernelOutliningPass());
 
   // GPU to SPIR-V.
   pm.addPass(createLegalizeStdOpsForSPIRVLoweringPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
-  pm.addPass(createConvertGPUToSPIRVPass());
+  pm.addPass(conversion::gpu_to_spirv::createGPUToSPIRVCustomPass());
 
   // SPIR-V passes for lowering attributes.
   pm.addPass(spirv::createLowerABIAttributesPass());
@@ -64,6 +86,8 @@ void pipelineBuilder(OpPassManager &pm) {
 
   // GPU to Vulkan.
   pm.addPass(conversion::gpu::createConvertGpuLaunchFuncToVulkanCallsPass());
+
+  // Convert Vulkan calls to LLVM code
   pm.addPass(createLowerToLLVMPass(LowerToLLVMOptions{
       /*useBarePtrCallConv=*/false,
       /*emitCWrappers=*/true,
@@ -76,7 +100,8 @@ void pipelineBuilder(OpPassManager &pm) {
 
 static PassPipelineRegistration<>
     passPipelineReg("target-intel_gen", "Target pipeline for Intel GEN iGPUs",
-                    pipelineBuilder);
-static compiler::TargetRegistration targetReg("intel_gen", pipelineBuilder);
+                    intelGenPipeline);
+
+static compiler::TargetRegistration targetReg("intel_gen", intelGenPipeline);
 
 } // namespace pmlc::target::intel_gen
