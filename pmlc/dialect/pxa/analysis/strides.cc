@@ -39,8 +39,8 @@ int64_t getIVStep(BlockArgument arg) {
 
   size_t idx = arg.getArgNumber();
   if (auto op = dyn_cast<AffineParallelOp>(baseOp)) {
-    auto stepAttr = op.steps().getValue()[idx];
-    return stepAttr.cast<IntegerAttr>().getInt();
+    auto steps = op.getSteps();
+    return steps[idx];
   }
   if (auto op = dyn_cast<AffineForOp>(baseOp)) {
     return op.getStep();
@@ -69,7 +69,8 @@ StrideRange::StrideRange(BlockArgument arg)
     if (range < 1) {
       return;
     }
-    int64_t step = ap.steps()[arg.getArgNumber()].cast<IntegerAttr>().getInt();
+    auto steps = ap.getSteps();
+    int64_t step = steps[arg.getArgNumber()];
     if (step <= 0) {
       return;
     }
@@ -256,9 +257,8 @@ static Optional<StrideInfo> computeStrideInfo(AffineParallelOp op,
     return out;
 
   // Otherwise add current index's contribution.
-  // TODO: getStep(size_t) on AffineParallelOp?
-  auto stepAttr = op.steps().getValue()[idx];
-  out->strides[arg] += stepAttr.cast<IntegerAttr>().getInt();
+  auto steps = op.getSteps();
+  out->strides[arg] += steps[idx];
   return out;
 }
 

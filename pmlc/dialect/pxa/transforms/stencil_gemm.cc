@@ -261,11 +261,7 @@ private:
 
   void transform(TensorAndIndexPermutation perm, ArrayRef<int64_t> tileSize) {
     // First, modify step size of all tiled indexes
-    SmallVector<int64_t, 8> steps;
-    auto oldSteps = op.steps().cast<ArrayAttr>().getValue();
-    for (auto step : oldSteps) {
-      steps.push_back(step.cast<IntegerAttr>().getInt());
-    }
+    auto steps = op.getSteps();
     for (size_t i = 0; i < getBlockArgsAsSet().size(); i++) {
       for (size_t j = 0; j < getTiledIdxCount(); j++) {
         if (perm.indexes[j] == op.getBody()->getArgument(i)) {
