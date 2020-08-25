@@ -16,6 +16,8 @@
 #include <memory>
 #include <vector>
 
+#include "pmlc/util/logging.h"
+
 using namespace mlir; // NOLINT[build/namespaces]
 
 void VulkanRuntime::setResourceStorageClassBindingMap(
@@ -364,6 +366,10 @@ LogicalResult VulkanRuntime::createDevice() {
 
   // TODO(denis0x0D): find the best device.
   const auto &physicalDevice = physicalDevices.front();
+  VkPhysicalDeviceProperties props;
+  vkGetPhysicalDeviceProperties(physicalDevice, &props);
+  IVLOG(1, "Choosing first available vulkan device: " << props.deviceName);
+
   getBestComputeQueue(physicalDevice);
 
   const float queuePrioritory = 1.0f;

@@ -18,17 +18,17 @@ namespace pmlc::dialect::pxa {
 
 // Produces all powers of 2 <= range
 struct PowerOfTwoGenerator {
-  std::vector<int64_t> operator()(int64_t range);
+  std::vector<int64_t> operator()(int64_t range) const;
 };
 
 // Produces all divisors of range (including the full range)
 struct EvenTilingGenerator {
-  std::vector<int64_t> operator()(int64_t range);
+  std::vector<int64_t> operator()(int64_t range) const;
 };
 
 // Produces only 'range' itself
 struct ExactRangeGenerator {
-  std::vector<int64_t> operator()(int64_t range) { return {range}; }
+  std::vector<int64_t> operator()(int64_t range) const { return {range}; }
 };
 
 // Produces only a specific value
@@ -74,7 +74,9 @@ private:
 // ArrayRef<int64_t>) to a double, which is 'inf' for infeasible tilings.  For
 // example:
 
-inline double DummyCostModel(ArrayRef<int64_t> tile, double bestCost) { return 1.0; }
+inline double DummyCostModel(ArrayRef<int64_t> tile, double bestCost) {
+  return 1.0;
+}
 
 // Given a generator and cost model, find the best tile size, return empty
 // tiling when all tiles are infeasible

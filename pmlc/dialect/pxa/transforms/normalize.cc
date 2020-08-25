@@ -28,23 +28,6 @@ void promoteIfEmptyIVs(AffineParallelOp op) {
   if (op.getNumDims())
     return;
 
-  // Only remove ops that don't have any custom attributes (i.e. those not
-  // defined by the op itself). This is needed to ensure that we don't drop
-  // ops that are structural in nature. One case is for kernel outlining; it's
-  // possible to have an outermost loop with a single iteration which would
-  // represent a single kernel launch. In this case, we don't want this
-  // canonicalization to drop it.
-  // TODO: This feels like a hack; should we create a new op with a region for
-  // this case? Or perhaps we can have a standard attribute that is used for
-  // controlling canoncializations?
-  StringSet<> opAttrs{AffineParallelOp::getReductionsAttrName(),
-                      AffineParallelOp::getLowerBoundsMapAttrName(),
-                      AffineParallelOp::getUpperBoundsMapAttrName(),
-                      AffineParallelOp::getStepsAttrName()};
-  for (NamedAttribute attr : op.getAttrs())
-    if (!opAttrs.count(attr.first.strref()))
-      return;
-
   // Replace yielded loop results.
   auto *body = op.getBody();
   auto yield = cast<AffineYieldOp>(body->back());
@@ -108,15 +91,23 @@ void elideSingleIterationIndexes(AffineParallelOp op) {
 }
 
 struct AffineNormalizePass : public AffineNormalizeBase<AffineNormalizePass> {
+  AffineNormalizePass() = default;
+  explicit AffineNormalizePass(bool promote) { this->promote = promote; }
   void runOnFunction() override {
     getFunction().walk(::normalizeAffineParallel);
     getFunction().walk(elideSingleIterationIndexes);
-    getFunction().walk(promoteIfEmptyIVs);
+    if (promote.getValue()) {
+      getFunction().walk(promoteIfEmptyIVs);
+    }
   }
 };
 
 std::unique_ptr<Pass> createAffineNormalizePass() {
   return std::make_unique<AffineNormalizePass>();
+}
+
+std::unique_ptr<Pass> createAffineNormalizePass(bool promote) {
+  return std::make_unique<AffineNormalizePass>(promote);
 }
 
 } // namespace pmlc::dialect::pxa

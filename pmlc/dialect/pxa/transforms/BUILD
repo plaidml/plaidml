@@ -28,6 +28,7 @@ plaidml_cc_library(
         "cache.cc",
         "dataflow_opt.cc",
         "fusion.cc",
+        "gpu_thread.cc",
         "localize.cc",
         "nest_loops.cc",
         "normalize.cc",
