@@ -9,11 +9,11 @@
 #include "pmlc/dialect/pxa/analysis/affine_expr.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
 
-namespace mlir {
+namespace pmlc::dialect::pxa {
 
 // Get the step for a block argument as an IV of an affine.for or
 // affine.parallel
-int64_t getIVStep(BlockArgument arg);
+int64_t getIVStep(mlir::BlockArgument arg);
 
 struct StrideRange {
   bool valid;
@@ -31,7 +31,7 @@ struct StrideRange {
     }
   }
 
-  explicit StrideRange(BlockArgument arg);
+  explicit StrideRange(mlir::BlockArgument arg);
 
   StrideRange &operator*=(int64_t factor);
   StrideRange operator*(int64_t factor) const {
@@ -73,7 +73,7 @@ enum class BoundaryRegion {
 // For example, this boundary could be defined as whether the owner (Block) of
 // an argument is an ancestor of another reference block.
 using BlockArgumentBoundaryFn =
-    std::function<BoundaryRegion(BlockArgument arg)>;
+    std::function<BoundaryRegion(mlir::BlockArgument arg)>;
 
 // StrideInfo provides a simple 'stride' multiplier for each affine induction
 // variable (from an affine.for or affine.parallel).  Basically, each step of
@@ -81,15 +81,23 @@ using BlockArgumentBoundaryFn =
 // that distance.  Additionally it holds a fixed offset.
 struct StrideInfo {
   int64_t offset;
-  DenseMap<BlockArgument, int64_t> strides;
+  mlir::DenseMap<mlir::BlockArgument, int64_t> strides;
 
-  explicit StrideInfo(BlockArgument arg) : offset(0), strides({{arg, 1}}) {}
+  explicit StrideInfo(mlir::BlockArgument arg)
+      : offset(0), strides({{arg, 1}}) {}
   explicit StrideInfo(int64_t offset = 0) : offset(offset) {}
 
   bool operator==(const StrideInfo &rhs) const {
     return offset == rhs.offset && strides == rhs.strides;
   }
+
   StrideInfo &operator*=(int64_t factor);
+  StrideInfo operator*(int64_t factor) const {
+    StrideInfo ret = *this;
+    ret *= factor;
+    return ret;
+  }
+
   StrideInfo &operator+=(const StrideInfo &rhs);
   StrideInfo operator+(const StrideInfo &rhs) const {
     StrideInfo r = *this;
@@ -99,8 +107,8 @@ struct StrideInfo {
 
   // Compute the outer and inner portion of stride info with respect to a given
   // block.
-  StrideInfo outer(Block *block);
-  StrideInfo inner(Block *block);
+  StrideInfo outer(mlir::Block *block);
+  StrideInfo inner(mlir::Block *block);
 
   // Compute the outer and inner portion of stride info with respect to a given
   // boundary function.
@@ -111,35 +119,42 @@ struct StrideInfo {
   StrideRange range() const;
 
   // Convert a StrideInfo back into an affine expression
-  AffineValueExpr toValueExpr(MLIRContext *ctx) const;
+  mlir::AffineValueExpr toValueExpr(mlir::MLIRContext *ctx) const;
 
-  void print(raw_ostream &os, Block *relative = nullptr) const;
+  void print(mlir::raw_ostream &os, mlir::Block *relative = nullptr) const;
 };
 
+std::ostream &operator<<(std::ostream &os, const StrideInfo &x);
+
 // Convert a vector of StrideInfo's into a value map
-AffineValueMap convertToValueMap(MLIRContext *ctx, ArrayRef<StrideInfo> dims);
+mlir::AffineValueMap convertToValueMap(mlir::MLIRContext *ctx,
+                                       mlir::ArrayRef<StrideInfo> dims);
 
 // Compute stride info for a given affine value (such an an induction variable
 // or the result of an affine.apply). Return None if the expression is not a
 // pure affine expression or if any of the gathered strides would be symbolic
-Optional<StrideInfo> computeStrideInfo(Value expr);
+mlir::Optional<StrideInfo> computeStrideInfo(mlir::Value expr);
 
 // Compute stride info but for an affine expression over some set of values
-Optional<StrideInfo> computeStrideInfo(AffineExpr expr, ValueRange args);
+mlir::Optional<StrideInfo> computeStrideInfo(mlir::AffineExpr expr,
+                                             mlir::ValueRange args);
 
 // Compute 'dimensionalized' strides for a given affine map and arguments
-Optional<llvm::SmallVector<StrideInfo, 4>> computeStrideInfo(AffineMap map,
-                                                             ValueRange args);
+mlir::Optional<mlir::SmallVector<StrideInfo, 4>>
+computeStrideInfo(mlir::AffineMap map, mlir::ValueRange args);
 
 // Compute stride info as additionaly applied to a memRef.
-Optional<StrideInfo> computeStrideInfo(MemRefType memRef, AffineMap map,
-                                       ValueRange values);
+mlir::Optional<StrideInfo> computeStrideInfo(mlir::MemRefType memRef,
+                                             mlir::AffineMap map,
+                                             mlir::ValueRange values);
 
 // Helper that works on a affine load / store, etc.
-Optional<StrideInfo> computeStrideInfo(pmlc::dialect::pxa::PxaLoadOp op);
-Optional<StrideInfo> computeStrideInfo(pmlc::dialect::pxa::PxaReduceOp op);
-Optional<StrideInfo> computeStrideInfo(pmlc::dialect::pxa::PxaVectorLoadOp op);
-Optional<StrideInfo>
+mlir::Optional<StrideInfo> computeStrideInfo(pmlc::dialect::pxa::PxaLoadOp op);
+mlir::Optional<StrideInfo>
+computeStrideInfo(pmlc::dialect::pxa::PxaReduceOp op);
+mlir::Optional<StrideInfo>
+computeStrideInfo(pmlc::dialect::pxa::PxaVectorLoadOp op);
+mlir::Optional<StrideInfo>
 computeStrideInfo(pmlc::dialect::pxa::PxaVectorReduceOp op);
 
 // For a given block + memory access:
@@ -147,49 +162,58 @@ computeStrideInfo(pmlc::dialect::pxa::PxaVectorReduceOp op);
 // block on the memory access, in terms of strides.
 // 2) For all interior blocks/load width/etc, what is the range of elements
 // accessed.
-
 struct RelativeAccessPattern {
-  explicit RelativeAccessPattern(MemRefType memRefType)
-      : memRefType(memRefType) {}
+  explicit RelativeAccessPattern(mlir::Value memRef) : memRef(memRef) {}
 
   // The memref type of the access.
-  MemRefType memRefType;
-  // For each dimension on the access, what are it's strides relative to various
+  mlir::Value memRef;
+  // For each dimension on the access, what are its strides relative to various
   // block args
-  SmallVector<StrideInfo, 4> outer;
+  mlir::SmallVector<StrideInfo, 4> outer;
   // For each dimension the offset inside the block
-  SmallVector<StrideInfo, 4> inner;
+  mlir::SmallVector<StrideInfo, 4> inner;
   // For each dimension what is the number of accesses
-  SmallVector<int64_t, 4> innerCount;
+  mlir::SmallVector<int64_t, 4> innerCount;
   // For each dimension what is the minimal stride of the access.  Note:
   // dimensions with a count of 1 have a stride of 1 automatically
-  SmallVector<int64_t, 4> innerStride;
+  mlir::SmallVector<int64_t, 4> innerStride;
+
+  // Return the outer linearized strides relative to each block argument.
+  mlir::Optional<StrideInfo> flatOuter() const;
+
+  // Return the inner linearized strides relative to each block argument.
+  mlir::Optional<StrideInfo> flatInner() const;
+
+  MemRefType getMemRefType() const;
+
+  // Return the total element count for all inner accesses.
+  int64_t totalInnerCount() const;
 
   // Return the total bytes for all inner accesses.
   int64_t totalInnerBytes() const;
 };
 
 // Compute relative access, fail if non-strided (or operation not supported)
-Optional<RelativeAccessPattern>
-computeRelativeAccess(Operation *op, BlockArgumentBoundaryFn fn);
+mlir::Optional<RelativeAccessPattern>
+computeRelativeAccess(mlir::Operation *op, BlockArgumentBoundaryFn fn);
 
-Optional<RelativeAccessPattern> computeRelativeAccess(Operation *op,
-                                                      Block *block);
+mlir::Optional<RelativeAccessPattern> computeRelativeAccess(mlir::Operation *op,
+                                                            mlir::Block *block);
 
 // A StrideArray contains a set of constant factors and a constant offset.
 struct StrideArray {
   int64_t offset;
-  SmallVector<int64_t, 8> strides;
+  mlir::SmallVector<int64_t, 8> strides;
 
   explicit StrideArray(unsigned numDims, int64_t offset = 0);
   StrideArray &operator*=(int64_t factor);
   StrideArray &operator+=(const StrideArray &rhs);
 
-  void print(raw_ostream &os);
+  void print(mlir::raw_ostream &os);
 };
 
 // Compute the StrideArray for a given AffineMap. The map must have a single
 // AffineExpr result and this result must be purely affine.
-Optional<StrideArray> computeStrideArray(AffineMap map);
+mlir::Optional<StrideArray> computeStrideArray(mlir::AffineMap map);
 
-} // namespace mlir
+} // namespace pmlc::dialect::pxa

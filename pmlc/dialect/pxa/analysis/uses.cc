@@ -11,22 +11,19 @@ using namespace mlir; // NOLINT
 
 namespace pmlc::dialect::pxa {
 
-Operation *getOriginalDef(Value val) {
-  auto opRes = val.cast<mlir::OpResult>();
-  while (true) {
-    if (auto ap = mlir::dyn_cast<AffineParallelOp>(opRes.getOwner())) {
-      auto ret = mlir::cast<AffineYieldOp>(ap.getBody()->getTerminator());
-      auto src = ret.getOperand(opRes.getResultNumber());
-      opRes = src.cast<mlir::OpResult>();
-    } else if (auto iop = dyn_cast<AffineIfOp>(opRes.getOwner())) {
-      auto ret = mlir::cast<AffineYieldOp>(iop.getThenBlock()->getTerminator());
-      auto src = ret.getOperand(opRes.getResultNumber());
-      opRes = src.cast<mlir::OpResult>();
+Operation *getOriginalDef(Value value) {
+  while (auto opResult = value.dyn_cast<OpResult>()) {
+    if (auto ap = dyn_cast<AffineParallelOp>(opResult.getOwner())) {
+      auto yield = cast<AffineYieldOp>(ap.getBody()->getTerminator());
+      value = yield.getOperand(opResult.getResultNumber());
+    } else if (auto iop = dyn_cast<AffineIfOp>(opResult.getOwner())) {
+      auto yield = cast<AffineYieldOp>(iop.getThenBlock()->getTerminator());
+      value = yield.getOperand(opResult.getResultNumber());
     } else {
-      break;
+      return opResult.getOwner();
     }
   }
-  return opRes.getOwner();
+  return nullptr;
 }
 
 IndirectValuesIterator &IndirectValuesIterator::operator++() {

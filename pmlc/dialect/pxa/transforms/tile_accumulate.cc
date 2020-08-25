@@ -29,9 +29,9 @@ AffineParallelOp tileAccumulations(AffineParallelOp op, bool skipTrivial) {
   // Find the originating reduce
   assert(op.getNumResults() == 1);
   auto srcDef = getOriginalDef(op.getResult(0));
-  auto red = mlir::cast<PxaReduceOp>(srcDef);
+  auto reduceOp = cast<PxaReduceOp>(srcDef);
   // Get strides for output
-  auto si = *computeStrideInfo(red);
+  auto si = *computeStrideInfo(reduceOp);
   // Find all the accumulation indexes (stride 0 with respect to output) and
   // tile them into an inner block
   auto ranges = *op.getConstantRanges();
@@ -62,10 +62,6 @@ AffineParallelOp tileAccumulations(AffineParallelOp op, bool skipTrivial) {
 }
 
 namespace {
-using llvm::DenseMap;
-using llvm::DenseSet;
-using llvm::SmallVector;
-using mlir::BlockArgument;
 
 struct TileAccumulatePass : public TileAccumulateBase<TileAccumulatePass> {
   void runOnFunction() final {
@@ -78,9 +74,10 @@ struct TileAccumulatePass : public TileAccumulateBase<TileAccumulatePass> {
     }
   }
 };
+
 } // namespace
 
-std::unique_ptr<mlir::Pass> createTileAccumulatePass() {
+std::unique_ptr<Pass> createTileAccumulatePass() {
   return std::make_unique<TileAccumulatePass>();
 }
 

@@ -31,7 +31,7 @@ def PxaReduceOp : PXA_OpWithPP<"reduce"> {
   let arguments = (ins
     AtomicRMWKindAttr:$agg,
     AnyType:$val,
-    Arg<AnyMemRef, "the memref to reduce", [MemRead, MemWrite]>:$mem,
+    AnyMemRef:$memref,
     AffineMapAttr:$map,
     Variadic<Index>:$idxs
   );
@@ -48,10 +48,10 @@ def PxaReduceOp : PXA_OpWithPP<"reduce"> {
   >];
 
   let extraClassDeclaration = [{
-    Value getMemRef() { return mem(); }
+    Value getMemRef() { return memref(); }
     unsigned getMemRefOperandIndex() { return 1; }
     void setMemRef(Value value) { setOperand(getMemRefOperandIndex(), value); }
-    MemRefType getMemRefType() { return mem().getType().cast<MemRefType>(); }
+    MemRefType getMemRefType() { return memref().getType().cast<MemRefType>(); }
     AffineMap getAffineMap() { return map(); }
     operand_range getMapOperands() { return idxs(); }
     static StringRef getMapAttrName() { return "map"; }
@@ -83,12 +83,12 @@ def PxaGemmOp : PXA_OpWithPP<"gemm"> {
   }];
 }
 
-def PxaVectorReduceOp : PXA_OpWithPP<"vector_reduce", []> {
+def PxaVectorReduceOp : PXA_OpWithPP<"vector_reduce"> {
   let summary = "affine vector reduction operation";
   let arguments = (ins
     AtomicRMWKindAttr:$agg,
     AnyVector:$vector,
-    Arg<AnyMemRef, "the memref to reduce", [MemRead, MemWrite]>:$mem,
+    AnyMemRef:$memref,
     AffineMapAttr:$map,
     Variadic<Index>:$idxs
   );
@@ -105,10 +105,10 @@ def PxaVectorReduceOp : PXA_OpWithPP<"vector_reduce", []> {
   >];
 
   let extraClassDeclaration = [{
-    Value getMemRef() { return mem(); }
+    Value getMemRef() { return memref(); }
     unsigned getMemRefOperandIndex() { return 1; }
     void setMemRef(Value value) { setOperand(getMemRefOperandIndex(), value); }
-    MemRefType getMemRefType() { return mem().getType().cast<MemRefType>(); }
+    MemRefType getMemRefType() { return memref().getType().cast<MemRefType>(); }
     AffineMap getAffineMap() { return map(); }
     operand_range getMapOperands() { return idxs(); }
     static StringRef getMapAttrName() { return "map"; }
@@ -122,9 +122,10 @@ def PxaVectorReduceOp : PXA_OpWithPP<"vector_reduce", []> {
 class PxaLoadOpBase<string mnemonic, list<OpTrait> traits = []> :
     PXA_OpWithPP<mnemonic, !listconcat(traits,
         [DeclareOpInterfaceMethods<AffineReadOpInterface>])> {
-  let arguments = (ins Arg<AnyMemRef, "the reference to load from",
-      [MemRead]>:$memref,
-      Variadic<Index>:$indices);
+  let arguments = (ins
+    AnyMemRef:$memref,
+    Variadic<Index>:$indices
+  );
 
   code extraClassDeclarationBase = [{
     /// Returns the operand index of the memref.
@@ -141,7 +142,7 @@ class PxaLoadOpBase<string mnemonic, list<OpTrait> traits = []> :
   }];
 }
 
-def PxaLoadOp : PxaLoadOpBase<"load"> {
+def PxaLoadOp : PxaLoadOpBase<"load", [NoSideEffect]> {
   let summary = "affine load operation";
   let description = [{
     The "affine.load" op reads an element from a memref, where the index

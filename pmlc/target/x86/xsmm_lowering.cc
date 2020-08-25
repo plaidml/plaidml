@@ -19,14 +19,14 @@ namespace xsmm = dialect::xsmm;
 
 namespace {
 
-StrideArray getStrideArray(Value operand, AffineMap tileMap) {
+pxa::StrideArray getStrideArray(Value operand, AffineMap tileMap) {
   int64_t offset;
   SmallVector<int64_t, 4> strides;
   auto type = operand.getType().cast<MemRefType>();
   getStridesAndOffset(type, strides, offset);
   auto layoutMap =
       makeStridedLinearLayoutMap(strides, offset, operand.getContext());
-  auto info = computeStrideArray(layoutMap.compose(tileMap));
+  auto info = pxa::computeStrideArray(layoutMap.compose(tileMap));
   assert(info.hasValue() && "computeStrideArray must succeed");
   return *info;
 }
