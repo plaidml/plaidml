@@ -1,8 +1,8 @@
 CppEdsl.Acos
 CppEdsl.Asin
 CppEdsl.Atan
-CppEdsl.BitNot
 CppEdsl.BitLeft
+CppEdsl.BitNot
 CppEdsl.BitRightScalar
 CppEdsl.BitRightTensor
 CppEdsl.ComplexConv2d
