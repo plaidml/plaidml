@@ -66,6 +66,9 @@ void intelGenPipeline(OpPassManager &pm) {
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
+  // Fix booleans
+  pm.addPass(dialect::stdx::createI1StorageToI32Pass());
+
   // Lower mapped scf.parallel's to GPU
   pm.addPass(mlir::createParallelLoopToGpuPass());
   pm.addPass(createCanonicalizerPass());
