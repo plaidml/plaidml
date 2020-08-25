@@ -421,7 +421,7 @@ Optional<StrideInfo> computeStrideInfo(MemRefType memRefType, AffineMap map,
   assert(map.getNumResults() == memRefType.getRank());
   assert(map.getNumInputs() == values.size());
 
-  // Get the memRef strides/offsets, and fail early if there is an issse.
+  // Get the memRef strides/offsets, and fail early if there is an issue.
   int64_t memRefOffset;
   SmallVector<int64_t, 4> memRefStrides;
   if (failed(getStridesAndOffset(memRefType, memRefStrides, memRefOffset)))
