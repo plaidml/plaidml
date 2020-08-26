@@ -97,6 +97,11 @@ std::unique_ptr<Pass> createXSMMStencilPass() {
   return pxa::createStencilGEMMPass(numThreads, heatmapCostTransposed);
 }
 
+std::unique_ptr<Pass> createXSMMBRGEMMStencilPass() {
+  auto numThreads = std::thread::hardware_concurrency();
+  return pxa::createStencilBRGEMMPass(numThreads, heatmapCostTransposed);
+}
+
 std::unique_ptr<Pass> createLowerPXAToAffinePass() {
   return std::make_unique<LowerPXAToAffinePass>();
 }

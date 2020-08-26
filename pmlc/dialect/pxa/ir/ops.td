@@ -83,6 +83,33 @@ def PxaGemmOp : PXA_OpWithPP<"gemm"> {
   }];
 }
 
+def PxaBRGemmOp : PXA_OpWithPP<"brgemm"> {
+  let arguments = (ins
+    Arg<AnyMemRef, "the C memref to store to", [MemWrite]>:$c,
+    AffineMapAttr:$cAccessMap,
+    AffineMapAttr:$cTileMap,
+    Arg<AnyMemRef, "the A memref to load from", [MemRead]>:$a,
+    AffineMapAttr:$aAccessMap,
+    AffineMapAttr:$aTileMap,
+    Arg<AnyMemRef, "the B memref to load from", [MemRead]>:$b,
+    AffineMapAttr:$bAccessMap,
+    AffineMapAttr:$bTileMap,
+    I64ArrayAttr:$tile,
+    I64Attr:$StrideA,
+    I64Attr:$StrideB,
+    I64Attr:$lBr,
+    Variadic<Index>:$mapOperands);
+  let results = (outs AnyMemRef:$out);
+
+  let hasCanonicalizer = 1;
+
+  let extraClassDeclaration = [{
+    operand_range getOperandsForA();
+    operand_range getOperandsForB();
+    operand_range getOperandsForC();
+  }];
+}
+
 def PxaVectorReduceOp : PXA_OpWithPP<"vector_reduce"> {
   let summary = "affine vector reduction operation";
   let arguments = (ins
