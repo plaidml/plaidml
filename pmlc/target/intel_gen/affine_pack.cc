@@ -12,8 +12,6 @@
 #include "pmlc/util/logging.h"
 #include "pmlc/util/math/util.h"
 
-#include "mlir/Support/DebugStringHelper.h"
-
 using namespace mlir; // NOLINT
 
 namespace pmlc::target::intel_gen {
@@ -61,7 +59,6 @@ struct AffinePackPass : public AffinePackBase<AffinePackPass> {
         return failure();
       }
     }
-    IVLOG(1, "Here we go!");
     // Initialize packing state
     SmallVector<int64_t, 3> curPack = {1, 1, 1};
     SmallVector<IndexPacking, 6> packInfo(ranges.size());
@@ -86,7 +83,6 @@ struct AffinePackPass : public AffinePackBase<AffinePackPass> {
         curIdx = std::min(curIdx + 1, 2u);
       }
     }
-    IVLOG(1, "Past packing");
     // Remove extra indexes
     while (curPack.size() > 0 && curPack.back() == 1) {
       curPack.pop_back();
@@ -119,7 +115,6 @@ struct AffinePackPass : public AffinePackBase<AffinePackPass> {
           ibuild.create<AffineApplyOp>(op.getLoc(), map, ValueRange{newIV});
       op.getIVs()[i].replaceAllUsesWith(mapped);
     }
-    IVLOG(1, "Past mapping: " << debugString(*newLoop.getOperation()));
     // Slice in the interior
     newLoop.getBody()->getOperations().splice( //
         std::prev(newLoop.getBody()->end()),   //
@@ -127,12 +122,11 @@ struct AffinePackPass : public AffinePackBase<AffinePackPass> {
         op.getBody()->begin(),                 //
         std::prev(op.getBody()->end()));
     newLoop.setAttr("hardware", hardware);
-    IVLOG(1, "Past merging: " << debugString(*newLoop.getOperation()));
     // Erase old op
     op.erase();
-    IVLOG(1, "Should be good");
     return success();
   }
+
   void runOnFunction() override {
     getFunction().walk([&](AffineParallelOp op) {
       if (failed(maybePack(op))) {
