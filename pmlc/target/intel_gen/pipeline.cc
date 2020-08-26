@@ -122,6 +122,11 @@ void pipelineBuilder(OpPassManager &pm) {
   // Lower out of PXA memory semantics
   pm.addPass(conversion::pxa_to_affine::createLowerPXAToAffinePass());
 
+  // Pack dims
+  pm.addPass(createAffinePackPass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
+
   // Do a custom version of lower-affine which also set GPU mappings
   pm.addPass(createIntelGenLowerAffinePass());
   pm.addPass(createCanonicalizerPass());

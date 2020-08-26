@@ -5,17 +5,13 @@ CppEdsl.BitLeft
 CppEdsl.BitNot
 CppEdsl.BitRightScalar
 CppEdsl.BitRightTensor
-CppEdsl.ComplexConv2d
 CppEdsl.ConvI8
 CppEdsl.CosH
 CppEdsl.Erf
 CppEdsl.Floor
 CppEdsl.HigherPrecisionConstants
-CppEdsl.MnistCnn
 CppEdsl.Pow
 CppEdsl.Prng
-CppEdsl.Reciprocal
 CppEdsl.Round
 CppEdsl.SinH
 CppEdsl.Tan
-CppEdsl.Winograd

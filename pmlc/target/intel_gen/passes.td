@@ -11,6 +11,11 @@ def IntelGenLowerAffine : FunctionPass<"intel-gen-lower-affine"> {
   ];
 }
 
+def AffinePack : FunctionPass<"affine-pack"> {
+  let summary = "Pack affine parallels with hardware set and > 3 dims into 3 dims";
+  let constructor = "pmlc::target::intel_gen::createAffinePackPass()";
+}
+
 def ConvertStandardToLLVM : Pass<"intel-gen-convert-std-to-llvm", "mlir::ModuleOp"> {
   let summary = "Convert Standard + StandardX dialects to LLVM dialect";
   let constructor = "pmlc::target::intel_gen::createConvertStandardToLLVM()";
