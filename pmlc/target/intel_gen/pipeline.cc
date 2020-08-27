@@ -108,19 +108,23 @@ void pipelineBuilder(OpPassManager &pm) {
 
   // Move accumulation indexes into an inner loop
   pm.addPass(pmlc::dialect::pxa::createTileAccumulatePass());
-  pm.addPass(
-      pmlc::dialect::pxa::createAffineNormalizePass(/*normalize=*/false));
+  pm.addPass(pmlc::dialect::pxa::createAffineNormalizePass(/*promote=*/false));
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
   // Assign GPU blocks + threads to outermost loop
   pm.addPass(pmlc::dialect::pxa::createGPUThreadPass(/*maxThreads=*/128));
-  pm.addPass(pmlc::dialect::pxa::createAffineNormalizePass());
+  pm.addPass(pmlc::dialect::pxa::createAffineNormalizePass(/*promote=*/false));
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
   // Lower out of PXA memory semantics
   pm.addPass(conversion::pxa_to_affine::createLowerPXAToAffinePass());
+
+  // Pack dims
+  pm.addPass(createAffineIndexPackPass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
 
   // Do a custom version of lower-affine which also set GPU mappings
   pm.addPass(createIntelGenLowerAffinePass());
