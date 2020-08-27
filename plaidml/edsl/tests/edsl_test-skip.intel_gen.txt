@@ -5,6 +5,7 @@ CppEdsl.BitLeft
 CppEdsl.BitNot
 CppEdsl.BitRightScalar
 CppEdsl.BitRightTensor
+CppEdsl.Cast
 CppEdsl.ConvI8
 CppEdsl.CosH
 CppEdsl.Erf
