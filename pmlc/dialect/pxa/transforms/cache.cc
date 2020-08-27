@@ -75,63 +75,6 @@ static Value allocateLocalCache(OpBuilder &builder, Value memref, Location loc,
   return alloc;
 }
 
-struct CacheUtils {
-  static Value allocateAndTransfer(Value memref, mlir::Location loc,
-                                   mlir::Block *block,
-                                   const RelativeAccessPattern &rap) {
-    // Prep for generation
-    auto builder = OpBuilder::atBlockBegin(block);
-
-    // Allocate a temporary buffer
-    auto originalType = memref.getType().cast<MemRefType>();
-    auto elementType = originalType.getElementType();
-    auto memRefType = MemRefType::get(rap.innerCount, elementType);
-    auto localBuf = builder.create<AllocOp>(loc, memRefType);
-
-    // Implement the copy loop
-    SmallVector<StrideInfo, 4> zeroOffset(rap.innerCount.size());
-    auto copyLoop =
-        createCopyLoop(builder, loc, rap.innerCount, memref, localBuf,
-                       rap.outer, zeroOffset, AtomicRMWKind::assign);
-
-    // Return the result so it can be updated in the actual load.
-    return copyLoop.getResult(0);
-  }
-
-  static Value allocateAndInitialize(Value memref, mlir::Location loc,
-                                     mlir::Block *block,
-                                     const RelativeAccessPattern &rap,
-                                     mlir::AtomicRMWKind agg) {
-    // Prep for generation
-    auto builder = OpBuilder::atBlockBegin(block);
-
-    // Allocate a temporary buffer
-    auto originalType = memref.getType().cast<MemRefType>();
-    auto elementType = originalType.getElementType();
-    auto memRefType = MemRefType::get(rap.innerCount, elementType);
-    auto localBuf = builder.create<AllocOp>(loc, memRefType);
-
-    if (agg == AtomicRMWKind::assign) {
-      return localBuf;
-    }
-
-    // If it's not an assign, clear it to the reduction identity
-    auto ident = createIdentity(builder, loc, agg, elementType);
-    return createInitLoop(builder, loc, localBuf, ident);
-  }
-
-  static void replaceLoad(PxaLoadOp load, Value source,
-                          const RelativeAccessPattern &rap) {
-    // Make a new load and remove the old one
-    OpBuilder builder(load);
-    auto innerMap = convertToValueMap(load.getContext(), rap.inner);
-    auto newLoad = builder.create<PxaLoadOp>(
-        load.getLoc(), source, innerMap.getAffineMap(), innerMap.getOperands());
-    load.replaceAllUsesWith(newLoad.result());
-    load.erase();
-  }
-};
-
 LogicalResult cacheLoad(AffineParallelOp par, PxaLoadOp load) {
   // Get the striding information for the load op, fail if unsuccessful
   auto maybeRap = computeRelativeAccess(load, par.getBody());
@@ -387,6 +330,17 @@ static AffineParallelOp getRelevantBand(const RelativeAccessPattern &rap,
   return hasIndices(rap.outer, middleBand.getIVs()) ? middleBand : outerBand;
 }
 
+static void replaceLoad(PxaLoadOp load, Value source,
+                        const RelativeAccessPattern &rap) {
+  // Make a new load and remove the old one
+  OpBuilder builder(load);
+  auto innerMap = convertToValueMap(load.getContext(), rap.inner);
+  auto newLoad = builder.create<PxaLoadOp>(
+      load.getLoc(), source, innerMap.getAffineMap(), innerMap.getOperands());
+  load.replaceAllUsesWith(newLoad.result());
+  load.erase();
+}
+
 static Value replaceReduce(AffineParallelOp band, PxaReduceOp reduce,
                            Value cache, const RelativeAccessPattern &rap) {
   // Make a new reduce and remove the old one
@@ -439,7 +393,7 @@ void CachePlan::execute() {
     }
 
     for (const auto &load : entry.loads) {
-      CacheUtils::replaceLoad(load.op, cache, load.rap);
+      replaceLoad(load.op, cache, load.rap);
     }
 
     if (entry.reduces.size()) {
