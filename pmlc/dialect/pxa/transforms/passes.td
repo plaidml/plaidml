@@ -23,6 +23,31 @@ def BufferPlacement : FunctionPass<"pxa-buffer-placement"> {
   let constructor = "pmlc::dialect::pxa::createBufferPlacementPass()";
 }
 
+def Cache : FunctionPass<"pxa-cache"> {
+  let summary = "Cache global memory into local memory";
+  let constructor = "pmlc::dialect::pxa::createCachePass()";
+  let options = [
+    Option<"cacheTag", "cache-tag", "std::string",
+           /*default=*/"\"cache\"",
+           "Cache loop tag to be set">,
+    Option<"inputTag", "input-tag", "std::string",
+           /*default=*/"\"input\"",
+           "Input cache loop tag">,
+    Option<"outputTag", "output-tag", "std::string",
+           /*default=*/"\"output\"",
+           "Output cache loop tag">,
+    Option<"outerTag", "outer-tag", "std::string",
+           /*default=*/"\"outer\"",
+           "Outer loop tag">,
+    Option<"middleTag", "middle-tag", "std::string",
+           /*default=*/"\"middle\"",
+           "Middle loop tag">,
+    Option<"innerTag", "inner-tag", "std::string",
+           /*default=*/"\"inner\"",
+           "Inner loop tag">,
+  ];
+}
+
 def Fusion : FunctionPass<"pxa-fusion"> {
   let summary = "Fuse blocks that are compatible";
   let constructor = "pmlc::dialect::pxa::createFusionPass()";

@@ -2,6 +2,9 @@
 
 #include "pmlc/dialect/pxa/transforms/cache.h"
 
+#include <memory>
+#include <utility>
+
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/IR/AffineValueMap.h"
 #include "mlir/Support/DebugStringHelper.h"
@@ -9,6 +12,7 @@
 #include "pmlc/dialect/pxa/analysis/strides.h"
 #include "pmlc/dialect/pxa/analysis/uses.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
+#include "pmlc/dialect/pxa/transforms/pass_detail.h"
 #include "pmlc/util/ident.h"
 #include "pmlc/util/logging.h"
 #include "pmlc/util/util.h"
@@ -289,7 +293,7 @@ void CachePlan::addLoad(PxaLoadOp op) {
   }
 
   Entry entry{*maybeRap};
-  auto [it, isNew] = entries.try_emplace(memref, entry);
+  auto [it, isNew] = entries.insert(std::make_pair(memref, entry));
   if (!isNew) {
     it->second.rap.unionMerge(*maybeRap);
   }
@@ -308,7 +312,7 @@ void CachePlan::addReduce(PxaReduceOp op) {
   }
 
   Entry entry{*maybeRap};
-  auto [it, isNew] = entries.try_emplace(memref, entry);
+  auto [it, isNew] = entries.insert(std::make_pair(memref, entry));
   if (!isNew) {
     it->second.rap.unionMerge(*maybeRap);
   }
@@ -415,6 +419,41 @@ void CachePlan::execute() {
       finalUse.set(copyLoop.getResult(0));
     }
   }
+}
+
+struct CachePass : public CacheBase<CachePass> {
+  void runOnFunction() final {
+    auto func = getFunction();
+
+    func.walk([&](AffineParallelOp inner) {
+      if (!util::hasTag(inner, innerTag)) {
+        return;
+      }
+
+      auto middle = dyn_cast<AffineParallelOp>(inner.getParentOp());
+      if (!middle || !util::hasTag(middle, middleTag)) {
+        middle.emitError("Middle loop does not have tag");
+        signalPassFailure();
+        return;
+      }
+
+      auto outer = dyn_cast<AffineParallelOp>(middle.getParentOp());
+      if (!outer || !util::hasTag(outer, outerTag)) {
+        outer.emitError("Outer loop does not have tag");
+        signalPassFailure();
+        return;
+      }
+
+      CachePlan plan(outer, middle);
+      inner.walk([&](PxaLoadOp load) { plan.addLoad(load); });
+      inner.walk([&](PxaReduceOp reduce) { plan.addReduce(reduce); });
+      plan.execute();
+    });
+  }
+};
+
+std::unique_ptr<mlir::Pass> createCachePass() {
+  return std::make_unique<CachePass>();
 }
 
 } // namespace pmlc::dialect::pxa

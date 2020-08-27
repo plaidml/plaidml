@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include "llvm/ADT/MapVector.h"
+
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 
 #include "pmlc/dialect/pxa/analysis/strides.h"
@@ -28,7 +30,7 @@ struct CachePlan {
     bool copyFrom = false;
   };
 
-  mlir::DenseMap<Value, Entry> entries;
+  llvm::MapVector<Value, Entry> entries;
   mlir::AffineParallelOp outerBand;
   mlir::AffineParallelOp middleBand;
 
