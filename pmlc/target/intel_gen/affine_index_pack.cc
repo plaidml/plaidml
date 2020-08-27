@@ -33,7 +33,7 @@ struct IndexPacking {
 struct AffineIndexPackPass : public AffineIndexPackBase<AffineIndexPackPass> {
   LogicalResult maybePack(AffineParallelOp op) {
     auto hardware = op.getAttrOfType<StringAttr>("hardware");
-    if (!hardware || op.getIVs().size() <= 3) {
+    if (!hardware || (op.getIVs().size() <= 3 && op.getIVs().size() != 0)) {
       // Doesn't need special handling
       return success();
     }
@@ -84,7 +84,7 @@ struct AffineIndexPackPass : public AffineIndexPackBase<AffineIndexPackPass> {
       }
     }
     // Remove extra indexes with range 1
-    while (curPack.size() > 0 && curPack.back() == 1) {
+    while (curPack.size() > 1 && curPack.back() == 1) {
       curPack.pop_back();
     }
     // Make a normalized affineParallel

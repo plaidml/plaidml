@@ -108,14 +108,13 @@ void pipelineBuilder(OpPassManager &pm) {
 
   // Move accumulation indexes into an inner loop
   pm.addPass(pmlc::dialect::pxa::createTileAccumulatePass());
-  pm.addPass(
-      pmlc::dialect::pxa::createAffineNormalizePass(/*normalize=*/false));
+  pm.addPass(pmlc::dialect::pxa::createAffineNormalizePass(/*promote=*/false));
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
   // Assign GPU blocks + threads to outermost loop
   pm.addPass(pmlc::dialect::pxa::createGPUThreadPass(/*maxThreads=*/128));
-  pm.addPass(pmlc::dialect::pxa::createAffineNormalizePass());
+  pm.addPass(pmlc::dialect::pxa::createAffineNormalizePass(/*promote=*/false));
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
