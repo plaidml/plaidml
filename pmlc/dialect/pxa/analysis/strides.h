@@ -47,7 +47,7 @@ struct StrideRange {
     return ret;
   }
 
-  int64_t count() {
+  int64_t count() const {
     if (!valid) {
       return 0;
     }
@@ -90,6 +90,8 @@ struct StrideInfo {
   bool operator==(const StrideInfo &rhs) const {
     return offset == rhs.offset && strides == rhs.strides;
   }
+
+  bool operator!=(const StrideInfo &rhs) const { return !(*this == rhs); }
 
   StrideInfo &operator*=(int64_t factor);
   StrideInfo operator*(int64_t factor) const {
@@ -150,10 +152,13 @@ mlir::Optional<StrideInfo> computeStrideInfo(mlir::MemRefType memRef,
 
 // Helper that works on a affine load / store, etc.
 mlir::Optional<StrideInfo> computeStrideInfo(pmlc::dialect::pxa::PxaLoadOp op);
+
 mlir::Optional<StrideInfo>
 computeStrideInfo(pmlc::dialect::pxa::PxaReduceOp op);
+
 mlir::Optional<StrideInfo>
 computeStrideInfo(pmlc::dialect::pxa::PxaVectorLoadOp op);
+
 mlir::Optional<StrideInfo>
 computeStrideInfo(pmlc::dialect::pxa::PxaVectorReduceOp op);
 
@@ -167,16 +172,23 @@ struct RelativeAccessPattern {
 
   // The memref type of the access.
   mlir::Value memRef;
-  // For each dimension on the access, what are its strides relative to various
-  // block args
+
+  // For each dimension of the access: the strides relative to all in-scope
+  // block arguments.
   mlir::SmallVector<StrideInfo, 4> outer;
-  // For each dimension the offset inside the block
+
+  // For each dimension of the access: the offset inside the block.
   mlir::SmallVector<StrideInfo, 4> inner;
+
+  // For each dimension of the access: the StrideRange of the interior.
+  mlir::SmallVector<StrideRange, 4> innerRanges;
+
   // For each dimension what is the number of accesses
   mlir::SmallVector<int64_t, 4> innerCount;
+
   // For each dimension what is the minimal stride of the access.  Note:
   // dimensions with a count of 1 have a stride of 1 automatically
-  mlir::SmallVector<int64_t, 4> innerStride;
+  mlir::SmallVector<int64_t, 4> innerStride() const;
 
   // Return the outer linearized strides relative to each block argument.
   mlir::Optional<StrideInfo> flatOuter() const;
@@ -191,6 +203,9 @@ struct RelativeAccessPattern {
 
   // Return the total bytes for all inner accesses.
   int64_t totalInnerBytes() const;
+
+  // Merge another RelativeAccesPattern together by using a union.
+  LogicalResult unionMerge(const RelativeAccessPattern &rhs);
 };
 
 // Compute relative access, fail if non-strided (or operation not supported)

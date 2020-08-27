@@ -4,10 +4,14 @@
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/IR/AffineValueMap.h"
+#include "mlir/Support/DebugStringHelper.h"
+
 #include "pmlc/dialect/pxa/analysis/strides.h"
+#include "pmlc/dialect/pxa/analysis/uses.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/util/ident.h"
 #include "pmlc/util/logging.h"
+#include "pmlc/util/util.h"
 
 using namespace mlir; // NOLINT
 
@@ -61,19 +65,87 @@ static AffineParallelOp createCopyLoop(OpBuilder &builder,               //
   return loop;
 }
 
-Optional<CacheInfo> cacheLoad(AffineParallelOp par, PxaLoadOp load) {
+static Value allocateLocalCache(OpBuilder &builder, Value memref, Location loc,
+                                const RelativeAccessPattern &rap) {
+  auto originalType = memref.getType().cast<MemRefType>();
+  auto elementType = originalType.getElementType();
+  auto memRefType = MemRefType::get(rap.innerCount, elementType);
+  auto alloc = builder.create<AllocOp>(loc, memRefType);
+  alloc.getOperation()->setAttr("cache", builder.getUnitAttr());
+  return alloc;
+}
+
+struct CacheUtils {
+  static Value allocateAndTransfer(Value memref, mlir::Location loc,
+                                   mlir::Block *block,
+                                   const RelativeAccessPattern &rap) {
+    // Prep for generation
+    auto builder = OpBuilder::atBlockBegin(block);
+
+    // Allocate a temporary buffer
+    auto originalType = memref.getType().cast<MemRefType>();
+    auto elementType = originalType.getElementType();
+    auto memRefType = MemRefType::get(rap.innerCount, elementType);
+    auto localBuf = builder.create<AllocOp>(loc, memRefType);
+
+    // Implement the copy loop
+    SmallVector<StrideInfo, 4> zeroOffset(rap.innerCount.size());
+    auto copyLoop =
+        createCopyLoop(builder, loc, rap.innerCount, memref, localBuf,
+                       rap.outer, zeroOffset, AtomicRMWKind::assign);
+
+    // Return the result so it can be updated in the actual load.
+    return copyLoop.getResult(0);
+  }
+
+  static Value allocateAndInitialize(Value memref, mlir::Location loc,
+                                     mlir::Block *block,
+                                     const RelativeAccessPattern &rap,
+                                     mlir::AtomicRMWKind agg) {
+    // Prep for generation
+    auto builder = OpBuilder::atBlockBegin(block);
+
+    // Allocate a temporary buffer
+    auto originalType = memref.getType().cast<MemRefType>();
+    auto elementType = originalType.getElementType();
+    auto memRefType = MemRefType::get(rap.innerCount, elementType);
+    auto localBuf = builder.create<AllocOp>(loc, memRefType);
+
+    if (agg == AtomicRMWKind::assign) {
+      return localBuf;
+    }
+
+    // If it's not an assign, clear it to the reduction identity
+    auto ident = createIdentity(builder, loc, agg, elementType);
+    return createInitLoop(builder, loc, localBuf, ident);
+  }
+
+  static void replaceLoad(PxaLoadOp load, Value source,
+                          const RelativeAccessPattern &rap) {
+    // Make a new load and remove the old one
+    OpBuilder builder(load);
+    auto innerMap = convertToValueMap(load.getContext(), rap.inner);
+    auto newLoad = builder.create<PxaLoadOp>(
+        load.getLoc(), source, innerMap.getAffineMap(), innerMap.getOperands());
+    load.replaceAllUsesWith(newLoad.result());
+    load.erase();
+  }
+};
+
+LogicalResult cacheLoad(AffineParallelOp par, PxaLoadOp load) {
   // Get the striding information for the load op, fail if unsuccessful
   auto maybeRap = computeRelativeAccess(load, par.getBody());
   if (!maybeRap) {
     IVLOG(3, "cacheLoad: Failed due to a non-strided access");
-    return None;
+    return failure();
   }
   const auto &rap = *maybeRap;
   // Fail for non-1 strides, TODO: Handle compression case
-  for (int64_t stride : rap.innerStride) {
+  auto innerStride = rap.innerStride();
+  for (int64_t stride : innerStride) {
     if (stride != 1) {
       IVLOG(3, "cacheLoad failed: not all strides are one");
-      return None;
+      return failure();
     }
   }
   // Prep for generation
@@ -98,10 +170,7 @@ Optional<CacheInfo> cacheLoad(AffineParallelOp par, PxaLoadOp load) {
   load.replaceAllUsesWith(newLoad.result());
   load.erase();
 
-  return CacheInfo{
-      /*copyLoopOp=*/copyLoop,
-      /*relativeAccess=*/*maybeRap,
-  };
+  return success();
 }
 
 LogicalResult cacheLoadAsVector(AffineParallelOp par, PxaLoadOp load,
@@ -127,9 +196,10 @@ LogicalResult cacheLoadAsVector(AffineParallelOp par, PxaLoadOp load,
     }
   }
   unsigned last = rap.inner.size() - 1;
-  if (rap.innerStride[last] != 1) {
+  auto innerStride = rap.innerStride();
+  if (innerStride[last] != 1) {
     IVLOG(3, "cacheLoadAsVector: Failed due to invalid stride: "
-                 << rap.innerStride[last]);
+                 << innerStride[last]);
     return failure();
   }
   int64_t vectorSize = rap.innerCount[last];
@@ -166,20 +236,21 @@ LogicalResult cacheLoadAsVector(AffineParallelOp par, PxaLoadOp load,
   return success();
 }
 
-Optional<CacheInfo> cacheReduce(AffineParallelOp par, PxaReduceOp reduce) {
+LogicalResult cacheReduce(AffineParallelOp par, PxaReduceOp reduce) {
   // Get the striding information for the load op, fail if unsuccessful
   auto maybeRap = computeRelativeAccess(reduce, par.getBody());
   if (!maybeRap) {
     IVLOG(3, "cacheReduce failed: due to a non-strided access");
-    return None;
+    return failure();
   }
   const auto &rap = *maybeRap;
 
   // Fail for non-1 strides, TODO: Handle compression case
-  for (int64_t stride : rap.innerStride) {
+  auto innerStride = rap.innerStride();
+  for (int64_t stride : innerStride) {
     if (stride != 1) {
       IVLOG(3, "cacheReduce failed: not all strides are one.");
-      return None;
+      return failure();
     }
   }
 
@@ -189,13 +260,13 @@ Optional<CacheInfo> cacheReduce(AffineParallelOp par, PxaReduceOp reduce) {
   while (out.getParentBlock() != par.getBody()) {
     if (!out.hasOneUse()) {
       IVLOG(3, "cacheReduce failed: multiple uses");
-      return None;
+      return failure();
     }
     auto &use = *out.use_begin();
     auto yieldOp = dyn_cast<AffineYieldOp>(use.getOwner());
     if (!yieldOp) {
       IVLOG(3, "cacheReduce failed: missing yield op");
-      return None;
+      return failure();
     }
     out = yieldOp.getParentOp()->getResult(use.getOperandNumber());
   }
@@ -204,7 +275,7 @@ Optional<CacheInfo> cacheReduce(AffineParallelOp par, PxaReduceOp reduce) {
   // requirement, but it's easier
   if (!out.hasOneUse()) {
     IVLOG(3, "cacheReduce failed: multiple uses");
-    return None;
+    return failure();
   }
   auto &finalUse = *out.use_begin();
 
@@ -251,10 +322,145 @@ Optional<CacheInfo> cacheReduce(AffineParallelOp par, PxaReduceOp reduce) {
   finalUse.set(copyLoop.getResult(0));
   reduce.erase();
 
-  return CacheInfo{
-      /*copyLoopOp=*/copyLoop,
-      /*relativeAccess=*/*maybeRap,
-  };
+  return success();
+}
+
+static bool isInitialized(Value memref) {
+  if (auto op = memref.getDefiningOp()) {
+    if (isa<AllocOp>(op)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+void CachePlan::addLoad(PxaLoadOp op) {
+  auto memref = getIndirectDefOutsideScope(op.memref(), outerBand);
+  if (!memref) {
+    return;
+  }
+
+  auto maybeRap = computeRelativeAccess(op, middleBand.getBody());
+  if (!maybeRap) {
+    return;
+  }
+
+  Entry entry{*maybeRap};
+  auto [it, isNew] = entries.try_emplace(memref, entry);
+  if (!isNew) {
+    it->second.rap.unionMerge(*maybeRap);
+  }
+  it->second.loads.push_back(LoadInfo{op, *maybeRap});
+}
+
+void CachePlan::addReduce(PxaReduceOp op) {
+  auto memref = getIndirectDefOutsideScope(op.memref(), outerBand);
+  if (!memref) {
+    return;
+  }
+
+  auto maybeRap = computeRelativeAccess(op, middleBand.getBody());
+  if (!maybeRap) {
+    return;
+  }
+
+  Entry entry{*maybeRap};
+  auto [it, isNew] = entries.try_emplace(memref, entry);
+  if (!isNew) {
+    it->second.rap.unionMerge(*maybeRap);
+  }
+  it->second.reduces.push_back(ReduceInfo{op, *maybeRap});
+}
+
+static bool hasIndices(ArrayRef<StrideInfo> strideInfos,
+                       ArrayRef<BlockArgument> idxs) {
+  return llvm::any_of(idxs, [&](BlockArgument idx) {
+    return llvm::any_of(strideInfos, [&](const StrideInfo &si) {
+      return si.strides.count(idx);
+    });
+  });
+}
+
+static AffineParallelOp getRelevantBand(const RelativeAccessPattern &rap,
+                                        AffineParallelOp outerBand,
+                                        AffineParallelOp middleBand) {
+  return hasIndices(rap.outer, middleBand.getIVs()) ? middleBand : outerBand;
+}
+
+static Value replaceReduce(AffineParallelOp band, PxaReduceOp reduce,
+                           Value cache, const RelativeAccessPattern &rap) {
+  // Make a new reduce and remove the old one
+  auto loc = reduce.getLoc();
+  auto innerMap = convertToValueMap(band.getContext(), rap.inner);
+  OpBuilder builder(reduce);
+  auto newReduce = builder.create<PxaReduceOp>(loc, reduce.agg(), reduce.val(),
+                                               cache, innerMap.getAffineMap(),
+                                               innerMap.getOperands());
+  reduce.replaceAllUsesWith(newReduce.result());
+  reduce.erase();
+
+  // Walk upwards to adjust types
+  Value result = newReduce;
+  Type newType = newReduce.getType();
+  while (result.getParentBlock() != band.getBody()) {
+    auto use = result.use_begin();
+    result = getNextIndirectUse(*use);
+    // if (!result) {
+    //   band.emitOpError("No indirect uses found");
+    // }
+    if (auto ifOp = dyn_cast<AffineIfOp>(result.getDefiningOp())) {
+      // TODO: should we fail in this case?
+      auto yield =
+          dyn_cast<AffineYieldOp>(ifOp.getElseBlock()->getTerminator());
+      yield.setOperand(0, cache);
+    }
+    result.setType(newType);
+  }
+  return result;
+}
+
+void CachePlan::execute() {
+  for (auto &[memref, entry] : entries) {
+    // determine the level to cache at
+    entry.band = getRelevantBand(entry.rap, outerBand, middleBand);
+    auto loc = entry.band.getLoc();
+    auto builder = OpBuilder::atBlockBegin(entry.band.getBody());
+    SmallVector<StrideInfo, 4> zeroOffset(entry.rap.innerCount.size());
+
+    auto cache = allocateLocalCache(builder, memref, loc, entry.rap);
+    if (isInitialized(memref)) {
+      // copy global -> local
+      entry.copyInto = true;
+      auto copyLoop =
+          createCopyLoop(builder, loc, entry.rap.innerCount, memref, cache,
+                         entry.rap.outer, zeroOffset, AtomicRMWKind::assign);
+      copyLoop.getOperation()->setAttr("cache_in", builder.getUnitAttr());
+      cache = copyLoop.getResult(0);
+    }
+
+    for (const auto &load : entry.loads) {
+      CacheUtils::replaceLoad(load.op, cache, load.rap);
+    }
+
+    if (entry.reduces.size()) {
+      Value finalValue;
+      for (const auto &reduce : entry.reduces) {
+        finalValue = replaceReduce(entry.band, reduce.op, cache, reduce.rap);
+      }
+
+      // copy local -> global
+      entry.copyFrom = true;
+      OpBuilder::InsertionGuard guard(builder);
+      auto yield = entry.band.getBody()->getTerminator();
+      builder.setInsertionPoint(yield);
+      auto &finalUse = *finalValue.use_begin();
+      auto copyLoop =
+          createCopyLoop(builder, loc, entry.rap.innerCount, finalValue, memref,
+                         zeroOffset, entry.rap.outer, AtomicRMWKind::assign);
+      copyLoop.getOperation()->setAttr("cache_out", builder.getUnitAttr());
+      finalUse.set(copyLoop.getResult(0));
+    }
+  }
 }
 
 } // namespace pmlc::dialect::pxa

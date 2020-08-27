@@ -239,11 +239,11 @@ LogicalResult simpleVectorize(AffineParallelOp op, unsigned vecSize) {
   if (op.getNumResults() != 1) {
     return failure();
   }
-  auto red = mlir::dyn_cast<PxaReduceOp>(getOriginalDef(op.getResult(0)));
-  if (!red) {
+  auto reduce = mlir::dyn_cast<PxaReduceOp>(getPrevWriter(op.getResult(0)));
+  if (!reduce) {
     return failure();
   }
-  auto maybeSI = computeStrideInfo(red);
+  auto maybeSI = computeStrideInfo(reduce);
   if (!maybeSI) {
     return failure();
   }
