@@ -10,10 +10,16 @@ namespace pmlc::target::intel_gen {
 
 std::unique_ptr<mlir::Pass> createIntelGenLowerAffinePass();
 
-std::unique_ptr<mlir::Pass> createAffinePackPass();
+std::unique_ptr<mlir::Pass> createAffineIndexPackPass();
+
+std::unique_ptr<mlir::Pass> createConvertStandardToLLVM();
 
 std::unique_ptr<mlir::Pass> createParallelLoopToGpuPass();
 
 void pipelineBuilder(mlir::OpPassManager &pm);
+
+/// Generate the code for registering passes.
+#define GEN_PASS_REGISTRATION
+#include "pmlc/target/intel_gen/passes.h.inc"
 
 } // namespace pmlc::target::intel_gen

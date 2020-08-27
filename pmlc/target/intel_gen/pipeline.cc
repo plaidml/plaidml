@@ -123,7 +123,7 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(conversion::pxa_to_affine::createLowerPXAToAffinePass());
 
   // Pack dims
-  pm.addPass(createAffinePackPass());
+  pm.addPass(createAffineIndexPackPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 

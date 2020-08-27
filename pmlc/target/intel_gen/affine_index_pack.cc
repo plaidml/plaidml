@@ -30,7 +30,7 @@ struct IndexPacking {
 
 // Pack N indexes into 3 indexes via floor div + mod, pack po2 indexes first to
 // make floor div and mod more likely to be lowerable as bit operations
-struct AffinePackPass : public AffinePackBase<AffinePackPass> {
+struct AffineIndexPackPass : public AffineIndexPackBase<AffineIndexPackPass> {
   LogicalResult maybePack(AffineParallelOp op) {
     auto hardware = op.getAttrOfType<StringAttr>("hardware");
     if (!hardware || op.getIVs().size() <= 3) {
@@ -49,7 +49,7 @@ struct AffinePackPass : public AffinePackBase<AffinePackPass> {
       return failure();
     }
     auto ranges = *maybeRanges;
-    // Verify outer loop is mormalized and no trip-count 1 ranges
+    // Verify outer loop is normalized and no trip-count 1 ranges
     for (unsigned i = 0; i < ranges.size(); i++) {
       auto lbExpr =
           op.lowerBoundsMap().getResult(i).dyn_cast<AffineConstantExpr>();
@@ -83,11 +83,11 @@ struct AffinePackPass : public AffinePackBase<AffinePackPass> {
         curIdx = std::min(curIdx + 1, 2u);
       }
     }
-    // Remove extra indexes
+    // Remove extra indexes with range 1
     while (curPack.size() > 0 && curPack.back() == 1) {
       curPack.pop_back();
     }
-    // Make a noralized affineParallel
+    // Make a normalized affineParallel
     auto builder = OpBuilder(op);
     auto newLoop = builder.create<AffineParallelOp>(
         op.getLoc(),
@@ -95,7 +95,7 @@ struct AffinePackPass : public AffinePackBase<AffinePackPass> {
         /*reductions=*/ArrayRef<AtomicRMWKind>{},
         /*ranges=*/curPack);
     // Make an affine apply for each original index
-    auto ibuild = newLoop.getBodyBuilder();
+    auto innerBuilder = newLoop.getBodyBuilder();
     for (unsigned i = 0; i < ranges.size(); i++) {
       const auto &info = packInfo[i];
       // Begin with the original value
@@ -107,15 +107,15 @@ struct AffinePackPass : public AffinePackBase<AffinePackPass> {
           static_cast<uint64_t>(curPack[info.sourceIdx])) {
         cur = cur % info.mod;
       }
-      // Make an affine map
+      // Convert the affine expression into a single result map
       auto map = AffineMap::get(1, 0, cur);
-      // Make the affine apply
+      // Apply the map to the new IV to generate the old IV
       Value newIV = newLoop.getIVs()[info.sourceIdx];
-      Value mapped =
-          ibuild.create<AffineApplyOp>(op.getLoc(), map, ValueRange{newIV});
+      Value mapped = innerBuilder.create<AffineApplyOp>(op.getLoc(), map,
+                                                        ValueRange{newIV});
       op.getIVs()[i].replaceAllUsesWith(mapped);
     }
-    // Slice in the interior
+    // Splice in the interior
     newLoop.getBody()->getOperations().splice( //
         std::prev(newLoop.getBody()->end()),   //
         op.getBody()->getOperations(),         //
@@ -138,7 +138,7 @@ struct AffinePackPass : public AffinePackBase<AffinePackPass> {
 
 } // namespace
 
-std::unique_ptr<mlir::Pass> createAffinePackPass() {
-  return std::make_unique<AffinePackPass>();
+std::unique_ptr<mlir::Pass> createAffineIndexPackPass() {
+  return std::make_unique<AffineIndexPackPass>();
 }
 } // namespace pmlc::target::intel_gen
