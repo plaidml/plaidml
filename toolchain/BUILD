@@ -1,3 +1,4 @@
+load("@rules_cc//cc:defs.bzl", "cc_toolchain", "cc_toolchain_suite")
 load(":build_defs.bzl", "gcc_toolchain_config")
 
 package(default_visibility = ["//visibility:public"])
@@ -7,6 +8,7 @@ cc_toolchain_suite(
     tags = ["linux"],
     # target_cpu | compiler
     toolchains = {
+        "k8": ":cc-linux_x86_64-gcc_8.3.0",
         "linux_x86_64|gcc": ":cc-linux_x86_64-gcc_8.3.0",
         "linux_x86_64": ":cc-linux_x86_64-gcc_8.3.0",
     },
