@@ -14,8 +14,6 @@ AffineParallelOp performTiling(AffineParallelOp op,
   // Verify sizes match
   size_t dimCount = tileSizes.size();
   assert(op.lowerBoundsMap().getNumResults() == dimCount);
-  // Fail on no dimensions (TODO: should we handle this case anyway?)
-  assert(dimCount > 0);
   // Check that tile sizes is a multiple of original steps
   auto steps = op.getSteps();
   for (size_t i = 0; i < dimCount; i++) {

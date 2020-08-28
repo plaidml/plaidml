@@ -69,7 +69,7 @@ struct TileAccumulatePass : public TileAccumulateBase<TileAccumulatePass> {
     // Tile only the outermost loops
     for (auto op : func.getBody().getOps<AffineParallelOp>()) {
       if (op.getNumResults() == 1) {
-        tileAccumulations(op, true);
+        tileAccumulations(op, false);
       }
     }
   }

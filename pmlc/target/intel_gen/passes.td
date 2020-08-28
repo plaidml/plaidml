@@ -11,6 +11,11 @@ def IntelGenLowerAffine : FunctionPass<"intel-gen-lower-affine"> {
   ];
 }
 
+def AffineIndexPack : FunctionPass<"intel-gen-affine-index-pack"> {
+  let summary = "Pack affine parallels with hardware set and > 3 dims into 3 dims";
+  let constructor = "pmlc::target::intel_gen::createAffineIndexPackPass()";
+}
+
 def ConvertStandardToLLVM : Pass<"intel-gen-convert-std-to-llvm", "mlir::ModuleOp"> {
   let summary = "Convert Standard + StandardX dialects to LLVM dialect";
   let constructor = "pmlc::target::intel_gen::createConvertStandardToLLVM()";
@@ -19,7 +24,7 @@ def ConvertStandardToLLVM : Pass<"intel-gen-convert-std-to-llvm", "mlir::ModuleO
 
 def ConvertParallelLoopToGpu : Pass<"intel-gen-convert-parallel-loops-to-gpu"> {
   let summary = "Convert mapped scf.parallel ops to gpu launch operations";
-  let constructor = "pmlc::target::createParallelLoopToGpuPass()";
+  let constructor = "pmlc::target::intel_gen::createParallelLoopToGpuPass()";
   let dependentDialects = ["mlir::AffineDialect", "mlir::gpu::GPUDialect"];
 }
 

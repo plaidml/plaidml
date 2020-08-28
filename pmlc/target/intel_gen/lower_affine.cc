@@ -65,8 +65,7 @@ public:
       proc = Processor::ThreadX;
     }
     if (proc != Processor::Sequential && steps.size() > 3) {
-      // TODO: Add index packing goo here
-      op.emitRemark("Failed to lower to GPU due to lack of index packing");
+      op.emitError("Failed to lower to GPU due to lack of index packing");
       return failure();
     }
     // Creating empty scf.parallel op body with appropriate bounds.

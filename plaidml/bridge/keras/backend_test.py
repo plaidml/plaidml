@@ -11,6 +11,7 @@ import warnings
 from collections import OrderedDict
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
+os.environ['KERAS_BACKEND'] = 'plaidml.bridge.keras'
 
 import numpy as np
 import numpy.testing as npt
