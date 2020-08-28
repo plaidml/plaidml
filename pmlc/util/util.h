@@ -16,6 +16,8 @@
 
 namespace pmlc::util {
 
+static constexpr const char *kTagAttribute = "tags";
+
 // Adjust the result types on the containing FuncOp if this op relates to an
 // output
 void UpdateFuncOpType(mlir::Operation *op);
@@ -54,6 +56,15 @@ std::string getUniqueName(Set *names, llvm::StringRef name) {
 }
 
 uint64_t getByteSize(mlir::MemRefType type);
+
+// Check if all tags exist in op and they are all true
+bool hasAllTags(mlir::Operation *op, llvm::ArrayRef<llvm::StringRef> tags);
+
+// Check if tag exists in op
+bool hasTag(mlir::Operation *op, llvm::StringRef tag);
+
+// Set tags in op
+void setTags(mlir::Operation *op, llvm::ArrayRef<llvm::StringRef> tags);
 
 } // namespace pmlc::util
 

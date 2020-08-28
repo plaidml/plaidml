@@ -28,7 +28,7 @@ namespace pmlc::dialect::pxa {
 AffineParallelOp tileAccumulations(AffineParallelOp op, bool skipTrivial) {
   // Find the originating reduce
   assert(op.getNumResults() == 1);
-  auto srcDef = getOriginalDef(op.getResult(0));
+  auto srcDef = getPrevWriter(op.getResult(0));
   auto reduceOp = cast<PxaReduceOp>(srcDef);
   // Get strides for output
   auto si = *computeStrideInfo(reduceOp);

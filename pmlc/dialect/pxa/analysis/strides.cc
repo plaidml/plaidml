@@ -72,31 +72,6 @@ static Optional<StrideInfo> flatten(MemRefType memRefType,
   return flat;
 }
 
-MemRefType RelativeAccessPattern::getMemRefType() const {
-  return memRef.getType().cast<MemRefType>();
-}
-
-int64_t RelativeAccessPattern::totalInnerCount() const {
-  int64_t ret = 1;
-  for (auto dim : innerCount) {
-    ret *= dim;
-  }
-  return ret;
-}
-
-int64_t RelativeAccessPattern::totalInnerBytes() const {
-  auto eltSize = llvm::divideCeil(getMemRefType().getElementTypeBitWidth(), 8);
-  return totalInnerCount() * eltSize;
-}
-
-Optional<StrideInfo> RelativeAccessPattern::flatOuter() const {
-  return flatten(getMemRefType(), outer);
-}
-
-Optional<StrideInfo> RelativeAccessPattern::flatInner() const {
-  return flatten(getMemRefType(), inner);
-}
-
 StrideRange::StrideRange(BlockArgument arg)
     : valid(false), minVal(0), maxVal(0), stride(0) {
   if (auto ap = dyn_cast<AffineParallelOp>(arg.getOwner()->getParentOp())) {
@@ -520,12 +495,8 @@ computeRelativeAccess(Operation *op, BlockArgumentBoundaryFn fn) {
     if (!range.valid || range.minVal != 0) {
       return None;
     }
+    ret.innerRanges.push_back(range);
     ret.innerCount.push_back(range.count());
-    int64_t stride = range.stride;
-    if (stride == 0) {
-      stride = 1;
-    }
-    ret.innerStride.push_back(stride);
   }
   return ret;
 }
@@ -535,6 +506,62 @@ Optional<RelativeAccessPattern> computeRelativeAccess(Operation *op,
   return computeRelativeAccess(op, [block](BlockArgument arg) {
     return getBoundaryRegion(arg.getOwner(), block);
   });
+}
+
+MemRefType RelativeAccessPattern::getMemRefType() const {
+  return memRef.getType().cast<MemRefType>();
+}
+
+SmallVector<int64_t, 4> RelativeAccessPattern::innerStride() const {
+  SmallVector<int64_t, 4> ret;
+  for (const StrideRange &range : innerRanges) {
+    ret.push_back(range.stride ? range.stride : 1);
+  }
+  return ret;
+}
+
+int64_t RelativeAccessPattern::totalInnerCount() const {
+  int64_t ret = 1;
+  for (auto range : innerRanges) {
+    ret *= range.count();
+  }
+  return ret;
+}
+
+int64_t RelativeAccessPattern::totalInnerBytes() const {
+  auto eltSize = llvm::divideCeil(getMemRefType().getElementTypeBitWidth(), 8);
+  return totalInnerCount() * eltSize;
+}
+
+Optional<StrideInfo> RelativeAccessPattern::flatOuter() const {
+  return flatten(getMemRefType(), outer);
+}
+
+Optional<StrideInfo> RelativeAccessPattern::flatInner() const {
+  return flatten(getMemRefType(), inner);
+}
+
+LogicalResult
+RelativeAccessPattern::unionMerge(const RelativeAccessPattern &rhs) {
+  if (innerRanges.size() != rhs.innerRanges.size()) {
+    return failure();
+  }
+
+  for (unsigned i = 0; i < outer.size(); i++) {
+    if (outer[i] != rhs.outer[i]) {
+      return failure();
+    }
+  }
+
+  inner.clear();
+  innerCount.clear();
+
+  for (unsigned i = 0; i < innerRanges.size(); i++) {
+    innerRanges[i].unionEquals(rhs.innerRanges[i]);
+    innerCount.push_back(innerRanges[i].count());
+  }
+
+  return success();
 }
 
 StrideArray::StrideArray(unsigned numDims, int64_t offset)

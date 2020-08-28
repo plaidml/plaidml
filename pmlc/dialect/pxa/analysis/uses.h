@@ -9,13 +9,19 @@
 
 namespace pmlc::dialect::pxa {
 
-// Trace through any parallel fors to find the original defining operation for a
+// Trace through any parallel fors to find the previous writer operation for a
 // given value.
-Operation *getOriginalDef(Value val);
+Operation *getPrevWriter(Value value);
+
+Value getPrevIndirectDef(mlir::OpResult def);
+Value getNextIndirectUse(mlir::OpOperand &use);
+
+Value getIndirectDef(Value value);
+Value getIndirectDefOutsideScope(Value value, Operation *scope);
 
 class IndirectValuesIterator
-    : public llvm::iterator_facade_base<
-          IndirectValuesIterator, std::forward_iterator_tag, mlir::Value> {
+    : public llvm::iterator_facade_base<IndirectValuesIterator,
+                                        std::forward_iterator_tag, Value> {
 public:
   IndirectValuesIterator() {}
   explicit IndirectValuesIterator(Value value) : curValue(value) {}
@@ -27,8 +33,8 @@ public:
     return curValue == rhs.curValue;
   }
 
-  mlir::Value getValue() const { return curValue; }
-  mlir::Value operator*() const { return curValue; }
+  Value getValue() const { return curValue; }
+  Value operator*() const { return curValue; }
 
   IndirectValuesIterator &operator++();
   IndirectValuesIterator operator++(int) {

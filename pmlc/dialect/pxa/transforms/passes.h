@@ -24,6 +24,8 @@ std::unique_ptr<mlir::Pass> createAutoTileExamplePass();
 
 std::unique_ptr<mlir::Pass> createBufferPlacementPass();
 
+std::unique_ptr<mlir::Pass> createCachePass();
+
 std::unique_ptr<mlir::Pass>
 createFusionPass(int64_t memoryActivityThreshold = 0);
 
