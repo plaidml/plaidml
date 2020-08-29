@@ -23,18 +23,18 @@ public:
     return &registry;
   }
 
-  void registerTarget(StringRef name, const TargetRegistryFunction &function) {
-    if (registry.count(name)) {
+  void registerTarget(StringRef targetId, std::shared_ptr<Target> target) {
+    auto [it, inserted] = registry.try_emplace(targetId, std::move(target));
+    if (!inserted) {
       throw std::runtime_error(
-          formatv("Target is already registered: {0}", name));
+          formatv("Target is already registered: {0}", targetId));
     }
-    registry[name] = function;
   }
 
-  TargetRegistryFunction resolve(StringRef name) {
-    auto it = registry.find(name);
+  std::shared_ptr<Target> resolve(StringRef targetId) {
+    auto it = registry.find(targetId);
     if (it == registry.end()) {
-      throw std::runtime_error(formatv("Could not find target: {0}", name));
+      throw std::runtime_error(formatv("Could not find target: {0}", targetId));
     }
     return it->second;
   }
@@ -45,17 +45,17 @@ public:
   }
 
 private:
-  StringMap<TargetRegistryFunction> registry;
+  StringMap<std::shared_ptr<Target>> registry;
 };
 
 } // namespace
 
-void registerTarget(StringRef name, const TargetRegistryFunction &function) {
-  TargetRegistry::instance()->registerTarget(name, function);
+void registerTarget(StringRef targetId, std::shared_ptr<Target> function) {
+  TargetRegistry::instance()->registerTarget(targetId, std::move(function));
 }
 
-TargetRegistryFunction resolveTarget(StringRef name) {
-  return TargetRegistry::instance()->resolve(name);
+std::shared_ptr<Target> resolveTarget(StringRef targetId) {
+  return TargetRegistry::instance()->resolve(targetId);
 }
 
 std::vector<StringRef> listTargets() {

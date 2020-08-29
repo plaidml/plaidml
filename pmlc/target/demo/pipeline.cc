@@ -37,10 +37,17 @@ void addToPipeline(OpPassManager &pm) {
 
 } // namespace
 
+class Target final : public compiler::Target {
+ public:
+  void addPassesToPipeline(mlir::OpPassManager* mgr) {
+    addToPipeline(*mgr);
+  }
+};
+
 void registerPassPipeline() {
   static PassPipelineRegistration<> passPipelineReg(
       "target-demo", "Target pipeline for demonstrations", addToPipeline);
-  static compiler::TargetRegistration targetReg("demo", addToPipeline);
+  static compiler::TargetRegistration targetReg("demo", std::make_shared<Target>());
 }
 
 } // namespace pmlc::target::demo

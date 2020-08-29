@@ -91,8 +91,8 @@ Program::Program(std::unique_ptr<llvm::MemoryBuffer> buffer) {
   module = mlir::parseSourceFile(sourceMgr, &context);
 }
 
-void Program::compile(StringRef target, bool collectPasses, StringRef dumpDir) {
-  if (target.empty()) {
+void Program::compile(StringRef targetId, bool collectPasses, StringRef dumpDir) {
+  if (targetId.empty()) {
     return;
   }
 
@@ -124,8 +124,8 @@ void Program::compile(StringRef target, bool collectPasses, StringRef dumpDir) {
                         /*out=*/llvm::errs());
   }
 
-  auto pipelineBuilder = resolveTarget(target);
-  pipelineBuilder(pm);
+  auto target = resolveTarget(targetId);
+  target->addPassesToPipeline(&pm);
 
   if (failed(pm.run(*module))) {
     throw std::runtime_error("conversion to the LLVM IR dialect failed");

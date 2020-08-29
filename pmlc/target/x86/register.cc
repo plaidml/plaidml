@@ -11,6 +11,14 @@ namespace pmlc::target::x86 {
 
 static PassPipelineRegistration<>
     passPipelineReg("target-cpu", "Target pipeline for CPU", pipelineBuilder);
-static compiler::TargetRegistration targetReg("llvm_cpu", pipelineBuilder);
+
+class Target final : public compiler::Target {
+ public:
+  void addPassesToPipeline(mlir::OpPassManager* mgr) {
+    pipelineBuilder(*mgr);
+  }
+};
+
+static compiler::TargetRegistration targetReg("llvm_cpu", std::make_shared<Target>());
 
 } // namespace pmlc::target::x86
