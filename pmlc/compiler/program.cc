@@ -124,8 +124,11 @@ void Program::compile(StringRef targetId, bool collectPasses, StringRef dumpDir)
                         /*out=*/llvm::errs());
   }
 
-  auto target = resolveTarget(targetId);
-  target->addPassesToPipeline(&pm);
+  auto targetIt = globalTargetRegistry().find(targetId);
+  if (targetIt == globalTargetRegistry().end()) {
+    throw std::runtime_error{llvm::formatv("Could not find target: {0}", targetId)};
+  }
+  targetIt->second->addPassesToPipeline(&pm);
 
   if (failed(pm.run(*module))) {
     throw std::runtime_error("conversion to the LLVM IR dialect failed");

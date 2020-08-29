@@ -1035,10 +1035,11 @@ void plaidml_program_args_free(  //
 plaidml_strings* plaidml_targets_get(  //
     plaidml_error* err) {
   return ffi_wrap<plaidml_strings*>(err, nullptr, [&] {
-    const auto& targets = pmlc::compiler::listTargets();
+    const auto& targets = pmlc::compiler::globalTargetRegistry();
     auto strs = new plaidml_string*[targets.size()];
-    for (unsigned i = 0; i < targets.size(); i++) {
-      strs[i] = new plaidml_string{targets[i].str()};
+    auto str = strs;
+    for (const auto& entry : targets) {
+      *str++ = new plaidml_string{entry.first().str()};
     }
     return new plaidml_strings{targets.size(), strs};
   });

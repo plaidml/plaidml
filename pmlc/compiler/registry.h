@@ -14,11 +14,9 @@
 
 namespace pmlc::compiler {
 
+const llvm::StringMap<std::shared_ptr<Target>>& globalTargetRegistry();
+
 void registerTarget(llvm::StringRef targetId, std::shared_ptr<Target> target);
-
-std::shared_ptr<Target> resolveTarget(llvm::StringRef targetId);
-
-std::vector<llvm::StringRef> listTargets();
 
 struct TargetRegistration {
   TargetRegistration(llvm::StringRef targetId, std::shared_ptr<Target> target) {
