@@ -9,8 +9,6 @@ cc_library(
     deps = [
         "//plaidml:testenv",
         "//plaidml/bridge/tensorflow/service:compiler",
-        #"@org_tensorflow//tensorflow/compiler/xla/service:llvm_compiler",
-        #"@org_tensorflow//tensorflow/compiler/xla/service/llvm_ir:llvm_util",
         "@org_tensorflow//tensorflow/compiler/xla/tests:hlo_test_base",
         "@org_tensorflow//tensorflow/core:test",
         "@org_tensorflow//tensorflow/core:test_main",
@@ -35,12 +33,29 @@ cc_library(
 )
 
 tf_cc_test(
+    name = "compare_op_test",
+    srcs = ["compare_op_test.cc"],
+    extra_copts = ["-fexceptions"],
+    deps = [
+        ":codegen_test",
+        ":filecheck",
+        "//plaidml/bridge/tensorflow/service:compiler",
+        "@com_google_absl//absl/strings",
+        "@com_google_googletest//:gtest",
+        "@org_tensorflow//tensorflow/compiler/xla/service:hlo",
+        "@org_tensorflow//tensorflow/compiler/xla/tests:hlo_test_base",
+        "@org_tensorflow//tensorflow/compiler/xla/tests:test_utils",
+        "@org_tensorflow//tensorflow/core:framework",
+        "@org_tensorflow//tensorflow/core:lib",
+        "@org_tensorflow//tensorflow/core:test",
+        "@org_tensorflow//tensorflow/core:test_main",
+    ],
+)
+
+tf_cc_test(
     name = "eltwise_op_test",
     srcs = ["eltwise_op_test.cc"],
     extra_copts = ["-fexceptions"],
-    data = [
-        "@llvm-project//llvm:FileCheck",
-    ],
     deps = [
         ":codegen_test",
 	":filecheck",
