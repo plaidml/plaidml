@@ -1093,6 +1093,7 @@ struct ReturnOpConversion : public OpConversionPattern<ReturnOp> {
       auto def = pxa::getIndirectDef(operand);
       def.replaceAllUsesWith(block.getArgument(blockArg++));
     }
+    rewriter.replaceOpWithNewOp<ReturnOp>(op, operands);
     return success();
   }
 };
