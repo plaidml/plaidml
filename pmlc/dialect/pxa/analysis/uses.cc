@@ -22,6 +22,15 @@ Value getPrevIndirectDef(OpResult def) {
         auto yield = cast<AffineYieldOp>(op.getThenBlock()->getTerminator());
         return yield.getOperand(def.getResultNumber());
       })
+      .Case<PrngOp>([&](auto op) {
+        if (op.getResult(def.getResultNumber()) == op.result_tensor()) {
+          return op.tensor();
+        }
+        if (op.getResult(def.getResultNumber()) == op.result_state()) {
+          return op.new_state();
+        }
+        return Value();
+      })
       .Case<PxaReduceOp>([&](auto op) { return op.memref(); })
       .Case<PxaVectorReduceOp>([&](auto op) { return op.memref(); })
       .Case<PxaGemmOp>([&](auto op) { return op.c(); })

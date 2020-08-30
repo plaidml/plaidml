@@ -31,6 +31,7 @@ plaidml_cc_library(
     ],
     deps = [
         ":gen-pass",
+        "//pmlc/dialect/pxa/analysis",
         "//pmlc/dialect/pxa/ir",
         "//pmlc/dialect/stdx/ir",
         "//pmlc/dialect/tile",
