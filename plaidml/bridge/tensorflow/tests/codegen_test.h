@@ -1,4 +1,4 @@
-/* Copyright 2017 The TensorFlow Authors. All Rights Reserved.
+/* Copyright 2018 The TensorFlow Authors. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -13,21 +13,33 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-#include "plaidml/bridge/tensorflow/tests/plaidml_codegen_test.h"
-#include "plaidml/bridge/tensorflow/service/compiler.h"
+#ifndef PLAIDML_BRIDGE_TENSORFLOW_TESTS_CODEGEN_TEST_H_
+#define PLAIDML_BRIDGE_TENSORFLOW_TESTS_CODEGEN_TEST_H_
+
+#include <memory>
+
+#include "tensorflow/compiler/xla/service/hlo_module.h"
+#include "tensorflow/compiler/xla/tests/hlo_test_base.h"
 
 #include "plaidml/edsl/edsl.h"
 
 using ::plaidml::edsl::Program;
 
+#include "plaidml/testenv.h"
+
+using ::plaidml::edsl::TestFixture;
+
 namespace xla {
 namespace plaidml {
 
-std::unique_ptr<Program> PlaidMLCodegenTest::CompileToProgram(
-    std::unique_ptr<HloModule> hlo_module) {
-  auto program = PlaidMLCompiler::ProgramFromHloModule(std::move(hlo_module)).ValueOrDie();
-  return std::move(program);
-}
+// Tests that verify IR emitted by the PLAIDML backend is as expected.
+class PlaidMLCodegenTest : public TestFixture {
+ protected:
+  // Compiles hlo_module with the JIT compiler.
+  std::unique_ptr<Program> CompileToProgram(std::unique_ptr<HloModule> hlo_module);
+};
 
 }  // namespace plaidml
 }  // namespace xla
+
+#endif  // PLAIDML_BRIDGE_TENSORFLOW_TESTS_CODEGEN_TEST_H_
