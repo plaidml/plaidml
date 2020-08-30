@@ -10,10 +10,11 @@
 #include "absl/strings/str_cat.h"
 #include "plaidml/bridge/tensorflow/service/compiler.h"
 #include "plaidml/bridge/tensorflow/tests/codegen_test.h"
+#include "plaidml/bridge/tensorflow/tests/filecheck.h"
 #include "plaidml/testenv.h"
+
 #include "tensorflow/compiler/xla/service/hlo_computation.h"
 #include "tensorflow/compiler/xla/service/hlo_evaluator.h"
-#include "tensorflow/compiler/xla/tests/filecheck.h"
 #include "tensorflow/compiler/xla/tests/test_utils.h"
 #include "tensorflow/core/lib/core/status_test_util.h"
 #include "tensorflow/core/platform/test.h"

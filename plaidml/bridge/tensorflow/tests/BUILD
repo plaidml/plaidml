@@ -9,16 +9,30 @@ cc_library(
     deps = [
         "//plaidml:testenv",
         "//plaidml/bridge/tensorflow/service:compiler",
-        "@org_tensorflow//tensorflow/compiler/xla/service:llvm_compiler",
-        "@org_tensorflow//tensorflow/compiler/xla/service/llvm_ir:llvm_util",
-        "@org_tensorflow//tensorflow/compiler/xla/tests:filecheck",
+        #"@org_tensorflow//tensorflow/compiler/xla/service:llvm_compiler",
+        #"@org_tensorflow//tensorflow/compiler/xla/service/llvm_ir:llvm_util",
         "@org_tensorflow//tensorflow/compiler/xla/tests:hlo_test_base",
         "@org_tensorflow//tensorflow/core:test",
         "@org_tensorflow//tensorflow/core:test_main",
     ],
 )
 
-
+cc_library(
+    name = "filecheck",
+    testonly = True,
+    srcs = ["filecheck.cc"],
+    hdrs = ["filecheck.h"],
+    data = [
+        "@llvm-project//llvm:FileCheck",
+    ],
+    deps = [
+        "@org_tensorflow//tensorflow/compiler/xla:statusor",
+        "@org_tensorflow//tensorflow/compiler/xla:types",
+        "@org_tensorflow//tensorflow/compiler/xla:util",
+        "@org_tensorflow//tensorflow/core:lib",
+	"@bazel_tools//tools/cpp/runfiles",
+    ],
+)
 
 tf_cc_test(
     name = "eltwise_op_test",
@@ -29,6 +43,7 @@ tf_cc_test(
     ],
     deps = [
         ":codegen_test",
+	":filecheck",
         "//plaidml/bridge/tensorflow/service:compiler",
         "@com_google_absl//absl/strings",
         "@com_google_googletest//:gtest",
