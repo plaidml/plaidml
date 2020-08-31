@@ -13,6 +13,26 @@ using mlir::success;
 
 Value ReshapeOp::getViewSource() { return tensor(); }
 
+// ---- SubgroupBlockReadINTELOp ----
+
+static LogicalResult
+verifySubgroupBlockReadINTELOp(SubgroupBlockReadINTELOp op) {
+  if (op.getNumOperands() != 1 + op.getMemRefType().getRank())
+    return op.emitOpError("incorrect number of indices for memory ref");
+  return success();
+}
+
+// ---- SubgroupBlockWriteINTELOp ----
+
+static LogicalResult
+verifySubgroupBlockWriteINTELOp(SubgroupBlockWriteINTELOp op) {
+  if (op.getNumOperands() != 2 + op.getMemRefType().getRank())
+    return op.emitOpError("subgroup block write index operand"
+                          " count not equal to memref rank");
+
+  return success();
+}
+
 #define GET_OP_CLASSES
 #include "pmlc/dialect/stdx/ir/ops.cc.inc"
 

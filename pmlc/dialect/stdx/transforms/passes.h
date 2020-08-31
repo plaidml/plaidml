@@ -13,6 +13,8 @@ std::unique_ptr<mlir::Pass> createBoundsCheckPass();
 
 std::unique_ptr<mlir::Pass> createI1StorageToI32Pass();
 
+std::unique_ptr<mlir::Pass> createSubgroupBlockOpsPass();
+
 std::unique_ptr<mlir::Pass> createSubgroupBroadcastPass();
 
 /// Generate the code for registering passes.

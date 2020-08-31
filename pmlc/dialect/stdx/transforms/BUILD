@@ -26,6 +26,7 @@ plaidml_cc_library(
         "boundscheck.cc",
         "i1_to_i32.cc",
         "pass_detail.h",
+        "subgroup_block_ops.cc",
         "subgroup_broadcast.cc",
     ],
     hdrs = [
