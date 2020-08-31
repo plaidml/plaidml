@@ -25,6 +25,9 @@ build --action_env=HTTPS_PROXY
 build --action_env=no_proxy
 build --action_env=http_proxy
 build --action_env=https_proxy
+build --action_env=XLA_DUMPDIR="/tmp/hlo_module"
+build --action_env=XLA_FLAGS=--xla_dump_to="/tmp/hlo_module"
+build --action_env=TF_XLA_FLAGS="--tf_xla_auto_jit=2 --tf_xla_cpu_global_jit --tf_xla_min_cluster_size=0"
 
 build --define=version=0.0.0.dev0
 test --test_timeout_filters=-eternal
