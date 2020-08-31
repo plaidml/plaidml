@@ -25,9 +25,6 @@ build --action_env=HTTPS_PROXY
 build --action_env=no_proxy
 build --action_env=http_proxy
 build --action_env=https_proxy
-build --action_env=XLA_DUMPDIR="/tmp/hlo_module"
-build --action_env=XLA_FLAGS=--xla_dump_to="/tmp/hlo_module"
-build --action_env=TF_XLA_FLAGS="--tf_xla_auto_jit=2 --tf_xla_cpu_global_jit --tf_xla_min_cluster_size=0"
 
 build --define=version=0.0.0.dev0
 test --test_timeout_filters=-eternal
@@ -50,7 +47,6 @@ build:llvm --define=compiler=clang
 
 build:linux --cpu=linux_x86_64
 build:linux --crosstool_top=//toolchain:toolchain
-build:linux --cxxopt=-DGTEST_HAS_PTHREAD=0
 build:linux --define=compiler=gcc
 build:linux --host_crosstool_top=//toolchain:toolchain
 build:linux --build_tag_filters=-latex,-macos,-pytorch,-skip_linux,-windows
@@ -108,6 +104,10 @@ test:asan --test_env=ASAN_SYMBOLIZER_PATH
 test:asan --test_env=DYLD_INSERT_LIBRARIES
 
 # For building tensorflow
+build --action_env=XLA_DUMPDIR="/tmp/hlo_module"
+build --action_env=XLA_FLAGS=--xla_dump_to="/tmp/hlo_module"
+build --action_env=TF_XLA_FLAGS="--tf_xla_auto_jit=2 --tf_xla_cpu_global_jit --tf_xla_min_cluster_size=0"
 build --define=no_aws_support=true
 build --nocheck_visibility
+build:linux --cxxopt=-DGTEST_HAS_PTHREAD=0
 common --experimental_repo_remote_exec
