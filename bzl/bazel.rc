@@ -18,6 +18,7 @@ build --enable_platform_specific_config
 
 build --action_env=LC_ALL # This is to allow plaidbench to work on *nix under python3
 build --action_env=LANG # This is to allow plaidbench to work on *nix under python3
+build --action_env=LD_PRELOAD # Needed on *nix to prevent malloc errors in tensorflow
 build --action_env=NO_PROXY
 build --action_env=HTTP_PROXY
 build --action_env=HTTPS_PROXY
