@@ -1153,7 +1153,6 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
     using CmpIntGeOp =
         CmpIntInequalityOp<CmpIPredicate::sge, CmpIPredicate::uge>;
     OwningRewritePatternList patterns;
-    populateFuncOpTypeConversionPattern(patterns, &getContext(), converter);
     patterns.insert<
         CastOpConversion,           //
         FuncOpConversion,           //
