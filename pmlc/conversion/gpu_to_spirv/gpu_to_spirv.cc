@@ -38,6 +38,86 @@ struct StdxSubgroupBroadcastOpConversion
   }
 };
 
+template <typename StdxOpTy, typename SpirvOpTy>
+struct StdxUnaryOpConversion : public SPIRVOpLowering<StdxOpTy> {
+  using SPIRVOpLowering<StdxOpTy>::SPIRVOpLowering;
+
+  LogicalResult
+  matchAndRewrite(StdxOpTy op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const final {
+    assert(operands.size() == 1);
+    auto dstType = op.getResult().getType();
+    rewriter.replaceOpWithNewOp<SpirvOpTy>(op, dstType, operands.front());
+    return success();
+  }
+};
+
+struct StdxRoundOpConversion : public SPIRVOpLowering<stdx::RoundOp> {
+  using SPIRVOpLowering<stdx::RoundOp>::SPIRVOpLowering;
+
+  LogicalResult
+  matchAndRewrite(stdx::RoundOp op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const final {
+    assert(operands.size() == 1);
+    auto stdxType = op.getResult().getType();
+    auto loc = op.getLoc();
+    // Since there is no round op in SPIRV dialect right now,
+    // implement round(x) by floor(x + 0.5)
+    auto cstOp = rewriter.create<spirv::ConstantOp>(
+        loc, stdxType, FloatAttr::get(stdxType, 0.5));
+    auto addOp = rewriter.create<spirv::FAddOp>(loc, cstOp.getResult(),
+                                                operands.front());
+    rewriter.replaceOpWithNewOp<spirv::GLSLFloorOp>(op, stdxType,
+                                                    addOp.getResult());
+
+    return success();
+  }
+};
+
+struct StdxCosHOpConversion : public SPIRVOpLowering<stdx::CosHOp> {
+  using SPIRVOpLowering<stdx::CosHOp>::SPIRVOpLowering;
+  LogicalResult
+  matchAndRewrite(stdx::CosHOp op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const final {
+    assert(operands.size() == 1);
+    auto loc = op.getLoc();
+    auto operand = operands.front();
+    auto srcType = operand.getType();
+    auto posExp = rewriter.create<spirv::GLSLExpOp>(loc, srcType, operand);
+    auto negOperand = rewriter.create<spirv::FNegateOp>(loc, operand);
+    auto negExp = rewriter.create<spirv::GLSLExpOp>(loc, srcType, negOperand);
+    auto expSum = rewriter.create<spirv::FAddOp>(loc, posExp, negExp);
+    auto cst2 = rewriter.create<spirv::ConstantOp>(
+        loc, srcType, FloatAttr::get(srcType, 2.0));
+    auto divOp = rewriter.create<spirv::FDivOp>(loc, expSum, cst2);
+    op.getResult().replaceAllUsesWith(divOp.getResult());
+    op.erase();
+    return success();
+  }
+};
+
+struct StdxSinHOpConversion : public SPIRVOpLowering<stdx::SinHOp> {
+  using SPIRVOpLowering<stdx::SinHOp>::SPIRVOpLowering;
+  LogicalResult
+  matchAndRewrite(stdx::SinHOp op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const final {
+    assert(operands.size() == 1);
+    auto loc = op.getLoc();
+    auto operand = operands.front();
+    auto srcType = operand.getType();
+    auto posExp = rewriter.create<spirv::GLSLExpOp>(loc, srcType, operand);
+    auto negOperand = rewriter.create<spirv::FNegateOp>(loc, operand);
+    auto negExp = rewriter.create<spirv::GLSLExpOp>(loc, srcType, negOperand);
+    auto expSum = rewriter.create<spirv::FSubOp>(loc, posExp, negExp);
+    auto cst2 = rewriter.create<spirv::ConstantOp>(
+        loc, srcType, FloatAttr::get(srcType, 2.0));
+    auto divOp = rewriter.create<spirv::FDivOp>(loc, expSum, cst2);
+    op.getResult().replaceAllUsesWith(divOp.getResult());
+    op.erase();
+    return success();
+  }
+};
+
 struct GPUToSPIRVCustomPass
     : public GPUToSPIRVCustomBase<GPUToSPIRVCustomPass> {
   void runOnOperation() final {
@@ -65,6 +145,8 @@ struct GPUToSPIRVCustomPass
     populateSCFToSPIRVPatterns(context, typeConverter, scfContext, patterns);
     populateStandardToSPIRVPatterns(context, typeConverter, patterns);
     populateStdxToSPIRVPatterns(context, typeConverter, patterns);
+    if (spirv::getMemoryModel(targetAttr) == spirv::MemoryModel::GLSL450)
+      populateStdxToSPIRVGLSLPatterns(context, typeConverter, patterns);
 
     if (failed(applyFullConversion(kernelModules, *target, patterns)))
       return signalPassFailure();
@@ -76,6 +158,16 @@ void populateStdxToSPIRVPatterns(MLIRContext *context,
                                  SPIRVTypeConverter &typeConverter,
                                  OwningRewritePatternList &patterns) {
   patterns.insert<StdxSubgroupBroadcastOpConversion>(context, typeConverter);
+}
+
+void populateStdxToSPIRVGLSLPatterns(MLIRContext *context,
+                                     SPIRVTypeConverter &typeConverter,
+                                     OwningRewritePatternList &patterns) {
+  patterns.insert<StdxRoundOpConversion,
+                  StdxUnaryOpConversion<stdx::FloorOp, spirv::GLSLFloorOp>,
+                  StdxUnaryOpConversion<stdx::TanOp, spirv::GLSLTanOp>,
+                  StdxCosHOpConversion, StdxSinHOpConversion>(context,
+                                                              typeConverter);
 }
 
 std::unique_ptr<Pass> createGPUToSPIRVCustomPass() {
