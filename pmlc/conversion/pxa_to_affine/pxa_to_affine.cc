@@ -228,13 +228,9 @@ struct FuncOpConversion : public OpConversionPattern<FuncOp> {
     IVLOG(2, "FuncOpConversion::rewrite> " << debugString(type));
 
     // Convert the function signature
-    TypeConverter::SignatureConversion result(type.getNumInputs() +
-                                              type.getNumResults());
+    TypeConverter::SignatureConversion result(type.getNumInputs());
     for (unsigned i = 0; i < type.getNumInputs(); ++i) {
       result.addInputs(i, {type.getInput(i)});
-    }
-    for (unsigned i = 0; i < type.getNumResults(); ++i) {
-      result.addInputs({type.getResult(i)});
     }
 
     // Create a new function with an updated signature.
@@ -259,13 +255,6 @@ struct ReturnOpConversion : public OpConversionPattern<ReturnOp> {
   matchAndRewrite(ReturnOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
     IVLOG(2, "ReturnOpConversion::matchAndRewrite>");
-    auto &block = op.getParentRegion()->front();
-    auto funcOp = op.getParentOfType<FuncOp>();
-    auto blockArg = funcOp.getType().getNumInputs() - op.getNumOperands();
-    for (auto operand : operands) {
-      // Find very initial allocation of memref
-      operand.replaceAllUsesWith(block.getArgument(blockArg++));
-    }
     rewriter.replaceOpWithNewOp<ReturnOp>(op);
     return success();
   }

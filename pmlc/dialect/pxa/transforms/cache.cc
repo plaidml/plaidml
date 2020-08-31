@@ -276,6 +276,13 @@ static bool isInitialized(Value memref) {
     if (isa<AllocOp>(op)) {
       return false;
     }
+    return true;
+  }
+  auto arg = memref.cast<BlockArgument>();
+  auto *parentOp = arg.getOwner()->getParentOp();
+  if (auto funcOp = dyn_cast<FuncOp>(parentOp)) {
+    auto numInputs = funcOp.getNumArguments() - funcOp.getNumResults();
+    return arg.getArgNumber() < numInputs;
   }
   return true;
 }
