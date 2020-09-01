@@ -12,6 +12,7 @@
 #include "mlir/IR/Module.h"
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/Pass/Pass.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallString.h"
 
 #include "pmlc/conversion/gpu/pass_detail.h"
@@ -167,14 +168,29 @@ private:
   uint64_t lauchFuncIndex = 0;
   mlir::Value vulkanRuntime;
   llvm::DenseMap<Value, llvm::SmallVector<uint64_t, 2>> bufferMap;
-  llvm::SmallVector<mlir::Type, 4> bufferElementTypes;
+
+  struct mlirTypeComparator {
+    bool operator()(mlir::Type x, mlir::Type y) const {
+      return x.getTypeID().getAsOpaquePointer() >
+             y.getTypeID().getAsOpaquePointer();
+    }
+  };
+
+  llvm::SmallSet<mlir::Type, 4, mlirTypeComparator> bufferElementTypes;
+  llvm::SmallSet<const char *, 4> optionalSymbols;
 };
 
 void ConvertGpuLaunchFuncToVulkanCalls::runOnOperation() {
+  auto loc = getOperation().getLoc();
   getCachedTypes();
+
   getOperation().walk([this](gpu::LaunchFuncOp op) { numKernel++; });
+
   getOperation().walk(
       [this](gpu::LaunchFuncOp op) { convertGpuLaunchFunc(op); });
+
+  // Declare runtime functions.
+  declareVulkanFunctions(loc);
 
   // Erase `gpu::GPUModuleOp` and `spirv::Module` operations.
   for (auto gpuModule :
@@ -240,7 +256,7 @@ ConvertGpuLaunchFuncToVulkanCalls::bindBuffers(Location loc, OpBuilder &builder,
       }
 
       auto elementType = memRefType.getElementType();
-      bufferElementTypes.push_back(elementType);
+      bufferElementTypes.insert(elementType);
       uint32_t elementTypeSize =
           llvm::divideCeil(elementType.getIntOrFloatBitWidth(), kByteBits);
 
@@ -254,6 +270,7 @@ ConvertGpuLaunchFuncToVulkanCalls::bindBuffers(Location loc, OpBuilder &builder,
           builder.getSymbolRefAttr(getBufferBindingFunc(elementType)),
           ArrayRef<Value>{vulkanRuntime, descriptorSet, descriptorBinding,
                           bufferByteSize, unrankedBuffer});
+      optionalSymbols.insert(getBufferBindingFunc(elementType));
     } else {
       return failure();
     }
@@ -281,6 +298,7 @@ LogicalResult ConvertGpuLaunchFuncToVulkanCalls::transferBuffers(
             builder.getSymbolRefAttr(kCreateVulkanMemoryTransferAction),
             ArrayRef<Value>{vulkanRuntime, src_index, src_binding, dst_index,
                             dst_binding});
+        optionalSymbols.insert(kCreateVulkanMemoryTransferAction);
       }
     }
     llvm::SmallVector<uint64_t, 2> second;
@@ -302,44 +320,62 @@ LogicalResult ConvertGpuLaunchFuncToVulkanCalls::printBuffer(Location loc,
       builder.create<CallOp>(loc, ArrayRef<Type>{},
                              builder.getSymbolRefAttr(kPrint_memref_f32),
                              ArrayRef<Value>(unrankedBuffer));
+      optionalSymbols.insert(kPrint_memref_f32);
     }
   }
   return success();
 }
 
 void ConvertGpuLaunchFuncToVulkanCalls::declareVulkanFunctions(Location loc) {
+  auto &ctx = getContext();
   ModuleOp module = getOperation();
   OpBuilder builder(module.getBody()->getTerminator());
 
-  if (!module.lookupSymbol(kInitVulkan)) {
-    builder.create<LLVM::LLVMFuncOp>(
-        loc, kInitVulkan,
-        LLVM::LLVMType::getFunctionTy(getLLVMPointerType(), {},
-                                      /*isVarArg=*/false));
+  builder.create<LLVM::LLVMFuncOp>(
+      loc, kInitVulkan,
+      LLVM::LLVMType::getFunctionTy(getLLVMPointerType(), {},
+                                    /*isVarArg=*/false));
+
+  builder.create<FuncOp>(
+      loc, kCreateVulkanLaunchKernelAction,
+      FunctionType::get(
+          {ArrayRef<Type>{getLLVMPointerType(), getLLVMPointerType(),
+                          getLLVMInt32Type(), getLLVMPointerType(),
+                          getMLIRIndexType(), getMLIRIndexType(),
+                          getMLIRIndexType()}},
+          {}, &ctx),
+      ArrayRef<std::pair<mlir::Identifier, mlir::Attribute>>());
+
+  builder.create<LLVM::LLVMFuncOp>(
+      loc, kSetVulkanLaunchKernelAction,
+      LLVM::LLVMType::getFunctionTy(getLLVMVoidType(), {getLLVMPointerType()},
+                                    /*isVarArg=*/false));
+
+  builder.create<LLVM::LLVMFuncOp>(
+      loc, kAddVulkanLaunchActionToSchedule,
+      LLVM::LLVMType::getFunctionTy(getLLVMVoidType(), {getLLVMPointerType()},
+                                    /*isVarArg=*/false));
+
+  builder.create<LLVM::LLVMFuncOp>(
+      loc, kSubmitCommandBuffers,
+      LLVM::LLVMType::getFunctionTy(getLLVMVoidType(), {getLLVMPointerType()},
+                                    /*isVarArg=*/false));
+
+  builder.create<LLVM::LLVMFuncOp>(
+      loc, kDeinitVulkan,
+      LLVM::LLVMType::getFunctionTy(getLLVMVoidType(), {getLLVMPointerType()},
+                                    /*isVarArg=*/false));
+
+  if (optionalSymbols.count(kPrint_memref_f32)) {
+    builder.create<FuncOp>(
+        loc, kPrint_memref_f32,
+        FunctionType::get(
+            {ArrayRef<Type>{getUnrankedMemRefType(getMLIRFloat32Type())}}, {},
+            &ctx),
+        ArrayRef<std::pair<mlir::Identifier, mlir::Attribute>>());
   }
 
-  if (!module.lookupSymbol(kDeinitVulkan)) {
-    builder.create<LLVM::LLVMFuncOp>(
-        loc, kDeinitVulkan,
-        LLVM::LLVMType::getFunctionTy(getLLVMVoidType(), {getLLVMPointerType()},
-                                      /*isVarArg=*/false));
-  }
-
-  if (!module.lookupSymbol(kAddVulkanLaunchActionToSchedule)) {
-    builder.create<LLVM::LLVMFuncOp>(
-        loc, kAddVulkanLaunchActionToSchedule,
-        LLVM::LLVMType::getFunctionTy(getLLVMVoidType(), {getLLVMPointerType()},
-                                      /*isVarArg=*/false));
-  }
-
-  if (!module.lookupSymbol(kSubmitCommandBuffers)) {
-    builder.create<LLVM::LLVMFuncOp>(
-        loc, kSubmitCommandBuffers,
-        LLVM::LLVMType::getFunctionTy(getLLVMVoidType(), {getLLVMPointerType()},
-                                      /*isVarArg=*/false));
-  }
-
-  if (!module.lookupSymbol(kCreateVulkanMemoryTransferAction)) {
+  if (optionalSymbols.count(kCreateVulkanMemoryTransferAction)) {
     builder.create<LLVM::LLVMFuncOp>(
         loc, kCreateVulkanMemoryTransferAction,
         LLVM::LLVMType::getFunctionTy(getLLVMVoidType(),
@@ -349,40 +385,9 @@ void ConvertGpuLaunchFuncToVulkanCalls::declareVulkanFunctions(Location loc) {
                                       /*isVarArg=*/false));
   }
 
-  if (!module.lookupSymbol(kCreateVulkanLaunchKernelAction)) {
-    auto &ctx = getContext();
-    builder.create<FuncOp>(
-        loc, kCreateVulkanLaunchKernelAction,
-        FunctionType::get(
-            {ArrayRef<Type>{getLLVMPointerType(), getLLVMPointerType(),
-                            getLLVMInt32Type(), getLLVMPointerType(),
-                            getMLIRIndexType(), getMLIRIndexType(),
-                            getMLIRIndexType()}},
-            {}, &ctx),
-        ArrayRef<std::pair<mlir::Identifier, mlir::Attribute>>());
-  }
-
-  if (!module.lookupSymbol(kSetVulkanLaunchKernelAction)) {
-    builder.create<LLVM::LLVMFuncOp>(
-        loc, kSetVulkanLaunchKernelAction,
-        LLVM::LLVMType::getFunctionTy(getLLVMVoidType(), {getLLVMPointerType()},
-                                      /*isVarArg=*/false));
-  }
-
-  if (!module.lookupSymbol(kPrint_memref_f32)) {
-    auto &ctx = getContext();
-    builder.create<FuncOp>(
-        loc, kPrint_memref_f32,
-        FunctionType::get(
-            {ArrayRef<Type>{getUnrankedMemRefType(getMLIRFloat32Type())}}, {},
-            &ctx),
-        ArrayRef<std::pair<mlir::Identifier, mlir::Attribute>>());
-  }
-
   for (auto bufferElementType : bufferElementTypes) {
     auto func = getBufferBindingFunc(bufferElementType);
-    if (!module.lookupSymbol(func)) {
-      auto &ctx = getContext();
+    if (optionalSymbols.count(func)) {
       builder.create<FuncOp>(
           loc, func,
           FunctionType::get(
@@ -397,6 +402,7 @@ void ConvertGpuLaunchFuncToVulkanCalls::declareVulkanFunctions(Location loc) {
 
 void ConvertGpuLaunchFuncToVulkanCalls::convertGpuLaunchFunc(
     gpu::LaunchFuncOp launchOp) {
+
   ModuleOp module = getOperation();
   OpBuilder builder(launchOp);
   Location loc = launchOp.getLoc();
@@ -480,10 +486,6 @@ void ConvertGpuLaunchFuncToVulkanCalls::convertGpuLaunchFunc(
       }
     }
   }
-
-  // Declare runtime functions.
-  declareVulkanFunctions(loc);
-
   launchOp.erase();
   lauchFuncIndex++;
 }
