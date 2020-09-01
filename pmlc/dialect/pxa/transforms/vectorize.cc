@@ -33,8 +33,7 @@ private:
   DenseSet<Operation *> vectorizedOps;
   llvm::DenseSet<Operation *> zeroStrideReductions;
 
-  ::llvm::StringRef
-  stringifyAtomicRMWKindForVectorReductionOp(AtomicRMWKind val) {
+  const char *stringifyAtomicRMWKindForVectorReductionOp(AtomicRMWKind val) {
     switch (val) {
     case AtomicRMWKind::addf:
       return "add";
@@ -59,7 +58,7 @@ private:
     case AtomicRMWKind::muli:
       return "mul";
     }
-    return "";
+    llvm_unreachable("Invalid aggregation type");
   }
 
   LogicalResult tryVectorizeOperation(Operation *op) {
@@ -104,6 +103,8 @@ private:
                 (!eltType.isF32() && !eltType.isF64() &&
                  !eltType.isSignlessInteger(32) &&
                  !eltType.isSignlessInteger(64))) {
+              op.emitRemark("Vectorization failed: Unsupported reduction or "
+                            "type for vector::ReductionOp");
               return failure();
             }
             // If stride is 0, "remember it" as such.
