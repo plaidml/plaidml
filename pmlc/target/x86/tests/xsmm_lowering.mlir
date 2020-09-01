@@ -4,9 +4,7 @@
 #id_map = affine_map<(i, j) -> (i, j)>
 
 // CHECK: func @dot
-func @dot(%A: memref<4x8xf32>, %B: memref<8x6xf32>) -> memref<4x6xf32> {
-  // CHECK-NOT: alloc
-  %C = alloc() : memref<4x6xf32>
+func @dot(%A: memref<4x8xf32>, %B: memref<8x6xf32>, %C: memref<4x6xf32>) -> memref<4x6xf32> {
   // CHECK: xsmm.gemm.dispatch [2, 2, 2], [8, 6, 6]
   // CHECK: affine.for
   // CHECK: affine.for
@@ -27,9 +25,7 @@ func @dot(%A: memref<4x8xf32>, %B: memref<8x6xf32>) -> memref<4x6xf32> {
 #K_tile = affine_map<(k, n) -> (0, 0, k, n)>
 
 // CHECK: func @res2a_branch2a
-func @res2a_branch2a(%I: memref<1x56x56x64xf32>, %K: memref<1x1x64x64xf32>) -> memref<1x56x56x64xf32> {
-  // CHECK-NOT: alloc
-  %O = alloc() : memref<1x56x56x64xf32>
+func @res2a_branch2a(%I: memref<1x56x56x64xf32>, %K: memref<1x1x64x64xf32>, %O: memref<1x56x56x64xf32>) -> memref<1x56x56x64xf32> {
   // CHECK: xsmm.gemm.dispatch [14, 64, 64], [3584, 64, 3584]
   // CHECK: affine.for
   // CHECK: affine.for

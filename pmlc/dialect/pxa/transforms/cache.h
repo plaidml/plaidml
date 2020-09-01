@@ -26,6 +26,7 @@ struct CachePlan {
     mlir::SmallVector<LoadInfo, 4> loads;
     mlir::SmallVector<ReduceInfo, 4> reduces;
     mlir::AffineParallelOp band;
+    mlir::Value cache;
     bool copyInto = false;
     bool copyFrom = false;
   };

@@ -276,6 +276,13 @@ static bool isInitialized(Value memref) {
     if (isa<AllocOp>(op)) {
       return false;
     }
+    return true;
+  }
+  auto arg = memref.cast<BlockArgument>();
+  auto *parentOp = arg.getOwner()->getParentOp();
+  if (auto funcOp = dyn_cast<FuncOp>(parentOp)) {
+    auto numInputs = funcOp.getNumArguments() - funcOp.getNumResults();
+    return arg.getArgNumber() < numInputs;
   }
   return true;
 }
@@ -384,25 +391,26 @@ void CachePlan::execute() {
     auto builder = OpBuilder::atBlockBegin(entry.band.getBody());
     SmallVector<StrideInfo, 4> zeroOffset(entry.rap.innerCount.size());
 
-    auto cache = allocateLocalCache(builder, memref, loc, entry.rap);
+    entry.cache = allocateLocalCache(builder, memref, loc, entry.rap);
     if (isInitialized(memref)) {
       // copy global -> local
       entry.copyInto = true;
-      auto copyLoop =
-          createCopyLoop(builder, loc, entry.rap.innerCount, memref, cache,
-                         entry.rap.outer, zeroOffset, AtomicRMWKind::assign);
+      auto copyLoop = createCopyLoop(builder, loc, entry.rap.innerCount, memref,
+                                     entry.cache, entry.rap.outer, zeroOffset,
+                                     AtomicRMWKind::assign);
       copyLoop.getOperation()->setAttr("cache_in", builder.getUnitAttr());
-      cache = copyLoop.getResult(0);
+      entry.cache = copyLoop.getResult(0);
     }
 
     for (const auto &load : entry.loads) {
-      replaceLoad(load.op, cache, load.rap);
+      replaceLoad(load.op, entry.cache, load.rap);
     }
 
     if (entry.reduces.size()) {
       Value finalValue;
       for (const auto &reduce : entry.reduces) {
-        finalValue = replaceReduce(entry.band, reduce.op, cache, reduce.rap);
+        finalValue =
+            replaceReduce(entry.band, reduce.op, entry.cache, reduce.rap);
       }
 
       // copy local -> global
