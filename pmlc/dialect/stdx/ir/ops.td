@@ -118,12 +118,7 @@ def SubgroupBlockReadINTELOp : StdX_Op<"subgroup_block_read_intel",
 
   let builders = [OpBuilder<
     "OpBuilder &, OperationState &result, Value memref,"
-    "ValueRange indices = {}", [{
-      auto memrefType = memref.getType().cast<MemRefType>();
-      result.addOperands(memref);
-      result.addOperands(indices);
-      result.types.push_back(memrefType.getElementType());
-  }]>];
+    "ValueRange indices = {}">];
 
   let extraClassDeclaration = [{
     Value getMemRef() { return getOperand(0); }
@@ -150,10 +145,7 @@ def SubgroupBlockWriteINTELOp : StdX_Op<"subgroup_block_write_intel",
                        Variadic<Index>:$indices);
 
   let builders = [OpBuilder<
-    "OpBuilder &, OperationState &result, Value valueToStore, Value memref", [{
-      result.addOperands(valueToStore);
-      result.addOperands(memref);
-  }]>];
+    "OpBuilder &, OperationState &result, Value valueToStore, Value memref">];
 
   let extraClassDeclaration = [{
       Value getValueToStore() { return getOperand(0); }

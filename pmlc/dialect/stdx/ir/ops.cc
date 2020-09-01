@@ -15,6 +15,14 @@ Value ReshapeOp::getViewSource() { return tensor(); }
 
 // ---- SubgroupBlockReadINTELOp ----
 
+void SubgroupBlockReadINTELOp::build(OpBuilder &builder, OperationState &result,
+                                     Value memref, ValueRange indices) {
+  auto memrefType = memref.getType().cast<MemRefType>();
+  result.addOperands(memref);
+  result.addOperands(indices);
+  result.types.push_back(memrefType.getElementType());
+}
+
 static LogicalResult
 verifySubgroupBlockReadINTELOp(SubgroupBlockReadINTELOp op) {
   if (op.getNumOperands() != 1 + op.getMemRefType().getRank())
@@ -23,6 +31,13 @@ verifySubgroupBlockReadINTELOp(SubgroupBlockReadINTELOp op) {
 }
 
 // ---- SubgroupBlockWriteINTELOp ----
+
+void SubgroupBlockWriteINTELOp::build(OpBuilder &builder,
+                                      OperationState &result,
+                                      Value valueToStore, Value memref) {
+  result.addOperands(valueToStore);
+  result.addOperands(memref);
+}
 
 static LogicalResult
 verifySubgroupBlockWriteINTELOp(SubgroupBlockWriteINTELOp op) {
