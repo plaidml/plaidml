@@ -71,7 +71,7 @@ fstr += '#include <string>\n'
 fstr += desstr + istr + kstr + ostr + modstr
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Process some integers.')
+    parser = argparse.ArgumentParser(description='Generate headers for conv opo')
     parser.add_argument('--output', dest='outfile', help='location to write the generated header')
     args = parser.parse_args()
     print(args.outfile)

@@ -172,7 +172,7 @@ for opname in ops:
     fstr += desstr + istr + ostr + modstr
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Process some integers.')
+    parser = argparse.ArgumentParser(description='Generate headers for shape op')
     parser.add_argument('--output', dest='outfile', help='location to write the generated header')
     args = parser.parse_args()
     print(args.outfile)
