@@ -13,6 +13,7 @@ plaidml_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pmlc/compiler",
+        "//pmlc/rt/vulkan",
         "@half",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:mlir_runner_utils",

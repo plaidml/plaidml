@@ -64,7 +64,9 @@ plaidml_cc_test(
         ":edsl",
         "//plaidml:testenv",
         "//plaidml/exec",
+        "@volk",
     ],
+    linkstatic=True,
 )
 
 py_test(
