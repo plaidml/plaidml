@@ -51,10 +51,9 @@ namespace {
 class BlockOpsImpl {
 private:
   scf::ParallelOp loop;
-  DenseSet<Operation *> toReplace;
 
   template <typename OpType>
-  void checkLoadStore(OpType loadOp) {
+  LogicalResult checkLoadStore(OpType op) {
     // The loadOp/storeOp needs to be stride 1,
     // and the last index needs to be from AddI operation with subgroup_id
     // (this is modelled in subgroup_broadcast pass)
@@ -62,16 +61,19 @@ private:
     // TODO: Verify if this condition is correct, or it
     // will be needed to check for the additional parallel
     // op gpu thread attribute
-    if (auto addIOp =
-            dyn_cast<AddIOp>(loadOp.indices().back().getDefiningOp())) {
+    // TODO: Check the required alignment for the block ops
+    if (auto addIOp = dyn_cast<AddIOp>(op.indices().back().getDefiningOp())) {
       auto addIOperand = addIOp.getOperand(1);
       auto lastIndiceOfLoop = loop.getBody()->getArguments().back();
       int64_t memRefOffset;
       SmallVector<int64_t, 4> memRefStrides;
-      getStridesAndOffset(loadOp.getMemRefType(), memRefStrides, memRefOffset);
+      if (failed(getStridesAndOffset(op.getMemRefType(), memRefStrides,
+                                     memRefOffset)))
+        return failure();
       if ((addIOperand == lastIndiceOfLoop) && (memRefStrides.back() == 1))
-        toReplace.insert(loadOp);
+        return success();
     }
+    return failure();
   }
 
 public:
@@ -109,26 +111,17 @@ public:
   LogicalResult blockOps() {
     mlir::Block *body = loop.getBody();
 
-    for (auto &op : body->getOperations()) {
-      // Check if the load/store ops can be replaced with subgroup block ops
-      if (auto loadOp = dyn_cast<LoadOp>(op))
-        checkLoadStore(loadOp);
-      else if (auto storeOp = dyn_cast<StoreOp>(op))
-        checkLoadStore(storeOp);
-    }
-
-    if (toReplace.empty()) {
-      // No valid vector ops used, nothing to do
-      return success();
-    }
-
-    // Do the Ops transform
     for (auto &op : llvm::make_early_inc_range(body->getOperations())) {
-      if (auto loadOp = dyn_cast<LoadOp>(&op))
-        replaceLoadOp(loadOp);
-      else if (auto storeOp = dyn_cast<StoreOp>(&op))
-        replaceStoreOp(storeOp);
+      // Check if the load/store ops can be replaced with subgroup block ops
+      if (auto loadOp = dyn_cast<LoadOp>(op)) {
+        if (succeeded(checkLoadStore(loadOp)))
+          replaceLoadOp(loadOp);
+      } else if (auto storeOp = dyn_cast<StoreOp>(op)) {
+        if (succeeded(checkLoadStore(storeOp)))
+          replaceStoreOp(storeOp);
+      }
     }
+
     return success();
   }
 };
@@ -158,6 +151,8 @@ struct SubgroupBlockOpsPass
     : public SubgroupBlockOpsBase<SubgroupBlockOpsPass> {
   void runOnFunction() final {
     auto func = getFunction();
+    // TODO: Generalize this to all Load and Store ops,
+    // not only the inner loop ones
     SmallVector<scf::ParallelOp, 4> loops;
     gatherInnermostLoops(func, loops);
     for (auto parallelOp : loops) {
