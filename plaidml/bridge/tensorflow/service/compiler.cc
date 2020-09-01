@@ -370,9 +370,7 @@ std::unique_ptr<Program> makeProgram(const std::string& name, const std::vector<
               op = instr_map[operand_ids[0]] < instr_map[operand_ids[1]];
               break;
             }
-            default: {
-              VLOG(2) << "Unknown comparison direction";
-            }
+            default: { VLOG(2) << "Unknown comparison direction"; }
           }
           instr_map.insert(std::make_pair(cur_instr_id, op));
           break;
@@ -525,13 +523,14 @@ std::unique_ptr<Program> makeProgram(const std::string& name, const std::vector<
           std::vector<int> high_pads;
           auto padding_config = instruction->padding_config();
           // NXC layout, check only the X
-          for (int64 i = 1; i < padding_config.dimensions_size() - 1; i++) {
+          for (int64 i = 0; i < padding_config.dimensions_size(); i++) {
             auto padding_dimension = padding_config.dimensions(i);
             low_pads.push_back(padding_dimension.edge_padding_low());
             high_pads.push_back(padding_dimension.edge_padding_high());
           }
-          auto op = plaidml_op::spatial_padding(instr_map[operand_ids[0]], low_pads, high_pads,
-                                                plaidml_op::TensorLayout::NXC);
+          auto op = plaidml_op::explicit_padding(instr_map[operand_ids[0]], low_pads, high_pads);
+          op.mode(plaidml_op::PadMode::CONSTANT);
+          op.padval(instr_map[operand_ids[1]]);
           instr_map.insert(std::make_pair(cur_instr_id, op));
           break;
         }
@@ -663,8 +662,12 @@ std::unique_ptr<Program> makeProgram(const std::string& name, const std::vector<
         }
         case HloOpcode::kTranspose: {
           // Tensor transpose operation
-          // TODO: test correctness, see if the axes operand is needed
-          auto op = plaidml_op::transpose(instr_map[operand_ids[0]]);
+          auto dims = instruction->dimensions();
+          std::vector<Value> pattern;
+          for (int64_t d : dims) {
+            pattern.push_back(Value(d));
+          }
+          auto op = plaidml_op::transpose(instr_map[operand_ids[0]], Value(pattern));
           instr_map.insert(std::make_pair(cur_instr_id, op));
           break;
         }

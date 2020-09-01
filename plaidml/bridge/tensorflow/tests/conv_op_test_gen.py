@@ -20,8 +20,6 @@ kstr = '\nstd::vector<std::vector<float>> conv_ks = {'
 ostr = '\nstd::vector<std::vector<float>> conv_os = {'
 modstr = '\nstd::vector<std::string> conv_modules = {'
 
-nstr = '0000'
-
 
 def ary2str(A):
     A = A.flatten()
@@ -34,7 +32,7 @@ def ary2str(A):
 #Calculate convoluion for each combination; store inputs, outputs & module
 for (i, combination) in enumerate(itertools.product(i_sizes, k_sizes, strides, paddings,
                                                     dilations)):
-    nstr = nstr[:3 - (i // 10)] + str(i)
+    nstr = str(i).zfill(4)
     I = tf.compat.v1.placeholder(tf.float32, combination[0])
     K1 = tf.compat.v1.placeholder(tf.float32, combination[1])
     C1 = tf.nn.conv2d(I,

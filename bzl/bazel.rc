@@ -106,7 +106,6 @@ test:asan --test_env=DYLD_INSERT_LIBRARIES
 build --action_env=LD_PRELOAD # Needed on *nix to prevent malloc errors in tensorflow
 build --action_env=XLA_DUMPDIR="/tmp/hlo_module"
 build --action_env=XLA_FLAGS=--xla_dump_to="/tmp/hlo_module"
-build --action_env=TF_XLA_FLAGS="--tf_xla_auto_jit=2 --tf_xla_cpu_global_jit --tf_xla_min_cluster_size=0"
 build --define=no_aws_support=true
 build --nocheck_visibility
 build:linux --cxxopt=-DGTEST_HAS_PTHREAD=0
