@@ -4,6 +4,7 @@ CppEdsl.Atan
 CppEdsl.BitNot
 CppEdsl.BitRightScalar
 CppEdsl.ConvI8
+CppEdsl.CosH
 CppEdsl.Erf
 CppEdsl.HigherPrecisionConstants
 CppEdsl.Pow
