@@ -89,6 +89,26 @@ tf_cc_test(
 )
 
 tf_cc_test(
+    name = "dot_op_test",
+    srcs = ["dot_op_test.cc"],
+    extra_copts = ["-fexceptions"],
+    deps = [
+        ":codegen_test",
+        ":filecheck",
+        "//plaidml/bridge/tensorflow/service:compiler",
+        "@com_google_absl//absl/strings",
+        "@com_google_googletest//:gtest",
+        "@org_tensorflow//tensorflow/compiler/xla/service:hlo",
+        "@org_tensorflow//tensorflow/compiler/xla/tests:hlo_test_base",
+        "@org_tensorflow//tensorflow/compiler/xla/tests:test_utils",
+        "@org_tensorflow//tensorflow/core:framework",
+        "@org_tensorflow//tensorflow/core:lib",
+        "@org_tensorflow//tensorflow/core:test",
+        "@org_tensorflow//tensorflow/core:test_main",
+    ],
+)
+
+tf_cc_test(
     name = "eltwise_op_test",
     srcs = ["eltwise_op_test.cc"],
     extra_copts = ["-fexceptions"],
@@ -102,6 +122,26 @@ tf_cc_test(
         "@org_tensorflow//tensorflow/compiler/xla/tests:hlo_test_base",
         "@org_tensorflow//tensorflow/compiler/xla/tests:test_utils",
 	"@org_tensorflow//tensorflow/core:framework",
+        "@org_tensorflow//tensorflow/core:lib",
+        "@org_tensorflow//tensorflow/core:test",
+        "@org_tensorflow//tensorflow/core:test_main",
+    ],
+)
+
+tf_cc_test(
+    name = "logical_op_test",
+    srcs = ["logical_op_test.cc"],
+    extra_copts = ["-fexceptions"],
+    deps = [
+        ":codegen_test",
+        ":filecheck",
+        "//plaidml/bridge/tensorflow/service:compiler",
+        "@com_google_absl//absl/strings",
+        "@com_google_googletest//:gtest",
+        "@org_tensorflow//tensorflow/compiler/xla/service:hlo",
+        "@org_tensorflow//tensorflow/compiler/xla/tests:hlo_test_base",
+        "@org_tensorflow//tensorflow/compiler/xla/tests:test_utils",
+        "@org_tensorflow//tensorflow/core:framework",
         "@org_tensorflow//tensorflow/core:lib",
         "@org_tensorflow//tensorflow/core:test",
         "@org_tensorflow//tensorflow/core:test_main",
