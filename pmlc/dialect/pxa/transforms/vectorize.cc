@@ -33,6 +33,35 @@ private:
   DenseSet<Operation *> vectorizedOps;
   llvm::DenseSet<Operation *> zeroStrideReductions;
 
+  ::llvm::StringRef
+  stringifyAtomicRMWKindForVectorReductionOp(AtomicRMWKind val) {
+    switch (val) {
+    case AtomicRMWKind::addf:
+      return "add";
+    case AtomicRMWKind::addi:
+      return "add";
+    case AtomicRMWKind::assign:
+      return "invalid";
+    case AtomicRMWKind::maxf:
+      return "max";
+    case AtomicRMWKind::maxs:
+      return "max";
+    case AtomicRMWKind::maxu:
+      return "max";
+    case AtomicRMWKind::minf:
+      return "min";
+    case AtomicRMWKind::mins:
+      return "min";
+    case AtomicRMWKind::minu:
+      return "min";
+    case AtomicRMWKind::mulf:
+      return "mul";
+    case AtomicRMWKind::muli:
+      return "mul";
+    }
+    return "";
+  }
+
   LogicalResult tryVectorizeOperation(Operation *op) {
     return llvm::TypeSwitch<Operation *, LogicalResult>(op)
         .Case<PxaLoadOp>([&](auto op) {
@@ -66,6 +95,17 @@ private:
 
           auto it = strideInfo->strides.find(index);
           if (it == strideInfo->strides.end()) {
+            // vector::ReductionOp doesn't support pxa's assign reduction.
+            // Also, make sure we handle only the supported types -
+            // see the vector::ReductionOp verification code
+            // (https://github.com/llvm/llvm-project/blob/master/mlir/lib/Dialect/Vector/VectorOps.cpp#L134).
+            Type eltType = op.getMemRefType().getElementType();
+            if (op.agg() == AtomicRMWKind::assign ||
+                (!eltType.isF32() && !eltType.isF64() &&
+                 !eltType.isSignlessInteger(32) &&
+                 !eltType.isSignlessInteger(64))) {
+              return failure();
+            }
             // If stride is 0, "remember it" as such.
             zeroStrideReductions.insert(op.getOperation());
           } else if (it->second != 1) {
@@ -162,7 +202,9 @@ public:
         zeroStrideReductions.end()) {
       vector::ReductionOp reductionOp = builder.create<vector::ReductionOp>(
           op.getLoc(), op.getMemRefType().getElementType(),
-          builder.getStringAttr("add"), val, ValueRange{});
+          builder.getStringAttr(
+              stringifyAtomicRMWKindForVectorReductionOp(op.agg())),
+          val, ValueRange{});
 
       auto reduceOp = builder.create<PxaReduceOp>(
           op.getLoc(), ArrayRef<Type>{op.getMemRefType()}, op.agg(),
