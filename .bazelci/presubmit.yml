@@ -8,6 +8,7 @@ tasks:
     - sh ./Miniconda3-latest-Linux-x86_64.sh -b -p $HOME/miniconda
     - which python
     - which python3
+    - ls -lrt /var/lib/buildkite-agent/miniconda/lib/site-packages
     environment:
       PATH: /var/lib/buildkite-agent/miniconda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
       PLAIDML_DEVICE_IDS: llvm_cpu.0
@@ -15,6 +16,7 @@ tasks:
       PLAIDML_TARGET: llvm_cpu
       PLAIDML_EXPERIMENTAL: 1
       PYTHON_BIN_PATH: /var/lib/buildkite-agent/miniconda/bin/python
+      PYTHON_LIB_PATH: /var/lib/buildkite-agent/miniconda/lib/site-packages
     test_flags:
     test_targets:
     - "..."
@@ -33,6 +35,7 @@ tasks:
       PLAIDML_TARGET: llvm_cpu
       PLAIDML_EXPERIMENTAL: 1
       PYTHON_BIN_PATH: /var/lib/buildkite-agent/miniconda/bin/python
+      PYTHON_LIB_PATH: /var/lib/buildkite-agent/miniconda/lib/site-packages
     test_flags:
     test_targets:
     - "..."
