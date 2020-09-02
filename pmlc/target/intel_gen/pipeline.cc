@@ -52,8 +52,7 @@ struct LowerPXAToAffinePass
 
     if (failed(applyPartialConversion(getOperation(), target, patterns,
                                       nullptr))) {
-      getOperation().dump();
-      emitError(UnknownLoc::get(&ctx), "Error lowering pxa -> affine\n");
+      getOperation().emitError("Error lowering pxa -> affine\n");
       signalPassFailure();
     }
   }

@@ -28,7 +28,7 @@ def ConvertParallelLoopToGpu : Pass<"intel-gen-convert-parallel-loops-to-gpu"> {
   let dependentDialects = ["mlir::AffineDialect", "mlir::gpu::GPUDialect"];
 }
 
-def ConvertPXAToAffine : Pass<"intel_gen-convert-pxa-to-affine", "mlir::ModuleOp"> {
+def ConvertPXAToAffine : Pass<"intel-gen-convert-pxa-to-affine", "mlir::ModuleOp"> {
   let summary = "Convert PXA dialect to Affine dialect";
   let constructor = "pmlc::target::intel_gen::createLowerPXAToAffinePass()";
   let dependentDialects = [
