@@ -8,10 +8,8 @@ CppEdsl.BitRightTensor
 CppEdsl.ConvI8
 CppEdsl.CosH
 CppEdsl.Erf
-CppEdsl.Floor
 CppEdsl.HigherPrecisionConstants
 CppEdsl.Pow
 CppEdsl.Prng
 CppEdsl.Round
 CppEdsl.SinH
-CppEdsl.Tan
