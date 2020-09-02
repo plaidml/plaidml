@@ -17,6 +17,8 @@
 #include "pmlc/dialect/pxa/transforms/vectorize.h"
 #include "pmlc/util/logging.h"
 
+#include "mlir/Support/DebugStringHelper.h"
+
 using namespace mlir; // NOLINT[build/namespaces]
 
 namespace pmlc::dialect::pxa {
@@ -29,6 +31,35 @@ private:
   unsigned vectorSize;
   DenseSet<Value> vectorizedValues;
   DenseSet<Operation *> vectorizedOps;
+  llvm::DenseSet<Operation *> zeroStrideReductions;
+
+  const char *stringifyAtomicRMWKindForVectorReductionOp(AtomicRMWKind val) {
+    switch (val) {
+    case AtomicRMWKind::addf:
+      return "add";
+    case AtomicRMWKind::addi:
+      return "add";
+    case AtomicRMWKind::assign:
+      return "invalid";
+    case AtomicRMWKind::maxf:
+      return "max";
+    case AtomicRMWKind::maxs:
+      return "max";
+    case AtomicRMWKind::maxu:
+      return "max";
+    case AtomicRMWKind::minf:
+      return "min";
+    case AtomicRMWKind::mins:
+      return "min";
+    case AtomicRMWKind::minu:
+      return "min";
+    case AtomicRMWKind::mulf:
+      return "mul";
+    case AtomicRMWKind::muli:
+      return "mul";
+    }
+    llvm_unreachable("Invalid aggregation type");
+  }
 
   LogicalResult tryVectorizeOperation(Operation *op) {
     return llvm::TypeSwitch<Operation *, LogicalResult>(op)
@@ -63,13 +94,22 @@ private:
 
           auto it = strideInfo->strides.find(index);
           if (it == strideInfo->strides.end()) {
-            // Deal with reductions of stride 0.
-            // TODO: If input is a vector, call vector.reduce and then scalar
-            // pxa.reduce. Right now, we say things are cool if out input isn't
-            // vectorized
-            return failure(vectorizedValues.count(op.val()));
-          }
-          if (it->second != 1) {
+            // vector::ReductionOp doesn't support pxa's assign reduction.
+            // Also, make sure we handle only the supported types -
+            // see the vector::ReductionOp verification code
+            // (https://github.com/llvm/llvm-project/blob/master/mlir/lib/Dialect/Vector/VectorOps.cpp#L134).
+            Type eltType = op.getMemRefType().getElementType();
+            if (op.agg() == AtomicRMWKind::assign ||
+                (!eltType.isF32() && !eltType.isF64() &&
+                 !eltType.isSignlessInteger(32) &&
+                 !eltType.isSignlessInteger(64))) {
+              op.emitRemark("Vectorization failed: Unsupported reduction or "
+                            "type for vector::ReductionOp");
+              return failure();
+            }
+            // If stride is 0, "remember it" as such.
+            zeroStrideReductions.insert(op.getOperation());
+          } else if (it->second != 1) {
             IVLOG(3, "Vectorize: Failed, PxaReduceOp stride != 1");
             return failure();
           }
@@ -158,11 +198,27 @@ public:
           builder.create<vector::BroadcastOp>(op.getLoc(), vecType, val);
       val = bcast.getResult();
     }
-    auto vecOp = builder.create<PxaVectorReduceOp>(
-        op.getLoc(), ArrayRef<Type>{op.getMemRefType()}, op.agg(), val,
-        op.memref(), op.map(), op.idxs());
-    op.replaceAllUsesWith(vecOp.getResult());
-    op.erase();
+    // Add vector_reduction only if the stride is 0
+    if (zeroStrideReductions.find(op.getOperation()) !=
+        zeroStrideReductions.end()) {
+      vector::ReductionOp reductionOp = builder.create<vector::ReductionOp>(
+          op.getLoc(), op.getMemRefType().getElementType(),
+          builder.getStringAttr(
+              stringifyAtomicRMWKindForVectorReductionOp(op.agg())),
+          val, ValueRange{});
+
+      auto reduceOp = builder.create<PxaReduceOp>(
+          op.getLoc(), ArrayRef<Type>{op.getMemRefType()}, op.agg(),
+          reductionOp.getResult(), op.memref(), op.map(), op.idxs());
+      op.replaceAllUsesWith(reduceOp.getResult());
+      op.erase();
+    } else {
+      auto vecOp = builder.create<PxaVectorReduceOp>(
+          op.getLoc(), ArrayRef<Type>{op.getMemRefType()}, op.agg(), val,
+          op.memref(), op.map(), op.idxs());
+      op.replaceAllUsesWith(vecOp.getResult());
+      op.erase();
+    }
   }
 
   void vectorizeOperation(Operation *op) {
