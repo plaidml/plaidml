@@ -668,13 +668,27 @@ struct PrngOpConversion : public OpConversionPattern<PrngOp> {
   matchAndRewrite(dialect::tile::PrngOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
     PrngOp::Adaptor transformed(operands);
+    auto loc = op.getLoc();
     BufferAllocator allocResult(rewriter, op.getOperation(),
                                 op.result().getType());
     BufferAllocator stateResult(rewriter, op.getOperation(),
                                 op.state().getType());
-    rewriter.replaceOpWithNewOp<pxa::PrngOp>(
-        op, allocResult.memRefType, stateResult.memRefType, transformed.state(),
-        allocResult.resultMemRef, stateResult.resultMemRef);
+    auto resultType = allocResult.memRefType.getElementType();
+    auto zero = createInit(rewriter, loc, resultType, AggregationKind::add);
+    auto shape = allocResult.memRefType.getShape();
+    auto parallel = rewriter.create<AffineParallelOp>(
+        loc,
+        /*resultTypes=*/ArrayRef<Type>{allocResult.memRefType},
+        /*reductions=*/ArrayRef<AtomicRMWKind>{AtomicRMWKind::assign},
+        /*ranges=*/shape);
+    auto parallelBuilder = parallel.getBodyBuilder();
+    auto load = buildBroadcastLoad(parallelBuilder, loc, zero, shape.size());
+    auto stored = buildSimpleStore(parallelBuilder, loc, load,
+                                   allocResult.resultMemRef, llvm::None);
+    parallelBuilder.create<AffineYieldOp>(loc, ValueRange{stored});
+    SmallVector<Value, 2> x = {parallel.getResult(0), stateResult.resultMemRef};
+    rewriter.replaceOp(op, x);
+
     return success();
   }
 };
