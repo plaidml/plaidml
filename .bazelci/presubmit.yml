@@ -7,12 +7,14 @@ tasks:
     - curl -O https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
     - sh ./Miniconda3-latest-Linux-x86_64.sh -b -p $HOME/miniconda
     - python -m pip install numpy
+    - apt-get install libtcmalloc-minimal4
     environment:
       PATH: /var/lib/buildkite-agent/miniconda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
       PLAIDML_DEVICE_IDS: llvm_cpu.0
       PLAIDML_DEVICE: llvm_cpu.0
       PLAIDML_TARGET: llvm_cpu
       PLAIDML_EXPERIMENTAL: 1
+      LD_PRELOAD: /usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so.4
     test_flags:
     test_targets:
     - "..."
