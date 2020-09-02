@@ -30,11 +30,10 @@ func @grn(%arg0: tensor<1x224x128x24xf16>) -> tensor<1x224x128x24xf16> {
   return %6 : tensor<1x224x128x24xf16>
 }
 
-// CHECK: func @grn(%[[in:.*]]: memref<1x224x128x24xf16>) -> memref<1x224x128x24xf16>
+// CHECK: func @grn(%[[in:.*]]: memref<1x224x128x24xf16>, %[[out:.*]]: memref<1x224x128x24xf16>) -> memref<1x224x128x24xf16>
 // CHECK:   %[[epsilon:.*]] = constant 1.001360e-05 : f16
 // CHECK:   %[[zero:.*]] = constant 0.000000e+00 : f16
 // CHECK:   %[[one:.*]] = constant 1.000000e+00 : f16
-// CHECK:   %[[out:.*]] = alloc() : memref<1x224x128x24xf16>
 // CHECK:   %[[P0:.*]] = affine.parallel (%[[i:.*]], %[[j:.*]]) = (0, 0) to (224, 128) reduce ("assign") -> (memref<1x224x128x24xf16>)
 // CHECK:     %[[T0:.*]] = alloc() : memref<1x1x1x1xf16>
 // CHECK:     %[[T1:.*]] = pxa.reduce assign %[[zero]], %[[T0]][0, 0, 0, 0] : memref<1x1x1x1xf16>

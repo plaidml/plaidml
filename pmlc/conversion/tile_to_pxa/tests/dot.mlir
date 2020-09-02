@@ -18,11 +18,11 @@ func @dot(%arg0: tensor<1x784xf32>, %arg1: tensor<784x512xf32>) -> tensor<1x512x
 // CHECK-LABEL: func @dot
 // CHECK-SAME: %[[ARG0:.*]]: memref<1x784xf32>
 // CHECK-SAME: %[[ARG1:.*]]: memref<784x512xf32>
+// CHECK-SAME: %[[ARG2:.*]]: memref<1x512xf32>
 // CHECK-SAME: -> memref<1x512xf32>
 // CHECK-DAG: %[[ZERO:.*]] = constant 0.0 
-// CHECK-DAG: %[[OUT:.*]] = alloc() : memref<1x512xf32>
 // CHECK: %[[ZEROED:.*]] = affine.parallel  (%[[I1:.*]], %[[J1:.*]]) = (0, 0) to (1, 512)
-// CHECK: pxa.reduce assign %[[ZERO]], %[[OUT]][%[[I1]], %[[J1]]] : memref<1x512xf32>
+// CHECK: pxa.reduce assign %[[ZERO]], %[[ARG2]][%[[I1]], %[[J1]]] : memref<1x512xf32>
 // CHECK: %[[FINAL:.*]] = affine.parallel (%[[I2:.*]], %[[J2:.*]], %[[K2:.*]]) = (0, 0, 0) to (784, 1, 512)
 // CHECK-DAG: %[[A:.*]] = pxa.load %[[ARG0]][%[[J2]], %[[I2]]] : memref<1x784xf32>
 // CHECK-DAG: %[[B:.*]] = pxa.load %[[ARG1]][%[[I2]], %[[K2]]] : memref<784x512xf32>

@@ -13,6 +13,7 @@
 
 #include "pmlc/conversion/tile_to_pxa/pass_detail.h"
 #include "pmlc/dialect/eltwise/ir/ops.h"
+#include "pmlc/dialect/pxa/analysis/uses.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/dialect/stdx/ir/ops.h"
 #include "pmlc/dialect/tile/ir/ops.h"
@@ -77,38 +78,6 @@ static RankedTensorType getRankedTensorType(Type type) {
   }
   return RankedTensorType::get({}, type);
 }
-
-struct FuncOpConversion : public OpConversionPattern<FuncOp> {
-  using OpConversionPattern<FuncOp>::OpConversionPattern;
-
-  LogicalResult
-  matchAndRewrite(FuncOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const final {
-    FunctionType type = op.getType();
-    IVLOG(2, "FuncOpConversion::rewrite> " << mlir::debugString(type));
-
-    // Convert the function signature
-    TypeConverter typeConverter;
-    mlir::TypeConverter::SignatureConversion result(type.getNumInputs());
-    for (unsigned i = 0; i < type.getNumInputs(); ++i) {
-      result.addInputs(i, {typeConverter.convertType(type.getInput(i))});
-    }
-
-    // Create a new function with an updated signature.
-    auto newOp = rewriter.cloneWithoutRegions(op);
-    rewriter.inlineRegionBefore(op.getBody(), newOp.getBody(), newOp.end());
-    newOp.setType(FunctionType::get(result.getConvertedTypes(), llvm::None,
-                                    op.getContext()));
-
-    // Tell the rewriter to convert the region signature.
-    rewriter.applySignatureConversion(&newOp.getBody(), result);
-
-    // Finally cause the old func op to be erased
-    rewriter.eraseOp(op);
-
-    return success();
-  }
-};
 
 struct TileConstantOpConversion : public OpConversionPattern<ConstantOp> {
   using OpConversionPattern<ConstantOp>::OpConversionPattern;
@@ -571,7 +540,7 @@ buildBroadcastLoad(OpBuilder &builder, Location loc, Value operand,
   auto defOp = operand.getDefiningOp();
   Attribute attr;
   // Handle scalar values
-  if (defOp && mlir::m_Constant(&attr).match(defOp)) {
+  if (defOp && m_Constant(&attr).match(defOp)) {
     return operand;
   }
   // handle broadcasts
@@ -867,7 +836,7 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
       auto operand = cionOperands[i];
       auto defOp = operand.getDefiningOp();
       Attribute attr;
-      if (defOp && mlir::m_Constant(&attr).match(defOp)) {
+      if (defOp && m_Constant(&attr).match(defOp)) {
         scalars.push_back(operand);
       } else {
         auto map = srcs[i].cast<AffineMapAttr>().getValue();
@@ -1070,6 +1039,45 @@ struct CastOpConversion : public OpConversionPattern<ew::CastOp> {
   }
 };
 
+struct FuncOpConversion : public OpConversionPattern<FuncOp> {
+  using OpConversionPattern<FuncOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(FuncOp op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const final {
+    FunctionType type = op.getType();
+    IVLOG(2, "FuncOpConversion::rewrite> " << debugString(type));
+
+    // Convert the function signature
+    TypeConverter typeConverter;
+    mlir::TypeConverter::SignatureConversion result(type.getNumInputs() +
+                                                    type.getNumResults());
+    for (unsigned i = 0; i < type.getNumInputs(); ++i) {
+      result.addInputs(i, {typeConverter.convertType(type.getInput(i))});
+    }
+    SmallVector<Type, 8> resultTypes;
+    for (Type resultType : type.getResults()) {
+      Type newResultType = typeConverter.convertType(resultType);
+      result.addInputs({newResultType});
+      resultTypes.push_back(newResultType);
+    }
+
+    // Create a new function with an updated signature.
+    auto newOp = rewriter.cloneWithoutRegions(op);
+    rewriter.inlineRegionBefore(op.getBody(), newOp.getBody(), newOp.end());
+    newOp.setType(FunctionType::get(result.getConvertedTypes(), resultTypes,
+                                    op.getContext()));
+
+    // Tell the rewriter to convert the region signature.
+    rewriter.applySignatureConversion(&newOp.getBody(), result);
+
+    // Finally cause the old func op to be erased
+    rewriter.eraseOp(op);
+
+    return success();
+  }
+};
+
 struct ReturnOpConversion : public OpConversionPattern<ReturnOp> {
   using OpConversionPattern<ReturnOp>::OpConversionPattern;
 
@@ -1082,9 +1090,10 @@ struct ReturnOpConversion : public OpConversionPattern<ReturnOp> {
     auto blockArg = funcOp.getType().getNumInputs() - op.getNumOperands();
     for (auto operand : operands) {
       // Find very initial allocation of memref
-      operand.replaceAllUsesWith(block.getArgument(blockArg++));
+      auto def = pxa::getIndirectDef(operand);
+      def.replaceAllUsesWith(block.getArgument(blockArg++));
     }
-    rewriter.replaceOpWithNewOp<ReturnOp>(op);
+    rewriter.replaceOpWithNewOp<ReturnOp>(op, operands);
     return success();
   }
 };
@@ -1122,7 +1131,7 @@ struct TraceOpConversion : public OpConversionPattern<TraceOp> {
 struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
   void runOnOperation() final {
     // Set up target (i.e. what is legal)
-    mlir::ConversionTarget target(getContext());
+    ConversionTarget target(getContext());
     TypeConverter converter;
     target.addLegalDialect<mlir::AffineDialect>();
     target.addLegalDialect<mlir::StandardOpsDialect>();
@@ -1131,6 +1140,8 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
     target.addLegalOp<mlir::ModuleOp, mlir::ModuleTerminatorOp, ReturnOp>();
     target.addDynamicallyLegalOp<FuncOp>(
         [&](FuncOp op) { return converter.isSignatureLegal(op.getType()); });
+    target.addDynamicallyLegalOp<ReturnOp>(
+        [&](ReturnOp op) { return converter.isLegal(op); });
 
     // Setup rewrite patterns
     using CmpIntLtOp =
@@ -1142,11 +1153,17 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
     using CmpIntGeOp =
         CmpIntInequalityOp<CmpIPredicate::sge, CmpIPredicate::uge>;
     OwningRewritePatternList patterns;
-    populateFuncOpTypeConversionPattern(patterns, &getContext(), converter);
     patterns.insert<
-        TileConstantOpConversion, CastOpConversion, IndexOpConversion,
-        ScalarConstantOpConversion, ShapeOpConversion, TraceOpConversion,
-        PrngOpConversion, ReshapeOpConversion,
+        CastOpConversion,           //
+        FuncOpConversion,           //
+        IndexOpConversion,          //
+        PrngOpConversion,           //
+        ReshapeOpConversion,        //
+        ReturnOpConversion,         //
+        ScalarConstantOpConversion, //
+        ShapeOpConversion,          //
+        TileConstantOpConversion,   //
+        TraceOpConversion,          //
         // TODO: SpecialOpConversion (GatherOp, ScatterOp, ZeroOp)
         ContractionOpConversion<CombinationKind::none, FirstOperand>,
         ContractionOpConversion<CombinationKind::add, StdOp<mlir::AddFOp>,
@@ -1280,7 +1297,7 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
 };
 } // namespace
 
-std::unique_ptr<mlir::Pass> createLowerTileToPXAPass() {
+std::unique_ptr<Pass> createLowerTileToPXAPass() {
   return std::make_unique<LowerTileToPXAPass>();
 }
 
