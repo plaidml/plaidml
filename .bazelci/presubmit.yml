@@ -10,6 +10,7 @@ tasks:
     - which python3
     - ls -lrt /var/lib/buildkite-agent/miniconda/lib
     - ls -lrt /var/lib/buildkite-agent/miniconda/lib/python*/site-packages
+    - python -m pip install numpy
     environment:
       PATH: /var/lib/buildkite-agent/miniconda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
       PLAIDML_DEVICE_IDS: llvm_cpu.0
