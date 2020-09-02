@@ -53,3 +53,26 @@ func @vector_set(%val: f32) -> (memref<64xf32>) {
   return %o : memref<64xf32>
 }
 
+// CHECK-LABEL: func @vectorize_reduce_stride_0
+func @vectorize_reduce_stride_0() {
+  %a = alloc() : memref<1x4x128x24xf32>
+  %b = alloc() : memref<1x4x128x24xf32>
+  %c = alloc() : memref<1x1x1x1xf32>
+  %o = affine.parallel (%arg0, %arg1, %arg2, %i) = (0, 0, 0, 0) to (1, 128, 128, 24) reduce ("assign") -> (memref<1x1x1x1xf32>) {
+    // CHECK: affine.parallel (%{{.*}}, %{{.*}}, %{{.*}}, %{{.*}}) = (0, 0, 0, 0) to (1, 128, 128, 24) step (1, 1, 1, 8) reduce ("assign") -> (memref<1x1x1x1xf32>)
+    %1 = pxa.load %a[0, %arg0, %arg1, %i] : memref<1x4x128x24xf32>
+    // CHECK: pxa.vector_load %{{.*}}[0, %{{.*}}, %{{.*}}, %{{.*}}] : memref<1x4x128x24xf32>, vector<8xf32>
+    %2 = pxa.load %b[0, %arg0, %arg2, %i] : memref<1x4x128x24xf32>
+    // CHECK: pxa.vector_load %{{.*}}[0, %{{.*}}, %{{.*}}, %{{.*}}] : memref<1x4x128x24xf32>, vector<8xf32>
+    %3 = mulf %1, %2 : f32
+    // CHECK: mulf %{{.*}}, %{{.*}} : vector<8xf32>
+    %4 = pxa.reduce addf %3, %c[0, 0, 0, 0] : memref<1x1x1x1xf32>
+    // CHECK: vector.reduction "add", %{{.*}} : vector<8xf32> into f32
+    // CHECK-NEXT: pxa.reduce addf %{{.*}}, %{{.}}[0, 0, 0, 0] : memref<1x1x1x1xf32>
+    affine.yield %4 : memref<1x1x1x1xf32>
+    // CHECK: affine.yield %{{.*}} : memref<1x1x1x1xf32>
+  }
+
+  return
+}
+
