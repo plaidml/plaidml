@@ -6,10 +6,6 @@ tasks:
     shell_commands:
     - curl -O https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
     - sh ./Miniconda3-latest-Linux-x86_64.sh -b -p $HOME/miniconda
-    - which python
-    - which python3
-    - ls -lrt /var/lib/buildkite-agent/miniconda/lib
-    - ls -lrt /var/lib/buildkite-agent/miniconda/lib/python*/site-packages
     - python -m pip install numpy
     environment:
       PATH: /var/lib/buildkite-agent/miniconda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -17,8 +13,6 @@ tasks:
       PLAIDML_DEVICE: llvm_cpu.0
       PLAIDML_TARGET: llvm_cpu
       PLAIDML_EXPERIMENTAL: 1
-      PYTHON_BIN_PATH: /var/lib/buildkite-agent/miniconda/bin/python
-      PYTHON_LIB_PATH: /var/lib/buildkite-agent/miniconda/lib/python3.8/site-packages
     test_flags:
     test_targets:
     - "..."
@@ -28,16 +22,13 @@ tasks:
     shell_commands:
     - curl -O https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-x86_64.sh
     - sh ./Miniconda3-latest-MacOSX-x86_64.sh -b -p $HOME/miniconda
-    - which python
-    - which python3
+    - python -m pip install numpy
     environment:
       PATH: /Users/buildkite/miniconda/bin:/usr/local/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
       PLAIDML_DEVICE_IDS: llvm_cpu.0
       PLAIDML_DEVICE: llvm_cpu.0
       PLAIDML_TARGET: llvm_cpu
       PLAIDML_EXPERIMENTAL: 1
-      PYTHON_BIN_PATH: /var/lib/buildkite-agent/miniconda/bin/python
-      PYTHON_LIB_PATH: /var/lib/buildkite-agent/miniconda/lib/python3.8/site-packages
     test_flags:
     test_targets:
     - "..."
