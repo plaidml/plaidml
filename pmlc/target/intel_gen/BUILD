@@ -42,6 +42,9 @@ plaidml_cc_library(
         "@llvm-project//mlir:LLVMTransforms",
         "@llvm-project//mlir:SCFToGPUPass",
         "@llvm-project//mlir:StandardOpsTransforms",
-    ],
+    ] + select({
+        "//plaidml:gpu_target": ["//pmlc/rt/vulkan"],
+        "//conditions:default": [],
+    }),
     alwayslink = 1,
 )
