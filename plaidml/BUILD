@@ -127,8 +127,8 @@ py_binary(
     data = [
         "plaidml-config.cmake",
         ":setup",
-        "//bzl:googlemock.LICENSE",
         "//:LICENSE",
+        "//bzl:googlemock.LICENSE",
         "//plaidml/core:sdk",
         "//plaidml/edsl:sdk",
         "//plaidml/exec:sdk",
@@ -204,14 +204,14 @@ config_setting(
     name = "llvm_cpu",
     flag_values = {
         ":target": "llvm_cpu",
-    }
+    },
 )
 
 config_setting(
     name = "intel_gen",
     flag_values = {
         ":target": "intel_gen",
-    }
+    },
 )
 
 selects.config_setting_group(
@@ -227,8 +227,8 @@ plaidml_settings(
 plaidml_target_test_package(
     name = "intel_gen_test",
     plaidml_target = "intel_gen",
+    tags = ["skip_windows"],
     tests = [
         "//plaidml/edsl/tests:cc_test",
     ],
-    tags = ["skip_windows"],
 )
