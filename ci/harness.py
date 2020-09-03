@@ -135,7 +135,7 @@ def run(args, remainder):
         except ValueError:
             pass
 
-    runner = shutil.which(popt.get('runner'), path=os.pathsep.join(cwd, env['PATH']))
+    runner = shutil.which(popt.get('runner'), path=os.pathsep.join([cwd, env['PATH']]))
     cmd = [runner] + cmd_args
     retcode = util.call(cmd, cwd=cwd, env=env)
 
