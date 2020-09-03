@@ -25,8 +25,6 @@ def main():
 
     if sys.platform == 'win32':
         binary_name = 'plaidml.dll'
-    elif sys.platform == 'darwin':
-        binary_name = 'libplaidml.dylib'
     else:
         binary_name = 'libplaidml.so'
 
