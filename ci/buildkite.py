@@ -154,9 +154,8 @@ def cmd_build(args, remainder):
 
     env = os.environ.copy()
     variant = plan['VARIANTS'][args.variant]
-    if 'env' in variant:
-        for key, value in variant['env'].items():
-            env[key] = str(value)
+    for key, value in variant.get('env', {}).items():
+        env[key] = str(value)
 
     explain_log = 'explain.log'
     profile_json = 'profile.json.gz'
@@ -199,11 +198,6 @@ def cmd_build(args, remainder):
         tar.extractall('tmp', members=wheels)
     if 'dbg' not in args.variant:
         util.buildkite_upload('*.whl', cwd='tmp')
-
-    actions = util.check_output(['bazelisk'] + startup_args +
-                                ['aquery', 'kind(_plaidml_target_test_package, //plaidml/...)'])
-    for output in re.findall(r'^ *Outputs: \[(.*)\] *$', actions.decode('utf-8'), re.MULTILINE):
-        util.buildkite_upload(output)
 
     variant_dir = os.path.join('tmp', 'build', args.variant)
     os.makedirs(variant_dir)

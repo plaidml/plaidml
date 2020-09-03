@@ -16,9 +16,6 @@ steps:
       - "tmp/build/**/*"
       {{/artifacts}}
       - "bazel-testlogs/**/test.log"
-    env:
-      PLAIDML_DEVICE: llvm_cpu.0
-      PLAIDML_TARGET: llvm_cpu
 {{/variants}}
 
 
