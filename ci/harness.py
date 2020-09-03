@@ -79,7 +79,7 @@ def run(args, remainder):
     shutil.rmtree(output_root, ignore_errors=True)
     output.mkdir(parents=True)
 
-    cwd = popt.get('cwd', '.')
+    cwd = os.path.abspath(popt.get('cwd', '.'))
     spec = pathlib.Path(popt.get('conda_env'))
 
     util.printf('--- :snake: Creating conda env from {}'.format(spec))
