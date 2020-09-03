@@ -143,8 +143,8 @@ SUITES:
         platform_overrides:
           pml-vk-gen:
             append_args:
-              - --plaidml_target=intel_gen,
-              - --skip_test_file=edsl_test-skip.intel_gen.txt,
+              - --plaidml_target=intel_gen
+              - --skip_test_file=edsl_test-skip.intel_gen.txt
             soft_fail: true # maybe flakey?
       # mnist_mlp:
       #   args: [mnist_mlp_test.py]
