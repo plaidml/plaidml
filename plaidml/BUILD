@@ -6,7 +6,7 @@ load("@bazel_skylib//rules:common_settings.bzl", "string_flag")
 load("@bazel_skylib//lib:selects.bzl", "selects")
 load("@rules_python//python:defs.bzl", "py_binary", "py_library")
 load("@io_bazel_rules_jsonnet//jsonnet:jsonnet.bzl", "jsonnet_to_json")
-load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_shlib", "plaidml_settings", "plaidml_target_test_package")
+load("//bzl:plaidml.bzl", "plaidml_cc_binary", "plaidml_cc_library", "plaidml_settings")
 
 plaidml_cc_library(
     name = "api",
@@ -20,7 +20,7 @@ plaidml_cc_library(
 )
 
 plaidml_cc_library(
-    name = "plaidml",
+    name = "lib",
     visibility = ["//visibility:public"],
     deps = [
         ":api",
@@ -50,8 +50,8 @@ jsonnet_to_json(
     extra_args = ["-S"],
 )
 
-plaidml_cc_shlib(
-    name = "shlib",
+plaidml_cc_binary(
+    name = "plaidml",
     linkopts = select({
         "@bazel_tools//src/conditions:windows": [],
         "@bazel_tools//src/conditions:darwin_x86_64": [
@@ -66,11 +66,11 @@ plaidml_cc_shlib(
             "$(location :plaidml.lds)",
         ],
     }),
-    shlib_name = "plaidml",
+    linkshared = 1,
     visibility = ["//visibility:public"],
     win_def_file = ":plaidml.def",
     deps = [
-        ":plaidml",
+        ":lib",
     ] + select({
         "@bazel_tools//src/conditions:windows": [],
         "@bazel_tools//src/conditions:darwin_x86_64": [
@@ -88,9 +88,7 @@ py_library(
         "__init__.py",
         "ffi.py",
     ],
-    data = [
-        ":shlib",
-    ],
+    data = [":plaidml"],
     visibility = ["//visibility:public"],
     deps = [
         ":_ffi",
@@ -166,12 +164,11 @@ py_setup(
 
 plaidml_cc_library(
     name = "testenv",
-    testonly = 1,
     srcs = ["testenv.cc"],
     hdrs = ["testenv.h"],
     visibility = ["//visibility:public"],
     deps = [
-        ":plaidml",
+        ":lib",
         "@gflags",
         "@gmock//:gtest",
     ],
@@ -222,13 +219,4 @@ selects.config_setting_group(
 plaidml_settings(
     name = "settings",
     visibility = ["//visibility:public"],
-)
-
-plaidml_target_test_package(
-    name = "intel_gen_test",
-    plaidml_target = "intel_gen",
-    tags = ["skip_windows"],
-    tests = [
-        "//plaidml/edsl/tests:cc_test",
-    ],
 )

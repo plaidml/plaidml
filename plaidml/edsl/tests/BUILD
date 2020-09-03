@@ -4,8 +4,13 @@ load("@rules_python//python:defs.bzl", "py_test")
 load("//bzl:plaidml.bzl", "plaidml_cc_test")
 load("//pmlc:lit.bzl", "lit_test")
 
+exports_files(
+    ["edsl_test-skip.intel_gen.txt"],
+)
+
 plaidml_cc_test(
     name = "cc_test",
+    testonly = 0,
     srcs = ["edsl_test.cc"],
     args = [
         "--plaidml_device=$(plaidml_device)",

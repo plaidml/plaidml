@@ -52,6 +52,8 @@ PLATFORMS:
     variant: linux_x86_64
   keras-pml-ocl-neo:
     variant: linux_x86_64
+  pml-vk-gen:
+    variant: linux_x86_64
   keras-pml-ocl-gfx804:
     variant: windows_x86_64
 
@@ -110,6 +112,8 @@ SUITES:
     platforms:
       keras-pml-llvm-cpu:
         pipelines: [nightly, plaidml, ci]
+      pml-vk-gen:
+        pipelines: [nightly, plaidml, ci]
     params:
       ci:
         batch_sizes: [0]
@@ -124,24 +128,36 @@ SUITES:
     timeout: 30
     conda_env: ci/conda/tensorflow.yml
     compare: no
-    cwd: plaidml/bridge/keras
     runner: python
     workloads:
       backend:
         args: [backend_test.py]
+        cwd: plaidml/bridge/keras
         conda_env: ci/conda/keras_backend_test.yml
         precision: untested
-      regression:
-        args: [regression_test.py]
+      edsl_cc_test:
+        args: [cc_test]
+        cwd: plaidml/edsl/tests
+        conda_env: ci/conda/keras_backend_test.yml
         precision: untested
-        soft_fail: true
+        platform_overrides:
+          pml-vk-gen:
+            append_args:
+              - --plaidml_target=intel_gen,
+              - --skip_test_file=edsl_test-skip.intel_gen.txt,
+            soft_fail: true # maybe flakey?
+      # mnist_mlp:
+      #   args: [mnist_mlp_test.py]
+      #   precision: untested
+      #   soft_fail: true
+      # regression:
+      #   args: [regression_test.py]
+      #   precision: untested
+      #   soft_fail: true
       trivial_model:
         args: [trivial_model_test.py]
+        cwd: plaidml/bridge/keras
         precision: untested
-      mnist_mlp:
-        args: [mnist_mlp_test.py]
-        precision: untested
-        soft_fail: true
 
   infer:
     platforms:
