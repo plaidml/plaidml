@@ -156,7 +156,7 @@ class Platform(object):
     def __init__(self, full, gpu_flops):
         self.full = full
         self.compiler, self.runtime, self.gpu = full.split('-')
-        self.engine = '_'.join(self.compiler, self.runtime)
+        self.engine = '{}_{}'.format(self.compiler, self.runtime)
         self.gpu_flops = gpu_flops.get(self.gpu)
 
     def __repr__(self):
