@@ -150,13 +150,15 @@ SUITES:
         cwd: plaidml/bridge/keras
         conda_env: ci/conda/keras_backend_test.yml
         precision: untested
+        skip_platforms:
+          - pml-vk-gen
       edsl_cc_test:
         runner: cc_test
         cwd: tmp/input
         precision: untested
+        skip_platforms:
+          - pml-llvm-cpu
         platform_overrides:
-          pml-llvm-cpu:
-            args: [--plaidml_target=llvm_cpu]
           pml-vk-gen:
             args:
               - --plaidml_target=intel_gen
