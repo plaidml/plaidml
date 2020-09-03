@@ -18,7 +18,6 @@
 #include "mlir/Transforms/Passes.h"
 
 #include "pmlc/compiler/registry.h"
-
 #include "pmlc/conversion/gpu/lowering.h"
 #include "pmlc/conversion/gpu_to_spirv/passes.h"
 #include "pmlc/conversion/pxa_to_affine/passes.h"
@@ -30,6 +29,7 @@
 #include "pmlc/dialect/tile/transforms/passes.h"
 #include "pmlc/target/intel_gen/pass_detail.h"
 #include "pmlc/target/intel_gen/passes.h"
+#include "pmlc/target/x86/passes.h"
 
 using namespace mlir; // NOLINT[build/namespaces]
 
@@ -46,7 +46,7 @@ struct LowerPXAToAffinePass
     conversion::pxa_to_affine::PXAToAffineConversionTarget target(ctx);
 
     OwningRewritePatternList patterns;
-    populatePXAPrngToAffineConversionPatterns(patterns, &ctx);
+    x86::populatePXAPrngToAffineConversionPatterns(patterns, &ctx);
     conversion::pxa_to_affine::populatePXAToAffineConversionPatterns(patterns,
                                                                      &ctx);
 

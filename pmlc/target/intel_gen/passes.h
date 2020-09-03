@@ -18,9 +18,6 @@ std::unique_ptr<mlir::Pass> createParallelLoopToGpuPass();
 
 std::unique_ptr<mlir::Pass> createLowerPXAToAffinePass();
 
-void populatePXAPrngToAffineConversionPatterns(
-    mlir::OwningRewritePatternList &patterns, mlir::MLIRContext *ctx);
-
 void pipelineBuilder(mlir::OpPassManager &pm);
 
 /// Generate the code for registering passes.
