@@ -61,74 +61,77 @@ private:
     llvm_unreachable("Invalid aggregation type");
   }
 
+  LogicalResult tryVectorizePxaLoadOp(PxaLoadOp op) {
+    auto strideInfo = computeStrideInfo(op);
+    if (!strideInfo) {
+      op.emitRemark("Vectorize: Failed, non-affine strides");
+      return failure();
+    }
+
+    auto it = strideInfo->strides.find(index);
+    if (it == strideInfo->strides.end()) {
+      // Stride 0, safe to leave unvectorized
+      return success();
+    }
+
+    // Stride is non-zero, must vectorize
+    if (it->second != 1) {
+      op.emitRemark("Vectorize: Failed, stride != 1");
+      return failure();
+    }
+    vectorizedOps.insert(op);
+    vectorizedValues.insert(op.getResult());
+    return success();
+  }
+
+  LogicalResult tryVectorizePxaReduceOp(PxaReduceOp op) {
+    auto strideInfo = computeStrideInfo(op);
+    if (!strideInfo) {
+      op.emitRemark("Vectorize: Failed, non-affine strides");
+      return failure();
+    }
+
+    auto it = strideInfo->strides.find(index);
+    if (it == strideInfo->strides.end()) {
+      // vector::ReductionOp doesn't support pxa's assign reduction.
+      // Also, make sure we handle only the supported types -
+      // see the vector::ReductionOp verification code
+      // (https://github.com/llvm/llvm-project/blob/master/mlir/lib/Dialect/Vector/VectorOps.cpp#L134).
+      Type eltType = op.getMemRefType().getElementType();
+      if (op.agg() == AtomicRMWKind::assign ||
+          (!eltType.isF32() && !eltType.isF64() &&
+           !eltType.isSignlessInteger(32) && !eltType.isSignlessInteger(64))) {
+        op.emitRemark("Vectorization failed: Unsupported reduction or "
+                      "type for vector::ReductionOp");
+        return failure();
+      }
+      // If stride is 0, "remember it" as such.
+      zeroStrideReductions.insert(op.getOperation());
+    } else if (it->second != 1) {
+      op.emitRemark("Vectorize: Failed, stride != 1");
+      return failure();
+    }
+
+    vectorizedOps.insert(op);
+    return success();
+  }
+
   LogicalResult tryVectorizeOperation(Operation *op) {
     return llvm::TypeSwitch<Operation *, LogicalResult>(op)
-        .Case<PxaLoadOp>([&](auto op) {
-          auto strideInfo = computeStrideInfo(op);
-          if (!strideInfo) {
-            IVLOG(3, "Vectorize: Failed, non-affine strides");
-            return failure();
-          }
-
-          auto it = strideInfo->strides.find(index);
-          if (it == strideInfo->strides.end()) {
-            // Stride 0, safe to leave unvectorized
-            return success();
-          }
-
-          // Stride is non-zero, must vectorize
-          if (it->second != 1) {
-            IVLOG(3, "Vectorize: Failed, AffineLoadOp stride != 1");
-            return failure();
-          }
-          vectorizedOps.insert(op);
-          vectorizedValues.insert(op.getResult());
-          return success();
-        })
-        .Case<PxaReduceOp>([&](auto op) {
-          auto strideInfo = computeStrideInfo(op);
-          if (!strideInfo) {
-            IVLOG(3, "Vectorize: Failed, non-affine strides");
-            return failure();
-          }
-
-          auto it = strideInfo->strides.find(index);
-          if (it == strideInfo->strides.end()) {
-            // vector::ReductionOp doesn't support pxa's assign reduction.
-            // Also, make sure we handle only the supported types -
-            // see the vector::ReductionOp verification code
-            // (https://github.com/llvm/llvm-project/blob/master/mlir/lib/Dialect/Vector/VectorOps.cpp#L134).
-            Type eltType = op.getMemRefType().getElementType();
-            if (op.agg() == AtomicRMWKind::assign ||
-                (!eltType.isF32() && !eltType.isF64() &&
-                 !eltType.isSignlessInteger(32) &&
-                 !eltType.isSignlessInteger(64))) {
-              op.emitRemark("Vectorization failed: Unsupported reduction or "
-                            "type for vector::ReductionOp");
-              return failure();
-            }
-            // If stride is 0, "remember it" as such.
-            zeroStrideReductions.insert(op.getOperation());
-          } else if (it->second != 1) {
-            IVLOG(3, "Vectorize: Failed, PxaReduceOp stride != 1");
-            return failure();
-          }
-
-          vectorizedOps.insert(op);
-          return success();
-        })
+        .Case<PxaLoadOp>([&](auto op) { return tryVectorizePxaLoadOp(op); })
+        .Case<PxaReduceOp>([&](auto op) { return tryVectorizePxaReduceOp(op); })
         .Default([&](Operation *op) {
           if (op->getNumRegions() != 0) {
-            IVLOG(3, "Vectorize: Failed, interior loops");
+            op->emitRemark("Vectorize: Failed, interior loops");
             return failure();
           }
-          if (!mlir::isa<VectorUnrollOpInterface>(op)) {
+          if (!isa<VectorUnrollOpInterface>(op)) {
             // Probably not a vectorizable op.  Verify it doesn't use an
             // vectorized results.
             for (auto operand : op->getOperands()) {
               if (vectorizedValues.count(operand)) {
-                IVLOG(3,
-                      "Vectorize: Failed, unknown op used vectorized result");
+                op->emitRemark(
+                    "Vectorize: Failed, unknown op used vectorized result");
                 return failure();
               }
             }
@@ -136,19 +139,16 @@ private:
             return success();
           }
           // Only vectorize if at least one operand is vectorized
-          bool anyVec = false;
-          for (auto operand : op->getOperands()) {
-            if (vectorizedValues.count(operand)) {
-              anyVec = true;
-            }
-          }
+          bool anyVec = llvm::any_of(op->getOperands(), [&](Value operand) {
+            return vectorizedValues.count(operand);
+          });
           if (!anyVec) {
             // No need to vectorize, all is good
             return success();
           }
           // We also don't handle ops with multiple results
           if (op->getNumResults() != 1) {
-            IVLOG(3, "Vectorize: Failed, multi-result scalar op");
+            op->emitRemark("Vectorize: Failed, multi-result scalar op");
             return failure();
           }
           vectorizedOps.insert(op);
@@ -198,25 +198,23 @@ public:
           builder.create<vector::BroadcastOp>(op.getLoc(), vecType, val);
       val = bcast.getResult();
     }
-    // Add vector_reduction only if the stride is 0
-    if (zeroStrideReductions.find(op.getOperation()) !=
-        zeroStrideReductions.end()) {
-      vector::ReductionOp reductionOp = builder.create<vector::ReductionOp>(
+    if (zeroStrideReductions.count(op.getOperation())) {
+      // Add vector_reduction only if the stride is 0
+      auto reductionOp = builder.create<vector::ReductionOp>(
           op.getLoc(), op.getMemRefType().getElementType(),
           builder.getStringAttr(
               stringifyAtomicRMWKindForVectorReductionOp(op.agg())),
           val, ValueRange{});
-
       auto reduceOp = builder.create<PxaReduceOp>(
           op.getLoc(), ArrayRef<Type>{op.getMemRefType()}, op.agg(),
           reductionOp.getResult(), op.memref(), op.map(), op.idxs());
       op.replaceAllUsesWith(reduceOp.getResult());
       op.erase();
     } else {
-      auto vecOp = builder.create<PxaVectorReduceOp>(
+      auto vectorReduceOp = builder.create<PxaVectorReduceOp>(
           op.getLoc(), ArrayRef<Type>{op.getMemRefType()}, op.agg(), val,
           op.memref(), op.map(), op.idxs());
-      op.replaceAllUsesWith(vecOp.getResult());
+      op.replaceAllUsesWith(vectorReduceOp.getResult());
       op.erase();
     }
   }
@@ -235,29 +233,27 @@ public:
   }
 
   LogicalResult vectorize() {
-    mlir::Block *body = loop.getBody();
+    Block *body = loop.getBody();
     IVLOG(3, "Vectorize: Attempting Vectorizing for BlockArgument: "
                  << index.getArgNumber());
 
     auto ranges = loop.getConstantRanges();
     if (!ranges) {
-      IVLOG(3, " Vectorize: Failed, Requires constant ranges");
+      loop.emitRemark("Vectorize: Failed, Requires constant ranges");
       return failure();
     }
 
     auto argNum = index.getArgNumber();
     if ((*ranges)[argNum] % vectorSize != 0) {
-      IVLOG(3, "Vectorize: Failed, the dimension being vectorized not multiple "
-               "of the number of elements in a register");
+      loop.emitRemark(
+          "Vectorize: Failed, dimension is not a multiple of the vector width");
       return failure();
     }
 
     auto steps = loop.getSteps();
     auto step = steps[argNum];
     if (step != 1) {
-      IVLOG(3,
-            "Vectorize: Failed, the steps for the dimension being vectorized "
-            "is not 1");
+      loop.emitRemark("Vectorize: Failed, dimension step is not 1");
       return failure();
     }
 
@@ -271,7 +267,7 @@ public:
     if (vectorizedOps.empty()) {
       // TODO: should we actually fail in this case?  Currently we need to since
       // we have no cost model
-      IVLOG(3, "Vectorize: Failed, no point in vectorization");
+      loop.emitRemark("Vectorize: Failed, nothing to vectorize");
       return failure();
     }
 
@@ -295,7 +291,7 @@ LogicalResult simpleVectorize(AffineParallelOp op, unsigned vecSize) {
   if (op.getNumResults() != 1) {
     return failure();
   }
-  auto reduce = mlir::dyn_cast<PxaReduceOp>(getPrevWriter(op.getResult(0)));
+  auto reduce = dyn_cast<PxaReduceOp>(getPrevWriter(op.getResult(0)));
   if (!reduce) {
     return failure();
   }
@@ -315,13 +311,13 @@ LogicalResult simpleVectorize(AffineParallelOp op, unsigned vecSize) {
   return performVectorization(op, options[0], vecSize);
 }
 
-struct VectorizeExample : public VectorizeExampleBase<VectorizeExample> {
+struct VectorizePass : public VectorizeBase<VectorizePass> {
   void runOnFunction() final {
     static constexpr unsigned vectorWidth = 8;
     auto func = getFunction();
     // Vectorize only the outermost loops
     for (auto &op : func.getBody().front()) {
-      auto loop = mlir::dyn_cast<mlir::AffineParallelOp>(op);
+      auto loop = dyn_cast<AffineParallelOp>(op);
       if (!loop) {
         continue;
       }
@@ -336,8 +332,8 @@ struct VectorizeExample : public VectorizeExampleBase<VectorizeExample> {
   }
 };
 
-std::unique_ptr<mlir::Pass> createVectorizeExamplePass() {
-  return std::make_unique<VectorizeExample>();
+std::unique_ptr<Pass> createVectorizePass() {
+  return std::make_unique<VectorizePass>();
 }
 
 // TODO: Maybe move this to a generic utility somewhere

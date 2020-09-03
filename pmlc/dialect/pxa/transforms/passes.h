@@ -54,7 +54,7 @@ std::unique_ptr<mlir::Pass> createTestIndirectValuesIteratorPass();
 
 std::unique_ptr<mlir::Pass> createTileAccumulatePass();
 
-std::unique_ptr<mlir::Pass> createVectorizeExamplePass();
+std::unique_ptr<mlir::Pass> createVectorizePass();
 
 /// Generate the code for registering passes.
 #define GEN_PASS_REGISTRATION

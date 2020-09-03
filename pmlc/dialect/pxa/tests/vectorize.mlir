@@ -1,4 +1,4 @@
-// RUN: pmlc-opt -pxa-vectorize-example %s | FileCheck %s
+// RUN: pmlc-opt -pxa-vectorize %s | FileCheck %s
 
 // CHECK-LABEL: func @vectorize_gemm
 func @vectorize_gemm(%arg0: memref<64x64xf32>, %arg1: memref<64x64xf32>) -> (memref<64x64xf32>, memref<64xf32>) {
@@ -76,3 +76,16 @@ func @vectorize_reduce_stride_0() {
   return
 }
 
+func @vectorize_grn_reduction(%arg1: memref<1x2x128x24xf16>, %out: memref<1x1x1x1xf32>) -> memref<1x1x1x1xf32> {
+  %cst = constant 0.000000e+00 : f16
+  %4 = fpext %cst : f16 to f32
+  %5 = pxa.reduce assign %4, %out[0, 0, 0, 0] : memref<1x1x1x1xf32>  
+  %6 = affine.parallel (%arg5) = (0) to (24) reduce ("assign") -> (memref<1x1x1x1xf32>) {
+    %14 = pxa.load %arg1[0, 0, 0, %arg5] : memref<1x2x128x24xf16>
+    %15 = fpext %14 : f16 to f32
+    %16 = mulf %15, %15 : f32
+    %17 = pxa.reduce addf %16, %5[0, 0, 0, 0] : memref<1x1x1x1xf32>
+    affine.yield %17 : memref<1x1x1x1xf32>
+  }
+  return %6 : memref<1x1x1x1xf32>
+}

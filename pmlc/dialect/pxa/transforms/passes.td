@@ -118,9 +118,9 @@ def TileAccumulate : FunctionPass<"pxa-tile-accumulate"> {
   let constructor = "pmlc::dialect::pxa::createTileAccumulatePass()";
 }
 
-def VectorizeExample : FunctionPass<"pxa-vectorize-example"> {
+def Vectorize : FunctionPass<"pxa-vectorize"> {
   let summary = "Vectorizes with vector register of 8 elements";
-  let constructor = "pmlc::dialect::pxa::createVectorizeExamplePass()";
+  let constructor = "pmlc::dialect::pxa::createVectorizePass()";
   let dependentDialects = ["mlir::vector::VectorDialect"];
 }
 
