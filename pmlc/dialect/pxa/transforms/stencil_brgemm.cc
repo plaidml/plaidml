@@ -324,6 +324,7 @@ namespace pmlc::dialect::pxa {
           mapOperands);
 
       opC.result().replaceAllUsesWith(brgemm);
+      opC.erase();
     }
 
   public:
