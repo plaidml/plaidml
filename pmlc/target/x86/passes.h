@@ -29,6 +29,9 @@ namespace pmlc::target::x86 {
   void populatePXAGemmToXSMMConversionPatterns(
     mlir::OwningRewritePatternList &patterns, mlir::MLIRContext *ctx);
 
+  void populatePXABRGemmToXSMMConversionPatterns(
+    mlir::OwningRewritePatternList &patterns, mlir::MLIRContext *ctx);
+
   void populatePXAPrngToAffineConversionPatterns(
     mlir::OwningRewritePatternList &patterns, mlir::MLIRContext *ctx);
 
