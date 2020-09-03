@@ -136,13 +136,15 @@ SUITES:
         conda_env: ci/conda/keras_backend_test.yml
         precision: untested
       edsl_cc_test:
+        runner: cc_test
         args: [cc_test]
         cwd: tmp/input
-        conda_env: ci/conda/keras_backend_test.yml
         precision: untested
         platform_overrides:
+          pml-llvm-cpu:
+            args: [--plaidml_target=llvm_cpu]
           pml-vk-gen:
-            append_args:
+            args:
               - --plaidml_target=intel_gen
               - --skip_test_file=edsl_test-skip.intel_gen.txt
             soft_fail: true # maybe flakey?
