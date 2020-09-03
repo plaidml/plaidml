@@ -839,7 +839,6 @@ LogicalResult VulkanRuntime::createCommandPool() {
   commandPoolCreateInfo.pNext = nullptr;
   commandPoolCreateInfo.flags = 0;
   commandPoolCreateInfo.queueFamilyIndex = queueFamilyIndex;
-  llvm::errs() << "queueFamilyIndex = " << queueFamilyIndex;
   RETURN_ON_VULKAN_ERROR(
       vkCreateCommandPool(device, &commandPoolCreateInfo, 0, &commandPool),
       "vkCreateCommandPool");
@@ -953,7 +952,7 @@ LogicalResult VulkanRuntime::createSchedule() {
     VkQueryPool                                 queryPool,
     uint32_t                                    query);
   */
-  vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+  vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
                       timestampQueryPool, /*query=*/0);
 
   for (const auto &action : schedule) {
@@ -1006,8 +1005,32 @@ LogicalResult VulkanRuntime::createSchedule() {
     VkQueryPool                                 queryPool,
     uint32_t                                    query);
   */
-  vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+  vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
                       timestampQueryPool, /*query=*/1);
+
+  /*
+  VkResult vkGetQueryPoolResults(
+    VkDevice                                    device,
+    VkQueryPool                                 queryPool,
+    uint32_t                                    firstQuery,
+    uint32_t                                    queryCount,
+    size_t                                      dataSize,
+    void*                                       pData,
+    VkDeviceSize                                stride,
+    VkQueryResultFlags                          flags);
+  */
+  uint32_t results[2];
+  vkGetQueryPoolResults(device, timestampQueryPool, 0, 2, 8,
+                        /*(void*)*/ &results, 4, VK_QUERY_RESULT_WAIT_BIT);
+  llvm::errs() << "\n";
+  llvm::errs() << "results[0] = " << results[0] << "\n";
+  llvm::errs() << "results[1] = " << results[1] << "\n";
+
+  uint32_t ns = results[1] - results[0];
+  double ms = ns / 1000000.0d;
+
+  llvm::errs() << "ns = " << ns << "\n";
+  llvm::errs() << "ms = " << ms << "\n";
 
   RETURN_ON_VULKAN_ERROR(vkEndCommandBuffer(commandBuffer),
                          "vkEndCommandBuffer");
