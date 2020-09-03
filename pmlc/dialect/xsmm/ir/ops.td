@@ -48,4 +48,29 @@ def XSMM_GemmInvokeOp : XSMM_Op<"gemm.invoke"> {
   }];
 }
 
+def XSMM_BRGemmDispatchOp : XSMM_Op<"brgemm.dispatch", [NoSideEffect]> {
+  let summary = "query LIBXSMM's code registry based on GEMM shape";
+  let arguments = (ins I64ArrayAttr:$tile, I64ArrayAttr:$tileld);
+  let results = (outs I64:$ptr);
+  let printer = ?;
+  let parser = ?;
+  let assemblyFormat = "$tile `,` $tileld attr-dict";
+}
+
+def XSMM_BRGemmInvokeOp : XSMM_Op<"brgemm.invoke"> {
+  let summary = "invoke a previously queried LIBXSMM kernel";
+  let arguments = (ins I64:$ptr,
+    Arg<AnyMemRef, "the C memref to store to", [MemWrite]>:$c,
+    Arg<AnyMemRef, "the A memref to load from", [MemRead]>:$a,
+    Arg<AnyMemRef, "the B memref to load from", [MemRead]>:$b,
+    I64Attr:$lBr,
+    Variadic<Index>:$indices);
+
+  let extraClassDeclaration = [{
+    operand_range getOperandsForA();
+    operand_range getOperandsForB();
+    operand_range getOperandsForC();
+  }];
+}
+
 #endif // __PML_XSMM_OPS__

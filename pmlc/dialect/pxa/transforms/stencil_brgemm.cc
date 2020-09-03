@@ -268,7 +268,7 @@ namespace pmlc::dialect::pxa {
 
       auto AStrideInfo = getStrideInfo(perm.ioOps[1]);
       int count = 0;
-      int64_t kRange = -1, stride = -1, l_br = -1;
+      int64_t kRange = -1, l_br = -1;
       for (const auto &kvp : AStrideInfo->strides) {
         count++;
         if (count == 2) {
@@ -289,7 +289,6 @@ namespace pmlc::dialect::pxa {
             if (j == 2) {
               IVLOG(3, "steps[" << i << "] = " << steps[i]);
               if (kRange != -1) {
-                stride = steps[i];
                 l_br = kRange / steps[i];
                 steps[i] = kRange;
               }
@@ -309,8 +308,6 @@ namespace pmlc::dialect::pxa {
 
       auto tileAttr = bodyBuilder.getI64ArrayAttr(tileSize);
       auto lBrAttr = bodyBuilder.getI64IntegerAttr(l_br);
-      auto strideAAttr = bodyBuilder.getI64IntegerAttr(stride);
-      auto strideBAttr = bodyBuilder.getI64IntegerAttr(stride);
 
       SmallVector<Value, 8> mapOperands;
       BRGemmOperand c(opC, { perm.indexes[0], perm.indexes[1] }, mapOperands);
@@ -323,7 +320,7 @@ namespace pmlc::dialect::pxa {
           a.memref, AffineMapAttr::get(a.accessMap), AffineMapAttr::get(a.tileMap), //
           b.memref, AffineMapAttr::get(b.accessMap), AffineMapAttr::get(b.tileMap), //
           tileAttr,
-          strideAAttr, strideBAttr, lBrAttr,
+          lBrAttr,
           mapOperands);
 
       opC.result().replaceAllUsesWith(brgemm);

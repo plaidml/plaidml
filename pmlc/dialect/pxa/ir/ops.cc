@@ -500,11 +500,33 @@ namespace pmlc::dialect::pxa {
     p << "]:";
     p.printAttribute(op.bTileMapAttr());
     p << ", " << op.tile() << ", "
-      << op.StrideA() << ", " << op.StrideB() << ", " << op.lBr() << " : " << funcType;
+      << op.lBr() << " : " << funcType;
   }
 
   ParseResult parsePxaBRGemmOp(OpAsmParser &parser, OperationState &result) {
-    // TODO: Implement
+    auto &builder = parser.getBuilder();
+    auto indexType = builder.getIndexType();
+    auto i64Type = builder.getIntegerType(64);
+    GemmOperandParser a("a"), b("b"), c("c");
+    ArrayAttr tileAttr;
+    IntegerAttr lBrAttr;
+    FunctionType funcType;
+    return failure(
+      c.parse(parser, result) || parser.parseEqual() ||
+      a.parse(parser, result) || parser.parseComma() ||
+      b.parse(parser, result) || parser.parseComma() ||
+      parser.parseAttribute(tileAttr, i64Type, "tile", result.attributes) ||
+      parser.parseComma() ||
+      parser.parseAttribute(lBrAttr, i64Type, "lBr", result.attributes) ||
+      parser.parseColonType(funcType) ||
+      parser.addTypesToList(funcType.getResults(), result.types) ||
+      parser.resolveOperand(c.operand, funcType.getResult(0),
+        result.operands) ||
+      parser.resolveOperand(a.operand, funcType.getInput(0), result.operands) ||
+      parser.resolveOperand(b.operand, funcType.getInput(1), result.operands) ||
+      parser.resolveOperands(c.accessOperands, indexType, result.operands) ||
+      parser.resolveOperands(a.accessOperands, indexType, result.operands) ||
+      parser.resolveOperands(b.accessOperands, indexType, result.operands));
     return success();
   }
 

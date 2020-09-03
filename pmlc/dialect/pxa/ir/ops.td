@@ -95,8 +95,6 @@ def PxaBRGemmOp : PXA_OpWithPP<"brgemm"> {
     AffineMapAttr:$bAccessMap,
     AffineMapAttr:$bTileMap,
     I64ArrayAttr:$tile,
-    I64Attr:$StrideA,
-    I64Attr:$StrideB,
     I64Attr:$lBr,
     Variadic<Index>:$mapOperands);
   let results = (outs AnyMemRef:$out);

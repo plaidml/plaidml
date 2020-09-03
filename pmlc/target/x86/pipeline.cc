@@ -43,6 +43,7 @@ namespace pmlc::target::x86 {
 
         OwningRewritePatternList patterns;
         populatePXAGemmToXSMMConversionPatterns(patterns, &ctx);
+        populatePXABRGemmToXSMMConversionPatterns(patterns, &ctx);
         populatePXAPrngToAffineConversionPatterns(patterns, &ctx);
         conversion::pxa_to_affine::populatePXAToAffineConversionPatterns(patterns,
           &ctx);
