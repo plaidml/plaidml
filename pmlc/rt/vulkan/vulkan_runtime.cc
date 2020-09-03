@@ -134,15 +134,6 @@ LogicalResult VulkanRuntime::destroy() {
   vkFreeCommandBuffers(device, commandPool, commandBuffers.size(),
                        commandBuffers.data());
   vkDestroyCommandPool(device, commandPool, nullptr);
-
-  /*
-  void vkDestroyQueryPool(
-    VkDevice                                    device,
-    VkQueryPool                                 queryPool,
-    const VkAllocationCallbacks*                pAllocator);
-  */
-  vkDestroyQueryPool(device, timestampQueryPool, /*allocator=*/nullptr);
-
   for (const auto &action : schedule) {
     if (auto kernel = std::dynamic_pointer_cast<LaunchKernelAction>(action)) {
       vkFreeDescriptorSets(device, kernel->descriptorPool,
@@ -174,7 +165,7 @@ LogicalResult VulkanRuntime::destroy() {
 
 LogicalResult VulkanRuntime::init() {
   if (failed(createInstance()) || failed(createDevice()) ||
-      failed(createCommandPool()) || failed(createTimestampQueryPool())) {
+      failed(createCommandPool())) {
     return failure();
   }
   // Get working queue.
@@ -839,43 +830,9 @@ LogicalResult VulkanRuntime::createCommandPool() {
   commandPoolCreateInfo.pNext = nullptr;
   commandPoolCreateInfo.flags = 0;
   commandPoolCreateInfo.queueFamilyIndex = queueFamilyIndex;
-  llvm::errs() << "queueFamilyIndex = " << queueFamilyIndex;
   RETURN_ON_VULKAN_ERROR(
       vkCreateCommandPool(device, &commandPoolCreateInfo, 0, &commandPool),
       "vkCreateCommandPool");
-  return success();
-}
-
-LogicalResult VulkanRuntime::createTimestampQueryPool() {
-  /*
-  typedef struct VkQueryPoolCreateInfo {
-    VkStructureType                  sType;
-    const void*                      pNext;
-    VkQueryPoolCreateFlags           flags;
-    VkQueryType                      queryType;
-    uint32_t                         queryCount;
-    VkQueryPipelineStatisticFlags    pipelineStatistics;
-  } VkQueryPoolCreateInfo;
-  */
-
-  VkQueryPoolCreateInfo queryPoolCreateInfo = {};
-  queryPoolCreateInfo.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
-  queryPoolCreateInfo.pNext = nullptr;
-  queryPoolCreateInfo.flags = 0;
-  queryPoolCreateInfo.queryType = VK_QUERY_TYPE_TIMESTAMP;
-  queryPoolCreateInfo.queryCount = 1024; // TODO: hardcode?
-
-  /*
-  VkResult vkCreateQueryPool(
-    VkDevice                                    device,
-    const VkQueryPoolCreateInfo*                pCreateInfo,
-    const VkAllocationCallbacks*                pAllocator,
-    VkQueryPool*                                pQueryPool);
-  */
-  RETURN_ON_VULKAN_ERROR(vkCreateQueryPool(device, &queryPoolCreateInfo,
-                                           /*allocator=*/nullptr,
-                                           &timestampQueryPool),
-                         "vkCreateQueryPool");
   return success();
 }
 
@@ -946,16 +903,6 @@ LogicalResult VulkanRuntime::createSchedule() {
   RETURN_ON_VULKAN_ERROR(vkBeginCommandBuffer(commandBuffer, &beginInfo),
                          "vkBeginCommandBuffer");
 
-  /*
-  void vkCmdWriteTimestamp(
-    VkCommandBuffer                             commandBuffer,
-    VkPipelineStageFlagBits                     pipelineStage,
-    VkQueryPool                                 queryPool,
-    uint32_t                                    query);
-  */
-  vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                      timestampQueryPool, /*query=*/0);
-
   for (const auto &action : schedule) {
     if (auto kernel = std::dynamic_pointer_cast<LaunchKernelAction>(action)) {
       if (kernel->deps.size()) {
@@ -998,16 +945,6 @@ LogicalResult VulkanRuntime::createSchedule() {
                       /*pRegions=*/xfer->regions.data());
     }
   }
-
-  /*
-  void vkCmdWriteTimestamp(
-    VkCommandBuffer                             commandBuffer,
-    VkPipelineStageFlagBits                     pipelineStage,
-    VkQueryPool                                 queryPool,
-    uint32_t                                    query);
-  */
-  vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-                      timestampQueryPool, /*query=*/1);
 
   RETURN_ON_VULKAN_ERROR(vkEndCommandBuffer(commandBuffer),
                          "vkEndCommandBuffer");

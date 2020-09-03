@@ -198,7 +198,6 @@ private:
   mlir::LogicalResult allocateDescriptorSets();
   mlir::LogicalResult setWriteDescriptors();
   mlir::LogicalResult createCommandPool();
-  mlir::LogicalResult createTimestampQueryPool();
   mlir::LogicalResult checkResourceData();
   mlir::LogicalResult createSchedule();
   mlir::LogicalResult submitCommandBuffersToQueue();
@@ -231,7 +230,6 @@ private:
   VkDevice device;
   VkQueue queue;
   VkCommandPool commandPool;
-  VkQueryPool timestampQueryPool;
 
   //===--------------------------------------------------------------------===//
   // Vulkan memory context.

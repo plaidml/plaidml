@@ -35,7 +35,6 @@ plaidml_cc_library(
         "//pmlc/dialect/pxa/transforms",
         "//pmlc/dialect/tile/transforms",
         "//pmlc/dialect/stdx/transforms",
-        "//pmlc/rt/vulkan",
         "@llvm-project//mlir:AffineToStandardTransforms",
         "@llvm-project//mlir:GPUToSPIRVTransforms",
         "@llvm-project//mlir:GPUToVulkanTransforms",
