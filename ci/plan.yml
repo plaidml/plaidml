@@ -137,7 +137,7 @@ SUITES:
         precision: untested
       edsl_cc_test:
         args: [cc_test]
-        cwd: plaidml/edsl/tests
+        cwd: tmp/input
         conda_env: ci/conda/keras_backend_test.yml
         precision: untested
         platform_overrides:

@@ -56,8 +56,11 @@ def get_engine(pkey):
         return ':crown:'
     if 'opencl-cpu' in pkey:
         return ':crown::cl:'
-    else:
-        return (':tensorflow:')
+    if 'tf-' in pkey:
+        return ':tensorflow:'
+    if '-gen' in pkey:
+        return ':information_source:'
+    return ':small_blue_diamond:'
 
 
 def get_shard_emoji(shard):
