@@ -62,6 +62,7 @@ py_library(
 plaidml_cc_test(
     name = "cc_test",
     srcs = ["op_test.cc"],
+    linkstatic = True,
     deps = [
         ":op",
         "//plaidml:testenv",
