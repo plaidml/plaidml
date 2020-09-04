@@ -99,7 +99,7 @@ def SubgroupBroadcastOp : StdX_Op<"subgroup_broadcast", [NoSideEffect, AllTypesM
   let arguments = (ins AnyStdScalar:$value, Index:$localid);
   let results = (outs AnyStdScalar:$result);
   let assemblyFormat = [{
-    `(` $value `,` $localid `)` attr-dict `:` type($value) `,` type($localid)
+    `(` $value `,` $localid `)` attr-dict `:` type($value)
   }];
   let verifier = ?;
 }
