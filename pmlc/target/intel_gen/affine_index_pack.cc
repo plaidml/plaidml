@@ -11,6 +11,7 @@
 #include "pmlc/target/intel_gen/pass_detail.h"
 #include "pmlc/util/logging.h"
 #include "pmlc/util/math/util.h"
+#include "pmlc/util/tags.h"
 
 using namespace mlir; // NOLINT
 
@@ -32,20 +33,25 @@ struct IndexPacking {
 // make floor div and mod more likely to be lowerable as bit operations
 struct AffineIndexPackPass : public AffineIndexPackBase<AffineIndexPackPass> {
   LogicalResult maybePack(AffineParallelOp op) {
-    auto hardware = op.getAttrOfType<StringAttr>("hardware");
-    if (!hardware || (op.getIVs().size() <= 3 && op.getIVs().size() != 0)) {
+    bool isThread = hasUnitTag(op, gpuThreadTag());
+    bool isBlock = hasUnitTag(op, gpuBlockTag());
+    bool isHardware = (isBlock || isThread);
+    auto subgroupSize = getIntegerTag(op, subgroupSizeTag(), 1);
+    unsigned maxDims = (isThread && subgroupSize > 1) ? 2 : 3;
+    if (!isHardware ||
+        (op.getIVs().size() <= maxDims && op.getIVs().size() != 0)) {
       // Doesn't need special handling
       return success();
     }
     // Check for unsupported cases
     if (op.getNumResults() != 0) {
-      op.emitError("Unable to reduce dims to 3 for affine.parallel that "
-                   "produces results");
+      op.emitError(
+          "Unable to reduce dims for affine.parallel that produces results");
       return failure();
     }
     auto maybeRanges = op.getConstantRanges();
     if (!maybeRanges) {
-      op.emitError("Unable to reduce dims to 3 for non-constant ranges");
+      op.emitError("Unable to reduce dims for non-constant ranges");
       return failure();
     }
     auto ranges = *maybeRanges;
@@ -55,7 +61,7 @@ struct AffineIndexPackPass : public AffineIndexPackBase<AffineIndexPackPass> {
           op.lowerBoundsMap().getResult(i).dyn_cast<AffineConstantExpr>();
       if (!lbExpr || lbExpr.getValue() != 0 || op.getSteps()[i] != 1 ||
           ranges[i] == 1) {
-        op.emitError("Unable to reduce dims to 3 for non-normalized loop");
+        op.emitError("Unable to reduce dims for non-normalized loop");
         return failure();
       }
     }
@@ -80,7 +86,7 @@ struct AffineIndexPackPass : public AffineIndexPackBase<AffineIndexPackPass> {
         packInfo[i].floorDiv = curPack[curIdx];
         packInfo[i].mod = ranges[i];
         curPack[curIdx] *= ranges[i];
-        curIdx = std::min(curIdx + 1, 2u);
+        curIdx = std::min(curIdx + 1, maxDims - 1);
       }
     }
     // Remove extra indexes with range 1
@@ -121,7 +127,10 @@ struct AffineIndexPackPass : public AffineIndexPackBase<AffineIndexPackPass> {
         op.getBody()->getOperations(),         //
         op.getBody()->begin(),                 //
         std::prev(op.getBody()->end()));
-    newLoop.setAttr("hardware", hardware);
+
+    // Copy across any tags
+    copyTags(newLoop, op);
+
     // Erase old op
     op.erase();
     return success();

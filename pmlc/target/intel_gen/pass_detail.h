@@ -4,6 +4,7 @@
 #include "mlir/Dialect/GPU/GPUDialect.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/SCF/SCF.h"
+#include "pmlc/dialect/stdx/ir/ops.h"
 
 #include "mlir/Pass/Pass.h"
 

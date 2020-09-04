@@ -364,16 +364,25 @@ LogicalResult vectorizeBuffer(AllocOp op) {
   auto newOp = replaceOp<AllocOp>(op, newType);
   // Walk over the uses and update them all
   auto curUse = IndirectUsesIterator(newOp);
+  auto updateMap = [&](AffineMap map) {
+    SmallVector<AffineExpr, 4> affineExprs(map.getResults().begin(),
+                                           map.getResults().end());
+    unsigned lastIdx = affineExprs.size() - 1;
+    affineExprs[lastIdx] = affineExprs[lastIdx].floorDiv(vecSize);
+    return AffineMap::get(map.getNumDims(), map.getNumSymbols(), affineExprs,
+                          map.getContext());
+  };
   while (curUse != IndirectUsesIterator()) {
     curUse->get().setType(newType);
     if (auto vecOp = dyn_cast<PxaVectorLoadOp>(curUse->getOwner())) {
-      replaceOp<PxaLoadOp>(vecOp, vecOp.getMemRef(), vecOp.getAffineMap(),
+      replaceOp<PxaLoadOp>(vecOp, vecOp.getMemRef(),
+                           updateMap(vecOp.getAffineMap()),
                            vecOp.getMapOperands());
       curUse++;
     } else if (auto vecOp = dyn_cast<PxaVectorReduceOp>(curUse->getOwner())) {
       auto newVecOp = replaceOp<PxaReduceOp>(
           vecOp, vecOp.agg(), vecOp.getValueToStore(), vecOp.getMemRef(),
-          vecOp.getAffineMap(), vecOp.getMapOperands());
+          updateMap(vecOp.getAffineMap()), vecOp.getMapOperands());
       curUse = IndirectUsesIterator(newVecOp);
     } else {
       curUse++;
