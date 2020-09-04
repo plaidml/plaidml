@@ -65,13 +65,11 @@ def run(args, remainder):
     shutil.rmtree(input, ignore_errors=True)
     if args.local:
         pkg_path = pathlib.Path('bazel-bin/pkg.tar.gz')
-        outdir = root / 'nas'
         version = '0.0.0.dev0'
     else:
         archive_path = os.path.join('tmp', 'build', variant_name, 'pkg.tar.gz')
         util.buildkite_download(archive_path, '.')
         pkg_path = root / 'build' / variant_name / 'pkg.tar.gz'
-        outdir = root
         version = args.version
 
     util.printf('--- Extracting {} -> {}'.format(pkg_path, input))
@@ -81,7 +79,7 @@ def run(args, remainder):
     shutil.rmtree(output_root, ignore_errors=True)
     output.mkdir(parents=True)
 
-    cwd = popt.get('cwd', '.')
+    cwd = os.path.abspath(popt.get('cwd', '.'))
     spec = pathlib.Path(popt.get('conda_env'))
 
     util.printf('--- :snake: Creating conda env from {}'.format(spec))
@@ -137,7 +135,7 @@ def run(args, remainder):
         except ValueError:
             pass
 
-    runner = shutil.which(popt.get('runner'), path=env['PATH'])
+    runner = shutil.which(popt.get('runner'), path=os.pathsep.join([cwd, env['PATH']]))
     cmd = [runner] + cmd_args
     retcode = util.call(cmd, cwd=cwd, env=env)
 

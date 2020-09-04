@@ -19,8 +19,6 @@ _LIBNAME = 'plaidml'
 
 if platform.system() == 'Windows':
     lib_name = '{}.dll'.format(_LIBNAME)
-elif platform.system() == 'Darwin':
-    lib_name = 'lib{}.dylib'.format(_LIBNAME)
 else:
     lib_name = 'lib{}.so'.format(_LIBNAME)
 

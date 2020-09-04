@@ -1,6 +1,6 @@
 ---
 CONST:
-  efficiency_baseline: keras-tf-cuda-gp100gl
+  efficiency_baseline: tf-cuda-gp100gl
 
   gpu_flops:
     # nvidia
@@ -32,52 +32,69 @@ CONST:
     neo: 1084.50
 
 PLATFORMS:
-  keras-tf-cuda-gtx780:
+  tf-cuda-gtx780:
     variant: linux_x86_64
-  keras-tf-cuda-gtx1070:
+  tf-cuda-gtx1070:
     variant: linux_x86_64
-  keras-tf-dnnl-cpu:
+  tf-dnnl-cpu:
     variant: linux_x86_64
-  keras-pml-mtl-uhd630:
+  pml-mtl-uhd630:
     variant: macos_x86_64
-  keras-pml-llvm-cpu:
+  pml-llvm-cpu:
     variant: linux_x86_64
-  keras-tf-cuda-gp100gl:
+  tf-cuda-gp100gl:
     variant: linux_x86_64
-  keras-pml-ocl-gfx900:
+  pml-ocl-gfx900:
     variant: linux_x86_64
-  keras-pml-ocl-gp100gl:
+  pml-ocl-gp100gl:
     variant: linux_x86_64
-  keras-pml-ocl-gv100gl:
+  pml-ocl-gv100gl:
     variant: linux_x86_64
-  keras-pml-ocl-neo:
+  pml-ocl-neo:
     variant: linux_x86_64
-  keras-pml-ocl-gfx804:
+  pml-vk-gen:
+    variant: linux_x86_64
+  pml-ocl-gfx804:
     variant: windows_x86_64
 
 VARIANTS:
   linux_x86_64:
     arch: manylinux1_x86_64
     system: Linux
+    env:
+      PLAIDML_DEVICE: llvm_cpu.0
+      PLAIDML_TARGET: llvm_cpu
   linux_x86_64_dbg:
     bazel_config: dbg
     arch: manylinux1_x86_64
     system: Linux
+    env:
+      PLAIDML_DEVICE: llvm_cpu.0
+      PLAIDML_TARGET: llvm_cpu
   macos_x86_64:
     arch: macosx_10_10_x86_64
     system: Darwin
+    env:
+      PLAIDML_DEVICE: llvm_cpu.0
+      PLAIDML_TARGET: llvm_cpu
   macos_x86_64_dbg:
     bazel_config: dbg
     arch: macosx_10_10_x86_64
     system: Darwin
+    env:
+      PLAIDML_DEVICE: llvm_cpu.0
+      PLAIDML_TARGET: llvm_cpu
   windows_x86_64:
     arch: win_amd64
     system: Windows
+    env:
+      PLAIDML_DEVICE: llvm_cpu.0
+      PLAIDML_TARGET: llvm_cpu
 
 SUITES:
   smoke:
     platforms:
-      keras-pml-llvm-cpu:
+      pml-llvm-cpu:
         pipelines: [nightly, plaidml]
     params:
       plaidml:
@@ -108,7 +125,9 @@ SUITES:
 
   base:
     platforms:
-      keras-pml-llvm-cpu:
+      pml-llvm-cpu:
+        pipelines: [nightly, plaidml, ci]
+      pml-vk-gen:
         pipelines: [nightly, plaidml, ci]
     params:
       ci:
@@ -124,28 +143,43 @@ SUITES:
     timeout: 30
     conda_env: ci/conda/tensorflow.yml
     compare: no
-    cwd: plaidml/bridge/keras
     runner: python
     workloads:
       backend:
         args: [backend_test.py]
+        cwd: plaidml/bridge/keras
         conda_env: ci/conda/keras_backend_test.yml
         precision: untested
-      regression:
-        args: [regression_test.py]
+        skip_platforms:
+          - pml-vk-gen
+      edsl_cc_test:
+        runner: cc_test
+        cwd: tmp/input
         precision: untested
-        soft_fail: true
+        skip_platforms:
+          - pml-llvm-cpu
+        platform_overrides:
+          pml-vk-gen:
+            args:
+              - --plaidml_target=intel_gen
+              - --skip_test_file=edsl_test-skip.intel_gen.txt
+            soft_fail: true # maybe flakey?
+      # mnist_mlp:
+      #   args: [mnist_mlp_test.py]
+      #   precision: untested
+      #   soft_fail: true
+      # regression:
+      #   args: [regression_test.py]
+      #   precision: untested
+      #   soft_fail: true
       trivial_model:
         args: [trivial_model_test.py]
+        cwd: plaidml/bridge/keras
         precision: untested
-      mnist_mlp:
-        args: [mnist_mlp_test.py]
-        precision: untested
-        soft_fail: true
 
   infer:
     platforms:
-      keras-pml-llvm-cpu:
+      pml-llvm-cpu:
         pipelines: [nightly, plaidml, ci]
     params:
       ci:
@@ -173,82 +207,82 @@ SUITES:
       imdb_lstm:
         precision: high
         skip_platforms:
-          - keras-pml-llvm-cpu
-          - keras-tf-dnnl-cpu
+          - pml-llvm-cpu
+          - tf-dnnl-cpu
         perf_threshold: 0.7
       inception_v3:
         precision: high
         platform_overrides:
-          keras-tf-dnnl-cpu:
+          tf-dnnl-cpu:
             conda_env: ci/conda/tensorflow-dnnl.yml
-          keras-pml-llvm-cpu:
+          pml-llvm-cpu:
             prepend_args: [--examples=64]
             soft_fail: true # performance regression
-          keras-pml-ocl-gfx804:
+          pml-ocl-gfx804:
             prepend_args: [--examples=64]
-          keras-pml-ocl-neo:
+          pml-ocl-neo:
             prepend_args: [--examples=512]
-          keras-pml-mtl-uhd630:
+          pml-mtl-uhd630:
             prepend_args: [--examples=256]
       mobilenet:
         expected: "could not broadcast input array from shape (3,2048) into shape (1,2048)"
         soft_fail: true
         precision: high
         platform_overrides:
-          keras-tf-dnnl-cpu:
+          tf-dnnl-cpu:
             conda_env: ci/conda/tensorflow-dnnl.yml
       mobilenet_v2:
         precision: high
         platform_overrides:
-          keras-pml-llvm-cpu:
+          pml-llvm-cpu:
             soft_fail: true # performance regression
-          keras-tf-dnnl-cpu:
+          tf-dnnl-cpu:
             conda_env: ci/conda/tensorflow-dnnl.yml
       resnet50:
         precision: high
         platform_overrides:
-          keras-pml-llvm-cpu:
+          pml-llvm-cpu:
             prepend_args: [--examples=128]
-          keras-pml-ocl-gfx804:
+          pml-ocl-gfx804:
             prepend_args: [--examples=128]
-          keras-pml-mtl-uhd630:
+          pml-mtl-uhd630:
             prepend_args: [--examples=256]
-          keras-tf-dnnl-cpu:
+          tf-dnnl-cpu:
             conda_env: ci/conda/tensorflow-dnnl.yml
       vgg19:
         precision: high
         platform_overrides:
-          keras-pml-llvm-cpu:
+          pml-llvm-cpu:
             prepend_args: [--examples=64]
             soft_fail: true # performance regression
-          keras-pml-ocl-gfx804:
+          pml-ocl-gfx804:
             prepend_args: [--examples=64]
-          keras-pml-ocl-neo:
+          pml-ocl-neo:
             prepend_args: [--examples=256]
-          keras-pml-mtl-uhd630:
+          pml-mtl-uhd630:
             prepend_args: [--examples=256]
-          keras-tf-dnnl-cpu:
+          tf-dnnl-cpu:
             conda_env: ci/conda/tensorflow-dnnl.yml
         skip_platforms:
-          - keras-pml-mtl-uhd630
+          - pml-mtl-uhd630
       xception:
         expected: "Unrecognized data_format"
         soft_fail: true
         precision: high
         platform_overrides:
-          keras-pml-llvm-cpu:
+          pml-llvm-cpu:
             prepend_args: [--examples=64]
-          keras-pml-ocl-gfx804:
+          pml-ocl-gfx804:
             prepend_args: [--examples=64]
-          keras-pml-ocl-gv100gl:
+          pml-ocl-gv100gl:
             prepend_args: [--examples=512]
-          keras-pml-ocl-neo:
+          pml-ocl-neo:
             prepend_args: [--examples=256]
             perf_threshold: 0.7
-          keras-pml-mtl-uhd630:
+          pml-mtl-uhd630:
             prepend_args: [--examples=64]
             soft_fail: true
-          keras-tf-dnnl-cpu:
+          tf-dnnl-cpu:
             conda_env: ci/conda/tensorflow-dnnl.yml
 
   train:
