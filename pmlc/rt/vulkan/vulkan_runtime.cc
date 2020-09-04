@@ -327,15 +327,8 @@ LogicalResult VulkanRuntime::submitCommandBuffers() {
                         /*stride=*/8,
                         (VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT));
 
-  llvm::errs() << "\n";
-  llvm::errs() << "results[0] = " << results[0] << "\n";
-  llvm::errs() << "results[1] = " << results[1] << "\n";
-
   uint64_t ns = (results[1] - results[0]) * timestampPeriod;
-  double ms = ns / 1000000.0d;
-
-  llvm::errs() << "ns = " << ns << "\n";
-  llvm::errs() << "ms = " << ms << "\n";
+  IVLOG(1, "Total program execution duration: " << ns);
 
   updateHostMemoryBuffers();
   return success();
