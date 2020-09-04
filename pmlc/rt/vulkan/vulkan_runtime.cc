@@ -134,13 +134,6 @@ LogicalResult VulkanRuntime::destroy() {
   vkFreeCommandBuffers(device, commandPool, commandBuffers.size(),
                        commandBuffers.data());
   vkDestroyCommandPool(device, commandPool, nullptr);
-
-  /*
-  void vkDestroyQueryPool(
-    VkDevice                                    device,
-    VkQueryPool                                 queryPool,
-    const VkAllocationCallbacks*                pAllocator);
-  */
   vkDestroyQueryPool(device, timestampQueryPool, /*allocator=*/nullptr);
 
   for (const auto &action : schedule) {
@@ -321,26 +314,19 @@ LogicalResult VulkanRuntime::submitCommandBuffers() {
 
   RETURN_ON_VULKAN_ERROR(vkQueueWaitIdle(queue), "vkQueueWaitIdle");
 
-  /*
-  VkResult vkGetQueryPoolResults(
-    VkDevice                                    device,
-    VkQueryPool                                 queryPool,
-    uint32_t                                    firstQuery,
-    uint32_t                                    queryCount,
-    size_t                                      dataSize,
-    void*                                       pData,
-    VkDeviceSize                                stride,
-    VkQueryResultFlags                          flags);
-  */
-
+  // TODO: if this is not valid then we should not be printing profile data
   if (timestampValidBits == 0) {
     llvm::errs() << "timestamps not supported by queue\n";
   }
 
   uint64_t *results = reinterpret_cast<uint64_t *>(calloc(2, sizeof(uint64_t)));
-  vkGetQueryPoolResults(device, timestampQueryPool, 0, 2, 16,
-                        /*(void*)*/ results, 8,
+  vkGetQueryPoolResults(device, timestampQueryPool,
+                        /*firstQuery=*/0,
+                        /*queryCount=*/2,
+                        /*dataSize=*/16, results,
+                        /*stride=*/8,
                         (VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT));
+
   llvm::errs() << "\n";
   llvm::errs() << "results[0] = " << results[0] << "\n";
   llvm::errs() << "results[1] = " << results[1] << "\n";
@@ -882,31 +868,13 @@ LogicalResult VulkanRuntime::createCommandPool() {
 }
 
 LogicalResult VulkanRuntime::createTimestampQueryPool() {
-  /*
-  typedef struct VkQueryPoolCreateInfo {
-    VkStructureType                  sType;
-    const void*                      pNext;
-    VkQueryPoolCreateFlags           flags;
-    VkQueryType                      queryType;
-    uint32_t                         queryCount;
-    VkQueryPipelineStatisticFlags    pipelineStatistics;
-  } VkQueryPoolCreateInfo;
-  */
-
   VkQueryPoolCreateInfo queryPoolCreateInfo = {};
   queryPoolCreateInfo.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
   queryPoolCreateInfo.pNext = nullptr;
   queryPoolCreateInfo.flags = 0;
   queryPoolCreateInfo.queryType = VK_QUERY_TYPE_TIMESTAMP;
-  queryPoolCreateInfo.queryCount = 1024; // TODO: hardcode?
-
-  /*
-  VkResult vkCreateQueryPool(
-    VkDevice                                    device,
-    const VkQueryPoolCreateInfo*                pCreateInfo,
-    const VkAllocationCallbacks*                pAllocator,
-    VkQueryPool*                                pQueryPool);
-  */
+  queryPoolCreateInfo.queryCount = 2;
+  queryPoolCreateInfo.pipelineStatistics = 0;
   RETURN_ON_VULKAN_ERROR(vkCreateQueryPool(device, &queryPoolCreateInfo,
                                            /*allocator=*/nullptr,
                                            &timestampQueryPool),
@@ -981,13 +949,6 @@ LogicalResult VulkanRuntime::createSchedule() {
   RETURN_ON_VULKAN_ERROR(vkBeginCommandBuffer(commandBuffer, &beginInfo),
                          "vkBeginCommandBuffer");
 
-  /*
-  void vkCmdWriteTimestamp(
-    VkCommandBuffer                             commandBuffer,
-    VkPipelineStageFlagBits                     pipelineStage,
-    VkQueryPool                                 queryPool,
-    uint32_t                                    query);
-  */
   vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
                       timestampQueryPool, /*query=*/0);
 
@@ -1034,13 +995,6 @@ LogicalResult VulkanRuntime::createSchedule() {
     }
   }
 
-  /*
-  void vkCmdWriteTimestamp(
-    VkCommandBuffer                             commandBuffer,
-    VkPipelineStageFlagBits                     pipelineStage,
-    VkQueryPool                                 queryPool,
-    uint32_t                                    query);
-  */
   vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
                       timestampQueryPool, /*query=*/1);
 
