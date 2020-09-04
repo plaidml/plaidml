@@ -1,11 +1,13 @@
 // Copyright 2020 Intel Corporation
 
 #include <algorithm>
+#include <map>
 #include <memory>
 #include <unordered_map>
 #include <utility>
 #include <vector>
 
+#include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/TypeSwitch.h"
 
 #include "mlir/Dialect/Vector/VectorOps.h"
@@ -24,7 +26,7 @@ using namespace mlir; // NOLINT[build/namespaces]
 namespace pmlc::dialect::pxa {
 using pmlc::dialect::pxa::PxaReduceOp;
 
-class Impl {
+class VectorizeCandidate {
 private:
   AffineParallelOp loop;
   BlockArgument index;
@@ -64,8 +66,7 @@ private:
   LogicalResult tryVectorizePxaLoadOp(PxaLoadOp op) {
     auto strideInfo = computeStrideInfo(op);
     if (!strideInfo) {
-      op.emitRemark("Vectorize: Failed, non-affine strides");
-      return failure();
+      return op.emitRemark("Vectorize op: Failed, non-affine strides");
     }
 
     auto it = strideInfo->strides.find(index);
@@ -76,8 +77,7 @@ private:
 
     // Stride is non-zero, must vectorize
     if (it->second != 1) {
-      op.emitRemark("Vectorize: Failed, stride != 1");
-      return failure();
+      return op.emitRemark("Vectorize op: Failed, stride != 1");
     }
     vectorizedOps.insert(op);
     vectorizedValues.insert(op.getResult());
@@ -87,8 +87,7 @@ private:
   LogicalResult tryVectorizePxaReduceOp(PxaReduceOp op) {
     auto strideInfo = computeStrideInfo(op);
     if (!strideInfo) {
-      op.emitRemark("Vectorize: Failed, non-affine strides");
-      return failure();
+      return op.emitRemark("Vectorize op: Failed, non-affine strides");
     }
 
     auto it = strideInfo->strides.find(index);
@@ -101,18 +100,50 @@ private:
       if (op.agg() == AtomicRMWKind::assign ||
           (!eltType.isF32() && !eltType.isF64() &&
            !eltType.isSignlessInteger(32) && !eltType.isSignlessInteger(64))) {
-        op.emitRemark("Vectorization failed: Unsupported reduction or "
-                      "type for vector::ReductionOp");
-        return failure();
+        return op.emitRemark(
+            "Vectorize op: Failed, unsupported reduction or type "
+            "for vector::ReductionOp");
       }
       // If stride is 0, "remember it" as such.
       zeroStrideReductions.insert(op.getOperation());
     } else if (it->second != 1) {
-      op.emitRemark("Vectorize: Failed, stride != 1");
-      return failure();
+      return op.emitRemark("Vectorize op: Failed, stride != 1");
     }
 
     vectorizedOps.insert(op);
+    return success();
+  }
+
+  LogicalResult tryVectorizeOther(Operation *op) {
+    if (op->getNumRegions() != 0) {
+      return op->emitRemark("Vectorize op: Failed, interior loops");
+    }
+    if (!isa<FPExtOp, FPTruncOp, IndexCastOp, VectorUnrollOpInterface>(op)) {
+      // Probably not a vectorizable op. Verify it doesn't use an
+      // vectorized results.
+      for (auto operand : op->getOperands()) {
+        if (vectorizedValues.count(operand)) {
+          return op->emitRemark(
+              "Vectorize op: Failed, unknown op used vectorized result");
+        }
+      }
+      // Otherwise, safe and ignorable.
+      return success();
+    }
+    // Only vectorize if at least one operand is vectorized
+    bool anyVec = llvm::any_of(op->getOperands(), [&](Value operand) {
+      return vectorizedValues.count(operand);
+    });
+    if (!anyVec) {
+      // No need to vectorize, all is good
+      return success();
+    }
+    // We also don't handle ops with multiple results
+    if (op->getNumResults() != 1) {
+      return op->emitRemark("Vectorize op: Failed, multi-result scalar op");
+    }
+    vectorizedOps.insert(op);
+    vectorizedValues.insert(op->getResult(0));
     return success();
   }
 
@@ -120,45 +151,12 @@ private:
     return llvm::TypeSwitch<Operation *, LogicalResult>(op)
         .Case<PxaLoadOp>([&](auto op) { return tryVectorizePxaLoadOp(op); })
         .Case<PxaReduceOp>([&](auto op) { return tryVectorizePxaReduceOp(op); })
-        .Default([&](Operation *op) {
-          if (op->getNumRegions() != 0) {
-            op->emitRemark("Vectorize: Failed, interior loops");
-            return failure();
-          }
-          if (!isa<VectorUnrollOpInterface>(op)) {
-            // Probably not a vectorizable op.  Verify it doesn't use an
-            // vectorized results.
-            for (auto operand : op->getOperands()) {
-              if (vectorizedValues.count(operand)) {
-                op->emitRemark(
-                    "Vectorize: Failed, unknown op used vectorized result");
-                return failure();
-              }
-            }
-            // Otherwise, safe and ignorable.
-            return success();
-          }
-          // Only vectorize if at least one operand is vectorized
-          bool anyVec = llvm::any_of(op->getOperands(), [&](Value operand) {
-            return vectorizedValues.count(operand);
-          });
-          if (!anyVec) {
-            // No need to vectorize, all is good
-            return success();
-          }
-          // We also don't handle ops with multiple results
-          if (op->getNumResults() != 1) {
-            op->emitRemark("Vectorize: Failed, multi-result scalar op");
-            return failure();
-          }
-          vectorizedOps.insert(op);
-          vectorizedValues.insert(op->getResult(0));
-          return success();
-        });
+        .Default([&](Operation *op) { return tryVectorizeOther(op); });
   }
 
 public:
-  Impl(AffineParallelOp loop, BlockArgument index, unsigned vectorSize)
+  VectorizeCandidate(AffineParallelOp loop, BlockArgument index,
+                     unsigned vectorSize)
       : loop(loop), index(index), vectorSize(vectorSize) {}
 
   void vectorizeScalarOp(Operation *op) {
@@ -232,29 +230,26 @@ public:
     }
   }
 
-  LogicalResult vectorize() {
+  LogicalResult isLegal() {
     Block *body = loop.getBody();
-    IVLOG(3, "Vectorize: Attempting Vectorizing for BlockArgument: "
+    IVLOG(3, "Vectorize: Attempting to vectorize for BlockArgument: "
                  << index.getArgNumber());
 
     auto ranges = loop.getConstantRanges();
     if (!ranges) {
-      loop.emitRemark("Vectorize: Failed, Requires constant ranges");
-      return failure();
+      return loop.emitRemark("Vectorize: Failed, Requires constant ranges");
     }
 
     auto argNum = index.getArgNumber();
     if ((*ranges)[argNum] % vectorSize != 0) {
-      loop.emitRemark(
+      return loop.emitRemark(
           "Vectorize: Failed, dimension is not a multiple of the vector width");
-      return failure();
     }
 
     auto steps = loop.getSteps();
     auto step = steps[argNum];
     if (step != 1) {
-      loop.emitRemark("Vectorize: Failed, dimension step is not 1");
-      return failure();
+      return loop.emitRemark("Vectorize: Failed, dimension step is not 1");
     }
 
     bool vectorizable = true;
@@ -262,19 +257,23 @@ public:
       vectorizable &= succeeded(tryVectorizeOperation(&op));
     }
     if (!vectorizable) {
-      return failure();
+      return loop.emitRemark("Vectorize: Failed, !vectorizable");
     }
     if (vectorizedOps.empty()) {
       // TODO: should we actually fail in this case?  Currently we need to since
       // we have no cost model
-      loop.emitRemark("Vectorize: Failed, nothing to vectorize");
-      return failure();
+      return loop.emitRemark("Vectorize: Failed, nothing to vectorize");
     }
+    return success();
+  }
 
-    // Preflight complete, do the transform
+  LogicalResult vectorize() {
+    Block *body = loop.getBody();
+    auto steps = loop.getSteps();
     for (auto &op : llvm::make_early_inc_range(body->getOperations())) {
       vectorizeOperation(&op);
     }
+    auto argNum = index.getArgNumber();
     steps[argNum] *= vectorSize;
     loop.setSteps(steps);
     return success();
@@ -283,22 +282,30 @@ public:
 
 LogicalResult performVectorization(AffineParallelOp op, BlockArgument index,
                                    unsigned vectorSize) {
-  Impl impl(op, index, vectorSize);
-  return impl.vectorize();
+  VectorizeCandidate candidate(op, index, vectorSize);
+  if (failed(candidate.isLegal())) {
+    return failure();
+  }
+  // Preflight complete, do the transform
+  return candidate.vectorize();
 }
 
-LogicalResult simpleVectorize(AffineParallelOp op, unsigned vecSize) {
+LogicalResult vectorizeOverOutputs(AffineParallelOp op, unsigned vecSize) {
+  IVLOG(3, "Attempting to vectorize: " << debugString(*op));
   if (op.getNumResults() != 1) {
-    return failure();
+    return op.emitRemark("vectorizeOverOutputs: Failed, #result != 1");
   }
   auto reduce = dyn_cast<PxaReduceOp>(getPrevWriter(op.getResult(0)));
   if (!reduce) {
-    return failure();
+    return op.emitRemark(
+        "vectorizeOverOutputs: Failed, missing previous PxaReduceOp");
   }
   auto maybeSI = computeStrideInfo(reduce);
   if (!maybeSI) {
-    return failure();
+    return op.emitRemark(
+        "vectorizeOverOutputs: Failed, could not compute StrideInfo");
   }
+  IVLOG(1, "StrideInfo: " << debugString(*maybeSI));
   SmallVector<BlockArgument, 4> options;
   for (auto ba : op.getIVs()) {
     if (maybeSI->strides.count(ba) && maybeSI->strides[ba] == 1) {
@@ -306,27 +313,63 @@ LogicalResult simpleVectorize(AffineParallelOp op, unsigned vecSize) {
     }
   }
   if (options.size() != 1) {
-    return failure();
+    return op.emitRemark("vectorizeOverOutputs: Failed, options != 1");
   }
   return performVectorization(op, options[0], vecSize);
 }
 
-struct VectorizePass : public VectorizeBase<VectorizePass> {
-  void runOnFunction() final {
-    static constexpr unsigned vectorWidth = 8;
-    auto func = getFunction();
-    // Vectorize only the outermost loops
-    for (auto &op : func.getBody().front()) {
-      auto loop = dyn_cast<AffineParallelOp>(op);
-      if (!loop) {
-        continue;
+LogicalResult vectorizeOverIVs(AffineParallelOp band, unsigned vectorWidth) {
+  for (BlockArgument blockArg : band.getIVs()) {
+    if (succeeded(performVectorization(band, blockArg, vectorWidth))) {
+      break;
+    }
+  }
+  return success();
+}
+
+LogicalResult vectorizeMaxVectorRatio(AffineParallelOp band,
+                                      unsigned vectorWidth) {
+  std::map<double, VectorizeCandidate> ratios;
+  // ratio = ((TripCount // VecSize) * VecSize) / TripCount
+  band.walk([&](AffineParallelOp op) {
+    for (BlockArgument iv : band.getIVs()) {
+      VectorizeCandidate candidate(op, iv, vectorWidth);
+      if (succeeded(candidate.isLegal())) {
+        candidate.vectorize();
+        break;
       }
-      // Try IV's until we succeed
-      for (unsigned int i = 0; i < loop.getIVs().size(); i++) {
-        auto blockArg = loop.getIVs()[i];
-        if (succeeded(performVectorization(loop, blockArg, vectorWidth))) {
-          break;
-        }
+    }
+  });
+  return success();
+}
+
+using StrategyFn =
+    std::function<LogicalResult(AffineParallelOp op, unsigned vectorWidth)>;
+
+static llvm::StringMap<StrategyFn> strategies{
+    {"simple", vectorizeOverIVs},
+    {"outputs", vectorizeOverOutputs},
+    {"maxVectorRatio", vectorizeMaxVectorRatio},
+};
+
+struct VectorizePass : public VectorizeBase<VectorizePass> {
+  VectorizePass() = default;
+
+  explicit VectorizePass(StringRef strategy, unsigned vectorWidth) {
+    this->strategy = strategy.str();
+    this->vectorWidth = vectorWidth;
+  }
+
+  void runOnFunction() final {
+    auto func = getFunction();
+    auto it = strategies.find(strategy);
+    if (it == strategies.end()) {
+      emitError(func.getLoc(), "Invalid strategy specified: ") << strategy;
+      return signalPassFailure();
+    }
+    for (auto band : func.getOps<AffineParallelOp>()) {
+      if (failed(it->second(band, vectorWidth))) {
+        return signalPassFailure();
       }
     }
   }
@@ -334,6 +377,11 @@ struct VectorizePass : public VectorizeBase<VectorizePass> {
 
 std::unique_ptr<Pass> createVectorizePass() {
   return std::make_unique<VectorizePass>();
+}
+
+std::unique_ptr<mlir::Pass> createVectorizePass(StringRef strategy,
+                                                unsigned vectorWidth) {
+  return std::make_unique<VectorizePass>(strategy, vectorWidth);
 }
 
 // TODO: Maybe move this to a generic utility somewhere

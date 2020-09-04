@@ -11,8 +11,8 @@ LogicalResult performVectorization(mlir::AffineParallelOp op,
                                    mlir::BlockArgument index,
                                    unsigned vectorSize);
 
-// Attempt to vectorize a loop on the stride 1 index of it's output
-LogicalResult simpleVectorize(mlir::AffineParallelOp op, unsigned vecSize);
+// Attempt to vectorize a loop on the stride 1 index of its output
+LogicalResult vectorizeOverOutputs(mlir::AffineParallelOp op, unsigned vecSize);
 
 // Attempt to vectorize a buffer (given it's allocation)
 LogicalResult vectorizeBuffer(mlir::AllocOp op);

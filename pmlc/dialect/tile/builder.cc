@@ -691,7 +691,7 @@ TileBuilder::MakeProgram(StringRef name, const ProgramMutations &mutations,
   }
   // Do some optimization passes
   mlir::PassManager pm(getContext());
-  if (VLOG_IS_ON(1)) {
+  if (VLOG_IS_ON(2)) {
     pm.enableStatistics();
     pm.enableTiming();
     auto shouldPrintBeforePass = [](auto pass, auto op) { return false; };
