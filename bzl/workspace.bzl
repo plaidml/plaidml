@@ -90,8 +90,8 @@ def plaidml_workspace():
         strip_prefix = "jsonnet-0.13.0",
     )
 
-    LLVM_COMMIT = "10d7e2d83cc8b2c605af9346913c1b56a5a317bc"
-    LLVM_SHA256 = "ef8fb8575ca85f594c3c72834078b14aab73f8b6720350ae307091a3abd0ac6f"
+    LLVM_COMMIT = "a38882d8d63e9e093926789331b6c5b4711a889e"
+    LLVM_SHA256 = "8f5dd8dc9479eb7fae76376947c0155f800bc21a508454645d2563024102467e"
     LLVM_URL = "https://github.com/plaidml/llvm-project/archive/{commit}.tar.gz".format(commit = LLVM_COMMIT)
     http_archive(
         name = "llvm-project",
@@ -166,4 +166,30 @@ def plaidml_workspace():
         sha256 = "c3e5e9fdd5004dcb542feda5ee4f0ff0744628baf8ed2dd5d66f8ca1197cb1a1",
         strip_prefix = "zlib-1.2.11",
         build_file = clean_dep("//bzl:zlib.BUILD"),
+    )
+
+    http_archive(
+        name = "opencl_headers",
+        url = "https://github.com/KhronosGroup/OpenCL-Headers/archive/v2020.06.16.zip",
+        sha256 = "518703d3c3a6333bcf8e4f80758e4e98f7af30fbd72a09fe8c2673da1628d80c",
+        strip_prefix = "OpenCL-Headers-2020.06.16",
+        build_file = clean_dep("//vendor/opencl_headers:opencl_headers.BUILD"),
+    )
+
+    http_archive(
+        name = "opencl_hpp_headers",
+        url = "https://github.com/KhronosGroup/OpenCL-CLHPP/archive/v2.0.12.zip",
+        sha256 = "127936b3a5ef147f23b85fb043599d1480e9e57acabe2d2a67c5dac05aa4ad70",
+        strip_prefix = "OpenCL-CLHPP-2.0.12",
+        build_file = clean_dep("//vendor/opencl_hpp_headers:opencl_hpp_headers.BUILD"),
+        # Patch hpp headers trying to use system OpenCL header on Apple.
+        patches = ["//vendor/opencl_hpp_headers:fix_apple_headers.patch"],
+    )
+
+    http_archive(
+        name = "opencl_icd_loader",
+        url = "https://github.com/KhronosGroup/OpenCL-ICD-Loader/archive/v2020.06.16.zip",
+        sha256 = "e4c27a5adcef4dbc0fee98864af203dc78dfc967ca7287c9bad9add030e7516e",
+        strip_prefix = "OpenCL-ICD-Loader-2020.06.16",
+        build_file = clean_dep("//vendor/opencl_icd_loader:opencl_icd_loader.BUILD"),
     )

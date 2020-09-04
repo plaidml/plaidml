@@ -9,20 +9,20 @@ plaidml_cc_library(
         "@bazel_tools//src/conditions:windows": [],
         "//conditions:default": ["-Wno-deprecated-declarations"],
     }),
+    data = [
+        "//:ov_plugins_xml",
+        "//plaidml/bridge/openvino:plaidml-plugin",
+    ],
     tags = [
         "skip_macos",
         "skip_windows",
-    ],
-    data = [
-        "//plaidml/bridge/openvino:libplaidml-plugin.so",
-        "//:ov_plugins_xml",
     ],
     deps = [
         "//pmlc/util:logging",
         "@gflags",
         "@gmock//:gtest_main",
-        "@openvino//:inference_engine",
         "@openvino//:common_test_utils",
+        "@openvino//:inference_engine",
         "@openvino//:shared_plugin_tests",
     ],
 )

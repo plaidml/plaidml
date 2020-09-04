@@ -154,11 +154,9 @@ class PlanOption(object):
 class Platform(object):
 
     def __init__(self, full, gpu_flops):
-        parts = full.split('-')
         self.full = full
-        self.framework = parts[0]
-        self.engine = '_'.join(parts[1:3])
-        self.gpu = parts[3]
+        self.compiler, self.runtime, self.gpu = full.split('-')
+        self.engine = '{}_{}'.format(self.compiler, self.runtime)
         self.gpu_flops = gpu_flops.get(self.gpu)
 
     def __repr__(self):

@@ -6,9 +6,7 @@ include "mlir/Pass/PassBase.td"
 def IntelGenLowerAffine : FunctionPass<"intel-gen-lower-affine"> {
   let summary = "Lower affine -> std + scf, and add GPU mappings ";
   let constructor = "pmlc::target::intel_gen::createIntelGenLowerAffinePass()";
-  let dependentDialects = [
-    "mlir::scf::SCFDialect"
-  ];
+  let dependentDialects = ["mlir::scf::SCFDialect"];
 }
 
 def AffineIndexPack : FunctionPass<"intel-gen-affine-index-pack"> {
@@ -34,6 +32,10 @@ def SubgroupBroadcast : FunctionPass<"stdx-subgroup-broadcast"> {
   let dependentDialects = ["pmlc::dialect::stdx::StdXDialect"];
 }
 
+def ConvertPXAToAffine : Pass<"intel-gen-convert-pxa-to-affine", "mlir::ModuleOp"> {
+  let summary = "Convert PXA dialect to Affine dialect";
+  let constructor = "pmlc::target::intel_gen::createLowerPXAToAffinePass()";
+  let dependentDialects = ["mlir::AffineDialect"];
+}
 
 #endif
-

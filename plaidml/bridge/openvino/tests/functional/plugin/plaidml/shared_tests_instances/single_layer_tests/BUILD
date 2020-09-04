@@ -9,7 +9,7 @@ TAGS = [
 ]
 
 DATA = [
-    "//plaidml/bridge/openvino:libplaidml-plugin.so",
+    "//plaidml/bridge/openvino:plaidml-plugin",
 ]
 
 DEPS = [
@@ -31,7 +31,7 @@ cc_library(
             # Exclusions for files lost in update to OV `master`
             "batch_norm_inference.cpp",
             "broadcast.cpp",
-            "convert_like.cpp",   # Note: Broken not missing
+            "convert_like.cpp",  # Note: Broken not missing
             "divide.cpp",
             "floor_mod.cpp",
             "greater_equal.cpp",
@@ -79,7 +79,7 @@ cc_library(
             # Exclusions for files lost in update to OV `master`
             "batch_norm_inference.cpp",
             "broadcast.cpp",
-            "convert_like.cpp",   # Note: Broken not missing
+            "convert_like.cpp",  # Note: Broken not missing
             "divide.cpp",
             "floor_mod.cpp",
             "greater_equal.cpp",
