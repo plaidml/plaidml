@@ -225,7 +225,6 @@ class ProgramTimeFilter(object):
 
     def filter(self, record):
         msg = record.getMessage()
-        print("HELLO FROM PLAIDBENCH")
         if msg.startswith("Total program execution duration:"):
             self.runs += 1
             self.tot_time_ns += int(msg.split(' ')[-1])
@@ -284,8 +283,6 @@ def _inner_run(reports,
         stop_watch.start()
         _, overrides = model.run()
         stop_watch.stop()
-
-        timef.filter()
 
         # Record stopwatch times
         execution_duration = overrides.get('time', stop_watch.elapsed())
