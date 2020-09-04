@@ -237,6 +237,8 @@ private:
   // Vulkan memory context.
   //===--------------------------------------------------------------------===//
   uint32_t queueFamilyIndex{0};
+  uint32_t timestampValidBits{0};
+  float timestampPeriod{0.0};
   uint32_t memoryTypeIndex{VK_MAX_MEMORY_TYPES};
   VkDeviceSize memorySize{0};
 

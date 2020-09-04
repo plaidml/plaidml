@@ -321,6 +321,36 @@ LogicalResult VulkanRuntime::submitCommandBuffers() {
 
   RETURN_ON_VULKAN_ERROR(vkQueueWaitIdle(queue), "vkQueueWaitIdle");
 
+  /*
+  VkResult vkGetQueryPoolResults(
+    VkDevice                                    device,
+    VkQueryPool                                 queryPool,
+    uint32_t                                    firstQuery,
+    uint32_t                                    queryCount,
+    size_t                                      dataSize,
+    void*                                       pData,
+    VkDeviceSize                                stride,
+    VkQueryResultFlags                          flags);
+  */
+
+  if (timestampValidBits == 0) {
+    llvm::errs() << "timestamps not supported by queue\n";
+  }
+
+  uint64_t *results = reinterpret_cast<uint64_t *>(calloc(2, sizeof(uint64_t)));
+  vkGetQueryPoolResults(device, timestampQueryPool, 0, 2, 16,
+                        /*(void*)*/ results, 8,
+                        (VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT));
+  llvm::errs() << "\n";
+  llvm::errs() << "results[0] = " << results[0] << "\n";
+  llvm::errs() << "results[1] = " << results[1] << "\n";
+
+  uint64_t ns = (results[1] - results[0]) * timestampPeriod;
+  double ms = ns / 1000000.0d;
+
+  llvm::errs() << "ns = " << ns << "\n";
+  llvm::errs() << "ms = " << ms << "\n";
+
   updateHostMemoryBuffers();
   return success();
 }
@@ -378,6 +408,8 @@ LogicalResult VulkanRuntime::createDevice() {
   VkPhysicalDeviceProperties props;
   vkGetPhysicalDeviceProperties(physicalDevice, &props);
   IVLOG(1, "Choosing first available vulkan device: " << props.deviceName);
+
+  timestampPeriod = props.limits.timestampPeriod;
 
   getBestComputeQueue(physicalDevice);
 
@@ -457,6 +489,8 @@ VulkanRuntime::getBestComputeQueue(const VkPhysicalDevice &physicalDevice) {
     if (!(VK_QUEUE_GRAPHICS_BIT & maskedFlags) &&
         (VK_QUEUE_COMPUTE_BIT & maskedFlags)) {
       queueFamilyIndex = i;
+      // TODO: need to check if there is another queue that supports timestamps
+      timestampValidBits = queueFamilyProperties[i].timestampValidBits;
       return success();
     }
   }
@@ -468,6 +502,8 @@ VulkanRuntime::getBestComputeQueue(const VkPhysicalDevice &physicalDevice) {
 
     if (VK_QUEUE_COMPUTE_BIT & maskedFlags) {
       queueFamilyIndex = i;
+      // TODO: need to check if there is another queue that supports timestamps
+      timestampValidBits = queueFamilyProperties[i].timestampValidBits;
       return success();
     }
   }
@@ -1007,30 +1043,6 @@ LogicalResult VulkanRuntime::createSchedule() {
   */
   vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
                       timestampQueryPool, /*query=*/1);
-
-  /*
-  VkResult vkGetQueryPoolResults(
-    VkDevice                                    device,
-    VkQueryPool                                 queryPool,
-    uint32_t                                    firstQuery,
-    uint32_t                                    queryCount,
-    size_t                                      dataSize,
-    void*                                       pData,
-    VkDeviceSize                                stride,
-    VkQueryResultFlags                          flags);
-  */
-  uint32_t results[2];
-  vkGetQueryPoolResults(device, timestampQueryPool, 0, 2, 8,
-                        /*(void*)*/ &results, 4, VK_QUERY_RESULT_WAIT_BIT);
-  llvm::errs() << "\n";
-  llvm::errs() << "results[0] = " << results[0] << "\n";
-  llvm::errs() << "results[1] = " << results[1] << "\n";
-
-  uint32_t ns = results[1] - results[0];
-  double ms = ns / 1000000.0d;
-
-  llvm::errs() << "ns = " << ns << "\n";
-  llvm::errs() << "ms = " << ms << "\n";
 
   RETURN_ON_VULKAN_ERROR(vkEndCommandBuffer(commandBuffer),
                          "vkEndCommandBuffer");
