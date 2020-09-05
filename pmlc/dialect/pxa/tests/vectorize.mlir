@@ -28,7 +28,6 @@ func @vectorize_gemm(%arg0: memref<64x64xf32>, %arg1: memref<64x64xf32>) -> (mem
     // This mulf is pure scalar
     // CHECK: mulf %{{.*}}, %{{.*}} : f32
 
-    // expected-remark@+1 {{Vectorize op: Failed, stride != 1}}
     %red1 = pxa.reduce addf %2, %a[%i, %j] : memref<64x64xf32>
     // This reduce vectorizes 
     // CHECK: pxa.vector_reduce addf %{{.*}}, %{{.*}} : memref<64x64xf32>, vector<8xf32>

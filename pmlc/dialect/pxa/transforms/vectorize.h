@@ -6,6 +6,10 @@
 
 namespace pmlc::dialect::pxa {
 
+static constexpr const char *kVectorizeStrategy_Outputs = "outputs";
+static constexpr const char *kVectorizeStrategy_Recursive = "recursive";
+static constexpr const char *kVectorizeStrategy_Simple = "simple";
+
 // Explicitly attempt to vectorize on a specific loop/index/size
 LogicalResult performVectorization(mlir::AffineParallelOp op,
                                    mlir::BlockArgument index,

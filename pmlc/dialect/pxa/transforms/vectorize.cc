@@ -11,6 +11,7 @@
 #include "llvm/ADT/TypeSwitch.h"
 
 #include "mlir/Dialect/Vector/VectorOps.h"
+#include "mlir/IR/AsmState.h"
 #include "mlir/Interfaces/VectorInterfaces.h"
 
 #include "pmlc/dialect/pxa/analysis/strides.h"
@@ -26,14 +27,22 @@ using namespace mlir; // NOLINT[build/namespaces]
 namespace pmlc::dialect::pxa {
 using pmlc::dialect::pxa::PxaReduceOp;
 
+static std::string getValueName(Operation *op, Value value) {
+  AsmState state(op->getParentOfType<FuncOp>());
+  std::string str;
+  llvm::raw_string_ostream os(str);
+  value.printAsOperand(os, state);
+  return os.str();
+}
+
 class VectorizeCandidate {
 private:
   AffineParallelOp loop;
   BlockArgument index;
-  unsigned vectorSize;
+  unsigned vectorWidth;
   DenseSet<Value> vectorizedValues;
   DenseSet<Operation *> vectorizedOps;
-  llvm::DenseSet<Operation *> zeroStrideReductions;
+  DenseSet<Operation *> zeroStrideReductions;
 
   const char *stringifyAtomicRMWKindForVectorReductionOp(AtomicRMWKind val) {
     switch (val) {
@@ -96,10 +105,11 @@ private:
       // Also, make sure we handle only the supported types -
       // see the vector::ReductionOp verification code
       // (https://github.com/llvm/llvm-project/blob/master/mlir/lib/Dialect/Vector/VectorOps.cpp#L134).
-      Type eltType = op.getMemRefType().getElementType();
+      Type elementType = op.getMemRefType().getElementType();
       if (op.agg() == AtomicRMWKind::assign ||
-          (!eltType.isF32() && !eltType.isF64() &&
-           !eltType.isSignlessInteger(32) && !eltType.isSignlessInteger(64))) {
+          (!elementType.isF32() && !elementType.isF64() &&
+           !elementType.isSignlessInteger(32) &&
+           !elementType.isSignlessInteger(64))) {
         return op.emitRemark(
             "Vectorize op: Failed, unsupported reduction or type "
             "for vector::ReductionOp");
@@ -114,7 +124,7 @@ private:
     return success();
   }
 
-  LogicalResult tryVectorizeOther(Operation *op) {
+  LogicalResult tryVectorizeScalarOp(Operation *op) {
     if (op->getNumRegions() != 0) {
       return op->emitRemark("Vectorize op: Failed, interior loops");
     }
@@ -148,41 +158,45 @@ private:
   }
 
   LogicalResult tryVectorizeOperation(Operation *op) {
-    return llvm::TypeSwitch<Operation *, LogicalResult>(op)
+    return TypeSwitch<Operation *, LogicalResult>(op)
         .Case<PxaLoadOp>([&](auto op) { return tryVectorizePxaLoadOp(op); })
         .Case<PxaReduceOp>([&](auto op) { return tryVectorizePxaReduceOp(op); })
-        .Default([&](Operation *op) { return tryVectorizeOther(op); });
+        .Default([&](Operation *op) { return tryVectorizeScalarOp(op); });
   }
 
 public:
   VectorizeCandidate(AffineParallelOp loop, BlockArgument index,
-                     unsigned vectorSize)
-      : loop(loop), index(index), vectorSize(vectorSize) {}
+                     unsigned vectorWidth)
+      : loop(loop), index(index), vectorWidth(vectorWidth) {
+    IVLOG(3, "Vectorize candidate: " << getValueName(loop, index));
+  }
 
   void vectorizeScalarOp(Operation *op) {
     OpBuilder builder(op);
     for (auto &operand : op->getOpOperands()) {
       // For each non-vector operand, broadcast as needed
       if (!operand.get().getType().isa<VectorType>()) {
-        auto vecType = VectorType::get({vectorSize}, operand.get().getType());
-        auto bcast = builder.create<vector::BroadcastOp>(op->getLoc(), vecType,
-                                                         operand.get());
-        operand.set(bcast);
+        auto vectorType =
+            VectorType::get({vectorWidth}, operand.get().getType());
+        auto broadcast = builder.create<vector::BroadcastOp>(
+            op->getLoc(), vectorType, operand.get());
+        operand.set(broadcast);
       }
     }
     // Update the result type
     auto result = op->getResult(0);
-    auto vecType = VectorType::get({vectorSize}, result.getType());
-    result.setType(vecType);
+    auto vectorType = VectorType::get({vectorWidth}, result.getType());
+    result.setType(vectorType);
   }
 
   void vectorizeLoadOp(PxaLoadOp op) {
     Value operand = op.getMemRef();
-    auto eltType = op.getMemRefType().getElementType();
-    auto vecType = VectorType::get(vectorSize, eltType);
+    auto elementType = op.getMemRefType().getElementType();
+    auto vectorType = VectorType::get(vectorWidth, elementType);
     OpBuilder builder(op);
-    auto vecOp = builder.create<PxaVectorLoadOp>(
-        op.getLoc(), vecType, operand, op.getAffineMap(), op.getMapOperands());
+    auto vecOp =
+        builder.create<PxaVectorLoadOp>(op.getLoc(), vectorType, operand,
+                                        op.getAffineMap(), op.getMapOperands());
     op.replaceAllUsesWith(vecOp.getResult());
     op.erase();
   }
@@ -191,10 +205,10 @@ public:
     Value val = op.val();
     OpBuilder builder(op);
     if (!val.getType().isa<VectorType>()) {
-      auto vecType = VectorType::get({vectorSize}, val.getType());
-      auto bcast =
-          builder.create<vector::BroadcastOp>(op.getLoc(), vecType, val);
-      val = bcast.getResult();
+      auto vectorType = VectorType::get({vectorWidth}, val.getType());
+      auto broadcast =
+          builder.create<vector::BroadcastOp>(op.getLoc(), vectorType, val);
+      val = broadcast.getResult();
     }
     if (zeroStrideReductions.count(op.getOperation())) {
       // Add vector_reduction only if the stride is 0
@@ -221,27 +235,20 @@ public:
     if (!vectorizedOps.count(op)) {
       return;
     }
-    if (auto loadOp = dyn_cast<PxaLoadOp>(op)) {
-      vectorizeLoadOp(loadOp);
-    } else if (auto reduceOp = dyn_cast<PxaReduceOp>(op)) {
-      vectorizeReduceOp(reduceOp);
-    } else {
-      vectorizeScalarOp(op);
-    }
+    TypeSwitch<Operation *>(op)
+        .Case<PxaLoadOp>([&](auto op) { vectorizeLoadOp(op); })
+        .Case<PxaReduceOp>([&](auto op) { vectorizeReduceOp(op); })
+        .Default([&](Operation *op) { vectorizeScalarOp(op); });
   }
 
   LogicalResult isLegal() {
-    Block *body = loop.getBody();
-    IVLOG(3, "Vectorize: Attempting to vectorize for BlockArgument: "
-                 << index.getArgNumber());
-
     auto ranges = loop.getConstantRanges();
     if (!ranges) {
       return loop.emitRemark("Vectorize: Failed, Requires constant ranges");
     }
 
     auto argNum = index.getArgNumber();
-    if ((*ranges)[argNum] % vectorSize != 0) {
+    if ((*ranges)[argNum] % vectorWidth != 0) {
       return loop.emitRemark(
           "Vectorize: Failed, dimension is not a multiple of the vector width");
     }
@@ -252,10 +259,10 @@ public:
       return loop.emitRemark("Vectorize: Failed, dimension step is not 1");
     }
 
-    bool vectorizable = true;
-    for (auto &op : body->getOperations()) {
-      vectorizable &= succeeded(tryVectorizeOperation(&op));
-    }
+    Block *body = loop.getBody();
+    bool vectorizable = llvm::all_of(*body, [&](Operation &op) {
+      return succeeded(tryVectorizeOperation(&op));
+    });
     if (!vectorizable) {
       return loop.emitRemark("Vectorize: Failed, !vectorizable");
     }
@@ -274,15 +281,15 @@ public:
       vectorizeOperation(&op);
     }
     auto argNum = index.getArgNumber();
-    steps[argNum] *= vectorSize;
+    steps[argNum] *= vectorWidth;
     loop.setSteps(steps);
     return success();
   }
 };
 
 LogicalResult performVectorization(AffineParallelOp op, BlockArgument index,
-                                   unsigned vectorSize) {
-  VectorizeCandidate candidate(op, index, vectorSize);
+                                   unsigned vectorWidth) {
+  VectorizeCandidate candidate(op, index, vectorWidth);
   if (failed(candidate.isLegal())) {
     return failure();
   }
@@ -290,7 +297,7 @@ LogicalResult performVectorization(AffineParallelOp op, BlockArgument index,
   return candidate.vectorize();
 }
 
-LogicalResult vectorizeOverOutputs(AffineParallelOp op, unsigned vecSize) {
+LogicalResult vectorizeOverOutputs(AffineParallelOp op, unsigned vectorWidth) {
   IVLOG(3, "Attempting to vectorize: " << debugString(*op));
   if (op.getNumResults() != 1) {
     return op.emitRemark("vectorizeOverOutputs: Failed, #result != 1");
@@ -315,27 +322,22 @@ LogicalResult vectorizeOverOutputs(AffineParallelOp op, unsigned vecSize) {
   if (options.size() != 1) {
     return op.emitRemark("vectorizeOverOutputs: Failed, options != 1");
   }
-  return performVectorization(op, options[0], vecSize);
+  return performVectorization(op, options[0], vectorWidth);
 }
 
 LogicalResult vectorizeOverIVs(AffineParallelOp band, unsigned vectorWidth) {
-  for (BlockArgument blockArg : band.getIVs()) {
-    if (succeeded(performVectorization(band, blockArg, vectorWidth))) {
+  for (BlockArgument iv : band.getIVs()) {
+    if (succeeded(performVectorization(band, iv, vectorWidth))) {
       break;
     }
   }
   return success();
 }
 
-LogicalResult vectorizeMaxVectorRatio(AffineParallelOp band,
-                                      unsigned vectorWidth) {
-  std::map<double, VectorizeCandidate> ratios;
-  // ratio = ((TripCount // VecSize) * VecSize) / TripCount
+LogicalResult vectorizeRecursive(AffineParallelOp band, unsigned vectorWidth) {
   band.walk([&](AffineParallelOp op) {
-    for (BlockArgument iv : band.getIVs()) {
-      VectorizeCandidate candidate(op, iv, vectorWidth);
-      if (succeeded(candidate.isLegal())) {
-        candidate.vectorize();
+    for (BlockArgument iv : op.getIVs()) {
+      if (succeeded(performVectorization(op, iv, vectorWidth))) {
         break;
       }
     }
@@ -347,9 +349,9 @@ using StrategyFn =
     std::function<LogicalResult(AffineParallelOp op, unsigned vectorWidth)>;
 
 static llvm::StringMap<StrategyFn> strategies{
-    {"simple", vectorizeOverIVs},
-    {"outputs", vectorizeOverOutputs},
-    {"maxVectorRatio", vectorizeMaxVectorRatio},
+    {kVectorizeStrategy_Simple, vectorizeOverIVs},
+    {kVectorizeStrategy_Outputs, vectorizeOverOutputs},
+    {kVectorizeStrategy_Recursive, vectorizeRecursive},
 };
 
 struct VectorizePass : public VectorizeBase<VectorizePass> {
@@ -397,7 +399,7 @@ static OpTy replaceOp(Operation *op, Args &&... args) {
 LogicalResult vectorizeBuffer(AllocOp op) {
   // Verify that all uses are vector load/stores of the same width and with
   // valid minimum strides
-  int64_t vecSize = 0;
+  int64_t vectorWidth = 0;
   // Make generic lambda to verify/capture vector size
   auto validAccess = [&](auto vecOp) -> LogicalResult {
     auto shape = vecOp.getVectorType().getShape();
@@ -405,17 +407,17 @@ LogicalResult vectorizeBuffer(AllocOp op) {
       return failure(); // Only support 1-d vectors
     }
     int64_t newSize = shape[0];
-    if (vecSize && vecSize != newSize) {
+    if (vectorWidth && vectorWidth != newSize) {
       return failure(); // All vectors must have the same width
     }
-    vecSize = newSize;
-    assert(vecSize != 0 && "Vector shape should never be zero elements");
+    vectorWidth = newSize;
+    assert(vectorWidth != 0 && "Vector shape should never be zero elements");
     auto maybeStride = computeStrideInfo(vecOp);
     if (!maybeStride) {
       return failure(); // Non strided access
     }
     auto range = maybeStride->range();
-    if (range.stride % vecSize != 0) {
+    if (range.stride % vectorWidth != 0) {
       return failure(); // Vector op not aligned
     }
     return success();
@@ -435,7 +437,7 @@ LogicalResult vectorizeBuffer(AllocOp op) {
     }
   }
   // Exit early if no accesses
-  if (!vecSize) {
+  if (!vectorWidth) {
     return failure();
   }
   // Compute new memref shape
@@ -448,10 +450,10 @@ LogicalResult vectorizeBuffer(AllocOp op) {
   for (size_t i = 0; i < mshape.size(); i++) {
     if (i == mshape.size() - 1) {
       // Last index, verify it's divisible vector size + reduce
-      if (mshape[i] % vecSize != 0) {
+      if (mshape[i] % vectorWidth != 0) {
         return failure();
       }
-      newShape.push_back(mshape[i] / vecSize);
+      newShape.push_back(mshape[i] / vectorWidth);
     } else {
       // Leave non-final indexes alone
       newShape.push_back(mshape[i]);
@@ -459,7 +461,7 @@ LogicalResult vectorizeBuffer(AllocOp op) {
   }
   // Make the new type
   auto newType = MemRefType::get(
-      newShape, VectorType::get({vecSize}, mtype.getElementType()));
+      newShape, VectorType::get({vectorWidth}, mtype.getElementType()));
   // Replace the alloc
   auto newOp = replaceOp<AllocOp>(op, newType);
   // Walk over the uses and update them all
