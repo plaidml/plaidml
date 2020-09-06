@@ -227,8 +227,9 @@ void SubgroupApply(AffineParallelOp op, SubgroupPlan plan) {
   // Cache innermost reduces at op level
   subgroup.walk([&](PxaReduceOp reduce) { cacheReduce(op, reduce); });
   // Vectorize everything we can
-  op.walk(
-      [&](AffineParallelOp par) { simpleVectorize(par, plan.subgroupSize); });
+  op.walk([&](AffineParallelOp par) {
+    vectorizeOverOutputs(par, plan.subgroupSize);
+  });
   // Try to 'vector cache' any remaining innermost loads
   subgroup.walk([&](PxaLoadOp load) {
     cacheLoadAsVector(inner, load, plan.subgroupSize);
