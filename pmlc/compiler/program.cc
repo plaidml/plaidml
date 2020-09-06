@@ -112,7 +112,7 @@ void Program::compile(StringRef target, bool collectPasses, StringRef dumpDir) {
 
   PassManager pm(module->getContext());
   ScopedDiagnosticHandler diagHandler(pm.getContext(), [&](Diagnostic &diag) {
-    IVLOG(1, getDiagKindStr(diag.getSeverity()) << ": " << diag.str());
+    IVLOG(1, getDiagKindStr(diag.getSeverity()).str() << ": " << diag.str());
     for (auto &note : diag.getNotes()) {
       IVLOG(1, "  note: " << note.str());
     }
