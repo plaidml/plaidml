@@ -9,6 +9,7 @@
 #include "mlir/Dialect/SPIRV/SPIRVDialect.h"
 #include "mlir/Dialect/SPIRV/SPIRVLowering.h"
 #include "mlir/Dialect/SPIRV/SPIRVOps.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
 
 #include "pmlc/conversion/gpu_to_spirv/pass_detail.h"
 #include "pmlc/conversion/gpu_to_spirv/passes.h"
@@ -21,7 +22,7 @@ namespace stdx = dialect::stdx;
 
 namespace {
 /// Pass to lower to SPIRV that includes GPU, SCF, Std and Stdx dialects
-struct StdxSubgroupBroadcastOpConversion
+struct StdxSubgroupBroadcastOpConversion final
     : public SPIRVOpLowering<stdx::SubgroupBroadcastOp> {
   using SPIRVOpLowering<stdx::SubgroupBroadcastOp>::SPIRVOpLowering;
 
@@ -31,9 +32,33 @@ struct StdxSubgroupBroadcastOpConversion
     auto stdxType = op.getResult().getType();
     auto spirvType = typeConverter.convertType(stdxType);
     rewriter.replaceOpWithNewOp<spirv::GroupBroadcastOp>(
-        op, spirvType, spirv::Scope::Subgroup, op.getOperand(0),
-        op.getOperand(1));
+        op, spirvType, spirv::Scope::Subgroup, operands[0], operands[1]);
 
+    return success();
+  }
+};
+
+// Convert all allocations within SPIRV code to function local allocations.
+// TODO: Allocations outside of threads but inside blocks should probably be
+// shared memory, but currently we never generate such allocs.
+struct AllocOpPattern final : public SPIRVOpLowering<AllocOp> {
+public:
+  using SPIRVOpLowering<AllocOp>::SPIRVOpLowering;
+
+  AllocOpPattern(MLIRContext *context, SPIRVTypeConverter &typeConverter)
+      : SPIRVOpLowering<AllocOp>(context, typeConverter, /*benefit=*/1000) {}
+
+  LogicalResult
+  matchAndRewrite(AllocOp operation, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override {
+    MemRefType allocType = operation.getType();
+    unsigned memSpace = typeConverter.getMemorySpaceForStorageClass(
+        spirv::StorageClass::Function);
+    MemRefType allocType2 =
+        MemRefType::Builder(allocType).setMemorySpace(memSpace);
+    Type spirvType = typeConverter.convertType(allocType2);
+    rewriter.replaceOpWithNewOp<spirv::VariableOp>(
+        operation, spirvType, spirv::StorageClass::Function, nullptr);
     return success();
   }
 };
@@ -79,6 +104,7 @@ struct GPUToSPIRVCustomPass
     populateSCFToSPIRVPatterns(context, typeConverter, scfContext, patterns);
     populateStandardToSPIRVPatterns(context, typeConverter, patterns);
     populateStdxToSPIRVPatterns(context, typeConverter, patterns);
+    patterns.insert<AllocOpPattern>(context, typeConverter);
     if (spirv::getMemoryModel(targetAttr) == spirv::MemoryModel::GLSL450)
       populateStdxToSPIRVGLSLPatterns(context, typeConverter, patterns);
 

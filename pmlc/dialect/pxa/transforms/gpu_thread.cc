@@ -20,6 +20,7 @@
 #include "pmlc/dialect/pxa/analysis/uses.h"
 #include "pmlc/dialect/pxa/transforms/autotile.h"
 #include "pmlc/util/logging.h"
+#include "pmlc/util/tags.h"
 
 using namespace mlir; // NOLINT
 
@@ -34,7 +35,6 @@ using llvm::SmallVector;
 struct CostModel {
   AffineParallelOp op;
   unsigned maxThreads;
-  // StrideInfo outStride;
   CostModel(AffineParallelOp op, unsigned maxThreads)
       : op(op), maxThreads(maxThreads) {}
   double operator()(ArrayRef<int64_t> tile, double bestCost) const {
@@ -48,9 +48,12 @@ struct CostModel {
         biggestSize = std::max(tile[i], biggestSize);
       }
     }
+    // Can't thead over more than 3 dims, can't have more than maxThreads
     if (dimCount > 3 || innerSize > maxThreads) {
       return std::numeric_limits<double>::infinity();
     }
+    // We want a lot of threads (innerSize) and preferable at least one big
+    // dimension.  This hureristic optimized for that (sort of).
     return 1.0 / (innerSize + biggestSize);
   }
 };
@@ -61,18 +64,26 @@ struct GPUThreadPass : public GPUThreadBase<GPUThreadPass> {
   void threadOp(AffineParallelOp op) {}
   void runOnFunction() final {
     auto func = getFunction();
-    // Nest output loops
+    // Nest outermost loops into 'blocks' and 'threads'
     for (auto op : func.getOps<AffineParallelOp>()) {
       auto maybeRanges = op.getConstantRanges();
       if (!maybeRanges) {
+        // Fail if we can't compute the ranges at compile time
         continue;
       }
-      CostModel model(op, maxThreads);
+      // We want 'logical threads' * 'threads per subgroup' (i.e. subgroupSize)
+      // to end up beging about 'maxThreads' threads, and the rest we put into
+      // the grid
+      unsigned subgroupSize = getIntegerTag(op, subgroupSizeTag(), 1);
+      auto goalThreads =
+          std::max(1u, static_cast<unsigned>(maxThreads / subgroupSize));
+      CostModel model(op, goalThreads);
       auto tileSize =
           findBestTileSize(EvenTilingGenerator(), model, *maybeRanges);
       auto inner = performTiling(op, tileSize);
-      op.setAttr("hardware", StringAttr::get("gpu_block", &getContext()));
-      inner.setAttr("hardware", StringAttr::get("gpu_thread", &getContext()));
+      setUnitTag(op, gpuBlockTag());
+      setUnitTag(inner, gpuThreadTag());
+      setIntegerTag(inner, subgroupSizeTag(), subgroupSize);
     }
   }
 };

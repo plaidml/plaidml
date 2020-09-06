@@ -16,6 +16,7 @@
 #include "mlir/Transforms/Passes.h"
 #include "pmlc/target/intel_gen/pass_detail.h"
 #include "pmlc/util/logging.h"
+#include "pmlc/util/tags.h"
 
 using namespace mlir;         // NOLINT
 using namespace mlir::gpu;    // NOLINT
@@ -58,10 +59,9 @@ public:
           loc, step.cast<IntegerAttr>().getInt()));
     // Pick mapping level
     Processor proc = Processor::Sequential;
-    auto hardware = op.getAttrOfType<StringAttr>("hardware");
-    if (hardware.getValue() == "gpu_block") {
+    if (hasUnitTag(op, gpuBlockTag())) {
       proc = Processor::BlockX;
-    } else if (hardware.getValue() == "gpu_thread") {
+    } else if (hasUnitTag(op, gpuThreadTag())) {
       proc = Processor::ThreadX;
     }
     if (proc != Processor::Sequential && steps.size() > 3) {
@@ -79,6 +79,8 @@ public:
       }
     }
     setMappingAttr(parallelOp, mappings);
+    copyTags(parallelOp, op);
+
     rewriter.eraseBlock(parallelOp.getBody());
     rewriter.inlineRegionBefore(op.region(), parallelOp.region(),
                                 parallelOp.region().end());

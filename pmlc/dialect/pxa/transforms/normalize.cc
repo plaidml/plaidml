@@ -13,6 +13,7 @@
 
 #include "pmlc/dialect/pxa/transforms/pass_detail.h"
 #include "pmlc/dialect/pxa/transforms/passes.h"
+#include "pmlc/util/tags.h"
 
 using namespace mlir; // NOLINT
 
@@ -26,6 +27,10 @@ namespace pmlc::dialect::pxa {
 void promoteIfEmptyIVs(AffineParallelOp op) {
   // Nothing to do when there are induction variables.
   if (op.getNumDims())
+    return;
+
+  // Don't remove any affine.parallel loop with tags
+  if (hasTags(op))
     return;
 
   // Replace yielded loop results.
