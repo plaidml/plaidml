@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <map>
 #include <memory>
+#include <string>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -470,7 +471,7 @@ LogicalResult vectorizeBuffer(AllocOp op) {
     SmallVector<AffineExpr, 4> affineExprs(map.getResults().begin(),
                                            map.getResults().end());
     unsigned lastIdx = affineExprs.size() - 1;
-    affineExprs[lastIdx] = affineExprs[lastIdx].floorDiv(vecSize);
+    affineExprs[lastIdx] = affineExprs[lastIdx].floorDiv(vectorWidth);
     return AffineMap::get(map.getNumDims(), map.getNumSymbols(), affineExprs,
                           map.getContext());
   };
