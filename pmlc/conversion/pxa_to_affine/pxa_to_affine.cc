@@ -11,6 +11,7 @@
 #include "pmlc/conversion/pxa_to_affine/passes.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/util/logging.h"
+#include "pmlc/util/tags.h"
 #include "pmlc/util/util.h"
 
 using namespace mlir; // NOLINT
@@ -30,10 +31,9 @@ struct AffineParallelOpConversion
                   ConversionPatternRewriter &rewriter) const final {
     // Make a map for induction variable
     llvm::SmallVector<Value, 8> ivs;
-    auto hardware = op.getAttr("hardware");
     auto steps = op.getSteps();
-    // If it's a hardware parallel loop, leave as parallel
-    if (hardware) {
+    // If it's tagged, leave as a parallel
+    if (hasTags(op)) {
       // Make a new affine parallel with no return values
       auto newOp = rewriter.create<AffineParallelOp>(
           op.getLoc(),                                      //
@@ -44,7 +44,7 @@ struct AffineParallelOpConversion
       for (Value iv : newOp.getIVs()) {
         ivs.push_back(iv);
       }
-      newOp.setAttr("hardware", hardware);
+      copyTags(newOp, op);
       rewriter.setInsertionPointToStart(newOp.getBody());
     } else {
       // Otherwise unroll into serial loops
@@ -286,7 +286,7 @@ PXAToAffineConversionTarget::PXAToAffineConversionTarget(MLIRContext &ctx)
   addLegalDialect<StandardOpsDialect>();
   addIllegalDialect<pxa::PXADialect>();
   addDynamicallyLegalOp<AffineParallelOp>([](AffineParallelOp op) {
-    return op.getNumResults() == 0 && op.getAttr("hardware");
+    return op.getNumResults() == 0 && hasTags(op);
   });
   addDynamicallyLegalOp<AffineIfOp>(
       [](AffineIfOp op) { return op.getNumResults() == 0; });

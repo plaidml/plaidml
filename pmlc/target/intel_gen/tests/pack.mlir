@@ -19,7 +19,7 @@ func @pack_test(%out: memref<1xf32>, %in: memref<100xf32>) {
     %a = affine.load %in[%i0 + %i1 + %i2 + %i3 + %i4 + %i5] :  memref<100xf32>
     // CHECK: affine.load %{{.*}}[%[[i0]] + %[[i1]] + %[[i2]] + %[[i3]] + %[[i4]] + %[[i5]]]
     affine.store %a, %out[0] : memref<1xf32>
-  } {hardware = "block"}
+  } {tags = {gpuBlock}}
   return
 }
 

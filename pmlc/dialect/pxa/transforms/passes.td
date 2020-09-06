@@ -95,6 +95,7 @@ def ResizeTmps : FunctionPass<"pxa-resize-tmps"> {
 def Subgroups : FunctionPass<"pxa-subgroups"> {
   let summary = "Regorganize top level block to maximum use of subgroups on gen9";
   let constructor = "pmlc::dialect::pxa::createSubgroupsPass()";
+  let dependentDialects = ["mlir::vector::VectorDialect"];
 }
 
 def TestIndirectUsesIterator : Pass<"pxa-test-indirect-uses-iterator"> {

@@ -13,10 +13,10 @@ module attributes {gpu.container_module, spv.target_env = #spv.target_env<#spv.v
     gpu.func @bcast_kernel(%arg0: memref<3x3xf32>) kernel attributes {spv.entry_point_abi = {local_size = dense<[3, 1, 1]> : vector<3xi32>}} {
       %0 = "gpu.block_id"() {dimension = "x"} : () -> index
       %1 = "gpu.thread_id"() {dimension = "x"} : () -> index
-      %c1_i32 = constant 1 : i32
-      // CHECK: spv.GroupBroadcast "Subgroup" %{{.*}}, %{{.*}} : f32, i32 
+      %c1 = constant 1 : index 
+      // CHECK: spv.GroupBroadcast "Subgroup" %{{.*}}, %{{.*}} : f32
       %4 = load %arg0[%0, %1] : memref<3x3xf32>
-      %5 = stdx.subgroup_broadcast(%4, %c1_i32) : f32, i32
+      %5 = stdx.subgroup_broadcast(%4, %c1) : f32
       store %5, %arg0[%0, %1] : memref<3x3xf32>
       gpu.return
     }
