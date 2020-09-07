@@ -6,8 +6,6 @@
 
 namespace {
 
-class Device final : public pmlc::rt::Device {};
-
 class Runtime final : public pmlc::rt::Runtime {
 public:
   std::size_t deviceCount() const noexcept final { return 1; }
@@ -19,7 +17,7 @@ public:
   }
 
 private:
-  std::shared_ptr<Device> dev = std::make_shared<Device>();
+  std::shared_ptr<pmlc::rt::Device> dev = std::make_shared<pmlc::rt::Device>();
 };
 
 pmlc::rt::RuntimeRegistration<Runtime> reg{"llvm_cpu"};
