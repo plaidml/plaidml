@@ -1,12 +1,13 @@
+// Vulkan device interface, originally from the LLVM project, and subsequently
+// modified by Intel Corporation.
+//
+// Original copyright:
+//
 //===- VulkanRuntime.cpp - MLIR Vulkan runtime ------------------*- C++ -*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-//
-//===----------------------------------------------------------------------===//
-//
-// This file declares Vulkan runtime API.
 //
 //===----------------------------------------------------------------------===//
 
@@ -19,11 +20,15 @@
 #include "mlir/Dialect/SPIRV/Serialization.h"
 #include "mlir/IR/Module.h"
 #include "mlir/Support/LogicalResult.h"
+#include "pmlc/rt/runtime.h"
+#include "pmlc/rt/vulkan/vulkan_state.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/ToolOutputFile.h"
 
 #include "volk.h" // NOLINT[build/include_subdir]
+
+namespace pmlc::runtime::vulkan {
 
 using DescriptorSetIndex = uint32_t;
 using BindingIndex = uint32_t;
@@ -73,17 +78,6 @@ using ResourceData =
 using ResourceStorageClassBindingMap =
     llvm::DenseMap<DescriptorSetIndex,
                    llvm::DenseMap<BindingIndex, mlir::spirv::StorageClass>>;
-
-inline void emitVulkanError(const llvm::Twine &message, VkResult error) {
-  llvm::errs()
-      << message.concat(" failed with error code ").concat(llvm::Twine{error});
-}
-
-#define RETURN_ON_VULKAN_ERROR(result, msg)                                    \
-  if ((result) != VK_SUCCESS) {                                                \
-    emitVulkanError(msg, (result));                                            \
-    return failure();                                                          \
-  }
 
 struct Action {
   virtual ~Action() {}
@@ -145,23 +139,23 @@ struct MemoryTransferAction : Action {
   llvm::SmallVector<VkBufferCopy, 1> regions;
 };
 
-/// Vulkan runtime.
-/// The purpose of this class is to run SPIR-V compute shader on Vulkan
+/// Vulkan device abstraction.
+/// The purpose of this class is to run a SPIR-V compute shader on a Vulkan
 /// device.
 /// Before the run, user must provide and set resource data with descriptors,
 /// SPIR-V shader, number of work groups and entry point. After the creation of
-/// VulkanRuntime, special methods must be called in the following
+/// VulkanDevice, special methods must be called in the following
 /// sequence: initRuntime(), run(), updateHostMemoryBuffers(), destroy();
 /// each method in the sequence returns succes or failure depends on the Vulkan
 /// result code.
-class VulkanRuntime {
+class VulkanDevice final : public pmlc::runtime::Device {
 public:
-  VulkanRuntime() = default;
-  VulkanRuntime(const VulkanRuntime &) = delete;
-  VulkanRuntime &operator=(const VulkanRuntime &) = delete;
+  VulkanDevice(const VkPhysicalDevice &physicalDevice,
+               std::shared_ptr<VulkanState> state);
+  ~VulkanDevice();
+  VulkanDevice(const VulkanDevice &) = delete;
+  VulkanDevice &operator=(const VulkanDevice &) = delete;
 
-  mlir::LogicalResult init();
-  mlir::LogicalResult destroy();
   mlir::LogicalResult createLaunchKernelAction(uint8_t *shader, uint32_t size,
                                                const char *entryPoint,
                                                NumWorkGroups numWorkGroups);
@@ -174,7 +168,7 @@ public:
   mlir::LogicalResult createMemoryTransferAction(VkBuffer src, VkBuffer dst,
                                                  size_t size);
   mlir::LogicalResult submitCommandBuffers();
-  /// Sets needed data for Vulkan runtime.
+  /// Sets needed data for Vulkan device.
   void setResourceData(const ResourceData &resData);
   void setResourceData(const DescriptorSetIndex desIndex,
                        const BindingIndex bindIndex,
@@ -184,8 +178,6 @@ private:
   //===--------------------------------------------------------------------===//
   // Pipeline creation methods.
   //===--------------------------------------------------------------------===//
-  mlir::LogicalResult createInstance();
-  mlir::LogicalResult createDevice();
   mlir::LogicalResult
   getBestComputeQueue(const VkPhysicalDevice &physicalDevice);
   mlir::LogicalResult createMemoryBuffers();
@@ -197,7 +189,6 @@ private:
   mlir::LogicalResult createDescriptorPool();
   mlir::LogicalResult allocateDescriptorSets();
   mlir::LogicalResult setWriteDescriptors();
-  mlir::LogicalResult createCommandPool();
   mlir::LogicalResult checkResourceData();
   mlir::LogicalResult createSchedule();
   mlir::LogicalResult submitCommandBuffersToQueue();
@@ -221,12 +212,12 @@ private:
 
   mlir::LogicalResult countDeviceMemorySize();
 
-  VkResult volkInitialized = VK_RESULT_MAX_ENUM;
+  // Accessor for the Vulkan runtime state.
+  std::shared_ptr<VulkanState> state;
 
   //===--------------------------------------------------------------------===//
   // Vulkan objects.
   //===--------------------------------------------------------------------===//
-  VkInstance instance;
   VkDevice device;
   VkQueue queue;
   VkCommandPool commandPool;
@@ -242,3 +233,5 @@ private:
   std::shared_ptr<LaunchKernelAction> curr;
   llvm::SmallVector<VkCommandBuffer, 1> commandBuffers;
 };
+
+} // namespace pmlc::runtime::vulkan

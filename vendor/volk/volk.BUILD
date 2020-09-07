@@ -9,5 +9,6 @@ cc_library(
         "@bazel_tools//src/conditions:windows": ["VK_USE_PLATFORM_WIN32_KHR"],
         "//conditions:default": [],
     }),
+    linkstatic = 1,
     deps = ["@vulkan_headers"],
 )

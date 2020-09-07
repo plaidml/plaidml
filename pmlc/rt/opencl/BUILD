@@ -8,4 +8,5 @@ cc_test(
     name = "clprobe_test",
     srcs = ["clprobe.cc"],
     deps = ["@opencl_icd_loader", "@opencl_hpp_headers"],
+    size = "small",
 )

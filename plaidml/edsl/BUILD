@@ -66,6 +66,7 @@ plaidml_cc_test(
         "//plaidml:testenv",
         "//plaidml/exec",
     ],
+    size = "small",
 )
 
 py_test(
@@ -76,4 +77,5 @@ py_test(
         ":py",
         "//plaidml/exec:py",
     ],
+    size = "small",
 )

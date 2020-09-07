@@ -1,6 +1,6 @@
 // Copyright 2020 Intel Corporation
 
-#include "pmlc/compiler/executable.h"
+#include "pmlc/rt/executable.h"
 
 #include <fstream>
 #include <string>
@@ -31,13 +31,20 @@
 #include "mlir/Target/LLVMIR.h"
 #include "mlir/Transforms/Passes.h"
 
-#include "pmlc/compiler/registry.h"
+#include "pmlc/rt/internal.h"
+#include "pmlc/rt/runtime_registry.h"
+#include "pmlc/rt/symbol_registry.h"
 #include "pmlc/util/logging.h"
 
 using namespace mlir; // NOLINT[build/namespaces]
 
+using pmlc::compiler::Program;
+
+namespace pmlc::runtime {
+namespace {
+
 // Setup LLVM target triple from the current machine.
-static void setupTargetTriple(llvm::Module *llvmModule) {
+void setupTargetTriple(llvm::Module *llvmModule) {
   // Setup the machine properties from the current architecture.
   auto targetTriple = llvm::sys::getDefaultTargetTriple();
   std::string errorMessage;
@@ -60,7 +67,7 @@ static void setupTargetTriple(llvm::Module *llvmModule) {
   llvmModule->setTargetTriple(targetTriple);
 }
 
-static std::string makePackedFunctionName(StringRef name) {
+std::string makePackedFunctionName(StringRef name) {
   return "_mlir_" + name.str();
 }
 
@@ -71,8 +78,7 @@ std::string makeCWrapperFunctionName(StringRef name) {
 // Define an interface function that wraps all the arguments of the original
 // function and all its results into an i8** pointer to provide a unified
 // invocation interface.
-static std::string packFunctionArguments(llvm::Module *module,
-                                         StringRef entry) {
+std::string packFunctionArguments(llvm::Module *module, StringRef entry) {
   auto &ctx = module->getContext();
   llvm::IRBuilder<> builder(ctx);
   auto funcName = makeCWrapperFunctionName(entry);
@@ -113,8 +119,6 @@ static std::string packFunctionArguments(llvm::Module *module,
 
   return newName;
 }
-
-namespace pmlc::compiler {
 
 class MemRefDescriptor {
 private:
@@ -253,7 +257,7 @@ struct OrcJITEngineImpl : EngineImpl {
 
     SymbolMap symbols;
     auto &session = jit->getExecutionSession();
-    for (const auto &kvp : SymbolRegistry::instance()->symbols) {
+    for (const auto &kvp : getSymbolMap()) {
       auto addr = llvm::pointerToJITTargetAddress(kvp.second);
       auto symbol = llvm::JITEvaluatedSymbol(addr, llvm::JITSymbolFlags::None);
       symbols.insert(std::make_pair(session.intern(kvp.first()), symbol));
@@ -285,12 +289,17 @@ struct OrcJITEngineImpl : EngineImpl {
   }
 
   std::unique_ptr<llvm::orc::LLJIT> jit;
-}; // namespace pmlc::compiler
+};
+
+} // namespace
+
+namespace detail {
 
 struct ExecutableImpl {
   ExecutableImpl(const std::shared_ptr<Program> &program,
-                 ArrayRef<void *> bufptrs, EngineKind kind)
-      : program(program), ptrs(bufptrs.size()) {
+                 std::shared_ptr<Device> device, ArrayRef<void *> bufptrs,
+                 EngineKind kind)
+      : program(program), device(std::move(device)), ptrs(bufptrs.size()) {
     static std::once_flag is_initialized;
     std::call_once(is_initialized, []() {
       llvm::InitializeNativeTarget();
@@ -339,21 +348,29 @@ struct ExecutableImpl {
     }
   }
 
-  void invoke() { jitEntry(ptrs.data()); }
+  void invoke() {
+    ScopedCurrentDevice cdev(device.get());
+    jitEntry(ptrs.data());
+  }
 
   std::shared_ptr<Program> program;
+  std::shared_ptr<Device> device;
   std::unique_ptr<EngineImpl> impl;
   std::vector<MemRefDescriptor> descriptors;
   std::vector<void *> ptrs;
   Function jitEntry;
 };
 
+} // namespace detail
+
 Executable::Executable(const std::shared_ptr<Program> &program,
-                       ArrayRef<void *> bufptrs, EngineKind kind)
-    : impl(std::make_unique<ExecutableImpl>(program, bufptrs, kind)) {}
+                       std::shared_ptr<Device> device, ArrayRef<void *> bufptrs,
+                       EngineKind kind)
+    : impl(std::make_unique<detail::ExecutableImpl>(program, device, bufptrs,
+                                                    kind)) {}
 
 Executable::~Executable() = default;
 
 void Executable::invoke() { impl->invoke(); }
 
-} // namespace pmlc::compiler
+} // namespace pmlc::runtime

@@ -33,6 +33,7 @@ cc_binary(
     tags = TAGS,
     deps = [
         ":lib",
+        "//plaidml:runtimes",
         "//plaidml:targets",
     ],
 )
