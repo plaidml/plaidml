@@ -37,7 +37,7 @@ using Loader = std::function<std::unordered_map<std::string, Factory>()>;
 namespace details {
 
 // Creates a global registration for a loader.
-void registerLoader(Loader loader);
+void registerLoader(llvm::StringRef id, Loader loader);
 
 } // namespace details
 
@@ -45,10 +45,10 @@ void registerLoader(Loader loader);
 // an instance of the supplied concrete Runtime class.  The Runtime class must
 // be DefaultConstructible.
 template <class R>
-Loader makeStaticLoader(llvm::StringRef name) {
-  return Loader{[savedName = std::string{name}]() {
+Loader makeStaticLoader(llvm::StringRef id) {
+  return Loader{[savedId = std::string{id}]() {
     return std::unordered_map<std::string, Factory>{
-        {savedName, Factory{[]() { return std::make_shared<R>(); }}}};
+        {savedId, Factory{[]() { return std::make_shared<R>(); }}}};
   }};
 }
 
@@ -59,8 +59,8 @@ Loader makeStaticLoader(llvm::StringRef name) {
 //   LoaderRegistration reg{makeStaticLoader<OpenCLLoader>("opencl")};
 //
 struct LoaderRegistration {
-  explicit LoaderRegistration(Loader loader) {
-    details::registerLoader(std::move(loader));
+  LoaderRegistration(llvm::StringRef id, Loader loader) {
+    details::registerLoader(id, std::move(loader));
   }
 };
 
@@ -74,8 +74,8 @@ struct LoaderRegistration {
 //
 template <class R>
 struct RuntimeRegistration {
-  explicit RuntimeRegistration(llvm::StringRef name) {
-    details::registerLoader(makeStaticLoader<R>(name));
+  explicit RuntimeRegistration(llvm::StringRef id) {
+    details::registerLoader(id, makeStaticLoader<R>(id));
   }
 };
 

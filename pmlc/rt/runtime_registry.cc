@@ -7,6 +7,7 @@
 #include <stdexcept>
 #include <utility>
 
+#include "pmlc/util/logging.h"
 #include "llvm/Support/FormatVariadic.h"
 
 namespace pmlc::runtime {
@@ -14,7 +15,7 @@ namespace {
 
 struct LoaderList {
   std::mutex mutex;
-  std::list<Loader> loaders;
+  std::list<std::pair<std::string, Loader>> loaders;
 
   static LoaderList &instance() {
     static LoaderList ll;
@@ -43,8 +44,15 @@ buildRuntimeMap() {
   auto &ll = LoaderList::instance();
   std::lock_guard<std::mutex> lock{ll.mutex};
 
-  for (auto &loader : ll.loaders) {
-    for (auto &[id, factory] : loader()) {
+  for (auto &[loaderId, loader] : ll.loaders) {
+    std::unordered_map<std::string, Factory> factories;
+    try {
+      factories = loader();
+    } catch (const std::exception &e) {
+      IVLOG(1, "Loader " << loaderId << " initialization failed: " << e.what());
+      continue;
+    }
+    for (auto &[id, factory] : factories) {
       auto memo = std::make_shared<MemoizedFactory>(factory);
       auto [it, inserted] =
           result.emplace(id, [memo = std::move(memo)]() -> Runtime * {
@@ -64,10 +72,10 @@ buildRuntimeMap() {
 
 namespace details {
 
-void registerLoader(Loader loader) {
+void registerLoader(llvm::StringRef id, Loader loader) {
   auto &ll = LoaderList::instance();
   std::lock_guard<std::mutex> lock{ll.mutex};
-  ll.loaders.emplace_back(std::move(loader));
+  ll.loaders.emplace_back(id, std::move(loader));
 }
 
 } // namespace details
