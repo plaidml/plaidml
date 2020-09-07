@@ -33,7 +33,6 @@ plaidml_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "//plaidml/core",
-        "//plaidml/edsl",
         "//pmlc/compiler",
         "//pmlc/rt",
         "//pmlc/util",
