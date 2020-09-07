@@ -9,7 +9,7 @@
 
 #include "mlir/ExecutionEngine/RunnerUtils.h"
 
-#include "pmlc/rt/symbol_registry.h"
+#include "pmlc/runtime/symbol_registry.h"
 
 extern "C" void plaidml_rt_trace(const char *msg) {
   using clock = std::chrono::high_resolution_clock;

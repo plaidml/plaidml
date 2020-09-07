@@ -1,8 +1,8 @@
 // Copyright 2020, Intel Corporation
 
-#include "pmlc/rt/vulkan/vulkan_state.h"
+#include "pmlc/runtime/vulkan/vulkan_state.h"
 
-#include "pmlc/rt/vulkan/vulkan_error.h"
+#include "pmlc/runtime/vulkan/vulkan_error.h"
 
 namespace pmlc::runtime::vulkan {
 

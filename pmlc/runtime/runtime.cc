@@ -1,8 +1,8 @@
 // Copyright 2020, Intel Corporation
 
-#include "pmlc/rt/runtime.h"
+#include "pmlc/runtime/runtime.h"
 
-#include "pmlc/rt/internal.h"
+#include "pmlc/runtime/internal.h"
 
 namespace pmlc::runtime {
 namespace {

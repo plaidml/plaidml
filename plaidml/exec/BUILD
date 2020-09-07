@@ -35,7 +35,7 @@ plaidml_cc_library(
         "//plaidml/core",
         "//plaidml/edsl",
         "//pmlc/compiler",
-        "//pmlc/rt",
+        "//pmlc/runtime",
         "//pmlc/util",
     ],
     alwayslink = 1,

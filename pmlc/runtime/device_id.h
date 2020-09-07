@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-#include "pmlc/rt/runtime.h"
+#include "pmlc/runtime/runtime.h"
 #include "llvm/ADT/StringRef.h"
 
 namespace pmlc::runtime {

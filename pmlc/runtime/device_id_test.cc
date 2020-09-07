@@ -3,7 +3,7 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include "pmlc/rt/internal.h"
+#include "pmlc/runtime/internal.h"
 
 using ::testing::Not;
 

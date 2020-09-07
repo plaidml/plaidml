@@ -6,7 +6,7 @@
 #include <vector>
 
 #include "pmlc/compiler/program.h"
-#include "pmlc/rt/runtime.h"
+#include "pmlc/runtime/runtime.h"
 
 namespace pmlc::runtime {
 

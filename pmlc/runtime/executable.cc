@@ -1,6 +1,6 @@
 // Copyright 2020 Intel Corporation
 
-#include "pmlc/rt/executable.h"
+#include "pmlc/runtime/executable.h"
 
 #include <fstream>
 #include <string>
@@ -31,9 +31,9 @@
 #include "mlir/Target/LLVMIR.h"
 #include "mlir/Transforms/Passes.h"
 
-#include "pmlc/rt/internal.h"
-#include "pmlc/rt/runtime_registry.h"
-#include "pmlc/rt/symbol_registry.h"
+#include "pmlc/runtime/internal.h"
+#include "pmlc/runtime/runtime_registry.h"
+#include "pmlc/runtime/symbol_registry.h"
 #include "pmlc/util/logging.h"
 
 using namespace mlir; // NOLINT[build/namespaces]

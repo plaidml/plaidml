@@ -3,7 +3,7 @@
 load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_test")
 
 plaidml_cc_library(
-    name = "rt",
+    name = "runtime",
     srcs = [
         "boundscheck.cc",
         "builtin.cc",
@@ -42,7 +42,7 @@ plaidml_cc_test(
         "internal.h"
     ],
     deps = [
-        ":rt",
+        ":runtime",
     ],
     size = "small",
 )

@@ -1,6 +1,6 @@
 // Copyright 2020, Intel Corporation
 
-#include "pmlc/rt/runtime_registry.h"
+#include "pmlc/runtime/runtime_registry.h"
 
 #include <stdexcept>
 

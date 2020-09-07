@@ -2,7 +2,7 @@
 
 #include <cmath>
 
-#include "pmlc/rt/symbol_registry.h"
+#include "pmlc/runtime/symbol_registry.h"
 
 namespace {
 struct Registration {

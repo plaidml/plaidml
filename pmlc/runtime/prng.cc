@@ -2,7 +2,7 @@
 
 #include "mlir/ExecutionEngine/RunnerUtils.h"
 
-#include "pmlc/rt/symbol_registry.h"
+#include "pmlc/runtime/symbol_registry.h"
 #include "pmlc/util/logging.h"
 
 extern "C" void

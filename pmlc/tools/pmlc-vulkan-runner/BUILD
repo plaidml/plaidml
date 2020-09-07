@@ -9,9 +9,9 @@ plaidml_cc_library(
     srcs = ["pmlc-vulkan-runner.cc"],
     deps = [
         "//pmlc:all_passes_and_dialects",
-        "//pmlc/rt",
-        "//pmlc/rt/llvm",
-        "//pmlc/rt/vulkan",
+        "//pmlc/runtime",
+        "//pmlc/runtime/llvm",
+        "//pmlc/runtime/vulkan",
         "@llvm-project//mlir:MlirJitRunner",
     ],
 )

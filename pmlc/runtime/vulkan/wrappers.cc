@@ -23,8 +23,8 @@
 
 #include "mlir/ExecutionEngine/RunnerUtils.h"
 
-#include "pmlc/rt/symbol_registry.h"
-#include "pmlc/rt/vulkan/vulkan_device.h"
+#include "pmlc/runtime/symbol_registry.h"
+#include "pmlc/runtime/vulkan/vulkan_device.h"
 
 using pmlc::runtime::Device;
 

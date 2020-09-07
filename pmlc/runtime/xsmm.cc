@@ -4,7 +4,7 @@
 
 #include "libxsmm.h" // NOLINT [build/include_subdir]
 
-#include "pmlc/rt/symbol_registry.h"
+#include "pmlc/runtime/symbol_registry.h"
 #include "pmlc/util/logging.h"
 
 using FunctionPtr = void (*)(const void *, const void *, void *, ...);

@@ -11,13 +11,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "pmlc/rt/vulkan/vulkan_device.h"
+#include "pmlc/runtime/vulkan/vulkan_device.h"
 
 #include <memory>
 #include <utility>
 #include <vector>
 
-#include "pmlc/rt/vulkan/vulkan_error.h"
+#include "pmlc/runtime/vulkan/vulkan_error.h"
 #include "pmlc/util/logging.h"
 
 using namespace mlir; // NOLINT[build/namespaces]

@@ -10,7 +10,7 @@ plaidml_cc_library(
     ],
     deps = [
         "//pmlc/compiler",
-        "//pmlc/rt",
+        "//pmlc/runtime",
     ],
     alwayslink = 1,
     visibility = ["//visibility:public"],

@@ -8,7 +8,7 @@
 
 #include "llvm/ADT/StringMap.h"
 
-#include "pmlc/rt/runtime.h"
+#include "pmlc/runtime/runtime.h"
 
 namespace pmlc::runtime {
 

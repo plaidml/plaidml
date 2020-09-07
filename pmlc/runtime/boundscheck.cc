@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <stdexcept>
 
-#include "pmlc/rt/symbol_registry.h"
+#include "pmlc/runtime/symbol_registry.h"
 
 // This function is called from the BoundsCheckPass.
 // index - index for a dimension that is accessed by load/store operation

@@ -1,11 +1,11 @@
 // Copyright 2020 Intel Corporation
 
-#include "pmlc/rt/device_id.h"
+#include "pmlc/runtime/device_id.h"
 
 #include "llvm/Support/FormatVariadic.h"
 
-#include "pmlc/rt/internal.h"
-#include "pmlc/rt/runtime_registry.h"
+#include "pmlc/runtime/internal.h"
+#include "pmlc/runtime/runtime_registry.h"
 
 namespace pmlc::runtime {
 

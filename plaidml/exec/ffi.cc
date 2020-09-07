@@ -11,8 +11,8 @@
 #include <vector>
 
 #include "plaidml/core/internal.h"
-#include "pmlc/rt/device_id.h"
-#include "pmlc/rt/executable.h"
+#include "pmlc/runtime/device_id.h"
+#include "pmlc/runtime/executable.h"
 #include "pmlc/util/env.h"
 #include "pmlc/util/logging.h"
 

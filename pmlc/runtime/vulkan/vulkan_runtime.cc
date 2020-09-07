@@ -2,10 +2,10 @@
 
 #include <stdexcept>
 
-#include "pmlc/rt/runtime_registry.h"
-#include "pmlc/rt/vulkan/vulkan_device.h"
-#include "pmlc/rt/vulkan/vulkan_error.h"
-#include "pmlc/rt/vulkan/vulkan_state.h"
+#include "pmlc/runtime/runtime_registry.h"
+#include "pmlc/runtime/vulkan/vulkan_device.h"
+#include "pmlc/runtime/vulkan/vulkan_error.h"
+#include "pmlc/runtime/vulkan/vulkan_state.h"
 
 namespace pmlc::runtime::vulkan {
 

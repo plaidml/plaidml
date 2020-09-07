@@ -1,8 +1,8 @@
 // Copyright 2020 Intel Corporation
 
-#include "pmlc/rt/symbol_registry.h"
+#include "pmlc/runtime/symbol_registry.h"
 
-#include "pmlc/rt/internal.h"
+#include "pmlc/runtime/internal.h"
 #include "llvm/Support/FormatVariadic.h"
 
 namespace pmlc::runtime {
