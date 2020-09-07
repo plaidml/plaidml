@@ -11,19 +11,19 @@
 #include <vector>
 
 #include "plaidml/core/internal.h"
-#include "pmlc/runtime/device_id.h"
-#include "pmlc/runtime/executable.h"
+#include "pmlc/rt/device_id.h"
+#include "pmlc/rt/executable.h"
 #include "pmlc/util/env.h"
 #include "pmlc/util/logging.h"
 
 using plaidml::core::ffi_wrap;
 using plaidml::core::ffi_wrap_void;
 using pmlc::compiler::ProgramArgument;
-using pmlc::runtime::Device;
-using pmlc::runtime::EngineKind;
-using pmlc::runtime::Executable;
-using pmlc::runtime::getDevice;
-using pmlc::runtime::getDeviceIDs;
+using pmlc::rt::Device;
+using pmlc::rt::EngineKind;
+using pmlc::rt::Executable;
+using pmlc::rt::getDevice;
+using pmlc::rt::getDeviceIDs;
 using pmlc::util::Buffer;
 using pmlc::util::BufferPtr;
 using namespace mlir;  // NOLINT[build/namespaces]

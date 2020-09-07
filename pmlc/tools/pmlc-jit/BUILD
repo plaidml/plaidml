@@ -10,9 +10,9 @@ plaidml_cc_library(
     deps = [
         "//pmlc:all_passes_and_dialects",
         "//pmlc/compiler",
-        "//pmlc/runtime",
-        "//pmlc/runtime/llvm",
-        "//pmlc/runtime/vulkan",
+        "//pmlc/rt",
+        "//pmlc/rt/llvm",
+        "//pmlc/rt/vulkan",
         "//pmlc/util",
         "@llvm-project//mlir:ExecutionEngineUtils",
     ],

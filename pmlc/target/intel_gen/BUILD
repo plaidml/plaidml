@@ -35,7 +35,7 @@ plaidml_cc_library(
         "//pmlc/dialect/pxa/transforms",
         "//pmlc/dialect/stdx/transforms",
         "//pmlc/dialect/tile/transforms",
-        "//pmlc/runtime/vulkan",
+        "//pmlc/rt/vulkan",
         "//pmlc/target/x86:prng_lowering",
         "@llvm-project//mlir:AffineToStandardTransforms",
         "@llvm-project//mlir:GPUToSPIRVTransforms",

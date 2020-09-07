@@ -54,7 +54,7 @@ plaidml_cc_library(
         "//pmlc/dialect/stdx/transforms",
         "//pmlc/dialect/tile/transforms",
         "//pmlc/dialect/xsmm",
-        "//pmlc/runtime",
+        "//pmlc/rt",
         "@llvm-project//mlir:AffineToStandardTransforms",
         "@llvm-project//mlir:AffineTransforms",
         "@llvm-project//mlir:LLVMTransforms",
@@ -70,7 +70,7 @@ plaidml_cc_library(
     deps = [
         ":gen-pass",
         "//pmlc/dialect/pxa/ir",
-        "//pmlc/runtime",
+        "//pmlc/rt",
     ],
 )
 

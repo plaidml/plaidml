@@ -24,16 +24,16 @@
 
 #include "pmlc/all_dialects.h"
 #include "pmlc/compiler/program.h"
-#include "pmlc/runtime/device_id.h"
-#include "pmlc/runtime/executable.h"
+#include "pmlc/rt/device_id.h"
+#include "pmlc/rt/executable.h"
 #include "pmlc/util/logging.h"
 
 using namespace mlir; // NOLINT
 using llvm::Error;
 using pmlc::compiler::Program;
-using pmlc::runtime::EngineKind;
-using pmlc::runtime::Executable;
-using pmlc::runtime::getDevice;
+using pmlc::rt::EngineKind;
+using pmlc::rt::Executable;
+using pmlc::rt::getDevice;
 
 namespace {
 /// This options struct prevents the need for global static initializers, and
