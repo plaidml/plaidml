@@ -6,6 +6,7 @@
 
 #include "pmlc/runtime/internal.h"
 #include "pmlc/runtime/runtime_registry.h"
+#include "pmlc/util/logging.h"
 
 namespace pmlc::runtime {
 
@@ -36,7 +37,13 @@ std::shared_ptr<Device> getDevice(llvm::StringRef deviceID) {
 std::vector<std::string> getDeviceIDs() {
   std::vector<std::string> result;
   for (auto &[id, runtimeFunc] : getRuntimeMap()) {
-    auto *runtime = runtimeFunc();
+    Runtime *runtime;
+    try {
+      runtime = runtimeFunc();
+    } catch (const std::exception &e) {
+      IVLOG(1, "Runtime " << id << " initialization failed: " << e.what());
+      continue;
+    }
     for (std::size_t idx = 0; idx < runtime->deviceCount(); ++idx) {
       result.emplace_back(llvm::formatv("{0}.{1}", id, idx));
     }
