@@ -22,7 +22,6 @@ using pmlc::compiler::ProgramArgument;
 using pmlc::rt::Device;
 using pmlc::rt::EngineKind;
 using pmlc::rt::Executable;
-using pmlc::rt::getDevice;
 using pmlc::rt::getDeviceIDs;
 using pmlc::util::Buffer;
 using pmlc::util::BufferPtr;
@@ -101,7 +100,6 @@ plaidml_executable* plaidml_jit(  //
     plaidml_binding** outputs) {
   return ffi_wrap<plaidml_executable*>(err, nullptr, [&] {
     IVLOG(1, "JITing for device: " << deviceID);
-    auto device = getDevice(deviceID);
     auto args = BindProgramArguments(program, ninputs, inputs, noutputs, outputs);
     auto exec = std::make_unique<plaidml_executable>();
     std::vector<void*> bufptrs(args.size());
@@ -116,7 +114,7 @@ plaidml_executable* plaidml_jit(  //
     } else if (jit == "MCJIT") {
       kind = EngineKind::MCJIT;
     }
-    exec->exec = std::make_unique<Executable>(program->program, std::move(device), bufptrs, kind);
+    exec->exec = std::make_unique<Executable>(program->program, deviceID, bufptrs, kind);
     return exec.release();
   });
 }

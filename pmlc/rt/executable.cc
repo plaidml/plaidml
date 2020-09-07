@@ -31,6 +31,7 @@
 #include "mlir/Target/LLVMIR.h"
 #include "mlir/Transforms/Passes.h"
 
+#include "pmlc/rt/device_id.h"
 #include "pmlc/rt/internal.h"
 #include "pmlc/rt/runtime_registry.h"
 #include "pmlc/rt/symbol_registry.h"
@@ -299,9 +300,9 @@ namespace detail {
 
 struct ExecutableImpl {
   ExecutableImpl(const std::shared_ptr<Program> &program,
-                 std::shared_ptr<Device> device, ArrayRef<void *> bufptrs,
+                 llvm::StringRef deviceID, ArrayRef<void *> bufptrs,
                  EngineKind kind)
-      : program(program), device(std::move(device)), ptrs(bufptrs.size()) {
+      : program(program), device(getDevice(deviceID)), ptrs(bufptrs.size()) {
     static std::once_flag is_initialized;
     std::call_once(is_initialized, []() {
       llvm::InitializeNativeTarget();
@@ -366,9 +367,9 @@ struct ExecutableImpl {
 } // namespace detail
 
 Executable::Executable(const std::shared_ptr<Program> &program,
-                       std::shared_ptr<Device> device, ArrayRef<void *> bufptrs,
+                       llvm::StringRef deviceID, ArrayRef<void *> bufptrs,
                        EngineKind kind)
-    : impl(std::make_unique<detail::ExecutableImpl>(program, device, bufptrs,
+    : impl(std::make_unique<detail::ExecutableImpl>(program, deviceID, bufptrs,
                                                     kind)) {}
 
 Executable::~Executable() = default;

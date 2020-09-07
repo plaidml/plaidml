@@ -22,7 +22,7 @@ struct ExecutableImpl;
 class Executable {
 public:
   Executable(const std::shared_ptr<pmlc::compiler::Program> &program,
-             std::shared_ptr<Device> device, mlir::ArrayRef<void *> bufptrs,
+             llvm::StringRef deviceID, mlir::ArrayRef<void *> bufptrs,
              EngineKind kind = EngineKind::OrcJIT);
   ~Executable();
 

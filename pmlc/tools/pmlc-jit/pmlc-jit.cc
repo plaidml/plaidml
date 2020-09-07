@@ -24,7 +24,6 @@
 
 #include "pmlc/all_dialects.h"
 #include "pmlc/compiler/program.h"
-#include "pmlc/rt/device_id.h"
 #include "pmlc/rt/executable.h"
 #include "pmlc/util/logging.h"
 
@@ -33,7 +32,6 @@ using llvm::Error;
 using pmlc::compiler::Program;
 using pmlc::rt::EngineKind;
 using pmlc::rt::Executable;
-using pmlc::rt::getDevice;
 
 namespace {
 /// This options struct prevents the need for global static initializers, and
@@ -76,7 +74,7 @@ int JitRunnerMain(int argc, char **argv) {
     kind = EngineKind::OrcJIT;
   if (options.optMCJIT.getValue())
     kind = EngineKind::MCJIT;
-  Executable executable(program, getDevice(options.optDeviceID.getValue()),
+  Executable executable(program, options.optDeviceID.getValue(),
                         ArrayRef<void *>{}, kind);
   executable.invoke();
 
