@@ -41,10 +41,9 @@ using namespace mlir; // NOLINT[build/namespaces]
 using pmlc::compiler::Program;
 
 namespace pmlc::runtime {
-namespace {
 
 // Setup LLVM target triple from the current machine.
-void setupTargetTriple(llvm::Module *llvmModule) {
+static void setupTargetTriple(llvm::Module *llvmModule) {
   // Setup the machine properties from the current architecture.
   auto targetTriple = llvm::sys::getDefaultTargetTriple();
   std::string errorMessage;
@@ -67,18 +66,19 @@ void setupTargetTriple(llvm::Module *llvmModule) {
   llvmModule->setTargetTriple(targetTriple);
 }
 
-std::string makePackedFunctionName(StringRef name) {
+static std::string makePackedFunctionName(StringRef name) {
   return "_mlir_" + name.str();
 }
 
-std::string makeCWrapperFunctionName(StringRef name) {
+static std::string makeCWrapperFunctionName(StringRef name) {
   return "_mlir_ciface_" + name.str();
 }
 
 // Define an interface function that wraps all the arguments of the original
 // function and all its results into an i8** pointer to provide a unified
 // invocation interface.
-std::string packFunctionArguments(llvm::Module *module, StringRef entry) {
+static std::string packFunctionArguments(llvm::Module *module,
+                                         StringRef entry) {
   auto &ctx = module->getContext();
   llvm::IRBuilder<> builder(ctx);
   auto funcName = makeCWrapperFunctionName(entry);
@@ -119,6 +119,8 @@ std::string packFunctionArguments(llvm::Module *module, StringRef entry) {
 
   return newName;
 }
+
+namespace {
 
 class MemRefDescriptor {
 private:
