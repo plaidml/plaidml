@@ -23,6 +23,7 @@ plaidml_cc_test(
         "//plaidml:intel_gen": [":edsl_test-skip.intel_gen.txt"],
         "//conditions:default": [],
     }),
+    linkstatic = True,
     toolchains = ["//plaidml:settings"],
     visibility = ["//visibility:public"],
     deps = [
@@ -30,7 +31,6 @@ plaidml_cc_test(
         "//plaidml/edsl",
         "//plaidml/exec",
     ],
-    linkstatic = True,
 )
 
 py_test(
