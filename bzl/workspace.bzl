@@ -167,3 +167,29 @@ def plaidml_workspace():
         strip_prefix = "zlib-1.2.11",
         build_file = clean_dep("//bzl:zlib.BUILD"),
     )
+
+    http_archive(
+        name = "opencl_headers",
+        url = "https://github.com/KhronosGroup/OpenCL-Headers/archive/v2020.06.16.zip",
+        sha256 = "518703d3c3a6333bcf8e4f80758e4e98f7af30fbd72a09fe8c2673da1628d80c",
+        strip_prefix = "OpenCL-Headers-2020.06.16",
+        build_file = clean_dep("//vendor/opencl_headers:opencl_headers.BUILD"),
+    )
+
+    http_archive(
+        name = "opencl_hpp_headers",
+        url = "https://github.com/KhronosGroup/OpenCL-CLHPP/archive/v2.0.12.zip",
+        sha256 = "127936b3a5ef147f23b85fb043599d1480e9e57acabe2d2a67c5dac05aa4ad70",
+        strip_prefix = "OpenCL-CLHPP-2.0.12",
+        build_file = clean_dep("//vendor/opencl_hpp_headers:opencl_hpp_headers.BUILD"),
+        # Patch hpp headers trying to use system OpenCL header on Apple.
+        patches = ["//vendor/opencl_hpp_headers:fix_apple_headers.patch"],
+    )
+
+    http_archive(
+        name = "opencl_icd_loader",
+        url = "https://github.com/KhronosGroup/OpenCL-ICD-Loader/archive/v2020.06.16.zip",
+        sha256 = "e4c27a5adcef4dbc0fee98864af203dc78dfc967ca7287c9bad9add030e7516e",
+        strip_prefix = "OpenCL-ICD-Loader-2020.06.16",
+        build_file = clean_dep("//vendor/opencl_icd_loader:opencl_icd_loader.BUILD"),
+    )

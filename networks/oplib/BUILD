@@ -9,7 +9,7 @@ plaidml_cc_library(
     srcs = ["resnet50.cc"],
     hdrs = ["oplib.h"],
     deps = [
-        "//plaidml",
+        "//plaidml:lib",
         "//pmlc/util",
         "@llvm-project//llvm:Support",
     ],

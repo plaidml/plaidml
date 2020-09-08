@@ -26,6 +26,12 @@ def ConvertParallelLoopToGpu : Pass<"intel-gen-convert-parallel-loops-to-gpu"> {
   let dependentDialects = ["mlir::AffineDialect", "mlir::gpu::GPUDialect"];
 }
 
+def SubgroupBroadcast : FunctionPass<"stdx-subgroup-broadcast"> {
+  let summary = "Perform unvectorization for subgroups broadcast usage";
+  let constructor = "pmlc::target::intel_gen::createSubgroupBroadcastPass()";
+  let dependentDialects = ["pmlc::dialect::stdx::StdXDialect"];
+}
+
 def ConvertPXAToAffine : Pass<"intel-gen-convert-pxa-to-affine", "mlir::ModuleOp"> {
   let summary = "Convert PXA dialect to Affine dialect";
   let constructor = "pmlc::target::intel_gen::createLowerPXAToAffinePass()";

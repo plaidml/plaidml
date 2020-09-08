@@ -95,6 +95,7 @@ def ResizeTmps : FunctionPass<"pxa-resize-tmps"> {
 def Subgroups : FunctionPass<"pxa-subgroups"> {
   let summary = "Regorganize top level block to maximum use of subgroups on gen9";
   let constructor = "pmlc::dialect::pxa::createSubgroupsPass()";
+  let dependentDialects = ["mlir::vector::VectorDialect"];
 }
 
 def TestIndirectUsesIterator : Pass<"pxa-test-indirect-uses-iterator"> {
@@ -118,10 +119,16 @@ def TileAccumulate : FunctionPass<"pxa-tile-accumulate"> {
   let constructor = "pmlc::dialect::pxa::createTileAccumulatePass()";
 }
 
-def VectorizeExample : FunctionPass<"pxa-vectorize-example"> {
-  let summary = "Vectorizes with vector register of 8 elements";
-  let constructor = "pmlc::dialect::pxa::createVectorizeExamplePass()";
+def Vectorize : FunctionPass<"pxa-vectorize"> {
+  let summary = "Perform vectorization based on specified strategy";
+  let constructor = "pmlc::dialect::pxa::createVectorizePass()";
   let dependentDialects = ["mlir::vector::VectorDialect"];
+  let options = [
+    Option<"strategy", "strategy", "std::string",
+           "\"simple\"", "Strategy to use for vectorization">,
+    Option<"vectorWidth", "width", "unsigned", /*default=*/"8",
+           "Vector register size in elements">
+  ];
 }
 
 #endif // __PMLC_DIALECT_PXA_PASSES__

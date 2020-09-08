@@ -91,12 +91,33 @@ Program::Program(std::unique_ptr<llvm::MemoryBuffer> buffer) {
   module = mlir::parseSourceFile(sourceMgr, &context);
 }
 
+static StringRef getDiagKindStr(DiagnosticSeverity kind) {
+  switch (kind) {
+  case DiagnosticSeverity::Note:
+    return "note";
+  case DiagnosticSeverity::Warning:
+    return "warning";
+  case DiagnosticSeverity::Error:
+    return "error";
+  case DiagnosticSeverity::Remark:
+    return "remark";
+  }
+  llvm_unreachable("Unknown DiagnosticSeverity");
+}
+
 void Program::compile(StringRef target, bool collectPasses, StringRef dumpDir) {
   if (target.empty()) {
     return;
   }
 
   PassManager pm(module->getContext());
+  ScopedDiagnosticHandler diagHandler(pm.getContext(), [&](Diagnostic &diag) {
+    IVLOG(1, getDiagKindStr(diag.getSeverity()).str() << ": " << diag.str());
+    for (auto &note : diag.getNotes()) {
+      IVLOG(1, "  note: " << note.str());
+    }
+    return success();
+  });
 
   if (collectPasses || dumpDir.size()) {
     std::string ir;
@@ -107,7 +128,7 @@ void Program::compile(StringRef target, bool collectPasses, StringRef dumpDir) {
     pm.getContext()->disableMultithreading();
   }
 
-  if (VLOG_IS_ON(1)) {
+  if (VLOG_IS_ON(2)) {
     pm.enableStatistics();
     pm.enableTiming();
     auto shouldPrintBeforePass = [](auto *pass, auto *op) { return false; };
@@ -128,7 +149,7 @@ void Program::compile(StringRef target, bool collectPasses, StringRef dumpDir) {
   pipelineBuilder(pm);
 
   if (failed(pm.run(*module))) {
-    throw std::runtime_error("conversion to the LLVM IR dialect failed");
+    throw std::runtime_error("Compilation failure");
   }
 
   if (dumpDir.size()) {
