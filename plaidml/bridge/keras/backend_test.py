@@ -1768,6 +1768,10 @@ class TestBackendOps(unittest.TestCase):
     def bigMatMul(self, b, A, B):
         return [b.dot(A, B)]
 
+    @opTest([[m(1, 2048), m(2048, 1000)]], do_grads=False)
+    def resnetDense(self, b, A, B):
+        return [b.dot(A, B)]
+
     def testDupOutputs(self):
 
         def model(b):
