@@ -314,21 +314,21 @@ LogicalResult VulkanRuntime::submitCommandBuffers() {
 
   RETURN_ON_VULKAN_ERROR(vkQueueWaitIdle(queue), "vkQueueWaitIdle");
 
-  // TODO: if this is not valid then we should not be printing profile data
-  if (timestampValidBits == 0) {
-    llvm::errs() << "timestamps not supported by queue\n";
+  if (timestampValidBits) {
+    uint64_t *results =
+        reinterpret_cast<uint64_t *>(calloc(2, sizeof(uint64_t)));
+    vkGetQueryPoolResults(device, timestampQueryPool,
+                          /*firstQuery=*/0,
+                          /*queryCount=*/2,
+                          /*dataSize=*/16, results,
+                          /*stride=*/8,
+                          (VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT));
+
+    uint64_t ns = (results[1] - results[0]) * timestampPeriod;
+    IVLOG(1, "Total program execution duration: " << ns);
+    IVLOG(1, "Execution time: " << ns << "ns");
+    IVLOG(1, "Execution time: " << ns / 1000000.0d << "ms");
   }
-
-  uint64_t *results = reinterpret_cast<uint64_t *>(calloc(2, sizeof(uint64_t)));
-  vkGetQueryPoolResults(device, timestampQueryPool,
-                        /*firstQuery=*/0,
-                        /*queryCount=*/2,
-                        /*dataSize=*/16, results,
-                        /*stride=*/8,
-                        (VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT));
-
-  uint64_t ns = (results[1] - results[0]) * timestampPeriod;
-  IVLOG(1, "Total program execution duration: " << ns);
 
   updateHostMemoryBuffers();
   return success();
@@ -942,8 +942,10 @@ LogicalResult VulkanRuntime::createSchedule() {
   RETURN_ON_VULKAN_ERROR(vkBeginCommandBuffer(commandBuffer, &beginInfo),
                          "vkBeginCommandBuffer");
 
-  vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                      timestampQueryPool, /*query=*/0);
+  if (timestampValidBits) {
+    vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                        timestampQueryPool, /*query=*/0);
+  }
 
   for (const auto &action : schedule) {
     if (auto kernel = std::dynamic_pointer_cast<LaunchKernelAction>(action)) {
@@ -988,8 +990,10 @@ LogicalResult VulkanRuntime::createSchedule() {
     }
   }
 
-  vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                      timestampQueryPool, /*query=*/1);
+  if (timestampValidBits) {
+    vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                        timestampQueryPool, /*query=*/1);
+  }
 
   RETURN_ON_VULKAN_ERROR(vkEndCommandBuffer(commandBuffer),
                          "vkEndCommandBuffer");
