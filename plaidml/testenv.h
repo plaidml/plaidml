@@ -36,7 +36,8 @@ class TestFixture : public ::testing::Test {
     EXPECT_EQ(a, b);
   }
 
-  void compareElements(float a, float b) { EXPECT_NEAR(a, b, (fabs(a) + fabs(b)) / 10000.0); }
+  // Higher tolerance for full network computations
+  void compareElements(float a, float b) { EXPECT_NEAR(a, b, (fabs(a) + fabs(b)) / 100.0); }
   void compareElements(double a, double b) { EXPECT_NEAR(a, b, (fabs(a) + fabs(b)) / 10000.0); }
 
   template <typename T>

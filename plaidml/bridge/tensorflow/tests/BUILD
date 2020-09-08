@@ -128,6 +128,42 @@ tf_cc_test(
     ],
 )
 
+py_binary(
+    name = "i3d_test_gen",
+    srcs = ["i3d_test_gen.py"],
+    testonly = 1,
+)
+
+genrule(
+    name = "i3d_test_genrule",
+    srcs = [],
+    outs = ["i3d_test.h.inc"],
+    cmd = "$(location :i3d_test_gen) --output $@",
+    tools = [":i3d_test_gen"],
+    testonly = 1,
+)
+
+tf_cc_test(
+    name = "i3d_test",
+    srcs = ["i3d_test.cc", "i3d_test.h.inc"],
+    extra_copts = ["-fexceptions"],
+    data = [":i3d_test_genrule"],
+    deps = [
+        ":codegen_test",
+        ":filecheck",
+        "//plaidml/bridge/tensorflow/service:compiler",
+        "@org_tensorflow//tensorflow/compiler/xla/service:hlo",
+        "@org_tensorflow//tensorflow/compiler/xla/tests:test_utils",
+        "@org_tensorflow//tensorflow/compiler/xla/tests:hlo_test_base",
+        "@org_tensorflow//tensorflow/core:framework",
+        "@org_tensorflow//tensorflow/core:lib",
+        "@org_tensorflow//tensorflow/core:test",
+        "@org_tensorflow//tensorflow/core:test_main",
+        "@com_google_absl//absl/strings",
+        "@com_google_googletest//:gtest",
+    ],
+)
+
 tf_cc_test(
     name = "logical_op_test",
     srcs = ["logical_op_test.cc"],
