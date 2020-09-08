@@ -826,6 +826,43 @@ namespace pmlc::dialect::pxa {
       }
     };
 
+    struct SimplifyPxaBRGemmOp : public OpRewritePattern<PxaBRGemmOp> {
+      using OpRewritePattern<PxaBRGemmOp>::OpRewritePattern;
+
+      LogicalResult matchAndRewrite(PxaBRGemmOp op,
+        PatternRewriter &rewriter) const override {
+        auto aAccessMap = op.aAccessMap();
+        auto bAccessMap = op.bAccessMap();
+        auto cAccessMap = op.cAccessMap();
+
+        SmallVector<Value, 8> aOperands(op.getOperandsForA());
+        composeAffineMapAndOperands(&aAccessMap, &aOperands);
+        SmallVector<Value, 8> bOperands(op.getOperandsForB());
+        composeAffineMapAndOperands(&bAccessMap, &bOperands);
+        SmallVector<Value, 8> cOperands(op.getOperandsForC());
+        composeAffineMapAndOperands(&cAccessMap, &cOperands);
+
+        SmallVector<Value, 8> mapOperands;
+        mapOperands.append(cOperands.begin(), cOperands.end());
+        mapOperands.append(aOperands.begin(), aOperands.end());
+        mapOperands.append(bOperands.begin(), bOperands.end());
+
+        if (aAccessMap == op.aAccessMap() && bAccessMap == op.bAccessMap() &&
+          cAccessMap == op.cAccessMap() &&
+          std::equal(mapOperands.begin(), mapOperands.end(),
+            op.mapOperands().begin()))
+          return failure();
+
+        rewriter.replaceOpWithNewOp<pxa::PxaBRGemmOp>(
+          op, op.c().getType(),              //
+          op.c(), cAccessMap, op.cTileMap(), //
+          op.a(), aAccessMap, op.aTileMap(), //
+          op.b(), bAccessMap, op.bTileMap(), //
+          op.tile(), op.lBr(), mapOperands);
+        return success();
+      }
+    };
+
   } // namespace
 
   // ---- PxaLoadOp ----
@@ -1121,7 +1158,7 @@ namespace pmlc::dialect::pxa {
 
   void PxaBRGemmOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
     MLIRContext *context) {
-    // TODO: Implement this function
+    results.insert<SimplifyPxaBRGemmOp>(context);
   }
 
   void printPxaBRGemmOp(OpAsmPrinter &p, PxaBRGemmOp op) {

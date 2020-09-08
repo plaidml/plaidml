@@ -87,49 +87,6 @@ namespace pmlc::dialect::xsmm {
       parser.resolveOperands(b.indices, indexType, result.operands));
   }
 
-  //
-  // ---- BRGemmInvokeOp ----
-  //
-
-  BRGemmInvokeOp::operand_range BRGemmInvokeOp::getOperandsForA() {
-    auto aType = a().getType().cast<MemRefType>();
-    auto cType = c().getType().cast<MemRefType>();
-    return getOperands().slice(4 + cType.getRank(), aType.getRank());
-  }
-
-  BRGemmInvokeOp::operand_range BRGemmInvokeOp::getOperandsForB() {
-    auto aType = a().getType().cast<MemRefType>();
-    auto bType = b().getType().cast<MemRefType>();
-    auto cType = c().getType().cast<MemRefType>();
-    return getOperands().slice(4 + cType.getRank() + aType.getRank(),
-      bType.getRank());
-  }
-
-  BRGemmInvokeOp::operand_range BRGemmInvokeOp::getOperandsForC() {
-    auto cType = c().getType().cast<MemRefType>();
-    return getOperands().slice(4, cType.getRank());
-  }
-
-  void printBRGemmInvokeOp(OpAsmPrinter &p, BRGemmInvokeOp op) {
-    auto funcType = FunctionType::get({ op.a().getType(), op.b().getType() },
-      { op.c().getType() }, op.getContext());
-    p << op.getOperation()->getName() << ' ';
-    p << op.ptr() << ", ";
-    p << op.c() << '[';
-    p.printOperands(op.getOperandsForC());
-    p << "] = " << op.a() << '[';
-    p.printOperands(op.getOperandsForA());
-    p << "], " << op.b() << '[';
-    p.printOperands(op.getOperandsForB());
-    p << "] : " << funcType;
-  }
-
-
-  ParseResult parseBRGemmInvokeOp(OpAsmParser &parser, OperationState &result) {
-    return success();
-  }
-
-
 #define GET_OP_CLASSES
 #include "pmlc/dialect/xsmm/ir/ops.cc.inc" // NOLINT
 
