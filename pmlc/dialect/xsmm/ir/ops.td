@@ -66,6 +66,9 @@ def XSMM_BRGemmInvokeOp : XSMM_Op<"brgemm.invoke"> {
     I64Attr:$lBr,
     Variadic<Index>:$indices);
 
+  let printer = ?;
+  let parser = ?;
+
   let extraClassDeclaration = [{
     operand_range getOperandsForA();
     operand_range getOperandsForB();
