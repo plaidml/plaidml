@@ -327,7 +327,8 @@ LogicalResult VulkanRuntime::submitCommandBuffers() {
     uint64_t ns = (results[1] - results[0]) * timestampPeriod;
     IVLOG(1, "Total program execution duration: " << ns);
     IVLOG(1, "Execution time: " << ns << "ns");
-    IVLOG(1, "Execution time: " << ns / 1000000.0d << "ms");
+    const double NS_PER_MS = 1000000.0;
+    IVLOG(1, "Execution time: " << ns / NS_PER_MS << "ms");
   }
 
   updateHostMemoryBuffers();
