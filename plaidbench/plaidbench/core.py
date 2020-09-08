@@ -20,7 +20,6 @@ import json
 import os
 import pprint
 import time
-import logging
 from abc import ABCMeta, abstractmethod, abstractproperty
 from collections import namedtuple
 
