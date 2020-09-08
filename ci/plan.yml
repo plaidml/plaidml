@@ -162,6 +162,7 @@ SUITES:
           pml-vk-gen:
             args:
               - --plaidml_target=intel_gen
+              - --plaidml_device=vulkan.0
               - --skip_test_file=edsl_test-skip.intel_gen.txt
             soft_fail: true # maybe flakey?
       # mnist_mlp:
