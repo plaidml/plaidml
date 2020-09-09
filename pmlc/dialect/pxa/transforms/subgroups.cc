@@ -63,6 +63,13 @@ struct SubgroupCostModel {
     if (op.getNumResults() != 1) {
       return;
     }
+    // Skip low dimensional cases.  It's not profitable to subgroup such cases.
+    // However, additionally running the subgroup transform anyway should be
+    // safe, but actually causes backend test resnetDense to fail
+    // TODO: Debug correctness failure of resnetDense when this code is removed.
+    if (op.getIVs().size() < 3) {
+      return;
+    }
     // Verify we have constant ranges and cache
     auto maybeRanges = op.getConstantRanges();
     if (!maybeRanges) {
@@ -71,11 +78,6 @@ struct SubgroupCostModel {
     ranges = *maybeRanges;
     // Preflight all loads/stores + cache
     bool safe = true;
-    op.walk([&](PxaLoadOp load) {
-      if (!preflightIO(load)) {
-        safe = false;
-      }
-    });
     op.walk([&](PxaReduceOp red) {
       if (red.agg() != AtomicRMWKind::addf) {
         // This isn't really unsafe, but basically this test removes
@@ -87,6 +89,11 @@ struct SubgroupCostModel {
         return;
       }
       if (!preflightIO(red)) {
+        safe = false;
+      }
+    });
+    op.walk([&](PxaLoadOp load) {
+      if (!preflightIO(load)) {
         safe = false;
       }
     });
@@ -178,11 +185,18 @@ struct SubgroupCostModel {
   double computeCost() {
     // Compute memory usage
     int64_t totMemory = 0;
-    for (auto si : ioStrides) {
+    for (size_t i = 0; i < ioStrides.size(); i++) {
+      const auto &si = ioStrides[i];
       auto mi = computeMemoryInfo(si);
+      // It is illegal for any access to be subgrouped on two indexes
       if (mi.subgroupCount > 1) {
         return std::numeric_limits<double>::infinity();
       }
+      // Output (i.e. write) must be subgrouped on at least one index
+      if (i == 0 && mi.subgroupCount == 0) {
+        return std::numeric_limits<double>::infinity();
+      }
+
       totMemory += mi.memSize;
       IVLOG(3, "tomMemory += " << mi.memSize);
     }
