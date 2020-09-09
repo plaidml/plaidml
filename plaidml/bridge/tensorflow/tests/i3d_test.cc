@@ -8,94 +8,24 @@
 #include <chrono>
 #include <string>
 
-#include "absl/strings/str_cat.h"
-#include "plaidml/bridge/tensorflow/service/compiler.h"
 #include "plaidml/bridge/tensorflow/tests/codegen_test.h"
-#include "plaidml/bridge/tensorflow/tests/filecheck.h"
-#include "plaidml/testenv.h"
-#include "tensorflow/compiler/xla/service/hlo_computation.h"
-#include "tensorflow/compiler/xla/service/hlo_instruction.h"
-#include "tensorflow/compiler/xla/service/hlo_opcode.h"
-#include "tensorflow/compiler/xla/tests/test_utils.h"
-#include "tensorflow/compiler/xla/tests/verified_hlo_module.h"
-#include "tensorflow/core/lib/core/status_test_util.h"
-#include "tensorflow/core/platform/test.h"
-
-using ::plaidml::edsl::TensorBuffers;
 
 namespace xla {
 namespace plaidml {
 namespace {
 
-using TestCaseVal = std::vector<std::vector<float>>;
-using TestCasePairs = std::map<TestCaseVal, TestCaseVal>;
-
 struct I3DTestSpec {
   PrimitiveType primitive_type;
-  string filecheck_lines;
 };
 
 string I3DTestSpecToString(const ::testing::TestParamInfo<I3DTestSpec>& info) {
   return PrimitiveType_Name(info.param.primitive_type);
 }
 
-class PlaidMLI3DOperationTest : public PlaidMLCodegenTest, public ::testing::WithParamInterface<I3DTestSpec> {
- protected:
-  Status CompileAndCheck(std::unique_ptr<HloModule> hlo_module, const string& filecheck_lines,
-                         const TestCasePairs& testcase_pairs) {
-    auto program = CompileToProgram(std::move(hlo_module));
-
-    StatusOr<bool> fc_result = RunFileCheck(program->str(), filecheck_lines);
-
-    // TF_ASSERT_OK(fc_result.status());
-    EXPECT_TRUE(fc_result.ValueOrDie());
-
-    VLOG(0) << "Evaluating results";
-    for (auto pair : testcase_pairs) {
-      TensorBuffers inp;
-      TensorBuffers exp;
-
-      auto program_inputs = program->inputs();
-      auto tcp_inputs = pair.first;
-
-      if (tcp_inputs.size() != program_inputs.size()) {
-        VLOG(1) << "Found mismatch in input sizes: tcp " << tcp_inputs.size() << " program " << program_inputs.size();
-      }
-
-      for (auto i = 0; i < program_inputs.size(); i++) {
-        VLOG(1) << "Adding TestCaseInput " << i;
-        inp.insert(std::make_pair(program_inputs[i].tensor, pair.first[i]));
-      }
-
-      auto program_outputs = program->outputs();
-      auto tcp_outputs = pair.second;
-
-      if (tcp_outputs.size() != program_outputs.size()) {
-        VLOG(1) << "Found mismatch in output sizes: tcp " << tcp_outputs.size() << " program "
-                << program_outputs.size();
-      }
-
-      for (auto i = 0; i < program_outputs.size(); i++) {
-        VLOG(1) << "Adding TestCaseOutput " << i;
-        exp.insert(std::make_pair(program_outputs[i].tensor, pair.second[i]));
-      }
-
-      VLOG(0) << "Calling checkProgram";
-
-      auto start = std::chrono::high_resolution_clock::now();
-      checkProgram(*program, inp, exp);
-      auto end = std::chrono::high_resolution_clock::now();
-
-      auto perf = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
-
-      VLOG(0) << "Runtime Performance: " << perf.count() << " s.";
-    }
-    return Status::OK();
-  }
-};
+class PlaidMLI3DOperationTest : public PlaidMLCodegenTest, public ::testing::WithParamInterface<I3DTestSpec> {};
 
 TEST_P(PlaidMLI3DOperationTest, SimpleI3D) {
-  TestCaseVal I3D_WeightsInputs = {
+  std::vector<::plaidml::edsl::MultiBuffer> I3D_WeightsInputs = {
       {0},                                                          // %arg0: RGB/inception_i3d/Mean
       ::weights::RGB_inception_i3d_Logits_Conv3d_0c_1x1_conv_3d_w,  // %arg1
       {98},                                                         // %arg2: RGB/inception_i3d/Logits/AvgPool3D
@@ -419,9 +349,10 @@ TEST_P(PlaidMLI3DOperationTest, SimpleI3D) {
       ::weights::RGB_inception_i3d_Logits_Conv3d_0c_1x1_conv_3d_b                               // %arg320
   };
 
-  TestCaseVal I3D_Output = ::outputs::output;
-
-  TestCasePairs testcase_pairs = {{I3D_WeightsInputs, I3D_Output}};
+  std::vector<::plaidml::edsl::MultiBuffer> I3D_Output = ::outputs::output;
+  TestCases testcases = {
+      TestCaseIO{I3D_WeightsInputs, I3D_Output},
+  };
 
   I3DTestSpec spec = GetParam();
 
@@ -1654,20 +1585,17 @@ ENTRY %cluster_1__XlaCompiledKernel_true__XlaHasReferenceVars_false__XlaNumConst
 
   hlo_module->ParseHloStringAndVerifyModule(hlo_text);
 
-  CompileAndCheck(std::move(hlo_module), spec.filecheck_lines, testcase_pairs);
+  CompileAndCheck(std::move(hlo_module), testcases);
 }
 
 std::vector<I3DTestSpec> GetI3DTestCases() {
   std::vector<I3DTestSpec> result;
-  result.push_back({F32, R"(CHECK: func @hlo_module)"});
+  result.push_back({F32});
   return result;
 }
 
-/**/
-// TODO: INSTANTIATE_TEST_CASE_P was deprecated in favor for INSTANTIATE_TEST_SUITE_P, but the version of gtest that
-// bazel links in is looking for INSTANTIATE_TEST_CASE_P right now.
-INSTANTIATE_TEST_CASE_P(All, PlaidMLI3DOperationTest, ::testing::ValuesIn(GetI3DTestCases()), I3DTestSpecToString);
-/**/
+INSTANTIATE_TEST_SUITE_P(All, PlaidMLI3DOperationTest, ::testing::ValuesIn(GetI3DTestCases()), I3DTestSpecToString);
+
 }  // namespace
 }  // namespace plaidml
 }  // namespace xla

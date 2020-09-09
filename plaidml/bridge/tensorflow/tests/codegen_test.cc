@@ -14,18 +14,54 @@ limitations under the License.
 ==============================================================================*/
 
 #include "plaidml/bridge/tensorflow/tests/codegen_test.h"
-#include "plaidml/bridge/tensorflow/service/compiler.h"
 
+#include "tensorflow/compiler/xla/tests/test_utils.h"
+
+#include "plaidml/bridge/tensorflow/service/compiler.h"
 #include "plaidml/edsl/edsl.h"
 
-using ::plaidml::edsl::Program;
+using plaidml::edsl::TensorBuffers;
 
 namespace xla {
 namespace plaidml {
 
-std::unique_ptr<Program> PlaidMLCodegenTest::CompileToProgram(std::unique_ptr<HloModule> hlo_module) {
-  auto program = PlaidMLCompiler::ProgramFromHloModule(std::move(hlo_module)).ValueOrDie();
-  return std::move(program);
+std::unique_ptr<::plaidml::edsl::Program> PlaidMLCodegenTest::CompileToProgram(std::unique_ptr<HloModule> hlo_module) {
+  return PlaidMLCompiler::ProgramFromHloModule(std::move(hlo_module)).ValueOrDie();
+}
+
+Status PlaidMLCodegenTest::CompileAndCheck(std::unique_ptr<HloComputation> entry_computation,
+                                           const TestCases& testcases) {
+  HloModuleConfig cfg;
+  auto hlo_module = absl::make_unique<HloModule>("module", cfg);
+  hlo_module->AddEntryComputation(std::move(entry_computation));
+  return CompileAndCheck(std::move(hlo_module), testcases);
+}
+
+Status PlaidMLCodegenTest::CompileAndCheck(std::unique_ptr<HloModule> hlo_module, const TestCases& testcases) {
+  auto program = CompileToProgram(std::move(hlo_module));
+
+  VLOG(2) << "Program:\n" << program->str();
+
+  VLOG(2) << "Evaluating results";
+
+  for (const TestCaseIO& io : testcases) {
+    TensorBuffers input_buffers;
+    TensorBuffers output_buffers;
+
+    auto inputs = program->inputs();
+    for (size_t i = 0; i < inputs.size(); i++) {
+      input_buffers[inputs[i].tensor] = io.inputs[i];
+    }
+
+    auto outputs = program->outputs();
+    for (size_t i = 0; i < outputs.size(); i++) {
+      output_buffers[outputs[i].tensor] = io.outputs[i];
+    }
+
+    checkProgram(*program, input_buffers, output_buffers);
+  }
+
+  return Status::OK();
 }
 
 }  // namespace plaidml

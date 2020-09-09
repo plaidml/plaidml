@@ -20,127 +20,75 @@ limitations under the License.
 #include <string>
 #include <unordered_map>
 #include <utility>
+#include <vector>
 
 #include "absl/memory/memory.h"
-/*
-#include "tensorflow/compiler/xla/service/algebraic_simplifier.h"
-#include "tensorflow/compiler/xla/service/cholesky_expander.h"
-#include "tensorflow/compiler/xla/service/computation_placer.h"
-#include "tensorflow/compiler/xla/service/custom_call_target_registry.h"
-#include "tensorflow/compiler/xla/service/dynamic_index_splitter.h"
-#include "tensorflow/compiler/xla/service/flatten_call_graph.h"
-#include "tensorflow/compiler/xla/service/hlo_constant_folding.h"
-#include "tensorflow/compiler/xla/service/hlo_cse.h"
-#include "tensorflow/compiler/xla/service/hlo_dce.h"
-*/
 #include "tensorflow/compiler/xla/service/hlo_instruction.h"
 #include "tensorflow/compiler/xla/service/hlo_opcode.h"
-/*
-#include "tensorflow/compiler/xla/service/hlo_pass_fix.h"
-#include "tensorflow/compiler/xla/service/hlo_pass_pipeline.h"
-#include "tensorflow/compiler/xla/service/hlo_subcomputation_unification.h"
-*/
 #include "tensorflow/compiler/xla/service/pattern_matcher.h"
-/*
-#include "tensorflow/compiler/xla/service/layout_assignment.h"
-#include "tensorflow/compiler/xla/service/map_inliner.h"
-#include "tensorflow/compiler/xla/service/reshape_mover.h"
-#include "tensorflow/compiler/xla/service/triangular_solve_expander.h"
-#include "tensorflow/compiler/xla/service/while_loop_simplifier.h"
-*/
-#include "plaidml/edsl/edsl.h"
-#include "plaidml/exec/exec.h"
-#include "plaidml/op/op.h"
 #include "tensorflow/compiler/xla/status_macros.h"
 #include "tensorflow/compiler/xla/window_util.h"
 #include "tensorflow/core/lib/core/errors.h"
 #include "tensorflow/core/platform/types.h"
 
-using ::plaidml::Buffer;
-using ::plaidml::TensorShape;
-using ::plaidml::edsl::LogicalShape;
-using ::plaidml::edsl::Placeholder;
-using ::plaidml::edsl::Program;
-using ::plaidml::edsl::ProgramBuilder;
-using ::plaidml::edsl::Tensor;
-using ::plaidml::edsl::TensorDim;
-using ::plaidml::edsl::TensorIndex;
-using ::plaidml::edsl::TensorOutput;
-using ::plaidml::edsl::Value;
+#include "plaidml/edsl/edsl.h"
+#include "plaidml/op/op.h"
 
-using ::plaidml::DType;
-namespace plaidml_op = ::plaidml::op;
-namespace m = xla::match;
+namespace edsl = plaidml::edsl;
+namespace plaidml_op = plaidml::op;
 
-Buffer makeBuffer(const TensorShape& shape, const void* data) {
-  const auto& curDevice = ::plaidml::Settings::get("PLAIDML_DEVICE");
-  Buffer buffer(curDevice, shape);
+plaidml::Buffer makeBuffer(const plaidml::TensorShape& shape, const void* data) {
+  std::string curDevice = ::plaidml::Settings::get("PLAIDML_DEVICE");
+  plaidml::Buffer buffer(curDevice, shape);
   buffer.copy_from(data);
   return buffer;
 }
 
+static std::unordered_map<xla::PrimitiveType, plaidml::DType> pml_dtype_map = {
+    {xla::PRED, plaidml::DType::BOOLEAN},  //
+    {xla::S8, plaidml::DType::INT8},       //
+    {xla::S16, plaidml::DType::INT16},     //
+    {xla::S32, plaidml::DType::INT32},     //
+    {xla::S64, plaidml::DType::INT64},     //
+    {xla::U8, plaidml::DType::UINT8},      //
+    {xla::U16, plaidml::DType::UINT16},    //
+    {xla::U32, plaidml::DType::UINT32},    //
+    {xla::U64, plaidml::DType::UINT64},    //
+    {xla::F16, plaidml::DType::FLOAT16},   //
+    {xla::F32, plaidml::DType::FLOAT32},   //
+    {xla::F64, plaidml::DType::FLOAT32},   //
+};
+
 namespace xla {
 namespace plaidml {
 
-/*
-namespace {
-
-// TODO: Is this needed?
-// Handles custom_call ops during evaluation by routing them through the global
-// registry used by other backends.
-StatusOr<Literal> HandleEvaluatorCustomCall(
-    HloInstruction* custom_call, absl::Span<const Literal*> operands) {
-  // Find the target C function in the global registry.
-  auto* registry = CustomCallTargetRegistry::Global();
-  void* target_fn = registry->Lookup(custom_call->custom_call_target(), "Host");
-  if (!target_fn) {
-    return NotFound("Custom call target '%s' was not registered",
-                    custom_call->custom_call_target());
-  }
-
-  // Populate pointers to operand and output literal data.
-  std::vector<const void*> operand_data;
-  operand_data.reserve(operands.size());
-  for (const auto* literal : operands) {
-    operand_data.push_back(literal->untyped_data());
-  }
-  auto output = Literal::CreateFromShape(custom_call->shape());
-  void* output_data = output.untyped_data();
-
-  // Call the target function matching the C ABI used by the CPU backends.
-  auto* typed_fn = reinterpret_cast<void (*)(void*, const void**)>(target_fn);
-  (*typed_fn)(output_data, operand_data.data());
-
-  return std::move(output);
-}
-
-}  // namespace
-
-// TODO: Figure out the right passes to run here
-Status PlaidMLCompiler::RunHloOptimization(HloModule* hlo_module) {
-  HloPassPipeline pipeline("PlaidML");
-  pipeline.AddPass<FlattenCallGraph>();
-  pipeline.AddPass<WhileLoopSimplifier>();
-  return pipeline.Run(hlo_module).status();
-}
-
-*/
-
-std::unordered_map<xla::PrimitiveType, DType> PlaidMLCompiler::pml_dtype_map_ = {
-    {xla::PRED, DType::BOOLEAN}, {xla::S8, DType::INT8},     {xla::S16, DType::INT16},   {xla::S32, DType::INT32},
-    {xla::S64, DType::INT64},    {xla::U8, DType::UINT8},    {xla::U16, DType::UINT16},  {xla::U32, DType::UINT32},
-    {xla::U64, DType::UINT64},   {xla::F16, DType::FLOAT16}, {xla::F32, DType::FLOAT32}, {xla::F64, DType::FLOAT32}};
-
-std::unique_ptr<Program> makeProgram(const std::string& name, const std::vector<Tensor>& outputs) {
-  // auto program = ProgramBuilder(name, outputs).compile();
+static std::unique_ptr<edsl::Program> makeProgram(const std::string& name, const std::vector<edsl::Tensor>& outputs) {
   VLOG(1) << "makeProgram begin";
-  auto program = absl::make_unique<Program>(ProgramBuilder(name, outputs));
-  // std::cout << *program << std::endl;
+  auto program = absl::make_unique<edsl::Program>(edsl::ProgramBuilder(name, outputs));
   VLOG(1) << "Generated program:\n" << (*program).str();
   return std::move(program);
 }
 
-/* static */ std::string PlaidMLCompiler::HumanString(const Shape& shape) {
+static std::string legalize_computation_name(const std::string& cname) {
+  std::string result;
+  for (int i = 0; i < cname.size(); i++) {
+    if (cname[i] == '.') {
+      result += "_";
+    } else {
+      result += cname[i];
+    }
+  }
+  return result;
+}
+
+PlaidMLCompiler::PlaidMLCompiler() {
+  VLOG(1) << "Initializing PlaidMLCompiler";
+  ::plaidml::init();
+  ::plaidml::edsl::init();
+  ::plaidml::op::init();
+}
+
+std::string PlaidMLCompiler::HumanString(const Shape& shape) {
   if (shape.IsTuple()) {
     string text = "{";
     const char* prefix = "";
@@ -163,28 +111,31 @@ std::unique_ptr<Program> makeProgram(const std::string& name, const std::vector<
 }
 
 // Translate HLO Module to EDSL
-/* static */ StatusOr<std::unique_ptr<Program>> PlaidMLCompiler::ProgramFromHloModule(
-    std::unique_ptr<HloModule> hlo_module) {
+StatusOr<std::unique_ptr<edsl::Program>> PlaidMLCompiler::ProgramFromHloModule(std::unique_ptr<HloModule> hlo_module) {
   VLOG(2) << "ORIGINAL HLO MODULE:\n" << hlo_module->ToString();
 
-  std::unordered_map<int, Tensor> instr_map;
-  std::unordered_map<int, Value> tuple_instr_map;
-  std::unordered_map<std::string, Value> fn_returns;
+  std::unordered_map<int, edsl::Tensor> instr_map;
+  std::unordered_map<int, edsl::Value> tuple_instr_map;
+  std::unordered_map<std::string, edsl::Value> fn_returns;
 
   auto computation_is_addition = [](HloComputation* c) {
-    return c->instruction_count() == 3 && Match(c->root_instruction(), m::Add(m::Parameter(), m::Parameter()));
+    return c->instruction_count() == 3 &&
+           Match(c->root_instruction(), match::Add(match::Parameter(), match::Parameter()));
   };
 
   auto computation_is_multiplication = [](HloComputation* c) {
-    return c->instruction_count() == 3 && Match(c->root_instruction(), m::Multiply(m::Parameter(), m::Parameter()));
+    return c->instruction_count() == 3 &&
+           Match(c->root_instruction(), match::Multiply(match::Parameter(), match::Parameter()));
   };
 
   auto computation_is_maximum = [](HloComputation* c) {
-    return c->instruction_count() == 3 && Match(c->root_instruction(), m::Maximum(m::Parameter(), m::Parameter()));
+    return c->instruction_count() == 3 &&
+           Match(c->root_instruction(), match::Maximum(match::Parameter(), match::Parameter()));
   };
 
   auto computation_is_minimum = [](HloComputation* c) {
-    return c->instruction_count() == 3 && Match(c->root_instruction(), m::Minimum(m::Parameter(), m::Parameter()));
+    return c->instruction_count() == 3 &&
+           Match(c->root_instruction(), match::Minimum(match::Parameter(), match::Parameter()));
   };
 
   // TODO: may be unnecessary because TF has the kParameter opcode which instantiates Placeholder creation.
@@ -204,7 +155,7 @@ std::unique_ptr<Program> makeProgram(const std::string& name, const std::vector<
       auto param = entry_computation->parameter_instruction(i);
       auto pshape = param->shape();
       std::vector<int64_t> param_shape;
-      auto param_dtype = pml_dtype_map_[pshape.element_type()];
+      auto param_dtype = pml_dtype_map[pshape.element_type()];
       for (int j = 0; j < pshape.dimensions_size(); j++) {
         param_shape.push_back(pshape.dimensions(j));
       }
@@ -243,7 +194,7 @@ std::unique_ptr<Program> makeProgram(const std::string& name, const std::vector<
       for (int j = 0; j < shape.dimensions_size(); j++) {
         dims.push_back(shape.dimensions(j));
       }
-      auto type = pml_dtype_map_[shape.element_type()];
+      auto type = pml_dtype_map[shape.element_type()];
       // metadata
       auto instr_metadata = instruction->metadata();
       auto meta_name = cur_instr_name;
@@ -253,8 +204,8 @@ std::unique_ptr<Program> makeProgram(const std::string& name, const std::vector<
       // TODO: validate that all these general parameters are correct before constructing them into a larger program.
       switch (instruction->opcode()) {
         case HloOpcode::kConstant: {
-          auto tshape = TensorShape(type, dims);
-          auto lshape = LogicalShape(type, dims);
+          auto tshape = ::plaidml::TensorShape(type, dims);
+          auto lshape = edsl::LogicalShape(type, dims);
           const Literal& literal = instruction->literal();
           auto buf = makeBuffer(tshape, literal.untyped_data());
           auto op = Constant(lshape, buf, meta_name);
@@ -270,31 +221,31 @@ std::unique_ptr<Program> makeProgram(const std::string& name, const std::vector<
         }
         case HloOpcode::kCeil: {
           // Tensor elementwise ceiling
-          auto op = ::plaidml::edsl::ceil(instr_map[operand_ids[0]]);
+          auto op = edsl::ceil(instr_map[operand_ids[0]]);
           instr_map.insert(std::make_pair(cur_instr_id, op));
           break;
         }
         case HloOpcode::kCos: {
           // Tensor elementwise cosine
-          auto op = ::plaidml::edsl::cos(instr_map[operand_ids[0]]);
+          auto op = edsl::cos(instr_map[operand_ids[0]]);
           instr_map.insert(std::make_pair(cur_instr_id, op));
           break;
         }
         case HloOpcode::kExp: {
           // Tensor elementwise exp
-          auto op = ::plaidml::edsl::exp(instr_map[operand_ids[0]]);
+          auto op = edsl::exp(instr_map[operand_ids[0]]);
           instr_map.insert(std::make_pair(cur_instr_id, op));
           break;
         }
         case HloOpcode::kFloor: {
           // Tensor elementwise floor
-          auto op = ::plaidml::edsl::floor(instr_map[operand_ids[0]]);
+          auto op = edsl::floor(instr_map[operand_ids[0]]);
           instr_map.insert(std::make_pair(cur_instr_id, op));
           break;
         }
         case HloOpcode::kLog: {
           // Tensor elementwise natural logarithm
-          auto op = ::plaidml::edsl::log(instr_map[operand_ids[0]]);
+          auto op = edsl::log(instr_map[operand_ids[0]]);
           instr_map.insert(std::make_pair(cur_instr_id, op));
           break;
         }
@@ -312,19 +263,19 @@ std::unique_ptr<Program> makeProgram(const std::string& name, const std::vector<
         }
         case HloOpcode::kRsqrt: {
           // Tensor elementwise reciprocal square root
-          auto op = 1 / ::plaidml::edsl::sqrt(instr_map[operand_ids[0]]);
+          auto op = 1 / edsl::sqrt(instr_map[operand_ids[0]]);
           instr_map.insert(std::make_pair(cur_instr_id, op));
           break;
         }
         case HloOpcode::kSin: {
           // Tensor elementwise sine
-          auto op = ::plaidml::edsl::sin(instr_map[operand_ids[0]]);
+          auto op = edsl::sin(instr_map[operand_ids[0]]);
           instr_map.insert(std::make_pair(cur_instr_id, op));
           break;
         }
         case HloOpcode::kSqrt: {
           // Tensor elementwise square root
-          auto op = ::plaidml::edsl::sqrt(instr_map[operand_ids[0]]);
+          auto op = edsl::sqrt(instr_map[operand_ids[0]]);
           instr_map.insert(std::make_pair(cur_instr_id, op));
           break;
         }
@@ -343,7 +294,7 @@ std::unique_ptr<Program> makeProgram(const std::string& name, const std::vector<
         }
         case HloOpcode::kCompare: {
           // Tensor elementwise compare
-          Tensor op;
+          edsl::Tensor op;
           auto direction = instruction->comparison_direction();
           switch (direction) {
             case ComparisonDirection::kEq: {
@@ -370,7 +321,9 @@ std::unique_ptr<Program> makeProgram(const std::string& name, const std::vector<
               op = instr_map[operand_ids[0]] < instr_map[operand_ids[1]];
               break;
             }
-            default: { VLOG(2) << "Unknown comparison direction"; }
+            default: {
+              VLOG(2) << "Unknown comparison direction";
+            }
           }
           instr_map.insert(std::make_pair(cur_instr_id, op));
           break;
@@ -407,7 +360,7 @@ std::unique_ptr<Program> makeProgram(const std::string& name, const std::vector<
         }
         case HloOpcode::kPower: {
           // Tensor elementwise pow
-          auto op = ::plaidml::edsl::pow(instr_map[operand_ids[0]], instr_map[operand_ids[1]]);
+          auto op = edsl::pow(instr_map[operand_ids[0]], instr_map[operand_ids[1]]);
           instr_map.insert(std::make_pair(cur_instr_id, op));
           break;
         }
@@ -438,21 +391,21 @@ std::unique_ptr<Program> makeProgram(const std::string& name, const std::vector<
           // Epsilon and Feature Index operands must be accessed by calling the epsilon() and feature_index() functions
           int64_t feature_index = instruction->feature_index();
           VLOG(2) << "Feature index " << feature_index;
-          Value findex = Value{feature_index};
+          edsl::Value findex = edsl::Value{feature_index};
           float e = instruction->epsilon();
           VLOG(2) << "Epsilon " << e;
           auto batch_mean = plaidml_op::mean(instr_map[operand_ids[0]], findex, true);
           auto batch_variance = plaidml_op::variance(instr_map[operand_ids[0]], findex, true);
-          auto batch_norm_denom = ::plaidml::edsl::sqrt(batch_variance + e);
+          auto batch_norm_denom = edsl::sqrt(batch_variance + e);
           auto batch_norm = ((instr_map[operand_ids[0]] - batch_mean) * instr_map[operand_ids[1]] / batch_norm_denom) +
                             instr_map[operand_ids[2]];
-          auto tup = ::plaidml::edsl::make_tuple(batch_norm, batch_mean, batch_variance);
+          auto tup = edsl::make_tuple(batch_norm, batch_mean, batch_variance);
           tuple_instr_map.insert(std::make_pair(cur_instr_id, tup));
           break;
         }
         case HloOpcode::kConcatenate: {
           // Tensor concatenation
-          std::vector<Tensor> tensors;
+          std::vector<edsl::Tensor> tensors;
           for (auto i = 0; i < num_operands; i++) {
             tensors.push_back(instr_map[operand_ids[i]]);
           }
@@ -510,8 +463,8 @@ std::unique_ptr<Program> makeProgram(const std::string& name, const std::vector<
           }
           std::vector<int> x(total_dims);
           std::iota(x.begin(), x.end(), 0);
-          auto tshape = TensorShape(type, dims);
-          auto lshape = LogicalShape(type, dims);
+          auto tshape = ::plaidml::TensorShape(type, dims);
+          auto lshape = edsl::LogicalShape(type, dims);
           auto buf = makeBuffer(tshape, x.data());
           auto op = Constant(lshape, buf);
           instr_map.insert(std::make_pair(cur_instr_id, op));
@@ -544,20 +497,20 @@ std::unique_ptr<Program> makeProgram(const std::string& name, const std::vector<
             axes.push_back(d);
             VLOG(2) << "Adding axis " << d << " to reduce";
           }
-          Tensor op;
+          edsl::Tensor op;
           auto applied_computation = instruction->to_apply();
           if (computation_is_maximum(applied_computation)) {
             VLOG(2) << "Reached condition: max with reduce";
-            op = plaidml_op::max(instr_map[operand_ids[0]], ::plaidml::edsl::make_tuple(axes));
+            op = plaidml_op::max(instr_map[operand_ids[0]], edsl::make_tuple(axes));
           } else if (computation_is_minimum(applied_computation)) {
             VLOG(2) << "Reached condition: min with reduce";
-            op = plaidml_op::min(instr_map[operand_ids[0]], ::plaidml::edsl::make_tuple(axes));
+            op = plaidml_op::min(instr_map[operand_ids[0]], edsl::make_tuple(axes));
           } else if (computation_is_addition(applied_computation)) {
             VLOG(2) << "Reached condition: add with reduce";
-            op = plaidml_op::sum(instr_map[operand_ids[0]], ::plaidml::edsl::make_tuple(axes));
+            op = plaidml_op::sum(instr_map[operand_ids[0]], edsl::make_tuple(axes));
           } else if (computation_is_multiplication(applied_computation)) {
             VLOG(2) << "Reached condition: prod with reduce";
-            op = plaidml_op::prod(instr_map[operand_ids[0]], ::plaidml::edsl::make_tuple(axes));
+            op = plaidml_op::prod(instr_map[operand_ids[0]], edsl::make_tuple(axes));
           } else {
             VLOG(2) << "Unknown reduction type recieved";
           }
@@ -568,7 +521,7 @@ std::unique_ptr<Program> makeProgram(const std::string& name, const std::vector<
           // This is some sort of aggregation. If the aggregation op is max, then it's a max pool
           // TODO: Find a better way to calculate spatial dimensions
           VLOG(2) << "begin processing reduce-window";
-          Tensor op;
+          edsl::Tensor op;
           // Default pool mode and pad mode
           plaidml_op::PoolMode pm = plaidml_op::PoolMode::AVG;
           plaidml_op::AutoPadMode am = plaidml_op::AutoPadMode::EXPLICIT;
@@ -612,19 +565,19 @@ std::unique_ptr<Program> makeProgram(const std::string& name, const std::vector<
         }
         case HloOpcode::kConvert: {
           // Equivalent to cast
-          auto op = ::plaidml::edsl::cast(instr_map[operand_ids[0]], type);
+          auto op = edsl::cast(instr_map[operand_ids[0]], type);
           instr_map.insert(std::make_pair(cur_instr_id, op));
           break;
         }
         case HloOpcode::kParameter: {
           // Tensor inputs, create a placeholder
-          auto op = Placeholder(type, dims);
+          auto op = edsl::Placeholder(type, dims);
           instr_map.insert(std::make_pair(cur_instr_id, op));
           break;
         }
         case HloOpcode::kReshape: {
           // Tensor reshape operation
-          auto op = ::plaidml::edsl::reshape(instr_map[operand_ids[0]], dims);
+          auto op = edsl::reshape(instr_map[operand_ids[0]], dims);
           instr_map.insert(std::make_pair(cur_instr_id, op));
           break;
         }
@@ -642,8 +595,7 @@ std::unique_ptr<Program> makeProgram(const std::string& name, const std::vector<
         }
         case HloOpcode::kSelect: {
           // Tensor select conditional operation
-          auto op =
-              ::plaidml::edsl::select(instr_map[operand_ids[0]], instr_map[operand_ids[1]], instr_map[operand_ids[2]]);
+          auto op = edsl::select(instr_map[operand_ids[0]], instr_map[operand_ids[1]], instr_map[operand_ids[2]]);
           instr_map.insert(std::make_pair(cur_instr_id, op));
           break;
         }
@@ -663,21 +615,21 @@ std::unique_ptr<Program> makeProgram(const std::string& name, const std::vector<
         case HloOpcode::kTranspose: {
           // Tensor transpose operation
           auto dims = instruction->dimensions();
-          std::vector<Value> pattern;
-          for (int64_t d : dims) {
-            pattern.push_back(Value(d));
+          std::vector<edsl::Value> pattern;
+          for (int64_t dim : dims) {
+            pattern.push_back(edsl::Value(dim));
           }
-          auto op = plaidml_op::transpose(instr_map[operand_ids[0]], Value(pattern));
+          auto op = plaidml_op::transpose(instr_map[operand_ids[0]], edsl::Value(pattern));
           instr_map.insert(std::make_pair(cur_instr_id, op));
           break;
         }
         case HloOpcode::kTuple: {
           // a kTuple operation is kind of like make_tuple in EDSL
-          std::vector<Value> tup_operands;
+          std::vector<edsl::Value> tup_operands;
           for (int i = 0; i < num_operands; i++) {
-            tup_operands.push_back(Value(instr_map[operand_ids[i]]));
+            tup_operands.push_back(edsl::Value(instr_map[operand_ids[i]]));
           }
-          auto op = ::plaidml::edsl::make_tuple(tup_operands);
+          auto op = edsl::make_tuple(tup_operands);
           tuple_instr_map.insert(std::make_pair(cur_instr_id, op));
           break;
         }
@@ -695,7 +647,7 @@ std::unique_ptr<Program> makeProgram(const std::string& name, const std::vector<
           VLOG(2) << "Getting dimension size at axis " << dim_operand;
           int64_t operand_shape = instruction->operand(0)->shape().dimensions(dim_operand);
           VLOG(2) << "DImension size at axis " << dim_operand << " is " << operand_shape;
-          auto op = Tensor{operand_shape};
+          auto op = edsl::Tensor{operand_shape};
           instr_map.insert(std::make_pair(cur_instr_id, op));
           break;
         }
@@ -750,7 +702,7 @@ std::unique_ptr<Program> makeProgram(const std::string& name, const std::vector<
     }
   }
 
-  Tensor output;
+  edsl::Tensor output;
 
   if (hlo_module->has_entry_computation()) {
     output = fn_returns[legalize_computation_name(hlo_module->entry_computation()->name())].as_tensor();

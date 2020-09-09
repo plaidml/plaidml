@@ -9,7 +9,6 @@
 #include <vector>
 
 #include "plaidml/exec/exec.h"
-#include "pmlc/util/logging.h"
 
 DECLARE_bool(generate_filecheck_input);
 
@@ -36,8 +35,7 @@ class TestFixture : public ::testing::Test {
     EXPECT_EQ(a, b);
   }
 
-  // Higher tolerance for full network computations
-  void compareElements(float a, float b) { EXPECT_NEAR(a, b, (fabs(a) + fabs(b)) / 100.0); }
+  void compareElements(float a, float b) { EXPECT_NEAR(a, b, (fabs(a) + fabs(b)) / 10000.0); }
   void compareElements(double a, double b) { EXPECT_NEAR(a, b, (fabs(a) + fabs(b)) / 10000.0); }
 
   template <typename T>
@@ -45,8 +43,6 @@ class TestFixture : public ::testing::Test {
     ASSERT_THAT(view.size(), expected.size() * sizeof(expected[0]));
     auto data = reinterpret_cast<T*>(view.data());
     std::vector<T> actual(data, data + expected.size());
-    IVLOG(3, "Expected: " << expected);
-    IVLOG(3, "Actual  : " << actual);
     for (size_t i = 0; i < actual.size(); i++) {
       compareElements(actual[i], expected[i]);
     }

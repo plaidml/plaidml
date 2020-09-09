@@ -13,33 +13,39 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-#ifndef PLAIDML_BRIDGE_TENSORFLOW_TESTS_CODEGEN_TEST_H_
-#define PLAIDML_BRIDGE_TENSORFLOW_TESTS_CODEGEN_TEST_H_
+#pragma once
 
 #include <memory>
+#include <vector>
 
-#include "tensorflow/compiler/xla/service/hlo_module.h"
-#include "tensorflow/compiler/xla/tests/hlo_test_base.h"
+#include "tensorflow/compiler/xla/status.h"
 
 #include "plaidml/edsl/edsl.h"
-
-using ::plaidml::edsl::Program;
-
 #include "plaidml/testenv.h"
 
-using ::plaidml::edsl::TestFixture;
-
 namespace xla {
+
+class HloComputation;
+class HloModule;
+
 namespace plaidml {
 
+struct TestCaseIO {
+  std::vector<::plaidml::edsl::MultiBuffer> inputs;
+  std::vector<::plaidml::edsl::MultiBuffer> outputs;
+};
+
+using TestCases = std::vector<TestCaseIO>;
+
 // Tests that verify IR emitted by the PLAIDML backend is as expected.
-class PlaidMLCodegenTest : public TestFixture {
+class PlaidMLCodegenTest : public ::plaidml::edsl::TestFixture {
  protected:
   // Compiles hlo_module with the JIT compiler.
-  std::unique_ptr<Program> CompileToProgram(std::unique_ptr<HloModule> hlo_module);
+  std::unique_ptr<::plaidml::edsl::Program> CompileToProgram(std::unique_ptr<HloModule> hlo_module);
+
+  Status CompileAndCheck(std::unique_ptr<HloModule> hlo_module, const TestCases& testcases);
+  Status CompileAndCheck(std::unique_ptr<HloComputation> entry_computation, const TestCases& testcases);
 };
 
 }  // namespace plaidml
 }  // namespace xla
-
-#endif  // PLAIDML_BRIDGE_TENSORFLOW_TESTS_CODEGEN_TEST_H_

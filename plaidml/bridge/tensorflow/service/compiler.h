@@ -13,69 +13,31 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-#ifndef TENSORFLOW_COMPILER_XLA_SERVICE_PLAIDML_COMPILER_H_
-#define TENSORFLOW_COMPILER_XLA_SERVICE_PLAIDML_COMPILER_H_
+#pragma once
 
 #include <memory>
+#include <string>
 #include <unordered_map>
-#include <vector>
 
 #include "tensorflow/compiler/xla/service/compiler.h"
-#include "tensorflow/compiler/xla/service/executable.h"
-//#include "tensorflow/compiler/xla/service/plaidml/executable.h"
-#include "tensorflow/compiler/xla/service/hlo_cost_analysis.h"
 #include "tensorflow/compiler/xla/service/hlo_module.h"
-#include "tensorflow/compiler/xla/service/hlo_module_config.h"
-//#include "tensorflow/compiler/xla/service/plaidml/platform_id.h"
 #include "tensorflow/compiler/xla/status.h"
 #include "tensorflow/compiler/xla/statusor.h"
-#include "tensorflow/core/lib/core/status.h"
-#include "tensorflow/core/platform/macros.h"
-//#include "tensorflow/stream_executor/stream_executor.h"
-#include "plaidml/edsl/edsl.h"
-#include "plaidml/exec/exec.h"
-#include "plaidml/op/op.h"
-#include "pmlc/target/x86/passes.h"
 
-using ::plaidml::edsl::Program;
-using ::plaidml::DType;
+#include "plaidml/edsl/edsl.h"
 
 namespace xla {
 namespace plaidml {
 
 class PlaidMLCompiler : public Compiler {
  public:
-  PlaidMLCompiler() {
-    VLOG(1) << "Initializing PlaidMLCompiler";
-    ::plaidml::init();
-    ::plaidml::edsl::init();
-    ::plaidml::op::init();
-    ::plaidml::exec::init();
-    ::pmlc::target::x86::registerPasses();
-  }
-  ~PlaidMLCompiler() {}
+  PlaidMLCompiler();
 
-  std::unordered_map<xla::HloComputation*, std::string> function_map_;
-  static std::unordered_map<xla::PrimitiveType, DType> pml_dtype_map_;
-
+  std::unordered_map<HloComputation*, std::string> function_map_;
   std::string HumanString(const Shape& shape);
 
-  static StatusOr<std::unique_ptr<Program>> ProgramFromHloModule (
+  static StatusOr<std::unique_ptr<::plaidml::edsl::Program>> ProgramFromHloModule(
       std::unique_ptr<HloModule> hlo_module);
-
-  std::string DEVICE_ID = "llvm_cpu.0";
-
-  static std::string legalize_computation_name(const std::string& cname) {
-   std::string result;
-   for (int i = 0; i < cname.size(); i++) {
-      if (cname[i] == '.') {
-        result += "_";
-      } else {
-        result += cname[i];
-      }
-    }
-    return result;
-  }
 
  private:
   Status RunHloOptimization(HloModule* hlo_module);
@@ -85,5 +47,3 @@ class PlaidMLCompiler : public Compiler {
 
 }  // namespace plaidml
 }  // namespace xla
-
-#endif  // TENSORFLOW_COMPILER_XLA_SERVICE_PLAIDML_COMPILER_H_

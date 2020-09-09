@@ -1,9 +1,5 @@
 load("//vendor/bazel:repo.bzl", "http_archive")
 
-# Sanitize a dependency so that it works correctly from code that includes it as a submodule.
-def clean_dep(dep):
-    return str(Label(dep))
-
 def plaidml_tf_workspace():
     http_archive(
         name = "io_bazel_rules_closure",
