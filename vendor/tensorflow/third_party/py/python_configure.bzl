@@ -4,8 +4,6 @@ toolchain(
     name = "py_toolchain",
     toolchain = "@com_intel_plaidml//:py_runtime_pair",
     toolchain_type = "@bazel_tools//tools/python:toolchain_type",
-    target_compatible_with = [],
-    exec_compatible_with = [],
 )
     """)
 

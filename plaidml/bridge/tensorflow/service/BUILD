@@ -8,8 +8,7 @@ cc_library(
     hdrs = ["compiler.h"],
     deps = [
         "//plaidml",
-        "@com_google_absl//absl/memory",
-        "@org_tensorflow//tensorflow/compiler/xla:xla_headers_lib",
+        "@org_tensorflow//tensorflow/compiler/xla/service:compiler",
         "@org_tensorflow//tensorflow/core:lib",
     ],
 )
