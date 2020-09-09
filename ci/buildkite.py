@@ -4,6 +4,7 @@ import argparse
 import glob
 import os
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -55,8 +56,11 @@ def get_engine(pkey):
         return ':crown:'
     if 'opencl-cpu' in pkey:
         return ':crown::cl:'
-    else:
-        return (':tensorflow:')
+    if 'tf-' in pkey:
+        return ':tensorflow:'
+    if '-gen' in pkey:
+        return ':information_source:'
+    return ':small_blue_diamond:'
 
 
 def get_shard_emoji(shard):
@@ -150,7 +154,7 @@ def cmd_build(args, remainder):
 
     env = os.environ.copy()
     variant = plan['VARIANTS'][args.variant]
-    for key, value in variant['env'].items():
+    for key, value in variant.get('env', {}).items():
         env[key] = str(value)
 
     explain_log = 'explain.log'

@@ -319,12 +319,13 @@ struct FusionInfo {
     SmallVector<AffineExpr, 4> upperExprsC;
     SmallVector<int64_t, 4> stepsC;
     DenseMap<BlockArgument, size_t> aToNew;
+    auto aSteps = aInfo.op.getSteps();
     for (auto &pair : orderedIVs) {
       aToNew[pair.first] = aToNew.size();
       auto idx = pair.first.getArgNumber();
       lowerExprsC.push_back(aInfo.op.lowerBoundsMap().getResult(idx));
       upperExprsC.push_back(aInfo.op.upperBoundsMap().getResult(idx));
-      stepsC.push_back(aInfo.op.steps()[idx].cast<IntegerAttr>().getInt());
+      stepsC.push_back(aSteps[idx]);
     }
     // Compute B mappings to new
     DenseMap<BlockArgument, size_t> bToNew;
@@ -385,6 +386,7 @@ struct FusionInfo {
       SmallVector<AffineExpr, 6> newLowerBounds;
       SmallVector<AffineExpr, 6> newUpperBounds;
       SmallVector<int64_t, 6> newSteps;
+      auto apSteps = apOp.getSteps();
       for (size_t i = 0; i < origNumArgs; i++) {
         auto curArg = apOp.getBody()->getArgument(curArgNum);
         auto it = toNew.find(curArg);
@@ -394,8 +396,7 @@ struct FusionInfo {
         } else {
           newLowerBounds.push_back(apOp.lowerBoundsMap().getResult(i));
           newUpperBounds.push_back(apOp.upperBoundsMap().getResult(i));
-          newSteps.push_back(
-              apOp.steps()[i].template cast<IntegerAttr>().getInt());
+          newSteps.push_back(apSteps[i]);
           curArgNum++;
         }
       }

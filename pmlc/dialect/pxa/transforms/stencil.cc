@@ -105,8 +105,7 @@ int64_t StencilBase::getIdxRange(mlir::BlockArgument idx) {
   return ranges[idx.getArgNumber()];
 }
 
-mlir::Optional<mlir::StrideInfo>
-StencilBase::getStrideInfo(mlir::Operation *op) {
+mlir::Optional<StrideInfo> StencilBase::getStrideInfo(mlir::Operation *op) {
   // want?
   auto cached = strideInfoCache.find(op);
   if (cached != strideInfoCache.end()) {

@@ -2,19 +2,14 @@
 
 #include "pmlc/util/util.h"
 
+#include "mlir/IR/Builders.h"
 #include "mlir/IR/Function.h"
 
-using mlir::FuncOp;
-using mlir::FunctionType;
-using mlir::MemRefType;
-using mlir::Operation;
-using mlir::OperationName;
-using mlir::SmallVector;
-using mlir::Type;
+using namespace mlir; // NOLINT
 
 namespace pmlc::util {
 
-llvm::StringRef getOpName(const OperationName &name) {
+StringRef getOpName(const OperationName &name) {
   return name.getStringRef().drop_front(name.getDialect().size() + 1);
 }
 
@@ -35,7 +30,7 @@ void UpdateFuncOpType(Operation *op) {
 
 uint64_t getByteSize(MemRefType type) {
   int64_t offset;
-  llvm::SmallVector<int64_t, 8> strides;
+  SmallVector<int64_t, 8> strides;
   if (failed(mlir::getStridesAndOffset(type, strides, offset))) {
     throw std::runtime_error("Could not retrieve strides");
   }
@@ -51,6 +46,50 @@ uint64_t getByteSize(MemRefType type) {
   }
   unsigned elem_bytes = llvm::divideCeil(type.getElementTypeBitWidth(), 8);
   return (total + 1) * elem_bytes;
+}
+
+// Check if all tags exist
+bool hasAllTags(Operation *op, ArrayRef<StringRef> tags) {
+  if (tags.empty()) {
+    return true;
+  }
+  DictionaryAttr opTagsAttr = op->getAttrOfType<DictionaryAttr>(kTagAttribute);
+  if (!opTagsAttr) {
+    return false;
+  }
+  for (StringRef tag : tags) {
+    if (!opTagsAttr.get(tag)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool hasTag(Operation *op, StringRef tag) {
+  DictionaryAttr opTagsAttr = op->getAttrOfType<DictionaryAttr>(kTagAttribute);
+  if (!opTagsAttr) {
+    return false;
+  }
+  return opTagsAttr.get(tag) != nullptr;
+}
+
+// Set tags in op
+void setTags(Operation *op, ArrayRef<StringRef> tags) {
+  if (tags.empty()) {
+    return;
+  }
+  OpBuilder builder(op);
+  DictionaryAttr opTagsAttr = op->getAttrOfType<DictionaryAttr>(kTagAttribute);
+  SmallVector<NamedAttribute, 4> newTags;
+  if (opTagsAttr) {
+    newTags.append(opTagsAttr.begin(), opTagsAttr.end());
+  }
+  for (StringRef tag : tags) {
+    if (!opTagsAttr || !opTagsAttr.get(tag)) {
+      newTags.emplace_back(builder.getNamedAttr(tag, builder.getUnitAttr()));
+    }
+  }
+  op->setAttr(kTagAttribute, builder.getDictionaryAttr(newTags));
 }
 
 } // namespace pmlc::util

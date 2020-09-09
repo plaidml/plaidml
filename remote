@@ -8,7 +8,7 @@ import subprocess
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--host', default='lab-13')
+    parser.add_argument('host')
     args, remainder = parser.parse_known_args()
 
     # 1. compute target directory based on CWD
@@ -17,9 +17,7 @@ def main():
     tgt_dir = cwd.relative_to(home)
     base_dir = tgt_dir.parent
     if base_dir:
-        subprocess.check_call([
-            'ssh', '-q', args.host, 'mkdir -p {}'.format(base_dir.as_posix())
-        ])
+        subprocess.check_call(['ssh', '-q', args.host, 'mkdir -p {}'.format(base_dir.as_posix())])
 
     # 2. upload CWD to remote using rsync
     exclude_from = cwd / '.exclude'
@@ -40,8 +38,7 @@ def main():
     #     remainder.remove('--')
     remote_cmd = ' '.join(remainder)
     bash_cmd = "'cd {}; {}'".format(tgt_dir.as_posix(), remote_cmd)
-    subprocess.check_call(
-        ['ssh', '-q', '-t', args.host, "bash -l -c {}".format(bash_cmd)])
+    subprocess.check_call(['ssh', '-q', '-t', args.host, "bash -l -c {}".format(bash_cmd)])
 
 
 if __name__ == '__main__':

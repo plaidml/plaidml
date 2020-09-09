@@ -1,14 +1,14 @@
 ---
-bazel: 3.1.0
+bazel: 3.5.0
 tasks:
   ubuntu1804:
     name: PlaidML
     shell_commands:
-    - curl -O https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
-    - sh ./Miniconda3-latest-Linux-x86_64.sh -b -p $HOME/miniconda
-    - python -m pip install numpy
-    - apt-get install libtcmalloc-minimal4
-    - export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so.4
+      - curl -O https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+      - sh ./Miniconda3-latest-Linux-x86_64.sh -b -p $HOME/miniconda
+      - python -m pip install numpy
+      - apt-get install libtcmalloc-minimal4
+      - export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so.4
     environment:
       PATH: /var/lib/buildkite-agent/miniconda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
       PLAIDML_DEVICE_IDS: llvm_cpu.0
@@ -17,14 +17,14 @@ tasks:
       PLAIDML_EXPERIMENTAL: 1
     test_flags:
     test_targets:
-    - "..."
+      - "..."
   macos:
     name: PlaidML
     xcode_version: "11.2"
     shell_commands:
-    - curl -O https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-x86_64.sh
-    - sh ./Miniconda3-latest-MacOSX-x86_64.sh -b -p $HOME/miniconda
-    - python -m pip install numpy
+      - curl -O https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-x86_64.sh
+      - sh ./Miniconda3-latest-MacOSX-x86_64.sh -b -p $HOME/miniconda
+      - python -m pip install numpy
     environment:
       PATH: /Users/buildkite/miniconda/bin:/usr/local/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
       PLAIDML_DEVICE_IDS: llvm_cpu.0
@@ -33,4 +33,4 @@ tasks:
       PLAIDML_EXPERIMENTAL: 1
     test_flags:
     test_targets:
-    - "..."
+      - "..."

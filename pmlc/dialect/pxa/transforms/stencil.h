@@ -200,7 +200,7 @@ protected:
 
   // Call `computeStrideInfo` with caching and automatic conversion to whichever
   // of PxaLoadOp, or PxaReduceOp is correct
-  mlir::Optional<mlir::StrideInfo> getStrideInfo(mlir::Operation *ioOp);
+  mlir::Optional<StrideInfo> getStrideInfo(mlir::Operation *ioOp);
 
   // Print a log of the best stencil (reporting on cost, permutation, and
   // tiling) provided verbosity is at least `logLevel`
@@ -238,8 +238,7 @@ private:
   llvm::SmallVector<int64_t, 8> ranges;
 
   // Cache of StrideInfo results
-  llvm::DenseMap<mlir::Operation *, mlir::Optional<mlir::StrideInfo>>
-      strideInfoCache;
+  llvm::DenseMap<mlir::Operation *, mlir::Optional<StrideInfo>> strideInfoCache;
 
   // The load and store ops
   LoadStoreOps loadsAndStores;

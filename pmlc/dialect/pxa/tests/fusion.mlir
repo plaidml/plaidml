@@ -1,7 +1,7 @@
 // RUN: pmlc-opt -pxa-normalize -canonicalize -pxa-fusion -pxa-normalize -canonicalize %s | FileCheck %s
 
 // CHECK-LABEL: func @simple_fusion
-func @simple_fusion(%A: memref<2x3xf32>, %B: memref<2x3xf32>, %C: memref<2x3xf32>, %D: memref<2x3xf32>) {
+func @simple_fusion(%A: memref<2x3xf32>, %B: memref<2x3xf32>, %C: memref<2x3xf32>, %D: memref<2x3xf32>) -> memref<2x3xf32> {
   %T = alloc() : memref<2x3xf32>
   %4 = affine.parallel (%i, %j) = (0, 0) to (2, 3) reduce ("assign") -> (memref<2x3xf32>) {
     %0 = pxa.load %A[%i, %j] : memref<2x3xf32>
@@ -17,7 +17,7 @@ func @simple_fusion(%A: memref<2x3xf32>, %B: memref<2x3xf32>, %C: memref<2x3xf32
     %3 = pxa.reduce assign %2, %D[%i, %j] : memref<2x3xf32>
     affine.yield %3 : memref<2x3xf32>
   }
-  return
+  return %5 : memref<2x3xf32>
   // CHECK: affine.parallel (%{{.*}}, %{{.*}}) = (0, 0) to (2, 3)
   // CHECK: pxa.load
   // CHECK: pxa.load

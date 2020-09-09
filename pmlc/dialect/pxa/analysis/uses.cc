@@ -1,57 +1,109 @@
 // Copyright 2020 Intel Corporation
 
 #include "pmlc/dialect/pxa/analysis/uses.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
-#include "mlir/Support/DebugStringHelper.h"
-#include "pmlc/dialect/stdx/ir/ops.h"
 
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "llvm/ADT/TypeSwitch.h"
+
+#include "pmlc/dialect/stdx/ir/ops.h"
 #include "pmlc/util/logging.h"
 
 using namespace mlir; // NOLINT
 
 namespace pmlc::dialect::pxa {
 
-Operation *getOriginalDef(Value val) {
-  auto opRes = val.cast<mlir::OpResult>();
-  while (true) {
-    if (auto ap = mlir::dyn_cast<AffineParallelOp>(opRes.getOwner())) {
-      auto ret = mlir::cast<AffineYieldOp>(ap.getBody()->getTerminator());
-      auto src = ret.getOperand(opRes.getResultNumber());
-      opRes = src.cast<mlir::OpResult>();
-    } else if (auto iop = dyn_cast<AffineIfOp>(opRes.getOwner())) {
-      auto ret = mlir::cast<AffineYieldOp>(iop.getThenBlock()->getTerminator());
-      auto src = ret.getOperand(opRes.getResultNumber());
-      opRes = src.cast<mlir::OpResult>();
+Value getPrevIndirectDef(OpResult def) {
+  return TypeSwitch<Operation *, Value>(def.getOwner())
+      .Case<AffineParallelOp>([&](auto op) {
+        auto yield = cast<AffineYieldOp>(op.getBody()->getTerminator());
+        return yield.getOperand(def.getResultNumber());
+      })
+      .Case<AffineIfOp>([&](auto op) {
+        auto yield = cast<AffineYieldOp>(op.getThenBlock()->getTerminator());
+        return yield.getOperand(def.getResultNumber());
+      })
+      .Case<PrngOp>([&](auto op) {
+        if (op.getResult(def.getResultNumber()) == op.result_tensor()) {
+          return op.tensor();
+        }
+        if (op.getResult(def.getResultNumber()) == op.result_state()) {
+          return op.new_state();
+        }
+        return Value();
+      })
+      .Case<PxaReduceOp>([&](auto op) { return op.memref(); })
+      .Case<PxaVectorReduceOp>([&](auto op) { return op.memref(); })
+      .Case<PxaGemmOp>([&](auto op) { return op.c(); })
+      .Case<stdx::ReshapeOp>([&](auto op) { return op.tensor(); })
+      .Default([](auto op) { return nullptr; });
+}
+
+Value getNextIndirectUse(mlir::OpOperand &use) {
+  return TypeSwitch<Operation *, Value>(use.getOwner())
+      .Case<AffineYieldOp>([&](auto op) {
+        return op.getParentOp()->getResult(use.getOperandNumber());
+      })
+      .Case<PxaReduceOp>([&](auto op) { return op.result(); })
+      .Case<PxaVectorReduceOp>([&](auto op) { return op.result(); })
+      .Case<PxaGemmOp>([&](auto op) {
+        if (op.getOperand(use.getOperandNumber()) == op.c()) {
+          return op.out();
+        }
+        return Value();
+      })
+      .Case<PrngOp>([&](auto op) {
+        if (op.getOperand(use.getOperandNumber()) == op.tensor()) {
+          return op.result_tensor();
+        }
+        if (op.getOperand(use.getOperandNumber()) == op.new_state()) {
+          return op.result_state();
+        }
+        return Value();
+      })
+      .Case<stdx::ReshapeOp>([&](auto op) { return op.result(); })
+      .Default([](auto op) { return nullptr; });
+}
+
+Operation *getPrevWriter(Value value) {
+  while (auto opResult = value.dyn_cast<OpResult>()) {
+    auto op = opResult.getOwner();
+    if (isa<AffineParallelOp, AffineIfOp>(op)) {
+      value = getPrevIndirectDef(opResult);
     } else {
-      break;
+      return op;
     }
   }
-  return opRes.getOwner();
+  return nullptr;
+}
+
+Value getIndirectDef(Value value) {
+  while (auto opResult = value.dyn_cast<OpResult>()) {
+    value = getPrevIndirectDef(opResult);
+    if (!value) {
+      return opResult;
+    }
+  }
+  return value;
+}
+
+Value getIndirectDefOutsideScope(Value value, Operation *scope) {
+  while (auto opResult = value.dyn_cast<OpResult>()) {
+    auto op = opResult.getOwner();
+    if (!scope->isAncestor(op)) {
+      return opResult;
+    }
+    value = getPrevIndirectDef(opResult);
+    if (!value) {
+      return nullptr;
+    }
+  }
+  return value;
 }
 
 IndirectValuesIterator &IndirectValuesIterator::operator++() {
-  for (auto &use : curValue.getUses()) {
-    if (auto yieldOp = dyn_cast<AffineYieldOp>(use.getOwner())) {
-      auto value = yieldOp.getParentOp()->getResult(use.getOperandNumber());
-      enqueueNext(value);
-    } else if (auto reduceOp = dyn_cast<PxaReduceOp>(use.getOwner())) {
-      enqueueNext(reduceOp.result());
-    } else if (auto vecReduceOp = dyn_cast<PxaVectorReduceOp>(use.getOwner())) {
-      enqueueNext(vecReduceOp.result());
-    } else if (auto gemmOp = dyn_cast<PxaGemmOp>(use.getOwner())) {
-      if (gemmOp.getOperand(use.getOperandNumber()) == gemmOp.c()) {
-        enqueueNext(gemmOp.out());
-      }
-    } else if (auto prngOp = dyn_cast<PrngOp>(use.getOwner())) {
-      if (prngOp.getOperand(use.getOperandNumber()) == prngOp.tensor()) {
-        enqueueNext(prngOp.result_tensor());
-      } else if (prngOp.getOperand(use.getOperandNumber()) ==
-                 prngOp.new_state()) {
-        enqueueNext(prngOp.result_state());
-      }
-    } else if (auto reshapeOp =
-                   dyn_cast<pmlc::dialect::stdx::ReshapeOp>(use.getOwner())) {
-      enqueueNext(reshapeOp.result());
+  for (OpOperand &use : curValue.getUses()) {
+    if (auto next = getNextIndirectUse(use)) {
+      enqueueNext(next);
     }
   }
   if (workQueue.empty()) {
@@ -107,10 +159,8 @@ IndirectAccessUsesIterator &IndirectAccessUsesIterator::operator++() {
 
 void IndirectAccessUsesIterator::skipNonAccess() {
   while (inner != IndirectUsesIterator()) {
-    if (isa<PxaLoadOp>(inner->getOwner()) ||
-        isa<PxaReduceOp>(inner->getOwner()) ||
-        isa<PxaVectorLoadOp>(inner->getOwner()) ||
-        isa<PxaVectorReduceOp>(inner->getOwner())) {
+    if (isa<PxaLoadOp, PxaReduceOp, PxaVectorLoadOp, PxaVectorReduceOp>(
+            inner->getOwner())) {
       break;
     }
     ++inner;

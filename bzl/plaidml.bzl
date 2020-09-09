@@ -46,11 +46,25 @@ def plaidml_objc_library(copts = [], linkopts = [], **kwargs):
 def plaidml_cc_binary(copts = [], linkopts = [], **kwargs):
     native.cc_binary(copts = PLAIDML_COPTS + copts, linkopts = PLAIDML_LINKOPTS + linkopts, **kwargs)
 
-def plaidml_cc_test(copts = [], deps = (), linkopts = [], **kwargs):
+def plaidml_cc_test(
+        name,
+        args = [],
+        copts = [],
+        deps = [],
+        data = [],
+        linkopts = [],
+        toolchains = [],
+        visibility = [],
+        **kwargs):
     native.cc_test(
+        name = name,
+        args = args,
         copts = PLAIDML_COPTS + copts,
         deps = deps + [clean_dep("//pmlc/testing:gtest_main")],
+        data = data,
         linkopts = PLAIDML_LINKOPTS + linkopts,
+        toolchains = toolchains,
+        visibility = visibility,
         **kwargs
     )
 
@@ -90,41 +104,6 @@ plaidml_py_version = rule(
     implementation = _plaidml_version_impl,
 )
 
-def _shlib_name_patterns(name):
-    return {
-        "@bazel_tools//src/conditions:windows": ["{}.dll".format(name)],
-        "@bazel_tools//src/conditions:darwin_x86_64": ["lib{}.dylib".format(name)],
-        "//conditions:default": ["lib{}.so".format(name)],
-    }
-
-def plaidml_cc_shlib(
-        name,
-        shlib_name = None,
-        copts = [],
-        linkopts = [],
-        visibility = None,
-        **kwargs):
-    if shlib_name == None:
-        shlib_name = name
-    names = _shlib_name_patterns(shlib_name)
-    for key, name_list in names.items():
-        for name_os in name_list:
-            native.cc_binary(
-                name = name_os,
-                copts = PLAIDML_COPTS + copts,
-                linkopts = PLAIDML_LINKOPTS + linkopts,
-                linkshared = 1,
-                tags = PLATFORM_TAGS[key],
-                visibility = visibility,
-                **kwargs
-            )
-    native.filegroup(
-        name = name,
-        srcs = select(names),
-        visibility = visibility,
-    )
-
-
 def _plaidml_settings_impl(ctx):
     return [
         platform_common.TemplateVariableInfo({
@@ -133,11 +112,10 @@ def _plaidml_settings_impl(ctx):
         }),
     ]
 
-
 plaidml_settings = rule(
     attrs = {
-        "_device": attr.label(default="//plaidml:device"),
-        "_target": attr.label(default="//plaidml:target"),
+        "_device": attr.label(default = "//plaidml:device"),
+        "_target": attr.label(default = "//plaidml:target"),
     },
     implementation = _plaidml_settings_impl,
 )

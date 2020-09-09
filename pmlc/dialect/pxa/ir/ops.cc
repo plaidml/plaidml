@@ -96,8 +96,9 @@ template <>
 void SimplifyAffineOp<PxaReduceOp>::replaceAffineOp(
     PatternRewriter &rewriter, PxaReduceOp op, AffineMap map,
     ArrayRef<Value> mapOperands) const {
-  rewriter.replaceOpWithNewOp<PxaReduceOp>(
-      op, op.getMemRefType(), op.agg(), op.val(), op.mem(), map, mapOperands);
+  rewriter.replaceOpWithNewOp<PxaReduceOp>(op, op.getMemRefType(), op.agg(),
+                                           op.val(), op.memref(), map,
+                                           mapOperands);
 }
 
 template <>
@@ -113,7 +114,7 @@ void SimplifyAffineOp<PxaVectorReduceOp>::replaceAffineOp(
     ArrayRef<Value> mapOperands) const {
   rewriter.replaceOpWithNewOp<PxaVectorReduceOp>(op, op.getMemRefType(),
                                                  op.agg(), op.vector(),
-                                                 op.mem(), map, mapOperands);
+                                                 op.memref(), map, mapOperands);
 }
 
 /// This is a common class used for patterns of the form
@@ -323,13 +324,13 @@ void printPxaReduceOp(OpAsmPrinter &p, PxaReduceOp op) {
   p << op.getOperation()->getName() << ' ';
   p << stringifyAtomicRMWKind(op.agg()) << ' ';
   p << op.val() << ", ";
-  p << op.mem() << '[';
+  p << op.memref() << '[';
   auto mapAttr = op.getAttrOfType<AffineMapAttr>("map");
   p.printAffineMapOfSSAIds(mapAttr, op.idxs());
   p << ']';
   p.printOptionalAttrDict(op.getAttrs(), {"agg", "map"});
   p << " : ";
-  p.printType(op.mem().getType());
+  p.printType(op.memref().getType());
 }
 
 // <operation> ::= `pxa.reduce` keyword ssa-use `,` ssa-use `[` ssa-use-list `]`
@@ -464,13 +465,13 @@ void printPxaVectorReduceOp(OpAsmPrinter &p, PxaVectorReduceOp op) {
   p << op.getOperation()->getName() << ' ';
   p << stringifyAtomicRMWKind(op.agg()) << ' ';
   p << op.vector() << ", ";
-  p << op.mem() << '[';
+  p << op.memref() << '[';
   auto mapAttr = op.getAttrOfType<AffineMapAttr>("map");
   p.printAffineMapOfSSAIds(mapAttr, op.idxs());
   p << ']';
   p.printOptionalAttrDict(op.getAttrs(), {"agg", "map"});
   p << " : ";
-  p.printType(op.mem().getType());
+  p.printType(op.memref().getType());
   p << ", ";
   p.printType(op.vector().getType());
 }

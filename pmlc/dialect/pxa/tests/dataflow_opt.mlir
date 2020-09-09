@@ -1,7 +1,7 @@
 // RUN: pmlc-opt -pxa-dataflow-opt -canonicalize %s | FileCheck %s
 
 // CHECK-LABEL: func @simple
-func @simple(%out : memref<2xf32>) {
+func @simple(%out : memref<2xf32>) -> memref<2xf32> {
   // CHECK: constant 0.0
   %zero = constant 0.0 : f32
   %buf = alloc() : memref<2xf32>
@@ -13,7 +13,7 @@ func @simple(%out : memref<2xf32>) {
     %3 = pxa.reduce addf %2, %out[%i] : memref<2xf32>
     affine.yield %3 : memref<2xf32>
   }
-  return
+  return %0 : memref<2xf32>
 }
 
 // CHECK-LABEL: func @grn

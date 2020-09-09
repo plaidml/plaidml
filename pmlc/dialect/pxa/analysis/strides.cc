@@ -17,9 +17,10 @@
 #include "pmlc/dialect/pxa/analysis/affine_expr.h"
 #include "pmlc/util/logging.h"
 
-namespace mlir {
+using namespace mlir; // NOLINT
 
-namespace pxa = pmlc::dialect::pxa;
+namespace pmlc::dialect::pxa {
+
 const char *kBlockAndArgFormat = "^bb{0}:%arg{1}";
 
 static std::string getUniqueName(Block *ref, BlockArgument arg) {
@@ -39,8 +40,8 @@ int64_t getIVStep(BlockArgument arg) {
 
   size_t idx = arg.getArgNumber();
   if (auto op = dyn_cast<AffineParallelOp>(baseOp)) {
-    auto stepAttr = op.steps().getValue()[idx];
-    return stepAttr.cast<IntegerAttr>().getInt();
+    auto steps = op.getSteps();
+    return steps[idx];
   }
   if (auto op = dyn_cast<AffineForOp>(baseOp)) {
     return op.getStep();
@@ -48,28 +49,43 @@ int64_t getIVStep(BlockArgument arg) {
   llvm_unreachable("Get IV Step on non-IV");
 }
 
-int64_t RelativeAccessPattern::totalInnerBytes() const {
-  int64_t ret = 1;
-  for (auto dim : innerCount) {
-    ret *= dim;
+static Optional<StrideInfo> flatten(MemRefType memRefType,
+                                    ArrayRef<StrideInfo> dimensional) {
+  assert(memRefType.getRank() == static_cast<int64_t>(dimensional.size()) &&
+         "memRef and dimensional rank mismatch");
+  // Get the memRef strides/offsets, and fail early if there is an issue.
+  int64_t offset;
+  SmallVector<int64_t, 4> strides;
+  if (failed(getStridesAndOffset(memRefType, strides, offset)))
+    return None;
+
+  // Fail if anything is dynamic.
+  if (ShapedType::isDynamicStrideOrOffset(offset) ||
+      llvm::any_of(strides, ShapedType::isDynamicStrideOrOffset))
+    return None;
+
+  StrideInfo flat{offset};
+  for (size_t i = 0; i < strides.size(); i++) {
+    flat += dimensional[i] * strides[i];
   }
-  auto eltSize = llvm::divideCeil(memRefType.getElementTypeBitWidth(), 8);
-  return ret * eltSize;
+
+  return flat;
 }
 
 StrideRange::StrideRange(BlockArgument arg)
     : valid(false), minVal(0), maxVal(0), stride(0) {
   if (auto ap = dyn_cast<AffineParallelOp>(arg.getOwner()->getParentOp())) {
-    auto range_expr = ap.getRangesValueMap().getResult(arg.getArgNumber());
-    auto range_cst = range_expr.dyn_cast<AffineConstantExpr>();
-    if (!range_cst) {
+    auto rangeExpr = ap.getRangesValueMap().getResult(arg.getArgNumber());
+    auto rangeConstantExpr = rangeExpr.dyn_cast<AffineConstantExpr>();
+    if (!rangeConstantExpr) {
       return;
     }
-    int64_t range = range_cst.getValue();
+    int64_t range = rangeConstantExpr.getValue();
     if (range < 1) {
       return;
     }
-    int64_t step = ap.steps()[arg.getArgNumber()].cast<IntegerAttr>().getInt();
+    auto steps = ap.getSteps();
+    int64_t step = steps[arg.getArgNumber()];
     if (step <= 0) {
       return;
     }
@@ -229,13 +245,21 @@ void StrideInfo::print(raw_ostream &os, Block *relative) const {
                       kvp.second);
     }
   }
-  os << offset << ":[";
-  for (auto item : llvm::enumerate(ordered)) {
-    if (item.index())
-      os << ", ";
-    os << item.value().first << "=" << item.value().second;
+  os << offset;
+  if (ordered.size()) {
+    os << ":[";
+    for (auto item : llvm::enumerate(ordered)) {
+      if (item.index())
+        os << ", ";
+      os << item.value().first << "=" << item.value().second;
+    }
+    os << ']';
   }
-  os << ']';
+}
+
+std::ostream &operator<<(std::ostream &os, const StrideInfo &x) {
+  os << debugString(x);
+  return os;
 }
 
 AffineValueMap convertToValueMap(MLIRContext *ctx, ArrayRef<StrideInfo> dims) {
@@ -256,9 +280,8 @@ static Optional<StrideInfo> computeStrideInfo(AffineParallelOp op,
     return out;
 
   // Otherwise add current index's contribution.
-  // TODO: getStep(size_t) on AffineParallelOp?
-  auto stepAttr = op.steps().getValue()[idx];
-  out->strides[arg] += stepAttr.cast<IntegerAttr>().getInt();
+  auto steps = op.getSteps();
+  out->strides[arg] += steps[idx];
   return out;
 }
 
@@ -354,9 +377,9 @@ Optional<StrideInfo> computeStrideInfo(AffineExpr expr, ValueRange args) {
   return None;
 }
 
-Optional<llvm::SmallVector<StrideInfo, 4>> computeStrideInfo(AffineMap map,
-                                                             ValueRange args) {
-  llvm::SmallVector<StrideInfo, 4> results;
+Optional<SmallVector<StrideInfo, 4>> computeStrideInfo(AffineMap map,
+                                                       ValueRange args) {
+  SmallVector<StrideInfo, 4> results;
   for (auto expr : map.getResults()) {
     auto dimStride = computeStrideInfo(expr, args);
     if (!dimStride) {
@@ -373,7 +396,7 @@ Optional<StrideInfo> computeStrideInfo(MemRefType memRefType, AffineMap map,
   assert(map.getNumResults() == memRefType.getRank());
   assert(map.getNumInputs() == values.size());
 
-  // Get the memRef strides/offsets, and fail early if there is an isssue.
+  // Get the memRef strides/offsets, and fail early if there is an issue.
   int64_t memRefOffset;
   SmallVector<int64_t, 4> memRefStrides;
   if (failed(getStridesAndOffset(memRefType, memRefStrides, memRefOffset)))
@@ -405,22 +428,22 @@ Optional<StrideInfo> computeStrideInfo(MemRefType memRefType, AffineMap map,
   return out;
 }
 
-Optional<StrideInfo> computeStrideInfo(pxa::PxaLoadOp op) {
+Optional<StrideInfo> computeStrideInfo(PxaLoadOp op) {
   return computeStrideInfo(op.getMemRefType(), op.getAffineMap(),
                            op.getMapOperands());
 }
 
-Optional<StrideInfo> computeStrideInfo(pxa::PxaReduceOp op) {
+Optional<StrideInfo> computeStrideInfo(PxaReduceOp op) {
   return computeStrideInfo(op.getMemRefType(), op.getAffineMap(),
                            op.getMapOperands());
 }
 
-Optional<StrideInfo> computeStrideInfo(pxa::PxaVectorLoadOp op) {
+Optional<StrideInfo> computeStrideInfo(PxaVectorLoadOp op) {
   return computeStrideInfo(op.getMemRefType(), op.getAffineMap(),
                            op.getMapOperands());
 }
 
-Optional<StrideInfo> computeStrideInfo(pxa::PxaVectorReduceOp op) {
+Optional<StrideInfo> computeStrideInfo(PxaVectorReduceOp op) {
   return computeStrideInfo(op.getMemRefType(), op.getAffineMap(),
                            op.getMapOperands());
 }
@@ -428,36 +451,37 @@ Optional<StrideInfo> computeStrideInfo(pxa::PxaVectorReduceOp op) {
 Optional<RelativeAccessPattern>
 computeRelativeAccess(Operation *op, BlockArgumentBoundaryFn fn) {
   ArrayRef<int64_t> vecSize;
-  MemRefType memRefType;
-  using MaybeStrides = Optional<llvm::SmallVector<StrideInfo, 4>>;
+  Value memref;
+  using MaybeStrides = Optional<SmallVector<StrideInfo, 4>>;
   auto maybeStrides =
       TypeSwitch<Operation *, MaybeStrides>(op)
-          .Case<pxa::PxaLoadOp>([&](auto op) {
-            memRefType = op.getMemRefType();
+          .Case<PxaLoadOp>([&](auto op) {
+            memref = op.memref();
             return computeStrideInfo(op.getAffineMap(), op.getMapOperands());
           })
-          .Case<pxa::PxaReduceOp>([&](auto op) {
-            memRefType = op.getMemRefType();
+          .Case<PxaReduceOp>([&](auto op) {
+            memref = op.memref();
             return computeStrideInfo(op.getAffineMap(), op.getMapOperands());
           })
-          .Case<pxa::PxaVectorLoadOp>([&](auto op) {
-            memRefType = op.getMemRefType();
+          .Case<PxaVectorLoadOp>([&](auto op) {
+            memref = op.memref();
             vecSize = op.getVectorType().getShape();
             return computeStrideInfo(op.getAffineMap(), op.getMapOperands());
           })
-          .Case<pxa::PxaVectorReduceOp>([&](auto op) {
-            memRefType = op.getMemRefType();
+          .Case<PxaVectorReduceOp>([&](auto op) {
+            memref = op.memref();
             vecSize = op.getVectorType().getShape();
             return computeStrideInfo(op.getAffineMap(), op.getMapOperands());
           })
-          .Default([](auto op) { return llvm::None; });
+          .Default([](auto op) { return None; });
   if (!maybeStrides) {
-    return llvm::None;
+    return None;
   }
   auto &strides = *maybeStrides;
-  RelativeAccessPattern ret(memRefType);
+  RelativeAccessPattern ret(memref);
   for (size_t i = 0; i < strides.size(); i++) {
-    ret.outer.push_back(strides[i].outer(fn));
+    auto outer = strides[i].outer(fn);
+    ret.outer.push_back(outer);
     auto inner = strides[i].inner(fn);
     ret.inner.push_back(inner);
     StrideRange range = inner.range();
@@ -469,14 +493,10 @@ computeRelativeAccess(Operation *op, BlockArgumentBoundaryFn fn) {
       }
     }
     if (!range.valid || range.minVal != 0) {
-      return llvm::None;
+      return None;
     }
+    ret.innerRanges.push_back(range);
     ret.innerCount.push_back(range.count());
-    int64_t stride = range.stride;
-    if (stride == 0) {
-      stride = 1;
-    }
-    ret.innerStride.push_back(stride);
   }
   return ret;
 }
@@ -486,6 +506,62 @@ Optional<RelativeAccessPattern> computeRelativeAccess(Operation *op,
   return computeRelativeAccess(op, [block](BlockArgument arg) {
     return getBoundaryRegion(arg.getOwner(), block);
   });
+}
+
+MemRefType RelativeAccessPattern::getMemRefType() const {
+  return memRef.getType().cast<MemRefType>();
+}
+
+SmallVector<int64_t, 4> RelativeAccessPattern::innerStride() const {
+  SmallVector<int64_t, 4> ret;
+  for (const StrideRange &range : innerRanges) {
+    ret.push_back(range.stride ? range.stride : 1);
+  }
+  return ret;
+}
+
+int64_t RelativeAccessPattern::totalInnerCount() const {
+  int64_t ret = 1;
+  for (auto range : innerRanges) {
+    ret *= range.count();
+  }
+  return ret;
+}
+
+int64_t RelativeAccessPattern::totalInnerBytes() const {
+  auto eltSize = llvm::divideCeil(getMemRefType().getElementTypeBitWidth(), 8);
+  return totalInnerCount() * eltSize;
+}
+
+Optional<StrideInfo> RelativeAccessPattern::flatOuter() const {
+  return flatten(getMemRefType(), outer);
+}
+
+Optional<StrideInfo> RelativeAccessPattern::flatInner() const {
+  return flatten(getMemRefType(), inner);
+}
+
+LogicalResult
+RelativeAccessPattern::unionMerge(const RelativeAccessPattern &rhs) {
+  if (innerRanges.size() != rhs.innerRanges.size()) {
+    return failure();
+  }
+
+  for (unsigned i = 0; i < outer.size(); i++) {
+    if (outer[i] != rhs.outer[i]) {
+      return failure();
+    }
+  }
+
+  inner.clear();
+  innerCount.clear();
+
+  for (unsigned i = 0; i < innerRanges.size(); i++) {
+    innerRanges[i].unionEquals(rhs.innerRanges[i]);
+    innerCount.push_back(innerRanges[i].count());
+  }
+
+  return success();
 }
 
 StrideArray::StrideArray(unsigned numDims, int64_t offset)
@@ -520,7 +596,7 @@ void StrideArray::print(raw_ostream &os) {
 Optional<StrideArray> computeStrideArray(AffineMap map) {
   std::vector<SmallVector<int64_t, 8>> flat;
   if (failed(getFlattenedAffineExprs(map, &flat, nullptr)))
-    return llvm::None;
+    return None;
 
   StrideArray ret(map.getNumDims(), flat.front().back());
   for (unsigned i = 0, e = map.getNumDims(); i < e; i++) {
@@ -530,4 +606,4 @@ Optional<StrideArray> computeStrideArray(AffineMap map) {
   return ret;
 }
 
-} // namespace mlir
+} // namespace pmlc::dialect::pxa

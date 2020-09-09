@@ -16,6 +16,8 @@
 #include <memory>
 #include <vector>
 
+#include "pmlc/util/logging.h"
+
 using namespace mlir; // NOLINT[build/namespaces]
 
 void VulkanRuntime::setResourceStorageClassBindingMap(
@@ -132,6 +134,8 @@ LogicalResult VulkanRuntime::destroy() {
   vkFreeCommandBuffers(device, commandPool, commandBuffers.size(),
                        commandBuffers.data());
   vkDestroyCommandPool(device, commandPool, nullptr);
+  vkDestroyQueryPool(device, timestampQueryPool, /*allocator=*/nullptr);
+
   for (const auto &action : schedule) {
     if (auto kernel = std::dynamic_pointer_cast<LaunchKernelAction>(action)) {
       vkFreeDescriptorSets(device, kernel->descriptorPool,
@@ -163,7 +167,7 @@ LogicalResult VulkanRuntime::destroy() {
 
 LogicalResult VulkanRuntime::init() {
   if (failed(createInstance()) || failed(createDevice()) ||
-      failed(createCommandPool())) {
+      failed(createCommandPool()) || failed(createTimestampQueryPool())) {
     return failure();
   }
   // Get working queue.
@@ -310,6 +314,23 @@ LogicalResult VulkanRuntime::submitCommandBuffers() {
 
   RETURN_ON_VULKAN_ERROR(vkQueueWaitIdle(queue), "vkQueueWaitIdle");
 
+  if (timestampValidBits) {
+    uint64_t *results =
+        reinterpret_cast<uint64_t *>(calloc(2, sizeof(uint64_t)));
+    vkGetQueryPoolResults(device, timestampQueryPool,
+                          /*firstQuery=*/0,
+                          /*queryCount=*/2,
+                          /*dataSize=*/16, results,
+                          /*stride=*/8,
+                          (VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT));
+
+    uint64_t ns = (results[1] - results[0]) * timestampPeriod;
+    IVLOG(1, "Total program execution duration: " << ns);
+    IVLOG(1, "Execution time: " << ns << "ns");
+    const double NS_PER_MS = 1000000.0;
+    IVLOG(1, "Execution time: " << ns / NS_PER_MS << "ms");
+  }
+
   updateHostMemoryBuffers();
   return success();
 }
@@ -364,6 +385,12 @@ LogicalResult VulkanRuntime::createDevice() {
 
   // TODO(denis0x0D): find the best device.
   const auto &physicalDevice = physicalDevices.front();
+  VkPhysicalDeviceProperties props;
+  vkGetPhysicalDeviceProperties(physicalDevice, &props);
+  IVLOG(1, "Choosing first available vulkan device: " << props.deviceName);
+
+  timestampPeriod = props.limits.timestampPeriod;
+
   getBestComputeQueue(physicalDevice);
 
   const float queuePrioritory = 1.0f;
@@ -442,6 +469,8 @@ VulkanRuntime::getBestComputeQueue(const VkPhysicalDevice &physicalDevice) {
     if (!(VK_QUEUE_GRAPHICS_BIT & maskedFlags) &&
         (VK_QUEUE_COMPUTE_BIT & maskedFlags)) {
       queueFamilyIndex = i;
+      // TODO: need to check if there is another queue that supports timestamps
+      timestampValidBits = queueFamilyProperties[i].timestampValidBits;
       return success();
     }
   }
@@ -453,6 +482,8 @@ VulkanRuntime::getBestComputeQueue(const VkPhysicalDevice &physicalDevice) {
 
     if (VK_QUEUE_COMPUTE_BIT & maskedFlags) {
       queueFamilyIndex = i;
+      // TODO: need to check if there is another queue that supports timestamps
+      timestampValidBits = queueFamilyProperties[i].timestampValidBits;
       return success();
     }
   }
@@ -830,6 +861,21 @@ LogicalResult VulkanRuntime::createCommandPool() {
   return success();
 }
 
+LogicalResult VulkanRuntime::createTimestampQueryPool() {
+  VkQueryPoolCreateInfo queryPoolCreateInfo = {};
+  queryPoolCreateInfo.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
+  queryPoolCreateInfo.pNext = nullptr;
+  queryPoolCreateInfo.flags = 0;
+  queryPoolCreateInfo.queryType = VK_QUERY_TYPE_TIMESTAMP;
+  queryPoolCreateInfo.queryCount = 2;
+  queryPoolCreateInfo.pipelineStatistics = 0;
+  RETURN_ON_VULKAN_ERROR(vkCreateQueryPool(device, &queryPoolCreateInfo,
+                                           /*allocator=*/nullptr,
+                                           &timestampQueryPool),
+                         "vkCreateQueryPool");
+  return success();
+}
+
 LogicalResult VulkanRuntime::submitCommandBuffersToQueue() {
   VkSubmitInfo submitInfo = {};
   submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -897,6 +943,11 @@ LogicalResult VulkanRuntime::createSchedule() {
   RETURN_ON_VULKAN_ERROR(vkBeginCommandBuffer(commandBuffer, &beginInfo),
                          "vkBeginCommandBuffer");
 
+  if (timestampValidBits) {
+    vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                        timestampQueryPool, /*query=*/0);
+  }
+
   for (const auto &action : schedule) {
     if (auto kernel = std::dynamic_pointer_cast<LaunchKernelAction>(action)) {
       if (kernel->deps.size()) {
@@ -938,6 +989,11 @@ LogicalResult VulkanRuntime::createSchedule() {
                       /*regionCount=*/xfer->regions.size(),
                       /*pRegions=*/xfer->regions.data());
     }
+  }
+
+  if (timestampValidBits) {
+    vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                        timestampQueryPool, /*query=*/1);
   }
 
   RETURN_ON_VULKAN_ERROR(vkEndCommandBuffer(commandBuffer),

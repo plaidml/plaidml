@@ -41,28 +41,29 @@
     s << rest << "\n";                                                         \
   } while (0);
 
-template <class IT>
-std::string stringify_collection(IT begin, IT end) {
-  using std::to_string;
-  std::string r = "{ ";
-  while (begin != end) {
-    r += to_string(*begin);
-    begin++;
-    if (begin != end) {
-      r += ", ";
-    }
+template <class Iterator>
+std::ostream &stringify_collection(std::ostream &os, Iterator it,
+                                   Iterator itEnd) {
+  os << '[';
+  if (it != itEnd) {
+    os << *it++;
   }
-  r += " }";
-  return r;
+  for (; it != itEnd; ++it) {
+    os << ", " << *it;
+  }
+  os << ']';
+  return os;
 }
 
 namespace std {
 
-inline std::string to_string(const std::string &x) { return x; }
+inline string to_string(const string &x) { return x; }
 
 template <class T>
-std::string to_string(const std::vector<T> &x) {
-  return stringify_collection(x.begin(), x.end());
+string to_string(const vector<T> &x) {
+  std::stringstream ss;
+  stringify_collection(ss, x.begin(), x.end());
+  return ss.str();
 }
 
 } // namespace std

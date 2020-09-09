@@ -6,6 +6,11 @@ include "mlir/Pass/PassBase.td"
 def AffineNormalize : FunctionPass<"pxa-normalize"> {
   let summary = "Normalize affine ops";
   let constructor = "pmlc::dialect::pxa::createAffineNormalizePass()";
+  let options = [
+    Option<"promote", "promote", "bool",
+           /*default=*/"true",
+           "Promote the body of 1 trip loops">
+  ];
 }
 
 def AutoTileExample : FunctionPass<"pxa-autotile-example"> {
@@ -18,6 +23,31 @@ def BufferPlacement : FunctionPass<"pxa-buffer-placement"> {
   let constructor = "pmlc::dialect::pxa::createBufferPlacementPass()";
 }
 
+def Cache : FunctionPass<"pxa-cache"> {
+  let summary = "Cache global memory into local memory";
+  let constructor = "pmlc::dialect::pxa::createCachePass()";
+  let options = [
+    Option<"cacheTag", "cache-tag", "std::string",
+           /*default=*/"\"cache\"",
+           "Cache loop tag to be set">,
+    Option<"inputTag", "input-tag", "std::string",
+           /*default=*/"\"input\"",
+           "Input cache loop tag">,
+    Option<"outputTag", "output-tag", "std::string",
+           /*default=*/"\"output\"",
+           "Output cache loop tag">,
+    Option<"outerTag", "outer-tag", "std::string",
+           /*default=*/"\"outer\"",
+           "Outer loop tag">,
+    Option<"middleTag", "middle-tag", "std::string",
+           /*default=*/"\"middle\"",
+           "Middle loop tag">,
+    Option<"innerTag", "inner-tag", "std::string",
+           /*default=*/"\"inner\"",
+           "Inner loop tag">,
+  ];
+}
+
 def Fusion : FunctionPass<"pxa-fusion"> {
   let summary = "Fuse blocks that are compatible";
   let constructor = "pmlc::dialect::pxa::createFusionPass()";
@@ -26,6 +56,15 @@ def Fusion : FunctionPass<"pxa-fusion"> {
            /*default=*/"0",
            "Prevent over-fusion by specifying the maximum memory activity "
            "(alloc, read, write) allowed">
+  ];
+}
+
+def GPUThread : FunctionPass<"pxa-gpu-thread"> {
+  let summary = "Tile outmost loops for GPU threading";
+  let constructor = "pmlc::dialect::pxa::createGPUThreadPass()";
+  let options = [
+    Option<"maxThreads", "max-threads", "unsigned", /*default=*/"64",
+           "Set maximum/goal inner threads">
   ];
 }
 
@@ -54,8 +93,9 @@ def ResizeTmps : FunctionPass<"pxa-resize-tmps"> {
 }
 
 def Subgroups : FunctionPass<"pxa-subgroups"> {
-  let summary = "TODO: text";
+  let summary = "Regorganize top level block to maximum use of subgroups on gen9";
   let constructor = "pmlc::dialect::pxa::createSubgroupsPass()";
+  let dependentDialects = ["mlir::vector::VectorDialect"];
 }
 
 def TestIndirectUsesIterator : Pass<"pxa-test-indirect-uses-iterator"> {
@@ -79,10 +119,16 @@ def TileAccumulate : FunctionPass<"pxa-tile-accumulate"> {
   let constructor = "pmlc::dialect::pxa::createTileAccumulatePass()";
 }
 
-def VectorizeExample : FunctionPass<"pxa-vectorize-example"> {
-  let summary = "Vectorizes with vector register of 8 elements";
-  let constructor = "pmlc::dialect::pxa::createVectorizeExamplePass()";
+def Vectorize : FunctionPass<"pxa-vectorize"> {
+  let summary = "Perform vectorization based on specified strategy";
+  let constructor = "pmlc::dialect::pxa::createVectorizePass()";
   let dependentDialects = ["mlir::vector::VectorDialect"];
+  let options = [
+    Option<"strategy", "strategy", "std::string",
+           "\"simple\"", "Strategy to use for vectorization">,
+    Option<"vectorWidth", "width", "unsigned", /*default=*/"8",
+           "Vector register size in elements">
+  ];
 }
 
 #endif // __PMLC_DIALECT_PXA_PASSES__
