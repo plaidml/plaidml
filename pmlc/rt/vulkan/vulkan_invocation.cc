@@ -1,10 +1,22 @@
-// Copyright 2020 Intel Corporation
+// Vulkan invocation implementation, originally from the LLVM project, and
+// subsequently modified by Intel Corporation.
+//
+// Original copyright:
+//
+//===- VulkanRuntime.cpp - MLIR Vulkan runtime ------------------*- C++ -*-===//
+//
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
 
 #include "pmlc/rt/vulkan/vulkan_invocation.h"
 
 #include "llvm/Support/FormatVariadic.h"
 
 #include "pmlc/rt/vulkan/vulkan_error.h"
+#include "pmlc/util/logging.h"
 
 namespace pmlc::rt::vulkan {
 
@@ -18,6 +30,18 @@ VulkanInvocation::VulkanInvocation() : device{Device::current<VulkanDevice>()} {
                                          &commandPoolCreateInfo, 0,
                                          &commandPool),
                      "vkCreateCommandPool");
+
+  VkQueryPoolCreateInfo queryPoolCreateInfo = {};
+  queryPoolCreateInfo.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
+  queryPoolCreateInfo.pNext = nullptr;
+  queryPoolCreateInfo.flags = 0;
+  queryPoolCreateInfo.queryType = VK_QUERY_TYPE_TIMESTAMP;
+  queryPoolCreateInfo.queryCount = 2;
+  queryPoolCreateInfo.pipelineStatistics = 0;
+  throwOnVulkanError(
+      vkCreateQueryPool(device->getDevice(), &queryPoolCreateInfo,
+                        /*allocator=*/nullptr, &timestampQueryPool),
+      "vkCreateQueryPool");
 }
 
 VulkanInvocation::~VulkanInvocation() {
@@ -33,6 +57,9 @@ VulkanInvocation::~VulkanInvocation() {
   vkFreeCommandBuffers(device->getDevice(), commandPool, commandBuffers.size(),
                        commandBuffers.data());
   vkDestroyCommandPool(device->getDevice(), commandPool, nullptr);
+  vkDestroyQueryPool(device->getDevice(), timestampQueryPool,
+                     /*allocator=*/nullptr);
+
   for (const auto &action : schedule) {
     if (auto kernel = std::dynamic_pointer_cast<LaunchKernelAction>(action)) {
       vkFreeDescriptorSets(device->getDevice(), kernel->descriptorPool,
@@ -191,6 +218,23 @@ void VulkanInvocation::submitCommandBuffers() {
   submitCommandBuffersToQueue();
 
   throwOnVulkanError(vkQueueWaitIdle(device->getQueue()), "vkQueueWaitIdle");
+
+  if (device->getTimestampValidBits()) {
+    uint64_t *results =
+        reinterpret_cast<uint64_t *>(calloc(2, sizeof(uint64_t)));
+    vkGetQueryPoolResults(device->getDevice(), timestampQueryPool,
+                          /*firstQuery=*/0,
+                          /*queryCount=*/2,
+                          /*dataSize=*/16, results,
+                          /*stride=*/8,
+                          (VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT));
+
+    uint64_t ns = (results[1] - results[0]) * device->getTimestampPeriod();
+    IVLOG(1, "Total program execution duration: " << ns);
+    IVLOG(1, "Execution time: " << ns << "ns");
+    const double NS_PER_MS = 1000000.0;
+    IVLOG(1, "Execution time: " << ns / NS_PER_MS << "ms");
+  }
 
   updateHostMemoryBuffers();
 }
@@ -624,6 +668,11 @@ void VulkanInvocation::createSchedule() {
   throwOnVulkanError(vkBeginCommandBuffer(commandBuffer, &beginInfo),
                      "vkBeginCommandBuffer");
 
+  if (device->getTimestampValidBits()) {
+    vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                        timestampQueryPool, /*query=*/0);
+  }
+
   for (const auto &action : schedule) {
     if (auto kernel = std::dynamic_pointer_cast<LaunchKernelAction>(action)) {
       if (kernel->deps.size()) {
@@ -665,6 +714,11 @@ void VulkanInvocation::createSchedule() {
                       /*regionCount=*/xfer->regions.size(),
                       /*pRegions=*/xfer->regions.data());
     }
+  }
+
+  if (device->getTimestampValidBits()) {
+    vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                        timestampQueryPool, /*query=*/1);
   }
 
   throwOnVulkanError(vkEndCommandBuffer(commandBuffer), "vkEndCommandBuffer");

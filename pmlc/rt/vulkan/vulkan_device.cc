@@ -32,6 +32,8 @@ VulkanDevice::VulkanDevice(const VkPhysicalDevice &physicalDevice,
   vkGetPhysicalDeviceProperties(physicalDevice, &props);
   IVLOG(1, "Instantiating Vulkan device: " << props.deviceName);
 
+  timestampPeriod = props.limits.timestampPeriod;
+
   getBestComputeQueue(physicalDevice);
 
   const float queuePrioritory = 1.0f;
@@ -111,6 +113,8 @@ void VulkanDevice::getBestComputeQueue(const VkPhysicalDevice &physicalDevice) {
     if (!(VK_QUEUE_GRAPHICS_BIT & maskedFlags) &&
         (VK_QUEUE_COMPUTE_BIT & maskedFlags)) {
       queueFamilyIndex = i;
+      // TODO: need to check if there is another queue that supports timestamps
+      timestampValidBits = queueFamilyProperties[i].timestampValidBits;
       return;
     }
   }
@@ -122,6 +126,8 @@ void VulkanDevice::getBestComputeQueue(const VkPhysicalDevice &physicalDevice) {
 
     if (VK_QUEUE_COMPUTE_BIT & maskedFlags) {
       queueFamilyIndex = i;
+      // TODO: need to check if there is another queue that supports timestamps
+      timestampValidBits = queueFamilyProperties[i].timestampValidBits;
       return;
     }
   }

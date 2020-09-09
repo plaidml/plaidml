@@ -50,12 +50,18 @@ public:
   const VkQueue &getQueue() const { return queue; }
   uint32_t getQueueFamilyIndex() const { return queueFamilyIndex; }
   uint32_t getMemoryTypeIndex() const { return memoryTypeIndex; }
+  float getTimestampPeriod() const { return timestampPeriod; }
+  uint32_t getTimestampValidBits() const { return timestampValidBits; }
 
 private:
   void getBestComputeQueue(const VkPhysicalDevice &physicalDevice);
 
   // Accessor for the Vulkan runtime state.
   std::shared_ptr<VulkanState> state;
+
+  // Performance monitoring
+  float timestampPeriod{0.0};
+  uint32_t timestampValidBits{0};
 
   //===--------------------------------------------------------------------===//
   // Vulkan objects.
