@@ -1,5 +1,9 @@
 load("//vendor/bazel:repo.bzl", "http_archive")
 
+# Sanitize a dependency so that it works correctly from code that includes it as a submodule.
+def clean_dep(dep):
+    return str(Label(dep))
+
 def plaidml_tf_workspace():
     http_archive(
         name = "io_bazel_rules_closure",
@@ -13,4 +17,7 @@ def plaidml_tf_workspace():
         url = "https://github.com/tensorflow/tensorflow/archive/v2.3.0.zip",
         sha256 = "1a6f24d9e3b1cf5cc55ecfe076d3a61516701bc045925915b26a9d39f4084c34",
         strip_prefix = "tensorflow-2.3.0",
+        link_files = {
+            clean_dep("//vendor/tensorflow:third_party/py/python_configure.bzl"): "third_party/py/python_configure.bzl",
+        },
     )
