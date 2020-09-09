@@ -288,7 +288,7 @@ def _inner_run(reports,
         execution_duration = overrides.get('time', stop_watch.elapsed())
         exec_per_example = execution_duration / params.examples
         tile_exec_per_example = exec_per_example
-        if not timef.tot_time_ns == 0:
+        if timef.tot_time_ns:
             tile_exec_per_example = 1e-9 + timef.tot_time_ns / 10.0**9 / params.examples
 
         compile_duration = compile_stop_watch.elapsed()
