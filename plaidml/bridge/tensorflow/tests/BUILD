@@ -7,6 +7,7 @@ cc_library(
     testonly = True,
     srcs = ["codegen_test.cc"],
     hdrs = ["codegen_test.h"],
+    tags = ["skip_windows"],
     deps = [
         "//plaidml:testenv",
         "//plaidml/bridge/tensorflow/service:compiler",
@@ -21,6 +22,7 @@ tf_cc_test(
     srcs = ["compare_op_test.cc"],
     extra_copts = ["-fexceptions"],
     linkstatic = 1,
+    tags = ["skip_windows"],
     deps = [
         ":codegen_test",
         "//plaidml/bridge/tensorflow/service:compiler",
@@ -31,7 +33,10 @@ py_binary(
     name = "conv_op_test_gen",
     testonly = 1,
     srcs = ["conv_op_test_gen.py"],
-    tags = ["manual"],
+    tags = [
+        "manual",
+        "skip_windows",
+    ],
 )
 
 genrule(
@@ -40,7 +45,10 @@ genrule(
     srcs = [],
     outs = ["conv_op_test.h.inc"],
     cmd = """XLA_FLAGS="--xla_dump_to=/tmp/hlo_module" TF_XLA_FLAGS="--tf_xla_auto_jit=2 --tf_xla_cpu_global_jit --tf_xla_min_cluster_size=0" $(location :conv_op_test_gen) --output $@""",
-    tags = ["manual"],
+    tags = [
+        "manual",
+        "skip_windows",
+    ],
     tools = [":conv_op_test_gen"],
 )
 
@@ -53,6 +61,7 @@ tf_cc_test(
     # data = [":conv_op_test_genrule"],
     extra_copts = ["-fexceptions"],
     linkstatic = 1,
+    tags = ["skip_windows"],
     deps = [
         ":codegen_test",
         "//plaidml/bridge/tensorflow/service:compiler",
@@ -64,6 +73,7 @@ tf_cc_test(
     srcs = ["dot_op_test.cc"],
     extra_copts = ["-fexceptions"],
     linkstatic = 1,
+    tags = ["skip_windows"],
     deps = [
         ":codegen_test",
         "//plaidml/bridge/tensorflow/service:compiler",
@@ -75,6 +85,7 @@ tf_cc_test(
     srcs = ["eltwise_op_test.cc"],
     extra_copts = ["-fexceptions"],
     linkstatic = 1,
+    tags = ["skip_windows"],
     deps = [
         ":codegen_test",
         "//plaidml/bridge/tensorflow/service:compiler",
@@ -85,7 +96,10 @@ py_binary(
     name = "i3d_test_gen",
     testonly = 1,
     srcs = ["i3d_test_gen.py"],
-    tags = ["manual"],
+    tags = [
+        "manual",
+        "skip_windows",
+    ],
 )
 
 genrule(
@@ -94,7 +108,10 @@ genrule(
     srcs = [],
     outs = ["i3d_test.h.inc"],
     cmd = "$(location :i3d_test_gen) --output $@",
-    tags = ["manual"],
+    tags = [
+        "manual",
+        "skip_windows",
+    ],
     tools = [":i3d_test_gen"],
 )
 
@@ -107,7 +124,10 @@ tf_cc_test(
     data = [":i3d_test_genrule"],
     extra_copts = ["-fexceptions"],
     linkstatic = 1,
-    tags = ["manual"],
+    tags = [
+        "manual",
+        "skip_windows",
+    ],
     deps = [
         ":codegen_test",
         "//plaidml/bridge/tensorflow/service:compiler",
@@ -119,6 +139,7 @@ tf_cc_test(
     srcs = ["logical_op_test.cc"],
     extra_copts = ["-fexceptions"],
     linkstatic = 1,
+    tags = ["skip_windows"],
     deps = [
         ":codegen_test",
         "//plaidml/bridge/tensorflow/service:compiler",
@@ -129,7 +150,10 @@ py_binary(
     name = "shape_op_test_gen",
     testonly = 1,
     srcs = ["shape_op_test_gen.py"],
-    tags = ["manual"],
+    tags = [
+        "manual",
+        "skip_windows",
+    ],
 )
 
 genrule(
@@ -138,7 +162,10 @@ genrule(
     srcs = [],
     outs = ["shape_op_test.h.inc"],
     cmd = """XLA_FLAGS="--xla_dump_to=/tmp/hlo_module" TF_XLA_FLAGS="--tf_xla_auto_jit=2 --tf_xla_cpu_global_jit --tf_xla_min_cluster_size=0" $(location :shape_op_test_gen) --output $@""",
-    tags = ["manual"],
+    tags = [
+        "manual",
+        "skip_windows",
+    ],
     tools = [":shape_op_test_gen"],
 )
 
@@ -151,6 +178,7 @@ tf_cc_test(
     # data = [":shape_op_test_genrule"],
     extra_copts = ["-fexceptions"],
     linkstatic = 1,
+    tags = ["skip_windows"],
     deps = [
         ":codegen_test",
         "//plaidml/bridge/tensorflow/service:compiler",
