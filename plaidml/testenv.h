@@ -9,7 +9,6 @@
 #include <vector>
 
 #include "plaidml/exec/exec.h"
-#include "pmlc/util/logging.h"
 
 DECLARE_bool(generate_filecheck_input);
 
@@ -44,8 +43,6 @@ class TestFixture : public ::testing::Test {
     ASSERT_THAT(view.size(), expected.size() * sizeof(expected[0]));
     auto data = reinterpret_cast<T*>(view.data());
     std::vector<T> actual(data, data + expected.size());
-    IVLOG(3, "Expected: " << expected);
-    IVLOG(3, "Actual  : " << actual);
     for (size_t i = 0; i < actual.size(); i++) {
       compareElements(actual[i], expected[i]);
     }
