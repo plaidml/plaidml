@@ -6,6 +6,7 @@
 #include "pmlc/rt/vulkan/vulkan_device.h"
 #include "pmlc/rt/vulkan/vulkan_error.h"
 #include "pmlc/rt/vulkan/vulkan_state.h"
+#include "pmlc/util/logging.h"
 
 namespace pmlc::rt::vulkan {
 
@@ -30,6 +31,8 @@ public:
           std::make_shared<VulkanDevice>(physicalDevice, state));
     }
   }
+
+  ~VulkanRuntime() { IVLOG(1, "Destroying vulkan runtime"); }
 
   std::size_t deviceCount() const noexcept final { return devices.size(); }
   std::shared_ptr<pmlc::rt::Device> device(std::size_t idx) {

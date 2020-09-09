@@ -7,16 +7,16 @@
 namespace pmlc::rt {
 namespace {
 
-thread_local Device *currentDevice = nullptr;
+thread_local std::shared_ptr<Device> currentDevice;
 
 } // namespace
 
-ScopedCurrentDevice::ScopedCurrentDevice(Device *device) {
+ScopedCurrentDevice::ScopedCurrentDevice(std::shared_ptr<Device> device) {
   currentDevice = device;
 }
 
 ScopedCurrentDevice::~ScopedCurrentDevice() { currentDevice = nullptr; }
 
-Device *Device::currentUntyped() { return currentDevice; }
+std::shared_ptr<Device> Device::currentUntyped() { return currentDevice; }
 
 } // namespace pmlc::rt

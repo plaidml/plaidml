@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include <memory>
 #include <regex>
 #include <string>
 #include <unordered_map>
@@ -16,7 +17,7 @@ namespace pmlc::rt {
 // by Device::current().
 class ScopedCurrentDevice {
 public:
-  explicit ScopedCurrentDevice(Device *device);
+  explicit ScopedCurrentDevice(std::shared_ptr<Device> device);
   ScopedCurrentDevice(const ScopedCurrentDevice &) = delete;
   ~ScopedCurrentDevice();
 };

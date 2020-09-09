@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <memory>
 #include <stdexcept>
+#include <utility>
 
 namespace pmlc::rt {
 
@@ -20,12 +21,12 @@ public:
   // directly invoked by lowered code, when that lowered code doesn't support
   // the use of a passthrough parameter.
   template <typename T>
-  static T *current() {
-    Device *dev = currentUntyped();
+  static std::shared_ptr<T> current() {
+    std::shared_ptr<Device> dev = currentUntyped();
     if (!dev) {
       throw std::logic_error{"No current device established"};
     }
-    T *result = dynamic_cast<T *>(dev);
+    std::shared_ptr<T> result = std::dynamic_pointer_cast<T>(std::move(dev));
     if (!result) {
       throw std::runtime_error{"Incompatible target/device combination"};
     }
@@ -35,7 +36,7 @@ public:
   virtual ~Device() {}
 
 private:
-  static Device *currentUntyped();
+  static std::shared_ptr<Device> currentUntyped();
 };
 
 // Runtime represents a particular runtime implementation.

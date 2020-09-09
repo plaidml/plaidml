@@ -352,7 +352,7 @@ struct ExecutableImpl {
   }
 
   void invoke() {
-    ScopedCurrentDevice cdev(device.get());
+    ScopedCurrentDevice cdev(device);
     jitEntry(ptrs.data());
   }
 

@@ -10,6 +10,8 @@ plaidml_cc_library(
         "vulkan_device.cc",
         "vulkan_device.h",
         "vulkan_error.h",
+        "vulkan_invocation.cc",
+        "vulkan_invocation.h",
         "vulkan_runtime.cc",
         "vulkan_state.cc",
         "vulkan_state.h",

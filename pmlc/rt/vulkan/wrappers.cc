@@ -24,7 +24,7 @@
 #include "mlir/ExecutionEngine/RunnerUtils.h"
 
 #include "pmlc/rt/symbol_registry.h"
-#include "pmlc/rt/vulkan/vulkan_device.h"
+#include "pmlc/rt/vulkan/vulkan_invocation.h"
 
 using pmlc::rt::Device;
 
@@ -32,55 +32,59 @@ namespace pmlc::rt::vulkan {
 namespace {
 
 template <typename T>
-void bindBuffer(void *vkDevice, DescriptorSetIndex setIndex,
+void bindBuffer(void *vkInvocation, DescriptorSetIndex setIndex,
                 BindingIndex bindIndex, uint32_t bufferByteSize,
                 ::UnrankedMemRefType<T> *unrankedMemRef) {
   DynamicMemRefType<T> memRef(*unrankedMemRef);
   T *ptr = memRef.data + memRef.offset;
   VulkanHostMemoryBuffer memBuffer{ptr, bufferByteSize};
-  static_cast<VulkanDevice *>(vkDevice)->setResourceData(setIndex, bindIndex,
-                                                         memBuffer);
+  static_cast<VulkanInvocation *>(vkInvocation)
+      ->setResourceData(setIndex, bindIndex, memBuffer);
 }
 
 } // namespace
 
 extern "C" {
 
-void *initVulkan() { return Device::current<VulkanDevice>(); }
+void *initVulkan() { return new VulkanInvocation(); }
 
-void deinitVulkan(void * /* vkDevice */) {}
+void deinitVulkan(void *vkInvocation) {
+  delete static_cast<VulkanInvocation *>(vkInvocation);
+}
 
-void createVulkanLaunchKernelAction(void *vkDevice, uint8_t *shader,
+void createVulkanLaunchKernelAction(void *vkInvocation, uint8_t *shader,
                                     uint32_t size, const char *entryPoint,
                                     uint32_t x, uint32_t y, uint32_t z) {
-  static_cast<VulkanDevice *>(vkDevice)->createLaunchKernelAction(
-      shader, size, entryPoint, {x, y, z});
+  static_cast<VulkanInvocation *>(vkInvocation)
+      ->createLaunchKernelAction(shader, size, entryPoint, {x, y, z});
 }
 
-void createVulkanMemoryTransferAction(void *vkDevice, uint64_t src_index,
+void createVulkanMemoryTransferAction(void *vkInvocation, uint64_t src_index,
                                       uint64_t src_binding, uint64_t dst_index,
                                       uint64_t dst_binding) {
-  static_cast<VulkanDevice *>(vkDevice)->createMemoryTransferAction(
-      src_index, src_binding, dst_index, dst_binding);
+  static_cast<VulkanInvocation *>(vkInvocation)
+      ->createMemoryTransferAction(src_index, src_binding, dst_index,
+                                   dst_binding);
 }
 
-void setVulkanLaunchKernelAction(void *vkDevice) {
-  static_cast<VulkanDevice *>(vkDevice)->setLaunchKernelAction();
+void setVulkanLaunchKernelAction(void *vkInvocation) {
+  static_cast<VulkanInvocation *>(vkInvocation)->setLaunchKernelAction();
 }
 
-void addVulkanLaunchActionToSchedule(void *vkDevice) {
-  static_cast<VulkanDevice *>(vkDevice)->addLaunchActionToSchedule();
+void addVulkanLaunchActionToSchedule(void *vkInvocation) {
+  static_cast<VulkanInvocation *>(vkInvocation)->addLaunchActionToSchedule();
 }
 
-void submitCommandBuffers(void *vkDevice) {
-  static_cast<VulkanDevice *>(vkDevice)->submitCommandBuffers();
+void submitCommandBuffers(void *vkInvocation) {
+  static_cast<VulkanInvocation *>(vkInvocation)->submitCommandBuffers();
 }
 
 #define BIND_BUFFER_IMPL(_name_, _type_)                                       \
   void _mlir_ciface_bindBuffer##_name_(                                        \
-      void *vkDevice, DescriptorSetIndex setIndex, BindingIndex bindIndex,     \
+      void *vkInvocation, DescriptorSetIndex setIndex, BindingIndex bindIndex, \
       uint32_t bufferByteSize, ::UnrankedMemRefType<_type_> *unrankedMemRef) { \
-    bindBuffer(vkDevice, setIndex, bindIndex, bufferByteSize, unrankedMemRef); \
+    bindBuffer(vkInvocation, setIndex, bindIndex, bufferByteSize,              \
+               unrankedMemRef);                                                \
   }
 
 BIND_BUFFER_IMPL(Float16, half_float::half);
