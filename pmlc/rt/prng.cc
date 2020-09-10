@@ -2,7 +2,7 @@
 
 #include "mlir/ExecutionEngine/RunnerUtils.h"
 
-#include "pmlc/compiler/registry.h"
+#include "pmlc/rt/symbol_registry.h"
 #include "pmlc/util/logging.h"
 
 extern "C" void
@@ -41,7 +41,7 @@ _mlir_ciface_plaidml_rt_prng(UnrankedMemRefType<uint32_t> *state,
 namespace {
 struct Registration {
   Registration() {
-    using pmlc::compiler::registerSymbol;
+    using pmlc::rt::registerSymbol;
     registerSymbol("_mlir_ciface_plaidml_rt_prng",
                    reinterpret_cast<void *>(_mlir_ciface_plaidml_rt_prng));
   }

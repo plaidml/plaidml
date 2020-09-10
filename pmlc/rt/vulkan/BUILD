@@ -7,15 +7,20 @@ package(default_visibility = ["//visibility:public"])
 plaidml_cc_library(
     name = "vulkan",
     srcs = [
+        "vulkan_device.cc",
+        "vulkan_device.h",
+        "vulkan_error.h",
+        "vulkan_invocation.cc",
+        "vulkan_invocation.h",
         "vulkan_runtime.cc",
+        "vulkan_state.cc",
+        "vulkan_state.h",
         "wrappers.cc",
-    ],
-    hdrs = [
-        "vulkan_runtime.h",
     ],
     local_defines = ["VULKAN_RT_BUILD"],
     deps = [
         "//pmlc/compiler",
+        "//pmlc/rt",
         "@half",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:SPIRVLowering",
@@ -23,6 +28,7 @@ plaidml_cc_library(
         "@volk",
     ],
     alwayslink = 1,
+    linkstatic = 1,
 )
 
 plaidml_cc_binary(

@@ -78,4 +78,5 @@ py_test(
         "//plaidml:py",
         "//plaidml/edsl:py",
     ],
+    size = "small",
 )
