@@ -15,21 +15,16 @@ enum class EngineKind {
   OrcJIT,
 };
 
-namespace detail {
-struct ExecutableImpl;
-} // namespace detail
-
 class Executable {
 public:
-  Executable(const std::shared_ptr<pmlc::compiler::Program> &program,
-             llvm::StringRef deviceID, mlir::ArrayRef<void *> bufptrs,
-             EngineKind kind = EngineKind::OrcJIT);
-  ~Executable();
+  static std::unique_ptr<Executable>
+  fromProgram(const std::shared_ptr<pmlc::compiler::Program> &program,
+              llvm::StringRef deviceID, mlir::ArrayRef<void *> bufptrs,
+              EngineKind kind = EngineKind::OrcJIT);
 
-  void invoke();
+  virtual ~Executable() {}
 
-private:
-  std::unique_ptr<detail::ExecutableImpl> impl;
+  virtual void invoke() = 0;
 };
 
 } // namespace pmlc::rt

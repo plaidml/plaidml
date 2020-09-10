@@ -74,9 +74,9 @@ int JitRunnerMain(int argc, char **argv) {
     kind = EngineKind::OrcJIT;
   if (options.optMCJIT.getValue())
     kind = EngineKind::MCJIT;
-  Executable executable(program, options.optDeviceID.getValue(),
-                        ArrayRef<void *>{}, kind);
-  executable.invoke();
+  auto executable = Executable::fromProgram(
+      program, options.optDeviceID.getValue(), ArrayRef<void *>{}, kind);
+  executable->invoke();
 
   return EXIT_SUCCESS;
 }
