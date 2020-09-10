@@ -114,7 +114,7 @@ plaidml_executable* plaidml_jit(  //
     } else if (jit == "MCJIT") {
       kind = EngineKind::MCJIT;
     }
-    exec->exec = std::make_unique<Executable>(program->program, deviceID, bufptrs, kind);
+    exec->exec = Executable::fromProgram(program->program, deviceID, bufptrs, kind);
     return exec.release();
   });
 }

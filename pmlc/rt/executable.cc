@@ -294,11 +294,8 @@ struct OrcJITEngineImpl : EngineImpl {
   std::unique_ptr<llvm::orc::LLJIT> jit;
 };
 
-} // namespace
-
-namespace detail {
-
-struct ExecutableImpl {
+class ExecutableImpl final : public Executable {
+public:
   ExecutableImpl(const std::shared_ptr<Program> &program,
                  llvm::StringRef deviceID, ArrayRef<void *> bufptrs,
                  EngineKind kind)
@@ -351,11 +348,12 @@ struct ExecutableImpl {
     }
   }
 
-  void invoke() {
+  void invoke() final {
     ScopedCurrentDevice cdev(device);
     jitEntry(ptrs.data());
   }
 
+private:
   std::shared_ptr<Program> program;
   std::shared_ptr<Device> device;
   std::unique_ptr<EngineImpl> impl;
@@ -364,16 +362,13 @@ struct ExecutableImpl {
   Function jitEntry;
 };
 
-} // namespace detail
+} // namespace
 
-Executable::Executable(const std::shared_ptr<Program> &program,
-                       llvm::StringRef deviceID, ArrayRef<void *> bufptrs,
-                       EngineKind kind)
-    : impl(std::make_unique<detail::ExecutableImpl>(program, deviceID, bufptrs,
-                                                    kind)) {}
-
-Executable::~Executable() = default;
-
-void Executable::invoke() { impl->invoke(); }
+std::unique_ptr<Executable>
+Executable::fromProgram(const std::shared_ptr<Program> &program,
+                        llvm::StringRef deviceID, ArrayRef<void *> bufptrs,
+                        EngineKind kind) {
+  return std::make_unique<ExecutableImpl>(program, deviceID, bufptrs, kind);
+}
 
 } // namespace pmlc::rt

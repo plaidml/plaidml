@@ -94,9 +94,9 @@ int JitRunnerMain(int argc, char **argv) {
 
   runMLIRPasses(*program->module);
 
-  Executable executable(program, options.optDeviceID.getValue(),
-                        ArrayRef<void *>{});
-  executable.invoke();
+  auto executable = Executable::fromProgram(
+      program, options.optDeviceID.getValue(), ArrayRef<void *>{});
+  executable->invoke();
 
   return EXIT_SUCCESS;
 }
