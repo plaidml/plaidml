@@ -19,8 +19,8 @@ plaidml_cc_library(
     ],
     deps = [
         "//pmlc/util:logging",
+        "@com_google_googletest//:gtest_main",
         "@gflags",
-        "@gmock//:gtest_main",
         "@openvino//:common_test_utils",
         "@openvino//:inference_engine",
         "@openvino//:shared_plugin_tests",

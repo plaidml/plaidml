@@ -13,7 +13,7 @@ plaidml_cc_library(
         "//pmlc/util",
         "//pmlc/util/math",
         "@boost",
-        "@gmock//:gtest",
+        "@com_google_googletest//:gtest",
     ],
 )
 

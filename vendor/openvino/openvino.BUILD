@@ -53,7 +53,7 @@ cc_library(
         ":functional_test_utils",
         ":inference_engine",
         ":ngraph_function_tests",
-        "@gmock//:gtest",
+        "@com_google_googletest//:gtest",
     ],
 )
 
@@ -67,7 +67,7 @@ cc_library(
     deps = [
         ":inference_engine",
         ":ngraph_function_tests",
-        "@gmock//:gtest",
+        "@com_google_googletest//:gtest",
     ],
 )
 
@@ -97,7 +97,7 @@ cc_library(
     includes = ["inference-engine/tests/ie_test_utils"],
     deps = [
         ":inference_engine",
-        "@gmock//:gtest",
+        "@com_google_googletest//:gtest",
     ],
 )
 

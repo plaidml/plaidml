@@ -1,6 +1,6 @@
 // Copyright 2020 Intel Corporation
 
-#include "pmlc/compiler/executable.h"
+#include "pmlc/rt/executable.h"
 
 #include <fstream>
 #include <string>
@@ -31,10 +31,17 @@
 #include "mlir/Target/LLVMIR.h"
 #include "mlir/Transforms/Passes.h"
 
-#include "pmlc/compiler/registry.h"
+#include "pmlc/rt/device_id.h"
+#include "pmlc/rt/internal.h"
+#include "pmlc/rt/runtime_registry.h"
+#include "pmlc/rt/symbol_registry.h"
 #include "pmlc/util/logging.h"
 
 using namespace mlir; // NOLINT[build/namespaces]
+
+using pmlc::compiler::Program;
+
+namespace pmlc::rt {
 
 // Setup LLVM target triple from the current machine.
 static void setupTargetTriple(llvm::Module *llvmModule) {
@@ -64,7 +71,7 @@ static std::string makePackedFunctionName(StringRef name) {
   return "_mlir_" + name.str();
 }
 
-std::string makeCWrapperFunctionName(StringRef name) {
+static std::string makeCWrapperFunctionName(StringRef name) {
   return "_mlir_ciface_" + name.str();
 }
 
@@ -114,7 +121,7 @@ static std::string packFunctionArguments(llvm::Module *module,
   return newName;
 }
 
-namespace pmlc::compiler {
+namespace {
 
 class MemRefDescriptor {
 private:
@@ -253,7 +260,7 @@ struct OrcJITEngineImpl : EngineImpl {
 
     SymbolMap symbols;
     auto &session = jit->getExecutionSession();
-    for (const auto &kvp : SymbolRegistry::instance()->symbols) {
+    for (const auto &kvp : getSymbolMap()) {
       auto addr = llvm::pointerToJITTargetAddress(kvp.second);
       auto symbol = llvm::JITEvaluatedSymbol(addr, llvm::JITSymbolFlags::None);
       symbols.insert(std::make_pair(session.intern(kvp.first()), symbol));
@@ -285,12 +292,14 @@ struct OrcJITEngineImpl : EngineImpl {
   }
 
   std::unique_ptr<llvm::orc::LLJIT> jit;
-}; // namespace pmlc::compiler
+};
 
-struct ExecutableImpl {
+class ExecutableImpl final : public Executable {
+public:
   ExecutableImpl(const std::shared_ptr<Program> &program,
-                 ArrayRef<void *> bufptrs, EngineKind kind)
-      : program(program), ptrs(bufptrs.size()) {
+                 llvm::StringRef deviceID, ArrayRef<void *> bufptrs,
+                 EngineKind kind)
+      : program(program), device(getDevice(deviceID)), ptrs(bufptrs.size()) {
     static std::once_flag is_initialized;
     std::call_once(is_initialized, []() {
       llvm::InitializeNativeTarget();
@@ -339,21 +348,27 @@ struct ExecutableImpl {
     }
   }
 
-  void invoke() { jitEntry(ptrs.data()); }
+  void invoke() final {
+    ScopedCurrentDevice cdev(device);
+    jitEntry(ptrs.data());
+  }
 
+private:
   std::shared_ptr<Program> program;
+  std::shared_ptr<Device> device;
   std::unique_ptr<EngineImpl> impl;
   std::vector<MemRefDescriptor> descriptors;
   std::vector<void *> ptrs;
   Function jitEntry;
 };
 
-Executable::Executable(const std::shared_ptr<Program> &program,
-                       ArrayRef<void *> bufptrs, EngineKind kind)
-    : impl(std::make_unique<ExecutableImpl>(program, bufptrs, kind)) {}
+} // namespace
 
-Executable::~Executable() = default;
+std::unique_ptr<Executable>
+Executable::fromProgram(const std::shared_ptr<Program> &program,
+                        llvm::StringRef deviceID, ArrayRef<void *> bufptrs,
+                        EngineKind kind) {
+  return std::make_unique<ExecutableImpl>(program, deviceID, bufptrs, kind);
+}
 
-void Executable::invoke() { impl->invoke(); }
-
-} // namespace pmlc::compiler
+} // namespace pmlc::rt

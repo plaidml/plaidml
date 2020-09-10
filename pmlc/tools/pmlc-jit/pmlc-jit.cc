@@ -23,15 +23,15 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include "pmlc/all_dialects.h"
-#include "pmlc/compiler/executable.h"
 #include "pmlc/compiler/program.h"
+#include "pmlc/rt/executable.h"
 #include "pmlc/util/logging.h"
 
 using namespace mlir; // NOLINT
 using llvm::Error;
-using pmlc::compiler::EngineKind;
-using pmlc::compiler::Executable;
 using pmlc::compiler::Program;
+using pmlc::rt::EngineKind;
+using pmlc::rt::Executable;
 
 namespace {
 /// This options struct prevents the need for global static initializers, and
@@ -46,6 +46,10 @@ struct Options {
 
   llvm::cl::opt<bool> optMCJIT{"mcjit", llvm::cl::desc("Use MCJIT")};
   llvm::cl::opt<bool> optOrc{"orc", llvm::cl::desc("Use OrcJIT")};
+
+  llvm::cl::opt<std::string> optDeviceID{
+      "device", llvm::cl::desc("The device to use"),
+      llvm::cl::value_desc("<device_id>"), llvm::cl::init("llvm_cpu.0")};
 };
 } // namespace
 
@@ -70,8 +74,9 @@ int JitRunnerMain(int argc, char **argv) {
     kind = EngineKind::OrcJIT;
   if (options.optMCJIT.getValue())
     kind = EngineKind::MCJIT;
-  Executable executable(program, ArrayRef<void *>{}, kind);
-  executable.invoke();
+  auto executable = Executable::fromProgram(
+      program, options.optDeviceID.getValue(), ArrayRef<void *>{}, kind);
+  executable->invoke();
 
   return EXIT_SUCCESS;
 }

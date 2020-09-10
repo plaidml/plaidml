@@ -11,10 +11,10 @@ filegroup(
 filegroup(
     name = "lit_tests",
     srcs = [
+        "//pmlc/conversion/gpu_to_spirv/tests:all",
         "//pmlc/conversion/pxa_to_affine/tests:all",
         "//pmlc/conversion/stdx_to_llvm/tests:all",
         "//pmlc/conversion/tile_to_pxa/tests:all",
-        "//pmlc/conversion/gpu_to_spirv/tests:all",
         "//pmlc/dialect/comp/tests:all",
         "//pmlc/dialect/eltwise/tests:all",
         "//pmlc/dialect/oplib/tests:all",
@@ -37,6 +37,7 @@ plaidml_cc_test(
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Transforms",
     ],
+    size = "small",
 )
 
 plaidml_cc_library(
@@ -55,10 +56,10 @@ plaidml_cc_library(
     deps = [
         ":hdrs",
         "//pmlc/conversion/gpu",
+        "//pmlc/conversion/gpu_to_spirv",
         "//pmlc/conversion/pxa_to_affine",
         "//pmlc/conversion/stdx_to_llvm",
         "//pmlc/conversion/tile_to_pxa",
-        "//pmlc/conversion/gpu_to_spirv",
         "//pmlc/dialect/comp",
         "//pmlc/dialect/eltwise",
         "//pmlc/dialect/pxa",

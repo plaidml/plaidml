@@ -4,7 +4,7 @@
 
 #include "libxsmm.h" // NOLINT [build/include_subdir]
 
-#include "pmlc/compiler/registry.h"
+#include "pmlc/rt/symbol_registry.h"
 #include "pmlc/util/logging.h"
 
 using FunctionPtr = void (*)(const void *, const void *, void *, ...);
@@ -39,7 +39,7 @@ struct Registration {
   Registration() {
     libxsmm_init();
 
-    using pmlc::compiler::registerSymbol;
+    using pmlc::rt::registerSymbol;
 
     registerSymbol("plaidml_rt_xsmm_gemm_invoke_f32",
                    reinterpret_cast<void *>(plaidml_rt_xsmm_gemm_invoke_f32));
