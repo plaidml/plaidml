@@ -95,7 +95,7 @@ class Executable {
   /// Executable constructor
   ///
   Executable(const edsl::Program& program,        //
-             const std::string& device,           //
+             const std::string& deviceID,         //
              const std::vector<Binding>& inputs,  //
              const std::vector<Binding>& outputs) {
     std::vector<plaidml_binding> inputs_storage(inputs.size());
@@ -116,7 +116,7 @@ class Executable {
         ffi::call<plaidml_executable*>(  //
             plaidml_jit,                 //
             program.as_ptr(),            //
-            device.c_str(),              //
+            deviceID.c_str(),            //
             raw_inputs.size(),           //
             raw_inputs.data(),           //
             raw_outputs.size(),          //

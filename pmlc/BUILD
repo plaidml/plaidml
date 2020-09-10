@@ -37,6 +37,7 @@ plaidml_cc_test(
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Transforms",
     ],
+    size = "small",
 )
 
 plaidml_cc_library(

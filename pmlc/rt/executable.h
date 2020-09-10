@@ -6,26 +6,30 @@
 #include <vector>
 
 #include "pmlc/compiler/program.h"
+#include "pmlc/rt/runtime.h"
 
-namespace pmlc::compiler {
+namespace pmlc::rt {
 
 enum class EngineKind {
   MCJIT,
   OrcJIT,
 };
 
+namespace detail {
 struct ExecutableImpl;
+} // namespace detail
+
 class Executable {
 public:
-  Executable(const std::shared_ptr<Program> &program,
-             mlir::ArrayRef<void *> bufptrs,
+  Executable(const std::shared_ptr<pmlc::compiler::Program> &program,
+             llvm::StringRef deviceID, mlir::ArrayRef<void *> bufptrs,
              EngineKind kind = EngineKind::OrcJIT);
   ~Executable();
 
   void invoke();
 
 private:
-  std::unique_ptr<ExecutableImpl> impl;
+  std::unique_ptr<detail::ExecutableImpl> impl;
 };
 
-} // namespace pmlc::compiler
+} // namespace pmlc::rt

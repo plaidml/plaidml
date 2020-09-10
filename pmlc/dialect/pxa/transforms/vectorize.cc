@@ -478,10 +478,10 @@ LogicalResult vectorizeBuffer(AllocOp op) {
   while (curUse != IndirectUsesIterator()) {
     curUse->get().setType(newType);
     if (auto vecOp = dyn_cast<PxaVectorLoadOp>(curUse->getOwner())) {
+      curUse++;
       replaceOp<PxaLoadOp>(vecOp, vecOp.getMemRef(),
                            updateMap(vecOp.getAffineMap()),
                            vecOp.getMapOperands());
-      curUse++;
     } else if (auto vecOp = dyn_cast<PxaVectorReduceOp>(curUse->getOwner())) {
       auto newVecOp = replaceOp<PxaReduceOp>(
           vecOp, vecOp.agg(), vecOp.getValueToStore(), vecOp.getMemRef(),

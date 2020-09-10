@@ -11,6 +11,7 @@ plaidml_cc_library(
         "//pmlc:all_passes_and_dialects",
         "//pmlc/compiler",
         "//pmlc/rt",
+        "//pmlc/rt/llvm",
         "//pmlc/rt/vulkan",
         "//pmlc/util",
         "@llvm-project//mlir:ExecutionEngineUtils",

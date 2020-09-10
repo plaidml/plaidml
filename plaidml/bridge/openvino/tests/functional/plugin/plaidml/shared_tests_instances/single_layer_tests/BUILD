@@ -161,6 +161,7 @@ cc_test(
     data = DATA,
     linkopts = PLAIDML_LINKOPTS,
     tags = TAGS,
+    size = "large",
     deps = [
         ":smoke_lib",
         "//plaidml/bridge/openvino:testenv",
