@@ -12,9 +12,15 @@ cc_binary(
     name = "benchmark_app",
     srcs = glob([
         "inference-engine/samples/benchmark_app/**/*.hpp",
+        "inference-engine/samples/common/**/*.cpp",  # TODO
+        "inference-engine/samples/common/**/*.hpp",  # TODO
         "inference-engine/samples/benchmark_app/**/*.cpp",
     ]),
     data = [":plugins"],
+    includes = [
+        "inference-engine/samples/common",
+        "inference-engine/samples/common/format_reader",
+    ],
     linkopts = select({
         "@bazel_tools//src/conditions:windows": [],
         "@bazel_tools//src/conditions:darwin_x86_64": [],
@@ -28,6 +34,9 @@ cc_binary(
     deps = [
         ":inference_engine",
         ":mkldnn_plugin",
+        "@gmock//:gtest",
+        "@gflags",
+        # ":gapi",
     ],
 )
 
@@ -114,7 +123,7 @@ cc_library(
         "inference-engine/thirdparty/mkl-dnn/src/*.hpp",
     ]) + [":mkldnn_version"],
     includes = [
-        "inference-engine/src/mkldnn_plugin/",
+        "inference-engine/src/mkldnn_plugin",
         "inference-engine/src/mkldnn_plugin/mkldnn",
         "inference-engine/thirdparty/mkl-dnn/include",
         "inference-engine/thirdparty/mkl-dnn/src",
@@ -123,6 +132,7 @@ cc_library(
     ],
     local_defines = [
         "COMPILED_CPU_MKLDNN_QUANTIZE_NODE",
+        "COMPILED_CPU_MKLDNN_ACTIVATION_NODE",
     ],
     deps = [":inference_engine"],
     alwayslink = 1,
