@@ -286,8 +286,11 @@ def _inner_run(reports,
 
         # Record stopwatch times
         execution_duration = overrides.get('time', stop_watch.elapsed())
-        tile_exec_per_example = 1e-9 + timef.tot_time_ns / 10.0**9 / params.examples
         exec_per_example = execution_duration / params.examples
+        tile_exec_per_example = exec_per_example
+        if timef.tot_time_ns:
+            tile_exec_per_example = 1e-9 + timef.tot_time_ns / 10.0**9 / params.examples
+
         compile_duration = compile_stop_watch.elapsed()
         flops = overrides.get('flops', None)
         gflops = None
@@ -309,8 +312,7 @@ def _inner_run(reports,
         if gflops:
             resstr += ', {:.2f} (GFLOP/s)'.format(gflops)
         click.secho(resstr, fg='cyan', bold=True)
-        if frontend.name == 'plaidml' and 'metal' in str(device):
-            tile_exec_per_example = exec_per_example
+
         print(
             "-----------------------------------------------------------------------------------------"
         )
