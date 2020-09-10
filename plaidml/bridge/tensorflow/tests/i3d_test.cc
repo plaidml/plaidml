@@ -100,13 +100,6 @@ TEST_P(PlaidMLI3DOperationTest, SimpleI3D) {
     outputs.emplace_back(convertBuffer(buffer->data));
   }
 
-  // HloModuleConfig cfg;
-  // auto hlo_module = std::make_unique<VerifiedHloModule>(archive->name()->str(), cfg, false, true, nullptr);
-  // hlo_module->ParseHloStringAndVerifyModule(archive->model()->str());
-
-  // auto hlo_module = ParseAndReturnUnverifiedModule(archive.model);
-  // ASSERT_TRUE(hlo_module.ok());
-
   auto lookup = [&](const char* key) {
     auto it = weights.find(key);
     if (it == weights.end()) {
@@ -1701,15 +1694,10 @@ ENTRY %cluster_1__XlaCompiledKernel_true__XlaHasReferenceVars_false__XlaNumConst
 }
 )";
 
-  TestCases testcases = {TestCaseIO{args, outputs}};
-
   HloModuleConfig cfg;
-
   auto hlo_module = std::make_unique<VerifiedHloModule>("module", cfg, false, false, nullptr);
-
   hlo_module->ParseHloStringAndVerifyModule(hlo_text);
-
-  CompileAndCheck(std::move(hlo_module), testcases);
+  CompileAndCheck(std::move(hlo_module), {{args, outputs}});
 }
 
 std::vector<I3DTestSpec> GetI3DTestCases() {
