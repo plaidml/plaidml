@@ -27,6 +27,30 @@ plaidml_cc_library(
 )
 
 cc_binary(
+    name = "benchmark_app",
+    srcs = glob([
+        "inference-engine/samples/benchmark_app/**/*.cpp",
+    ]),
+    linkopts = select({
+        "@bazel_tools//src/conditions:windows": [],
+        "@bazel_tools//src/conditions:darwin_x86_64": [],
+        "//conditions:default": [
+            "-pthread",
+            "-lm",
+            "-ldl",
+        ],
+    }),
+    # linkstatic = 0,
+    data = [
+        ":plugins",
+    ],
+    deps = [
+        "@openvino//:benchmark_app",
+        ":libplaidml-plugin.so",
+    ],
+)
+
+cc_binary(
     name = "plaidml-plugin",
     linkopts = PLAIDML_LINKOPTS,
     linkshared = 1,

@@ -8,7 +8,7 @@ TAGS = [
     "skip_windows",
 ]
 
-cc_binary(
+cc_library(
     name = "benchmark_app",
     srcs = glob([
         "inference-engine/samples/benchmark_app/**/*.hpp",
@@ -34,9 +34,7 @@ cc_binary(
     deps = [
         ":inference_engine",
         ":mkldnn_plugin",
-        "@gmock//:gtest",
         "@gflags",
-        # ":gapi",
     ],
 )
 
