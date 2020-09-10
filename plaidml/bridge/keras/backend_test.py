@@ -1517,8 +1517,6 @@ class TestBackendOps(unittest.TestCase):
         skip_tensorflow=True)
     def testGather(self, b, v):
         I = b.variable(np.array([0, 2, 1, 0], dtype='int32'), dtype='int32')
-        #I2 = b.variable(np.array([[2, 1], [0, 1], [1, 0], [2, 1], [0, 0]], dtype='int32'),
-        #                dtype='int32')
         return [b.gather(v, I)]
 
     @compareForwardClose()

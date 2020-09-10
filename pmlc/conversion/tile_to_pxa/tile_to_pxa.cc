@@ -911,9 +911,6 @@ struct GatherOpConversion : public OpConversionPattern<GatherOp> {
     // Make an allocation for the output
     auto resultMemRef = rewriter.create<AllocOp>(loc, memrefType).getResult();
 
-    // affine loop nest
-    // symbol representing load of index from index tensor
-
     // we need an array of int64_t representing the results tensor's dims
     ArrayRef<int64_t> size = memrefType.getShape();
 
@@ -925,17 +922,12 @@ struct GatherOpConversion : public OpConversionPattern<GatherOp> {
 
     // create an affine map for loading the index, using the leading counters
     size_t idxDims = indexes.getType().cast<MemRefType>().getShape().size();
-    SmallVector<pxa::StrideInfo, 4> indexAccess;
-    for (size_t i = 0; i < idxDims; ++i) {
-      indexAccess.push_back(pxa::StrideInfo(loop.getIVs()[i]));
-    }
-    auto indexMap = convertToValueMap(ctx, indexAccess);
+    auto idxLoadMap = AffineMap::getMultiDimIdentityMap(idxDims, ctx);
+    auto idxLoadOps = loop.getIVs().take_front(idxDims);
 
     // load the value from the indexes array
     Value indexVal =
-        txBuilder
-            .create<pxa::PxaLoadOp>(loc, indexes, indexMap.getAffineMap(),
-                                    indexMap.getOperands())
+        txBuilder.create<pxa::PxaLoadOp>(loc, indexes, idxLoadMap, idxLoadOps)
             .getResult();
 
     if (!indexVal.getType().isa<IndexType>()) {
@@ -957,16 +949,12 @@ struct GatherOpConversion : public OpConversionPattern<GatherOp> {
     auto loaded = txBuilder.create<mlir::LoadOp>(loc, tensor, srcOps);
 
     // create a destination map using all of the dimensions
-    SmallVector<pxa::StrideInfo, 4> dstAccess;
-    for (size_t i = 0; i < dstDims; ++i) {
-      dstAccess.push_back(pxa::StrideInfo(loop.getIVs()[i]));
-    }
-    auto dstMap = convertToValueMap(ctx, dstAccess);
+    auto dstStoreMap = AffineMap::getMultiDimIdentityMap(dstDims, ctx);
 
     // create a destination map from the whole loop
     auto stored = txBuilder.create<pxa::PxaReduceOp>(
-        loc, AtomicRMWKind::assign, loaded, resultMemRef, dstMap.getAffineMap(),
-        dstMap.getOperands());
+        loc, AtomicRMWKind::assign, loaded, resultMemRef, dstStoreMap,
+        loop.getIVs());
     txBuilder.create<AffineYieldOp>(loc, ArrayRef<Value>{stored.getResult()});
 
     rewriter.replaceOp(op, loop.getResult(0));
