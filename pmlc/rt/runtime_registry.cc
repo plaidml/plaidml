@@ -20,13 +20,4 @@ void registerRuntime(llvm::StringRef id, std::unique_ptr<Runtime> runtime) {
 
 } // namespace details
 
-void initRuntimes() {
-  [[maybe_unused]] static bool inited = []() {
-    for (auto &[id, runtime] : getRuntimeMap()) {
-      runtime->init();
-    }
-    return true;
-  }();
-}
-
 } // namespace pmlc::rt

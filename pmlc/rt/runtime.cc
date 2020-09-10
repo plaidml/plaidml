@@ -19,4 +19,14 @@ ScopedCurrentDevice::~ScopedCurrentDevice() { currentDevice = nullptr; }
 
 std::shared_ptr<Device> Device::currentUntyped() { return currentDevice; }
 
+void Runtime::initRegisteredRuntimes() {
+  static std::once_flag inited;
+  std::call_once(inited, []() {
+    for (auto &[id, runtime] : getRuntimeMap()) {
+      std::call_once(runtime->initialized,
+                     [runtime = runtime.get()]() { runtime->init(); });
+    }
+  });
+}
+
 } // namespace pmlc::rt

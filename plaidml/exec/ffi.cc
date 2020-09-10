@@ -13,7 +13,7 @@
 #include "plaidml/core/internal.h"
 #include "pmlc/rt/device_id.h"
 #include "pmlc/rt/executable.h"
-#include "pmlc/rt/runtime_registry.h"
+#include "pmlc/rt/runtime.h"
 #include "pmlc/util/env.h"
 #include "pmlc/util/logging.h"
 
@@ -24,7 +24,7 @@ using pmlc::rt::Device;
 using pmlc::rt::EngineKind;
 using pmlc::rt::Executable;
 using pmlc::rt::getDeviceIDs;
-using pmlc::rt::initRuntimes;
+using pmlc::rt::Runtime;
 using pmlc::util::Buffer;
 using pmlc::util::BufferPtr;
 using namespace mlir;  // NOLINT[build/namespaces]
@@ -84,7 +84,7 @@ void plaidml_exec_init(  //
     plaidml_error* err) {
   ffi_wrap_void(err, [&] {  //
     IVLOG(1, "plaidml_exec_init");
-    initRuntimes();
+    Runtime::initRegisteredRuntimes();
   });
 }
 

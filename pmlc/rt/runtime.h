@@ -4,6 +4,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <mutex>
 #include <stdexcept>
 #include <utility>
 
@@ -57,12 +58,21 @@ private:
 //      that init() will be invoked prior to other methods.
 class Runtime {
 public:
+  // Calls Runtime::init() on every registered Runtime.  This call is
+  // idempotent.
+  static void initRegisteredRuntimes();
+
   virtual ~Runtime() {}
-  virtual void init() {}
 
   // Returns the devices supported by this Runtime.
   virtual std::size_t deviceCount() const noexcept = 0;
   virtual std::shared_ptr<Device> device(std::size_t idx) = 0;
+
+protected:
+  virtual void init() {}
+
+private:
+  std::once_flag initialized;
 };
 
 } // namespace pmlc::rt

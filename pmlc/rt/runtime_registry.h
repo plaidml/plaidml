@@ -35,8 +35,4 @@ struct RuntimeRegistration {
   }
 };
 
-// initRuntimes() calls Runtime::init() on every registered Runtime.
-// This call is idempotent.
-void initRuntimes();
-
 } // namespace pmlc::rt
