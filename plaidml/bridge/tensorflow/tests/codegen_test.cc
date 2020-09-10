@@ -48,16 +48,20 @@ Status PlaidMLCodegenTest::CompileAndCheck(std::unique_ptr<HloModule> hlo_module
     TensorBuffers input_buffers;
     TensorBuffers output_buffers;
 
+    VLOG(2) << "Loading input buffers";
     auto inputs = program->inputs();
     for (size_t i = 0; i < inputs.size(); i++) {
+      VLOG(2) << "i is " << i;
       input_buffers[inputs[i].tensor] = io.inputs[i];
     }
 
+    VLOG(2) << "Loading output buffers";
     auto outputs = program->outputs();
     for (size_t i = 0; i < outputs.size(); i++) {
       output_buffers[outputs[i].tensor] = io.outputs[i];
     }
 
+    VLOG(2) << "Running checkProgram";
     checkProgram(*program, input_buffers, output_buffers);
   }
 
