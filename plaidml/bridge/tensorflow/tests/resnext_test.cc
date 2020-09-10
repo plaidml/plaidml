@@ -400,7 +400,7 @@ TEST_P(PlaidMLResNextOperationTest, SimpleResNext) {
                                    lookup("bn_data_var"),
                                    std::vector<float>{2e-05},  // bn_data/add
                                    lookup("bn_data_bias"),
-                                   lookup("input_tensor"),
+                                   inputs[0],
                                    lookup("stage1_unit1_bn3_mean"),
                                    lookup("stage1_unit1_bn3_scale"),
                                    lookup("stage1_unit1_bn3_var"),
