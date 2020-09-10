@@ -8,7 +8,6 @@
 #include "tensorflow/compiler/xla/tests/test_utils.h"
 
 #include "plaidml/bridge/tensorflow/tests/codegen_test.h"
-#include "plaidml/testenv.h"
 
 namespace xla {
 namespace plaidml {

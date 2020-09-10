@@ -1,6 +1,23 @@
+load("@flatbuffers//:build_defs.bzl", "flatbuffer_cc_library", "flatbuffer_py_library")
 load("@rules_cc//cc:defs.bzl", "cc_library")
-load("@rules_python//python:defs.bzl", "py_binary")
+load("@rules_python//python:defs.bzl", "py_binary", "py_library")
 load("@org_tensorflow//tensorflow:tensorflow.bzl", "tf_cc_test")
+
+flatbuffer_cc_library(
+    name = "archive_cc_fbs",
+    srcs = ["archive.fbs"],
+)
+
+flatbuffer_py_library(
+    name = "archive_py",
+    srcs = ["archive.fbs"],
+)
+
+py_library(
+    name = "util",
+    srcs = ["util.py"],
+    deps = [":archive_py"],
+)
 
 cc_library(
     name = "codegen_test",
@@ -96,41 +113,34 @@ py_binary(
     name = "i3d_test_gen",
     testonly = 1,
     srcs = ["i3d_test_gen.py"],
-    tags = [
-        "manual",
-        "skip_windows",
+    tags = ["skip_windows"],
+    deps = [
+        ":util",
+        "@flatbuffers//:runtime_py",
     ],
 )
 
 genrule(
     name = "i3d_test_genrule",
     testonly = 1,
-    srcs = [],
-    outs = ["i3d_test.h.inc"],
-    cmd = "$(location :i3d_test_gen) --output $@",
-    tags = [
-        "manual",
-        "skip_windows",
-    ],
+    outs = ["i3d.pml"],
+    cmd = "$(location :i3d_test_gen) $@",
+    tags = ["skip_windows"],
     tools = [":i3d_test_gen"],
 )
 
 tf_cc_test(
     name = "i3d_test",
-    srcs = [
-        "i3d_test.cc",
-        "i3d_test.h.inc",
-    ],
+    srcs = ["i3d_test.cc"],
     data = [":i3d_test_genrule"],
     extra_copts = ["-fexceptions"],
     linkstatic = 1,
-    tags = [
-        "manual",
-        "skip_windows",
-    ],
+    tags = ["skip_windows"],
     deps = [
+        ":archive_cc_fbs",
         ":codegen_test",
         "//plaidml/bridge/tensorflow/service:compiler",
+        "@org_tensorflow//tensorflow/compiler/xla/tests:verified_hlo_module",
     ],
 )
 
