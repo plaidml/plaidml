@@ -13,6 +13,7 @@
 
 #include "pmlc/conversion/tile_to_pxa/pass_detail.h"
 #include "pmlc/dialect/eltwise/ir/ops.h"
+#include "pmlc/dialect/pxa/analysis/strides.h"
 #include "pmlc/dialect/pxa/analysis/uses.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/dialect/stdx/ir/ops.h"
@@ -20,6 +21,8 @@
 #include "pmlc/dialect/tile/transforms/padding.h"
 #include "pmlc/util/logging.h"
 #include "pmlc/util/util.h"
+
+#include "pmlc/util/ident.h"
 
 namespace pmlc::conversion::tile_to_pxa {
 
@@ -34,6 +37,8 @@ using dialect::tile::CombinationKind;
 using dialect::tile::ConstantOp;
 using dialect::tile::ContractionOp;
 using dialect::tile::ContractionOpAdaptor;
+using dialect::tile::GatherOp;
+using dialect::tile::GatherOpAdaptor;
 using dialect::tile::getPaddingInfo;
 using dialect::tile::IndexOp;
 using dialect::tile::PaddingInfo;
@@ -879,6 +884,85 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
   }
 };
 
+struct GatherOpConversion : public OpConversionPattern<GatherOp> {
+  using OpConversionPattern<GatherOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(GatherOp op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override {
+    IVLOG(2, "GatherOpConversion::matchAndRewrite>");
+
+    // Create an adaptor, to interpret the operands
+    GatherOpAdaptor adaptor(operands);
+
+    auto loc = op.getLoc();
+    auto ctx = rewriter.getContext();
+
+    // input values
+    auto tensor = adaptor.tensor();
+    // index values for the last dimension
+    // this is a one-dimensional array of integers
+    auto indexes = adaptor.dims();
+
+    TypeConverter typeConverter;
+    auto resultType = typeConverter.convertType(op.result().getType());
+    auto memrefType = resultType.cast<MemRefType>();
+
+    // Make an allocation for the output
+    auto resultMemRef = rewriter.create<AllocOp>(loc, memrefType).getResult();
+
+    // we need an array of int64_t representing the results tensor's dims
+    ArrayRef<int64_t> size = memrefType.getShape();
+
+    auto loop = rewriter.create<AffineParallelOp>(
+        loc, ArrayRef<Type>{memrefType},
+        ArrayRef<AtomicRMWKind>{AtomicRMWKind::assign}, size);
+
+    auto txBuilder = loop.getBodyBuilder();
+
+    // create an affine map for loading the index, using the leading counters
+    size_t idxDims = indexes.getType().cast<MemRefType>().getShape().size();
+    auto idxLoadMap = AffineMap::getMultiDimIdentityMap(idxDims, ctx);
+    auto idxLoadOps = loop.getIVs().take_front(idxDims);
+
+    // load the value from the indexes array
+    Value indexVal =
+        txBuilder.create<pxa::PxaLoadOp>(loc, indexes, idxLoadMap, idxLoadOps)
+            .getResult();
+
+    if (!indexVal.getType().isa<IndexType>()) {
+      // cast from whatever integer type it has to index type
+      auto indexType = txBuilder.getIndexType();
+      indexVal = txBuilder.create<mlir::IndexCastOp>(loc, indexVal, indexType)
+                     .getResult();
+    }
+
+    // mix the indexVal in with the loop indexes to create source map
+    size_t dstDims = size.size();
+    SmallVector<Value, 4> srcOps;
+    srcOps.push_back(indexVal);
+    for (size_t i = idxDims; i < dstDims; ++i) {
+      srcOps.push_back(loop.getIVs()[i]);
+    }
+
+    // load the specified value from the source tensor
+    auto loaded = txBuilder.create<mlir::LoadOp>(loc, tensor, srcOps);
+
+    // create a destination map using all of the dimensions
+    auto dstStoreMap = AffineMap::getMultiDimIdentityMap(dstDims, ctx);
+
+    // create a destination map from the whole loop
+    auto stored = txBuilder.create<pxa::PxaReduceOp>(
+        loc, AtomicRMWKind::assign, loaded, resultMemRef, dstStoreMap,
+        loop.getIVs());
+    txBuilder.create<AffineYieldOp>(loc, ArrayRef<Value>{stored.getResult()});
+
+    rewriter.replaceOp(op, loop.getResult(0));
+
+    return success();
+  }
+};
+
 struct IndexOpConversion : public OpConversionPattern<IndexOp> {
   using OpConversionPattern<IndexOp>::OpConversionPattern;
 
@@ -1156,6 +1240,7 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
     patterns.insert<
         CastOpConversion,           //
         FuncOpConversion,           //
+        GatherOpConversion,         //
         IndexOpConversion,          //
         PrngOpConversion,           //
         ReshapeOpConversion,        //
@@ -1164,7 +1249,7 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
         ShapeOpConversion,          //
         TileConstantOpConversion,   //
         TraceOpConversion,          //
-        // TODO: SpecialOpConversion (GatherOp, ScatterOp, ZeroOp)
+        // TODO: SpecialOpConversion (ScatterOp, ZeroOp)
         ContractionOpConversion<CombinationKind::none, FirstOperand>,
         ContractionOpConversion<CombinationKind::add, StdOp<mlir::AddFOp>,
                                 ResultIs<EltwiseFloat>>,
