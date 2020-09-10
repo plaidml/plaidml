@@ -52,8 +52,8 @@ private:
 //
 //      Typically, Runtime will be instantiated (via RuntimeRegistration) at
 //      static initialization time, i.e. before main() is invoked.  Since this
-//      is an unusual process environment in which various global objects may or
-//      may not be initialized, Runtime implementations may defer complicated
+//      is a process environment in which various global objects may or may not
+//      be initialized, Runtime implementations must defer complicated
 //      initialiation to their init() method; the contract with the caller is
 //      that init() will be invoked prior to other methods.
 class Runtime {
