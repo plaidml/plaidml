@@ -1,6 +1,6 @@
 load("@flatbuffers//:build_defs.bzl", "flatbuffer_cc_library", "flatbuffer_py_library")
 load("@rules_cc//cc:defs.bzl", "cc_library")
-load("@rules_python//python:defs.bzl", "py_binary")
+load("@rules_python//python:defs.bzl", "py_binary", "py_library")
 load("@org_tensorflow//tensorflow:tensorflow.bzl", "tf_cc_test")
 
 flatbuffer_cc_library(
@@ -11,6 +11,12 @@ flatbuffer_cc_library(
 flatbuffer_py_library(
     name = "archive_py",
     srcs = ["archive.fbs"],
+)
+
+py_library(
+    name = "util",
+    srcs = ["util.py"],
+    deps = [":archive_py"],
 )
 
 cc_library(
@@ -109,7 +115,7 @@ py_binary(
     srcs = ["i3d_test_gen.py"],
     tags = ["skip_windows"],
     deps = [
-        ":archive_py",
+        ":util",
         "@flatbuffers//:runtime_py",
     ],
 )
