@@ -30,6 +30,13 @@ def plaidml_workspace():
         strip_prefix = "benchmark-1.5.0",
     )
 
+    http_archive(
+        name = "com_google_googletest",
+        url = "https://github.com/google/googletest/archive/release-1.10.0.tar.gz",
+        sha256 = "9dc9157a9a1551ec7a7e43daea9a694a0bb5fb8bec81235d8a1e6ef64c716dcb",
+        strip_prefix = "googletest-release-1.10.0",
+    )
+
     conda_repo(
         name = "com_intel_plaidml_conda",
         env_unix = clean_dep("//conda:unix.yml"),
@@ -59,13 +66,6 @@ def plaidml_workspace():
         url = "https://github.com/gflags/gflags/archive/e292e0452fcfd5a8ae055b59052fc041cbab4abf.zip",
         sha256 = "7d17922978692175c67ef5786a014df44bfbfe3b48b30937cca1413d4ff65f75",
         strip_prefix = "gflags-e292e0452fcfd5a8ae055b59052fc041cbab4abf",
-    )
-
-    http_archive(
-        name = "gmock",
-        url = "https://github.com/google/googletest/archive/release-1.10.0.tar.gz",
-        sha256 = "9dc9157a9a1551ec7a7e43daea9a694a0bb5fb8bec81235d8a1e6ef64c716dcb",
-        strip_prefix = "googletest-release-1.10.0",
     )
 
     http_archive(

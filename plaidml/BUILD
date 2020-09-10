@@ -169,8 +169,8 @@ plaidml_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":lib",
+        "@com_google_googletest//:gtest",
         "@gflags",
-        "@gmock//:gtest",
     ],
     alwayslink = 1,
 )

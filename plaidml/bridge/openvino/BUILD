@@ -44,8 +44,8 @@ plaidml_cc_library(
     tags = TAGS,
     visibility = ["//visibility:public"],
     deps = [
+        "@com_google_googletest//:gtest",
         "@gflags",
-        "@gmock//:gtest",
         "@openvino//:shared_plugin_tests",
     ],
     alwayslink = 1,
