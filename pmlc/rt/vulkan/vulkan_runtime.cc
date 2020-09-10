@@ -23,7 +23,9 @@ namespace pmlc::rt::vulkan {
 
 class VulkanRuntime final : public pmlc::rt::Runtime {
 public:
-  VulkanRuntime() {
+  VulkanRuntime() {}
+
+  void init() final {
     auto state = std::make_shared<VulkanState>();
 
     uint32_t physicalDeviceCount = 0;
@@ -43,8 +45,6 @@ public:
     }
   }
 
-  ~VulkanRuntime() { IVLOG(1, "Destroying vulkan runtime"); }
-
   std::size_t deviceCount() const noexcept final { return devices.size(); }
   std::shared_ptr<pmlc::rt::Device> device(std::size_t idx) {
     return devices.at(idx);
@@ -54,6 +54,6 @@ private:
   std::vector<std::shared_ptr<VulkanDevice>> devices;
 };
 
-pmlc::rt::RuntimeRegistration<VulkanRuntime> reg{"vulkan"};
+pmlc::rt::RuntimeRegistration reg{"vulkan", std::make_unique<VulkanRuntime>()};
 
 } // namespace pmlc::rt::vulkan

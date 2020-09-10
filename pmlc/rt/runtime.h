@@ -46,9 +46,19 @@ private:
 // evaluating a PlaidML program.  These are typically single-instanced within a
 // process, constructed once as needed (typically well after process
 // initialization) and then held onto by the global runtime registry.
+//
+// N.B. The Runtime lifecycle is a little unusual.
+//
+//      Typically, Runtime will be instantiated (via RuntimeRegistration) at
+//      static initialization time, i.e. before main() is invoked.  Since this
+//      is an unusual process environment in which various global objects may or
+//      may not be initialized, Runtime implementations may defer complicated
+//      initialiation to their init() method; the contract with the caller is
+//      that init() will be invoked prior to other methods.
 class Runtime {
 public:
   virtual ~Runtime() {}
+  virtual void init() {}
 
   // Returns the devices supported by this Runtime.
   virtual std::size_t deviceCount() const noexcept = 0;

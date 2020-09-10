@@ -34,13 +34,8 @@ llvm::StringMap<void *> &getSymbolMap();
 const std::regex &getDeviceIDRegex();
 
 // getRuntimeMap returns the map of runtimes available to the current process.
-//
-// If the registered loaders have not yet been evaluated, this call will
-// evaluate them.  The caller may use the functions within the map to obtain a
-// pointer to the associated runtime; if the runtime has not yet been
-// instantiated, this will instantiate the associated runtime, which will be
-// memoized to make subsequent lookups less expensive.
-const std::unordered_map<std::string, std::function<Runtime *()>> &
-getRuntimeMap();
+// N.B. This is mutable at static initialization time, but should be treated as
+// immutable after main() has been called; there is no associated lock.
+std::unordered_map<std::string, std::unique_ptr<Runtime>> &getRuntimeMap();
 
 } // namespace pmlc::rt
