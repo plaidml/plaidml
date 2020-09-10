@@ -1527,7 +1527,7 @@ class TestBackendOps(unittest.TestCase):
         return b.gather(V, I)
 
     @compareForwardClose()
-    def testGatherLong(self, b, v):
+    def testGatherLong(self, b):
         V = b.variable(np.array([[1.0, 2.0], [2.0, 7.0], [5.0, 6.0]]))
         I = b.variable(np.array([[0, 1, 1, 0], [0, 0, 0, 1], [1, 0, 1, 0]], dtype='int32'),
                        dtype='int32')
