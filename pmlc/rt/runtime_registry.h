@@ -21,8 +21,8 @@ void registerRuntime(llvm::StringRef id, std::unique_ptr<Runtime> runtime);
 // initialization time (at runtime, prior to main()).
 //
 // N.B. This requires that an instance of the runtime must be instantiated at
-// static initialization time.
-//      Implementations should delegate non-trivial initialization to init().
+//      static initialization time.  Implementations must perform
+//      initializations within init().
 //
 // For example:
 //
