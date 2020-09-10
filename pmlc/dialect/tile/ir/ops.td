@@ -103,7 +103,7 @@ def GatherOp : SpecialOp<"gather">, HasCanonicalizer {
   let summary = "special gather operation";
   let arguments = (ins
     RankedTensorOf<[AnyScalar]>:$tensor,
-    RankedTensorOf<[Index]>:$dims);
+    RankedTensorOf<[AnyInteger]>:$dims);
   let results = (outs RankedTensorOf<[AnyScalar]>:$result);
 }
 
