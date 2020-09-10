@@ -30,6 +30,11 @@ def SubgroupBroadcast : FunctionPass<"stdx-subgroup-broadcast"> {
   let summary = "Perform unvectorization for subgroups broadcast usage";
   let constructor = "pmlc::target::intel_gen::createSubgroupBroadcastPass()";
   let dependentDialects = ["pmlc::dialect::stdx::StdXDialect"];
+  let options = [
+    Option<"useBlockOps", "use-block-ops", "bool",
+           /*default=*/"false",
+           "Use intel subgroup block reads and writes">
+  ];
 }
 
 def ConvertPXAToAffine : Pass<"intel-gen-convert-pxa-to-affine", "mlir::ModuleOp"> {

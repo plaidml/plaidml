@@ -104,4 +104,66 @@ def SubgroupBroadcastOp : StdX_Op<"subgroup_broadcast", [NoSideEffect, AllTypesM
   let verifier = ?;
 }
 
+def AnyVectorOrScalar : AnyTypeOf<[AnyStdScalar, AnyVector]> {} 
+
+def SubgroupBlockReadINTELOp : StdX_Op<"subgroup_block_read_intel",
+     [TypesMatchWith<"result type matches element type of 'memref'",
+                     "memref", "result",
+                     "$_self.cast<MemRefType>().getElementType()">]> {
+  let summary = "See intel_subgroups extension.";
+  let arguments = (ins Arg<AnyMemRef, "the reference to subgroup block read from",
+                           [MemRead]>:$memref,
+                           Variadic<Index>:$indices);
+  let results = (outs AnyVectorOrScalar:$result);
+
+  let builders = [OpBuilder<
+    "OpBuilder &, OperationState &result, Value memref,"
+    "ValueRange indices = {}">];
+
+  let extraClassDeclaration = [{
+    Value getMemRef() { return getOperand(0); }
+    void setMemRef(Value value) { setOperand(0, value); }
+    MemRefType getMemRefType() {
+      return getMemRef().getType().cast<MemRefType>();
+    }
+
+    operand_range getIndices() { return {operand_begin() + 1, operand_end()}; }
+  }];
+
+  let assemblyFormat = "$memref `[` $indices `]` attr-dict `:` type($memref)";
+}
+
+def SubgroupBlockWriteINTELOp : StdX_Op<"subgroup_block_write_intel",
+     [TypesMatchWith<"type of 'value' matches element type of 'memref'",
+                     "memref", "value",
+                     "$_self.cast<MemRefType>().getElementType()">]> {
+  let summary = "See intel_subgroups extension.";
+
+  let arguments = (ins AnyVectorOrScalar:$value,
+                       Arg<AnyMemRef, "the reference to subgroup block write to",
+                       [MemWrite]>:$memref,
+                       Variadic<Index>:$indices);
+
+  let builders = [OpBuilder<
+    "OpBuilder &, OperationState &result, Value valueToStore, Value memref">];
+
+  let extraClassDeclaration = [{
+      Value getValueToStore() { return getOperand(0); }
+
+      Value getMemRef() { return getOperand(1); }
+      void setMemRef(Value value) { setOperand(1, value); }
+      MemRefType getMemRefType() {
+        return getMemRef().getType().cast<MemRefType>();
+      }
+
+      operand_range getIndices() {
+        return {operand_begin() + 2, operand_end()};
+      }
+  }];
+
+  let assemblyFormat = [{
+    $value `,` $memref `[` $indices `]` attr-dict `:` type($memref)
+  }];
+}
+
 #endif // __PML_STDX_OPS__

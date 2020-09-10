@@ -29,10 +29,11 @@ private:
   scf::ParallelOp loop;
   unsigned vectorSize;
   Value sid;
+  bool useBlockOps;
 
 public:
-  DevectorizeImpl(scf::ParallelOp loop, unsigned vectorSize)
-      : loop(loop), vectorSize(vectorSize) {}
+  DevectorizeImpl(scf::ParallelOp loop, unsigned vectorSize, bool useBlockOps)
+      : loop(loop), vectorSize(vectorSize), useBlockOps(useBlockOps) {}
 
   bool isVectorTypeValid(VectorType type) {
     return type.getRank() == 1 && type.getDimSize(0) == vectorSize;
@@ -63,9 +64,17 @@ public:
     OpBuilder builder(op);
     // Add sid to lowest index
     SmallVector<Value, 4> idxs = op.indices();
-    idxs.back() = builder.create<AddIOp>(op.getLoc(), idxs.back(), sid);
-    auto newLoadOp = builder.create<LoadOp>(op.getLoc(), op.memref(), idxs);
-    op.replaceAllUsesWith(newLoadOp.getResult());
+    if (useBlockOps) {
+      // TODO: add additional requirements like mem alignment
+      auto newBlockReadOp =
+          builder.create<dialect::stdx::SubgroupBlockReadINTELOp>(
+              op.getLoc(), op.memref(), idxs);
+      op.replaceAllUsesWith(newBlockReadOp.getResult());
+    } else {
+      idxs.back() = builder.create<AddIOp>(op.getLoc(), idxs.back(), sid);
+      auto newLoadOp = builder.create<LoadOp>(op.getLoc(), op.memref(), idxs);
+      op.replaceAllUsesWith(newLoadOp.getResult());
+    }
     op.erase();
     return success();
   }
@@ -76,8 +85,14 @@ public:
     OpBuilder builder(op);
     // Add sid to lowest index
     SmallVector<Value, 4> idxs = op.indices();
-    idxs.back() = builder.create<AddIOp>(op.getLoc(), idxs.back(), sid);
-    builder.create<StoreOp>(op.getLoc(), op.vector(), op.memref(), idxs);
+    if (useBlockOps) {
+      // TODO: add additional requirements like mem alignment
+      builder.create<dialect::stdx::SubgroupBlockWriteINTELOp>(
+          op.getLoc(), op.vector(), op.memref(), idxs);
+    } else {
+      idxs.back() = builder.create<AddIOp>(op.getLoc(), idxs.back(), sid);
+      builder.create<StoreOp>(op.getLoc(), op.vector(), op.memref(), idxs);
+    }
     op.erase();
     return success();
   }
@@ -205,13 +220,17 @@ public:
 
 struct SubgroupBroadcastPass
     : public SubgroupBroadcastBase<SubgroupBroadcastPass> {
+  SubgroupBroadcastPass() = default;
+  explicit SubgroupBroadcastPass(bool useBlockOps) {
+    this->useBlockOps = useBlockOps;
+  }
   void runOnFunction() final {
     auto func = getFunction();
     IVLOG(1, "Doing something");
     func.walk([&](scf::ParallelOp op) {
       int64_t subgroupSize = getIntegerTag(op, subgroupSizeTag(), 1);
       if (hasUnitTag(op, gpuThreadTag()) && subgroupSize > 1) {
-        DevectorizeImpl impl(op, subgroupSize);
+        DevectorizeImpl impl(op, subgroupSize, useBlockOps.getValue());
         if (failed(impl.devectorize())) {
           signalPassFailure();
         }
@@ -224,6 +243,10 @@ struct SubgroupBroadcastPass
 
 std::unique_ptr<mlir::Pass> createSubgroupBroadcastPass() {
   return std::make_unique<SubgroupBroadcastPass>();
+}
+
+std::unique_ptr<mlir::Pass> createSubgroupBroadcastPass(bool useBlockOps) {
+  return std::make_unique<SubgroupBroadcastPass>(useBlockOps);
 }
 
 } // namespace pmlc::target::intel_gen
