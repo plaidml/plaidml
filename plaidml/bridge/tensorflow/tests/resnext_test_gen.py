@@ -1,4 +1,5 @@
 import argparse
+import glob
 import os
 import pathlib
 import tempfile
@@ -20,9 +21,9 @@ def main(args):
         # add resnext model here
         x = np.ones((1, 224, 224, 3))
         weights = {}
+        model_name = "resnext50_tf_saved_model"
         with tf.compat.v1.Session() as sess:
-            model = tf.saved_model.load(
-                sess, ["train"], "plaidml/bridge/tensorflow/tests/resnext50_tf_saved_model")
+            model = tf.saved_model.load(sess, ["train"], args.saved_model_path + "/" + model_name)
             input_name = model.signature_def['serving_default'].inputs['input'].name
             input_tensor = tf.get_default_graph().get_tensor_by_name(input_name)
             output_tensor = tf.get_default_graph().get_tensor_by_name('stage4_unit3_relu:0')
@@ -53,5 +54,6 @@ if __name__ == "__main__":
     parser.add_argument('output',
                         type=argparse.FileType('wb'),
                         help='location to write the generated archive')
+    parser.add_argument('saved_model_path', help='location where the saved_model is located')
     args = parser.parse_args()
     main(args)

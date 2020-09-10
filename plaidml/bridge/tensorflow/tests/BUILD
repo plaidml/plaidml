@@ -185,7 +185,7 @@ genrule(
     name = "resnext_test_genrule",
     testonly = 1,
     outs = ["resnext.pml"],
-    cmd = "$(execpath :resnext_test_gen) $@",
+    cmd = "$(execpath :resnext_test_gen) $@ $(RULEDIR)",
     tags = ["skip_windows"],
     tools = [":resnext_test_gen"],
 )
