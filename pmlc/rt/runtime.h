@@ -76,3 +76,11 @@ private:
 };
 
 } // namespace pmlc::rt
+
+namespace pmlc {
+
+inline void InitializeRuntimes() {
+  pmlc::rt::Runtime::initRegisteredRuntimes();
+}
+
+} // namespace pmlc

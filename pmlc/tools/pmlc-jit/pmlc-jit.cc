@@ -97,7 +97,7 @@ int main(int argc, char **argv) {
   llvm::InitializeNativeTarget();
   llvm::InitializeNativeTargetAsmPrinter();
   mlir::initializeLLVMPasses();
-  pmlc::rt::Runtime::initRegisteredRuntimes();
+  pmlc::InitializeRuntimes();
 
   std::set_terminate([]() {
     auto eptr = std::current_exception();

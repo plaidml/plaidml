@@ -120,7 +120,7 @@ int main(int argc, char **argv) {
   llvm::InitializeNativeTarget();
   llvm::InitializeNativeTargetAsmPrinter();
   mlir::initializeLLVMPasses();
-  pmlc::rt::Runtime::initRegisteredRuntimes();
+  pmlc::InitializeRuntimes();
 
   return JitRunnerMain(argc, argv);
 }
