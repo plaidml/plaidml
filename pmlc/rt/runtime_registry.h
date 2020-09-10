@@ -11,11 +11,8 @@
 
 namespace pmlc::rt {
 
-namespace details {
-
+// Register the supplied Runtime.
 void registerRuntime(llvm::StringRef id, std::unique_ptr<Runtime> runtime);
-
-} // namespace details
 
 // RuntimeRegistration is used to register a PlaidML Runtime class at static
 // initialization time (at runtime, prior to main()).
@@ -31,7 +28,7 @@ void registerRuntime(llvm::StringRef id, std::unique_ptr<Runtime> runtime);
 struct RuntimeRegistration {
   explicit RuntimeRegistration(llvm::StringRef id,
                                std::unique_ptr<Runtime> runtime) {
-    details::registerRuntime(id, std::move(runtime));
+    registerRuntime(id, std::move(runtime));
   }
 };
 

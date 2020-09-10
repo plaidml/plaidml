@@ -12,12 +12,8 @@ std::unordered_map<std::string, std::unique_ptr<Runtime>> &getRuntimeMap() {
   return runtimeMap;
 }
 
-namespace details {
-
 void registerRuntime(llvm::StringRef id, std::unique_ptr<Runtime> runtime) {
   getRuntimeMap()[id.str()] = std::move(runtime);
 }
-
-} // namespace details
 
 } // namespace pmlc::rt
