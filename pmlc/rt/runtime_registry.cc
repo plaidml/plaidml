@@ -87,4 +87,6 @@ getRuntimeMap() {
   return runtimeMap;
 }
 
+void loadRuntimes() { getRuntimeMap(); }
+
 } // namespace pmlc::rt

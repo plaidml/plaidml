@@ -79,4 +79,9 @@ struct RuntimeRegistration {
   }
 };
 
+// Performs any actions needed to load the set of available runtimes.  Note that
+// individual runtimes will still need to be lazily initialized, since we do not
+// want to initialize every runtime in programs that only use one.
+void loadRuntimes();
+
 } // namespace pmlc::rt
