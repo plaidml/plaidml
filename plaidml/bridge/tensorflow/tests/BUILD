@@ -156,6 +156,55 @@ tf_cc_test(
     ],
 )
 
+genrule(
+    name = "resnext_extract_weights",
+    testonly = 1,
+    srcs = ["@models_resnext50//file"],
+    outs = [
+        "resnext50_tf_saved_model/saved_model.pb",
+	"resnext50_tf_saved_model/variables/variables.data-00000-of-00001",
+	"resnext50_tf_saved_model/variables/variables.index"
+    ],
+    cmd = "tar -xzvf $(location @models_resnext50//file) -C $(RULEDIR)",
+    tags = ["skip_windows"],
+)
+
+py_binary(
+    name = "resnext_test_gen",
+    testonly = 1,
+    srcs = ["resnext_test_gen.py"],
+    data = [":resnext_extract_weights"],
+    tags = ["skip_windows"],
+    deps = [
+        ":util",
+        "@flatbuffers//:runtime_py",
+    ],
+)
+
+genrule(
+    name = "resnext_test_genrule",
+    testonly = 1,
+    outs = ["resnext.pml"],
+    cmd = "$(execpath :resnext_test_gen) $@",
+    tags = ["skip_windows"],
+    tools = [":resnext_test_gen"],
+)
+
+tf_cc_test(
+    name = "resnext_test",
+    srcs = ["resnext_test.cc"],
+    data = [":resnext_test_genrule"],
+    extra_copts = ["-fexceptions"],
+    linkstatic = 1,
+    tags = ["skip_windows"],
+    deps = [
+        ":archive_cc_fbs",
+        ":codegen_test",
+        "//plaidml/bridge/tensorflow/service:compiler",
+        "@org_tensorflow//tensorflow/compiler/xla/tests:verified_hlo_module",
+    ],
+)
+
 py_binary(
     name = "shape_op_test_gen",
     testonly = 1,
