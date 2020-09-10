@@ -42,6 +42,7 @@ def _http_archive_impl(ctx):
         buildfile_path = ctx.path("BUILD.bazel")
         ctx.symlink(ctx.attr.build_file, buildfile_path)
     for src, tgt in ctx.attr.link_files.items():
+        ctx.delete(ctx.path(tgt))
         ctx.symlink(Label(src), ctx.path(tgt))
 
 # Downloads and creates Bazel repos for dependencies.

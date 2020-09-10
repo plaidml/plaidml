@@ -110,4 +110,8 @@ void ffi_wrap_void(plaidml_error* err, F fn) {
 plaidml_datatype convertIntoDataType(mlir::Type type);
 mlir::Type convertFromDataType(plaidml_datatype dtype, mlir::MLIRContext* context);
 
+// Converts the supplied RAII strings vector into a plaidml_strings*
+// for returning via FFI.
+plaidml_strings* toFFI(std::vector<std::string> strings);
+
 }  // namespace plaidml::core

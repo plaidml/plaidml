@@ -24,6 +24,7 @@ plaidml_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":api",
+        ":runtimes",
         ":targets",
     ],
 )
@@ -37,6 +38,15 @@ plaidml_cc_library(
         "//pmlc/target/intel_gen",
         "//pmlc/target/x86",
     ],
+)
+
+plaidml_cc_library(
+    name = "runtimes",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//pmlc/rt/llvm",
+        "//pmlc/rt/vulkan",
+     ],
 )
 
 jsonnet_to_json(
@@ -169,8 +179,8 @@ plaidml_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":lib",
+        "@com_google_googletest//:gtest",
         "@gflags",
-        "@gmock//:gtest",
     ],
     alwayslink = 1,
 )

@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <memory>
 #include <mutex>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -105,6 +106,28 @@ Type convertFromDataType(plaidml_datatype dtype, MLIRContext* context) {
       break;
   }
   llvm_unreachable("Invalid plaidml_datatype");
+}
+
+plaidml_strings* toFFI(std::vector<std::string> strings) {
+  std::unique_ptr<plaidml_string* []> elts { new plaidml_string*[strings.size()] };
+  auto result = std::make_unique<plaidml_strings>();
+
+  std::size_t idx = 0;
+  try {
+    while (idx < strings.size()) {
+      elts[idx] = new plaidml_string{std::move(strings[idx])};
+      ++idx;
+    }
+  } catch (...) {
+    while (idx) {
+      delete elts[idx--];
+    }
+    throw;
+  }
+
+  result->size = strings.size();
+  result->elts = elts.release();
+  return result.release();
 }
 
 }  // namespace plaidml::core

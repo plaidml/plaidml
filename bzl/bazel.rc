@@ -101,3 +101,8 @@ test:asan --test_env=ASAN_ENABLE=1
 test:asan --test_env=ASAN_OPTIONS
 test:asan --test_env=ASAN_SYMBOLIZER_PATH
 test:asan --test_env=DYLD_INSERT_LIBRARIES
+
+# For building tensorflow
+build --define=no_aws_support=true
+build --nocheck_visibility
+common --experimental_repo_remote_exec

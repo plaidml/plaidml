@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <stdexcept>
 
-#include "pmlc/compiler/registry.h"
+#include "pmlc/rt/symbol_registry.h"
 
 // This function is called from the BoundsCheckPass.
 // index - index for a dimension that is accessed by load/store operation
@@ -20,8 +20,7 @@ extern "C" void _mlir_ciface_plaidml_rt_bounds_check(intptr_t index,
 namespace {
 struct Registration {
   Registration() {
-    using pmlc::compiler::registerSymbol;
-    registerSymbol(
+    pmlc::rt::registerSymbol(
         "_mlir_ciface_plaidml_rt_bounds_check",
         reinterpret_cast<void *>(_mlir_ciface_plaidml_rt_bounds_check));
   }
