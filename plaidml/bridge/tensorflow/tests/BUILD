@@ -34,6 +34,18 @@ cc_library(
     ],
 )
 
+cc_library(
+    name = "utils",
+    testonly = True,
+    srcs = ["utils.cc"],
+    hdrs = ["utils.h"],
+    tags = ["skip_windows"],
+    deps = [
+        ":archive_cc_fbs",
+        ":codegen_test",
+    ],
+)
+
 tf_cc_test(
     name = "compare_op_test",
     srcs = ["compare_op_test.cc"],
@@ -139,6 +151,7 @@ tf_cc_test(
     deps = [
         ":archive_cc_fbs",
         ":codegen_test",
+	":utils",
         "//plaidml/bridge/tensorflow/service:compiler",
         "@org_tensorflow//tensorflow/compiler/xla/tests:verified_hlo_module",
     ],
@@ -156,24 +169,11 @@ tf_cc_test(
     ],
 )
 
-genrule(
-    name = "resnext_extract_weights",
-    testonly = 1,
-    srcs = ["@models_resnext50//file"],
-    outs = [
-        "resnext50_tf_saved_model/saved_model.pb",
-	"resnext50_tf_saved_model/variables/variables.data-00000-of-00001",
-	"resnext50_tf_saved_model/variables/variables.index"
-    ],
-    cmd = "tar -xzvf $(location @models_resnext50//file) -C $(RULEDIR)",
-    tags = ["skip_windows"],
-)
-
 py_binary(
     name = "resnext_test_gen",
     testonly = 1,
     srcs = ["resnext_test_gen.py"],
-    data = [":resnext_extract_weights"],
+    data = ["@models_resnext50//file"],
     tags = ["skip_windows"],
     deps = [
         ":util",
@@ -182,12 +182,13 @@ py_binary(
 )
 
 genrule(
-    name = "resnext_test_genrule",
-    testonly = 1,
-    outs = ["resnext.pml"],
-    cmd = "$(execpath :resnext_test_gen) $@ $(RULEDIR)",
-    tags = ["skip_windows"],
-    tools = [":resnext_test_gen"],
+  name = "resnext_test_genrule",
+  testonly = 1,
+  srcs = ["@models_resnext50//file"],
+  outs = ["resnext.pml"],
+  cmd = "$(location :resnext_test_gen) $@ $(location @models_resnext50//file)",
+  tags = ["skip_windows"],
+  tools = [":resnext_test_gen"],
 )
 
 tf_cc_test(
@@ -200,6 +201,7 @@ tf_cc_test(
     deps = [
         ":archive_cc_fbs",
         ":codegen_test",
+	":utils",
         "//plaidml/bridge/tensorflow/service:compiler",
         "@org_tensorflow//tensorflow/compiler/xla/tests:verified_hlo_module",
     ],

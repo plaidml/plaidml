@@ -2,6 +2,7 @@ import argparse
 import glob
 import os
 import pathlib
+import tarfile
 import tempfile
 
 import numpy as np
@@ -13,6 +14,8 @@ from plaidml.bridge.tensorflow.tests import util
 
 
 def main(args):
+    saved_model = tarfile.open(args.saved_model_path)
+    saved_model.extractall()
     with tempfile.TemporaryDirectory() as tmp_dir:
         tmp_path = pathlib.Path(tmp_dir)
         os.environ['XLA_FLAGS'] = '--xla_dump_to={}'.format(tmp_dir)
@@ -23,7 +26,7 @@ def main(args):
         weights = {}
         model_name = "resnext50_tf_saved_model"
         with tf.compat.v1.Session() as sess:
-            model = tf.saved_model.load(sess, ["train"], args.saved_model_path + "/" + model_name)
+            model = tf.saved_model.load(sess, ["train"], model_name)
             input_name = model.signature_def['serving_default'].inputs['input'].name
             input_tensor = tf.get_default_graph().get_tensor_by_name(input_name)
             output_tensor = tf.get_default_graph().get_tensor_by_name('stage4_unit3_relu:0')
