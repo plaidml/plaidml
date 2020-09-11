@@ -67,10 +67,12 @@ cc_binary(
 cc_binary(
     name = "libinference_engine_ir_reader.so",
     # linkopts = TODO,
+    # linkopts = PLAIDML_LINKOPTS,
     linkshared = 1,
     tags = TAGS,
     deps = [
         "@openvino//:ie_reader",
+        # "@openvino//:inference_engine",
     ],
 )
 
