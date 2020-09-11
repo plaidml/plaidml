@@ -226,7 +226,6 @@ struct SubgroupBroadcastPass
   }
   void runOnFunction() final {
     auto func = getFunction();
-    IVLOG(1, "Doing something");
     func.walk([&](scf::ParallelOp op) {
       int64_t subgroupSize = getIntegerTag(op, subgroupSizeTag(), 1);
       if (hasUnitTag(op, gpuThreadTag()) && subgroupSize > 1) {
