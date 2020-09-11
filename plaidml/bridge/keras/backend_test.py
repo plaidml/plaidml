@@ -1515,15 +1515,18 @@ class TestBackendOps(unittest.TestCase):
          ]],
         skip_theano=False,
         skip_tensorflow=True)
-    @unittest.skip("gather is not yet implemented")
     def testGather(self, b, v):
         I = b.variable(np.array([0, 2, 1, 0], dtype='int32'), dtype='int32')
-        I2 = b.variable(np.array([[2, 1], [0, 1], [1, 0], [2, 1], [0, 0]], dtype='int32'),
-                        dtype='int32')
         return [b.gather(v, I)]
 
     @compareForwardClose()
-    @unittest.skip("gather is not yet implemented")
+    def testGather2(self, b):
+        V = b.variable(np.array([[1.0, 2.0], [2.0, 7.0], [5.0, 6.0]]))
+        I = b.variable(np.array([[2, 1], [0, 1], [1, 0], [2, 1], [0, 0]], dtype='int32'),
+                       dtype='int32')
+        return b.gather(V, I)
+
+    @compareForwardClose()
     def testGatherLong(self, b):
         V = b.variable(np.array([[1.0, 2.0], [2.0, 7.0], [5.0, 6.0]]))
         I = b.variable(np.array([[0, 1, 1, 0], [0, 0, 0, 1], [1, 0, 1, 0]], dtype='int32'),
@@ -1531,14 +1534,12 @@ class TestBackendOps(unittest.TestCase):
         return b.gather(V, I)
 
     @compareForwardClose()
-    @unittest.skip("gather is not yet implemented")
     def testGatherWithA1Dim(self, b):
         V = b.variable(np.array([[1.0, 2.0], [2.0, 7.0], [5.0, 6.0]]))
         I = b.variable(np.array([[0], [1], [0]], dtype='int32'), dtype='int32')
         return b.gather(V, I)
 
     @compareForwardClose()
-    @unittest.skip("gather is not yet implemented")
     def testGatherLong2(self, b):
         V = b.variable(np.array([[1.0, 2.0], [2.0, 7.0], [5.0, 6.0]]))
         I = b.variable(np.array([[[0, 1, 1, 0], [1, 0, 0, 1]], [[1, 0, 1, 0], [0, 0, 1, 1]]],
