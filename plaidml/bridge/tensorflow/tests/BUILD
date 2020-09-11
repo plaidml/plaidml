@@ -151,7 +151,7 @@ tf_cc_test(
     deps = [
         ":archive_cc_fbs",
         ":codegen_test",
-	":utils",
+        ":utils",
         "//plaidml/bridge/tensorflow/service:compiler",
         "@org_tensorflow//tensorflow/compiler/xla/tests:verified_hlo_module",
     ],
@@ -182,13 +182,13 @@ py_binary(
 )
 
 genrule(
-  name = "resnext_test_genrule",
-  testonly = 1,
-  srcs = ["@models_resnext50//file"],
-  outs = ["resnext.pml"],
-  cmd = "$(location :resnext_test_gen) $@ $(location @models_resnext50//file)",
-  tags = ["skip_windows"],
-  tools = [":resnext_test_gen"],
+    name = "resnext_test_genrule",
+    testonly = 1,
+    srcs = ["@models_resnext50//file"],
+    outs = ["resnext.pml"],
+    cmd = "$(location :resnext_test_gen) $@ $(location @models_resnext50//file)",
+    tags = ["skip_windows"],
+    tools = [":resnext_test_gen"],
 )
 
 tf_cc_test(
@@ -201,7 +201,7 @@ tf_cc_test(
     deps = [
         ":archive_cc_fbs",
         ":codegen_test",
-	":utils",
+        ":utils",
         "//plaidml/bridge/tensorflow/service:compiler",
         "@org_tensorflow//tensorflow/compiler/xla/tests:verified_hlo_module",
     ],
