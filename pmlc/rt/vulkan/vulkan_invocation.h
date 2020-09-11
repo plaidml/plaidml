@@ -189,7 +189,8 @@ private:
   VkCommandPool commandPool;
   VkQueryPool timestampQueryPool;
   llvm::SmallVector<VkCommandBuffer, 1> commandBuffers;
-  uint32_t timestampQuery{2};
+  uint32_t timestampQueryCount{2};
+  uint32_t memoryTransferCount{0};
 };
 
 } // namespace pmlc::rt::vulkan
