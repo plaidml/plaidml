@@ -189,7 +189,7 @@ private:
   VkCommandPool commandPool;
   llvm::SmallVector<VkCommandBuffer, 1> commandBuffers;
   VkQueryPool timestampQueryPool;
-  const uint32_t timestampQueryPoolSize{2};
+  const uint32_t timestampQueryPoolSize{8192};
   uint32_t timestampQueryCount{2};
   uint32_t memoryTransferCount{0};
 };
