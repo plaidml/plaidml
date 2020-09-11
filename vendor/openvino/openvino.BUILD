@@ -306,6 +306,29 @@ cc_library(
     ],
 )
 
+# TODO
+cc_library(
+    name = "ie_reader",
+    srcs = glob([
+        "inference-engine/src/readers/ir_reader/*.cpp",
+    ]),
+    hdrs = glob([
+        "inference-engine/src/readers/ir_reader/*.hpp",
+    ]),
+    includes = [
+        "inference-engine/src/inference_engine",
+        "inference-engine/src/readers/ir_reader",  # TODO: Why does this work?
+        "inference-engine/src/readers/reader_api",  # TODO: Why does this work?
+    ],
+    local_defines = [
+        "ENABLE_IR_READER",
+    ],
+    deps = [
+        "inference_engine",
+    ],
+    alwayslink = 1,
+)
+
 cc_library(
     name = "inference_engine",
     srcs = glob([

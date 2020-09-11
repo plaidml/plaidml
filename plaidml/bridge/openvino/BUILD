@@ -46,6 +46,7 @@ cc_binary(
     ],
     deps = [
         "@openvino//:benchmark_app",
+        ":libinference_engine_ir_reader.so",
         ":libplaidml-plugin.so",
     ],
 )
@@ -59,6 +60,17 @@ cc_binary(
         ":lib",
         "//plaidml:runtimes",
         "//plaidml:targets",
+    ],
+)
+
+# TODO
+cc_binary(
+    name = "libinference_engine_ir_reader.so",
+    # linkopts = TODO,
+    linkshared = 1,
+    tags = TAGS,
+    deps = [
+        "@openvino//:ie_reader",
     ],
 )
 
