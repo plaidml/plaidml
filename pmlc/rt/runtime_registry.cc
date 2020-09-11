@@ -5,6 +5,7 @@
 #include <list>
 #include <mutex>
 #include <stdexcept>
+#include <unordered_map>
 #include <utility>
 
 #include "pmlc/util/logging.h"
@@ -13,20 +14,17 @@
 namespace pmlc::rt {
 namespace {
 
-struct LoaderList {
-  std::mutex mutex;
-  std::list<std::pair<std::string, Loader>> loaders;
-
-  static LoaderList &instance() {
-    static LoaderList ll;
-    return ll;
-  }
+class DuplicateRuntimeError final : public std::runtime_error {
+public:
+  explicit DuplicateRuntimeError(llvm::StringRef id)
+      : std::runtime_error{llvm::formatv(
+            "Multiple runtime implementations found for {0}", id)} {}
 };
 
-class MemoizedFactory final {
+class Memoizer final {
 public:
-  explicit MemoizedFactory(Factory factory) : factory{std::move(factory)} {}
-  Runtime *getRuntime() {
+  explicit Memoizer(Factory factory) : factory{std::move(factory)} {}
+  Runtime *get() {
     std::call_once(init_once, [this]() { runtime = factory(); });
     return runtime.get();
   }
@@ -37,54 +35,86 @@ private:
   std::shared_ptr<Runtime> runtime;
 };
 
-const std::unordered_map<std::string, std::function<Runtime *()>>
-buildRuntimeMap() {
-  std::unordered_map<std::string, std::function<Runtime *()>> result;
+using Accessor = std::function<Runtime *()>;
 
-  auto &ll = LoaderList::instance();
-  std::lock_guard<std::mutex> lock{ll.mutex};
+class RuntimeRegistry {
+public:
+  static RuntimeRegistry *instance() {
+    static RuntimeRegistry reg;
+    return &reg;
+  }
 
-  for (auto &[loaderId, loader] : ll.loaders) {
-    std::unordered_map<std::string, Factory> factories;
-    try {
-      factories = loader();
-    } catch (const std::exception &e) {
-      IVLOG(1, "Loader " << loaderId << " initialization failed: " << e.what());
-      continue;
-    }
-    for (auto &[id, factory] : factories) {
-      auto memo = std::make_shared<MemoizedFactory>(factory);
-      auto [it, inserted] =
-          result.emplace(id, [memo = std::move(memo)]() -> Runtime * {
-            return memo->getRuntime();
-          });
-      if (!inserted) {
-        throw std::runtime_error{
-            llvm::formatv("Multiple runtime implementations found for {}", id)};
-      }
+  void registerFactory(llvm::StringRef id, Factory factory) {
+    std::lock_guard<std::mutex> lock{mutex};
+    auto memoizer = std::make_shared<Memoizer>(std::move(factory));
+    auto inserted =
+        runtimes
+            .emplace(id, Accessor{[memoizer = std::move(memoizer)]() {
+                       return memoizer->get();
+                     }})
+            .second;
+    if (!inserted) {
+      throw DuplicateRuntimeError{id};
     }
   }
 
-  return result;
-}
+  void bindRuntime(llvm::StringRef id, std::shared_ptr<Runtime> runtime) {
+    std::lock_guard<std::mutex> lock{mutex};
+    auto inserted =
+        runtimes
+            .emplace(id,
+                     [runtime = std::move(runtime)]() { return runtime.get(); })
+            .second;
+    if (!inserted) {
+      throw DuplicateRuntimeError{id};
+    }
+  }
+
+  Runtime *getRuntime(llvm::StringRef id) {
+    std::lock_guard<std::mutex> lock{mutex};
+    return runtimes.at(id.str())();
+  }
+
+  std::unordered_map<std::string, Runtime *> getRuntimeMap() {
+    std::lock_guard<std::mutex> lock{mutex};
+    std::unordered_map<std::string, Runtime *> result;
+    for (auto &[id, runtimeFunc] : runtimes) {
+      Runtime *runtime;
+      try {
+        runtime = runtimeFunc();
+      } catch (...) {
+        continue;
+      }
+      result[id] = runtime;
+    }
+    return result;
+  }
+
+private:
+  std::mutex mutex;
+  std::unordered_map<std::string, Accessor> runtimes;
+};
 
 } // namespace
 
 namespace details {
 
-void registerLoader(llvm::StringRef id, Loader loader) {
-  auto &ll = LoaderList::instance();
-  std::lock_guard<std::mutex> lock{ll.mutex};
-  ll.loaders.emplace_back(id, std::move(loader));
+void registerFactory(llvm::StringRef id, Factory factory) {
+  RuntimeRegistry::instance()->registerFactory(id, std::move(factory));
 }
 
 } // namespace details
 
-const std::unordered_map<std::string, std::function<Runtime *()>> &
-getRuntimeMap() {
-  static std::unordered_map<std::string, std::function<Runtime *()>>
-      runtimeMap = buildRuntimeMap();
-  return runtimeMap;
+Runtime *getRuntime(llvm::StringRef id) {
+  return RuntimeRegistry::instance()->getRuntime(id);
+}
+
+std::unordered_map<std::string, Runtime *> getRuntimeMap() {
+  return RuntimeRegistry::instance()->getRuntimeMap();
+}
+
+void bindRuntime(llvm::StringRef id, std::shared_ptr<Runtime> runtime) {
+  RuntimeRegistry::instance()->bindRuntime(id, std::move(runtime));
 }
 
 } // namespace pmlc::rt
