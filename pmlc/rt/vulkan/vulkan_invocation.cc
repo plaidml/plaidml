@@ -36,7 +36,7 @@ VulkanInvocation::VulkanInvocation() : device{Device::current<VulkanDevice>()} {
   queryPoolCreateInfo.pNext = nullptr;
   queryPoolCreateInfo.flags = 0;
   queryPoolCreateInfo.queryType = VK_QUERY_TYPE_TIMESTAMP;
-  queryPoolCreateInfo.queryCount = 8192;
+  queryPoolCreateInfo.queryCount = timestampQueryPoolSize;
   queryPoolCreateInfo.pipelineStatistics = 0;
   throwOnVulkanError(
       vkCreateQueryPool(device->getDevice(), &queryPoolCreateInfo,
@@ -244,6 +244,15 @@ void VulkanInvocation::submitCommandBuffers() {
       IVLOG(1, "  Vulkan kernel exec time: " << kernel_ns / NS_PER_MS << "ms");
 
       total_kernel_ns += kernel_ns;
+    }
+
+    if (timestampQueryCount == timestampQueryPoolSize) {
+      IVLOG(
+          1,
+          "WARNING: Ran out of space in the timestamp query pool which has "
+          "size = "
+              << timestampQueryPoolSize
+              << "; consider increasing the size of the timestamp query pool.");
     }
 
     IVLOG(1, "Total Vulkan kernels: " << (timestampQueryCount - 2) / 2);
@@ -701,7 +710,8 @@ void VulkanInvocation::createSchedule() {
 
   for (const auto &action : schedule) {
     if (auto kernel = std::dynamic_pointer_cast<LaunchKernelAction>(action)) {
-      if (device->getTimestampValidBits()) {
+      if (device->getTimestampValidBits() &&
+          timestampQueryCount < timestampQueryPoolSize) {
         vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
                             timestampQueryPool, timestampQueryCount++);
       }
@@ -738,7 +748,8 @@ void VulkanInvocation::createSchedule() {
                     /*groupCountY=*/kernel->workGroups.y,
                     /*groupCountZ=*/kernel->workGroups.z);
 
-      if (device->getTimestampValidBits()) {
+      if (device->getTimestampValidBits() &&
+          timestampQueryCount < timestampQueryPoolSize) {
         vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
                             timestampQueryPool, timestampQueryCount++);
       }
