@@ -241,7 +241,7 @@ void VulkanInvocation::submitCommandBuffers() {
       uint64_t kernel_ns =
           (results[i + 1] - results[i]) * device->getTimestampPeriod();
 
-      IVLOG(1, "  Vulkan kernel exec time: " << kernel_ns / NS_PER_MS << "ms");
+      IVLOG(2, "  Vulkan kernel exec time: " << kernel_ns / NS_PER_MS << "ms");
 
       total_kernel_ns += kernel_ns;
     }
