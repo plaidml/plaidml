@@ -76,9 +76,23 @@ struct RuntimeRegistration {
   }
 };
 
-// bindRuntime directly binds the indicated runtime ID to the supplied runtime
-// in the system's global runtime map.  This will throw an exception if the new
-// runtime's ID conflicts with an existing ID.
-void bindRuntime(llvm::StringRef id, std::shared_ptr<Runtime> runtime);
+// registerRuntime directly binds the indicated runtime ID to the supplied
+// runtime in the system's global runtime map.  This will throw an exception if
+// the new runtime's ID conflicts with an existing ID.
+//
+// N.B. This function is NOT synchronized.  It is the caller's responsibility to
+// ensure that other components are not accessing the system global runtime map
+// in parallel -- e.g. looking up device IDs or compiling programs to produce
+// executables.
+void registerRuntime(llvm::StringRef id, std::shared_ptr<Runtime> runtime);
+
+// initRuntimes processes registered factories and adds them to the system's
+// global runtime map.
+//
+// N.B. This function is NOT synchronized.  It is the caller's responsibility to
+// ensure that other components are not accessing the system global runtime map
+// in parallel -- e.g. looking up device IDs or compiling programs to produce
+// executables.
+void initRuntimes();
 
 } // namespace pmlc::rt

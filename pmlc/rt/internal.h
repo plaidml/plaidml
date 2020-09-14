@@ -38,6 +38,7 @@ Runtime *getRuntime(llvm::StringRef id);
 
 // getRuntimeMap returns the current map of runtimes available to the current
 // process.
-std::unordered_map<std::string, Runtime *> getRuntimeMap();
+const std::unordered_map<std::string, std::shared_ptr<Runtime>> &
+getRuntimeMap();
 
 } // namespace pmlc::rt
