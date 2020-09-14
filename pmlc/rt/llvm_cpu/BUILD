@@ -3,7 +3,7 @@
 load("//bzl:plaidml.bzl", "plaidml_cc_library")
 
 plaidml_cc_library(
-    name = "llvm",
+    name = "llvm_cpu",
     srcs = [
         "builtin.cc",
         "runtime.cc",

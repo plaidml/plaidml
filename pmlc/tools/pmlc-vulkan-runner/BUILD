@@ -10,7 +10,7 @@ plaidml_cc_library(
     deps = [
         "//pmlc:all_passes_and_dialects",
         "//pmlc/rt",
-        "//pmlc/rt/llvm",
+        "//pmlc/rt/llvm_cpu",
         "//pmlc/rt/vulkan",
         "@llvm-project//mlir:MlirJitRunner",
     ],
