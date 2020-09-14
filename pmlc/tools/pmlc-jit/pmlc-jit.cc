@@ -31,7 +31,6 @@
 using namespace mlir; // NOLINT
 using llvm::Error;
 using pmlc::compiler::Program;
-using pmlc::rt::EngineKind;
 using pmlc::rt::Executable;
 
 namespace {
@@ -70,13 +69,8 @@ int JitRunnerMain(int argc, char **argv) {
 
   auto program = std::make_shared<Program>(std::move(file));
   program->entry = options.mainFuncName.getValue();
-  auto kind = EngineKind::OrcJIT;
-  if (options.optOrc.getValue())
-    kind = EngineKind::OrcJIT;
-  if (options.optMCJIT.getValue())
-    kind = EngineKind::MCJIT;
   auto executable = Executable::fromProgram(
-      program, options.optDeviceID.getValue(), ArrayRef<void *>{}, kind);
+      program, options.optDeviceID.getValue(), ArrayRef<void *>{});
   executable->invoke();
 
   return EXIT_SUCCESS;

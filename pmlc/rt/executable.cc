@@ -35,6 +35,7 @@
 #include "pmlc/rt/internal.h"
 #include "pmlc/rt/runtime_registry.h"
 #include "pmlc/rt/symbol_registry.h"
+#include "pmlc/util/env.h"
 #include "pmlc/util/logging.h"
 
 using namespace mlir; // NOLINT[build/namespaces]
@@ -297,8 +298,7 @@ struct OrcJITEngineImpl : EngineImpl {
 class ExecutableImpl final : public Executable {
 public:
   ExecutableImpl(const std::shared_ptr<Program> &program,
-                 llvm::StringRef deviceID, ArrayRef<void *> bufptrs,
-                 EngineKind kind)
+                 llvm::StringRef deviceID, ArrayRef<void *> bufptrs)
       : program(program), device(getDevice(deviceID)), ptrs(bufptrs.size()) {
     static std::once_flag is_initialized;
     std::call_once(is_initialized, []() {
@@ -307,6 +307,14 @@ public:
       initializeLLVMPasses();
       llvm::sys::DynamicLibrary::LoadLibraryPermanently(nullptr);
     });
+
+    EngineKind kind = EngineKind::OrcJIT;
+    auto jit = pmlc::util::getEnvVar("LLVM_JIT");
+    if (jit == "ORC") {
+      kind = EngineKind::OrcJIT;
+    } else if (jit == "MCJIT") {
+      kind = EngineKind::MCJIT;
+    }
 
     switch (kind) {
     case EngineKind::MCJIT:
@@ -366,9 +374,8 @@ private:
 
 std::unique_ptr<Executable>
 Executable::fromProgram(const std::shared_ptr<Program> &program,
-                        llvm::StringRef deviceID, ArrayRef<void *> bufptrs,
-                        EngineKind kind) {
-  return std::make_unique<ExecutableImpl>(program, deviceID, bufptrs, kind);
+                        llvm::StringRef deviceID, ArrayRef<void *> bufptrs) {
+  return std::make_unique<ExecutableImpl>(program, deviceID, bufptrs);
 }
 
 } // namespace pmlc::rt

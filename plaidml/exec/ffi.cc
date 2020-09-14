@@ -109,14 +109,7 @@ plaidml_executable* plaidml_jit(  //
       auto view = args[i].buffer->MapCurrent();
       bufptrs[i] = view->data();
     }
-    EngineKind kind = EngineKind::OrcJIT;
-    auto jit = pmlc::util::getEnvVar("LLVM_JIT");
-    if (jit == "ORC") {
-      kind = EngineKind::OrcJIT;
-    } else if (jit == "MCJIT") {
-      kind = EngineKind::MCJIT;
-    }
-    exec->exec = Executable::fromProgram(program->program, deviceID, bufptrs, kind);
+    exec->exec = Executable::fromProgram(program->program, deviceID, bufptrs);
     return exec.release();
   });
 }

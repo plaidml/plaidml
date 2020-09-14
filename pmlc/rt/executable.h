@@ -19,8 +19,7 @@ class Executable {
 public:
   static std::unique_ptr<Executable>
   fromProgram(const std::shared_ptr<pmlc::compiler::Program> &program,
-              llvm::StringRef deviceID, mlir::ArrayRef<void *> bufptrs,
-              EngineKind kind = EngineKind::OrcJIT);
+              llvm::StringRef deviceID, mlir::ArrayRef<void *> bufptrs);
 
   virtual ~Executable() {}
 
