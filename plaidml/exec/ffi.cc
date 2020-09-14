@@ -51,7 +51,7 @@ std::vector<ProgramArgument> BindProgramArguments(  //
       if (it != input_bindings.end()) {
         arg.buffer = it->second;
       }
-      IVLOG(1, " Input[" << i << "]: " << arg.buffer);
+      IVLOG(2, " Input[" << i << "]: " << arg.buffer);
       if (!arg.buffer) {
         throw std::runtime_error("Unbound input");
       }
@@ -60,7 +60,7 @@ std::vector<ProgramArgument> BindProgramArguments(  //
       if (it != output_bindings.end()) {
         arg.buffer = it->second;
       }
-      IVLOG(1, "Output[" << i << "]: " << arg.buffer);
+      IVLOG(2, "Output[" << i << "]: " << arg.buffer);
       if (!arg.buffer) {
         throw std::runtime_error("Unbound output");
       }

@@ -274,7 +274,7 @@ struct SubgroupsPass : public SubgroupsBase<SubgroupsPass> {
       tileAccumulations(op, false);
       return;
     }
-    IVLOG(1, "best plan = " << cm.bestPlan);
+    IVLOG(2, "best plan = " << cm.bestPlan);
     SubgroupApply(op, cm.bestPlan);
   }
 };
