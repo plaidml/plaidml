@@ -66,13 +66,9 @@ private:
 
 } // namespace
 
-namespace details {
-
 void registerFactory(llvm::StringRef id, Factory factory) {
   RuntimeRegistry::instance()->registerFactory(id, std::move(factory));
 }
-
-} // namespace details
 
 Runtime *getRuntime(llvm::StringRef id) {
   return RuntimeRegistry::instance()->getRuntime(id);

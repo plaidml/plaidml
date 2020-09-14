@@ -37,12 +37,17 @@ namespace pmlc::rt {
 // memoize their results.
 using Factory = std::function<std::shared_ptr<Runtime>()>;
 
-namespace details {
-
 // Creates a global registration for a factory.
+//
+// This function does not check the ID for conflicts with other runtimes;
+// duplicate checking will occur when initRuntimes() is called.  The caller is
+// responsible for arranging for initRuntimes() to be called after this call
+// returns, in order to actually instantiate the Runtime.
+//
+// N.B. This function is NOT synchronized.  It is the caller's responsiblity to
+// ensure that other components are not concurrently accessing the system global
+// runtime map or registering other Factory instances.
 void registerFactory(llvm::StringRef id, Factory factory);
-
-} // namespace details
 
 // makeStaticFactory is a template function returning a Factory that
 // instantiates an instance of the supplied concrete Runtime class.  The Runtime
@@ -52,12 +57,17 @@ Factory makeStaticFactory() {
   return Factory{[]() { return std::make_shared<R>(); }};
 }
 
+// makeConstantFactory returns a Factory that always returns the given Runtime.
+inline Factory makeConstantFactory(std::shared_ptr<Runtime> runtime) {
+  return Factory{[runtime = std::move(runtime)]() { return runtime; }};
+}
+
 // FactoryRegistration is used to register a PlaidML Runtime Factory at static
 // initialization time. Components whose Runtimes are DefaultConstructible are
 // encouraged to use RuntimeRegistration instead.
 struct FactoryRegistration {
   FactoryRegistration(llvm::StringRef id, Factory factory) {
-    details::registerFactory(id, std::move(factory));
+    registerFactory(id, std::move(factory));
   }
 };
 
@@ -72,7 +82,12 @@ struct FactoryRegistration {
 template <class R>
 struct RuntimeRegistration {
   explicit RuntimeRegistration(llvm::StringRef id) {
-    details::registerFactory(id, makeStaticFactory<R>());
+    registerFactory(id, makeStaticFactory<R>());
+  }
+
+  RuntimeRegistration(llvm::StringRef id, std::shared_ptr<R> runtime) {
+    registerFactory(
+        id, makeConstantFactory(std::shared_ptr<Runtime>{std::move(runtime)}));
   }
 };
 
@@ -81,8 +96,8 @@ struct RuntimeRegistration {
 // the new runtime's ID conflicts with an existing ID.
 //
 // N.B. This function is NOT synchronized.  It is the caller's responsibility to
-// ensure that other components are not accessing the system global runtime map
-// in parallel -- e.g. looking up device IDs or compiling programs to produce
+// ensure that other components are not concurrently accessing the system global
+// runtime map -- e.g. looking up device IDs or compiling programs to produce
 // executables.
 void registerRuntime(llvm::StringRef id, std::shared_ptr<Runtime> runtime);
 
@@ -90,8 +105,9 @@ void registerRuntime(llvm::StringRef id, std::shared_ptr<Runtime> runtime);
 // global runtime map.
 //
 // N.B. This function is NOT synchronized.  It is the caller's responsibility to
-// ensure that other components are not accessing the system global runtime map
-// in parallel -- e.g. looking up device IDs or compiling programs to produce
+// ensure that other components are not concurrently accessing the system global
+// runtime map
+// -- e.g. looking up device IDs or compiling programs to produce
 // executables.
 void initRuntimes();
 
