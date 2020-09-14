@@ -606,4 +606,38 @@ Optional<StrideArray> computeStrideArray(AffineMap map) {
   return ret;
 }
 
+bool hasPerfectAliasing(const RelativeAccessPattern &aRap,
+                        const RelativeAccessPattern &bRap) {
+  if (aRap.outer.size() != bRap.outer.size()) {
+    IVLOG(1, "size mismatch: " << aRap.outer.size()
+                               << " != " << bRap.outer.size());
+    return false;
+  }
+  for (size_t i = 0; i < aRap.outer.size(); i++) {
+    const StrideInfo &aOuter = aRap.outer[i];
+    const StrideInfo &bOuter = bRap.outer[i];
+    const int64_t aInnerCount = aRap.innerCount[i];
+    const int64_t bInnerCount = bRap.innerCount[i];
+    if (aOuter != bOuter) {
+      IVLOG(1, "aOuter != bOuter");
+      return false;
+    }
+    if (aInnerCount != bInnerCount) {
+      IVLOG(1, "aInnerCount != bInnerCount");
+      return false;
+    }
+    if (aOuter.range().stride < aInnerCount) {
+      IVLOG(1, "aOuter.range().stride < aInnerCount");
+      IVLOG(1, "  aOuter.range().stride: " << aOuter.range().stride);
+      IVLOG(1, "  aInnerCount: " << aInnerCount);
+      return false;
+    }
+    if (bOuter.range().stride < bInnerCount) {
+      IVLOG(1, "bOuter.range().stride < bInnerCount");
+      return false;
+    }
+  }
+  return true;
+}
+
 } // namespace pmlc::dialect::pxa

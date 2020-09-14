@@ -231,4 +231,7 @@ struct StrideArray {
 // AffineExpr result and this result must be purely affine.
 mlir::Optional<StrideArray> computeStrideArray(mlir::AffineMap map);
 
+bool hasPerfectAliasing(const RelativeAccessPattern &aRap,
+                        const RelativeAccessPattern &bRap);
+
 } // namespace pmlc::dialect::pxa

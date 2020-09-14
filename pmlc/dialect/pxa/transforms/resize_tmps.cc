@@ -142,7 +142,6 @@ struct ResizeTmpsPass : public ResizeTmpsBase<ResizeTmpsPass> {
     }
     // If it's already sized right, don't bother
     if (!sizeChanged) {
-      op.emitRemark("Alloc is already correctly sized");
       return;
     }
     // Compute new memref type

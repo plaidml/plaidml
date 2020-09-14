@@ -43,9 +43,9 @@ struct FusionInfo {
   // Over-fusion prevention parameter
   int64_t memoryActivityThreshold;
 
-  FusionInfo(AffineParallelOp apA, AffineParallelOp apB,
+  FusionInfo(AffineParallelOp aBand, AffineParallelOp bBand,
              int64_t memoryActivityThreshold)
-      : aInfo{apA}, bInfo{apB}, hasPlan(false),
+      : aInfo{aBand}, bInfo{bBand}, hasPlan(false),
         memoryActivityThreshold(memoryActivityThreshold) {}
 
   // Helper method to find the original source write of a state update.
@@ -202,17 +202,41 @@ struct FusionInfo {
       }
     }
 
+    auto aRap = computeThisRelativeAccess(opA);
+    auto bRap = computeThisRelativeAccess(opB);
+    auto isAliased = hasPerfectAliasing(*aRap, *bRap);
+    IVLOG(1, "isAliased: " << isAliased);
+
+    // TODO: check perfect aliasing
+    for (const auto &raw : readAfterWrites) {
+      IVLOG(1, "  RAW: " << debugString(*raw.second));
+      // auto aRap = computeThisRelativeAccess(raw.first);
+      // auto bRap = computeThisRelativeAccess(raw.second);
+      // auto ret = hasPerfectAliasing(*aRap, *bRap);
+      // IVLOG(1, "  RAW: " << ret);
+    }
+
+    for (const auto &waw : writeAfterWrites) {
+      IVLOG(1, "  WAW: " << debugString(*waw.second));
+      // auto aRap = computeThisRelativeAccess(waw.first);
+      // auto bRap = computeThisRelativeAccess(waw.second);
+      // auto ret = hasPerfectAliasing(*aRap, *bRap);
+      // IVLOG(1, "  WAW: " << ret);
+    }
+
     hasPlan = true;
     return true;
   }
 
-  int64_t computeMemoryActivity() {
-    int64_t sum = 0;
-
-    auto boundaryFn = [&](BlockArgument arg) {
+  Optional<RelativeAccessPattern> computeThisRelativeAccess(Operation *op) {
+    return computeRelativeAccess(op, [&](BlockArgument arg) {
       return (aToB.count(arg) || bToA.count(arg)) ? BoundaryRegion::Exterior
                                                   : BoundaryRegion::Interior;
-    };
+    });
+  }
+
+  int64_t computeMemoryActivity() {
+    int64_t sum = 0;
 
     auto computeMemoryActivityForOp = [&](Operation *op) {
       if (auto allocOp = dyn_cast<AllocOp>(op)) {
@@ -220,7 +244,7 @@ struct FusionInfo {
         IVLOG(3, "op: " << debugString(*op) << ", bytes: " << bytes);
         sum += bytes;
       }
-      auto relAccess = computeRelativeAccess(op, boundaryFn);
+      auto relAccess = computeThisRelativeAccess(op);
       if (!relAccess)
         return;
       auto bytes = relAccess->totalInnerBytes();
@@ -253,16 +277,16 @@ struct FusionInfo {
     // writes to a value that block B reads from or writes into.
     IVLOG(3, "Collecting read/write information");
     // For each output from loop
-    for (auto res : aInfo.op.results()) {
+    for (OpResult result : aInfo.op.results()) {
       // Find the source write
-      auto write = findSourceWrite(res);
+      auto write = findSourceWrite(result);
       // If it's not a proper affine reduce, give up
       if (!write) {
         aInfo.op.emitRemark("Not all results can be traced to writes");
         return false;
       }
       // For each use of the write:
-      for (auto user : res.getUsers()) {
+      for (Operation *user : result.getUsers()) {
         // Check if it is inside B, if not, we don't care, check next use.
         if (!bInfo.op.getOperation()->isAncestor(user))
           continue;
@@ -292,14 +316,14 @@ struct FusionInfo {
 
     // First we need to find which results op A are used outside of B.  Those
     // results must also be outputs of the merged block.
-    for (auto res : aInfo.op.getResults()) {
+    for (OpResult result : aInfo.op.getResults()) {
       bool keep = false;
-      for (auto &use : res.getUses()) {
+      for (auto &use : result.getUses()) {
         if (!bInfo.op.getOperation()->isAncestor(use.getOwner()))
           keep = true;
       }
       if (keep)
-        typesC.push_back(res.getType());
+        typesC.push_back(result.getType());
     }
     // All outputs of B are to be kept
     typesC.insert(typesC.end(), bInfo.op.getResultTypes().begin(),
@@ -351,15 +375,15 @@ struct FusionInfo {
     // Move the two parallel for's inside the new op
     aInfo.op.getOperation()->moveBefore(apC.getBody(), apC.getBody()->end());
     bInfo.op.getOperation()->moveBefore(apC.getBody(), apC.getBody()->end());
-    // Fixup uses of A's  return values.  These uses are either in B (and thus
+    // Fixup uses of A's return values.  These uses are either in B (and thus
     // local to C now) or some other op (and thus need to be moved to a return
     // of C).  Basically, for each return, we go over all uses, and adjust to
     // the appropriate new value.  As we go, we add things that escape the the
     // yield output.
     SmallVector<Value, 6> returnVals;
-    for (auto res : aInfo.op.getResults()) {
+    for (OpResult result : aInfo.op.getResults()) {
       bool keep = false;
-      for (OpOperand &use : make_early_inc_range(res.getUses())) {
+      for (OpOperand &use : make_early_inc_range(result.getUses())) {
         // If it's not inside B, swith the use external return value
         if (!bInfo.op.getOperation()->isAncestor(use.getOwner())) {
           keep = true;
@@ -368,12 +392,12 @@ struct FusionInfo {
       }
       // If we are keeping the value, add to return
       if (keep)
-        returnVals.push_back(res);
+        returnVals.push_back(result);
     }
     // Replace all uses of B's outputs with C's outputs
-    for (auto res : bInfo.op.getResults()) {
-      res.replaceAllUsesWith(apC.getResult(returnVals.size()));
-      returnVals.push_back(res);
+    for (OpResult result : bInfo.op.getResults()) {
+      result.replaceAllUsesWith(apC.getResult(returnVals.size()));
+      returnVals.push_back(result);
     }
     // Next we make a new return op for the values that escape this block
     builder.setInsertionPointAfter(bInfo.op);
@@ -427,8 +451,12 @@ struct FusionPass : public FusionBase<FusionPass> {
 
   // Attempts to fuse two ops if they look good.  Returns the new fused loop
   // (which may be a nullptr if fusion failed).
-  AffineParallelOp attemptFusion(AffineParallelOp apA, AffineParallelOp apB) {
-    FusionInfo fusionInfo(apA, apB, memoryActivityThreshold.getValue());
+  AffineParallelOp attemptFusion(AffineParallelOp aBand,
+                                 AffineParallelOp bBand) {
+    IVLOG(4, "Attempt fusion:\nA:\n"
+                 << debugString(*aBand) << "\nB:\n"
+                 << debugString(*bBand));
+    FusionInfo fusionInfo(aBand, bBand, memoryActivityThreshold.getValue());
     bool canFuse = fusionInfo.computeFusion();
     if (!canFuse) {
       return nullptr;
@@ -451,14 +479,26 @@ struct FusionPass : public FusionBase<FusionPass> {
       opOrder[&op] = opOrder.size();
     }
 
+    util::DiagnosticCounter counter;
+
     for (auto itOp = block.begin(); itOp != block.end();) {
       auto fuseA = dyn_cast<AffineParallelOp>(*itOp);
       // Kick the iterator forward right away so if we end up fusing the op
       // down into a successor, we don't cause issues
       ++itOp;
       // Only consider affine.parallel ops
-      if (!fuseA)
+      if (!fuseA) {
         continue;
+      }
+
+      auto result = counter.next();
+      if (result == util::DiagnosticCounter::Result::Break) {
+        continue;
+      }
+      if (result == util::DiagnosticCounter::Result::Match) {
+        IVLOG(0, "Match: " << counter.counter << "\n" << debugString(*fuseA));
+      }
+
       // Find the 'nearest reader' block:  Walk over each output, find any
       // blocks that they output. pick the block closest to the writer.  This
       // block is legal to fuse into, since there are no intermediating
