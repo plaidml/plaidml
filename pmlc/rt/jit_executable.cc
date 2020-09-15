@@ -304,8 +304,8 @@ enum class EngineKind {
 class JitExecutable final : public Executable {
 public:
   JitExecutable(const std::shared_ptr<Program> &program,
-                llvm::StringRef deviceID, ArrayRef<void *> bufptrs)
-      : program(program), device(getDevice(deviceID)), ptrs(bufptrs.size()) {
+                std::shared_ptr<Device> device, ArrayRef<void *> bufptrs)
+      : program(program), device(std::move(device)), ptrs(bufptrs.size()) {
     static std::once_flag is_initialized;
     std::call_once(is_initialized, []() {
       llvm::InitializeNativeTarget();
@@ -380,8 +380,9 @@ private:
 
 std::unique_ptr<Executable>
 makeJitExecutable(const std::shared_ptr<pmlc::compiler::Program> &program,
-                  llvm::StringRef deviceID, llvm::ArrayRef<void *> bufptrs) {
-  return std::make_unique<JitExecutable>(program, deviceID, bufptrs);
+                  std::shared_ptr<Device> device,
+                  llvm::ArrayRef<void *> bufptrs) {
+  return std::make_unique<JitExecutable>(program, std::move(device), bufptrs);
 }
 
 } // namespace pmlc::rt

@@ -38,13 +38,18 @@ namespace pmlc::rt::vulkan {
 /// sequence: initRuntime(), run(), updateHostMemoryBuffers(), destroy();
 /// each method in the sequence returns succes or failure depends on the Vulkan
 /// result code.
-class VulkanDevice final : public pmlc::rt::Device {
+class VulkanDevice final : public pmlc::rt::Device,
+                           public std::enable_shared_from_this<Device> {
 public:
   VulkanDevice(const VkPhysicalDevice &physicalDevice,
                std::shared_ptr<VulkanState> state);
   ~VulkanDevice();
   VulkanDevice(const VulkanDevice &) = delete;
   VulkanDevice &operator=(const VulkanDevice &) = delete;
+
+  std::unique_ptr<Executable>
+  compile(const std::shared_ptr<pmlc::compiler::Program> &program,
+          llvm::ArrayRef<void *> bufptrs) final;
 
   const VkDevice &getDevice() const { return device; }
   const VkQueue &getQueue() const { return queue; }

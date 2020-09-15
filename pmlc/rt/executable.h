@@ -6,7 +6,6 @@
 #include <vector>
 
 #include "pmlc/compiler/program.h"
-#include "pmlc/rt/runtime.h"
 
 namespace pmlc::rt {
 
@@ -16,7 +15,7 @@ public:
   fromProgram(const std::shared_ptr<pmlc::compiler::Program> &program,
               llvm::StringRef deviceID, mlir::ArrayRef<void *> bufptrs);
 
-  virtual ~Executable() {}
+  virtual ~Executable() = default;
 
   virtual void invoke() = 0;
 };

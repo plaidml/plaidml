@@ -6,6 +6,8 @@ plaidml_cc_library(
     name = "llvm_cpu",
     srcs = [
         "builtin.cc",
+        "device.cc",
+        "device.h",
         "runtime.cc",
     ],
     deps = [

@@ -2,7 +2,7 @@
 
 #include "pmlc/rt/executable.h"
 
-#include "pmlc/rt/jit_executable.h"
+#include "pmlc/rt/device_id.h"
 
 using pmlc::compiler::Program;
 
@@ -12,7 +12,7 @@ std::unique_ptr<Executable>
 Executable::fromProgram(const std::shared_ptr<Program> &program,
                         llvm::StringRef deviceID,
                         llvm::ArrayRef<void *> bufptrs) {
-  return makeJitExecutable(program, deviceID, bufptrs);
+  return getDevice(deviceID)->compile(program, bufptrs);
 }
 
 } // namespace pmlc::rt

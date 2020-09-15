@@ -1,6 +1,6 @@
 // Copyright 2020, Intel Corporation
 
-#include "pmlc/rt/runtime.h"
+#include "pmlc/rt/device.h"
 
 #include "pmlc/rt/internal.h"
 

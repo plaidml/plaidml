@@ -4,6 +4,7 @@
 
 #include <memory>
 
+#include "pmlc/rt/device.h"
 #include "pmlc/rt/executable.h"
 
 namespace pmlc::rt {
@@ -13,6 +14,7 @@ namespace pmlc::rt {
 // has the effect of running the program.
 std::unique_ptr<Executable>
 makeJitExecutable(const std::shared_ptr<pmlc::compiler::Program> &program,
-                  llvm::StringRef deviceID, llvm::ArrayRef<void *> bufptrs);
+                  std::shared_ptr<Device> device,
+                  llvm::ArrayRef<void *> bufptrs);
 
 } // namespace pmlc::rt
