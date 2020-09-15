@@ -20,6 +20,6 @@ private:
   std::shared_ptr<pmlc::rt::Device> dev = std::make_shared<pmlc::rt::Device>();
 };
 
-pmlc::rt::RuntimeRegistration<Runtime> reg{"llvm_cpu"};
+pmlc::rt::RuntimeRegistration reg{"llvm_cpu", std::make_shared<Runtime>()};
 
 } // namespace
