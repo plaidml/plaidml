@@ -96,8 +96,6 @@ SUITES:
     platforms:
       pml-llvm-cpu:
         pipelines: [nightly, plaidml]
-      pml-vk-gen:
-        pipelines: [nightly, plaimdl]
     params:
       plaidml:
         batch_sizes: [1]
@@ -183,6 +181,8 @@ SUITES:
   infer:
     platforms:
       pml-llvm-cpu:
+        pipelines: [nightly, plaidml, ci]
+      pml-vk-gen:
         pipelines: [nightly, plaidml, ci]
     params:
       ci:
