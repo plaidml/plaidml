@@ -565,13 +565,33 @@ RelativeAccessPattern::unionMerge(const RelativeAccessPattern &rhs) {
   return success();
 }
 
+// Use ILP to find out if two different iterations of the outer indexes (in
+// allOuter) every alias.  To do this, we make a system with two copies of all
+// the variable (outer + inner indexes) called _a and _b.  Then we constrain the
+// totally effect of _a and the total effect of _b to be the same (i.e both
+// index sets access the same memory location).  We also contrain the indexes to
+// their appropriate ranges.  Then we see if we can ever get the _a and _b
+// version of any of the outer indexes to differ at all (by minimimizing oi_a -
+// oi_b).  If it's possible fot them the differ, then (since _a + _b are
+// symetrical), the minimum of the difference will be < 0.
 bool RelativeAccessPattern::outerAlias(DenseSet<BlockArgument> allOuter) const {
   using Poly = util::math::Polynomial<util::math::Rational>;
   using RangeCons = util::math::RangeConstraint;
   util::bilp::ILPSolver solver;
+  // We track each index as we add it, and make a string version since the old
+  // polynomial goo uses string names for variables
   DenseMap<BlockArgument, std::string> baToStr;
+  // The collection of constraints, this ends up including:
+  // 1) Range constraints for two copies (a + b)
+  // 2) Contraints requiring all dimensions of the access to be the same for
+  // both the a access and the b access
   std::vector<RangeCons> constraints;
+  // The collection of things to minimize.  Here it's the differences of _a and
+  // _b for all outer indexes
   std::vector<Poly> toMin;
+  // A labmda to convert a block arg to x<i>_a - x<i>_b for some unique i.  If
+  // we haven't seen the block arg before, we add it to the map, along with
+  // range constraints for the _a and _b versions.
   auto toDiff = [&](BlockArgument arg) {
     std::string &str = baToStr[arg];
     if (str.empty()) {
@@ -582,11 +602,15 @@ bool RelativeAccessPattern::outerAlias(DenseSet<BlockArgument> allOuter) const {
     }
     return Poly(str + "_a") - Poly(str + "_b");
   };
+  // Add entried for all the outer indexes
   for (auto &arg : allOuter) {
     auto diff = toDiff(arg);
     toMin.emplace_back(diff);
   }
+  // Go over each dimension of the access
   for (size_t i = 0; i < outer.size(); i++) {
+    // Compute the difference between the a + b versions of the access for this
+    // dimension of the access
     Poly totDiff;
     for (const auto &kvp : outer[i].strides) {
       auto diff = toDiff(kvp.first);
@@ -596,18 +620,25 @@ bool RelativeAccessPattern::outerAlias(DenseSet<BlockArgument> allOuter) const {
       auto diff = toDiff(kvp.first);
       totDiff += diff * kvp.second;
     }
+    // Constrain this diff to be the range [0, 1) in integers, i.e. constrain it
+    // to be exactly 0.
     constraints.emplace_back(totDiff, 1);
   }
   IVLOG(1, "Doing a batch solve!");
   IVLOG(1, "Constraints: " << constraints);
   IVLOG(1, "toMin: " << toMin);
+  // Do the actual ILP solve
   auto res = solver.batch_solve(constraints, toMin);
+  // If any of the results have a minimum that is not exactly 0, it means the _a
+  // and _b version of that index can have two differnt values while still
+  // accessing the same point in the tensor.  AKA we have hit an outer alias.
   for (const auto &kvp : res) {
     IVLOG(1, "obj_val = " << kvp.second.obj_val);
     if (kvp.second.obj_val < 0) {
       return true;
     }
   }
+  // Otherwise, all is well.
   return false;
 }
 

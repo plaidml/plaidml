@@ -208,8 +208,10 @@ struct RelativeAccessPattern {
   // Merge another RelativeAccesPattern together by using a union.
   LogicalResult unionMerge(const RelativeAccessPattern &rhs);
 
-  // Return true if two distinct outer loop interations can access the
-  // same memory element of the tensor.
+  // Given a full set of outer indexes (in case some of them are unused in the
+  // various stride-infos), return true if two distinct outer loop interations
+  // can access the same memory element of the tensor.  I.e. do any outer loops
+  // interations ever alias with other outer loop iterations.
   bool outerAlias(mlir::DenseSet<mlir::BlockArgument> allOuter) const;
 };
 
