@@ -3,8 +3,8 @@
 #include "pmlc/rt/runtime_registry.h"
 
 #include <list>
-#include <mutex>
 #include <stdexcept>
+#include <unordered_map>
 #include <utility>
 
 #include "pmlc/util/logging.h"
@@ -13,78 +13,76 @@
 namespace pmlc::rt {
 namespace {
 
-struct LoaderList {
-  std::mutex mutex;
-  std::list<std::pair<std::string, Loader>> loaders;
-
-  static LoaderList &instance() {
-    static LoaderList ll;
-    return ll;
-  }
-};
-
-class MemoizedFactory final {
+class RuntimeRegistry {
 public:
-  explicit MemoizedFactory(Factory factory) : factory{std::move(factory)} {}
-  Runtime *getRuntime() {
-    std::call_once(init_once, [this]() { runtime = factory(); });
-    return runtime.get();
+  static RuntimeRegistry *instance() {
+    static RuntimeRegistry reg;
+    return &reg;
+  }
+
+  void registerFactory(llvm::StringRef id, Factory factory) {
+    factories.emplace_back(id, std::move(factory));
+  }
+
+  void registerRuntime(llvm::StringRef id, std::shared_ptr<Runtime> runtime) {
+    auto inserted = runtimes.emplace(id, std::move(runtime)).second;
+    if (!inserted) {
+      throw std::runtime_error{
+          llvm::formatv("Multiple runtime implementations found for {0}", id)};
+    }
+  }
+
+  Runtime *getRuntime(llvm::StringRef id) {
+    auto it = runtimes.find(id.str());
+    if (it == runtimes.end()) {
+      throw std::runtime_error{llvm::formatv("Unable to find {0} runtime", id)};
+    }
+    return it->second.get();
+  }
+
+  const std::unordered_map<std::string, std::shared_ptr<Runtime>> &
+  getRuntimeMap() {
+    return runtimes;
+  }
+
+  void initRuntimes() {
+    while (!factories.empty()) {
+      auto [id, factory] = factories.front();
+      factories.pop_front();
+      std::shared_ptr<Runtime> runtime;
+      try {
+        runtime = factory();
+      } catch (...) {
+        continue;
+      }
+      registerRuntime(id, std::move(runtime));
+    }
   }
 
 private:
-  std::once_flag init_once;
-  Factory factory;
-  std::shared_ptr<Runtime> runtime;
+  std::list<std::pair<std::string, Factory>> factories;
+  std::unordered_map<std::string, std::shared_ptr<Runtime>> runtimes;
 };
-
-const std::unordered_map<std::string, std::function<Runtime *()>>
-buildRuntimeMap() {
-  std::unordered_map<std::string, std::function<Runtime *()>> result;
-
-  auto &ll = LoaderList::instance();
-  std::lock_guard<std::mutex> lock{ll.mutex};
-
-  for (auto &[loaderId, loader] : ll.loaders) {
-    std::unordered_map<std::string, Factory> factories;
-    try {
-      factories = loader();
-    } catch (const std::exception &e) {
-      IVLOG(1, "Loader " << loaderId << " initialization failed: " << e.what());
-      continue;
-    }
-    for (auto &[id, factory] : factories) {
-      auto memo = std::make_shared<MemoizedFactory>(factory);
-      auto [it, inserted] =
-          result.emplace(id, [memo = std::move(memo)]() -> Runtime * {
-            return memo->getRuntime();
-          });
-      if (!inserted) {
-        throw std::runtime_error{
-            llvm::formatv("Multiple runtime implementations found for {}", id)};
-      }
-    }
-  }
-
-  return result;
-}
 
 } // namespace
 
-namespace details {
-
-void registerLoader(llvm::StringRef id, Loader loader) {
-  auto &ll = LoaderList::instance();
-  std::lock_guard<std::mutex> lock{ll.mutex};
-  ll.loaders.emplace_back(id, std::move(loader));
+void registerFactory(llvm::StringRef id, Factory factory) {
+  RuntimeRegistry::instance()->registerFactory(id, std::move(factory));
 }
 
-} // namespace details
+Runtime *getRuntime(llvm::StringRef id) {
+  return RuntimeRegistry::instance()->getRuntime(id);
+}
 
-const std::unordered_map<std::string, std::function<Runtime *()>> &
+const std::unordered_map<std::string, std::shared_ptr<Runtime>> &
 getRuntimeMap() {
-  static std::unordered_map<std::string, std::function<Runtime *()>>
-      runtimeMap = buildRuntimeMap();
-  return runtimeMap;
+  return RuntimeRegistry::instance()->getRuntimeMap();
 }
+
+void registerRuntime(llvm::StringRef id, std::shared_ptr<Runtime> runtime) {
+  RuntimeRegistry::instance()->registerRuntime(id, std::move(runtime));
+}
+
+void initRuntimes() { RuntimeRegistry::instance()->initRuntimes(); }
 
 } // namespace pmlc::rt

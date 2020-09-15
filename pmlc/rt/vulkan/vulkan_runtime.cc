@@ -43,7 +43,7 @@ public:
     }
   }
 
-  ~VulkanRuntime() { IVLOG(1, "Destroying vulkan runtime"); }
+  ~VulkanRuntime() {}
 
   std::size_t deviceCount() const noexcept final { return devices.size(); }
   std::shared_ptr<pmlc::rt::Device> device(std::size_t idx) {
