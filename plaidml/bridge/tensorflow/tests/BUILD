@@ -110,6 +110,14 @@ tf_cc_test(
 )
 
 py_binary(
+    name = "i3d_control",
+    srcs = ["i3d_control.py"],
+    data = ["@kinetics-i3d//:i3d-data"],
+    tags = ["skip_windows"],
+    deps = ["@kinetics-i3d//:i3d"],
+)
+
+py_binary(
     name = "i3d_test_gen",
     testonly = 1,
     srcs = ["i3d_test_gen.py"],
