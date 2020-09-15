@@ -348,7 +348,8 @@ void ConvertGpuLaunchFuncToVulkanCalls::declareVulkanFunctions(Location loc) {
 
   builder.create<LLVM::LLVMFuncOp>(
       loc, kSetVulkanLaunchKernelAction,
-      LLVM::LLVMType::getFunctionTy(getLLVMVoidType(), {getLLVMPointerType()},
+      LLVM::LLVMType::getFunctionTy(getLLVMVoidType(),
+                                    {getLLVMPointerType(), getLLVMInt32Type()},
                                     /*isVarArg=*/false));
 
   builder.create<LLVM::LLVMFuncOp>(
@@ -448,11 +449,16 @@ void ConvertGpuLaunchFuncToVulkanCalls::convertGpuLaunchFunc(
     return signalPassFailure();
   }
 
+  // TODO: select subgroup size based on the previous passes and some special
+  // attribute
+  Value subgroupSize = builder.create<LLVM::ConstantOp>(
+      loc, getLLVMInt32Type(), builder.getI32IntegerAttr(8));
+
   // Create call to `setLaunchKernelAction` runtime function.
   builder.create<LLVM::CallOp>(
       loc, ArrayRef<Type>{},
       builder.getSymbolRefAttr(kSetVulkanLaunchKernelAction),
-      ArrayRef<Value>{vulkanRuntime});
+      ArrayRef<Value>{vulkanRuntime, subgroupSize});
 
   // Check and transfer VkBuffers when necessary.
   if (failed(transferBuffers(loc, builder, launchOp))) {

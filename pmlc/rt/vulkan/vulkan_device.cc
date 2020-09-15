@@ -25,6 +25,23 @@ using namespace mlir; // NOLINT[build/namespaces]
 
 namespace pmlc::rt::vulkan {
 
+void VulkanDevice::getExtensions(const VkPhysicalDevice &physicalDevice) {
+  uint32_t count;
+  vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &count,
+                                       nullptr); // get number of extensions
+  std::vector<VkExtensionProperties> extensions(count);
+  vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &count,
+                                       extensions.data()); // populate buffer
+
+  for (auto &extension : extensions) {
+    extensionList.insert(extension.extensionName);
+  }
+}
+
+bool VulkanDevice::isExtensionSupported(const std::string &extension_name) {
+  return extensionList.find(extension_name) != extensionList.end();
+}
+
 VulkanDevice::VulkanDevice(const VkPhysicalDevice &physicalDevice,
                            std::shared_ptr<VulkanState> state)
     : state{std::move(state)} {
@@ -33,6 +50,23 @@ VulkanDevice::VulkanDevice(const VkPhysicalDevice &physicalDevice,
   IVLOG(1, "Instantiating Vulkan device: " << props.deviceName);
 
   timestampPeriod = props.limits.timestampPeriod;
+
+  VkPhysicalDeviceSubgroupSizeControlPropertiesEXT subgroupProperties;
+  subgroupProperties.sType =
+      VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES;
+  subgroupProperties.pNext = NULL;
+
+  VkPhysicalDeviceProperties2 physicalDeviceProperties;
+  physicalDeviceProperties.sType =
+      VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+
+  getExtensions(physicalDevice);
+  if (isExtensionSupported("VK_EXT_subgroup_size_control"))
+    physicalDeviceProperties.pNext = &subgroupProperties;
+  else
+    physicalDeviceProperties.pNext = NULL;
+
+  vkGetPhysicalDeviceProperties2(physicalDevice, &physicalDeviceProperties);
 
   getBestComputeQueue(physicalDevice);
 
