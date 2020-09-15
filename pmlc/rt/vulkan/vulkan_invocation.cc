@@ -271,7 +271,7 @@ void VulkanInvocation::submitCommandBuffers() {
                  << "%");
   }
 
-  updateHostMemoryBuffers();
+  updateLastShaderHostMemoryBuffers();
 }
 
 void VulkanInvocation::setResourceData(const ResourceData &resData) {
@@ -789,29 +789,32 @@ void VulkanInvocation::submitCommandBuffersToQueue() {
                      "vkQueueSubmit");
 }
 
-void VulkanInvocation::updateHostMemoryBuffers() {
-  for (const auto &action : schedule) {
-    if (auto kernel = std::dynamic_pointer_cast<LaunchKernelAction>(action)) {
-      // For each descriptor set.
-      for (auto &resourceDataMapPair : kernel->resourceData) {
-        auto &resourceDataMap = resourceDataMapPair.second;
-        auto &deviceMemoryBuffers =
-            kernel->deviceMemoryBufferMap[resourceDataMapPair.first];
-        // For each device memory buffer in the set.
-        for (auto &deviceMemoryBuffer : deviceMemoryBuffers) {
-          if (resourceDataMap.count(deviceMemoryBuffer.bindingIndex)) {
-            void *payload;
-            auto &hostMemoryBuffer =
-                resourceDataMap[deviceMemoryBuffer.bindingIndex];
-            throwOnVulkanError(vkMapMemory(device->getDevice(),
-                                           deviceMemoryBuffer.deviceMemory, 0,
-                                           hostMemoryBuffer.size, 0,
-                                           reinterpret_cast<void **>(&payload)),
-                               "vkMapMemory");
-            std::memcpy(hostMemoryBuffer.ptr, payload, hostMemoryBuffer.size);
-            vkUnmapMemory(device->getDevice(), deviceMemoryBuffer.deviceMemory);
-          }
-        }
+void VulkanInvocation::updateLastShaderHostMemoryBuffers() {
+  const auto &action = schedule.back();
+  auto kernel = std::dynamic_pointer_cast<LaunchKernelAction>(action);
+  if (!kernel) {
+    throw std::runtime_error{
+        "last action in schedule is not LaunchKernelAction"};
+  }
+
+  // For each descriptor set.
+  for (auto &resourceDataMapPair : kernel->resourceData) {
+    auto &resourceDataMap = resourceDataMapPair.second;
+    auto &deviceMemoryBuffers =
+        kernel->deviceMemoryBufferMap[resourceDataMapPair.first];
+    // For each device memory buffer in the set.
+    for (auto &deviceMemoryBuffer : deviceMemoryBuffers) {
+      if (resourceDataMap.count(deviceMemoryBuffer.bindingIndex)) {
+        void *payload;
+        auto &hostMemoryBuffer =
+            resourceDataMap[deviceMemoryBuffer.bindingIndex];
+        throwOnVulkanError(vkMapMemory(device->getDevice(),
+                                       deviceMemoryBuffer.deviceMemory, 0,
+                                       hostMemoryBuffer.size, 0,
+                                       reinterpret_cast<void **>(&payload)),
+                           "vkMapMemory");
+        std::memcpy(hostMemoryBuffer.ptr, payload, hostMemoryBuffer.size);
+        vkUnmapMemory(device->getDevice(), deviceMemoryBuffer.deviceMemory);
       }
     }
   }
