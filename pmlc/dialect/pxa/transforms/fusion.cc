@@ -204,24 +204,30 @@ struct FusionInfo {
 
     auto aRap = computeThisRelativeAccess(opA);
     auto bRap = computeThisRelativeAccess(opB);
-    auto isAliased = hasPerfectAliasing(*aRap, *bRap);
+    auto isAliased = hasPerfectAliasing(*aRap, *bRap, bToA);
     IVLOG(1, "isAliased: " << isAliased);
 
     // TODO: check perfect aliasing
     for (const auto &raw : readAfterWrites) {
       IVLOG(1, "  RAW: " << debugString(*raw.second));
-      // auto aRap = computeThisRelativeAccess(raw.first);
-      // auto bRap = computeThisRelativeAccess(raw.second);
-      // auto ret = hasPerfectAliasing(*aRap, *bRap);
-      // IVLOG(1, "  RAW: " << ret);
+      auto aRap = computeThisRelativeAccess(raw.first);
+      auto bRap = computeThisRelativeAccess(raw.second);
+      auto ret = hasPerfectAliasing(*aRap, *bRap, bToA);
+      IVLOG(1, "  isAliased: " << ret);
+      if (!ret) {
+        return false;
+      }
     }
 
     for (const auto &waw : writeAfterWrites) {
       IVLOG(1, "  WAW: " << debugString(*waw.second));
-      // auto aRap = computeThisRelativeAccess(waw.first);
-      // auto bRap = computeThisRelativeAccess(waw.second);
-      // auto ret = hasPerfectAliasing(*aRap, *bRap);
-      // IVLOG(1, "  WAW: " << ret);
+      auto aRap = computeThisRelativeAccess(waw.first);
+      auto bRap = computeThisRelativeAccess(waw.second);
+      auto ret = hasPerfectAliasing(*aRap, *bRap, bToA);
+      IVLOG(1, "  isAliased: " << ret);
+      if (!ret) {
+        return false;
+      }
     }
 
     hasPlan = true;
@@ -293,12 +299,8 @@ struct FusionInfo {
         // Now we make sure it's a read or a write, if not, we can't do fusion,
         // bail.
         if (auto read = dyn_cast<PxaLoadOp>(user)) {
-          if (!considerPlan(write, read))
-            return false;
           readAfterWrites.emplace_back(write, read);
         } else if (auto write2 = dyn_cast<PxaReduceOp>(user)) {
-          if (!considerPlan(write, write2))
-            return false;
           writeAfterWrites.emplace_back(write, write2);
         } else {
           user->emitRemark("Op is not a load or reduce");
@@ -306,7 +308,14 @@ struct FusionInfo {
         }
       }
     }
-    return true;
+    // For each raw, waw, consider the plan
+    for (auto &raw : readAfterWrites) {
+      considerPlan(raw.first, raw.second);
+    }
+    for (auto &waw : writeAfterWrites) {
+      considerPlan(waw.first, waw.second);
+    }
+    return hasPlan;
   }
 
   AffineParallelOp applyFusion() {

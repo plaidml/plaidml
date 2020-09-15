@@ -15,6 +15,7 @@
 #include "llvm/Support/FormatVariadic.h"
 
 #include "pmlc/dialect/pxa/analysis/affine_expr.h"
+#include "pmlc/util/bilp/ilp_solver.h"
 #include "pmlc/util/logging.h"
 
 using namespace mlir; // NOLINT
@@ -564,6 +565,52 @@ RelativeAccessPattern::unionMerge(const RelativeAccessPattern &rhs) {
   return success();
 }
 
+bool RelativeAccessPattern::outerAlias(DenseSet<BlockArgument> allOuter) const {
+  using Poly = util::math::Polynomial<util::math::Rational>;
+  using RangeCons = util::math::RangeConstraint;
+  util::bilp::ILPSolver solver;
+  DenseMap<BlockArgument, std::string> baToStr;
+  std::vector<RangeCons> constraints;
+  std::vector<Poly> toMin;
+  auto toDiff = [&](BlockArgument arg) {
+    std::string &str = baToStr[arg];
+    if (str.empty()) {
+      str = "x" + std::to_string(baToStr.size());
+      StrideRange range(arg);
+      constraints.emplace_back(str + "_a", range.maxVal + 1);
+      constraints.emplace_back(str + "_b", range.maxVal + 1);
+    }
+    return Poly(str + "_a") - Poly(str + "_b");
+  };
+  for (auto &arg : allOuter) {
+    auto diff = toDiff(arg);
+    toMin.emplace_back(diff);
+  }
+  for (size_t i = 0; i < outer.size(); i++) {
+    Poly totDiff;
+    for (const auto &kvp : outer[i].strides) {
+      auto diff = toDiff(kvp.first);
+      totDiff += diff * kvp.second;
+    }
+    for (const auto &kvp : inner[i].strides) {
+      auto diff = toDiff(kvp.first);
+      totDiff += diff * kvp.second;
+    }
+    constraints.emplace_back(totDiff, 1);
+  }
+  IVLOG(1, "Doing a batch solve!");
+  IVLOG(1, "Constraints: " << constraints);
+  IVLOG(1, "toMin: " << toMin);
+  auto res = solver.batch_solve(constraints, toMin);
+  for (const auto &kvp : res) {
+    IVLOG(1, "obj_val = " << kvp.second.obj_val);
+    if (kvp.second.obj_val < 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
 StrideArray::StrideArray(unsigned numDims, int64_t offset)
     : offset(offset), strides(numDims) {}
 
@@ -607,7 +654,24 @@ Optional<StrideArray> computeStrideArray(AffineMap map) {
 }
 
 bool hasPerfectAliasing(const RelativeAccessPattern &aRap,
-                        const RelativeAccessPattern &bRap) {
+                        const RelativeAccessPattern &bRapOrig,
+                        const DenseMap<BlockArgument, BlockArgument> &bToA) {
+  RelativeAccessPattern bRap = bRapOrig;
+  DenseSet<BlockArgument> allOuter;
+  for (const auto &kvp : bToA) {
+    allOuter.insert(kvp.second);
+  }
+  if (aRap.outerAlias(allOuter)) {
+    IVLOG(1, "outerAlias");
+    return false;
+  }
+  for (auto &si : bRap.outer) {
+    StrideInfo translated(si.offset);
+    for (const auto &kvp : si.strides) {
+      translated.strides[bToA.find(kvp.first)->second] = kvp.second;
+    }
+    si = translated;
+  }
   if (aRap.outer.size() != bRap.outer.size()) {
     IVLOG(1, "size mismatch: " << aRap.outer.size()
                                << " != " << bRap.outer.size());
@@ -624,16 +688,6 @@ bool hasPerfectAliasing(const RelativeAccessPattern &aRap,
     }
     if (aInnerCount != bInnerCount) {
       IVLOG(1, "aInnerCount != bInnerCount");
-      return false;
-    }
-    if (aOuter.range().stride < aInnerCount) {
-      IVLOG(1, "aOuter.range().stride < aInnerCount");
-      IVLOG(1, "  aOuter.range().stride: " << aOuter.range().stride);
-      IVLOG(1, "  aInnerCount: " << aInnerCount);
-      return false;
-    }
-    if (bOuter.range().stride < bInnerCount) {
-      IVLOG(1, "bOuter.range().stride < bInnerCount");
       return false;
     }
   }
