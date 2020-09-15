@@ -10,6 +10,8 @@ plaidml_cc_library(
         "device_id.cc",
         "executable.cc",
         "internal.h",
+        "jit_executable.cc",
+        "jit_executable.h",
         "prng.cc",
         "runtime.cc",
         "runtime_registry.cc",

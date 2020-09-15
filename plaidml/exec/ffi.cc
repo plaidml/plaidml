@@ -21,7 +21,6 @@ using plaidml::core::ffi_wrap;
 using plaidml::core::ffi_wrap_void;
 using pmlc::compiler::ProgramArgument;
 using pmlc::rt::Device;
-using pmlc::rt::EngineKind;
 using pmlc::rt::Executable;
 using pmlc::rt::getDeviceIDs;
 using pmlc::util::Buffer;
