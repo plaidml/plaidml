@@ -11,7 +11,6 @@
 
 #include "plaidml/bridge/tensorflow/tests/archive_generated.h"
 #include "plaidml/bridge/tensorflow/tests/codegen_test.h"
-#include "plaidml/bridge/tensorflow/tests/utils.h"
 
 using plaidml::edsl::MultiBuffer;
 namespace zoo = plaidml::zoo;

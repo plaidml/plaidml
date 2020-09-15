@@ -29,13 +29,14 @@ def main(args):
             model = tf.saved_model.load(sess, ["train"], model_name)
             input_name = model.signature_def['serving_default'].inputs['input'].name
             input_tensor = tf.get_default_graph().get_tensor_by_name(input_name)
-            output_tensor = tf.get_default_graph().get_tensor_by_name('stage4_unit3_relu:0')
+            output_tensor = tf.get_default_graph().get_tensor_by_name('pool1:0')
             weights_ref = tf.all_variables()
             for index in range(len(weights_ref)):
                 weights[weights_ref[index].name.replace("/", "_").replace(":0", "")] = sess.run(
                     weights_ref[index].value())
             y = sess.run(output_tensor, feed_dict={input_tensor: x})
 
+        os.system("ls -lrt " + str(tmp_path))
         module_path = tmp_path / 'module_0000.before_optimizations.txt'
         module_text = module_path.read_text()
 

@@ -11,7 +11,6 @@
 
 #include "plaidml/bridge/tensorflow/tests/archive_generated.h"
 #include "plaidml/bridge/tensorflow/tests/codegen_test.h"
-#include "plaidml/bridge/tensorflow/tests/utils.h"
 
 using plaidml::edsl::MultiBuffer;
 namespace zoo = plaidml::zoo;
@@ -67,7 +66,9 @@ TEST_P(PlaidMLResNextOperationTest, SimpleResNext) {
     return it->second;
   };
 
-  std::vector<MultiBuffer> args = {std::vector<float>{0},  // stage4_unit3_relu
+  std::vector<MultiBuffer> args = {std::vector<float>{49},  // pool1
+                                   std::vector<float>{0},   // pool1_0
+                                   std::vector<float>{0},   // stage4_unit3_relu
                                    lookup("stage4_unit3_bn3_mean"),
                                    lookup("stage4_unit3_bn3_scale"),
                                    lookup("stage4_unit3_bn3_var"),

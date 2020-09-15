@@ -26,23 +26,12 @@ cc_library(
     hdrs = ["codegen_test.h"],
     tags = ["skip_windows"],
     deps = [
+        ":archive_cc_fbs",
         "//plaidml:testenv",
         "//plaidml/bridge/tensorflow/service:compiler",
         "@org_tensorflow//tensorflow/compiler/xla/tests:test_utils",
         "@org_tensorflow//tensorflow/core:test",
         "@org_tensorflow//tensorflow/core:test_main",
-    ],
-)
-
-cc_library(
-    name = "utils",
-    testonly = True,
-    srcs = ["utils.cc"],
-    hdrs = ["utils.h"],
-    tags = ["skip_windows"],
-    deps = [
-        ":archive_cc_fbs",
-        ":codegen_test",
     ],
 )
 
@@ -151,7 +140,6 @@ tf_cc_test(
     deps = [
         ":archive_cc_fbs",
         ":codegen_test",
-        ":utils",
         "//plaidml/bridge/tensorflow/service:compiler",
         "@org_tensorflow//tensorflow/compiler/xla/tests:verified_hlo_module",
     ],
@@ -201,7 +189,6 @@ tf_cc_test(
     deps = [
         ":archive_cc_fbs",
         ":codegen_test",
-        ":utils",
         "//plaidml/bridge/tensorflow/service:compiler",
         "@org_tensorflow//tensorflow/compiler/xla/tests:verified_hlo_module",
     ],

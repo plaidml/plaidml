@@ -16,12 +16,18 @@ limitations under the License.
 #pragma once
 
 #include <memory>
+#include <string>
 #include <vector>
 
 #include "tensorflow/compiler/xla/status.h"
 
+#include "plaidml/bridge/tensorflow/tests/archive_generated.h"
 #include "plaidml/edsl/edsl.h"
 #include "plaidml/testenv.h"
+
+using plaidml::edsl::MultiBuffer;
+
+namespace zoo = plaidml::zoo;
 
 namespace xla {
 
@@ -29,6 +35,9 @@ class HloComputation;
 class HloModule;
 
 namespace plaidml {
+
+MultiBuffer convertBuffer(const zoo::DataUnion& data);
+std::vector<char> ReadFile(const std::string& path);
 
 struct TestCaseIO {
   std::vector<::plaidml::edsl::MultiBuffer> inputs;
