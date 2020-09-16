@@ -305,15 +305,16 @@ LogicalResult vectorizeOverOutputs(AffineParallelOp op, unsigned vectorWidth) {
   }
   auto reduce = dyn_cast<PxaReduceOp>(getPrevWriter(op.getResult(0)));
   if (!reduce) {
-    return op.emitRemark(
-        "vectorizeOverOutputs: Failed, missing previous PxaReduceOp");
+    return failure();
+    // return op.emitRemark(
+    //    "vectorizeOverOutputs: Failed, missing previous PxaReduceOp");
   }
   auto maybeSI = computeStrideInfo(reduce);
   if (!maybeSI) {
     return op.emitRemark(
         "vectorizeOverOutputs: Failed, could not compute StrideInfo");
   }
-  IVLOG(1, "StrideInfo: " << debugString(*maybeSI));
+  IVLOG(2, "StrideInfo: " << debugString(*maybeSI));
   SmallVector<BlockArgument, 4> options;
   for (auto ba : op.getIVs()) {
     if (maybeSI->strides.count(ba) && maybeSI->strides[ba] == 1) {

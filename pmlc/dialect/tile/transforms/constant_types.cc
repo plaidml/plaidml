@@ -89,16 +89,16 @@ void ConstantTypesPass::runOnFunction() {
   auto *context = &getContext();
 
   if (!floatType) {
-    IVLOG(1, "parse floatKind: " << floatKind);
+    IVLOG(2, "parse floatKind: " << floatKind);
     floatType = llvm::StringSwitch<Type>(floatKind)
                     .Case("f16", FloatType::getF16(context))
                     .Case("f32", FloatType::getF32(context))
                     .Case("f64", FloatType::getF64(context));
-    IVLOG(1, "floatType: " << debugString(floatType));
+    IVLOG(2, "floatType: " << debugString(floatType));
   }
 
   if (!integerType) {
-    IVLOG(1, "parse integerKind: " << integerKind);
+    IVLOG(2, "parse integerKind: " << integerKind);
     integerType =
         llvm::StringSwitch<Type>(integerKind)
             .Case("si8", IntegerType::get(8, IntegerType::Signed, context))
@@ -109,7 +109,7 @@ void ConstantTypesPass::runOnFunction() {
             .Case("ui32", IntegerType::get(32, IntegerType::Unsigned, context))
             .Case("si64", IntegerType::get(64, IntegerType::Signed, context))
             .Case("ui64", IntegerType::get(64, IntegerType::Unsigned, context));
-    IVLOG(1, "integerType: " << debugString(integerType));
+    IVLOG(2, "integerType: " << debugString(integerType));
   }
 
   OwningRewritePatternList patterns;
