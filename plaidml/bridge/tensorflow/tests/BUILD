@@ -179,13 +179,13 @@ genrule(
     tools = [":resnext_test_gen"],
 )
 
-tf_cc_test(
+cc_binary(
     name = "resnext_test",
     srcs = ["resnext_test.cc"],
     data = [":resnext_test_genrule"],
-    extra_copts = ["-fexceptions"],
     linkstatic = 1,
     tags = ["skip_windows"],
+    testonly = 1,
     deps = [
         ":archive_cc_fbs",
         ":codegen_test",
