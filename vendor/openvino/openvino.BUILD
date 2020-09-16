@@ -338,6 +338,7 @@ cc_library(
     ],
     local_defines = [
         "ENABLE_IR_READER",
+        "IR_READER_V10",
     ],
     deps = [
         # ":inference_engine",
