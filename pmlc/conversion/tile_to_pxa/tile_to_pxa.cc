@@ -45,6 +45,8 @@ using dialect::tile::PaddingInfo;
 using dialect::tile::PrngOp;
 using dialect::tile::ReshapeOp;
 using dialect::tile::ReshapeOpAdaptor;
+using dialect::tile::ScatterOp;
+using dialect::tile::ScatterOpAdaptor;
 using dialect::tile::ShapeOp;
 using dialect::tile::ShapeOpAdaptor;
 using dialect::tile::TraceOp;
@@ -1070,6 +1072,92 @@ struct ShapeOpConversion : public OpConversionPattern<ShapeOp> {
   }
 };
 
+struct ScatterOpConversion : public OpConversionPattern<ScatterOp> {
+  using OpConversionPattern<ScatterOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(ScatterOp op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override {
+    IVLOG(2, "ScatterOpConversion::matchAndRewrite>");
+    // Helpful explanation of scatter from tensorflow docs:
+    // https://www.tensorflow.org/api_docs/python/tf/scatter_nd
+
+    auto loc = op.getLoc();
+    auto ctx = rewriter.getContext();
+    TypeConverter typeConverter;
+
+    // Create an adaptor, to interpret the operands
+    ScatterOpAdaptor adaptor(operands);
+    // 'tensor' provides update values
+    // 'dims' contains the destination indices
+    // 'other' is the shape of the output
+    // this is redundant because the result type also specifies output shape
+    auto updates = adaptor.tensor();
+    auto indices = adaptor.dims();
+
+    // Make an allocation for the output
+    auto resultType = typeConverter.convertType(op.result().getType());
+    auto resultMemRefType = resultType.cast<MemRefType>();
+    auto resultMemRef =
+        rewriter.create<AllocOp>(loc, resultMemRefType).getResult();
+
+    // Get the shape of the update tensor and create a parallel loop over its
+    // indexes; we will load each value from the updates, load its destination
+    // from the indexes, and store the value to the result.
+    auto updatesType = typeConverter.convertType(updates.getType());
+    auto updatesMemRefType = updatesType.cast<MemRefType>();
+    ArrayRef<int64_t> updatesShape = updatesMemRefType.getShape();
+
+    auto loop = rewriter.create<AffineParallelOp>(
+        loc, ArrayRef<Type>{resultMemRefType},
+        ArrayRef<AtomicRMWKind>{AtomicRMWKind::assign}, updatesShape);
+    auto txBuilder = loop.getBodyBuilder();
+
+    // Load the source value from the updates tensor.
+    // The affine map for locating the update value uses all loop dimensions.
+    size_t srcDims = updatesShape.size();
+    auto srcLoadMap = AffineMap::getMultiDimIdentityMap(srcDims, ctx);
+    auto srcLoadOps = loop.getIVs();
+    Value srcVal =
+        txBuilder.create<pxa::PxaLoadOp>(loc, updates, srcLoadMap, srcLoadOps)
+            .getResult();
+
+    // Load the location value from the indices tensor.
+    // Create an affine map for loading the index, using leading counters.
+    size_t idxDims = indices.getType().cast<MemRefType>().getShape().size();
+    auto idxLoadMap = AffineMap::getMultiDimIdentityMap(idxDims, ctx);
+    auto idxLoadOps = loop.getIVs().take_front(idxDims);
+
+    Value indexVal =
+        txBuilder.create<pxa::PxaLoadOp>(loc, indices, idxLoadMap, idxLoadOps)
+            .getResult();
+
+    // Cast the index value from its integer type to the index type
+    if (!indexVal.getType().isa<IndexType>()) {
+      // cast from whatever integer type it has to index type
+      auto indexType = txBuilder.getIndexType();
+      indexVal = txBuilder.create<mlir::IndexCastOp>(loc, indexVal, indexType)
+                     .getResult();
+    }
+
+    // Combine the index value with the loop dimension indexes to create the
+    // destination affine map.
+    size_t dstDims = resultMemRefType.getShape().size();
+    SmallVector<Value, 4> dstOps;
+    dstOps.push_back(indexVal);
+    for (size_t i = 1; i < dstDims; ++i) {
+      dstOps.push_back(loop.getIVs()[i]);
+    }
+
+    // Write the value to the destination
+    txBuilder.create<mlir::StoreOp>(loc, srcVal, resultMemRef, dstOps);
+
+    txBuilder.create<AffineYieldOp>(loc, ArrayRef<Value>{resultMemRef});
+    rewriter.replaceOp(op, loop.getResult(0));
+    return success();
+  }
+};
+
 struct CastOpConversion : public OpConversionPattern<ew::CastOp> {
   using OpConversionPattern<ew::CastOp>::OpConversionPattern;
 
@@ -1246,10 +1334,11 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
         ReshapeOpConversion,        //
         ReturnOpConversion,         //
         ScalarConstantOpConversion, //
+        ScatterOpConversion,        //
         ShapeOpConversion,          //
         TileConstantOpConversion,   //
         TraceOpConversion,          //
-        // TODO: SpecialOpConversion (ScatterOp, ZeroOp)
+        // TODO: SpecialOpConversion (ZeroOp)
         ContractionOpConversion<CombinationKind::none, FirstOperand>,
         ContractionOpConversion<CombinationKind::add, StdOp<mlir::AddFOp>,
                                 ResultIs<EltwiseFloat>>,

@@ -1506,10 +1506,9 @@ TEST_F(CppEdsl, Tan) {
 }
 
 TEST_F(CppEdsl, Scatter1D) {
-  auto I = Placeholder(DType::INT32, {1, 4});
+  auto I = Placeholder(DType::INT32, {4});
   auto U = Placeholder(DType::FLOAT32, {4});
-  auto S = Placeholder(DType::INT32, {1});
-  // Note that tensorflow's scatter parameters are ordered (I, U, S)
+  auto S = Placeholder(DType::INT32, {8});
   auto O = scatter(U, I, S);
   auto program = makeProgram("scatter", {O});
 
@@ -1521,9 +1520,9 @@ TEST_F(CppEdsl, Scatter1D) {
 }
 
 TEST_F(CppEdsl, Scatter3D) {
-  auto I = Placeholder(DType::INT32, {1, 2});
+  auto I = Placeholder(DType::INT32, {2});
   auto U = Placeholder(DType::FLOAT32, {2, 4, 4});
-  auto S = Placeholder(DType::INT32, {3});
+  auto S = Placeholder(DType::INT32, {4, 4, 4});
   auto O = scatter(U, I, S);
   auto program = makeProgram("scatter", {O});
 
