@@ -15,6 +15,7 @@
 #include "llvm/Support/FormatVariadic.h"
 
 #include "pmlc/dialect/pxa/analysis/affine_expr.h"
+#include "pmlc/util/bilp/ilp_solver.h"
 #include "pmlc/util/logging.h"
 
 using namespace mlir; // NOLINT
@@ -564,6 +565,83 @@ RelativeAccessPattern::unionMerge(const RelativeAccessPattern &rhs) {
   return success();
 }
 
+// Use ILP to find out if two different iterations of the outer indexes (in
+// allOuter) ever alias.  To do this, we make a system with two copies of all
+// the variable (outer + inner indexes) called _a and _b.  Then we constrain the
+// total effect of _a and the total effect of _b to be the same (i.e. both
+// index sets access the same memory location).  We also contrain the indexes to
+// their appropriate ranges.  Then we see if we can ever get the _a and _b
+// version of any of the outer indexes to differ at all (by minimimizing oi_a -
+// oi_b).  If it's possible for them the differ, then (since _a + _b are
+// symmetric), the minimum of the difference will be < 0.
+bool RelativeAccessPattern::outerAlias(DenseSet<BlockArgument> allOuter) const {
+  using Poly = util::math::Polynomial<util::math::Rational>;
+  using RangeCons = util::math::RangeConstraint;
+  util::bilp::ILPSolver solver;
+  // We track each index as we add it, and make a string version since the
+  // Polynomial logic uses string names for variables.
+  DenseMap<BlockArgument, std::string> baToStr;
+  // The collection of constraints, this ends up including:
+  // 1) Range constraints for two copies (a + b).
+  // 2) Contraints requiring all dimensions of the access to be the same for
+  //    both the a access and the b access.
+  std::vector<RangeCons> constraints;
+  // The collection of things to minimize.  Here it's the differences of _a and
+  // _b for all outer indexes
+  std::vector<Poly> toMin;
+  // A lambda to convert a block arg to x<i>_a - x<i>_b for some unique i.  If
+  // we haven't seen the block arg before, we add it to the map, along with
+  // range constraints for the _a and _b versions.
+  auto toDiff = [&](BlockArgument arg) {
+    std::string &str = baToStr[arg];
+    if (str.empty()) {
+      str = llvm::formatv("x{0}", baToStr.size());
+      StrideRange range(arg);
+      constraints.emplace_back(str + "_a", range.maxVal + 1);
+      constraints.emplace_back(str + "_b", range.maxVal + 1);
+    }
+    return Poly(str + "_a") - Poly(str + "_b");
+  };
+  // Add entries for all the outer indexes.
+  for (auto &arg : allOuter) {
+    auto diff = toDiff(arg);
+    toMin.emplace_back(diff);
+  }
+  // Go over each dimension of the access.
+  for (size_t i = 0; i < outer.size(); i++) {
+    // Compute the difference between the a + b versions of the access for this
+    // dimension of the access.
+    Poly totDiff;
+    for (const auto &kvp : outer[i].strides) {
+      auto diff = toDiff(kvp.first);
+      totDiff += diff * kvp.second;
+    }
+    for (const auto &kvp : inner[i].strides) {
+      auto diff = toDiff(kvp.first);
+      totDiff += diff * kvp.second;
+    }
+    // Constrain this diff to be the range [0, 1) in integers, i.e. constrain it
+    // to be exactly 0.
+    constraints.emplace_back(totDiff, 1);
+  }
+  IVLOG(3, "Doing a batch solve!");
+  IVLOG(3, "Constraints: " << constraints);
+  IVLOG(3, "toMin: " << toMin);
+  // Do the actual ILP solve.
+  auto res = solver.batch_solve(constraints, toMin);
+  // If any of the results have a minimum that is not exactly 0, it means the _a
+  // and _b version of that index can have two differnt values while still
+  // accessing the same point in the tensor.  AKA we have hit an outer alias.
+  for (const auto &kvp : res) {
+    IVLOG(3, "obj_val = " << kvp.second.obj_val);
+    if (kvp.second.obj_val < 0) {
+      return true;
+    }
+  }
+  // Otherwise, all is well.
+  return false;
+}
+
 StrideArray::StrideArray(unsigned numDims, int64_t offset)
     : offset(offset), strides(numDims) {}
 
@@ -604,6 +682,46 @@ Optional<StrideArray> computeStrideArray(AffineMap map) {
   }
 
   return ret;
+}
+
+bool hasPerfectAliasing(const RelativeAccessPattern &aRap,
+                        RelativeAccessPattern bRap,
+                        const DenseMap<BlockArgument, BlockArgument> &bToA) {
+  DenseSet<BlockArgument> allOuter;
+  for (const auto &kvp : bToA) {
+    allOuter.insert(kvp.second);
+  }
+  if (aRap.outerAlias(allOuter)) {
+    IVLOG(3, "outerAlias");
+    return false;
+  }
+  for (auto &si : bRap.outer) {
+    StrideInfo translated(si.offset);
+    for (const auto &kvp : si.strides) {
+      translated.strides[bToA.find(kvp.first)->second] = kvp.second;
+    }
+    si = translated;
+  }
+  if (aRap.outer.size() != bRap.outer.size()) {
+    IVLOG(3, "size mismatch: " << aRap.outer.size()
+                               << " != " << bRap.outer.size());
+    return false;
+  }
+  for (size_t i = 0; i < aRap.outer.size(); i++) {
+    const StrideInfo &aOuter = aRap.outer[i];
+    const StrideInfo &bOuter = bRap.outer[i];
+    const int64_t aInnerCount = aRap.innerCount[i];
+    const int64_t bInnerCount = bRap.innerCount[i];
+    if (aOuter != bOuter) {
+      IVLOG(3, "aOuter != bOuter");
+      return false;
+    }
+    if (aInnerCount != bInnerCount) {
+      IVLOG(3, "aInnerCount != bInnerCount");
+      return false;
+    }
+  }
+  return true;
 }
 
 } // namespace pmlc::dialect::pxa

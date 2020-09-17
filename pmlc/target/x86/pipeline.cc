@@ -117,10 +117,12 @@ void pipelineBuilder(OpPassManager &pm) {
 
   pm.addPass(
       pxa::createStencilGEMMPass(/*numThreads=*/1, heatmapCostTransposed));
+  pm.addPass(pxa::createAffineNormalizePass());
+  pm.addPass(createCanonicalizerPass());
 
-  // FIXME: these passes cause test failures (correctness or otherwise)
   // pm.addPass(pxa::createFusionPass());
-  // pm.addPass(createCanonicalizerPass());
+  pm.addPass(pxa::createAffineNormalizePass());
+  pm.addPass(createCanonicalizerPass());
   pm.addPass(pxa::createMemRefDataFlowOptPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(pxa::createLocalizePass());
