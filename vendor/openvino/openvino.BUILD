@@ -16,24 +16,24 @@ cc_library(
         "inference-engine/samples/common/**/*.hpp",  # TODO
         "inference-engine/samples/benchmark_app/**/*.cpp",
     ]),
-    data = [":plugins"],
+    # data = [":plugins"],
     includes = [
         "inference-engine/samples/common",
         "inference-engine/samples/common/format_reader",
     ],
-    linkopts = select({
-        "@bazel_tools//src/conditions:windows": [],
-        "@bazel_tools//src/conditions:darwin_x86_64": [],
-        "//conditions:default": [
-            "-pthread",
-            "-lm",
-            "-ldl",
-        ],
-    }),
+    # linkopts = select({
+    #     "@bazel_tools//src/conditions:windows": [],
+    #     "@bazel_tools//src/conditions:darwin_x86_64": [],
+    #     "//conditions:default": [
+    #         "-pthread",
+    #         "-lm",
+    #         "-ldl",
+    #     ],
+    # }),
     linkstatic = 0,
     deps = [
         ":inference_engine",
-        ":mkldnn_plugin",
+        # ":mkldnn_plugin",
         "@gflags",
     ],
 )
