@@ -157,13 +157,17 @@ public:
         spirv::getTargetEnvAttrName());
     if (!target_env) {
       auto triple = spirv::VerCapExtAttr::get(
-          spirv::Version::V_1_0,
-          {spirv::Capability::Shader, spirv::Capability::Groups,
+          spirv::Version::V_1_5,
+          {spirv::Capability::Shader, spirv::Capability::GroupNonUniformBallot,
+           spirv::Capability::SubgroupBufferBlockIOINTEL,
            spirv::Capability::Int64, spirv::Capability::Int16,
            spirv::Capability::Int8, spirv::Capability::Float64,
-           spirv::Capability::Float16},
+           spirv::Capability::Float16,
+           spirv::Capability::StorageBuffer16BitAccess},
           ArrayRef<spirv::Extension>(
-              spirv::Extension::SPV_KHR_storage_buffer_storage_class),
+              {spirv::Extension::SPV_KHR_storage_buffer_storage_class,
+               spirv::Extension::SPV_KHR_16bit_storage,
+               spirv::Extension::SPV_INTEL_subgroups}),
           &getContext());
       getOperation().setAttr(
           spirv::getTargetEnvAttrName(),

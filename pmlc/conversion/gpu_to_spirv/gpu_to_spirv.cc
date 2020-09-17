@@ -31,9 +31,48 @@ struct StdxSubgroupBroadcastOpConversion final
                   ConversionPatternRewriter &rewriter) const final {
     auto stdxType = op.getResult().getType();
     auto spirvType = typeConverter.convertType(stdxType);
-    rewriter.replaceOpWithNewOp<spirv::GroupBroadcastOp>(
+    rewriter.replaceOpWithNewOp<spirv::GroupNonUniformBroadcastOp>(
         op, spirvType, spirv::Scope::Subgroup, operands[0], operands[1]);
 
+    return success();
+  }
+};
+
+struct StdxSubgroupBlockReadINTELOpConversion
+    : public SPIRVOpLowering<stdx::SubgroupBlockReadINTELOp> {
+  using SPIRVOpLowering<stdx::SubgroupBlockReadINTELOp>::SPIRVOpLowering;
+
+  LogicalResult
+  matchAndRewrite(stdx::SubgroupBlockReadINTELOp blockReadOp,
+                  ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const final {
+    stdx::SubgroupBlockReadINTELOpAdaptor blockReadOperands(operands);
+    auto memrefType = blockReadOp.memref().getType().cast<MemRefType>();
+    auto loadPtr = spirv::getElementPtr(
+        typeConverter, memrefType, blockReadOperands.memref(),
+        blockReadOperands.indices(), blockReadOp.getLoc(), rewriter);
+    auto ptrType = loadPtr.component_ptr().getType().cast<spirv::PointerType>();
+    rewriter.replaceOpWithNewOp<spirv::SubgroupBlockReadINTELOp>(
+        blockReadOp, ptrType.getPointeeType(), loadPtr.component_ptr());
+    return success();
+  }
+};
+
+struct StdxSubgroupBlockWriteINTELOpConversion
+    : public SPIRVOpLowering<stdx::SubgroupBlockWriteINTELOp> {
+  using SPIRVOpLowering<stdx::SubgroupBlockWriteINTELOp>::SPIRVOpLowering;
+
+  LogicalResult
+  matchAndRewrite(stdx::SubgroupBlockWriteINTELOp blockReadOp,
+                  ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const final {
+    stdx::SubgroupBlockWriteINTELOpAdaptor blockWriteOperands(operands);
+    auto memrefType = blockReadOp.memref().getType().cast<MemRefType>();
+    auto storePtr = spirv::getElementPtr(
+        typeConverter, memrefType, blockWriteOperands.memref(),
+        blockWriteOperands.indices(), blockReadOp.getLoc(), rewriter);
+    rewriter.replaceOpWithNewOp<spirv::SubgroupBlockWriteINTELOp>(
+        blockReadOp, storePtr, blockWriteOperands.value());
     return success();
   }
 };
@@ -132,7 +171,10 @@ struct GPUToSPIRVCustomPass
 void populateStdxToSPIRVPatterns(MLIRContext *context,
                                  SPIRVTypeConverter &typeConverter,
                                  OwningRewritePatternList &patterns) {
-  patterns.insert<StdxSubgroupBroadcastOpConversion>(context, typeConverter);
+  patterns.insert<StdxSubgroupBroadcastOpConversion,
+                  StdxSubgroupBlockReadINTELOpConversion,
+                  StdxSubgroupBlockWriteINTELOpConversion>(context,
+                                                           typeConverter);
 }
 
 void populateStdxToSPIRVGLSLPatterns(MLIRContext *context,
