@@ -2,10 +2,10 @@
 
 #include <stdexcept>
 
-#include "pmlc/rt/llvm_cpu/device.h"
+#include "pmlc/rt/llvm/device.h"
 #include "pmlc/rt/runtime_registry.h"
 
-namespace pmlc::rt::llvm_cpu {
+namespace pmlc::rt::llvm {
 namespace {
 
 class Runtime final : public pmlc::rt::Runtime {
@@ -25,4 +25,4 @@ private:
 RuntimeRegistration<Runtime> reg{"llvm_cpu"};
 
 } // namespace
-} // namespace pmlc::rt::llvm_cpu
+} // namespace pmlc::rt::llvm

@@ -44,7 +44,7 @@ plaidml_cc_library(
     name = "runtimes",
     visibility = ["//visibility:public"],
     deps = [
-        "//pmlc/rt/llvm_cpu",
+        "//pmlc/rt/llvm",
         "//pmlc/rt/vulkan",
      ],
 )

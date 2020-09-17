@@ -17,7 +17,7 @@ public:
 
   virtual std::unique_ptr<Executable>
   compile(const std::shared_ptr<pmlc::compiler::Program> &program,
-          llvm::ArrayRef<void *> bufptrs) = 0;
+          ::llvm::ArrayRef<void *> bufptrs) = 0;
 };
 
 } // namespace pmlc::rt

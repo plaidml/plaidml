@@ -15,7 +15,7 @@ namespace pmlc::rt {
 // to ensure that other components are not concurrently accessing the system
 // global runtime map -- e.g. adding runtimes.
 
-std::shared_ptr<Device> getDevice(llvm::StringRef deviceID);
+std::shared_ptr<Device> getDevice(::llvm::StringRef deviceID);
 std::vector<std::string> getDeviceIDs();
 
 } // namespace pmlc::rt

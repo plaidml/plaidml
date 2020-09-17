@@ -6,8 +6,8 @@
 
 namespace pmlc::rt {
 
-void registerSymbol(llvm::StringRef symbol, void *ptr);
+void registerSymbol(::llvm::StringRef symbol, void *ptr);
 
-void *resolveSymbol(llvm::StringRef symbol);
+void *resolveSymbol(::llvm::StringRef symbol);
 
 } // namespace pmlc::rt
