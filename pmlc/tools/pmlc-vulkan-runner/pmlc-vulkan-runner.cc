@@ -31,6 +31,7 @@
 #include "pmlc/compiler/program.h"
 #include "pmlc/conversion/gpu/lowering.h"
 #include "pmlc/rt/executable.h"
+#include "pmlc/rt/runtime_registry.h"
 #include "pmlc/util/logging.h"
 
 using namespace mlir; // NOLINT[build/namespaces]
@@ -94,9 +95,9 @@ int JitRunnerMain(int argc, char **argv) {
 
   runMLIRPasses(*program->module);
 
-  Executable executable(program, options.optDeviceID.getValue(),
-                        ArrayRef<void *>{});
-  executable.invoke();
+  auto executable = Executable::fromProgram(
+      program, options.optDeviceID.getValue(), ArrayRef<void *>{});
+  executable->invoke();
 
   return EXIT_SUCCESS;
 }
@@ -119,6 +120,7 @@ int main(int argc, char **argv) {
   llvm::InitializeNativeTarget();
   llvm::InitializeNativeTargetAsmPrinter();
   mlir::initializeLLVMPasses();
+  pmlc::rt::initRuntimes();
 
   return JitRunnerMain(argc, argv);
 }

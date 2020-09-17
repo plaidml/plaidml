@@ -187,8 +187,11 @@ private:
   std::shared_ptr<LaunchKernelAction> curr;
   std::shared_ptr<VulkanDevice> device;
   VkCommandPool commandPool;
-  VkQueryPool timestampQueryPool;
   llvm::SmallVector<VkCommandBuffer, 1> commandBuffers;
+  VkQueryPool timestampQueryPool;
+  const uint32_t timestampQueryPoolSize{8192};
+  uint32_t timestampQueryCount{2};
+  uint32_t memoryTransferCount{0};
 };
 
 } // namespace pmlc::rt::vulkan

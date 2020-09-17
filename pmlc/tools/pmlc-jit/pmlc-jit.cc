@@ -25,6 +25,7 @@
 #include "pmlc/all_dialects.h"
 #include "pmlc/compiler/program.h"
 #include "pmlc/rt/executable.h"
+#include "pmlc/rt/runtime_registry.h"
 #include "pmlc/util/logging.h"
 
 using namespace mlir; // NOLINT
@@ -74,9 +75,9 @@ int JitRunnerMain(int argc, char **argv) {
     kind = EngineKind::OrcJIT;
   if (options.optMCJIT.getValue())
     kind = EngineKind::MCJIT;
-  Executable executable(program, options.optDeviceID.getValue(),
-                        ArrayRef<void *>{}, kind);
-  executable.invoke();
+  auto executable = Executable::fromProgram(
+      program, options.optDeviceID.getValue(), ArrayRef<void *>{}, kind);
+  executable->invoke();
 
   return EXIT_SUCCESS;
 }
@@ -96,6 +97,7 @@ int main(int argc, char **argv) {
   llvm::InitializeNativeTarget();
   llvm::InitializeNativeTargetAsmPrinter();
   mlir::initializeLLVMPasses();
+  pmlc::rt::initRuntimes();
 
   std::set_terminate([]() {
     auto eptr = std::current_exception();

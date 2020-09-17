@@ -36,7 +36,7 @@ VulkanInvocation::VulkanInvocation() : device{Device::current<VulkanDevice>()} {
   queryPoolCreateInfo.pNext = nullptr;
   queryPoolCreateInfo.flags = 0;
   queryPoolCreateInfo.queryType = VK_QUERY_TYPE_TIMESTAMP;
-  queryPoolCreateInfo.queryCount = 2;
+  queryPoolCreateInfo.queryCount = timestampQueryPoolSize;
   queryPoolCreateInfo.pipelineStatistics = 0;
   throwOnVulkanError(
       vkCreateQueryPool(device->getDevice(), &queryPoolCreateInfo,
@@ -220,20 +220,55 @@ void VulkanInvocation::submitCommandBuffers() {
   throwOnVulkanError(vkQueueWaitIdle(device->getQueue()), "vkQueueWaitIdle");
 
   if (device->getTimestampValidBits()) {
-    uint64_t *results =
-        reinterpret_cast<uint64_t *>(calloc(2, sizeof(uint64_t)));
+    uint64_t *results = reinterpret_cast<uint64_t *>(
+        calloc(timestampQueryCount, sizeof(uint64_t)));
     vkGetQueryPoolResults(device->getDevice(), timestampQueryPool,
                           /*firstQuery=*/0,
-                          /*queryCount=*/2,
-                          /*dataSize=*/16, results,
-                          /*stride=*/8,
+                          /*queryCount=*/timestampQueryCount,
+                          /*dataSize=*/timestampQueryCount * sizeof(uint64_t),
+                          results,
+                          /*stride=*/sizeof(uint64_t),
                           (VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT));
 
-    uint64_t ns = (results[1] - results[0]) * device->getTimestampPeriod();
-    IVLOG(1, "Total program execution duration: " << ns);
-    IVLOG(1, "Execution time: " << ns << "ns");
     const double NS_PER_MS = 1000000.0;
-    IVLOG(1, "Execution time: " << ns / NS_PER_MS << "ms");
+    uint64_t overall_ns =
+        (results[1] - results[0]) * device->getTimestampPeriod();
+    IVLOG(1, "Overall Vulkan time: " << overall_ns / NS_PER_MS << "ms");
+
+    uint64_t total_kernel_ns = 0;
+
+    for (uint32_t i = 2; i < timestampQueryCount; i += 2) {
+      uint64_t kernel_ns =
+          (results[i + 1] - results[i]) * device->getTimestampPeriod();
+
+      IVLOG(2, "  Vulkan kernel exec time: " << kernel_ns / NS_PER_MS << "ms");
+
+      total_kernel_ns += kernel_ns;
+    }
+
+    if (timestampQueryCount == timestampQueryPoolSize) {
+      IVLOG(
+          1,
+          "WARNING: Ran out of space in the timestamp query pool which has "
+          "size = "
+              << timestampQueryPoolSize
+              << "; consider increasing the size of the timestamp query pool.");
+    }
+
+    IVLOG(1, "Total Vulkan kernels: " << (timestampQueryCount - 2) / 2);
+    IVLOG(1, "Total Vulkan kernel exec time: " << total_kernel_ns / NS_PER_MS
+                                               << "ms");
+    IVLOG(1, "Percentage Vulkan kernel exec time: "
+                 << total_kernel_ns * 100 / static_cast<double>(overall_ns)
+                 << "%");
+
+    uint64_t total_memxfer_ns = overall_ns - total_kernel_ns;
+    IVLOG(1, "Total Vulkan memory transfers: " << memoryTransferCount);
+    IVLOG(1, "Total (esimtated) Vulkan memory transfer time: "
+                 << total_memxfer_ns / NS_PER_MS << "ms");
+    IVLOG(1, "Percentage (estimated) Vulkan memory transfer time: "
+                 << total_memxfer_ns * 100 / static_cast<double>(overall_ns)
+                 << "%");
   }
 
   updateHostMemoryBuffers();
@@ -675,6 +710,12 @@ void VulkanInvocation::createSchedule() {
 
   for (const auto &action : schedule) {
     if (auto kernel = std::dynamic_pointer_cast<LaunchKernelAction>(action)) {
+      if (device->getTimestampValidBits() &&
+          timestampQueryCount < timestampQueryPoolSize) {
+        vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                            timestampQueryPool, timestampQueryCount++);
+      }
+
       if (kernel->deps.size()) {
         vkCmdPipelineBarrier(
             commandBuffer,
@@ -706,8 +747,15 @@ void VulkanInvocation::createSchedule() {
                     /*groupCountX=*/kernel->workGroups.x,
                     /*groupCountY=*/kernel->workGroups.y,
                     /*groupCountZ=*/kernel->workGroups.z);
+
+      if (device->getTimestampValidBits() &&
+          timestampQueryCount < timestampQueryPoolSize) {
+        vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                            timestampQueryPool, timestampQueryCount++);
+      }
     }
     if (auto xfer = std::dynamic_pointer_cast<MemoryTransferAction>(action)) {
+      memoryTransferCount++;
       vkCmdCopyBuffer(commandBuffer,
                       /*srcBuffer=*/xfer->src,
                       /*dstBuffer=*/xfer->dst,
