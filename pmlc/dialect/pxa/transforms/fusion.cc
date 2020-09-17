@@ -205,26 +205,25 @@ struct FusionInfo {
     auto aRap = computeThisRelativeAccess(opA);
     auto bRap = computeThisRelativeAccess(opB);
     auto isAliased = hasPerfectAliasing(*aRap, *bRap, bToA);
-    IVLOG(1, "isAliased: " << isAliased);
+    IVLOG(3, "isAliased: " << isAliased);
 
-    // TODO: check perfect aliasing
     for (const auto &raw : readAfterWrites) {
-      IVLOG(1, "  RAW: " << debugString(*raw.second));
+      IVLOG(3, "  RAW: " << debugString(*raw.second));
       auto aRap = computeThisRelativeAccess(raw.first);
       auto bRap = computeThisRelativeAccess(raw.second);
       auto ret = hasPerfectAliasing(*aRap, *bRap, bToA);
-      IVLOG(1, "  isAliased: " << ret);
+      IVLOG(3, "  isAliased: " << ret);
       if (!ret) {
         return false;
       }
     }
 
     for (const auto &waw : writeAfterWrites) {
-      IVLOG(1, "  WAW: " << debugString(*waw.second));
+      IVLOG(3, "  WAW: " << debugString(*waw.second));
       auto aRap = computeThisRelativeAccess(waw.first);
       auto bRap = computeThisRelativeAccess(waw.second);
       auto ret = hasPerfectAliasing(*aRap, *bRap, bToA);
-      IVLOG(1, "  isAliased: " << ret);
+      IVLOG(3, "  isAliased: " << ret);
       if (!ret) {
         return false;
       }
@@ -308,7 +307,7 @@ struct FusionInfo {
         }
       }
     }
-    // For each raw, waw, consider the plan
+    // For each raw & waw, consider the plan
     for (auto &raw : readAfterWrites) {
       considerPlan(raw.first, raw.second);
     }

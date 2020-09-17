@@ -210,7 +210,7 @@ struct RelativeAccessPattern {
 
   // Given a full set of outer indexes (in case some of them are unused in the
   // various stride-infos), return true if two distinct outer loop interations
-  // can access the same memory element of the tensor.  I.e. do any outer loops
+  // can access the same memory element of the tensor.  i.e. do any outer loops
   // interations ever alias with other outer loop iterations.
   bool outerAlias(mlir::DenseSet<mlir::BlockArgument> allOuter) const;
 };
@@ -239,7 +239,7 @@ struct StrideArray {
 mlir::Optional<StrideArray> computeStrideArray(mlir::AffineMap map);
 
 bool hasPerfectAliasing(
-    const RelativeAccessPattern &aRap, const RelativeAccessPattern &bRap,
+    const RelativeAccessPattern &aRap, RelativeAccessPattern bRap,
     const mlir::DenseMap<mlir::BlockArgument, mlir::BlockArgument> &bToA);
 
 } // namespace pmlc::dialect::pxa
