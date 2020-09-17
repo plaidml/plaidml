@@ -7,7 +7,6 @@ plaidml_cc_library(
     srcs = [
         "boundscheck.cc",
         "builtin.cc",
-        "device.cc",
         "device.h",
         "device_id.cc",
         "executable.cc",

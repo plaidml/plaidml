@@ -13,15 +13,6 @@
 
 namespace pmlc::rt {
 
-// ScopedCurrentDevice sets the current thread's Device pointer.  This is read
-// by Device::current().
-class ScopedCurrentDevice {
-public:
-  explicit ScopedCurrentDevice(std::shared_ptr<Device> device);
-  ScopedCurrentDevice(const ScopedCurrentDevice &) = delete;
-  ~ScopedCurrentDevice();
-};
-
 // getSymbolMap returns the map of symbols registered by components within the
 // current process.
 llvm::StringMap<void *> &getSymbolMap();

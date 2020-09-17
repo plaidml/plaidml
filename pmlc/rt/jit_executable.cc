@@ -368,10 +368,7 @@ public:
     }
   }
 
-  void invoke() {
-    ScopedCurrentDevice cdev(device);
-    jitEntry(ptrs.data());
-  }
+  void invoke() { jitEntry(ptrs.data()); }
 
 private:
   std::shared_ptr<pmlc::compiler::Program> program;
