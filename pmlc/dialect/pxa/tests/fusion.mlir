@@ -1,6 +1,5 @@
 // RUN: pmlc-opt -pxa-fusion -pxa-normalize -canonicalize %s | FileCheck %s
 
-// CHECK-LABEL: func @simple_fusion
 func @simple_fusion(%A: memref<2x3xf32>, %B: memref<2x3xf32>, %C: memref<2x3xf32>, %D: memref<2x3xf32>) -> memref<2x3xf32> {
   %T = alloc() : memref<2x3xf32>
   %4 = affine.parallel (%i, %j) = (0, 0) to (2, 3) reduce ("assign") -> (memref<2x3xf32>) {
@@ -18,18 +17,20 @@ func @simple_fusion(%A: memref<2x3xf32>, %B: memref<2x3xf32>, %C: memref<2x3xf32
     affine.yield %3 : memref<2x3xf32>
   }
   return %5 : memref<2x3xf32>
-  // CHECK: affine.parallel (%{{.*}}, %{{.*}}) = (0, 0) to (2, 3)
-  // CHECK: pxa.load
-  // CHECK: pxa.load
-  // CHECK: addf
-  // CHECK: pxa.reduce
-  // CHECK-NOT: affine.parallel
-  // CHECK: pxa.load
-  // CHECK: pxa.load
-  // CHECK: mulf
-  // CHECK: pxa.reduce
-  // CHECK: affine.yield
 }
+
+// CHECK-LABEL: func @simple_fusion
+// CHECK:       affine.parallel (%{{.*}}, %{{.*}}) = (0, 0) to (2, 3)
+// CHECK:         pxa.load
+// CHECK:         pxa.load
+// CHECK:         addf
+// CHECK:         pxa.reduce
+// CHECK-NOT:   affine.parallel
+// CHECK:         pxa.load
+// CHECK:         pxa.load
+// CHECK:         mulf
+// CHECK:         pxa.reduce
+// CHECK:         affine.yield
 
 // -----
 
@@ -66,3 +67,21 @@ func @resnet50_tail(%arg0: memref<1000xf32>, %arg1: memref<1x1000xf32>, %out: me
   }
   return %8 : memref<1x1000xf32>
 }
+
+// CHECK-LABEL: func @resnet50_tail
+// CHECK:         %{{.*}}:2 = affine.parallel (%{{.*}}) = (0) to (1000) reduce ("assign", "assign") -> (memref<1x1000xf32>, memref<1x1xf32>)
+// CHECK:           pxa.load
+// CHECK:           pxa.load
+// CHECK:           addf
+// CHECK:           pxa.reduce assign
+// CHECK:           pxa.load
+// CHECK:           pxa.reduce assign
+// CHECK:           pxa.load
+// CHECK:           pxa.reduce maxf
+// CHECK:           affine.yield %{{.*}}, %{{.*}} : memref<1x1000xf32>, memref<1x1xf32>
+// CHECK:         affine.parallel (%{{.*}}) = (0) to (1000) reduce ("assign") -> (memref<1x1000xf32>)
+// CHECK:           pxa.load %{{.*}}#0[0, %{{.*}}] : memref<1x1000xf32>
+// CHECK:           pxa.load %{{.*}}#1[0, 0] : memref<1x1xf32>
+// CHECK:           subf
+// CHECK:           pxa.reduce assign
+// CHECK:           affine.yield

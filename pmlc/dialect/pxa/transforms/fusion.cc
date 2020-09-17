@@ -487,8 +487,6 @@ struct FusionPass : public FusionBase<FusionPass> {
       opOrder[&op] = opOrder.size();
     }
 
-    util::DiagnosticCounter counter;
-
     for (auto itOp = block.begin(); itOp != block.end();) {
       auto fuseA = dyn_cast<AffineParallelOp>(*itOp);
       // Kick the iterator forward right away so if we end up fusing the op
@@ -497,14 +495,6 @@ struct FusionPass : public FusionBase<FusionPass> {
       // Only consider affine.parallel ops
       if (!fuseA) {
         continue;
-      }
-
-      auto result = counter.next();
-      if (result == util::DiagnosticCounter::Result::Break) {
-        continue;
-      }
-      if (result == util::DiagnosticCounter::Result::Match) {
-        IVLOG(0, "Match: " << counter.counter << "\n" << debugString(*fuseA));
       }
 
       // Find the 'nearest reader' block:  Walk over each output, find any
