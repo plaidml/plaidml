@@ -919,8 +919,7 @@ struct GatherOpConversion : public OpConversionPattern<GatherOp> {
     auto loop = rewriter.create<AffineParallelOp>(
         loc, ArrayRef<Type>{memrefType},
         ArrayRef<AtomicRMWKind>{AtomicRMWKind::assign}, size);
-
-    auto txBuilder = loop.getBodyBuilder();
+    rewriter.setInsertionPointToStart(loop.getBody());
 
     // create an affine map for loading the index, using the leading counters
     size_t idxDims = indexes.getType().cast<MemRefType>().getShape().size();
@@ -929,13 +928,13 @@ struct GatherOpConversion : public OpConversionPattern<GatherOp> {
 
     // load the value from the indexes array
     Value indexVal =
-        txBuilder.create<pxa::PxaLoadOp>(loc, indexes, idxLoadMap, idxLoadOps)
+        rewriter.create<pxa::PxaLoadOp>(loc, indexes, idxLoadMap, idxLoadOps)
             .getResult();
 
     if (!indexVal.getType().isa<IndexType>()) {
       // cast from whatever integer type it has to index type
-      auto indexType = txBuilder.getIndexType();
-      indexVal = txBuilder.create<mlir::IndexCastOp>(loc, indexVal, indexType)
+      auto indexType = rewriter.getIndexType();
+      indexVal = rewriter.create<mlir::IndexCastOp>(loc, indexVal, indexType)
                      .getResult();
     }
 
@@ -948,16 +947,16 @@ struct GatherOpConversion : public OpConversionPattern<GatherOp> {
     }
 
     // load the specified value from the source tensor
-    auto loaded = txBuilder.create<mlir::LoadOp>(loc, tensor, srcOps);
+    auto loaded = rewriter.create<mlir::LoadOp>(loc, tensor, srcOps);
 
     // create a destination map using all of the dimensions
     auto dstStoreMap = AffineMap::getMultiDimIdentityMap(dstDims, ctx);
 
     // create a destination map from the whole loop
-    auto stored = txBuilder.create<pxa::PxaReduceOp>(
-        loc, AtomicRMWKind::assign, loaded, resultMemRef, dstStoreMap,
-        loop.getIVs());
-    txBuilder.create<AffineYieldOp>(loc, ArrayRef<Value>{stored.getResult()});
+    auto stored = rewriter.create<pxa::PxaReduceOp>(loc, AtomicRMWKind::assign,
+                                                    loaded, resultMemRef,
+                                                    dstStoreMap, loop.getIVs());
+    rewriter.create<AffineYieldOp>(loc, ArrayRef<Value>{stored.getResult()});
 
     rewriter.replaceOp(op, loop.getResult(0));
 
@@ -1111,7 +1110,7 @@ struct ScatterOpConversion : public OpConversionPattern<ScatterOp> {
     auto loop = rewriter.create<AffineParallelOp>(
         loc, ArrayRef<Type>{resultMemRefType},
         ArrayRef<AtomicRMWKind>{AtomicRMWKind::assign}, updatesShape);
-    auto txBuilder = loop.getBodyBuilder();
+    rewriter.setInsertionPointToStart(loop.getBody());
 
     // Load the source value from the updates tensor.
     // The affine map for locating the update value uses all loop dimensions.
@@ -1119,7 +1118,7 @@ struct ScatterOpConversion : public OpConversionPattern<ScatterOp> {
     auto srcLoadMap = AffineMap::getMultiDimIdentityMap(srcDims, ctx);
     auto srcLoadOps = loop.getIVs();
     Value srcVal =
-        txBuilder.create<pxa::PxaLoadOp>(loc, updates, srcLoadMap, srcLoadOps)
+        rewriter.create<pxa::PxaLoadOp>(loc, updates, srcLoadMap, srcLoadOps)
             .getResult();
 
     // Load the location value from the indices tensor.
@@ -1129,14 +1128,14 @@ struct ScatterOpConversion : public OpConversionPattern<ScatterOp> {
     auto idxLoadOps = loop.getIVs().take_front(idxDims);
 
     Value indexVal =
-        txBuilder.create<pxa::PxaLoadOp>(loc, indices, idxLoadMap, idxLoadOps)
+        rewriter.create<pxa::PxaLoadOp>(loc, indices, idxLoadMap, idxLoadOps)
             .getResult();
 
     // Cast the index value from its integer type to the index type
     if (!indexVal.getType().isa<IndexType>()) {
       // cast from whatever integer type it has to index type
-      auto indexType = txBuilder.getIndexType();
-      indexVal = txBuilder.create<mlir::IndexCastOp>(loc, indexVal, indexType)
+      auto indexType = rewriter.getIndexType();
+      indexVal = rewriter.create<mlir::IndexCastOp>(loc, indexVal, indexType)
                      .getResult();
     }
 
@@ -1150,9 +1149,9 @@ struct ScatterOpConversion : public OpConversionPattern<ScatterOp> {
     }
 
     // Write the value to the destination
-    txBuilder.create<mlir::StoreOp>(loc, srcVal, resultMemRef, dstOps);
+    rewriter.create<mlir::StoreOp>(loc, srcVal, resultMemRef, dstOps);
 
-    txBuilder.create<AffineYieldOp>(loc, ArrayRef<Value>{resultMemRef});
+    rewriter.create<AffineYieldOp>(loc, ArrayRef<Value>{resultMemRef});
     rewriter.replaceOp(op, loop.getResult(0));
     return success();
   }
