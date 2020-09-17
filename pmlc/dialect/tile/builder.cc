@@ -612,6 +612,7 @@ TileBuilder::MakeProgram(StringRef name, const ProgramMutations &mutations,
   // Construct a function to represent the entire program
   auto initialFuncType = FunctionType::get(inputTypes, {}, getContext());
   auto funcOp = FuncOp::create(loc, name, initialFuncType, {});
+  funcOp.setAttr("entrypoint", mlir::UnitAttr::get(getContext()));
   funcOp.addEntryBlock();
   OpBuilder builder(funcOp.getBody());
   std::set<std::string> names;

@@ -2,7 +2,7 @@
 
 !tensor = type tensor<2x4xf32>
 
-func @eltwise_add(%A: !tensor, %B: !tensor) -> !tensor {
+func @eltwise_add(%A: !tensor, %B: !tensor) -> !tensor attributes {entrypoint} {
   %C = "eltwise.add"(%A, %B) : (!tensor, !tensor) -> !tensor
   return %C : !tensor
 }

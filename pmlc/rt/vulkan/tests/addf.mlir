@@ -20,7 +20,7 @@ module attributes {
     }
   }
 
-  func @main() {
+  func @main() attributes {entrypoint} {
     %arg0 = alloc() : memref<8xf32>
     %arg1 = alloc() : memref<8xf32>
     %arg2 = alloc() : memref<8xf32>

@@ -2,6 +2,7 @@
 
 #include "pmlc/rt/jit_executable.h"
 
+#include <algorithm>
 #include <fstream>
 #include <string>
 #include <utility>
@@ -304,8 +305,9 @@ enum class EngineKind {
 class JitExecutable final : public Executable {
 public:
   JitExecutable(const std::shared_ptr<Program> &program,
-                std::shared_ptr<Device> device, ArrayRef<void *> bufptrs)
-      : program(program), device(std::move(device)), ptrs(bufptrs.size()) {
+                std::shared_ptr<Device> device, ArrayRef<void *> preParams,
+                ArrayRef<void *> bufptrs)
+      : program(program), device(std::move(device)) {
     static std::once_flag is_initialized;
     std::call_once(is_initialized, []() {
       llvm::InitializeNativeTarget();
@@ -313,6 +315,8 @@ public:
       initializeLLVMPasses();
       llvm::sys::DynamicLibrary::LoadLibraryPermanently(nullptr);
     });
+
+    ptrs.reserve(preParams.size() + bufptrs.size());
 
     EngineKind kind = EngineKind::OrcJIT;
     auto jit = pmlc::util::getEnvVar("LLVM_JIT");
@@ -355,10 +359,12 @@ public:
       throw std::runtime_error("jitEntry function is null");
     }
 
+    std::copy(preParams.begin(), preParams.end(), std::back_inserter(ptrs));
+
     descriptors.reserve(bufptrs.size());
     for (unsigned i = 0; i < bufptrs.size(); i++) {
       descriptors.emplace_back(bufptrs[i], program->arguments[i].shape);
-      ptrs[i] = descriptors[i].ptr();
+      ptrs.push_back(descriptors[i].ptr());
     }
   }
 
@@ -381,8 +387,10 @@ private:
 std::unique_ptr<Executable>
 makeJitExecutable(const std::shared_ptr<pmlc::compiler::Program> &program,
                   std::shared_ptr<Device> device,
+                  llvm::ArrayRef<void *> preParams,
                   llvm::ArrayRef<void *> bufptrs) {
-  return std::make_unique<JitExecutable>(program, std::move(device), bufptrs);
+  return std::make_unique<JitExecutable>(program, std::move(device), preParams,
+                                         bufptrs);
 }
 
 } // namespace pmlc::rt

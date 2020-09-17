@@ -96,7 +96,8 @@ VulkanDevice::~VulkanDevice() { vkDestroyDevice(device, nullptr); }
 std::unique_ptr<Executable>
 VulkanDevice::compile(const std::shared_ptr<pmlc::compiler::Program> &program,
                       llvm::ArrayRef<void *> bufptrs) {
-  return makeJitExecutable(program, shared_from_this(), bufptrs);
+  return makeJitExecutable(program, shared_from_this(),
+                           llvm::ArrayRef<void *>{this}, bufptrs);
 }
 
 void VulkanDevice::getBestComputeQueue(const VkPhysicalDevice &physicalDevice) {

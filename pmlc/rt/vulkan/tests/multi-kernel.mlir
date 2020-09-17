@@ -12,7 +12,7 @@ module attributes {
     {max_compute_workgroup_invocations = 128 : i32,
      max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>
 } {
-  func @main() {
+  func @main() attributes {entrypoint} {
     %arg0 = alloc() : memref<3x3xf32>
     %arg1 = alloc() : memref<3x3xf32>
     %arg2 = alloc() : memref<3x3xf32>

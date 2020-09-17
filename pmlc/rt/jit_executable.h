@@ -15,6 +15,7 @@ namespace pmlc::rt {
 std::unique_ptr<Executable>
 makeJitExecutable(const std::shared_ptr<pmlc::compiler::Program> &program,
                   std::shared_ptr<Device> device,
+                  llvm::ArrayRef<void *> preParams,
                   llvm::ArrayRef<void *> bufptrs);
 
 } // namespace pmlc::rt

@@ -30,16 +30,8 @@
 namespace pmlc::rt::vulkan {
 
 /// Vulkan device abstraction.
-/// The purpose of this class is to run a SPIR-V compute shader on a Vulkan
-/// device.
-/// Before the run, user must provide and set resource data with descriptors,
-/// SPIR-V shader, number of work groups and entry point. After the creation of
-/// VulkanDevice, special methods must be called in the following
-/// sequence: initRuntime(), run(), updateHostMemoryBuffers(), destroy();
-/// each method in the sequence returns succes or failure depends on the Vulkan
-/// result code.
 class VulkanDevice final : public pmlc::rt::Device,
-                           public std::enable_shared_from_this<Device> {
+                           public std::enable_shared_from_this<VulkanDevice> {
 public:
   VulkanDevice(const VkPhysicalDevice &physicalDevice,
                std::shared_ptr<VulkanState> state);

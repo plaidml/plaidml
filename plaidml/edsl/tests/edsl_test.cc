@@ -386,7 +386,7 @@ TEST_F(CppEdsl, DoubleDot) {
   // clang-format off
   // CHECK-LABEL: CppEdsl.DoubleDot
   // CHECK: func @double_dot
-  // CHECK: tensor<10x20xf32>) -> tensor<10x40xf32> {
+  // CHECK: tensor<10x20xf32>) -> tensor<10x40xf32> attributes {entrypoint} {
   // CHECK: %[[cst:.*]] = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> tensor<f32>
   // CHECK: %{{.*}} = tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {idxs = ["i", "j", "k"], sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : tensor<f32>, tensor<10x20xf32>, tensor<20x30xf32> -> tensor<10x30xf32>
   // CHECK: %{{.*}} = tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {idxs = ["i", "j", "k"], sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : tensor<f32>, tensor<10x30xf32>, tensor<30x40xf32> -> tensor<10x40xf32>
