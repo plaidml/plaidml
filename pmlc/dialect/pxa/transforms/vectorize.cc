@@ -306,8 +306,6 @@ LogicalResult vectorizeOverOutputs(AffineParallelOp op, unsigned vectorWidth) {
   auto reduce = dyn_cast<PxaReduceOp>(getPrevWriter(op.getResult(0)));
   if (!reduce) {
     return failure();
-    // return op.emitRemark(
-    //    "vectorizeOverOutputs: Failed, missing previous PxaReduceOp");
   }
   auto maybeSI = computeStrideInfo(reduce);
   if (!maybeSI) {
