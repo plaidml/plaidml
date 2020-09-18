@@ -182,7 +182,6 @@ private:
 
 void ConvertGpuLaunchFuncToVulkanCalls::runOnOperation() {
   auto loc = getOperation().getLoc();
-
   getCachedTypes();
 
   getOperation().walk([this](gpu::LaunchFuncOp op) { numKernel++; });
@@ -244,10 +243,8 @@ ConvertGpuLaunchFuncToVulkanCalls::bindBuffers(Location loc, OpBuilder &builder,
   Value descriptorSet = builder.create<LLVM::ConstantOp>(
       loc, getLLVMInt32Type(), builder.getI32IntegerAttr(0));
 
-  // launchOp.dump();
   for (uint32_t bindIndex = 0; bindIndex < buffers.size(); bindIndex++) {
     auto buffer = buffers[bindIndex];
-
     // Create LLVM constant for the descriptor binding index.
     Value descriptorBinding = builder.create<LLVM::ConstantOp>(
         loc, getLLVMInt32Type(), builder.getI32IntegerAttr(bindIndex));
