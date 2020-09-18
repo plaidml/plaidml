@@ -28,14 +28,8 @@ with plaidml.open_first_device(ctx) as dev:
     X = tile.Value.from_ndims(1)
     R = tile.Value.from_ndims(1)
 
-    Ap = tile.Operation("""function (A[I,J], P[J]) -> (Ap) {
-                            Ap[i: I] = +(A[i,j] * P[j]);
-                        }
-                        """, [('A', A), ('P', P)], [('Ap', tile.Shape(dtype, (N,)))]).outputs['Ap']
-    pAp = tile.Operation("""function(Ap[I], P[I]) -> (C) {
-                        C[:] = +(Ap[i] * P[i]);
-                    }""", [('Ap', Ap), ('P', P)], [('C', tile.Shape(dtype, ()))]).outputs['C']
-    alpha = RSQ/pAp
+    Ap = op.matmul(A, P)
+    alpha = RSQ/op.matmul(P, Ap)
     OX = X + alpha*P
     OR = R - alpha*Ap
     RSQN = op.matmul(OR, OR)
