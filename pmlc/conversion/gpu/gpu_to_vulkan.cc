@@ -182,6 +182,7 @@ private:
 
 void ConvertGpuLaunchFuncToVulkanCalls::runOnOperation() {
   auto loc = getOperation().getLoc();
+
   getCachedTypes();
 
   getOperation().walk([this](gpu::LaunchFuncOp op) { numKernel++; });
@@ -243,8 +244,10 @@ ConvertGpuLaunchFuncToVulkanCalls::bindBuffers(Location loc, OpBuilder &builder,
   Value descriptorSet = builder.create<LLVM::ConstantOp>(
       loc, getLLVMInt32Type(), builder.getI32IntegerAttr(0));
 
+  // launchOp.dump();
   for (uint32_t bindIndex = 0; bindIndex < buffers.size(); bindIndex++) {
     auto buffer = buffers[bindIndex];
+
     // Create LLVM constant for the descriptor binding index.
     Value descriptorBinding = builder.create<LLVM::ConstantOp>(
         loc, getLLVMInt32Type(), builder.getI32IntegerAttr(bindIndex));
@@ -265,11 +268,21 @@ ConvertGpuLaunchFuncToVulkanCalls::bindBuffers(Location loc, OpBuilder &builder,
           builder.getI32IntegerAttr(numElement * elementTypeSize));
       Value unrankedBuffer = builder.create<mlir::MemRefCastOp>(
           loc, buffer, getUnrankedMemRefType(elementType));
+
+      Value bufferType;
+      if (auto arg = buffer.dyn_cast<mlir::BlockArgument>()) {
+        bufferType = builder.create<LLVM::ConstantOp>(
+            loc, getLLVMInt32Type(), builder.getI32IntegerAttr(0));
+      } else {
+        bufferType = builder.create<LLVM::ConstantOp>(
+            loc, getLLVMInt32Type(), builder.getI32IntegerAttr(1));
+      }
+
       builder.create<CallOp>(
           loc, ArrayRef<Type>{},
           builder.getSymbolRefAttr(getBufferBindingFunc(elementType)),
           ArrayRef<Value>{vulkanRuntime, descriptorSet, descriptorBinding,
-                          bufferByteSize, unrankedBuffer});
+                          bufferByteSize, bufferType, unrankedBuffer});
       optionalSymbols.insert(getBufferBindingFunc(elementType));
     } else {
       return failure();
@@ -393,6 +406,7 @@ void ConvertGpuLaunchFuncToVulkanCalls::declareVulkanFunctions(Location loc) {
           FunctionType::get(
               {ArrayRef<Type>{getLLVMPointerType(), getLLVMInt32Type(),
                               getLLVMInt32Type(), getLLVMInt32Type(),
+                              getLLVMInt32Type(),
                               getUnrankedMemRefType(bufferElementType)}},
               {}, &ctx),
           ArrayRef<std::pair<mlir::Identifier, mlir::Attribute>>());

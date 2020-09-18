@@ -283,11 +283,12 @@ void VulkanInvocation::setResourceData(const ResourceData &resData) {
 
 void VulkanInvocation::setResourceData(
     const DescriptorSetIndex desIndex, const BindingIndex bindIndex,
-    const VulkanHostMemoryBuffer &hostMemBuffer) {
+    const BufferType bufferType, const VulkanHostMemoryBuffer &hostMemBuffer) {
   if (!curr) {
     throw std::runtime_error{"setResourceData: curr is nullptr!"};
   }
   curr->resourceData[desIndex][bindIndex] = hostMemBuffer;
+  curr->resourceDataType[desIndex][bindIndex] = bufferType;
   curr->resourceStorageClassData[desIndex][bindIndex] =
       mlir::spirv::StorageClass::StorageBuffer;
 }
