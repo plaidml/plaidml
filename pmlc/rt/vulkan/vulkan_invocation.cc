@@ -13,6 +13,8 @@
 
 #include "pmlc/rt/vulkan/vulkan_invocation.h"
 
+#include <chrono>
+
 #include "llvm/Support/FormatVariadic.h"
 
 #include "pmlc/rt/vulkan/vulkan_error.h"
@@ -213,6 +215,10 @@ void VulkanInvocation::createMemoryTransferAction(uint64_t src_index,
 }
 
 void VulkanInvocation::submitCommandBuffers() {
+  using namespace std::chrono; // NOLINT
+  using fp_milliseconds = duration<double, milliseconds::period>;
+  using fp_nanoseconds = duration<double, nanoseconds::period>;
+
   createSchedule();
 
   submitCommandBuffersToQueue();
@@ -230,18 +236,19 @@ void VulkanInvocation::submitCommandBuffers() {
                           /*stride=*/sizeof(uint64_t),
                           (VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT));
 
-    const double NS_PER_MS = 1000000.0;
-    uint64_t overall_ns =
-        (results[1] - results[0]) * device->getTimestampPeriod();
-    IVLOG(1, "Overall Vulkan time: " << overall_ns / NS_PER_MS << "ms");
+    fp_nanoseconds overall_ns{(results[1] - results[0]) *
+                              device->getTimestampPeriod()};
+    IVLOG(1, "Overall Vulkan time: "
+                 << duration_cast<fp_milliseconds>(overall_ns).count() << "ms");
 
-    uint64_t total_kernel_ns = 0;
-
+    fp_nanoseconds total_kernel_ns = 0ns;
     for (uint32_t i = 2; i < timestampQueryCount; i += 2) {
-      uint64_t kernel_ns =
-          (results[i + 1] - results[i]) * device->getTimestampPeriod();
+      fp_nanoseconds kernel_ns{(results[i + 1] - results[i]) *
+                               device->getTimestampPeriod()};
 
-      IVLOG(2, "  Vulkan kernel exec time: " << kernel_ns / NS_PER_MS << "ms");
+      IVLOG(2, "  Vulkan kernel exec time: "
+                   << duration_cast<fp_milliseconds>(kernel_ns).count()
+                   << "ms");
 
       total_kernel_ns += kernel_ns;
     }
@@ -256,19 +263,19 @@ void VulkanInvocation::submitCommandBuffers() {
     }
 
     IVLOG(1, "Total Vulkan kernels: " << (timestampQueryCount - 2) / 2);
-    IVLOG(1, "Total Vulkan kernel exec time: " << total_kernel_ns / NS_PER_MS
-                                               << "ms");
+    IVLOG(1, "Total Vulkan kernel exec time: "
+                 << duration_cast<fp_milliseconds>(total_kernel_ns).count()
+                 << "ms");
     IVLOG(1, "Percentage Vulkan kernel exec time: "
-                 << total_kernel_ns * 100 / static_cast<double>(overall_ns)
-                 << "%");
+                 << total_kernel_ns.count() * 100 / overall_ns.count() << "%");
 
-    uint64_t total_memxfer_ns = overall_ns - total_kernel_ns;
+    fp_nanoseconds total_memxfer_ns = overall_ns - total_kernel_ns;
     IVLOG(1, "Total Vulkan memory transfers: " << memoryTransferCount);
     IVLOG(1, "Total (esimtated) Vulkan memory transfer time: "
-                 << total_memxfer_ns / NS_PER_MS << "ms");
+                 << duration_cast<fp_milliseconds>(total_memxfer_ns).count()
+                 << "ms");
     IVLOG(1, "Percentage (estimated) Vulkan memory transfer time: "
-                 << total_memxfer_ns * 100 / static_cast<double>(overall_ns)
-                 << "%");
+                 << total_memxfer_ns.count() * 100 / overall_ns.count() << "%");
   }
 
   updateHostMemoryBuffers();
