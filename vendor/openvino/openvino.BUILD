@@ -16,24 +16,14 @@ cc_library(
         "inference-engine/samples/common/**/*.hpp",  # TODO
         "inference-engine/samples/benchmark_app/**/*.cpp",
     ]),
-    # data = [":plugins"],
     includes = [
         "inference-engine/samples/common",
         "inference-engine/samples/common/format_reader",
     ],
-    # linkopts = select({
-    #     "@bazel_tools//src/conditions:windows": [],
-    #     "@bazel_tools//src/conditions:darwin_x86_64": [],
-    #     "//conditions:default": [
-    #         "-pthread",
-    #         "-lm",
-    #         "-ldl",
-    #     ],
-    # }),
     linkstatic = 0,
     deps = [
         ":inference_engine",
-        # ":mkldnn_plugin",
+        ":ngraph",
         "@gflags",
     ],
 )
@@ -399,6 +389,15 @@ cc_library(
         "inference-engine/src/readers/ir_reader",  # TODO: Why does this work?
         "inference-engine/src/readers/reader_api",  # TODO: Why does this work?
     ],
+    linkopts = select({
+        "@bazel_tools//src/conditions:windows": [],
+        "@bazel_tools//src/conditions:darwin_x86_64": [],
+        "//conditions:default": [
+            # "-pthread",
+            "-lm",
+            "-ldl",
+        ],
+    }),
     local_defines = [
         "ENABLE_IR_READER",
     ],
@@ -462,9 +461,14 @@ cc_library(
     name = "ngraph",
     srcs = glob(
         [
+            "ngraph/core/builder/src/*.cpp",
+            "ngraph/core/reference/src/*.cpp",
+            "ngraph/core/reference/src/runtime/**/*.cpp",
+            "ngraph/core/src/descriptor/*.cpp",
+            "ngraph/core/src/**/*.cpp",
+            "ngraph/core/src/*.cpp",
             "ngraph/src/ngraph/*.cpp",
             "ngraph/src/ngraph/*.hpp",
-            "ngraph/core/builder/src/*.cpp",
             "ngraph/src/ngraph/descriptor/**/*.cpp",
             "ngraph/src/ngraph/distributed/*.cpp",
             "ngraph/src/ngraph/op/*.cpp",
@@ -476,19 +480,18 @@ cc_library(
             "ngraph/src/ngraph/runtime/reference/*.cpp",
             "ngraph/src/ngraph/state/*.cpp",
             "ngraph/src/ngraph/type/*.cpp",
-            "ngraph/test/runtime/*.cpp",
-            "ngraph/test/runtime/**/*.cpp",
         ],
         exclude = [
             "ngraph/src/ngraph/serializer.cpp",
-            "ngraph/test/runtime/ie/*.cpp",
         ],
     ),
     hdrs = glob(
         [
             "ngraph/core/builder/include/ngraph/builder/*.hpp",
             "ngraph/core/include/ngraph/*.hpp",
+            "ngraph/core/include/ngraph/**/*.hpp",
             "ngraph/core/reference/include/ngraph/runtime/reference/*.hpp",
+            "ngraph/core/src/*.hpp",
             "ngraph/src/ngraph/*.hpp",
             "ngraph/src/ngraph/descriptor/**/*.hpp",
             "ngraph/src/ngraph/distributed/*.hpp",
@@ -501,11 +504,6 @@ cc_library(
             "ngraph/src/ngraph/state/*.hpp",
             "ngraph/src/ngraph/pattern/**/*.hpp",
             "ngraph/src/ngraph/type/*.hpp",
-            "ngraph/test/runtime/*.hpp",
-            "ngraph/test/runtime/**/*.hpp",
-        ],
-        exclude = [
-            "ngraph/test/runtime/ie/*.hpp",
         ],
     ),
     defines = [
@@ -516,10 +514,17 @@ cc_library(
     includes = [
         "ngraph/core/builder/include",
         "ngraph/core/include",
+        "ngraph/core/include/ngraph",
+        "ngraph/core/include/ngraph/op",
+        "ngraph/core/include/ngraph/op/util",
+        "ngraph/core/include/ngraph/pass",
+        "ngraph/core/include/ngraph/pattern",
+        "ngraph/core/include/ngraph/pattern/op",
+        "ngraph/core/include/ngraph/runtime",
         "ngraph/core/reference/include",
+        "ngraph/core/src",
         "ngraph/src",
         "ngraph/src/ngraph",
-        "ngraph/test/runtime",
     ],
     local_defines = [
         "PROJECT_ROOT_DIR=\\\"./\\\"",
@@ -527,4 +532,8 @@ cc_library(
         "SHARED_LIB_SUFFIX=\\\"\\\"",
     ],
     tags = TAGS,
+    deps = [
+        ":itt",
+        "@tbb",
+    ],
 )
