@@ -260,10 +260,18 @@ struct OrcJITEngineImpl : EngineImpl {
 
     SymbolMap symbols;
     auto &session = jit->getExecutionSession();
-    for (const auto &kvp : getSymbolMap()) {
-      auto addr = llvm::pointerToJITTargetAddress(kvp.second);
+
+    auto addSymbol = [&](StringRef name, void *ptr) {
+      auto addr = llvm::pointerToJITTargetAddress(ptr);
       auto symbol = llvm::JITEvaluatedSymbol(addr, llvm::JITSymbolFlags::None);
-      symbols.insert(std::make_pair(session.intern(kvp.first()), symbol));
+      symbols.insert(std::make_pair(session.intern(name), symbol));
+    };
+
+    for (const auto &kvp : SymbolRegistry::instance()->symbols) {
+      addSymbol(kvp.first(), kvp.second);
+#ifdef __APPLE__
+      addSymbol(llvm::formatv("_{0}", kvp.first()).str(), kvp.second);
+#endif
     }
 
     auto &mainJitDylib = jit->getMainJITDylib();
