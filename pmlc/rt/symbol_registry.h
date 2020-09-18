@@ -2,12 +2,25 @@
 
 #pragma once
 
+#include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
 
 namespace pmlc::rt {
 
-void registerSymbol(llvm::StringRef symbol, void *ptr);
+struct SymbolRegistry {
+  static SymbolRegistry *instance();
+  void registerSymbol(llvm::StringRef symbol, void *ptr);
+  void *resolve(llvm::StringRef symbol);
 
-void *resolveSymbol(llvm::StringRef symbol);
+  llvm::StringMap<void *> symbols;
+};
+
+inline void registerSymbol(llvm::StringRef symbol, void *ptr) {
+  SymbolRegistry::instance()->registerSymbol(symbol, ptr);
+}
+
+inline void *resolveSymbol(llvm::StringRef symbol) {
+  return SymbolRegistry::instance()->resolve(symbol);
+}
 
 } // namespace pmlc::rt
