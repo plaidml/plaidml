@@ -331,11 +331,14 @@ cc_library(
         "inference-engine/src/inference_engine/ie_layouts.cpp",
         "inference-engine/src/inference_engine/ie_memcpy.cpp",
         "inference-engine/src/inference_engine/ie_rtti.cpp",
+        "inference-engine/src/inference_engine/ie_unicode.cpp",
         "inference-engine/src/inference_engine/network_serializer.cpp",
         "inference-engine/src/inference_engine/precision_utils.cpp",
         "inference-engine/src/inference_engine/system_allocator.cpp",
         "inference-engine/src/inference_engine/xml_parse_utils.cpp",
         # "inference-engine/src/inference_engine/*.cpp",
+        # TODO: New stuff from here
+        "inference-engine/src/inference_engine/shape_infer/ie_built_in_holder.cpp",
     ]),
     hdrs = glob([
         "inference-engine/src/readers/ir_reader/*.hpp",
@@ -348,7 +351,8 @@ cc_library(
         "inference-engine/src/readers/reader_api",  # TODO: Why does this work?
     ],
     local_defines = [
-        "ENABLE_IR_READER",
+        "ENABLE_IR_READER",  # TODO: Still needed?
+        "ENABLE_UNICODE_PATH_SUPPORT",  # TODO: Maybe unneeded?
         "IR_READER_V10",
     ],
     deps = [
@@ -371,6 +375,8 @@ cc_library(
     srcs = glob([
         "inference-engine/src/inference_engine/*.cpp",
         "inference-engine/src/inference_engine/threading/*.cpp",
+        # TODO: New from here
+        "inference-engine/src/inference_engine/shape_infer/ie_built_in_holder.cpp",
     ]) + select({
         "@bazel_tools//src/conditions:windows": glob([
             "inference-engine/src/inference_engine/os/win/*.cpp",
@@ -382,6 +388,8 @@ cc_library(
     }),
     hdrs = glob([
         # "inference-engine/src/readers/ir_reader/ie_ir_version.hpp",  # TODO: Ok to remove?
+        # TODO: New from here
+        "inference-engine/src/inference_engine/shape_infer/ie_built_in_holder.hpp",
     ]),
     copts = ["-w"],
     includes = [
@@ -462,6 +470,7 @@ cc_library(
     srcs = glob(
         [
             "ngraph/core/builder/src/*.cpp",
+            "ngraph/core/builder/src/builder/*.cpp",
             "ngraph/core/reference/src/*.cpp",
             "ngraph/core/reference/src/runtime/**/*.cpp",
             "ngraph/core/src/descriptor/*.cpp",
@@ -513,6 +522,8 @@ cc_library(
     ],
     includes = [
         "ngraph/core/builder/include",
+        "ngraph/core/builder/include/ngraph",
+        "ngraph/core/builder/include/ngraph/builder",
         "ngraph/core/include",
         "ngraph/core/include/ngraph",
         "ngraph/core/include/ngraph/op",
