@@ -188,7 +188,7 @@ private:
   void setWriteDescriptors();
   void createSchedule();
   void submitCommandBuffersToQueue();
-  void updateLastShaderHostMemoryBuffers();
+  void updateHostMemoryBuffers();
 
   std::vector<ActionPtr> schedule;
   std::shared_ptr<LaunchKernelAction> curr;
