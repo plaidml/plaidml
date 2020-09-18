@@ -3015,6 +3015,7 @@ cc_library(
     deps = [
         ":AllPassesAndDialectsNoRegistration",
     ],
+    alwayslink = 1,  ### PlaidML-change
 )
 
 cc_binary(
@@ -3077,6 +3078,7 @@ cc_library(
         "include/mlir/ExecutionEngine/CRunnerUtils.h",
     ],
     includes = ["include"],
+    local_defines = ["mlir_c_runner_utils_EXPORTS"],  ### PlaidML-change - Windows build
 )
 
 cc_library(
@@ -3105,99 +3107,99 @@ cc_binary(
     ],
 )
 
-cc_binary(
-    name = "tools/libcuda-runtime-wrappers.so",
-    srcs = ["tools/mlir-cuda-runner/cuda-runtime-wrappers.cpp"],
-    linkshared = True,
-    deps = [
-        ":mlir_c_runner_utils",
-        "//third_party/gpus/cuda:cuda_headers",
-        "//third_party/gpus/cuda:cuda_runtime",
-        "//third_party/gpus/cuda:libcuda",
-        "@llvm-project//llvm:Support",
-    ],
-)
+# cc_binary( ###PlaidML-change Removed
+#     name = "tools/libcuda-runtime-wrappers.so",
+#     srcs = ["tools/mlir-cuda-runner/cuda-runtime-wrappers.cpp"],
+#     linkshared = True,
+#     deps = [
+#         ":mlir_c_runner_utils",
+#         "//third_party/gpus/cuda:cuda_headers",
+#         "//third_party/gpus/cuda:cuda_runtime",
+#         "//third_party/gpus/cuda:libcuda",
+#         "@llvm-project//llvm:Support",
+#     ],
+# )
 
-cc_library(
-    name = "VulkanRuntime",
-    srcs = [
-        "tools/mlir-vulkan-runner/VulkanRuntime.cpp",
-    ],
-    hdrs = [
-        "tools/mlir-vulkan-runner/VulkanRuntime.h",
-    ],
-    deps = [
-        ":IR",
-        ":Pass",
-        ":SPIRVDialect",
-        ":SideEffectInterfaces",
-        ":StandardOps",
-        ":Support",
-        "@llvm-project//llvm:Support",
-        "@vulkan_headers",
-        "@vulkan_sdk//:sdk",
-    ],
-)
+# cc_library(
+#     name = "VulkanRuntime",
+#     srcs = [
+#         "tools/mlir-vulkan-runner/VulkanRuntime.cpp",
+#     ],
+#     hdrs = [
+#         "tools/mlir-vulkan-runner/VulkanRuntime.h",
+#     ],
+#     deps = [
+#         ":IR",
+#         ":Pass",
+#         ":SPIRVDialect",
+#         ":SideEffectInterfaces",
+#         ":StandardOps",
+#         ":Support",
+#         "@llvm-project//llvm:Support",
+#         "@vulkan_headers",
+#         "@vulkan_sdk//:sdk",
+#     ],
+# )
 
-cc_binary(
-    name = "tools/libvulkan-runtime-wrappers.so",
-    srcs = ["tools/mlir-vulkan-runner/vulkan-runtime-wrappers.cpp"],
-    linkshared = True,
-    deps = [
-        ":VulkanRuntime",
-        "@llvm-project//llvm:Support",
-    ],
-)
+# cc_binary(
+#     name = "tools/libvulkan-runtime-wrappers.so",
+#     srcs = ["tools/mlir-vulkan-runner/vulkan-runtime-wrappers.cpp"],
+#     linkshared = True,
+#     deps = [
+#         ":VulkanRuntime",
+#         "@llvm-project//llvm:Support",
+#     ],
+# )
 
-cc_binary(
-    name = "mlir-cuda-runner",
-    srcs = ["tools/mlir-cuda-runner/mlir-cuda-runner.cpp"],
-    data = [":tools/libcuda-runtime-wrappers.so"],
-    deps = [
-        ":AllPassesAndDialectsNoRegistration",
-        ":ExecutionEngineUtils",
-        ":GPUDialect",
-        ":GPUToGPURuntimeTransforms",
-        ":GPUToNVVMTransforms",
-        ":GPUToROCDLTransforms",
-        ":GPUTransforms",
-        ":IR",
-        ":LLVMDialect",
-        ":MlirJitRunner",
-        ":NVVMDialect",
-        ":Pass",
-        ":StandardToLLVM",
-        ":TargetNVVMIR",
-        ":Transforms",
-        "//devtools/build/runtime:get_runfiles_dir",
-        "//third_party/gpus/cuda:cuda_headers",
-        "//third_party/gpus/cuda:cuda_runtime",
-        "//third_party/gpus/cuda:libcuda",
-        "@llvm-project//llvm:Support",
-    ],
-)
+# cc_binary(
+#     name = "mlir-cuda-runner",
+#     srcs = ["tools/mlir-cuda-runner/mlir-cuda-runner.cpp"],
+#     data = [":tools/libcuda-runtime-wrappers.so"],
+#     deps = [
+#         ":AllPassesAndDialectsNoRegistration",
+#         ":ExecutionEngineUtils",
+#         ":GPUDialect",
+#         ":GPUToGPURuntimeTransforms",
+#         ":GPUToNVVMTransforms",
+#         ":GPUToROCDLTransforms",
+#         ":GPUTransforms",
+#         ":IR",
+#         ":LLVMDialect",
+#         ":MlirJitRunner",
+#         ":NVVMDialect",
+#         ":Pass",
+#         ":StandardToLLVM",
+#         ":TargetNVVMIR",
+#         ":Transforms",
+#         "//devtools/build/runtime:get_runfiles_dir",
+#         "//third_party/gpus/cuda:cuda_headers",
+#         "//third_party/gpus/cuda:cuda_runtime",
+#         "//third_party/gpus/cuda:libcuda",
+#         "@llvm-project//llvm:Support",
+#     ],
+# )
 
-cc_binary(
-    name = "mlir-vulkan-runner",
-    srcs = ["tools/mlir-vulkan-runner/mlir-vulkan-runner.cpp"],
-    data = [
-        ":tools/libvulkan-runtime-wrappers.so",
-        "@llvm-project//mlir/test/mlir-cpu-runner:libmlir_runner_utils.so",
-    ],
-    deps = [
-        ":AllPassesAndDialectsNoRegistration",
-        ":ExecutionEngineUtils",
-        ":GPUToSPIRVTransforms",
-        ":GPUToVulkanTransforms",
-        ":GPUTransforms",
-        ":MlirJitRunner",
-        ":Pass",
-        ":SPIRVDialect",
-        ":StandardToLLVM",
-        ":StandardToSPIRVTransforms",
-        "@llvm-project//llvm:Support",
-    ],
-)
+# cc_binary(
+#     name = "mlir-vulkan-runner",
+#     srcs = ["tools/mlir-vulkan-runner/mlir-vulkan-runner.cpp"],
+#     data = [
+#         ":tools/libvulkan-runtime-wrappers.so",
+#         "@llvm-project//mlir/test/mlir-cpu-runner:libmlir_runner_utils.so",
+#     ],
+#     deps = [
+#         ":AllPassesAndDialectsNoRegistration",
+#         ":ExecutionEngineUtils",
+#         ":GPUToSPIRVTransforms",
+#         ":GPUToVulkanTransforms",
+#         ":GPUTransforms",
+#         ":MlirJitRunner",
+#         ":Pass",
+#         ":SPIRVDialect",
+#         ":StandardToLLVM",
+#         ":StandardToSPIRVTransforms",
+#         "@llvm-project//llvm:Support",
+#     ],
+# )
 
 cc_library(
     name = "TableGen",

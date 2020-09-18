@@ -22,9 +22,7 @@
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/raw_ostream.h"
 
-#include "mlir/Dialect/LLVMIR/LLVMDialect.h" // Lubo
 #include "pmlc/all_dialects.h"
-#include "pmlc/all_passes.h" // Lubo and more
 #include "pmlc/compiler/program.h"
 #include "pmlc/rt/executable.h"
 #include "pmlc/util/logging.h"
@@ -94,23 +92,12 @@ int main(int argc, char **argv) {
   }
 
   registerAllDialects();
-  // Lubo registerAllPasses();
-
-  // Lubo mlir::DialectRegistry registry;
-  // Lubo registerAllDialects(registry, true);
 
   llvm::InitLLVM y(argc, argv);
   llvm::InitializeNativeTarget();
   llvm::InitializeNativeTargetAsmPrinter();
   mlir::initializeLLVMPasses();
 
-  MLIRContext context(/*loadAllDialects=*/true);
-  getGlobalDialectRegistry().appendTo(context.getDialectRegistry());
-  if (true)
-    getGlobalDialectRegistry().loadAll(&context);
-
-  // Lubo getGlobalDialectRegistry().loadAll(getGlobalDialectRegistry());
-  // Lubo getContext()->getOrLoadDialect<mlir::LLVM::LLVMDialect>();
   std::set_terminate([]() {
     auto eptr = std::current_exception();
     if (eptr) {
