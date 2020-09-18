@@ -90,3 +90,6 @@ Parameter Engine::GetMetric(const std::string& name, const std::map<std::string,
 }
 
 }  // namespace PlaidMLPlugin
+
+static const Version version = {{2, 1}, CI_BUILD_NUMBER, "PlaidMLPlugin"};
+IE_DEFINE_PLUGIN_CREATE_FUNCTION(PlaidMLPlugin::Engine, version)
