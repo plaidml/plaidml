@@ -904,7 +904,7 @@ LogicalResult verifyConstantOp(ConstantOp op) { return success(); }
 // ---- PolyIndexOp ----
 
 void printPolyIndexOp(OpAsmPrinter *printer, PolyIndexOp op) {
-  *printer << op.getOperation()->getName() << ' ' << op.id().getSExtValue();
+  *printer << op.getOperation()->getName() << ' ' << op.id();
 }
 
 ParseResult parsePolyIndexOp(OpAsmParser *parser, OperationState &result) {

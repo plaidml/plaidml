@@ -15,6 +15,7 @@
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/FormatVariadic.h"
 
+#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
@@ -90,10 +91,17 @@ struct TileBuilder::Impl {
   }
 
   std::unique_ptr<MLIRContext> createContext() {
+    // Register and load the dialects.
     mlir::registerDialect<TileDialect>();
     mlir::registerDialect<eltwise::EltwiseDialect>();
     mlir::registerDialect<mlir::StandardOpsDialect>();
-    return std::make_unique<MLIRContext>();
+    mlir::registerDialect<mlir::LLVM::LLVMDialect>();
+    auto ret = std::make_unique<MLIRContext>();
+    ret->getOrLoadDialect<TileDialect>();
+    ret->getOrLoadDialect<eltwise::EltwiseDialect>();
+    ret->getOrLoadDialect<mlir::StandardOpsDialect>();
+    ret->getOrLoadDialect<mlir::LLVM::LLVMDialect>();
+    return ret;
   }
 
   const AbstractOperation *lookupOperation(StringRef op) {

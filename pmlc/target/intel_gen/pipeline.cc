@@ -117,8 +117,6 @@ std::unique_ptr<Pass> createLowerPXAToAffinePass() {
 }
 
 void pipelineBuilder(OpPassManager &pm) {
-  pm.getContext()->getOrLoadDialect<spirv::SPIRVDialect>();
-
   // Bound + pad initial tile code
   pm.addPass(dialect::tile::createComputeBoundsPass());
   pm.addPass(dialect::tile::createPadPass());

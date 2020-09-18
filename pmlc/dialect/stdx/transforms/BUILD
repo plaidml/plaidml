@@ -37,6 +37,8 @@ plaidml_cc_library(
         "//pmlc/dialect/pxa/ir",
         "//pmlc/dialect/stdx/ir",
         "//pmlc/dialect/tile/ir",
+        "@llvm-project//mlir:LLVMTransforms",
+        "@llvm-project//mlir:StandardOpsTransforms",
         "@llvm-project//mlir:SCFDialect",
         "@llvm-project//mlir:VectorOps",
     ],

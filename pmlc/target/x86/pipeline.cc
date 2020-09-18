@@ -143,9 +143,6 @@ void pipelineBuilder(OpPassManager &pm) {
   if (pmlc::util::getEnvVar("PLAIDML_BOUNDS_CHECK") == "1") {
     pm.addPass(pmlc::dialect::stdx::createBoundsCheckPass());
   }
-
-  pm.addPass(createLowerToLLVMPass());
-  pm.addPass(createTraceLinkingPass());
 }
 
 } // namespace pmlc::target::x86

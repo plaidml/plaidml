@@ -5,9 +5,10 @@ load("@com_intel_plaidml//vendor/mlir:tblgen.bzl", "gentbl")
 load("@com_intel_plaidml//vendor/mlir:linalggen.bzl", "genlinalg")
 load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
 
-licenses(["notice"])
-
-package(default_visibility = [":friends"])
+package(
+    default_visibility = [":friends"],
+    licenses = ["notice"],
+)
 
 package_group(
     name = "subpackages",
@@ -601,10 +602,10 @@ cc_library(
         ":LinalgToLLVM",
         ":LinalgToSPIRV",
         ":LinalgToStandard",
+        ":OpenMPToLLVM",
         ":SCFToGPUPass",
         ":SCFToStandard",
         ":SPIRVToLLVM",
-        ":ShapeToSCF",
         ":ShapeToStandard",
         ":StandardToLLVM",
         ":StandardToSPIRVTransforms",
@@ -818,25 +819,6 @@ cc_library(
     ],
 )
 
-cc_library(
-    name = "ShapeToSCF",
-    srcs = glob([
-        "lib/Conversion/ShapeToSCF/*.cpp",
-        "lib/Conversion/ShapeToSCF/*.h",
-    ]) + ["lib/Conversion/PassDetail.h"],
-    hdrs = ["include/mlir/Conversion/ShapeToSCF/ShapeToSCF.h"],
-    includes = ["include"],
-    deps = [
-        ":ConversionPassIncGen",
-        ":IR",
-        ":Pass",
-        ":SCFDialect",
-        ":Shape",
-        ":StandardOps",
-        ":Transforms",
-    ],
-)
-
 gentbl(
     name = "ShapeTransformsPassIncGen",
     strip_include_prefix = "include",
@@ -1006,7 +988,6 @@ cc_library(
     ],
     includes = ["include"],
     deps = [
-        ":Analysis",
         ":IR",
         ":ParserTokenKinds",
         ":Support",
@@ -1823,6 +1804,61 @@ gentbl(
     td_file = "include/mlir/Dialect/PDL/IR/PDLOps.td",
     td_srcs = [
         ":PDLOpsTdFiles",
+    ],
+)
+
+cc_library(
+    name = "PDLInterpDialect",
+    srcs = glob([
+        "lib/Dialect/PDLInterp/IR/*.cpp",
+        "lib/Dialect/PDLInterp/IR/*.h",
+    ]),
+    hdrs = glob([
+        "include/mlir/Dialect/PDLInterp/IR/*.h",
+    ]),
+    includes = ["include"],
+    deps = [
+        ":IR",
+        ":InferTypeOpInterface",
+        ":PDLDialect",
+        ":PDLInterpOpsIncGen",
+        ":SideEffects",
+        ":Support",
+        "@llvm-project//llvm:Support",
+    ],
+)
+
+filegroup(
+    name = "PDLInterpOpsTdFiles",
+    srcs = [
+        "include/mlir/Dialect/PDL/IR/PDLBase.td",
+        "include/mlir/Dialect/PDLInterp/IR/PDLInterpOps.td",
+        "include/mlir/Interfaces/SideEffectInterfaces.td",
+        ":OpBaseTdFiles",
+    ],
+)
+
+gentbl(
+    name = "PDLInterpOpsIncGen",
+    strip_include_prefix = "include",
+    tbl_outs = [
+        (
+            "-gen-op-decls",
+            "include/mlir/Dialect/PDLInterp/IR/PDLInterpOps.h.inc",
+        ),
+        (
+            "-gen-op-defs",
+            "include/mlir/Dialect/PDLInterp/IR/PDLInterpOps.cpp.inc",
+        ),
+        (
+            "-gen-dialect-decls -dialect=pdl_interp",
+            "include/mlir/Dialect/PDLInterp/IR/PDLInterpOpsDialect.h.inc",
+        ),
+    ],
+    tblgen = ":mlir-tblgen",
+    td_file = "include/mlir/Dialect/PDLInterp/IR/PDLInterpOps.td",
+    td_srcs = [
+        ":PDLInterpOpsTdFiles",
     ],
 )
 
@@ -2651,6 +2687,7 @@ cc_library(
         ":Affine",
         ":CallOpInterfaces",
         ":IR",
+        ":LinalgOps",
         ":SCFDialect",
         ":StandardOps",
         ":Support",
@@ -2849,7 +2886,6 @@ cc_library(
         ":Parser",
         ":Pass",
         ":SCFTransforms",
-        ":ShapeToSCF",
         ":ShapeToStandard",
         ":ShapeTransforms",
         ":StandardOpsTransforms",
@@ -2940,7 +2976,9 @@ cc_library(
         ":NVVMDialect",
         ":OpenACCDialect",
         ":OpenMPDialect",
+        ":OpenMPToLLVM",
         ":PDLDialect",
+        ":PDLInterpDialect",
         ":QuantOps",
         ":QuantPassIncGen",
         ":ROCDLDialect",
@@ -2955,7 +2993,6 @@ cc_library(
         ":SPIRVPassIncGen",
         ":SPIRVToLLVM",
         ":Shape",
-        ":ShapeToSCF",
         ":ShapeToStandard",
         ":ShapeTransforms",
         ":ShapeTransformsPassIncGen",
@@ -2975,11 +3012,9 @@ cc_library(
 
 cc_library(
     name = "AllPassesAndDialects",
-    srcs = ["@org_tensorflow//third_party/mlir:mlir-auto-init.cpp"],
     deps = [
         ":AllPassesAndDialectsNoRegistration",
     ],
-    alwayslink = 1,
 )
 
 cc_binary(
@@ -3042,7 +3077,6 @@ cc_library(
         "include/mlir/ExecutionEngine/CRunnerUtils.h",
     ],
     includes = ["include"],
-    local_defines = ["mlir_c_runner_utils_EXPORTS"],
 )
 
 cc_library(
@@ -3054,11 +3088,9 @@ cc_library(
         "include/mlir/ExecutionEngine/RunnerUtils.h",
     ],
     includes = ["include"],
-    local_defines = ["mlir_runner_utils_EXPORTS"],
     deps = [
         ":mlir_c_runner_utils",
     ],
-    alwayslink = 1,
 )
 
 cc_binary(
@@ -3073,99 +3105,99 @@ cc_binary(
     ],
 )
 
-# cc_binary(
-#     name = "tools/libcuda-runtime-wrappers.so",
-#     srcs = ["tools/mlir-cuda-runner/cuda-runtime-wrappers.cpp"],
-#     linkshared = True,
-#     deps = [
-#         ":mlir_c_runner_utils",
-#         "//third_party/gpus/cuda:cuda_headers",
-#         "//third_party/gpus/cuda:cuda_runtime",
-#         "//third_party/gpus/cuda:libcuda",
-#         "@llvm-project//llvm:Support",
-#     ],
-# )
+cc_binary(
+    name = "tools/libcuda-runtime-wrappers.so",
+    srcs = ["tools/mlir-cuda-runner/cuda-runtime-wrappers.cpp"],
+    linkshared = True,
+    deps = [
+        ":mlir_c_runner_utils",
+        "//third_party/gpus/cuda:cuda_headers",
+        "//third_party/gpus/cuda:cuda_runtime",
+        "//third_party/gpus/cuda:libcuda",
+        "@llvm-project//llvm:Support",
+    ],
+)
 
-# cc_library(
-#     name = "VulkanRuntime",
-#     srcs = [
-#         "tools/mlir-vulkan-runner/VulkanRuntime.cpp",
-#     ],
-#     hdrs = [
-#         "tools/mlir-vulkan-runner/VulkanRuntime.h",
-#     ],
-#     deps = [
-#         ":IR",
-#         ":Pass",
-#         ":SPIRVDialect",
-#         ":SideEffectInterfaces",
-#         ":StandardOps",
-#         ":Support",
-#         "@llvm-project//llvm:Support",
-#         "@vulkan_headers",
-#         "@vulkan_sdk//:sdk",
-#     ],
-# )
+cc_library(
+    name = "VulkanRuntime",
+    srcs = [
+        "tools/mlir-vulkan-runner/VulkanRuntime.cpp",
+    ],
+    hdrs = [
+        "tools/mlir-vulkan-runner/VulkanRuntime.h",
+    ],
+    deps = [
+        ":IR",
+        ":Pass",
+        ":SPIRVDialect",
+        ":SideEffectInterfaces",
+        ":StandardOps",
+        ":Support",
+        "@llvm-project//llvm:Support",
+        "@vulkan_headers",
+        "@vulkan_sdk//:sdk",
+    ],
+)
 
-# cc_binary(
-#     name = "tools/libvulkan-runtime-wrappers.so",
-#     srcs = ["tools/mlir-vulkan-runner/vulkan-runtime-wrappers.cpp"],
-#     linkshared = True,
-#     deps = [
-#         ":VulkanRuntime",
-#         "@llvm-project//llvm:Support",
-#     ],
-# )
+cc_binary(
+    name = "tools/libvulkan-runtime-wrappers.so",
+    srcs = ["tools/mlir-vulkan-runner/vulkan-runtime-wrappers.cpp"],
+    linkshared = True,
+    deps = [
+        ":VulkanRuntime",
+        "@llvm-project//llvm:Support",
+    ],
+)
 
-# cc_binary(
-#     name = "mlir-cuda-runner",
-#     srcs = ["tools/mlir-cuda-runner/mlir-cuda-runner.cpp"],
-#     data = [":tools/libcuda-runtime-wrappers.so"],
-#     deps = [
-#         ":AllPassesAndDialectsNoRegistration",
-#         ":ExecutionEngineUtils",
-#         ":GPUDialect",
-#         ":GPUToGPURuntimeTransforms",
-#         ":GPUToNVVMTransforms",
-#         ":GPUToROCDLTransforms",
-#         ":GPUTransforms",
-#         ":IR",
-#         ":LLVMDialect",
-#         ":MlirJitRunner",
-#         ":NVVMDialect",
-#         ":Pass",
-#         ":StandardToLLVM",
-#         ":TargetNVVMIR",
-#         ":Transforms",
-#         "//devtools/build/runtime:get_runfiles_dir",
-#         "//third_party/gpus/cuda:cuda_headers",
-#         "//third_party/gpus/cuda:cuda_runtime",
-#         "//third_party/gpus/cuda:libcuda",
-#         "@llvm-project//llvm:Support",
-#     ],
-# )
+cc_binary(
+    name = "mlir-cuda-runner",
+    srcs = ["tools/mlir-cuda-runner/mlir-cuda-runner.cpp"],
+    data = [":tools/libcuda-runtime-wrappers.so"],
+    deps = [
+        ":AllPassesAndDialectsNoRegistration",
+        ":ExecutionEngineUtils",
+        ":GPUDialect",
+        ":GPUToGPURuntimeTransforms",
+        ":GPUToNVVMTransforms",
+        ":GPUToROCDLTransforms",
+        ":GPUTransforms",
+        ":IR",
+        ":LLVMDialect",
+        ":MlirJitRunner",
+        ":NVVMDialect",
+        ":Pass",
+        ":StandardToLLVM",
+        ":TargetNVVMIR",
+        ":Transforms",
+        "//devtools/build/runtime:get_runfiles_dir",
+        "//third_party/gpus/cuda:cuda_headers",
+        "//third_party/gpus/cuda:cuda_runtime",
+        "//third_party/gpus/cuda:libcuda",
+        "@llvm-project//llvm:Support",
+    ],
+)
 
-# cc_binary(
-#     name = "mlir-vulkan-runner",
-#     srcs = ["tools/mlir-vulkan-runner/mlir-vulkan-runner.cpp"],
-#     data = [
-#         ":tools/libvulkan-runtime-wrappers.so",
-#         "@llvm-project//mlir/test/mlir-cpu-runner:libmlir_runner_utils.so",
-#     ],
-#     deps = [
-#         ":AllPassesAndDialectsNoRegistration",
-#         ":ExecutionEngineUtils",
-#         ":GPUToSPIRVTransforms",
-#         ":GPUToVulkanTransforms",
-#         ":GPUTransforms",
-#         ":MlirJitRunner",
-#         ":Pass",
-#         ":SPIRVDialect",
-#         ":StandardToLLVM",
-#         ":StandardToSPIRVTransforms",
-#         "@llvm-project//llvm:Support",
-#     ],
-# )
+cc_binary(
+    name = "mlir-vulkan-runner",
+    srcs = ["tools/mlir-vulkan-runner/mlir-vulkan-runner.cpp"],
+    data = [
+        ":tools/libvulkan-runtime-wrappers.so",
+        "@llvm-project//mlir/test/mlir-cpu-runner:libmlir_runner_utils.so",
+    ],
+    deps = [
+        ":AllPassesAndDialectsNoRegistration",
+        ":ExecutionEngineUtils",
+        ":GPUToSPIRVTransforms",
+        ":GPUToVulkanTransforms",
+        ":GPUTransforms",
+        ":MlirJitRunner",
+        ":Pass",
+        ":SPIRVDialect",
+        ":StandardToLLVM",
+        ":StandardToSPIRVTransforms",
+        "@llvm-project//llvm:Support",
+    ],
+)
 
 cc_library(
     name = "TableGen",
@@ -3358,6 +3390,30 @@ cc_library(
         ":IR",
         ":OpenMPOpsIncGen",
         ":StandardOps",
+        "@llvm-project//llvm:Support",
+    ],
+)
+
+cc_library(
+    name = "OpenMPToLLVM",
+    srcs = glob([
+        "lib/Conversion/OpenMPToLLVM/*.cpp",
+        "lib/Conversion/OpenMPToLLVM/*.h",
+    ]) + ["lib/Conversion/PassDetail.h"],
+    hdrs = glob([
+        "include/mlir/Conversion/OpenMPToLLVM/*.h",
+    ]),
+    includes = ["include"],
+    deps = [
+        ":ConversionPassIncGen",
+        ":IR",
+        ":LLVMDialect",
+        ":OpenMPDialect",
+        ":Pass",
+        ":StandardOps",
+        ":StandardToLLVM",
+        ":Transforms",
+        "@llvm-project//llvm:Core",
         "@llvm-project//llvm:Support",
     ],
 )
@@ -3867,6 +3923,7 @@ exports_files(
         "include/mlir/Interfaces/CallInterfaces.td",
         "include/mlir/Interfaces/ControlFlowInterfaces.h",
         "include/mlir/Interfaces/ControlFlowInterfaces.td",
+        "include/mlir/Interfaces/CopyOpInterface.td",
         "include/mlir/Interfaces/SideEffectInterfaces.td",
         "include/mlir/Interfaces/VectorInterfaces.td",
         "include/mlir/Interfaces/ViewLikeInterface.td",

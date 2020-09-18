@@ -6,6 +6,7 @@ include "mlir/Pass/PassBase.td"
 def BoundsCheck : FunctionPass<"stdx-check-bounds"> {
   let summary = "Check bounds for Load and Store Ops";
   let constructor = "pmlc::dialect::stdx::createBoundsCheckPass()";
+  // Lubo let dependentDialects = ["mlir::LLVM::LLVMDialect"];
 }
 
 def I1StorageToI32 : FunctionPass<"stdx-i1-storage-to-i32"> {
