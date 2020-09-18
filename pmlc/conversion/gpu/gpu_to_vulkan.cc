@@ -17,6 +17,7 @@
 
 #include "pmlc/conversion/gpu/pass_detail.h"
 #include "pmlc/util/logging.h"
+#include "pmlc/util/tags.h"
 
 namespace pmlc::conversion::gpu {
 namespace gpu = mlir::gpu;
@@ -449,16 +450,18 @@ void ConvertGpuLaunchFuncToVulkanCalls::convertGpuLaunchFunc(
     return signalPassFailure();
   }
 
-  // TODO: select subgroup size based on the previous passes and some special
-  // attribute
-  Value subgroupSize = builder.create<LLVM::ConstantOp>(
-      loc, getLLVMInt32Type(), builder.getI32IntegerAttr(8));
+  int64_t subgroupSize = 1;
+  if (pmlc::hasIntegerTag(launchOp, "subgroupSize"))
+    subgroupSize = pmlc::getIntegerTag(launchOp, "subgroupSize", 1);
+
+  Value subgroupSizeVal = builder.create<LLVM::ConstantOp>(
+      loc, getLLVMInt32Type(), builder.getI32IntegerAttr(subgroupSize));
 
   // Create call to `setLaunchKernelAction` runtime function.
   builder.create<LLVM::CallOp>(
       loc, ArrayRef<Type>{},
       builder.getSymbolRefAttr(kSetVulkanLaunchKernelAction),
-      ArrayRef<Value>{vulkanRuntime, subgroupSize});
+      ArrayRef<Value>{vulkanRuntime, subgroupSizeVal});
 
   // Check and transfer VkBuffers when necessary.
   if (failed(transferBuffers(loc, builder, launchOp))) {
