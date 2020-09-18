@@ -143,7 +143,7 @@ cc_library(
         "inference-engine/include/**/*.hpp",
     ]),
     defines = [
-        "CI_BUILD_NUMBER=\\\"0\\\"",
+        "CI_BUILD_NUMBER=\\\"0\\\"",  # TODO
         "IE_BUILD_POSTFIX=\\\"\\\"",
     ],
     includes = [
@@ -237,6 +237,7 @@ cc_library(
         "inference-engine/src/legacy_api/src/**/*.h",
     ]),
     hdrs = glob([
+        "inference-engine/src/legacy_api/include/**/*.h",
         "inference-engine/src/legacy_api/include/**/*.hpp",
     ]),
     copts = [
@@ -245,11 +246,13 @@ cc_library(
     includes = [
         "inference-engine/src/inference_engine",  # TODO: Why does this work?
         "inference-engine/src/legacy_api/include",
+        "inference-engine/src/legacy_api/include/legacy",
         "inference-engine/src/legacy_api/src",
     ],
     tags = TAGS,
     deps = [
         ":inc",
+        ":itt",
         ":ngraph",
         ":plugin_api",
         ":pugixml",
@@ -261,6 +264,7 @@ cc_library(
 cc_library(
     name = "low_precision_transformations",
     srcs = glob(["inference-engine/src/low_precision_transformations/src/**/*.cpp"]),
+    hdrs = glob(["inference-engine/src/low_precision_transformations/src/**/*.hpp"]),  # TODO: Is this the "missing dependency declarations" fix?
     copts = ["-w"],
     includes = ["inference-engine/src/low_precision_transformations/include"],
     tags = TAGS,
@@ -289,19 +293,36 @@ cc_library(
     deps = [
         ":fluid_gapi",
         ":inc",
+        ":itt",
         ":plugin_api",
         "@tbb",
     ],
 )
 
 cc_library(
+    name = "itt",
+    srcs = glob(["openvino/itt/src/*.cpp"]),
+    hdrs = glob(["openvino/itt/include/openvino/*.hpp"]),
+    includes = ["openvino/itt/include"],
+    tags = TAGS,
+)
+
+cc_library(
     name = "transformations",
     srcs = glob(["inference-engine/src/transformations/src/**/*.cpp"]),
+    hdrs = glob([
+        "inference-engine/src/transformations/include/**/*.hpp",
+        "inference-engine/src/transformations/src/**/*.hpp",
+    ]),
     copts = ["-w"],
-    includes = ["inference-engine/src/transformations/include"],
+    includes = [
+        "inference-engine/src/transformations/include",
+        "inference-engine/src/transformations/src",
+    ],
     tags = TAGS,
     deps = [
         ":inc",
+        ":itt",  # TODO: I think? to makes #include <openvino/itt.hpp> work
         ":ngraph",
     ],
 )
@@ -443,7 +464,7 @@ cc_library(
         [
             "ngraph/src/ngraph/*.cpp",
             "ngraph/src/ngraph/*.hpp",
-            "ngraph/src/ngraph/builder/*.cpp",
+            "ngraph/core/builder/src/*.cpp",
             "ngraph/src/ngraph/descriptor/**/*.cpp",
             "ngraph/src/ngraph/distributed/*.cpp",
             "ngraph/src/ngraph/op/*.cpp",
@@ -465,9 +486,10 @@ cc_library(
     ),
     hdrs = glob(
         [
+            "ngraph/core/builder/include/ngraph/builder/*.hpp",
             "ngraph/core/include/ngraph/*.hpp",
+            "ngraph/core/reference/include/ngraph/runtime/reference/*.hpp",
             "ngraph/src/ngraph/*.hpp",
-            "ngraph/src/ngraph/builder/*.hpp",
             "ngraph/src/ngraph/descriptor/**/*.hpp",
             "ngraph/src/ngraph/distributed/*.hpp",
             "ngraph/src/ngraph/op/*.hpp",
@@ -492,7 +514,9 @@ cc_library(
         "NGRAPH_VERSION=\\\"0.21.0\\\"",
     ],
     includes = [
+        "ngraph/core/builder/include",
         "ngraph/core/include",
+        "ngraph/core/reference/include",
         "ngraph/src",
         "ngraph/src/ngraph",
         "ngraph/test/runtime",
