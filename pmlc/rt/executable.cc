@@ -2,6 +2,7 @@
 
 #include "pmlc/rt/executable.h"
 
+#include <chrono>
 #include <fstream>
 #include <string>
 #include <utility>
@@ -302,6 +303,23 @@ struct OrcJITEngineImpl : EngineImpl {
   std::unique_ptr<llvm::orc::LLJIT> jit;
 };
 
+struct StopWatch {
+  using fp_milliseconds =
+      std::chrono::duration<double, std::chrono::milliseconds::period>;
+
+  void start() { startTime = std::chrono::steady_clock::now(); }
+
+  void stop() { stopTime = std::chrono::steady_clock::now(); }
+
+  double delta_ms() {
+    return std::chrono::duration_cast<fp_milliseconds>(stopTime - startTime)
+        .count();
+  }
+
+  std::chrono::steady_clock::time_point startTime;
+  std::chrono::steady_clock::time_point stopTime;
+};
+
 class ExecutableImpl final : public Executable {
 public:
   ExecutableImpl(const std::shared_ptr<Program> &program,
@@ -358,7 +376,15 @@ public:
 
   void invoke() final {
     ScopedCurrentDevice cdev(device);
+    StopWatch stopWatch;
+    if (VLOG_IS_ON(1)) {
+      stopWatch.start();
+    }
     jitEntry(ptrs.data());
+    if (VLOG_IS_ON(1)) {
+      stopWatch.stop();
+      IVLOG(1, "Execution time: " << stopWatch.delta_ms() << "ms");
+    }
   }
 
 private:
