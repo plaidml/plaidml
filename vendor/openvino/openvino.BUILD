@@ -133,7 +133,7 @@ cc_library(
         "inference-engine/include/**/*.hpp",
     ]),
     defines = [
-        "CI_BUILD_NUMBER=\\\"0\\\"",  # TODO
+        "CI_BUILD_NUMBER=\\\"0\\\"",
         "IE_BUILD_POSTFIX=\\\"\\\"",
     ],
     includes = [
@@ -254,7 +254,7 @@ cc_library(
 cc_library(
     name = "low_precision_transformations",
     srcs = glob(["inference-engine/src/low_precision_transformations/src/**/*.cpp"]),
-    hdrs = glob(["inference-engine/src/low_precision_transformations/src/**/*.hpp"]),  # TODO: Is this the "missing dependency declarations" fix?
+    hdrs = glob(["inference-engine/src/low_precision_transformations/src/**/*.hpp"]),
     copts = ["-w"],
     includes = ["inference-engine/src/low_precision_transformations/include"],
     tags = TAGS,
@@ -312,7 +312,6 @@ cc_library(
     tags = TAGS,
     deps = [
         ":inc",
-        ":itt",  # TODO: I think? to makes #include <openvino/itt.hpp> work
         ":ngraph",
     ],
 )
@@ -351,8 +350,6 @@ cc_library(
         "inference-engine/src/readers/reader_api",  # TODO: Why does this work?
     ],
     local_defines = [
-        "ENABLE_IR_READER",  # TODO: Still needed?
-        "ENABLE_UNICODE_PATH_SUPPORT",  # TODO: Maybe unneeded?
         "IR_READER_V10",
     ],
     deps = [
@@ -476,19 +473,6 @@ cc_library(
             "ngraph/core/src/descriptor/*.cpp",
             "ngraph/core/src/**/*.cpp",
             "ngraph/core/src/*.cpp",
-            "ngraph/src/ngraph/*.cpp",
-            "ngraph/src/ngraph/*.hpp",
-            "ngraph/src/ngraph/descriptor/**/*.cpp",
-            "ngraph/src/ngraph/distributed/*.cpp",
-            "ngraph/src/ngraph/op/*.cpp",
-            "ngraph/src/ngraph/op/**/*.cpp",
-            "ngraph/src/ngraph/opsets/*.cpp",
-            "ngraph/src/ngraph/pass/*.cpp",
-            "ngraph/src/ngraph/pattern/**/*.cpp",
-            "ngraph/src/ngraph/runtime/*.cpp",
-            "ngraph/src/ngraph/runtime/reference/*.cpp",
-            "ngraph/src/ngraph/state/*.cpp",
-            "ngraph/src/ngraph/type/*.cpp",
         ],
         exclude = [
             "ngraph/src/ngraph/serializer.cpp",
@@ -501,18 +485,6 @@ cc_library(
             "ngraph/core/include/ngraph/**/*.hpp",
             "ngraph/core/reference/include/ngraph/runtime/reference/*.hpp",
             "ngraph/core/src/*.hpp",
-            "ngraph/src/ngraph/*.hpp",
-            "ngraph/src/ngraph/descriptor/**/*.hpp",
-            "ngraph/src/ngraph/distributed/*.hpp",
-            "ngraph/src/ngraph/op/*.hpp",
-            "ngraph/src/ngraph/op/**/*.hpp",
-            "ngraph/src/ngraph/opsets/*.hpp",
-            "ngraph/src/ngraph/pass/*.hpp",
-            "ngraph/src/ngraph/pattern/*.hpp",
-            "ngraph/src/ngraph/runtime/**/*.hpp",
-            "ngraph/src/ngraph/state/*.hpp",
-            "ngraph/src/ngraph/pattern/**/*.hpp",
-            "ngraph/src/ngraph/type/*.hpp",
         ],
     ),
     defines = [
@@ -534,8 +506,6 @@ cc_library(
         "ngraph/core/include/ngraph/runtime",
         "ngraph/core/reference/include",
         "ngraph/core/src",
-        "ngraph/src",
-        "ngraph/src/ngraph",
     ],
     local_defines = [
         "PROJECT_ROOT_DIR=\\\"./\\\"",

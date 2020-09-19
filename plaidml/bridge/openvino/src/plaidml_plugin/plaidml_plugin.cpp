@@ -9,7 +9,6 @@
 
 #include <memory>
 
-// #include "cpp_interfaces/base/ie_plugin_base.hpp"  // TODO: Probably this got moved
 // #include "details/caseless.hpp"
 // #include "details/ie_cnn_network_tools.h"
 #include "ie_plugin_config.hpp"
