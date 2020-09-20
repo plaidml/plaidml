@@ -431,10 +431,10 @@ RankedTensorType TileBuilder::MakeRankedTensorType(Type dtype,
   return RankedTensorType::get(shape, dtype);
 }
 
-Value TileBuilder::MakePlaceholderOp(RankedTensorType type, BufferPtr buffer,
-                                     StringRef name) {
-  IVLOG(5, "TileBuilder::MakePlaceholderOp> " << name.str() << ": "
-                                              << mlir::debugString(type));
+Value TileBuilder::MakeInputOp(RankedTensorType type,
+                               pmlc::util::BufferPtr buffer, StringRef name) {
+  IVLOG(5, "TileBuilder::MakeInputOp> " << name.str() << ": "
+                                        << mlir::debugString(type));
   auto op = impl->builder.create<PlaceholderOp>(impl->loc, type);
   if (!name.empty()) {
     op.setAttr("name", impl->builder.getStringAttr(name));
@@ -442,6 +442,18 @@ Value TileBuilder::MakePlaceholderOp(RankedTensorType type, BufferPtr buffer,
   if (buffer) {
     impl->implicitBindings[op.result()] = buffer;
   }
+  return op.result();
+}
+
+Value TileBuilder::MakeConstantOp(RankedTensorType type, BufferPtr buffer,
+                                  StringRef name) {
+  IVLOG(5, "TileBuilder::MakeConstantOp> " << name.str() << ": "
+                                           << mlir::debugString(type));
+  auto op = impl->builder.create<PlaceholderOp>(impl->loc, type);
+  if (!name.empty()) {
+    op.setAttr("name", impl->builder.getStringAttr(name));
+  }
+  impl->implicitBindings[op.result()] = buffer;
   return op.result();
 }
 

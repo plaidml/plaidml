@@ -89,9 +89,11 @@ public:
   mlir::Value MakeCastOp(mlir::Value tensor, mlir::Type dtype);
   mlir::Value MakeTraceOp(mlir::Value tensor, const char *msg);
   mlir::Value MakeDimOp(mlir::Value tensor, unsigned dim);
-  mlir::Value MakePlaceholderOp(mlir::RankedTensorType type,
-                                pmlc::util::BufferPtr buffer,
-                                llvm::StringRef name);
+  mlir::Value MakeInputOp(mlir::RankedTensorType type,
+                          pmlc::util::BufferPtr buffer, llvm::StringRef name);
+  mlir::Value MakeConstantOp(mlir::RankedTensorType type,
+                             pmlc::util::BufferPtr buffer,
+                             llvm::StringRef name);
   mlir::Value MakeConstantOp(int64_t value);
   mlir::Value MakePolyIndexOp(llvm::StringRef name = "");
   mlir::Value MakePolyAddOp(llvm::ArrayRef<mlir::Value> args);

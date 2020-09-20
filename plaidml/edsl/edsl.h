@@ -637,7 +637,7 @@ class Tensor {
   ///
   /// Assigns a buffer to an existing Tensor
   ///
-  void set_param_value(const Buffer& buf) { ffi::call_void(plaidml_expr_param_reset, as_ptr(), buf.as_ptr()); }
+  void bind_buffer(const Buffer& buf) { ffi::call_void(plaidml_expr_bind_buffer, as_ptr(), buf.as_ptr()); }
 
   ///
   /// Represents an operator overload for `=` for a `Tensor`
@@ -881,7 +881,7 @@ inline Tensor Constant(         //
     const Buffer& buf,          //
     const std::string& name = "") {
   auto ptr = ffi::call<plaidml_expr*>(  //
-      plaidml_expr_placeholder,         //
+      plaidml_expr_constant,            //
       shape.as_ptr(),                   //
       buf.as_ptr(),                     //
       name.c_str());
@@ -901,10 +901,9 @@ inline Tensor Placeholder(      //
     const LogicalShape& shape,  //
     const std::string& name = "") {
   auto ptr = ffi::call<plaidml_expr*>(  //
-      plaidml_expr_placeholder,         //
+      plaidml_expr_input,               //
       shape.as_ptr(),                   //
-      nullptr,                          //
-      name.c_str());
+      nullptr, name.c_str());
   return Tensor(ptr);
 }
 

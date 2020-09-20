@@ -108,7 +108,7 @@ class TensorDim(ForeignObject):
 
         Example:
             >>> N, M = TensorDims(2)
-            >>> A = Placeholder(DType.FLOAT32, [3, 3])
+            >>> A = Input(DType.FLOAT32, [3, 3])
             >>> A.bind_dims(N, M)
             >>> R = TensorOutput(-N)
         """
@@ -120,7 +120,7 @@ class TensorDim(ForeignObject):
 
         Example:
             >>> N, M = TensorDims(2)
-            >>> A = Placeholder(DType.FLOAT32, [3, 3])
+            >>> A = Input(DType.FLOAT32, [3, 3])
             >>> A.bind_dims(N, M)
             >>> R = TensorOutput(N + 5)
         """
@@ -132,7 +132,7 @@ class TensorDim(ForeignObject):
 
         Example:
             >>> N, M = TensorDims(2)
-            >>> A = Placeholder(DType.FLOAT32, [3, 3])
+            >>> A = Input(DType.FLOAT32, [3, 3])
             >>> A.bind_dims(N, M)
             >>> R = TensorOutput(5 + N)
         """
@@ -144,7 +144,7 @@ class TensorDim(ForeignObject):
 
         Example:
             >>> N, M = TensorDims(2)
-            >>> A = Placeholder(DType.FLOAT32, [3, 3])
+            >>> A = Input(DType.FLOAT32, [3, 3])
             >>> A.bind_dims(N, M)
             >>> R = TensorOutput(N - 5)
         """
@@ -156,7 +156,7 @@ class TensorDim(ForeignObject):
 
         Example:
             >>> N, M = TensorDims(2)
-            >>> A = Placeholder(DType.FLOAT32, [3, 3])
+            >>> A = Input(DType.FLOAT32, [3, 3])
             >>> A.bind_dims(N, M)
             >>> R = TensorOutput(5 - N)
         """
@@ -168,7 +168,7 @@ class TensorDim(ForeignObject):
 
         Example:
             >>> N, M = TensorDims(2)
-            >>> A = Placeholder(DType.FLOAT32, [3, 3])
+            >>> A = Input(DType.FLOAT32, [3, 3])
             >>> A.bind_dims(N, M)
             >>> R = TensorOutput(N * 5)
         """
@@ -180,7 +180,7 @@ class TensorDim(ForeignObject):
 
         Example:
             >>> N, M = TensorDims(2)
-            >>> A = Placeholder(DType.FLOAT32, [3, 3])
+            >>> A = Input(DType.FLOAT32, [3, 3])
             >>> A.bind_dims(N, M)
             >>> R = TensorOutput(5 * N)
         """
@@ -192,7 +192,7 @@ class TensorDim(ForeignObject):
 
         Example:
             >>> N, M = TensorDims(2)
-            >>> A = Placeholder(DType.FLOAT32, [3, 3])
+            >>> A = Input(DType.FLOAT32, [3, 3])
             >>> A.bind_dims(N, M)
             >>> R = TensorOutput(N // 5)
         """
@@ -204,7 +204,7 @@ class TensorDim(ForeignObject):
 
         Example:
             >>> N, M = TensorDims(2)
-            >>> A = Placeholder(DType.FLOAT32, [3, 3])
+            >>> A = Input(DType.FLOAT32, [3, 3])
             >>> A.bind_dims(N, M)
             >>> R = TensorOutput(5 // N)
         """
@@ -246,7 +246,7 @@ class TensorIndex(ForeignObject):
 
         Example:
             >>> i, j = TensorIndexes(2)
-            >>> A = Placeholder(DType.FLOAT32, [3, 3])
+            >>> A = Input(DType.FLOAT32, [3, 3])
             >>> R = TensorOutput()
             >>> R[()] += A[i, j]
             >>> R.add_constraint(i < 5)
@@ -258,7 +258,7 @@ class TensorIndex(ForeignObject):
 
         Example:
             >>> i, j = TensorIndexes(2)
-            >>> A = Placeholder(DType.FLOAT32, [3, 3])
+            >>> A = Input(DType.FLOAT32, [3, 3])
             >>> R = TensorOutput()
             >>> R[()] += A[-i, j]
         """
@@ -270,7 +270,7 @@ class TensorIndex(ForeignObject):
 
         Example:
             >>> i, j = TensorIndexes(2)
-            >>> A = Placeholder(DType.FLOAT32, [3, 3])
+            >>> A = Input(DType.FLOAT32, [3, 3])
             >>> R = TensorOutput()
             >>> R[()] += A[i + 5, j]
         """
@@ -282,7 +282,7 @@ class TensorIndex(ForeignObject):
 
         Example:
             >>> i, j = TensorIndexes(2)
-            >>> A = Placeholder(DType.FLOAT32, [3, 3])
+            >>> A = Input(DType.FLOAT32, [3, 3])
             >>> R = TensorOutput()
             >>> R[()] += A[5 + i, j]
         """
@@ -294,7 +294,7 @@ class TensorIndex(ForeignObject):
 
         Example:
             >>> i, j = TensorIndexes(2)
-            >>> A = Placeholder(DType.FLOAT32, [3, 3])
+            >>> A = Input(DType.FLOAT32, [3, 3])
             >>> R = TensorOutput()
             >>> R[()] += A[i - 5, j]
         """
@@ -306,7 +306,7 @@ class TensorIndex(ForeignObject):
 
         Example:
             >>> i, j = TensorIndexes(2)
-            >>> A = Placeholder(DType.FLOAT32, [3, 3])
+            >>> A = Input(DType.FLOAT32, [3, 3])
             >>> R = TensorOutput()
             >>> R[()] += A[5 - i, j]
         """
@@ -318,7 +318,7 @@ class TensorIndex(ForeignObject):
 
         Example:
             >>> i, j = TensorIndexes(2)
-            >>> A = Placeholder(DType.FLOAT32, [3, 3])
+            >>> A = Input(DType.FLOAT32, [3, 3])
             >>> R = TensorOutput()
             >>> R[()] += A[i * 5, j]
         """
@@ -330,7 +330,7 @@ class TensorIndex(ForeignObject):
 
         Example:
             >>> i, j = TensorIndexes(2)
-            >>> A = Placeholder(DType.FLOAT32, [3, 3])
+            >>> A = Input(DType.FLOAT32, [3, 3])
             >>> R = TensorOutput()
             >>> R[()] += A[5 * i, j]
         """
@@ -342,7 +342,7 @@ class TensorIndex(ForeignObject):
 
         Example:
             >>> i, j = TensorIndexes(2)
-            >>> A = Placeholder(DType.FLOAT32, [3, 3])
+            >>> A = Input(DType.FLOAT32, [3, 3])
             >>> R = TensorOutput()
             >>> R[()] += A[i // 5, j]
         """
@@ -354,7 +354,7 @@ class TensorIndex(ForeignObject):
 
         Example:
             >>> i, j = TensorIndexes(2)
-            >>> A = Placeholder(DType.FLOAT32, [3, 3])
+            >>> A = Input(DType.FLOAT32, [3, 3])
             >>> R = TensorOutput()
             >>> R[()] += A[5 // i, j]
         """
@@ -423,7 +423,7 @@ class IndexedTensor(object):
 
         Example:
             >>> i, j = TensorIndexes(2)
-            >>> A = Placeholder(DType.FLOAT32, [3, 3])
+            >>> A = Input(DType.FLOAT32, [3, 3])
             >>> R = TensorOutput()
             >>> R[()] += A[i, j]
         """
@@ -434,7 +434,7 @@ class IndexedTensor(object):
 
         Example:
             >>> i, j = TensorIndexes(2)
-            >>> A = Placeholder(DType.FLOAT32, [3, 3])
+            >>> A = Input(DType.FLOAT32, [3, 3])
             >>> R = TensorOutput()
             >>> R[()] *= A[i, j]
         """
@@ -445,7 +445,7 @@ class IndexedTensor(object):
 
         Example:
             >>> i, j = TensorIndexes(2)
-            >>> A = Placeholder(DType.FLOAT32, [3, 3])
+            >>> A = Input(DType.FLOAT32, [3, 3])
             >>> R = TensorOutput()
             >>> R[()] >= A[i, j]
         """
@@ -456,7 +456,7 @@ class IndexedTensor(object):
 
         Example:
             >>> i, j = TensorIndexes(2)
-            >>> A = Placeholder(DType.FLOAT32, [3, 3])
+            >>> A = Input(DType.FLOAT32, [3, 3])
             >>> R = TensorOutput()
             >>> R[()] <= A[i, j]
         """
@@ -467,8 +467,8 @@ class IndexedTensor(object):
 
         Example:
             >>> i, j, k = TensorIndexes(3)
-            >>> A = Placeholder(DType.FLOAT32, [3, 3])
-            >>> B = Placeholder(DType.FLOAT32, [3, 3])
+            >>> A = Input(DType.FLOAT32, [3, 3])
+            >>> B = Input(DType.FLOAT32, [3, 3])
             >>> A[i, j] + B[j, k]
         """
         return IndexedTensor(_ContractionPart(lib.PLAIDML_COMBO_OP_ADD, (self, rhs)))
@@ -478,8 +478,8 @@ class IndexedTensor(object):
 
         Example:
             >>> i, j, k = TensorIndexes(3)
-            >>> A = Placeholder(DType.FLOAT32, [3, 3])
-            >>> B = Placeholder(DType.FLOAT32, [3, 3])
+            >>> A = Input(DType.FLOAT32, [3, 3])
+            >>> B = Input(DType.FLOAT32, [3, 3])
             >>> A[i, j] * B[j, k]
         """
         return IndexedTensor(_ContractionPart(lib.PLAIDML_COMBO_OP_MUL, (self, rhs)))
@@ -489,7 +489,7 @@ class IndexedTensor(object):
 
         Example:
             >>> i, j, k = TensorIndexes(3)
-            >>> A = Placeholder(DType.FLOAT32, [3, 3])
+            >>> A = Input(DType.FLOAT32, [3, 3])
             >>> A[i, j] == B[j, k]
         """
         return IndexedTensor(_ContractionPart(lib.PLAIDML_COMBO_OP_EQ, (self, rhs)))
@@ -525,17 +525,9 @@ class Tensor(ForeignObject):
     _dims = None
     _is_contraction = False
 
-    def __init__(self, shape=None, dims=None, expr=None, value=None, name='', buffer=None):
+    def __init__(self, dims=None, expr=None, value=None, name=''):
         self._name = name
-        self._buffer = buffer
-        if shape:
-            if buffer is None:
-                raw_buffer = ffi.NULL
-            else:
-                raw_buffer = buffer.as_ptr()
-            expr = ffi_call(lib.plaidml_expr_placeholder, shape.as_ptr(), raw_buffer,
-                            name.encode())
-        elif dims is not None:
+        if dims is not None:
             self._dims = dims
             expr = None
         elif value is not None:
@@ -546,14 +538,13 @@ class Tensor(ForeignObject):
             else:
                 raise TypeError('Invalid type for value={}'.format(value))
         elif expr is None:
-            raise ValueError('One of dims=, shape=, or expr= must be specified.')
+            raise ValueError('One of dims= or expr= must be specified.')
         super(Tensor, self).__init__(expr)
 
-    def set_param_value(self, buffer):
+    def bind_buffer(self, buffer):
         # Changes the value of a parameter tensor (i.e. one explicitly set to a buffer value)
         # Illegal on other tensors
-        self._buffer = buffer
-        ffi_call(lib.plaidml_expr_param_reset, self.__ffi_obj__, buffer.as_ptr())
+        ffi_call(lib.plaidml_expr_bind_buffer, self.__ffi_obj__, buffer.as_ptr())
 
     def __hash__(self):
         return hash((self.as_ptr(), self._dims, self._is_contraction))
@@ -838,20 +829,21 @@ def Constant(dtype_or_shape, buffer, dims=[], name=''):
     else:
         raise TypeError('Unsupported type {} for dtype_or_shape={}'.format(
             type(dtype_or_shape), dtype_or_shape))
-    return Tensor(shape=shape, name=name, buffer=buffer)
+    return Tensor(
+        expr=ffi_call(lib.plaidml_expr_constant, shape.as_ptr(), buffer.as_ptr(), name.encode()))
 
 
-def Placeholder(dtype_or_shape, dims=[], name=''):
-    """Creates a placeholder tensor.
+def Input(dtype_or_shape, buffer=None, dims=[], name=''):
+    """Creates an input tensor.
 
     Args:
         dtype_or_shape (DType | LogicalShape): A data type or a shape can be
             specified. If a shape is specified, the `dims` parameter is ignored.
-        dims (list, optional): Specifies the dimensions of the ``Placeholder``.
+        dims (list, optional): Specifies the dimensions of the ``Input``.
         name (string, optional): A name to be assigned to the ``Tensor``.
 
     Returns:
-        Tensor: The placeholder ``Tensor``.
+        Tensor: The input ``Tensor``.
     """
     if isinstance(dtype_or_shape, LogicalShape):
         shape = dtype_or_shape
@@ -860,7 +852,11 @@ def Placeholder(dtype_or_shape, dims=[], name=''):
     else:
         raise TypeError('Unsupported type {} for dtype_or_shape={}'.format(
             type(dtype_or_shape), dtype_or_shape))
-    return Tensor(shape=shape, name=name)
+    if buffer is None:
+        buffer = ffi.NULL
+    else:
+        buffer = buffer.as_ptr()
+    return Tensor(expr=ffi_call(lib.plaidml_expr_input, shape.as_ptr(), buffer, name.encode()))
 
 
 class ProgramArgument:

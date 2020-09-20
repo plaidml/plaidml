@@ -17,6 +17,7 @@
 #include "pmlc/util/env.h"
 #include "pmlc/util/logging.h"
 
+using plaidml::core::ffi_strings;
 using plaidml::core::ffi_wrap;
 using plaidml::core::ffi_wrap_void;
 using pmlc::compiler::ProgramArgument;
@@ -89,7 +90,9 @@ void plaidml_exec_init(  //
 
 plaidml_strings* plaidml_devices_get(  //
     plaidml_error* err) {
-  return ffi_wrap<plaidml_strings*>(err, nullptr, [&] { return plaidml::core::toFFI(getDeviceIDs()); });
+  return ffi_wrap<plaidml_strings*>(err, nullptr, [&] {  //
+    return ffi_strings(getDeviceIDs());
+  });
 }
 
 plaidml_executable* plaidml_jit(  //
@@ -102,6 +105,7 @@ plaidml_executable* plaidml_jit(  //
     plaidml_binding** outputs) {
   return ffi_wrap<plaidml_executable*>(err, nullptr, [&] {
     IVLOG(1, "JITing for device: " << deviceID);
+    IVLOG(1, program->program->tileIR);
     auto args = BindProgramArguments(program, ninputs, inputs, noutputs, outputs);
     auto exec = std::make_unique<plaidml_executable>();
     std::vector<void*> bufptrs(args.size());

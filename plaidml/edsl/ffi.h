@@ -205,13 +205,19 @@ plaidml_expr* plaidml_expr_dim(  //
     plaidml_error* err,          //
     plaidml_dim_expr* expr);
 
-plaidml_expr* plaidml_expr_placeholder(  //
-    plaidml_error* err,                  //
-    plaidml_logical_shape* shape,        //
-    plaidml_buffer* buffer,              //
+plaidml_expr* plaidml_expr_input(  //
+    plaidml_error* err,            //
+    plaidml_logical_shape* shape,  //
+    // plaidml_buffer* buffer,        //
     const char* name);
 
-void plaidml_expr_param_reset(  //
+plaidml_expr* plaidml_expr_constant(  //
+    plaidml_error* err,               //
+    plaidml_logical_shape* shape,     //
+    plaidml_buffer* buffer,           //
+    const char* name);
+
+void plaidml_expr_bind_buffer(  //
     plaidml_error* err,         //
     plaidml_expr* shape,        //
     plaidml_buffer* buffer);

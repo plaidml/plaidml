@@ -302,19 +302,29 @@ plaidml_expr* plaidml_expr_dim(  //
   });
 }
 
-plaidml_expr* plaidml_expr_placeholder(  //
-    plaidml_error* err,                  //
-    plaidml_logical_shape* shape,        //
-    plaidml_buffer* buffer,              //
+plaidml_expr* plaidml_expr_input(  //
+    plaidml_error* err,            //
+    plaidml_logical_shape* shape,  //
+    plaidml_buffer* buffer,        //
     const char* name) {
   return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
-    IVLOG(3, "plaidml_expr_placeholder");
-    return new plaidml_expr{
-        GlobalContext::get()->MakePlaceholderOp(shape->type, buffer ? buffer->buffer : nullptr, name)};
+    IVLOG(1, "plaidml_expr_input");
+    return new plaidml_expr{GlobalContext::get()->MakeInputOp(shape->type, buffer ? buffer->buffer : nullptr, name)};
   });
 }
 
-void plaidml_expr_param_reset(  //
+plaidml_expr* plaidml_expr_constant(  //
+    plaidml_error* err,               //
+    plaidml_logical_shape* shape,     //
+    plaidml_buffer* buffer,           //
+    const char* name) {
+  return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
+    IVLOG(1, "plaidml_expr_constant");
+    return new plaidml_expr{GlobalContext::get()->MakeConstantOp(shape->type, buffer->buffer, name)};
+  });
+}
+
+void plaidml_expr_bind_buffer(  //
     plaidml_error* err,         //
     plaidml_expr* expr,         //
     plaidml_buffer* buffer) {
