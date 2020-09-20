@@ -14,7 +14,7 @@ namespace plaidml::edsl {
 namespace {
 
 Program makeProgram(const std::string& name, const std::vector<Tensor>& outputs) {
-  return ProgramBuilder(name, outputs).target("").compile();
+  return ProgramBuilder(name, outputs).compile();
 }
 
 }  // namespace
@@ -69,7 +69,7 @@ Tensor Avg(const Tensor& I) {
   TensorDim X, Y;
   TensorIndex x, y;
   I.bind_dims(X, Y);
-  auto Sum = TensorOutput();
+  auto Sum = TensorOutput(Y);
   Sum(y) += I(x, y);
   return Sum / X;
 }
@@ -128,7 +128,7 @@ Tensor ValidIndices(const Tensor& I) {
   TensorIndex i, j;
   // valid_indices_start
   I.bind_dims(N);
-  auto O = TensorOutput(N / 2);
+  auto O = TensorOutput(N + 1 / 2);
   O(i) >= I(2 * i + j);
   O.add_constraint(j < 2);
   // valid_indices_end
@@ -281,22 +281,22 @@ TEST(DocCppEdsl, AvgMerge) {
 }
 
 TEST(DocCppEdsl, WrongMaxPool1D) {
-  auto I = Placeholder(DType::UINT64, {3, 3});
+  auto I = Placeholder(DType::UINT64, {3});
   makeProgram("wrong_max_pool_1d", {WrongMaxPool1D(I)});
 }
 
 TEST(DocCppEdsl, ValidIndices) {
-  auto I = Placeholder(DType::UINT64, {3, 3});
+  auto I = Placeholder(DType::UINT64, {3});
   makeProgram("valid_indices", {ValidIndices(I)});
 }
 
 TEST(DocCppEdsl, MaxPool1D) {
-  auto I = Placeholder(DType::UINT64, {3, 3});
+  auto I = Placeholder(DType::UINT64, {3});
   makeProgram("max_pool_1d", {MaxPool1D(I)});
 }
 
 TEST(DocCppEdsl, MaxPool1DOdd) {
-  auto I = Placeholder(DType::UINT64, {3, 3});
+  auto I = Placeholder(DType::UINT64, {3});
   makeProgram("max_poo_1d_odd", {MaxPool1DOdd(I)});
 }
 

@@ -59,15 +59,6 @@ Tensor Softmax(const Tensor& X) {
   return E / N;
 }
 
-Tensor ConstAdd(const std::vector<int32_t>& a, const std::vector<int32_t>& b) {
-  std::vector<int64_t> shape = {4};
-  auto bufferA = makeBuffer(TensorShape(DType::INT32, shape), a);
-  auto bufferB = makeBuffer(TensorShape(DType::INT32, shape), b);
-  auto A = Constant(LogicalShape(DType::INT32, shape), bufferA, "A");
-  auto B = Constant(LogicalShape(DType::INT32, shape), bufferB, "B");
-  return A + B;
-}
-
 TEST_F(CppEdsl, HigherPrecisionInvalidNegative) {
   auto A = Placeholder(DType::FLOAT32, {3, 3});
   auto C = A * (-2);
@@ -289,28 +280,32 @@ TEST_F(CppEdsl, Add) {
       6 + (1UL << 12),
       7 + (1UL << 24),
       8 + (1ULL << 32),
-      9 + (1ULL << 40)  //
+      9 + (1ULL << 40),  //
   };
 
-  std::vector<uint64_t> B_input = {1,
-                                   2 + (1UL << 12),
-                                   3,
-                                   4 + (1UL << 24),
-                                   5,
-                                   6 + (1ULL << 32),
-                                   7,
-                                   8 + (1ULL << 40),  //
-                                   9};
+  std::vector<uint64_t> B_input = {
+      1,
+      2 + (1UL << 12),
+      3,
+      4 + (1UL << 24),
+      5,
+      6 + (1ULL << 32),
+      7,
+      8 + (1ULL << 40),  //
+      9,
+  };
 
-  std::vector<uint64_t> C_output = {2,
-                                    4 + (1UL << 12),
-                                    6,
-                                    8 + (1UL << 24),
-                                    10,
-                                    12 + (1UL << 12) + (1ULL << 32),
-                                    14 + (1UL << 24),
-                                    16 + (1ULL << 32) + (1ULL << 40),
-                                    18 + (1ULL << 40)};
+  std::vector<uint64_t> C_output = {
+      2,
+      4 + (1UL << 12),
+      6,
+      8 + (1UL << 24),
+      10,
+      12 + (1UL << 12) + (1ULL << 32),
+      14 + (1UL << 24),
+      16 + (1ULL << 32) + (1ULL << 40),
+      18 + (1ULL << 40),
+  };
 
   checkProgram(program, {{A, A_input}, {B, B_input}}, {{C, C_output}});
 }
@@ -318,7 +313,11 @@ TEST_F(CppEdsl, Add) {
 TEST_F(CppEdsl, ConstAdd) {
   std::vector<int> a = {4, 3, 2, 1};
   std::vector<int> b = {1, 2, 3, 4};
-  auto O = ConstAdd(a, b);
+  auto bufferA = makeBuffer(TensorShape(DType::INT32, {4}), a);
+  auto bufferB = makeBuffer(TensorShape(DType::INT32, {4}), b);
+  auto A = Constant(LogicalShape(DType::INT32, {4}), bufferA, "A");
+  auto B = Constant(LogicalShape(DType::INT32, {4}), bufferB, "B");
+  auto O = A + B;
   auto program = makeProgram("const_add", {O});
 
   // clang-format off

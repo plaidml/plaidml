@@ -24,6 +24,25 @@ def ConstantOp : TileOpWithPPV<"constant", [ConstantLike, NoSideEffect]>, HasFol
   }];
 }
 
+// def ConstantTensorOp : TileOp<"constant_tensor", [ConstantLike, NoSideEffect]>, HasFolder {
+//   let summary = "constant tensor operation";
+//   let arguments = (ins IndexAttr:$value);
+//   let results = (outs Index:$result);
+// 
+//   let builders = [OpBuilder<
+//     "OpBuilder &builder, OperationState& result, int64_t value", [{
+//       auto indexType = builder.getIndexType();
+//       result.addAttribute("value", builder.getIntegerAttr(indexType, value));
+//       result.addTypes(indexType);
+//     }]
+//   >];
+// 
+//   let assemblyFormat = [{
+//     `(` $tensor `)` attr-dict `:` functional-type($tensor, results)
+//   }];
+// 
+// }
+
 def ContractionOp : TileOpWithPPV<"contract", [NoSideEffect]> {
   let arguments = (ins
     EltwiseAny:$init,

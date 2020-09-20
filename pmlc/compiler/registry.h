@@ -3,6 +3,7 @@
 #pragma once
 
 #include <functional>
+#include <string>
 #include <vector>
 
 #include "llvm/ADT/StringRef.h"
@@ -20,7 +21,7 @@ void registerTarget(llvm::StringRef name,
 
 TargetRegistryFunction resolveTarget(llvm::StringRef name);
 
-std::vector<llvm::StringRef> listTargets();
+std::vector<std::string> listTargets();
 
 struct TargetRegistration {
   TargetRegistration(llvm::StringRef name, TargetRegistryFunction builder) {

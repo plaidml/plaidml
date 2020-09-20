@@ -35,13 +35,9 @@ plaidml_cc_test(
 
 py_test(
     name = "py_test",
-    srcs = [
-        "__init__.py",
-        "edsl_test.py",
-    ],
+    srcs = ["edsl_test.py"],
     args = ["-v"],
     main = "edsl_test.py",
-    tags = ["manual"],  # the `edsl_test.py.test` rule will run this test via lit
     deps = [
         "//plaidml/edsl:py",
         "//plaidml/exec:py",
@@ -51,10 +47,4 @@ py_test(
 lit_test(
     name = "edsl_test.cc",
     data = [":cc_test"],
-)
-
-lit_test(
-    name = "edsl_test.py",
-    data = [":py_test"],
-    tags = ["skip_windows"],
 )

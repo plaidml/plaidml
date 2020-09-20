@@ -76,7 +76,7 @@ struct TileBuilder::Impl {
   ModuleOp module;
   OpBuilder builder;
   llvm::DenseMap<Value, Value> implicitUpdates;
-  llvm::DenseMap<Value, BufferPtr> implicitBindings;
+  // llvm::DenseMap<Value, BufferPtr> implicitBindings;
   llvm::DenseMap<Value, RankedTensorType> shapeCache;
   NoneOp noneOp;
   Location loc;
@@ -226,10 +226,10 @@ void TileBuilder::BindShape(Value tensor, RankedTensorType type) {
   tensor.setType(type);
 }
 
-void TileBuilder::BindBuffer(Value tensor, BufferPtr buffer) {
-  IVLOG(5, "TileBuilder::BindBuffer>");
-  impl->implicitBindings[tensor] = buffer;
-}
+// void TileBuilder::BindBuffer(Value tensor, BufferPtr buffer) {
+//   IVLOG(5, "TileBuilder::BindBuffer>");
+//   impl->implicitBindings[tensor] = buffer;
+// }
 
 void TileBuilder::BindTensorDims(Value from, ArrayRef<Value *> intos) {
   if (!from) {
@@ -431,17 +431,28 @@ RankedTensorType TileBuilder::MakeRankedTensorType(Type dtype,
   return RankedTensorType::get(shape, dtype);
 }
 
-Value TileBuilder::MakePlaceholderOp(RankedTensorType type, BufferPtr buffer,
-                                     StringRef name) {
-  IVLOG(5, "TileBuilder::MakePlaceholderOp> " << name.str() << ": "
-                                              << mlir::debugString(type));
+Value TileBuilder::MakeInputOp(RankedTensorType type, StringRef name) {
+  IVLOG(5, "TileBuilder::MakeInputOp> " << name.str() << ": "
+                                        << mlir::debugString(type));
   auto op = impl->builder.create<PlaceholderOp>(impl->loc, type);
   if (!name.empty()) {
     op.setAttr("name", impl->builder.getStringAttr(name));
   }
-  if (buffer) {
-    impl->implicitBindings[op.result()] = buffer;
+  // if (buffer) {
+  //   impl->implicitBindings[op.result()] = buffer;
+  // }
+  return op.result();
+}
+
+Value TileBuilder::MakeConstantOp(RankedTensorType type, BufferPtr buffer,
+                                  StringRef name) {
+  IVLOG(5, "TileBuilder::MakeConstantOp> " << name.str() << ": "
+                                           << mlir::debugString(type));
+  auto op = impl->builder.create<PlaceholderOp>(impl->loc, type);
+  if (!name.empty()) {
+    op.setAttr("name", impl->builder.getStringAttr(name));
   }
+  // impl->implicitBindings[op.result()] = buffer;
   return op.result();
 }
 
@@ -636,10 +647,10 @@ TileBuilder::MakeProgram(StringRef name, const ProgramMutations &mutations,
         mapper.map(value, blockArg);
         compiler::ProgramArgument programArg{
             true, value, value.getType().cast<RankedTensorType>()};
-        auto itBinding = impl->implicitBindings.find(value);
-        if (itBinding != impl->implicitBindings.end()) {
-          programArg.buffer = itBinding->second;
-        }
+        // auto itBinding = impl->implicitBindings.find(value);
+        // if (itBinding != impl->implicitBindings.end()) {
+        //   programArg.buffer = itBinding->second;
+        // }
         program->arguments.emplace_back(programArg);
       } else {
         Operation *newOp;
@@ -736,10 +747,10 @@ TileBuilder::MakeProgram(StringRef name, const ProgramMutations &mutations,
     }
     compiler::ProgramArgument programArg{
         false, userValue, finalValue.getType().cast<RankedTensorType>()};
-    auto itBinding = impl->implicitBindings.find(finalValue);
-    if (itBinding != impl->implicitBindings.end()) {
-      programArg.buffer = itBinding->second;
-    }
+    // auto itBinding = impl->implicitBindings.find(finalValue);
+    // if (itBinding != impl->implicitBindings.end()) {
+    //   programArg.buffer = itBinding->second;
+    // }
     program->arguments.emplace_back(programArg);
   }
   program->tileIR = mlir::debugString(module);

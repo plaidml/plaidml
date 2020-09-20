@@ -9,6 +9,9 @@ import unittest
 import plaidml
 from plaidml.edsl import *
 
+DEFAULT_DEVICE = 'llvm_cpu.0'
+DEFAULT_TARGET = 'llvm_cpu'
+
 
 def sum_over_axis(I):
     M, N = TensorDims(2)
@@ -51,7 +54,7 @@ def avg(I):
     X, Y = TensorDims(2)
     x, y = TensorIndexes(2)
     I.bind_dims(X, Y)
-    Sum = TensorOutput()
+    Sum = TensorOutput(Y)
     Sum[y] += I[x, y]
     return Sum / X
 
@@ -204,65 +207,76 @@ def complex_conv_2d(I, K, s0, s1, d0, d1):
 class TestEdslDocs(unittest.TestCase):
 
     def test_sum_over_axis(self):
-        I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 78]))
+        I = Input(plaidml.DType.FLOAT32, [1, 78])
         O = sum_over_axis(I)
         program = Program('sum_over_axis', [O])
 
     def test_max_over_axis(self):
-        I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 78]))
+        I = Input(plaidml.DType.FLOAT32, [1, 78])
         O = max_over_axis(I)
         program = Program('max_over_axis', [O])
 
     def test_matmul(self):
-        A = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 78]))
-        B = Tensor(LogicalShape(plaidml.DType.FLOAT32, [78, 78]))
+        A = Input(plaidml.DType.FLOAT32, [1, 78])
+        B = Input(plaidml.DType.FLOAT32, [78, 78])
         O = matmul(A, B)
         program = Program('matmul', [O])
 
     def test_avg(self):
-        I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 78]))
+        I = Input(plaidml.DType.FLOAT32, [1, 78])
         O = avg(I)
         program = Program('avg', [O])
 
     def test_avg_stages(self):
-        I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 78]))
+        I = Input(plaidml.DType.FLOAT32, [1, 78])
         O = avg_stages(I)
         program = Program('avg_stages', [O])
 
     def test_avg_merge(self):
-        I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 78]))
+        I = Input(plaidml.DType.FLOAT32, [1, 78])
         O = avg_merge(I)
         program = Program('avg_merge', [O])
 
+    def test_cumsum(self):
+        I = Input(plaidml.DType.FLOAT32, [10], name='I')
+        O = cumsum(I)
+        program = Program('cumsum', [O])
+
     def test_max_pool_1d(self):
-        I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [10]), name='I')
+        I = Input(plaidml.DType.FLOAT32, [10], name='I')
         O = max_pool_1d(I)
         program = Program('max_pool_1d', [O])
 
     def test_max_pool_1d_odd(self):
-        I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [10]), name='I')
+        I = Input(plaidml.DType.FLOAT32, [10], name='I')
         O = max_pool_1d_odd(I)
         program = Program('max_pool_1d_odd', [O])
 
     def test_skip(self):
-        I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 78]))
+        I = Input(plaidml.DType.FLOAT32, [1, 78])
         O = skip(I)
         program = Program('skip', [O])
 
     def test_conv_1d(self):
-        I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 224, 3]))
-        K = Tensor(LogicalShape(plaidml.DType.FLOAT32, [3, 3, 1]))
+        I = Input(plaidml.DType.FLOAT32, [1, 224, 3])
+        K = Input(plaidml.DType.FLOAT32, [3, 3, 1])
         O = conv_1d(I, K)
         program = Program('conv_1d', [O])
 
     def test_conv_2d_dilated(self):
-        I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 224, 224, 1]))
-        K = Tensor(LogicalShape(plaidml.DType.FLOAT32, [3, 3, 1, 32]))
+        I = Input(plaidml.DType.FLOAT32, [1, 224, 224, 1])
+        K = Input(plaidml.DType.FLOAT32, [3, 3, 1, 32])
         O = conv_2d_dilated(I, K)
         program = Program('conv_2d_dilated', [O])
 
     def test_complex_conv_2d(self):
-        I = Tensor(LogicalShape(plaidml.DType.FLOAT32, [1, 224, 224, 3, 3]))
-        K = Tensor(LogicalShape(plaidml.DType.FLOAT32, [3, 3, 3, 3, 32]))
+        I = Input(plaidml.DType.FLOAT32, [1, 224, 224, 3, 3])
+        K = Input(plaidml.DType.FLOAT32, [3, 3, 3, 3, 32])
         O = complex_conv_2d(I, K, 1, 2, 1, 2)
         program = Program('complex_conv_2d', [O])
+
+
+if __name__ == '__main__':
+    plaidml.settings.set('PLAIDML_DEVICE', DEFAULT_DEVICE)
+    plaidml.settings.set('PLAIDML_TARGET', DEFAULT_TARGET)
+    unittest.main()

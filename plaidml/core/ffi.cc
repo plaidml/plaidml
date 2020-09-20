@@ -108,24 +108,15 @@ Type convertFromDataType(plaidml_datatype dtype, MLIRContext* context) {
   llvm_unreachable("Invalid plaidml_datatype");
 }
 
-plaidml_strings* toFFI(std::vector<std::string> strings) {
-  std::unique_ptr<plaidml_string* []> elts { new plaidml_string*[strings.size()] };
+plaidml_strings* ffi_strings(mlir::ArrayRef<std::string> strs) {
+  std::vector<std::unique_ptr<plaidml_string>> ptrs(strs.size());
+  std::unique_ptr<plaidml_string* []> elts { new plaidml_string*[strs.size()] };
   auto result = std::make_unique<plaidml_strings>();
-
-  std::size_t idx = 0;
-  try {
-    while (idx < strings.size()) {
-      elts[idx] = new plaidml_string{std::move(strings[idx])};
-      ++idx;
-    }
-  } catch (...) {
-    while (idx) {
-      delete elts[idx--];
-    }
-    throw;
+  for (size_t i = 0; i < strs.size(); i++) {
+    ptrs[i].reset(new plaidml_string{strs[i]});
+    elts[i] = ptrs[i].release();
   }
-
-  result->size = strings.size();
+  result->size = strs.size();
   result->elts = elts.release();
   return result.release();
 }

@@ -25,6 +25,7 @@
 
 using plaidml::core::convertFromDataType;
 using plaidml::core::convertIntoDataType;
+using plaidml::core::ffi_strings;
 using plaidml::core::ffi_wrap;
 using plaidml::core::ffi_wrap_void;
 using plaidml::core::GlobalContext;
@@ -302,24 +303,33 @@ plaidml_expr* plaidml_expr_dim(  //
   });
 }
 
-plaidml_expr* plaidml_expr_placeholder(  //
-    plaidml_error* err,                  //
-    plaidml_logical_shape* shape,        //
-    plaidml_buffer* buffer,              //
+plaidml_expr* plaidml_expr_input(  //
+    plaidml_error* err,            //
+    plaidml_logical_shape* shape,  //
     const char* name) {
   return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
-    IVLOG(3, "plaidml_expr_placeholder");
-    return new plaidml_expr{
-        GlobalContext::get()->MakePlaceholderOp(shape->type, buffer ? buffer->buffer : nullptr, name)};
+    IVLOG(1, "plaidml_expr_input");
+    return new plaidml_expr{GlobalContext::get()->MakeInputOp(shape->type, name)};
   });
 }
 
-void plaidml_expr_param_reset(  //
-    plaidml_error* err,         //
-    plaidml_expr* expr,         //
-    plaidml_buffer* buffer) {
-  return ffi_wrap_void(err, [&] { GlobalContext::get()->BindBuffer(expr->value, buffer->buffer); });
+plaidml_expr* plaidml_expr_constant(  //
+    plaidml_error* err,               //
+    plaidml_logical_shape* shape,     //
+    plaidml_buffer* buffer,           //
+    const char* name) {
+  return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
+    IVLOG(1, "plaidml_expr_constant");
+    return new plaidml_expr{GlobalContext::get()->MakeConstantOp(shape->type, buffer->buffer, name)};
+  });
 }
+
+// void plaidml_expr_bind_buffer(  //
+//     plaidml_error* err,         //
+//     plaidml_expr* expr,         //
+//     plaidml_buffer* buffer) {
+//   return ffi_wrap_void(err, [&] { GlobalContext::get()->BindBuffer(expr->value, buffer->buffer); });
+// }
 
 plaidml_expr* plaidml_expr_clone(  //
     plaidml_error* err,            //
@@ -1008,10 +1018,9 @@ plaidml_kvps* plaidml_program_get_passes(  //
   return ffi_wrap<plaidml_kvps*>(err, nullptr, [&] {
     const auto& passes = program->program->passes;
     auto ret = new plaidml_kvps{passes.size(), new plaidml_kvp[passes.size()]};
-    size_t i = 0;
-    for (auto it = passes.begin(), eit = passes.end(); it != eit; ++it, ++i) {
-      ret->elts[i].key = new plaidml_string{it->name};
-      ret->elts[i].value = new plaidml_string{it->ir};
+    for (auto item : llvm::enumerate(passes)) {
+      ret->elts[item.index()].key = new plaidml_string{item.value().name};
+      ret->elts[item.index()].value = new plaidml_string{item.value().ir};
     }
     return ret;
   });
@@ -1034,13 +1043,8 @@ void plaidml_program_args_free(  //
 
 plaidml_strings* plaidml_targets_get(  //
     plaidml_error* err) {
-  return ffi_wrap<plaidml_strings*>(err, nullptr, [&] {
-    const auto& targets = pmlc::compiler::listTargets();
-    auto strs = new plaidml_string*[targets.size()];
-    for (unsigned i = 0; i < targets.size(); i++) {
-      strs[i] = new plaidml_string{targets[i].str()};
-    }
-    return new plaidml_strings{targets.size(), strs};
+  return ffi_wrap<plaidml_strings*>(err, nullptr, [&] {  //
+    return ffi_strings(pmlc::compiler::listTargets());
   });
 }
 

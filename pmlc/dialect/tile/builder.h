@@ -61,7 +61,7 @@ public:
   void BindTensorDims(mlir::Value from, llvm::ArrayRef<mlir::Value *> into);
   mlir::RankedTensorType ComputeShape(mlir::Value tensor);
   void BindShape(mlir::Value tensor, mlir::RankedTensorType type);
-  void BindBuffer(mlir::Value tensor, pmlc::util::BufferPtr buffer);
+  // void BindBuffer(mlir::Value tensor, pmlc::util::BufferPtr buffer);
 
   mlir::MemRefType MakeMemRefType(mlir::Type dtype,
                                   llvm::ArrayRef<int64_t> sizes,
@@ -89,9 +89,10 @@ public:
   mlir::Value MakeCastOp(mlir::Value tensor, mlir::Type dtype);
   mlir::Value MakeTraceOp(mlir::Value tensor, const char *msg);
   mlir::Value MakeDimOp(mlir::Value tensor, unsigned dim);
-  mlir::Value MakePlaceholderOp(mlir::RankedTensorType type,
-                                pmlc::util::BufferPtr buffer,
-                                llvm::StringRef name);
+  mlir::Value MakeInputOp(mlir::RankedTensorType type, llvm::StringRef name);
+  mlir::Value MakeConstantOp(mlir::RankedTensorType type,
+                             pmlc::util::BufferPtr buffer,
+                             llvm::StringRef name);
   mlir::Value MakeConstantOp(int64_t value);
   mlir::Value MakePolyIndexOp(llvm::StringRef name = "");
   mlir::Value MakePolyAddOp(llvm::ArrayRef<mlir::Value> args);

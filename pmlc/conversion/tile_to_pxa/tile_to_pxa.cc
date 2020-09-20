@@ -190,7 +190,9 @@ static Value createCastOp(OpBuilder &builder, Location loc, Value from,
       return builder.create<mlir::IndexCastOp>(loc, from, intType);
     }
   }
-  llvm_unreachable("Unsupported cast op");
+  IVLOG(1, llvm::formatv("Unsupported cast: {0} -> {1}", debugString(from),
+                         debugString(intoType)));
+  llvm_unreachable("Unsupported cast");
 }
 
 struct Matcher {
@@ -355,6 +357,7 @@ struct StdOp {
   Value create(ConversionPatternRewriter &rewriter, Location loc,
                Type resultType, ArrayRef<Value> operands,
                ArrayRef<Type> types) {
+    IVLOG(1, "StdOp");
     SmallVector<Value, 2> promoted;
     promoteTypes(rewriter, loc, operands, types, &promoted);
     auto attrs = ArrayRef<NamedAttribute>{};
@@ -543,11 +546,13 @@ static Value
 buildBroadcastLoad(OpBuilder &builder, Location loc, Value operand,
                    unsigned outRank,
                    Optional<PaddingInfo> maybePadding = llvm::None) {
+  IVLOG(1, "buildBroadcastLoad: " << debugString(operand));
   auto body = builder.getBlock();
   auto defOp = operand.getDefiningOp();
   Attribute attr;
   // Handle scalar values
   if (defOp && m_Constant(&attr).match(defOp)) {
+    IVLOG(1, "  constant");
     return operand;
   }
   // handle broadcasts
@@ -1299,6 +1304,22 @@ struct TraceOpConversion : public OpConversionPattern<TraceOp> {
   }
 };
 
+struct StdConstantOpConversion : public OpConversionPattern<mlir::ConstantOp> {
+  using OpConversionPattern<mlir::ConstantOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(mlir::ConstantOp op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const final {
+    IVLOG(1, "StdConstantOpConversion");
+    TypeConverter typeConverter;
+    auto resultType = typeConverter.convertType(op.getType());
+    IVLOG(1, "resultType: " << debugString(resultType));
+    rewriter.replaceOpWithNewOp<mlir::ConstantOp>(op, resultType,
+                                                  op.getValue());
+    return success();
+  }
+};
+
 struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
   void runOnOperation() final {
     // Set up target (i.e. what is legal)
@@ -1313,6 +1334,8 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
         [&](FuncOp op) { return converter.isSignatureLegal(op.getType()); });
     target.addDynamicallyLegalOp<ReturnOp>(
         [&](ReturnOp op) { return converter.isLegal(op); });
+    target.addDynamicallyLegalOp<mlir::ConstantOp>(
+        [&](mlir::ConstantOp op) { return converter.isLegal(op); });
 
     // Setup rewrite patterns
     using CmpIntLtOp =
@@ -1335,6 +1358,7 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
         ScalarConstantOpConversion, //
         ScatterOpConversion,        //
         ShapeOpConversion,          //
+        StdConstantOpConversion,    //
         TileConstantOpConversion,   //
         TraceOpConversion,          //
         // TODO: SpecialOpConversion (ZeroOp)

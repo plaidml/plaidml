@@ -39,9 +39,9 @@ public:
     return it->second;
   }
 
-  std::vector<StringRef> list() {
+  std::vector<std::string> list() {
     auto keys = registry.keys();
-    return std::vector<StringRef>(keys.begin(), keys.end());
+    return std::vector<std::string>(keys.begin(), keys.end());
   }
 
 private:
@@ -58,7 +58,7 @@ TargetRegistryFunction resolveTarget(StringRef name) {
   return TargetRegistry::instance()->resolve(name);
 }
 
-std::vector<StringRef> listTargets() {
+std::vector<std::string> listTargets() {
   return TargetRegistry::instance()->list();
 }
 

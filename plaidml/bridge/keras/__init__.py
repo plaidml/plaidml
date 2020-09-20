@@ -134,7 +134,7 @@ class _Function(object):
     def __call__(self, inputs):
         inputs = [np.array(x) if isinstance(x, (six.integer_types, float)) else x for x in inputs]
         input_shapes = tuple([x.shape for x in inputs])
-        logger.debug('_Function: {}({})'.format(self._name, input_shapes))
+        # logger.debug('_Function: {}({})'.format(self._name, input_shapes))
         exe = self._cache.get(input_shapes)
         if not exe:
             exe = self._compile(inputs)
@@ -152,24 +152,29 @@ class _Function(object):
         return _Executable(self._name, inputs, outputs, updates)
 
 
-def _create_var(name, value):
+def _create_buffer(value):
     dtype = plaidml.DType.from_numpy(value.dtype)
     shape = edsl.LogicalShape(dtype, value.shape)
     tensor_shape = plaidml.TensorShape(dtype, value.shape)
     buffer = plaidml.Buffer(tensor_shape, device=_device)
     buffer.copy_from_ndarray(value)
-    return edsl.Constant(shape, buffer, name=name)
+    return shape, buffer
 
 
 class _KerasNode(object):
 
-    def __init__(self, opname, name=None, shape=None, tensor=None, value=None):
+    def __init__(self, opname, name=None, input=None, tensor=None, var=None, const=None):
+        self.buffer = None
         self.opname = opname
         self.name = _prepend_name_scope(name, opname)
-        if value is not None:
-            tensor = _create_var(self.name, value)
-        elif tensor is None:
-            tensor = edsl.Tensor(shape=shape, name=self.name)
+        if input is not None:
+            tensor = edsl.Input(input, name=self.name)
+        elif var is not None:
+            shape, self.buffer = _create_buffer(var)
+            tensor = edsl.Input(shape, name=self.name)
+        elif const is not None:
+            shape, self.buffer = _create_buffer(const)
+            tensor = edsl.Constant(shape, self.buffer, name=self.name)
         # logger.debug('_KerasNode({})'.format(tensor))
         self.tensor = tensor
 
@@ -194,7 +199,7 @@ class _KerasNode(object):
         self.__keras_shape = shape
 
     def __getitem__(self, key):
-        logger.debug('__getitem__(self: {}, key: {})'.format(self, key))
+        # logger.debug('__getitem__(self: {}, key: {})'.format(self, key))
         # Any _RawTensorDims are to be forwarded
         raw_tensor_dims = getattr(self, '_RawTensorDims', None)
         if raw_tensor_dims is not None:
@@ -276,7 +281,7 @@ class _KerasNode(object):
         return self.__binary_op('cmp_lt', other, lambda x, y: x < y)
 
     def __binary_op(self, op, other, fn):
-        logger.debug('{}(self: {}, other: {})'.format(op, self, other))
+        # logger.debug('{}(self: {}, other: {})'.format(op, self, other))
         if isinstance(other, _KerasNode):
             other = other.tensor
         if isinstance(other, np.ndarray):
@@ -547,7 +552,7 @@ def constant(value, dtype=None, shape=None, name=None):
         else:
             shape = (1,)
     np_value = np.full(shape, value, dtype=dtype or floatx())
-    return _KerasNode('constant', name=name, value=np_value)
+    return _KerasNode('constant', name=name, const=np_value)
 
 
 @_log_call
@@ -875,8 +880,8 @@ def get_uid(prefix=''):
 
 @_log_call
 def get_value(x):
-    if x.tensor._buffer:
-        return x.tensor._buffer.as_ndarray()
+    if x.buffer:
+        return x.buffer.as_ndarray()
     inputs = []
     fn = _Function(inputs, [x], [], name='get_value')
     outputs = fn(inputs)
@@ -1068,10 +1073,10 @@ def moving_average_update(x, value, momentum):
 @contextmanager
 def name_scope(name):
     _NAME_SCOPE_STACK.append(name)
-    logger.debug('name_scope({}), push: {}'.format(name, _NAME_SCOPE_STACK))
+    # logger.debug('name_scope({}), push: {}'.format(name, _NAME_SCOPE_STACK))
     yield
     _NAME_SCOPE_STACK.pop()
-    logger.debug('name_scope({}), pop: {}'.format(name, _NAME_SCOPE_STACK))
+    # logger.debug('name_scope({}), pop: {}'.format(name, _NAME_SCOPE_STACK))
 
 
 @_log_call
@@ -1150,20 +1155,20 @@ def one_hot(indices, num_classes):
 @_log_call
 def ones(shape, dtype=None, name=None):
     value = np.full(shape, 1, dtype=dtype or floatx())
-    return _KerasNode('ones', name=name, value=value)
+    return _KerasNode('ones', name=name, var=value)
 
 
 @_log_call
 def ones_like(x, dtype=None, name=None):
     value = np.full((1), 1, dtype=dtype or floatx())
-    one = _create_var('a_one', value)
+    one = edsl.Tensor(value=1)
     I = x.tensor
     ndim = I.rank
     dims = edsl.TensorDims(ndim)
     idxs = edsl.TensorIndexes(ndim)
     I.bind_dims(*dims)
     O = edsl.TensorOutput(*dims)
-    O[idxs] = one[0]
+    O[idxs] = one[()]
     return _KerasNode('ones_like', name=name, tensor=O)
 
 
@@ -1175,11 +1180,10 @@ def permute_dimensions(x, pattern=None):
 @_log_call
 def placeholder(shape=None, ndim=None, dtype=None, sparse=False, name=None):
     dtype = plaidml.DType.from_numpy(dtype or floatx())
-    # TODO: Need to support empty shapes; once supported, convert below to `if _ is not None`
     if shape is not None:
-        return _KerasNode('placeholder', shape=edsl.LogicalShape(dtype, shape), name=name)
+        return _KerasNode('placeholder', input=edsl.LogicalShape(dtype, shape), name=name)
     if ndim is not None:
-        return _KerasNode('placeholder', shape=edsl.LogicalShape(dtype, [0] * ndim), name=name)
+        return _KerasNode('placeholder', input=edsl.LogicalShape(dtype, [0] * ndim), name=name)
     raise ValueError()
 
 
@@ -1513,7 +1517,7 @@ def set_value(x, value):
     tensor_shape = plaidml.TensorShape(dtype, value.shape)
     buffer = plaidml.Buffer(tensor_shape, device=_device)
     buffer.copy_from_ndarray(value)
-    x.tensor.set_param_value(buffer)
+    x.buffer = buffer
 
 
 @_log_call
@@ -1724,29 +1728,29 @@ def variable(value, dtype=None, name=None, constraint=None):
         value = np.array(value, dtype=dtype)
     if isinstance(value, np.ndarray):
         if dtype != value.dtype:
-            logger.debug(
-                'Casting to requested dtype in variable, received {} and requested {}'.format(
-                    value.dtype, dtype))
+            # logger.debug(
+            #     'Casting to requested dtype in variable, received {} and requested {}'.format(
+            #         value.dtype, dtype))
             value = value.astype(dtype)
-        return _KerasNode('variable', name=name, value=value)
+        return _KerasNode('variable', name=name, var=value)
     raise TypeError('Unknown type for variable: {}'.format(type(value)))
 
 
 @_log_call
 def zeros(shape, dtype=None, name=None):
     value = np.full(shape, 0, dtype=dtype or floatx())
-    return _KerasNode('zeros', name=name, value=value)
+    return _KerasNode('zeros', name=name, var=value)
 
 
 @_log_call
 def zeros_like(x, dtype=None, name=None):
     value = np.full((1), 0, dtype=dtype or floatx())
-    zero = _create_var('a_zero', value)
+    zero = edsl.Tensor(value=0)
     I = x.tensor
     ndim = I.rank
     dims = edsl.TensorDims(ndim)
     idxs = edsl.TensorIndexes(ndim)
     I.bind_dims(*dims)
     O = edsl.TensorOutput(*dims)
-    O[idxs] = zero[0]
+    O[idxs] = zero[()]
     return _KerasNode('zeros_like', name=name, tensor=O)
