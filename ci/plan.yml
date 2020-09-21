@@ -232,6 +232,8 @@ SUITES:
         expected: "could not broadcast input array from shape (3,2048) into shape (1,2048)"
         soft_fail: true
         precision: high
+        skip_platforms:
+          - pml-vk-gen
         platform_overrides:
           tf-dnnl-cpu:
             conda_env: ci/conda/tensorflow-dnnl.yml
@@ -273,6 +275,8 @@ SUITES:
         expected: "Unrecognized data_format"
         soft_fail: true
         precision: high
+        skip_platforms:
+          - pml-vk-gen
         platform_overrides:
           pml-llvm-cpu:
             prepend_args: [--examples=64]
