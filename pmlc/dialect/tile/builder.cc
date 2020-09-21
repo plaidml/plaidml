@@ -50,6 +50,8 @@ using llvm::StringSwitch;
 using mlir::AbstractOperation;
 using mlir::Block;
 using mlir::BlockAndValueMapping;
+using mlir::DenseElementsAttr;
+using mlir::FloatAttr;
 using mlir::FloatType;
 using mlir::FuncOp;
 using mlir::FunctionType;
@@ -121,7 +123,7 @@ struct TileBuilder::Impl {
     }
     auto axis = args.front();
     IntegerAttr axisAttr;
-    if (!m_Constant(&axisAttr).match(axis.getDefiningOp())) {
+    if (!matchPattern(axis, m_Constant(&axisAttr))) {
       throw std::runtime_error(
           "'index' primitive expects argument 1 to be a constant integer");
     }
@@ -146,12 +148,12 @@ struct TileBuilder::Impl {
 
   Value makeScalarConstantOp(int64_t value) {
     auto type = builder.getIntegerType(32, true);
-    return builder.create<ScalarConstantOp>(loc, type, value).result();
+    return builder.create<ScalarConstantOp>(loc, type, value);
   }
 
   Value makeScalarConstantOp(double value) {
     auto type = builder.getF32Type();
-    return builder.create<ScalarConstantOp>(loc, type, value).result();
+    return builder.create<ScalarConstantOp>(loc, type, value);
   }
 
   Value makeIdentity(Type elemType, util::AggregationKind agg) {
@@ -381,9 +383,8 @@ std::vector<Value> TileBuilder::GetTupleElements(Value value) {
 
 Value TileBuilder::MakeScalarConstantOp(uint64_t value) {
   IVLOG(5, "TileBuilder::MakeScalarConstantOp> " << value);
-  auto type = impl->builder.getIntegerType(32, true);
-  return impl->builder.create<ScalarConstantOp>(impl->loc, type, value)
-      .result();
+  auto type = impl->builder.getIntegerType(32, /*isSigned=*/true);
+  return impl->builder.create<ScalarConstantOp>(impl->loc, type, value);
 }
 
 Value TileBuilder::MakeScalarConstantOp(int64_t value) {
@@ -392,11 +393,11 @@ Value TileBuilder::MakeScalarConstantOp(int64_t value) {
 }
 
 int64_t TileBuilder::GetIntegerValue(Value value) {
-  if (auto op =
-          llvm::dyn_cast_or_null<ScalarConstantOp>(value.getDefiningOp())) {
-    return op.getIntAttr().getInt();
+  IntegerAttr attr;
+  if (matchPattern(value, m_Constant(&attr))) {
+    return attr.getInt();
   }
-  throw std::runtime_error("Expected ScalarConstantOp");
+  throw std::runtime_error("Expected ConstantOp");
 }
 
 Value TileBuilder::MakeScalarConstantOp(double value) {
@@ -405,11 +406,11 @@ Value TileBuilder::MakeScalarConstantOp(double value) {
 }
 
 double TileBuilder::GetFloatValue(Value value) {
-  if (auto op =
-          llvm::dyn_cast_or_null<ScalarConstantOp>(value.getDefiningOp())) {
-    return op.getFloatAttr().getValueAsDouble();
+  FloatAttr attr;
+  if (matchPattern(value, m_Constant(&attr))) {
+    return attr.getValueAsDouble();
   }
-  throw std::runtime_error("Expected ScalarConstantOp");
+  throw std::runtime_error("Expected ConstantOp");
 }
 
 Value TileBuilder::MakeDimOp(Value tensor, unsigned dim) {
@@ -448,12 +449,17 @@ Value TileBuilder::MakeConstantOp(RankedTensorType type, BufferPtr buffer,
                                   StringRef name) {
   IVLOG(5, "TileBuilder::MakeConstantOp> " << name.str() << ": "
                                            << mlir::debugString(type));
-  auto op = impl->builder.create<PlaceholderOp>(impl->loc, type);
+  auto view = buffer->MapCurrent();
+  auto rawBuffer = llvm::makeArrayRef(view->data(), view->size());
+  auto attr = DenseElementsAttr::getFromRawBuffer(type, rawBuffer,
+                                                  /*isSplatBuffer=*/false);
+  auto op = impl->builder.create<mlir::ConstantOp>(impl->loc, type, attr);
+  // auto op = impl->builder.create<PlaceholderOp>(impl->loc, type);
   if (!name.empty()) {
     op.setAttr("name", impl->builder.getStringAttr(name));
   }
   // impl->implicitBindings[op.result()] = buffer;
-  return op.result();
+  return op;
 }
 
 Value TileBuilder::MakeConstantOp(int64_t value) {
@@ -585,7 +591,7 @@ Value TileBuilder::MakeContractionOp(AggregationKind agg, CombinationKind combo,
 
 std::shared_ptr<compiler::Program>
 TileBuilder::MakeProgram(StringRef name, const ProgramMutations &mutations,
-                         Type concreteFloat, Type concreteInt) {
+                         FloatType concreteFloat, IntegerType concreteInt) {
   if (name.empty()) {
     name = "noname";
   }

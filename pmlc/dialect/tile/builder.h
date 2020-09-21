@@ -118,8 +118,8 @@ public:
 
   std::shared_ptr<compiler::Program>
   MakeProgram(llvm::StringRef name, const ProgramMutations &mutations,
-              mlir::Type concreteFloat = mlir::Type(),
-              mlir::Type concreteInt = mlir::Type());
+              mlir::FloatType concreteFloat = mlir::FloatType(),
+              mlir::IntegerType concreteInt = mlir::IntegerType());
 
   void Dump();
 

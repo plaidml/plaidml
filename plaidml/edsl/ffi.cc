@@ -972,13 +972,13 @@ plaidml_program* plaidml_compile(  //
     }
 
     auto ctx = GlobalContext::get();
-    auto floatType = convertFromDataType(floatx, ctx->getContext());
-    if (!floatType.isa<mlir::FloatType>()) {
+    auto floatType = convertFromDataType(floatx, ctx->getContext()).dyn_cast<mlir::FloatType>();
+    if (!floatType) {
       throw std::runtime_error("Invalid floatx in plaidml_compile");
     }
 
-    auto intType = convertFromDataType(intx, ctx->getContext());
-    if (!intType.isa<mlir::IntegerType>()) {
+    auto intType = convertFromDataType(intx, ctx->getContext()).dyn_cast<mlir::IntegerType>();
+    if (!intType) {
       throw std::runtime_error("Invalid intx in plaidml_compile");
     }
 

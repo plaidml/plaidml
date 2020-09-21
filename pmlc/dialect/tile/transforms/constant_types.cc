@@ -4,6 +4,7 @@
 
 #include "llvm/Support/FormatVariadic.h"
 
+#include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/DebugStringHelper.h"
@@ -26,20 +27,20 @@ namespace {
 struct ConstantTypesPass : public ConstantTypesBase<ConstantTypesPass> {
   ConstantTypesPass() {}
 
-  ConstantTypesPass(Type floatType, Type integerType)
+  ConstantTypesPass(FloatType floatType, IntegerType integerType)
       : floatType(floatType), integerType(integerType) {}
 
   void runOnFunction() final;
 
   void notifyPassFailure() { signalPassFailure(); }
 
-  Type floatType;
-  Type integerType;
+  FloatType floatType;
+  IntegerType integerType;
 };
 
 struct ConstantTypesRewriter : public OpRewritePattern<ScalarConstantOp> {
   ConstantTypesRewriter(MLIRContext *context, ConstantTypesPass *pass,
-                        Type floatType, Type integerType)
+                        FloatType floatType, IntegerType integerType)
       : OpRewritePattern<ScalarConstantOp>(context), pass(pass),
         floatType(floatType), integerType(integerType) {}
 
@@ -80,8 +81,8 @@ struct ConstantTypesRewriter : public OpRewritePattern<ScalarConstantOp> {
   }
 
   ConstantTypesPass *pass;
-  Type floatType;
-  Type integerType;
+  FloatType floatType;
+  IntegerType integerType;
 };
 
 void ConstantTypesPass::runOnFunction() {
@@ -90,7 +91,7 @@ void ConstantTypesPass::runOnFunction() {
 
   if (!floatType) {
     IVLOG(2, "parse floatKind: " << floatKind);
-    floatType = llvm::StringSwitch<Type>(floatKind)
+    floatType = llvm::StringSwitch<FloatType>(floatKind)
                     .Case("f16", FloatType::getF16(context))
                     .Case("f32", FloatType::getF32(context))
                     .Case("f64", FloatType::getF64(context));
@@ -100,7 +101,7 @@ void ConstantTypesPass::runOnFunction() {
   if (!integerType) {
     IVLOG(2, "parse integerKind: " << integerKind);
     integerType =
-        llvm::StringSwitch<Type>(integerKind)
+        llvm::StringSwitch<IntegerType>(integerKind)
             .Case("si8", IntegerType::get(8, IntegerType::Signed, context))
             .Case("ui8", IntegerType::get(8, IntegerType::Unsigned, context))
             .Case("si16", IntegerType::get(16, IntegerType::Signed, context))
@@ -123,8 +124,8 @@ std::unique_ptr<Pass> createConstantTypesPass() {
   return std::make_unique<ConstantTypesPass>();
 }
 
-std::unique_ptr<Pass> createConstantTypesPass(Type floatType,
-                                              Type integerType) {
+std::unique_ptr<Pass> createConstantTypesPass(FloatType floatType,
+                                              IntegerType integerType) {
   return std::make_unique<ConstantTypesPass>(floatType, integerType);
 }
 

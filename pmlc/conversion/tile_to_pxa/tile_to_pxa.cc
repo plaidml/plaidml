@@ -106,7 +106,7 @@ static llvm::APFloat convertFloatUsingType(llvm::APFloat value,
   return value;
 }
 
-struct ScalarConstantOpConversion
+struct EltwiseConstantOpConversion
     : public OpConversionPattern<ew::ScalarConstantOp> {
   using OpConversionPattern<ew::ScalarConstantOp>::OpConversionPattern;
 
@@ -542,34 +542,47 @@ static void updateAffineMap(Operation *in, const PaddingInfo &padding) {
   in->setAttr("map", AffineMapAttr::get(accMap));
 }
 
+static SmallVector<Value, 8> buildBroadcastIndices(OpBuilder &builder,
+                                                   Location loc, Block *body,
+                                                   Value value,
+                                                   unsigned outRank) {
+  auto shapedType = value.getType().cast<ShapedType>();
+  assert(shapedType.getRank() <= outRank && "result rank < operand rank");
+  auto shape = shapedType.getShape();
+  SmallVector<Value, 8> idxs(shapedType.getRank());
+  for (unsigned i = 0; i < shapedType.getRank(); i++) {
+    unsigned j = outRank - i - 1;
+    unsigned k = shapedType.getRank() - i - 1;
+    if (shape[k] == 1) {
+      idxs[k] = builder.create<mlir::ConstantIndexOp>(loc, 0);
+    } else {
+      idxs[k] = body->getArgument(j);
+    }
+  }
+  return idxs;
+}
+
 static Value
 buildBroadcastLoad(OpBuilder &builder, Location loc, Value operand,
                    unsigned outRank,
                    Optional<PaddingInfo> maybePadding = llvm::None) {
   IVLOG(1, "buildBroadcastLoad: " << debugString(operand));
   auto body = builder.getBlock();
-  auto defOp = operand.getDefiningOp();
   Attribute attr;
-  // Handle scalar values
-  if (defOp && m_Constant(&attr).match(defOp)) {
+  // Handle constant values
+  if (matchPattern(operand, m_Constant(&attr))) {
     IVLOG(1, "  constant");
+    if (attr.isa<ElementsAttr>()) {
+      IVLOG(1, "  attr: " << debugString(attr));
+      auto idxs = buildBroadcastIndices(builder, loc, body, operand, outRank);
+      return builder.create<ExtractElementOp>(loc, operand, idxs);
+    }
+    // This is a scalar constant value.
     return operand;
   }
   // handle broadcasts
-  auto operandType = operand.getType().cast<MemRefType>();
-  assert(operandType.getRank() <= outRank && "result rank < operand rank");
-  auto shape = operandType.getShape();
-  SmallVector<Value, 8> operandIdxs(operandType.getRank());
-  for (unsigned i = 0; i < operandType.getRank(); i++) {
-    unsigned j = outRank - i - 1;
-    unsigned k = operandType.getRank() - i - 1;
-    if (shape[k] == 1) {
-      operandIdxs[k] = builder.create<mlir::ConstantIndexOp>(loc, 0);
-    } else {
-      operandIdxs[k] = body->getArgument(j);
-    }
-  }
-  auto loadOp = builder.create<pxa::PxaLoadOp>(loc, operand, operandIdxs);
+  auto idxs = buildBroadcastIndices(builder, loc, body, operand, outRank);
+  auto loadOp = builder.create<pxa::PxaLoadOp>(loc, operand, idxs);
   if (maybePadding)
     updateAffineMap(loadOp, *maybePadding);
   return loadOp;
@@ -1312,10 +1325,23 @@ struct StdConstantOpConversion : public OpConversionPattern<mlir::ConstantOp> {
                   ConversionPatternRewriter &rewriter) const final {
     IVLOG(1, "StdConstantOpConversion");
     TypeConverter typeConverter;
-    auto resultType = typeConverter.convertType(op.getType());
-    IVLOG(1, "resultType: " << debugString(resultType));
-    rewriter.replaceOpWithNewOp<mlir::ConstantOp>(op, resultType,
-                                                  op.getValue());
+    auto type = op.getType().dyn_cast<RankedTensorType>();
+    if (!type) {
+      return failure();
+    }
+    IVLOG(1, "  original type: " << debugString(type));
+    auto elementType = typeConverter.convertType(type.getElementType());
+    auto resultType = RankedTensorType::get(type.getShape(), elementType);
+    IVLOG(1, "  result type: " << debugString(resultType));
+    auto value = op.getValue();
+    auto elts = value.dyn_cast<DenseElementsAttr>();
+    if (!elts) {
+      op.emitError(
+          "DenseElementsAttr is the only support attribute type for value");
+      return failure();
+    }
+    auto newElts = elts.reshape(resultType);
+    rewriter.replaceOpWithNewOp<mlir::ConstantOp>(op, resultType, newElts);
     return success();
   }
 };
@@ -1334,8 +1360,14 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
         [&](FuncOp op) { return converter.isSignatureLegal(op.getType()); });
     target.addDynamicallyLegalOp<ReturnOp>(
         [&](ReturnOp op) { return converter.isLegal(op); });
-    target.addDynamicallyLegalOp<mlir::ConstantOp>(
-        [&](mlir::ConstantOp op) { return converter.isLegal(op); });
+    target.addDynamicallyLegalOp<mlir::ConstantOp>([&](mlir::ConstantOp op) {
+      if (auto attr = op.getValue().dyn_cast<ElementsAttr>()) {
+        if (auto type = attr.getType().dyn_cast<ShapedType>()) {
+          return converter.isLegal(type.getElementType());
+        }
+      }
+      return true;
+    });
 
     // Setup rewrite patterns
     using CmpIntLtOp =
@@ -1348,19 +1380,19 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
         CmpIntInequalityOp<CmpIPredicate::sge, CmpIPredicate::uge>;
     OwningRewritePatternList patterns;
     patterns.insert<
-        CastOpConversion,           //
-        FuncOpConversion,           //
-        GatherOpConversion,         //
-        IndexOpConversion,          //
-        PrngOpConversion,           //
-        ReshapeOpConversion,        //
-        ReturnOpConversion,         //
-        ScalarConstantOpConversion, //
-        ScatterOpConversion,        //
-        ShapeOpConversion,          //
-        StdConstantOpConversion,    //
-        TileConstantOpConversion,   //
-        TraceOpConversion,          //
+        CastOpConversion,            //
+        EltwiseConstantOpConversion, //
+        FuncOpConversion,            //
+        GatherOpConversion,          //
+        IndexOpConversion,           //
+        PrngOpConversion,            //
+        ReshapeOpConversion,         //
+        ReturnOpConversion,          //
+        ScatterOpConversion,         //
+        ShapeOpConversion,           //
+        StdConstantOpConversion,     //
+        TileConstantOpConversion,    //
+        TraceOpConversion,           //
         // TODO: SpecialOpConversion (ZeroOp)
         ContractionOpConversion<CombinationKind::none, FirstOperand>,
         ContractionOpConversion<CombinationKind::add, StdOp<mlir::AddFOp>,

@@ -27,6 +27,7 @@ using mlir::ArrayRef;
 using mlir::AtomicRMWKind;
 using mlir::Attribute;
 using mlir::BoolAttr;
+using mlir::DenseElementsAttr;
 using mlir::DictionaryAttr;
 using mlir::FloatType;
 using mlir::IndexType;

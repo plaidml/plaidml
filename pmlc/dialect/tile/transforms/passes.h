@@ -18,8 +18,9 @@ std::unique_ptr<mlir::Pass> createComputeBoundsPass();
 
 std::unique_ptr<mlir::Pass> createConstantTypesPass();
 
-std::unique_ptr<mlir::Pass> createConstantTypesPass(mlir::Type concreteFloat,
-                                                    mlir::Type concreteInt);
+std::unique_ptr<mlir::Pass>
+createConstantTypesPass(mlir::FloatType concreteFloat,
+                        mlir::IntegerType concreteInt);
 
 std::unique_ptr<mlir::Pass> createMakeProgramPass();
 
