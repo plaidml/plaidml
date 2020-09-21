@@ -552,6 +552,7 @@ class Tensor(ForeignObject):
     def set_param_value(self, buffer):
         # Changes the value of a parameter tensor (i.e. one explicitly set to a buffer value)
         # Illegal on other tensors
+        self._buffer = buffer
         ffi_call(lib.plaidml_expr_param_reset, self.__ffi_obj__, buffer.as_ptr())
 
     def __hash__(self):

@@ -183,7 +183,7 @@ def plaidml_workspace():
         strip_prefix = "OpenCL-CLHPP-2.0.12",
         build_file = clean_dep("//vendor/opencl_hpp_headers:opencl_hpp_headers.BUILD"),
         # Patch hpp headers trying to use system OpenCL header on Apple.
-        patches = ["//vendor/opencl_hpp_headers:fix_apple_headers.patch"],
+        patches = [clean_dep("//vendor/opencl_hpp_headers:fix_apple_headers.patch")],
     )
 
     http_archive(

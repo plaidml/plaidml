@@ -703,7 +703,7 @@ size_t compute_conv_rank_validating_strides(std::vector<int64_t>* strides, const
 void validate_conv_padding(const std::vector<int64_t>& manual_padding, AutoPadMode autopad_mode,
                            std::stringstream& args_log) {
   if (!manual_padding.empty() && autopad_mode != AutoPadMode::EXPLICIT) {
-    IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+    IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
     throw std::runtime_error("Autopadding and manual padding both requested for single conv operation");
   }
 }
@@ -716,7 +716,7 @@ void validate_conv_dilations_rank(size_t spatial_rank, std::vector<int64_t>* dil
       dilations->push_back(1);
     }
   } else if (dilations->size() != spatial_rank) {
-    IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+    IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
     throw std::runtime_error(
         llvm::formatv("Inconsistent spatial rank in conv op (expecting rank {0}, received {1}D dilations)",
                       spatial_rank, dilations->size()));
@@ -731,7 +731,7 @@ void validate_conv_data_dilations_rank(size_t spatial_rank, std::vector<int64_t>
       data_dilations->push_back(1);
     }
   } else if (data_dilations->size() != spatial_rank) {
-    IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+    IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
     throw std::runtime_error(
         llvm::formatv("Inconsistent spatial rank in conv op (expecting rank {0}, received {1}D data_dilations)",
                       spatial_rank, data_dilations->size()));
@@ -740,14 +740,14 @@ void validate_conv_data_dilations_rank(size_t spatial_rank, std::vector<int64_t>
 
 void validate_conv_input_layout(TensorLayout input_layout, std::stringstream& args_log) {
   if (!is_input_layout(input_layout)) {
-    IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+    IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
     throw std::runtime_error("Input tensor layout requested in conv op does not apply to convolution input tensors");
   }
 }
 
 void validate_conv_filter_layout(TensorLayout filter_layout, std::stringstream& args_log) {
   if (!is_filter_layout(filter_layout)) {
-    IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+    IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
     throw std::runtime_error("Filter tensor layout requested in conv op does not apply to convolution filter tensors");
   }
 }
@@ -757,7 +757,7 @@ void validate_conv_input_rank(size_t const spatial_rank, const Tensor& I, Tensor
   if (deriv_mode != ConvDerivMode::DATA && I.rank() - spatial_rank != nonspatial_dims(input_layout)) {
     // If we ever extend possible layouts so that I and O may have different layouts, we will
     // need to do this check in different ways depending on whether deriv_mode is DATA or not
-    IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+    IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
     throw std::runtime_error(llvm::formatv(
         "Inconsistent spatial rank in conv op (expected spatial rank {0} but input tensor has {1} dimensions, and thus "
         "{2} spatial dims). (This error can also occur if the layout of I is incorrectly specified or interpreted.)",
@@ -768,7 +768,7 @@ void validate_conv_input_rank(size_t const spatial_rank, const Tensor& I, Tensor
 void validate_conv_filter_rank(size_t spatial_rank, const Tensor& F, TensorLayout filter_layout,
                                ConvDerivMode deriv_mode, std::stringstream& args_log) {
   if (deriv_mode != ConvDerivMode::FILTER && F.rank() - spatial_rank != nonspatial_dims(filter_layout)) {
-    IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+    IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
     throw std::runtime_error(
         llvm::formatv("Inconsistent spatial rank in conv op (expected spatial rank {0} but filter tensor has {1} "
                       "dimensions, and thus {2} spatial dims). (This error can also occur if the layout of F is "
@@ -780,7 +780,7 @@ void validate_conv_filter_rank(size_t spatial_rank, const Tensor& F, TensorLayou
 void validate_conv_filter_shape_rank(size_t spatial_rank, std::vector<int64_t> filter_shape,
                                      std::stringstream& args_log) {
   if (filter_shape.size() && (filter_shape.size() != spatial_rank)) {
-    IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+    IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
     throw std::runtime_error(
         llvm::formatv("Filter shape manually specified with inconsistent rank (expected spatial rank {0} but "
                       "filter_shape has {1} dimensions)",
@@ -790,11 +790,11 @@ void validate_conv_filter_shape_rank(size_t spatial_rank, std::vector<int64_t> f
 
 void validate_conv_group_layout(TensorLayout filter_layout, GroupLayout group_layout, std::stringstream& args_log) {
   if (is_filter_layout_with_separate_groups(filter_layout) && group_layout != GroupLayout::SEPARATE) {
-    IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+    IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
     throw std::runtime_error("Filter_layout specifies separate groups but group_layout isn't SEPARATE");
   }
   if (!is_filter_layout_with_separate_groups(filter_layout) && group_layout == GroupLayout::SEPARATE) {
-    IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+    IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
     throw std::runtime_error("Filter_layout lacks separate groups but group_layout is SEPARATE");
   }
 }
@@ -803,7 +803,7 @@ void validate_conv_result_shape(size_t spatial_rank, const std::vector<int64_t>&
                                 bool infer_result_shape, std::stringstream& args_log) {
   if (result_shape.empty()) {
     if (deriv_mode != ConvDerivMode::NONE && !infer_result_shape) {
-      IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+      IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
       throw std::runtime_error(
           "Transposed/gradient convolutions require specifying the result_shape. This can be bypassed by setting "
           "infer_result_shape = true, but be warned that infered result shapes do not necessarily match the input "
@@ -811,7 +811,7 @@ void validate_conv_result_shape(size_t spatial_rank, const std::vector<int64_t>&
     }
   } else {
     if (result_shape.size() != spatial_rank) {
-      IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+      IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
       throw std::runtime_error(
           llvm::formatv("Inconsistent spatial rank in conv op (received {0} spatial dimensions based on strides "
                         "but result shape has {1} spatial dims).",
@@ -975,7 +975,7 @@ Value convolution(const Value& value) {
       O = F_or_O;
       break;
     default:
-      IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+      IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
       throw std::runtime_error("Invalid ConvDerivMode");
   }
 
@@ -1045,7 +1045,7 @@ Value convolution(const Value& value) {
       } else if (group_layout == GroupLayout::IN_C) {
         // Everything can be inferred, do nothing  // nolint(whitespace/empty_if_body)
       } else {
-        IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+        IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
         throw std::runtime_error(llvm::formatv("Unsupported group layout '{0}' used with autogroup mode DEPTHWISE",
                                                to_string(group_layout)));
       }
@@ -1054,13 +1054,13 @@ Value convolution(const Value& value) {
       if (group_layout == GroupLayout::SEPARATE || group_layout == GroupLayout::IN_K) {
         // just let G be inferred; i.e. do nothing  // nolint(whitespace/empty_if_body)
       } else {
-        IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+        IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
         throw std::runtime_error(
             llvm::formatv("Unsupported group layout '{0}' used with autogroup mode AUTO", to_string(group_layout)));
       }
       break;
     default:
-      IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+      IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
       throw std::runtime_error("Unrecognized AutoGroupMode");
   }
 
@@ -1087,7 +1087,7 @@ Value convolution(const Value& value) {
       // Later: F_CI = CI / G;
       break;
     default:
-      IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+      IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
       throw std::runtime_error("Invalid group_layout");
   }
 
@@ -1109,7 +1109,7 @@ Value convolution(const Value& value) {
         I_dims.push_back(CI);
         break;
       default:
-        IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+        IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
         throw std::runtime_error("Invalid input_layout");
     }
     I.bind_dims(I_dims);
@@ -1152,7 +1152,7 @@ Value convolution(const Value& value) {
         F_explicit_dims.push_back(F_CO);
         break;
       default:
-        IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+        IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
         throw std::runtime_error("Invalid filter_layout");
     }
     F.bind_dims(F_dims);
@@ -1181,7 +1181,7 @@ Value convolution(const Value& value) {
         O_dims.push_back(CO);
         break;
       default:
-        IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+        IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
         throw std::runtime_error("Invalid input_layout");
     }
     O.bind_dims(O_dims);
@@ -1202,7 +1202,7 @@ Value convolution(const Value& value) {
       CI = F_CI * G;
       break;
     default:
-      IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+      IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
       throw std::runtime_error("Invalid group_layout");
   }
 
@@ -1238,7 +1238,7 @@ Value convolution(const Value& value) {
       I_spatial_dims.push_back(local_input_size);
     } else {
       if (deriv_mode == ConvDerivMode::FILTER && result_shape.empty()) {
-        IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+        IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
         throw std::runtime_error(
             "Result shape inference not yet supported for filter transposed/derivative convolutions");
       }
@@ -1282,7 +1282,7 @@ Value convolution(const Value& value) {
           O_dims.push_back(CO);
           break;
         default:
-          IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+          IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
           throw std::runtime_error("Invalid input_layout");
       }
       O = Tensor{name, O_dims};
@@ -1305,7 +1305,7 @@ Value convolution(const Value& value) {
           I_dims.push_back(CI);
           break;
         default:
-          IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+          IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
           throw std::runtime_error("Invalid input_layout");
       }
       I = Tensor{name, I_dims};
@@ -1336,14 +1336,14 @@ Value convolution(const Value& value) {
           F_dims.push_back(F_CO);
           break;
         default:
-          IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+          IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
           throw std::runtime_error("Invalid filter_layout");
       }
       F = Tensor{name, F_dims};
       // F = NamedTensorOutput(name, F_dims);  // TODO: Re-enable when ready
       break;
     default:
-      IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+      IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
       throw std::runtime_error("Invalid deriv_mode");
   }
 
@@ -1373,7 +1373,7 @@ Value convolution(const Value& value) {
       }
       break;
     default:
-      IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+      IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
       throw std::runtime_error("Invalid input_layout");
   }
 
@@ -1398,7 +1398,7 @@ Value convolution(const Value& value) {
       constraints.push_back(co < CO / G);
       break;
     default:
-      IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+      IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
       throw std::runtime_error("Unrecognized group layout");
   }
   switch (filter_layout) {
@@ -1424,7 +1424,7 @@ Value convolution(const Value& value) {
       F_idxs.push_back(f_co);
       break;
     default:
-      IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+      IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
       throw std::runtime_error("Invalid filter_layout");
   }
 
@@ -1455,7 +1455,7 @@ Value convolution(const Value& value) {
       }
       break;
     default:
-      IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+      IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
       throw std::runtime_error("Invalid input_layout");
   }
 
@@ -1474,7 +1474,7 @@ Value convolution(const Value& value) {
       F.add_constraints(constraints);
       return Value{F};
     default:
-      IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+      IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
       throw std::runtime_error("Unrecognized deriv_mode");
   }
 }
@@ -1614,9 +1614,9 @@ Value explicit_padding(const Value& value) {
   // validate inputs
 
   if (lo_pads.size() != I.rank()) {
-    IVLOG(1, lo_pads.size())
-    IVLOG(1, I.rank())
-    IVLOG(1, lo_pads[0])
+    IVLOG(2, lo_pads.size())
+    IVLOG(2, I.rank())
+    IVLOG(2, lo_pads[0])
     throw std::runtime_error(
         llvm::formatv("Inconsistent shapes in explicit_padding op (received an input tensor with {0} dims, "
                       "but received lower padding for {1} dims.)",
@@ -1656,7 +1656,7 @@ Value explicit_padding(const Value& value) {
 
   switch (mode) {
     case PadMode::CONSTANT: {
-      IVLOG(1, "Constant padding requested");
+      IVLOG(2, "Constant padding requested");
 
       auto padval = args[4].as_tensor();
       I = I - padval;
@@ -2658,7 +2658,7 @@ Value spatial_padding(const Value& value) {
 
   switch (data_layout) {
     case TensorLayout::GKCX: {
-      IVLOG(1, "Spatial padding requested for tensor with kernel-style layout.");
+      IVLOG(2, "Spatial padding requested for tensor with kernel-style layout.");
       // Initialize dims & indexes
       TensorDim G, K, C;
       TensorIndex g("g");
@@ -2696,7 +2696,7 @@ Value spatial_padding(const Value& value) {
       }
     } break;
     case TensorLayout::KCX: {
-      IVLOG(1, "Spatial padding requested for tensor with kernel-style layout.");
+      IVLOG(2, "Spatial padding requested for tensor with kernel-style layout.");
       // Initialize dims & indexes
       TensorDim K, C;
       TensorIndex k("k");
@@ -2791,7 +2791,7 @@ Value spatial_padding(const Value& value) {
       O_idxs.push_back(c);
     } break;
     case TensorLayout::XCK: {
-      IVLOG(1, "Spatial padding requested for tensor with kernel-style layout.");
+      IVLOG(2, "Spatial padding requested for tensor with kernel-style layout.");
       TensorDim C, K;
       TensorIndex c("c");
       TensorIndex k("k");
@@ -2823,7 +2823,7 @@ Value spatial_padding(const Value& value) {
       O_idxs.push_back(k);
     } break;
     case TensorLayout::XGCK: {
-      IVLOG(1, "Spatial padding requested for tensor with kernel-style layout.");
+      IVLOG(2, "Spatial padding requested for tensor with kernel-style layout.");
       TensorDim G, C, K;
       TensorIndex g("g");
       TensorIndex c("c");

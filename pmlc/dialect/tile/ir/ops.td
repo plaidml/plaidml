@@ -129,7 +129,7 @@ def ScatterOp : SpecialOp<"scatter">, HasCanonicalizer {
   let summary = "special scatter operation";
   let arguments = (ins
     RankedTensorOf<[AnyScalar]>:$tensor,
-    RankedTensorOf<[Index]>:$dims,
+    RankedTensorOf<[AnyInteger]>:$dims,
     RankedTensorOf<[AnyScalar]>:$other);
   let results = (outs RankedTensorOf<[AnyScalar]>:$result);
 }
