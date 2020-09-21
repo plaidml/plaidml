@@ -140,6 +140,7 @@ genrule(
     srcs = [],
     outs = ["include/llvm/Support/VCSRevision.h"],
     cmd = "echo '' > \"$@\"",
+    cmd_ps = "echo '' > \"$@\"",  # (PlaidML)
 )
 
 # Rules that apply the LLVM tblgen tool.

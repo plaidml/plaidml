@@ -3015,7 +3015,6 @@ cc_library(
     deps = [
         ":AllPassesAndDialectsNoRegistration",
     ],
-    alwayslink = 1,  ### PlaidML-change
 )
 
 cc_binary(
@@ -3078,7 +3077,7 @@ cc_library(
         "include/mlir/ExecutionEngine/CRunnerUtils.h",
     ],
     includes = ["include"],
-    local_defines = ["mlir_c_runner_utils_EXPORTS"],  ### PlaidML-change - Windows build
+    local_defines = ["mlir_c_runner_utils_EXPORTS"],  # (PlaidML)
 )
 
 cc_library(
@@ -3090,9 +3089,11 @@ cc_library(
         "include/mlir/ExecutionEngine/RunnerUtils.h",
     ],
     includes = ["include"],
+    local_defines = ["mlir_runner_utils_EXPORTS"],  # (PlaidML)
     deps = [
         ":mlir_c_runner_utils",
     ],
+    alwayslink = 1,  # (PlaidML)
 )
 
 cc_binary(
@@ -3107,7 +3108,8 @@ cc_binary(
     ],
 )
 
-# cc_binary( ###PlaidML-change Removed
+# (PlaidML)
+# cc_binary(
 #     name = "tools/libcuda-runtime-wrappers.so",
 #     srcs = ["tools/mlir-cuda-runner/cuda-runtime-wrappers.cpp"],
 #     linkshared = True,
@@ -3120,6 +3122,7 @@ cc_binary(
 #     ],
 # )
 
+# (PlaidML)
 # cc_library(
 #     name = "VulkanRuntime",
 #     srcs = [
@@ -3141,6 +3144,7 @@ cc_binary(
 #     ],
 # )
 
+# (PlaidML)
 # cc_binary(
 #     name = "tools/libvulkan-runtime-wrappers.so",
 #     srcs = ["tools/mlir-vulkan-runner/vulkan-runtime-wrappers.cpp"],
@@ -3151,6 +3155,7 @@ cc_binary(
 #     ],
 # )
 
+# (PlaidML)
 # cc_binary(
 #     name = "mlir-cuda-runner",
 #     srcs = ["tools/mlir-cuda-runner/mlir-cuda-runner.cpp"],
@@ -3179,6 +3184,7 @@ cc_binary(
 #     ],
 # )
 
+# (PlaidML)
 # cc_binary(
 #     name = "mlir-vulkan-runner",
 #     srcs = ["tools/mlir-vulkan-runner/mlir-vulkan-runner.cpp"],
