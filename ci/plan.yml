@@ -211,6 +211,7 @@ SUITES:
         precision: high
         skip_platforms:
           - pml-llvm-cpu
+          - pml-vk-gen
           - tf-dnnl-cpu
         perf_threshold: 0.7
       inception_v3:
