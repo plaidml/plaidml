@@ -19,6 +19,7 @@ dependencies:
       - breathe
       - click
       - defaultlist
+      - dm-sonnet<2.0.0
       - drawSvg
       - graphviz
       - humanize

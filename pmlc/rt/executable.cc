@@ -2,6 +2,7 @@
 
 #include "pmlc/rt/executable.h"
 
+#include <chrono>
 #include <fstream>
 #include <string>
 #include <utility>
@@ -260,10 +261,18 @@ struct OrcJITEngineImpl : EngineImpl {
 
     SymbolMap symbols;
     auto &session = jit->getExecutionSession();
-    for (const auto &kvp : getSymbolMap()) {
-      auto addr = llvm::pointerToJITTargetAddress(kvp.second);
+
+    auto addSymbol = [&](StringRef name, void *ptr) {
+      auto addr = llvm::pointerToJITTargetAddress(ptr);
       auto symbol = llvm::JITEvaluatedSymbol(addr, llvm::JITSymbolFlags::None);
-      symbols.insert(std::make_pair(session.intern(kvp.first()), symbol));
+      symbols.insert(std::make_pair(session.intern(name), symbol));
+    };
+
+    for (const auto &kvp : SymbolRegistry::instance()->symbols) {
+      addSymbol(kvp.first(), kvp.second);
+#ifdef __APPLE__
+      addSymbol(llvm::formatv("_{0}", kvp.first()).str(), kvp.second);
+#endif
     }
 
     auto &mainJitDylib = jit->getMainJITDylib();
@@ -292,6 +301,23 @@ struct OrcJITEngineImpl : EngineImpl {
   }
 
   std::unique_ptr<llvm::orc::LLJIT> jit;
+};
+
+struct StopWatch {
+  using fp_milliseconds =
+      std::chrono::duration<double, std::chrono::milliseconds::period>;
+
+  void start() { startTime = std::chrono::steady_clock::now(); }
+
+  void stop() { stopTime = std::chrono::steady_clock::now(); }
+
+  double delta_ms() {
+    return std::chrono::duration_cast<fp_milliseconds>(stopTime - startTime)
+        .count();
+  }
+
+  std::chrono::steady_clock::time_point startTime;
+  std::chrono::steady_clock::time_point stopTime;
 };
 
 class ExecutableImpl final : public Executable {
@@ -350,7 +376,15 @@ public:
 
   void invoke() final {
     ScopedCurrentDevice cdev(device);
+    StopWatch stopWatch;
+    if (VLOG_IS_ON(1)) {
+      stopWatch.start();
+    }
     jitEntry(ptrs.data());
+    if (VLOG_IS_ON(1)) {
+      stopWatch.stop();
+      IVLOG(1, "Execution time: " << stopWatch.delta_ms() << "ms");
+    }
   }
 
 private:

@@ -1505,5 +1505,43 @@ TEST_F(CppEdsl, Tan) {
   checkProgram(program, {{S, input}}, {{O, expected}});
 }
 
+TEST_F(CppEdsl, Scatter1D) {
+  auto I = Placeholder(DType::INT32, {4});
+  auto U = Placeholder(DType::FLOAT32, {4});
+  auto S = Placeholder(DType::INT32, {8});
+  auto O = scatter(U, I, S);
+  auto program = makeProgram("scatter", {O});
+
+  std::vector<int32_t> indices = {4, 3, 1, 7};
+  std::vector<float> updates = {9, 10, 11, 12};
+  std::vector<int32_t> shape = {8};
+  std::vector<float> expected = {0, 11, 0, 10, 9, 0, 0, 12};
+  checkProgram(program, {{I, indices}, {U, updates}, {S, shape}}, {{O, expected}});
+}
+
+TEST_F(CppEdsl, Scatter3D) {
+  auto I = Placeholder(DType::INT32, {2});
+  auto U = Placeholder(DType::FLOAT32, {2, 4, 4});
+  auto S = Placeholder(DType::INT32, {4, 4, 4});
+  auto O = scatter(U, I, S);
+  auto program = makeProgram("scatter", {O});
+
+  std::vector<int32_t> indices = {0, 2};
+  std::vector<float> updates = {
+      5, 5, 5, 5, 6, 6, 6, 6,  //
+      7, 7, 7, 7, 8, 8, 8, 8,  //
+      5, 5, 5, 5, 6, 6, 6, 6,  //
+      7, 7, 7, 7, 8, 8, 8, 8   //
+  };
+  std::vector<int32_t> shape = {4, 4, 4};
+  std::vector<float> expected = {
+      5, 5, 5, 5, 6, 6, 6, 6, 7, 7, 7, 7, 8, 8, 8, 8,  //
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  //
+      5, 5, 5, 5, 6, 6, 6, 6, 7, 7, 7, 7, 8, 8, 8, 8,  //
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0   //
+  };
+  checkProgram(program, {{I, indices}, {U, updates}, {S, shape}}, {{O, expected}});
+}
+
 }  // namespace
 }  // namespace plaidml::edsl

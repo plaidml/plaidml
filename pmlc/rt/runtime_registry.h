@@ -17,56 +17,63 @@ namespace pmlc::rt {
 
 // Factory is used to instantiate a Runtime.
 //
-// Factory is invoked on-demand (typically well after process initialization) to
+// A Factory is typically a small, stateless function, safely instantiated at
+// static initialization time to defer Runtime instantiation to a time after
+// static initialization is complete.
+//
+// Typical runtime implementations have no need to explicitly use Factory.  To
+// register a DefaultConstructible Runtime at static initialization time, the
+// runtime implementation should use RuntimeRegistration, which will
+// automatically create and register a Factory.
+//
+// (Alternatively, if the Runtime is instantiated explicitly after static
+// initialization time, the caller may use bindRuntime() to add the runtime to
+// the system's global runtime map.)
+//
+// Factory is invoked on-demand (typically well after static initialization) to
 // instantiate a runtime, either as a specific request by the PlaidML caller or
 // for general device enumeration.  The registry is responsible for arranging
-// runtimes to be instantiated exactly once; Factory implementations do not need
-// to memoize their results.
+// runtimes to be instantiated exactly once; Factory implementations should not
+// memoize their results.
 using Factory = std::function<std::shared_ptr<Runtime>()>;
 
-// Loaders instantiate Factories.
+// Creates a global registration for a factory.
 //
-// PlaidML Loaders are (typically) simple, stateless functions, automatically
-// registered via LoaderRegistration when their containing library is loaded
-// into the process.
+// This function does not check the ID for conflicts with other runtimes;
+// duplicate checking will occur when initRuntimes() is called.  The caller is
+// responsible for arranging for initRuntimes() to be called after this call
+// returns, in order to actually instantiate the Runtime.
 //
-// Loaders are invoked on-demand (typically well after process initialization)
-// to determine the runtime factories they're able to provide.
-using Loader = std::function<std::unordered_map<std::string, Factory>()>;
+// N.B. This function is NOT synchronized.  It is the caller's responsiblity to
+// ensure that other components are not concurrently accessing the system global
+// runtime map or registering other Factory instances.
+void registerFactory(llvm::StringRef id, Factory factory);
 
-namespace details {
-
-// Creates a global registration for a loader.
-void registerLoader(llvm::StringRef id, Loader loader);
-
-} // namespace details
-
-// makeStaticLoader is a template function returning a Loader that instantiates
-// an instance of the supplied concrete Runtime class.  The Runtime class must
-// be DefaultConstructible.
+// makeStaticFactory is a template function returning a Factory that
+// instantiates an instance of the supplied concrete Runtime class.  The Runtime
+// class must be DefaultConstructible.
 template <class R>
-Loader makeStaticLoader(llvm::StringRef id) {
-  return Loader{[savedId = std::string{id}]() {
-    return std::unordered_map<std::string, Factory>{
-        {savedId, Factory{[]() { return std::make_shared<R>(); }}}};
-  }};
+Factory makeStaticFactory() {
+  return Factory{[]() { return std::make_shared<R>(); }};
 }
 
-// LoaderRegistration is used to register a PlaidML Loader at image load time.
-//
-// For example:
-//
-//   LoaderRegistration reg{makeStaticLoader<OpenCLLoader>("opencl")};
-//
-struct LoaderRegistration {
-  LoaderRegistration(llvm::StringRef id, Loader loader) {
-    details::registerLoader(id, std::move(loader));
+// makeConstantFactory returns a Factory that always returns the given Runtime.
+inline Factory makeConstantFactory(std::shared_ptr<Runtime> runtime) {
+  return Factory{[runtime = std::move(runtime)]() { return runtime; }};
+}
+
+// FactoryRegistration is used to register a PlaidML Runtime Factory at static
+// initialization time. Components whose Runtimes are DefaultConstructible are
+// encouraged to use RuntimeRegistration instead.
+struct FactoryRegistration {
+  FactoryRegistration(llvm::StringRef id, Factory factory) {
+    registerFactory(id, std::move(factory));
   }
 };
 
-// RuntimeRegistration is used to register a PlaidML Runtime class at image load
-// time.  This is used by runtimes that are linked into the image (vs. being
-// dynamically discovered and loaded).
+// RuntimeRegistration is used to register a PlaidML Runtime class at static
+// initialization time.  This is used by runtimes that are linked into the image
+// (vs. being dynamically discovered and loaded).
 //
 // For example:
 //
@@ -75,8 +82,33 @@ struct LoaderRegistration {
 template <class R>
 struct RuntimeRegistration {
   explicit RuntimeRegistration(llvm::StringRef id) {
-    details::registerLoader(id, makeStaticLoader<R>(id));
+    registerFactory(id, makeStaticFactory<R>());
+  }
+
+  RuntimeRegistration(llvm::StringRef id, std::shared_ptr<R> runtime) {
+    registerFactory(
+        id, makeConstantFactory(std::shared_ptr<Runtime>{std::move(runtime)}));
   }
 };
+
+// registerRuntime directly binds the indicated runtime ID to the supplied
+// runtime in the system's global runtime map.  This will throw an exception if
+// the new runtime's ID conflicts with an existing ID.
+//
+// N.B. This function is NOT synchronized.  It is the caller's responsibility to
+// ensure that other components are not concurrently accessing the system global
+// runtime map -- e.g. looking up device IDs or compiling programs to produce
+// executables.
+void registerRuntime(llvm::StringRef id, std::shared_ptr<Runtime> runtime);
+
+// initRuntimes processes registered factories and adds them to the system's
+// global runtime map.
+//
+// N.B. This function is NOT synchronized.  It is the caller's responsibility to
+// ensure that other components are not concurrently accessing the system global
+// runtime map
+// -- e.g. looking up device IDs or compiling programs to produce
+// executables.
+void initRuntimes();
 
 } // namespace pmlc::rt

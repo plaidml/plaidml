@@ -12,7 +12,7 @@
 #include "pmlc/rt/symbol_registry.h"
 
 extern "C" void plaidml_rt_trace(const char *msg) {
-  using clock = std::chrono::high_resolution_clock;
+  using clock = std::chrono::steady_clock;
   static bool isFirst = true;
   static std::chrono::time_point<clock> lastTime = clock::now();
   auto now = clock::now();

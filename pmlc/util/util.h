@@ -24,26 +24,6 @@ void UpdateFuncOpType(mlir::Operation *op);
 
 llvm::StringRef getOpName(const mlir::OperationName &name);
 
-template <typename Filter>
-std::vector<mlir::AbstractOperation *> getAllOpsWith(mlir::MLIRContext *context,
-                                                     Filter filter) {
-  std::vector<mlir::AbstractOperation *> ops;
-  for (auto *op : context->getRegisteredOperations()) {
-    if (filter(op)) {
-      ops.emplace_back(op);
-    }
-  }
-  return ops;
-}
-
-template <typename Interface>
-std::vector<mlir::AbstractOperation *>
-getAllOpsWithInterface(mlir::MLIRContext *context) {
-  return getAllOpsWith(context, [](mlir::AbstractOperation *op) {
-    return op->getInterface<Interface>();
-  });
-}
-
 template <typename Set>
 std::string getUniqueName(Set *names, llvm::StringRef name) {
   auto next = name.str();
@@ -65,6 +45,34 @@ bool hasTag(mlir::Operation *op, llvm::StringRef tag);
 
 // Set tags in op
 void setTags(mlir::Operation *op, llvm::ArrayRef<llvm::StringRef> tags);
+
+// A diagnostic tool for searching for problematic transformations in passes.
+// Example usage:
+//   DiagnosticCounter counter;
+//   for (auto op : func.getOps<SomeOp>()) {
+//     auto result = counter.next();
+//     if (result == DiagnosticCounter::Result::Break)
+//       continue;
+//     if (result == DiagnosticCounter::Result::Match)
+//       IVLOG(0, "match: " << debugString(*fuseA));
+//     // Do transformation as normal
+//   }
+// Use the PLAIDML_COUNTER environment variable to define the threshold where
+// the counter will return Break. When the counter reaches the threshold
+// excatly, Match is returned.
+struct DiagnosticCounter {
+  enum Result {
+    Break,
+    Continue,
+    Match,
+  };
+
+  DiagnosticCounter();
+  Result next();
+
+  size_t counter;
+  size_t threshold;
+};
 
 } // namespace pmlc::util
 

@@ -4,6 +4,7 @@
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/Optional.h"
 
 #include "pmlc/dialect/pxa/analysis/affine_expr.h"
@@ -206,6 +207,12 @@ struct RelativeAccessPattern {
 
   // Merge another RelativeAccesPattern together by using a union.
   LogicalResult unionMerge(const RelativeAccessPattern &rhs);
+
+  // Given a full set of outer indexes (in case some of them are unused in the
+  // various stride-infos), return true if two distinct outer loop interations
+  // can access the same memory element of the tensor.  i.e. do any outer loops
+  // interations ever alias with other outer loop iterations.
+  bool outerAlias(mlir::DenseSet<mlir::BlockArgument> allOuter) const;
 };
 
 // Compute relative access, fail if non-strided (or operation not supported)
@@ -230,5 +237,9 @@ struct StrideArray {
 // Compute the StrideArray for a given AffineMap. The map must have a single
 // AffineExpr result and this result must be purely affine.
 mlir::Optional<StrideArray> computeStrideArray(mlir::AffineMap map);
+
+bool hasPerfectAliasing(
+    const RelativeAccessPattern &aRap, RelativeAccessPattern bRap,
+    const mlir::DenseMap<mlir::BlockArgument, mlir::BlockArgument> &bToA);
 
 } // namespace pmlc::dialect::pxa
