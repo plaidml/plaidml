@@ -92,6 +92,7 @@ struct TileBuilder::Impl {
   }
 
   std::unique_ptr<MLIRContext> createContext() {
+    mlir::enableGlobalDialectRegistry(true);
     mlir::registerDialect<TileDialect>();
     mlir::registerDialect<eltwise::EltwiseDialect>();
     mlir::registerDialect<mlir::StandardOpsDialect>();
