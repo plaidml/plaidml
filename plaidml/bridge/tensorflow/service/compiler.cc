@@ -208,7 +208,7 @@ StatusOr<std::unique_ptr<edsl::Program>> PlaidMLCompiler::ProgramFromHloModule(s
           auto lshape = edsl::LogicalShape(type, dims);
           const Literal& literal = instruction->literal();
           auto buf = makeBuffer(tshape, literal.untyped_data());
-          auto op = Constant(lshape, buf, meta_name);
+          auto op = edsl::Constant(lshape, buf, meta_name);
           instr_map.insert(std::make_pair(cur_instr_id, op));
           break;
         }
@@ -466,7 +466,7 @@ StatusOr<std::unique_ptr<edsl::Program>> PlaidMLCompiler::ProgramFromHloModule(s
           auto tshape = ::plaidml::TensorShape(type, dims);
           auto lshape = edsl::LogicalShape(type, dims);
           auto buf = makeBuffer(tshape, x.data());
-          auto op = Constant(lshape, buf);
+          auto op = edsl::Constant(lshape, buf);
           instr_map.insert(std::make_pair(cur_instr_id, op));
           break;
         }
@@ -570,8 +570,8 @@ StatusOr<std::unique_ptr<edsl::Program>> PlaidMLCompiler::ProgramFromHloModule(s
           break;
         }
         case HloOpcode::kParameter: {
-          // Tensor inputs, create a placeholder
-          auto op = edsl::Placeholder(type, dims);
+          // Tensor inputs, create an Input
+          auto op = edsl::Input(type, dims);
           instr_map.insert(std::make_pair(cur_instr_id, op));
           break;
         }

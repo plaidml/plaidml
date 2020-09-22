@@ -13,15 +13,15 @@ plaidml_cc_library(
         "prng.cc",
         "runtime.cc",
         "runtime_registry.cc",
-        "symbol_registry.cc",
         "xsmm.cc",
     ],
     hdrs = [
         "device_id.h",
         "executable.h",
-        "symbol_registry.h",
+        "registry.h",
         "runtime.h",
         "runtime_registry.h",
+        "symbol_registry.h",
     ],
     visibility = ["//visibility:public"],
     deps = [
@@ -37,12 +37,12 @@ plaidml_cc_library(
 
 plaidml_cc_test(
     name = "device_id_test",
+    size = "small",
     srcs = [
         "device_id_test.cc",
-        "internal.h"
+        "internal.h",
     ],
     deps = [
         ":rt",
     ],
-    size = "small",
 )

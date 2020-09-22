@@ -24,6 +24,11 @@ std::unique_ptr<mlir::Pass> createXSMMLoweringPass();
 
 std::unique_ptr<mlir::Pass> createXSMMStencilPass();
 
+void declareConstantLinkingFunctions(mlir::ModuleOp module);
+
+void populateConstantLinkingPatterns(mlir::LLVMTypeConverter &converter,
+                                     mlir::OwningRewritePatternList &patterns);
+
 void populatePXAGemmToXSMMConversionPatterns(
     mlir::OwningRewritePatternList &patterns, mlir::MLIRContext *ctx);
 

@@ -9,9 +9,13 @@
 
 #include "mlir/ExecutionEngine/RunnerUtils.h"
 
+#include "pmlc/rt/registry.h"
 #include "pmlc/rt/symbol_registry.h"
+#include "pmlc/util/logging.h"
 
-extern "C" void plaidml_rt_trace(const char *msg) {
+extern "C" {
+
+void plaidml_rt_trace(const char *msg) {
   using clock = std::chrono::steady_clock;
   static bool isFirst = true;
   static std::chrono::time_point<clock> lastTime = clock::now();
@@ -36,6 +40,15 @@ half_float::half f2h(float n) {
   return half_float::half_cast<half_float::half>(n);
 }
 
+void *plaidml_rt_get_constant_ptr(const char *symbol) {
+  IVLOG(1, "Resolve: " << symbol);
+  auto buffer = pmlc::rt::ConstantRegistry::instance()->resolve(symbol);
+  auto view = buffer->MapCurrent();
+  return view->data();
+}
+
+} // extern "C"
+
 namespace {
 struct Registration {
   Registration() {
@@ -56,6 +69,8 @@ struct Registration {
     registerSymbol("_mlir_ciface_print_memref_f32",
                    reinterpret_cast<void *>(_mlir_ciface_print_memref_f32));
 
+    registerSymbol("plaidml_rt_get_constant_ptr",
+                   reinterpret_cast<void *>(plaidml_rt_get_constant_ptr));
     registerSymbol("plaidml_rt_trace",
                    reinterpret_cast<void *>(plaidml_rt_trace));
   }

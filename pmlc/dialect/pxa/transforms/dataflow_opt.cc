@@ -62,8 +62,8 @@ struct MemRefDataFlowOptPass
 
       MemRefAccess srcAccess(reduceOp);
       MemRefAccess dstAccess(loadOp);
-      IVLOG(1, "src: " << debugString(*reduceOp));
-      IVLOG(1, "dst: " << debugString(*loadOp));
+      IVLOG(3, "src: " << debugString(*reduceOp));
+      IVLOG(3, "dst: " << debugString(*loadOp));
       if (srcAccess != dstAccess)
         return;
 

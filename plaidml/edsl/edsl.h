@@ -897,7 +897,7 @@ inline Tensor Constant(                //
   return Constant(shape, buf, name);
 }
 
-inline Tensor Placeholder(      //
+inline Tensor Input(            //
     const LogicalShape& shape,  //
     const std::string& name = "") {
   auto ptr = ffi::call<plaidml_expr*>(  //
@@ -907,12 +907,12 @@ inline Tensor Placeholder(      //
   return Tensor(ptr);
 }
 
-inline Tensor Placeholder(             //
+inline Tensor Input(                   //
     DType dtype,                       //
     const std::vector<int64_t>& dims,  //
     const std::string& name = "") {
   LogicalShape shape(dtype, dims);
-  return Placeholder(shape, name);
+  return Input(shape, name);
 }
 
 inline plaidml_deriv TensorDerivThunk() {

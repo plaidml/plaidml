@@ -24,24 +24,20 @@ def ConstantOp : TileOpWithPPV<"constant", [ConstantLike, NoSideEffect]>, HasFol
   }];
 }
 
-// def ConstantTensorOp : TileOp<"constant_tensor", [ConstantLike, NoSideEffect]>, HasFolder {
-//   let summary = "constant tensor operation";
-//   let arguments = (ins IndexAttr:$value);
-//   let results = (outs Index:$result);
-// 
-//   let builders = [OpBuilder<
-//     "OpBuilder &builder, OperationState& result, int64_t value", [{
-//       auto indexType = builder.getIndexType();
-//       result.addAttribute("value", builder.getIntegerAttr(indexType, value));
-//       result.addTypes(indexType);
-//     }]
-//   >];
-// 
-//   let assemblyFormat = [{
-//     `(` $tensor `)` attr-dict `:` functional-type($tensor, results)
-//   }];
-// 
-// }
+def ConstantTensorOp : TileOp<"constant_tensor", [NoSideEffect]> {
+  let summary = "constant tensor operation";
+  let arguments = (ins FlatSymbolRefAttr:$symbol);
+  let results = (outs RankedTensorOf<[AnyScalar]>:$result);
+
+  let builders = [OpBuilder<
+    "OpBuilder &builder, OperationState &result, StringRef symbol,"
+    "Type resultType", [{
+      result.addAttribute("symbol", builder.getSymbolRefAttr(symbol));
+      result.addTypes(resultType);
+  }]>];
+
+  let assemblyFormat = "$symbol attr-dict `:` type($result)";
+}
 
 def ContractionOp : TileOpWithPPV<"contract", [NoSideEffect]> {
   let arguments = (ins

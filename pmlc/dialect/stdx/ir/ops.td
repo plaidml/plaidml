@@ -166,4 +166,20 @@ def SubgroupBlockWriteINTELOp : StdX_Op<"subgroup_block_write_intel",
   }];
 }
 
+def ConstantMemRefOp : StdX_Op<"constant_memref", [NoSideEffect]> {
+  let summary = "constant memref operation";
+  let arguments = (ins FlatSymbolRefAttr:$symbol);
+  let results = (outs AnyMemRef:$result);
+
+  let builders = [OpBuilder<
+    "OpBuilder &builder, OperationState &result, StringRef symbol,"
+    "Type resultType", [{
+      result.addAttribute("symbol", builder.getSymbolRefAttr(symbol));
+      result.addTypes(resultType);
+  }]>];
+
+  let assemblyFormat = "$symbol attr-dict `:` type($result)";
+  let verifier = ?;
+}
+
 #endif // __PML_STDX_OPS__

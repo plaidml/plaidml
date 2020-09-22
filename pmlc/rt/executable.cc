@@ -268,7 +268,7 @@ struct OrcJITEngineImpl : EngineImpl {
       symbols.insert(std::make_pair(session.intern(name), symbol));
     };
 
-    for (const auto &kvp : SymbolRegistry::instance()->symbols) {
+    for (const auto &kvp : SymbolRegistry::instance()->map) {
       addSymbol(kvp.first(), kvp.second);
 #ifdef __APPLE__
       addSymbol(llvm::formatv("_{0}", kvp.first()).str(), kvp.second);
@@ -333,6 +333,12 @@ public:
       initializeLLVMPasses();
       llvm::sys::DynamicLibrary::LoadLibraryPermanently(nullptr);
     });
+
+    ConstantRegistry::instance()->map.clear();
+    for (const auto &kvp : program->constantBuffers) {
+      IVLOG(1, "Register: " << kvp.first());
+      ConstantRegistry::instance()->registerItem(kvp.first(), kvp.second);
+    }
 
     switch (kind) {
     case EngineKind::MCJIT:

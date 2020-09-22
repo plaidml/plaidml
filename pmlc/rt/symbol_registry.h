@@ -2,21 +2,14 @@
 
 #pragma once
 
-#include "llvm/ADT/StringMap.h"
-#include "llvm/ADT/StringRef.h"
+#include "pmlc/rt/registry.h"
 
 namespace pmlc::rt {
 
-struct SymbolRegistry {
-  static SymbolRegistry *instance();
-  void registerSymbol(llvm::StringRef symbol, void *ptr);
-  void *resolve(llvm::StringRef symbol);
-
-  llvm::StringMap<void *> symbols;
-};
+using SymbolRegistry = Registry<void *>;
 
 inline void registerSymbol(llvm::StringRef symbol, void *ptr) {
-  SymbolRegistry::instance()->registerSymbol(symbol, ptr);
+  SymbolRegistry::instance()->registerItem(symbol, ptr);
 }
 
 inline void *resolveSymbol(llvm::StringRef symbol) {

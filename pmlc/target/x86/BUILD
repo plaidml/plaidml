@@ -31,6 +31,7 @@ gentbl(
 plaidml_cc_library(
     name = "lib",
     srcs = [
+        "constant_linking.cc",
         "heatmap.h",
         "heatmap_impl.cc",
         "pass_detail.h",

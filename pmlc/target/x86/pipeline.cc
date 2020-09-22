@@ -71,11 +71,14 @@ struct ConvertStandardToLLVMPass
     LLVMTypeConverter typeConverter(context, options);
 
     OwningRewritePatternList patterns;
+    populateConstantLinkingPatterns(typeConverter, patterns);
     populateExpandTanhPattern(patterns, context);
     populateXSMMToLLVMConversionPatterns(typeConverter, patterns);
     populateStdToLLVMConversionPatterns(typeConverter, patterns);
     conversion::stdx_to_llvm::populateStdXToLLVMConversionPatterns(
         typeConverter, patterns);
+
+    declareConstantLinkingFunctions(module);
 
     LLVMConversionTarget target(*context);
     if (failed(applyPartialConversion(module, target, patterns))) {

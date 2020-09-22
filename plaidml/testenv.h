@@ -28,24 +28,36 @@ using MultiBuffer = std::variant<  //
 
 using TensorBuffers = std::map<TensorRef, MultiBuffer>;
 
-class TestFixture : public ::testing::Test {
- protected:
-  template <typename T>
-  void compareElements(T a, T b) {
-    EXPECT_EQ(a, b);
-  }
+// template <typename T, typename U>
+// bool compareElement(T a, U b) {
+//   return a == b;
+// }
 
-  void compareElements(float a, float b) { EXPECT_NEAR(a, b, (fabs(a) + fabs(b)) / 10000.0); }
-  void compareElements(double a, double b) { EXPECT_NEAR(a, b, (fabs(a) + fabs(b)) / 10000.0); }
+// void compareElements(float a, float b) { EXPECT_NEAR(a, b, (fabs(a) + fabs(b)) / 10000.0); }
+// void compareElements(double a, double b) { EXPECT_NEAR(a, b, (fabs(a) + fabs(b)) / 10000.0); }
+
+// MATCHER(NearlyEq, "") { return compareElement(std::get<0>(arg), std::get<1>(arg)); }
+
+class TestFixture : public testing::Test {
+ protected:
+  // template <typename T>
+  // void compareElements(T a, T b) {
+  //   EXPECT_EQ(a, b);
+  // }
+
+  // void compareElements(float a, float b) { EXPECT_NEAR(a, b, (fabs(a) + fabs(b)) / 10000.0); }
+  // void compareElements(double a, double b) { EXPECT_NEAR(a, b, (fabs(a) + fabs(b)) / 10000.0); }
 
   template <typename T>
   void compareBuffers(plaidml::View view, const std::vector<T>& expected) {
     ASSERT_THAT(view.size(), expected.size() * sizeof(expected[0]));
     auto data = reinterpret_cast<T*>(view.data());
     std::vector<T> actual(data, data + expected.size());
-    for (size_t i = 0; i < actual.size(); i++) {
-      compareElements(actual[i], expected[i]);
-    }
+    EXPECT_THAT(actual, testing::ContainerEq(expected));
+    // EXPECT_THAT(actual, testing::Pointwise(NearlyEq(), expected));
+    // for (size_t i = 0; i < actual.size(); i++) {
+    //   compareElements(actual[i], expected[i]);
+    // }
   }
 
   void checkProgram(                //

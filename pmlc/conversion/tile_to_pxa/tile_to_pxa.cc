@@ -35,6 +35,7 @@ using namespace mlir; // NOLINT
 using dialect::tile::AggregationKind;
 using dialect::tile::CombinationKind;
 using dialect::tile::ConstantOp;
+using dialect::tile::ConstantTensorOp;
 using dialect::tile::ContractionOp;
 using dialect::tile::ContractionOpAdaptor;
 using dialect::tile::GatherOp;
@@ -357,7 +358,6 @@ struct StdOp {
   Value create(ConversionPatternRewriter &rewriter, Location loc,
                Type resultType, ArrayRef<Value> operands,
                ArrayRef<Type> types) {
-    IVLOG(1, "StdOp");
     SmallVector<Value, 2> promoted;
     promoteTypes(rewriter, loc, operands, types, &promoted);
     auto attrs = ArrayRef<NamedAttribute>{};
@@ -566,21 +566,13 @@ static Value
 buildBroadcastLoad(OpBuilder &builder, Location loc, Value operand,
                    unsigned outRank,
                    Optional<PaddingInfo> maybePadding = llvm::None) {
-  IVLOG(1, "buildBroadcastLoad: " << debugString(operand));
   auto body = builder.getBlock();
-  Attribute attr;
   // Handle constant values
-  if (matchPattern(operand, m_Constant(&attr))) {
-    IVLOG(1, "  constant");
-    if (attr.isa<ElementsAttr>()) {
-      IVLOG(1, "  attr: " << debugString(attr));
-      auto idxs = buildBroadcastIndices(builder, loc, body, operand, outRank);
-      return builder.create<ExtractElementOp>(loc, operand, idxs);
-    }
+  if (matchPattern(operand, m_Constant())) {
     // This is a scalar constant value.
     return operand;
   }
-  // handle broadcasts
+  // Handle broadcasts
   auto idxs = buildBroadcastIndices(builder, loc, body, operand, outRank);
   auto loadOp = builder.create<pxa::PxaLoadOp>(loc, operand, idxs);
   if (maybePadding)
@@ -1317,31 +1309,17 @@ struct TraceOpConversion : public OpConversionPattern<TraceOp> {
   }
 };
 
-struct StdConstantOpConversion : public OpConversionPattern<mlir::ConstantOp> {
-  using OpConversionPattern<mlir::ConstantOp>::OpConversionPattern;
+struct ConstantTensorOpConversion
+    : public OpConversionPattern<ConstantTensorOp> {
+  using OpConversionPattern<ConstantTensorOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(mlir::ConstantOp op, ArrayRef<Value> operands,
+  matchAndRewrite(ConstantTensorOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
-    IVLOG(1, "StdConstantOpConversion");
     TypeConverter typeConverter;
-    auto type = op.getType().dyn_cast<RankedTensorType>();
-    if (!type) {
-      return failure();
-    }
-    IVLOG(1, "  original type: " << debugString(type));
-    auto elementType = typeConverter.convertType(type.getElementType());
-    auto resultType = RankedTensorType::get(type.getShape(), elementType);
-    IVLOG(1, "  result type: " << debugString(resultType));
-    auto value = op.getValue();
-    auto elts = value.dyn_cast<DenseElementsAttr>();
-    if (!elts) {
-      op.emitError(
-          "DenseElementsAttr is the only support attribute type for value");
-      return failure();
-    }
-    auto newElts = elts.reshape(resultType);
-    rewriter.replaceOpWithNewOp<mlir::ConstantOp>(op, resultType, newElts);
+    auto resultType = typeConverter.convertType(op.getResult().getType());
+    rewriter.replaceOpWithNewOp<stdx::ConstantMemRefOp>(op, op.symbol(),
+                                                        resultType);
     return success();
   }
 };
@@ -1360,14 +1338,14 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
         [&](FuncOp op) { return converter.isSignatureLegal(op.getType()); });
     target.addDynamicallyLegalOp<ReturnOp>(
         [&](ReturnOp op) { return converter.isLegal(op); });
-    target.addDynamicallyLegalOp<mlir::ConstantOp>([&](mlir::ConstantOp op) {
-      if (auto attr = op.getValue().dyn_cast<ElementsAttr>()) {
-        if (auto type = attr.getType().dyn_cast<ShapedType>()) {
-          return converter.isLegal(type.getElementType());
-        }
-      }
-      return true;
-    });
+    // target.addDynamicallyLegalOp<mlir::ConstantOp>([&](mlir::ConstantOp op) {
+    //   if (auto attr = op.getValue().dyn_cast<ElementsAttr>()) {
+    //     if (auto type = attr.getType().dyn_cast<ShapedType>()) {
+    //       return converter.isLegal(type.getElementType());
+    //     }
+    //   }
+    //   return true;
+    // });
 
     // Setup rewrite patterns
     using CmpIntLtOp =
@@ -1381,6 +1359,7 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
     OwningRewritePatternList patterns;
     patterns.insert<
         CastOpConversion,            //
+        ConstantTensorOpConversion,  //
         EltwiseConstantOpConversion, //
         FuncOpConversion,            //
         GatherOpConversion,          //
@@ -1390,7 +1369,6 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
         ReturnOpConversion,          //
         ScatterOpConversion,         //
         ShapeOpConversion,           //
-        StdConstantOpConversion,     //
         TileConstantOpConversion,    //
         TraceOpConversion,           //
         // TODO: SpecialOpConversion (ZeroOp)

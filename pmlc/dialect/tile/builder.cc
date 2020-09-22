@@ -50,7 +50,6 @@ using llvm::StringSwitch;
 using mlir::AbstractOperation;
 using mlir::Block;
 using mlir::BlockAndValueMapping;
-using mlir::DenseElementsAttr;
 using mlir::FloatAttr;
 using mlir::FloatType;
 using mlir::FuncOp;
@@ -80,6 +79,7 @@ struct TileBuilder::Impl {
   llvm::DenseMap<Value, Value> implicitUpdates;
   // llvm::DenseMap<Value, BufferPtr> implicitBindings;
   llvm::DenseMap<Value, RankedTensorType> shapeCache;
+  llvm::StringMap<BufferPtr> constantBuffers;
   NoneOp noneOp;
   Location loc;
   unsigned idxCounter = 0;
@@ -450,17 +450,10 @@ Value TileBuilder::MakeConstantOp(RankedTensorType type, BufferPtr buffer,
                                   StringRef name) {
   IVLOG(5, "TileBuilder::MakeConstantOp> " << name.str() << ": "
                                            << mlir::debugString(type));
-  auto view = buffer->MapCurrent();
-  auto rawBuffer = llvm::makeArrayRef(view->data(), view->size());
-  auto attr = DenseElementsAttr::getFromRawBuffer(type, rawBuffer,
-                                                  /*isSplatBuffer=*/false);
-  auto op = impl->builder.create<mlir::ConstantOp>(impl->loc, type, attr);
-  // auto op = impl->builder.create<PlaceholderOp>(impl->loc, type);
-  if (!name.empty()) {
-    op.setAttr("name", impl->builder.getStringAttr(name));
-  }
-  // impl->implicitBindings[op.result()] = buffer;
-  return op;
+  // auto symbol = llvm::formatv("_mlir_memref_{0}", name).str();
+  // TODO: check for duplicate symbols
+  impl->constantBuffers.try_emplace(name, buffer);
+  return impl->builder.create<ConstantTensorOp>(impl->loc, name, type);
 }
 
 Value TileBuilder::MakeConstantOp(int64_t value) {
@@ -626,6 +619,7 @@ TileBuilder::MakeProgram(StringRef name, const ProgramMutations &mutations,
   auto loc = UnknownLoc::get(getContext());
   auto module = ModuleOp::create(loc);
   auto program = std::make_shared<compiler::Program>(module);
+  program->constantBuffers = impl->constantBuffers;
   program->entry = name;
   // Construct a function to represent the entire program
   auto initialFuncType = FunctionType::get(inputTypes, {}, getContext());

@@ -8,6 +8,7 @@
 
 #include "mlir/IR/Module.h"
 #include "mlir/IR/StandardTypes.h"
+#include "llvm/ADT/StringMap.h"
 
 #include "pmlc/util/buffer.h"
 
@@ -32,6 +33,7 @@ struct Program {
   std::vector<ProgramArgument> arguments;
   std::vector<PassInfo> passes;
   mlir::MLIRContext context;
+  llvm::StringMap<pmlc::util::BufferPtr> constantBuffers;
 
   explicit Program(mlir::ModuleOp module);
   explicit Program(mlir::StringRef source);
