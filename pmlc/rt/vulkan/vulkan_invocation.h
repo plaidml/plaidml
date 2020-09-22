@@ -141,7 +141,7 @@ public:
                                 const char *entryPoint,
                                 NumWorkGroups numWorkGroups);
 
-  void setLaunchKernelAction();
+  void setLaunchKernelAction(uint32_t subgroupSize);
 
   void addLaunchActionToSchedule();
 
@@ -175,7 +175,7 @@ private:
   void initDescriptorSetLayoutBindingMap();
   void createDescriptorSetLayout();
   void createPipelineLayout();
-  void createComputePipeline();
+  void createComputePipeline(uint32_t subgroupSize);
   void createDescriptorPool();
   void allocateDescriptorSets();
   void setWriteDescriptors();
