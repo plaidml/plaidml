@@ -413,18 +413,18 @@ void VulkanInvocation::createMemoryBuffers() {
                                           &memoryBuffer.deviceMemory),
                          "vkAllocateMemory");
 
-      // if (curr->resourceDataType[descriptorSetIndex]
-      //                          [memoryBuffer.bindingIndex]) {
-      void *payload;
-      throwOnVulkanError(vkMapMemory(device->getDevice(),
-                                     memoryBuffer.deviceMemory, 0, bufferSize,
-                                     0, reinterpret_cast<void **>(&payload)),
-                         "vkMapMemory");
+      if (curr->resourceDataType[descriptorSetIndex]
+                                [memoryBuffer.bindingIndex]) {
+        void *payload;
+        throwOnVulkanError(vkMapMemory(device->getDevice(),
+                                       memoryBuffer.deviceMemory, 0, bufferSize,
+                                       0, reinterpret_cast<void **>(&payload)),
+                           "vkMapMemory");
 
-      // Copy host memory into the mapped area.
-      std::memcpy(payload, resourceDataBindingPair.second.ptr, bufferSize);
-      vkUnmapMemory(device->getDevice(), memoryBuffer.deviceMemory);
-      // }
+        // Copy host memory into the mapped area.
+        std::memcpy(payload, resourceDataBindingPair.second.ptr, bufferSize);
+        vkUnmapMemory(device->getDevice(), memoryBuffer.deviceMemory);
+      }
 
       VkBufferCreateInfo bufferCreateInfo = {};
       bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
