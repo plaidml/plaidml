@@ -9,6 +9,7 @@
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Function.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/IR/Module.h"
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/Pass/Pass.h"
@@ -454,13 +455,10 @@ void ConvertGpuLaunchFuncToVulkanCalls::convertGpuLaunchFunc(
 
   // Presume block.x is the subgroup size
   auto blockSize = launchOp.getBlockSizeOperandValues();
-  auto constOp = blockSize.x.getDefiningOp<mlir::ConstantOp>();
   int64_t subgroupSize = 1;
-  if (constOp) {
-    auto asInt = constOp.getValue().dyn_cast<mlir::IntegerAttr>();
-    if (asInt) {
-      subgroupSize = asInt.getInt();
-    }
+  mlir::IntegerAttr intAttr;
+  if (matchPattern(blockSize.x, m_Constant(&intAttr))) {
+    subgroupSize = intAttr.getInt();
   }
   if (subgroupSize != 1) {
     IVLOG(2, "Subgroup size = " << subgroupSize);
