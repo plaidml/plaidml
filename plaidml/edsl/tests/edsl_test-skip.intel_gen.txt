@@ -1,3 +1,4 @@
+CppEdsl.Asin
 CppEdsl.BitLeft
 CppEdsl.BitNot
 CppEdsl.BitRightScalar
