@@ -14,6 +14,8 @@
 #pragma once
 
 #include <memory>
+#include <set>
+#include <string>
 #include <vector>
 
 #include "mlir/Dialect/SPIRV/SPIRVOps.h"
@@ -53,8 +55,11 @@ public:
   float getTimestampPeriod() const { return timestampPeriod; }
   uint32_t getTimestampValidBits() const { return timestampValidBits; }
 
+  bool isExtensionSupported(const std::string &extension_name);
+
 private:
   void getBestComputeQueue(const VkPhysicalDevice &physicalDevice);
+  void getExtensions(const VkPhysicalDevice &physicalDevice);
 
   // Accessor for the Vulkan runtime state.
   std::shared_ptr<VulkanState> state;
@@ -74,6 +79,8 @@ private:
   //===--------------------------------------------------------------------===//
   uint32_t queueFamilyIndex{0};
   uint32_t memoryTypeIndex{VK_MAX_MEMORY_TYPES};
+
+  std::set<std::string> extensionList;
 };
 
 } // namespace pmlc::rt::vulkan

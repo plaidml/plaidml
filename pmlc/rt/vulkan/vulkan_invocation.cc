@@ -102,7 +102,7 @@ void VulkanInvocation::createLaunchKernelAction(uint8_t *shader, uint32_t size,
   curr->workGroups = numWorkGroups;
 }
 
-void VulkanInvocation::setLaunchKernelAction() {
+void VulkanInvocation::setLaunchKernelAction(uint32_t subgroupSize) {
   // Create logical device, shader module and memory buffers.
   checkResourceData();
   createMemoryBuffers();
@@ -117,7 +117,7 @@ void VulkanInvocation::setLaunchKernelAction() {
   createPipelineLayout();
 
   // Each descriptor set must be allocated from a descriptor pool.
-  createComputePipeline();
+  createComputePipeline(subgroupSize);
   createDescriptorPool();
   allocateDescriptorSets();
   setWriteDescriptors();
@@ -570,13 +570,22 @@ void VulkanInvocation::createPipelineLayout() {
                      "vkCreatePipelineLayout");
 }
 
-void VulkanInvocation::createComputePipeline() {
+void VulkanInvocation::createComputePipeline(uint32_t subgroupSize) {
   if (!curr) {
     throw std::runtime_error{"createComputePipeline: curr is nullptr!"};
   }
 
+  VkPipelineShaderStageRequiredSubgroupSizeCreateInfoEXT subgroupSizeInfo;
+  subgroupSizeInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+  subgroupSizeInfo.requiredSubgroupSize = subgroupSize;
+  subgroupSizeInfo.pNext = NULL;
+
   VkPipelineShaderStageCreateInfo stageInfo = {};
   stageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+  if (device->isExtensionSupported("VK_EXT_subgroup_size_control"))
+    stageInfo.pNext = &subgroupSizeInfo;
+  else
+    stageInfo.pNext = NULL;
   stageInfo.pNext = nullptr;
   stageInfo.flags = 0;
   stageInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
