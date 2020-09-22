@@ -108,6 +108,7 @@ private:
   void getCachedTypes() {
     llvmVoidType = LLVM::LLVMType::getVoidTy(&getContext());
     llvmPointerType = LLVM::LLVMType::getInt8PtrTy(&getContext());
+    llvmInt1Type = LLVM::LLVMType::getInt1Ty(&getContext());
     llvmInt32Type = LLVM::LLVMType::getInt32Ty(&getContext());
     llvmInt64Type = LLVM::LLVMType::getInt64Ty(&getContext());
 
@@ -150,6 +151,7 @@ private:
 
   LLVM::LLVMType getLLVMVoidType() { return llvmVoidType; }
   LLVM::LLVMType getLLVMPointerType() { return llvmPointerType; }
+  LLVM::LLVMType getLLVMInt1Type() { return llvmInt1Type; }
   LLVM::LLVMType getLLVMInt32Type() { return llvmInt32Type; }
   LLVM::LLVMType getLLVMInt64Type() { return llvmInt64Type; }
 
@@ -158,6 +160,7 @@ private:
 
   LLVM::LLVMType llvmVoidType;
   LLVM::LLVMType llvmPointerType;
+  LLVM::LLVMType llvmInt1Type;
   LLVM::LLVMType llvmInt32Type;
   LLVM::LLVMType llvmInt64Type;
 
@@ -266,20 +269,14 @@ ConvertGpuLaunchFuncToVulkanCalls::bindBuffers(Location loc, OpBuilder &builder,
       Value unrankedBuffer = builder.create<mlir::MemRefCastOp>(
           loc, buffer, getUnrankedMemRefType(elementType));
 
-      Value bufferType;
-      if (auto arg = buffer.dyn_cast<mlir::BlockArgument>()) {
-        bufferType = builder.create<LLVM::ConstantOp>(
-            loc, getLLVMInt32Type(), builder.getI32IntegerAttr(0));
-      } else {
-        bufferType = builder.create<LLVM::ConstantOp>(
-            loc, getLLVMInt32Type(), builder.getI32IntegerAttr(1));
-      }
-
+      Value isBlockArgument = builder.create<LLVM::ConstantOp>(
+          loc, getLLVMInt1Type(),
+          builder.getBoolAttr(buffer.isa<mlir::BlockArgument>()));
       builder.create<CallOp>(
           loc, ArrayRef<Type>{},
           builder.getSymbolRefAttr(getBufferBindingFunc(elementType)),
           ArrayRef<Value>{vulkanRuntime, descriptorSet, descriptorBinding,
-                          bufferByteSize, bufferType, unrankedBuffer});
+                          bufferByteSize, isBlockArgument, unrankedBuffer});
       optionalSymbols.insert(getBufferBindingFunc(elementType));
     } else {
       return failure();
@@ -403,7 +400,7 @@ void ConvertGpuLaunchFuncToVulkanCalls::declareVulkanFunctions(Location loc) {
           FunctionType::get(
               {ArrayRef<Type>{getLLVMPointerType(), getLLVMInt32Type(),
                               getLLVMInt32Type(), getLLVMInt32Type(),
-                              getLLVMInt32Type(),
+                              getLLVMInt1Type(),
                               getUnrankedMemRefType(bufferElementType)}},
               {}, &ctx),
           ArrayRef<std::pair<mlir::Identifier, mlir::Attribute>>());

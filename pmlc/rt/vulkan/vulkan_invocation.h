@@ -22,7 +22,6 @@ namespace pmlc::rt::vulkan {
 
 using DescriptorSetIndex = uint32_t;
 using BindingIndex = uint32_t;
-using BufferType = uint32_t;
 
 /// Struct containing information regarding to a device memory buffer.
 struct VulkanDeviceMemoryBuffer {
@@ -66,8 +65,7 @@ using ResourceData =
                    llvm::DenseMap<BindingIndex, VulkanHostMemoryBuffer>>;
 
 using ResourceDataType =
-    llvm::DenseMap<DescriptorSetIndex,
-                   llvm::DenseMap<BindingIndex, BufferType>>;
+    llvm::DenseMap<DescriptorSetIndex, llvm::DenseMap<BindingIndex, bool>>;
 
 /// StorageClass mapped into a descriptor set and a binding.
 using ResourceStorageClassBindingMap =
@@ -161,8 +159,7 @@ public:
   /// Sets needed data for Vulkan device.
   void setResourceData(const ResourceData &resData);
   void setResourceData(const DescriptorSetIndex desIndex,
-                       const BindingIndex bindIndex,
-                       const BufferType bufferType,
+                       const BindingIndex bindIndex, const bool isBlockArgument,
                        const VulkanHostMemoryBuffer &hostMemBuffer);
 
 private:

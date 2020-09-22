@@ -34,12 +34,12 @@ namespace {
 template <typename T>
 void bindBuffer(void *vkInvocation, DescriptorSetIndex setIndex,
                 BindingIndex bindIndex, uint32_t bufferByteSize,
-                uint32_t bufferType, ::UnrankedMemRefType<T> *unrankedMemRef) {
+                bool isBlockArgument, ::UnrankedMemRefType<T> *unrankedMemRef) {
   DynamicMemRefType<T> memRef(*unrankedMemRef);
   T *ptr = memRef.data + memRef.offset;
   VulkanHostMemoryBuffer memBuffer{ptr, bufferByteSize};
   static_cast<VulkanInvocation *>(vkInvocation)
-      ->setResourceData(setIndex, bindIndex, bufferType, memBuffer);
+      ->setResourceData(setIndex, bindIndex, isBlockArgument, memBuffer);
 }
 
 } // namespace
@@ -82,10 +82,10 @@ void submitCommandBuffers(void *vkInvocation) {
 #define BIND_BUFFER_IMPL(_name_, _type_)                                       \
   void _mlir_ciface_bindBuffer##_name_(                                        \
       void *vkInvocation, DescriptorSetIndex setIndex, BindingIndex bindIndex, \
-      uint32_t bufferByteSize, uint32_t buffer_type,                           \
+      uint32_t bufferByteSize, bool isBlockArgument,                           \
       ::UnrankedMemRefType<_type_> *unrankedMemRef) {                          \
-    bindBuffer(vkInvocation, setIndex, bindIndex, bufferByteSize, buffer_type, \
-               unrankedMemRef);                                                \
+    bindBuffer(vkInvocation, setIndex, bindIndex, bufferByteSize,              \
+               isBlockArgument, unrankedMemRef);                               \
   }
 
 BIND_BUFFER_IMPL(Float16, half_float::half);

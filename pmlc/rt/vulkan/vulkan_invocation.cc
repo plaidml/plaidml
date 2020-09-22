@@ -288,12 +288,12 @@ void VulkanInvocation::setResourceData(const ResourceData &resData) {
 
 void VulkanInvocation::setResourceData(
     const DescriptorSetIndex desIndex, const BindingIndex bindIndex,
-    const BufferType bufferType, const VulkanHostMemoryBuffer &hostMemBuffer) {
+    const bool isBlockArgument, const VulkanHostMemoryBuffer &hostMemBuffer) {
   if (!curr) {
     throw std::runtime_error{"setResourceData: curr is nullptr!"};
   }
   curr->resourceData[desIndex][bindIndex] = hostMemBuffer;
-  curr->resourceDataType[desIndex][bindIndex] = bufferType;
+  curr->resourceDataType[desIndex][bindIndex] = isBlockArgument;
   curr->resourceStorageClassData[desIndex][bindIndex] =
       mlir::spirv::StorageClass::StorageBuffer;
 }
@@ -413,18 +413,18 @@ void VulkanInvocation::createMemoryBuffers() {
                                           &memoryBuffer.deviceMemory),
                          "vkAllocateMemory");
 
-      if (curr->resourceDataType[descriptorSetIndex]
-                                [memoryBuffer.bindingIndex] == 0) {
-        void *payload;
-        throwOnVulkanError(vkMapMemory(device->getDevice(),
-                                       memoryBuffer.deviceMemory, 0, bufferSize,
-                                       0, reinterpret_cast<void **>(&payload)),
-                           "vkMapMemory");
+      // if (curr->resourceDataType[descriptorSetIndex]
+      //                          [memoryBuffer.bindingIndex]) {
+      void *payload;
+      throwOnVulkanError(vkMapMemory(device->getDevice(),
+                                     memoryBuffer.deviceMemory, 0, bufferSize,
+                                     0, reinterpret_cast<void **>(&payload)),
+                         "vkMapMemory");
 
-        // Copy host memory into the mapped area.
-        std::memcpy(payload, resourceDataBindingPair.second.ptr, bufferSize);
-        vkUnmapMemory(device->getDevice(), memoryBuffer.deviceMemory);
-      }
+      // Copy host memory into the mapped area.
+      std::memcpy(payload, resourceDataBindingPair.second.ptr, bufferSize);
+      vkUnmapMemory(device->getDevice(), memoryBuffer.deviceMemory);
+      // }
 
       VkBufferCreateInfo bufferCreateInfo = {};
       bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -810,7 +810,7 @@ void VulkanInvocation::updateHostMemoryBuffers() {
         // For each device memory buffer in the set.
         for (auto &deviceMemoryBuffer : deviceMemoryBuffers) {
           if (kernel->resourceDataType[resourceDataMapPair.first]
-                                      [deviceMemoryBuffer.bindingIndex] == 0 &&
+                                      [deviceMemoryBuffer.bindingIndex] &&
               resourceDataMap.count(deviceMemoryBuffer.bindingIndex)) {
             void *payload;
             auto &hostMemoryBuffer =
