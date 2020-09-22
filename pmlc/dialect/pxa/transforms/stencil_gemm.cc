@@ -293,6 +293,7 @@ private:
                                            tileAttr, mapOperands);
 
     opC.result().replaceAllUsesWith(gemm);
+    opC.erase();
   }
 
 public:
