@@ -8,6 +8,7 @@
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/dialect/pxa/transforms/pass_detail.h"
 #include "pmlc/util/logging.h"
+#include "pmlc/util/tags.h"
 #include "pmlc/util/util.h"
 
 using namespace mlir; // NOLINT[build/namespaces]
@@ -379,6 +380,15 @@ struct FusionInfo {
         /*lbMap=*/lowerC, /*lbArgs=*/aInfo.op.getLowerBoundsOperands(),
         /*ubMap=*/upperC, /*ubArgs=*/aInfo.op.getUpperBoundsOperands(),
         /*steps=*/stepsC);
+
+    // Copy across any tags, prefer A's.
+    if (hasTags(aInfo.op)) {
+      copyTags(apC, aInfo.op);
+    } else if (hasTags(bInfo.op)) {
+      copyTags(apC, bInfo.op);
+    }
+    clearTags(aInfo.op);
+    clearTags(bInfo.op);
 
     // Move the two parallel for's inside the new op
     aInfo.op.getOperation()->moveBefore(apC.getBody(), apC.getBody()->end());

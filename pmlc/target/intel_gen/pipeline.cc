@@ -131,8 +131,19 @@ void pipelineBuilder(OpPassManager &pm) {
 
   // Do subgroup or accumulation
   pm.addPass(pmlc::dialect::pxa::createSubgroupsPass());
-  // pm.addPass(pmlc::dialect::pxa::createTileAccumulatePass());
-  pm.addPass(pmlc::dialect::pxa::createAffineNormalizePass(/*promote=*/false));
+  pm.addPass(pmlc::dialect::pxa::createAffineNormalizePass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
+
+  // Do fusion
+  pm.addPass(pxa::createFusionPass());
+  pm.addPass(pxa::createAffineNormalizePass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(pxa::createMemRefDataFlowOptPass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(pxa::createLocalizePass());
+  pm.addPass(pxa::createResizeTmpsPass());
+  pm.addPass(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
