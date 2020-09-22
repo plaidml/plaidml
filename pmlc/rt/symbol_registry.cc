@@ -7,13 +7,12 @@
 
 namespace pmlc::rt {
 
-llvm::StringMap<void *> &getSymbolMap() {
-  static llvm::StringMap<void *> symbolMap;
-  return symbolMap;
+SymbolRegistry *SymbolRegistry::instance() {
+  static SymbolRegistry registry;
+  return &registry;
 }
 
-void registerSymbol(llvm::StringRef symbol, void *ptr) {
-  auto &symbols = getSymbolMap();
+void SymbolRegistry::registerSymbol(llvm::StringRef symbol, void *ptr) {
   if (symbols.count(symbol)) {
     throw std::runtime_error(
         llvm::formatv("Symbol is already registered: {0}", symbol));
@@ -21,8 +20,7 @@ void registerSymbol(llvm::StringRef symbol, void *ptr) {
   symbols[symbol] = ptr;
 }
 
-void *resolveSymbol(llvm::StringRef symbol) {
-  auto symbols = getSymbolMap();
+void *SymbolRegistry::resolve(llvm::StringRef symbol) {
   auto it = symbols.find(symbol);
   if (it == symbols.end()) {
     return nullptr;

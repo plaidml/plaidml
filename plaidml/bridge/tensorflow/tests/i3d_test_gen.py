@@ -17,6 +17,7 @@ def main(args):
         tmp_path = pathlib.Path(tmp_dir)
         os.environ['XLA_FLAGS'] = '--xla_dump_to={}'.format(tmp_dir)
         os.environ['TF_XLA_FLAGS'] = '--tf_xla_auto_jit=2 --tf_xla_cpu_global_jit'
+        os.environ["TFHUB_CACHE_DIR"] = tmp_dir
         tf.compat.v1.enable_eager_execution()
 
         hub_url = "https://tfhub.dev/deepmind/i3d-kinetics-400/1"

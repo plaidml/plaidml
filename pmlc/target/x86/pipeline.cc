@@ -56,8 +56,8 @@ struct LowerPXAToAffinePass
   }
 };
 
-struct ConvertToLLVMPass
-    : public PassWrapper<ConvertToLLVMPass, OperationPass<ModuleOp>> {
+struct ConvertStandardToLLVMPass
+    : public ConvertStandardToLLVMBase<ConvertStandardToLLVMPass> {
   void runOnOperation() override {
     auto module = getOperation();
     auto *context = module.getContext();
@@ -102,7 +102,7 @@ std::unique_ptr<Pass> createLowerPXAToAffinePass() {
 }
 
 std::unique_ptr<Pass> createLowerToLLVMPass() {
-  return std::make_unique<ConvertToLLVMPass>();
+  return std::make_unique<ConvertStandardToLLVMPass>();
 }
 
 void pipelineBuilder(OpPassManager &pm) {
@@ -117,10 +117,12 @@ void pipelineBuilder(OpPassManager &pm) {
 
   pm.addPass(
       pxa::createStencilGEMMPass(/*numThreads=*/1, heatmapCostTransposed));
+  pm.addPass(pxa::createAffineNormalizePass());
+  pm.addPass(createCanonicalizerPass());
 
-  // FIXME: these passes cause test failures (correctness or otherwise)
-  // pm.addPass(pxa::createFusionPass());
-  // pm.addPass(createCanonicalizerPass());
+  pm.addPass(pxa::createFusionPass());
+  pm.addPass(pxa::createAffineNormalizePass());
+  pm.addPass(createCanonicalizerPass());
   pm.addPass(pxa::createMemRefDataFlowOptPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(pxa::createLocalizePass());

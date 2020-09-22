@@ -31,6 +31,7 @@
 #include "pmlc/compiler/program.h"
 #include "pmlc/conversion/gpu/lowering.h"
 #include "pmlc/rt/executable.h"
+#include "pmlc/rt/runtime_registry.h"
 #include "pmlc/util/logging.h"
 
 using namespace mlir; // NOLINT[build/namespaces]
@@ -114,11 +115,14 @@ int main(int argc, char **argv) {
   llvm::llvm_shutdown_obj x;
   registerPassManagerCLOptions();
 
+  mlir::enableGlobalDialectRegistry(true);
   registerAllDialects();
+
   llvm::InitLLVM y(argc, argv);
   llvm::InitializeNativeTarget();
   llvm::InitializeNativeTargetAsmPrinter();
   mlir::initializeLLVMPasses();
+  pmlc::rt::initRuntimes();
 
   return JitRunnerMain(argc, argv);
 }

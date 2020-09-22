@@ -25,6 +25,7 @@
 #include "pmlc/all_dialects.h"
 #include "pmlc/compiler/program.h"
 #include "pmlc/rt/executable.h"
+#include "pmlc/rt/runtime_registry.h"
 #include "pmlc/util/logging.h"
 
 using namespace mlir; // NOLINT
@@ -91,11 +92,14 @@ int main(int argc, char **argv) {
     IVLOG(level, "PLAIDML_VERBOSE=" << level);
   }
 
+  mlir::enableGlobalDialectRegistry(true);
   registerAllDialects();
+
   llvm::InitLLVM y(argc, argv);
   llvm::InitializeNativeTarget();
   llvm::InitializeNativeTargetAsmPrinter();
   mlir::initializeLLVMPasses();
+  pmlc::rt::initRuntimes();
 
   std::set_terminate([]() {
     auto eptr = std::current_exception();

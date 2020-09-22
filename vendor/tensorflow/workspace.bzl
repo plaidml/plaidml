@@ -21,3 +21,11 @@ def plaidml_tf_workspace():
             clean_dep("//vendor/tensorflow:third_party/py/python_configure.bzl"): "third_party/py/python_configure.bzl",
         },
     )
+
+    http_archive(
+        name = "kinetics-i3d",
+        url = "https://github.com/deepmind/kinetics-i3d/archive/efebe2eb948cb8a3d2601b6a7ee1af9986a4aedf.zip",
+        sha256 = "4c7d9a32390a7b49865444beae96278c264b5eab8e111e63b8e20753e3ea3dde",
+        strip_prefix = "kinetics-i3d-efebe2eb948cb8a3d2601b6a7ee1af9986a4aedf",
+        build_file = clean_dep("//vendor/tensorflow:kinetics-i3d.BUILD"),
+    )
