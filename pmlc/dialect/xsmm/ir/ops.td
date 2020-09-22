@@ -18,18 +18,18 @@ def XSMM_Dialect : Dialect {
   let cppNamespace = "pmlc::dialect::xsmm";
 }
 
-class XSMM_Op<string mnemonic, list<OpTrait> traits = []> :
-    Op<XSMM_Dialect, mnemonic, traits> {
+class XSMM_Op<string mnemonic, list<OpTrait> traits = []>
+    : Op<XSMM_Dialect, mnemonic, traits> {
   let printer = [{ print$cppClass(p, *this); }];
   let parser = [{ return parse$cppClass(parser, result); }];
 }
 
 def XSMM_GemmDispatchOp : XSMM_Op<"gemm.dispatch", [NoSideEffect]> {
   let summary = "query LIBXSMM's code registry based on GEMM shape";
-  let arguments = (ins I64ArrayAttr:$tile, I64ArrayAttr:$tileld);
-  let results = (outs I64:$ptr);
-  let printer = ?;
-  let parser = ?;
+  let arguments = (ins I64ArrayAttr : $tile, I64ArrayAttr : $tileld);
+  let results = (outs I64 : $ptr);
+  let printer = ? ;
+  let parser = ? ;
   let assemblyFormat = "$tile `,` $tileld attr-dict";
 }
 
@@ -50,10 +50,10 @@ def XSMM_GemmInvokeOp : XSMM_Op<"gemm.invoke"> {
 
 def XSMM_BRGemmDispatchOp : XSMM_Op<"brgemm.dispatch", [NoSideEffect]> {
   let summary = "query LIBXSMM's code registry based on GEMM shape";
-  let arguments = (ins I64ArrayAttr:$tile, I64ArrayAttr:$tileld);
-  let results = (outs I64:$ptr);
-  let printer = ?;
-  let parser = ?;
+  let arguments = (ins I64ArrayAttr : $tile, I64ArrayAttr : $tileld);
+  let results = (outs I64 : $ptr);
+  let printer = ? ;
+  let parser = ? ;
   let assemblyFormat = "$tile `,` $tileld attr-dict";
 }
 
@@ -66,8 +66,8 @@ def XSMM_BRGemmInvokeOp : XSMM_Op<"brgemm.invoke"> {
     I64Attr:$lBr,
     Variadic<Index>:$indices);
 
-  let printer = ?;
-  let parser = ?;
+  let printer = ? ;
+  let parser = ? ;
 
   let extraClassDeclaration = [{
     operand_range getOperandsForA();
