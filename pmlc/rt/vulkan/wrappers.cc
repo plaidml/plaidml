@@ -67,8 +67,9 @@ void createVulkanMemoryTransferAction(void *vkInvocation, uint64_t src_index,
                                    dst_binding);
 }
 
-void setVulkanLaunchKernelAction(void *vkInvocation) {
-  static_cast<VulkanInvocation *>(vkInvocation)->setLaunchKernelAction();
+void setVulkanLaunchKernelAction(void *vkInvocation, uint32_t subgroupSize) {
+  static_cast<VulkanInvocation *>(vkInvocation)
+      ->setLaunchKernelAction(subgroupSize);
 }
 
 void addVulkanLaunchActionToSchedule(void *vkInvocation) {
