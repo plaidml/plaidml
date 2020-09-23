@@ -204,6 +204,7 @@ cc_library(
     ],
     deps = [
         ":inference_engine",
+        ":ngraph_tests",
     ],
 )
 
@@ -516,5 +517,26 @@ cc_library(
     deps = [
         ":itt",
         "@tbb",
+    ],
+)
+
+cc_library(
+    name = "ngraph_tests",
+    srcs = glob([
+        "ngraph/test/runtime/*.cpp",
+    ]),
+    hdrs = glob([
+        "ngraph/test/runtime/*.cpp",
+    ]),
+    includes = [
+        "ngraph/test/runtime",
+    ],
+    local_defines = [
+        "PROJECT_ROOT_DIR=\\\"./\\\"",
+        "SHARED_LIB_PREFIX=\\\"\\\"",
+        "SHARED_LIB_SUFFIX=\\\"\\\"",
+    ],
+    deps = [
+        ":ngraph",
     ],
 )
