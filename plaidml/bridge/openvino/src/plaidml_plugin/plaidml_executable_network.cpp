@@ -53,23 +53,37 @@ PlaidMLExecutableNetwork::PlaidMLExecutableNetwork(const ICNNNetwork& network, c
       bool TODOisout = ngraph::op::is_output(node);
       IVLOG(5, "The node we have is an output?: " << TODOisout);
     }
-    if (ngraph::op::is_constant(node)) {
+    if (ngraph::op::is_constant(node) || node->description() == "Constant") {  // TODO Unneeded ||
       IVLOG(4, "Building constant node");
       IE_ASSERT(node->get_output_size() == 1);
       IE_ASSERT(node->description() == "Constant");
+      IVLOG(6, "Asserts pass");
       auto type = to_plaidml(node->get_element_type());
+      IVLOG(6, "Chkpt 1");
       std::vector<int64_t> dims{node->get_shape().begin(), node->get_shape().end()};
+      IVLOG(6, "Chkpt 2");
       TensorShape ts(type, dims);
+      IVLOG(6, "Chkpt 3");
       Buffer buffer(device, ts);
+      IVLOG(6, "Chkpt 4");
       // Specially resolve the constant-creating op
       Context ctx{node.get()};
+      IVLOG(6, "Chkpt 5");
       auto* layer = dynamic_cast<ngraph::opset1::Constant*>(ctx.layer);
+      IVLOG(5, "Have layer, about to get_data_ptr");
+      if (!layer) {
+        IVLOG(1, "LAYER IS NULL!!!!!");  // TODO
+      } else {
+        IVLOG(1, "Layer is not null, should be safe");
+      }
       buffer.copy_from(layer->get_data_ptr());
+      IVLOG(5, "Layer copied");
       auto tensor = edsl::Constant(type, buffer, dims, node->get_friendly_name());
+      IVLOG(6, "Chkpt 8");
       IVLOG(3, "    Adding constant named '" << node->get_output_tensor_name(0) << "'");
       tensorMap_[node->get_output_tensor_name(0)] = tensor;
       continue;
-    } else if (ngraph::op::is_parameter(node)) {
+    } else if (ngraph::op::is_parameter(node) || node->description() == "Parameter") {  // TODO Unneeded ||
       IVLOG(4, "Building parameter node");
       IE_ASSERT(node->get_output_size() == 1);
       std::vector<int64_t> dims{node->get_shape().begin(), node->get_shape().end()};
