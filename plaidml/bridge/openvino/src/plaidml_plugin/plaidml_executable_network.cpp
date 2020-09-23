@@ -44,7 +44,17 @@ PlaidMLExecutableNetwork::PlaidMLExecutableNetwork(const ICNNNetwork& network, c
   IVLOG(2, "Layers:");
   for (auto& node : fcn->get_ordered_ops()) {
     IVLOG(2, "  " << node->description() << ": " << node->get_name() << "... " << node->get_friendly_name());
+    if (VLOG_IS_ON(5)) {
+      IVLOG(5, "TODO verifying that we can print here");
+      bool TODOisconst = ngraph::op::is_constant(node);
+      IVLOG(5, "The node we have is a constant?: " << TODOisconst);
+      bool TODOisparam = ngraph::op::is_parameter(node);
+      IVLOG(5, "The node we have is a parameter?: " << TODOisparam);
+      bool TODOisout = ngraph::op::is_output(node);
+      IVLOG(5, "The node we have is an output?: " << TODOisout);
+    }
     if (ngraph::op::is_constant(node)) {
+      IVLOG(4, "Building constant node");
       IE_ASSERT(node->get_output_size() == 1);
       IE_ASSERT(node->description() == "Constant");
       auto type = to_plaidml(node->get_element_type());
@@ -60,6 +70,7 @@ PlaidMLExecutableNetwork::PlaidMLExecutableNetwork(const ICNNNetwork& network, c
       tensorMap_[node->get_output_tensor_name(0)] = tensor;
       continue;
     } else if (ngraph::op::is_parameter(node)) {
+      IVLOG(4, "Building parameter node");
       IE_ASSERT(node->get_output_size() == 1);
       std::vector<int64_t> dims{node->get_shape().begin(), node->get_shape().end()};
       auto type = to_plaidml(node->get_element_type());
@@ -70,6 +81,7 @@ PlaidMLExecutableNetwork::PlaidMLExecutableNetwork(const ICNNNetwork& network, c
       tensorIOMap_[node->get_friendly_name()] = tensor;
       continue;
     } else if (ngraph::op::is_output(node)) {
+      IVLOG(4, "Building output node");
       const auto& src_output = node->inputs()[0].get_source_output();
       const auto& friendly_name = src_output.get_node()->get_friendly_name();
       const auto& original_name = src_output.get_node()->get_output_tensor_name(src_output.get_index());
@@ -80,6 +92,7 @@ PlaidMLExecutableNetwork::PlaidMLExecutableNetwork(const ICNNNetwork& network, c
 
     auto op = OpsRegistry::instance()->resolve(node->description());
     if (!op) {
+      IVLOG(1, "About to throw with \"Unsupported operation: " << node->description() << "\"");
       THROW_IE_EXCEPTION << "Unsupported operation: " << node->description();
     }
 
