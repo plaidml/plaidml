@@ -524,9 +524,17 @@ cc_library(
     name = "ngraph_tests",
     srcs = glob([
         "ngraph/test/runtime/*.cpp",
+        "ngraph/test/runtime/dynamic/*.cpp",
+        "ngraph/test/runtime/interpreter/*.cpp",
+        "ngraph/test/runtime/pass/*.cpp",
+        "ngraph/test/runtime/op/*.cpp",
     ]),
     hdrs = glob([
-        "ngraph/test/runtime/*.cpp",
+        "ngraph/test/runtime/*.hpp",
+        "ngraph/test/runtime/dynamic/*.hpp",
+        "ngraph/test/runtime/interpreter/*.hpp",
+        "ngraph/test/runtime/pass/*.hpp",
+        "ngraph/test/runtime/op/*.hpp",
     ]),
     includes = [
         "ngraph/test/runtime",
