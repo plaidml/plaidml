@@ -48,7 +48,7 @@ static constexpr const char *kSPIRVBinary = "SPIRV_BIN";
 static constexpr const char *kPrint_memref_f32 = "print_memref_f32";
 static constexpr const char *kInitVulkan = "initVulkan";
 static constexpr const char *kDeinitVulkan = "deinitVulkan";
-static constexpr const char *kSubmitCommandBuffers = "submitCommandBuffers";
+static constexpr const char *kRun = "run";
 static constexpr const char *kCreateVulkanLaunchKernelAction =
     "createVulkanLaunchKernelAction";
 static constexpr const char *kSetVulkanLaunchKernelAction =
@@ -362,7 +362,7 @@ void ConvertGpuLaunchFuncToVulkanCalls::declareVulkanFunctions(Location loc) {
                                     /*isVarArg=*/false));
 
   builder.create<LLVM::LLVMFuncOp>(
-      loc, kSubmitCommandBuffers,
+      loc, kRun,
       LLVM::LLVMType::getFunctionTy(getLLVMVoidType(), {getLLVMPointerType()},
                                     /*isVarArg=*/false));
 
@@ -484,12 +484,12 @@ void ConvertGpuLaunchFuncToVulkanCalls::convertGpuLaunchFunc(
       builder.getSymbolRefAttr(kAddVulkanLaunchActionToSchedule),
       ArrayRef<Value>{vulkanRuntime});
 
-  // Create call to 'submitCommandBuffers' and 'deinitVulkan' runtime function
+  // Create call to 'run' and 'deinitVulkan' runtime function
   // after the last GpuLauchFunc.
   if (lauchFuncIndex == numKernel - 1) {
-    builder.create<LLVM::CallOp>(
-        loc, ArrayRef<Type>{}, builder.getSymbolRefAttr(kSubmitCommandBuffers),
-        ArrayRef<Value>{vulkanRuntime});
+    builder.create<LLVM::CallOp>(loc, ArrayRef<Type>{},
+                                 builder.getSymbolRefAttr(kRun),
+                                 ArrayRef<Value>{vulkanRuntime});
 
     builder.create<LLVM::CallOp>(loc, ArrayRef<Type>{},
                                  builder.getSymbolRefAttr(kDeinitVulkan),
