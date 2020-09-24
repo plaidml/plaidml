@@ -1739,7 +1739,7 @@ class TestBackendOps(unittest.TestCase):
         return [b.sum(x, axis=1)]
 
     # Resnet sized tests
-    @opTest([[m(1, 224, 224, 3), m(7, 7, 3, 64)]], do_grads=False)
+    @opTest([[m(1, 229, 229, 3), m(7, 7, 3, 64)]], do_grads=False)
     def resnetLayer1(self, b, x, k):
         return [b.conv2d(x, k, strides=(2, 2), padding='valid')]
 

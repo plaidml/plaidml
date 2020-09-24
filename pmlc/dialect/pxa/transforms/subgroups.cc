@@ -34,14 +34,14 @@ std::ostream &operator<<(std::ostream &os, const SubgroupPlan &plan) {
   size_t sz = plan.innerTile.size();
   os << plan.subgroupSize << ":[";
   for (size_t i = 0; i < sz; i++) {
-    os << plan.innerTile[i];
+    os << plan.subgroupTile[i];
     if (i != sz - 1) {
       os << " ";
     }
   }
   os << "]:[";
   for (size_t i = 0; i < sz; i++) {
-    os << plan.subgroupTile[i];
+    os << plan.innerTile[i];
     if (i != sz - 1) {
       os << " ";
     }
@@ -110,12 +110,13 @@ struct SubgroupCostModel {
 
   template <typename OpType>
   bool preflightIO(OpType ioOp) {
-    IVLOG(3, "Prelight: " << debugString(*ioOp.getOperation()));
+    IVLOG(1, "Preflight: " << debugString(*ioOp.getOperation()));
     if (ioOp.getOperation()->getBlock() != op.getBody()) {
       IVLOG(3, "Not part of block");
       return false;
     }
-    auto maybeStrides = computeStrideInfo(ioOp);
+    auto maybeStrides =
+        computeStrideInfo(ioOp.getAffineMap(), ioOp.getMapOperands());
     if (!maybeStrides) {
       IVLOG(3, "Not strided");
       return false;
@@ -165,16 +166,28 @@ struct SubgroupCostModel {
   };
 
   // Compute the memory info for a single load/store given the current plan
-  MemInfo computeMemoryInfo(StrideInfo si) {
+  MemInfo computeMemoryInfo(SmallVectorImpl<StrideInfo> &blah) {
     MemInfo out = {0, 1};
-    for (unsigned i = 0; i < ranges.size(); i++) {
-      auto iv = op.getIVs()[i];
-      if (si.strides.count(iv)) {
-        if (plan.subgroupTile[i] == plan.subgroupSize && si.strides[iv] == 1) {
+    for (auto si : blah) {
+      IVLOG(1, "stride info = " << si);
+      int64_t pos = 0;
+      // TODO: add neg
+      for (auto kvp : si.strides) {
+        auto index = kvp.first.getArgNumber();
+        auto stride = kvp.second;
+
+        IVLOG(1, "  index = " << index);
+        IVLOG(1, "  stride = " << stride);
+        IVLOG(1, "  inner_tile = " << plan.innerTile[index]);
+        pos += stride * (plan.innerTile[index] - 1);
+        IVLOG(1, "  pos += " << stride * (plan.innerTile[index] - 1));
+
+        if (plan.subgroupTile[index] == plan.subgroupSize && stride == 1) {
           out.subgroupCount++;
         }
-        out.memSize *= plan.innerTile[i];
       }
+      out.memSize *= pos + 1;
+      IVLOG(1, "mem *= " << pos + 1);
     }
     if (out.subgroupCount) {
       out.memSize /= plan.subgroupSize;
@@ -186,8 +199,7 @@ struct SubgroupCostModel {
     // Compute memory usage
     int64_t totMemory = 0;
     for (size_t i = 0; i < ioStrides.size(); i++) {
-      const auto &si = ioStrides[i];
-      auto mi = computeMemoryInfo(si);
+      MemInfo mi = computeMemoryInfo(ioStrides[i]);
       // It is illegal for any access to be subgrouped on two indexes
       if (mi.subgroupCount > 1) {
         return std::numeric_limits<double>::infinity();
@@ -198,19 +210,20 @@ struct SubgroupCostModel {
       }
 
       totMemory += mi.memSize;
-      IVLOG(3, "tomMemory += " << mi.memSize);
+      IVLOG(1, "totMemory += " << mi.memSize);
     }
     if (totMemory > params.maxRegsPerThread) {
-      IVLOG(3,
-            "Invalid subgroup plan: " << plan << ", totMemory = " << totMemory);
+      IVLOG(2, "subgroup: " << plan << ", mem: " << totMemory << ", cost: INF");
       return std::numeric_limits<double>::infinity();
     }
-    IVLOG(3, "Valid subgroup plan: " << plan << ", totMemory = " << totMemory);
     int64_t groups = 1;
     for (size_t i = 0; i < ranges.size(); i++) {
       groups *= ranges[i] / plan.innerTile[i];
     }
-    return static_cast<double>(groups * plan.subgroupSize);
+    double cost = static_cast<double>(groups * plan.subgroupSize);
+    IVLOG(1,
+          "subgroup: " << plan << ", mem: " << totMemory << ", cost: " << cost);
+    return cost;
   }
 
   // The parameters to the cost model
@@ -226,7 +239,7 @@ struct SubgroupCostModel {
   // Cache of the index ranges
   SmallVector<int64_t, 8> ranges;
   // Strides for all io ops
-  SmallVector<StrideInfo, 4> ioStrides;
+  SmallVector<SmallVector<StrideInfo, 4>, 4> ioStrides;
 };
 
 void SubgroupApply(AffineParallelOp op, SubgroupPlan plan) {
@@ -264,8 +277,8 @@ struct SubgroupsPass : public SubgroupsBase<SubgroupsPass> {
     SubgroupParams params = {
         // Currently we only allow size 8 since we can't control runtime
         // subgroup size
-        {8}, // Subgroup sizes, currently
-        64,  // Maximum register per thread
+        {16}, // Subgroup sizes, currently
+        64,   // Maximum register per thread
     };
     SubgroupCostModel cm(params, op);
     if (cm.bestCost == std::numeric_limits<double>::infinity()) {
@@ -274,7 +287,7 @@ struct SubgroupsPass : public SubgroupsBase<SubgroupsPass> {
       tileAccumulations(op, false);
       return;
     }
-    IVLOG(2, "best plan = " << cm.bestPlan);
+    IVLOG(1, "best plan = " << cm.bestPlan);
     SubgroupApply(op, cm.bestPlan);
   }
 };
