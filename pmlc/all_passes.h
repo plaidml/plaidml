@@ -12,6 +12,7 @@
 #include "mlir/Dialect/StandardOps/Transforms/Passes.h"
 #include "mlir/Transforms/Passes.h"
 
+#include "pmlc/conversion/comp_to_llvm/passes.h"
 #include "pmlc/conversion/gpu_to_comp/passes.h"
 #include "pmlc/conversion/gpu_to_spirv/passes.h"
 #include "pmlc/conversion/pxa_to_affine/passes.h"
@@ -55,6 +56,7 @@ inline void registerAllPasses() {
   //
 
   // Conversion passes
+  pmlc::conversion::comp_to_llvm::registerPasses();
   pmlc::conversion::pxa_to_affine::registerPasses();
   pmlc::conversion::stdx_to_llvm::registerPasses();
   pmlc::conversion::tile_to_pxa::registerPasses();
