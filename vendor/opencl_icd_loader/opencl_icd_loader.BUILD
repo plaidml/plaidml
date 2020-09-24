@@ -57,6 +57,7 @@ opencl_icd_loader_lnks = select({
 cc_library(
     name = "opencl_icd_loader",
     srcs = opencl_icd_loader_srcs,
+    copts = ["-w"],
     includes = ["loader"],
     linkopts = opencl_icd_loader_lnks,
     linkstatic = 1,

@@ -16,6 +16,8 @@ plaidml_cc_library(
         "prng.cc",
         "runtime_registry.cc",
         "symbol_registry.cc",
+        "timed_executable.cc",
+        "timed_executable.h",
         "xsmm.cc",
     ],
     hdrs = [

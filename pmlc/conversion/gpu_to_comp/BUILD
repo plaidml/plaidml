@@ -1,9 +1,9 @@
 # Copyright 2020 Intel Corporation
 
+package(default_visibility = ["//visibility:public"])
+
 load("//bzl:plaidml.bzl", "plaidml_cc_library")
 load("//vendor/mlir:tblgen.bzl", "gentbl")
-
-package(default_visibility = ["//visibility:public"])
 
 gentbl(
     name = "gen-pass",
@@ -21,10 +21,9 @@ gentbl(
 )
 
 plaidml_cc_library(
-    name = "transforms",
+    name = "gpu_to_comp",
     srcs = [
-        "boundscheck.cc",
-        "i1_to_i32.cc",
+        "gpu_to_comp.cc",
         "pass_detail.h",
     ],
     hdrs = [
@@ -32,14 +31,11 @@ plaidml_cc_library(
     ],
     deps = [
         ":gen-pass",
-        "//pmlc/dialect/eltwise/ir",
-        "//pmlc/dialect/pxa/analysis",
-        "//pmlc/dialect/pxa/ir",
-        "//pmlc/dialect/stdx/ir",
-        "//pmlc/dialect/tile/ir",
-        "@llvm-project//mlir:LLVMTransforms",
-        "@llvm-project//mlir:StandardOpsTransforms",
-        "@llvm-project//mlir:SCFDialect",
-        "@llvm-project//mlir:VectorOps",
+        "//pmlc/dialect/comp/ir",
+        "@llvm-project//mlir:GPUDialect",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:Transforms",
+        "@llvm-project//mlir:Support",
     ],
 )
