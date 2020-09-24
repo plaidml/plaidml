@@ -346,10 +346,16 @@ struct StencilGEMMPass : public PassWrapper<StencilGEMMPass, FunctionPass> {
   Option<unsigned> numThreads{
       *this, "threads",
       llvm::cl::desc("Specifies number of threads for the stencil pass")};
+
+  Option<std::string> strategy{
+      *this, "strategy", llvm::cl::desc("Specifies the stenciling strategy")};
 };
 
 std::unique_ptr<Pass> createStencilGEMMPass(unsigned numThreads,
+                                            std::string strategy,
                                             StencilCostFunction costFn) {
+  IVLOG(3, "numThreads: " << numThreads);
+  IVLOG(3, "strategy: " << strategy);
   return std::make_unique<StencilGEMMPass>(numThreads, costFn);
 }
 

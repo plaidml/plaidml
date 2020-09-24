@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <string>
 
 #include "mlir/Pass/Pass.h"
 
@@ -23,6 +24,8 @@ std::unique_ptr<mlir::Pass> createTraceLinkingPass();
 std::unique_ptr<mlir::Pass> createXSMMLoweringPass();
 
 std::unique_ptr<mlir::Pass> createXSMMStencilPass();
+
+std::unique_ptr<mlir::Pass> createXSMMStencilPass(std::string strategy);
 
 std::unique_ptr<mlir::Pass> createXSMMBRGEMMStencilPass();
 

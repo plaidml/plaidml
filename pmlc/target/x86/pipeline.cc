@@ -95,7 +95,18 @@ static pxa::StencilCost heatmapCostTransposed(ArrayRef<int64_t> tile) {
 
 std::unique_ptr<Pass> createXSMMStencilPass() {
   auto numThreads = std::thread::hardware_concurrency();
-  return pxa::createStencilGEMMPass(numThreads, heatmapCostTransposed);
+  IVLOG(3, "Stenciling numThreads: " + numThreads);
+  std::string defaultStrategy = "complicated";
+  return pxa::createStencilGEMMPass(numThreads, defaultStrategy,
+                                    heatmapCostTransposed);
+}
+
+std::unique_ptr<mlir::Pass> createXSMMStencilPass(std::string strategy) {
+  auto numThreads = std::thread::hardware_concurrency();
+  IVLOG(3, "Stenciling numThreads: " + numThreads);
+  IVLOG(3, "Stenciling strategy: " + strategy);
+  return pxa::createStencilGEMMPass(numThreads, strategy,
+                                    heatmapCostTransposed);
 }
 
 std::unique_ptr<Pass> createXSMMBRGEMMStencilPass() {
@@ -121,8 +132,9 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
-  pm.addPass(
-      pxa::createStencilGEMMPass(/*numThreads=*/1, heatmapCostTransposed));
+  std::string defaultStrategy = "simple";
+  pm.addPass(pxa::createStencilGEMMPass(/*numThreads=*/1, defaultStrategy,
+                                        heatmapCostTransposed));
   pm.addPass(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
 
