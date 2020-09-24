@@ -6,7 +6,7 @@
 
 #include "volk.h" // NOLINT[build/include_subdir]
 
-#include "llvm/ADT/StringExtras.h"
+#include "mlir/Support/LLVM.h"
 #include "llvm/Support/FormatVariadic.h"
 
 namespace pmlc::rt::vulkan {

@@ -14,8 +14,8 @@ namespace pmlc::rt {
 
 std::unique_ptr<Executable>
 Executable::fromProgram(const std::shared_ptr<Program> &program,
-                        llvm::StringRef deviceID,
-                        llvm::ArrayRef<void *> bufptrs) {
+                        mlir::StringRef deviceID,
+                        mlir::ArrayRef<void *> bufptrs) {
   auto executable = getDevice(deviceID)->compile(program, bufptrs);
   if (VLOG_IS_ON(1)) {
     executable = makeTimedExecutable(std::move(executable));

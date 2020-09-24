@@ -21,10 +21,9 @@
 #include "mlir/Dialect/SPIRV/SPIRVOps.h"
 #include "mlir/Dialect/SPIRV/Serialization.h"
 #include "mlir/IR/Module.h"
+#include "mlir/Support/LLVM.h"
 #include "pmlc/rt/runtime.h"
 #include "pmlc/rt/vulkan/vulkan_state.h"
-#include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/ToolOutputFile.h"
 
 #include "volk.h" // NOLINT[build/include_subdir]
@@ -43,7 +42,7 @@ public:
 
   std::unique_ptr<Executable>
   compile(const std::shared_ptr<pmlc::compiler::Program> &program,
-          llvm::ArrayRef<void *> bufptrs) final;
+          mlir::ArrayRef<void *> bufptrs) final;
 
   const VkDevice &getDevice() const { return device; }
   const VkQueue &getQueue() const { return queue; }

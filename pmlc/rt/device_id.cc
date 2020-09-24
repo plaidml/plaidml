@@ -17,7 +17,7 @@ const std::regex &getDeviceIDRegex() {
   return re;
 }
 
-std::shared_ptr<Device> getDevice(llvm::StringRef deviceID) {
+std::shared_ptr<Device> getDevice(mlir::StringRef deviceID) {
   std::cmatch match;
   if (!std::regex_match(deviceID.data(), match, getDeviceIDRegex())) {
     throw std::runtime_error{

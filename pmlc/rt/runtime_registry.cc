@@ -20,11 +20,11 @@ public:
     return &reg;
   }
 
-  void registerFactory(llvm::StringRef id, Factory factory) {
+  void registerFactory(mlir::StringRef id, Factory factory) {
     factories.emplace_back(id, std::move(factory));
   }
 
-  void registerRuntime(llvm::StringRef id, std::shared_ptr<Runtime> runtime) {
+  void registerRuntime(mlir::StringRef id, std::shared_ptr<Runtime> runtime) {
     auto inserted = runtimes.emplace(id, std::move(runtime)).second;
     if (!inserted) {
       throw std::runtime_error{
@@ -32,7 +32,7 @@ public:
     }
   }
 
-  Runtime *getRuntime(llvm::StringRef id) {
+  Runtime *getRuntime(mlir::StringRef id) {
     auto it = runtimes.find(id.str());
     if (it == runtimes.end()) {
       throw std::runtime_error{llvm::formatv("Unable to find {0} runtime", id)};
@@ -66,11 +66,11 @@ private:
 
 } // namespace
 
-void registerFactory(llvm::StringRef id, Factory factory) {
+void registerFactory(mlir::StringRef id, Factory factory) {
   RuntimeRegistry::instance()->registerFactory(id, std::move(factory));
 }
 
-Runtime *getRuntime(llvm::StringRef id) {
+Runtime *getRuntime(mlir::StringRef id) {
   return RuntimeRegistry::instance()->getRuntime(id);
 }
 
@@ -79,7 +79,7 @@ getRuntimeMap() {
   return RuntimeRegistry::instance()->getRuntimeMap();
 }
 
-void registerRuntime(llvm::StringRef id, std::shared_ptr<Runtime> runtime) {
+void registerRuntime(mlir::StringRef id, std::shared_ptr<Runtime> runtime) {
   RuntimeRegistry::instance()->registerRuntime(id, std::move(runtime));
 }
 
