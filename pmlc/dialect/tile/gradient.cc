@@ -84,7 +84,7 @@ void Gradient::ComputeOperandDerivs(mlir::Value val) {
   }
   if (mlir::isa<eltwise::EltwiseOp>(op)) {
     size_t idx = 0; // Need to track which operand we're at
-    for (const auto &operand : op->getOperands()) {
+    for (const auto operand : op->getOperands()) {
       auto dop = DeriveEltwise(grads_[val], val, idx);
       AddToGradient(operand, dop);
       idx++;
@@ -131,7 +131,7 @@ void Gradient::ComputeOperandDerivs(mlir::Value val) {
         "Unrecognized special operation, unable to differentiate");
   } else if (mlir::isa<DimOp>(op) || mlir::isa<eltwise::ScalarConstantOp>(op)) {
     auto dop = builder_->MakeScalarConstantOp(0.);
-    for (const auto &operand : op->getOperands()) {
+    for (const auto operand : op->getOperands()) {
       AddToGradient(operand, dop);
     }
   } else if (auto tmap_op = mlir::dyn_cast<AffineTensorMapOp>(op)) {
@@ -213,7 +213,7 @@ mlir::Value Gradient::DeriveContraction(mlir::Value dout, mlir::Value out,
         }
         new_srcs.push_back(src_op);
         std::vector<Value> dout_idxs;
-        for (const auto &dim :
+        for (const auto dim :
              llvm::cast<AffineMapOp>(op.sink().getDefiningOp()).dims()) {
           dout_idxs.push_back(dim);
         }
@@ -236,7 +236,7 @@ mlir::Value Gradient::DeriveContraction(mlir::Value dout, mlir::Value out,
         // This is the differentiated input; so swap in dout here to create the
         // new op
         std::vector<Value> dout_idxs;
-        for (const auto &dim :
+        for (const auto dim :
              llvm::cast<AffineMapOp>(op.sink().getDefiningOp()).dims()) {
           dout_idxs.push_back(dim);
         }
@@ -304,7 +304,7 @@ mlir::Value Gradient::DeriveContraction(mlir::Value dout, mlir::Value out,
     sizes.push_back(builder_->MakeDimOp(target_src_op.tensor(), i));
   }
   std::vector<mlir::Value> dsrc_idxs;
-  for (const auto &dim : target_src_op.dims()) {
+  for (const auto dim : target_src_op.dims()) {
     dsrc_idxs.push_back(dim);
   }
 
@@ -325,7 +325,7 @@ mlir::Value Gradient::DeriveContraction(mlir::Value dout, mlir::Value out,
   auto dst_cons =
       llvm::dyn_cast<AffineConstraintsOp>(dop.cons().getDefiningOp());
   mlir::SmallVector<mlir::Value, 6> pairs{src_cons.pairs()};
-  for (const auto &pair : src_cons.pairs()) {
+  for (const auto pair : src_cons.pairs()) {
     pairs.emplace_back(pair);
   }
   dst_cons.getOperation()->setOperands(pairs);
