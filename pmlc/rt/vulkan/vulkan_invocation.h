@@ -150,18 +150,14 @@ public:
 
   void createMemoryTransferAction(VkBuffer src, VkBuffer dst, size_t size);
 
-  void submitCommandBuffers();
+  void run();
 
   /// Sets needed data for Vulkan device.
-  void setResourceData(const ResourceData &resData);
   void setResourceData(const DescriptorSetIndex desIndex,
                        const BindingIndex bindIndex,
                        const VulkanHostMemoryBuffer &hostMemBuffer);
 
 private:
-  void setResourceStorageClassBindingMap(
-      const ResourceStorageClassBindingMap &stClassData);
-
   void mapStorageClassToDescriptorType(mlir::spirv::StorageClass storageClass,
                                        VkDescriptorType &descriptorType);
 
@@ -171,6 +167,7 @@ private:
   void checkResourceData();
 
   void createMemoryBuffers();
+  void createQueryPool();
   void createShaderModule();
   void initDescriptorSetLayoutBindingMap();
   void createDescriptorSetLayout();
@@ -180,6 +177,7 @@ private:
   void allocateDescriptorSets();
   void setWriteDescriptors();
   void createSchedule();
+  void getQueryPoolResults();
   void submitCommandBuffersToQueue();
   void updateHostMemoryBuffers();
 
