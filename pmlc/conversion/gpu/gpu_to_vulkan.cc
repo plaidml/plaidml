@@ -9,6 +9,7 @@
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Function.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/IR/Module.h"
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/Pass/Pass.h"
@@ -17,6 +18,9 @@
 
 #include "pmlc/conversion/gpu/pass_detail.h"
 #include "pmlc/util/logging.h"
+#include "pmlc/util/tags.h"
+
+#include "mlir/Support/DebugStringHelper.h"
 
 namespace pmlc::conversion::gpu {
 namespace gpu = mlir::gpu;
@@ -44,7 +48,7 @@ static constexpr const char *kSPIRVBinary = "SPIRV_BIN";
 static constexpr const char *kPrint_memref_f32 = "print_memref_f32";
 static constexpr const char *kInitVulkan = "initVulkan";
 static constexpr const char *kDeinitVulkan = "deinitVulkan";
-static constexpr const char *kSubmitCommandBuffers = "submitCommandBuffers";
+static constexpr const char *kRun = "run";
 static constexpr const char *kCreateVulkanLaunchKernelAction =
     "createVulkanLaunchKernelAction";
 static constexpr const char *kSetVulkanLaunchKernelAction =
@@ -348,7 +352,8 @@ void ConvertGpuLaunchFuncToVulkanCalls::declareVulkanFunctions(Location loc) {
 
   builder.create<LLVM::LLVMFuncOp>(
       loc, kSetVulkanLaunchKernelAction,
-      LLVM::LLVMType::getFunctionTy(getLLVMVoidType(), {getLLVMPointerType()},
+      LLVM::LLVMType::getFunctionTy(getLLVMVoidType(),
+                                    {getLLVMPointerType(), getLLVMInt32Type()},
                                     /*isVarArg=*/false));
 
   builder.create<LLVM::LLVMFuncOp>(
@@ -357,7 +362,7 @@ void ConvertGpuLaunchFuncToVulkanCalls::declareVulkanFunctions(Location loc) {
                                     /*isVarArg=*/false));
 
   builder.create<LLVM::LLVMFuncOp>(
-      loc, kSubmitCommandBuffers,
+      loc, kRun,
       LLVM::LLVMType::getFunctionTy(getLLVMVoidType(), {getLLVMPointerType()},
                                     /*isVarArg=*/false));
 
@@ -448,11 +453,25 @@ void ConvertGpuLaunchFuncToVulkanCalls::convertGpuLaunchFunc(
     return signalPassFailure();
   }
 
+  // Presume block.x is the subgroup size
+  auto blockSize = launchOp.getBlockSizeOperandValues();
+  int64_t subgroupSize = 1;
+  mlir::IntegerAttr intAttr;
+  if (matchPattern(blockSize.x, m_Constant(&intAttr))) {
+    subgroupSize = intAttr.getInt();
+  }
+  if (subgroupSize != 1) {
+    IVLOG(2, "Subgroup size = " << subgroupSize);
+  }
+
+  Value subgroupSizeVal = builder.create<LLVM::ConstantOp>(
+      loc, getLLVMInt32Type(), builder.getI32IntegerAttr(subgroupSize));
+
   // Create call to `setLaunchKernelAction` runtime function.
   builder.create<LLVM::CallOp>(
       loc, ArrayRef<Type>{},
       builder.getSymbolRefAttr(kSetVulkanLaunchKernelAction),
-      ArrayRef<Value>{vulkanRuntime});
+      ArrayRef<Value>{vulkanRuntime, subgroupSizeVal});
 
   // Check and transfer VkBuffers when necessary.
   if (failed(transferBuffers(loc, builder, launchOp))) {
@@ -465,12 +484,12 @@ void ConvertGpuLaunchFuncToVulkanCalls::convertGpuLaunchFunc(
       builder.getSymbolRefAttr(kAddVulkanLaunchActionToSchedule),
       ArrayRef<Value>{vulkanRuntime});
 
-  // Create call to 'submitCommandBuffers' and 'deinitVulkan' runtime function
+  // Create call to 'run' and 'deinitVulkan' runtime function
   // after the last GpuLauchFunc.
   if (lauchFuncIndex == numKernel - 1) {
-    builder.create<LLVM::CallOp>(
-        loc, ArrayRef<Type>{}, builder.getSymbolRefAttr(kSubmitCommandBuffers),
-        ArrayRef<Value>{vulkanRuntime});
+    builder.create<LLVM::CallOp>(loc, ArrayRef<Type>{},
+                                 builder.getSymbolRefAttr(kRun),
+                                 ArrayRef<Value>{vulkanRuntime});
 
     builder.create<LLVM::CallOp>(loc, ArrayRef<Type>{},
                                  builder.getSymbolRefAttr(kDeinitVulkan),

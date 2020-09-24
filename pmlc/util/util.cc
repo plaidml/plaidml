@@ -4,6 +4,7 @@
 
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Function.h"
+#include "llvm/Support/Process.h"
 
 using namespace mlir; // NOLINT
 
@@ -90,6 +91,27 @@ void setTags(Operation *op, ArrayRef<StringRef> tags) {
     }
   }
   op->setAttr(kTagAttribute, builder.getDictionaryAttr(newTags));
+}
+
+DiagnosticCounter::DiagnosticCounter() : counter(0), threshold(0) {
+  auto env = llvm::sys::Process::GetEnv("PLAIDML_COUNTER");
+  if (env) {
+    threshold = std::atoi(env->c_str());
+  }
+}
+
+DiagnosticCounter::Result DiagnosticCounter::next() {
+  if (!threshold) {
+    return Result::Continue;
+  }
+  ++counter;
+  if (counter < threshold) {
+    return Result::Continue;
+  }
+  if (counter > threshold) {
+    return Result::Break;
+  }
+  return Result::Match;
 }
 
 } // namespace pmlc::util

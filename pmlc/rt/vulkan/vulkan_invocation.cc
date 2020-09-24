@@ -13,6 +13,8 @@
 
 #include "pmlc/rt/vulkan/vulkan_invocation.h"
 
+#include <chrono>
+
 #include "llvm/Support/FormatVariadic.h"
 
 #include "pmlc/rt/vulkan/vulkan_error.h"
@@ -21,27 +23,7 @@
 namespace pmlc::rt::vulkan {
 
 VulkanInvocation::VulkanInvocation() : device{Device::current<VulkanDevice>()} {
-  VkCommandPoolCreateInfo commandPoolCreateInfo = {};
-  commandPoolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-  commandPoolCreateInfo.pNext = nullptr;
-  commandPoolCreateInfo.flags = 0;
-  commandPoolCreateInfo.queueFamilyIndex = device->getQueueFamilyIndex();
-  throwOnVulkanError(vkCreateCommandPool(device->getDevice(),
-                                         &commandPoolCreateInfo, 0,
-                                         &commandPool),
-                     "vkCreateCommandPool");
-
-  VkQueryPoolCreateInfo queryPoolCreateInfo = {};
-  queryPoolCreateInfo.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
-  queryPoolCreateInfo.pNext = nullptr;
-  queryPoolCreateInfo.flags = 0;
-  queryPoolCreateInfo.queryType = VK_QUERY_TYPE_TIMESTAMP;
-  queryPoolCreateInfo.queryCount = timestampQueryPoolSize;
-  queryPoolCreateInfo.pipelineStatistics = 0;
-  throwOnVulkanError(
-      vkCreateQueryPool(device->getDevice(), &queryPoolCreateInfo,
-                        /*allocator=*/nullptr, &timestampQueryPool),
-      "vkCreateQueryPool");
+  createQueryPool();
 }
 
 VulkanInvocation::~VulkanInvocation() {
@@ -89,6 +71,29 @@ VulkanInvocation::~VulkanInvocation() {
   }
 }
 
+void VulkanInvocation::createQueryPool() {
+  VkCommandPoolCreateInfo commandPoolCreateInfo = {};
+  commandPoolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+  commandPoolCreateInfo.pNext = nullptr;
+  commandPoolCreateInfo.flags = 0;
+  commandPoolCreateInfo.queueFamilyIndex = device->getQueueFamilyIndex();
+  throwOnVulkanError(vkCreateCommandPool(device->getDevice(),
+                                         &commandPoolCreateInfo, 0,
+                                         &commandPool),
+                     "vkCreateCommandPool");
+  VkQueryPoolCreateInfo queryPoolCreateInfo = {};
+  queryPoolCreateInfo.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
+  queryPoolCreateInfo.pNext = nullptr;
+  queryPoolCreateInfo.flags = 0;
+  queryPoolCreateInfo.queryType = VK_QUERY_TYPE_TIMESTAMP;
+  queryPoolCreateInfo.queryCount = timestampQueryPoolSize;
+  queryPoolCreateInfo.pipelineStatistics = 0;
+  throwOnVulkanError(vkCreateQueryPool(device->getDevice(),
+                                       &queryPoolCreateInfo, /*allocator=*/
+                                       nullptr, &timestampQueryPool),
+                     "vkCreateQueryPool");
+}
+
 void VulkanInvocation::createLaunchKernelAction(uint8_t *shader, uint32_t size,
                                                 const char *entryPoint,
                                                 NumWorkGroups numWorkGroups) {
@@ -100,7 +105,11 @@ void VulkanInvocation::createLaunchKernelAction(uint8_t *shader, uint32_t size,
   curr->workGroups = numWorkGroups;
 }
 
-void VulkanInvocation::setLaunchKernelAction() {
+void VulkanInvocation::setLaunchKernelAction(uint32_t subgroupSize) {
+  if (!curr) {
+    throw std::runtime_error{"current LaunchKernelAction has not been created"};
+  }
+
   // Create logical device, shader module and memory buffers.
   checkResourceData();
   createMemoryBuffers();
@@ -110,12 +119,12 @@ void VulkanInvocation::setLaunchKernelAction() {
   // must have a layout binding attached into a descriptor set layout.
   // Each layout set must be binded into a pipeline layout.
   initDescriptorSetLayoutBindingMap();
-
   createDescriptorSetLayout();
   createPipelineLayout();
 
+  createComputePipeline(subgroupSize);
+
   // Each descriptor set must be allocated from a descriptor pool.
-  createComputePipeline();
   createDescriptorPool();
   allocateDescriptorSets();
   setWriteDescriptors();
@@ -212,93 +221,81 @@ void VulkanInvocation::createMemoryTransferAction(uint64_t src_index,
   kernel_dst->deps.push_back(bufferMemoryBarrier);
 }
 
-void VulkanInvocation::submitCommandBuffers() {
-  createSchedule();
+void VulkanInvocation::getQueryPoolResults() {
+  using fp_milliseconds =
+      std::chrono::duration<double, std::chrono::milliseconds::period>;
+  using fp_nanoseconds =
+      std::chrono::duration<double, std::chrono::nanoseconds::period>;
 
-  submitCommandBuffersToQueue();
+  uint64_t *results = reinterpret_cast<uint64_t *>(
+      calloc(timestampQueryCount, sizeof(uint64_t)));
+  vkGetQueryPoolResults(device->getDevice(), timestampQueryPool,
+                        /*firstQuery=*/0,
+                        /*queryCount=*/timestampQueryCount,
+                        /*dataSize=*/timestampQueryCount * sizeof(uint64_t),
+                        results,
+                        /*stride=*/sizeof(uint64_t),
+                        (VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT));
 
-  throwOnVulkanError(vkQueueWaitIdle(device->getQueue()), "vkQueueWaitIdle");
+  fp_nanoseconds overall_ns{(results[1] - results[0]) *
+                            device->getTimestampPeriod()};
+  IVLOG(1,
+        "Overall Vulkan time: " << fp_milliseconds(overall_ns).count() << "ms");
 
-  if (device->getTimestampValidBits()) {
-    uint64_t *results = reinterpret_cast<uint64_t *>(
-        calloc(timestampQueryCount, sizeof(uint64_t)));
-    vkGetQueryPoolResults(device->getDevice(), timestampQueryPool,
-                          /*firstQuery=*/0,
-                          /*queryCount=*/timestampQueryCount,
-                          /*dataSize=*/timestampQueryCount * sizeof(uint64_t),
-                          results,
-                          /*stride=*/sizeof(uint64_t),
-                          (VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT));
+  fp_nanoseconds total_kernel_ns{0};
+  for (uint32_t i = 2; i < timestampQueryCount; i += 2) {
+    fp_nanoseconds kernel_ns{(results[i + 1] - results[i]) *
+                             device->getTimestampPeriod()};
 
-    const double NS_PER_MS = 1000000.0;
-    uint64_t overall_ns =
-        (results[1] - results[0]) * device->getTimestampPeriod();
-    IVLOG(1, "Overall Vulkan time: " << overall_ns / NS_PER_MS << "ms");
+    IVLOG(2, "  Vulkan kernel exec time: " << fp_milliseconds(kernel_ns).count()
+                                           << "ms");
 
-    uint64_t total_kernel_ns = 0;
+    total_kernel_ns += kernel_ns;
+  }
 
-    for (uint32_t i = 2; i < timestampQueryCount; i += 2) {
-      uint64_t kernel_ns =
-          (results[i + 1] - results[i]) * device->getTimestampPeriod();
-
-      IVLOG(2, "  Vulkan kernel exec time: " << kernel_ns / NS_PER_MS << "ms");
-
-      total_kernel_ns += kernel_ns;
-    }
-
-    if (timestampQueryCount == timestampQueryPoolSize) {
-      IVLOG(
-          1,
+  if (timestampQueryCount == timestampQueryPoolSize) {
+    IVLOG(1,
           "WARNING: Ran out of space in the timestamp query pool which has "
           "size = "
               << timestampQueryPoolSize
               << "; consider increasing the size of the timestamp query pool.");
-    }
-
-    IVLOG(1, "Total Vulkan kernels: " << (timestampQueryCount - 2) / 2);
-    IVLOG(1, "Total Vulkan kernel exec time: " << total_kernel_ns / NS_PER_MS
-                                               << "ms");
-    IVLOG(1, "Percentage Vulkan kernel exec time: "
-                 << total_kernel_ns * 100 / static_cast<double>(overall_ns)
-                 << "%");
-
-    uint64_t total_memxfer_ns = overall_ns - total_kernel_ns;
-    IVLOG(1, "Total Vulkan memory transfers: " << memoryTransferCount);
-    IVLOG(1, "Total (esimtated) Vulkan memory transfer time: "
-                 << total_memxfer_ns / NS_PER_MS << "ms");
-    IVLOG(1, "Percentage (estimated) Vulkan memory transfer time: "
-                 << total_memxfer_ns * 100 / static_cast<double>(overall_ns)
-                 << "%");
   }
 
-  updateHostMemoryBuffers();
+  IVLOG(1, "Total Vulkan kernels: " << (timestampQueryCount - 2) / 2);
+  IVLOG(1, "Total Vulkan kernel exec time: "
+               << fp_milliseconds(total_kernel_ns).count() << "ms");
+  IVLOG(1, "Percentage Vulkan kernel exec time: "
+               << total_kernel_ns.count() * 100 / overall_ns.count() << "%");
+
+  fp_nanoseconds total_memxfer_ns = overall_ns - total_kernel_ns;
+  IVLOG(1, "Total Vulkan memory transfers: " << memoryTransferCount);
+  IVLOG(1, "Total (esimtated) Vulkan memory transfer time: "
+               << fp_milliseconds(total_memxfer_ns).count() << "ms");
+  IVLOG(1, "Percentage (estimated) Vulkan memory transfer time: "
+               << total_memxfer_ns.count() * 100 / overall_ns.count() << "%");
 }
 
-void VulkanInvocation::setResourceData(const ResourceData &resData) {
-  if (!curr) {
-    throw std::runtime_error{"setResourceData: curr is nullptr!"};
+void VulkanInvocation::run() {
+  createSchedule();
+  submitCommandBuffersToQueue();
+  throwOnVulkanError(vkQueueWaitIdle(device->getQueue()), "vkQueueWaitIdle");
+
+  if (device->getTimestampValidBits()) {
+    getQueryPoolResults();
   }
-  curr->resourceData = resData;
+  updateHostMemoryBuffers();
 }
 
 void VulkanInvocation::setResourceData(
     const DescriptorSetIndex desIndex, const BindingIndex bindIndex,
     const VulkanHostMemoryBuffer &hostMemBuffer) {
   if (!curr) {
-    throw std::runtime_error{"setResourceData: curr is nullptr!"};
+    throw std::runtime_error{
+        "setResourceData: current LaunchKernelAction has not been created"};
   }
   curr->resourceData[desIndex][bindIndex] = hostMemBuffer;
   curr->resourceStorageClassData[desIndex][bindIndex] =
       mlir::spirv::StorageClass::StorageBuffer;
-}
-
-void VulkanInvocation::setResourceStorageClassBindingMap(
-    const ResourceStorageClassBindingMap &stClassData) {
-  if (!curr) {
-    throw std::runtime_error{
-        "setResourceStorageClassBindingMap: curr is nullptr!"};
-  }
-  curr->resourceStorageClassData = stClassData;
 }
 
 void VulkanInvocation::mapStorageClassToDescriptorType(
@@ -331,9 +328,6 @@ void VulkanInvocation::mapStorageClassToBufferUsageFlag(
 }
 
 void VulkanInvocation::checkResourceData() {
-  if (!curr) {
-    throw std::runtime_error{"checkResourceData: curr is nullptr!"};
-  }
   if (!curr->resourceData.size()) {
     throw std::runtime_error{"Vulkan device needs at least one resource"};
   }
@@ -343,10 +337,6 @@ void VulkanInvocation::checkResourceData() {
 }
 
 void VulkanInvocation::createMemoryBuffers() {
-  if (!curr) {
-    throw std::runtime_error{"createMemoryBuffers: curr is nullptr!"};
-  }
-
   // For each descriptor set.
   for (const auto &resourceDataMapPair : curr->resourceData) {
     llvm::SmallVector<VulkanDeviceMemoryBuffer, 1> deviceMemoryBuffers;
@@ -451,10 +441,6 @@ void VulkanInvocation::createMemoryBuffers() {
 }
 
 void VulkanInvocation::createShaderModule() {
-  if (!curr) {
-    throw std::runtime_error{"createShaderModule : curr is nullptr!"};
-  }
-
   VkShaderModuleCreateInfo shaderModuleCreateInfo = {};
   shaderModuleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
   shaderModuleCreateInfo.pNext = nullptr;
@@ -470,11 +456,6 @@ void VulkanInvocation::createShaderModule() {
 }
 
 void VulkanInvocation::initDescriptorSetLayoutBindingMap() {
-  if (!curr) {
-    throw std::runtime_error{
-        "initDescriptorSetLayoutBindingMap: curr is nullptr!"};
-  }
-
   for (const auto &deviceMemoryBufferMapPair : curr->deviceMemoryBufferMap) {
     llvm::SmallVector<VkDescriptorSetLayoutBinding, 1>
         descriptorSetLayoutBindings;
@@ -497,10 +478,6 @@ void VulkanInvocation::initDescriptorSetLayoutBindingMap() {
 }
 
 void VulkanInvocation::createDescriptorSetLayout() {
-  if (!curr) {
-    throw std::runtime_error{"createDescriptorSetLayout: curr is nullptr!"};
-  }
-
   for (const auto &deviceMemoryBufferMapPair : curr->deviceMemoryBufferMap) {
     const auto descriptorSetIndex = deviceMemoryBufferMapPair.first;
     const auto &deviceMemoryBuffers = deviceMemoryBufferMapPair.second;
@@ -545,10 +522,6 @@ void VulkanInvocation::createDescriptorSetLayout() {
 }
 
 void VulkanInvocation::createPipelineLayout() {
-  if (!curr) {
-    throw std::runtime_error{"createPipelineLayout: curr is nullptr!"};
-  }
-
   // Associate descriptor sets with a pipeline layout.
   VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {};
   pipelineLayoutCreateInfo.sType =
@@ -565,13 +538,18 @@ void VulkanInvocation::createPipelineLayout() {
                      "vkCreatePipelineLayout");
 }
 
-void VulkanInvocation::createComputePipeline() {
-  if (!curr) {
-    throw std::runtime_error{"createComputePipeline: curr is nullptr!"};
-  }
+void VulkanInvocation::createComputePipeline(uint32_t subgroupSize) {
+  VkPipelineShaderStageRequiredSubgroupSizeCreateInfoEXT subgroupSizeInfo;
+  subgroupSizeInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+  subgroupSizeInfo.requiredSubgroupSize = subgroupSize;
+  subgroupSizeInfo.pNext = NULL;
 
   VkPipelineShaderStageCreateInfo stageInfo = {};
   stageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+  if (device->isExtensionSupported("VK_EXT_subgroup_size_control"))
+    stageInfo.pNext = &subgroupSizeInfo;
+  else
+    stageInfo.pNext = NULL;
   stageInfo.pNext = nullptr;
   stageInfo.flags = 0;
   stageInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
@@ -596,10 +574,6 @@ void VulkanInvocation::createComputePipeline() {
 }
 
 void VulkanInvocation::createDescriptorPool() {
-  if (!curr) {
-    throw std::runtime_error{"createDescriptorPool: curr is nullptr!"};
-  }
-
   llvm::SmallVector<VkDescriptorPoolSize, 1> descriptorPoolSizes;
   for (const auto &descriptorSetInfo : curr->descriptorSetInfoPool) {
     // For each descriptor set populate descriptor pool size.
@@ -624,10 +598,6 @@ void VulkanInvocation::createDescriptorPool() {
 }
 
 void VulkanInvocation::allocateDescriptorSets() {
-  if (!curr) {
-    throw std::runtime_error{"allocateDescriptorSets: curr is nullptr!"};
-  }
-
   VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = {};
   // Size of desciptor sets and descriptor layout sets is the same.
   curr->descriptorSets.resize(curr->descriptorSetLayouts.size());
@@ -645,10 +615,6 @@ void VulkanInvocation::allocateDescriptorSets() {
 }
 
 void VulkanInvocation::setWriteDescriptors() {
-  if (!curr) {
-    throw std::runtime_error{"setWriteDescriptors: curr is nullptr!"};
-  }
-
   if (curr->descriptorSets.size() != curr->descriptorSetInfoPool.size()) {
     throw std::runtime_error{
         "Each descriptor set must have descriptor set information"};

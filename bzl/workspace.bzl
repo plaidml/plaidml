@@ -90,8 +90,8 @@ def plaidml_workspace():
         strip_prefix = "jsonnet-0.13.0",
     )
 
-    LLVM_COMMIT = "81a1f9c06b9a84d9afcec8a1edfb578a768fa70e"
-    LLVM_SHA256 = "92c2dde9d0e4c3bbf15d9fb899019cca31c3479554ab6096ef93e79101595645"
+    LLVM_COMMIT = "7c0ec48b435bdff257e28a8db8d754dc22c8cbbd"
+    LLVM_SHA256 = "3941b496b8d539a2b0317cca2cb922e1384310647d3d5421ea47a93c5cee0900"
     LLVM_URL = "https://github.com/plaidml/llvm-project/archive/{commit}.tar.gz".format(commit = LLVM_COMMIT)
     http_archive(
         name = "llvm-project",
@@ -183,7 +183,7 @@ def plaidml_workspace():
         strip_prefix = "OpenCL-CLHPP-2.0.12",
         build_file = clean_dep("//vendor/opencl_hpp_headers:opencl_hpp_headers.BUILD"),
         # Patch hpp headers trying to use system OpenCL header on Apple.
-        patches = ["//vendor/opencl_hpp_headers:fix_apple_headers.patch"],
+        patches = [clean_dep("//vendor/opencl_hpp_headers:fix_apple_headers.patch")],
     )
 
     http_archive(

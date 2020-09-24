@@ -1734,7 +1734,6 @@ class TestBackendOps(unittest.TestCase):
 
     # Big rollup
     @opTest([[m(1000, 1000)]], do_grads=False)
-    @unittest.skip('This is slow (TODO: re-enable)')
     def testBigRollup(self, b, x):
         return [b.sum(x, axis=1)]
 

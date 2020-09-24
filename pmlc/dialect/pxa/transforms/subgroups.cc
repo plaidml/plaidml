@@ -275,16 +275,15 @@ struct SubgroupsPass : public SubgroupsBase<SubgroupsPass> {
 
   void doSubgroups(AffineParallelOp op) {
     SubgroupParams params = {
-        // Currently we only allow size 8 since we can't control runtime
-        // subgroup size
-        {16}, // Subgroup sizes, currently
-        64,   // Maximum register per thread
+        {8, 16}, // Subgroup sizes to consider
+        64,      // Maximum register per thread
     };
     SubgroupCostModel cm(params, op);
     if (cm.bestCost == std::numeric_limits<double>::infinity()) {
       // If subgrouping fails, we tile accumulations instead to handle the other
       // cases
       tileAccumulations(op, false);
+      setIntegerTag(op, subgroupSizeTag(), 1);
       return;
     }
     IVLOG(1, "best plan = " << cm.bestPlan);

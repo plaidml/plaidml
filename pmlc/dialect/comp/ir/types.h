@@ -58,7 +58,9 @@ public:
 
   static bool classof(mlir::Type type);
   /// Returns runtime of this type.
-  ExecEnvRuntime getRuntime() { return static_cast<ImplType *>(impl)->runtime; }
+  ExecEnvRuntime getRuntime() const {
+    return static_cast<const ImplType *>(impl)->runtime;
+  }
 };
 
 // ============================================================================
