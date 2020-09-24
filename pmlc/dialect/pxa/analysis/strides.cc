@@ -642,48 +642,6 @@ bool RelativeAccessPattern::outerAlias(DenseSet<BlockArgument> allOuter) const {
   return false;
 }
 
-StrideArray::StrideArray(unsigned numDims, int64_t offset)
-    : offset(offset), strides(numDims) {}
-
-StrideArray &StrideArray::operator*=(int64_t factor) {
-  offset *= factor;
-  for (auto &dim : strides)
-    dim *= factor;
-  return *this;
-}
-
-StrideArray &StrideArray::operator+=(const StrideArray &rhs) {
-  assert(strides.size() == rhs.strides.size() && "strides sizes much match");
-  offset += rhs.offset;
-  for (unsigned i = 0, e = strides.size(); i < e; ++i) {
-    strides[i] += rhs.strides[i];
-  }
-  return *this;
-}
-
-void StrideArray::print(raw_ostream &os) {
-  os << offset << ":[";
-  for (auto item : llvm::enumerate(strides)) {
-    if (item.index())
-      os << ", ";
-    os << item.value();
-  }
-  os << ']';
-}
-
-Optional<StrideArray> computeStrideArray(AffineMap map) {
-  std::vector<SmallVector<int64_t, 8>> flat;
-  if (failed(getFlattenedAffineExprs(map, &flat, nullptr)))
-    return None;
-
-  StrideArray ret(map.getNumDims(), flat.front().back());
-  for (unsigned i = 0, e = map.getNumDims(); i < e; i++) {
-    ret.strides[i] = flat.front()[i];
-  }
-
-  return ret;
-}
-
 bool hasPerfectAliasing(const RelativeAccessPattern &aRap,
                         RelativeAccessPattern bRap,
                         const DenseMap<BlockArgument, BlockArgument> &bToA) {

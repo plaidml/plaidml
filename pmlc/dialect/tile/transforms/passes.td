@@ -26,9 +26,14 @@ def MakeProgram : FunctionPass<"tile-make-program"> {
   let constructor = "pmlc::dialect::tile::createMakeProgramPass()";
 }
 
-def Pad : FunctionPass<"tile-pad"> {
+def PadRanges : FunctionPass<"tile-pad-ranges"> {
+  let summary = "Pad ranges to make things more even (possibly adding constraints)";
+  let constructor = "pmlc::dialect::tile::createPadRangesPass()";
+}
+
+def PadConstraints : FunctionPass<"tile-pad-constraints"> {
   let summary = "Pad outputs to remove constraints on inputs";
-  let constructor = "pmlc::dialect::tile::createPadPass()";
+  let constructor = "pmlc::dialect::tile::createPadConstraintsPass()";
 }
 
 #endif // __PMLC_DIALECT_TILE_PASSES__
