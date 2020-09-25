@@ -11,6 +11,8 @@ filegroup(
 filegroup(
     name = "lit_tests",
     srcs = [
+        "//pmlc/conversion/comp_to_llvm/tests:all",
+        "//pmlc/conversion/gpu_to_comp/tests:all",
         "//pmlc/conversion/gpu_to_spirv/tests:all",
         "//pmlc/conversion/pxa_to_affine/tests:all",
         "//pmlc/conversion/stdx_to_llvm/tests:all",
@@ -55,7 +57,9 @@ plaidml_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":hdrs",
+        "//pmlc/conversion/comp_to_llvm",
         "//pmlc/conversion/gpu",
+        "//pmlc/conversion/gpu_to_comp",
         "//pmlc/conversion/gpu_to_spirv",
         "//pmlc/conversion/pxa_to_affine",
         "//pmlc/conversion/stdx_to_llvm",

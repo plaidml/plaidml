@@ -1,15 +1,9 @@
-CppEdsl.Acos
 CppEdsl.Asin
-CppEdsl.Atan
 CppEdsl.BitLeft
 CppEdsl.BitNot
 CppEdsl.BitRightScalar
 CppEdsl.BitRightTensor
 CppEdsl.ConvI8
-CppEdsl.CosH
 CppEdsl.Erf
 CppEdsl.HigherPrecisionConstants
-CppEdsl.Pow
-CppEdsl.Round
-CppEdsl.SinH
 CppEdsl.Winograd

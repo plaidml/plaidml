@@ -96,6 +96,8 @@ SUITES:
     platforms:
       pml-llvm-cpu:
         pipelines: [nightly, plaidml]
+      pml-vk-gen:
+        pipelines: [nightly, plaidml]
     params:
       plaidml:
         batch_sizes: [1]
@@ -209,6 +211,7 @@ SUITES:
         precision: high
         skip_platforms:
           - pml-llvm-cpu
+          - pml-vk-gen
           - tf-dnnl-cpu
         perf_threshold: 0.7
       inception_v3:

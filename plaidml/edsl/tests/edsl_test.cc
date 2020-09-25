@@ -252,9 +252,9 @@ TEST_F(CppEdsl, BitXor) {
   std::vector<uint64_t> B_input{10, 11, 12,  //
                                 13, 14, 15,  //
                                 16, 17, 18};
-  std::vector<uint64_t> C_output{1 ^ 10, 2 ^ 11, 3 ^ 12,  //
-                                 4 ^ 13, 5 ^ 14, 6 ^ 15,  //
-                                 7 ^ 16, 8 ^ 17, 9 ^ 18};
+  std::vector<uint64_t> C_output{0x1 ^ 10, 0x2 ^ 11, 0x3 ^ 12,  //
+                                 0x4 ^ 13, 0x5 ^ 14, 0x6 ^ 15,  //
+                                 0x7 ^ 16, 0x8 ^ 17, 0x9 ^ 18};
   checkProgram(program, {{A, A_input}, {B, B_input}}, {{C, C_output}});
 }
 

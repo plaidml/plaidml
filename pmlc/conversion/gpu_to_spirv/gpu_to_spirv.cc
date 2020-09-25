@@ -77,6 +77,21 @@ struct StdxUnaryOpConversion : public SPIRVOpLowering<StdxOpTy> {
   }
 };
 
+template <typename StdxOpTy, typename SpirvOpTy>
+struct StdxBinaryOpConversion : public SPIRVOpLowering<StdxOpTy> {
+  using SPIRVOpLowering<StdxOpTy>::SPIRVOpLowering;
+
+  LogicalResult
+  matchAndRewrite(StdxOpTy op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const final {
+    assert(operands.size() == 2);
+    auto dstType = op.getResult().getType();
+    rewriter.replaceOpWithNewOp<SpirvOpTy>(op, dstType, operands.front(),
+                                           operands.back());
+    return success();
+  }
+};
+
 struct GPUToSPIRVCustomPass
     : public GPUToSPIRVCustomBase<GPUToSPIRVCustomPass> {
   void runOnOperation() final {
@@ -123,8 +138,15 @@ void populateStdxToSPIRVPatterns(MLIRContext *context,
 void populateStdxToSPIRVGLSLPatterns(MLIRContext *context,
                                      SPIRVTypeConverter &typeConverter,
                                      OwningRewritePatternList &patterns) {
-  patterns.insert<StdxUnaryOpConversion<stdx::FloorOp, spirv::GLSLFloorOp>,
-                  StdxUnaryOpConversion<stdx::TanOp, spirv::GLSLTanOp>>(
+  patterns.insert<StdxUnaryOpConversion<stdx::RoundOp, spirv::GLSLRoundOp>,
+                  StdxUnaryOpConversion<stdx::FloorOp, spirv::GLSLFloorOp>,
+                  StdxUnaryOpConversion<stdx::TanOp, spirv::GLSLTanOp>,
+                  StdxUnaryOpConversion<stdx::SinHOp, spirv::GLSLSinhOp>,
+                  StdxUnaryOpConversion<stdx::CosHOp, spirv::GLSLCoshOp>,
+                  StdxUnaryOpConversion<stdx::ASinOp, spirv::GLSLAsinOp>,
+                  StdxUnaryOpConversion<stdx::ACosOp, spirv::GLSLAcosOp>,
+                  StdxUnaryOpConversion<stdx::ATanOp, spirv::GLSLAtanOp>,
+                  StdxBinaryOpConversion<stdx::PowOp, spirv::GLSLPowOp>>(
       context, typeConverter);
 }
 
