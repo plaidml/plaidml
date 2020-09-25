@@ -288,12 +288,13 @@ void VulkanInvocation::setResourceData(const ResourceData &resData) {
 
 void VulkanInvocation::setResourceData(
     const DescriptorSetIndex desIndex, const BindingIndex bindIndex,
-    const bool isBlockArgument, const VulkanHostMemoryBuffer &hostMemBuffer) {
+    const uint32_t bufferCopyLevel,
+    const VulkanHostMemoryBuffer &hostMemBuffer) {
   if (!curr) {
     throw std::runtime_error{"setResourceData: curr is nullptr!"};
   }
   curr->resourceData[desIndex][bindIndex] = hostMemBuffer;
-  curr->resourceDataType[desIndex][bindIndex] = isBlockArgument;
+  curr->resourceDataType[desIndex][bindIndex] = bufferCopyLevel;
   curr->resourceStorageClassData[desIndex][bindIndex] =
       mlir::spirv::StorageClass::StorageBuffer;
 }
@@ -414,7 +415,9 @@ void VulkanInvocation::createMemoryBuffers() {
                          "vkAllocateMemory");
 
       if (curr->resourceDataType[descriptorSetIndex]
-                                [memoryBuffer.bindingIndex]) {
+                                [memoryBuffer.bindingIndex] == 1 ||
+          curr->resourceDataType[descriptorSetIndex]
+                                [memoryBuffer.bindingIndex] == 3) {
         void *payload;
         throwOnVulkanError(vkMapMemory(device->getDevice(),
                                        memoryBuffer.deviceMemory, 0, bufferSize,
@@ -809,8 +812,11 @@ void VulkanInvocation::updateHostMemoryBuffers() {
             kernel->deviceMemoryBufferMap[resourceDataMapPair.first];
         // For each device memory buffer in the set.
         for (auto &deviceMemoryBuffer : deviceMemoryBuffers) {
-          if (kernel->resourceDataType[resourceDataMapPair.first]
-                                      [deviceMemoryBuffer.bindingIndex] &&
+          if ((kernel->resourceDataType[resourceDataMapPair.first]
+                                       [deviceMemoryBuffer.bindingIndex] == 2 ||
+               kernel->resourceDataType[resourceDataMapPair.first]
+                                       [deviceMemoryBuffer.bindingIndex] ==
+                   3) &&
               resourceDataMap.count(deviceMemoryBuffer.bindingIndex)) {
             void *payload;
             auto &hostMemoryBuffer =
