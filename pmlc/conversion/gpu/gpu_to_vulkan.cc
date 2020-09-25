@@ -17,6 +17,7 @@
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallString.h"
 
+#include "pmlc/conversion/gpu/lowering.h"
 #include "pmlc/conversion/gpu/pass_detail.h"
 #include "pmlc/util/logging.h"
 #include "pmlc/util/tags.h"
@@ -75,6 +76,10 @@ static constexpr const char *kBindBufferInteger64 = "bindBufferInteger64";
 
 static constexpr const int kByteBits = 8;
 
+static constexpr const int kBufferCopyModeInit = 0;
+static constexpr const int kBufferCopyModeHostToDevice = 1;
+static constexpr const int kBufferCopyModeDeviceToHost = 2;
+
 /// A pass to convert gpu launch op to vulkan launch call op, by creating a
 /// SPIR-V binary shader from `spirv::ModuleOp` using `spirv::serialize`
 /// function and attaching binary data and entry point name as an attributes to
@@ -115,7 +120,6 @@ private:
   void getCachedTypes() {
     llvmVoidType = LLVM::LLVMType::getVoidTy(&getContext());
     llvmPointerType = LLVM::LLVMType::getInt8PtrTy(&getContext());
-    llvmInt1Type = LLVM::LLVMType::getInt1Ty(&getContext());
     llvmInt32Type = LLVM::LLVMType::getInt32Ty(&getContext());
     llvmInt64Type = LLVM::LLVMType::getInt64Ty(&getContext());
 
@@ -158,7 +162,6 @@ private:
 
   LLVM::LLVMType getLLVMVoidType() { return llvmVoidType; }
   LLVM::LLVMType getLLVMPointerType() { return llvmPointerType; }
-  LLVM::LLVMType getLLVMInt1Type() { return llvmInt1Type; }
   LLVM::LLVMType getLLVMInt32Type() { return llvmInt32Type; }
   LLVM::LLVMType getLLVMInt64Type() { return llvmInt64Type; }
 
@@ -167,7 +170,6 @@ private:
 
   LLVM::LLVMType llvmVoidType;
   LLVM::LLVMType llvmPointerType;
-  LLVM::LLVMType llvmInt1Type;
   LLVM::LLVMType llvmInt32Type;
   LLVM::LLVMType llvmInt64Type;
 
@@ -276,45 +278,36 @@ ConvertGpuLaunchFuncToVulkanCalls::bindBuffers(Location loc, OpBuilder &builder,
       Value unrankedBuffer = builder.create<mlir::MemRefCastOp>(
           loc, buffer, getUnrankedMemRefType(elementType));
 
-      // Check if it's required to be moved
-      uint32_t memCpyLevel = 0;
-      auto parentOp = launchOp.getParentOp();
-      parentOp->walk([&](StoreOp storeOp) {
-        if (storeOp.getOperation()->isBeforeInBlock(launchOp.getOperation())) {
-          for (auto operand : storeOp.getOperands()) {
-            if (buffer == operand) {
-              memCpyLevel = 1;
-            }
-          }
+      uint32_t memCpyLevel = kBufferCopyModeInit;
+
+      for (auto &user : buffer.getUses()) {
+        if (auto loadOp = llvm::dyn_cast<LoadOp>(user.getOwner())) {
+          memCpyLevel |= kBufferCopyModeDeviceToHost;
         }
-      });
-      parentOp->walk([&](LoadOp loadOp) {
-        if (!loadOp.getOperation()->isBeforeInBlock(launchOp.getOperation())) {
-          for (auto operand : loadOp.getOperands()) {
-            if (buffer == operand) {
-              memCpyLevel = (memCpyLevel == 0) ? 2 : 3;
-            }
-          }
+        if (auto storeOp = llvm::dyn_cast<StoreOp>(user.getOwner())) {
+          memCpyLevel |= kBufferCopyModeHostToDevice;
         }
-      });
+      };
+
       if (buffer.isa<mlir::BlockArgument>()) {
-        memCpyLevel = 3;
+        memCpyLevel = memCpyLevel | kBufferCopyModeHostToDevice |
+                      kBufferCopyModeDeviceToHost;
       }
 
-      Value bufferCopyLevel = builder.create<LLVM::ConstantOp>(
+      Value bufferCopyMode = builder.create<LLVM::ConstantOp>(
           loc, getLLVMInt32Type(), builder.getI32IntegerAttr(memCpyLevel));
       builder.create<CallOp>(
           loc, ArrayRef<Type>{},
           builder.getSymbolRefAttr(getBufferBindingFunc(elementType)),
           ArrayRef<Value>{vulkanRuntime, descriptorSet, descriptorBinding,
-                          bufferByteSize, bufferCopyLevel, unrankedBuffer});
+                          bufferByteSize, bufferCopyMode, unrankedBuffer});
       optionalSymbols.insert(getBufferBindingFunc(elementType));
     } else {
       return failure();
     }
   }
   return success();
-} // namespace pmlc::conversion::gpu
+}
 
 LogicalResult ConvertGpuLaunchFuncToVulkanCalls::transferBuffers(
     Location loc, OpBuilder &builder, gpu::LaunchFuncOp launchOp) {

@@ -34,13 +34,13 @@ namespace {
 template <typename T>
 void bindBuffer(void *vkInvocation, DescriptorSetIndex setIndex,
                 BindingIndex bindIndex, uint32_t bufferByteSize,
-                uint32_t bufferCopyLevel,
+                BufferCopyMode bufferCopyMode,
                 ::UnrankedMemRefType<T> *unrankedMemRef) {
   DynamicMemRefType<T> memRef(*unrankedMemRef);
   T *ptr = memRef.data + memRef.offset;
   VulkanHostMemoryBuffer memBuffer{ptr, bufferByteSize};
   static_cast<VulkanInvocation *>(vkInvocation)
-      ->setResourceData(setIndex, bindIndex, bufferCopyLevel, memBuffer);
+      ->setResourceData(setIndex, bindIndex, bufferCopyMode, memBuffer);
 }
 
 } // namespace
@@ -84,10 +84,10 @@ void run(void *vkInvocation) {
 #define BIND_BUFFER_IMPL(_name_, _type_)                                       \
   void _mlir_ciface_bindBuffer##_name_(                                        \
       void *vkInvocation, DescriptorSetIndex setIndex, BindingIndex bindIndex, \
-      uint32_t bufferByteSize, uint32_t bufferCopyLevel,                       \
+      uint32_t bufferByteSize, uint32_t bufferCopyMode,                        \
       ::UnrankedMemRefType<_type_> *unrankedMemRef) {                          \
     bindBuffer(vkInvocation, setIndex, bindIndex, bufferByteSize,              \
-               bufferCopyLevel, unrankedMemRef);                               \
+               bufferCopyMode, unrankedMemRef);                                \
   }
 
 BIND_BUFFER_IMPL(Float16, half_float::half);

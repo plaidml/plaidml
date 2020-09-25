@@ -22,6 +22,10 @@
 
 namespace pmlc::rt::vulkan {
 
+static constexpr const int kBufferCopyModeInit = 0;
+static constexpr const int kBufferCopyModeHostToDevice = 1;
+static constexpr const int kBufferCopyModeDeviceToHost = 2;
+
 VulkanInvocation::VulkanInvocation() : device{Device::current<VulkanDevice>()} {
   createQueryPool();
 }
@@ -288,14 +292,14 @@ void VulkanInvocation::run() {
 
 void VulkanInvocation::setResourceData(
     const DescriptorSetIndex desIndex, const BindingIndex bindIndex,
-    const uint32_t bufferCopyLevel,
+    const BufferCopyMode bufferCopyMode,
     const VulkanHostMemoryBuffer &hostMemBuffer) {
   if (!curr) {
     throw std::runtime_error{
         "setResourceData: current LaunchKernelAction has not been created"};
   }
   curr->resourceData[desIndex][bindIndex] = hostMemBuffer;
-  curr->resourceDataType[desIndex][bindIndex] = bufferCopyLevel;
+  curr->resourceDataType[desIndex][bindIndex] = bufferCopyMode;
   curr->resourceStorageClassData[desIndex][bindIndex] =
       mlir::spirv::StorageClass::StorageBuffer;
 }
@@ -400,9 +404,8 @@ void VulkanInvocation::createMemoryBuffers() {
                          "vkAllocateMemory");
 
       if (curr->resourceDataType[descriptorSetIndex]
-                                [memoryBuffer.bindingIndex] == 1 ||
-          curr->resourceDataType[descriptorSetIndex]
-                                [memoryBuffer.bindingIndex] == 3) {
+                                [memoryBuffer.bindingIndex] &
+          kBufferCopyModeHostToDevice) {
         void *payload;
         throwOnVulkanError(vkMapMemory(device->getDevice(),
                                        memoryBuffer.deviceMemory, 0, bufferSize,
@@ -774,10 +777,8 @@ void VulkanInvocation::updateHostMemoryBuffers() {
         // For each device memory buffer in the set.
         for (auto &deviceMemoryBuffer : deviceMemoryBuffers) {
           if ((kernel->resourceDataType[resourceDataMapPair.first]
-                                       [deviceMemoryBuffer.bindingIndex] == 2 ||
-               kernel->resourceDataType[resourceDataMapPair.first]
-                                       [deviceMemoryBuffer.bindingIndex] ==
-                   3) &&
+                                       [deviceMemoryBuffer.bindingIndex] &
+               kBufferCopyModeDeviceToHost) &&
               resourceDataMap.count(deviceMemoryBuffer.bindingIndex)) {
             void *payload;
             auto &hostMemoryBuffer =
