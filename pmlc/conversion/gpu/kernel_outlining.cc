@@ -25,6 +25,7 @@
 #include "mlir/Dialect/SPIRV/TargetAndABI.h"
 
 #include "pmlc/conversion/gpu/pass_detail.h"
+#include "pmlc/util/tags.h"
 using namespace mlir; // NOLINT[build/namespaces]
 
 template <typename OpTy>
@@ -126,9 +127,13 @@ static void convertToLaunchFuncOp(gpu::LaunchOp launchOp,
                                   gpu::GPUFuncOp kernelFunc,
                                   ValueRange operands) {
   OpBuilder builder(launchOp);
-  builder.create<gpu::LaunchFuncOp>(
+  auto launchFuncOp = builder.create<gpu::LaunchFuncOp>(
       launchOp.getLoc(), kernelFunc, launchOp.getGridSizeOperandValues(),
       launchOp.getBlockSizeOperandValues(), operands);
+
+  if (pmlc::hasTags(launchOp))
+    pmlc::copyTags(launchFuncOp, launchOp);
+
   launchOp.erase();
 }
 

@@ -14,6 +14,7 @@
 #include "pmlc/rt/vulkan/vulkan_device.h"
 
 #include <memory>
+#include <queue>
 #include <stdexcept>
 #include <utility>
 #include <vector>
@@ -25,6 +26,23 @@ using namespace mlir; // NOLINT[build/namespaces]
 
 namespace pmlc::rt::vulkan {
 
+void VulkanDevice::getExtensions(const VkPhysicalDevice &physicalDevice) {
+  uint32_t count;
+  vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &count,
+                                       nullptr); // get number of extensions
+  std::vector<VkExtensionProperties> extensions(count);
+  vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &count,
+                                       extensions.data()); // populate buffer
+
+  for (auto &extension : extensions) {
+    extensionList.insert(extension.extensionName);
+  }
+}
+
+bool VulkanDevice::isExtensionSupported(const std::string &extension_name) {
+  return extensionList.find(extension_name) != extensionList.end();
+}
+
 VulkanDevice::VulkanDevice(const VkPhysicalDevice &physicalDevice,
                            std::shared_ptr<VulkanState> state)
     : state{std::move(state)} {
@@ -33,7 +51,7 @@ VulkanDevice::VulkanDevice(const VkPhysicalDevice &physicalDevice,
   IVLOG(1, "Instantiating Vulkan device: " << props.deviceName);
 
   timestampPeriod = props.limits.timestampPeriod;
-
+  getExtensions(physicalDevice);
   getBestComputeQueue(physicalDevice);
 
   const float queuePrioritory = 1.0f;
@@ -103,36 +121,48 @@ void VulkanDevice::getBestComputeQueue(const VkPhysicalDevice &physicalDevice) {
                                            &queueFamilyPropertiesCount,
                                            queueFamilyProperties.data());
 
-  // VK_QUEUE_COMPUTE_BIT specifies that queues in this queue family support
-  // compute operations.
-  for (uint32_t i = 0; i < queueFamilyPropertiesCount; ++i) {
-    const VkQueueFlags maskedFlags =
-        (~(VK_QUEUE_TRANSFER_BIT | VK_QUEUE_SPARSE_BINDING_BIT) &
-         queueFamilyProperties[i].queueFlags);
+  // By default a max heap is created ordered by first element of pair.
+  std::priority_queue<std::pair<int, int>> indexPriorityQueue;
 
-    if (!(VK_QUEUE_GRAPHICS_BIT & maskedFlags) &&
-        (VK_QUEUE_COMPUTE_BIT & maskedFlags)) {
-      queueFamilyIndex = i;
-      // TODO: need to check if there is another queue that supports timestamps
-      timestampValidBits = queueFamilyProperties[i].timestampValidBits;
-      return;
-    }
-  }
+  // Queue family priorities (larger numbers for higher priority)
+  // ----------------------------------------------------------------------
+  // |priority|         supported           |         unsupported         |
+  // ----------------------------------------------------------------------
+  // |   4    |     compute,timestamps      |          graphics           |
+  // |   3    | compute,graphics,timestamps |              -              |
+  // |   2    |          compute            |    graphics,timestamps      |
+  // |   1    |     compute,graphics        |         timestamps          |
+  // ----------------------------------------------------------------------
 
   for (uint32_t i = 0; i < queueFamilyPropertiesCount; ++i) {
     const VkQueueFlags maskedFlags =
         (~(VK_QUEUE_TRANSFER_BIT | VK_QUEUE_SPARSE_BINDING_BIT) &
          queueFamilyProperties[i].queueFlags);
-
+    int queueFamilyPriority = 0;
     if (VK_QUEUE_COMPUTE_BIT & maskedFlags) {
-      queueFamilyIndex = i;
-      // TODO: need to check if there is another queue that supports timestamps
-      timestampValidBits = queueFamilyProperties[i].timestampValidBits;
-      return;
+      queueFamilyPriority++;
+      if (!(VK_QUEUE_GRAPHICS_BIT & maskedFlags)) {
+        queueFamilyPriority++;
+      }
+      if (queueFamilyProperties[i].timestampValidBits > 0) {
+        queueFamilyPriority += 2;
+      }
+      indexPriorityQueue.push(std::make_pair(queueFamilyPriority, i));
     }
   }
 
-  throw std::runtime_error{"Cannot find a valid queue"};
+  if (indexPriorityQueue.empty()) {
+    throw std::runtime_error{"Cannot find a valid queue"};
+  }
+  queueFamilyIndex = indexPriorityQueue.top().second;
+  timestampValidBits =
+      queueFamilyProperties[queueFamilyIndex].timestampValidBits;
+  if (timestampValidBits > 0) {
+    IVLOG(1, "  Selected device queue family supports " << timestampValidBits
+                                                        << "-bit timestamps");
+  } else {
+    IVLOG(1, "  Selected device queue family does not supports timestamps");
+  }
 }
 
 } // namespace pmlc::rt::vulkan

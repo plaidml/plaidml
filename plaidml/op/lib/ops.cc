@@ -2905,7 +2905,7 @@ Value squeeze(const Value& value) {
     }
   }
   std::vector<Value> O_dims_values;
-  for (const auto dim : O_dims) {
+  for (const TensorDim& dim : O_dims) {
     O_dims_values.push_back(Value{dim});
   }
   return reshape(make_tuple(Value{I}, Value{O_dims_values}));

@@ -115,7 +115,9 @@ int main(int argc, char **argv) {
   llvm::llvm_shutdown_obj x;
   registerPassManagerCLOptions();
 
+  mlir::enableGlobalDialectRegistry(true);
   registerAllDialects();
+
   llvm::InitLLVM y(argc, argv);
   llvm::InitializeNativeTarget();
   llvm::InitializeNativeTargetAsmPrinter();
