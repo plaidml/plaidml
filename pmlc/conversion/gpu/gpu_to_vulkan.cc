@@ -17,7 +17,6 @@
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallString.h"
 
-#include "pmlc/conversion/gpu/lowering.h"
 #include "pmlc/conversion/gpu/pass_detail.h"
 #include "pmlc/util/logging.h"
 #include "pmlc/util/tags.h"
