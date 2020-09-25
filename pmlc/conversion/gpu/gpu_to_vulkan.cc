@@ -13,6 +13,7 @@
 #include "mlir/IR/Module.h"
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallString.h"
 
@@ -31,6 +32,7 @@ using mlir::CallOp;
 using mlir::failure;
 using mlir::FuncOp;
 using mlir::FunctionType;
+using mlir::LoadOp;
 using mlir::Location;
 using mlir::LogicalResult;
 using mlir::MemRefType;
@@ -38,6 +40,7 @@ using mlir::ModuleOp;
 using mlir::OpBuilder;
 using mlir::SmallString;
 using mlir::SmallVector;
+using mlir::StoreOp;
 using mlir::StringRef;
 using mlir::success;
 using mlir::Type;
@@ -273,21 +276,45 @@ ConvertGpuLaunchFuncToVulkanCalls::bindBuffers(Location loc, OpBuilder &builder,
       Value unrankedBuffer = builder.create<mlir::MemRefCastOp>(
           loc, buffer, getUnrankedMemRefType(elementType));
 
-      Value isBlockArgument = builder.create<LLVM::ConstantOp>(
-          loc, getLLVMInt1Type(),
-          builder.getBoolAttr(buffer.isa<mlir::BlockArgument>()));
+      // Check if it's required to be moved
+      uint32_t memCpyLevel = 0;
+      auto parentOp = launchOp.getParentOp();
+      parentOp->walk([&](StoreOp storeOp) {
+        if (storeOp.getOperation()->isBeforeInBlock(launchOp.getOperation())) {
+          for (auto operand : storeOp.getOperands()) {
+            if (buffer == operand) {
+              memCpyLevel = 1;
+            }
+          }
+        }
+      });
+      parentOp->walk([&](LoadOp loadOp) {
+        if (!loadOp.getOperation()->isBeforeInBlock(launchOp.getOperation())) {
+          for (auto operand : loadOp.getOperands()) {
+            if (buffer == operand) {
+              memCpyLevel = (memCpyLevel == 0) ? 2 : 3;
+            }
+          }
+        }
+      });
+      if (buffer.isa<mlir::BlockArgument>()) {
+        memCpyLevel = 3;
+      }
+
+      Value bufferCopyLevel = builder.create<LLVM::ConstantOp>(
+          loc, getLLVMInt32Type(), builder.getI32IntegerAttr(memCpyLevel));
       builder.create<CallOp>(
           loc, ArrayRef<Type>{},
           builder.getSymbolRefAttr(getBufferBindingFunc(elementType)),
           ArrayRef<Value>{vulkanRuntime, descriptorSet, descriptorBinding,
-                          bufferByteSize, isBlockArgument, unrankedBuffer});
+                          bufferByteSize, bufferCopyLevel, unrankedBuffer});
       optionalSymbols.insert(getBufferBindingFunc(elementType));
     } else {
       return failure();
     }
   }
   return success();
-}
+} // namespace pmlc::conversion::gpu
 
 LogicalResult ConvertGpuLaunchFuncToVulkanCalls::transferBuffers(
     Location loc, OpBuilder &builder, gpu::LaunchFuncOp launchOp) {
@@ -405,7 +432,7 @@ void ConvertGpuLaunchFuncToVulkanCalls::declareVulkanFunctions(Location loc) {
           FunctionType::get(
               {ArrayRef<Type>{getLLVMPointerType(), getLLVMInt32Type(),
                               getLLVMInt32Type(), getLLVMInt32Type(),
-                              getLLVMInt1Type(),
+                              getLLVMInt32Type(),
                               getUnrankedMemRefType(bufferElementType)}},
               {}, &ctx),
           ArrayRef<std::pair<mlir::Identifier, mlir::Attribute>>());

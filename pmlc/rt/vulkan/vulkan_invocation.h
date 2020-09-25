@@ -65,7 +65,7 @@ using ResourceData =
                    llvm::DenseMap<BindingIndex, VulkanHostMemoryBuffer>>;
 
 using ResourceDataType =
-    llvm::DenseMap<DescriptorSetIndex, llvm::DenseMap<BindingIndex, bool>>;
+    llvm::DenseMap<DescriptorSetIndex, llvm::DenseMap<BindingIndex, uint32_t>>;
 
 /// StorageClass mapped into a descriptor set and a binding.
 using ResourceStorageClassBindingMap =
@@ -158,7 +158,8 @@ public:
 
   /// Sets needed data for Vulkan device.
   void setResourceData(const DescriptorSetIndex desIndex,
-                       const BindingIndex bindIndex, const bool isBlockArgument,
+                       const BindingIndex bindIndex,
+                       const uint32_t bufferCopyLevel,
                        const VulkanHostMemoryBuffer &hostMemBuffer);
 
 private:
