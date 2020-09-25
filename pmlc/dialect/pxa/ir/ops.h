@@ -21,6 +21,7 @@ using mlir::AffineMap;
 using mlir::AffineMapAttr;
 using mlir::AffineReadOpInterface;
 using mlir::AffineValueMap;
+using mlir::AffineWriteOpInterface;
 using mlir::AffineYieldOp;
 using mlir::ArrayAttr;
 using mlir::ArrayRef;
