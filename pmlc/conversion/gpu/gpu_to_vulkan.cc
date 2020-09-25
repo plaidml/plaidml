@@ -12,6 +12,7 @@
 #include "mlir/IR/Module.h"
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallString.h"
 
@@ -39,6 +40,8 @@ using mlir::success;
 using mlir::Type;
 using mlir::UnrankedMemRefType;
 using mlir::Value;
+using mlir::StoreOp;
+using mlir::LoadOp;
 
 static constexpr const char *kSPIRVBinary = "SPIRV_BIN";
 static constexpr const char *kPrint_memref_f32 = "print_memref_f32";
@@ -269,9 +272,22 @@ ConvertGpuLaunchFuncToVulkanCalls::bindBuffers(Location loc, OpBuilder &builder,
       Value unrankedBuffer = builder.create<mlir::MemRefCastOp>(
           loc, buffer, getUnrankedMemRefType(elementType));
 
+      // Check if it's required to be moved
+      bool isDeviceBuffer = false;
+      auto parentOp = launchOp.getParentOp();
+      parentOp->walk([&](StoreOp storeOp){
+        // if(storeOp.isBeforeInBlock(&launchOp)) {
+          for(auto operand: storeOp.getOperands()) {
+            if (buffer == operand) {
+              isDeviceBuffer = true;
+            }
+          }
+        // }
+      });
+
       Value isBlockArgument = builder.create<LLVM::ConstantOp>(
           loc, getLLVMInt1Type(),
-          builder.getBoolAttr(buffer.isa<mlir::BlockArgument>()));
+          builder.getBoolAttr(buffer.isa<mlir::BlockArgument>() || isDeviceBuffer));
       builder.create<CallOp>(
           loc, ArrayRef<Type>{},
           builder.getSymbolRefAttr(getBufferBindingFunc(elementType)),
