@@ -22,7 +22,6 @@
 
 namespace pmlc::rt::vulkan {
 
-static constexpr const int kBufferCopyModeInit = 0;
 static constexpr const int kBufferCopyModeHostToDevice = 1;
 static constexpr const int kBufferCopyModeDeviceToHost = 2;
 

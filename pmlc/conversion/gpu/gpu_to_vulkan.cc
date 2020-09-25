@@ -74,6 +74,7 @@ static constexpr const char *kBindBufferInteger32 = "bindBufferInteger32";
 static constexpr const char *kBindBufferInteger64 = "bindBufferInteger64";
 
 static constexpr const int kByteBits = 8;
+static constexpr const int kBufferCopyModeInit = 0;
 static constexpr const int kBufferCopyModeHostToDevice = 1;
 static constexpr const int kBufferCopyModeDeviceToHost = 2;
 
