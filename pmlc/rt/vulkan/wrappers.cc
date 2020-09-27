@@ -115,7 +115,7 @@ struct Registration {
     // Vulkan Runtime functions
     registerSymbol("initVulkan", reinterpret_cast<void *>(initVulkan));
     registerSymbol("deinitVulkan", reinterpret_cast<void *>(deinitVulkan));
-    registerSymbol("_mlir_ciface_createVulkanLaunchKernelAction",
+    registerSymbol("createVulkanLaunchKernelAction",
                    reinterpret_cast<void *>(createVulkanLaunchKernelAction));
     registerSymbol("createVulkanMemoryTransferAction",
                    reinterpret_cast<void *>(createVulkanMemoryTransferAction));
