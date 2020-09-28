@@ -123,7 +123,7 @@ private:
   /// Check buffer type and only copy from/to device when necessary
   uint32_t getBufferCopyMode(mlir::CallOp &callOp, Value &buffer);
 
-  bool isExternalOperation(Operation *op);
+  bool isInternalOperation(Operation *op);
 
   llvm::SmallSet<Operation *, 4> getExternalDependentOperations(Value &value);
 
@@ -284,30 +284,28 @@ ConvertGpuLaunchFuncToVulkanCalls::getExternalDependentOperations(
   }
 
   for (auto operation : operations) {
-    if (!isExternalOperation(operation)) {
+    if (isInternalOperation(operation)) {
       operations.erase(operation);
     }
   }
   return operations;
 }
 
-bool ConvertGpuLaunchFuncToVulkanCalls::isExternalOperation(Operation *op) {
+bool ConvertGpuLaunchFuncToVulkanCalls::isInternalOperation(Operation *op) {
   // Buffer related calls are all mlir::CallOp, does not need to check
   // LLVM::CallOp
-  if (auto callOp = llvm::dyn_cast<mlir::CallOp>(op)) {
-    if (callOp.callee() == kBindAllBuffers ||
-        optionalSymbols.count(callOp.callee())) {
-      return false;
-    }
+  auto callOp = llvm::dyn_cast<mlir::CallOp>(op);
+  if (callOp && (callOp.callee() == kBindAllBuffers ||
+                 optionalSymbols.count(callOp.callee()))) {
     return true;
   }
 
   auto allocOp = llvm::dyn_cast<AllocOp>(op);
   auto memRefCastOp = llvm::dyn_cast<MemRefCastOp>(op);
-  if (allocOp | memRefCastOp) {
-    return false;
+  if (allocOp || memRefCastOp) {
+    return true;
   }
-  return true;
+  return false;
 }
 
 uint32_t
