@@ -25,6 +25,7 @@ filegroup(
         "//pmlc/dialect/tile/tests:all",
         "//pmlc/dialect/xsmm/tests:all",
         "//pmlc/rt/tests:all",
+        "//pmlc/rt/opencl/tests:all",
         "//pmlc/rt/vulkan/tests:all",
         "//pmlc/target/intel_gen/tests:all",
         "//pmlc/target/x86/tests:all",
@@ -111,4 +112,10 @@ plaidml_cc_binary(
     name = "vulkan",
     data = [":lit_tests"],
     deps = ["//pmlc/tools/pmlc-vulkan-runner:lib"],
+)
+
+plaidml_cc_binary(
+    name = "opencl",
+    data = [":lit_tests"],
+    deps = ["//pmlc/tools/pmlc-opencl-runner:lib"],
 )

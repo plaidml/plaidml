@@ -46,6 +46,7 @@ tool_names = [
     'pmlc-tblgen',
     'pmlc-translate',
     'pmlc-vulkan-runner',
+    'pmlc-opencl-runner',
     'cc_test',
     'py_test',
 ]
