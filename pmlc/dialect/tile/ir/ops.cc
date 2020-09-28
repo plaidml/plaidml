@@ -1249,6 +1249,37 @@ ParseResult parsePolyBinaryOp(OpAsmParser *parser, OperationState &result) {
                  parser->resolveOperand(rhs, indexType, result.operands));
 }
 
+// ---- SortOp ----
+
+Type SortOp::getResultType(ArrayRef<Value> operands) {
+  IVLOG(5, "SortOp::getResultType>")
+  if (operands.size() != 2) {
+    throw std::runtime_error("SortOp requires 2 operands");
+  }
+  auto tensor = operands[0];
+  auto tensorType = eltwise::getRankedTensorType(tensor.getType());
+  if (!tensorType.getRank()) {
+    throw std::runtime_error(
+        "'sort' requires first operand to have at least one dimension.");
+  }
+  /*
+  TODO: validate that the axis operand is an integer attribute
+  the code below is wrong; I haven't figured it out yet
+  auto axis = operands[1];
+  auto& const_op = llvm::dyn_cast<ConstantOp>(axis);
+  if (!const_op) {
+    throw std::runtime_error(
+        "'sort' requires the axis argument to be a constant");
+  }
+  auto& axisAttr = llvm::dyn_cast<IntegerAttr>(const_op);
+  if (!axisAttr) {
+    throw std::runtime_error(
+        "'sort' requires the axis argument to be an integer attribute");
+  }
+  */
+  return tensorType;
+}
+
 // ---- TraceOp ----
 
 struct TraceOpCanonicalizer : public OpRewritePattern<TraceOp> {

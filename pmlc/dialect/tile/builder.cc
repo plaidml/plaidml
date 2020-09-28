@@ -310,6 +310,15 @@ Value TileBuilder::MakeCastOp(Value tensor, Type dtype) {
       .result();
 }
 
+Value TileBuilder::MakeSortOp(Value tensor, size_t axis) {
+  IVLOG(5, "TileBuilder::MakeSortOp> " << std::to_string(axis));
+  IVLOG(6, "  arg: " << mlir::debugString(tensor));
+  auto tensorType = eltwise::getRankedTensorType(tensor.getType());
+  auto axisAttr = impl->builder.getI64IntegerAttr(static_cast<int64_t>(axis));
+  return impl->builder.create<SortOp>(impl->loc, tensorType, tensor, axisAttr)
+      .result();
+}
+
 Value TileBuilder::MakeTraceOp(Value tensor, const char *msg) {
   IVLOG(5, "TileBuilder::MakeTraceOp> " << msg);
   return impl->builder.create<TraceOp>(impl->loc, tensor, msg).out();

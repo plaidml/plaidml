@@ -140,6 +140,14 @@ def ShapeOp : SpecialOp<"shape">, HasCanonicalizer {
   let results = (outs RankedTensorOf<[SI32]>:$result);
 }
 
+def SortOp : SpecialOp<"sort"> {
+  let summary = "tensor sort operation";
+  let arguments = (ins
+    RankedTensorOf<[AnyScalar]>:$tensor,
+    APIntAttr:$axis);
+  let results = (outs RankedTensorOf<[AnyScalar]>:$result);
+}
+
 def TraceOp : Op<TileDialect, "trace", []>, HasCanonicalizer {
   let summary = "tracepoint operation";
   let arguments = (ins AnyType:$in, StrAttr:$msg);

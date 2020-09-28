@@ -87,6 +87,7 @@ public:
   mlir::Value MakePrimitiveOp(llvm::StringRef fn,
                               llvm::ArrayRef<mlir::Value> args);
   mlir::Value MakeCastOp(mlir::Value tensor, mlir::Type dtype);
+  mlir::Value MakeSortOp(mlir::Value tensor, size_t axis);
   mlir::Value MakeTraceOp(mlir::Value tensor, const char *msg);
   mlir::Value MakeDimOp(mlir::Value tensor, unsigned dim);
   mlir::Value MakePlaceholderOp(mlir::RankedTensorType type,

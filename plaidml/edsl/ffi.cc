@@ -378,6 +378,17 @@ plaidml_expr* plaidml_expr_cast(  //
   });
 }
 
+plaidml_expr* plaidml_expr_sort(  //
+    plaidml_error* err,           //
+    plaidml_expr* tensor,         //
+    size_t axis) {
+  return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
+    IVLOG(3, "plaidml_expr_sort");
+    auto ctx = GlobalContext::get();
+    return new plaidml_expr{ctx->MakeSortOp(tensor->value, axis)};
+  });
+}
+
 plaidml_expr* plaidml_expr_trace(  //
     plaidml_error* err,            //
     plaidml_expr* tensor,          //

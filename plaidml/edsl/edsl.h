@@ -1172,6 +1172,17 @@ inline Tensor select(const Tensor& cond, const Tensor& true_case, const Tensor& 
 inline Tensor shape(const Tensor& x) { return Call("shape", x); }
 
 ///
+/// Returns a copy of `x` sorted along `axis`.
+/// \param x Tensor
+/// \param axis size_t
+/// \return Tensor
+///
+inline Tensor sort(const Tensor& x, size_t axis) {
+  auto ptr = ffi::call<plaidml_expr*>(plaidml_expr_sort, x.as_ptr(), axis);
+  return Tensor{ptr};
+}
+
+///
 /// Computes the elementwise sine of `x`.
 /// \param x Tensor
 /// \return Tensor

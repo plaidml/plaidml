@@ -1129,6 +1129,59 @@ TEST_F(CppEdsl, Shape) {
   EXPECT_THAT(data[1], 20);
 }
 
+TEST_F(CppEdsl, Sort1d) {
+  auto I = Placeholder(DType::FLOAT32, {20});
+  auto O = sort(I, /*axis=*/0);
+  auto program = makeProgram("sort", {O});
+  std::vector<float> input = {
+      81, 95, 27, 43, 55, 56, 57, 5,  39, 7,   //
+      14, 66, 20, 66, 64, 71, 67, 54, 87, 80,  //
+  };
+  std::vector<float> output = {
+      5,  7,  14, 20, 27, 39, 43, 54, 55, 56,  //
+      57, 64, 66, 66, 67, 71, 80, 81, 87, 95,  //
+  };
+  checkProgram(program, {{I, input}}, {{O, output}});
+}
+
+TEST_F(CppEdsl, Sort2dAxis0) {
+  auto I = Placeholder(DType::FLOAT32, {5, 4});
+  auto O = sort(I, /*axis=*/0);
+  auto program = makeProgram("sort", {O});
+  std::vector<float> input = {
+      81, 95, 27, 43, 55,  //
+      56, 57, 5,  39, 7,   //
+      14, 66, 20, 66, 64,  //
+      71, 67, 54, 87, 80,  //
+  };
+  std::vector<float> output = {
+      14, 57, 5,  39, 7,   //
+      56, 66, 20, 43, 55,  //
+      71, 67, 27, 66, 64,  //
+      81, 95, 54, 87, 80,  //
+  };
+  checkProgram(program, {{I, input}}, {{O, output}});
+}
+
+TEST_F(CppEdsl, Sort2dAxis1) {
+  auto I = Placeholder(DType::FLOAT32, {5, 4});
+  auto O = sort(I, /*axis=*/1);
+  auto program = makeProgram("sort", {O});
+  std::vector<float> input = {
+      81, 95, 27, 43, 55,  //
+      56, 57, 5,  39, 7,   //
+      14, 66, 20, 66, 64,  //
+      71, 67, 54, 87, 80,  //
+  };
+  std::vector<float> output = {
+      27, 43, 55, 81, 95,  //
+      5,  7,  39, 56, 57,  //
+      14, 20, 64, 66, 66,  //
+      54, 67, 71, 80, 87,  //
+  };
+  checkProgram(program, {{I, input}}, {{O, output}});
+}
+
 TEST_F(CppEdsl, Prng) {
   auto S = Placeholder(DType::UINT32, {1, 3});
   auto O = prng(S, {2, 3});

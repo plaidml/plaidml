@@ -49,6 +49,8 @@ using dialect::tile::ScatterOp;
 using dialect::tile::ScatterOpAdaptor;
 using dialect::tile::ShapeOp;
 using dialect::tile::ShapeOpAdaptor;
+using dialect::tile::SortOp;
+using dialect::tile::SortOpAdaptor;
 using dialect::tile::TraceOp;
 
 namespace {
@@ -1269,6 +1271,18 @@ struct ReturnOpConversion : public OpConversionPattern<ReturnOp> {
   }
 };
 
+struct SortOpConversion : public OpConversionPattern<SortOp> {
+  using OpConversionPattern<SortOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(SortOp op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const final {
+    IVLOG(2, "SortOpConversion::matchAndRewrite>");
+
+    return failure();
+  }
+};
+
 struct TraceOpConversion : public OpConversionPattern<TraceOp> {
   using OpConversionPattern<TraceOp>::OpConversionPattern;
 
@@ -1335,6 +1349,7 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
         ScalarConstantOpConversion, //
         ScatterOpConversion,        //
         ShapeOpConversion,          //
+        SortOpConversion,           //
         TileConstantOpConversion,   //
         TraceOpConversion,          //
         // TODO: SpecialOpConversion (ZeroOp)
