@@ -22,8 +22,8 @@
 
 namespace pmlc::rt::vulkan {
 
-static constexpr const int kBufferCopyModeHostToDevice = 1;
-static constexpr const int kBufferCopyModeDeviceToHost = 2;
+static constexpr const int kBufferCopyModeHostToDevice = 1 << 0;
+static constexpr const int kBufferCopyModeDeviceToHost = 1 << 1;
 
 VulkanInvocation::VulkanInvocation() : device{Device::current<VulkanDevice>()} {
   createQueryPool();
