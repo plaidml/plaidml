@@ -1,5 +1,7 @@
 // Copyright 2020 Intel Corporation
 
+#include <string>
+
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Pass/Pass.h"
@@ -58,7 +60,9 @@ struct GemmOperand {
 class StencilGEMM : public StencilBase {
 private:
   unsigned numThreads;
+  std::string strategy;
   StencilCostFunction stencilCostFn;
+  std::string kStrategy_StridedBRGEMM = "strided_brgemm";
 
   Optional<LoadStoreOps> capture() {
     // Looking for load..load..mul..reduce..terminator
@@ -260,6 +264,79 @@ private:
   }
 
   void transform(TensorAndIndexPermutation perm, ArrayRef<int64_t> tileSize) {
+    PxaGemmOp gemm;
+
+    if (strategy == kStrategy_StridedBRGEMM) {
+      createStridedBRGemmPxaGemmOp(perm, tileSize);
+    } else {
+      createSimplePxaGemmOp(perm, tileSize);
+    }
+  }
+
+  void createStridedBRGemmPxaGemmOp(TensorAndIndexPermutation perm,
+                                    ArrayRef<int64_t> tileSize) {
+    auto AStrideInfo = getStrideInfo(perm.ioOps[1]);
+    int count = 0;
+    int64_t kRange = -1, l_br = -1;
+    for (const auto &kvp : AStrideInfo->strides) {
+      count++;
+      if (count == 2) {
+        IVLOG(3, "AStride range: " << getIdxRange(kvp.first))
+        kRange = getIdxRange(kvp.first);
+      }
+    }
+
+    // First, modify step size of all tiled indexes
+    auto steps = op.getSteps();
+    for (size_t i = 0; i < getBlockArgsAsSet().size(); i++) {
+      for (size_t j = 0; j < getTiledIdxCount(); j++) {
+        if (perm.indexes[j] == op.getBody()->getArgument(i)) {
+          steps[i] *= tileSize[j];
+
+          // K index
+          if (j == 2) {
+            IVLOG(3, "steps[" << i << "] = " << steps[i]);
+            if (kRange != -1) {
+              l_br = kRange / steps[i];
+              steps[i] = kRange;
+            }
+          }
+        }
+      }
+    }
+    op.setSteps(steps);
+
+    // Generate the GEMM op; select inputs based on permutation order
+    auto opC = cast<PxaReduceOp>(*perm.ioOps[0]);
+    auto opA = cast<PxaLoadOp>(*perm.ioOps[1]);
+    auto opB = cast<PxaLoadOp>(*perm.ioOps[2]);
+
+    auto bodyBuilder = op.getBodyBuilder();
+
+    auto tileAttr = bodyBuilder.getI64ArrayAttr(tileSize);
+    auto lBrAttr = bodyBuilder.getI64IntegerAttr(l_br);
+
+    SmallVector<Value, 8> mapOperands;
+    GemmOperand c(opC, {perm.indexes[0], perm.indexes[1]}, mapOperands);
+    GemmOperand a(opA, {perm.indexes[0], perm.indexes[2]}, mapOperands);
+    GemmOperand b(opB, {perm.indexes[2], perm.indexes[1]}, mapOperands);
+
+    auto brgemm = bodyBuilder.create<pxa::PxaGemmOp>(
+        op.getLoc(), c.memref.getType(), //
+        c.memref, AffineMapAttr::get(c.accessMap),
+        AffineMapAttr::get(c.tileMap), //
+        a.memref, AffineMapAttr::get(a.accessMap),
+        AffineMapAttr::get(a.tileMap), //
+        b.memref, AffineMapAttr::get(b.accessMap),
+        AffineMapAttr::get(b.tileMap), //
+        tileAttr, lBrAttr, mapOperands);
+
+    opC.result().replaceAllUsesWith(brgemm);
+    opC.erase();
+  }
+
+  void createSimplePxaGemmOp(TensorAndIndexPermutation perm,
+                             ArrayRef<int64_t> tileSize) {
     // First, modify step size of all tiled indexes
     auto steps = op.getSteps();
     for (size_t i = 0; i < getBlockArgsAsSet().size(); i++) {
@@ -279,25 +356,29 @@ private:
     auto bodyBuilder = op.getBodyBuilder();
 
     auto tileAttr = bodyBuilder.getI64ArrayAttr(tileSize);
+    auto lBrAttr = bodyBuilder.getI64IntegerAttr(1);
 
     SmallVector<Value, 8> mapOperands;
     GemmOperand c(opC, {perm.indexes[0], perm.indexes[1]}, mapOperands);
     GemmOperand a(opA, {perm.indexes[0], perm.indexes[2]}, mapOperands);
     GemmOperand b(opB, {perm.indexes[2], perm.indexes[1]}, mapOperands);
 
-    auto gemm =
-        bodyBuilder.create<pxa::PxaGemmOp>(op.getLoc(), c.memref.getType(),  //
-                                           c.memref, c.accessMap, c.tileMap, //
-                                           a.memref, a.accessMap, a.tileMap, //
-                                           b.memref, b.accessMap, b.tileMap, //
-                                           tileAttr, mapOperands);
+    auto gemm = bodyBuilder.create<pxa::PxaGemmOp>(
+        op.getLoc(), c.memref.getType(), //
+        c.memref, AffineMapAttr::get(c.accessMap),
+        AffineMapAttr::get(c.tileMap), //
+        a.memref, AffineMapAttr::get(a.accessMap),
+        AffineMapAttr::get(a.tileMap), //
+        b.memref, AffineMapAttr::get(b.accessMap),
+        AffineMapAttr::get(b.tileMap), //
+        tileAttr, lBrAttr, mapOperands);
 
     opC.result().replaceAllUsesWith(gemm);
     opC.erase();
   }
 
 public:
-  StencilGEMM(AffineParallelOp op, unsigned numThreads,
+  StencilGEMM(AffineParallelOp op, unsigned numThreads, std::string strategy,
               StencilCostFunction costFn)
       : StencilBase{op,
                     3, // Three tileable indexes
@@ -318,7 +399,7 @@ public:
                          [](int64_t stride) { return stride == 1; }, // input0
                          [](int64_t stride) { return stride != 0; }, // input1
                      }}},
-        numThreads{numThreads}, stencilCostFn(costFn) {}
+        numThreads{numThreads}, strategy{strategy}, stencilCostFn(costFn) {}
 };
 
 struct StencilGEMMPass : public PassWrapper<StencilGEMMPass, FunctionPass> {
@@ -326,17 +407,24 @@ struct StencilGEMMPass : public PassWrapper<StencilGEMMPass, FunctionPass> {
 
   StencilGEMMPass(const StencilGEMMPass &rhs) : costFn(rhs.costFn) {
     numThreads = rhs.numThreads.getValue();
+    strategy = rhs.strategy.getValue();
   }
 
-  StencilGEMMPass(unsigned numThreads_, StencilCostFunction costFn)
+  StencilGEMMPass(unsigned numThreads_, std::string strategy_,
+                  StencilCostFunction costFn)
       : costFn(costFn) {
     numThreads = numThreads_;
+    strategy = strategy_;
   }
 
   void runOnFunction() final {
     auto func = getFunction();
     func.walk([this](AffineParallelOp op) {
-      StencilGEMM stencil(op, numThreads.getValue(), costFn);
+      IVLOG(3, "StencilGEMMPass - numThreads: " << numThreads.getValue());
+      IVLOG(3, "StencilGEMMPass - strategy: " << strategy.getValue());
+
+      StencilGEMM stencil(op, numThreads.getValue(), strategy.getValue(),
+                          costFn);
       stencil.DoStenciling();
     });
   }
@@ -356,7 +444,7 @@ std::unique_ptr<Pass> createStencilGEMMPass(unsigned numThreads,
                                             StencilCostFunction costFn) {
   IVLOG(3, "numThreads: " << numThreads);
   IVLOG(3, "strategy: " << strategy);
-  return std::make_unique<StencilGEMMPass>(numThreads, costFn);
+  return std::make_unique<StencilGEMMPass>(numThreads, strategy, costFn);
 }
 
 } // namespace pmlc::dialect::pxa

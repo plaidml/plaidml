@@ -1,4 +1,4 @@
-// RUN: pmlc-opt -convert-linalg-to-loops -x86-affine-stencil-brgemm-xsmm -x86-convert-pxa-to-affine -lower-affine \
+// RUN: pmlc-opt -convert-linalg-to-loops -x86-affine-stencil-xsmm="strategy=strided_brgemm" -x86-convert-pxa-to-affine -lower-affine \
 // RUN:     -canonicalize -convert-scf-to-std -x86-convert-std-to-llvm %s | \
 // RUN:   pmlc-jit -e baseline | FileCheck %s
 
@@ -91,7 +91,7 @@ module {
       %0 = pxa.load %arg1[%arg3, %arg5] : memref<8x8xf32>
       %1 = pxa.load %arg0[%arg5, %arg4] : memref<8x8xf32>
       %2 = mulf %0, %1 : f32
-      %3 = pxa.brgemm %arg2[%arg3, %arg4]:#map3 = %arg1[%arg3, %arg5]:#map3, %arg0[%arg5, %arg4]:#map3, [2, 2, 2], 4 : (memref<8x8xf32>, memref<8x8xf32>) -> memref<8x8xf32>
+      %3 = pxa.gemm %arg2[%arg3, %arg4]:#map3 = %arg1[%arg3, %arg5]:#map3, %arg0[%arg5, %arg4]:#map3, [2, 2, 2], 4 : (memref<8x8xf32>, memref<8x8xf32>) -> memref<8x8xf32>
     }
     return
   }

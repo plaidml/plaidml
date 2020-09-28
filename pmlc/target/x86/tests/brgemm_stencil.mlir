@@ -1,4 +1,4 @@
-// RUN: pmlc-opt -convert-linalg-to-loops -x86-affine-stencil-brgemm-xsmm  \
+// RUN: pmlc-opt -convert-linalg-to-loops -x86-affine-stencil-xsmm="strategy=strided_brgemm"  \
 // RUN:    %s | FileCheck %s 
 
 !I_memref = type memref<1x6x5x7xf32>
@@ -91,4 +91,4 @@ func @gemm_operation_rewrite_fl32(%arg0: memref<8x8xf32>, %arg1: memref<8x8xf32>
   }
   return
 }
-// CHECK: pxa.brgemm
+// CHECK: pxa.gemm

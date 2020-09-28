@@ -9,6 +9,7 @@
 #include "pmlc/dialect/pxa/analysis/strides.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/dialect/xsmm/ir/ops.h"
+#include "pmlc/util/logging.h"
 
 using namespace mlir; // NOLINT[build/namespaces]
 
@@ -68,12 +69,25 @@ struct PxaGemmOpConversion : public OpConversionPattern<pxa::PxaGemmOp> {
     auto leadingDimsAttr = rewriter.getI64ArrayAttr(ArrayRef<int64_t>{
         aInfo.strides[0], bInfo.strides[0], cInfo.strides[0]});
 
-    auto dispatch = rewriter.create<xsmm::GemmDispatchOp>(
-        op.getLoc(), rewriter.getI64Type(), op.tile(), leadingDimsAttr);
+    int64_t lBr = op.lBr().getSExtValue();
 
-    rewriter.create<xsmm::GemmInvokeOp>(op.getLoc(), ArrayRef<Type>(), dispatch,
-                                        transformed.c(), transformed.a(),
-                                        transformed.b(), indices);
+    if (lBr == 1) {
+      auto dispatch = rewriter.create<xsmm::GemmDispatchOp>(
+          op.getLoc(), rewriter.getI64Type(), op.tile(), leadingDimsAttr);
+
+      rewriter.create<xsmm::GemmInvokeOp>(
+          op.getLoc(), ArrayRef<Type>(), dispatch, transformed.c(),
+          transformed.a(), transformed.b(), indices);
+    } else if (lBr > 1) {
+      auto dispatch = rewriter.create<xsmm::BRGemmDispatchOp>(
+          op.getLoc(), rewriter.getI64Type(), op.tile(), leadingDimsAttr);
+
+      rewriter.create<xsmm::BRGemmInvokeOp>(
+          op.getLoc(), ArrayRef<Type>(), dispatch, transformed.c(),
+          transformed.a(), transformed.b(), op.lBr(), indices);
+    } else {
+      return failure();
+    }
 
     op.replaceAllUsesWith(transformed.c());
     rewriter.eraseOp(op);

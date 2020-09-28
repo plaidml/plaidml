@@ -180,7 +180,7 @@ struct SimplifyPxaGemmOp : public OpRewritePattern<PxaGemmOp> {
         op.c(), cAccessMap, op.cTileMap(), //
         op.a(), aAccessMap, op.aTileMap(), //
         op.b(), bAccessMap, op.bTileMap(), //
-        op.tile(), mapOperands);
+        op.tile(), op.lBr(), mapOperands);
     return success();
   }
 };
@@ -448,7 +448,7 @@ void printPxaGemmOp(OpAsmPrinter &p, PxaGemmOp op) {
   p.printAffineMapOfSSAIds(op.bAccessMapAttr(), op.getOperandsForB());
   p << "]:";
   p.printAttribute(op.bTileMapAttr());
-  p << ", " << op.tile() << " : " << funcType;
+  p << ", " << op.tile() << ", " << op.lBr() << " : " << funcType;
 }
 
 struct GemmOperandParser {
@@ -479,12 +479,15 @@ ParseResult parsePxaGemmOp(OpAsmParser &parser, OperationState &result) {
   auto i64Type = builder.getIntegerType(64);
   GemmOperandParser a("a"), b("b"), c("c");
   ArrayAttr tileAttr;
+  IntegerAttr lBrAttr;
   FunctionType funcType;
   return failure(
       c.parse(parser, result) || parser.parseEqual() ||
       a.parse(parser, result) || parser.parseComma() ||
       b.parse(parser, result) || parser.parseComma() ||
       parser.parseAttribute(tileAttr, i64Type, "tile", result.attributes) ||
+      parser.parseComma() ||
+      parser.parseAttribute(lBrAttr, i64Type, "lBr", result.attributes) ||
       parser.parseColonType(funcType) ||
       parser.addTypesToList(funcType.getResults(), result.types) ||
       parser.resolveOperand(c.operand, funcType.getResult(0),
