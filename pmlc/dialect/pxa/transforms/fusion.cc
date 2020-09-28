@@ -59,7 +59,7 @@ struct FusionInfo {
   static Operation *findSourceWrite(Value val) {
     auto opRes = val.dyn_cast<OpResult>();
     auto owner = opRes.getOwner();
-    if (isa<AffineWriteOpInterface>(owner)) {
+    if (isa<PxaWriteOpInterface>(owner)) {
       return owner;
     }
     if (auto op = dyn_cast<AffineParallelOp>(owner)) {
@@ -334,9 +334,9 @@ struct FusionInfo {
           continue;
         // Now we make sure it's a read or a write, if not, we can't do fusion,
         // bail.
-        if (isa<AffineReadOpInterface>(user)) {
+        if (isa<PxaReadOpInterface>(user)) {
           readAfterWrites.emplace_back(write, user);
-        } else if (isa<AffineWriteOpInterface>(user)) {
+        } else if (isa<PxaWriteOpInterface>(user)) {
           writeAfterWrites.emplace_back(write, user);
         } else {
           user->emitRemark("Op is not a load or reduce");
@@ -346,13 +346,13 @@ struct FusionInfo {
     }
     // For each raw & waw, consider the plan
     for (auto &raw : readAfterWrites) {
-      auto write = cast<AffineWriteOpInterface>(raw.first);
-      auto read = cast<AffineReadOpInterface>(raw.second);
+      auto write = cast<PxaWriteOpInterface>(raw.first);
+      auto read = cast<PxaReadOpInterface>(raw.second);
       considerPlan(write, read);
     }
     for (auto &waw : writeAfterWrites) {
-      auto write = cast<AffineWriteOpInterface>(waw.first);
-      auto write2 = cast<AffineWriteOpInterface>(waw.second);
+      auto write = cast<PxaWriteOpInterface>(waw.first);
+      auto write2 = cast<PxaWriteOpInterface>(waw.second);
       considerPlan(write, write2);
     }
     return hasPlan;

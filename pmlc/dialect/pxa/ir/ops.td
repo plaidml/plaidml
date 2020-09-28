@@ -5,10 +5,10 @@
 
 include "mlir/Dialect/StandardOps/IR/StandardOpsBase.td"
 include "mlir/Dialect/Affine/IR/AffineOpsBase.td"
-include "pmlc/util/enums.td"
-
-include "mlir/Dialect/Affine/IR/AffineMemoryOpInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
+
+include "pmlc/util/enums.td"
+include "interfaces.td"
 
 def PXA_Dialect : Dialect {
   let name = "pxa";
@@ -28,7 +28,7 @@ def AnyStdScalar : AnyTypeOf<[AnyFloat, AnySignlessInteger]> {}
 
 class PxaReduceOpBase<string mnemonic, list<OpTrait> traits = []> :
     PXA_OpWithPP<mnemonic, !listconcat(traits,
-        [DeclareOpInterfaceMethods<AffineWriteOpInterface>])> {
+        [DeclareOpInterfaceMethods<PxaWriteOpInterface>])> {
 
   code extraClassDeclarationBase = [{
     Value getMemRef() { return memref(); }
@@ -125,7 +125,7 @@ def PxaVectorReduceOp : PxaReduceOpBase<"vector_reduce"> {
 
 class PxaLoadOpBase<string mnemonic, list<OpTrait> traits = []> :
     PXA_OpWithPP<mnemonic, !listconcat(traits,
-        [DeclareOpInterfaceMethods<AffineReadOpInterface>])> {
+        [DeclareOpInterfaceMethods<PxaReadOpInterface>])> {
   let arguments = (ins
     AnyMemRef:$memref,
     Variadic<Index>:$indices

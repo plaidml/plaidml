@@ -11,6 +11,7 @@
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 
+#include "pmlc/dialect/pxa/ir/interfaces.h"
 #include "pmlc/util/enums.h"
 
 namespace pmlc::dialect::pxa {
@@ -19,9 +20,7 @@ using llvm::SmallVectorImpl;
 using mlir::AffineExpr;
 using mlir::AffineMap;
 using mlir::AffineMapAttr;
-using mlir::AffineReadOpInterface;
 using mlir::AffineValueMap;
-using mlir::AffineWriteOpInterface;
 using mlir::AffineYieldOp;
 using mlir::ArrayAttr;
 using mlir::ArrayRef;
