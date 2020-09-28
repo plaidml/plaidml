@@ -38,15 +38,6 @@ InferRequestInternal::Ptr PlaidMLExecutableNetwork::CreateInferRequestImpl(Input
 }
 
 PlaidMLExecutableNetwork::PlaidMLExecutableNetwork(const ICNNNetwork& network, const std::string& device) {
-  // TODO: Do we need to load the InputsDataMap?
-  InputsDataMap inputMap;
-  network.getInputsInfo(inputMap);
-  IVLOG(1, "The inputMap is " << inputMap);
-  // TODO: Do we need to load the OutputsDataMap?
-  OutputsDataMap outputMap;
-  network.getOutputsInfo(outputMap);
-  IVLOG(1, "The outputMap is " << outputMap);
-
   auto fcn = network.getFunction();
   IE_ASSERT(fcn);  // PlaidML requires that the nGraph-based API be used
   IVLOG(2, "Layers:");
@@ -97,21 +88,12 @@ PlaidMLExecutableNetwork::PlaidMLExecutableNetwork(const ICNNNetwork& network, c
       std::vector<int64_t> dims{node->get_shape().begin(), node->get_shape().end()};
       auto type = to_plaidml(node->get_element_type());
       auto tensor = edsl::Placeholder(edsl::LogicalShape(type, dims), node->get_friendly_name());
-      IVLOG(3, "    Adding placeholder named '" << node->get_name() << "'");
+      IVLOG(3, "    Adding parameter named '" << node->get_name() << "'");
       tensorMap_[node->output(0).get_tensor_ptr()] = tensor;
-      IVLOG(1, "Possible names for this input: " << node->get_output_tensor_name(0) << "; " << node->get_name() << "; "
-                                                 << node->get_friendly_name() << ".");
       tensorIONameMap_[node->get_name()] = tensor;
       continue;
     } else if (ngraph::op::is_output(node)) {
       IVLOG(4, "Building output node");
-      if (VLOG_IS_ON(1)) {
-        const auto& src_node = node->inputs()[0].get_source_output().get_node();
-        IVLOG(1, "Possible names for this output: "
-                     << node->get_input_tensor_name(0) << "; " << node->get_name() << "; " << node->get_friendly_name()
-                     << ".\nOr go up a node: " << src_node->get_input_tensor_name(0) << "; " << src_node->get_name()
-                     << "; " << src_node->get_friendly_name() << ".");
-      }
       // The OV output name is the name of the node _prior_ to the result
       tensorIONameMap_[node->inputs()[0].get_source_output().get_node()->get_name()] =
           tensorMap_.at(node->input(0).get_tensor_ptr());

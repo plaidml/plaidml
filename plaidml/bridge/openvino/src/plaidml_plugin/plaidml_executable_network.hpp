@@ -30,10 +30,10 @@ class PlaidMLExecutableNetwork : public InferenceEngine::ExecutableNetworkThread
                  InferenceEngine::ResponseDesc* resp) const override;
 
  private:
-  // Maps the names of the nGraph tensors to the corresponding PlaidML Tensors // TODO Rewrite comment
+  // Go from the nGraph Tensor descriptors available from nGraph Nodes to the corresponding PlaidML Tensor
   std::map<std::shared_ptr<ngraph::descriptor::Tensor>, plaidml::edsl::Tensor> tensorMap_;
-  // std::unordered_map<InferenceEngine::DataPtr, plaidml::edsl::Tensor> tensorMap_;
 
+  // Go from the names OV uses for a networks inputs and outputs to the corresponding PlaidML Tensor
   std::map<std::string, plaidml::edsl::Tensor> tensorIONameMap_;
 };
 

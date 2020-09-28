@@ -40,7 +40,7 @@ namespace PlaidMLPlugin {
 
 PlaidMLInferRequest::PlaidMLInferRequest(const InputsDataMap& networkInputs, const OutputsDataMap& networkOutputs,
                                          const edsl::Program& program,
-                                         const std::map<std::string, edsl::Tensor>& tensorIONameMap)  // TODO
+                                         const std::map<std::string, edsl::Tensor>& tensorIONameMap)
     : InferRequestInternal(networkInputs, networkOutputs),
       tensorIONameMap_(tensorIONameMap),
       binder_(program),
@@ -53,7 +53,7 @@ PlaidMLInferRequest::PlaidMLInferRequest(const InputsDataMap& networkInputs, con
 void PlaidMLInferRequest::InferImpl() {
   IVLOG(1, "PlaidMLInferRequest::InferImpl>");
   IVLOG(2, "  _inputs: " << _inputs);
-  IVLOG(3, "  tensorMap_: " << tensorIONameMap_);
+  IVLOG(3, "  tensorIONameMap_: " << tensorIONameMap_);
   execDataPreprocessing(_inputs);
 
   SyncInput();
