@@ -74,7 +74,9 @@ toolchain(
 # TODO
 write_file(
     name = "ov_plugins_xml",
-    out = "_solib_linux_x86_64/plugins.xml",
+    # TODO: Not sure what's up with this change, but this is brittle anyway...
+    # out = "_solib_linux_x86_64/plugins.xml",
+    out = "_solib_k8/plugins.xml",
     content = [
         "<ie>",
         "   <plugins>",
