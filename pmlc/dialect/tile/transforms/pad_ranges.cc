@@ -78,7 +78,7 @@ void PadRangesPass::runOnFunction() {
       return;
     }
     IVLOG(2, "Pad Ranges: outStrides = " << *outStrides);
-    // Decide what to round up
+    // Decide wthat to round up
     bool didChange = false;
     SmallVector<int64_t, 6> newRanges = ranges;
     for (unsigned i = 0; i < indexCount; i++) {
@@ -135,7 +135,7 @@ void PadRangesPass::runOnFunction() {
     op.getResult().setType(
         RankedTensorType::get(newOutSize, op.getResultType().getElementType()));
     // Convert ranges to bounds
-    SmallVector<int64_t4> newBounds;
+    SmallVector<int64_t, 4> newBounds;
     for (unsigned i = 0; i < indexCount; i++) {
       newBounds.push_back(newRanges[i] - 1);
     }
