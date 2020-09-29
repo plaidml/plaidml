@@ -21,6 +21,7 @@ plaidml_cc_library(
     deps = [
         "//pmlc/compiler",
         "//pmlc/rt",
+        "//pmlc/conversion/gpu:enums-gen",
         "@half",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:SPIRVLowering",

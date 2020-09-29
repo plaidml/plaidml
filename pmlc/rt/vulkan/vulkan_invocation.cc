@@ -22,9 +22,6 @@
 
 namespace pmlc::rt::vulkan {
 
-static constexpr const int kBufferCopyModeHostToDevice = 1 << 0;
-static constexpr const int kBufferCopyModeDeviceToHost = 1 << 1;
-
 VulkanInvocation::VulkanInvocation() : device{Device::current<VulkanDevice>()} {
   createQueryPool();
 }
@@ -291,7 +288,7 @@ void VulkanInvocation::run() {
 
 void VulkanInvocation::setResourceData(
     const DescriptorSetIndex desIndex, const BindingIndex bindIndex,
-    const BufferCopyMode bufferCopyMode,
+    const BUFFER_COPY_MODE bufferCopyMode,
     const VulkanHostMemoryBuffer &hostMemBuffer) {
   if (!curr) {
     throw std::runtime_error{
@@ -402,9 +399,11 @@ void VulkanInvocation::createMemoryBuffers() {
                                           &memoryBuffer.deviceMemory),
                          "vkAllocateMemory");
 
-      if (curr->resourceDataType[descriptorSetIndex]
+      uint32_t hostToDevice = static_cast<uint32_t>(
+          curr->resourceDataType[descriptorSetIndex]
                                 [memoryBuffer.bindingIndex] &
-          kBufferCopyModeHostToDevice) {
+          BUFFER_COPY_MODE::HOST_TO_DEVICE);
+      if (hostToDevice) {
         void *payload;
         throwOnVulkanError(vkMapMemory(device->getDevice(),
                                        memoryBuffer.deviceMemory, 0, bufferSize,
@@ -775,9 +774,11 @@ void VulkanInvocation::updateHostMemoryBuffers() {
             kernel->deviceMemoryBufferMap[resourceDataMapPair.first];
         // For each device memory buffer in the set.
         for (auto &deviceMemoryBuffer : deviceMemoryBuffers) {
-          if ((kernel->resourceDataType[resourceDataMapPair.first]
-                                       [deviceMemoryBuffer.bindingIndex] &
-               kBufferCopyModeDeviceToHost) &&
+          uint32_t deviceToHost = static_cast<uint32_t>(
+              kernel->resourceDataType[resourceDataMapPair.first]
+                                      [deviceMemoryBuffer.bindingIndex] &
+              BUFFER_COPY_MODE::DEVICE_TO_HOST);
+          if (deviceToHost &&
               resourceDataMap.count(deviceMemoryBuffer.bindingIndex)) {
             void *payload;
             auto &hostMemoryBuffer =

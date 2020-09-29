@@ -34,7 +34,7 @@ namespace {
 template <typename T>
 void bindBuffer(void *vkInvocation, DescriptorSetIndex setIndex,
                 BindingIndex bindIndex, uint32_t bufferByteSize,
-                BufferCopyMode bufferCopyMode,
+                BUFFER_COPY_MODE bufferCopyMode,
                 ::UnrankedMemRefType<T> *unrankedMemRef) {
   DynamicMemRefType<T> memRef(*unrankedMemRef);
   T *ptr = memRef.data + memRef.offset;
@@ -84,7 +84,7 @@ void run(void *vkInvocation) {
 #define BIND_BUFFER_IMPL(_name_, _type_)                                       \
   void _mlir_ciface_bindBuffer##_name_(                                        \
       void *vkInvocation, DescriptorSetIndex setIndex, BindingIndex bindIndex, \
-      uint32_t bufferByteSize, uint32_t bufferCopyMode,                        \
+      uint32_t bufferByteSize, BUFFER_COPY_MODE bufferCopyMode,                \
       ::UnrankedMemRefType<_type_> *unrankedMemRef) {                          \
     bindBuffer(vkInvocation, setIndex, bindIndex, bufferByteSize,              \
                bufferCopyMode, unrankedMemRef);                                \

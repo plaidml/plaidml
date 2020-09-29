@@ -24,7 +24,10 @@
 
 #include "mlir/Support/DebugStringHelper.h"
 
+#include "pmlc/conversion/gpu/enums.h.inc"
+
 namespace pmlc::conversion::gpu {
+
 namespace gpu = mlir::gpu;
 namespace spirv = mlir::spirv;
 namespace LLVM = mlir::LLVM;
@@ -50,6 +53,7 @@ using mlir::success;
 using mlir::Type;
 using mlir::UnrankedMemRefType;
 using mlir::Value;
+using pmlc::conversion::gpu::BUFFER_COPY_MODE;
 
 static constexpr const char *kSPIRVBinary = "SPIRV_BIN";
 static constexpr const char *kPrint_memref_f32 = "print_memref_f32";
@@ -80,9 +84,6 @@ static constexpr const char *kBindBufferInteger32 = "bindBufferInteger32";
 static constexpr const char *kBindBufferInteger64 = "bindBufferInteger64";
 
 static constexpr const int kByteBits = 8;
-static constexpr const int kBufferCopyModeInit = 0;
-static constexpr const int kBufferCopyModeHostToDevice = 1 << 0;
-static constexpr const int kBufferCopyModeDeviceToHost = 1 << 1;
 
 /// A pass to convert gpu launch op to vulkan launch call op, by creating a
 /// SPIR-V binary shader from `spirv::ModuleOp` using `spirv::serialize`
@@ -121,7 +122,7 @@ private:
   void declareVulkanFunctions(Location loc);
 
   /// Check buffer type and only copy from/to device when necessary
-  uint32_t getBufferCopyMode(mlir::CallOp &callOp, Value &buffer);
+  BUFFER_COPY_MODE getBufferCopyMode(mlir::CallOp &callOp, Value &buffer);
 
   bool isInternalOperation(Operation *op);
 
@@ -186,7 +187,6 @@ private:
   uint64_t numKernel = 0;
   uint64_t lauchFuncIndex = 0;
   mlir::Value vulkanRuntime;
-  LLVM::CallOp deinitVulkan;
   llvm::DenseMap<Value, llvm::SmallVector<uint64_t, 2>> bufferMap;
 
   struct mlirTypeComparator {
@@ -308,29 +308,58 @@ bool ConvertGpuLaunchFuncToVulkanCalls::isInternalOperation(Operation *op) {
   return false;
 }
 
-uint32_t
+BUFFER_COPY_MODE
 ConvertGpuLaunchFuncToVulkanCalls::getBufferCopyMode(mlir::CallOp &callOp,
                                                      Value &buffer) {
-  uint32_t copyMode = kBufferCopyModeInit;
+  BUFFER_COPY_MODE copyMode = BUFFER_COPY_MODE::NO_COPY;
+
   if (buffer.isa<BlockArgument>()) {
-    copyMode |= (kBufferCopyModeHostToDevice | kBufferCopyModeDeviceToHost);
+    copyMode = copyMode | (BUFFER_COPY_MODE::HOST_TO_DEVICE |
+                           BUFFER_COPY_MODE::DEVICE_TO_HOST);
     return copyMode;
   }
 
-  auto operationDeps = getExternalDependentOperations(buffer);
   auto currentBlock = callOp.getOperation()->getBlock();
-  for (auto op : operationDeps) {
-    if (op->getBlock() == currentBlock) {
-      if (op->isBeforeInBlock(callOp.getOperation())) {
-        copyMode |= kBufferCopyModeHostToDevice;
-      } else if (deinitVulkan.getOperation()->isBeforeInBlock(op)) {
-        copyMode |= kBufferCopyModeDeviceToHost;
+
+  // Get llvm.call @run in current block
+  LLVM::CallOp *pRunOp = nullptr;
+  auto llvmCallOps = currentBlock->getOps<LLVM::CallOp>();
+  for (auto llvmCallOp : llvmCallOps) {
+    if (llvmCallOp.callee().getValue().equals(kRun)) {
+      if (pRunOp) {
+        callOp.emitError("Does not support multiple llvm.call @run.");
+        signalPassFailure();
+      }
+      pRunOp = &llvmCallOp;
+    }
+  }
+
+  if (pRunOp == nullptr) {
+    callOp.emitError("No llvm.call @run in function body.");
+    signalPassFailure();
+  }
+
+  auto operationDeps = getExternalDependentOperations(buffer);
+  for (auto dependency : operationDeps) {
+    if (dependency->getBlock() == currentBlock) {
+      if (dependency->isBeforeInBlock(callOp.getOperation())) {
+        // Dependency is before current callOp.
+        copyMode = copyMode | BUFFER_COPY_MODE::HOST_TO_DEVICE;
       } else {
-        callOp.emitWarning("A host side buffer is used after copied to "
-                           "device and before device returns.");
+        // Dependency is after current callOp.
+        if (pRunOp->getOperation()->isBeforeInBlock(dependency)) {
+          // Dependency is after llvm.call @run.
+          copyMode = copyMode | BUFFER_COPY_MODE::DEVICE_TO_HOST;
+        } else {
+          // Dependency is after current callOp and before llvm.call @run.
+          callOp.emitWarning("A host side buffer is used after copied to "
+                             "device and before device returns.");
+        }
       }
     } else {
-      copyMode |= (kBufferCopyModeHostToDevice | kBufferCopyModeDeviceToHost);
+      // Dependency is outside of current block.
+      copyMode = copyMode | (BUFFER_COPY_MODE::HOST_TO_DEVICE |
+                             BUFFER_COPY_MODE::DEVICE_TO_HOST);
     }
   }
   return copyMode;
@@ -370,7 +399,8 @@ ConvertGpuLaunchFuncToVulkanCalls::bindBuffers(mlir::CallOp &callOp) {
           loc, buffer, getUnrankedMemRefType(elementType));
       Value bufferCopyMode = builder.create<LLVM::ConstantOp>(
           loc, getLLVMInt32Type(),
-          builder.getI32IntegerAttr(getBufferCopyMode(callOp, buffer)));
+          builder.getI32IntegerAttr(
+              static_cast<uint32_t>(getBufferCopyMode(callOp, buffer))));
 
       builder.create<mlir::CallOp>(
           loc, ArrayRef<Type>{},
@@ -600,9 +630,9 @@ void ConvertGpuLaunchFuncToVulkanCalls::convertGpuLaunchFunc(
                                  builder.getSymbolRefAttr(kRun),
                                  ArrayRef<Value>{vulkanRuntime});
 
-    deinitVulkan = builder.create<LLVM::CallOp>(
-        loc, ArrayRef<Type>{}, builder.getSymbolRefAttr(kDeinitVulkan),
-        ArrayRef<Value>{vulkanRuntime});
+    builder.create<LLVM::CallOp>(loc, ArrayRef<Type>{},
+                                 builder.getSymbolRefAttr(kDeinitVulkan),
+                                 ArrayRef<Value>{vulkanRuntime});
   }
 
   // Print buffers
