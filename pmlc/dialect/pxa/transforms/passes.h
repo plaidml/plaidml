@@ -46,9 +46,6 @@ std::unique_ptr<mlir::Pass> createStencilGEMMPass(unsigned numThreads,
                                                   std::string strategy,
                                                   StencilCostFunction costFn);
 
-std::unique_ptr<mlir::Pass> createStencilBRGEMMPass(unsigned numThreads,
-                                                    StencilCostFunction costFn);
-
 std::unique_ptr<mlir::Pass> createSubgroupsPass();
 
 std::unique_ptr<mlir::Pass> createTestStrideInfoPass();

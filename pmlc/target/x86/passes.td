@@ -23,16 +23,6 @@ def TraceLinking : Pass<"x86-trace-linking", "mlir::ModuleOp"> {
 def XSMMStencil : FunctionPass<"x86-affine-stencil-xsmm"> {
   let summary = "Find a tiling for extracting 'micro' GEMMs suitable for XSMM";
   let constructor = "pmlc::target::x86::createXSMMStencilPass()";
-  let options = [
-    Option<"strategy", "strategy", "std::string",
-           "\"simple\"", "Strategy to use for stenciling">
-  ];
-}
-
-def XSMMBRGEMMStencil : FunctionPass<"x86-affine-stencil-brgemm-xsmm"> {
-  let summary =
-      "Find a tiling for extracting 'micro' BR-GEMMs suitable for XSMM";
-  let constructor = "pmlc::target::x86::createXSMMBRGEMMStencilPass()";
 }
 
 #endif // __PMLC_TARGET_X86_PASSES__

@@ -43,7 +43,6 @@ struct LowerPXAToAffinePass
 
     OwningRewritePatternList patterns;
     populatePXAGemmToXSMMConversionPatterns(patterns, &ctx);
-    populatePXABRGemmToXSMMConversionPatterns(patterns, &ctx);
     populatePXAPrngToAffineConversionPatterns(patterns, &ctx);
     conversion::pxa_to_affine::populatePXAToAffineConversionPatterns(patterns,
                                                                      &ctx);
@@ -96,22 +95,9 @@ static pxa::StencilCost heatmapCostTransposed(ArrayRef<int64_t> tile) {
 std::unique_ptr<Pass> createXSMMStencilPass() {
   auto numThreads = std::thread::hardware_concurrency();
   IVLOG(3, "Stenciling numThreads: " + numThreads);
-  std::string defaultStrategy = "complicated";
+  std::string defaultStrategy = "simple";
   return pxa::createStencilGEMMPass(numThreads, defaultStrategy,
                                     heatmapCostTransposed);
-}
-
-std::unique_ptr<mlir::Pass> createXSMMStencilPass(std::string strategy) {
-  auto numThreads = std::thread::hardware_concurrency();
-  IVLOG(3, "Stenciling numThreads: " + numThreads);
-  IVLOG(3, "Stenciling strategy: " + strategy);
-  return pxa::createStencilGEMMPass(numThreads, strategy,
-                                    heatmapCostTransposed);
-}
-
-std::unique_ptr<Pass> createXSMMBRGEMMStencilPass() {
-  auto numThreads = std::thread::hardware_concurrency();
-  return pxa::createStencilBRGEMMPass(numThreads, heatmapCostTransposed);
 }
 
 std::unique_ptr<Pass> createLowerPXAToAffinePass() {

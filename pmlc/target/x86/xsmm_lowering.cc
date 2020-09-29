@@ -215,57 +215,6 @@ struct XSMMGemmInvokeLowering
   }
 };
 
-struct PxaBRGemmOpConversion : public OpConversionPattern<pxa::PxaBRGemmOp> {
-  using OpConversionPattern<pxa::PxaBRGemmOp>::OpConversionPattern;
-
-  bool getIndices(pxa::PxaBRGemmOp op, ConversionPatternRewriter &rewriter,
-                  pxa::PxaBRGemmOp::Adaptor &adaptor, AffineMap accessMap,
-                  unsigned start, unsigned count,
-                  SmallVectorImpl<Value> &into) const {
-    auto operands = adaptor.mapOperands().slice(start, count);
-    auto indices = expandAffineMap(rewriter, op.getLoc(), accessMap, operands);
-    if (!indices)
-      return false;
-    into.append(indices->begin(), indices->end());
-    return true;
-  }
-
-  LogicalResult
-  matchAndRewrite(pxa::PxaBRGemmOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const override {
-    pxa::PxaBRGemmOp::Adaptor transformed(operands);
-    SmallVector<Value, 8> indices;
-    auto aNumInputs = op.aAccessMap().getNumInputs();
-    auto bNumInputs = op.bAccessMap().getNumInputs();
-    auto cNumInputs = op.cAccessMap().getNumInputs();
-    if (!getIndices(op, rewriter, transformed, op.cAccessMap(), 0, cNumInputs,
-                    indices) ||
-        !getIndices(op, rewriter, transformed, op.aAccessMap(), cNumInputs,
-                    aNumInputs, indices) ||
-        !getIndices(op, rewriter, transformed, op.bAccessMap(),
-                    cNumInputs + aNumInputs, bNumInputs, indices))
-      return failure();
-
-    auto aInfo = getStrideArray(transformed.a(), op.aTileMap());
-    auto bInfo = getStrideArray(transformed.b(), op.bTileMap());
-    auto cInfo = getStrideArray(transformed.c(), op.cTileMap());
-    auto leadingDimsAttr = rewriter.getI64ArrayAttr(ArrayRef<int64_t>{
-        aInfo.strides[0], bInfo.strides[0], cInfo.strides[0]});
-
-    auto dispatch = rewriter.create<xsmm::BRGemmDispatchOp>(
-        op.getLoc(), rewriter.getI64Type(), op.tile(), leadingDimsAttr);
-
-    rewriter.create<xsmm::BRGemmInvokeOp>(
-        op.getLoc(), ArrayRef<Type>(), dispatch, transformed.c(),
-        transformed.a(), transformed.b(), op.lBr(), indices);
-
-    op.replaceAllUsesWith(transformed.c());
-    rewriter.eraseOp(op);
-
-    return success();
-  }
-};
-
 struct XSMMBRGemmDispatchLowering
     : public ConvertOpToLLVMPattern<xsmm::BRGemmDispatchOp> {
   using ConvertOpToLLVMPattern<xsmm::BRGemmDispatchOp>::ConvertOpToLLVMPattern;
@@ -402,11 +351,6 @@ struct XSMMBRGemmInvokeLowering
 void populatePXAGemmToXSMMConversionPatterns(OwningRewritePatternList &patterns,
                                              MLIRContext *ctx) {
   patterns.insert<PxaGemmOpConversion>(ctx);
-}
-
-void populatePXABRGemmToXSMMConversionPatterns(
-    OwningRewritePatternList &patterns, MLIRContext *ctx) {
-  patterns.insert<PxaBRGemmOpConversion>(ctx);
 }
 
 void populateXSMMToLLVMConversionPatterns(LLVMTypeConverter &converter,
