@@ -55,7 +55,7 @@ llvm::Optional<StrideArray> computeStrideArray(mlir::AffineMap map) {
 
 mlir::Optional<StrideArray> computeStrideArray(mlir::MemRefType memRefType,
                                                mlir::AffineMap map) {
-  assert(map.getNumResults() == memref.getRank());
+  assert(map.getNumResults() == memRefType.getRank());
 
   // MLIR doesnt' corrently handle rank 0 in some places, early exit
   if (memRefType.getRank() == 0) {
