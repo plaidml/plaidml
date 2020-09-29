@@ -373,7 +373,6 @@ cc_library(
     srcs = glob([
         "inference-engine/src/inference_engine/*.cpp",
         "inference-engine/src/inference_engine/threading/*.cpp",
-        # TODO: New from here
         "inference-engine/src/inference_engine/shape_infer/ie_built_in_holder.cpp",
     ]) + select({
         "@bazel_tools//src/conditions:windows": glob([
@@ -386,7 +385,6 @@ cc_library(
     }),
     hdrs = glob([
         # "inference-engine/src/readers/ir_reader/ie_ir_version.hpp",  # TODO: Ok to remove?
-        # TODO: New from here
         "inference-engine/src/inference_engine/shape_infer/ie_built_in_holder.hpp",
     ]),
     copts = ["-w"],
