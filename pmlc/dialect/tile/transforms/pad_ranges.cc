@@ -43,8 +43,8 @@ void PadRangesPass::runOnFunction() {
       return;
     }
     // Extract which dimensions of the contraction are which output dimension
-    SmallVector<unsigned, 4> outIdx;
     unsigned outRank = op.getResultType().getRank();
+    SmallVector<unsigned, 4> outIdx(outRank);
     for (unsigned i = 0; i < outRank; i++) {
       auto outDim = op.sink().getResult(i).dyn_cast<AffineDimExpr>();
       if (!outDim) {
