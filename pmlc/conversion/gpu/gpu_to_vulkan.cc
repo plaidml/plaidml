@@ -334,26 +334,27 @@ ConvertGpuLaunchFuncToVulkanCalls::getBufferCopyMode(mlir::CallOp &callOp,
     }
   }
 
-  if (pRunOp == nullptr) {
-    callOp.emitError("No llvm.call @run in function body.");
-    signalPassFailure();
-  }
-
   auto operationDeps = getExternalDependentOperations(buffer);
   for (auto dependency : operationDeps) {
     if (dependency->getBlock() == currentBlock) {
       if (dependency->isBeforeInBlock(callOp.getOperation())) {
-        // Dependency is before current callOp.
+        // Dependency is before callOp in current block.
         copyMode = copyMode | BUFFER_COPY_MODE::HOST_TO_DEVICE;
       } else {
-        // Dependency is after current callOp.
-        if (pRunOp->getOperation()->isBeforeInBlock(dependency)) {
-          // Dependency is after llvm.call @run.
+        // Dependency is after callOp in current block.
+        if ((pRunOp != nullptr) &&
+            (pRunOp->getOperation()->isBeforeInBlock(dependency))) {
+          // Dependency is after llvm.call @run in current block.
           copyMode = copyMode | BUFFER_COPY_MODE::DEVICE_TO_HOST;
         } else {
-          // Dependency is after current callOp and before llvm.call @run.
-          callOp.emitWarning("A host side buffer is used after copied to "
-                             "device and before device returns.");
+          // Two possible situations that may generate incorrect result
+          // 1. Dependency is after callOp and before llvm.call @run.
+          // 2. Dependency is after callOp and llvm.call @run is not in current
+          // block.
+          IVLOG(1, "A host side buffer is used after copied to device and "
+                   "before device returns.");
+          copyMode = copyMode | (BUFFER_COPY_MODE::HOST_TO_DEVICE |
+                                 BUFFER_COPY_MODE::DEVICE_TO_HOST);
         }
       }
     } else {
