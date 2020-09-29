@@ -31,14 +31,13 @@ cc_binary(
     srcs = glob([
         "inference-engine/samples/benchmark_app/**/*.cpp",
     ]),
-    # linkstatic = 0,
     data = [
         ":plugins",
     ],
     deps = [
         "@openvino//:benchmark_app",
         ":libinference_engine_ir_reader.so",
-        ":libplaidml-plugin.so",
+        ":plaidml-plugin",
     ],
 )
 
@@ -54,16 +53,12 @@ cc_binary(
     ],
 )
 
-# TODO
 cc_binary(
     name = "libinference_engine_ir_reader.so",
-    # linkopts = TODO,
-    # linkopts = PLAIDML_LINKOPTS,
     linkshared = 1,
     tags = TAGS,
     deps = [
         "@openvino//:ie_reader",
-        # "@openvino//:inference_engine",
     ],
 )
 
