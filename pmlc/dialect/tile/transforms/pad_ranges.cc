@@ -18,6 +18,7 @@
 #include "pmlc/dialect/tile/transforms/pass_detail.h"
 #include "pmlc/util/ident.h"
 #include "pmlc/util/logging.h"
+#include "pmlc/util/math/util.h"
 #include "pmlc/util/strides.h"
 
 namespace pmlc::dialect::tile {
@@ -31,6 +32,11 @@ struct PadRangesPass : public PadRangesBase<PadRangesPass> {
 };
 
 void PadRangesPass::runOnFunction() {
+  assert(maxPowerOfTwo >= minPowerOfTwo);
+  assert(util::math::IsPo2(maxPowerOfTwo));
+  assert(util::math::IsPo2(minPowerOfTwo));
+  assert(maxIncrease >= 0.0);
+  assert(maxIncrease < 1.0);
   auto func = getFunction();
   func.walk([&](ContractionOp op) {
     // Skip some cases where the padding pass can't operate.
@@ -91,12 +97,12 @@ void PadRangesPass::runOnFunction() {
           break;
         }
         int64_t increase = roundedRange - ranges[i];
-        float precIncrease =
+        float percIncrease =
             static_cast<float>(increase) / static_cast<float>(ranges[i]);
         IVLOG(3, "Pad Ranges: Orig: " << ranges[i]
                                       << ", rounded: " << roundedRange
-                                      << ", precIncrease = " << precIncrease);
-        if (precIncrease < maxIncrease) {
+                                      << ", percIncrease = " << percIncrease);
+        if (percIncrease < maxIncrease) {
           newRanges[i] = roundedRange;
           didChange = true;
           break;
@@ -110,7 +116,7 @@ void PadRangesPass::runOnFunction() {
     // Start building a new contraction to 'shrink'
     OpBuilder builder(op.getContext());
     builder.setInsertionPointAfter(op.getOperation());
-    // Make shinking contraction
+    // Make shrinking contraction
     auto ident = createIdentity(builder, op.getLoc(), AtomicRMWKind::assign,
                                 op.getResultType().getElementType());
     auto idMap = AffineMap::getMultiDimIdentityMap(outRank, op.getContext());
@@ -122,12 +128,12 @@ void PadRangesPass::runOnFunction() {
         /*noReduce=*/true, "shrink");
     newOp.setLowerBounds(SmallVector<int64_t, 4>(outRank, 0));
     SmallVector<int64_t, 4> newOutSize;
-    SmallVector<int64_t, 4> shinkUpperBounds;
+    SmallVector<int64_t, 4> shrinkUpperBounds;
     for (unsigned i = 0; i < outRank; i++) {
       newOutSize.push_back(newRanges[outIdx[i]]);
-      shinkUpperBounds.push_back(ranges[outIdx[i]] - 1);
+      shrinkUpperBounds.push_back(ranges[outIdx[i]] - 1);
     }
-    newOp.setUpperBounds(shinkUpperBounds);
+    newOp.setUpperBounds(shrinkUpperBounds);
     // Switch all uses to the new contracton
     op.getResult().replaceAllUsesExcept(
         newOp.getResult(), SmallPtrSet<Operation *, 1>{newOp.getOperation()});
