@@ -10,7 +10,8 @@ plaidml_cc_library(
         "//conditions:default": ["-Wno-deprecated-declarations"],
     }),
     data = [
-        "//:ov_plugins_xml",
+        "//:ov_plugins_xml_k8",
+        "//:ov_plugins_xml_linux_x86_64",
         "//plaidml/bridge/openvino:plaidml-plugin",
     ],
     tags = [
