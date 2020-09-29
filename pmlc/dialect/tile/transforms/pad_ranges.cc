@@ -77,8 +77,8 @@ void PadRangesPass::runOnFunction() {
       op.emitRemark("Unable to compute output strides");
       return;
     }
-    IVLOG(1, "outStrides = " << *outStrides);
-    // Decide wthat to round up
+    IVLOG(2, "Pad Ranges: outStrides = " << *outStrides);
+    // Decide what to round up
     bool didChange = false;
     SmallVector<int64_t, 6> newRanges = ranges;
     for (unsigned i = 0; i < indexCount; i++) {
@@ -93,8 +93,9 @@ void PadRangesPass::runOnFunction() {
         int64_t increase = roundedRange - ranges[i];
         float precIncrease =
             static_cast<float>(increase) / static_cast<float>(ranges[i]);
-        IVLOG(1, "Orig: " << ranges[i] << ", rounded: " << roundedRange
-                          << ", precIncrease = " << precIncrease);
+        IVLOG(3, "Pad Ranges: Orig: " << ranges[i]
+                                      << ", rounded: " << roundedRange
+                                      << ", precIncrease = " << precIncrease);
         if (precIncrease < maxIncrease) {
           newRanges[i] = roundedRange;
           didChange = true;
@@ -106,7 +107,6 @@ void PadRangesPass::runOnFunction() {
     if (!didChange) {
       return;
     }
-    IVLOG(1, "Making a brave new op");
     // Start building a new contraction to 'shrink'
     OpBuilder builder(op.getContext());
     builder.setInsertionPointAfter(op.getOperation());
@@ -134,10 +134,12 @@ void PadRangesPass::runOnFunction() {
     // Resize + rerange the output of the original op
     op.getResult().setType(
         RankedTensorType::get(newOutSize, op.getResultType().getElementType()));
+    // Convert ranges to bounds
+    SmallVector<int64_t4> newBounds;
     for (unsigned i = 0; i < indexCount; i++) {
-      newRanges[i] -= 1;
+      newBounds.push_back(newRanges[i] - 1);
     }
-    op.setUpperBounds(newRanges);
+    op.setUpperBounds(newBounds);
   });
 }
 

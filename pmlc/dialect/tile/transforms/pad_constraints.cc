@@ -22,7 +22,7 @@ using mlir::AffineMap;
 
 namespace {
 
-bool validForPadding(AggregationKind agg, CombinationKind comb) {
+bool isValidForPadding(AggregationKind agg, CombinationKind comb) {
   if (agg == AggregationKind::assign) {
     return false;
   }
@@ -61,7 +61,7 @@ void PadConstraintsPass::runOnFunction() {
       return;
     }
 
-    if (!validForPadding(op.agg(), op.combo())) {
+    if (!isValidForPadding(op.agg(), op.combo())) {
       op.emitRemark("invalid agg/comb for use in padding");
       return;
     }
