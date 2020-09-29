@@ -1,4 +1,4 @@
-// RUN: pmlc-opt -tile-compute-bounds -tile-pad -convert-tile-to-pxa -split-input-file %s | FileCheck %s
+// RUN: pmlc-opt -tile-compute-bounds -tile-pad-constraints -convert-tile-to-pxa -split-input-file %s | FileCheck %s
 
 #conv1dcenter = affine_map<(i, j) -> (i + j - 1)>
 #first = affine_map<(i, j) -> (i)>

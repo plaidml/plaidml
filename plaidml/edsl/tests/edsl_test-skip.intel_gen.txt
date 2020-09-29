@@ -6,4 +6,5 @@ CppEdsl.BitRightTensor
 CppEdsl.ConvI8
 CppEdsl.Erf
 CppEdsl.HigherPrecisionConstants
-CppEdsl.Winograd
+CppEdsl.Scatter1D
+CppEdsl.Scatter3D

@@ -56,19 +56,25 @@ llvm::Optional<StrideArray> computeStrideArray(mlir::AffineMap map) {
 mlir::Optional<StrideArray> computeStrideArray(mlir::MemRefType memRefType,
                                                mlir::AffineMap map) {
   assert(map.getNumResults() == memref.getRank());
+
+  // MLIR doesnt' corrently handle rank 0 in some places, early exit
+  if (memRefType.getRank() == 0) {
+    return StrideArray(0);
+  }
+
+  // Get the memref strides
   int64_t offset;
   llvm::SmallVector<int64_t, 4> strides;
   if (failed(getStridesAndOffset(memRefType, strides, offset)))
     return llvm::None;
 
-  IVLOG(1, "WOOT");
-
+  // Get the dimensionalized map multipliers
   std::vector<llvm::SmallVector<int64_t, 8>> flat;
-  if (failed(getFlattenedAffineExprs(map, &flat, nullptr)))
+  if (failed(getFlattenedAffineExprs(map, &flat, nullptr))) {
     return llvm::None;
+  }
 
-  IVLOG(1, "POOT");
-
+  // Flatten the per-dimension data via memory order
   StrideArray ret(map.getNumDims(), offset);
   for (unsigned d = 0; d < memRefType.getRank(); d++) {
     StrideArray perDim(map.getNumDims(), flat[d].back());

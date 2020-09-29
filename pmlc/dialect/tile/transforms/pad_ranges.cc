@@ -27,9 +27,6 @@ using namespace mlir; // NOLINT
 namespace {
 
 struct PadRangesPass : public PadRangesBase<PadRangesPass> {
-  int64_t maxPowerOfTwo = 16;
-  int64_t minPowerOfTwo = 8;
-  int64_t maxIncreasePercent = 5;
   void runOnFunction() final;
 };
 
@@ -76,6 +73,10 @@ void PadRangesPass::runOnFunction() {
     }
     // Get strides for output
     auto outStrides = util::computeStrideArray(op.getResultType(), op.sink());
+    if (!outStrides) {
+      op.emitRemark("Unable to compute output strides");
+      return;
+    }
     IVLOG(1, "outStrides = " << *outStrides);
     // Decide wthat to round up
     bool didChange = false;
@@ -90,10 +91,11 @@ void PadRangesPass::runOnFunction() {
           break;
         }
         int64_t increase = roundedRange - ranges[i];
-        int64_t precIncrease = increase * 100 / ranges[i];
+        float precIncrease =
+            static_cast<float>(increase) / static_cast<float>(ranges[i]);
         IVLOG(1, "Orig: " << ranges[i] << ", rounded: " << roundedRange
                           << ", precIncrease = " << precIncrease);
-        if (precIncrease < maxIncreasePercent) {
+        if (precIncrease < maxIncrease) {
           newRanges[i] = roundedRange;
           didChange = true;
           break;
