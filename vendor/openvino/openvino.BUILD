@@ -9,26 +9,6 @@ TAGS = [
 ]
 
 cc_library(
-    name = "benchmark_app",
-    srcs = glob([
-        "inference-engine/samples/benchmark_app/**/*.hpp",
-        "inference-engine/samples/common/**/*.cpp",  # TODO
-        "inference-engine/samples/common/**/*.hpp",  # TODO
-        "inference-engine/samples/benchmark_app/**/*.cpp",
-    ]),
-    includes = [
-        "inference-engine/samples/common",
-        "inference-engine/samples/common/format_reader",
-    ],
-    linkstatic = 0,
-    deps = [
-        ":inference_engine",
-        ":ngraph",
-        "@gflags",
-    ],
-)
-
-cc_library(
     name = "testing",
     srcs = glob([
         "inference-engine/tests/helpers/*common*cpp",
@@ -315,57 +295,6 @@ cc_library(
         ":inc",
         ":ngraph",
     ],
-)
-
-# TODO
-cc_library(
-    name = "ie_reader",
-    srcs = glob([
-        "inference-engine/src/readers/ir_reader/*.cpp",
-        # TODO
-        "inference-engine/src/inference_engine/blob_factory.cpp",
-        "inference-engine/src/inference_engine/cnn_network_ngraph_impl.cpp",
-        "inference-engine/src/inference_engine/generic_ie.cpp",
-        "inference-engine/src/inference_engine/ie_blob_common.cpp",
-        "inference-engine/src/inference_engine/ie_data.cpp",
-        "inference-engine/src/inference_engine/ie_layouts.cpp",
-        "inference-engine/src/inference_engine/ie_memcpy.cpp",
-        "inference-engine/src/inference_engine/ie_rtti.cpp",
-        "inference-engine/src/inference_engine/ie_unicode.cpp",
-        "inference-engine/src/inference_engine/network_serializer.cpp",
-        "inference-engine/src/inference_engine/precision_utils.cpp",
-        "inference-engine/src/inference_engine/system_allocator.cpp",
-        "inference-engine/src/inference_engine/xml_parse_utils.cpp",
-        # "inference-engine/src/inference_engine/*.cpp",
-        # TODO: New stuff from here
-        "inference-engine/src/inference_engine/shape_infer/ie_built_in_holder.cpp",
-    ]),
-    hdrs = glob([
-        "inference-engine/src/readers/ir_reader/*.hpp",
-        # TODO
-        "inference-engine/include/details/ie_exception.hpp",
-    ]),
-    includes = [
-        # "inference-engine/src/inference_engine",
-        "inference-engine/src/readers/ir_reader",  # TODO: Why does this work?
-        "inference-engine/src/readers/reader_api",  # TODO: Why does this work?
-    ],
-    local_defines = [
-        "IR_READER_V10",
-    ],
-    deps = [
-        # ":inference_engine",
-        ":inc",
-        ":legacy_api",
-        ":low_precision_transformations",
-        ":ngraph",
-        ":plugin_api",
-        ":preprocessing",
-        ":pugixml",
-        ":transformations",
-        "@tbb",
-    ],
-    alwayslink = 1,
 )
 
 cc_library(

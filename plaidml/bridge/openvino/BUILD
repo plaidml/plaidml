@@ -27,21 +27,6 @@ plaidml_cc_library(
 )
 
 cc_binary(
-    name = "benchmark_app",
-    srcs = glob([
-        "inference-engine/samples/benchmark_app/**/*.cpp",
-    ]),
-    data = [
-        ":plugins",
-    ],
-    deps = [
-        "@openvino//:benchmark_app",
-        ":libinference_engine_ir_reader.so",
-        ":plaidml-plugin",
-    ],
-)
-
-cc_binary(
     name = "plaidml-plugin",
     linkopts = PLAIDML_LINKOPTS,
     linkshared = 1,
@@ -50,15 +35,6 @@ cc_binary(
         ":lib",
         "//plaidml:runtimes",
         "//plaidml:targets",
-    ],
-)
-
-cc_binary(
-    name = "libinference_engine_ir_reader.so",
-    linkshared = 1,
-    tags = TAGS,
-    deps = [
-        "@openvino//:ie_reader",
     ],
 )
 

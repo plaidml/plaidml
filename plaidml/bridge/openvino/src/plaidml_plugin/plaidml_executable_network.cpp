@@ -43,7 +43,7 @@ PlaidMLExecutableNetwork::PlaidMLExecutableNetwork(const ICNNNetwork& network, c
   IVLOG(2, "Layers:");
   for (auto& node : fcn->get_ordered_ops()) {
     IVLOG(2, "  " << node->description() << ": " << node->get_name() << "... " << node->get_friendly_name());
-    if (ngraph::op::is_constant(node) || node->description() == "Constant") {  // TODO Unneeded ||
+    if (ngraph::op::is_constant(node)) {
       IE_ASSERT(node->get_output_size() == 1);
       IE_ASSERT(node->description() == "Constant");
       auto type = to_plaidml(node->get_element_type());
@@ -53,17 +53,12 @@ PlaidMLExecutableNetwork::PlaidMLExecutableNetwork(const ICNNNetwork& network, c
       // Specially resolve the constant-creating op
       Context ctx{node.get()};
       auto* layer = dynamic_cast<ngraph::opset1::Constant*>(ctx.layer);
-      if (!layer) {
-        IVLOG(1, "LAYER IS NULL!!!!!");  // TODO
-      } else {
-        IVLOG(1, "Layer is not null, should be safe");
-      }
       buffer.copy_from(layer->get_data_ptr());
       auto tensor = edsl::Constant(type, buffer, dims, node->get_friendly_name());
       IVLOG(3, "    Adding constant named '" << node->get_output_tensor_name(0) << "'");
       tensorMap_[node->output(0).get_tensor_ptr()] = tensor;
       continue;
-    } else if (ngraph::op::is_parameter(node) || node->description() == "Parameter") {  // TODO Unneeded ||
+    } else if (ngraph::op::is_parameter(node)) {
       IE_ASSERT(node->get_output_size() == 1);
       std::vector<int64_t> dims{node->get_shape().begin(), node->get_shape().end()};
       auto type = to_plaidml(node->get_element_type());
