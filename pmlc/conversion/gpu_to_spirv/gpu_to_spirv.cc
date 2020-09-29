@@ -92,6 +92,32 @@ struct StdxBinaryOpConversion : public SPIRVOpLowering<StdxOpTy> {
   }
 };
 
+// ============================================================================
+// GLSL SPIRV -> Standard SPIRV
+// ============================================================================
+template <typename GLSLOpTy, typename NegOpTy, typename LessThanOpTy>
+struct GLSLAbsOpPattern final : public SPIRVOpLowering<GLSLOpTy> {
+  using SPIRVOpLowering<GLSLOpTy>::SPIRVOpLowering;
+
+  mlir::LogicalResult
+  matchAndRewrite(GLSLOpTy op, mlir::ArrayRef<mlir::Value> operands,
+                  ConversionPatternRewriter &rewriter) const final {
+    mlir::Value arg = operands[0];
+    mlir::Type targetType = arg.getType();
+    mlir::Value cst0 = rewriter.create<spirv::ConstantOp>(
+        op.getLoc(), targetType, rewriter.getIntegerAttr(targetType, 0));
+    mlir::Value negArg = rewriter.create<NegOpTy>(op.getLoc(), arg);
+    mlir::Value isNeg = rewriter.create<LessThanOpTy>(op.getLoc(), arg, cst0);
+    rewriter.replaceOpWithNewOp<spirv::SelectOp>(op, isNeg, negArg, arg);
+    return mlir::success();
+  }
+};
+
+using GLSLFAbsOpPattern = GLSLAbsOpPattern<spirv::GLSLFAbsOp, spirv::FNegateOp,
+                                           spirv::FOrdLessThanOp>;
+using GLSLSAbsOpPattern =
+    GLSLAbsOpPattern<spirv::GLSLSAbsOp, spirv::SNegateOp, spirv::SLessThanOp>;
+
 struct GPUToSPIRVCustomPass
     : public GPUToSPIRVCustomBase<GPUToSPIRVCustomPass> {
   void runOnOperation() final {
@@ -122,6 +148,10 @@ struct GPUToSPIRVCustomPass
     patterns.insert<AllocOpPattern>(context, typeConverter);
     if (spirv::getMemoryModel(targetAttr) == spirv::MemoryModel::GLSL450)
       populateStdxToSPIRVGLSLPatterns(context, typeConverter, patterns);
+    if (spirv::getMemoryModel(targetAttr) != spirv::MemoryModel::GLSL450) {
+      populateCustomGLSLToStdSpirvPatterns(context, typeConverter, patterns);
+      target->addIllegalOp<spirv::GLSLFAbsOp, spirv::GLSLSAbsOp>();
+    }
 
     if (failed(applyFullConversion(kernelModules, *target, patterns)))
       return signalPassFailure();
@@ -148,6 +178,12 @@ void populateStdxToSPIRVGLSLPatterns(MLIRContext *context,
                   StdxUnaryOpConversion<stdx::ATanOp, spirv::GLSLAtanOp>,
                   StdxBinaryOpConversion<stdx::PowOp, spirv::GLSLPowOp>>(
       context, typeConverter);
+}
+
+void populateCustomGLSLToStdSpirvPatterns(MLIRContext *context,
+                                          SPIRVTypeConverter &typeConverter,
+                                          OwningRewritePatternList &patterns) {
+  patterns.insert<GLSLFAbsOpPattern, GLSLSAbsOpPattern>(context, typeConverter);
 }
 
 std::unique_ptr<Pass> createGPUToSPIRVCustomPass() {
