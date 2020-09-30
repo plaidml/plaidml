@@ -6,8 +6,8 @@
 #include "common_test_utils/test_constants.hpp"
 #include <vector>
 
+using CommonTestUtils::OpType;
 using LayerTestsDefinitions::EltwiseLayerTest;
-using LayerTestsDefinitions::EltwiseParams::OpType;
 
 namespace {
 std::vector<std::vector<std::vector<size_t>>> inShapes = {

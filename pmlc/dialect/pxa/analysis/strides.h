@@ -222,22 +222,6 @@ computeRelativeAccess(mlir::Operation *op, BlockArgumentBoundaryFn fn);
 mlir::Optional<RelativeAccessPattern> computeRelativeAccess(mlir::Operation *op,
                                                             mlir::Block *block);
 
-// A StrideArray contains a set of constant factors and a constant offset.
-struct StrideArray {
-  int64_t offset;
-  mlir::SmallVector<int64_t, 8> strides;
-
-  explicit StrideArray(unsigned numDims, int64_t offset = 0);
-  StrideArray &operator*=(int64_t factor);
-  StrideArray &operator+=(const StrideArray &rhs);
-
-  void print(mlir::raw_ostream &os);
-};
-
-// Compute the StrideArray for a given AffineMap. The map must have a single
-// AffineExpr result and this result must be purely affine.
-mlir::Optional<StrideArray> computeStrideArray(mlir::AffineMap map);
-
 bool hasPerfectAliasing(
     const RelativeAccessPattern &aRap, RelativeAccessPattern bRap,
     const mlir::DenseMap<mlir::BlockArgument, mlir::BlockArgument> &bToA);
