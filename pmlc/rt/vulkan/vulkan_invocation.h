@@ -22,7 +22,7 @@
 
 namespace pmlc::rt::vulkan {
 
-using pmlc::conversion::gpu::BUFFER_COPY_MODE;
+using pmlc::conversion::gpu::BufferCopyMode;
 using DescriptorSetIndex = uint32_t;
 using BindingIndex = uint32_t;
 
@@ -69,7 +69,7 @@ using ResourceData =
 
 using ResourceDataType =
     llvm::DenseMap<DescriptorSetIndex,
-                   llvm::DenseMap<BindingIndex, BUFFER_COPY_MODE>>;
+                   llvm::DenseMap<BindingIndex, BufferCopyMode>>;
 
 /// StorageClass mapped into a descriptor set and a binding.
 using ResourceStorageClassBindingMap =
@@ -163,7 +163,7 @@ public:
   /// Sets needed data for Vulkan device.
   void setResourceData(const DescriptorSetIndex desIndex,
                        const BindingIndex bindIndex,
-                       const BUFFER_COPY_MODE bufferCopyMode,
+                       const BufferCopyMode bufferCopyMode,
                        const VulkanHostMemoryBuffer &hostMemBuffer);
 
 private:

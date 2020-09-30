@@ -5,16 +5,16 @@
 include "mlir/IR/OpBase.td"
 #endif
 
-def BUFFER_COPY_MODE : BitEnumAttr<
-    "BUFFER_COPY_MODE",
+def BufferCopyMode : BitEnumAttr<
+    "BufferCopyMode",
     "Modes that control buffer copy between host and device",
     [
-      BitEnumAttrCase<"NO_COPY", 0x0000>,
-      BitEnumAttrCase<"HOST_TO_DEVICE", 0x0001>,
-      BitEnumAttrCase<"DEVICE_TO_HOST", 0x0002>,
+      BitEnumAttrCase<"NoCopy", 0x0000>,
+      BitEnumAttrCase<"HostToDevice", 0x0001>,
+      BitEnumAttrCase<"DeviceToHost", 0x0002>,
     ]> {
   let cppNamespace = "pmlc::conversion::gpu";
-  let returnType = "BUFFER_COPY_MODE";
+  let returnType = "BufferCopyMode";
   let convertFromStorage = "static_cast<" # returnType # ">($_self.getValue().getZExtValue())";
 }
 
