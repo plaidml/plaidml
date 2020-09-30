@@ -107,7 +107,7 @@ std::unique_ptr<Pass> createLowerToLLVMPass() {
 
 void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(pmlc::dialect::tile::createComputeBoundsPass());
-  pm.addPass(pmlc::dialect::tile::createPadPass());
+  pm.addPass(pmlc::dialect::tile::createPadConstraintsPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 

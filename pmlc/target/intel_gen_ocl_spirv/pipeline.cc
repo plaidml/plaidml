@@ -41,7 +41,8 @@ namespace pxa = pmlc::dialect::pxa;
 void pipelineBuilder(OpPassManager &pm) {
   // Bound + pad initial tile code
   pm.addPass(dialect::tile::createComputeBoundsPass());
-  pm.addPass(dialect::tile::createPadPass());
+  pm.addPass(dialect::tile::createPadRangesPass());
+  pm.addPass(dialect::tile::createPadConstraintsPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
