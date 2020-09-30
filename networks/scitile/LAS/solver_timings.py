@@ -30,7 +30,7 @@ def conjgrad(A, b, x):
     return x
 
 
-testnames = ['10x10', '20x20', '40x40', '80x80']
+testnames = ['10x10', '20x20']
 labels = [
     'Numpy Linalg', 'Numpy Conjgrad', 'SciPy Dense', 'SciPy Sparse', 'PlaidML CG Dense',
     'PlaidML CG Sparse'
