@@ -190,25 +190,9 @@ void ConvertGpuLaunchFuncToVulkanCalls::runOnOperation() {
 
   getOperation().walk([this](gpu::LaunchFuncOp op) { numKernel++; });
   getOperation().walk([this](mlir::FuncOp op) {
-    if (!op.getAttr("entrypoint")) {
-      // Early exit -- we only add a device parameter and convert launch
-      // operations in functions that are marked as entrypoints.
-      //
-      // N.B. We don't currently produce non-entrypoint functions that contain
-      // kernel launch operations, so we don't support them here (and we
-      // explicitly flag them so that it's obvious what's going wrong if/when
-      // earlier passes ever produce them).  In order to add support for them,
-      // we should add the invocation pointer as a function argument, and update
-      // all callers recursively to supply the invocation pointer.
-      op.walk([this, &op](gpu::LaunchFuncOp) {
-        op.emitError("Non-entrypoint function contains launch operations; this "
-                     "is not currently supported for Vulkan.");
-        signalPassFailure();
-        return mlir::WalkResult::interrupt();
-      });
+    if (op.isExternal()) {
       return;
     }
-
     // Add the execution device parameter to the function.
     auto ty = op.getType();
     std::vector<mlir::Type> inputs{getLLVMPointerType()};
