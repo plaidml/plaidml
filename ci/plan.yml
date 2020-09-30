@@ -254,6 +254,7 @@ SUITES:
         platform_overrides:
           pml-vk-gen:
             prepend_args: [--examples=128]
+            perf_threshold: 0.5
           pml-llvm-cpu:
             prepend_args: [--examples=128]
           pml-ocl-gfx804:
