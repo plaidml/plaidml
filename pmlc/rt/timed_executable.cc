@@ -12,10 +12,9 @@ namespace {
 
 // A trivial stopwatch class.
 //
-// TODO: Consider using std::chrono::high_resolution_clock.  Also consider
-// detecting core switch events and hyperthreading, and notifying the user if
-// CPU frequency scaling is enabled.  (Realistically, this should probably be
-// done as a test, completely external to the runtime.)
+// TODO: Consider detecting core switch events and hyperthreading, and notifying
+// the user if CPU frequency scaling is enabled.  (Realistically, this should
+// probably be done as a test, completely external to the runtime.)
 struct StopWatch {
   using fp_milliseconds =
       std::chrono::duration<double, std::chrono::milliseconds::period>;
