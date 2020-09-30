@@ -6,6 +6,7 @@ import subprocess
 import sys
 
 verbose = True  # pylint: disable=invalid-name
+DEFAULT_RATIO_THRESHOLD = 0.8
 
 
 def printf(*args, **kwargs):
@@ -174,6 +175,7 @@ class TestInfo(object):
         self.timeout = popt.get('timeout', 20)
         self.retry = popt.get('retry')
         self.soft_fail = popt.get('soft_fail')
+        self.perf_threshold = popt.get('perf_threshold', DEFAULT_RATIO_THRESHOLD)
         self.shards = shards
         self.shard_id = shard_id
         if self.shards > 1:

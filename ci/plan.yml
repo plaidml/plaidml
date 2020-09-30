@@ -183,6 +183,8 @@ SUITES:
     platforms:
       pml-llvm-cpu:
         pipelines: [nightly, plaidml, ci]
+      pml-vk-gen:
+        pipelines: [nightly, plaidml]
     params:
       ci:
         batch_sizes: [1]
@@ -214,6 +216,8 @@ SUITES:
           - tf-dnnl-cpu
         perf_threshold: 0.7
       inception_v3:
+        skip_platforms:
+          - pml-vk-gen
         precision: high
         platform_overrides:
           tf-dnnl-cpu:
@@ -231,6 +235,8 @@ SUITES:
         expected: "could not broadcast input array from shape (3,2048) into shape (1,2048)"
         soft_fail: true
         precision: high
+        skip_platforms:
+          - pml-vk-gen
         platform_overrides:
           tf-dnnl-cpu:
             conda_env: ci/conda/tensorflow-dnnl.yml
@@ -241,9 +247,14 @@ SUITES:
             soft_fail: true # performance regression
           tf-dnnl-cpu:
             conda_env: ci/conda/tensorflow-dnnl.yml
+        skip_platforms:
+          - pml-vk-gen
       resnet50:
         precision: high
         platform_overrides:
+          pml-vk-gen:
+            prepend_args: [--examples=128]
+            perf_threshold: 0.01
           pml-llvm-cpu:
             prepend_args: [--examples=128]
           pml-ocl-gfx804:
@@ -268,10 +279,13 @@ SUITES:
             conda_env: ci/conda/tensorflow-dnnl.yml
         skip_platforms:
           - pml-mtl-uhd630
+          - pml-vk-gen
       xception:
         expected: "Unrecognized data_format"
         soft_fail: true
         precision: high
+        skip_platforms:
+          - pml-vk-gen
         platform_overrides:
           pml-llvm-cpu:
             prepend_args: [--examples=64]
