@@ -6,9 +6,9 @@
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/IR/Module.h"
 
-#include "pmlc/dialect/pxa/analysis/strides.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/dialect/xsmm/ir/ops.h"
+#include "pmlc/util/strides.h"
 
 using namespace mlir; // NOLINT[build/namespaces]
 
@@ -19,14 +19,14 @@ namespace xsmm = dialect::xsmm;
 
 namespace {
 
-pxa::StrideArray getStrideArray(Value operand, AffineMap tileMap) {
+util::StrideArray getStrideArray(Value operand, AffineMap tileMap) {
   int64_t offset;
   SmallVector<int64_t, 4> strides;
   auto type = operand.getType().cast<MemRefType>();
   getStridesAndOffset(type, strides, offset);
   auto layoutMap =
       makeStridedLinearLayoutMap(strides, offset, operand.getContext());
-  auto info = pxa::computeStrideArray(layoutMap.compose(tileMap));
+  auto info = util::computeStrideArray(layoutMap.compose(tileMap));
   assert(info.hasValue() && "computeStrideArray must succeed");
   return *info;
 }

@@ -21,6 +21,12 @@ void populateStdxToSPIRVGLSLPatterns(mlir::MLIRContext *context,
                                      mlir::SPIRVTypeConverter &typeConverter,
                                      mlir::OwningRewritePatternList &patterns);
 
+/// Adds patterns that perform conversion from GLSL spirv operations
+/// to chain of core spirv operations.
+void populateCustomGLSLToStdSpirvPatterns(
+    mlir::MLIRContext *context, mlir::SPIRVTypeConverter &typeConverter,
+    mlir::OwningRewritePatternList &patterns);
+
 std::unique_ptr<mlir::Pass> createGPUToSPIRVCustomPass();
 
 /// Generate the code for registering conversion passes.

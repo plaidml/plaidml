@@ -7,7 +7,7 @@
 
 namespace mlir {
 
-Value createIdentity(OpBuilder &builder, Location &loc, AtomicRMWKind agg,
+Value createIdentity(OpBuilder &builder, Location loc, AtomicRMWKind agg,
                      Type type);
 
 } // namespace mlir

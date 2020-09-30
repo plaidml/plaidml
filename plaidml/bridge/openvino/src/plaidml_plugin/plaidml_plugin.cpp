@@ -9,7 +9,6 @@
 
 #include <memory>
 
-#include "cpp_interfaces/base/ie_plugin_base.hpp"
 // #include "details/caseless.hpp"
 // #include "details/ie_cnn_network_tools.h"
 #include "ie_plugin_config.hpp"
@@ -57,20 +56,10 @@ void Engine::QueryNetwork(const ICNNNetwork& network, const std::map<std::string
   // }
 }
 
-IE_SUPPRESS_DEPRECATED_START
-
-INFERENCE_PLUGIN_API(StatusCode)
-CreatePluginEngine(IInferencePlugin*& plugin, ResponseDesc* resp) noexcept {
-  try {
-    plaidml::op::init();
-    plaidml::exec::init();
-
-    IVLOG(1, "CreatePluginEngine>");
-    plugin = make_ie_compatible_plugin({{1, 6}, CI_BUILD_NUMBER, "PlaidMLPlugin"}, std::make_shared<Engine>());
-    return OK;
-  } catch (std::exception& ex) {
-    return DescriptionBuffer(GENERAL_ERROR, resp) << ex.what();
-  }
+Engine::Engine() {
+  _pluginName = "PlaidML";
+  plaidml::op::init();
+  plaidml::exec::init();
 }
 
 Parameter Engine::GetMetric(const std::string& name, const std::map<std::string, Parameter>&) const {
@@ -99,6 +88,7 @@ Parameter Engine::GetMetric(const std::string& name, const std::map<std::string,
   throw std::logic_error("Unsupported metric: " + name);
 }
 
-IE_SUPPRESS_DEPRECATED_END
-
 }  // namespace PlaidMLPlugin
+
+static const Version version = {{2, 1}, CI_BUILD_NUMBER, "PlaidMLPlugin"};
+IE_DEFINE_PLUGIN_CREATE_FUNCTION(PlaidMLPlugin::Engine, version)

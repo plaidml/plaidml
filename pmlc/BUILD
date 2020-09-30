@@ -73,6 +73,7 @@ plaidml_cc_library(
         "//pmlc/dialect/xsmm",
         "//pmlc/target/demo",
         "//pmlc/target/intel_gen",
+        "//pmlc/target/intel_gen_ocl_spirv",
         "//pmlc/target/x86",
         "@llvm-project//mlir:AllPassesAndDialectsNoRegistration",
     ],
