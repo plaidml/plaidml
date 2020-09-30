@@ -34,6 +34,7 @@ namespace spirv = mlir::spirv;
 namespace LLVM = mlir::LLVM;
 using mlir::AllocOp;
 using mlir::ArrayRef;
+using mlir::Block;
 using mlir::BlockArgument;
 using mlir::failure;
 using mlir::FunctionType;
@@ -126,6 +127,9 @@ private:
   BufferCopyMode getBufferCopyMode(mlir::CallOp callOp, Value buffer);
 
   bool isInternalOperation(Operation *op);
+
+  llvm::Optional<LLVM::CallOp> findLLVMCallOp(Block *block,
+                                              llvm::StringRef name);
 
   llvm::SmallSet<Operation *, 4> getExternalDependentOperations(Value value);
 
@@ -308,6 +312,23 @@ bool ConvertGpuLaunchFuncToVulkanCalls::isInternalOperation(Operation *op) {
   return false;
 }
 
+llvm::Optional<LLVM::CallOp>
+ConvertGpuLaunchFuncToVulkanCalls::findLLVMCallOp(Block *block,
+                                                  llvm::StringRef name) {
+  LLVM::CallOp op = nullptr;
+  auto llvmCallOps = block->getOps<LLVM::CallOp>();
+  for (auto llvmCallOp : llvmCallOps) {
+    if (llvmCallOp.callee().getValue().equals(name)) {
+      if (op) {
+        llvmCallOp.emitError("Does not support multiple llvm.call @run.");
+        signalPassFailure();
+      }
+      op = llvmCallOp;
+    }
+  }
+  return op;
+}
+
 BufferCopyMode
 ConvertGpuLaunchFuncToVulkanCalls::getBufferCopyMode(mlir::CallOp callOp,
                                                      Value buffer) {
@@ -322,17 +343,7 @@ ConvertGpuLaunchFuncToVulkanCalls::getBufferCopyMode(mlir::CallOp callOp,
   auto currentBlock = callOp.getOperation()->getBlock();
 
   // Get llvm.call @run in current block
-  LLVM::CallOp *pRunOp = nullptr;
-  auto llvmCallOps = currentBlock->getOps<LLVM::CallOp>();
-  for (auto llvmCallOp : llvmCallOps) {
-    if (llvmCallOp.callee().getValue().equals(kRun)) {
-      if (pRunOp) {
-        callOp.emitError("Does not support multiple llvm.call @run.");
-        signalPassFailure();
-      }
-      pRunOp = &llvmCallOp;
-    }
-  }
+  auto runOp = findLLVMCallOp(currentBlock, kRun);
 
   auto operationDeps = getExternalDependentOperations(buffer);
   for (auto dependency : operationDeps) {
@@ -342,8 +353,8 @@ ConvertGpuLaunchFuncToVulkanCalls::getBufferCopyMode(mlir::CallOp callOp,
         copyMode = copyMode | BufferCopyMode::HostToDevice;
       } else {
         // Dependency is after callOp in current block.
-        if ((pRunOp != nullptr) &&
-            (pRunOp->getOperation()->isBeforeInBlock(dependency))) {
+        if (runOp &&
+            (runOp.getValue().getOperation()->isBeforeInBlock(dependency))) {
           // Dependency is after llvm.call @run in current block.
           copyMode = copyMode | BufferCopyMode::DeviceToHost;
         } else {
