@@ -3,6 +3,7 @@
 #include "pmlc/rt/executable.h"
 
 #include <algorithm>
+#include <chrono>
 #include <fstream>
 #include <string>
 #include <utility>
@@ -37,7 +38,6 @@
 #include "pmlc/rt/internal.h"
 #include "pmlc/rt/runtime.h"
 #include "pmlc/rt/symbol_registry.h"
-#include "pmlc/rt/timed_executable.h"
 #include "pmlc/util/env.h"
 #include "pmlc/util/logging.h"
 
@@ -311,6 +311,23 @@ enum class EngineKind {
   OrcJIT,
 };
 
+struct StopWatch {
+  using fp_milliseconds =
+      std::chrono::duration<double, std::chrono::milliseconds::period>;
+
+  void start() { startTime = std::chrono::steady_clock::now(); }
+
+  void stop() { stopTime = std::chrono::steady_clock::now(); }
+
+  double delta_ms() {
+    return std::chrono::duration_cast<fp_milliseconds>(stopTime - startTime)
+        .count();
+  }
+
+  std::chrono::steady_clock::time_point startTime;
+  std::chrono::steady_clock::time_point stopTime;
+};
+
 class JitExecutable final : public Executable {
 public:
   JitExecutable(const std::shared_ptr<Program> &program,
@@ -377,7 +394,17 @@ public:
     }
   }
 
-  void invoke() { jitEntry(ptrs.data()); }
+  void invoke() {
+    StopWatch stopWatch;
+    if (VLOG_IS_ON(1)) {
+      stopWatch.start();
+    }
+    jitEntry(ptrs.data());
+    if (VLOG_IS_ON(1)) {
+      stopWatch.stop();
+      IVLOG(1, "Executable time: " << stopWatch.delta_ms() << "ms");
+    }
+  }
 
 private:
   std::shared_ptr<pmlc::compiler::Program> program;
@@ -403,11 +430,7 @@ std::unique_ptr<Executable>
 Executable::fromProgram(const std::shared_ptr<Program> &program,
                         mlir::StringRef deviceID,
                         mlir::ArrayRef<void *> bufptrs) {
-  auto executable = getDevice(deviceID)->compile(program, bufptrs);
-  if (VLOG_IS_ON(1)) {
-    executable = makeTimedExecutable(std::move(executable));
-  }
-  return executable;
+  return getDevice(deviceID)->compile(program, bufptrs);
 }
 
 } // namespace pmlc::rt
