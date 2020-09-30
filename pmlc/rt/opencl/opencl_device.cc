@@ -1,6 +1,7 @@
 // Copyright 2020 Intel Corporation
 #include "pmlc/rt/opencl/opencl_device.h"
 
+#include "pmlc/rt/jit_executable.h"
 #include "pmlc/util/logging.h"
 
 namespace pmlc::rt::opencl {
@@ -41,6 +42,13 @@ OpenCLQueueUser OpenCLQueueGuard::use() {
 OpenCLDevice::OpenCLDevice(cl::Device device)
     : context(device), device(device) {
   IVLOG(1, "Instantiating OpenCL device: " << device.getInfo<CL_DEVICE_NAME>());
+}
+
+std::unique_ptr<Executable>
+OpenCLDevice::compile(const std::shared_ptr<pmlc::compiler::Program> &program,
+                      mlir::ArrayRef<void *> bufptrs) {
+  return makeJitExecutable(program, shared_from_this(),
+                           mlir::ArrayRef<void *>{this}, bufptrs);
 }
 
 OpenCLQueueUser OpenCLDevice::getQueue(cl::QueueProperties properties) {

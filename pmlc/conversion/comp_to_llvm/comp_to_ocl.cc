@@ -42,6 +42,26 @@ public:
   void runOnOperation();
 };
 
+class CompToOclConversionTarget final : public mlir::ConversionTarget {
+public:
+  CompToOclConversionTarget(mlir::MLIRContext &context,
+                            mlir::TypeConverter *typeConverter)
+      : mlir::ConversionTarget{context}, typeConverter{typeConverter} {}
+
+  bool isDynamicallyLegal(mlir::Operation *op) const final {
+    auto funcOp = mlir::cast<mlir::FuncOp>(op);
+    if (!funcOp) {
+      op->emitWarning(
+          "Unable to determine dynamic legality of a non-function operation");
+      return true;
+    }
+    return typeConverter->isSignatureLegal(funcOp.getType());
+  }
+
+private:
+  mlir::TypeConverter *typeConverter;
+};
+
 void ConvertCompToOcl::runOnOperation() {
   mlir::ModuleOp module = getOperation();
   // Serialize SPIRV kernels.
@@ -54,11 +74,13 @@ void ConvertCompToOcl::runOnOperation() {
   mlir::OwningRewritePatternList patterns;
   populateCommonPatterns(context, typeConverter);
   populateCompToOclPatterns(context, modulesMap, typeConverter, patterns);
+  mlir::populateFuncOpTypeConversionPattern(patterns, context, typeConverter);
   // Set conversion target.
-  mlir::ConversionTarget target(*context);
+  CompToOclConversionTarget target(*context, &typeConverter);
   target.addLegalDialect<LLVM::LLVMDialect>();
   target.addLegalDialect<mlir::StandardOpsDialect>();
   target.addIllegalDialect<comp::COMPDialect>();
+  target.addDynamicallyLegalOp<mlir::FuncOp>();
   if (mlir::failed(mlir::applyPartialConversion(module, target, patterns)))
     signalPassFailure();
   // Insert runtime function declarations.
@@ -154,6 +176,14 @@ void populateCompToOclPatterns(mlir::MLIRContext *context,
   // Populate type conversion patterns.
   LLVM::LLVMType llvmInt8Ptr = LLVM::LLVMType::getInt8PtrTy(context);
   typeConverter.addConversion(
+      [=](comp::DeviceType deviceType) -> mlir::Optional<mlir::Type> {
+        llvm::errs() << "Translating device type: " << deviceType << "\n";
+        if (deviceType.getRuntime() != comp::ExecEnvRuntime::OpenCL) {
+          return llvm::None;
+        }
+        return llvmInt8Ptr;
+      });
+  typeConverter.addConversion(
       [=](comp::ExecEnvType execEnvType) -> mlir::Optional<mlir::Type> {
         if (execEnvType.getRuntime() != comp::ExecEnvRuntime::OpenCL)
           return llvm::None;
@@ -193,7 +223,8 @@ void addOclFunctionDeclarations(mlir::ModuleOp &module) {
   if (!module.lookupSymbol(kOclCreate)) {
     builder.create<LLVM::LLVMFuncOp>(
         loc, kOclCreate,
-        LLVM::LLVMType::getFunctionTy(llvmInt8Ptr, {}, /*isVarArg=*/false));
+        LLVM::LLVMType::getFunctionTy(llvmInt8Ptr, {llvmInt8Ptr},
+                                      /*isVarArg=*/false));
   }
   if (!module.lookupSymbol(kOclDestroy)) {
     builder.create<LLVM::LLVMFuncOp>(

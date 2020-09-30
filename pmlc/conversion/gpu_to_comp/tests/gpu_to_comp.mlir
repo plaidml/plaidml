@@ -3,15 +3,16 @@
 
 module attributes {gpu.container_module} {
   //  CHECK-LABEL: func @one_gpu_func
-  //   CHECK-SAME:     %[[ARG:[a-zA-Z0-9]*]]:
-  //        CHECK:   %[[ENV:.*]] = comp.create_execenv
-  //      SPACE11:   %[[MEM:.*]] = comp.alloc %[[ENV]] %[[ARG]]
+  //   CHECK-SAME:     %[[DEV:[a-zA-Z0-9]*]]:
+  //   CHECK-SAME:     %[[ARGMEM:[a-zA-Z0-9]*]]:
+  //        CHECK:   %[[ENV:.*]] = comp.create_execenv %[[DEV]]
+  //      SPACE11:   %[[MEM:.*]] = comp.alloc %[[ENV]] %[[ARGMEM]]
   //        CHECK:   %[[FEV:.*]] = "comp.schedule_func"(%[[ENV]])
   //   CHECK-NEXT:     gpu.launch_func
-  //  SPACE0-SAME:       %[[ARG]]
+  //  SPACE0-SAME:       %[[ARGMEM]]
   // SPACE11-SAME:       %[[MEM]]
   //       SPACE0:   comp.wait %[[FEV]]
-  //      SPACE11:   %[[REV:.*]] = comp.schedule_read %[[ARG]] from %[[MEM]] on %[[ENV]] wait for %[[FEV]]
+  //      SPACE11:   %[[REV:.*]] = comp.schedule_read %[[ARGMEM]] from %[[MEM]] on %[[ENV]] wait for %[[FEV]]
   //      SPACE11:   comp.wait %[[REV]]
   //      SPACE11:   comp.dealloc %[[ENV]] %[[MEM]]
   //        CHECK:   comp.destroy_execenv %[[ENV]]
@@ -38,11 +39,12 @@ module attributes {gpu.container_module} {
 
 module attributes {gpu.container_module} {
   //  CHECK-LABEL: func @two_gpu_func
+  //   CHECK-SAME:     %[[DEV:[a-zA-Z0-9]*]]:
   //   CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]*]]:
   //   CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]*]]:
   //   CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]*]]:
 
-  //        CHECK:   %[[ENV0:.*]] = comp.create_execenv
+  //        CHECK:   %[[ENV0:.*]] = comp.create_execenv %[[DEV]]
   //      SPACE11:   %[[MEM02:.*]] = comp.alloc %[[ENV0]] %[[ARG2]]
   //        CHECK:   %[[FEV0:.*]] = "comp.schedule_func"(%[[ENV0]])
   //        CHECK:     gpu.launch_func
@@ -54,7 +56,7 @@ module attributes {gpu.container_module} {
   //      SPACE11:   comp.dealloc %[[ENV0]] %[[MEM02]]
   //        CHECK:   comp.destroy_execenv %[[ENV0]]
 
-  //        CHECK:   %[[ENV1:.*]] = comp.create_execenv
+  //        CHECK:   %[[ENV1:.*]] = comp.create_execenv %[[DEV]]
   //      SPACE11:   %[[MEM10:.*]] = comp.alloc %[[ENV1]] %[[ARG0]]
   //      SPACE11:   %[[MEM11:.*]] = comp.alloc %[[ENV1]] %[[ARG1]]
   //      SPACE11:   %[[MEM12:.*]] = comp.alloc %[[ENV1]] %[[ARG2]]

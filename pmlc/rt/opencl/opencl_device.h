@@ -90,9 +90,14 @@ private:
 /// OpenCL device abstraction.
 /// Purpose of this class is to manage OpenCL resources connected
 /// to device.
-class OpenCLDevice final : public pmlc::rt::Device {
+class OpenCLDevice final : public pmlc::rt::Device,
+                           public std::enable_shared_from_this<OpenCLDevice> {
 public:
   explicit OpenCLDevice(cl::Device device);
+
+  std::unique_ptr<Executable>
+  compile(const std::shared_ptr<pmlc::compiler::Program> &program,
+          mlir::ArrayRef<void *> bufptrs) final;
 
   /// Returns OpenCL context created with only this device.
   cl::Context getOclContext() { return context; }

@@ -72,6 +72,19 @@ static ParseResult parseRuntime(DialectAsmParser &parser,
   return success();
 }
 
+static void printDeviceType(DeviceType type, DialectAsmPrinter &printer) {
+  printer << "device<" << runtimeToString(type.getRuntime()) << ">";
+}
+
+static Type parseDeviceType(DialectAsmParser &parser, Location loc) {
+  ExecEnvRuntime runtime;
+  if (parser.parseLess() || parseRuntime(parser, runtime) ||
+      parser.parseGreater())
+    return nullptr;
+
+  return DeviceType::getChecked(runtime, loc);
+}
+
 static void printEventType(EventType type, DialectAsmPrinter &printer) {
   printer << "event<" << runtimeToString(type.getRuntime()) << ">";
 }
@@ -130,6 +143,8 @@ static Type parseExecEnvType(DialectAsmParser &parser, Location loc) {
 void pmlc::dialect::comp::detail::printType(mlir::Type type,
                                             mlir::DialectAsmPrinter &printer) {
   llvm::TypeSwitch<mlir::Type>(type)
+      .Case<DeviceType>(
+          [&](DeviceType deviceType) { printDeviceType(deviceType, printer); })
       .Case<EventType>(
           [&](EventType eventType) { printEventType(eventType, printer); })
       .Case<ExecEnvType>([&](ExecEnvType execEnvType) {
@@ -146,6 +161,7 @@ Type pmlc::dialect::comp::detail::parseType(mlir::DialectAsmParser &parser) {
     return nullptr;
 
   return llvm::StringSwitch<function_ref<Type()>>(typeKeyword)
+      .Case("device", [&] { return parseDeviceType(parser, loc); })
       .Case("event", [&] { return parseEventType(parser, loc); })
       .Case("execenv", [&] { return parseExecEnvType(parser, loc); })
       .Default([&] {

@@ -80,8 +80,32 @@ mlir::LogicalResult
 RewriteLaunchFunc::matchAndRewrite(gpu::LaunchFuncOp op,
                                    mlir::PatternRewriter &rewriter) const {
   mlir::Location loc = op.getLoc();
+  // Look up the containing function.
+  auto func = op.getParentOfType<mlir::FuncOp>();
+  if (!func) {
+    return mlir::failure();
+  }
+  // Add the execution device parameter to the containing function, unless it
+  // already has one.
+  auto funcTy = func.getType();
+  mlir::Value device;
+  if (funcTy.getNumInputs() && funcTy.getInput(0).isa<comp::DeviceType>()) {
+    device = func.getArgument(0);
+  } else {
+    auto deviceTy =
+        rewriter.getType<comp::DeviceType>(execEnvType.getRuntime());
+    std::vector<mlir::Type> inputs{deviceTy};
+    inputs.insert(inputs.end(), funcTy.getInputs().begin(),
+                  funcTy.getInputs().end());
+    func.setType(
+        mlir::FunctionType::get(inputs, funcTy.getResults(), op.getContext()));
+    // Add the execution device parameter to the entry block.
+    mlir::Block &block = func.front();
+    device = block.insertArgument(0u, deviceTy);
+  }
   // Create execution environment.
-  auto execEnvOp = rewriter.create<comp::CreateExecEnv>(loc, execEnvType);
+  auto execEnvOp =
+      rewriter.create<comp::CreateExecEnv>(loc, execEnvType, device);
   mlir::Value execEnv = execEnvOp.getResult();
   // Allocate memory on device for memory operands.
   std::vector<mlir::Value> newOperands;

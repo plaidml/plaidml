@@ -15,7 +15,7 @@ def COMP_Dialect : Dialect {
   let name = "comp";
   let summary = "Dialect for modeling device-host execution scenarios.";
   let description = [{
-    The 'comp' dialect provides types and operations that are usefull
+    The 'comp' dialect provides types and operations that are useful
     for modeling host-device relation, including synchronizing execution order
     and managing dedicated memory on device.
     It serves as an abstraction of lower level API's like Vulkan or OpenCL,
@@ -38,6 +38,9 @@ def COMP_Dialect : Dialect {
 // =============================================================================
 // Types
 // =============================================================================
+def COMP_IsDeviceTypePred : CPred<"$_self.isa<::pmlc::dialect::comp::DeviceType>()">;
+def COMP_AnyDevice : Type<COMP_IsDeviceTypePred, "any device type">;
+
 def COMP_IsExecEnvTypePred : CPred<"$_self.isa<::pmlc::dialect::comp::ExecEnvType>()">;
 def COMP_AnyExecEnv : Type<COMP_IsExecEnvTypePred, "any execenv type">;
 
@@ -63,6 +66,7 @@ class COMP_Op<string mnemonic, list<OpTrait> traits = []> :
 
 def COMP_CreateExecEnv : COMP_Op<"create_execenv",
                                  [MemoryEffects<[MemAlloc<DefaultResource>]>]>
+                       , Arguments<(ins COMP_AnyDevice:$device)>
                        , Results<(outs COMP_AnyExecEnv:$execEnv)> {
   let summary = "Creates execution environment.";
 
@@ -72,7 +76,7 @@ def COMP_CreateExecEnv : COMP_Op<"create_execenv",
   }];
 
   let assemblyFormat = [{
-    attr-dict `:` type($execEnv)
+    operands attr-dict `:` functional-type(operands, results)
   }];
 }
 

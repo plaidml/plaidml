@@ -64,6 +64,47 @@ public:
 };
 
 // ============================================================================
+// DeviceType;
+// ============================================================================
+class ExecEnvType;
+
+struct DeviceStorage : public RuntimeTypeStorage {
+  explicit DeviceStorage(ExecEnvRuntime runtime)
+      : RuntimeTypeStorage(runtime) {}
+
+  using KeyTy = ExecEnvRuntime;
+
+  bool operator==(const KeyTy &key) const { return key == KeyTy(getRuntime()); }
+
+  static llvm::hash_code hashKey(const KeyTy &key) {
+    return llvm::hash_combine(key);
+  }
+
+  static KeyTy getKey(ExecEnvRuntime runtime) { return KeyTy(runtime); }
+
+  static DeviceStorage *construct(mlir::TypeStorageAllocator &allocator,
+                                  const KeyTy &key) {
+    return new (allocator.allocate<DeviceStorage>()) DeviceStorage(key);
+  }
+};
+
+/// Devices represent an object capable of evaluating a Comp program.
+class DeviceType
+    : public mlir::Type::TypeBase<DeviceType, RuntimeType, DeviceStorage> {
+public:
+  using Base::Base;
+
+  static DeviceType get(mlir::MLIRContext *context, ExecEnvRuntime runtime) {
+    return Base::get(context, runtime);
+  }
+
+  static DeviceType getChecked(ExecEnvRuntime runtime,
+                               mlir::Location location) {
+    return Base::getChecked(location, runtime);
+  }
+};
+
+// ============================================================================
 // ExecEnvType
 // ============================================================================
 class EventType;
@@ -133,7 +174,7 @@ public:
     return Base::getChecked(location, runtime, tag, memorySpaces);
   }
 
-  // ExecEnvRuntime getRuntime() const { return getImpl()->runtime; }
+  ExecEnvRuntime getRuntime() const { return getImpl()->runtime; }
   /// Returns tag of this execution environment.
   ExecEnvTag getTag() const { return getImpl()->tag; }
   /// Returns reference to list of supported memory spaces.
