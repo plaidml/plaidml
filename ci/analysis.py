@@ -137,13 +137,13 @@ class Result(object):
         util.printf(self.test_info, self.cur.compile_duration, self.ref.execution_duration,
                     self.cur.execution_duration, self.ratio, self.efficiency)
 
-        skip = self.test_info.workload.get('skip', False)
-        expected = self.test_info.workload.get('expected')
-        precision = self.test_info.workload.get('precision')
-        perf_threshold = self.test_info.workload.get('perf_threshold', DEFAULT_RATIO_THRESHOLD)
-        correct = self.test_info.workload.get('correct', True)
         popt = util.PlanOption(self.test_info.suite, self.test_info.workload,
                                self.test_info.platform)
+        skip = popt.get('skip', False)
+        expected = popt.get('expected')
+        precision = popt.get('precision')
+        perf_threshold = popt.get('perf_threshold', DEFAULT_RATIO_THRESHOLD)
+        correct = popt.get('correct', True)
         compare = popt.get('compare', True)
 
         if not self.cur.exists():

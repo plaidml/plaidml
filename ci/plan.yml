@@ -251,10 +251,10 @@ SUITES:
           - pml-vk-gen
       resnet50:
         precision: high
-        perf_threshold: 0.001 # ignore perf_fail for now
         platform_overrides:
           pml-vk-gen:
             prepend_args: [--examples=128]
+            perf_threshold: 0.001 # ignore perf_fail for now
           pml-llvm-cpu:
             prepend_args: [--examples=128]
           pml-ocl-gfx804:
