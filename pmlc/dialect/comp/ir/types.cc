@@ -73,16 +73,11 @@ static ParseResult parseRuntime(DialectAsmParser &parser,
 }
 
 static void printDeviceType(DeviceType type, DialectAsmPrinter &printer) {
-  printer << "device<" << runtimeToString(type.getRuntime()) << ">";
+  printer << "device";
 }
 
 static Type parseDeviceType(DialectAsmParser &parser, Location loc) {
-  ExecEnvRuntime runtime;
-  if (parser.parseLess() || parseRuntime(parser, runtime) ||
-      parser.parseGreater())
-    return nullptr;
-
-  return DeviceType::getChecked(runtime, loc);
+  return DeviceType::getChecked(loc);
 }
 
 static void printEventType(EventType type, DialectAsmPrinter &printer) {

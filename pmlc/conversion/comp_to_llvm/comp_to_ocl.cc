@@ -177,10 +177,6 @@ void populateCompToOclPatterns(mlir::MLIRContext *context,
   LLVM::LLVMType llvmInt8Ptr = LLVM::LLVMType::getInt8PtrTy(context);
   typeConverter.addConversion(
       [=](comp::DeviceType deviceType) -> mlir::Optional<mlir::Type> {
-        llvm::errs() << "Translating device type: " << deviceType << "\n";
-        if (deviceType.getRuntime() != comp::ExecEnvRuntime::OpenCL) {
-          return llvm::None;
-        }
         return llvmInt8Ptr;
       });
   typeConverter.addConversion(

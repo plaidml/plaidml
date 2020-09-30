@@ -92,8 +92,7 @@ RewriteLaunchFunc::matchAndRewrite(gpu::LaunchFuncOp op,
   if (funcTy.getNumInputs() && funcTy.getInput(0).isa<comp::DeviceType>()) {
     device = func.getArgument(0);
   } else {
-    auto deviceTy =
-        rewriter.getType<comp::DeviceType>(execEnvType.getRuntime());
+    auto deviceTy = rewriter.getType<comp::DeviceType>();
     std::vector<mlir::Type> inputs{deviceTy};
     inputs.insert(inputs.end(), funcTy.getInputs().begin(),
                   funcTy.getInputs().end());
