@@ -174,6 +174,7 @@ class TestInfo(object):
         self.timeout = popt.get('timeout', 20)
         self.retry = popt.get('retry')
         self.soft_fail = popt.get('soft_fail')
+        self.perf_threshold = popt.get('perf_threshold')
         self.shards = shards
         self.shard_id = shard_id
         if self.shards > 1:
