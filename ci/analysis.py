@@ -4,7 +4,6 @@ import pathlib
 import numpy as np
 import util
 
-DEFAULT_RATIO_THRESHOLD = 0.8
 GOLDEN_ROOT = pathlib.Path('ci/golden')
 
 
