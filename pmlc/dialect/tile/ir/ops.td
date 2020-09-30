@@ -75,6 +75,8 @@ def ContractionOp : TileOpWithPPV<"contract", [NoSideEffect]> {
     void setSink(AffineMap sink);
     void setSources(ArrayRef<AffineMap> srcs);
     void setConstraints(IntegerSet cons);
+
+    RankedTensorType getResultType() { return result().getType().cast<RankedTensorType>(); }
   }];
 }
 

@@ -3,14 +3,18 @@
 #include <gflags/gflags.h>
 #include <gmock/gmock.h>
 
-// TODO: The awkward include of a *.cpp is to get `ngraph_register_interpreter_backend`. We could instead duplicate the
-// function's code to only include headers, but I don't think that's actually cleaner.
-#include "ngraph/test/runtime/interpreter/int_backend.cpp"  // NOLINT[build/include]
+#include "ngraph/test/runtime/interpreter/int_backend.hpp"
 
 namespace {
 
 class Environment : public ::testing::Environment {
-  void SetUp() override { ngraph_register_interpreter_backend(); }
+  void SetUp() override {
+    // TODO: This is a duplication of `ngraph_register_interpreter_backend` from
+    // "ngraph/test/runtime/interpreter/int_backend.cpp" because it's not available in headers
+    ngraph::runtime::BackendManager::register_backend("INTERPRETER", [](const std::string& /* config */) {
+      return std::make_shared<ngraph::runtime::interpreter::INTBackend>();
+    });
+  }
 };
 
 [[gnu::unused]] auto init = []() {

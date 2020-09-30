@@ -13,6 +13,7 @@
 #include "mlir/Transforms/Passes.h"
 
 #include "pmlc/conversion/comp_to_llvm/passes.h"
+#include "pmlc/conversion/gpu/lowering.h"
 #include "pmlc/conversion/gpu_to_comp/passes.h"
 #include "pmlc/conversion/gpu_to_spirv/passes.h"
 #include "pmlc/conversion/pxa_to_affine/passes.h"
@@ -22,6 +23,7 @@
 #include "pmlc/dialect/stdx/transforms/passes.h"
 #include "pmlc/dialect/tile/transforms/passes.h"
 #include "pmlc/target/intel_gen/passes.h"
+#include "pmlc/target/intel_gen_ocl_spirv/passes.h"
 #include "pmlc/target/x86/passes.h"
 
 // This function may be called to register the MLIR passes with the
@@ -62,6 +64,7 @@ inline void registerAllPasses() {
   pmlc::conversion::tile_to_pxa::registerPasses();
   pmlc::conversion::gpu_to_spirv::registerPasses();
   pmlc::conversion::gpu_to_comp::registerPasses();
+  pmlc::conversion::gpu::registerPasses();
 
   // Dialect passes
   pmlc::dialect::pxa::registerPasses();
@@ -71,4 +74,5 @@ inline void registerAllPasses() {
   // Target passes
   pmlc::target::x86::registerPasses();
   pmlc::target::intel_gen::registerPasses();
+  pmlc::target::intel_gen_ocl_spirv::registerPasses();
 }

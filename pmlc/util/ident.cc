@@ -57,7 +57,7 @@ static Attribute getAggAttr(AtomicRMWKind agg, Type type) {
   llvm_unreachable("Unable to compute identity for aggregation");
 }
 
-Value createIdentity(OpBuilder &builder, Location &loc, AtomicRMWKind agg,
+Value createIdentity(OpBuilder &builder, Location loc, AtomicRMWKind agg,
                      Type type) {
   Attribute attr = getAggAttr(agg, type);
   return builder.create<mlir::ConstantOp>(loc, type, attr);

@@ -86,6 +86,7 @@ cc_library(
     ],
     deps = [
         ":inference_engine",
+        ":ngraph_tests",
     ],
 )
 
@@ -109,6 +110,7 @@ cc_library(
         "inference-engine/src/legacy_api/src/**/*.h",
     ]),
     hdrs = glob([
+        "inference-engine/src/legacy_api/include/**/*.h",
         "inference-engine/src/legacy_api/include/**/*.hpp",
     ]),
     copts = [
@@ -117,11 +119,13 @@ cc_library(
     includes = [
         "inference-engine/src/inference_engine",  # TODO: Why does this work?
         "inference-engine/src/legacy_api/include",
+        "inference-engine/src/legacy_api/include/legacy",
         "inference-engine/src/legacy_api/src",
     ],
     tags = TAGS,
     deps = [
         ":inc",
+        ":itt",
         ":ngraph",
         ":plugin_api",
         ":pugixml",
@@ -133,6 +137,7 @@ cc_library(
 cc_library(
     name = "low_precision_transformations",
     srcs = glob(["inference-engine/src/low_precision_transformations/src/**/*.cpp"]),
+    hdrs = glob(["inference-engine/src/low_precision_transformations/src/**/*.hpp"]),
     copts = ["-w"],
     includes = ["inference-engine/src/low_precision_transformations/include"],
     tags = TAGS,
@@ -161,16 +166,32 @@ cc_library(
     deps = [
         ":fluid_gapi",
         ":inc",
+        ":itt",
         ":plugin_api",
         "@tbb",
     ],
 )
 
 cc_library(
+    name = "itt",
+    srcs = glob(["openvino/itt/src/*.cpp"]),
+    hdrs = glob(["openvino/itt/include/openvino/*.hpp"]),
+    includes = ["openvino/itt/include"],
+    tags = TAGS,
+)
+
+cc_library(
     name = "transformations",
     srcs = glob(["inference-engine/src/transformations/src/**/*.cpp"]),
+    hdrs = glob([
+        "inference-engine/src/transformations/include/**/*.hpp",
+        "inference-engine/src/transformations/src/**/*.hpp",
+    ]),
     copts = ["-w"],
-    includes = ["inference-engine/src/transformations/include"],
+    includes = [
+        "inference-engine/src/transformations/include",
+        "inference-engine/src/transformations/src",
+    ],
     tags = TAGS,
     deps = [
         ":inc",
@@ -183,6 +204,7 @@ cc_library(
     srcs = glob([
         "inference-engine/src/inference_engine/*.cpp",
         "inference-engine/src/inference_engine/threading/*.cpp",
+        "inference-engine/src/inference_engine/shape_infer/ie_built_in_holder.cpp",
     ]) + select({
         "@bazel_tools//src/conditions:windows": glob([
             "inference-engine/src/inference_engine/os/win/*.cpp",
@@ -194,6 +216,7 @@ cc_library(
     }),
     hdrs = glob([
         # "inference-engine/src/readers/ir_reader/ie_ir_version.hpp",  # TODO: Ok to remove?
+        "inference-engine/src/inference_engine/shape_infer/ie_built_in_holder.hpp",
     ]),
     copts = ["-w"],
     includes = [
@@ -201,6 +224,15 @@ cc_library(
         "inference-engine/src/readers/ir_reader",  # TODO: Why does this work?
         "inference-engine/src/readers/reader_api",  # TODO: Why does this work?
     ],
+    linkopts = select({
+        "@bazel_tools//src/conditions:windows": [],
+        "@bazel_tools//src/conditions:darwin_x86_64": [],
+        "//conditions:default": [
+            # "-pthread",
+            "-lm",
+            "-ldl",
+        ],
+    }),
     local_defines = [
         "ENABLE_IR_READER",
     ],
@@ -264,49 +296,25 @@ cc_library(
     name = "ngraph",
     srcs = glob(
         [
-            "ngraph/src/ngraph/*.cpp",
-            "ngraph/src/ngraph/*.hpp",
-            "ngraph/src/ngraph/builder/*.cpp",
-            "ngraph/src/ngraph/descriptor/**/*.cpp",
-            "ngraph/src/ngraph/distributed/*.cpp",
-            "ngraph/src/ngraph/op/*.cpp",
-            "ngraph/src/ngraph/op/**/*.cpp",
-            "ngraph/src/ngraph/opsets/*.cpp",
-            "ngraph/src/ngraph/pass/*.cpp",
-            "ngraph/src/ngraph/pattern/**/*.cpp",
-            "ngraph/src/ngraph/runtime/*.cpp",
-            "ngraph/src/ngraph/runtime/reference/*.cpp",
-            "ngraph/src/ngraph/state/*.cpp",
-            "ngraph/src/ngraph/type/*.cpp",
-            "ngraph/test/runtime/*.cpp",
-            "ngraph/test/runtime/**/*.cpp",
+            "ngraph/core/builder/src/*.cpp",
+            "ngraph/core/builder/src/builder/*.cpp",
+            "ngraph/core/reference/src/*.cpp",
+            "ngraph/core/reference/src/runtime/**/*.cpp",
+            "ngraph/core/src/descriptor/*.cpp",
+            "ngraph/core/src/**/*.cpp",
+            "ngraph/core/src/*.cpp",
         ],
         exclude = [
             "ngraph/src/ngraph/serializer.cpp",
-            "ngraph/test/runtime/ie/*.cpp",
         ],
     ),
     hdrs = glob(
         [
+            "ngraph/core/builder/include/ngraph/builder/*.hpp",
             "ngraph/core/include/ngraph/*.hpp",
-            "ngraph/src/ngraph/*.hpp",
-            "ngraph/src/ngraph/builder/*.hpp",
-            "ngraph/src/ngraph/descriptor/**/*.hpp",
-            "ngraph/src/ngraph/distributed/*.hpp",
-            "ngraph/src/ngraph/op/*.hpp",
-            "ngraph/src/ngraph/op/**/*.hpp",
-            "ngraph/src/ngraph/opsets/*.hpp",
-            "ngraph/src/ngraph/pass/*.hpp",
-            "ngraph/src/ngraph/pattern/*.hpp",
-            "ngraph/src/ngraph/runtime/**/*.hpp",
-            "ngraph/src/ngraph/state/*.hpp",
-            "ngraph/src/ngraph/pattern/**/*.hpp",
-            "ngraph/src/ngraph/type/*.hpp",
-            "ngraph/test/runtime/*.hpp",
-            "ngraph/test/runtime/**/*.hpp",
-        ],
-        exclude = [
-            "ngraph/test/runtime/ie/*.hpp",
+            "ngraph/core/include/ngraph/**/*.hpp",
+            "ngraph/core/reference/include/ngraph/runtime/reference/*.hpp",
+            "ngraph/core/src/*.hpp",
         ],
     ),
     defines = [
@@ -315,10 +323,19 @@ cc_library(
         "NGRAPH_VERSION=\\\"0.21.0\\\"",
     ],
     includes = [
+        "ngraph/core/builder/include",
+        "ngraph/core/builder/include/ngraph",
+        "ngraph/core/builder/include/ngraph/builder",
         "ngraph/core/include",
-        "ngraph/src",
-        "ngraph/src/ngraph",
-        "ngraph/test/runtime",
+        "ngraph/core/include/ngraph",
+        "ngraph/core/include/ngraph/op",
+        "ngraph/core/include/ngraph/op/util",
+        "ngraph/core/include/ngraph/pass",
+        "ngraph/core/include/ngraph/pattern",
+        "ngraph/core/include/ngraph/pattern/op",
+        "ngraph/core/include/ngraph/runtime",
+        "ngraph/core/reference/include",
+        "ngraph/core/src",
     ],
     local_defines = [
         "PROJECT_ROOT_DIR=\\\"./\\\"",
@@ -326,4 +343,37 @@ cc_library(
         "SHARED_LIB_SUFFIX=\\\"\\\"",
     ],
     tags = TAGS,
+    deps = [
+        ":itt",
+        "@tbb",
+    ],
+)
+
+cc_library(
+    name = "ngraph_tests",
+    srcs = glob([
+        "ngraph/test/runtime/*.cpp",
+        "ngraph/test/runtime/dynamic/*.cpp",
+        "ngraph/test/runtime/interpreter/*.cpp",
+        "ngraph/test/runtime/pass/*.cpp",
+        "ngraph/test/runtime/op/*.cpp",
+    ]),
+    hdrs = glob([
+        "ngraph/test/runtime/*.hpp",
+        "ngraph/test/runtime/dynamic/*.hpp",
+        "ngraph/test/runtime/interpreter/*.hpp",
+        "ngraph/test/runtime/pass/*.hpp",
+        "ngraph/test/runtime/op/*.hpp",
+    ]),
+    includes = [
+        "ngraph/test/runtime",
+    ],
+    local_defines = [
+        "PROJECT_ROOT_DIR=\\\"./\\\"",
+        "SHARED_LIB_PREFIX=\\\"\\\"",
+        "SHARED_LIB_SUFFIX=\\\"\\\"",
+    ],
+    deps = [
+        ":ngraph",
+    ],
 )

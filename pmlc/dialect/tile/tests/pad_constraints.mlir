@@ -1,4 +1,4 @@
-// RUN: pmlc-opt -tile-compute-bounds -tile-pad %s | FileCheck %s
+// RUN: pmlc-opt -tile-compute-bounds -tile-pad-constraints %s | FileCheck %s
 
 #conv1dcenter = affine_map<(i, j) -> (i + j - 1)>
 #conv1djustify = affine_map<(i, j) -> (i + j)>
