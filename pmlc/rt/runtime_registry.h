@@ -9,8 +9,7 @@
 #include <utility>
 #include <vector>
 
-#include "llvm/ADT/StringRef.h"
-
+#include "mlir/Support/LLVM.h"
 #include "pmlc/rt/runtime.h"
 
 namespace pmlc::rt {
@@ -47,7 +46,7 @@ using Factory = std::function<std::shared_ptr<Runtime>()>;
 // N.B. This function is NOT synchronized.  It is the caller's responsiblity to
 // ensure that other components are not concurrently accessing the system global
 // runtime map or registering other Factory instances.
-void registerFactory(llvm::StringRef id, Factory factory);
+void registerFactory(mlir::StringRef id, Factory factory);
 
 // makeStaticFactory is a template function returning a Factory that
 // instantiates an instance of the supplied concrete Runtime class.  The Runtime
@@ -66,7 +65,7 @@ inline Factory makeConstantFactory(std::shared_ptr<Runtime> runtime) {
 // initialization time. Components whose Runtimes are DefaultConstructible are
 // encouraged to use RuntimeRegistration instead.
 struct FactoryRegistration {
-  FactoryRegistration(llvm::StringRef id, Factory factory) {
+  FactoryRegistration(mlir::StringRef id, Factory factory) {
     registerFactory(id, std::move(factory));
   }
 };
@@ -81,11 +80,11 @@ struct FactoryRegistration {
 //
 template <class R>
 struct RuntimeRegistration {
-  explicit RuntimeRegistration(llvm::StringRef id) {
+  explicit RuntimeRegistration(mlir::StringRef id) {
     registerFactory(id, makeStaticFactory<R>());
   }
 
-  RuntimeRegistration(llvm::StringRef id, std::shared_ptr<R> runtime) {
+  RuntimeRegistration(mlir::StringRef id, std::shared_ptr<R> runtime) {
     registerFactory(
         id, makeConstantFactory(std::shared_ptr<Runtime>{std::move(runtime)}));
   }
@@ -99,7 +98,7 @@ struct RuntimeRegistration {
 // ensure that other components are not concurrently accessing the system global
 // runtime map -- e.g. looking up device IDs or compiling programs to produce
 // executables.
-void registerRuntime(llvm::StringRef id, std::shared_ptr<Runtime> runtime);
+void registerRuntime(mlir::StringRef id, std::shared_ptr<Runtime> runtime);
 
 // initRuntimes processes registered factories and adds them to the system's
 // global runtime map.

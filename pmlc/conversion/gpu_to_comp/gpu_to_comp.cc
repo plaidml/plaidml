@@ -71,6 +71,15 @@ struct ConvertGpuFunc : public mlir::OpConversionPattern<gpu::GPUFuncOp> {
   comp::ExecEnvType execEnvType;
 };
 
+// Adds device parameters to entrypoint functions.
+struct ConvertFunc final : public mlir::OpConversionPattern<mlir::FuncOp> {
+  using mlir::OpConversionPattern<mlir::FuncOp>::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::FuncOp op, mlir::ArrayRef<mlir::Value> operands,
+                  mlir::ConversionPatternRewriter &rewriter) const final;
+};
+
 class ConvertGpuToComp : public ConvertGpuToCompBase<ConvertGpuToComp> {
 public:
   void runOnOperation();
@@ -80,8 +89,21 @@ mlir::LogicalResult
 RewriteLaunchFunc::matchAndRewrite(gpu::LaunchFuncOp op,
                                    mlir::PatternRewriter &rewriter) const {
   mlir::Location loc = op.getLoc();
+  // Look up the containing function.
+  auto func = op.getParentOfType<mlir::FuncOp>();
+  if (!func) {
+    return mlir::failure();
+  }
+  auto funcTy = func.getType();
+  if (!funcTy.getNumInputs() || !funcTy.getInput(0).isa<comp::DeviceType>()) {
+    func.emitError(
+        "Expected containing function to supply an execution device");
+    return mlir::failure();
+  }
+  mlir::Value device = func.getArgument(0);
   // Create execution environment.
-  auto execEnvOp = rewriter.create<comp::CreateExecEnv>(loc, execEnvType);
+  auto execEnvOp =
+      rewriter.create<comp::CreateExecEnv>(loc, execEnvType, device);
   mlir::Value execEnv = execEnvOp.getResult();
   // Allocate memory on device for memory operands.
   std::vector<mlir::Value> newOperands;
@@ -230,6 +252,31 @@ mlir::LogicalResult ConvertGpuFunc::matchAndRewrite(
   return mlir::success();
 }
 
+mlir::LogicalResult
+ConvertFunc::matchAndRewrite(mlir::FuncOp op,
+                             mlir::ArrayRef<mlir::Value> operands,
+                             mlir::ConversionPatternRewriter &rewriter) const {
+  if (op.isExternal() ||
+      (op.getNumArguments() > 0 &&
+       op.getArgument(0).getType().isa<comp::DeviceType>())) {
+    return mlir::failure();
+  }
+
+  auto oldFuncTy = op.getType();
+  auto deviceTy = rewriter.getType<comp::DeviceType>();
+  std::vector<mlir::Type> inputs{deviceTy};
+  inputs.insert(inputs.end(), oldFuncTy.getInputs().begin(),
+                oldFuncTy.getInputs().end());
+  auto newFuncTy = rewriter.getFunctionType(inputs, oldFuncTy.getResults());
+
+  rewriter.updateRootInPlace(op, [&] {
+    op.setType(newFuncTy);
+    op.front().insertArgument(0u, deviceTy);
+  });
+
+  return mlir::success();
+}
+
 void ConvertGpuToComp::runOnOperation() {
   auto runtime = static_cast<comp::ExecEnvRuntime>(execEnvRuntime.getValue());
   unsigned memorySpace = execEnvMemorySpace.getValue();
@@ -258,6 +305,11 @@ void ConvertGpuToComp::runOnOperation() {
     }
     return true;
   });
+  target.addDynamicallyLegalOp<mlir::FuncOp>([](mlir::FuncOp op) -> bool {
+    return op.isExternal() ||
+           ((op.getNumArguments() > 0) &&
+            op.getArgument(0).getType().isa<comp::DeviceType>());
+  });
   target.addIllegalOp<gpu::LaunchOp>();
 
   // Setup rewrite patterns.
@@ -277,6 +329,7 @@ void populateGpuToCompPatterns(mlir::MLIRContext *context,
                                mlir::OwningRewritePatternList &patterns) {
   patterns.insert<RewriteLaunchFunc>(context, execEnvType);
   patterns.insert<ConvertGpuFunc>(context, execEnvType);
+  patterns.insert<ConvertFunc>(context);
 }
 
 std::unique_ptr<mlir::Pass> createConvertGpuToCompPass() {

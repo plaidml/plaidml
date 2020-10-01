@@ -64,6 +64,17 @@ public:
 };
 
 // ============================================================================
+// DeviceType
+// ============================================================================
+
+/// Devices represent a device capable of evaluating a Comp program.
+class DeviceType : public mlir::Type::TypeBase<DeviceType, mlir::Type,
+                                               mlir::DefaultTypeStorage> {
+public:
+  using Base::Base;
+};
+
+// ============================================================================
 // ExecEnvType
 // ============================================================================
 class EventType;

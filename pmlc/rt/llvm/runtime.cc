@@ -1,9 +1,11 @@
 // Copyright 2020, Intel Corporation
 
-#include "pmlc/rt/runtime_registry.h"
-
 #include <stdexcept>
 
+#include "pmlc/rt/llvm/device.h"
+#include "pmlc/rt/runtime_registry.h"
+
+namespace pmlc::rt::llvm {
 namespace {
 
 class Runtime final : public pmlc::rt::Runtime {
@@ -17,9 +19,10 @@ public:
   }
 
 private:
-  std::shared_ptr<pmlc::rt::Device> dev = std::make_shared<pmlc::rt::Device>();
+  std::shared_ptr<Device> dev = std::make_shared<Device>();
 };
 
-pmlc::rt::RuntimeRegistration reg{"llvm_cpu", std::make_shared<Runtime>()};
+RuntimeRegistration<Runtime> reg{"llvm_cpu"};
 
 } // namespace
+} // namespace pmlc::rt::llvm

@@ -2,10 +2,12 @@
 
 #include "pmlc/rt/executable.h"
 
+#include <algorithm>
 #include <chrono>
 #include <fstream>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
 #include "llvm/ExecutionEngine/GenericValue.h"
@@ -34,8 +36,9 @@
 
 #include "pmlc/rt/device_id.h"
 #include "pmlc/rt/internal.h"
-#include "pmlc/rt/runtime_registry.h"
+#include "pmlc/rt/runtime.h"
 #include "pmlc/rt/symbol_registry.h"
+#include "pmlc/util/env.h"
 #include "pmlc/util/logging.h"
 
 using namespace mlir; // NOLINT[build/namespaces]
@@ -303,6 +306,11 @@ struct OrcJITEngineImpl : EngineImpl {
   std::unique_ptr<llvm::orc::LLJIT> jit;
 };
 
+enum class EngineKind {
+  MCJIT,
+  OrcJIT,
+};
+
 struct StopWatch {
   using fp_milliseconds =
       std::chrono::duration<double, std::chrono::milliseconds::period>;
@@ -320,12 +328,12 @@ struct StopWatch {
   std::chrono::steady_clock::time_point stopTime;
 };
 
-class ExecutableImpl final : public Executable {
+class JitExecutable final : public Executable {
 public:
-  ExecutableImpl(const std::shared_ptr<Program> &program,
-                 llvm::StringRef deviceID, ArrayRef<void *> bufptrs,
-                 EngineKind kind)
-      : program(program), device(getDevice(deviceID)), ptrs(bufptrs.size()) {
+  JitExecutable(const std::shared_ptr<Program> &program,
+                std::shared_ptr<Device> device, ArrayRef<void *> preParams,
+                ArrayRef<void *> bufptrs)
+      : program(program), device(std::move(device)) {
     static std::once_flag is_initialized;
     std::call_once(is_initialized, []() {
       llvm::InitializeNativeTarget();
@@ -333,6 +341,16 @@ public:
       initializeLLVMPasses();
       llvm::sys::DynamicLibrary::LoadLibraryPermanently(nullptr);
     });
+
+    ptrs.reserve(preParams.size() + bufptrs.size());
+
+    EngineKind kind = EngineKind::OrcJIT;
+    auto jit = pmlc::util::getEnvVar("LLVM_JIT");
+    if (jit == "ORC") {
+      kind = EngineKind::OrcJIT;
+    } else if (jit == "MCJIT") {
+      kind = EngineKind::MCJIT;
+    }
 
     switch (kind) {
     case EngineKind::MCJIT:
@@ -367,15 +385,16 @@ public:
       throw std::runtime_error("jitEntry function is null");
     }
 
+    std::copy(preParams.begin(), preParams.end(), std::back_inserter(ptrs));
+
     descriptors.reserve(bufptrs.size());
     for (unsigned i = 0; i < bufptrs.size(); i++) {
       descriptors.emplace_back(bufptrs[i], program->arguments[i].shape);
-      ptrs[i] = descriptors[i].ptr();
+      ptrs.push_back(descriptors[i].ptr());
     }
   }
 
   void invoke() final {
-    ScopedCurrentDevice cdev(device);
     StopWatch stopWatch;
     if (VLOG_IS_ON(1)) {
       stopWatch.start();
@@ -399,10 +418,19 @@ private:
 } // namespace
 
 std::unique_ptr<Executable>
+makeJitExecutable(const std::shared_ptr<pmlc::compiler::Program> &program,
+                  std::shared_ptr<Device> device,
+                  mlir::ArrayRef<void *> preParams,
+                  mlir::ArrayRef<void *> bufptrs) {
+  return std::make_unique<JitExecutable>(program, std::move(device), preParams,
+                                         bufptrs);
+}
+
+std::unique_ptr<Executable>
 Executable::fromProgram(const std::shared_ptr<Program> &program,
-                        llvm::StringRef deviceID, ArrayRef<void *> bufptrs,
-                        EngineKind kind) {
-  return std::make_unique<ExecutableImpl>(program, deviceID, bufptrs, kind);
+                        mlir::StringRef deviceID,
+                        mlir::ArrayRef<void *> bufptrs) {
+  return getDevice(deviceID)->compile(program, bufptrs);
 }
 
 } // namespace pmlc::rt

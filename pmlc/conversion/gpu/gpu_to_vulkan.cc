@@ -89,7 +89,7 @@ private:
                                    std::vector<char> &binaryShader);
 
   /// Creates a LLVM global for the given `name`.
-  Value createEntryPointNameConstant(StringRef name, uint64_t lauchFuncIndex,
+  Value createEntryPointNameConstant(StringRef name, uint64_t launchFuncIndex,
                                      Location loc, OpBuilder &builder);
 
   /// bind gpu.launchOp buffers to Vulkan runtime.
@@ -103,8 +103,8 @@ private:
   /// Print a single buffer.
   LogicalResult printBuffer(Location loc, OpBuilder &builder, Value &buffer);
 
-  /// Converts the given `luanchOp` to vulkan launch call.
-  void convertGpuLaunchFunc(gpu::LaunchFuncOp launchOp);
+  /// Converts the given `launchOp` to vulkan launch call.
+  void convertGpuLaunchFunc(gpu::LaunchFuncOp launchOp, Value &device);
 
   /// Declares all needed runtime functions.
   void declareVulkanFunctions(Location loc);
@@ -169,7 +169,7 @@ private:
   mlir::Type mlirIndexType;
 
   uint64_t numKernel = 0;
-  uint64_t lauchFuncIndex = 0;
+  uint64_t launchFuncIndex = 0;
   mlir::Value vulkanRuntime;
   llvm::DenseMap<Value, llvm::SmallVector<uint64_t, 2>> bufferMap;
 
@@ -189,9 +189,26 @@ void ConvertGpuLaunchFuncToVulkanCalls::runOnOperation() {
   getCachedTypes();
 
   getOperation().walk([this](gpu::LaunchFuncOp op) { numKernel++; });
+  getOperation().walk([this](mlir::FuncOp op) {
+    if (op.isExternal()) {
+      return;
+    }
+    // Add the execution device parameter to the function.
+    auto ty = op.getType();
+    std::vector<mlir::Type> inputs{getLLVMPointerType()};
+    inputs.insert(inputs.end(), ty.getInputs().begin(), ty.getInputs().end());
+    op.setType(
+        mlir::FunctionType::get(inputs, ty.getResults(), op.getContext()));
 
-  getOperation().walk(
-      [this](gpu::LaunchFuncOp op) { convertGpuLaunchFunc(op); });
+    // Add the execution device parameter to the block.
+    auto &block = op.front();
+    auto device = block.insertArgument(0u, getLLVMPointerType());
+
+    // Convert the LaunchFuncOps.
+    op.walk([this, &device](gpu::LaunchFuncOp op) {
+      convertGpuLaunchFunc(op, device);
+    });
+  });
 
   // Declare runtime functions.
   declareVulkanFunctions(loc);
@@ -211,7 +228,7 @@ LogicalResult ConvertGpuLaunchFuncToVulkanCalls::createBinaryShader(
   SmallVector<uint32_t, 0> binary;
   uint64_t shader_index = 0;
   for (auto spirvModule : module.getOps<spirv::ModuleOp>()) {
-    if (shader_index == lauchFuncIndex) {
+    if (shader_index == launchFuncIndex) {
       if (failed(spirv::serialize(spirvModule, binary))) {
         return failure();
       }
@@ -225,14 +242,15 @@ LogicalResult ConvertGpuLaunchFuncToVulkanCalls::createBinaryShader(
 }
 
 Value ConvertGpuLaunchFuncToVulkanCalls::createEntryPointNameConstant(
-    StringRef name, uint64_t lauchFuncIndex, Location loc, OpBuilder &builder) {
+    StringRef name, uint64_t launchFuncIndex, Location loc,
+    OpBuilder &builder) {
   SmallString<16> shaderName(name.begin(), name.end());
   // Append `\0` to follow C style string given that
   // LLVM::createGlobalString() won't handle this directly for us.
   shaderName.push_back('\0');
 
   std::string entryPointGlobalName =
-      (name + "_spv_entry_point_name" + std::to_string(lauchFuncIndex)).str();
+      (name + "_spv_entry_point_name" + std::to_string(launchFuncIndex)).str();
   return LLVM::createGlobalString(loc, builder, entryPointGlobalName,
                                   shaderName, LLVM::Linkage::Internal);
 }
@@ -289,7 +307,8 @@ LogicalResult ConvertGpuLaunchFuncToVulkanCalls::transferBuffers(
     for (auto pair : bufferMap) {
       if (pair.first == buffers[i]) {
         Value dst_index = builder.create<LLVM::ConstantOp>(
-            loc, getLLVMInt64Type(), builder.getI64IntegerAttr(lauchFuncIndex));
+            loc, getLLVMInt64Type(),
+            builder.getI64IntegerAttr(launchFuncIndex));
         Value dst_binding = builder.create<LLVM::ConstantOp>(
             loc, getLLVMInt64Type(), builder.getI64IntegerAttr(i));
         Value src_index = builder.create<LLVM::ConstantOp>(
@@ -306,7 +325,7 @@ LogicalResult ConvertGpuLaunchFuncToVulkanCalls::transferBuffers(
       }
     }
     llvm::SmallVector<uint64_t, 2> second;
-    second.append({lauchFuncIndex, i});
+    second.append({launchFuncIndex, i});
     bufferMap[buffers[i]] = second;
   }
   return success();
@@ -337,7 +356,8 @@ void ConvertGpuLaunchFuncToVulkanCalls::declareVulkanFunctions(Location loc) {
 
   builder.create<LLVM::LLVMFuncOp>(
       loc, kInitVulkan,
-      LLVM::LLVMType::getFunctionTy(getLLVMPointerType(), {},
+      LLVM::LLVMType::getFunctionTy(getLLVMPointerType(),
+                                    {getLLVMPointerType()},
                                     /*isVarArg=*/false));
 
   builder.create<FuncOp>(
@@ -406,17 +426,17 @@ void ConvertGpuLaunchFuncToVulkanCalls::declareVulkanFunctions(Location loc) {
 }
 
 void ConvertGpuLaunchFuncToVulkanCalls::convertGpuLaunchFunc(
-    gpu::LaunchFuncOp launchOp) {
+    gpu::LaunchFuncOp launchOp, Value &device) {
 
   ModuleOp module = getOperation();
   OpBuilder builder(launchOp);
   Location loc = launchOp.getLoc();
 
-  // Create call to `initVulkan` before the first GpuLauchFunc.
-  if (lauchFuncIndex == 0) {
+  // Create call to `initVulkan` before the first GpuLaunchFunc.
+  if (launchFuncIndex == 0) {
     auto initVulkanCall = builder.create<LLVM::CallOp>(
         loc, ArrayRef<Type>{getLLVMPointerType()},
-        builder.getSymbolRefAttr(kInitVulkan), ArrayRef<Value>{});
+        builder.getSymbolRefAttr(kInitVulkan), ArrayRef<Value>{device});
     vulkanRuntime = initVulkanCall.getResult(0);
   }
 
@@ -428,7 +448,7 @@ void ConvertGpuLaunchFuncToVulkanCalls::convertGpuLaunchFunc(
   // Create LLVM global with SPIR-V binary data, so we can pass a pointer with
   // that data to runtime call.
   Value ptrToSPIRVBinary = LLVM::createGlobalString(
-      loc, builder, kSPIRVBinary + std::to_string(lauchFuncIndex),
+      loc, builder, kSPIRVBinary + std::to_string(launchFuncIndex),
       {binary.data(), binary.size()}, LLVM::Linkage::Internal);
 
   // Create LLVM constant for the size of SPIR-V binary shader.
@@ -437,7 +457,7 @@ void ConvertGpuLaunchFuncToVulkanCalls::convertGpuLaunchFunc(
 
   // Create LLVM global with entry point name.
   Value entryPointName = createEntryPointNameConstant(
-      launchOp.getKernelName(), lauchFuncIndex, loc, builder);
+      launchOp.getKernelName(), launchFuncIndex, loc, builder);
 
   auto gridSize = launchOp.getGridSizeOperandValues();
 
@@ -486,7 +506,7 @@ void ConvertGpuLaunchFuncToVulkanCalls::convertGpuLaunchFunc(
 
   // Create call to 'run' and 'deinitVulkan' runtime function
   // after the last GpuLauchFunc.
-  if (lauchFuncIndex == numKernel - 1) {
+  if (launchFuncIndex == numKernel - 1) {
     builder.create<LLVM::CallOp>(loc, ArrayRef<Type>{},
                                  builder.getSymbolRefAttr(kRun),
                                  ArrayRef<Value>{vulkanRuntime});
@@ -506,7 +526,7 @@ void ConvertGpuLaunchFuncToVulkanCalls::convertGpuLaunchFunc(
     }
   }
   launchOp.erase();
-  lauchFuncIndex++;
+  launchFuncIndex++;
 }
 
 std::unique_ptr<mlir::Pass> createConvertGpuLaunchFuncToVulkanCallsPass() {

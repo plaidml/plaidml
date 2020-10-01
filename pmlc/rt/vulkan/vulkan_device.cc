@@ -19,6 +19,7 @@
 #include <utility>
 #include <vector>
 
+#include "pmlc/rt/jit_executable.h"
 #include "pmlc/rt/vulkan/vulkan_error.h"
 #include "pmlc/util/logging.h"
 
@@ -109,6 +110,13 @@ VulkanDevice::VulkanDevice(const VkPhysicalDevice &physicalDevice,
 }
 
 VulkanDevice::~VulkanDevice() { vkDestroyDevice(device, nullptr); }
+
+std::unique_ptr<Executable>
+VulkanDevice::compile(const std::shared_ptr<pmlc::compiler::Program> &program,
+                      mlir::ArrayRef<void *> bufptrs) {
+  return makeJitExecutable(program, shared_from_this(),
+                           mlir::ArrayRef<void *>{this}, bufptrs);
+}
 
 void VulkanDevice::getBestComputeQueue(const VkPhysicalDevice &physicalDevice) {
   uint32_t queueFamilyPropertiesCount = 0;

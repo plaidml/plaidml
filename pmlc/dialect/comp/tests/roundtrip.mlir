@@ -1,44 +1,44 @@
 // RUN: pmlc-opt --allow-unregistered-dialect --split-input-file %s | pmlc-opt | FileCheck %s
 
-func @runtime_number_vk() {
+func @runtime_number_vk(%arg0 : !comp.device) {
   // CHECK-LABEL: func @runtime_number_vk
-  //       CHECK:   comp.create_execenv : !comp.execenv<vk:0,(0)>
-  %env = comp.create_execenv : !comp.execenv<0:0,(0)>
+  //       CHECK:   comp.create_execenv %arg0 : (!comp.device) -> !comp.execenv<vk:0,(0)>
+  %env = comp.create_execenv %arg0 : (!comp.device) -> !comp.execenv<0:0,(0)>
   return
 }
 
-func @runtime_string_vk() {
+func @runtime_string_vk(%arg0: !comp.device) {
   // CHECK-LABEL: func @runtime_string_vk
-  //       CHECK:   comp.create_execenv : !comp.execenv<vk:0,(1)>
-  %env = comp.create_execenv : !comp.execenv<vk:0,(1)>
+  //       CHECK:   comp.create_execenv %arg0 : (!comp.device) -> !comp.execenv<vk:0,(1)>
+  %env = comp.create_execenv %arg0 : (!comp.device) -> !comp.execenv<vk:0,(1)>
   return
 }
 
-func @runtime_number_ocl() {
+func @runtime_number_ocl(%arg0: !comp.device) {
   // CHECK-LABEL: func @runtime_number_ocl
-  //       CHECK:   comp.create_execenv : !comp.execenv<ocl:0,(11)>
-  %env = comp.create_execenv : !comp.execenv<1:0,(11)>
+  //       CHECK:   comp.create_execenv %arg0 : (!comp.device) -> !comp.execenv<ocl:0,(11)>
+  %env = comp.create_execenv %arg0 : (!comp.device) -> !comp.execenv<1:0,(11)>
   return
 }
 
-func @runtime_string_ocl() {
+func @runtime_string_ocl(%arg0: !comp.device) {
   // CHECK-LABEL: func @runtime_string_ocl
-  //       CHECK:   comp.create_execenv : !comp.execenv<ocl:1,(11)>
-  %env = comp.create_execenv : !comp.execenv<ocl:1,(11)>
+  //       CHECK:   comp.create_execenv %arg0 : (!comp.device) -> !comp.execenv<ocl:1,(11)>
+  %env = comp.create_execenv %arg0 : (!comp.device) -> !comp.execenv<ocl:1,(11)>
   return
 }
 
-func @runtime_number_custom() {
+func @runtime_number_custom(%arg0: !comp.device) {
   // CHECK-LABEL: @runtime_number_custom
-  //       CHECK:   comp.create_execenv : !comp.execenv<1000:0,(2)>
-  %env = comp.create_execenv : !comp.execenv<1000:0,(2)>
+  //       CHECK:   comp.create_execenv %arg0 : (!comp.device) -> !comp.execenv<1000:0,(2)>
+  %env = comp.create_execenv %arg0 : (!comp.device) -> !comp.execenv<1000:0,(2)>
   return
 }
 
-func @runtime_memory_spaces() {
+func @runtime_memory_spaces(%arg0: !comp.device) {
   // CHECK-LABEL: @runtime_memory_spaces
-  //       CHECK:   comp.create_execenv : !comp.execenv<1000:0,(2,11,3)>
-  %env = comp.create_execenv : !comp.execenv<1000:0,(2,11,3)>
+  //       CHECK:   comp.create_execenv %arg0 : (!comp.device) -> !comp.execenv<1000:0,(2,11,3)>
+  %env = comp.create_execenv %arg0 : (!comp.device) -> !comp.execenv<1000:0,(2,11,3)>
   return
 }
 

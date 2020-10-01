@@ -90,7 +90,7 @@ private:
 // callbacks in opencl_wrappers.cc.
 class OpenCLInvocation {
 public:
-  OpenCLInvocation();
+  explicit OpenCLInvocation(OpenCLDevice *device);
   ~OpenCLInvocation();
 
   /// Allocates memory on OpenCL device with specified size in bytes.

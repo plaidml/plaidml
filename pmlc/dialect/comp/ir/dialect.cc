@@ -68,7 +68,7 @@ static LogicalResult verify(Alloc op) {
 #undef GET_OP_CLASSES
 
 void COMPDialect::initialize() {
-  addTypes<ExecEnvType, EventType>();
+  addTypes<DeviceType, ExecEnvType, EventType>();
 #define GET_OP_LIST
   addOperations<
 #include "pmlc/dialect/comp/ir/ops.cc.inc" // NOLINT
