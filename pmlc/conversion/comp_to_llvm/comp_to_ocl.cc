@@ -42,26 +42,6 @@ public:
   void runOnOperation();
 };
 
-class CompToOclConversionTarget final : public mlir::ConversionTarget {
-public:
-  CompToOclConversionTarget(mlir::MLIRContext &context,
-                            mlir::TypeConverter *typeConverter)
-      : mlir::ConversionTarget{context}, typeConverter{typeConverter} {}
-
-  bool isDynamicallyLegal(mlir::Operation *op) const final {
-    auto funcOp = mlir::cast<mlir::FuncOp>(op);
-    if (!funcOp) {
-      op->emitWarning(
-          "Unable to determine dynamic legality of a non-function operation");
-      return true;
-    }
-    return typeConverter->isSignatureLegal(funcOp.getType());
-  }
-
-private:
-  mlir::TypeConverter *typeConverter;
-};
-
 void ConvertCompToOcl::runOnOperation() {
   mlir::ModuleOp module = getOperation();
   // Serialize SPIRV kernels.
@@ -76,11 +56,13 @@ void ConvertCompToOcl::runOnOperation() {
   populateCompToOclPatterns(context, modulesMap, typeConverter, patterns);
   mlir::populateFuncOpTypeConversionPattern(patterns, context, typeConverter);
   // Set conversion target.
-  CompToOclConversionTarget target(*context, &typeConverter);
+  mlir::ConversionTarget target(*context);
   target.addLegalDialect<LLVM::LLVMDialect>();
   target.addLegalDialect<mlir::StandardOpsDialect>();
   target.addIllegalDialect<comp::COMPDialect>();
-  target.addDynamicallyLegalOp<mlir::FuncOp>();
+  target.addDynamicallyLegalOp<mlir::FuncOp>([&](mlir::FuncOp op) -> bool {
+    return typeConverter.isSignatureLegal(op.getType());
+  });
   if (mlir::failed(mlir::applyPartialConversion(module, target, patterns)))
     signalPassFailure();
   // Insert runtime function declarations.
