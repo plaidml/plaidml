@@ -61,7 +61,7 @@ cc_library(
     defines = ["CL_TARGET_OPENCL_VERSION=220"],
     local_defines = select({
         "@bazel_tools//src/conditions:windows": [],
-        "//conditions:default": ["HAVE_SECURE_GETENV"],
+        "//conditions:default": ["HAVE___SECURE_GETENV"],
     }),
     includes = ["loader"],
     linkopts = opencl_icd_loader_lnks,
