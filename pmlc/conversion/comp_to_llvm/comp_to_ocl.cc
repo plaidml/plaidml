@@ -54,11 +54,15 @@ void ConvertCompToOcl::runOnOperation() {
   mlir::OwningRewritePatternList patterns;
   populateCommonPatterns(context, typeConverter);
   populateCompToOclPatterns(context, modulesMap, typeConverter, patterns);
+  mlir::populateFuncOpTypeConversionPattern(patterns, context, typeConverter);
   // Set conversion target.
   mlir::ConversionTarget target(*context);
   target.addLegalDialect<LLVM::LLVMDialect>();
   target.addLegalDialect<mlir::StandardOpsDialect>();
   target.addIllegalDialect<comp::COMPDialect>();
+  target.addDynamicallyLegalOp<mlir::FuncOp>([&](mlir::FuncOp op) -> bool {
+    return typeConverter.isSignatureLegal(op.getType());
+  });
   if (mlir::failed(mlir::applyPartialConversion(module, target, patterns)))
     signalPassFailure();
   // Insert runtime function declarations.
@@ -154,6 +158,10 @@ void populateCompToOclPatterns(mlir::MLIRContext *context,
   // Populate type conversion patterns.
   LLVM::LLVMType llvmInt8Ptr = LLVM::LLVMType::getInt8PtrTy(context);
   typeConverter.addConversion(
+      [=](comp::DeviceType deviceType) -> mlir::Optional<mlir::Type> {
+        return llvmInt8Ptr;
+      });
+  typeConverter.addConversion(
       [=](comp::ExecEnvType execEnvType) -> mlir::Optional<mlir::Type> {
         if (execEnvType.getRuntime() != comp::ExecEnvRuntime::OpenCL)
           return llvm::None;
@@ -193,7 +201,8 @@ void addOclFunctionDeclarations(mlir::ModuleOp &module) {
   if (!module.lookupSymbol(kOclCreate)) {
     builder.create<LLVM::LLVMFuncOp>(
         loc, kOclCreate,
-        LLVM::LLVMType::getFunctionTy(llvmInt8Ptr, {}, /*isVarArg=*/false));
+        LLVM::LLVMType::getFunctionTy(llvmInt8Ptr, {llvmInt8Ptr},
+                                      /*isVarArg=*/false));
   }
   if (!module.lookupSymbol(kOclDestroy)) {
     builder.create<LLVM::LLVMFuncOp>(

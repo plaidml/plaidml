@@ -22,7 +22,8 @@
 
 namespace pmlc::rt::vulkan {
 
-VulkanInvocation::VulkanInvocation() : device{Device::current<VulkanDevice>()} {
+VulkanInvocation::VulkanInvocation(VulkanDevice *device)
+    : device{device->shared_from_this()} {
   createQueryPool();
 }
 

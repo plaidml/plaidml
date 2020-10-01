@@ -6,23 +6,16 @@
 #include <vector>
 
 #include "pmlc/compiler/program.h"
-#include "pmlc/rt/runtime.h"
 
 namespace pmlc::rt {
-
-enum class EngineKind {
-  MCJIT,
-  OrcJIT,
-};
 
 class Executable {
 public:
   static std::unique_ptr<Executable>
   fromProgram(const std::shared_ptr<pmlc::compiler::Program> &program,
-              llvm::StringRef deviceID, mlir::ArrayRef<void *> bufptrs,
-              EngineKind kind = EngineKind::OrcJIT);
+              mlir::StringRef deviceID, mlir::ArrayRef<void *> bufptrs);
 
-  virtual ~Executable() {}
+  virtual ~Executable() = default;
 
   virtual void invoke() = 0;
 };

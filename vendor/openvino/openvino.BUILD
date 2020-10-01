@@ -14,6 +14,7 @@ cc_library(
         "inference-engine/include/**/*.h",
         "inference-engine/include/**/*.hpp",
     ]),
+    copts = ["-w"],
     defines = [
         "CI_BUILD_NUMBER=\\\"0\\\"",
         "IE_BUILD_POSTFIX=\\\"\\\"",
@@ -48,6 +49,7 @@ cc_library(
             "inference-engine/tests/functional/plugin/shared/include/single_layer_tests/proposal.hpp",
         ],
     ),
+    copts = ["-w"],
     includes = ["inference-engine/tests/functional/plugin/shared/include"],
     deps = [
         ":functional_test_utils",
@@ -63,6 +65,7 @@ cc_library(
     hdrs = glob(
         ["inference-engine/tests/ie_test_utils/functional_test_utils/*.hpp"],
     ),
+    copts = ["-w"],
     includes = ["inference-engine/tests/ie_test_utils"],
     deps = [
         ":inference_engine",
@@ -81,6 +84,7 @@ cc_library(
         "inference-engine/tests/ngraph_functions/include/ngraph_functions/*.hpp",
         "inference-engine/tests/ngraph_functions/include/ngraph_functions/utils/*.hpp",
     ]),
+    copts = ["-w"],
     includes = [
         "inference-engine/tests/ngraph_functions/include/",
     ],
@@ -113,9 +117,7 @@ cc_library(
         "inference-engine/src/legacy_api/include/**/*.h",
         "inference-engine/src/legacy_api/include/**/*.hpp",
     ]),
-    copts = [
-        "-w",
-    ],
+    copts = ["-w"],
     includes = [
         "inference-engine/src/inference_engine",  # TODO: Why does this work?
         "inference-engine/src/legacy_api/include",
@@ -153,6 +155,7 @@ cc_library(
         "inference-engine/src/plugin_api/**/*.h",
         "inference-engine/src/plugin_api/**/*.hpp",
     ]),
+    copts = ["-w"],
     includes = ["inference-engine/src/plugin_api"],
     tags = TAGS,
 )
@@ -176,6 +179,7 @@ cc_library(
     name = "itt",
     srcs = glob(["openvino/itt/src/*.cpp"]),
     hdrs = glob(["openvino/itt/include/openvino/*.hpp"]),
+    copts = ["-w"],
     includes = ["openvino/itt/include"],
     tags = TAGS,
 )
@@ -317,6 +321,7 @@ cc_library(
             "ngraph/core/src/*.hpp",
         ],
     ),
+    copts = ["-w"],
     defines = [
         "NGRAPH_JSON_DISABLE",
         "NGRAPH_INTERPRETER_ENABLE",
@@ -365,6 +370,7 @@ cc_library(
         "ngraph/test/runtime/pass/*.hpp",
         "ngraph/test/runtime/op/*.hpp",
     ]),
+    copts = ["-w"],
     includes = [
         "ngraph/test/runtime",
     ],

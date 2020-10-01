@@ -58,8 +58,8 @@ void OpenCLEvent::wait(const std::vector<OpenCLEvent *> &events) {
   cl::Event::waitForEvents(oclEvents);
 }
 
-OpenCLInvocation::OpenCLInvocation()
-    : device{Device::current<OpenCLDevice>()},
+OpenCLInvocation::OpenCLInvocation(OpenCLDevice *device)
+    : device{device->shared_from_this()},
       queueUser(device->getQueue(cl::QueueProperties::Profiling)) {}
 
 OpenCLInvocation::~OpenCLInvocation() {

@@ -6,8 +6,8 @@
 #include <string>
 #include <vector>
 
+#include "mlir/Support/LLVM.h"
 #include "pmlc/rt/runtime.h"
-#include "llvm/ADT/StringRef.h"
 
 namespace pmlc::rt {
 
@@ -15,7 +15,7 @@ namespace pmlc::rt {
 // to ensure that other components are not concurrently accessing the system
 // global runtime map -- e.g. adding runtimes.
 
-std::shared_ptr<Device> getDevice(llvm::StringRef deviceID);
+std::shared_ptr<Device> getDevice(mlir::StringRef deviceID);
 std::vector<std::string> getDeviceIDs();
 
 } // namespace pmlc::rt

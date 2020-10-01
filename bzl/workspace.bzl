@@ -102,6 +102,7 @@ def plaidml_workspace():
             clean_dep("//vendor/llvm:llvm.BUILD"): "llvm/BUILD.bazel",
             clean_dep("//vendor/mlir:mlir.BUILD"): "mlir/BUILD.bazel",
             clean_dep("//vendor/mlir:test.BUILD"): "mlir/test/BUILD.bazel",
+            clean_dep("//vendor/openmp:openmp.BUILD"): "openmp/BUILD.bazel",
         },
         override = "PLAIDML_LLVM_REPO",
     )

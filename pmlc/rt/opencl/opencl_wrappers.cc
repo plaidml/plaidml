@@ -11,7 +11,9 @@ namespace pmlc::rt::opencl {
 
 extern "C" {
 
-void *oclCreate() { return new OpenCLInvocation(); }
+void *oclCreate(void *device) {
+  return new OpenCLInvocation(static_cast<OpenCLDevice *>(device));
+}
 
 void oclDestroy(void *invocation) {
   delete static_cast<OpenCLInvocation *>(invocation);

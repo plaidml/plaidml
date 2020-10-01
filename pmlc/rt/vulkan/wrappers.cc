@@ -46,7 +46,9 @@ void bindBuffer(void *vkInvocation, DescriptorSetIndex setIndex,
 
 extern "C" {
 
-void *initVulkan() { return new VulkanInvocation(); }
+void *initVulkan(void *device) {
+  return new VulkanInvocation(static_cast<VulkanDevice *>(device));
+}
 
 void deinitVulkan(void *vkInvocation) {
   delete static_cast<VulkanInvocation *>(vkInvocation);

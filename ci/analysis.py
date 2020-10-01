@@ -4,7 +4,6 @@ import pathlib
 import numpy as np
 import util
 
-DEFAULT_RATIO_THRESHOLD = 0.8
 GOLDEN_ROOT = pathlib.Path('ci/golden')
 
 
@@ -140,7 +139,7 @@ class Result(object):
         skip = self.test_info.workload.get('skip', False)
         expected = self.test_info.workload.get('expected')
         precision = self.test_info.workload.get('precision')
-        perf_threshold = self.test_info.workload.get('perf_threshold', DEFAULT_RATIO_THRESHOLD)
+        perf_threshold = self.test_info.perf_threshold
         correct = self.test_info.workload.get('correct', True)
         popt = util.PlanOption(self.test_info.suite, self.test_info.workload,
                                self.test_info.platform)

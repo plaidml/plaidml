@@ -1,16 +1,16 @@
 // RUN: pmlc-opt --allow-unregistered-dialect --verify-diagnostics --split-input-file %s
 
-func @invalid_runtime() {
+func @invalid_runtime(%dev: !comp.device) {
   // expected-error@+2 {{unrecognized runtime string name}}
   // expected-note@+1 {{available runtime names are}}
-  %env = comp.create_execenv : !comp.execenv<invalid:0,(11)>
+  %env = comp.create_execenv %dev : (!comp.device) -> !comp.execenv<invalid:0,(11)>
   return
 }
 
 // -----
 
-func @invalid_schedule() {
-  %env = comp.create_execenv : !comp.execenv<0:0,(11)>
+func @invalid_schedule(%dev: !comp.device) {
+  %env = comp.create_execenv %dev : (!comp.device) -> !comp.execenv<0:0,(11)>
   // expected-error@+1 {{'comp.schedule_func' op body must have one operation - 'gpu.launch_func'}}
   "comp.schedule_func"(%env) ({
     "comp.schedule_end"() : () -> ()
@@ -20,8 +20,8 @@ func @invalid_schedule() {
 
 // -----
 
-func @invalid_schedule() {
-  %env = comp.create_execenv : !comp.execenv<0:0,(11)>
+func @invalid_schedule(%dev: !comp.device) {
+  %env = comp.create_execenv %dev : (!comp.device) -> !comp.execenv<0:0,(11)>
   // expected-error@+1 {{'comp.schedule_func' op body must have one operation - 'gpu.launch_func'}}
   "comp.schedule_func"(%env) ({
     %cst = constant 42 : i32
@@ -33,8 +33,8 @@ func @invalid_schedule() {
 // -----
 
 module attributes { gpu.container_module } {
-  func @invalid_schedule() {
-    %env = comp.create_execenv : !comp.execenv<0:0,(11)>
+  func @invalid_schedule(%dev: !comp.device) {
+    %env = comp.create_execenv %dev : (!comp.device) -> !comp.execenv<0:0,(11)>
     %ev = "op"() : () -> (!comp.event<1>)
     %idx = "op"() : () -> (index)
     // expected-error@+1 {{'comp.schedule_func' op mismatch between execenv runtime and dependant event runtime}}
@@ -54,8 +54,8 @@ module attributes { gpu.container_module } {
 
 // -----
 
-func @invalid_alloc() {
-  %env = comp.create_execenv : !comp.execenv<0:0,(11)>
+func @invalid_alloc(%dev: !comp.device) {
+  %env = comp.create_execenv %dev : (!comp.device) -> !comp.execenv<0:0,(11)>
   // expected-error@+1 {{'comp.alloc' op failed to verify that memory space is supported by execenv}}
   %mem = comp.alloc %env : (!comp.execenv<0:0,(11)>) -> (memref<2x3xf32, 1>)
   return
@@ -63,8 +63,8 @@ func @invalid_alloc() {
 
 // -----
 
-func @invalid_alloc() {
-  %env = comp.create_execenv : !comp.execenv<0:0,(11)>
+func @invalid_alloc(%dev: !comp.device) {
+  %env = comp.create_execenv %dev : (!comp.device) -> !comp.execenv<0:0,(11)>
   %host = "op"() : () -> (memref<1x1xf32>)
   // expected-error@+1 {{'comp.alloc' op host and device memory shapes must match}}
   %mem = comp.alloc %env %host : (!comp.execenv<0:0,(11)>, memref<1x1xf32>) -> (memref<2x3xf32, 11>)
@@ -73,8 +73,8 @@ func @invalid_alloc() {
 
 // -----
 
-func @invalid_alloc() {
-  %env = comp.create_execenv : !comp.execenv<0:0,(11)>
+func @invalid_alloc(%dev: !comp.device) {
+  %env = comp.create_execenv %dev : (!comp.device) -> !comp.execenv<0:0,(11)>
   %host = "op"() : () -> (memref<2x3xf32>)
   // expected-error@+1 {{'comp.alloc' op host and device memory element types must match}}
   %mem = comp.alloc %env %host : (!comp.execenv<0:0,(11)>, memref<2x3xf32>) -> (memref<2x3xf16, 11>)
@@ -83,8 +83,8 @@ func @invalid_alloc() {
 
 // -----
 
-func @invalid_dealloc() {
-  %env = comp.create_execenv : !comp.execenv<0:0,(11)>
+func @invalid_dealloc(%dev: !comp.device) {
+  %env = comp.create_execenv %dev : (!comp.device) -> !comp.execenv<0:0,(11)>
   %mem = "op"() : () -> (memref<2x3xf32, 1>)
   // expected-error@+1 {{'comp.dealloc' op failed to verify that memory space is supported by execenv}}
   comp.dealloc %env %mem : (!comp.execenv<0:0,(11)>, memref<2x3xf32, 1>) -> ()
@@ -93,8 +93,8 @@ func @invalid_dealloc() {
 
 // -----
 
-func @invalid_write() {
-  %env = comp.create_execenv : !comp.execenv<0:0,(11)>
+func @invalid_write(%dev: !comp.device) {
+  %env = comp.create_execenv %dev : (!comp.device) -> !comp.execenv<0:0,(11)>
   %host = "op"() : () -> (memref<2x3xf32>)
   %device = "op"() : () -> (memref<2x3xf32, 1>)
   // expected-error@+1 {{'comp.schedule_write' op memory space is not supported by execenv}}
@@ -105,8 +105,8 @@ func @invalid_write() {
 
 // -----
 
-func @invalid_read() {
-  %env = comp.create_execenv : !comp.execenv<0:0,(11)>
+func @invalid_read(%dev: !comp.device) {
+  %env = comp.create_execenv %dev : (!comp.device) -> !comp.execenv<0:0,(11)>
   %host = "op"() : () -> (memref<2x3xf32>)
   %device = "op"() : () -> (memref<2x3xf32, 1>)
   // expected-error@+1 {{'comp.schedule_read' op memory space is not supported by execenv}}
@@ -117,8 +117,8 @@ func @invalid_read() {
 
 // -----
 
-func @invalid_read() {
-  %env = comp.create_execenv : !comp.execenv<0:0,(11)>
+func @invalid_read(%dev: !comp.device) {
+  %env = comp.create_execenv %dev : (!comp.device) -> !comp.execenv<0:0,(11)>
   %host = "op"() : () -> (memref<2x3xf32>)
   %device = "op"() : () -> (memref<2x3xf32, 11>)
   // expected-error@+1 {{'comp.schedule_read' op mismatch between execenv runtime and resulting event runtime}}
@@ -129,8 +129,8 @@ func @invalid_read() {
 
 // -----
 
-func @invalid_barrier() {
-  %env = comp.create_execenv : !comp.execenv<0:0,(11)>
+func @invalid_barrier(%dev: !comp.device) {
+  %env = comp.create_execenv %dev : (!comp.device) -> !comp.execenv<0:0,(11)>
   %ev0 = "op"() : () -> (!comp.event<0>)
   %ev1 = "op"() : () -> (!comp.event<1>)
   // expected-error@+1 {{'comp.schedule_barrier' op mismatch between execenv runtime and dependant event runtime}}

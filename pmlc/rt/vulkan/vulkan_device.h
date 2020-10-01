@@ -21,10 +21,9 @@
 #include "mlir/Dialect/SPIRV/SPIRVOps.h"
 #include "mlir/Dialect/SPIRV/Serialization.h"
 #include "mlir/IR/Module.h"
+#include "mlir/Support/LLVM.h"
 #include "pmlc/rt/runtime.h"
 #include "pmlc/rt/vulkan/vulkan_state.h"
-#include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/ToolOutputFile.h"
 
 #include "volk.h" // NOLINT[build/include_subdir]
@@ -32,21 +31,18 @@
 namespace pmlc::rt::vulkan {
 
 /// Vulkan device abstraction.
-/// The purpose of this class is to run a SPIR-V compute shader on a Vulkan
-/// device.
-/// Before the run, user must provide and set resource data with descriptors,
-/// SPIR-V shader, number of work groups and entry point. After the creation of
-/// VulkanDevice, special methods must be called in the following
-/// sequence: initRuntime(), run(), updateHostMemoryBuffers(), destroy();
-/// each method in the sequence returns succes or failure depends on the Vulkan
-/// result code.
-class VulkanDevice final : public pmlc::rt::Device {
+class VulkanDevice final : public pmlc::rt::Device,
+                           public std::enable_shared_from_this<VulkanDevice> {
 public:
   VulkanDevice(const VkPhysicalDevice &physicalDevice,
                std::shared_ptr<VulkanState> state);
   ~VulkanDevice();
   VulkanDevice(const VulkanDevice &) = delete;
   VulkanDevice &operator=(const VulkanDevice &) = delete;
+
+  std::unique_ptr<Executable>
+  compile(const std::shared_ptr<pmlc::compiler::Program> &program,
+          mlir::ArrayRef<void *> bufptrs) final;
 
   const VkDevice &getDevice() const { return device; }
   const VkQueue &getQueue() const { return queue; }

@@ -2,6 +2,7 @@
 #pragma once
 
 #include "mlir/Dialect/SPIRV/SPIRVDialect.h"
+#include "mlir/Dialect/SPIRV/SPIRVOps.h"
 #include "mlir/Pass/Pass.h"
 
 namespace pmlc::target::intel_gen_ocl_spirv {

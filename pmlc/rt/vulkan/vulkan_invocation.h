@@ -134,7 +134,7 @@ struct MemoryTransferAction : Action {
 // callbacks in wrappers.cc.
 class VulkanInvocation {
 public:
-  VulkanInvocation();
+  explicit VulkanInvocation(VulkanDevice *device);
   ~VulkanInvocation();
 
   void createLaunchKernelAction(uint8_t *shader, uint32_t size,
