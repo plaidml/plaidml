@@ -394,7 +394,7 @@ public:
     }
   }
 
-  void invoke() {
+  void invoke() final {
     StopWatch stopWatch;
     if (VLOG_IS_ON(1)) {
       stopWatch.start();
