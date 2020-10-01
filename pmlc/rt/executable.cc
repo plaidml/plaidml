@@ -125,28 +125,6 @@ static std::string packFunctionArguments(llvm::Module *module,
   return newName;
 }
 
-static void *tryResolveSymbol(StringRef symbol) {
-  if (auto ptr = resolveSymbol(symbol))
-    return ptr;
-  if (symbol[0] == '_') {
-    if (auto ptr = resolveSymbol(symbol.drop_front()))
-      return ptr;
-  }
-
-  auto ptr = llvm::sys::DynamicLibrary::SearchForAddressOfSymbol(symbol.str());
-  if (ptr)
-    return ptr;
-
-  if (symbol[0] == '_') {
-    if (auto ptr = llvm::sys::DynamicLibrary::SearchForAddressOfSymbol(
-            symbol.drop_front().str())) {
-      return ptr;
-    }
-  }
-
-  return nullptr;
-}
-
 namespace {
 
 class MemRefDescriptor {
@@ -197,6 +175,28 @@ struct EngineImpl {
                            std::unique_ptr<llvm::LLVMContext> ctx,
                            StringRef entryPoint) = 0;
 };
+
+static void *tryResolveSymbol(StringRef symbol) {
+  if (auto ptr = resolveSymbol(symbol))
+    return ptr;
+  if (symbol[0] == '_') {
+    if (auto ptr = resolveSymbol(symbol.drop_front()))
+      return ptr;
+  }
+
+  auto ptr = llvm::sys::DynamicLibrary::SearchForAddressOfSymbol(symbol.str());
+  if (ptr)
+    return ptr;
+
+  if (symbol[0] == '_') {
+    if (auto ptr = llvm::sys::DynamicLibrary::SearchForAddressOfSymbol(
+            symbol.drop_front().str())) {
+      return ptr;
+    }
+  }
+
+  return nullptr;
+}
 
 struct MCJITEngineImpl : EngineImpl {
   struct Runtime : public llvm::LegacyJITSymbolResolver {
@@ -402,12 +402,12 @@ public:
     jitEntry(ptrs.data());
     if (VLOG_IS_ON(1)) {
       stopWatch.stop();
-      IVLOG(1, "Executable time: " << stopWatch.delta_ms() << "ms");
+      IVLOG(1, "Execution time: " << stopWatch.delta_ms() << "ms");
     }
   }
 
 private:
-  std::shared_ptr<pmlc::compiler::Program> program;
+  std::shared_ptr<Program> program;
   std::shared_ptr<Device> device;
   std::unique_ptr<EngineImpl> impl;
   std::vector<MemRefDescriptor> descriptors;
