@@ -15,4 +15,8 @@ std::unique_ptr<mlir::Pass> createGpuKernelOutliningPass();
 
 std::unique_ptr<mlir::Pass> createConvertGpuLaunchFuncToVulkanCallsPass();
 
+/// Generate the code for registering conversion passes.
+#define GEN_PASS_REGISTRATION
+#include "pmlc/conversion/gpu/passes.h.inc"
+
 } // namespace pmlc::conversion::gpu

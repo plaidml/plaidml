@@ -23,7 +23,9 @@ std::unique_ptr<mlir::Pass> createConstantTypesPass(mlir::Type concreteFloat,
 
 std::unique_ptr<mlir::Pass> createMakeProgramPass();
 
-std::unique_ptr<mlir::Pass> createPadPass();
+std::unique_ptr<mlir::Pass> createPadRangesPass();
+
+std::unique_ptr<mlir::Pass> createPadConstraintsPass();
 
 /// Generate the code for registering passes.
 #define GEN_PASS_REGISTRATION

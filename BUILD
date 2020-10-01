@@ -71,9 +71,22 @@ toolchain(
     toolchain_type = "@rules_python//python:toolchain_type",
 )
 
-# TODO
+# TODO: Unite the plugins_xml rules into single rule
 write_file(
-    name = "ov_plugins_xml",
+    name = "ov_plugins_xml_k8",
+    out = "_solib_k8/plugins.xml",
+    content = [
+        "<ie>",
+        "   <plugins>",
+        "       <plugin name='PlaidML' location='plaidml/bridge/openvino/libplaidml-plugin.so'/>",
+        "   </plugins>",
+        "</ie>",
+        "",
+    ],
+)
+
+write_file(
+    name = "ov_plugins_xml_linux_x86_64",
     out = "_solib_linux_x86_64/plugins.xml",
     content = [
         "<ie>",

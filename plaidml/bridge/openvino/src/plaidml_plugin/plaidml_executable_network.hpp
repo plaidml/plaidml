@@ -4,11 +4,13 @@
 
 #pragma once
 
+#include <map>
 #include <memory>
 #include <string>
-#include <unordered_map>
 
 #include "cpp_interfaces/impl/ie_executable_network_thread_safe_default.hpp"
+
+#include "ngraph/descriptor/tensor.hpp"
 
 #include "plaidml/edsl/edsl.h"
 
@@ -28,13 +30,11 @@ class PlaidMLExecutableNetwork : public InferenceEngine::ExecutableNetworkThread
                  InferenceEngine::ResponseDesc* resp) const override;
 
  private:
-  // Maps the names of the nGraph tensors to the corresponding PlaidML Tensors
-  std::unordered_map<std::string, plaidml::edsl::Tensor> tensorMap_;
-  // Maps the friendly names of the nGraph nodes generating input or output tensors to the corresponding PlaidML Tensors
-  // Since general nGraph Nodes may have multiple outputs, this cannot be the same as tensorMap_; I'm also concerned
-  // about possibly non-unique friendly names. However, we need to track I/O tensors by Nodes' friendly names since
-  // that is was the InputsDataMap and OutputsDataMap use.
-  std::unordered_map<std::string, plaidml::edsl::Tensor> tensorIOMap_;
+  // Go from the nGraph Tensor descriptors available from nGraph Nodes to the corresponding PlaidML Tensor
+  std::map<std::shared_ptr<ngraph::descriptor::Tensor>, plaidml::edsl::Tensor> tensorMap_;
+
+  // Go from the names OV uses for a networks inputs and outputs to the corresponding PlaidML Tensor
+  std::map<std::string, plaidml::edsl::Tensor> tensorIONameMap_;
 };
 
 }  // namespace PlaidMLPlugin

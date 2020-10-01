@@ -27,6 +27,8 @@ plaidml_cc_library(
         "contraction.cc",
         "make_program.cc",
         "padding.cc",
+        "pad_ranges.cc",
+        "pad_constraints.cc",
         "pass_detail.h",
     ],
     hdrs = [

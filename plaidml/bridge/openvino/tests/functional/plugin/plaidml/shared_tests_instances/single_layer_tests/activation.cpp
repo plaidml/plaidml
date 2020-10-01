@@ -47,45 +47,48 @@ const std::vector<InferenceEngine::Precision> netPrecisions = {
     InferenceEngine::Precision::FP32,
 };
 
-const std::vector<ActivationTypes> activationTypes = {
-    // Gelu, //
-    // Mish, //
-    Sigmoid,      //
-    Tanh,         //
-    Relu,         //
-    LeakyRelu,    //
-    Exp,          //
-    Log,          //
-    Sign,         //
-    Abs,          //
-    Clamp,        //
-    Negative,     //
-    Acos,         //
-    Asin,         //
-    Atan,         //
-    Cos,          //
-    Cosh,         //
-    Floor,        //
-    Sin,          //
-    Sinh,         //
-    Sqrt,         //
-    Tan,          //
-    Elu,          //
-    Erf,          //
-    HardSigmoid,  //
-    Selu,         //
-    Ceiling,      //
-    PReLu,        //
+const std::map<ActivationTypes, std::vector<std::vector<float>>> activationTypes = {
+    {Sigmoid, {}},
+    {Tanh, {}},
+    {Relu, {}},
+    {Exp, {}},
+    {Log, {}},
+    {Sign, {}},
+    {Abs, {}},
+    {Clamp, {{-2.0f, 2.0f}}},
+    {Negative, {}},
+    {Acos, {}},
+    {Asin, {}},
+    {Atan, {}},
+    {Cos, {}},
+    {Cosh, {}},
+    {Floor, {}},
+    {Sin, {}},
+    {Sinh, {}},
+    {Sqrt, {}},
+    {Tan, {}},
+    {Elu, {{0.1f}}},
+    {Erf, {}},
+    {HardSigmoid, {{0.2f, 0.5f}}},
+    {Selu, {{1.6732f, 1.0507f}}},
+    {Ceiling, {}},
+    // {Mish,        {}},
+    // Gelu
+    // {HSwish,      {}},
+    // {SoftPlus,    {}}
 };
+
+// TODO: Missing PReLU types, see
+// inference-engine/tests/functional/plugin/cpu/shared_tests_instances/single_layer_tests/activation.cpp
 
 std::map<std::vector<size_t>, std::vector<std::vector<size_t>>> basic = {
     {{1, 50}, {{}}},
     {{1, 128}, {{}}},
 };
 
-const auto basicCases = ::testing::Combine(::testing::ValuesIn(activationTypes),                                //
-                                           ::testing::ValuesIn(netPrecisions),                                  //
-                                           ::testing::ValuesIn(CommonTestUtils::combineShapes<size_t>(basic)),  //
+const auto basicCases = ::testing::Combine(::testing::ValuesIn(CommonTestUtils::combineParams(activationTypes)),  //
+                                           ::testing::ValuesIn(netPrecisions),                                    //
+                                           ::testing::ValuesIn(CommonTestUtils::combineParams(basic)),            //
                                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML));
 
 INSTANTIATE_TEST_SUITE_P(Activation_Basic, ActivationLayerTest, basicCases, ActivationLayerTest::getTestCaseName);
