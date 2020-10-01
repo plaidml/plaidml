@@ -60,8 +60,8 @@ cc_library(
     copts = ["-w"],
     defines = ["CL_TARGET_OPENCL_VERSION=220"],
     local_defines = select({
-        "@bazel_tools//src/conditions:linux_x86_64": ["HAVE_SECURE_GETENV"],
-        "//conditions:default": [],
+        "@bazel_tools//src/conditions:windows": [],
+        "//conditions:default": ["HAVE_SECURE_GETENV"],
     }),
     includes = ["loader"],
     linkopts = opencl_icd_loader_lnks,
