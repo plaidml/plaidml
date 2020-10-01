@@ -144,7 +144,7 @@ public:
     return Base::getChecked(location, runtime, tag, memorySpaces);
   }
 
-  ExecEnvRuntime getRuntime() const { return getImpl()->runtime; }
+  // ExecEnvRuntime getRuntime() const { return getImpl()->runtime; }
   /// Returns tag of this execution environment.
   ExecEnvTag getTag() const { return getImpl()->tag; }
   /// Returns reference to list of supported memory spaces.
