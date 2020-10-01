@@ -53,8 +53,8 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(createCSEPass());
 
   // Do subgroup or accumulation
-  // pm.addPass(pmlc::dialect::pxa::createSubgroupsPass());
-  pm.addPass(pmlc::dialect::pxa::createTileAccumulatePass());
+  pm.addPass(pmlc::dialect::pxa::createSubgroupsPass());
+  // pm.addPass(pmlc::dialect::pxa::createTileAccumulatePass());
   pm.addPass(pmlc::dialect::pxa::createAffineNormalizePass(/*promote=*/false));
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
@@ -82,7 +82,7 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(dialect::stdx::createI1StorageToI32Pass());
 
   // Devectorize
-  // pm.addPass(createSubgroupBroadcastPass());
+  pm.addPass(pmlc::target::intel_gen::createSubgroupBroadcastPass());
   pm.addPass(createCSEPass());
 
   // Lower mapped scf.parallel's to GPU
@@ -110,6 +110,7 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(conversion::gpu_to_spirv::createGPUToSPIRVCustomPass());
 
   // SPIR-V passes for lowering attributes.
+  pm.addPass(createSetSubgroupSizePass());
   pm.addPass(spirv::createLowerABIAttributesPass());
   pm.addPass(spirv::createUpdateVersionCapabilityExtensionPass());
 
