@@ -36,6 +36,8 @@ struct FusionInfo {
   SmallVector<WriteWrite, 4> writeAfterWrites;
   // Current state (whether we have a plan or not)
   bool hasPlan;
+  // Fuse the ops with exactly matched idxs
+  bool exactlyMatch;
   // Specifies the mapping from A's index space into B's index space (post
   // tiling)
   DenseMap<BlockArgument, BlockArgument> aToB;
@@ -44,8 +46,8 @@ struct FusionInfo {
   int64_t memoryActivityThreshold;
 
   FusionInfo(AffineParallelOp aBand, AffineParallelOp bBand,
-             int64_t memoryActivityThreshold)
-      : aInfo{aBand}, bInfo{bBand}, hasPlan(false),
+             int64_t memoryActivityThreshold, bool exactlyMatch)
+      : aInfo{aBand}, bInfo{bBand}, hasPlan(false), exactlyMatch(exactlyMatch),
         memoryActivityThreshold(memoryActivityThreshold) {}
 
   // Helper method to find the original source write of a state update.
@@ -186,6 +188,11 @@ struct FusionInfo {
 
     if (aToB.size() == 0) {
       bInfo.op.emitRemark("No index matches");
+      return false;
+    }
+
+    if (exactlyMatch && (aToB.size() != aInfo.sizes.size() || bToA.size() != bInfo.sizes.size())) {
+      bInfo.op.emitRemark("Loops do not match exactly.");
       return false;
     }
 
@@ -453,8 +460,9 @@ struct FusionInfo {
 struct FusionPass : public FusionBase<FusionPass> {
   FusionPass() = default;
 
-  explicit FusionPass(int64_t memoryActivityThreshold) {
+  explicit FusionPass(int64_t memoryActivityThreshold, bool exactlyMatch) {
     this->memoryActivityThreshold = memoryActivityThreshold;
+    this->exactlyMatch = exactlyMatch;
   }
 
   // Attempts to fuse two ops if they look good.  Returns the new fused loop
@@ -464,7 +472,7 @@ struct FusionPass : public FusionBase<FusionPass> {
     IVLOG(4, "Attempt fusion:\nA:\n"
                  << debugString(*aBand) << "\nB:\n"
                  << debugString(*bBand));
-    FusionInfo fusionInfo(aBand, bBand, memoryActivityThreshold.getValue());
+    FusionInfo fusionInfo(aBand, bBand, memoryActivityThreshold.getValue(), exactlyMatch);
     bool canFuse = fusionInfo.computeFusion();
     if (!canFuse) {
       return nullptr;
@@ -532,8 +540,8 @@ struct FusionPass : public FusionBase<FusionPass> {
 
 } // namespace
 
-std::unique_ptr<Pass> createFusionPass(int64_t memoryActivityThreshold) {
-  return std::make_unique<FusionPass>(memoryActivityThreshold);
+std::unique_ptr<Pass> createFusionPass(int64_t memoryActivityThreshold, bool exactlyMatch) {
+  return std::make_unique<FusionPass>(memoryActivityThreshold, exactlyMatch);
 }
 
 } // namespace pmlc::dialect::pxa
