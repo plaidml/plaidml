@@ -84,11 +84,9 @@ def _impl(ctx):
                     flag_group(
                         flags = [
                             "-fstack-protector",
-                            "-Wall",
-                            "-Wunused-but-set-parameter",
-                            "-Wno-free-nonheap-object",
-                            "-Wno-error=pragmas",
-                            "-Wno-unknown-pragmas",
+                            "-Wno-return-type",
+                            "-Wno-attributes",
+                            "-Wno-deprecated-declarations",
                             "-fno-omit-frame-pointer",
                         ],
                     ),

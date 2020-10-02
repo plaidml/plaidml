@@ -13,6 +13,7 @@ PLAIDML_COPTS = select({
     ],
     "//conditions:default": [
         "-std=c++17",
+        "-Wall",
         "-Werror",
     ],
 })
