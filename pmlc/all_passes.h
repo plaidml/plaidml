@@ -19,6 +19,7 @@
 #include "pmlc/conversion/pxa_to_affine/passes.h"
 #include "pmlc/conversion/stdx_to_llvm/passes.h"
 #include "pmlc/conversion/tile_to_pxa/passes.h"
+#include "pmlc/dialect/comp/transforms/passes.h"
 #include "pmlc/dialect/pxa/transforms/passes.h"
 #include "pmlc/dialect/stdx/transforms/passes.h"
 #include "pmlc/dialect/tile/transforms/passes.h"
@@ -67,6 +68,7 @@ inline void registerAllPasses() {
   pmlc::conversion::gpu::registerPasses();
 
   // Dialect passes
+  pmlc::dialect::comp::registerPasses();
   pmlc::dialect::pxa::registerPasses();
   pmlc::dialect::stdx::registerPasses();
   pmlc::dialect::tile::registerPasses();
