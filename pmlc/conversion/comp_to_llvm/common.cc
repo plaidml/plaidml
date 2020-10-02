@@ -14,9 +14,11 @@
 #include "pmlc/conversion/comp_to_llvm/pass_detail.h"
 #include "pmlc/conversion/comp_to_llvm/passes.h"
 #include "pmlc/conversion/comp_to_llvm/utils.h"
+#include "pmlc/dialect/comp/ir/dialect.h"
 
 namespace pmlc::conversion::comp_to_llvm {
 
+namespace comp = pmlc::dialect::comp;
 namespace spirv = mlir::spirv;
 namespace LLVM = mlir::LLVM;
 namespace gpu = mlir::gpu;
@@ -113,8 +115,17 @@ getManglingTypes(mlir::MLIRContext *context) {
 }
 
 void populateCommonPatterns(mlir::MLIRContext *context,
-                            mlir::TypeConverter &typeConverter) {
+                            mlir::TypeConverter &typeConverter,
+                            mlir::TypeConverter &signatureConverter,
+                            mlir::OwningRewritePatternList &patterns) {
+  // ==========================================================================
+  // Type conversion patterns.
+  // ==========================================================================
   LLVM::LLVMType llvmInt8Ptr = LLVM::LLVMType::getInt8PtrTy(context);
+  typeConverter.addConversion(
+      [=](comp::DeviceType deviceType) -> mlir::Optional<mlir::Type> {
+        return llvmInt8Ptr;
+      });
   // Identity conversion for LLVM types.
   typeConverter.addConversion([](LLVM::LLVMType type) { return type; });
   // Conversion between memref and int8 pointer.
@@ -162,6 +173,21 @@ void populateCommonPatterns(mlir::MLIRContext *context,
             builder.getSymbolRefAttr(castFuncName.str()), unrankedBuffer);
         return castOp.getResult(0);
       });
+  // ==========================================================================
+  // Signature conversion patterns.
+  // ==========================================================================
+  signatureConverter.addConversion([](mlir::Type type) { return type; });
+  signatureConverter.addConversion(
+      [&](mlir::Type type) -> mlir::Optional<mlir::Type> {
+        if (mlir::isa<comp::COMPDialect>(type.getDialect()))
+          return typeConverter.convertType(type);
+        return llvm::None;
+      });
+  // ==========================================================================
+  // Operation conversion patterns.
+  // ==========================================================================
+  mlir::populateFuncOpTypeConversionPattern(patterns, context,
+                                            signatureConverter);
 }
 
 void addCommonFunctionDeclarations(mlir::ModuleOp &module) {
