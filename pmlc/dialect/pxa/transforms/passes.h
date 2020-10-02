@@ -27,7 +27,7 @@ std::unique_ptr<mlir::Pass> createBufferPlacementPass();
 std::unique_ptr<mlir::Pass> createCachePass();
 
 std::unique_ptr<mlir::Pass>
-createFusionPass(int64_t memoryActivityThreshold = 0);
+createFusionPass(int64_t memoryActivityThreshold = 0, bool exactlyMatch = false);
 
 std::unique_ptr<mlir::Pass> createGPUThreadPass();
 std::unique_ptr<mlir::Pass> createGPUThreadPass(unsigned maxThreads);
