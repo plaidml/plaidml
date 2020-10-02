@@ -79,7 +79,7 @@ void PadRangesPass::runOnFunction() {
     }
     // Get strides for output
     auto outStrides = util::computeStrideArray(op.getResultType(), op.sink());
-    if (!outStrides || outStrides->strides.size() == 0) {
+    if (!outStrides || outStrides->strides.empty()) {
       op.emitRemark("Unable to compute output strides");
       return;
     }
