@@ -7,5 +7,6 @@ plaidml_cc_library(
     name = "comp",
     deps = [
         "//pmlc/dialect/comp/ir",
+        "//pmlc/dialect/comp/transforms",
     ],
 )

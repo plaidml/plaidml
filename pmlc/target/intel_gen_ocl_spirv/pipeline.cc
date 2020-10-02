@@ -25,6 +25,7 @@
 #include "pmlc/conversion/pxa_to_affine/passes.h"
 #include "pmlc/conversion/stdx_to_llvm/passes.h"
 #include "pmlc/conversion/tile_to_pxa/passes.h"
+#include "pmlc/dialect/comp/transforms/passes.h"
 #include "pmlc/dialect/pxa/transforms/passes.h"
 #include "pmlc/dialect/stdx/ir/ops.h"
 #include "pmlc/dialect/stdx/transforms/passes.h"
@@ -36,6 +37,7 @@ using namespace mlir; // NOLINT[build/namespaces]
 
 namespace pmlc::target::intel_gen_ocl_spirv {
 
+namespace comp = pmlc::dialect::comp;
 namespace pxa = pmlc::dialect::pxa;
 
 void pipelineBuilder(OpPassManager &pm) {
@@ -102,6 +104,7 @@ void pipelineBuilder(OpPassManager &pm) {
         "comp-execenv-runtime=1 comp-execenv-memory-space=11");
     pm.addPass(std::move(convertPass));
   }
+  pm.addPass(comp::createExecEnvCoalescingPass());
 
   // GPU to SPIR-V.
   pm.addPass(createLegalizeStdOpsForSPIRVLoweringPass());
