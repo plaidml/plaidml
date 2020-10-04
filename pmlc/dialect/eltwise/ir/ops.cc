@@ -205,8 +205,6 @@ OpFoldResult SubOp::fold(ArrayRef<Attribute> operands) {
   return constFoldBinaryOp(operands, [](double a, double b) { return a - b; });
 }
 
-#include "pmlc/dialect/eltwise/ir/interfaces.cc.inc"
-
 #define GET_OP_CLASSES
 #include "pmlc/dialect/eltwise/ir/ops.cc.inc"
 

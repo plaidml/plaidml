@@ -4,8 +4,6 @@
 include "pmlc/dialect/tile/ir/base.td"
 #endif
 
-include "pmlc/dialect/tile/ir/builder.td"
-
 def ConstantOp : TileOpWithPPV<"constant", [ConstantLike, NoSideEffect]>, HasFolder {
   let summary = "constant operation";
   let arguments = (ins IndexAttr:$value);
@@ -92,7 +90,6 @@ def IndexOp : TileOp<"index", [NoSideEffect]>, HasCanonicalizer {
 
 class SpecialOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
     Op<TileDialect, mnemonic, !listconcat(traits, [
-      SpecialOpInterface,
       GenericBuilderInterface
   ])> {
 

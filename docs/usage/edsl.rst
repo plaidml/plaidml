@@ -71,10 +71,10 @@ code. Some portions of the notation do not perfectly correspond. Here's why:
   user-specified constraints as discussed in later examples).
 
 - Tile must be explicitly given the shape of any new tensor created, done in
-  this code by ``TensorOutput(N)``. In this case we want ``N`` to match the size of
-  the last dimension of ``I``, which is specified by using ``I.bind_dims(M, N)``.
-  It is possible, however, to make this dimension of ``O`` larger or smaller,
-  which would zero-pad or truncate ``O`` respectively.
+  this code by ``Contraction().outShape(N)``. In this case we want ``N`` to
+  match the size of the last dimension of ``I``, which is specified by using
+  ``I.bind_dims(M, N)``. It is possible, however, to make this dimension of
+  ``O`` larger or smaller, which would zero-pad or truncate ``O`` respectively.
   For example,
 
   .. tabs::

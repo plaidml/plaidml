@@ -42,7 +42,8 @@ public:
 
   std::unique_ptr<Executable>
   compile(const std::shared_ptr<pmlc::compiler::Program> &program,
-          mlir::ArrayRef<void *> bufptrs) final;
+          mlir::ArrayRef<util::BufferPtr> inputBuffers,
+          mlir::ArrayRef<util::BufferPtr> outputBuffers) final;
 
   const VkDevice &getDevice() const { return device; }
   const VkQueue &getQueue() const { return queue; }

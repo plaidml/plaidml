@@ -19,8 +19,8 @@ static OpRegistration reg("hardsigmoid", [](const Context& ctx) {
   auto I = ctx.operands.at(0);
   auto alpha = ctx.operands.at(1);
   auto beta = ctx.operands.at(2);
-  auto O = edsl::Tensor(1.0);
-  auto Z = edsl::Tensor(0.0);
+  auto O = edsl::cast(edsl::Tensor(1.0), I.dtype());
+  auto Z = edsl::cast(edsl::Tensor(0.0), I.dtype());
 
   I = alpha * I + beta;
   I = edsl::select(I > O, O, I);

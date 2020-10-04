@@ -1,6 +1,5 @@
 // Copyright 2020, Intel Corp.
 
-#include <gflags/gflags.h>
 #include <gmock/gmock.h>
 
 #include "ngraph/test/runtime/interpreter/int_backend.hpp"

@@ -8,24 +8,6 @@ def ComputeBounds : FunctionPass<"tile-compute-bounds"> {
   let constructor = "pmlc::dialect::tile::createComputeBoundsPass()";
 }
 
-def ConstantTypes : FunctionPass<"tile-constant-types"> {
-  let summary = "Set constant types precision";
-  let constructor = "pmlc::dialect::tile::createConstantTypesPass()";
-  let options = [
-    Option<"floatKind", "floatx", "std::string",
-           /*default=*/"\"f32\"",
-           "Set floating-point constant precision (default: f32)">,
-    Option<"integerKind", "intx", "std::string",
-           /*default=*/"\"si32\"",
-           "Set integer constant precision (default: si32)">,
-  ];
-}
-
-def MakeProgram : FunctionPass<"tile-make-program"> {
-  let summary = "Forward-only canonicalization pass";
-  let constructor = "pmlc::dialect::tile::createMakeProgramPass()";
-}
-
 def PadRanges : FunctionPass<"tile-pad-ranges"> {
   let summary = "Pad ranges to make things more even (possibly adding constraints)";
   let constructor = "pmlc::dialect::tile::createPadRangesPass()";

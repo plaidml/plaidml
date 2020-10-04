@@ -38,97 +38,39 @@ py_setup(
 py_test(
     name = "backend_test",
     timeout = "long",
-    srcs = [
-        "backend_test.py",
-    ],
+    srcs = ["backend_test.py"],
     args = ["-v"],
     tags = [
         "keras",
         "manual",
         "tensorflow",
     ],
-    deps = [
-        ":keras",
-    ],
+    deps = [":keras"],
 )
 
 py_test(
     name = "mnist_mlp_test",
-    srcs = [
-        "mnist_mlp_test.py",
-    ],
+    srcs = ["mnist_mlp_test.py"],
     tags = [
         "keras",
         "manual",
     ],
-    deps = [
-        ":keras",
-    ],
+    deps = [":keras"],
 )
 
 py_test(
     name = "regression_test",
-    srcs = [
-        "regression_test.py",
-    ],
+    srcs = ["regression_test.py"],
     tags = [
         "keras",
         "manual",
     ],
-    deps = [
-        ":keras",
-    ],
+    deps = [":keras"],
 )
-
-# py_test(
-#     name = "tf_test",
-#     srcs = [
-#         "tf_test.py",
-#     ],
-#     tags = [
-#         "keras",
-#         "tensorflow",
-#     ],
-#     deps = [
-#         ":keras",
-#     ],
-# )
-
-# py_test(
-#     name = "tile_sandbox",
-#     srcs = [
-#         "tile_sandbox.py",
-#     ],
-#     tags = [
-#         "keras",
-#         "manual",
-#     ],
-#     deps = [
-#         ":keras",
-#     ],
-# )
 
 py_test(
     name = "trivial_model_test",
     srcs = ["trivial_model_test.py"],
-    tags = [
-        "keras",
-        "manual",
-    ],
-    deps = [
-        ":keras",
-    ],
+    tags = ["keras"],
+    deps = [":keras"],
 )
-
-# py_test(
-#     name = "tutorial_test",
-#     srcs = [
-#         "tutorial_test.py",
-#     ],
-#     tags = [
-#         "keras",
-#     ],
-#     deps = [
-#         ":keras",
-#     ],
-# )

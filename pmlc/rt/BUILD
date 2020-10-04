@@ -21,16 +21,25 @@ plaidml_cc_library(
     hdrs = [
         "device_id.h",
         "executable.h",
-        "symbol_registry.h",
         "runtime.h",
         "runtime_registry.h",
+        "symbol_registry.h",
     ],
     visibility = ["//visibility:public"],
     deps = [
         "//pmlc/compiler",
         "//pmlc/util:logging",
         "@half",
+        "@llvm-project//llvm:ExecutionEngine",
+        "@llvm-project//llvm:IPO",
+        "@llvm-project//llvm:MCJIT",
+        "@llvm-project//llvm:OrcJIT",
         "@llvm-project//llvm:Support",
+        "@llvm-project//llvm:X86AsmParser",
+        "@llvm-project//llvm:X86CodeGen",
+        "@llvm-project//mlir:ExecutionEngineUtils",
+        "@llvm-project//mlir:TargetLLVMIR",
+        "@llvm-project//mlir:Transforms",
         "@llvm-project//mlir:mlir_runner_utils",
         "@xsmm",
     ],
@@ -39,12 +48,12 @@ plaidml_cc_library(
 
 plaidml_cc_test(
     name = "device_id_test",
+    size = "small",
     srcs = [
         "device_id_test.cc",
-        "internal.h"
+        "internal.h",
     ],
     deps = [
         ":rt",
     ],
-    size = "small",
 )

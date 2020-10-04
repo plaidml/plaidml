@@ -11,13 +11,10 @@ include "mlir/Dialect/Affine/IR/AffineOpsBase.td"
 
 include "pmlc/util/enums.td"
 include "pmlc/util/interfaces.td"
-include "pmlc/dialect/eltwise/ir/interfaces.td"
 
 #ifndef __PML_ELTWISE_PREDICATES__
 include "pmlc/dialect/eltwise/ir/predicates.td"
 #endif
-
-include "pmlc/dialect/tile/ir/interfaces.td"
 
 // TODO: this should be defined upstream
 def IntegerSetAttr : Attr<
@@ -36,22 +33,6 @@ def TileDialect : Dialect {
     static std::string getCanonicalOpName(llvm::StringRef name);
   }];
 }
-
-def AffineMap : DialectType<TileDialect,
-  CPred<"$_self.isa<AffineMapType>()">,
-  "affine-map">;
-
-def AffineConstraints : DialectType<TileDialect,
-  CPred<"$_self.isa<AffineConstraintsType>()">,
-  "affine-constraints">;
-
-def AffineTensorMap : DialectType<TileDialect,
-  CPred<"$_self.isa<AffineTensorMapType>()">,
-  "affine-tensor-map">;
-
-def StrType : DialectType<TileDialect,
-  CPred<"$_self.isa<StringType>()">,
-  "string">;
 
 class TileOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
     Op<TileDialect, mnemonic, traits> {}

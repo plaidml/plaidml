@@ -4,25 +4,24 @@ import pathlib
 import tempfile
 
 import numpy as np
-
 import tensorflow as tf
 import tensorflow_hub as hub
 from flatbuffers.python import flatbuffers
+
 from plaidml.bridge.tensorflow.tests import archive_py_generated as schema
 from plaidml.bridge.tensorflow.tests import util
 
 
 def main(args):
+
     with tempfile.TemporaryDirectory() as tmp_dir:
         tmp_path = pathlib.Path(tmp_dir)
         os.environ['XLA_FLAGS'] = '--xla_dump_to={}'.format(tmp_dir)
         os.environ['TF_XLA_FLAGS'] = '--tf_xla_auto_jit=2 --tf_xla_cpu_global_jit'
-        os.environ["TFHUB_CACHE_DIR"] = tmp_dir
         tf.compat.v1.enable_eager_execution()
 
-        hub_url = "https://tfhub.dev/deepmind/i3d-kinetics-400/1"
-        layer = hub.KerasLayer(hub_url, trainable=False)
-
+        handle = str(args.model.parent)
+        layer = hub.KerasLayer(handle, trainable=False)
         x = np.random.uniform(size=(1, 32, 224, 224, 3)).astype('float32')
         y = layer(x)
         module_path = tmp_path / 'module_0001.before_optimizations.txt'
@@ -43,6 +42,7 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Generate archive for i3d')
+    parser.add_argument('model', type=pathlib.Path, help='location to read the model')
     parser.add_argument('output',
                         type=argparse.FileType('wb'),
                         help='location to write the generated archive')

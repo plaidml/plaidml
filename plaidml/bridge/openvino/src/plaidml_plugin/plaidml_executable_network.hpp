@@ -30,6 +30,12 @@ class PlaidMLExecutableNetwork : public InferenceEngine::ExecutableNetworkThread
                  InferenceEngine::ResponseDesc* resp) const override;
 
  private:
+  void handleConstant(const std::shared_ptr<ngraph::Node>& node);
+  void handleParameter(const std::shared_ptr<ngraph::Node>& node);
+  void handleOutput(const std::shared_ptr<ngraph::Node>& node);
+  void handleOp(const std::shared_ptr<ngraph::Node>& node);
+
+ private:
   // Go from the nGraph Tensor descriptors available from nGraph Nodes to the corresponding PlaidML Tensor
   std::map<std::shared_ptr<ngraph::descriptor::Tensor>, plaidml::edsl::Tensor> tensorMap_;
 

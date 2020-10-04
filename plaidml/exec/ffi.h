@@ -25,11 +25,11 @@ plaidml_strings* plaidml_devices_get(  //
 plaidml_executable* plaidml_jit(  //
     plaidml_error* err,           //
     plaidml_program* program,     //
-    const char* deviceID,         //
+    const char* device,           //
     size_t ninputs,               //
-    plaidml_binding** inputs,     //
+    plaidml_buffer** inputs,      //
     size_t noutputs,              //
-    plaidml_binding** outputs);
+    plaidml_buffer** outputs);
 
 void plaidml_executable_free(  //
     plaidml_error* err,        //

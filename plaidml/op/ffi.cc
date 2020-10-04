@@ -38,7 +38,7 @@ plaidml_value* plaidml_op_make(  //
       throw std::runtime_error(llvm::formatv("Operation not registered: {0}", op_name).str());
     }
     auto ret = op(Value{value});
-    return new plaidml_value{ret.as_ptr()->variant};
+    return new plaidml_value{ret.as_ptr()->node};
   });
 }
 
