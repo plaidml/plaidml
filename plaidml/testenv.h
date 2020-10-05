@@ -35,8 +35,21 @@ class TestFixture : public ::testing::Test {
     EXPECT_EQ(a, b);
   }
 
-  void compareElements(float a, float b) { EXPECT_NEAR(a, b, (fabs(a) + fabs(b)) / 10000.0); }
-  void compareElements(double a, double b) { EXPECT_NEAR(a, b, (fabs(a) + fabs(b)) / 10000.0); }
+  void compareElements(float a, float b) {
+    if (isfinite(a) && isfinite(b)) {
+      EXPECT_NEAR(a, b, (fabs(a) + fabs(b)) / 10000.0);
+    } else {
+      EXPECT_EQ(a, b);
+    }
+  }
+
+  void compareElements(double a, double b) { 
+    if (isfinite(a) && isfinite(b)) {
+      EXPECT_NEAR(a, b, (fabs(a) + fabs(b)) / 10000.0); 
+    } else {
+      EXPECT_EQ(a, b);
+    }
+  }
 
   template <typename T>
   void compareBuffers(plaidml::View view, const std::vector<T>& expected) {
