@@ -69,10 +69,11 @@ Primitives
 
    .. group-tab:: Python
 
+      .. autofunction:: plaidml.edsl.Constant
+      .. autofunction:: plaidml.edsl.Contraction
       .. autofunction:: plaidml.edsl.Placeholder
       .. autofunction:: plaidml.edsl.TensorDims
       .. autofunction:: plaidml.edsl.TensorIndexes
-      .. autofunction:: plaidml.edsl.TensorOutput
       .. autofunction:: plaidml.edsl.abs
       .. autofunction:: plaidml.edsl.cast
       .. autofunction:: plaidml.edsl.ceil

@@ -54,8 +54,6 @@ namespace MemoryEffects = mlir::MemoryEffects;
 namespace OpTrait = mlir::OpTrait;
 namespace SideEffects = mlir::SideEffects;
 
-#include "pmlc/dialect/eltwise/ir/interfaces.h.inc"
-
 #define GET_OP_CLASSES
 #include "pmlc/dialect/eltwise/ir/ops.h.inc"
 

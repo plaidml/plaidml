@@ -33,11 +33,9 @@ class PlaidMLCompiler : public Compiler {
  public:
   PlaidMLCompiler();
 
-  std::unordered_map<HloComputation*, std::string> function_map_;
   std::string HumanString(const Shape& shape);
 
-  static StatusOr<std::unique_ptr<::plaidml::edsl::Program>> ProgramFromHloModule(
-      std::unique_ptr<HloModule> hlo_module);
+  static StatusOr<::plaidml::Program> ProgramFromHloModule(std::unique_ptr<HloModule> hlo_module);
 
  private:
   Status RunHloOptimization(HloModule* hlo_module);

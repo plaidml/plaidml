@@ -8,10 +8,6 @@ include "mlir/Interfaces/SideEffectInterfaces.td"
 include "pmlc/util/interfaces.td"
 #endif
 
-#ifndef __PML_ELTWISE_INTERFACES__
-include "pmlc/dialect/eltwise/ir/interfaces.td"
-#endif
-
 #ifndef __PML_ELTWISE_PREDICATES__
 include "pmlc/dialect/eltwise/ir/predicates.td"
 #endif
@@ -27,7 +23,6 @@ def EltwiseDialect : Dialect {
 
 class EltwiseOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
     Op<EltwiseDialect, mnemonic, !listconcat(traits, [
-      EltwiseOpInterface,
       GenericBuilderInterface
     ])>;
 
@@ -101,7 +96,7 @@ class EW_BinaryOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
   }];
 }
 
-def EW_CastOp : Op<EltwiseDialect, "cast", [EltwiseOpInterface, NoSideEffect]>,
+def EW_CastOp : Op<EltwiseDialect, "cast", [NoSideEffect]>,
     HasCanonicalizer, HasFolder {
   let summary = "cast operation";
   let arguments = (ins EltwiseAny:$tensor);

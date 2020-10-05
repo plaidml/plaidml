@@ -17,13 +17,13 @@ def partial(F, wrt, delta):
     dims = edsl.TensorDims(3)
     x, y, z = edsl.TensorIndexes(3)
     F.bind_dims(*dims)
-    O = edsl.TensorOutput(*dims)
+    OC = edsl.Contraction().outShape(*dims)
     if wrt == 'x':
-        O[x, y, z] = F[x + 1, y, z] + F_neg[x - 1, y, z]
+        O = OC.outAccess(x, y, z).assign(F[x + 1, y, z] + F_neg[x - 1, y, z]).build()
     elif wrt == 'y':
-        O[x, y, z] = F[x, y + 1, z] + F_neg[x, y - 1, z]
+        O = OC.outAccess(x, y, z).assign(F[x, y + 1, z] + F_neg[x, y - 1, z]).build()
     elif wrt == 'z':
-        O[x, y, z] = F[x, y, z + 1] + F_neg[x, y, z - 1]
+        O = OC.outAccess(x, y, z).assign(F[x, y, z + 1] + F_neg[x, y, z - 1]).build()
     return O / (2.0 * delta)
 
 
@@ -31,29 +31,31 @@ def partial_chi(F, wrt, delta):
     dims = edsl.TensorDims(3)
     x, y, z = edsl.TensorIndexes(3)
     F.bind_dims(*dims)
-    DF_left = edsl.TensorOutput(*dims)
-    DF_right = edsl.TensorOutput(*dims)
+    DF_left_C = edsl.Contraction().outShape(*dims)
+    DF_right_C = edsl.Contraction().outShape(*dims)
 
     if wrt == 'x':
-        DF_right[x, y, z] = F[x + 1, y, z]
-        DF_left[x, y, z] = F[x - 1, y, z]
+        DF_right = DF_right_C.outAccess(x, y, z).assign(F[x + 1, y, z]).build()
+        DF_left = DF_left_C.outAccess(x, y, z).assign(F[x - 1, y, z]).build()
     elif wrt == 'y':
-        DF_right[x, y, z] = F[x, y + 1, z]
-        DF_left[x, y, z] = F[x, y - 1, z]
+        DF_right = DF_right_C.outAccess(x, y, z).assign(F[x, y + 1, z]).build()
+        DF_left = DF_left_C.outAccess(x, y, z).assign(F[x, y - 1, z]).build()
     elif wrt == 'z':
-        DF_right[x, y, z] = F[x, y, z + 1]
-        DF_left[x, y, z] = F[x, y, z - 1]
+        DF_right = DF_right_C.outAccess(x, y, z).assign(F[x, y, z + 1]).build()
+        DF_left = DF_left_C.outAccess(x, y, z).assign(F[x, y, z - 1]).build()
 
-    DF_chi_right = edsl.select(DF_right < 0, 1, 0)
-    DF_chi_left = edsl.select(DF_left < 0, -1, 0)
+    one = edsl.cast(1, F.dtype)
+    zero = edsl.cast(1, F.dtype)
+    neg_one = edsl.cast(-1, F.dtype)
+
+    DF_chi_right = edsl.select(DF_right < 0, one, zero)
+    DF_chi_left = edsl.select(DF_left < 0, neg_one, zero)
     return (DF_chi_right + DF_chi_left) / (2.0 * delta)
 
 
 def sum(R):
     idxs = edsl.TensorIndexes(3)
-    O = edsl.TensorOutput()
-    O[()] += R[idxs]
-    return O
+    return edsl.Contraction().sum(R[idxs]).build()
 
 
 # n: number of grid points along each coord direction
@@ -66,9 +68,9 @@ def toroidal_shell_integral(n, minval, maxval, eps, benchmark=False):
     X_data = coordvals.reshape(n, 1, 1)
     Y_data = coordvals.reshape(1, n, 1)
     Z_data = coordvals.reshape(1, 1, n)
-    X = edsl.Tensor(edsl.LogicalShape(plaidml.DType.FLOAT32, X_data.shape))
-    Y = edsl.Tensor(edsl.LogicalShape(plaidml.DType.FLOAT32, Y_data.shape))
-    Z = edsl.Tensor(edsl.LogicalShape(plaidml.DType.FLOAT32, Z_data.shape))
+    X = edsl.Placeholder(plaidml.DType.FLOAT32, X_data.shape)
+    Y = edsl.Placeholder(plaidml.DType.FLOAT32, Y_data.shape)
+    Z = edsl.Placeholder(plaidml.DType.FLOAT32, Z_data.shape)
 
     # f-rep of torodial shell f(x, y, z) = (sqrt(x^2 + y^2) - 1)^2 + z^2 + (0.1)^2
     F = sq(edsl.sqrt(sq(X) + sq(Y)) - 1.0) + sq(Z) - sq(0.1)
@@ -86,33 +88,24 @@ def toroidal_shell_integral(n, minval, maxval, eps, benchmark=False):
 
     NUMER = DFDX * DCHIDX + DFDY * DCHIDY + DFDZ * DCHIDZ
     DENOM = edsl.sqrt(sq(DFDX) + sq(DFDY) + sq(DFDZ))
-    H = edsl.select(DENOM < eps, 0, NUMER / DENOM)
+    zero = edsl.cast(0, NUMER.dtype)
+    H = edsl.select(DENOM < eps, zero, NUMER / DENOM)
     O = sum(-G * H)
 
-    program = edsl.Program('toroidal_shell_integral', [O])
-    binder = plaidml.exec.Binder(program)
-    executable = binder.compile()
+    program = plaidml.Program('toroidal_shell_integral', [X, Y, Z], [O])
+    runner = plaidml.exec.Runner(program)
 
     def run():
-        binder.input(X).copy_from_ndarray(X_data)
-        binder.input(Y).copy_from_ndarray(Y_data)
-        binder.input(Z).copy_from_ndarray(Z_data)
-        executable.run()
-        return binder.output(O).as_ndarray()
+        outputs = runner.run([X_data, Y_data, Z_data])
+        return outputs[0]
 
     if benchmark:
-        # the first run will compile and run
-        print('compiling...')
-        result = run()
-
-        # subsequent runs should not include compile time
         print('running...')
         ITERATIONS = 100
         elapsed = timeit.timeit(run, number=ITERATIONS)
         print('runtime:', elapsed / ITERATIONS)
-    else:
-        result = run()
 
+    result = run()
     return result * (delta**3)
 
 

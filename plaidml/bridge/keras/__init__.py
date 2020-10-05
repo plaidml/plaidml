@@ -16,7 +16,6 @@ import plaidml
 import plaidml.edsl as edsl
 import plaidml.exec
 import plaidml.op as plaidml_op
-import plaidml.settings
 from keras.backend.common import epsilon, floatx, image_data_format
 from keras.backend.common import set_floatx as keras_set_floatx
 
@@ -31,8 +30,6 @@ _NAME_SCOPE_STACK = []
 _CONV_DATA_FORMAT = ['channels_first', 'channels_last']
 
 _in_train_phase = None  # Will be initialized on first use
-
-_device = plaidml.settings.get('PLAIDML_DEVICE')
 
 
 def _prepend_name_scope(name, default):
@@ -104,73 +101,120 @@ def _log_call(func):
     return wrapper
 
 
-class _Executable(object):
+def _get_operand_and_tensor(x):
+    if isinstance(x, np.ndarray):
+        var = variable(x)
+        return var, var.tensor
+    if isinstance(x, _KerasNode):
+        return x, x.tensor
+    return x, x
 
-    def __init__(self, name, inputs, outputs, updates):
-        self._inputs = inputs
-        self.program = edsl.Program(name, outputs, updates=updates)
-        self.binder = plaidml.exec.Binder(self.program)
-        self.executable = self.binder.compile()
 
-    def __call__(self, inputs):
-        for tensor, data in zip(self._inputs, inputs):
-            buffer = self.binder.input(tensor)
-            if buffer:
-                data = np.array(data, dtype=buffer.shape.dtype.into_numpy())
-                buffer.copy_from_ndarray(data)
+class _Runner(object):
+
+    def __init__(self, name, shapes, inputs, outputs, updates, vars):
+        input_tensors = [x.tensor for x in inputs]
+        input_shapes = [
+            edsl.TensorShape(tensor.dtype, shape) for tensor, shape in zip(input_tensors, shapes)
+        ]
+        self.input_buffers = [plaidml.Buffer(shape) for shape in input_shapes]
+        var_tensors = [x.tensor for x in vars]
+        var_shapes = [x.compute_shape() for x in var_tensors]
+        self.var_buffers = [x.buffer for x in vars]
+        output_tensors = [x.tensor for x in outputs]
+        update_tensors = [x[1].tensor for x in updates]
+        program = plaidml.Program(
+            name,
+            input_tensors + var_tensors,
+            output_tensors + update_tensors,
+            shapes=input_shapes + var_shapes,
+        )
+        program.compile()
+        self.output_buffers = [plaidml.Buffer(x) for x in program.outputs[:len(output_tensors)]]
+        self.update_buffers = [x[0].buffer for x in updates]
+        self.executable = plaidml.exec.Executable(
+            program,
+            self.input_buffers + self.var_buffers,
+            self.output_buffers + self.update_buffers,
+        )
+
+    def run(self, inputs):
+        for input, buffer in zip(inputs, self.input_buffers):
+            buffer.copy_from_ndarray(input)
         self.executable.run()
-        return [self.binder.output(x.ref).as_ndarray() for x in self.program.outputs]
+        return [buffer.as_ndarray() for buffer in self.output_buffers]
 
 
 class _Function(object):
 
     def __init__(self, inputs, outputs, updates, name):
+        if not name:
+            name = 'keras'
         self._name = name
         self._inputs = inputs
         self._outputs = outputs
         self._updates = updates
         self._cache = {}
+        self._vars = set()
+        self._trace_vars(outputs + [x[1] for x in updates])
+        # logger.debug('vars: {}'.format(self._vars))
 
-    def __call__(self, inputs):
+    def _trace_vars(self, nodes):
+        for node in nodes:
+            if is_placeholder(node) and node not in self._inputs:
+                raise PlaidMLKerasException('_Function depends on an unspecified input')
+            if is_tensor(node):
+                if node.opname == 'variable':
+                    self._vars.add(node)
+                self._trace_vars(node.operands)
+
+    def __call__(self, inputs=[]):
         inputs = [np.array(x) if isinstance(x, (six.integer_types, float)) else x for x in inputs]
         input_shapes = tuple([x.shape for x in inputs])
         logger.debug('_Function: {}({})'.format(self._name, input_shapes))
-        exe = self._cache.get(input_shapes)
-        if not exe:
-            exe = self._compile(inputs)
-            self._cache[input_shapes] = exe
-        return exe(inputs)
+        runner = self._cache.get(input_shapes)
+        if not runner:
+            runner = self._compile(inputs)
+            self._cache[input_shapes] = runner
+        # logger.debug('run({})'.format(inputs))
+        return runner.run(inputs)
 
     def _compile(self, inputs):
-        for node, data in zip(self._inputs, inputs):
-            dtype = node.tensor.dtype
-            shape = edsl.LogicalShape(dtype, data.shape)
-            node.tensor.bind(shape)
-        inputs = [x.tensor for x in self._inputs]
-        outputs = [x.tensor for x in self._outputs]
-        updates = [(x[0].tensor, x[1].tensor) for x in self._updates]
-        return _Executable(self._name, inputs, outputs, updates)
+        shapes = [x.shape for x in inputs]
+        return _Runner(self._name, shapes, self._inputs, self._outputs, self._updates, self._vars)
 
 
-def _create_var(name, value):
+def _create_buffer(value):
     dtype = plaidml.DType.from_numpy(value.dtype)
-    shape = edsl.LogicalShape(dtype, value.shape)
-    tensor_shape = plaidml.TensorShape(dtype, value.shape)
-    buffer = plaidml.Buffer(tensor_shape, device=_device)
+    shape = plaidml.TensorShape(dtype, value.shape)
+    buffer = plaidml.Buffer(shape)
     buffer.copy_from_ndarray(value)
-    return edsl.Constant(shape, buffer, name=name)
+    return shape, buffer
 
 
 class _KerasNode(object):
 
-    def __init__(self, opname, name=None, shape=None, tensor=None, value=None):
+    def __init__(self,
+                 opname,
+                 name=None,
+                 input=None,
+                 tensor=None,
+                 var=None,
+                 const=None,
+                 operands=[]):
+        self.buffer = None
         self.opname = opname
+        self.operands = operands
         self.name = _prepend_name_scope(name, opname)
-        if value is not None:
-            tensor = _create_var(self.name, value)
-        elif tensor is None:
-            tensor = edsl.Tensor(shape=shape, name=self.name)
         # logger.debug('_KerasNode({})'.format(tensor))
+        if input is not None:
+            tensor = edsl.Placeholder(input, name=self.name)
+        elif var is not None:
+            shape, self.buffer = _create_buffer(var)
+            tensor = edsl.Placeholder(shape, name=self.name)
+        elif const is not None:
+            shape, self.buffer = _create_buffer(const)
+            tensor = edsl.Constant(self.buffer, name=self.name)
         self.tensor = tensor
 
     def __repr__(self):
@@ -194,7 +238,7 @@ class _KerasNode(object):
         self.__keras_shape = shape
 
     def __getitem__(self, key):
-        logger.debug('__getitem__(self: {}, key: {})'.format(self, key))
+        # logger.debug('__getitem__(self: {}, key: {})'.format(self, key))
         # Any _RawTensorDims are to be forwarded
         raw_tensor_dims = getattr(self, '_RawTensorDims', None)
         if raw_tensor_dims is not None:
@@ -225,13 +269,13 @@ class _KerasNode(object):
                 list(key[ellipsis_idx + 1:]))
         else:
             key = tuple(list(key) + [slice(None, None, None)] * extension_length)
-        ret = _KerasNode('slice', tensor=plaidml_op.slice_of(I, key))
+        ret = _KerasNode('slice', tensor=plaidml_op.slice_of(I, key), operands=[self])
         if raw_tensor_dims is not None:
             ret._RawTensorDims = raw_tensor_dims
         return ret
 
     def __neg__(self):
-        return _KerasNode('neg', tensor=-self.tensor)
+        return _KerasNode('neg', tensor=-self.tensor, operands=[self])
 
     def __add__(self, other):
         return self.__binary_op('add', other, lambda x, y: x + y)
@@ -276,12 +320,10 @@ class _KerasNode(object):
         return self.__binary_op('cmp_lt', other, lambda x, y: x < y)
 
     def __binary_op(self, op, other, fn):
-        logger.debug('{}(self: {}, other: {})'.format(op, self, other))
-        if isinstance(other, _KerasNode):
-            other = other.tensor
-        if isinstance(other, np.ndarray):
-            other = variable(other).tensor
-        return _KerasNode(op, tensor=fn(self.tensor, other))
+        # logger.debug('{}(self: {}, other: {})'.format(op, self, other))
+        x, xt = self, self.tensor
+        y, yt = _get_operand_and_tensor(other)
+        return _KerasNode(op, tensor=fn(xt, yt), operands=[x, y])
 
 
 _k_rng_size = 2048
@@ -295,9 +337,7 @@ def _make_rng_state(seed=None):
     rng_init[0] = np.random.randint(1, 2**32, (_k_rng_size,), dtype=np.uint32)
     rng_init[1] = np.random.randint(7, 2**32, (_k_rng_size,), dtype=np.uint32)
     rng_init[2] = np.random.randint(15, 2**32, (_k_rng_size,), dtype=np.uint32)
-    rng_state = variable(rng_init, dtype='uint32')
-
-    return rng_state
+    return variable(rng_init, dtype='uint32')
 
 
 def _report_unimplemented(name):
@@ -314,17 +354,17 @@ class PlaidMLKerasException(Exception):
 
 @_log_call
 def abs(x):
-    return _KerasNode('abs', tensor=plaidml_op.abs(x.tensor))
+    return _KerasNode('abs', tensor=plaidml_op.abs(x.tensor), operands=[x])
 
 
 @_log_call
 def all(x, axis=None, keepdims=False):
-    return _KerasNode('all', tensor=plaidml_op.all(x.tensor, axis, keepdims))
+    return _KerasNode('all', tensor=plaidml_op.all(x.tensor, axis, keepdims), operands=[x])
 
 
 @_log_call
 def any(x, axis=None, keepdims=False):
-    return _KerasNode('any', tensor=plaidml_op.any(x.tensor, axis, keepdims))
+    return _KerasNode('any', tensor=plaidml_op.any(x.tensor, axis, keepdims), operands=[x])
 
 
 @_log_call
@@ -336,7 +376,7 @@ def arange(start, stop=None, step=1, dtype='int32'):
 
 @_log_call
 def argmax(x, axis=-1):
-    return _KerasNode('argmax', tensor=plaidml_op.argmax(x.tensor, axis))
+    return _KerasNode('argmax', tensor=plaidml_op.argmax(x.tensor, axis), operands=[x])
 
 
 @_log_call
@@ -384,11 +424,10 @@ def batch_dot(x, y, axes=None, name=None):
                 ] + [yidxs[N] for N in range(1, len(yidxs)) if N != axes[1]]
         X.bind_dims(*xdims)
         Y.bind_dims(*ydims)
-        O = edsl.TensorOutput(*odims)
-        O[oidxs] += X[xidxs] * Y[yidxs]
+        O = edsl.Contraction().outShape(*odims).outAccess(*oidxs).sum(X[xidxs] * Y[yidxs]).build()
     if len(odims) == 1:
         O = plaidml_op.unsqueeze(O, [1])
-    return _KerasNode('batch_dot', tensor=O)
+    return _KerasNode('batch_dot', tensor=O, operands=[x, y])
 
 
 @_log_call
@@ -460,7 +499,8 @@ def binary_crossentropy(target, output, from_logits=False):
         output = sigmoid(output)
     return _KerasNode('binary_crossentropy',
                       tensor=plaidml_op.binary_crossentropy(target.tensor, output.tensor,
-                                                            epsilon()))
+                                                            epsilon()),
+                      operands=[target, output])
 
 
 @_log_call
@@ -485,7 +525,7 @@ def cast(x, dtype):
     if x.tensor.dtype == dtype:
         return x
 
-    return _KerasNode('cast', tensor=edsl.cast(x.tensor, dtype))
+    return _KerasNode('cast', tensor=edsl.cast(x.tensor, dtype), operands=[x])
 
 
 @_log_call
@@ -506,15 +546,18 @@ def categorical_crossentropy(target, output, from_logits=False):
     O.bind_dims(*input_dims)
     T.bind_dims(*input_dims)
     LO = edsl.log(O)
-    TR = edsl.TensorOutput(*fixed_dims)
-    TR[fixed_idxs] += T[fixed_idxs + [y]] * LO[fixed_idxs + [y]]
+    TR = edsl.Contraction() \
+        .outShape(*fixed_dims) \
+        .outAccess(*fixed_idxs) \
+        .sum(T[fixed_idxs + [y]] * LO[fixed_idxs + [y]]) \
+        .build()
     R = -TR
-    return _KerasNode('categorical_crossentropy', tensor=R)
+    return _KerasNode('categorical_crossentropy', tensor=R, operands=[target, output])
 
 
 @_log_call
 def ceil(x):
-    return _KerasNode('ceil', tensor=edsl.ceil(x.tensor))
+    return _KerasNode('ceil', tensor=edsl.ceil(x.tensor), operands=[x])
 
 
 @_log_call
@@ -525,16 +568,19 @@ def clear_session():
 
 @_log_call
 def clip(x, min_val, max_val):
+    min_val = variable(min_val)
+    max_val = variable(max_val)
     return _KerasNode('clip',
-                      tensor=plaidml_op.clip(x.tensor,
-                                             variable(min_val).tensor,
-                                             variable(max_val).tensor))
+                      tensor=plaidml_op.clip(x.tensor, min_val.tensor, max_val.tensor),
+                      operands=[x, min_val, max_val])
 
 
 @_log_call
 def concatenate(tensors, axis=-1):
     tensor_vals = [x.tensor for x in tensors]
-    return _KerasNode('concatenate', tensor=plaidml_op.concatenate(tensor_vals, axis))
+    return _KerasNode('concatenate',
+                      tensor=plaidml_op.concatenate(tensor_vals, axis),
+                      operands=tensors)
 
 
 @_log_call
@@ -547,12 +593,12 @@ def constant(value, dtype=None, shape=None, name=None):
         else:
             shape = (1,)
     np_value = np.full(shape, value, dtype=dtype or floatx())
-    return _KerasNode('constant', name=name, value=np_value)
+    return _KerasNode('constant', name=name, const=np_value)
 
 
 @_log_call
 def cos(x):
-    return _KerasNode('cos', tensor=edsl.cos(x.tensor))
+    return _KerasNode('cos', tensor=edsl.cos(x.tensor), operands=[x])
 
 
 @_log_call
@@ -594,7 +640,8 @@ def conv(x,
             autogroup_mode,
             plaidml_op.ConvDerivMode.NONE,
             [],
-        ))
+        ),
+        operands=[x, kernel])
 
 
 @_log_call
@@ -632,7 +679,8 @@ def conv_transpose(x, kernel, output_shape, strides, padding, data_format, dilat
             plaidml_op.AutoGroupMode.UNGROUPED,
             plaidml_op.ConvDerivMode.DATA,
             output_shape,
-        ))
+        ),
+        operands=[x, kernel])
 
 
 @_log_call
@@ -700,7 +748,7 @@ def conv3d_transpose(x,
 @_log_call
 def count_params(x):
     result = 1
-    for dim in x.tensor.compute_shape().into_TensorShape().sizes:
+    for dim in x.tensor.compute_shape().sizes:
         result *= dim
     return result
 
@@ -722,12 +770,12 @@ def ctc_label_dense_to_sparse(labels, label_lengths):
 
 @_log_call
 def cumprod(x, axis=0):
-    return _KerasNode('cumprod', tensor=plaidml_op.cumprod(x.tensor, axis))
+    return _KerasNode('cumprod', tensor=plaidml_op.cumprod(x.tensor, axis), operands=[x])
 
 
 @_log_call
 def cumsum(x, axis=0):
-    return _KerasNode('cumsum', tensor=plaidml_op.cumsum(x.tensor, axis))
+    return _KerasNode('cumsum', tensor=plaidml_op.cumsum(x.tensor, axis), operands=[x])
 
 
 @_log_call
@@ -749,7 +797,7 @@ def depthwise_conv2d(x,
 
 @_log_call
 def dot(x, y, name=None):
-    return _KerasNode('dot', tensor=plaidml_op.dot(x.tensor, y.tensor), name=name)
+    return _KerasNode('dot', tensor=plaidml_op.dot(x.tensor, y.tensor), name=name, operands=[x, y])
 
 
 @_log_call
@@ -766,9 +814,9 @@ def dropout(x, level, noise_shape=None, seed=None):
     rng_state = _make_rng_state(seed)
     R = 1.0 - level
     M = 1.0 / R
-    T = edsl.prng(rng_state.tensor, shape)
-    O = edsl.select(T < R, I * M, 0.0)
-    return _KerasNode('dropout', tensor=O)
+    T, S = edsl.prng(rng_state.tensor, shape)
+    O = edsl.select(T < R, I * M, edsl.cast(0, I.dtype))
+    return _KerasNode('dropout', tensor=O, operands=[x, rng_state])
 
 
 @_log_call
@@ -778,25 +826,19 @@ def dtype(x):
 
 @_log_call
 def elu(x, alpha=1.0):
-    return _KerasNode('elu', name='elu', tensor=plaidml_op.elu(x.tensor, alpha))
+    return _KerasNode('elu', name='elu', tensor=plaidml_op.elu(x.tensor, alpha), operands=[x])
 
 
 @_log_call
 def equal(x, y):
-    if isinstance(x, _KerasNode):
-        x = x.tensor
-    if isinstance(x, np.ndarray):
-        x = variable(x).tensor
-    if isinstance(y, _KerasNode):
-        y = y.tensor
-    if isinstance(y, np.ndarray):
-        y = variable(y).tensor
-    return _KerasNode('equal', tensor=(x == y))
+    x, xt = _get_operand_and_tensor(x)
+    y, yt = _get_operand_and_tensor(y)
+    return _KerasNode('equal', tensor=(xt == yt), operands=[x, y])
 
 
 @_log_call
 def exp(x):
-    return _KerasNode('exp', tensor=edsl.exp(x.tensor))
+    return _KerasNode('exp', tensor=edsl.exp(x.tensor), operands=[x])
 
 
 @_log_call
@@ -806,7 +848,10 @@ def eval(x):
 
 @_log_call
 def expand_dims(x, axis=-1, name=None):
-    return _KerasNode('expand_dims', name=name, tensor=plaidml_op.unsqueeze(x.tensor, [axis]))
+    return _KerasNode('expand_dims',
+                      name=name,
+                      tensor=plaidml_op.unsqueeze(x.tensor, [axis]),
+                      operands=[x])
 
 
 @_log_call
@@ -829,7 +874,7 @@ def flatten(x):
 
 @_log_call
 def floor(x):
-    return _KerasNode('floor', tensor=edsl.floor(x.tensor))
+    return _KerasNode('floor', tensor=edsl.floor(x.tensor), operands=[x])
 
 
 @_log_call
@@ -863,8 +908,10 @@ def function(inputs, outputs, updates=None, name=None):
 
 
 @_log_call
-def gather(x, indicies):
-    return _KerasNode('gather', tensor=edsl.gather(x.tensor, indicies.tensor))
+def gather(x, indices):
+    return _KerasNode('gather',
+                      tensor=edsl.gather(x.tensor, indices.tensor),
+                      operands=[x, indices])
 
 
 @_log_call
@@ -875,11 +922,11 @@ def get_uid(prefix=''):
 
 @_log_call
 def get_value(x):
-    if x.tensor._buffer:
-        return x.tensor._buffer.as_ndarray()
-    inputs = []
-    fn = _Function(inputs, [x], [], name='get_value')
-    outputs = fn(inputs)
+    if x.buffer:
+        return x.buffer.as_ndarray()
+
+    fn = _Function([], [x], [], name='get_value')
+    outputs = fn()
     return outputs[0]
 
 
@@ -890,8 +937,7 @@ def get_variable_shape(x):
 
 @_log_call
 def gradients(loss, variables):
-    grads = edsl.gradients(loss.tensor, [x.tensor for x in variables])
-    return [_KerasNode('gradients', tensor=x) for x in grads]
+    _report_unimplemented('graidents')
 
 
 @_log_call
@@ -908,12 +954,13 @@ def greater_equal(x, y):
 def hard_sigmoid(x):
     return _KerasNode('hard_sigmoid',
                       name='hard_sigmoid',
-                      tensor=plaidml_op.hard_sigmoid(x.tensor, 0.2))
+                      tensor=plaidml_op.hard_sigmoid(x.tensor, 0.2),
+                      operands=[x])
 
 
 @_log_call
 def identity(x):
-    return _KerasNode('identity', tensor=edsl.ident(x.tensor))
+    return _KerasNode('identity', tensor=edsl.ident(x.tensor), operands=[x])
 
 
 @_log_call
@@ -951,7 +998,7 @@ def in_train_phase(x, alt, training=None):
 
 @_log_call
 def int_shape(x):
-    shape = x.tensor.compute_shape().into_TensorShape()
+    shape = x.tensor.compute_shape()
     return tuple(None if x == 0 else x for x in shape.sizes)
 
 
@@ -1016,7 +1063,7 @@ def local_conv2d(inputs, kernel, kernel_size, strides, output_shape, data_format
 
 @_log_call
 def log(x):
-    return _KerasNode('log', tensor=edsl.log(x.tensor))
+    return _KerasNode('log', tensor=edsl.log(x.tensor), operands=[x])
 
 
 @_log_call
@@ -1036,27 +1083,27 @@ def map_fn(fn, elems, name=None, dtype=None):
 
 @_log_call
 def max(x, axis=None, keepdims=False):
-    return _KerasNode('max', tensor=plaidml_op.max(x.tensor, axis, keepdims))
+    return _KerasNode('max', tensor=plaidml_op.max(x.tensor, axis, keepdims), operands=[x])
 
 
 @_log_call
 def maximum(x, y):
-    return _KerasNode('maximum', tensor=plaidml_op.maximum(x.tensor, y.tensor))
+    return _KerasNode('maximum', tensor=plaidml_op.maximum(x.tensor, y.tensor), operands=[x, y])
 
 
 @_log_call
 def mean(x, axis=None, keepdims=False):
-    return _KerasNode('mean', tensor=plaidml_op.mean(x.tensor, axis, keepdims))
+    return _KerasNode('mean', tensor=plaidml_op.mean(x.tensor, axis, keepdims), operands=[x])
 
 
 @_log_call
 def min(x, axis=None, keepdims=False):
-    return _KerasNode('min', tensor=plaidml_op.min(x.tensor, axis, keepdims))
+    return _KerasNode('min', tensor=plaidml_op.min(x.tensor, axis, keepdims), operands=[x])
 
 
 @_log_call
 def minimum(x, y):
-    return _KerasNode('minimum', tensor=plaidml_op.minimum(x.tensor, y.tensor))
+    return _KerasNode('minimum', tensor=plaidml_op.minimum(x.tensor, y.tensor), operands=[x, y])
 
 
 @_log_call
@@ -1068,10 +1115,10 @@ def moving_average_update(x, value, momentum):
 @contextmanager
 def name_scope(name):
     _NAME_SCOPE_STACK.append(name)
-    logger.debug('name_scope({}), push: {}'.format(name, _NAME_SCOPE_STACK))
+    # logger.debug('name_scope({}), push: {}'.format(name, _NAME_SCOPE_STACK))
     yield
     _NAME_SCOPE_STACK.pop()
-    logger.debug('name_scope({}), pop: {}'.format(name, _NAME_SCOPE_STACK))
+    # logger.debug('name_scope({}), pop: {}'.format(name, _NAME_SCOPE_STACK))
 
 
 @_log_call
@@ -1081,15 +1128,9 @@ def ndim(x):
 
 @_log_call
 def not_equal(lhs, rhs):
-    if isinstance(lhs, _KerasNode):
-        lhs = lhs.tensor
-    if isinstance(lhs, np.ndarray):
-        lhs = variable(lhs).tensor
-    if isinstance(rhs, _KerasNode):
-        rhs = rhs.tensor
-    if isinstance(rhs, np.ndarray):
-        rhs = variable(rhs).tensor
-    return _KerasNode('not_equal', tensor=(lhs != rhs))
+    x, xt = _get_operand_and_tensor(lhs)
+    y, yt = _get_operand_and_tensor(rhs)
+    return _KerasNode('not_equal', tensor=(xt != yt), operands=[x, y])
 
 
 @_log_call
@@ -1131,7 +1172,8 @@ def normalize_batch_in_training(x, gamma, beta, reduction_axes, epsilon=1e-3):
 @_log_call
 def one_hot(indices, num_classes):
     #Note: does not error check for entries in indices that are >= num_classes
-    count = variable(np.array(range(num_classes)), dtype='int32').tensor
+    count_var = variable(np.array(range(num_classes)), dtype='int32')
+    count = count_var.tensor
     I = indices.tensor
     I_ndims = I.rank
     I_dims = edsl.TensorDims(I_ndims)
@@ -1142,34 +1184,37 @@ def one_hot(indices, num_classes):
     O_idxs = I_idxs + [c]
     I.bind_dims(*I_dims)
     count.bind_dims(C)
-    O = edsl.TensorOutput(*O_dims)
-    O[O_idxs] = I[I_idxs] == count[c]
-    return _KerasNode('one_hot', name='one_hot', tensor=O)
+    O = edsl.Contraction() \
+        .outShape(*O_dims) \
+        .outAccess(*O_idxs) \
+        .assign(I[I_idxs] == count[c]) \
+        .build()
+    return _KerasNode('one_hot', name='one_hot', tensor=O, operands=[indices, count_var])
 
 
 @_log_call
 def ones(shape, dtype=None, name=None):
     value = np.full(shape, 1, dtype=dtype or floatx())
-    return _KerasNode('ones', name=name, value=value)
+    return _KerasNode('ones', name=name, var=value)
 
 
 @_log_call
 def ones_like(x, dtype=None, name=None):
-    value = np.full((1), 1, dtype=dtype or floatx())
-    one = _create_var('a_one', value)
     I = x.tensor
     ndim = I.rank
     dims = edsl.TensorDims(ndim)
     idxs = edsl.TensorIndexes(ndim)
     I.bind_dims(*dims)
-    O = edsl.TensorOutput(*dims)
-    O[idxs] = one[0]
-    return _KerasNode('ones_like', name=name, tensor=O)
+    one = edsl.cast(edsl.Tensor(value=1), I.dtype)
+    O = edsl.Contraction().outShape(*dims).outAccess(*idxs).assign(one).build()
+    return _KerasNode('ones_like', name=name, tensor=O, operands=[x])
 
 
 @_log_call
 def permute_dimensions(x, pattern=None):
-    return _KerasNode('permute_dimensions', tensor=plaidml_op.transpose(x.tensor, pattern))
+    return _KerasNode('permute_dimensions',
+                      tensor=plaidml_op.transpose(x.tensor, pattern),
+                      operands=[x])
 
 
 @_log_call
@@ -1177,9 +1222,9 @@ def placeholder(shape=None, ndim=None, dtype=None, sparse=False, name=None):
     dtype = plaidml.DType.from_numpy(dtype or floatx())
     # TODO: Need to support empty shapes; once supported, convert below to `if _ is not None`
     if shape is not None:
-        return _KerasNode('placeholder', shape=edsl.LogicalShape(dtype, shape), name=name)
+        return _KerasNode('placeholder', input=edsl.TensorShape(dtype, shape), name=name)
     if ndim is not None:
-        return _KerasNode('placeholder', shape=edsl.LogicalShape(dtype, [0] * ndim), name=name)
+        return _KerasNode('placeholder', input=edsl.TensorShape(dtype, [0] * ndim), name=name)
     raise ValueError()
 
 
@@ -1196,7 +1241,8 @@ def pool(x, pool_size, strides=None, padding='valid', data_format=None, pool_mod
                           _normalize_data_format(data_format),
                           False,
                           False,
-                      ))
+                      ),
+                      operands=[x])
 
 
 @_log_call
@@ -1221,7 +1267,7 @@ def pool3d(x, pool_size, strides=(1, 1, 1), padding='valid', data_format=None, p
 
 @_log_call
 def pow(x, a):
-    return _KerasNode('pow', tensor=edsl.pow(x.tensor, a))
+    return _KerasNode('pow', tensor=edsl.pow(x.tensor, a), operands=[x])
 
 
 @_log_call
@@ -1235,7 +1281,9 @@ def prod(value, axis=None, keepdims=False):
         # In this case, a product of the elements of the tuple/list is being requested,
         # rather than a within-tensor product
         return functools.reduce(lambda x, y: x * y, value)
-    return _KerasNode('prod', tensor=plaidml_op.prod(value.tensor, axis, keepdims))
+    return _KerasNode('prod',
+                      tensor=plaidml_op.prod(value.tensor, axis, keepdims),
+                      operands=[value])
 
 
 @_log_call
@@ -1275,12 +1323,12 @@ def random_normal_variable(shape, mean, scale, dtype=None, name=None, seed=None)
 @_log_call
 def random_uniform(shape, minval=0.0, maxval=1.0, dtype=None, seed=None):
     rng_state = _make_rng_state(seed)
-    R = edsl.prng(rng_state.tensor, shape)
+    R, S = edsl.prng(rng_state.tensor, shape)
     dtype = dtype or floatx()
     if dtype != 'float32':
         R = edsl.cast(R, plaidml.DType.from_numpy(dtype))
     O = (maxval - minval) * R + minval
-    return _KerasNode('random_uniform', tensor=O)
+    return _KerasNode('random_uniform', tensor=O, operands=[rng_state])
 
 
 @_log_call
@@ -1293,7 +1341,9 @@ def random_uniform_variable(shape, low, high, dtype=None, name=None, seed=None):
 
 @_log_call
 def relu(x, alpha=None, max_value=None, threshold=0.):
-    return _KerasNode('relu', tensor=plaidml_op.relu(x.tensor, alpha, max_value, threshold))
+    return _KerasNode('relu',
+                      tensor=plaidml_op.relu(x.tensor, alpha, max_value, threshold),
+                      operands=[x])
 
 
 @_log_call
@@ -1306,7 +1356,8 @@ def repeat(x, n):
 def repeat_elements(x, rep, axis):
     return _KerasNode('repeat_elements',
                       name='repeat_elements',
-                      tensor=plaidml_op.repeat(x.tensor, rep, axis))
+                      tensor=plaidml_op.repeat(x.tensor, rep, axis),
+                      operands=[x])
 
 
 @_log_call
@@ -1333,7 +1384,7 @@ def reshape(x, dims):
             continue
         if s == 0:
             dims[i] = plaidml_op.AutoDimMode.MATCH
-    return _KerasNode('reshape', tensor=plaidml_op.reshape(I, dims))
+    return _KerasNode('reshape', tensor=plaidml_op.reshape(I, dims), operands=[x])
 
 
 @_log_call
@@ -1347,7 +1398,8 @@ def resize_images(x, height_factor, width_factor, data_format, interpolation='ne
     return _KerasNode('resize_images',
                       tensor=plaidml_op.image_resize(x.tensor, (height_factor, width_factor),
                                                      table[interpolation],
-                                                     _normalize_data_format(data_format)))
+                                                     _normalize_data_format(data_format)),
+                      operands=[x])
 
 
 @_log_call
@@ -1368,12 +1420,17 @@ def resize_volumes(x, depth_factor, height_factor, width_factor, data_format):
 
 @_log_call
 def reverse(x, axes):
-    return _KerasNode('reverse', name='reverse', tensor=plaidml_op.flip(x.tensor, axes))
+    return _KerasNode('reverse',
+                      name='reverse',
+                      tensor=plaidml_op.flip(x.tensor, axes),
+                      operands=[x])
 
 
 @_log_call
 def reverse_gradient(x, coeff=1.0):
-    return _KerasNode('reverse_gradient', tensor=plaidml_op.scale_gradient(x.tensor, -coeff))
+    return _KerasNode('reverse_gradient',
+                      tensor=plaidml_op.scale_gradient(x.tensor, -coeff),
+                      operands=[x])
 
 
 @_log_call
@@ -1386,7 +1443,7 @@ def rnn(step_function,
         unroll=False,
         input_length=None):
     if input_length is None:
-        input_length = inputs.tensor.compute_shape().into_TensorShape().sizes[1]
+        input_length = inputs.tensor.compute_shape().sizes[1]
     if not isinstance(input_length, six.integer_types):
         raise NotImplementedError('rnn is not implemented for variable sized inputs')
     if mask is not None:
@@ -1407,15 +1464,15 @@ def rnn(step_function,
         I_idxs = [batch_idx] + idxs
         I.bind_dims(*I_dims)
         O_dims = [batch_dim] + [t] + dims
-        O = edsl.TensorOutput(*O_dims)
         O_idxs = [batch_idx] + [ii] + idxs
-        O[O_idxs] = I[I_idxs]
+        OC = edsl.Contraction().outShape(*O_dims).outAccess(*O_idxs).assign(I[I_idxs])
         if prev is None:
             if ii != 0:
                 raise RuntimeError(
                     'Generating RNN at time step {} with no previous time step'.format(ii))
         else:
-            O.use_default(prev.tensor)
+            OC.init(prev.tensor)
+        O = OC.build()
         return _KerasNode('time_expand', name='time_expand', tensor=O)
 
     states = initial_states
@@ -1434,7 +1491,7 @@ def rnn(step_function,
 
 @_log_call
 def round(x):
-    return _KerasNode('round', tensor=edsl.round(x.tensor))
+    return _KerasNode('round', tensor=edsl.round(x.tensor), operands=[x])
 
 
 @_log_call
@@ -1510,15 +1567,15 @@ def set_learning_phase(value):
 @_log_call
 def set_value(x, value):
     dtype = plaidml.DType.from_numpy(value.dtype)
-    tensor_shape = plaidml.TensorShape(dtype, value.shape)
-    buffer = plaidml.Buffer(tensor_shape, device=_device)
+    shape = plaidml.TensorShape(dtype, value.shape)
+    buffer = plaidml.Buffer(shape)
     buffer.copy_from_ndarray(value)
-    x.tensor.set_param_value(buffer)
+    x.buffer = buffer
 
 
 @_log_call
 def shape(x):
-    ret = _KerasNode('shape', tensor=edsl.shape(x.tensor))
+    ret = _KerasNode('shape', tensor=edsl.shape(x.tensor), operands=[x])
     # Save the TensorDims directly on the _KerasNode, where they can be extracted if needed
     ret._RawTensorDims = edsl.TensorDims(x.tensor.rank)
     x.tensor.bind_dims(*ret._RawTensorDims)
@@ -1527,18 +1584,23 @@ def shape(x):
 
 @_log_call
 def sigmoid(x):
-    return _KerasNode('sigmoid', tensor=plaidml_op.sigmoid(x.tensor))
+    return _KerasNode('sigmoid', tensor=plaidml_op.sigmoid(x.tensor), operands=[x])
 
 
 @_log_call
 def sign(x):
-    intermediate = _KerasNode('sign_intermediate', tensor=edsl.select((x > 0).tensor, 1., -1.))
-    return _KerasNode('sign', tensor=edsl.select((x.tensor == 0.), 0., intermediate.tensor))
+    I = x.tensor
+    neg_one = edsl.cast(-1, I.dtype)
+    one = edsl.cast(1, I.dtype)
+    zero = edsl.cast(0, I.dtype)
+    T = edsl.select(I > 0, one, neg_one)
+    O = edsl.select(I == 0., zero, T)
+    return _KerasNode('sign', tensor=O, operands=[x])
 
 
 @_log_call
 def sin(x):
-    return _KerasNode('sin', tensor=edsl.sin(x.tensor))
+    return _KerasNode('sin', tensor=edsl.sin(x.tensor), operands=[x])
 
 
 @_log_call
@@ -1549,7 +1611,7 @@ def softmax(x, axis=None, name=None):
     if axis is None:
         axis = I.rank - 1
     y = plaidml_op.softmax(I, axis=axis)
-    return _KerasNode('softmax', name=name, tensor=y)
+    return _KerasNode('softmax', name=name, tensor=y, operands=[x])
 
 
 @_log_call
@@ -1568,9 +1630,8 @@ def sparse_categorical_crossentropy(target, output, from_logits=False):
     dims = edsl.TensorDims(shape.rank)
     output.tensor.bind_dims(*dims)
     # FIXME: tensor.shape is expensive
-    return categorical_crossentropy(
-        reshape(one_hot(target,
-                        shape.into_TensorShape().sizes[-1]), dims), output, from_logits)
+    return categorical_crossentropy(reshape(one_hot(target, shape.sizes[-1]), dims), output,
+                                    from_logits)
 
 
 @_log_call
@@ -1582,7 +1643,8 @@ def spatial_2d_padding(x, padding=((1, 1), (1, 1)), data_format=None):
                       tensor=plaidml_op.spatial_padding(x.tensor,
                                                         lo_pads=lo_pads,
                                                         hi_pads=hi_pads,
-                                                        data_layout=data_format))
+                                                        data_layout=data_format),
+                      operands=[x])
 
 
 @_log_call
@@ -1594,17 +1656,18 @@ def spatial_3d_padding(x, padding=((1, 1), (1, 1), (1, 1)), data_format=None):
                       tensor=plaidml_op.spatial_padding(x.tensor,
                                                         lo_pads=lo_pads,
                                                         hi_pads=hi_pads,
-                                                        data_layout=data_format))
+                                                        data_layout=data_format),
+                      operands=[x])
 
 
 @_log_call
 def sqrt(x):
-    return _KerasNode('sqrt', tensor=edsl.sqrt(x.tensor))
+    return _KerasNode('sqrt', tensor=edsl.sqrt(x.tensor), operands=[x])
 
 
 @_log_call
 def square(x):
-    return _KerasNode('square', tensor=plaidml_op.square(x.tensor))
+    return _KerasNode('square', tensor=plaidml_op.square(x.tensor), operands=[x])
 
 
 @_log_call
@@ -1616,7 +1679,7 @@ def squeeze(x, axis=None):
         for s in range(len(x_shape)):
             if x_shape[s] == 1:
                 axis.append(s)
-    return _KerasNode('squeeze', tensor=plaidml_op.squeeze(x.tensor, axis))
+    return _KerasNode('squeeze', tensor=plaidml_op.squeeze(x.tensor, axis), operands=[x])
 
 
 @_log_call
@@ -1639,7 +1702,7 @@ def sum(x, axis=None, keepdims=False):
         # In this case, a sum of the elements of the tuple/list is being requested,
         # rather than a within-tensor sum
         return functools.reduce(lambda a, b: a + b, x)
-    return _KerasNode('sum', tensor=plaidml_op.sum(x.tensor, axis, keepdims))
+    return _KerasNode('sum', tensor=plaidml_op.sum(x.tensor, axis, keepdims), operands=[x])
 
 
 @_log_call
@@ -1647,12 +1710,13 @@ def switch(condition, then_expression, else_expression):
     bool_condition = cast(condition, dtype='bool')
     return _KerasNode('switch',
                       tensor=edsl.select(bool_condition.tensor, then_expression.tensor,
-                                         else_expression.tensor))
+                                         else_expression.tensor),
+                      operands=[condition, then_expression, else_expression])
 
 
 @_log_call
 def tanh(x):
-    return _KerasNode('tanh', tensor=edsl.tanh(x.tensor))
+    return _KerasNode('tanh', tensor=edsl.tanh(x.tensor), operands=[x])
 
 
 @_log_call
@@ -1664,12 +1728,13 @@ def temporal_padding(x, padding=(1, 1)):
                       tensor=plaidml_op.spatial_padding(x.tensor,
                                                         lo_pads=lo_pads,
                                                         hi_pads=hi_pads,
-                                                        data_layout=data_format))
+                                                        data_layout=data_format),
+                      operands=[x])
 
 
 @_log_call
 def tile(x, n):
-    return _KerasNode('tile', tensor=plaidml_op.tile(x.tensor, n))
+    return _KerasNode('tile', tensor=plaidml_op.tile(x.tensor, n), operands=[x])
 
 
 @_log_call
@@ -1679,7 +1744,7 @@ def to_dense(tensor):
 
 @_log_call
 def transpose(x):
-    return _KerasNode('transpose', tensor=plaidml_op.transpose(x.tensor))
+    return _KerasNode('transpose', tensor=plaidml_op.transpose(x.tensor), operands=[x])
 
 
 @_log_call
@@ -1708,13 +1773,11 @@ def update_sub(x, decrement):
 
 @_log_call
 def var(x, axis=None, keepdims=False):
-    return _KerasNode('var', tensor=plaidml_op.variance(x.tensor, axis, keepdims))
+    return _KerasNode('var', tensor=plaidml_op.variance(x.tensor, axis, keepdims), operands=[x])
 
 
 @_log_call
 def variable(value, dtype=None, name=None, constraint=None):
-    if name is None:
-        name = 'anon'
     dtype = dtype or floatx()
     if isinstance(value, _KerasNode):
         value = value.eval()
@@ -1724,29 +1787,27 @@ def variable(value, dtype=None, name=None, constraint=None):
         value = np.array(value, dtype=dtype)
     if isinstance(value, np.ndarray):
         if dtype != value.dtype:
-            logger.debug(
-                'Casting to requested dtype in variable, received {} and requested {}'.format(
-                    value.dtype, dtype))
+            # logger.debug(
+            #     'Casting to requested dtype in variable, received {} and requested {}'.format(
+            #         value.dtype, dtype))
             value = value.astype(dtype)
-        return _KerasNode('variable', name=name, value=value)
+        return _KerasNode('variable', name=name, var=value)
     raise TypeError('Unknown type for variable: {}'.format(type(value)))
 
 
 @_log_call
 def zeros(shape, dtype=None, name=None):
     value = np.full(shape, 0, dtype=dtype or floatx())
-    return _KerasNode('zeros', name=name, value=value)
+    return _KerasNode('zeros', name=name, var=value)
 
 
 @_log_call
 def zeros_like(x, dtype=None, name=None):
-    value = np.full((1), 0, dtype=dtype or floatx())
-    zero = _create_var('a_zero', value)
     I = x.tensor
     ndim = I.rank
     dims = edsl.TensorDims(ndim)
     idxs = edsl.TensorIndexes(ndim)
     I.bind_dims(*dims)
-    O = edsl.TensorOutput(*dims)
-    O[idxs] = zero[0]
-    return _KerasNode('zeros_like', name=name, tensor=O)
+    zero = edsl.cast(edsl.Tensor(value=0), I.dtype)
+    O = edsl.Contraction().outShape(*dims).outAccess(*idxs).assign(zero).build()
+    return _KerasNode('zeros_like', name=name, tensor=O, operands=[x])

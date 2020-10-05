@@ -171,16 +171,6 @@ Type promoteTypes(Type lhs, Type rhs) {
   return typeScore(lhs) > typeScore(rhs) ? lhs : rhs;
 }
 
-Type inferElementType(ArrayRef<Type> types) {
-  Type ret;
-  for (auto type : types) {
-    auto rankedTensorType = getRankedTensorType(type);
-    auto dtype = rankedTensorType.getElementType();
-    ret = promoteTypes(ret, dtype);
-  }
-  return ret;
-}
-
 RankedTensorType getRankedTensorType(Type type) {
   if (auto rankedType = type.dyn_cast<RankedTensorType>()) {
     return rankedType;

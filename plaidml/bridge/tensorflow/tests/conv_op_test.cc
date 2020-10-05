@@ -69,7 +69,7 @@ TEST_P(PlaidMLConvOperationTest, SimpleConvOp) {
                                      0.17, 0.17, 0.17,  //
                                      0.23, 0.23, 0.23};
   TestCases testcases = {
-      TestCaseIO{{kernel_val, input_val}, {expected_val}},
+      TestCaseIO{{input_val, kernel_val}, {expected_val}},
   };
 
   HloComputation::Builder builder("SimpleConvOp");

@@ -25,7 +25,7 @@ using plaidml::edsl::TensorBuffers;
 namespace xla {
 namespace plaidml {
 
-std::unique_ptr<::plaidml::edsl::Program> PlaidMLCodegenTest::CompileToProgram(std::unique_ptr<HloModule> hlo_module) {
+::plaidml::Program PlaidMLCodegenTest::CompileToProgram(std::unique_ptr<HloModule> hlo_module) {
   return PlaidMLCompiler::ProgramFromHloModule(std::move(hlo_module)).ValueOrDie();
 }
 
@@ -40,25 +40,10 @@ Status PlaidMLCodegenTest::CompileAndCheck(std::unique_ptr<HloComputation> entry
 Status PlaidMLCodegenTest::CompileAndCheck(std::unique_ptr<HloModule> hlo_module, const TestCases& testcases) {
   auto program = CompileToProgram(std::move(hlo_module));
 
-  VLOG(2) << "Program:\n" << program->str();
-
   VLOG(2) << "Evaluating results";
 
   for (const TestCaseIO& io : testcases) {
-    TensorBuffers input_buffers;
-    TensorBuffers output_buffers;
-
-    auto inputs = program->inputs();
-    for (size_t i = 0; i < inputs.size(); i++) {
-      input_buffers[inputs[i].tensor] = io.inputs[i];
-    }
-
-    auto outputs = program->outputs();
-    for (size_t i = 0; i < outputs.size(); i++) {
-      output_buffers[outputs[i].tensor] = io.outputs[i];
-    }
-
-    checkProgram(*program, input_buffers, output_buffers);
+    checkProgram(program, io.inputs, io.outputs);
   }
 
   return Status::OK();

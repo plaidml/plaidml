@@ -1301,7 +1301,7 @@ class TestBackendOps(unittest.TestCase):
 
     # Note: we skip tensorflow since init_global must be called in the middle of this function
     # for correct semantics, and Theano is sufficient.
-    @compareForwardExact(skip_tensorflow=True)
+    @compareForwardExact(skip_tensorflow=True, skip_theano=False)
     def testUpdate(self, b):
         a = b.variable(m(10, 10))
         a2 = a * a
@@ -1330,17 +1330,17 @@ class TestBackendOps(unittest.TestCase):
     # sufficient. It may be worthwhile to make this test more resilient
     # to refactoring and make it test that the update portion is working
     # as expected.
-    @compareForwardClose(skip_tensorflow=True)
+    @compareForwardClose(skip_tensorflow=True, skip_theano=False)
     def testMovingAverageUpdate(self, b):
         return b.moving_average_update(b.variable(m(5, 4, 9, 3, 2)), b.variable(n(5, 4, 9, 3, 2)),
                                        0.95)[1]
 
-    @compareForwardClose(skip_tensorflow=True, atol=1e-6)
+    @compareForwardClose(skip_tensorflow=True, skip_theano=False, atol=1e-6)
     def testBatchNormAndUpdate(self, b):
         b.set_learning_phase(1)
         x = b.variable(n(4, 7))
-        moving_mean = b.variable(m(4, 1))
-        moving_var = b.variable(m(4, 1))
+        moving_mean = b.variable(m(4, 4))
+        moving_var = b.variable(m(4, 4))
         beta = b.zeros([4, 1])
         gamma = b.ones([4, 1])
         normed, mean, var = b.normalize_batch_in_training(x, gamma, beta, reduction_axes=[1])

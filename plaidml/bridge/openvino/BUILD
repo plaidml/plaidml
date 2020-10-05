@@ -1,6 +1,4 @@
-load("@bazel_skylib//rules:write_file.bzl", "write_file")
-load("@rules_cc//cc:defs.bzl", "cc_binary")
-load("//bzl:plaidml.bzl", "PLAIDML_LINKOPTS", "plaidml_cc_library")
+load("//bzl:plaidml.bzl", "plaidml_cc_binary", "plaidml_cc_library")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -26,9 +24,8 @@ plaidml_cc_library(
     alwayslink = 1,
 )
 
-cc_binary(
+plaidml_cc_binary(
     name = "plaidml-plugin",
-    linkopts = PLAIDML_LINKOPTS,
     linkshared = 1,
     tags = TAGS,
     deps = [
@@ -43,24 +40,10 @@ plaidml_cc_library(
     testonly = 1,
     srcs = ["testenv.cpp"],
     tags = TAGS,
-    visibility = ["//visibility:public"],
     deps = [
         "@com_google_googletest//:gtest",
         "@gflags",
         "@openvino//:shared_plugin_tests",
     ],
     alwayslink = 1,
-)
-
-write_file(
-    name = "plugins",
-    out = "plugins.xml",
-    content = [
-        "<ie>",
-        "   <plugins>",
-        "       <plugin name='PlaidML' location='plaidml/bridge/openvino/libplaidml-plugin.so'/>",
-        "   </plugins>",
-        "</ie>",
-        "",
-    ],
 )

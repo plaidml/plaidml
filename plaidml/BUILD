@@ -33,7 +33,6 @@ plaidml_cc_library(
     name = "targets",
     visibility = ["//visibility:public"],
     deps = [
-        "//pmlc:all_passes_and_dialects",
         "//pmlc/target/demo",
         "//pmlc/target/intel_gen",
         "//pmlc/target/intel_gen_ocl_spirv",
@@ -47,7 +46,7 @@ plaidml_cc_library(
     deps = [
         "//pmlc/rt/llvm",
         "//pmlc/rt/vulkan",
-     ],
+    ],
 )
 
 jsonnet_to_json(
@@ -223,15 +222,18 @@ config_setting(
 )
 
 config_setting(
-  name = "intel_gen_ocl_spirv",
-  flag_values = {
-    ":target": "intel_gen_ocl_spirv"
-  },
+    name = "intel_gen_ocl_spirv",
+    flag_values = {
+        ":target": "intel_gen_ocl_spirv",
+    },
 )
 
 selects.config_setting_group(
     name = "gpu_target",
-    match_any = [":intel_gen", ":intel_gen_ocl_spirv"],
+    match_any = [
+        ":intel_gen",
+        ":intel_gen_ocl_spirv",
+    ],
 )
 
 plaidml_settings(

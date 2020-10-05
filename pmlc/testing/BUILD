@@ -8,7 +8,7 @@ plaidml_cc_library(
     name = "gtest_main",
     srcs = ["gtest_main.cc"],
     deps = [
-        "//pmlc/util",
+        "//pmlc/util:logging",
         "@com_google_googletest//:gtest",
         "@easylogging",
         "@gflags",

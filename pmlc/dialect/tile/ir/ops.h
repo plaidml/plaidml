@@ -10,7 +10,6 @@
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 
 #include "pmlc/dialect/eltwise/ir/ops.h"
-#include "pmlc/dialect/tile/ir/types.h"
 #include "pmlc/util/enums.h"
 
 namespace pmlc::dialect::tile {
@@ -68,14 +67,9 @@ namespace MemoryEffects = mlir::MemoryEffects;
 namespace OpTrait = mlir::OpTrait;
 namespace SideEffects = mlir::SideEffects;
 
-#include "pmlc/dialect/tile/ir/interfaces.h.inc"
-
 #define GET_OP_CLASSES
 #include "pmlc/dialect/tile/ir/ops.h.inc"
 
 #include "pmlc/dialect/tile/ir/dialect.h.inc"
-
-Type inferElementType(MLIRContext *context, CombinationKind combo,
-                      ValueRange srcs);
 
 } // namespace pmlc::dialect::tile

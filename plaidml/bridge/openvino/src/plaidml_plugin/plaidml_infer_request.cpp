@@ -39,21 +39,17 @@ static Blob::Ptr make_shared_blob(const TensorDesc& desc) {
 namespace PlaidMLPlugin {
 
 PlaidMLInferRequest::PlaidMLInferRequest(const InputsDataMap& networkInputs, const OutputsDataMap& networkOutputs,
-                                         const edsl::Program& program,
-                                         const std::map<std::string, edsl::Tensor>& tensorIONameMap)
-    : InferRequestInternal(networkInputs, networkOutputs),
-      tensorIONameMap_(tensorIONameMap),
-      binder_(program),
-      exec_(binder_.compile()) {
+                                         const Program& program)
+    : InferRequestInternal(networkInputs, networkOutputs), program_(program) {
   IVLOG(1, "Program:\n" << program.str());
   AllocateInputs();
   AllocateOutputs();
+  exec_ = std::make_shared<exec::Executable>(program, input_buffers_, output_buffers_);
 }
 
 void PlaidMLInferRequest::InferImpl() {
   IVLOG(1, "PlaidMLInferRequest::InferImpl>");
   IVLOG(2, "  _inputs: " << _inputs);
-  IVLOG(3, "  tensorIONameMap_: " << tensorIONameMap_);
   execDataPreprocessing(_inputs);
 
   SyncInput();
@@ -66,36 +62,42 @@ void PlaidMLInferRequest::GetPerformanceCounts(std::map<std::string, InferenceEn
 }
 
 void PlaidMLInferRequest::AllocateInputs() {
+  size_t i = 0;
+  auto inputs = program_.inputs();
   for (const auto& kvp : _networkInputs) {
     const auto& name = kvp.first;
     const auto& desc = kvp.second->getTensorDesc();
     auto info = _inputs.emplace(name, make_shared_blob(desc));
     info.first->second->allocate();
+    input_buffers_.emplace_back(inputs[i++]);
   }
 }
 
 void PlaidMLInferRequest::AllocateOutputs() {
+  size_t i = 0;
+  auto outputs = program_.outputs();
   for (const auto& kvp : _networkOutputs) {
     const auto& name = kvp.first;
     const auto& desc = kvp.second->getTensorDesc();
     auto info = _outputs.emplace(name, make_shared_blob(desc));
     info.first->second->allocate();
+    output_buffers_.emplace_back(outputs[i++]);
   }
 }
 
 void PlaidMLInferRequest::SyncInput() {
+  size_t i = 0;
   for (const auto& kvp : _networkInputs) {
     const auto& name = kvp.first;
-    const auto& tensor = tensorIONameMap_.at(name);
-    binder_.input(tensor).copy_from(_inputs[name]->buffer());
+    input_buffers_[i++].copy_from(_inputs[name]->buffer());
   }
 }
 
 void PlaidMLInferRequest::SyncOutput() {
+  size_t i = 0;
   for (const auto& kvp : _networkOutputs) {
     const auto& name = kvp.first;
-    const auto& tensor = tensorIONameMap_.at(name);
-    binder_.output(tensor).copy_into(_outputs[name]->buffer());
+    output_buffers_[i++].copy_into(_outputs[name]->buffer());
   }
 }
 

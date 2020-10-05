@@ -46,6 +46,7 @@ build:llvm --define=compiler=clang
 
 build:linux --cpu=linux_x86_64
 build:linux --crosstool_top=//toolchain:toolchain
+build:linux --cxxopt=-std=c++17
 build:linux --define=compiler=gcc
 build:linux --host_crosstool_top=//toolchain:toolchain
 build:linux --build_tag_filters=-latex,-macos,-pytorch,-skip_linux,-windows

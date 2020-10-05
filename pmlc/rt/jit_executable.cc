@@ -331,7 +331,8 @@ class JitExecutable final : public Executable {
 public:
   JitExecutable(const std::shared_ptr<Program> &program,
                 std::shared_ptr<Device> device, ArrayRef<void *> preParams,
-                ArrayRef<void *> bufptrs)
+                ArrayRef<util::BufferPtr> inputBuffers,
+                ArrayRef<util::BufferPtr> outputBuffers)
       : program(program), device(std::move(device)) {
     static std::once_flag is_initialized;
     std::call_once(is_initialized, []() {
@@ -340,8 +341,6 @@ public:
       initializeLLVMPasses();
       llvm::sys::DynamicLibrary::LoadLibraryPermanently(nullptr);
     });
-
-    ptrs.reserve(preParams.size() + bufptrs.size());
 
     EngineKind kind = EngineKind::OrcJIT;
     auto jit = pmlc::util::getEnvVar("LLVM_JIT");
@@ -362,8 +361,12 @@ public:
       throw std::runtime_error("Invalid EngineKind");
     }
 
-    if (program->arguments.size() != bufptrs.size()) {
-      throw std::runtime_error("Program arguments and bufptrs size mismatch");
+    if (inputBuffers.size() != program->inputs.size()) {
+      throw std::runtime_error("Program input arguments and buffers mismatch");
+    }
+    if (outputBuffers.size() != program->outputs.size()) {
+      throw std::runtime_error(
+          "Program outputs arguments and buffers mismatch");
     }
 
     auto ctx = std::make_unique<llvm::LLVMContext>();
@@ -386,10 +389,18 @@ public:
 
     std::copy(preParams.begin(), preParams.end(), std::back_inserter(ptrs));
 
-    descriptors.reserve(bufptrs.size());
-    for (unsigned i = 0; i < bufptrs.size(); i++) {
-      descriptors.emplace_back(bufptrs[i], program->arguments[i].shape);
-      ptrs.push_back(descriptors[i].ptr());
+    for (auto [type, buffer] : llvm::zip(program->inputs, inputBuffers)) {
+      descriptors.emplace_back(buffer->data(), type.cast<RankedTensorType>());
+      ptrs.push_back(descriptors.back().ptr());
+    }
+    for (const compiler::ConstantArgument &arg : program->constants) {
+      descriptors.emplace_back(arg.buffer->data(),
+                               arg.type.cast<RankedTensorType>());
+      ptrs.push_back(descriptors.back().ptr());
+    }
+    for (auto [type, buffer] : llvm::zip(program->outputs, outputBuffers)) {
+      descriptors.emplace_back(buffer->data(), type.cast<RankedTensorType>());
+      ptrs.push_back(descriptors.back().ptr());
     }
   }
 
@@ -416,11 +427,13 @@ private:
 
 } // namespace
 
-std::unique_ptr<Executable> makeJitExecutable(
-    const std::shared_ptr<Program> &program, std::shared_ptr<Device> device,
-    mlir::ArrayRef<void *> preParams, mlir::ArrayRef<void *> bufptrs) {
+std::unique_ptr<Executable>
+makeJitExecutable(const std::shared_ptr<Program> &program,
+                  std::shared_ptr<Device> device, ArrayRef<void *> preParams,
+                  ArrayRef<util::BufferPtr> inputBuffers,
+                  ArrayRef<util::BufferPtr> outputBuffers) {
   return std::make_unique<JitExecutable>(program, std::move(device), preParams,
-                                         bufptrs);
+                                         inputBuffers, outputBuffers);
 }
 
 } // namespace pmlc::rt

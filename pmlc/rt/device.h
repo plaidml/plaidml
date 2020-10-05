@@ -7,6 +7,7 @@
 #include <utility>
 
 #include "pmlc/rt/executable.h"
+#include "pmlc/util/buffer.h"
 
 namespace pmlc::rt {
 
@@ -17,7 +18,8 @@ public:
 
   virtual std::unique_ptr<Executable>
   compile(const std::shared_ptr<pmlc::compiler::Program> &program,
-          mlir::ArrayRef<void *> bufptrs) = 0;
+          mlir::ArrayRef<util::BufferPtr> inputBuffers,
+          mlir::ArrayRef<util::BufferPtr> outputBuffers) = 0;
 };
 
 } // namespace pmlc::rt

@@ -26,14 +26,8 @@ filegroup(
 gentbl(
     name = "interfaces-gen",
     tbl_outs = [
-        (
-            "-gen-op-interface-decls",
-            "interfaces.h.inc",
-        ),
-        (
-            "-gen-op-interface-defs",
-            "interfaces.cc.inc",
-        ),
+        ("-gen-op-interface-decls", "interfaces.h.inc"),
+        ("-gen-op-interface-defs", "interfaces.cc.inc"),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "interfaces.td",
@@ -43,14 +37,8 @@ gentbl(
 gentbl(
     name = "enums-gen",
     tbl_outs = [
-        (
-            "-gen-enum-decls",
-            "enums.h.inc",
-        ),
-        (
-            "-gen-enum-defs",
-            "enums.cc.inc",
-        ),
+        ("-gen-enum-decls", "enums.h.inc"),
+        ("-gen-enum-defs", "enums.cc.inc"),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "enums.td",

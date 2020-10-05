@@ -13,13 +13,12 @@ from keras.layers import Conv2D, Dense, Flatten, Input, MaxPooling2D, Reshape
 from keras.layers.normalization import BatchNormalization
 from keras.models import Model, Sequential
 
-# from plaidml.bridge.keras import backend as pkb
+from plaidml.bridge.keras import backend as pkb
 
 
 class RegressionTests(unittest.TestCase):
     """PlaidML Keras regression tests"""
 
-    @unittest.skipIf(os.environ.get("PLAIDML_USE_STRIPE", "0") == "1", "Stripe fails this test")
     def testBatchNormalizationWithFlatten(self):
         # This regression test is thanks to Hans Pinckaers (HansPinckaers on
         # GitHub), who reported https://github.com/plaidml/plaidml/issues/57,
@@ -130,13 +129,4 @@ if __name__ == '__main__':
     parser.add_argument('--fp16', action='store_true')
     parser.add_argument('-v', '--verbose', action='count', default=0)
     args, remainder = parser.parse_known_args()
-
-    # plaidml._internal_set_vlog(args.verbose)
-    # if args.fp16:
-    #     pkb.set_floatx('float16')
-    #     DEFAULT_TOL = 1e-2
-    #     DEFAULT_ATOL = 1e-5
-    # else:
-    #     pkb.set_floatx('float32')
-
     unittest.main(argv=sys.argv[:1] + remainder, verbosity=args.verbose + 1)

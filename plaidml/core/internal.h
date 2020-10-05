@@ -8,72 +8,34 @@
 #include <vector>
 
 #include "plaidml/core/ffi.h"
-#include "pmlc/dialect/tile/builder.h"
+#include "pmlc/ast/ast.h"
+#include "pmlc/compiler/program.h"
 
 extern "C" {
 
-struct plaidml_string {
-  std::string str;
-};
-
-struct plaidml_shape {
-  mlir::MemRefType type;
-};
-
-struct plaidml_dim_expr {
-  mlir::Value value;
-};
-
-struct plaidml_expr {
-  mlir::Value value;
-  std::shared_ptr<pmlc::compiler::Program> program;
+struct plaidml_buffer {
+  std::shared_ptr<pmlc::util::Buffer> buffer;
 };
 
 struct plaidml_program {
   std::shared_ptr<pmlc::compiler::Program> program;
 };
 
-struct plaidml_buffer {
-  std::shared_ptr<pmlc::util::Buffer> buffer;
+struct plaidml_shape {
+  pmlc::util::TensorShape shape;
 };
 
-struct plaidml_view {
-  std::shared_ptr<pmlc::util::View> view;
-};
-
-struct VariantHolder;
-using VariantPtr = std::shared_ptr<VariantHolder>;
-using Tuple = std::vector<VariantPtr>;
-
-using Variant = std::variant<  //
-    std::monostate,            // PLAIDML_VALUE_NONE
-    plaidml_dim_expr,          // PLAIDML_VALUE_DIM
-    plaidml_expr,              // PLAIDML_VALUE_EXPR
-    double,                    // PLAIDML_VALUE_FLOAT
-    int64_t,                   // PLAIDML_VALUE_INT
-    std::string,               // PLAIDML_VALUE_STR
-    Tuple                      // PLAIDML_VALUE_TUPLE
-    >;
-
-struct VariantHolder {
-  explicit VariantHolder(const Variant& inner);
-  Variant inner;
+struct plaidml_string {
+  std::string str;
 };
 
 struct plaidml_value {
-  Variant variant;
+  pmlc::ast::VarNodePtr node;
 };
 
 }  // extern "C"
 
 namespace plaidml::core {
-
-struct GlobalContext {
-  static pmlc::dialect::tile::TileBuilder* get() {
-    static thread_local pmlc::dialect::tile::TileBuilder builder;
-    return &builder;
-  }
-};
 
 template <typename T, typename F>
 T ffi_wrap(plaidml_error* err, T val, F fn) {
@@ -107,11 +69,21 @@ void ffi_wrap_void(plaidml_error* err, F fn) {
   }
 }
 
-plaidml_datatype convertIntoDataType(mlir::Type type);
-mlir::Type convertFromDataType(plaidml_datatype dtype, mlir::MLIRContext* context);
+template <typename ResultT, typename ElementT, typename T>
+ResultT* ffi_vector(const std::vector<T>& vec) {
+  std::vector<std::unique_ptr<ElementT>> ptrs(vec.size());
+  std::unique_ptr<ElementT* []> elts { new ElementT*[vec.size()] };
+  auto result = std::make_unique<ResultT>();
+  for (size_t i = 0; i < vec.size(); i++) {
+    ptrs[i].reset(new ElementT{vec[i]});
+    elts[i] = ptrs[i].release();
+  }
+  result->size = vec.size();
+  result->elts = elts.release();
+  return result.release();
+}
 
-// Converts the supplied RAII strings vector into a plaidml_strings*
-// for returning via FFI.
-plaidml_strings* toFFI(std::vector<std::string> strings);
+plaidml_datatype convertIntoDataType(pmlc::util::DataType type);
+pmlc::util::DataType convertFromDataType(plaidml_datatype dtype);
 
 }  // namespace plaidml::core

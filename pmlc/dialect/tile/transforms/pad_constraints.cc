@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "mlir/Analysis/AffineStructures.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/AffineExprVisitor.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/Pass/Pass.h"
@@ -123,13 +124,10 @@ void PadConstraintsPass::runOnFunction() {
       auto block = arg.getOwner();
       auto loc = block->getParentOp()->getLoc();
       OpBuilder inner(block->getParent());
-      auto stub = inner.create<PlaceholderOp>(loc, arg.getType());
       // Construct an initial identity operation.
-      auto ident = inner.create<eltwise::IdentOp>(loc, stub.result());
+      auto ident = inner.create<eltwise::IdentOp>(loc, arg);
       // Replace all uses with ident (except for newly generated use).
-      arg.replaceAllUsesWith(ident);
-      ident.getOperation()->replaceUsesOfWith(stub, arg);
-      stub.erase();
+      arg.replaceAllUsesExcept(ident, llvm::SmallPtrSet<Operation *, 1>{ident});
       // Now use ident for all further work.
       def = ident;
     }

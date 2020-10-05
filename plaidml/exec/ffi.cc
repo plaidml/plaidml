@@ -10,67 +10,25 @@
 #include <utility>
 #include <vector>
 
+#include "llvm/Support/FormatVariadic.h"
+
 #include "plaidml/core/internal.h"
+#include "plaidml/core/settings.h"
 #include "pmlc/rt/device_id.h"
 #include "pmlc/rt/executable.h"
 #include "pmlc/rt/runtime_registry.h"
 #include "pmlc/util/env.h"
 #include "pmlc/util/logging.h"
 
+using plaidml::core::ffi_vector;
 using plaidml::core::ffi_wrap;
 using plaidml::core::ffi_wrap_void;
-using pmlc::compiler::ProgramArgument;
 using pmlc::rt::Device;
 using pmlc::rt::Executable;
 using pmlc::rt::getDeviceIDs;
-using pmlc::util::Buffer;
 using pmlc::util::BufferPtr;
+using pmlc::util::TensorShape;
 using namespace mlir;  // NOLINT[build/namespaces]
-
-namespace {
-
-std::vector<ProgramArgument> BindProgramArguments(  //
-    plaidml_program* program,                       //
-    size_t ninputs,                                 //
-    plaidml_binding** inputs,                       //
-    size_t noutputs,                                //
-    plaidml_binding** outputs) {
-  llvm::DenseMap<Value, BufferPtr> input_bindings;
-  for (unsigned i = 0; i < ninputs; i++) {
-    input_bindings[inputs[i]->expr->value] = inputs[i]->buffer->buffer;
-  }
-  llvm::DenseMap<Value, BufferPtr> output_bindings;
-  for (unsigned i = 0; i < noutputs; i++) {
-    output_bindings[outputs[i]->expr->value] = outputs[i]->buffer->buffer;
-  }
-  std::vector<ProgramArgument> args(program->program->arguments.size());
-  for (unsigned i = 0; i < args.size(); i++) {
-    auto arg = program->program->arguments[i];
-    if (arg.isInput) {
-      auto it = input_bindings.find(arg.value);
-      if (it != input_bindings.end()) {
-        arg.buffer = it->second;
-      }
-      IVLOG(2, " Input[" << i << "]: " << arg.buffer);
-      if (!arg.buffer) {
-        throw std::runtime_error("Unbound input");
-      }
-    } else {
-      auto it = output_bindings.find(arg.value);
-      if (it != output_bindings.end()) {
-        arg.buffer = it->second;
-      }
-      IVLOG(2, "Output[" << i << "]: " << arg.buffer);
-      if (!arg.buffer) {
-        throw std::runtime_error("Unbound output");
-      }
-    }
-    args[i] = std::move(arg);
-  }
-  return args;
-}
-
-}  // namespace
 
 extern "C" {
 
@@ -88,28 +46,56 @@ void plaidml_exec_init(  //
 
 plaidml_strings* plaidml_devices_get(  //
     plaidml_error* err) {
-  return ffi_wrap<plaidml_strings*>(err, nullptr, [&] { return plaidml::core::toFFI(getDeviceIDs()); });
+  return ffi_wrap<plaidml_strings*>(err, nullptr, [&] {  //
+    return ffi_vector<plaidml_strings, plaidml_string>(getDeviceIDs());
+  });
 }
 
 plaidml_executable* plaidml_jit(  //
     plaidml_error* err,           //
     plaidml_program* program,     //
-    const char* deviceID,         //
+    const char* raw_device,       //
     size_t ninputs,               //
-    plaidml_binding** inputs,     //
+    plaidml_buffer** inputs,      //
     size_t noutputs,              //
-    plaidml_binding** outputs) {
+    plaidml_buffer** outputs) {
   return ffi_wrap<plaidml_executable*>(err, nullptr, [&] {
-    IVLOG(1, "JITing for device: " << deviceID);
-    auto args = BindProgramArguments(program, ninputs, inputs, noutputs, outputs);
-    auto exec = std::make_unique<plaidml_executable>();
-    std::vector<void*> bufptrs(args.size());
-    for (unsigned i = 0; i < args.size(); i++) {
-      auto view = args[i].buffer->MapCurrent();
-      bufptrs[i] = view->data();
+    std::string device(raw_device);
+    if (device.empty()) {
+      device = plaidml::core::Settings::Instance()->get("PLAIDML_DEVICE");
     }
-    exec->exec = Executable::fromProgram(program->program, deviceID, bufptrs);
-    return exec.release();
+    IVLOG(1, "JITing for device: " << device);
+    if (program->program->inputs.size() != ninputs) {
+      throw std::runtime_error(llvm::formatv("Program expects {0} inputs, but {1} were specified",
+                                             program->program->inputs.size(), ninputs));
+    }
+    if (program->program->outputs.size() != noutputs) {
+      throw std::runtime_error(llvm::formatv("Program expects {0} outputs, but {1} were specified",
+                                             program->program->outputs.size(), noutputs));
+    }
+    std::vector<BufferPtr> inputBuffers;
+    for (unsigned i = 0; i < ninputs; i++) {
+      TensorShape actual = inputs[i]->buffer->shape();
+      TensorShape expected = TensorShape::fromType(program->program->inputs[i]);
+      if (actual != expected) {
+        throw std::runtime_error(
+            llvm::formatv("Shape mismatch for input buffer #{0}, expected '{1}' but '{2}' was specified", i,
+                          expected.str(), actual.str()));
+      }
+      inputBuffers.push_back(inputs[i]->buffer);
+    }
+    std::vector<BufferPtr> outputBuffers;
+    for (unsigned i = 0; i < noutputs; i++) {
+      TensorShape actual = outputs[i]->buffer->shape();
+      TensorShape expected = TensorShape::fromType(program->program->outputs[i]);
+      if (actual != expected) {
+        throw std::runtime_error(
+            llvm::formatv("Shape mismatch for output buffer #{0}, expected '{1}' but '{2}' was specified", i,
+                          expected.str(), actual.str()));
+      }
+      outputBuffers.push_back(outputs[i]->buffer);
+    }
+    return new plaidml_executable{Executable::fromProgram(program->program, device, inputBuffers, outputBuffers)};
   });
 }
 
