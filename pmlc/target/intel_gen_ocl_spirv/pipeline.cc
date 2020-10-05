@@ -105,6 +105,7 @@ void pipelineBuilder(OpPassManager &pm) {
     pm.addPass(std::move(convertPass));
   }
   pm.addPass(comp::createExecEnvCoalescingPass());
+  pm.addPass(comp::createMinimizeAllocationsPass());
 
   // GPU to SPIR-V.
   pm.addPass(createLegalizeStdOpsForSPIRVLoweringPass());
