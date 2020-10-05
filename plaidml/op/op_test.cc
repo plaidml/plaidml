@@ -314,11 +314,11 @@ TEST_F(OpTest, ExplicitPaddingNegInf) {
 
   std::vector<float> I_input = {1, 2, 3,  //
                                 4, 5, 6};
-  std::vector<float> O_output = {neg_inf, neg_inf, neg_inf, neg_inf, neg_inf, //
-                                 neg_inf, neg_inf, neg_inf, neg_inf, neg_inf, //
-                                 neg_inf, 1,  2,  3,  neg_inf,  //
-                                 neg_inf, 4,  5,  6,  neg_inf,  //
-                                 neg_inf, neg_inf, neg_inf, neg_inf, neg_inf, //
+  std::vector<float> O_output = {neg_inf, neg_inf, neg_inf, neg_inf, neg_inf,  //
+                                 neg_inf, neg_inf, neg_inf, neg_inf, neg_inf,  //
+                                 neg_inf, 1,       2,       3,       neg_inf,  //
+                                 neg_inf, 4,       5,       6,       neg_inf,  //
+                                 neg_inf, neg_inf, neg_inf, neg_inf, neg_inf,  //
                                  neg_inf, neg_inf, neg_inf, neg_inf, neg_inf};
 
   checkProgram(program, {{I, I_input}}, {{O, O_output}});
@@ -332,11 +332,11 @@ TEST_F(OpTest, ExplicitPaddingInf) {
 
   std::vector<float> I_input = {-1, -2, -3,  //
                                 -4, -5, -6};
-  std::vector<float> O_output = {inf, inf, inf, inf, inf, //
-                                 inf, inf, inf, inf, inf, //
+  std::vector<float> O_output = {inf, inf, inf, inf, inf,  //
+                                 inf, inf, inf, inf, inf,  //
                                  inf, -1,  -2,  -3,  inf,  //
                                  inf, -4,  -5,  -6,  inf,  //
-                                 inf, inf, inf, inf, inf, //
+                                 inf, inf, inf, inf, inf,  //
                                  inf, inf, inf, inf, inf};
 
   checkProgram(program, {{I, I_input}}, {{O, O_output}});
@@ -350,7 +350,7 @@ TEST_F(OpTest, ExplicitPaddingNoOp) {
 
   std::vector<float> I_input = {1, 2, 3,  //
                                 4, 5, 6};
-  std::vector<float> O_output = {1, 2, 3, //
+  std::vector<float> O_output = {1, 2, 3,  //
                                  4, 5, 6};
 
   checkProgram(program, {{I, I_input}}, {{O, O_output}});
