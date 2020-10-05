@@ -43,9 +43,9 @@ class TestFixture : public ::testing::Test {
     }
   }
 
-  void compareElements(double a, double b) { 
+  void compareElements(double a, double b) {
     if (isfinite(a) && isfinite(b)) {
-      EXPECT_NEAR(a, b, (fabs(a) + fabs(b)) / 10000.0); 
+      EXPECT_NEAR(a, b, (fabs(a) + fabs(b)) / 10000.0);
     } else {
       EXPECT_EQ(a, b);
     }
