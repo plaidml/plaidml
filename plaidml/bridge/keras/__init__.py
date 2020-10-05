@@ -1471,7 +1471,7 @@ def rnn(step_function,
                 raise RuntimeError(
                     'Generating RNN at time step {} with no previous time step'.format(ii))
         else:
-            OC.simplify(False)
+            OC.init(prev.tensor)
         O = OC.build()
         return _KerasNode('time_expand', name='time_expand', tensor=O)
 
