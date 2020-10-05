@@ -372,6 +372,7 @@ class Contraction(object):
         self.__rhs = rhs
         return self
 
+    # TODO: remove this
     def simplify(self, flag):
         self.__simplify = flag
         return self
@@ -510,7 +511,7 @@ class Tensor(ForeignObject):
             else:
                 raise TypeError('Invalid type for value={}'.format(value))
         elif expr is None:
-            raise ValueError('One of dims= or expr= must be specified.')
+            raise ValueError('One of expr= or value= must be specified.')
         super(Tensor, self).__init__(expr)
 
     def __getitem__(self, key):

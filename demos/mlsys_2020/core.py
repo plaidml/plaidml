@@ -96,7 +96,7 @@ def edsl_program(X):
 ({html.code_tensor_dim}I{html.font_close},{html.code_tensor_dim}K{html.font_close}){html.br}
 {html.sp}{html.code_input_param}Y{html.font_close}.{html.code_directive}bind_dims{html.font_close}
 ({html.code_tensor_dim}K{html.font_close},{html.code_tensor_dim}J{html.font_close}){html.br}
-{html.sp}{html.code_output_param}R{html.font_close} = {html.code_directive}Contration{html.font_close}().
+{html.sp}{html.code_output_param}R{html.font_close} = {html.code_directive}Contraction{html.font_close}().
 {html.code_directive}outShape{html.font_close}
 ({html.code_tensor_dim}I{html.font_close},{html.code_tensor_dim}J{html.font_close}){html.br}
 {html.code_close}

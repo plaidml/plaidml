@@ -278,6 +278,7 @@ class Tensor {
   IndexedTensor operator()(Ts... idxs) const;
   IndexedTensor operator()(const std::vector<TensorIndex>& idxs) const;
 
+  // TODO: remove this
   Tensor operator[](size_t ordinal) const;
 
   ///
@@ -463,6 +464,7 @@ class Contraction {
   ///
   /// Enable/disable simplification of output access expressions within contraction.
   ///
+  // TODO: remove this
   Contraction& simplify(bool flag);
 
   ///
