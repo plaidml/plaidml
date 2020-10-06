@@ -129,7 +129,9 @@ private:
     if (op->getNumRegions() != 0) {
       return op->emitRemark("Vectorize op: Failed, interior loops");
     }
-    if (!isa<FPExtOp, FPTruncOp, IndexCastOp, VectorUnrollOpInterface>(op)) {
+    // TODO: consider more generic way to add ops supported here
+    if (!isa<FPExtOp, FPTruncOp, IndexCastOp, VectorUnrollOpInterface, SelectOp,
+             CmpFOp>(op)) {
       // Probably not a vectorizable op. Verify it doesn't use an
       // vectorized results.
       for (auto operand : op->getOperands()) {

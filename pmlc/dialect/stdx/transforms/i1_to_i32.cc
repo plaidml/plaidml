@@ -12,6 +12,7 @@ using namespace mlir; // NOLINT[build/namespaces]
 namespace pmlc::dialect::stdx {
 
 namespace {
+// TODO: add support for vector types
 
 /// Changes loadOp from i1 memref to loadOp i32 followed by creating constant
 /// value 0 of i32 type and doing cmpi afterwards, next this bool-like type will

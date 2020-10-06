@@ -6,8 +6,12 @@
 
 #include "pmlc/dialect/pxa/analysis/strides.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
+#include "pmlc/dialect/pxa/transforms/cache.h"
+#include "pmlc/dialect/pxa/transforms/normalize.h"
 #include "pmlc/dialect/pxa/transforms/pass_detail.h"
 #include "pmlc/dialect/pxa/transforms/tile.h"
+#include "pmlc/dialect/pxa/transforms/tile_accumulate.h"
+#include "pmlc/dialect/pxa/transforms/vectorize.h"
 #include "pmlc/util/logging.h"
 #include "pmlc/util/tags.h"
 #include "pmlc/util/util.h"
@@ -28,7 +32,9 @@ struct FusionInfo {
     // The loop sizes for the corresponding affine.parallel op.
     SmallVector<int64_t, 4> sizes;
     // The tile for the corresponding affine.parallel.op (pre-fusion).
-    SmallVector<int64_t, 8> tile;
+    SmallVector<int64_t, 8> tileSizes;
+    // Mark if the op needs tiling
+    bool needsTiling = false;
   };
 
   AffineParallelInfo aInfo;
@@ -79,6 +85,32 @@ struct FusionInfo {
     }
   }
 
+  void undoTilings() {
+    if (aInfo.needsTiling)
+      undoTiling(aInfo.op, aInfo.tileSizes);
+    if (bInfo.needsTiling)
+      undoTiling(bInfo.op, bInfo.tileSizes);
+  }
+
+  // Helper to perform loop transformations, so the loops can be fused
+  // TODO: make this optional for the pass, so user can define if these
+  // were performed before and actually needed here,
+  // probably two params needed: subgroup related and affine normalization
+  void loopTransformations(AffineParallelOp outer, AffineParallelOp inner) {
+    inner.walk([&](AffineParallelOp par) { vectorizeOverOutputs(par, 8); });
+
+    // Try to 'vector cache' any remaining innermost loads
+    outer.walk([&](PxaLoadOp load) { cacheLoadAsVector(inner, load, 8); });
+
+    // Convert local allocations to vector types
+    outer.walk([&](AllocOp alloc) { vectorizeBuffer(alloc); });
+
+    // Affine normalizations
+    outer.walk(::normalizeAffineParallel);
+    outer.walk(elideSingleIterationIndexes);
+    outer.walk(promoteIfEmptyIVs);
+  }
+
   // Helper to get a clean version of the strides for a specific op (or fail)
   template <typename OpA>
   static bool getStrides(SmallVectorImpl<StrideInfo> &out, OpA op,
@@ -116,9 +148,7 @@ struct FusionInfo {
     if (!getStrides(stridesB, opB, bInfo.op))
       return false;
 
-    SmallVector<int64_t, 6> tileSizes;
-    auto needsTiling = false;
-
+    // Get subgroup sizes for both loop candidates
     auto subgroupSizeA = 1;
     auto subgroupSizeB = 1;
     if (hasIntegerTag(aInfo.op, "subgroupSize"))
@@ -126,7 +156,8 @@ struct FusionInfo {
     if (hasIntegerTag(bInfo.op, "subgroupSize"))
       subgroupSizeB = pmlc::getIntegerTag(bInfo.op, "subgroupSize", 1);
 
-    if (subgroupSizeA = 1 && subgroupSizeB != 1)
+    // Set reverse fusion only in case when second loop was subgrouped
+    if (subgroupSizeA == 1 && subgroupSizeB != 1)
       reverseFusion = true;
 
     assert(stridesA.size() == stridesB.size() &&
@@ -172,10 +203,18 @@ struct FusionInfo {
       // loop with subgroupSize != attribute if present
       if (mulA != mulB) {
         auto tileSize = reverseFusion ? sizeA / sizeB : sizeB / sizeA;
-        tileSizes.push_back(tileSize);
-        needsTiling = true;
+        if (reverseFusion) {
+          aInfo.tileSizes.push_back(tileSize);
+          aInfo.needsTiling = true;
+        } else {
+          bInfo.tileSizes.push_back(tileSize);
+          bInfo.needsTiling = true;
+        }
       } else {
-        tileSizes.push_back(1);
+        if (reverseFusion)
+          aInfo.tileSizes.push_back(1);
+        else
+          bInfo.tileSizes.push_back(1);
       }
 
       // Also fail if the AP's don't have the same lower bound
@@ -218,13 +257,11 @@ struct FusionInfo {
       return false;
     }
 
-    // Add tiling if needed
-    if (needsTiling) {
-      if (reverseFusion)
-        performTiling(aInfo.op, tileSizes);
-      else
-        performTiling(bInfo.op, tileSizes);
-    }
+    // Add tilings if needed
+    if (aInfo.needsTiling)
+      performTiling(aInfo.op, aInfo.tileSizes);
+    if (bInfo.needsTiling)
+      performTiling(bInfo.op, bInfo.tileSizes);
 
     // Over-fusion prevention:
     // Compute the amount of memory activity, defined as the amount of memory
@@ -235,6 +272,7 @@ struct FusionInfo {
     if (memoryActivityThreshold) {
       auto memoryActivity = computeMemoryActivity();
       if (memoryActivity > memoryActivityThreshold) {
+        undoTilings();
         return false;
       }
     }
@@ -251,6 +289,7 @@ struct FusionInfo {
       auto ret = hasPerfectAliasing(*aRap, *bRap, bToA);
       IVLOG(3, "  isAliased: " << ret);
       if (!ret) {
+        undoTilings();
         return false;
       }
     }
@@ -262,6 +301,7 @@ struct FusionInfo {
       auto ret = hasPerfectAliasing(*aRap, *bRap, bToA);
       IVLOG(3, "  isAliased: " << ret);
       if (!ret) {
+        undoTilings();
         return false;
       }
     }
@@ -439,8 +479,17 @@ struct FusionInfo {
     clearTags(bInfo.op);
 
     // Move the two parallel for's inside the new op
-    aInfo.op.getOperation()->moveBefore(apC.getBody(), apC.getBody()->end());
-    bInfo.op.getOperation()->moveBefore(apC.getBody(), apC.getBody()->end());
+    if (reverseFusion) {
+      aInfo.op.getOperation()->moveBefore(apC.getBody(), apC.getBody()->end());
+      loopTransformations(apC, aInfo.op);
+      bInfo.op.getOperation()->moveBefore(apC.getBody(), apC.getBody()->end());
+    } else {
+      bInfo.op.getOperation()->moveBefore(apC.getBody(), apC.getBody()->end());
+      loopTransformations(apC, bInfo.op);
+      aInfo.op.getOperation()->moveBefore(apC.getBody(),
+                                          apC.getBody()->begin());
+    }
+
     // Fixup uses of A's return values.  These uses are either in B (and thus
     // local to C now) or some other op (and thus need to be moved to a return
     // of C).  Basically, for each return, we go over all uses, and adjust to
@@ -504,6 +553,8 @@ struct FusionInfo {
     fixupLoops(aInfo.op, aToNew);
     fixupLoops(bInfo.op, bToNew);
 
+    IVLOG(3, "!!!!!!!!!!!!!!!!:\n\n\n" << debugString(*apC));
+
     return apC;
   }
 };
@@ -536,11 +587,7 @@ struct FusionPass : public FusionBase<FusionPass> {
     return fusionInfo.applyFusion();
   }
 
-  void runOnFunction() final {
-    auto func = getFunction();
-    // Autotile only the outermost loops: TODO how should a user specify which
-    // blocks to consider?
-    auto &block = func.getBody().front();
+  void performFusion(Block &block) {
     // First we 'number' every op
     DenseMap<Operation *, size_t> opOrder;
     for (auto &op : block) {
@@ -584,10 +631,25 @@ struct FusionPass : public FusionBase<FusionPass> {
           if (merge_immediate) {
             itOp = Block::iterator(newOp.getOperation());
           }
-          // TODO: add affine normalizations
+          // Affine normalizations
+          newOp.walk(::normalizeAffineParallel);
+          newOp.walk(elideSingleIterationIndexes);
+          newOp.walk(promoteIfEmptyIVs);
         }
       }
     }
+  }
+
+  void runOnFunction() final {
+    auto func = getFunction();
+    auto &block = func.getBody().front();
+    performFusion(block);
+    func.walk([&](AffineParallelOp affineParallelOp) {
+      auto *parentOp = affineParallelOp.getParentOp();
+      if (dyn_cast<AffineParallelOp>(parentOp))
+        return;
+      performFusion(*affineParallelOp.getBody());
+    });
   }
 };
 

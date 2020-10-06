@@ -18,11 +18,11 @@ namespace {
 struct MemRefAccess {
   AffineValueMap accessMap;
 
-  explicit MemRefAccess(PxaLoadOp op) {
+  explicit MemRefAccess(PxaReadOpInterface op) {
     getAccessMap(op.getAffineMap(), op.getMapOperands(), &accessMap);
   }
 
-  explicit MemRefAccess(PxaReduceOp op) {
+  explicit MemRefAccess(PxaWriteOpInterface op) {
     getAccessMap(op.getAffineMap(), op.getMapOperands(), &accessMap);
   }
 
@@ -49,14 +49,15 @@ struct MemRefDataFlowOptPass
   void runOnFunction() final {
     // Walk all load's and perform reduce to load forwarding.
     FuncOp f = getFunction();
-    f.walk([&](PxaLoadOp loadOp) {
+    f.walk([&](PxaReadOpInterface loadOp) {
       auto defOp = loadOp.getMemRef().getDefiningOp();
       if (!defOp) {
         return;
       }
 
-      auto reduceOp = dyn_cast_or_null<PxaReduceOp>(defOp);
-      if (!reduceOp || reduceOp.agg() != AtomicRMWKind::assign) {
+      auto reduceOp = dyn_cast_or_null<PxaWriteOpInterface>(defOp);
+      // TODO: move the agg to PxaWriteOpInterface
+      if (!reduceOp /* || reduceOp.getAgg() != AtomicRMWKind::assign*/) {
         return;
       }
 
@@ -68,7 +69,8 @@ struct MemRefDataFlowOptPass
         return;
 
       // Perform the actual store to load forwarding.
-      loadOp.getResult().replaceAllUsesWith(reduceOp.getValueToStore());
+      loadOp.getOperation()->getResult(0).replaceAllUsesWith(
+          reduceOp.getValueToStore());
 
       loadOp.erase();
     });
