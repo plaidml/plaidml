@@ -276,15 +276,9 @@ private:
   void createStridedBRGemmPxaGemmOp(TensorAndIndexPermutation perm,
                                     ArrayRef<int64_t> tileSize) {
     auto AStrideInfo = getStrideInfo(perm.ioOps[1]);
-    int count = 0;
-    int64_t kRange = -1, l_br = -1;
-    for (const auto &kvp : AStrideInfo->strides) {
-      count++;
-      if (count == 2) {
-        IVLOG(3, "AStride range: " << getIdxRange(kvp.first))
-        kRange = getIdxRange(kvp.first);
-      }
-    }
+    int64_t numBatches = 1;
+    int64_t kRange = getIdxRange(perm.indexes[2]);
+    IVLOG(3, "kRange: " << kRange);
 
     // First, modify step size of all tiled indexes
     auto steps = op.getSteps();
@@ -293,13 +287,33 @@ private:
         if (perm.indexes[j] == op.getBody()->getArgument(i)) {
           steps[i] *= tileSize[j];
 
-          // K index
+          // K index (reduction dimension)
           if (j == 2) {
-            IVLOG(3, "steps[" << i << "] = " << steps[i]);
-            if (kRange != -1) {
-              l_br = kRange / steps[i];
-              steps[i] = kRange;
+            /*
+            We want to transform "regular" pxa.gemm where numBatches is 1:
+            affine.parallel (i, j, k) = (..., 0) to (..., kRange) step (..,
+            kStep) { pxa.gemm C[i, j] = A[i, k], B[k, j]: [..., kStep], 1
             }
+
+            to
+
+            affine.parallel (i, j, k) = (..., 0) to (..., kRange) step (..,
+            kRange) { pxa.gemm C[i, j] = A[i, k], B[k, j]: [..., kStep],
+            (kRange/64)
+            }
+
+            where the number of batches of A and B matrices to multiply is
+            the k loop's range divided by the original step size for the k loop.
+
+            Subsequently, kStep is set to kRange. That is, in one step, a block
+            of C is completely computed through reduction of batches of A and B
+            matrix multiplies.
+            */
+            numBatches = kRange / steps[i];
+            steps[i] = kRange;
+
+            IVLOG(3, "steps[" << i << "] = " << steps[i]);
+            IVLOG(3, "numBatches: " << numBatches);
           }
         }
       }
@@ -314,7 +328,7 @@ private:
     auto bodyBuilder = op.getBodyBuilder();
 
     auto tileAttr = bodyBuilder.getI64ArrayAttr(tileSize);
-    auto lBrAttr = bodyBuilder.getI64IntegerAttr(l_br);
+    auto numBatchesAttr = bodyBuilder.getI64IntegerAttr(numBatches);
 
     SmallVector<Value, 8> mapOperands;
     GemmOperand c(opC, {perm.indexes[0], perm.indexes[1]}, mapOperands);
@@ -329,7 +343,7 @@ private:
         AffineMapAttr::get(a.tileMap), //
         b.memref, AffineMapAttr::get(b.accessMap),
         AffineMapAttr::get(b.tileMap), //
-        tileAttr, lBrAttr, mapOperands);
+        tileAttr, numBatchesAttr, mapOperands);
 
     opC.result().replaceAllUsesWith(brgemm);
     opC.erase();
@@ -356,7 +370,7 @@ private:
     auto bodyBuilder = op.getBodyBuilder();
 
     auto tileAttr = bodyBuilder.getI64ArrayAttr(tileSize);
-    auto lBrAttr = bodyBuilder.getI64IntegerAttr(1);
+    auto numBatchesAttr = bodyBuilder.getI64IntegerAttr(1);
 
     SmallVector<Value, 8> mapOperands;
     GemmOperand c(opC, {perm.indexes[0], perm.indexes[1]}, mapOperands);
@@ -371,7 +385,7 @@ private:
         AffineMapAttr::get(a.tileMap), //
         b.memref, AffineMapAttr::get(b.accessMap),
         AffineMapAttr::get(b.tileMap), //
-        tileAttr, lBrAttr, mapOperands);
+        tileAttr, numBatchesAttr, mapOperands);
 
     opC.result().replaceAllUsesWith(gemm);
     opC.erase();

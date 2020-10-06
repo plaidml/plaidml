@@ -69,22 +69,22 @@ struct PxaGemmOpConversion : public OpConversionPattern<pxa::PxaGemmOp> {
     auto leadingDimsAttr = rewriter.getI64ArrayAttr(ArrayRef<int64_t>{
         aInfo.strides[0], bInfo.strides[0], cInfo.strides[0]});
 
-    int64_t lBr = op.lBr().getSExtValue();
+    int64_t numBatches = op.numBatches().getSExtValue();
 
-    if (lBr == 1) {
+    if (numBatches == 1) {
       auto dispatch = rewriter.create<xsmm::GemmDispatchOp>(
           op.getLoc(), rewriter.getI64Type(), op.tile(), leadingDimsAttr);
 
       rewriter.create<xsmm::GemmInvokeOp>(
           op.getLoc(), ArrayRef<Type>(), dispatch, transformed.c(),
           transformed.a(), transformed.b(), indices);
-    } else if (lBr > 1) {
+    } else if (numBatches > 1) {
       auto dispatch = rewriter.create<xsmm::BRGemmDispatchOp>(
           op.getLoc(), rewriter.getI64Type(), op.tile(), leadingDimsAttr);
 
       rewriter.create<xsmm::BRGemmInvokeOp>(
           op.getLoc(), ArrayRef<Type>(), dispatch, transformed.c(),
-          transformed.a(), transformed.b(), op.lBr(), indices);
+          transformed.a(), transformed.b(), op.numBatches(), indices);
     } else {
       return failure();
     }
@@ -307,14 +307,15 @@ struct XSMMBRGemmInvokeLowering
         getDataPtr(op->getLoc(), cType, transformed.c(), cIndices, rewriter);
 
     auto int64Type = LLVM::LLVMType::getInt64Ty(op->getContext());
-    auto lBr = rewriter.getI64IntegerAttr(invokeOp.lBr().getSExtValue());
-    auto lBrValue =
-        rewriter.create<LLVM::ConstantOp>(op->getLoc(), int64Type, lBr);
+    auto numBatches =
+        rewriter.getI64IntegerAttr(invokeOp.numBatches().getSExtValue());
+    auto numBatchesValue =
+        rewriter.create<LLVM::ConstantOp>(op->getLoc(), int64Type, numBatches);
 
     auto func = getOrInsertFunc(op, rewriter);
     rewriter.create<LLVM::CallOp>(
         op->getLoc(), ArrayRef<Type>(), rewriter.getSymbolRefAttr(func),
-        ArrayRef<Value>{transformed.ptr(), aPtr, bPtr, cPtr, lBrValue});
+        ArrayRef<Value>{transformed.ptr(), aPtr, bPtr, cPtr, numBatchesValue});
     rewriter.eraseOp(op);
 
     return success();
@@ -342,7 +343,7 @@ struct XSMMBRGemmInvokeLowering
                                      floatPtrType, // a
                                      floatPtrType, // b
                                      floatPtrType, // c
-                                     int64Type},   // lBr
+                                     int64Type},   // numBatches
             /*isVarArg=*/false));
   }
 };
