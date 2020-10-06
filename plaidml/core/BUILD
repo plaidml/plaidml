@@ -51,8 +51,8 @@ plaidml_cc_library(
     hdrs = SDK_HDRS,
     visibility = ["//visibility:public"],
     deps = [
+        "//pmlc/ast",
         "//pmlc/compiler",
-        "//pmlc/dialect/tile",
         "//pmlc/util",
         "@llvm-project//llvm:Support",
     ],
@@ -70,6 +70,7 @@ py_library(
 
 py_test(
     name = "py_test",
+    size = "small",
     srcs = ["core_test.py"],
     args = ["-v"],
     main = "core_test.py",
@@ -78,5 +79,4 @@ py_test(
         "//plaidml:py",
         "//plaidml/edsl:py",
     ],
-    size = "small",
 )

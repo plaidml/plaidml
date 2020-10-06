@@ -49,9 +49,8 @@ static OpRegistration reg("batchtospace", [](const Context& ctx) {
     O_idxs.push_back(block_shape[i] * I_idxs[i] + block_idxs[i - 1] - crops_begin[i]);
     constraints.push_back(block_idxs[i - 1] < block_shape[i]);
   }
-  auto O = edsl::TensorOutput(O_dims);
-  O(O_idxs) = I(I_idxs);
-  O.add_constraints(constraints);
+  edsl::Tensor O =
+      edsl::Contraction().outShape(O_dims).outAccess(O_idxs).assign(I(I_idxs)).add_constraints(constraints);
 
   return edsl::make_tuple(O);
 });

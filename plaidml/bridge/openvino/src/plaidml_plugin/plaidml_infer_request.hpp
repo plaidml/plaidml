@@ -7,11 +7,13 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "cpp_interfaces/impl/ie_infer_request_internal.hpp"
 
 #include "ngraph/descriptor/tensor.hpp"
 
+#include "plaidml/core/core.h"
 #include "plaidml/edsl/edsl.h"
 #include "plaidml/exec/exec.h"
 
@@ -22,9 +24,7 @@ class PlaidMLInferRequest : public InferenceEngine::InferRequestInternal {
   using Ptr = std::shared_ptr<PlaidMLInferRequest>;
 
   explicit PlaidMLInferRequest(const InferenceEngine::InputsDataMap& networkInputs,
-                               const InferenceEngine::OutputsDataMap& networkOutputs,
-                               const plaidml::edsl::Program& program,
-                               const std::map<std::string, plaidml::edsl::Tensor>& tensorIONameMap);
+                               const InferenceEngine::OutputsDataMap& networkOutputs, const plaidml::Program& program);
 
   void InferImpl() override;
 
@@ -37,9 +37,10 @@ class PlaidMLInferRequest : public InferenceEngine::InferRequestInternal {
   void SyncOutput();
 
  private:
-  std::map<std::string, plaidml::edsl::Tensor> tensorIONameMap_;
-  plaidml::exec::Binder binder_;
+  plaidml::Program program_;
   std::shared_ptr<plaidml::exec::Executable> exec_;
+  std::vector<plaidml::Buffer> input_buffers_;
+  std::vector<plaidml::Buffer> output_buffers_;
 };
 
 }  // namespace PlaidMLPlugin

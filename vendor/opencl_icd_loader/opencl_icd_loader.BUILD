@@ -61,8 +61,8 @@ cc_library(
     linkopts = opencl_icd_loader_lnks,
     linkstatic = 1,
     local_defines = select({
-        "@bazel_tools//src/conditions:windows": [],
-        "//conditions:default": ["HAVE___SECURE_GETENV"],
+        "@bazel_tools//src/conditions:linux_x86_64": ["HAVE_SECURE_GETENV"],
+        "//conditions:default": [],
     }),
     deps = ["@opencl_headers"],
 )

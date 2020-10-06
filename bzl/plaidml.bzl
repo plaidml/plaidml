@@ -1,5 +1,6 @@
 # Copyright 2020 Intel Corporation.
 
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "cc_test", "objc_library")
 load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
 
 PLAIDML_COPTS = select({
@@ -38,33 +39,19 @@ def clean_dep(dep):
     return str(Label(dep))
 
 def plaidml_cc_library(copts = [], **kwargs):
-    native.cc_library(copts = PLAIDML_COPTS + copts, **kwargs)
+    cc_library(copts = PLAIDML_COPTS + copts, **kwargs)
 
 def plaidml_objc_library(copts = [], linkopts = [], **kwargs):
-    native.objc_library(copts = PLAIDML_COPTS + copts + ["-Wno-shorten-64-to-32"], **kwargs)
+    objc_library(copts = PLAIDML_COPTS + copts + ["-Wno-shorten-64-to-32"], **kwargs)
 
 def plaidml_cc_binary(copts = [], linkopts = [], **kwargs):
-    native.cc_binary(copts = PLAIDML_COPTS + copts, linkopts = PLAIDML_LINKOPTS + linkopts, **kwargs)
+    cc_binary(copts = PLAIDML_COPTS + copts, linkopts = PLAIDML_LINKOPTS + linkopts, **kwargs)
 
-def plaidml_cc_test(
-        name,
-        args = [],
-        copts = [],
-        deps = [],
-        data = [],
-        linkopts = [],
-        toolchains = [],
-        visibility = [],
-        **kwargs):
-    native.cc_test(
-        name = name,
-        args = args,
+def plaidml_cc_test(copts = [], deps = [], linkopts = [], **kwargs):
+    cc_test(
         copts = PLAIDML_COPTS + copts,
         deps = deps + [clean_dep("//pmlc/testing:gtest_main")],
-        data = data,
         linkopts = PLAIDML_LINKOPTS + linkopts,
-        toolchains = toolchains,
-        visibility = visibility,
         **kwargs
     )
 

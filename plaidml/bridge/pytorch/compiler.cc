@@ -50,8 +50,7 @@ edsl::Tensor addmm(const std::vector<edsl::Value>& args) {
   edsl::TensorIndex i, j, k;
   B.bind_dims(I, K);
   C.bind_dims(K, J);
-  auto O = edsl::TensorOutput(I, J);
-  O(i, j) += B(i, k) * C(k, j);
+  Tensor O = edsl::Contraction().outShape(I, J).outAccess(i, j).sum(B(i, k) * C(k, j));
   return beta * A + alpha * O;
 }
 
@@ -259,8 +258,10 @@ edsl::Tensor avg_pool2d(const std::vector<edsl::Value>& args) {
   auto K1 = kernel_size[1].as_int();
   auto S0 = strides[0].as_int();
   auto S1 = strides[1].as_int();
-  auto O = edsl::TensorOutput(N, C, (H + 2 * P0 - K0) / S0 + 1, (W + 2 * P1 - K1) / S1 + 1);
-  O(n, c, h, w) += I(n, c, S0 * h + i, S1 * w + j);
+  Tensor O = edsl::Contraction()
+                 .outShape(N, C, (H + 2 * P0 - K0) / S0 + 1, (W + 2 * P1 - K1) / S1 + 1)
+                 .outAccess(n, c, h, w)
+                 .sum(I(n, c, S0 * h + i, S1 * w + j));
   O.add_constraints({i < K0, j < K1});
   return O / (K0 * K1);
 }
@@ -350,11 +351,11 @@ edsl::Tensor max_pool2d(const std::vector<edsl::Value>& args) {
   auto S1 = strides[1].as_int();
   auto D0 = dilation[0].as_int();
   auto D1 = dilation[1].as_int();
-  auto O = edsl::TensorOutput(N, C,                                       //
-                              (H + 2 * P0 - D0 * (K0 - 1) - 1) / S0 + 1,  //
-                              (W + 2 * P1 - D1 * (K1 - 1) - 1) / S1 + 1);
-  O(n, c, h, w) >= I(n, c, S0 * h + k0 - P0, S1 * w + k1 - P1);
-  O.add_constraints({k0 < K0, k1 < K1});
+  Tensor O = edsl::Contraction
+                 .outShape(N, C, (H + 2 * P0 - D0 * (K0 - 1) - 1) / S0 + 1, (W + 2 * P1 - D1 * (K1 - 1) - 1) / S1 + 1)
+                 .outAccess(n, c, h, w)
+                 .max(I(n, c, S0 * h + k0 - P0, S1 * w + k1 - P1))
+                 .add_constraints({k0 < K0, k1 < K1});
   return O;
 }
 
@@ -418,9 +419,7 @@ edsl::Tensor transpose(const std::vector<edsl::Value>& args) {
   edsl::TensorDim X, Y;
   edsl::TensorIndex x, y;
   I.bind_dims(X, Y);
-  auto O = edsl::TensorOutput(Y, X);
-  O(y, x) = I(x, y);
-  return O;
+  return edsl::Contraction().outShape(Y, X).outAccess(y, x).assign(I(x, y));
 }
 
 // aten::linear(Tensor input, Tensor weight, Tensor? bias) -> Tensor
@@ -440,8 +439,7 @@ edsl::Tensor linear(const std::vector<edsl::Value>& args) {
   edsl::TensorIndex i, j, k;
   input.bind_dims(I, K);
   weight.bind_dims(J, K);
-  auto O = edsl::TensorOutput(I, J);
-  O(i, j) += input(i, k) * weight(j, k);
+  Tensor O = edsl::Contraction.outShape(I, J).outAccess(i, j).sum(input(i, k) * weight(j, k));
   if (!bias.is_none()) {
     O = bias.as_tensor() + O;
   }

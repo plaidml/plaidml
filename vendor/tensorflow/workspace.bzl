@@ -23,6 +23,13 @@ def plaidml_tf_workspace():
     )
 
     http_archive(
+        name = "tfhub_i3d_kinetics_400",
+        url = "https://storage.googleapis.com/tfhub-modules/deepmind/i3d-kinetics-400/1.tar.gz",
+        sha256 = "bafe29bb4528badad428207d8fe86ca2a998b5b1386b82e42175339f12ea2ff5",
+        build_file = clean_dep("//vendor/tensorflow:tfhub_i3d_kinetics_400.BUILD"),
+    )
+
+    http_archive(
         name = "kinetics-i3d",
         url = "https://github.com/deepmind/kinetics-i3d/archive/efebe2eb948cb8a3d2601b6a7ee1af9986a4aedf.zip",
         sha256 = "4c7d9a32390a7b49865444beae96278c264b5eab8e111e63b8e20753e3ea3dde",

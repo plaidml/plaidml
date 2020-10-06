@@ -37,6 +37,7 @@
 using namespace mlir; // NOLINT[build/namespaces]
 using pmlc::compiler::Program;
 using pmlc::rt::Executable;
+using pmlc::util::BufferPtr;
 
 static LogicalResult runMLIRPasses(ModuleOp module) {
   PassManager passManager(module.getContext());
@@ -95,8 +96,9 @@ int JitRunnerMain(int argc, char **argv) {
 
   runMLIRPasses(*program->module);
 
-  auto executable = Executable::fromProgram(
-      program, options.optDeviceID.getValue(), ArrayRef<void *>{});
+  auto executable =
+      Executable::fromProgram(program, options.optDeviceID.getValue(),
+                              ArrayRef<BufferPtr>{}, ArrayRef<BufferPtr>{});
   executable->invoke();
 
   return EXIT_SUCCESS;

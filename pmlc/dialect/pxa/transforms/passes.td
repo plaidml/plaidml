@@ -55,7 +55,10 @@ def Fusion : FunctionPass<"pxa-fusion"> {
     Option<"memoryActivityThreshold", "mem-threshold", "int64_t",
            /*default=*/"0",
            "Prevent over-fusion by specifying the maximum memory activity "
-           "(alloc, read, write) allowed">
+           "(alloc, read, write) allowed">,
+    Option<"exactlyMatch", "exactly-match", "bool",
+           /*default=*/"false",
+           "Whether fuse the loops with exactly matched indices">,
   ];
 }
 

@@ -1,4 +1,4 @@
-# Copyright 2019 Intel Corporation.
+# Copyright 2019 Intel Corporation
 
 import logging
 
@@ -29,15 +29,10 @@ def list_devices():
 class Executable(ForeignObject):
     __ffi_del__ = lib.plaidml_executable_free
 
-    def __init__(self, program, inputs=[], outputs=[], device=None):
-        if device is None:
-            device = plaidml.settings.get('PLAIDML_DEVICE')
-
-        def wrap(x, y):
-            return ffi.new('plaidml_binding*', [x.as_ptr(), y.as_ptr()])
-
-        inputs = [wrap(x, y) for x, y in inputs]
-        outputs = [wrap(x, y) for x, y in outputs]
+    def __init__(self, program, inputs=[], outputs=[], device=''):
+        # logger.debug('Executable({}, {})'.format(inputs, outputs))
+        inputs = [x.as_ptr() for x in inputs]
+        outputs = [x.as_ptr() for x in outputs]
         ffi_obj = ffi_call(
             lib.plaidml_jit,
             program.as_ptr(),
@@ -53,58 +48,21 @@ class Executable(ForeignObject):
         self._methodcall(lib.plaidml_executable_run)
 
 
-class Binder:
+class Runner(object):
 
-    def __init__(self, program, device=None):
+    def __init__(self, program, device=''):
+        program.compile()
         self.program = program
-        if device is None:
-            device = plaidml.settings.get('PLAIDML_DEVICE')
-        self.device = device
-        self.inputs = {arg.ref: arg.buffer for arg in program.inputs if arg.buffer}
-        self.outputs = {arg.ref: arg.buffer for arg in program.outputs if arg.buffer}
+        self.inputs = [plaidml.Buffer(shape) for shape in program.inputs]
+        self.outputs = [plaidml.Buffer(shape) for shape in program.outputs]
+        self.executable = Executable(program, self.inputs, self.outputs, device=device)
 
-    def input(self, tensor):
-        if isinstance(tensor, edsl.Tensor):
-            tensor = edsl.TensorRef(tensor)
-        return self.inputs.get(tensor)
-
-    def output(self, tensor):
-        if isinstance(tensor, edsl.Tensor):
-            tensor = edsl.TensorRef(tensor)
-        return self.outputs.get(tensor)
-
-    def set_input(self, tensor, buffer):
-        if isinstance(tensor, edsl.Tensor):
-            tensor = edsl.TensorRef(tensor)
-        self.inputs[tensor] = buffer
-        return self
-
-    def set_output(self, tensor, buffer):
-        if isinstance(tensor, edsl.Tensor):
-            tensor = edsl.TensorRef(tensor)
-        self.outputs[tensor] = buffer
-        return self
-
-    def compile(self):
-        inputs = [(x.ref.tensor, self._get_buffer(self.inputs, x)) for x in self.program.inputs]
-        outputs = [(x.ref.tensor, self._get_buffer(self.outputs, x)) for x in self.program.outputs]
-        return Executable(self.program, inputs, outputs, device=self.device)
-
-    def _get_buffer(self, map, arg):
-        buffer = map.get(arg.ref)
-        if buffer:
-            return buffer
-        buffer = plaidml.Buffer(arg.shape.into_TensorShape(), device=self.device)
-        map[arg.ref] = buffer
-        return buffer
+    def run(self, inputs):
+        for ndarray, buffer in zip(inputs, self.inputs):
+            buffer.copy_from_ndarray(ndarray)
+        self.executable.run()
+        return [buffer.as_ndarray() for buffer in self.outputs]
 
 
-def run(program, inputs, device=None):
-    binder = Binder(program, device=device)
-    executable = binder.compile()
-    for tensor, data in inputs:
-        buffer = binder.input(tensor)
-        data = np.array(data, dtype=buffer.shape.dtype.into_numpy())
-        buffer.copy_from_ndarray(data)
-    executable.run()
-    return [binder.output(x.ref).as_ndarray() for x in program.outputs]
+def run(program, inputs, device=''):
+    return Runner(program, device=device).run(inputs)
