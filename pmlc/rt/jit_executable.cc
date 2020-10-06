@@ -330,7 +330,7 @@ struct StopWatch {
 class JitExecutable final : public Executable {
 public:
   JitExecutable(const std::shared_ptr<Program> &program,
-                std::shared_ptr<Device> device, ArrayRef<void *> preParams,
+                std::shared_ptr<Device> device,
                 ArrayRef<util::BufferPtr> inputBuffers,
                 ArrayRef<util::BufferPtr> outputBuffers)
       : program(program), device(std::move(device)) {
@@ -387,7 +387,7 @@ public:
       throw std::runtime_error("jitEntry function is null");
     }
 
-    std::copy(preParams.begin(), preParams.end(), std::back_inserter(ptrs));
+    ptrs.push_back(this->device.get());
 
     for (auto [type, buffer] : llvm::zip(program->inputs, inputBuffers)) {
       descriptors.emplace_back(buffer->data(), type.cast<RankedTensorType>());
@@ -429,10 +429,10 @@ private:
 
 std::unique_ptr<Executable>
 makeJitExecutable(const std::shared_ptr<Program> &program,
-                  std::shared_ptr<Device> device, ArrayRef<void *> preParams,
+                  std::shared_ptr<Device> device,
                   ArrayRef<util::BufferPtr> inputBuffers,
                   ArrayRef<util::BufferPtr> outputBuffers) {
-  return std::make_unique<JitExecutable>(program, std::move(device), preParams,
+  return std::make_unique<JitExecutable>(program, std::move(device),
                                          inputBuffers, outputBuffers);
 }
 

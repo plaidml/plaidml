@@ -48,8 +48,7 @@ std::unique_ptr<Executable>
 OpenCLDevice::compile(const std::shared_ptr<pmlc::compiler::Program> &program,
                       mlir::ArrayRef<util::BufferPtr> inputBuffers,
                       mlir::ArrayRef<util::BufferPtr> outputBuffers) {
-  return makeJitExecutable(program, shared_from_this(),
-                           mlir::ArrayRef<void *>{this}, inputBuffers,
+  return makeJitExecutable(program, shared_from_this(), inputBuffers,
                            outputBuffers);
 }
 

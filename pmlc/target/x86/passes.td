@@ -12,6 +12,11 @@ def ConvertPXAToAffine : Pass<"x86-convert-pxa-to-affine", "mlir::ModuleOp"> {
   ];
 }
 
+def AddDeviceParameter : Pass<"x86-add-device-parameter", "mlir::ModuleOp"> {
+  let summary = "Add an unused Device parameter, to provide a consistent ABI";
+  let constructor = "pmlc::target::x86::createAddDeviceParameterPass()";
+}
+
 def ConvertStandardToLLVM : Pass<"x86-convert-std-to-llvm", "mlir::ModuleOp"> {
   let summary = "Convert StandardX + XSMM dialects to LLVM dialect";
   let constructor = "pmlc::target::x86::createLowerToLLVMPass()";

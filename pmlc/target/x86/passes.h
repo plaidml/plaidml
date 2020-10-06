@@ -16,6 +16,8 @@ namespace pmlc::target::x86 {
 
 std::unique_ptr<mlir::Pass> createLowerPXAToAffinePass();
 
+std::unique_ptr<mlir::Pass> createAddDeviceParameterPass();
+
 std::unique_ptr<mlir::Pass> createLowerToLLVMPass();
 
 std::unique_ptr<mlir::Pass> createTraceLinkingPass();
