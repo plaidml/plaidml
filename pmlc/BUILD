@@ -24,8 +24,8 @@ filegroup(
         "//pmlc/dialect/stdx/tests:all",
         "//pmlc/dialect/tile/tests:all",
         "//pmlc/dialect/xsmm/tests:all",
-        "//pmlc/rt/tests:all",
         "//pmlc/rt/opencl/tests:all",
+        "//pmlc/rt/tests:all",
         "//pmlc/rt/vulkan/tests:all",
         "//pmlc/target/intel_gen/tests:all",
         "//pmlc/target/x86/tests:all",
@@ -35,12 +35,12 @@ filegroup(
 
 plaidml_cc_test(
     name = "test",
+    size = "small",
     srcs = ["test.cc"],
     deps = [
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Transforms",
     ],
-    size = "small",
 )
 
 plaidml_cc_library(
@@ -75,7 +75,33 @@ plaidml_cc_library(
         "//pmlc/target/intel_gen",
         "//pmlc/target/intel_gen_ocl_spirv",
         "//pmlc/target/x86",
-        "@llvm-project//mlir:AllPassesAndDialectsNoRegistration",
+        "@llvm-project//mlir:Affine",
+        "@llvm-project//mlir:AffineToStandard",
+        "@llvm-project//mlir:AffineTransforms",
+        "@llvm-project//mlir:GPUDialect",
+        "@llvm-project//mlir:GPUTransforms",
+        "@llvm-project//mlir:LLVMDialect",
+        "@llvm-project//mlir:LLVMIRTransforms",
+        "@llvm-project//mlir:LinalgOps",
+        "@llvm-project//mlir:LinalgToLLVM",
+        "@llvm-project//mlir:LinalgToStandard",
+        "@llvm-project//mlir:LinalgTransforms",
+        "@llvm-project//mlir:OpenMPDialect",
+        "@llvm-project//mlir:OpenMPToLLVM",
+        "@llvm-project//mlir:SCFDialect",
+        "@llvm-project//mlir:SCFToGPUPass",
+        "@llvm-project//mlir:SCFToStandard",
+        "@llvm-project//mlir:SCFTransforms",
+        "@llvm-project//mlir:SPIRVDialect",
+        "@llvm-project//mlir:SPIRVLowering",
+        "@llvm-project//mlir:SPIRVSerialization",
+        "@llvm-project//mlir:SPIRVToLLVM",
+        "@llvm-project//mlir:StandardOps",
+        "@llvm-project//mlir:StandardOpsTransforms",
+        "@llvm-project//mlir:StandardToLLVM",
+        "@llvm-project//mlir:StandardToSPIRVTransforms",
+        "@llvm-project//mlir:Transforms",
+        "@llvm-project//mlir:VectorOps",
     ],
 )
 

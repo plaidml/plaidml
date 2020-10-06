@@ -38,8 +38,7 @@ namespace edsl = plaidml::edsl;
 namespace plaidml_op = plaidml::op;
 
 plaidml::Buffer makeBuffer(const plaidml::TensorShape& shape, const void* data) {
-  std::string curDevice = ::plaidml::Settings::get("PLAIDML_DEVICE");
-  plaidml::Buffer buffer(curDevice, shape);
+  plaidml::Buffer buffer(shape);
   buffer.copy_from(data);
   return buffer;
 }
@@ -61,13 +60,6 @@ static std::unordered_map<xla::PrimitiveType, plaidml::DType> pml_dtype_map = {
 
 namespace xla {
 namespace plaidml {
-
-static std::unique_ptr<edsl::Program> makeProgram(const std::string& name, const std::vector<edsl::Tensor>& outputs) {
-  VLOG(1) << "makeProgram begin";
-  auto program = absl::make_unique<edsl::Program>(edsl::ProgramBuilder(name, outputs));
-  VLOG(1) << "Generated program:\n" << (*program).str();
-  return std::move(program);
-}
 
 static std::string legalize_computation_name(const std::string& cname) {
   std::string result;
@@ -111,7 +103,7 @@ std::string PlaidMLCompiler::HumanString(const Shape& shape) {
 }
 
 // Translate HLO Module to EDSL
-StatusOr<std::unique_ptr<edsl::Program>> PlaidMLCompiler::ProgramFromHloModule(std::unique_ptr<HloModule> hlo_module) {
+StatusOr<::plaidml::Program> PlaidMLCompiler::ProgramFromHloModule(std::unique_ptr<HloModule> hlo_module) {
   VLOG(2) << "ORIGINAL HLO MODULE:\n" << hlo_module->ToString();
 
   std::unordered_map<int, edsl::Tensor> instr_map;
@@ -138,9 +130,6 @@ StatusOr<std::unique_ptr<edsl::Program>> PlaidMLCompiler::ProgramFromHloModule(s
            Match(c->root_instruction(), match::Minimum(match::Parameter(), match::Parameter()));
   };
 
-  // TODO: may be unnecessary because TF has the kParameter opcode which instantiates Placeholder creation.
-  // std::vector<Tensor> inputs;
-
   VLOG(1) << "ProgramFromHloModule begin";
 
   VLOG(1) << "result_shape" << hlo_module->result_shape().ToString();
@@ -164,6 +153,7 @@ StatusOr<std::unique_ptr<edsl::Program>> PlaidMLCompiler::ProgramFromHloModule(s
     */
   }
 
+  std::vector<edsl::Tensor> inputs;
   for (auto* computation : hlo_module->computations()) {
     VLOG(2) << "Computation name" << computation->name() << " num_parameters " << computation->num_parameters()
             << " returns " << computation->root_instruction()->shape().ToString();
@@ -204,11 +194,10 @@ StatusOr<std::unique_ptr<edsl::Program>> PlaidMLCompiler::ProgramFromHloModule(s
       // TODO: validate that all these general parameters are correct before constructing them into a larger program.
       switch (instruction->opcode()) {
         case HloOpcode::kConstant: {
-          auto tshape = ::plaidml::TensorShape(type, dims);
-          auto lshape = edsl::LogicalShape(type, dims);
+          ::plaidml::TensorShape shape(type, dims);
           const Literal& literal = instruction->literal();
-          auto buf = makeBuffer(tshape, literal.untyped_data());
-          auto op = Constant(lshape, buf, meta_name);
+          auto buf = makeBuffer(shape, literal.untyped_data());
+          auto op = edsl::Constant(buf, meta_name);
           instr_map.insert(std::make_pair(cur_instr_id, op));
           break;
         }
@@ -463,10 +452,9 @@ StatusOr<std::unique_ptr<edsl::Program>> PlaidMLCompiler::ProgramFromHloModule(s
           }
           std::vector<int> x(total_dims);
           std::iota(x.begin(), x.end(), 0);
-          auto tshape = ::plaidml::TensorShape(type, dims);
-          auto lshape = edsl::LogicalShape(type, dims);
-          auto buf = makeBuffer(tshape, x.data());
-          auto op = Constant(lshape, buf);
+          auto shape = ::plaidml::TensorShape(type, dims);
+          auto buf = makeBuffer(shape, x.data());
+          auto op = edsl::Constant(buf, "iota");
           instr_map.insert(std::make_pair(cur_instr_id, op));
           break;
         }
@@ -573,6 +561,7 @@ StatusOr<std::unique_ptr<edsl::Program>> PlaidMLCompiler::ProgramFromHloModule(s
           // Tensor inputs, create a placeholder
           auto op = edsl::Placeholder(type, dims);
           instr_map.insert(std::make_pair(cur_instr_id, op));
+          inputs.push_back(op);
           break;
         }
         case HloOpcode::kReshape: {
@@ -708,9 +697,9 @@ StatusOr<std::unique_ptr<edsl::Program>> PlaidMLCompiler::ProgramFromHloModule(s
     output = fn_returns[legalize_computation_name(hlo_module->entry_computation()->name())].as_tensor();
   }
 
-  auto program = makeProgram("hlo_module", {output});
-  VLOG(1) << "ProgramFromHloModule complete";
-  return std::move(program);
+  auto program = edsl::buildProgram("hlo_module", inputs, {output});
+  VLOG(1) << "Generated program:\n" << program.str();
+  return program;
 }
 
 }  // namespace plaidml

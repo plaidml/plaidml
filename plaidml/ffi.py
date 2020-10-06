@@ -44,6 +44,16 @@ def decode_str(ptr):
     return None
 
 
+def decode_list(ffi_list, ffi_free, fn, *args):
+    list = ffi_call(ffi_list, *args)
+    if fn is None:
+        fn = lambda x: x
+    try:
+        return [fn(list.elts[i]) for i in range(list.size)]
+    finally:
+        ffi_call(ffi_free, list)
+
+
 class Error(Exception):
 
     def __init__(self, err):

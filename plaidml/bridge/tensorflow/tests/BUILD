@@ -132,9 +132,12 @@ genrule(
     name = "i3d_test_genrule",
     testonly = 1,
     outs = ["i3d.pml"],
-    cmd = "$(location :i3d_test_gen) $@",
+    cmd = "$(location :i3d_test_gen) $(location @tfhub_i3d_kinetics_400//:saved_model.pb) $@",
     tags = ["skip_windows"],
-    tools = [":i3d_test_gen"],
+    tools = [
+        ":i3d_test_gen",
+        "@tfhub_i3d_kinetics_400//:saved_model.pb",
+    ],
 )
 
 tf_cc_test(
@@ -143,7 +146,10 @@ tf_cc_test(
     data = [":i3d_test_genrule"],
     extra_copts = ["-fexceptions"],
     linkstatic = 1,
-    tags = ["skip_windows"],
+    tags = [
+        "manual",
+        "skip_windows",
+    ],
     deps = [
         ":archive_cc_fbs",
         ":codegen_test",

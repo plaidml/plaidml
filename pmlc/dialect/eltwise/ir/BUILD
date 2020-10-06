@@ -8,7 +8,6 @@ package(default_visibility = ["//visibility:public"])
 filegroup(
     name = "td_files",
     srcs = [
-        "interfaces.td",
         "predicates.td",
         "//pmlc/util:td_files",
         "@llvm-project//mlir:OpBaseTdFiles",
@@ -16,37 +15,11 @@ filegroup(
 )
 
 gentbl(
-    name = "gen-interfaces",
-    tbl_outs = [
-        (
-            "-gen-op-interface-decls",
-            "interfaces.h.inc",
-        ),
-        (
-            "-gen-op-interface-defs",
-            "interfaces.cc.inc",
-        ),
-    ],
-    tblgen = "@llvm-project//mlir:mlir-tblgen",
-    td_file = "interfaces.td",
-    td_srcs = [":td_files"],
-)
-
-gentbl(
     name = "gen-ops",
     tbl_outs = [
-        (
-            "-gen-op-decls",
-            "ops.h.inc",
-        ),
-        (
-            "-gen-op-defs",
-            "ops.cc.inc",
-        ),
-        (
-            "-gen-dialect-decls",
-            "dialect.h.inc",
-        ),
+        ("-gen-op-decls", "ops.h.inc"),
+        ("-gen-op-defs", "ops.cc.inc"),
+        ("-gen-dialect-decls", "dialect.h.inc"),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "ops.td",
@@ -66,7 +39,6 @@ plaidml_cc_library(
         "util.h",
     ],
     deps = [
-        ":gen-interfaces",
         ":gen-ops",
         "//pmlc/util",
         "@llvm-project//llvm:Support",

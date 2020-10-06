@@ -58,9 +58,8 @@ static OpRegistration reg("depthtospace", [](const Context& ctx) {
     O_idxs.push_back(block_size * I_idxs[i] + block_idxs[i - 2]);
     constraints.push_back(block_idxs[i - 2] < block_size);
   }
-  auto O = edsl::TensorOutput(O_dims);
-  O(O_idxs) = I(I_idxs);
-  O.add_constraints(constraints);
+  edsl::Tensor O =
+      edsl::Contraction().outShape(O_dims).outAccess(O_idxs).assign(I(I_idxs)).add_constraints(constraints);
 
   return edsl::make_tuple(O);
 });

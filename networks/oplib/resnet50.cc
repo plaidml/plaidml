@@ -19,6 +19,7 @@ using llvm::ArrayRef;
 using llvm::SmallVector;
 using llvm::StringRef;
 using plaidml::DType;
+using plaidml::Program;
 
 edsl::Tensor block(             //
     const edsl::Tensor& I_raw,  //
@@ -217,7 +218,7 @@ std::vector<edsl::Tensor> bias_placeholders() {
   };
 }
 
-edsl::Program build(int64_t batch_size, const edsl::Tensor& I, ArrayRef<edsl::Tensor> W, ArrayRef<edsl::Tensor> B) {
+Program build(int64_t batch_size, const edsl::Tensor& I, ArrayRef<edsl::Tensor> W, ArrayRef<edsl::Tensor> B) {
   auto W_conv1 = W[0];
   auto B_conv1 = B[0];
   auto conv1 = op::convolution(I, W_conv1)
@@ -309,16 +310,33 @@ edsl::Program build(int64_t batch_size, const edsl::Tensor& I, ArrayRef<edsl::Te
   auto B_dense = B[53];
   auto dense = op::dot(global_mean, W_dense) + B_dense;
   auto softmax = op::softmax(dense, 1);
-  return edsl::ProgramBuilder("resnet50", {edsl::trace(softmax, "done")}).compile();
+  auto O = edsl::trace(softmax, "done");
+  std::vector<edsl::Tensor> inputs{I};
+  inputs.insert(inputs.end(), W.begin(), W.end());
+  inputs.insert(inputs.end(), B.begin(), B.end());
+  return edsl::buildProgram("resnet50", inputs, {O});
 }
 
 }  // namespace
 
-edsl::Program buildResnet50(int64_t batch_size) {
+Program buildResnet50(int64_t batch_size) {
   auto I = edsl::Placeholder(DType::FLOAT32, {batch_size, 224, 224, 3});
   auto W = weight_placeholders();
   auto B = bias_placeholders();
   return build(batch_size, I, W, B);
+}
+
+plaidml::exec::Executable createDefaultExecutable(plaidml::Program program) {
+  program.compile();
+  std::vector<plaidml::Buffer> inputs;
+  for (const plaidml::TensorShape& shape : program.inputs()) {
+    inputs.emplace_back(shape);
+  }
+  std::vector<plaidml::Buffer> outputs;
+  for (const plaidml::TensorShape& shape : program.outputs()) {
+    outputs.emplace_back(shape);
+  }
+  return plaidml::exec::Executable(program, inputs, outputs);
 }
 
 }  // namespace networks::oplib

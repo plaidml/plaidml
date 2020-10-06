@@ -13,7 +13,8 @@ class Device final : public pmlc::rt::Device,
 public:
   std::unique_ptr<Executable>
   compile(const std::shared_ptr<pmlc::compiler::Program> &program,
-          mlir::ArrayRef<void *> bufptrs) final;
+          mlir::ArrayRef<util::BufferPtr> inputBuffers,
+          mlir::ArrayRef<util::BufferPtr> outputBuffers) final;
 };
 
 } // namespace pmlc::rt::llvm
