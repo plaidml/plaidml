@@ -31,10 +31,12 @@ std::unique_ptr<BinaryModulesMap> getEmptyModulesMap();
 mlir::LogicalResult serializeSpirvKernels(mlir::ModuleOp &op,
                                           BinaryModulesMap &map);
 
-/// Populates type conversion patterns that can be used across
-/// lowerings for multiple runtimes.
+/// Populates type and operation conversion patterns that are common to all
+/// comp lowerings.
 void populateCommonPatterns(mlir::MLIRContext *context,
-                            mlir::TypeConverter &typeConverter);
+                            mlir::TypeConverter &typeConverter,
+                            mlir::TypeConverter &signatureConverter,
+                            mlir::OwningRewritePatternList &patterns);
 
 /// Adds declarations of functions common across lowerings
 /// to specified top-level module.
