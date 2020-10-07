@@ -332,7 +332,8 @@ public:
   JitExecutable(const std::shared_ptr<Program> &program,
                 std::shared_ptr<Device> device,
                 ArrayRef<util::BufferPtr> inputBuffers,
-                ArrayRef<util::BufferPtr> outputBuffers)
+                ArrayRef<util::BufferPtr> outputBuffers,
+                bool addDeviceParameter)
       : program(program), device(std::move(device)) {
     static std::once_flag is_initialized;
     std::call_once(is_initialized, []() {
@@ -387,7 +388,9 @@ public:
       throw std::runtime_error("jitEntry function is null");
     }
 
-    ptrs.push_back(this->device.get());
+    if (addDeviceParameter) {
+      ptrs.push_back(this->device.get());
+    }
 
     for (auto [type, buffer] : llvm::zip(program->inputs, inputBuffers)) {
       descriptors.emplace_back(buffer->data(), type.cast<RankedTensorType>());
@@ -427,13 +430,13 @@ private:
 
 } // namespace
 
-std::unique_ptr<Executable>
-makeJitExecutable(const std::shared_ptr<Program> &program,
-                  std::shared_ptr<Device> device,
-                  ArrayRef<util::BufferPtr> inputBuffers,
-                  ArrayRef<util::BufferPtr> outputBuffers) {
+std::unique_ptr<Executable> makeJitExecutable(
+    const std::shared_ptr<Program> &program, std::shared_ptr<Device> device,
+    ArrayRef<util::BufferPtr> inputBuffers,
+    ArrayRef<util::BufferPtr> outputBuffers, bool addDeviceParameter) {
   return std::make_unique<JitExecutable>(program, std::move(device),
-                                         inputBuffers, outputBuffers);
+                                         inputBuffers, outputBuffers,
+                                         addDeviceParameter);
 }
 
 } // namespace pmlc::rt

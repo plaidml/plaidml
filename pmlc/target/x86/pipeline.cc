@@ -58,38 +58,6 @@ struct LowerPXAToAffinePass
   }
 };
 
-struct AddDeviceParameterPass final
-    : public AddDeviceParameterBase<AddDeviceParameterPass> {
-  void runOnOperation() final {
-    // N.B. This implementation currently assumes that there's exactly one
-    // non-external FuncOp. If this invariant fails to hold, we'll need to
-    // modify it to explicitly look for the main function, after we remove all
-    // traces of support for having an entrypoint called anything other than
-    // "main".
-    bool foundMainOp = false;
-    getOperation().walk([&](FuncOp op) {
-      if (op.isExternal()) {
-        return WalkResult::advance();
-      }
-      if (foundMainOp) {
-        op.emitError(
-            "Expected only a single non-external function during lowering");
-        signalPassFailure();
-        return WalkResult::interrupt();
-      }
-      auto ty = op.getType();
-      auto llvmPtrTy = LLVMType::getInt8PtrTy(op.getContext());
-      std::vector<mlir::Type> inputs{llvmPtrTy};
-      inputs.insert(inputs.end(), ty.getInputs().begin(), ty.getInputs().end());
-      op.setType(
-          mlir::FunctionType::get(inputs, ty.getResults(), op.getContext()));
-      auto &block = op.front();
-      block.insertArgument(0u, llvmPtrTy);
-      return WalkResult::advance();
-    });
-  }
-};
-
 struct ConvertStandardToLLVMPass
     : public ConvertStandardToLLVMBase<ConvertStandardToLLVMPass> {
   void runOnOperation() override {
@@ -133,10 +101,6 @@ std::unique_ptr<Pass> createXSMMStencilPass() {
 
 std::unique_ptr<Pass> createLowerPXAToAffinePass() {
   return std::make_unique<LowerPXAToAffinePass>();
-}
-
-std::unique_ptr<Pass> createAddDeviceParameterPass() {
-  return std::make_unique<AddDeviceParameterPass>();
 }
 
 std::unique_ptr<Pass> createLowerToLLVMPass() {
@@ -184,7 +148,6 @@ void pipelineBuilder(OpPassManager &pm) {
     pm.addPass(pmlc::dialect::stdx::createBoundsCheckPass());
   }
 
-  pm.addPass(createAddDeviceParameterPass());
   pm.addPass(createLowerToLLVMPass());
   pm.addPass(createTraceLinkingPass());
 }
