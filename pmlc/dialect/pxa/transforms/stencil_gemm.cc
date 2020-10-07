@@ -62,7 +62,7 @@ private:
   unsigned numThreads;
   std::string strategy;
   StencilCostFunction stencilCostFn;
-  std::string kStrategy_StridedBRGEMM = "strided_brgemm";
+  std::string kStrategy_StridedBRGEMM = std::string("strided_brgemm");
 
   Optional<LoadStoreOps> capture() {
     // Looking for load..load..mul..reduce..terminator
@@ -454,11 +454,11 @@ struct StencilGEMMPass : public PassWrapper<StencilGEMMPass, FunctionPass> {
 };
 
 std::unique_ptr<Pass> createStencilGEMMPass(unsigned numThreads,
-                                            std::string strategy,
+                                            llvm::StringRef strategy,
                                             StencilCostFunction costFn) {
   IVLOG(3, "numThreads: " << numThreads);
   IVLOG(3, "strategy: " << strategy);
-  return std::make_unique<StencilGEMMPass>(numThreads, strategy, costFn);
+  return std::make_unique<StencilGEMMPass>(numThreads, strategy.str(), costFn);
 }
 
 } // namespace pmlc::dialect::pxa

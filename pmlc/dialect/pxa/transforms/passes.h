@@ -4,7 +4,6 @@
 
 #include <functional>
 #include <memory>
-#include <string>
 
 #include "mlir/Pass/Pass.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -28,7 +27,8 @@ std::unique_ptr<mlir::Pass> createBufferPlacementPass();
 std::unique_ptr<mlir::Pass> createCachePass();
 
 std::unique_ptr<mlir::Pass>
-createFusionPass(int64_t memoryActivityThreshold = 0, bool exactlyMatch = false);
+createFusionPass(int64_t memoryActivityThreshold = 0,
+                 bool exactlyMatch = false);
 
 std::unique_ptr<mlir::Pass> createGPUThreadPass();
 std::unique_ptr<mlir::Pass> createGPUThreadPass(unsigned maxThreads);
@@ -43,7 +43,7 @@ std::unique_ptr<mlir::Pass> createNestLoopsPass(unsigned minLoopIVs);
 std::unique_ptr<mlir::Pass> createResizeTmpsPass();
 
 std::unique_ptr<mlir::Pass> createStencilGEMMPass(unsigned numThreads,
-                                                  std::string strategy,
+                                                  llvm::StringRef strategy,
                                                   StencilCostFunction costFn);
 
 std::unique_ptr<mlir::Pass> createSubgroupsPass();
