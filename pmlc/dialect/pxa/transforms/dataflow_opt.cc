@@ -22,7 +22,7 @@ struct MemRefAccess {
     getAccessMap(op.getAffineMap(), op.getMapOperands(), &accessMap);
   }
 
-  explicit MemRefAccess(PxaWriteOpInterface op) {
+  explicit MemRefAccess(PxaReduceOpInterface op) {
     getAccessMap(op.getAffineMap(), op.getMapOperands(), &accessMap);
   }
 
@@ -55,9 +55,8 @@ struct MemRefDataFlowOptPass
         return;
       }
 
-      auto reduceOp = dyn_cast_or_null<PxaWriteOpInterface>(defOp);
-      // TODO: move the agg to PxaWriteOpInterface
-      if (!reduceOp /* || reduceOp.getAgg() != AtomicRMWKind::assign*/) {
+      auto reduceOp = dyn_cast_or_null<PxaReduceOpInterface>(defOp);
+      if (!reduceOp || reduceOp.getAgg() != AtomicRMWKind::assign) {
         return;
       }
 

@@ -86,7 +86,7 @@ def PxaReadOpInterface : PxaOpInterface<"PxaReadOpInterface"> {
   ];
 }
 
-def PxaWriteOpInterface : PxaOpInterface<"PxaWriteOpInterface"> {
+def PxaReduceOpInterface : PxaOpInterface<"PxaReduceOpInterface"> {
   let description = [{
       Interface to query characteristics of write-like ops with affine
       restrictions.
@@ -161,6 +161,17 @@ def PxaWriteOpInterface : PxaOpInterface<"PxaWriteOpInterface"> {
       /*defaultImplementation=*/[{
         ConcreteOp op = cast<ConcreteOp>(this->getOperation());
         return op.getOperand(op.getStoredValOperandIndex());
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/"Returns the agg.",
+      /*retTy=*/"::mlir::AtomicRMWKind",
+      /*methodName=*/"getAgg",
+      /*args=*/(ins),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        ConcreteOp op = cast<ConcreteOp>(this->getOperation());
+        return op.getAgg();
       }]
     >,
   ];

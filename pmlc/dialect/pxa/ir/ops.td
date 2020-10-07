@@ -28,7 +28,7 @@ def AnyStdScalar : AnyTypeOf<[AnyFloat, AnySignlessInteger]> {}
 
 class PxaReduceOpBase<string mnemonic, list<OpTrait> traits = []> :
     PXA_OpWithPP<mnemonic, !listconcat(traits,
-        [DeclareOpInterfaceMethods<PxaWriteOpInterface>])> {
+        [DeclareOpInterfaceMethods<PxaReduceOpInterface>])> {
 
   code extraClassDeclarationBase = [{
     Value getMemRef() { return memref(); }
@@ -41,6 +41,7 @@ class PxaReduceOpBase<string mnemonic, list<OpTrait> traits = []> :
     AffineMapAttr getAffineMapAttr() {
       return getAttr(getMapAttrName()).cast<AffineMapAttr>();
     }
+    AtomicRMWKind getAgg() { return agg(); }
   }];
 }
 

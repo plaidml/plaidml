@@ -22,8 +22,8 @@ namespace pmlc::dialect::pxa {
 
 namespace {
 
-using WriteRead = std::pair<Operation *, Operation *>;
-using WriteWrite = std::pair<Operation *, Operation *>;
+using WriteRead = std::pair<PxaReduceOpInterface, PxaReadOpInterface>;
+using WriteWrite = std::pair<PxaReduceOpInterface, PxaReduceOpInterface>;
 
 struct FusionInfo {
   struct AffineParallelInfo {
@@ -62,10 +62,10 @@ struct FusionInfo {
   }
 
   // Helper method to find the original source write of a state update.
-  static Operation *findSourceWrite(Value val) {
+  static PxaReduceOpInterface findSourceWrite(Value val) {
     auto opRes = val.dyn_cast<OpResult>();
     auto owner = opRes.getOwner();
-    if (isa<PxaWriteOpInterface>(owner)) {
+    if (isa<PxaReduceOpInterface>(owner)) {
       return owner;
     }
     if (auto op = dyn_cast<AffineParallelOp>(owner)) {
@@ -376,7 +376,7 @@ struct FusionInfo {
         // bail.
         if (isa<PxaReadOpInterface>(user)) {
           readAfterWrites.emplace_back(write, user);
-        } else if (isa<PxaWriteOpInterface>(user)) {
+        } else if (isa<PxaReduceOpInterface>(user)) {
           writeAfterWrites.emplace_back(write, user);
         } else {
           user->emitRemark("Op is not a load or reduce");
@@ -385,16 +385,12 @@ struct FusionInfo {
       }
     }
     // For each raw & waw, consider the plan
-    for (auto &raw : readAfterWrites) {
-      auto write = cast<PxaWriteOpInterface>(raw.first);
-      auto read = cast<PxaReadOpInterface>(raw.second);
-      considerPlan(write, read);
-    }
-    for (auto &waw : writeAfterWrites) {
-      auto write = cast<PxaWriteOpInterface>(waw.first);
-      auto write2 = cast<PxaWriteOpInterface>(waw.second);
-      considerPlan(write, write2);
-    }
+    for (auto &raw : readAfterWrites)
+      considerPlan(raw.first, raw.second);
+
+    for (auto &waw : writeAfterWrites)
+      considerPlan(waw.first, waw.second);
+
     return hasPlan;
   }
 
@@ -552,8 +548,6 @@ struct FusionInfo {
     };
     fixupLoops(aInfo.op, aToNew);
     fixupLoops(bInfo.op, bToNew);
-
-    IVLOG(3, "!!!!!!!!!!!!!!!!:\n\n\n" << debugString(*apC));
 
     return apC;
   }
