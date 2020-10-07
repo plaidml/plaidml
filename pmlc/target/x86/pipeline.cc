@@ -94,7 +94,6 @@ static pxa::StencilCost heatmapCostTransposed(ArrayRef<int64_t> tile) {
 
 std::unique_ptr<Pass> createXSMMStencilPass() {
   auto numThreads = std::thread::hardware_concurrency();
-  IVLOG(3, "Stenciling numThreads: " + numThreads);
   llvm::StringRef defaultStrategy = llvm::StringRef("simple");
   return pxa::createStencilGEMMPass(numThreads, defaultStrategy,
                                     heatmapCostTransposed);
