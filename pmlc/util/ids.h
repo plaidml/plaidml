@@ -6,8 +6,8 @@
 namespace pmlc {
 
 static constexpr const char kEntrypoint[] = "main";
-static constexpr const char kSetup[] = "setup";
-static constexpr const char kExecute[] = "execute";
-static constexpr const char kTeardown[] = "teardown";
+static constexpr const char kPlaidmlInit[] = "plaidml_init";
+static constexpr const char kPlaidmlExecute[] = "plaidml_execute";
+static constexpr const char kPlaidmlFini[] = "plaidml_fini";
 
 } // namespace pmlc

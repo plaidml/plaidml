@@ -26,9 +26,9 @@ private:
   void initMembers();
   mlir::FuncOp getNetworkEntry();
 
-  void makeSetup(mlir::OpBuilder &builder);
-  void makeExecute(mlir::OpBuilder &builder, mlir::FuncOp entryFunc);
-  void makeTeardown(mlir::OpBuilder &builder);
+  void makePlaidmlInit(mlir::OpBuilder &builder);
+  void makePlaidmlExecute(mlir::OpBuilder &builder, mlir::FuncOp entryFunc);
+  void makePlaidmlFini(mlir::OpBuilder &builder);
 
   LLVMType llvmInt32Type;
   LLVMType llvmPtrTy;
@@ -43,9 +43,9 @@ void MakeEntrypointsPass::runOnOperation() {
 
   initMembers();
   mlir::OpBuilder builder(getOperation().getBody()->getTerminator());
-  makeSetup(builder);
-  makeExecute(builder, entryFunc);
-  makeTeardown(builder);
+  makePlaidmlInit(builder);
+  makePlaidmlExecute(builder, entryFunc);
+  makePlaidmlFini(builder);
 }
 
 void MakeEntrypointsPass::initMembers() {
@@ -80,16 +80,17 @@ mlir::FuncOp MakeEntrypointsPass::getNetworkEntry() {
   return entryFunc;
 }
 
-void MakeEntrypointsPass::makeSetup(mlir::OpBuilder &builder) {
+void MakeEntrypointsPass::makePlaidmlInit(mlir::OpBuilder &builder) {
   // This method builds:
   //
-  //   Device* setup(Device* device) {
+  //   Device* plaidml_init(Device* device) {
   //     return device;
   //   }
   //
   // This is a rather trivial function; the plan is to expand it later.
   auto func = builder.create<mlir::FuncOp>(
-      getLoc(), kSetup, builder.getFunctionType({llvmPtrTy}, {llvmPtrTy}));
+      getLoc(), kPlaidmlInit,
+      builder.getFunctionType({llvmPtrTy}, {llvmPtrTy}));
   auto block = func.addEntryBlock();
   mlir::OpBuilder::InsertionGuard guard(builder);
   builder.setInsertionPointToStart(block);
@@ -97,11 +98,11 @@ void MakeEntrypointsPass::makeSetup(mlir::OpBuilder &builder) {
       getLoc(), mlir::ArrayRef<mlir::Value>{block->getArgument(0)});
 }
 
-void MakeEntrypointsPass::makeExecute(mlir::OpBuilder &builder,
-                                      mlir::FuncOp entryFunc) {
+void MakeEntrypointsPass::makePlaidmlExecute(mlir::OpBuilder &builder,
+                                             mlir::FuncOp entryFunc) {
   // This method builds:
   //
-  //   void execute(Device* device, memref...) {
+  //   void plaidml_execute(Device* device, memref...) {
   //     // N.B. main() may not take a Device parameter.
   //     main(device, memref...);
   //   }
@@ -121,7 +122,7 @@ void MakeEntrypointsPass::makeExecute(mlir::OpBuilder &builder,
     inputTypes.push_back(ty);
   }
   auto func = builder.create<mlir::FuncOp>(
-      getLoc(), kExecute, builder.getFunctionType(inputTypes, {}));
+      getLoc(), kPlaidmlExecute, builder.getFunctionType(inputTypes, {}));
   auto block = func.addEntryBlock();
   mlir::OpBuilder::InsertionGuard guard(builder);
   builder.setInsertionPointToStart(block);
@@ -136,7 +137,7 @@ void MakeEntrypointsPass::makeExecute(mlir::OpBuilder &builder,
   builder.create<mlir::ReturnOp>(getLoc(), mlir::ArrayRef<mlir::Value>{});
 }
 
-void MakeEntrypointsPass::makeTeardown(mlir::OpBuilder &builder) {
+void MakeEntrypointsPass::makePlaidmlFini(mlir::OpBuilder &builder) {
   // This method builds:
   //
   //   void teardown(Device* device) {
@@ -144,7 +145,7 @@ void MakeEntrypointsPass::makeTeardown(mlir::OpBuilder &builder) {
   //
   // This is a rather trivial function; the plan is to expand it later.
   auto func = builder.create<mlir::FuncOp>(
-      getLoc(), kTeardown, builder.getFunctionType({llvmPtrTy}, {}));
+      getLoc(), kPlaidmlFini, builder.getFunctionType({llvmPtrTy}, {}));
   auto block = func.addEntryBlock();
   mlir::OpBuilder::InsertionGuard guard(builder);
   builder.setInsertionPointToStart(block);
