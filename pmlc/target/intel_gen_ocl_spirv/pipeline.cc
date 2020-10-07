@@ -32,6 +32,7 @@
 #include "pmlc/dialect/tile/transforms/passes.h"
 #include "pmlc/target/intel_gen/passes.h"
 #include "pmlc/target/intel_gen_ocl_spirv/passes.h"
+#include "pmlc/transforms/passes.h"
 
 using namespace mlir; // NOLINT[build/namespaces]
 
@@ -119,6 +120,9 @@ void pipelineBuilder(OpPassManager &pm) {
 
   // Comp to LLVM - OpenCL function calls.
   pm.addPass(pmlc::conversion::comp_to_llvm::createConvertCompToOclPass());
+
+  // Add standard entrypoints.
+  pm.addPass(pmlc::transforms::createMakeEntrypointsPass());
 
   // Convert to LLVM code.
   pm.addPass(pmlc::target::intel_gen::createConvertStandardToLLVM());

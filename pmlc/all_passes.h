@@ -26,6 +26,7 @@
 #include "pmlc/target/intel_gen/passes.h"
 #include "pmlc/target/intel_gen_ocl_spirv/passes.h"
 #include "pmlc/target/x86/passes.h"
+#include "pmlc/transforms/passes.h"
 
 // This function may be called to register the MLIR passes with the
 // global registry.
@@ -77,4 +78,7 @@ inline void registerAllPasses() {
   pmlc::target::x86::registerPasses();
   pmlc::target::intel_gen::registerPasses();
   pmlc::target::intel_gen_ocl_spirv::registerPasses();
+
+  // Transform passes
+  pmlc::transforms::registerPasses();
 }

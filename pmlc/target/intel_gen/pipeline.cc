@@ -30,6 +30,7 @@
 #include "pmlc/target/intel_gen/pass_detail.h"
 #include "pmlc/target/intel_gen/passes.h"
 #include "pmlc/target/x86/passes.h"
+#include "pmlc/transforms/passes.h"
 
 using namespace mlir; // NOLINT[build/namespaces]
 
@@ -183,6 +184,9 @@ void pipelineBuilder(OpPassManager &pm) {
 
   // GPU to Vulkan.
   pm.addPass(conversion::gpu::createConvertGpuLaunchFuncToVulkanCallsPass());
+
+  // Add standard entrypoints.
+  pm.addPass(pmlc::transforms::createMakeEntrypointsPass());
 
   // Convert Vulkan calls to LLVM code
   pm.addPass(createConvertStandardToLLVM());

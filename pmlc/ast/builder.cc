@@ -23,6 +23,7 @@
 #include "pmlc/ast/eval.h"
 #include "pmlc/dialect/eltwise/ir/ops.h"
 #include "pmlc/dialect/tile/ir/ops.h"
+#include "pmlc/util/ids.h"
 #include "pmlc/util/logging.h"
 
 using namespace mlir; // NOLINT
@@ -36,8 +37,6 @@ namespace eltwise = pmlc::dialect::eltwise;
 namespace tile = pmlc::dialect::tile;
 
 namespace {
-
-static constexpr const char *kEntrypoint = "main";
 
 class OpBuilder : public mlir::OpBuilder {
 public:

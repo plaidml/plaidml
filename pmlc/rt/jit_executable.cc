@@ -38,6 +38,7 @@
 #include "pmlc/rt/runtime.h"
 #include "pmlc/rt/symbol_registry.h"
 #include "pmlc/util/env.h"
+#include "pmlc/util/ids.h"
 #include "pmlc/util/logging.h"
 
 using namespace mlir; // NOLINT[build/namespaces]
@@ -81,8 +82,7 @@ static std::string makeCWrapperFunctionName(StringRef name) {
 // Define an interface function that wraps all the arguments of the original
 // function and all its results into an i8** pointer to provide a unified
 // invocation interface.
-static std::string packFunctionArguments(llvm::Module *module,
-                                         StringRef entry) {
+static void packFunctionArguments(llvm::Module *module, StringRef entry) {
   auto &ctx = module->getContext();
   llvm::IRBuilder<> builder(ctx);
   auto funcName = makeCWrapperFunctionName(entry);
@@ -120,8 +120,6 @@ static std::string packFunctionArguments(llvm::Module *module,
 
   // The interface function returns void.
   builder.CreateRetVoid();
-
-  return newName;
 }
 
 namespace {
@@ -166,13 +164,23 @@ private:
   std::vector<char> memory;
 };
 
-using Function = void (*)(void **);
+using Network = void;
+using SetupFunc = Network *(*)(Device *);
+using ExecuteFunc = void (*)(void ** /* Network* followed by descriptor ptrs*/);
+using TeardownFunc = void (*)(Network *);
+
+struct ABI {
+  SetupFunc setupFunc = nullptr;
+  ExecuteFunc executeFunc = nullptr;
+  TeardownFunc teardownFunc = nullptr;
+
+  bool operator!() { return !setupFunc || !executeFunc || !teardownFunc; }
+};
 
 struct EngineImpl {
   virtual ~EngineImpl() = default;
-  virtual Function compile(std::unique_ptr<llvm::Module> module,
-                           std::unique_ptr<llvm::LLVMContext> ctx,
-                           StringRef entryPoint) = 0;
+  virtual ABI compile(std::unique_ptr<llvm::Module> module,
+                      std::unique_ptr<llvm::LLVMContext> ctx) = 0;
 };
 
 static void *tryResolveSymbol(StringRef symbol) {
@@ -214,9 +222,8 @@ struct MCJITEngineImpl : EngineImpl {
     }
   };
 
-  Function compile(std::unique_ptr<llvm::Module> module,
-                   std::unique_ptr<llvm::LLVMContext> ctx,
-                   StringRef entryPoint) final {
+  ABI compile(std::unique_ptr<llvm::Module> module,
+              std::unique_ptr<llvm::LLVMContext> ctx) final {
     std::string error;
     std::unique_ptr<llvm::LegacyJITSymbolResolver> resolver(new Runtime);
     engine = std::unique_ptr<llvm::ExecutionEngine>(
@@ -233,21 +240,30 @@ struct MCJITEngineImpl : EngineImpl {
 
     engine->finalizeObject();
 
-    uint64_t addr = engine->getFunctionAddress(entryPoint.str());
+    ABI abi;
+    abi.setupFunc = getFunc<SetupFunc>(makeCWrapperFunctionName(kSetup));
+    abi.executeFunc = getFunc<ExecuteFunc>(makePackedFunctionName(kExecute));
+    abi.teardownFunc =
+        getFunc<TeardownFunc>(makeCWrapperFunctionName(kTeardown));
+    return abi;
+  }
+
+  template <typename Func>
+  Func getFunc(const std::string &name) {
+    uint64_t addr = engine->getFunctionAddress(name);
     if (!addr) {
       throw std::runtime_error(
-          llvm::formatv("Entry point not found: {0}", entryPoint.str()));
+          llvm::formatv("Entry point not found: {0}", name));
     }
-    return reinterpret_cast<Function>(addr);
+    return reinterpret_cast<Func>(addr);
   }
 
   std::unique_ptr<llvm::ExecutionEngine> engine;
 };
 
 struct OrcJITEngineImpl : EngineImpl {
-  Function compile(std::unique_ptr<llvm::Module> module,
-                   std::unique_ptr<llvm::LLVMContext> ctx,
-                   StringRef entryPoint) final {
+  ABI compile(std::unique_ptr<llvm::Module> module,
+              std::unique_ptr<llvm::LLVMContext> ctx) final {
     using llvm::orc::DynamicLibrarySearchGenerator;
     using llvm::orc::MangleAndInterner;
     using llvm::orc::SymbolMap;
@@ -283,13 +299,23 @@ struct OrcJITEngineImpl : EngineImpl {
         cantFail(DynamicLibrarySearchGenerator::GetForCurrentProcess(
             dataLayout.getGlobalPrefix())));
 
+    ABI abi;
+    abi.setupFunc = getFunc<SetupFunc>(makeCWrapperFunctionName(kSetup));
+    abi.executeFunc = getFunc<ExecuteFunc>(makePackedFunctionName(kExecute));
+    abi.teardownFunc =
+        getFunc<TeardownFunc>(makeCWrapperFunctionName(kTeardown));
+    return abi;
+  }
+
+  template <typename Func>
+  Func getFunc(mlir::StringRef name) {
     // JIT lookup may return an Error referring to strings stored internally by
     // the JIT. If the Error outlives the ExecutionEngine, it would want have a
     // dangling reference, which is currently caught by an assertion inside JIT
     // thanks to hand-rolled reference counting. Rewrap the error message into a
     // string before returning. Alternatively, ORC JIT should consider copying
     // the string into the error message.
-    auto expectedSymbol = jit->lookup(entryPoint);
+    auto expectedSymbol = jit->lookup(name);
     if (!expectedSymbol) {
       std::string errorMessage;
       llvm::raw_string_ostream os(errorMessage);
@@ -299,7 +325,7 @@ struct OrcJITEngineImpl : EngineImpl {
     }
 
     auto addr = expectedSymbol->getAddress();
-    return reinterpret_cast<Function>(addr);
+    return reinterpret_cast<Func>(addr);
   }
 
   std::unique_ptr<llvm::orc::LLJIT> jit;
@@ -332,8 +358,7 @@ public:
   JitExecutable(const std::shared_ptr<Program> &program,
                 std::shared_ptr<Device> device,
                 ArrayRef<util::BufferPtr> inputBuffers,
-                ArrayRef<util::BufferPtr> outputBuffers,
-                bool addDeviceParameter)
+                ArrayRef<util::BufferPtr> outputBuffers)
       : program(program), device(std::move(device)) {
     static std::once_flag is_initialized;
     std::call_once(is_initialized, []() {
@@ -377,20 +402,19 @@ public:
     }
 
     setupTargetTriple(llvmModule.get());
-    auto entryPoint = packFunctionArguments(llvmModule.get(), program->entry);
+    packFunctionArguments(llvmModule.get(), kExecute);
 
     if (VLOG_IS_ON(6)) {
       llvmModule->print(llvm::errs(), nullptr);
     }
 
-    jitEntry = impl->compile(std::move(llvmModule), std::move(ctx), entryPoint);
-    if (!jitEntry) {
-      throw std::runtime_error("jitEntry function is null");
+    abi = impl->compile(std::move(llvmModule), std::move(ctx));
+    if (!abi) {
+      throw std::runtime_error("Entrypoint functions not found");
     }
 
-    if (addDeviceParameter) {
-      ptrs.push_back(this->device.get());
-    }
+    network = abi.setupFunc(this->device.get());
+    ptrs.push_back(network);
 
     for (auto [type, buffer] : llvm::zip(program->inputs, inputBuffers)) {
       descriptors.emplace_back(buffer->data(), type.cast<RankedTensorType>());
@@ -412,12 +436,14 @@ public:
     if (VLOG_IS_ON(1)) {
       stopWatch.start();
     }
-    jitEntry(ptrs.data());
+    abi.executeFunc(ptrs.data());
     if (VLOG_IS_ON(1)) {
       stopWatch.stop();
       IVLOG(1, "Execution time: " << stopWatch.delta_ms() << "ms");
     }
   }
+
+  ~JitExecutable() { abi.teardownFunc(network); }
 
 private:
   std::shared_ptr<Program> program;
@@ -425,18 +451,19 @@ private:
   std::unique_ptr<EngineImpl> impl;
   std::vector<MemRefDescriptor> descriptors;
   std::vector<void *> ptrs;
-  Function jitEntry;
+  ABI abi;
+  void *network = nullptr;
 };
 
 } // namespace
 
-std::unique_ptr<Executable> makeJitExecutable(
-    const std::shared_ptr<Program> &program, std::shared_ptr<Device> device,
-    ArrayRef<util::BufferPtr> inputBuffers,
-    ArrayRef<util::BufferPtr> outputBuffers, bool addDeviceParameter) {
+std::unique_ptr<Executable>
+makeJitExecutable(const std::shared_ptr<Program> &program,
+                  std::shared_ptr<Device> device,
+                  ArrayRef<util::BufferPtr> inputBuffers,
+                  ArrayRef<util::BufferPtr> outputBuffers) {
   return std::make_unique<JitExecutable>(program, std::move(device),
-                                         inputBuffers, outputBuffers,
-                                         addDeviceParameter);
+                                         inputBuffers, outputBuffers);
 }
 
 } // namespace pmlc::rt

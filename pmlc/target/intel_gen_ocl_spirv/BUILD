@@ -41,6 +41,7 @@ plaidml_cc_library(
         "//pmlc/rt/opencl",
         "//pmlc/target/x86:prng_lowering",
         "//pmlc/target/intel_gen",
+        "//pmlc/transforms",
         "@llvm-project//mlir:AffineToStandardTransforms",
         "@llvm-project//mlir:GPUToSPIRVTransforms",
         "@llvm-project//mlir:GPUToVulkanTransforms",

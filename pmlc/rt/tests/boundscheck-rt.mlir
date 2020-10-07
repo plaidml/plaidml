@@ -1,4 +1,5 @@
-// RUN: pmlc-opt -stdx-check-bounds -convert-std-to-llvm='emit-c-wrappers' %s | pmlc-jit | FileCheck %s
+// RUN: pmlc-opt -stdx-check-bounds -pmlc-make-entrypoints -convert-std-to-llvm='emit-c-wrappers' -print-ir-after-all %s \
+// RUN: | pmlc-jit | FileCheck %s
 
 func @main() {
   %c0 = constant 0 : index

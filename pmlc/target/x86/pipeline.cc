@@ -22,6 +22,7 @@
 #include "pmlc/target/x86/heatmap.h"
 #include "pmlc/target/x86/pass_detail.h"
 #include "pmlc/target/x86/passes.h"
+#include "pmlc/transforms/passes.h"
 #include "pmlc/util/env.h"
 #include "pmlc/util/logging.h"
 
@@ -31,8 +32,6 @@ namespace pmlc::target::x86 {
 
 namespace pxa = dialect::pxa;
 namespace xsmm = dialect::xsmm;
-
-using LLVMType = LLVM::LLVMType;
 
 namespace {
 
@@ -148,6 +147,7 @@ void pipelineBuilder(OpPassManager &pm) {
     pm.addPass(pmlc::dialect::stdx::createBoundsCheckPass());
   }
 
+  pm.addPass(pmlc::transforms::createMakeEntrypointsPass());
   pm.addPass(createLowerToLLVMPass());
   pm.addPass(createTraceLinkingPass());
 }

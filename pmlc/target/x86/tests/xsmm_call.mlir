@@ -1,11 +1,14 @@
 // RUN: pmlc-opt -convert-linalg-to-loops -x86-convert-pxa-to-affine -lower-affine \
-// RUN:     -canonicalize -convert-scf-to-std -x86-convert-std-to-llvm %s | \
+// RUN:     -canonicalize -convert-scf-to-std -pmlc-make-entrypoints=main=baseline \
+// RUN:     -x86-convert-std-to-llvm %s | \
 // RUN:   pmlc-jit -e baseline | FileCheck %s
 // RUN: pmlc-opt -convert-linalg-to-loops -x86-convert-pxa-to-affine -lower-affine \
-// RUN:     -canonicalize -convert-scf-to-std -x86-convert-std-to-llvm %s | \
+// RUN:     -canonicalize -convert-scf-to-std -pmlc-make-entrypoints=main=tiled \
+// RUN:     -x86-convert-std-to-llvm %s | \
 // RUN:   pmlc-jit -e tiled | FileCheck %s
 // RUN: pmlc-opt -convert-linalg-to-loops -x86-convert-pxa-to-affine -lower-affine \
-// RUN:     -canonicalize -convert-scf-to-std -x86-convert-std-to-llvm %s | \
+// RUN:     -canonicalize -convert-scf-to-std -pmlc-make-entrypoints=main=xsmm \
+// RUN:     -x86-convert-std-to-llvm %s | \
 // RUN:   pmlc-jit -e xsmm | FileCheck %s
 
 !I_memref = type memref<1x6x5x7xf32>
