@@ -37,6 +37,7 @@
 using namespace mlir; // NOLINT[build/namespaces]
 using pmlc::compiler::Program;
 using pmlc::rt::Executable;
+using pmlc::util::BufferPtr;
 
 static LogicalResult runMLIRPasses(ModuleOp module) {
   PassManager passManager(module.getContext());
@@ -95,8 +96,9 @@ int JitRunnerMain(int argc, char **argv) {
 
   runMLIRPasses(*program->module);
 
-  auto executable = Executable::fromProgram(
-      program, options.optDeviceID.getValue(), ArrayRef<void *>{});
+  auto executable =
+      Executable::fromProgram(program, options.optDeviceID.getValue(),
+                              ArrayRef<BufferPtr>{}, ArrayRef<BufferPtr>{});
   executable->invoke();
 
   return EXIT_SUCCESS;
@@ -115,7 +117,9 @@ int main(int argc, char **argv) {
   llvm::llvm_shutdown_obj x;
   registerPassManagerCLOptions();
 
+  mlir::enableGlobalDialectRegistry(true);
   registerAllDialects();
+
   llvm::InitLLVM y(argc, argv);
   llvm::InitializeNativeTarget();
   llvm::InitializeNativeTargetAsmPrinter();

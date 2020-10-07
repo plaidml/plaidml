@@ -115,14 +115,14 @@ enum class PadMode {
   _LAST,
 };
 
-struct int_list {
-  int_list(const std::vector<int>& elts)  // NOLINT[runtime/explicit]
+struct Integers {
+  Integers(const std::vector<int>& elts)  // NOLINT[runtime/explicit]
       : value(edsl::make_tuple(elts)) {}
-  int_list(const std::vector<size_t>& elts)  // NOLINT[runtime/explicit]
+  Integers(const std::vector<size_t>& elts)  // NOLINT[runtime/explicit]
       : value(edsl::make_tuple(elts)) {}
-  int_list(const std::initializer_list<int>& elts)  // NOLINT[runtime/explicit]
+  Integers(const std::initializer_list<int>& elts)  // NOLINT[runtime/explicit]
       : value(edsl::make_tuple(std::vector<int>(elts))) {}
-  int_list(const std::initializer_list<size_t>& elts)  // NOLINT[runtime/explicit]
+  Integers(const std::initializer_list<size_t>& elts)  // NOLINT[runtime/explicit]
       : value(edsl::make_tuple(std::vector<size_t>(elts))) {}
 
   edsl::Value value;
@@ -184,22 +184,22 @@ class convolution {
         deriv_mode_(ConvDerivMode::NONE),
         infer_result_shape_(false) {}
 
-  convolution& strides(int_list elts) {
+  convolution& strides(Integers elts) {
     strides_ = elts.value;
     return *this;
   }
 
-  convolution& dilations(int_list elts) {
+  convolution& dilations(Integers elts) {
     dilations_ = elts.value;
     return *this;
   }
 
-  convolution& data_dilations(int_list elts) {
+  convolution& data_dilations(Integers elts) {
     data_dilations_ = elts.value;
     return *this;
   }
 
-  convolution& filter_shape(int_list elts) {
+  convolution& filter_shape(Integers elts) {
     filter_shape_ = elts.value;
     return *this;
   }
@@ -209,7 +209,7 @@ class convolution {
     return *this;
   }
 
-  convolution& manual_padding(int_list elts) {
+  convolution& manual_padding(Integers elts) {
     manual_padding_ = elts.value;
     return *this;
   }
@@ -254,7 +254,7 @@ class convolution {
     return *this;
   }
 
-  convolution& result_shape(int_list elts) {
+  convolution& result_shape(Integers elts) {
     result_shape_ = elts.value;
     return *this;
   }
@@ -331,7 +331,7 @@ inline edsl::Tensor elu(const edsl::Tensor& I, double alpha) {
 class explicit_padding {
  public:
   explicit explicit_padding(const edsl::Tensor& I, const std::vector<int>& lo_pads, const std::vector<int>& hi_pads)
-      : I_(I), lo_pads_(lo_pads), hi_pads_(hi_pads), mode_(PadMode::CONSTANT), padval_(0) {}
+      : I_(I), lo_pads_(lo_pads), hi_pads_(hi_pads), mode_(PadMode::CONSTANT), padval_(edsl::Constant(0)) {}
 
   explicit_padding& lo_pads(const std::vector<int>& lo_pads) {
     lo_pads_ = lo_pads;
@@ -348,9 +348,8 @@ class explicit_padding {
     return *this;
   }
 
-  template <typename T>
-  explicit_padding& padval(const T& padval) {
-    padval_ = edsl::Value(padval);
+  explicit_padding& padval(const edsl::Tensor& padval) {
+    padval_ = padval;
     return *this;
   }
 
@@ -365,7 +364,7 @@ class explicit_padding {
   std::vector<int> lo_pads_;
   std::vector<int> hi_pads_;
   PadMode mode_;
-  edsl::Value padval_;
+  edsl::Tensor padval_;
 };
 
 inline edsl::Tensor flip(const edsl::Tensor& I, int axis) {

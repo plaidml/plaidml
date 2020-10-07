@@ -1,8 +1,6 @@
 package(default_visibility = ["//visibility:public"])
 
-# This file is used for detecting secure_getenv, in which case it will contain
-# #define HAVE_SECURE_GETENV.
-# For now leave blank to fallback to getenv.
+# This file contains cmake-generated definitions.  We use local defines on the cc_library rule instead.
 genrule(
     name = "icd_cmake_config_gen",
     srcs = [],
@@ -57,8 +55,14 @@ opencl_icd_loader_lnks = select({
 cc_library(
     name = "opencl_icd_loader",
     srcs = opencl_icd_loader_srcs,
+    copts = ["-w"],
+    defines = ["CL_TARGET_OPENCL_VERSION=220"],
     includes = ["loader"],
     linkopts = opencl_icd_loader_lnks,
     linkstatic = 1,
+    local_defines = select({
+        "@bazel_tools//src/conditions:linux_x86_64": ["HAVE_SECURE_GETENV"],
+        "//conditions:default": [],
+    }),
     deps = ["@opencl_headers"],
 )

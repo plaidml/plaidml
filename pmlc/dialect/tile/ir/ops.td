@@ -4,8 +4,6 @@
 include "pmlc/dialect/tile/ir/base.td"
 #endif
 
-include "pmlc/dialect/tile/ir/builder.td"
-
 def ConstantOp : TileOpWithPPV<"constant", [ConstantLike, NoSideEffect]>, HasFolder {
   let summary = "constant operation";
   let arguments = (ins IndexAttr:$value);
@@ -75,6 +73,8 @@ def ContractionOp : TileOpWithPPV<"contract", [NoSideEffect]> {
     void setSink(AffineMap sink);
     void setSources(ArrayRef<AffineMap> srcs);
     void setConstraints(IntegerSet cons);
+
+    RankedTensorType getResultType() { return result().getType().cast<RankedTensorType>(); }
   }];
 }
 
@@ -90,7 +90,6 @@ def IndexOp : TileOp<"index", [NoSideEffect]>, HasCanonicalizer {
 
 class SpecialOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
     Op<TileDialect, mnemonic, !listconcat(traits, [
-      SpecialOpInterface,
       GenericBuilderInterface
   ])> {
 

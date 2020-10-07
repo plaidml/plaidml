@@ -36,8 +36,7 @@ struct AffineIndexPackPass : public AffineIndexPackBase<AffineIndexPackPass> {
     bool isThread = hasUnitTag(op, gpuThreadTag());
     bool isBlock = hasUnitTag(op, gpuBlockTag());
     bool isHardware = (isBlock || isThread);
-    auto subgroupSize = getIntegerTag(op, subgroupSizeTag(), 1);
-    unsigned maxDims = (isThread && subgroupSize > 1) ? 2 : 3;
+    unsigned maxDims = isThread ? 2 : 3;
     if (!isHardware ||
         (op.getIVs().size() <= maxDims && op.getIVs().size() != 0)) {
       // Doesn't need special handling

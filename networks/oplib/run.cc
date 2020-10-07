@@ -14,10 +14,12 @@ int main(int argc, char** argv) {
     plaidml::op::init();
     plaidml::exec::init();
     auto program = networks::oplib::buildResnet50();
-    // std::cout << program.str() << std::endl;
-    auto executable = plaidml::exec::Binder(program).compile();
+    std::cout << program.str() << std::endl;
+    auto exe = networks::oplib::createDefaultExecutable(program);
     std::cout << "Running..." << std::endl;
-    executable->run();
+#if !defined(_WIN32)
+    exe.run();
+#endif
     return EXIT_SUCCESS;
   } catch (const std::exception& ex) {
     std::cerr << "Caught unhandled exception: " << ex.what() << std::endl;

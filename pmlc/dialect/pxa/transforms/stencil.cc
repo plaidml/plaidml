@@ -142,7 +142,7 @@ void StencilBase::RecursiveBindIndex(
     RecursiveTileIndex(TensorAndIndexPermutation(ioOps, boundIdxs),
                        currTileSize, 0);
   } else {
-    for (const auto &blockArg : getBlockArgsAsSet()) {
+    for (const auto blockArg : getBlockArgsAsSet()) {
       // Don't bind same index twice
       // Note: While it's awkward to be repeatedly searching a vector, I think
       // boundIdxs is small enough that it would not be efficient to maintain a

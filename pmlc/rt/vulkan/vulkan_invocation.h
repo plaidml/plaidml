@@ -134,14 +134,14 @@ struct MemoryTransferAction : Action {
 // callbacks in wrappers.cc.
 class VulkanInvocation {
 public:
-  VulkanInvocation();
+  explicit VulkanInvocation(VulkanDevice *device);
   ~VulkanInvocation();
 
   void createLaunchKernelAction(uint8_t *shader, uint32_t size,
                                 const char *entryPoint,
                                 NumWorkGroups numWorkGroups);
 
-  void setLaunchKernelAction();
+  void setLaunchKernelAction(uint32_t subgroupSize);
 
   void addLaunchActionToSchedule();
 
@@ -150,18 +150,14 @@ public:
 
   void createMemoryTransferAction(VkBuffer src, VkBuffer dst, size_t size);
 
-  void submitCommandBuffers();
+  void run();
 
   /// Sets needed data for Vulkan device.
-  void setResourceData(const ResourceData &resData);
   void setResourceData(const DescriptorSetIndex desIndex,
                        const BindingIndex bindIndex,
                        const VulkanHostMemoryBuffer &hostMemBuffer);
 
 private:
-  void setResourceStorageClassBindingMap(
-      const ResourceStorageClassBindingMap &stClassData);
-
   void mapStorageClassToDescriptorType(mlir::spirv::StorageClass storageClass,
                                        VkDescriptorType &descriptorType);
 
@@ -171,15 +167,17 @@ private:
   void checkResourceData();
 
   void createMemoryBuffers();
+  void createQueryPool();
   void createShaderModule();
   void initDescriptorSetLayoutBindingMap();
   void createDescriptorSetLayout();
   void createPipelineLayout();
-  void createComputePipeline();
+  void createComputePipeline(uint32_t subgroupSize);
   void createDescriptorPool();
   void allocateDescriptorSets();
   void setWriteDescriptors();
   void createSchedule();
+  void getQueryPoolResults();
   void submitCommandBuffersToQueue();
   void updateHostMemoryBuffers();
 

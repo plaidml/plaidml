@@ -44,7 +44,7 @@ static OpRegistration reg("pad", [](const Context& ctx) {
   auto op = op::explicit_padding(I, lo_pads, hi_pads).mode(autopad_mode);
 
   if (ctx.operands.size() == 4) {
-    op.padval(edsl::Value(ctx.operands.at(0)));
+    op.padval(ctx.operands.at(3));
   }
 
   return edsl::make_tuple(op);

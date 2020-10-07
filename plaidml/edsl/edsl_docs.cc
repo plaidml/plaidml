@@ -8,25 +8,18 @@
 #include <gtest/gtest.h>
 
 #include "plaidml/edsl/edsl.h"
+#include "plaidml/testenv.h"
 
 namespace plaidml::edsl {
 
-namespace {
-
-Program makeProgram(const std::string& name, const std::vector<Tensor>& outputs) {
-  return ProgramBuilder(name, outputs).target("").compile();
-}
-
-}  // namespace
+class DocCppEdsl : public TestFixture {};
 
 // sum_over_axis_start
 Tensor SumOverAxis(const Tensor& I) {
   TensorDim M, N;
   TensorIndex m, n;
   I.bind_dims(M, N);
-  auto O = TensorOutput(N);
-  O(n) += I(m, n);  // contraction
-  return O;
+  return Contraction().outShape(N).outAccess(n).sum(I(m, n));  // contraction
 }
 // sum_over_axis_end
 
@@ -35,9 +28,7 @@ Tensor MaxOverAxis(const Tensor& I) {
   TensorDim M, N;
   TensorIndex m, n;
   I.bind_dims(M, N);
-  auto O = TensorOutput(N);
-  O(n) >= I(m, n);
-  return O;
+  return Contraction().outShape(N).outAccess(n).max(I(m, n));
 }
 // max_over_axis_end
 
@@ -47,9 +38,7 @@ Tensor MatMul(const Tensor& A, const Tensor& B) {
   TensorIndex i, j, k;
   A.bind_dims(I, K);
   B.bind_dims(K, J);
-  auto C = TensorOutput(I, J);
-  C(i, j) += A(i, k) * B(k, j);
-  return C;
+  return Contraction().outShape(I, J).outAccess(i, j).sum(A(i, k) * B(k, j));
 }
 // matmul_end
 
@@ -57,10 +46,8 @@ Tensor MatMul(const Tensor& A, const Tensor& B) {
 Tensor GlobalMin(const Tensor& I) {
   TensorIndex i, j, k;
   auto Neg = -I;
-  auto O_Neg = TensorOutput();
-  O_Neg() >= Neg(i, j, k);
-  auto O = -O_Neg;
-  return O;
+  Tensor O = Contraction().max(Neg(i, j, k));
+  return -O;
 }
 // global_min_end
 
@@ -69,8 +56,7 @@ Tensor Avg(const Tensor& I) {
   TensorDim X, Y;
   TensorIndex x, y;
   I.bind_dims(X, Y);
-  auto Sum = TensorOutput();
-  Sum(y) += I(x, y);
+  Tensor Sum = Contraction().outShape(Y).outAccess(y).sum(I(x, y));
   return Sum / X;
 }
 // avg_end
@@ -80,8 +66,7 @@ Tensor AvgStages(const Tensor& I) {
   TensorDim X, Y;
   TensorIndex x, y;
   I.bind_dims(X, Y);
-  auto Sum = TensorOutput();
-  Sum() += I(x, y);
+  Tensor Sum = Contraction().sum(I(x, y));
   auto PartialMean = Sum / X;
   return PartialMean / Y;
 }
@@ -92,8 +77,7 @@ Tensor AvgMerge(const Tensor& I) {
   TensorDim X, Y;
   TensorIndex x, y;
   I.bind_dims(X, Y);
-  auto Sum = TensorOutput();
-  Sum() += I(x, y);
+  Tensor Sum = Contraction().sum(I(x, y));
   return Sum / (X * Y);
 }
 // avg_merge_end
@@ -117,9 +101,7 @@ Tensor WrongMaxPool1D(const Tensor& I) {
   TensorDim N;
   TensorIndex i, j;
   I.bind_dims(N);
-  auto O = TensorOutput(N / 2);
-  O(i) >= I(2 * i + j);
-  return O;
+  return Contraction().outShape(N / 2).outAccess(i).max(I(2 * i + j));
 }
 // wrong_max_pool_end
 
@@ -128,9 +110,7 @@ Tensor ValidIndices(const Tensor& I) {
   TensorIndex i, j;
   // valid_indices_start
   I.bind_dims(N);
-  auto O = TensorOutput(N / 2);
-  O(i) >= I(2 * i + j);
-  O.add_constraint(j < 2);
+  Tensor O = Contraction().outShape(N / 2).outAccess(i).max(I(2 * i + j)).add_constraint(j < 2);
   // valid_indices_end
   return O;
 }
@@ -140,10 +120,7 @@ Tensor MaxPool1D(const Tensor& I) {
   TensorDim N;
   TensorIndex i, j;
   I.bind_dims(N);
-  auto O = TensorOutput(N / 2);
-  O(i) >= I(2 * i + j);
-  O.add_constraint(j < 2);
-  return O;
+  return Contraction().outShape(N / 2).outAccess(i).max(I(2 * i + j)).add_constraint(j < 2);
 }
 // max_pool_1d_end
 
@@ -152,10 +129,7 @@ Tensor MaxPool1DOdd(const Tensor& I) {
   TensorDim N;
   TensorIndex i, j;
   I.bind_dims(N);
-  auto O = TensorOutput((N + 1) / 2);
-  O(i) >= I(2 * i + j);
-  O.add_constraint(j < 2);
-  return O;
+  return Contraction().outShape((N + 1) / 2).outAccess(i).max(I(2 * i + j)).add_constraint(j < 2);
 }
 // max_pool_1d_odd_end
 
@@ -164,9 +138,7 @@ Tensor Skip(const Tensor& I) {
   TensorDim M, N;
   TensorIndex i, j;
   I.bind_dims(M, N);
-  auto O = TensorOutput(N);
-  O(2 * i) += I(2 * i, j);
-  return O;
+  return Contraction().outShape(N).outAccess(2 * i).sum(I(2 * i, j));
 }
 // skip_end
 
@@ -175,10 +147,7 @@ Tensor CumSum(const Tensor& I) {
   TensorDim N;
   TensorIndex i, k;
   I.bind_dims(N);
-  auto O = TensorOutput(N);
-  O(i) += I(k);
-  O.add_constraint(i - k < N);
-  return O;
+  return Contraction().outShape(N).outAccess(i).sum(I(k)).add_constraint(i - k < N);
 }
 // cumsum_end
 
@@ -188,9 +157,7 @@ Tensor Conv1D(const Tensor& I, const Tensor& K) {
   TensorIndex n, x, k, ci, co;
   I.bind_dims(N, X, CI);
   K.bind_dims(KX, CI, CO);
-  auto O = TensorOutput(N, X - KX + 1, CO);
-  O(n, x, co) += I(n, x + k, ci) * K(k, ci, co);
-  return O;
+  return Contraction().outShape(N, X - KX + 1, CO).outAccess(n, x, co).sum(I(n, x + k, ci) * K(k, ci, co));
 }
 // conv_1d_end
 
@@ -200,9 +167,10 @@ Tensor Conv2DDilated(const Tensor& I, const Tensor& K) {
   TensorIndex n, x, y, kx, ky, ci, co;
   I.bind_dims(N, X, Y, CI);
   K.bind_dims(KX, KY, CI, CO);
-  auto O = TensorOutput(N, X - 2 * (KX - 1), Y - 3 * (KY - 1), CO);
-  O(n, x, y, co) += I(n, x + 2 * kx, y + 3 * ky, ci) * K(kx, ky, ci, co);
-  return O;
+  return Contraction()
+      .outShape(N, X - 2 * (KX - 1), Y - 3 * (KY - 1), CO)
+      .outAccess(n, x, y, co)
+      .sum(I(n, x + 2 * kx, y + 3 * ky, ci) * K(kx, ky, ci, co));
 }
 // conv_2d_dilated_end
 
@@ -235,98 +203,98 @@ Tensor ComplexConv2D(const Tensor& I, const Tensor& K,
   for (size_t i = 0; i < P.size(); ++i) {
     P[i] = ((Y[i] - 1) * s[i] + EK[i] - X[i]) / 2;
   }
-  // Specify the output size
-  auto O = TensorOutput(N, Y[0], Y[1], G, GCO);
   // Compute the convolution
-  O(n, x[0], x[1], g, gco) +=
-      I(n, s[0] * x[0] + d[0] * k[0] - P[0], s[1] * x[1] + d[1] * k[1] - P[1], g, gci) * K(k[0], k[1], g, gci, gco);
-  return O;
+  return Contraction()
+      .outShape(N, Y[0], Y[1], G, GCO)
+      .outAccess(n, x[0], x[1], g, gco)
+      .sum(I(n, s[0] * x[0] + d[0] * k[0] - P[0], s[1] * x[1] + d[1] * k[1] - P[1], g, gci) *
+           K(k[0], k[1], g, gci, gco));
 }
 // complex_conv_end
 
-TEST(DocCppEdsl, SumOveAxis) {
+TEST_F(DocCppEdsl, SumOveAxis) {
   auto I = Placeholder(DType::UINT64, {3, 3});
-  makeProgram("sum_over_axis", {SumOverAxis(I)});
+  runProgram(makeProgram("sum_over_axis", {I}, {SumOverAxis(I)}));
 }
 
-TEST(DocCppEdsl, MaxOverAxis) {
+TEST_F(DocCppEdsl, MaxOverAxis) {
   auto I = Placeholder(DType::UINT64, {3, 3});
-  makeProgram("max_over_axis", {MaxOverAxis(I)});
+  runProgram(makeProgram("max_over_axis", {I}, {MaxOverAxis(I)}));
 }
 
-TEST(DocCppEdsl, MatMul) {
+TEST_F(DocCppEdsl, MatMul) {
   auto A = Placeholder(DType::UINT64, {3, 3});
   auto B = Placeholder(DType::UINT64, {3, 3});
-  makeProgram("mat_mul", {MatMul(A, B)});
+  runProgram(makeProgram("mat_mul", {A, B}, {MatMul(A, B)}));
 }
 
-TEST(DocCppEdsl, GlobalMin) {
+TEST_F(DocCppEdsl, GlobalMin) {
   auto I = Placeholder(DType::FLOAT32, {10, 10, 10}, "I");
-  makeProgram("global_min", {GlobalMin(I)});
+  runProgram(makeProgram("global_min", {I}, {GlobalMin(I)}));
 }
 
-TEST(DocCppEdsl, Avg) {
+TEST_F(DocCppEdsl, Avg) {
   auto I = Placeholder(DType::UINT64, {3, 3});
-  makeProgram("avg", {Avg(I)});
+  runProgram(makeProgram("avg", {I}, {Avg(I)}));
 }
 
-TEST(DocCppEdsl, AvgStages) {
+TEST_F(DocCppEdsl, AvgStages) {
   auto I = Placeholder(DType::UINT64, {3, 3});
-  makeProgram("avg_stages", {AvgStages(I)});
+  runProgram(makeProgram("avg_stages", {I}, {AvgStages(I)}));
 }
 
-TEST(DocCppEdsl, AvgMerge) {
+TEST_F(DocCppEdsl, AvgMerge) {
   auto I = Placeholder(DType::UINT64, {3, 3});
-  makeProgram("avg_merge", {AvgMerge(I)});
+  runProgram(makeProgram("avg_merge", {I}, {AvgMerge(I)}));
 }
 
-TEST(DocCppEdsl, WrongMaxPool1D) {
+TEST_F(DocCppEdsl, WrongMaxPool1D) {
+  auto I = Placeholder(DType::UINT64, {3});
+  makeProgram("wrong_max_pool_1d", {I}, {WrongMaxPool1D(I)});
+}
+
+TEST_F(DocCppEdsl, ValidIndices) {
+  auto I = Placeholder(DType::UINT64, {3});
+  runProgram(makeProgram("valid_indices", {I}, {ValidIndices(I)}));
+}
+
+TEST_F(DocCppEdsl, MaxPool1D) {
+  auto I = Placeholder(DType::UINT64, {3});
+  runProgram(makeProgram("max_pool_1d", {I}, {MaxPool1D(I)}));
+}
+
+TEST_F(DocCppEdsl, MaxPool1DOdd) {
+  auto I = Placeholder(DType::UINT64, {3});
+  runProgram(makeProgram("max_poo_1d_odd", {I}, {MaxPool1DOdd(I)}));
+}
+
+TEST_F(DocCppEdsl, Skip) {
   auto I = Placeholder(DType::UINT64, {3, 3});
-  makeProgram("wrong_max_pool_1d", {WrongMaxPool1D(I)});
+  runProgram(makeProgram("skip", {I}, {Skip(I)}));
 }
 
-TEST(DocCppEdsl, ValidIndices) {
-  auto I = Placeholder(DType::UINT64, {3, 3});
-  makeProgram("valid_indices", {ValidIndices(I)});
-}
-
-TEST(DocCppEdsl, MaxPool1D) {
-  auto I = Placeholder(DType::UINT64, {3, 3});
-  makeProgram("max_pool_1d", {MaxPool1D(I)});
-}
-
-TEST(DocCppEdsl, MaxPool1DOdd) {
-  auto I = Placeholder(DType::UINT64, {3, 3});
-  makeProgram("max_poo_1d_odd", {MaxPool1DOdd(I)});
-}
-
-TEST(DocCppEdsl, Skip) {
-  auto I = Placeholder(DType::UINT64, {3, 3});
-  makeProgram("skip", {Skip(I)});
-}
-
-TEST(DocCppEdsl, CumSum) {
+TEST_F(DocCppEdsl, CumSum) {
   auto I = Placeholder(DType::FLOAT32, {10}, "I");
-  makeProgram("cumsum", {CumSum(I)});
+  runProgram(makeProgram("cumsum", {I}, {CumSum(I)}));
 }
 
-TEST(DocCppEdsl, Conv1D) {
+TEST_F(DocCppEdsl, Conv1D) {
   auto I = Placeholder(DType::UINT64, {1, 244, 3});
   auto K = Placeholder(DType::UINT64, {3, 3, 1});
-  makeProgram("conv_1d", {Conv1D(I, K)});
+  runProgram(makeProgram("conv_1d", {I, K}, {Conv1D(I, K)}));
 }
 
-TEST(DocCppEdsl, Conv2DDilated) {
+TEST_F(DocCppEdsl, Conv2DDilated) {
   auto I = Placeholder(DType::UINT64, {1, 244, 244, 1});
   auto K = Placeholder(DType::UINT64, {3, 3, 1, 32});
-  makeProgram("conv_2d_dilated", {Conv2DDilated(I, K)});
+  runProgram(makeProgram("conv_2d_dilated", {I, K}, {Conv2DDilated(I, K)}));
 }
 
-TEST(DocCppEdsl, ComplexConv2d) {
+TEST_F(DocCppEdsl, ComplexConv2d) {
   auto I = Placeholder(DType::FLOAT32, {1, 224, 224, 3, 3});
   auto K = Placeholder(DType::FLOAT32, {3, 3, 3, 3, 32});
   auto O = ComplexConv2D(I, K, {2, 2}, {3, 3});
-  makeProgram("complex_conv_2d", {O});
+  runProgram(makeProgram("complex_conv_2d", {I, K}, {O}));
 }
 
 }  // namespace plaidml::edsl

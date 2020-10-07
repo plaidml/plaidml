@@ -26,7 +26,7 @@ using MultiBuffer = std::variant<  //
     std::vector<uint32_t>,         //
     std::vector<uint64_t>>;
 
-using TensorBuffers = std::map<TensorRef, MultiBuffer>;
+using TensorBuffers = std::vector<MultiBuffer>;
 
 class TestFixture : public ::testing::Test {
  protected:
@@ -35,39 +35,63 @@ class TestFixture : public ::testing::Test {
     EXPECT_EQ(a, b);
   }
 
-  void compareElements(float a, float b) { EXPECT_NEAR(a, b, (fabs(a) + fabs(b)) / 10000.0); }
-  void compareElements(double a, double b) { EXPECT_NEAR(a, b, (fabs(a) + fabs(b)) / 10000.0); }
+  void compareElements(float a, float b) {
+    if (isfinite(a) && isfinite(b)) {
+      EXPECT_NEAR(a, b, (fabs(a) + fabs(b)) / 10000.0);
+    } else {
+      EXPECT_EQ(a, b);
+    }
+  }
+
+  void compareElements(double a, double b) {
+    if (isfinite(a) && isfinite(b)) {
+      EXPECT_NEAR(a, b, (fabs(a) + fabs(b)) / 10000.0);
+    } else {
+      EXPECT_EQ(a, b);
+    }
+  }
 
   template <typename T>
-  void compareBuffers(plaidml::View view, const std::vector<T>& expected) {
-    ASSERT_THAT(view.size(), expected.size() * sizeof(expected[0]));
-    auto data = reinterpret_cast<T*>(view.data());
+  void compareBuffers(plaidml::Buffer buffer, const std::vector<T>& expected) {
+    ASSERT_EQ(buffer.size(), expected.size() * sizeof(expected[0]));
+    auto data = reinterpret_cast<T*>(buffer.data());
     std::vector<T> actual(data, data + expected.size());
     for (size_t i = 0; i < actual.size(); i++) {
       compareElements(actual[i], expected[i]);
     }
   }
 
-  void checkProgram(                //
-      const Program& program,       //
-      const TensorBuffers& inputs,  //
-      const TensorBuffers& expected) {
+  void checkProgram(Program program, const TensorBuffers& inputs, const TensorBuffers& expected) {
+    program.compile();
 #if !defined(_WIN32)
-    auto binder = exec::Binder(program);
-    auto executable = binder.compile();
-    for (const auto& kvp : inputs) {
-      std::visit([&](auto&& vec) { binder.input(kvp.first).copy_from(vec.data()); }, kvp.second);
+    std::vector<Buffer> input_buffers;
+    auto input_shapes = program.inputs();
+    ASSERT_EQ(inputs.size(), input_shapes.size());
+    for (size_t i = 0; i < inputs.size(); i++) {
+      std::visit(
+          [&](auto&& vec) {
+            Buffer buffer{vec, input_shapes[i]};
+            input_buffers.emplace_back(buffer);
+          },
+          inputs[i]);
     }
-    executable->run();
-    for (auto kvp : expected) {
-      auto view = binder.output(kvp.first).mmap_current();
-      std::visit([&](auto&& vec) { compareBuffers(view, vec); }, kvp.second);
+
+    std::vector<Buffer> output_buffers;
+    for (auto shape : program.outputs()) {
+      output_buffers.emplace_back(shape);
+    }
+    auto executable = exec::Executable(program, input_buffers, output_buffers);
+    executable.run();
+
+    ASSERT_EQ(expected.size(), program.outputs().size());
+    for (size_t i = 0; i < expected.size(); i++) {
+      std::visit([&](auto&& vec) { compareBuffers(output_buffers[i], vec); }, expected[i]);
     }
 #endif
   }
 
-  Program makeProgram(const std::string& name, const std::vector<Tensor>& outputs) {
-    auto program = ProgramBuilder(name, outputs).compile();
+  Program makeProgram(const std::string& name, const std::vector<Tensor>& inputs, const std::vector<Tensor>& outputs) {
+    auto program = edsl::buildProgram(name, inputs, outputs);
     writeForFileCheck(program);
     return program;
   }
@@ -78,9 +102,18 @@ class TestFixture : public ::testing::Test {
     }
   }
 
-  void runProgram(const Program& program) {
+  void runProgram(Program program) {
+    program.compile();
 #if !defined(_WIN32)
-    exec::Binder(program).compile()->run();
+    std::vector<Buffer> inputs;
+    for (const TensorShape& shape : program.inputs()) {
+      inputs.emplace_back(shape);
+    }
+    std::vector<Buffer> outputs;
+    for (const TensorShape& shape : program.outputs()) {
+      outputs.emplace_back(shape);
+    }
+    exec::Executable(program, inputs, outputs).run();
 #endif
   }
 };

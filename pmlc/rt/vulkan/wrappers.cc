@@ -46,7 +46,9 @@ void bindBuffer(void *vkInvocation, DescriptorSetIndex setIndex,
 
 extern "C" {
 
-void *initVulkan() { return new VulkanInvocation(); }
+void *initVulkan(void *device) {
+  return new VulkanInvocation(static_cast<VulkanDevice *>(device));
+}
 
 void deinitVulkan(void *vkInvocation) {
   delete static_cast<VulkanInvocation *>(vkInvocation);
@@ -67,16 +69,17 @@ void createVulkanMemoryTransferAction(void *vkInvocation, uint64_t src_index,
                                    dst_binding);
 }
 
-void setVulkanLaunchKernelAction(void *vkInvocation) {
-  static_cast<VulkanInvocation *>(vkInvocation)->setLaunchKernelAction();
+void setVulkanLaunchKernelAction(void *vkInvocation, uint32_t subgroupSize) {
+  static_cast<VulkanInvocation *>(vkInvocation)
+      ->setLaunchKernelAction(subgroupSize);
 }
 
 void addVulkanLaunchActionToSchedule(void *vkInvocation) {
   static_cast<VulkanInvocation *>(vkInvocation)->addLaunchActionToSchedule();
 }
 
-void submitCommandBuffers(void *vkInvocation) {
-  static_cast<VulkanInvocation *>(vkInvocation)->submitCommandBuffers();
+void run(void *vkInvocation) {
+  static_cast<VulkanInvocation *>(vkInvocation)->run();
 }
 
 #define BIND_BUFFER_IMPL(_name_, _type_)                                       \
@@ -120,8 +123,7 @@ struct Registration {
                    reinterpret_cast<void *>(setVulkanLaunchKernelAction));
     registerSymbol("addVulkanLaunchActionToSchedule",
                    reinterpret_cast<void *>(addVulkanLaunchActionToSchedule));
-    registerSymbol("submitCommandBuffers",
-                   reinterpret_cast<void *>(submitCommandBuffers));
+    registerSymbol("run", reinterpret_cast<void *>(run));
     registerSymbol("_mlir_ciface_bindBufferFloat16",
                    reinterpret_cast<void *>(_mlir_ciface_bindBufferFloat16));
     registerSymbol("_mlir_ciface_bindBufferFloat32",

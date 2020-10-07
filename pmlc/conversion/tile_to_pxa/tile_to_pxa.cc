@@ -1301,6 +1301,18 @@ struct TraceOpConversion : public OpConversionPattern<TraceOp> {
 
 struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
   void runOnOperation() final {
+    // Inject eltwise.ident ops for each return operand that is a direct block
+    // argument.
+    getOperation().walk([&](ReturnOp op) {
+      OpBuilder builder(op);
+      for (OpOperand &operand : op.getOperation()->getOpOperands()) {
+        if (operand.get().isa<BlockArgument>()) {
+          Value value = builder.create<ew::IdentOp>(op.getLoc(), operand.get());
+          operand.set(value);
+        }
+      }
+    });
+
     // Set up target (i.e. what is legal)
     ConversionTarget target(getContext());
     TypeConverter converter;

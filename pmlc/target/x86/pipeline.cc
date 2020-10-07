@@ -56,8 +56,8 @@ struct LowerPXAToAffinePass
   }
 };
 
-struct ConvertToLLVMPass
-    : public PassWrapper<ConvertToLLVMPass, OperationPass<ModuleOp>> {
+struct ConvertStandardToLLVMPass
+    : public ConvertStandardToLLVMBase<ConvertStandardToLLVMPass> {
   void runOnOperation() override {
     auto module = getOperation();
     auto *context = module.getContext();
@@ -105,12 +105,12 @@ std::unique_ptr<Pass> createLowerPXAToAffinePass() {
 }
 
 std::unique_ptr<Pass> createLowerToLLVMPass() {
-  return std::make_unique<ConvertToLLVMPass>();
+  return std::make_unique<ConvertStandardToLLVMPass>();
 }
 
 void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(pmlc::dialect::tile::createComputeBoundsPass());
-  pm.addPass(pmlc::dialect::tile::createPadPass());
+  pm.addPass(pmlc::dialect::tile::createPadConstraintsPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 

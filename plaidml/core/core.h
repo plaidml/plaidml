@@ -47,8 +47,9 @@ namespace details {
 struct Deleter {
   void operator()(plaidml_buffer* ptr) { ffi::call_void(plaidml_buffer_free, ptr); }
   void operator()(plaidml_integers* ptr) { ffi::call_void(plaidml_integers_free, ptr); }
+  void operator()(plaidml_program* ptr) { ffi::call_void(plaidml_program_free, ptr); }
   void operator()(plaidml_shape* ptr) { ffi::call_void(plaidml_shape_free, ptr); }
-  void operator()(plaidml_view* ptr) { ffi::call_void(plaidml_view_free, ptr); }
+  void operator()(plaidml_shapes* ptr) { ffi::call_void(plaidml_shapes_free, ptr); }
 };
 
 template <typename T>
@@ -57,6 +58,8 @@ inline std::shared_ptr<T> make_ptr(T* ptr) {
 }
 
 }  // namespace details
+
+class Program;
 
 ///
 /// Initializes the PlaidML Core API.
@@ -76,6 +79,9 @@ inline void init() {  //
 ///
 enum class DType {
   INVALID = PLAIDML_DATA_INVALID,
+  INTX = PLAIDML_DATA_INTX,
+  UINTX = PLAIDML_DATA_UINTX,
+  FLOATX = PLAIDML_DATA_FLOATX,
   BOOLEAN = PLAIDML_DATA_BOOLEAN,
   INT8 = PLAIDML_DATA_INT8,
   UINT8 = PLAIDML_DATA_UINT8,
@@ -141,14 +147,12 @@ class TensorShape {
   /// \param dtype DType
   ///
   TensorShape(DType dtype, const std::vector<int64_t>& sizes) {
-    size_t stride = 1;
-    std::vector<int64_t> strides(sizes.size());
-    for (int i = sizes.size() - 1; i >= 0; --i) {
-      strides[i] = stride;
-      stride *= sizes[i];
-    }
-    ptr_ = details::make_ptr(ffi::call<plaidml_shape*>(plaidml_shape_alloc, static_cast<plaidml_datatype>(dtype),
-                                                       sizes.size(), sizes.data(), strides.data()));
+    ptr_ = details::make_ptr(ffi::call<plaidml_shape*>(  //
+        plaidml_shape_alloc,                             //
+        static_cast<plaidml_datatype>(dtype),            //
+        sizes.size(),                                    //
+        sizes.data(),                                    //
+        /*strides=*/nullptr));
   }
 
   ///
@@ -163,8 +167,12 @@ class TensorShape {
     if (sizes.size() != strides.size()) {
       throw std::runtime_error("Sizes and strides must have the same rank.");
     }
-    ptr_ = details::make_ptr(ffi::call<plaidml_shape*>(plaidml_shape_alloc, static_cast<plaidml_datatype>(dtype),
-                                                       sizes.size(), sizes.data(), strides.data()));
+    ptr_ = details::make_ptr(ffi::call<plaidml_shape*>(  //
+        plaidml_shape_alloc,                             //
+        static_cast<plaidml_datatype>(dtype),            //
+        sizes.size(),                                    //
+        sizes.data(),                                    //
+        strides.data()));
   }
 
   // This is an internal constructor.
@@ -224,38 +232,46 @@ class TensorShape {
 
 ///
 /// \ingroup core_objects
-/// \class View
+/// \class Program
 ///
-class View {
-  friend class Buffer;
-
+class Program {
  public:
-  ///
-  /// data
-  ///
-  char* data() {  //
-    return ffi::call<char*>(plaidml_view_data, ptr_.get());
-  }
+  explicit Program(plaidml_program* ptr) : ptr_(details::make_ptr(ptr)) {}
 
   ///
-  /// size
+  /// Returns a textual representation of the program.
   ///
-  size_t size() {  //
-    return ffi::call<size_t>(plaidml_view_size, ptr_.get());
-  }
+  std::string str() const { return ffi::str(ffi::call<plaidml_string*>(plaidml_program_repr, as_ptr())); }
 
   ///
-  /// writeback
+  /// Compiles a program using the specified target.
   ///
-  void writeback() {  //
-    ffi::call_void(plaidml_view_writeback, ptr_.get());
+  void compile(const std::string& target = "", bool debug = false) {
+    ffi::call_void(plaidml_program_compile, as_ptr(), debug, target.c_str());
   }
+
+  std::vector<TensorShape> inputs() const {
+    auto shapes = details::make_ptr(ffi::call<plaidml_shapes*>(plaidml_program_get_inputs, as_ptr()));
+    std::vector<TensorShape> ret(shapes->size);
+    for (size_t i = 0; i < shapes->size; i++) {
+      ret[i] = TensorShape(shapes->elts[i]);
+    }
+    return ret;
+  }
+
+  std::vector<TensorShape> outputs() const {
+    auto shapes = details::make_ptr(ffi::call<plaidml_shapes*>(plaidml_program_get_outputs, as_ptr()));
+    std::vector<TensorShape> ret(shapes->size);
+    for (size_t i = 0; i < shapes->size; i++) {
+      ret[i] = TensorShape(shapes->elts[i]);
+    }
+    return ret;
+  }
+
+  plaidml_program* as_ptr() const { return ptr_.get(); }
 
  private:
-  explicit View(const std::shared_ptr<plaidml_view>& ptr) : ptr_(ptr) {}
-
- private:
-  std::shared_ptr<plaidml_view> ptr_;
+  std::shared_ptr<plaidml_program> ptr_;
 };
 
 ///
@@ -271,57 +287,56 @@ class Buffer {
 
   ///
   /// Buffer constructor
-  /// \param device string
   /// \param shape TensorShape
   ///
-  Buffer(const std::string& device, const TensorShape& shape)
-      : ptr_(details::make_ptr(ffi::call<plaidml_buffer*>(plaidml_buffer_alloc, device.c_str(), shape.byte_size()))),
-        shape_(shape) {}
+  Buffer(void* data, size_t size, const TensorShape& shape)
+      : ptr_(details::make_ptr(ffi::call<plaidml_buffer*>(plaidml_buffer_adopt, shape.as_ptr(), data, size))) {}
+
+  template <typename T>
+  Buffer(const std::vector<T>& vec, const TensorShape& shape)
+      : ptr_(details::make_ptr(ffi::call<plaidml_buffer*>(   //
+            plaidml_buffer_adopt,                            //
+            shape.as_ptr(),                                  //
+            static_cast<void*>(const_cast<T*>(vec.data())),  //
+            vec.size() * sizeof(T)))) {}
+
+  ///
+  /// Buffer constructor
+  /// \param shape TensorShape
+  ///
+  explicit Buffer(const TensorShape& shape)
+      : ptr_(details::make_ptr(ffi::call<plaidml_buffer*>(plaidml_buffer_alloc, shape.as_ptr()))) {}
 
   ///
   /// Buffer constructor
   /// \param ptr plaidml_buffer*
   /// \param shape TensorShape
-  explicit Buffer(plaidml_buffer* ptr, const TensorShape& shape) : ptr_(details::make_ptr(ptr)), shape_(shape) {}
+  explicit Buffer(plaidml_buffer* ptr, const TensorShape& shape) : ptr_(details::make_ptr(ptr)) {}
 
   ///
-  /// Returns a pointer to the Buffer.
-  /// \return plaidml_buffer*
+  /// data
   ///
-  plaidml_buffer* as_ptr() const {  //
-    return ptr_.get();
-  }
+  char* data() { return ffi::call<char*>(plaidml_buffer_data, as_ptr()); }
 
   ///
-  /// mmap_current
-  /// \return View
+  /// size
   ///
-  View mmap_current() {
-    return View(details::make_ptr(ffi::call<plaidml_view*>(plaidml_buffer_mmap_current, as_ptr())));
-  }
+  size_t size() { return ffi::call<size_t>(plaidml_buffer_size, as_ptr()); }
 
   ///
-  /// mmap_discard
-  /// \return View
+  /// shape
   ///
-  View mmap_discard() {
-    return View(details::make_ptr(ffi::call<plaidml_view*>(plaidml_buffer_mmap_discard, as_ptr())));
-  }
 
-  void copy_into(void* dst) {
-    auto view = mmap_current();
-    memcpy(dst, view.data(), view.size());
-  }
+  TensorShape shape() { return TensorShape{ffi::call<plaidml_shape*>(plaidml_buffer_shape, as_ptr())}; }
 
-  void copy_from(const void* src) {
-    auto view = mmap_discard();
-    memcpy(view.data(), src, view.size());
-    view.writeback();
-  }
+  plaidml_buffer* as_ptr() const { return ptr_.get(); }
+
+  void copy_into(void* dst) { memcpy(dst, data(), size()); }
+
+  void copy_from(const void* src) { memcpy(data(), src, size()); }
 
  private:
   std::shared_ptr<plaidml_buffer> ptr_;
-  TensorShape shape_;
 };
 
 ///
@@ -352,6 +367,11 @@ struct Settings {
     ffi::call_void(plaidml_settings_set, key.c_str(), value.c_str());
   }
 };
+
+inline std::ostream& operator<<(std::ostream& os, const Program& x) {
+  os << x.str();
+  return os;
+}
 
 inline std::ostream& operator<<(std::ostream& os, const TensorShape& x) {
   os << x.str();

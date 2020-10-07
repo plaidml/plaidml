@@ -5,11 +5,15 @@ load("//bzl:plaidml.bzl", "plaidml_cc_test")
 load("//pmlc:lit.bzl", "lit_test")
 
 exports_files(
-    ["edsl_test-skip.intel_gen.txt"],
+    [
+        "edsl_test-skip.intel_gen.txt",
+        "edsl_test-skip.intel_gen_ocl_spirv.txt",
+    ],
 )
 
 plaidml_cc_test(
     name = "cc_test",
+    size = "medium",
     testonly = 0,
     srcs = ["edsl_test.cc"],
     args = [
@@ -17,10 +21,12 @@ plaidml_cc_test(
         "--plaidml_target=$(plaidml_target)",
     ] + select({
         "//plaidml:intel_gen": ["--skip_test_file=$(location edsl_test-skip.intel_gen.txt)"],
+        "//plaidml:intel_gen_ocl_spirv": ["--skip_test_file=$(location edsl_test-skip.intel_gen_ocl_spirv.txt)"],
         "//conditions:default": [],
     }),
     data = select({
         "//plaidml:intel_gen": [":edsl_test-skip.intel_gen.txt"],
+        "//plaidml:intel_gen_ocl_spirv": [":edsl_test-skip.intel_gen_ocl_spirv.txt"],
         "//conditions:default": [],
     }),
     linkstatic = True,
@@ -35,13 +41,9 @@ plaidml_cc_test(
 
 py_test(
     name = "py_test",
-    srcs = [
-        "__init__.py",
-        "edsl_test.py",
-    ],
+    srcs = ["edsl_test.py"],
     args = ["-v"],
     main = "edsl_test.py",
-    tags = ["manual"],  # the `edsl_test.py.test` rule will run this test via lit
     deps = [
         "//plaidml/edsl:py",
         "//plaidml/exec:py",
@@ -51,10 +53,4 @@ py_test(
 lit_test(
     name = "edsl_test.cc",
     data = [":cc_test"],
-)
-
-lit_test(
-    name = "edsl_test.py",
-    data = [":py_test"],
-    tags = ["skip_windows"],
 )

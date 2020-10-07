@@ -41,7 +41,7 @@ using TestCases = std::vector<TestCaseIO>;
 class PlaidMLCodegenTest : public ::plaidml::edsl::TestFixture {
  protected:
   // Compiles hlo_module with the JIT compiler.
-  std::unique_ptr<::plaidml::edsl::Program> CompileToProgram(std::unique_ptr<HloModule> hlo_module);
+  ::plaidml::Program CompileToProgram(std::unique_ptr<HloModule> hlo_module);
 
   Status CompileAndCheck(std::unique_ptr<HloModule> hlo_module, const TestCases& testcases);
   Status CompileAndCheck(std::unique_ptr<HloComputation> entry_computation, const TestCases& testcases);

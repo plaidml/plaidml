@@ -9,16 +9,11 @@ plaidml_cc_library(
         "@bazel_tools//src/conditions:windows": [],
         "//conditions:default": ["-Wno-deprecated-declarations"],
     }),
-    data = [
-        "//:ov_plugins_xml",
-        "//plaidml/bridge/openvino:plaidml-plugin",
-    ],
     tags = [
         "skip_macos",
         "skip_windows",
     ],
     deps = [
-        "//pmlc/util:logging",
         "@com_google_googletest//:gtest_main",
         "@gflags",
         "@openvino//:common_test_utils",

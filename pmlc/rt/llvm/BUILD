@@ -6,12 +6,14 @@ plaidml_cc_library(
     name = "llvm",
     srcs = [
         "builtin.cc",
+        "device.cc",
+        "device.h",
         "runtime.cc",
     ],
+    visibility = ["//visibility:public"],
     deps = [
         "//pmlc/compiler",
         "//pmlc/rt",
     ],
     alwayslink = 1,
-    visibility = ["//visibility:public"],
 )

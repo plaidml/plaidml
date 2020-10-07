@@ -31,7 +31,7 @@ TEST_P(PlaidMLCompareOperationTest, CompEqOp) {
   auto comp_type = ComparisonDirection::kEq;
 
   TestCases testcases = {
-      TestCaseIO{{B, A}, {expected_val}},
+      TestCaseIO{{A, B}, {expected_val}},
   };
 
   HloComputation::Builder builder("CompOp");
@@ -53,7 +53,7 @@ TEST_P(PlaidMLCompareOperationTest, CompLtOp) {
   auto comp_type = ComparisonDirection::kLt;
 
   TestCases testcases = {
-      TestCaseIO{{B, A}, {expected_val}},
+      TestCaseIO{{A, B}, {expected_val}},
   };
 
   HloComputation::Builder builder("CompOp");
@@ -75,7 +75,7 @@ TEST_P(PlaidMLCompareOperationTest, CompLeOp) {
   auto comp_type = ComparisonDirection::kLe;
 
   TestCases testcases = {
-      TestCaseIO{{B, A}, {expected_val}},
+      TestCaseIO{{A, B}, {expected_val}},
   };
 
   HloComputation::Builder builder("CompOp");
@@ -97,7 +97,7 @@ TEST_P(PlaidMLCompareOperationTest, CompGtOp) {
   auto comp_type = ComparisonDirection::kGt;
 
   TestCases testcases = {
-      TestCaseIO{{B, A}, {expected_val}},
+      TestCaseIO{{A, B}, {expected_val}},
   };
 
   HloComputation::Builder builder("CompOp");
@@ -119,7 +119,7 @@ TEST_P(PlaidMLCompareOperationTest, CompGeOp) {
   auto comp_type = ComparisonDirection::kGe;
 
   TestCases testcases = {
-      TestCaseIO{{B, A}, {expected_val}},
+      TestCaseIO{{A, B}, {expected_val}},
   };
 
   HloComputation::Builder builder("CompOp");

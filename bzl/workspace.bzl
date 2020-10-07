@@ -90,8 +90,8 @@ def plaidml_workspace():
         strip_prefix = "jsonnet-0.13.0",
     )
 
-    LLVM_COMMIT = "81a1f9c06b9a84d9afcec8a1edfb578a768fa70e"
-    LLVM_SHA256 = "92c2dde9d0e4c3bbf15d9fb899019cca31c3479554ab6096ef93e79101595645"
+    LLVM_COMMIT = "7c0ec48b435bdff257e28a8db8d754dc22c8cbbd"
+    LLVM_SHA256 = "3941b496b8d539a2b0317cca2cb922e1384310647d3d5421ea47a93c5cee0900"
     LLVM_URL = "https://github.com/plaidml/llvm-project/archive/{commit}.tar.gz".format(commit = LLVM_COMMIT)
     http_archive(
         name = "llvm-project",
@@ -102,6 +102,7 @@ def plaidml_workspace():
             clean_dep("//vendor/llvm:llvm.BUILD"): "llvm/BUILD.bazel",
             clean_dep("//vendor/mlir:mlir.BUILD"): "mlir/BUILD.bazel",
             clean_dep("//vendor/mlir:test.BUILD"): "mlir/test/BUILD.bazel",
+            clean_dep("//vendor/openmp:openmp.BUILD"): "openmp/BUILD.bazel",
         },
         override = "PLAIDML_LLVM_REPO",
     )

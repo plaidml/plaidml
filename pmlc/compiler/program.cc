@@ -14,7 +14,6 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/DebugStringHelper.h"
 #include "mlir/Support/FileUtilities.h"
-#include "mlir/Transforms/Passes.h"
 
 #include "pmlc/compiler/registry.h"
 #include "pmlc/util/logging.h"
@@ -80,10 +79,14 @@ private:
 
 } // namespace
 
+Program::Program(int x, llvm::StringRef name)
+    : module(ModuleOp::create(UnknownLoc::get(&context), name)) {}
+
 Program::Program(mlir::ModuleOp module) : module(module) {}
 
-Program::Program(mlir::StringRef source)
-    : Program(llvm::MemoryBuffer::getMemBuffer(source)) {}
+Program Program::fromSource(mlir::StringRef source) {
+  return Program(llvm::MemoryBuffer::getMemBuffer(source));
+}
 
 Program::Program(std::unique_ptr<llvm::MemoryBuffer> buffer) {
   llvm::SourceMgr sourceMgr;
@@ -112,9 +115,9 @@ void Program::compile(StringRef target, bool collectPasses, StringRef dumpDir) {
 
   PassManager pm(module->getContext());
   ScopedDiagnosticHandler diagHandler(pm.getContext(), [&](Diagnostic &diag) {
-    IVLOG(1, getDiagKindStr(diag.getSeverity()).str() << ": " << diag.str());
+    IVLOG(2, getDiagKindStr(diag.getSeverity()).str() << ": " << diag.str());
     for (auto &note : diag.getNotes()) {
-      IVLOG(1, "  note: " << note.str());
+      IVLOG(2, "  note: " << note.str());
     }
     return success();
   });
