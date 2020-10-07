@@ -46,6 +46,9 @@ struct FusionInfo {
   bool hasPlan;
   // Fuse the ops with exactly matched idxs
   bool exactlyMatch;
+  // Perform tiled fusions, including additional loop transformations from
+  // subgroups pass
+  bool tiledFusion;
   // Specifies the mapping from A's index space into B's index space (post
   // tiling)
   DenseMap<BlockArgument, BlockArgument> aToB;
@@ -56,10 +59,11 @@ struct FusionInfo {
   bool reverseFusion;
 
   FusionInfo(AffineParallelOp aBand, AffineParallelOp bBand,
-             int64_t memoryActivityThreshold, bool exactlyMatch)
+             int64_t memoryActivityThreshold, bool exactlyMatch,
+             bool tiledFusion)
       : aInfo{aBand}, bInfo{bBand}, hasPlan(false), exactlyMatch(exactlyMatch),
-        memoryActivityThreshold(memoryActivityThreshold), reverseFusion(false) {
-  }
+        memoryActivityThreshold(memoryActivityThreshold),
+        tiledFusion(tiledFusion), reverseFusion(false) {}
 
   // Helper method to find the original source write of a state update.
   static PxaReduceOpInterface findSourceWrite(Value val) {
@@ -86,10 +90,12 @@ struct FusionInfo {
   }
 
   void undoTilings() {
-    if (aInfo.needsTiling)
-      undoTiling(aInfo.op, aInfo.tileSizes);
-    if (bInfo.needsTiling)
-      undoTiling(bInfo.op, bInfo.tileSizes);
+    if (tiledFusion) {
+      if (aInfo.needsTiling)
+        undoTiling(aInfo.op, aInfo.tileSizes);
+      if (bInfo.needsTiling)
+        undoTiling(bInfo.op, bInfo.tileSizes);
+    }
   }
 
   // Helper to perform loop transformations, so the loops can be fused
@@ -97,18 +103,20 @@ struct FusionInfo {
   // were performed before and actually needed here,
   // probably two params needed: subgroup related and affine normalization
   void loopTransformations(AffineParallelOp outer, AffineParallelOp inner) {
-    inner.walk([&](AffineParallelOp par) { vectorizeOverOutputs(par, 8); });
+    if (tiledFusion) {
+      inner.walk([&](AffineParallelOp par) { vectorizeOverOutputs(par, 8); });
 
-    // Try to 'vector cache' any remaining innermost loads
-    outer.walk([&](PxaLoadOp load) { cacheLoadAsVector(inner, load, 8); });
+      // Try to 'vector cache' any remaining innermost loads
+      outer.walk([&](PxaLoadOp load) { cacheLoadAsVector(inner, load, 8); });
 
-    // Convert local allocations to vector types
-    outer.walk([&](AllocOp alloc) { vectorizeBuffer(alloc); });
+      // Convert local allocations to vector types
+      outer.walk([&](AllocOp alloc) { vectorizeBuffer(alloc); });
 
-    // Affine normalizations
-    outer.walk(::normalizeAffineParallel);
-    outer.walk(elideSingleIterationIndexes);
-    outer.walk(promoteIfEmptyIVs);
+      // Affine normalizations
+      outer.walk(::normalizeAffineParallel);
+      outer.walk(elideSingleIterationIndexes);
+      outer.walk(promoteIfEmptyIVs);
+    }
   }
 
   // Helper to get a clean version of the strides for a specific op (or fail)
@@ -258,10 +266,12 @@ struct FusionInfo {
     }
 
     // Add tilings if needed
-    if (aInfo.needsTiling)
-      performTiling(aInfo.op, aInfo.tileSizes);
-    if (bInfo.needsTiling)
-      performTiling(bInfo.op, bInfo.tileSizes);
+    if (tiledFusion) {
+      if (aInfo.needsTiling)
+        performTiling(aInfo.op, aInfo.tileSizes);
+      if (bInfo.needsTiling)
+        performTiling(bInfo.op, bInfo.tileSizes);
+    }
 
     // Over-fusion prevention:
     // Compute the amount of memory activity, defined as the amount of memory
@@ -556,9 +566,11 @@ struct FusionInfo {
 struct FusionPass : public FusionBase<FusionPass> {
   FusionPass() = default;
 
-  explicit FusionPass(int64_t memoryActivityThreshold, bool exactlyMatch) {
+  explicit FusionPass(int64_t memoryActivityThreshold, bool exactlyMatch,
+                      bool tiledFusion) {
     this->memoryActivityThreshold = memoryActivityThreshold;
     this->exactlyMatch = exactlyMatch;
+    this->tiledFusion = tiledFusion;
   }
 
   // Attempts to fuse two ops if they look good.  Returns the new fused loop
@@ -569,7 +581,7 @@ struct FusionPass : public FusionBase<FusionPass> {
                  << debugString(*aBand) << "\nB:\n"
                  << debugString(*bBand));
     FusionInfo fusionInfo(aBand, bBand, memoryActivityThreshold.getValue(),
-                          exactlyMatch);
+                          exactlyMatch, tiledFusion);
     bool canFuse = fusionInfo.computeFusion();
     if (!canFuse) {
       return nullptr;
@@ -625,10 +637,12 @@ struct FusionPass : public FusionBase<FusionPass> {
           if (merge_immediate) {
             itOp = Block::iterator(newOp.getOperation());
           }
-          // Affine normalizations
-          newOp.walk(::normalizeAffineParallel);
-          newOp.walk(elideSingleIterationIndexes);
-          newOp.walk(promoteIfEmptyIVs);
+          if (tiledFusion) {
+            // Affine normalizations
+            newOp.walk(::normalizeAffineParallel);
+            newOp.walk(elideSingleIterationIndexes);
+            newOp.walk(promoteIfEmptyIVs);
+          }
         }
       }
     }
@@ -650,8 +664,9 @@ struct FusionPass : public FusionBase<FusionPass> {
 } // namespace
 
 std::unique_ptr<Pass> createFusionPass(int64_t memoryActivityThreshold,
-                                       bool exactlyMatch) {
-  return std::make_unique<FusionPass>(memoryActivityThreshold, exactlyMatch);
+                                       bool exactlyMatch, bool tiledFusion) {
+  return std::make_unique<FusionPass>(memoryActivityThreshold, exactlyMatch,
+                                      tiledFusion);
 }
 
 } // namespace pmlc::dialect::pxa

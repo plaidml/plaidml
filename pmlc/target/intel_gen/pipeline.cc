@@ -137,8 +137,10 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
-  // Do fusion
-  pm.addPass(pxa::createFusionPass());
+  // Do tiled fusion
+  pm.addPass(pxa::createFusionPass(0 /*memoryActivityThreshold*/,
+                                   false /*exactlyMatch*/,
+                                   true /*tiledFusion*/));
   pm.addPass(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(pxa::createMemRefDataFlowOptPass());

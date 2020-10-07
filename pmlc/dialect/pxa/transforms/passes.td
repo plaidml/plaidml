@@ -59,6 +59,9 @@ def Fusion : FunctionPass<"pxa-fusion"> {
     Option<"exactlyMatch", "exactly-match", "bool",
            /*default=*/"false",
            "Whether fuse the loops with exactly matched indices">,
+    Option<"tiledFusion", "tiled-fusion", "bool",
+           /*default=*/"false",
+           "Perform tiled fusions, including additional loop transformations from subgroups pass">,
   ];
 }
 
