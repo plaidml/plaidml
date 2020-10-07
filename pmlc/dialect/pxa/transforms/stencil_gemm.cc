@@ -15,6 +15,7 @@
 #include "pmlc/dialect/pxa/transforms/stencil.h"
 
 #include "pmlc/util/logging.h"
+#include "pmlc/util/tags.h"
 
 using namespace mlir; // NOLINT
 
@@ -337,6 +338,10 @@ struct StencilGEMMPass : public PassWrapper<StencilGEMMPass, FunctionPass> {
     func.walk([this](AffineParallelOp op) {
       StencilGEMM stencil(op, numThreads.getValue(), costFn);
       stencil.DoStenciling();
+
+      // tag this affine.parallel so it won't be lowered to affine.for
+      // we will lower it to an openmp block instead
+      setUnitTag(op, cpuBlockTag());
     });
   }
 

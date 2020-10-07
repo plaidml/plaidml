@@ -46,6 +46,7 @@ plaidml_cc_library(
         ":gen-pass",
         ":prng_lowering",
         "//pmlc/compiler",
+        "//pmlc/conversion/affine_to_omp",
         "//pmlc/conversion/pxa_to_affine",
         "//pmlc/conversion/stdx_to_llvm",
         "//pmlc/conversion/tile_to_pxa",

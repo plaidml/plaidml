@@ -13,6 +13,7 @@
 #include "mlir/Transforms/Passes.h"
 
 #include "pmlc/compiler/registry.h"
+#include "pmlc/conversion/affine_to_omp/passes.h"
 #include "pmlc/conversion/pxa_to_affine/passes.h"
 #include "pmlc/conversion/stdx_to_llvm/passes.h"
 #include "pmlc/conversion/tile_to_pxa/passes.h"
@@ -131,6 +132,10 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(pxa::createResizeTmpsPass());
   pm.addPass(pxa::createBufferPlacementPass());
   pm.addPass(pxa::createAffineNormalizePass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
+
+  pm.addPass(pmlc::conversion::affine_to_omp::createLowerAffineToOpenMPPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 

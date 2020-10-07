@@ -58,6 +58,7 @@ plaidml_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":hdrs",
+        "//pmlc/conversion/affine_to_omp",
         "//pmlc/conversion/comp_to_llvm",
         "//pmlc/conversion/gpu",
         "//pmlc/conversion/gpu_to_comp",
