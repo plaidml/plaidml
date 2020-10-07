@@ -69,7 +69,7 @@ struct PxaGemmOpConversion : public OpConversionPattern<pxa::PxaGemmOp> {
     auto leadingDimsAttr = rewriter.getI64ArrayAttr(ArrayRef<int64_t>{
         aInfo.strides[0], bInfo.strides[0], cInfo.strides[0]});
 
-    int64_t numBatches = op.numBatches().getSExtValue();
+    int64_t numBatches = op.numBatches();
 
     if (numBatches == 1) {
       auto dispatch = rewriter.create<xsmm::GemmDispatchOp>(
@@ -307,8 +307,7 @@ struct XSMMBRGemmInvokeLowering
         getDataPtr(op->getLoc(), cType, transformed.c(), cIndices, rewriter);
 
     auto int64Type = LLVM::LLVMType::getInt64Ty(op->getContext());
-    auto numBatches =
-        rewriter.getI64IntegerAttr(invokeOp.numBatches().getSExtValue());
+    auto numBatches = rewriter.getI64IntegerAttr(invokeOp.numBatches());
     auto numBatchesValue =
         rewriter.create<LLVM::ConstantOp>(op->getLoc(), int64Type, numBatches);
 
