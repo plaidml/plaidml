@@ -457,7 +457,7 @@ std::unique_ptr<Pass> createStencilGEMMPass(unsigned numThreads,
                                             llvm::StringRef strategy,
                                             StencilCostFunction costFn) {
   IVLOG(3, "numThreads: " << numThreads);
-  IVLOG(3, "strategy: " << strategy);
+  IVLOG(3, "strategy: " << strategy.str());
   return std::make_unique<StencilGEMMPass>(numThreads, strategy.str(), costFn);
 }
 
