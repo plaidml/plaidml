@@ -36,11 +36,11 @@ extern "C" int64_t plaidml_rt_xsmm_gemm_dispatch_f32(int32_t lda, int32_t ldb,
 
 extern "C" void plaidml_rt_xsmm_brgemm_invoke_f32(int64_t funcAddr, float *a,
                                                   float *b, float *c,
-                                                  int64_t lBr) {
+                                                  int64_t numBatches) {
   libxsmm_xmmfunction sgemm;
   sgemm.xmm = reinterpret_cast<FunctionPtr>(funcAddr);
-  unsigned long long l_br = lBr; // NOLINT
-  sgemm.smrs(b, a, c, &l_br);
+  unsigned long long numBatchesVar = numBatches; // NOLINT
+  sgemm.smrs(b, a, c, &numBatchesVar);
 }
 
 extern "C" int64_t plaidml_rt_xsmm_brgemm_dispatch_f32(int32_t lda, int32_t ldb,
