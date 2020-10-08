@@ -264,8 +264,6 @@ private:
   }
 
   void transform(TensorAndIndexPermutation perm, ArrayRef<int64_t> tileSize) {
-    PxaGemmOp gemm;
-
     if (strategy == kStrategy_StridedBRGEMM) {
       createStridedBRGemmPxaGemmOp(perm, tileSize);
     } else {
