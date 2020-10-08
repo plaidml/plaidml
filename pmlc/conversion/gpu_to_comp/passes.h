@@ -5,6 +5,7 @@
 
 namespace pmlc::dialect::comp {
 class ExecEnvType;
+enum ExecEnvRuntime : unsigned;
 } // namespace pmlc::dialect::comp
 
 namespace mlir {
@@ -21,6 +22,10 @@ void populateGpuToCompPatterns(
     mlir::OwningRewritePatternList &patterns);
 
 std::unique_ptr<mlir::Pass> createConvertGpuToCompPass();
+
+std::unique_ptr<mlir::Pass>
+createConvertGpuToCompPass(pmlc::dialect::comp::ExecEnvRuntime runtime,
+                           unsigned memorySpace);
 
 /// Generate the code for registering conversion passes.
 #define GEN_PASS_REGISTRATION
