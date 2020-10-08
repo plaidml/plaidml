@@ -62,6 +62,9 @@ def Fusion : FunctionPass<"pxa-fusion"> {
     Option<"tiledFusion", "tiled-fusion", "bool",
            /*default=*/"false",
            "Perform tiled fusions, including additional loop transformations from subgroups pass">,
+    Option<"loopDepth", "loop-depth", "int64_t",
+           /*default=*/"0",
+           "How deep the fusion should perform">,
   ];
 }
 

@@ -1,4 +1,4 @@
-// RUN: pmlc-opt -pxa-fusion="tiled-fusion=true" -pxa-normalize -canonicalize %s | FileCheck %s
+// RUN: pmlc-opt -pxa-fusion="tiled-fusion=true" -pxa-fusion="loop-depth=3" -pxa-normalize -canonicalize %s | FileCheck %s
 
 func @fusion_tiled() -> memref<1x56x56x256xi1> {
   %cst = constant 0.000000e+00 : f32

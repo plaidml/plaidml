@@ -99,11 +99,9 @@ struct FusionInfo {
   }
 
   // Helper to perform loop transformations, so the loops can be fused
-  // TODO: make this optional for the pass, so user can define if these
-  // were performed before and actually needed here,
-  // probably two params needed: subgroup related and affine normalization
-  void loopTransformations(AffineParallelOp outer, AffineParallelOp inner) {
-    if (tiledFusion) {
+  void loopTransformations(AffineParallelOp outer, AffineParallelOp inner,
+                           bool needsTiling) {
+    if (tiledFusion && needsTiling) {
       inner.walk([&](AffineParallelOp par) { vectorizeOverOutputs(par, 8); });
 
       // Try to 'vector cache' any remaining innermost loads
@@ -209,12 +207,13 @@ struct FusionInfo {
 
       // If sizes do not match, apply tiling later, scale to the
       // loop with subgroupSize != attribute if present
+      auto sameSubgroups = subgroupSizeA == subgroupSizeB;
       if (mulA != mulB) {
         auto tileSize = reverseFusion ? sizeA / sizeB : sizeB / sizeA;
-        if (reverseFusion) {
+        if (reverseFusion && (subgroupSizeA == 1 || sameSubgroups)) {
           aInfo.tileSizes.push_back(tileSize);
           aInfo.needsTiling = true;
-        } else {
+        } else if (subgroupSizeB == 1 || sameSubgroups) {
           bInfo.tileSizes.push_back(tileSize);
           bInfo.needsTiling = true;
         }
@@ -267,10 +266,22 @@ struct FusionInfo {
 
     // Add tilings if needed
     if (tiledFusion) {
-      if (aInfo.needsTiling)
+      if (aInfo.needsTiling) {
+        if (aInfo.op.lowerBoundsMap().getNumResults() !=
+            aInfo.tileSizes.size()) {
+          bInfo.op.emitRemark("Tile sizes do not match.");
+          return false;
+        }
         performTiling(aInfo.op, aInfo.tileSizes);
-      if (bInfo.needsTiling)
+      }
+      if (bInfo.needsTiling) {
+        if (bInfo.op.lowerBoundsMap().getNumResults() !=
+            bInfo.tileSizes.size()) {
+          bInfo.op.emitRemark("Tile sizes do not match.");
+          return false;
+        }
         performTiling(bInfo.op, bInfo.tileSizes);
+      }
     }
 
     // Over-fusion prevention:
@@ -487,11 +498,11 @@ struct FusionInfo {
     // Move the two parallel for's inside the new op
     if (reverseFusion) {
       aInfo.op.getOperation()->moveBefore(apC.getBody(), apC.getBody()->end());
-      loopTransformations(apC, aInfo.op);
+      loopTransformations(apC, aInfo.op, aInfo.needsTiling);
       bInfo.op.getOperation()->moveBefore(apC.getBody(), apC.getBody()->end());
     } else {
       bInfo.op.getOperation()->moveBefore(apC.getBody(), apC.getBody()->end());
-      loopTransformations(apC, bInfo.op);
+      loopTransformations(apC, bInfo.op, bInfo.needsTiling);
       aInfo.op.getOperation()->moveBefore(apC.getBody(),
                                           apC.getBody()->begin());
     }
@@ -559,6 +570,13 @@ struct FusionInfo {
     fixupLoops(aInfo.op, aToNew);
     fixupLoops(bInfo.op, bToNew);
 
+    if (tiledFusion && (aInfo.needsTiling || bInfo.needsTiling)) {
+      // Affine normalizations
+      apC.walk(::normalizeAffineParallel);
+      apC.walk(elideSingleIterationIndexes);
+      apC.walk(promoteIfEmptyIVs);
+    }
+
     return apC;
   }
 };
@@ -567,10 +585,11 @@ struct FusionPass : public FusionBase<FusionPass> {
   FusionPass() = default;
 
   explicit FusionPass(int64_t memoryActivityThreshold, bool exactlyMatch,
-                      bool tiledFusion) {
+                      bool tiledFusion, int64_t loopDepth) {
     this->memoryActivityThreshold = memoryActivityThreshold;
     this->exactlyMatch = exactlyMatch;
     this->tiledFusion = tiledFusion;
+    this->loopDepth = loopDepth;
   }
 
   // Attempts to fuse two ops if they look good.  Returns the new fused loop
@@ -637,12 +656,6 @@ struct FusionPass : public FusionBase<FusionPass> {
           if (merge_immediate) {
             itOp = Block::iterator(newOp.getOperation());
           }
-          if (tiledFusion) {
-            // Affine normalizations
-            newOp.walk(::normalizeAffineParallel);
-            newOp.walk(elideSingleIterationIndexes);
-            newOp.walk(promoteIfEmptyIVs);
-          }
         }
       }
     }
@@ -651,22 +664,35 @@ struct FusionPass : public FusionBase<FusionPass> {
   void runOnFunction() final {
     auto func = getFunction();
     auto &block = func.getBody().front();
+    // Always run on outer blocks, inner will be also
+    // fused based on the loopDepth parameter
     performFusion(block);
-    func.walk([&](AffineParallelOp affineParallelOp) {
-      auto *parentOp = affineParallelOp.getParentOp();
-      if (dyn_cast<AffineParallelOp>(parentOp))
-        return;
-      performFusion(*affineParallelOp.getBody());
-    });
+
+    int64_t loopDepthVal = loopDepth.getValue();
+    for (auto it = 0; it < loopDepthVal; it++) {
+      func.walk([&](AffineParallelOp affineParallelOp) {
+        auto opLoopNest = 0;
+        auto parentOp =
+            dyn_cast<AffineParallelOp>(affineParallelOp.getParentOp());
+        while (parentOp) {
+          parentOp = dyn_cast<AffineParallelOp>(parentOp.getParentOp());
+          opLoopNest++;
+        }
+        if (opLoopNest >= loopDepthVal)
+          return;
+        performFusion(*affineParallelOp.getBody());
+      });
+    }
   }
 };
 
 } // namespace
 
 std::unique_ptr<Pass> createFusionPass(int64_t memoryActivityThreshold,
-                                       bool exactlyMatch, bool tiledFusion) {
+                                       bool exactlyMatch, bool tiledFusion,
+                                       int64_t loopDepth) {
   return std::make_unique<FusionPass>(memoryActivityThreshold, exactlyMatch,
-                                      tiledFusion);
+                                      tiledFusion, loopDepth);
 }
 
 } // namespace pmlc::dialect::pxa
