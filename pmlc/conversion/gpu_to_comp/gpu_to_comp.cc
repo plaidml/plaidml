@@ -82,6 +82,11 @@ struct ConvertFunc final : public mlir::OpConversionPattern<mlir::FuncOp> {
 
 class ConvertGpuToComp : public ConvertGpuToCompBase<ConvertGpuToComp> {
 public:
+  ConvertGpuToComp() = default;
+  ConvertGpuToComp(comp::ExecEnvRuntime runtime, unsigned memorySpace) {
+    this->execEnvRuntime = static_cast<unsigned>(runtime);
+    this->execEnvMemorySpace = memorySpace;
+  }
   void runOnOperation();
 };
 
@@ -334,6 +339,11 @@ void populateGpuToCompPatterns(mlir::MLIRContext *context,
 
 std::unique_ptr<mlir::Pass> createConvertGpuToCompPass() {
   return std::make_unique<ConvertGpuToComp>();
+}
+
+std::unique_ptr<mlir::Pass>
+createConvertGpuToCompPass(comp::ExecEnvRuntime runtime, unsigned memorySpace) {
+  return std::make_unique<ConvertGpuToComp>(runtime, memorySpace);
 }
 
 } // namespace pmlc::conversion::gpu_to_comp
