@@ -27,7 +27,7 @@ LogicalResult ContractionOp::materializeOperands(OpBuilder &builder) {
     return success(
         succeeded(eltwise::materializeOperands(
             builder, op,
-            llvm::ArrayRef<OpOperand *>{&operands[0], &operands[3]})) ||
+            llvm::ArrayRef<OpOperand *>{&operands[0], &operands[3]})) &&
         succeeded(eltwise::materializeOperands(
             builder, op,
             llvm::ArrayRef<OpOperand *>{&operands[1], &operands[2]})));
