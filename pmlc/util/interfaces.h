@@ -1,24 +1,18 @@
-// Copyright 2019, Intel Corporation
+// Copyright 2020 Intel Corporation
 
 #pragma once
 
-#include "mlir/IR/Builders.h"
-#include "mlir/IR/Types.h"
-#include "mlir/IR/Value.h"
+#include "mlir/IR/OpDefinition.h"
+#include "mlir/IR/Operation.h"
+#include "mlir/Support/InterfaceSupport.h"
+#include "mlir/Support/LogicalResult.h"
 
-namespace pmlc {
-namespace util {
+namespace pmlc::util {
 
-using mlir::ArrayRef;
-using mlir::Location;
+using mlir::failure;
+using mlir::LogicalResult;
 using mlir::OpBuilder;
-using mlir::Operation;
-using mlir::OperationState;
-using mlir::OpInterface;
-using mlir::Type;
-using mlir::Value;
 
 #include "pmlc/util/interfaces.h.inc"
 
-} // namespace util
-} // namespace pmlc
+} // namespace pmlc::util
