@@ -7,6 +7,7 @@
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
 #include "mlir/Conversion/StandardToSPIRV/ConvertStandardToSPIRVPass.h"
+#include "mlir/Dialect/Affine/Passes.h"
 #include "mlir/Dialect/GPU/Passes.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/SPIRV/Passes.h"
@@ -145,6 +146,13 @@ void pipelineBuilder(OpPassManager &pm) {
 
   // Lower out of PXA memory semantics
   pm.addPass(createLowerPXAToAffinePass());
+
+  // Unroll affine.for loops.
+  pm.addPass(createLoopUnrollPass(
+                      /*unrollFactor=*/6,
+                      /*unrollUpToFactor=*/true));
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
 
   // Pack dims
   pm.addPass(createAffineIndexPackPass());
