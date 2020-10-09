@@ -135,8 +135,7 @@ def ScatterOp : MaterializeOp<"scatter"> {
   let summary = "special scatter operation";
   let arguments = (ins
     RankedTensorOf<[AnyScalar]>:$tensor,
-    RankedTensorOf<[AnyInteger]>:$dims,
-    RankedTensorOf<[AnyScalar]>:$other);
+    RankedTensorOf<[AnyInteger]>:$dims);
   let results = (outs RankedTensorOf<[AnyScalar]>:$result);
 }
 

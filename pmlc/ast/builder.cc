@@ -608,6 +608,7 @@ struct ProgramBuilder {
             .Case("index", [&]() { return makeIndexOp(node, operands); })
             .Case("prng", [&]() { return makePrngOp(node, operands); })
             .Case("reshape", [&]() { return makeReshapeOp(node, operands); })
+            .Case("scatter", [&]() { return makeScatterOp(node, operands); })
             .Default([&]() {
               const AbstractOperation *abstractOp = lookupOperation(node->op);
               OperationState state(loc, abstractOp->name);
@@ -628,6 +629,14 @@ struct ProgramBuilder {
     TensorShape shape = evaluator.getShape(node);
     RankedTensorType resultType = builder.getRankedTensorType(shape);
     auto op = builder.create<tile::ReshapeOp>(loc, resultType, operands[0]);
+    return op.result();
+  }
+
+  Value makeScatterOp(ExprNodeIntrinsic *node, ArrayRef<Value> operands) {
+    TensorShape shape = evaluator.getShape(node);
+    RankedTensorType resultType = builder.getRankedTensorType(shape);
+    auto op = builder.create<tile::ScatterOp>(loc, resultType,
+                                              operands.take_front(2));
     return op.result();
   }
 

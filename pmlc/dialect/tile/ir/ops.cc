@@ -62,7 +62,6 @@ LogicalResult TraceOp::materializeOperands(OpBuilder &builder) {
 // ---- ReshapeOp ----
 
 OpFoldResult ReshapeOp::fold(ArrayRef<Attribute> operands) {
-  IVLOG(5, "ReshapeOp::fold");
   // reshape(x, x.shape) -> x
   if (tensor().getType() == getType()) {
     return tensor();
@@ -73,7 +72,6 @@ OpFoldResult ReshapeOp::fold(ArrayRef<Attribute> operands) {
 // ---- ConstantOp ----
 
 OpFoldResult ConstantOp::fold(ArrayRef<Attribute> operands) {
-  // IVLOG(5, "ConstantOp::fold> " << debugString(*getOperation()));
   assert(operands.empty() && "constant has no operands");
   return getValue();
 }
