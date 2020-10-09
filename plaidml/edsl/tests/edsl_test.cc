@@ -64,8 +64,8 @@ TEST_F(CppEdsl, HigherPrecisionConstants) {
 
   // CHECK-LABEL: CppEdsl.HigherPrecisionConstants
   // CHECK: module @higher_precision_constants
-  // CHECK: "eltwise.add"(%{{.*}}, %{{.*}}) : (tensor<3x3xf32>, tensor<f32>) -> tensor<3x3xf32>
-  // CHECK: "eltwise.add"(%{{.*}}, %{{.*}}) : (tensor<3x3xf64>, tensor<f64>) -> tensor<3x3xf64>
+  // CHECK: "eltwise.add"(%{{.*}}, %{{.*}}) : (tensor<3x3xf32>, tensor<ui64>) -> tensor<3x3xf32>
+  // CHECK: "eltwise.add"(%{{.*}}, %{{.*}}) : (tensor<3x3xf32>, tensor<f64>) -> tensor<3x3xf64>
   // CHECK: return %{{.*}} : tensor<3x3xf64>
 
   std::vector<float> A_input{1, 2, 3, 4, 5, 6, 7, 8, 9};

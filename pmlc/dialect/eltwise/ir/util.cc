@@ -188,7 +188,10 @@ LogicalResult materializeOperands(OpBuilder &builder, Operation *op,
     RankedTensorType rankedTensorType =
         getRankedTensorType(operand->get().getType());
     Type elementType = rankedTensorType.getElementType();
-    if (elementType != promotedType) {
+    if (elementType != promotedType &&
+        (elementType.isa<APFloatType>() ||
+         elementType.isa<APSignedIntegerType>() ||
+         elementType.isa<APUnsignedIntegerType>())) {
       RankedTensorType newType =
           RankedTensorType::get(rankedTensorType.getShape(), promotedType);
       Value value =
