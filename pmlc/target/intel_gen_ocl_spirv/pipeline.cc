@@ -25,6 +25,7 @@
 #include "pmlc/conversion/pxa_to_affine/passes.h"
 #include "pmlc/conversion/stdx_to_llvm/passes.h"
 #include "pmlc/conversion/tile_to_pxa/passes.h"
+#include "pmlc/dialect/comp/ir/types.h"
 #include "pmlc/dialect/comp/transforms/passes.h"
 #include "pmlc/dialect/pxa/transforms/passes.h"
 #include "pmlc/dialect/stdx/ir/ops.h"
@@ -97,14 +98,10 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(conversion::gpu::createGpuKernelOutliningPass());
 
   // Convert GPU to comp.
-  {
-    std::unique_ptr<mlir::Pass> convertPass =
-        pmlc::conversion::gpu_to_comp::createConvertGpuToCompPass();
-    convertPass->initializeOptions(
-        "comp-execenv-runtime=1 comp-execenv-memory-space=11");
-    pm.addPass(std::move(convertPass));
-  }
+  pm.addPass(pmlc::conversion::gpu_to_comp::createConvertGpuToCompPass(
+      comp::ExecEnvRuntime::OpenCL, /*memorySpace=*/11));
   pm.addPass(comp::createExecEnvCoalescingPass());
+  pm.addPass(comp::createMinimizeAllocationsPass());
 
   // GPU to SPIR-V.
   pm.addPass(createLegalizeStdOpsForSPIRVLoweringPass());

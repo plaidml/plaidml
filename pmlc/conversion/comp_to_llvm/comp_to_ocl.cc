@@ -50,18 +50,17 @@ void ConvertCompToOcl::runOnOperation() {
     return signalPassFailure();
   // Populate conversion patterns.
   mlir::MLIRContext *context = &getContext();
-  mlir::TypeConverter typeConverter;
+  mlir::TypeConverter typeConverter, signatureConverter;
   mlir::OwningRewritePatternList patterns;
-  populateCommonPatterns(context, typeConverter);
+  populateCommonPatterns(context, typeConverter, signatureConverter, patterns);
   populateCompToOclPatterns(context, modulesMap, typeConverter, patterns);
-  mlir::populateFuncOpTypeConversionPattern(patterns, context, typeConverter);
   // Set conversion target.
   mlir::ConversionTarget target(*context);
   target.addLegalDialect<LLVM::LLVMDialect>();
   target.addLegalDialect<mlir::StandardOpsDialect>();
   target.addIllegalDialect<comp::COMPDialect>();
   target.addDynamicallyLegalOp<mlir::FuncOp>([&](mlir::FuncOp op) -> bool {
-    return typeConverter.isSignatureLegal(op.getType());
+    return signatureConverter.isSignatureLegal(op.getType());
   });
   if (mlir::failed(mlir::applyPartialConversion(module, target, patterns)))
     signalPassFailure();
@@ -157,10 +156,6 @@ void populateCompToOclPatterns(mlir::MLIRContext *context,
                                mlir::OwningRewritePatternList &patterns) {
   // Populate type conversion patterns.
   LLVM::LLVMType llvmInt8Ptr = LLVM::LLVMType::getInt8PtrTy(context);
-  typeConverter.addConversion(
-      [=](comp::DeviceType deviceType) -> mlir::Optional<mlir::Type> {
-        return llvmInt8Ptr;
-      });
   typeConverter.addConversion(
       [=](comp::ExecEnvType execEnvType) -> mlir::Optional<mlir::Type> {
         if (execEnvType.getRuntime() != comp::ExecEnvRuntime::OpenCL)

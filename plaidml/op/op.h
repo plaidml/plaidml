@@ -331,7 +331,7 @@ inline edsl::Tensor elu(const edsl::Tensor& I, double alpha) {
 class explicit_padding {
  public:
   explicit explicit_padding(const edsl::Tensor& I, const std::vector<int>& lo_pads, const std::vector<int>& hi_pads)
-      : I_(I), lo_pads_(lo_pads), hi_pads_(hi_pads), mode_(PadMode::CONSTANT), padval_(0) {}
+      : I_(I), lo_pads_(lo_pads), hi_pads_(hi_pads), mode_(PadMode::CONSTANT), padval_(edsl::Constant(0)) {}
 
   explicit_padding& lo_pads(const std::vector<int>& lo_pads) {
     lo_pads_ = lo_pads;
@@ -348,9 +348,8 @@ class explicit_padding {
     return *this;
   }
 
-  template <typename T>
-  explicit_padding& padval(const T& padval) {
-    padval_ = edsl::Value(padval);
+  explicit_padding& padval(const edsl::Tensor& padval) {
+    padval_ = padval;
     return *this;
   }
 
@@ -365,7 +364,7 @@ class explicit_padding {
   std::vector<int> lo_pads_;
   std::vector<int> hi_pads_;
   PadMode mode_;
-  edsl::Value padval_;
+  edsl::Tensor padval_;
 };
 
 inline edsl::Tensor flip(const edsl::Tensor& I, int axis) {

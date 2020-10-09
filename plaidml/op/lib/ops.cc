@@ -1632,9 +1632,7 @@ Value explicit_padding(const Value& value) {
       IVLOG(2, "Constant padding requested");
 
       auto padval = args[4].as_tensor();
-      I = I - padval;
-      Tensor OC = Contraction(O_dims, O_idxs).assign(I(I_idxs));
-      O = OC + padval;
+      O = Contraction(O_dims, O_idxs).assign(I(I_idxs)).init(padval);
     } break;
     case PadMode::EDGE:
     case PadMode::SYMMETRIC:

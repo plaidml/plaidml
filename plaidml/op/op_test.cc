@@ -3,6 +3,8 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include <limits>
+
 #include "llvm/ADT/StringRef.h"
 
 #include "plaidml/op/op.h"
@@ -289,7 +291,7 @@ TEST_F(OpTest, Elu) {
 
 TEST_F(OpTest, ExplicitPadding) {
   auto I = Placeholder(DType::FLOAT32, {2, 3}, "A");
-  auto O = op::explicit_padding(I, {2, 1}, {2, 1}).padval(-1.0);
+  auto O = op::explicit_padding(I, {2, 1}, {2, 1}).padval(Constant(-1.0));
   auto program = makeProgram("explicit_padding", {I}, {O});
 
   std::vector<float> I_input = {1, 2, 3,  //
@@ -300,6 +302,56 @@ TEST_F(OpTest, ExplicitPadding) {
                                  -1, 4,  5,  6,  -1,  //
                                  -1, -1, -1, -1, -1,  //
                                  -1, -1, -1, -1, -1};
+
+  checkProgram(program, {I_input}, {O_output});
+}
+
+TEST_F(OpTest, ExplicitPaddingNegInf) {
+  auto I = Placeholder(DType::FLOAT32, {2, 3}, "A");
+  float neg_inf = -std::numeric_limits<float>::infinity();
+  auto O = op::explicit_padding(I, {2, 1}, {2, 1}).padval(Constant(neg_inf));
+  auto program = makeProgram("explicit_padding", {I}, {O});
+
+  std::vector<float> I_input = {1, 2, 3,  //
+                                4, 5, 6};
+  std::vector<float> O_output = {neg_inf, neg_inf, neg_inf, neg_inf, neg_inf,  //
+                                 neg_inf, neg_inf, neg_inf, neg_inf, neg_inf,  //
+                                 neg_inf, 1,       2,       3,       neg_inf,  //
+                                 neg_inf, 4,       5,       6,       neg_inf,  //
+                                 neg_inf, neg_inf, neg_inf, neg_inf, neg_inf,  //
+                                 neg_inf, neg_inf, neg_inf, neg_inf, neg_inf};
+
+  checkProgram(program, {I_input}, {O_output});
+}
+
+TEST_F(OpTest, ExplicitPaddingInf) {
+  auto I = Placeholder(DType::FLOAT32, {2, 3}, "A");
+  float inf = std::numeric_limits<float>::infinity();
+  auto O = op::explicit_padding(I, {2, 1}, {2, 1}).padval(Constant(inf));
+  auto program = makeProgram("explicit_padding", {I}, {O});
+
+  std::vector<float> I_input = {-1, -2, -3,  //
+                                -4, -5, -6};
+  std::vector<float> O_output = {inf, inf, inf, inf, inf,  //
+                                 inf, inf, inf, inf, inf,  //
+                                 inf, -1,  -2,  -3,  inf,  //
+                                 inf, -4,  -5,  -6,  inf,  //
+                                 inf, inf, inf, inf, inf,  //
+                                 inf, inf, inf, inf, inf};
+
+  checkProgram(program, {I_input}, {O_output});
+}
+
+// TODO: Consider writing a folder for this test case.
+TEST_F(OpTest, ExplicitPaddingNoOp) {
+  auto I = Placeholder(DType::FLOAT32, {2, 3}, "A");
+  auto O = op::explicit_padding(I, {0, 0}, {0, 0}).padval(Constant(0));
+  auto program = makeProgram("explicit_padding", {I}, {O});
+
+  std::vector<float> I_input = {1, 2, 3,  //
+                                4, 5, 6};
+  std::vector<float> O_output = {1, 2, 3,  //
+                                 4, 5, 6};
 
   checkProgram(program, {I_input}, {O_output});
 }

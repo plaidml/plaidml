@@ -40,4 +40,9 @@ def ExecEnvCoalescing : FunctionPass<"comp-execenv-coalescing"> {
   let constructor = "pmlc::dialect::comp::createExecEnvCoalescingPass()";
 }
 
+def MinimizeAllocations : FunctionPass<"comp-minimize-allocations"> {
+  let summary = "Minimize number and total size of memory allocations on device";
+  let constructor = "pmlc::dialect::comp::createMinimizeAllocationsPass()";
+}
+
 #endif // __PMLC_DIALECT_COMP_TRANSFORMS__
