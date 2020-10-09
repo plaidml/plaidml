@@ -60,19 +60,13 @@ Tensor Softmax(Tensor X) {
 TEST_F(CppEdsl, HigherPrecisionConstants) {
   auto A = Placeholder(DType::FLOAT32, {3, 3});
   auto C = A + cast(Tensor{1}, DType::UINT64) + cast(Tensor{2.0}, DType::FLOAT64);
-
   auto program = makeProgram("higher_precision_constants", {A}, {C});
-  writeForFileCheck(program);
 
   // CHECK-LABEL: CppEdsl.HigherPrecisionConstants
   // CHECK: module @higher_precision_constants
-  // CHECK: %[[c1:.*]] = "eltwise.sconst"() {value = 1 : i64} : () -> tensor<si32>
-  // CHECK: %[[cst:.*]] = "eltwise.sconst"() {value = 2.000000e+00 : f64} : () -> tensor<f32>
-  // CHECK: %[[X0:.*]] = "eltwise.cast"(%[[c1]]) : (tensor<si32>) -> tensor<ui64>
-  // CHECK: %[[A:.*]] = "eltwise.add"(%{{.*}}, %[[X0]]) : (tensor<3x3xf32>, tensor<ui64>) -> tensor<3x3xf32>
-  // CHECK: %[[X1:.*]] = "eltwise.cast"(%[[cst]]) : (tensor<f32>) -> tensor<f64>
-  // CHECK: %[[B:.*]] = "eltwise.add"(%[[A]], %[[X1]]) : (tensor<3x3xf32>, tensor<f64>) -> tensor<3x3xf64>
-  // CHECK: return %[[B]] : tensor<3x3xf64>
+  // CHECK: "eltwise.add"(%{{.*}}, %{{.*}}) : (tensor<3x3xf32>, tensor<f32>) -> tensor<3x3xf32>
+  // CHECK: "eltwise.add"(%{{.*}}, %{{.*}}) : (tensor<3x3xf64>, tensor<f64>) -> tensor<3x3xf64>
+  // CHECK: return %{{.*}} : tensor<3x3xf64>
 
   std::vector<float> A_input{1, 2, 3, 4, 5, 6, 7, 8, 9};
   std::vector<double> C_output{4, 5, 6, 7, 8, 9, 10, 11, 12};
@@ -112,7 +106,6 @@ TEST_F(CppEdsl, BitAndScalar) {
   uint64_t mask = UINT32_MAX;
   auto B = A & mask;
   auto program = makeProgram("bit_and", {A}, {B});
-  writeForFileCheck(program);
 
   std::vector<uint64_t> A_input{(ONE << 32),     (ONE << 33) + 1, (ONE << 34) + 2,  //
                                 (ONE << 35) + 3, (ONE << 36) + 4, (ONE << 37) + 5,  //
@@ -525,7 +518,7 @@ TEST_F(CppEdsl, Convolution) {
   // CHECK: return %{{.*}} : tensor<1x56x56x64xf32>
   // clang-format on
   runProgram(program);
-}  // namespace
+}
 
 Tensor MaxPooling2(Tensor I) {
   TensorDim N, X0, X1, C;
@@ -581,9 +574,7 @@ TEST_F(CppEdsl, MnistCnn) {
   // clang-format off
   // CHECK-LABEL: CppEdsl.MnistCnn
   // CHECK: module @mnist_cnn
-  // CHECK-DAG: %[[c12544:.*]] = tile.constant 12544
   // CHECK-DAG: %[[cst:.*]] = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> tensor<f32>
-  // CHECK-DAG: %[[c1:.*]] = tile.constant 1
   // CHECK-DAG: %[[cst_0:.*]] = "eltwise.sconst"() {value = 0xFFF0000000000000 : f64} : () -> tensor<f32>
   // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : tensor<f32>, tensor<1x224x224x1xf32>, tensor<3x3x1x32xf32> -> tensor<1x224x224x32xf32>
   // CHECK: "eltwise.add"(%{{.*}}, %{{.*}}) : (tensor<1x224x224x32xf32>, tensor<32xf32>) -> tensor<1x224x224x32xf32>
@@ -594,7 +585,7 @@ TEST_F(CppEdsl, MnistCnn) {
   // CHECK: "eltwise.cmp_lt"(%{{.*}}, %[[cst]]) : (tensor<1x224x224x64xf32>, tensor<f32>) -> tensor<1x224x224x64xi1>
   // CHECK: "eltwise.select"(%{{.*}}, %[[cst]], %{{.*}}) : (tensor<1x224x224x64xi1>, tensor<f32>, tensor<1x224x224x64xf32>) -> tensor<1x224x224x64xf32>
   // CHECK: tile.contract max, none, %[[cst_0]], %{{.*}} {cons = #set{{[0-9]+}}, sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}]} : tensor<f32>, tensor<1x224x224x64xf32> -> tensor<1x112x112x64xf32>
-  // CHECK: "tile.reshape"(%{{.*}}, %[[c1]], %[[c12544]]) : (tensor<1x112x112x64xf32>, index, index) -> tensor<1x12544xf32>
+  // CHECK: tile.reshape %{{.*}} : (tensor<1x112x112x64xf32>) -> tensor<1x12544xf32>
   // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : tensor<f32>, tensor<1x12544xf32>, tensor<12544x128xf32> -> tensor<1x128xf32>
   // CHECK: "eltwise.add"(%{{.*}}, %{{.*}}) : (tensor<1x128xf32>, tensor<128xf32>) -> tensor<1x128xf32>
   // CHECK: "eltwise.cmp_lt"(%{{.*}}, %[[cst]]) : (tensor<1x128xf32>, tensor<f32>) -> tensor<1x128xi1>
@@ -645,9 +636,9 @@ TEST_F(CppEdsl, LarsMomentum4d) {
   // clang-format off
   // CHECK-LABEL: CppEdsl.LarsMomentum4d
   // CHECK: module @lars_momentum4d
+  // CHECK: "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> tensor<f32>
   // CHECK: "eltwise.sconst"() {value = 1.250000e-01 : f64} : () -> tensor<f32>
   // CHECK: "eltwise.sconst"() {value = 9.765625E-4 : f64} : () -> tensor<f32>
-  // CHECK: "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> tensor<f32>
   // CHECK: "eltwise.sconst"() {value = 4.8828125E-4 : f64} : () -> tensor<f32>
   // CHECK: "eltwise.mul"(%{{.*}}, %{{.*}}) : (tensor<4x7x3x9xf32>, tensor<f32>) -> tensor<4x7x3x9xf32>
   // CHECK: "eltwise.mul"(%{{.*}}, %{{.*}}) : (tensor<f32>, tensor<f32>) -> tensor<f32>
@@ -918,7 +909,7 @@ TEST_F(CppEdsl, ReshapeIntoScalar) {
   // clang-format off
   // CHECK-LABEL: CppEdsl.ReshapeIntoScalar
   // CHECK: module @reshape_into_scalar
-  // CHECK: %[[X0:.*]] = "tile.reshape"(%{{.*}}) : (tensor<1x1x1xsi32>) -> tensor<si32>
+  // CHECK:      %[[X0:.*]] = tile.reshape %{{.*}} : (tensor<1x1x1xsi32>) -> tensor<si32>
   // CHECK-NEXT: %[[X1:.*]] = "eltwise.ident"(%[[X0]]) : (tensor<si32>) -> tensor<si32>
   // CHECK-NEXT: return %[[X1]] : tensor<si32>
   // clang-format on
@@ -935,8 +926,7 @@ TEST_F(CppEdsl, ReshapeFromScalar) {
   // clang-format off
   // CHECK-LABEL: CppEdsl.ReshapeFromScalar
   // CHECK: module @reshape_from_scalar
-  // CHECK: %[[c1:.*]] = "eltwise.sconst"() {value = 1 : i64} : () -> tensor<si32>
-  // CHECK-NEXT: %[[X0:.*]] = "tile.reshape"(%{{.*}}, %[[c1]], %[[c1]], %[[c1]]) : (tensor<si32>, tensor<si32>, tensor<si32>, tensor<si32>) -> tensor<1x1x1xsi32>
+  // CHECK:      %[[X0:.*]] = tile.reshape %{{.*}} : (tensor<si32>) -> tensor<1x1x1xsi32>
   // CHECK-NEXT: %[[X1:.*]] = "eltwise.ident"(%[[X0]]) : (tensor<1x1x1xsi32>) -> tensor<1x1x1xsi32>
   // CHECK-NEXT: return %[[X1]] : tensor<1x1x1xsi32>
   // clang-format on
@@ -963,7 +953,7 @@ TEST_F(CppEdsl, DefractLong) {
   // CHECK: return %{{.*}} : tensor<1x5x5x1xf32>
   // clang-format on
   runProgram(program);
-}  // namespace
+}
 
 TEST_F(CppEdsl, DupOut) {
   auto A = Placeholder(DType::FLOAT32, {10, 20});
@@ -992,10 +982,9 @@ TEST_F(CppEdsl, Select) {
   // clang-format off
   // CHECK-LABEL: CppEdsl.Select
   // CHECK: module @select
-  // CHECK-DAG: %[[c0:.*]] = "eltwise.sconst"() {value = 0 : i64} : () -> tensor<si32>
   // CHECK-DAG: %[[fp1:.*]] = "eltwise.sconst"() {value = 1.000000e+00 : f64} : () -> tensor<f32>
   // CHECK-DAG: %[[fp0:.*]] = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> tensor<f32>
-  // CHECK: "eltwise.cmp_eq"(%{{.*}}, %[[c0]]) : (tensor<10x20xf32>, tensor<si32>) -> tensor<10x20xi1>
+  // CHECK: "eltwise.cmp_eq"(%{{.*}}, %[[fp0]]) : (tensor<10x20xf32>, tensor<f32>) -> tensor<10x20xi1>
   // CHECK: "eltwise.select"(%{{.*}}, %[[fp0]], %[[fp1]]) : (tensor<10x20xi1>, tensor<f32>, tensor<f32>) -> tensor<10x20xf32>
   // CHECK: return %{{.*}} : tensor<10x20xf32>
   // clang-format on
@@ -1027,9 +1016,7 @@ TEST_F(CppEdsl, Prng) {
   // clang-format off
   // CHECK-LABEL: CppEdsl.Prng
   // CHECK: module @prng
-  // CHECK-DAG: %[[c2:.*]] = tile.constant 2
-  // CHECK-DAG: %[[c3:.*]] = tile.constant 3
-  // CHECK: %result, %new_state = "tile.prng"(%{{.*}}, %[[c2]], %[[c3]]) : (tensor<1x3xui32>, index, index) -> (tensor<2x3xf32>, tensor<1x3xui32>)
+  // CHECK: %result, %new_state = "tile.prng"(%{{.*}}) : (tensor<1x3xui32>) -> (tensor<2x3xf32>, tensor<1x3xui32>)
   // CHECK: return %result, %new_state : tensor<2x3xf32>, tensor<1x3xui32>
   // clang-format on
 

@@ -4,6 +4,10 @@
 include "pmlc/dialect/tile/ir/base.td"
 #endif
 
+#ifndef __PMLC_UTIL_INTERFACES__
+include "pmlc/util/interfaces.td"
+#endif
+
 def ConstantOp : TileOpWithPPV<"constant", [ConstantLike, NoSideEffect]>, HasFolder {
   let summary = "constant operation";
   let arguments = (ins IndexAttr:$value);
@@ -22,7 +26,10 @@ def ConstantOp : TileOpWithPPV<"constant", [ConstantLike, NoSideEffect]>, HasFol
   }];
 }
 
-def ContractionOp : TileOpWithPPV<"contract", [NoSideEffect]> {
+def ContractionOp : TileOpWithPPV<"contract", [
+  NoSideEffect,
+  MaterializeOperandsOpInterface
+]> {
   let arguments = (ins
     EltwiseAny:$init,
     Variadic<AnyType>:$operands,
@@ -75,30 +82,24 @@ def ContractionOp : TileOpWithPPV<"contract", [NoSideEffect]> {
     void setConstraints(IntegerSet cons);
 
     RankedTensorType getResultType() { return result().getType().cast<RankedTensorType>(); }
-  }];
-}
 
-def IndexOp : TileOp<"index", [NoSideEffect]>, HasCanonicalizer {
-  let summary = "tensor index lookup operation";
-  let arguments = (ins APIntAttr:$axis, Variadic<EltwiseIndex>:$dims);
-  let results = (outs EltwiseIndex:$result);
-
-  let extraClassDeclaration = [{
-    static Type getResultType(ArrayRef<Value> operands);
+    LogicalResult materializeOperands(OpBuilder& builder);
   }];
 }
 
 class SpecialOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
-    Op<TileDialect, mnemonic, !listconcat(traits, [
-      GenericBuilderInterface
-  ])> {
+    Op<TileDialect, mnemonic, traits>;
 
+class MaterializeOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
+  Op<TileDialect, mnemonic, !listconcat(traits, [
+    MaterializeOperandsOpInterface
+  ])> {
   let extraClassDeclaration = [{
-    static Type getResultType(ArrayRef<Value> operands);
+    LogicalResult materializeOperands(OpBuilder& builder);
   }];
 }
 
-def GatherOp : SpecialOp<"gather">, HasCanonicalizer {
+def GatherOp : MaterializeOp<"gather"> {
   let summary = "special gather operation";
   let arguments = (ins
     RankedTensorOf<[AnyScalar]>:$tensor,
@@ -106,25 +107,31 @@ def GatherOp : SpecialOp<"gather">, HasCanonicalizer {
   let results = (outs RankedTensorOf<[AnyScalar]>:$result);
 }
 
-def PrngOp : SpecialOp<"prng", []>, HasCanonicalizer {
+def IndexOp : SpecialOp<"index"> {
+  let summary = "tensor index lookup operation";
+  let arguments = (ins APIntAttr:$axis, Variadic<EltwiseIndex>:$dims);
+  let results = (outs EltwiseIndex:$result);
+}
+
+def PrngOp : SpecialOp<"prng"> {
   let summary = "pseudorandom number generator";
-  let arguments = (ins
-    RankedTensorOf<[UI32]>:$state,
-    Variadic<EltwiseIndex>:$dims);
+  let arguments = (ins RankedTensorOf<[UI32]>:$state);
   let results = (outs
     RankedTensorOf<[AnyFloat]>:$result,
     RankedTensorOf<[UI32]>:$new_state);
 }
 
-def ReshapeOp : SpecialOp<"reshape">, HasCanonicalizer, HasFolder {
+def ReshapeOp : MaterializeOp<"reshape">,
+  HasFolder {
   let summary = "tensor reshape operation";
-  let arguments = (ins
-    RankedTensorOf<[AnyScalar]>:$tensor,
-    Variadic<EltwiseIndex>:$dims);
+  let arguments = (ins RankedTensorOf<[AnyScalar]>:$tensor);
   let results = (outs RankedTensorOf<[AnyScalar]>:$result);
+  let assemblyFormat = [{
+    $tensor attr-dict `:` functional-type(operands, results)
+  }];
 }
 
-def ScatterOp : SpecialOp<"scatter">, HasCanonicalizer {
+def ScatterOp : MaterializeOp<"scatter"> {
   let summary = "special scatter operation";
   let arguments = (ins
     RankedTensorOf<[AnyScalar]>:$tensor,
@@ -133,13 +140,13 @@ def ScatterOp : SpecialOp<"scatter">, HasCanonicalizer {
   let results = (outs RankedTensorOf<[AnyScalar]>:$result);
 }
 
-def ShapeOp : SpecialOp<"shape">, HasCanonicalizer {
+def ShapeOp : MaterializeOp<"shape"> {
   let summary = "tensor shape operation";
   let arguments = (ins RankedTensorOf<[AnyScalar]>:$tensor);
   let results = (outs RankedTensorOf<[SI32]>:$result);
 }
 
-def TraceOp : Op<TileDialect, "trace", []>, HasCanonicalizer {
+def TraceOp : MaterializeOp<"trace", []> {
   let summary = "tracepoint operation";
   let arguments = (ins AnyType:$in, StrAttr:$msg);
   let results = (outs AnyType:$out);

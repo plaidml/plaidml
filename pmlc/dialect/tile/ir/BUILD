@@ -19,7 +19,7 @@ gentbl(
     tbl_outs = [
         ("-gen-op-decls", "ops.h.inc"),
         ("-gen-op-defs", "ops.cc.inc"),
-        ("-gen-dialect-decls", "dialect.h.inc"),
+        ("-gen-dialect-decls -dialect=tile", "dialect.h.inc"),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "ops.td",

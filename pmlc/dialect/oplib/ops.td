@@ -2,8 +2,6 @@
 
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
-include "pmlc/util/interfaces.td"
-
 //===----------------------------------------------------------------------===//
 // PML op dialect definition
 //===----------------------------------------------------------------------===//
