@@ -9,6 +9,4 @@ namespace networks::oplib {
 
 plaidml::Program buildResnet50(int64_t batch_size = 1);
 
-plaidml::exec::Executable createDefaultExecutable(plaidml::Program program);
-
 }  // namespace networks::oplib

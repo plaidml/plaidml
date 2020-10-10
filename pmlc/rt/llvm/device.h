@@ -12,9 +12,7 @@ class Device final : public pmlc::rt::Device,
                      public std::enable_shared_from_this<Device> {
 public:
   std::unique_ptr<Executable>
-  compile(const std::shared_ptr<pmlc::compiler::Program> &program,
-          mlir::ArrayRef<util::BufferPtr> inputBuffers,
-          mlir::ArrayRef<util::BufferPtr> outputBuffers) final;
+  compile(const std::shared_ptr<pmlc::compiler::Program> &program) final;
 };
 
 } // namespace pmlc::rt::llvm
