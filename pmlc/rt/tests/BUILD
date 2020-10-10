@@ -8,5 +8,6 @@ glob_lit_tests(default_tags = ["skip_windows"])
 plaidml_cc_test(
     name = "openmp_test",
     srcs = ["openmp_test.cc"],
+    copts = ["-w"],
     deps = ["@llvm-project//openmp"],
 )
