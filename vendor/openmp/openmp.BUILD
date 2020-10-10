@@ -1,16 +1,5 @@
-licenses(["notice"])
-
-exports_files(["LICENSE.TXT"])
-
-load(
-    "@com_intel_plaidml//vendor/llvm:llvm.bzl",  # "@org_tensorflow//third_party/llvm:llvm.bzl",
-    "cmake_var_string",
-    "expand_cmake_vars",
-    "llvm_all_cmake_vars",
-    "llvm_copts",
-    "llvm_defines",
-    "llvm_linkopts",
-)
+load("@com_intel_plaidml//vendor/llvm:llvm.bzl", "cmake_var_string", "expand_cmake_vars", "llvm_defines")
+load("@rules_cc//cc:defs.bzl", "cc_library")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -47,13 +36,6 @@ expand_cmake_vars(
     dst = "runtime/src/omp-tools.h",
 )
 
-expand_cmake_vars(
-    name = "lit_site_cfg_gen",
-    src = "runtime/test/lit.site.cfg.in",
-    cmake_vars = openmp_all_cmake_vars,
-    dst = "runtime/test/lit.site.cfg",
-)
-
 genrule(
     name = "kmp_i18n_id",
     srcs = ["runtime/src/i18n/en_US.txt"],
@@ -79,21 +61,17 @@ genrule(
 )
 
 filegroup(
-    name = "omp_data",
+    name = "asm",
     srcs = select({
-        "@bazel_tools//src/conditions:windows": [
-            "runtime/src/z_Windows_NT-586_asm.asm",
-        ],
-        "//conditions:default": [
-            "runtime/src/z_Linux_asm.S",
-        ],
+        "@bazel_tools//src/conditions:windows": ["runtime/src/z_Windows_NT-586_asm.asm"],
+        "//conditions:default": ["runtime/src/z_Linux_asm.S"],
     }),
 )
 
 cc_library(
-    name = "omp",
+    name = "openmp",
     srcs = [
-        ":omp_data",
+        ":asm",
         "runtime/src/kmp_config.h",
         "runtime/src/kmp_i18n_id.inc",
         "runtime/src/kmp_i18n_default.inc",
@@ -163,13 +141,4 @@ cc_library(
     defines = llvm_defines,
     include_prefix = "runtime/src",
     includes = ["runtime/src"],
-)
-
-cc_library(
-    name = "omp_testsuite",
-    srcs = ["runtime/test/omp_testsuite.h"],
-    defines = llvm_defines,
-    include_prefix = "runtime/test",
-    includes = ["runtime/test"],
-    deps = [":omp"],
 )
