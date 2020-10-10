@@ -149,7 +149,7 @@ void pipelineBuilder(OpPassManager &pm) {
 
   // Unroll affine.for loops.
   pm.addPass(createLoopUnrollPass(
-                      /*unrollFactor=*/107,
+                      /*unrollFactor=*/6,
                       /*unrollUpToFactor=*/true));
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
