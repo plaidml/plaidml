@@ -41,10 +41,35 @@ genrule(
     srcs = ["runtime/src/i18n/en_US.txt"],
     outs = ["runtime/src/kmp_i18n_id.inc"],
     cmd = select({
-        "@bazel_tools//src/conditions:darwin": "perl external/llvm-project/openmp/runtime/tools/message-converter.pl --os=mac --prefix=kmp_i18n --enum=$@ external/llvm-project/openmp/runtime/src/i18n/en_US.txt",
-        "@bazel_tools//src/conditions:windows": "perl external/llvm-project/openmp/runtime/tools/message-converter.pl --os=win --prefix=kmp_i18n --enum=$@ external/llvm-project/openmp/runtime/src/i18n/en_US.txt",
-        "//conditions:default": "perl external/llvm-project/openmp/runtime/tools/message-converter.pl --os=lin --prefix=kmp_i18n --enum=$@ external/llvm-project/openmp/runtime/src/i18n/en_US.txt",
+        "@bazel_tools//src/conditions:darwin": """
+            perl external/llvm-project/openmp/runtime/tools/message-converter.pl \
+                --os=mac \
+                --prefix=kmp_i18n \
+                --enum=$@ \
+                external/llvm-project/openmp/runtime/src/i18n/en_US.txt
+        """,
+        "@bazel_tools//src/conditions:windows": """
+            perl external/llvm-project/openmp/runtime/tools/message-converter.pl \
+                --os=win \
+                --prefix=kmp_i18n \
+                --enum=$@ \
+                external/llvm-project/openmp/runtime/src/i18n/en_US.txt
+        """,
+        "//conditions:default": """
+            perl external/llvm-project/openmp/runtime/tools/message-converter.pl \
+                --os=lin \
+                --prefix=kmp_i18n \
+                --enum=$@ \
+                external/llvm-project/openmp/runtime/src/i18n/en_US.txt
+        """,
     }),
+    cmd_ps = """
+        perl external/llvm-project/openmp/runtime/tools/message-converter.pl \
+            --os=win \
+            --prefix=kmp_i18n \
+            --enum=$@ \
+            external/llvm-project/openmp/runtime/src/i18n/en_US.txt
+    """,
     tools = ["runtime/tools/message-converter.pl"],
 )
 
@@ -53,10 +78,35 @@ genrule(
     srcs = ["runtime/src/i18n/en_US.txt"],
     outs = ["runtime/src/kmp_i18n_default.inc"],
     cmd = select({
-        "@bazel_tools//src/conditions:darwin": "perl external/llvm-project/openmp/runtime/tools/message-converter.pl --os=mac --prefix=kmp_i18n --default=$@ external/llvm-project/openmp/runtime/src/i18n/en_US.txt",
-        "@bazel_tools//src/conditions:windows": "perl external/llvm-project/openmp/runtime/tools/message-converter.pl --os=win --prefix=kmp_i18n --default=$@ external/llvm-project/openmp/runtime/src/i18n/en_US.txt",
-        "//conditions:default": "perl external/llvm-project/openmp/runtime/tools/message-converter.pl --os=lin --prefix=kmp_i18n --default=$@ external/llvm-project/openmp/runtime/src/i18n/en_US.txt",
+        "@bazel_tools//src/conditions:darwin": """
+            perl external/llvm-project/openmp/runtime/tools/message-converter.pl \
+                --os=mac \
+                --prefix=kmp_i18n \
+                --default=$@ \
+                external/llvm-project/openmp/runtime/src/i18n/en_US.txt
+        """,
+        "@bazel_tools//src/conditions:windows": """
+            perl external/llvm-project/openmp/runtime/tools/message-converter.pl \
+                --os=win \
+                --prefix=kmp_i18n \
+                --default=$@ \
+                external/llvm-project/openmp/runtime/src/i18n/en_US.txt
+        """,
+        "//conditions:default": """
+            perl external/llvm-project/openmp/runtime/tools/message-converter.pl \
+                --os=lin \
+                --prefix=kmp_i18n \
+                --default=$@ \
+                external/llvm-project/openmp/runtime/src/i18n/en_US.txt
+        """,
     }),
+    cmd_ps = """
+        perl external/llvm-project/openmp/runtime/tools/message-converter.pl \
+            --os=win \
+            --prefix=kmp_i18n \
+            --default=$@ \
+            external/llvm-project/openmp/runtime/src/i18n/en_US.txt
+    """,
     tools = ["runtime/tools/message-converter.pl"],
 )
 
