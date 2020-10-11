@@ -1,3 +1,4 @@
+load("@bazel_skylib//rules:run_binary.bzl", "run_binary")
 load("@com_intel_plaidml//vendor/llvm:llvm.bzl", "cmake_var_string", "expand_cmake_vars", "llvm_defines")
 load("@rules_cc//cc:defs.bzl", "cc_library")
 
@@ -36,84 +37,46 @@ expand_cmake_vars(
     dst = "runtime/src/omp-tools.h",
 )
 
-genrule(
+run_binary(
     name = "kmp_i18n_id",
-    srcs = ["runtime/src/i18n/en_US.txt"],
-    outs = ["runtime/src/kmp_i18n_id.inc"],
-    cmd = select({
-        "@bazel_tools//src/conditions:darwin": """$(location @com_intel_plaidml_conda//:perl) \
-            $(location runtime/tools/message-converter.pl) \
-            --os=mac \
-            --prefix=kmp_i18n \
-            --enum=$@ \
-            $(location runtime/src/i18n/en_US.txt)
-        """,
-        "@bazel_tools//src/conditions:windows": """$(location @com_intel_plaidml_conda//:perl) \
-            $(location runtime/tools/message-converter.pl) \
-            --os=win \
-            --prefix=kmp_i18n \
-            --enum=$@ \
-            $(location runtime/src/i18n/en_US.txt)
-        """,
-        "//conditions:default": """$(location @com_intel_plaidml_conda//:perl) \
-            $(location runtime/tools/message-converter.pl) \
-            --os=lin \
-            --prefix=kmp_i18n \
-            --enum=$@ \
-            $(location runtime/src/i18n/en_US.txt)
-        """,
-    }),
-    cmd_ps = """$(location @com_intel_plaidml_conda//:perl) \
-        $(location runtime/tools/message-converter.pl) \
-        --os=win \
-        --prefix=kmp_i18n \
-        --enum=$@ \
-        $(location runtime/src/i18n/en_US.txt)
-    """,
-    tools = [
+    srcs = [
+        "runtime/src/i18n/en_US.txt",
         "runtime/tools/message-converter.pl",
-        "@com_intel_plaidml_conda//:perl",
     ],
+    outs = ["runtime/src/kmp_i18n_id.inc"],
+    args = [
+        "$(location runtime/tools/message-converter.pl)",
+    ] + select({
+        "@bazel_tools//src/conditions:darwin": ["--os=mac"],
+        "@bazel_tools//src/conditions:windows": ["--os=win"],
+        "//conditions:default": ["--os=lin"],
+    }) + [
+        "--prefix=kmp_i18n",
+        "--enum=$(location runtime/src/kmp_i18n_id.inc)",
+        "$(location runtime/src/i18n/en_US.txt)",
+    ],
+    tool = "@com_intel_plaidml_conda//:perl",
 )
 
-genrule(
+run_binary(
     name = "kmp_i18n_default",
-    srcs = ["runtime/src/i18n/en_US.txt"],
-    outs = ["runtime/src/kmp_i18n_default.inc"],
-    cmd = select({
-        "@bazel_tools//src/conditions:darwin": """$(location @com_intel_plaidml_conda//:perl) \
-            $(location runtime/tools/message-converter.pl) \
-            --os=mac \
-            --prefix=kmp_i18n \
-            --default=$@ \
-            $(location runtime/src/i18n/en_US.txt)
-        """,
-        "@bazel_tools//src/conditions:windows": """$(location @com_intel_plaidml_conda//:perl) \
-            $(location runtime/tools/message-converter.pl) \
-            --os=win \
-            --prefix=kmp_i18n \
-            --default=$@ \
-            $(location runtime/src/i18n/en_US.txt)
-        """,
-        "//conditions:default": """$(location @com_intel_plaidml_conda//:perl) \
-            $(location runtime/tools/message-converter.pl) \
-            --os=lin \
-            --prefix=kmp_i18n \
-            --default=$@ \
-            $(location runtime/src/i18n/en_US.txt)
-        """,
-    }),
-    cmd_ps = """$(location @com_intel_plaidml_conda//:perl) \
-        $(location runtime/tools/message-converter.pl) \
-        --os=win \
-        --prefix=kmp_i18n \
-        --default=$@ \
-        $(location runtime/src/i18n/en_US.txt)
-    """,
-    tools = [
+    srcs = [
+        "runtime/src/i18n/en_US.txt",
         "runtime/tools/message-converter.pl",
-        "@com_intel_plaidml_conda//:perl",
     ],
+    outs = ["runtime/src/kmp_i18n_default.inc"],
+    args = [
+        "$(location runtime/tools/message-converter.pl)",
+    ] + select({
+        "@bazel_tools//src/conditions:darwin": ["--os=mac"],
+        "@bazel_tools//src/conditions:windows": ["--os=win"],
+        "//conditions:default": ["--os=lin"],
+    }) + [
+        "--prefix=kmp_i18n",
+        "--default=$(location runtime/src/kmp_i18n_default.inc)",
+        "$(location runtime/src/i18n/en_US.txt)",
+    ],
+    tool = "@com_intel_plaidml_conda//:perl",
 )
 
 filegroup(
