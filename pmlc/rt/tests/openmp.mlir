@@ -1,14 +1,17 @@
-// RUN: pmlc-opt -x86-convert-std-to-llvm -x86-trace-linking %s -split-input-file | pmlc-jit | FileCheck %s
+// RUN: pmlc-opt -x86-convert-std-to-llvm -x86-trace-linking %s | pmlc-jit | FileCheck %s
 
 func @__trace_0() attributes {id = 0 : i64, msg = "msg\n", trace}
 
 func @main() {
-  %cst = constant 1.000000e+00 : f32
-  omp.parallel {
+  %c1 = constant 1 : index
+  omp.parallel num_threads(%c1 : index) private(%c1: index) {
     call @__trace_0() : () -> ()
+    omp.flush
+    omp.barrier
+    omp.taskwait
+    omp.taskyield
     omp.terminator
   }
-  call @__trace_0() : () -> ()
   return
 }
 

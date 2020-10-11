@@ -5,6 +5,11 @@ package(default_visibility = ["//visibility:public"])
 exports_files(["env"])
 
 filegroup(
+    name = "perl",
+    srcs = ["env/bin/perl"],
+)
+
+filegroup(
     name = "python",
     srcs = ["env/bin/python"],
 )

@@ -41,36 +41,39 @@ genrule(
     srcs = ["runtime/src/i18n/en_US.txt"],
     outs = ["runtime/src/kmp_i18n_id.inc"],
     cmd = select({
-        "@bazel_tools//src/conditions:darwin": """
-            perl external/llvm-project/openmp/runtime/tools/message-converter.pl \
-                --os=mac \
-                --prefix=kmp_i18n \
-                --enum=$@ \
-                external/llvm-project/openmp/runtime/src/i18n/en_US.txt
+        "@bazel_tools//src/conditions:darwin": """$(location @com_intel_plaidml_conda//:perl) \
+            $(location runtime/tools/message-converter.pl) \
+            --os=mac \
+            --prefix=kmp_i18n \
+            --enum=$@ \
+            $(location runtime/src/i18n/en_US.txt)
         """,
-        "@bazel_tools//src/conditions:windows": """
-            perl external/llvm-project/openmp/runtime/tools/message-converter.pl \
-                --os=win \
-                --prefix=kmp_i18n \
-                --enum=$@ \
-                external/llvm-project/openmp/runtime/src/i18n/en_US.txt
-        """,
-        "//conditions:default": """
-            perl external/llvm-project/openmp/runtime/tools/message-converter.pl \
-                --os=lin \
-                --prefix=kmp_i18n \
-                --enum=$@ \
-                external/llvm-project/openmp/runtime/src/i18n/en_US.txt
-        """,
-    }),
-    cmd_ps = """
-        perl external/llvm-project/openmp/runtime/tools/message-converter.pl \
+        "@bazel_tools//src/conditions:windows": """$(location @com_intel_plaidml_conda//:perl) \
+            $(location runtime/tools/message-converter.pl) \
             --os=win \
             --prefix=kmp_i18n \
             --enum=$@ \
-            external/llvm-project/openmp/runtime/src/i18n/en_US.txt
+            $(location runtime/src/i18n/en_US.txt)
+        """,
+        "//conditions:default": """$(location @com_intel_plaidml_conda//:perl) \
+            $(location runtime/tools/message-converter.pl) \
+            --os=lin \
+            --prefix=kmp_i18n \
+            --enum=$@ \
+            $(location runtime/src/i18n/en_US.txt)
+        """,
+    }),
+    cmd_ps = """$(location @com_intel_plaidml_conda//:perl) \
+        $(location runtime/tools/message-converter.pl) \
+        --os=win \
+        --prefix=kmp_i18n \
+        --enum=$@ \
+        $(location runtime/src/i18n/en_US.txt)
     """,
-    tools = ["runtime/tools/message-converter.pl"],
+    tools = [
+        "runtime/tools/message-converter.pl",
+        "@com_intel_plaidml_conda//:perl",
+    ],
 )
 
 genrule(
@@ -78,36 +81,39 @@ genrule(
     srcs = ["runtime/src/i18n/en_US.txt"],
     outs = ["runtime/src/kmp_i18n_default.inc"],
     cmd = select({
-        "@bazel_tools//src/conditions:darwin": """
-            perl external/llvm-project/openmp/runtime/tools/message-converter.pl \
-                --os=mac \
-                --prefix=kmp_i18n \
-                --default=$@ \
-                external/llvm-project/openmp/runtime/src/i18n/en_US.txt
+        "@bazel_tools//src/conditions:darwin": """$(location @com_intel_plaidml_conda//:perl) \
+            $(location runtime/tools/message-converter.pl) \
+            --os=mac \
+            --prefix=kmp_i18n \
+            --default=$@ \
+            $(location runtime/src/i18n/en_US.txt)
         """,
-        "@bazel_tools//src/conditions:windows": """
-            perl external/llvm-project/openmp/runtime/tools/message-converter.pl \
-                --os=win \
-                --prefix=kmp_i18n \
-                --default=$@ \
-                external/llvm-project/openmp/runtime/src/i18n/en_US.txt
-        """,
-        "//conditions:default": """
-            perl external/llvm-project/openmp/runtime/tools/message-converter.pl \
-                --os=lin \
-                --prefix=kmp_i18n \
-                --default=$@ \
-                external/llvm-project/openmp/runtime/src/i18n/en_US.txt
-        """,
-    }),
-    cmd_ps = """
-        perl external/llvm-project/openmp/runtime/tools/message-converter.pl \
+        "@bazel_tools//src/conditions:windows": """$(location @com_intel_plaidml_conda//:perl) \
+            $(location runtime/tools/message-converter.pl) \
             --os=win \
             --prefix=kmp_i18n \
             --default=$@ \
-            external/llvm-project/openmp/runtime/src/i18n/en_US.txt
+            $(location runtime/src/i18n/en_US.txt)
+        """,
+        "//conditions:default": """$(location @com_intel_plaidml_conda//:perl) \
+            $(location runtime/tools/message-converter.pl) \
+            --os=lin \
+            --prefix=kmp_i18n \
+            --default=$@ \
+            $(location runtime/src/i18n/en_US.txt)
+        """,
+    }),
+    cmd_ps = """$(location @com_intel_plaidml_conda//:perl) \
+        $(location runtime/tools/message-converter.pl) \
+        --os=win \
+        --prefix=kmp_i18n \
+        --default=$@ \
+        $(location runtime/src/i18n/en_US.txt)
     """,
-    tools = ["runtime/tools/message-converter.pl"],
+    tools = [
+        "runtime/tools/message-converter.pl",
+        "@com_intel_plaidml_conda//:perl",
+    ],
 )
 
 filegroup(
