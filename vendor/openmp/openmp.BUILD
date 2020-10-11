@@ -1,11 +1,12 @@
+load("@bazel_skylib//lib:dicts.bzl", "dicts")
 load("@bazel_skylib//rules:run_binary.bzl", "run_binary")
-load("@com_intel_plaidml//vendor/llvm:llvm.bzl", "cmake_var_string", "expand_cmake_vars", "llvm_defines")
+load("@com_intel_plaidml//vendor/llvm:llvm.bzl", "cmake_var_string", "expand_cmake_vars")
 load("@rules_cc//cc:defs.bzl", "cc_library")
 
 package(default_visibility = ["//visibility:public"])
 
 # Define OpenMP-specific CMake vars
-openmp_cmake_vars = {
+cmake_vars_base = {
     "LIBOMP_LIB_FILE": "libomp.so",
     "LIBOMP_VERSION_MAJOR": "5",
     "LIBOMP_VERSION_MINOR": "0",
@@ -13,27 +14,41 @@ openmp_cmake_vars = {
     "LIBOMP_BUILD_DATE": "20140926",
 }
 
-openmp_all_cmake_vars = cmake_var_string(openmp_cmake_vars)
+cmake_vars_windows = {
+    "MSVC": 1,
+}
+
+cmake_vars = select({
+    "@bazel_tools//src/conditions:darwin": cmake_var_string(cmake_vars_base),
+    "@bazel_tools//src/conditions:darwin_x86_64": cmake_var_string(cmake_vars_base),
+    "@bazel_tools//src/conditions:windows": cmake_var_string(
+        dicts.add(
+            cmake_vars_base,
+            cmake_vars_windows,
+        ),
+    ),
+    "//conditions:default": cmake_var_string(cmake_vars_base),
+})
 
 # Auto-generated files (generated using configure_file in CMake)
 expand_cmake_vars(
     name = "omp_gen",
     src = "runtime/src/include/omp.h.var",
-    cmake_vars = openmp_all_cmake_vars,
+    cmake_vars = cmake_vars,
     dst = "runtime/src/omp.h",
 )
 
 expand_cmake_vars(
     name = "kmp_config_gen",
     src = "runtime/src/kmp_config.h.cmake",
-    cmake_vars = openmp_all_cmake_vars,
+    cmake_vars = cmake_vars,
     dst = "runtime/src/kmp_config.h",
 )
 
 expand_cmake_vars(
     name = "omp_tools_gen",
     src = "runtime/src/include/omp-tools.h.var",
-    cmake_vars = openmp_all_cmake_vars,
+    cmake_vars = cmake_vars,
     dst = "runtime/src/omp-tools.h",
 )
 
@@ -79,18 +94,9 @@ run_binary(
     tool = "@com_intel_plaidml_conda//:perl",
 )
 
-filegroup(
-    name = "asm",
-    srcs = select({
-        "@bazel_tools//src/conditions:windows": ["runtime/src/z_Windows_NT-586_asm.asm"],
-        "//conditions:default": ["runtime/src/z_Linux_asm.S"],
-    }),
-)
-
 cc_library(
     name = "openmp",
     srcs = [
-        ":asm",
         "runtime/src/kmp_config.h",
         "runtime/src/kmp_i18n_id.inc",
         "runtime/src/kmp_i18n_default.inc",
@@ -126,9 +132,11 @@ cc_library(
     ] + select({
         "@bazel_tools//src/conditions:windows": [
             "runtime/src/z_Windows_NT_util.cpp",
+            "runtime/src/z_Windows_NT-586_asm.asm",
             "runtime/src/z_Windows_NT-586_util.cpp",
         ],
         "//conditions:default": [
+            "runtime/src/z_Linux_asm.S",
             "runtime/src/z_Linux_util.cpp",
             "runtime/src/kmp_gsupport.cpp",
         ],
@@ -150,6 +158,7 @@ cc_library(
         "runtime/src/ompt-specific.h",
         "runtime/src/thirdparty/ittnotify/ittnotify_config.h",
     ],
+    copts = ["-w"],
     data = [
         ":kmp_config_gen",
         ":kmp_i18n_default",
@@ -157,7 +166,13 @@ cc_library(
         ":omp_gen",
         ":omp_tools_gen",
     ],
-    defines = llvm_defines,
     include_prefix = "runtime/src",
     includes = ["runtime/src"],
+    local_defines = select({
+        "@bazel_tools//src/conditions:windows": [
+            "_M_AMD64",
+            "OMPT_SUPPORT=0",
+        ],
+        "//conditions:default": [],
+    }),
 )
