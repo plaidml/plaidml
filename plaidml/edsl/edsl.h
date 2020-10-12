@@ -278,9 +278,6 @@ class Tensor {
   IndexedTensor operator()(Ts... idxs) const;
   IndexedTensor operator()(const std::vector<TensorIndex>& idxs) const;
 
-  // TODO: remove this
-  Tensor operator[](size_t ordinal) const;
-
   ///
   /// Represents an eltwise negation
   ///
@@ -332,6 +329,11 @@ class Tensor {
     details::into_vector(&vec, std::forward<Ts>(dims)...);
     bind_dims(vec);
   }
+
+  ///
+  /// Get an element of an operation that returns a tuple (i.e. multlpe results).
+  ///
+  Tensor element(size_t ordinal) const;
 
   plaidml_expr* as_ptr() const { return ptr_.get(); }
 
@@ -634,7 +636,7 @@ inline IndexedTensor Tensor::operator()(const std::vector<TensorIndex>& idxs) co
   return IndexedTensor(*this, idxs);
 }
 
-inline Tensor Tensor::operator[](size_t ordinal) const {
+inline Tensor Tensor::element(size_t ordinal) const {
   return Tensor(ffi::call<plaidml_expr*>(plaidml_expr_element, as_ptr(), ordinal));
 }
 
@@ -829,7 +831,7 @@ inline std::pair<Tensor, Tensor> prng(const Tensor& state, const std::vector<int
     args.emplace_back(TensorDim(dim));
   }
   Tensor R = intrinsicCall("prng", args);
-  return std::make_pair(R[0], R[1]);
+  return std::make_pair(R.element(0), R.element(1));
 }
 
 ///
