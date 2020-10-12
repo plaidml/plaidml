@@ -44,26 +44,27 @@ struct FusionInfo {
   SmallVector<WriteWrite, 4> writeAfterWrites;
   // Current state (whether we have a plan or not)
   bool hasPlan;
-  // Fuse the ops with exactly matched idxs
-  bool exactlyMatch;
-  // Perform tiled fusions, including additional loop transformations from
-  // subgroups pass
-  bool tiledFusion;
   // Specifies the mapping from A's index space into B's index space (post
   // tiling)
   DenseMap<BlockArgument, BlockArgument> aToB;
   DenseMap<BlockArgument, BlockArgument> bToA;
   // Over-fusion prevention parameter
   int64_t memoryActivityThreshold;
+  // Fuse the ops with exactly matched idxs
+  bool exactlyMatch;
+  // Perform tiled fusions, including additional loop transformations from
+  // subgroups pass
+  bool tiledFusion;
 
   bool reverseFusion;
 
   FusionInfo(AffineParallelOp aBand, AffineParallelOp bBand,
              int64_t memoryActivityThreshold, bool exactlyMatch,
              bool tiledFusion)
-      : aInfo{aBand}, bInfo{bBand}, hasPlan(false), exactlyMatch(exactlyMatch),
+      : aInfo{aBand}, bInfo{bBand}, hasPlan(false),
         memoryActivityThreshold(memoryActivityThreshold),
-        tiledFusion(tiledFusion), reverseFusion(false) {}
+        exactlyMatch(exactlyMatch), tiledFusion(tiledFusion),
+        reverseFusion(false) {}
 
   // Helper method to find the original source write of a state update.
   static PxaReduceOpInterface findSourceWrite(Value val) {
