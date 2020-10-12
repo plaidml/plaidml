@@ -61,7 +61,7 @@ using mlir::ValueRange;
 using mlir::VectorType;
 using util::AggregationKind;
 using util::CombinationKind;
-using util::GenericBuilder;
+using util::MaterializeOperandsOpInterface;
 
 namespace MemoryEffects = mlir::MemoryEffects;
 namespace OpTrait = mlir::OpTrait;

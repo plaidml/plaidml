@@ -14,27 +14,82 @@
 #include "pmlc/util/logging.h"
 #include "pmlc/util/util.h"
 
+using namespace mlir; // NOLINT
+
 namespace pmlc::dialect::tile {
 
 using llvm::SmallVector;
-using mlir::AffineExpr;
-using mlir::ArrayAttr;
-using mlir::failure;
-using mlir::FloatAttr;
-using mlir::IntegerAttr;
-using mlir::IntegerType;
-using mlir::LogicalResult;
-using mlir::OpRewritePattern;
-using mlir::PatternRewriter;
-using mlir::StringAttr;
-using mlir::success;
-using mlir::Value;
+
+LogicalResult ContractionOp::materializeOperands(OpBuilder &builder) {
+  Operation *op = getOperation();
+  if (combo() == CombinationKind::cond) {
+    auto operands = op->getOpOperands();
+    return success(
+        succeeded(eltwise::materializeOperands(
+            builder, op,
+            llvm::ArrayRef<OpOperand *>{&operands[0], &operands[3]})) &&
+        succeeded(eltwise::materializeOperands(
+            builder, op,
+            llvm::ArrayRef<OpOperand *>{&operands[1], &operands[2]})));
+  }
+  return eltwise::materializeOperands(builder, getOperation());
+}
+
+LogicalResult GatherOp::materializeOperands(OpBuilder &builder) {
+  Operation *op = getOperation();
+  return eltwise::materializeOperands(builder, op,
+                                      op->getOpOperands().take_front());
+}
+
+LogicalResult ReshapeOp::materializeOperands(OpBuilder &builder) {
+  return eltwise::materializeOperands(builder, getOperation());
+}
+
+LogicalResult ScatterOp::materializeOperands(OpBuilder &builder) {
+  Operation *op = getOperation();
+  return eltwise::materializeOperands(builder, op,
+                                      op->getOpOperands().take_front());
+}
+
+LogicalResult ShapeOp::materializeOperands(OpBuilder &builder) {
+  return eltwise::materializeOperands(builder, getOperation());
+}
+
+LogicalResult TraceOp::materializeOperands(OpBuilder &builder) {
+  return eltwise::materializeOperands(builder, getOperation());
+}
+
+// ---- ReshapeOp ----
+
+OpFoldResult ReshapeOp::fold(ArrayRef<Attribute> operands) {
+  // reshape(x, x.shape) -> x
+  if (tensor().getType() == getType()) {
+    return tensor();
+  }
+  return {};
+}
+
+// ---- ConstantOp ----
 
 OpFoldResult ConstantOp::fold(ArrayRef<Attribute> operands) {
-  // IVLOG(5, "ConstantOp::fold> " << mlir::debugString(*getOperation()));
   assert(operands.empty() && "constant has no operands");
   return getValue();
 }
+
+void printConstantOp(OpAsmPrinter *printer, ConstantOp op) {
+  *printer << op.getOperation()->getName() << ' ' << op.value().getZExtValue();
+}
+
+ParseResult parseConstantOp(OpAsmParser *parser, OperationState &result) {
+  auto indexType = parser->getBuilder().getIndexType();
+  result.addTypes(indexType);
+  IntegerAttr value;
+  return parser->parseAttribute(value, indexType, "value", result.attributes);
+}
+
+LogicalResult verifyConstantOp(ConstantOp op) { return success(); }
+
+// ---- ContractionOp ----
 
 unsigned ContractionOp::getNumTensors(CombinationKind combo) {
   switch (combo) {
@@ -84,7 +139,7 @@ AffineMap ContractionOp::getSourceMap(unsigned i) {
 void ContractionOp::setLowerBounds(ArrayRef<int64_t> bounds) {
   SmallVector<AffineExpr, 6> exprs;
   for (auto dim : bounds) {
-    exprs.push_back(mlir::getAffineConstantExpr(dim, getContext()));
+    exprs.push_back(getAffineConstantExpr(dim, getContext()));
   }
   auto map =
       AffineMap::get(/*dimCount=*/0, /*symbolCount=*/0, exprs, getContext());
@@ -94,7 +149,7 @@ void ContractionOp::setLowerBounds(ArrayRef<int64_t> bounds) {
 void ContractionOp::setUpperBounds(ArrayRef<int64_t> bounds) {
   SmallVector<AffineExpr, 6> exprs;
   for (auto dim : bounds) {
-    exprs.push_back(mlir::getAffineConstantExpr(dim, getContext()));
+    exprs.push_back(getAffineConstantExpr(dim, getContext()));
   }
   auto map =
       AffineMap::get(/*dimCount=*/0, /*symbolCount=*/0, exprs, getContext());
@@ -120,317 +175,6 @@ void ContractionOp::setConstraints(IntegerSet cons) {
     setAttr(getConstraintsAttrName(), IntegerSetAttr::get(cons));
   }
 }
-
-// --- GatherOp ---
-
-struct GatherCanonicalizer : public OpRewritePattern<GatherOp> {
-  using OpRewritePattern<GatherOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(GatherOp gatherOp,
-                                PatternRewriter &rewriter) const override {
-    IVLOG(5, "IndexCanonicalizer::matchAndRewrite> "
-                 << mlir::debugString(gatherOp));
-    auto op = gatherOp.getOperation();
-    SmallVector<Value, 2> operands(op->getOperands());
-    auto resultType = GatherOp::getResultType(operands);
-    if (resultType == gatherOp.result().getType()) {
-      return failure();
-    }
-    auto newOp = rewriter.create<GatherOp>(op->getLoc(), resultType,
-                                           gatherOp.tensor(), gatherOp.dims());
-    rewriter.replaceOp(op, {newOp});
-    util::UpdateFuncOpType(newOp.getOperation());
-    return success();
-  }
-};
-
-void GatherOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
-                                           MLIRContext *context) {
-  results.insert<GatherCanonicalizer>(context);
-}
-
-Type GatherOp::getResultType(ArrayRef<Value> operands) {
-  IVLOG(5, "GatherOp::getResultType>")
-  if (operands.size() != 2) {
-    throw std::runtime_error("GatherOp requires 2 operands");
-  }
-  auto tensor = operands[0];
-  auto tensorType = eltwise::getRankedTensorType(tensor.getType());
-  auto tensorElementType = tensorType.getElementType();
-  if (!tensorType.getRank()) {
-    throw std::runtime_error(
-        "'gather' requires first operand to have at least one dimension.");
-  }
-  auto index = operands[1];
-  auto indexType = eltwise::getRankedTensorType(index.getType());
-  auto indexElementType = indexType.getElementType();
-  if (!indexElementType.isSignedInteger(32)) {
-    throw std::runtime_error(
-        "'gather' requires the data type for the second argument to be i32.");
-  }
-  SmallVector<int64_t, 4> shape;
-  auto tensorShape = tensorType.getShape();
-  auto indexShape = indexType.getShape();
-  for (size_t i = 0; i < indexShape.size(); i++) {
-    shape.push_back(indexShape[i]);
-  }
-  for (size_t i = 1; i < tensorShape.size(); i++) {
-    shape.push_back(tensorShape[i]);
-  }
-  auto resultType = RankedTensorType::get(shape, tensorElementType);
-  IVLOG(6, "  resultType: " << mlir::debugString(resultType));
-  return resultType;
-}
-
-// ---- IndexOp ----
-
-struct IndexCanonicalizer : public OpRewritePattern<IndexOp> {
-  using OpRewritePattern<IndexOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(IndexOp indexOp,
-                                PatternRewriter &rewriter) const override {
-    IVLOG(5, "IndexCanonicalizer::matchAndRewrite> "
-                 << mlir::debugString(indexOp));
-    auto op = indexOp.getOperation();
-    SmallVector<Value, 4> operands(op->getOperands());
-    auto resultType = IndexOp::getResultType(operands);
-    if (resultType == indexOp.result().getType()) {
-      return failure();
-    }
-    auto newOp = rewriter.create<IndexOp>(op->getLoc(), resultType,
-                                          indexOp.axisAttr(), indexOp.dims());
-    rewriter.replaceOp(op, {newOp});
-    util::UpdateFuncOpType(newOp.getOperation());
-    return success();
-  }
-};
-
-void IndexOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
-                                          MLIRContext *context) {
-  results.insert<IndexCanonicalizer>(context);
-}
-
-Type IndexOp::getResultType(ArrayRef<Value> operands) {
-  if (operands.size() < 1) {
-    throw std::runtime_error("IndexOp requires at least one operand");
-  }
-
-  auto *context = operands.front().getContext();
-  auto elementType = IntegerType::get(32, IntegerType::Signed, context);
-  auto shape = eltwise::getShapeFromOperands(operands);
-  return RankedTensorType::get(shape, elementType);
-}
-
-// ---- PrngOp ----
-
-struct PrngCanonicalizer : public OpRewritePattern<PrngOp> {
-  using OpRewritePattern<PrngOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(PrngOp prngOp,
-                                PatternRewriter &rewriter) const override {
-    IVLOG(5,
-          "PrngCanonicalizer::matchAndRewrite> " << mlir::debugString(prngOp));
-    auto op = prngOp.getOperation();
-    SmallVector<Value, 5> operands(op->getOperands());
-    auto resultType = PrngOp::getResultType(operands);
-    if (resultType == prngOp.result().getType()) {
-      return failure();
-    }
-    auto stateType = prngOp.new_state().getType();
-    SmallVector<Value, 4> dims(prngOp.dims());
-    auto newOp = rewriter.create<PrngOp>(op->getLoc(), resultType, stateType,
-                                         prngOp.state(), dims);
-    rewriter.replaceOp(op, {newOp.result(), newOp.new_state()});
-    util::UpdateFuncOpType(newOp.getOperation());
-    return success();
-  }
-};
-
-void PrngOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
-                                         MLIRContext *context) {
-  results.insert<PrngCanonicalizer>(context);
-}
-
-Type PrngOp::getResultType(ArrayRef<Value> operands) {
-  IVLOG(5, "PrngOp::getResultType>")
-  if (operands.size() < 1) {
-    throw std::runtime_error("PrngOp requires at least one operand");
-  }
-  auto state = operands.front();
-  auto dims = operands.drop_front();
-  auto shape = eltwise::getShapeFromOperands(dims);
-  auto elementType = FloatType::getF32(state.getContext());
-  return RankedTensorType::get(shape, elementType);
-}
-
-// ---- ReshapeOp ----
-
-OpFoldResult ReshapeOp::fold(ArrayRef<Attribute> operands) {
-  IVLOG(5, "ReshapeOp::fold");
-  // reshape(x, x.shape) -> x
-  if (tensor().getType() == getType()) {
-    return tensor();
-  }
-  return {};
-}
-
-struct ReshapeCanonicalizer : public OpRewritePattern<ReshapeOp> {
-  using OpRewritePattern<ReshapeOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(ReshapeOp reshapeOp,
-                                PatternRewriter &rewriter) const override {
-    IVLOG(5, "ReshapeCanonicalizer::matchAndRewrite> "
-                 << mlir::debugString(reshapeOp));
-    auto op = reshapeOp.getOperation();
-    SmallVector<Value, 5> operands(op->getOperands());
-    auto resultType = ReshapeOp::getResultType(operands);
-    if (resultType == reshapeOp.result().getType()) {
-      return failure();
-    }
-    SmallVector<Value, 4> dims(reshapeOp.dims());
-    auto newOp = rewriter.create<ReshapeOp>(op->getLoc(), resultType,
-                                            reshapeOp.tensor(), dims);
-    rewriter.replaceOp(op, {newOp});
-    util::UpdateFuncOpType(newOp.getOperation());
-    return success();
-  }
-};
-
-void ReshapeOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
-                                            MLIRContext *context) {
-  results.insert<ReshapeCanonicalizer>(context);
-}
-
-Type ReshapeOp::getResultType(ArrayRef<Value> operands) {
-  IVLOG(5, "ReshapeOp::getResultType>")
-  if (operands.empty()) {
-    throw std::runtime_error("ReshapeOp requires at least 1 operand");
-  }
-  auto tensor = operands.front();
-  auto dims = operands.drop_front();
-  auto tensorType = eltwise::getRankedTensorType(tensor.getType());
-  auto elementType = tensorType.getElementType();
-  auto shape = eltwise::getShapeFromOperands(dims);
-  return RankedTensorType::get(shape, elementType);
-}
-
-// --- ScatterOp ---
-
-struct ScatterCanonicalizer : public OpRewritePattern<ScatterOp> {
-  using OpRewritePattern<ScatterOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(ScatterOp scatterOp,
-                                PatternRewriter &rewriter) const override {
-    IVLOG(5, "IndexCanonicalizer::matchAndRewrite> "
-                 << mlir::debugString(scatterOp));
-    auto op = scatterOp.getOperation();
-    SmallVector<Value, 3> operands(op->getOperands());
-    auto resultType = ScatterOp::getResultType(operands);
-    if (resultType == scatterOp.result().getType()) {
-      return failure();
-    }
-    auto newOp =
-        rewriter.create<ScatterOp>(op->getLoc(), resultType, scatterOp.tensor(),
-                                   scatterOp.dims(), scatterOp.other());
-    rewriter.replaceOp(op, {newOp});
-    util::UpdateFuncOpType(newOp.getOperation());
-    return success();
-  }
-};
-
-void ScatterOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
-                                            MLIRContext *context) {
-  results.insert<ScatterCanonicalizer>(context);
-}
-
-Type ScatterOp::getResultType(ArrayRef<Value> operands) {
-  IVLOG(5, "ScatterOp::getResultType>")
-  if (operands.size() != 3) {
-    throw std::runtime_error("ScatterOp requires 3 operands");
-  }
-  auto tensor = operands[0];
-  auto tensorType = eltwise::getRankedTensorType(tensor.getType());
-  auto tensorElementType = tensorType.getElementType();
-  const auto &tensorShape = tensorType.getShape();
-  if (!tensorType.getRank()) {
-    throw std::runtime_error(
-        "'scatter' requires first operand to have at least one dimension.");
-  }
-  auto index = operands[1];
-  auto indexType = eltwise::getRankedTensorType(index.getType());
-  auto indexElementType = indexType.getElementType();
-  if (!indexElementType.isSignedInteger(32)) {
-    throw std::runtime_error(
-        "'scatter' requires the data type for the second argument to be i32.");
-  }
-  auto other = operands[2];
-  auto otherType = eltwise::getRankedTensorType(other.getType());
-  const auto &otherShape = otherType.getShape();
-  SmallVector<int64_t, 4> shape{otherShape[0]};
-  for (unsigned i = indexType.getRank(); i < tensorType.getRank(); i++) {
-    shape.emplace_back(tensorShape[i]);
-  }
-  auto resultType = RankedTensorType::get(shape, tensorElementType);
-  IVLOG(6, "  resultType: " << mlir::debugString(resultType));
-  return resultType;
-}
-
-// ---- ShapeOp ----
-
-struct ShapeCanonicalizer : public OpRewritePattern<ShapeOp> {
-  using OpRewritePattern<ShapeOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(ShapeOp shapeOp,
-                                PatternRewriter &rewriter) const override {
-    IVLOG(5, "ShapeCanonicalizer::matchAndRewrite> "
-                 << mlir::debugString(shapeOp));
-    auto op = shapeOp.getOperation();
-    SmallVector<Value, 1> operands(op->getOperands());
-    auto resultType = ShapeOp::getResultType(operands);
-    if (resultType == shapeOp.result().getType()) {
-      return failure();
-    }
-    auto newOp =
-        rewriter.create<ShapeOp>(op->getLoc(), resultType, shapeOp.tensor());
-    rewriter.replaceOp(op, {newOp});
-    util::UpdateFuncOpType(newOp.getOperation());
-    return success();
-  }
-};
-
-void ShapeOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
-                                          MLIRContext *context) {
-  results.insert<ShapeCanonicalizer>(context);
-}
-
-Type ShapeOp::getResultType(ArrayRef<Value> operands) {
-  IVLOG(5, "ShapeOp::getResultType>")
-  if (operands.size() != 1) {
-    throw std::runtime_error("ShapeOp requires 1 operand");
-  }
-  auto tensor = operands[0];
-  auto tensorType = eltwise::getRankedTensorType(tensor.getType());
-  auto elementType = IntegerType::get(32, IntegerType::Signed,
-                                      tensor.getContext()); // TODO: index type?
-  return RankedTensorType::get({tensorType.getRank()}, elementType);
-}
-
-// ---- ConstantOp ----
-
-void printConstantOp(OpAsmPrinter *printer, ConstantOp op) {
-  *printer << op.getOperation()->getName() << ' ' << op.value().getZExtValue();
-}
-
-ParseResult parseConstantOp(OpAsmParser *parser, OperationState &result) {
-  auto indexType = parser->getBuilder().getIndexType();
-  result.addTypes(indexType);
-  IntegerAttr value;
-  return parser->parseAttribute(value, indexType, "value", result.attributes);
-}
-
-LogicalResult verifyConstantOp(ConstantOp op) { return success(); }
-
-// ---- ContractionOp ----
 
 unsigned ContractionOp::getNumTensors() { return getNumTensors(combo()); }
 
@@ -595,30 +339,6 @@ LogicalResult verifyContractionOp(ContractionOp op) {
     }
   }
   return success();
-}
-
-// ---- TraceOp ----
-
-struct TraceOpCanonicalizer : public OpRewritePattern<TraceOp> {
-  using OpRewritePattern<TraceOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(TraceOp op,
-                                PatternRewriter &rewriter) const override {
-    IVLOG(5,
-          "TraceOpCanonicalizer::matchAndRewrite> " << mlir::debugString(op));
-    if (op.in().getType() == op.out().getType()) {
-      return failure();
-    }
-    auto newOp = rewriter.create<TraceOp>(op.getLoc(), op.in(), op.msg());
-    rewriter.replaceOp(op, {newOp});
-    util::UpdateFuncOpType(newOp.getOperation());
-    return success();
-  }
-};
-
-void TraceOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
-                                          MLIRContext *context) {
-  results.insert<TraceOpCanonicalizer>(context);
 }
 
 #define GET_OP_CLASSES

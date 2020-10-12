@@ -10,6 +10,7 @@
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 
+#include "pmlc/dialect/eltwise/ir/types.h"
 #include "pmlc/dialect/eltwise/ir/util.h"
 #include "pmlc/util/interfaces.h"
 
@@ -48,7 +49,7 @@ using mlir::TypeAttr;
 using mlir::Value;
 using mlir::ValueRange;
 using mlir::VectorType;
-using util::GenericBuilder;
+using util::MaterializeOperandsOpInterface;
 
 namespace MemoryEffects = mlir::MemoryEffects;
 namespace OpTrait = mlir::OpTrait;

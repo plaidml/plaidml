@@ -6,32 +6,11 @@ load("//bzl:plaidml.bzl", "plaidml_cc_library")
 package(default_visibility = ["//visibility:public"])
 
 filegroup(
-    name = "enums-td",
-    srcs = ["enums.td"],
-)
-
-filegroup(
-    name = "interfaces-td",
-    srcs = ["interfaces.td"],
-)
-
-filegroup(
     name = "td_files",
     srcs = [
-        ":enums-td",
-        ":interfaces-td",
+        "enums.td",
+        "interfaces.td",
     ],
-)
-
-gentbl(
-    name = "interfaces-gen",
-    tbl_outs = [
-        ("-gen-op-interface-decls", "interfaces.h.inc"),
-        ("-gen-op-interface-defs", "interfaces.cc.inc"),
-    ],
-    tblgen = "@llvm-project//mlir:mlir-tblgen",
-    td_file = "interfaces.td",
-    td_srcs = ["@llvm-project//mlir:OpBaseTdFiles"],
 )
 
 gentbl(
@@ -42,6 +21,17 @@ gentbl(
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "enums.td",
+    td_srcs = ["@llvm-project//mlir:OpBaseTdFiles"],
+)
+
+gentbl(
+    name = "interfaces-gen",
+    tbl_outs = [
+        ("-gen-op-interface-decls", "interfaces.h.inc"),
+        ("-gen-op-interface-defs", "interfaces.cc.inc"),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "interfaces.td",
     td_srcs = ["@llvm-project//mlir:OpBaseTdFiles"],
 )
 
