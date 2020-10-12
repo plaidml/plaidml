@@ -21,7 +21,7 @@ def PxaReadOpInterface : PxaOpInterface<"PxaReadOpInterface"> {
       /*args=*/(ins),
       /*methodBody*/[{}],
       /*defaultImplementation=*/ [{
-        ConcreteOp op = cast<ConcreteOp>(this->getOperation());
+        ConcreteOp op = ::mlir::cast<ConcreteOp>(this->getOperation());
         return op.getOperand(op.getMemRefOperandIndex());
       }]
     >,
@@ -32,7 +32,7 @@ def PxaReadOpInterface : PxaOpInterface<"PxaReadOpInterface"> {
       /*args=*/(ins),
       /*methodBody=*/[{}],
       /*defaultImplementation=*/[{
-        ConcreteOp op = cast<ConcreteOp>(this->getOperation());
+        ConcreteOp op = ::mlir::cast<ConcreteOp>(this->getOperation());
         return op.getMemRef().getType().template cast<::mlir::MemRefType>();
       }]
     >,
@@ -43,7 +43,7 @@ def PxaReadOpInterface : PxaOpInterface<"PxaReadOpInterface"> {
       /*args=*/(ins),
       /*methodBody=*/[{}],
       /*defaultImplementation=*/[{
-        ConcreteOp op = cast<ConcreteOp>(this->getOperation());
+        ConcreteOp op = ::mlir::cast<ConcreteOp>(this->getOperation());
         return llvm::drop_begin(op.getOperands(), 1);
       }]
     >,
@@ -56,7 +56,7 @@ def PxaReadOpInterface : PxaOpInterface<"PxaReadOpInterface"> {
       /*args=*/(ins),
       /*methodBody=*/[{}],
       /*defaultImplementation=*/[{
-        ConcreteOp op = cast<ConcreteOp>(this->getOperation());
+        ConcreteOp op = ::mlir::cast<ConcreteOp>(this->getOperation());
         return op.getAffineMapAttr().getValue();
       }]
     >,
@@ -67,9 +67,9 @@ def PxaReadOpInterface : PxaOpInterface<"PxaReadOpInterface"> {
       /*args=*/(ins "::mlir::Value":$memref),
       /*methodBody=*/[{}],
       /*defaultImplementation=*/[{
-        ConcreteOp op = cast<ConcreteOp>(this->getOperation());
+        ConcreteOp op = ::mlir::cast<ConcreteOp>(this->getOperation());
         assert(memref == getMemRef());
-        return {Identifier::get(op.getMapAttrName(), op.getContext()),
+        return {::mlir::Identifier::get(op.getMapAttrName(), op.getContext()),
                 op.getAffineMapAttr()};
       }]
     >,
@@ -80,7 +80,7 @@ def PxaReadOpInterface : PxaOpInterface<"PxaReadOpInterface"> {
       /*args=*/(ins),
       /*methodBody=*/[{}],
       /*defaultImplementation=*/[{
-        return cast<ConcreteOp>(this->getOperation());
+        return ::mlir::cast<ConcreteOp>(this->getOperation());
       }]
     >,
   ];
@@ -100,7 +100,7 @@ def PxaReduceOpInterface : PxaOpInterface<"PxaReduceOpInterface"> {
       /*args=*/(ins),
       /*methodBody=*/[{}],
       /*defaultImplementation=*/[{
-        ConcreteOp op = cast<ConcreteOp>(this->getOperation());
+        ConcreteOp op = ::mlir::cast<ConcreteOp>(this->getOperation());
         return op.getOperand(op.getMemRefOperandIndex());
       }]
     >,
@@ -111,7 +111,7 @@ def PxaReduceOpInterface : PxaOpInterface<"PxaReduceOpInterface"> {
       /*args=*/(ins),
       /*methodBody=*/[{}],
       /*defaultImplementation=*/[{
-        ConcreteOp op = cast<ConcreteOp>(this->getOperation());
+        ConcreteOp op = ::mlir::cast<ConcreteOp>(this->getOperation());
         return op.getMemRef().getType().template cast<::mlir::MemRefType>();
       }]
     >,
@@ -122,7 +122,7 @@ def PxaReduceOpInterface : PxaOpInterface<"PxaReduceOpInterface"> {
       /*args=*/(ins),
       /*methodBody=*/[{}],
       /*defaultImplementation=*/[{
-        ConcreteOp op = cast<ConcreteOp>(this->getOperation());
+        ConcreteOp op = ::mlir::cast<ConcreteOp>(this->getOperation());
         return llvm::drop_begin(op.getOperands(), 2);
       }]
     >,
@@ -135,7 +135,7 @@ def PxaReduceOpInterface : PxaOpInterface<"PxaReduceOpInterface"> {
       /*args=*/(ins),
       /*methodName=*/[{}],
       /*defaultImplementation=*/[{
-        ConcreteOp op = cast<ConcreteOp>(this->getOperation());
+        ConcreteOp op = ::mlir::cast<ConcreteOp>(this->getOperation());
         return op.getAffineMapAttr().getValue();
       }]
     >,
@@ -146,9 +146,9 @@ def PxaReduceOpInterface : PxaOpInterface<"PxaReduceOpInterface"> {
       /*args=*/(ins "::mlir::Value":$memref),
       /*methodBody=*/[{}],
       /*defaultImplementation=*/[{
-        ConcreteOp op = cast<ConcreteOp>(this->getOperation());
+        ConcreteOp op = ::mlir::cast<ConcreteOp>(this->getOperation());
         assert(memref == getMemRef());
-        return {Identifier::get(op.getMapAttrName(), op.getContext()),
+        return {::mlir::Identifier::get(op.getMapAttrName(), op.getContext()),
                 op.getAffineMapAttr()};
       }]
     >,
@@ -159,7 +159,7 @@ def PxaReduceOpInterface : PxaOpInterface<"PxaReduceOpInterface"> {
       /*args=*/(ins),
       /*methodBody=*/[{}],
       /*defaultImplementation=*/[{
-        ConcreteOp op = cast<ConcreteOp>(this->getOperation());
+        ConcreteOp op = ::mlir::cast<ConcreteOp>(this->getOperation());
         return op.getOperand(op.getStoredValOperandIndex());
       }]
     >,
@@ -170,7 +170,7 @@ def PxaReduceOpInterface : PxaOpInterface<"PxaReduceOpInterface"> {
       /*args=*/(ins),
       /*methodBody=*/[{}],
       /*defaultImplementation=*/[{
-        ConcreteOp op = cast<ConcreteOp>(this->getOperation());
+        ConcreteOp op = ::mlir::cast<ConcreteOp>(this->getOperation());
         return op.getAgg();
       }]
     >,
