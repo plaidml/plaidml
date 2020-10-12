@@ -667,18 +667,17 @@ TEST_F(CppEdsl, RepeatElements) {
   TensorDim N0, N1, N2;
   TensorIndex n0, n1, n2, k;
   I.bind_dims(N0, N1, N2);
-  Tensor O = Contraction()
+  Tensor O = Contraction()  //
                  .outShape(N0, 3 * N1, N2)
                  .outAccess(n0, 3 * n1 + k, n2)
                  .assign(I(n0, n1, n2))
-                 .add_constraint(k < 3)
-                 .simplify(false);
+                 .add_constraint(k < 3);
   auto program = makeProgram("repeat_elts", {I}, {O});
   // clang-format off
   // CHECK-LABEL: CppEdsl.RepeatElements
   // CHECK: module @repeat_elts
   // CHECK: %[[cst:.*]] = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> tensor<f32>
-  // CHECK: tile.contract assign, none, %[[cst]], %{{.*}} {cons = #set{{[0-9]+}}, no_reduce, sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}]} : tensor<f32>, tensor<10x10x10xf32> -> tensor<10x30x10xf32>
+  // CHECK: tile.contract assign, none, %[[cst]], %{{.*}} {cons = #set{{[0-9]+}}, sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}]} : tensor<f32>, tensor<10x10x10xf32> -> tensor<10x30x10xf32>
   // CHECK: return %{{.*}} : tensor<10x30x10xf32>
   // clang-format on
   runProgram(program);
@@ -698,53 +697,6 @@ TEST_F(CppEdsl, UseDefault) {
   // CHECK: tile.contract assign, none, %{{.*}}, %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}]} : tensor<1x7x10x10xf32>, tensor<1x10x10xf32> -> tensor<1x7x10x10xf32>
   // CHECK: return %{{.*}} : tensor<1x7x10x10xf32>
   // clang-format on
-  runProgram(program);
-}
-
-Tensor Winograd(Tensor I, Tensor K, Tensor A, Tensor B, Tensor G) {
-  TensorDim N, S, X, Y, CI, CO, BI, BO;
-  I.bind_dims(N, X, Y, CI);
-  K.bind_dims(S, S, CI, CO);
-  A.bind_dims(BI, BO);
-  B.bind_dims(BI, BI);
-  G.bind_dims(BI, S);
-  auto XO = (X - S + 1) / 1;
-  auto YO = (Y - S + 1) / 1;
-  auto XB = (XO + BO - 1) / BO;
-  auto YB = (YO + BO - 1) / BO;
-  auto XP = 0, YP = 0;
-  // assert(BI - CI + 1 == BO);
-  TensorIndex n, i, j, k, x, y, ci, co;
-  Tensor U1 = Contraction().outShape(BI, S, CI, CO).outAccess(i, j, ci, co).sum(G(i, k) * K(k, j, ci, co));
-  Tensor U = Contraction().outShape(BI, BI, CI, CO).outAccess(i, j, ci, co).sum(U1(i, k, ci, co) * G(j, k));
-  Tensor V1 = Contraction()
-                  .outShape(N, BI, BI, XB, YB, CI)
-                  .outAccess(n, i, j, x, y, ci)
-                  .sum(B(k, i) * I(n, BO * x + k - XP, BO * y + j - YP, ci));
-  Tensor V =
-      Contraction().outShape(N, BI, BI, XB, YB, CI).outAccess(n, i, j, x, y, ci).sum(V1(n, i, k, x, y, ci) * B(k, j));
-  Tensor M = Contraction()
-                 .outShape(N, BI, BI, XB, YB, CO)
-                 .outAccess(n, i, j, x, y, co)
-                 .sum(V(n, i, j, x, y, ci) * U(i, j, ci, co));
-  Tensor O1 =
-      Contraction().outShape(N, BO, BI, XB, YB, CO).outAccess(n, i, j, x, y, co).sum(A(k, i) * M(n, k, j, x, y, co));
-  return Contraction()
-      .outShape(N, XO, YO, CO)
-      .outAccess(n, BO * x + i, BO * y + j, co)
-      .sum(O1(n, i, k, x, y, co) * A(k, j))
-      .simplify(false);
-}
-
-TEST_F(CppEdsl, Winograd) {
-  const int64_t N = 1, X = 224, Y = 224, CI = 3, S = 3, CO = 32, BI = 32, BO = BI - CI + 1;
-  auto I = Placeholder(DType::FLOAT32, {N, X, Y, CI});
-  auto K = Placeholder(DType::FLOAT32, {S, S, CI, CO});
-  auto A = Placeholder(DType::FLOAT32, {BI, BO});
-  auto B = Placeholder(DType::FLOAT32, {BI, BI});
-  auto G = Placeholder(DType::FLOAT32, {BI, S});
-  auto W = Winograd(I, K, A, B, G);
-  auto program = makeProgram("winograd", {I, K, A, B, G}, {W});
   runProgram(program);
 }
 

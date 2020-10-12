@@ -187,7 +187,7 @@ class TensorIndex {
   static plaidml_poly_expr* makeDimPolyOp(plaidml_int_op op, const TensorIndex& idx, const TensorDim& dim,
                                           bool lhs_first) {
     std::vector<plaidml_poly_expr*> operands;
-    auto dim_ptr = ffi::call<plaidml_poly_expr*>(plaidml_poly_expr_dim, dim.as_ptr());
+    auto* dim_ptr = ffi::call<plaidml_poly_expr*>(plaidml_poly_expr_dim, dim.as_ptr());
     if (lhs_first) {
       operands.emplace_back(idx.as_ptr());
       operands.emplace_back(dim_ptr);
@@ -464,12 +464,6 @@ class Contraction {
   Contraction& sum(const IndexedTensor& tensor);
 
   ///
-  /// Enable/disable simplification of output access expressions within contraction.
-  ///
-  // TODO: remove this
-  Contraction& simplify(bool flag);
-
-  ///
   /// Set the initializer for a contraction.
   ///
   Contraction& init(const Tensor& rhs);
@@ -498,7 +492,6 @@ class Contraction {
   std::vector<Constraint> constraints_;
   IndexedTensor rhs_;
   plaidml_agg_op agg_op_;
-  bool simplify_ = true;
   Tensor init_;
 };
 
@@ -528,11 +521,6 @@ inline Contraction& Contraction::outAccess(Ts... idxs) {
 
 inline Contraction& Contraction::outAccess(const std::vector<TensorIndex>& idxs) {
   outIdxs_ = idxs;
-  return *this;
-}
-
-inline Contraction& Contraction::simplify(bool flag) {
-  simplify_ = flag;
   return *this;
 }
 
@@ -595,15 +583,14 @@ inline Tensor Contraction::build() {
     dims[i] = outDims_[i].as_ptr();
   }
 
-  auto ptr = ffi::call<plaidml_expr*>(  //
-      plaidml_expr_contraction,         //
-      agg_op_,                          //
-      rhs_.op_,                         //
-      rank,                             //
-      idxs.data(),                      //
-      dims.data(),                      //
-      init_.as_ptr(),                   //
-      simplify_,                        //
+  auto* ptr = ffi::call<plaidml_expr*>(  //
+      plaidml_expr_contraction,          //
+      agg_op_,                           //
+      rhs_.op_,                          //
+      rank,                              //
+      idxs.data(),                       //
+      dims.data(),                       //
+      init_.as_ptr(),                    //
       name_.c_str());
 
   std::vector<IndexedTensor> operands;
@@ -656,9 +643,9 @@ inline Tensor Tensor::element(size_t ordinal) const {
 inline Tensor Constant(    //
     const Buffer& buffer,  //
     const std::string& name) {
-  auto ptr = ffi::call<plaidml_expr*>(  //
-      plaidml_expr_constant,            //
-      buffer.as_ptr(),                  //
+  auto* ptr = ffi::call<plaidml_expr*>(  //
+      plaidml_expr_constant,             //
+      buffer.as_ptr(),                   //
       name.c_str());
   return Tensor(ptr);
 }
@@ -674,9 +661,9 @@ inline Tensor Constant(double value) { return Tensor(value); }
 inline Tensor Placeholder(     //
     const TensorShape& shape,  //
     const std::string& name = "") {
-  auto ptr = ffi::call<plaidml_expr*>(  //
-      plaidml_expr_input,               //
-      shape.as_ptr(),                   //
+  auto* ptr = ffi::call<plaidml_expr*>(  //
+      plaidml_expr_input,                //
+      shape.as_ptr(),                    //
       name.c_str());
   return Tensor(ptr);
 }
@@ -1073,7 +1060,7 @@ class Value {
       : ptr_(details::make_ptr(ffi::call<plaidml_value*>(plaidml_value_dim, dim.as_ptr()))) {}
 
   explicit Value(const Tensor& tensor) {
-    if (auto ptr = tensor.as_ptr()) {
+    if (auto* ptr = tensor.as_ptr()) {
       ptr_ = details::make_ptr(ffi::call<plaidml_value*>(plaidml_value_expr, ptr));
     } else {
       ptr_ = details::make_ptr(ffi::call<plaidml_value*>(plaidml_value_none));

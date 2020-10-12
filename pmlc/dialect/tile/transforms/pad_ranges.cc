@@ -124,8 +124,7 @@ void PadRangesPass::runOnFunction() {
         op.getLoc(), op.getResultType(), ident, ArrayRef<Value>{op},
         AggregationKind::assign, CombinationKind::none, idMap,
         ArrayRef<AffineMap>{idMap},
-        IntegerSet::getEmptySet(outRank, 0, op.getContext()),
-        /*noReduce=*/true, "shrink");
+        IntegerSet::getEmptySet(outRank, 0, op.getContext()), "shrink");
     newOp.setLowerBounds(SmallVector<int64_t, 4>(outRank, 0));
     SmallVector<int64_t, 4> newOutSize;
     SmallVector<int64_t, 4> shrinkUpperBounds;

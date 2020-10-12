@@ -692,7 +692,6 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
   using OpConversionPattern<FromOpType>::OpConversionPattern;
 
   LogicalResult match(Operation *op) const final {
-    IVLOG(2, "EltwiseOpConversion::match>");
     Matcher pred;
     return pred(op);
   }
@@ -1242,7 +1241,6 @@ struct ReturnOpConversion : public OpConversionPattern<ReturnOp> {
   LogicalResult
   matchAndRewrite(ReturnOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
-    IVLOG(2, "ReturnOpConversion::matchAndRewrite>");
     auto &block = op.getParentRegion()->front();
     auto funcOp = op.getParentOfType<FuncOp>();
     auto blockArg = funcOp.getType().getNumInputs() - op.getNumOperands();

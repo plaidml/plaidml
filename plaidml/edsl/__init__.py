@@ -310,7 +310,6 @@ class Contraction(object):
         self.__rhs = None
         self.__agg_op = None
         self.__init = None
-        self.__simplify = True
 
     def outShape(self, *args):
         self.__outDims = args
@@ -372,11 +371,6 @@ class Contraction(object):
         self.__rhs = rhs
         return self
 
-    # TODO: remove this
-    def simplify(self, flag):
-        self.__simplify = flag
-        return self
-
     def init(self, rhs):
         self.__init = rhs
         return self
@@ -422,7 +416,6 @@ class Contraction(object):
             raw_idxs,
             raw_dims,
             init,
-            self.__simplify,
             self.__name.encode(),
         ))
 

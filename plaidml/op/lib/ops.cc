@@ -2882,7 +2882,7 @@ Value tile(const Value& value) {
     O_dims.push_back(I_dims[i] * reps[i]);
     O_idxs.push_back(TensorIndex() * I_dims[i] + I_idxs[i]);
   }
-  Tensor O = Contraction(O_dims, O_idxs).assign(I(I_idxs)).simplify(false);
+  Tensor O = Contraction(O_dims, O_idxs).assign(I(I_idxs));
   return Value{O};
 }
 
