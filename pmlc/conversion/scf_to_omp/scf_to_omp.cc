@@ -1,28 +1,29 @@
 // Copyright 2020, Intel Corporation
 
-#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/OpenMP/OpenMPDialect.h"
+#include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-#include "pmlc/conversion/affine_to_omp/pass_detail.h"
-#include "pmlc/conversion/affine_to_omp/passes.h"
+#include "pmlc/conversion/scf_to_omp/pass_detail.h"
+#include "pmlc/conversion/scf_to_omp/passes.h"
 #include "pmlc/util/tags.h"
 
 using namespace mlir; // NOLINT[build/namespaces]
 
-namespace pmlc::conversion::affine_to_omp {
+namespace pmlc::conversion::scf_to_omp {
 
+namespace scf = mlir::scf;
 namespace omp = mlir::omp;
 
 namespace {
 
-struct ParallelOpConversion : public OpConversionPattern<AffineParallelOp> {
-  using OpConversionPattern<AffineParallelOp>::OpConversionPattern;
+struct ParallelOpConversion : public OpConversionPattern<scf::ParallelOp> {
+  using OpConversionPattern<scf::ParallelOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(AffineParallelOp op, ArrayRef<Value> operands,
+  matchAndRewrite(scf::ParallelOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
     bool isThread = hasUnitTag(op, cpuBlockTag());
     if (isThread) {
@@ -34,16 +35,16 @@ struct ParallelOpConversion : public OpConversionPattern<AffineParallelOp> {
   }
 };
 
-/// A pass converting affine operations into the OpenMP dialect.
-struct LowerAffineToOpenMPPass
-    : public LowerAffineToOpenMPBase<LowerAffineToOpenMPPass> {
+/// A pass converting SCF parallel loop into the OpenMP dialect.
+struct LowerSCFToOpenMPPass
+    : public LowerSCFToOpenMPBase<LowerSCFToOpenMPPass> {
   // Run the dialect converter on the module.
   void runOnOperation() final {
     ModuleOp module = getOperation();
     auto context = module.getContext();
 
     OwningRewritePatternList patterns;
-    populateAffineToOpenMPConversionPatterns(patterns, context);
+    populateSCFToOpenMPConversionPatterns(patterns, context);
 
     ConversionTarget target(*context);
     target.addLegalDialect<omp::OpenMPDialect>();
@@ -55,13 +56,13 @@ struct LowerAffineToOpenMPPass
 
 } // namespace
 
-void populateAffineToOpenMPConversionPatterns(
-    OwningRewritePatternList &patterns, MLIRContext *ctx) {
+void populateSCFToOpenMPConversionPatterns(OwningRewritePatternList &patterns,
+                                           MLIRContext *ctx) {
   patterns.insert<ParallelOpConversion>(ctx);
 }
 
-std::unique_ptr<mlir::Pass> createLowerAffineToOpenMPPass() {
-  return std::make_unique<LowerAffineToOpenMPPass>();
+std::unique_ptr<mlir::Pass> createLowerSCFToOpenMPPass() {
+  return std::make_unique<LowerSCFToOpenMPPass>();
 }
 
-} // namespace pmlc::conversion::affine_to_omp
+} // namespace pmlc::conversion::scf_to_omp

@@ -21,10 +21,10 @@ gentbl(
 )
 
 plaidml_cc_library(
-    name = "affine_to_omp",
+    name = "scf_to_omp",
     srcs = [
         "pass_detail.h",
-        "affine_to_omp.cc",
+        "scf_to_omp.cc",
     ],
     hdrs = [
         "passes.h",
@@ -33,8 +33,7 @@ plaidml_cc_library(
         ":gen-pass",
         "//pmlc/util",
         "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:Affine",
-        "@llvm-project//mlir:AffineUtils",
+        "@llvm-project//mlir:SCFDialect",
         "@llvm-project//mlir:OpenMPDialect",
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Support",
