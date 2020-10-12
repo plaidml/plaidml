@@ -125,5 +125,10 @@ int main(int argc, char **argv) {
   mlir::initializeLLVMPasses();
   pmlc::rt::initRuntimes();
 
-  return JitRunnerMain(argc, argv);
+  try {
+    return JitRunnerMain(argc, argv);
+  } catch (const std::exception &ex) {
+    llvm::errs() << "Unhandled exception caught: " << ex.what() << "\n";
+  }
+  return EXIT_FAILURE;
 }

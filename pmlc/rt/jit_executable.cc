@@ -448,7 +448,7 @@ public:
 private:
   std::shared_ptr<Program> program;
   std::shared_ptr<Device> device;
-  ArrayRef<void *> preParams;
+  std::vector<void *> preParams;
   std::unique_ptr<EngineImpl> impl;
   std::vector<MemRefDescriptor> descriptors;
   std::vector<void *> ptrs;
