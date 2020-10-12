@@ -38,7 +38,7 @@ func @main(%arg0: !comp.device, %arg1: memref<8x16xf32>, %arg2: memref<16x32xf32
 }
 ```
 
-A network isn't run just once; typically, it's compiled once, loaded once, and then run multiple times before being deleted.  So we can get a substantial performance boost by factoring out the bits that can be done once, instead of performing them every time the network is run -- e.g. resource allocation and constant pre-computation.
+A network typically isn't run just once; usually, it's compiled once, loaded once, and then run multiple times before being deleted (once).  So we can get a substantial performance boost by factoring out the bits that can be done once, instead of performing them every time the network is run &mdash; e.g. resource allocation and constant pre-computation.
 
 ## High-Level Design
 
@@ -58,7 +58,7 @@ thought of as:
       yield main(inputs);
     }
 
-We can reify this by defining a `comp.loop`.  Here's what it looks like, when applied to our original code:
+We can reify this by defining a `comp.loop` operation.  Here's what it looks like, when applied to our original code:
 
 ```mlir
 func @main(%arg0: !comp.device) {
@@ -251,9 +251,8 @@ Although it's not strictly necessary for setup/teardown optimization, the code's
 if we coalesce `comp.wait` operations into subsequent operations that depend on the values touched by the `comp.wait`;
 we can also optimize a bit by eliminating redundant memory transfers.
 
-(Note that since we don't have information about which values
-are kernel inputs and which are kernel outputs, kernels reading the same data will be forced to serialize; fixing this
-is an important optimization, but not one we're considering in this document).
+(Note that we can analyze the kernel code to determine which values are inputs and outputs, so that kernels reading the
+same data aren't forced to serialize, and we can elide readbacks of constant inputs.)
 
 With our example code, this produces:
 
@@ -276,10 +275,8 @@ func @main(%arg0: !comp.device) {
     %w4 = comp.schedule_write %arg2 to %4 on %0 : (!comp.execenv<ocl:0,(11)>, memref<16x32xf32>, memref<16x32xf32, 11>) -> !comp.event<ocl>
     %w5 = comp.schedule_write %arg1 to %5 on %0 : (!comp.execenv<ocl:0,(11)>, memref<8x16xf32>, memref<8x16xf32, 11>) -> !comp.event<ocl>
     %7 = comp.launch_kernel %k2, %c1, %c1, %c1, %c8, %c4, %c1, %4, %5, %1 wait for %2, %w4, %w5: (!comp.kernel<ocl, 11, 16x32xf32, 8x16xf32, 8x32xf32>, index, index, index, index, index, index, memref<16x32xf32, 11>, memref<8x16xf32, 11>, memref<8x32xf32, 11>, !comp.event<ocl>, !comp.event<ocl>, !comp.event<ocl>) -> !comp.event<ocl>
-    %8 = comp.schedule_read %arg2 from %4 on %0 wait for %7 : (memref<16x32xf32>, memref<16x32xf32, 11>, !comp.execenv<ocl:0,(11)>, !comp.event<ocl>) -> !comp.event<ocl>
-    %9 = comp.schedule_read %arg1 from %5 on %0 wait for %7 : (memref<8x16xf32>, memref<8x16xf32, 11>, !comp.execenv<ocl:0,(11)>, !comp.event<ocl>) -> !comp.event<ocl>
     %10 = comp.schedule_read %arg3 from %1 on %0 wait for %7 : (memref<8x32xf32>, memref<8x32xf32, 11>, !comp.execenv<ocl:0,(11)>, !comp.event<ocl>) -> !comp.event<ocl>
-    comp.wait %8, %9, %10 : !comp.event<ocl>, !comp.event<ocl>, !comp.event<ocl>
+    comp.wait %10 : !comp.event<ocl>
   }
   comp.destroy_kernel %k1 : !comp.kernel<ocl, 11, 8x32xf32>
   comp.destroy_kernel %k2 : !comp.kernel<ocl, 11, 16x32xf32, 8x16xf32, 8x32xf32>
@@ -297,54 +294,43 @@ With a minor tweak, we could run the above code as a coroutine &mdash; we could 
 a bidirectional request/response pipe, and pass it to `comp.loop`.  Our sense is that it's more obvious to split the
 current `main()` function into multiple functions invoked individually to set up the network, run it, and tear it down.
 
-To do this, we augment the existing `!comp.execenv` to serve as a resource container, and add accessor operations for
-the various resources.  For our example code, this transformation looks something like this:
+To do this, we add a new `!comp.network` to serve as a resource container, and add construction and deconstruction
+operations for it; this allows us to return a single value to the caller to represent the constructed network, and in
+the lowering to LLVMIR, we can trivially replace it with a pointer to a heap-allocated well-typed struct.  For our
+example code, this transformation looks something like this:
 
 ```mlir
-func @plaidml_init(%arg0: !comp.device) -> !comp.execenv<ocl:0,11)> {
+func @plaidml_init(%arg0: !comp.device) -> !comp.network {
   %0 = comp.create_execenv %arg0 : (!comp.device) -> !comp.execenv<ocl:0,(11)>
   %1 = comp.alloc %0 : (!comp.execenv<ocl:0,(11)>) -> memref<8x32xf32, 11>
-  comp.execenv_set_alloc %0, %1 {midx = 0} : !comp.execenv<ocl:0,(11)>, memref<8x32xf32, 11>
   %4 = comp.alloc %0 : (!comp.execenv<ocl:0,(11)>) -> memref<16x32xf32, 11>
-  comp.execenv_set_alloc %0, %4 {midx = 1} : !comp.execenv<ocl:0,(11)>, memref<16x32xf32, 11>
   %5 = comp.alloc %0 : (!comp.execenv<ocl:0,(11)>) -> memref<8x16xf32, 11>
-  comp.execenv_set_alloc %0, %5 {midx = 2} : !comp.execenv<ocl:0,(11)>, memref<8x16xf32, 11>
   %k1 = comp.create_kernel %0 {kernel = @main_kernel::@main_kernel} : (!comp.execenv<ocl:0,(11)>) -> !comp.kernel<ocl, 11, 8x32xf32>
-  comp.execenv_set_kernel %0, %k1 {kidx = 0} : !comp.execenv<ocl:0,(11)>, !comp.kernel<ocl, 11, 8x32xf32>
   %k2 = comp.create_kernel %0 {kernel = @main_kernel_0::@main_kernel} : (!comp.execenv<ocl:0,(11)>) -> !comp.kernel<ocl, 11, 16x32xf32, 8x16xf32, 8x32xf32>
-  comp.execenv_set_kernel %0, %k2 {kidx = 1} : !comp.execenv<ocl:0,(11)>, !comp.kernel<ocl, 11, 16x32xf32, 8x16xf32, 8x32xf32>
-  return %0
+  %n1 = comp.create_network %0, %1, %4, %5, %k1, %k2 : (!comp.execenv<ocl:0,(11)>, memref<8x32xf32, 11>, memref<16x32xf32, 11>, memref<8x16xf32, 11>, !comp.kernel<ocl, 11, 8x32xf32>, !comp.kernel<ocl, 11, 16x32xf32, 8x16xf32, 8x32xf32>) -> !comp.network
+  return %n1
 }
 
-func @plaidml_exec(%arg0: !comp.execenv<ocl:0,11>, %arg1: memref<8x16xf32>, %arg2: memref<16x32xf32>, %arg3: memref<8x32xf32>) {
+func @plaidml_exec(%arg0: !comp.network, %arg1: memref<8x16xf32>, %arg2: memref<16x32xf32>, %arg3: memref<8x32xf32>) {
   %c2 = constant 2 : index
   %c32 = constant 32 : index
   %c1 = constant 1 : index
   %c8 = constant 8 : index
   %c4 = constant 4 : index
-  %1 = comp.execenv_get_alloc %arg0 {midx = 0}: (!comp.execenv<ocl:0,(11)>) -> memref<8x32xf32, 11>
-  %4 = comp.execenv_get_alloc %arg0 {midx = 1}: (!comp.execenv<ocl:0,(11)>) -> memref<16x32xf32, 11>
-  %5 = comp.execenv_get_alloc %arg0 {midx = 2}: (!comp.execenv<ocl:0,(11)>) -> memref<8x16xf32, 11>
-  %k1 = comp.execenv_get_kernel %arg0 {kidx = 0} : (!comp.execenv<ocl:0,(11)>) -> !comp.kernel<ocl, 11, 8x32xf32>
-  %k2 = comp.execenv_get_kernel %arg0 {kidx = 1} : (!comp.execenv<ocl:0,(11)>) -> !comp.kernel<ocl, 11, 16x32xf32, 8x16xf32, 8x32xf32>
+  %0, %1, %4, %5, %k1, %k2 = comp.deconstruct_network %arg0 : (!comp.network) -> !comp.execenv<ocl:0,(11)>, memref<8x32xf32, 11>, memref<16x32xf32, 11>, memref<8x16xf32, 11>, !comp.kernel<ocl, 11, 8x32xf32>, !comp.kernel<ocl, 11, 16x32xf32, 8x16xf32, 8x32xf32>
   %w1 = comp.schedule_write %arg3 to %1 on %0 : (!comp.execenv<ocl:0,(11)>, memref<8x32xf32>, memref<8x32xf32, 11>) -> !comp.event<ocl>
   %2 = comp.launch_kernel %k1, %c4, %c1, %c1, %c1, %c2, %c32, %1 wait for %w1: (!comp.kernel<ocl, 11, 8x32xf32>, index, index, index, index, index, index, memref<8x32xf32, 11>, !comp.event<ocl>) -> !comp.event<ocl>
   %w4 = comp.schedule_write %arg2 to %4 on %0 : (!comp.execenv<ocl:0,(11)>, memref<16x32xf32>, memref<16x32xf32, 11>) -> !comp.event<ocl>
   %w5 = comp.schedule_write %arg1 to %5 on %0 : (!comp.execenv<ocl:0,(11)>, memref<8x16xf32>, memref<8x16xf32, 11>) -> !comp.event<ocl>
   %7 = comp.launch_kernel %k2, %c1, %c1, %c1, %c8, %c4, %c1, %4, %5, %1 wait for %2, %w4, %w5: (!comp.kernel<ocl, 11, 16x32xf32, 8x16xf32, 8x32xf32>, index, index, index, index, index, index, memref<16x32xf32, 11>, memref<8x16xf32, 11>, memref<8x32xf32, 11>, !comp.event<ocl>, !comp.event<ocl>, !comp.event<ocl>) -> !comp.event<ocl>
-  %8 = comp.schedule_read %arg2 from %4 on %0 wait for %7 : (memref<16x32xf32>, memref<16x32xf32, 11>, !comp.execenv<ocl:0,(11)>, !comp.event<ocl>) -> !comp.event<ocl>
-  %9 = comp.schedule_read %arg1 from %5 on %0 wait for %7 : (memref<8x16xf32>, memref<8x16xf32, 11>, !comp.execenv<ocl:0,(11)>, !comp.event<ocl>) -> !comp.event<ocl>
   %10 = comp.schedule_read %arg3 from %1 on %0 wait for %7 : (memref<8x32xf32>, memref<8x32xf32, 11>, !comp.execenv<ocl:0,(11)>, !comp.event<ocl>) -> !comp.event<ocl>
-  comp.wait %8, %9, %10 : !comp.event<ocl>, !comp.event<ocl>, !comp.event<ocl>
+  comp.wait %10 : !comp.event<ocl>
   return
 }
 
-func @plaidml_fini(%arg0: !comp.execenv<ocl:0,11>) {
-  %1 = comp.execenv_get_alloc %arg0 {midx = 0}: (!comp.execenv<ocl:0,(11)>) -> memref<8x32xf32, 11>
-  %4 = comp.execenv_get_alloc %arg0 {midx = 1}: (!comp.execenv<ocl:0,(11)>) -> memref<16x32xf32, 11>
-  %5 = comp.execenv_get_alloc %arg0 {midx = 2}: (!comp.execenv<ocl:0,(11)>) -> memref<8x16xf32, 11>
-  %k1 = comp.execenv_get_kernel %arg0 {kidx = 0} : (!comp.execenv<ocl:0,(11)>) -> !comp.kernel<ocl, 11, 8x32xf32>
-  %k2 = comp.execenv_get_kernel %arg0 {kidx = 1} : (!comp.execenv<ocl:0,(11)>) -> !comp.kernel<ocl, 11, 16x32xf32, 8x16xf32, 8x32xf32>
+func @plaidml_fini(%arg0: !comp.network) {
+  %0, %1, %4, %5, %k1, %k2 = comp.deconstruct_network %arg0 : (!comp.network) -> !comp.execenv<ocl:0,(11)>, memref<8x32xf32, 11>, memref<16x32xf32, 11>, memref<8x16xf32, 11>, !comp.kernel<ocl, 11, 8x32xf32>, !comp.kernel<ocl, 11, 16x32xf32, 8x16xf32, 8x32xf32>
+  comp.destroy_network %arg0
   comp.destroy_kernel %k1 : !comp.kernel<ocl, 11, 8x32xf32>
   comp.destroy_kernel %k2 : !comp.kernel<ocl, 11, 16x32xf32, 8x16xf32, 8x32xf32>
   comp.dealloc %0 %4 : (!comp.execenv<ocl:0,(11)>, memref<16x32xf32, 11>) -> ()
@@ -356,8 +342,7 @@ func @plaidml_fini(%arg0: !comp.execenv<ocl:0,11>) {
 ```
 
 [TODO: Discuss this more.  The coroutine style is actually kind of elegant, and may provide additional opportunities for
-optimization.  We also might want to use a separate type for the resource container, allowing us to make the get/set
-calls more obviously typesafe when lowered into LLVMIR.]
+optimization.  We also might want to parameterize `!comp.network` to make it more typesafe in the lowering to LLVMIR.]
 
 ## Notes
 
