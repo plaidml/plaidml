@@ -97,9 +97,8 @@ int JitRunnerMain(int argc, char **argv) {
   runMLIRPasses(*program->module);
 
   auto executable =
-      Executable::fromProgram(program, options.optDeviceID.getValue(),
-                              ArrayRef<BufferPtr>{}, ArrayRef<BufferPtr>{});
-  executable->invoke();
+      Executable::fromProgram(program, options.optDeviceID.getValue());
+  executable->invoke(ArrayRef<BufferPtr>{}, ArrayRef<BufferPtr>{});
 
   return EXIT_SUCCESS;
 }
@@ -126,5 +125,10 @@ int main(int argc, char **argv) {
   mlir::initializeLLVMPasses();
   pmlc::rt::initRuntimes();
 
-  return JitRunnerMain(argc, argv);
+  try {
+    return JitRunnerMain(argc, argv);
+  } catch (const std::exception &ex) {
+    llvm::errs() << "Unhandled exception caught: " << ex.what() << "\n";
+  }
+  return EXIT_FAILURE;
 }

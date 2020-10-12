@@ -392,12 +392,15 @@ void ConvertGpuLaunchFuncToVulkanCalls::declareVulkanFunctions(Location loc) {
                                     /*isVarArg=*/false));
 
   if (optionalSymbols.count(kPrint_memref_f32)) {
-    builder.create<FuncOp>(
-        loc, kPrint_memref_f32,
-        FunctionType::get(
-            {ArrayRef<Type>{getUnrankedMemRefType(getMLIRFloat32Type())}}, {},
-            &ctx),
-        ArrayRef<std::pair<mlir::Identifier, mlir::Attribute>>());
+    auto func = module.lookupSymbol<FuncOp>(kPrint_memref_f32);
+    if (!func) {
+      builder.create<FuncOp>(
+          loc, kPrint_memref_f32,
+          FunctionType::get(
+              {ArrayRef<Type>{getUnrankedMemRefType(getMLIRFloat32Type())}}, {},
+              &ctx),
+          ArrayRef<std::pair<mlir::Identifier, mlir::Attribute>>());
+    }
   }
 
   if (optionalSymbols.count(kCreateVulkanMemoryTransferAction)) {

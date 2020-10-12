@@ -11,10 +11,8 @@ namespace pmlc::rt {
 
 std::unique_ptr<Executable>
 Executable::fromProgram(const std::shared_ptr<Program> &program,
-                        mlir::StringRef deviceID,
-                        mlir::ArrayRef<util::BufferPtr> inputBuffers,
-                        mlir::ArrayRef<util::BufferPtr> outputBuffers) {
-  return getDevice(deviceID)->compile(program, inputBuffers, outputBuffers);
+                        mlir::StringRef deviceID) {
+  return getDevice(deviceID)->compile(program);
 }
 
 } // namespace pmlc::rt

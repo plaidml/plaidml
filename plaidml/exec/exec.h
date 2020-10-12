@@ -69,19 +69,19 @@ class Executable {
   ///
   /// Executable constructor
   ///
-  Executable(const Program& program,             //
-             const std::vector<Buffer>& inputs,  //
-             const std::vector<Buffer>& outputs)
-      : Executable(program, "", inputs, outputs) {}
+  explicit Executable(const Program& program,  //
+                      const std::string& device = "")
+      : ptr_(details::make_ptr(              //
+            ffi::call<plaidml_executable*>(  //
+                plaidml_jit,                 //
+                program.as_ptr(),            //
+                device.c_str()))) {}
 
   ///
-  /// Executable constructor
+  /// run
   ///
-  Executable(const Program& program,             //
-             const std::string& device,          //
-             const std::vector<Buffer>& inputs,  //
-             const std::vector<Buffer>& outputs)
-      : inputs_(inputs), outputs_(outputs) {
+  void run(const std::vector<Buffer>& inputs,  //
+           const std::vector<Buffer>& outputs) {
     std::vector<plaidml_buffer*> raw_inputs(inputs.size());
     for (size_t i = 0; i < inputs.size(); i++) {
       raw_inputs[i] = inputs[i].as_ptr();
@@ -90,26 +90,17 @@ class Executable {
     for (size_t i = 0; i < raw_outputs.size(); i++) {
       raw_outputs[i] = outputs[i].as_ptr();
     }
-    ptr_ = details::make_ptr(            //
-        ffi::call<plaidml_executable*>(  //
-            plaidml_jit,                 //
-            program.as_ptr(),            //
-            device.c_str(),              //
-            raw_inputs.size(),           //
-            raw_inputs.data(),           //
-            raw_outputs.size(),          //
-            raw_outputs.data()));
+    ffi::call_void(              //
+        plaidml_executable_run,  //
+        ptr_.get(),              //
+        raw_inputs.size(),       //
+        raw_inputs.data(),       //
+        raw_outputs.size(),      //
+        raw_outputs.data());
   }
-
-  ///
-  /// run
-  ///
-  void run() { ffi::call_void(plaidml_executable_run, ptr_.get()); }
 
  private:
   std::shared_ptr<plaidml_executable> ptr_;
-  std::vector<Buffer> inputs_;
-  std::vector<Buffer> outputs_;
 };
 
 }  // namespace exec

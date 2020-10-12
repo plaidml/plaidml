@@ -24,30 +24,25 @@ module attributes {
     %arg0 = alloc() : memref<8xf32>
     %arg1 = alloc() : memref<8xf32>
     %arg2 = alloc() : memref<8xf32>
-    %0 = constant 0 : i32
-    %1 = constant 1 : i32
-    %2 = constant 2 : i32
     %value0 = constant 0.0 : f32
     %value1 = constant 1.1 : f32
     %value2 = constant 2.2 : f32
     %arg3 = memref_cast %arg0 : memref<8xf32> to memref<*xf32>
     %arg4 = memref_cast %arg1 : memref<8xf32> to memref<*xf32>
     %arg5 = memref_cast %arg2 : memref<8xf32> to memref<*xf32>
-    %size3 = constant 8 : i32
-    %size4 = constant 8 : i32
-    %size5 = constant 8 : i32
-    
-    call @fillResourceFloat32(%arg3, %size3, %value1) : (memref<*xf32>, i32, f32) -> ()
-    call @fillResourceFloat32(%arg4, %size4, %value2) : (memref<*xf32>, i32, f32) -> ()
-    call @fillResourceFloat32(%arg5, %size5, %value0) : (memref<*xf32>, i32, f32) -> ()
+    %c8 = constant 8 : i32
 
-    %cst1 = constant 1 : index
+    call @fillResourceFloat32(%arg3, %c8, %value1) : (memref<*xf32>, i32, f32) -> ()
+    call @fillResourceFloat32(%arg4, %c8, %value2) : (memref<*xf32>, i32, f32) -> ()
+    call @fillResourceFloat32(%arg5, %c8, %value0) : (memref<*xf32>, i32, f32) -> ()
+
+    %c1 = constant 1 : index
     %cst8 = constant 8 : index
-    "gpu.launch_func"(%cst8, %cst1, %cst1, %cst1, %cst1, %cst1, %arg0, %arg1, %arg2) { kernel = @kernels::@kernel_add }
+    "gpu.launch_func"(%cst8, %c1, %c1, %c1, %c1, %c1, %arg0, %arg1, %arg2) { kernel = @kernels::@kernel_add }
         : (index, index, index, index, index, index, memref<8xf32>, memref<8xf32>, memref<8xf32>) -> ()
     call @print_memref_f32(%arg5) : (memref<*xf32>) -> ()
     return
   }
-  func @fillResourceFloat32(%0 : memref<*xf32>, %1 : i32, %2 : f32)
-  func @print_memref_f32(%ptr : memref<*xf32>)
+  func @fillResourceFloat32(memref<*xf32>, i32, f32) -> ()
+  func @print_memref_f32(memref<*xf32>) -> ()
 }
