@@ -89,6 +89,9 @@ static std::string packFunctionArguments(llvm::Module *module,
   llvm::IRBuilder<> builder(ctx);
   auto funcName = makeCWrapperFunctionName(entry);
   auto *func = module->getFunction(funcName);
+  if (!func) {
+    throw std::runtime_error("Could not find function: " + funcName);
+  }
 
   // Given a function `foo(<...>)`, define the interface function
   // `mlir_foo(i8**)`.
