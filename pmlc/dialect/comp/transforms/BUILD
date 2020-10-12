@@ -26,6 +26,7 @@ plaidml_cc_library(
         "execenv_coalescing.cc",
         "pass_detail.h",
         "minimize_allocations.cc",
+        "remove_redundant_rw.cc",
     ],
     hdrs = [
         "passes.h",
@@ -33,5 +34,6 @@ plaidml_cc_library(
     deps = [
         ":gen-pass",
         "//pmlc/dialect/comp/ir",
+        "//pmlc/dialect/comp/analysis"
     ],
 )
