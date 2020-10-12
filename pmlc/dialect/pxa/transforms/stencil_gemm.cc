@@ -396,7 +396,7 @@ struct StencilGEMMPass : public PassWrapper<StencilGEMMPass, FunctionPass> {
       llvm::cl::desc("Specifies number of threads for the stencil pass")};
 
   Option<bool> doBatch{
-      *this, "do-batch",
+      *this, "batched",
       llvm::cl::desc("Allow strided batching over k dimension of GEMM"),
       llvm::cl::initializer(false)};
 };

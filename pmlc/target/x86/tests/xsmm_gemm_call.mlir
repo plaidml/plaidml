@@ -1,4 +1,9 @@
-// RUN: pmlc-opt -convert-linalg-to-loops  --pass-pipeline='x86-affine-stencil-xsmm' -x86-convert-pxa-to-affine -lower-affine \
+// RUN: pmlc-opt -convert-linalg-to-loops --pass-pipeline='x86-affine-stencil-xsmm{batched=false}' \
+// RUN:     -x86-convert-pxa-to-affine -lower-affine \
+// RUN:     -canonicalize -convert-scf-to-std -x86-convert-std-to-llvm %s | \
+// RUN:   pmlc-jit -e baseline | FileCheck %s
+// RUN: pmlc-opt -convert-linalg-to-loops --pass-pipeline='x86-affine-stencil-xsmm{batched=true}' \
+// RUN:     -x86-convert-pxa-to-affine -lower-affine \
 // RUN:     -canonicalize -convert-scf-to-std -x86-convert-std-to-llvm %s | \
 // RUN:   pmlc-jit -e baseline | FileCheck %s
 

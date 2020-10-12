@@ -1,4 +1,4 @@
-// RUN: pmlc-opt -convert-linalg-to-loops -x86-affine-stencil-xsmm="do-batch=true"  \
+// RUN: pmlc-opt -convert-linalg-to-loops -x86-affine-stencil-xsmm="batched=true"  \
 // RUN:    %s | FileCheck %s 
 
 !I_memref = type memref<1x6x5x7xf32>
