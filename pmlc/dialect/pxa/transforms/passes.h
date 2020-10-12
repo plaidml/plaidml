@@ -42,8 +42,9 @@ std::unique_ptr<mlir::Pass> createNestLoopsPass(unsigned minLoopIVs);
 
 std::unique_ptr<mlir::Pass> createResizeTmpsPass();
 
+std::unique_ptr<mlir::Pass> createStencilGEMMPass();
 std::unique_ptr<mlir::Pass> createStencilGEMMPass(unsigned numThreads,
-                                                  llvm::StringRef strategy,
+                                                  bool doBatch,
                                                   StencilCostFunction costFn);
 
 std::unique_ptr<mlir::Pass> createSubgroupsPass();
