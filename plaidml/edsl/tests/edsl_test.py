@@ -188,8 +188,8 @@ class TestEdsl(unittest.TestCase):
             return
         input_buffers = [plaidml.Buffer(shape) for shape in program.inputs]
         output_buffers = [plaidml.Buffer(shape) for shape in program.outputs]
-        executable = plaidml.exec.Executable(program, input_buffers, output_buffers)
-        executable.run()
+        executable = plaidml.exec.Executable(program)
+        executable.run(input_buffers, output_buffers)
 
     def checkProgram(self, program, inputs, expected):
         if platform.system() == 'Windows':

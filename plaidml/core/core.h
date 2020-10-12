@@ -289,15 +289,15 @@ class Buffer {
   /// Buffer constructor
   /// \param shape TensorShape
   ///
-  Buffer(void* data, size_t size, const TensorShape& shape)
+  Buffer(char* data, size_t size, const TensorShape& shape)
       : ptr_(details::make_ptr(ffi::call<plaidml_buffer*>(plaidml_buffer_adopt, shape.as_ptr(), data, size))) {}
 
   template <typename T>
   Buffer(const std::vector<T>& vec, const TensorShape& shape)
-      : ptr_(details::make_ptr(ffi::call<plaidml_buffer*>(   //
-            plaidml_buffer_adopt,                            //
-            shape.as_ptr(),                                  //
-            static_cast<void*>(const_cast<T*>(vec.data())),  //
+      : ptr_(details::make_ptr(ffi::call<plaidml_buffer*>(        //
+            plaidml_buffer_adopt,                                 //
+            shape.as_ptr(),                                       //
+            reinterpret_cast<char*>(const_cast<T*>(vec.data())),  //
             vec.size() * sizeof(T)))) {}
 
   ///
