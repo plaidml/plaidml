@@ -68,8 +68,7 @@ void reuseExecEnvInBlock(mlir::Block &block) {
         op.replaceAllUsesWith(earliestCreation[key]);
         op.erase();
       }
-    }
-    if (auto destroyOp = mlir::dyn_cast<DestroyExecEnv>(op)) {
+    } else if (auto destroyOp = mlir::dyn_cast<DestroyExecEnv>(op)) {
       TypeDevicePair key = getDestroyKey(destroyOp);
       if (latestDestruction[key] != destroyOp)
         op.erase();
