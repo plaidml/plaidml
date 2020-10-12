@@ -12,8 +12,20 @@ plaidml_cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
+        ":openmp",
         "//pmlc/compiler",
         "//pmlc/rt",
+    ],
+    alwayslink = 1,
+)
+
+plaidml_cc_library(
+    name = "openmp",
+    srcs = ["openmp.cc"],
+    copts = ["-w"],
+    deps = [
+        "//pmlc/rt",
+        "@llvm-project//openmp",
     ],
     alwayslink = 1,
 )
