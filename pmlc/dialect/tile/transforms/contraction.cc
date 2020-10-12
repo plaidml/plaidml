@@ -652,8 +652,7 @@ void Contraction::DeduceRangeConstraints() {
   }
 }
 
-BoundsAndConstraints Contraction::ComputeBounds(ArrayRef<Shape> shapes,
-                                                bool no_reduce) {
+BoundsAndConstraints Contraction::ComputeBounds(ArrayRef<Shape> shapes) {
   // Because we construct `range_constraints` from `constraints` and then ignore
   // the information in `constraints` in favor of `range_constraints`, this
   // section is a bit brittle. Check assumptions about whether `constraints` or
@@ -662,7 +661,7 @@ BoundsAndConstraints Contraction::ComputeBounds(ArrayRef<Shape> shapes,
   GatherConstraints(shapes);
   IVLOG(3, "Constraints:" << to_string(range_constraints.constraints));
   // Reduce if needed
-  if (NeedReduce() && !no_reduce) {
+  if (NeedReduce()) {
     ReduceOutputPolynomials();
     GatherConstraints(shapes);
   }
@@ -719,9 +718,7 @@ struct ComputeBoundsImpl {
     }
 
     Contraction contraction{op};
-    bool no_reduce = op.no_reduce().hasValue();
-    const auto &[bounds, constraints] =
-        contraction.ComputeBounds(shapes, no_reduce);
+    const auto &[bounds, constraints] = contraction.ComputeBounds(shapes);
 
     unsigned i = 0;
     for (const auto &[name, extent] : bounds) {

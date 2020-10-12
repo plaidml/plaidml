@@ -386,7 +386,6 @@ class TestEdsl(unittest.TestCase):
             .outShape(N0, 3 * N1, N2) \
             .outAccess(n0, 3 * n1 + k, n2) \
             .assign(I[n0, n1, n2]) \
-            .simplify(False) \
             .add_constraint(k < 3) \
             .build()
         program = Program('repeat_elts', [I], [O])

@@ -322,7 +322,6 @@ plaidml_expr* plaidml_expr_contraction(  //
     plaidml_poly_expr** idxs,            //
     plaidml_dim_expr** dims,             //
     plaidml_expr* init,                  //
-    bool simplify,                       //
     const char* name) {
   return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
     IVLOG(3, "plaidml_expr_contraction");
@@ -333,7 +332,6 @@ plaidml_expr* plaidml_expr_contraction(  //
       node->sinkDims.push_back(dims[i]->node);
       node->sinkIdxs.push_back(idxs[i]->node);
     }
-    node->simplify = simplify;
     if (init) {
       node->init = init->node;
     }
