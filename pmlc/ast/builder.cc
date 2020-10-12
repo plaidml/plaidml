@@ -23,6 +23,7 @@
 #include "pmlc/ast/eval.h"
 #include "pmlc/dialect/eltwise/ir/ops.h"
 #include "pmlc/dialect/tile/ir/ops.h"
+#include "pmlc/dialect/tile/transforms/passes.h"
 #include "pmlc/util/logging.h"
 
 using namespace mlir; // NOLINT
@@ -60,14 +61,17 @@ public:
     case DataType::ui32:
       return getIntegerType(32, /*isSigned=*/false);
     case DataType::si64:
+    case DataType::six:
       return getIntegerType(64, /*isSigned=*/true);
     case DataType::ui64:
+    case DataType::uix:
       return getIntegerType(64, /*isSigned=*/false);
     case DataType::f16:
       return getF16Type();
     case DataType::f32:
       return getF32Type();
     case DataType::f64:
+    case DataType::fx:
       return getF64Type();
     default:
       throw std::runtime_error(llvm::formatv("OpBuilder> Invalid DataType: {0}",
@@ -79,6 +83,18 @@ public:
   RankedTensorType getRankedTensorType(const TensorShape &shape) {
     Type elementType = getElementType(shape.elementType);
     return RankedTensorType::get(shape.sizes, elementType);
+  }
+
+  eltwise::APFloatType getAPFloatType() {
+    return eltwise::APFloatType::get(context);
+  }
+
+  eltwise::APSignedIntegerType getAPSignedIntegerType() {
+    return eltwise::APSignedIntegerType::get(context);
+  }
+
+  eltwise::APUnsignedIntegerType getAPUnsignedIntegerType() {
+    return eltwise::APUnsignedIntegerType::get(context);
   }
 
   Value lookupNode(const ExprNodePtr &node) {
@@ -511,7 +527,7 @@ struct ProgramBuilder {
       auto defOp = value.getDefiningOp();
       if (!defOp || isa<tile::ReshapeOp>(defOp) ||
           returnOperands.count(value)) {
-        value = builder.create<eltwise::IdentOp>(loc, value);
+        value = builder.create<eltwise::IdentOp>(loc, value.getType(), value);
       }
       returnOperands.insert(value);
     }
@@ -519,7 +535,12 @@ struct ProgramBuilder {
 
     program->entry = kEntrypoint;
 
+    IVLOG(3, "\n" << debugString(module));
+
     PassManager pm(context);
+    pm.addPass(createCanonicalizerPass());
+    pm.addPass(createCSEPass());
+    pm.addPass(tile::createMaterializePass());
     pm.addPass(createCanonicalizerPass());
     pm.addPass(createCSEPass());
     auto result = pm.run(module);
@@ -543,17 +564,17 @@ struct ProgramBuilder {
   }
 
   Value handleConstFloat(ExprNodeConstFloat *node) {
-    Type type = builder.getF32Type(); // TODO
+    Type type = builder.getAPFloatType();
     return builder.makeScalarConstantFloatOp(type, node->value);
   }
 
   Value handleConstSigned(ExprNodeConstSigned *node) {
-    Type type = builder.getIntegerType(32, /*isSigned=*/true); // TODO
+    Type type = builder.getAPSignedIntegerType();
     return builder.makeScalarConstantIntOp(type, node->value);
   }
 
   Value handleConstUnsigned(ExprNodeConstUnsigned *node) {
-    Type type = builder.getIntegerType(32, /*isSigned=*/false); // TODO
+    Type type = builder.getAPUnsignedIntegerType();
     return builder.makeScalarConstantIntOp(type, node->value);
   }
 
@@ -571,27 +592,29 @@ struct ProgramBuilder {
   }
 
   Value handleIntrinsic(ExprNodeIntrinsic *node) {
-    using IntrinsicBuilder = std::function<Value()>;
     SmallVector<Value, 8> operands;
-    for (const ExprNodePtr &operand : node->operands) {
-      operands.push_back(builder.lookupNode(operand));
+    SmallVector<Type, 2> resultTypes;
+    auto resultShapes = evaluator.getShapes(node);
+    for (auto shape : resultShapes) {
+      resultTypes.push_back(builder.getRankedTensorType(shape));
     }
+    for (const ExprNodePtr &operand : node->operands) {
+      Value value = builder.lookupNode(operand);
+      operands.push_back(value);
+    }
+    using IntrinsicBuilder = std::function<Value()>;
     auto intrinsicBuilder =
         llvm::StringSwitch<IntrinsicBuilder>(node->op)
-            .Case("index", [&]() { return makeIndexOp(operands); })
+            .Case("index", [&]() { return makeIndexOp(node, operands); })
             .Case("prng", [&]() { return makePrngOp(node, operands); })
+            .Case("reshape", [&]() { return makeReshapeOp(node, operands); })
+            .Case("scatter", [&]() { return makeScatterOp(node, operands); })
             .Default([&]() {
               const AbstractOperation *abstractOp = lookupOperation(node->op);
-              auto genericBuilder =
-                  abstractOp->getInterface<util::GenericBuilder>();
-              if (!genericBuilder) {
-                throw std::runtime_error("Unknown intrinsic: " + node->op);
-              }
-              auto op = genericBuilder->create(builder, loc, operands);
-              // OperationState state(loc, abstractOp->name);
-              // state.addOperands(operands);
-              // state.addTypes(getResultType(operands));
-              // return builder.createOperation(state);
+              OperationState state(loc, abstractOp->name);
+              state.addOperands(operands);
+              state.addTypes(resultTypes);
+              Operation *op = builder.createOperation(state);
               return op->getResult(0);
             });
     return intrinsicBuilder();
@@ -602,7 +625,22 @@ struct ProgramBuilder {
     return builder.create<tile::TraceOp>(loc, tensor, node->msg).out();
   }
 
-  Value makeIndexOp(ArrayRef<Value> operands) {
+  Value makeReshapeOp(ExprNodeIntrinsic *node, ArrayRef<Value> operands) {
+    TensorShape shape = evaluator.getShape(node);
+    RankedTensorType resultType = builder.getRankedTensorType(shape);
+    auto op = builder.create<tile::ReshapeOp>(loc, resultType, operands[0]);
+    return op.result();
+  }
+
+  Value makeScatterOp(ExprNodeIntrinsic *node, ArrayRef<Value> operands) {
+    TensorShape shape = evaluator.getShape(node);
+    RankedTensorType resultType = builder.getRankedTensorType(shape);
+    auto op = builder.create<tile::ScatterOp>(loc, resultType,
+                                              operands.take_front(2));
+    return op.result();
+  }
+
+  Value makeIndexOp(ExprNodeIntrinsic *node, ArrayRef<Value> operands) {
     if (operands.size() < 1) {
       throw std::runtime_error(
           "'index' primitive expects at least one operand");
@@ -614,7 +652,8 @@ struct ProgramBuilder {
           "'index' primitive expects argument 1 to be a constant integer");
     }
     auto dims = operands.drop_front();
-    auto resultType = tile::IndexOp::getResultType(dims);
+    TensorShape shape = evaluator.getShape(node);
+    RankedTensorType resultType = builder.getRankedTensorType(shape);
     auto op = builder.create<tile::IndexOp>(loc, resultType, axisAttr, dims);
     return op.result();
   }
@@ -624,10 +663,11 @@ struct ProgramBuilder {
       throw std::runtime_error("'prng' primitive expects at least one operand");
     }
     Value state = operands.front();
-    auto dims = operands.drop_front();
-    auto resultType = tile::PrngOp::getResultType(operands);
-    tile::PrngOp op = builder.create<tile::PrngOp>(
-        loc, resultType, state.getType(), state, dims);
+    SmallVector<Type, 2> resultTypes;
+    for (const TensorShape &shape : evaluator.getShapes(node)) {
+      resultTypes.push_back(builder.getRankedTensorType(shape));
+    }
+    auto op = builder.create<tile::PrngOp>(loc, resultTypes, state);
     SmallVector<Value, 4> tuple;
     for (OpResult result : op.getResults()) {
       tuple.push_back(result);

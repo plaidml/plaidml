@@ -18,23 +18,6 @@ namespace pmlc::util {
 
 static constexpr const char *kTagAttribute = "tags";
 
-// Adjust the result types on the containing FuncOp if this op relates to an
-// output
-void UpdateFuncOpType(mlir::Operation *op);
-
-llvm::StringRef getOpName(const mlir::OperationName &name);
-
-template <typename Set>
-std::string getUniqueName(Set *names, llvm::StringRef name) {
-  auto next = name.str();
-  auto [it, isUnique] = names->insert(next); // NOLINT(whitespace/braces)
-  for (unsigned i = 0; !isUnique; i++) {
-    next = llvm::formatv("{0}_{1}", name, i).str();
-    std::tie(it, isUnique) = names->insert(next);
-  }
-  return next;
-}
-
 uint64_t getByteSize(mlir::MemRefType type);
 
 // Check if all tags exist in op and they are all true

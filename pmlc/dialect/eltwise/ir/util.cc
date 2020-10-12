@@ -10,101 +10,22 @@
 #include "llvm/Support/FormatVariadic.h"
 
 #include "mlir/IR/Attributes.h"
+#include "mlir/IR/Builders.h"
 #include "mlir/IR/Function.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/Support/DebugStringHelper.h"
 
+#include "pmlc/dialect/eltwise/ir/ops.h"
+#include "pmlc/dialect/eltwise/ir/types.h"
 #include "pmlc/util/logging.h"
+
+using namespace mlir; // NOLINT
 
 namespace pmlc::dialect::eltwise {
 
 using llvm::ArrayRef;
 using llvm::SmallVector;
-using mlir::Attribute;
-using mlir::debugString;
-using mlir::FloatAttr;
-using mlir::FuncOp;
-using mlir::IndexType;
-using mlir::IntegerAttr;
-using mlir::IntegerType;
-using mlir::m_Constant;
-using mlir::Operation;
-using mlir::RankedTensorType;
-using mlir::Type;
-using mlir::Value;
-using mlir::ValueRange;
-
-namespace {
-
-bool MergeTypes(Type *into, Type from, Type dtype) {
-  IVLOG(6, "MergeTypes> " << debugString(*into) << ", " << debugString(from));
-  auto intoShapedType = getRankedTensorType(*into);
-  auto fromShapedType = getRankedTensorType(from);
-
-  // To compute the result broadcasted shape, we compare operand shapes
-  // element-wise: starting with the trailing dimensions, and working the
-  // way backward. Two dimensions are compatible when
-  //   1. they are equal, or
-  //   2. one of them is 1
-  // The result shape has the maximum among the two inputs at every
-  // dimension index.
-  SmallVector<int64_t, 4> resultShape;
-  auto shape1 = intoShapedType.getShape();
-  auto shape2 = fromShapedType.getShape();
-  IVLOG(6, "  Checking compatibility between " << shape1.vec() << " and "
-                                               << shape2.vec());
-  if (shape1.size() > shape2.size()) {
-    std::copy(shape1.begin(), shape1.end(), std::back_inserter(resultShape));
-  } else {
-    std::copy(shape2.begin(), shape2.end(), std::back_inserter(resultShape));
-  }
-
-  auto i1 = shape1.rbegin(), e1 = shape1.rend();
-  auto i2 = shape2.rbegin(), e2 = shape2.rend();
-  auto iR = resultShape.rbegin();
-
-  // Check each dimension is consistent.
-  for (; i1 != e1 && i2 != e2; ++i1, ++i2, ++iR) {
-    if (*i1 == -1 || *i2 == -1) {
-      // One or both dimensions is unknown. Follow TensorFlow behavior:
-      // - If either dimension is greater than 1, we assume that the program is
-      //   correct, and the other dimension will be broadcast to match it.
-      // - If either dimension is 1, the other dimension is the output.
-      if (*i1 > 1) {
-        *iR = *i1;
-      } else if (*i2 > 1) {
-        *iR = *i2;
-      } else if (*i1 == 1) {
-        *iR = *i2;
-      } else if (*i2 == 1) {
-        *iR = *i1;
-      } else {
-        *iR = -1;
-      }
-    } else {
-      if (*i1 == *i2 || *i2 == 1) {
-        *iR = *i1;
-      } else if (*i1 == 1) {
-        *iR = *i2;
-      } else {
-        // This dimension of the two operand types is incompatible.
-        return false;
-      }
-    }
-  }
-
-  if (!dtype) {
-    auto intoElementType = intoShapedType.getElementType();
-    auto fromElementType = fromShapedType.getElementType();
-    dtype = promoteTypes(intoElementType, fromElementType);
-  }
-  *into = RankedTensorType::get(resultShape, dtype);
-  IVLOG(6, "  Resulting type: " << debugString(*into));
-  return true;
-}
-
-} // namespace
 
 // I64EnumAttrCase<"invalid", 0>,
 // I64EnumAttrCase<"u1",      1>,
@@ -124,45 +45,55 @@ unsigned typeScore(Type type) {
   if (!type || type.isIndex()) {
     return 0;
   }
-  if (type.isInteger(1)) {
+  if (type.isa<APSignedIntegerType>()) {
     return 1;
   }
-  if (type.isSignedInteger(8)) {
+  if (type.isa<APUnsignedIntegerType>()) {
     return 2;
   }
-  if (type.isUnsignedInteger(8)) {
+  if (type.isa<APFloatType>()) {
     return 3;
   }
-  if (type.isSignedInteger(16)) {
+  if (type.isInteger(1)) {
     return 4;
   }
-  if (type.isUnsignedInteger(16)) {
+  if (type.isSignedInteger(8)) {
     return 5;
   }
-  if (type.isSignedInteger(32)) {
+  if (type.isUnsignedInteger(8)) {
     return 6;
   }
-  if (type.isUnsignedInteger(32)) {
+  if (type.isSignedInteger(16)) {
     return 7;
   }
-  if (type.isSignedInteger(64)) {
+  if (type.isUnsignedInteger(16)) {
     return 8;
   }
-  if (type.isUnsignedInteger(64)) {
+  if (type.isSignedInteger(32)) {
     return 9;
   }
-  if (type.isBF16()) {
+  if (type.isUnsignedInteger(32)) {
     return 10;
   }
-  if (type.isF16()) {
+  if (type.isSignedInteger(64)) {
     return 11;
   }
-  if (type.isF32()) {
+  if (type.isUnsignedInteger(64)) {
     return 12;
   }
-  if (type.isF64()) {
+  if (type.isBF16()) {
     return 13;
   }
+  if (type.isF16()) {
+    return 14;
+  }
+  if (type.isF32()) {
+    return 15;
+  }
+  if (type.isF64()) {
+    return 16;
+  }
+  IVLOG(1, "Type: " << debugString(type));
   assert(false && "Undefined typeScore");
   return 0;
 }
@@ -183,49 +114,6 @@ RankedTensorType getRankedTensorType(Type type) {
                                 type.getContext()));
   }
   return RankedTensorType::get(shape, type);
-}
-
-Type ComputeResultType(ValueRange operands, Type override) {
-  if (VLOG_IS_ON(6)) {
-    std::vector<std::string> types;
-    for (auto operand : operands) {
-      auto type = operand.getType();
-      types.push_back(debugString(type));
-    }
-    IVLOG(6, "ComputeResultType> " << types);
-  }
-  Type ret = (*operands.begin()).getType();
-  for (auto operand : operands.drop_front()) {
-    auto type = operand.getType();
-    if (!MergeTypes(&ret, type, override)) {
-      std::stringstream ss;
-      ss << "Incompatible types: (";
-      for (size_t i = 0; i < operands.size(); i++) {
-        if (i) {
-          ss << ", ";
-        }
-        auto type = operands[i].getType();
-        ss << debugString(type);
-      }
-      ss << ")";
-      throw std::runtime_error(ss.str());
-    }
-  }
-  return ret;
-}
-
-SmallVector<int64_t, 4> getShapeFromOperands(ArrayRef<Value> operands) {
-  SmallVector<int64_t, 4> shape;
-  for (auto operand : operands) {
-    auto op = operand.getDefiningOp();
-    IntegerAttr attr;
-    if (m_Constant(&attr).match(op)) {
-      shape.push_back(attr.getInt());
-    } else {
-      shape.push_back(-1);
-    }
-  }
-  return shape;
 }
 
 Attribute constFoldUnaryOp(ArrayRef<Attribute> operands,
@@ -284,6 +172,49 @@ Type toSignlessType(Type type) {
     return IntegerType::get(integerType.getWidth(), type.getContext());
   }
   return type;
+}
+
+LogicalResult materializeOperands(OpBuilder &builder, Operation *op,
+                                  llvm::ArrayRef<OpOperand *> operands) {
+  Type promotedType;
+  for (OpOperand *operand : operands) {
+    Type type = operand->get().getType();
+    RankedTensorType rankedTensorType = getRankedTensorType(type);
+    Type elementType = rankedTensorType.getElementType();
+    promotedType = promoteTypes(promotedType, elementType);
+  }
+
+  for (OpOperand *operand : operands) {
+    RankedTensorType rankedTensorType =
+        getRankedTensorType(operand->get().getType());
+    Type elementType = rankedTensorType.getElementType();
+    if (elementType != promotedType &&
+        (elementType.isa<APFloatType>() ||
+         elementType.isa<APSignedIntegerType>() ||
+         elementType.isa<APUnsignedIntegerType>())) {
+      RankedTensorType newType =
+          RankedTensorType::get(rankedTensorType.getShape(), promotedType);
+      Value value =
+          builder.create<CastOp>(op->getLoc(), newType, operand->get());
+      operand->set(value);
+    }
+  }
+
+  return success();
+}
+
+LogicalResult materializeOperands(OpBuilder &builder, Operation *op,
+                                  llvm::MutableArrayRef<OpOperand> operands) {
+  std::vector<OpOperand *> ptrs;
+  ptrs.reserve(operands.size());
+  for (OpOperand &operand : operands) {
+    ptrs.push_back(&operand);
+  }
+  return materializeOperands(builder, op, ptrs);
+}
+
+LogicalResult materializeOperands(OpBuilder &builder, Operation *op) {
+  return materializeOperands(builder, op, op->getOpOperands());
 }
 
 } // namespace pmlc::dialect::eltwise

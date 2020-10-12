@@ -11,12 +11,6 @@ namespace pmlc::dialect::eltwise {
 
 mlir::Type promoteTypes(mlir::Type lhs, mlir::Type rhs);
 
-llvm::SmallVector<int64_t, 4>
-getShapeFromOperands(llvm::ArrayRef<mlir::Value> operands);
-
-mlir::Type ComputeResultType(mlir::ValueRange operands,
-                             mlir::Type override = mlir::Type());
-
 mlir::RankedTensorType getRankedTensorType(mlir::Type type);
 
 using UnaryCalculate = std::function<double(double)>;
@@ -37,5 +31,16 @@ inline ConstantValueMatcher m_Zero() { return ConstantValueMatcher{0}; }
 inline ConstantValueMatcher m_One() { return ConstantValueMatcher{1}; }
 
 mlir::Type toSignlessType(mlir::Type type);
+
+mlir::LogicalResult
+materializeOperands(mlir::OpBuilder &builder, mlir::Operation *op,
+                    llvm::ArrayRef<mlir::OpOperand *> operands);
+
+mlir::LogicalResult
+materializeOperands(mlir::OpBuilder &builder, mlir::Operation *op,
+                    llvm::MutableArrayRef<mlir::OpOperand> operands);
+
+mlir::LogicalResult materializeOperands(mlir::OpBuilder &builder,
+                                        mlir::Operation *op);
 
 } // namespace pmlc::dialect::eltwise
