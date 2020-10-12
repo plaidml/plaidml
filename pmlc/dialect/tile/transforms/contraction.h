@@ -67,6 +67,9 @@ private:
 
   // Remove any fractional polynomial multipliers (IE, any non-integers).
   void Defractionalize();
+
+private:
+  AggregationKind agg_;
 };
 
 math::Affine Integerize(const IndexPoly &poly, const math::IndexBounds &bounds);

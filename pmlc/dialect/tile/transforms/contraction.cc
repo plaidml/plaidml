@@ -208,7 +208,7 @@ static IndexAccess ConvertAffineMap(ContractionOp op, mlir::AffineMap map) {
   return dims;
 }
 
-Contraction::Contraction(ContractionOp op) {
+Contraction::Contraction(ContractionOp op) : agg_(op.agg()) {
   auto op_result = op.result();
   IVLOG(2, "Processing: " << mlir::debugString(op_result));
   accesses.emplace_back(ConvertAffineMap(op, op.sink()));
@@ -562,6 +562,9 @@ void Contraction::Defractionalize() {
 }
 
 bool Contraction::NeedReduce() const {
+  if (agg_ == AggregationKind::assign) {
+    return false;
+  }
   for (const auto &poly : accesses[0]) {
     if (poly.getMap().size() > 2 ||
         (poly.getMap().size() == 2 && poly.constant() == 0)) {
