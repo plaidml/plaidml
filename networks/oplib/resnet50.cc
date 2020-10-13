@@ -326,17 +326,4 @@ Program buildResnet50(int64_t batch_size) {
   return build(batch_size, I, W, B);
 }
 
-plaidml::exec::Executable createDefaultExecutable(plaidml::Program program) {
-  program.compile();
-  std::vector<plaidml::Buffer> inputs;
-  for (const plaidml::TensorShape& shape : program.inputs()) {
-    inputs.emplace_back(shape);
-  }
-  std::vector<plaidml::Buffer> outputs;
-  for (const plaidml::TensorShape& shape : program.outputs()) {
-    outputs.emplace_back(shape);
-  }
-  return plaidml::exec::Executable(program, inputs, outputs);
-}
-
 }  // namespace networks::oplib

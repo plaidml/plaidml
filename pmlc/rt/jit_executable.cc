@@ -14,6 +14,8 @@
 #include "llvm/ExecutionEngine/MCJIT.h"
 #include "llvm/ExecutionEngine/ObjectCache.h"
 #include "llvm/ExecutionEngine/Orc/ExecutionUtils.h"
+#include "llvm/ExecutionEngine/Orc/IRCompileLayer.h"
+#include "llvm/ExecutionEngine/Orc/JITTargetMachineBuilder.h"
 #include "llvm/ExecutionEngine/Orc/LLJIT.h"
 #include "llvm/ExecutionEngine/Orc/ObjectLinkingLayer.h"
 #include "llvm/ExecutionEngine/Orc/RTDyldObjectLinkingLayer.h"
@@ -87,6 +89,9 @@ static void packFunctionArguments(llvm::Module *module, StringRef entry) {
   llvm::IRBuilder<> builder(ctx);
   auto funcName = makeCWrapperFunctionName(entry);
   auto *func = module->getFunction(funcName);
+  if (!func) {
+    throw std::runtime_error("Could not find function: " + funcName);
+  }
 
   // Given a function `foo(<...>)`, define the interface function
   // `mlir_foo(i8**)`.
@@ -265,14 +270,31 @@ struct MCJITEngineImpl : EngineImpl {
 struct OrcJITEngineImpl : EngineImpl {
   ABI compile(std::unique_ptr<llvm::Module> module,
               std::unique_ptr<llvm::LLVMContext> ctx) final {
+    using llvm::Expected;
     using llvm::orc::DynamicLibrarySearchGenerator;
+    using llvm::orc::IRCompileLayer;
+    using llvm::orc::JITTargetMachineBuilder;
     using llvm::orc::MangleAndInterner;
     using llvm::orc::SymbolMap;
     using llvm::orc::ThreadSafeModule;
+    using llvm::orc::TMOwningSimpleCompiler;
 
     auto dataLayout = module->getDataLayout();
 
-    jit = llvm::cantFail(llvm::orc::LLJITBuilder().create());
+    // Callback to inspect the cache and recompile on demand. This follows
+    // Lang's LLJITWithObjectCache example.
+    auto compileFunctionCreator = [&](JITTargetMachineBuilder JTMB)
+        -> Expected<std::unique_ptr<IRCompileLayer::IRCompiler>> {
+      JTMB.setCodeGenOptLevel(llvm::CodeGenOpt::Level::Aggressive);
+      auto TM = JTMB.createTargetMachine();
+      if (!TM)
+        return TM.takeError();
+      return std::make_unique<TMOwningSimpleCompiler>(std::move(*TM), nullptr);
+    };
+
+    jit = llvm::cantFail(llvm::orc::LLJITBuilder()
+                             .setCompileFunctionCreator(compileFunctionCreator)
+                             .create());
 
     // Add a ThreadSafeModule to the engine and return.
     ThreadSafeModule tsm(std::move(module), std::move(ctx));
@@ -358,9 +380,7 @@ struct StopWatch {
 class JitExecutable final : public Executable {
 public:
   JitExecutable(const std::shared_ptr<Program> &program,
-                std::shared_ptr<Device> device,
-                ArrayRef<util::BufferPtr> inputBuffers,
-                ArrayRef<util::BufferPtr> outputBuffers)
+                std::shared_ptr<Device> device)
       : program(program), device(std::move(device)) {
     static std::once_flag is_initialized;
     std::call_once(is_initialized, []() {
@@ -389,14 +409,6 @@ public:
       throw std::runtime_error("Invalid EngineKind");
     }
 
-    if (inputBuffers.size() != program->inputs.size()) {
-      throw std::runtime_error("Program input arguments and buffers mismatch");
-    }
-    if (outputBuffers.size() != program->outputs.size()) {
-      throw std::runtime_error(
-          "Program outputs arguments and buffers mismatch");
-    }
-
     auto ctx = std::make_unique<llvm::LLVMContext>();
     auto llvmModule = translateModuleToLLVMIR(*program->module, *ctx);
     if (!llvmModule) {
@@ -414,6 +426,37 @@ public:
     if (!abi) {
       throw std::runtime_error("Entrypoint functions not found");
     }
+  }
+
+  ~JitExecutable() { abi.teardownFunc(network); }
+
+  void invoke(mlir::ArrayRef<util::BufferPtr> inputBuffers,
+              mlir::ArrayRef<util::BufferPtr> outputBuffers) final {
+    StopWatch stopWatch;
+    if (VLOG_IS_ON(1)) {
+      stopWatch.start();
+    }
+    bindArguments(inputBuffers, outputBuffers);
+    abi.executeFunc(ptrs.data());
+    if (VLOG_IS_ON(1)) {
+      stopWatch.stop();
+      IVLOG(1, "Execution time: " << stopWatch.delta_ms() << "ms");
+    }
+  }
+
+  void bindArguments(ArrayRef<util::BufferPtr> inputBuffers,
+                     ArrayRef<util::BufferPtr> outputBuffers) {
+    if (inputBuffers.size() != program->inputs.size()) {
+      throw std::runtime_error("Program input arguments and buffers mismatch");
+    }
+
+    if (outputBuffers.size() != program->outputs.size()) {
+      throw std::runtime_error(
+          "Program outputs arguments and buffers mismatch");
+    }
+
+    descriptors.clear();
+    ptrs.clear();
 
     network = abi.setupFunc(this->device.get());
     ptrs.push_back(network);
@@ -433,20 +476,6 @@ public:
     }
   }
 
-  void invoke() final {
-    StopWatch stopWatch;
-    if (VLOG_IS_ON(1)) {
-      stopWatch.start();
-    }
-    abi.executeFunc(ptrs.data());
-    if (VLOG_IS_ON(1)) {
-      stopWatch.stop();
-      IVLOG(1, "Execution time: " << stopWatch.delta_ms() << "ms");
-    }
-  }
-
-  ~JitExecutable() { abi.teardownFunc(network); }
-
 private:
   std::shared_ptr<Program> program;
   std::shared_ptr<Device> device;
@@ -461,11 +490,8 @@ private:
 
 std::unique_ptr<Executable>
 makeJitExecutable(const std::shared_ptr<Program> &program,
-                  std::shared_ptr<Device> device,
-                  ArrayRef<util::BufferPtr> inputBuffers,
-                  ArrayRef<util::BufferPtr> outputBuffers) {
-  return std::make_unique<JitExecutable>(program, std::move(device),
-                                         inputBuffers, outputBuffers);
+                  std::shared_ptr<Device> device) {
+  return std::make_unique<JitExecutable>(program, std::move(device));
 }
 
 } // namespace pmlc::rt

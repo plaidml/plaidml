@@ -13,6 +13,11 @@ namespace pmlc::ast {
 
 bool isAmbiguousDataType(util::DataType dtype);
 
+util::DataType inferElementType(llvm::ArrayRef<util::TensorShape> shapes);
+
+util::TensorShape inferShape(llvm::ArrayRef<util::TensorShape> operands,
+                             util::DataType override = util::DataType::invalid);
+
 //
 // Evaluator
 //

@@ -294,10 +294,11 @@ plaidml_buffer* plaidml_buffer_alloc(  //
 plaidml_buffer* plaidml_buffer_adopt(  //
     plaidml_error* err,                //
     plaidml_shape* shape,              //
-    void* data,                        //
+    char* data,                        //
     size_t size) {
   return ffi_wrap<plaidml_buffer*>(err, nullptr, [&] {
-    auto buffer = std::make_shared<AdoptedBuffer>(shape->shape, size, static_cast<char*>(data));
+    IVLOG(3, "plaidml_buffer_adopt: " << static_cast<void*>(data));
+    auto buffer = std::make_shared<AdoptedBuffer>(shape->shape, size, data);
     return new plaidml_buffer{buffer};
   });
 }

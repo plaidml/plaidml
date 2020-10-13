@@ -41,9 +41,7 @@ public:
   VulkanDevice &operator=(const VulkanDevice &) = delete;
 
   std::unique_ptr<Executable>
-  compile(const std::shared_ptr<pmlc::compiler::Program> &program,
-          mlir::ArrayRef<util::BufferPtr> inputBuffers,
-          mlir::ArrayRef<util::BufferPtr> outputBuffers) final;
+  compile(const std::shared_ptr<pmlc::compiler::Program> &program) final;
 
   const VkDevice &getDevice() const { return device; }
   const VkQueue &getQueue() const { return queue; }

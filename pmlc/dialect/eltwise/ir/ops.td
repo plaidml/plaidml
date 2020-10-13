@@ -4,26 +4,17 @@
 
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
-#ifndef __PML_UTIL_INTERFACES__
+#ifndef __PML_ELTWISE_BASE__
+include "pmlc/dialect/eltwise/ir/base.td"
+#endif
+
+#ifndef __PMLC_UTIL_INTERFACES__
 include "pmlc/util/interfaces.td"
 #endif
 
-#ifndef __PML_ELTWISE_PREDICATES__
-include "pmlc/dialect/eltwise/ir/predicates.td"
-#endif
-
-def EltwiseDialect : Dialect {
-  let name = "eltwise";
-  let cppNamespace = "pmlc::dialect::eltwise";
-  let hasConstantMaterializer = 1;
-  let extraClassDeclaration = [{
-    static std::string getCanonicalOpName(llvm::StringRef name);
-  }];
-}
-
 class EltwiseOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
     Op<EltwiseDialect, mnemonic, !listconcat(traits, [
-      GenericBuilderInterface
+      MaterializeOperandsOpInterface
     ])>;
 
 def ScalarConstantOp :
@@ -42,7 +33,8 @@ def ScalarConstantOp :
     "OpBuilder &builder, OperationState& result, Type type, int64_t value", [{
       result.addAttribute("value", builder.getI64IntegerAttr(value));
       result.addTypes(RankedTensorType::get({}, type));
-    }]>, OpBuilder<
+    }]
+  >, OpBuilder<
     "OpBuilder &builder, OperationState& result, Type type, uint64_t value", [{
       result.addAttribute("value", builder.getI64IntegerAttr(value));
       result.addTypes(RankedTensorType::get({}, type));
@@ -57,69 +49,40 @@ def ScalarConstantOp :
 }
 
 class EW_UnaryOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
-    EltwiseOp<mnemonic, traits>,
-    HasCanonicalizer {
+    EltwiseOp<mnemonic, traits> {
   let arguments = (ins EltwiseAny:$operand);
   let results = (outs EltwiseAny:$result);
-
-  let builders = [OpBuilder<
-    "OpBuilder &builder, OperationState& result, ValueRange operands", [{
-      result.addOperands(operands);
-      result.addTypes(getResultType(operands));
-    }]
-  >];
-
   let extraClassDeclaration = [{
-    static Type getResultType(ValueRange operands) {
-      return ComputeResultType(operands);
+    LogicalResult materializeOperands(OpBuilder& builder) {
+      return eltwise::materializeOperands(builder, getOperation());
     }
   }];
 }
 
 class EW_BinaryOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
-    EltwiseOp<mnemonic, traits>,
-    HasCanonicalizer {
+    EltwiseOp<mnemonic, traits> {
   let arguments = (ins EltwiseAny:$lhs, EltwiseAny:$rhs);
   let results = (outs EltwiseAny:$result);
-
-  let builders = [OpBuilder<
-    "OpBuilder &builder, OperationState& result, ValueRange operands", [{
-      result.addOperands(operands);
-      result.addTypes(getResultType(operands));
-    }]
-  >];
-
   let extraClassDeclaration = [{
-    static Type getResultType(ValueRange operands) {
-      return ComputeResultType(operands);
+    LogicalResult materializeOperands(OpBuilder& builder) {
+      return eltwise::materializeOperands(builder, getOperation());
     }
   }];
 }
 
-def EW_CastOp : Op<EltwiseDialect, "cast", [NoSideEffect]>,
-    HasCanonicalizer, HasFolder {
+def EW_CastOp : Op<EltwiseDialect, "cast", [NoSideEffect]>, HasFolder {
   let summary = "cast operation";
   let arguments = (ins EltwiseAny:$tensor);
   let results = (outs EltwiseAny:$result);
 }
 
 class EW_CompareOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
-    EltwiseOp<mnemonic, traits>,
-    HasCanonicalizer {
+    EltwiseOp<mnemonic, traits> {
   let arguments = (ins EltwiseAny:$lhs, EltwiseAny:$rhs);
   let results = (outs EltwiseBool:$result);
-
-  let builders = [OpBuilder<
-    "OpBuilder &builder, OperationState& result, ValueRange operands", [{
-      result.addOperands(operands);
-      result.addTypes(getResultType(operands));
-    }]
-  >];
-
   let extraClassDeclaration = [{
-    static Type getResultType(ValueRange operands) {
-      return ComputeResultType(operands,
-        IntegerType::get(1, operands[0].getContext()));
+    LogicalResult materializeOperands(OpBuilder& builder) {
+      return eltwise::materializeOperands(builder, getOperation());
     }
   }];
 }
@@ -142,31 +105,12 @@ class EW_BinaryIntOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
 class EW_BinaryLogicOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
     EW_BinaryOp<mnemonic, traits>,
     Arguments<(ins EltwiseAny:$lhs, EltwiseAny:$rhs)>,
-    Results<(outs EltwiseBool:$result)> {
-
-  let extraClassDeclaration = [{
-    static Type getResultType(ValueRange operands) {
-      return ComputeResultType(operands,
-        IntegerType::get(1, operands[0].getContext()));
-    }
-  }];
-}
+    Results<(outs EltwiseBool:$result)>;
 
 class EW_UnaryLogicOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
     EW_UnaryOp<mnemonic, traits>,
     Arguments<(ins EltwiseAny:$operand)>,
-    Results<(outs EltwiseBool:$result)> {
-
-  let extraClassDeclaration = [{
-    static Type getResultType(ValueRange operands) {
-      Value operand = operands[0];
-      auto opType = getRankedTensorType(operand.getType());
-      auto resultShape = opType.getShape();
-      Type dtype = IntegerType::get(1, operand.getContext());
-      return RankedTensorType::get(resultShape, dtype);
-    }
-  }];
-}
+    Results<(outs EltwiseBool:$result)>;
 
 
 def EW_AbsOp : EW_UnaryOp<"abs">;
@@ -221,20 +165,12 @@ def EW_LogicalNotOp : EW_UnaryLogicOp<"logical_not">;
 def EW_LogicalOrOp : EW_BinaryLogicOp<"logical_or", [Commutative, NoSideEffect]>;
 def EW_LogicalXorOp : EW_BinaryLogicOp<"logical_xor", [Commutative, NoSideEffect]>;
 
-def EW_SelectOp : EltwiseOp<"select">, HasCanonicalizer {
+def EW_SelectOp : EltwiseOp<"select", [NoSideEffect]> {
   let summary = "conditional selection";
   let arguments = (ins EltwiseBool:$cond, EltwiseAny:$tcase, EltwiseAny:$fcase);
   let results = (outs EltwiseAny:$result);
-
-  let builders = [OpBuilder<
-    "OpBuilder &builder, OperationState& result, ValueRange operands", [{
-      result.addOperands(operands);
-      result.addTypes(getResultType(operands));
-    }]
-  >];
-
   let extraClassDeclaration = [{
-    static Type getResultType(ValueRange operands);
+    LogicalResult materializeOperands(OpBuilder& builder);
   }];
 }
 

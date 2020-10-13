@@ -36,110 +36,6 @@ static llvm::StringRef getAffineOpStr(AffineOp op) {
   llvm_unreachable("getAffineOpStr");
 }
 
-static int64_t getTypeScore(DataType type) {
-  return static_cast<int64_t>(type);
-}
-
-static DataType promoteTypes(DataType lhs, DataType rhs) {
-  return getTypeScore(lhs) > getTypeScore(rhs) ? lhs : rhs;
-}
-
-DataType inferElementType(llvm::ArrayRef<TensorShape> shapes) {
-  DataType ret = DataType::invalid;
-  for (const TensorShape &shape : shapes) {
-    ret = promoteTypes(ret, shape.elementType);
-  }
-  return ret;
-}
-
-static bool mergeShapes(TensorShape *into, const TensorShape &from,
-                        DataType dtype) {
-  // To compute the resulting broadcasted shape, we compare operand shapes
-  // element-wise: starting with the trailing dimensions, and working our
-  // way backward. Two dimensions are compatible when
-  //   1. they are equal, or
-  //   2. one of them is 1
-  // The result shape has the maximum among the two inputs at every
-  // dimension index.
-  std::vector<int64_t> resultShape;
-  const std::vector<int64_t> &shape1 = into->sizes;
-  const std::vector<int64_t> &shape2 = from.sizes;
-  IVLOG(6, "  Checking compatibility between " << shape1 << " and " << shape2);
-  if (shape1.size() > shape2.size()) {
-    std::copy(shape1.begin(), shape1.end(), std::back_inserter(resultShape));
-  } else {
-    std::copy(shape2.begin(), shape2.end(), std::back_inserter(resultShape));
-  }
-
-  auto i1 = shape1.rbegin(), e1 = shape1.rend();
-  auto i2 = shape2.rbegin(), e2 = shape2.rend();
-  auto iR = resultShape.rbegin();
-
-  // Check each dimension is consistent.
-  for (; i1 != e1 && i2 != e2; ++i1, ++i2, ++iR) {
-    if (*i1 == 0 || *i2 == 0) {
-      // One or both dimensions is unknown. Follow TensorFlow behavior:
-      // - If either dimension is greater than 1, we assume that the program is
-      //   correct, and the other dimension will be broadcast to match it.
-      // - If either dimension is 1, the other dimension is the output.
-      if (*i1 > 1) {
-        *iR = *i1;
-      } else if (*i2 > 1) {
-        *iR = *i2;
-      } else if (*i1 == 1) {
-        *iR = *i2;
-      } else if (*i2 == 1) {
-        *iR = *i1;
-      } else {
-        *iR = 0;
-      }
-    } else {
-      if (*i1 == *i2 || *i2 == 1) {
-        *iR = *i1;
-      } else if (*i1 == 1) {
-        *iR = *i2;
-      } else {
-        // This dimension of the two operand types is incompatible.
-        return false;
-      }
-    }
-  }
-
-  if (dtype == DataType::invalid) {
-    dtype = promoteTypes(into->elementType, from.elementType);
-  }
-  *into = TensorShape{dtype, resultShape};
-  IVLOG(6, "  Resulting shape: " << into->str());
-  return true;
-}
-
-TensorShape inferShape(llvm::ArrayRef<TensorShape> operands,
-                       DataType override) {
-  TensorShape ret = operands.front();
-  if (override != DataType::invalid) {
-    ret.elementType = override;
-  }
-  for (const TensorShape &operand : operands.drop_front()) {
-    if (!mergeShapes(&ret, operand, override)) {
-      std::stringstream ss;
-      ss << "Incompatible types: (";
-      for (size_t i = 0; i < operands.size(); i++) {
-        if (i) {
-          ss << ", ";
-        }
-        ss << operands[i].str();
-      }
-      ss << ")";
-      throw std::runtime_error(ss.str());
-    }
-  }
-  return ret;
-}
-
-//
-// TensorShape
-//
-
 //
 // ExprNode
 //
@@ -161,7 +57,9 @@ std::string ExprNodeCast::str() const { return "cast"; }
 
 ExprNodeConstSigned::ExprNodeConstSigned(int64_t value) : value(value) {}
 
-std::string ExprNodeConstSigned::str() const { return std::to_string(value); }
+std::string ExprNodeConstSigned::str() const {
+  return llvm::formatv("{0}:six", value);
+}
 
 //
 // ExprNodeConstUnsigned
@@ -169,7 +67,9 @@ std::string ExprNodeConstSigned::str() const { return std::to_string(value); }
 
 ExprNodeConstUnsigned::ExprNodeConstUnsigned(uint64_t value) : value(value) {}
 
-std::string ExprNodeConstUnsigned::str() const { return std::to_string(value); }
+std::string ExprNodeConstUnsigned::str() const {
+  return llvm::formatv("{0}:uix", value);
+}
 
 //
 // ExprNodeConstFloat
@@ -177,7 +77,9 @@ std::string ExprNodeConstUnsigned::str() const { return std::to_string(value); }
 
 ExprNodeConstFloat::ExprNodeConstFloat(double value) : value(value) {}
 
-std::string ExprNodeConstFloat::str() const { return std::to_string(value); }
+std::string ExprNodeConstFloat::str() const {
+  return llvm::formatv("{0}:fx", value);
+}
 
 //
 // ExprNodeConstTensor
@@ -199,7 +101,18 @@ std::string Constraint::str() const {
 
 ExprNodeContraction::ExprNodeContraction(llvm::StringRef name) : Base(name) {}
 
-std::string ExprNodeContraction::str() const { return "contraction"; }
+std::string ExprNodeContraction::str() const {
+  std::stringstream ss;
+  ss << util::stringifyAggregationKind(aggKind).str() << '(';
+  // for (auto item : llvm::enumerate(srcs)) {
+  //   if (item.index()) {
+  //     ss << ", ";
+  //   }
+  //   ss << item.value().ref->str();
+  // }
+  ss << ')';
+  return ss.str();
+}
 
 //
 // ExprNodeDim
@@ -217,7 +130,7 @@ ExprNodeElement::ExprNodeElement(const ExprNodePtr &expr, size_t ordinal)
     : expr(expr), ordinal(ordinal) {}
 
 std::string ExprNodeElement::str() const {
-  return llvm::formatv("{0}[{1}]", expr->str(), ordinal);
+  return llvm::formatv("element({0}, {1})", expr->str(), ordinal);
 }
 
 //
@@ -229,9 +142,9 @@ ExprNodeInput::ExprNodeInput(const TensorShape &shape, llvm::StringRef name)
 
 std::string ExprNodeInput::str() const {
   if (name.size()) {
-    return llvm::formatv("input<{0}, \"{1}\">", shape.str(), name);
+    return llvm::formatv("input({0}, \"{1}\")", shape.str(), name);
   }
-  return llvm::formatv("input<{0}>", shape.str());
+  return llvm::formatv("input({0})", shape.str());
 }
 
 //
@@ -243,30 +156,51 @@ ExprNodeIntrinsic::ExprNodeIntrinsic(llvm::StringRef op,
     : op(op), operands(operands) {}
 
 std::string ExprNodeIntrinsic::str() const {
-  return llvm::formatv("{0}()", op);
+  std::stringstream ss;
+  ss << op << '(';
+  // for (auto item : llvm::enumerate(operands)) {
+  //   if (item.index()) {
+  //     ss << ", ";
+  //   }
+  //   ss << item.value()->str();
+  // }
+  ss << ')';
+  return ss.str();
 }
 
 //
-// ExprNodeTrace
+// ExprNodePragma
 //
 
-ExprNodeTrace::ExprNodeTrace(const ExprNodePtr &expr, llvm::StringRef msg)
-    : expr(expr), msg(msg) {}
+ExprNodePragma::ExprNodePragma(const ExprNodePtr &expr, llvm::StringRef op,
+                               const llvm::StringMap<VarNodePtr> &attrs)
+    : expr(expr), op(op), attrs(attrs) {}
 
-std::string ExprNodeTrace::str() const {
-  return llvm::formatv("trace(\"{0}\")", msg);
-}
+std::string ExprNodePragma::str() const { return op; }
 
 //
 // DimNode tree
 //
 
-std::string DimNodeLiteral::str() const { return std::to_string(value); }
+std::string DimNodeLiteral::str() const {
+  return llvm::formatv("{0}:ix", value);
+}
 
-std::string DimNodeOp::str() const { return getAffineOpStr(op).str(); }
+std::string DimNodeOp::str() const {
+  std::stringstream ss;
+  ss << getAffineOpStr(op).str() << '(';
+  for (auto item : llvm::enumerate(operands)) {
+    if (item.index()) {
+      ss << ", ";
+    }
+    ss << item.value()->str();
+  }
+  ss << ')';
+  return ss.str();
+}
 
 std::string DimNodeRef::str() const {
-  return llvm::formatv("{0}[{1}]", ref->str(), dim);
+  return llvm::formatv("dim({0}, {1})", ref->str(), dim);
 }
 
 //
@@ -275,11 +209,27 @@ std::string DimNodeRef::str() const {
 
 std::string PolyNodeDim::str() const { return dim->str(); }
 
-std::string PolyNodeIndex::str() const { return llvm::formatv("%{0}", name); }
+std::string PolyNodeIndex::str() const {
+  if (name.empty()) {
+    return llvm::formatv("%{0}", this);
+  }
+  return llvm::formatv("%{0}", name);
+}
 
 std::string PolyNodeLiteral::str() const { return std::to_string(value); }
 
-std::string PolyNodeOp::str() const { return getAffineOpStr(op).str(); }
+std::string PolyNodeOp::str() const {
+  std::stringstream ss;
+  ss << getAffineOpStr(op).str() << '(';
+  for (auto item : llvm::enumerate(operands)) {
+    if (item.index()) {
+      ss << ", ";
+    }
+    ss << item.value()->str();
+  }
+  ss << ')';
+  return ss.str();
+}
 
 //
 // VarNode tree

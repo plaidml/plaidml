@@ -8,6 +8,11 @@ def ComputeBounds : FunctionPass<"tile-compute-bounds"> {
   let constructor = "pmlc::dialect::tile::createComputeBoundsPass()";
 }
 
+def Materialize : FunctionPass<"tile-materialize"> {
+  let summary = "Materialize arbitrary-precision values based on type promotion rules";
+  let constructor = "pmlc::dialect::tile::createMaterializePass()";
+}
+
 def PadRanges : FunctionPass<"tile-pad-ranges"> {
   let summary = "Pad ranges to make things more even (possibly adding constraints)";
   let constructor = "pmlc::dialect::tile::createPadRangesPass()";

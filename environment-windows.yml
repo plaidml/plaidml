@@ -1,6 +1,7 @@
 channels:
   - conda-forge
 dependencies:
+  - clang-tools
   - conda=4.6
   - numpy=1.16
   - pip=19

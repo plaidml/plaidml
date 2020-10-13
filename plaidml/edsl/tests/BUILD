@@ -52,5 +52,6 @@ py_test(
 
 lit_test(
     name = "edsl_test.cc",
+    size = "medium",
     data = [":cc_test"],
 )

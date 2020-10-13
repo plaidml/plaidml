@@ -38,6 +38,7 @@ plaidml_cc_library(
         "//pmlc/rt/vulkan",
         "//pmlc/target/x86:prng_lowering",
         "//pmlc/transforms",
+        "@llvm-project//mlir:AffineTransforms",
         "@llvm-project//mlir:AffineToStandardTransforms",
         "@llvm-project//mlir:GPUToSPIRVTransforms",
         "@llvm-project//mlir:GPUToVulkanTransforms",

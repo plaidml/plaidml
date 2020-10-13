@@ -32,6 +32,15 @@ void plaidml_edsl_init(  //
     plaidml_error* err);
 
 //
+// plaidml_attr
+//
+
+typedef struct {
+  const char* key;
+  plaidml_value* value;
+} plaidml_attr;
+
+//
 // plaidml_poly_expr
 //
 
@@ -171,10 +180,12 @@ plaidml_expr* plaidml_expr_cast(  //
     plaidml_expr* tensor,         //
     plaidml_datatype dtype);
 
-plaidml_expr* plaidml_expr_trace(  //
-    plaidml_error* err,            //
-    plaidml_expr* tensor,          //
-    const char* msg);
+plaidml_expr* plaidml_expr_pragma(  //
+    plaidml_error* err,             //
+    plaidml_expr* tensor,           //
+    const char* op,                 //
+    size_t nattrs,                  //
+    plaidml_attr** attrs);
 
 //
 // plaidml_contraction
@@ -205,7 +216,6 @@ plaidml_expr* plaidml_expr_contraction(  //
     plaidml_poly_expr** idxs,            //
     plaidml_dim_expr** dims,             //
     plaidml_expr* init,                  //
-    bool simplify,                       //
     const char* name);
 
 void plaidml_contraction_add_operand(  //

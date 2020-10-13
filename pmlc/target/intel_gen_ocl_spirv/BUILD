@@ -43,6 +43,7 @@ plaidml_cc_library(
         "//pmlc/target/intel_gen",
         "//pmlc/transforms",
         "@llvm-project//mlir:AffineToStandardTransforms",
+        "@llvm-project//mlir:AffineTransforms",
         "@llvm-project//mlir:GPUToSPIRVTransforms",
         "@llvm-project//mlir:GPUToVulkanTransforms",
         "@llvm-project//mlir:GPUTransforms",

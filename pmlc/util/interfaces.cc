@@ -1,4 +1,4 @@
-// Copyright 2019, Intel Corporation
+// Copyright 2020 Intel Corporation
 
 #include "pmlc/util/interfaces.h"
 

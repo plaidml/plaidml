@@ -45,11 +45,8 @@ OpenCLDevice::OpenCLDevice(cl::Device device)
 }
 
 std::unique_ptr<Executable>
-OpenCLDevice::compile(const std::shared_ptr<pmlc::compiler::Program> &program,
-                      mlir::ArrayRef<util::BufferPtr> inputBuffers,
-                      mlir::ArrayRef<util::BufferPtr> outputBuffers) {
-  return makeJitExecutable(program, shared_from_this(), inputBuffers,
-                           outputBuffers);
+OpenCLDevice::compile(const std::shared_ptr<pmlc::compiler::Program> &program) {
+  return makeJitExecutable(program, shared_from_this());
 }
 
 OpenCLQueueUser OpenCLDevice::getQueue(cl::QueueProperties properties) {

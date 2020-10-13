@@ -8,7 +8,7 @@ package(default_visibility = ["//visibility:public"])
 filegroup(
     name = "td_files",
     srcs = [
-        "predicates.td",
+        "base.td",
         "//pmlc/util:td_files",
         "@llvm-project//mlir:OpBaseTdFiles",
     ],
@@ -36,6 +36,7 @@ plaidml_cc_library(
     ],
     hdrs = [
         "ops.h",
+        "types.h",
         "util.h",
     ],
     deps = [
