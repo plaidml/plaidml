@@ -132,6 +132,19 @@ public:
     return create<eltwise::ScalarConstantOp>(getUnknownLoc(), type, value);
   }
 
+  Attribute getAttribute(const VarNodePtr &node) {
+    return TypeSwitch<VarNode *, Attribute>(node.get())
+        .Case<VarNodeFloat>(
+            [&](VarNodeFloat *node) { return getF64FloatAttr(node->value); })
+        .Case<VarNodeInt>(
+            [&](VarNodeInt *node) { return getI64IntegerAttr(node->value); })
+        .Case<VarNodeString>(
+            [&](VarNodeString *node) { return getStringAttr(node->value); })
+        .Default([](VarNode *) -> Attribute {
+          llvm_unreachable("Invalid VarNode");
+        });
+  }
+
   DenseMap<const ExprNode *, Value> exprMap;
   DenseMap<const ExprNode *, SmallVector<Value, 4>> exprTuples;
 };
@@ -169,7 +182,7 @@ public:
 
 private:
   void visit(ExprNode *node) {
-    llvm::TypeSwitch<ExprNode *>(node) //
+    TypeSwitch<ExprNode *>(node) //
         .Case<ExprNodeCast>([&](ExprNodeCast *expr) { push(expr->expr); })
         .Case<ExprNodeContraction>([&](ExprNodeContraction *expr) {
           // Push inputs from right-to-left so they eventually get processed in
@@ -189,7 +202,7 @@ private:
             push(node);
           }
         })
-        .Case<ExprNodeTrace>([&](ExprNodeTrace *expr) { push(expr->expr); });
+        .Case<ExprNodePragma>([&](ExprNodePragma *expr) { push(expr->expr); });
   }
 
 private:
@@ -485,7 +498,7 @@ struct ProgramBuilder {
 
     for (const ExprNodePtr &node : flat) {
       Value value =
-          llvm::TypeSwitch<ExprNode *, Value>(node.get())
+          TypeSwitch<ExprNode *, Value>(node.get())
               .Case<ExprNodeCast>(
                   [&](ExprNodeCast *node) { return handleCast(node); })
               .Case<ExprNodeConstSigned>([&](ExprNodeConstSigned *node) {
@@ -510,8 +523,8 @@ struct ProgramBuilder {
               .Case<ExprNodeIntrinsic>([&](ExprNodeIntrinsic *node) {
                 return handleIntrinsic(node);
               })
-              .Case<ExprNodeTrace>(
-                  [&](ExprNodeTrace *node) { return handleTrace(node); });
+              .Case<ExprNodePragma>(
+                  [&](ExprNodePragma *node) { return handlePragma(node); });
       if (value) {
         builder.addNode(node, value);
       }
@@ -620,9 +633,17 @@ struct ProgramBuilder {
     return intrinsicBuilder();
   }
 
-  Value handleTrace(ExprNodeTrace *node) {
+  Value handlePragma(ExprNodePragma *node) {
     Value tensor = builder.lookupNode(node->expr);
-    return builder.create<tile::TraceOp>(loc, tensor, node->msg).out();
+    std::vector<NamedAttribute> attrs;
+    for (const auto &kvp : node->attrs) {
+      Attribute value = builder.getAttribute(kvp.getValue());
+      attrs.push_back(builder.getNamedAttr(kvp.getKey(), value));
+    }
+    return builder
+        .create<tile::PragmaOp>(loc, tensor, node->op,
+                                builder.getDictionaryAttr(attrs))
+        .result();
   }
 
   Value makeReshapeOp(ExprNodeIntrinsic *node, ArrayRef<Value> operands) {

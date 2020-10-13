@@ -31,7 +31,7 @@ AffineParallelOp performTiling(AffineParallelOp op,
   auto lbMap = AffineMap::get(dimCount, 0, lbExprs, op.getContext());
   auto ubMap = AffineMap::get(dimCount, 0, ubExprs, op.getContext());
   auto outerIdxs = outerBody->getArguments();
-  // Make the inner parallel for (abve all other code);
+  // Make the inner parallel for (above all other code);
   llvm::SmallVector<mlir::AtomicRMWKind, 8> reductions;
   for (Attribute attr : op.reductions()) {
     auto intAttr = attr.dyn_cast<IntegerAttr>();
@@ -62,6 +62,57 @@ AffineParallelOp performTiling(AffineParallelOp op,
   inner.setSteps(steps);
   op.setSteps(tileSizes);
   return inner;
+}
+
+AffineParallelOp undoTiling(AffineParallelOp op,
+                            llvm::ArrayRef<int64_t> tileSizes) {
+  // Make builder
+  mlir::OpBuilder builder(op.getBody(), op.getBody()->begin());
+  mlir::Block *outerBody = op.getBody();
+  // Verify sizes match
+  size_t dimCount = tileSizes.size();
+  assert(op.lowerBoundsMap().getNumResults() == dimCount);
+  // Check that we can undo steps
+  auto steps = op.getSteps();
+  for (size_t i = 0; i < dimCount; i++) {
+    assert(steps[i] % tileSizes[i] == 0);
+    steps[i] /= tileSizes[i];
+  }
+
+  // Check if first operation is AffineParallelOp (inner loop after tiling)
+  Operation &inner = outerBody->front();
+  auto innerOp = mlir::dyn_cast<AffineParallelOp>(&inner);
+  assert(innerOp);
+
+  // Check if last operation is AffineYieldOp
+  Operation &yield = outerBody->back();
+  auto yieldOp = mlir::dyn_cast<AffineYieldOp>(&yield);
+  assert(yieldOp);
+
+  // Finished with checks, first remove the redundant AffineYieldOp
+  yieldOp.erase();
+
+  // Replace old indices with new indices
+  auto &outerLoopOps = outerBody->getOperations();
+  auto &innerLoopOps = innerOp.getBody()->getOperations();
+
+  auto outerIdxs = outerBody->getArguments();
+  auto innerIdxs = innerOp.getBody()->getArguments();
+  for (unsigned i = 0; i < innerIdxs.size(); ++i) {
+    innerIdxs[i].replaceAllUsesWith(outerIdxs[i]);
+  }
+
+  // Move the ops from inner back to outer
+  outerLoopOps.splice(std::prev(outerLoopOps.end()), innerLoopOps,
+                      innerLoopOps.begin(), innerLoopOps.end());
+
+  // Remove empty inner loop
+  innerOp.erase();
+
+  // Set orginal steps
+  op.setSteps(steps);
+
+  return op;
 }
 
 } // namespace pmlc::dialect::pxa

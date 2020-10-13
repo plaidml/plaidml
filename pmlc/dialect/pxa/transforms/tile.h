@@ -10,4 +10,8 @@ namespace pmlc::dialect::pxa {
 mlir::AffineParallelOp performTiling(mlir::AffineParallelOp op,
                                      llvm::ArrayRef<int64_t> tileSizes);
 
+// Undo tiling
+mlir::AffineParallelOp undoTiling(mlir::AffineParallelOp op,
+                                  llvm::ArrayRef<int64_t> tileSizes);
+
 } // namespace pmlc::dialect::pxa

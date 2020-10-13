@@ -1943,7 +1943,7 @@ Value mvn(const Value& value) {
 
   if (normalize_variance) {
     auto stdev = edsl::sqrt(variance(edsl::make_tuple(I_raw, axes, /*keepdims=*/true)).as_tensor());
-    R = R / maximum(edsl::make_tuple(stdev, Tensor(epsilon))).as_tensor();
+    R = R / maximum(edsl::make_tuple(stdev, edsl::cast(Tensor(epsilon), I.dtype()))).as_tensor();
   }
 
   return Value{R};

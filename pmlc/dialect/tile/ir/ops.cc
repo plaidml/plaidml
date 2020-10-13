@@ -61,7 +61,7 @@ LogicalResult SortOp::materializeOperands(OpBuilder &builder) {
                                       op->getOpOperands().take_front());
 }
 
-LogicalResult TraceOp::materializeOperands(OpBuilder &builder) {
+LogicalResult PragmaOp::materializeOperands(OpBuilder &builder) {
   return eltwise::materializeOperands(builder, getOperation());
 }
 

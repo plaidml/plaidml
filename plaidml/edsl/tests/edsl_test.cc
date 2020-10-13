@@ -62,11 +62,13 @@ TEST_F(CppEdsl, HigherPrecisionConstants) {
   auto C = A + cast(Tensor{1}, DType::UINT64) + cast(Tensor{2.0}, DType::FLOAT64);
   auto program = makeProgram("higher_precision_constants", {A}, {C});
 
+  // clang-format off
   // CHECK-LABEL: CppEdsl.HigherPrecisionConstants
   // CHECK: module @higher_precision_constants
   // CHECK: "eltwise.add"(%{{.*}}, %{{.*}}) : (tensor<3x3xf32>, tensor<ui64>) -> tensor<3x3xf32>
   // CHECK: "eltwise.add"(%{{.*}}, %{{.*}}) : (tensor<3x3xf32>, tensor<f64>) -> tensor<3x3xf64>
   // CHECK: return %{{.*}} : tensor<3x3xf64>
+  // clang-format on
 
   std::vector<float> A_input{1, 2, 3, 4, 5, 6, 7, 8, 9};
   std::vector<double> C_output{4, 5, 6, 7, 8, 9, 10, 11, 12};
@@ -328,12 +330,14 @@ TEST_F(CppEdsl, Dot) {
   auto program = makeProgram("dot", {A, B}, {C});
   IVLOG(3, "program: \n" << program.str());
 
+  // clang-format off
   // CHECK-LABEL: CppEdsl.Dot
   // CHECK: module @dot
   // CHECK: %[[cst:.*]] = "eltwise.sconst"{{.*}}-> tensor<f32>
   // CHECK: %[[cion:.*]] = tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {{{.*}}}
   // CHECK-SAME: tensor<f32>, tensor<8x16xf32>, tensor<16x32xf32> -> tensor<8x32xf32>
   // CHECK: return %[[cion]] : tensor<8x32xf32>
+  // clang-format on
 
   std::default_random_engine rng(2);
   std::normal_distribution<float> normal_dist(0.0, 1.0);
@@ -1429,6 +1433,18 @@ TEST_F(CppEdsl, Sort2dAxis1) {
   //     54, 67, 71, 80, 87,  //
   // };
   // checkProgram(program, {input}, {output});
+}
+
+TEST_F(CppEdsl, Trace) {
+  auto I = Placeholder(DType::FLOAT32, {3, 3});
+  auto O = trace(I, "msg");
+  auto program = makeProgram("trace", {I}, {O});
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.Trace
+  // CHECK: module @trace
+  // CHECK: tile.pragma %{{.*}} "trace" {msg = "msg"} : tensor<3x3xf32>
+  // CHECK: return %{{.*}} : tensor<3x3xf32>
+  // clang-format on
 }
 
 }  // namespace

@@ -576,6 +576,11 @@ class TestEdsl(unittest.TestCase):
         O = sort(I, axis=0, mode=SortMode.DESC)
         program = Program('sort', [I], [O])
 
+    def test_trace(self):
+        I = Placeholder(plaidml.DType.FLOAT32, [3, 3])
+        O = trace(I, 'msg')
+        program = Program('trace', [I], [O])
+
 
 if __name__ == '__main__':
     plaidml.settings.set('PLAIDML_DEVICE', DEFAULT_DEVICE)

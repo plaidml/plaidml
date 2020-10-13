@@ -6,6 +6,7 @@
 #include <memory>
 #include <ostream>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -331,7 +332,7 @@ class Tensor {
   }
 
   ///
-  /// Get an element of an operation that returns a tuple (i.e. multlpe results).
+  /// Get an element of an operation that returns a tuple (i.e. multiple results).
   ///
   Tensor element(size_t ordinal) const;
 
@@ -688,10 +689,10 @@ Tensor intrinsic(const std::string& fn, Ts... args) {
 }
 
 ///
-/// \defgroup edsl_primitives EDSL Primitives
+/// \defgroup edsl_intrinsics EDSL Intrinsics
 ///
 
-/// \addtogroup edsl_primitives
+/// \addtogroup edsl_intrinsics
 /// @{
 
 ///
@@ -950,13 +951,6 @@ inline Tensor tan(const Tensor& x) { return intrinsic("tan", x); }
 /// \return Tensor
 ///
 inline Tensor tanh(const Tensor& x) { return intrinsic("tanh", x); }
-
-///
-/// Adds a tracepoint to the graph
-///
-inline Tensor trace(const Tensor& x, const std::string& msg) {
-  return Tensor{ffi::call<plaidml_expr*>(plaidml_expr_trace, x.as_ptr(), msg.c_str())};
-}
 
 /// @}
 
@@ -1250,6 +1244,26 @@ inline std::ostream& operator<<(std::ostream& os, const Value& x) {
   os << x.str();
   return os;
 }
+
+using PragmaAttrs = std::unordered_map<std::string, Value>;
+
+inline Tensor pragma(const Tensor& tensor, const std::string& op, const PragmaAttrs& attrs) {
+  std::vector<plaidml_attr> elts;
+  std::vector<plaidml_attr*> ptrs;
+  elts.reserve(attrs.size());
+  ptrs.reserve(attrs.size());
+  for (const auto& kvp : attrs) {
+    plaidml_attr attr{kvp.first.c_str(), kvp.second.as_ptr()};
+    elts.push_back(attr);
+    ptrs.push_back(&elts.back());
+  }
+  return Tensor{ffi::call<plaidml_expr*>(plaidml_expr_pragma, tensor.as_ptr(), op.c_str(), elts.size(), ptrs.data())};
+}
+
+///
+/// Adds a tracepoint to the graph
+///
+inline Tensor trace(const Tensor& x, const std::string& msg) { return pragma(x, "trace", {{"msg", Value(msg)}}); }
 
 }  // namespace edsl
 }  // namespace plaidml

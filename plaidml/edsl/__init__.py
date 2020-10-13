@@ -675,7 +675,7 @@ class Value(ForeignObject):
             raw_elts = [x.as_ptr() for x in self._elts]
             ffi_obj = ffi_call(lib.plaidml_value_tuple, len(raw_elts), raw_elts)
         elif isinstance(value, six.string_types):
-            ffi_obj = ffi_call(lib.plaidml_value_str, value.encode('utf-8'))
+            ffi_obj = ffi_call(lib.plaidml_value_str, value.encode())
         elif isinstance(value, ffi.CData) and ffi.typeof(value) is ffi.typeof('plaidml_value*'):
             ffi_obj = value
         else:
@@ -1105,3 +1105,28 @@ def tanh(x):
         Tensor: The result of the elementwise ``tanh`` operation.
     """
     return intrinsic('tanh', x)
+
+
+def _wrap_value(x):
+    if isinstance(x, Value):
+        return x
+    return Value(x)
+
+
+def pragma(tensor, op, attrs):
+    tensor = _wrap_tensor(tensor)
+    keys = []
+    values = []
+    raw_attrs = []
+    for key, value in attrs.items():
+        key = ffi.new('char[]', key.encode())
+        keys.append(key)
+        value = _wrap_value(value)
+        values.append(value)
+        raw_attrs.append(ffi.new('plaidml_attr*', {'key': key, 'value': value.as_ptr()}))
+    return Tensor(expr=ffi_call(lib.plaidml_expr_pragma, tensor.as_ptr(), op.encode(),
+                                len(raw_attrs), raw_attrs))
+
+
+def trace(x, msg):
+    return pragma(x, 'trace', dict(msg=msg))
