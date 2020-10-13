@@ -55,7 +55,7 @@ LogicalResult ShapeOp::materializeOperands(OpBuilder &builder) {
   return eltwise::materializeOperands(builder, getOperation());
 }
 
-LogicalResult TraceOp::materializeOperands(OpBuilder &builder) {
+LogicalResult PragmaOp::materializeOperands(OpBuilder &builder) {
   return eltwise::materializeOperands(builder, getOperation());
 }
 

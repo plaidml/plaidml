@@ -143,16 +143,24 @@ def ShapeOp : MaterializeOp<"shape"> {
   let results = (outs RankedTensorOf<[SI32]>:$result);
 }
 
-def TraceOp : MaterializeOp<"trace", []> {
-  let summary = "tracepoint operation";
-  let arguments = (ins AnyType:$in, StrAttr:$msg);
-  let results = (outs AnyType:$out);
+def PragmaOp : MaterializeOp<"pragma", [
+      AllTypesMatch<["tensor", "result"]>
+    ]> {
+  let summary = "pragma operation";
+  let arguments = (ins AnyType:$tensor, StrAttr:$op, DictionaryAttr:$attrs);
+  let results = (outs AnyType:$result);
 
   let builders = [OpBuilder<
-    "OpBuilder &builder, OperationState& result, Value tensor, StringRef msg", [{
+    "OpBuilder &builder, OperationState& result, Value tensor, StringRef op,"
+      "DictionaryAttr attrs", [{
       result.addTypes(tensor.getType());
       result.addOperands(tensor);
-      result.addAttribute("msg", builder.getStringAttr(msg));
+      result.addAttribute("op", builder.getStringAttr(op));
+      result.addAttribute("attrs", attrs);
     }]
   >];
+
+  let assemblyFormat = [{
+    $tensor $op $attrs attr-dict `:` type($tensor)
+  }];
 }
