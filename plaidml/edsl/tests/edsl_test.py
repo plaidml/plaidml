@@ -188,8 +188,8 @@ class TestEdsl(unittest.TestCase):
             return
         input_buffers = [plaidml.Buffer(shape) for shape in program.inputs]
         output_buffers = [plaidml.Buffer(shape) for shape in program.outputs]
-        executable = plaidml.exec.Executable(program, input_buffers, output_buffers)
-        executable.run()
+        executable = plaidml.exec.Executable(program)
+        executable.run(input_buffers, output_buffers)
 
     def checkProgram(self, program, inputs, expected):
         if platform.system() == 'Windows':
@@ -386,7 +386,6 @@ class TestEdsl(unittest.TestCase):
             .outShape(N0, 3 * N1, N2) \
             .outAccess(n0, 3 * n1 + k, n2) \
             .assign(I[n0, n1, n2]) \
-            .simplify(False) \
             .add_constraint(k < 3) \
             .build()
         program = Program('repeat_elts', [I], [O])
@@ -571,6 +570,11 @@ class TestEdsl(unittest.TestCase):
 
         first_pass = program.passes[0]
         self.assertEqual('tile', first_pass[0])
+
+    def test_trace(self):
+        I = Placeholder(plaidml.DType.FLOAT32, [3, 3])
+        O = trace(I, 'msg')
+        program = Program('trace', [I], [O])
 
 
 if __name__ == '__main__':

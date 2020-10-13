@@ -3,7 +3,7 @@
 
 func @main() {
   %c1 = constant 1.0 : f32
-  "tile.trace"(%c1) {msg = "msg"} : (f32) -> (f32)
+  tile.pragma %c1 "trace" {msg = "msg"} : f32
   return
 }
 

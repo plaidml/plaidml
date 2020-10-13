@@ -43,8 +43,7 @@ struct Constraints {
 struct Contraction {
   explicit Contraction(ContractionOp op);
 
-  BoundsAndConstraints ComputeBounds(llvm::ArrayRef<Shape> shapes,
-                                     bool no_reduce);
+  BoundsAndConstraints ComputeBounds(llvm::ArrayRef<Shape> shapes);
   void DeduceRangeConstraints();
 
   std::vector<IndexAccess> accesses;
@@ -68,6 +67,9 @@ private:
 
   // Remove any fractional polynomial multipliers (IE, any non-integers).
   void Defractionalize();
+
+private:
+  AggregationKind agg_;
 };
 
 math::Affine Integerize(const IndexPoly &poly, const math::IndexBounds &bounds);

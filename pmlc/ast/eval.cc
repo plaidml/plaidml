@@ -279,7 +279,7 @@ TensorShapes Evaluator::computeShapes(const ExprNode *node) {
             }
             return TensorShapes{inferShape(shapes)};
           })
-          .Case<ExprNodeTrace>([&](const auto *node) {
+          .Case<ExprNodePragma>([&](const auto *node) {
             auto shapes = getShapes(node->expr);
             return TensorShapes(shapes.begin(), shapes.end());
           });

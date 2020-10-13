@@ -17,9 +17,7 @@ public:
   virtual ~Device() = default;
 
   virtual std::unique_ptr<Executable>
-  compile(const std::shared_ptr<pmlc::compiler::Program> &program,
-          mlir::ArrayRef<util::BufferPtr> inputBuffers,
-          mlir::ArrayRef<util::BufferPtr> outputBuffers) = 0;
+  compile(const std::shared_ptr<pmlc::compiler::Program> &program) = 0;
 };
 
 } // namespace pmlc::rt

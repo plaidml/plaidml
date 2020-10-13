@@ -42,6 +42,8 @@ using dialect::tile::GatherOpAdaptor;
 using dialect::tile::getPaddingInfo;
 using dialect::tile::IndexOp;
 using dialect::tile::PaddingInfo;
+using dialect::tile::PragmaOp;
+using dialect::tile::PragmaOpAdaptor;
 using dialect::tile::PrngOp;
 using dialect::tile::ReshapeOp;
 using dialect::tile::ReshapeOpAdaptor;
@@ -49,7 +51,6 @@ using dialect::tile::ScatterOp;
 using dialect::tile::ScatterOpAdaptor;
 using dialect::tile::ShapeOp;
 using dialect::tile::ShapeOpAdaptor;
-using dialect::tile::TraceOp;
 
 namespace {
 
@@ -692,7 +693,6 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
   using OpConversionPattern<FromOpType>::OpConversionPattern;
 
   LogicalResult match(Operation *op) const final {
-    IVLOG(2, "EltwiseOpConversion::match>");
     Matcher pred;
     return pred(op);
   }
@@ -1242,7 +1242,6 @@ struct ReturnOpConversion : public OpConversionPattern<ReturnOp> {
   LogicalResult
   matchAndRewrite(ReturnOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
-    IVLOG(2, "ReturnOpConversion::matchAndRewrite>");
     auto &block = op.getParentRegion()->front();
     auto funcOp = op.getParentOfType<FuncOp>();
     auto blockArg = funcOp.getType().getNumInputs() - op.getNumOperands();
@@ -1256,16 +1255,39 @@ struct ReturnOpConversion : public OpConversionPattern<ReturnOp> {
   }
 };
 
-struct TraceOpConversion : public OpConversionPattern<TraceOp> {
-  using OpConversionPattern<TraceOp>::OpConversionPattern;
+struct PragmaOpConversion : public OpConversionPattern<PragmaOp> {
+  using OpConversionPattern<PragmaOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(TraceOp op, ArrayRef<Value> operands,
+  matchAndRewrite(PragmaOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
+    if (op.op() == "trace") {
+      return failure();
+    }
+    PragmaOpAdaptor adaptor(operands);
+    rewriter.replaceOp(op, adaptor.tensor());
+    return success();
+  }
+};
+
+struct TraceOpConversion : public OpConversionPattern<PragmaOp> {
+  using OpConversionPattern<PragmaOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(PragmaOp op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const final {
+    if (op.op() != "trace") {
+      return failure();
+    }
+    PragmaOpAdaptor adaptor(operands);
     auto module = op.getParentOfType<ModuleOp>();
-    auto symbol = createStubFunc(module, op.msgAttr());
+    auto msg = op.attrs().getNamed("msg");
+    if (!msg) {
+      return failure();
+    }
+    auto symbol = createStubFunc(module, msg->second.cast<StringAttr>());
     rewriter.create<CallOp>(op.getLoc(), symbol, ArrayRef<Type>{});
-    rewriter.replaceOp(op, op.in());
+    rewriter.replaceOp(op, adaptor.tensor());
     return success();
   }
 
@@ -1330,6 +1352,7 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
         FuncOpConversion,           //
         GatherOpConversion,         //
         IndexOpConversion,          //
+        PragmaOpConversion,         //
         PrngOpConversion,           //
         ReshapeOpConversion,        //
         ReturnOpConversion,         //
@@ -1338,7 +1361,6 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
         ShapeOpConversion,          //
         TileConstantOpConversion,   //
         TraceOpConversion,          //
-        // TODO: SpecialOpConversion (ZeroOp)
         ContractionOpConversion<CombinationKind::none, FirstOperand>,
         ContractionOpConversion<CombinationKind::add, StdOp<mlir::AddFOp>,
                                 ResultIs<EltwiseFloat>>,

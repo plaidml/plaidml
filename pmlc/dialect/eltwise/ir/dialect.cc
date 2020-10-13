@@ -63,7 +63,7 @@ std::string EltwiseDialect::getCanonicalOpName(llvm::StringRef name) {
 Operation *EltwiseDialect::materializeConstant(OpBuilder &builder,
                                                Attribute value, Type type,
                                                Location loc) {
-  IVLOG(1, "eltwise::Dialect::materializeConstant> "
+  IVLOG(3, "eltwise::Dialect::materializeConstant> "
                << debugString(value) << " : " << debugString(type));
   auto rankedTensorType = getRankedTensorType(type);
   Type elementType = rankedTensorType.getElementType();
