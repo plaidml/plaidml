@@ -205,7 +205,6 @@ plaidml_expr* plaidml_expr_contraction(  //
     plaidml_poly_expr** idxs,            //
     plaidml_dim_expr** dims,             //
     plaidml_expr* init,                  //
-    bool simplify,                       //
     const char* name);
 
 void plaidml_contraction_add_operand(  //

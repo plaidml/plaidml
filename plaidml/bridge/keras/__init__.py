@@ -132,16 +132,13 @@ class _Runner(object):
         program.compile()
         self.output_buffers = [plaidml.Buffer(x) for x in program.outputs[:len(output_tensors)]]
         self.update_buffers = [x[0].buffer for x in updates]
-        self.executable = plaidml.exec.Executable(
-            program,
-            self.input_buffers + self.var_buffers,
-            self.output_buffers + self.update_buffers,
-        )
+        self.executable = plaidml.exec.Executable(program)
 
     def run(self, inputs):
         for input, buffer in zip(inputs, self.input_buffers):
             buffer.copy_from_ndarray(input)
-        self.executable.run()
+        self.executable.run(self.input_buffers + self.var_buffers,
+                            self.output_buffers + self.update_buffers)
         return [buffer.as_ndarray() for buffer in self.output_buffers]
 
 
@@ -174,21 +171,19 @@ class _Function(object):
         logger.debug('_Function: {}({})'.format(self._name, input_shapes))
         runner = self._cache.get(input_shapes)
         if not runner:
-            runner = self._compile(inputs)
+            runner = self._compile(input_shapes)
             self._cache[input_shapes] = runner
-        # logger.debug('run({})'.format(inputs))
+        logger.debug('run({})'.format(inputs))
         return runner.run(inputs)
 
-    def _compile(self, inputs):
-        shapes = [x.shape for x in inputs]
+    def _compile(self, shapes):
         return _Runner(self._name, shapes, self._inputs, self._outputs, self._updates, self._vars)
 
 
 def _create_buffer(value):
     dtype = plaidml.DType.from_numpy(value.dtype)
     shape = plaidml.TensorShape(dtype, value.shape)
-    buffer = plaidml.Buffer(shape)
-    buffer.copy_from_ndarray(value)
+    buffer = plaidml.Buffer(shape, data=value)
     return shape, buffer
 
 
@@ -1568,8 +1563,7 @@ def set_learning_phase(value):
 def set_value(x, value):
     dtype = plaidml.DType.from_numpy(value.dtype)
     shape = plaidml.TensorShape(dtype, value.shape)
-    buffer = plaidml.Buffer(shape)
-    buffer.copy_from_ndarray(value)
+    buffer = plaidml.Buffer(shape, data=value)
     x.buffer = buffer
 
 

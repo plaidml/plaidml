@@ -169,7 +169,6 @@ struct ExprNodeContraction : NodeBase<ExprNodeContraction, ExprNode> {
   std::vector<PolyNodePtr> sinkIdxs;
   std::vector<PolyMap> srcs;
   std::vector<Constraint> constraints;
-  bool simplify = true;
   ExprNodePtr init;
 
   explicit ExprNodeContraction(llvm::StringRef name = "");

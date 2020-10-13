@@ -29,23 +29,21 @@ def list_devices():
 class Executable(ForeignObject):
     __ffi_del__ = lib.plaidml_executable_free
 
-    def __init__(self, program, inputs=[], outputs=[], device=''):
+    def __init__(self, program, device=''):
         # logger.debug('Executable({}, {})'.format(inputs, outputs))
-        inputs = [x.as_ptr() for x in inputs]
-        outputs = [x.as_ptr() for x in outputs]
-        ffi_obj = ffi_call(
-            lib.plaidml_jit,
-            program.as_ptr(),
-            device.encode(),
-            len(inputs),
-            inputs,
-            len(outputs),
-            outputs,
-        )
+        ffi_obj = ffi_call(lib.plaidml_jit, program.as_ptr(), device.encode())
         super(Executable, self).__init__(ffi_obj)
 
-    def run(self):
-        self._methodcall(lib.plaidml_executable_run)
+    def run(self, inputs, outputs):
+        raw_inputs = [x.as_ptr() for x in inputs]
+        raw_outputs = [x.as_ptr() for x in outputs]
+        self._methodcall(
+            lib.plaidml_executable_run,
+            len(raw_inputs),
+            raw_inputs,
+            len(raw_outputs),
+            raw_outputs,
+        )
 
 
 class Runner(object):
@@ -55,12 +53,12 @@ class Runner(object):
         self.program = program
         self.inputs = [plaidml.Buffer(shape) for shape in program.inputs]
         self.outputs = [plaidml.Buffer(shape) for shape in program.outputs]
-        self.executable = Executable(program, self.inputs, self.outputs, device=device)
+        self.executable = Executable(program, device=device)
 
     def run(self, inputs):
         for ndarray, buffer in zip(inputs, self.inputs):
             buffer.copy_from_ndarray(ndarray)
-        self.executable.run()
+        self.executable.run(self.inputs, self.outputs)
         return [buffer.as_ndarray() for buffer in self.outputs]
 
 
