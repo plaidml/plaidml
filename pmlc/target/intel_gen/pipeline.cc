@@ -143,7 +143,7 @@ void pipelineBuilder(OpPassManager &pm) {
                                    false /*tiledFusion*/, 0 /*loopDepth*/));
   pm.addPass(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
-  pm.addPass(pxa::createMemRefDataFlowOptPass());
+  pm.addPass(pxa::createMemRefDataFlowOptPass(true /*onlyParallelNested*/));
   pm.addPass(createCanonicalizerPass());
   pm.addPass(pxa::createLocalizePass());
   pm.addPass(pxa::createResizeTmpsPass());
@@ -162,8 +162,8 @@ void pipelineBuilder(OpPassManager &pm) {
 
   // Unroll affine.for loops.
   pm.addPass(createLoopUnrollPass(
-                      /*unrollFactor=*/256,
-                      /*unrollUpToFactor=*/true));
+      /*unrollFactor=*/256,
+      /*unrollUpToFactor=*/true));
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 

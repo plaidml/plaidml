@@ -46,6 +46,11 @@ struct MemRefAccess {
 
 struct MemRefDataFlowOptPass
     : public MemRefDataFlowOptBase<MemRefDataFlowOptPass> {
+
+  explicit MemRefDataFlowOptPass(int64_t onlyParallelNested) {
+    this->onlyParallelNested = onlyParallelNested;
+  }
+
   void runOnFunction() final {
     // Walk all load's and perform reduce to load forwarding.
     FuncOp f = getFunction();
@@ -57,6 +62,12 @@ struct MemRefDataFlowOptPass
 
       auto reduceOp = dyn_cast_or_null<PxaReduceOpInterface>(defOp);
       if (!reduceOp || reduceOp.getAgg() != AtomicRMWKind::assign) {
+        return;
+      }
+
+      if (onlyParallelNested &&
+          (!dyn_cast<AffineParallelOp>(loadOp.getParentOp()) ||
+           !dyn_cast<AffineParallelOp>(reduceOp.getParentOp()))) {
         return;
       }
 
@@ -78,8 +89,8 @@ struct MemRefDataFlowOptPass
 
 } // namespace
 
-std::unique_ptr<Pass> createMemRefDataFlowOptPass() {
-  return std::make_unique<MemRefDataFlowOptPass>();
+std::unique_ptr<Pass> createMemRefDataFlowOptPass(bool onlyParallelNested) {
+  return std::make_unique<MemRefDataFlowOptPass>(onlyParallelNested);
 }
 
 } // namespace pmlc::dialect::pxa

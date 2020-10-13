@@ -7,6 +7,7 @@
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
 #include "mlir/Conversion/StandardToSPIRV/ConvertStandardToSPIRVPass.h"
+#include "mlir/Dialect/Affine/Passes.h"
 #include "mlir/Dialect/GPU/Passes.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/SPIRV/Passes.h"
@@ -57,8 +58,21 @@ void pipelineBuilder(OpPassManager &pm) {
 
   // Do subgroup or accumulation
   pm.addPass(pmlc::dialect::pxa::createSubgroupsPass());
-  // pm.addPass(pmlc::dialect::pxa::createTileAccumulatePass());
-  pm.addPass(pmlc::dialect::pxa::createAffineNormalizePass(/*promote=*/false));
+  pm.addPass(pmlc::dialect::pxa::createAffineNormalizePass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
+
+  // Do tiled fusion
+  pm.addPass(pxa::createFusionPass(0 /*memoryActivityThreshold*/,
+                                   false /*exactlyMatch*/,
+                                   false /*tiledFusion*/, 0 /*loopDepth*/));
+  pm.addPass(pxa::createAffineNormalizePass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(pxa::createMemRefDataFlowOptPass(true /*onlyParallelNested*/));
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(pxa::createLocalizePass());
+  pm.addPass(pxa::createResizeTmpsPass());
+  pm.addPass(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
@@ -70,6 +84,13 @@ void pipelineBuilder(OpPassManager &pm) {
 
   // Lower out of PXA memory semantics
   pm.addPass(pmlc::target::intel_gen::createLowerPXAToAffinePass());
+
+  // Unroll affine.for loops.
+  pm.addPass(createLoopUnrollPass(
+      /*unrollFactor=*/6,
+      /*unrollUpToFactor=*/true));
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
 
   // Pack dims
   pm.addPass(pmlc::target::intel_gen::createAffineIndexPackPass());

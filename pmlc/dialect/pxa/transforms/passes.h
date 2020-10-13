@@ -35,7 +35,8 @@ std::unique_ptr<mlir::Pass> createGPUThreadPass(unsigned maxThreads);
 
 std::unique_ptr<mlir::Pass> createLocalizePass();
 
-std::unique_ptr<mlir::Pass> createMemRefDataFlowOptPass();
+std::unique_ptr<mlir::Pass>
+createMemRefDataFlowOptPass(bool onlyParallelNested = false);
 
 std::unique_ptr<mlir::Pass> createNestLoopsPass();
 std::unique_ptr<mlir::Pass> createNestLoopsPass(unsigned minLoopIVs);

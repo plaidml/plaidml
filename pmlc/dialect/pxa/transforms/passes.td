@@ -85,6 +85,11 @@ def Localize : FunctionPass<"pxa-localize"> {
 def MemRefDataFlowOpt : FunctionPass<"pxa-dataflow-opt"> {
   let summary = "Perform reduce/load forwarding for memrefs";
   let constructor = "pmlc::dialect::pxa::createMemRefDataFlowOptPass()";
+    let options = [
+    Option<"onlyParallelNested", "only-parallel-nested", "bool",
+           /*default=*/"false",
+           "Perform memref optimizations only under AffineParallel's scope.">,
+  ];
 }
 
 def NestLoops : FunctionPass<"pxa-nest-loops"> {
