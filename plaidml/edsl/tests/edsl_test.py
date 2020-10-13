@@ -571,6 +571,11 @@ class TestEdsl(unittest.TestCase):
         first_pass = program.passes[0]
         self.assertEqual('tile', first_pass[0])
 
+    def test_trace(self):
+        I = Placeholder(plaidml.DType.FLOAT32, [3, 3])
+        O = trace(I, 'msg')
+        program = Program('trace', [I], [O])
+
 
 if __name__ == '__main__':
     plaidml.settings.set('PLAIDML_DEVICE', DEFAULT_DEVICE)
