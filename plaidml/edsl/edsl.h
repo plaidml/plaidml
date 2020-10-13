@@ -332,7 +332,7 @@ class Tensor {
   }
 
   ///
-  /// Get an element of an operation that returns a tuple (i.e. multlpe results).
+  /// Get an element of an operation that returns a tuple (i.e. multiple results).
   ///
   Tensor element(size_t ordinal) const;
 
