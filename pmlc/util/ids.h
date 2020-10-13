@@ -3,11 +3,11 @@
 
 // A collection of well-known identifiers used in codegen.
 
-namespace pmlc {
+namespace pmlc::util {
 
 static constexpr const char kEntrypoint[] = "main";
 static constexpr const char kPlaidmlInit[] = "plaidml_init";
-static constexpr const char kPlaidmlExecute[] = "plaidml_exec";
+static constexpr const char kPlaidmlExec[] = "plaidml_exec";
 static constexpr const char kPlaidmlFini[] = "plaidml_fini";
 
-} // namespace pmlc
+} // namespace pmlc::util

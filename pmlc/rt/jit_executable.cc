@@ -246,11 +246,12 @@ struct MCJITEngineImpl : EngineImpl {
     engine->finalizeObject();
 
     ABI abi;
-    abi.setupFunc = getFunc<SetupFunc>(makeCWrapperFunctionName(kPlaidmlInit));
+    abi.setupFunc =
+        getFunc<SetupFunc>(makeCWrapperFunctionName(util::kPlaidmlInit));
     abi.executeFunc =
-        getFunc<ExecuteFunc>(makePackedFunctionName(kPlaidmlExecute));
+        getFunc<ExecuteFunc>(makePackedFunctionName(util::kPlaidmlExec));
     abi.teardownFunc =
-        getFunc<TeardownFunc>(makeCWrapperFunctionName(kPlaidmlFini));
+        getFunc<TeardownFunc>(makeCWrapperFunctionName(util::kPlaidmlFini));
     return abi;
   }
 
@@ -323,11 +324,12 @@ struct OrcJITEngineImpl : EngineImpl {
             dataLayout.getGlobalPrefix())));
 
     ABI abi;
-    abi.setupFunc = getFunc<SetupFunc>(makeCWrapperFunctionName(kPlaidmlInit));
+    abi.setupFunc =
+        getFunc<SetupFunc>(makeCWrapperFunctionName(util::kPlaidmlInit));
     abi.executeFunc =
-        getFunc<ExecuteFunc>(makePackedFunctionName(kPlaidmlExecute));
+        getFunc<ExecuteFunc>(makePackedFunctionName(util::kPlaidmlExec));
     abi.teardownFunc =
-        getFunc<TeardownFunc>(makeCWrapperFunctionName(kPlaidmlFini));
+        getFunc<TeardownFunc>(makeCWrapperFunctionName(util::kPlaidmlFini));
     return abi;
   }
 
@@ -416,7 +418,7 @@ public:
     }
 
     setupTargetTriple(llvmModule.get());
-    packFunctionArguments(llvmModule.get(), kPlaidmlExecute);
+    packFunctionArguments(llvmModule.get(), util::kPlaidmlExec);
 
     if (VLOG_IS_ON(6)) {
       llvmModule->print(llvm::errs(), nullptr);

@@ -80,13 +80,16 @@ mlir::FuncOp MakeEntrypointsPass::getNetworkEntry() {
 void MakeEntrypointsPass::makePlaidmlInit(mlir::OpBuilder &builder) {
   // This method builds:
   //
-  //   Device* plaidml_init(Device* device) {
-  //     return device;
+  //   Network* plaidml_init(Device* device) {
+  //     return device;  // Network == Device for now.
   //   }
   //
   // This is a rather trivial function; the plan is to expand it later.
+  // In particular, the Network parameter gives networks a mechanism to carry
+  // additional information from plaidml_init to plaidml_exec and
+  // plaidml_fini.
   auto func = builder.create<mlir::FuncOp>(
-      getLoc(), kPlaidmlInit,
+      getLoc(), util::kPlaidmlInit,
       builder.getFunctionType({llvmPtrTy}, {llvmPtrTy}));
   auto block = func.addEntryBlock();
   mlir::OpBuilder::InsertionGuard guard(builder);
@@ -99,9 +102,9 @@ void MakeEntrypointsPass::makePlaidmlExecute(mlir::OpBuilder &builder,
                                              mlir::FuncOp entryFunc) {
   // This method builds:
   //
-  //   void plaidml_execute(Device* device, memref...) {
-  //     // N.B. main() may not take a Device parameter.
-  //     main(device, memref...);
+  //   void plaidml_exec(Network* network, memref...) {
+  //     // N.B. main() may not take a Network parameter.
+  //     main(network, memref...);
   //   }
   //
   // This is a rather trivial function; the plan is to expand it later.
@@ -109,24 +112,24 @@ void MakeEntrypointsPass::makePlaidmlExecute(mlir::OpBuilder &builder,
   auto entryType = entryFunc.getType();
   auto entryInputTypes = entryType.getInputs();
   mlir::SmallVector<mlir::Type, 8> inputTypes;
-  bool addedDeviceArgument = false;
+  bool addedNetworkArgument = false;
   if (!entryInputTypes.size() ||
       !entryInputTypes[0].isa<LLVM::LLVMPointerType>()) {
-    addedDeviceArgument = true;
+    addedNetworkArgument = true;
     inputTypes.push_back(llvmPtrTy);
   }
   for (auto ty : entryInputTypes) {
     inputTypes.push_back(ty);
   }
   auto func = builder.create<mlir::FuncOp>(
-      getLoc(), kPlaidmlExecute, builder.getFunctionType(inputTypes, {}));
+      getLoc(), util::kPlaidmlExec, builder.getFunctionType(inputTypes, {}));
   auto block = func.addEntryBlock();
   mlir::OpBuilder::InsertionGuard guard(builder);
   builder.setInsertionPointToStart(block);
   auto args = block->getArguments();
   mlir::SmallVector<mlir::Value, 8> callArgs;
   auto firstIt = args.begin();
-  if (addedDeviceArgument) {
+  if (addedNetworkArgument) {
     ++firstIt;
   }
   std::copy(firstIt, args.end(), std::back_inserter(callArgs));
@@ -137,12 +140,11 @@ void MakeEntrypointsPass::makePlaidmlExecute(mlir::OpBuilder &builder,
 void MakeEntrypointsPass::makePlaidmlFini(mlir::OpBuilder &builder) {
   // This method builds:
   //
-  //   void teardown(Device* device) {
-  //   }
+  //   void plaidml_fini(Network* network) {}
   //
   // This is a rather trivial function; the plan is to expand it later.
   auto func = builder.create<mlir::FuncOp>(
-      getLoc(), kPlaidmlFini, builder.getFunctionType({llvmPtrTy}, {}));
+      getLoc(), util::kPlaidmlFini, builder.getFunctionType({llvmPtrTy}, {}));
   auto block = func.addEntryBlock();
   mlir::OpBuilder::InsertionGuard guard(builder);
   builder.setInsertionPointToStart(block);

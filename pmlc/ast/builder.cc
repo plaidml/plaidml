@@ -486,7 +486,7 @@ struct ProgramBuilder {
 
     FunctionType funcType =
         FunctionType::get(inputTypes, program->outputs, context);
-    FuncOp funcOp = FuncOp::create(loc, kEntrypoint, funcType, {});
+    FuncOp funcOp = FuncOp::create(loc, util::kEntrypoint, funcType, {});
     Block *body = funcOp.addEntryBlock();
     builder.setInsertionPointToStart(body);
     module.push_back(funcOp);
@@ -544,7 +544,7 @@ struct ProgramBuilder {
     }
     builder.create<ReturnOp>(loc, returnOperands.getArrayRef());
 
-    program->entry = kEntrypoint;
+    program->entry = util::kEntrypoint;
 
     IVLOG(3, "\n" << debugString(module));
 
