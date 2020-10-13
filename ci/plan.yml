@@ -188,6 +188,8 @@ SUITES:
         pipelines: [nightly, plaidml, ci]
       pml-vk-gen:
         pipelines: [nightly, plaidml]
+      pml-ocl-gen:
+        pipelines: [nightly, plaidml]
     params:
       ci:
         batch_sizes: [1]
@@ -216,11 +218,13 @@ SUITES:
         skip_platforms:
           - pml-llvm-cpu
           - pml-vk-gen
+          - pml-ocl-gen
           - tf-dnnl-cpu
         perf_threshold: 0.7
       inception_v3:
         skip_platforms:
           - pml-vk-gen
+          - pml-ocl-gen
         precision: high
         platform_overrides:
           tf-dnnl-cpu:
@@ -240,6 +244,7 @@ SUITES:
         precision: high
         skip_platforms:
           - pml-vk-gen
+          - pml-ocl-gen
         platform_overrides:
           tf-dnnl-cpu:
             conda_env: ci/conda/tensorflow-dnnl.yml
@@ -252,10 +257,14 @@ SUITES:
             conda_env: ci/conda/tensorflow-dnnl.yml
         skip_platforms:
           - pml-vk-gen
+          - pml-ocl-gen
       resnet50:
         precision: high
         platform_overrides:
           pml-vk-gen:
+            prepend_args: [--examples=128]
+            perf_threshold: 0.01
+          pml-ocl-gen:
             prepend_args: [--examples=128]
             perf_threshold: 0.01
           pml-llvm-cpu:
@@ -283,12 +292,14 @@ SUITES:
         skip_platforms:
           - pml-mtl-uhd630
           - pml-vk-gen
+          - pml-ocl-gen
       xception:
         expected: "Unrecognized data_format"
         soft_fail: true
         precision: high
         skip_platforms:
           - pml-vk-gen
+          - pml-ocl-gen
         platform_overrides:
           pml-llvm-cpu:
             prepend_args: [--examples=64]

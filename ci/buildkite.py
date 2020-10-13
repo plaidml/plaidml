@@ -60,6 +60,8 @@ def get_engine(pkey):
         return ':tensorflow:'
     if '-gen' in pkey:
         return ':information_source:'
+    if 'ocl-gen' in pkey:
+        return ':information_source::cl:'
     return ':small_blue_diamond:'
 
 
