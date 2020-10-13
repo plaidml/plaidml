@@ -197,8 +197,8 @@ func @main(%arg0: !comp.device) {
 Another operation we'd like to hoist is kernel creation.  We can't do this with `gpu.launch_func`, since it requires a kernel as input.  We can instead define a set of new operations, and lower `gpu.launch_func` into a sequence of calls:
 
   * `comp.create_kernel` &mdash; create a kernel
-  * `comp.launch_kernel` &mdash; launch a kernel
-  * `comp.destroy_kernel` &mdash; delete a kernel (with implicit wait on all outstanding launches)
+  * `comp.schedule_kernel` &mdash; schedule a kernel for execution
+  * `comp.destroy_kernel` &mdash; delete a kernel (with implicit wait on all outstanding scheduled executions)
 
 To connect these, we reify `!comp.kernel` as a type parameterized by the kernel's operands (to make validation straightforward).
 
@@ -215,12 +215,12 @@ func @main(%arg0: !comp.device) {
   %1 = comp.alloc %0 : (!comp.execenv<ocl:0,(11)>) -> memref<8x32xf32, 11>
   %4 = comp.alloc %0 : (!comp.execenv<ocl:0,(11)>) -> memref<16x32xf32, 11>
   %5 = comp.alloc %0 : (!comp.execenv<ocl:0,(11)>) -> memref<8x16xf32, 11>
-  %k1 = comp.create_kernel %0 {kernel = @main_kernel::@main_kernel} : (!comp.execenv<ocl:0,(11)>) -> !comp.kernel<ocl, 11, 8x32xf32>
-  %k2 = comp.create_kernel %0 {kernel = @main_kernel_0::@main_kernel} : (!comp.execenv<ocl:0,(11)>) -> !comp.kernel<ocl, 11, 16x32xf32, 8x16xf32, 8x32xf32>
+  %k1 = comp.create_kernel %0 {kernel = @main_kernel::@main_kernel} : (!comp.execenv<ocl:0,(11)>) -> !comp.kernel<ocl, 8x32xf32>
+  %k2 = comp.create_kernel %0 {kernel = @main_kernel_0::@main_kernel} : (!comp.execenv<ocl:0,(11)>) -> !comp.kernel<ocl, 16x32xf32, 8x16xf32, 8x32xf32>
   comp.loop(%arg1: memref<8x16xf32>, %arg2: memref<16x32xf32>, %arg3: memref<8x32xf32>) {
     %w1 = comp.schedule_write %arg3 to %1 on %0 : (!comp.execenv<ocl:0,(11)>, memref<8x32xf32>, memref<8x32xf32, 11>) -> !comp.event<ocl>
     comp.wait %w1 : !comp.event<ocl>
-    %2 = comp.launch_kernel %k1, %c4, %c1, %c1, %c1, %c2, %c32, %1 : (!comp.kernel<ocl, 11, 8x32xf32>, index, index, index, index, index, index, memref<8x32xf32, 11>) -> !comp.event<ocl>
+    %2 = comp.schedule_kernel %0, %k1, grid(%c4, %c1, %c1, %c1, %c2, %c32), args(%1) : (!comp.kernel<ocl, 8x32xf32>, index, index, index, index, index, index, memref<8x32xf32, 11>) -> !comp.event<ocl>
     %3 = comp.schedule_read %arg3 from %1 on %0 wait for %2 : (memref<8x32xf32>, memref<8x32xf32, 11>, !comp.execenv<ocl:0,(11)>, !comp.event<ocl>) -> !comp.event<ocl>
     comp.wait %3 : !comp.event<ocl>
     %w4 = comp.schedule_write %arg2 to %4 on %0 : (!comp.execenv<ocl:0,(11)>, memref<16x32xf32>, memref<16x32xf32, 11>) -> !comp.event<ocl>
@@ -229,14 +229,14 @@ func @main(%arg0: !comp.device) {
     comp.wait %w5 : !comp.event<ocl>
     %6 = comp.schedule_write %arg3 to %1 on %0 : (memref<8x32xf32>, memref<8x32xf32, 11>, !comp.execenv<ocl:0,(11)>) -> !comp.event<ocl>
     comp.wait %6 : !comp.event<ocl>
-    %7 = comp.launch_kernel %k2, %c1, %c1, %c1, %c8, %c4, %c1, %4, %5, %1 : (!comp.kernel<ocl, 11, 16x32xf32, 8x16xf32, 8x32xf32>, index, index, index, index, index, index, memref<16x32xf32, 11>, memref<8x16xf32, 11>, memref<8x32xf32, 11>) -> !comp.event<ocl>
+    %7 = comp.schedule_kernel %0, %k2, grid(%c1, %c1, %c1, %c8, %c4, %c1), args(%4, %5, %1) : (!comp.kernel<ocl, 16x32xf32, 8x16xf32, 8x32xf32>, index, index, index, index, index, index, memref<16x32xf32, 11>, memref<8x16xf32, 11>, memref<8x32xf32, 11>) -> !comp.event<ocl>
     %8 = comp.schedule_read %arg2 from %4 on %0 wait for %7 : (memref<16x32xf32>, memref<16x32xf32, 11>, !comp.execenv<ocl:0,(11)>, !comp.event<ocl>) -> !comp.event<ocl>
     %9 = comp.schedule_read %arg1 from %5 on %0 wait for %7 : (memref<8x16xf32>, memref<8x16xf32, 11>, !comp.execenv<ocl:0,(11)>, !comp.event<ocl>) -> !comp.event<ocl>
     %10 = comp.schedule_read %arg3 from %1 on %0 wait for %7 : (memref<8x32xf32>, memref<8x32xf32, 11>, !comp.execenv<ocl:0,(11)>, !comp.event<ocl>) -> !comp.event<ocl>
     comp.wait %8, %9, %10 : !comp.event<ocl>, !comp.event<ocl>, !comp.event<ocl>
   }
-  comp.destroy_kernel %k1 : !comp.kernel<ocl, 11, 8x32xf32>
-  comp.destroy_kernel %k2 : !comp.kernel<ocl, 11, 16x32xf32, 8x16xf32, 8x32xf32>
+  comp.destroy_kernel %k1 : !comp.kernel<ocl, 8x32xf32>
+  comp.destroy_kernel %k2 : !comp.kernel<ocl, 16x32xf32, 8x16xf32, 8x32xf32>
   comp.dealloc %0 %4 : (!comp.execenv<ocl:0,(11)>, memref<16x32xf32, 11>) -> ()
   comp.dealloc %0 %5 : (!comp.execenv<ocl:0,(11)>, memref<8x16xf32, 11>) -> ()
   comp.dealloc %0 %1 : (!comp.execenv<ocl:0,(11)>, memref<8x32xf32, 11>) -> ()
@@ -267,19 +267,19 @@ func @main(%arg0: !comp.device) {
   %1 = comp.alloc %0 : (!comp.execenv<ocl:0,(11)>) -> memref<8x32xf32, 11>
   %4 = comp.alloc %0 : (!comp.execenv<ocl:0,(11)>) -> memref<16x32xf32, 11>
   %5 = comp.alloc %0 : (!comp.execenv<ocl:0,(11)>) -> memref<8x16xf32, 11>
-  %k1 = comp.create_kernel %0 {kernel = @main_kernel::@main_kernel} : (!comp.execenv<ocl:0,(11)>) -> !comp.kernel<ocl, 11, 8x32xf32>
-  %k2 = comp.create_kernel %0 {kernel = @main_kernel_0::@main_kernel} : (!comp.execenv<ocl:0,(11)>) -> !comp.kernel<ocl, 11, 16x32xf32, 8x16xf32, 8x32xf32>
+  %k1 = comp.create_kernel %0 {kernel = @main_kernel::@main_kernel} : (!comp.execenv<ocl:0,(11)>) -> !comp.kernel<ocl, 8x32xf32>
+  %k2 = comp.create_kernel %0 {kernel = @main_kernel_0::@main_kernel} : (!comp.execenv<ocl:0,(11)>) -> !comp.kernel<ocl, 16x32xf32, 8x16xf32, 8x32xf32>
   comp.loop(%arg1: memref<8x16xf32>, %arg2: memref<16x32xf32>, %arg3: memref<8x32xf32>) {
     %w1 = comp.schedule_write %arg3 to %1 on %0 : (!comp.execenv<ocl:0,(11)>, memref<8x32xf32>, memref<8x32xf32, 11>) -> !comp.event<ocl>
-    %2 = comp.launch_kernel %k1, %c4, %c1, %c1, %c1, %c2, %c32, %1 wait for %w1: (!comp.kernel<ocl, 11, 8x32xf32>, index, index, index, index, index, index, memref<8x32xf32, 11>, !comp.event<ocl>) -> !comp.event<ocl>
+    %2 = comp.schedule_kernel %0, %k1, grid(%c4, %c1, %c1, %c1, %c2, %c32), args(%1), events(%w1): (!comp.kernel<ocl, 8x32xf32>, index, index, index, index, index, index, memref<8x32xf32, 11>, !comp.event<ocl>) -> !comp.event<ocl>
     %w4 = comp.schedule_write %arg2 to %4 on %0 : (!comp.execenv<ocl:0,(11)>, memref<16x32xf32>, memref<16x32xf32, 11>) -> !comp.event<ocl>
     %w5 = comp.schedule_write %arg1 to %5 on %0 : (!comp.execenv<ocl:0,(11)>, memref<8x16xf32>, memref<8x16xf32, 11>) -> !comp.event<ocl>
-    %7 = comp.launch_kernel %k2, %c1, %c1, %c1, %c8, %c4, %c1, %4, %5, %1 wait for %2, %w4, %w5: (!comp.kernel<ocl, 11, 16x32xf32, 8x16xf32, 8x32xf32>, index, index, index, index, index, index, memref<16x32xf32, 11>, memref<8x16xf32, 11>, memref<8x32xf32, 11>, !comp.event<ocl>, !comp.event<ocl>, !comp.event<ocl>) -> !comp.event<ocl>
+    %7 = comp.schedule_kernel %0, %k2, grid(%c1, %c1, %c1, %c8, %c4, %c1), args(%4, %5, %1) events(%2, %w4, %w5): (!comp.kernel<ocl, 16x32xf32, 8x16xf32, 8x32xf32>, index, index, index, index, index, index, memref<16x32xf32, 11>, memref<8x16xf32, 11>, memref<8x32xf32, 11>, !comp.event<ocl>, !comp.event<ocl>, !comp.event<ocl>) -> !comp.event<ocl>
     %10 = comp.schedule_read %arg3 from %1 on %0 wait for %7 : (memref<8x32xf32>, memref<8x32xf32, 11>, !comp.execenv<ocl:0,(11)>, !comp.event<ocl>) -> !comp.event<ocl>
     comp.wait %10 : !comp.event<ocl>
   }
-  comp.destroy_kernel %k1 : !comp.kernel<ocl, 11, 8x32xf32>
-  comp.destroy_kernel %k2 : !comp.kernel<ocl, 11, 16x32xf32, 8x16xf32, 8x32xf32>
+  comp.destroy_kernel %k1 : !comp.kernel<ocl, 8x32xf32>
+  comp.destroy_kernel %k2 : !comp.kernel<ocl, 16x32xf32, 8x16xf32, 8x32xf32>
   comp.dealloc %0 %4 : (!comp.execenv<ocl:0,(11)>, memref<16x32xf32, 11>) -> ()
   comp.dealloc %0 %5 : (!comp.execenv<ocl:0,(11)>, memref<8x16xf32, 11>) -> ()
   comp.dealloc %0 %1 : (!comp.execenv<ocl:0,(11)>, memref<8x32xf32, 11>) -> ()
@@ -305,9 +305,9 @@ func @plaidml_init(%arg0: !comp.device) -> !comp.network {
   %1 = comp.alloc %0 : (!comp.execenv<ocl:0,(11)>) -> memref<8x32xf32, 11>
   %4 = comp.alloc %0 : (!comp.execenv<ocl:0,(11)>) -> memref<16x32xf32, 11>
   %5 = comp.alloc %0 : (!comp.execenv<ocl:0,(11)>) -> memref<8x16xf32, 11>
-  %k1 = comp.create_kernel %0 {kernel = @main_kernel::@main_kernel} : (!comp.execenv<ocl:0,(11)>) -> !comp.kernel<ocl, 11, 8x32xf32>
-  %k2 = comp.create_kernel %0 {kernel = @main_kernel_0::@main_kernel} : (!comp.execenv<ocl:0,(11)>) -> !comp.kernel<ocl, 11, 16x32xf32, 8x16xf32, 8x32xf32>
-  %n1 = comp.create_network %0, %1, %4, %5, %k1, %k2 : (!comp.execenv<ocl:0,(11)>, memref<8x32xf32, 11>, memref<16x32xf32, 11>, memref<8x16xf32, 11>, !comp.kernel<ocl, 11, 8x32xf32>, !comp.kernel<ocl, 11, 16x32xf32, 8x16xf32, 8x32xf32>) -> !comp.network
+  %k1 = comp.create_kernel %0 {kernel = @main_kernel::@main_kernel} : (!comp.execenv<ocl:0,(11)>) -> !comp.kernel<ocl, 8x32xf32>
+  %k2 = comp.create_kernel %0 {kernel = @main_kernel_0::@main_kernel} : (!comp.execenv<ocl:0,(11)>) -> !comp.kernel<ocl, 16x32xf32, 8x16xf32, 8x32xf32>
+  %n1 = comp.create_network %0, %1, %4, %5, %k1, %k2 : (!comp.execenv<ocl:0,(11)>, memref<8x32xf32, 11>, memref<16x32xf32, 11>, memref<8x16xf32, 11>, !comp.kernel<ocl, 8x32xf32>, !comp.kernel<ocl, 16x32xf32, 8x16xf32, 8x32xf32>) -> !comp.network
   return %n1
 }
 
@@ -317,22 +317,22 @@ func @plaidml_exec(%arg0: !comp.network, %arg1: memref<8x16xf32>, %arg2: memref<
   %c1 = constant 1 : index
   %c8 = constant 8 : index
   %c4 = constant 4 : index
-  %0, %1, %4, %5, %k1, %k2 = comp.deconstruct_network %arg0 : (!comp.network) -> !comp.execenv<ocl:0,(11)>, memref<8x32xf32, 11>, memref<16x32xf32, 11>, memref<8x16xf32, 11>, !comp.kernel<ocl, 11, 8x32xf32>, !comp.kernel<ocl, 11, 16x32xf32, 8x16xf32, 8x32xf32>
+  %0, %1, %4, %5, %k1, %k2 = comp.deconstruct_network %arg0 : (!comp.network) -> !comp.execenv<ocl:0,(11)>, memref<8x32xf32, 11>, memref<16x32xf32, 11>, memref<8x16xf32, 11>, !comp.kernel<ocl, 8x32xf32>, !comp.kernel<ocl, 16x32xf32, 8x16xf32, 8x32xf32>
   %w1 = comp.schedule_write %arg3 to %1 on %0 : (!comp.execenv<ocl:0,(11)>, memref<8x32xf32>, memref<8x32xf32, 11>) -> !comp.event<ocl>
-  %2 = comp.launch_kernel %k1, %c4, %c1, %c1, %c1, %c2, %c32, %1 wait for %w1: (!comp.kernel<ocl, 11, 8x32xf32>, index, index, index, index, index, index, memref<8x32xf32, 11>, !comp.event<ocl>) -> !comp.event<ocl>
+  %2 = comp.schedule_kernel %0, %k1, grid(%c4, %c1, %c1, %c1, %c2, %c32), args(%1), events(%w1): (!comp.kernel<ocl, 8x32xf32>, index, index, index, index, index, index, memref<8x32xf32, 11>, !comp.event<ocl>) -> !comp.event<ocl>
   %w4 = comp.schedule_write %arg2 to %4 on %0 : (!comp.execenv<ocl:0,(11)>, memref<16x32xf32>, memref<16x32xf32, 11>) -> !comp.event<ocl>
   %w5 = comp.schedule_write %arg1 to %5 on %0 : (!comp.execenv<ocl:0,(11)>, memref<8x16xf32>, memref<8x16xf32, 11>) -> !comp.event<ocl>
-  %7 = comp.launch_kernel %k2, %c1, %c1, %c1, %c8, %c4, %c1, %4, %5, %1 wait for %2, %w4, %w5: (!comp.kernel<ocl, 11, 16x32xf32, 8x16xf32, 8x32xf32>, index, index, index, index, index, index, memref<16x32xf32, 11>, memref<8x16xf32, 11>, memref<8x32xf32, 11>, !comp.event<ocl>, !comp.event<ocl>, !comp.event<ocl>) -> !comp.event<ocl>
+  %7 = comp.schedule_kernel %0, %k2, grid(%c1, %c1, %c1, %c8, %c4, %c1), args(%4, %5, %1), events(%2, %w4, %w5): (!comp.kernel<ocl, 16x32xf32, 8x16xf32, 8x32xf32>, index, index, index, index, index, index, memref<16x32xf32, 11>, memref<8x16xf32, 11>, memref<8x32xf32, 11>, !comp.event<ocl>, !comp.event<ocl>, !comp.event<ocl>) -> !comp.event<ocl>
   %10 = comp.schedule_read %arg3 from %1 on %0 wait for %7 : (memref<8x32xf32>, memref<8x32xf32, 11>, !comp.execenv<ocl:0,(11)>, !comp.event<ocl>) -> !comp.event<ocl>
   comp.wait %10 : !comp.event<ocl>
   return
 }
 
 func @plaidml_fini(%arg0: !comp.network) {
-  %0, %1, %4, %5, %k1, %k2 = comp.deconstruct_network %arg0 : (!comp.network) -> !comp.execenv<ocl:0,(11)>, memref<8x32xf32, 11>, memref<16x32xf32, 11>, memref<8x16xf32, 11>, !comp.kernel<ocl, 11, 8x32xf32>, !comp.kernel<ocl, 11, 16x32xf32, 8x16xf32, 8x32xf32>
+  %0, %1, %4, %5, %k1, %k2 = comp.deconstruct_network %arg0 : (!comp.network) -> !comp.execenv<ocl:0,(11)>, memref<8x32xf32, 11>, memref<16x32xf32, 11>, memref<8x16xf32, 11>, !comp.kernel<ocl, 8x32xf32>, !comp.kernel<ocl, 16x32xf32, 8x16xf32, 8x32xf32>
   comp.destroy_network %arg0
-  comp.destroy_kernel %k1 : !comp.kernel<ocl, 11, 8x32xf32>
-  comp.destroy_kernel %k2 : !comp.kernel<ocl, 11, 16x32xf32, 8x16xf32, 8x32xf32>
+  comp.destroy_kernel %k1 : !comp.kernel<ocl, 8x32xf32>
+  comp.destroy_kernel %k2 : !comp.kernel<ocl, 16x32xf32, 8x16xf32, 8x32xf32>
   comp.dealloc %0 %4 : (!comp.execenv<ocl:0,(11)>, memref<16x32xf32, 11>) -> ()
   comp.dealloc %0 %5 : (!comp.execenv<ocl:0,(11)>, memref<8x16xf32, 11>) -> ()
   comp.dealloc %0 %1 : (!comp.execenv<ocl:0,(11)>, memref<8x32xf32, 11>) -> ()
