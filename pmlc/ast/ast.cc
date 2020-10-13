@@ -169,15 +169,14 @@ std::string ExprNodeIntrinsic::str() const {
 }
 
 //
-// ExprNodeTrace
+// ExprNodePragma
 //
 
-ExprNodeTrace::ExprNodeTrace(const ExprNodePtr &expr, llvm::StringRef msg)
-    : expr(expr), msg(msg) {}
+ExprNodePragma::ExprNodePragma(const ExprNodePtr &expr, llvm::StringRef op,
+                               const llvm::StringMap<VarNodePtr> &attrs)
+    : expr(expr), op(op), attrs(attrs) {}
 
-std::string ExprNodeTrace::str() const {
-  return llvm::formatv("trace(\"{0}\")", msg);
-}
+std::string ExprNodePragma::str() const { return op; }
 
 //
 // DimNode tree

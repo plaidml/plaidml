@@ -261,11 +261,4 @@ def PrngOp : PXA_Op<"prng"> {
   let results = (outs AnyMemRef:$result_tensor, AnyMemRef:$result_state);
 }
 
-// TODO: replace TraceOp with an AffineGreyboxOp
-def TraceOp : PXA_Op<"trace"> {
-  let summary = "tracepoint operation";
-  let arguments = (ins AnyMemRef:$in, StrAttr:$msg);
-  let results = (outs AnyMemRef:$out);
-}
-
 #endif // __PML_PXA_OPS__
