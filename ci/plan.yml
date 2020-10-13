@@ -131,6 +131,8 @@ SUITES:
         pipelines: [nightly, plaidml, ci]
       pml-vk-gen:
         pipelines: [nightly, plaidml, ci]
+      pml-ocl-neo:
+        pipelines: [nightly, plaidml, ci]
     params:
       ci:
         batch_sizes: [0]
@@ -154,6 +156,7 @@ SUITES:
         precision: untested
         skip_platforms:
           - pml-vk-gen
+          - pml-ocl-neo
       edsl_cc_test:
         runner: cc_test
         cwd: tmp/input
