@@ -129,7 +129,9 @@ private:
     if (op->getNumRegions() != 0) {
       return op->emitRemark("Vectorize op: Failed, interior loops");
     }
-    if (!isa<FPExtOp, FPTruncOp, IndexCastOp, VectorUnrollOpInterface>(op)) {
+    // TODO: consider more generic way to add ops supported here
+    if (!isa<FPExtOp, FPTruncOp, IndexCastOp, VectorUnrollOpInterface, SelectOp,
+             CmpFOp>(op)) {
       // Probably not a vectorizable op. Verify it doesn't use an
       // vectorized results.
       for (auto operand : op->getOperands()) {
@@ -312,7 +314,7 @@ LogicalResult vectorizeOverOutputs(AffineParallelOp op, unsigned vectorWidth) {
     return op.emitRemark(
         "vectorizeOverOutputs: Failed, could not compute StrideInfo");
   }
-  IVLOG(2, "StrideInfo: " << debugString(*maybeSI));
+  IVLOG(3, "StrideInfo: " << debugString(*maybeSI));
   SmallVector<BlockArgument, 4> options;
   for (auto ba : op.getIVs()) {
     if (maybeSI->strides.count(ba) && maybeSI->strides[ba] == 1) {

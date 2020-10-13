@@ -273,7 +273,7 @@ struct SubgroupsPass : public SubgroupsBase<SubgroupsPass> {
       setIntegerTag(op, subgroupSizeTag(), 1);
       return;
     }
-    IVLOG(2, "best plan = " << cm.bestPlan);
+    IVLOG(3, "best plan = " << cm.bestPlan);
     SubgroupApply(op, cm.bestPlan);
   }
 };
