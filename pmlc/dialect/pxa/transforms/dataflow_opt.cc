@@ -18,11 +18,11 @@ namespace {
 struct MemRefAccess {
   AffineValueMap accessMap;
 
-  explicit MemRefAccess(PxaLoadOp op) {
+  explicit MemRefAccess(PxaReadOpInterface op) {
     getAccessMap(op.getAffineMap(), op.getMapOperands(), &accessMap);
   }
 
-  explicit MemRefAccess(PxaReduceOp op) {
+  explicit MemRefAccess(PxaReduceOpInterface op) {
     getAccessMap(op.getAffineMap(), op.getMapOperands(), &accessMap);
   }
 
@@ -46,17 +46,28 @@ struct MemRefAccess {
 
 struct MemRefDataFlowOptPass
     : public MemRefDataFlowOptBase<MemRefDataFlowOptPass> {
+
+  explicit MemRefDataFlowOptPass(int64_t onlyParallelNested) {
+    this->onlyParallelNested = onlyParallelNested;
+  }
+
   void runOnFunction() final {
     // Walk all load's and perform reduce to load forwarding.
     FuncOp f = getFunction();
-    f.walk([&](PxaLoadOp loadOp) {
+    f.walk([&](PxaReadOpInterface loadOp) {
       auto defOp = loadOp.getMemRef().getDefiningOp();
       if (!defOp) {
         return;
       }
 
-      auto reduceOp = dyn_cast_or_null<PxaReduceOp>(defOp);
-      if (!reduceOp || reduceOp.agg() != AtomicRMWKind::assign) {
+      auto reduceOp = dyn_cast_or_null<PxaReduceOpInterface>(defOp);
+      if (!reduceOp || reduceOp.getAgg() != AtomicRMWKind::assign) {
+        return;
+      }
+
+      if (onlyParallelNested &&
+          (!dyn_cast<AffineParallelOp>(loadOp.getParentOp()) ||
+           !dyn_cast<AffineParallelOp>(reduceOp.getParentOp()))) {
         return;
       }
 
@@ -68,7 +79,8 @@ struct MemRefDataFlowOptPass
         return;
 
       // Perform the actual store to load forwarding.
-      loadOp.getResult().replaceAllUsesWith(reduceOp.getValueToStore());
+      loadOp.getOperation()->getResult(0).replaceAllUsesWith(
+          reduceOp.getValueToStore());
 
       loadOp.erase();
     });
@@ -77,8 +89,8 @@ struct MemRefDataFlowOptPass
 
 } // namespace
 
-std::unique_ptr<Pass> createMemRefDataFlowOptPass() {
-  return std::make_unique<MemRefDataFlowOptPass>();
+std::unique_ptr<Pass> createMemRefDataFlowOptPass(bool onlyParallelNested) {
+  return std::make_unique<MemRefDataFlowOptPass>(onlyParallelNested);
 }
 
 } // namespace pmlc::dialect::pxa
