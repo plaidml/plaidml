@@ -913,7 +913,7 @@ enum class SortMode {
 /// \return Tensor
 ///
 inline Tensor sort(const Tensor& x, size_t axis, SortMode mode = SortMode::ASC) {
-  return intrinsic("sort", x, axis, static_cast<size_t>(mode));
+  return intrinsic("sort", x, static_cast<int64_t>(axis), static_cast<int64_t>(mode));
 }
 
 ///
