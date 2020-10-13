@@ -306,7 +306,6 @@ struct ContractionBuilder : PolyVisitor<ContractionBuilder, AffineExpr> {
         /*sink=*/sinkMap,
         /*srcs=*/srcs,
         /*cons=*/getConstraints(),
-        /*no_reduce=*/!node->simplify,
         /*name=*/node->name);
   }
 
@@ -546,7 +545,7 @@ struct ProgramBuilder {
     auto result = pm.run(module);
 
     program->tileIR = debugString(module);
-    IVLOG(1, "\n" << program->tileIR);
+    IVLOG(2, "\n" << program->tileIR);
     if (failed(result)) {
       throw std::runtime_error("Program build failure.");
     }

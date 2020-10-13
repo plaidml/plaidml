@@ -80,8 +80,8 @@ class TestFixture : public ::testing::Test {
     for (auto shape : program.outputs()) {
       output_buffers.emplace_back(shape);
     }
-    auto executable = exec::Executable(program, input_buffers, output_buffers);
-    executable.run();
+    auto executable = exec::Executable(program);
+    executable.run(input_buffers, output_buffers);
 
     ASSERT_EQ(expected.size(), program.outputs().size());
     for (size_t i = 0; i < expected.size(); i++) {
@@ -113,7 +113,7 @@ class TestFixture : public ::testing::Test {
     for (const TensorShape& shape : program.outputs()) {
       outputs.emplace_back(shape);
     }
-    exec::Executable(program, inputs, outputs).run();
+    exec::Executable(program).run(inputs, outputs);
 #endif
   }
 };

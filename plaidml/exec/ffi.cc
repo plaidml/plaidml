@@ -23,6 +23,7 @@
 using plaidml::core::ffi_vector;
 using plaidml::core::ffi_wrap;
 using plaidml::core::ffi_wrap_void;
+using pmlc::compiler::Program;
 using pmlc::rt::Device;
 using pmlc::rt::Executable;
 using pmlc::rt::getDeviceIDs;
@@ -34,6 +35,7 @@ extern "C" {
 
 struct plaidml_executable {
   std::unique_ptr<Executable> exec;
+  std::shared_ptr<Program> program;
 };
 
 void plaidml_exec_init(  //
@@ -54,48 +56,14 @@ plaidml_strings* plaidml_devices_get(  //
 plaidml_executable* plaidml_jit(  //
     plaidml_error* err,           //
     plaidml_program* program,     //
-    const char* raw_device,       //
-    size_t ninputs,               //
-    plaidml_buffer** inputs,      //
-    size_t noutputs,              //
-    plaidml_buffer** outputs) {
+    const char* raw_device) {
   return ffi_wrap<plaidml_executable*>(err, nullptr, [&] {
     std::string device(raw_device);
     if (device.empty()) {
       device = plaidml::core::Settings::Instance()->get("PLAIDML_DEVICE");
     }
     IVLOG(1, "JITing for device: " << device);
-    if (program->program->inputs.size() != ninputs) {
-      throw std::runtime_error(llvm::formatv("Program expects {0} inputs, but {1} were specified",
-                                             program->program->inputs.size(), ninputs));
-    }
-    if (program->program->outputs.size() != noutputs) {
-      throw std::runtime_error(llvm::formatv("Program expects {0} outputs, but {1} were specified",
-                                             program->program->outputs.size(), noutputs));
-    }
-    std::vector<BufferPtr> inputBuffers;
-    for (unsigned i = 0; i < ninputs; i++) {
-      TensorShape actual = inputs[i]->buffer->shape();
-      TensorShape expected = TensorShape::fromType(program->program->inputs[i]);
-      if (actual != expected) {
-        throw std::runtime_error(
-            llvm::formatv("Shape mismatch for input buffer #{0}, expected '{1}' but '{2}' was specified", i,
-                          expected.str(), actual.str()));
-      }
-      inputBuffers.push_back(inputs[i]->buffer);
-    }
-    std::vector<BufferPtr> outputBuffers;
-    for (unsigned i = 0; i < noutputs; i++) {
-      TensorShape actual = outputs[i]->buffer->shape();
-      TensorShape expected = TensorShape::fromType(program->program->outputs[i]);
-      if (actual != expected) {
-        throw std::runtime_error(
-            llvm::formatv("Shape mismatch for output buffer #{0}, expected '{1}' but '{2}' was specified", i,
-                          expected.str(), actual.str()));
-      }
-      outputBuffers.push_back(outputs[i]->buffer);
-    }
-    return new plaidml_executable{Executable::fromProgram(program->program, device, inputBuffers, outputBuffers)};
+    return new plaidml_executable{Executable::fromProgram(program->program, device), program->program};
   });
 }
 
@@ -107,11 +75,45 @@ void plaidml_executable_free(  //
   });
 }
 
-void plaidml_executable_run(  //
-    plaidml_error* err,       //
-    plaidml_executable* exec) {
+void plaidml_executable_run(   //
+    plaidml_error* err,        //
+    plaidml_executable* exec,  //
+    size_t ninputs,            //
+    plaidml_buffer** inputs,   //
+    size_t noutputs,           //
+    plaidml_buffer** outputs) {
   ffi_wrap_void(err, [&] {  //
-    exec->exec->invoke();
+    llvm::SmallVector<BufferPtr, 8> inputBuffers;
+    if (exec->program->inputs.size() != ninputs) {
+      throw std::runtime_error(
+          llvm::formatv("Program expects {0} inputs, but {1} were specified", exec->program->inputs.size(), ninputs));
+    }
+    if (exec->program->outputs.size() != noutputs) {
+      throw std::runtime_error(llvm::formatv("Program expects {0} outputs, but {1} were specified",
+                                             exec->program->outputs.size(), noutputs));
+    }
+    for (unsigned i = 0; i < ninputs; i++) {
+      TensorShape actual = inputs[i]->buffer->shape();
+      TensorShape expected = TensorShape::fromType(exec->program->inputs[i]);
+      if (actual != expected) {
+        throw std::runtime_error(
+            llvm::formatv("Shape mismatch for input buffer #{0}, expected '{1}' but '{2}' was specified", i,
+                          expected.str(), actual.str()));
+      }
+      inputBuffers.push_back(inputs[i]->buffer);
+    }
+    llvm::SmallVector<BufferPtr, 8> outputBuffers;
+    for (unsigned i = 0; i < noutputs; i++) {
+      TensorShape actual = outputs[i]->buffer->shape();
+      TensorShape expected = TensorShape::fromType(exec->program->outputs[i]);
+      if (actual != expected) {
+        throw std::runtime_error(
+            llvm::formatv("Shape mismatch for output buffer #{0}, expected '{1}' but '{2}' was specified", i,
+                          expected.str(), actual.str()));
+      }
+      outputBuffers.push_back(outputs[i]->buffer);
+    }
+    exec->exec->invoke(inputBuffers, outputBuffers);
   });
 }
 

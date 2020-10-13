@@ -39,7 +39,6 @@ def ContractionOp : TileOpWithPPV<"contract", [
     AffineMapArrayAttr:$srcs,
     OptionalAttr<IntegerSetAttr>:$cons,
     OptionalAttr<AffineMapAttr>:$shape,
-    OptionalAttr<UnitAttr>:$no_reduce,
     OptionalAttr<AffineMapAttr>:$lowerBounds,
     OptionalAttr<AffineMapAttr>:$upperBounds,
     OptionalAttr<StrAttr>:$name
@@ -57,7 +56,6 @@ def ContractionOp : TileOpWithPPV<"contract", [
     "AffineMap sink, "
     "ArrayRef<AffineMap> srcs, "
     "IntegerSet cons, "
-    "bool no_reduce, "
     "StringRef name"
   >];
 

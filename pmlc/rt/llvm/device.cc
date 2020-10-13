@@ -7,12 +7,9 @@
 namespace pmlc::rt::llvm {
 
 std::unique_ptr<Executable>
-Device::compile(const std::shared_ptr<pmlc::compiler::Program> &program,
-                mlir::ArrayRef<util::BufferPtr> inputBuffers,
-                mlir::ArrayRef<util::BufferPtr> outputBuffers) {
+Device::compile(const std::shared_ptr<pmlc::compiler::Program> &program) {
   return makeJitExecutable(program, shared_from_this(),
-                           mlir::ArrayRef<void *>{}, inputBuffers,
-                           outputBuffers);
+                           mlir::ArrayRef<void *>{});
 }
 
 } // namespace pmlc::rt::llvm

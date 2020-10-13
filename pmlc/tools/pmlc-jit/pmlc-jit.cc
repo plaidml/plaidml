@@ -71,9 +71,8 @@ int JitRunnerMain(int argc, char **argv) {
   auto program = std::make_shared<Program>(std::move(file));
   program->entry = options.mainFuncName.getValue();
   auto executable =
-      Executable::fromProgram(program, options.optDeviceID.getValue(),
-                              ArrayRef<BufferPtr>{}, ArrayRef<BufferPtr>{});
-  executable->invoke();
+      Executable::fromProgram(program, options.optDeviceID.getValue());
+  executable->invoke(ArrayRef<BufferPtr>{}, ArrayRef<BufferPtr>{});
 
   return EXIT_SUCCESS;
 }

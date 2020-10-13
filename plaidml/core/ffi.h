@@ -207,7 +207,7 @@ plaidml_buffer* plaidml_buffer_alloc(  //
 plaidml_buffer* plaidml_buffer_adopt(  //
     plaidml_error* err,                //
     plaidml_shape* shape,              //
-    void* data,                        //
+    char* data,                        //
     size_t size);
 
 void plaidml_buffer_free(  //

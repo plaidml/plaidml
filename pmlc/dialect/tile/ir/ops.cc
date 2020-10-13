@@ -110,7 +110,7 @@ void ContractionOp::build(OpBuilder &builder, OperationState &result,
                           Type resultType, Value init, ArrayRef<Value> tensors,
                           AggregationKind agg, CombinationKind combo,
                           AffineMap sink, ArrayRef<AffineMap> srcs,
-                          IntegerSet cons, bool no_reduce, StringRef name) {
+                          IntegerSet cons, StringRef name) {
   result.addOperands(init);
   result.addOperands(tensors);
   result.addTypes(resultType);
@@ -123,9 +123,6 @@ void ContractionOp::build(OpBuilder &builder, OperationState &result,
                       builder.getAffineMapArrayAttr(srcs));
   if (!cons.isEmptyIntegerSet()) {
     result.addAttribute(getConstraintsAttrName(), IntegerSetAttr::get(cons));
-  }
-  if (no_reduce) {
-    result.addAttribute("no_reduce", builder.getUnitAttr());
   }
   if (name.size()) {
     result.addAttribute("name", builder.getStringAttr(name));
