@@ -7,9 +7,6 @@
 #include "pmlc/transforms/pass_detail.h"
 #include "pmlc/util/ids.h"
 
-#pragma GCC diagnostic ignored "-Wunused-function"
-#pragma GCC diagnostic ignored "-Wunused-but-set-variable"
-
 namespace LLVM = mlir::LLVM;
 using LLVMType = LLVM::LLVMType;
 
