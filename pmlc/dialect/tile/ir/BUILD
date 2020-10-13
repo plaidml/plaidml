@@ -15,11 +15,22 @@ filegroup(
 )
 
 gentbl(
+    name = "gen-base",
+    tbl_outs = [
+        ("-gen-enum-decls", "enums.h.inc"),
+        ("-gen-enum-defs", "enums.cc.inc"),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "base.td",
+    td_srcs = [":td_files"],
+)
+
+gentbl(
     name = "gen-ops",
     tbl_outs = [
+        ("-gen-dialect-decls -dialect=tile", "dialect.h.inc"),
         ("-gen-op-decls", "ops.h.inc"),
         ("-gen-op-defs", "ops.cc.inc"),
-        ("-gen-dialect-decls -dialect=tile", "dialect.h.inc"),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "ops.td",
@@ -36,6 +47,7 @@ plaidml_cc_library(
         "ops.h",
     ],
     deps = [
+        ":gen-base",
         ":gen-ops",
         "//pmlc/dialect/eltwise/ir",
         "//pmlc/util",

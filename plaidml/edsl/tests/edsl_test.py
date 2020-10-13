@@ -571,6 +571,11 @@ class TestEdsl(unittest.TestCase):
         first_pass = program.passes[0]
         self.assertEqual('tile', first_pass[0])
 
+    def test_sort(self):
+        I = Placeholder(plaidml.DType.FLOAT32, [5, 4])
+        O = sort(I, axis=0, mode=SortMode.DESC)
+        program = Program('sort', [I], [O])
+
 
 if __name__ == '__main__':
     plaidml.settings.set('PLAIDML_DEVICE', DEFAULT_DEVICE)

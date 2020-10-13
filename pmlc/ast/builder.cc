@@ -608,6 +608,7 @@ struct ProgramBuilder {
             .Case("prng", [&]() { return makePrngOp(node, operands); })
             .Case("reshape", [&]() { return makeReshapeOp(node, operands); })
             .Case("scatter", [&]() { return makeScatterOp(node, operands); })
+            .Case("sort", [&]() { return makeSortOp(node, operands); })
             .Default([&]() {
               const AbstractOperation *abstractOp = lookupOperation(node->op);
               OperationState state(loc, abstractOp->name);
@@ -639,16 +640,36 @@ struct ProgramBuilder {
     return op.result();
   }
 
+  Value makeSortOp(ExprNodeIntrinsic *node, ArrayRef<Value> operands) {
+    TensorShape shape = evaluator.getShape(node);
+    RankedTensorType resultType = builder.getRankedTensorType(shape);
+    Value tensor = operands[0];
+    Value axis = operands[1];
+    Value mode = operands[2];
+    IntegerAttr axisAttr;
+    if (!matchPattern(axis, m_Constant(&axisAttr))) {
+      throw std::runtime_error(
+          "'sort' requires operand #2 to be a constant integer.");
+    }
+    IntegerAttr modeAttr;
+    if (!matchPattern(mode, m_Constant(&modeAttr))) {
+      throw std::runtime_error(
+          "'sort' requires operand #3 to be a constant integer.");
+    }
+    auto op = builder.create<tile::SortOp>(loc, resultType, tensor, axisAttr,
+                                           modeAttr);
+    return op.result();
+  }
+
   Value makeIndexOp(ExprNodeIntrinsic *node, ArrayRef<Value> operands) {
     if (operands.size() < 1) {
-      throw std::runtime_error(
-          "'index' primitive expects at least one operand");
+      throw std::runtime_error("'index' requires at least one operand");
     }
     Value axis = operands.front();
     IntegerAttr axisAttr;
-    if (!m_Constant(&axisAttr).match(axis.getDefiningOp())) {
+    if (!matchPattern(axis, m_Constant(&axisAttr))) {
       throw std::runtime_error(
-          "'index' primitive expects argument 1 to be a constant integer");
+          "'index' requires operand #1 to be a constant integer");
     }
     auto dims = operands.drop_front();
     TensorShape shape = evaluator.getShape(node);
@@ -659,7 +680,7 @@ struct ProgramBuilder {
 
   Value makePrngOp(ExprNodeIntrinsic *node, ArrayRef<Value> operands) {
     if (operands.size() < 1) {
-      throw std::runtime_error("'prng' primitive expects at least one operand");
+      throw std::runtime_error("'prng' requires at least one operand");
     }
     Value state = operands.front();
     SmallVector<Type, 2> resultTypes;
@@ -682,7 +703,7 @@ struct ProgramBuilder {
       opName = tile::TileDialect::getCanonicalOpName(op);
       abstractOp = AbstractOperation::lookup(opName, context);
       if (!abstractOp) {
-        throw std::runtime_error("Unknown EDSL primitive: " + op.str());
+        throw std::runtime_error("Unknown EDSL intrinsic: " + op.str());
       }
     }
     return abstractOp;

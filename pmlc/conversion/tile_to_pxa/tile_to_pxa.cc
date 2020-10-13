@@ -49,6 +49,8 @@ using dialect::tile::ScatterOp;
 using dialect::tile::ScatterOpAdaptor;
 using dialect::tile::ShapeOp;
 using dialect::tile::ShapeOpAdaptor;
+using dialect::tile::SortOp;
+using dialect::tile::SortOpAdaptor;
 using dialect::tile::TraceOp;
 
 namespace {
@@ -1146,6 +1148,35 @@ struct ScatterOpConversion : public OpConversionPattern<ScatterOp> {
   }
 };
 
+struct SortOpConversion : public OpConversionPattern<SortOp> {
+  using OpConversionPattern<SortOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(SortOp op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override {
+    SortOpAdaptor adaptor(operands);
+
+    // bitonic sort:
+    // for (int k = 2; k <= N; k = 2 * k) {
+    //   for (int j = k >> 1; j > 0; j = j >> 1) {
+    //     for (int i = 0; i < N; i++) {
+    //       int ixj = i ^ j;
+    //       if (ixj > i) {
+    //         if ((i & k) == 0 && a[i] > a[ixj]) {
+    //           swap(a[i], a[ixj]);
+    //         }
+    //         if ((i & k) != 0 && a[i] < a[ixj]) {
+    //           swap(a[i], a[ixj]);
+    //         }
+    //       }
+    //     }
+    //   }
+    // }
+
+    return failure();
+  }
+};
+
 struct CastOpConversion : public OpConversionPattern<ew::CastOp> {
   using OpConversionPattern<ew::CastOp>::OpConversionPattern;
 
@@ -1334,6 +1365,7 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
         ScalarConstantOpConversion, //
         ScatterOpConversion,        //
         ShapeOpConversion,          //
+        SortOpConversion,           //
         TileConstantOpConversion,   //
         TraceOpConversion,          //
         // TODO: SpecialOpConversion (ZeroOp)

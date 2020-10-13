@@ -1043,9 +1043,32 @@ def sinh(x):
 
     Returns:
         Tensor: The result of the elementwise ``sinh`` operation.
-
     """
-    return intrinsic('sin', x)
+    return intrinsic('sinh', x)
+
+
+class SortMode(enum.IntEnum):
+    """The supported modes for the sort operation."""
+
+    ASC = 0
+    """Sort a tensor in ascending order."""
+
+    DESC = 1
+    """Sort a tensor in descending order."""
+
+
+def sort(x, axis, mode=SortMode.ASC):
+    """Sorts the tensor ``x`` along axis ``axis`` using the specified ``mode``.
+
+    Args:
+        x (Tensor): The tensor to be sorted.
+        axis (TensorDim): The axis to perform sorting on.
+        mode (SortMode): The mode of the sort operation.
+
+    Returns:
+        Tensor: The sorted tensor.
+    """
+    return intrinsic('sort', x, axis, mode)
 
 
 def sqrt(x):

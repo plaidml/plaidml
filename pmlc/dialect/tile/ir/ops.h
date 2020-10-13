@@ -12,6 +12,8 @@
 #include "pmlc/dialect/eltwise/ir/ops.h"
 #include "pmlc/util/enums.h"
 
+#include "pmlc/dialect/tile/ir/enums.h.inc"
+
 namespace pmlc::dialect::tile {
 
 using llvm::APInt;

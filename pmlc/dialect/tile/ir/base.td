@@ -9,8 +9,6 @@ include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Dialect/Affine/IR/AffineOpsBase.td"
 #endif
 
-include "pmlc/util/enums.td"
-
 #ifndef __PML_ELTWISE_BASE__
 include "pmlc/dialect/eltwise/ir/base.td"
 #endif
@@ -41,6 +39,18 @@ class TileOpWithPPV<string mnemonic, list<OpTrait> traits = []> :
   let printer = [{ print$cppClass(&p, *this); }];
   let parser = [{ return parse$cppClass(&parser, result); }];
   let verifier = [{ return verify$cppClass(*this); }];
+}
+
+def SortMode : I64EnumAttr<
+    "SortMode",
+    "Mode for sorting operation",
+    [
+      I64EnumAttrCase<"asc", 0>,
+      I64EnumAttrCase<"desc", 1>,
+    ]> {
+  let cppNamespace = "pmlc::dialect::tile";
+  let returnType = "SortMode";
+  let convertFromStorage = "static_cast<" # returnType # ">($_self.getValue().getZExtValue())";
 }
 
 #endif // __PML_TILE_BASE__

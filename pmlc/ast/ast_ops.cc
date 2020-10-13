@@ -177,6 +177,24 @@ struct ShapeOp : Intrinsic {
   }
 };
 
+struct SortOp : Intrinsic {
+  TensorShapes getShapes(Evaluator *evaluator, ArrayRef<ExprNodePtr> operands,
+                         ArrayRef<TensorShape> shapes) const final {
+    if (operands.size() != 3) {
+      throw std::runtime_error("'sort' requires 3 arguments.");
+    }
+    auto axis = getIntegerValue(evaluator, operands[1]);
+    if (!axis) {
+      throw std::runtime_error("'sort' requires operand #2 to be an integer.");
+    }
+    auto mode = getIntegerValue(evaluator, operands[2]);
+    if (!mode) {
+      throw std::runtime_error("'sort' requires operand #3 to be an integer.");
+    }
+    return {shapes[0]};
+  }
+};
+
 struct Registration {
   Registration() {
     auto registry = IntrinsicRegistry::Instance();
@@ -197,6 +215,7 @@ struct Registration {
     registry->add("scatter", std::make_unique<ScatterOp>());
     registry->add("select", std::make_unique<SelectOp>());
     registry->add("shape", std::make_unique<ShapeOp>());
+    registry->add("sort", std::make_unique<SortOp>());
   }
 };
 

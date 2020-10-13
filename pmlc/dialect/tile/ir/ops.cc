@@ -55,6 +55,12 @@ LogicalResult ShapeOp::materializeOperands(OpBuilder &builder) {
   return eltwise::materializeOperands(builder, getOperation());
 }
 
+LogicalResult SortOp::materializeOperands(OpBuilder &builder) {
+  Operation *op = getOperation();
+  return eltwise::materializeOperands(builder, op,
+                                      op->getOpOperands().take_front());
+}
+
 LogicalResult TraceOp::materializeOperands(OpBuilder &builder) {
   return eltwise::materializeOperands(builder, getOperation());
 }
@@ -342,3 +348,5 @@ LogicalResult verifyContractionOp(ContractionOp op) {
 #include "pmlc/dialect/tile/ir/ops.cc.inc"
 
 } // namespace pmlc::dialect::tile
+
+#include "pmlc/dialect/tile/ir/enums.cc.inc"

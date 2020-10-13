@@ -8,6 +8,10 @@ include "pmlc/dialect/tile/ir/base.td"
 include "pmlc/util/interfaces.td"
 #endif
 
+#ifndef __PMLC_UTIL_ENUMS__
+include "pmlc/util/enums.td"
+#endif
+
 def ConstantOp : TileOpWithPPV<"constant", [ConstantLike, NoSideEffect]>, HasFolder {
   let summary = "constant operation";
   let arguments = (ins IndexAttr:$value);
@@ -141,6 +145,21 @@ def ShapeOp : MaterializeOp<"shape"> {
   let summary = "tensor shape operation";
   let arguments = (ins RankedTensorOf<[AnyScalar]>:$tensor);
   let results = (outs RankedTensorOf<[SI32]>:$result);
+}
+
+def SortOp : MaterializeOp<"sort", [
+      AllTypesMatch<["tensor", "result"]>,
+      NoSideEffect
+    ]> {
+  let summary = "tensor sort operation";
+  let arguments = (ins
+    RankedTensorOf<[AnyScalar]>:$tensor,
+    IndexAttr:$axis,
+    SortMode:$mode);
+  let results = (outs RankedTensorOf<[AnyScalar]>:$result);
+  let assemblyFormat = [{
+    $mode $tensor `[` $axis `]` attr-dict `:` type($tensor)
+  }];
 }
 
 def TraceOp : MaterializeOp<"trace", []> {
