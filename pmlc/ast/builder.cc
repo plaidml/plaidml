@@ -656,8 +656,9 @@ struct ProgramBuilder {
       throw std::runtime_error(
           "'sort' requires operand #3 to be a constant integer.");
     }
-    auto op = builder.create<tile::SortOp>(loc, resultType, tensor, axisAttr,
-                                           modeAttr);
+    IntegerAttr axisIndexAttr = builder.getIndexAttr(axisAttr.getInt());
+    auto op = builder.create<tile::SortOp>(loc, resultType, tensor,
+                                           axisIndexAttr, modeAttr);
     return op.result();
   }
 
