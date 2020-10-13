@@ -50,7 +50,7 @@ PLATFORMS:
     variant: linux_x86_64
   pml-ocl-gv100gl:
     variant: linux_x86_64
-  pml-ocl-neo:
+  pml-ocl-gen:
     variant: linux_x86_64
   pml-vk-gen:
     variant: linux_x86_64
@@ -131,7 +131,7 @@ SUITES:
         pipelines: [nightly, plaidml, ci]
       pml-vk-gen:
         pipelines: [nightly, plaidml, ci]
-      pml-ocl-neo:
+      pml-ocl-gen:
         pipelines: [nightly, plaidml, ci]
     params:
       ci:
@@ -156,7 +156,7 @@ SUITES:
         precision: untested
         skip_platforms:
           - pml-vk-gen
-          - pml-ocl-neo
+          - pml-ocl-gen
       edsl_cc_test:
         runner: cc_test
         cwd: tmp/input
@@ -230,7 +230,7 @@ SUITES:
             soft_fail: true # performance regression
           pml-ocl-gfx804:
             prepend_args: [--examples=64]
-          pml-ocl-neo:
+          pml-ocl-gen:
             prepend_args: [--examples=512]
           pml-mtl-uhd630:
             prepend_args: [--examples=256]
@@ -274,7 +274,7 @@ SUITES:
             soft_fail: true # performance regression
           pml-ocl-gfx804:
             prepend_args: [--examples=64]
-          pml-ocl-neo:
+          pml-ocl-gen:
             prepend_args: [--examples=256]
           pml-mtl-uhd630:
             prepend_args: [--examples=256]
@@ -296,7 +296,7 @@ SUITES:
             prepend_args: [--examples=64]
           pml-ocl-gv100gl:
             prepend_args: [--examples=512]
-          pml-ocl-neo:
+          pml-ocl-gen:
             prepend_args: [--examples=256]
             perf_threshold: 0.7
           pml-mtl-uhd630:
