@@ -181,6 +181,8 @@ SUITES:
         args: [trivial_model_test.py]
         cwd: plaidml/bridge/keras
         precision: untested
+        skip_platforms:
+          - pml-ocl-gen
 
   infer:
     platforms:
@@ -189,7 +191,7 @@ SUITES:
       pml-vk-gen:
         pipelines: [nightly, plaidml]
       pml-ocl-gen:
-        pipelines: [nightly, plaidml]
+        pipelines: [ci]
     params:
       ci:
         batch_sizes: [1]
