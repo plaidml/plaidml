@@ -211,6 +211,8 @@ struct FusionInfo {
       auto sameSubgroups = subgroupSizeA == subgroupSizeB;
       if (mulA != mulB) {
         auto tileSize = reverseFusion ? sizeA / sizeB : sizeB / sizeA;
+        if (!tileSize)
+          return false;
         if (reverseFusion && (subgroupSizeA == 1 || sameSubgroups)) {
           aInfo.tileSizes.push_back(tileSize);
           aInfo.needsTiling = true;
@@ -301,6 +303,11 @@ struct FusionInfo {
 
     auto aRap = computeThisRelativeAccess(opA);
     auto bRap = computeThisRelativeAccess(opB);
+    // Fail if getting Rap is unsuccessfull
+    if (!aRap || !bRap) {
+      undoTilings();
+      return false;
+    }
     auto isAliased = hasPerfectAliasing(*aRap, *bRap, bToA);
     IVLOG(3, "isAliased: " << isAliased);
 
@@ -308,6 +315,10 @@ struct FusionInfo {
       IVLOG(3, "  RAW: " << debugString(*raw.second));
       auto aRap = computeThisRelativeAccess(raw.first);
       auto bRap = computeThisRelativeAccess(raw.second);
+      if (!aRap || !bRap) {
+        undoTilings();
+        return false;
+      }
       auto ret = hasPerfectAliasing(*aRap, *bRap, bToA);
       IVLOG(3, "  isAliased: " << ret);
       if (!ret) {
@@ -320,6 +331,10 @@ struct FusionInfo {
       IVLOG(3, "  WAW: " << debugString(*waw.second));
       auto aRap = computeThisRelativeAccess(waw.first);
       auto bRap = computeThisRelativeAccess(waw.second);
+      if (!aRap || !bRap) {
+        undoTilings();
+        return false;
+      }
       auto ret = hasPerfectAliasing(*aRap, *bRap, bToA);
       IVLOG(3, "  isAliased: " << ret);
       if (!ret) {
