@@ -66,6 +66,7 @@ local exports = [
   'plaidml_expr_pragma',
   'plaidml_expr_ptr',
   'plaidml_expr_repr',
+  'plaidml_expr_uint',
   'plaidml_poly_expr_dim',
   'plaidml_poly_expr_free',
   'plaidml_poly_expr_index',
