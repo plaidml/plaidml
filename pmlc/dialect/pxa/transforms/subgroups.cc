@@ -172,37 +172,31 @@ struct SubgroupCostModel {
     return;
   }
 
-  double memory_io(size_t cache_width, SmallVector<int64_t, 4> dimensions,
-                   SmallVector<int64_t, 4> strides) {
-    // TODO: fixed sizeof
-    double cache_elems = static_cast<double>(cache_width) / 4;
-
+  double memory_io(double cache_elems,
+                   SmallVector<int64_t, 4> tensor_dimensions,
+                   SmallVector<int64_t, 4> tensor_strides) {
     // Start with one cache line
     double cache_lines = 1.0;
-
     // Current accumulated maximum value
     int64_t max_val = 0;
-
-    // TODO: check that dimensiosn / strides are same size
     // For each dimension (in sorted order)
-    for (size_t i = dimensions.size(); i > 0; i--) {
+    assert(tensor_dimensions.size() == tensor_strides.size());
+    for (size_t i = tensor_dimensions.size(); i > 0; i--) {
       // Compute gap per step
-      int64_t gap = std::abs(strides[i - 1]) - max_val;
-
+      int64_t gap = std::abs(tensor_strides[i - 1]) - max_val;
       // Multiply current cache hits by size
-      cache_lines *= static_cast<double>(dimensions[i - 1]);
-
+      cache_lines *= static_cast<double>(tensor_dimensions[i - 1]);
       // Compute probability that cache line is shared across gap
       double prob_shared = 0.0; // Assume it's never shared
       if (cache_elems != 0.0 && gap < cache_elems) {
         prob_shared = 1.0 - (gap / cache_elems);
       }
-
       // Subtract shared elements
-      cache_lines -= prob_shared * static_cast<double>(dimensions[i - 1] - 1);
-
+      cache_lines -=
+          prob_shared * static_cast<double>(tensor_dimensions[i - 1] - 1);
       // Update max_val
-      max_val += std::abs(strides[i - 1]) * (dimensions[i - 1] - 1);
+      max_val +=
+          std::abs(tensor_strides[i - 1]) * (tensor_dimensions[i - 1] - 1);
     }
     return cache_lines;
   }
@@ -212,7 +206,7 @@ struct SubgroupCostModel {
     int64_t registers;
     int64_t accesses;
     double cacheMiss;
-    SmallVector<int64_t, 4> dimensions;
+    SmallVector<int64_t, 4> tensor_dimensions;
     SmallVector<int64_t, 4> tensor_strides;
   };
 
@@ -250,12 +244,15 @@ struct SubgroupCostModel {
       }
       if (tensor_stride != -1) {
         out.registers *= pos + 1;
-        out.dimensions.push_back(pos + 1);
+        out.tensor_dimensions.push_back(pos + 1);
         out.tensor_strides.push_back(tensor_stride);
       }
     }
 
-    out.cacheMiss = memory_io(64, out.dimensions, out.tensor_strides);
+    double kCacheWidth = 64.0;
+    // TODO: fixed sizeof
+    out.cacheMiss =
+        memory_io(kCacheWidth / 4, out.tensor_dimensions, out.tensor_strides);
     return out;
   }
 
