@@ -288,23 +288,29 @@ func @main(%arg0: !comp.device) {
 }
 ```
 
-### Final Lowering
+### Lowering into Split Functions
 
 With a minor tweak, we could run the above code as a coroutine&mdash;we could pass in an extra parameter to represent
 a bidirectional request/response pipe, and pass it to `comp.loop`.  Our sense is that it's more obvious to split the
 current `main()` function into multiple functions invoked individually to set up the network, run it, and tear it down.
 
+To simplify the `JitExecutable` calling convention, while preserving the ability to easily hand-write multi-dialect MLIR
+code and run it with `JitExecutable`, we've decided to pass the memrefs (memref descriptors, when finally lowered) to
+the initialization function, and to match the output of the initialization function with the input of the execution and
+teardown functions for a given network.  Note that this also allows the network to perform folding of known-constant
+memrefs during initialization.
+
 For our example code, this looks like:
 
 ```mlir
-func @plaidml_init(%arg0: !comp.device) -> (!comp.execenv<ocl:0,(11)>, memref<8x32xf32, 11>, memref<16x32xf32, 11>, memref<8x16xf32, 11>, !comp.kernel<ocl, 8x32xf32>, !comp.kernel<ocl, 16x32xf32, 8x16xf32, 8x32xf32>) {
+func @plaidml_init(%arg0: !comp.device, %arg1: memref<8x16xf32>, %arg2: memref<16x32xf32>, %arg3: memref<8x32xf32>) -> (!comp.execenv<ocl:0,(11)>, memref<8x32xf32, 11>, memref<16x32xf32, 11>, memref<8x16xf32, 11>, !comp.kernel<ocl, 8x32xf32>, !comp.kernel<ocl, 16x32xf32, 8x16xf32, 8x32xf32>, memref<8x16xf32>, memref<16x32xf32>, memref<8x32xf32>) {
   %0 = comp.create_execenv %arg0 : (!comp.device) -> !comp.execenv<ocl:0,(11)>
   %1 = comp.alloc %0 : (!comp.execenv<ocl:0,(11)>) -> memref<8x32xf32, 11>
   %4 = comp.alloc %0 : (!comp.execenv<ocl:0,(11)>) -> memref<16x32xf32, 11>
   %5 = comp.alloc %0 : (!comp.execenv<ocl:0,(11)>) -> memref<8x16xf32, 11>
   %k1 = comp.create_kernel %0 {kernel = @main_kernel::@main_kernel} : (!comp.execenv<ocl:0,(11)>) -> !comp.kernel<ocl, 8x32xf32>
   %k2 = comp.create_kernel %0 {kernel = @main_kernel_0::@main_kernel} : (!comp.execenv<ocl:0,(11)>) -> !comp.kernel<ocl, 16x32xf32, 8x16xf32, 8x32xf32>
-  return %0, %1, %4, %5, %k1, %k2
+  return %0, %1, %4, %5, %k1, %k2, %arg1, %arg2, %arg3
 }
 
 func @plaidml_exec(%0: !comp.execenv<ocl:0,(11)>, %1: memref<8x32xf32, 11>, %4: memref<16x32xf32, 11>, %5: memref<8x16xf32, 11>, %k1: !comp.kernel<ocl, 8x32xf32>, %k2: !comp.kernel<ocl, 16x32xf32, 8x16xf32, 8x32xf32>, %arg1: memref<8x16xf32>, %arg2: memref<16x32xf32>, %arg3: memref<8x32xf32>) {
@@ -323,7 +329,7 @@ func @plaidml_exec(%0: !comp.execenv<ocl:0,(11)>, %1: memref<8x32xf32, 11>, %4: 
   return
 }
 
-func @plaidml_fini(%0: !comp.execenv<ocl:0,(11)>, %1: memref<8x32xf32, 11>, %4: memref<16x32xf32, 11>, %5: memref<8x16xf32, 11>, %k1: !comp.kernel<ocl, 8x32xf32>, %k2: !comp.kernel<ocl, 16x32xf32, 8x16xf32, 8x32xf32>) {
+func @plaidml_fini(%0: !comp.execenv<ocl:0,(11)>, %1: memref<8x32xf32, 11>, %4: memref<16x32xf32, 11>, %5: memref<8x16xf32, 11>, %k1: !comp.kernel<ocl, 8x32xf32>, %k2: !comp.kernel<ocl, 16x32xf32, 8x16xf32, 8x32xf32>, %arg1: memref<8x16xf32>, %arg2: memref<16x32xf32>, %arg3: memref<8x32xf32>) {
   memref<8x16xf32, 11>, !comp.kernel<ocl, 8x32xf32>, !comp.kernel<ocl, 16x32xf32, 8x16xf32, 8x32xf32>
   comp.destroy_kernel %k1 : !comp.kernel<ocl, 8x32xf32>
   comp.destroy_kernel %k2 : !comp.kernel<ocl, 16x32xf32, 8x16xf32, 8x32xf32>
@@ -335,8 +341,24 @@ func @plaidml_fini(%0: !comp.execenv<ocl:0,(11)>, %1: memref<8x32xf32, 11>, %4: 
 }
 ```
 
-[TODO: Discuss this more.  The coroutine style is actually kind of elegant, and may provide additional opportunities for
-optimization.]
+### Lowering into Package Functions
+
+Finally, to be usable from `JitExecutable`, we'll package these functions in the LLVMIR dialect.  The packaging will
+wrap functions s.t. inputs and outputs are represented as `void **` arrays.  Output arrays will be allocated with
+`calloc()`, and will include a trailing `nullptr` element; the caller is expected to handle calling `free()`; empty outputs will be
+represented as `nullptr`.
+
+So the function signatures as seen by `JitExecutable` are:
+
+```c
+    void** plaidml_init(void** device_and_memrefs);  // returns network state
+    void** plaidml_exec(void** network_state);       // returns nullptr
+    void** plaidml_fini(void** network_state);       // returns nullptr
+
+    // The caller is responsible for calling free(network_state) to explicitly
+    // release the memory backing the network state after calling
+    // plaidml_fini(network_state) to release its contents.
+```
 
 ### Pass Structure
 
@@ -347,9 +369,6 @@ lowering pass.
 Adding the `comp.loop` instruction is simple enough that we propose to do it in the initial lowering to the comp
 dialect, so that comp programs never appear without it.
 
-In order to more easily connect the results of `plaidml_init` with the arguments of `plaidml_exec` and `plaidml_fini`,
-we've decided to do the split as part of the lowering to LLVMIR.
-
 The transformation of `gpu.launch_func` is also required, so we'll perform it as part of the initial lowering to the
 comp dialect.
 
@@ -359,6 +378,10 @@ alloc/dealloc pairs as pairs (&Implies; only hoisting one if we're also hoisting
 may switch to implicit deallocation.
 
 Wait coalescing is also just an optimization, to be performed by its own pass.
+
+A final `comp` dialect pass will lower `main` into `plaidml_init`, `plaidml_exec`, and `plaidml_fini`.
+
+A final packaging pass will operate in the LLVMIR dialect to provide the expected function signatures.
 
 ## Notes
 
