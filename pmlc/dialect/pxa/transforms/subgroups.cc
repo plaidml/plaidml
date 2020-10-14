@@ -54,6 +54,9 @@ std::ostream &operator<<(std::ostream &os, const SubgroupPlan &plan) {
 struct SubgroupParams {
   SmallVector<int64_t, 4> subgroupSizes;
   int64_t maxRegsPerThread;
+  double cacheWidth;
+  double cacheLatency;
+  double memoryLatency;
 };
 
 struct SubgroupCostModel {
@@ -122,7 +125,7 @@ struct SubgroupCostModel {
       IVLOG(3, "Not strided");
       return false;
     }
-    flat_strides.push_back(*maybeFlatStrides);
+    allFlatStrides.push_back(*maybeFlatStrides);
     IVLOG(3, "  flat strides = " << *maybeFlatStrides);
 
     auto maybeDimStrides =
@@ -131,7 +134,7 @@ struct SubgroupCostModel {
       IVLOG(3, "Not strided");
       return false;
     }
-    dim_strides.push_back(*maybeDimStrides);
+    allDimStrides.push_back(*maybeDimStrides);
     IVLOG(3, "  dimensional strides = " << *maybeDimStrides)
 
     return true;
@@ -172,33 +175,31 @@ struct SubgroupCostModel {
     return;
   }
 
-  double memory_io(double cache_elems,
-                   SmallVector<int64_t, 4> tensor_dimensions,
-                   SmallVector<int64_t, 4> tensor_strides) {
+  double memoryIO(double cacheElems, SmallVector<int64_t, 4> tensorDimensions,
+                  SmallVector<int64_t, 4> tensorStrides) {
     // Start with one cache line
-    double cache_lines = 1.0;
+    double cacheLines = 1.0;
     // Current accumulated maximum value
-    int64_t max_val = 0;
+    int64_t maxVal = 0;
     // For each dimension (in sorted order)
-    assert(tensor_dimensions.size() == tensor_strides.size());
-    for (size_t i = tensor_dimensions.size(); i > 0; i--) {
+    assert(tensorDimensions.size() == tensorStrides.size());
+    for (size_t i = tensorDimensions.size(); i > 0; i--) {
       // Compute gap per step
-      int64_t gap = std::abs(tensor_strides[i - 1]) - max_val;
+      int64_t gap = std::abs(tensorStrides[i - 1]) - maxVal;
       // Multiply current cache hits by size
-      cache_lines *= static_cast<double>(tensor_dimensions[i - 1]);
+      cacheLines *= static_cast<double>(tensorDimensions[i - 1]);
       // Compute probability that cache line is shared across gap
-      double prob_shared = 0.0; // Assume it's never shared
-      if (cache_elems != 0.0 && gap < cache_elems) {
-        prob_shared = 1.0 - (gap / cache_elems);
+      double probShared = 0.0; // Assume it's never shared
+      if (cacheElems != 0.0 && gap < cacheElems) {
+        probShared = 1.0 - (gap / cacheElems);
       }
       // Subtract shared elements
-      cache_lines -=
-          prob_shared * static_cast<double>(tensor_dimensions[i - 1] - 1);
-      // Update max_val
-      max_val +=
-          std::abs(tensor_strides[i - 1]) * (tensor_dimensions[i - 1] - 1);
+      cacheLines -=
+          probShared * static_cast<double>(tensorDimensions[i - 1] - 1);
+      // Update maxVal
+      maxVal += std::abs(tensorStrides[i - 1]) * (tensorDimensions[i - 1] - 1);
     }
-    return cache_lines;
+    return cacheLines;
   }
 
   struct MemInfo {
@@ -206,53 +207,75 @@ struct SubgroupCostModel {
     int64_t registers;
     int64_t accesses;
     double cacheMiss;
-    SmallVector<int64_t, 4> tensor_dimensions;
-    SmallVector<int64_t, 4> tensor_strides;
+    SmallVector<int64_t, 4> tensorStrides;
+    SmallVector<int64_t, 4> tensorDimensions;
   };
 
-  MemInfo computeMemoryInfo(SmallVectorImpl<StrideInfo> &dim_strides,
-                            StrideInfo flat_strides) {
+  size_t getIndexByArgument(mlir::BlockArgument arg) {
+    size_t index = ranges.size();
+    for (size_t i = 0; i < ranges.size(); ++i) {
+      auto iv = op.getIVs()[i];
+      if (iv == arg) {
+        index = i;
+        break;
+      }
+    }
+    assert(index != ranges.size());
+    return index;
+  }
+
+  MemInfo computeMemoryInfo(SmallVector<StrideInfo, 4> dimStrides,
+                            StrideInfo flatStrides) {
     MemInfo out = {0, 1, 1, 0.0};
-    for (auto si : dim_strides) {
+    for (auto positionalDimStrides : dimStrides) {
+      // no strides, nothing to do
+      if (positionalDimStrides.strides.empty()) {
+        continue;
+      }
+
       int64_t pos = 0;
-      // TODO: add neg
+      int64_t neg = 0;
+      int64_t tensorStride = 0;
+      bool hasTensorStride = false;
 
-      bool has_tensor_stride = false;
-      int64_t tensor_stride = -1;
-      for (auto kvp : si.strides) {
-        auto index = kvp.first.getArgNumber();
-        auto dim_stride = kvp.second;
+      for (auto kvp : positionalDimStrides.strides) {
+        auto index = getIndexByArgument(kvp.first);
+        auto dimStride = kvp.second;
 
-        if (flat_strides.strides.count(kvp.first)) {
-          auto flat_stride = flat_strides.strides[kvp.first];
+        // dim strides should be a superset of flat strides
+        assert(flatStrides.strides.count(kvp.first));
+        auto flatStride = flatStrides.strides[kvp.first];
 
-          if (!has_tensor_stride) {
-            has_tensor_stride = true;
-            tensor_stride = flat_stride / dim_stride;
-          }
-          assert(tensor_stride == flat_stride / dim_stride);
-
-          if (tensor_stride == 1 &&
+        // set tensor stride the first time through the loop
+        if (!hasTensorStride) {
+          hasTensorStride = true;
+          tensorStride = flatStride / dimStride;
+          if (tensorStride == 1 &&
               plan.subgroupTile[index] == plan.subgroupSize) {
             out.subgroupCount++;
           }
         }
+        // tensor = flat / dim should be invariant
+        assert(tensorStride == flatStride / dimStride);
 
-        pos += dim_stride * (plan.innerTile[index] - 1);
+        if (dimStride > 0) {
+          pos += dimStride * (plan.innerTile[index] - 1);
+        } else {
+          neg += dimStride * (plan.innerTile[index] - 1);
+        }
 
         out.accesses *= plan.innerTile[index];
       }
-      if (tensor_stride != -1) {
-        out.registers *= pos + 1;
-        out.tensor_dimensions.push_back(pos + 1);
-        out.tensor_strides.push_back(tensor_stride);
-      }
+
+      auto dimSize = pos - neg + 1;
+      out.registers *= dimSize;
+      out.tensorStrides.push_back(tensorStride);
+      out.tensorDimensions.push_back(dimSize);
     }
 
-    double kCacheWidth = 64.0;
-    // TODO: fixed sizeof
-    out.cacheMiss =
-        memory_io(kCacheWidth / 4, out.tensor_dimensions, out.tensor_strides);
+    // TODO: need to get data type size from op
+    out.cacheMiss = memoryIO(params.cacheWidth / 4, out.tensorDimensions,
+                             out.tensorStrides);
     return out;
   }
 
@@ -261,9 +284,13 @@ struct SubgroupCostModel {
     int64_t totAccesses = 0;
     double totCacheMiss = 0.0;
 
-    for (size_t i = 0; i < flat_strides.size(); i++) {
-      auto mi = computeMemoryInfo(dim_strides[i], flat_strides[i]);
+    assert(allFlatStrides.size() == allDimStrides.size());
+    for (size_t i = 0; i < allFlatStrides.size(); i++) {
+      auto mi = computeMemoryInfo(allDimStrides[i], allFlatStrides[i]);
       if (i == 0 && mi.subgroupCount == 0) {
+        return std::numeric_limits<double>::infinity();
+      }
+      if (mi.subgroupCount > 0) {
         return std::numeric_limits<double>::infinity();
       }
 
@@ -291,10 +318,8 @@ struct SubgroupCostModel {
       totOps *= it;
     }
 
-    double kCacheLatency = 125.0;
-    double kMemoryLatency = 420.0;
-    double totMemIO = (totAccesses - totCacheMiss) * kCacheLatency +
-                      totCacheMiss * kMemoryLatency;
+    double totMemIO = (totAccesses - totCacheMiss) * params.cacheLatency +
+                      totCacheMiss * params.memoryLatency;
 
     return totMemIO / totOps;
   }
@@ -312,8 +337,8 @@ struct SubgroupCostModel {
   // Cache of the index ranges
   SmallVector<int64_t, 8> ranges;
   // Strides for all io ops
-  SmallVector<StrideInfo, 4> flat_strides;
-  SmallVector<SmallVector<StrideInfo, 4>, 4> dim_strides;
+  SmallVector<StrideInfo, 4> allFlatStrides;
+  SmallVector<SmallVector<StrideInfo, 4>, 4> allDimStrides;
 };
 
 void SubgroupApply(AffineParallelOp op, SubgroupPlan plan) {
@@ -351,6 +376,9 @@ struct SubgroupsPass : public SubgroupsBase<SubgroupsPass> {
     SubgroupParams params = {
         {8, 16}, // Subgroup sizes to consider
         40,      // Maximum register per thread
+        64.0,    // Cache width
+        125.0,   // Cache latency
+        420.0,   // Memory latency
     };
     SubgroupCostModel cm(params, op);
     if (cm.bestCost == std::numeric_limits<double>::infinity()) {
