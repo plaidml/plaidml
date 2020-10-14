@@ -35,10 +35,8 @@ using llvm::SmallVector;
 // 1) Has at most one index
 // 2) Is as large as possible without going over maxThreads
 struct CostModel {
-  AffineParallelOp op;
   unsigned maxThreads;
-  CostModel(AffineParallelOp op, unsigned maxThreads)
-      : op(op), maxThreads(maxThreads) {}
+  explicit CostModel(unsigned maxThreads) : maxThreads(maxThreads) {}
   double operator()(ArrayRef<int64_t> tile, double bestCost) const {
     int64_t innerSize = 1;
     for (size_t i = 0; i < tile.size(); i++) {
@@ -59,6 +57,7 @@ struct CPUThreadPass : public CPUThreadBase<CPUThreadPass> {
   void threadOp(AffineParallelOp op) {}
   void runOnFunction() final {
     auto func = getFunction();
+    CostModel model(threads);
     // Nest outermost loops into 'blocks' and 'threads'
     for (auto op : func.getOps<AffineParallelOp>()) {
       auto maybeRanges = op.getConstantRanges();
@@ -66,7 +65,6 @@ struct CPUThreadPass : public CPUThreadBase<CPUThreadPass> {
         // Fail if we can't compute the ranges at compile time
         continue;
       }
-      CostModel model(op, threads);
       auto tileSize =
           findBestTileSize(EvenTilingGenerator(), model, *maybeRanges);
       // Invert tiling (we want 'threads' on the outer loop
