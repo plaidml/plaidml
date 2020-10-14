@@ -21,16 +21,16 @@ void XSMMDialect::initialize() {
 }
 
 //
-// ---- GemmInvokeOp ----
+// ---- SGemmInvokeOp ----
 //
 
-GemmInvokeOp::operand_range GemmInvokeOp::getOperandsForA() {
+SGemmInvokeOp::operand_range SGemmInvokeOp::getOperandsForA() {
   auto aType = a().getType().cast<MemRefType>();
   auto cType = c().getType().cast<MemRefType>();
   return getOperands().slice(4 + cType.getRank(), aType.getRank());
 }
 
-GemmInvokeOp::operand_range GemmInvokeOp::getOperandsForB() {
+SGemmInvokeOp::operand_range SGemmInvokeOp::getOperandsForB() {
   auto aType = a().getType().cast<MemRefType>();
   auto bType = b().getType().cast<MemRefType>();
   auto cType = c().getType().cast<MemRefType>();
@@ -38,12 +38,12 @@ GemmInvokeOp::operand_range GemmInvokeOp::getOperandsForB() {
                              bType.getRank());
 }
 
-GemmInvokeOp::operand_range GemmInvokeOp::getOperandsForC() {
+SGemmInvokeOp::operand_range SGemmInvokeOp::getOperandsForC() {
   auto cType = c().getType().cast<MemRefType>();
   return getOperands().slice(4, cType.getRank());
 }
 
-void printGemmInvokeOp(OpAsmPrinter &p, GemmInvokeOp op) {
+void printSGemmInvokeOp(OpAsmPrinter &p, SGemmInvokeOp op) {
   auto funcType = FunctionType::get({op.a().getType(), op.b().getType()},
                                     {op.c().getType()}, op.getContext());
   p << op.getOperation()->getName() << ' ';
@@ -62,7 +62,7 @@ struct GemmOperand {
   SmallVector<OpAsmParser::OperandType, 4> indices;
 };
 
-ParseResult parseGemmInvokeOp(OpAsmParser &parser, OperationState &result) {
+ParseResult parseSGemmInvokeOp(OpAsmParser &parser, OperationState &result) {
   auto &builder = parser.getBuilder();
   auto indexType = builder.getIndexType();
   auto i64Type = builder.getIntegerType(64);

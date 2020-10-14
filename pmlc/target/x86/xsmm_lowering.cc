@@ -68,12 +68,12 @@ struct PxaGemmOpConversion : public OpConversionPattern<pxa::PxaGemmOp> {
     auto leadingDimsAttr = rewriter.getI64ArrayAttr(ArrayRef<int64_t>{
         aInfo.strides[0], bInfo.strides[0], cInfo.strides[0]});
 
-    auto dispatch = rewriter.create<xsmm::GemmDispatchOp>(
+    auto dispatch = rewriter.create<xsmm::SGemmDispatchOp>(
         op.getLoc(), rewriter.getI64Type(), op.tile(), leadingDimsAttr);
 
-    rewriter.create<xsmm::GemmInvokeOp>(op.getLoc(), ArrayRef<Type>(), dispatch,
-                                        transformed.c(), transformed.a(),
-                                        transformed.b(), indices);
+    rewriter.create<xsmm::SGemmInvokeOp>(
+        op.getLoc(), ArrayRef<Type>(), dispatch, transformed.c(),
+        transformed.a(), transformed.b(), indices);
 
     op.replaceAllUsesWith(transformed.c());
     rewriter.eraseOp(op);
@@ -82,14 +82,14 @@ struct PxaGemmOpConversion : public OpConversionPattern<pxa::PxaGemmOp> {
   }
 };
 
-struct XSMMGemmDispatchLowering
-    : public ConvertOpToLLVMPattern<xsmm::GemmDispatchOp> {
-  using ConvertOpToLLVMPattern<xsmm::GemmDispatchOp>::ConvertOpToLLVMPattern;
+struct XSMMSGemmDispatchLowering
+    : public ConvertOpToLLVMPattern<xsmm::SGemmDispatchOp> {
+  using ConvertOpToLLVMPattern<xsmm::SGemmDispatchOp>::ConvertOpToLLVMPattern;
 
   LogicalResult
   matchAndRewrite(Operation *op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
-    auto dispatchOp = cast<xsmm::GemmDispatchOp>(op);
+    auto dispatchOp = cast<xsmm::SGemmDispatchOp>(op);
     auto func = getOrInsertFunc(op, rewriter);
 
     auto int32Type = LLVM::LLVMType::getInt32Ty(op->getContext());
@@ -139,15 +139,15 @@ struct XSMMGemmDispatchLowering
   }
 };
 
-struct XSMMGemmInvokeLowering
-    : public ConvertOpToLLVMPattern<xsmm::GemmInvokeOp> {
-  using ConvertOpToLLVMPattern<xsmm::GemmInvokeOp>::ConvertOpToLLVMPattern;
+struct XSMMSGemmInvokeLowering
+    : public ConvertOpToLLVMPattern<xsmm::SGemmInvokeOp> {
+  using ConvertOpToLLVMPattern<xsmm::SGemmInvokeOp>::ConvertOpToLLVMPattern;
 
   LogicalResult
   matchAndRewrite(Operation *op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
-    auto invokeOp = cast<xsmm::GemmInvokeOp>(op);
-    xsmm::GemmInvokeOp::Adaptor transformed(operands);
+    auto invokeOp = cast<xsmm::SGemmInvokeOp>(op);
+    xsmm::SGemmInvokeOp::Adaptor transformed(operands);
     auto aType = invokeOp.a().getType().cast<MemRefType>();
     auto bType = invokeOp.b().getType().cast<MemRefType>();
     auto cType = invokeOp.c().getType().cast<MemRefType>();
@@ -210,7 +210,8 @@ void populatePXAGemmToXSMMConversionPatterns(OwningRewritePatternList &patterns,
 
 void populateXSMMToLLVMConversionPatterns(LLVMTypeConverter &converter,
                                           OwningRewritePatternList &patterns) {
-  patterns.insert<XSMMGemmDispatchLowering, XSMMGemmInvokeLowering>(converter);
+  patterns.insert<XSMMSGemmDispatchLowering, XSMMSGemmInvokeLowering>(
+      converter);
 }
 
 } // namespace pmlc::target::x86

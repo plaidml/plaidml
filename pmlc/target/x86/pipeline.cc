@@ -88,7 +88,17 @@ struct ConvertStandardToLLVMPass
 
 // NOTE: the stencil pass uses row-major ordering, the heatmap is
 // specified in column-major ordering.
-static pxa::StencilCost heatmapCostTransposed(ArrayRef<int64_t> tile) {
+static pxa::StencilCost heatmapCostTransposed(ArrayRef<int64_t> tile,
+                                              ArrayRef<Type> types) {
+  // Only f32 is supported currently.
+  if (llvm::any_of(types, [](Type type) {
+        if (auto shapedType = type.dyn_cast<ShapedType>()) {
+          type = shapedType.getElementType();
+        }
+        return !type.isF32();
+      })) {
+    return pxa::StencilCost{/*throughput=*/0.0, /*startupCost=*/0};
+  }
   return heatmapCost(ArrayRef<int64_t>{tile[1], tile[0], tile[2]});
 }
 

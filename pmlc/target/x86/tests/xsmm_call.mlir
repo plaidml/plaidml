@@ -265,9 +265,9 @@ func @conv2_xsmm(%I: !I_memref, %K: !K_memref, %O: !O_memref) {
   %Y = dim %I, %c2 : !I_memref
   %CI = dim %I, %c3 : !I_memref
   %CO = dim %O, %c3 : !O_memref
-  %ptr = xsmm.gemm.dispatch [2, 11, 7], [35, 11, 55]
+  %ptr = xsmm.sgemm.dispatch [2, 11, 7], [35, 11, 55]
   affine.parallel (%x, %y) = (0, 0) to (%X, %Y) step (2, 1) {
-    xsmm.gemm.invoke %ptr, %O[%c0, %x, %y, %c0] = %I[%c0, %x, %y, %c0], %K[%c0, %c0, %c0, %c0]
+    xsmm.sgemm.invoke %ptr, %O[%c0, %x, %y, %c0] = %I[%c0, %x, %y, %c0], %K[%c0, %c0, %c0, %c0]
       : (!I_memref, !K_memref) -> !O_memref
   }
   return

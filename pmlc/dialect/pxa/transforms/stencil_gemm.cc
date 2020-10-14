@@ -3,18 +3,17 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Pass/Pass.h"
-#include "mlir/Pass/PassOptions.h"
+// #include "mlir/Pass/PassOptions.h"
 #include "mlir/Support/DebugStringHelper.h"
 
-// TODO: Including autotile.h for PowerOfTwoGenerator, but maybe instead both
-// should include a third file with the tile size generators
 #include "pmlc/dialect/pxa/analysis/strides.h"
+#include "pmlc/dialect/pxa/ir/matchers.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/dialect/pxa/transforms/autotile.h"
 #include "pmlc/dialect/pxa/transforms/passes.h"
 #include "pmlc/dialect/pxa/transforms/stencil.h"
-
 #include "pmlc/util/logging.h"
+#include "pmlc/util/matchers.h"
 
 using namespace mlir; // NOLINT
 
@@ -62,81 +61,36 @@ private:
 
   Optional<LoadStoreOps> capture() {
     // Looking for load..load..mul..reduce..terminator
-    LoadStoreOps ret;
-    const unsigned kNumValidInstrInGemmRegion = 5;
-    auto *body = op.getBody();
-
-    // Verify the number of ops
-    if (body->getOperations().size() != kNumValidInstrInGemmRegion) {
-      IVLOG(5, "The AffineParallelOp region didn't have the right number of "
-               "instructions for a GEMM");
-      return llvm::None;
+    Value load1, load2, reduce;
+    Operation *yield = op.getBody()->getTerminator();
+    if (matchPattern(yield,
+                     m_Op<AffineYieldOp>( //
+                         m_Capture(&reduce, m_PxaReduceOp(
+                                                AtomicRMWKind::addf,
+                                                m_Op<MulFOp>(m_Capture(&load1),
+                                                             m_Capture(&load2)),
+                                                matchers::m_Any())))) ||
+        matchPattern(yield,
+                     m_Op<AffineYieldOp>( //
+                         m_Capture(&reduce, m_PxaReduceOp(
+                                                AtomicRMWKind::addf,
+                                                m_Op<MulIOp>(m_Capture(&load1),
+                                                             m_Capture(&load2)),
+                                                matchers::m_Any()))))) {
+      return LoadStoreOps{{reduce}, {load1, load2}};
     }
 
-    // Find the Reduce Op
-    auto it = std::prev(body->end(), 2);
-    auto reduceOp = dyn_cast<PxaReduceOp>(*it);
-    if (!reduceOp) {
-      IVLOG(5, "The AffineParallelOp region didn't have a reduce as its last "
-               "non-terminator");
-      return llvm::None;
-    }
-    ret.stores.push_back(&*it);
-    IVLOG(5, "Found ReduceOp");
-
-    // Now check the reduceOp aggregation.
-    if (reduceOp.agg() != AtomicRMWKind::addf) {
-      IVLOG(5, "the reduce operation is not addition");
-      return llvm::None;
-    }
-
-    // Get the operand for the reduce op and make sure it is the result of a
-    // multiplication.
-    auto defOp = reduceOp.val().getDefiningOp();
-    if (!defOp) {
-      IVLOG(5,
-            "the source of the reduce operation is not defined in this block");
-      return llvm::None;
-    }
-
-    Operation *lhs;
-    Operation *rhs;
-    if (auto mulfOp = dyn_cast_or_null<MulFOp>(defOp)) {
-      lhs = mulfOp.lhs().getDefiningOp();
-      if (!dyn_cast_or_null<PxaLoadOp>(lhs)) {
-        IVLOG(3, "The LHS of the mul op is not affine.load.");
-        return llvm::None;
-      }
-      rhs = mulfOp.rhs().getDefiningOp();
-      if (!dyn_cast_or_null<PxaLoadOp>(rhs)) {
-        IVLOG(3, "The RHS of the mul op is not affine.load.");
-        return llvm::None;
-      }
-    } else if (auto muliOp = dyn_cast_or_null<MulIOp>(defOp)) {
-      lhs = muliOp.lhs().getDefiningOp();
-      if (!dyn_cast_or_null<PxaLoadOp>(lhs)) {
-        IVLOG(3, "The LHS of the mul op is not affine.load.");
-        return llvm::None;
-      }
-      rhs = muliOp.rhs().getDefiningOp();
-      if (!dyn_cast_or_null<PxaLoadOp>(rhs)) {
-        IVLOG(3, "The RHS of the mul op is not affine.load.");
-        return llvm::None;
-      }
-    } else {
-      IVLOG(5, "The source of the reduce is not a multiplication operation");
-      return llvm::None;
-    }
-    ret.loads.push_back(lhs);
-    ret.loads.push_back(rhs);
-
-    return Optional<LoadStoreOps>(ret);
+    return llvm::None;
   }
 
   double getCost(TensorAndIndexPermutation perm, ArrayRef<int64_t> tileSize) {
     unsigned tot_inner_loop = tileSize[0] * tileSize[1] * tileSize[2];
 
-    auto cost = stencilCostFn(tileSize);
+    SmallVector<Type, 3> types;
+    for (Value value : perm.values) {
+      types.push_back(value.getType());
+    }
+    auto cost = stencilCostFn(tileSize, types);
     if (cost.throughput == 0) {
       return std::numeric_limits<double>::infinity();
     }
@@ -144,13 +98,13 @@ private:
     IVLOG(6,
           "Inner: loop = " << tot_inner_loop << " inner_time = " << inner_time);
     for (unsigned i = 0; i < getTiledIdxCount(); ++i) {
-      IVLOG(6, debugString(perm.indexes[i]) << ": " << tileSize[i]);
+      IVLOG(6, debugString(perm.idxs[i]) << ": " << tileSize[i]);
     }
 
-    // The middle idxs are the accumulation indexes, i.e. those used on loads
+    // The middle idxs are the accumulation indices, i.e. those used on loads
     // but not stores
     DenseMap<BlockArgument, unsigned> middle_idxs;
-    auto in0StrideInfo = getStrideInfo(perm.ioOps[1]);
+    auto in0StrideInfo = getStrideInfo(perm.values[1]);
     for (const auto &kvp : in0StrideInfo->strides) {
       if (getBlockArgsAsSet().count(kvp.first)) {
         IVLOG(6, "Based on first tensor, inserting middle index "
@@ -163,7 +117,7 @@ private:
     }
     IVLOG(5, "Current size of middle_idxs = " << middle_idxs.size());
 
-    auto in1StrideInfo = getStrideInfo(perm.ioOps[2]);
+    auto in1StrideInfo = getStrideInfo(perm.values[2]);
     for (const auto &kvp : in1StrideInfo->strides) {
       if (getBlockArgsAsSet().count(kvp.first)) {
         IVLOG(6, "Based on second tensor, inserting middle index "
@@ -175,7 +129,7 @@ private:
       }
     }
     IVLOG(5, "Current size of middle_idxs = " << middle_idxs.size());
-    auto outStrideInfo = getStrideInfo(perm.ioOps[0]);
+    auto outStrideInfo = getStrideInfo(perm.values[0]);
     for (const auto &kvp : outStrideInfo->strides) {
       if (getBlockArgsAsSet().count(kvp.first)) {
         auto it = middle_idxs.find(kvp.first);
@@ -191,9 +145,9 @@ private:
     }
 
     for (unsigned i = 0; i < getTiledIdxCount(); ++i) {
-      assert(getBlockArgsAsSet().count(perm.indexes[i]) &&
-             "All tiled indexes must be introduced in current loop");
-      auto it = middle_idxs.find(perm.indexes[i]);
+      assert(getBlockArgsAsSet().count(perm.idxs[i]) &&
+             "All tiled indices must be introduced in current loop");
+      auto it = middle_idxs.find(perm.idxs[i]);
       if (it != middle_idxs.end()) {
         it->second = llvm::divideCeil(it->second, tileSize[i]);
       }
@@ -226,9 +180,9 @@ private:
       // for `else` branch here
     }
     for (unsigned i = 0; i < getTiledIdxCount(); i++) {
-      assert(getBlockArgsAsSet().count(perm.indexes[i]) &&
-             "All tiled indexes must be introduced in current loop");
-      auto it = outer_idxs.find(perm.indexes[i]);
+      assert(getBlockArgsAsSet().count(perm.idxs[i]) &&
+             "All tiled indices must be introduced in current loop");
+      auto it = outer_idxs.find(perm.idxs[i]);
       if (it != outer_idxs.end()) {
         it->second = llvm::divideCeil(it->second, tileSize[i]);
       }
@@ -260,11 +214,11 @@ private:
   }
 
   void transform(TensorAndIndexPermutation perm, ArrayRef<int64_t> tileSize) {
-    // First, modify step size of all tiled indexes
+    // First, modify step size of all tiled indices
     auto steps = op.getSteps();
     for (size_t i = 0; i < getBlockArgsAsSet().size(); i++) {
       for (size_t j = 0; j < getTiledIdxCount(); j++) {
-        if (perm.indexes[j] == op.getBody()->getArgument(i)) {
+        if (perm.idxs[j] == op.getBody()->getArgument(i)) {
           steps[i] *= tileSize[j];
         }
       }
@@ -272,18 +226,18 @@ private:
     op.setSteps(steps);
 
     // Generate the GEMM op; select inputs based on permutation order
-    auto opC = cast<PxaReduceOp>(*perm.ioOps[0]);
-    auto opA = cast<PxaLoadOp>(*perm.ioOps[1]);
-    auto opB = cast<PxaLoadOp>(*perm.ioOps[2]);
+    auto opC = cast<PxaReduceOp>(perm.values[0].getDefiningOp());
+    auto opA = cast<PxaLoadOp>(perm.values[1].getDefiningOp());
+    auto opB = cast<PxaLoadOp>(perm.values[2].getDefiningOp());
 
     auto bodyBuilder = op.getBodyBuilder();
 
     auto tileAttr = bodyBuilder.getI64ArrayAttr(tileSize);
 
     SmallVector<Value, 8> mapOperands;
-    GemmOperand c(opC, {perm.indexes[0], perm.indexes[1]}, mapOperands);
-    GemmOperand a(opA, {perm.indexes[0], perm.indexes[2]}, mapOperands);
-    GemmOperand b(opB, {perm.indexes[2], perm.indexes[1]}, mapOperands);
+    GemmOperand c(opC, {perm.idxs[0], perm.idxs[1]}, mapOperands);
+    GemmOperand a(opA, {perm.idxs[0], perm.idxs[2]}, mapOperands);
+    GemmOperand b(opB, {perm.idxs[2], perm.idxs[1]}, mapOperands);
 
     auto gemm =
         bodyBuilder.create<pxa::PxaGemmOp>(op.getLoc(), c.memref.getType(),  //
@@ -299,7 +253,7 @@ public:
   StencilGEMM(AffineParallelOp op, unsigned numThreads,
               StencilCostFunction costFn)
       : StencilBase{op,
-                    3, // Three tileable indexes
+                    3, // Three tileable indices
                     {EvenTilingGenerator(), EvenTilingGenerator(),
                      EvenTilingGenerator()},
                     {IdxStrideReqs{

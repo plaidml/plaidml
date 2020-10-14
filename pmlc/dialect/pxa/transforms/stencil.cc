@@ -2,6 +2,8 @@
 
 #include "pmlc/dialect/pxa/transforms/stencil.h"
 
+#include "llvm/ADT/TypeSwitch.h"
+
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Support/DebugStringHelper.h"
 
@@ -61,17 +63,17 @@ void StencilBase::reportBestStencil(unsigned logLevel) {
     bestReport << "    Best Perf: " << bestCost << "\n";
     std::stringstream tensorPermStr;
     tensorPermStr << "[\n";
-    for (auto ioOp : bestPermutation.ioOps) {
-      tensorPermStr << "        " << mlir::debugString(*ioOp) << "\n";
+    for (auto value : bestPermutation.values) {
+      tensorPermStr << "        " << mlir::debugString(value) << "\n";
     }
     tensorPermStr << "    ]";
     bestReport << "    Best Tensor Permutation: " << tensorPermStr.str()
                << "\n";
     std::stringstream indexPermStr;
     indexPermStr << "[ ";
-    for (auto ind : bestPermutation.indexes) {
+    for (auto ind : bestPermutation.idxs) {
       assert(getBlockArgsAsSet().count(ind) &&
-             "All tiled indexes must be introduced in current loop");
+             "All tiled indices must be introduced in current loop");
       indexPermStr << ind.getArgNumber() << " ";
     }
     indexPermStr << "]";
@@ -100,46 +102,40 @@ std::vector<int64_t> StencilBase::generateTilings(int64_t idx, int64_t range) {
 
 int64_t StencilBase::getIdxRange(mlir::BlockArgument idx) {
   assert(getBlockArgsAsSet().count(idx) &&
-         "getIdxRange only valid on indexes of current op");
+         "getIdxRange only valid on indices of current op");
   assert(idx.getArgNumber() < ranges.size());
   return ranges[idx.getArgNumber()];
 }
 
-mlir::Optional<StrideInfo> StencilBase::getStrideInfo(mlir::Operation *op) {
-  // want?
-  auto cached = strideInfoCache.find(op);
+mlir::Optional<StrideInfo> StencilBase::getStrideInfo(Value value) {
+  auto cached = strideInfoCache.find(value);
   if (cached != strideInfoCache.end()) {
     return cached->second;
   }
-  auto loadOp = llvm::dyn_cast<PxaLoadOp>(*op);
-  if (loadOp) {
-    auto strideInfo = computeStrideInfo(loadOp);
-    strideInfoCache.insert(std::make_pair(op, strideInfo));
-    return strideInfo;
-  }
-  auto reduceOp = llvm::dyn_cast<PxaReduceOp>(*op);
-  if (reduceOp) {
-    auto strideInfo = computeStrideInfo(reduceOp);
-    strideInfoCache.insert(std::make_pair(op, strideInfo));
-    return strideInfo;
-  }
-  strideInfoCache.insert(std::make_pair(op, llvm::None));
-  return llvm::None;
+  auto maybeInfo =
+      llvm::TypeSwitch<Operation *, mlir::Optional<StrideInfo>>(
+          value.getDefiningOp())
+          .Case<PxaLoadOp>([&](PxaLoadOp op) { return computeStrideInfo(op); })
+          .Case<PxaReduceOp>(
+              [&](PxaReduceOp op) { return computeStrideInfo(op); })
+          .Default([](Operation *) { return llvm::None; });
+  strideInfoCache[value] = maybeInfo;
+  return maybeInfo;
 }
 
-void StencilBase::BindIndexes(llvm::ArrayRef<mlir::Operation *> ioOps) {
+void StencilBase::BindIndices(llvm::ArrayRef<Value> values) {
   llvm::SmallVector<mlir::BlockArgument, 8> emptyBoundIdxsVector;
-  RecursiveBindIndex(emptyBoundIdxsVector, ioOps);
+  RecursiveBindIndex(emptyBoundIdxsVector, values);
 }
 
 void StencilBase::RecursiveBindIndex(
     llvm::SmallVector<mlir::BlockArgument, 8> &boundIdxs,
-    llvm::ArrayRef<mlir::Operation *> ioOps) {
+    llvm::ArrayRef<mlir::Value> values) {
   auto currIdx = boundIdxs.size();
   if (currIdx == tiledIdxCount) {
     // This is a legal binding, go find a tiling for it
     llvm::SmallVector<int64_t, 8> currTileSize(tiledIdxCount);
-    RecursiveTileIndex(TensorAndIndexPermutation(ioOps, boundIdxs),
+    RecursiveTileIndex(TensorAndIndexPermutation(values, boundIdxs),
                        currTileSize, 0);
   } else {
     for (const auto blockArg : getBlockArgsAsSet()) {
@@ -154,10 +150,10 @@ void StencilBase::RecursiveBindIndex(
 
       // Verify the requirements for this index with each tensor are all met
       bool reqsMet = true;
-      assert(requirements[currIdx].size() == ioOps.size() &&
+      assert(requirements[currIdx].size() == values.size() &&
              "Each requirements entry must have one function per I/O op");
-      for (unsigned i = 0; i < ioOps.size(); i++) {
-        auto strideInfo = getStrideInfo(ioOps[i]);
+      for (unsigned i = 0; i < values.size(); i++) {
+        auto strideInfo = getStrideInfo(values[i]);
         auto stride = strideInfo->strides[blockArg];
         if (!requirements[currIdx][i](stride)) {
           reqsMet = false;
@@ -171,7 +167,7 @@ void StencilBase::RecursiveBindIndex(
       // If we made it to here, this index has appropriate semantics; bind it
       // and recurse
       boundIdxs.push_back(blockArg);
-      RecursiveBindIndex(boundIdxs, ioOps);
+      RecursiveBindIndex(boundIdxs, values);
       boundIdxs.pop_back();
     }
   }
@@ -200,10 +196,10 @@ void StencilBase::RecursiveTileIndex(        //
       bestTiling.assign(tileSize.begin(), tileSize.end());
     }
   } else {
-    assert(getBlockArgsAsSet().count(perm.indexes[currIdx]) &&
+    assert(getBlockArgsAsSet().count(perm.idxs[currIdx]) &&
            "BlockArg for current index must be valid");
-    for (int64_t currIdxTileSize : generateTilings(
-             currIdx, ranges[perm.indexes[currIdx].getArgNumber()])) {
+    for (int64_t currIdxTileSize :
+         generateTilings(currIdx, ranges[perm.idxs[currIdx].getArgNumber()])) {
       tileSize[currIdx] = currIdxTileSize;
       RecursiveTileIndex(perm, tileSize, currIdx + 1);
     }
@@ -213,47 +209,45 @@ void StencilBase::RecursiveTileIndex(        //
 void StencilBase::DoStenciling() {
   // Initialization
   auto maybeRanges = op.getConstantRanges();
-  if (maybeRanges) {
-    ranges = *maybeRanges;
-  } else {
+  if (!maybeRanges) {
     IVLOG(4, "Cannot Stencil: Requires constant ranges");
     return;
   }
+  ranges = *maybeRanges;
   assert(ranges.size() == getBlockArgsAsSet().size());
 
   auto maybeLoadsAndStores = capture();
-  if (maybeLoadsAndStores) {
-    loadsAndStores = *maybeLoadsAndStores;
-  } else {
+  if (!maybeLoadsAndStores) {
     IVLOG(4, "Cannot Stencil: Operations fail to pattern-match.");
     return;
   }
+  loadsAndStores = *maybeLoadsAndStores;
 
   // We wrap loads & stores with `Orderer` to make the order the permutations
   // are iterated through deterministic (the "sorted" order of the IO ops is the
   // order they were returned by `capture`) -- without this, the sorted order
   // would be however the pointers were ordered in memory.
-  llvm::SmallVector<Orderer<mlir::Operation *>, 3> ioOpsOrdered;
+  llvm::SmallVector<Orderer<mlir::Value>, 3> ordered;
   unsigned ord = 0;
   for (auto &storeOp : loadsAndStores.stores) {
-    ioOpsOrdered.push_back(Orderer<mlir::Operation *>(ord++, storeOp));
+    ordered.push_back(Orderer<mlir::Value>(ord++, storeOp));
   }
-  size_t firstLoadIdx = ioOpsOrdered.size();
+  size_t firstLoadIdx = ordered.size();
   for (auto &loadOp : loadsAndStores.loads) {
-    ioOpsOrdered.push_back(Orderer<mlir::Operation *>(ord++, loadOp));
+    ordered.push_back(Orderer<mlir::Value>(ord++, loadOp));
   }
-  auto lastStoreFirstLoadIt = ioOpsOrdered.begin() + firstLoadIdx;
-  std::sort(ioOpsOrdered.begin(), lastStoreFirstLoadIt);
+  auto itLastStoreFirstLoad = ordered.begin() + firstLoadIdx;
+  std::sort(ordered.begin(), itLastStoreFirstLoad);
   do { // Each store tensor permutation
-    std::sort(lastStoreFirstLoadIt, ioOpsOrdered.end());
+    std::sort(itLastStoreFirstLoad, ordered.end());
     do { // Each load tensor permutation
-      llvm::SmallVector<mlir::Operation *, 3> ioOps;
-      for (const auto &ioOp : ioOpsOrdered) {
-        ioOps.push_back(*ioOp);
+      llvm::SmallVector<mlir::Value, 3> values;
+      for (const auto &ioOp : ordered) {
+        values.push_back(*ioOp);
       }
-      BindIndexes(ioOps);
-    } while (std::next_permutation(lastStoreFirstLoadIt, ioOpsOrdered.end()));
-  } while (std::next_permutation(ioOpsOrdered.begin(), lastStoreFirstLoadIt));
+      BindIndices(values);
+    } while (std::next_permutation(itLastStoreFirstLoad, ordered.end()));
+  } while (std::next_permutation(ordered.begin(), itLastStoreFirstLoad));
 
   if (bestCost < std::numeric_limits<double>::infinity()) {
     reportBestStencil(2);
