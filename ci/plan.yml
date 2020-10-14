@@ -169,6 +169,12 @@ SUITES:
               - --plaidml_target=intel_gen
               - --plaidml_device=vulkan.0
               - --skip_test_file=edsl_test-skip.intel_gen.txt
+          pml-ocl-gen:
+            args:
+              - --plaidml_target=intel_gen_ocl_spirv
+              - --plaidml_device=opencl.0
+              - --skip_test_file=edsl_test-skip.intel_gen_ocl_spirv.txt
+              
       # mnist_mlp:
       #   args: [mnist_mlp_test.py]
       #   precision: untested
