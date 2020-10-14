@@ -265,9 +265,6 @@ void VulkanInvocation::getQueryPoolResults() {
   IVLOG(1, "Total Vulkan kernels: " << (timestampQueryCount - 2) / 2);
   IVLOG(1, "Total Vulkan kernel exec time: "
                << fp_milliseconds(total_kernel_ns).count() << "ms");
-  std::ofstream csv("/home/adstraw/temp/subgroups.csv", std::ios::app);
-  csv << fp_milliseconds(total_kernel_ns).count() << std::endl;
-  csv.close();
   IVLOG(1, "Percentage Vulkan kernel exec time: "
                << total_kernel_ns.count() * 100 / overall_ns.count() << "%");
 
