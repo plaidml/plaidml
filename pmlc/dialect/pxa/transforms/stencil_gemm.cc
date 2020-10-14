@@ -1,5 +1,7 @@
 // Copyright 2020 Intel Corporation
 
+#include <string>
+
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Pass/Pass.h"
@@ -56,6 +58,7 @@ struct GemmOperand {
 class StencilGEMM : public StencilBase {
 private:
   unsigned numThreads;
+  bool doBatch;
   StencilCostFunction stencilCostFn;
 
   Optional<LoadStoreOps> capture() {
@@ -213,12 +216,46 @@ private:
   }
 
   void transform(TensorAndIndexPermutation perm, ArrayRef<int64_t> tileSize) {
+    auto AStrideInfo = getStrideInfo(perm.ioOps[1]);
+    int64_t numBatches = 1;
+    int64_t kRange = getIdxRange(perm.indexes[2]);
+    IVLOG(3, "kRange: " << kRange);
+
     // First, modify step size of all tiled indexes
     auto steps = op.getSteps();
     for (size_t i = 0; i < getBlockArgsAsSet().size(); i++) {
       for (size_t j = 0; j < getTiledIdxCount(); j++) {
         if (perm.indexes[j] == op.getBody()->getArgument(i)) {
           steps[i] *= tileSize[j];
+
+          // K index (reduction dimension)
+          if (doBatch && j == 2) {
+            // We want to transform "regular" pxa.gemm where numBatches is 1:
+            // affine.parallel (i, j, k) = (..., 0) to (..., kRange)
+            //                             step (kStep) {
+            //   pxa.gemm C[i, j] = A[i, k], B[k, j]: [..., kStep], 1
+            // }
+            //
+            // to
+            //
+            // affine.parallel (i, j, k) = (..., 0) to (..., kRange) step (..,
+            //                             step (kRange) {
+            // pxa.gemm C[i, j] = A[i, k], B[k, j]: [..., kStep], (kRange/64)
+            // }
+            //
+            // where the number of batches of A and B matrices to multiply is
+            // the k loop's range divided by the original step size for the k
+            // loop.
+            //
+            // Subsequently, kStep is set to kRange. That is, in one step, a
+            // block of C is completely computed through reduction of batches of
+            // A and B matrix multiplies.
+            numBatches = kRange / steps[i];
+            steps[i] = kRange;
+
+            IVLOG(3, "steps[" << i << "] = " << steps[i]);
+            IVLOG(3, "numBatches: " << numBatches);
+          }
         }
       }
     }
@@ -232,24 +269,29 @@ private:
     auto bodyBuilder = op.getBodyBuilder();
 
     auto tileAttr = bodyBuilder.getI64ArrayAttr(tileSize);
+    auto numBatchesAttr = bodyBuilder.getI64IntegerAttr(numBatches);
 
     SmallVector<Value, 8> mapOperands;
     GemmOperand c(opC, {perm.indexes[0], perm.indexes[1]}, mapOperands);
     GemmOperand a(opA, {perm.indexes[0], perm.indexes[2]}, mapOperands);
     GemmOperand b(opB, {perm.indexes[2], perm.indexes[1]}, mapOperands);
 
-    auto gemm =
-        bodyBuilder.create<pxa::PxaGemmOp>(op.getLoc(), c.memref.getType(),  //
-                                           c.memref, c.accessMap, c.tileMap, //
-                                           a.memref, a.accessMap, a.tileMap, //
-                                           b.memref, b.accessMap, b.tileMap, //
-                                           tileAttr, mapOperands);
+    auto brgemm = bodyBuilder.create<pxa::PxaGemmOp>(
+        op.getLoc(), c.memref.getType(), //
+        c.memref, AffineMapAttr::get(c.accessMap),
+        AffineMapAttr::get(c.tileMap), //
+        a.memref, AffineMapAttr::get(a.accessMap),
+        AffineMapAttr::get(a.tileMap), //
+        b.memref, AffineMapAttr::get(b.accessMap),
+        AffineMapAttr::get(b.tileMap), //
+        tileAttr, numBatchesAttr, mapOperands);
 
-    opC.result().replaceAllUsesWith(gemm);
+    opC.result().replaceAllUsesWith(brgemm);
+    opC.erase();
   }
 
 public:
-  StencilGEMM(AffineParallelOp op, unsigned numThreads,
+  StencilGEMM(AffineParallelOp op, unsigned numThreads, bool doBatch,
               StencilCostFunction costFn)
       : StencilBase{op,
                     3, // Three tileable indexes
@@ -270,7 +312,7 @@ public:
                          [](int64_t stride) { return stride == 1; }, // input0
                          [](int64_t stride) { return stride != 0; }, // input1
                      }}},
-        numThreads{numThreads}, stencilCostFn(costFn) {}
+        numThreads{numThreads}, doBatch{doBatch}, stencilCostFn(costFn) {}
 };
 
 struct StencilGEMMPass : public PassWrapper<StencilGEMMPass, FunctionPass> {
@@ -278,17 +320,24 @@ struct StencilGEMMPass : public PassWrapper<StencilGEMMPass, FunctionPass> {
 
   StencilGEMMPass(const StencilGEMMPass &rhs) : costFn(rhs.costFn) {
     numThreads = rhs.numThreads.getValue();
+    doBatch = rhs.doBatch.getValue();
   }
 
-  StencilGEMMPass(unsigned numThreads_, StencilCostFunction costFn)
+  StencilGEMMPass(unsigned numThreads_, bool doBatch_,
+                  StencilCostFunction costFn)
       : costFn(costFn) {
     numThreads = numThreads_;
+    doBatch = doBatch_;
   }
 
   void runOnFunction() final {
     auto func = getFunction();
     func.walk([this](AffineParallelOp op) {
-      StencilGEMM stencil(op, numThreads.getValue(), costFn);
+      IVLOG(3, "StencilGEMMPass - numThreads: " << numThreads.getValue());
+      IVLOG(3, "StencilGEMMPass - doBatch: " << doBatch.getValue());
+
+      StencilGEMM stencil(op, numThreads.getValue(), doBatch.getValue(),
+                          costFn);
       stencil.DoStenciling();
     });
   }
@@ -298,11 +347,18 @@ struct StencilGEMMPass : public PassWrapper<StencilGEMMPass, FunctionPass> {
   Option<unsigned> numThreads{
       *this, "threads",
       llvm::cl::desc("Specifies number of threads for the stencil pass")};
+
+  Option<bool> doBatch{
+      *this, "batched",
+      llvm::cl::desc("Allow strided batching over k dimension of GEMM"),
+      llvm::cl::initializer(false)};
 };
 
-std::unique_ptr<Pass> createStencilGEMMPass(unsigned numThreads,
+std::unique_ptr<Pass> createStencilGEMMPass(unsigned numThreads, bool doBatch,
                                             StencilCostFunction costFn) {
-  return std::make_unique<StencilGEMMPass>(numThreads, costFn);
+  IVLOG(3, "numThreads: " << numThreads);
+  IVLOG(3, "doBatch: " << doBatch);
+  return std::make_unique<StencilGEMMPass>(numThreads, doBatch, costFn);
 }
 
 } // namespace pmlc::dialect::pxa

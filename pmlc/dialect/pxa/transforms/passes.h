@@ -28,6 +28,7 @@ std::unique_ptr<mlir::Pass> createBufferPlacementPass();
 std::unique_ptr<mlir::Pass> createCachePass();
 
 std::unique_ptr<mlir::Pass>
+
 createFusionPass(int64_t memoryActivityThreshold = 0, bool exactlyMatch = false,
                  bool tiledFusion = false, int64_t loopDepth = 0);
 
@@ -44,7 +45,9 @@ std::unique_ptr<mlir::Pass> createNestLoopsPass(unsigned minLoopIVs);
 
 std::unique_ptr<mlir::Pass> createResizeTmpsPass();
 
+std::unique_ptr<mlir::Pass> createStencilGEMMPass();
 std::unique_ptr<mlir::Pass> createStencilGEMMPass(unsigned numThreads,
+                                                  bool doBatch,
                                                   StencilCostFunction costFn);
 
 std::unique_ptr<mlir::Pass> createSubgroupsPass();
