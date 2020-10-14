@@ -3,7 +3,6 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Pass/Pass.h"
-// #include "mlir/Pass/PassOptions.h"
 #include "mlir/Support/DebugStringHelper.h"
 
 #include "pmlc/dialect/pxa/analysis/strides.h"
@@ -73,7 +72,7 @@ private:
         matchPattern(yield,
                      m_Op<AffineYieldOp>( //
                          m_Capture(&reduce, m_PxaReduceOp(
-                                                AtomicRMWKind::addf,
+                                                AtomicRMWKind::addi,
                                                 m_Op<MulIOp>(m_Capture(&load1),
                                                              m_Capture(&load2)),
                                                 matchers::m_Any()))))) {
@@ -98,10 +97,10 @@ private:
     IVLOG(6,
           "Inner: loop = " << tot_inner_loop << " inner_time = " << inner_time);
     for (unsigned i = 0; i < getTiledIdxCount(); ++i) {
-      IVLOG(6, debugString(perm.idxs[i]) << ": " << tileSize[i]);
+      IVLOG(6, debugString(perm.indexes[i]) << ": " << tileSize[i]);
     }
 
-    // The middle idxs are the accumulation indices, i.e. those used on loads
+    // The middle idxs are the accumulation indexes, i.e. those used on loads
     // but not stores
     DenseMap<BlockArgument, unsigned> middle_idxs;
     auto in0StrideInfo = getStrideInfo(perm.values[1]);
@@ -145,9 +144,9 @@ private:
     }
 
     for (unsigned i = 0; i < getTiledIdxCount(); ++i) {
-      assert(getBlockArgsAsSet().count(perm.idxs[i]) &&
-             "All tiled indices must be introduced in current loop");
-      auto it = middle_idxs.find(perm.idxs[i]);
+      assert(getBlockArgsAsSet().count(perm.indexes[i]) &&
+             "All tiled indexes must be introduced in current loop");
+      auto it = middle_idxs.find(perm.indexes[i]);
       if (it != middle_idxs.end()) {
         it->second = llvm::divideCeil(it->second, tileSize[i]);
       }
@@ -180,9 +179,9 @@ private:
       // for `else` branch here
     }
     for (unsigned i = 0; i < getTiledIdxCount(); i++) {
-      assert(getBlockArgsAsSet().count(perm.idxs[i]) &&
-             "All tiled indices must be introduced in current loop");
-      auto it = outer_idxs.find(perm.idxs[i]);
+      assert(getBlockArgsAsSet().count(perm.indexes[i]) &&
+             "All tiled indexes must be introduced in current loop");
+      auto it = outer_idxs.find(perm.indexes[i]);
       if (it != outer_idxs.end()) {
         it->second = llvm::divideCeil(it->second, tileSize[i]);
       }
@@ -214,11 +213,11 @@ private:
   }
 
   void transform(TensorAndIndexPermutation perm, ArrayRef<int64_t> tileSize) {
-    // First, modify step size of all tiled indices
+    // First, modify step size of all tiled indexes
     auto steps = op.getSteps();
     for (size_t i = 0; i < getBlockArgsAsSet().size(); i++) {
       for (size_t j = 0; j < getTiledIdxCount(); j++) {
-        if (perm.idxs[j] == op.getBody()->getArgument(i)) {
+        if (perm.indexes[j] == op.getBody()->getArgument(i)) {
           steps[i] *= tileSize[j];
         }
       }
@@ -235,9 +234,9 @@ private:
     auto tileAttr = bodyBuilder.getI64ArrayAttr(tileSize);
 
     SmallVector<Value, 8> mapOperands;
-    GemmOperand c(opC, {perm.idxs[0], perm.idxs[1]}, mapOperands);
-    GemmOperand a(opA, {perm.idxs[0], perm.idxs[2]}, mapOperands);
-    GemmOperand b(opB, {perm.idxs[2], perm.idxs[1]}, mapOperands);
+    GemmOperand c(opC, {perm.indexes[0], perm.indexes[1]}, mapOperands);
+    GemmOperand a(opA, {perm.indexes[0], perm.indexes[2]}, mapOperands);
+    GemmOperand b(opB, {perm.indexes[2], perm.indexes[1]}, mapOperands);
 
     auto gemm =
         bodyBuilder.create<pxa::PxaGemmOp>(op.getLoc(), c.memref.getType(),  //
@@ -253,7 +252,7 @@ public:
   StencilGEMM(AffineParallelOp op, unsigned numThreads,
               StencilCostFunction costFn)
       : StencilBase{op,
-                    3, // Three tileable indices
+                    3, // Three tileable indexes
                     {EvenTilingGenerator(), EvenTilingGenerator(),
                      EvenTilingGenerator()},
                     {IdxStrideReqs{

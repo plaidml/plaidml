@@ -22,8 +22,8 @@
 //
 //  It will then iterate through all permutations of the IO ops that have all
 //  stores precede all loads, and all permutations of `op`'s `BlockArgument`s as
-//  tiled indices. (Strictly speaking, since there may be more block args than
-//  tiled indices, it will iterate over all subsets of block args of size
+//  tiled indexes. (Strictly speaking, since there may be more block args than
+//  tiled indexes, it will iterate over all subsets of block args of size
 //  `tiledIdxCount` and all permutations of each subset). For each such
 //  permutation, `DoStenciling` will verify that each stride requirement
 //  specified in `requirements` is met. This logic includes shortcutting to skip
@@ -42,7 +42,7 @@
 //    This `mlir::AffineParallelOp` is the op that the current instance will
 //    stencil.
 //  * `tiledIdxCount`:
-//    How many indices will be considered for tiling.
+//    How many indexes will be considered for tiling.
 //  * `tilingGenerators`:
 //    A `TileSizeGenerator` for each tileable index, used to generate candidate
 //    tile sizes for that index.
@@ -55,13 +55,13 @@
 //    instance, if the op shouldn't use this index, the function should be
 //        return stride == 0;
 //
-//    To build requirements, decide on an order of the tensors and indices.
+//    To build requirements, decide on an order of the tensors and indexes.
 //    Importantly, all stores MUST PRECEDE all loads. These orders are otherwise
 //    arbitrary. As an example, consider trying to stencil the matmul
 //        C[i, j] += A[i, k] * B[k, j]
 //    Since the AffineReductionOp writing C is the only store, we make sure it
 //    is first in our tensor order and choose {C, A, B} to order our I/O ops and
-//    choose {i, j, k} to order our indices. Then the first element of
+//    choose {i, j, k} to order our indexes. Then the first element of
 //    `requirements` will be the stride requirements for `i`. Looking at the
 //    formula above, we see that both `C` and `A` use `i` in the their access,
 //    but neither needs `i` to be stride 1 specifically as neither uses `i` for
@@ -96,10 +96,10 @@
 //    Determine the cost of a proposed tiling. The tiling is provided as
 //    parameters to `getCost` (same as for `transform`):
 //     * `perm`: A `TensorAndIndexPermutation` which gives the IO ops and the
-//       indices in the same order as `requirements` uses. In particular, this
+//       indexes in the same order as `requirements` uses. In particular, this
 //       means all store ops will precede all load ops.
 //     * `tileSizes`: An `ArrayRef<int64_t>` which gives the size of each index
-//       in the selected tiling. Uses the same order of indices as in `perm` and
+//       in the selected tiling. Uses the same order of indexes as in `perm` and
 //       `requirements`.
 //    Returns the cost as a double. If the proposed tiling is illegal, the cost
 //    `std::numeric_limits<double>::infinity()` should be returned.
@@ -107,10 +107,10 @@
 //    Transform `op` based on the already-determined optimal tiling. The tiling
 //    is provided as paramters to `transform` (same as for `getCost`):
 //     * `perm`: A `TensorAndIndexPermutation` which gives the IO ops and the
-//       indices in the same order `requirements` uses. In particular, this
+//       indexes in the same order `requirements` uses. In particular, this
 //       means all store ops will precede all load ops.
 //     * `tileSizes`: An `ArrayRef<int64_t>` which gives the size of each index
-//       in the selected tiling. Uses the same order of indices as in `perm` and
+//       in the selected tiling. Uses the same order of indexes as in `perm` and
 //       `requirements`.
 //    The `transform` function will also need to access the member variable
 //    `op`, as this is the operation it is transforming.
@@ -138,13 +138,14 @@ using IdxStrideReqs = llvm::SmallVector<std::function<bool(int64_t)>, 3>;
 struct TensorAndIndexPermutation {
   // An order of the Tensors and indicies used in an operation
   llvm::SmallVector<mlir::Value, 3> values;
-  llvm::SmallVector<mlir::BlockArgument, 8> idxs;
+  llvm::SmallVector<mlir::BlockArgument, 8> indexes;
 
   TensorAndIndexPermutation() = default;
 
   TensorAndIndexPermutation(llvm::ArrayRef<mlir::Value> values,
-                            llvm::ArrayRef<mlir::BlockArgument> idxs)
-      : values(values.begin(), values.end()), idxs(idxs.begin(), idxs.end()) {}
+                            llvm::ArrayRef<mlir::BlockArgument> indexes)
+      : values(values.begin(), values.end()),
+        indexes(indexes.begin(), indexes.end()) {}
 };
 
 struct LoadStoreOps {
@@ -202,7 +203,7 @@ protected:
   // tiling) provided verbosity is at least `logLevel`
   void reportBestStencil(unsigned logLevel);
 
-  // The number of indices whose semantics must be considered in the tiling
+  // The number of indexes whose semantics must be considered in the tiling
   unsigned getTiledIdxCount() const { return tiledIdxCount; }
 
   // The BlockArguments of `op` (stored as a set for easy lookup)
@@ -212,7 +213,7 @@ protected:
   mlir::AffineParallelOp op;
 
 private:
-  void BindIndices(llvm::ArrayRef<mlir::Value> values);
+  void BindIndexes(llvm::ArrayRef<mlir::Value> values);
   void RecursiveBindIndex(llvm::SmallVector<mlir::BlockArgument, 8> &bound_idxs,
                           llvm::ArrayRef<mlir::Value> values);
   void RecursiveTileIndex(const TensorAndIndexPermutation &perm,

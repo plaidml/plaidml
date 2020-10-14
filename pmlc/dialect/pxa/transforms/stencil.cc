@@ -71,9 +71,9 @@ void StencilBase::reportBestStencil(unsigned logLevel) {
                << "\n";
     std::stringstream indexPermStr;
     indexPermStr << "[ ";
-    for (auto ind : bestPermutation.idxs) {
+    for (auto ind : bestPermutation.indexes) {
       assert(getBlockArgsAsSet().count(ind) &&
-             "All tiled indices must be introduced in current loop");
+             "All tiled indexes must be introduced in current loop");
       indexPermStr << ind.getArgNumber() << " ";
     }
     indexPermStr << "]";
@@ -102,7 +102,7 @@ std::vector<int64_t> StencilBase::generateTilings(int64_t idx, int64_t range) {
 
 int64_t StencilBase::getIdxRange(mlir::BlockArgument idx) {
   assert(getBlockArgsAsSet().count(idx) &&
-         "getIdxRange only valid on indices of current op");
+         "getIdxRange only valid on indexes of current op");
   assert(idx.getArgNumber() < ranges.size());
   return ranges[idx.getArgNumber()];
 }
@@ -123,7 +123,7 @@ mlir::Optional<StrideInfo> StencilBase::getStrideInfo(Value value) {
   return maybeInfo;
 }
 
-void StencilBase::BindIndices(llvm::ArrayRef<Value> values) {
+void StencilBase::BindIndexes(llvm::ArrayRef<Value> values) {
   llvm::SmallVector<mlir::BlockArgument, 8> emptyBoundIdxsVector;
   RecursiveBindIndex(emptyBoundIdxsVector, values);
 }
@@ -196,10 +196,10 @@ void StencilBase::RecursiveTileIndex(        //
       bestTiling.assign(tileSize.begin(), tileSize.end());
     }
   } else {
-    assert(getBlockArgsAsSet().count(perm.idxs[currIdx]) &&
+    assert(getBlockArgsAsSet().count(perm.indexes[currIdx]) &&
            "BlockArg for current index must be valid");
-    for (int64_t currIdxTileSize :
-         generateTilings(currIdx, ranges[perm.idxs[currIdx].getArgNumber()])) {
+    for (int64_t currIdxTileSize : generateTilings(
+             currIdx, ranges[perm.indexes[currIdx].getArgNumber()])) {
       tileSize[currIdx] = currIdxTileSize;
       RecursiveTileIndex(perm, tileSize, currIdx + 1);
     }
@@ -245,7 +245,7 @@ void StencilBase::DoStenciling() {
       for (const auto &ioOp : ordered) {
         values.push_back(*ioOp);
       }
-      BindIndices(values);
+      BindIndexes(values);
     } while (std::next_permutation(itLastStoreFirstLoad, ordered.end()));
   } while (std::next_permutation(ordered.begin(), itLastStoreFirstLoad));
 
