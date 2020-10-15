@@ -19,18 +19,18 @@ namespace xla {
 namespace plaidml {
 namespace {
 
-struct I3DTestSpec {
+struct ResNextTestSpec {
   PrimitiveType primitive_type;
 };
 
-string I3DTestSpecToString(const ::testing::TestParamInfo<I3DTestSpec>& info) {
+string ResNextTestSpecToString(const ::testing::TestParamInfo<ResNextTestSpec>& info) {
   return PrimitiveType_Name(info.param.primitive_type);
 }
 
-class PlaidMLI3DOperationTest : public PlaidMLCodegenTest, public ::testing::WithParamInterface<I3DTestSpec> {};
+class PlaidMLResNextOperationTest : public PlaidMLCodegenTest, public ::testing::WithParamInterface<ResNextTestSpec> {};
 
-TEST_P(PlaidMLI3DOperationTest, SimpleI3D) {
-  auto data = ReadFile("plaidml/bridge/tensorflow/tests/i3d.pml");
+TEST_P(PlaidMLResNextOperationTest, SimpleResNext) {
+  auto data = ReadFile("plaidml/bridge/tensorflow/tests/resnext.pml");
   zoo::ArchiveT archive;
   zoo::GetArchive(data.data())->UnPackTo(&archive);
 
@@ -61,22 +61,22 @@ TEST_P(PlaidMLI3DOperationTest, SimpleI3D) {
 
   std::vector<MultiBuffer> args = {inputs[0]};
 
-  auto hlo_module = ImportFrozenGraph("plaidml/bridge/tensorflow/tests/i3d_frozen_graph.pb",  //
-                                      {"Placeholder"},                                        // x.op.name
-                                      {"module_apply_default/RGB/inception_i3d/Mean"}         // y.op.name
+  auto hlo_module = ImportFrozenGraph("plaidml/bridge/tensorflow/tests/resnext_frozen_graph.pb",  //
+                                      {"data"},                                                   // x.op.name
+                                      {"module_apply_default/pool1"}                              // y.op.name
                                       )
                         .ValueOrDie();
   CompileAndCheck(std::move(hlo_module), {{args, outputs}});
 }
 
-std::vector<I3DTestSpec> GetI3DTestCases() {
-  std::vector<I3DTestSpec> result;
+std::vector<ResNextTestSpec> GetResNextTestCases() {
+  std::vector<ResNextTestSpec> result;
   result.push_back({F32});
   return result;
 }
 
-INSTANTIATE_TEST_SUITE_P(All, PlaidMLI3DOperationTest, ::testing::ValuesIn(GetI3DTestCases()), I3DTestSpecToString);
-
+INSTANTIATE_TEST_SUITE_P(All, PlaidMLResNextOperationTest, ::testing::ValuesIn(GetResNextTestCases()),
+                         ResNextTestSpecToString);
 }  // namespace
 }  // namespace plaidml
 }  // namespace xla

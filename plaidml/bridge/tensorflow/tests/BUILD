@@ -26,6 +26,7 @@ cc_library(
     hdrs = ["codegen_test.h"],
     tags = ["skip_windows"],
     deps = [
+        ":archive_cc_fbs",
         "//plaidml:testenv",
         "//plaidml/bridge/tensorflow/service:compiler",
         "@org_tensorflow//tensorflow/compiler/xla/tests:test_utils",
@@ -171,6 +172,52 @@ tf_cc_test(
     deps = [
         ":codegen_test",
         "//plaidml/bridge/tensorflow/service:compiler",
+    ],
+)
+
+py_binary(
+    name = "resnext_test_gen",
+    testonly = 1,
+    srcs = ["resnext_test_gen.py"],
+    data = ["@models_resnext50//file"],
+    tags = ["skip_windows"],
+    deps = [
+        ":util",
+        "@flatbuffers//:runtime_py",
+    ],
+)
+
+genrule(
+    name = "resnext_test_genrule",
+    testonly = 1,
+    srcs = ["@models_resnext50//file"],
+    outs = [
+        "resnext.pml",
+        "resnext_frozen_graph.pb"
+    ],
+    cmd = "$(location :resnext_test_gen) $(location @models_resnext50//file) $(location resnext.pml) $(location resnext_frozen_graph.pb)",
+    tags = ["skip_windows"],
+    tools = [
+        ":resnext_test_gen",
+    ],
+)
+
+tf_cc_test(
+    name = "resnext_test",
+    srcs = ["resnext_test.cc"],
+    data = [
+        ":resnext_test_genrule",
+    ],
+    extra_copts = ["-fexceptions"],
+    linkstatic = 1,
+    tags = [
+        "skip_windows",
+    ],
+    deps = [
+        ":archive_cc_fbs",
+        ":codegen_test",
+        "//plaidml/bridge/tensorflow/service:compiler",
+        "//plaidml/bridge/tensorflow/service:graph_util",
     ],
 )
 
