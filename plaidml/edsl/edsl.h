@@ -6,6 +6,7 @@
 #include <memory>
 #include <ostream>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -187,7 +188,7 @@ class TensorIndex {
   static plaidml_poly_expr* makeDimPolyOp(plaidml_int_op op, const TensorIndex& idx, const TensorDim& dim,
                                           bool lhs_first) {
     std::vector<plaidml_poly_expr*> operands;
-    auto dim_ptr = ffi::call<plaidml_poly_expr*>(plaidml_poly_expr_dim, dim.as_ptr());
+    auto* dim_ptr = ffi::call<plaidml_poly_expr*>(plaidml_poly_expr_dim, dim.as_ptr());
     if (lhs_first) {
       operands.emplace_back(idx.as_ptr());
       operands.emplace_back(dim_ptr);
@@ -278,9 +279,6 @@ class Tensor {
   IndexedTensor operator()(Ts... idxs) const;
   IndexedTensor operator()(const std::vector<TensorIndex>& idxs) const;
 
-  // TODO: remove this
-  Tensor operator[](size_t ordinal) const;
-
   ///
   /// Represents an eltwise negation
   ///
@@ -332,6 +330,11 @@ class Tensor {
     details::into_vector(&vec, std::forward<Ts>(dims)...);
     bind_dims(vec);
   }
+
+  ///
+  /// Get an element of an operation that returns a tuple (i.e. multiple results).
+  ///
+  Tensor element(size_t ordinal) const;
 
   plaidml_expr* as_ptr() const { return ptr_.get(); }
 
@@ -462,12 +465,6 @@ class Contraction {
   Contraction& sum(const IndexedTensor& tensor);
 
   ///
-  /// Enable/disable simplification of output access expressions within contraction.
-  ///
-  // TODO: remove this
-  Contraction& simplify(bool flag);
-
-  ///
   /// Set the initializer for a contraction.
   ///
   Contraction& init(const Tensor& rhs);
@@ -496,7 +493,6 @@ class Contraction {
   std::vector<Constraint> constraints_;
   IndexedTensor rhs_;
   plaidml_agg_op agg_op_;
-  bool simplify_ = true;
   Tensor init_;
 };
 
@@ -526,11 +522,6 @@ inline Contraction& Contraction::outAccess(Ts... idxs) {
 
 inline Contraction& Contraction::outAccess(const std::vector<TensorIndex>& idxs) {
   outIdxs_ = idxs;
-  return *this;
-}
-
-inline Contraction& Contraction::simplify(bool flag) {
-  simplify_ = flag;
   return *this;
 }
 
@@ -593,15 +584,14 @@ inline Tensor Contraction::build() {
     dims[i] = outDims_[i].as_ptr();
   }
 
-  auto ptr = ffi::call<plaidml_expr*>(  //
-      plaidml_expr_contraction,         //
-      agg_op_,                          //
-      rhs_.op_,                         //
-      rank,                             //
-      idxs.data(),                      //
-      dims.data(),                      //
-      init_.as_ptr(),                   //
-      simplify_,                        //
+  auto* ptr = ffi::call<plaidml_expr*>(  //
+      plaidml_expr_contraction,          //
+      agg_op_,                           //
+      rhs_.op_,                          //
+      rank,                              //
+      idxs.data(),                       //
+      dims.data(),                       //
+      init_.as_ptr(),                    //
       name_.c_str());
 
   std::vector<IndexedTensor> operands;
@@ -647,16 +637,16 @@ inline IndexedTensor Tensor::operator()(const std::vector<TensorIndex>& idxs) co
   return IndexedTensor(*this, idxs);
 }
 
-inline Tensor Tensor::operator[](size_t ordinal) const {
+inline Tensor Tensor::element(size_t ordinal) const {
   return Tensor(ffi::call<plaidml_expr*>(plaidml_expr_element, as_ptr(), ordinal));
 }
 
 inline Tensor Constant(    //
     const Buffer& buffer,  //
     const std::string& name) {
-  auto ptr = ffi::call<plaidml_expr*>(  //
-      plaidml_expr_constant,            //
-      buffer.as_ptr(),                  //
+  auto* ptr = ffi::call<plaidml_expr*>(  //
+      plaidml_expr_constant,             //
+      buffer.as_ptr(),                   //
       name.c_str());
   return Tensor(ptr);
 }
@@ -672,9 +662,9 @@ inline Tensor Constant(double value) { return Tensor(value); }
 inline Tensor Placeholder(     //
     const TensorShape& shape,  //
     const std::string& name = "") {
-  auto ptr = ffi::call<plaidml_expr*>(  //
-      plaidml_expr_input,               //
-      shape.as_ptr(),                   //
+  auto* ptr = ffi::call<plaidml_expr*>(  //
+      plaidml_expr_input,                //
+      shape.as_ptr(),                    //
       name.c_str());
   return Tensor(ptr);
 }
@@ -699,10 +689,10 @@ Tensor intrinsic(const std::string& fn, Ts... args) {
 }
 
 ///
-/// \defgroup edsl_primitives EDSL Primitives
+/// \defgroup edsl_intrinsics EDSL Intrinsics
 ///
 
-/// \addtogroup edsl_primitives
+/// \addtogroup edsl_intrinsics
 /// @{
 
 ///
@@ -842,7 +832,7 @@ inline std::pair<Tensor, Tensor> prng(const Tensor& state, const std::vector<int
     args.emplace_back(TensorDim(dim));
   }
   Tensor R = intrinsicCall("prng", args);
-  return std::make_pair(R[0], R[1]);
+  return std::make_pair(R.element(0), R.element(1));
 }
 
 ///
@@ -945,13 +935,6 @@ inline Tensor tan(const Tensor& x) { return intrinsic("tan", x); }
 /// \return Tensor
 ///
 inline Tensor tanh(const Tensor& x) { return intrinsic("tanh", x); }
-
-///
-/// Adds a tracepoint to the graph
-///
-inline Tensor trace(const Tensor& x, const std::string& msg) {
-  return Tensor{ffi::call<plaidml_expr*>(plaidml_expr_trace, x.as_ptr(), msg.c_str())};
-}
 
 /// @}
 
@@ -1071,7 +1054,7 @@ class Value {
       : ptr_(details::make_ptr(ffi::call<plaidml_value*>(plaidml_value_dim, dim.as_ptr()))) {}
 
   explicit Value(const Tensor& tensor) {
-    if (auto ptr = tensor.as_ptr()) {
+    if (auto* ptr = tensor.as_ptr()) {
       ptr_ = details::make_ptr(ffi::call<plaidml_value*>(plaidml_value_expr, ptr));
     } else {
       ptr_ = details::make_ptr(ffi::call<plaidml_value*>(plaidml_value_none));
@@ -1245,6 +1228,26 @@ inline std::ostream& operator<<(std::ostream& os, const Value& x) {
   os << x.str();
   return os;
 }
+
+using PragmaAttrs = std::unordered_map<std::string, Value>;
+
+inline Tensor pragma(const Tensor& tensor, const std::string& op, const PragmaAttrs& attrs) {
+  std::vector<plaidml_attr> elts;
+  std::vector<plaidml_attr*> ptrs;
+  elts.reserve(attrs.size());
+  ptrs.reserve(attrs.size());
+  for (const auto& kvp : attrs) {
+    plaidml_attr attr{kvp.first.c_str(), kvp.second.as_ptr()};
+    elts.push_back(attr);
+    ptrs.push_back(&elts.back());
+  }
+  return Tensor{ffi::call<plaidml_expr*>(plaidml_expr_pragma, tensor.as_ptr(), op.c_str(), elts.size(), ptrs.data())};
+}
+
+///
+/// Adds a tracepoint to the graph
+///
+inline Tensor trace(const Tensor& x, const std::string& msg) { return pragma(x, "trace", {{"msg", Value(msg)}}); }
 
 }  // namespace edsl
 }  // namespace plaidml

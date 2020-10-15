@@ -9,6 +9,7 @@
 #include "mlir/Support/TypeID.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringMap.h"
 
 #include "pmlc/util/buffer.h"
 #include "pmlc/util/enums.h"
@@ -27,7 +28,7 @@ struct ExprNodeDim;
 struct ExprNodeElement;
 struct ExprNodeInput;
 struct ExprNodeIntrinsic;
-struct ExprNodeTrace;
+struct ExprNodePragma;
 
 struct DimNode;
 struct DimNodeLiteral;
@@ -64,11 +65,6 @@ enum class AffineOp {
   Neg,
   Sub,
 };
-
-util::DataType inferElementType(llvm::ArrayRef<util::TensorShape> shapes);
-
-util::TensorShape inferShape(llvm::ArrayRef<util::TensorShape> operands,
-                             util::DataType override = util::DataType::invalid);
 
 //
 // Base AST Node
@@ -174,7 +170,6 @@ struct ExprNodeContraction : NodeBase<ExprNodeContraction, ExprNode> {
   std::vector<PolyNodePtr> sinkIdxs;
   std::vector<PolyMap> srcs;
   std::vector<Constraint> constraints;
-  bool simplify = true;
   ExprNodePtr init;
 
   explicit ExprNodeContraction(llvm::StringRef name = "");
@@ -220,13 +215,15 @@ struct ExprNodeIntrinsic : NodeBase<ExprNodeIntrinsic, ExprNode> {
   std::string str() const final;
 };
 
-struct ExprNodeTrace : NodeBase<ExprNodeTrace, ExprNode> {
-  using Base = NodeBase<ExprNodeTrace, ExprNode>;
+struct ExprNodePragma : NodeBase<ExprNodePragma, ExprNode> {
+  using Base = NodeBase<ExprNodePragma, ExprNode>;
 
   ExprNodePtr expr;
-  std::string msg;
+  std::string op;
+  llvm::StringMap<VarNodePtr> attrs;
 
-  ExprNodeTrace(const ExprNodePtr &expr, llvm::StringRef msg);
+  ExprNodePragma(const ExprNodePtr &expr, llvm::StringRef op,
+                 const llvm::StringMap<VarNodePtr> &attrs);
   std::string str() const final;
 };
 

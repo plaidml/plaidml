@@ -59,6 +59,12 @@ def Fusion : FunctionPass<"pxa-fusion"> {
     Option<"exactlyMatch", "exactly-match", "bool",
            /*default=*/"false",
            "Whether fuse the loops with exactly matched indices">,
+    Option<"tiledFusion", "tiled-fusion", "bool",
+           /*default=*/"false",
+           "Perform tiled fusions, including additional loop transformations from subgroups pass">,
+    Option<"loopDepth", "loop-depth", "int64_t",
+           /*default=*/"0",
+           "How deep the fusion should perform">,
   ];
 }
 
@@ -79,6 +85,11 @@ def Localize : FunctionPass<"pxa-localize"> {
 def MemRefDataFlowOpt : FunctionPass<"pxa-dataflow-opt"> {
   let summary = "Perform reduce/load forwarding for memrefs";
   let constructor = "pmlc::dialect::pxa::createMemRefDataFlowOptPass()";
+    let options = [
+    Option<"onlyParallelNested", "only-parallel-nested", "bool",
+           /*default=*/"false",
+           "Perform memref optimizations only under AffineParallel's scope.">,
+  ];
 }
 
 def NestLoops : FunctionPass<"pxa-nest-loops"> {

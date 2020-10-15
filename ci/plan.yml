@@ -50,7 +50,7 @@ PLATFORMS:
     variant: linux_x86_64
   pml-ocl-gv100gl:
     variant: linux_x86_64
-  pml-ocl-neo:
+  pml-ocl-gen:
     variant: linux_x86_64
   pml-vk-gen:
     variant: linux_x86_64
@@ -131,6 +131,8 @@ SUITES:
         pipelines: [nightly, plaidml, ci]
       pml-vk-gen:
         pipelines: [nightly, plaidml, ci]
+      pml-ocl-gen:
+        pipelines: [nightly, plaidml, ci]
     params:
       ci:
         batch_sizes: [0]
@@ -154,6 +156,7 @@ SUITES:
         precision: untested
         skip_platforms:
           - pml-vk-gen
+          - pml-ocl-gen
       edsl_cc_test:
         runner: cc_test
         cwd: tmp/input
@@ -166,6 +169,12 @@ SUITES:
               - --plaidml_target=intel_gen
               - --plaidml_device=vulkan.0
               - --skip_test_file=edsl_test-skip.intel_gen.txt
+          pml-ocl-gen:
+            args:
+              - --plaidml_target=intel_gen_ocl_spirv
+              - --plaidml_device=opencl.0
+              - --skip_test_file=edsl_test-skip.intel_gen_ocl_spirv.txt
+              
       # mnist_mlp:
       #   args: [mnist_mlp_test.py]
       #   precision: untested
@@ -178,6 +187,8 @@ SUITES:
         args: [trivial_model_test.py]
         cwd: plaidml/bridge/keras
         precision: untested
+        skip_platforms:
+          - pml-ocl-gen
 
   infer:
     platforms:
@@ -185,6 +196,8 @@ SUITES:
         pipelines: [nightly, plaidml, ci]
       pml-vk-gen:
         pipelines: [nightly, plaidml]
+      pml-ocl-gen:
+        pipelines: [ci]
     params:
       ci:
         batch_sizes: [1]
@@ -213,11 +226,13 @@ SUITES:
         skip_platforms:
           - pml-llvm-cpu
           - pml-vk-gen
+          - pml-ocl-gen
           - tf-dnnl-cpu
         perf_threshold: 0.7
       inception_v3:
         skip_platforms:
           - pml-vk-gen
+          - pml-ocl-gen
         precision: high
         platform_overrides:
           tf-dnnl-cpu:
@@ -227,7 +242,7 @@ SUITES:
             soft_fail: true # performance regression
           pml-ocl-gfx804:
             prepend_args: [--examples=64]
-          pml-ocl-neo:
+          pml-ocl-gen:
             prepend_args: [--examples=512]
           pml-mtl-uhd630:
             prepend_args: [--examples=256]
@@ -237,6 +252,7 @@ SUITES:
         precision: high
         skip_platforms:
           - pml-vk-gen
+          - pml-ocl-gen
         platform_overrides:
           tf-dnnl-cpu:
             conda_env: ci/conda/tensorflow-dnnl.yml
@@ -249,10 +265,14 @@ SUITES:
             conda_env: ci/conda/tensorflow-dnnl.yml
         skip_platforms:
           - pml-vk-gen
+          - pml-ocl-gen
       resnet50:
         precision: high
         platform_overrides:
           pml-vk-gen:
+            prepend_args: [--examples=128]
+            perf_threshold: 0.01
+          pml-ocl-gen:
             prepend_args: [--examples=128]
             perf_threshold: 0.01
           pml-llvm-cpu:
@@ -271,7 +291,7 @@ SUITES:
             soft_fail: true # performance regression
           pml-ocl-gfx804:
             prepend_args: [--examples=64]
-          pml-ocl-neo:
+          pml-ocl-gen:
             prepend_args: [--examples=256]
           pml-mtl-uhd630:
             prepend_args: [--examples=256]
@@ -280,12 +300,14 @@ SUITES:
         skip_platforms:
           - pml-mtl-uhd630
           - pml-vk-gen
+          - pml-ocl-gen
       xception:
         expected: "Unrecognized data_format"
         soft_fail: true
         precision: high
         skip_platforms:
           - pml-vk-gen
+          - pml-ocl-gen
         platform_overrides:
           pml-llvm-cpu:
             prepend_args: [--examples=64]
@@ -293,7 +315,7 @@ SUITES:
             prepend_args: [--examples=64]
           pml-ocl-gv100gl:
             prepend_args: [--examples=512]
-          pml-ocl-neo:
+          pml-ocl-gen:
             prepend_args: [--examples=256]
             perf_threshold: 0.7
           pml-mtl-uhd630:

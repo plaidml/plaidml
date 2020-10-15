@@ -42,6 +42,8 @@ using dialect::tile::GatherOpAdaptor;
 using dialect::tile::getPaddingInfo;
 using dialect::tile::IndexOp;
 using dialect::tile::PaddingInfo;
+using dialect::tile::PragmaOp;
+using dialect::tile::PragmaOpAdaptor;
 using dialect::tile::PrngOp;
 using dialect::tile::ReshapeOp;
 using dialect::tile::ReshapeOpAdaptor;
@@ -49,7 +51,6 @@ using dialect::tile::ScatterOp;
 using dialect::tile::ScatterOpAdaptor;
 using dialect::tile::ShapeOp;
 using dialect::tile::ShapeOpAdaptor;
-using dialect::tile::TraceOp;
 
 namespace {
 
@@ -692,7 +693,6 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
   using OpConversionPattern<FromOpType>::OpConversionPattern;
 
   LogicalResult match(Operation *op) const final {
-    IVLOG(2, "EltwiseOpConversion::match>");
     Matcher pred;
     return pred(op);
   }
@@ -746,7 +746,6 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
   using OpConversionPattern<ContractionOp>::OpConversionPattern;
 
   LogicalResult match(Operation *op) const final {
-    IVLOG(2, "ContractionOpConversion::match>");
     if (auto cionOp = dyn_cast<ContractionOp>(op)) {
       if (cionOp.combo() != comboKind) {
         return failure();
@@ -892,8 +891,6 @@ struct GatherOpConversion : public OpConversionPattern<GatherOp> {
   LogicalResult
   matchAndRewrite(GatherOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
-    IVLOG(2, "GatherOpConversion::matchAndRewrite>");
-
     // Create an adaptor, to interpret the operands
     GatherOpAdaptor adaptor(operands);
 
@@ -970,8 +967,6 @@ struct IndexOpConversion : public OpConversionPattern<IndexOp> {
   LogicalResult
   matchAndRewrite(IndexOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
-    IVLOG(2, "IndexOpConversion::matchAndRewrite>");
-
     // Gather some basic info
     auto loc = op.getLoc();
     TypeConverter typeConverter;
@@ -1017,8 +1012,6 @@ struct ReshapeOpConversion : public OpConversionPattern<ReshapeOp> {
   LogicalResult
   matchAndRewrite(ReshapeOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
-    IVLOG(2, "ReshapeOpConversion::matchAndRewrite>");
-
     // Create an adaptor, to interpret the operands
     ReshapeOpAdaptor adaptor(operands);
 
@@ -1038,8 +1031,6 @@ struct ShapeOpConversion : public OpConversionPattern<ShapeOp> {
   LogicalResult
   matchAndRewrite(ShapeOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
-    IVLOG(2, "ShapeOpConversion::matchAndRewrite>");
-
     // Create an adaptor
     ShapeOpAdaptor adaptor(operands);
 
@@ -1077,7 +1068,6 @@ struct ScatterOpConversion : public OpConversionPattern<ScatterOp> {
   LogicalResult
   matchAndRewrite(ScatterOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
-    IVLOG(2, "ScatterOpConversion::matchAndRewrite>");
     // Helpful explanation of scatter from tensorflow docs:
     // https://www.tensorflow.org/api_docs/python/tf/scatter_nd
 
@@ -1163,8 +1153,6 @@ struct CastOpConversion : public OpConversionPattern<ew::CastOp> {
   LogicalResult
   matchAndRewrite(ew::CastOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
-    IVLOG(2, "CastOpConversion::matchAndRewrite>");
-
     auto loc = op.getLoc();
     TypeConverter typeConverter;
     auto oldResultType = op.result().getType();
@@ -1217,7 +1205,6 @@ struct FuncOpConversion : public OpConversionPattern<FuncOp> {
   matchAndRewrite(FuncOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
     FunctionType type = op.getType();
-    IVLOG(2, "FuncOpConversion::rewrite> " << debugString(type));
 
     // Convert the function signature
     TypeConverter typeConverter;
@@ -1255,11 +1242,10 @@ struct ReturnOpConversion : public OpConversionPattern<ReturnOp> {
   LogicalResult
   matchAndRewrite(ReturnOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
-    IVLOG(2, "ReturnOpConversion::matchAndRewrite>");
     auto &block = op.getParentRegion()->front();
     auto funcOp = op.getParentOfType<FuncOp>();
     auto blockArg = funcOp.getType().getNumInputs() - op.getNumOperands();
-    for (auto operand : operands) {
+    for (Value operand : operands) {
       // Find very initial allocation of memref
       auto def = pxa::getIndirectDef(operand);
       def.replaceAllUsesWith(block.getArgument(blockArg++));
@@ -1269,16 +1255,39 @@ struct ReturnOpConversion : public OpConversionPattern<ReturnOp> {
   }
 };
 
-struct TraceOpConversion : public OpConversionPattern<TraceOp> {
-  using OpConversionPattern<TraceOp>::OpConversionPattern;
+struct PragmaOpConversion : public OpConversionPattern<PragmaOp> {
+  using OpConversionPattern<PragmaOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(TraceOp op, ArrayRef<Value> operands,
+  matchAndRewrite(PragmaOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
+    if (op.op() == "trace") {
+      return failure();
+    }
+    PragmaOpAdaptor adaptor(operands);
+    rewriter.replaceOp(op, adaptor.tensor());
+    return success();
+  }
+};
+
+struct TraceOpConversion : public OpConversionPattern<PragmaOp> {
+  using OpConversionPattern<PragmaOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(PragmaOp op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const final {
+    if (op.op() != "trace") {
+      return failure();
+    }
+    PragmaOpAdaptor adaptor(operands);
     auto module = op.getParentOfType<ModuleOp>();
-    auto symbol = createStubFunc(module, op.msgAttr());
+    auto msg = op.attrs().getNamed("msg");
+    if (!msg) {
+      return failure();
+    }
+    auto symbol = createStubFunc(module, msg->second.cast<StringAttr>());
     rewriter.create<CallOp>(op.getLoc(), symbol, ArrayRef<Type>{});
-    rewriter.replaceOp(op, op.in());
+    rewriter.replaceOp(op, adaptor.tensor());
     return success();
   }
 
@@ -1302,13 +1311,15 @@ struct TraceOpConversion : public OpConversionPattern<TraceOp> {
 struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
   void runOnOperation() final {
     // Inject eltwise.ident ops for each return operand that is a direct block
-    // argument.
+    // argument or a constant value.
     getOperation().walk([&](ReturnOp op) {
       OpBuilder builder(op);
       for (OpOperand &operand : op.getOperation()->getOpOperands()) {
-        if (operand.get().isa<BlockArgument>()) {
-          Value value = builder.create<ew::IdentOp>(op.getLoc(), operand.get());
-          operand.set(value);
+        Value value = operand.get();
+        if (value.isa<BlockArgument>() || matchPattern(value, m_Constant())) {
+          Value copy =
+              builder.create<ew::IdentOp>(op.getLoc(), value.getType(), value);
+          operand.set(copy);
         }
       }
     });
@@ -1341,6 +1352,7 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
         FuncOpConversion,           //
         GatherOpConversion,         //
         IndexOpConversion,          //
+        PragmaOpConversion,         //
         PrngOpConversion,           //
         ReshapeOpConversion,        //
         ReturnOpConversion,         //
@@ -1349,7 +1361,6 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
         ShapeOpConversion,          //
         TileConstantOpConversion,   //
         TraceOpConversion,          //
-        // TODO: SpecialOpConversion (ZeroOp)
         ContractionOpConversion<CombinationKind::none, FirstOperand>,
         ContractionOpConversion<CombinationKind::add, StdOp<mlir::AddFOp>,
                                 ResultIs<EltwiseFloat>>,

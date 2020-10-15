@@ -5,10 +5,10 @@
 
 include "mlir/Dialect/StandardOps/IR/StandardOpsBase.td"
 include "mlir/Dialect/Affine/IR/AffineOpsBase.td"
-include "pmlc/util/enums.td"
-
-include "mlir/Dialect/Affine/IR/AffineMemoryOpInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
+
+include "pmlc/util/enums.td"
+include "interfaces.td"
 
 def PXA_Dialect : Dialect {
   let name = "pxa";
@@ -26,7 +26,26 @@ class PXA_OpWithPP<string mnemonic, list<OpTrait> traits = []> :
 
 def AnyStdScalar : AnyTypeOf<[AnyFloat, AnySignlessInteger]> {}
 
-def PxaReduceOp : PXA_OpWithPP<"reduce"> {
+class PxaReduceOpBase<string mnemonic, list<OpTrait> traits = []> :
+    PXA_OpWithPP<mnemonic, !listconcat(traits,
+        [DeclareOpInterfaceMethods<PxaReduceOpInterface>])> {
+
+  code extraClassDeclarationBase = [{
+    Value getMemRef() { return memref(); }
+    unsigned getMemRefOperandIndex() { return 1; }
+    void setMemRef(Value value) { setOperand(getMemRefOperandIndex(), value); }
+    MemRefType getMemRefType() { return memref().getType().cast<MemRefType>(); }
+    AffineMap getAffineMap() { return map(); }
+    operand_range getMapOperands() { return idxs(); }
+    static StringRef getMapAttrName() { return "map"; }
+    AffineMapAttr getAffineMapAttr() {
+      return getAttr(getMapAttrName()).cast<AffineMapAttr>();
+    }
+    AtomicRMWKind getAgg() { return agg(); }
+  }];
+}
+
+def PxaReduceOp : PxaReduceOpBase<"reduce"> {
   let summary = "affine reduction operation";
   let arguments = (ins
     AtomicRMWKindAttr:$agg,
@@ -47,14 +66,7 @@ def PxaReduceOp : PXA_OpWithPP<"reduce"> {
     }]
   >];
 
-  let extraClassDeclaration = [{
-    Value getMemRef() { return memref(); }
-    unsigned getMemRefOperandIndex() { return 1; }
-    void setMemRef(Value value) { setOperand(getMemRefOperandIndex(), value); }
-    MemRefType getMemRefType() { return memref().getType().cast<MemRefType>(); }
-    AffineMap getAffineMap() { return map(); }
-    operand_range getMapOperands() { return idxs(); }
-    static StringRef getMapAttrName() { return "map"; }
+  let extraClassDeclaration =  extraClassDeclarationBase # [{
     Value getValueToStore() { return val(); }
   }];
 }
@@ -71,6 +83,7 @@ def PxaGemmOp : PXA_OpWithPP<"gemm"> {
     AffineMapAttr:$bAccessMap,
     AffineMapAttr:$bTileMap,
     I64ArrayAttr:$tile,
+    I64Attr:$numBatches,
     Variadic<Index>:$mapOperands);
   let results = (outs AnyMemRef:$out);
 
@@ -83,7 +96,7 @@ def PxaGemmOp : PXA_OpWithPP<"gemm"> {
   }];
 }
 
-def PxaVectorReduceOp : PXA_OpWithPP<"vector_reduce"> {
+def PxaVectorReduceOp : PxaReduceOpBase<"vector_reduce"> {
   let summary = "affine vector reduction operation";
   let arguments = (ins
     AtomicRMWKindAttr:$agg,
@@ -104,14 +117,7 @@ def PxaVectorReduceOp : PXA_OpWithPP<"vector_reduce"> {
     }]
   >];
 
-  let extraClassDeclaration = [{
-    Value getMemRef() { return memref(); }
-    unsigned getMemRefOperandIndex() { return 1; }
-    void setMemRef(Value value) { setOperand(getMemRefOperandIndex(), value); }
-    MemRefType getMemRefType() { return memref().getType().cast<MemRefType>(); }
-    AffineMap getAffineMap() { return map(); }
-    operand_range getMapOperands() { return idxs(); }
-    static StringRef getMapAttrName() { return "map"; }
+  let extraClassDeclaration = extraClassDeclarationBase # [{
     Value getValueToStore() { return vector(); }
     mlir::VectorType getVectorType() {
       return vector().getType().cast<mlir::VectorType>();
@@ -121,7 +127,7 @@ def PxaVectorReduceOp : PXA_OpWithPP<"vector_reduce"> {
 
 class PxaLoadOpBase<string mnemonic, list<OpTrait> traits = []> :
     PXA_OpWithPP<mnemonic, !listconcat(traits,
-        [DeclareOpInterfaceMethods<AffineReadOpInterface>])> {
+        [DeclareOpInterfaceMethods<PxaReadOpInterface>])> {
   let arguments = (ins
     AnyMemRef:$memref,
     Variadic<Index>:$indices
@@ -259,13 +265,6 @@ def PrngOp : PXA_Op<"prng"> {
   let summary = "pseudorandom number generator operation";
   let arguments = (ins AnyMemRef:$state, AnyMemRef:$tensor, AnyMemRef:$new_state);
   let results = (outs AnyMemRef:$result_tensor, AnyMemRef:$result_state);
-}
-
-// TODO: replace TraceOp with an AffineGreyboxOp
-def TraceOp : PXA_Op<"trace"> {
-  let summary = "tracepoint operation";
-  let arguments = (ins AnyMemRef:$in, StrAttr:$msg);
-  let results = (outs AnyMemRef:$out);
 }
 
 #endif // __PML_PXA_OPS__

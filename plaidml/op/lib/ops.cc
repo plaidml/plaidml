@@ -1943,7 +1943,7 @@ Value mvn(const Value& value) {
 
   if (normalize_variance) {
     auto stdev = edsl::sqrt(variance(edsl::make_tuple(I_raw, axes, /*keepdims=*/true)).as_tensor());
-    R = R / maximum(edsl::make_tuple(stdev, Tensor(epsilon))).as_tensor();
+    R = R / maximum(edsl::make_tuple(stdev, edsl::cast(Tensor(epsilon), I.dtype()))).as_tensor();
   }
 
   return Value{R};
@@ -2882,7 +2882,7 @@ Value tile(const Value& value) {
     O_dims.push_back(I_dims[i] * reps[i]);
     O_idxs.push_back(TensorIndex() * I_dims[i] + I_idxs[i]);
   }
-  Tensor O = Contraction(O_dims, O_idxs).assign(I(I_idxs)).simplify(false);
+  Tensor O = Contraction(O_dims, O_idxs).assign(I(I_idxs));
   return Value{O};
 }
 

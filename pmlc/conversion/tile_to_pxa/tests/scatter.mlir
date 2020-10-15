@@ -1,7 +1,7 @@
 // RUN: pmlc-opt -convert-tile-to-pxa -canonicalize -cse %s | FileCheck %s
 
-func @scatter1d(%arg0: tensor<8xsi32>, %arg1: tensor<4xsi32>, %arg2: tensor<4xf32>) -> tensor<8xf32> {
-  %0 = "tile.scatter"(%arg2, %arg1, %arg0) : (tensor<4xf32>, tensor<4xsi32>, tensor<8xsi32>) -> tensor<8xf32>
+func @scatter1d(%arg1: tensor<4xsi32>, %arg2: tensor<4xf32>) -> tensor<8xf32> {
+  %0 = "tile.scatter"(%arg2, %arg1) : (tensor<4xf32>, tensor<4xsi32>) -> tensor<8xf32>
   return %0 : tensor<8xf32>
 }
 
@@ -15,8 +15,8 @@ func @scatter1d(%arg0: tensor<8xsi32>, %arg1: tensor<4xsi32>, %arg2: tensor<4xf3
 
 // -----
 
-func @scatter3d(%arg0: tensor<4x4x4xsi32>, %arg1: tensor<2xsi32>, %arg2: tensor<2x4x4xf32>) -> tensor<4x4x4xf32> {
-  %0 = "tile.scatter"(%arg2, %arg1, %arg0) : (tensor<2x4x4xf32>, tensor<2xsi32>, tensor<4x4x4xsi32>) -> tensor<4x4x4xf32>
+func @scatter3d(%arg1: tensor<2xsi32>, %arg2: tensor<2x4x4xf32>) -> tensor<4x4x4xf32> {
+  %0 = "tile.scatter"(%arg2, %arg1) : (tensor<2x4x4xf32>, tensor<2xsi32>) -> tensor<4x4x4xf32>
   return %0 : tensor<4x4x4xf32>
 }
 

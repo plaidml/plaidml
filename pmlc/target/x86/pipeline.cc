@@ -91,13 +91,24 @@ struct ConvertStandardToLLVMPass
 
 // NOTE: the stencil pass uses row-major ordering, the heatmap is
 // specified in column-major ordering.
-static pxa::StencilCost heatmapCostTransposed(ArrayRef<int64_t> tile) {
+static pxa::StencilCost heatmapCostTransposed(ArrayRef<int64_t> tile,
+                                              ArrayRef<Type> types) {
+  // Only f32 is supported currently.
+  if (llvm::any_of(types, [](Type type) {
+        if (auto shapedType = type.dyn_cast<ShapedType>()) {
+          type = shapedType.getElementType();
+        }
+        return !type.isF32();
+      })) {
+    return pxa::StencilCost{/*throughput=*/0.0, /*startupCost=*/0};
+  }
   return heatmapCost(ArrayRef<int64_t>{tile[1], tile[0], tile[2]});
 }
 
 std::unique_ptr<Pass> createXSMMStencilPass() {
   auto numThreads = std::thread::hardware_concurrency();
-  return pxa::createStencilGEMMPass(numThreads, heatmapCostTransposed);
+  return pxa::createStencilGEMMPass(numThreads, /*doBatch=*/true,
+                                    heatmapCostTransposed);
 }
 
 std::unique_ptr<Pass> createLowerPXAToAffinePass() {
@@ -118,8 +129,8 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
-  pm.addPass(
-      pxa::createStencilGEMMPass(/*numThreads=*/1, heatmapCostTransposed));
+  pm.addPass(pxa::createStencilGEMMPass(/*numThreads=*/1, /*doBatch=*/true,
+                                        heatmapCostTransposed));
   pm.addPass(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
 

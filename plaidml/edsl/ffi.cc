@@ -286,13 +286,20 @@ plaidml_expr* plaidml_expr_element(  //
   });
 }
 
-plaidml_expr* plaidml_expr_trace(  //
-    plaidml_error* err,            //
-    plaidml_expr* expr,            //
-    const char* msg) {
+plaidml_expr* plaidml_expr_pragma(  //
+    plaidml_error* err,             //
+    plaidml_expr* expr,             //
+    const char* op,                 //
+    size_t nattrs,                  //
+    plaidml_attr** raw_attrs) {
   return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
-    IVLOG(3, "plaidml_expr_trace");
-    return new plaidml_expr{std::make_shared<ast::ExprNodeTrace>(expr->node, msg)};
+    IVLOG(3, "plaidml_expr_pragma");
+    llvm::StringMap<ast::VarNodePtr> attrs;
+    for (size_t i = 0; i < nattrs; i++) {
+      plaidml_attr* attr = raw_attrs[i];
+      attrs[attr->key] = attr->value->node;
+    }
+    return new plaidml_expr{std::make_shared<ast::ExprNodePragma>(expr->node, op, attrs)};
   });
 }
 
@@ -322,7 +329,6 @@ plaidml_expr* plaidml_expr_contraction(  //
     plaidml_poly_expr** idxs,            //
     plaidml_dim_expr** dims,             //
     plaidml_expr* init,                  //
-    bool simplify,                       //
     const char* name) {
   return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
     IVLOG(3, "plaidml_expr_contraction");
@@ -333,7 +339,6 @@ plaidml_expr* plaidml_expr_contraction(  //
       node->sinkDims.push_back(dims[i]->node);
       node->sinkIdxs.push_back(idxs[i]->node);
     }
-    node->simplify = simplify;
     if (init) {
       node->init = init->node;
     }

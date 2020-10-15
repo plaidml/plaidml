@@ -37,6 +37,7 @@ plaidml_cc_library(
         "//pmlc/dialect/tile/transforms",
         "//pmlc/rt/vulkan",
         "//pmlc/target/x86:prng_lowering",
+        "@llvm-project//mlir:AffineTransforms",
         "@llvm-project//mlir:AffineToStandardTransforms",
         "@llvm-project//mlir:GPUToSPIRVTransforms",
         "@llvm-project//mlir:GPUToVulkanTransforms",

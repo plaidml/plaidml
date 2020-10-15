@@ -15,8 +15,6 @@ namespace pmlc::rt {
 std::unique_ptr<Executable>
 makeJitExecutable(const std::shared_ptr<pmlc::compiler::Program> &program,
                   std::shared_ptr<Device> device,
-                  mlir::ArrayRef<void *> preParams,
-                  mlir::ArrayRef<util::BufferPtr> inputBuffers,
-                  mlir::ArrayRef<util::BufferPtr> outputBuffers);
+                  mlir::ArrayRef<void *> preParams);
 
 } // namespace pmlc::rt
