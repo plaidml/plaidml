@@ -1,4 +1,4 @@
-// RUN: pmlc-opt --pxa-tile-accumulate --pxa-normalize="promote=false" --canonicalize --pxa-cpu-thread --pxa-normalize --canonicalize %s | FileCheck %s
+// RUN: pmlc-opt --pxa-tile-accumulate --pxa-normalize="promote=false" --canonicalize --pxa-cpu-thread="threads=64" --pxa-normalize --canonicalize %s | FileCheck %s
 
 // CHECK-LABEL: func @basic
 func @basic(%arg0: memref<100x100xf32>, %arg1: memref<100x100xf32>) -> (memref<100x100xf32>) {

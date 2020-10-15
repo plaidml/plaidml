@@ -81,7 +81,8 @@ def CPUThread : FunctionPass<"pxa-cpu-thread"> {
   let summary = "Tile outmost loops for CPU threading";
   let constructor = "pmlc::dialect::pxa::createCPUThreadPass()";
   let options = [
-    Option<"threads", "threads", "unsigned", /*default=*/"64",
+    Option<"threads", "threads", "unsigned", 
+           /*default=*/"std::thread::hardware_concurrency()",
            "Set maximum/goal inner threads">
   ];
 }
