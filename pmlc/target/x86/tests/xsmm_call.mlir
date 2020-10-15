@@ -7,14 +7,16 @@
 // RUN: pmlc-opt -convert-linalg-to-loops -x86-convert-pxa-to-affine -lower-affine \
 // RUN:     -canonicalize -convert-scf-to-std -x86-convert-std-to-llvm %s | \
 // RUN:   pmlc-jit -e xsmm | FileCheck %s
+// RUN: pmlc-opt -convert-linalg-to-loops --pass-pipeline='x86-affine-stencil-xsmm{batched=true}' \
+// RUN:     -x86-convert-pxa-to-affine -lower-affine \
+// RUN:     -canonicalize -convert-scf-to-std -x86-convert-std-to-llvm %s | \
+// RUN:   pmlc-jit -e baseline | FileCheck %s
 
 !I_memref = type memref<1x6x5x7xf32>
 !K_memref = type memref<1x1x7x11xf32>
 !O_memref = type memref<1x6x5x11xf32>
 
 func @print_memref_f32(memref<*xf32>)
-llvm.func @plaidml_rt_xsmm_gemm_invoke_f32(!llvm.ptr<i8>, !llvm.ptr<float>, !llvm.ptr<float>, !llvm.ptr<float>)
-llvm.func @plaidml_rt_xsmm_gemm_dispatch_f32(!llvm.i32, !llvm.i32, !llvm.i32, !llvm.i32, !llvm.i32, !llvm.i32) -> !llvm.ptr<i8>
 
 func @baseline() {
   %dot = constant @dot : (memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>) -> ()
@@ -102,12 +104,10 @@ func @test_dot(%impl : (memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>) -> ()
   %A_2d = memref_cast %A : memref<8x8xf32> to memref<?x?xf32>
   %A_ud = memref_cast %A : memref<8x8xf32> to memref<*xf32>
   call @fill_2d(%A_2d, %false) : (memref<?x?xf32>, i1) -> ()
-  // call @print_memref_f32(%A_ud) : (memref<*xf32>) -> ()
   %B = alloc() : memref<8x8xf32>
   %B_2d = memref_cast %B : memref<8x8xf32> to memref<?x?xf32>
   %B_ud = memref_cast %B : memref<8x8xf32> to memref<*xf32>
   call @fill_2d(%B_2d, %true) : (memref<?x?xf32>, i1) -> ()
-  // call @print_memref_f32(%B_ud) : (memref<*xf32>) -> ()
   %C = alloc() : memref<8x8xf32>
   %C_2d = memref_cast %C : memref<8x8xf32> to memref<?x?xf32>
   %C_ud = memref_cast %C : memref<8x8xf32> to memref<*xf32>
@@ -170,12 +170,10 @@ func @test_conv2(%impl : (!I_memref, !K_memref, !O_memref) -> ()) {
   %I_2d = memref_cast %I : !I_memref to memref<?x?x?x?xf32>
   %I_ud = memref_cast %I : !I_memref to memref<*xf32>
   call @fill_4d(%I_2d, %false) : (memref<?x?x?x?xf32>, i1) -> ()
-  // call @print_memref_f32(%I_ud) : (memref<*xf32>) -> ()
   %K = alloc() : !K_memref
   %K_2d = memref_cast %K : !K_memref to memref<?x?x?x?xf32>
   %K_ud = memref_cast %K : !K_memref to memref<*xf32>
   call @fill_4d(%K_2d, %true) : (memref<?x?x?x?xf32>, i1) -> ()
-  // call @print_memref_f32(%K_ud) : (memref<*xf32>) -> ()
   %O = alloc() : !O_memref
   %O_2d = memref_cast %O : !O_memref to memref<?x?x?x?xf32>
   %O_ud = memref_cast %O : !O_memref to memref<*xf32>
@@ -265,9 +263,9 @@ func @conv2_xsmm(%I: !I_memref, %K: !K_memref, %O: !O_memref) {
   %Y = dim %I, %c2 : !I_memref
   %CI = dim %I, %c3 : !I_memref
   %CO = dim %O, %c3 : !O_memref
-  %ptr = xsmm.gemm.dispatch [2, 11, 7], [35, 11, 55]
+  %ptr = xsmm.gemm.dispatch.f32 [2, 11, 7], [35, 11, 55]
   affine.parallel (%x, %y) = (0, 0) to (%X, %Y) step (2, 1) {
-    xsmm.gemm.invoke %ptr, %O[%c0, %x, %y, %c0] = %I[%c0, %x, %y, %c0], %K[%c0, %c0, %c0, %c0]
+    xsmm.gemm.invoke.f32 %ptr, %O[%c0, %x, %y, %c0] = %I[%c0, %x, %y, %c0], %K[%c0, %c0, %c0, %c0]
       : (!I_memref, !K_memref) -> !O_memref
   }
   return

@@ -16,14 +16,8 @@ filegroup(
 gentbl(
     name = "interfaces-gen",
     tbl_outs = [
-        (
-            "-gen-op-interface-decls",
-            "interfaces.h.inc",
-        ),
-        (
-            "-gen-op-interface-defs",
-            "interfaces.cc.inc",
-        ),
+        ("-gen-op-interface-decls", "interfaces.h.inc"),
+        ("-gen-op-interface-defs", "interfaces.cc.inc"),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "interfaces.td",
@@ -33,18 +27,9 @@ gentbl(
 gentbl(
     name = "gen-ops",
     tbl_outs = [
-        (
-            "-gen-op-decls",
-            "ops.h.inc",
-        ),
-        (
-            "-gen-op-defs",
-            "ops.cc.inc",
-        ),
-        (
-            "-gen-dialect-decls",
-            "dialect.h.inc",
-        ),
+        ("-gen-dialect-decls", "dialect.h.inc"),
+        ("-gen-op-decls", "ops.h.inc"),
+        ("-gen-op-defs", "ops.cc.inc"),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "ops.td",
@@ -55,11 +40,12 @@ plaidml_cc_library(
     name = "ir",
     srcs = [
         "interfaces.cc",
-        "ops.cc"
+        "ops.cc",
     ],
     hdrs = [
         "interfaces.h",
-        "ops.h"
+        "matchers.h",
+        "ops.h",
     ],
     deps = [
         ":gen-ops",
