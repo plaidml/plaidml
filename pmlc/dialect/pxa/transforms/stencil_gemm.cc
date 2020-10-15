@@ -82,14 +82,8 @@ private:
                              m_Op<MulIOp>(m_Capture(&load1, m_Op<PxaLoadOp>()),
                                           m_Capture(&load2, m_Op<PxaLoadOp>())),
                              m_Any()))))) {
-      IVLOG(1, "matched");
-      IVLOG(1, "  load1: " << debugString(load1));
-      IVLOG(1, "  load2: " << debugString(load2));
-      IVLOG(1, "  reduce: " << debugString(reduce));
       return LoadStoreOps{{reduce}, {load1, load2}};
     }
-
-    IVLOG(1, "no match");
     return llvm::None;
   }
 

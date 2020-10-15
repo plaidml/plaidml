@@ -4,6 +4,7 @@ CppEdsl.BitNot
 CppEdsl.BitRightScalar
 CppEdsl.BitRightTensor
 CppEdsl.ConvI8
+CppEdsl.DotF16_AccF32
 CppEdsl.Erf
 CppEdsl.HigherPrecisionConstants
 CppEdsl.Scatter1D

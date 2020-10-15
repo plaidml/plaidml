@@ -1063,7 +1063,7 @@ TEST_F(CppEdsl, Cos) {
 
   std::vector<float> C_output = {0.283662, 0.96017,  0.753902, -0.653644, 0.283662,
                                  0.96017,  0.753902, -0.1455,  -0.91113};
-  checkClose(program, {A_input}, {C_output});
+  checkClose(program, {A_input}, {C_output}, /*tolerance=*/1e-4);
 }
 
 TEST_F(CppEdsl, Sin) {
@@ -1081,7 +1081,7 @@ TEST_F(CppEdsl, Sin) {
       -0.756802, 0.958924,  0.891207,  //
       0.656987,  0.989358,  0.412118   //
   };
-  checkClose(program, {A_input}, {C_output});
+  checkClose(program, {A_input}, {C_output}, /*tolerance=*/1e-4);
 }
 
 TEST_F(CppEdsl, ConvI8) {
@@ -1250,7 +1250,7 @@ TEST_F(CppEdsl, Acos) {
       1.15928, 1.0472,  0.927295,  //
       0.0,     1.5708,  2.2143     //
   };
-  checkClose(program, {input}, {expected});
+  checkClose(program, {input}, {expected}, /*tolerance=*/1e-4);
 }
 
 TEST_F(CppEdsl, Atan) {
@@ -1400,7 +1400,7 @@ TEST_F(CppEdsl, Tan) {
       0.422793, 0.546302, 0.684137,  //
       1.55741,  0,        -0.684137  //
   };
-  checkClose(program, {input}, {expected});
+  checkClose(program, {input}, {expected}, /*tolerance=*/1e-4);
 }
 
 TEST_F(CppEdsl, Scatter1D) {
