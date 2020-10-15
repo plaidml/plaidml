@@ -421,7 +421,7 @@ cc_binary(
 )
 
 cc_library(
-    name = "filecheck-lib",
+    name = "FileCheckLib",
     srcs = glob([
         "lib/FileCheck/*.cpp",
         "lib/FileCheck/*.h",
@@ -444,8 +444,8 @@ cc_binary(
     linkopts = llvm_linkopts,
     stamp = 0,
     deps = [
+        ":FileCheckLib",
         ":Support",
-        ":filecheck-lib",
     ],
 )
 
@@ -652,8 +652,8 @@ gentbl(
     td_srcs = [
         ":common_target_td_sources",
     ] + glob([
-        "lib/Target/" + target["name"] + "/GISel/*.td",
         "lib/Target/" + target["dir_name"] + "/*.td",
+        "lib/Target/" + target["name"] + "/GISel/*.td",
     ]),
     deps = target.get("tbl_deps", []),
 ) for target in llvm_target_list]
@@ -1768,6 +1768,50 @@ cc_library(
     copts = llvm_copts,
     deps = [
         ":Core",
+        ":Support",
+        ":config",
+    ],
+)
+
+cc_library(
+    name = "CSKYCodeGen",
+    srcs = glob([
+        "lib/Target/CSKY/*.c",
+        "lib/Target/CSKY/*.cpp",
+        "lib/Target/CSKY/*.inc",
+    ]),
+    hdrs = glob([
+        "include/llvm/Target/CSKY/*.h",
+        "include/llvm/Target/CSKY/*.def",
+        "include/llvm/Target/CSKY/*.inc",
+        "lib/Target/CSKY/*.h",
+    ]),
+    copts = llvm_copts + ["-Iexternal/llvm-project/llvm/lib/Target/CSKY"],
+    deps = [
+        ":CSKYInfo",
+        ":CodeGen",
+        ":Core",
+        ":Support",
+        ":Target",
+        ":config",
+    ],
+)
+
+cc_library(
+    name = "CSKYInfo",
+    srcs = glob([
+        "lib/Target/CSKY/TargetInfo/*.c",
+        "lib/Target/CSKY/TargetInfo/*.cpp",
+        "lib/Target/CSKY/TargetInfo/*.inc",
+    ]),
+    hdrs = glob([
+        "include/llvm/Target/CSKY/TargetInfo/*.h",
+        "include/llvm/Target/CSKY/TargetInfo/*.def",
+        "include/llvm/Target/CSKY/TargetInfo/*.inc",
+        "lib/Target/CSKY/TargetInfo/*.h",
+    ]),
+    copts = llvm_copts + ["-Iexternal/llvm-project/llvm/lib/Target/CSKY"],
+    deps = [
         ":Support",
         ":config",
     ],
@@ -3527,6 +3571,7 @@ cc_library(
     copts = llvm_copts,
     deps = [
         ":Core",
+        ":Demangle",
         ":Support",
         ":config",
     ],

@@ -2,15 +2,15 @@
 
 #include "pmlc/dialect/pxa/transforms/tile.h"
 
-namespace pmlc::dialect::pxa {
+using namespace mlir; // NOLINT
 
-using mlir::AffineParallelOp;
+namespace pmlc::dialect::pxa {
 
 AffineParallelOp performTiling(AffineParallelOp op,
                                llvm::ArrayRef<int64_t> tileSizes) {
   // Make builder
-  mlir::OpBuilder builder(op.getBody(), op.getBody()->begin());
-  mlir::Block *outerBody = op.getBody();
+  OpBuilder builder(op.getBody(), op.getBody()->begin());
+  Block *outerBody = op.getBody();
   // Verify sizes match
   size_t dimCount = tileSizes.size();
   assert(op.lowerBoundsMap().getNumResults() == dimCount);
@@ -20,8 +20,8 @@ AffineParallelOp performTiling(AffineParallelOp op,
     assert(tileSizes[i] % steps[i] == 0);
   }
   // Make the maps for the inner parallel
-  llvm::SmallVector<mlir::AffineExpr, 8> lbExprs;
-  llvm::SmallVector<mlir::AffineExpr, 8> ubExprs;
+  llvm::SmallVector<AffineExpr, 8> lbExprs;
+  llvm::SmallVector<AffineExpr, 8> ubExprs;
   for (size_t i = 0; i < dimCount; i++) {
     auto outerDim = builder.getAffineDimExpr(i);
     auto tileSize = builder.getAffineConstantExpr(tileSizes[i]);
@@ -32,10 +32,10 @@ AffineParallelOp performTiling(AffineParallelOp op,
   auto ubMap = AffineMap::get(dimCount, 0, ubExprs, op.getContext());
   auto outerIdxs = outerBody->getArguments();
   // Make the inner parallel for (above all other code);
-  llvm::SmallVector<mlir::AtomicRMWKind, 8> reductions;
+  llvm::SmallVector<AtomicRMWKind, 8> reductions;
   for (Attribute attr : op.reductions()) {
     auto intAttr = attr.dyn_cast<IntegerAttr>();
-    reductions.push_back(*mlir::symbolizeAtomicRMWKind(intAttr.getInt()));
+    reductions.push_back(*symbolizeAtomicRMWKind(intAttr.getInt()));
   }
   auto inner = builder.create<AffineParallelOp>(
       op.getLoc(), op.getResultTypes(), reductions, lbMap, outerIdxs, ubMap,
@@ -67,8 +67,8 @@ AffineParallelOp performTiling(AffineParallelOp op,
 AffineParallelOp undoTiling(AffineParallelOp op,
                             llvm::ArrayRef<int64_t> tileSizes) {
   // Make builder
-  mlir::OpBuilder builder(op.getBody(), op.getBody()->begin());
-  mlir::Block *outerBody = op.getBody();
+  OpBuilder builder(op.getBody(), op.getBody()->begin());
+  Block *outerBody = op.getBody();
   // Verify sizes match
   size_t dimCount = tileSizes.size();
   assert(op.lowerBoundsMap().getNumResults() == dimCount);
@@ -81,12 +81,12 @@ AffineParallelOp undoTiling(AffineParallelOp op,
 
   // Check if first operation is AffineParallelOp (inner loop after tiling)
   Operation &inner = outerBody->front();
-  auto innerOp = mlir::dyn_cast<AffineParallelOp>(&inner);
+  auto innerOp = dyn_cast<AffineParallelOp>(&inner);
   assert(innerOp);
 
   // Check if last operation is AffineYieldOp
   Operation &yield = outerBody->back();
-  auto yieldOp = mlir::dyn_cast<AffineYieldOp>(&yield);
+  auto yieldOp = dyn_cast<AffineYieldOp>(&yield);
   assert(yieldOp);
 
   // Finished with checks, first remove the redundant AffineYieldOp

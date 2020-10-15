@@ -14,62 +14,14 @@
 
 namespace pmlc::dialect::tile {
 
-using llvm::APInt;
-using llvm::Optional;
-using mlir::AffineMap;
-using mlir::AffineMapAttr;
-using mlir::ArrayAttr;
-using mlir::ArrayRef;
-using mlir::Attribute;
-using mlir::BoolAttr;
-using mlir::DictionaryAttr;
-using mlir::FloatType;
-using mlir::IndexType;
-using mlir::IntegerAttr;
 using mlir::IntegerSet;
 using mlir::IntegerSetAttr;
-using mlir::Location;
-using mlir::LogicalResult;
-using mlir::MemoryEffectOpInterface;
-using mlir::MLIRContext;
-using mlir::NamedAttribute;
-using mlir::NoneType;
-using mlir::Op;
-using mlir::OpAsmOpInterface;
-using mlir::OpAsmParser;
-using mlir::OpAsmPrinter;
-using mlir::OpAsmSetValueNameFn;
-using mlir::OpBuilder;
-using mlir::Operation;
-using mlir::OperationState;
-using mlir::OpFoldResult;
-using mlir::OpInterface;
-using mlir::OwningRewritePatternList;
-using mlir::ParseResult;
-using mlir::RankedTensorType;
-using mlir::Region;
-using mlir::ShapedType;
-using mlir::SmallVectorImpl;
-using mlir::StringAttr;
-using mlir::StringRef;
-using mlir::TupleType;
-using mlir::Type;
-using mlir::TypeAttr;
-using mlir::UnitAttr;
-using mlir::Value;
-using mlir::ValueRange;
-using mlir::VectorType;
 using util::AggregationKind;
 using util::CombinationKind;
-using util::MaterializeOperandsOpInterface;
 
-namespace MemoryEffects = mlir::MemoryEffects;
-namespace OpTrait = mlir::OpTrait;
-namespace SideEffects = mlir::SideEffects;
+} // namespace pmlc::dialect::tile
 
 #define GET_OP_CLASSES
 #include "pmlc/dialect/tile/ir/ops.h.inc"
 
 #include "pmlc/dialect/tile/ir/dialect.h.inc"
-
-} // namespace pmlc::dialect::tile

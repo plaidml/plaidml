@@ -521,9 +521,6 @@ OpFoldResult PxaVectorReduceOp::fold(ArrayRef<Attribute> cstOperands) {
   return OpFoldResult();
 }
 
-#define GET_OP_CLASSES
-#include "pmlc/dialect/pxa/ir/ops.cc.inc"
-
 void PXADialect::initialize() {
   addOperations<
 #define GET_OP_LIST
@@ -532,3 +529,6 @@ void PXADialect::initialize() {
 }
 
 } // namespace pmlc::dialect::pxa
+
+#define GET_OP_CLASSES
+#include "pmlc/dialect/pxa/ir/ops.cc.inc" // NOLINT

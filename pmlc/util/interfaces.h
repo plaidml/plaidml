@@ -7,12 +7,4 @@
 #include "mlir/Support/InterfaceSupport.h"
 #include "mlir/Support/LogicalResult.h"
 
-namespace pmlc::util {
-
-using mlir::failure;
-using mlir::LogicalResult;
-using mlir::OpBuilder;
-
 #include "pmlc/util/interfaces.h.inc"
-
-} // namespace pmlc::util

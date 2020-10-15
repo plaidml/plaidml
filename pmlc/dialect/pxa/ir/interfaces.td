@@ -13,6 +13,8 @@ def PxaReadOpInterface : PxaOpInterface<"PxaReadOpInterface"> {
       restrictions.
   }];
 
+  let cppNamespace = "pmlc::dialect::pxa";
+
   let methods = [
     InterfaceMethod<
       /*desc=*/"Returns the memref operand to read from.",
