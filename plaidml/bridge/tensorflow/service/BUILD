@@ -13,3 +13,18 @@ cc_library(
         "@org_tensorflow//tensorflow/core:lib",
     ],
 )
+
+cc_library(
+    name = "graph_util",
+    srcs = ["graph_util.cc"],
+    hdrs = ["graph_util.h"],
+    tags = ["skip_windows"],
+    deps = [
+        "@org_tensorflow//tensorflow/compiler/tf2xla:tf2xla",
+        "@org_tensorflow//tensorflow/compiler/xla/client:client",
+        "@org_tensorflow//tensorflow/compiler/xla/service:hlo",
+        "@org_tensorflow//tensorflow/compiler/xla/service:hlo_parser",
+        "@org_tensorflow//tensorflow/core:lib",
+        "@org_tensorflow//tensorflow/compiler/jit:xla_cpu_jit",
+    ],
+)

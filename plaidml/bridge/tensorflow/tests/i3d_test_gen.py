@@ -13,38 +13,44 @@ from plaidml.bridge.tensorflow.tests import util
 
 
 def main(args):
-
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        tmp_path = pathlib.Path(tmp_dir)
-        os.environ['XLA_FLAGS'] = '--xla_dump_to={}'.format(tmp_dir)
-        os.environ['TF_XLA_FLAGS'] = '--tf_xla_auto_jit=2 --tf_xla_cpu_global_jit'
-        tf.compat.v1.enable_eager_execution()
-
+    with tf.compat.v1.Session() as sess:
         handle = str(args.model.parent)
-        layer = hub.KerasLayer(handle, trainable=False)
-        x = np.random.uniform(size=(1, 32, 224, 224, 3)).astype('float32')
+        layer = hub.Module(handle)
+        # Initialize weights in this session
+        sess.run(tf.compat.v1.global_variables_initializer())
+        # Create placeholders for graphdef generation
+        input_shape = [1, 32, 224, 224, 3]
+        x = tf.compat.v1.placeholder(tf.float32, shape=input_shape)
         y = layer(x)
-        module_path = tmp_path / 'module_0001.before_optimizations.txt'
-        module_text = module_path.read_text()
+        output_graph_def = tf.compat.v1.graph_util.convert_variables_to_constants(
+            sess,  # The session in which the weights were initialized
+            sess.graph.as_graph_def(),  # The original (non-frozen) graph def
+            [y.op.name]  # The output op name
+        )
+        # Run an inference with random inputs to generate a correctness baseline for the archive
+        x_input = np.random.uniform(size=input_shape)
+        y_output = sess.run(y, feed_dict={x: x_input})
+    # Write frozen graph def as binary
+    with tf.io.gfile.GFile(args.graphdef, "wb+") as f:
+        f.write(output_graph_def.SerializeToString())
 
     archive = schema.ArchiveT()
     archive.name = 'i3d'
-    archive.model = module_text
-    archive.weights = [util.convertBuffer(x.name, x.numpy()) for x in layer.weights]
-    archive.inputs = [util.convertBuffer('input', x)]
-    archive.outputs = [util.convertBuffer('output', y.numpy())]
+    archive.inputs = [util.convertBuffer('input', x_input)]
+    archive.outputs = [util.convertBuffer('output', y_output)]
 
     builder = flatbuffers.Builder(0)
     packed = archive.Pack(builder)
     builder.Finish(packed)
-    args.output.write(builder.Output())
+    args.archive.write(builder.Output())
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Generate archive for i3d')
     parser.add_argument('model', type=pathlib.Path, help='location to read the model')
-    parser.add_argument('output',
+    parser.add_argument('archive',
                         type=argparse.FileType('wb'),
                         help='location to write the generated archive')
+    parser.add_argument('graphdef', type=str, help='location to write the frozen graphdef')
     args = parser.parse_args()
     main(args)

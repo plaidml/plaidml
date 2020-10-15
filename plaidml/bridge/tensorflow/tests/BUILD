@@ -131,8 +131,11 @@ py_binary(
 genrule(
     name = "i3d_test_genrule",
     testonly = 1,
-    outs = ["i3d.pml"],
-    cmd = "$(location :i3d_test_gen) $(location @tfhub_i3d_kinetics_400//:saved_model.pb) $@",
+    outs = [
+        "i3d.pml",
+        "i3d_frozen_graph.pb"
+    ],
+    cmd = "$(location :i3d_test_gen) $(location @tfhub_i3d_kinetics_400//:saved_model.pb) $(location i3d.pml) $(location i3d_frozen_graph.pb)",
     tags = ["skip_windows"],
     tools = [
         ":i3d_test_gen",
@@ -143,18 +146,19 @@ genrule(
 tf_cc_test(
     name = "i3d_test",
     srcs = ["i3d_test.cc"],
-    data = [":i3d_test_genrule"],
+    data = [
+        ":i3d_test_genrule",
+    ],
     extra_copts = ["-fexceptions"],
     linkstatic = 1,
     tags = [
-        "manual",
         "skip_windows",
     ],
     deps = [
         ":archive_cc_fbs",
         ":codegen_test",
         "//plaidml/bridge/tensorflow/service:compiler",
-        "@org_tensorflow//tensorflow/compiler/xla/tests:verified_hlo_module",
+        "//plaidml/bridge/tensorflow/service:graph_util",
     ],
 )
 
