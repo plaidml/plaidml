@@ -15,7 +15,8 @@ struct StencilCost {
   unsigned startupCost;
 };
 
-using StencilCostFunction = std::function<StencilCost(llvm::ArrayRef<int64_t>)>;
+using StencilCostFunction = std::function<StencilCost(
+    llvm::ArrayRef<int64_t>, llvm::ArrayRef<mlir::Type>)>;
 
 std::unique_ptr<mlir::Pass> createAffineNormalizePass();
 std::unique_ptr<mlir::Pass> createAffineNormalizePass(bool promote);
@@ -30,7 +31,6 @@ std::unique_ptr<mlir::Pass>
 
 createFusionPass(int64_t memoryActivityThreshold = 0, bool exactlyMatch = false,
                  bool tiledFusion = false, int64_t loopDepth = 0);
-
 
 std::unique_ptr<mlir::Pass> createGPUThreadPass();
 std::unique_ptr<mlir::Pass> createGPUThreadPass(unsigned maxThreads);

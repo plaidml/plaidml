@@ -72,17 +72,17 @@ struct PxaGemmOpConversion : public OpConversionPattern<pxa::PxaGemmOp> {
     int64_t numBatches = op.numBatches();
 
     if (numBatches == 1) {
-      auto dispatch = rewriter.create<xsmm::GemmDispatchOp>(
+      auto dispatch = rewriter.create<xsmm::GemmDispatchF32Op>(
           op.getLoc(), rewriter.getI64Type(), op.tile(), leadingDimsAttr);
 
-      rewriter.create<xsmm::GemmInvokeOp>(
+      rewriter.create<xsmm::GemmInvokeF32Op>(
           op.getLoc(), ArrayRef<Type>(), dispatch, transformed.c(),
           transformed.a(), transformed.b(), indices);
     } else if (numBatches > 1) {
-      auto dispatch = rewriter.create<xsmm::BRGemmDispatchOp>(
+      auto dispatch = rewriter.create<xsmm::BRGemmDispatchF32Op>(
           op.getLoc(), rewriter.getI64Type(), op.tile(), leadingDimsAttr);
 
-      rewriter.create<xsmm::BRGemmInvokeOp>(
+      rewriter.create<xsmm::BRGemmInvokeF32Op>(
           op.getLoc(), ArrayRef<Type>(), dispatch, transformed.c(),
           transformed.a(), transformed.b(), op.numBatches(), indices);
     } else {
@@ -96,14 +96,14 @@ struct PxaGemmOpConversion : public OpConversionPattern<pxa::PxaGemmOp> {
   }
 };
 
-struct XSMMGemmDispatchLowering
-    : public ConvertOpToLLVMPattern<xsmm::GemmDispatchOp> {
-  using ConvertOpToLLVMPattern<xsmm::GemmDispatchOp>::ConvertOpToLLVMPattern;
+struct XSMMGemmDispatchF32Lowering
+    : public ConvertOpToLLVMPattern<xsmm::GemmDispatchF32Op> {
+  using ConvertOpToLLVMPattern<xsmm::GemmDispatchF32Op>::ConvertOpToLLVMPattern;
 
   LogicalResult
   matchAndRewrite(Operation *op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
-    auto dispatchOp = cast<xsmm::GemmDispatchOp>(op);
+    auto dispatchOp = cast<xsmm::GemmDispatchF32Op>(op);
     auto func = getOrInsertFunc(op, rewriter);
 
     auto int32Type = LLVM::LLVMType::getInt32Ty(op->getContext());
@@ -153,15 +153,15 @@ struct XSMMGemmDispatchLowering
   }
 };
 
-struct XSMMGemmInvokeLowering
-    : public ConvertOpToLLVMPattern<xsmm::GemmInvokeOp> {
-  using ConvertOpToLLVMPattern<xsmm::GemmInvokeOp>::ConvertOpToLLVMPattern;
+struct XSMMGemmInvokeF32Lowering
+    : public ConvertOpToLLVMPattern<xsmm::GemmInvokeF32Op> {
+  using ConvertOpToLLVMPattern<xsmm::GemmInvokeF32Op>::ConvertOpToLLVMPattern;
 
   LogicalResult
   matchAndRewrite(Operation *op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
-    auto invokeOp = cast<xsmm::GemmInvokeOp>(op);
-    xsmm::GemmInvokeOp::Adaptor transformed(operands);
+    auto invokeOp = cast<xsmm::GemmInvokeF32Op>(op);
+    xsmm::GemmInvokeF32Op::Adaptor transformed(operands);
     auto aType = invokeOp.a().getType().cast<MemRefType>();
     auto bType = invokeOp.b().getType().cast<MemRefType>();
     auto cType = invokeOp.c().getType().cast<MemRefType>();
@@ -215,14 +215,15 @@ struct XSMMGemmInvokeLowering
   }
 };
 
-struct XSMMBRGemmDispatchLowering
-    : public ConvertOpToLLVMPattern<xsmm::BRGemmDispatchOp> {
-  using ConvertOpToLLVMPattern<xsmm::BRGemmDispatchOp>::ConvertOpToLLVMPattern;
+struct XSMMBRGemmDispatchF32Lowering
+    : public ConvertOpToLLVMPattern<xsmm::BRGemmDispatchF32Op> {
+  using ConvertOpToLLVMPattern<
+      xsmm::BRGemmDispatchF32Op>::ConvertOpToLLVMPattern;
 
   LogicalResult
   matchAndRewrite(Operation *op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
-    auto dispatchOp = cast<xsmm::BRGemmDispatchOp>(op);
+    auto dispatchOp = cast<xsmm::BRGemmDispatchF32Op>(op);
     auto func = getOrInsertFunc(op, rewriter);
 
     auto int32Type = LLVM::LLVMType::getInt32Ty(op->getContext());
@@ -279,15 +280,15 @@ struct XSMMBRGemmDispatchLowering
   }
 };
 
-struct XSMMBRGemmInvokeLowering
-    : public ConvertOpToLLVMPattern<xsmm::BRGemmInvokeOp> {
-  using ConvertOpToLLVMPattern<xsmm::BRGemmInvokeOp>::ConvertOpToLLVMPattern;
+struct XSMMBRGemmInvokeF32Lowering
+    : public ConvertOpToLLVMPattern<xsmm::BRGemmInvokeF32Op> {
+  using ConvertOpToLLVMPattern<xsmm::BRGemmInvokeF32Op>::ConvertOpToLLVMPattern;
 
   LogicalResult
   matchAndRewrite(Operation *op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
-    auto invokeOp = cast<xsmm::BRGemmInvokeOp>(op);
-    xsmm::BRGemmInvokeOp::Adaptor transformed(operands);
+    auto invokeOp = cast<xsmm::BRGemmInvokeF32Op>(op);
+    xsmm::BRGemmInvokeF32Op::Adaptor transformed(operands);
     auto aType = invokeOp.a().getType().cast<MemRefType>();
     auto bType = invokeOp.b().getType().cast<MemRefType>();
     auto cType = invokeOp.c().getType().cast<MemRefType>();
@@ -346,6 +347,7 @@ struct XSMMBRGemmInvokeLowering
             /*isVarArg=*/false));
   }
 };
+
 } // namespace
 
 void populatePXAGemmToXSMMConversionPatterns(OwningRewritePatternList &patterns,
@@ -355,8 +357,8 @@ void populatePXAGemmToXSMMConversionPatterns(OwningRewritePatternList &patterns,
 
 void populateXSMMToLLVMConversionPatterns(LLVMTypeConverter &converter,
                                           OwningRewritePatternList &patterns) {
-  patterns.insert<XSMMGemmDispatchLowering, XSMMGemmInvokeLowering>(converter);
-  patterns.insert<XSMMBRGemmDispatchLowering, XSMMBRGemmInvokeLowering>(
+  patterns.insert<XSMMGemmDispatchF32Lowering, XSMMGemmInvokeF32Lowering,
+                  XSMMBRGemmDispatchF32Lowering, XSMMBRGemmInvokeF32Lowering>(
       converter);
 }
 } // namespace pmlc::target::x86
