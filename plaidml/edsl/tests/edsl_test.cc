@@ -367,11 +367,10 @@ TEST_F(CppEdsl, DotF16) {
   const int64_t M = 8;
   const int64_t N = 32;
   const int64_t K = 16;
-  auto A = Placeholder(DType::FLOAT16, {M, K});
-  auto B = Placeholder(DType::FLOAT16, {K, N});
+  Tensor A = Placeholder(DType::FLOAT16, {M, K});
+  Tensor B = Placeholder(DType::FLOAT16, {K, N});
   auto C = Dot(A, B);
   auto program = makeProgram("dot_f16", {A, B}, {C});
-  IVLOG(3, "program: \n" << program.str());
 
   // clang-format off
   // CHECK-LABEL: CppEdsl.DotF16
@@ -381,6 +380,22 @@ TEST_F(CppEdsl, DotF16) {
   // CHECK-SAME: tensor<f16>, tensor<8x16xf16>, tensor<16x32xf16> -> tensor<8x32xf16>
   // CHECK: return %[[cion]] : tensor<8x32xf16>
   // clang-format on
+}
+
+TEST_F(CppEdsl, DotF16_AccF32) {
+  const int64_t M = 8;
+  const int64_t N = 32;
+  const int64_t K = 16;
+  Tensor A = Placeholder(DType::FLOAT16, {M, K});
+  Tensor B = Placeholder(DType::FLOAT16, {K, N});
+
+  Tensor A_f32 = cast(A, DType::FLOAT32);
+  Tensor B_f32 = cast(B, DType::FLOAT32);
+  TensorIndex i, j, k;
+  Tensor C_f32 = Contraction().outShape(M, N).outAccess(i, j).sum(A_f32(i, k) * B_f32(k, j));
+  Tensor C = cast(C_f32, DType::FLOAT16);
+
+  auto program = makeProgram("dot_f16_acc_f32", {A, B}, {C});
 
   std::default_random_engine rng(2);
   std::normal_distribution<float> normal_dist(0.0, 1.0);
@@ -393,15 +408,16 @@ TEST_F(CppEdsl, DotF16) {
   for (unsigned i = 0; i < in2.size(); i++) {
     in2[i] = normal_dist(rng);
   }
-  std::vector<half> expected(M * N);
+  std::vector<float> acc(M * N);
   for (int i = 0; i < M; i++) {
     for (int j = 0; j < N; j++) {
       for (int k = 0; k < K; k++) {
-        expected[i * N + j] += in1[i * K + k] * in2[k * N + j];
+        acc[i * N + j] += in1[i * K + k] * in2[k * N + j];
       }
     }
   }
-  // checkClose(program, {in1, in2}, {expected}, /*tolerance=*/1e-2);
+  std::vector<half> expected(acc.begin(), acc.end());
+  checkClose(program, {in1, in2}, {expected}, /*tolerance=*/1e-2);
 }
 
 TEST_F(CppEdsl, DoubleDot) {

@@ -112,6 +112,7 @@ mlir::Optional<StrideInfo> StencilBase::getStrideInfo(Value value) {
   if (cached != strideInfoCache.end()) {
     return cached->second;
   }
+  IVLOG(1, "getStrideInfo: " << debugString(value));
   auto maybeInfo =
       llvm::TypeSwitch<Operation *, mlir::Optional<StrideInfo>>(
           value.getDefiningOp())

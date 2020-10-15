@@ -62,26 +62,34 @@ private:
   StencilCostFunction stencilCostFn;
 
   Optional<LoadStoreOps> capture() {
+    using matchers::m_Any;
     // Looking for load..load..mul..reduce..terminator
     Value load1, load2, reduce;
     Operation *yield = op.getBody()->getTerminator();
-    if (matchPattern(yield,
-                     m_Op<AffineYieldOp>( //
-                         m_Capture(&reduce, m_PxaReduceOp(
-                                                AtomicRMWKind::addf,
-                                                m_Op<MulFOp>(m_Capture(&load1),
-                                                             m_Capture(&load2)),
-                                                matchers::m_Any())))) ||
-        matchPattern(yield,
-                     m_Op<AffineYieldOp>( //
-                         m_Capture(&reduce, m_PxaReduceOp(
-                                                AtomicRMWKind::addi,
-                                                m_Op<MulIOp>(m_Capture(&load1),
-                                                             m_Capture(&load2)),
-                                                matchers::m_Any()))))) {
+    if (matchPattern(
+            yield,
+            m_Op<AffineYieldOp>(m_Capture(
+                &reduce, m_PxaReduceOp(
+                             AtomicRMWKind::addf,
+                             m_Op<MulFOp>(m_Capture(&load1, m_Op<PxaLoadOp>()),
+                                          m_Capture(&load2, m_Op<PxaLoadOp>())),
+                             m_Any())))) ||
+        matchPattern(
+            yield,
+            m_Op<AffineYieldOp>(m_Capture(
+                &reduce, m_PxaReduceOp(
+                             AtomicRMWKind::addi,
+                             m_Op<MulIOp>(m_Capture(&load1, m_Op<PxaLoadOp>()),
+                                          m_Capture(&load2, m_Op<PxaLoadOp>())),
+                             m_Any()))))) {
+      IVLOG(1, "matched");
+      IVLOG(1, "  load1: " << debugString(load1));
+      IVLOG(1, "  load2: " << debugString(load2));
+      IVLOG(1, "  reduce: " << debugString(reduce));
       return LoadStoreOps{{reduce}, {load1, load2}};
     }
 
+    IVLOG(1, "no match");
     return llvm::None;
   }
 
@@ -216,7 +224,6 @@ private:
   }
 
   void transform(TensorAndIndexPermutation perm, ArrayRef<int64_t> tileSize) {
-    auto AStrideInfo = getStrideInfo(perm.ioOps[1]);
     int64_t numBatches = 1;
     int64_t kRange = getIdxRange(perm.indexes[2]);
     IVLOG(3, "kRange: " << kRange);

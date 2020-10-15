@@ -86,7 +86,7 @@ func @no_gemm_no_stride_one_2(%arg0: memref<100x100xf32>, %arg1: memref<100x100x
 // CHECK-LABEL: @gemm_operation_rewrite_f32
 func @gemm_operation_rewrite_f32(%arg0: memref<100x100xf32>, %arg1: memref<100x100xf32>) -> memref<100x100xf32> {
   %out = alloc() : memref<100x100xf32>
-  %ret = affine.parallel (%i, %j, %k) = (0, 0, 0) to (100, 100, 100) reduce ("assign") -> (memref<100x100xf32>)  {
+  %ret = affine.parallel (%i, %j, %k) = (0, 0, 0) to (100, 100, 100) reduce ("assign") -> (memref<100x100xf32>) {
     %0 = pxa.load %arg1[%i, %k] : memref<100x100xf32>
     %1 = pxa.load %arg0[%k, %j] : memref<100x100xf32>
     %2 = mulf %0, %1 : f32
