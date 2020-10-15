@@ -97,7 +97,10 @@ module attributes {gpu.container_module} {
   spv.module Physical64 OpenCL requires #spv.vce<v1.0, [Addresses, Kernel], []> {
     spv.globalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
     spv.globalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-    spv.func @zero(%arg0: !spv.ptr<!spv.struct<!spv.array<256 x f32, stride=4> [0]>, CrossWorkgroup>) "None" attributes {spv.entry_point_abi = {local_size = dense<[32, 1, 1]> : vector<3xi32>}, workgroup_attributions = 0 : i64} {
+    spv.func @zero(%arg0: !spv.ptr<!spv.struct<(!spv.array<256 x f32, stride=4> [0])>, CrossWorkgroup>) "None" attributes {
+      spv.entry_point_abi = {local_size = dense<[32, 1, 1]> : vector<3xi32>},
+      workgroup_attributions = 0 : i64
+    } {
       %0 = spv.constant 0.000000e+00 : f32
       %1 = spv._address_of @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
       %2 = spv.Load "Input" %1 : vector<3xi32>
@@ -113,7 +116,7 @@ module attributes {gpu.container_module} {
       %12 = spv.constant 1 : i32
       %13 = spv.IMul %12, %6 : i32
       %14 = spv.IAdd %11, %13 : i32
-      %15 = spv.AccessChain %arg0[%7, %14] : !spv.ptr<!spv.struct<!spv.array<256 x f32, stride=4> [0]>, CrossWorkgroup>, i32, i32
+      %15 = spv.AccessChain %arg0[%7, %14] : !spv.ptr<!spv.struct<(!spv.array<256 x f32, stride=4> [0])>, CrossWorkgroup>, i32, i32
       spv.Store "CrossWorkgroup" %15, %0 : f32
       spv.Return
     }
@@ -172,7 +175,10 @@ module attributes {gpu.container_module} {
   spv.module Physical64 OpenCL requires #spv.vce<v1.0, [Addresses, Kernel], []> {
     spv.globalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
     spv.globalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
-    spv.func @zero(%arg0: !spv.ptr<!spv.struct<!spv.array<256 x f16, stride=4> [0]>, CrossWorkgroup>) "None" attributes {spv.entry_point_abi = {local_size = dense<[32, 1, 1]> : vector<3xi32>}, workgroup_attributions = 0 : i64} {
+    spv.func @zero(%arg0: !spv.ptr<!spv.struct<(!spv.array<256 x f16, stride=4> [0])>, CrossWorkgroup>) "None" attributes {
+      spv.entry_point_abi = {local_size = dense<[32, 1, 1]> : vector<3xi32>},
+      workgroup_attributions = 0 : i64
+    } {
       %0 = spv.constant 0.000000e+00 : f16
       %1 = spv._address_of @__builtin_var_WorkgroupId__ : !spv.ptr<vector<3xi32>, Input>
       %2 = spv.Load "Input" %1 : vector<3xi32>
@@ -188,7 +194,7 @@ module attributes {gpu.container_module} {
       %12 = spv.constant 1 : i32
       %13 = spv.IMul %12, %6 : i32
       %14 = spv.IAdd %11, %13 : i32
-      %15 = spv.AccessChain %arg0[%7, %14] : !spv.ptr<!spv.struct<!spv.array<256 x f16, stride=4> [0]>, CrossWorkgroup>, i32, i32
+      %15 = spv.AccessChain %arg0[%7, %14] : !spv.ptr<!spv.struct<(!spv.array<256 x f16, stride=4> [0])>, CrossWorkgroup>, i32, i32
       spv.Store "CrossWorkgroup" %15, %0 : f16
       spv.Return
     }

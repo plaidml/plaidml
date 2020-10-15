@@ -25,26 +25,26 @@ def ScalarConstantOp :
   let results = (outs EltwiseAny:$result);
 
   let builders = [OpBuilder<
-    "OpBuilder &builder, OperationState& result, Type type, double value", [{
+    "mlir::OpBuilder &builder, mlir::OperationState& result, mlir::Type type, double value", [{
       result.addAttribute("value", builder.getF64FloatAttr(value));
       result.addTypes(RankedTensorType::get({}, type));
     }]
   >, OpBuilder<
-    "OpBuilder &builder, OperationState& result, Type type, int64_t value", [{
+    "mlir::OpBuilder &builder, mlir::OperationState& result, mlir::Type type, int64_t value", [{
       result.addAttribute("value", builder.getI64IntegerAttr(value));
       result.addTypes(RankedTensorType::get({}, type));
     }]
   >, OpBuilder<
-    "OpBuilder &builder, OperationState& result, Type type, uint64_t value", [{
+    "mlir::OpBuilder &builder, mlir::OperationState& result, mlir::Type type, uint64_t value", [{
       result.addAttribute("value", builder.getI64IntegerAttr(value));
       result.addTypes(RankedTensorType::get({}, type));
     }]
   >];
 
   let extraClassDeclaration = [{
-    Attribute getValue() { return getAttr("value"); }
-    IntegerAttr getIntAttr() { return getAttrOfType<IntegerAttr>("value"); }
-    FloatAttr getFloatAttr() { return getAttrOfType<FloatAttr>("value"); }
+    mlir::Attribute getValue() { return getAttr("value"); }
+    mlir::IntegerAttr getIntAttr() { return getAttrOfType<mlir::IntegerAttr>("value"); }
+    mlir::FloatAttr getFloatAttr() { return getAttrOfType<mlir::FloatAttr>("value"); }
   }];
 }
 
@@ -53,7 +53,7 @@ class EW_UnaryOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
   let arguments = (ins EltwiseAny:$operand);
   let results = (outs EltwiseAny:$result);
   let extraClassDeclaration = [{
-    LogicalResult materializeOperands(OpBuilder& builder) {
+    mlir::LogicalResult materializeOperands(mlir::OpBuilder& builder) {
       return eltwise::materializeOperands(builder, getOperation());
     }
   }];
@@ -64,7 +64,7 @@ class EW_BinaryOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
   let arguments = (ins EltwiseAny:$lhs, EltwiseAny:$rhs);
   let results = (outs EltwiseAny:$result);
   let extraClassDeclaration = [{
-    LogicalResult materializeOperands(OpBuilder& builder) {
+    mlir::LogicalResult materializeOperands(mlir::OpBuilder& builder) {
       return eltwise::materializeOperands(builder, getOperation());
     }
   }];
@@ -81,7 +81,7 @@ class EW_CompareOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
   let arguments = (ins EltwiseAny:$lhs, EltwiseAny:$rhs);
   let results = (outs EltwiseBool:$result);
   let extraClassDeclaration = [{
-    LogicalResult materializeOperands(OpBuilder& builder) {
+    mlir::LogicalResult materializeOperands(mlir::OpBuilder& builder) {
       return eltwise::materializeOperands(builder, getOperation());
     }
   }];
@@ -170,7 +170,7 @@ def EW_SelectOp : EltwiseOp<"select", [NoSideEffect]> {
   let arguments = (ins EltwiseBool:$cond, EltwiseAny:$tcase, EltwiseAny:$fcase);
   let results = (outs EltwiseAny:$result);
   let extraClassDeclaration = [{
-    LogicalResult materializeOperands(OpBuilder& builder);
+    mlir::LogicalResult materializeOperands(mlir::OpBuilder& builder);
   }];
 }
 

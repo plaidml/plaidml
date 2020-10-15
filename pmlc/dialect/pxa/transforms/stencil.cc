@@ -11,6 +11,8 @@
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/util/logging.h"
 
+using namespace mlir; // NOLINT
+
 namespace pmlc::dialect::pxa {
 
 namespace {
@@ -64,7 +66,7 @@ void StencilBase::reportBestStencil(unsigned logLevel) {
     std::stringstream tensorPermStr;
     tensorPermStr << "[\n";
     for (auto value : bestPermutation.values) {
-      tensorPermStr << "        " << mlir::debugString(value) << "\n";
+      tensorPermStr << "        " << debugString(value) << "\n";
     }
     tensorPermStr << "    ]";
     bestReport << "    Best Tensor Permutation: " << tensorPermStr.str()
@@ -100,22 +102,21 @@ std::vector<int64_t> StencilBase::generateTilings(int64_t idx, int64_t range) {
   return result;
 }
 
-int64_t StencilBase::getIdxRange(mlir::BlockArgument idx) {
+int64_t StencilBase::getIdxRange(BlockArgument idx) {
   assert(getBlockArgsAsSet().count(idx) &&
          "getIdxRange only valid on indexes of current op");
   assert(idx.getArgNumber() < ranges.size());
   return ranges[idx.getArgNumber()];
 }
 
-mlir::Optional<StrideInfo> StencilBase::getStrideInfo(Value value) {
+Optional<StrideInfo> StencilBase::getStrideInfo(Value value) {
   auto cached = strideInfoCache.find(value);
   if (cached != strideInfoCache.end()) {
     return cached->second;
   }
   IVLOG(1, "getStrideInfo: " << debugString(value));
   auto maybeInfo =
-      llvm::TypeSwitch<Operation *, mlir::Optional<StrideInfo>>(
-          value.getDefiningOp())
+      llvm::TypeSwitch<Operation *, Optional<StrideInfo>>(value.getDefiningOp())
           .Case<PxaLoadOp>([&](PxaLoadOp op) { return computeStrideInfo(op); })
           .Case<PxaReduceOp>(
               [&](PxaReduceOp op) { return computeStrideInfo(op); })
@@ -125,13 +126,13 @@ mlir::Optional<StrideInfo> StencilBase::getStrideInfo(Value value) {
 }
 
 void StencilBase::BindIndexes(llvm::ArrayRef<Value> values) {
-  llvm::SmallVector<mlir::BlockArgument, 8> emptyBoundIdxsVector;
+  llvm::SmallVector<BlockArgument, 8> emptyBoundIdxsVector;
   RecursiveBindIndex(emptyBoundIdxsVector, values);
 }
 
 void StencilBase::RecursiveBindIndex(
-    llvm::SmallVector<mlir::BlockArgument, 8> &boundIdxs,
-    llvm::ArrayRef<mlir::Value> values) {
+    llvm::SmallVector<BlockArgument, 8> &boundIdxs,
+    llvm::ArrayRef<Value> values) {
   auto currIdx = boundIdxs.size();
   if (currIdx == tiledIdxCount) {
     // This is a legal binding, go find a tiling for it
@@ -228,21 +229,21 @@ void StencilBase::DoStenciling() {
   // are iterated through deterministic (the "sorted" order of the IO ops is the
   // order they were returned by `capture`) -- without this, the sorted order
   // would be however the pointers were ordered in memory.
-  llvm::SmallVector<Orderer<mlir::Value>, 3> ordered;
+  llvm::SmallVector<Orderer<Value>, 3> ordered;
   unsigned ord = 0;
   for (auto &storeOp : loadsAndStores.stores) {
-    ordered.push_back(Orderer<mlir::Value>(ord++, storeOp));
+    ordered.push_back(Orderer<Value>(ord++, storeOp));
   }
   size_t firstLoadIdx = ordered.size();
   for (auto &loadOp : loadsAndStores.loads) {
-    ordered.push_back(Orderer<mlir::Value>(ord++, loadOp));
+    ordered.push_back(Orderer<Value>(ord++, loadOp));
   }
   auto itLastStoreFirstLoad = ordered.begin() + firstLoadIdx;
   std::sort(ordered.begin(), itLastStoreFirstLoad);
   do { // Each store tensor permutation
     std::sort(itLastStoreFirstLoad, ordered.end());
     do { // Each load tensor permutation
-      llvm::SmallVector<mlir::Value, 3> values;
+      llvm::SmallVector<Value, 3> values;
       for (const auto &ioOp : ordered) {
         values.push_back(*ioOp);
       }

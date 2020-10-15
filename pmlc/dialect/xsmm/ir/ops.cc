@@ -6,12 +6,9 @@
 
 #include "mlir/IR/OpImplementation.h"
 
-namespace pmlc::dialect::xsmm {
+using namespace mlir; // NOLINT
 
-using llvm::SmallVector;
-using mlir::failure;
-using mlir::FunctionType;
-using mlir::success;
+namespace pmlc::dialect::xsmm {
 
 void XSMMDialect::initialize() {
   addOperations<
@@ -87,7 +84,7 @@ ParseResult parseGemmInvokeF32Op(OpAsmParser &parser, OperationState &result) {
       parser.resolveOperands(b.indices, indexType, result.operands));
 }
 
+} // namespace pmlc::dialect::xsmm
+
 #define GET_OP_CLASSES
 #include "pmlc/dialect/xsmm/ir/ops.cc.inc" // NOLINT
-
-} // namespace pmlc::dialect::xsmm

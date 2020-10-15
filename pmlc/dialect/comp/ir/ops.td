@@ -29,29 +29,25 @@ def COMP_Dialect : Dialect {
     dedicated memory space.
   }];
   let cppNamespace = "pmlc::dialect::comp";
-  let extraClassDeclaration = [{
-    Type parseType(DialectAsmParser& parser) const override;
-    void printType(Type, DialectAsmPrinter& printer) const override;
-  }];
 }
 
 // =============================================================================
 // Types
 // =============================================================================
-def COMP_IsDeviceTypePred : CPred<"$_self.isa<::pmlc::dialect::comp::DeviceType>()">;
-def COMP_AnyDevice : Type<COMP_IsDeviceTypePred, "any device type">;
+def COMP_AnyDevice : DialectType<COMP_Dialect,
+  CPred<"$_self.isa<DeviceType>()">, "any device type">;
 
-def COMP_IsExecEnvTypePred : CPred<"$_self.isa<::pmlc::dialect::comp::ExecEnvType>()">;
-def COMP_AnyExecEnv : Type<COMP_IsExecEnvTypePred, "any execenv type">;
+def COMP_AnyExecEnv : DialectType<COMP_Dialect,
+  CPred<"$_self.isa<ExecEnvType>()">, "any execenv type">;
 
-def COMP_IsEventTypePred : CPred<"$_self.isa<::pmlc::dialect::comp::EventType>()">;
-def COMP_AnyEvent : Type<COMP_IsEventTypePred, "any event type">;
+def COMP_AnyEvent : DialectType<COMP_Dialect,
+  CPred<"$_self.isa<EventType>()">, "any event type">;
 
 class COMP_MemorySpace<string name> :
-    StrFunc<"$" # name # ".getType().cast<::mlir::MemRefType>().getMemorySpace()">;
+    StrFunc<"$" # name # ".getType().cast<mlir::MemRefType>().getMemorySpace()">;
 
 class COMP_ExecEnvSupportsMemPred<string execEnv, string memRef> :
-    CPred<"$" # execEnv # ".getType().cast<::pmlc::dialect::comp::ExecEnvType>()"
+    CPred<"$" # execEnv # ".getType().cast<ExecEnvType>()"
           ".supportsMemorySpace(" # COMP_MemorySpace<memRef>.result # ")">;
 
 class COMP_ExecEnvSupportsMemTrait<string execEnv, string memRef> :

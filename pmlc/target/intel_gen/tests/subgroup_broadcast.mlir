@@ -115,3 +115,24 @@ func @subgroup_test_multiple_dim_inner_loop(%arg0: memref<1x1x8x16xf32>) {
   }
   return
 }
+
+// CHECK-LABEL: @devectorize_constant
+func @devectorize_constant() {
+  %cst = constant dense<0.0> : vector<8xf32>
+  %c0 = constant 0 : index
+  %c1 = constant 1 : index
+  %c4 = constant 4 : index
+  %c8 = constant 8 : index
+  // CHECK: scf.parallel
+  scf.parallel (%arg4) = (%c0) to (%c4) step (%c1) {
+    // CHECK-NEXT: alloc() : memref<8x1xf32>
+    // CHECK-NEXT: scf.for
+    // CHECK-NEXT: constant 0.000000e+00 : f32
+    // CHECK-NEXT: store %{{.*}}, %{{.*}}[%{{.*}}, %{{.*}}] : memref<8x1xf32>
+    %0 = alloc() : memref<8x1xvector<8xf32>>
+    scf.for %arg5 = %c0 to %c8 step %c1 {
+      store %cst, %0[%arg5, %c0] : memref<8x1xvector<8xf32>>
+    }
+  } {tags = {gpuThread, subgroupSize = 8}}
+  return
+}

@@ -338,7 +338,7 @@ LogicalResult verifyContractionOp(ContractionOp op) {
   return success();
 }
 
+} // namespace pmlc::dialect::tile
+
 #define GET_OP_CLASSES
 #include "pmlc/dialect/tile/ir/ops.cc.inc"
-
-} // namespace pmlc::dialect::tile

@@ -7,6 +7,7 @@
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/IR/BlockAndValueMapping.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/Interfaces/VectorInterfaces.h"
 #include "mlir/Pass/Pass.h"
@@ -46,13 +47,28 @@ public:
     if (dyn_cast_or_null<ExtractElementOp>(op))
       return success();
 
-    // Update the result type if it is a vector, operands types should have
-    // already been updated before
-    for (auto result : op->getResults()) {
-      if (auto vtype = result.getType().dyn_cast<VectorType>()) {
-        if (!isVectorTypeValid(vtype))
+    // Replace operands if they are still vectorized. This can happen for
+    // constant ops.
+    for (OpOperand &operand : op->getOpOperands()) {
+      if (auto vectorType = operand.get().getType().dyn_cast<VectorType>()) {
+        if (!isVectorTypeValid(vectorType))
           return failure();
-        result.setType(vtype.getElementType());
+        DenseElementsAttr attr;
+        if (!matchPattern(operand.get(), m_Constant(&attr)) && !attr.isSplat())
+          return failure();
+        auto constantOp = builder.create<ConstantOp>(
+            op->getLoc(), vectorType.getElementType(), attr.getSplatValue());
+        operand.set(constantOp);
+      }
+    }
+
+    // Update the result type if it is a vector, operands types should have
+    // already been updated before.
+    for (auto result : op->getResults()) {
+      if (auto vectorType = result.getType().dyn_cast<VectorType>()) {
+        if (!isVectorTypeValid(vectorType))
+          return failure();
+        result.setType(vectorType.getElementType());
       }
     }
     return success();
@@ -146,9 +162,8 @@ public:
     } else if (auto vecBroadcastOp = dyn_cast<vector::BroadcastOp>(op)) {
       return devectorizeBroadcast(vecBroadcastOp);
     } else if (auto forOp = dyn_cast<scf::ForOp>(op)) {
-      for (auto &iop :
-           llvm::make_early_inc_range(forOp.getBody()->getOperations())) {
-        if (failed(devectorizeOperation(&iop))) {
+      for (auto &innerOp : llvm::make_early_inc_range(forOp.getOps())) {
+        if (failed(devectorizeOperation(&innerOp))) {
           return failure();
         }
       }
@@ -185,7 +200,7 @@ public:
         loop.getLoc(), newLowerBounds, newUpperBounds, newStepsBounds);
     mlir::Block *newBody = newLoop.getBody();
 
-    // Splice across interior + erase orig
+    // Splice across interior + erase originals
     auto &oldBodyOps = body->getOperations();
     auto &newBodyOps = newBody->getOperations();
     newBodyOps.splice(std::prev(newBodyOps.end()), oldBodyOps,

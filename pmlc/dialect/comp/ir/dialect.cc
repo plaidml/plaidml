@@ -1,4 +1,5 @@
 // Copyright 2020 Intel Corporation
+
 #include "pmlc/dialect/comp/ir/dialect.h"
 
 #include "mlir/Dialect/GPU/GPUDialect.h"
@@ -65,7 +66,6 @@ static LogicalResult verify(Alloc op) {
 
 #define GET_OP_CLASSES
 #include "pmlc/dialect/comp/ir/ops.cc.inc"
-#undef GET_OP_CLASSES
 
 void COMPDialect::initialize() {
   addTypes<DeviceType, ExecEnvType, EventType>();
