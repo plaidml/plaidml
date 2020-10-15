@@ -39,7 +39,7 @@ struct ParallelOpConversion : public OpConversionPattern<scf::ParallelOp> {
     // some kind of appropriately tiled affine parallel structure which will
     // derive the index ranges from the thread number.
 
-    bool isThread = hasUnitTag(op, cpuBlockTag());
+    bool isThread = hasUnitTag(op, cpuThreadTag());
     if (!isThread) {
       // we only care about parallel ops marked with the thread tag
       return success();

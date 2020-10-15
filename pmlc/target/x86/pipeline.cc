@@ -134,6 +134,14 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
 
+  pm.addPass(pxa::createTileAccumulatePass());
+  pm.addPass(pxa::createAffineNormalizePass(/*promote=*/false));
+  pm.addPass(createCanonicalizerPass());
+
+  pm.addPass(pxa::createCPUThreadPass());
+  pm.addPass(pxa::createAffineNormalizePass());
+  pm.addPass(createCanonicalizerPass());
+
   pm.addPass(pxa::createFusionPass());
   pm.addPass(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());

@@ -26,12 +26,23 @@ using namespace mlir; // NOLINT
 namespace pmlc::dialect::pxa {
 
 AffineParallelOp tileAccumulations(AffineParallelOp op, bool skipTrivial) {
-  // Find the originating reduce
-  assert(op.getNumResults() == 1);
+  // Find the originating write and it's StrideInfo
+  Optional<StrideInfo> maybeStrideInfo;
+  assert(
+      op.getNumResults() == 1 &&
+      "tileAccumulations is only valid for single output affine.parallel loop");
   auto srcDef = getPrevWriter(op.getResult(0));
-  auto reduceOp = cast<PxaReduceOp>(srcDef);
+  if (auto gemmOp = dyn_cast<PxaGemmOp>(srcDef)) {
+    maybeStrideInfo =
+        computeStrideInfo(gemmOp.out().getType().cast<MemRefType>(),
+                          gemmOp.cAccessMap(), gemmOp.getOperandsForC());
+  } else if (auto reduceOp = dyn_cast<PxaReduceOp>(srcDef)) {
+    maybeStrideInfo = computeStrideInfo(reduceOp);
+  }
+  assert(maybeStrideInfo &&
+         "Unable to compute write stride in tileAccumulations");
+  auto si = *maybeStrideInfo;
   // Get strides for output
-  auto si = *computeStrideInfo(reduceOp);
   // Find all the accumulation indexes (stride 0 with respect to output) and
   // tile them into an inner block
   auto ranges = *op.getConstantRanges();

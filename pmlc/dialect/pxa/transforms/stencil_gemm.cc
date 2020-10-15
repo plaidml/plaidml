@@ -341,10 +341,6 @@ struct StencilGEMMPass : public PassWrapper<StencilGEMMPass, FunctionPass> {
       StencilGEMM stencil(op, numThreads.getValue(), doBatch.getValue(),
                           costFn);
       stencil.DoStenciling();
-
-      // tag this affine.parallel so it won't be lowered to affine.for
-      // we will lower it to an openmp block instead
-      setUnitTag(op, cpuBlockTag());
     });
   }
 
