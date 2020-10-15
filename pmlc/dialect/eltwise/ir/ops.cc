@@ -16,8 +16,6 @@
 #include "pmlc/util/logging.h"
 #include "pmlc/util/util.h"
 
-#define DEBUG_TYPE "eltwise"
-
 using namespace mlir; // NOLINT
 
 namespace pmlc::dialect::eltwise {
@@ -92,7 +90,7 @@ LogicalResult SelectOp::materializeOperands(OpBuilder &builder) {
                                       op->getOpOperands().drop_front());
 }
 
+} // namespace pmlc::dialect::eltwise
+
 #define GET_OP_CLASSES
 #include "pmlc/dialect/eltwise/ir/ops.cc.inc"
-
-} // namespace pmlc::dialect::eltwise

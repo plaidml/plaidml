@@ -14,7 +14,7 @@ def ConstantOp : TileOpWithPPV<"constant", [ConstantLike, NoSideEffect]>, HasFol
   let results = (outs Index:$result);
 
   let builders = [OpBuilder<
-    "OpBuilder &builder, OperationState& result, int64_t value", [{
+    "mlir::OpBuilder &builder, mlir::OperationState& result, int64_t value", [{
       auto indexType = builder.getIndexType();
       result.addAttribute("value", builder.getIntegerAttr(indexType, value));
       result.addTypes(indexType);
@@ -22,7 +22,7 @@ def ConstantOp : TileOpWithPPV<"constant", [ConstantLike, NoSideEffect]>, HasFol
   >];
 
   let extraClassDeclaration = [{
-    Attribute getValue() { return getAttr("value"); }
+    mlir::Attribute getValue() { return getAttr("value"); }
   }];
 }
 
@@ -46,42 +46,42 @@ def ContractionOp : TileOpWithPPV<"contract", [
   let results = (outs RankedTensorOf<[AnyScalar]>:$result);
 
   let builders = [OpBuilder<
-    "OpBuilder &builder, "
-    "OperationState& result, "
-    "Type resultType, "
-    "Value init, "
-    "ArrayRef<Value> tensors, "
-    "AggregationKind agg, "
-    "CombinationKind combo, "
-    "AffineMap sink, "
-    "ArrayRef<AffineMap> srcs, "
-    "IntegerSet cons, "
-    "StringRef name"
+    "mlir::OpBuilder &builder, "
+    "mlir::OperationState& result, "
+    "mlir::Type resultType, "
+    "mlir::Value init, "
+    "mlir::ArrayRef<mlir::Value> tensors, "
+    "util::AggregationKind agg, "
+    "util::CombinationKind combo, "
+    "mlir::AffineMap sink, "
+    "mlir::ArrayRef<mlir::AffineMap> srcs, "
+    "mlir::IntegerSet cons, "
+    "mlir::StringRef name"
   >];
 
   let extraClassDeclaration = [{
     static unsigned getNumTensors(CombinationKind combo);
-    static StringRef getSinkAttrName() { return "sink"; }
-    static StringRef getSourcesAttrName() { return "srcs"; }
-    static StringRef getConstraintsAttrName() { return "cons"; }
-    static StringRef getLowerBoundsAttrName() { return "lowerBounds"; }
-    static StringRef getUpperBoundsAttrName() { return "upperBounds"; }
+    static mlir::StringRef getSinkAttrName() { return "sink"; }
+    static mlir::StringRef getSourcesAttrName() { return "srcs"; }
+    static mlir::StringRef getConstraintsAttrName() { return "cons"; }
+    static mlir::StringRef getLowerBoundsAttrName() { return "lowerBounds"; }
+    static mlir::StringRef getUpperBoundsAttrName() { return "upperBounds"; }
 
     unsigned getNumTensors();
     unsigned getNumSymbols();
-    Value getTensor(unsigned i);
-    Value getSymbol(unsigned i);
-    AffineMap getSourceMap(unsigned i);
+    mlir::Value getTensor(unsigned i);
+    mlir::Value getSymbol(unsigned i);
+    mlir::AffineMap getSourceMap(unsigned i);
 
-    void setLowerBounds(ArrayRef<int64_t> bounds);
-    void setUpperBounds(ArrayRef<int64_t> bounds);
-    void setSink(AffineMap sink);
-    void setSources(ArrayRef<AffineMap> srcs);
-    void setConstraints(IntegerSet cons);
+    void setLowerBounds(mlir::ArrayRef<int64_t> bounds);
+    void setUpperBounds(mlir::ArrayRef<int64_t> bounds);
+    void setSink(mlir::AffineMap sink);
+    void setSources(mlir::ArrayRef<mlir::AffineMap> srcs);
+    void setConstraints(mlir::IntegerSet cons);
 
-    RankedTensorType getResultType() { return result().getType().cast<RankedTensorType>(); }
+    mlir::RankedTensorType getResultType() { return result().getType().cast<mlir::RankedTensorType>(); }
 
-    LogicalResult materializeOperands(OpBuilder& builder);
+    mlir::LogicalResult materializeOperands(mlir::OpBuilder& builder);
   }];
 }
 
@@ -93,7 +93,7 @@ class MaterializeOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
     MaterializeOperandsOpInterface
   ])> {
   let extraClassDeclaration = [{
-    LogicalResult materializeOperands(OpBuilder& builder);
+    mlir::LogicalResult materializeOperands(mlir::OpBuilder& builder);
   }];
 }
 
@@ -151,8 +151,8 @@ def PragmaOp : MaterializeOp<"pragma", [
   let results = (outs AnyType:$result);
 
   let builders = [OpBuilder<
-    "OpBuilder &builder, OperationState& result, Value tensor, StringRef op,"
-      "DictionaryAttr attrs", [{
+    "mlir::OpBuilder &builder, mlir::OperationState& result, mlir::Value tensor, mlir::StringRef op,"
+      "mlir::DictionaryAttr attrs", [{
       result.addTypes(tensor.getType());
       result.addOperands(tensor);
       result.addAttribute("op", builder.getStringAttr(op));

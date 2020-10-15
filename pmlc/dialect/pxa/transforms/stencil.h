@@ -190,10 +190,10 @@ protected:
   virtual llvm::Optional<LoadStoreOps> capture() = 0;
   // Determine the cost of the specified stencil
   virtual double getCost(TensorAndIndexPermutation perm,
-                         ArrayRef<int64_t> tileSize) = 0;
+                         llvm::ArrayRef<int64_t> tileSize) = 0;
   // Rewrite `op` by applying the specified stencil
   virtual void transform(TensorAndIndexPermutation perm,
-                         ArrayRef<int64_t> tileSize) = 0;
+                         llvm::ArrayRef<int64_t> tileSize) = 0;
 
   // Get the range of the `idx`th BlockArg
   int64_t getIdxRange(mlir::BlockArgument idx);

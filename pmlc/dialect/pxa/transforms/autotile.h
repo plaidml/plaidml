@@ -74,7 +74,7 @@ private:
 // ArrayRef<int64_t>) to a double, which is 'inf' for infeasible tilings.  For
 // example:
 
-inline double DummyCostModel(ArrayRef<int64_t> tile, double bestCost) {
+inline double DummyCostModel(mlir::ArrayRef<int64_t> tile, double bestCost) {
   return 1.0;
 }
 
@@ -83,7 +83,7 @@ inline double DummyCostModel(ArrayRef<int64_t> tile, double bestCost) {
 template <typename Generator, typename CostModel>
 llvm::SmallVector<int64_t, 8> findBestTileSize(const Generator &generator,
                                                const CostModel &costModel,
-                                               ArrayRef<int64_t> ranges) {
+                                               mlir::ArrayRef<int64_t> ranges) {
   // Build a list of potential tile sizes for each dimension.
   // Basically, we are caching the output of the generator in case it is
   // expensive.

@@ -10,14 +10,16 @@ def MaterializeOperandsOpInterface : OpInterface<"MaterializeOperandsOpInterface
     TODO
   }];
 
+  let cppNamespace = "pmlc::util";
+
   let methods = [
     InterfaceMethod<
       /*desc=*/"",
-      /*retTy=*/"LogicalResult",
+      /*retTy=*/"mlir::LogicalResult",
       /*methodName=*/"materializeOperands",
-      /*args=*/(ins "OpBuilder&":$builder),
+      /*args=*/(ins "mlir::OpBuilder&":$builder),
       /*methodBody=*/[{}],
-      /*defaultImplementation=*/[{ return failure(); }]
+      /*defaultImplementation=*/[{ return mlir::failure(); }]
     >
   ];
 }

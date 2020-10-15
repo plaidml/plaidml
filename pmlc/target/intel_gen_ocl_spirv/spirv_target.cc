@@ -31,7 +31,9 @@ public:
       getOperation().setAttr(
           spirv::getTargetEnvAttrName(),
           spirv::TargetEnvAttr::get(
-              triple, spirv::getDefaultResourceLimits(&getContext())));
+              triple, spirv::Vendor::Unknown, spirv::DeviceType::Unknown,
+              spirv::TargetEnvAttr::kUnknownDeviceID,
+              spirv::getDefaultResourceLimits(&getContext())));
     }
   }
 };

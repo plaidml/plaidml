@@ -5,10 +5,6 @@
 
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
-#ifndef AFFINE_OPS_BASE
-include "mlir/Dialect/Affine/IR/AffineOpsBase.td"
-#endif
-
 include "pmlc/util/enums.td"
 
 #ifndef __PML_ELTWISE_BASE__
