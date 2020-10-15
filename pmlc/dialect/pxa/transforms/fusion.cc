@@ -209,7 +209,14 @@ struct FusionInfo {
       // If sizes do not match, apply tiling later, scale to the
       // loop with subgroupSize != attribute if present
       auto sameSubgroups = subgroupSizeA == subgroupSizeB;
-      if (mulA != mulB) {
+      // TODO: remove these two checks for allowed_subgroups sizes.
+      // Currently when merging loop with subgroupsize = 16 with other loop
+      // subgroup size = 8 or not subgrouped loop (that will be vectorized
+      // for vec size 8 in the subgroups transformation) generated kernel will
+      // cause vulkan crash. Need more debug on the actual rootcause
+      auto allowed_subgroupA = subgroupSizeA == 8 || subgroupSizeA == 1;
+      auto allowed_subgroupB = subgroupSizeB == 8 || subgroupSizeB == 1;
+      if ((mulA != mulB) && allowed_subgroupA && allowed_subgroupB) {
         auto tileSize = reverseFusion ? sizeA / sizeB : sizeB / sizeA;
         if (!tileSize)
           return false;
