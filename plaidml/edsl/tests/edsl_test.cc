@@ -8,6 +8,7 @@
 
 #include <random>
 
+#include "half.hpp"
 #include "llvm/ADT/StringRef.h"
 
 #include "plaidml/edsl/edsl.h"
@@ -16,6 +17,7 @@
 #include "pmlc/util/env.h"
 #include "pmlc/util/logging.h"
 
+using half_float::half;
 using llvm::StringRef;
 using ::testing::ContainerEq;
 using ::testing::Eq;
@@ -72,7 +74,7 @@ TEST_F(CppEdsl, HigherPrecisionConstants) {
 
   std::vector<float> A_input{1, 2, 3, 4, 5, 6, 7, 8, 9};
   std::vector<double> C_output{4, 5, 6, 7, 8, 9, 10, 11, 12};
-  checkProgram(program, {A_input}, {C_output});
+  checkExact(program, {A_input}, {C_output});
 }
 
 TEST_F(CppEdsl, Cast) {
@@ -98,7 +100,7 @@ TEST_F(CppEdsl, Cast) {
                                  7 + (1UL << 24),
                                  8 + (1UL << 31),  //
                                  (1ULL << 32) - 1};
-  checkProgram(program, {A_input}, {B_output});
+  checkExact(program, {A_input}, {B_output});
 }
 
 TEST_F(CppEdsl, BitAndScalar) {
@@ -115,7 +117,7 @@ TEST_F(CppEdsl, BitAndScalar) {
   std::vector<uint64_t> B_output{0, 1, 2,  //
                                  3, 4, 5,  //
                                  6, 7, 8};
-  checkProgram(program, {A_input}, {B_output});
+  checkExact(program, {A_input}, {B_output});
 }
 
 TEST_F(CppEdsl, BitAnd) {
@@ -133,7 +135,7 @@ TEST_F(CppEdsl, BitAnd) {
   std::vector<uint64_t> C_output{1 & 10, 2 & 11, 3 & 12,  //
                                  4 & 13, 5 & 14, 6 & 15,  //
                                  7 & 16, 8 & 17, 9 & 18};
-  checkProgram(program, {A_input, B_input}, {C_output});
+  checkExact(program, {A_input, B_input}, {C_output});
 }
 
 TEST_F(CppEdsl, BitOr) {
@@ -151,7 +153,7 @@ TEST_F(CppEdsl, BitOr) {
   std::vector<uint64_t> C_output{1 | 10, 2 | 11, 3 | 12,  //
                                  4 | 13, 5 | 14, 6 | 15,  //
                                  7 | 16, 8 | 17, 9 | 18};
-  checkProgram(program, {A_input, B_input}, {C_output});
+  checkExact(program, {A_input, B_input}, {C_output});
 }
 
 TEST_F(CppEdsl, BitLeft) {
@@ -169,7 +171,7 @@ TEST_F(CppEdsl, BitLeft) {
   std::vector<uint64_t> C_output{1 << 10, 2 << 11, 3 << 12,  //
                                  4 << 13, 5 << 14, 6 << 15,  //
                                  7 << 16, 8 << 17, 9 << 18};
-  checkProgram(program, {A_input, B_input}, {C_output});
+  checkExact(program, {A_input, B_input}, {C_output});
 }
 
 TEST_F(CppEdsl, BitRightTensor) {
@@ -187,7 +189,7 @@ TEST_F(CppEdsl, BitRightTensor) {
   std::vector<uint64_t> C_output{1, 2, 3,  //
                                  4, 5, 6,  //
                                  7, 8, 9};
-  checkProgram(program, {A_input, B_input}, {C_output});
+  checkExact(program, {A_input, B_input}, {C_output});
 }
 
 TEST_F(CppEdsl, BitRightScalar) {
@@ -201,7 +203,7 @@ TEST_F(CppEdsl, BitRightScalar) {
   std::vector<uint64_t> B_output{1 << 1, 2 << 2, 3 << 3,  //
                                  4 << 4, 5 << 5, 6 << 6,  //
                                  7 << 7, 8 << 8, 9 << 9};
-  checkProgram(program, {A_input}, {B_output});
+  checkExact(program, {A_input}, {B_output});
 }
 
 TEST_F(CppEdsl, BitNot) {
@@ -215,7 +217,7 @@ TEST_F(CppEdsl, BitNot) {
   std::vector<uint8_t> B_output{0xFF, 0xFE, 0xFD,  //
                                 0xEF, 0xEE, 0xDD,  //
                                 0x0F, 0xF0, 0x00};
-  checkProgram(program, {A_input}, {B_output});
+  checkExact(program, {A_input}, {B_output});
 }
 
 TEST_F(CppEdsl, BitXor) {
@@ -233,7 +235,7 @@ TEST_F(CppEdsl, BitXor) {
   std::vector<uint64_t> C_output{0x1 ^ 10, 0x2 ^ 11, 0x3 ^ 12,  //
                                  0x4 ^ 13, 0x5 ^ 14, 0x6 ^ 15,  //
                                  0x7 ^ 16, 0x8 ^ 17, 0x9 ^ 18};
-  checkProgram(program, {A_input, B_input}, {C_output});
+  checkExact(program, {A_input, B_input}, {C_output});
 }
 
 TEST_F(CppEdsl, BroadcastCmp) {
@@ -249,7 +251,7 @@ TEST_F(CppEdsl, BroadcastCmp) {
   std::vector<uint64_t> C_output = {1, 1, 1, 1,  //
                                     0, 0, 1, 1,  //
                                     0, 0, 0, 0};
-  checkProgram(program, {A_input, B_input}, {C_output});
+  checkExact(program, {A_input, B_input}, {C_output});
 }
 
 TEST_F(CppEdsl, Add) {
@@ -290,7 +292,7 @@ TEST_F(CppEdsl, Add) {
                                     16 + (1ULL << 32) + (1ULL << 40),
                                     18 + (1ULL << 40)};
 
-  checkProgram(program, {A_input, B_input}, {C_output});
+  checkExact(program, {A_input, B_input}, {C_output});
 }
 
 TEST_F(CppEdsl, ConstAdd) {
@@ -310,14 +312,14 @@ TEST_F(CppEdsl, ConstAdd) {
   // clang-format on
 
   std::vector<int32_t> expected = {5, 5, 5, 5};
-  checkProgram(program, {}, {expected});
+  checkExact(program, {}, {expected});
 }
 
 TEST_F(CppEdsl, ConstCast) {
   auto O = cast(Tensor{3}, DType::FLOAT32);
   auto program = makeProgram("const_cast", {}, {O});
   std::vector<float> expected = {3.0};
-  checkProgram(program, {}, {expected});
+  checkExact(program, {}, {expected});
 }
 
 TEST_F(CppEdsl, Dot) {
@@ -333,7 +335,7 @@ TEST_F(CppEdsl, Dot) {
   // clang-format off
   // CHECK-LABEL: CppEdsl.Dot
   // CHECK: module @dot
-  // CHECK: %[[cst:.*]] = "eltwise.sconst"{{.*}}-> tensor<f32>
+  // CHECK: %[[cst:.*]] = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> tensor<f32>
   // CHECK: %[[cion:.*]] = tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {{{.*}}}
   // CHECK-SAME: tensor<f32>, tensor<8x16xf32>, tensor<16x32xf32> -> tensor<8x32xf32>
   // CHECK: return %[[cion]] : tensor<8x32xf32>
@@ -358,7 +360,64 @@ TEST_F(CppEdsl, Dot) {
       }
     }
   }
-  checkProgram(program, {in1, in2}, {expected});
+  checkClose(program, {in1, in2}, {expected});
+}
+
+TEST_F(CppEdsl, DotF16) {
+  const int64_t M = 8;
+  const int64_t N = 32;
+  const int64_t K = 16;
+  Tensor A = Placeholder(DType::FLOAT16, {M, K});
+  Tensor B = Placeholder(DType::FLOAT16, {K, N});
+  auto C = Dot(A, B);
+  auto program = makeProgram("dot_f16", {A, B}, {C});
+
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.DotF16
+  // CHECK: module @dot_f16
+  // CHECK: %[[cst:.*]] = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> tensor<f16>
+  // CHECK: %[[cion:.*]] = tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {{{.*}}}
+  // CHECK-SAME: tensor<f16>, tensor<8x16xf16>, tensor<16x32xf16> -> tensor<8x32xf16>
+  // CHECK: return %[[cion]] : tensor<8x32xf16>
+  // clang-format on
+}
+
+TEST_F(CppEdsl, DotF16_AccF32) {
+  const int64_t M = 8;
+  const int64_t N = 32;
+  const int64_t K = 16;
+  Tensor A = Placeholder(DType::FLOAT16, {M, K});
+  Tensor B = Placeholder(DType::FLOAT16, {K, N});
+
+  Tensor A_f32 = cast(A, DType::FLOAT32);
+  Tensor B_f32 = cast(B, DType::FLOAT32);
+  TensorIndex i, j, k;
+  Tensor C_f32 = Contraction().outShape(M, N).outAccess(i, j).sum(A_f32(i, k) * B_f32(k, j));
+  Tensor C = cast(C_f32, DType::FLOAT16);
+
+  auto program = makeProgram("dot_f16_acc_f32", {A, B}, {C});
+
+  std::default_random_engine rng(2);
+  std::normal_distribution<float> normal_dist(0.0, 1.0);
+
+  std::vector<half> in1(M * K);
+  for (unsigned i = 0; i < in1.size(); i++) {
+    in1[i] = normal_dist(rng);
+  }
+  std::vector<half> in2(K * N);
+  for (unsigned i = 0; i < in2.size(); i++) {
+    in2[i] = normal_dist(rng);
+  }
+  std::vector<float> acc(M * N);
+  for (int i = 0; i < M; i++) {
+    for (int j = 0; j < N; j++) {
+      for (int k = 0; k < K; k++) {
+        acc[i * N + j] += in1[i * K + k] * in2[k * N + j];
+      }
+    }
+  }
+  std::vector<half> expected(acc.begin(), acc.end());
+  checkClose(program, {in1, in2}, {expected}, /*tolerance=*/1e-2);
 }
 
 TEST_F(CppEdsl, DoubleDot) {
@@ -403,7 +462,7 @@ TEST_F(CppEdsl, Max) {
       7.0f,  8.0f,  9.0f,   //
   };
   std::vector<float> expected = {-5.0, 6.0, 9.0};
-  checkProgram(program, {input}, {expected});
+  checkExact(program, {input}, {expected});
 }
 
 TEST_F(CppEdsl, EltwiseAdd) {
@@ -442,7 +501,7 @@ TEST_F(CppEdsl, EltwiseMod) {
   std::vector<int32_t> C_output{2 % 1,   4 % 2,   8 % 3,   //
                                 16 % 4,  32 % 5,  64 % 6,  //
                                 128 % 7, 256 % 8, 512 % 9};
-  checkProgram(program, {A_input, B_input}, {C_output});
+  checkExact(program, {A_input, B_input}, {C_output});
 }
 
 TEST_F(CppEdsl, Relu) {
@@ -821,7 +880,7 @@ TEST_F(CppEdsl, Reciprocal) {
   // clang-format on
   std::vector<float> input = {1, 2, 4, 5, 8, 10};
   std::vector<float> expected = {1.0, 0.5, 0.25, 0.2, 0.125, 0.1};
-  checkProgram(program, {input}, {expected});
+  checkExact(program, {input}, {expected});
 }
 
 TEST_F(CppEdsl, ReshapeFold) {
@@ -839,7 +898,7 @@ TEST_F(CppEdsl, ReshapeFold) {
       4, 5, 6,  //
       7, 8, 9,  //
   };
-  checkProgram(program, {input}, {input});
+  checkExact(program, {input}, {input});
 }
 
 TEST_F(CppEdsl, ReshapeScalar) {
@@ -854,7 +913,7 @@ TEST_F(CppEdsl, ReshapeScalar) {
   // CHECK-NEXT: return %[[X0]] : tensor<si32>
   // clang-format on
   std::vector<int32_t> data = {2};
-  checkProgram(program, {data}, {data});
+  checkExact(program, {data}, {data});
 }
 
 TEST_F(CppEdsl, ReshapeIntoScalar) {
@@ -871,7 +930,7 @@ TEST_F(CppEdsl, ReshapeIntoScalar) {
   // clang-format on
 
   std::vector<int32_t> data = {2};
-  checkProgram(program, {data}, {data});
+  checkExact(program, {data}, {data});
 }
 
 TEST_F(CppEdsl, ReshapeFromScalar) {
@@ -887,7 +946,7 @@ TEST_F(CppEdsl, ReshapeFromScalar) {
   // CHECK-NEXT: return %[[X1]] : tensor<1x1x1xsi32>
   // clang-format on
   std::vector<int32_t> data = {2};
-  checkProgram(program, {data}, {data});
+  checkExact(program, {data}, {data});
 }
 
 TEST_F(CppEdsl, DefractLong) {
@@ -962,7 +1021,7 @@ TEST_F(CppEdsl, Shape) {
       1, 2, 3,  //
   };
   std::vector<int32_t> expected = {2, 3};
-  checkProgram(program, {input}, {expected});
+  checkExact(program, {input}, {expected});
 }
 
 TEST_F(CppEdsl, Prng) {
@@ -989,7 +1048,7 @@ TEST_F(CppEdsl, Prng) {
       1052804, 0, 0  //
   };
 
-  checkProgram(program, {state}, {result, new_state});
+  checkClose(program, {state}, {result, new_state});
 }
 
 TEST_F(CppEdsl, Cos) {
@@ -1004,7 +1063,7 @@ TEST_F(CppEdsl, Cos) {
 
   std::vector<float> C_output = {0.283662, 0.96017,  0.753902, -0.653644, 0.283662,
                                  0.96017,  0.753902, -0.1455,  -0.91113};
-  checkProgram(program, {A_input}, {C_output});
+  checkClose(program, {A_input}, {C_output}, /*tolerance=*/1e-4);
 }
 
 TEST_F(CppEdsl, Sin) {
@@ -1022,7 +1081,7 @@ TEST_F(CppEdsl, Sin) {
       -0.756802, 0.958924,  0.891207,  //
       0.656987,  0.989358,  0.412118   //
   };
-  checkProgram(program, {A_input}, {C_output});
+  checkClose(program, {A_input}, {C_output}, /*tolerance=*/1e-4);
 }
 
 TEST_F(CppEdsl, ConvI8) {
@@ -1055,7 +1114,7 @@ TEST_F(CppEdsl, LogicalAnd_uint64) {
   std::vector<int8_t> C_output{1, 1, 1,  //
                                1, 0, 1,  //
                                1, 0, 1};
-  checkProgram(program, {A_input, B_input}, {C_output});
+  checkExact(program, {A_input, B_input}, {C_output});
 }
 
 TEST_F(CppEdsl, LogicalAnd_mixed) {
@@ -1073,7 +1132,7 @@ TEST_F(CppEdsl, LogicalAnd_mixed) {
   std::vector<int8_t> C_output{1, 1, 1,  //
                                1, 0, 1,  //
                                1, 0, 1};
-  checkProgram(program, {A_input, B_input}, {C_output});
+  checkExact(program, {A_input, B_input}, {C_output});
 }
 
 TEST_F(CppEdsl, LogicalOr_uint64) {
@@ -1091,7 +1150,7 @@ TEST_F(CppEdsl, LogicalOr_uint64) {
   std::vector<int8_t> C_output{1, 1, 1,  //
                                1, 0, 1,  //
                                1, 1, 1};
-  checkProgram(program, {A_input, B_input}, {C_output});
+  checkExact(program, {A_input, B_input}, {C_output});
 }
 
 TEST_F(CppEdsl, LogicalOr_float) {
@@ -1109,7 +1168,7 @@ TEST_F(CppEdsl, LogicalOr_float) {
   std::vector<int8_t> C_output{1, 1, 1,  //
                                1, 0, 1,  //
                                1, 1, 1};
-  checkProgram(program, {A_input, B_input}, {C_output});
+  checkExact(program, {A_input, B_input}, {C_output});
 }
 
 TEST_F(CppEdsl, LogicalOr_int32) {
@@ -1127,7 +1186,7 @@ TEST_F(CppEdsl, LogicalOr_int32) {
   std::vector<int8_t> C_output{1, 1, 1,  //
                                1, 0, 1,  //
                                1, 1, 1};
-  checkProgram(program, {A_input, B_input}, {C_output});
+  checkExact(program, {A_input, B_input}, {C_output});
 }
 
 TEST_F(CppEdsl, LogicalNot_int32) {
@@ -1141,7 +1200,7 @@ TEST_F(CppEdsl, LogicalNot_int32) {
   std::vector<int8_t> expected{0, 0, 0,  //
                                0, 1, 0,  //
                                0, 1, 0};
-  checkProgram(program, {input}, {expected});
+  checkExact(program, {input}, {expected});
 }
 
 TEST_F(CppEdsl, LogicalNot_float) {
@@ -1155,7 +1214,7 @@ TEST_F(CppEdsl, LogicalNot_float) {
   std::vector<int8_t> expected{0, 0, 0,  //
                                0, 1, 0,  //
                                0, 1, 0};
-  checkProgram(program, {input}, {expected});
+  checkExact(program, {input}, {expected});
 }
 
 TEST_F(CppEdsl, Asin) {
@@ -1173,7 +1232,7 @@ TEST_F(CppEdsl, Asin) {
       0.411517, 0.523599, 0.643501,  //
       1.5708,   0.0,      -0.643501  //
   };
-  checkProgram(program, {input}, {expected});
+  checkClose(program, {input}, {expected});
 }
 
 TEST_F(CppEdsl, Acos) {
@@ -1191,7 +1250,7 @@ TEST_F(CppEdsl, Acos) {
       1.15928, 1.0472,  0.927295,  //
       0.0,     1.5708,  2.2143     //
   };
-  checkProgram(program, {input}, {expected});
+  checkClose(program, {input}, {expected}, /*tolerance=*/1e-4);
 }
 
 TEST_F(CppEdsl, Atan) {
@@ -1209,7 +1268,7 @@ TEST_F(CppEdsl, Atan) {
       0.380506,  0.463648, 0.54042,   //
       0.785398,  0,        -0.54042   //
   };
-  checkProgram(program, {input}, {expected});
+  checkClose(program, {input}, {expected});
 }
 
 TEST_F(CppEdsl, CosH) {
@@ -1227,7 +1286,7 @@ TEST_F(CppEdsl, CosH) {
       1.08107, 1.12763, 1.18547,  //
       1.54308, 1,       1.18547   //
   };
-  checkProgram(program, {input}, {expected});
+  checkClose(program, {input}, {expected});
 }
 
 TEST_F(CppEdsl, Erf) {
@@ -1245,7 +1304,7 @@ TEST_F(CppEdsl, Erf) {
       0.428392, 0.5205,   0.603856,  //
       0.842701, 0,        -0.603856  //
   };
-  checkProgram(program, {input}, {expected});
+  checkClose(program, {input}, {expected});
 }
 
 TEST_F(CppEdsl, Floor) {
@@ -1263,7 +1322,7 @@ TEST_F(CppEdsl, Floor) {
       -1, -7, 0,  //
       1,  0,  -7  //
   };
-  checkProgram(program, {input}, {expected});
+  checkExact(program, {input}, {expected});
 }
 
 TEST_F(CppEdsl, Pow) {
@@ -1287,7 +1346,7 @@ TEST_F(CppEdsl, Pow) {
       0.353553, 1.83712, 3.95285,  //
       0.176777, 2.75568, 9.88212   //
   };
-  checkProgram(program, {A_input, B_input}, {expected});
+  checkClose(program, {A_input, B_input}, {expected});
 }
 
 TEST_F(CppEdsl, Round) {
@@ -1305,7 +1364,7 @@ TEST_F(CppEdsl, Round) {
       -0, -7, 1,  //
       1,  0,  -7  //
   };
-  checkProgram(program, {input}, {expected});
+  checkExact(program, {input}, {expected});
 }
 
 TEST_F(CppEdsl, SinH) {
@@ -1323,7 +1382,7 @@ TEST_F(CppEdsl, SinH) {
       -1.1752,  0.100167, 0.201336,  //
       1.1752,   2.12928,  74.2032    //
   };
-  checkProgram(program, {input}, {expected});
+  checkClose(program, {input}, {expected});
 }
 
 TEST_F(CppEdsl, Tan) {
@@ -1341,7 +1400,7 @@ TEST_F(CppEdsl, Tan) {
       0.422793, 0.546302, 0.684137,  //
       1.55741,  0,        -0.684137  //
   };
-  checkProgram(program, {input}, {expected});
+  checkClose(program, {input}, {expected}, /*tolerance=*/1e-4);
 }
 
 TEST_F(CppEdsl, Scatter1D) {
@@ -1355,7 +1414,7 @@ TEST_F(CppEdsl, Scatter1D) {
   std::vector<float> updates = {9, 10, 11, 12};
   std::vector<int32_t> shape = {8};
   std::vector<float> expected = {0, 11, 0, 10, 9, 0, 0, 12};
-  checkProgram(program, {indices, updates, shape}, {expected});
+  checkExact(program, {indices, updates, shape}, {expected});
 }
 
 TEST_F(CppEdsl, Scatter3D) {
@@ -1379,7 +1438,7 @@ TEST_F(CppEdsl, Scatter3D) {
       5, 5, 5, 5, 6, 6, 6, 6, 7, 7, 7, 7, 8, 8, 8, 8,  //
       0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0   //
   };
-  checkProgram(program, {indices, updates, shape}, {expected});
+  checkExact(program, {indices, updates, shape}, {expected});
 }
 
 TEST_F(CppEdsl, Trace) {
