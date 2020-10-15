@@ -4,6 +4,7 @@
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/AffineMap.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
 
@@ -21,106 +22,103 @@ namespace omp = mlir::omp;
 
 namespace {
 
-struct ParallelOpConversion : public OpConversionPattern<scf::ParallelOp> {
-  using OpConversionPattern<scf::ParallelOp>::OpConversionPattern;
+LogicalResult convertSCPParallel(scf::ParallelOp op) {
+  IVLOG(2, "convertSCPParallel");
+  OpBuilder builder(op);
 
-  LogicalResult
-  matchAndRewrite(scf::ParallelOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const final {
-    IVLOG(2, "scf::ParallelOpConversion::matchAndRewrite");
+  // Look for a parallel loop.  We expect that it will have a single index,
+  // whose range is the number of threads which should execute it.  We will
+  // generate an OpenMP parallel block which will execute the contents of this
+  // loop.  For the index variable, we will substitute omp_get_thread_num().
+  // We expect that the body of the loop we are transforming will contain some
+  // kind of appropriately tiled affine parallel structure which will derive
+  // the index ranges from the thread number.
 
-    // Look for a parallel loop with the CPU thread tag
-    // We expect that it will have a single index, whose range is the number
-    // of threads which should execute it.
-    // We will generate an OpenMP parallel block which will execute the
-    // contents of this loop.
-    // For the index variable, we will substitute omp_get_thread_num().
-    // We expect that the body of the loop we are transforming will contain
-    // some kind of appropriately tiled affine parallel structure which will
-    // derive the index ranges from the thread number.
-
-    bool isThread = hasUnitTag(op, cpuThreadTag());
-    if (!isThread) {
-      // we only care about parallel ops marked with the thread tag
-      return success();
-    }
-
-    if (op.getNumLoops() != 1) {
-      IVLOG(2, "Can't lower scf::ParallelOp unless number of indexes == 1");
-      op.emitError("Number of loops must be 1");
-      return failure();
-    }
-
-    auto loc = op.getLoc();
-
-    // look up the loop bounds to get the number of threads to run
-    Value lb = op.lowerBound().front();
-    Value ub = op.upperBound().front();
-    IVLOG(2, "DUMP OF LOOP BOUNDS:");
-    lb.dump();
-    ub.dump();
-
-    // dummy thread count until we compute upper bounds value
-    Value numThreads = rewriter.create<ConstantIndexOp>(loc, 8);
-
-    // create the omp parallel fork/join region
-    llvm::ArrayRef<mlir::Type> argTy;
-    Attribute defaultValue, procBindValue;
-    auto parallelOp = rewriter.create<omp::ParallelOp>(
-        loc, argTy, Value(), numThreads,
-        defaultValue.dyn_cast_or_null<StringAttr>(), ValueRange(), ValueRange(),
-        ValueRange(), ValueRange(),
-        procBindValue.dyn_cast_or_null<StringAttr>());
-
-    // create a terminator (representing the join operation)
-    rewriter.createBlock(&parallelOp.getRegion());
-    auto &block = parallelOp.getRegion().back();
-    rewriter.setInsertionPointToStart(&block);
-    rewriter.create<omp::TerminatorOp>(loc);
-    rewriter.setInsertionPointToStart(&block);
-
-    // copy the body of the scf loop into the parallel region
-    auto &insts = op.getBody()->getOperations();
-    block.getOperations().splice(Block::iterator(parallelOp), insts,
-                                 insts.begin(), std::prev(insts.end()));
-
-    // generate a call to omp_get_thread_num()
-    // ...or generate a dummy value, for the moment
-    Value tid = rewriter.create<ConstantIndexOp>(loc, 42);
-
-    // replace all references to the IV with the thread ID
-    auto iv = op.getInductionVars().front();
-    iv.replaceAllUsesWith(tid);
-
-    return success();
+  if (op.getNumLoops() != 1) {
+    IVLOG(2, "Can't lower scf::ParallelOp unless number of indexes == 1");
+    op.emitError("Number of loops must be 1");
+    return failure();
   }
-};
+
+  auto loc = op.getLoc();
+
+  // Look up the loop bounds to get the number of threads to run.
+  APInt lowerAP, upperAP, stepAP;
+  if (!matchPattern(op.lowerBound().front(), m_ConstantInt(&lowerAP)) ||
+      !matchPattern(op.upperBound().front(), m_ConstantInt(&upperAP)) ||
+      !matchPattern(op.step().front(), m_ConstantInt(&stepAP))) {
+    IVLOG(2, "Unable to get constant bounds in scf::ParallelOp");
+    op.emitError("scf.parallel bounds must be constant");
+  }
+
+  // Verify everthing is normalized.
+  uint64_t lower = lowerAP.getLimitedValue();
+  uint64_t upper = upperAP.getLimitedValue();
+  uint64_t step = stepAP.getLimitedValue();
+  IVLOG(2, "lower = " << lower << ", upper = " << upper << ", step = " << step);
+  if (lower != 0 || step != 1) {
+    op.emitError("Non-normalized loops not supported");
+    return failure();
+  }
+
+  auto clauseAttr =
+      StringAttr::get(stringifyClauseDefault(omp::ClauseDefault::defshared),
+                      builder.getContext());
+  // Create the omp parallel fork/join region
+  auto parallelOp = builder.create<omp::ParallelOp>(
+      loc,
+      /*if_expr_va=*/Value(),                      //
+      /*num_threads_var=*/op.upperBound().front(), //
+      /*default_val=*/clauseAttr,                  //
+      /*private_vars=*/ValueRange(),               //
+      /*firstprivate_vars=*/ValueRange(),          //
+      /*shared_vars=*/ValueRange(),                //
+      /*copyin_vars=*/ValueRange(),                //
+      /*proc_bind_val=*/StringAttr());
+
+  // create a terminator (representing the join operation)
+  builder.createBlock(&parallelOp.getRegion());
+  auto *block = &parallelOp.getRegion().back();
+  builder.setInsertionPointToStart(block);
+  auto termOp = builder.create<omp::TerminatorOp>(loc);
+  (void)termOp;
+
+  // copy the body of the scf loop into the parallel region
+  auto &insts = op.getBody()->getOperations();
+  block->getOperations().splice(Block::iterator(termOp), insts, insts.begin(),
+                                std::prev(insts.end()));
+
+  // generate a call to omp_get_thread_num()
+  // ...or generate a dummy value, for the moment
+  builder.setInsertionPointToStart(block);
+  Value tid = builder.create<ConstantIndexOp>(loc, 42);
+  (void)tid;
+
+  // replace all references to the IV with the thread ID
+  auto iv = op.getInductionVars().front();
+  iv.replaceAllUsesWith(tid);
+
+  // Delete old loop + return
+  op.erase();
+  return success();
+}
 
 /// A pass converting SCF parallel loop into the OpenMP dialect.
 struct LowerSCFToOpenMPPass
     : public LowerSCFToOpenMPBase<LowerSCFToOpenMPPass> {
   // Run the dialect converter on the module.
   void runOnOperation() final {
-    ModuleOp module = getOperation();
-    auto context = module.getContext();
-
-    OwningRewritePatternList patterns;
-    populateSCFToOpenMPConversionPatterns(patterns, context);
-
-    ConversionTarget target(*context);
-    target.addLegalDialect<omp::OpenMPDialect>();
-    if (failed(applyPartialConversion(module, target, patterns))) {
-      signalPassFailure();
-    }
+    Operation *op = getOperation();
+    op->walk([&](scf::ParallelOp op) {
+      if (failed(convertSCPParallel(op))) {
+        signalPassFailure();
+        return;
+      }
+    });
   }
 };
 
 } // namespace
-
-void populateSCFToOpenMPConversionPatterns(OwningRewritePatternList &patterns,
-                                           MLIRContext *ctx) {
-  patterns.insert<ParallelOpConversion>(ctx);
-}
 
 std::unique_ptr<mlir::Pass> createLowerSCFToOpenMPPass() {
   return std::make_unique<LowerSCFToOpenMPPass>();
