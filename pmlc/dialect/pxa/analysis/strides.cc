@@ -682,4 +682,31 @@ bool hasPerfectAliasing(const RelativeAccessPattern &aRap,
   return true;
 }
 
+double computeCacheMiss(double cacheElems,
+                        SmallVector<int64_t, 4> tileDimensions,
+                        SmallVector<int64_t, 4> tensorStrides) {
+  // Start with one cache line
+  double cacheLines = 1.0;
+  // Current accumulated maximum value
+  int64_t maxVal = 0;
+  // For each dimension (in sorted order)
+  assert(tileDimensions.size() == tensorStrides.size());
+  for (size_t i = tileDimensions.size(); i > 0; i--) {
+    // Compute gap per step
+    int64_t gap = std::abs(tensorStrides[i - 1]) - maxVal;
+    // Multiply current cache hits by size
+    cacheLines *= static_cast<double>(tileDimensions[i - 1]);
+    // Compute probability that cache line is shared across gap
+    double probShared = 0.0; // Assume it's never shared
+    if (cacheElems != 0.0 && gap < cacheElems) {
+      probShared = 1.0 - (gap / cacheElems);
+    }
+    // Subtract shared elements
+    cacheLines -= probShared * static_cast<double>(tileDimensions[i - 1] - 1);
+    // Update maxVal
+    maxVal += std::abs(tensorStrides[i - 1]) * (tileDimensions[i - 1] - 1);
+  }
+  return cacheLines;
+}
+
 } // namespace pmlc::dialect::pxa

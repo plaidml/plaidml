@@ -26,6 +26,7 @@ plaidml_cc_library(
         "autotile.cc",
         "buffer_placement.cc",
         "cache.cc",
+        "cpu_thread.cc",
         "dataflow_opt.cc",
         "fusion.cc",
         "gpu_thread.cc",

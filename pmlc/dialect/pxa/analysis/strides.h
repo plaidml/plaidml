@@ -226,4 +226,12 @@ bool hasPerfectAliasing(
     const RelativeAccessPattern &aRap, RelativeAccessPattern bRap,
     const mlir::DenseMap<mlir::BlockArgument, mlir::BlockArgument> &bToA);
 
+// Compute the number of cache misses for a given tile dimensions and strides
+// cacheElems = cache size in elements = cache size / element width in bytes
+// tileDimensions = dimensions of the tile to be loaded into cache
+// tensorStrides = natural / flat strides of the untiled tensor
+double computeCacheMiss(double cacheElems,
+                        mlir::SmallVector<int64_t, 4> tileDimensions,
+                        mlir::SmallVector<int64_t, 4> tensorStrides);
+
 } // namespace pmlc::dialect::pxa
