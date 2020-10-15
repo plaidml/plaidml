@@ -120,23 +120,30 @@ struct SubgroupCostModel {
       IVLOG(3, "Not part of block");
       return false;
     }
-    auto maybeFlatStrides = computeStrideInfo(ioOp);
-    if (!maybeFlatStrides) {
-      IVLOG(3, "Not strided");
-      return false;
-    }
-    allFlatStrides.push_back(*maybeFlatStrides);
-    IVLOG(3, "  flat strides = " << *maybeFlatStrides);
 
     auto maybeDimStrides =
         computeStrideInfo(ioOp.getAffineMap(), ioOp.getMapOperands());
     if (!maybeDimStrides) {
-      IVLOG(3, "Not strided");
+      IVLOG(3, "Cannot compute dimensionalized strides");
       return false;
     }
-    allDimStrides.push_back(*maybeDimStrides);
+    ioDimStrides.push_back(*maybeDimStrides);
     IVLOG(3, "  dimensional strides = " << *maybeDimStrides)
 
+    auto memreftype = ioOp.getMemRefType();
+
+    int64_t offset;
+    SmallVector<int64_t, 4> tensorStrides;
+    if (failed(getStridesAndOffset(memreftype, tensorStrides, offset))) {
+      IVLOG(3, "Cannot compute tensor strides");
+      return false;
+    }
+    ioTensorStrides.push_back(tensorStrides);
+    IVLOG(3, "  dimensional strides = " << tensorStrides);
+
+    auto elementtype = memreftype.getElementType();
+    assert(elementtype.isIntOrFloat());
+    ioElementSizesInBytes.push_back(elementtype.getIntOrFloatBitWidth() / 8);
     return true;
   }
 
@@ -175,88 +182,31 @@ struct SubgroupCostModel {
     return;
   }
 
-  double memoryIO(double cacheElems, SmallVector<int64_t, 4> tensorDimensions,
-                  SmallVector<int64_t, 4> tensorStrides) {
-    // Start with one cache line
-    double cacheLines = 1.0;
-    // Current accumulated maximum value
-    int64_t maxVal = 0;
-    // For each dimension (in sorted order)
-    assert(tensorDimensions.size() == tensorStrides.size());
-    for (size_t i = tensorDimensions.size(); i > 0; i--) {
-      // Compute gap per step
-      int64_t gap = std::abs(tensorStrides[i - 1]) - maxVal;
-      // Multiply current cache hits by size
-      cacheLines *= static_cast<double>(tensorDimensions[i - 1]);
-      // Compute probability that cache line is shared across gap
-      double probShared = 0.0; // Assume it's never shared
-      if (cacheElems != 0.0 && gap < cacheElems) {
-        probShared = 1.0 - (gap / cacheElems);
-      }
-      // Subtract shared elements
-      cacheLines -=
-          probShared * static_cast<double>(tensorDimensions[i - 1] - 1);
-      // Update maxVal
-      maxVal += std::abs(tensorStrides[i - 1]) * (tensorDimensions[i - 1] - 1);
-    }
-    return cacheLines;
-  }
-
   struct MemInfo {
     unsigned subgroupCount;
     int64_t registers;
     int64_t accesses;
     double cacheMiss;
-    SmallVector<int64_t, 4> tensorStrides;
     SmallVector<int64_t, 4> tensorDimensions;
   };
 
-  size_t getIndexByArgument(mlir::BlockArgument arg) {
-    size_t index = ranges.size();
-    for (size_t i = 0; i < ranges.size(); ++i) {
-      auto iv = op.getIVs()[i];
-      if (iv == arg) {
-        index = i;
-        break;
-      }
-    }
-    assert(index != ranges.size());
-    return index;
-  }
-
   MemInfo computeMemoryInfo(SmallVector<StrideInfo, 4> dimStrides,
-                            StrideInfo flatStrides) {
+                            SmallVector<int64_t, 4> tensorStrides,
+                            unsigned elementSizeInBytes) {
     MemInfo out = {0, 1, 1, 0.0};
-    for (auto positionalDimStrides : dimStrides) {
-      // no strides, nothing to do
-      if (positionalDimStrides.strides.empty()) {
-        continue;
-      }
-
+    assert(dimStrides.size() == tensorStrides.size());
+    for (size_t i = 0; i < dimStrides.size(); i++) {
       int64_t pos = 0;
       int64_t neg = 0;
-      int64_t tensorStride = 0;
-      bool hasTensorStride = false;
 
-      for (auto kvp : positionalDimStrides.strides) {
-        auto index = getIndexByArgument(kvp.first);
+      for (auto kvp : dimStrides[i].strides) {
+        auto index = kvp.first.getArgNumber();
         auto dimStride = kvp.second;
 
-        // dim strides should be a superset of flat strides
-        assert(flatStrides.strides.count(kvp.first));
-        auto flatStride = flatStrides.strides[kvp.first];
-
-        // set tensor stride the first time through the loop
-        if (!hasTensorStride) {
-          hasTensorStride = true;
-          tensorStride = flatStride / dimStride;
-          if (tensorStride == 1 &&
-              plan.subgroupTile[index] == plan.subgroupSize) {
-            out.subgroupCount++;
-          }
+        if (plan.subgroupTile[index] == plan.subgroupSize &&
+            tensorStrides[i] == 1) {
+          out.subgroupCount++;
         }
-        // tensor = flat / dim should be invariant
-        assert(tensorStride == flatStride / dimStride);
 
         if (dimStride > 0) {
           pos += dimStride * (plan.innerTile[index] - 1);
@@ -269,13 +219,12 @@ struct SubgroupCostModel {
 
       auto dimSize = pos - neg + 1;
       out.registers *= dimSize;
-      out.tensorStrides.push_back(tensorStride);
       out.tensorDimensions.push_back(dimSize);
     }
 
-    // TODO: need to get data type size from op
-    out.cacheMiss = memoryIO(params.cacheWidth / 4, out.tensorDimensions,
-                             out.tensorStrides);
+    out.cacheMiss = computeCacheMiss(params.cacheWidth / elementSizeInBytes,
+                                     out.tensorDimensions, tensorStrides);
+
     return out;
   }
 
@@ -284,13 +233,13 @@ struct SubgroupCostModel {
     int64_t totAccesses = 0;
     double totCacheMiss = 0.0;
 
-    assert(allFlatStrides.size() == allDimStrides.size());
-    for (size_t i = 0; i < allFlatStrides.size(); i++) {
-      auto mi = computeMemoryInfo(allDimStrides[i], allFlatStrides[i]);
-      if (i == 0 && mi.subgroupCount == 0) {
+    for (size_t i = 0; i < ioDimStrides.size(); i++) {
+      auto mi = computeMemoryInfo(ioDimStrides[i], ioTensorStrides[i],
+                                  ioElementSizesInBytes[i]);
+      if (mi.subgroupCount > 1) {
         return std::numeric_limits<double>::infinity();
       }
-      if (mi.subgroupCount > 0) {
+      if (i == 0 && mi.subgroupCount == 0) {
         return std::numeric_limits<double>::infinity();
       }
 
@@ -337,8 +286,9 @@ struct SubgroupCostModel {
   // Cache of the index ranges
   SmallVector<int64_t, 8> ranges;
   // Strides for all io ops
-  SmallVector<StrideInfo, 4> allFlatStrides;
-  SmallVector<SmallVector<StrideInfo, 4>, 4> allDimStrides;
+  SmallVector<SmallVector<StrideInfo, 4>, 4> ioDimStrides;
+  SmallVector<SmallVector<int64_t, 4>, 4> ioTensorStrides;
+  SmallVector<unsigned, 4> ioElementSizesInBytes;
 };
 
 void SubgroupApply(AffineParallelOp op, SubgroupPlan plan) {
