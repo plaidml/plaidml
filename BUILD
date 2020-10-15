@@ -41,6 +41,7 @@ pkg_tar(
         "//plaidml/bridge/keras:wheel",
         "//plaidml/edsl/tests:cc_test",
         "//plaidml/edsl/tests:edsl_test-skip.intel_gen.txt",
+        "//plaidml/edsl/tests:edsl_test-skip.intel_gen_ocl_spirv.txt",
     ],
     extension = "tar.gz",
 )
