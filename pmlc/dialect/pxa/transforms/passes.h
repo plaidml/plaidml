@@ -27,8 +27,10 @@ std::unique_ptr<mlir::Pass> createBufferPlacementPass();
 
 std::unique_ptr<mlir::Pass> createCachePass();
 
-std::unique_ptr<mlir::Pass>
+std::unique_ptr<mlir::Pass> createCPUThreadPass();
+std::unique_ptr<mlir::Pass> createCPUThreadPass(unsigned threads);
 
+std::unique_ptr<mlir::Pass>
 createFusionPass(int64_t memoryActivityThreshold = 0, bool exactlyMatch = false,
                  bool tiledFusion = false, int64_t loopDepth = 0);
 
