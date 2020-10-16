@@ -88,15 +88,30 @@ LogicalResult convertSCPParallel(scf::ParallelOp op) {
   block->getOperations().splice(Block::iterator(termOp), insts, insts.begin(),
                                 std::prev(insts.end()));
 
-  // generate a call to omp_get_thread_num()
-  // ...or generate a dummy value, for the moment
+  // generate a call to omp_get_thread_num() at the start of the block
   builder.setInsertionPointToStart(block);
-  Value tid = builder.create<ConstantIndexOp>(loc, 42);
-  (void)tid;
+  const char *threadFuncName = "omp_get_thread_num";
+  SmallVector<Value, 0> emptyOperands;
+  auto indexType = builder.getIndexType();
+  auto callOp = builder.create<mlir::CallOp>(
+      loc, mlir::ArrayRef<mlir::Type>{indexType},
+      builder.getSymbolRefAttr(threadFuncName), emptyOperands);
+  Value tid = callOp.getResult(0);
 
-  // replace all references to the IV with the thread ID
+  // replace all references to the original IV with the thread ID, since we
+  // are replacing each loop iteration with one threaded execution
   auto iv = op.getInductionVars().front();
   iv.replaceAllUsesWith(tid);
+
+  // make sure the module contains a declaration for omp_get_thread_num
+  auto module = op.getParentOfType<ModuleOp>();
+  if (!module.lookupSymbol(threadFuncName)) {
+    mlir::OpBuilder subBuilder(module.getBody()->getTerminator());
+    subBuilder.create<mlir::FuncOp>(
+        module.getLoc(), threadFuncName,
+        mlir::FunctionType::get({}, mlir::ArrayRef<mlir::Type>{indexType},
+                                subBuilder.getContext()));
+  }
 
   // Delete old loop + return
   op.erase();
