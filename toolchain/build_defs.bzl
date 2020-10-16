@@ -84,11 +84,6 @@ def _impl(ctx):
                     flag_group(
                         flags = [
                             "-fstack-protector",
-                            "-Wall",
-                            "-Wunused-but-set-parameter",
-                            "-Wno-free-nonheap-object",
-                            "-Wno-error=pragmas",
-                            "-Wno-unknown-pragmas",
                             "-fno-omit-frame-pointer",
                         ],
                     ),
@@ -110,7 +105,6 @@ def _impl(ctx):
                             "-ffunction-sections",
                             "-fdata-sections",
                             "-U_FORTIFY_SOURCE",
-                            "-D_FORTIFY_SOURCE=1",
                         ],
                     ),
                 ],
@@ -153,7 +147,9 @@ def _impl(ctx):
                 actions = compile_actions,
                 flag_groups = [
                     flag_group(
-                        flags = ["%{user_compile_flags}"],
+                        flags = [
+                            "%{user_compile_flags}",
+                        ],
                         iterate_over = "user_compile_flags",
                         expand_if_available = "user_compile_flags",
                     ),

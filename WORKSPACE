@@ -3,6 +3,17 @@ workspace(name = "com_intel_plaidml")
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
+# Rule repository
+http_archive(
+    name = "rules_foreign_cc",
+    strip_prefix = "rules_foreign_cc-master",
+    url = "https://github.com/bazelbuild/rules_foreign_cc/archive/master.zip",
+)
+
+load("@rules_foreign_cc//:workspace_definitions.bzl", "rules_foreign_cc_dependencies")
+
+rules_foreign_cc_dependencies()
+
 # define this first in case any repository rules want to use it
 http_archive(
     name = "bazel_skylib",
@@ -57,9 +68,14 @@ load("@llvm_toolchain//:toolchains.bzl", "llvm_register_toolchains")
 
 llvm_register_toolchains()
 
-load("//vendor/openvino:workspace.bzl", "openvino_workspace")
-
-openvino_workspace()
+#load("//vendor/openvino:workspace.bzl", "openvino_workspace")
+#
+#openvino_workspace()
+new_local_repository(
+    name = "openvino",
+    build_file = "//vendor/openvino:openvino.BUILD",
+    path = "/home/brian/openvino",
+)
 
 load("//vendor/tensorflow:workspace.bzl", "plaidml_tf_workspace")
 
