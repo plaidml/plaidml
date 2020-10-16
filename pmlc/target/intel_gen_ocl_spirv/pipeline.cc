@@ -64,8 +64,8 @@ void pipelineBuilder(OpPassManager &pm) {
 
   // Do tiled fusion
   pm.addPass(pxa::createFusionPass(0 /*memoryActivityThreshold*/,
-                                   false /*exactlyMatch*/,
-                                   false /*tiledFusion*/, 0 /*loopDepth*/));
+                                   false /*exactlyMatch*/, true /*tiledFusion*/,
+                                   3 /*loopDepth*/));
   pm.addPass(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(pxa::createMemRefDataFlowOptPass(true /*onlyParallelNested*/));
@@ -87,7 +87,7 @@ void pipelineBuilder(OpPassManager &pm) {
 
   // Unroll affine.for loops.
   pm.addPass(createLoopUnrollPass(
-      /*unrollFactor=*/6,
+      /*unrollFactor=*/256,
       /*unrollUpToFactor=*/true));
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
@@ -106,11 +106,11 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(dialect::stdx::createI1StorageToI32Pass());
 
   // Devectorize
-  pm.addPass(pmlc::target::intel_gen::createSubgroupBroadcastPass());
+  pm.addPass(pmlc::target::intel_gen::createSubgroupBroadcastPass(true));
   pm.addPass(createCSEPass());
 
   // Lower mapped scf.parallel's to GPU
-  pm.addPass(createParallelLoopToGpuPass());
+  pm.addPass(pmlc::target::intel_gen::createParallelLoopToGpuPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
