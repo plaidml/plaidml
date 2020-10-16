@@ -73,58 +73,8 @@ static void setupTargetTriple(llvm::Module *llvmModule) {
   llvmModule->setTargetTriple(targetTriple);
 }
 
-static std::string makePackedFunctionName(StringRef name) {
-  return "_mlir_" + name.str();
-}
-
 static std::string makeCWrapperFunctionName(StringRef name) {
-  return "_mlir_ciface_" + name.str();
-}
-
-// Define an interface function that wraps all the arguments of the original
-// function and all its results into an i8** pointer to provide a unified
-// invocation interface.
-static void packFunctionArguments(llvm::Module *module, StringRef entry) {
-  auto &ctx = module->getContext();
-  llvm::IRBuilder<> builder(ctx);
-  auto funcName = makeCWrapperFunctionName(entry);
-  auto *func = module->getFunction(funcName);
-  if (!func) {
-    throw std::runtime_error("Could not find function: " + funcName);
-  }
-
-  // Given a function `foo(<...>)`, define the interface function
-  // `mlir_foo(i8**)`.
-  auto newType = llvm::FunctionType::get(builder.getVoidTy(),
-                                         builder.getInt8PtrTy()->getPointerTo(),
-                                         /*isVarArg=*/false);
-  auto newName = makePackedFunctionName(entry);
-  auto funcCst = module->getOrInsertFunction(newName, newType);
-  llvm::Function *interfaceFunc = cast<llvm::Function>(funcCst.getCallee());
-
-  // Extract the arguments from the type-erased argument list and cast them to
-  // the proper types.
-  auto bb = llvm::BasicBlock::Create(ctx);
-  bb->insertInto(interfaceFunc);
-  builder.SetInsertPoint(bb);
-  llvm::Value *argList = interfaceFunc->arg_begin();
-  SmallVector<llvm::Value *, 8> args;
-  args.reserve(llvm::size(func->args()));
-  for (auto &indexedArg : llvm::enumerate(func->args())) {
-    llvm::Value *argIndex = llvm::Constant::getIntegerValue(
-        builder.getInt64Ty(), APInt(64, indexedArg.index()));
-    llvm::Value *argPtrPtr = builder.CreateGEP(argList, argIndex);
-    llvm::Value *argPtr = builder.CreateLoad(argPtrPtr);
-    llvm::Value *arg =
-        builder.CreateBitCast(argPtr, indexedArg.value().getType());
-    args.push_back(arg);
-  }
-
-  // Call the implementation function with the extracted arguments.
-  builder.CreateCall(func, args);
-
-  // The interface function returns void.
-  builder.CreateRetVoid();
+  return "_mlir_wrapper__mlir_ciface_" + name.str();
 }
 
 namespace {
@@ -139,11 +89,10 @@ private:
   };
 
 public:
-  MemRefDescriptor(void *data, RankedTensorType type)
-      : memory(computeSize(type)) {
-    auto base = reinterpret_cast<Base *>(memory.data());
-    base->basePtr = data;
-    base->data = data;
+  explicit MemRefDescriptor(RankedTensorType type) : memory(computeSize(type)) {
+    auto base = getBase();
+    base->basePtr = nullptr;
+    base->data = nullptr;
     auto rank = type.getRank();
     auto shape = type.getShape();
     auto memRefType = MemRefType::get(shape, type.getElementType());
@@ -157,6 +106,12 @@ public:
 
   void *ptr() { return memory.data(); }
 
+  void setDataPtr(void *data) {
+    auto base = getBase();
+    base->basePtr = data;
+    base->data = data;
+  }
+
 private:
   static unsigned computeSize(RankedTensorType type) {
     return sizeof(void *) +                   // allocatedPtr
@@ -166,13 +121,15 @@ private:
            sizeof(int64_t) * type.getRank();  // strides
   }
 
+  Base *getBase() { return reinterpret_cast<Base *>(memory.data()); }
+
   std::vector<char> memory;
 };
 
 using Network = void;
-using SetupFunc = Network *(*)(Device *);
-using ExecuteFunc = void (*)(void ** /* Network* followed by descriptor ptrs*/);
-using TeardownFunc = void (*)(Network *);
+using SetupFunc = void *(*)(void ** /* Device* followed by descriptor ptrs */);
+using ExecuteFunc = void *(*)(void *);
+using TeardownFunc = void *(*)(void *);
 
 struct ABI {
   SetupFunc setupFunc = nullptr;
@@ -249,7 +206,7 @@ struct MCJITEngineImpl : EngineImpl {
     abi.setupFunc =
         getFunc<SetupFunc>(makeCWrapperFunctionName(util::kPlaidmlInit));
     abi.executeFunc =
-        getFunc<ExecuteFunc>(makePackedFunctionName(util::kPlaidmlExec));
+        getFunc<ExecuteFunc>(makeCWrapperFunctionName(util::kPlaidmlExec));
     abi.teardownFunc =
         getFunc<TeardownFunc>(makeCWrapperFunctionName(util::kPlaidmlFini));
     return abi;
@@ -327,7 +284,7 @@ struct OrcJITEngineImpl : EngineImpl {
     abi.setupFunc =
         getFunc<SetupFunc>(makeCWrapperFunctionName(util::kPlaidmlInit));
     abi.executeFunc =
-        getFunc<ExecuteFunc>(makePackedFunctionName(util::kPlaidmlExec));
+        getFunc<ExecuteFunc>(makeCWrapperFunctionName(util::kPlaidmlExec));
     abi.teardownFunc =
         getFunc<TeardownFunc>(makeCWrapperFunctionName(util::kPlaidmlFini));
     return abi;
@@ -392,6 +349,8 @@ public:
       llvm::sys::DynamicLibrary::LoadLibraryPermanently(nullptr);
     });
 
+    IVLOG(3, "In JitExecutable::JitExecutable");
+
     EngineKind kind = EngineKind::OrcJIT;
     auto jit = pmlc::util::getEnvVar("LLVM_JIT");
     if (jit == "ORC") {
@@ -411,69 +370,87 @@ public:
       throw std::runtime_error("Invalid EngineKind");
     }
 
+    IVLOG(3, "Translating to LLVMIR");
+
     auto ctx = std::make_unique<llvm::LLVMContext>();
     auto llvmModule = translateModuleToLLVMIR(*program->module, *ctx);
     if (!llvmModule) {
       throw std::runtime_error("could not convert to LLVM IR");
     }
+    IVLOG(3, "Setting target triple");
 
     setupTargetTriple(llvmModule.get());
-    packFunctionArguments(llvmModule.get(), util::kPlaidmlExec);
 
-    if (VLOG_IS_ON(6)) {
+    if (VLOG_IS_ON(3)) {
       llvmModule->print(llvm::errs(), nullptr);
     }
 
+    IVLOG(3, "Compiling");
     abi = impl->compile(std::move(llvmModule), std::move(ctx));
     if (!abi) {
       throw std::runtime_error("Entrypoint functions not found");
     }
+
+    IVLOG(3, "Building memrefs");
+    buildMemrefDescriptors();
+    IVLOG(3, "Calling setup");
+    networkState = abi.setupFunc(ptrs.data());
+    if (!networkState) {
+      throw std::runtime_error("Unable to initialize the network");
+    }
+    IVLOG(3, "Compiled");
   }
 
-  ~JitExecutable() { abi.teardownFunc(network); }
+  ~JitExecutable() {
+    if (networkState) {
+      abi.teardownFunc(networkState);
+      std::free(networkState);
+    }
+  }
 
   void invoke(mlir::ArrayRef<util::BufferPtr> inputBuffers,
               mlir::ArrayRef<util::BufferPtr> outputBuffers) final {
+    if (inputBuffers.size() != program->inputs.size()) {
+      throw std::runtime_error("Program input arguments and buffers mismatch");
+    }
+    if (outputBuffers.size() != program->outputs.size()) {
+      throw std::runtime_error(
+          "Program outputs arguments and buffers mismatch");
+    }
     StopWatch stopWatch;
     if (VLOG_IS_ON(1)) {
       stopWatch.start();
     }
-    bindArguments(inputBuffers, outputBuffers);
-    abi.executeFunc(ptrs.data());
+    auto dp = descriptors.begin();
+    for (auto &bp : inputBuffers) {
+      (dp++)->setDataPtr(bp->data());
+    }
+    std::advance(dp, program->constants.size());
+    for (auto &bp : outputBuffers) {
+      (dp++)->setDataPtr(bp->data());
+    }
+    IVLOG(3, "Running executable");
+    abi.executeFunc(networkState);
+    IVLOG(3, "Executable complete");
     if (VLOG_IS_ON(1)) {
       stopWatch.stop();
       IVLOG(1, "Execution time: " << stopWatch.delta_ms() << "ms");
     }
   }
 
-  void bindArguments(ArrayRef<util::BufferPtr> inputBuffers,
-                     ArrayRef<util::BufferPtr> outputBuffers) {
-    if (inputBuffers.size() != program->inputs.size()) {
-      throw std::runtime_error("Program input arguments and buffers mismatch");
-    }
+  void buildMemrefDescriptors() {
+    ptrs.push_back(device.get());
 
-    if (outputBuffers.size() != program->outputs.size()) {
-      throw std::runtime_error(
-          "Program outputs arguments and buffers mismatch");
-    }
-
-    descriptors.clear();
-    ptrs.clear();
-
-    network = abi.setupFunc(this->device.get());
-    ptrs.push_back(network);
-
-    for (auto [type, buffer] : llvm::zip(program->inputs, inputBuffers)) {
-      descriptors.emplace_back(buffer->data(), type.cast<RankedTensorType>());
+    for (auto type : program->inputs) {
+      descriptors.emplace_back(type.cast<RankedTensorType>());
       ptrs.push_back(descriptors.back().ptr());
     }
     for (const compiler::ConstantArgument &arg : program->constants) {
-      descriptors.emplace_back(arg.buffer->data(),
-                               arg.type.cast<RankedTensorType>());
+      descriptors.emplace_back(arg.type.cast<RankedTensorType>());
       ptrs.push_back(descriptors.back().ptr());
     }
-    for (auto [type, buffer] : llvm::zip(program->outputs, outputBuffers)) {
-      descriptors.emplace_back(buffer->data(), type.cast<RankedTensorType>());
+    for (auto type : program->outputs) {
+      descriptors.emplace_back(type.cast<RankedTensorType>());
       ptrs.push_back(descriptors.back().ptr());
     }
   }
@@ -485,7 +462,7 @@ private:
   std::vector<MemRefDescriptor> descriptors;
   std::vector<void *> ptrs;
   ABI abi;
-  void *network = nullptr;
+  void *networkState = nullptr;
 };
 
 } // namespace

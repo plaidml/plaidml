@@ -24,8 +24,11 @@ private:
   mlir::FuncOp getNetworkEntry();
 
   void makePlaidmlInit(mlir::OpBuilder &builder);
-  void makePlaidmlExecute(mlir::OpBuilder &builder, mlir::FuncOp entryFunc);
+  void makePlaidmlExec(mlir::OpBuilder &builder);
   void makePlaidmlFini(mlir::OpBuilder &builder);
+
+  mlir::FuncOp entryFunc;
+  mlir::FunctionType entryType;
 
   LLVMType llvmInt32Type;
   LLVMType llvmPtrTy;
@@ -33,15 +36,16 @@ private:
 };
 
 void MakeEntrypointsPass::runOnOperation() {
-  mlir::FuncOp entryFunc = getNetworkEntry();
+  entryFunc = getNetworkEntry();
   if (!entryFunc) {
     return;
   }
+  entryType = entryFunc.getType();
 
   initMembers();
   mlir::OpBuilder builder(getOperation().getBody()->getTerminator());
   makePlaidmlInit(builder);
-  makePlaidmlExecute(builder, entryFunc);
+  makePlaidmlExec(builder);
   makePlaidmlFini(builder);
 }
 
@@ -55,19 +59,18 @@ void MakeEntrypointsPass::initMembers() {
 mlir::FuncOp MakeEntrypointsPass::getNetworkEntry() {
   mlir::FuncOp entryFunc;
 
-  getOperation().walk([&](mlir::FuncOp func) {
+  for (auto func : getOperation().getOps<mlir::FuncOp>()) {
     if (func.isExternal() || func.getName() != networkMain) {
-      return mlir::WalkResult::advance();
+      continue;
     }
     if (entryFunc) {
       getOperation().emitError(
           "Expected only one entrypoint function definition");
       signalPassFailure();
-      return mlir::WalkResult::interrupt();
+      break;
     }
     entryFunc = func;
-    return mlir::WalkResult::advance();
-  });
+  }
   if (!entryFunc) {
     getOperation().emitError(
         "Expected a single entrypoint function definition");
@@ -78,73 +81,66 @@ mlir::FuncOp MakeEntrypointsPass::getNetworkEntry() {
 }
 
 void MakeEntrypointsPass::makePlaidmlInit(mlir::OpBuilder &builder) {
-  // This method builds:
+  // This method builds a trivial passthrough plaidml_init:
   //
-  //   Network* plaidml_init(Device* device) {
-  //     return device;  // Network == Device for now.
+  //   (Device*, memref...) plaidml_init(Device* device, memref...) {
+  //     return device, memref...;
   //   }
   //
-  // This is a rather trivial function; the plan is to expand it later.
-  // In particular, the Network parameter gives networks a mechanism to carry
-  // additional information from plaidml_init to plaidml_exec and
-  // plaidml_fini.
-  auto func = builder.create<mlir::FuncOp>(
-      getLoc(), util::kPlaidmlInit,
-      builder.getFunctionType({llvmPtrTy}, {llvmPtrTy}));
-  auto block = func.addEntryBlock();
-  mlir::OpBuilder::InsertionGuard guard(builder);
-  builder.setInsertionPointToStart(block);
-  builder.create<mlir::ReturnOp>(
-      getLoc(), mlir::ArrayRef<mlir::Value>{block->getArgument(0)});
-}
+  // ... with one exception: if the existing entry function does not take an
+  // initial pointer parameter, the device pointer is omitted from the return
+  // values.
 
-void MakeEntrypointsPass::makePlaidmlExecute(mlir::OpBuilder &builder,
-                                             mlir::FuncOp entryFunc) {
-  // This method builds:
-  //
-  //   void plaidml_exec(Network* network, memref...) {
-  //     // N.B. main() may not take a Network parameter.
-  //     main(network, memref...);
-  //   }
-  //
-  // This is a rather trivial function; the plan is to expand it later.
-
-  auto entryType = entryFunc.getType();
   auto entryInputTypes = entryType.getInputs();
-  mlir::SmallVector<mlir::Type, 8> inputTypes;
-  bool addedNetworkArgument = false;
+  mlir::SmallVector<mlir::Type, 8> initInputTypes;
+  bool addedDeviceArgument = false;
   if (!entryInputTypes.size() ||
       !entryInputTypes[0].isa<LLVM::LLVMPointerType>()) {
-    addedNetworkArgument = true;
-    inputTypes.push_back(llvmPtrTy);
+    addedDeviceArgument = true;
+    initInputTypes.push_back(llvmPtrTy);
   }
   for (auto ty : entryInputTypes) {
-    inputTypes.push_back(ty);
+    initInputTypes.push_back(ty);
   }
   auto func = builder.create<mlir::FuncOp>(
-      getLoc(), util::kPlaidmlExec, builder.getFunctionType(inputTypes, {}));
+      getLoc(), util::kPlaidmlInit,
+      builder.getFunctionType(initInputTypes, entryInputTypes));
   auto block = func.addEntryBlock();
   mlir::OpBuilder::InsertionGuard guard(builder);
   builder.setInsertionPointToStart(block);
-  auto args = block->getArguments();
-  mlir::SmallVector<mlir::Value, 8> callArgs;
-  auto firstIt = args.begin();
-  if (addedNetworkArgument) {
-    ++firstIt;
+  auto argsBegin = block->args_begin();
+  if (addedDeviceArgument) {
+    ++argsBegin;
   }
-  std::copy(firstIt, args.end(), std::back_inserter(callArgs));
-  builder.create<mlir::CallOp>(getLoc(), entryFunc, callArgs);
+  builder.create<mlir::ReturnOp>(
+      getLoc(), mlir::ArrayRef<mlir::Value>(argsBegin, block->args_end()));
+}
+
+void MakeEntrypointsPass::makePlaidmlExec(mlir::OpBuilder &builder) {
+  // This method builds a trivial passthrough plaidml_exec:
+  //
+  //   void plaidml_exec(args...) {
+  //     main(args...);
+  //   }
+
+  auto func = builder.create<mlir::FuncOp>(
+      getLoc(), util::kPlaidmlExec,
+      builder.getFunctionType(entryType.getInputs(), {}));
+  auto block = func.addEntryBlock();
+  mlir::OpBuilder::InsertionGuard guard(builder);
+  builder.setInsertionPointToStart(block);
+  builder.create<mlir::CallOp>(getLoc(), entryFunc, block->getArguments());
   builder.create<mlir::ReturnOp>(getLoc(), mlir::ArrayRef<mlir::Value>{});
 }
 
 void MakeEntrypointsPass::makePlaidmlFini(mlir::OpBuilder &builder) {
-  // This method builds:
+  // This method builds a trivial plaidml_fini:
   //
-  //   void plaidml_fini(Network* network) {}
-  //
-  // This is a rather trivial function; the plan is to expand it later.
+  //   void plaidml_fini(args...) {}
+
   auto func = builder.create<mlir::FuncOp>(
-      getLoc(), util::kPlaidmlFini, builder.getFunctionType({llvmPtrTy}, {}));
+      getLoc(), util::kPlaidmlFini,
+      builder.getFunctionType({entryType.getInputs()}, {}));
   auto block = func.addEntryBlock();
   mlir::OpBuilder::InsertionGuard guard(builder);
   builder.setInsertionPointToStart(block);

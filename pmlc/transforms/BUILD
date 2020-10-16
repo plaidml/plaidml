@@ -23,6 +23,7 @@ gentbl(
 plaidml_cc_library(
     name = "transforms",
     srcs = [
+        "boxing.cc",
         "make_entrypoints.cc",
         "pass_detail.h",
     ],

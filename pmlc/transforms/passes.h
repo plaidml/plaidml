@@ -11,6 +11,7 @@ class Pass;
 
 namespace pmlc::transforms {
 
+std::unique_ptr<mlir::Pass> createBoxingPass();
 std::unique_ptr<mlir::Pass> createMakeEntrypointsPass();
 
 #define GEN_PASS_REGISTRATION

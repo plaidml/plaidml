@@ -149,6 +149,7 @@ void pipelineBuilder(OpPassManager &pm) {
 
   pm.addPass(pmlc::transforms::createMakeEntrypointsPass());
   pm.addPass(createLowerToLLVMPass());
+  pm.addPass(pmlc::transforms::createBoxingPass());
   pm.addPass(createTraceLinkingPass());
 }
 

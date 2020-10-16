@@ -3,6 +3,14 @@
 
 include "mlir/Pass/PassBase.td"
 
+def BoxingPass : Pass<"llvm-boxing", "mlir::ModuleOp"> {
+  let summary = "Creates wrappers that box function inputs and outputs";
+  let constructor = "pmlc::transforms::createBoxingPass()";
+  let dependentDialects = [
+    "mlir::LLVM::LLVMDialect"
+  ];
+}
+
 def MakeEntrypointsPass : Pass<"pmlc-make-entrypoints", "mlir::ModuleOp"> {
   let summary = "Creates the standard PlaidML entrypoints";
   let constructor = "pmlc::transforms::createMakeEntrypointsPass()";
