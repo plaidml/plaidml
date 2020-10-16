@@ -41,8 +41,10 @@ plaidml_cc_library(
         "@llvm-project//mlir:TargetLLVMIR",
         "@llvm-project//mlir:Transforms",
         "@llvm-project//mlir:mlir_runner_utils",
+	"@llvm-project//openmp",
         "@xsmm",
     ],
+    copts = ["-w"],
     alwayslink = 1,
 )
 

@@ -74,6 +74,8 @@ LogicalResult convertSCPParallel(scf::ParallelOp op) {
       /*firstprivate_vars=*/ValueRange(),          //
       /*shared_vars=*/ValueRange(),                //
       /*copyin_vars=*/ValueRange(),                //
+      /*allocate_vars=*/ValueRange(),              //
+      /*allocators_vars=*/ValueRange(),            //
       /*proc_bind_val=*/StringAttr());
 
   // create a terminator (representing the join operation)
@@ -81,7 +83,6 @@ LogicalResult convertSCPParallel(scf::ParallelOp op) {
   auto *block = &parallelOp.getRegion().back();
   builder.setInsertionPointToStart(block);
   auto termOp = builder.create<omp::TerminatorOp>(loc);
-  (void)termOp;
 
   // copy the body of the scf loop into the parallel region
   auto &insts = op.getBody()->getOperations();
@@ -90,7 +91,7 @@ LogicalResult convertSCPParallel(scf::ParallelOp op) {
 
   // generate a call to omp_get_thread_num() at the start of the block
   builder.setInsertionPointToStart(block);
-  const char *threadFuncName = "omp_get_thread_num";
+  const char *threadFuncName = "plaidml_rt_thread_num";
   SmallVector<Value, 0> emptyOperands;
   auto indexType = builder.getIndexType();
   auto callOp = builder.create<mlir::CallOp>(

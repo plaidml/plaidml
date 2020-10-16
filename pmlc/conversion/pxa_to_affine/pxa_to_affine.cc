@@ -35,14 +35,27 @@ struct AffineParallelOpConversion
     // If it's tagged, leave as a parallel
     if (hasTags(op)) {
       // Make a new affine parallel with no return values
-      auto newOp = rewriter.create<AffineParallelOp>(
-          op.getLoc(),                                      //
-          ArrayRef<Type>{}, ArrayRef<AtomicRMWKind>{},      //
-          op.lowerBoundsMap(), op.getLowerBoundsOperands(), //
-          op.upperBoundsMap(), op.getUpperBoundsOperands(), //
-          steps);
-      for (Value iv : newOp.getIVs()) {
-        ivs.push_back(iv);
+      AffineParallelOp newOp;
+      if (op.getIVs().size() == 0) {
+        // If it's empty, add a dummy index (since some affine / scf things
+        // don't like 0 index affine.parallel
+        newOp = rewriter.create<AffineParallelOp>(
+            op.getLoc(),                                                 //
+            ArrayRef<Type>{}, ArrayRef<AtomicRMWKind>{},                 //
+            AffineMap::getConstantMap(0, op.getContext()), ValueRange(), //
+            AffineMap::getConstantMap(1, op.getContext()), ValueRange(), //
+            ArrayRef<int64_t>{1});
+      } else {
+        // Normal case for parallels with IVs
+        newOp = rewriter.create<AffineParallelOp>(
+            op.getLoc(),                                      //
+            ArrayRef<Type>{}, ArrayRef<AtomicRMWKind>{},      //
+            op.lowerBoundsMap(), op.getLowerBoundsOperands(), //
+            op.upperBoundsMap(), op.getUpperBoundsOperands(), //
+            steps);
+        for (Value iv : newOp.getIVs()) {
+          ivs.push_back(iv);
+        }
       }
       copyTags(newOp, op);
       rewriter.setInsertionPointToStart(newOp.getBody());

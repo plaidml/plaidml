@@ -6,6 +6,7 @@
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
 #include "mlir/Dialect/Affine/Passes.h"
+#include "mlir/Dialect/OpenMP/OpenMPDialect.h"
 #include "mlir/Dialect/StandardOps/Transforms/Passes.h"
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/Pass/Pass.h"
@@ -81,6 +82,11 @@ struct ConvertStandardToLLVMPass
     populateOpenMPToLLVMConversionPatterns(context, typeConverter, patterns);
 
     LLVMConversionTarget target(*context);
+    target.addDynamicallyLegalOp<omp::ParallelOp>([&](omp::ParallelOp op) {
+      return typeConverter.isLegal(&op.getRegion());
+    });
+    target.addLegalOp<omp::TerminatorOp, omp::TaskyieldOp, omp::FlushOp,
+                      omp::BarrierOp, omp::TaskwaitOp>();
     if (failed(applyPartialConversion(module, target, patterns))) {
       signalPassFailure();
     }
@@ -138,7 +144,7 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(pxa::createAffineNormalizePass(/*promote=*/false));
   pm.addPass(createCanonicalizerPass());
 
-  pm.addPass(pxa::createCPUThreadPass());
+  pm.addPass(pxa::createCPUThreadPass(1));
   pm.addPass(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
 
