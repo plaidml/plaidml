@@ -40,7 +40,7 @@ public:
   template <typename T>
   bool isBlockOpTypeSupported(T op) {
     auto elementType = op.vector().getType();
-    auto vectorType = elementType.dyn_cast<VectorType>();
+    auto vectorType = elementType.template dyn_cast<VectorType>();
     if (vectorType)
       elementType = vectorType.getElementType();
     return elementType.isInteger(16) || elementType.isInteger(32) ||
