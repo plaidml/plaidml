@@ -595,8 +595,8 @@ class relu {
   double threshold_ = 0.0;
 };
 
-inline edsl::Tensor reorg_yolo(const edsl::Tensor& I, int stride, bool decrease) {
-  auto args = edsl::make_tuple(I, stride, decrease);
+inline edsl::Tensor reorg_yolo(const edsl::Tensor& I, int stride, bool decrease, const std::string& layout = "NCHW") {
+  auto args = edsl::make_tuple(I, stride, decrease, layout);
   return details::op("reorg_yolo", args).as_tensor();
 }
 
