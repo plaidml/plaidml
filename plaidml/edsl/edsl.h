@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <memory>
 #include <ostream>
+#include <sstream>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -622,12 +623,16 @@ inline Tensor Contraction::build() {
 
 inline TensorLens::TensorLens(const std::string& source, const std::string& target) : map(source.size()) {
   if (source.size() != target.size()) {
-    throw std::runtime_error("source and target rank mismatch");
+    std::stringstream ss;
+    ss << "source and target rank mismatch: " << source << " != " << target;
+    throw std::runtime_error(ss.str());
   }
   for (unsigned i = 0; i < source.size(); i++) {
     auto pos = target.find(source[i]);
     if (pos == std::string::npos) {
-      throw std::runtime_error("source and target dims mismatch");
+      std::stringstream ss;
+      ss << "source and target dims mismatch: " << source << " != " << target;
+      throw std::runtime_error(ss.str());
     }
     map[i] = pos;
   }
@@ -637,6 +642,9 @@ template <typename T>
 inline std::vector<T> TensorLens::apply(const std::vector<T>& dims) const {
   if (map.empty()) {
     return dims;
+  }
+  if (dims.size() != map.size()) {
+    throw std::runtime_error("rank mismatch in TensorLens apply");
   }
   std::vector<T> ret(dims.size());
   for (unsigned i = 0; i < dims.size(); i++) {

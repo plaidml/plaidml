@@ -59,6 +59,43 @@ Tensor Softmax(Tensor X) {
   return E / N;
 }
 
+TEST_F(CppEdsl, BindDims) {
+  const int64_t M = 8;
+  const int64_t N = 32;
+  const int64_t K = 16;
+  auto A = Placeholder(DType::FLOAT32, {M, K});
+  auto B = Placeholder(DType::FLOAT32, {K, N});
+  auto C = Placeholder(DType::FLOAT32, {K, 0});
+
+  EXPECT_NO_THROW({ A.bind_dims(M, K); });
+  EXPECT_NO_THROW({ C.bind_dims(K, K); });
+  EXPECT_ANY_THROW({ A.bind_dims(0, 0); });
+
+  {
+    TensorDim D0, D1, D2;
+    EXPECT_NO_THROW({
+      A.bind_dims(D0, D1);
+      B.bind_dims(D1, D2);
+    });
+  }
+
+  {
+    TensorDim D0, D1, D2;
+    EXPECT_ANY_THROW({
+      A.bind_dims(D0, D1);
+      B.bind_dims(D0, D2);
+    });
+  }
+
+  {
+    TensorDim D0, D1, D2;
+    EXPECT_NO_THROW({
+      A.bind_dims(D0, D1);
+      C.bind_dims(D1, D2);
+    });
+  }
+}
+
 TEST_F(CppEdsl, HigherPrecisionConstants) {
   auto A = Placeholder(DType::FLOAT32, {3, 3});
   auto C = A + cast(Tensor{1}, DType::UINT64) + cast(Tensor{2.0}, DType::FLOAT64);
@@ -330,7 +367,6 @@ TEST_F(CppEdsl, Dot) {
   auto B = Placeholder(DType::FLOAT32, {K, N});
   auto C = Dot(A, B);
   auto program = makeProgram("dot", {A, B}, {C});
-  IVLOG(3, "program: \n" << program.str());
 
   // clang-format off
   // CHECK-LABEL: CppEdsl.Dot
@@ -558,12 +594,16 @@ TEST_F(CppEdsl, MnistMlp) {
   runProgram(program);
 }
 
-Tensor Convolution2(Tensor I, Tensor K) {
+Tensor Convolution2(Tensor I, Tensor K, const std::string& I_layout = "NHWC", const std::string& K_layout = "HWCK") {
+  TensorLens I_lens(I_layout, "NHWC");
+  TensorLens K_lens(K_layout, "HWCK");
+  I = I.use(I_lens);
+  K = K.use(K_lens);
   TensorDim CI, CO, K0, K1, N, X0, X1;
   TensorIndex n, x0, x1, co, ci, k0, k1;
   I.bind_dims(N, X0, X1, CI);
   K.bind_dims(K0, K1, CI, CO);
-  return Contraction()
+  return Contraction(I_lens)
       .outShape(N, X0, X1, CO)
       .outAccess(n, x0, x1, co)
       .sum(I(n, x0 + k0 - (K0 / 2), x1 + k1 - (K1 / 2), ci) * K(k0, k1, ci, co));
@@ -1086,14 +1126,14 @@ TEST_F(CppEdsl, Sin) {
 
 TEST_F(CppEdsl, ConvI8) {
   auto I = Placeholder(DType::INT8, {1, 224, 224, 3});
-  auto K = Placeholder(DType::INT8, {3, 3, 1, 32});
+  auto K = Placeholder(DType::INT8, {3, 3, 3, 32});
   auto O = Convolution2(I, K);
   auto program = makeProgram("convolution", {I, K}, {O});
   // clang-format off
   // CHECK-LABEL: CppEdsl.ConvI8
   // CHECK: module @convolution
   // CHECK: %[[cst:.*]] = "eltwise.sconst"() {value = 0 : i64} : () -> tensor<si8>
-  // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : tensor<si8>, tensor<1x224x224x3xsi8>, tensor<3x3x1x32xsi8> -> tensor<1x224x224x32xsi8>
+  // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : tensor<si8>, tensor<1x224x224x3xsi8>, tensor<3x3x3x32xsi8> -> tensor<1x224x224x32xsi8>
   // CHECK: return %{{.*}} : tensor<1x224x224x32xsi8>
   // clang-format on
   runProgram(program);
@@ -1451,6 +1491,48 @@ TEST_F(CppEdsl, Trace) {
   // CHECK: tile.pragma %{{.*}} "trace" {msg = "msg"} : tensor<3x3xf32>
   // CHECK: return %{{.*}} : tensor<3x3xf32>
   // clang-format on
+}
+
+Tensor Transpose(Tensor I, const std::string& layout) {
+  TensorLens lens(layout, "MN");
+  I = I.use(lens);
+  TensorDim M, N;
+  TensorIndex i, j;
+  I.bind_dims(M, N);
+  return Contraction(lens).outShape(N, M).outAccess(j, i).assign(I(i, j));
+}
+
+TEST_F(CppEdsl, Lens) {
+  auto I = Placeholder(DType::FLOAT32, {1, 224, 224, 3});
+  auto K = Placeholder(DType::FLOAT32, {3, 3, 3, 32});
+  auto O = Convolution2(I, K, /*I_layout=*/"NHWC", /*K_layout=*/"HWCK");
+  makeProgram("conv2d_nhwc", {I, K}, {O});
+
+  I = Placeholder(DType::FLOAT32, {1, 3, 224, 224});
+  K = Placeholder(DType::FLOAT32, {3, 32, 7, 7});
+  O = Convolution2(I, K, /*I_layout=*/"NCHW", /*K_layout=*/"CKHW");
+  makeProgram("conv2d_nchw", {I, K}, {O});
+
+  std::vector<float> input = {
+      1, 2, 3,  //
+      4, 5, 6,  //
+  };
+
+  std::vector<float> expected = {
+      1, 4,  //
+      2, 5,  //
+      3, 6,  //
+  };
+
+  I = Placeholder(DType::FLOAT32, {2, 3});
+  O = Transpose(I, "MN");
+  auto program = makeProgram("transpose_mn", {I}, {O});
+  checkExact(program, {input}, {expected});
+
+  I = Placeholder(DType::FLOAT32, {2, 3});
+  O = Transpose(I, "NM");
+  program = makeProgram("transpose_nm", {I}, {O});
+  checkExact(program, {input}, {expected});
 }
 
 }  // namespace
