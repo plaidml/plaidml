@@ -64,7 +64,7 @@ public:
 };
 
 template <typename StdxOpTy, typename SpirvOpTy>
-struct StdxUnaryOpConversion : public SPIRVOpLowering<StdxOpTy> {
+struct UnaryOpConversion : public SPIRVOpLowering<StdxOpTy> {
   using SPIRVOpLowering<StdxOpTy>::SPIRVOpLowering;
 
   LogicalResult
@@ -78,7 +78,7 @@ struct StdxUnaryOpConversion : public SPIRVOpLowering<StdxOpTy> {
 };
 
 template <typename StdxOpTy, typename SpirvOpTy>
-struct StdxBinaryOpConversion : public SPIRVOpLowering<StdxOpTy> {
+struct BinaryOpConversion : public SPIRVOpLowering<StdxOpTy> {
   using SPIRVOpLowering<StdxOpTy>::SPIRVOpLowering;
 
   LogicalResult
@@ -150,8 +150,11 @@ struct GPUToSPIRVCustomPass
       populateStdxToSPIRVGLSLPatterns(context, typeConverter, patterns);
     if (spirv::getMemoryModel(targetAttr) != spirv::MemoryModel::GLSL450) {
       populateCustomGLSLToStdSpirvPatterns(context, typeConverter, patterns);
-      target->addIllegalOp<spirv::GLSLFAbsOp, spirv::GLSLSAbsOp>();
+      target->addIllegalOp<spirv::GLSLFAbsOp, spirv::GLSLSAbsOp,
+                           spirv::GLSLExpOp>();
     }
+    if (spirv::getMemoryModel(targetAttr) == spirv::MemoryModel::OpenCL)
+      populateCustomStdToOCLSpirvPatterns(context, typeConverter, patterns);
 
     if (failed(applyFullConversion(kernelModules, *target, patterns)))
       return signalPassFailure();
@@ -168,15 +171,15 @@ void populateStdxToSPIRVPatterns(MLIRContext *context,
 void populateStdxToSPIRVGLSLPatterns(MLIRContext *context,
                                      SPIRVTypeConverter &typeConverter,
                                      OwningRewritePatternList &patterns) {
-  patterns.insert<StdxUnaryOpConversion<stdx::RoundOp, spirv::GLSLRoundOp>,
-                  StdxUnaryOpConversion<stdx::FloorOp, spirv::GLSLFloorOp>,
-                  StdxUnaryOpConversion<stdx::TanOp, spirv::GLSLTanOp>,
-                  StdxUnaryOpConversion<stdx::SinHOp, spirv::GLSLSinhOp>,
-                  StdxUnaryOpConversion<stdx::CosHOp, spirv::GLSLCoshOp>,
-                  StdxUnaryOpConversion<stdx::ASinOp, spirv::GLSLAsinOp>,
-                  StdxUnaryOpConversion<stdx::ACosOp, spirv::GLSLAcosOp>,
-                  StdxUnaryOpConversion<stdx::ATanOp, spirv::GLSLAtanOp>,
-                  StdxBinaryOpConversion<stdx::PowOp, spirv::GLSLPowOp>>(
+  patterns.insert<UnaryOpConversion<stdx::RoundOp, spirv::GLSLRoundOp>,
+                  UnaryOpConversion<stdx::FloorOp, spirv::GLSLFloorOp>,
+                  UnaryOpConversion<stdx::TanOp, spirv::GLSLTanOp>,
+                  UnaryOpConversion<stdx::SinHOp, spirv::GLSLSinhOp>,
+                  UnaryOpConversion<stdx::CosHOp, spirv::GLSLCoshOp>,
+                  UnaryOpConversion<stdx::ASinOp, spirv::GLSLAsinOp>,
+                  UnaryOpConversion<stdx::ACosOp, spirv::GLSLAcosOp>,
+                  UnaryOpConversion<stdx::ATanOp, spirv::GLSLAtanOp>,
+                  BinaryOpConversion<stdx::PowOp, spirv::GLSLPowOp>>(
       context, typeConverter);
 }
 
@@ -184,6 +187,13 @@ void populateCustomGLSLToStdSpirvPatterns(MLIRContext *context,
                                           SPIRVTypeConverter &typeConverter,
                                           OwningRewritePatternList &patterns) {
   patterns.insert<GLSLFAbsOpPattern, GLSLSAbsOpPattern>(context, typeConverter);
+}
+
+void populateCustomStdToOCLSpirvPatterns(MLIRContext *context,
+                                         SPIRVTypeConverter &typeConverter,
+                                         OwningRewritePatternList &patterns) {
+  patterns.insert<UnaryOpConversion<mlir::ExpOp, spirv::OCLExpOp>>(
+      context, typeConverter);
 }
 
 std::unique_ptr<Pass> createGPUToSPIRVCustomPass() {
