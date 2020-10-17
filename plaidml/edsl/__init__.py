@@ -14,14 +14,6 @@ from plaidml.ffi import ForeignObject, ffi, ffi_call, lib
 
 logger = logging.getLogger(__name__)
 
-
-def __init():
-    """Initializes the PlaidML EDSL API."""
-    ffi_call(lib.plaidml_edsl_init)
-
-
-ffi.init_once(__init, 'plaidml_edsl_init')
-
 Constraint = namedtuple('Constraint', ['lhs', 'rhs'])
 
 

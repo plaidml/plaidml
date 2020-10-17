@@ -228,30 +228,16 @@ plaidml_datatype plaidml_shape_get_dtype(  //
 plaidml_integers* plaidml_shape_get_sizes(  //
     plaidml_error* err,                     //
     plaidml_shape* shape) {
-  return ffi_wrap<plaidml_integers*>(err, 0, [&] {
-    const auto& sizes = shape->shape.sizes;
-    auto ret = new plaidml_integers{sizes.size(), new int64_t[sizes.size()]};
-    for (unsigned i = 0; i < sizes.size(); i++) {
-      if (sizes[i] < 0) {
-        ret->elts[i] = 0;
-      } else {
-        ret->elts[i] = sizes[i];
-      }
-    }
-    return ret;
+  return ffi_wrap<plaidml_integers*>(err, nullptr, [&] {  //
+    return ffi_vector<plaidml_integers>(shape->shape.sizes);
   });
 }
 
 plaidml_integers* plaidml_shape_get_strides(  //
     plaidml_error* err,                       //
     plaidml_shape* shape) {
-  return ffi_wrap<plaidml_integers*>(err, 0, [&] {
-    const auto& strides = shape->shape.strides;
-    auto ret = new plaidml_integers{strides.size(), new int64_t[strides.size()]};
-    for (unsigned i = 0; i < strides.size(); i++) {
-      ret->elts[i] = strides[i];
-    }
-    return ret;
+  return ffi_wrap<plaidml_integers*>(err, nullptr, [&] {  //
+    return ffi_vector<plaidml_integers>(shape->shape.strides);
   });
 }
 

@@ -14,7 +14,6 @@ namespace op {
 inline void init() {
   plaidml::init();
   plaidml::edsl::init();
-  ffi::call_void(plaidml_op_init);
 }
 
 namespace details {

@@ -106,16 +106,6 @@ struct plaidml_dim_expr {
   ast::DimNodePtr node;
 };
 
-void plaidml_edsl_init(  //
-    plaidml_error* err) {
-  static std::once_flag is_initialized;
-  ffi_wrap_void(err, [&] {
-    std::call_once(is_initialized, []() {  //
-      IVLOG(1, "plaidml_edsl_init");
-    });
-  });
-}
-
 void plaidml_expr_free(  //
     plaidml_error* err,  //
     plaidml_expr* expr) {

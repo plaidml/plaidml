@@ -452,7 +452,7 @@ struct ContractionBuilder : PolyVisitor<ContractionBuilder, AffineExpr> {
 
 struct ProgramBuilder {
   explicit ProgramBuilder(llvm::StringRef name)
-      : program(std::make_shared<compiler::Program>(0, name)),
+      : program(std::make_shared<compiler::Program>(name)),
         context(&program->context), loc(UnknownLoc::get(context)),
         module(*program->module), builder(module) {}
 

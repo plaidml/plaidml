@@ -33,7 +33,7 @@ struct Program {
   std::vector<ConstantArgument> constants;
   std::vector<PassInfo> passes;
 
-  explicit Program(int x, llvm::StringRef name = "");
+  explicit Program(llvm::StringRef name = "");
   explicit Program(mlir::ModuleOp module);
   explicit Program(std::unique_ptr<llvm::MemoryBuffer> buffer);
 

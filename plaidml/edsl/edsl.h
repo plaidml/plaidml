@@ -56,10 +56,7 @@ void into_vector(std::vector<T>* into, Head&& head, Tail&&... tail) {
 ///
 /// Initializes the PlaidML EDSL API.
 ///
-inline void init() {
-  plaidml::init();
-  ffi::call_void(plaidml_edsl_init);
-}
+inline void init() { plaidml::init(); }
 
 ///
 /// Lists the available targets.
