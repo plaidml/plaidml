@@ -4,51 +4,52 @@
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Builders.h"
 
-#include "pmlc/transforms/pass_detail.h"
+#include "pmlc/dialect/abi/transforms/pass_detail.h"
 #include "pmlc/util/ids.h"
 
-namespace LLVM = mlir::LLVM;
-using LLVMType = LLVM::LLVMType;
+// namespace LLVM = mlir::LLVM;
+// using LLVMType = LLVM::LLVMType;
 
-namespace pmlc::transforms {
+namespace pmlc::dialect::abi {
 namespace {
 
-class MakeEntrypointsPass final
-    : public MakeEntrypointsPassBase<MakeEntrypointsPass> {
+class LowerToABIPass final : public LowerToABIPassBase<LowerToABIPass> {
 public:
   void runOnOperation() final;
 
-private:
-  mlir::Location getLoc() { return getOperation().getLoc(); }
-  void initMembers();
-  mlir::FuncOp getNetworkEntry();
+  /* private:
+    mlir::Location getLoc() { return getOperation().getLoc(); }
+    void initMembers();
+    mlir::FuncOp getNetworkEntry();
 
-  void makePlaidmlInit(mlir::OpBuilder &builder);
-  void makePlaidmlExec(mlir::OpBuilder &builder);
-  void makePlaidmlFini(mlir::OpBuilder &builder);
+    void makePlaidmlInit(mlir::OpBuilder &builder);
+    void makePlaidmlExec(mlir::OpBuilder &builder);
+    void makePlaidmlFini(mlir::OpBuilder &builder);
 
-  mlir::FuncOp entryFunc;
-  mlir::FunctionType entryType;
+    mlir::FuncOp entryFunc;
+    mlir::FunctionType entryType;
 
-  LLVMType llvmInt32Type;
-  LLVMType llvmPtrTy;
-  LLVMType llvmVoidTy;
+    LLVMType llvmInt32Type;
+    LLVMType llvmPtrTy;
+    LLVMType llvmVoidTy;
+   */
 };
 
-void MakeEntrypointsPass::runOnOperation() {
-  entryFunc = getNetworkEntry();
-  if (!entryFunc) {
-    return;
-  }
-  entryType = entryFunc.getType();
+void LowerToABIPass::runOnOperation() {
+  /*   entryFunc = getNetworkEntry();
+    if (!entryFunc) {
+      return;
+    }
+    entryType = entryFunc.getType();
 
-  initMembers();
-  mlir::OpBuilder builder(getOperation().getBody()->getTerminator());
-  makePlaidmlInit(builder);
-  makePlaidmlExec(builder);
-  makePlaidmlFini(builder);
+    initMembers();
+    mlir::OpBuilder builder(getOperation().getBody()->getTerminator());
+    makePlaidmlInit(builder);
+    makePlaidmlExec(builder);
+    makePlaidmlFini(builder);
+   */
 }
-
+/*
 void MakeEntrypointsPass::initMembers() {
   auto ctx = &getContext();
   llvmInt32Type = LLVMType::getInt32Ty(ctx);
@@ -146,11 +147,12 @@ void MakeEntrypointsPass::makePlaidmlFini(mlir::OpBuilder &builder) {
   builder.setInsertionPointToStart(block);
   builder.create<mlir::ReturnOp>(getLoc(), mlir::ArrayRef<mlir::Value>{});
 }
+*/
 
 } // namespace
 
-std::unique_ptr<mlir::Pass> createMakeEntrypointsPass() {
-  return std::make_unique<MakeEntrypointsPass>();
+std::unique_ptr<mlir::Pass> createLowerToABIPass() {
+  return std::make_unique<LowerToABIPass>();
 }
 
-} // namespace pmlc::transforms
+} // namespace pmlc::dialect::abi

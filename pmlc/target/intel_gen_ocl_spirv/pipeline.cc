@@ -26,6 +26,7 @@
 #include "pmlc/conversion/pxa_to_affine/passes.h"
 #include "pmlc/conversion/stdx_to_llvm/passes.h"
 #include "pmlc/conversion/tile_to_pxa/passes.h"
+#include "pmlc/dialect/abi/transforms/passes.h"
 #include "pmlc/dialect/comp/ir/types.h"
 #include "pmlc/dialect/comp/transforms/passes.h"
 #include "pmlc/dialect/pxa/transforms/passes.h"
@@ -34,12 +35,12 @@
 #include "pmlc/dialect/tile/transforms/passes.h"
 #include "pmlc/target/intel_gen/passes.h"
 #include "pmlc/target/intel_gen_ocl_spirv/passes.h"
-#include "pmlc/transforms/passes.h"
 
 using namespace mlir; // NOLINT[build/namespaces]
 
 namespace pmlc::target::intel_gen_ocl_spirv {
 
+namespace abi = pmlc::dialect::abi;
 namespace comp = pmlc::dialect::comp;
 namespace pxa = pmlc::dialect::pxa;
 
@@ -139,11 +140,15 @@ void pipelineBuilder(OpPassManager &pm) {
   // Comp to LLVM - OpenCL function calls.
   pm.addPass(pmlc::conversion::comp_to_llvm::createConvertCompToOclPass());
 
-  // Add standard entrypoints.
-  pm.addPass(pmlc::transforms::createMakeEntrypointsPass());
+  // Add the ABI loop, and optimize the code to around it.
+  pm.addPass(abi::createAddABILoopPass());
+  pm.addPass(createLoopInvariantCodeMotionPass());
 
   // Convert to LLVM code.
   pm.addPass(pmlc::target::intel_gen::createConvertStandardToLLVM());
+
+  // Lower to ABI entrypoints.
+  pm.addPass(abi::createLowerToABIPass());
 }
 
 static PassPipelineRegistration<>

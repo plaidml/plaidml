@@ -23,8 +23,8 @@ gentbl(
 plaidml_cc_library(
     name = "transforms",
     srcs = [
-        "boxing.cc",
-        "make_entrypoints.cc",
+        "add_abi_loop.cc",
+        "lower_abi.cc",
         "pass_detail.h",
     ],
     hdrs = [
@@ -32,6 +32,7 @@ plaidml_cc_library(
     ],
     deps = [
         ":gen-pass",
+        "//pmlc/dialect/abi/ir",
         "//pmlc/util",
         "@llvm-project//mlir:LLVMDialect",
         "@llvm-project//mlir:Pass",

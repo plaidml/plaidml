@@ -12,9 +12,11 @@
 #include "mlir/Transforms/Passes.h"
 
 #include "pmlc/compiler/registry.h"
+#include "pmlc/conversion/abi_to_llvm/passes.h"
 #include "pmlc/conversion/pxa_to_affine/passes.h"
 #include "pmlc/conversion/stdx_to_llvm/passes.h"
 #include "pmlc/conversion/tile_to_pxa/passes.h"
+#include "pmlc/dialect/abi/transforms/passes.h"
 #include "pmlc/dialect/pxa/transforms/passes.h"
 #include "pmlc/dialect/stdx/transforms/passes.h"
 #include "pmlc/dialect/tile/transforms/passes.h"
@@ -22,7 +24,6 @@
 #include "pmlc/target/x86/heatmap.h"
 #include "pmlc/target/x86/pass_detail.h"
 #include "pmlc/target/x86/passes.h"
-#include "pmlc/transforms/passes.h"
 #include "pmlc/util/env.h"
 #include "pmlc/util/logging.h"
 
@@ -30,6 +31,7 @@ using namespace mlir; // NOLINT[build/namespaces]
 
 namespace pmlc::target::x86 {
 
+namespace abi = dialect::abi;
 namespace pxa = dialect::pxa;
 namespace xsmm = dialect::xsmm;
 
@@ -65,7 +67,7 @@ struct ConvertStandardToLLVMPass
 
     LowerToLLVMOptions options = {
         /*useBarePtrCallConv=*/false,
-        /*emitCWrappers=*/true,
+        /*emitCWrappers=*/false,
         /*indexBitwidth=*/kDeriveIndexBitwidthFromDataLayout,
         /*useAlignedAlloc=*/false,
     };
@@ -77,8 +79,11 @@ struct ConvertStandardToLLVMPass
     populateStdToLLVMConversionPatterns(typeConverter, patterns);
     conversion::stdx_to_llvm::populateStdXToLLVMConversionPatterns(
         typeConverter, patterns);
+    conversion::abi_to_llvm::populateABIToLLVMConversionPatterns(typeConverter,
+                                                                 patterns);
 
     LLVMConversionTarget target(*context);
+    conversion::abi_to_llvm::addLoopLegality(target);
     if (failed(applyPartialConversion(module, target, patterns))) {
       signalPassFailure();
     }
@@ -147,10 +152,11 @@ void pipelineBuilder(OpPassManager &pm) {
     pm.addPass(pmlc::dialect::stdx::createBoundsCheckPass());
   }
 
-  pm.addPass(pmlc::transforms::createMakeEntrypointsPass());
+  pm.addPass(abi::createAddABILoopPass());
+  pm.addPass(createLoopInvariantCodeMotionPass());
   pm.addPass(createLowerToLLVMPass());
-  pm.addPass(pmlc::transforms::createBoxingPass());
   pm.addPass(createTraceLinkingPass());
+  // pm.addPass(abi::createLowerToLLVMPass());
 }
 
 } // namespace pmlc::target::x86

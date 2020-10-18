@@ -24,6 +24,7 @@
 #include "pmlc/conversion/pxa_to_affine/passes.h"
 #include "pmlc/conversion/stdx_to_llvm/passes.h"
 #include "pmlc/conversion/tile_to_pxa/passes.h"
+#include "pmlc/dialect/abi/transforms/passes.h"
 #include "pmlc/dialect/pxa/transforms/passes.h"
 #include "pmlc/dialect/stdx/ir/ops.h"
 #include "pmlc/dialect/stdx/transforms/passes.h"
@@ -31,12 +32,12 @@
 #include "pmlc/target/intel_gen/pass_detail.h"
 #include "pmlc/target/intel_gen/passes.h"
 #include "pmlc/target/x86/passes.h"
-#include "pmlc/transforms/passes.h"
 
 using namespace mlir; // NOLINT[build/namespaces]
 
 namespace pmlc::target::intel_gen {
 
+namespace abi = pmlc::dialect::abi;
 namespace pxa = pmlc::dialect::pxa;
 
 namespace {
@@ -206,11 +207,15 @@ void pipelineBuilder(OpPassManager &pm) {
   // GPU to Vulkan.
   pm.addPass(conversion::gpu::createConvertGpuLaunchFuncToVulkanCallsPass());
 
-  // Add standard entrypoints.
-  pm.addPass(pmlc::transforms::createMakeEntrypointsPass());
+  // Add the ABI loop, and optimize the code to around it.
+  pm.addPass(abi::createAddABILoopPass());
+  pm.addPass(createLoopInvariantCodeMotionPass());
 
   // Convert Vulkan calls to LLVM code
   pm.addPass(createConvertStandardToLLVM());
+
+  // Lower to ABI entrypoints.
+  pm.addPass(abi::createLowerToABIPass());
 }
 
 static PassPipelineRegistration<>
