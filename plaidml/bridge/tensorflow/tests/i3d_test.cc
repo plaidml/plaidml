@@ -36,7 +36,6 @@ TEST_P(PlaidMLI3DOperationTest, SimpleI3D) {
 
   std::vector<MultiBuffer> inputs;
   std::vector<MultiBuffer> outputs;
-  std::unordered_map<std::string, MultiBuffer> weights;
 
   VLOG(0) << "Archive: " << archive.name;
   VLOG(0) << "Inputs: " << archive.inputs.size();
@@ -50,14 +49,6 @@ TEST_P(PlaidMLI3DOperationTest, SimpleI3D) {
     VLOG(2) << "  " << buffer->name;
     outputs.emplace_back(convertBuffer(buffer->data));
   }
-
-  auto lookup = [&](const char* key) {
-    auto it = weights.find(key);
-    if (it == weights.end()) {
-      throw std::runtime_error(std::string("Key not found: ") + key);
-    }
-    return it->second;
-  };
 
   std::vector<MultiBuffer> args = {inputs[0]};
 

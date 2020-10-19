@@ -2,9 +2,6 @@
 
 #include "plaidml/bridge/tensorflow/service/graph_util.h"
 
-#include <string>
-#include <vector>
-
 #include "tensorflow/compiler/tf2xla/tf2xla.h"
 #include "tensorflow/compiler/xla/client/client_library.h"
 #include "tensorflow/compiler/xla/client/local_client.h"
@@ -27,11 +24,11 @@ namespace xla {
 namespace plaidml {
 
 // Translate Frozen Graph to HLO Module
-StatusOr<std::unique_ptr<HloModule>> ImportFrozenGraph(std::string frozen_graph_def_file_path,
-                                                       std::vector<std::string> input_names,
-                                                       std::vector<std::string> output_names) {
+StatusOr<std::unique_ptr<HloModule>> ImportFrozenGraph(StringRef frozen_graph_def_file_path,
+                                                       ArrayRef<StringRef> input_names,
+                                                       ArrayRef<StringRef> output_names) {
   tensorflow::GraphDef frozen_graph_def;
-  if (ReadBinaryProto(tensorflow::Env::Default(), frozen_graph_def_file_path, &frozen_graph_def).ok()) {
+  if (ReadBinaryProto(tensorflow::Env::Default(), frozen_graph_def_file_path.str(), &frozen_graph_def).ok()) {
     // Temp: dump graph def to file for debug
     // This dumps to TF_DUMP_GRAPH_PREFIX
     DumpGraphDefToFile("cc_frozen_graph_def.pb", frozen_graph_def);
@@ -39,10 +36,10 @@ StatusOr<std::unique_ptr<HloModule>> ImportFrozenGraph(std::string frozen_graph_
     XlaComputation xla_computation;
     tensorflow::tf2xla::Config tf2xla_config;
     for (auto input_name : input_names) {
-      tf2xla_config.add_feed()->mutable_id()->set_node_name(input_name);
+      tf2xla_config.add_feed()->mutable_id()->set_node_name(input_name.str());
     }
     for (auto output_name : output_names) {
-      tf2xla_config.add_fetch()->mutable_id()->set_node_name(output_name);
+      tf2xla_config.add_fetch()->mutable_id()->set_node_name(output_name.str());
     }
     if (ConvertGraphDefToXla(frozen_graph_def, tf2xla_config, xla_client, &xla_computation).ok()) {
       const HloModuleProto& module_proto = xla_computation.proto();
@@ -53,7 +50,7 @@ StatusOr<std::unique_ptr<HloModule>> ImportFrozenGraph(std::string frozen_graph_
       return tensorflow::errors::Internal("Error converting frozen graph to XLA");
     }
   } else {
-    return tensorflow::errors::Internal("Error reading frozen graph file: " + frozen_graph_def_file_path);
+    return tensorflow::errors::Internal("Error reading frozen graph file: " + frozen_graph_def_file_path.str());
   }
 }
 

@@ -20,6 +20,7 @@ cc_library(
     hdrs = ["graph_util.h"],
     tags = ["skip_windows"],
     deps = [
+        "@llvm-project//llvm:Support",
         "@org_tensorflow//tensorflow/compiler/tf2xla:tf2xla",
         "@org_tensorflow//tensorflow/compiler/xla/client:client",
         "@org_tensorflow//tensorflow/compiler/xla/service:hlo",
