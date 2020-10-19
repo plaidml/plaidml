@@ -10,12 +10,12 @@
 #include "mlir/Analysis/AffineStructures.h"
 #include "mlir/IR/AffineExprVisitor.h"
 #include "mlir/IR/AffineMap.h"
+#include "mlir/IR/Builders.h"
 #include "mlir/Pass/Pass.h"
 
 #include "pmlc/dialect/tile/ir/ops.h"
 #include "pmlc/dialect/tile/transforms/padding.h"
 #include "pmlc/dialect/tile/transforms/pass_detail.h"
-#include "pmlc/util/ident.h"
 #include "pmlc/util/logging.h"
 #include "pmlc/util/math/util.h"
 #include "pmlc/util/strides.h"
@@ -117,9 +117,8 @@ void PadRangesPass::runOnFunction() {
     builder.setInsertionPointAfter(op.getOperation());
     // Make shrinking contraction
     Type elementType = op.getResultType().getElementType();
-    RankedTensorType tensorType = getRankedTensorType(elementType);
-    auto ident =
-        createIdentity(builder, op.getLoc(), AtomicRMWKind::assign, tensorType);
+    auto ident = tile::createIdentity(builder, op.getLoc(), elementType,
+                                      AggregationKind::assign);
     auto idMap = AffineMap::getMultiDimIdentityMap(outRank, op.getContext());
     auto newOp = builder.create<ContractionOp>(
         op.getLoc(), op.getResultType(), ident, ArrayRef<Value>{op},

@@ -7,6 +7,8 @@
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/IR/Value.h"
 
+#include "pmlc/util/enums.h"
+
 namespace pmlc::dialect::tile {
 
 mlir::Type promoteTypes(mlir::Type lhs, mlir::Type rhs);
@@ -42,5 +44,8 @@ materializeOperands(mlir::OpBuilder &builder, mlir::Operation *op,
 
 mlir::LogicalResult materializeOperands(mlir::OpBuilder &builder,
                                         mlir::Operation *op);
+
+mlir::Value createIdentity(mlir::OpBuilder &builder, mlir::Location loc,
+                           mlir::Type elementType, util::AggregationKind agg);
 
 } // namespace pmlc::dialect::tile

@@ -22,6 +22,7 @@
 #include "pmlc/ast/ast.h"
 #include "pmlc/ast/eval.h"
 #include "pmlc/dialect/tile/ir/ops.h"
+#include "pmlc/dialect/tile/ir/util.h"
 #include "pmlc/dialect/tile/transforms/passes.h"
 #include "pmlc/util/logging.h"
 
@@ -118,14 +119,6 @@ public:
 
   void addNode(const ExprNodePtr &node, Value value) {
     exprMap[node.get()] = value;
-  }
-
-  Value makeScalarConstantIntOp(Type type, int64_t value) {
-    return create<tile::ConstantOp>(getUnknownLoc(), type, value);
-  }
-
-  Value makeScalarConstantFloatOp(Type type, double value) {
-    return create<tile::ConstantOp>(getUnknownLoc(), type, value);
   }
 
   Attribute getAttribute(const VarNodePtr &node) {
@@ -322,48 +315,8 @@ struct ContractionBuilder : PolyVisitor<ContractionBuilder, AffineExpr> {
     if (node->init) {
       return builder.lookupNode(node->init);
     }
-    return makeIdentity(resultType.getElementType(), node->aggKind);
-  }
-
-  Value makeIdentity(Type elementType, util::AggregationKind agg) {
-    switch (agg) {
-    case util::AggregationKind::assign:
-    case util::AggregationKind::add:
-      if (elementType.isa<FloatType>()) {
-        return builder.makeScalarConstantFloatOp(elementType, 0.0);
-      } else {
-        return builder.makeScalarConstantIntOp(elementType, 0);
-      }
-    case util::AggregationKind::mul:
-      if (elementType.isa<FloatType>()) {
-        return builder.makeScalarConstantFloatOp(elementType, 1.0);
-      } else {
-        return builder.makeScalarConstantIntOp(elementType, 1);
-      }
-    case util::AggregationKind::min:
-      if (elementType.isa<FloatType>()) {
-        return builder.makeScalarConstantFloatOp(
-            elementType, std::numeric_limits<double>::infinity());
-      } else if (elementType.isSignedInteger()) {
-        return builder.makeScalarConstantIntOp(
-            elementType, std::numeric_limits<int64_t>::max());
-      } else {
-        return builder.makeScalarConstantIntOp(
-            elementType,
-            static_cast<int64_t>(std::numeric_limits<uint64_t>::max()));
-      }
-    case util::AggregationKind::max:
-      if (elementType.isa<FloatType>()) {
-        return builder.makeScalarConstantFloatOp(
-            elementType, -std::numeric_limits<double>::infinity());
-      } else if (elementType.isSignedInteger()) {
-        return builder.makeScalarConstantIntOp(
-            elementType, std::numeric_limits<int64_t>::min());
-      } else {
-        return builder.makeScalarConstantIntOp(elementType, 0);
-      }
-    }
-    llvm_unreachable("Invalid aggregation kind");
+    return tile::createIdentity(builder, builder.getUnknownLoc(),
+                                resultType.getElementType(), node->aggKind);
   }
 
   AffineExpr makeExpr(const PolyNodePtr &node) { return visit(node.get()); }
@@ -573,17 +526,20 @@ struct ProgramBuilder {
 
   Value handleConstFloat(ExprNodeConstFloat *node) {
     Type type = builder.getAPFloatType();
-    return builder.makeScalarConstantFloatOp(type, node->value);
+    return builder.create<tile::ConstantOp>(builder.getUnknownLoc(), type,
+                                            node->value);
   }
 
   Value handleConstSigned(ExprNodeConstSigned *node) {
     Type type = builder.getAPSignedIntegerType();
-    return builder.makeScalarConstantIntOp(type, node->value);
+    return builder.create<tile::ConstantOp>(builder.getUnknownLoc(), type,
+                                            node->value);
   }
 
   Value handleConstUnsigned(ExprNodeConstUnsigned *node) {
     Type type = builder.getAPUnsignedIntegerType();
-    return builder.makeScalarConstantIntOp(type, node->value);
+    return builder.create<tile::ConstantOp>(builder.getUnknownLoc(), type,
+                                            node->value);
   }
 
   Value handleContraction(ExprNodeContraction *node) {
@@ -593,7 +549,8 @@ struct ProgramBuilder {
   Value handleDim(ExprNodeDim *node) {
     int64_t value = evaluator.evaluate(node->dim);
     Type type = builder.getAPUnsignedIntegerType();
-    return builder.makeScalarConstantIntOp(type, value);
+    return builder.create<tile::ConstantOp>(builder.getUnknownLoc(), type,
+                                            value);
   }
 
   Value handleElement(ExprNodeElement *node) {
