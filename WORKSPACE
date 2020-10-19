@@ -68,14 +68,14 @@ load("@llvm_toolchain//:toolchains.bzl", "llvm_register_toolchains")
 
 llvm_register_toolchains()
 
-#load("//vendor/openvino:workspace.bzl", "openvino_workspace")
-#
-#openvino_workspace()
-new_local_repository(
-    name = "openvino",
-    build_file = "//vendor/openvino:openvino.BUILD",
-    path = "/home/brian/openvino",
-)
+load("//vendor/openvino:workspace.bzl", "openvino_workspace")
+
+openvino_workspace()
+#new_local_repository(
+#    name = "openvino",
+#    build_file = "//vendor/openvino:openvino.BUILD",
+#    path = "/home/brian/openvino",
+#)
 
 load("//vendor/tensorflow:workspace.bzl", "plaidml_tf_workspace")
 

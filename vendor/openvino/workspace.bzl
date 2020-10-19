@@ -10,7 +10,7 @@ def clean_dep(dep):
 def openvino_workspace():
     new_git_repository(
         name = "openvino",
-        branch = "tzerrell-plaidml-plugin",
+        branch = "plaidml-2021.1",
         init_submodules = True,
         remote = "https://github.com/plaidml/openvino",
         build_file = clean_dep("//vendor/openvino:openvino.BUILD"),
