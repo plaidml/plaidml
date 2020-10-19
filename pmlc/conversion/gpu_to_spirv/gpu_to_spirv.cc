@@ -31,9 +31,113 @@ struct StdxSubgroupBroadcastOpConversion final
                   ConversionPatternRewriter &rewriter) const final {
     auto stdxType = op.getResult().getType();
     auto spirvType = typeConverter.convertType(stdxType);
-    rewriter.replaceOpWithNewOp<spirv::GroupBroadcastOp>(
+    rewriter.replaceOpWithNewOp<spirv::GroupNonUniformBroadcastOp>(
         op, spirvType, spirv::Scope::Subgroup, operands[0], operands[1]);
 
+    return success();
+  }
+};
+
+struct StdxSubgroupBlockReadINTELOpConversion
+    : public SPIRVOpLowering<stdx::SubgroupBlockReadINTELOp> {
+  using SPIRVOpLowering<stdx::SubgroupBlockReadINTELOp>::SPIRVOpLowering;
+
+  LogicalResult
+  matchAndRewrite(stdx::SubgroupBlockReadINTELOp blockReadOp,
+                  ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const final {
+    stdx::SubgroupBlockReadINTELOpAdaptor blockReadOperands(operands);
+    auto loc = blockReadOp.getLoc();
+    auto memrefType = blockReadOp.memref().getType().cast<MemRefType>();
+    auto memrefElementType = memrefType.getElementType();
+
+    // Check if bitcast is needed, implementation should transform to block
+    // ops only for certain types supported by the HW, that is why other types
+    // are not checked here, stdx transform pass should handle those cases
+    auto needBitcast = memrefElementType.isF16() || memrefElementType.isF32();
+
+    if (needBitcast) {
+      // Support inly fp16 and fp32 for now
+      auto IType = memrefElementType.isF16() ? rewriter.getIntegerType(16)
+                                             : rewriter.getIntegerType(32);
+      auto memrefIType = MemRefType::get(memrefType.getShape(), IType, {},
+                                         memrefType.getMemorySpace());
+      auto FToI_ptr = rewriter.create<spirv::BitcastOp>(
+          loc, typeConverter.convertType(memrefIType),
+          blockReadOperands.memref());
+
+      auto loadPtr =
+          spirv::getElementPtr(typeConverter, memrefIType, FToI_ptr.getResult(),
+                               blockReadOperands.indices(), loc, rewriter);
+      auto ptrType =
+          loadPtr.component_ptr().getType().cast<spirv::PointerType>();
+
+      auto blockRead = rewriter.create<spirv::SubgroupBlockReadINTELOp>(
+          loc, ptrType.getPointeeType(), loadPtr.component_ptr());
+
+      auto UToF_val = rewriter.create<spirv::BitcastOp>(
+          loc, memrefType.getElementType(), blockRead.getResult());
+      rewriter.replaceOp(blockReadOp, {UToF_val});
+    } else {
+      auto loadPtr = spirv::getElementPtr(
+          typeConverter, memrefType, blockReadOperands.memref(),
+          blockReadOperands.indices(), blockReadOp.getLoc(), rewriter);
+      auto ptrType =
+          loadPtr.component_ptr().getType().cast<spirv::PointerType>();
+      rewriter.replaceOpWithNewOp<spirv::SubgroupBlockReadINTELOp>(
+          blockReadOp, ptrType.getPointeeType(), loadPtr.component_ptr());
+    }
+    return success();
+  }
+};
+
+struct StdxSubgroupBlockWriteINTELOpConversion
+    : public SPIRVOpLowering<stdx::SubgroupBlockWriteINTELOp> {
+  using SPIRVOpLowering<stdx::SubgroupBlockWriteINTELOp>::SPIRVOpLowering;
+
+  LogicalResult
+  matchAndRewrite(stdx::SubgroupBlockWriteINTELOp blockWriteOp,
+                  ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const final {
+    stdx::SubgroupBlockWriteINTELOpAdaptor blockWriteOperands(operands);
+    auto loc = blockWriteOp.getLoc();
+    auto memrefType = blockWriteOp.memref().getType().cast<MemRefType>();
+    auto memrefElementType = memrefType.getElementType();
+
+    // Check if bitcast is needed, implementation should transform to block
+    // ops only for certain types supported by the HW, that is why other types
+    // are not checked here, stdx transform pass should handle those cases
+    auto needBitcast = memrefElementType.isF16() || memrefElementType.isF32();
+
+    if (needBitcast) {
+      // Support inly fp16 and fp32 for now
+      auto IType = memrefElementType.isF16() ? rewriter.getIntegerType(16)
+                                             : rewriter.getIntegerType(32);
+
+      // Bitcast mem pointer
+      auto memrefIType = MemRefType::get(memrefType.getShape(), IType, {},
+                                         memrefType.getMemorySpace());
+      auto FToI_ptr = rewriter.create<spirv::BitcastOp>(
+          loc, typeConverter.convertType(memrefIType),
+          blockWriteOperands.memref());
+
+      // Bitcast value
+      auto FToI_val = rewriter.create<spirv::BitcastOp>(
+          loc, IType, blockWriteOperands.value());
+
+      auto storePtr =
+          spirv::getElementPtr(typeConverter, memrefIType, FToI_ptr.getResult(),
+                               blockWriteOperands.indices(), loc, rewriter);
+
+      rewriter.replaceOpWithNewOp<spirv::SubgroupBlockWriteINTELOp>(
+          blockWriteOp, storePtr, FToI_val.getResult());
+    } else {
+      auto storePtr = spirv::getElementPtr(
+          typeConverter, memrefType, blockWriteOperands.memref(),
+          blockWriteOperands.indices(), blockWriteOp.getLoc(), rewriter);
+      rewriter.replaceOpWithNewOp<spirv::SubgroupBlockWriteINTELOp>(
+          blockWriteOp, storePtr, blockWriteOperands.value());
+    }
     return success();
   }
 };
@@ -165,7 +269,10 @@ struct GPUToSPIRVCustomPass
 void populateStdxToSPIRVPatterns(MLIRContext *context,
                                  SPIRVTypeConverter &typeConverter,
                                  OwningRewritePatternList &patterns) {
-  patterns.insert<StdxSubgroupBroadcastOpConversion>(context, typeConverter);
+  patterns.insert<StdxSubgroupBroadcastOpConversion,
+                  StdxSubgroupBlockReadINTELOpConversion,
+                  StdxSubgroupBlockWriteINTELOpConversion>(context,
+                                                           typeConverter);
 }
 
 void populateStdxToSPIRVGLSLPatterns(MLIRContext *context,

@@ -2174,18 +2174,22 @@ Value reorg_yolo(const Value& value) {
   IVLOG(1, "reorg_yolo");
 
   auto args = value.as_tuple();
-  if (args.size() != 3) {
-    throw std::runtime_error(llvm::formatv("PlaidML reorg_yolo op expects 3 arguments (received {0})", args.size()));
+  if (args.size() != 4) {
+    throw std::runtime_error(llvm::formatv("PlaidML reorg_yolo op expects 4 arguments (received {0})", args.size()));
   }
   auto I = args[0].as_tensor();
   auto stride = args[1].as_int();
   auto decrease = args[2].as_bool();
+  auto layout = args[3].as_str();
 
   auto ndims = I.rank();
   if (ndims != 4) {
     throw std::runtime_error(
         llvm::formatv("PlaidML reorg_yolo op expects I to have 4 dimensions (received {0})", ndims));
   }
+
+  TensorLens lens(layout, "NCHW");
+  I = I.use(lens);
 
   TensorDim N, C, H, W;
   I.bind_dims(N, C, H, W);
@@ -2198,7 +2202,7 @@ Value reorg_yolo(const Value& value) {
   if (decrease) {
     auto C_out = C / (stride * stride);
     auto c = k + ((x + y * stride) * C_out);
-    O = Contraction()
+    O = Contraction(lens)
             .outShape(N, C_out, H * stride, W * stride)
             .outAccess(b, k, h, w)
             .assign(I(b, c, j, i))
@@ -2207,7 +2211,7 @@ Value reorg_yolo(const Value& value) {
   } else {
     auto C_out = C * (stride * stride);
     auto c = k + ((x + y * stride) * C);
-    O = Contraction()
+    O = Contraction(lens)
             .outShape(N, C_out, H / stride, W / stride)
             .outAccess(b, c, j, i)
             .assign(I(b, k, h, w))

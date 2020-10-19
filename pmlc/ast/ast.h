@@ -245,7 +245,7 @@ struct DimNodeLiteral : NodeBase<DimNodeLiteral, DimNode> {
 };
 
 struct DimNodeNone : NodeBase<DimNodeNone, DimNode> {
-  std::string str() const final { return "none"; }
+  std::string str() const final { return "?"; }
 };
 
 struct DimNodeOp : NodeBase<DimNodeOp, DimNode> {

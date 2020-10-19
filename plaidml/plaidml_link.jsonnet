@@ -41,7 +41,6 @@ local exports = [
   'plaidml_contraction_add_constraint',
   'plaidml_contraction_add_operand',
   'plaidml_contraction_build',
-  'plaidml_edsl_init',
   'plaidml_dim_expr_free',
   'plaidml_dim_expr_int',
   'plaidml_dim_expr_none',
@@ -94,7 +93,6 @@ local exports = [
   'plaidml_value_tuple_get',
 
   // op/ffi.h
-  'plaidml_op_init',
   'plaidml_op_make',
 
   // exec/ffi.h
