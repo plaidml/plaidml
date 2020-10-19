@@ -7,7 +7,7 @@
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/IR/Value.h"
 
-namespace pmlc::dialect::eltwise {
+namespace pmlc::dialect::tile {
 
 mlir::Type promoteTypes(mlir::Type lhs, mlir::Type rhs);
 
@@ -43,4 +43,4 @@ materializeOperands(mlir::OpBuilder &builder, mlir::Operation *op,
 mlir::LogicalResult materializeOperands(mlir::OpBuilder &builder,
                                         mlir::Operation *op);
 
-} // namespace pmlc::dialect::eltwise
+} // namespace pmlc::dialect::tile

@@ -12,7 +12,6 @@
 #include "mlir/IR/AffineMap.h"
 #include "mlir/Pass/Pass.h"
 
-#include "pmlc/dialect/eltwise/ir/ops.h"
 #include "pmlc/dialect/tile/ir/ops.h"
 #include "pmlc/dialect/tile/transforms/padding.h"
 #include "pmlc/dialect/tile/transforms/pass_detail.h"
@@ -117,8 +116,10 @@ void PadRangesPass::runOnFunction() {
     OpBuilder builder(op.getContext());
     builder.setInsertionPointAfter(op.getOperation());
     // Make shrinking contraction
-    auto ident = createIdentity(builder, op.getLoc(), AtomicRMWKind::assign,
-                                op.getResultType().getElementType());
+    Type elementType = op.getResultType().getElementType();
+    RankedTensorType tensorType = getRankedTensorType(elementType);
+    auto ident =
+        createIdentity(builder, op.getLoc(), AtomicRMWKind::assign, tensorType);
     auto idMap = AffineMap::getMultiDimIdentityMap(outRank, op.getContext());
     auto newOp = builder.create<ContractionOp>(
         op.getLoc(), op.getResultType(), ident, ArrayRef<Value>{op},
@@ -137,8 +138,7 @@ void PadRangesPass::runOnFunction() {
     op.getResult().replaceAllUsesExcept(
         newOp.getResult(), SmallPtrSet<Operation *, 1>{newOp.getOperation()});
     // Resize + rerange the output of the original op
-    op.getResult().setType(
-        RankedTensorType::get(newOutSize, op.getResultType().getElementType()));
+    op.getResult().setType(RankedTensorType::get(newOutSize, elementType));
     // Convert ranges to bounds
     SmallVector<int64_t, 4> newBounds;
     for (unsigned i = 0; i < indexCount; i++) {

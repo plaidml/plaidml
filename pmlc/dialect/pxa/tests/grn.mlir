@@ -17,16 +17,16 @@
 #map1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d4)>
 
 func @grn(%arg0: tensor<1x224x128x24xf16>) -> tensor<1x224x128x24xf16> {
-  %cst = "eltwise.sconst"() {value = 1.000000e-05 : f64} : () -> tensor<f16>
-  %cst_0 = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> tensor<f16>
-  %cst_1 = "eltwise.sconst"() {value = 1.000000e+00 : f64} : () -> tensor<f16>
-  %0 = "eltwise.mul"(%arg0, %arg0) : (tensor<1x224x128x24xf16>, tensor<1x224x128x24xf16>) -> tensor<1x224x128x24xf16>
+  %cst = tile.constant(1.000000e-05 : f64) : tensor<f16>
+  %cst_0 = tile.constant(0.000000e+00 : f64) : tensor<f16>
+  %cst_1 = tile.constant(1.000000e+00 : f64) : tensor<f16>
+  %0 = tile.mul %arg0, %arg0 : (tensor<1x224x128x24xf16>, tensor<1x224x128x24xf16>) -> tensor<1x224x128x24xf16>
   %1 = tile.contract add, none, %cst_0, %0 {sink = #map0, srcs = [#map1]} : tensor<f16>, tensor<1x224x128x24xf16> -> tensor<1x224x128x1xf16>
-  %2 = "eltwise.add"(%1, %cst_1) : (tensor<1x224x128x1xf16>, tensor<f16>) -> tensor<1x224x128x1xf16>
-  %3 = "eltwise.sqrt"(%2) : (tensor<1x224x128x1xf16>) -> tensor<1x224x128x1xf16>
-  %4 = "eltwise.cmp_lt"(%3, %cst) : (tensor<1x224x128x1xf16>, tensor<f16>) -> tensor<1x224x128x1xi1>
-  %5 = "eltwise.select"(%4, %cst, %3) : (tensor<1x224x128x1xi1>, tensor<f16>, tensor<1x224x128x1xf16>) -> tensor<1x224x128x1xf16>
-  %6 = "eltwise.div"(%arg0, %5) : (tensor<1x224x128x24xf16>, tensor<1x224x128x1xf16>) -> tensor<1x224x128x24xf16>
+  %2 = tile.add %1, %cst_1 : (tensor<1x224x128x1xf16>, tensor<f16>) -> tensor<1x224x128x1xf16>
+  %3 = tile.sqrt %2 : (tensor<1x224x128x1xf16>) -> tensor<1x224x128x1xf16>
+  %4 = tile.cmp_lt %3, %cst : (tensor<1x224x128x1xf16>, tensor<f16>) -> tensor<1x224x128x1xi1>
+  %5 = tile.select %4, %cst, %3 : (tensor<1x224x128x1xi1>, tensor<f16>, tensor<1x224x128x1xf16>) -> tensor<1x224x128x1xf16>
+  %6 = tile.div %arg0, %5 : (tensor<1x224x128x24xf16>, tensor<1x224x128x1xf16>) -> tensor<1x224x128x24xf16>
   return %6 : tensor<1x224x128x24xf16>
 }
 

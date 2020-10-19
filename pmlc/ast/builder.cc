@@ -21,7 +21,6 @@
 
 #include "pmlc/ast/ast.h"
 #include "pmlc/ast/eval.h"
-#include "pmlc/dialect/eltwise/ir/ops.h"
 #include "pmlc/dialect/tile/ir/ops.h"
 #include "pmlc/dialect/tile/transforms/passes.h"
 #include "pmlc/util/logging.h"
@@ -33,7 +32,6 @@ namespace pmlc::ast {
 using compiler::Program;
 using pmlc::util::DataType;
 using pmlc::util::TensorShape;
-namespace eltwise = pmlc::dialect::eltwise;
 namespace tile = pmlc::dialect::tile;
 
 namespace {
@@ -85,16 +83,14 @@ public:
     return RankedTensorType::get(shape.sizes, elementType);
   }
 
-  eltwise::APFloatType getAPFloatType() {
-    return eltwise::APFloatType::get(context);
+  tile::APFloatType getAPFloatType() { return tile::APFloatType::get(context); }
+
+  tile::APSignedIntegerType getAPSignedIntegerType() {
+    return tile::APSignedIntegerType::get(context);
   }
 
-  eltwise::APSignedIntegerType getAPSignedIntegerType() {
-    return eltwise::APSignedIntegerType::get(context);
-  }
-
-  eltwise::APUnsignedIntegerType getAPUnsignedIntegerType() {
-    return eltwise::APUnsignedIntegerType::get(context);
+  tile::APUnsignedIntegerType getAPUnsignedIntegerType() {
+    return tile::APUnsignedIntegerType::get(context);
   }
 
   Value lookupNode(const ExprNodePtr &node) {
@@ -125,11 +121,11 @@ public:
   }
 
   Value makeScalarConstantIntOp(Type type, int64_t value) {
-    return create<eltwise::ScalarConstantOp>(getUnknownLoc(), type, value);
+    return create<tile::ConstantOp>(getUnknownLoc(), type, value);
   }
 
   Value makeScalarConstantFloatOp(Type type, double value) {
-    return create<eltwise::ScalarConstantOp>(getUnknownLoc(), type, value);
+    return create<tile::ConstantOp>(getUnknownLoc(), type, value);
   }
 
   Attribute getAttribute(const VarNodePtr &node) {
@@ -539,7 +535,7 @@ struct ProgramBuilder {
       auto defOp = value.getDefiningOp();
       if (!defOp || isa<tile::ReshapeOp>(defOp) ||
           returnOperands.count(value)) {
-        value = builder.create<eltwise::IdentOp>(loc, value.getType(), value);
+        value = builder.create<tile::IdentOp>(loc, value.getType(), value);
       }
       returnOperands.insert(value);
     }
@@ -572,7 +568,7 @@ struct ProgramBuilder {
     RankedTensorType resultType =
         RankedTensorType::get(shape.sizes, elementType);
     Value tensor = builder.lookupNode(node->expr);
-    return builder.create<eltwise::CastOp>(loc, resultType, tensor);
+    return builder.create<tile::CastOp>(loc, resultType, tensor);
   }
 
   Value handleConstFloat(ExprNodeConstFloat *node) {
@@ -596,7 +592,8 @@ struct ProgramBuilder {
 
   Value handleDim(ExprNodeDim *node) {
     int64_t value = evaluator.evaluate(node->dim);
-    return builder.create<tile::ConstantOp>(loc, value);
+    Type type = builder.getAPUnsignedIntegerType();
+    return builder.makeScalarConstantIntOp(type, value);
   }
 
   Value handleElement(ExprNodeElement *node) {
@@ -671,10 +668,10 @@ struct ProgramBuilder {
       throw std::runtime_error(
           "'index' primitive expects argument 1 to be a constant integer");
     }
-    auto dims = operands.drop_front();
     TensorShape shape = evaluator.getShape(node);
     RankedTensorType resultType = builder.getRankedTensorType(shape);
-    auto op = builder.create<tile::IndexOp>(loc, resultType, axisAttr, dims);
+    IntegerAttr indexAttr = builder.getIndexAttr(axisAttr.getInt());
+    auto op = builder.create<tile::IndexOp>(loc, resultType, indexAttr);
     return op.result();
   }
 
@@ -697,14 +694,10 @@ struct ProgramBuilder {
   }
 
   const AbstractOperation *lookupOperation(StringRef op) {
-    auto opName = eltwise::EltwiseDialect::getCanonicalOpName(op);
+    auto opName = tile::TileDialect::getCanonicalOpName(op);
     auto abstractOp = AbstractOperation::lookup(opName, context);
     if (!abstractOp) {
-      opName = tile::TileDialect::getCanonicalOpName(op);
-      abstractOp = AbstractOperation::lookup(opName, context);
-      if (!abstractOp) {
-        throw std::runtime_error("Unknown EDSL primitive: " + op.str());
-      }
+      throw std::runtime_error("Unknown EDSL primitive: " + op.str());
     }
     return abstractOp;
   }
@@ -724,7 +717,6 @@ std::shared_ptr<Program> buildProgram(llvm::StringRef name,
                                       const ProgramArguments &args) {
   enableGlobalDialectRegistry(true);
   registerDialect<dialect::tile::TileDialect>();
-  registerDialect<dialect::eltwise::EltwiseDialect>();
   registerDialect<StandardOpsDialect>();
   if (name.empty()) {
     name = "module";

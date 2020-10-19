@@ -1,6 +1,6 @@
 // Copyright 2019, Intel Corporation
 
-#include "pmlc/dialect/eltwise/ir/util.h"
+#include "pmlc/dialect/tile/ir/util.h"
 
 #include <algorithm>
 #include <string>
@@ -16,13 +16,13 @@
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/Support/DebugStringHelper.h"
 
-#include "pmlc/dialect/eltwise/ir/ops.h"
-#include "pmlc/dialect/eltwise/ir/types.h"
+#include "pmlc/dialect/tile/ir/ops.h"
+#include "pmlc/dialect/tile/ir/types.h"
 #include "pmlc/util/logging.h"
 
 using namespace mlir; // NOLINT
 
-namespace pmlc::dialect::eltwise {
+namespace pmlc::dialect::tile {
 
 using llvm::ArrayRef;
 using llvm::SmallVector;
@@ -217,4 +217,4 @@ LogicalResult materializeOperands(OpBuilder &builder, Operation *op) {
   return materializeOperands(builder, op, op->getOpOperands());
 }
 
-} // namespace pmlc::dialect::eltwise
+} // namespace pmlc::dialect::tile

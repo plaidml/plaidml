@@ -1,5 +1,6 @@
 // Copyright 2019, Intel Corporation
 
+#include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/FormatVariadic.h"
 
 #include "mlir/IR/Builders.h"
@@ -8,6 +9,7 @@
 #include "mlir/Support/DebugStringHelper.h"
 
 #include "pmlc/dialect/tile/ir/ops.h"
+#include "pmlc/dialect/tile/ir/types.h"
 #include "pmlc/util/logging.h"
 
 using namespace mlir; // NOLINT
@@ -24,11 +26,15 @@ struct OpAsmDialectInterfaceImpl : public OpAsmDialectInterface {
                          OpAsmSetValueNameFn setNameFn) const final {
     llvm::SmallString<32> osbuf;
     llvm::raw_svector_ostream os(osbuf);
-    if (auto constOp = llvm::dyn_cast<ConstantOp>(op)) {
-      os << 'c' << constOp.value().getSExtValue();
-    } else if (auto cionOp = llvm::dyn_cast<ContractionOp>(op)) {
+    if (auto cionOp = llvm::dyn_cast<ContractionOp>(op)) {
       if (cionOp.name().hasValue()) {
         os << *cionOp.name();
+      }
+    } else if (auto const_op = llvm::dyn_cast<tile::ConstantOp>(op)) {
+      if (auto attr = const_op.value().dyn_cast<IntegerAttr>()) {
+        os << 'c' << attr.getValue();
+      } else {
+        os << "cst";
       }
     }
     setNameFn(op->getResult(0), os.str());
@@ -38,6 +44,7 @@ struct OpAsmDialectInterfaceImpl : public OpAsmDialectInterface {
 } // namespace
 
 void TileDialect::initialize() {
+  addTypes<APFloatType, APSignedIntegerType, APUnsignedIntegerType>();
   addOperations<
 #define GET_OP_LIST
 #include "pmlc/dialect/tile/ir/ops.cc.inc"
@@ -55,14 +62,49 @@ std::string TileDialect::getCanonicalOpName(StringRef name) {
 
 Operation *TileDialect::materializeConstant(OpBuilder &builder, Attribute value,
                                             Type type, Location loc) {
-  IVLOG(5, "tile::TileDialect::materializeConstant> "
+  IVLOG(1, "tile::TileDialect::materializeConstant> "
                << debugString(value) << " : " << debugString(type));
-  if (auto attr = value.dyn_cast<IntegerAttr>()) {
-    auto indexType = builder.getIndexType();
-    auto indexAttr = builder.getIntegerAttr(indexType, attr.getInt());
-    return builder.create<ConstantOp>(loc, indexType, indexAttr);
+  auto rankedTensorType = getRankedTensorType(type);
+  Type elementType = rankedTensorType.getElementType();
+  if (elementType.isa<FloatType>()) {
+    if (auto attr = value.dyn_cast<IntegerAttr>()) {
+      return builder.create<tile::ConstantOp>(
+          loc, elementType, static_cast<double>(attr.getInt()));
+    }
   }
-  return nullptr;
+  if (elementType.isa<IntegerType>()) {
+    if (auto attr = value.dyn_cast<FloatAttr>()) {
+      return builder.create<tile::ConstantOp>(
+          loc, elementType, static_cast<int64_t>(attr.getValueAsDouble()));
+    }
+  }
+  return builder.create<tile::ConstantOp>(loc, type, value);
+}
+
+void TileDialect::printType(Type type, DialectAsmPrinter &printer) const {
+  llvm::TypeSwitch<Type>(type)
+      .Case<APFloatType>([&](auto deviceType) { printer << "fx"; })
+      .Case<APSignedIntegerType>([&](auto eventType) { printer << "six"; })
+      .Case<APUnsignedIntegerType>([&](auto eventType) { printer << "uix"; })
+      .Default([](Type) { llvm_unreachable("Unsupported 'eltwise' type"); });
+}
+
+Type TileDialect::parseType(DialectAsmParser &parser) const {
+  Location loc = parser.getEncodedSourceLoc(parser.getNameLoc());
+
+  StringRef typeKeyword;
+  if (failed(parser.parseKeyword(&typeKeyword)))
+    return nullptr;
+
+  return llvm::StringSwitch<function_ref<Type()>>(typeKeyword)
+      .Case("fx", [&] { return APFloatType::getChecked(loc); })
+      .Case("six", [&] { return APSignedIntegerType::getChecked(loc); })
+      .Case("uix", [&] { return APUnsignedIntegerType::getChecked(loc); })
+      .Default([&] {
+        parser.emitError(parser.getNameLoc(),
+                         "Unsupported 'eltwise' type: " + typeKeyword);
+        return Type();
+      })();
 }
 
 } // namespace pmlc::dialect::tile

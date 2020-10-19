@@ -1,24 +1,17 @@
 // Copyright 2019, Intel Corporation
-#ifndef __PML_ELTWISE_OPS__
-#define __PML_ELTWISE_OPS__
 
-include "mlir/Interfaces/SideEffectInterfaces.td"
+#ifndef __PML_TILE_ELTWISE_OPS__
+#define __PML_TILE_ELTWISE_OPS__
 
-#ifndef __PML_ELTWISE_BASE__
-include "pmlc/dialect/eltwise/ir/base.td"
-#endif
-
-#ifndef __PMLC_UTIL_INTERFACES__
-include "pmlc/util/interfaces.td"
-#endif
+include "pmlc/dialect/tile/ir/base.td"
 
 class EltwiseOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
-    Op<EltwiseDialect, mnemonic, !listconcat(traits, [
+    Op<TileDialect, mnemonic, !listconcat(traits, [
       MaterializeOperandsOpInterface
     ])>;
 
-def ScalarConstantOp :
-    Op<EltwiseDialect, "sconst", [ConstantLike, NoSideEffect]>,
+def ConstantOp :
+    Op<TileDialect, "constant", [ConstantLike, NoSideEffect]>,
     HasFolder {
   let summary = "constant";
   let arguments = (ins AnyAttr:$value);
@@ -43,9 +36,9 @@ def ScalarConstantOp :
 
   let extraClassDeclaration = [{
     mlir::Attribute getValue() { return getAttr("value"); }
-    mlir::IntegerAttr getIntAttr() { return getAttrOfType<mlir::IntegerAttr>("value"); }
-    mlir::FloatAttr getFloatAttr() { return getAttrOfType<mlir::FloatAttr>("value"); }
   }];
+
+  let assemblyFormat = "`(` $value `)` attr-dict `:` type($result)";
 }
 
 class EW_UnaryOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
@@ -54,8 +47,11 @@ class EW_UnaryOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
   let results = (outs EltwiseAny:$result);
   let extraClassDeclaration = [{
     mlir::LogicalResult materializeOperands(mlir::OpBuilder& builder) {
-      return eltwise::materializeOperands(builder, getOperation());
+      return tile::materializeOperands(builder, getOperation());
     }
+  }];
+  let assemblyFormat = [{
+    $operand attr-dict `:` functional-type($operand, $result)
   }];
 }
 
@@ -65,15 +61,21 @@ class EW_BinaryOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
   let results = (outs EltwiseAny:$result);
   let extraClassDeclaration = [{
     mlir::LogicalResult materializeOperands(mlir::OpBuilder& builder) {
-      return eltwise::materializeOperands(builder, getOperation());
+      return tile::materializeOperands(builder, getOperation());
     }
+  }];
+  let assemblyFormat = [{
+    $lhs `,` $rhs attr-dict `:` functional-type(operands, $result)
   }];
 }
 
-def EW_CastOp : Op<EltwiseDialect, "cast", [NoSideEffect]>, HasFolder {
+def EW_CastOp : Op<TileDialect, "cast", [NoSideEffect]>, HasFolder {
   let summary = "cast operation";
   let arguments = (ins EltwiseAny:$tensor);
   let results = (outs EltwiseAny:$result);
+  let assemblyFormat = [{
+    $tensor attr-dict `:` functional-type($tensor, $result)
+  }];
 }
 
 class EW_CompareOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
@@ -82,8 +84,11 @@ class EW_CompareOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
   let results = (outs EltwiseBool:$result);
   let extraClassDeclaration = [{
     mlir::LogicalResult materializeOperands(mlir::OpBuilder& builder) {
-      return eltwise::materializeOperands(builder, getOperation());
+      return tile::materializeOperands(builder, getOperation());
     }
+  }];
+  let assemblyFormat = [{
+    $lhs `,` $rhs attr-dict `:` functional-type(operands, $result)
   }];
 }
 
@@ -172,6 +177,9 @@ def EW_SelectOp : EltwiseOp<"select", [NoSideEffect]> {
   let extraClassDeclaration = [{
     mlir::LogicalResult materializeOperands(mlir::OpBuilder& builder);
   }];
+  let assemblyFormat = [{
+    $cond `,` $tcase `,` $fcase attr-dict `:` functional-type(operands, $result)
+  }];
 }
 
-#endif // __PML_ELTWISE_OPS__
+#endif // __PML_TILE_ELTWISE_OPS__

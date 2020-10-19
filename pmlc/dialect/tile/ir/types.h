@@ -4,7 +4,7 @@
 
 #include "mlir/IR/Types.h"
 
-namespace pmlc::dialect::eltwise {
+namespace pmlc::dialect::tile {
 
 class APFloatType : public mlir::Type::TypeBase<APFloatType, mlir::Type,
                                                 mlir::DefaultTypeStorage> {
@@ -26,4 +26,4 @@ public:
   using Base::Base;
 };
 
-} // namespace pmlc::dialect::eltwise
+} // namespace pmlc::dialect::tile
