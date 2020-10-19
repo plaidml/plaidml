@@ -11,11 +11,9 @@
 #include "mlir/Dialect/SPIRV/SPIRVOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 
-#include "mlir/Support/DebugStringHelper.h"
 #include "pmlc/conversion/gpu_to_spirv/pass_detail.h"
 #include "pmlc/conversion/gpu_to_spirv/passes.h"
 #include "pmlc/dialect/stdx/ir/ops.h"
-#include "pmlc/util/logging.h"
 
 using namespace mlir; // NOLINT[build/namespaces]
 
