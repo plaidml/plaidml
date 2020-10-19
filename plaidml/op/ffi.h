@@ -8,9 +8,6 @@
 extern "C" {
 #endif  // __cplusplus
 
-void plaidml_op_init(  //
-    plaidml_error* err);
-
 plaidml_value* plaidml_op_make(  //
     plaidml_error* err,          //
     const char* op_name,         //

@@ -14,14 +14,6 @@ from plaidml.ffi import ForeignObject, ffi, ffi_call, lib
 
 logger = logging.getLogger(__name__)
 
-
-def __init():
-    """Initializes the PlaidML EDSL API."""
-    ffi_call(lib.plaidml_edsl_init)
-
-
-ffi.init_once(__init, 'plaidml_edsl_init')
-
 Constraint = namedtuple('Constraint', ['lhs', 'rhs'])
 
 
@@ -48,9 +40,6 @@ class TensorDim(ForeignObject):
         if expr is None:
             expr = ffi_call(lib.plaidml_dim_expr_none)
         super(TensorDim, self).__init__(expr)
-
-    def _bind(self, expr):
-        self.take_ptr(expr)
 
     def __neg__(self):
         """Negates a TensorDim in a polynomial expression.
@@ -300,9 +289,30 @@ class TensorIndex(ForeignObject):
         return TensorIndex(_poly_op(lib.PLAIDML_INT_OP_DIV, lhs, self))
 
 
+class TensorLens(object):
+
+    def __init__(self, source='', target=''):
+        self.map = []
+        if len(source) != len(target):
+            raise ValueError('source and target rank mismatch')
+        for i in range(len(source)):
+            pos = target.find(source[i])
+            if pos == -1:
+                raise ValueError('source and target dims mismatch')
+            self.map.append(pos)
+
+    def apply(self, dims):
+        if len(self.map) == 0:
+            return dims
+        if len(dims) != len(self.map):
+            raise ValueError('rank mismatch in TensorLens apply')
+        return [dims[x] for x in self.map]
+
+
 class Contraction(object):
 
-    def __init__(self, name=''):
+    def __init__(self, lens=TensorLens(), name=''):
+        self.__lens = lens
         self.__name = name
         self.__outDims = []
         self.__outIdxs = []
@@ -399,10 +409,10 @@ class Contraction(object):
             return [idxs]
 
         dims = [_wrap_dim(x) for x in self.__outDims]
-        raw_dims = [x.as_ptr() for x in dims]
+        raw_dims = [x.as_ptr() for x in self.__lens.apply(dims)]
 
         idxs = [_wrap_poly(x) for x in make_list(self.__outIdxs)]
-        raw_idxs = [x.as_ptr() for x in idxs]
+        raw_idxs = [x.as_ptr() for x in self.__lens.apply(idxs)]
 
         init = ffi.NULL
         if self.__init:
@@ -426,7 +436,7 @@ class Contraction(object):
 
         for operand in operands:
             idxs = [_wrap_poly(x) for x in make_list(operand._idxs)]
-            raw_idxs = [x.as_ptr() for x in idxs]
+            raw_idxs = [x.as_ptr() for x in operand._ref._lens.apply(idxs)]
             ffi_call(
                 lib.plaidml_contraction_add_operand,
                 tensor.as_ptr(),
@@ -494,8 +504,8 @@ class Tensor(ForeignObject):
     __ffi_del__ = lib.plaidml_expr_free
     __ffi_repr__ = lib.plaidml_expr_repr
 
-    def __init__(self, expr=None, value=None, name=''):
-        self._name = name
+    def __init__(self, expr=None, value=None, lens=TensorLens()):
+        self._lens = lens
         if value is not None:
             if isinstance(value, six.integer_types):
                 expr = ffi_call(lib.plaidml_expr_int, value)
@@ -626,25 +636,14 @@ class Tensor(ForeignObject):
 
     # Verify that the specified dims match the dims of this tensor.
     def bind_dims(self, *dims):
-        raw_dims = [x.as_ptr() for x in dims]
+        raw_dims = [x.as_ptr() for x in self._lens.apply(dims)]
         self._methodcall(lib.plaidml_expr_bind_dims, len(raw_dims), raw_dims)
 
     def element(self, ordinal):
         return Tensor(expr=self._methodcall(lib.plaidml_expr_element, ordinal))
 
-
-class TensorRef:
-
-    def __init__(self, tensor):
-        self.tensor = tensor
-
-    def __hash__(self):
-        return hash(ffi_call(lib.plaidml_expr_ptr, self.tensor.as_ptr()))
-
-    def __eq__(self, other):
-        if isinstance(other, Tensor):
-            return self.__hash__() == TensorRef(other).__hash__()
-        return self.__hash__() == other.__hash__()
+    def use(self, lens):
+        return Tensor(expr=self._methodcall(lib.plaidml_expr_clone), lens=lens)
 
 
 class Value(ForeignObject):

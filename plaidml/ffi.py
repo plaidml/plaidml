@@ -102,9 +102,3 @@ class ForeignObject(object):
         if release:
             self.__ffi_obj__ = None
         return ret
-
-    def set_ptr(self, ffi_obj):
-        self.__ffi_obj__ = ffi_obj
-
-    def take_ptr(self, obj):
-        self.__ffi_obj__ = obj.as_ptr(True)

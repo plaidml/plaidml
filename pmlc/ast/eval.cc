@@ -3,10 +3,12 @@
 #include "pmlc/ast/eval.h"
 
 #include <algorithm>
+#include <memory>
 #include <vector>
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/FormatVariadic.h"
 
 #include "pmlc/ast/ast_ops.h"
 #include "pmlc/util/logging.h"
@@ -185,7 +187,9 @@ int64_t Evaluator::evaluate(const DimNode *node) {
       })
       .Case<DimNodeRef>([&](const auto *node) {
         TensorShape shape = getShape(node->ref);
-        // TODO: verify dim is not out of bounds
+        if (shape.getRank() < node->dim) {
+          throw std::runtime_error("DimNodeRef out of bounds");
+        }
         return shape.sizes[node->dim];
       });
 }
@@ -284,6 +288,70 @@ TensorShapes Evaluator::computeShapes(const ExprNode *node) {
             return TensorShapes(shapes.begin(), shapes.end());
           });
   return shapes;
+}
+
+void Evaluator::bindDims(const ExprNodePtr &expr,
+                         llvm::ArrayRef<DimNodePtr *> into) {
+  TensorShape shape = getShape(expr);
+  if (into.size() != shape.getRank()) {
+    throw std::runtime_error("Rank mismatch in bind_dims");
+  }
+  bool failed = false;
+  for (size_t i = 0; i < into.size(); i++) {
+    DimNodePtr *ptr = into[i];
+    int64_t dim = shape.sizes[i];
+    llvm::TypeSwitch<const DimNode *>(ptr->get())
+        .Case<DimNodeNone>([&](auto *node) {
+          if (dim) {
+            *ptr = std::make_shared<ast::DimNodeLiteral>(dim);
+          } else {
+            *ptr = std::make_shared<ast::DimNodeRef>(expr, i);
+          }
+        })
+        .Case<DimNodeRef>([&](auto *node) {
+          if (dim) {
+            *ptr = std::make_shared<ast::DimNodeLiteral>(dim);
+          }
+        })
+        .Case<DimNodeLiteral>([&](auto *node) {
+          if (dim && dim != node->value) {
+            failed = true;
+          }
+        })
+        .Default([&](auto *node) {
+          throw std::runtime_error("Can only bind dims to an unbound or "
+                                   "previously bound TensorDim.");
+        });
+  }
+  if (failed) {
+    std::stringstream ss1;
+    for (auto item : llvm::enumerate(shape.sizes)) {
+      if (item.index()) {
+        ss1 << ", ";
+      }
+      if (item.value()) {
+        ss1 << item.value();
+      } else {
+        ss1 << '?';
+      }
+    }
+    std::stringstream ss2;
+    for (auto item : llvm::enumerate(into)) {
+      if (item.index()) {
+        ss2 << ", ";
+      }
+      auto value = evaluate(item.value()->get());
+      if (value) {
+        ss2 << value;
+      } else {
+        ss2 << '?';
+      }
+    }
+    throw std::runtime_error(
+        llvm::formatv("bind dims mismatch: shape=[{0}] != dims=[{1}]",
+                      ss1.str(), ss2.str())
+            .str());
+  }
 }
 
 } // namespace pmlc::ast
