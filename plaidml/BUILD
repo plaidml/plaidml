@@ -132,13 +132,6 @@ py_cffi(
     ],
 )
 
-plaidml_cc_library(
-    name = "sdklib",
-    data = [
-        ":libplaidml.so"
-    ]
-)
-
 py_binary(
     name = "setup",
     srcs = ["plaidml_setup.py"],
