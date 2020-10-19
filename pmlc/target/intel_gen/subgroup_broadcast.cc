@@ -53,7 +53,6 @@ public:
     // transformation
     if (dyn_cast_or_null<ExtractElementOp>(op))
       return success();
-
     // Replace operands if they are still vectorized. This can happen for
     // constant ops.
     for (OpOperand &operand : op->getOpOperands()) {
@@ -101,10 +100,12 @@ public:
       auto newBlockReadOp =
           builder.create<dialect::stdx::SubgroupBlockReadINTELOp>(
               op.getLoc(), op.memref(), idxs);
+      devectorizeVectorOp(newBlockReadOp.getOperation());
       op.replaceAllUsesWith(newBlockReadOp.getResult());
     } else {
       idxs.back() = builder.create<AddIOp>(op.getLoc(), idxs.back(), sid);
       auto newLoadOp = builder.create<LoadOp>(op.getLoc(), op.memref(), idxs);
+      devectorizeVectorOp(newLoadOp.getOperation());
       op.replaceAllUsesWith(newLoadOp.getResult());
     }
     op.erase();
@@ -128,11 +129,15 @@ public:
     // TODO: add additional requirements like mem alignment
     if (useBlockOps && !invalidMemScope &&
         isBlockOpTypeSupported<vector::TransferWriteOp>(op)) {
-      builder.create<dialect::stdx::SubgroupBlockWriteINTELOp>(
-          op.getLoc(), op.vector(), op.memref(), idxs);
+      auto newBlockWriteOp =
+          builder.create<dialect::stdx::SubgroupBlockWriteINTELOp>(
+              op.getLoc(), op.vector(), op.memref(), idxs);
+      devectorizeVectorOp(newBlockWriteOp.getOperation());
     } else {
       idxs.back() = builder.create<AddIOp>(op.getLoc(), idxs.back(), sid);
-      builder.create<StoreOp>(op.getLoc(), op.vector(), op.memref(), idxs);
+      auto newStoreOp =
+          builder.create<StoreOp>(op.getLoc(), op.vector(), op.memref(), idxs);
+      devectorizeVectorOp(newStoreOp.getOperation());
     }
     op.erase();
     return success();
