@@ -1,6 +1,5 @@
 load("@rules_cc//cc:defs.bzl", "cc_library")
 load("@com_intel_plaidml//bzl:template.bzl", "template_rule")
-load("@rules_foreign_cc//tools/build_defs:cmake.bzl", "cmake_external")
 
 package(default_visibility = ["//visibility:public"])
 
