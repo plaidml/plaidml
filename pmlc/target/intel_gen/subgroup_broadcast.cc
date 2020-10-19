@@ -12,11 +12,8 @@
 #include "mlir/Interfaces/VectorInterfaces.h"
 #include "mlir/Pass/Pass.h"
 
-#include "mlir/Support/DebugStringHelper.h"
-
 #include "pmlc/dialect/stdx/ir/ops.h"
 #include "pmlc/target/intel_gen/pass_detail.h"
-#include "pmlc/util/logging.h"
 #include "pmlc/util/tags.h"
 
 using namespace mlir; // NOLINT[build/namespaces]
@@ -40,13 +37,22 @@ public:
     return type.getRank() == 1 && type.getDimSize(0) == vectorSize;
   }
 
+  template <typename T>
+  bool isBlockOpTypeSupported(T op) {
+    auto elementType = op.vector().getType();
+    auto vectorType = elementType.template dyn_cast<VectorType>();
+    if (vectorType)
+      elementType = vectorType.getElementType();
+    return elementType.isInteger(16) || elementType.isInteger(32) ||
+           elementType.isF16() || elementType.isF32();
+  }
+
   LogicalResult devectorizeVectorOp(Operation *op) {
     OpBuilder builder(op);
     // Skip on std.extractelement as it will be removed with broadcast op
     // transformation
     if (dyn_cast_or_null<ExtractElementOp>(op))
       return success();
-
     // Replace operands if they are still vectorized. This can happen for
     // constant ops.
     for (OpOperand &operand : op->getOpOperands()) {
@@ -80,15 +86,26 @@ public:
     OpBuilder builder(op);
     // Add sid to lowest index
     SmallVector<Value, 4> idxs = op.indices();
-    if (useBlockOps) {
-      // TODO: add additional requirements like mem alignment
+    // TODO: Current HW supports only block read\write on global mem scope.
+    // This can change in the future so probably need to be better handled with
+    // HW specific parameters
+    auto invalidMemScope =
+        dyn_cast_or_null<AllocOp>(op.memref().getDefiningOp());
+
+    // TODO: Based on the HW caps we should accept these for certain data types
+    // Right now we accept i16/fp16 and i32/fp32 for the block read extensions
+    // TODO: add additional requirements like mem alignment
+    if (useBlockOps && !invalidMemScope &&
+        isBlockOpTypeSupported<vector::TransferReadOp>(op)) {
       auto newBlockReadOp =
           builder.create<dialect::stdx::SubgroupBlockReadINTELOp>(
               op.getLoc(), op.memref(), idxs);
+      devectorizeVectorOp(newBlockReadOp.getOperation());
       op.replaceAllUsesWith(newBlockReadOp.getResult());
     } else {
       idxs.back() = builder.create<AddIOp>(op.getLoc(), idxs.back(), sid);
       auto newLoadOp = builder.create<LoadOp>(op.getLoc(), op.memref(), idxs);
+      devectorizeVectorOp(newLoadOp.getOperation());
       op.replaceAllUsesWith(newLoadOp.getResult());
     }
     op.erase();
@@ -101,13 +118,26 @@ public:
     OpBuilder builder(op);
     // Add sid to lowest index
     SmallVector<Value, 4> idxs = op.indices();
-    if (useBlockOps) {
-      // TODO: add additional requirements like mem alignment
-      builder.create<dialect::stdx::SubgroupBlockWriteINTELOp>(
-          op.getLoc(), op.vector(), op.memref(), idxs);
+    // TODO: Current HW supports only block read\write on global mem scope.
+    // This can change in the future so probably need to be better handled with
+    // HW specific parameters
+    auto invalidMemScope =
+        dyn_cast_or_null<AllocOp>(op.memref().getDefiningOp());
+
+    // TODO: Based on the HW caps we should accept these for certain data types
+    // Right now we accept i16/fp16 and i32/fp32 for the block read extensions
+    // TODO: add additional requirements like mem alignment
+    if (useBlockOps && !invalidMemScope &&
+        isBlockOpTypeSupported<vector::TransferWriteOp>(op)) {
+      auto newBlockWriteOp =
+          builder.create<dialect::stdx::SubgroupBlockWriteINTELOp>(
+              op.getLoc(), op.vector(), op.memref(), idxs);
+      devectorizeVectorOp(newBlockWriteOp.getOperation());
     } else {
       idxs.back() = builder.create<AddIOp>(op.getLoc(), idxs.back(), sid);
-      builder.create<StoreOp>(op.getLoc(), op.vector(), op.memref(), idxs);
+      auto newStoreOp =
+          builder.create<StoreOp>(op.getLoc(), op.vector(), op.memref(), idxs);
+      devectorizeVectorOp(newStoreOp.getOperation());
     }
     op.erase();
     return success();
