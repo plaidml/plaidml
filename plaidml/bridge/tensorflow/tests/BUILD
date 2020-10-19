@@ -175,6 +175,19 @@ tf_cc_test(
     ],
 )
 
+genrule(
+    name = "resnext_extract_weights",
+    testonly = 1,
+    srcs = ["@models_resnext50//file"],
+    outs = [
+        "resnext50_tf_saved_model/saved_model.pb",
+	"resnext50_tf_saved_model/variables/variables.data-00000-of-00001",
+	"resnext50_tf_saved_model/variables/variables.index"
+    ],
+    cmd = "tar -xzvf $(location @models_resnext50//file) -C $(RULEDIR)",
+    tags = ["skip_windows"],
+)
+
 py_binary(
     name = "resnext_test_gen",
     testonly = 1,
@@ -193,9 +206,8 @@ genrule(
     srcs = ["@models_resnext50//file"],
     outs = [
         "resnext.pml",
-        "resnext_frozen_graph.pb"
     ],
-    cmd = "$(location :resnext_test_gen) $(location @models_resnext50//file) $(location resnext.pml) $(location resnext_frozen_graph.pb)",
+    cmd = "$(location :resnext_test_gen) $(location @models_resnext50//file) $(location resnext.pml)",
     tags = ["skip_windows"],
     tools = [
         ":resnext_test_gen",
@@ -207,6 +219,7 @@ tf_cc_test(
     srcs = ["resnext_test.cc"],
     data = [
         ":resnext_test_genrule",
+	":resnext_extract_weights",
     ],
     extra_copts = ["-fexceptions"],
     linkstatic = 1,

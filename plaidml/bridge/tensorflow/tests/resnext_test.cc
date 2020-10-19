@@ -52,11 +52,10 @@ TEST_P(PlaidMLResNextOperationTest, SimpleResNext) {
 
   std::vector<MultiBuffer> args = {inputs[0]};
 
-  auto hlo_module = ImportFrozenGraph("plaidml/bridge/tensorflow/tests/resnext_frozen_graph.pb",  //
-                                      {"data"},                                                   // x.op.name
-                                      {"module_apply_default/pool1"}                              // y.op.name
-                                      )
-                        .ValueOrDie();
+  StringRef saved_model_dir("plaidml/bridge/tensorflow/tests/resnext50_tf_saved_model");
+  auto frozen_graph_def = FreezeGraph(saved_model_dir, {"data"}, {"pool1"}).ValueOrDie();
+  auto hlo_module = LowerFrozenGraphToHlo(&frozen_graph_def, {"data"}, {"outputs"}).ValueOrDie();
+
   CompileAndCheck(std::move(hlo_module), {{args, outputs}});
 }
 

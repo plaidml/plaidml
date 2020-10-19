@@ -1,3 +1,5 @@
+### TODO: migrate the rest of this code over to c++
+
 import argparse
 import glob
 import os
@@ -26,20 +28,9 @@ def main(args):
         x = tf.get_default_graph().get_tensor_by_name(x_name)
         y = tf.get_default_graph().get_tensor_by_name('pool1:0')
 
-        # TODO(dgkutnic): need to figure out how to set x batch_size in the graph def to avoid graph conversion errors downstream
-        output_graph_def = tf.compat.v1.graph_util.convert_variables_to_constants(
-            sess,  # The session in which the weights were initialized
-            sess.graph.as_graph_def(),  # The original (non-frozen) graph def
-            [y.op.name]  # The output op name
-        )
-
         # Run an inference with random inputs to generate a correctness baseline for the archive
         x_input = np.random.uniform(size=input_shape)
         y_output = sess.run(y, feed_dict={x: x_input})
-
-    # Write frozen graph def as binary
-    with tf.io.gfile.GFile(args.graphdef, "wb+") as f:
-        f.write(output_graph_def.SerializeToString())
 
     archive = schema.ArchiveT()
     archive.name = 'resnext'
@@ -58,6 +49,6 @@ if __name__ == "__main__":
     parser.add_argument('archive',
                         type=argparse.FileType('wb'),
                         help='location to write the generated archive')
-    parser.add_argument('graphdef', type=str, help='location to write the frozen graphdef')
+    #parser.add_argument('graphdef', type=str, help='location to write the frozen graphdef')
     args = parser.parse_args()
     main(args)
