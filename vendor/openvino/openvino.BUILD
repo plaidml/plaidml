@@ -17,13 +17,26 @@ filegroup(
 
 genrule(
     name = "benchmarkapp",
-    srcs = [":all"],
-    outs = ["benchmark_app"],
+    srcs = [
+        ":all",
+        "@//plaidml",
+    ],
+    outs = [
+        "benchmark_app",
+        "libtbb.so.2",
+        "libMKLDNNPlugin.so",
+        "libPlaidMLPlugin.so",
+    ],
     cmd = """
-mkdir -p buildov;
-cd buildov; 
-cmake -GNinja ../external/openvino -DENABLE_CLDNN=OFF -DENABLE_VPU=OFF -DENABLE_MYRIAD=OFF -DENABLE_PLAIDML=ON -DENABLE_SPEECH_DEMO=OFF -DPLAIDML_SRC_PATH=/home/brian/plaidml; ninja benchmark_app;
-ls $$(PWD); cp ../external/openvino/bin/intel64/Release/benchmark_app ../$(@)""",
+mkdir -p $(@D)/buildov;
+pushd $(@D)/buildov; 
+cmake -GNinja ../../../../../../external/openvino -DENABLE_CLDNN=OFF -DENABLE_VPU=OFF -DENABLE_MYRIAD=OFF -DENABLE_MKL_DNN=ON -DENABLE_PLAIDML=ON -DENABLE_SPEECH_DEMO=OFF -DPLAIDML_SRC_PATH=/home/brian/plaidml;
+ninja ;
+popd ;
+cp external/openvino/bin/intel64/Release/benchmark_app $(@D); 
+cp external/openvino/bin/intel64/Release/lib/libMKLDNNPlugin.so $(@D); 
+cp external/openvino/bin/intel64/Release/lib/libPlaidMLPlugin.so $(@D); 
+cp external/openvino/inference-engine/temp/tbb/lib/libtbb.so.2 $(@D);""",
     local = True,
 )
 
