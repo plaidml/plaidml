@@ -18,8 +18,8 @@ public:
 
   virtual ~Executable() = default;
 
-  virtual void invoke(mlir::ArrayRef<util::BufferPtr> inputBuffers,
-                      mlir::ArrayRef<util::BufferPtr> outputBuffers) = 0;
+  virtual double invoke(mlir::ArrayRef<util::BufferPtr> inputBuffers,
+                        mlir::ArrayRef<util::BufferPtr> outputBuffers) = 0;
 };
 
 } // namespace pmlc::rt

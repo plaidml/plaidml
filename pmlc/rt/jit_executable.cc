@@ -400,18 +400,19 @@ public:
     }
   }
 
-  void invoke(mlir::ArrayRef<util::BufferPtr> inputBuffers,
-              mlir::ArrayRef<util::BufferPtr> outputBuffers) final {
+  double invoke(mlir::ArrayRef<util::BufferPtr> inputBuffers,
+                mlir::ArrayRef<util::BufferPtr> outputBuffers) final {
+    bindArguments(inputBuffers, outputBuffers);
     StopWatch stopWatch;
     if (VLOG_IS_ON(1)) {
       stopWatch.start();
     }
-    bindArguments(inputBuffers, outputBuffers);
     jitEntry(ptrs.data());
     if (VLOG_IS_ON(1)) {
       stopWatch.stop();
       IVLOG(1, "Execution time: " << stopWatch.delta_ms() << "ms");
     }
+    return stopWatch.delta_ms();
   }
 
   void bindArguments(ArrayRef<util::BufferPtr> inputBuffers,

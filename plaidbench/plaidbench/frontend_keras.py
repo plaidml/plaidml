@@ -246,6 +246,7 @@ class InferenceModel(Model):
         if not once and not warmup:
             import keras.backend as b
             if b.backend() == 'plaidml':
+                # set a global here (self.execution_time = b.whatever)
                 b._ctx.shutdown()
         return (out, {})
 

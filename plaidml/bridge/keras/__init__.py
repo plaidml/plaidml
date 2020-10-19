@@ -137,8 +137,18 @@ class _Runner(object):
     def run(self, inputs):
         for input, buffer in zip(inputs, self.input_buffers):
             buffer.copy_from_ndarray(input)
-        self.executable.run(self.input_buffers + self.var_buffers,
-                            self.output_buffers + self.update_buffers)
+        # or, just have this return a double (execution time)
+        # in frontend keras
+        stop_watch = self.executable.run(self.input_buffers + self.var_buffers,
+                                         self.output_buffers + self.update_buffers)
+        print("------------------------------------------")
+        print("------------------------------------------")
+        print("------------------------------------------")
+        print("OUTSIDE THE FFI, STOP WATCH = ")
+        print(stop_watch)
+        print("------------------------------------------")
+        print("------------------------------------------")
+        print("------------------------------------------")
         return [buffer.as_ndarray() for buffer in self.output_buffers]
 
 

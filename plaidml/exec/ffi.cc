@@ -75,13 +75,14 @@ void plaidml_executable_free(  //
   });
 }
 
-void plaidml_executable_run(   //
-    plaidml_error* err,        //
-    plaidml_executable* exec,  //
-    size_t ninputs,            //
-    plaidml_buffer** inputs,   //
-    size_t noutputs,           //
+double plaidml_executable_run(  //
+    plaidml_error* err,         //
+    plaidml_executable* exec,   //
+    size_t ninputs,             //
+    plaidml_buffer** inputs,    //
+    size_t noutputs,            //
     plaidml_buffer** outputs) {
+  double stop_watch = 0.0;
   ffi_wrap_void(err, [&] {  //
     llvm::SmallVector<BufferPtr, 8> inputBuffers;
     if (exec->program->inputs.size() != ninputs) {
@@ -113,8 +114,18 @@ void plaidml_executable_run(   //
       }
       outputBuffers.push_back(outputs[i]->buffer);
     }
-    exec->exec->invoke(inputBuffers, outputBuffers);
+    stop_watch = exec->exec->invoke(inputBuffers, outputBuffers);
+    IVLOG(1, "++++++++++++++++++++++++++++++++++++++++++++++");
+    IVLOG(1, "++++++++++++++++++++++++++++++++++++++++++++++");
+    IVLOG(1, "++++++++++++++++++++++++++++++++++++++++++++++");
+    IVLOG(1, "IN THE FFI, STOP WATCH =");
+    IVLOG(1, stop_watch);
+    IVLOG(1, "++++++++++++++++++++++++++++++++++++++++++++++");
+    IVLOG(1, "++++++++++++++++++++++++++++++++++++++++++++++");
+    IVLOG(1, "++++++++++++++++++++++++++++++++++++++++++++++");
   });
+
+  return stop_watch;
 }
 
 }  // extern "C"
