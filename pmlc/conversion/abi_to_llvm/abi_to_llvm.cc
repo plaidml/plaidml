@@ -205,29 +205,25 @@ struct LoopLowering : public mlir::ConvertOpToLLVMPattern<LLVM::LLVMFuncOp> {
             operand.getKind() != mlir::Value::Kind::BlockArgument) {
           if (auto constOp = mlir::dyn_cast_or_null<mlir::ConstantOp>(
                   operand.getDefiningOp())) {
+            // TODO: It might be useful to copy additional operations into the
+            // generated plaidml_exec, instead of plumbing them through from
+            // the network, to increase the number of values we can compute
+            // or elide at compilation time.
             auto newOpSrc = rewriter.create<mlir::ConstantOp>(
                 constOp.getLoc(), constOp.getValue());
             mapper.map(constOp, newOpSrc);
           } else {
             llvm::errs() << "Creating extractor for: "
                          << mlir::debugString(*operand.getDefiningOp()) << "\n";
-            mlir::Optional<LLVMType> opType =
-                llvm::TypeSwitch<mlir::Type, mlir::Optional<LLVMType>>(
-                    typeConverter.convertType(operand.getType()))
-                    .Case<mlir::IndexType>([&](mlir::IndexType ty) {
-                      return typeConverter.getIndexType();
-                    })
-                    .Case<LLVMType>([](LLVMType ty) { return ty; })
-                    .Default([](mlir::Type ty) {
-                      return mlir::Optional<LLVMType>();
-                    });
+            LLVMType opType =
+                typeConverter.convertType(operand.getType()).cast<LLVMType>();
             llvm::errs() << "OpType for " << operand.getType() << " is "
                          << opType << "\n";
             auto newOpSrc = rewriter.create<LLVM::ExtractValueOp>(
-                rewriter.getUnknownLoc(), opType.getValue(), execNetwork,
+                rewriter.getUnknownLoc(), opType, execNetwork,
                 rewriter.getI64ArrayAttr(networkFieldTypes.size()));
             mapper.map(operand, newOpSrc);
-            networkFieldTypes.emplace_back(opType.getValue());
+            networkFieldTypes.emplace_back(opType);
           }
         }
       }
@@ -241,7 +237,6 @@ struct LoopLowering : public mlir::ConvertOpToLLVMPattern<LLVM::LLVMFuncOp> {
           rewriter.getUnknownLoc(), execEntryBlock->getArgument(idx)));
     }
 
-    LLVMType::setStructTyBody(networkTy, networkFieldTypes);
     // Clone the loop's region into plaidml_exec().
     rewriter.cloneRegionBefore(loopOp.getRegion(), execFunc.getRegion(),
                                execFunc.getRegion().end(), mapper);
@@ -282,6 +277,8 @@ struct LoopLowering : public mlir::ConvertOpToLLVMPattern<LLVM::LLVMFuncOp> {
     });
 
     llvm::errs() << "After replacement: plaidml_exec: " << execFunc << "\n";
+
+    LLVMType::setStructTyBody(networkTy, networkFieldTypes);
 
     rewriter.finalizeRootUpdate(funcOp);
 
