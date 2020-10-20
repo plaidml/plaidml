@@ -29,7 +29,7 @@ plaidml_cc_test(
         "//plaidml:intel_gen_ocl_spirv": [":edsl_test-skip.intel_gen_ocl_spirv.txt"],
         "//conditions:default": [],
     }),
-    linkstatic = True,
+    # linkstatic = False,
     toolchains = ["//plaidml:settings"],
     visibility = ["//visibility:public"],
     deps = [

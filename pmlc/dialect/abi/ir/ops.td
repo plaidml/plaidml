@@ -28,7 +28,7 @@ def ABI_LoopOp : ABI_Op<"loop", [
     operations outside of the loop, so that their cost is ammortized over
     many runs of the program.
   }];
-  let arguments = (ins Variadic<AnyMemRef>:$inputs);
+  let arguments = (ins Variadic<AnyMemRef>:$args);
   let regions = (region AnyRegion:$region);
 }
 
