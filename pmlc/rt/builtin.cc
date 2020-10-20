@@ -34,7 +34,6 @@ extern "C" void plaidml_rt_trace(const char *msg) {
 
 extern "C" uint64_t _mlir_ciface_plaidml_rt_thread_num() {
   uint64_t tid = __kmp_get_tid();
-  std::cerr << "Calling thread_num -> " << tid << "\n";
   return tid;
 }
 

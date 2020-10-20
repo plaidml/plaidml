@@ -13,6 +13,8 @@
 #include "pmlc/util/logging.h"
 #include "pmlc/util/tags.h"
 
+#include "mlir/Support/DebugStringHelper.h"
+
 using namespace mlir; // NOLINT[build/namespaces]
 
 namespace pmlc::conversion::scf_to_omp {
@@ -25,58 +27,54 @@ namespace {
 LogicalResult convertSCPParallel(scf::ParallelOp op) {
   IVLOG(2, "convertSCPParallel");
   OpBuilder builder(op);
-
-  // Look for a parallel loop.  We expect that it will have a single index,
-  // whose range is the number of threads which should execute it.  We will
-  // generate an OpenMP parallel block which will execute the contents of this
-  // loop.  For the index variable, we will substitute omp_get_thread_num().
-  // We expect that the body of the loop we are transforming will contain some
-  // kind of appropriately tiled affine parallel structure which will derive
-  // the index ranges from the thread number.
-
-  if (op.getNumLoops() != 1) {
-    IVLOG(2, "Can't lower scf::ParallelOp unless number of indexes == 1");
-    op.emitError("Number of loops must be 1");
-    return failure();
-  }
-
   auto loc = op.getLoc();
 
-  // Look up the loop bounds to get the number of threads to run.
-  APInt lowerAP, upperAP, stepAP;
-  if (!matchPattern(op.lowerBound().front(), m_ConstantInt(&lowerAP)) ||
-      !matchPattern(op.upperBound().front(), m_ConstantInt(&upperAP)) ||
-      !matchPattern(op.step().front(), m_ConstantInt(&stepAP))) {
-    IVLOG(2, "Unable to get constant bounds in scf::ParallelOp");
-    op.emitError("scf.parallel bounds must be constant");
+  // Extact the range of each parallel index, requiring the all indexes are
+  // normalized (lower bound of zero, step size of 1).
+  int64_t numThreads = 1;
+  SmallVector<int64_t, 4> ranges;
+  for (size_t i = 0; i < op.lowerBound().size(); i++) {
+    APInt lowerAP, upperAP, stepAP;
+    if (!matchPattern(op.lowerBound()[i], m_ConstantInt(&lowerAP)) ||
+        !matchPattern(op.upperBound()[i], m_ConstantInt(&upperAP)) ||
+        !matchPattern(op.step()[i], m_ConstantInt(&stepAP))) {
+      IVLOG(2, "Unable to get constant bounds in scf::ParallelOp");
+      op.emitError("scf.parallel bounds must be constant");
+      return failure();
+    }
+    // Verify everthing is normalized.
+    uint64_t lower = lowerAP.getLimitedValue();
+    uint64_t upper = upperAP.getLimitedValue();
+    uint64_t step = stepAP.getLimitedValue();
+    if (lower != 0 || step != 1) {
+      op.emitError("Non-normalized loops not supported");
+      return failure();
+    }
+    // Add range to array + update number of threads
+    ranges.push_back(upper);
+    numThreads *= upper;
   }
 
-  // Verify everthing is normalized.
-  uint64_t lower = lowerAP.getLimitedValue();
-  uint64_t upper = upperAP.getLimitedValue();
-  uint64_t step = stepAP.getLimitedValue();
-  IVLOG(2, "lower = " << lower << ", upper = " << upper << ", step = " << step);
-  if (lower != 0 || step != 1) {
-    op.emitError("Non-normalized loops not supported");
-    return failure();
-  }
+  // Emit a constant of the number of threads
+  auto numThreadsVal = builder.create<ConstantIndexOp>(loc, numThreads);
 
   auto clauseAttr =
       StringAttr::get(stringifyClauseDefault(omp::ClauseDefault::defshared),
                       builder.getContext());
+
   // Create the omp parallel fork/join region
-  auto parallelOp = builder.create<omp::ParallelOp>(
-      loc,
-      /*if_expr_va=*/Value(),                      //
-      /*num_threads_var=*/op.upperBound().front(), //
-      /*default_val=*/clauseAttr,                  //
-      /*private_vars=*/ValueRange(),               //
-      /*firstprivate_vars=*/ValueRange(),          //
-      /*shared_vars=*/ValueRange(),                //
-      /*copyin_vars=*/ValueRange(),                //
-      /*allocate_vars=*/ValueRange(),              //
-      /*allocators_vars=*/ValueRange(),            //
-      /*proc_bind_val=*/StringAttr());
+  auto parallelOp =
+      builder.create<omp::ParallelOp>(loc,
+                                      /*if_expr_va=*/Value(),             //
+                                      /*num_threads_var=*/numThreadsVal,  //
+                                      /*default_val=*/clauseAttr,         //
+                                      /*private_vars=*/ValueRange(),      //
+                                      /*firstprivate_vars=*/ValueRange(), //
+                                      /*shared_vars=*/ValueRange(),       //
+                                      /*copyin_vars=*/ValueRange(),       //
+                                      /*allocate_vars=*/ValueRange(),     //
+                                      /*allocators_vars=*/ValueRange(),   //
+                                      /*proc_bind_val=*/StringAttr());
 
   // create a terminator (representing the join operation)
   builder.createBlock(&parallelOp.getRegion());
@@ -99,10 +97,17 @@ LogicalResult convertSCPParallel(scf::ParallelOp op) {
       builder.getSymbolRefAttr(threadFuncName), emptyOperands);
   Value tid = callOp.getResult(0);
 
-  // replace all references to the original IV with the thread ID, since we
-  // are replacing each loop iteration with one threaded execution
-  auto iv = op.getInductionVars().front();
-  iv.replaceAllUsesWith(tid);
+  // Extract the components of the threadID and replace indexes
+  for (size_t i = 0; i < ranges.size(); i++) {
+    Value range = builder.create<ConstantIndexOp>(loc, ranges[i]);
+    Value local = tid;
+    if (i != ranges.size() - 1) {
+      local = builder.create<UnsignedRemIOp>(loc, tid, range);
+      tid = builder.create<UnsignedDivIOp>(loc, tid, range);
+    }
+    Value iv = op.getInductionVars()[i];
+    iv.replaceAllUsesWith(local);
+  }
 
   // make sure the module contains a declaration for omp_get_thread_num
   auto module = op.getParentOfType<ModuleOp>();
