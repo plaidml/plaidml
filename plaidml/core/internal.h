@@ -83,6 +83,18 @@ ResultT* ffi_vector(const std::vector<T>& vec) {
   return result.release();
 }
 
+template <typename ResultT>
+ResultT* ffi_vector(const std::vector<int64_t>& vec) {
+  std::unique_ptr<int64_t[]> elts{new int64_t[vec.size()]};
+  auto result = std::make_unique<ResultT>();
+  for (size_t i = 0; i < vec.size(); i++) {
+    elts[i] = vec[i];
+  }
+  result->size = vec.size();
+  result->elts = elts.release();
+  return result.release();
+}
+
 plaidml_datatype convertIntoDataType(pmlc::util::DataType type);
 pmlc::util::DataType convertFromDataType(plaidml_datatype dtype);
 

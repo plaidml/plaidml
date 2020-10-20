@@ -100,8 +100,12 @@ public:
   Value lookupNode(const ExprNodePtr &node) {
     auto it = exprMap.find(node.get());
     if (it == exprMap.end()) {
-      // NOTE: this can happen if the user forgets to add an input to the
-      // edsl::Program constructor.
+      if (isa<ExprNodeInput>(node.get())) {
+        // NOTE: this can happen if the user forgets to add an input to the
+        // edsl::Program constructor.
+        throw std::runtime_error(llvm::formatv(
+            "Missing placeholder during program build: {0}", node->str()));
+      }
       throw std::runtime_error(
           llvm::formatv("ExprNode not found: {0}", node->str()));
     }
@@ -448,7 +452,7 @@ struct ContractionBuilder : PolyVisitor<ContractionBuilder, AffineExpr> {
 
 struct ProgramBuilder {
   explicit ProgramBuilder(llvm::StringRef name)
-      : program(std::make_shared<compiler::Program>(0, name)),
+      : program(std::make_shared<compiler::Program>(name)),
         context(&program->context), loc(UnknownLoc::get(context)),
         module(*program->module), builder(module) {}
 

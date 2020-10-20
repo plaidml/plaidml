@@ -79,7 +79,7 @@ private:
 
 } // namespace
 
-Program::Program(int x, llvm::StringRef name)
+Program::Program(llvm::StringRef name)
     : module(ModuleOp::create(UnknownLoc::get(&context), name)) {}
 
 Program::Program(mlir::ModuleOp module) : module(module) {}

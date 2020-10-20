@@ -476,13 +476,10 @@ void ConvertGpuLaunchFuncToVulkanCalls::convertGpuLaunchFunc(
     return signalPassFailure();
   }
 
-  // Presume block.x is the subgroup size
-  auto blockSize = launchOp.getBlockSizeOperandValues();
+  // Get subgroup size
   int64_t subgroupSize = 1;
-  mlir::IntegerAttr intAttr;
-  if (matchPattern(blockSize.x, m_Constant(&intAttr))) {
-    subgroupSize = intAttr.getInt();
-  }
+  if (pmlc::hasIntegerTag(launchOp, "subgroupSize"))
+    subgroupSize = pmlc::getIntegerTag(launchOp, "subgroupSize", 1);
   if (subgroupSize != 1) {
     IVLOG(2, "Subgroup size = " << subgroupSize);
   }

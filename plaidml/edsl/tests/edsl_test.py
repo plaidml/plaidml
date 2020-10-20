@@ -44,12 +44,11 @@ def conv_1d(I, K):
     n, x, k, ci, co = TensorIndexes(5)
     I.bind_dims(N, X, CI)
     K.bind_dims(KX, CI, CO)
-    O = Contraction() \
+    return Contraction() \
         .outShape(N, X - KX + 1, CO) \
         .outAccess(n, x, co) \
         .sum(I[n, x + k, ci] * K[k, ci, co]) \
         .build()
-    return O
 
 
 def conv_2d_dilated(I, K):
@@ -57,25 +56,27 @@ def conv_2d_dilated(I, K):
     n, x, y, kx, ky, ci, co = TensorIndexes(7)
     I.bind_dims(N, X, Y, CI)
     K.bind_dims(KX, KY, CI, CO)
-    O = Contraction() \
+    return Contraction() \
         .outShape(N, X - 2 * (KX - 1), Y - 3 * (KY - 1), CO) \
         .outAccess(n, x, y, co) \
         .sum(I[n, x + 2 * kx, y + 3 * ky, ci] * K[kx, ky, ci, co]) \
         .build()
-    return O
 
 
-def conv_2d(I, K):
+def conv_2d(I, K, I_layout='NHWC', K_layout='HWCK'):
+    I_lens = TensorLens(I_layout, 'NHWC')
+    K_lens = TensorLens(K_layout, 'HWCK')
+    I = I.use(I_lens)
+    K = K.use(K_lens)
     CI, CO, K0, K1, N, X0, X1 = TensorDims(7)
     n, x0, x1, k0, k1, ci, co = TensorIndexes(7)
     I.bind_dims(N, X0, X1, CI)
     K.bind_dims(K0, K1, CI, CO)
-    R = Contraction() \
+    return Contraction(I_lens) \
         .outShape(N, X0 - (K0 - 1), X1 - (K1 - 1), CO) \
         .outAccess(n, x0, x1, co) \
         .sum(I[n, x0 + k0 - (K0 // 2), x1 + k1 - (K1 // 2), ci] * K[k0, k1, ci, co]) \
         .build()
-    return R
 
 
 def complex_conv_2d(
@@ -112,26 +113,24 @@ def complex_conv_2d(
     P1 = ((Y1 - 1) * s1 + EK1 - X1) // 2
 
     # Compute the convolution
-    O = Contraction() \
+    return Contraction() \
         .outShape(N, Y0, Y1, G, GCO) \
         .outAccess(n, x0, x1, g, gco) \
         .sum(I[n, s0 * x1 + d0 * k0 - P0, s1 * x1 + d1 * k1 - P1, g, gci] * K[k0, k1, g, gci, gco]) \
         .build()
-    return O
 
 
 def max_pool_2d(I):
     N, X0, X1, C = TensorDims(4)
     n, x0, x1, i, j, c = TensorIndexes(6)
     I.bind_dims(N, X0, X1, C)
-    R = Contraction() \
+    return Contraction() \
         .outShape(N, (X0 + 1) // 2, (X1 + 1) // 2, C) \
         .outAccess(n, x0, x1, c) \
         .max(I[n, 2 * x0 + i, 2 * x1 + j, c]) \
         .add_constraint(i < 2) \
         .add_constraint(j < 2) \
         .build()
-    return R
 
 
 def flatten(X):
@@ -575,6 +574,47 @@ class TestEdsl(unittest.TestCase):
         I = Placeholder(plaidml.DType.FLOAT32, [3, 3])
         O = trace(I, 'msg')
         program = Program('trace', [I], [O])
+
+    def test_lens(self):
+        I = Placeholder(plaidml.DType.FLOAT32, [1, 224, 224, 3])
+        K = Placeholder(plaidml.DType.FLOAT32, [3, 3, 3, 32])
+        O = conv_2d(I, K, I_layout='NHWC', K_layout='HWCK')
+        program = Program('conv2d_nhwc', [I, K], [O])
+        self.runProgram(program)
+
+        I = Placeholder(plaidml.DType.FLOAT32, [1, 3, 224, 224])
+        K = Placeholder(plaidml.DType.FLOAT32, [3, 32, 7, 7])
+        O = conv_2d(I, K, I_layout='NCHW', K_layout='CKHW')
+        program = Program('conv2d_nchw', [I, K], [O])
+        self.runProgram(program)
+
+        def transpose(I, layout='MN'):
+            lens = TensorLens(layout, 'MN')
+            I = I.use(lens)
+            M, N = TensorDims(2)
+            i, j = TensorIndexes(2)
+            I.bind_dims(M, N)
+            return Contraction(lens).outShape(N, M).outAccess(j, i).assign(I[i, j]).build()
+
+        input = np.array([
+            [1, 2, 3],
+            [4, 5, 6],
+        ])
+        expected = [
+            [1, 4],
+            [2, 5],
+            [3, 6],
+        ]
+
+        I = Placeholder(plaidml.DType.FLOAT32, [2, 3])
+        O = transpose(I, 'MN')
+        program = Program('transpose_mn', [I], [O])
+        self.checkProgram(program, [input], [expected])
+
+        I = Placeholder(plaidml.DType.FLOAT32, [2, 3])
+        O = transpose(I, 'NM')
+        program = Program('transpose_nm', [I], [O])
+        self.checkProgram(program, [input], [expected])
 
 
 if __name__ == '__main__':

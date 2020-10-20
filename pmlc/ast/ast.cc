@@ -182,9 +182,7 @@ std::string ExprNodePragma::str() const { return op; }
 // DimNode tree
 //
 
-std::string DimNodeLiteral::str() const {
-  return llvm::formatv("{0}:ix", value);
-}
+std::string DimNodeLiteral::str() const { return llvm::formatv("{0}", value); }
 
 std::string DimNodeOp::str() const {
   std::stringstream ss;

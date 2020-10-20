@@ -31,9 +31,113 @@ struct StdxSubgroupBroadcastOpConversion final
                   ConversionPatternRewriter &rewriter) const final {
     auto stdxType = op.getResult().getType();
     auto spirvType = typeConverter.convertType(stdxType);
-    rewriter.replaceOpWithNewOp<spirv::GroupBroadcastOp>(
+    rewriter.replaceOpWithNewOp<spirv::GroupNonUniformBroadcastOp>(
         op, spirvType, spirv::Scope::Subgroup, operands[0], operands[1]);
 
+    return success();
+  }
+};
+
+struct StdxSubgroupBlockReadINTELOpConversion
+    : public SPIRVOpLowering<stdx::SubgroupBlockReadINTELOp> {
+  using SPIRVOpLowering<stdx::SubgroupBlockReadINTELOp>::SPIRVOpLowering;
+
+  LogicalResult
+  matchAndRewrite(stdx::SubgroupBlockReadINTELOp blockReadOp,
+                  ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const final {
+    stdx::SubgroupBlockReadINTELOpAdaptor blockReadOperands(operands);
+    auto loc = blockReadOp.getLoc();
+    auto memrefType = blockReadOp.memref().getType().cast<MemRefType>();
+    auto memrefElementType = memrefType.getElementType();
+
+    // Check if bitcast is needed, implementation should transform to block
+    // ops only for certain types supported by the HW, that is why other types
+    // are not checked here, stdx transform pass should handle those cases
+    auto needBitcast = memrefElementType.isF16() || memrefElementType.isF32();
+
+    if (needBitcast) {
+      // Support inly fp16 and fp32 for now
+      auto IType = memrefElementType.isF16() ? rewriter.getIntegerType(16)
+                                             : rewriter.getIntegerType(32);
+      auto memrefIType = MemRefType::get(memrefType.getShape(), IType, {},
+                                         memrefType.getMemorySpace());
+      auto FToI_ptr = rewriter.create<spirv::BitcastOp>(
+          loc, typeConverter.convertType(memrefIType),
+          blockReadOperands.memref());
+
+      auto loadPtr =
+          spirv::getElementPtr(typeConverter, memrefIType, FToI_ptr.getResult(),
+                               blockReadOperands.indices(), loc, rewriter);
+      auto ptrType =
+          loadPtr.component_ptr().getType().cast<spirv::PointerType>();
+
+      auto blockRead = rewriter.create<spirv::SubgroupBlockReadINTELOp>(
+          loc, ptrType.getPointeeType(), loadPtr.component_ptr());
+
+      auto UToF_val = rewriter.create<spirv::BitcastOp>(
+          loc, memrefType.getElementType(), blockRead.getResult());
+      rewriter.replaceOp(blockReadOp, {UToF_val});
+    } else {
+      auto loadPtr = spirv::getElementPtr(
+          typeConverter, memrefType, blockReadOperands.memref(),
+          blockReadOperands.indices(), blockReadOp.getLoc(), rewriter);
+      auto ptrType =
+          loadPtr.component_ptr().getType().cast<spirv::PointerType>();
+      rewriter.replaceOpWithNewOp<spirv::SubgroupBlockReadINTELOp>(
+          blockReadOp, ptrType.getPointeeType(), loadPtr.component_ptr());
+    }
+    return success();
+  }
+};
+
+struct StdxSubgroupBlockWriteINTELOpConversion
+    : public SPIRVOpLowering<stdx::SubgroupBlockWriteINTELOp> {
+  using SPIRVOpLowering<stdx::SubgroupBlockWriteINTELOp>::SPIRVOpLowering;
+
+  LogicalResult
+  matchAndRewrite(stdx::SubgroupBlockWriteINTELOp blockWriteOp,
+                  ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const final {
+    stdx::SubgroupBlockWriteINTELOpAdaptor blockWriteOperands(operands);
+    auto loc = blockWriteOp.getLoc();
+    auto memrefType = blockWriteOp.memref().getType().cast<MemRefType>();
+    auto memrefElementType = memrefType.getElementType();
+
+    // Check if bitcast is needed, implementation should transform to block
+    // ops only for certain types supported by the HW, that is why other types
+    // are not checked here, stdx transform pass should handle those cases
+    auto needBitcast = memrefElementType.isF16() || memrefElementType.isF32();
+
+    if (needBitcast) {
+      // Support inly fp16 and fp32 for now
+      auto IType = memrefElementType.isF16() ? rewriter.getIntegerType(16)
+                                             : rewriter.getIntegerType(32);
+
+      // Bitcast mem pointer
+      auto memrefIType = MemRefType::get(memrefType.getShape(), IType, {},
+                                         memrefType.getMemorySpace());
+      auto FToI_ptr = rewriter.create<spirv::BitcastOp>(
+          loc, typeConverter.convertType(memrefIType),
+          blockWriteOperands.memref());
+
+      // Bitcast value
+      auto FToI_val = rewriter.create<spirv::BitcastOp>(
+          loc, IType, blockWriteOperands.value());
+
+      auto storePtr =
+          spirv::getElementPtr(typeConverter, memrefIType, FToI_ptr.getResult(),
+                               blockWriteOperands.indices(), loc, rewriter);
+
+      rewriter.replaceOpWithNewOp<spirv::SubgroupBlockWriteINTELOp>(
+          blockWriteOp, storePtr, FToI_val.getResult());
+    } else {
+      auto storePtr = spirv::getElementPtr(
+          typeConverter, memrefType, blockWriteOperands.memref(),
+          blockWriteOperands.indices(), blockWriteOp.getLoc(), rewriter);
+      rewriter.replaceOpWithNewOp<spirv::SubgroupBlockWriteINTELOp>(
+          blockWriteOp, storePtr, blockWriteOperands.value());
+    }
     return success();
   }
 };
@@ -64,7 +168,7 @@ public:
 };
 
 template <typename StdxOpTy, typename SpirvOpTy>
-struct StdxUnaryOpConversion : public SPIRVOpLowering<StdxOpTy> {
+struct UnaryOpConversion : public SPIRVOpLowering<StdxOpTy> {
   using SPIRVOpLowering<StdxOpTy>::SPIRVOpLowering;
 
   LogicalResult
@@ -78,7 +182,7 @@ struct StdxUnaryOpConversion : public SPIRVOpLowering<StdxOpTy> {
 };
 
 template <typename StdxOpTy, typename SpirvOpTy>
-struct StdxBinaryOpConversion : public SPIRVOpLowering<StdxOpTy> {
+struct BinaryOpConversion : public SPIRVOpLowering<StdxOpTy> {
   using SPIRVOpLowering<StdxOpTy>::SPIRVOpLowering;
 
   LogicalResult
@@ -150,8 +254,11 @@ struct GPUToSPIRVCustomPass
       populateStdxToSPIRVGLSLPatterns(context, typeConverter, patterns);
     if (spirv::getMemoryModel(targetAttr) != spirv::MemoryModel::GLSL450) {
       populateCustomGLSLToStdSpirvPatterns(context, typeConverter, patterns);
-      target->addIllegalOp<spirv::GLSLFAbsOp, spirv::GLSLSAbsOp>();
+      target->addIllegalOp<spirv::GLSLFAbsOp, spirv::GLSLSAbsOp,
+                           spirv::GLSLExpOp>();
     }
+    if (spirv::getMemoryModel(targetAttr) == spirv::MemoryModel::OpenCL)
+      populateCustomStdToOCLSpirvPatterns(context, typeConverter, patterns);
 
     if (failed(applyFullConversion(kernelModules, *target, patterns)))
       return signalPassFailure();
@@ -162,21 +269,24 @@ struct GPUToSPIRVCustomPass
 void populateStdxToSPIRVPatterns(MLIRContext *context,
                                  SPIRVTypeConverter &typeConverter,
                                  OwningRewritePatternList &patterns) {
-  patterns.insert<StdxSubgroupBroadcastOpConversion>(context, typeConverter);
+  patterns.insert<StdxSubgroupBroadcastOpConversion,
+                  StdxSubgroupBlockReadINTELOpConversion,
+                  StdxSubgroupBlockWriteINTELOpConversion>(context,
+                                                           typeConverter);
 }
 
 void populateStdxToSPIRVGLSLPatterns(MLIRContext *context,
                                      SPIRVTypeConverter &typeConverter,
                                      OwningRewritePatternList &patterns) {
-  patterns.insert<StdxUnaryOpConversion<stdx::RoundOp, spirv::GLSLRoundOp>,
-                  StdxUnaryOpConversion<stdx::FloorOp, spirv::GLSLFloorOp>,
-                  StdxUnaryOpConversion<stdx::TanOp, spirv::GLSLTanOp>,
-                  StdxUnaryOpConversion<stdx::SinHOp, spirv::GLSLSinhOp>,
-                  StdxUnaryOpConversion<stdx::CosHOp, spirv::GLSLCoshOp>,
-                  StdxUnaryOpConversion<stdx::ASinOp, spirv::GLSLAsinOp>,
-                  StdxUnaryOpConversion<stdx::ACosOp, spirv::GLSLAcosOp>,
-                  StdxUnaryOpConversion<stdx::ATanOp, spirv::GLSLAtanOp>,
-                  StdxBinaryOpConversion<stdx::PowOp, spirv::GLSLPowOp>>(
+  patterns.insert<UnaryOpConversion<stdx::RoundOp, spirv::GLSLRoundOp>,
+                  UnaryOpConversion<stdx::FloorOp, spirv::GLSLFloorOp>,
+                  UnaryOpConversion<stdx::TanOp, spirv::GLSLTanOp>,
+                  UnaryOpConversion<stdx::SinHOp, spirv::GLSLSinhOp>,
+                  UnaryOpConversion<stdx::CosHOp, spirv::GLSLCoshOp>,
+                  UnaryOpConversion<stdx::ASinOp, spirv::GLSLAsinOp>,
+                  UnaryOpConversion<stdx::ACosOp, spirv::GLSLAcosOp>,
+                  UnaryOpConversion<stdx::ATanOp, spirv::GLSLAtanOp>,
+                  BinaryOpConversion<stdx::PowOp, spirv::GLSLPowOp>>(
       context, typeConverter);
 }
 
@@ -184,6 +294,13 @@ void populateCustomGLSLToStdSpirvPatterns(MLIRContext *context,
                                           SPIRVTypeConverter &typeConverter,
                                           OwningRewritePatternList &patterns) {
   patterns.insert<GLSLFAbsOpPattern, GLSLSAbsOpPattern>(context, typeConverter);
+}
+
+void populateCustomStdToOCLSpirvPatterns(MLIRContext *context,
+                                         SPIRVTypeConverter &typeConverter,
+                                         OwningRewritePatternList &patterns) {
+  patterns.insert<UnaryOpConversion<mlir::ExpOp, spirv::OCLExpOp>>(
+      context, typeConverter);
 }
 
 std::unique_ptr<Pass> createGPUToSPIRVCustomPass() {
