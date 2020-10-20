@@ -271,7 +271,7 @@ void VulkanInvocation::getQueryPoolResults() {
   IVLOG(1, "Total Vulkan memory transfer time: "
                << fp_milliseconds(total_memxfer_ns).count() << "ms");
 
-  device->executeTime = fp_milliseconds(overall_ns).count();
+  device->execTimeInMS = fp_milliseconds(overall_ns).count();
 }
 
 void VulkanInvocation::run() {

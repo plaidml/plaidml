@@ -115,7 +115,7 @@ OpenCLInvocation::~OpenCLInvocation() {
   IVLOG(1, "Total OpenCL memory transfer time: "
                << fp_milliseconds(memoryExecuteTime).count() << "ms");
 
-  device->executeTime = fp_milliseconds(totalExecuteTime).count();
+  device->execTimeInMS = fp_milliseconds(totalExecuteTime).count();
 }
 
 OpenCLMemory *OpenCLInvocation::allocateMemory(size_t bytes, void *data) {
