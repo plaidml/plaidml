@@ -31,6 +31,8 @@ _CONV_DATA_FORMAT = ['channels_first', 'channels_last']
 
 _in_train_phase = None  # Will be initialized on first use
 
+lastExecuteTime = 0.0
+
 
 def _prepend_name_scope(name, default):
     if name:
@@ -137,18 +139,10 @@ class _Runner(object):
     def run(self, inputs):
         for input, buffer in zip(inputs, self.input_buffers):
             buffer.copy_from_ndarray(input)
-        # or, just have this return a double (execution time)
-        # in frontend keras
-        stop_watch = self.executable.run(self.input_buffers + self.var_buffers,
-                                         self.output_buffers + self.update_buffers)
-        print("------------------------------------------")
-        print("------------------------------------------")
-        print("------------------------------------------")
-        print("OUTSIDE THE FFI, STOP WATCH = ")
-        print(stop_watch)
-        print("------------------------------------------")
-        print("------------------------------------------")
-        print("------------------------------------------")
+        executeTime = self.executable.run(self.input_buffers + self.var_buffers,
+                                          self.output_buffers + self.update_buffers)
+        global lastExecuteTime
+        lastExecuteTime = executeTime
         return [buffer.as_ndarray() for buffer in self.output_buffers]
 
 

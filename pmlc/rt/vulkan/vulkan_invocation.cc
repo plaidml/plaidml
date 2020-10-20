@@ -240,8 +240,8 @@ void VulkanInvocation::getQueryPoolResults() {
 
   fp_nanoseconds overall_ns{(results[1] - results[0]) *
                             device->getTimestampPeriod()};
-  IVLOG(1,
-        "Overall Vulkan time: " << fp_milliseconds(overall_ns).count() << "ms");
+  IVLOG(1, "Total Vulkan exec time: " << fp_milliseconds(overall_ns).count()
+                                      << "ms");
 
   fp_nanoseconds total_kernel_ns{0};
   for (uint32_t i = 2; i < timestampQueryCount; i += 2) {
@@ -263,17 +263,15 @@ void VulkanInvocation::getQueryPoolResults() {
   }
 
   IVLOG(1, "Total Vulkan kernels: " << (timestampQueryCount - 2) / 2);
-  IVLOG(1, "Total Vulkan kernel exec time: "
+  IVLOG(1, "Total Vulkan kernel execute time: "
                << fp_milliseconds(total_kernel_ns).count() << "ms");
-  IVLOG(1, "Percentage Vulkan kernel exec time: "
-               << total_kernel_ns.count() * 100 / overall_ns.count() << "%");
 
   fp_nanoseconds total_memxfer_ns = overall_ns - total_kernel_ns;
   IVLOG(1, "Total Vulkan memory transfers: " << memoryTransferCount);
-  IVLOG(1, "Total (esimtated) Vulkan memory transfer time: "
+  IVLOG(1, "Total Vulkan memory transfer time: "
                << fp_milliseconds(total_memxfer_ns).count() << "ms");
-  IVLOG(1, "Percentage (estimated) Vulkan memory transfer time: "
-               << total_memxfer_ns.count() * 100 / overall_ns.count() << "%");
+
+  device->executeTime = fp_milliseconds(overall_ns).count();
 }
 
 void VulkanInvocation::run() {

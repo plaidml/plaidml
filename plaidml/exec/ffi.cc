@@ -82,7 +82,7 @@ double plaidml_executable_run(  //
     plaidml_buffer** inputs,    //
     size_t noutputs,            //
     plaidml_buffer** outputs) {
-  double stop_watch = 0.0;
+  double executeTime = 0.0;
   ffi_wrap_void(err, [&] {  //
     llvm::SmallVector<BufferPtr, 8> inputBuffers;
     if (exec->program->inputs.size() != ninputs) {
@@ -114,18 +114,10 @@ double plaidml_executable_run(  //
       }
       outputBuffers.push_back(outputs[i]->buffer);
     }
-    stop_watch = exec->exec->invoke(inputBuffers, outputBuffers);
-    IVLOG(1, "++++++++++++++++++++++++++++++++++++++++++++++");
-    IVLOG(1, "++++++++++++++++++++++++++++++++++++++++++++++");
-    IVLOG(1, "++++++++++++++++++++++++++++++++++++++++++++++");
-    IVLOG(1, "IN THE FFI, STOP WATCH =");
-    IVLOG(1, stop_watch);
-    IVLOG(1, "++++++++++++++++++++++++++++++++++++++++++++++");
-    IVLOG(1, "++++++++++++++++++++++++++++++++++++++++++++++");
-    IVLOG(1, "++++++++++++++++++++++++++++++++++++++++++++++");
+    executeTime = exec->exec->invoke(inputBuffers, outputBuffers);
   });
 
-  return stop_watch;
+  return executeTime;
 }
 
 }  // extern "C"

@@ -412,7 +412,8 @@ public:
       stopWatch.stop();
       IVLOG(1, "Execution time: " << stopWatch.delta_ms() << "ms");
     }
-    return stopWatch.delta_ms();
+    // TODO: switch to stopWatch time once compile / execute are separate
+    return device->executeTime;
   }
 
   void bindArguments(ArrayRef<util::BufferPtr> inputBuffers,
