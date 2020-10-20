@@ -59,6 +59,26 @@ struct LowerPXAToAffinePass
   }
 };
 
+struct ExtractLoweringPattern
+    : public OpConversionPattern<LLVM::ExtractValueOp> {
+  using OpConversionPattern<LLVM::ExtractValueOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(LLVM::ExtractValueOp op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const final {
+    Value src = operands[0];
+    while (auto insertOp = mlir::dyn_cast_or_null<LLVM::InsertValueOp>(
+               src.getDefiningOp())) {
+      if (op.position() == insertOp.position()) {
+        rewriter.replaceOp(op, insertOp.value());
+        return success();
+      }
+      src = insertOp.container();
+    }
+    return failure();
+  }
+};
+
 struct ConvertStandardToLLVMPass
     : public ConvertStandardToLLVMBase<ConvertStandardToLLVMPass> {
   void runOnOperation() override {
@@ -80,6 +100,7 @@ struct ConvertStandardToLLVMPass
     conversion::stdx_to_llvm::populateStdXToLLVMConversionPatterns(
         typeConverter, patterns);
     populateOpenMPToLLVMConversionPatterns(context, typeConverter, patterns);
+    patterns.insert<ExtractLoweringPattern>(context);
 
     LLVMConversionTarget target(*context);
     target.addDynamicallyLegalOp<omp::ParallelOp>([&](omp::ParallelOp op) {
@@ -87,6 +108,11 @@ struct ConvertStandardToLLVMPass
     });
     target.addLegalOp<omp::TerminatorOp, omp::TaskyieldOp, omp::FlushOp,
                       omp::BarrierOp, omp::TaskwaitOp>();
+    target.addDynamicallyLegalOp<LLVM::ExtractValueOp>(
+        [](LLVM::ExtractValueOp op) {
+          return !mlir::dyn_cast_or_null<LLVM::InsertValueOp>(
+              op.container().getDefiningOp());
+        });
     if (failed(applyPartialConversion(module, target, patterns))) {
       signalPassFailure();
     }
@@ -144,7 +170,7 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(pxa::createAffineNormalizePass(/*promote=*/false));
   pm.addPass(createCanonicalizerPass());
 
-  pm.addPass(pxa::createCPUThreadPass(1));
+  pm.addPass(pxa::createCPUThreadPass(32));
   pm.addPass(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
 
