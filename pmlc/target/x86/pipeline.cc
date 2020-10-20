@@ -156,7 +156,6 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(createLoopInvariantCodeMotionPass());
   pm.addPass(createLowerToLLVMPass());
   pm.addPass(createTraceLinkingPass());
-  // pm.addPass(abi::createLowerToLLVMPass());
 }
 
 } // namespace pmlc::target::x86
