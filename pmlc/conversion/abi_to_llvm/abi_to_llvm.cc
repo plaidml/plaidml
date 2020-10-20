@@ -51,13 +51,13 @@ struct LoopLowering : public mlir::ConvertOpToLLVMPattern<LLVM::LLVMFuncOp> {
   matchAndRewrite(mlir::Operation *op, mlir::ArrayRef<mlir::Value> operands,
                   mlir::ConversionPatternRewriter &rewriter) const final {
     llvm::DebugFlag = true;
-    auto funcOp = mlir::cast<LLVM::LLVMFuncOp>(op);
-    auto loopOp = findLoopToLower(funcOp);
+    auto mainFunc = mlir::cast<LLVM::LLVMFuncOp>(op);
+    auto loopOp = findLoopToLower(mainFunc);
     if (!loopOp) {
       return mlir::failure();
     }
 
-    llvm::errs() << "Converting fn: " << funcOp << "\n";
+    llvm::errs() << "Converting fn: " << mainFunc << "\n";
 
     for (auto operand : loopOp.getOperation()->getOperands()) {
       llvm::errs() << "Found loop operand: " << operand
@@ -68,10 +68,10 @@ struct LoopLowering : public mlir::ConvertOpToLLVMPattern<LLVM::LLVMFuncOp> {
     auto networkTy = LLVM::LLVMStructType::getIdentified(ctx, "Network");
 
     auto initFunc = rewriter.create<LLVM::LLVMFuncOp>(
-        funcOp.getLoc(), pmlc::util::kPlaidmlInit,
+        mainFunc.getLoc(), pmlc::util::kPlaidmlInit,
         LLVMType::getFunctionTy(
             networkTy.getPointerTo(),
-            funcOp.getType().cast<LLVM::LLVMFunctionType>().getParams(),
+            mainFunc.getType().cast<LLVM::LLVMFunctionType>().getParams(),
             /*isVarArg=*/false));
 
     // The inputs to the exec function are the network object, followed by the
@@ -90,12 +90,12 @@ struct LoopLowering : public mlir::ConvertOpToLLVMPattern<LLVM::LLVMFuncOp> {
     }
 
     auto execFunc = rewriter.create<LLVM::LLVMFuncOp>(
-        funcOp.getLoc(), pmlc::util::kPlaidmlExec,
+        mainFunc.getLoc(), pmlc::util::kPlaidmlExec,
         LLVMType::getFunctionTy(getVoidType(), execArgTypes,
                                 /*isVarArg=*/false));
 
     auto finiFunc = rewriter.create<LLVM::LLVMFuncOp>(
-        funcOp.getLoc(), pmlc::util::kPlaidmlFini,
+        mainFunc.getLoc(), pmlc::util::kPlaidmlFini,
         LLVMType::getFunctionTy(getVoidType(), {networkTy.getPointerTo()},
                                 /*isVarArg=*/false));
 
@@ -170,7 +170,8 @@ struct LoopLowering : public mlir::ConvertOpToLLVMPattern<LLVM::LLVMFuncOp> {
 
     llvm::errs() << "Initial plaidml_exec: " << execFunc << "\n";
 
-    rewriter.startRootUpdate(funcOp);
+    rewriter.startRootUpdate(mainFunc);
+
     // Build plaidml_exec().
     //
     // To do this, we start by walking the loop region.  Every operand that
@@ -183,13 +184,6 @@ struct LoopLowering : public mlir::ConvertOpToLLVMPattern<LLVM::LLVMFuncOp> {
     mlir::BlockAndValueMapping mapper;
     mlir::Block *execEntryBlock = execFunc.addEntryBlock();
     rewriter.setInsertionPointToStart(execEntryBlock);
-
-    // Map the loop's basic block arguments to the corresponding exec function
-    // arguments.
-    /* for (auto idx = 1; idx < execEntryBlock->getNumArguments(); ++idx) {
-      mapper.map(loopOp.getRegion().getArgument(idx - 1),
-                  execEntryBlock->getArgument(idx));
-    } */
 
     auto execNetworkPtr = execEntryBlock->getArgument(0);
     auto execNetwork =
@@ -241,15 +235,13 @@ struct LoopLowering : public mlir::ConvertOpToLLVMPattern<LLVM::LLVMFuncOp> {
     rewriter.cloneRegionBefore(loopOp.getRegion(), execFunc.getRegion(),
                                execFunc.getRegion().end(), mapper);
 
-    rewriter.eraseOp(loopOp);
-
     llvm::errs() << "After clone: plaidml_exec: " << execFunc << "\n";
 
     auto conversionResult =
         rewriter.convertRegionTypes(&execFunc.getRegion(), *getTypeConverter());
     if (mlir::failed(conversionResult)) {
       llvm::errs() << "Region type conversion failed\n";
-      rewriter.cancelRootUpdate(funcOp);
+      rewriter.cancelRootUpdate(mainFunc);
       return mlir::failure();
     }
 
@@ -277,10 +269,29 @@ struct LoopLowering : public mlir::ConvertOpToLLVMPattern<LLVM::LLVMFuncOp> {
     });
 
     llvm::errs() << "After replacement: plaidml_exec: " << execFunc << "\n";
+    llvm::errs() << "After replacement: main: " << mainFunc << "\n";
 
+    // Build plaidml_fini().
+    //
+    // This is a little different from the plaidml_exec build, since we're
+    // restricted to the operations supported by the rewriter and we don't have
+    // the code we need in a convenient sub-region.
+    //
+    // Hmm.  What if we did?  That's a fascinating idea...
+    // Suppose we had a pass that added pre- and post- operations?
+    // Then the outputs of the pre- operation would be exactly the
+    // values that would be wrapped up into our Network object.
+    //
+    // EVEN BETTER: abi.Loop can have multiple regions.
+    // When we hoist, we can move code from the loop body to the initialization
+    // region.  The main function DISAPPEARS.  It becomes abi.loop.  ZOMG.
+
+    llvm::errs() << "After eraseage: main: " << mainFunc << "\n";
+
+    rewriter.eraseOp(loopOp);
     LLVMType::setStructTyBody(networkTy, networkFieldTypes);
 
-    rewriter.finalizeRootUpdate(funcOp);
+    rewriter.finalizeRootUpdate(mainFunc);
 
     llvm::errs() << "Final: plaidml_exec: " << execFunc << "\n";
 
