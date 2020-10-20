@@ -144,6 +144,14 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(createCSEPass());
 
   pm.addPass(createLowerPXAToAffinePass());
+
+  // Unroll affine.for loops.
+  pm.addPass(createLoopUnrollPass(
+      /*unrollFactor=*/32,
+      /*unrollUpToFactor=*/true));
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
+
   pm.addPass(createLoopInvariantCodeMotionPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());

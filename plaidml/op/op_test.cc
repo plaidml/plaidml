@@ -495,14 +495,12 @@ TEST_F(OpTest, ReorgYoloDecrease) {
   auto I = Placeholder(DType::INT64, {N, C, H, W});
   auto O = op::reorg_yolo(I, S, decrease);
   auto program = makeProgram("reorg_yolo", {I}, {O});
-  IVLOG(1, "program:\n" << program);
 
   std::vector<int64_t> I_input(N * C * H * W);
   for (unsigned i = 0; i < I_input.size(); i++) {
     I_input[i] = i;
   }
   auto O_expected = reorgYoloRefImpl(I_input, N, C, H, W, S, decrease);
-  IVLOG(1, "expected:\n" << O_expected);
   checkExact(program, {I_input}, {O_expected});
 }
 
@@ -514,15 +512,23 @@ TEST_F(OpTest, ReorgYoloIncrease) {
   auto I = Placeholder(DType::INT64, {N, C, H, W});
   auto O = op::reorg_yolo(I, S, decrease);
   auto program = makeProgram("reorg_yolo", {I}, {O});
-  IVLOG(1, "program:\n" << program);
 
   std::vector<int64_t> I_input(N * C * H * W);
   for (unsigned i = 0; i < I_input.size(); i++) {
     I_input[i] = i;
   }
   auto O_expected = reorgYoloRefImpl(I_input, N, C_out, H_out, W_out, S, decrease);
-  IVLOG(1, "expected:\n" << O_expected);
   checkExact(program, {I_input}, {O_expected});
+}
+
+TEST_F(OpTest, ReorgYoloNHWC) {
+  const unsigned N = 1, C = 4, H = 6, W = 6, S = 2;
+  const bool decrease = true;
+
+  auto I = Placeholder(DType::INT64, {N, H, W, C});
+  auto O = op::reorg_yolo(I, S, decrease, /*layout=*/"NHWC");
+  auto program = makeProgram("reorg_yolo", {I}, {O});
+  runProgram(program);
 }
 
 TEST_F(OpTest, Repeat) {

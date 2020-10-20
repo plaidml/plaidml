@@ -45,7 +45,8 @@ createMemRefDataFlowOptPass(bool onlyParallelNested = false);
 std::unique_ptr<mlir::Pass> createNestLoopsPass();
 std::unique_ptr<mlir::Pass> createNestLoopsPass(unsigned minLoopIVs);
 
-std::unique_ptr<mlir::Pass> createResizeTmpsPass();
+std::unique_ptr<mlir::Pass>
+createResizeTmpsPass(bool onlyParallelNested = false);
 
 std::unique_ptr<mlir::Pass> createStencilGEMMPass();
 std::unique_ptr<mlir::Pass> createStencilGEMMPass(unsigned numThreads,

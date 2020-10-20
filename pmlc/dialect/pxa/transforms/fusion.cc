@@ -101,12 +101,15 @@ struct FusionInfo {
 
   // Helper to perform loop transformations, so the loops can be fused
   void loopTransformations(AffineParallelOp outer, AffineParallelOp inner,
-                           bool needsTiling) {
+                           bool needsTiling, int64_t vectorWidth) {
     if (tiledFusion && needsTiling) {
-      inner.walk([&](AffineParallelOp par) { vectorizeOverOutputs(par, 8); });
+      inner.walk([&](AffineParallelOp par) {
+        vectorizeOverOutputs(par, vectorWidth);
+      });
 
       // Try to 'vector cache' any remaining innermost loads
-      outer.walk([&](PxaLoadOp load) { cacheLoadAsVector(inner, load, 8); });
+      outer.walk(
+          [&](PxaLoadOp load) { cacheLoadAsVector(inner, load, vectorWidth); });
 
       // Convert local allocations to vector types
       outer.walk([&](AllocOp alloc) { vectorizeBuffer(alloc); });
@@ -209,14 +212,7 @@ struct FusionInfo {
       // If sizes do not match, apply tiling later, scale to the
       // loop with subgroupSize != attribute if present
       auto sameSubgroups = subgroupSizeA == subgroupSizeB;
-      // TODO: remove these two checks for allowed_subgroups sizes.
-      // Currently when merging loop with subgroupsize = 16 with other loop
-      // subgroup size = 8 or not subgrouped loop (that will be vectorized
-      // for vec size 8 in the subgroups transformation) generated kernel will
-      // cause vulkan crash. Need more debug on the actual rootcause
-      auto allowed_subgroupA = subgroupSizeA == 8 || subgroupSizeA == 1;
-      auto allowed_subgroupB = subgroupSizeB == 8 || subgroupSizeB == 1;
-      if ((mulA != mulB) && allowed_subgroupA && allowed_subgroupB) {
+      if (mulA != mulB) {
         auto tileSize = reverseFusion ? sizeA / sizeB : sizeB / sizeA;
         if (!tileSize)
           return false;
@@ -518,14 +514,15 @@ struct FusionInfo {
     clearTags(aInfo.op);
     clearTags(bInfo.op);
 
+    auto subgroupSize = pmlc::getIntegerTag(apC, "subgroupSize", 1);
     // Move the two parallel for's inside the new op
     if (reverseFusion) {
       aInfo.op.getOperation()->moveBefore(apC.getBody(), apC.getBody()->end());
-      loopTransformations(apC, aInfo.op, aInfo.needsTiling);
+      loopTransformations(apC, aInfo.op, aInfo.needsTiling, subgroupSize);
       bInfo.op.getOperation()->moveBefore(apC.getBody(), apC.getBody()->end());
     } else {
       bInfo.op.getOperation()->moveBefore(apC.getBody(), apC.getBody()->end());
-      loopTransformations(apC, bInfo.op, bInfo.needsTiling);
+      loopTransformations(apC, bInfo.op, bInfo.needsTiling, subgroupSize);
       aInfo.op.getOperation()->moveBefore(apC.getBody(),
                                           apC.getBody()->begin());
     }
