@@ -60,6 +60,23 @@ void addOclFunctionDeclarations(mlir::ModuleOp &module);
 /// than OpenCL will cause this pass to report failure.
 std::unique_ptr<mlir::Pass> createConvertCompToOclPass();
 
+// ============================================================================
+// Vulkan
+// ============================================================================
+
+void populateCompToVkPatterns(mlir::MLIRContext *context,
+                              const BinaryModulesMap &modulesMap,
+                              mlir::ModuleOp moduleOp, uint32_t numKernel,
+                              mlir::TypeConverter &typeConverter,
+                              mlir::OwningRewritePatternList &patterns);
+
+void addVkFunctionDeclarations(mlir::ModuleOp &module);
+
+/// Returns pass that will perform lowering for Vulkan runtime.
+/// To provide stronger guarantees any comp operation with runtime different
+/// than OpenCL will cause this pass to report failure.
+std::unique_ptr<mlir::Pass> createConvertCompToVulkanPass();
+
 /// Generate the code for registering conversion passes.
 #define GEN_PASS_REGISTRATION
 #include "pmlc/conversion/comp_to_llvm/passes.h.inc"
