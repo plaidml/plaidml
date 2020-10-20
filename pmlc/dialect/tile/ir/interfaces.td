@@ -1,7 +1,7 @@
 // Copyright 2020 Intel Corporation
 
-#ifndef __PML_UTIL_INTERFACES__
-#define __PML_UTIL_INTERFACES__
+#ifndef __PML_TILE_INTERFACES__
+#define __PML_TILE_INTERFACES__
 
 include "mlir/IR/OpBase.td"
 
@@ -10,7 +10,7 @@ def MaterializeOperandsOpInterface : OpInterface<"MaterializeOperandsOpInterface
     TODO
   }];
 
-  let cppNamespace = "pmlc::util";
+  let cppNamespace = "pmlc::dialect::tile";
 
   let methods = [
     InterfaceMethod<
@@ -24,4 +24,4 @@ def MaterializeOperandsOpInterface : OpInterface<"MaterializeOperandsOpInterface
   ];
 }
 
-#endif  // __PML_UTIL_INTERFACES__
+#endif // __PML_TILE_INTERFACES__

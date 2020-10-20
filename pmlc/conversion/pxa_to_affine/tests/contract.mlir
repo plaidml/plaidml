@@ -7,9 +7,9 @@
 #sink_to_empty = affine_map<(i, j) -> ()>
 
 func @transpose(%arg0: tensor<10x20xf32>) -> tensor<20x10xf32> {
-  %cst = "eltwise.sconst"() {value = 0.0 : f64} : () -> f32
+  %cst = tile.constant(0.0 : f64) : tensor<f32>
   %0 = tile.contract assign, none, %cst, %arg0 {sink=#sink, srcs=[#src]} :
-    f32, tensor<10x20xf32> -> tensor<20x10xf32>
+    tensor<f32>, tensor<10x20xf32> -> tensor<20x10xf32>
   return %0 : tensor<20x10xf32>
 }
 
@@ -22,7 +22,7 @@ func @transpose(%arg0: tensor<10x20xf32>) -> tensor<20x10xf32> {
 // CHECK-DAG: affine.store %[[X]], %[[OUT]][%{{.*}}, %{{.*}}] : memref<20x10xf32>
 
 func @global_sum(%arg0: tensor<5x10xf32>) -> tensor<f32> {
-  %cst = "eltwise.sconst"() {value = 0.0 : f64} : () -> tensor<f32>
+  %cst = tile.constant(0.0 : f64) : tensor<f32>
   %0 = tile.contract add, none, %cst, %arg0 {sink=#sink_to_empty, srcs=[#src]} :
     tensor<f32>, tensor<5x10xf32> -> tensor<f32>
   return %0 : tensor<f32>

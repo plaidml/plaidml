@@ -21,8 +21,8 @@
 
 #include "pmlc/ast/ast.h"
 #include "pmlc/ast/eval.h"
-#include "pmlc/dialect/eltwise/ir/ops.h"
 #include "pmlc/dialect/tile/ir/ops.h"
+#include "pmlc/dialect/tile/ir/util.h"
 #include "pmlc/dialect/tile/transforms/passes.h"
 #include "pmlc/util/logging.h"
 
@@ -33,7 +33,6 @@ namespace pmlc::ast {
 using compiler::Program;
 using pmlc::util::DataType;
 using pmlc::util::TensorShape;
-namespace eltwise = pmlc::dialect::eltwise;
 namespace tile = pmlc::dialect::tile;
 
 namespace {
@@ -85,16 +84,14 @@ public:
     return RankedTensorType::get(shape.sizes, elementType);
   }
 
-  eltwise::APFloatType getAPFloatType() {
-    return eltwise::APFloatType::get(context);
+  tile::APFloatType getAPFloatType() { return tile::APFloatType::get(context); }
+
+  tile::APSignedIntegerType getAPSignedIntegerType() {
+    return tile::APSignedIntegerType::get(context);
   }
 
-  eltwise::APSignedIntegerType getAPSignedIntegerType() {
-    return eltwise::APSignedIntegerType::get(context);
-  }
-
-  eltwise::APUnsignedIntegerType getAPUnsignedIntegerType() {
-    return eltwise::APUnsignedIntegerType::get(context);
+  tile::APUnsignedIntegerType getAPUnsignedIntegerType() {
+    return tile::APUnsignedIntegerType::get(context);
   }
 
   Value lookupNode(const ExprNodePtr &node) {
@@ -126,14 +123,6 @@ public:
 
   void addNode(const ExprNodePtr &node, Value value) {
     exprMap[node.get()] = value;
-  }
-
-  Value makeScalarConstantIntOp(Type type, int64_t value) {
-    return create<eltwise::ScalarConstantOp>(getUnknownLoc(), type, value);
-  }
-
-  Value makeScalarConstantFloatOp(Type type, double value) {
-    return create<eltwise::ScalarConstantOp>(getUnknownLoc(), type, value);
   }
 
   Attribute getAttribute(const VarNodePtr &node) {
@@ -330,48 +319,8 @@ struct ContractionBuilder : PolyVisitor<ContractionBuilder, AffineExpr> {
     if (node->init) {
       return builder.lookupNode(node->init);
     }
-    return makeIdentity(resultType.getElementType(), node->aggKind);
-  }
-
-  Value makeIdentity(Type elementType, util::AggregationKind agg) {
-    switch (agg) {
-    case util::AggregationKind::assign:
-    case util::AggregationKind::add:
-      if (elementType.isa<FloatType>()) {
-        return builder.makeScalarConstantFloatOp(elementType, 0.0);
-      } else {
-        return builder.makeScalarConstantIntOp(elementType, 0);
-      }
-    case util::AggregationKind::mul:
-      if (elementType.isa<FloatType>()) {
-        return builder.makeScalarConstantFloatOp(elementType, 1.0);
-      } else {
-        return builder.makeScalarConstantIntOp(elementType, 1);
-      }
-    case util::AggregationKind::min:
-      if (elementType.isa<FloatType>()) {
-        return builder.makeScalarConstantFloatOp(
-            elementType, std::numeric_limits<double>::infinity());
-      } else if (elementType.isSignedInteger()) {
-        return builder.makeScalarConstantIntOp(
-            elementType, std::numeric_limits<int64_t>::max());
-      } else {
-        return builder.makeScalarConstantIntOp(
-            elementType,
-            static_cast<int64_t>(std::numeric_limits<uint64_t>::max()));
-      }
-    case util::AggregationKind::max:
-      if (elementType.isa<FloatType>()) {
-        return builder.makeScalarConstantFloatOp(
-            elementType, -std::numeric_limits<double>::infinity());
-      } else if (elementType.isSignedInteger()) {
-        return builder.makeScalarConstantIntOp(
-            elementType, std::numeric_limits<int64_t>::min());
-      } else {
-        return builder.makeScalarConstantIntOp(elementType, 0);
-      }
-    }
-    llvm_unreachable("Invalid aggregation kind");
+    return tile::createIdentity(builder, builder.getUnknownLoc(),
+                                resultType.getElementType(), node->aggKind);
   }
 
   AffineExpr makeExpr(const PolyNodePtr &node) { return visit(node.get()); }
@@ -543,7 +492,7 @@ struct ProgramBuilder {
       auto defOp = value.getDefiningOp();
       if (!defOp || isa<tile::ReshapeOp>(defOp) ||
           returnOperands.count(value)) {
-        value = builder.create<eltwise::IdentOp>(loc, value.getType(), value);
+        value = builder.create<tile::IdentOp>(loc, value.getType(), value);
       }
       returnOperands.insert(value);
     }
@@ -576,22 +525,25 @@ struct ProgramBuilder {
     RankedTensorType resultType =
         RankedTensorType::get(shape.sizes, elementType);
     Value tensor = builder.lookupNode(node->expr);
-    return builder.create<eltwise::CastOp>(loc, resultType, tensor);
+    return builder.create<tile::CastOp>(loc, resultType, tensor);
   }
 
   Value handleConstFloat(ExprNodeConstFloat *node) {
     Type type = builder.getAPFloatType();
-    return builder.makeScalarConstantFloatOp(type, node->value);
+    return builder.create<tile::ConstantOp>(builder.getUnknownLoc(), type,
+                                            node->value);
   }
 
   Value handleConstSigned(ExprNodeConstSigned *node) {
     Type type = builder.getAPSignedIntegerType();
-    return builder.makeScalarConstantIntOp(type, node->value);
+    return builder.create<tile::ConstantOp>(builder.getUnknownLoc(), type,
+                                            node->value);
   }
 
   Value handleConstUnsigned(ExprNodeConstUnsigned *node) {
     Type type = builder.getAPUnsignedIntegerType();
-    return builder.makeScalarConstantIntOp(type, node->value);
+    return builder.create<tile::ConstantOp>(builder.getUnknownLoc(), type,
+                                            node->value);
   }
 
   Value handleContraction(ExprNodeContraction *node) {
@@ -600,7 +552,9 @@ struct ProgramBuilder {
 
   Value handleDim(ExprNodeDim *node) {
     int64_t value = evaluator.evaluate(node->dim);
-    return builder.create<tile::ConstantOp>(loc, value);
+    Type type = builder.getAPUnsignedIntegerType();
+    return builder.create<tile::ConstantOp>(builder.getUnknownLoc(), type,
+                                            value);
   }
 
   Value handleElement(ExprNodeElement *node) {
@@ -675,10 +629,10 @@ struct ProgramBuilder {
       throw std::runtime_error(
           "'index' primitive expects argument 1 to be a constant integer");
     }
-    auto dims = operands.drop_front();
     TensorShape shape = evaluator.getShape(node);
     RankedTensorType resultType = builder.getRankedTensorType(shape);
-    auto op = builder.create<tile::IndexOp>(loc, resultType, axisAttr, dims);
+    IntegerAttr indexAttr = builder.getIndexAttr(axisAttr.getInt());
+    auto op = builder.create<tile::IndexOp>(loc, resultType, indexAttr);
     return op.result();
   }
 
@@ -701,14 +655,10 @@ struct ProgramBuilder {
   }
 
   const AbstractOperation *lookupOperation(StringRef op) {
-    auto opName = eltwise::EltwiseDialect::getCanonicalOpName(op);
+    auto opName = tile::TileDialect::getCanonicalOpName(op);
     auto abstractOp = AbstractOperation::lookup(opName, context);
     if (!abstractOp) {
-      opName = tile::TileDialect::getCanonicalOpName(op);
-      abstractOp = AbstractOperation::lookup(opName, context);
-      if (!abstractOp) {
-        throw std::runtime_error("Unknown EDSL primitive: " + op.str());
-      }
+      throw std::runtime_error("Unknown EDSL primitive: " + op.str());
     }
     return abstractOp;
   }
@@ -728,7 +678,6 @@ std::shared_ptr<Program> buildProgram(llvm::StringRef name,
                                       const ProgramArguments &args) {
   enableGlobalDialectRegistry(true);
   registerDialect<dialect::tile::TileDialect>();
-  registerDialect<dialect::eltwise::EltwiseDialect>();
   registerDialect<StandardOpsDialect>();
   if (name.empty()) {
     name = "module";

@@ -14,7 +14,6 @@
 #include "mlir/IR/Dialect.h"
 
 #include "pmlc/dialect/comp/ir/dialect.h"
-#include "pmlc/dialect/eltwise/ir/ops.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/dialect/stdx/ir/ops.h"
 #include "pmlc/dialect/tile/ir/ops.h"
@@ -24,20 +23,19 @@ using namespace mlir; // NOLINT [build/namespaces]
 
 // Add all the MLIR dialects to the provided registry.
 void registerAllDialects(DialectRegistry &registry) {
-  registry.insert<AffineDialect,                          //
-                  gpu::GPUDialect,                        //
-                  LLVM::LLVMDialect,                      //
-                  linalg::LinalgDialect,                  //
-                  scf::SCFDialect,                        //
-                  omp::OpenMPDialect,                     //
-                  spirv::SPIRVDialect,                    //
-                  StandardOpsDialect,                     //
-                  vector::VectorDialect,                  //
-                  pmlc::dialect::comp::COMPDialect,       //
-                  pmlc::dialect::eltwise::EltwiseDialect, //
-                  pmlc::dialect::pxa::PXADialect,         //
-                  pmlc::dialect::stdx::StdXDialect,       //
-                  pmlc::dialect::tile::TileDialect,       //
+  registry.insert<AffineDialect,                    //
+                  gpu::GPUDialect,                  //
+                  LLVM::LLVMDialect,                //
+                  linalg::LinalgDialect,            //
+                  scf::SCFDialect,                  //
+                  omp::OpenMPDialect,               //
+                  spirv::SPIRVDialect,              //
+                  StandardOpsDialect,               //
+                  vector::VectorDialect,            //
+                  pmlc::dialect::comp::COMPDialect, //
+                  pmlc::dialect::pxa::PXADialect,   //
+                  pmlc::dialect::stdx::StdXDialect, //
+                  pmlc::dialect::tile::TileDialect, //
                   pmlc::dialect::xsmm::XSMMDialect>();
 }
 
