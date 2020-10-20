@@ -18,3 +18,5 @@ func @main() {
   return
 }
 
+// CHECK: [42,  42,  42,  42]
+
