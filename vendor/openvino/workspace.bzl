@@ -10,7 +10,7 @@ def clean_dep(dep):
 def openvino_workspace():
     new_git_repository(
         name = "openvino",
-        tag = "pml-current",
+        commit = "c32a7f47e9df54bbeef31ff90e1b9248bc30070e",
         init_submodules = True,
         remote = "https://github.com/plaidml/openvino",
         build_file = clean_dep("//vendor/openvino:openvino.BUILD"),
