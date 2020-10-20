@@ -240,16 +240,16 @@ void VulkanInvocation::getQueryPoolResults() {
 
   fp_nanoseconds overall_ns{(results[1] - results[0]) *
                             device->getTimestampPeriod()};
-  IVLOG(1, "Total Vulkan exec time: " << fp_milliseconds(overall_ns).count()
-                                      << "ms");
+  IVLOG(1, "Total Vulkan execute time: " << fp_milliseconds(overall_ns).count()
+                                         << "ms");
 
   fp_nanoseconds total_kernel_ns{0};
   for (uint32_t i = 2; i < timestampQueryCount; i += 2) {
     fp_nanoseconds kernel_ns{(results[i + 1] - results[i]) *
                              device->getTimestampPeriod()};
 
-    IVLOG(2, "  Vulkan kernel exec time: " << fp_milliseconds(kernel_ns).count()
-                                           << "ms");
+    IVLOG(2, "  Kernel execute time: " << fp_milliseconds(kernel_ns).count()
+                                       << "ms");
 
     total_kernel_ns += kernel_ns;
   }
