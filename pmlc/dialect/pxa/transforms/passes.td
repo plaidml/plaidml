@@ -114,6 +114,11 @@ def NestLoops : FunctionPass<"pxa-nest-loops"> {
 def ResizeTmps : FunctionPass<"pxa-resize-tmps"> {
   let summary = "Resize temporary buffers to minimal sizes";
   let constructor = "pmlc::dialect::pxa::createResizeTmpsPass()";
+  let options = [
+  Option<"onlyParallelNested", "only-parallel-nested", "bool",
+         /*default=*/"false",
+         "Perform resize tmp optimizations only under AffineParallel's scope.">,
+  ];
 }
 
 def Subgroups : FunctionPass<"pxa-subgroups"> {

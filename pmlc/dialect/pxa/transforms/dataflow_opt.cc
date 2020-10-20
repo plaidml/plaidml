@@ -47,7 +47,7 @@ struct MemRefAccess {
 struct MemRefDataFlowOptPass
     : public MemRefDataFlowOptBase<MemRefDataFlowOptPass> {
 
-  explicit MemRefDataFlowOptPass(int64_t onlyParallelNested) {
+  explicit MemRefDataFlowOptPass(bool onlyParallelNested) {
     this->onlyParallelNested = onlyParallelNested;
   }
 

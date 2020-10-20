@@ -19,6 +19,10 @@ namespace pmlc::dialect::pxa {
 namespace {
 
 struct ResizeTmpsPass : public ResizeTmpsBase<ResizeTmpsPass> {
+  explicit ResizeTmpsPass(bool onlyParallelNested) {
+    this->onlyParallelNested = onlyParallelNested;
+  }
+
   void runOnFunction() final {
     auto func = getFunction();
     func.walk([&](AllocOp op) { runOnAlloc(op); });
@@ -50,17 +54,63 @@ struct ResizeTmpsPass : public ResizeTmpsBase<ResizeTmpsPass> {
       }
     }
 
+    // Resize only nested ops option
+    if (onlyParallelNested && !dyn_cast<AffineParallelOp>(op.getParentOp())) {
+      return;
+    }
+
     SmallVector<StrideInfo, 4> outer;
     SmallVector<StrideRange, 4> inner;
+    auto vectorSize = 0;
     for (auto &use : getIndirectAccessUses(op)) {
       IVLOG(2, "Found use: " << debugString(*use.getOwner()));
       Optional<SmallVector<StrideInfo, 4>> maybeStrides;
-      if (auto lop = dyn_cast<PxaLoadOp>(use.getOwner())) {
+      if (auto lop = dyn_cast<PxaReadOpInterface>(use.getOwner())) {
         maybeStrides =
             computeStrideInfo(lop.getAffineMap(), lop.getMapOperands());
-      } else if (auto rop = dyn_cast<PxaReduceOp>(use.getOwner())) {
+        // Get vector size value. For scalar ops vec size is set to 1.
+        // For now this value can be optimized only when all sizes match.
+        // TODO: investigate if different values can be used here and how to
+        // set the indices afterwards
+        if (auto vecOp = dyn_cast<PxaVectorLoadOp>(use.getOwner())) {
+          auto vecShape = vecOp.getVectorType().getShape();
+          // Accept only vectors with dim size 1
+          if (vecShape.size() != 1)
+            return;
+          // Check if size is the same as for previous op
+          vectorSize =
+              (vectorSize == 0 || vectorSize == vecShape[0]) ? vecShape[0] : 0;
+        } else if (auto scalarOp = dyn_cast<PxaLoadOp>(use.getOwner())) {
+          vectorSize = (vectorSize == 0 || vectorSize == 1) ? 1 : 0;
+        }
+        if (!vectorSize) {
+          use.getOwner()->emitRemark(
+              "Users of Alloc ops have different vector/scalar sizes");
+          return;
+        }
+      } else if (auto rop = dyn_cast<PxaReduceOpInterface>(use.getOwner())) {
         maybeStrides =
             computeStrideInfo(rop.getAffineMap(), rop.getMapOperands());
+        // Get vector size value. For scalar ops vec size is set to 1.
+        // For now this value can be optimized only when all sizes match.
+        // TODO: investigate if different values can be used here and how to
+        // set the indices afterwards
+        if (auto vecOp = dyn_cast<PxaVectorReduceOp>(use.getOwner())) {
+          auto vecShape = vecOp.getVectorType().getShape();
+          // Accept only vectors with dim size 1
+          if (vecShape.size() != 1)
+            return;
+          // Check if size is the same as for previous op
+          vectorSize =
+              (vectorSize == 0 || vectorSize == vecShape[0]) ? vecShape[0] : 0;
+        } else if (auto scalarOp = dyn_cast<PxaReduceOp>(use.getOwner())) {
+          vectorSize = (vectorSize == 0 || vectorSize == 1) ? 1 : 0;
+        }
+        if (!vectorSize) {
+          use.getOwner()->emitRemark(
+              "Users of Alloc ops have different vector/scalar sizes");
+          return;
+        }
       }
       if (!maybeStrides) {
         use.getOwner()->emitRemark("Unable to compute strides for access");
@@ -136,6 +186,10 @@ struct ResizeTmpsPass : public ResizeTmpsBase<ResizeTmpsPass> {
         newShape[i] = oldShape[i];
       }
 
+      // Expand the last size for vector ops
+      if (i == oldShape.size() - 1)
+        newShape[i] *= vectorSize;
+
       if (newShape[i] != oldShape[i]) {
         sizeChanged = true;
       }
@@ -144,6 +198,7 @@ struct ResizeTmpsPass : public ResizeTmpsBase<ResizeTmpsPass> {
     if (!sizeChanged) {
       return;
     }
+
     // Compute new memref type
     auto newType = MemRefType::get(newShape, op.getType().getElementType());
     op.getResult().setType(newType);
@@ -151,6 +206,7 @@ struct ResizeTmpsPass : public ResizeTmpsBase<ResizeTmpsPass> {
     for (auto value : getIndirectValues(op.getResult())) {
       value.setType(newType);
     }
+
     // Update all of the access maps
     // Get ops first and then replace since we modify use-def chain during
     // mutation.
@@ -161,24 +217,40 @@ struct ResizeTmpsPass : public ResizeTmpsBase<ResizeTmpsPass> {
     // Now do the actual changes.  Note, we don't bother erasing the original
     // instructions, but they get cleaned up via canonicalization
     for (Operation *op : ops) {
-      if (auto rop = dyn_cast<PxaReduceOp>(op)) {
+      if (auto rop = dyn_cast<PxaReduceOpInterface>(op)) {
         // TODO: This probably should move into some sort of utility transform,
         // but I need another example or two to generalize from
         auto vm = computeInnerValueMap(rop.getAffineMap(), rop.getMapOperands(),
                                        opBlock);
-        OpBuilder replace(rop);
-        auto nrop = replace.create<PxaReduceOp>(
-            rop.getLoc(), rop.agg(), rop.val(), rop.getMemRef(),
-            vm.getAffineMap(), vm.getOperands());
-        rop.replaceAllUsesWith(nrop.result());
+        OpBuilder replace(rop.getOperation());
+        if (auto ropOp = dyn_cast<PxaReduceOp>(rop.getOperation())) {
+          auto nrop = replace.create<PxaReduceOp>(
+              ropOp.getLoc(), ropOp.agg(), ropOp.val(), ropOp.getMemRef(),
+              vm.getAffineMap(), vm.getOperands());
+          ropOp.replaceAllUsesWith(nrop.result());
+        } else if (auto ropOp =
+                       dyn_cast<PxaVectorReduceOp>(rop.getOperation())) {
+          auto nrop = replace.create<PxaVectorReduceOp>(
+              ropOp.getLoc(), ropOp.agg(), ropOp.vector(), ropOp.getMemRef(),
+              vm.getAffineMap(), vm.getOperands());
+          ropOp.replaceAllUsesWith(nrop.result());
+        }
       }
-      if (auto lop = dyn_cast<PxaLoadOp>(op)) {
+      if (auto lop = dyn_cast<PxaReadOpInterface>(op)) {
         auto vm = computeInnerValueMap(lop.getAffineMap(), lop.getMapOperands(),
                                        opBlock);
-        OpBuilder replace(lop);
-        auto nlop = replace.create<PxaLoadOp>(
-            lop.getLoc(), lop.getMemRef(), vm.getAffineMap(), vm.getOperands());
-        lop.replaceAllUsesWith(nlop.result());
+        OpBuilder replace(lop.getOperation());
+        if (auto lopOp = dyn_cast<PxaLoadOp>(lop.getOperation())) {
+          auto nlop =
+              replace.create<PxaLoadOp>(lopOp.getLoc(), lopOp.getMemRef(),
+                                        vm.getAffineMap(), vm.getOperands());
+          lopOp.replaceAllUsesWith(nlop.result());
+        } else if (auto lopOp = dyn_cast<PxaVectorLoadOp>(lop.getOperation())) {
+          auto nlop = replace.create<PxaVectorLoadOp>(
+              lopOp.getLoc(), lopOp.getVectorType(), lopOp.getMemRef(),
+              vm.getAffineMap(), vm.getOperands());
+          lopOp.replaceAllUsesWith(nlop.result());
+        }
       }
     }
   }
@@ -186,8 +258,8 @@ struct ResizeTmpsPass : public ResizeTmpsBase<ResizeTmpsPass> {
 
 } // namespace
 
-std::unique_ptr<Pass> createResizeTmpsPass() {
-  return std::make_unique<ResizeTmpsPass>();
+std::unique_ptr<Pass> createResizeTmpsPass(bool onlyParallelNested) {
+  return std::make_unique<ResizeTmpsPass>(onlyParallelNested);
 }
 
 } // namespace pmlc::dialect::pxa
