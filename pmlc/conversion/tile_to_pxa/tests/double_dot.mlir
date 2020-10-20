@@ -9,11 +9,11 @@ func @double_dot(
   %arg1: tensor<20x30xf32>,
   %arg2: tensor<30x40xf32>
 ) -> tensor<10x40xf32> {
-  %cst = "eltwise.sconst"() {value = 0.0 : f64} : () -> f32
+  %cst = tile.constant(0.0 : f64) : tensor<f32>
   %0 = tile.contract add, mul, %cst, %arg0, %arg1 {sink = #map0, srcs = [#map1, #map2]} :
-    f32, tensor<10x20xf32>, tensor<20x30xf32> -> tensor<10x30xf32>
+    tensor<f32>, tensor<10x20xf32>, tensor<20x30xf32> -> tensor<10x30xf32>
   %1 = tile.contract add, mul, %cst, %0, %arg2 {sink = #map0, srcs = [#map1, #map2]} :
-    f32, tensor<10x30xf32>, tensor<30x40xf32> -> tensor<10x40xf32>
+    tensor<f32>, tensor<10x30xf32>, tensor<30x40xf32> -> tensor<10x40xf32>
   return %1 : tensor<10x40xf32>
 }
 

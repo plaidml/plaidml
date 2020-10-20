@@ -11,7 +11,6 @@
 #include "mlir/IR/AffineMap.h"
 #include "mlir/Pass/Pass.h"
 
-#include "pmlc/dialect/eltwise/ir/ops.h"
 #include "pmlc/dialect/tile/ir/ops.h"
 #include "pmlc/dialect/tile/transforms/padding.h"
 #include "pmlc/dialect/tile/transforms/pass_detail.h"
@@ -124,7 +123,7 @@ void PadConstraintsPass::runOnFunction() {
       auto loc = block->getParentOp()->getLoc();
       OpBuilder inner(block->getParent());
       // Construct an initial identity operation.
-      auto ident = inner.create<eltwise::IdentOp>(loc, arg.getType(), arg);
+      auto ident = inner.create<IdentOp>(loc, arg.getType(), arg);
       // Replace all uses with ident (except for newly generated use).
       arg.replaceAllUsesExcept(ident, llvm::SmallPtrSet<Operation *, 1>{ident});
       // Now use ident for all further work.

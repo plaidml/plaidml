@@ -7,10 +7,7 @@ package(default_visibility = ["//visibility:public"])
 
 filegroup(
     name = "td_files",
-    srcs = [
-        "enums.td",
-        "interfaces.td",
-    ],
+    srcs = ["enums.td"],
 )
 
 gentbl(
@@ -24,17 +21,6 @@ gentbl(
     td_srcs = ["@llvm-project//mlir:OpBaseTdFiles"],
 )
 
-gentbl(
-    name = "interfaces-gen",
-    tbl_outs = [
-        ("-gen-op-interface-decls", "interfaces.h.inc"),
-        ("-gen-op-interface-defs", "interfaces.cc.inc"),
-    ],
-    tblgen = "@llvm-project//mlir:mlir-tblgen",
-    td_file = "interfaces.td",
-    td_srcs = ["@llvm-project//mlir:OpBaseTdFiles"],
-)
-
 plaidml_cc_library(
     name = "util",
     srcs = glob(["*.cc"]),
@@ -42,7 +28,6 @@ plaidml_cc_library(
     copts = COPTS,
     deps = [
         ":enums-gen",
-        ":interfaces-gen",
         "@easylogging",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Analysis",
