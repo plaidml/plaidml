@@ -240,36 +240,33 @@ def _inner_run(reports,
         model.validate()
         model.setup()
 
-        stop_watch = StopWatch(callgrind)
+        exec_stop_watch = StopWatch(callgrind)
         compile_stop_watch = StopWatch(callgrind)
 
         click.echo('Compiling network...', nl=False)
         compile_stop_watch.start_outer()
-        stop_watch.start_outer()
-
         model.compile()
+        compile_stop_watch.stop()
+
         model_output, overrides = model.run(once=True)
         if tile:
             click.echo(' Saving Tile to {}...'.format(tile), nl=False)
             model.model.predict_function._invoker.save(tile)
-
-        compile_stop_watch.stop()
 
         # Run a few more warmups -- this seems to improve the variability of the
         # benchmark results.
         if warmup:
             click.echo(' Warming up...', nl=False)
             model.run(warmup=True)
-        click.echo(' Running...')
 
-        stop_watch.start()
+        click.echo(' Running...')
+        exec_stop_watch.start_outer()
         _, overrides = model.run()
-        stop_watch.stop()
+        exec_stop_watch.stop()
 
         # Record stopwatch times
-        execution_duration = overrides.get('time', stop_watch.elapsed())
-        exec_per_example = execution_duration / params.examples
-
+        execution_duration = overrides.get('time', exec_stop_watch.elapsed())
+        exec_per_example = overrides.get('lastExecTimeInNS', execution_duration / params.examples)
         compile_duration = compile_stop_watch.elapsed()
         flops = overrides.get('flops', None)
         gflops = None
