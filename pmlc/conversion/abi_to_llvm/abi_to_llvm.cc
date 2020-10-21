@@ -84,36 +84,45 @@ struct LoopLowering : public mlir::ConvertOpToLLVMPattern<abi::LoopOp> {
       networkFieldTypes.emplace_back(convValue.getType().cast<LLVMType>());
       networkFieldValues.emplace_back(convValue);
     }
+    llvm::errs() << "After all materializations, loop: " << loopOp << "\n";
 
     auto networkTy = LLVMType::getStructTy(ctx, networkFieldTypes);
 
     // Fill in a local stack copy of the network structure.
-    auto initNetworkValue = rewriter.create<LLVM::UndefOp>(
-      rewriter.getUnknownLoc(), networkTy);
+    auto initNetworkValue =
+        rewriter.create<LLVM::UndefOp>(rewriter.getUnknownLoc(), networkTy);
     for (unsigned idx = 0; idx < networkFieldValues.size(); ++idx) {
       rewriter.create<LLVM::InsertValueOp>(
-        rewriter.getUnknownLoc(), initNetworkValue,
-        rewriter.getI64ArrayAttr(idx));
+          rewriter.getUnknownLoc(), initNetworkValue, networkFieldValues[idx],
+          rewriter.getI64ArrayAttr(idx));
     }
 
     // malloc the structure instance, and store the stack local into it.
     auto initNullNetworkValue = rewriter.create<LLVM::NullOp>(
         rewriter.getUnknownLoc(), networkTy.getPointerTo());
     auto initConstOne = rewriter.create<LLVM::ConstantOp>(
-      rewriter.getUnknownLoc(), rewriter.getI64ArrayAttr(1));
+        rewriter.getUnknownLoc(), getIndexType(), rewriter.getI64ArrayAttr(1));
     auto initNextNetworkValue = rewriter.create<LLVM::GEPOp>(
-      rewriter.getUnknownLoc(), initNullNetworkValue,
-      mlir::ValueRange{initConstOne});
+        rewriter.getUnknownLoc(), networkTy.getPointerTo(),
+        initNullNetworkValue, mlir::ValueRange{initConstOne});
     auto initNetworkSize = rewriter.create<LLVM::PtrToIntOp>(
-      rewriter.getUnknownLoc(), getIndexType(), initNextNetworkValue);
-    auto initNetworkRawPtr = rewriter.create<LLVM::CallOp>(
-      rewriter.getUnknownLoc(), mallocFunc, mlir::ValueRange{initNetworkSize});
+        rewriter.getUnknownLoc(), getIndexType(), initNextNetworkValue);
+    auto initNetworkRawPtr =
+        rewriter
+            .create<LLVM::CallOp>(rewriter.getUnknownLoc(), mallocFunc,
+                                  mlir::ValueRange{initNetworkSize})
+            .getResult(0);
     auto initNetworkPtr = rewriter.create<LLVM::BitcastOp>(
-      rewriter.getUnknownLoc(), networkTy.getPointerTo(), initNetworkRawPtr);
-    rewriter.create<LLVM::StoreOp>(rewriter.getUnknownLoc(), initNetworkPtr, initNetworkValue);
+        rewriter.getUnknownLoc(), networkTy.getPointerTo(), initNetworkRawPtr);
+    rewriter.create<LLVM::StoreOp>(rewriter.getUnknownLoc(), initNetworkPtr,
+                                   initNetworkValue);
 
-    // Finally, terminate the block.
-    rewriter.create<LLVM::ReturnOp>(rewriter.getUnknownLoc(), initNetworkPtr);    
+    // Finally, terminate the block, and remove the previous terminator.
+    auto initReturn = rewriter.create<LLVM::ReturnOp>(
+        rewriter.getUnknownLoc(), mlir::ValueRange{initNetworkPtr});
+    rewriter.eraseOp(initTerminator);
+
+    llvm::errs() << "After network rewrite, loop: " << loopOp << "\n";
 
     // Create plaidml_init().
     auto initArgTypes = loopOp.initRegion().getArgumentTypes();
