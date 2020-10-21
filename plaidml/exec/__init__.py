@@ -37,7 +37,7 @@ class Executable(ForeignObject):
     def run(self, inputs, outputs):
         raw_inputs = [x.as_ptr() for x in inputs]
         raw_outputs = [x.as_ptr() for x in outputs]
-        self._methodcall(
+        return self._methodcall(
             lib.plaidml_executable_run,
             len(raw_inputs),
             raw_inputs,

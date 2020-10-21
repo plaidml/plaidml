@@ -26,12 +26,32 @@ using namespace mlir; // NOLINT
 namespace pmlc::dialect::pxa {
 
 AffineParallelOp tileAccumulations(AffineParallelOp op, bool skipTrivial) {
-  // Find the originating reduce
-  assert(op.getNumResults() == 1);
-  auto srcDef = getPrevWriter(op.getResult(0));
-  auto reduceOp = cast<PxaReduceOp>(srcDef);
+  // Find the originating write and its StrideInfo
+  Optional<StrideInfo> maybeStrideInfo;
+  if (op.getNumResults() == 1) {
+    auto srcDef = getPrevWriter(op.getResult(0));
+    if (auto gemmOp = dyn_cast_or_null<PxaGemmOp>(srcDef)) {
+      maybeStrideInfo =
+          computeStrideInfo(gemmOp.out().getType().cast<MemRefType>(),
+                            gemmOp.cAccessMap(), gemmOp.getOperandsForC());
+    } else if (auto reduceOp = dyn_cast_or_null<PxaReduceOp>(srcDef)) {
+      maybeStrideInfo = computeStrideInfo(reduceOp);
+    }
+  }
+  // If we can't fall back to adding a nesting level (to guarentee all
+  // accumulations are in the 'inner' loop)
+  if (!maybeStrideInfo) {
+    auto maybeRanges = op.getConstantRanges();
+    assert(maybeRanges &&
+           "Cannot tile accumulations on dynamic sized paralllel for");
+    if (!skipTrivial) {
+      op = performTiling(op, *maybeRanges);
+    }
+    return op;
+  }
+
+  auto si = *maybeStrideInfo;
   // Get strides for output
-  auto si = *computeStrideInfo(reduceOp);
   // Find all the accumulation indexes (stride 0 with respect to output) and
   // tile them into an inner block
   auto ranges = *op.getConstantRanges();
@@ -68,9 +88,11 @@ struct TileAccumulatePass : public TileAccumulateBase<TileAccumulatePass> {
     auto func = getFunction();
     // Tile only the outermost loops
     for (auto op : func.getBody().getOps<AffineParallelOp>()) {
-      if (op.getNumResults() == 1) {
-        tileAccumulations(op, false);
+      if (!op.getConstantRanges()) {
+        signalPassFailure();
+        break;
       }
+      tileAccumulations(op, false);
     }
   }
 };

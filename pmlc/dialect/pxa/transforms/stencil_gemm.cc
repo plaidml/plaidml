@@ -15,6 +15,7 @@
 #include "pmlc/dialect/pxa/transforms/stencil.h"
 #include "pmlc/util/logging.h"
 #include "pmlc/util/matchers.h"
+#include "pmlc/util/tags.h"
 
 using namespace mlir; // NOLINT
 

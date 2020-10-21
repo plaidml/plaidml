@@ -9,6 +9,7 @@
 
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/MLIRContext.h"
+#include "mlir/InitAllTranslations.h"
 #include "mlir/Support/FileUtilities.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Support/ToolUtilities.h"
@@ -42,6 +43,8 @@ int main(int argc, char **argv) {
       el::Loggers::setVerboseLevel(level);
     }
   }
+
+  mlir::registerAllTranslations();
 
   // Add flags for all the registered translations.
   llvm::cl::opt<const TranslateFunction *, false, TranslationParser>
