@@ -402,18 +402,19 @@ public:
 
   double invoke(mlir::ArrayRef<util::BufferPtr> inputBuffers,
                 mlir::ArrayRef<util::BufferPtr> outputBuffers) final {
-    bindArguments(inputBuffers, outputBuffers);
     StopWatch stopWatch;
-    if (VLOG_IS_ON(1)) {
-      stopWatch.start();
-    }
+    stopWatch.start();
+    bindArguments(inputBuffers, outputBuffers);
     jitEntry(ptrs.data());
-    if (VLOG_IS_ON(1)) {
-      stopWatch.stop();
-      IVLOG(1, "Execution time: " << stopWatch.delta_ms() << "ms");
+    stopWatch.stop();
+
+    double execTime = device->execTimeInMS;
+    if (execTime == 0.0) {
+      execTime = stopWatch.delta_ms();
     }
-    // TODO: switch to stopWatch time once compile / execute are separate
-    return device->execTimeInMS;
+
+    IVLOG(1, "Execution time: " << execTime << "ms");
+    return execTime;
   }
 
   void bindArguments(ArrayRef<util::BufferPtr> inputBuffers,

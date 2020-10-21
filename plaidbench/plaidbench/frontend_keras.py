@@ -243,8 +243,13 @@ class InferenceModel(Model):
             epoch_size = self.params.epoch_size
         out = self.model.predict(x=self.x[:epoch_size], batch_size=self.params.batch_size)
 
-        import plaidml.bridge.keras as keras_bridge
-        return (out, {"time": keras_bridge.lastExecuteTime / 1000})
+        overrides = {}
+        import keras.backend as b
+        if b.backend() == "plaidml.bridge.keras":
+            import plaidml.bridge.keras as keras_bridge
+            overrides = {"time": keras_bridge.lastExecTimeInMS / 1000}
+
+        return (out, overrides)
 
     def golden_output(self):
         return (self.keras_golden_output('infer'), core.Precision.INFERENCE)

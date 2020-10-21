@@ -82,8 +82,7 @@ double plaidml_executable_run(  //
     plaidml_buffer** inputs,    //
     size_t noutputs,            //
     plaidml_buffer** outputs) {
-  double execTimeInMS = 0.0;
-  ffi_wrap_void(err, [&] {  //
+  return ffi_wrap<double>(err, 0.0, [&] {  //
     llvm::SmallVector<BufferPtr, 8> inputBuffers;
     if (exec->program->inputs.size() != ninputs) {
       throw std::runtime_error(
@@ -114,10 +113,8 @@ double plaidml_executable_run(  //
       }
       outputBuffers.push_back(outputs[i]->buffer);
     }
-    execTimeInMS = exec->exec->invoke(inputBuffers, outputBuffers);
+    return exec->exec->invoke(inputBuffers, outputBuffers);
   });
-
-  return execTimeInMS;
 }
 
 }  // extern "C"

@@ -90,7 +90,7 @@ class Executable {
     for (size_t i = 0; i < raw_outputs.size(); i++) {
       raw_outputs[i] = outputs[i].as_ptr();
     }
-    return ffi::call_double(     //
+    return ffi::call<double>(    //
         plaidml_executable_run,  //
         ptr_.get(),              //
         raw_inputs.size(),       //

@@ -40,16 +40,6 @@ void call_void(F fn, Args... args) {
   }
 }
 
-template <typename F, typename... Args>
-double call_double(F fn, Args... args) {
-  plaidml_error err;
-  double ret = fn(&err, args...);
-  if (err.code) {
-    throw std::runtime_error(str(err.msg));
-  }
-  return ret;
-}
-
 }  // namespace ffi
 
 namespace details {
