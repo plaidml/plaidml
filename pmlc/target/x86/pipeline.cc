@@ -1,10 +1,12 @@
 // Copyright 2020 Intel Corporation
 
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
+#include "mlir/Conversion/OpenMPToLLVM/ConvertOpenMPToLLVM.h"
 #include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
 #include "mlir/Dialect/Affine/Passes.h"
+#include "mlir/Dialect/OpenMP/OpenMPDialect.h"
 #include "mlir/Dialect/StandardOps/Transforms/Passes.h"
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/Pass/Pass.h"
@@ -13,6 +15,7 @@
 
 #include "pmlc/compiler/registry.h"
 #include "pmlc/conversion/pxa_to_affine/passes.h"
+#include "pmlc/conversion/scf_to_omp/passes.h"
 #include "pmlc/conversion/stdx_to_llvm/passes.h"
 #include "pmlc/conversion/tile_to_pxa/passes.h"
 #include "pmlc/dialect/pxa/transforms/passes.h"
@@ -56,6 +59,26 @@ struct LowerPXAToAffinePass
   }
 };
 
+struct ExtractLoweringPattern
+    : public OpConversionPattern<LLVM::ExtractValueOp> {
+  using OpConversionPattern<LLVM::ExtractValueOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(LLVM::ExtractValueOp op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const final {
+    Value src = operands[0];
+    while (auto insertOp = mlir::dyn_cast_or_null<LLVM::InsertValueOp>(
+               src.getDefiningOp())) {
+      if (op.position() == insertOp.position()) {
+        rewriter.replaceOp(op, insertOp.value());
+        return success();
+      }
+      src = insertOp.container();
+    }
+    return failure();
+  }
+};
+
 struct ConvertStandardToLLVMPass
     : public ConvertStandardToLLVMBase<ConvertStandardToLLVMPass> {
   void runOnOperation() override {
@@ -76,8 +99,20 @@ struct ConvertStandardToLLVMPass
     populateStdToLLVMConversionPatterns(typeConverter, patterns);
     conversion::stdx_to_llvm::populateStdXToLLVMConversionPatterns(
         typeConverter, patterns);
+    populateOpenMPToLLVMConversionPatterns(context, typeConverter, patterns);
+    patterns.insert<ExtractLoweringPattern>(context);
 
     LLVMConversionTarget target(*context);
+    target.addDynamicallyLegalOp<omp::ParallelOp>([&](omp::ParallelOp op) {
+      return typeConverter.isLegal(&op.getRegion());
+    });
+    target.addLegalOp<omp::TerminatorOp, omp::TaskyieldOp, omp::FlushOp,
+                      omp::BarrierOp, omp::TaskwaitOp>();
+    target.addDynamicallyLegalOp<LLVM::ExtractValueOp>(
+        [](LLVM::ExtractValueOp op) {
+          return !mlir::dyn_cast_or_null<LLVM::InsertValueOp>(
+              op.container().getDefiningOp());
+        });
     if (failed(applyPartialConversion(module, target, patterns))) {
       signalPassFailure();
     }
@@ -131,11 +166,31 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
 
+  pm.addPass(pxa::createTileAccumulatePass());
+  pm.addPass(pxa::createAffineNormalizePass(/*promote=*/false));
+  pm.addPass(createCanonicalizerPass());
+
+  // TODO: Figure out a better way to prevent 'overthreading'
+  auto maxThreads = std::thread::hardware_concurrency();
+  if (maxThreads > 8) {
+    maxThreads = 8;
+  }
+  std::min(std::thread::hardware_concurrency(), maxThreads);
+  pm.addPass(pxa::createCPUThreadPass(maxThreads));
+  pm.addPass(pxa::createAffineNormalizePass());
+  pm.addPass(createCanonicalizerPass());
+
   pm.addPass(pxa::createFusionPass());
   pm.addPass(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
-  pm.addPass(pxa::createMemRefDataFlowOptPass());
-  pm.addPass(createCanonicalizerPass());
+
+  // Currently these MemRefDataFlowOptPass is disabled because it will turn
+  // 0-dim tensors into actual floats, which do not correctly pass through
+  // OpenMP due to calling convention issues.  TODO: Fix OpenMP upstream and
+  // re-enable.
+  // pm.addPass(pxa::createMemRefDataFlowOptPass());
+  // pm.addPass(createCanonicalizerPass());
+
   pm.addPass(pxa::createLocalizePass());
   pm.addPass(pxa::createResizeTmpsPass());
   pm.addPass(pxa::createBufferPlacementPass());
@@ -157,6 +212,10 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(createCSEPass());
 
   pm.addPass(createLowerAffinePass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
+
+  pm.addPass(pmlc::conversion::scf_to_omp::createLowerSCFToOpenMPPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 

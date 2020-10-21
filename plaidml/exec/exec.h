@@ -80,8 +80,8 @@ class Executable {
   ///
   /// run
   ///
-  void run(const std::vector<Buffer>& inputs,  //
-           const std::vector<Buffer>& outputs) {
+  double run(const std::vector<Buffer>& inputs,  //
+             const std::vector<Buffer>& outputs) {
     std::vector<plaidml_buffer*> raw_inputs(inputs.size());
     for (size_t i = 0; i < inputs.size(); i++) {
       raw_inputs[i] = inputs[i].as_ptr();
@@ -90,7 +90,7 @@ class Executable {
     for (size_t i = 0; i < raw_outputs.size(); i++) {
       raw_outputs[i] = outputs[i].as_ptr();
     }
-    ffi::call_void(              //
+    return ffi::call<double>(    //
         plaidml_executable_run,  //
         ptr_.get(),              //
         raw_inputs.size(),       //

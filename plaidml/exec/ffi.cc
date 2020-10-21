@@ -75,14 +75,14 @@ void plaidml_executable_free(  //
   });
 }
 
-void plaidml_executable_run(   //
-    plaidml_error* err,        //
-    plaidml_executable* exec,  //
-    size_t ninputs,            //
-    plaidml_buffer** inputs,   //
-    size_t noutputs,           //
+double plaidml_executable_run(  //
+    plaidml_error* err,         //
+    plaidml_executable* exec,   //
+    size_t ninputs,             //
+    plaidml_buffer** inputs,    //
+    size_t noutputs,            //
     plaidml_buffer** outputs) {
-  ffi_wrap_void(err, [&] {  //
+  return ffi_wrap<double>(err, 0.0, [&] {  //
     llvm::SmallVector<BufferPtr, 8> inputBuffers;
     if (exec->program->inputs.size() != ninputs) {
       throw std::runtime_error(
@@ -113,7 +113,7 @@ void plaidml_executable_run(   //
       }
       outputBuffers.push_back(outputs[i]->buffer);
     }
-    exec->exec->invoke(inputBuffers, outputBuffers);
+    return exec->exec->invoke(inputBuffers, outputBuffers);
   });
 }
 
