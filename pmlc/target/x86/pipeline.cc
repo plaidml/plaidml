@@ -83,7 +83,7 @@ struct ConvertStandardToLLVMPass
                                                                  patterns);
 
     LLVMConversionTarget target(*context);
-    conversion::abi_to_llvm::addLoopLegality(target);
+    target.addIllegalDialect<abi::ABIDialect>();
     if (failed(applyPartialConversion(module, target, patterns))) {
       signalPassFailure();
     }

@@ -36,7 +36,8 @@ gentbl(
 plaidml_cc_library(
     name = "ir",
     srcs = [
-        "dialect.cc"
+        "dialect.cc",
+        "loop_op.cc",
     ],
     hdrs = [
         "dialect.h"

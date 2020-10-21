@@ -24,51 +24,123 @@ using LLVMType = LLVM::LLVMType;
 
 namespace pmlc::conversion::abi_to_llvm {
 
-static abi::LoopOp findLoopToLower(LLVM::LLVMFuncOp funcOp) {
-  auto moduleOp = funcOp.getParentOfType<mlir::ModuleOp>();
-  auto existingInit = moduleOp.lookupSymbol(pmlc::util::kPlaidmlInit);
-  if (existingInit) {
-    return abi::LoopOp{};
-  }
-
-  abi::LoopOp loopOp;
-  for (auto childOp : funcOp.getOps<abi::LoopOp>()) {
-    if (loopOp) {
-      return abi::LoopOp{}; // Two loop ops => failure
-    }
-    loopOp = childOp;
-  }
-
-  return loopOp;
-}
-
 namespace {
 
-struct LoopLowering : public mlir::ConvertOpToLLVMPattern<LLVM::LLVMFuncOp> {
-  using mlir::ConvertOpToLLVMPattern<LLVM::LLVMFuncOp>::ConvertOpToLLVMPattern;
+struct LoopLowering : public mlir::ConvertOpToLLVMPattern<abi::LoopOp> {
+  using mlir::ConvertOpToLLVMPattern<abi::LoopOp>::ConvertOpToLLVMPattern;
 
   mlir::LogicalResult
   matchAndRewrite(mlir::Operation *op, mlir::ArrayRef<mlir::Value> operands,
                   mlir::ConversionPatternRewriter &rewriter) const final {
     llvm::DebugFlag = true;
-    auto mainFunc = mlir::cast<LLVM::LLVMFuncOp>(op);
-    auto loopOp = findLoopToLower(mainFunc);
-    if (!loopOp) {
+    auto loopOp = mlir::cast<abi::LoopOp>(op);
+
+    llvm::errs() << "Converting loop: " << loopOp << "\n";
+
+    auto ctx = rewriter.getContext();
+
+    // We will need malloc() and free().
+    auto moduleOp = loopOp.getParentOfType<mlir::ModuleOp>();
+
+    auto mallocFunc = moduleOp.lookupSymbol<LLVM::LLVMFuncOp>("malloc");
+    if (!mallocFunc) {
+      rewriter.setInsertionPointToStart(moduleOp.getBody());
+      mallocFunc = rewriter.create<LLVM::LLVMFuncOp>(
+          rewriter.getUnknownLoc(), "malloc",
+          LLVMType::getFunctionTy(getVoidPtrType(),
+                                  mlir::ArrayRef<LLVMType>{getIndexType()},
+                                  /*isVarArg=*/false));
+    }
+
+    auto freeFunc = moduleOp.lookupSymbol<LLVM::LLVMFuncOp>("free");
+    if (!freeFunc) {
+      rewriter.setInsertionPointToStart(moduleOp.getBody());
+      freeFunc = rewriter.create<LLVM::LLVMFuncOp>(
+          rewriter.getUnknownLoc(), "free",
+          LLVMType::getFunctionTy(getVoidType(),
+                                  mlir::ArrayRef<LLVMType>{getVoidPtrType()},
+                                  /*isVarArg=*/false));
+    }
+
+    rewriter.startRootUpdate(loopOp);
+
+    // Rewrite the init region's terminator to build and return
+    // a pointer to a struct containing the information to be passed
+    // to exec() and fini().
+    //
+    // Start by figuring out the type of the network structure.
+    mlir::SmallVector<LLVMType, 8> networkFieldTypes;
+    mlir::SmallVector<mlir::Value, 8> networkFieldValues;
+    auto initTerminator = loopOp.getInitTerminator();
+    rewriter.setInsertionPoint(initTerminator);
+    for (auto srcValue : initTerminator.getOperands()) {
+      auto convValue = typeConverter.materializeTargetConversion(
+          rewriter, initTerminator.getLoc(),
+          typeConverter.convertType(srcValue.getType()), srcValue);
+      if (!convValue) {
+        rewriter.cancelRootUpdate(loopOp);
+        return mlir::failure();
+      }
+      networkFieldTypes.emplace_back(convValue.getType().cast<LLVMType>());
+      networkFieldValues.emplace_back(convValue);
+    }
+
+    auto networkTy = LLVMType::getStructTy(ctx, networkFieldTypes);
+
+    // Fill in a local stack copy of the network structure.
+    auto initNetworkValue = rewriter.create<LLVM::UndefOp>(
+      rewriter.getUnknownLoc(), networkTy);
+    for (unsigned idx = 0; idx < networkFieldValues.size(); ++idx) {
+      rewriter.create<LLVM::InsertValueOp>(
+        rewriter.getUnknownLoc(), initNetworkValue,
+        rewriter.getI64ArrayAttr(idx));
+    }
+
+    // malloc the structure instance, and store the stack local into it.
+    auto initNullNetworkValue = rewriter.create<LLVM::NullOp>(
+        rewriter.getUnknownLoc(), networkTy.getPointerTo());
+    auto initConstOne = rewriter.create<LLVM::ConstantOp>(
+      rewriter.getUnknownLoc(), rewriter.getI64ArrayAttr(1));
+    auto initNextNetworkValue = rewriter.create<LLVM::GEPOp>(
+      rewriter.getUnknownLoc(), initNullNetworkValue,
+      mlir::ValueRange{initConstOne});
+    auto initNetworkSize = rewriter.create<LLVM::PtrToIntOp>(
+      rewriter.getUnknownLoc(), getIndexType(), initNextNetworkValue);
+    auto initNetworkRawPtr = rewriter.create<LLVM::CallOp>(
+      rewriter.getUnknownLoc(), mallocFunc, mlir::ValueRange{initNetworkSize});
+    auto initNetworkPtr = rewriter.create<LLVM::BitcastOp>(
+      rewriter.getUnknownLoc(), networkTy.getPointerTo(), initNetworkRawPtr);
+    rewriter.create<LLVM::StoreOp>(rewriter.getUnknownLoc(), initNetworkPtr, initNetworkValue);
+
+    // Finally, terminate the block.
+    rewriter.create<LLVM::ReturnOp>(rewriter.getUnknownLoc(), initNetworkPtr);    
+
+    // Create plaidml_init().
+    auto initArgTypes = loopOp.initRegion().getArgumentTypes();
+    auto initFuncType = rewriter.getFunctionType(
+        initArgTypes, mlir::TypeRange{networkTy.getPointerTo()});
+    mlir::TypeConverter::SignatureConversion initSigConversion{
+        loopOp.initRegion().getNumArguments()};
+    auto initLLVMType = typeConverter.convertFunctionSignature(
+        initFuncType,
+        /*isVariadic=*/false, initSigConversion);
+    auto initFunc = rewriter.create<LLVM::LLVMFuncOp>(
+        loopOp.getLoc(), pmlc::util::kPlaidmlInit, initLLVMType);
+
+    rewriter.inlineRegionBefore(loopOp.initRegion(), initFunc.getBody(),
+                                initFunc.getBody().end());
+
+    if (mlir::failed(rewriter.convertRegionTypes(
+            &initFunc.getBody(), typeConverter, &initSigConversion))) {
+      rewriter.cancelRootUpdate(loopOp);
       return mlir::failure();
     }
 
-    llvm::errs() << "Converting fn: " << mainFunc << "\n";
-
-    for (auto operand : loopOp.getOperation()->getOperands()) {
-      llvm::errs() << "Found loop operand: " << operand
-                   << " type=" << operand.getType() << "\n";
-    }
-
-    auto ctx = rewriter.getContext();
-    auto networkTy = LLVM::LLVMStructType::getIdentified(ctx, "Network");
+    llvm::errs() << "Built plaidml_init: " << initFunc << "\n";
+#if 0
 
     auto initFunc = rewriter.create<LLVM::LLVMFuncOp>(
-        mainFunc.getLoc(), pmlc::util::kPlaidmlInit,
+        loopOp.getLoc(), pmlc::util::kPlaidmlInit,
         LLVMType::getFunctionTy(
             networkTy.getPointerTo(),
             mainFunc.getType().cast<LLVM::LLVMFunctionType>().getParams(),
@@ -169,8 +241,6 @@ struct LoopLowering : public mlir::ConvertOpToLLVMPattern<LLVM::LLVMFuncOp> {
     // Let's write that up and see how far we get.
 
     llvm::errs() << "Initial plaidml_exec: " << execFunc << "\n";
-
-    rewriter.startRootUpdate(mainFunc);
 
     // Build plaidml_exec().
     //
@@ -288,12 +358,14 @@ struct LoopLowering : public mlir::ConvertOpToLLVMPattern<LLVM::LLVMFuncOp> {
 
     llvm::errs() << "After eraseage: main: " << mainFunc << "\n";
 
-    rewriter.eraseOp(loopOp);
     LLVMType::setStructTyBody(networkTy, networkFieldTypes);
 
-    rewriter.finalizeRootUpdate(mainFunc);
 
     llvm::errs() << "Final: plaidml_exec: " << execFunc << "\n";
+
+#endif
+    rewriter.eraseOp(loopOp);
+    rewriter.finalizeRootUpdate(loopOp);
 
     return mlir::success();
   }
@@ -305,17 +377,6 @@ void populateABIToLLVMConversionPatterns(
     mlir::LLVMTypeConverter &converter,
     mlir::OwningRewritePatternList &patterns) {
   patterns.insert<LoopLowering>(converter);
-}
-
-void addLoopLegality(mlir::ConversionTarget &target) {
-  target.addDynamicallyLegalOp<LLVM::LLVMFuncOp>([](LLVM::LLVMFuncOp op) {
-    if (findLoopToLower(op)) {
-      // We have a loop to lower, so this op is not legal.
-      return false;
-    }
-    // With no loop to lower, there's nothing for us to do.
-    return true;
-  });
 }
 
 } // namespace pmlc::conversion::abi_to_llvm

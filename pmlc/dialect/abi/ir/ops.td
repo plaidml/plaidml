@@ -30,6 +30,10 @@ def ABI_LoopOp : ABI_Op<"loop", [
   let regions = (region AnyRegion:$initRegion, AnyRegion:$bodyRegion, AnyRegion:$finiRegion);
   let extraClassDeclaration = [{
     mlir::Block* bodyEntryBlock() { return &bodyRegion().front(); }
+    
+    CreateNetworkOp getInitTerminator() {
+      return mlir::cast<CreateNetworkOp>(initRegion().back().getTerminator());
+    }
   }];
 }
 

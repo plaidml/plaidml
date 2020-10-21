@@ -15,6 +15,4 @@ void populateABIToLLVMConversionPatterns(
     mlir::LLVMTypeConverter &converter,
     mlir::OwningRewritePatternList &patterns);
 
-void addLoopLegality(mlir::ConversionTarget &target);
-
 } // namespace pmlc::conversion::abi_to_llvm
