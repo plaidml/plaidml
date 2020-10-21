@@ -29,6 +29,38 @@ def ABI_LoopOp : ABI_Op<"loop", [
   }];
   let regions = (region AnyRegion:$initRegion, AnyRegion:$bodyRegion, AnyRegion:$finiRegion);
   let extraClassDeclaration = [{
+    static mlir::StringRef getNetworkFieldTypesAttrName() { return "networkFieldTypes"; }
+
+    std::vector<mlir::Type> getNetworkFieldTypes() {
+      std::vector<mlir::Type> result;
+      auto arrayAttr = getAttrOfType<mlir::ArrayAttr>(getNetworkFieldTypesAttrName());
+      if (arrayAttr) {
+        for (auto attr : arrayAttr) {
+          if (auto tyAttr = attr.dyn_cast<mlir::TypeAttr>()) {
+            result.emplace_back(tyAttr.getValue());
+          }
+        }
+      }
+      return result;
+    }
+
+    unsigned getNumNetworkFields() {
+      auto arrayAttr = getAttrOfType<mlir::ArrayAttr>(getNetworkFieldTypesAttrName());
+      if (arrayAttr) {
+        return arrayAttr.size();
+      }
+      return 0;
+    }
+
+    void setNetworkFieldTypes(mlir::TypeRange types) {
+      mlir::SmallVector<mlir::Attribute, 8> attrs;
+      for (auto ty : types) {
+        attrs.emplace_back(mlir::TypeAttr::get(ty));
+      }
+      auto arrayAttr = mlir::ArrayAttr::get(attrs, getContext());
+      setAttr(getNetworkFieldTypesAttrName(), arrayAttr);
+    }
+
     mlir::Block* bodyEntryBlock() { return &bodyRegion().front(); }
     
     CreateNetworkOp getInitTerminator() {

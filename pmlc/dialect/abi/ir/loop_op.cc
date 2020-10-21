@@ -3,7 +3,7 @@
 #include "pmlc/dialect/abi/ir/dialect.h"
 
 namespace pmlc::dialect::abi {
-    
+
 mlir::Region &LoopOp::getLoopBody() { return bodyRegion(); }
 
 bool LoopOp::isDefinedOutsideOfLoop(mlir::Value value) {
@@ -17,13 +17,12 @@ bool LoopOp::isDefinedOutsideOfLoop(mlir::Value value) {
     // entry region.
     return false;
   }
-  // Finally: if the argument number is less than the number of operands to the
-  // init final block terminator, the value is coming from outside of the loop
-  // region (making its user eligible for hoisting); otherwise, the argument is
-  // coming from what will eventually be a parameter to the loop iterator call,
-  // so it must not be hoisted.
-  return blockArg.getArgNumber() < getInitTerminator().getNumOperands();
-
+  // Finally: if the argument number is less than the number of items in the
+  // network type, the value is coming from outside of the loop region via the
+  // network pointer (making its user eligible for hoisting); otherwise, the
+  // argument is coming from what will eventually be a parameter to the loop
+  // iterator call, so it must not be hoisted.
+  return blockArg.getArgNumber() < getNumNetworkFields();
 }
 
 LogicalResult LoopOp::moveOutOfLoop(mlir::ArrayRef<mlir::Operation *> ops) {
@@ -58,6 +57,7 @@ LogicalResult LoopOp::moveOutOfLoop(mlir::ArrayRef<mlir::Operation *> ops) {
     }
     op->moveBefore(networkOp);
   }
+  setNetworkFieldTypes(networkOp.getOperandTypes());
   return mlir::success();
 }
 

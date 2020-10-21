@@ -26,21 +26,20 @@ namespace pmlc::conversion::abi_to_llvm {
 
 namespace {
 
-struct LoopLowering : public mlir::ConvertOpToLLVMPattern<abi::LoopOp> {
-  using mlir::ConvertOpToLLVMPattern<abi::LoopOp>::ConvertOpToLLVMPattern;
+struct CreateNetworkOpLowering final
+    : public mlir::ConvertOpToLLVMPattern<abi::CreateNetworkOp> {
+  using mlir::ConvertOpToLLVMPattern<
+      abi::CreateNetworkOp>::ConvertOpToLLVMPattern;
 
   mlir::LogicalResult
   matchAndRewrite(mlir::Operation *op, mlir::ArrayRef<mlir::Value> operands,
                   mlir::ConversionPatternRewriter &rewriter) const final {
     llvm::DebugFlag = true;
-    auto loopOp = mlir::cast<abi::LoopOp>(op);
-
-    llvm::errs() << "Converting loop: " << loopOp << "\n";
-
-    auto ctx = rewriter.getContext();
+    auto createNetworkOp = mlir::cast<abi::CreateNetworkOp>(op);
+    llvm::errs() << "Converting create_network: " << createNetworkOp << "\n";
 
     // We will need malloc() and free().
-    auto moduleOp = loopOp.getParentOfType<mlir::ModuleOp>();
+    auto moduleOp = createNetworkOp.getParentOfType<mlir::ModuleOp>();
 
     auto mallocFunc = moduleOp.lookupSymbol<LLVM::LLVMFuncOp>("malloc");
     if (!mallocFunc) {
@@ -62,31 +61,26 @@ struct LoopLowering : public mlir::ConvertOpToLLVMPattern<abi::LoopOp> {
                                   /*isVarArg=*/false));
     }
 
-    rewriter.startRootUpdate(loopOp);
+    rewriter.startRootUpdate(createNetworkOp);
+    rewriter.setInsertionPoint(createNetworkOp);
 
-    // Rewrite the init region's terminator to build and return
-    // a pointer to a struct containing the information to be passed
-    // to exec() and fini().
-    //
-    // Start by figuring out the type of the network structure.
+    // Figure out the type of the network structure.
     mlir::SmallVector<LLVMType, 8> networkFieldTypes;
     mlir::SmallVector<mlir::Value, 8> networkFieldValues;
-    auto initTerminator = loopOp.getInitTerminator();
-    rewriter.setInsertionPoint(initTerminator);
-    for (auto srcValue : initTerminator.getOperands()) {
+    for (auto srcValue : createNetworkOp.getOperands()) {
       auto convValue = typeConverter.materializeTargetConversion(
-          rewriter, initTerminator.getLoc(),
+          rewriter, createNetworkOp.getLoc(),
           typeConverter.convertType(srcValue.getType()), srcValue);
       if (!convValue) {
-        rewriter.cancelRootUpdate(loopOp);
+        rewriter.cancelRootUpdate(createNetworkOp);
         return mlir::failure();
       }
       networkFieldTypes.emplace_back(convValue.getType().cast<LLVMType>());
       networkFieldValues.emplace_back(convValue);
     }
-    llvm::errs() << "After all materializations, loop: " << loopOp << "\n";
 
-    auto networkTy = LLVMType::getStructTy(ctx, networkFieldTypes);
+    auto networkTy =
+        LLVMType::getStructTy(rewriter.getContext(), networkFieldTypes);
 
     // Fill in a local stack copy of the network structure.
     auto initNetworkValue =
@@ -117,14 +111,40 @@ struct LoopLowering : public mlir::ConvertOpToLLVMPattern<abi::LoopOp> {
     rewriter.create<LLVM::StoreOp>(rewriter.getUnknownLoc(), initNetworkPtr,
                                    initNetworkValue);
 
-    // Finally, terminate the block, and remove the previous terminator.
+    // Add the new LLVM terminator, replacing the abi.create_network op.
     auto initReturn = rewriter.create<LLVM::ReturnOp>(
         rewriter.getUnknownLoc(), mlir::ValueRange{initNetworkPtr});
-    rewriter.eraseOp(initTerminator);
+    rewriter.eraseOp(createNetworkOp);
 
-    llvm::errs() << "After network rewrite, loop: " << loopOp << "\n";
+    rewriter.finalizeRootUpdate(createNetworkOp);
+    return mlir::success();
+  }
+};
+
+struct LoopOpLowering final : public mlir::ConvertOpToLLVMPattern<abi::LoopOp> {
+  using mlir::ConvertOpToLLVMPattern<abi::LoopOp>::ConvertOpToLLVMPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::Operation *op, mlir::ArrayRef<mlir::Value> operands,
+                  mlir::ConversionPatternRewriter &rewriter) const final {
+    llvm::DebugFlag = true;
+    auto loopOp = mlir::cast<abi::LoopOp>(op);
+
+    llvm::errs() << "Lowering loop: " << loopOp << "\n";
+
+    rewriter.startRootUpdate(loopOp);
+
+    mlir::SmallVector<LLVMType, 8> networkFieldTypes;
+    for (auto ty : loopOp.getNetworkFieldTypes()) {
+      networkFieldTypes.emplace_back(
+          typeConverter.convertType(ty).cast<LLVMType>());
+    }
+
+    auto networkTy =
+        LLVMType::getStructTy(rewriter.getContext(), networkFieldTypes);
 
     // Create plaidml_init().
+    rewriter.setInsertionPoint(loopOp);
     auto initArgTypes = loopOp.initRegion().getArgumentTypes();
     auto initFuncType = rewriter.getFunctionType(
         initArgTypes, mlir::TypeRange{networkTy.getPointerTo()});
@@ -136,8 +156,8 @@ struct LoopLowering : public mlir::ConvertOpToLLVMPattern<abi::LoopOp> {
     auto initFunc = rewriter.create<LLVM::LLVMFuncOp>(
         loopOp.getLoc(), pmlc::util::kPlaidmlInit, initLLVMType);
 
-    rewriter.inlineRegionBefore(loopOp.initRegion(), initFunc.getBody(),
-                                initFunc.getBody().end());
+    rewriter.cloneRegionBefore(loopOp.initRegion(), initFunc.getBody(),
+                               initFunc.getBody().end());
 
     if (mlir::failed(rewriter.convertRegionTypes(
             &initFunc.getBody(), typeConverter, &initSigConversion))) {
@@ -146,20 +166,37 @@ struct LoopLowering : public mlir::ConvertOpToLLVMPattern<abi::LoopOp> {
     }
 
     llvm::errs() << "Built plaidml_init: " << initFunc << "\n";
-#if 0
 
-    auto initFunc = rewriter.create<LLVM::LLVMFuncOp>(
-        loopOp.getLoc(), pmlc::util::kPlaidmlInit,
-        LLVMType::getFunctionTy(
-            networkTy.getPointerTo(),
-            mainFunc.getType().cast<LLVM::LLVMFunctionType>().getParams(),
-            /*isVarArg=*/false));
+    // Create plaidml_exec().
 
-    // The inputs to the exec function are the network object, followed by the
-    // raw buffer pointers of all inputs.
-    mlir::SmallVector<LLVMType, 8> execArgTypes;
+    // The inputs to the exec function are the network object, and a
+    // pointer to an struct, where each struct field is a pointer to
+    // the LLVM type of the corresponding entry block argument
+    // (the arguments after the arguments passed via the network structure).
+    mlir::SmallVector<LLVMType, 8> execInputTypes;
+    mlir::SmallVector<LLVMType, 8> execInputPtrTypes;
+    for (unsigned idx = loopOp.getNumNetworkFields();
+         idx < loopOp.bodyRegion().getNumArguments(); ++idx) {
+      auto ty = typeConverter
+                    .convertType(loopOp.bodyRegion().getArgument(idx).getType())
+                    .cast<LLVMType>();
+      execInputTypes.emplace_back(ty);
+      execInputPtrTypes.emplace_back(ty.getPointerTo());
+    }
+    auto execInputTy =
+        LLVMType::getStructTy(rewriter.getContext(), execInputPtrTypes);
+    mlir::SmallVector<LLVMType, 2> execArgTypes;
     execArgTypes.emplace_back(networkTy.getPointerTo());
+    execArgTypes.emplace_back(execInputTy.getPointerTo());
 
+    auto execFunc = rewriter.create<LLVM::LLVMFuncOp>(
+        loopOp.getLoc(), pmlc::util::kPlaidmlExec,
+        LLVMType::getFunctionTy(getVoidType(), execArgTypes,
+                                /*isVarArg=*/false));
+
+    llvm::errs() << "Initial plaidml_exec: " << execFunc << "\n";
+
+#if 0
     for (auto operand : loopOp.getOperation()->getOperands()) {
       auto ty = getTypeConverter()
                     ->convertType(operand.getType())
@@ -169,11 +206,6 @@ struct LoopLowering : public mlir::ConvertOpToLLVMPattern<abi::LoopOp> {
       }
       execArgTypes.emplace_back(ty.getPointerTo());
     }
-
-    auto execFunc = rewriter.create<LLVM::LLVMFuncOp>(
-        mainFunc.getLoc(), pmlc::util::kPlaidmlExec,
-        LLVMType::getFunctionTy(getVoidType(), execArgTypes,
-                                /*isVarArg=*/false));
 
     auto finiFunc = rewriter.create<LLVM::LLVMFuncOp>(
         mainFunc.getLoc(), pmlc::util::kPlaidmlFini,
@@ -385,7 +417,7 @@ struct LoopLowering : public mlir::ConvertOpToLLVMPattern<abi::LoopOp> {
 void populateABIToLLVMConversionPatterns(
     mlir::LLVMTypeConverter &converter,
     mlir::OwningRewritePatternList &patterns) {
-  patterns.insert<LoopLowering>(converter);
+  patterns.insert<CreateNetworkOpLowering, LoopOpLowering>(converter);
 }
 
 } // namespace pmlc::conversion::abi_to_llvm
