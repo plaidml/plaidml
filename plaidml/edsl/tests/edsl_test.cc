@@ -59,6 +59,43 @@ Tensor Softmax(Tensor X) {
   return E / N;
 }
 
+TEST_F(CppEdsl, BindDims) {
+  const int64_t M = 8;
+  const int64_t N = 32;
+  const int64_t K = 16;
+  auto A = Placeholder(DType::FLOAT32, {M, K});
+  auto B = Placeholder(DType::FLOAT32, {K, N});
+  auto C = Placeholder(DType::FLOAT32, {K, 0});
+
+  EXPECT_NO_THROW({ A.bind_dims(M, K); });
+  EXPECT_NO_THROW({ C.bind_dims(K, K); });
+  EXPECT_ANY_THROW({ A.bind_dims(0, 0); });
+
+  {
+    TensorDim D0, D1, D2;
+    EXPECT_NO_THROW({
+      A.bind_dims(D0, D1);
+      B.bind_dims(D1, D2);
+    });
+  }
+
+  {
+    TensorDim D0, D1, D2;
+    EXPECT_ANY_THROW({
+      A.bind_dims(D0, D1);
+      B.bind_dims(D0, D2);
+    });
+  }
+
+  {
+    TensorDim D0, D1, D2;
+    EXPECT_NO_THROW({
+      A.bind_dims(D0, D1);
+      C.bind_dims(D1, D2);
+    });
+  }
+}
+
 TEST_F(CppEdsl, HigherPrecisionConstants) {
   auto A = Placeholder(DType::FLOAT32, {3, 3});
   auto C = A + cast(Tensor{1}, DType::UINT64) + cast(Tensor{2.0}, DType::FLOAT64);
@@ -67,8 +104,8 @@ TEST_F(CppEdsl, HigherPrecisionConstants) {
   // clang-format off
   // CHECK-LABEL: CppEdsl.HigherPrecisionConstants
   // CHECK: module @higher_precision_constants
-  // CHECK: "eltwise.add"(%{{.*}}, %{{.*}}) : (tensor<3x3xf32>, tensor<ui64>) -> tensor<3x3xf32>
-  // CHECK: "eltwise.add"(%{{.*}}, %{{.*}}) : (tensor<3x3xf32>, tensor<f64>) -> tensor<3x3xf64>
+  // CHECK: tile.add %{{.*}}, %{{.*}} : (tensor<3x3xf32>, tensor<ui64>) -> tensor<3x3xf32>
+  // CHECK: tile.add %{{.*}}, %{{.*}} : (tensor<3x3xf32>, tensor<f64>) -> tensor<3x3xf64>
   // CHECK: return %{{.*}} : tensor<3x3xf64>
   // clang-format on
 
@@ -307,7 +344,7 @@ TEST_F(CppEdsl, ConstAdd) {
   // clang-format off
   // CHECK-LABEL: CppEdsl.ConstAdd
   // CHECK: module @const_add
-  // CHECK: "eltwise.add"(%{{.*}}, %{{.*}}) : (tensor<4xsi32>, tensor<4xsi32>) -> tensor<4xsi32>
+  // CHECK: tile.add %{{.*}}, %{{.*}} : (tensor<4xsi32>, tensor<4xsi32>) -> tensor<4xsi32>
   // CHECK: return %{{.*}} : tensor<4xsi32>
   // clang-format on
 
@@ -330,12 +367,11 @@ TEST_F(CppEdsl, Dot) {
   auto B = Placeholder(DType::FLOAT32, {K, N});
   auto C = Dot(A, B);
   auto program = makeProgram("dot", {A, B}, {C});
-  IVLOG(3, "program: \n" << program.str());
 
   // clang-format off
   // CHECK-LABEL: CppEdsl.Dot
   // CHECK: module @dot
-  // CHECK: %[[cst:.*]] = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> tensor<f32>
+  // CHECK: %[[cst:.*]] = tile.constant(0.000000e+00 : f64) : tensor<f32>
   // CHECK: %[[cion:.*]] = tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {{{.*}}}
   // CHECK-SAME: tensor<f32>, tensor<8x16xf32>, tensor<16x32xf32> -> tensor<8x32xf32>
   // CHECK: return %[[cion]] : tensor<8x32xf32>
@@ -375,7 +411,7 @@ TEST_F(CppEdsl, DotF16) {
   // clang-format off
   // CHECK-LABEL: CppEdsl.DotF16
   // CHECK: module @dot_f16
-  // CHECK: %[[cst:.*]] = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> tensor<f16>
+  // CHECK: %[[cst:.*]] = tile.constant(0.000000e+00 : f64) : tensor<f16>
   // CHECK: %[[cion:.*]] = tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {{{.*}}}
   // CHECK-SAME: tensor<f16>, tensor<8x16xf16>, tensor<16x32xf16> -> tensor<8x32xf16>
   // CHECK: return %[[cion]] : tensor<8x32xf16>
@@ -430,7 +466,7 @@ TEST_F(CppEdsl, DoubleDot) {
   // CHECK-LABEL: CppEdsl.DoubleDot
   // CHECK: module @double_dot
   // CHECK: -> tensor<10x40xf32> {
-  // CHECK: %[[cst:.*]] = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> tensor<f32>
+  // CHECK: %[[cst:.*]] = tile.constant(0.000000e+00 : f64) : tensor<f32>
   // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : tensor<f32>, tensor<10x20xf32>, tensor<20x30xf32> -> tensor<10x30xf32>
   // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : tensor<f32>, tensor<10x30xf32>, tensor<30x40xf32> -> tensor<10x40xf32>
   // CHECK: return %{{.*}} : tensor<10x40xf32>
@@ -473,7 +509,7 @@ TEST_F(CppEdsl, EltwiseAdd) {
   // clang-format off
   // CHECK-LABEL: CppEdsl.EltwiseAdd
   // CHECK: module @eltwise_add
-  // CHECK: "eltwise.add"(%{{.*}}, %{{.*}}) : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
+  // CHECK: tile.add %{{.*}}, %{{.*}} : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
   // CHECK: return %{{.*}} : tensor<10x20xf32>
   // clang-format on
   runProgram(program);
@@ -488,7 +524,7 @@ TEST_F(CppEdsl, EltwiseMod) {
   // clang-format off
   // CHECK-LABEL: CppEdsl.EltwiseMod
   // CHECK: module @mod
-  // CHECK: "eltwise.mod"(%{{.*}}, %{{.*}}) : (tensor<3x3xsi32>, tensor<3x3xsi32>) -> tensor<3x3xsi32>
+  // CHECK: tile.mod %{{.*}}, %{{.*}} : (tensor<3x3xsi32>, tensor<3x3xsi32>) -> tensor<3x3xsi32>
   // CHECK: return %{{.*}} : tensor<3x3xsi32>
   // clang-format on
 
@@ -510,9 +546,9 @@ TEST_F(CppEdsl, Relu) {
   // clang-format off
   // CHECK-LABEL: CppEdsl.Relu
   // CHECK: module @relu
-  // CHECK: %[[cst:.*]] = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> tensor<f32>
-  // CHECK: "eltwise.cmp_lt"(%{{.*}}, %[[cst]]) : (tensor<10x20xf32>, tensor<f32>) -> tensor<10x20xi1>
-  // CHECK: "eltwise.select"(%{{.*}}, %[[cst]], %{{.*}}) : (tensor<10x20xi1>, tensor<f32>, tensor<10x20xf32>) -> tensor<10x20xf32>
+  // CHECK: %[[cst:.*]] = tile.constant(0.000000e+00 : f64) : tensor<f32>
+  // CHECK: tile.cmp_lt %{{.*}}, %[[cst]] : (tensor<10x20xf32>, tensor<f32>) -> tensor<10x20xi1>
+  // CHECK: tile.select %{{.*}}, %[[cst]], %{{.*}} : (tensor<10x20xi1>, tensor<f32>, tensor<10x20xf32>) -> tensor<10x20xf32>
   // CHECK: return %{{.*}} : tensor<10x20xf32>
   // clang-format on
   runProgram(program);
@@ -536,34 +572,38 @@ TEST_F(CppEdsl, MnistMlp) {
   // clang-format off
   // CHECK-LABEL: CppEdsl.MnistMlp
   // CHECK: module @mnist_mlp
-  // CHECK-DAG: %[[cst:.*]] = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> tensor<f32>
-  // CHECK-DAG: %[[cst0:.*]] = "eltwise.sconst"() {value = 0xFFF0000000000000 : f64} : () -> tensor<f32>
+  // CHECK-DAG: %[[cst:.*]] = tile.constant(0.000000e+00 : f64) : tensor<f32>
+  // CHECK-DAG: %[[cst0:.*]] = tile.constant(0xFFF0000000000000 : f64) : tensor<f32>
   // CHECK: %[[X0:.*]] = tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : tensor<f32>, tensor<1x784xf32>, tensor<784x512xf32> -> tensor<1x512xf32>
-  // CHECK: %[[X1:.*]] = "eltwise.add"(%{{.*}}, %{{.*}}) : (tensor<1x512xf32>, tensor<512xf32>) -> tensor<1x512xf32>
-  // CHECK: %[[X2:.*]] = "eltwise.cmp_lt"(%{{.*}}, %[[cst]]) : (tensor<1x512xf32>, tensor<f32>) -> tensor<1x512xi1>
-  // CHECK: %[[X3:.*]] = "eltwise.select"(%{{.*}}, %[[cst]], %{{.*}}) : (tensor<1x512xi1>, tensor<f32>, tensor<1x512xf32>) -> tensor<1x512xf32>
+  // CHECK: %[[X1:.*]] = tile.add %{{.*}}, %{{.*}} : (tensor<1x512xf32>, tensor<512xf32>) -> tensor<1x512xf32>
+  // CHECK: %[[X2:.*]] = tile.cmp_lt %{{.*}}, %[[cst]] : (tensor<1x512xf32>, tensor<f32>) -> tensor<1x512xi1>
+  // CHECK: %[[X3:.*]] = tile.select %{{.*}}, %[[cst]], %{{.*}} : (tensor<1x512xi1>, tensor<f32>, tensor<1x512xf32>) -> tensor<1x512xf32>
   // CHECK: %[[X4:.*]] = tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : tensor<f32>, tensor<1x512xf32>, tensor<512x512xf32> -> tensor<1x512xf32>
-  // CHECK: %[[X5:.*]] = "eltwise.add"(%{{.*}}, %{{.*}}) : (tensor<1x512xf32>, tensor<512xf32>) -> tensor<1x512xf32>
-  // CHECK: %[[X6:.*]] = "eltwise.cmp_lt"(%{{.*}}, %[[cst]]) : (tensor<1x512xf32>, tensor<f32>) -> tensor<1x512xi1>
-  // CHECK: %[[X7:.*]] = "eltwise.select"(%{{.*}}, %[[cst]], %{{.*}}) : (tensor<1x512xi1>, tensor<f32>, tensor<1x512xf32>) -> tensor<1x512xf32>
+  // CHECK: %[[X5:.*]] = tile.add %{{.*}}, %{{.*}} : (tensor<1x512xf32>, tensor<512xf32>) -> tensor<1x512xf32>
+  // CHECK: %[[X6:.*]] = tile.cmp_lt %{{.*}}, %[[cst]] : (tensor<1x512xf32>, tensor<f32>) -> tensor<1x512xi1>
+  // CHECK: %[[X7:.*]] = tile.select %{{.*}}, %[[cst]], %{{.*}} : (tensor<1x512xi1>, tensor<f32>, tensor<1x512xf32>) -> tensor<1x512xf32>
   // CHECK: %[[X8:.*]] = tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : tensor<f32>, tensor<1x512xf32>, tensor<512x10xf32> -> tensor<1x10xf32>
-  // CHECK: %[[X9:.*]] = "eltwise.add"(%{{.*}}, %{{.*}}) : (tensor<1x10xf32>, tensor<10xf32>) -> tensor<1x10xf32>
+  // CHECK: %[[X9:.*]] = tile.add %{{.*}}, %{{.*}} : (tensor<1x10xf32>, tensor<10xf32>) -> tensor<1x10xf32>
   // CHECK: %[[X10:.*]] = tile.contract max, none, %[[cst0]], %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}]} : tensor<f32>, tensor<1x10xf32> -> tensor<1x1xf32>
-  // CHECK: %[[X11:.*]] = "eltwise.sub"(%{{.*}}, %{{.*}}) : (tensor<1x10xf32>, tensor<1x1xf32>) -> tensor<1x10xf32>
-  // CHECK: %[[X12:.*]] = "eltwise.exp"(%{{.*}}) : (tensor<1x10xf32>) -> tensor<1x10xf32>
+  // CHECK: %[[X11:.*]] = tile.sub %{{.*}}, %{{.*}} : (tensor<1x10xf32>, tensor<1x1xf32>) -> tensor<1x10xf32>
+  // CHECK: %[[X12:.*]] = tile.exp %{{.*}} : (tensor<1x10xf32>) -> tensor<1x10xf32>
   // CHECK: %[[X13:.*]] = tile.contract add, none, %[[cst]], %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}]} : tensor<f32>, tensor<1x10xf32> -> tensor<1x1xf32>
-  // CHECK: %[[X14:.*]] = "eltwise.div"(%{{.*}}, %{{.*}}) : (tensor<1x10xf32>, tensor<1x1xf32>) -> tensor<1x10xf32>
+  // CHECK: %[[X14:.*]] = tile.div %{{.*}}, %{{.*}} : (tensor<1x10xf32>, tensor<1x1xf32>) -> tensor<1x10xf32>
   // CHECK: return %{{.*}} : tensor<1x10xf32>
   // clang-format on
   runProgram(program);
 }
 
-Tensor Convolution2(Tensor I, Tensor K) {
+Tensor Convolution2(Tensor I, Tensor K, const std::string& I_layout = "NHWC", const std::string& K_layout = "HWCK") {
+  TensorLens I_lens(I_layout, "NHWC");
+  TensorLens K_lens(K_layout, "HWCK");
+  I = I.use(I_lens);
+  K = K.use(K_lens);
   TensorDim CI, CO, K0, K1, N, X0, X1;
   TensorIndex n, x0, x1, co, ci, k0, k1;
   I.bind_dims(N, X0, X1, CI);
   K.bind_dims(K0, K1, CI, CO);
-  return Contraction()
+  return Contraction(I_lens)
       .outShape(N, X0, X1, CO)
       .outAccess(n, x0, x1, co)
       .sum(I(n, x0 + k0 - (K0 / 2), x1 + k1 - (K1 / 2), ci) * K(k0, k1, ci, co));
@@ -576,7 +616,7 @@ TEST_F(CppEdsl, Convolution) {
   // clang-format off
   // CHECK-LABEL: CppEdsl.Convolution
   // CHECK: module @convolution
-  // CHECK: %[[cst:.*]] = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> tensor<f32>
+  // CHECK: %[[cst:.*]] = tile.constant(0.000000e+00 : f64) : tensor<f32>
   // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : tensor<f32>, tensor<1x56x56x64xf32>, tensor<3x3x64x64xf32> -> tensor<1x56x56x64xf32>
   // CHECK: return %{{.*}} : tensor<1x56x56x64xf32>
   // clang-format on
@@ -637,29 +677,29 @@ TEST_F(CppEdsl, MnistCnn) {
   // clang-format off
   // CHECK-LABEL: CppEdsl.MnistCnn
   // CHECK: module @mnist_cnn
-  // CHECK-DAG: %[[cst:.*]] = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> tensor<f32>
-  // CHECK-DAG: %[[cst_0:.*]] = "eltwise.sconst"() {value = 0xFFF0000000000000 : f64} : () -> tensor<f32>
+  // CHECK-DAG: %[[cst:.*]] = tile.constant(0.000000e+00 : f64) : tensor<f32>
+  // CHECK-DAG: %[[cst_0:.*]] = tile.constant(0xFFF0000000000000 : f64) : tensor<f32>
   // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : tensor<f32>, tensor<1x224x224x1xf32>, tensor<3x3x1x32xf32> -> tensor<1x224x224x32xf32>
-  // CHECK: "eltwise.add"(%{{.*}}, %{{.*}}) : (tensor<1x224x224x32xf32>, tensor<32xf32>) -> tensor<1x224x224x32xf32>
-  // CHECK: "eltwise.cmp_lt"(%{{.*}}, %[[cst]]) : (tensor<1x224x224x32xf32>, tensor<f32>) -> tensor<1x224x224x32xi1>
-  // CHECK: "eltwise.select"(%{{.*}}, %[[cst]], %{{.*}}) : (tensor<1x224x224x32xi1>, tensor<f32>, tensor<1x224x224x32xf32>) -> tensor<1x224x224x32xf32>
+  // CHECK: tile.add %{{.*}}, %{{.*}} : (tensor<1x224x224x32xf32>, tensor<32xf32>) -> tensor<1x224x224x32xf32>
+  // CHECK: tile.cmp_lt %{{.*}}, %[[cst]] : (tensor<1x224x224x32xf32>, tensor<f32>) -> tensor<1x224x224x32xi1>
+  // CHECK: tile.select %{{.*}}, %[[cst]], %{{.*}} : (tensor<1x224x224x32xi1>, tensor<f32>, tensor<1x224x224x32xf32>) -> tensor<1x224x224x32xf32>
   // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : tensor<f32>, tensor<1x224x224x32xf32>, tensor<3x3x32x64xf32> -> tensor<1x224x224x64xf32>
-  // CHECK: "eltwise.add"(%{{.*}}, %{{.*}}) : (tensor<1x224x224x64xf32>, tensor<64xf32>) -> tensor<1x224x224x64xf32>
-  // CHECK: "eltwise.cmp_lt"(%{{.*}}, %[[cst]]) : (tensor<1x224x224x64xf32>, tensor<f32>) -> tensor<1x224x224x64xi1>
-  // CHECK: "eltwise.select"(%{{.*}}, %[[cst]], %{{.*}}) : (tensor<1x224x224x64xi1>, tensor<f32>, tensor<1x224x224x64xf32>) -> tensor<1x224x224x64xf32>
+  // CHECK: tile.add %{{.*}}, %{{.*}} : (tensor<1x224x224x64xf32>, tensor<64xf32>) -> tensor<1x224x224x64xf32>
+  // CHECK: tile.cmp_lt %{{.*}}, %[[cst]] : (tensor<1x224x224x64xf32>, tensor<f32>) -> tensor<1x224x224x64xi1>
+  // CHECK: tile.select %{{.*}}, %[[cst]], %{{.*}} : (tensor<1x224x224x64xi1>, tensor<f32>, tensor<1x224x224x64xf32>) -> tensor<1x224x224x64xf32>
   // CHECK: tile.contract max, none, %[[cst_0]], %{{.*}} {cons = #set{{[0-9]+}}, sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}]} : tensor<f32>, tensor<1x224x224x64xf32> -> tensor<1x112x112x64xf32>
   // CHECK: tile.reshape %{{.*}} : (tensor<1x112x112x64xf32>) -> tensor<1x12544xf32>
   // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : tensor<f32>, tensor<1x12544xf32>, tensor<12544x128xf32> -> tensor<1x128xf32>
-  // CHECK: "eltwise.add"(%{{.*}}, %{{.*}}) : (tensor<1x128xf32>, tensor<128xf32>) -> tensor<1x128xf32>
-  // CHECK: "eltwise.cmp_lt"(%{{.*}}, %[[cst]]) : (tensor<1x128xf32>, tensor<f32>) -> tensor<1x128xi1>
-  // CHECK: "eltwise.select"(%{{.*}}, %[[cst]], %{{.*}}) : (tensor<1x128xi1>, tensor<f32>, tensor<1x128xf32>) -> tensor<1x128xf32>
+  // CHECK: tile.add %{{.*}}, %{{.*}} : (tensor<1x128xf32>, tensor<128xf32>) -> tensor<1x128xf32>
+  // CHECK: tile.cmp_lt %{{.*}}, %[[cst]] : (tensor<1x128xf32>, tensor<f32>) -> tensor<1x128xi1>
+  // CHECK: tile.select %{{.*}}, %[[cst]], %{{.*}} : (tensor<1x128xi1>, tensor<f32>, tensor<1x128xf32>) -> tensor<1x128xf32>
   // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : tensor<f32>, tensor<1x128xf32>, tensor<128x100xf32> -> tensor<1x100xf32>
-  // CHECK: "eltwise.add"(%{{.*}}, %{{.*}}) : (tensor<1x100xf32>, tensor<100xf32>) -> tensor<1x100xf32>
+  // CHECK: tile.add %{{.*}}, %{{.*}} : (tensor<1x100xf32>, tensor<100xf32>) -> tensor<1x100xf32>
   // CHECK: tile.contract max, none,  %[[cst_0]], %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}]} : tensor<f32>, tensor<1x100xf32> -> tensor<1x1xf32>
-  // CHECK: "eltwise.sub"(%{{.*}}, %{{.*}}) : (tensor<1x100xf32>, tensor<1x1xf32>) -> tensor<1x100xf32>
-  // CHECK: "eltwise.exp"(%{{.*}}) : (tensor<1x100xf32>) -> tensor<1x100xf32>
+  // CHECK: tile.sub %{{.*}}, %{{.*}} : (tensor<1x100xf32>, tensor<1x1xf32>) -> tensor<1x100xf32>
+  // CHECK: tile.exp %{{.*}} : (tensor<1x100xf32>) -> tensor<1x100xf32>
   // CHECK: tile.contract add, none, %[[cst]], %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}]} : tensor<f32>, tensor<1x100xf32> -> tensor<1x1xf32>
-  // CHECK: "eltwise.div"(%{{.*}}, %{{.*}}) : (tensor<1x100xf32>, tensor<1x1xf32>) -> tensor<1x100xf32>
+  // CHECK: tile.div %{{.*}}, %{{.*}} : (tensor<1x100xf32>, tensor<1x1xf32>) -> tensor<1x100xf32>
   // CHECK: return %{{.*}} : tensor<1x100xf32>
   // clang-format on
   runProgram(program);
@@ -699,27 +739,27 @@ TEST_F(CppEdsl, LarsMomentum4d) {
   // clang-format off
   // CHECK-LABEL: CppEdsl.LarsMomentum4d
   // CHECK: module @lars_momentum4d
-  // CHECK: "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> tensor<f32>
-  // CHECK: "eltwise.sconst"() {value = 1.250000e-01 : f64} : () -> tensor<f32>
-  // CHECK: "eltwise.sconst"() {value = 9.765625E-4 : f64} : () -> tensor<f32>
-  // CHECK: "eltwise.sconst"() {value = 4.8828125E-4 : f64} : () -> tensor<f32>
-  // CHECK: "eltwise.mul"(%{{.*}}, %{{.*}}) : (tensor<4x7x3x9xf32>, tensor<f32>) -> tensor<4x7x3x9xf32>
-  // CHECK: "eltwise.mul"(%{{.*}}, %{{.*}}) : (tensor<f32>, tensor<f32>) -> tensor<f32>
-  // CHECK: "eltwise.mul"(%{{.*}}, %{{.*}}) : (tensor<4x7x3x9xf32>, tensor<4x7x3x9xf32>) -> tensor<4x7x3x9xf32>
+  // CHECK: tile.constant(0.000000e+00 : f64) : tensor<f32>
+  // CHECK: tile.constant(1.250000e-01 : f64) : tensor<f32>
+  // CHECK: tile.constant(9.765625E-4 : f64) : tensor<f32>
+  // CHECK: tile.constant(4.8828125E-4 : f64) : tensor<f32>
+  // CHECK: tile.mul %{{.*}}, %{{.*}} : (tensor<4x7x3x9xf32>, tensor<f32>) -> tensor<4x7x3x9xf32>
+  // CHECK: tile.mul %{{.*}}, %{{.*}} : (tensor<f32>, tensor<f32>) -> tensor<f32>
+  // CHECK: tile.mul %{{.*}}, %{{.*}} : (tensor<4x7x3x9xf32>, tensor<4x7x3x9xf32>) -> tensor<4x7x3x9xf32>
   // CHECK: tile.contract add, none, %{{.*}}, %{{.*}} {sink = #{{.*}}, srcs = [#{{.*}}]} : tensor<f32>, tensor<4x7x3x9xf32> -> tensor<f32>
-  // CHECK: "eltwise.sqrt"(%{{.*}}) : (tensor<f32>) -> tensor<f32>
-  // CHECK: "eltwise.mul"(%{{.*}}, %{{.*}}) : (tensor<f32>, tensor<f32>) -> tensor<f32>
-  // CHECK: "eltwise.mul"(%{{.*}}, %{{.*}}) : (tensor<4x7x3x9xf32>, tensor<4x7x3x9xf32>) -> tensor<4x7x3x9xf32>
+  // CHECK: tile.sqrt %{{.*}} : (tensor<f32>) -> tensor<f32>
+  // CHECK: tile.mul %{{.*}}, %{{.*}} : (tensor<f32>, tensor<f32>) -> tensor<f32>
+  // CHECK: tile.mul %{{.*}}, %{{.*}} : (tensor<4x7x3x9xf32>, tensor<4x7x3x9xf32>) -> tensor<4x7x3x9xf32>
   // CHECK: tile.contract add, none, %{{.*}}, %{{.*}} {sink = #{{.*}}, srcs = [#{{.*}}]} : tensor<f32>, tensor<4x7x3x9xf32> -> tensor<f32>
-  // CHECK: "eltwise.sqrt"(%{{.*}}) : (tensor<f32>) -> tensor<f32>
-  // CHECK: "eltwise.mul"(%{{.*}}, %{{.*}}) : (tensor<f32>, tensor<f32>) -> tensor<f32>
-  // CHECK: "eltwise.add"(%{{.*}}, %{{.*}}) : (tensor<f32>, tensor<f32>) -> tensor<f32>
-  // CHECK: "eltwise.div"(%{{.*}}, %{{.*}}) : (tensor<f32>, tensor<f32>) -> tensor<f32>
-  // CHECK: "eltwise.mul"(%{{.*}}, %{{.*}}) : (tensor<4x7x3x9xf32>, tensor<f32>) -> tensor<4x7x3x9xf32>
-  // CHECK: "eltwise.add"(%{{.*}}, %{{.*}}) : (tensor<4x7x3x9xf32>, tensor<4x7x3x9xf32>) -> tensor<4x7x3x9xf32>
-  // CHECK: "eltwise.mul"(%{{.*}}, %{{.*}}) : (tensor<f32>, tensor<4x7x3x9xf32>) -> tensor<4x7x3x9xf32>
-  // CHECK: "eltwise.add"(%{{.*}}, %{{.*}}) : (tensor<4x7x3x9xf32>, tensor<4x7x3x9xf32>) -> tensor<4x7x3x9xf32>
-  // CHECK: "eltwise.sub"(%{{.*}}, %{{.*}}) : (tensor<4x7x3x9xf32>, tensor<4x7x3x9xf32>) -> tensor<4x7x3x9xf32>
+  // CHECK: tile.sqrt %{{.*}} : (tensor<f32>) -> tensor<f32>
+  // CHECK: tile.mul %{{.*}}, %{{.*}} : (tensor<f32>, tensor<f32>) -> tensor<f32>
+  // CHECK: tile.add %{{.*}}, %{{.*}} : (tensor<f32>, tensor<f32>) -> tensor<f32>
+  // CHECK: tile.div %{{.*}}, %{{.*}} : (tensor<f32>, tensor<f32>) -> tensor<f32>
+  // CHECK: tile.mul %{{.*}}, %{{.*}} : (tensor<4x7x3x9xf32>, tensor<f32>) -> tensor<4x7x3x9xf32>
+  // CHECK: tile.add %{{.*}}, %{{.*}} : (tensor<4x7x3x9xf32>, tensor<4x7x3x9xf32>) -> tensor<4x7x3x9xf32>
+  // CHECK: tile.mul %{{.*}}, %{{.*}} : (tensor<f32>, tensor<4x7x3x9xf32>) -> tensor<4x7x3x9xf32>
+  // CHECK: tile.add %{{.*}}, %{{.*}} : (tensor<4x7x3x9xf32>, tensor<4x7x3x9xf32>) -> tensor<4x7x3x9xf32>
+  // CHECK: tile.sub %{{.*}}, %{{.*}} : (tensor<4x7x3x9xf32>, tensor<4x7x3x9xf32>) -> tensor<4x7x3x9xf32>
   // CHECK: return %{{.*}}, %{{.*}} : tensor<4x7x3x9xf32>, tensor<4x7x3x9xf32>
   // clang-format on
   runProgram(program);
@@ -739,7 +779,7 @@ TEST_F(CppEdsl, RepeatElements) {
   // clang-format off
   // CHECK-LABEL: CppEdsl.RepeatElements
   // CHECK: module @repeat_elts
-  // CHECK: %[[cst:.*]] = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> tensor<f32>
+  // CHECK: %[[cst:.*]] = tile.constant(0.000000e+00 : f64) : tensor<f32>
   // CHECK: tile.contract assign, none, %[[cst]], %{{.*}} {cons = #set{{[0-9]+}}, sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}]} : tensor<f32>, tensor<10x10x10xf32> -> tensor<10x30x10xf32>
   // CHECK: return %{{.*}} : tensor<10x30x10xf32>
   // clang-format on
@@ -773,9 +813,9 @@ TEST_F(CppEdsl, UniqueNames) {
   // clang-format off
   // CHECK-LABEL: CppEdsl.UniqueNames
   // CHECK: module @unique_names
-  // CHECK: "eltwise.add"(%{{.*}}, %{{.*}}) : (tensor<1xf32>, tensor<1xf32>) -> tensor<1xf32>
-  // CHECK: "eltwise.add"(%{{.*}}, %{{.*}}) : (tensor<1xf32>, tensor<1xf32>) -> tensor<1xf32>
-  // CHECK: "eltwise.add"(%{{.*}}, %{{.*}}) : (tensor<1xf32>, tensor<1xf32>) -> tensor<1xf32>
+  // CHECK: tile.add %{{.*}}, %{{.*}} : (tensor<1xf32>, tensor<1xf32>) -> tensor<1xf32>
+  // CHECK: tile.add %{{.*}}, %{{.*}} : (tensor<1xf32>, tensor<1xf32>) -> tensor<1xf32>
+  // CHECK: tile.add %{{.*}}, %{{.*}} : (tensor<1xf32>, tensor<1xf32>) -> tensor<1xf32>
   // CHECK: return %{{.*}} : tensor<1xf32>
   // clang-format on
   runProgram(program);
@@ -790,10 +830,10 @@ TEST_F(CppEdsl, GlobalMin) {
   // clang-format off
   // CHECK-LABEL: CppEdsl.GlobalMin
   // CHECK: module @global_min
-  // CHECK: %[[cst:.*]] = "eltwise.sconst"() {value = 0xFFF0000000000000 : f64} : () -> tensor<f32>
-  // CHECK: "eltwise.neg"(%{{.*}}) : (tensor<10x10x10xf32>) -> tensor<10x10x10xf32>
+  // CHECK: %[[cst:.*]] = tile.constant(0xFFF0000000000000 : f64) : tensor<f32>
+  // CHECK: tile.neg %{{.*}} : (tensor<10x10x10xf32>) -> tensor<10x10x10xf32>
   // CHECK: tile.contract max, none, %[[cst]], %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}]} : tensor<f32>, tensor<10x10x10xf32> -> tensor<f32>
-  // CHECK: "eltwise.neg"(%{{.*}}) : (tensor<f32>) -> tensor<f32>
+  // CHECK: tile.neg %{{.*}} : (tensor<f32>) -> tensor<f32>
   // CHECK: return %{{.*}} : tensor<f32>
   // clang-format on
   runProgram(program);
@@ -809,7 +849,7 @@ TEST_F(CppEdsl, CumSum) {
   // clang-format off
   // CHECK-LABEL: CppEdsl.CumSum
   // CHECK: module @cumsum
-  // CHECK: %[[cst:.*]] = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> tensor<f32>
+  // CHECK: %[[cst:.*]] = tile.constant(0.000000e+00 : f64) : tensor<f32>
   // CHECK: tile.contract add, none, %[[cst]], %{{.*}} {cons = #set{{[0-9]+}}, sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}]} : tensor<f32>, tensor<10xf32> -> tensor<10xf32>
   // CHECK: return %{{.*}} : tensor<10xf32>
   // clang-format on
@@ -860,7 +900,7 @@ TEST_F(CppEdsl, ComplexConv2d) {
   // clang-format off
   // CHECK-LABEL: CppEdsl.ComplexConv2d
   // CHECK: module @complex_conv_2d
-  // CHECK: %[[cst:.*]] = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> tensor<f32>
+  // CHECK: %[[cst:.*]] = tile.constant(0.000000e+00 : f64) : tensor<f32>
   // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : tensor<f32>, tensor<1x224x224x3x3xf32>, tensor<3x3x3x3x32xf32> -> tensor<1x112x112x3x32xf32>
   // CHECK: return %{{.*}} : tensor<1x112x112x3x32xf32>
   // clang-format on
@@ -874,8 +914,8 @@ TEST_F(CppEdsl, Reciprocal) {
   // clang-format off
   // CHECK-LABEL: CppEdsl.Reciprocal
   // CHECK: module @reciprocal
-  // CHECK: %[[cst:.*]] = "eltwise.sconst"() {value = 1.000000e+00 : f64} : () -> tensor<f32>
-  // CHECK: "eltwise.div"(%[[cst]], %{{.*}}) : (tensor<f32>, tensor<6xf32>) -> tensor<6xf32>
+  // CHECK: %[[cst:.*]] = tile.constant(1.000000e+00 : f64) : tensor<f32>
+  // CHECK: tile.div %[[cst]], %{{.*}} : (tensor<f32>, tensor<6xf32>) -> tensor<6xf32>
   // CHECK: return %{{.*}} : tensor<6xf32>
   // clang-format on
   std::vector<float> input = {1, 2, 4, 5, 8, 10};
@@ -890,7 +930,7 @@ TEST_F(CppEdsl, ReshapeFold) {
   // clang-format off
   // CHECK-LABEL: CppEdsl.ReshapeFold
   // CHECK: module @reshape_fold
-  // CHECK: %[[X0:.*]] = "eltwise.ident"(%{{.*}}) : (tensor<3x3xsi32>) -> tensor<3x3xsi32>
+  // CHECK: %[[X0:.*]] = tile.ident %{{.*}} : (tensor<3x3xsi32>) -> tensor<3x3xsi32>
   // CHECK-NEXT: return %[[X0]]
   // clang-format on
   std::vector<int32_t> input = {
@@ -909,7 +949,7 @@ TEST_F(CppEdsl, ReshapeScalar) {
   // clang-format off
   // CHECK-LABEL: CppEdsl.ReshapeScalar
   // CHECK: module @reshape_scalar
-  // CHECK: %[[X0:.*]] = "eltwise.ident"(%{{.*}}) : (tensor<si32>) -> tensor<si32>
+  // CHECK: %[[X0:.*]] = tile.ident %{{.*}} : (tensor<si32>) -> tensor<si32>
   // CHECK-NEXT: return %[[X0]] : tensor<si32>
   // clang-format on
   std::vector<int32_t> data = {2};
@@ -925,7 +965,7 @@ TEST_F(CppEdsl, ReshapeIntoScalar) {
   // CHECK-LABEL: CppEdsl.ReshapeIntoScalar
   // CHECK: module @reshape_into_scalar
   // CHECK:      %[[X0:.*]] = tile.reshape %{{.*}} : (tensor<1x1x1xsi32>) -> tensor<si32>
-  // CHECK-NEXT: %[[X1:.*]] = "eltwise.ident"(%[[X0]]) : (tensor<si32>) -> tensor<si32>
+  // CHECK-NEXT: %[[X1:.*]] = tile.ident %[[X0]] : (tensor<si32>) -> tensor<si32>
   // CHECK-NEXT: return %[[X1]] : tensor<si32>
   // clang-format on
 
@@ -942,7 +982,7 @@ TEST_F(CppEdsl, ReshapeFromScalar) {
   // CHECK-LABEL: CppEdsl.ReshapeFromScalar
   // CHECK: module @reshape_from_scalar
   // CHECK:      %[[X0:.*]] = tile.reshape %{{.*}} : (tensor<si32>) -> tensor<1x1x1xsi32>
-  // CHECK-NEXT: %[[X1:.*]] = "eltwise.ident"(%[[X0]]) : (tensor<1x1x1xsi32>) -> tensor<1x1x1xsi32>
+  // CHECK-NEXT: %[[X1:.*]] = tile.ident %[[X0]] : (tensor<1x1x1xsi32>) -> tensor<1x1x1xsi32>
   // CHECK-NEXT: return %[[X1]] : tensor<1x1x1xsi32>
   // clang-format on
   std::vector<int32_t> data = {2};
@@ -963,7 +1003,7 @@ TEST_F(CppEdsl, DefractLong) {
   // clang-format off
   // CHECK-LABEL: CppEdsl.DefractLong
   // CHECK: module @defract_long
-  // CHECK: %[[cst:.*]] = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> tensor<f32>
+  // CHECK: %[[cst:.*]] = tile.constant(0.000000e+00 : f64) : tensor<f32>
   // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : tensor<f32>, tensor<1x3x3x1xf32>, tensor<1x3x3x1xf32> -> tensor<1x5x5x1xf32>
   // CHECK: return %{{.*}} : tensor<1x5x5x1xf32>
   // clang-format on
@@ -978,11 +1018,11 @@ TEST_F(CppEdsl, DupOut) {
   auto program = makeProgram("dup_out", {A, B, C}, {R, R, R});
   // clang-format off
   // CHECK: module @dup_out
-  // CHECK: %[[cst:.*]] = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> tensor<f32>
+  // CHECK: %[[cst:.*]] = tile.constant(0.000000e+00 : f64) : tensor<f32>
   // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : tensor<f32>, tensor<10x20xf32>, tensor<20x30xf32> -> tensor<10x30xf32>
   // CHECK: %[[out:.*]] = tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : tensor<f32>, tensor<10x30xf32>, tensor<30x40xf32> -> tensor<10x40xf32>
-  // CHECK: %[[i2:.*]] = "eltwise.ident"(%[[out]]) : (tensor<10x40xf32>) -> tensor<10x40xf32>
-  // CHECK: %[[i3:.*]] = "eltwise.ident"(%[[out]]) : (tensor<10x40xf32>) -> tensor<10x40xf32>
+  // CHECK: %[[i2:.*]] = tile.ident %[[out]] : (tensor<10x40xf32>) -> tensor<10x40xf32>
+  // CHECK: %[[i3:.*]] = tile.ident %[[out]] : (tensor<10x40xf32>) -> tensor<10x40xf32>
   // CHECK: return %[[out]], %[[i2]], %[[i3]] : tensor<10x40xf32>, tensor<10x40xf32>, tensor<10x40xf32>
   // clang-format on
   runProgram(program);
@@ -997,10 +1037,10 @@ TEST_F(CppEdsl, Select) {
   // clang-format off
   // CHECK-LABEL: CppEdsl.Select
   // CHECK: module @select
-  // CHECK-DAG: %[[fp1:.*]] = "eltwise.sconst"() {value = 1.000000e+00 : f64} : () -> tensor<f32>
-  // CHECK-DAG: %[[fp0:.*]] = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> tensor<f32>
-  // CHECK: "eltwise.cmp_eq"(%{{.*}}, %[[fp0]]) : (tensor<10x20xf32>, tensor<f32>) -> tensor<10x20xi1>
-  // CHECK: "eltwise.select"(%{{.*}}, %[[fp0]], %[[fp1]]) : (tensor<10x20xi1>, tensor<f32>, tensor<f32>) -> tensor<10x20xf32>
+  // CHECK-DAG: %[[fp1:.*]] = tile.constant(1.000000e+00 : f64) : tensor<f32>
+  // CHECK-DAG: %[[fp0:.*]] = tile.constant(0.000000e+00 : f64) : tensor<f32>
+  // CHECK: tile.cmp_eq %{{.*}}, %[[fp0]] : (tensor<10x20xf32>, tensor<f32>) -> tensor<10x20xi1>
+  // CHECK: tile.select %{{.*}}, %[[fp0]], %[[fp1]] : (tensor<10x20xi1>, tensor<f32>, tensor<f32>) -> tensor<10x20xf32>
   // CHECK: return %{{.*}} : tensor<10x20xf32>
   // clang-format on
   runProgram(program);
@@ -1013,7 +1053,7 @@ TEST_F(CppEdsl, Shape) {
   // clang-format off
   // CHECK-LABEL: CppEdsl.Shape
   // CHECK: module @shape
-  // CHECK: "tile.shape"(%{{.*}}) : (tensor<2x3xf32>) -> tensor<2xsi32>
+  // CHECK: tile.shape %{{.*}} : (tensor<2x3xf32>) -> tensor<2xsi32>
   // CHECK: return %{{.*}} : tensor<2xsi32>
   // clang-format on
   std::vector<float> input = {
@@ -1031,7 +1071,7 @@ TEST_F(CppEdsl, Prng) {
   // clang-format off
   // CHECK-LABEL: CppEdsl.Prng
   // CHECK: module @prng
-  // CHECK: %result, %new_state = "tile.prng"(%{{.*}}) : (tensor<1x3xui32>) -> (tensor<2x3xf32>, tensor<1x3xui32>)
+  // CHECK: %result, %new_state = tile.prng %{{.*}} : (tensor<1x3xui32>) -> (tensor<2x3xf32>, tensor<1x3xui32>)
   // CHECK: return %result, %new_state : tensor<2x3xf32>, tensor<1x3xui32>
   // clang-format on
 
@@ -1086,14 +1126,14 @@ TEST_F(CppEdsl, Sin) {
 
 TEST_F(CppEdsl, ConvI8) {
   auto I = Placeholder(DType::INT8, {1, 224, 224, 3});
-  auto K = Placeholder(DType::INT8, {3, 3, 1, 32});
+  auto K = Placeholder(DType::INT8, {3, 3, 3, 32});
   auto O = Convolution2(I, K);
   auto program = makeProgram("convolution", {I, K}, {O});
   // clang-format off
   // CHECK-LABEL: CppEdsl.ConvI8
   // CHECK: module @convolution
-  // CHECK: %[[cst:.*]] = "eltwise.sconst"() {value = 0 : i64} : () -> tensor<si8>
-  // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : tensor<si8>, tensor<1x224x224x3xsi8>, tensor<3x3x1x32xsi8> -> tensor<1x224x224x32xsi8>
+  // CHECK: %[[cst:.*]] = tile.constant(0 : i64) : tensor<si8>
+  // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : tensor<si8>, tensor<1x224x224x3xsi8>, tensor<3x3x3x32xsi8> -> tensor<1x224x224x32xsi8>
   // CHECK: return %{{.*}} : tensor<1x224x224x32xsi8>
   // clang-format on
   runProgram(program);
@@ -1451,6 +1491,48 @@ TEST_F(CppEdsl, Trace) {
   // CHECK: tile.pragma %{{.*}} "trace" {msg = "msg"} : tensor<3x3xf32>
   // CHECK: return %{{.*}} : tensor<3x3xf32>
   // clang-format on
+}
+
+Tensor Transpose(Tensor I, const std::string& layout) {
+  TensorLens lens(layout, "MN");
+  I = I.use(lens);
+  TensorDim M, N;
+  TensorIndex i, j;
+  I.bind_dims(M, N);
+  return Contraction(lens).outShape(N, M).outAccess(j, i).assign(I(i, j));
+}
+
+TEST_F(CppEdsl, Lens) {
+  auto I = Placeholder(DType::FLOAT32, {1, 224, 224, 3});
+  auto K = Placeholder(DType::FLOAT32, {3, 3, 3, 32});
+  auto O = Convolution2(I, K, /*I_layout=*/"NHWC", /*K_layout=*/"HWCK");
+  makeProgram("conv2d_nhwc", {I, K}, {O});
+
+  I = Placeholder(DType::FLOAT32, {1, 3, 224, 224});
+  K = Placeholder(DType::FLOAT32, {3, 32, 7, 7});
+  O = Convolution2(I, K, /*I_layout=*/"NCHW", /*K_layout=*/"CKHW");
+  makeProgram("conv2d_nchw", {I, K}, {O});
+
+  std::vector<float> input = {
+      1, 2, 3,  //
+      4, 5, 6,  //
+  };
+
+  std::vector<float> expected = {
+      1, 4,  //
+      2, 5,  //
+      3, 6,  //
+  };
+
+  I = Placeholder(DType::FLOAT32, {2, 3});
+  O = Transpose(I, "MN");
+  auto program = makeProgram("transpose_mn", {I}, {O});
+  checkExact(program, {input}, {expected});
+
+  I = Placeholder(DType::FLOAT32, {2, 3});
+  O = Transpose(I, "NM");
+  program = makeProgram("transpose_nm", {I}, {O});
+  checkExact(program, {input}, {expected});
 }
 
 }  // namespace

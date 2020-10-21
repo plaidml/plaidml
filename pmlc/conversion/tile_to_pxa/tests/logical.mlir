@@ -4,10 +4,7 @@ func @eltwise_and_f32(
   %arg0: tensor<3x3xf32>,
   %arg1: tensor<3x3xf32>
 ) -> tensor<3x3xi1> {
-  %0 = "eltwise.logical_and"(%arg1, %arg0) : (
-    tensor<3x3xf32>,
-    tensor<3x3xf32>
-  ) -> tensor<3x3xi1>
+  %0 = tile.logical_and %arg1, %arg0 : (tensor<3x3xf32>, tensor<3x3xf32>) -> tensor<3x3xi1>
   return %0 : tensor<3x3xi1>
 }
 
@@ -24,10 +21,7 @@ func @eltwise_or_si32(
   %arg0: tensor<3x3xsi32>,
   %arg1: tensor<3x3xsi32>
 ) -> tensor<3x3xi1> {
-  %0 = "eltwise.logical_or"(%arg1, %arg0) : (
-    tensor<3x3xsi32>,
-    tensor<3x3xsi32>
-  ) -> tensor<3x3xi1>
+  %0 = tile.logical_or %arg1, %arg0 : (tensor<3x3xsi32>, tensor<3x3xsi32>) -> tensor<3x3xi1>
   return %0 : tensor<3x3xi1>
 }
 
@@ -44,10 +38,7 @@ func @eltwise_xor_mixed(
   %arg0: tensor<3x3xf32>,
   %arg1: tensor<3x3xui64>
 ) -> tensor<3x3xi1> {
-  %0 = "eltwise.logical_xor"(%arg0, %arg1) : (
-    tensor<3x3xf32>,
-    tensor<3x3xui64>
-  ) -> tensor<3x3xi1>
+  %0 = tile.logical_xor %arg0, %arg1 : (tensor<3x3xf32>, tensor<3x3xui64>) -> tensor<3x3xi1>
   return %0 : tensor<3x3xi1>
 }
 
@@ -63,9 +54,7 @@ func @eltwise_xor_mixed(
 func @eltwise_not_si32(
   %arg0: tensor<3x3xsi32>
 ) -> tensor<3x3xi1> {
-  %0 = "eltwise.logical_not"(%arg0) : (
-    tensor<3x3xsi32>
-  ) -> tensor<3x3xi1>
+  %0 = tile.logical_not %arg0 : (tensor<3x3xsi32>) -> tensor<3x3xi1>
   return %0 : tensor<3x3xi1>
 }
 
@@ -79,9 +68,7 @@ func @eltwise_not_si32(
 func @eltwise_not_f32(
   %arg0: tensor<3x3xf32>
 ) -> tensor<3x3xi1> {
-  %0 = "eltwise.logical_not"(%arg0) : (
-    tensor<3x3xf32>
-  ) -> tensor<3x3xi1>
+  %0 = tile.logical_not %arg0 : (tensor<3x3xf32>) -> tensor<3x3xi1>
   return %0 : tensor<3x3xi1>
 }
 

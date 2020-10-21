@@ -38,6 +38,8 @@ public:
 
   void verify(const ExprNodePtr &node);
 
+  void bindDims(const ExprNodePtr &node, llvm::ArrayRef<DimNodePtr *> into);
+
 private:
   util::TensorShapes computeShapes(const ExprNode *node);
 

@@ -71,8 +71,8 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(pxa::createMemRefDataFlowOptPass(/*onlyParallelNested=*/true));
   pm.addPass(createCanonicalizerPass());
   // TODO: parametrize localize pass depending on memory size and HW caps
-  // pm.addPass(pxa::createLocalizePass());
-  pm.addPass(pxa::createResizeTmpsPass());
+  pm.addPass(pxa::createLocalizePass());
+  pm.addPass(pxa::createResizeTmpsPass(/*onlyParallelNested=*/true));
   pm.addPass(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());

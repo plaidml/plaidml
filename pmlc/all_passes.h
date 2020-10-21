@@ -17,6 +17,7 @@
 #include "pmlc/conversion/gpu_to_comp/passes.h"
 #include "pmlc/conversion/gpu_to_spirv/passes.h"
 #include "pmlc/conversion/pxa_to_affine/passes.h"
+#include "pmlc/conversion/scf_to_omp/passes.h"
 #include "pmlc/conversion/stdx_to_llvm/passes.h"
 #include "pmlc/conversion/tile_to_pxa/passes.h"
 #include "pmlc/dialect/comp/transforms/passes.h"
@@ -61,6 +62,7 @@ inline void registerAllPasses() {
   // Conversion passes
   pmlc::conversion::comp_to_llvm::registerPasses();
   pmlc::conversion::pxa_to_affine::registerPasses();
+  pmlc::conversion::scf_to_omp::registerPasses();
   pmlc::conversion::stdx_to_llvm::registerPasses();
   pmlc::conversion::tile_to_pxa::registerPasses();
   pmlc::conversion::gpu_to_spirv::registerPasses();
