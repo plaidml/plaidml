@@ -7,6 +7,7 @@ load("@bazel_skylib//lib:selects.bzl", "selects")
 load("@rules_python//python:defs.bzl", "py_binary", "py_library")
 load("@io_bazel_rules_jsonnet//jsonnet:jsonnet.bzl", "jsonnet_to_json")
 load("//bzl:plaidml.bzl", "plaidml_cc_binary", "plaidml_cc_library", "plaidml_settings")
+load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_tar")
 
 plaidml_cc_library(
     name = "api",
@@ -90,6 +91,20 @@ plaidml_cc_binary(
             ":plaidml.lds",
         ],
     }),
+)
+
+pkg_tar(
+    name = "sdk_tar",
+    srcs = [
+        ":plaidml",
+    ],
+    deps = [
+        "//plaidml/core:sdk_tar",
+        "//plaidml/exec:sdk_tar",
+        "//plaidml/edsl:sdk_tar",
+        "//plaidml/op:sdk_tar",
+    ],
+    visibility = ["//visibility:public"],
 )
 
 py_library(

@@ -745,7 +745,7 @@ struct ComputeBoundsImpl {
   }
 
   Shape getShape(Type type) {
-    auto rankedTensorType = eltwise::getRankedTensorType(type);
+    auto rankedTensorType = getRankedTensorType(type);
     return rankedTensorType.getShape();
   }
 

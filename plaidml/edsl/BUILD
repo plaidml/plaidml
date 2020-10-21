@@ -2,6 +2,7 @@
 
 load("@rules_python//python:defs.bzl", "py_library", "py_test")
 load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_test")
+load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_tar")
 
 SDK_HDRS = [
     "edsl.h",
@@ -25,6 +26,13 @@ filegroup(
 filegroup(
     name = "sdk",
     srcs = SDK_HDRS,
+    visibility = ["//visibility:public"],
+)
+
+pkg_tar(
+    name = "sdk_tar",
+    srcs = [":sdk"],
+    package_dir = "include/plaidml/edsl",
     visibility = ["//visibility:public"],
 )
 

@@ -10,7 +10,7 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Support/DebugStringHelper.h"
 
-#include "pmlc/dialect/eltwise/ir/util.h"
+#include "pmlc/dialect/tile/ir/util.h"
 #include "pmlc/util/logging.h"
 #include "pmlc/util/util.h"
 
@@ -25,38 +25,38 @@ LogicalResult ContractionOp::materializeOperands(OpBuilder &builder) {
   if (combo() == CombinationKind::cond) {
     auto operands = op->getOpOperands();
     return success(
-        succeeded(eltwise::materializeOperands(
+        succeeded(tile::materializeOperands(
             builder, op,
             llvm::ArrayRef<OpOperand *>{&operands[0], &operands[3]})) &&
-        succeeded(eltwise::materializeOperands(
+        succeeded(tile::materializeOperands(
             builder, op,
             llvm::ArrayRef<OpOperand *>{&operands[1], &operands[2]})));
   }
-  return eltwise::materializeOperands(builder, getOperation());
+  return tile::materializeOperands(builder, getOperation());
 }
 
 LogicalResult GatherOp::materializeOperands(OpBuilder &builder) {
   Operation *op = getOperation();
-  return eltwise::materializeOperands(builder, op,
-                                      op->getOpOperands().take_front());
+  return tile::materializeOperands(builder, op,
+                                   op->getOpOperands().take_front());
 }
 
 LogicalResult ReshapeOp::materializeOperands(OpBuilder &builder) {
-  return eltwise::materializeOperands(builder, getOperation());
+  return tile::materializeOperands(builder, getOperation());
 }
 
 LogicalResult ScatterOp::materializeOperands(OpBuilder &builder) {
   Operation *op = getOperation();
-  return eltwise::materializeOperands(builder, op,
-                                      op->getOpOperands().take_front());
+  return tile::materializeOperands(builder, op,
+                                   op->getOpOperands().take_front());
 }
 
 LogicalResult ShapeOp::materializeOperands(OpBuilder &builder) {
-  return eltwise::materializeOperands(builder, getOperation());
+  return tile::materializeOperands(builder, getOperation());
 }
 
 LogicalResult PragmaOp::materializeOperands(OpBuilder &builder) {
-  return eltwise::materializeOperands(builder, getOperation());
+  return tile::materializeOperands(builder, getOperation());
 }
 
 // ---- ReshapeOp ----
@@ -68,26 +68,6 @@ OpFoldResult ReshapeOp::fold(ArrayRef<Attribute> operands) {
   }
   return {};
 }
-
-// ---- ConstantOp ----
-
-OpFoldResult ConstantOp::fold(ArrayRef<Attribute> operands) {
-  assert(operands.empty() && "constant has no operands");
-  return getValue();
-}
-
-void printConstantOp(OpAsmPrinter *printer, ConstantOp op) {
-  *printer << op.getOperation()->getName() << ' ' << op.value().getZExtValue();
-}
-
-ParseResult parseConstantOp(OpAsmParser *parser, OperationState &result) {
-  auto indexType = parser->getBuilder().getIndexType();
-  result.addTypes(indexType);
-  IntegerAttr value;
-  return parser->parseAttribute(value, indexType, "value", result.attributes);
-}
-
-LogicalResult verifyConstantOp(ConstantOp op) { return success(); }
 
 // ---- ContractionOp ----
 
@@ -342,3 +322,5 @@ LogicalResult verifyContractionOp(ContractionOp op) {
 
 #define GET_OP_CLASSES
 #include "pmlc/dialect/tile/ir/ops.cc.inc"
+
+#include "pmlc/dialect/tile/ir/interfaces.cc.inc"
