@@ -400,8 +400,8 @@ public:
     }
   }
 
-  void invoke(mlir::ArrayRef<util::BufferPtr> inputBuffers,
-              mlir::ArrayRef<util::BufferPtr> outputBuffers) final {
+  double invoke(mlir::ArrayRef<util::BufferPtr> inputBuffers,
+                mlir::ArrayRef<util::BufferPtr> outputBuffers) final {
     StopWatch stopWatch;
     if (VLOG_IS_ON(1)) {
       stopWatch.start();
@@ -412,6 +412,7 @@ public:
       stopWatch.stop();
       IVLOG(1, "Execution time: " << stopWatch.delta_ms() << "ms");
     }
+    return device->execTimeInMS;
   }
 
   void bindArguments(ArrayRef<util::BufferPtr> inputBuffers,

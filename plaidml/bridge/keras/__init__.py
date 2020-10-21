@@ -31,6 +31,8 @@ _CONV_DATA_FORMAT = ['channels_first', 'channels_last']
 
 _in_train_phase = None  # Will be initialized on first use
 
+lastExecTimeInMS = 0.0
+
 
 def _prepend_name_scope(name, default):
     if name:
@@ -137,8 +139,9 @@ class _Runner(object):
     def run(self, inputs):
         for input, buffer in zip(inputs, self.input_buffers):
             buffer.copy_from_ndarray(input)
-        self.executable.run(self.input_buffers + self.var_buffers,
-                            self.output_buffers + self.update_buffers)
+        global lastExecTimeInMS
+        lastExecTimeInMS = self.executable.run(self.input_buffers + self.var_buffers,
+                                               self.output_buffers + self.update_buffers)
         return [buffer.as_ndarray() for buffer in self.output_buffers]
 
 
