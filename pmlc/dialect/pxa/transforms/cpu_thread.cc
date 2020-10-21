@@ -31,21 +31,17 @@ using llvm::DenseMap;
 using llvm::DenseSet;
 using llvm::SmallVector;
 
-// Pick the tiling that:
-// 1) Has at most one index
-// 2) Is as large as possible without going over maxThreads
+// Pick the tiling that is as large as possible without going over maxThreads
 struct CostModel {
   unsigned maxThreads;
   explicit CostModel(unsigned maxThreads) : maxThreads(maxThreads) {}
   double operator()(ArrayRef<int64_t> tile, double bestCost) const {
     int64_t innerSize = 1;
     for (size_t i = 0; i < tile.size(); i++) {
-      if (tile[i] != 1) {
-        if (tile[i] > maxThreads || innerSize > 1) {
-          return std::numeric_limits<double>::infinity();
-        }
-        innerSize = tile[i];
-      }
+      innerSize *= tile[i];
+    }
+    if (innerSize > maxThreads) {
+      return std::numeric_limits<double>::infinity();
     }
     return 1.0 / innerSize;
   }

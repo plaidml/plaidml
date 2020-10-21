@@ -1,8 +1,9 @@
 // Copyright 2019, Intel Corporation
 
-#include "pmlc/dialect/eltwise/ir/util.h"
+#include "pmlc/dialect/tile/ir/util.h"
 
 #include <algorithm>
+#include <limits>
 #include <string>
 #include <utility>
 #include <vector>
@@ -16,13 +17,13 @@
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/Support/DebugStringHelper.h"
 
-#include "pmlc/dialect/eltwise/ir/ops.h"
-#include "pmlc/dialect/eltwise/ir/types.h"
+#include "pmlc/dialect/tile/ir/ops.h"
+#include "pmlc/dialect/tile/ir/types.h"
 #include "pmlc/util/logging.h"
 
 using namespace mlir; // NOLINT
 
-namespace pmlc::dialect::eltwise {
+namespace pmlc::dialect::tile {
 
 using llvm::ArrayRef;
 using llvm::SmallVector;
@@ -217,4 +218,49 @@ LogicalResult materializeOperands(OpBuilder &builder, Operation *op) {
   return materializeOperands(builder, op, op->getOpOperands());
 }
 
-} // namespace pmlc::dialect::eltwise
+Value createIdentity(OpBuilder &builder, Location loc, Type elementType,
+                     util::AggregationKind agg) {
+  switch (agg) {
+  case util::AggregationKind::assign:
+  case util::AggregationKind::add:
+    if (elementType.isa<FloatType>()) {
+      return builder.create<tile::ConstantOp>(loc, elementType, 0.0);
+    } else {
+      return builder.create<tile::ConstantOp>(loc, elementType,
+                                              static_cast<int64_t>(0));
+    }
+  case util::AggregationKind::mul:
+    if (elementType.isa<FloatType>()) {
+      return builder.create<tile::ConstantOp>(loc, elementType, 1.0);
+    } else {
+      return builder.create<tile::ConstantOp>(loc, elementType,
+                                              static_cast<int64_t>(1));
+    }
+  case util::AggregationKind::min:
+    if (elementType.isa<FloatType>()) {
+      return builder.create<tile::ConstantOp>(
+          loc, elementType, std::numeric_limits<double>::infinity());
+    } else if (elementType.isSignedInteger()) {
+      return builder.create<tile::ConstantOp>(
+          loc, elementType, std::numeric_limits<int64_t>::max());
+    } else {
+      return builder.create<tile::ConstantOp>(
+          loc, elementType,
+          static_cast<int64_t>(std::numeric_limits<uint64_t>::max()));
+    }
+  case util::AggregationKind::max:
+    if (elementType.isa<FloatType>()) {
+      return builder.create<tile::ConstantOp>(
+          loc, elementType, -std::numeric_limits<double>::infinity());
+    } else if (elementType.isSignedInteger()) {
+      return builder.create<tile::ConstantOp>(
+          loc, elementType, std::numeric_limits<int64_t>::min());
+    } else {
+      return builder.create<tile::ConstantOp>(loc, elementType,
+                                              static_cast<int64_t>(0));
+    }
+  }
+  llvm_unreachable("Invalid aggregation kind");
+}
+
+} // namespace pmlc::dialect::tile

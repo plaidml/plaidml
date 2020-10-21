@@ -1,7 +1,7 @@
 // RUN: pmlc-opt -convert-tile-to-pxa -canonicalize -cse -split-input-file %s | FileCheck %s
 
 func @const() -> tensor<f32> {
-  %cst = "eltwise.sconst"() {value = 3.0 : f64} : () -> tensor<f32>
+  %cst = tile.constant(3.0 : f64) : tensor<f32>
   return %cst : tensor<f32>
 }
 
