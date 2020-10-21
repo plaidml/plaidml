@@ -15,6 +15,7 @@
 
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/IR/Dialect.h"
+#include "mlir/IR/Module.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/Interfaces/LoopLikeInterface.h"
@@ -66,8 +67,8 @@ namespace MemoryEffects = mlir::MemoryEffects;
 namespace SideEffects = mlir::SideEffects;
 */
 using mlir::ArrayRef;
-using mlir::FuncOp;
 using mlir::LogicalResult;
+using mlir::ModuleOp;
 using mlir::Operation;
 using mlir::Region;
 using mlir::Value;

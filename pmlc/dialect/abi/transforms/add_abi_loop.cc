@@ -26,8 +26,6 @@ void AddABILoopPass::runOnOperation() {
     return;
   }
 
-  auto builder = mlir::OpBuilder{mainFunc};
-
   auto mainTy = mainFunc.getType();
   if (mainTy.getNumResults()) {
     mainFunc.emitError(
@@ -36,44 +34,23 @@ void AddABILoopPass::runOnOperation() {
     return;
   }
 
-  // It's a little simpler to create a new function, add the loop and
-  // terminator, clone the existing function's body into the loop, and delete
-  // the original function -- it seems a little wasteful, but it's easier to
-  // build the loop (otherwise, we'd need to build it without inserting it, move
-  // the existing region into it, and then insert it), and the cloning makes it
-  // easy to rewrite the block arguments correctly.
-  auto newFunc =
-      mlir::cast<mlir::FuncOp>(builder.insert(mainFunc.cloneWithoutRegions()));
-  auto *newEntryBlock = newFunc.addEntryBlock();
+  // Create the loop.
+  auto loc = mainFunc.getLoc();
+  auto builder = mlir::OpBuilder{mainFunc};
+  auto loopOp = builder.create<abi::LoopOp>(loc);
 
-  // Partition the function arguments: memrefs are passed to the loop (from
-  // which they'll be passed into the cloned region), while non-memrefs are
-  // added to the mapper (so that they'll be connected to the new function's
-  // arguments)
-  mlir::BlockAndValueMapping mapper;
-  mlir::SmallVector<mlir::Value, 8> loopArgs;
-  for (auto [mainArg, newArg] :
-       llvm::zip(mainFunc.getArguments(), newFunc.getArguments())) {
-    if (newArg.getType().isa<mlir::MemRefType>()) {
-      loopArgs.emplace_back(newArg);
-    } else {
-      mapper.map(mainArg, newArg);
-    }
-  }
-
-  // Create the new function's body.
-  builder.setInsertionPointToStart(newEntryBlock);
-  auto loopOp = builder.create<abi::LoopOp>(newFunc.getLoc(), loopArgs);
-  builder.create<mlir::ReturnOp>(newFunc.getLoc());
-  mainFunc.getRegion().cloneInto(&loopOp.getRegion(), mapper);
+  // Initialize the loop's body by taking the main function's body.
+  // N.B. We created the loop with the same argument types, so the entry
+  // block will be compatible with the loop's signature.
+  loopOp.bodyRegion().takeBody(mainFunc.getBody());
 
   // We no longer need the main function.
   mainFunc.erase();
 
-  // Normally, functions end with std.return; since std.return expects its
+  // A function's blocks can end with std.return; since std.return expects its
   // parent to be std.func, we need to replace any cloned top-level std.return
   // operations with abi.done.
-  for (auto &op : llvm::make_early_inc_range(loopOp.getOps())) {
+  for (auto &op : llvm::make_early_inc_range(loopOp.bodyRegion().getOps())) {
     auto returnOp = mlir::dyn_cast<mlir::ReturnOp>(op);
     if (returnOp) {
       builder.setInsertionPoint(returnOp);
@@ -81,6 +58,48 @@ void AddABILoopPass::runOnOperation() {
       returnOp.erase();
     }
   }
+
+  // Add an entry block for the init region.
+  auto *initEntryBlock = builder.createBlock(&loopOp.initRegion());
+
+  // Reorder the non-memref parameters in the body entry block.
+  //
+  // Memrefs will vary from invocation to invocation; they are intrinsically
+  // parameters of the body entry block.  Non-memrefs are all going to be passed
+  // via the network structure, so we reorder them in the body entry block,
+  // putting them at the front of the argument list and plumbing them in
+  // through the init block's parameters and the CreateNetworkOp terminator of
+  // the init block.
+  //
+  // TODO: We should distinguish weight memrefs (constants) and non-weight
+  //       memrefs (actual network inputs).  It might also be interesting to
+  //       allow non-memrefs to vary from run to run.  Perhaps we could signify
+  //       const-over-the-network-lifetime via attributes?
+  auto *bodyEntryBlock = loopOp.bodyEntryBlock();
+  mlir::Optional<unsigned> firstMemrefIdx;
+  for (unsigned idx = 0; idx < bodyEntryBlock->getNumArguments(); ++idx) {
+    auto arg = bodyEntryBlock->getArgument(idx);
+    auto ty = arg.getType();
+    if (ty.isa<mlir::MemRefType>()) {
+      firstMemrefIdx = idx;
+      continue;
+    }
+    if (firstMemrefIdx.hasValue()) {
+      auto newArg =
+          bodyEntryBlock->insertArgument(firstMemrefIdx.getValue(), ty);
+      arg.replaceAllUsesWith(newArg);
+      bodyEntryBlock->eraseArgument(idx + 1);
+    }
+    initEntryBlock->addArgument(ty);
+  }
+
+  // Finally, terminate the init block using a passthrough of the
+  // init block's arguments.
+  builder.create<abi::CreateNetworkOp>(loc, initEntryBlock->getArguments());
+
+  // Finally, create the fini region's entry block.
+  builder.createBlock(&loopOp.finiRegion());
+  builder.create<abi::DoneOp>(loc);
 }
 
 } // namespace

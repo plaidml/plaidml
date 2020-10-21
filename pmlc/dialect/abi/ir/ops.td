@@ -18,8 +18,7 @@ class ABI_Op<string mnemonic, list<OpTrait> traits = []> :
 
 def ABI_LoopOp : ABI_Op<"loop", [
   DeclareOpInterfaceMethods<LoopLikeOpInterface>,
-  ParentOneOf<["FuncOp", "LLVMFuncOp"]>
-]> {
+  IsolatedFromAbove, HasParent<"ModuleOp">]> {
   let summary = "Repeat runs of a network";
   let description = [{
     The "abi.loop" operation represents repeated runs of a program,
@@ -28,12 +27,19 @@ def ABI_LoopOp : ABI_Op<"loop", [
     operations outside of the loop, so that their cost is ammortized over
     many runs of the program.
   }];
-  let arguments = (ins Variadic<AnyMemRef>:$args);
-  let regions = (region AnyRegion:$region);
+  let regions = (region AnyRegion:$initRegion, AnyRegion:$bodyRegion, AnyRegion:$finiRegion);
+  let extraClassDeclaration = [{
+    mlir::Block* bodyEntryBlock() { return &bodyRegion().front(); }
+  }];
 }
 
-def ABI_DoneOp : ABI_Op<"done", [Terminator]> {
-  let summary = "Terminates an abi.loop operation region";
+def ABI_DoneOp : ABI_Op<"done", [Terminator, HasParent<"pmlc::dialect::abi::LoopOp">]> {
+  let summary = "Terminates an abi.loop operation body or fini region";
+}
+
+def ABI_CreateNetworkOp : ABI_Op<"create_network", [Terminator, HasParent<"pmlc::dialect::abi::LoopOp">]> {
+  let summary = "Terminates an abi.loop operation init region";
+  let arguments = (ins Variadic<AnyType>);
 }
 
 #endif // __PML_ABI_OPS__

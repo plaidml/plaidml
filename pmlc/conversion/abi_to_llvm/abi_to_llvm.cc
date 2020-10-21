@@ -192,7 +192,7 @@ struct LoopLowering : public mlir::ConvertOpToLLVMPattern<LLVM::LLVMFuncOp> {
 
     // Build the non-input-memref-buffer mapper entries and value extraction
     // operations.
-    loopOp.getRegion().walk([&](mlir::Operation *op) {
+    loopOp.getLoopBody().walk([&](mlir::Operation *op) {
       for (auto operand : op->getOperands()) {
         if (operand.getParentRegion() == loopOp.getParentRegion() &&
             !mapper.contains(operand) &&
@@ -232,7 +232,7 @@ struct LoopLowering : public mlir::ConvertOpToLLVMPattern<LLVM::LLVMFuncOp> {
     }
 
     // Clone the loop's region into plaidml_exec().
-    rewriter.cloneRegionBefore(loopOp.getRegion(), execFunc.getRegion(),
+    rewriter.cloneRegionBefore(loopOp.getLoopBody(), execFunc.getRegion(),
                                execFunc.getRegion().end(), mapper);
 
     llvm::errs() << "After clone: plaidml_exec: " << execFunc << "\n";
