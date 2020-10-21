@@ -19,6 +19,8 @@
 #include "pmlc/conversion/comp_to_llvm/pass_detail.h"
 #include "pmlc/conversion/comp_to_llvm/utils.h"
 #include "pmlc/dialect/comp/ir/dialect.h"
+#include "pmlc/util/logging.h"
+#include "pmlc/util/tags.h"
 
 namespace pmlc::conversion::comp_to_llvm {
 
@@ -417,9 +419,16 @@ mlir::LogicalResult ConvertScheduleFunc::matchAndRewrite(
       rewriter.getSymbolRefAttr(kVkCreateLaunchKernelAction),
       createActionOperands);
 
-  // Set kernel arguments.
+  // Get subgroup size
+  int64_t subgroupSize = 1;
+  if (pmlc::hasIntegerTag(launchOp, "subgroupSize"))
+    subgroupSize = pmlc::getIntegerTag(launchOp, "subgroupSize", 1);
+  if (subgroupSize != 1) {
+    IVLOG(2, "Subgroup size = " << subgroupSize);
+  }
+
   mlir::Value subgroupSizeVal = rewriter.create<LLVM::ConstantOp>(
-      loc, llvmInt32Type, rewriter.getI32IntegerAttr(1));
+      loc, llvmInt32Ty, rewriter.getI32IntegerAttr(subgroupSize));
 
   rewriter.create<LLVM::CallOp>(
       loc, mlir::ArrayRef<mlir::Type>{},
