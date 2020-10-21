@@ -26,7 +26,7 @@ using namespace mlir; // NOLINT
 namespace pmlc::dialect::pxa {
 
 AffineParallelOp tileAccumulations(AffineParallelOp op, bool skipTrivial) {
-  // Find the originating write and it's StrideInfo
+  // Find the originating write and its StrideInfo
   Optional<StrideInfo> maybeStrideInfo;
   if (op.getNumResults() == 1) {
     auto srcDef = getPrevWriter(op.getResult(0));

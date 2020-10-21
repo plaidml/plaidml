@@ -183,8 +183,14 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(pxa::createFusionPass());
   pm.addPass(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
-  pm.addPass(pxa::createMemRefDataFlowOptPass());
-  pm.addPass(createCanonicalizerPass());
+
+  // Currently these MemRefDataFlowOptPass is disabled because it will turn
+  // 0-dim tensors into actual floats, which do not correctly pass through
+  // OpenMP due to calling convention issues.  TODO: Fix OpenMP upstream and
+  // re-enable.
+  // pm.addPass(pxa::createMemRefDataFlowOptPass());
+  // pm.addPass(createCanonicalizerPass());
+
   pm.addPass(pxa::createLocalizePass());
   pm.addPass(pxa::createResizeTmpsPass());
   pm.addPass(pxa::createBufferPlacementPass());

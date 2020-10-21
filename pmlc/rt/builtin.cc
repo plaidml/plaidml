@@ -9,8 +9,6 @@
 
 #include "mlir/ExecutionEngine/RunnerUtils.h"
 
-#include "openmp/runtime/src/kmp.h"
-
 #include "pmlc/rt/symbol_registry.h"
 
 extern "C" void plaidml_rt_trace(const char *msg) {
@@ -30,11 +28,6 @@ extern "C" void plaidml_rt_trace(const char *msg) {
   }
   llvm::outs() << msg;
   llvm::outs().flush();
-}
-
-extern "C" uint64_t _mlir_ciface_plaidml_rt_thread_num() {
-  uint64_t tid = __kmp_get_tid();
-  return tid;
 }
 
 float h2f(half_float::half n) { return n; }
@@ -62,10 +55,6 @@ struct Registration {
     // RunnerUtils functions
     registerSymbol("_mlir_ciface_print_memref_f32",
                    reinterpret_cast<void *>(_mlir_ciface_print_memref_f32));
-
-    registerSymbol(
-        "_mlir_ciface_plaidml_rt_thread_num",
-        reinterpret_cast<void *>(_mlir_ciface_plaidml_rt_thread_num));
 
     registerSymbol("plaidml_rt_trace",
                    reinterpret_cast<void *>(plaidml_rt_trace));

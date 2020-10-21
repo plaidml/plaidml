@@ -19,17 +19,19 @@ using namespace mlir; // NOLINT[build/namespaces]
 
 namespace pmlc::conversion::scf_to_omp {
 
-namespace scf = mlir::scf;
-namespace omp = mlir::omp;
+namespace scf = gscf;
+namespace omp = gomp;
 
 namespace {
+
+const char *kThreadFuncName = "plaidml_rt_thread_num";
 
 LogicalResult convertSCPParallel(scf::ParallelOp op) {
   IVLOG(2, "convertSCPParallel");
   OpBuilder builder(op);
   auto loc = op.getLoc();
 
-  // Extact the range of each parallel index, requiring the all indexes are
+  // Extract the range of each parallel index, requiring that all indexes are
   // normalized (lower bound of zero, step size of 1).
   int64_t numThreads = 1;
   SmallVector<int64_t, 4> ranges;
@@ -89,12 +91,11 @@ LogicalResult convertSCPParallel(scf::ParallelOp op) {
 
   // generate a call to omp_get_thread_num() at the start of the block
   builder.setInsertionPointToStart(block);
-  const char *threadFuncName = "plaidml_rt_thread_num";
   SmallVector<Value, 0> emptyOperands;
   auto indexType = builder.getIndexType();
-  auto callOp = builder.create<mlir::CallOp>(
-      loc, mlir::ArrayRef<mlir::Type>{indexType},
-      builder.getSymbolRefAttr(threadFuncName), emptyOperands);
+  auto callOp = builder.create<gCallOp>(
+      loc, gArrayRef<mlir::Type>{indexType},
+      builder.getSymbolRefAttr(kTreadFuncName), emptyOperands);
   Value tid = callOp.getResult(0);
 
   // Extract the components of the threadID and replace indexes
@@ -111,12 +112,12 @@ LogicalResult convertSCPParallel(scf::ParallelOp op) {
 
   // make sure the module contains a declaration for omp_get_thread_num
   auto module = op.getParentOfType<ModuleOp>();
-  if (!module.lookupSymbol(threadFuncName)) {
-    mlir::OpBuilder subBuilder(module.getBody()->getTerminator());
-    subBuilder.create<mlir::FuncOp>(
-        module.getLoc(), threadFuncName,
-        mlir::FunctionType::get({}, mlir::ArrayRef<mlir::Type>{indexType},
-                                subBuilder.getContext()));
+  if (!module.lookupSymbol(kThreadFuncName)) {
+    gOpBuilder subBuilder(module.getBody()->getTerminator());
+    subBuilder.create<gFuncOp>(
+        module.getLoc(), kThreadFuncName,
+        gFunctionType::get({}, mlir::ArrayRef<mlir::Type>{indexType},
+                           subBuilder.getContext()));
   }
 
   // Delete old loop + return
@@ -141,7 +142,7 @@ struct LowerSCFToOpenMPPass
 
 } // namespace
 
-std::unique_ptr<mlir::Pass> createLowerSCFToOpenMPPass() {
+std::unique_ptr<gPass> createLowerSCFToOpenMPPass() {
   return std::make_unique<LowerSCFToOpenMPPass>();
 }
 
