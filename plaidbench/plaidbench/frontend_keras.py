@@ -247,7 +247,8 @@ class InferenceModel(Model):
         import keras.backend as b
         if b.backend() == "plaidml.bridge.keras":
             import plaidml.bridge.keras as keras_bridge
-            overrides['lastExecTimeInNS'] = keras_bridge.lastExecTimeInMS / 1000
+            if keras_bridge.lastExecTimeInMS:
+                overrides['lastExecTimeInNS'] = keras_bridge.lastExecTimeInMS / 1000
 
         return (out, overrides)
 
