@@ -1,9 +1,10 @@
 load(
     "@bazel_tools//tools/cpp:cc_toolchain_config_lib.bzl",
+    "action_config",
     "feature",
-    "feature_set",
     "flag_group",
     "flag_set",
+    "tool",
     "tool_path",
     "with_feature_set",
 )
@@ -90,6 +91,8 @@ def _impl(ctx):
                             "-Wno-error=pragmas",
                             "-Wno-unknown-pragmas",
                             "-fno-omit-frame-pointer",
+                            # "-Wno-unused-parameter",
+                            # "-Wno-unused-result",
                         ],
                     ),
                 ],
@@ -249,8 +252,25 @@ def _impl(ctx):
         unfiltered_compile_flags_feature,
     ]
 
+    action_configs = [
+        action_config(
+            action_name = action,
+            tools = [
+                tool(path = "crosstool_ng/" + ctx.attr.target + "-gcc_" + ctx.attr.version + "/wrappers/g++"),
+            ],
+        )
+        for action in [
+            ACTION_NAMES.cpp_compile,
+            ACTION_NAMES.cpp_module_compile,
+            ACTION_NAMES.cpp_link_executable,
+            ACTION_NAMES.cpp_link_dynamic_library,
+            ACTION_NAMES.cpp_link_nodeps_dynamic_library,
+        ]
+    ]
+
     return cc_common.create_cc_toolchain_config_info(
         ctx = ctx,
+        action_configs = action_configs,
         toolchain_identifier = "gcc-" + ctx.attr.target + "-gcc_" + ctx.attr.version,
         host_system_name = ctx.attr.target,
         target_system_name = ctx.attr.target,

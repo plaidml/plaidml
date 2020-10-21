@@ -98,13 +98,13 @@ pkg_tar(
     srcs = [
         ":plaidml",
     ],
+    visibility = ["//visibility:public"],
     deps = [
         "//plaidml/core:sdk_tar",
-        "//plaidml/exec:sdk_tar",
         "//plaidml/edsl:sdk_tar",
+        "//plaidml/exec:sdk_tar",
         "//plaidml/op:sdk_tar",
     ],
-    visibility = ["//visibility:public"],
 )
 
 py_library(

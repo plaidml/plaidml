@@ -14,23 +14,17 @@ exports_files([
 
 config_setting(
     name = "clang",
-    values = {
-        "define": "compiler=clang",
-    },
+    values = {"define": "compiler=clang"},
 )
 
 config_setting(
     name = "gcc",
-    values = {
-        "define": "compiler=gcc",
-    },
+    values = {"define": "compiler=gcc"},
 )
 
 config_setting(
     name = "msvc",
-    values = {
-        "define": "compiler=msvc",
-    },
+    values = {"define": "compiler=msvc"},
 )
 
 pkg_tar(

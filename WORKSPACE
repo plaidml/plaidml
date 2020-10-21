@@ -53,9 +53,7 @@ llvm_toolchain(
     llvm_version = "8.0.0",
 )
 
-load("@llvm_toolchain//:toolchains.bzl", "llvm_register_toolchains")
-
-llvm_register_toolchains()
+register_toolchains("//toolchain:cc-toolchain-linux")
 
 load("//vendor/openvino:workspace.bzl", "openvino_workspace")
 

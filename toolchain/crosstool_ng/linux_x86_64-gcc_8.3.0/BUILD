@@ -4,6 +4,7 @@ filegroup(
     name = "compiler_files",
     srcs = [
         ":as",
+        ":g++",
         ":gcc",
         ":ld",
     ],
@@ -14,6 +15,7 @@ filegroup(
     name = "linker_files",
     srcs = [
         ":ar",
+        ":g++",
         ":gcc",
         ":ld",
         "@crosstool_ng_linux_x86_64_gcc_8.3.0//:all_files",
@@ -44,6 +46,15 @@ filegroup(
     srcs = [
         "wrappers/gcc",
         "@crosstool_ng_linux_x86_64_gcc_8.3.0//:gcc",
+    ],
+    tags = ["linux"],
+)
+
+filegroup(
+    name = "g++",
+    srcs = [
+        "wrappers/g++",
+        "@crosstool_ng_linux_x86_64_gcc_8.3.0//:g++",
     ],
     tags = ["linux"],
 )
@@ -98,6 +109,7 @@ filegroup(
     srcs = [
         ":ar",
         ":as",
+        ":g++",
         ":gcc",
         ":ld",
         ":nm",

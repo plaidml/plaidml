@@ -1,21 +1,15 @@
+load("@bazel_skylib//rules:write_file.bzl", "write_file")
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
 package(default_visibility = ["//visibility:public"])
 
 # This file contains cmake-generated definitions.  We use local defines on the cc_library rule instead.
-genrule(
+write_file(
     name = "icd_cmake_config_gen",
-    srcs = [],
-    outs = ["loader/icd_cmake_config.h"],
-    cmd = "echo '' > \"$@\"",
-    cmd_ps = "echo '' > \"$@\"",
+    out = "loader/icd_cmake_config.h",
+    content = [],
     visibility = ["//visibility:private"],
 )
-
-opencl_icd_loader_srcs = glob([
-    "loader/*.c",
-    "loader/*.h",
-]) + [
-    "loader/icd_cmake_config.h",
-]
 
 # Linux specific configuration
 opencl_icd_loader_lnx_srcs = glob([
@@ -41,8 +35,12 @@ opencl_icd_loader_win_lnks = [
     "ole32.lib",
 ]
 
-# Select configuration based on system
-opencl_icd_loader_srcs += select({
+opencl_icd_loader_srcs = glob([
+    "loader/*.c",
+    "loader/*.h",
+]) + [
+    "loader/icd_cmake_config.h",
+] + select({
     "@bazel_tools//src/conditions:windows": opencl_icd_loader_win_srcs,
     "//conditions:default": opencl_icd_loader_lnx_srcs,
 })
@@ -61,7 +59,7 @@ cc_library(
     linkopts = opencl_icd_loader_lnks,
     linkstatic = 1,
     local_defines = select({
-        "@bazel_tools//src/conditions:linux_x86_64": ["HAVE_SECURE_GETENV"],
+        "@com_intel_plaidml//:clang": ["HAVE_SECURE_GETENV"],
         "//conditions:default": [],
     }),
     deps = ["@opencl_headers"],

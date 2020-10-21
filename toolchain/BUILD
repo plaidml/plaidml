@@ -1,18 +1,7 @@
-load("@rules_cc//cc:defs.bzl", "cc_toolchain", "cc_toolchain_suite")
+load("@rules_cc//cc:defs.bzl", "cc_toolchain")
 load(":build_defs.bzl", "gcc_toolchain_config")
 
 package(default_visibility = ["//visibility:public"])
-
-cc_toolchain_suite(
-    name = "toolchain",
-    tags = ["linux"],
-    # target_cpu | compiler
-    toolchains = {
-        "k8": ":cc-linux_x86_64-gcc_8.3.0",
-        "linux_x86_64|gcc": ":cc-linux_x86_64-gcc_8.3.0",
-        "linux_x86_64": ":cc-linux_x86_64-gcc_8.3.0",
-    },
-)
 
 filegroup(
     name = "empty",
@@ -29,14 +18,32 @@ cc_toolchain(
     strip_files = "//toolchain/crosstool_ng/linux_x86_64-gcc_8.3.0:strip",
     supports_param_files = 1,
     tags = ["linux"],
-    toolchain_config = ":cc_linux_x86_64-gcc_8.3.0",
+    toolchain_config = ":cc-linux_x86_64-gcc_8.3.0-config",
     toolchain_identifier = "gcc-linux_x86_64",
 )
 
 gcc_toolchain_config(
-    name = "cc_linux_x86_64-gcc_8.3.0",
+    name = "cc-linux_x86_64-gcc_8.3.0-config",
     libc_version = "glibc_2.12.1",
     tags = ["linux"],
     target = "linux_x86_64",
     version = "8.3.0",
+)
+
+toolchain(
+    name = "cc-toolchain-linux",
+    exec_compatible_with = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:linux",
+    ],
+    target_compatible_with = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:linux",
+    ],
+    toolchain =
+        select({
+            "//:gcc": ":cc-linux_x86_64-gcc_8.3.0",
+            "//:clang": "@llvm_toolchain//:cc-clang-linux",
+        }),
+    toolchain_type = "@bazel_tools//tools/cpp:toolchain_type",
 )

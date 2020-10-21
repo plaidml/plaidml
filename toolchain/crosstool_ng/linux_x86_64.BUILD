@@ -16,6 +16,11 @@ filegroup(
 )
 
 filegroup(
+    name = "g++",
+    srcs = ["bin/x86_64-unknown-linux-gnu-g++"],
+)
+
+filegroup(
     name = "gcov",
     srcs = ["bin/x86_64-unknown-linux-gnu-gcov"],
 )
