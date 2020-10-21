@@ -217,20 +217,6 @@ class BlanketReporter(object):
             json.dump(self.outputs, out, sort_keys=True, indent=2)
 
 
-class ProgramTimeFilter(object):
-
-    def __init__(self):
-        self.tot_time_ns = 0
-        self.runs = 0
-
-    def filter(self, record):
-        msg = record.getMessage()
-        if msg.startswith("Total program execution duration:"):
-            self.runs += 1
-            self.tot_time_ns += int(msg.split(' ')[-1])
-        return True
-
-
 def _inner_run(reports,
                frontend,
                network_names,
@@ -254,43 +240,33 @@ def _inner_run(reports,
         model.validate()
         model.setup()
 
-        stop_watch = StopWatch(callgrind)
+        exec_stop_watch = StopWatch(callgrind)
         compile_stop_watch = StopWatch(callgrind)
 
         click.echo('Compiling network...', nl=False)
         compile_stop_watch.start_outer()
-        stop_watch.start_outer()
-
         model.compile()
+        compile_stop_watch.stop()
+
         model_output, overrides = model.run(once=True)
         if tile:
             click.echo(' Saving Tile to {}...'.format(tile), nl=False)
             model.model.predict_function._invoker.save(tile)
-
-        compile_stop_watch.stop()
 
         # Run a few more warmups -- this seems to improve the variability of the
         # benchmark results.
         if warmup:
             click.echo(' Warming up...', nl=False)
             model.run(warmup=True)
+
         click.echo(' Running...')
-
-        # Plaid currently doesn't make it easy to get at metrics,
-        # So we steal them from the logs
-        timef = ProgramTimeFilter()
-
-        stop_watch.start()
+        exec_stop_watch.start_outer()
         _, overrides = model.run()
-        stop_watch.stop()
+        exec_stop_watch.stop()
 
         # Record stopwatch times
-        execution_duration = overrides.get('time', stop_watch.elapsed())
-        exec_per_example = execution_duration / params.examples
-        tile_exec_per_example = exec_per_example
-        if timef.tot_time_ns:
-            tile_exec_per_example = 1e-9 + timef.tot_time_ns / 10.0**9 / params.examples
-
+        execution_duration = overrides.get('time', exec_stop_watch.elapsed())
+        exec_per_example = overrides.get('lastExecTimeInNS', execution_duration / params.examples)
         compile_duration = compile_stop_watch.elapsed()
         flops = overrides.get('flops', None)
         gflops = None
@@ -301,7 +277,7 @@ def _inner_run(reports,
 
         benchmark_results['compile_duration'] = compile_duration
         benchmark_results['duration_per_example'] = exec_per_example
-        benchmark_results['tile_duration_per_example'] = tile_exec_per_example
+        benchmark_results['tile_duration_per_example'] = exec_per_example
         benchmark_results['examples'] = params.examples
         benchmark_results['batch_size'] = params.batch_size
         benchmark_results['model'] = params.network_name
@@ -322,7 +298,7 @@ def _inner_run(reports,
         )
         print("%-20s %-25s %-20s" %
               (params.network_name, "%.2f ms" % (exec_per_example * 1000), "%.2f ms / %.2f fps" %
-               (tile_exec_per_example * 1000, 1.0 / tile_exec_per_example)))
+               (exec_per_example * 1000, 1.0 / exec_per_example)))
 
         (golden_output, precision) = model.golden_output()
         (correct, max_error, max_abs_error,
