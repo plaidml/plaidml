@@ -96,8 +96,8 @@ struct CreateNetworkOpLowering final
     // malloc the structure instance, and store the stack local into it.
     auto initNullNetworkValue = rewriter.create<LLVM::NullOp>(
         rewriter.getUnknownLoc(), networkTy.getPointerTo());
-    auto initConstOne = rewriter.create<LLVM::ConstantOp>(
-        rewriter.getUnknownLoc(), getIndexType(), rewriter.getI64ArrayAttr(1));
+    auto initConstOne =
+        createIndexConstant(rewriter, rewriter.getUnknownLoc(), 1);
     auto initNextNetworkValue = rewriter.create<LLVM::GEPOp>(
         rewriter.getUnknownLoc(), networkTy.getPointerTo(),
         initNullNetworkValue, mlir::ValueRange{initConstOne});
@@ -110,8 +110,8 @@ struct CreateNetworkOpLowering final
             .getResult(0);
     auto initNetworkPtr = rewriter.create<LLVM::BitcastOp>(
         rewriter.getUnknownLoc(), networkTy.getPointerTo(), initNetworkRawPtr);
-    rewriter.create<LLVM::StoreOp>(rewriter.getUnknownLoc(), initNetworkPtr,
-                                   initNetworkValue);
+    rewriter.create<LLVM::StoreOp>(rewriter.getUnknownLoc(), initNetworkValue,
+                                   initNetworkPtr);
 
     // Add the new LLVM terminator, replacing the abi.create_network op.
     auto initReturn = rewriter.create<LLVM::ReturnOp>(
@@ -260,12 +260,23 @@ struct LoopOpLowering final : public mlir::ConvertOpToLLVMPattern<abi::LoopOp> {
     llvm::errs() << "After iteration materialization, plaidml_exec: "
                  << execFunc << "\n";
 
-    // Clone the loop body.
+    // Clone the loop body, and merge it with our initial region.
     rewriter.cloneRegionBefore(loopOp.bodyRegion(), execFunc.getBody(),
                                execFunc.getBody().end(), mapping);
 
     llvm::errs() << "After cloning the body, plaidml_exec: " << execFunc
                  << "\n";
+
+    // Connect the entry block to the initial loop block.  Note that it's
+    // always safe to merge the blocks: the entry block has no terminator
+    // (yet), the loop's entry block has no predecessors (since it's an entry
+    // block), and the loop's entry block's arguments were converted in
+    // the cloning process.
+    auto it = execFunc.getRegion().begin();
+    ++it;
+    rewriter.mergeBlocks(&*it, execEntryBlock, {});
+
+    llvm::errs() << "After mergine, plaidml_exec: " << execFunc << "\n";
 
     if (mlir::failed(
             rewriter.convertRegionTypes(&execFunc.getBody(), typeConverter))) {
