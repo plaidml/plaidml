@@ -26,9 +26,7 @@ int main(int argc, char** argv) {
     for (const plaidml::TensorShape& shape : program.outputs()) {
       outputs.emplace_back(shape);
     }
-#if !defined(_WIN32)
     exe.run(inputs, outputs);
-#endif
     return EXIT_SUCCESS;
   } catch (const std::exception& ex) {
     std::cerr << "Caught unhandled exception: " << ex.what() << std::endl;

@@ -70,7 +70,6 @@ struct Runner {
   explicit Runner(Program program) : program(program) { program.compile(); }
 
   void run(const TensorBuffers& inputs) {
-#if !defined(_WIN32)
     std::vector<Buffer> inputBuffers;
     auto inputShapes = program.inputs();
     ASSERT_EQ(inputs.size(), inputShapes.size());
@@ -88,25 +87,20 @@ struct Runner {
     }
     auto executable = exec::Executable(program);
     executable.run(inputBuffers, outputBuffers);
-#endif
   }
 
   void checkExact(const TensorBuffers& expected) {
     ASSERT_EQ(expected.size(), program.outputs().size());
-#if !defined(_WIN32)
     for (size_t i = 0; i < expected.size(); i++) {
       std::visit([&](auto&& vec) { compareExact(outputBuffers[i], vec); }, expected[i]);
     }
-#endif
   }
 
   void checkClose(const TensorBuffers& expected, double tolerance) {
     ASSERT_EQ(expected.size(), program.outputs().size());
-#if !defined(_WIN32)
     for (size_t i = 0; i < expected.size(); i++) {
       std::visit([&](auto&& vec) { compareClose(outputBuffers[i], vec, tolerance); }, expected[i]);
     }
-#endif
   }
 
   Program program;
@@ -141,7 +135,6 @@ void TestFixture::writeForFileCheck(const Program& program) {
 
 void TestFixture::runProgram(Program program) {
   program.compile();
-#if !defined(_WIN32)
   std::vector<Buffer> inputs;
   for (const TensorShape& shape : program.inputs()) {
     inputs.emplace_back(shape);
@@ -151,7 +144,6 @@ void TestFixture::runProgram(Program program) {
     outputs.emplace_back(shape);
   }
   exec::Executable(program).run(inputs, outputs);
-#endif
 }
 
 }  // namespace plaidml
