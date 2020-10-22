@@ -45,6 +45,7 @@ toolchain(
         select({
             "//:gcc": ":cc-linux_x86_64-gcc_8.3.0",
             "//:clang": "@llvm_toolchain//:cc-clang-linux",
+            "//conditions:default": ":cc-linux_x86_64-gcc_8.3.0",
         }),
     toolchain_type = "@bazel_tools//tools/cpp:toolchain_type",
 )
