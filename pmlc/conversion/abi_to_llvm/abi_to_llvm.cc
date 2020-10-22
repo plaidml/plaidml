@@ -36,7 +36,9 @@ struct CreateNetworkOpLowering final
                   mlir::ConversionPatternRewriter &rewriter) const final {
     llvm::DebugFlag = true;
     auto createNetworkOp = mlir::cast<abi::CreateNetworkOp>(op);
-    llvm::errs() << "Converting create_network: " << createNetworkOp << "\n";
+    auto funcOp = createNetworkOp.getParentOfType<LLVM::LLVMFuncOp>();
+    llvm::errs() << "Converting create_network: " << createNetworkOp << "\nin "
+                 << funcOp << "\n";
 
     // We will need malloc() and free().
     auto moduleOp = createNetworkOp.getParentOfType<mlir::ModuleOp>();
@@ -117,6 +119,26 @@ struct CreateNetworkOpLowering final
     rewriter.eraseOp(createNetworkOp);
 
     rewriter.finalizeRootUpdate(createNetworkOp);
+
+    llvm::errs() << "Converting create_network produced: " << funcOp << "\n";
+
+    return mlir::success();
+  }
+};
+
+struct DoneOpLowering final : public mlir::ConvertOpToLLVMPattern<abi::DoneOp> {
+  using mlir::ConvertOpToLLVMPattern<abi::DoneOp>::ConvertOpToLLVMPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::Operation *op, mlir::ArrayRef<mlir::Value> operands,
+                  mlir::ConversionPatternRewriter &rewriter) const final {
+    llvm::DebugFlag = true;
+    auto doneOp = mlir::cast<abi::DoneOp>(op);
+    rewriter.updateRootInPlace(doneOp, [&] {
+      rewriter.setInsertionPoint(doneOp);
+      rewriter.create<LLVM::ReturnOp>(doneOp.getLoc(), mlir::ValueRange{});
+      rewriter.eraseOp(doneOp);
+    });
     return mlir::success();
   }
 };
@@ -173,39 +195,87 @@ struct LoopOpLowering final : public mlir::ConvertOpToLLVMPattern<abi::LoopOp> {
     // pointer to an struct, where each struct field is a pointer to
     // the LLVM type of the corresponding entry block argument
     // (the arguments after the arguments passed via the network structure).
-    mlir::SmallVector<LLVMType, 8> execInputTypes;
-    mlir::SmallVector<LLVMType, 8> execInputPtrTypes;
+    mlir::SmallVector<LLVMType, 8> iterationTypes;
+    mlir::SmallVector<LLVMType, 8> iterationFieldTypes;
     for (unsigned idx = loopOp.getNumNetworkFields();
          idx < loopOp.bodyRegion().getNumArguments(); ++idx) {
       auto ty = typeConverter
                     .convertType(loopOp.bodyRegion().getArgument(idx).getType())
                     .cast<LLVMType>();
-      execInputTypes.emplace_back(ty);
-      execInputPtrTypes.emplace_back(ty.getPointerTo());
+      iterationTypes.emplace_back(ty);
+      iterationFieldTypes.emplace_back(ty.getPointerTo());
     }
-    auto execInputTy =
-        LLVMType::getStructTy(rewriter.getContext(), execInputPtrTypes);
-    mlir::SmallVector<LLVMType, 2> execArgTypes;
-    execArgTypes.emplace_back(networkTy.getPointerTo());
-    execArgTypes.emplace_back(execInputTy.getPointerTo());
+    auto iterationTy =
+        LLVMType::getStructTy(rewriter.getContext(), iterationFieldTypes);
 
     auto execFunc = rewriter.create<LLVM::LLVMFuncOp>(
         loopOp.getLoc(), pmlc::util::kPlaidmlExec,
-        LLVMType::getFunctionTy(getVoidType(), execArgTypes,
-                                /*isVarArg=*/false));
+        LLVMType::getFunctionTy(
+            getVoidType(),
+            mlir::ArrayRef<LLVMType>{networkTy.getPointerTo(),
+                                     iterationTy.getPointerTo()},
+            /*isVarArg=*/false));
 
     llvm::errs() << "Initial plaidml_exec: " << execFunc << "\n";
 
-#if 0
-    for (auto operand : loopOp.getOperation()->getOperands()) {
-      auto ty = getTypeConverter()
-                    ->convertType(operand.getType())
-                    .dyn_cast_or_null<LLVM::LLVMStructType>();
-      if (!ty) {
-        continue;
-      }
-      execArgTypes.emplace_back(ty.getPointerTo());
+    // Create an entry block, and materialize the arguments for the loop body.
+    auto *execEntryBlock = rewriter.createBlock(
+        &execFunc.getBody(), execFunc.getBody().end(),
+        mlir::TypeRange{networkTy.getPointerTo(), iterationTy.getPointerTo()});
+    rewriter.setInsertionPointToStart(execEntryBlock);
+    mlir::BlockAndValueMapping mapping;
+    unsigned bodyArgIdx = 0;
+
+    // Materialize the network structure arguments.
+    auto networkValue = rewriter.create<LLVM::LoadOp>(
+        rewriter.getUnknownLoc(), execEntryBlock->getArgument(0));
+    for (auto fieldIdx = 0; fieldIdx < networkFieldTypes.size(); ++fieldIdx) {
+      auto fieldVal = rewriter.create<LLVM::ExtractValueOp>(
+          rewriter.getUnknownLoc(), networkFieldTypes[fieldIdx], networkValue,
+          rewriter.getI64ArrayAttr(fieldIdx));
+      auto bodyArg = loopOp.bodyRegion().getArgument(bodyArgIdx++);
+      auto argVal = typeConverter.materializeSourceConversion(
+          rewriter, rewriter.getUnknownLoc(), bodyArg.getType(),
+          mlir::ValueRange{fieldVal});
+      mapping.map(bodyArg, argVal);
     }
+    llvm::errs() << "After network materialization, plaidml_exec: " << execFunc
+                 << "\n";
+
+    // Materialize the iteration arguments.
+    auto iterationValue = rewriter.create<LLVM::LoadOp>(
+        rewriter.getUnknownLoc(), execEntryBlock->getArgument(1));
+    for (auto fieldIdx = 0; fieldIdx < iterationFieldTypes.size(); ++fieldIdx) {
+      auto ptrVal = rewriter.create<LLVM::ExtractValueOp>(
+          rewriter.getUnknownLoc(), iterationFieldTypes[fieldIdx],
+          iterationValue, rewriter.getI64ArrayAttr(fieldIdx));
+      auto fieldVal =
+          rewriter.create<LLVM::LoadOp>(rewriter.getUnknownLoc(), ptrVal);
+      auto bodyArg = loopOp.bodyRegion().getArgument(bodyArgIdx++);
+      auto argVal = typeConverter.materializeSourceConversion(
+          rewriter, rewriter.getUnknownLoc(), bodyArg.getType(),
+          mlir::ValueRange{fieldVal});
+      mapping.map(bodyArg, argVal);
+    }
+    llvm::errs() << "After iteration materialization, plaidml_exec: "
+                 << execFunc << "\n";
+
+    // Clone the loop body.
+    rewriter.cloneRegionBefore(loopOp.bodyRegion(), execFunc.getBody(),
+                               execFunc.getBody().end(), mapping);
+
+    llvm::errs() << "After cloning the body, plaidml_exec: " << execFunc
+                 << "\n";
+
+    if (mlir::failed(
+            rewriter.convertRegionTypes(&execFunc.getBody(), typeConverter))) {
+      rewriter.cancelRootUpdate(loopOp);
+      return mlir::failure();
+    }
+
+    llvm::errs() << "After converting region types, plaidml_exec: " << execFunc
+                 << "\n";
+#if 0
 
     auto finiFunc = rewriter.create<LLVM::LLVMFuncOp>(
         mainFunc.getLoc(), pmlc::util::kPlaidmlFini,
@@ -417,7 +487,8 @@ struct LoopOpLowering final : public mlir::ConvertOpToLLVMPattern<abi::LoopOp> {
 void populateABIToLLVMConversionPatterns(
     mlir::LLVMTypeConverter &converter,
     mlir::OwningRewritePatternList &patterns) {
-  patterns.insert<CreateNetworkOpLowering, LoopOpLowering>(converter);
+  patterns.insert<CreateNetworkOpLowering, DoneOpLowering, LoopOpLowering>(
+      converter);
 }
 
 } // namespace pmlc::conversion::abi_to_llvm
