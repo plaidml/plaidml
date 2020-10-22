@@ -1,18 +1,22 @@
 // RUN: pmlc-opt -x86-convert-std-to-llvm -x86-trace-linking %s | pmlc-jit | FileCheck %s
 
-func @__trace_0() attributes {id = 0 : i64, msg = "msg\n", trace}
+func @print_memref_f32(memref<*xf32>)
+func @plaidml_rt_thread_num() -> index
 
 func @main() {
-  %c1 = constant 1 : index
-  omp.parallel num_threads(%c1 : index) private(%c1: index) {
-    call @__trace_0() : () -> ()
-    omp.flush
-    omp.barrier
-    omp.taskwait
-    omp.taskyield
+  %num_threads = constant 4 : index
+  %B = alloc() : memref<4xf32>
+  omp.parallel num_threads(%num_threads : index) {
+    %tid = call @plaidml_rt_thread_num() : () -> index
+    %c0 = constant 0 : index
+    %cf0 = constant 42.0 : f32
+    store %cf0, %B[%tid] : memref<4xf32>
     omp.terminator
   }
+  %B_u = memref_cast %B : memref<4xf32> to memref<*xf32>
+  call @print_memref_f32(%B_u) : (memref<*xf32>) -> ()
   return
 }
 
-// CHECK: msg
+// CHECK: [42,  42,  42,  42]
+

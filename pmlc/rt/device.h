@@ -18,6 +18,7 @@ public:
 
   virtual std::unique_ptr<Executable>
   compile(const std::shared_ptr<pmlc::compiler::Program> &program) = 0;
+  double execTimeInMS{0.0};
 };
 
 } // namespace pmlc::rt

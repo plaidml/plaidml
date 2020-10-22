@@ -242,12 +242,15 @@ class InferenceModel(Model):
         else:
             epoch_size = self.params.epoch_size
         out = self.model.predict(x=self.x[:epoch_size], batch_size=self.params.batch_size)
-        # Hack to ensure eventlog gets written
-        if not once and not warmup:
-            import keras.backend as b
-            if b.backend() == 'plaidml':
-                b._ctx.shutdown()
-        return (out, {})
+
+        overrides = {}
+        import keras.backend as b
+        if b.backend() == "plaidml.bridge.keras":
+            import plaidml.bridge.keras as keras_bridge
+            if keras_bridge.lastExecTimeInMS:
+                overrides['lastExecTimeInNS'] = keras_bridge.lastExecTimeInMS / 1000
+
+        return (out, overrides)
 
     def golden_output(self):
         return (self.keras_golden_output('infer'), core.Precision.INFERENCE)
