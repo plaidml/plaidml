@@ -251,10 +251,10 @@ struct SubgroupCostModel {
       auto mi = computeMemoryInfo(ioDimStrides[i], ioTensorStrides[i],
                                   ioElementSizesInBytes[i]);
       if (mi.subgroupCount > 1) {
-        return std::numeric_limits<double>::infinity();
+        return;
       }
       if (i == 0 && mi.subgroupCount == 0) {
-        return std::numeric_limits<double>::infinity();
+        return;
       }
 
       if (mi.subgroupCount) {
@@ -272,7 +272,7 @@ struct SubgroupCostModel {
     if (totRegisters > params.maxRegsPerThread) {
       IVLOG(3, "Invalid subgroup plan: " << plan << ", totRegisters = "
                                          << totRegisters);
-      return std::numeric_limits<double>::infinity();
+      return;
     }
     IVLOG(3, "Valid subgroup plan: " << plan
                                      << ", totRegisters = " << totRegisters);
