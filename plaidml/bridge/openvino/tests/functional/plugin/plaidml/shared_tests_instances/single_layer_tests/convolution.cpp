@@ -45,19 +45,19 @@ const auto conv2DParams_AutoPadValid = ::testing::Combine(::testing::ValuesIn(ke
                                                           ::testing::Values(ngraph::op::PadType::VALID)       //
 );
 
-INSTANTIATE_TEST_CASE_P(Convolution2D_ExplicitPadding, ConvolutionLayerTest,
-                        ::testing::Combine(conv2DParams_ExplicitPadding,                            //
-                                           ::testing::ValuesIn(netPrecisions),                      //
-                                           ::testing::Values(std::vector<size_t>({1, 3, 30, 30})),  //
-                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),     //
-                        ConvolutionLayerTest::getTestCaseName);
+INSTANTIATE_TEST_SUITE_P(Convolution2D_ExplicitPadding, ConvolutionLayerTest,
+                         ::testing::Combine(conv2DParams_ExplicitPadding,                            //
+                                            ::testing::ValuesIn(netPrecisions),                      //
+                                            ::testing::Values(std::vector<size_t>({1, 3, 30, 30})),  //
+                                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),     //
+                         ConvolutionLayerTest::getTestCaseName);
 
-INSTANTIATE_TEST_CASE_P(Convolution2D_AutoPadValid, ConvolutionLayerTest,
-                        ::testing::Combine(conv2DParams_AutoPadValid,  //
-                                           ::testing::ValuesIn(netPrecisions),
-                                           ::testing::Values(std::vector<size_t>({1, 3, 30, 30})),  //
-                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),     //
-                        ConvolutionLayerTest::getTestCaseName);
+INSTANTIATE_TEST_SUITE_P(Convolution2D_AutoPadValid, ConvolutionLayerTest,
+                         ::testing::Combine(conv2DParams_AutoPadValid,  //
+                                            ::testing::ValuesIn(netPrecisions),
+                                            ::testing::Values(std::vector<size_t>({1, 3, 30, 30})),  //
+                                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),     //
+                         ConvolutionLayerTest::getTestCaseName);
 /* ============= 3D Convolution ============= */
 const std::vector<std::vector<size_t>> kernels3d = {{3, 3, 3}, {3, 5, 3}};
 const std::vector<std::vector<ptrdiff_t>> paddings3d = {{0, 0, 0}, {0, 2, 0}};
@@ -82,18 +82,18 @@ const auto conv3DParams_AutoPadValid = ::testing::Combine(::testing::ValuesIn(ke
                                                           ::testing::Values(ngraph::op::PadType::VALID)          //
 );
 
-INSTANTIATE_TEST_CASE_P(Convolution3D_ExplicitPadding, ConvolutionLayerTest,
-                        ::testing::Combine(conv3DParams_ExplicitPadding,                                //
-                                           ::testing::ValuesIn(netPrecisions),                          //
-                                           ::testing::Values(std::vector<size_t>({1, 3, 10, 10, 10})),  //
-                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),         //
-                        ConvolutionLayerTest::getTestCaseName);
+INSTANTIATE_TEST_SUITE_P(Convolution3D_ExplicitPadding, ConvolutionLayerTest,
+                         ::testing::Combine(conv3DParams_ExplicitPadding,                                //
+                                            ::testing::ValuesIn(netPrecisions),                          //
+                                            ::testing::Values(std::vector<size_t>({1, 3, 10, 10, 10})),  //
+                                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),         //
+                         ConvolutionLayerTest::getTestCaseName);
 
-INSTANTIATE_TEST_CASE_P(Convolution3D_AutoPadValid, ConvolutionLayerTest,
-                        ::testing::Combine(conv3DParams_AutoPadValid,                                   //
-                                           ::testing::ValuesIn(netPrecisions),                          //
-                                           ::testing::Values(std::vector<size_t>({1, 3, 10, 10, 10})),  //
-                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),         //
-                        ConvolutionLayerTest::getTestCaseName);
+INSTANTIATE_TEST_SUITE_P(Convolution3D_AutoPadValid, ConvolutionLayerTest,
+                         ::testing::Combine(conv3DParams_AutoPadValid,                                   //
+                                            ::testing::ValuesIn(netPrecisions),                          //
+                                            ::testing::Values(std::vector<size_t>({1, 3, 10, 10, 10})),  //
+                                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),         //
+                         ConvolutionLayerTest::getTestCaseName);
 
 }  // namespace

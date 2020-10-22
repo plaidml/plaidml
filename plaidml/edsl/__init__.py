@@ -14,76 +14,17 @@ from plaidml.ffi import ForeignObject, ffi, ffi_call, lib
 
 logger = logging.getLogger(__name__)
 
-
-def __init():
-    """Initializes the PlaidML EDSL API."""
-    ffi_call(lib.plaidml_edsl_init)
-
-
-ffi.init_once(__init, 'plaidml_edsl_init')
-
-
-class LogicalShape(ForeignObject):
-    """Represents the logical shape of a Tensor.
-
-    Args:
-        dtype (:py:class:`~plaidml.core.DType`): The element DType.
-        dims (:obj:`list` of :obj:`int`, optional): The dimensions for this
-            LogicalShape.
-    """
-
-    __ffi_del__ = lib.plaidml_logical_shape_free
-    __ffi_repr__ = lib.plaidml_logical_shape_repr
-
-    def __init__(self, dtype=None, dims=[], ptr=None):
-        if ptr:
-            ffi_obj = ptr
-        elif dtype is not None:
-            raw_dims = ffi.new('int64_t[]', [0 if x is None else x for x in dims])
-            ffi_obj = ffi_call(lib.plaidml_logical_shape_alloc, dtype, len(dims), raw_dims)
-        else:
-            raise ValueError('One of dtype= or ptr= must be specified.')
-        super(LogicalShape, self).__init__(ffi_obj)
-
-    @property
-    def dtype(self):
-        """:py:class:`~plaidml.core.DType`: Returns the element DType of this
-        LogicalShape.
-        """
-        return DType(self._methodcall(lib.plaidml_logical_shape_get_dtype))
-
-    @property
-    def rank(self):
-        """:obj:`int`: Returns the rank (i.e. number of dimensions) of this
-        LogicalShape.
-        """
-        return self._methodcall(lib.plaidml_logical_shape_get_rank)
-
-    @property
-    def sizes(self):
-        """:obj:`list` of :obj:`int`: Returns the sizes of this LogicalShape."""
-        return get_integers(lib.plaidml_logical_shape_get_sizes, self.as_ptr())
-
-    def into_TensorShape(self):
-        """Converts a ``LogicalShape`` into a ``TensorShape``.
-
-        Returns:
-            :py:class:`~plaidml.core.TensorShape`: The resultant TensorShape.
-        """
-        return TensorShape(ptr=self._methodcall(lib.plaidml_logical_shape_into_tensor_shape))
-
-
 Constraint = namedtuple('Constraint', ['lhs', 'rhs'])
 
 
-def wrap_dim(x):
+def _wrap_dim(x):
     if isinstance(x, six.integer_types):
         return TensorDim(expr=ffi_call(lib.plaidml_dim_expr_int, x))
     return x
 
 
-def dim_op(op, *args):
-    args = [wrap_dim(x) for x in args]
+def _dim_op(op, *args):
+    args = [_wrap_dim(x) for x in args]
     raw_args = [x.as_ptr() for x in args]
     return ffi_call(lib.plaidml_dim_expr_op, op, len(args), raw_args)
 
@@ -100,9 +41,6 @@ class TensorDim(ForeignObject):
             expr = ffi_call(lib.plaidml_dim_expr_none)
         super(TensorDim, self).__init__(expr)
 
-    def _bind(self, expr):
-        self.take_ptr(expr)
-
     def __neg__(self):
         """Negates a TensorDim in a polynomial expression.
 
@@ -110,9 +48,9 @@ class TensorDim(ForeignObject):
             >>> N, M = TensorDims(2)
             >>> A = Placeholder(DType.FLOAT32, [3, 3])
             >>> A.bind_dims(N, M)
-            >>> R = TensorOutput(-N)
+            >>> R = Contraction().outShape(-N)
         """
-        return TensorDim(dim_op(lib.PLAIDML_INT_OP_NEG, self))
+        return TensorDim(_dim_op(lib.PLAIDML_INT_OP_NEG, self))
 
     def __add__(self, other):
         """Performs an addition between a TensorDim and another operand in a
@@ -122,9 +60,9 @@ class TensorDim(ForeignObject):
             >>> N, M = TensorDims(2)
             >>> A = Placeholder(DType.FLOAT32, [3, 3])
             >>> A.bind_dims(N, M)
-            >>> R = TensorOutput(N + 5)
+            >>> R = Contraction().outShape(N + 5)
         """
-        return TensorDim(dim_op(lib.PLAIDML_INT_OP_ADD, self, other))
+        return TensorDim(_dim_op(lib.PLAIDML_INT_OP_ADD, self, other))
 
     def __radd__(self, other):
         """Performs an addition between a TensorDim and another operand in a
@@ -134,9 +72,9 @@ class TensorDim(ForeignObject):
             >>> N, M = TensorDims(2)
             >>> A = Placeholder(DType.FLOAT32, [3, 3])
             >>> A.bind_dims(N, M)
-            >>> R = TensorOutput(5 + N)
+            >>> R = Contraction().outShape(5 + N)
         """
-        return TensorDim(dim_op(lib.PLAIDML_INT_OP_ADD, other, self))
+        return TensorDim(_dim_op(lib.PLAIDML_INT_OP_ADD, other, self))
 
     def __sub__(self, other):
         """Performs a subtraction between a TensorDim and another operand in a
@@ -146,9 +84,9 @@ class TensorDim(ForeignObject):
             >>> N, M = TensorDims(2)
             >>> A = Placeholder(DType.FLOAT32, [3, 3])
             >>> A.bind_dims(N, M)
-            >>> R = TensorOutput(N - 5)
+            >>> R = Contraction().outShape(N - 5)
         """
-        return TensorDim(dim_op(lib.PLAIDML_INT_OP_SUB, self, other))
+        return TensorDim(_dim_op(lib.PLAIDML_INT_OP_SUB, self, other))
 
     def __rsub__(self, other):
         """Performs a subtraction between a TensorDim and another operand in a
@@ -158,9 +96,9 @@ class TensorDim(ForeignObject):
             >>> N, M = TensorDims(2)
             >>> A = Placeholder(DType.FLOAT32, [3, 3])
             >>> A.bind_dims(N, M)
-            >>> R = TensorOutput(5 - N)
+            >>> R = Contraction().outShape(5 - N)
         """
-        return TensorDim(dim_op(lib.PLAIDML_INT_OP_SUB, other, self))
+        return TensorDim(_dim_op(lib.PLAIDML_INT_OP_SUB, other, self))
 
     def __mul__(self, other):
         """Performs a multiplication between a TensorDim and another operand in
@@ -170,9 +108,9 @@ class TensorDim(ForeignObject):
             >>> N, M = TensorDims(2)
             >>> A = Placeholder(DType.FLOAT32, [3, 3])
             >>> A.bind_dims(N, M)
-            >>> R = TensorOutput(N * 5)
+            >>> R = Contraction().outShape(N * 5)
         """
-        return TensorDim(dim_op(lib.PLAIDML_INT_OP_MUL, self, other))
+        return TensorDim(_dim_op(lib.PLAIDML_INT_OP_MUL, self, other))
 
     def __rmul__(self, other):
         """Performs a multiplication between a TensorDim and another operand in
@@ -182,9 +120,9 @@ class TensorDim(ForeignObject):
             >>> N, M = TensorDims(2)
             >>> A = Placeholder(DType.FLOAT32, [3, 3])
             >>> A.bind_dims(N, M)
-            >>> R = TensorOutput(5 * N)
+            >>> R = Contraction().outShape(5 * N)
         """
-        return TensorDim(dim_op(lib.PLAIDML_INT_OP_MUL, other, self))
+        return TensorDim(_dim_op(lib.PLAIDML_INT_OP_MUL, other, self))
 
     def __floordiv__(self, other):
         """Performs a floor division between a TensorDim and another operand in
@@ -194,9 +132,9 @@ class TensorDim(ForeignObject):
             >>> N, M = TensorDims(2)
             >>> A = Placeholder(DType.FLOAT32, [3, 3])
             >>> A.bind_dims(N, M)
-            >>> R = TensorOutput(N // 5)
+            >>> R = Contraction().outShape(N // 5)
         """
-        return TensorDim(dim_op(lib.PLAIDML_INT_OP_DIV, self, other))
+        return TensorDim(_dim_op(lib.PLAIDML_INT_OP_DIV, self, other))
 
     def __rfloordiv__(self, other):
         """Performs a floor division between a TensorDim and another operand in
@@ -206,12 +144,12 @@ class TensorDim(ForeignObject):
             >>> N, M = TensorDims(2)
             >>> A = Placeholder(DType.FLOAT32, [3, 3])
             >>> A.bind_dims(N, M)
-            >>> R = TensorOutput(5 // N)
+            >>> R = Contraction().outShape(5 // N)
         """
-        return TensorDim(dim_op(lib.PLAIDML_INT_OP_DIV, other, self))
+        return TensorDim(_dim_op(lib.PLAIDML_INT_OP_DIV, other, self))
 
 
-def wrap_poly(x):
+def _wrap_poly(x):
     if isinstance(x, six.integer_types):
         return TensorIndex(expr=ffi_call(lib.plaidml_poly_expr_literal, x))
     if isinstance(x, TensorDim):
@@ -219,8 +157,8 @@ def wrap_poly(x):
     return x
 
 
-def poly_op(op, *args):
-    args = [wrap_poly(x) for x in args]
+def _poly_op(op, *args):
+    args = [_wrap_poly(x) for x in args]
     raw_args = [x.as_ptr() for x in args]
     return ffi_call(lib.plaidml_poly_expr_op, op, len(args), raw_args)
 
@@ -247,11 +185,9 @@ class TensorIndex(ForeignObject):
         Example:
             >>> i, j = TensorIndexes(2)
             >>> A = Placeholder(DType.FLOAT32, [3, 3])
-            >>> R = TensorOutput()
-            >>> R[()] += A[i, j]
-            >>> R.add_constraint(i < 5)
+            >>> R = Contraction().sum(A[i, j]).add_constraint(i < 5).build()
         """
-        return Constraint(self, wrap_dim(rhs))
+        return Constraint(self, _wrap_dim(rhs))
 
     def __neg__(self):
         """Negates a TensorIndex in a polynomial expression.
@@ -259,10 +195,9 @@ class TensorIndex(ForeignObject):
         Example:
             >>> i, j = TensorIndexes(2)
             >>> A = Placeholder(DType.FLOAT32, [3, 3])
-            >>> R = TensorOutput()
-            >>> R[()] += A[-i, j]
+            >>> R = Contraction().sum(A[-i, j]).build()
         """
-        return TensorIndex(poly_op(lib.PLAIDML_INT_OP_NEG, self))
+        return TensorIndex(_poly_op(lib.PLAIDML_INT_OP_NEG, self))
 
     def __add__(self, rhs):
         """Performs an addition between a TensorIndex and another operand in a
@@ -271,10 +206,9 @@ class TensorIndex(ForeignObject):
         Example:
             >>> i, j = TensorIndexes(2)
             >>> A = Placeholder(DType.FLOAT32, [3, 3])
-            >>> R = TensorOutput()
-            >>> R[()] += A[i + 5, j]
+            >>> R = Contraction().sum(A[i + 5, j]).build()
         """
-        return TensorIndex(poly_op(lib.PLAIDML_INT_OP_ADD, self, rhs))
+        return TensorIndex(_poly_op(lib.PLAIDML_INT_OP_ADD, self, rhs))
 
     def __radd__(self, lhs):
         """Performs an addition between a TensorIndex and another operand in a
@@ -283,10 +217,9 @@ class TensorIndex(ForeignObject):
         Example:
             >>> i, j = TensorIndexes(2)
             >>> A = Placeholder(DType.FLOAT32, [3, 3])
-            >>> R = TensorOutput()
-            >>> R[()] += A[5 + i, j]
+            >>> R = Contraction().sum(A[5 + i, j]).build()
         """
-        return TensorIndex(poly_op(lib.PLAIDML_INT_OP_ADD, lhs, self))
+        return TensorIndex(_poly_op(lib.PLAIDML_INT_OP_ADD, lhs, self))
 
     def __sub__(self, rhs):
         """Performs a subtraction between a TensorIndex and another operand in a
@@ -295,10 +228,9 @@ class TensorIndex(ForeignObject):
         Example:
             >>> i, j = TensorIndexes(2)
             >>> A = Placeholder(DType.FLOAT32, [3, 3])
-            >>> R = TensorOutput()
-            >>> R[()] += A[i - 5, j]
+            >>> R = Contraction().sum(A[i - 5, j]).build()
         """
-        return TensorIndex(poly_op(lib.PLAIDML_INT_OP_SUB, self, rhs))
+        return TensorIndex(_poly_op(lib.PLAIDML_INT_OP_SUB, self, rhs))
 
     def __rsub__(self, lhs):
         """Performs a subtraction between a TensorIndex and another operand in a
@@ -307,10 +239,9 @@ class TensorIndex(ForeignObject):
         Example:
             >>> i, j = TensorIndexes(2)
             >>> A = Placeholder(DType.FLOAT32, [3, 3])
-            >>> R = TensorOutput()
-            >>> R[()] += A[5 - i, j]
+            >>> R = Contraction().sum(A[5 - i, j]).build()
         """
-        return TensorIndex(poly_op(lib.PLAIDML_INT_OP_SUB, lhs, self))
+        return TensorIndex(_poly_op(lib.PLAIDML_INT_OP_SUB, lhs, self))
 
     def __mul__(self, rhs):
         """Performs a multiplication between a TensorIndex and another operand
@@ -319,10 +250,10 @@ class TensorIndex(ForeignObject):
         Example:
             >>> i, j = TensorIndexes(2)
             >>> A = Placeholder(DType.FLOAT32, [3, 3])
-            >>> R = TensorOutput()
-            >>> R[()] += A[i * 5, j]
+            >>> R = Contraction().sum()
+            >>> R = Contraction().sum(A[i * 5, j]).build()
         """
-        return TensorIndex(poly_op(lib.PLAIDML_INT_OP_MUL, self, rhs))
+        return TensorIndex(_poly_op(lib.PLAIDML_INT_OP_MUL, self, rhs))
 
     def __rmul__(self, lhs):
         """Performs a multiplication between a TensorIndex and another operand
@@ -331,10 +262,9 @@ class TensorIndex(ForeignObject):
         Example:
             >>> i, j = TensorIndexes(2)
             >>> A = Placeholder(DType.FLOAT32, [3, 3])
-            >>> R = TensorOutput()
-            >>> R[()] += A[5 * i, j]
+            >>> R = Contraction().sum(A[5 * i, j]).build()
         """
-        return TensorIndex(poly_op(lib.PLAIDML_INT_OP_MUL, lhs, self))
+        return TensorIndex(_poly_op(lib.PLAIDML_INT_OP_MUL, lhs, self))
 
     def __floordiv__(self, rhs):
         """Performs a floor division between a TensorIndex and another operand
@@ -343,10 +273,9 @@ class TensorIndex(ForeignObject):
         Example:
             >>> i, j = TensorIndexes(2)
             >>> A = Placeholder(DType.FLOAT32, [3, 3])
-            >>> R = TensorOutput()
-            >>> R[()] += A[i // 5, j]
+            >>> R = Contraction().sum(A[i // 5, j]).build()
         """
-        return TensorIndex(poly_op(lib.PLAIDML_INT_OP_DIV, self, rhs))
+        return TensorIndex(_poly_op(lib.PLAIDML_INT_OP_DIV, self, rhs))
 
     def __rfloordiv__(self, lhs):
         """Performs a floor division between a TensorIndex and another operand
@@ -355,112 +284,186 @@ class TensorIndex(ForeignObject):
         Example:
             >>> i, j = TensorIndexes(2)
             >>> A = Placeholder(DType.FLOAT32, [3, 3])
-            >>> R = TensorOutput()
-            >>> R[()] += A[5 // i, j]
+            >>> R = Contraction().sum(A[5 // i, j]).build()
         """
-        return TensorIndex(poly_op(lib.PLAIDML_INT_OP_DIV, lhs, self))
+        return TensorIndex(_poly_op(lib.PLAIDML_INT_OP_DIV, lhs, self))
 
 
-class _IndexMap(ForeignObject):
-    __ffi_del__ = lib.plaidml_expr_free
-    __ffi_repr__ = lib.plaidml_expr_repr
+class TensorLens(object):
 
-    def __init__(self, ref, key):
-        if isinstance(key, tuple) or isinstance(key, list):
-            idxs = key
+    def __init__(self, source='', target=''):
+        self.map = []
+        if len(source) != len(target):
+            raise ValueError('source and target rank mismatch')
+        for i in range(len(source)):
+            pos = target.find(source[i])
+            if pos == -1:
+                raise ValueError('source and target dims mismatch')
+            self.map.append(pos)
+
+    def apply(self, dims):
+        if len(self.map) == 0:
+            return dims
+        if len(dims) != len(self.map):
+            raise ValueError('rank mismatch in TensorLens apply')
+        return [dims[x] for x in self.map]
+
+
+class Contraction(object):
+
+    def __init__(self, lens=TensorLens(), name=''):
+        self.__lens = lens
+        self.__name = name
+        self.__outDims = []
+        self.__outIdxs = []
+        self.__constraints = []
+        self.__rhs = None
+        self.__agg_op = None
+        self.__init = None
+
+    def outShape(self, *args):
+        self.__outDims = args
+        return self
+
+    def outAccess(self, *args):
+        self.__outIdxs = args
+        return self
+
+    def assign(self, rhs):
+        self.__agg_op = lib.PLAIDML_AGG_OP_ASSIGN
+        self.__rhs = rhs
+        return self
+
+    def max(self, rhs):
+        """Performs a `maximum` reduction within a contraction.
+
+        Example:
+            >>> i, j = TensorIndexes(2)
+            >>> A = Placeholder(DType.FLOAT32, [3, 3])
+            >>> R = Contraction().max(A[i, j]).build()
+        """
+        self.__agg_op = lib.PLAIDML_AGG_OP_MAX
+        self.__rhs = rhs
+        return self
+
+    def min(self, rhs):
+        """Performs a `minimum` reduction within a contraction.
+
+        Example:
+            >>> i, j = TensorIndexes(2)
+            >>> A = Placeholder(DType.FLOAT32, [3, 3])
+            >>> R = Contraction().min(A[i, j]).build()
+        """
+        self.__agg_op = lib.PLAIDML_AGG_OP_MIN
+        self.__rhs = rhs
+        return self
+
+    def product(self, rhs):
+        """Performs a `product` reduction within a contraction.
+
+        Example:
+            >>> i, j = TensorIndexes(2)
+            >>> A = Placeholder(DType.FLOAT32, [3, 3])
+            >>> R = Contraction().product(A[i, j]).build()
+        """
+        self.__agg_op = lib.PLAIDML_AGG_OP_PROD
+        return self
+
+    def sum(self, rhs):
+        """Performs a `summation` reduction within a contraction.
+
+        Example:
+            >>> i, j = TensorIndexes(2)
+            >>> A = Placeholder(DType.FLOAT32, [3, 3])
+            >>> R = Contraction().sum(A[i, j]).build()
+        """
+        self.__agg_op = lib.PLAIDML_AGG_OP_SUM
+        self.__rhs = rhs
+        return self
+
+    def init(self, rhs):
+        self.__init = rhs
+        return self
+
+    def add_constraint(self, constraint):
+        self.__constraints.append(constraint)
+        return self
+
+    def add_constraints(self, constraints):
+        self.__constraints.extend(constraints)
+        return self
+
+    def build(self):
+
+        if isinstance(self.__rhs, IndexedTensor):
+            rhs = self.__rhs
+        elif isinstance(self.__rhs, Tensor):
+            rhs = IndexedTensor(lib.PLAIDML_COMBO_OP_NONE, ref=self.__rhs, idxs=())
         else:
-            idxs = [key]
-        idxs = [wrap_poly(x) for x in idxs]
-        raw_idxs = [x.as_ptr() for x in idxs]
-        expr = ffi_call(lib.plaidml_expr_index_map, ref.as_ptr(), len(idxs), raw_idxs)
-        super(_IndexMap, self).__init__(expr)
+            tensor = Tensor(value=self.__rhs)
+            rhs = IndexedTensor(lib.PLAIDML_COMBO_OP_NONE, ref=tensor, idxs=())
 
+        def make_list(idxs):
+            if isinstance(idxs, tuple) or isinstance(idxs, list):
+                return idxs
+            return [idxs]
 
-class _SizeMap(ForeignObject):
-    __ffi_del__ = lib.plaidml_expr_free
-    __ffi_repr__ = lib.plaidml_expr_repr
+        dims = [_wrap_dim(x) for x in self.__outDims]
+        raw_dims = [x.as_ptr() for x in self.__lens.apply(dims)]
 
-    def __init__(self, dims):
-        dims = [wrap_dim(x) for x in dims]
-        raw_dims = [x.as_ptr() for x in dims]
-        expr = ffi_call(lib.plaidml_expr_size_map, len(dims), raw_dims)
-        super(_SizeMap, self).__init__(expr)
+        idxs = [_wrap_poly(x) for x in make_list(self.__outIdxs)]
+        raw_idxs = [x.as_ptr() for x in self.__lens.apply(idxs)]
 
+        init = ffi.NULL
+        if self.__init:
+            init = self.__init.as_ptr()
 
-class _Contraction(ForeignObject):
-    __ffi_del__ = lib.plaidml_expr_free
-    __ffi_repr__ = lib.plaidml_expr_repr
-
-    def __init__(self, agg_op, combo_op, src_idxs, sink_idxs, sink_sizes, name):
-        src_idxs = [x.as_ptr() for x in src_idxs]
-        expr = ffi_call(
+        tensor = Tensor(expr=ffi_call(
             lib.plaidml_expr_contraction,
-            agg_op,
-            combo_op,
-            sink_idxs.as_ptr(),
-            sink_sizes.as_ptr(),
-            len(src_idxs),
-            src_idxs,
-            name.encode(),
-        )
-        super(_Contraction, self).__init__(expr)
+            self.__agg_op,
+            rhs._op,
+            len(raw_idxs),
+            raw_idxs,
+            raw_dims,
+            init,
+            self.__name.encode(),
+        ))
 
+        if rhs._op == lib.PLAIDML_COMBO_OP_NONE:
+            operands = [rhs]
+        else:
+            operands = rhs._args
 
-_ContractionPart = namedtuple('_ContractionPart', ['op', 'args'])
+        for operand in operands:
+            idxs = [_wrap_poly(x) for x in make_list(operand._idxs)]
+            raw_idxs = [x.as_ptr() for x in operand._ref._lens.apply(idxs)]
+            ffi_call(
+                lib.plaidml_contraction_add_operand,
+                tensor.as_ptr(),
+                operand._ref.as_ptr(),
+                len(raw_idxs),
+                raw_idxs,
+            )
+
+        for constraint in self.__constraints:
+            ffi_call(
+                lib.plaidml_contraction_add_constraint,
+                tensor.as_ptr(),
+                constraint.lhs.as_ptr(),
+                constraint.rhs.as_ptr(),
+            )
+
+        ffi_call(lib.plaidml_contraction_build, tensor.as_ptr())
+        return tensor
 
 
 class IndexedTensor(object):
 
-    def __init__(self, impl, tensor=None):
-        self._impl = impl
-        self._tensor = tensor
-
-    def __repr__(self):
-        return repr(self._impl)
-
-    def __iadd__(self, rhs):
-        """Represents a `summation` reduction within a contraction.
-
-        Example:
-            >>> i, j = TensorIndexes(2)
-            >>> A = Placeholder(DType.FLOAT32, [3, 3])
-            >>> R = TensorOutput()
-            >>> R[()] += A[i, j]
-        """
-        return IndexedTensor(self._make_contraction(lib.PLAIDML_AGG_OP_SUM, rhs))
-
-    def __imul__(self, rhs):
-        """Represents a `product` reduction within a contraction.
-
-        Example:
-            >>> i, j = TensorIndexes(2)
-            >>> A = Placeholder(DType.FLOAT32, [3, 3])
-            >>> R = TensorOutput()
-            >>> R[()] *= A[i, j]
-        """
-        return IndexedTensor(self._make_contraction(lib.PLAIDML_AGG_OP_PROD, rhs))
-
-    def __ge__(self, rhs):
-        """Represents a `maximum` reduction within a contraction.
-
-        Example:
-            >>> i, j = TensorIndexes(2)
-            >>> A = Placeholder(DType.FLOAT32, [3, 3])
-            >>> R = TensorOutput()
-            >>> R[()] >= A[i, j]
-        """
-        self._tensor._set_contraction(self._make_contraction(lib.PLAIDML_AGG_OP_MAX, rhs))
-
-    def __le__(self, rhs):
-        """Represents a `minimum` reduction within a contraction.
-
-        Example:
-            >>> i, j = TensorIndexes(2)
-            >>> A = Placeholder(DType.FLOAT32, [3, 3])
-            >>> R = TensorOutput()
-            >>> R[()] <= A[i, j]
-        """
-        self._tensor._set_contraction(self._make_contraction(lib.PLAIDML_AGG_OP_MIN, rhs))
+    def __init__(self, op, ref=None, idxs=None, args=None):
+        self._op = op
+        self._ref = ref
+        self._idxs = idxs
+        self._args = args
 
     def __add__(self, rhs):
         """Represents an `addition` combination within a contraction.
@@ -471,7 +474,7 @@ class IndexedTensor(object):
             >>> B = Placeholder(DType.FLOAT32, [3, 3])
             >>> A[i, j] + B[j, k]
         """
-        return IndexedTensor(_ContractionPart(lib.PLAIDML_COMBO_OP_ADD, (self, rhs)))
+        return IndexedTensor(lib.PLAIDML_COMBO_OP_ADD, args=(self, rhs))
 
     def __mul__(self, rhs):
         """Represents a `multiply` combination within in a contraction.
@@ -482,7 +485,7 @@ class IndexedTensor(object):
             >>> B = Placeholder(DType.FLOAT32, [3, 3])
             >>> A[i, j] * B[j, k]
         """
-        return IndexedTensor(_ContractionPart(lib.PLAIDML_COMBO_OP_MUL, (self, rhs)))
+        return IndexedTensor(lib.PLAIDML_COMBO_OP_MUL, args=(self, rhs))
 
     def __eq__(self, rhs):
         """Represents an `equality comparison` combination within a contraction.
@@ -492,28 +495,7 @@ class IndexedTensor(object):
             >>> A = Placeholder(DType.FLOAT32, [3, 3])
             >>> A[i, j] == B[j, k]
         """
-        return IndexedTensor(_ContractionPart(lib.PLAIDML_COMBO_OP_EQ, (self, rhs)))
-
-    def _make_contraction(self, agg_op, rhs):
-        # Extract combo_op and inputs
-        if isinstance(rhs._impl, _IndexMap):
-            # Unary op
-            combo_op = lib.PLAIDML_COMBO_OP_NONE
-            inputs = [rhs._impl]
-        elif isinstance(rhs._impl, _ContractionPart):
-            # Binary/Ternary op
-            combo_op = rhs._impl.op
-            inputs = [x._impl for x in rhs._impl.args]
-        else:
-            raise ValueError('Invalid impl')
-        return _Contraction(
-            agg_op,
-            combo_op,
-            inputs,
-            self._impl,
-            _SizeMap(self._tensor._dims),
-            self._tensor._name,
-        )
+        return IndexedTensor(lib.PLAIDML_COMBO_OP_EQ, args=(self, rhs))
 
 
 class Tensor(ForeignObject):
@@ -522,23 +504,9 @@ class Tensor(ForeignObject):
     __ffi_del__ = lib.plaidml_expr_free
     __ffi_repr__ = lib.plaidml_expr_repr
 
-    _dims = None
-    _is_contraction = False
-
-    def __init__(self, shape=None, dims=None, expr=None, value=None, name='', buffer=None):
-        self._name = name
-        self._buffer = buffer
-        if shape:
-            if buffer is None:
-                raw_buffer = ffi.NULL
-            else:
-                raw_buffer = buffer.as_ptr()
-            expr = ffi_call(lib.plaidml_expr_placeholder, shape.as_ptr(), raw_buffer,
-                            name.encode())
-        elif dims is not None:
-            self._dims = dims
-            expr = None
-        elif value is not None:
+    def __init__(self, expr=None, value=None, lens=TensorLens()):
+        self._lens = lens
+        if value is not None:
             if isinstance(value, six.integer_types):
                 expr = ffi_call(lib.plaidml_expr_int, value)
             elif isinstance(value, float):
@@ -546,187 +514,117 @@ class Tensor(ForeignObject):
             else:
                 raise TypeError('Invalid type for value={}'.format(value))
         elif expr is None:
-            raise ValueError('One of dims=, shape=, or expr= must be specified.')
+            raise ValueError('One of expr= or value= must be specified.')
         super(Tensor, self).__init__(expr)
 
-    def set_param_value(self, buffer):
-        # Changes the value of a parameter tensor (i.e. one explicitly set to a buffer value)
-        # Illegal on other tensors
-        ffi_call(lib.plaidml_expr_param_reset, self.__ffi_obj__, buffer.as_ptr())
-
-    def __hash__(self):
-        return hash((self.as_ptr(), self._dims, self._is_contraction))
-
     def __getitem__(self, key):
-        return IndexedTensor(_IndexMap(self, key), tensor=self)
-
-    def __setitem__(self, key, value):
-        if isinstance(value._impl, _Contraction):
-            # standard contraction
-            self._set_contraction(value._impl)
-        elif isinstance(value, Tensor):
-            pass
-        elif isinstance(value._impl, _IndexMap):
-            # Unary ASSIGN contraction
-            self._set_contraction(
-                _Contraction(
-                    lib.PLAIDML_AGG_OP_ASSIGN,
-                    lib.PLAIDML_COMBO_OP_NONE,
-                    [value._impl],
-                    _IndexMap(self, key),
-                    _SizeMap(self._dims),
-                    self._name,
-                ))
-        elif isinstance(value._impl, _ContractionPart):
-            # Binary or ternary ASSIGN contraction
-            self._set_contraction(
-                _Contraction(
-                    lib.PLAIDML_AGG_OP_ASSIGN,
-                    value._impl.op,
-                    [x._impl for x in value._impl.args],
-                    _IndexMap(self, key),
-                    _SizeMap(self._dims),
-                    self._name,
-                ))
-        else:
-            raise ValueError('Invalid impl when assigning to a Tensor (Type: {})'.format(
-                type(value._impl)))
-
-    def _set_contraction(self, cion):
-        self._is_contraction = True
-        self.take_ptr(cion)
+        return IndexedTensor(lib.PLAIDML_COMBO_OP_NONE, ref=self, idxs=key)
 
     # Represents an eltwise negation
     def __neg__(self):
-        return call('neg', self)
+        return intrinsic('neg', self)
 
     # Represents an eltwise bit_not
     def __invert__(self):
-        return call('bit_not', self)
+        return intrinsic('bit_not', self)
 
     # Represents an eltwise addition
     def __add__(self, rhs):
-        return call('add', self, rhs)
+        return intrinsic('add', self, rhs)
 
     def __radd__(self, lhs):
-        return call('add', lhs, self)
+        return intrinsic('add', lhs, self)
 
     # Represents an eltwise subtraction
     def __sub__(self, rhs):
-        return call('sub', self, rhs)
+        return intrinsic('sub', self, rhs)
 
     def __rsub__(self, lhs):
-        return call('sub', lhs, self)
+        return intrinsic('sub', lhs, self)
 
     # Represents an eltwise multiplication
     def __mul__(self, rhs):
-        return call('mul', self, rhs)
+        return intrinsic('mul', self, rhs)
 
     def __rmul__(self, lhs):
-        return call('mul', lhs, self)
+        return intrinsic('mul', lhs, self)
 
     # Represents an eltwise division
     def __div__(self, rhs):
-        return call('div', self, rhs)
+        return intrinsic('div', self, rhs)
 
     def __rdiv__(self, lhs):
-        return call('div', lhs, self)
+        return intrinsic('div', lhs, self)
 
     # Represents an eltwise division
     def __truediv__(self, rhs):
-        return call('div', self, rhs)
+        return intrinsic('div', self, rhs)
 
     def __rtruediv__(self, lhs):
-        return call('div', lhs, self)
+        return intrinsic('div', lhs, self)
 
     # Represents an eltwise cmp_eq
     def __eq__(self, rhs):
-        return call('cmp_eq', self, rhs)
+        return intrinsic('cmp_eq', self, rhs)
 
     # Represents an eltwise cmp_ne
     def __ne__(self, rhs):
-        return call('cmp_ne', self, rhs)
+        return intrinsic('cmp_ne', self, rhs)
 
     # Represents an eltwise cmp_lt
     def __lt__(self, rhs):
-        return call('cmp_lt', self, rhs)
+        return intrinsic('cmp_lt', self, rhs)
 
     # Represents an eltwise cmp_gt
     def __gt__(self, rhs):
-        return call('cmp_gt', self, rhs)
+        return intrinsic('cmp_gt', self, rhs)
 
     # Represents an eltwise cmp_le
     def __le__(self, rhs):
-        return call('cmp_le', self, rhs)
+        return intrinsic('cmp_le', self, rhs)
 
     # Represents an eltwise cmp_ge
     def __ge__(self, rhs):
-        return call('cmp_ge', self, rhs)
+        return intrinsic('cmp_ge', self, rhs)
 
     # Represents an eltwise bit_shl
     def __lshift__(self, rhs):
-        return call('bit_shl', self, rhs)
+        return intrinsic('bit_shl', self, rhs)
 
     def __rlshift__(self, lhs):
-        return call('bit_shl', lhs, self)
+        return intrinsic('bit_shl', lhs, self)
 
     # Represents an eltwise bit_shr
     def __rshift__(self, rhs):
-        return call('bit_shr', self, rhs)
+        return intrinsic('bit_shr', self, rhs)
 
     def __rrshift__(self, lhs):
-        return call('bit_shr', lhs, self)
+        return intrinsic('bit_shr', lhs, self)
 
     # Represents an eltwise bit_and
     def __and__(self, rhs):
-        return call('bit_and', self, rhs)
+        return intrinsic('bit_and', self, rhs)
 
     def __rand__(self, lhs):
-        return call('bit_and', lhs, self)
+        return intrinsic('bit_and', lhs, self)
 
     # Represents an eltwise bit_or
     def __or__(self, rhs):
-        return call('bit_or', self, rhs)
+        return intrinsic('bit_or', self, rhs)
 
     def __ror__(self, lhs):
-        return call('bit_or', lhs, self)
+        return intrinsic('bit_or', lhs, self)
 
     # Represents an eltwise bit_xor
     def __xor__(self, rhs):
-        return call('bit_xor', self, rhs)
+        return intrinsic('bit_xor', self, rhs)
 
     def __rxor__(self, lhs):
-        return call('bit_xor', lhs, self)
-
-    # Enable no_reduce on a contraction
-    def no_reduce(self):
-        if not self._is_contraction:
-            raise TypeError('no_reduce can only be specified on a contraction.')
-        self._methodcall(lib.plaidml_expr_contraction_set_no_reduce, True)
-        return self
-
-    # Set use_default on a contraction
-    def use_default(self, rhs):
-        if not self._is_contraction:
-            raise TypeError('use_default can only be specified on a contraction.')
-        self._methodcall(lib.plaidml_expr_contraction_set_use_default, rhs.as_ptr())
-        return self
-
-    def add_constraint(self, constraint):
-        ffi_call(
-            lib.plaidml_expr_contraction_add_constraint,
-            self.as_ptr(),
-            constraint.lhs.as_ptr(),
-            constraint.rhs.as_ptr(),
-        )
-
-    def add_constraints(self, constraints):
-        for constraint in constraints:
-            self.add_constraint(constraint)
+        return intrinsic('bit_xor', lhs, self)
 
     # Return the tensor's shape
     def compute_shape(self):
-        return LogicalShape(ptr=self._methodcall(lib.plaidml_expr_get_shape))
+        return TensorShape(ptr=self._methodcall(lib.plaidml_expr_get_shape))
 
     @property
     def dtype(self):
@@ -738,26 +636,14 @@ class Tensor(ForeignObject):
 
     # Verify that the specified dims match the dims of this tensor.
     def bind_dims(self, *dims):
-        raw_dims = [x.as_ptr() for x in dims]
+        raw_dims = [x.as_ptr() for x in self._lens.apply(dims)]
         self._methodcall(lib.plaidml_expr_bind_dims, len(raw_dims), raw_dims)
 
-    # bind a concrete shape to this tensor
-    def bind(self, shape):
-        self._methodcall(lib.plaidml_expr_bind_shape, shape.as_ptr())
+    def element(self, ordinal):
+        return Tensor(expr=self._methodcall(lib.plaidml_expr_element, ordinal))
 
-
-class TensorRef:
-
-    def __init__(self, tensor):
-        self.tensor = tensor
-
-    def __hash__(self):
-        return hash(ffi_call(lib.plaidml_expr_ptr, self.tensor.as_ptr()))
-
-    def __eq__(self, other):
-        if isinstance(other, Tensor):
-            return self.__hash__() == TensorRef(other).__hash__()
-        return self.__hash__() == other.__hash__()
+    def use(self, lens):
+        return Tensor(expr=self._methodcall(lib.plaidml_expr_clone), lens=lens)
 
 
 class Value(ForeignObject):
@@ -788,7 +674,7 @@ class Value(ForeignObject):
             raw_elts = [x.as_ptr() for x in self._elts]
             ffi_obj = ffi_call(lib.plaidml_value_tuple, len(raw_elts), raw_elts)
         elif isinstance(value, six.string_types):
-            ffi_obj = ffi_call(lib.plaidml_value_str, value.encode('utf-8'))
+            ffi_obj = ffi_call(lib.plaidml_value_str, value.encode())
         elif isinstance(value, ffi.CData) and ffi.typeof(value) is ffi.typeof('plaidml_value*'):
             ffi_obj = value
         else:
@@ -797,14 +683,6 @@ class Value(ForeignObject):
 
     def as_tensor(self):
         return Tensor(expr=self._methodcall(lib.plaidml_value_expr_get))
-
-
-def TensorOutput(*args):
-    """Declares a ``Tensor`` and specifies its output shape.
-
-    This must be used before building a contraction.
-    """
-    return Tensor(dims=args)
 
 
 def TensorDims(count):
@@ -817,12 +695,10 @@ def TensorIndexes(count):
     return [TensorIndex() for i in range(count)]
 
 
-def Constant(dtype_or_shape, buffer, dims=[], name=''):
+def Constant(buffer, dims=[], name=''):
     """Creates a tensor with constant values.
 
     Args:
-        dtype_or_shape (DType | LogicalShape): A data type or a shape can be
-            specified. If a shape is specified, the `dims` parameter is ignored.
         buffer (Buffer): A Buffer that stores the values of the ``Constant``.
         dims (list, optional): Specifies the dimensions of the ``Constant``.
         name (string, optional): A name to be assigned to the ``Tensor``.
@@ -830,21 +706,14 @@ def Constant(dtype_or_shape, buffer, dims=[], name=''):
     Returns:
         Tensor: The constant ``Tensor``.
     """
-    if isinstance(dtype_or_shape, LogicalShape):
-        shape = dtype_or_shape
-    elif isinstance(dtype_or_shape, DType):
-        shape = LogicalShape(dtype=dtype_or_shape, dims=dims)
-    else:
-        raise TypeError('Unsupported type {} for dtype_or_shape={}'.format(
-            type(dtype_or_shape), dtype_or_shape))
-    return Tensor(shape=shape, name=name, buffer=buffer)
+    return Tensor(expr=ffi_call(lib.plaidml_expr_constant, buffer.as_ptr(), name.encode()))
 
 
 def Placeholder(dtype_or_shape, dims=[], name=''):
     """Creates a placeholder tensor.
 
     Args:
-        dtype_or_shape (DType | LogicalShape): A data type or a shape can be
+        dtype_or_shape (DType | TensorShape): A data type or a shape can be
             specified. If a shape is specified, the `dims` parameter is ignored.
         dims (list, optional): Specifies the dimensions of the ``Placeholder``.
         name (string, optional): A name to be assigned to the ``Tensor``.
@@ -852,90 +721,17 @@ def Placeholder(dtype_or_shape, dims=[], name=''):
     Returns:
         Tensor: The placeholder ``Tensor``.
     """
-    if isinstance(dtype_or_shape, LogicalShape):
+    if isinstance(dtype_or_shape, TensorShape):
         shape = dtype_or_shape
     elif isinstance(dtype_or_shape, DType):
-        shape = LogicalShape(dtype=dtype_or_shape, dims=dims)
+        shape = TensorShape(dtype=dtype_or_shape, sizes=dims)
     else:
         raise TypeError('Unsupported type {} for dtype_or_shape={}'.format(
             type(dtype_or_shape), dtype_or_shape))
-    return Tensor(shape=shape, name=name)
+    return Tensor(expr=ffi_call(lib.plaidml_expr_input, shape.as_ptr(), name.encode()))
 
 
-class ProgramArgument:
-
-    def __init__(self, arg):
-        self.is_input = arg.is_input
-        self.ref = TensorRef(Tensor(expr=ffi_call(lib.plaidml_expr_clone, arg.tensor)))
-        self.shape = LogicalShape(ptr=ffi_call(lib.plaidml_logical_shape_clone, arg.shape))
-        if arg.buffer:
-            tensor_shape = self.shape.into_TensorShape()
-            self.buffer = Buffer(tensor_shape, ptr=ffi_call(lib.plaidml_buffer_clone, arg.buffer))
-        else:
-            self.buffer = None
-
-
-class Program(ForeignObject):
-    __ffi_del__ = lib.plaidml_program_free
-    __ffi_repr__ = lib.plaidml_program_repr
-
-    def __init__(self,
-                 name,
-                 outputs,
-                 updates=[],
-                 floatx=DType.FLOAT32,
-                 intx=DType.INT32,
-                 debug=False,
-                 target=None):
-        if target is None:
-            target = plaidml.settings.get('PLAIDML_TARGET')
-        raw_outputs = [x.as_ptr() for x in outputs]
-        dst_updates = [x[0].as_ptr() for x in updates]
-        src_updates = [x[1].as_ptr() for x in updates]
-        raw_args = ffi.new('plaidml_program_args**')
-        ffi_obj = ffi_call(
-            lib.plaidml_compile,
-            name.encode(),
-            target.encode(),
-            len(raw_outputs),
-            raw_outputs,
-            len(updates),
-            src_updates,
-            dst_updates,
-            floatx,
-            intx,
-            debug,
-            raw_args,
-        )
-        self.args = [ProgramArgument(raw_args[0].elts[i]) for i in range(raw_args[0].size)]
-        ffi_call(lib.plaidml_program_args_free, raw_args[0])
-        super(Program, self).__init__(ffi_obj)
-
-    @property
-    def inputs(self):
-        return [x for x in self.args if x.is_input]
-
-    @property
-    def outputs(self):
-        return [x for x in self.args if not x.is_input]
-
-    @property
-    def passes(self):
-        """Returns a list of passes.
-
-        Each pass in the list is a tuple of ``(name, ir)``, where ``ir`` means
-        `intermediate representation`.
-
-        Note that ``debug`` must be enabled when compiling the program.
-
-        Returns:
-            :obj:`list` of :obj:`tuple` of :obj:`str`: The passes.
-
-        """
-        return plaidml.kvps_to_list(self._methodcall(lib.plaidml_program_get_passes))
-
-
-def wrap_tensor(x):
+def _wrap_tensor(x):
     if isinstance(x, six.integer_types):
         return Tensor(expr=ffi_call(lib.plaidml_expr_int, x))
     if np.issubdtype(type(x), np.integer):
@@ -950,10 +746,10 @@ def wrap_tensor(x):
         type(x), fn, args, x))
 
 
-def call(fn, *args):
-    args = [wrap_tensor(x) for x in args]
+def intrinsic(fn, *args):
+    args = [_wrap_tensor(x) for x in args]
     raw_args = [x.as_ptr() for x in args]
-    return Tensor(expr=ffi_call(lib.plaidml_expr_call, fn.encode(), len(args), raw_args))
+    return Tensor(expr=ffi_call(lib.plaidml_expr_intrinsic, fn.encode(), len(args), raw_args))
 
 
 def abs(x):
@@ -965,7 +761,7 @@ def abs(x):
     Returns:
         Tensor: The result of the elementwise ``abs`` operation.
     """
-    return call('abs', x)
+    return intrinsic('abs', x)
 
 
 def cast(x, dtype):
@@ -978,7 +774,8 @@ def cast(x, dtype):
     Returns:
         Tensor: The result of the elementwise ``cast`` operation.
     """
-    return Tensor(expr=ffi_call(lib.plaidml_expr_cast, wrap_tensor(x).as_ptr(), dtype))
+    tensor = _wrap_tensor(x)
+    return Tensor(expr=ffi_call(lib.plaidml_expr_cast, tensor.as_ptr(), dtype))
 
 
 def ceil(x):
@@ -990,11 +787,11 @@ def ceil(x):
     Returns:
         Tensor: The result of the elementwise ``ceil`` operation.
     """
-    return call('ceil', x)
+    return intrinsic('ceil', x)
 
 
 def cond(lhs, rhs, true_case):
-    return IndexedTensor(_ContractionPart(lib.PLAIDML_COMBO_OP_COND, (lhs, rhs, true_case)))
+    return IndexedTensor(lib.PLAIDML_COMBO_OP_COND, args=(lhs, rhs, true_case))
 
 
 def cos(x):
@@ -1006,7 +803,7 @@ def cos(x):
     Returns:
         Tensor: The result of the elementwise ``cos`` operation.
     """
-    return call('cos', x)
+    return intrinsic('cos', x)
 
 
 def cosh(x):
@@ -1018,7 +815,7 @@ def cosh(x):
     Returns:
         Tensor: The result of the elementwise ``cosh`` operation.
     """
-    return call('cosh', x)
+    return intrinsic('cosh', x)
 
 
 def exp(x):
@@ -1030,7 +827,7 @@ def exp(x):
     Returns:
         Tensor: The result of the elementwise ``exp`` operation.
     """
-    return call('exp', x)
+    return intrinsic('exp', x)
 
 
 def floor(x):
@@ -1042,7 +839,7 @@ def floor(x):
     Returns:
         Tensor: The result of the elementwise ``floor`` operation.
     """
-    return call('floor', x)
+    return intrinsic('floor', x)
 
 
 def gather(x, y):
@@ -1057,20 +854,7 @@ def gather(x, y):
     Returns:
         Tensor: The result of the ``gather`` operation.
     """
-    return call('gather', x, y)
-
-
-def gradients(loss, variables):
-    wrts = [x.as_ptr() for x in variables]
-    raw_grads = ffi.new('plaidml_expr*[]', len(wrts))
-    ffi_call(
-        lib.plaidml_expr_gradient,
-        len(wrts),
-        wrts,
-        loss.as_ptr(),
-        raw_grads,
-    )
-    return [Tensor(expr=x) for x in raw_grads]
+    return intrinsic('gather', x, y)
 
 
 def ident(x):
@@ -1082,7 +866,7 @@ def ident(x):
     Returns:
         Tensor: The resultant tensor.
     """
-    return call('ident', x)
+    return intrinsic('ident', x)
 
 
 def index(dims, axis):
@@ -1095,7 +879,7 @@ def index(dims, axis):
     Returns:
         Tensor: The resultant tensor.
     """
-    return call('index', axis, *dims)
+    return intrinsic('index', axis, *dims)
 
 
 def log(x):
@@ -1107,7 +891,7 @@ def log(x):
     Returns:
         Tensor: The resultant tensor.
     """
-    return call('log', x)
+    return intrinsic('log', x)
 
 
 def max(x, y):
@@ -1120,7 +904,7 @@ def max(x, y):
     Returns:
         Tensor: The resultant tensor.
     """
-    return call('max', x, y)
+    return intrinsic('max', x, y)
 
 
 def min(x, y):
@@ -1133,7 +917,7 @@ def min(x, y):
     Returns:
         Tensor: The resultant tensor.
     """
-    return call('min', x, y)
+    return intrinsic('min', x, y)
 
 
 def pow(x, y):
@@ -1146,7 +930,7 @@ def pow(x, y):
     Returns:
         Tensor: The resultant tensor.
     """
-    return call('pow', x, y)
+    return intrinsic('pow', x, y)
 
 
 def prng(state, shape):
@@ -1154,13 +938,15 @@ def prng(state, shape):
     by ``state``.
 
     Args:
-        state (Tensor): The seed values for the ``prng`` operation.
+        state (Tensor): The state of the pseudorandom number generator.
         shape (Tensor): The desired shape of the tensor of pseudorandom numbers.
 
     Returns:
         Tensor: The tensor of pseudorandom numbers.
+        Tensor: The updated state of the pseudorandom number generator.
     """
-    return call('prng', state, *shape)
+    x = intrinsic('prng', state, *shape)
+    return x.element(0), x.element(1)
 
 
 def reshape(x, dims):
@@ -1173,7 +959,7 @@ def reshape(x, dims):
     Returns:
         Tensor: The reshaped tensor.
     """
-    return call('reshape', x, *dims)
+    return intrinsic('reshape', x, *dims)
 
 
 def round(x):
@@ -1185,7 +971,7 @@ def round(x):
     Returns:
         Tensor: The rounded tensor.
     """
-    return call('round', x)
+    return intrinsic('round', x)
 
 
 def scatter(x, y, z):
@@ -1202,7 +988,7 @@ def scatter(x, y, z):
     Returns:
         Tensor: The scattered tensor.
     """
-    return call('scatter', x, y, z)
+    return intrinsic('scatter', x, y, z)
 
 
 def select(cond, true_case, false_case):
@@ -1221,7 +1007,7 @@ def select(cond, true_case, false_case):
     Returns:
         Tensor: The tensor with the conditionally selected elements.
     """
-    return call('cond', cond, true_case, false_case)
+    return intrinsic('select', cond, true_case, false_case)
 
 
 def shape(x):
@@ -1233,7 +1019,7 @@ def shape(x):
     Returns:
         Tensor: The shape of the tensor.
     """
-    return call('shape', x)
+    return intrinsic('shape', x)
 
 
 def sin(x):
@@ -1245,7 +1031,7 @@ def sin(x):
     Returns:
         Tensor: The result of the elementwise ``sin`` operation.
     """
-    return call('sin', x)
+    return intrinsic('sin', x)
 
 
 def sinh(x):
@@ -1258,7 +1044,7 @@ def sinh(x):
         Tensor: The result of the elementwise ``sinh`` operation.
 
     """
-    return call('sin', x)
+    return intrinsic('sin', x)
 
 
 def sqrt(x):
@@ -1270,7 +1056,7 @@ def sqrt(x):
     Returns:
         Tensor: The result of the elementwise ``sqrt`` operation.
     """
-    return call('sqrt', x)
+    return intrinsic('sqrt', x)
 
 
 def tan(x):
@@ -1282,7 +1068,7 @@ def tan(x):
     Returns:
         Tensor: The result of the elementwise ``tan`` operation.
     """
-    return call('tan', x)
+    return intrinsic('tan', x)
 
 
 def tanh(x):
@@ -1294,4 +1080,29 @@ def tanh(x):
     Returns:
         Tensor: The result of the elementwise ``tanh`` operation.
     """
-    return call('tanh', x)
+    return intrinsic('tanh', x)
+
+
+def _wrap_value(x):
+    if isinstance(x, Value):
+        return x
+    return Value(x)
+
+
+def pragma(tensor, op, attrs):
+    tensor = _wrap_tensor(tensor)
+    keys = []
+    values = []
+    raw_attrs = []
+    for key, value in attrs.items():
+        key = ffi.new('char[]', key.encode())
+        keys.append(key)
+        value = _wrap_value(value)
+        values.append(value)
+        raw_attrs.append(ffi.new('plaidml_attr*', {'key': key, 'value': value.as_ptr()}))
+    return Tensor(expr=ffi_call(lib.plaidml_expr_pragma, tensor.as_ptr(), op.encode(),
+                                len(raw_attrs), raw_attrs))
+
+
+def trace(x, msg):
+    return pragma(x, 'trace', dict(msg=msg))

@@ -2,6 +2,7 @@
 
 load("@rules_python//python:defs.bzl", "py_library")
 load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_test")
+load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_tar")
 
 SDK_HDRS = [
     "ffi.h",
@@ -15,6 +16,13 @@ exports_files([
 filegroup(
     name = "sdk",
     srcs = SDK_HDRS,
+    visibility = ["//visibility:public"],
+)
+
+pkg_tar(
+    name = "sdk_tar",
+    srcs = [":sdk"],
+    package_dir = "include/plaidml/op",
     visibility = ["//visibility:public"],
 )
 
@@ -60,8 +68,9 @@ py_library(
 )
 
 plaidml_cc_test(
-    name = "cc_test",
+    name = "op_test",
     srcs = ["op_test.cc"],
+    linkstatic = True,
     deps = [
         ":op",
         "//plaidml:testenv",

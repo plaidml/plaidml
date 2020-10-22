@@ -17,14 +17,13 @@
 #include "pmlc/util/math/basis.h"
 #include "pmlc/util/util.h"
 
+using namespace mlir; // NOLINT
+
 namespace pmlc::dialect::tile {
 
 namespace bilp = util::bilp;
 
 using llvm::SmallVector;
-using mlir::AffineExpr;
-using mlir::AffineExprKind;
-using mlir::ArrayAttr;
 
 using util::math::Integer;
 using util::math::RangeConstraint;
@@ -150,8 +149,8 @@ BoundsAndConstraints Constraints::ComputeBounds() {
 }
 
 static IndexPoly MakePoly(ContractionOp op, AffineExpr expr) {
-  IVLOG(4, "MakePoly: " << mlir::debugString(expr));
-  if (auto dimExpr = expr.dyn_cast<mlir::AffineDimExpr>()) {
+  IVLOG(4, "MakePoly: " << debugString(expr));
+  if (auto dimExpr = expr.dyn_cast<AffineDimExpr>()) {
     auto idxNames = op.getAttrOfType<ArrayAttr>("idxs");
     if (idxNames) {
       auto attr = idxNames.getValue()[dimExpr.getPosition()];
@@ -161,10 +160,10 @@ static IndexPoly MakePoly(ContractionOp op, AffineExpr expr) {
     auto name = llvm::formatv("x{0}", dimExpr.getPosition());
     return IndexPoly{name.str()};
   }
-  if (auto constExpr = expr.dyn_cast<mlir::AffineConstantExpr>()) {
+  if (auto constExpr = expr.dyn_cast<AffineConstantExpr>()) {
     return IndexPoly{constExpr.getValue()};
   }
-  if (auto binaryExpr = expr.dyn_cast<mlir::AffineBinaryOpExpr>()) {
+  if (auto binaryExpr = expr.dyn_cast<AffineBinaryOpExpr>()) {
     switch (binaryExpr.getKind()) {
     case AffineExprKind::Add:
       return MakePoly(op, binaryExpr.getLHS()) +
@@ -200,7 +199,7 @@ static IndexPoly MakePoly(ContractionOp op, AffineExpr expr) {
   throw std::runtime_error("Invalid AffineExpr");
 }
 
-static IndexAccess ConvertAffineMap(ContractionOp op, mlir::AffineMap map) {
+static IndexAccess ConvertAffineMap(ContractionOp op, AffineMap map) {
   IndexAccess dims;
   for (auto expr : map.getResults()) {
     dims.emplace_back(MakePoly(op, expr));
@@ -208,9 +207,9 @@ static IndexAccess ConvertAffineMap(ContractionOp op, mlir::AffineMap map) {
   return dims;
 }
 
-Contraction::Contraction(ContractionOp op) {
+Contraction::Contraction(ContractionOp op) : agg_(op.agg()) {
   auto op_result = op.result();
-  IVLOG(2, "Processing: " << mlir::debugString(op_result));
+  IVLOG(2, "Processing: " << debugString(op_result));
   accesses.emplace_back(ConvertAffineMap(op, op.sink()));
   for (auto src : op.srcs()) {
     auto map = src.cast<AffineMapAttr>().getValue();
@@ -562,6 +561,9 @@ void Contraction::Defractionalize() {
 }
 
 bool Contraction::NeedReduce() const {
+  if (agg_ == AggregationKind::assign) {
+    return false;
+  }
   for (const auto &poly : accesses[0]) {
     if (poly.getMap().size() > 2 ||
         (poly.getMap().size() == 2 && poly.constant() == 0)) {
@@ -652,8 +654,7 @@ void Contraction::DeduceRangeConstraints() {
   }
 }
 
-BoundsAndConstraints Contraction::ComputeBounds(ArrayRef<Shape> shapes,
-                                                bool no_reduce) {
+BoundsAndConstraints Contraction::ComputeBounds(ArrayRef<Shape> shapes) {
   // Because we construct `range_constraints` from `constraints` and then ignore
   // the information in `constraints` in favor of `range_constraints`, this
   // section is a bit brittle. Check assumptions about whether `constraints` or
@@ -662,7 +663,7 @@ BoundsAndConstraints Contraction::ComputeBounds(ArrayRef<Shape> shapes,
   GatherConstraints(shapes);
   IVLOG(3, "Constraints:" << to_string(range_constraints.constraints));
   // Reduce if needed
-  if (NeedReduce() && !no_reduce) {
+  if (NeedReduce()) {
     ReduceOutputPolynomials();
     GatherConstraints(shapes);
   }
@@ -719,9 +720,7 @@ struct ComputeBoundsImpl {
     }
 
     Contraction contraction{op};
-    bool no_reduce = op.no_reduce().hasValue();
-    const auto &[bounds, constraints] =
-        contraction.ComputeBounds(shapes, no_reduce);
+    const auto &[bounds, constraints] = contraction.ComputeBounds(shapes);
 
     unsigned i = 0;
     for (const auto &[name, extent] : bounds) {
@@ -739,19 +738,19 @@ struct ComputeBoundsImpl {
       // All coefficients and any constant is expected to be integers by now.
       auto affine = makeAffineExprFromIntPoly(constraint.poly);
       // Convert into `affine >= 0` format via `rhs - affine` (implied >= 0)
-      auto simplifiedExpr = mlir::simplifyAffineExpr(
+      auto simplifiedExpr = simplifyAffineExpr(
           constraint.rhs - affine, /*numDims=*/bounds.size(), /*numSymbols=*/0);
       affineConstraints.push_back(simplifiedExpr);
     }
   }
 
   Shape getShape(Type type) {
-    auto rankedTensorType = eltwise::getRankedTensorType(type);
+    auto rankedTensorType = getRankedTensorType(type);
     return rankedTensorType.getShape();
   }
 
   AffineExpr makeAffineExprFromIntPoly(IndexPoly poly) {
-    auto expr = mlir::getAffineConstantExpr(0, op.getContext());
+    auto expr = getAffineConstantExpr(0, op.getContext());
     for (const auto &[var, coeff] : poly.getMap()) {
       if (denominator(coeff) != 1) {
         throw std::runtime_error(
@@ -759,14 +758,13 @@ struct ComputeBoundsImpl {
       }
       auto intCoeff = static_cast<int64_t>(numerator(coeff));
       if (var.empty()) {
-        expr = expr + mlir::getAffineConstantExpr(intCoeff, op.getContext());
+        expr = expr + getAffineConstantExpr(intCoeff, op.getContext());
       } else {
         assert(idxs.find(var) != idxs.end() &&
                "Unexpected variable name in polynomial.");
         auto idxOrdinal = idxs.at(var);
-        auto idxExpr = mlir::getAffineDimExpr(idxOrdinal, op.getContext());
-        auto factorExpr =
-            mlir::getAffineConstantExpr(intCoeff, op.getContext());
+        auto idxExpr = getAffineDimExpr(idxOrdinal, op.getContext());
+        auto factorExpr = getAffineConstantExpr(intCoeff, op.getContext());
         auto termExpr = idxExpr * factorExpr;
         expr = termExpr + expr;
       }
@@ -814,7 +812,7 @@ struct ComputeBoundsPass : public ComputeBoundsBase<ComputeBoundsPass> {
   }
 };
 
-std::unique_ptr<mlir::Pass> createComputeBoundsPass() {
+std::unique_ptr<Pass> createComputeBoundsPass() {
   return std::make_unique<ComputeBoundsPass>();
 }
 

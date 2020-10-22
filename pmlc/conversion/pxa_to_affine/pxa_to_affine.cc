@@ -11,6 +11,7 @@
 #include "pmlc/conversion/pxa_to_affine/passes.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/util/logging.h"
+#include "pmlc/util/tags.h"
 #include "pmlc/util/util.h"
 
 using namespace mlir; // NOLINT
@@ -28,34 +29,60 @@ struct AffineParallelOpConversion
   LogicalResult
   matchAndRewrite(AffineParallelOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
-    // This conversion doesn't work in the rank 0 case; that case will be
-    // covered by canonicalization.
-    if (op.lowerBoundsMap().getNumResults() == 0)
-      return failure();
-    // Create an affine loop nest, capture induction variables
+    // Make a map for induction variable
     llvm::SmallVector<Value, 8> ivs;
-    for (unsigned int i = 0; i < op.lowerBoundsMap().getNumResults(); i++) {
-      auto step = op.steps().getValue()[i].cast<IntegerAttr>().getInt();
-      auto forOp = rewriter.create<AffineForOp>(
-          op.getLoc(), op.getLowerBoundsOperands(),
-          op.lowerBoundsMap().getSubMap({i}), op.getUpperBoundsOperands(),
-          op.upperBoundsMap().getSubMap({i}), step);
-      rewriter.setInsertionPointToStart(&forOp.region().front());
-      ivs.push_back(forOp.getInductionVar());
+    auto steps = op.getSteps();
+    // If it's tagged, leave as a parallel
+    if (hasTags(op)) {
+      // Make a new affine parallel with no return values
+      AffineParallelOp newOp;
+      if (op.getIVs().size() == 0) {
+        // If it's empty, add a dummy index (since some affine / scf things
+        // don't like 0 index affine.parallel
+        newOp = rewriter.create<AffineParallelOp>(
+            op.getLoc(),                                                 //
+            ArrayRef<Type>{}, ArrayRef<AtomicRMWKind>{},                 //
+            AffineMap::getConstantMap(0, op.getContext()), ValueRange(), //
+            AffineMap::getConstantMap(1, op.getContext()), ValueRange(), //
+            ArrayRef<int64_t>{1});
+      } else {
+        // Normal case for parallels with IVs
+        newOp = rewriter.create<AffineParallelOp>(
+            op.getLoc(),                                      //
+            ArrayRef<Type>{}, ArrayRef<AtomicRMWKind>{},      //
+            op.lowerBoundsMap(), op.getLowerBoundsOperands(), //
+            op.upperBoundsMap(), op.getUpperBoundsOperands(), //
+            steps);
+        for (Value iv : newOp.getIVs()) {
+          ivs.push_back(iv);
+        }
+      }
+      copyTags(newOp, op);
+      rewriter.setInsertionPointToStart(newOp.getBody());
+    } else {
+      // Otherwise unroll into serial loops
+      for (unsigned int i = 0; i < op.lowerBoundsMap().getNumResults(); i++) {
+        auto forOp = rewriter.create<AffineForOp>(
+            op.getLoc(), op.getLowerBoundsOperands(),
+            op.lowerBoundsMap().getSubMap({i}), op.getUpperBoundsOperands(),
+            op.upperBoundsMap().getSubMap({i}), steps[i]);
+        rewriter.setInsertionPointToStart(forOp.getBody());
+        ivs.push_back(forOp.getInductionVar());
+      }
     }
-    // Move ParallelOp's operations (single block) to Affine innermost loop.
-    auto &innerLoopOps = rewriter.getInsertionBlock()->getOperations();
-    auto &parallelBodyOps = op.region().front().getOperations();
-    innerLoopOps.splice(std::prev(innerLoopOps.end()), parallelBodyOps,
-                        parallelBodyOps.begin(),
-                        std::prev(parallelBodyOps.end()));
+
+    // Move ParallelOp's operations across to the new op
+    auto &oldBodyOps = op.getBody()->getOperations();
+    auto &newBodyOps = rewriter.getInsertionBlock()->getOperations();
+    newBodyOps.splice(std::prev(newBodyOps.end()), oldBodyOps,
+                      oldBodyOps.begin(), std::prev(oldBodyOps.end()));
     // Replace all uses of old values
     size_t idx = 0;
-    for (auto arg : op.region().front().getArguments()) {
+    for (auto arg : op.getBody()->getArguments()) {
       arg.replaceAllUsesWith(ivs[idx++]);
     }
     // Replace outputs with values from yield
-    auto termIt = std::prev(parallelBodyOps.end());
+    auto termIt = std::prev(oldBodyOps.end());
     for (size_t i = 0; i < op.getNumResults(); i++) {
       op.getResult(i).replaceAllUsesWith(termIt->getOperand(i));
     }
@@ -169,13 +196,13 @@ struct PxaReduceOpConversion : public OpConversionPattern<pxa::PxaReduceOp> {
   LogicalResult
   matchAndRewrite(pxa::PxaReduceOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
-    auto source = rewriter.create<AffineLoadOp>(op.getLoc(), op.mem(), op.map(),
-                                                op.idxs());
+    auto source = rewriter.create<AffineLoadOp>(op.getLoc(), op.memref(),
+                                                op.map(), op.idxs());
     auto reduce =
         createReduction(rewriter, op.getLoc(), op.agg(), source, op.val());
-    rewriter.create<AffineStoreOp>(op.getLoc(), reduce, op.mem(), op.map(),
+    rewriter.create<AffineStoreOp>(op.getLoc(), reduce, op.memref(), op.map(),
                                    op.idxs());
-    op.replaceAllUsesWith(op.mem());
+    op.replaceAllUsesWith(op.memref());
     rewriter.eraseOp(op);
     return success();
   }
@@ -189,13 +216,13 @@ struct PxaVectorReduceOpConversion
   matchAndRewrite(pxa::PxaVectorReduceOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
     auto source = rewriter.create<AffineVectorLoadOp>(
-        op.getLoc(), op.getVectorType(), op.mem(), op.getAffineMap(),
+        op.getLoc(), op.getVectorType(), op.memref(), op.getAffineMap(),
         op.idxs());
     auto reduce =
         createReduction(rewriter, op.getLoc(), op.agg(), source, op.vector());
-    rewriter.create<AffineVectorStoreOp>(op.getLoc(), reduce, op.mem(),
+    rewriter.create<AffineVectorStoreOp>(op.getLoc(), reduce, op.memref(),
                                          op.getAffineMap(), op.idxs());
-    op.replaceAllUsesWith(op.mem());
+    op.replaceAllUsesWith(op.memref());
     rewriter.eraseOp(op);
     return success();
   }
@@ -214,13 +241,9 @@ struct FuncOpConversion : public OpConversionPattern<FuncOp> {
     IVLOG(2, "FuncOpConversion::rewrite> " << debugString(type));
 
     // Convert the function signature
-    TypeConverter::SignatureConversion result(type.getNumInputs() +
-                                              type.getNumResults());
+    TypeConverter::SignatureConversion result(type.getNumInputs());
     for (unsigned i = 0; i < type.getNumInputs(); ++i) {
       result.addInputs(i, {type.getInput(i)});
-    }
-    for (unsigned i = 0; i < type.getNumResults(); ++i) {
-      result.addInputs({type.getResult(i)});
     }
 
     // Create a new function with an updated signature.
@@ -245,13 +268,6 @@ struct ReturnOpConversion : public OpConversionPattern<ReturnOp> {
   matchAndRewrite(ReturnOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
     IVLOG(2, "ReturnOpConversion::matchAndRewrite>");
-    auto &block = op.getParentRegion()->front();
-    auto funcOp = op.getParentOfType<FuncOp>();
-    auto blockArg = funcOp.getType().getNumInputs() - op.getNumOperands();
-    for (auto operand : operands) {
-      // Find very initial allocation of memref
-      operand.replaceAllUsesWith(block.getArgument(blockArg++));
-    }
     rewriter.replaceOpWithNewOp<ReturnOp>(op);
     return success();
   }
@@ -282,7 +298,9 @@ PXAToAffineConversionTarget::PXAToAffineConversionTarget(MLIRContext &ctx)
   addLegalDialect<AffineDialect>();
   addLegalDialect<StandardOpsDialect>();
   addIllegalDialect<pxa::PXADialect>();
-  addIllegalOp<AffineParallelOp>();
+  addDynamicallyLegalOp<AffineParallelOp>([](AffineParallelOp op) {
+    return op.getNumResults() == 0 && hasTags(op);
+  });
   addDynamicallyLegalOp<AffineIfOp>(
       [](AffineIfOp op) { return op.getNumResults() == 0; });
   addDynamicallyLegalOp<FuncOp>([](FuncOp op) {

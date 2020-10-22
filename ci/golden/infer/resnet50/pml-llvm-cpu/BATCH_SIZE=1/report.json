@@ -1,0 +1,1 @@
+{"build_url": "https://buildkite.com/plaidml/plaidml-plaidml/builds/2644#61bb0fc1-66a7-455a-b673-e744e58ce86d", "compare": true, "efficiency": null, "errors": [], "failures": [], "ratio": 12.177325135219872, "reason": "", "status": "PASS", "compile_duration": 2.5741686820983887, "cur.execution_duration": 0.0505574606359005, "ref.execution_duration": 0.6156546361744404}

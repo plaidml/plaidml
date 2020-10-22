@@ -96,8 +96,9 @@ template <>
 void SimplifyAffineOp<PxaReduceOp>::replaceAffineOp(
     PatternRewriter &rewriter, PxaReduceOp op, AffineMap map,
     ArrayRef<Value> mapOperands) const {
-  rewriter.replaceOpWithNewOp<PxaReduceOp>(
-      op, op.getMemRefType(), op.agg(), op.val(), op.mem(), map, mapOperands);
+  rewriter.replaceOpWithNewOp<PxaReduceOp>(op, op.getMemRefType(), op.agg(),
+                                           op.val(), op.memref(), map,
+                                           mapOperands);
 }
 
 template <>
@@ -113,7 +114,7 @@ void SimplifyAffineOp<PxaVectorReduceOp>::replaceAffineOp(
     ArrayRef<Value> mapOperands) const {
   rewriter.replaceOpWithNewOp<PxaVectorReduceOp>(op, op.getMemRefType(),
                                                  op.agg(), op.vector(),
-                                                 op.mem(), map, mapOperands);
+                                                 op.memref(), map, mapOperands);
 }
 
 /// This is a common class used for patterns of the form
@@ -147,10 +148,10 @@ struct SimplifyDeadReduce : public OpRewritePattern<ReduceOp> {
   }
 };
 
-struct SimplifyAffineGemmOp : public OpRewritePattern<AffineGemmOp> {
-  using OpRewritePattern<AffineGemmOp>::OpRewritePattern;
+struct SimplifyPxaGemmOp : public OpRewritePattern<PxaGemmOp> {
+  using OpRewritePattern<PxaGemmOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(AffineGemmOp op,
+  LogicalResult matchAndRewrite(PxaGemmOp op,
                                 PatternRewriter &rewriter) const override {
     auto aAccessMap = op.aAccessMap();
     auto bAccessMap = op.bAccessMap();
@@ -174,16 +175,15 @@ struct SimplifyAffineGemmOp : public OpRewritePattern<AffineGemmOp> {
                    op.mapOperands().begin()))
       return failure();
 
-    rewriter.replaceOpWithNewOp<pxa::AffineGemmOp>(
+    rewriter.replaceOpWithNewOp<pxa::PxaGemmOp>(
         op, op.c().getType(),              //
         op.c(), cAccessMap, op.cTileMap(), //
         op.a(), aAccessMap, op.aTileMap(), //
         op.b(), bAccessMap, op.bTileMap(), //
-        op.tile(), mapOperands);
+        op.tile(), op.numBatches(), mapOperands);
     return success();
   }
 };
-
 } // namespace
 
 // ---- PxaLoadOp ----
@@ -323,13 +323,13 @@ void printPxaReduceOp(OpAsmPrinter &p, PxaReduceOp op) {
   p << op.getOperation()->getName() << ' ';
   p << stringifyAtomicRMWKind(op.agg()) << ' ';
   p << op.val() << ", ";
-  p << op.mem() << '[';
+  p << op.memref() << '[';
   auto mapAttr = op.getAttrOfType<AffineMapAttr>("map");
   p.printAffineMapOfSSAIds(mapAttr, op.idxs());
   p << ']';
   p.printOptionalAttrDict(op.getAttrs(), {"agg", "map"});
   p << " : ";
-  p.printType(op.mem().getType());
+  p.printType(op.memref().getType());
 }
 
 // <operation> ::= `pxa.reduce` keyword ssa-use `,` ssa-use `[` ssa-use-list `]`
@@ -371,30 +371,30 @@ OpFoldResult PxaReduceOp::fold(ArrayRef<Attribute> cstOperands) {
 }
 
 //
-// ---- AffineGemmOp ----
+// ---- PxaGemmOp ----
 //
 
-AffineGemmOp::operand_range AffineGemmOp::getOperandsForA() {
+PxaGemmOp::operand_range PxaGemmOp::getOperandsForA() {
   return getOperands().slice(3 + cAccessMap().getNumInputs(),
                              aAccessMap().getNumInputs());
 }
 
-AffineGemmOp::operand_range AffineGemmOp::getOperandsForB() {
+PxaGemmOp::operand_range PxaGemmOp::getOperandsForB() {
   return getOperands().slice(3 + cAccessMap().getNumInputs() +
                                  aAccessMap().getNumInputs(),
                              bAccessMap().getNumInputs());
 }
 
-AffineGemmOp::operand_range AffineGemmOp::getOperandsForC() {
+PxaGemmOp::operand_range PxaGemmOp::getOperandsForC() {
   return getOperands().slice(3, cAccessMap().getNumInputs());
 }
 
-void AffineGemmOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
-  results.insert<SimplifyAffineGemmOp>(context);
+void PxaGemmOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+                                            MLIRContext *context) {
+  results.insert<SimplifyPxaGemmOp>(context);
 }
 
-void printAffineGemmOp(OpAsmPrinter &p, AffineGemmOp op) {
+void printPxaGemmOp(OpAsmPrinter &p, PxaGemmOp op) {
   auto funcType = FunctionType::get({op.a().getType(), op.b().getType()},
                                     {op.c().getType()}, op.getContext());
   p << op.getOperation()->getName() << ' ';
@@ -410,7 +410,7 @@ void printAffineGemmOp(OpAsmPrinter &p, AffineGemmOp op) {
   p.printAffineMapOfSSAIds(op.bAccessMapAttr(), op.getOperandsForB());
   p << "]:";
   p.printAttribute(op.bTileMapAttr());
-  p << ", " << op.tile() << " : " << funcType;
+  p << ", " << op.tile() << ", " << op.numBatches() << " : " << funcType;
 }
 
 struct GemmOperandParser {
@@ -435,18 +435,22 @@ struct GemmOperandParser {
   }
 };
 
-ParseResult parseAffineGemmOp(OpAsmParser &parser, OperationState &result) {
+ParseResult parsePxaGemmOp(OpAsmParser &parser, OperationState &result) {
   auto &builder = parser.getBuilder();
   auto indexType = builder.getIndexType();
   auto i64Type = builder.getIntegerType(64);
   GemmOperandParser a("a"), b("b"), c("c");
   ArrayAttr tileAttr;
+  IntegerAttr numBatchesAttr;
   FunctionType funcType;
   return failure(
       c.parse(parser, result) || parser.parseEqual() ||
       a.parse(parser, result) || parser.parseComma() ||
       b.parse(parser, result) || parser.parseComma() ||
       parser.parseAttribute(tileAttr, i64Type, "tile", result.attributes) ||
+      parser.parseComma() ||
+      parser.parseAttribute(numBatchesAttr, i64Type, "numBatches",
+                            result.attributes) ||
       parser.parseColonType(funcType) ||
       parser.addTypesToList(funcType.getResults(), result.types) ||
       parser.resolveOperand(c.operand, funcType.getResult(0),
@@ -464,13 +468,13 @@ void printPxaVectorReduceOp(OpAsmPrinter &p, PxaVectorReduceOp op) {
   p << op.getOperation()->getName() << ' ';
   p << stringifyAtomicRMWKind(op.agg()) << ' ';
   p << op.vector() << ", ";
-  p << op.mem() << '[';
+  p << op.memref() << '[';
   auto mapAttr = op.getAttrOfType<AffineMapAttr>("map");
   p.printAffineMapOfSSAIds(mapAttr, op.idxs());
   p << ']';
   p.printOptionalAttrDict(op.getAttrs(), {"agg", "map"});
   p << " : ";
-  p.printType(op.mem().getType());
+  p.printType(op.memref().getType());
   p << ", ";
   p.printType(op.vector().getType());
 }
@@ -517,9 +521,6 @@ OpFoldResult PxaVectorReduceOp::fold(ArrayRef<Attribute> cstOperands) {
   return OpFoldResult();
 }
 
-#define GET_OP_CLASSES
-#include "pmlc/dialect/pxa/ir/ops.cc.inc"
-
 void PXADialect::initialize() {
   addOperations<
 #define GET_OP_LIST
@@ -528,3 +529,6 @@ void PXADialect::initialize() {
 }
 
 } // namespace pmlc::dialect::pxa
+
+#define GET_OP_CLASSES
+#include "pmlc/dialect/pxa/ir/ops.cc.inc" // NOLINT

@@ -26,18 +26,38 @@ using namespace mlir; // NOLINT
 namespace pmlc::dialect::pxa {
 
 AffineParallelOp tileAccumulations(AffineParallelOp op, bool skipTrivial) {
-  // Find the originating reduce
-  assert(op.getNumResults() == 1);
-  auto srcDef = getOriginalDef(op.getResult(0));
-  auto red = mlir::cast<PxaReduceOp>(srcDef);
+  // Find the originating write and its StrideInfo
+  Optional<StrideInfo> maybeStrideInfo;
+  if (op.getNumResults() == 1) {
+    auto srcDef = getPrevWriter(op.getResult(0));
+    if (auto gemmOp = dyn_cast_or_null<PxaGemmOp>(srcDef)) {
+      maybeStrideInfo =
+          computeStrideInfo(gemmOp.out().getType().cast<MemRefType>(),
+                            gemmOp.cAccessMap(), gemmOp.getOperandsForC());
+    } else if (auto reduceOp = dyn_cast_or_null<PxaReduceOp>(srcDef)) {
+      maybeStrideInfo = computeStrideInfo(reduceOp);
+    }
+  }
+  // If we can't fall back to adding a nesting level (to guarentee all
+  // accumulations are in the 'inner' loop)
+  if (!maybeStrideInfo) {
+    auto maybeRanges = op.getConstantRanges();
+    assert(maybeRanges &&
+           "Cannot tile accumulations on dynamic sized paralllel for");
+    if (!skipTrivial) {
+      op = performTiling(op, *maybeRanges);
+    }
+    return op;
+  }
+
+  auto si = *maybeStrideInfo;
   // Get strides for output
-  auto si = *computeStrideInfo(red);
   // Find all the accumulation indexes (stride 0 with respect to output) and
   // tile them into an inner block
   auto ranges = *op.getConstantRanges();
   SmallVector<int64_t, 6> accumTile;
-  auto steps = op.steps().cast<ArrayAttr>().getValue();
-  // Track if both inner + outer loops would bee used
+  auto steps = op.getSteps();
+  // Track if both inner + outer loops would be used
   bool anyAccum = false;
   bool anyNonAccum = false;
   for (size_t i = 0; i < ranges.size(); i++) {
@@ -45,7 +65,7 @@ AffineParallelOp tileAccumulations(AffineParallelOp op, bool skipTrivial) {
     if (si.strides.count(arg)) {
       // Output non-stationary, outer loop
       anyNonAccum = true;
-      accumTile.push_back(steps[i].cast<IntegerAttr>().getInt());
+      accumTile.push_back(steps[i]);
     } else {
       // Output stationary, accumulate in inner loop
       anyAccum = true;
@@ -62,25 +82,24 @@ AffineParallelOp tileAccumulations(AffineParallelOp op, bool skipTrivial) {
 }
 
 namespace {
-using llvm::DenseMap;
-using llvm::DenseSet;
-using llvm::SmallVector;
-using mlir::BlockArgument;
 
 struct TileAccumulatePass : public TileAccumulateBase<TileAccumulatePass> {
   void runOnFunction() final {
     auto func = getFunction();
     // Tile only the outermost loops
     for (auto op : func.getBody().getOps<AffineParallelOp>()) {
-      if (op.getNumResults() == 1) {
-        tileAccumulations(op, true);
+      if (!op.getConstantRanges()) {
+        signalPassFailure();
+        break;
       }
+      tileAccumulations(op, false);
     }
   }
 };
+
 } // namespace
 
-std::unique_ptr<mlir::Pass> createTileAccumulatePass() {
+std::unique_ptr<Pass> createTileAccumulatePass() {
   return std::make_unique<TileAccumulatePass>();
 }
 

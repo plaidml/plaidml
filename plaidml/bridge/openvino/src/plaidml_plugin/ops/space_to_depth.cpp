@@ -58,8 +58,7 @@ static OpRegistration reg("spacetodepth", [](const Context& ctx) {
     Reordered_dims.push_back(I_dims[i + 2] / block_size);
     I_idxs.push_back(block_size * Reordered_idxs[I.rank() + i] + Reordered_idxs[i + block_offset]);
   }
-  auto Reordered = edsl::TensorOutput(Reordered_dims);
-  Reordered(Reordered_idxs) = I(I_idxs);
+  edsl::Tensor Reordered = edsl::Contraction().outShape(Reordered_dims).outAccess(Reordered_idxs).assign(I(I_idxs));
 
   std::vector<edsl::TensorDim> O_dims;
   O_dims.push_back(Reordered_dims[0]);

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "mlir/Dialect/GPU/GPUDialect.h"
+#include "mlir/Dialect/SPIRV/SPIRVDialect.h"
 #include "mlir/Pass/Pass.h"
 
 namespace pmlc::conversion::gpu {

@@ -12,7 +12,8 @@
 #include "mlir/Transforms/DialectConversion.h"
 
 #include "pmlc/conversion/tile_to_pxa/pass_detail.h"
-#include "pmlc/dialect/eltwise/ir/ops.h"
+#include "pmlc/dialect/pxa/analysis/strides.h"
+#include "pmlc/dialect/pxa/analysis/uses.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/dialect/stdx/ir/ops.h"
 #include "pmlc/dialect/tile/ir/ops.h"
@@ -20,28 +21,18 @@
 #include "pmlc/util/logging.h"
 #include "pmlc/util/util.h"
 
+#include "pmlc/util/ident.h"
+
 namespace pmlc::conversion::tile_to_pxa {
 
-namespace ew = dialect::eltwise;
+namespace tile = dialect::tile;
 namespace pxa = dialect::pxa;
 namespace stdx = dialect::stdx;
 
 using namespace mlir; // NOLINT
 
-using dialect::tile::AggregationKind;
-using dialect::tile::CombinationKind;
-using dialect::tile::ConstantOp;
-using dialect::tile::ContractionOp;
-using dialect::tile::ContractionOpAdaptor;
-using dialect::tile::getPaddingInfo;
-using dialect::tile::IndexOp;
-using dialect::tile::PaddingInfo;
-using dialect::tile::PrngOp;
-using dialect::tile::ReshapeOp;
-using dialect::tile::ReshapeOpAdaptor;
-using dialect::tile::ShapeOp;
-using dialect::tile::ShapeOpAdaptor;
-using dialect::tile::TraceOp;
+using util::AggregationKind;
+using util::CombinationKind;
 
 namespace {
 
@@ -49,7 +40,7 @@ struct TypeConverter : public mlir::TypeConverter {
   TypeConverter() {
     addConversion([](FunctionType type) { return type; });
     addConversion([](FloatType type) { return type; });
-    addConversion([](IntegerType type) { return ew::toSignlessType(type); });
+    addConversion([](IntegerType type) { return tile::toSignlessType(type); });
     addConversion([](MemRefType type) { return type; });
     addConversion([this](RankedTensorType type) {
       auto elementType = type.getElementType();
@@ -78,50 +69,6 @@ static RankedTensorType getRankedTensorType(Type type) {
   return RankedTensorType::get({}, type);
 }
 
-struct FuncOpConversion : public OpConversionPattern<FuncOp> {
-  using OpConversionPattern<FuncOp>::OpConversionPattern;
-
-  LogicalResult
-  matchAndRewrite(FuncOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const final {
-    FunctionType type = op.getType();
-    IVLOG(2, "FuncOpConversion::rewrite> " << mlir::debugString(type));
-
-    // Convert the function signature
-    TypeConverter typeConverter;
-    mlir::TypeConverter::SignatureConversion result(type.getNumInputs());
-    for (unsigned i = 0; i < type.getNumInputs(); ++i) {
-      result.addInputs(i, {typeConverter.convertType(type.getInput(i))});
-    }
-
-    // Create a new function with an updated signature.
-    auto newOp = rewriter.cloneWithoutRegions(op);
-    rewriter.inlineRegionBefore(op.getBody(), newOp.getBody(), newOp.end());
-    newOp.setType(FunctionType::get(result.getConvertedTypes(), llvm::None,
-                                    op.getContext()));
-
-    // Tell the rewriter to convert the region signature.
-    rewriter.applySignatureConversion(&newOp.getBody(), result);
-
-    // Finally cause the old func op to be erased
-    rewriter.eraseOp(op);
-
-    return success();
-  }
-};
-
-struct TileConstantOpConversion : public OpConversionPattern<ConstantOp> {
-  using OpConversionPattern<ConstantOp>::OpConversionPattern;
-
-  LogicalResult
-  matchAndRewrite(ConstantOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const final {
-    auto value = op.getValue().cast<IntegerAttr>().getInt();
-    rewriter.replaceOpWithNewOp<mlir::ConstantIndexOp>(op, value);
-    return success();
-  }
-};
-
 static llvm::APFloat convertFloatUsingType(llvm::APFloat value,
                                            FloatType type) {
   bool losesInfo = false;
@@ -130,14 +77,13 @@ static llvm::APFloat convertFloatUsingType(llvm::APFloat value,
   return value;
 }
 
-struct ScalarConstantOpConversion
-    : public OpConversionPattern<ew::ScalarConstantOp> {
-  using OpConversionPattern<ew::ScalarConstantOp>::OpConversionPattern;
+struct ConstantOpConversion : public OpConversionPattern<tile::ConstantOp> {
+  using OpConversionPattern<tile::ConstantOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(ew::ScalarConstantOp op, ArrayRef<Value> operands,
+  matchAndRewrite(tile::ConstantOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
-    auto stdType = ew::toSignlessType(getElementType(op));
+    auto stdType = tile::toSignlessType(getElementType(op));
     auto value = op.getValue();
     if (auto floatType = stdType.dyn_cast<FloatType>()) {
       auto floatAttr = value.cast<FloatAttr>();
@@ -275,7 +221,7 @@ template <typename InnerPredicate>
 struct AnyComparandIs : Matcher {
   bool match(Operation *op) const final {
     SmallVector<Value, 4> allOperands(op->getOperands());
-    ContractionOpAdaptor adaptor(allOperands);
+    tile::ContractionOpAdaptor adaptor(allOperands);
     auto operands = adaptor.operands();
     InnerPredicate pred;
     return pred.match(operands[0].getType()) ||
@@ -287,7 +233,7 @@ template <typename InnerPredicate>
 struct ComparandsAre : Matcher {
   bool match(Operation *op) const final {
     SmallVector<Value, 4> allOperands(op->getOperands());
-    ContractionOpAdaptor adaptor(allOperands);
+    tile::ContractionOpAdaptor adaptor(allOperands);
     auto operands = adaptor.operands();
     InnerPredicate pred;
     return pred.match(operands[0].getType()) &&
@@ -337,11 +283,11 @@ static Type promoteTypes(ConversionPatternRewriter &rewriter, Location loc,
   // First, determine the 'final' type that wins the promotion
   Type bestType;
   for (auto type : types) {
-    bestType = ew::promoteTypes(bestType, type);
+    bestType = tile::promoteTypes(bestType, type);
   }
   // Next, cast each operand to the 'final' type
   bool intoSigned = bestType.isSignedInteger();
-  auto targetType = ew::toSignlessType(bestType);
+  auto targetType = tile::toSignlessType(bestType);
   for (unsigned i = 0; i < operands.size(); i++) {
     auto dtype = types[i];
     auto operand = operands[i];
@@ -552,7 +498,7 @@ struct CondOp {
   }
 };
 
-static void updateAffineMap(Operation *in, const PaddingInfo &padding) {
+static void updateAffineMap(Operation *in, const tile::PaddingInfo &padding) {
   auto accMap = in->getAttr("map").cast<AffineMapAttr>().getValue();
   assert(padding.lower.size() == accMap.getNumResults());
   SmallVector<AffineExpr, 4> newExprs;
@@ -566,12 +512,12 @@ static void updateAffineMap(Operation *in, const PaddingInfo &padding) {
 static Value
 buildBroadcastLoad(OpBuilder &builder, Location loc, Value operand,
                    unsigned outRank,
-                   Optional<PaddingInfo> maybePadding = llvm::None) {
+                   Optional<tile::PaddingInfo> maybePadding = llvm::None) {
   auto body = builder.getBlock();
   auto defOp = operand.getDefiningOp();
   Attribute attr;
   // Handle scalar values
-  if (defOp && mlir::m_Constant(&attr).match(defOp)) {
+  if (defOp && m_Constant(&attr).match(defOp)) {
     return operand;
   }
   // handle broadcasts
@@ -632,7 +578,7 @@ static AtomicRMWKind convertAgg(AggregationKind agg, Type type) {
 
 static Value buildSimpleStore(OpBuilder &builder, Location loc, Value scalar,
                               Value memRef,
-                              Optional<PaddingInfo> maybePadding) {
+                              Optional<tile::PaddingInfo> maybePadding) {
   auto body = builder.getBlock();
   auto memRefType = memRef.getType().cast<MemRefType>();
   auto elementType = memRefType.getElementType();
@@ -664,7 +610,7 @@ struct BufferAllocator {
     auto shape = llvm::to_vector<8>(originalShape);
 
     // If padding is detected, expand the shape to accomodate.
-    auto maybePadding = getPaddingInfo(op);
+    auto maybePadding = tile::getPaddingInfo(op);
     if (maybePadding) {
       for (unsigned i = 0, e = shape.size(); i < e; ++i) {
         shape[i] += maybePadding->lower[i] + maybePadding->upper[i];
@@ -692,13 +638,13 @@ struct BufferAllocator {
   }
 };
 
-struct PrngOpConversion : public OpConversionPattern<PrngOp> {
-  using OpConversionPattern<PrngOp>::OpConversionPattern;
+struct PrngOpConversion : public OpConversionPattern<tile::PrngOp> {
+  using OpConversionPattern<tile::PrngOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(dialect::tile::PrngOp op, ArrayRef<Value> operands,
+  matchAndRewrite(tile::PrngOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
-    PrngOp::Adaptor transformed(operands);
+    tile::PrngOpAdaptor transformed(operands);
     BufferAllocator allocResult(rewriter, op.getOperation(),
                                 op.result().getType());
     BufferAllocator stateResult(rewriter, op.getOperation(),
@@ -716,7 +662,6 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
   using OpConversionPattern<FromOpType>::OpConversionPattern;
 
   LogicalResult match(Operation *op) const final {
-    IVLOG(2, "EltwiseOpConversion::match>");
     Matcher pred;
     return pred(op);
   }
@@ -738,8 +683,8 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
     // Create the loads
     SmallVector<Value, 4> scalars;
     for (size_t i = 0; i < operands.size(); i++) {
-      auto maybePadding =
-          getPaddingInfo(op.getOperation()->getOperand(i).getDefiningOp());
+      auto maybePadding = tile::getPaddingInfo(
+          op.getOperation()->getOperand(i).getDefiningOp());
       scalars.push_back(buildBroadcastLoad(rewriter, loc, operands[i],
                                            alloc.memRefType.getRank(),
                                            maybePadding));
@@ -756,7 +701,7 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
 
     // Create the store
     auto stored = buildSimpleStore(rewriter, loc, result, alloc.resultMemRef,
-                                   getPaddingInfo(op));
+                                   tile::getPaddingInfo(op));
     rewriter.create<AffineYieldOp>(loc, ValueRange{stored});
 
     // Replace output with the newly allocated buffer
@@ -766,12 +711,12 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
 
 template <CombinationKind comboKind, typename ComboBuilder,
           typename Matcher = AlwaysTrue>
-struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
-  using OpConversionPattern<ContractionOp>::OpConversionPattern;
+struct ContractionOpConversion
+    : public OpConversionPattern<tile::ContractionOp> {
+  using OpConversionPattern<tile::ContractionOp>::OpConversionPattern;
 
   LogicalResult match(Operation *op) const final {
-    IVLOG(2, "ContractionOpConversion::match>");
-    if (auto cionOp = dyn_cast<ContractionOp>(op)) {
+    if (auto cionOp = dyn_cast<tile::ContractionOp>(op)) {
       if (cionOp.combo() != comboKind) {
         return failure();
       }
@@ -786,7 +731,7 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
     return failure();
   }
 
-  void rewrite(ContractionOp op, ArrayRef<Value> operands,
+  void rewrite(tile::ContractionOp op, ArrayRef<Value> operands,
                ConversionPatternRewriter &rewriter) const final {
     try {
       tryRewrite(op, operands, rewriter);
@@ -795,10 +740,10 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
     }
   }
 
-  void tryRewrite(ContractionOp op, ArrayRef<Value> operands,
+  void tryRewrite(tile::ContractionOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const {
     // Create an adaptor
-    ContractionOpAdaptor cionAdaptor(operands);
+    tile::ContractionOpAdaptor cionAdaptor(operands);
     auto cionOperands = cionAdaptor.operands();
 
     auto loc = op.getLoc();
@@ -812,11 +757,11 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
         /*reductions=*/ArrayRef<AtomicRMWKind>{AtomicRMWKind::assign},
         /*ranges=*/shape);
     auto parallelBuilder = parallel.getBodyBuilder();
-    auto maybePadding = getPaddingInfo(op.init().getDefiningOp());
+    auto maybePadding = tile::getPaddingInfo(op.init().getDefiningOp());
     auto load = buildBroadcastLoad(parallelBuilder, loc, cionAdaptor.init(),
                                    shape.size(), maybePadding);
     auto store = buildSimpleStore(parallelBuilder, loc, load,
-                                  alloc.resultMemRef, getPaddingInfo(op));
+                                  alloc.resultMemRef, tile::getPaddingInfo(op));
     if (maybePadding)
       updateAffineMap(store.getDefiningOp(), *maybePadding);
     parallelBuilder.create<AffineYieldOp>(loc, ValueRange{store});
@@ -867,12 +812,13 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
       auto operand = cionOperands[i];
       auto defOp = operand.getDefiningOp();
       Attribute attr;
-      if (defOp && mlir::m_Constant(&attr).match(defOp)) {
+      if (defOp && m_Constant(&attr).match(defOp)) {
         scalars.push_back(operand);
       } else {
         auto map = srcs[i].cast<AffineMapAttr>().getValue();
         auto loadOp = rewriter.create<pxa::PxaLoadOp>(loc, operand, map, idxs);
-        auto maybePadding = getPaddingInfo(op.operands()[i].getDefiningOp());
+        auto maybePadding =
+            tile::getPaddingInfo(op.operands()[i].getDefiningOp());
         if (maybePadding)
           updateAffineMap(loadOp, *maybePadding);
         scalars.push_back(loadOp);
@@ -900,7 +846,7 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
       reduceOp = rewriter.create<pxa::PxaReduceOp>(loc, agg, combined, filled,
                                                    resultMap, idxs);
     }
-    maybePadding = getPaddingInfo(op);
+    maybePadding = tile::getPaddingInfo(op);
     if (maybePadding)
       updateAffineMap(reduceOp, *maybePadding);
     rewriter.create<AffineYieldOp>(loc, ValueRange{reduceOp});
@@ -910,14 +856,88 @@ struct ContractionOpConversion : public OpConversionPattern<ContractionOp> {
   }
 };
 
-struct IndexOpConversion : public OpConversionPattern<IndexOp> {
-  using OpConversionPattern<IndexOp>::OpConversionPattern;
+struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
+  using OpConversionPattern<tile::GatherOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(IndexOp op, ArrayRef<Value> operands,
+  matchAndRewrite(tile::GatherOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
-    IVLOG(2, "IndexOpConversion::matchAndRewrite>");
+    // Create an adaptor, to interpret the operands
+    tile::GatherOpAdaptor adaptor(operands);
 
+    auto loc = op.getLoc();
+    auto ctx = rewriter.getContext();
+
+    // input values
+    auto tensor = adaptor.tensor();
+    // index values for the last dimension
+    // this is a one-dimensional array of integers
+    auto indexes = adaptor.dims();
+
+    TypeConverter typeConverter;
+    auto resultType = typeConverter.convertType(op.result().getType());
+    auto memrefType = resultType.cast<MemRefType>();
+
+    // Make an allocation for the output
+    auto resultMemRef = rewriter.create<AllocOp>(loc, memrefType).getResult();
+
+    // we need an array of int64_t representing the results tensor's dims
+    ArrayRef<int64_t> size = memrefType.getShape();
+
+    auto loop = rewriter.create<AffineParallelOp>(
+        loc, ArrayRef<Type>{memrefType},
+        ArrayRef<AtomicRMWKind>{AtomicRMWKind::assign}, size);
+    rewriter.setInsertionPointToStart(loop.getBody());
+
+    // create an affine map for loading the index, using the leading counters
+    size_t idxDims = indexes.getType().cast<MemRefType>().getShape().size();
+    auto idxLoadMap = AffineMap::getMultiDimIdentityMap(idxDims, ctx);
+    auto idxLoadOps = loop.getIVs().take_front(idxDims);
+
+    // load the value from the indexes array
+    Value indexVal =
+        rewriter.create<pxa::PxaLoadOp>(loc, indexes, idxLoadMap, idxLoadOps)
+            .getResult();
+
+    if (!indexVal.getType().isa<IndexType>()) {
+      // cast from whatever integer type it has to index type
+      auto indexType = rewriter.getIndexType();
+      indexVal = rewriter.create<mlir::IndexCastOp>(loc, indexVal, indexType)
+                     .getResult();
+    }
+
+    // mix the indexVal in with the loop indexes to create source map
+    size_t dstDims = size.size();
+    SmallVector<Value, 4> srcOps;
+    srcOps.push_back(indexVal);
+    for (size_t i = idxDims; i < dstDims; ++i) {
+      srcOps.push_back(loop.getIVs()[i]);
+    }
+
+    // load the specified value from the source tensor
+    auto loaded = rewriter.create<mlir::LoadOp>(loc, tensor, srcOps);
+
+    // create a destination map using all of the dimensions
+    auto dstStoreMap = AffineMap::getMultiDimIdentityMap(dstDims, ctx);
+
+    // create a destination map from the whole loop
+    auto stored = rewriter.create<pxa::PxaReduceOp>(loc, AtomicRMWKind::assign,
+                                                    loaded, resultMemRef,
+                                                    dstStoreMap, loop.getIVs());
+    rewriter.create<AffineYieldOp>(loc, ArrayRef<Value>{stored.getResult()});
+
+    rewriter.replaceOp(op, loop.getResult(0));
+
+    return success();
+  }
+};
+
+struct IndexOpConversion : public OpConversionPattern<tile::IndexOp> {
+  using OpConversionPattern<tile::IndexOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(tile::IndexOp op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override {
     // Gather some basic info
     auto loc = op.getLoc();
     TypeConverter typeConverter;
@@ -946,8 +966,8 @@ struct IndexOpConversion : public OpConversionPattern<IndexOp> {
     // Create the store
     auto cast = rewriter.create<mlir::IndexCastOp>(loc, apply,
                                                    rewriter.getIntegerType(32));
-    auto stored =
-        buildSimpleStore(rewriter, loc, cast, resultMemRef, getPaddingInfo(op));
+    auto stored = buildSimpleStore(rewriter, loc, cast, resultMemRef,
+                                   tile::getPaddingInfo(op));
     rewriter.create<AffineYieldOp>(loc, ValueRange{stored});
 
     // Replace the op
@@ -957,16 +977,14 @@ struct IndexOpConversion : public OpConversionPattern<IndexOp> {
   }
 };
 
-struct ReshapeOpConversion : public OpConversionPattern<ReshapeOp> {
-  using OpConversionPattern<ReshapeOp>::OpConversionPattern;
+struct ReshapeOpConversion : public OpConversionPattern<tile::ReshapeOp> {
+  using OpConversionPattern<tile::ReshapeOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(ReshapeOp op, ArrayRef<Value> operands,
+  matchAndRewrite(tile::ReshapeOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
-    IVLOG(2, "ReshapeOpConversion::matchAndRewrite>");
-
     // Create an adaptor, to interpret the operands
-    ReshapeOpAdaptor adaptor(operands);
+    tile::ReshapeOpAdaptor adaptor(operands);
 
     auto tensor = adaptor.tensor();
 
@@ -978,16 +996,14 @@ struct ReshapeOpConversion : public OpConversionPattern<ReshapeOp> {
   }
 };
 
-struct ShapeOpConversion : public OpConversionPattern<ShapeOp> {
-  using OpConversionPattern<ShapeOp>::OpConversionPattern;
+struct ShapeOpConversion : public OpConversionPattern<tile::ShapeOp> {
+  using OpConversionPattern<tile::ShapeOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(ShapeOp op, ArrayRef<Value> operands,
+  matchAndRewrite(tile::ShapeOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
-    IVLOG(2, "ShapeOpConversion::matchAndRewrite>");
-
     // Create an adaptor
-    ShapeOpAdaptor adaptor(operands);
+    tile::ShapeOpAdaptor adaptor(operands);
 
     // Gather some basic info
     auto loc = op.getLoc();
@@ -1017,14 +1033,97 @@ struct ShapeOpConversion : public OpConversionPattern<ShapeOp> {
   }
 };
 
-struct CastOpConversion : public OpConversionPattern<ew::CastOp> {
-  using OpConversionPattern<ew::CastOp>::OpConversionPattern;
+struct ScatterOpConversion : public OpConversionPattern<tile::ScatterOp> {
+  using OpConversionPattern<tile::ScatterOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(ew::CastOp op, ArrayRef<Value> operands,
+  matchAndRewrite(tile::ScatterOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
-    IVLOG(2, "CastOpConversion::matchAndRewrite>");
+    // Helpful explanation of scatter from tensorflow docs:
+    // https://www.tensorflow.org/api_docs/python/tf/scatter_nd
 
+    auto loc = op.getLoc();
+    auto ctx = rewriter.getContext();
+    TypeConverter typeConverter;
+
+    // Create an adaptor, to interpret the operands
+    tile::ScatterOpAdaptor adaptor(operands);
+    // 'tensor' provides update values
+    // 'dims' contains the destination indices
+    // 'other' is the shape of the output
+    // this is redundant because the result type also specifies output shape
+    auto updates = adaptor.tensor();
+    auto indices = adaptor.dims();
+
+    // Make an allocation for the output
+    auto resultType = typeConverter.convertType(op.result().getType());
+    auto resultMemRefType = resultType.cast<MemRefType>();
+    auto resultMemRef =
+        rewriter.create<AllocOp>(loc, resultMemRefType).getResult();
+
+    // Get the shape of the update tensor and create a parallel loop over its
+    // indexes; we will load each value from the updates, load its destination
+    // from the indexes, and store the value to the result.
+    auto updatesType = typeConverter.convertType(updates.getType());
+    auto updatesMemRefType = updatesType.cast<MemRefType>();
+    ArrayRef<int64_t> updatesShape = updatesMemRefType.getShape();
+
+    auto loop = rewriter.create<AffineParallelOp>(
+        loc, ArrayRef<Type>{resultMemRefType},
+        ArrayRef<AtomicRMWKind>{AtomicRMWKind::assign}, updatesShape);
+    rewriter.setInsertionPointToStart(loop.getBody());
+
+    // Load the source value from the updates tensor.
+    // The affine map for locating the update value uses all loop dimensions.
+    size_t srcDims = updatesShape.size();
+    auto srcLoadMap = AffineMap::getMultiDimIdentityMap(srcDims, ctx);
+    auto srcLoadOps = loop.getIVs();
+    Value srcVal =
+        rewriter.create<pxa::PxaLoadOp>(loc, updates, srcLoadMap, srcLoadOps)
+            .getResult();
+
+    // Load the location value from the indices tensor.
+    // Create an affine map for loading the index, using leading counters.
+    size_t idxDims = indices.getType().cast<MemRefType>().getShape().size();
+    auto idxLoadMap = AffineMap::getMultiDimIdentityMap(idxDims, ctx);
+    auto idxLoadOps = loop.getIVs().take_front(idxDims);
+
+    Value indexVal =
+        rewriter.create<pxa::PxaLoadOp>(loc, indices, idxLoadMap, idxLoadOps)
+            .getResult();
+
+    // Cast the index value from its integer type to the index type
+    if (!indexVal.getType().isa<IndexType>()) {
+      // cast from whatever integer type it has to index type
+      auto indexType = rewriter.getIndexType();
+      indexVal = rewriter.create<mlir::IndexCastOp>(loc, indexVal, indexType)
+                     .getResult();
+    }
+
+    // Combine the index value with the loop dimension indexes to create the
+    // destination affine map.
+    size_t dstDims = resultMemRefType.getShape().size();
+    SmallVector<Value, 4> dstOps;
+    dstOps.push_back(indexVal);
+    for (size_t i = 1; i < dstDims; ++i) {
+      dstOps.push_back(loop.getIVs()[i]);
+    }
+
+    // Write the value to the destination
+    rewriter.create<mlir::StoreOp>(loc, srcVal, resultMemRef, dstOps);
+
+    rewriter.create<AffineYieldOp>(loc, ArrayRef<Value>{resultMemRef});
+    rewriter.replaceOp(op, loop.getResult(0));
+    return success();
+  }
+};
+
+struct CastOpConversion : public OpConversionPattern<tile::CastOp> {
+  using OpConversionPattern<tile::CastOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(tile::CastOp op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override {
     auto loc = op.getLoc();
     TypeConverter typeConverter;
     auto oldResultType = op.result().getType();
@@ -1060,11 +1159,49 @@ struct CastOpConversion : public OpConversionPattern<ew::CastOp> {
 
     // Create the store
     auto stored = buildSimpleStore(rewriter, loc, result, resultMemRef,
-                                   getPaddingInfo(op));
+                                   tile::getPaddingInfo(op));
     rewriter.create<AffineYieldOp>(loc, ValueRange{stored});
 
     // Replace the op
     rewriter.replaceOp(op, forOp.getResult(0));
+
+    return success();
+  }
+};
+
+struct FuncOpConversion : public OpConversionPattern<FuncOp> {
+  using OpConversionPattern<FuncOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(FuncOp op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const final {
+    FunctionType type = op.getType();
+
+    // Convert the function signature
+    TypeConverter typeConverter;
+    mlir::TypeConverter::SignatureConversion result(type.getNumInputs() +
+                                                    type.getNumResults());
+    for (unsigned i = 0; i < type.getNumInputs(); ++i) {
+      result.addInputs(i, {typeConverter.convertType(type.getInput(i))});
+    }
+    SmallVector<Type, 8> resultTypes;
+    for (Type resultType : type.getResults()) {
+      Type newResultType = typeConverter.convertType(resultType);
+      result.addInputs({newResultType});
+      resultTypes.push_back(newResultType);
+    }
+
+    // Create a new function with an updated signature.
+    auto newOp = rewriter.cloneWithoutRegions(op);
+    rewriter.inlineRegionBefore(op.getBody(), newOp.getBody(), newOp.end());
+    newOp.setType(FunctionType::get(result.getConvertedTypes(), resultTypes,
+                                    op.getContext()));
+
+    // Tell the rewriter to convert the region signature.
+    rewriter.applySignatureConversion(&newOp.getBody(), result);
+
+    // Finally cause the old func op to be erased
+    rewriter.eraseOp(op);
 
     return success();
   }
@@ -1076,29 +1213,52 @@ struct ReturnOpConversion : public OpConversionPattern<ReturnOp> {
   LogicalResult
   matchAndRewrite(ReturnOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
-    IVLOG(2, "ReturnOpConversion::matchAndRewrite>");
     auto &block = op.getParentRegion()->front();
     auto funcOp = op.getParentOfType<FuncOp>();
     auto blockArg = funcOp.getType().getNumInputs() - op.getNumOperands();
-    for (auto operand : operands) {
+    for (Value operand : operands) {
       // Find very initial allocation of memref
-      operand.replaceAllUsesWith(block.getArgument(blockArg++));
+      auto def = pxa::getIndirectDef(operand);
+      def.replaceAllUsesWith(block.getArgument(blockArg++));
     }
-    rewriter.replaceOpWithNewOp<ReturnOp>(op);
+    rewriter.replaceOpWithNewOp<ReturnOp>(op, operands);
     return success();
   }
 };
 
-struct TraceOpConversion : public OpConversionPattern<TraceOp> {
-  using OpConversionPattern<TraceOp>::OpConversionPattern;
+struct PragmaOpConversion : public OpConversionPattern<tile::PragmaOp> {
+  using OpConversionPattern<tile::PragmaOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(TraceOp op, ArrayRef<Value> operands,
+  matchAndRewrite(tile::PragmaOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
+    if (op.op() == "trace") {
+      return failure();
+    }
+    tile::PragmaOpAdaptor adaptor(operands);
+    rewriter.replaceOp(op, adaptor.tensor());
+    return success();
+  }
+};
+
+struct TraceOpConversion : public OpConversionPattern<tile::PragmaOp> {
+  using OpConversionPattern<tile::PragmaOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(tile::PragmaOp op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const final {
+    if (op.op() != "trace") {
+      return failure();
+    }
+    tile::PragmaOpAdaptor adaptor(operands);
     auto module = op.getParentOfType<ModuleOp>();
-    auto symbol = createStubFunc(module, op.msgAttr());
+    auto msg = op.attrs().getNamed("msg");
+    if (!msg) {
+      return failure();
+    }
+    auto symbol = createStubFunc(module, msg->second.cast<StringAttr>());
     rewriter.create<CallOp>(op.getLoc(), symbol, ArrayRef<Type>{});
-    rewriter.replaceOp(op, op.in());
+    rewriter.replaceOp(op, adaptor.tensor());
     return success();
   }
 
@@ -1121,8 +1281,22 @@ struct TraceOpConversion : public OpConversionPattern<TraceOp> {
 
 struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
   void runOnOperation() final {
+    // Inject eltwise.ident ops for each return operand that is a direct block
+    // argument or a constant value.
+    getOperation().walk([&](ReturnOp op) {
+      OpBuilder builder(op);
+      for (OpOperand &operand : op.getOperation()->getOpOperands()) {
+        Value value = operand.get();
+        if (value.isa<BlockArgument>() || matchPattern(value, m_Constant())) {
+          Value copy = builder.create<tile::IdentOp>(op.getLoc(),
+                                                     value.getType(), value);
+          operand.set(copy);
+        }
+      }
+    });
+
     // Set up target (i.e. what is legal)
-    mlir::ConversionTarget target(getContext());
+    ConversionTarget target(getContext());
     TypeConverter converter;
     target.addLegalDialect<mlir::AffineDialect>();
     target.addLegalDialect<mlir::StandardOpsDialect>();
@@ -1131,6 +1305,8 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
     target.addLegalOp<mlir::ModuleOp, mlir::ModuleTerminatorOp, ReturnOp>();
     target.addDynamicallyLegalOp<FuncOp>(
         [&](FuncOp op) { return converter.isSignatureLegal(op.getType()); });
+    target.addDynamicallyLegalOp<ReturnOp>(
+        [&](ReturnOp op) { return converter.isLegal(op); });
 
     // Setup rewrite patterns
     using CmpIntLtOp =
@@ -1142,12 +1318,19 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
     using CmpIntGeOp =
         CmpIntInequalityOp<CmpIPredicate::sge, CmpIPredicate::uge>;
     OwningRewritePatternList patterns;
-    populateFuncOpTypeConversionPattern(patterns, &getContext(), converter);
     patterns.insert<
-        TileConstantOpConversion, CastOpConversion, IndexOpConversion,
-        ScalarConstantOpConversion, ShapeOpConversion, TraceOpConversion,
-        PrngOpConversion, ReshapeOpConversion,
-        // TODO: SpecialOpConversion (GatherOp, ScatterOp, ZeroOp)
+        CastOpConversion,     //
+        ConstantOpConversion, //
+        FuncOpConversion,     //
+        GatherOpConversion,   //
+        IndexOpConversion,    //
+        PragmaOpConversion,   //
+        PrngOpConversion,     //
+        ReshapeOpConversion,  //
+        ReturnOpConversion,   //
+        ScatterOpConversion,  //
+        ShapeOpConversion,    //
+        TraceOpConversion,    //
         ContractionOpConversion<CombinationKind::none, FirstOperand>,
         ContractionOpConversion<CombinationKind::add, StdOp<mlir::AddFOp>,
                                 ResultIs<EltwiseFloat>>,
@@ -1169,108 +1352,108 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
         ContractionOpConversion<CombinationKind::cond,
                                 CondOp<CmpIntOp<CmpIPredicate::eq>>,
                                 AnyComparandIs<EltwiseInteger>>,
-        EltwiseOpConversion<ew::ExpOp, StdOp<mlir::ExpOp>>,
-        EltwiseOpConversion<ew::LogOp, StdOp<mlir::LogOp>,
+        EltwiseOpConversion<tile::ExpOp, StdOp<mlir::ExpOp>>,
+        EltwiseOpConversion<tile::LogOp, StdOp<mlir::LogOp>,
                             ResultIs<EltwiseFloat>>,
-        EltwiseOpConversion<ew::PowOp, StdOp<stdx::PowOp>,
+        EltwiseOpConversion<tile::PowOp, StdOp<stdx::PowOp>,
                             ResultIs<EltwiseFloat>>,
-        EltwiseOpConversion<ew::ErfOp, StdOp<stdx::ErfOp>,
+        EltwiseOpConversion<tile::ErfOp, StdOp<stdx::ErfOp>,
                             OperandsAre<EltwiseFloat>>,
-        EltwiseOpConversion<ew::CosOp, StdOp<mlir::CosOp>,
+        EltwiseOpConversion<tile::CosOp, StdOp<mlir::CosOp>,
                             ResultIs<EltwiseFloat>>,
-        EltwiseOpConversion<ew::TanOp, StdOp<stdx::TanOp>,
+        EltwiseOpConversion<tile::TanOp, StdOp<stdx::TanOp>,
                             OperandsAre<EltwiseFloat>>,
-        EltwiseOpConversion<ew::SinHOp, StdOp<stdx::SinHOp>,
+        EltwiseOpConversion<tile::SinHOp, StdOp<stdx::SinHOp>,
                             OperandsAre<EltwiseFloat>>,
-        EltwiseOpConversion<ew::CosHOp, StdOp<stdx::CosHOp>,
+        EltwiseOpConversion<tile::CosHOp, StdOp<stdx::CosHOp>,
                             OperandsAre<EltwiseFloat>>,
-        EltwiseOpConversion<ew::SinOp, StdOp<mlir::SinOp>,
+        EltwiseOpConversion<tile::SinOp, StdOp<mlir::SinOp>,
                             ResultIs<EltwiseFloat>>,
-        EltwiseOpConversion<ew::TanHOp, StdOp<mlir::TanhOp>,
+        EltwiseOpConversion<tile::TanHOp, StdOp<mlir::TanhOp>,
                             ResultIs<EltwiseFloat>>,
-        EltwiseOpConversion<ew::ASinOp, StdOp<stdx::ASinOp>,
+        EltwiseOpConversion<tile::ASinOp, StdOp<stdx::ASinOp>,
                             OperandsAre<EltwiseFloat>>,
-        EltwiseOpConversion<ew::ACosOp, StdOp<stdx::ACosOp>,
+        EltwiseOpConversion<tile::ACosOp, StdOp<stdx::ACosOp>,
                             OperandsAre<EltwiseFloat>>,
-        EltwiseOpConversion<ew::ATanOp, StdOp<stdx::ATanOp>,
+        EltwiseOpConversion<tile::ATanOp, StdOp<stdx::ATanOp>,
                             OperandsAre<EltwiseFloat>>,
-        EltwiseOpConversion<ew::CeilOp, StdOp<mlir::CeilFOp>,
+        EltwiseOpConversion<tile::CeilOp, StdOp<mlir::CeilFOp>,
                             ResultIs<EltwiseFloat>>,
-        EltwiseOpConversion<ew::FloorOp, StdOp<stdx::FloorOp>,
+        EltwiseOpConversion<tile::FloorOp, StdOp<stdx::FloorOp>,
                             OperandsAre<EltwiseFloat>>,
-        EltwiseOpConversion<ew::RoundOp, StdOp<stdx::RoundOp>,
+        EltwiseOpConversion<tile::RoundOp, StdOp<stdx::RoundOp>,
                             OperandsAre<EltwiseFloat>>,
-        EltwiseOpConversion<ew::NegOp, StdOp<mlir::NegFOp>,
+        EltwiseOpConversion<tile::NegOp, StdOp<mlir::NegFOp>,
                             ResultIs<EltwiseFloat>>,
-        EltwiseOpConversion<ew::NegOp, NegIOp, ResultIs<EltwiseInteger>>,
-        EltwiseOpConversion<ew::AddOp, StdOp<mlir::AddFOp>,
+        EltwiseOpConversion<tile::NegOp, NegIOp, ResultIs<EltwiseInteger>>,
+        EltwiseOpConversion<tile::AddOp, StdOp<mlir::AddFOp>,
                             ResultIs<EltwiseFloat>>,
-        EltwiseOpConversion<ew::AddOp, StdOp<mlir::AddIOp>,
+        EltwiseOpConversion<tile::AddOp, StdOp<mlir::AddIOp>,
                             ResultIs<EltwiseInteger>>,
-        EltwiseOpConversion<ew::SubOp, StdOp<mlir::SubFOp>,
+        EltwiseOpConversion<tile::SubOp, StdOp<mlir::SubFOp>,
                             ResultIs<EltwiseFloat>>,
-        EltwiseOpConversion<ew::SubOp, StdOp<mlir::SubIOp>,
+        EltwiseOpConversion<tile::SubOp, StdOp<mlir::SubIOp>,
                             ResultIs<EltwiseInteger>>,
-        EltwiseOpConversion<ew::MulOp, StdOp<mlir::MulFOp>,
+        EltwiseOpConversion<tile::MulOp, StdOp<mlir::MulFOp>,
                             ResultIs<EltwiseFloat>>,
-        EltwiseOpConversion<ew::MulOp, StdOp<mlir::MulIOp>,
+        EltwiseOpConversion<tile::MulOp, StdOp<mlir::MulIOp>,
                             ResultIs<EltwiseInteger>>,
-        EltwiseOpConversion<ew::DivOp, StdOp<mlir::DivFOp>,
+        EltwiseOpConversion<tile::DivOp, StdOp<mlir::DivFOp>,
                             ResultIs<EltwiseFloat>>,
-        EltwiseOpConversion<ew::DivOp, StdOp<mlir::SignedDivIOp>,
+        EltwiseOpConversion<tile::DivOp, StdOp<mlir::SignedDivIOp>,
                             ResultIs<EltwiseSigned>>,
-        EltwiseOpConversion<ew::DivOp, StdOp<mlir::UnsignedDivIOp>,
+        EltwiseOpConversion<tile::DivOp, StdOp<mlir::UnsignedDivIOp>,
                             ResultIs<EltwiseUnsigned>>,
-        EltwiseOpConversion<ew::SqrtOp, StdOp<mlir::SqrtOp>>,
-        EltwiseOpConversion<ew::ModOp, StdOp<mlir::RemFOp>,
+        EltwiseOpConversion<tile::SqrtOp, StdOp<mlir::SqrtOp>>,
+        EltwiseOpConversion<tile::ModOp, StdOp<mlir::RemFOp>,
                             ResultIs<EltwiseFloat>>,
-        EltwiseOpConversion<ew::ModOp, StdOp<mlir::SignedRemIOp>,
+        EltwiseOpConversion<tile::ModOp, StdOp<mlir::SignedRemIOp>,
                             ResultIs<EltwiseSigned>>,
-        EltwiseOpConversion<ew::ModOp, StdOp<mlir::UnsignedRemIOp>,
+        EltwiseOpConversion<tile::ModOp, StdOp<mlir::UnsignedRemIOp>,
                             ResultIs<EltwiseUnsigned>>,
-        EltwiseOpConversion<ew::CmpEqOp, CmpFloatOp<CmpFPredicate::OEQ>,
+        EltwiseOpConversion<tile::CmpEqOp, CmpFloatOp<CmpFPredicate::OEQ>,
                             AnyOperandIs<EltwiseFloat>>,
-        EltwiseOpConversion<ew::CmpEqOp, CmpIntOp<CmpIPredicate::eq>,
+        EltwiseOpConversion<tile::CmpEqOp, CmpIntOp<CmpIPredicate::eq>,
                             OperandsAre<Not<EltwiseFloat>>>,
-        EltwiseOpConversion<ew::CmpNeOp, CmpFloatOp<CmpFPredicate::ONE>,
+        EltwiseOpConversion<tile::CmpNeOp, CmpFloatOp<CmpFPredicate::ONE>,
                             AnyOperandIs<EltwiseFloat>>,
-        EltwiseOpConversion<ew::CmpNeOp, CmpIntOp<CmpIPredicate::ne>,
+        EltwiseOpConversion<tile::CmpNeOp, CmpIntOp<CmpIPredicate::ne>,
                             OperandsAre<Not<EltwiseFloat>>>,
-        EltwiseOpConversion<ew::CmpLtOp, CmpFloatOp<CmpFPredicate::OLT>,
+        EltwiseOpConversion<tile::CmpLtOp, CmpFloatOp<CmpFPredicate::OLT>,
                             AnyOperandIs<EltwiseFloat>>,
-        EltwiseOpConversion<ew::CmpLtOp, CmpIntLtOp,
+        EltwiseOpConversion<tile::CmpLtOp, CmpIntLtOp,
                             OperandsAre<Not<EltwiseFloat>>>,
-        EltwiseOpConversion<ew::CmpLeOp, CmpFloatOp<CmpFPredicate::OLE>,
+        EltwiseOpConversion<tile::CmpLeOp, CmpFloatOp<CmpFPredicate::OLE>,
                             AnyOperandIs<EltwiseFloat>>,
-        EltwiseOpConversion<ew::CmpLeOp, CmpIntLeOp,
+        EltwiseOpConversion<tile::CmpLeOp, CmpIntLeOp,
                             OperandsAre<Not<EltwiseFloat>>>,
-        EltwiseOpConversion<ew::CmpGtOp, CmpFloatOp<CmpFPredicate::OGT>,
+        EltwiseOpConversion<tile::CmpGtOp, CmpFloatOp<CmpFPredicate::OGT>,
                             AnyOperandIs<EltwiseFloat>>,
-        EltwiseOpConversion<ew::CmpGtOp, CmpIntGtOp,
+        EltwiseOpConversion<tile::CmpGtOp, CmpIntGtOp,
                             OperandsAre<Not<EltwiseFloat>>>,
-        EltwiseOpConversion<ew::CmpGeOp, CmpFloatOp<CmpFPredicate::OGE>,
+        EltwiseOpConversion<tile::CmpGeOp, CmpFloatOp<CmpFPredicate::OGE>,
                             AnyOperandIs<EltwiseFloat>>,
-        EltwiseOpConversion<ew::CmpGeOp, CmpIntGeOp,
+        EltwiseOpConversion<tile::CmpGeOp, CmpIntGeOp,
                             OperandsAre<Not<EltwiseFloat>>>,
-        EltwiseOpConversion<ew::BitAndOp, StdOp<mlir::AndOp>,
+        EltwiseOpConversion<tile::BitAndOp, StdOp<mlir::AndOp>,
                             OperandsAre<EltwiseInteger>>,
-        EltwiseOpConversion<ew::BitOrOp, StdOp<mlir::OrOp>,
+        EltwiseOpConversion<tile::BitOrOp, StdOp<mlir::OrOp>,
                             OperandsAre<EltwiseInteger>>,
-        EltwiseOpConversion<ew::BitNotOp, NotOp>,
-        EltwiseOpConversion<ew::BitXorOp, StdOp<mlir::XOrOp>,
+        EltwiseOpConversion<tile::BitNotOp, NotOp>,
+        EltwiseOpConversion<tile::BitXorOp, StdOp<mlir::XOrOp>,
                             OperandsAre<EltwiseInteger>>,
-        EltwiseOpConversion<ew::BitShlOp, StdOp<mlir::ShiftLeftOp>,
+        EltwiseOpConversion<tile::BitShlOp, StdOp<mlir::ShiftLeftOp>,
                             OperandsAre<EltwiseInteger>>,
-        EltwiseOpConversion<ew::BitShrOp, StdOp<mlir::SignedShiftRightOp>,
+        EltwiseOpConversion<tile::BitShrOp, StdOp<mlir::SignedShiftRightOp>,
                             FirstOperandIs<EltwiseSigned>>,
-        EltwiseOpConversion<ew::BitShrOp, StdOp<mlir::UnsignedShiftRightOp>,
+        EltwiseOpConversion<tile::BitShrOp, StdOp<mlir::UnsignedShiftRightOp>,
                             FirstOperandIs<EltwiseUnsigned>>,
-        EltwiseOpConversion<ew::LogicalAndOp, LogicalOp<mlir::AndOp>>,
-        EltwiseOpConversion<ew::LogicalNotOp, LogicalNotOp>,
-        EltwiseOpConversion<ew::LogicalOrOp, LogicalOp<mlir::OrOp>>,
-        EltwiseOpConversion<ew::LogicalXorOp, LogicalOp<mlir::XOrOp>>,
-        EltwiseOpConversion<ew::SelectOp, SelectOp>,
-        EltwiseOpConversion<ew::IdentOp, FirstOperand>>(&getContext());
+        EltwiseOpConversion<tile::LogicalAndOp, LogicalOp<mlir::AndOp>>,
+        EltwiseOpConversion<tile::LogicalNotOp, LogicalNotOp>,
+        EltwiseOpConversion<tile::LogicalOrOp, LogicalOp<mlir::OrOp>>,
+        EltwiseOpConversion<tile::LogicalXorOp, LogicalOp<mlir::XOrOp>>,
+        EltwiseOpConversion<tile::SelectOp, SelectOp>,
+        EltwiseOpConversion<tile::IdentOp, FirstOperand>>(&getContext());
     // Run the conversion
     if (failed(applyFullConversion(getOperation(), target, patterns))) {
       signalPassFailure();
@@ -1280,7 +1463,7 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
 };
 } // namespace
 
-std::unique_ptr<mlir::Pass> createLowerTileToPXAPass() {
+std::unique_ptr<Pass> createLowerTileToPXAPass() {
   return std::make_unique<LowerTileToPXAPass>();
 }
 

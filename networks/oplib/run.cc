@@ -14,10 +14,21 @@ int main(int argc, char** argv) {
     plaidml::op::init();
     plaidml::exec::init();
     auto program = networks::oplib::buildResnet50();
-    // std::cout << program.str() << std::endl;
-    auto executable = plaidml::exec::Binder(program).compile();
+    std::cout << program.str() << std::endl;
+    program.compile();
+    auto exe = plaidml::exec::Executable(program);
     std::cout << "Running..." << std::endl;
-    executable->run();
+    std::vector<plaidml::Buffer> inputs;
+    for (const plaidml::TensorShape& shape : program.inputs()) {
+      inputs.emplace_back(shape);
+    }
+    std::vector<plaidml::Buffer> outputs;
+    for (const plaidml::TensorShape& shape : program.outputs()) {
+      outputs.emplace_back(shape);
+    }
+#if !defined(_WIN32)
+    exe.run(inputs, outputs);
+#endif
     return EXIT_SUCCESS;
   } catch (const std::exception& ex) {
     std::cerr << "Caught unhandled exception: " << ex.what() << std::endl;

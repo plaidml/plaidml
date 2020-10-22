@@ -38,9 +38,9 @@ def edsl_program(X, Y):
         i, j, k = TensorIndexes(3)
         X.bind_dims(I, K)
         Y.bind_dims(K, J)
-        R = TensorOutput(I, J)
+        R = Contraction().outShape(I, J)
         {}
-        return R
+        return R.build()
 """,
             "Sum Over Axis":
                 """
@@ -48,9 +48,9 @@ def edsl_program(X):
         I, J = TensorDims(2)
         i, j = TensorIndexes(2)
         X.bind_dims(I, J)
-        R = TensorOutput(I)
+        R = Contraction().outShape(I)
         {}
-        return R
+        return R.build()
 """,
             "Generic_Two_Input_Eltwise":
                 """
@@ -96,7 +96,8 @@ def edsl_program(X):
 ({html.code_tensor_dim}I{html.font_close},{html.code_tensor_dim}K{html.font_close}){html.br}
 {html.sp}{html.code_input_param}Y{html.font_close}.{html.code_directive}bind_dims{html.font_close}
 ({html.code_tensor_dim}K{html.font_close},{html.code_tensor_dim}J{html.font_close}){html.br}
-{html.sp}{html.code_output_param}R{html.font_close} = {html.code_directive}TensorOutput{html.font_close}
+{html.sp}{html.code_output_param}R{html.font_close} = {html.code_directive}Contraction{html.font_close}().
+{html.code_directive}outShape{html.font_close}
 ({html.code_tensor_dim}I{html.font_close},{html.code_tensor_dim}J{html.font_close}){html.br}
 {html.code_close}
 """,
@@ -111,7 +112,8 @@ def edsl_program(X):
  = {html.code_directive}TensorIndexes{html.font_close}({html.code_numeric}2{html.font_close}){html.br}
 {html.sp}{html.code_input_param}X{html.font_close}.{html.code_directive}bind_dims{html.font_close}
 ({html.code_tensor_dim}I{html.font_close},{html.code_tensor_dim}J{html.font_close}){html.br}
-{html.sp}{html.code_output_param}R{html.font_close} = {html.code_directive}TensorOutput{html.font_close}
+{html.sp}{html.code_output_param}R{html.font_close} = {html.code_directive}Contraction{html.font_close}().
+{html.code_directive}outShape{html.font_close}
 ({html.code_tensor_dim}I{html.font_close}){html.br}
 {html.code_close}
 """,

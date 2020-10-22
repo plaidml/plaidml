@@ -26,8 +26,10 @@ plaidml_cc_library(
         "autotile.cc",
         "buffer_placement.cc",
         "cache.cc",
+        "cpu_thread.cc",
         "dataflow_opt.cc",
         "fusion.cc",
+        "gpu_thread.cc",
         "localize.cc",
         "nest_loops.cc",
         "normalize.cc",
@@ -44,6 +46,7 @@ plaidml_cc_library(
     hdrs = [
         "autotile.h",
         "cache.h",
+        "normalize.h",
         "passes.h",
         "stencil.h",
         "tile.h",
@@ -52,7 +55,6 @@ plaidml_cc_library(
     ],
     deps = [
         ":gen-pass",
-        "//pmlc/dialect/eltwise/ir",
         "//pmlc/dialect/pxa/analysis",
         "//pmlc/dialect/pxa/ir",
         "//pmlc/dialect/xsmm/ir",

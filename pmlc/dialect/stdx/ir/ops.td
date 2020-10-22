@@ -96,12 +96,74 @@ def AnyStdScalar : AnyTypeOf<[AnyFloat, AnySignlessInteger]> {}
 
 def SubgroupBroadcastOp : StdX_Op<"subgroup_broadcast", [NoSideEffect, AllTypesMatch<["value", "result"]>]> {
   let summary = "broadcast to all elements in subgroup";
-  let arguments = (ins AnyStdScalar:$value, AnySignlessInteger:$localid);
+  let arguments = (ins AnyStdScalar:$value, Index:$localid);
   let results = (outs AnyStdScalar:$result);
   let assemblyFormat = [{
-    `(` $value `,` $localid `)` attr-dict `:` type($value) `,` type($localid)
+    `(` $value `,` $localid `)` attr-dict `:` type($value)
   }];
   let verifier = ?;
+}
+
+def AnyVectorOrScalar : AnyTypeOf<[AnyStdScalar, AnyVector]> {} 
+
+def SubgroupBlockReadINTELOp : StdX_Op<"subgroup_block_read_intel",
+     [TypesMatchWith<"result type matches element type of 'memref'",
+                     "memref", "result",
+                     "$_self.cast<mlir::MemRefType>().getElementType()">]> {
+  let summary = "See intel_subgroups extension.";
+  let arguments = (ins Arg<AnyMemRef, "the reference to subgroup block read from",
+                           [MemRead]>:$memref,
+                           Variadic<Index>:$indices);
+  let results = (outs AnyVectorOrScalar:$result);
+
+  let builders = [OpBuilder<
+    "mlir::OpBuilder &, mlir::OperationState &result, mlir::Value memref,"
+    "mlir::ValueRange indices = {}">];
+
+  let extraClassDeclaration = [{
+    mlir::Value getMemRef() { return getOperand(0); }
+    void setMemRef(mlir::Value value) { setOperand(0, value); }
+    mlir::MemRefType getMemRefType() {
+      return getMemRef().getType().cast<mlir::MemRefType>();
+    }
+
+    operand_range getIndices() { return {operand_begin() + 1, operand_end()}; }
+  }];
+
+  let assemblyFormat = "$memref `[` $indices `]` attr-dict `:` type($memref)";
+}
+
+def SubgroupBlockWriteINTELOp : StdX_Op<"subgroup_block_write_intel",
+     [TypesMatchWith<"type of 'value' matches element type of 'memref'",
+                     "memref", "value",
+                     "$_self.cast<mlir::MemRefType>().getElementType()">]> {
+  let summary = "See intel_subgroups extension.";
+
+  let arguments = (ins AnyVectorOrScalar:$value,
+                       Arg<AnyMemRef, "the reference to subgroup block write to",
+                       [MemWrite]>:$memref,
+                       Variadic<Index>:$indices);
+
+  let builders = [OpBuilder<
+    "mlir::OpBuilder &, mlir::OperationState &result, mlir::Value valueToStore, mlir::Value memref">];
+
+  let extraClassDeclaration = [{
+      mlir::Value getValueToStore() { return getOperand(0); }
+
+      mlir::Value getMemRef() { return getOperand(1); }
+      void setMemRef(mlir::Value value) { setOperand(1, value); }
+      mlir::MemRefType getMemRefType() {
+        return getMemRef().getType().cast<mlir::MemRefType>();
+      }
+
+      operand_range getIndices() {
+        return {operand_begin() + 2, operand_end()};
+      }
+  }];
+
+  let assemblyFormat = [{
+    $value `,` $memref `[` $indices `]` attr-dict `:` type($memref)
+  }];
 }
 
 #endif // __PML_STDX_OPS__

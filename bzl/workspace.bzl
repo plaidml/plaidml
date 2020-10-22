@@ -30,6 +30,13 @@ def plaidml_workspace():
         strip_prefix = "benchmark-1.5.0",
     )
 
+    http_archive(
+        name = "com_google_googletest",
+        url = "https://github.com/google/googletest/archive/release-1.10.0.tar.gz",
+        sha256 = "9dc9157a9a1551ec7a7e43daea9a694a0bb5fb8bec81235d8a1e6ef64c716dcb",
+        strip_prefix = "googletest-release-1.10.0",
+    )
+
     conda_repo(
         name = "com_intel_plaidml_conda",
         env_unix = clean_dep("//conda:unix.yml"),
@@ -62,14 +69,6 @@ def plaidml_workspace():
     )
 
     http_archive(
-        name = "gmock",
-        url = "https://github.com/google/googletest/archive/release-1.8.0.tar.gz",
-        sha256 = "58a6f4277ca2bc8565222b3bbd58a177609e9c488e8a72649359ba51450db7d8",
-        strip_prefix = "googletest-release-1.8.0",
-        build_file = clean_dep("//bzl:gmock.BUILD"),
-    )
-
-    http_archive(
         name = "half",
         url = "https://github.com/plaidml/depot/raw/master/half-1.11.0.zip",
         sha256 = "9e5ddb4b43abeafe190e780b5b606b081acb511e6edd4ef6fbe5de863a4affaf",
@@ -91,8 +90,8 @@ def plaidml_workspace():
         strip_prefix = "jsonnet-0.13.0",
     )
 
-    LLVM_COMMIT = "10d7e2d83cc8b2c605af9346913c1b56a5a317bc"
-    LLVM_SHA256 = "ef8fb8575ca85f594c3c72834078b14aab73f8b6720350ae307091a3abd0ac6f"
+    LLVM_COMMIT = "b3f1f66eddd9ed4e3caf6043344b17f5b0920bb0"
+    LLVM_SHA256 = "217fb2d6b249e886d6954612ff65dbf834a418e1f1c835c47445722afb5a54be"
     LLVM_URL = "https://github.com/plaidml/llvm-project/archive/{commit}.tar.gz".format(commit = LLVM_COMMIT)
     http_archive(
         name = "llvm-project",
@@ -103,6 +102,7 @@ def plaidml_workspace():
             clean_dep("//vendor/llvm:llvm.BUILD"): "llvm/BUILD.bazel",
             clean_dep("//vendor/mlir:mlir.BUILD"): "mlir/BUILD.bazel",
             clean_dep("//vendor/mlir:test.BUILD"): "mlir/test/BUILD.bazel",
+            clean_dep("//vendor/openmp:openmp.BUILD"): "openmp/BUILD.bazel",
         },
         override = "PLAIDML_LLVM_REPO",
     )
@@ -167,4 +167,30 @@ def plaidml_workspace():
         sha256 = "c3e5e9fdd5004dcb542feda5ee4f0ff0744628baf8ed2dd5d66f8ca1197cb1a1",
         strip_prefix = "zlib-1.2.11",
         build_file = clean_dep("//bzl:zlib.BUILD"),
+    )
+
+    http_archive(
+        name = "opencl_headers",
+        url = "https://github.com/KhronosGroup/OpenCL-Headers/archive/v2020.06.16.zip",
+        sha256 = "518703d3c3a6333bcf8e4f80758e4e98f7af30fbd72a09fe8c2673da1628d80c",
+        strip_prefix = "OpenCL-Headers-2020.06.16",
+        build_file = clean_dep("//vendor/opencl_headers:opencl_headers.BUILD"),
+    )
+
+    http_archive(
+        name = "opencl_hpp_headers",
+        url = "https://github.com/KhronosGroup/OpenCL-CLHPP/archive/v2.0.12.zip",
+        sha256 = "127936b3a5ef147f23b85fb043599d1480e9e57acabe2d2a67c5dac05aa4ad70",
+        strip_prefix = "OpenCL-CLHPP-2.0.12",
+        build_file = clean_dep("//vendor/opencl_hpp_headers:opencl_hpp_headers.BUILD"),
+        # Patch hpp headers trying to use system OpenCL header on Apple.
+        patches = [clean_dep("//vendor/opencl_hpp_headers:fix_apple_headers.patch")],
+    )
+
+    http_archive(
+        name = "opencl_icd_loader",
+        url = "https://github.com/KhronosGroup/OpenCL-ICD-Loader/archive/v2020.06.16.zip",
+        sha256 = "e4c27a5adcef4dbc0fee98864af203dc78dfc967ca7287c9bad9add030e7516e",
+        strip_prefix = "OpenCL-ICD-Loader-2020.06.16",
+        build_file = clean_dep("//vendor/opencl_icd_loader:opencl_icd_loader.BUILD"),
     )

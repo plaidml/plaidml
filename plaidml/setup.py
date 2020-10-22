@@ -25,8 +25,6 @@ def main():
 
     if sys.platform == 'win32':
         binary_name = 'plaidml.dll'
-    elif sys.platform == 'darwin':
-        binary_name = 'libplaidml.dylib'
     else:
         binary_name = 'libplaidml.so'
 
@@ -78,7 +76,7 @@ def main():
             ]),
             ('share/plaidml/boost', ['boost/LICENSE_1_0.txt']),
             ('share/plaidml/easylogging', ['easylogging/LICENSE']),
-            ('share/plaidml/gmock', ['gmock/googlemock/LICENSE']),
+            ('share/plaidml/gmock', ['com_intel_plaidml/bzl/googlemock.LICENSE']),
             ('share/plaidml/half', ['half/LICENSE.txt']),
             ('share/plaidml/llvm', ['llvm-project/llvm/LICENSE.TXT']),
             ('share/plaidml/mlir', ['llvm-project/mlir/LICENSE.TXT']),

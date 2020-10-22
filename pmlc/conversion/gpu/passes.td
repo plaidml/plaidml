@@ -11,6 +11,10 @@ def ConvertGpuLaunchFuncToVulkanCalls : Pass<"pmlc-convert-gpu-to-vulkan", "mlir
 def GpuKernelOutliningPass : Pass<"pmlc-kernel_outlining", "mlir::ModuleOp"> {
   let summary = "Outline gpu.launch bodies to kernel functions";
   let constructor = "pmlc::conversion::gpu::createGpuKernelOutliningPass()";
+  let dependentDialects = [
+    "mlir::gpu::GPUDialect",
+    "mlir::spirv::SPIRVDialect"
+  ];
 }
 
 #endif // __PMLC_CONVERSION_GPU_TO_VULKAN_PASSES__

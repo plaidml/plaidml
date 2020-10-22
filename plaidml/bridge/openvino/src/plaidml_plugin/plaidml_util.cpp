@@ -8,7 +8,6 @@
 
 #include "plaidml/edsl/edsl.h"
 
-using plaidml::edsl::LogicalShape;
 using namespace InferenceEngine;  // NOLINT[build/namespaces]
 
 namespace PlaidMLPlugin {

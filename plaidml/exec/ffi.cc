@@ -13,117 +13,57 @@
 #include "llvm/Support/FormatVariadic.h"
 
 #include "plaidml/core/internal.h"
-#include "pmlc/compiler/executable.h"
+#include "plaidml/core/settings.h"
+#include "pmlc/rt/device_id.h"
+#include "pmlc/rt/executable.h"
+#include "pmlc/rt/runtime_registry.h"
 #include "pmlc/util/env.h"
 #include "pmlc/util/logging.h"
 
+using plaidml::core::ffi_vector;
 using plaidml::core::ffi_wrap;
 using plaidml::core::ffi_wrap_void;
-using pmlc::compiler::EngineKind;
-using pmlc::compiler::Executable;
-using pmlc::compiler::ProgramArgument;
-using pmlc::util::Buffer;
+using pmlc::compiler::Program;
+using pmlc::rt::Device;
+using pmlc::rt::Executable;
+using pmlc::rt::getDeviceIDs;
 using pmlc::util::BufferPtr;
+using pmlc::util::TensorShape;
 using namespace mlir;  // NOLINT[build/namespaces]
-
-namespace {
-
-const char* kCpuDevice = "llvm_cpu.0";
-
-std::vector<ProgramArgument> BindProgramArguments(  //
-    plaidml_program* program,                       //
-    size_t ninputs,                                 //
-    plaidml_binding** inputs,                       //
-    size_t noutputs,                                //
-    plaidml_binding** outputs) {
-  llvm::DenseMap<Value, BufferPtr> input_bindings;
-  for (unsigned i = 0; i < ninputs; i++) {
-    input_bindings[inputs[i]->expr->value] = inputs[i]->buffer->buffer;
-  }
-  llvm::DenseMap<Value, BufferPtr> output_bindings;
-  for (unsigned i = 0; i < noutputs; i++) {
-    output_bindings[outputs[i]->expr->value] = outputs[i]->buffer->buffer;
-  }
-  std::vector<ProgramArgument> args(program->program->arguments.size());
-  for (unsigned i = 0; i < args.size(); i++) {
-    auto arg = program->program->arguments[i];
-    if (arg.isInput) {
-      auto it = input_bindings.find(arg.value);
-      if (it != input_bindings.end()) {
-        arg.buffer = it->second;
-      }
-      IVLOG(1, " Input[" << i << "]: " << arg.buffer);
-      if (!arg.buffer) {
-        throw std::runtime_error("Unbound input");
-      }
-    } else {
-      auto it = output_bindings.find(arg.value);
-      if (it != output_bindings.end()) {
-        arg.buffer = it->second;
-      }
-      IVLOG(1, "Output[" << i << "]: " << arg.buffer);
-      if (!arg.buffer) {
-        throw std::runtime_error("Unbound output");
-      }
-    }
-    args[i] = std::move(arg);
-  }
-  return args;
-}
-
-}  // namespace
 
 extern "C" {
 
 struct plaidml_executable {
   std::unique_ptr<Executable> exec;
+  std::shared_ptr<Program> program;
 };
 
 void plaidml_exec_init(  //
     plaidml_error* err) {
   ffi_wrap_void(err, [&] {  //
     IVLOG(1, "plaidml_exec_init");
+    pmlc::rt::initRuntimes();
   });
 }
 
 plaidml_strings* plaidml_devices_get(  //
     plaidml_error* err) {
-  return ffi_wrap<plaidml_strings*>(err, nullptr, [&] {
-    std::vector<std::string> devices{kCpuDevice};
-    auto strs = new plaidml_string*[devices.size()];
-    for (size_t i = 0; i < devices.size(); i++) {
-      strs[i] = new plaidml_string{devices[i]};
-    }
-    return new plaidml_strings{devices.size(), strs};
+  return ffi_wrap<plaidml_strings*>(err, nullptr, [&] {  //
+    return ffi_vector<plaidml_strings, plaidml_string>(getDeviceIDs());
   });
 }
 
 plaidml_executable* plaidml_jit(  //
     plaidml_error* err,           //
     plaidml_program* program,     //
-    const char* device,           //
-    size_t ninputs,               //
-    plaidml_binding** inputs,     //
-    size_t noutputs,              //
-    plaidml_binding** outputs) {
+    const char* raw_device) {
   return ffi_wrap<plaidml_executable*>(err, nullptr, [&] {
+    std::string device(raw_device);
+    if (device.empty()) {
+      device = plaidml::core::Settings::Instance()->get("PLAIDML_DEVICE");
+    }
     IVLOG(1, "JITing for device: " << device);
-    auto args = BindProgramArguments(program, ninputs, inputs, noutputs, outputs);
-    auto exec = std::make_unique<plaidml_executable>();
-    std::vector<void*> bufptrs(args.size());
-    for (unsigned i = 0; i < args.size(); i++) {
-      auto view = args[i].buffer->MapCurrent();
-      bufptrs[i] = view->data();
-    }
-    EngineKind kind = EngineKind::OrcJIT;
-    auto jit = pmlc::util::getEnvVar("LLVM_JIT");
-    if (jit == "ORC") {
-      kind = EngineKind::OrcJIT;
-    } else if (jit == "MCJIT") {
-      kind = EngineKind::MCJIT;
-    }
-    exec->exec = std::make_unique<Executable>(program->program, bufptrs, kind);
-    return exec.release();
+    return new plaidml_executable{Executable::fromProgram(program->program, device), program->program};
   });
 }
 
@@ -135,11 +75,45 @@ void plaidml_executable_free(  //
   });
 }
 
-void plaidml_executable_run(  //
-    plaidml_error* err,       //
-    plaidml_executable* exec) {
-  ffi_wrap_void(err, [&] {  //
-    exec->exec->invoke();
+double plaidml_executable_run(  //
+    plaidml_error* err,         //
+    plaidml_executable* exec,   //
+    size_t ninputs,             //
+    plaidml_buffer** inputs,    //
+    size_t noutputs,            //
+    plaidml_buffer** outputs) {
+  return ffi_wrap<double>(err, 0.0, [&] {  //
+    llvm::SmallVector<BufferPtr, 8> inputBuffers;
+    if (exec->program->inputs.size() != ninputs) {
+      throw std::runtime_error(
+          llvm::formatv("Program expects {0} inputs, but {1} were specified", exec->program->inputs.size(), ninputs));
+    }
+    if (exec->program->outputs.size() != noutputs) {
+      throw std::runtime_error(llvm::formatv("Program expects {0} outputs, but {1} were specified",
+                                             exec->program->outputs.size(), noutputs));
+    }
+    for (unsigned i = 0; i < ninputs; i++) {
+      TensorShape actual = inputs[i]->buffer->shape();
+      TensorShape expected = TensorShape::fromType(exec->program->inputs[i]);
+      if (actual != expected) {
+        throw std::runtime_error(
+            llvm::formatv("Shape mismatch for input buffer #{0}, expected '{1}' but '{2}' was specified", i,
+                          expected.str(), actual.str()));
+      }
+      inputBuffers.push_back(inputs[i]->buffer);
+    }
+    llvm::SmallVector<BufferPtr, 8> outputBuffers;
+    for (unsigned i = 0; i < noutputs; i++) {
+      TensorShape actual = outputs[i]->buffer->shape();
+      TensorShape expected = TensorShape::fromType(exec->program->outputs[i]);
+      if (actual != expected) {
+        throw std::runtime_error(
+            llvm::formatv("Shape mismatch for output buffer #{0}, expected '{1}' but '{2}' was specified", i,
+                          expected.str(), actual.str()));
+      }
+      outputBuffers.push_back(outputs[i]->buffer);
+    }
+    return exec->exec->invoke(inputBuffers, outputBuffers);
   });
 }
 

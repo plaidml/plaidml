@@ -198,9 +198,9 @@ class Model(core.Model):
             eval(code, mod)
         self.x = mod['scale_dataset'](self.x)
         self.model = mod['build_model'](**build_model_kwargs)
-        # if self.enable_bn_folding:
-        #     click.echo('Model loaded, folding in batch_norm')
-        #     self.model = self.fold_batch_norm(self.model)
+        if self.enable_bn_folding:
+            click.echo('Model loaded, folding in batch_norm')
+            self.model = self.fold_batch_norm(self.model)
 
     def compile(self):
         if self.params.network_name[:3] == 'vgg':
@@ -242,12 +242,15 @@ class InferenceModel(Model):
         else:
             epoch_size = self.params.epoch_size
         out = self.model.predict(x=self.x[:epoch_size], batch_size=self.params.batch_size)
-        # Hack to ensure eventlog gets written
-        if not once and not warmup:
-            import keras.backend as b
-            if b.backend() == 'plaidml':
-                b._ctx.shutdown()
-        return (out, {})
+
+        overrides = {}
+        import keras.backend as b
+        if b.backend() == "plaidml.bridge.keras":
+            import plaidml.bridge.keras as keras_bridge
+            if keras_bridge.lastExecTimeInMS:
+                overrides['lastExecTimeInNS'] = keras_bridge.lastExecTimeInMS / 1000
+
+        return (out, overrides)
 
     def golden_output(self):
         return (self.keras_golden_output('infer'), core.Precision.INFERENCE)

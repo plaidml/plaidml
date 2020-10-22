@@ -140,6 +140,7 @@ genrule(
     srcs = [],
     outs = ["include/llvm/Support/VCSRevision.h"],
     cmd = "echo '' > \"$@\"",
+    cmd_ps = "echo '' > \"$@\"",  # (PlaidML)
 )
 
 # Rules that apply the LLVM tblgen tool.
@@ -419,6 +420,19 @@ cc_binary(
     ],
 )
 
+cc_library(
+    name = "FileCheckLib",
+    srcs = glob([
+        "lib/FileCheck/*.cpp",
+        "lib/FileCheck/*.h",
+    ]),
+    hdrs = glob([
+        "include/llvm/FileCheck/*.h",
+    ]),
+    includes = ["include"],
+    deps = [":Support"],
+)
+
 cc_binary(
     name = "FileCheck",
     testonly = 1,
@@ -429,7 +443,10 @@ cc_binary(
     copts = llvm_copts,
     linkopts = llvm_linkopts,
     stamp = 0,
-    deps = [":Support"],
+    deps = [
+        ":FileCheckLib",
+        ":Support",
+    ],
 )
 
 llvm_target_list = [
@@ -532,6 +549,8 @@ llvm_target_list = [
             ("-gen-callingconv", "lib/Target/PowerPC/PPCGenCallingConv.inc"),
             ("-gen-subtarget", "lib/Target/PowerPC/PPCGenSubtargetInfo.inc"),
             ("-gen-disassembler", "lib/Target/PowerPC/PPCGenDisassemblerTables.inc"),
+            ("-gen-register-bank", "lib/Target/PowerPC/PPCGenRegisterBank.inc"),
+            ("-gen-global-isel", "lib/Target/PowerPC/PPCGenGlobalISel.inc"),
         ],
     },
     {
@@ -634,6 +653,7 @@ gentbl(
         ":common_target_td_sources",
     ] + glob([
         "lib/Target/" + target["dir_name"] + "/*.td",
+        "lib/Target/" + target["name"] + "/GISel/*.td",
     ]),
     deps = target.get("tbl_deps", []),
 ) for target in llvm_target_list]
@@ -1754,11 +1774,56 @@ cc_library(
 )
 
 cc_library(
+    name = "CSKYCodeGen",
+    srcs = glob([
+        "lib/Target/CSKY/*.c",
+        "lib/Target/CSKY/*.cpp",
+        "lib/Target/CSKY/*.inc",
+    ]),
+    hdrs = glob([
+        "include/llvm/Target/CSKY/*.h",
+        "include/llvm/Target/CSKY/*.def",
+        "include/llvm/Target/CSKY/*.inc",
+        "lib/Target/CSKY/*.h",
+    ]),
+    copts = llvm_copts + ["-Iexternal/llvm-project/llvm/lib/Target/CSKY"],
+    deps = [
+        ":CSKYInfo",
+        ":CodeGen",
+        ":Core",
+        ":Support",
+        ":Target",
+        ":config",
+    ],
+)
+
+cc_library(
+    name = "CSKYInfo",
+    srcs = glob([
+        "lib/Target/CSKY/TargetInfo/*.c",
+        "lib/Target/CSKY/TargetInfo/*.cpp",
+        "lib/Target/CSKY/TargetInfo/*.inc",
+    ]),
+    hdrs = glob([
+        "include/llvm/Target/CSKY/TargetInfo/*.h",
+        "include/llvm/Target/CSKY/TargetInfo/*.def",
+        "include/llvm/Target/CSKY/TargetInfo/*.inc",
+        "lib/Target/CSKY/TargetInfo/*.h",
+    ]),
+    copts = llvm_copts + ["-Iexternal/llvm-project/llvm/lib/Target/CSKY"],
+    deps = [
+        ":Support",
+        ":config",
+    ],
+)
+
+cc_library(
     name = "CodeGen",
     srcs = glob([
         "lib/CodeGen/*.c",
         "lib/CodeGen/*.cpp",
         "lib/CodeGen/*.inc",
+        "lib/CodeGen/LiveDebugValues/*.cpp",
         "lib/CodeGen/*.h",
     ]),
     hdrs = glob([
@@ -2094,7 +2159,10 @@ cc_library(
         "include/llvm/Extensions/*.inc",
     ]),
     copts = llvm_copts,
-    deps = [":config"],
+    deps = [
+        ":Support",
+        ":config",
+    ],
 )
 
 cc_library(
@@ -2170,6 +2238,27 @@ cc_library(
         ":Support",
         ":Target",
         ":TransformUtils",
+        ":config",
+    ],
+)
+
+cc_library(
+    name = "HelloNew",
+    srcs = glob([
+        "lib/Transforms/HelloNew/*.c",
+        "lib/Transforms/HelloNew/*.cpp",
+        "lib/Transforms/HelloNew/*.inc",
+        "lib/Transforms/HelloNew/*.h",
+    ]),
+    hdrs = glob([
+        "include/llvm/Transforms/HelloNew/*.h",
+        "include/llvm/Transforms/HelloNew/*.def",
+        "include/llvm/Transforms/HelloNew/*.inc",
+    ]),
+    copts = llvm_copts,
+    deps = [
+        ":Core",
+        ":Support",
         ":config",
     ],
 )
@@ -3320,9 +3409,11 @@ cc_library(
         ":CodeGen",
         ":Core",
         ":Coroutines",
+        ":HelloNew",
         ":IPO",
         ":InstCombine",
         ":Instrumentation",
+        ":ObjCARC",
         ":Scalar",
         ":Support",
         ":Target",
@@ -3362,6 +3453,7 @@ cc_library(
         "lib/Target/PowerPC/*.c",
         "lib/Target/PowerPC/*.cpp",
         "lib/Target/PowerPC/*.inc",
+        "lib/Target/PowerPC/GISel/*.cpp",
     ]),
     hdrs = glob([
         "include/llvm/Target/PowerPC/*.h",
@@ -3375,6 +3467,7 @@ cc_library(
         ":AsmPrinter",
         ":CodeGen",
         ":Core",
+        ":GlobalISel",
         ":MC",
         ":PowerPCDesc",
         ":PowerPCInfo",
@@ -3478,6 +3571,7 @@ cc_library(
     copts = llvm_copts,
     deps = [
         ":Core",
+        ":Demangle",
         ":Support",
         ":config",
     ],

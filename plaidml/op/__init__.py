@@ -11,13 +11,6 @@ from plaidml.ffi import ffi, ffi_call, lib
 logger = logging.getLogger(__name__)
 
 
-def __init():
-    ffi_call(lib.plaidml_op_init)
-
-
-ffi.init_once(__init, 'plaidml_op_init')
-
-
 class AutoDimMode(enum.IntEnum):
     MATCH = 0
     FILL = -1
@@ -196,30 +189,6 @@ def minimum(x, y):
     return op('minimum', [x, y]).as_tensor()
 
 
-def scale_gradient(x, scale=-1.0):
-    return op('scale_gradient', [x, scale]).as_tensor()
-
-
-def relu(x, alpha=None, max_value=None, threshold=0.):
-    return op('relu', [x, alpha, max_value, threshold]).as_tensor()
-
-
-def repeat(x, repeats, axis):
-    return op('repeat', [x, repeats, axis]).as_tensor()
-
-
-def sigmoid(x):
-    return op('sigmoid', [x]).as_tensor()
-
-
-def softmax(x, axis=None):
-    return op('softmax', [x, axis]).as_tensor()
-
-
-def reshape(x, shape):
-    return op('reshape', [x, shape]).as_tensor()
-
-
 def prod(x, axis=None, keepdims=False):
     return op('prod', [x, axis, keepdims]).as_tensor()
 
@@ -248,6 +217,30 @@ def pool(
     ]).as_tensor()
 
 
+def relu(x, alpha=None, max_value=None, threshold=0.):
+    return op('relu', [x, alpha, max_value, threshold]).as_tensor()
+
+
+def reorg_yolo(x, stride, decrease, layout='NCHW'):
+    return op('reorg_yolo', [x, stride, decrease, layout])
+
+
+def repeat(x, repeats, axis):
+    return op('repeat', [x, repeats, axis]).as_tensor()
+
+
+def reshape(x, shape):
+    return op('reshape', [x, shape]).as_tensor()
+
+
+def scale_gradient(x, scale=-1.0):
+    return op('scale_gradient', [x, scale]).as_tensor()
+
+
+def sigmoid(x):
+    return op('sigmoid', [x]).as_tensor()
+
+
 def slice_of(x, slices):
     # Note: ellipses and too-short slice lists must be handled by the calling op if desired
     reformatted_slices = list()
@@ -260,6 +253,10 @@ def slice_of(x, slices):
             continue
         raise ValueError("Unexpected type {} used to slice tensor".format(type(s)))
     return op("slice", [x, reformatted_slices]).as_tensor()
+
+
+def softmax(x, axis=None):
+    return op('softmax', [x, axis]).as_tensor()
 
 
 def spatial_padding(x, lo_pads, hi_pads, data_layout):

@@ -60,3 +60,14 @@ llvm_register_toolchains()
 load("//vendor/openvino:workspace.bzl", "openvino_workspace")
 
 openvino_workspace()
+
+load("//vendor/tensorflow:workspace.bzl", "plaidml_tf_workspace")
+
+plaidml_tf_workspace()
+
+load("@org_tensorflow//tensorflow:workspace.bzl", "tf_workspace")
+
+tf_workspace(
+    path_prefix = "",
+    tf_repo_name = "org_tensorflow",
+)

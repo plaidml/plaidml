@@ -35,13 +35,13 @@ const std::vector<std::vector<size_t>> input_shapes = {
     {3, 2},  //
 };
 
-INSTANTIATE_TEST_CASE_P(Broadcast, BroadcastLayerTest,
-                        ::testing::Combine(::testing::ValuesIn(modes),                           //
-                                           ::testing::ValuesIn(target_shapes),                   //
-                                           ::testing::ValuesIn(axes_mapping),                    //
-                                           ::testing::ValuesIn(netPrecisions),                   //
-                                           ::testing::ValuesIn(input_shapes),                    //
-                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
-                        BroadcastLayerTest::getTestCaseName);
+INSTANTIATE_TEST_SUITE_P(Broadcast, BroadcastLayerTest,
+                         ::testing::Combine(::testing::ValuesIn(modes),                           //
+                                            ::testing::ValuesIn(target_shapes),                   //
+                                            ::testing::ValuesIn(axes_mapping),                    //
+                                            ::testing::ValuesIn(netPrecisions),                   //
+                                            ::testing::ValuesIn(input_shapes),                    //
+                                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
+                         BroadcastLayerTest::getTestCaseName);
 
 }  // namespace

@@ -1,7 +1,7 @@
 
 #include "pmlc/util/math/bignum.h"
 
-#include <boost/math/common_factor_rt.hpp>
+#include <boost/integer/common_factor_rt.hpp>
 
 namespace pmlc::util::math {
 

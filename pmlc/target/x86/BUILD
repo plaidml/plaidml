@@ -35,7 +35,6 @@ plaidml_cc_library(
         "heatmap_impl.cc",
         "pass_detail.h",
         "pipeline.cc",
-        "prng_lowering.cc",
         "trace_linking.cc",
         "xsmm_lowering.cc",
         ":heatmap",
@@ -45,8 +44,10 @@ plaidml_cc_library(
     ],
     deps = [
         ":gen-pass",
+        ":prng_lowering",
         "//pmlc/compiler",
         "//pmlc/conversion/pxa_to_affine",
+        "//pmlc/conversion/scf_to_omp",
         "//pmlc/conversion/stdx_to_llvm",
         "//pmlc/conversion/tile_to_pxa",
         "//pmlc/dialect/pxa/analysis",
@@ -60,6 +61,18 @@ plaidml_cc_library(
         "@llvm-project//mlir:LLVMTransforms",
         "@llvm-project//mlir:SCFToStandard",
         "@llvm-project//mlir:StandardOpsTransforms",
+        "@llvm-project//mlir:OpenMPToLLVM",
+    ],
+)
+
+plaidml_cc_library(
+    name = "prng_lowering",
+    srcs = ["prng_lowering.cc"],
+    hdrs = ["passes.h"],
+    deps = [
+        ":gen-pass",
+        "//pmlc/dialect/pxa/ir",
+        "//pmlc/rt",
     ],
 )
 

@@ -19,8 +19,6 @@ _LIBNAME = 'plaidml'
 
 if platform.system() == 'Windows':
     lib_name = '{}.dll'.format(_LIBNAME)
-elif platform.system() == 'Darwin':
-    lib_name = 'lib{}.dylib'.format(_LIBNAME)
 else:
     lib_name = 'lib{}.so'.format(_LIBNAME)
 
@@ -44,6 +42,16 @@ def decode_str(ptr):
         finally:
             lib.plaidml_string_free(ptr)
     return None
+
+
+def decode_list(ffi_list, ffi_free, fn, *args):
+    list = ffi_call(ffi_list, *args)
+    if fn is None:
+        fn = lambda x: x
+    try:
+        return [fn(list.elts[i]) for i in range(list.size)]
+    finally:
+        ffi_call(ffi_free, list)
 
 
 class Error(Exception):
@@ -94,9 +102,3 @@ class ForeignObject(object):
         if release:
             self.__ffi_obj__ = None
         return ret
-
-    def set_ptr(self, ffi_obj):
-        self.__ffi_obj__ = ffi_obj
-
-    def take_ptr(self, obj):
-        self.__ffi_obj__ = obj.as_ptr(True)

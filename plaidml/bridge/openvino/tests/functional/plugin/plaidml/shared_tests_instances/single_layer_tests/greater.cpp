@@ -12,16 +12,23 @@
 using LayerTestsDefinitions::GreaterLayerTest;
 
 namespace {
-const std::vector<InferenceEngine::Precision> netPrecisions = {
+
+const std::vector<InferenceEngine::Precision> inPrecisions = {
     InferenceEngine::Precision::FP32,
+};
+
+const std::vector<InferenceEngine::Precision> outPrecisions = {
+    InferenceEngine::Precision::BOOL,
 };
 
 const std::vector<std::vector<std::size_t>> inputShapes = {
     {std::vector<std::size_t>({40, 30}), std::vector<std::size_t>({1, 30})}};
 
-INSTANTIATE_TEST_CASE_P(CompareWithRefs, GreaterLayerTest,
-                        ::testing::Combine(::testing::Values(inputShapes), ::testing::ValuesIn(netPrecisions),
-                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),
-                        GreaterLayerTest::getTestCaseName);
+const auto cases = ::testing::Combine(::testing::Values(inputShapes),      //
+                                      ::testing::ValuesIn(inPrecisions),   //
+                                      ::testing::ValuesIn(outPrecisions),  //
+                                      ::testing::Values(CommonTestUtils::DEVICE_PLAIDML));
+
+INSTANTIATE_TEST_SUITE_P(CompareWithRefs, GreaterLayerTest, cases, GreaterLayerTest::getTestCaseName);
 
 }  // namespace

@@ -80,24 +80,22 @@ Please choose a default device:
     print("Selected target:")
     print("    {}".format(target))
 
-    print()
-    print("Almost done. Multiplying some matrices...")
-    print("Tile code:")
-    print("  function (B[X, Z], C[Z, Y]) -> (A) { A[x, y : X, Y] = +(B[x, z] * C[z, y]); }")
-
-    shape = edsl.LogicalShape(plaidml.DType.FLOAT32, [3, 3])
-    B = edsl.Tensor(shape)
-    C = edsl.Tensor(shape)
-
+    shape = edsl.TensorShape(plaidml.DType.FLOAT32, [3, 3])
+    B = edsl.Placeholder(shape)
+    C = edsl.Placeholder(shape)
     X, Y, Z = edsl.TensorDims(3)
     x, y, z = edsl.TensorIndexes(3)
     B.bind_dims(X, Z)
     C.bind_dims(Z, Y)
-    A = edsl.TensorOutput(X, Y)
-    A[x, y] += B[x, z] * C[z, y]
+    A = edsl.Contraction().outShape(X, Y).outAccess(x, y).sum(B[x, z] * C[z, y]).build()
+    program = plaidml.Program('plaidml_setup', [B, C], [A])
 
-    program = edsl.Program('plaidml_setup', [A])
-    plaidml.exec.run(program, [(B, np.random.rand(3, 3)), (C, np.random.rand(3, 3))])
+    print()
+    print("Almost done. Multiplying some matrices...")
+    print("Tile code:")
+    print(program)
+
+    plaidml.exec.run(program, [np.random.rand(3, 3), np.random.rand(3, 3)])
     print("Whew. That worked.")
     print()
 

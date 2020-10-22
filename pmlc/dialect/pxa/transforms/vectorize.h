@@ -6,15 +6,20 @@
 
 namespace pmlc::dialect::pxa {
 
-// Explicitly attempt to vectorize on a specific loop/index/size
-LogicalResult performVectorization(mlir::AffineParallelOp op,
-                                   mlir::BlockArgument index,
-                                   unsigned vectorSize);
+static constexpr const char *kVectorizeStrategy_Outputs = "outputs";
+static constexpr const char *kVectorizeStrategy_Recursive = "recursive";
+static constexpr const char *kVectorizeStrategy_Simple = "simple";
 
-// Attempt to vectorize a loop on the stride 1 index of it's output
-LogicalResult simpleVectorize(mlir::AffineParallelOp op, unsigned vecSize);
+// Explicitly attempt to vectorize on a specific loop/index/size
+mlir::LogicalResult performVectorization(mlir::AffineParallelOp op,
+                                         mlir::BlockArgument index,
+                                         unsigned vectorSize);
+
+// Attempt to vectorize a loop on the stride 1 index of its output
+mlir::LogicalResult vectorizeOverOutputs(mlir::AffineParallelOp op,
+                                         unsigned vecSize);
 
 // Attempt to vectorize a buffer (given it's allocation)
-LogicalResult vectorizeBuffer(mlir::AllocOp op);
+mlir::LogicalResult vectorizeBuffer(mlir::AllocOp op);
 
 } // namespace pmlc::dialect::pxa

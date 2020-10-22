@@ -5,11 +5,9 @@
 #map2 = affine_map<(i, j, k) -> (i, k)>
 
 func @dot(%arg0: tensor<1x784xf32>, %arg1: tensor<784x512xf32>) -> tensor<1x512xf32> {
-  %c0 = "eltwise.sconst"() {value = 0.0 : f64} : () -> f32
-  %0 = tile.constant 512
-  %1 = tile.constant 1
+  %c0 = tile.constant(0.0 : f64) : tensor<f32>
   %2 = tile.contract add, mul, %c0, %arg0, %arg1 {sink=#map0, srcs=[#map1, #map2]} :
-    f32, tensor<1x784xf32>, tensor<784x512xf32> -> tensor<1x512xf32>
+    tensor<f32>, tensor<1x784xf32>, tensor<784x512xf32> -> tensor<1x512xf32>
   return %2 : tensor<1x512xf32>
 }
 
@@ -26,3 +24,21 @@ func @dot(%arg0: tensor<1x784xf32>, %arg1: tensor<784x512xf32>) -> tensor<1x512x
 // CHECK-SAME: upperBounds = #map4
 
 // -----
+
+// This test checks that reduce/defract is disabled for all assignment aggregations.
+
+#map0 = affine_map<(d0, d1) -> (d0 * 10 + d1)>
+#map1 = affine_map<(d0, d1) -> (d0, d1)>
+#set0 = affine_set<(d0, d1) : (d0 >= 0, -d0 + 9 >= 0, d1 >= 0, -d1 + 9 >= 0)>
+
+func @no_reduce(%arg0: tensor<10x10xf32>) -> tensor<100xf32> {
+  %cst = tile.constant(0.0 : f64) : tensor<f32>
+  %0 = tile.contract assign, none, %cst, %arg0 {cons = #set0, sink = #map0, srcs = [#map1]} : tensor<f32>, tensor<10x10xf32> -> tensor<100xf32>
+  return %0 : tensor<100xf32>
+}
+
+// CHECK: #map0 = affine_map<() -> (0, 0)>
+// CHECK: #map1 = affine_map<(d0, d1) -> (d1 + d0 * 10)>
+// CHECK: #map2 = affine_map<(d0, d1) -> (d0, d1)>
+// CHECK: #map3 = affine_map<() -> (9, 9)>
+// CHECK-LABEL: func @no_reduce

@@ -6,12 +6,9 @@
 
 #include "mlir/IR/OpImplementation.h"
 
-namespace pmlc::dialect::xsmm {
+using namespace mlir; // NOLINT
 
-using llvm::SmallVector;
-using mlir::failure;
-using mlir::FunctionType;
-using mlir::success;
+namespace pmlc::dialect::xsmm {
 
 void XSMMDialect::initialize() {
   addOperations<
@@ -21,16 +18,16 @@ void XSMMDialect::initialize() {
 }
 
 //
-// ---- GemmInvokeOp ----
+// ---- GemmInvokeF32Op ----
 //
 
-GemmInvokeOp::operand_range GemmInvokeOp::getOperandsForA() {
+GemmInvokeF32Op::operand_range GemmInvokeF32Op::getOperandsForA() {
   auto aType = a().getType().cast<MemRefType>();
   auto cType = c().getType().cast<MemRefType>();
   return getOperands().slice(4 + cType.getRank(), aType.getRank());
 }
 
-GemmInvokeOp::operand_range GemmInvokeOp::getOperandsForB() {
+GemmInvokeF32Op::operand_range GemmInvokeF32Op::getOperandsForB() {
   auto aType = a().getType().cast<MemRefType>();
   auto bType = b().getType().cast<MemRefType>();
   auto cType = c().getType().cast<MemRefType>();
@@ -38,12 +35,12 @@ GemmInvokeOp::operand_range GemmInvokeOp::getOperandsForB() {
                              bType.getRank());
 }
 
-GemmInvokeOp::operand_range GemmInvokeOp::getOperandsForC() {
+GemmInvokeF32Op::operand_range GemmInvokeF32Op::getOperandsForC() {
   auto cType = c().getType().cast<MemRefType>();
   return getOperands().slice(4, cType.getRank());
 }
 
-void printGemmInvokeOp(OpAsmPrinter &p, GemmInvokeOp op) {
+void printGemmInvokeF32Op(OpAsmPrinter &p, GemmInvokeF32Op op) {
   auto funcType = FunctionType::get({op.a().getType(), op.b().getType()},
                                     {op.c().getType()}, op.getContext());
   p << op.getOperation()->getName() << ' ';
@@ -62,7 +59,7 @@ struct GemmOperand {
   SmallVector<OpAsmParser::OperandType, 4> indices;
 };
 
-ParseResult parseGemmInvokeOp(OpAsmParser &parser, OperationState &result) {
+ParseResult parseGemmInvokeF32Op(OpAsmParser &parser, OperationState &result) {
   auto &builder = parser.getBuilder();
   auto indexType = builder.getIndexType();
   auto i64Type = builder.getIntegerType(64);
@@ -87,7 +84,7 @@ ParseResult parseGemmInvokeOp(OpAsmParser &parser, OperationState &result) {
       parser.resolveOperands(b.indices, indexType, result.operands));
 }
 
+} // namespace pmlc::dialect::xsmm
+
 #define GET_OP_CLASSES
 #include "pmlc/dialect/xsmm/ir/ops.cc.inc" // NOLINT
-
-} // namespace pmlc::dialect::xsmm

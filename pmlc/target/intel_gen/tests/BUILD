@@ -6,5 +6,4 @@ package(default_visibility = ["//visibility:public"])
 
 glob_lit_tests(
     data = ["//pmlc/rt/vulkan:vkprobe"],
-    default_tags = ["manual"],
 )

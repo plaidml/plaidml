@@ -1,5 +1,11 @@
 // Copyright 2020 Intel Corporation
 
+#include "pmlc/dialect/pxa/transforms/normalize.h"
+
+#include <memory>
+
+#include "llvm/ADT/StringSet.h"
+
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/IR/AffineValueMap.h"
 #include "mlir/Dialect/Affine/Utils.h"
@@ -7,6 +13,7 @@
 
 #include "pmlc/dialect/pxa/transforms/pass_detail.h"
 #include "pmlc/dialect/pxa/transforms/passes.h"
+#include "pmlc/util/tags.h"
 
 using namespace mlir; // NOLINT
 
@@ -20,6 +27,10 @@ namespace pmlc::dialect::pxa {
 void promoteIfEmptyIVs(AffineParallelOp op) {
   // Nothing to do when there are induction variables.
   if (op.getNumDims())
+    return;
+
+  // Don't remove any affine.parallel loop with tags
+  if (hasTags(op))
     return;
 
   // Replace yielded loop results.
@@ -85,15 +96,23 @@ void elideSingleIterationIndexes(AffineParallelOp op) {
 }
 
 struct AffineNormalizePass : public AffineNormalizeBase<AffineNormalizePass> {
+  AffineNormalizePass() = default;
+  explicit AffineNormalizePass(bool promote) { this->promote = promote; }
   void runOnFunction() override {
     getFunction().walk(::normalizeAffineParallel);
     getFunction().walk(elideSingleIterationIndexes);
-    getFunction().walk(promoteIfEmptyIVs);
+    if (promote.getValue()) {
+      getFunction().walk(promoteIfEmptyIVs);
+    }
   }
 };
 
 std::unique_ptr<Pass> createAffineNormalizePass() {
   return std::make_unique<AffineNormalizePass>();
+}
+
+std::unique_ptr<Pass> createAffineNormalizePass(bool promote) {
+  return std::make_unique<AffineNormalizePass>(promote);
 }
 
 } // namespace pmlc::dialect::pxa

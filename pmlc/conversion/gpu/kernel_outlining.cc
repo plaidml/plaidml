@@ -25,6 +25,7 @@
 #include "mlir/Dialect/SPIRV/TargetAndABI.h"
 
 #include "pmlc/conversion/gpu/pass_detail.h"
+#include "pmlc/util/tags.h"
 using namespace mlir; // NOLINT[build/namespaces]
 
 template <typename OpTy>
@@ -126,9 +127,13 @@ static void convertToLaunchFuncOp(gpu::LaunchOp launchOp,
                                   gpu::GPUFuncOp kernelFunc,
                                   ValueRange operands) {
   OpBuilder builder(launchOp);
-  builder.create<gpu::LaunchFuncOp>(
+  auto launchFuncOp = builder.create<gpu::LaunchFuncOp>(
       launchOp.getLoc(), kernelFunc, launchOp.getGridSizeOperandValues(),
       launchOp.getBlockSizeOperandValues(), operands);
+
+  if (pmlc::hasTags(launchOp))
+    pmlc::copyTags(launchFuncOp, launchOp);
+
   launchOp.erase();
 }
 
@@ -152,17 +157,22 @@ public:
         spirv::getTargetEnvAttrName());
     if (!target_env) {
       auto triple = spirv::VerCapExtAttr::get(
-          spirv::Version::V_1_0,
-          {spirv::Capability::Shader, spirv::Capability::Int64,
-           spirv::Capability::Int16, spirv::Capability::Int8,
-           spirv::Capability::Float64, spirv::Capability::Float16},
+          spirv::Version::V_1_5,
+          {spirv::Capability::Shader, spirv::Capability::GroupNonUniformBallot,
+           spirv::Capability::Int64, spirv::Capability::Int16,
+           spirv::Capability::Int8, spirv::Capability::Float64,
+           spirv::Capability::Float16,
+           spirv::Capability::StorageBuffer16BitAccess},
           ArrayRef<spirv::Extension>(
-              spirv::Extension::SPV_KHR_storage_buffer_storage_class),
+              {spirv::Extension::SPV_KHR_storage_buffer_storage_class,
+               spirv::Extension::SPV_KHR_16bit_storage}),
           &getContext());
       getOperation().setAttr(
           spirv::getTargetEnvAttrName(),
           spirv::TargetEnvAttr::get(
-              triple, spirv::getDefaultResourceLimits(&getContext())));
+              triple, spirv::Vendor::Unknown, spirv::DeviceType::Unknown,
+              spirv::TargetEnvAttr::kUnknownDeviceID,
+              spirv::getDefaultResourceLimits(&getContext())));
     }
 
     SymbolTable symbolTable(getOperation());
