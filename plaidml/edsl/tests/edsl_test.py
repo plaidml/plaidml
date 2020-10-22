@@ -616,6 +616,36 @@ class TestEdsl(unittest.TestCase):
         program = Program('transpose_nm', [I], [O])
         self.checkProgram(program, [input], [expected])
 
+    def test_argsort_1d(self):
+        I = Placeholder(plaidml.DType.FLOAT32, [20])
+        O = argsort(I, axis=0, mode=SortMode.ASC)
+        program = Program('argsort_1d', [I], [O])
+
+    def test_argsort_2d_axis_0(self):
+        I = Placeholder(plaidml.DType.FLOAT32, [5, 4])
+        O = argsort(I, axis=0, mode=SortMode.DESC)
+        program = Program('argsort_2d_axis_0', [I], [O])
+
+    def test_argsort_2d_axis_1(self):
+        I = Placeholder(plaidml.DType.FLOAT32, [5, 4])
+        O = argsort(I, axis=1)
+        program = Program('argsort_2d_axis_1', [I], [O])
+
+    def test_argsort_3d_axis_1_asc(self):
+        I = Placeholder(plaidml.DType.FLOAT32, [5, 4, 3])
+        O = argsort(I, axis=1, mode=SortMode.ASC)
+        program = Program('argsort_3d_axis_1_asc', [I], [O])
+
+    def test_argsort_3d_axis_1_desc(self):
+        I = Placeholder(plaidml.DType.FLOAT32, [5, 4, 3])
+        O = argsort(I, axis=1, mode=SortMode.DESC)
+        program = Program('argsort_3d_axis_1_desc', [I], [O])
+
+    def test_argsort_3d_last_axis(self):
+        I = Placeholder(plaidml.DType.FLOAT32, [5, 4, 3])
+        O = argsort(I, axis=-1)
+        program = Program('argsort_3d_last_axis', [I], [O])
+
 
 if __name__ == '__main__':
     plaidml.settings.set('PLAIDML_DEVICE', DEFAULT_DEVICE)

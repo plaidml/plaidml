@@ -43,6 +43,26 @@ static bool isDataTypeFloat(DataType type) {
          type == DataType::f64;
 }
 
+struct ArgSortOp : Intrinsic {
+  TensorShapes getShapes(Evaluator *evaluator, ArrayRef<ExprNodePtr> operands,
+                         ArrayRef<TensorShape> shapes) const final {
+    if (operands.size() != 3) {
+      throw std::runtime_error("'argsort' requires 3 arguments.");
+    }
+    auto axis = getIntegerValue(evaluator, operands[1]);
+    if (!axis) {
+      throw std::runtime_error(
+          "'argsort' requires operand #2 to be an integer.");
+    }
+    auto direction = getIntegerValue(evaluator, operands[2]);
+    if (!direction) {
+      throw std::runtime_error(
+          "'argsort' requires operand #3 to be an integer.");
+    }
+    return {TensorShape(DataType::si32, shapes[0].sizes)};
+  }
+};
+
 struct BooleanOp : Intrinsic {
   TensorShapes getShapes(Evaluator *evaluator, ArrayRef<ExprNodePtr> operands,
                          ArrayRef<TensorShape> shapes) const final {

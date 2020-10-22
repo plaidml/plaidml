@@ -856,6 +856,35 @@ struct ContractionOpConversion
   }
 };
 
+struct ArgSortOpConversion : public OpConversionPattern<tile::ArgSortOp> {
+  using OpConversionPattern<tile::ArgSortOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(tile::ArgSortOp op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override {
+    tile::ArgSortOpAdaptor adaptor(operands);
+
+    // bitonic sort:
+    // for (int k = 2; k <= N; k = 2 * k) {
+    //   for (int j = k >> 1; j > 0; j = j >> 1) {
+    //     for (int i = 0; i < N; i++) {
+    //       int ixj = i ^ j;
+    //       if (ixj > i) {
+    //         if ((i & k) == 0 && a[i] > a[ixj]) {
+    //           swap(a[i], a[ixj]);
+    //         }
+    //         if ((i & k) != 0 && a[i] < a[ixj]) {
+    //           swap(a[i], a[ixj]);
+    //         }
+    //       }
+    //     }
+    //   }
+    // }
+
+    return failure();
+  }
+};
+
 struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
   using OpConversionPattern<tile::GatherOp>::OpConversionPattern;
 
@@ -1741,6 +1770,7 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
         CmpIntInequalityOp<CmpIPredicate::sge, CmpIPredicate::uge>;
     OwningRewritePatternList patterns;
     patterns.insert<
+        ArgSortOpConversion,  //
         CastOpConversion,     //
         ConstantOpConversion, //
         FuncOpConversion,     //

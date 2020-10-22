@@ -5,6 +5,10 @@ include "pmlc/dialect/tile/ir/eltwise.td"
 
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 
+#ifndef __PMLC_UTIL_ENUMS__
+include "pmlc/util/enums.td"
+#endif
+
 // TODO: this should be defined upstream
 def IntegerSetAttr : Attr<
     CPred<"$_self.isa<IntegerSetAttr>()">, "IntegerSet attribute"> {
@@ -85,6 +89,18 @@ class MaterializeOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
   ])> {
   let extraClassDeclaration = [{
     mlir::LogicalResult materializeOperands(mlir::OpBuilder& builder);
+  }];
+}
+
+def ArgSortOp : MaterializeOp<"argsort", [NoSideEffect]> {
+  let summary = "tensor sort index operation";
+  let arguments = (ins
+    RankedTensorOf<[AnyScalar]>:$tensor,
+    IndexAttr:$axis,
+    SortDirection:$direction);
+  let results = (outs RankedTensorOf<[SI32]>:$result);
+  let assemblyFormat = [{
+    $direction $tensor `[` $axis `]` attr-dict `:` functional-type(operands, $result)
   }];
 }
 

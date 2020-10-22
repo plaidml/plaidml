@@ -764,6 +764,31 @@ def abs(x):
     return intrinsic('abs', x)
 
 
+class SortDirection(enum.IntEnum):
+    """Ordering direction for a sort operation."""
+
+    ASC = 0
+    """Sort a tensor in ascending order."""
+
+    DESC = 1
+    """Sort a tensor in descending order."""
+
+
+def argsort(x, axis=-1, direction=SortDirection.ASC):
+    """Returns the indices of a tensor ``x`` that give its sorted order along
+    an ``axis``, where -1 represents the last axis, in either ascending or
+    descending ``direction``.
+
+    Args:
+        x (Tensor): The tensor to be sorted.
+        axis (TensorDim): The axis to perform sorting on.
+        direction (SortDirection): The direction of value comparison.
+    Returns:
+        Tensor: An integer tensor with the same shape as ``x``.
+    """
+    return intrinsic('sort', x, axis, direction)
+
+
 def cast(x, dtype):
     """Casts the element type of a tensor ``x`` to the type specified by ``dtype``.
 
