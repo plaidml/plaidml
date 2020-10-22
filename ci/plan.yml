@@ -98,6 +98,8 @@ SUITES:
         pipelines: [nightly, plaidml]
       pml-vk-gen:
         pipelines: [nightly, plaidml]
+      pml-ocl-gen:
+        pipelines: [nightly, plaidml]
     params:
       plaidml:
         batch_sizes: [1]
