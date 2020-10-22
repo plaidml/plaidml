@@ -275,7 +275,7 @@ SUITES:
             prepend_args: [--examples=128]
             perf_threshold: 0.33
           pml-ocl-gen:
-            prepend_args: [--examples=128]
+            prepend_args: [--examples=4]
             perf_threshold: 0.33
           pml-llvm-cpu:
             prepend_args: [--examples=128]
