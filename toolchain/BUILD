@@ -36,6 +36,7 @@ toolchain(
         "@platforms//cpu:x86_64",
         "@platforms//os:linux",
     ],
+    tags = ["linux"],
     target_compatible_with = [
         "@platforms//cpu:x86_64",
         "@platforms//os:linux",
