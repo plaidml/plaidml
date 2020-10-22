@@ -78,12 +78,12 @@ void vkRun(void *vkInvocation) {
   static_cast<VulkanInvocation *>(vkInvocation)->run();
 }
 
-void *VkScheduleFunc(void *vkInvocation) {
+void *vkScheduleFunc(void *vkInvocation) {
   static_cast<VulkanInvocation *>(vkInvocation)->addLaunchActionToSchedule();
   return nullptr;
 }
 
-void VkWait(uint32_t count, ...) {
+void vkWait(uint32_t count, ...) {
   // TODO(Yanglei Zou): replace vkCmdPipelineBarrier by
   // vkCmdSetEvent + vkCmdWaitEvents
 }
@@ -128,8 +128,8 @@ struct Registration {
     registerSymbol("vkSetLaunchKernelAction",
                    reinterpret_cast<void *>(vkSetLaunchKernelAction));
     registerSymbol("vkRun", reinterpret_cast<void *>(vkRun));
-    registerSymbol("VkWait", reinterpret_cast<void *>(VkWait));
-    registerSymbol("VkScheduleFunc", reinterpret_cast<void *>(VkScheduleFunc));
+    registerSymbol("vkWait", reinterpret_cast<void *>(vkWait));
+    registerSymbol("vkScheduleFunc", reinterpret_cast<void *>(vkScheduleFunc));
     registerSymbol("_mlir_ciface_bindBufferFloat16",
                    reinterpret_cast<void *>(_mlir_ciface_bindBufferFloat16));
     registerSymbol("_mlir_ciface_bindBufferFloat32",

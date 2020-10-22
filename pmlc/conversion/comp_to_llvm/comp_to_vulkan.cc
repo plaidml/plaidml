@@ -38,8 +38,8 @@ static constexpr const char *kVkSetLaunchKernelAction =
     "vkSetLaunchKernelAction";
 static constexpr const char *kVkCreateMemoryTransferAction =
     "vkCreateMemoryTransferAction";
-static constexpr const char *kVkWait = "VkWait";
-static constexpr const char *kVkScheduleFunc = "VkScheduleFunc";
+static constexpr const char *kVkWait = "vkWait";
+static constexpr const char *kVkScheduleFunc = "vkScheduleFunc";
 
 static constexpr const char *kBindBufferBFloat16 = "bindBufferBFloat16";
 static constexpr const char *kBindBufferFloat16 = "bindBufferFloat16";
@@ -85,20 +85,19 @@ class ConvertCompToVulkanCall
     : public ConvertCompToVulkanCallBase<ConvertCompToVulkanCall> {
 public:
   void runOnOperation();
-
-private:
-  uint32_t scheduleFuncNum = 0;
 };
 
 void ConvertCompToVulkanCall::runOnOperation() {
   mlir::ModuleOp module = getOperation();
 
-  module.walk([this](comp::ScheduleFunc op) { scheduleFuncNum++; });
+  uint32_t scheduleFuncNum = 0;
+  module.walk([&](comp::ScheduleFunc op) { scheduleFuncNum++; });
 
   // Serialize SPIRV kernels.
   BinaryModulesMap modulesMap;
   if (mlir::failed(serializeSpirvKernels(module, modulesMap)))
     return signalPassFailure();
+
   // Populate conversion patterns.
   mlir::MLIRContext *context = &getContext();
   mlir::TypeConverter typeConverter, signatureConverter;
@@ -157,11 +156,12 @@ using ConvertWait = ConvertToFuncCallPattern<comp::Wait>;
 
 struct ConvertScheduleFunc : ConvertCompToVkBasePattern<comp::ScheduleFunc> {
   ConvertScheduleFunc(const BinaryModulesMap &modulesMap,
-                      mlir::ModuleOp &module, uint32_t numKernel,
+                      mlir::ModuleOp &module, uint32_t scheduleFuncNum,
                       mlir::TypeConverter &typeConverter,
                       mlir::MLIRContext *context)
       : ConvertCompToVkBasePattern<comp::ScheduleFunc>(typeConverter, context),
-        modulesMap(modulesMap), moduleOp(module), scheduleFuncNum(numKernel) {
+        modulesMap(modulesMap), moduleOp(module),
+        scheduleFuncNum(scheduleFuncNum) {
     pScheduleFuncIndex =
         reinterpret_cast<uint32_t *>(calloc(1, sizeof(uint32_t)));
     pBufferMap =
