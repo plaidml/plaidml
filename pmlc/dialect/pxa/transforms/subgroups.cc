@@ -57,6 +57,8 @@ struct SubgroupParams {
   double cacheWidth;
   double cacheLatency;
   double memoryLatency;
+  int64_t cacheSize;
+  double memoryBoundThreshold;
 };
 
 struct SubgroupCostModel {
@@ -130,30 +132,26 @@ struct SubgroupCostModel {
     ioDimStrides.push_back(*maybeDimStrides);
     IVLOG(3, "  dimensional strides = " << *maybeDimStrides)
 
-    auto memreftype = ioOp.getMemRefType();
+    auto memRefType = ioOp.getMemRefType();
 
     int64_t offset;
     SmallVector<int64_t, 4> tensorStrides;
-    if (failed(getStridesAndOffset(memreftype, tensorStrides, offset))) {
+    if (failed(getStridesAndOffset(memRefType, tensorStrides, offset))) {
       IVLOG(3, "Cannot compute tensor strides");
       return false;
     }
     ioTensorStrides.push_back(tensorStrides);
-    IVLOG(3, "  dimensional strides = " << tensorStrides);
+    IVLOG(3, "  tensor strides = " << tensorStrides);
 
-    auto elementtype = memreftype.getElementType();
-    assert(elementtype.isIntOrFloat());
-    ioElementSizesInBytes.push_back(elementtype.getIntOrFloatBitWidth() / 8);
+    auto elementType = memRefType.getElementType();
+    assert(elementType.isIntOrFloat());
+    ioElementSizesInBytes.push_back(elementType.getIntOrFloatBitWidth() / 8);
     return true;
   }
 
   void computeCostRecursive(unsigned idx) {
     if (idx == ranges.size()) {
-      auto cost = computeCost();
-      if (cost < bestCost) {
-        bestCost = cost;
-        bestPlan = plan;
-      }
+      computeCost();
       return;
     }
     // Try using a subgroup or not for each index
@@ -228,10 +226,26 @@ struct SubgroupCostModel {
     return out;
   }
 
-  double computeCost() {
+  int64_t num_groups(SmallVector<StrideInfo, 4> outputDimStrides) {
+    int64_t groups = 1;
+    for (size_t rangeIndex = 0; rangeIndex < ranges.size(); ++rangeIndex) {
+      for (size_t i = 0; i < outputDimStrides.size(); ++i) {
+        for (auto kvp : outputDimStrides[i].strides) {
+          auto strideIndex = kvp.first.getArgNumber();
+          if (rangeIndex == strideIndex && kvp.second) {
+            groups *= (ranges[rangeIndex] / plan.innerTile[rangeIndex]);
+          }
+        }
+      }
+    }
+    return groups;
+  }
+
+  void computeCost() {
     int64_t totRegisters = 0;
     int64_t totAccesses = 0;
     double totCacheMiss = 0.0;
+    int64_t totMemory = 0;
 
     for (size_t i = 0; i < ioDimStrides.size(); i++) {
       auto mi = computeMemoryInfo(ioDimStrides[i], ioTensorStrides[i],
@@ -252,6 +266,7 @@ struct SubgroupCostModel {
       totRegisters += mi.registers;
       totAccesses += mi.accesses;
       totCacheMiss += mi.cacheMiss;
+      totMemory += totRegisters * ioElementSizesInBytes[i];
     }
 
     if (totRegisters > params.maxRegsPerThread) {
@@ -270,7 +285,26 @@ struct SubgroupCostModel {
     double totMemIO = (totAccesses - totCacheMiss) * params.cacheLatency +
                       totCacheMiss * params.memoryLatency;
 
-    return totMemIO / totOps;
+    double cost = totMemIO / totOps;
+    int64_t groups = num_groups(ioDimStrides[0]);
+    bool isMemBounded =
+        (totMemory * groups) > params.cacheSize ||
+        (static_cast<double>(totOps) / static_cast<double>(totMemory)) <=
+            params.memoryBoundThreshold;
+
+    bool replace = !isMemBounded && bestIsMemBounded;
+    if (isMemBounded == bestIsMemBounded) {
+      replace = isMemBounded ? cost < bestCost
+                             : groups / totMemIO > bestGroups / bestTotMemIO;
+    }
+
+    if (replace) {
+      bestPlan = plan;
+      bestCost = cost;
+      bestGroups = groups;
+      bestTotMemIO = totMemIO;
+      bestIsMemBounded = isMemBounded;
+    }
   }
 
   // The parameters to the cost model
@@ -289,6 +323,10 @@ struct SubgroupCostModel {
   SmallVector<SmallVector<StrideInfo, 4>, 4> ioDimStrides;
   SmallVector<SmallVector<int64_t, 4>, 4> ioTensorStrides;
   SmallVector<unsigned, 4> ioElementSizesInBytes;
+
+  bool bestIsMemBounded{true};
+  int64_t bestGroups = 0;
+  double bestTotMemIO = 1.0;
 };
 
 void SubgroupApply(AffineParallelOp op, SubgroupPlan plan) {
@@ -329,6 +367,8 @@ struct SubgroupsPass : public SubgroupsBase<SubgroupsPass> {
         64.0,    // Cache width
         125.0,   // Cache latency
         420.0,   // Memory latency
+        2359296, // Cache size
+        14.0     // Memory bound threshold
     };
     SubgroupCostModel cm(params, op);
     if (cm.bestCost == std::numeric_limits<double>::infinity()) {
