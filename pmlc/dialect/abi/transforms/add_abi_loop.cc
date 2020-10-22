@@ -93,13 +93,9 @@ void AddABILoopPass::runOnOperation() {
     initEntryBlock->addArgument(ty);
   }
 
-  // Finally, terminate the init block using a passthrough of the
+  // Terminate the init block using a passthrough of the
   // init block's arguments.
   builder.create<abi::CreateNetworkOp>(loc, initEntryBlock->getArguments());
-
-  // Finally, create the fini region's entry block.
-  builder.createBlock(&loopOp.finiRegion());
-  builder.create<abi::DoneOp>(loc);
 }
 
 } // namespace

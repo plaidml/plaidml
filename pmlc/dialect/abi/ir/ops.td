@@ -27,7 +27,9 @@ def ABI_LoopOp : ABI_Op<"loop", [
     operations outside of the loop, so that their cost is ammortized over
     many runs of the program.
   }];
-  let regions = (region AnyRegion:$initRegion, AnyRegion:$bodyRegion, AnyRegion:$finiRegion);
+  // TODO: Add a region for finalization operations, once we have
+  // anything to put into such a region.
+  let regions = (region AnyRegion:$initRegion, AnyRegion:$bodyRegion);
   let extraClassDeclaration = [{
     static mlir::StringRef getNetworkFieldTypesAttrName() { return "networkFieldTypes"; }
 
