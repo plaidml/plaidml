@@ -178,7 +178,7 @@ void pipelineBuilder(OpPassManager &pm) {
   // TODO: The hyperthreading is very harmful on perf, so exclude the
   //       hyper threads.
   maxThreads = maxThreads / 2;
-  std::max(1, maxThreads);
+  maxThreads = std::max(1, maxThreads);
   pm.addPass(pxa::createCPUThreadPass(maxThreads));
   pm.addPass(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
