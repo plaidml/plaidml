@@ -8,6 +8,8 @@
 #include "pmlc/dialect/abi/transforms/pass_detail.h"
 #include "pmlc/util/ids.h"
 
+using LLVMType = mlir::LLVM::LLVMType;
+
 namespace pmlc::dialect::abi {
 namespace {
 
@@ -75,6 +77,13 @@ void LowerToABIPass::runOnOperation() {
   //       memrefs (actual network inputs).  It might also be interesting to
   //       allow non-memrefs to vary from run to run.  Perhaps we could signify
   //       const-over-the-network-lifetime via attributes?
+  //
+  // TODO: We should package up the arguments into a pointer to a struct
+  //       of pointers, exactly the way we do with the variable number of
+  //       memrefs we pass to the loop body.  For now, we assume that there's
+  //       only a single argument -- the execution device parameter; we fail
+  //       if we see more than this, and add one if it's missing (which is
+  //       just there to support the CPU target, for now).
   auto *bodyEntryBlock = loopOp.bodyEntryBlock();
   mlir::Optional<unsigned> firstMemrefIdx;
   for (unsigned idx = 0; idx < bodyEntryBlock->getNumArguments(); ++idx) {
@@ -91,6 +100,17 @@ void LowerToABIPass::runOnOperation() {
       bodyEntryBlock->eraseArgument(idx + 1);
     }
     initEntryBlock->addArgument(ty);
+  }
+  if (1 < initEntryBlock->getNumArguments()) {
+    loopOp.emitError("Expected at most one non-memref argument");
+    signalPassFailure();
+    return;
+  }
+  if (!initEntryBlock->getNumArguments()) {
+    // Add a fake device parameter for ABI compatibility.
+    auto ty = LLVMType::getInt8Ty(&getContext()).getPointerTo();
+    initEntryBlock->addArgument(ty);
+    bodyEntryBlock->insertArgument(0u, ty);
   }
 
   // Terminate the init block using a passthrough of the
