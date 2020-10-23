@@ -863,6 +863,42 @@ struct ArgSortOpConversion : public OpConversionPattern<tile::ArgSortOp> {
   matchAndRewrite(tile::ArgSortOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
     tile::ArgSortOpAdaptor adaptor(operands);
+    auto loc = op.getLoc();
+    // auto ctx = rewriter.getContext();
+
+    // Axis represents one of the tensor dimensions.
+    int64_t axis = adaptor.axis().getInt();
+
+    // Special case value -1 indicates the last axis.
+    Value tensor = adaptor.tensor();
+    auto shape = tensor.getType().cast<MemRefType>().getShape();
+    size_t tensorDims = shape.size();
+    if (-1 == axis) {
+      axis += tensorDims;
+    } else if (axis < 0 || axis >= tensorDims) {
+      return failure();
+    }
+
+    // Allocate an output tensor to contain the sorted argument indices.
+    auto resultType = op.result().getType();
+    auto resultMemRefType = resultType.cast<MemRefType>();
+    auto result = rewriter.create<AllocOp>(loc, resultMemRefType).getResult();
+
+    // Create an affine loop nest over all the dimensions but the one we are
+    // sorting on.
+    SmallVector<int64_t, 4> outerLoopShape;
+    for (auto i : resultMemRefType.getShape()) {
+      outerLoopShape.push_back(i);
+    }
+    outerLoopShape[axis] = 0;
+    auto outerLoop = rewriter.create<AffineParallelOp>(
+        loc, ArrayRef<Type>{resultMemRefType},
+        ArrayRef<AtomicRMWKind>{AtomicRMWKind::assign}, outerLoopShape);
+    rewriter.setInsertionPointToStart(outerLoop.getBody());
+
+    // Initialize result tensor using index values in ascending order
+
+    // Build inner sorting loop
 
     // bitonic sort:
     // for (int k = 2; k <= N; k = 2 * k) {
@@ -881,7 +917,9 @@ struct ArgSortOpConversion : public OpConversionPattern<tile::ArgSortOp> {
     //   }
     // }
 
-    return failure();
+    rewriter.create<AffineYieldOp>(loc, ArrayRef<Value>{result});
+    rewriter.replaceOp(op, outerLoop.getResult(0));
+    return success();
   }
 };
 
