@@ -11,12 +11,12 @@
 namespace pmlc::dialect::abi {
 namespace {
 
-class AddABILoopPass final : public AddABILoopPassBase<AddABILoopPass> {
+class LowerToABIPass final : public LowerToABIPassBase<LowerToABIPass> {
 public:
   void runOnOperation() final;
 };
 
-void AddABILoopPass::runOnOperation() {
+void LowerToABIPass::runOnOperation() {
   auto moduleOp = getOperation();
   auto mainFunc =
       mlir::dyn_cast_or_null<mlir::FuncOp>(moduleOp.lookupSymbol(networkMain));
@@ -100,8 +100,8 @@ void AddABILoopPass::runOnOperation() {
 
 } // namespace
 
-std::unique_ptr<mlir::Pass> createAddABILoopPass() {
-  return std::make_unique<AddABILoopPass>();
+std::unique_ptr<mlir::Pass> createLowerToABIPass() {
+  return std::make_unique<LowerToABIPass>();
 }
 
 } // namespace pmlc::dialect::abi

@@ -23,8 +23,7 @@ gentbl(
 plaidml_cc_library(
     name = "transforms",
     srcs = [
-        "add_abi_loop.cc",
-        "lower_abi.cc",
+        "lower_to_abi.cc",
         "pass_detail.h",
     ],
     hdrs = [

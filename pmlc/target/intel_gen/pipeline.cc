@@ -19,6 +19,7 @@
 #include "mlir/Transforms/Passes.h"
 
 #include "pmlc/compiler/registry.h"
+#include "pmlc/conversion/abi_to_llvm/passes.h"
 #include "pmlc/conversion/gpu/lowering.h"
 #include "pmlc/conversion/gpu_to_spirv/passes.h"
 #include "pmlc/conversion/pxa_to_affine/passes.h"
@@ -80,8 +81,11 @@ struct ConvertStandardToLLVMPass
     populateStdToLLVMConversionPatterns(typeConverter, patterns);
     conversion::stdx_to_llvm::populateStdXToLLVMConversionPatterns(
         typeConverter, patterns);
+    conversion::abi_to_llvm::populateABIToLLVMConversionPatterns(typeConverter,
+                                                                 patterns);
 
     LLVMConversionTarget target(*context);
+    target.addIllegalDialect<abi::ABIDialect>();
     if (failed(applyPartialConversion(module, target, patterns))) {
       signalPassFailure();
     }
@@ -207,15 +211,13 @@ void pipelineBuilder(OpPassManager &pm) {
   // GPU to Vulkan.
   pm.addPass(conversion::gpu::createConvertGpuLaunchFuncToVulkanCallsPass());
 
-  // Add the ABI loop, and optimize the code to around it.
-  pm.addPass(abi::createAddABILoopPass());
+  // Look at the network as being run repeatedly, and optimize to
+  // take that into account.
+  pm.addPass(abi::createLowerToABIPass());
   pm.addPass(createLoopInvariantCodeMotionPass());
 
-  // Convert Vulkan calls to LLVM code
+  // Convert to LLVM code
   pm.addPass(createConvertStandardToLLVM());
-
-  // Lower to ABI entrypoints.
-  pm.addPass(abi::createLowerToABIPass());
 }
 
 static PassPipelineRegistration<>

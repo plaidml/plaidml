@@ -140,15 +140,13 @@ void pipelineBuilder(OpPassManager &pm) {
   // Comp to LLVM - OpenCL function calls.
   pm.addPass(pmlc::conversion::comp_to_llvm::createConvertCompToOclPass());
 
-  // Add the ABI loop, and optimize the code to around it.
-  pm.addPass(abi::createAddABILoopPass());
+  // Look at the network as being run repeatedly, and optimize to
+  // take that into account.
+  pm.addPass(abi::createLowerToABIPass());
   pm.addPass(createLoopInvariantCodeMotionPass());
 
   // Convert to LLVM code.
   pm.addPass(pmlc::target::intel_gen::createConvertStandardToLLVM());
-
-  // Lower to ABI entrypoints.
-  pm.addPass(abi::createLowerToABIPass());
 }
 
 static PassPipelineRegistration<>

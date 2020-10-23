@@ -152,7 +152,7 @@ void pipelineBuilder(OpPassManager &pm) {
     pm.addPass(pmlc::dialect::stdx::createBoundsCheckPass());
   }
 
-  pm.addPass(abi::createAddABILoopPass());
+  pm.addPass(abi::createLowerToABIPass());
   pm.addPass(createLoopInvariantCodeMotionPass());
   pm.addPass(createLowerToLLVMPass());
   pm.addPass(createTraceLinkingPass());

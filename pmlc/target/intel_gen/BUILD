@@ -27,6 +27,7 @@ plaidml_cc_library(
     deps = [
         ":gen-pass",
         "//pmlc/compiler",
+        "//pmlc/conversion/abi_to_llvm",
         "//pmlc/conversion/gpu",
         "//pmlc/conversion/gpu_to_spirv",
         "//pmlc/conversion/pxa_to_affine",

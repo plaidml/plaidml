@@ -13,7 +13,6 @@ class Pass;
 
 namespace pmlc::dialect::abi {
 
-std::unique_ptr<mlir::Pass> createAddABILoopPass();
 std::unique_ptr<mlir::Pass> createLowerToABIPass();
 
 #define GEN_PASS_REGISTRATION
