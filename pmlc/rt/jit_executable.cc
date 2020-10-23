@@ -75,37 +75,38 @@ static void setupTargetTriple(llvm::Module *llvmModule) {
 
 namespace {
 
-class MemRefDescriptor {
-private:
-  struct Base {
+class MemRef {
+public:
+  struct Descriptor {
     void *basePtr;
     void *data;
     int64_t offset;
     int64_t sizesAndStrides[];
   };
 
-public:
-  explicit MemRefDescriptor(RankedTensorType type) : memory(computeSize(type)) {
-    auto base = getBase();
-    base->basePtr = nullptr;
-    base->data = nullptr;
+  explicit MemRef(RankedTensorType type) : memory(computeSize(type)) {
+    auto descriptor = getDescriptor();
+    descriptor->basePtr = nullptr;
+    descriptor->data = nullptr;
     auto rank = type.getRank();
     auto shape = type.getShape();
     auto memRefType = MemRefType::get(shape, type.getElementType());
     SmallVector<int64_t, 8> strides;
-    getStridesAndOffset(memRefType, strides, base->offset);
+    getStridesAndOffset(memRefType, strides, descriptor->offset);
     for (unsigned i = 0; i < rank; i++) {
-      base->sizesAndStrides[i] = shape[i];
-      base->sizesAndStrides[i + rank] = strides[i];
+      descriptor->sizesAndStrides[i] = shape[i];
+      descriptor->sizesAndStrides[i + rank] = strides[i];
     }
   }
 
-  void *ptr() { return memory.data(); }
+  Descriptor *getDescriptor() {
+    return reinterpret_cast<Descriptor *>(memory.data());
+  }
 
   void setDataPtr(void *data) {
-    auto base = getBase();
-    base->basePtr = data;
-    base->data = data;
+    auto descriptor = getDescriptor();
+    descriptor->basePtr = data;
+    descriptor->data = data;
   }
 
 private:
@@ -117,15 +118,14 @@ private:
            sizeof(int64_t) * type.getRank();  // strides
   }
 
-  Base *getBase() { return reinterpret_cast<Base *>(memory.data()); }
-
   std::vector<char> memory;
 };
 
-using Network = void;
-using SetupFunc = void *(*)(void ** /* Device* followed by descriptor ptrs */);
-using ExecuteFunc = void *(*)(void *);
-using TeardownFunc = void *(*)(void *);
+struct Network;
+using SetupFunc = Network *(*)(Device *device,
+                               MemRef::Descriptor **descriptors);
+using ExecuteFunc = void (*)(Network *);
+using TeardownFunc = void (*)(Network *);
 
 struct ABI {
   SetupFunc setupFunc = nullptr;
@@ -381,20 +381,19 @@ public:
       throw std::runtime_error("Entrypoint functions not found");
     }
 
-    IVLOG(3, "Building memrefs");
-    buildMemrefDescriptors();
+    IVLOG(3, "Building memref descriptors");
+    buildMemRefDescriptors();
     IVLOG(3, "Calling setup");
-    networkState = abi.setupFunc(ptrs.data());
-    if (!networkState) {
+    network = abi.setupFunc(device.get(), descriptors.data());
+    if (!network) {
       throw std::runtime_error("Unable to initialize the network");
     }
     IVLOG(3, "Compiled");
   }
 
   ~JitExecutable() {
-    if (networkState) {
-      abi.teardownFunc(networkState);
-      std::free(networkState);
+    if (network) {
+      abi.teardownFunc(network);
     }
   }
 
@@ -411,16 +410,16 @@ public:
     if (VLOG_IS_ON(1)) {
       stopWatch.start();
     }
-    auto dp = descriptors.begin();
+    auto memrefIt = memrefs.begin();
     for (auto &bp : inputBuffers) {
-      (dp++)->setDataPtr(bp->data());
+      (memrefIt++)->setDataPtr(bp->data());
     }
-    std::advance(dp, program->constants.size());
+    std::advance(memrefIt, program->constants.size());
     for (auto &bp : outputBuffers) {
-      (dp++)->setDataPtr(bp->data());
+      (memrefIt++)->setDataPtr(bp->data());
     }
     IVLOG(3, "Running executable");
-    abi.executeFunc(networkState);
+    abi.executeFunc(network);
     IVLOG(3, "Executable complete");
     if (VLOG_IS_ON(1)) {
       stopWatch.stop();
@@ -428,20 +427,18 @@ public:
     }
   }
 
-  void buildMemrefDescriptors() {
-    ptrs.push_back(device.get());
-
+  void buildMemRefDescriptors() {
     for (auto type : program->inputs) {
-      descriptors.emplace_back(type.cast<RankedTensorType>());
-      ptrs.push_back(descriptors.back().ptr());
+      memrefs.emplace_back(type.cast<RankedTensorType>());
+      descriptors.push_back(memrefs.back().getDescriptor());
     }
     for (const compiler::ConstantArgument &arg : program->constants) {
-      descriptors.emplace_back(arg.type.cast<RankedTensorType>());
-      ptrs.push_back(descriptors.back().ptr());
+      memrefs.emplace_back(arg.type.cast<RankedTensorType>());
+      descriptors.push_back(memrefs.back().getDescriptor());
     }
     for (auto type : program->outputs) {
-      descriptors.emplace_back(type.cast<RankedTensorType>());
-      ptrs.push_back(descriptors.back().ptr());
+      memrefs.emplace_back(type.cast<RankedTensorType>());
+      descriptors.push_back(memrefs.back().getDescriptor());
     }
   }
 
@@ -449,10 +446,10 @@ private:
   std::shared_ptr<Program> program;
   std::shared_ptr<Device> device;
   std::unique_ptr<EngineImpl> impl;
-  std::vector<MemRefDescriptor> descriptors;
-  std::vector<void *> ptrs;
+  std::vector<MemRef> memrefs;
+  std::vector<MemRef::Descriptor *> descriptors;
   ABI abi;
-  void *networkState = nullptr;
+  Network *network = nullptr;
 };
 
 } // namespace
