@@ -173,7 +173,7 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(createCanonicalizerPass());
 
   // Use OMP thread count
-  auto maxThreads = omp_get_max_theads();
+  auto maxThreads = omp_get_max_threads();
   // TODO: Get the physical core count (coming in the next commit)
   // TODO: The hyperthreading is very harmful on perf, so exclude the
   //       hyper threads.
