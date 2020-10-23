@@ -73,10 +73,6 @@ static void setupTargetTriple(llvm::Module *llvmModule) {
   llvmModule->setTargetTriple(targetTriple);
 }
 
-static std::string makeCWrapperFunctionName(StringRef name) {
-  return "_mlir_wrapper__mlir_ciface_" + name.str();
-}
-
 namespace {
 
 class MemRefDescriptor {
@@ -203,12 +199,9 @@ struct MCJITEngineImpl : EngineImpl {
     engine->finalizeObject();
 
     ABI abi;
-    abi.setupFunc =
-        getFunc<SetupFunc>(makeCWrapperFunctionName(util::kPlaidmlInit));
-    abi.executeFunc =
-        getFunc<ExecuteFunc>(makeCWrapperFunctionName(util::kPlaidmlExec));
-    abi.teardownFunc =
-        getFunc<TeardownFunc>(makeCWrapperFunctionName(util::kPlaidmlFini));
+    abi.setupFunc = getFunc<SetupFunc>(util::kPlaidmlInit);
+    abi.executeFunc = getFunc<ExecuteFunc>(util::kPlaidmlExec);
+    abi.teardownFunc = getFunc<TeardownFunc>(util::kPlaidmlFini);
     return abi;
   }
 
@@ -281,12 +274,9 @@ struct OrcJITEngineImpl : EngineImpl {
             dataLayout.getGlobalPrefix())));
 
     ABI abi;
-    abi.setupFunc =
-        getFunc<SetupFunc>(makeCWrapperFunctionName(util::kPlaidmlInit));
-    abi.executeFunc =
-        getFunc<ExecuteFunc>(makeCWrapperFunctionName(util::kPlaidmlExec));
-    abi.teardownFunc =
-        getFunc<TeardownFunc>(makeCWrapperFunctionName(util::kPlaidmlFini));
+    abi.setupFunc = getFunc<SetupFunc>(util::kPlaidmlInit);
+    abi.executeFunc = getFunc<ExecuteFunc>(util::kPlaidmlExec);
+    abi.teardownFunc = getFunc<TeardownFunc>(util::kPlaidmlFini);
     return abi;
   }
 
