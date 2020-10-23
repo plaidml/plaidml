@@ -17,4 +17,12 @@ def LowerToABIPass : Pass<"lower-to-abi", "mlir::ModuleOp"> {
   ];
 }
 
+def DenormalizeConstantsPass : Pass<"abi-denormalize-constants", "pmlc::dialect::abi::LoopOp"> {
+  let summary = "Denormalizes constants from loop initialization";
+  let constructor = "pmlc::dialect::abi::createDenormalizeConstantsPass()";
+  let dependentDialects = [
+    "pmlc::dialect::abi::ABIDialect"
+  ];
+}
+
 #endif // __PMLC_DIALECT_ABI_PASSES__

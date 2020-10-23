@@ -14,6 +14,7 @@ class Pass;
 namespace pmlc::dialect::abi {
 
 std::unique_ptr<mlir::Pass> createLowerToABIPass();
+std::unique_ptr<mlir::Pass> createDenormalizeConstantsPass();
 
 #define GEN_PASS_REGISTRATION
 #include "pmlc/dialect/abi/transforms/passes.h.inc"

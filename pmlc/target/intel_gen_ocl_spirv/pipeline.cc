@@ -144,6 +144,7 @@ void pipelineBuilder(OpPassManager &pm) {
   // take that into account.
   pm.addPass(abi::createLowerToABIPass());
   pm.addPass(createLoopInvariantCodeMotionPass());
+  pm.addPass(abi::createDenormalizeConstantsPass());
 
   // Convert to LLVM code.
   pm.addPass(pmlc::target::intel_gen::createConvertStandardToLLVM());
