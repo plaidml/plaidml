@@ -25,11 +25,14 @@ struct DenormalizeConstantsPattern final
     unsigned idx = 0;
     for (auto tyAttr : networkFieldTypes) {
       auto val = networkOp.getOperand(idx);
-      if (auto constOp = val.getDefiningOp<mlir::ConstantOp>()) {
-        auto denormOp = constOp.clone();
+      auto definingOp = val.getDefiningOp();
+      if (definingOp && definingOp->hasTrait<mlir::OpTrait::ConstantLike>()) {
+        // N.B. Constant-Like operations have no side-effects, exactly one
+        //      result, and no operands.
+        auto *denormOp = definingOp->clone();
         rewriter.insert(denormOp);
         auto arg = loopOp.bodyEntryBlock()->getArgument(idx);
-        arg.replaceAllUsesWith(denormOp);
+        arg.replaceAllUsesWith(denormOp->getResult(0));
         loopOp.bodyEntryBlock()->eraseArgument(idx);
         networkOp.getOperation()->eraseOperand(idx);
       } else {
