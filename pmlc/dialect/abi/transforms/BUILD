@@ -23,7 +23,6 @@ gentbl(
 plaidml_cc_library(
     name = "transforms",
     srcs = [
-        "denormalize_constants.cc",
         "lower_to_abi.cc",
         "pass_detail.h",
     ],

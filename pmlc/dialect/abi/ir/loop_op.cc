@@ -1,8 +1,59 @@
 // Copyright 2020, Intel Corporation
 
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/IR/PatternMatch.h"
+
 #include "pmlc/dialect/abi/ir/dialect.h"
 
 namespace pmlc::dialect::abi {
+
+namespace {
+
+struct DenormalizeConstantsPattern final
+    : public mlir::OpRewritePattern<LoopOp> {
+  using mlir::OpRewritePattern<LoopOp>::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(LoopOp loopOp, mlir::PatternRewriter &rewriter) const final {
+    mlir::OpBuilder::InsertionGuard insertionGuard{rewriter};
+    auto networkOp = loopOp.getInitTerminator();
+    auto networkFieldTypes = loopOp.getAttrOfType<mlir::ArrayAttr>(
+        abi::LoopOp::getNetworkFieldTypesAttrName());
+    mlir::SmallVector<mlir::Attribute, 8> newNetworkFieldTypes;
+    rewriter.startRootUpdate(loopOp);
+    rewriter.setInsertionPointToStart(&loopOp.bodyRegion().front());
+    unsigned idx = 0;
+    for (auto tyAttr : networkFieldTypes) {
+      auto val = networkOp.getOperand(idx);
+      if (auto constOp = val.getDefiningOp<mlir::ConstantOp>()) {
+        auto denormOp = constOp.clone();
+        rewriter.insert(denormOp);
+        auto arg = loopOp.bodyEntryBlock()->getArgument(idx);
+        arg.replaceAllUsesWith(denormOp);
+        loopOp.bodyEntryBlock()->eraseArgument(idx);
+        networkOp.getOperation()->eraseOperand(idx);
+      } else {
+        newNetworkFieldTypes.emplace_back(tyAttr);
+        ++idx;
+      }
+    }
+    if (networkFieldTypes.size() != newNetworkFieldTypes.size()) {
+      loopOp.setAttr(abi::LoopOp::getNetworkFieldTypesAttrName(),
+                     rewriter.getArrayAttr(newNetworkFieldTypes));
+      rewriter.finalizeRootUpdate(loopOp);
+      return mlir::success();
+    }
+    rewriter.cancelRootUpdate(loopOp);
+    return mlir::failure();
+  }
+};
+
+} // namespace
+
+void LoopOp::getCanonicalizationPatterns(
+    mlir::OwningRewritePatternList &patterns, mlir::MLIRContext *ctx) {
+  patterns.insert<DenormalizeConstantsPattern>(ctx);
+}
 
 mlir::Region &LoopOp::getLoopBody() { return bodyRegion(); }
 

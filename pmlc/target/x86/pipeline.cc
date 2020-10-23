@@ -154,7 +154,7 @@ void pipelineBuilder(OpPassManager &pm) {
 
   pm.addPass(abi::createLowerToABIPass());
   pm.addPass(createLoopInvariantCodeMotionPass());
-  pm.addPass(abi::createDenormalizeConstantsPass());
+  pm.addPass(createCanonicalizerPass());
   pm.addPass(createLowerToLLVMPass());
   pm.addPass(createTraceLinkingPass());
   pm.addPass(createCanonicalizerPass());

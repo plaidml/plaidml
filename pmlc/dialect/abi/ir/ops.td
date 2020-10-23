@@ -30,6 +30,7 @@ def ABI_LoopOp : ABI_Op<"loop", [
   // TODO: Add a region for finalization operations, once we have
   // anything to put into such a region.
   let regions = (region AnyRegion:$initRegion, AnyRegion:$bodyRegion);
+  let hasCanonicalizer = 1;
   let extraClassDeclaration = [{
     static mlir::StringRef getNetworkFieldTypesAttrName() { return "networkFieldTypes"; }
 
