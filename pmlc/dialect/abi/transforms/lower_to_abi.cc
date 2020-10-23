@@ -106,16 +106,22 @@ void LowerToABIPass::runOnOperation() {
     signalPassFailure();
     return;
   }
+
+  mlir::SmallVector<mlir::Value, 8> networkArgs;
+  for (auto &arg : initEntryBlock->getArguments()) {
+    networkArgs.emplace_back(arg);
+  }
+
   if (!initEntryBlock->getNumArguments()) {
-    // Add a fake device parameter for ABI compatibility.
+    // Add a fake device parameter for ABI compatibility, but do not
+    // pass it along to the body.
     auto ty = LLVMType::getInt8Ty(&getContext()).getPointerTo();
     initEntryBlock->addArgument(ty);
-    bodyEntryBlock->insertArgument(0u, ty);
   }
 
   // Terminate the init block using a passthrough of the
   // init block's arguments.
-  builder.create<abi::CreateNetworkOp>(loc, initEntryBlock->getArguments());
+  builder.create<abi::CreateNetworkOp>(loc, networkArgs);
 }
 
 } // namespace
