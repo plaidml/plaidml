@@ -22,7 +22,7 @@ public:
   }
 };
 
-static compiler::TargetRegistration targetReg("llvm_cpu", [&]() {
+static compiler::TargetRegistration targetReg("llvm_cpu", []() {
   return std::make_shared<Target>();
 });
 

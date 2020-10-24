@@ -234,7 +234,7 @@ public:
   }
 };
 
-static compiler::TargetRegistration targetReg("intel_gen", [&]() {
+static compiler::TargetRegistration targetReg("intel_gen", []() {
   return std::make_shared<Target>();
 });
 

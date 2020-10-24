@@ -159,7 +159,7 @@ public:
   }
 };
 
-static compiler::TargetRegistration targetReg("intel_gen_ocl_spirv", [&]() {
+static compiler::TargetRegistration targetReg("intel_gen_ocl_spirv", []() {
   return std::make_shared<Target>();
 });
 
