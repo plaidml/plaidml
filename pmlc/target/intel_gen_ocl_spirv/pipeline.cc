@@ -149,7 +149,18 @@ static PassPipelineRegistration<>
     passPipelineReg("target-intel_gen_ocl_spirv",
                     "Target pipeline for Intel GEN iGPUs", pipelineBuilder);
 
-static compiler::TargetRegistration targetReg("intel_gen_ocl_spirv",
-                                              pipelineBuilder);
+class Target : public compiler::Target {
+public:
+  void buildPipeline(mlir::OpPassManager &pm) { pipelineBuilder(pm); }
+
+  util::BufferPtr generateBlob(compiler::Program &program) {
+    util::BufferPtr ret;
+    return ret;
+  }
+};
+
+static compiler::TargetRegistration targetReg("intel_gen_ocl_spirv", [&]() {
+  return std::make_shared<Target>();
+});
 
 } // namespace pmlc::target::intel_gen_ocl_spirv

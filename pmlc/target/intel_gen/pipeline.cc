@@ -224,6 +224,18 @@ static PassPipelineRegistration<>
     passPipelineReg("target-intel_gen", "Target pipeline for Intel GEN iGPUs",
                     pipelineBuilder);
 
-static compiler::TargetRegistration targetReg("intel_gen", pipelineBuilder);
+class Target : public compiler::Target {
+public:
+  void buildPipeline(mlir::OpPassManager &pm) { pipelineBuilder(pm); }
+
+  util::BufferPtr generateBlob(compiler::Program &program) {
+    util::BufferPtr ret;
+    return ret;
+  }
+};
+
+static compiler::TargetRegistration targetReg("intel_gen", [&]() {
+  return std::make_shared<Target>();
+});
 
 } // namespace pmlc::target::intel_gen

@@ -14,7 +14,7 @@
 extern "C" {
 
 struct plaidml_buffer {
-  std::shared_ptr<pmlc::util::Buffer> buffer;
+  pmlc::util::BufferPtr buffer;
 };
 
 struct plaidml_program {
