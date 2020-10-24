@@ -76,12 +76,12 @@ struct CreateNetworkOpLowering final
         LLVMType::getStructTy(rewriter.getContext(), networkFieldTypes);
 
     // Fill in a local stack copy of the network structure.
-    auto initNetworkValue =
+    mlir::Value initNetworkValue =
         rewriter.create<LLVM::UndefOp>(rewriter.getUnknownLoc(), networkTy);
     for (unsigned idx = 0; idx < networkFieldValues.size(); ++idx) {
-      rewriter.create<LLVM::InsertValueOp>(
-          rewriter.getUnknownLoc(), initNetworkValue, networkFieldValues[idx],
-          rewriter.getI64ArrayAttr(idx));
+      initNetworkValue = rewriter.create<LLVM::InsertValueOp>(
+          rewriter.getUnknownLoc(), networkTy, initNetworkValue,
+          networkFieldValues[idx], rewriter.getI64ArrayAttr(idx));
     }
 
     // malloc the structure instance, and store the stack local into it.

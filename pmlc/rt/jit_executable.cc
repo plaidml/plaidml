@@ -122,9 +122,8 @@ private:
 };
 
 struct Network;
-using SetupFunc = Network *(*)(Device *device,
-                               MemRef::Descriptor **descriptors);
-using ExecuteFunc = void (*)(Network *);
+using SetupFunc = Network *(*)(Device *device);
+using ExecuteFunc = void (*)(Network *, MemRef::Descriptor **descriptors);
 using TeardownFunc = void (*)(Network *);
 
 struct ABI {
@@ -384,7 +383,7 @@ public:
     IVLOG(3, "Building memref descriptors");
     buildMemRefDescriptors();
     IVLOG(3, "Calling setup");
-    network = abi.setupFunc(device.get(), descriptors.data());
+    network = abi.setupFunc(device.get());
     if (!network) {
       throw std::runtime_error("Unable to initialize the network");
     }
@@ -419,7 +418,7 @@ public:
       (memrefIt++)->setDataPtr(bp->data());
     }
     IVLOG(3, "Running executable");
-    abi.executeFunc(network);
+    abi.executeFunc(network, descriptors.data());
     IVLOG(3, "Executable complete");
     if (VLOG_IS_ON(1)) {
       stopWatch.stop();
