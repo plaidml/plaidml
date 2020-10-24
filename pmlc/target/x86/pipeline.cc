@@ -67,7 +67,7 @@ struct ConvertStandardToLLVMPass
 
     LowerToLLVMOptions options = {
         /*useBarePtrCallConv=*/false,
-        /*emitCWrappers=*/false,
+        /*emitCWrappers=*/true,
         /*indexBitwidth=*/kDeriveIndexBitwidthFromDataLayout,
         /*useAlignedAlloc=*/false,
     };

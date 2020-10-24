@@ -47,66 +47,76 @@ struct CreateNetworkOpLowering final
                   mlir::ConversionPatternRewriter &rewriter) const final {
     auto createNetworkOp = mlir::cast<abi::CreateNetworkOp>(op);
 
-    auto mallocFunc = importFunc(
-        "malloc", createNetworkOp,
-        LLVMType::getFunctionTy(getVoidPtrType(),
-                                mlir::ArrayRef<LLVMType>{getIndexType()},
-                                /*isVarArg=*/false),
-        rewriter);
-
     rewriter.startRootUpdate(createNetworkOp);
     rewriter.setInsertionPoint(createNetworkOp);
 
-    // Figure out the type of the network structure.
-    mlir::SmallVector<LLVMType, 8> networkFieldTypes;
-    mlir::SmallVector<mlir::Value, 8> networkFieldValues;
-    for (auto srcValue : createNetworkOp.getOperands()) {
-      auto convValue = typeConverter.materializeTargetConversion(
-          rewriter, createNetworkOp.getLoc(),
-          typeConverter.convertType(srcValue.getType()), srcValue);
-      if (!convValue) {
-        rewriter.cancelRootUpdate(createNetworkOp);
-        return mlir::failure();
+    mlir::Value networkPtr;
+
+    if (createNetworkOp.getNumOperands() == 0) {
+      // There's no data being passed from initialization to the body:
+      // just return a void* nullptr.
+      networkPtr = rewriter.create<LLVM::NullOp>(rewriter.getUnknownLoc(),
+                                                 getVoidPtrType());
+    } else {
+      auto mallocFunc = importFunc(
+          "malloc", createNetworkOp,
+          LLVMType::getFunctionTy(getVoidPtrType(),
+                                  mlir::ArrayRef<LLVMType>{getIndexType()},
+                                  /*isVarArg=*/false),
+          rewriter);
+
+      // Figure out the type of the network structure.
+      mlir::SmallVector<LLVMType, 8> networkFieldTypes;
+      mlir::SmallVector<mlir::Value, 8> networkFieldValues;
+      for (auto srcValue : createNetworkOp.getOperands()) {
+        auto convValue = typeConverter.materializeTargetConversion(
+            rewriter, createNetworkOp.getLoc(),
+            typeConverter.convertType(srcValue.getType()), srcValue);
+        if (!convValue) {
+          rewriter.cancelRootUpdate(createNetworkOp);
+          return mlir::failure();
+        }
+        networkFieldTypes.emplace_back(convValue.getType().cast<LLVMType>());
+        networkFieldValues.emplace_back(convValue);
       }
-      networkFieldTypes.emplace_back(convValue.getType().cast<LLVMType>());
-      networkFieldValues.emplace_back(convValue);
+
+      auto networkTy =
+          LLVMType::getStructTy(rewriter.getContext(), networkFieldTypes);
+
+      // Fill in a local stack copy of the network structure.
+      mlir::Value networkValue =
+          rewriter.create<LLVM::UndefOp>(rewriter.getUnknownLoc(), networkTy);
+      for (unsigned idx = 0; idx < networkFieldValues.size(); ++idx) {
+        networkValue = rewriter.create<LLVM::InsertValueOp>(
+            rewriter.getUnknownLoc(), networkTy, networkValue,
+            networkFieldValues[idx], rewriter.getI64ArrayAttr(idx));
+      }
+
+      // malloc the structure instance, and store the stack local into it.
+      auto initNullNetworkValue = rewriter.create<LLVM::NullOp>(
+          rewriter.getUnknownLoc(), networkTy.getPointerTo());
+      auto initConstOne =
+          createIndexConstant(rewriter, rewriter.getUnknownLoc(), 1);
+      auto initNextNetworkValue = rewriter.create<LLVM::GEPOp>(
+          rewriter.getUnknownLoc(), networkTy.getPointerTo(),
+          initNullNetworkValue, mlir::ValueRange{initConstOne});
+      auto initNetworkSize = rewriter.create<LLVM::PtrToIntOp>(
+          rewriter.getUnknownLoc(), getIndexType(), initNextNetworkValue);
+      auto initNetworkRawPtr =
+          rewriter
+              .create<LLVM::CallOp>(rewriter.getUnknownLoc(), mallocFunc,
+                                    mlir::ValueRange{initNetworkSize})
+              .getResult(0);
+      networkPtr = rewriter.create<LLVM::BitcastOp>(rewriter.getUnknownLoc(),
+                                                    networkTy.getPointerTo(),
+                                                    initNetworkRawPtr);
+      rewriter.create<LLVM::StoreOp>(rewriter.getUnknownLoc(), networkValue,
+                                     networkPtr);
     }
-
-    auto networkTy =
-        LLVMType::getStructTy(rewriter.getContext(), networkFieldTypes);
-
-    // Fill in a local stack copy of the network structure.
-    mlir::Value initNetworkValue =
-        rewriter.create<LLVM::UndefOp>(rewriter.getUnknownLoc(), networkTy);
-    for (unsigned idx = 0; idx < networkFieldValues.size(); ++idx) {
-      initNetworkValue = rewriter.create<LLVM::InsertValueOp>(
-          rewriter.getUnknownLoc(), networkTy, initNetworkValue,
-          networkFieldValues[idx], rewriter.getI64ArrayAttr(idx));
-    }
-
-    // malloc the structure instance, and store the stack local into it.
-    auto initNullNetworkValue = rewriter.create<LLVM::NullOp>(
-        rewriter.getUnknownLoc(), networkTy.getPointerTo());
-    auto initConstOne =
-        createIndexConstant(rewriter, rewriter.getUnknownLoc(), 1);
-    auto initNextNetworkValue = rewriter.create<LLVM::GEPOp>(
-        rewriter.getUnknownLoc(), networkTy.getPointerTo(),
-        initNullNetworkValue, mlir::ValueRange{initConstOne});
-    auto initNetworkSize = rewriter.create<LLVM::PtrToIntOp>(
-        rewriter.getUnknownLoc(), getIndexType(), initNextNetworkValue);
-    auto initNetworkRawPtr =
-        rewriter
-            .create<LLVM::CallOp>(rewriter.getUnknownLoc(), mallocFunc,
-                                  mlir::ValueRange{initNetworkSize})
-            .getResult(0);
-    auto initNetworkPtr = rewriter.create<LLVM::BitcastOp>(
-        rewriter.getUnknownLoc(), networkTy.getPointerTo(), initNetworkRawPtr);
-    rewriter.create<LLVM::StoreOp>(rewriter.getUnknownLoc(), initNetworkValue,
-                                   initNetworkPtr);
 
     // Add the new LLVM terminator, replacing the abi.create_network op.
     rewriter.create<LLVM::ReturnOp>(rewriter.getUnknownLoc(),
-                                    mlir::ValueRange{initNetworkPtr});
+                                    mlir::ValueRange{networkPtr});
     rewriter.eraseOp(createNetworkOp);
 
     rewriter.finalizeRootUpdate(createNetworkOp);
@@ -152,12 +162,15 @@ struct LoopOpLowering final : public mlir::ConvertOpToLLVMPattern<abi::LoopOp> {
 
     rewriter.setInsertionPoint(loopOp);
 
+    bool hasNetworkFields = networkFieldTypes.size() != 0;
+
     if (mlir::failed( //
-            buildInit(loopOp, networkTy, rewriter)) ||
+            buildInit(loopOp, networkTy, hasNetworkFields, rewriter)) ||
         mlir::failed( //
-            buildExec(loopOp, networkTy, networkFieldTypes, rewriter)) ||
+            buildExec(loopOp, networkTy, hasNetworkFields, networkFieldTypes,
+                      rewriter)) ||
         mlir::failed( //
-            buildFini(loopOp, networkTy, rewriter))) {
+            buildFini(loopOp, networkTy, hasNetworkFields, rewriter))) {
       rewriter.cancelRootUpdate(loopOp);
       return mlir::failure();
     }
@@ -170,22 +183,23 @@ struct LoopOpLowering final : public mlir::ConvertOpToLLVMPattern<abi::LoopOp> {
 
 private:
   mlir::LogicalResult
-  buildInit(abi::LoopOp loopOp, LLVMType networkTy,
+  buildInit(abi::LoopOp loopOp, LLVMType networkTy, bool hasNetworkFields,
             mlir::ConversionPatternRewriter &rewriter) const {
     // Create plaidml_init().
 
     mlir::OpBuilder::InsertionGuard insertionGuard{rewriter};
-
     auto initArgTypes = loopOp.initRegion().getArgumentTypes();
-    auto initFuncType = rewriter.getFunctionType(
-        initArgTypes, mlir::TypeRange{networkTy.getPointerTo()});
+    auto initSrcType = rewriter.getFunctionType(
+        initArgTypes, hasNetworkFields
+                          ? mlir::TypeRange{networkTy.getPointerTo()}
+                          : getVoidPtrType());
     mlir::TypeConverter::SignatureConversion initSigConversion{
         loopOp.initRegion().getNumArguments()};
-    auto initLLVMType = typeConverter.convertFunctionSignature(
-        initFuncType,
-        /*isVariadic=*/false, initSigConversion);
+    auto initType = typeConverter.convertFunctionSignature(initSrcType,
+                                                           /*isVariadic=*/false,
+                                                           initSigConversion);
     auto initFunc = rewriter.create<LLVM::LLVMFuncOp>(
-        loopOp.getLoc(), pmlc::util::kPlaidmlInit, initLLVMType);
+        loopOp.getLoc(), pmlc::util::kPlaidmlInit, initType);
 
     rewriter.cloneRegionBefore(loopOp.initRegion(), initFunc.getBody(),
                                initFunc.getBody().end());
@@ -195,7 +209,7 @@ private:
   }
 
   mlir::LogicalResult
-  buildExec(abi::LoopOp loopOp, LLVMType networkTy,
+  buildExec(abi::LoopOp loopOp, LLVMType networkTy, bool hasNetworkFields,
             const mlir::SmallVectorImpl<LLVMType> &networkFieldTypes,
             mlir::ConversionPatternRewriter &rewriter) const {
     // Create plaidml_exec().
@@ -224,30 +238,35 @@ private:
         loopOp.getLoc(), pmlc::util::kPlaidmlExec,
         LLVMType::getFunctionTy(
             getVoidType(),
-            mlir::ArrayRef<LLVMType>{networkTy.getPointerTo(),
+            mlir::ArrayRef<LLVMType>{hasNetworkFields ? networkTy.getPointerTo()
+                                                      : getVoidPtrType(),
                                      iterationTy.getPointerTo()},
             /*isVarArg=*/false));
 
     // Create an entry block, and materialize the arguments for the loop body.
     auto *execEntryBlock = rewriter.createBlock(
         &execFunc.getBody(), execFunc.getBody().end(),
-        mlir::TypeRange{networkTy.getPointerTo(), iterationTy.getPointerTo()});
+        mlir::TypeRange{hasNetworkFields ? networkTy.getPointerTo()
+                                         : getVoidPtrType(),
+                        iterationTy.getPointerTo()});
     rewriter.setInsertionPointToStart(execEntryBlock);
     mlir::BlockAndValueMapping mapping;
     unsigned bodyArgIdx = 0;
 
-    // Materialize the network structure arguments.
-    auto networkValue = rewriter.create<LLVM::LoadOp>(
-        rewriter.getUnknownLoc(), execEntryBlock->getArgument(0));
-    for (auto fieldIdx = 0; fieldIdx < networkFieldTypes.size(); ++fieldIdx) {
-      auto fieldVal = rewriter.create<LLVM::ExtractValueOp>(
-          rewriter.getUnknownLoc(), networkFieldTypes[fieldIdx], networkValue,
-          rewriter.getI64ArrayAttr(fieldIdx));
-      auto bodyArg = loopOp.bodyRegion().getArgument(bodyArgIdx++);
-      auto argVal = typeConverter.materializeSourceConversion(
-          rewriter, rewriter.getUnknownLoc(), bodyArg.getType(),
-          mlir::ValueRange{fieldVal});
-      mapping.map(bodyArg, argVal);
+    if (hasNetworkFields) {
+      // Materialize the network structure arguments.
+      auto networkValue = rewriter.create<LLVM::LoadOp>(
+          rewriter.getUnknownLoc(), execEntryBlock->getArgument(0));
+      for (auto fieldIdx = 0; fieldIdx < networkFieldTypes.size(); ++fieldIdx) {
+        auto fieldVal = rewriter.create<LLVM::ExtractValueOp>(
+            rewriter.getUnknownLoc(), networkFieldTypes[fieldIdx], networkValue,
+            rewriter.getI64ArrayAttr(fieldIdx));
+        auto bodyArg = loopOp.bodyRegion().getArgument(bodyArgIdx++);
+        auto argVal = typeConverter.materializeSourceConversion(
+            rewriter, rewriter.getUnknownLoc(), bodyArg.getType(),
+            mlir::ValueRange{fieldVal});
+        mapping.map(bodyArg, argVal);
+      }
     }
 
     // Materialize the iteration arguments.
@@ -284,7 +303,7 @@ private:
   }
 
   mlir::LogicalResult
-  buildFini(abi::LoopOp loopOp, LLVMType networkTy,
+  buildFini(abi::LoopOp loopOp, LLVMType networkTy, bool hasNetworkFields,
             mlir::ConversionPatternRewriter &rewriter) const {
     // Create plaidml_fini().
     //
@@ -293,29 +312,33 @@ private:
     // So we build plaidml_fini as a simple function that frees the network.
 
     mlir::OpBuilder::InsertionGuard insertionGuard{rewriter};
-
-    auto freeFunc = importFunc(
-        "free", loopOp,
-        LLVMType::getFunctionTy(getVoidType(),
-                                mlir::ArrayRef<LLVMType>{getVoidPtrType()},
-                                /*isVarArg=*/false),
-        rewriter);
-
+    auto argType =
+        hasNetworkFields ? networkTy.getPointerTo() : getVoidPtrType();
     auto finiFunc = rewriter.create<LLVM::LLVMFuncOp>(
         loopOp.getLoc(), pmlc::util::kPlaidmlFini,
-        LLVMType::getFunctionTy(getVoidType(), {networkTy.getPointerTo()},
+        LLVMType::getFunctionTy(getVoidType(), {argType},
                                 /*isVarArg=*/false));
 
     auto *entryBlock =
         rewriter.createBlock(&finiFunc.getBody(), finiFunc.getBody().end(),
-                             mlir::TypeRange{networkTy.getPointerTo()});
+                             mlir::TypeRange{argType});
 
-    rewriter.setInsertionPointToStart(entryBlock);
+    if (hasNetworkFields) {
+      auto freeFunc = importFunc(
+          "free", loopOp,
+          LLVMType::getFunctionTy(getVoidType(),
+                                  mlir::ArrayRef<LLVMType>{getVoidPtrType()},
+                                  /*isVarArg=*/false),
+          rewriter);
 
-    auto networkRawPtr = rewriter.create<LLVM::BitcastOp>(
-        loopOp.getLoc(), getVoidPtrType(), entryBlock->getArgument(0));
-    rewriter.create<LLVM::CallOp>(loopOp.getLoc(), freeFunc,
-                                  mlir::ValueRange{networkRawPtr});
+      rewriter.setInsertionPointToStart(entryBlock);
+
+      auto networkRawPtr = rewriter.create<LLVM::BitcastOp>(
+          loopOp.getLoc(), getVoidPtrType(), entryBlock->getArgument(0));
+      rewriter.create<LLVM::CallOp>(loopOp.getLoc(), freeFunc,
+                                    mlir::ValueRange{networkRawPtr});
+    }
+
     rewriter.create<LLVM::ReturnOp>(loopOp.getLoc(), mlir::None);
 
     return mlir::success();

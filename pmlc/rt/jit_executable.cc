@@ -384,9 +384,9 @@ public:
     buildMemRefDescriptors();
     IVLOG(3, "Calling setup");
     network = abi.setupFunc(device.get());
-    if (!network) {
-      throw std::runtime_error("Unable to initialize the network");
-    }
+    // if (!network) {
+    //   throw std::runtime_error("Unable to initialize the network");
+    // }
     IVLOG(3, "Compiled");
   }
 
@@ -413,7 +413,9 @@ public:
     for (auto &bp : inputBuffers) {
       (memrefIt++)->setDataPtr(bp->data());
     }
-    std::advance(memrefIt, program->constants.size());
+    for (auto &constArg : program->constants) {
+      (memrefIt++)->setDataPtr(constArg.buffer->data());
+    }
     for (auto &bp : outputBuffers) {
       (memrefIt++)->setDataPtr(bp->data());
     }
