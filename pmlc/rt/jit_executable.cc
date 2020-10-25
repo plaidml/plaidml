@@ -384,9 +384,9 @@ public:
     buildMemRefDescriptors();
     IVLOG(3, "Calling setup");
     network = abi.setupFunc(device.get());
-    // if (!network) {
-    //   throw std::runtime_error("Unable to initialize the network");
-    // }
+    if (!network) {
+      throw std::runtime_error("Unable to initialize the network");
+    }
     IVLOG(3, "Compiled");
   }
 

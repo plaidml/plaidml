@@ -37,6 +37,8 @@ static LLVM::LLVMFuncOp importFunc(mlir::StringRef name, mlir::Operation *op,
 
 namespace {
 
+constexpr char emptyNetworkSingletonName[] = "plaidml_empty_network";
+
 struct CreateNetworkOpLowering final
     : public mlir::ConvertOpToLLVMPattern<abi::CreateNetworkOp> {
   using mlir::ConvertOpToLLVMPattern<
@@ -54,9 +56,26 @@ struct CreateNetworkOpLowering final
 
     if (createNetworkOp.getNumOperands() == 0) {
       // There's no data being passed from initialization to the body:
-      // just return a void* nullptr.
-      networkPtr = rewriter.create<LLVM::NullOp>(rewriter.getUnknownLoc(),
-                                                 getVoidPtrType());
+      // we don't want to return nullptr (since that's our failure indication),
+      // but returning a Network* is a little simpler than managing an output
+      // parameter.  So: we create a global to represent an empty network
+      // singleton, and return a pointer to it.
+      auto moduleOp = op->getParentOfType<mlir::ModuleOp>();
+      LLVM::GlobalOp emptyNetwork =
+          moduleOp.lookupSymbol<LLVM::GlobalOp>(emptyNetworkSingletonName);
+      if (!emptyNetwork) {
+        mlir::OpBuilder::InsertionGuard insertionGuard{rewriter};
+        rewriter.setInsertionPointToStart(moduleOp.getBody());
+        emptyNetwork = rewriter.create<LLVM::GlobalOp>(
+            rewriter.getUnknownLoc(),
+            LLVMType::getInt8Ty(rewriter.getContext()), /*isConstant=*/true,
+            LLVM::Linkage::Internal, emptyNetworkSingletonName,
+            rewriter.getI8IntegerAttr(0));
+      }
+
+      networkPtr = rewriter.create<LLVM::AddressOfOp>(rewriter.getUnknownLoc(),
+                                                      emptyNetwork);
+
     } else {
       auto mallocFunc = importFunc(
           "malloc", createNetworkOp,
