@@ -1,6 +1,7 @@
 // Copyright 2020, Intel Corporation
 
 #include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/Debug.h"
 
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
@@ -167,6 +168,8 @@ struct LoopOpLowering final : public mlir::ConvertOpToLLVMPattern<abi::LoopOp> {
   matchAndRewrite(mlir::Operation *op, mlir::ArrayRef<mlir::Value> operands,
                   mlir::ConversionPatternRewriter &rewriter) const final {
     auto loopOp = mlir::cast<abi::LoopOp>(op);
+    // llvm::errs() << "Lowering " << loopOp << "\n";
+    // llvm::DebugFlag = true;
 
     rewriter.startRootUpdate(loopOp);
 
@@ -280,7 +283,10 @@ private:
     ++it;
     rewriter.mergeBlocks(&*it, initEntryBlock, mlir::None);
 
-    return rewriter.convertRegionTypes(&initFunc.getBody(), typeConverter);
+    auto result =
+        rewriter.convertRegionTypes(&initFunc.getBody(), typeConverter);
+    // lvm::errs() << "Constructed " << initFunc << "\n";
+    return result;
   }
 
   mlir::LogicalResult
@@ -371,7 +377,10 @@ private:
     ++it;
     rewriter.mergeBlocks(&*it, execEntryBlock, mlir::None);
 
-    return rewriter.convertRegionTypes(&execFunc.getBody(), typeConverter);
+    auto result =
+        rewriter.convertRegionTypes(&execFunc.getBody(), typeConverter);
+    // llvm::errs() << "Constructed " << execFunc << "\n";
+    return result;
   }
 
   mlir::LogicalResult
