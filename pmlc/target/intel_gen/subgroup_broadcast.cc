@@ -89,8 +89,8 @@ public:
     // TODO: Current HW supports only block read\write on global mem scope.
     // This can change in the future so probably need to be better handled with
     // HW specific parameters
-    auto invalidMemScope =
-        dyn_cast_or_null<AllocOp>(op.memref().getDefiningOp());
+    scf::ParallelOp actualBlock = loop.getParentOfType<scf::ParallelOp>();
+    bool invalidMemScope = !actualBlock.isDefinedOutsideOfLoop(op.memref());
 
     // TODO: Based on the HW caps we should accept these for certain data types
     // Right now we accept i16/fp16 and i32/fp32 for the block read extensions
@@ -121,8 +121,8 @@ public:
     // TODO: Current HW supports only block read\write on global mem scope.
     // This can change in the future so probably need to be better handled with
     // HW specific parameters
-    auto invalidMemScope =
-        dyn_cast_or_null<AllocOp>(op.memref().getDefiningOp());
+    scf::ParallelOp actualBlock = loop.getParentOfType<scf::ParallelOp>();
+    bool invalidMemScope = !actualBlock.isDefinedOutsideOfLoop(op.memref());
 
     // TODO: Based on the HW caps we should accept these for certain data types
     // Right now we accept i16/fp16 and i32/fp32 for the block read extensions
@@ -274,9 +274,13 @@ struct SubgroupBroadcastPass
     func.walk([&](scf::ParallelOp op) {
       int64_t subgroupSize = getIntegerTag(op, subgroupSizeTag(), 1);
       if (hasUnitTag(op, gpuThreadTag())) {
-        DevectorizeImpl impl(op, subgroupSize, useBlockOps.getValue());
-        if (failed(impl.devectorize())) {
-          signalPassFailure();
+        // Make sure that gpuBlock loop is present
+        auto gpuBlockOp = op.getParentOfType<scf::ParallelOp>();
+        if (gpuBlockOp && hasUnitTag(gpuBlockOp, gpuBlockTag())) {
+          DevectorizeImpl impl(op, subgroupSize, useBlockOps.getValue());
+          if (failed(impl.devectorize())) {
+            signalPassFailure();
+          }
         }
       }
     });

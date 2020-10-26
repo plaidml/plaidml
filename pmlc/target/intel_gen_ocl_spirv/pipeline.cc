@@ -85,6 +85,12 @@ void pipelineBuilder(OpPassManager &pm) {
 
   // Lower out of PXA memory semantics
   pm.addPass(pmlc::target::intel_gen::createLowerPXAToAffinePass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
+
+  pm.addPass(createAffineLoopInvariantCodeMotionPass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
 
   // Unroll affine.for loops.
   pm.addPass(createLoopUnrollPass(
