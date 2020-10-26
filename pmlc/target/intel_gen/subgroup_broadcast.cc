@@ -274,9 +274,13 @@ struct SubgroupBroadcastPass
     func.walk([&](scf::ParallelOp op) {
       int64_t subgroupSize = getIntegerTag(op, subgroupSizeTag(), 1);
       if (hasUnitTag(op, gpuThreadTag())) {
-        DevectorizeImpl impl(op, subgroupSize, useBlockOps.getValue());
-        if (failed(impl.devectorize())) {
-          signalPassFailure();
+        // Make sure that gpuBlock loop is present
+        auto gpuBlockOp = op.getParentOfType<scf::ParallelOp>();
+        if (gpuBlockOp && hasUnitTag(gpuBlockOp, gpuBlockTag())) {
+          DevectorizeImpl impl(op, subgroupSize, useBlockOps.getValue());
+          if (failed(impl.devectorize())) {
+            signalPassFailure();
+          }
         }
       }
     });
