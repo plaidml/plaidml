@@ -155,6 +155,7 @@ cc_library(
         "runtime/src/kmp_version.h",
         "runtime/src/kmp_wait_release.h",
         "runtime/src/kmp_wrapper_getpid.h",
+        "runtime/src/omp.h",
         "runtime/src/ompt-specific.h",
         "runtime/src/thirdparty/ittnotify/ittnotify_config.h",
     ],
