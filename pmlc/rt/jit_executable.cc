@@ -122,8 +122,9 @@ private:
 };
 
 struct Network;
-using SetupFunc = Network *(*)(Device *device);
-using ExecuteFunc = void (*)(Network *, MemRef::Descriptor **descriptors);
+using SetupFunc = Network *(*)(Device *device,
+                               MemRef::Descriptor **initDescriptors);
+using ExecuteFunc = void (*)(Network *, MemRef::Descriptor **execDescriptors);
 using TeardownFunc = void (*)(Network *);
 
 struct ABI {
@@ -383,7 +384,7 @@ public:
     IVLOG(3, "Building memref descriptors");
     buildMemRefDescriptors();
     IVLOG(3, "Calling setup");
-    network = abi.setupFunc(device.get());
+    network = abi.setupFunc(device.get(), initDescriptors.data());
     if (!network) {
       throw std::runtime_error("Unable to initialize the network");
     }
@@ -413,14 +414,13 @@ public:
     for (auto &bp : inputBuffers) {
       (memrefIt++)->setDataPtr(bp->data());
     }
-    for (auto &constArg : program->constants) {
-      (memrefIt++)->setDataPtr(constArg.buffer->data());
-    }
     for (auto &bp : outputBuffers) {
       (memrefIt++)->setDataPtr(bp->data());
     }
-    IVLOG(3, "Running executable");
-    abi.executeFunc(network, descriptors.data());
+    IVLOG(3, "Running executable - inputs="
+                 << inputBuffers.size() << " outputs=" << outputBuffers.size());
+    auto *data = execDescriptors.data();
+    abi.executeFunc(network, data);
     IVLOG(3, "Executable complete");
     if (VLOG_IS_ON(1)) {
       stopWatch.stop();
@@ -430,17 +430,23 @@ public:
   }
 
   void buildMemRefDescriptors() {
+    IVLOG(3, "Building descriptors - inputs="
+                 << program->inputs.size()
+                 << " outputs=" << program->outputs.size()
+                 << " constants=" << program->constants.size());
+
     for (auto type : program->inputs) {
       memrefs.emplace_back(type.cast<RankedTensorType>());
-      descriptors.push_back(memrefs.back().getDescriptor());
-    }
-    for (const compiler::ConstantArgument &arg : program->constants) {
-      memrefs.emplace_back(arg.type.cast<RankedTensorType>());
-      descriptors.push_back(memrefs.back().getDescriptor());
+      execDescriptors.push_back(memrefs.back().getDescriptor());
     }
     for (auto type : program->outputs) {
       memrefs.emplace_back(type.cast<RankedTensorType>());
-      descriptors.push_back(memrefs.back().getDescriptor());
+      execDescriptors.push_back(memrefs.back().getDescriptor());
+    }
+    for (const compiler::ConstantArgument &arg : program->constants) {
+      auto &memref = memrefs.emplace_back(arg.type.cast<RankedTensorType>());
+      memref.setDataPtr(arg.buffer->data());
+      initDescriptors.push_back(memref.getDescriptor());
     }
   }
 
@@ -449,7 +455,8 @@ private:
   std::shared_ptr<Device> device;
   std::unique_ptr<EngineImpl> impl;
   std::vector<MemRef> memrefs;
-  std::vector<MemRef::Descriptor *> descriptors;
+  std::vector<MemRef::Descriptor *> initDescriptors;
+  std::vector<MemRef::Descriptor *> execDescriptors;
   ABI abi;
   Network *network = nullptr;
 };

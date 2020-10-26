@@ -207,24 +207,80 @@ private:
     // Create plaidml_init().
 
     mlir::OpBuilder::InsertionGuard insertionGuard{rewriter};
-    auto initArgTypes = loopOp.initRegion().getArgumentTypes();
-    auto initSrcType = rewriter.getFunctionType(
-        initArgTypes, hasNetworkFields
-                          ? mlir::TypeRange{networkTy.getPointerTo()}
-                          : getVoidPtrType());
-    mlir::TypeConverter::SignatureConversion initSigConversion{
-        loopOp.initRegion().getNumArguments()};
-    auto initType = typeConverter.convertFunctionSignature(initSrcType,
-                                                           /*isVariadic=*/false,
-                                                           initSigConversion);
+    auto argTypes = loopOp.initRegion().getArgumentTypes();
+    auto argIt = argTypes.begin();
+
+    LLVMType devicePtrTy;
+    if (loopOp.initRegion().getNumArguments() == 0) {
+      devicePtrTy = getVoidPtrType();
+    } else {
+      devicePtrTy = (*argIt++).cast<LLVMType>();
+    }
+
+    mlir::SmallVector<LLVMType, 8> initFieldTypes;
+    LLVMType initTy;
+    LLVMType initPtrTy;
+    if (loopOp.initRegion().getNumArguments() <= 1) {
+      initPtrTy = getVoidPtrType();
+    } else {
+      for (unsigned idx = 1; idx < loopOp.initRegion().getNumArguments();
+           ++idx) {
+        auto ty = typeConverter.convertType(*argIt++).cast<LLVMType>();
+        initFieldTypes.emplace_back(ty.getPointerTo());
+      }
+      initTy = LLVMType::getStructTy(rewriter.getContext(), initFieldTypes);
+      initPtrTy = initTy.getPointerTo();
+    }
+
+    auto initType = LLVMType::getFunctionTy(
+        hasNetworkFields ? networkTy.getPointerTo() : getVoidPtrType(),
+        {devicePtrTy, initPtrTy},
+        /*isVarArg=*/false);
+
     auto initFunc = rewriter.create<LLVM::LLVMFuncOp>(
         loopOp.getLoc(), pmlc::util::kPlaidmlInit, initType);
 
-    rewriter.cloneRegionBefore(loopOp.initRegion(), initFunc.getBody(),
-                               initFunc.getBody().end());
+    // Create an entry block, and materialize the arguments for the
+    // initialization.
+    auto *initEntryBlock =
+        rewriter.createBlock(&initFunc.getBody(), initFunc.getBody().end(),
+                             {devicePtrTy, initPtrTy});
+    rewriter.setInsertionPointToStart(initEntryBlock);
+    mlir::BlockAndValueMapping mapping;
+    mapping.map(loopOp.initRegion().getArgument(0),
+                initEntryBlock->getArgument(0));
 
-    return rewriter.convertRegionTypes(&initFunc.getBody(), typeConverter,
-                                       &initSigConversion);
+    if (initTy) {
+      unsigned initArgIdx = 1;
+      auto initValue = rewriter.create<LLVM::LoadOp>(
+          rewriter.getUnknownLoc(), initEntryBlock->getArgument(1));
+      for (auto fieldIdx = 0; fieldIdx < initFieldTypes.size(); ++fieldIdx) {
+        auto ptrVal = rewriter.create<LLVM::ExtractValueOp>(
+            rewriter.getUnknownLoc(), initFieldTypes[fieldIdx], initValue,
+            rewriter.getI64ArrayAttr(fieldIdx));
+        auto fieldVal =
+            rewriter.create<LLVM::LoadOp>(rewriter.getUnknownLoc(), ptrVal);
+        auto bodyArg = loopOp.initRegion().getArgument(initArgIdx++);
+        auto argVal = typeConverter.materializeSourceConversion(
+            rewriter, rewriter.getUnknownLoc(), bodyArg.getType(),
+            mlir::ValueRange{fieldVal});
+        mapping.map(bodyArg, argVal);
+      }
+    }
+
+    rewriter.cloneRegionBefore(loopOp.initRegion(), initFunc.getBody(),
+                               initFunc.getBody().end(), mapping);
+
+    // Connect the entry block to the initial init block.  Note that it's
+    // always safe to merge the blocks: the entry block has no terminator,
+    // the initialization entry block has no predecessors (since it's an entry
+    // block), and the initialization's entry block's arguments were remapped in
+    // the cloning process.
+    auto it = initFunc.getRegion().begin();
+    ++it;
+    rewriter.mergeBlocks(&*it, initEntryBlock, mlir::None);
+
+    return rewriter.convertRegionTypes(&initFunc.getBody(), typeConverter);
   }
 
   mlir::LogicalResult
@@ -233,21 +289,18 @@ private:
             mlir::ConversionPatternRewriter &rewriter) const {
     // Create plaidml_exec().
     //
-    // The inputs to the exec function are a pointer toa network object, and a
+    // The inputs to the exec function are a pointer to a network object, and a
     // pointer to a struct with per-iteration parameters; each struct field is a
     // pointer to the LLVM type of the corresponding entry block argument
     // (the arguments after the arguments passed via the network structure).
 
     mlir::OpBuilder::InsertionGuard insertionGuard{rewriter};
-
-    mlir::SmallVector<LLVMType, 8> iterationTypes;
     mlir::SmallVector<LLVMType, 8> iterationFieldTypes;
     for (unsigned idx = loopOp.getNumNetworkFields();
          idx < loopOp.bodyRegion().getNumArguments(); ++idx) {
       auto ty = typeConverter
                     .convertType(loopOp.bodyRegion().getArgument(idx).getType())
                     .cast<LLVMType>();
-      iterationTypes.emplace_back(ty);
       iterationFieldTypes.emplace_back(ty.getPointerTo());
     }
     auto iterationTy =

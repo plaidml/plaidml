@@ -42,12 +42,7 @@ void LowerToABIPass::runOnOperation() {
   auto loopOp = builder.create<abi::LoopOp>(loc);
 
   // Initialize the loop's body by taking the main function's body.
-  // N.B. We created the loop with the same argument types, so the entry
-  // block will be compatible with the loop's signature.
   loopOp.bodyRegion().takeBody(mainFunc.getBody());
-
-  // We no longer need the main function.
-  mainFunc.erase();
 
   // A function's blocks can end with std.return; since std.return expects its
   // parent to be std.func, we need to replace any cloned top-level std.return
@@ -64,64 +59,65 @@ void LowerToABIPass::runOnOperation() {
   // Add an entry block for the init region.
   auto *initEntryBlock = builder.createBlock(&loopOp.initRegion());
 
-  // Reorder the non-memref parameters in the body entry block.
+  // Non-constant arguments will vary from invocation to invocation; they are
+  // intrinsically parameters of the body entry block.  Constant arguments do
+  // not vary; we pass them to the initializtion block, which can then pass them
+  // on to the body as needed.
   //
-  // Memrefs will vary from invocation to invocation; they are intrinsically
-  // parameters of the body entry block.  Non-memrefs are all going to be passed
-  // via the network structure, so we reorder them in the body entry block,
-  // putting them at the front of the argument list and plumbing them in
-  // through the init block's parameters and the CreateNetworkOp terminator of
-  // the init block.
-  //
-  // TODO: We should distinguish weight memrefs (constants) and non-weight
-  //       memrefs (actual network inputs).  It might also be interesting to
-  //       allow non-memrefs to vary from run to run.  Perhaps we could signify
-  //       const-over-the-network-lifetime via attributes?
-  //
-  // TODO: We should package up the arguments into a pointer to a struct
-  //       of pointers, exactly the way we do with the variable number of
-  //       memrefs we pass to the loop body.  For now, we assume that there's
-  //       only a single argument -- the execution device parameter; we fail
-  //       if we see more than this, and add one if it's missing (which is
-  //       just there to support the CPU target, for now).
+  // At this point, all of the arguments should be memrefs, except for a
+  // possible initial device argument -- which, if present, is always passed
+  // to the initialization block.
   auto *bodyEntryBlock = loopOp.bodyEntryBlock();
-  mlir::Optional<unsigned> firstMemrefIdx;
-  for (unsigned idx = 0; idx < bodyEntryBlock->getNumArguments(); ++idx) {
-    auto arg = bodyEntryBlock->getArgument(idx);
-    auto ty = arg.getType();
-    if (ty.isa<mlir::MemRefType>()) {
-      firstMemrefIdx = idx;
-      continue;
-    }
-    if (firstMemrefIdx.hasValue()) {
-      auto newArg =
-          bodyEntryBlock->insertArgument(firstMemrefIdx.getValue(), ty);
-      arg.replaceAllUsesWith(newArg);
-      bodyEntryBlock->eraseArgument(idx + 1);
-    }
-    initEntryBlock->addArgument(ty);
-  }
-  if (1 < initEntryBlock->getNumArguments()) {
-    loopOp.emitError("Expected at most one non-memref argument");
-    signalPassFailure();
-    return;
+  unsigned argIdx = 0;
+  mlir::Identifier constAttrId = builder.getIdentifier("tile.const");
+  if (bodyEntryBlock->getNumArguments() == 0 ||
+      bodyEntryBlock->getArgument(0)
+          .getType()
+          .isa<mlir::MemRefType, mlir::UnrankedMemRefType>()) {
+    // The body entry block started with a memref (or didn't have any
+    // arguments --we should always have at least *one* argument, but we handle
+    // the no-argument case for completeness).  So, create a fake device
+    // parameter.
+    initEntryBlock->addArgument(
+        LLVMType::getInt8Ty(&getContext()).getPointerTo());
+  } else {
+    initEntryBlock->addArgument(bodyEntryBlock->getArgument(0).getType());
+    ++argIdx;
   }
 
   mlir::SmallVector<mlir::Value, 8> networkArgs;
-  for (auto &arg : initEntryBlock->getArguments()) {
-    networkArgs.emplace_back(arg);
-  }
-
-  if (!initEntryBlock->getNumArguments()) {
-    // Add a fake device parameter for ABI compatibility, but do not
-    // pass it along to the body.
-    auto ty = LLVMType::getInt8Ty(&getContext()).getPointerTo();
-    initEntryBlock->addArgument(ty);
+  mlir::SmallVector<mlir::Type, 8> networkTypes;
+  while (argIdx < bodyEntryBlock->getNumArguments()) {
+    auto arg = bodyEntryBlock->getArgument(argIdx);
+    if (!arg.getType().isa<mlir::MemRefType, mlir::UnrankedMemRefType>()) {
+      mainFunc.emitError(
+          "Expected only memrefs after an optional device parameter");
+      signalPassFailure();
+      return;
+    }
+    auto constAttr =
+        mainFunc.getArgAttrOfType<mlir::IntegerAttr>(argIdx, constAttrId);
+    if (constAttr) {
+      auto ty = arg.getType();
+      auto newArg = bodyEntryBlock->insertArgument(networkArgs.size(), ty);
+      arg.replaceAllUsesWith(newArg);
+      bodyEntryBlock->eraseArgument(argIdx + 1);
+      initEntryBlock->addArgument(ty);
+      networkArgs.emplace_back(
+          initEntryBlock->getArgument(initEntryBlock->getNumArguments() - 1));
+      networkTypes.emplace_back(ty);
+    }
+    ++argIdx;
   }
 
   // Terminate the init block using a passthrough of the
   // init block's arguments.
   builder.create<abi::CreateNetworkOp>(loc, networkArgs);
+
+  loopOp.setNetworkFieldTypes(networkTypes);
+
+  // We no longer need the main function.
+  mainFunc.erase();
 }
 
 } // namespace

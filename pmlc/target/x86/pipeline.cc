@@ -221,7 +221,8 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
-  pm.addPass(pmlc::conversion::scf_to_omp::createLowerSCFToOpenMPPass());
+  // TODO: Debug what causes this to fail.
+  // pm.addPass(pmlc::conversion::scf_to_omp::createLowerSCFToOpenMPPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
