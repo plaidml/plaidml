@@ -19,8 +19,8 @@ project(PlaidML LANGUAGES CXX C)
 
 include(FetchContent)
 
-
-SET(LLVM_COMMIT f00f71b2a279449c04796e28b3b7bb0e06c945bf)
+# TODO - dedupe from workspace.bzl
+SET(LLVM_COMMIT b3f1f66eddd9ed4e3caf6043344b17f5b0920bb0)
 #-------------------------------------------------------------------------------
 # Third party: llvm/mlir
 #-------------------------------------------------------------------------------
@@ -41,7 +41,7 @@ FetchContent_Declare(
   llvm_project
   FETCHCONTENT_QUIET OFF
   URL https://github.com/plaidml/llvm-project/archive/${LLVM_COMMIT}.tar.gz
-  URL_HASH SHA256=88fccbb163aac6192d572ce3ed1538a2f6e4eb9341c529ecccba502bb2f0d144
+  URL_HASH SHA256=217fb2d6b249e886d6954612ff65dbf834a418e1f1c835c47445722afb5a54be
 )
 FetchContent_GetProperties(llvm_project)
 if(NOT llvm_project_POPULATED)
@@ -58,9 +58,9 @@ include_directories(${MLIR_INCLUDE_DIRS})
 include_directories(${PROJECT_SOURCE_DIR}/include)
 include_directories(${PROJECT_BINARY_DIR}/include)
 
-#####
+#############
 # Easylogging
-####
+#############
 FetchContent_Declare(
   easyloggingpp
   FETCHCONTENT_QUIET OFF
@@ -75,9 +75,21 @@ if(NOT easyloggingpp_POPULATED)
 endif()
 include_directories(${easyloggingpp_SOURCE_DIR}/src)
 
-#####
+#########
 # Plaidml
-#####
+#########
+
+set(PML_IDE_FOLDER PML)
+set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+list(APPEND CMAKE_MODULE_PATH
+  ${CMAKE_CURRENT_LIST_DIR}/cmake/
+)
+
+include(pml_copts)
+include(pml_macros)
+include(pml_cc_binary)
+include(pml_cc_library)
+
 
 # C++
 list(APPEND PMLC_DEFAULT_COPTS -Wno-c++17-extensions)

@@ -10,12 +10,10 @@ add_mlir_dialect_library(PMLCStdX
         DEPENDS
                 MLIROpAsmInterfaceIncGen
                 PMLCStdXDialectGen
-                PMLCUtilInterfacesGen
         LINK_LIBS 
                 PUBLIC 
                 MLIRIR
                 MLIRSideEffectInterfaces
-                MLIRStandardOps
  )
 target_compile_options(PMLCStdX PUBLIC ${PMLC_DEFAULT_COPTS})
 

@@ -1,24 +1,25 @@
-pmlc_add_mlir_dialect(Eltwise)
-pmlc_add_mlir_interfaces(Eltwise)
-add_mlir_doc(interfaces -gen-dialect-doc EltwiseInterfaces Eltwise/)
-add_mlir_doc(ops -gen-op-doc EltwiseOps Eltwise/)
+pmlc_add_mlir_dialect(Tile)
+pmlc_add_mlir_interfaces(Tile)
+add_mlir_doc(interfaces -gen-dialect-doc TileInterfaces Tile/)
+add_mlir_doc(ops -gen-op-doc TileOps Tile/)
 
-add_mlir_dialect_library(PMLCEltwise
+add_mlir_dialect_library(pmlc_dialect_ir_tile
         dialect.cc
+        eltwise.cc
         ops.cc
+        util.cc
 
         ADDITIONAL_HEADER_DIRS
 
         DEPENDS
                 MLIROpAsmInterfaceIncGen
-                PMLCEltwiseDialectGen
-                PMLCEltwiseInterfacesGen
-                PMLCUtilInterfacesGen
+                PMLCTileDialectGen
+                PMLCTileInterfacesGen
+                PMLCUtilEnumsGen
         LINK_LIBS 
                 PUBLIC 
                 MLIRIR
                 MLIRSideEffectInterfaces
-                MLIRStandardOps
  )
-target_compile_options(PMLCEltwise PUBLIC ${PMLC_DEFAULT_COPTS})
+target_compile_options(pmlc_dialect_ir_tile PUBLIC ${PMLC_DEFAULT_COPTS})
 

@@ -32,6 +32,21 @@ function(pmlc_add_mlir_passes namespace)
   add_dependencies(mlir-headers PMLC${namespace}PassesGen)
 endfunction()
 
+add_subdirectory(util)
 add_subdirectory(dialect)
 add_subdirectory(tools)
-add_subdirectory(util)
+
+pml_cc_library(
+  NAME
+    all_passes_and_dialects
+  DEPS
+    pmlc::dialect::tile
+    
+    MLIRAffinePassIncGen
+    MLIRConversionPassIncGen
+    MLIRGPUPassIncGen
+    MLIRLinalgPassIncGen
+    MLIRLLVMPassIncGen
+    MLIRTransformsPassIncGen
+    MLIRStandardTransformsIncGen
+)
