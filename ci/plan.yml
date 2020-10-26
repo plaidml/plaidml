@@ -176,7 +176,7 @@ SUITES:
               - --plaidml_target=intel_gen_ocl_spirv
               - --plaidml_device=opencl.0
               - --skip_test_file=edsl_test-skip.intel_gen_ocl_spirv.txt
-              
+
       # mnist_mlp:
       #   args: [mnist_mlp_test.py]
       #   precision: untested
@@ -249,8 +249,6 @@ SUITES:
           pml-mtl-uhd630:
             prepend_args: [--examples=256]
       mobilenet:
-        expected: "could not broadcast input array from shape (3,2048) into shape (1,2048)"
-        soft_fail: true
         precision: high
         skip_platforms:
           - pml-vk-gen
@@ -304,8 +302,6 @@ SUITES:
           - pml-vk-gen
           - pml-ocl-gen
       xception:
-        expected: "Unrecognized data_format"
-        soft_fail: true
         precision: high
         skip_platforms:
           - pml-vk-gen
