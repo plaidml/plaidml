@@ -1,0 +1,1 @@
+{"compile_duration": 12.060444355010986, "duration_per_example": 0.02133624185808003, "tile_duration_per_example": 1e-09, "examples": 1024, "batch_size": 1, "model": "resnet50", "backend": "plaid", "correct": true, "max_error": 9.301000318373553e-06, "max_abs_error": 7.897615432739258e-07, "fail_ratio": 0.0}

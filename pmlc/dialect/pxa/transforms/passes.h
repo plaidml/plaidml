@@ -15,7 +15,8 @@ struct StencilCost {
   unsigned startupCost;
 };
 
-using StencilCostFunction = std::function<StencilCost(llvm::ArrayRef<int64_t>)>;
+using StencilCostFunction = std::function<StencilCost(
+    llvm::ArrayRef<int64_t>, llvm::ArrayRef<mlir::Type>)>;
 
 std::unique_ptr<mlir::Pass> createAffineNormalizePass();
 std::unique_ptr<mlir::Pass> createAffineNormalizePass(bool promote);
@@ -25,6 +26,9 @@ std::unique_ptr<mlir::Pass> createAutoTileExamplePass();
 std::unique_ptr<mlir::Pass> createBufferPlacementPass();
 
 std::unique_ptr<mlir::Pass> createCachePass();
+
+std::unique_ptr<mlir::Pass> createCPUThreadPass();
+std::unique_ptr<mlir::Pass> createCPUThreadPass(unsigned threads);
 
 std::unique_ptr<mlir::Pass>
 createFusionPass(int64_t memoryActivityThreshold = 0, bool exactlyMatch = false,
@@ -41,9 +45,12 @@ createMemRefDataFlowOptPass(bool onlyParallelNested = false);
 std::unique_ptr<mlir::Pass> createNestLoopsPass();
 std::unique_ptr<mlir::Pass> createNestLoopsPass(unsigned minLoopIVs);
 
-std::unique_ptr<mlir::Pass> createResizeTmpsPass();
+std::unique_ptr<mlir::Pass>
+createResizeTmpsPass(bool onlyParallelNested = false);
 
+std::unique_ptr<mlir::Pass> createStencilGEMMPass();
 std::unique_ptr<mlir::Pass> createStencilGEMMPass(unsigned numThreads,
+                                                  bool doBatch,
                                                   StencilCostFunction costFn);
 
 std::unique_ptr<mlir::Pass> createSubgroupsPass();

@@ -25,13 +25,17 @@ public:
            spirv::Capability::Groups, spirv::Capability::SubgroupDispatch,
            spirv::Capability::Int64, spirv::Capability::Int16,
            spirv::Capability::Int8, spirv::Capability::Float64,
-           spirv::Capability::Float16,
-           spirv::Capability::GroupNonUniformBallot},
-          mlir::ArrayRef<spirv::Extension>(), &getContext());
+           spirv::Capability::Float16, spirv::Capability::GroupNonUniformBallot,
+           spirv::Capability::SubgroupBufferBlockIOINTEL},
+          mlir::ArrayRef<spirv::Extension>(
+              spirv::Extension::SPV_INTEL_subgroups),
+          &getContext());
       getOperation().setAttr(
           spirv::getTargetEnvAttrName(),
           spirv::TargetEnvAttr::get(
-              triple, spirv::getDefaultResourceLimits(&getContext())));
+              triple, spirv::Vendor::Unknown, spirv::DeviceType::Unknown,
+              spirv::TargetEnvAttr::kUnknownDeviceID,
+              spirv::getDefaultResourceLimits(&getContext())));
     }
   }
 };

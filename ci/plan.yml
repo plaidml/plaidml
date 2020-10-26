@@ -98,6 +98,8 @@ SUITES:
         pipelines: [nightly, plaidml]
       pml-vk-gen:
         pipelines: [nightly, plaidml]
+      pml-ocl-gen:
+        pipelines: [nightly, plaidml]
     params:
       plaidml:
         batch_sizes: [1]
@@ -169,6 +171,12 @@ SUITES:
               - --plaidml_target=intel_gen
               - --plaidml_device=vulkan.0
               - --skip_test_file=edsl_test-skip.intel_gen.txt
+          pml-ocl-gen:
+            args:
+              - --plaidml_target=intel_gen_ocl_spirv
+              - --plaidml_device=opencl.0
+              - --skip_test_file=edsl_test-skip.intel_gen_ocl_spirv.txt
+              
       # mnist_mlp:
       #   args: [mnist_mlp_test.py]
       #   precision: untested
@@ -191,7 +199,7 @@ SUITES:
       pml-vk-gen:
         pipelines: [nightly, plaidml]
       pml-ocl-gen:
-        pipelines: [ci]
+        pipelines: [nightly, plaidml, ci]
     params:
       ci:
         batch_sizes: [1]
@@ -265,10 +273,10 @@ SUITES:
         platform_overrides:
           pml-vk-gen:
             prepend_args: [--examples=128]
-            perf_threshold: 0.01
+            perf_threshold: 0.33
           pml-ocl-gen:
-            prepend_args: [--examples=128]
-            perf_threshold: 0.01
+            prepend_args: [--examples=4]
+            perf_threshold: 0.33
           pml-llvm-cpu:
             prepend_args: [--examples=128]
           pml-ocl-gfx804:

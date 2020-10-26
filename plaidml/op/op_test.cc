@@ -57,7 +57,7 @@ TEST_F(OpTest, BroadcastNoOp) {
   auto program = makeProgram("broadcast_nop", {A}, {C});
 
   std::vector<float> A_input = {0, 1, 2};
-  checkProgram(program, {A_input}, {A_input});
+  checkExact(program, {A_input}, {A_input});
 }
 
 TEST_F(OpTest, BroadcastScalar) {
@@ -71,7 +71,7 @@ TEST_F(OpTest, BroadcastScalar) {
   std::vector<float> C_output = {3, 3, 3, 3,  //
                                  3, 3, 3, 3,  //
                                  3, 3, 3, 3};
-  checkProgram(program, {A_input}, {C_output});
+  checkExact(program, {A_input}, {C_output});
 }
 
 TEST_F(OpTest, BroadcastNoOpLarge) {
@@ -84,7 +84,7 @@ TEST_F(OpTest, BroadcastNoOpLarge) {
   std::vector<float> A_input = {0, 1, 2, 3,  //
                                 0, 1, 2, 3,  //
                                 0, 1, 2, 3};
-  checkProgram(program, {A_input}, {A_input});
+  checkExact(program, {A_input}, {A_input});
 }
 
 TEST_F(OpTest, BroadcastNumpy) {
@@ -109,7 +109,7 @@ TEST_F(OpTest, BroadcastNumpy) {
                                  0, 1, 2,  //
                                  0, 1, 2,  //
                                  0, 1, 2};
-  checkProgram(program, {A_input}, {C_output});
+  checkExact(program, {A_input}, {C_output});
 }
 
 TEST_F(OpTest, BroadcastNumpy2) {
@@ -123,7 +123,7 @@ TEST_F(OpTest, BroadcastNumpy2) {
   std::vector<float> C_output = {0, 0, 0, 0,  //
                                  1, 1, 1, 1,  //
                                  2, 2, 2, 2};
-  checkProgram(program, {A_input}, {C_output});
+  checkExact(program, {A_input}, {C_output});
 }
 
 TEST_F(OpTest, BroadcastNumpy3) {
@@ -138,7 +138,7 @@ TEST_F(OpTest, BroadcastNumpy3) {
                                  0, 1, 2,  //
                                  0, 1, 2,  //
                                  0, 1, 2};
-  checkProgram(program, {A_input}, {C_output});
+  checkExact(program, {A_input}, {C_output});
 }
 
 TEST_F(OpTest, BroadcastNonNumpy) {
@@ -152,7 +152,7 @@ TEST_F(OpTest, BroadcastNonNumpy) {
   std::vector<float> C_output = {0, 0, 0, 0,  //
                                  1, 1, 1, 1,  //
                                  2, 2, 2, 2};
-  checkProgram(program, {A_input}, {C_output});
+  checkExact(program, {A_input}, {C_output});
 }
 
 TEST_F(OpTest, Broadcast) {
@@ -303,7 +303,7 @@ TEST_F(OpTest, ExplicitPadding) {
                                  -1, -1, -1, -1, -1,  //
                                  -1, -1, -1, -1, -1};
 
-  checkProgram(program, {I_input}, {O_output});
+  checkExact(program, {I_input}, {O_output});
 }
 
 TEST_F(OpTest, ExplicitPaddingNegInf) {
@@ -321,7 +321,7 @@ TEST_F(OpTest, ExplicitPaddingNegInf) {
                                  neg_inf, neg_inf, neg_inf, neg_inf, neg_inf,  //
                                  neg_inf, neg_inf, neg_inf, neg_inf, neg_inf};
 
-  checkProgram(program, {I_input}, {O_output});
+  checkExact(program, {I_input}, {O_output});
 }
 
 TEST_F(OpTest, ExplicitPaddingInf) {
@@ -339,7 +339,7 @@ TEST_F(OpTest, ExplicitPaddingInf) {
                                  inf, inf, inf, inf, inf,  //
                                  inf, inf, inf, inf, inf};
 
-  checkProgram(program, {I_input}, {O_output});
+  checkExact(program, {I_input}, {O_output});
 }
 
 // TODO: Consider writing a folder for this test case.
@@ -353,7 +353,7 @@ TEST_F(OpTest, ExplicitPaddingNoOp) {
   std::vector<float> O_output = {1, 2, 3,  //
                                  4, 5, 6};
 
-  checkProgram(program, {I_input}, {O_output});
+  checkExact(program, {I_input}, {O_output});
 }
 
 TEST_F(OpTest, Flip) {
@@ -495,15 +495,13 @@ TEST_F(OpTest, ReorgYoloDecrease) {
   auto I = Placeholder(DType::INT64, {N, C, H, W});
   auto O = op::reorg_yolo(I, S, decrease);
   auto program = makeProgram("reorg_yolo", {I}, {O});
-  IVLOG(1, "program:\n" << program);
 
   std::vector<int64_t> I_input(N * C * H * W);
   for (unsigned i = 0; i < I_input.size(); i++) {
     I_input[i] = i;
   }
   auto O_expected = reorgYoloRefImpl(I_input, N, C, H, W, S, decrease);
-  IVLOG(1, "expected:\n" << O_expected);
-  checkProgram(program, {I_input}, {O_expected});
+  checkExact(program, {I_input}, {O_expected});
 }
 
 TEST_F(OpTest, ReorgYoloIncrease) {
@@ -514,15 +512,23 @@ TEST_F(OpTest, ReorgYoloIncrease) {
   auto I = Placeholder(DType::INT64, {N, C, H, W});
   auto O = op::reorg_yolo(I, S, decrease);
   auto program = makeProgram("reorg_yolo", {I}, {O});
-  IVLOG(1, "program:\n" << program);
 
   std::vector<int64_t> I_input(N * C * H * W);
   for (unsigned i = 0; i < I_input.size(); i++) {
     I_input[i] = i;
   }
   auto O_expected = reorgYoloRefImpl(I_input, N, C_out, H_out, W_out, S, decrease);
-  IVLOG(1, "expected:\n" << O_expected);
-  checkProgram(program, {I_input}, {O_expected});
+  checkExact(program, {I_input}, {O_expected});
+}
+
+TEST_F(OpTest, ReorgYoloNHWC) {
+  const unsigned N = 1, C = 4, H = 6, W = 6, S = 2;
+  const bool decrease = true;
+
+  auto I = Placeholder(DType::INT64, {N, H, W, C});
+  auto O = op::reorg_yolo(I, S, decrease, /*layout=*/"NHWC");
+  auto program = makeProgram("reorg_yolo", {I}, {O});
+  runProgram(program);
 }
 
 TEST_F(OpTest, Repeat) {
@@ -595,7 +601,7 @@ TEST_F(OpTest, Squeeze) {
   std::vector<uint64_t> A_input = {0, 1, 2,  3,  //
                                    4, 5, 6,  7,  //
                                    8, 9, 10, 11};
-  checkProgram(program, {A_input}, {A_input});
+  checkExact(program, {A_input}, {A_input});
 }
 
 TEST_F(OpTest, Tile) {
@@ -618,7 +624,7 @@ TEST_F(OpTest, Unsqueeze) {
   std::vector<uint64_t> A_input = {0, 1, 2,  3,  //
                                    4, 5, 6,  7,  //
                                    8, 9, 10, 11};
-  checkProgram(program, {A_input}, {A_input});
+  checkExact(program, {A_input}, {A_input});
 }
 
 TEST_F(OpTest, Variance) {

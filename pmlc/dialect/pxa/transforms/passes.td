@@ -77,6 +77,16 @@ def GPUThread : FunctionPass<"pxa-gpu-thread"> {
   ];
 }
 
+def CPUThread : FunctionPass<"pxa-cpu-thread"> {
+  let summary = "Tile outmost loops for CPU threading";
+  let constructor = "pmlc::dialect::pxa::createCPUThreadPass()";
+  let options = [
+    Option<"threads", "threads", "unsigned", 
+           /*default=*/"std::thread::hardware_concurrency()",
+           "Set maximum/goal inner threads">
+  ];
+}
+
 def Localize : FunctionPass<"pxa-localize"> {
   let summary = "Push memref allocs to innermost scope";
   let constructor = "pmlc::dialect::pxa::createLocalizePass()";
@@ -104,6 +114,11 @@ def NestLoops : FunctionPass<"pxa-nest-loops"> {
 def ResizeTmps : FunctionPass<"pxa-resize-tmps"> {
   let summary = "Resize temporary buffers to minimal sizes";
   let constructor = "pmlc::dialect::pxa::createResizeTmpsPass()";
+  let options = [
+  Option<"onlyParallelNested", "only-parallel-nested", "bool",
+         /*default=*/"false",
+         "Perform resize tmp optimizations only under AffineParallel's scope.">,
+  ];
 }
 
 def Subgroups : FunctionPass<"pxa-subgroups"> {

@@ -48,6 +48,7 @@ plaidml_cc_library(
         "//pmlc/compiler",
         "//pmlc/conversion/abi_to_llvm",
         "//pmlc/conversion/pxa_to_affine",
+        "//pmlc/conversion/scf_to_omp",
         "//pmlc/conversion/stdx_to_llvm",
         "//pmlc/conversion/tile_to_pxa",
         "//pmlc/dialect/abi/transforms",
@@ -62,6 +63,7 @@ plaidml_cc_library(
         "@llvm-project//mlir:LLVMTransforms",
         "@llvm-project//mlir:SCFToStandard",
         "@llvm-project//mlir:StandardOpsTransforms",
+        "@llvm-project//mlir:OpenMPToLLVM",
     ],
 )
 

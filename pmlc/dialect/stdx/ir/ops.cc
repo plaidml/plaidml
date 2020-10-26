@@ -4,10 +4,9 @@
 
 #include "mlir/IR/OpImplementation.h"
 
-namespace pmlc::dialect::stdx {
+using namespace mlir; // NOLINT
 
-using mlir::failure;
-using mlir::success;
+namespace pmlc::dialect::stdx {
 
 // ---- ReshapeOp ----
 
@@ -48,9 +47,6 @@ verifySubgroupBlockWriteINTELOp(SubgroupBlockWriteINTELOp op) {
   return success();
 }
 
-#define GET_OP_CLASSES
-#include "pmlc/dialect/stdx/ir/ops.cc.inc"
-
 void StdXDialect::initialize() {
   addOperations<
 #define GET_OP_LIST
@@ -59,3 +55,6 @@ void StdXDialect::initialize() {
 }
 
 } // namespace pmlc::dialect::stdx
+
+#define GET_OP_CLASSES
+#include "pmlc/dialect/stdx/ir/ops.cc.inc" // NOLINT

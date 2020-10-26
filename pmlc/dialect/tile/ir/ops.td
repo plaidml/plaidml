@@ -1,32 +1,17 @@
 // Copyright 2020 Intel Corporation
 
-#ifndef __PML_TILE_BASE__
 include "pmlc/dialect/tile/ir/base.td"
-#endif
+include "pmlc/dialect/tile/ir/eltwise.td"
 
-#ifndef __PMLC_UTIL_INTERFACES__
-include "pmlc/util/interfaces.td"
-#endif
-
-def ConstantOp : TileOpWithPPV<"constant", [ConstantLike, NoSideEffect]>, HasFolder {
-  let summary = "constant operation";
-  let arguments = (ins IndexAttr:$value);
-  let results = (outs Index:$result);
-
-  let builders = [OpBuilder<
-    "OpBuilder &builder, OperationState& result, int64_t value", [{
-      auto indexType = builder.getIndexType();
-      result.addAttribute("value", builder.getIntegerAttr(indexType, value));
-      result.addTypes(indexType);
-    }]
-  >];
-
-  let extraClassDeclaration = [{
-    Attribute getValue() { return getAttr("value"); }
-  }];
+// TODO: this should be defined upstream
+def IntegerSetAttr : Attr<
+    CPred<"$_self.isa<IntegerSetAttr>()">, "IntegerSet attribute"> {
+  let storageType = [{ IntegerSetAttr }];
+  let returnType = [{ IntegerSet }];
+  let constBuilderCall = "IntegerSetAttr::get($0)";
 }
 
-def ContractionOp : TileOpWithPPV<"contract", [
+def ContractionOp : TileOp<"contract", [
   NoSideEffect,
   MaterializeOperandsOpInterface
 ]> {
@@ -46,43 +31,47 @@ def ContractionOp : TileOpWithPPV<"contract", [
   let results = (outs RankedTensorOf<[AnyScalar]>:$result);
 
   let builders = [OpBuilder<
-    "OpBuilder &builder, "
-    "OperationState& result, "
-    "Type resultType, "
-    "Value init, "
-    "ArrayRef<Value> tensors, "
-    "AggregationKind agg, "
-    "CombinationKind combo, "
-    "AffineMap sink, "
-    "ArrayRef<AffineMap> srcs, "
-    "IntegerSet cons, "
-    "StringRef name"
+    "mlir::OpBuilder &builder, "
+    "mlir::OperationState& result, "
+    "mlir::Type resultType, "
+    "mlir::Value init, "
+    "mlir::ArrayRef<mlir::Value> tensors, "
+    "util::AggregationKind agg, "
+    "util::CombinationKind combo, "
+    "mlir::AffineMap sink, "
+    "mlir::ArrayRef<mlir::AffineMap> srcs, "
+    "mlir::IntegerSet cons, "
+    "mlir::StringRef name"
   >];
 
   let extraClassDeclaration = [{
     static unsigned getNumTensors(CombinationKind combo);
-    static StringRef getSinkAttrName() { return "sink"; }
-    static StringRef getSourcesAttrName() { return "srcs"; }
-    static StringRef getConstraintsAttrName() { return "cons"; }
-    static StringRef getLowerBoundsAttrName() { return "lowerBounds"; }
-    static StringRef getUpperBoundsAttrName() { return "upperBounds"; }
+    static mlir::StringRef getSinkAttrName() { return "sink"; }
+    static mlir::StringRef getSourcesAttrName() { return "srcs"; }
+    static mlir::StringRef getConstraintsAttrName() { return "cons"; }
+    static mlir::StringRef getLowerBoundsAttrName() { return "lowerBounds"; }
+    static mlir::StringRef getUpperBoundsAttrName() { return "upperBounds"; }
 
     unsigned getNumTensors();
     unsigned getNumSymbols();
-    Value getTensor(unsigned i);
-    Value getSymbol(unsigned i);
-    AffineMap getSourceMap(unsigned i);
+    mlir::Value getTensor(unsigned i);
+    mlir::Value getSymbol(unsigned i);
+    mlir::AffineMap getSourceMap(unsigned i);
 
-    void setLowerBounds(ArrayRef<int64_t> bounds);
-    void setUpperBounds(ArrayRef<int64_t> bounds);
-    void setSink(AffineMap sink);
-    void setSources(ArrayRef<AffineMap> srcs);
-    void setConstraints(IntegerSet cons);
+    void setLowerBounds(mlir::ArrayRef<int64_t> bounds);
+    void setUpperBounds(mlir::ArrayRef<int64_t> bounds);
+    void setSink(mlir::AffineMap sink);
+    void setSources(mlir::ArrayRef<mlir::AffineMap> srcs);
+    void setConstraints(mlir::IntegerSet cons);
 
-    RankedTensorType getResultType() { return result().getType().cast<RankedTensorType>(); }
+    mlir::RankedTensorType getResultType() { return result().getType().cast<mlir::RankedTensorType>(); }
 
-    LogicalResult materializeOperands(OpBuilder& builder);
+    mlir::LogicalResult materializeOperands(mlir::OpBuilder& builder);
   }];
+
+  let printer = [{ print$cppClass(&p, *this); }];
+  let parser = [{ return parse$cppClass(&parser, result); }];
+  let verifier = [{ return verify$cppClass(*this); }];
 }
 
 class SpecialOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
@@ -93,7 +82,7 @@ class MaterializeOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
     MaterializeOperandsOpInterface
   ])> {
   let extraClassDeclaration = [{
-    LogicalResult materializeOperands(OpBuilder& builder);
+    mlir::LogicalResult materializeOperands(mlir::OpBuilder& builder);
   }];
 }
 
@@ -103,12 +92,16 @@ def GatherOp : MaterializeOp<"gather"> {
     RankedTensorOf<[AnyScalar]>:$tensor,
     RankedTensorOf<[AnyInteger]>:$dims);
   let results = (outs RankedTensorOf<[AnyScalar]>:$result);
+  let assemblyFormat = [{
+    $tensor $dims attr-dict `:` functional-type(operands, $result)
+  }];
 }
 
 def IndexOp : SpecialOp<"index"> {
   let summary = "tensor index lookup operation";
-  let arguments = (ins APIntAttr:$axis, Variadic<EltwiseIndex>:$dims);
+  let arguments = (ins IndexAttr:$axis);
   let results = (outs EltwiseIndex:$result);
+  let assemblyFormat = "$axis attr-dict `:` type($result)";
 }
 
 def PrngOp : SpecialOp<"prng"> {
@@ -117,6 +110,7 @@ def PrngOp : SpecialOp<"prng"> {
   let results = (outs
     RankedTensorOf<[AnyFloat]>:$result,
     RankedTensorOf<[UI32]>:$new_state);
+  let assemblyFormat = "$state attr-dict `:` functional-type($state, results)";
 }
 
 def ReshapeOp : MaterializeOp<"reshape">,
@@ -125,7 +119,7 @@ def ReshapeOp : MaterializeOp<"reshape">,
   let arguments = (ins RankedTensorOf<[AnyScalar]>:$tensor);
   let results = (outs RankedTensorOf<[AnyScalar]>:$result);
   let assemblyFormat = [{
-    $tensor attr-dict `:` functional-type(operands, results)
+    $tensor attr-dict `:` functional-type($tensor, $result)
   }];
 }
 
@@ -135,12 +129,18 @@ def ScatterOp : MaterializeOp<"scatter"> {
     RankedTensorOf<[AnyScalar]>:$tensor,
     RankedTensorOf<[AnyInteger]>:$dims);
   let results = (outs RankedTensorOf<[AnyScalar]>:$result);
+  let assemblyFormat = [{
+    $tensor $dims attr-dict `:` functional-type(operands, $result)
+  }];
 }
 
 def ShapeOp : MaterializeOp<"shape"> {
   let summary = "tensor shape operation";
   let arguments = (ins RankedTensorOf<[AnyScalar]>:$tensor);
   let results = (outs RankedTensorOf<[SI32]>:$result);
+  let assemblyFormat = [{
+    $tensor attr-dict `:` functional-type($tensor, $result)
+  }];
 }
 
 def PragmaOp : MaterializeOp<"pragma", [
@@ -151,8 +151,11 @@ def PragmaOp : MaterializeOp<"pragma", [
   let results = (outs AnyType:$result);
 
   let builders = [OpBuilder<
-    "OpBuilder &builder, OperationState& result, Value tensor, StringRef op,"
-      "DictionaryAttr attrs", [{
+    "mlir::OpBuilder &builder, "
+    "mlir::OperationState& result, "
+    "mlir::Value tensor, "
+    "mlir::StringRef op, "
+    "mlir::DictionaryAttr attrs", [{
       result.addTypes(tensor.getType());
       result.addOperands(tensor);
       result.addAttribute("op", builder.getStringAttr(op));
@@ -160,7 +163,5 @@ def PragmaOp : MaterializeOp<"pragma", [
     }]
   >];
 
-  let assemblyFormat = [{
-    $tensor $op $attrs attr-dict `:` type($tensor)
-  }];
+  let assemblyFormat = "$tensor $op $attrs attr-dict `:` type($tensor)";
 }

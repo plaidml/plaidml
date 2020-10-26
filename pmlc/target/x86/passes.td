@@ -6,10 +6,7 @@ include "mlir/Pass/PassBase.td"
 def ConvertPXAToAffine : Pass<"x86-convert-pxa-to-affine", "mlir::ModuleOp"> {
   let summary = "Convert PXA dialect to Affine dialect";
   let constructor = "pmlc::target::x86::createLowerPXAToAffinePass()";
-  let dependentDialects = [
-    "dialect::xsmm::XSMMDialect",
-    "mlir::AffineDialect"
-  ];
+  let dependentDialects = ["dialect::xsmm::XSMMDialect", "mlir::AffineDialect"];
 }
 
 def ConvertStandardToLLVM : Pass<"x86-convert-std-to-llvm", "mlir::ModuleOp"> {

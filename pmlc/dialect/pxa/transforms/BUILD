@@ -26,6 +26,7 @@ plaidml_cc_library(
         "autotile.cc",
         "buffer_placement.cc",
         "cache.cc",
+        "cpu_thread.cc",
         "dataflow_opt.cc",
         "fusion.cc",
         "gpu_thread.cc",
@@ -54,7 +55,6 @@ plaidml_cc_library(
     ],
     deps = [
         ":gen-pass",
-        "//pmlc/dialect/eltwise/ir",
         "//pmlc/dialect/pxa/analysis",
         "//pmlc/dialect/pxa/ir",
         "//pmlc/dialect/xsmm/ir",

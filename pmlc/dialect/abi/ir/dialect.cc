@@ -2,12 +2,12 @@
 
 #include "pmlc/dialect/abi/ir/dialect.h"
 
+#define GET_OP_CLASSES
+#include "pmlc/dialect/abi/ir/ops.cc.inc"
+
 namespace pmlc::dialect::abi {
 
 using namespace mlir; // NOLINT
-
-#define GET_OP_CLASSES
-#include "pmlc/dialect/abi/ir/ops.cc.inc"
 
 void ABIDialect::initialize() {
   addOperations<

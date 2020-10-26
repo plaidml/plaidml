@@ -101,12 +101,15 @@ struct FusionInfo {
 
   // Helper to perform loop transformations, so the loops can be fused
   void loopTransformations(AffineParallelOp outer, AffineParallelOp inner,
-                           bool needsTiling) {
+                           bool needsTiling, int64_t vectorWidth) {
     if (tiledFusion && needsTiling) {
-      inner.walk([&](AffineParallelOp par) { vectorizeOverOutputs(par, 8); });
+      inner.walk([&](AffineParallelOp par) {
+        vectorizeOverOutputs(par, vectorWidth);
+      });
 
       // Try to 'vector cache' any remaining innermost loads
-      outer.walk([&](PxaLoadOp load) { cacheLoadAsVector(inner, load, 8); });
+      outer.walk(
+          [&](PxaLoadOp load) { cacheLoadAsVector(inner, load, vectorWidth); });
 
       // Convert local allocations to vector types
       outer.walk([&](AllocOp alloc) { vectorizeBuffer(alloc); });
@@ -211,6 +214,8 @@ struct FusionInfo {
       auto sameSubgroups = subgroupSizeA == subgroupSizeB;
       if (mulA != mulB) {
         auto tileSize = reverseFusion ? sizeA / sizeB : sizeB / sizeA;
+        if (!tileSize)
+          return false;
         if (reverseFusion && (subgroupSizeA == 1 || sameSubgroups)) {
           aInfo.tileSizes.push_back(tileSize);
           aInfo.needsTiling = true;
@@ -301,6 +306,11 @@ struct FusionInfo {
 
     auto aRap = computeThisRelativeAccess(opA);
     auto bRap = computeThisRelativeAccess(opB);
+    // Fail if getting Rap is unsuccessfull
+    if (!aRap || !bRap) {
+      undoTilings();
+      return false;
+    }
     auto isAliased = hasPerfectAliasing(*aRap, *bRap, bToA);
     IVLOG(3, "isAliased: " << isAliased);
 
@@ -308,6 +318,10 @@ struct FusionInfo {
       IVLOG(3, "  RAW: " << debugString(*raw.second));
       auto aRap = computeThisRelativeAccess(raw.first);
       auto bRap = computeThisRelativeAccess(raw.second);
+      if (!aRap || !bRap) {
+        undoTilings();
+        return false;
+      }
       auto ret = hasPerfectAliasing(*aRap, *bRap, bToA);
       IVLOG(3, "  isAliased: " << ret);
       if (!ret) {
@@ -320,6 +334,10 @@ struct FusionInfo {
       IVLOG(3, "  WAW: " << debugString(*waw.second));
       auto aRap = computeThisRelativeAccess(waw.first);
       auto bRap = computeThisRelativeAccess(waw.second);
+      if (!aRap || !bRap) {
+        undoTilings();
+        return false;
+      }
       auto ret = hasPerfectAliasing(*aRap, *bRap, bToA);
       IVLOG(3, "  isAliased: " << ret);
       if (!ret) {
@@ -496,14 +514,15 @@ struct FusionInfo {
     clearTags(aInfo.op);
     clearTags(bInfo.op);
 
+    auto subgroupSize = pmlc::getIntegerTag(apC, "subgroupSize", 1);
     // Move the two parallel for's inside the new op
     if (reverseFusion) {
       aInfo.op.getOperation()->moveBefore(apC.getBody(), apC.getBody()->end());
-      loopTransformations(apC, aInfo.op, aInfo.needsTiling);
+      loopTransformations(apC, aInfo.op, aInfo.needsTiling, subgroupSize);
       bInfo.op.getOperation()->moveBefore(apC.getBody(), apC.getBody()->end());
     } else {
       bInfo.op.getOperation()->moveBefore(apC.getBody(), apC.getBody()->end());
-      loopTransformations(apC, bInfo.op, bInfo.needsTiling);
+      loopTransformations(apC, bInfo.op, bInfo.needsTiling, subgroupSize);
       aInfo.op.getOperation()->moveBefore(apC.getBody(),
                                           apC.getBody()->begin());
     }

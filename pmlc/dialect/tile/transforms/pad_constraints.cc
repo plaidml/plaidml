@@ -11,15 +11,13 @@
 #include "mlir/IR/AffineMap.h"
 #include "mlir/Pass/Pass.h"
 
-#include "pmlc/dialect/eltwise/ir/ops.h"
 #include "pmlc/dialect/tile/ir/ops.h"
 #include "pmlc/dialect/tile/transforms/padding.h"
 #include "pmlc/dialect/tile/transforms/pass_detail.h"
 
-namespace pmlc::dialect::tile {
+using namespace mlir; // NOLINT
 
-using mlir::AffineExpr;
-using mlir::AffineMap;
+namespace pmlc::dialect::tile {
 
 namespace {
 
@@ -69,7 +67,7 @@ void PadConstraintsPass::runOnFunction() {
 
     for (unsigned i = 0; i < op.getNumTensors(); i++) {
       auto tensor = op.getTensor(i);
-      auto rankedTensorType = tensor.getType().cast<mlir::RankedTensorType>();
+      auto rankedTensorType = tensor.getType().cast<RankedTensorType>();
       if (!rankedTensorType.hasStaticShape()) {
         op.emitRemark("padding cannot support dynamic memref sizes");
         return;
@@ -120,12 +118,12 @@ void PadConstraintsPass::runOnFunction() {
 
     // Check if it's a block argument, and if so add an IdentOp to copy the
     // value.
-    if (auto arg = def.dyn_cast<mlir::BlockArgument>()) {
+    if (auto arg = def.dyn_cast<BlockArgument>()) {
       auto block = arg.getOwner();
       auto loc = block->getParentOp()->getLoc();
       OpBuilder inner(block->getParent());
       // Construct an initial identity operation.
-      auto ident = inner.create<eltwise::IdentOp>(loc, arg.getType(), arg);
+      auto ident = inner.create<IdentOp>(loc, arg.getType(), arg);
       // Replace all uses with ident (except for newly generated use).
       arg.replaceAllUsesExcept(ident, llvm::SmallPtrSet<Operation *, 1>{ident});
       // Now use ident for all further work.
@@ -161,7 +159,7 @@ void PadConstraintsPass::runOnFunction() {
       if (!getPaddingInfo(in.getDefiningOp()))
         continue;
       // Get the tensor and the map associated with the tensor
-      auto ttype = in.getType().cast<mlir::TensorType>();
+      auto ttype = in.getType().cast<TensorType>();
       auto map = op.getSourceMap(i);
       // The should have the same rank.
       assert(ttype.getRank() == map.getNumResults());
@@ -204,7 +202,7 @@ void PadConstraintsPass::runOnFunction() {
         // It seems wasteful to intern a temporary integer set, but any other
         // way of doing this is also annoying given the current class structures
         auto set = makeConstraintSet(numDims, cons);
-        mlir::FlatAffineConstraints fac(set);
+        FlatAffineConstraints fac(set);
         // Can't prove it's empty, keep constraint
         if (fac.isEmpty())
           keep = false;
@@ -257,7 +255,7 @@ llvm::Optional<PaddingInfo> getPaddingInfo(Operation *op) {
   return ret;
 }
 
-std::unique_ptr<mlir::Pass> createPadConstraintsPass() {
+std::unique_ptr<Pass> createPadConstraintsPass() {
   return std::make_unique<PadConstraintsPass>();
 }
 

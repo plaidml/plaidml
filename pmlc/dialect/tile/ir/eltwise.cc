@@ -1,6 +1,4 @@
-// Copyright 2019, Intel Corporation
-
-#include "pmlc/dialect/eltwise/ir/ops.h"
+// Copyright 2020 Intel Corporation
 
 #include <algorithm>
 #include <map>
@@ -12,17 +10,16 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Support/DebugStringHelper.h"
 
-#include "pmlc/dialect/eltwise/ir/util.h"
+#include "pmlc/dialect/tile/ir/ops.h"
+#include "pmlc/dialect/tile/ir/util.h"
 #include "pmlc/util/logging.h"
 #include "pmlc/util/util.h"
 
-#define DEBUG_TYPE "eltwise"
-
 using namespace mlir; // NOLINT
 
-namespace pmlc::dialect::eltwise {
+namespace pmlc::dialect::tile {
 
-OpFoldResult ScalarConstantOp::fold(ArrayRef<Attribute> operands) {
+OpFoldResult ConstantOp::fold(ArrayRef<Attribute> operands) {
   assert(operands.empty() && "constant has no operands");
   return getValue();
 }
@@ -88,11 +85,8 @@ OpFoldResult SubOp::fold(ArrayRef<Attribute> operands) {
 
 LogicalResult SelectOp::materializeOperands(OpBuilder &builder) {
   Operation *op = getOperation();
-  return eltwise::materializeOperands(builder, op,
-                                      op->getOpOperands().drop_front());
+  return tile::materializeOperands(builder, op,
+                                   op->getOpOperands().drop_front());
 }
 
-#define GET_OP_CLASSES
-#include "pmlc/dialect/eltwise/ir/ops.cc.inc"
-
-} // namespace pmlc::dialect::eltwise
+} // namespace pmlc::dialect::tile

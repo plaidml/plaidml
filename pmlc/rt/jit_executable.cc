@@ -396,8 +396,8 @@ public:
     }
   }
 
-  void invoke(mlir::ArrayRef<util::BufferPtr> inputBuffers,
-              mlir::ArrayRef<util::BufferPtr> outputBuffers) final {
+  double invoke(mlir::ArrayRef<util::BufferPtr> inputBuffers,
+                mlir::ArrayRef<util::BufferPtr> outputBuffers) final {
     if (inputBuffers.size() != program->inputs.size()) {
       throw std::runtime_error("Program input arguments and buffers mismatch");
     }
@@ -426,6 +426,7 @@ public:
       stopWatch.stop();
       IVLOG(1, "Execution time: " << stopWatch.delta_ms() << "ms");
     }
+    return device->execTimeInMS;
   }
 
   void buildMemRefDescriptors() {

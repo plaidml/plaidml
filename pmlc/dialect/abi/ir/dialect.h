@@ -76,9 +76,9 @@ using mlir::LLVM::LLVMFuncOp;
 
 namespace OpTrait = mlir::OpTrait;
 
+} // namespace pmlc::dialect::abi
+
 #define GET_OP_CLASSES
 #include "pmlc/dialect/abi/ir/ops.h.inc"
 
 #include "pmlc/dialect/abi/ir/dialect.h.inc"
-
-} // namespace pmlc::dialect::abi

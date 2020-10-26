@@ -8,10 +8,7 @@ package(default_visibility = ["//visibility:public"])
 gentbl(
     name = "gen-pass",
     tbl_outs = [
-        (
-            "-gen-pass-decls",
-            "passes.h.inc",
-        ),
+        ("-gen-pass-decls", "passes.h.inc"),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "passes.td",
@@ -32,14 +29,7 @@ plaidml_cc_library(
     ],
     deps = [
         ":gen-pass",
-        "//pmlc/dialect/eltwise/ir",
-        "//pmlc/dialect/pxa/analysis",
-        "//pmlc/dialect/pxa/ir",
         "//pmlc/dialect/stdx/ir",
-        "//pmlc/dialect/tile/ir",
-        "@llvm-project//mlir:LLVMTransforms",
-        "@llvm-project//mlir:StandardOpsTransforms",
-        "@llvm-project//mlir:SCFDialect",
         "@llvm-project//mlir:VectorOps",
     ],
 )
