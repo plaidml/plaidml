@@ -182,7 +182,7 @@ void pipelineBuilder(OpPassManager &pm) {
     maxThreads = 8;
   }
   std::min(std::thread::hardware_concurrency(), maxThreads);
-  pm.addPass(pxa::createCPUThreadPass(maxThreads));
+  // pm.addPass(pxa::createCPUThreadPass(maxThreads));
   pm.addPass(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
 
@@ -221,8 +221,7 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
-  // TODO: Debug what causes this to fail.
-  // pm.addPass(pmlc::conversion::scf_to_omp::createLowerSCFToOpenMPPass());
+  pm.addPass(pmlc::conversion::scf_to_omp::createLowerSCFToOpenMPPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
