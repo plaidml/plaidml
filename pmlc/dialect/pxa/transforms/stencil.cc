@@ -114,7 +114,6 @@ Optional<StrideInfo> StencilBase::getStrideInfo(Value value) {
   if (cached != strideInfoCache.end()) {
     return cached->second;
   }
-  IVLOG(1, "getStrideInfo: " << debugString(value));
   auto maybeInfo =
       llvm::TypeSwitch<Operation *, Optional<StrideInfo>>(value.getDefiningOp())
           .Case<PxaLoadOp>([&](PxaLoadOp op) { return computeStrideInfo(op); })

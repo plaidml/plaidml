@@ -13,4 +13,13 @@ def ConvertCompToOcl : Pass<"pmlc-convert-comp-to-ocl", "mlir::ModuleOp"> {
   ];
 }
 
+def ConvertCompToVulkanCall : Pass<"pmlc-convert-comp-to-vulkan", "mlir::ModuleOp"> {
+  let summary = "Convert comp operations to Vulkan runtime calls";
+  let constructor = "pmlc::conversion::comp_to_llvm::createConvertCompToVulkanPass()";
+  let dependentDialects = [
+    "mlir::LLVM::LLVMDialect",
+    "mlir::StandardOpsDialect"
+  ];
+}
+
 #endif // __PMLC_CONVERSION_COMP_TO_LLVM_PASSES__

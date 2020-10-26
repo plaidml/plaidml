@@ -31,6 +31,8 @@ _CONV_DATA_FORMAT = ['channels_first', 'channels_last']
 
 _in_train_phase = None  # Will be initialized on first use
 
+lastExecTimeInMS = 0.0
+
 
 def _prepend_name_scope(name, default):
     if name:
@@ -137,8 +139,9 @@ class _Runner(object):
     def run(self, inputs):
         for input, buffer in zip(inputs, self.input_buffers):
             buffer.copy_from_ndarray(input)
-        self.executable.run(self.input_buffers + self.var_buffers,
-                            self.output_buffers + self.update_buffers)
+        global lastExecTimeInMS
+        lastExecTimeInMS = self.executable.run(self.input_buffers + self.var_buffers,
+                                               self.output_buffers + self.update_buffers)
         return [buffer.as_ndarray() for buffer in self.output_buffers]
 
 
@@ -153,17 +156,22 @@ class _Function(object):
         self._updates = updates
         self._cache = {}
         self._vars = set()
-        self._trace_vars(outputs + [x[1] for x in updates])
-        # logger.debug('vars: {}'.format(self._vars))
+        self._trace_vars(outputs + [x[1] for x in updates], seen=set())
+        logger.debug('vars:')
+        for var in self._vars:
+            logger.debug('  {}: {}'.format(var, var.tensor.compute_shape()))
 
-    def _trace_vars(self, nodes):
+    def _trace_vars(self, nodes, seen):
         for node in nodes:
+            if node in seen:
+                continue
+            seen.add(node)
             if is_placeholder(node) and node not in self._inputs:
                 raise PlaidMLKerasException('_Function depends on an unspecified input')
             if is_tensor(node):
                 if node.opname == 'variable':
                     self._vars.add(node)
-                self._trace_vars(node.operands)
+                self._trace_vars(node.operands, seen)
 
     def __call__(self, inputs=[]):
         inputs = [np.array(x) if isinstance(x, (six.integer_types, float)) else x for x in inputs]
@@ -887,10 +895,10 @@ def function(inputs, outputs, updates=None, name=None):
     logger.debug('function(name: {})'.format(name))
     logger.debug('  inputs:')
     for input in inputs:
-        logger.debug('    {}'.format(input))
+        logger.debug('    {}: {}'.format(input, input.tensor.compute_shape()))
     logger.debug('  outputs:')
     for output in outputs:
-        logger.debug('    {}'.format(output))
+        logger.debug('    {}: {}'.format(output, output.tensor.compute_shape()))
     if updates:
         logger.debug('  updates:')
         for update in updates:
@@ -1497,17 +1505,16 @@ def separable_conv(x,
                    padding='valid',
                    data_format=None,
                    dilation_rate=None):
-    data_format = _normalize_data_format(data_format)
-    if int_shape(pointwise_kernel
-                )[-2] != int_shape(depthwise_kernel)[-1] * int_shape(depthwise_kernel)[-2]:
+    pointwise_kernel_shape = int_shape(pointwise_kernel)
+    depthwise_kernel_shape = int_shape(depthwise_kernel)
+    if pointwise_kernel_shape[-2] != depthwise_kernel_shape[-1] * depthwise_kernel_shape[-2]:
         # FIXME: tensor.shape is expensive
         raise ValueError(
             ('Shape mismatch in separable convolution. Depthwise kernel input ' +
              'channel count must match pointwise kernel channel count times channel ' +
              'multiplier.\nReceived {} v {} * {} (from full shapes {} and ' + '{})').format(
-                 pointwise_kernel.tensor.shape.dims[-2], depthwise_kernel.tensor.shape.dims[-2],
-                 depthwise_kernel.tensor.shape.dims[-1], pointwise_kernel.tensor.shape,
-                 depthwise_kernel.tensor.shape))
+                 pointwise_kernel_shape[-2], depthwise_kernel_shape[-2],
+                 depthwise_kernel_shape[-1], pointwise_kernel_shape, depthwise_kernel_shape))
     intermediate = conv(x,
                         depthwise_kernel,
                         strides=strides,

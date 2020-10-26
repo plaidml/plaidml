@@ -31,12 +31,12 @@ void plaidml_executable_free(  //
     plaidml_error* err,        //
     plaidml_executable* exec);
 
-void plaidml_executable_run(   //
-    plaidml_error* err,        //
-    plaidml_executable* exec,  //
-    size_t ninputs,            //
-    plaidml_buffer** inputs,   //
-    size_t noutputs,           //
+double plaidml_executable_run(  //
+    plaidml_error* err,         //
+    plaidml_executable* exec,   //
+    size_t ninputs,             //
+    plaidml_buffer** inputs,    //
+    size_t noutputs,            //
     plaidml_buffer** outputs);
 
 #ifdef __cplusplus
