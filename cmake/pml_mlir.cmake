@@ -11,7 +11,7 @@ function(pml_mlir_enums)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME"
+    ""
     "DEPS"
     ${ARGN}
   )
@@ -22,7 +22,7 @@ function(pml_mlir_enums)
   pml_package_ns(_PACKAGE_NS)
   list(TRANSFORM _RULE_DEPS REPLACE "^::" "${_PACKAGE_NS}::")
   pml_package_name(_PACKAGE_NAME)
-  set(_NAME "${_PACKAGE_NAME}_mlir_enums")
+  set(_NAME "${_PACKAGE_NAME}_enums")
 
 
   set(LLVM_TARGET_DEFINITIONS enums.td)
@@ -38,7 +38,8 @@ function(pml_mlir_enums)
 
   add_public_tablegen_target(${_NAME}_gen)
   add_dependencies(mlir-headers ${_NAME}_gen)
-  add_library(${_PACKAGE_NS}::mlir_enums ALIAS ${_NAME})
+  # Barf - enums in util are handled differently than everything else
+  add_library(${_PACKAGE_NS}::enums ALIAS ${_NAME})
   target_compile_options(${_NAME} PUBLIC ${PMLC_DEFAULT_COPTS})
   pml_package_dir(_PACKAGE_DIR)
 endfunction()
@@ -54,7 +55,7 @@ function(pml_mlir_ir)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME"
+    "NAME" # have to have this here in order to skim dialect name - could be renamed
     "SRCS;DEPS"
     ${ARGN}
   )
@@ -62,6 +63,7 @@ function(pml_mlir_ir)
   # Replace dependencies passed by ::name with ::pml::package::name
   # Prefix the library with the package name, so we get: pml_package_name.
   pml_package_ns(_PACKAGE_NS)
+
   list(TRANSFORM _RULE_DEPS REPLACE "^::" "${_PACKAGE_NS}::")
   pml_package_name(_PACKAGE_NAME)
   set(_NAME "${_PACKAGE_NAME}")
@@ -71,20 +73,32 @@ function(pml_mlir_ir)
   mlir_tablegen(ops.cc.inc -gen-op-defs)
   mlir_tablegen(dialect.h.inc -gen-dialect-decls -dialect=${_RULE_NAME})
   add_mlir_doc(ops -gen-op-doc ${_RULE_NAME}_ops ${_RULE_NAME}/)
- 
+  add_public_tablegen_target(${_NAME}_gen)
+  add_dependencies(mlir-headers ${_NAME}_gen)
+  list(APPEND _GEN_DEPS ${_NAME}_gen)
+  if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/interfaces.td")
+    set(LLVM_TARGET_DEFINITIONS interfaces.td)
+    mlir_tablegen(interfaces.h.inc -gen-op-interface-decls)
+    mlir_tablegen(interfaces.cc.inc -gen-op-interface-defs)
+    add_mlir_doc(ops -gen-interfaces-doc "${_PACKAGE_NAME}_interfaces" /=${RULE_NAME}/)
+    add_public_tablegen_target(${_NAME}_interfaces_gen)
+    add_dependencies(mlir-headers ${_NAME}_interfaces_gen)
+    list(APPEND _GEN_DEPS ${_NAME}_interfaces_gen)
+  endif()
+
   add_mlir_dialect_library(${_NAME}
     ${_RULE_SRCS}
     DEPENDS
+      ${_GEN_DEPS}
       ${_RULE_DEPS}
+      MLIROpAsmInterfaceIncGen
     LINK_LIBS 
-      PUBLIC 
       MLIRIR
       MLIRSideEffectInterfaces
+    PUBLIC 
   )
 
-  add_public_tablegen_target(${_NAME}_gen)
-  add_dependencies(mlir-headers ${_NAME}_gen)
-  add_library(${_PACKAGE_NS}::mlir_enums ALIAS ${_NAME})
+  add_library(${_PACKAGE_NS} ALIAS ${_NAME})
   target_compile_options(${_NAME} PUBLIC ${PMLC_DEFAULT_COPTS})
   pml_package_dir(_PACKAGE_DIR)
 endfunction()
@@ -101,7 +115,7 @@ function(pml_mlir_transforms)
     _RULE
     ""
     ""
-    "DEPS"
+    "SRCS;DEPS"
     ${ARGN}
   )
 
@@ -111,25 +125,26 @@ function(pml_mlir_transforms)
   list(TRANSFORM _RULE_DEPS REPLACE "^::" "${_PACKAGE_NS}::")
   # Prefix the library with the package name, so we get: pml_package_name.
   pml_package_name(_PACKAGE_NAME)
-  set(_NAME "${_PACKAGE_NAME}_mlir_transforms")
-  file(GLOB _GLOB_SRCS ${CMAKE_CURRENT_SOURCE_DIR} *.cc)
+  set(_NAME "${_PACKAGE_NAME}")
  
   set(LLVM_TARGET_DEFINITIONS passes.td)
   mlir_tablegen(passes.h.inc -gen-pass-decls)
-  add_mlir_doc(ops -gen-passes-doc "${PACKAGE_NAME}_passes" stdx/)
-  add_mlir_dialect_library(${_NAME}
-        ${_GLOB_SRCS}
-        DEPENDS
-                ${DEPS}
-        LINK_LIBS 
-                PUBLIC 
-                MLIRIR
-                MLIRSideEffectInterfaces
-  )
+  add_mlir_doc(ops -gen-passes-doc "${_PACKAGE_NAME}_passes" stdx/)
   add_public_tablegen_target(${_NAME}_gen)
   add_dependencies(mlir-headers ${_NAME}_gen)
+  message(STATUS "WOOOO ${_RULE_SRCS}")
+  add_mlir_dialect_library(${_NAME}
+        ${_RULE_SRCS}
+        DEPENDS
+          ${_NAME}_gen
+          ${_RULE_DEPS}
+        LINK_LIBS 
+          PUBLIC 
+          MLIRIR
+          MLIRSideEffectInterfaces
+  )
 
   # Alias the pml_package_name library to pml::package::name.
-  add_library(${_PACKAGE_NS}::mlir_enums ALIAS ${_NAME})
+  add_library(${_PACKAGE_NS} ALIAS ${_NAME})
   pml_package_dir(_PACKAGE_DIR)
 endfunction()

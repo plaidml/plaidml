@@ -1,21 +1,9 @@
-pmlc_add_mlir_dialect(pxa)
-add_mlir_doc(ops -gen-op-doc pxa_ops PXA/)
-pmlc_add_mlir_interfaces(pxa)
-
-add_mlir_dialect_library(pmlc_pxa_ir_lib
-        ops.cc
-        interfaces.cc
-
-        ADDITIONAL_HEADER_DIRS
-
-        DEPENDS
-                MLIROpAsmInterfaceIncGen
-                pmlc_pxa_dialect_gen
-                pmlc_util_mlir_enums_gen
-        LINK_LIBS 
-                PUBLIC 
-                MLIRIR
-                MLIRSideEffectInterfaces
- )
-target_compile_options(pmlc_pxa_ir_lib PUBLIC ${PMLC_DEFAULT_COPTS})
-
+file(GLOB GLOB_SRCS ${CMAKE_CURRENT_SOURCE_DIR} *.cc)
+pml_mlir_ir(
+  NAME
+    pxa
+  SRCS
+    ${GLOB_SRCS}
+  DEPS
+    pmlc::util
+)

@@ -15,8 +15,8 @@ add_mlir_dialect_library(pmlc_dialect_ir_tile
      MLIROpAsmInterfaceIncGen
      pmlc_tile_dialect_gen
      pmlc_tile_interfaces_gen
-     pmlc_util_mlir_enums_gen
-     
+     pmlc_util_enums_gen
+
    LINK_LIBS 
      PUBLIC 
      MLIRIR

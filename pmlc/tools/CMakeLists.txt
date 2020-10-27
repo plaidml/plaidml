@@ -1,2 +1,2 @@
-#add_subdirectory(pmlc-opt)
+add_subdirectory(pmlc-opt)
 

@@ -1,10 +1,7 @@
 
 add_all_subdirs()
 
-pml_mlir_enums(
-  NAME
-    util
-)
+pml_mlir_enums()
 
 file(GLOB _GLOB_UTIL_SRCS ${CMAKE_CURRENT_SOURCE_DIR} *.cc)
 file(GLOB _GLOB_UTIL_HDRS ${CMAKE_CURRENT_SOURCE_DIR} *.h)
@@ -16,5 +13,6 @@ pml_cc_library(
   SRCS
     ${_GLOB_UTIL_SRCS}
   DEPS
-    pmlc::util::mlir_enums
+    pmlc::util::enums
+  PUBLIC
 )
