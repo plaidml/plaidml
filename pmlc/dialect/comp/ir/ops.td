@@ -60,8 +60,7 @@ class COMP_ExecEnvSupportsMemTrait<string execEnv, string memRef> :
 class COMP_Op<string mnemonic, list<OpTrait> traits = []> :
     Op<COMP_Dialect, mnemonic, traits>;
 
-def COMP_CreateExecEnv : COMP_Op<"create_execenv",
-                                 [MemoryEffects<[MemAlloc<DefaultResource>]>]>
+def COMP_CreateExecEnv : COMP_Op<"create_execenv", [NoSideEffect]>
                        , Arguments<(ins COMP_AnyDevice:$device)>
                        , Results<(outs COMP_AnyExecEnv:$execEnv)> {
   let summary = "Creates execution environment.";
@@ -76,8 +75,7 @@ def COMP_CreateExecEnv : COMP_Op<"create_execenv",
   }];
 }
 
-def COMP_DestroyExecEnv : COMP_Op<"destroy_execenv",
-                                  [MemoryEffects<[MemFree<DefaultResource>]>]> {
+def COMP_DestroyExecEnv : COMP_Op<"destroy_execenv", [NoSideEffect]> {
   let summary = "Destroys execution environment.";
 
   let description = [{
@@ -141,7 +139,7 @@ def COMP_Submit : COMP_Op<"submit",
   }];
 }
 
-def COMP_Alloc : COMP_Op<"alloc", [MemoryEffects<[MemAlloc<DefaultResource>]>,
+def COMP_Alloc : COMP_Op<"alloc", [NoSideEffect,
                                    COMP_ExecEnvSupportsMemTrait<"execEnv", "deviceMem">,
                                    DeclareOpInterfaceMethods<COMP_ExecEnvOpInterface>]>
                , Arguments<(ins COMP_AnyExecEnv:$execEnv,
@@ -161,7 +159,7 @@ def COMP_Alloc : COMP_Op<"alloc", [MemoryEffects<[MemAlloc<DefaultResource>]>,
   let verifier = [{ return ::verify(*this); }];
 }
 
-def COMP_Dealloc : COMP_Op<"dealloc", [MemoryEffects<[MemFree<DefaultResource>]>,
+def COMP_Dealloc : COMP_Op<"dealloc", [NoSideEffect,
                                        COMP_ExecEnvSupportsMemTrait<"execEnv", "deviceMem">,
                                        DeclareOpInterfaceMethods<COMP_ExecEnvOpInterface>]>
                   , Arguments<(ins COMP_AnyExecEnv:$execEnv,

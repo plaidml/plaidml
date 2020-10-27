@@ -140,14 +140,13 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(spirv::createLowerABIAttributesPass());
   pm.addPass(spirv::createUpdateVersionCapabilityExtensionPass());
 
-  // Comp to LLVM - OpenCL function calls.
-  pm.addPass(pmlc::conversion::comp_to_llvm::createConvertCompToOclPass());
-
-  // Look at the network as being run repeatedly, and optimize to
-  // take that into account.
+  // Refactor and optimize for multiple runs.
   pm.addPass(abi::createLowerToABIPass());
   pm.addPass(createLoopInvariantCodeMotionPass());
   pm.addPass(createCanonicalizerPass());
+
+  // Comp to LLVM - OpenCL function calls.
+  pm.addPass(pmlc::conversion::comp_to_llvm::createConvertCompToOclPass());
 
   // Convert to LLVM code.
   pm.addPass(pmlc::target::intel_gen::createConvertStandardToLLVM());

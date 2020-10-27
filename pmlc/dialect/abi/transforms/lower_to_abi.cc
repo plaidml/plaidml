@@ -80,16 +80,15 @@ void LowerToABIPass::runOnOperation() {
     // parameter.
     initEntryBlock->addArgument(
         LLVMType::getInt8Ty(&getContext()).getPointerTo());
-  } else {
-    initEntryBlock->addArgument(bodyEntryBlock->getArgument(0).getType());
-    ++argIdx;
   }
 
   mlir::SmallVector<mlir::Value, 8> networkArgs;
   mlir::SmallVector<mlir::Type, 8> networkTypes;
   while (argIdx < bodyEntryBlock->getNumArguments()) {
     auto arg = bodyEntryBlock->getArgument(argIdx);
-    if (!arg.getType().isa<mlir::MemRefType, mlir::UnrankedMemRefType>()) {
+    bool isMemRef =
+        arg.getType().isa<mlir::MemRefType, mlir::UnrankedMemRefType>();
+    if (argIdx && !isMemRef) {
       mainFunc.emitError(
           "Expected only memrefs after an optional device parameter");
       signalPassFailure();
@@ -97,7 +96,7 @@ void LowerToABIPass::runOnOperation() {
     }
     auto constAttr =
         mainFunc.getArgAttrOfType<mlir::IntegerAttr>(argIdx, constAttrId);
-    if (constAttr) {
+    if (constAttr || (!argIdx && !isMemRef)) {
       auto ty = arg.getType();
       auto newArg = bodyEntryBlock->insertArgument(networkArgs.size(), ty);
       arg.replaceAllUsesWith(newArg);
