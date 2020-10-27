@@ -156,7 +156,7 @@ public:
   /// Returns whether `requestedSpace` is supported memory space.
   bool supportsMemorySpace(unsigned requestedSpace) const;
   /// Returns EventType with matching runtime.
-  EventType getEventType();
+  EventType getEventType() const;
 };
 
 // ============================================================================

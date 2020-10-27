@@ -23,7 +23,7 @@ bool ExecEnvType::supportsMemorySpace(unsigned requestedSpace) const {
   return memSpaceSupported;
 }
 
-EventType ExecEnvType::getEventType() {
+EventType ExecEnvType::getEventType() const {
   return EventType::get(getContext(), *this);
 }
 

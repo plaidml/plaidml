@@ -24,22 +24,6 @@ public:
 /// Performs very greedy linear scan for memory reuse opportunities.
 /// Does not check any interference for Out-of-Order execution.
 void greedyInPlaceReuse(mlir::Block &block) {
-  auto builder = mlir::OpBuilder::atBlockBegin(&block);
-  // Replaces Alloc `op` with already allocated `memory`.
-  // Inserts copying of host memory if needed.
-  auto replaceAlloc = [&](Alloc op, mlir::Value memory) {
-    if (mlir::Value hostMem = op.hostMem()) {
-      builder.setInsertionPoint(op);
-      mlir::Value execEnv = op.execEnv();
-      ExecEnvType execEnvType = execEnv.getType().cast<ExecEnvType>();
-      EventType eventType = execEnvType.getEventType();
-      mlir::Value event = builder.create<ScheduleWrite>(
-          op.getLoc(), eventType, hostMem, memory, execEnv, mlir::ValueRange{});
-      builder.create<Wait>(op.getLoc(), event);
-    }
-    op.replaceAllUsesWith(memory);
-    op.erase();
-  };
   // Map used to store deallocated memory. After processing Dealloc op it is
   // assumed that further operations can safely reuse it.
   using EnvMemTypePair = std::pair<mlir::Value, mlir::MemRefType>;
@@ -69,7 +53,8 @@ void greedyInPlaceReuse(mlir::Block &block) {
       auto deallocIt = deallocated.find(key);
       if (deallocIt != deallocated.end()) {
         Dealloc deallocOp = deallocIt->second;
-        replaceAlloc(allocOp, deallocOp.deviceMem());
+        allocOp.replaceAllUsesWith(deallocOp.deviceMem());
+        allocOp.erase();
         deallocOp.erase();
         deallocated.erase(deallocIt);
       }

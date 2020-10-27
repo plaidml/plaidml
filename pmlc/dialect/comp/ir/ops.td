@@ -167,21 +167,13 @@ def COMP_Submit : COMP_Op<"submit",
 def COMP_Alloc : COMP_Op<"alloc", [NoSideEffect,
                                    COMP_ExecEnvSupportsMemTrait<"execEnv", "deviceMem">,
                                    DeclareOpInterfaceMethods<COMP_ExecEnvOpInterface>]>
-               , Arguments<(ins COMP_AnyExecEnv:$execEnv,
-                                Optional<AnyMemRef>:$hostMem)>
+               , Arguments<(ins COMP_AnyExecEnv:$execEnv)>
                , Results<(outs AnyMemRef:$deviceMem)> {
   let summary = "Allocates memory for use in execution environment.";
 
-  let description = [{
-    Optionally accepts host memory, in which case there is guarantee that
-    after allocation new device memory will contain the same data.
-  }];
-
   let assemblyFormat = [{
-     $execEnv ($hostMem^)? attr-dict `:` functional-type(operands, results)
+     $execEnv attr-dict `:` functional-type(operands, results)
   }];
-
-  let verifier = [{ return ::verify(*this); }];
 }
 
 def COMP_Dealloc : COMP_Op<"dealloc", [NoSideEffect,
@@ -189,7 +181,7 @@ def COMP_Dealloc : COMP_Op<"dealloc", [NoSideEffect,
                                        DeclareOpInterfaceMethods<COMP_ExecEnvOpInterface>]>
                   , Arguments<(ins COMP_AnyExecEnv:$execEnv,
                                    AnyMemRef:$deviceMem)> {
-  let summary = "Deallocates memory previously allocated for use in executon environment.";
+  let summary = "Deallocates memory previously allocated for use in execution environment.";
 
   let assemblyFormat = [{
     $execEnv $deviceMem attr-dict `:` functional-type(operands, results)
