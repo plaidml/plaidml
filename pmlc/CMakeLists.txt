@@ -21,5 +21,5 @@ pml_cc_library(
     pmlc
   DEPS
     ::all_passes_and_dialects
-    pmlc::targets::all_targets
+    pmlc::targets::all_
 )
