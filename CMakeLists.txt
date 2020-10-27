@@ -46,7 +46,6 @@ FetchContent_Declare(
 FetchContent_GetProperties(llvm_project)
 if(NOT llvm_project_POPULATED)
   FetchContent_Populate(llvm_project)
-  #find_package(MLIR PATHS ${CMAKE_BINARY_DIR}/lib/cmake/mlir/)
   add_subdirectory(${llvm_project_SOURCE_DIR}/llvm ${llvm_project_BINARY_DIR} EXCLUDE_FROM_ALL)
 endif()
 
@@ -75,6 +74,24 @@ if(NOT easyloggingpp_POPULATED)
 endif()
 include_directories(${easyloggingpp_SOURCE_DIR}/src)
 
+#######
+# gtest
+#######
+
+include(FetchContent)
+FetchContent_Declare(
+  googletest
+  GIT_REPOSITORY      https://github.com/google/googletest.git
+  GIT_TAG             release-1.8.0)
+FetchContent_GetProperties(googletest)
+if(NOT googletest_POPULATED)
+  FetchContent_Populate(googletest)
+  set(CMAKE_SUPPRESS_DEVELOPER_WARNINGS 1 CACHE BOOL "")
+  add_subdirectory(${googletest_SOURCE_DIR} ${googletest_BINARY_DIR} EXCLUDE_FROM_ALL)
+  unset(CMAKE_SUPPRESS_DEVELOPER_WARNINGS)
+endif()
+include_directories(${googletest_SOURCE_DIR}/googletest/include)
+
 #########
 # Plaidml
 #########
@@ -89,6 +106,7 @@ include(pml_copts)
 include(pml_macros)
 include(pml_cc_binary)
 include(pml_cc_library)
+include(pml_mlir)
 
 
 # C++

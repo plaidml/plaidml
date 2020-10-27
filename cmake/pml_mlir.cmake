@@ -1,0 +1,135 @@
+include(CMakeParseArguments)
+
+
+# pml_mlir_enums()
+#
+# Creates a <PACKAGE>_mlir_enums target
+#
+# Parameters:
+# DEPS: List of other libraries to be linked in to the binary targets
+function(pml_mlir_enums)
+  cmake_parse_arguments(
+    _RULE
+    ""
+    "NAME"
+    "DEPS"
+    ${ARGN}
+  )
+
+
+  # Replace dependencies passed by ::name with ::pml::package::name
+  # Prefix the library with the package name, so we get: pml_package_name.
+  pml_package_ns(_PACKAGE_NS)
+  list(TRANSFORM _RULE_DEPS REPLACE "^::" "${_PACKAGE_NS}::")
+  pml_package_name(_PACKAGE_NAME)
+  set(_NAME "${_PACKAGE_NAME}_mlir_enums")
+
+
+  set(LLVM_TARGET_DEFINITIONS enums.td)
+  mlir_tablegen(enums.h.inc -gen-enum-decls)
+  mlir_tablegen(enums.cc.inc -gen-enum-defs)
+  add_mlir_dialect_library(${_NAME}
+    enums.cc
+    LINK_LIBS 
+            PUBLIC 
+            MLIRIR
+            MLIRSideEffectInterfaces
+  )
+
+  add_public_tablegen_target(${_NAME}_gen)
+  add_dependencies(mlir-headers ${_NAME}_gen)
+  add_library(${_PACKAGE_NS}::mlir_enums ALIAS ${_NAME})
+  target_compile_options(${_NAME} PUBLIC ${PMLC_DEFAULT_COPTS})
+  pml_package_dir(_PACKAGE_DIR)
+endfunction()
+
+
+# pml_mlir_ir()
+#
+# Creates a <PACKAGE>_mlir_ir target
+#
+# Parameters:
+# DEPS: List of other libraries to be linked in to the binary targets
+function(pml_mlir_ir)
+  cmake_parse_arguments(
+    _RULE
+    ""
+    "NAME"
+    "SRCS;DEPS"
+    ${ARGN}
+  )
+  
+  # Replace dependencies passed by ::name with ::pml::package::name
+  # Prefix the library with the package name, so we get: pml_package_name.
+  pml_package_ns(_PACKAGE_NS)
+  list(TRANSFORM _RULE_DEPS REPLACE "^::" "${_PACKAGE_NS}::")
+  pml_package_name(_PACKAGE_NAME)
+  set(_NAME "${_PACKAGE_NAME}")
+
+  set(LLVM_TARGET_DEFINITIONS ops.td)
+  mlir_tablegen(ops.h.inc -gen-op-decls)
+  mlir_tablegen(ops.cc.inc -gen-op-defs)
+  mlir_tablegen(dialect.h.inc -gen-dialect-decls -dialect=${_RULE_NAME})
+  add_mlir_doc(ops -gen-op-doc ${_RULE_NAME}_ops ${_RULE_NAME}/)
+ 
+  add_mlir_dialect_library(${_NAME}
+    ${_RULE_SRCS}
+    DEPENDS
+      ${_RULE_DEPS}
+    LINK_LIBS 
+      PUBLIC 
+      MLIRIR
+      MLIRSideEffectInterfaces
+  )
+
+  add_public_tablegen_target(${_NAME}_gen)
+  add_dependencies(mlir-headers ${_NAME}_gen)
+  add_library(${_PACKAGE_NS}::mlir_enums ALIAS ${_NAME})
+  target_compile_options(${_NAME} PUBLIC ${PMLC_DEFAULT_COPTS})
+  pml_package_dir(_PACKAGE_DIR)
+endfunction()
+
+
+# pml_mlir_transforms()
+#
+# Creates a <PACKAGE>_mlir_transforms target
+#
+# Parameters:
+# DEPS: List of other libraries to be linked in to the binary targets
+function(pml_mlir_transforms)
+  cmake_parse_arguments(
+    _RULE
+    ""
+    ""
+    "DEPS"
+    ${ARGN}
+  )
+
+  pml_package_ns(_PACKAGE_NS)
+
+  # Replace dependencies passed by ::name with ::pml::package::name
+  list(TRANSFORM _RULE_DEPS REPLACE "^::" "${_PACKAGE_NS}::")
+  # Prefix the library with the package name, so we get: pml_package_name.
+  pml_package_name(_PACKAGE_NAME)
+  set(_NAME "${_PACKAGE_NAME}_mlir_transforms")
+  file(GLOB _GLOB_SRCS ${CMAKE_CURRENT_SOURCE_DIR} *.cc)
+ 
+  set(LLVM_TARGET_DEFINITIONS passes.td)
+  mlir_tablegen(passes.h.inc -gen-pass-decls)
+  add_mlir_doc(ops -gen-passes-doc "${PACKAGE_NAME}_passes" stdx/)
+  add_mlir_dialect_library(${_NAME}
+        ${_GLOB_SRCS}
+        DEPENDS
+                ${DEPS}
+        LINK_LIBS 
+                PUBLIC 
+                MLIRIR
+                MLIRSideEffectInterfaces
+  )
+  add_public_tablegen_target(${_NAME}_gen)
+  add_dependencies(mlir-headers ${_NAME}_gen)
+
+  # Alias the pml_package_name library to pml::package::name.
+  add_library(${_PACKAGE_NS}::mlir_enums ALIAS ${_NAME})
+  pml_package_dir(_PACKAGE_DIR)
+endfunction()

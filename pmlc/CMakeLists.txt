@@ -1,35 +1,22 @@
 # Declare a dialect in the include directory
 function(pmlc_add_mlir_dialect namespace)
-  string(TOLOWER ${namespace} dialect)
   set(LLVM_TARGET_DEFINITIONS ops.td)
   mlir_tablegen(ops.h.inc -gen-op-decls)
   mlir_tablegen(ops.cc.inc -gen-op-defs)
-  mlir_tablegen(dialect.h.inc -gen-dialect-decls -dialect=${dialect})
-  add_public_tablegen_target(PMLC${namespace}DialectGen)
-  add_dependencies(mlir-headers PMLC${namespace}DialectGen)
+  mlir_tablegen(dialect.h.inc -gen-dialect-decls -dialect=${namespace})
+  add_public_tablegen_target(pmlc_${namespace}_dialect_gen)
+  add_dependencies(mlir-headers pmlc_${namespace}_dialect_gen)
 endfunction()
 
 function(pmlc_add_mlir_interfaces namespace)
   set(LLVM_TARGET_DEFINITIONS interfaces.td)
   mlir_tablegen(interfaces.h.inc -gen-op-interface-decls)
   mlir_tablegen(interfaces.cc.inc -gen-op-interface-defs)
-  add_public_tablegen_target(PMLC${namespace}InterfacesGen)
-  add_dependencies(mlir-headers PMLC${namespace}InterfacesGen)
-endfunction()
-
-function(pmlc_add_mlir_enums namespace)
-  set(LLVM_TARGET_DEFINITIONS enums.td)
-  mlir_tablegen(enums.h.inc -gen-enum-decls)
-  mlir_tablegen(enums.cc.inc -gen-enum-defs)
-  add_public_tablegen_target(PMLC${namespace}EnumsGen)
-  add_dependencies(mlir-headers PMLC${namespace}EnumsGen)
+  add_public_tablegen_target(pmlc_${namespace}_interfaces_gen)
+  add_dependencies(mlir-headers pmlc_${namespace}_interfaces_gen)
 endfunction()
 
 function(pmlc_add_mlir_passes namespace)
-  set(LLVM_TARGET_DEFINITIONS passes.td)
-  mlir_tablegen(passes.h.inc -gen-pass-decls)
-  add_public_tablegen_target(PMLC${namespace}PassesGen)
-  add_dependencies(mlir-headers PMLC${namespace}PassesGen)
 endfunction()
 
 add_subdirectory(util)
@@ -40,7 +27,7 @@ pml_cc_library(
   NAME
     all_passes_and_dialects
   DEPS
-    pmlc::dialect::tile
+    pmlc_dialect_tile
     
     MLIRAffinePassIncGen
     MLIRConversionPassIncGen

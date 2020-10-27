@@ -122,8 +122,7 @@ function(pml_cc_library)
         ${_RULE_COPTS}
         ${PML_DEFAULT_COPTS}
     )
-
-  if(_RULE_WHOLEARCHIVE)
+    if(_RULE_WHOLEARCHIVE)
       pml_whole_archive_link(${_NAME} ${_RULE_DEPS})
     else()
       target_link_libraries(${_NAME} PUBLIC ${_RULE_DEPS})
