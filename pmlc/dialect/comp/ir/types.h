@@ -218,6 +218,17 @@ public:
 };
 
 // ============================================================================
+// KernelType
+// ============================================================================
+
+/// Kernels represent programs that run on devices.
+class KernelType : public mlir::Type::TypeBase<KernelType, mlir::Type,
+                                               mlir::DefaultTypeStorage> {
+public:
+  using Base::Base;
+};
+
+// ============================================================================
 // Printing and parsing
 // ============================================================================
 namespace detail {

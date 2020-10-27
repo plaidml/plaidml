@@ -43,6 +43,9 @@ def COMP_AnyExecEnv : DialectType<COMP_Dialect,
 def COMP_AnyEvent : DialectType<COMP_Dialect,
   CPred<"$_self.isa<EventType>()">, "any event type">;
 
+def COMP_Kernel : DialectType<COMP_Dialect,
+  CPred<"$_self.isa<KernelType>()">, "kernel type">;
+
 class COMP_MemorySpace<string name> :
     StrFunc<"$" # name # ".getType().cast<mlir::MemRefType>().getMemorySpace()">;
 
@@ -96,6 +99,28 @@ def COMP_ScheduleEnd : COMP_Op<"schedule_end", [Terminator]> {
 }
 
 def COMP_ScheduleSingleBlock : SingleBlockImplicitTerminator<"ScheduleEnd">;
+
+// def COMP_CreateKernel : COMP_Op<"create_kernel",
+//                                 [DeclareOpInterfaceMethods<COMP_ExecEnvOpInterface>]>,
+//                   , Arguments<(ins COMP_AnyExecEnv:$execEnv)>
+//                   , Results<(outs COMP_Kernel:$kernel)> {
+//   let summary = "Creates an executable kernel.";
+// }
+// 
+// def COMP_DestroyKernel : COMP_Op<"destroy_kernel",
+//                                  [DeclareOpInterfaceMethods<COMP_ExecEnvOpInterface>]>,
+//                   , Arguments<(ins COMP_AnyExecEnv:$execEnv,
+//                                    COMP_Kernel:$kernel)> {
+//   let summary = "Destroys an executable kernel.";
+// }
+// 
+// def COMP_ScheduleKernel : COMP_Op<"schedule_kernel",
+//                                   [DeclareOpInterfaceMethods<COMP_ExecEnvOpInterface>,
+//                                    DeclareOpInterfaceMethods<COMP_ScheduleOpInterface>]>
+//                   , Arguments<(ins COMP_AnyExecEnv:$execEnv,
+//                                    COMP_Kernel:$kernel)> {
+//   let summary = "Schedules a kernel for execution.";
+// }
 
 def COMP_ScheduleFunc : COMP_Op<"schedule_func",
                                 [COMP_ScheduleSingleBlock,
