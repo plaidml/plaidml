@@ -62,7 +62,7 @@ std::string TileDialect::getCanonicalOpName(StringRef name) {
 
 Operation *TileDialect::materializeConstant(OpBuilder &builder, Attribute value,
                                             Type type, Location loc) {
-  IVLOG(1, "tile::TileDialect::materializeConstant> "
+  IVLOG(3, "tile::TileDialect::materializeConstant> "
                << debugString(value) << " : " << debugString(type));
   auto rankedTensorType = getRankedTensorType(type);
   Type elementType = rankedTensorType.getElementType();
