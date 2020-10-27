@@ -27,6 +27,7 @@
 #include "pmlc/target/x86/heatmap.h"
 #include "pmlc/target/x86/pass_detail.h"
 #include "pmlc/target/x86/passes.h"
+#include "pmlc/transforms/passes.h"
 #include "pmlc/util/env.h"
 #include "pmlc/util/logging.h"
 
@@ -231,7 +232,7 @@ void pipelineBuilder(OpPassManager &pm) {
   }
 
   pm.addPass(abi::createLowerToABIPass());
-  pm.addPass(createLoopInvariantCodeMotionPass());
+  pm.addPass(pmlc::transforms::createHoistingPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createLowerToLLVMPass());
   pm.addPass(createTraceLinkingPass());

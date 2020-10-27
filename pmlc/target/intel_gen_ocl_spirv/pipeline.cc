@@ -35,6 +35,7 @@
 #include "pmlc/dialect/tile/transforms/passes.h"
 #include "pmlc/target/intel_gen/passes.h"
 #include "pmlc/target/intel_gen_ocl_spirv/passes.h"
+#include "pmlc/transforms/passes.h"
 
 using namespace mlir; // NOLINT[build/namespaces]
 
@@ -142,7 +143,7 @@ void pipelineBuilder(OpPassManager &pm) {
 
   // Refactor and optimize for multiple runs.
   pm.addPass(abi::createLowerToABIPass());
-  pm.addPass(createLoopInvariantCodeMotionPass());
+  pm.addPass(pmlc::transforms::createHoistingPass());
   pm.addPass(createCanonicalizerPass());
 
   // Comp to LLVM - OpenCL function calls.

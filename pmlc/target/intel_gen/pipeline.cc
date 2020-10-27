@@ -37,6 +37,7 @@
 #include "pmlc/target/intel_gen/pass_detail.h"
 #include "pmlc/target/intel_gen/passes.h"
 #include "pmlc/target/x86/passes.h"
+#include "pmlc/transforms/passes.h"
 
 using namespace mlir; // NOLINT[build/namespaces]
 
@@ -225,7 +226,7 @@ void pipelineBuilder(OpPassManager &pm) {
   // Look at the network as being run repeatedly, and optimize to
   // take that into account.
   pm.addPass(abi::createLowerToABIPass());
-  pm.addPass(createLoopInvariantCodeMotionPass());
+  pm.addPass(pmlc::transforms::createHoistingPass());
   pm.addPass(createCanonicalizerPass());
 
   // Convert to LLVM code
