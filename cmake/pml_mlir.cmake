@@ -132,15 +132,16 @@ function(pml_mlir_transforms)
   add_mlir_doc(ops -gen-passes-doc "${_PACKAGE_NAME}_passes" stdx/)
   add_public_tablegen_target(${_NAME}_gen)
   add_dependencies(mlir-headers ${_NAME}_gen)
-  message(STATUS "WOOOO ${_RULE_SRCS}")
   add_mlir_dialect_library(${_NAME}
         ${_RULE_SRCS}
         DEPENDS
           ${_NAME}_gen
           ${_RULE_DEPS}
+          MLIRLLVMIR
         LINK_LIBS 
           PUBLIC 
           MLIRIR
+          MLIROpenMP
           MLIRSideEffectInterfaces
   )
 

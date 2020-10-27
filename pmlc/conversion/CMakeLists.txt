@@ -5,4 +5,7 @@ pml_cc_library(
     all_conversions
   DEPS
     ::comp_to_llvm
+    ::gpu
+    ::gpu_to_comp
+    ::gpu_to_spirv
 )

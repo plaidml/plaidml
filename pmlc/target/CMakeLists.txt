@@ -2,9 +2,7 @@ add_all_subdirs()
 
 pml_cc_library(
   NAME
-    all_dialects
+    all_targets
   DEPS
-    ::comp
-    ::pxa
-    ::stdx
+    ::intel_gen
 )

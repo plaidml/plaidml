@@ -15,3 +15,11 @@ pml_cc_library(
     MLIRTransformsPassIncGen
     MLIRStandardTransformsIncGen
 )
+
+pml_cc_library(
+  NAME
+    pmlc
+  DEPS
+    ::all_passes_and_dialects
+    pmlc::targets::all_targets
+)
