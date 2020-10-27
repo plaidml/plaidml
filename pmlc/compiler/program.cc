@@ -181,7 +181,7 @@ util::BufferPtr Program::save() {
   if (!target) {
     throw std::runtime_error("Program must be compiled to be saved.");
   }
-  return target->generateBlob(*this);
+  return target->save(*this);
 }
 
 } // namespace pmlc::compiler

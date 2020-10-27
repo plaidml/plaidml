@@ -33,7 +33,7 @@ class Target {
 public:
   virtual ~Target() = default;
   virtual void buildPipeline(mlir::OpPassManager &pm) = 0;
-  virtual util::BufferPtr generateBlob(Program &program) = 0;
+  virtual util::BufferPtr save(Program &program) = 0;
 };
 
 using TargetPtr = std::shared_ptr<Target>;

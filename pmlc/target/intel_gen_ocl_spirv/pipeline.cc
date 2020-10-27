@@ -1,5 +1,7 @@
 // Copyright 2020, Intel Corporation
 
+#include "llvm/Support/FormatVariadic.h"
+
 #include "mlir/Conversion/GPUToVulkan/ConvertGPUToVulkanPass.h"
 #include "mlir/Conversion/SCFToGPU/SCFToGPU.h"
 #include "mlir/Conversion/SCFToGPU/SCFToGPUPass.h"
@@ -151,21 +153,26 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(pmlc::target::intel_gen::createConvertStandardToLLVM());
 }
 
+static constexpr const char *kTargetName = "intel_gen_ocl_spirv";
+static constexpr const char *kPassPipelineTargetName =
+    "target-intel_gen_ocl_spirv";
+
 static PassPipelineRegistration<>
-    passPipelineReg("target-intel_gen_ocl_spirv",
+    passPipelineReg(kPassPipelineTargetName,
                     "Target pipeline for Intel GEN iGPUs", pipelineBuilder);
 
 class Target : public compiler::Target {
 public:
   void buildPipeline(mlir::OpPassManager &pm) { pipelineBuilder(pm); }
 
-  util::BufferPtr generateBlob(compiler::Program &program) {
-    util::BufferPtr ret;
-    return ret;
+  util::BufferPtr save(compiler::Program &program) {
+    throw std::runtime_error(
+        llvm::formatv("Target '{0}' does not have 'save' support.", kTargetName)
+            .str());
   }
 };
 
-static compiler::TargetRegistration targetReg("intel_gen_ocl_spirv", []() {
+static compiler::TargetRegistration targetReg(kTargetName, []() {
   return std::make_shared<Target>();
 });
 
