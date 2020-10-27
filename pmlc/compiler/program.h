@@ -11,6 +11,10 @@
 
 #include "pmlc/util/buffer.h"
 
+namespace mlir {
+class OpPassManager;
+} // namespace mlir
+
 namespace pmlc::compiler {
 
 struct PassInfo {
@@ -23,6 +27,17 @@ struct ConstantArgument {
   util::BufferPtr buffer;
 };
 
+struct Program;
+
+class Target {
+public:
+  virtual ~Target() = default;
+  virtual void buildPipeline(mlir::OpPassManager &pm) = 0;
+  virtual util::BufferPtr save(Program &program) = 0;
+};
+
+using TargetPtr = std::shared_ptr<Target>;
+
 struct Program {
   std::string entry;
   std::string tileIR;
@@ -32,6 +47,7 @@ struct Program {
   std::vector<mlir::Type> outputs;
   std::vector<ConstantArgument> constants;
   std::vector<PassInfo> passes;
+  TargetPtr target;
 
   explicit Program(llvm::StringRef name = "");
   explicit Program(mlir::ModuleOp module);
@@ -39,8 +55,10 @@ struct Program {
 
   static Program fromSource(llvm::StringRef source);
 
-  void compile(mlir::StringRef target, bool collectPasses = false,
+  void compile(mlir::StringRef targetName, bool collectPasses = false,
                mlir::StringRef dumpDir = "");
+
+  util::BufferPtr save();
 };
 
 } // namespace pmlc::compiler

@@ -260,6 +260,10 @@ void plaidml_program_compile(  //
     bool debug,                //
     const char* target);
 
+plaidml_buffer* plaidml_program_save(  //
+    plaidml_error* err,                //
+    plaidml_program* program);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

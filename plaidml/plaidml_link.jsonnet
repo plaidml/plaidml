@@ -16,6 +16,7 @@ local exports = [
   'plaidml_program_get_outputs',
   'plaidml_program_get_passes',
   'plaidml_program_repr',
+  'plaidml_program_save',
   'plaidml_settings_get',
   'plaidml_settings_list',
   'plaidml_settings_load',
