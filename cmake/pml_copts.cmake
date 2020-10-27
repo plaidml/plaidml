@@ -19,6 +19,7 @@ set(PML_TEST_COPTS)
 #-------------------------------------------------------------------------------
 
 include(CheckCXXCompilerFlag)
+
 if(${PML_ENABLE_ASAN})
   if(NOT ${CMAKE_BUILD_TYPE} STREQUAL "Debug")
     message(FATAL_ERROR "PML_ENABLE_ASAN requires Debug build")
@@ -34,6 +35,7 @@ if(${PML_ENABLE_ASAN})
                         "or is missing configuration for address sanitizer")
   endif()
 endif()
+
 if(${PML_ENABLE_MSAN})
   if(NOT ${CMAKE_BUILD_TYPE} STREQUAL "Debug")
     message(FATAL_ERROR "PML_ENABLE_MSAN requires Debug build")
@@ -49,6 +51,7 @@ if(${PML_ENABLE_MSAN})
                         "or is missing configuration for address sanitizer")
   endif()
 endif()
+
 if(${PML_ENABLE_TSAN})
   if(NOT ${CMAKE_BUILD_TYPE} STREQUAL "Debug")
     message(FATAL_ERROR "PML_ENABLE_TSAN requires Debug build")
@@ -99,11 +102,11 @@ endif()
 # Third party: tensorflow
 #-------------------------------------------------------------------------------
 
-list(APPEND PML_COMMON_INCLUDE_DIRS
-  ${PROJECT_SOURCE_DIR}/third_party/tensorflow
-  ${PROJECT_SOURCE_DIR}/third_party/tensorflow/tensorflow/compiler/mlir/hlo/include/
-  ${PROJECT_BINARY_DIR}/build_tools/third_party/tensorflow
-  ${PROJECT_BINARY_DIR}/build_tools/third_party/tensorflow/tensorflow/compiler/mlir/hlo/include/
-  ${PROJECT_BINARY_DIR}/build_tools/third_party/tensorflow/tensorflow/compiler/mlir/hlo/lib/Dialect/mhlo/IR/
-  ${PROJECT_BINARY_DIR}/build_tools/third_party/tensorflow/tensorflow/compiler/mlir/hlo/lib/Dialect/mhlo/transforms
-)
+# list(APPEND PML_COMMON_INCLUDE_DIRS
+#   ${PROJECT_SOURCE_DIR}/third_party/tensorflow
+#   ${PROJECT_SOURCE_DIR}/third_party/tensorflow/tensorflow/compiler/mlir/hlo/include/
+#   ${PROJECT_BINARY_DIR}/build_tools/third_party/tensorflow
+#   ${PROJECT_BINARY_DIR}/build_tools/third_party/tensorflow/tensorflow/compiler/mlir/hlo/include/
+#   ${PROJECT_BINARY_DIR}/build_tools/third_party/tensorflow/tensorflow/compiler/mlir/hlo/lib/Dialect/mhlo/IR/
+#   ${PROJECT_BINARY_DIR}/build_tools/third_party/tensorflow/tensorflow/compiler/mlir/hlo/lib/Dialect/mhlo/transforms
+# )

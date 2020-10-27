@@ -1,8 +1,7 @@
 add_all_subdirs()
 
 pml_cc_library(
-  NAME
-    all_targets
+  NAME all_targets
   DEPS
     ::intel_gen
 )

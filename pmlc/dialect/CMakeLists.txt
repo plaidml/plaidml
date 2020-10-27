@@ -1,10 +1,11 @@
-add_all_subdirs()
+add_subdirectory(tile)
 
-pml_cc_library(
-  NAME
-    all_dialects
-  DEPS
-    ::comp
-    ::pxa
-    ::stdx
-)
+# add_all_subdirs()
+
+# pml_cc_library(
+#   NAME all_dialects
+#   DEPS
+#     ::comp
+#     ::pxa
+#     ::stdx
+# )

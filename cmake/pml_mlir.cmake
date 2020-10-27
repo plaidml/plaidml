@@ -1,50 +1,6 @@
 include(CMakeParseArguments)
 
 
-# pml_mlir_enums()
-#
-# Creates a <PACKAGE>_mlir_enums target
-#
-# Parameters:
-# DEPS: List of other libraries to be linked in to the binary targets
-function(pml_mlir_enums)
-  cmake_parse_arguments(
-    _RULE
-    ""
-    ""
-    "DEPS"
-    ${ARGN}
-  )
-
-
-  # Replace dependencies passed by ::name with ::pml::package::name
-  # Prefix the library with the package name, so we get: pml_package_name.
-  pml_package_ns(_PACKAGE_NS)
-  list(TRANSFORM _RULE_DEPS REPLACE "^::" "${_PACKAGE_NS}::")
-  pml_package_name(_PACKAGE_NAME)
-  set(_NAME "${_PACKAGE_NAME}_enums")
-
-
-  set(LLVM_TARGET_DEFINITIONS enums.td)
-  mlir_tablegen(enums.h.inc -gen-enum-decls)
-  mlir_tablegen(enums.cc.inc -gen-enum-defs)
-  add_mlir_dialect_library(${_NAME}
-    enums.cc
-    LINK_LIBS 
-            PUBLIC 
-            MLIRIR
-            MLIRSideEffectInterfaces
-  )
-
-  add_public_tablegen_target(${_NAME}_gen)
-  add_dependencies(mlir-headers ${_NAME}_gen)
-  # Barf - enums in util are handled differently than everything else
-  add_library(${_PACKAGE_NS}::enums ALIAS ${_NAME})
-  target_compile_options(${_NAME} PUBLIC ${PMLC_DEFAULT_COPTS})
-  pml_package_dir(_PACKAGE_DIR)
-endfunction()
-
-
 # pml_mlir_ir()
 #
 # Creates a <PACKAGE>_mlir_ir target
@@ -87,15 +43,14 @@ function(pml_mlir_ir)
   endif()
 
   add_mlir_dialect_library(${_NAME}
-    ${_RULE_SRCS}
+      ${_RULE_SRCS}
     DEPENDS
       ${_GEN_DEPS}
       ${_RULE_DEPS}
       MLIROpAsmInterfaceIncGen
-    LINK_LIBS 
+    LINK_LIBS PUBLIC
       MLIRIR
       MLIRSideEffectInterfaces
-    PUBLIC 
   )
 
   add_library(${_PACKAGE_NS} ALIAS ${_NAME})
@@ -133,16 +88,15 @@ function(pml_mlir_transforms)
   add_public_tablegen_target(${_NAME}_gen)
   add_dependencies(mlir-headers ${_NAME}_gen)
   add_mlir_dialect_library(${_NAME}
-        ${_RULE_SRCS}
-        DEPENDS
-          ${_NAME}_gen
-          ${_RULE_DEPS}
-          MLIRLLVMIR
-        LINK_LIBS 
-          PUBLIC 
-          MLIRIR
-          MLIROpenMP
-          MLIRSideEffectInterfaces
+      ${_RULE_SRCS}
+    DEPENDS
+      ${_NAME}_gen
+      ${_RULE_DEPS}
+      MLIRLLVMIR
+    LINK_LIBS PUBLIC
+      MLIRIR
+      MLIROpenMP
+      MLIRSideEffectInterfaces
   )
 
   # Alias the pml_package_name library to pml::package::name.

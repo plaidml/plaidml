@@ -1,4 +1,4 @@
-# Heavily inspired by and with gratitude to the PML project:
+# Heavily inspired by and with gratitude to the IREE project:
 # https://github.com/google/iree/blob/main/build_tools/cmake/iree_cc_library.cmake
 
 include(CMakeParseArguments)

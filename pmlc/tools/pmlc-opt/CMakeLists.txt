@@ -1,21 +1,14 @@
-
 pml_cc_binary(
-  NAME
-    pmlc-opt
-  SRCS
-    "pmlc-opt.cc"
+  NAME pmlc-opt
+  SRCS pmlc-opt.cc
   DEPS
+    LLVMSupport
     MLIRIR
-    MLIRAffine
-    MLIRAffineToStandard
-    MLIRLinalg
+    MLIROptLib
     MLIRParser
     MLIRPass
-    MLIRConversion
-    MLIRStandard
+    MLIRTransformUtils
     MLIRSupport
-    MLIRTransforms
-    
-    pmlc::all_passes_and_dialects
+    pmlc::init_passes_and_dialects
     pmlc::util::util
 )

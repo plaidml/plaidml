@@ -1,7 +1,5 @@
-
 pml_cc_library(
-  NAME
-    bilp
+  NAME bilp
   HDRS
     ilp_solver.h
     tableau.h
