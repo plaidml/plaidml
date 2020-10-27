@@ -1,3 +1,8 @@
+// Copyright 2020 Intel Corporation
+#ifdef _WIN32
+#include <intrin.h>
+#endif // _WIN32
+
 #include <string>
 
 #include "pmlc/target/x86/utils.h"
