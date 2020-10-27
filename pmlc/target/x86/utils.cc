@@ -6,7 +6,7 @@ namespace pmlc::target::x86 {
 
 void cpuId(unsigned i, unsigned regs[4]) {
 #ifdef _WIN32
-  __cpuid(reinterpret_cast<int *>(regs), static_cast<int> i);
+  __cpuid(reinterpret_cast<int *>(regs), static_cast<int>(i));
 #else
   asm volatile("cpuid"
                : "=a"(regs[0]), "=b"(regs[1]), "=c"(regs[2]), "=d"(regs[3])
