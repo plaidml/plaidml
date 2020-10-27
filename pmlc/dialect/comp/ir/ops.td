@@ -63,7 +63,8 @@ class COMP_ExecEnvSupportsMemTrait<string execEnv, string memRef> :
 class COMP_Op<string mnemonic, list<OpTrait> traits = []> :
     Op<COMP_Dialect, mnemonic, traits>;
 
-def COMP_CreateExecEnv : COMP_Op<"create_execenv", [NoSideEffect]>
+def COMP_CreateExecEnv : COMP_Op<"create_execenv",
+                                 [MemoryEffects<[MemAlloc]>]>
                        , Arguments<(ins COMP_AnyDevice:$device)>
                        , Results<(outs COMP_AnyExecEnv:$execEnv)> {
   let summary = "Creates execution environment.";
@@ -78,7 +79,8 @@ def COMP_CreateExecEnv : COMP_Op<"create_execenv", [NoSideEffect]>
   }];
 }
 
-def COMP_DestroyExecEnv : COMP_Op<"destroy_execenv", [NoSideEffect]> {
+def COMP_DestroyExecEnv : COMP_Op<"destroy_execenv",
+                                  [MemoryEffects<[MemFree]>]> {
   let summary = "Destroys execution environment.";
 
   let description = [{
@@ -101,14 +103,16 @@ def COMP_ScheduleEnd : COMP_Op<"schedule_end", [Terminator]> {
 def COMP_ScheduleSingleBlock : SingleBlockImplicitTerminator<"ScheduleEnd">;
 
 // def COMP_CreateKernel : COMP_Op<"create_kernel",
-//                                 [DeclareOpInterfaceMethods<COMP_ExecEnvOpInterface>]>,
+//                                 [MemoryEffects<MemAlloc>,
+//                                  DeclareOpInterfaceMethods<COMP_ExecEnvOpInterface>]>,
 //                   , Arguments<(ins COMP_AnyExecEnv:$execEnv)>
 //                   , Results<(outs COMP_Kernel:$kernel)> {
 //   let summary = "Creates an executable kernel.";
 // }
 // 
 // def COMP_DestroyKernel : COMP_Op<"destroy_kernel",
-//                                  [DeclareOpInterfaceMethods<COMP_ExecEnvOpInterface>]>,
+//                                  [MemoryEffects<MemFree>,
+//                                   DeclareOpInterfaceMethods<COMP_ExecEnvOpInterface>]>,
 //                   , Arguments<(ins COMP_AnyExecEnv:$execEnv,
 //                                    COMP_Kernel:$kernel)> {
 //   let summary = "Destroys an executable kernel.";
@@ -164,7 +168,7 @@ def COMP_Submit : COMP_Op<"submit",
   }];
 }
 
-def COMP_Alloc : COMP_Op<"alloc", [NoSideEffect,
+def COMP_Alloc : COMP_Op<"alloc", [MemoryEffects<[MemAlloc]>,
                                    COMP_ExecEnvSupportsMemTrait<"execEnv", "deviceMem">,
                                    DeclareOpInterfaceMethods<COMP_ExecEnvOpInterface>]>
                , Arguments<(ins COMP_AnyExecEnv:$execEnv)>
@@ -176,7 +180,7 @@ def COMP_Alloc : COMP_Op<"alloc", [NoSideEffect,
   }];
 }
 
-def COMP_Dealloc : COMP_Op<"dealloc", [NoSideEffect,
+def COMP_Dealloc : COMP_Op<"dealloc", [MemoryEffects<[MemFree]>,
                                        COMP_ExecEnvSupportsMemTrait<"execEnv", "deviceMem">,
                                        DeclareOpInterfaceMethods<COMP_ExecEnvOpInterface>]>
                   , Arguments<(ins COMP_AnyExecEnv:$execEnv,
