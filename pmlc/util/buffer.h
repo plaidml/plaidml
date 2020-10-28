@@ -69,4 +69,24 @@ private:
   char *data_;
 };
 
+class RawBuffer : public Buffer,
+                  public std::enable_shared_from_this<RawBuffer> {
+public:
+  size_t size() const final { return vec.size(); }
+
+  char *data() final { return vec.data(); }
+
+  BufferPtr clone() final {
+    auto ret = std::make_shared<RawBuffer>();
+    ret->vec = vec;
+    return ret;
+  }
+
+  TensorShape shape() final {
+    return TensorShape(DataType::ui8, {static_cast<int64_t>(size())});
+  }
+
+  std::vector<char> vec;
+};
+
 } // namespace pmlc::util

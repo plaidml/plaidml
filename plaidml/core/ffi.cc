@@ -384,4 +384,12 @@ void plaidml_program_compile(  //
   });
 }
 
+plaidml_buffer* plaidml_program_save(  //
+    plaidml_error* err,                //
+    plaidml_program* program) {
+  return ffi_wrap<plaidml_buffer*>(err, nullptr, [&] {  //
+    return new plaidml_buffer{program->program->save()};
+  });
+}
+
 }  // extern "C"

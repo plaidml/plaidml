@@ -316,6 +316,9 @@ class Program(ForeignObject):
     def compile(self, target='', debug=False):
         self._methodcall(lib.plaidml_program_compile, debug, target.encode())
 
+    def save(self):
+        return Buffer(ptr=self._methodcall(lib.plaidml_program_save))
+
     @property
     def inputs(self):
         return get_shapes(lib.plaidml_program_get_inputs, self.as_ptr())
