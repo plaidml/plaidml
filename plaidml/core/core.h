@@ -232,6 +232,71 @@ class TensorShape {
 
 ///
 /// \ingroup core_objects
+/// \class Buffer
+///
+class Buffer {
+ public:
+  ///
+  /// Buffer constructor
+  ///
+  Buffer() = default;
+
+  ///
+  /// Buffer constructor
+  /// \param shape TensorShape
+  ///
+  Buffer(char* data, size_t size, const TensorShape& shape)
+      : ptr_(details::make_ptr(ffi::call<plaidml_buffer*>(plaidml_buffer_adopt, shape.as_ptr(), data, size))) {}
+
+  template <typename T>
+  Buffer(const std::vector<T>& vec, const TensorShape& shape)
+      : ptr_(details::make_ptr(ffi::call<plaidml_buffer*>(        //
+            plaidml_buffer_adopt,                                 //
+            shape.as_ptr(),                                       //
+            reinterpret_cast<char*>(const_cast<T*>(vec.data())),  //
+            vec.size() * sizeof(T)))) {}
+
+  ///
+  /// Buffer constructor
+  /// \param shape TensorShape
+  ///
+  explicit Buffer(const TensorShape& shape)
+      : ptr_(details::make_ptr(ffi::call<plaidml_buffer*>(plaidml_buffer_alloc, shape.as_ptr()))) {}
+
+  ///
+  /// Buffer constructor
+  /// \param ptr plaidml_buffer*
+  /// \param shape TensorShape
+  explicit Buffer(plaidml_buffer* ptr) : ptr_(details::make_ptr(ptr)) {}
+
+  ///
+  /// data
+  ///
+  char* data() { return ffi::call<char*>(plaidml_buffer_data, as_ptr()); }
+
+  ///
+  /// size
+  ///
+  size_t size() { return ffi::call<size_t>(plaidml_buffer_size, as_ptr()); }
+
+  ///
+  /// shape
+  ///
+
+  TensorShape shape() { return TensorShape{ffi::call<plaidml_shape*>(plaidml_buffer_shape, as_ptr())}; }
+
+  plaidml_buffer* as_ptr() const { return ptr_.get(); }
+
+  void copy_into(void* dst) { memcpy(dst, data(), size()); }
+
+  void copy_from(const void* src) { memcpy(data(), src, size()); }
+
+ private:
+  std::shared_ptr<plaidml_buffer> ptr_;
+};
+
+///
+/// \ingroup core_objects
 /// \class Program
 ///
 class Program {
@@ -268,75 +333,12 @@ class Program {
     return ret;
   }
 
+  Buffer save() const { return Buffer(ffi::call<plaidml_buffer*>(plaidml_program_save, as_ptr())); }
+
   plaidml_program* as_ptr() const { return ptr_.get(); }
 
  private:
   std::shared_ptr<plaidml_program> ptr_;
-};
-
-///
-/// \ingroup core_objects
-/// \class Buffer
-///
-class Buffer {
- public:
-  ///
-  /// Buffer constructor
-  ///
-  Buffer() = default;
-
-  ///
-  /// Buffer constructor
-  /// \param shape TensorShape
-  ///
-  Buffer(char* data, size_t size, const TensorShape& shape)
-      : ptr_(details::make_ptr(ffi::call<plaidml_buffer*>(plaidml_buffer_adopt, shape.as_ptr(), data, size))) {}
-
-  template <typename T>
-  Buffer(const std::vector<T>& vec, const TensorShape& shape)
-      : ptr_(details::make_ptr(ffi::call<plaidml_buffer*>(        //
-            plaidml_buffer_adopt,                                 //
-            shape.as_ptr(),                                       //
-            reinterpret_cast<char*>(const_cast<T*>(vec.data())),  //
-            vec.size() * sizeof(T)))) {}
-
-  ///
-  /// Buffer constructor
-  /// \param shape TensorShape
-  ///
-  explicit Buffer(const TensorShape& shape)
-      : ptr_(details::make_ptr(ffi::call<plaidml_buffer*>(plaidml_buffer_alloc, shape.as_ptr()))) {}
-
-  ///
-  /// Buffer constructor
-  /// \param ptr plaidml_buffer*
-  /// \param shape TensorShape
-  explicit Buffer(plaidml_buffer* ptr, const TensorShape& shape) : ptr_(details::make_ptr(ptr)) {}
-
-  ///
-  /// data
-  ///
-  char* data() { return ffi::call<char*>(plaidml_buffer_data, as_ptr()); }
-
-  ///
-  /// size
-  ///
-  size_t size() { return ffi::call<size_t>(plaidml_buffer_size, as_ptr()); }
-
-  ///
-  /// shape
-  ///
-
-  TensorShape shape() { return TensorShape{ffi::call<plaidml_shape*>(plaidml_buffer_shape, as_ptr())}; }
-
-  plaidml_buffer* as_ptr() const { return ptr_.get(); }
-
-  void copy_into(void* dst) { memcpy(dst, data(), size()); }
-
-  void copy_from(const void* src) { memcpy(data(), src, size()); }
-
- private:
-  std::shared_ptr<plaidml_buffer> ptr_;
 };
 
 ///
