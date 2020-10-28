@@ -177,7 +177,10 @@ void pipelineBuilder(OpPassManager &pm) {
   // Use OMP thread count
   unsigned maxThreads = omp_get_max_threads();
   unsigned physCores = getPhysicalCoreNumber();
-  maxThreads = std::min(physCores, maxThreads);
+  if (0 != physCores) {
+    maxThreads = std::min(physCores, maxThreads);
+  }
+
   pm.addPass(pxa::createCPUThreadPass(maxThreads));
 
   pm.addPass(pxa::createAffineNormalizePass());
