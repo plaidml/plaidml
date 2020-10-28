@@ -4,6 +4,7 @@
 #include <utility>
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/Pass/Pass.h"
@@ -862,12 +863,14 @@ struct ArgSortOpConversion : public OpConversionPattern<tile::ArgSortOp> {
   LogicalResult
   matchAndRewrite(tile::ArgSortOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
+    IVLOG(3, "ArgSortOpConversion::matchAndRewrite");
     tile::ArgSortOpAdaptor adaptor(operands);
     auto loc = op.getLoc();
+    auto i32Type = rewriter.getI32Type();
     // auto ctx = rewriter.getContext();
 
     // Axis represents one of the tensor dimensions.
-    int64_t axis = adaptor.axis().getInt();
+    int64_t axis = op.axis().getSExtValue();
 
     // Special case value -1 indicates the last axis.
     Value tensor = adaptor.tensor();
@@ -880,23 +883,45 @@ struct ArgSortOpConversion : public OpConversionPattern<tile::ArgSortOp> {
     }
 
     // Allocate an output tensor to contain the sorted argument indices.
-    auto resultType = op.result().getType();
-    auto resultMemRefType = resultType.cast<MemRefType>();
-    auto result = rewriter.create<AllocOp>(loc, resultMemRefType).getResult();
+    auto resultType = MemRefType::get(shape, i32Type);
+    auto result = rewriter.create<AllocOp>(loc, resultType).getResult();
 
-    // Create an affine loop nest over all the dimensions but the one we are
-    // sorting on.
+    // Create an affine loop nest over all the dimensions, including the one
+    // we are sorting on. We will use a single iteration for the sort axis,
+    // since the body of the loop will contain the sorting loop, but we will
+    // keep the number of IVs equal to the tensor rank to simplify accounting.
     SmallVector<int64_t, 4> outerLoopShape;
-    for (auto i : resultMemRefType.getShape()) {
-      outerLoopShape.push_back(i);
+    for (size_t i = 0; i < tensorDims; ++i) {
+      outerLoopShape.push_back((i == axis) ? 1 : shape[i]);
     }
-    outerLoopShape[axis] = 0;
     auto outerLoop = rewriter.create<AffineParallelOp>(
-        loc, ArrayRef<Type>{resultMemRefType},
+        loc, ArrayRef<Type>{resultType},
         ArrayRef<AtomicRMWKind>{AtomicRMWKind::assign}, outerLoopShape);
     rewriter.setInsertionPointToStart(outerLoop.getBody());
 
     // Initialize result tensor using index values in ascending order
+    IVLOG(4, "Generating init loop");
+    auto initLB = rewriter.create<ConstantOp>(loc, rewriter.getIndexAttr(0));
+    auto initUB =
+        rewriter.create<ConstantOp>(loc, rewriter.getIndexAttr(shape[axis]));
+    auto initStep = rewriter.create<ConstantOp>(loc, rewriter.getIndexAttr(1));
+    auto initLoop = rewriter.create<scf::ForOp>(loc, initLB, initUB, initStep);
+    auto initIV = initLoop.getInductionVar();
+    rewriter.setInsertionPointToStart(initLoop.getBody());
+    // The induction var is the index value across the sort axis.
+    // Write the value of the index to its position in the sorted output.
+    // This will be our initial argument index into the source tensor.
+    // Combine the index value with the loop dimension indexes to create the
+    // destination affine map.
+    SmallVector<Value, 4> initOps;
+    for (size_t i = 0; i < tensorDims; ++i) {
+      initOps.push_back((i == axis) ? initIV : outerLoop.getIVs()[i]);
+    }
+    auto indexVal =
+        rewriter.create<IndexCastOp>(loc, initIV, i32Type).getResult();
+    rewriter.create<StoreOp>(loc, indexVal, result, initOps);
+    IVLOG(4, "Done generating init loop");
+    rewriter.setInsertionPointAfter(initLoop);
 
     // Build inner sorting loop
 
@@ -1785,6 +1810,7 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
     target.addLegalDialect<mlir::StandardOpsDialect>();
     target.addLegalDialect<dialect::pxa::PXADialect>();
     target.addLegalDialect<dialect::stdx::StdXDialect>();
+    target.addLegalOp<scf::ForOp, scf::YieldOp>();
     target.addLegalOp<mlir::ModuleOp, mlir::ModuleTerminatorOp, ReturnOp>();
     target.addDynamicallyLegalOp<FuncOp>(
         [&](FuncOp op) { return converter.isSignatureLegal(op.getType()); });
