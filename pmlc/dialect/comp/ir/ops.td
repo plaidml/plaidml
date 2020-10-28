@@ -135,10 +135,11 @@ def COMP_ScheduleSingleBlock : SingleBlockImplicitTerminator<"ScheduleEnd">;
 // }
 
 def COMP_ScheduleFunc : COMP_Op<"schedule_func",
-                                [COMP_ScheduleSingleBlock,
+                                [RecursiveSideEffects,
+                                 COMP_ScheduleSingleBlock,
                                  DeclareOpInterfaceMethods<COMP_ExecEnvOpInterface>,
                                  DeclareOpInterfaceMethods<COMP_ScheduleOpInterface>]>
-                  , Arguments<(ins Arg<COMP_AnyExecEnv, "", [MemWrite<COMP_ExecEnvResource>]>:$execEnv,
+                  , Arguments<(ins Arg<COMP_AnyExecEnv, "", [MemRead<COMP_ExecEnvResource>]>:$execEnv,
                                    Variadic<COMP_AnyEvent>:$depEvents)>
                   , Results<(outs COMP_AnyEvent:$outEvent)> {
   let summary = "Schedules function in region for execution on device.";
@@ -164,7 +165,7 @@ def COMP_ScheduleFunc : COMP_Op<"schedule_func",
 
 def COMP_Submit : COMP_Op<"submit",
                           [DeclareOpInterfaceMethods<COMP_ExecEnvOpInterface>]>
-                , Arguments<(ins Arg<COMP_AnyExecEnv, "", [MemWrite<COMP_ExecEnvResource>]>:$execEnv)> {
+                , Arguments<(ins Arg<COMP_AnyExecEnv, "", [MemRead<COMP_ExecEnvResource>]>:$execEnv)> {
   let summary = "Submits all scheduled tasks.";
 
   let description = [{
@@ -209,7 +210,7 @@ def COMP_ScheduleWrite : COMP_Op<"schedule_write",
                                      "getSourceExecEnv", "getDestinationExecEnv"]>]>
                        , Arguments<(ins Arg<AnyMemRef, "", [MemRead<COMP_DeviceMemoryResource>]>:$hostMem,
                                         Arg<AnyMemRef, "", [MemWrite<COMP_DeviceMemoryResource>]>:$deviceMem,
-                                        Arg<COMP_AnyExecEnv, "", [MemWrite<COMP_ExecEnvResource>]>:$execEnv,
+                                        Arg<COMP_AnyExecEnv, "", [MemRead<COMP_ExecEnvResource>]>:$execEnv,
                                         Variadic<COMP_AnyEvent>:$depEvents)>
                        , Results<(outs COMP_AnyEvent:$outEvent)> {
   let summary = "Schedules data copy from host for use in execution environment.";
@@ -230,7 +231,7 @@ def COMP_ScheduleRead : COMP_Op<"schedule_read",
                                    "getSourceExecEnv", "getDestinationExecEnv"]>]>
                       , Arguments<(ins Arg<AnyMemRef, "", [MemWrite<COMP_DeviceMemoryResource>]>:$hostMem,
                                        Arg<AnyMemRef, "", [MemRead<COMP_DeviceMemoryResource>]>:$deviceMem,
-                                       Arg<COMP_AnyExecEnv, "", [MemWrite<COMP_ExecEnvResource>]>:$execEnv,
+                                       Arg<COMP_AnyExecEnv, "", [MemRead<COMP_ExecEnvResource>]>:$execEnv,
                                        Variadic<COMP_AnyEvent>:$depEvents)>
                       , Results<(outs COMP_AnyEvent:$outEvent)> {
   let summary = "Schedules data copy from execution environment for use on host.";
@@ -257,7 +258,7 @@ def COMP_Wait : COMP_Op<"wait">
 def COMP_ScheduleBarrier : COMP_Op<"schedule_barrier",
                                    [DeclareOpInterfaceMethods<COMP_ExecEnvOpInterface>,
                                     DeclareOpInterfaceMethods<COMP_ScheduleOpInterface>]>
-                          , Arguments<(ins Arg<COMP_AnyExecEnv, "", [MemWrite<COMP_ExecEnvResource>]>:$execEnv,
+                          , Arguments<(ins Arg<COMP_AnyExecEnv, "", [MemRead<COMP_ExecEnvResource>]>:$execEnv,
                                            Variadic<COMP_AnyEvent>:$depEvents)>
                           , Results<(outs COMP_AnyEvent:$outEvent)> {
   let summary = "Schedules barrier between previous and next scheduling operations.";
