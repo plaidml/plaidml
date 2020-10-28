@@ -18,7 +18,7 @@ include(FetchContent)
 # set the project name
 project(PlaidML LANGUAGES CXX C)
 set(CMAKE_C_STANDARD 11)
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 set(PML_IDE_FOLDER PML)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 

@@ -15,8 +15,6 @@ pml_cc_library(
     ops.cc
     util.cc
   DEPS
-    LLVMSupport
-    MLIRIR
     pmlc::util
     ::interfaces-gen
     ::ops-gen
