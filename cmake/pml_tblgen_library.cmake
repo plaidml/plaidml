@@ -5,6 +5,8 @@
 
 include(CMakeParseArguments)
 
+set(MLIR_TABLEGEN_EXE mlir-tblgen)
+
 # pml_tblgen_library()
 #
 # Runs tblgen to produce some artifacts.
@@ -28,7 +30,7 @@ function(pml_tblgen_library)
   # if(${_RULE_TBLGEN} MATCHES "IREE")
   #   set(_TBLGEN "IREE")
   # else()
-    set(_TBLGEN "MLIR")
+  set(_TBLGEN "MLIR")
   # endif()
 
   set(LLVM_TARGET_DEFINITIONS ${_RULE_TD_FILE})

@@ -118,4 +118,4 @@ ENV/
 tags
 
 # CMake stuff
-build/
+build*/

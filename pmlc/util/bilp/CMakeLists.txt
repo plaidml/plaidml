@@ -9,5 +9,5 @@ pml_cc_library(
   DEPS
     pmlc::util
     pmlc::util::math
-    # googletest
+    gtest
 )
