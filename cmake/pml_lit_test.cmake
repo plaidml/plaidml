@@ -7,6 +7,7 @@ configure_lit_site_cfg(
 
 set(PML_TEST_DEPENDS
   FileCheck count not
+  pmlc-jit
   pmlc-opt
 )
 

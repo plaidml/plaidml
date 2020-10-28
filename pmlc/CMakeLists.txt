@@ -22,6 +22,8 @@ pml_cc_library(
     ${dialect_libs}
     ${conversion_libs}
     MLIRTransforms
+    pmlc::conversion::comp_to_llvm
+    pmlc::conversion::gpu
     pmlc::conversion::gpu_to_comp
     pmlc::conversion::gpu_to_spirv
     pmlc::conversion::pxa_to_affine
@@ -37,5 +39,7 @@ pml_cc_library(
     pmlc::dialect::tile::ir
     pmlc::dialect::tile::transforms
     pmlc::dialect::xsmm::ir
+    pmlc::target::intel_gen
+    pmlc::target::intel_gen_ocl_spirv
     pmlc::target::x86
 )

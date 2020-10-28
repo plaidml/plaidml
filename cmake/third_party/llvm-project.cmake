@@ -11,8 +11,11 @@ set(LLVM_APPEND_VC_REV OFF CACHE BOOL "" FORCE)
 set(LLVM_ENABLE_IDE OFF CACHE BOOL "" FORCE)
 set(LLVM_ENABLE_RTTI ON CACHE BOOL "" FORCE)
 set(LLVM_TARGETS_TO_BUILD "X86" CACHE STRING "" FORCE)
-set(LLVM_ENABLE_PROJECTS "mlir;" CACHE STRING "" FORCE)
+set(LLVM_ENABLE_PROJECTS "mlir;openmp" CACHE STRING "" FORCE)
 set(LLVM_ENABLE_BINDINGS OFF CACHE BOOL "" FORCE)
+set(OPENMP_ENABLE_LIBOMPTARGET OFF CACHE BOOL "" FORCE)
+set(OPENMP_ENABLE_OMPT_TOOLS OFF CACHE BOOL "" FORCE)
+set(OPENMP_STANDALONE_BUILD ON CACHE BOOL "" FORCE)
 
 FetchContent_GetProperties(llvm-project)
 if(NOT llvm-project_POPULATED)
@@ -30,7 +33,13 @@ list(APPEND MLIR_INCLUDE_DIRS
   ${llvm-project_BINARY_DIR}/tools/mlir/include
 )
 
-add_library(LLVM INTERFACE)
+# add_library(LLVM INTERFACE)
 
 include_directories(${LLVM_INCLUDE_DIRS})
 include_directories(${MLIR_INCLUDE_DIRS})
+include_directories(${LIBOMP_INCLUDE_DIR})
+
+target_include_directories(omp PUBLIC
+  ${llvm-project_SOURCE_DIR}/openmp/runtime/src
+  ${llvm-project_BINARY_DIR}/projects/openmp/runtime/src
+)

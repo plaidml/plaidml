@@ -3,11 +3,13 @@ pml_cc_library(
   SRCS
     builtin.cc
     device.cc
+    openmp.cc
     runtime.cc
   DEPS
     pmlc::compiler
     pmlc::rt
     # ::openmp
+    omp
 )
 
 # pml_cc_library(
@@ -16,5 +18,5 @@ pml_cc_library(
 #     openmp.cc
 #   DEPS
 #     pmlc::rt
-#     # LLVMOpenMP
+#     omp
 # )
