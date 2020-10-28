@@ -1,7 +1,21 @@
-file(GLOB GLOB_SRCS ${CMAKE_CURRENT_SOURCE_DIR} *.cc)
-pml_mlir_transforms(
+pml_cc_library(
+  NAME transforms
+  HRDS
+    pass_detail.h
+    passes.h
   SRCS
-    ${GLOB_SRCS}
+    execenv_coalescing.cc
+    minimize_allocations.cc
   DEPS
+    LLVMSupport
+    MLIRIR
     pmlc::dialect::comp::ir
+    ::passes-gen
+)
+
+pml_tblgen_library(
+  NAME passes-gen
+  TD_FILE passes.td
+  OUTS
+    -gen-pass-decls passes.h.inc
 )

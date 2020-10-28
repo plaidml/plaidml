@@ -29,10 +29,12 @@ pml_cc_library(
     MLIRStandardToSPIRVTransforms
     MLIRTransforms
     MLIRVector
-    pmlc::dialect::tile::transforms
-    pmlc::dialect::tile::ir
-    pmlc::dialect::stdx::transforms
-    pmlc::dialect::stdx::ir
+    pmlc::dialect::comp::transforms
+    pmlc::dialect::comp::ir
     pmlc::dialect::pxa::transforms
     pmlc::dialect::pxa::ir
+    pmlc::dialect::stdx::transforms
+    pmlc::dialect::stdx::ir
+    pmlc::dialect::tile::transforms
+    pmlc::dialect::tile::ir
 )
