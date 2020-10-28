@@ -67,9 +67,9 @@ FetchContent_Declare(
 FetchContent_GetProperties(easyloggingpp)
 if(NOT easyloggingpp_POPULATED)
   FetchContent_Populate(easyloggingpp)
-  add_subdirectory(${easyloggingpp_SOURCE_DIR} ${easyloggingpp_BINARY_DIR}EXCLUDE_FROM_ALL)
+  add_subdirectory(${easyloggingpp_SOURCE_DIR} ${easyloggingpp_BINARY_DIR} EXCLUDE_FROM_ALL)
 endif()
-include_directories(${easyloggingpp_SOURCE_DIR}/src)
+# include_directories(${easyloggingpp_SOURCE_DIR}/src)
 
 #######
 # gtest
@@ -103,6 +103,7 @@ include(pml_macros)
 include(pml_cc_binary)
 include(pml_cc_library)
 include(pml_tblgen_library)
+include(pml_whole_archive_link)
 
 # C++
 list(APPEND PMLC_DEFAULT_COPTS -Wno-c++17-extensions)
@@ -112,3 +113,6 @@ list(APPEND PMLC_DEFAULT_COPTS -Wno-c++17-extensions)
 # include_directories(${CMAKE_BINARY_DIR})
 
 add_subdirectory(pmlc)
+
+# Note: this must be called after all libraries have been declared.
+pml_complete_binary_link_options()

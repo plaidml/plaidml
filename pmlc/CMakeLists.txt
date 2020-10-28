@@ -10,16 +10,15 @@ pml_cc_library(
   SRCS
     all_dialects.cc
   DEPS
-    # pmlc::conversion::all_conversions
-    # pmlc::dialect::all_dialects
     MLIRAffine
     MLIRAffineTransforms
     MLIRGPU
     MLIRGPUToSPIRVTransforms
     MLIRLinalg
     MLIRLinalgTransforms
-    MLIRStandardOps
+    MLIRStandard
     MLIRStandardOpsTransforms
     MLIRTransforms
     MLIRVector
+    pmlc::dialect::tile::transforms
 )
